@@ -62,7 +62,7 @@
     "verify:modes": "node scripts/verify-modes.mjs",
     "verify:qq": "node scripts/verify-qq-entry.mjs",
     "verify:hud": "node scripts/verify-hud-extras.mjs",
-    "verify:camera": "node scripts/verify-camera.mjs",
+    "verify:camera": "node --experimental-strip-types --test scripts/camera-hold-test.mjs && node scripts/verify-camera.mjs",
     "verify:creator": "tsx scripts/verify-creator.mjs",
     "test:emote": "node --experimental-strip-types --test scripts/emote-test.mjs"
   },

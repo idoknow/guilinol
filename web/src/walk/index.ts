@@ -1,3 +1,4 @@
+import {cameraHoldLayer} from './camera-hold'
 import {emoteWheel} from '../emote/wheel'
 import {emotePlayback} from '../emote/playback'
 import {interrupted,emotesEnabled} from '../emote/emotes'
@@ -1338,7 +1339,7 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
   addEventListener('glol:mp-pref',()=>{if(mpEnabled())attachMp();else disconnect()})
   function disconnect(){net?.dispose();net=undefined}
   function leave(){disconnect();resetWalk()}
-  function resetWalk(){emote.stop();emote.reset();wheel.close();smoking?.dispose();smoking=undefined;cigarette.stop();if(shopOverlay?.isOpen())shopOverlay?.close('fly');outfitController.setRidingEbike(false);finishActiveTestRide('mode_switch');shopHintGroup.visible=false;ebikeShowroomGroup.visible=false;shopEbikeShowcaseRig.root.visible=false;for(const item of showroomBikes)item.snapped=false;destination=null;active=false;crashSession=null;standUpSession=null;pickupSession=null;crashRecoverQueued=false;twoWheelOp=createInitialTwoWheelOpState();carHeadlight='off';carHeadlightManual=false;clearAllDowned();releaseDynamicCar();releaseDynamicBike();input.syncRideHud(null,null);rides?.clearBoatPose(figure);rides?.show(false);actionButton.hidden=true;setPrompt(null);updateTravel('fly',null);if(wasCar||wasBike)applyFootController();wasBoat=wasBike=wasCar=false;bikeObstacle='';boatBoardElapsed=BOAT_BOARD_DUR;boatLandElapsed=BOAT_LAND_DUR;ridePose.reset();driverPose.reset(false);clearAvatarPose(figure);mixer.stopAllAction();action=undefined;resetMotion();figure.visible=false;input.show(false);external=null;sim.clear();camera.near=1;camera.updateProjectionMatrix()}
+  function resetWalk(){emote.stop();emote.reset();holdLayer.reset();camHoldBlend=0;wheel.close();smoking?.dispose();smoking=undefined;cigarette.stop();if(shopOverlay?.isOpen())shopOverlay?.close('fly');outfitController.setRidingEbike(false);finishActiveTestRide('mode_switch');shopHintGroup.visible=false;ebikeShowroomGroup.visible=false;shopEbikeShowcaseRig.root.visible=false;for(const item of showroomBikes)item.snapped=false;destination=null;active=false;crashSession=null;standUpSession=null;pickupSession=null;crashRecoverQueued=false;twoWheelOp=createInitialTwoWheelOpState();carHeadlight='off';carHeadlightManual=false;clearAllDowned();releaseDynamicCar();releaseDynamicBike();input.syncRideHud(null,null);rides?.clearBoatPose(figure);rides?.show(false);actionButton.hidden=true;setPrompt(null);updateTravel('fly',null);if(wasCar||wasBike)applyFootController();wasBoat=wasBike=wasCar=false;bikeObstacle='';boatBoardElapsed=BOAT_BOARD_DUR;boatLandElapsed=BOAT_LAND_DUR;ridePose.reset();driverPose.reset(false);clearAvatarPose(figure);mixer.stopAllAction();action=undefined;resetMotion();figure.visible=false;input.show(false);external=null;sim.clear();camera.near=1;camera.updateProjectionMatrix()}
   function canPlaceCrashOffset(x:number,z:number,refY:number,fromX?:number,fromZ?:number){
     if(!sim.withinBounds(x,z))return false
     if(sim.insideHouse(x,z,refY+.4))return false
@@ -1853,7 +1854,7 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
       camDist:rig.distance,camClipped:rig.clipped,camBlocked:rig.blocked,camCeiling:rig.ceilingClearance,camInHouse:sim.insideHouse(camera.position.x,camera.position.z,camera.position.y),
       outfit:outfitController.getSnapshot(),
       boat:rides?.boatProbe()??null}}
-  function tick(dt:number){wheel.sync();if(!active)return;emote.reset();
+  function tick(dt:number){wheel.sync();if(!active)return;emote.reset();holdLayer.reset();
     if(emote.id&&(rides?.boat||rides?.car||rides?.bike)){emote.stop();emote.tick(.24,false)}
     smoking?.resetPose();const before=performance.now(),start=rides?.boat?.position??sim.body.translation();sim.sync(start.x,start.z);const footYNow=rides?.boat?start.y:start.y-cfg.height/2;rides?.nearby(start.x,start.z,footYNow);interactArbiter.sync(actionButton);syncGameTravelState();updateShopHintRings(start.x,start.z,footYNow)
     if(shopOverlay?.isOpen()){updateShopShowcaseCamera();return}
@@ -2614,70 +2615,13 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
     emote.tick(dt,emoteMoving)
     net?.tick(dt)
   }
-  // ---- 持机姿势（IDOK-188）----
-  // 装备了相机时把右手抬到胸前：走路动画每帧都会把骨骼写回原位，所以在 mixer.update 之后用一段
-  // 两骨 IK（肩 + 肘）把右手拉到「胸口前方」的目标点。目标点用肩宽推出来，和骨骼自身轴向无关，
-  // 换角色/换动画都不会飘。可用 setCameraHold(on, {aim:{forward,up,side}}) 现场微调。
-  let cameraHold=false
-  let camHoldBlend=0
+  let cameraHold=false,camHoldBlend=0
   let holdAim={forward:.32,up:.13,side:-.04}
-  const holdTarget=new THREE.Vector3(), holdWorldUp=new THREE.Vector3(0,1,0)
-  const holdRight=new THREE.Vector3(), holdFwd=new THREE.Vector3()
-  const holdPivot=new THREE.Vector3(), holdEffector=new THREE.Vector3(), holdV1=new THREE.Vector3(), holdV2=new THREE.Vector3()
-  const holdDelta=new THREE.Quaternion(), holdWorldQuat=new THREE.Quaternion(), holdParentQuat=new THREE.Quaternion()
-  const holdSnapshot=new Map<THREE.Object3D,THREE.Quaternion>()
-  function holdJointTowards(joint:THREE.Object3D,effector:THREE.Vector3){
-    if(!joint.parent)return
-    holdV1.subVectors(effector,holdPivot).normalize()
-    holdV2.subVectors(holdTarget,holdPivot).normalize()
-    if(holdV1.dot(holdV2)>.9999)return
-    holdDelta.setFromUnitVectors(holdV1,holdV2)
-    joint.getWorldQuaternion(holdWorldQuat).premultiply(holdDelta)
-    joint.parent.getWorldQuaternion(holdParentQuat).invert()
-    joint.quaternion.copy(holdParentQuat.multiply(holdWorldQuat))
-    figure.updateMatrixWorld(true)
-  }
+  const holdLayer=cameraHoldLayer(figure),holdTarget=holdLayer.target,holdEffector=new THREE.Vector3()
   function applyCameraHold(dt:number){
     const target=cameraHold?1:0
-    // 稳定态也每帧重算 —— 走路动画每帧都会把骨骼写回原姿势。
-    if(camHoldBlend!==target)camHoldBlend+=Math.sign(target-camHoldBlend)*Math.min(Math.abs(target-camHoldBlend),Math.max(dt,.001)*5)
-    if(camHoldBlend<=.002)return
-    const upper=figure.getObjectByName('upperarm_r'),lower=figure.getObjectByName('lowerarm_r'),hand=figure.getObjectByName('hand_r')
-    const leftArm=figure.getObjectByName('upperarm_l'),spine=figure.getObjectByName('spine_02')
-    if(!upper||!lower||!hand||!spine)return
-    figure.updateMatrixWorld(true)
-    // 身体坐标系：右 = 双肩连线，前 = 右 × 上，上 = 前 × 右。
-    holdRight.set(0,0,0)
-    if(leftArm){
-      leftArm.getWorldPosition(holdV1);upper.getWorldPosition(holdV2)
-      holdRight.subVectors(holdV2,holdV1)
-    }
-    if(holdRight.lengthSq()<1e-8)holdRight.set(1,0,0)
-    holdRight.normalize()
-    holdFwd.crossVectors(holdRight,holdWorldUp).normalize()
-    if(holdFwd.lengthSq()<1e-8)holdFwd.set(0,0,-1)
-    spine.getWorldPosition(holdTarget)
-    holdTarget.addScaledVector(holdFwd,holdAim.forward)
-    holdTarget.addScaledVector(holdWorldUp,holdAim.up)
-    holdTarget.addScaledVector(holdRight,holdAim.side)
-    // 记录 IK 前的姿势，算完再按 blend 混入，避免「装上就硬跳」。
-    holdSnapshot.clear()
-    holdSnapshot.set(upper,upper.quaternion.clone())
-    holdSnapshot.set(lower,lower.quaternion.clone())
-    for(let iteration=0;iteration<3;iteration++){
-      for(const joint of [lower,upper]){
-        hand.getWorldPosition(holdEffector)
-        joint.getWorldPosition(holdPivot)
-        holdJointTowards(joint,holdEffector)
-      }
-    }
-    if(camHoldBlend<.999){
-      for(const [joint,rest] of holdSnapshot){
-        const posed=joint.quaternion.clone()
-        joint.quaternion.copy(rest).slerp(posed,camHoldBlend)
-      }
-      figure.updateMatrixWorld(true)
-    }
+    camHoldBlend+=Math.sign(target-camHoldBlend)*Math.min(Math.abs(target-camHoldBlend),Math.max(dt,.001)*5)
+    holdLayer.apply(camHoldBlend,holdAim)
   }
   function photoSupport(x:number,z:number,bridgeRadius?:number){
     const tile=sim.tileAt(x,z), data=tile&&stream.loaded.get(tile)
