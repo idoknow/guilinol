@@ -25,7 +25,9 @@ scene.traverse(node=>{
   if(!node.isMesh)return
   if(meshName && node.name!==meshName && node.parent?.name!==meshName)return
   if(materialFilter && node.geometry.userData.seamMaterial!==materialFilter)return
-  let high=false
+  const collision=process.argv[3]==='--collision'
+  if(collision){let ancestor=node;while(ancestor&&!/^collision/i.test(ancestor.name))ancestor=ancestor.parent;if(!ancestor)return}
+  let high=collision
   for(let parent=node;parent;parent=parent.parent)high ||= parent.name.startsWith('lod0')
   if(!high && ((!inventory && process.argv[3]!=='--visible') || scene.getObjectByName('lod0')))return
   if(!high){for(let parent=node;parent;parent=parent.parent)if(/^collision|^lod[12]/i.test(parent.name))return}
@@ -55,5 +57,5 @@ scene.traverse(node=>{
   }
   for(let at=0;at<(index?.count??position.count);at++)coords.push(...vertex.fromBufferAttribute(position,index?index.getX(at):at).applyMatrix4(node.matrixWorld).toArray())
 })
-if(!coords.length && !process.argv[6])throw Error('Missing LOD0 triangles')
+if(!coords.length && !process.argv[6] && process.argv[3]!=='--collision')throw Error('Missing LOD0 triangles')
 process.stdout.write(Buffer.from(new Float32Array(coords).buffer))

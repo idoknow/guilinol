@@ -23,11 +23,11 @@ function streetWorker(){
   return worker
 }
 
-export async function loadStreetGeometry(paths:Streets,step:number,heights:THREE.BufferAttribute|THREE.InterleavedBufferAttribute,rails?:StreetRequest['rails'],signs?:StreetRequest['signs'],railCuts?:StreetRequest['railCuts'],paving?:StreetRequest['paving']){
+export async function loadStreetGeometry(paths:Streets,step:number,heights:THREE.BufferAttribute|THREE.InterleavedBufferAttribute,rails?:StreetRequest['rails'],signs?:StreetRequest['signs'],railCuts?:StreetRequest['railCuts'],paving?:StreetRequest['paving'],roadbeds?:number[]){
   const elevations=Float32Array.from({length:heights.count},(_,i)=>heights.getY(i))
   const target=streetWorker(), id=nextId++
   const data=await new Promise<StreetData>((resolve,reject)=>{
-    target.postMessage({id,paths,step,elevations,rails,signs,railCuts,paving} satisfies StreetRequest,[elevations.buffer])
+    target.postMessage({id,paths,step,elevations,rails,signs,railCuts,paving,roadbeds} satisfies StreetRequest,[elevations.buffer])
     pending.set(id,{resolve,reject})
   })
   const {positions,normals,colors,kinds,along,fencePositions,fenceNormals,fenceColors,fenceAlong,...instances}=data

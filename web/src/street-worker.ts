@@ -46,7 +46,8 @@ function lowerHeight(x:number,z:number,base:number,terrain:number,[,corners,prof
   return terrain+factor*(base-terrain)
 }
 
-export function streetGeometry([paths,lamps,banks,signals=[],stops=[],roadCtrl,stoneRails=[],beds=[],shops=[],decor=[],curbCuts=[],lower,platform,,stationRoads,stationCuts]:Streets,ground:(x:number,z:number)=>number,rails:RailSection[]=[],signs:CrossingSign[]=[],railGround:(x:number,z:number)=>number=ground,paving?:StationPavingStyle){
+const ROAD_LIFT=.03
+export function streetGeometry([paths,lamps,banks,signals=[],stops=[],roadCtrl,stoneRails=[],beds=[],shops=[],decor=[],curbCuts=[],lower,platform,,stationRoads,stationCuts]:Streets,ground:(x:number,z:number)=>number,rails:RailSection[]=[],signs:CrossingSign[]=[],railGround:(x:number,z:number)=>number=ground,paving?:StationPavingStyle,roadbeds=new Set<number>()){
   const xyz:number[]=[],rgb:number[]=[],sidewalk:number[]=[],road:number[]=[],mats:number[]=[],cols:number[]=[]
   const stationLevel=stationRoads?stationRoadSurface(stationRoads):null
   const remaining=stationCuts?stationPaving(stationCuts,stationLevel?.protectedAt):null
@@ -117,14 +118,35 @@ export function streetGeometry([paths,lamps,banks,signals=[],stops=[],roadCtrl,s
     lowerPath=!!lower && index>=lower[0]
     const loops=rings.map(ring=>ring.map(([x,z])=>new THREE.Vector2(x/100,z/100)))
     const tris=THREE.ShapeUtils.triangulateShape(loops[0],loops.slice(1)),points=loops.flat()
-    const height=[.045,.195,.065,0,.195,.06,.195][kind]
+    const protectedDeck=roadbeds.has(-index-1)
+    const lifted=roadbeds.has(index)||protectedDeck
+    const roadbed=lifted&&(kind===0||kind===5)
+    const height=[.045,.195,.065,0,.195,.06,.195][kind]+(lifted?ROAD_LIFT:0)
     function tessellate(a:THREE.Vector2,b:THREE.Vector2,c:THREE.Vector2){
       const ab=a.distanceToSquared(b),bc=b.distanceToSquared(c),ca=c.distanceToSquared(a)
-      if(Math.max(ab,bc,ca)<=16){triangle(vector(a,height),vector(c,height),vector(b,height),kind);return}
+      if(Math.max(ab,bc,ca)<=16){
+        const first=vector(a,height),second=vector(c,height),third=vector(b,height)
+        triangle(first,second,third,kind)
+        if(roadbed&&(protectedDeck||[first,second,third].some(point=>point.y-railGround(point.x,point.z)>.15))){
+          for(const point of [first,second,third])point.y-=protectedDeck?.18:ROAD_LIFT
+          triangle(first,third,second,3)
+        }
+        return
+      }
       if(bc>ab&&bc>=ca){tessellate(b,c,a);return}if(ca>ab){tessellate(c,a,b);return}
       const mid=a.clone().lerp(b,.5);tessellate(a,mid,c);tessellate(mid,b,c)
     }
     for(const [a,b,c] of tris)tessellate(points[a],points[b],points[c])
+    if(roadbed)for(const loop of loops)for(let index=0;index<loop.length;index++){
+      const start=loop[index],end=loop[(index+1)%loop.length]
+      if((start.x===end.x&&(start.x===0||start.x===256))||(start.y===end.y&&(start.y===0||start.y===256)))continue
+      const segments=2**Math.ceil(Math.log2(Math.max(1,start.distanceTo(end)/4)))
+      for(let segment=0;segment<segments;segment++){
+        const first=vector(start.clone().lerp(end,segment/segments),height),second=vector(start.clone().lerp(end,(segment+1)/segments),height)
+        const low=first.clone(),next=second.clone();low.y=protectedDeck?first.y-.18:railGround(low.x,low.z)-.04;next.y=protectedDeck?second.y-.18:railGround(next.x,next.z)-.04
+        triangle(first,second,next,3);triangle(first,next,low,3)
+      }
+    }
     if(kind===1)for(const loop of loops)for(let i=0;i<loop.length;i++){
       const a=loop[i],b=loop[(i+1)%loop.length],steps=Math.ceil(a.distanceTo(b)/4)
       if((a.x===b.x&&(a.x===0||a.x===256))||(a.y===b.y&&(a.y===0||a.y===256)))continue
@@ -359,10 +381,10 @@ export function streetGeometry([paths,lamps,banks,signals=[],stops=[],roadCtrl,s
 }
 
 export type StreetData=ReturnType<typeof streetGeometry>
-export interface StreetRequest {id:number; paths:Streets; paving?:StationPavingStyle; rails?:RailSection[]; signs?:CrossingSign[]; railCuts?:[number,number][]; step:number; elevations:Float32Array}
+export interface StreetRequest {id:number; paths:Streets; paving?:StationPavingStyle; roadbeds?:number[]; rails?:RailSection[]; signs?:CrossingSign[]; railCuts?:[number,number][]; step:number; elevations:Float32Array}
 export type StreetResponse={id:number; data:StreetData}|{id:number; error:string}
 
-if(typeof self!=='undefined')self.onmessage=({data:{id,paths,step,elevations,paving,rails=[],signs=[],railCuts=[]}}:MessageEvent<StreetRequest>)=>{
+if(typeof self!=='undefined')self.onmessage=({data:{id,paths,step,elevations,paving,rails=[],signs=[],railCuts=[],roadbeds=[]}}:MessageEvent<StreetRequest>)=>{
   try {
     const segments=256/step, stride=segments+1
     const sample=(grid:Float32Array)=>(x:number,z:number)=>{
@@ -372,7 +394,7 @@ if(typeof self!=='undefined')self.onmessage=({data:{id,paths,step,elevations,pav
     }
     const cut=railCuts.length?elevations.slice():elevations
     for(const [i,cm] of railCuts)cut[i]=cm/100
-    const data=streetGeometry(paths,sample(elevations),rails,signs,sample(cut),paving)
+    const data=streetGeometry(paths,sample(elevations),rails,signs,sample(cut),paving,new Set(roadbeds))
     const transfer=Object.values(data).flatMap(value=>typeof value==='number'?[]:[value.buffer])
     self.postMessage({id,data} satisfies StreetResponse,{transfer})
   } catch(error) {

@@ -238,7 +238,8 @@ export async function createPhysics(manifest:Manifest,stream:Stream,peaks:PeaksG
   function add(desc:R.ColliderDesc,kind:Kind){const coll=world.createCollider(desc);kinds.set(coll.handle,kind);return coll}
   const thinDecks=new Set<number>()
   const sources=new Map<number,string>()
-  function remove(coll:R.Collider){sources.delete(coll.handle);thinDecks.delete(coll.handle);kinds.delete(coll.handle);world.removeCollider(coll,false)}
+  const bridgeSurfaces=new Set<number>()
+  function remove(coll:R.Collider){bridgeSurfaces.delete(coll.handle);sources.delete(coll.handle);thinDecks.delete(coll.handle);kinds.delete(coll.handle);world.removeCollider(coll,false)}
   const trunks=new Map<import('../forest').Tree,R.Collider>()
   const landmarks=new Map<THREE.Group,R.Collider[]>()
   const landmarkBounds=new Map<THREE.Group,{minX:number,maxX:number,minZ:number,maxZ:number}>()
@@ -403,7 +404,8 @@ export async function createPhysics(manifest:Manifest,stream:Stream,peaks:PeaksG
           filtered.push(i0,i1,i2)
         }
         const solidDesc=filtered.length?weldedIndexed(vertices,filtered):null
-        if(solidDesc){const collider=add(solidDesc,'landmark');sources.set(collider.handle,`${entry.id}/${parent.name}/${node.name}`);colliders.push(collider)}
+        if(solidDesc){const collider=add(solidDesc,'landmark');sources.set(collider.handle,`${entry.id}/${parent.name}/${node.name}`);colliders.push(collider)
+          if(entry.id==='jiefang_bridge'&&parent.name==='collision_surface')bridgeSurfaces.add(collider.handle)}
         const slabDesc=lowSlabs.length?weldedIndexed(vertices,lowSlabs):null
         if(slabDesc)colliders.push(add(slabDesc,'sidewalk'))
       })
@@ -545,9 +547,10 @@ export async function createPhysics(manifest:Manifest,stream:Stream,peaks:PeaksG
   const canTrafficPush=trafficPushGuard(world,capsule,bikeWallFilter,insideHouse)
   const landmarkFilter=(coll:R.Collider)=>kinds.get(coll.handle)==='landmark'
   const walkableFilter=(coll:R.Collider)=>{const k=kinds.get(coll.handle);return k==='deck'||k==='deckThin'||k==='sidewalk'||k==='road'||k==='ground'||k==='overview'||k==='landmark'}
-  function surface(east:number,south:number,kind:Kind,origin=4000,reach=6000){
+  function surface(east:number,south:number,kind:Kind|'bridgeSurface',origin=4000,reach=6000){
+    if(kind==='bridgeSurface'&&!bridgeSurfaces.size)return null
     surfaceRay.origin.x=east;surfaceRay.origin.y=origin;surfaceRay.origin.z=south
-    const hit=world.castRayAndGetNormal(surfaceRay,reach,false,undefined,undefined,capsule,undefined,kind==='deck'?deckFilter:coll=>kinds.get(coll.handle)===kind)
+    const hit=world.castRayAndGetNormal(surfaceRay,reach,false,undefined,undefined,capsule,undefined,kind==='deck'?deckFilter:kind==='bridgeSurface'?coll=>bridgeSurfaces.has(coll.handle):coll=>kinds.get(coll.handle)===kind)
     const thin=!!hit&&(thinDecks.has(hit.collider.handle)||kinds.get(hit.collider.handle)==='deckThin')
     return hit?{y:origin-hit.timeOfImpact,slope:Math.acos(Math.min(1,Math.abs(hit.normal.y))),thin}:null
   }

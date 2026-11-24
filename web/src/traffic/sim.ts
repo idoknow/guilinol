@@ -207,12 +207,18 @@ export class Traffic {
         const min=Math.max(0,center-span),max=Math.min(track.length,center+span)
         if(max>min){availableLength+=max-min;candidates.push({track,min,max,end:availableLength})}
       }
+      const otherMotor=!walk&&this.actors.find(actor=>!actor.track.walk&&!actor.leaving&&actor.track.street===street)
       for(let count=existing,attempt=0;candidates.length&&count<desired&&attempt<24&&budget>0&&this.actors.length<this.actorLimit;attempt++){
         const metre=this.random()*availableLength
         const {track,min,max}=candidates.find(candidate=>candidate.end>metre)??candidates[candidates.length-1]
         const scooter=!walk&&this.actors.filter(other=>other.kind==='scooter').length<Math.round((1+this.actors.filter(other=>other.kind!=='person').length)*.36)
         const actor:Actor={track,dist:min+this.random()*(max-min),speed:0,kind:walk?'person':scooter?'scooter':'car',down:0,dodge:0,x:0,y:0,z:0,yaw:0,scale:0,leaving:false,halfWidth:walk||scooter?.3:.9*CAR_SCALE,halfLength:walk?.3:scooter?.85:2.1*CAR_SCALE,height:1.5}
         this.position(actor)
+        if(!walk&&attempt<18){
+          const approach=(camera.x-actor.x)*track.dx+(camera.z-actor.z)*track.dz
+          if(approach<10||approach>150)continue
+          if(attempt<10&&otherMotor&&track.dx*otherMotor.track.dx+track.dz*otherMotor.track.dz>.5)continue
+        }
         if(!hiddenSpawn(actor)||this.actors.some(other=>distanceSq(other,actor)<(walk?.5:5)**2))continue
         if(!walk&&nearStatic(actor.x,actor.z)&&resolveContact(actor,actor.y,actor.yaw,actor.halfWidth,actor.halfLength,staticSolids))continue
         this.actors.push(actor);count++;budget--
