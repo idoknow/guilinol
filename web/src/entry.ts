@@ -7,12 +7,14 @@ import {accountEntry, consumeCreatorSpawn, onUser, requireUser} from './ui/accou
 import {isDeepLink} from './deeplink'
 import {cancelRestore} from './lastview'
 import {fullLoader,veil,inlineBusy,type FullLoader,type Veil} from './ui/loading'
+import {watchForUpdates} from './ui/update-check'
 
 // Page entry. A plain visit lands on the title screen (ui/home.ts) and the 3D city (main.ts, three.js + world data)
 // only boots on 开始游览. Deep links — shares, feedback views, test harnesses — skip the title screen and boot directly.
 const params = new URLSearchParams(location.search)
 if (params.has('verify') || params.has('debug')) document.body.dataset.debug = ''
 const deepLink = isDeepLink(params)
+watchForUpdates()
 // Playing requires a signed-in account (IDOK-99). Local test harnesses (Playwright on 127.0.0.1 with deep-link params) skip it.
 const harness = deepLink && ['127.0.0.1', 'localhost'].includes(location.hostname)
 

@@ -7,6 +7,7 @@ import {photoMode} from './photo'
 import {mapView} from './map'
 import {isGlobalHotkeyBlocked, shouldPhotoYieldKeyPFromDom} from '../walk/input-guard'
 import {getPlayMode,soloServices,onPlayMode} from '../game/play-mode'
+import {checkForUpdate} from '../ui/update-check'
 import {type ShopTriggerDef} from '../game/shops'
 import {getState, onState} from '../game/state'
 import {mountLandscapeEntry} from '../ui/orientation'
@@ -131,7 +132,11 @@ export function play(host:Host) {
   let mapLoading:Promise<ReturnType<typeof mapView>|undefined>|undefined
   const ensureMap = ()=>{if(mapLoading)return mapLoading;const done=inlineBusy(slot,'载入地图');return mapLoading = import('../map/atlas').then(m=>m.loadAtlas(host.manifest)).then(loaded=>{
     atlas = loaded; return map = mapView(host,loaded,{slot,buttons,stamps,goPoint:(x,z,n)=>void goPoint(x,z,n),goSpot:s=>void goTo(s),goDock:d=>void goDock(d),goShop:sh=>void goShop(sh)})
-  }).catch(error=>{console.warn('atlas',error); mapLoading = undefined; return undefined}).finally(done)}
+  }).catch(error=>{console.warn('atlas',error); mapLoading = undefined
+    // IDOK-204: a failed load used to leave the minimap gone for the rest of the session. Retry with backoff, and
+    // ask whether the site was redeployed under us (old chunks 404 after a release) so the player can refresh.
+    mapRetryAt = pulse+Math.min(60,10*2**mapFailures++); mapRequested = false; checkForUpdate(true); return undefined}).finally(done)}
+  let mapFailures = 0, mapRetryAt = 2.5
   const loadMap = ()=>void ensureMap()
   let mapRequested = !(host.manifest as {atlas?:unknown}).atlas
   const feedbackEntry=button('反馈','反馈','dock-feedback');buttons.append(feedbackEntry)
@@ -269,7 +274,7 @@ export function play(host:Host) {
   let camShown = false
   function tick(dt:number) {
     pulse += dt
-    if(!mapRequested&&pulse>2.5){mapRequested = true; loadMap()}
+    if(!mapRequested&&pulse>mapRetryAt){mapRequested = true; loadMap()}
     const walker = host.walker(), walking = !!walker?.active, p = walking?walker!.position:host.camera.position
     // IDOK-182: 手上的相机只在徒步取景时出现；拍照/飞行/看相机包时收起来。
     const camOn = walking && !photo.active && !isRackOpen()
