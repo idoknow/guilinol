@@ -10,6 +10,7 @@ import {builtBoundary,loadRegional,northwest as regionNW,southeast as regionSE} 
 import {ll2xz} from '../../../lib/projection'
 import {getState} from '../game/state'
 import {listShops, type ShopTriggerDef} from '../game/shops'
+import {roster, bearing, type RosterPlayer} from '../mp-roster'
 
 // 地图 (M4): one canvas painter shared by the minimap and the full map. North up, world z grows south.
 // Look follows docs/style.md: rice-paper ground, jade water, pale-green parks, karst peaks as ink mounds,
@@ -17,13 +18,13 @@ import {listShops, type ShopTriggerDef} from '../game/shops'
 const C = {paper:'#efe8d8', green:'#d3dcc0', water:'#a6c9c1', waterEdge:'#86ada5', building:'#e0d6c3', buildingEdge:'#cdc1aa',
   road:'#fcfaf3', casing:'#cbbea4', major:'#f8ebcb', majorCasing:'#c4a676', path:'#b7aa90', ink:'#2a302c', inkSoft:'#5d655f',
   peak:'#7f9a7b', peakDark:'#4f6b55', seal:'#a9503c', sealSoft:'rgba(169,80,60,.55)', paperText:'#f4efe2',
-  shop:'#d9822b', shopText:'#9c4e0e', nav:'#f59e0b',
+  shop:'#d9822b', shopText:'#9c4e0e', nav:'#f59e0b', peer:'#2f7d70',
   halo:'rgba(239,232,216,.92)', roadHalo:'rgba(252,250,243,.95)'}
 // Phase 2 街头 palette (docs/style.md 第二期 · 小地图): night-asphalt ground, grey roads, white arterials, jade water.
 const STREET:typeof C = {paper:'#1b1f25', green:'#1f3329', water:'#17414c', waterEdge:'#245866', building:'#2a2f37', buildingEdge:'#353b45',
   road:'#7d838c', casing:'#14171b', major:'#e9e6de', majorCasing:'#0d0f12', path:'#4c525b', ink:'#f6f4ef', inkSoft:'#c9ccd2',
   peak:'#2d4a3a', peakDark:'#203629', seal:'#20d6c1', sealSoft:'rgba(32,214,193,.5)', paperText:'#101216',
-  shop:'#f5b841', shopText:'#ffd166', nav:'#ffd166',
+  shop:'#f5b841', shopText:'#ffd166', nav:'#ffd166', peer:'#8fe3ff',
   halo:'rgba(16,18,22,.9)', roadHalo:'rgba(16,18,22,.9)'}
 export function setMapPalette(name:'ink'|'street'){if(name==='street')Object.assign(C,STREET)}
 const SERIF = '"Noto Serif SC","Source Han Serif SC","Songti SC",serif'
@@ -216,6 +217,30 @@ export function mapView(host:Host, atlas:Atlas, ui:{slot:HTMLElement; buttons:HT
       }
       g.restore()
     }
+    // 同城玩家（IDOK-222）：青玉圆点 + 一道朝向短线；大地图上带名字，视野外的贴边画半个点指方向。
+    const peers = roster().players
+    if(peers.length) {
+      g.save(); g.textAlign = 'center'; g.textBaseline = 'middle'
+      const r = mini?3.6:5.2, labels:[number,number,number,number][] = [[hx-14,hy-14,hx+14,hy+14]]
+      for(const p of peers) {
+        let x = sx(p.x), y = sz(p.z), edge = false
+        if(x<-r||y<-r||x>w+r||y>h+r) {
+          if(!mini) continue
+          // 小地图：视野外的人贴着圆边画一个小点，告诉你他在哪个方向
+          const dx = x-w/2, dy = y-h/2, k = (w/2-r-2)/Math.hypot(dx,dy); x = w/2+dx*k; y = h/2+dy*k; edge = true
+        }
+        g.globalAlpha = edge?.55:1
+        g.fillStyle = C.peer; g.strokeStyle = C.paperText; g.lineWidth = mini?1.2:1.8
+        if(!edge) {g.beginPath(); g.moveTo(x,y); g.lineTo(x-Math.sin(p.yaw)*(r+5),y-Math.cos(p.yaw)*(r+5)); g.strokeStyle = C.peer; g.lineWidth = mini?1.4:2; g.stroke(); g.strokeStyle = C.paperText; g.lineWidth = mini?1.2:1.8}
+        g.beginPath(); g.arc(x,y,edge?r*.8:r,0,Math.PI*2); g.fill(); g.stroke()
+        if(!mini&&!edge&&scale>.06) {g.font = `600 12px ${SERIF}`
+          // 名字互相不压、也不压自己的箭头；挤在一起时只留一个，点圆点仍能看到是谁
+          const bw = g.measureText(p.name).width, box:[number,number,number,number] = [x-bw/2-3,y-r-18,x+bw/2+3,y-r-2]
+          if(labels.some(([a,b,c,d])=>box[0]<c&&box[2]>a&&box[1]<d&&box[3]>b)) continue
+          labels.push(box); g.lineWidth = 3.2; g.strokeStyle = C.halo; g.strokeText(p.name,x,y-r-10); g.fillStyle = C.peer; g.fillText(p.name,x,y-r-10)}
+      }
+      g.restore()
+    }
     // Player: vermilion arrow with a paper outline, pointing where the camera faces.
     const a = heading()
     g.save(); g.translate(hx,hy); g.rotate(Math.PI-a)
@@ -254,7 +279,7 @@ export function mapView(host:Host, atlas:Atlas, ui:{slot:HTMLElement; buttons:HT
   for(const b of Array.from(sheet.querySelectorAll<HTMLButtonElement>('.atlas-docks button[data-shop]'))) b.onclick = ()=>{const sh = listShops().find(x=>x.shopId===b.dataset.shop); if(sh){close(); if(ui.goShop) ui.goShop(sh); else ui.goPoint(sh.triggerPos[0],sh.triggerPos[2],sh.displayName)}}
   for(const b of Array.from(sheet.querySelectorAll<HTMLButtonElement>('.atlas-docks button[data-dock]'))) b.onclick = ()=>{const d = waterDocks.find(x=>x.id===b.dataset.dock); if(d){close(); ui.goDock(d)}}
   const view = {x:0,z:0,scale:.5}
-  let pin:{x:number,z:number,name:string,spot?:Spot,dock?:WaterDock,shop?:ShopTriggerDef}|null = null
+  let pin:{x:number,z:number,name:string,spot?:Spot,dock?:WaterDock,shop?:ShopTriggerDef,peer?:RosterPlayer}|null = null
   let navTarget:{x:number,z:number,name:string}|null = null
   function redraw() {
     if(sheet.hidden) return
@@ -263,9 +288,9 @@ export function mapView(host:Host, atlas:Atlas, ui:{slot:HTMLElement; buttons:HT
     const g = canvas.getContext('2d')!; paint(g,w,h,dpr,view.x,view.z,view.scale,false)
     if(pin) {
       const x = w/2+(pin.x-view.x)*view.scale, y = h/2+(pin.z-view.z)*view.scale
-      if(!pin.spot&&!pin.shop){g.setTransform(dpr,0,0,dpr,0,0); g.fillStyle = C.ink; g.beginPath(); g.arc(x,y-14,7,0,Math.PI*2); g.moveTo(x-5.5,y-10); g.lineTo(x,y); g.lineTo(x+5.5,y-10); g.fill()
+      if(!pin.spot&&!pin.shop&&!pin.peer){g.setTransform(dpr,0,0,dpr,0,0); g.fillStyle = C.ink; g.beginPath(); g.arc(x,y-14,7,0,Math.PI*2); g.moveTo(x-5.5,y-10); g.lineTo(x,y); g.lineTo(x+5.5,y-10); g.fill()
         g.fillStyle = C.paper; g.beginPath(); g.arc(x,y-14,2.6,0,Math.PI*2); g.fill()}
-      pop.style.transform = `translate(${Math.round(x)}px,${Math.round(y-(pin.spot||pin.shop?20:26))}px) translate(-50%,-100%)`
+      pop.style.transform = `translate(${Math.round(x)}px,${Math.round(y-(pin.peer?12:pin.spot||pin.shop?20:26))}px) translate(-50%,-100%)`
     }
   }
   function clampView(){view.scale = Math.min(3,Math.max(Math.min(sheet.clientWidth/(southeast.x-northwest.x),sheet.clientHeight/(southeast.z-northwest.z))*.9,view.scale))
@@ -286,7 +311,8 @@ export function mapView(host:Host, atlas:Atlas, ui:{slot:HTMLElement; buttons:HT
     pin = next; pop.hidden = !pin
     if(pin) {
       if(!built.contains(pin.x,pin.z)){pop.textContent='未开放'; redraw(); return}
-      const sub = pin.shop?pin.shop.displayName:pin.spot?pin.spot.sub:pin.dock?pin.dock.sub:atlas.roadAt(pin.x,pin.z,40)?.name ?? ''
+      const me = roster().me
+      const sub = pin.peer?`同城玩家${pin.peer.uid?` · ${pin.peer.uid}`:''}${me?` · ${bearing(me,pin.peer)}`:''}`:pin.shop?pin.shop.displayName:pin.spot?pin.spot.sub:pin.dock?pin.dock.sub:atlas.roadAt(pin.x,pin.z,40)?.name ?? ''
       const isNav = !!navTarget && Math.hypot(navTarget.x-pin.x,navTarget.z-pin.z)<1
       pop.innerHTML = `<b>${pin.name}</b>${sub&&sub!==pin.name?`<span>${sub}</span>`:''}<button type="button" data-act="go" ${getPlayMode()==='solo'?'hidden disabled':''}>前往</button><button type="button" class="atlas-nav-btn" data-act="nav">${isNav?'取消导航':'标记导航'}</button>`
       pop.querySelector<HTMLButtonElement>('[data-act="nav"]')!.onclick = ()=>{
@@ -340,7 +366,10 @@ export function mapView(host:Host, atlas:Atlas, ui:{slot:HTMLElement; buttons:HT
       const r = canvas.getBoundingClientRect(), x = view.x+(e.clientX-r.left-r.width/2)/view.scale, z = view.z+(e.clientY-r.top-r.height/2)/view.scale
       const nearShop = built.contains(x,z)&&listShops().find(s=>built.contains(s.triggerPos[0],s.triggerPos[2])&&Math.hypot(s.triggerPos[0]-x,s.triggerPos[2]-z)*view.scale<18)
       const near = !nearShop&&built.contains(x,z)&&spots.find(s=>built.contains(s.x,s.z)&&Math.hypot(s.x-x,s.z-z)*view.scale<16)
-      if(nearShop) setPin({x:nearShop.triggerPos[0],z:nearShop.triggerPos[2],name:nearShop.mapMarker.label,shop:nearShop})
+      const r2 = (o:{x:number,z:number})=>Math.hypot(o.x-x,o.z-z)*view.scale
+      const nearPeer = roster().players.filter(p=>r2(p)<14).sort((a,b)=>r2(a)-r2(b))[0]
+      if(nearPeer) setPin({x:nearPeer.x,z:nearPeer.z,name:nearPeer.name,peer:nearPeer})
+      else if(nearShop) setPin({x:nearShop.triggerPos[0],z:nearShop.triggerPos[2],name:nearShop.mapMarker.label,shop:nearShop})
       else if(near) setPin({x:near.x,z:near.z,name:near.name,spot:near})
       else setPin({x,z,name:atlas.roadAt(x,z,40)?.name ?? '这里'})
     }}
@@ -358,7 +387,13 @@ export function mapView(host:Host, atlas:Atlas, ui:{slot:HTMLElement; buttons:HT
     }
   })
 
+  addEventListener('glol:mp-locate',event=>{
+    const p = roster().players.find(item=>item.id===(event as CustomEvent<{id:string}>).detail?.id); if(!p) return
+    if(sheet.hidden) open()
+    requestAnimationFrame(()=>{focus(p.x,p.z,Math.max(view.scale,.9)); setPin({x:p.x,z:p.z,name:p.name,peer:p})})
+  })
+
   let clock = 0
   return {paint, contains:built.contains, extent:atlas.extent, roadAt:atlas.roadAt.bind(atlas), open, close, get active(){return !sheet.hidden}, get navTarget(){return navTarget}, setNavTarget:(next:typeof navTarget)=>{navTarget=next;drawMini();redraw()}, roadName:()=>lastRoad, search:(q:string)=>{input.value = q; input.oninput?.(new Event('input'))},
-    tick(dt:number){clock += dt; if(clock<.2) return; clock = 0; if(document.body.dataset.photo!=='on') drawMini(); if(!sheet.hidden&&!pointers.size) redraw()}}
+    tick(dt:number){clock += dt; if(clock<.2) return; clock = 0; if(pin?.peer){const live = roster().players.find(p=>p.id===pin!.peer!.id); if(live){pin.x = live.x; pin.z = live.z}} if(document.body.dataset.photo!=='on') drawMini(); if(!sheet.hidden&&!pointers.size) redraw()}}
 }
