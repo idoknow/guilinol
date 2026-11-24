@@ -8,7 +8,7 @@ import {interactions} from './interactions'
 import {touchUi} from '../ui/input-mode'
 import {npcDefaults,validNpc} from '../../../lib/npc'
 
-async function loadGraph(key:string,rules:typeof npcDefaults){
+async function loadGraph(key:string,signal:AbortSignal,rules:typeof npcDefaults){
   const start=performance.now()
   const response=await fetch(`/world/roads/${key}.json.gz`,{signal})
   if(!response.ok||!response.body)throw Error(`traffic graph: ${response.status}`)
@@ -17,6 +17,7 @@ async function loadGraph(key:string,rules:typeof npcDefaults){
   const signature=new Uint8Array(bytes,0,2)
   const body=signature[0]===31&&signature[1]===139?new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip')):bytes
   const decoded=await new Response(body).arrayBuffer()
+  signal.throwIfAborted()
   const graph:Graph=JSON.parse(new TextDecoder().decode(decoded)),sim=new Traffic(graph,Math.random,touchUi()?MOBILE_ACTORS:MAX_ACTORS,rules)
   const timing=performance.getEntriesByName(response.url).at(-1) as PerformanceResourceTiming|undefined
   return {sim,sample:{key,encodedBytes:timing?.encodedBodySize||bytes.byteLength,decodedBytes:decoded.byteLength,downloadMs:downloaded-start,parseAndIndexMs:performance.now()-downloaded}}
@@ -30,7 +31,7 @@ export async function traffic(scene:THREE.Scene,camera:THREE.Camera,verify:boole
   const settings=await fetch('/api/npc',{signal:AbortSignal.timeout(2500)}).then(response=>response.ok?response.json():null).catch(()=>null)
   const rules=validNpc(settings)?settings:npcDefaults
   const effects=interactions(scene,camera,rules)
-  let sim:Traffic|undefined,key=''
+  let sim:Traffic|undefined,key='',loading:AbortController|undefined
   const mesh=new THREE.InstancedMesh(new THREE.BoxGeometry(),new THREE.MeshLambertMaterial({color:0x999999}),MAX_ACTORS)
   const frustum=new THREE.Frustum(),projection=new THREE.Matrix4(),point=new THREE.Vector3()
   const visible=(actor:{x:number,y:number,z:number})=>frustum.containsPoint(point.set(actor.x,actor.y+.7,actor.z))
@@ -49,7 +50,7 @@ export async function traffic(scene:THREE.Scene,camera:THREE.Camera,verify:boole
   for(let slot=0;slot<SLOTS;slot++){batch.addInstance(geometryIds[0]);batch.setVisibleAt(slot,false)}
   const variants=new WeakMap<object,Variant>()
   const pose=new THREE.Object3D();pose.rotation.order='YXZ'
-  const transforms=new Float64Array(SLOTS*8).fill(NaN)
+  const transforms=new Float64Array(SLOTS*7).fill(NaN)
   const FAR=75**2 // IDOK-253: detailed car meshes only near the camera, light stand-ins beyond 75 m
   const show=(slot:number,variant:Variant,x:number,y:number,z:number,yaw:number,scale:number,down=false,pitch=0,roll=0,motor?:'car'|'scooter')=>{
     const lod=models.far[variant.geometry],geometry=lod!==undefined&&(x-camera.position.x)**2+(z-camera.position.z)**2>FAR?lod:variant.geometry
@@ -111,7 +112,7 @@ export async function traffic(scene:THREE.Scene,camera:THREE.Camera,verify:boole
   let walking=new Set<object>()
   return (dt:number,vehicle?:THREE.Vector3,player?:THREE.Vector3,_solo=false,enabled=true)=>{
     useTrafficSolids(enabled?near:undefined)
-    if(!enabled){effects.clear();people.clear();walking.clear();mesh.count=0;hide(0,SLOTS);parkKey='';parkCount=0;curbside.clear();return}
+    if(!enabled){effects.clear();loading?.abort();loading=undefined;sim=undefined;key='';people.clear();walking.clear();mesh.count=0;hide(0,SLOTS);parkKey='';parkCount=0;curbside.clear();return}
     updateParking(camera.position.x,camera.position.z)
     parkLodAt-=dt;if(parkLodAt<=0){parkLodAt=.5;for(const [slot,variant,x,y,z,yaw] of parkedRows)show(slot,variant,x,y,z,yaw,1)}
     if(verify&&mesh.userData.staticOnly){hide(0,STATIC);mesh.count=0;mesh.userData.allMotors=[];return}
@@ -122,8 +123,9 @@ export async function traffic(scene:THREE.Scene,camera:THREE.Camera,verify:boole
       const [east,south]=target.split('_').map(Number),[oldEast,oldSouth]=key.split('_').map(Number)
       if(Math.abs(east-oldEast)>1||Math.abs(south-oldSouth)>1){sim=undefined;people.clear();walking.clear();mesh.count=0;hide(0,STATIC)}
       key=target
-      if(cells.has(key))void loadGraph(key,rules).then(({sim:next,sample})=>{
-        if(key!==target)return
+      const controller=loading=new AbortController()
+      if(cells.has(key))void loadGraph(key,controller.signal,rules).then(({sim:next,sample})=>{
+        if(controller.signal.aborted||key!==target)return
         if(verify){mesh.userData.loads.push(sample);if(mesh.userData.loads.length>64)mesh.userData.loads.shift()}
         next.sampleGround=sampleGround
         if(sim)next.inherit(sim);sim=next

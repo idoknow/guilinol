@@ -137,7 +137,7 @@ function filterBridgeOverRoad(road: Float32Array, deck: Float32Array) {
   return kept.length === road.length ? road : Float32Array.from(kept)
 }
 
-function* weldedSurface(raw:Float32Array, corners:number[]|null, data:Detail, maxGap:number, minRun:number, maxRun:number, runScale:number){
+function* weldedSurface(raw:Float32Array, corners:number[]|null, data:Detail, maxGap:number, minRun:number, maxRun:number, runScale:number,clearance?:ReturnType<typeof tunnelClearanceClipper>){
   const verts:number[]=[],idxList:number[]=[],seen=new Map<string,number>()
   const addVertex=(corner:number)=>{
     const i=3*corner
@@ -348,10 +348,10 @@ export async function createPhysics(manifest:Manifest,stream:Stream,peaks:PeaksG
     }
     return built
   }
-  function* surfaces(tile:Tile,data:Detail,colliders:R.Collider[]){
+  function* surfaces(tile:Tile,data:Detail,colliders:R.Collider[],clearance?:ReturnType<typeof tunnelClearanceClipper>){
     const {sidewalk,road}=data.streets
     function* install(raw:Float32Array,corners:number[]|null,kind:'sidewalk'|'road'|'deck',settings:[number,number,number,number],thin=false){
-      const desc=yield* weldedSurface(raw,corners,data,...settings)
+      const desc=yield* weldedSurface(raw,corners,data,...settings,clearance)
       if(!desc)return
       yield true
       const collider=add(desc.setTranslation(tile.x,0,tile.z),kind)
@@ -468,6 +468,7 @@ export async function createPhysics(manifest:Manifest,stream:Stream,peaks:PeaksG
       const spacing=manifest.overview.step,stride=width/spacing+1,start=(tile.z-top)/spacing*stride+(tile.x-left)/spacing
       const colliders:R.Collider[]=[]
       let barrierColliders:R.Collider[]=[]
+      const clearance=data?.tunnel?tunnelClearanceClipper(tile,nearbyTunnels(manifest.tunnels,tile.x+128,tile.z+128)):undefined
       if(data?.tunnel){
         for(const [mesh,kind] of [[data.groundMesh,'ground'],[data.tunnel.fringe,'ground'],[data.tunnel.floor,'road'],[data.tunnel.portal,'rail'],[data.tunnel.interior,'rail']] as const){
           if(!mesh)continue
@@ -489,7 +490,16 @@ export async function createPhysics(manifest:Manifest,stream:Stream,peaks:PeaksG
       const rings=data?.rings??[]
       if(data){const {banks}=data.streets
         for(const [ax,az,bx,bz,top,bottom,endTop=top] of banks){const angle=-Math.atan2(bz-az,bx-ax),height=((top+endTop)/2-bottom)/10+1.25
-          colliders.push(add(R.ColliderDesc.cuboid(Math.hypot(bx-ax,bz-az)/20+.03,height/2,.09).setRotation({x:0,y:Math.sin(angle/2),z:0,w:Math.cos(angle/2)}).setTranslation(tile.x+(ax+bx)/20,bottom/10+height/2,tile.z+(az+bz)/20),'rail'))}}
+          const halfLength=Math.hypot(bx-ax,bz-az)/20+.03
+          const x=(ax+bx)/20,z=(az+bz)/20,y=bottom/10+height/2
+          if(clearance){
+            const box=new THREE.BoxGeometry(halfLength*2,height,.18)
+            box.rotateY(angle);box.translate(x,y,z)
+            const vertices=clearance(Float32Array.from(box.getAttribute('position').array),Array.from(box.index!.array))
+            box.dispose()
+            const desc=weldedIndexed(vertices,Array.from({length:vertices.length/3},(_,i)=>i))
+            if(desc)colliders.push(add(desc.setTranslation(tile.x,0,tile.z),'rail'))
+          }else colliders.push(add(R.ColliderDesc.cuboid(halfLength,height/2,.09).setRotation({x:0,y:Math.sin(angle/2),z:0,w:Math.cos(angle/2)}).setTranslation(tile.x+x,y,tile.z+z),'rail'))}}
       if(data){
         const bars=data.streets.railBarriers
         for(let i=0;i<bars.length;i+=6){
@@ -501,8 +511,8 @@ export async function createPhysics(manifest:Manifest,stream:Stream,peaks:PeaksG
         }
         barrierColliders=buildTileRoadBarriers(tile,data.streets.roadBarriers)
       }
-      if(rings.length)colliders.push(add(houses(rings).setTranslation(tile.x,0,tile.z),'building'))
-      const pending=data?surfaces(tile,data,colliders):undefined
+      if(rings.length){const desc=houses(rings,clearance);if(desc)colliders.push(add(desc.setTranslation(tile.x,0,tile.z),'building'))}
+      const pending=data?surfaces(tile,data,colliders,clearance):undefined
       if(urgent&&pending)while(!pending.next().done){}
       regions.set(tile,{colliders,barrierColliders,rings,data,surfaces:urgent?undefined:pending});changed=true
     }

@@ -380,7 +380,13 @@ export function trafficModels(cars:CarMesh[]=[]){
     const pool=pools[kind],geometry=pick(pool.ids.map((id,i)=>({id,w:pool.weights[i]})),u).id
     return {geometry,paint:geometry===cab||geometry===patrol?plain:new T.Color(pick(pool.paints,v).hex)}
   }
-  return {geometries,variant,police:patrol,far}
+  const axles=new Map<number,[number,number,number]>()
+  for(const [geometry,spec] of [[sedan,sedanSpec],[hatch,hatchSpec],[suv,suvSpec],[van,vanSpec],[cab,sedanSpec],[patrol,sedanSpec]] as const){
+    axles.set(geometry,[spec.wf*CAR_SCALE,spec.wr*CAR_SCALE,(spec.W/2-.15)*CAR_SCALE])
+  }
+  axles.set(lorry,[2.05*CAR_SCALE,-1.7*CAR_SCALE,.82*CAR_SCALE])
+  for(const id of scooters)axles.set(id,[.6,-.58,0])
+  return {geometries,variant,far,axles,police:patrol}
 }
 
 export function trafficMaterial(){

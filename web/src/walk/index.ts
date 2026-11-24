@@ -30,7 +30,6 @@ import {currentAvatar,characterModel,disposeCharacterParts,styleCharacter} from 
 import {avatar} from '../look/avatar'
 import {bikeConfig, carConfig, walkConfig as cfg, type CarDriveMode, type EbikeHeadlightMode, type EbikeTurnSignal, type EbikeUpgradeMods} from './config'
 import {createPhysics} from './physics'
-import {playerSupport} from './support'
 import {
   buildTianyuanObstacleVolume,
   TIANYUAN_VOLUME_ID,
@@ -1304,7 +1303,36 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
   const still={right:0,forward:0,run:false,crouch:false,jump:false}
   function setSnap(on:boolean){if(snapEnabled===on)return;snapEnabled=on;if(on)sim.controller.enableSnapToGround(cfg.snap);else sim.controller.disableSnapToGround()}
   function resetMotion(){vx=vz=velocity=coyoteTimer=jumpTimer=bankLean=strideLean=prevSpeed=jumpStageTimer=0;grounded=false;wasGroundedFoot=true;crouching=false;wasLandmarkHit=false;jumpStage='none';setSnap(true);figure.rotation.x=figure.rotation.z=0;if(traveller)traveller.rotation.set(0,0,0)}
-  const {supportAt,carSupportAt}=playerSupport(sim)
+  function supportAt(x:number,z:number,refY:number){
+    const bore=tunnelFloor(manifest.tunnels,x,z,refY)
+    if(bore!==undefined){
+      const floor=sim.surface(x,z,'road',bore+.15,.3)
+      if(floor)return floor
+    }
+    const deck=sim.surface(x,z,'deck',refY+.35,1.4)
+    const validDeck=deck&&deck.y<=refY+.35?deck:null
+    return validDeck??sim.surface(x,z,'sidewalk')??sim.surface(x,z,'road')??sim.surface(x,z,'ground')
+  }
+  function wheelSupportY(x:number,z:number,refY:number,above:number,reach:number){
+    if(grounded){
+      const floor=tunnelFloor(manifest.tunnels,x,z,refY)
+      if(floor!==undefined)return floor
+    }
+    return sim.groundSurface(x,z,refY,above,reach)?.y
+  }
+  function carSupportAt(x:number,z:number,refY:number){
+    const bore=tunnelFloor(manifest.tunnels,x,z,refY)
+    if(bore!==undefined){
+      const floor=sim.surface(x,z,'road',bore+.15,.3)
+      if(floor)return floor
+    }
+    const deck=sim.surface(x,z,'deck',refY+.55,1.8)
+    const validDeck=deck&&deck.y<=refY+.55?deck:null
+    const lm=sim.surface(x,z,'landmark',refY+.55,1.8)
+    const validLm=lm&&lm.y<=refY+.55&&lm.slope<=cfg.slope?lm:null
+    const bridgeHit=validDeck&&validLm?(validLm.y>validDeck.y?validLm:validDeck):(validDeck??validLm)
+    return bridgeHit??sim.groundSurface(x,z,refY,.55,1.8)
+  }
   function loadRides(){if(loading||rides||!active||!manifest.vehicles)return;loading=true
     const file=manifest.vehicles.file
     void import('./vehicles').then(module=>module.vehicles(scene,file,(x,z,bikeHeading,bikeY,kind)=>{sim.sync(x,z,bikeHeading!==undefined)
@@ -1434,7 +1462,25 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
     }
     if(active)resetWalk()
     syncSceneObstacleVolumes()
-    sim.sync(x,z);if(!place(x,z,reason,override)){disconnect();window.dispatchEvent(new CustomEvent('walk:spawn-failed',{detail:{x,z,reason:'no-walkable-support'}}));return false}
+    sim.sync(x,z)
+    let fixtureSpawn
+    if(verify&&fixtureFloor!==undefined){
+      // Approach a parked vehicle from an adjacent point on the same lane.
+      for(const along of [0,-.8,.8,-1.6,1.6]){
+        const east=x-along*Math.sin(heading),south=z-along*Math.cos(heading)
+        const support=sim.groundSurface(east,south,fixtureFloor,.45,.9)
+        if(!support)continue
+        const y=support.y+cfg.height/2+.055
+        if(!sim.freeCapsule(east,y,south))continue
+        fixtureSpawn={x:east,y,z:south,rule:'lane-fixture'}
+        break
+      }
+      if(!fixtureSpawn){
+        const road=sim.surface(x,z,'road',fixtureFloor+1,2),ground=sim.surface(x,z,'ground',fixtureFloor+1,2)
+        throw Error('No clear lane spawn '+JSON.stringify({x,z,fixtureFloor,road,ground,bore:tunnelFloor(manifest.tunnels,x,z,fixtureFloor)}))
+      }
+    }
+    if(!place(x,z,reason,override,fixtureSpawn)){disconnect();window.dispatchEvent(new CustomEvent('walk:spawn-failed',{detail:{x,z,reason:'no-walkable-support'}}));return false}
     active=true;rides?.show(true);requestAnimationFrame(()=>requestAnimationFrame(loadRides));figure.visible=true;firstPersonHidden=false
     yaw=heading;facing=yaw+avatar.yaw;figure.rotation.y=facing;input.show(true);accumulator=0;rig.reset(arm)
     restoreFootLocomotion(avatar.clips.idle)
@@ -1651,12 +1697,14 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
         const rx=-fz,rz=fx
         const contact=(forward:number,right:number)=>wheelSupportY(
           pos.x+fx*forward+rx*right,pos.z+fz*forward+rz*right,center,.85,1.7)
-        const fl=contact(1.34,-.795),fr=contact(1.34,.795),bl=contact(-1.31,-.795),br=contact(-1.31,.795)
+        const frontAxle=1.34*CAR_SCALE,rearAxle=-1.31*CAR_SCALE,halfTrack=.795*CAR_SCALE
+        const fl=contact(frontAxle,-halfTrack),fr=contact(frontAxle,halfTrack)
+        const bl=contact(rearAxle,-halfTrack),br=contact(rearAxle,halfTrack)
         if(fl!==undefined&&fr!==undefined&&bl!==undefined&&br!==undefined){
-          const front=(fl+fr)/2,back=(bl+br)/2,slope=(front-back)/2.65
+          const front=(fl+fr)/2,back=(bl+br)/2,slope=(front-back)/(frontAxle-rearAxle)
           groundPitch=Math.atan(slope)
-          groundRoll=Math.atan((fr+br-fl-bl)/(3.18*Math.hypot(1,slope)))
-          figure.position.y=back+1.31*slope
+          groundRoll=Math.atan((fr+br-fl-bl)/(4*halfTrack*Math.hypot(1,slope)))
+          figure.position.y=back-rearAxle*slope
           if(dt>0)rides.setCarPitch(front,back,dt)
         }else if(dt>0)rides.setCarPitch(undefined,undefined,dt)
       }
@@ -2870,7 +2918,8 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
   function findUnstuck(from?:{x:number,z:number}){if(!active)return null;const p=from??rides?.boat?.position??sim.body.translation();sim.sync(p.x,p.z);const spot=sim.findFlatGround(p.x,p.z)
     if(verify)spawns.push({reason:'unstuck-probe',from:[p.x,p.z],to:spot?[spot.x,spot.z]:null,distance:spot?Math.hypot(spot.x-p.x,spot.z-p.z):null,rule:spot?.rule??'none'})
     return spot&&{x:spot.x,z:spot.z,distance:Math.hypot(spot.x-p.x,spot.z-p.z),rule:spot.rule}}
-  return {supportAt,carSupportAt,emote,get net(){return net},photoSupport,enter,leave,tick,findUnstuck,get destination(){return destination},spawns,probe,boatClearance,parked(kind?:import('./ride').RideKind|'car'){return rides?.parked(kind)??[]},get freeMoorings(){return rides?.freeMoorings()??[]},get boatKind(){return rides?.freeKind??null},get obstacle(){return bikeObstacle},get vehicle(){return rides?.car?'car':rides?.bike?(rides.rideKind==='bicycle'?'bicycle':'bike'):rides?.boat?'boat':'foot'},get heading(){return rides?.heading??0},get speed(){return rides?.speed??0},get active(){return active},drive(x:number,z:number,run=true){external={x,z,run}},
+  return {supportAt,carSupportAt,fixtureHeight:verify?()=>rides?.car?rides.carY:sim.body.translation().y-cfg.height/2:undefined,
+    enterLaneFixture:verify?(x:number,y:number,z:number,heading:number)=>enter(x,z,heading,'lane-fixture',true,undefined,undefined,y):undefined,emote,get net(){return net},photoSupport,enter,leave,tick,findUnstuck,get destination(){return destination},spawns,probe,boatClearance,parked(kind?:import('./ride').RideKind|'car'){return rides?.parked(kind)??[]},get freeMoorings(){return rides?.freeMoorings()??[]},get boatKind(){return rides?.freeKind??null},get obstacle(){return bikeObstacle},get vehicle(){return rides?.car?'car':rides?.bike?(rides.rideKind==='bicycle'?'bicycle':'bike'):rides?.boat?'boat':'foot'},get heading(){return rides?.heading??0},get speed(){return rides?.speed??0},get active(){return active},drive(x:number,z:number,run=true){external={x,z,run}},
     ebike:{
       get state(){return ebikeState},
       triggerCrash(reason:Exclude<EbikeCrashReason,''>='lowside',side:-1|1=1){if(rides?.bike)triggerTwoWheelCrash(reason,side)},

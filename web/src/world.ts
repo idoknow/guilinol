@@ -315,7 +315,9 @@ export async function detail(tile:Tile, signal:AbortSignal, parseSlot?:()=>Promi
   const positions = new Int16Array(buffer,offset,vertices*3); offset+=vertices*6
   const normals = new Int8Array(buffer,offset,vertices*3); offset+=vertices*3
   const indices = new Uint32Array(buffer.slice(offset,offset+count*4)); offset+=count*4
-  const [rings,paths,thinIndices=[],asphalt=[],rails=[],signs=[],railCuts=[]]:[Building[],Streets,number[]?,number[]?,import('./railways').RailSection[]?,import('./railways').CrossingSign[]?,[number,number][]?]=JSON.parse(new TextDecoder().decode(new Uint8Array(buffer,offset,collision))); offset+=collision
+  const [rings,paths,thinIndices=[],asphalt=[],legacy=[],signs=[],railCuts=[],savedBed]:[Building[],Streets,number[]?,number[]?,(RoadBed|import('./railways').RailSection[])?,import('./railways').CrossingSign[]?,[number,number][]?,RoadBed?]=JSON.parse(new TextDecoder().decode(new Uint8Array(buffer,offset,collision))); offset+=collision
+  const bed=savedBed??(legacy&&!Array.isArray(legacy)?legacy:undefined)
+  const rails=Array.isArray(legacy)?legacy:[]
   const thin=new Set(thinIndices)
   const end = offset+imageBytes, tail = end+triangles*18, extra = buffer.byteLength-tail
   if(extra!==0 && extra!==8450) throw Error('Invalid GL04 sections')
@@ -341,8 +343,12 @@ export async function detail(tile:Tile, signal:AbortSignal, parseSlot?:()=>Promi
   })
   for(const [,topLevel] of rings) if(topLevel/10+8>maxY) maxY = topLevel/10+8
   const heights = geometry.getAttribute('position')
-  const streets = await loadStreetGeometry(paths,step,heights,rails,signs,railCuts,tile.stationPaving,tile.roadbeds)
-  if(tunnels)joinPortalRoads(tile,tunnels,[streets.road,streets.sidewalk,...(streets.surface?[streets.surface.getAttribute('position').array as Float32Array]:[])])
+  const streets = await loadStreetGeometry(paths,step,heights,rails,signs,railCuts)
+  if(tunnels)joinPortalRoads(tile,tunnels,[
+    streets.road.subarray(0,streets.legacyRoadLength),
+    streets.sidewalk.subarray(0,streets.legacyWalkLength),
+    ...(streets.surface?[(streets.surface.getAttribute('position').array as Float32Array).subarray(0,streets.legacySurfaceLength)]:[])
+  ])
   signal.throwIfAborted()
   const material = await surfaceMaterial(buffer.slice(offset,end))
   if(touchesCountryside(tile.x,tile.z))countryside(material)
@@ -352,6 +358,24 @@ export async function detail(tile:Tile, signal:AbortSignal, parseSlot?:()=>Promi
   // Cut after street construction to preserve the original carriageway grade.
   for(const [index,cm] of railCuts)heights.setY(index,cm/100)
   if(railCuts.length){geometry.computeVertexNormals();geometry.computeBoundingSphere()}
+  if(bed){
+    const drop=new Set(bed.drop),index=geometry.index!
+    const keep=Array.from(index.array).filter((_,i)=>!drop.has(Math.floor(i/3)))
+    const extra=bedPositions(bed),original=heights.count
+    const combined=new Float32Array(heights.array.length+extra.length)
+    combined.set(heights.array);combined.set(extra,heights.array.length)
+    geometry.setAttribute('position',new THREE.BufferAttribute(combined,3))
+    const uv=geometry.getAttribute('uv'),texcoords=new Float32Array(uv.array.length+extra.length/3*2)
+    texcoords.set(uv.array)
+    for(let i=0;i<extra.length/3;i++){
+      texcoords[uv.array.length+2*i]=extra[3*i]/256
+      texcoords[uv.array.length+2*i+1]=1-extra[3*i+2]/256
+      keep.push(original+i)
+    }
+    geometry.setAttribute('uv',new THREE.BufferAttribute(texcoords,2))
+    geometry.setIndex(keep)
+    geometry.deleteAttribute('normal');geometry.computeVertexNormals()
+  }
   const groundMesh = new THREE.Mesh(geometry,material)
   group.add(groundMesh)
   const tunnel=tunnels?tunnelGeometry(tile,geometry,tunnels):null
@@ -434,7 +458,8 @@ export async function detail(tile:Tile, signal:AbortSignal, parseSlot?:()=>Promi
     parked:streets.parked,
   }
   return {
-    group,groundMesh,terrain,underlay,water,rings,deck,thin,streets,batch,tunnel,railCutVertices:new Set(railCuts.map(([index])=>index)),
+    railCutVertices:new Set(railCuts.map(([index])=>index)),tunnelFloorStart,bridgeDepth:look.bridgeDepth,
+    group,groundMesh,roadBed:!!bed,terrain:terrain.slice(),water:water.slice(),rings,deck,thin,streets,batch,tunnel,
     dispose(){
       if(tunnel)for(const mesh of Object.values(tunnel)){mesh.geometry.dispose();if(mesh!==tunnel.fringe)mesh.material.dispose()}
       pond?.dispose(); streets.surface?.dispose(); streets.fence?.dispose(); bridge?.dispose(); geometry.dispose(); walls?.dispose()
