@@ -21,6 +21,7 @@ export interface TileBatchInput {
   streetSurface:THREE.BufferGeometry|null
   furnitureMatrices:Float32Array
   furnitureColors:Float32Array
+  sleeperStart:number
   detailCount:number
   railLodCount:number
   parked:Float32Array
@@ -447,7 +448,10 @@ export class ChunkBatcher {
         }
         if(tileDistance<=32){
           for(let index=0;index<item.parked.length/16;index++)if(near(item.parked,index)&&(!this.takenBikes.size||!this.takenBikes.has(`${tile.x}:${tile.z}:${index}`)))bikes.push(index)
-          for(let index=item.railLodCount;index<item.detailCount;index++)if(near(item.furnitureMatrices,index))boxes.push(index)
+          for(let index=item.railLodCount;index<item.sleeperStart;index++)if(near(item.furnitureMatrices,index))boxes.push(index)
+        }
+        if(tileDistance<=62){
+          for(let index=item.sleeperStart;index<item.detailCount;index++)if(near(item.furnitureMatrices,index,60))boxes.push(index)
         }
         return {item,bikes,boxes}
       })

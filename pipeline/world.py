@@ -573,6 +573,8 @@ def build(bbox, output, palette, workers=4):
     if play_region:
         from railways import bake_world as bake_railways
         report = bake_railways(output,manifest)
+        from railway_parking import filter_world
+        print("Parking excluded near railways:", filter_world(output,manifest))
         print('Railway tiles:',report['tiles'],'clearance conflicts:',len(report['clearanceConflicts']))
         (output/'manifest.json').write_text(json.dumps(manifest,separators=(',',':'))+'\n')
     print(f'{len(chunks)} chunks, {len(footprints)} footprints, {sum(c["bytes"] for c in chunks):,} chunk bytes')

@@ -160,7 +160,7 @@ def bake(world_dir, manifest, inventory, samples):
                         gaps.append((lo,hi,flag))
                         stops.update((lo,hi))
                 stops.add(at)
-                if row['status'] not in ('active','pending_road_structure'):
+                if row['status'] not in ('active','pending_road_structure','pending_road_deck'):
                     continue
                 is_level = row['type']=='level'
                 key = str(row['sharedNode']) if is_level else (row['rail'],row['road'],row['lat'],row['lon'])

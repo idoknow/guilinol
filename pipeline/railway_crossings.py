@@ -131,8 +131,16 @@ if __name__ == '__main__':
                 row['deferredRoad']=point['roadStructureDependency']
                 row['evidence']+=f"；IDOK-247 待补道路 {row['deferredRoad']} 的结构后复验"
             conflict=conflicts.get((row['rail'],row['road'],row['lat'],row['lon']))
+            if point['clearanceM'] is None and point['surfaceSource']=='terrain_proxy' and row['status']=='active':
+                row['status']='pending_road_structure'
+                row['evidence']+='；缺独立下层路面高程，待复验'
             if conflict:
                 row['clearanceConflict']={k:v for k,v in conflict.items() if k not in ('rail','road','lat','lon','type')}
+    pending_decks={tuple(pair) for pair in review['pendingRoadDeck']}
+    for row in rows:
+        if (row['rail'],row['road']) in pending_decks:
+            row['status']='pending_road_deck'
+            row['evidence']+='；IDOK-247 抬高合成桥面并补建引坡后复验'
     (docs / 'railway-crossings.json').write_text(json.dumps(rows, ensure_ascii=False, indent=2) + '\n')
     lines = ['# 可玩区路铁交点', '', '来源为 raw-expanded-20261124。每行对应一对 way 的一个相交分量。同一地点可能有多条股道或道路分段。JSON 保留双方标签。设计净空取中心线交点处的轨面、路面和梁底高程（铁路梁高 1.20 m，道路薄桥 0.60 m），单位 m。JSON 的 clearanceConflict 给出约束来源、允许高差和相反约束位置。terrain_proxy 表示下层路面尚缺独立高程证据。全宽最小净空仍待实测。', '',
              '| 铁路 way | 道路 way | 纬度 | 经度 | 共享节点及版本 | type | 验收状态 | 设计净空 m | 证据 |',
