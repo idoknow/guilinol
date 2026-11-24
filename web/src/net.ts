@@ -35,6 +35,9 @@ export function attachNet(scene:Scene,clips:AnimationClip[],getPose:()=>Pose,get
     timer=window.setTimeout(connect,Math.round(backoff*(0.8+Math.random()*0.4)))
   }
   async function connect(){
+    // 复用在用的连接：切偏好、重复触发、取票竞态都不能再建第二条（一条 tab 只许一条 socket）
+    if(socket&&(socket.readyState===WebSocket.OPEN||socket.readyState===WebSocket.CONNECTING))return
+    clearTimeout(timer)
     const version=++generation;update('connecting')
     try{
       const response=await fetch('/api/rt/ticket',{method:'POST',credentials:'same-origin'})
@@ -43,6 +46,8 @@ export function attachNet(scene:Scene,clips:AnimationClip[],getPose:()=>Pose,get
       if(!response.ok)throw Error('ticket unavailable')
       const {ticket}=await response.json();if(version!==generation)return
       const endpoint=localStorage.getItem('guiling.ws')||`${location.protocol==='https:'?'wss':'ws'}://${location.host}/ws`
+      const previous=socket
+      if(previous){previous.onopen=previous.onmessage=previous.onclose=previous.onerror=null;try{previous.close(1000,'replace')}catch{}}
       const ws=new WebSocket(endpoint);socket=ws
       ws.onopen=()=>{if(version===generation)send({t:'join',ticket,avatar:getAvatar(),...getPose()})}
       ws.onmessage=event=>{
@@ -77,8 +82,21 @@ export function attachNet(scene:Scene,clips:AnimationClip[],getPose:()=>Pose,get
   const unsubscribe=onUser(user=>{const id=user?.id??null;if(id===account)return
     account=id;stop();if(id){attempt=0;void connect()}})
   window.addEventListener('glol:avatar-change',avatarChanged)
+  // 切后台/关页面时干净收尾：手机浏览器经常直接冻结 WebSocket，主动关掉能立刻把服务端名额还回去，
+  // 不用等心跳超时——这也是「同一账号第二次连不上」的常见来源。
+  const pageHide=()=>{
+    clearTimeout(timer)
+    const ws=socket;socket=undefined
+    if(ws){ws.onopen=ws.onmessage=ws.onclose=ws.onerror=null;try{ws.close(1000,'pagehide')}catch{}}
+  }
+  const pageShow=()=>{if(!disposed&&!socket&&(state==='offline'||state==='connecting'))retry(500)}
+  window.addEventListener('pagehide',pageHide)
+  window.addEventListener('pageshow',pageShow)
   const manual=()=>{if(!disposed){stop();attempt=0;void connect()}}
   window.addEventListener('glol:mp-reconnect',manual)
   return {emote,status,tick,who:()=>send({t:'who'}),probe:peers.probe,reconnect:manual,
-    dispose(){disposed=true;unsubscribe();stop();badge?.remove();window.removeEventListener('glol:avatar-change',avatarChanged);window.removeEventListener('glol:mp-reconnect',manual);publish({state:'off',online:0})}}
+    dispose(){disposed=true;unsubscribe();stop();clearTimeout(timer)
+      if(socket){const ws=socket;socket=undefined;ws.onopen=ws.onmessage=ws.onclose=ws.onerror=null;try{ws.close(1000,'dispose')}catch{}}
+      badge?.remove();window.removeEventListener('glol:avatar-change',avatarChanged);window.removeEventListener('glol:mp-reconnect',manual)
+      window.removeEventListener('pagehide',pageHide);window.removeEventListener('pageshow',pageShow);publish({state:'off',online:0})}}
 }
