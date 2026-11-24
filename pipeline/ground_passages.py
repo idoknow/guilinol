@@ -209,3 +209,56 @@ def grain_yard(output,manifest,elements,widths):
             paths[0].insert(at,row)
             if lower:lower[0]+=1
         write_parts(file,tile,raw,start,size,c,parts,origin)
+
+
+def level_soffits(output, manifest, elements, widths):
+    """Include crossfall in the headroom check after paving the approaches."""
+    roads=[w for w in elements if w.get('surfaceUnderlay') and
+           w['tags']['highway'] not in ('footway','path','pedestrian') and w['id'] not in (1025751314,1034716138)]
+    axes=STRtree([LineString(points(w)) for w in roads])
+    work=[];samples=[]
+    for tile in manifest['chunks']:
+        x,z=tile['x'],tile['z']
+        if not len(axes.query(box(x,z,x+256,z+256))):continue
+        rows=read_chunk(output/tile['file'])[3][0]
+        origin=np.array([x,z]);updates=[]
+        for row in rows:
+            if not any(row[9:]) or row[5] in (1551968228%65536,1568418630%65536,1572366586):continue
+            poly=footprint(row,origin);start=len(samples)
+            for i in axes.query(poly,predicate='intersects'):
+                w=roads[i];axis=axes.geometries[i]
+                overlap=authorized_overlap(row[5],w['id'],axis.intersection(poly),w.get('warehousePassages'))
+                if overlap.length<=1:continue
+                half=widths.get(w['id'],width(w['tags']))/2+.5
+                for part in line_parts(overlap):
+                    n=math.ceil(part.length/.45)
+                    for j in range(n+1):
+                        d=part.length*j/n;pt=part.interpolate(d)
+                        a=part.interpolate(max(0,d-.02));b=part.interpolate(min(part.length,d+.02))
+                        dx,dz=b.x-a.x,b.y-a.y;length=math.hypot(dx,dz)
+                        if length<.001:continue
+                        for side in np.linspace(-half,half,2*math.ceil(half/.45)+1):
+                            px,pz=pt.x+dz*side/length,pt.y-dx*side/length
+                            if poly.covers(Point(px,pz)):samples.append(dict(x=px,z=pz,pavementOnly=True))
+            if len(samples)>start:updates.append((row[5],row[0],row[1],start,len(samples)))
+        if updates:work.append((tile,updates))
+    if not samples:return
+    heights=sample_road_heights(output,manifest,samples)
+    for tile,updates in work:
+        lifts={}
+        for seed,old,top,a,b in updates:
+            peak=max((y for y in heights[a:b] if y is not None),default=-math.inf)
+            if peak==-math.inf or old/10>=peak+3.54:continue
+            ceiling=math.ceil((peak+3.54)*10)
+            if ceiling>=top:raise ValueError(f'Passage {seed} cannot meet headroom at pavement edge')
+            lifts[seed,old]=max(ceiling,lifts.get((seed,old),old))
+        if not lifts:continue
+        file=output/tile['file'];raw,start,size,c=read_chunk(file)
+        origin=np.array([tile['x'],tile['z']]);parts=[]
+        for row in c[0]:
+            base,roof,_,kind,floors,seed,anchor,rect,shape,*flags=row
+            if any(flags):base=lifts.get((seed,base),base)
+            else:roof=lifts.get((seed,roof),roof)
+            center=Point(np.asarray(anchor)/100+origin) if anchor else Point(origin-1)
+            parts.extend((poly,(base/10,roof/10,kind,floors,seed,center,rect,shape,*flags)) for poly in polygons(footprint(row,origin)))
+        write_parts(file,tile,raw,start,size,c,parts,origin)
