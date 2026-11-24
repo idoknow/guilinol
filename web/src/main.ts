@@ -14,7 +14,8 @@ import {isDeepLink} from './deeplink'
 import {readLastView, saveLastView, consumeRestore, applyLastView} from './lastview'
 import {walkConfig} from './walk/config'
 import {atmo, env, evaluate, setFogMetrics} from './look/time'
-import {currentMirrorLevel, isWaterInView, renderMirror, WATER_LAYER} from './look/water'
+import {prepareMirror, renderMirror, WATER_LAYER} from './look/water'
+import {MAIN_DETAIL_LAYER} from './look/mirror-layer'
 import {rain} from './look/rain'
 import {windowLight} from './look/buildings'
 import {skyClock} from './ui/sky'
@@ -90,6 +91,7 @@ async function start(loader:FullLoader,creatorSpawn=false) {
   scene.fog = new THREE.Fog(look.hazeNear,0,1)
   const dome = sky(), drops = freezeStatic(rain()); scene.add(dome,drops)
   camera.layers.enable(WATER_LAYER)
+  camera.layers.enable(MAIN_DETAIL_LAYER)
   const light = new THREE.DirectionalLight(look.sunColor,look.sunPower)
   light.position.set(...look.sunDirection); scene.add(light)
   const hemi = new THREE.HemisphereLight(look.hemiSky,look.hemiGround,look.hemiPower); scene.add(hemi)
@@ -503,6 +505,7 @@ async function start(loader:FullLoader,creatorSpawn=false) {
     resume(){previous=0;renderer.setAnimationLoop(animate)},
     probeFoot(){
       const ray = new THREE.Raycaster(camera.position,new THREE.Vector3(0,-1,0))
+      ray.layers.enable(MAIN_DETAIL_LAYER)
       const clearance = ray.intersectObjects(scene.children)[0]?.distance
       ray.setFromCamera(new THREE.Vector2(0,0),camera)
       const hits = ray.intersectObjects(scene.children)
@@ -529,14 +532,14 @@ async function start(loader:FullLoader,creatorSpawn=false) {
   function draw(){
     base.update(camera)
     const metrics=stream.metrics
-    const mirror = frame>=2 && isWaterInView(camera) ? currentMirrorLevel(camera) : -Infinity
+    const ground=!!walker?.active && !cinema
+    const mirror=prepareMirror(camera,flags.noMirror||frame<2,ground?walker?.waterSightBlocked:undefined)
     cullLandmarks?.update(stream.landmarks.values(),camera,mirror,metrics.cullHorizon)
     peaks.update(camera,mirror,metrics,!stream.isInnerBusy())
     if(Number.isFinite(mirror))cullLandmarks?.pass(true)
     // Reuse the last reflection while tiles are still streaming: pending work is exactly when the
     // mirror costs the most, and a frame-old reflection is invisible under the ripple distortion.
-    const mirrorOff = flags.noMirror || !Number.isFinite(mirror)
-    renderMirror(renderer,scene,camera,mirrorOff,!walker?.active&&!cinema&&clock.weather==='clear')
+    renderMirror(renderer,scene,camera,mirror,ground||(!cinema&&clock.weather==='clear'),ground)
     cullLandmarks?.pass(false)
     renderer.render(scene,camera)
   }
