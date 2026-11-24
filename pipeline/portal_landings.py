@@ -1,6 +1,8 @@
 """Blend the baked pavement cross-section into the floor at a graded mouth."""
 import base64
 import math
+import json
+from pathlib import Path
 
 import numpy as np
 from shapely import LineString, Point, STRtree, box
@@ -8,6 +10,7 @@ from shapely.ops import substring
 from canal_passages import sample_road_heights
 from features import points
 from vehicle_tunnels import grade_limit
+from service_streets import width
 
 from surveyed_corridors import read_chunk, write_chunk
 
@@ -22,7 +25,6 @@ def bake(output, manifest, tunnels, elements):
             # Tie the existing outside pavement across the entire lane, then
             # return to its longitudinal grade. Keep the space over the roof.
             mouths.append((x,z,y,dx,dz,half,tunnel['clearance']))
-    index=STRtree([Point(x,z).buffer(14) for x,z,*_ in mouths])
     # These two approaches turn inside the measured 20 m station. Follow
     # their actual centreline past the bend and tie back into the existing road.
     approaches=[];samples=[]
@@ -39,6 +41,37 @@ def bake(output, manifest, tunnels, elements):
     heights=sample_road_heights(output,manifest,samples) if samples else []
     ribbons=[(k,np.asarray(axis.coords),axis.length,half,base,target,cap) for (k,axis,half,base,cap),target
              in zip(approaches,heights,strict=True) if abs(target-base)<=cap*axis.length]
+    refit(output, chunks, mouths, ribbons, landing=True)
+
+
+def carriageways(output, manifest, elements, widths):
+    intervals = json.loads(Path(__file__).with_name('wheel-track-survey.json').read_text())
+    spans, samples = [], []
+    for way in elements:
+        if way['type'] != 'way' or str(way['id']) not in intervals:
+            continue
+        line = LineString(points(way))
+        half = widths.get(way['id'], width(way['tags'])) / 2
+        limit = grade_limit(way['tags']['highway'])
+        for start, end in intervals[str(way['id'])]:
+            axis = substring(line, start, end)
+            if axis.length < 10:
+                continue
+            for x,z in (axis.coords[0], axis.coords[-1]):
+                samples.append(dict(x=x, z=z, way=way['id']))
+            spans.append((way['id'], np.asarray(axis.coords), axis.length, half, limit))
+    heights = iter(sample_road_heights(output, manifest, samples)) if samples else iter(())
+    ribbons = []
+    for way, coords, length, half, limit in spans:
+        start, end = next(heights), next(heights)
+        if abs(end-start) <= limit*length:
+            ribbons.append((way, coords, length, half, start, end, limit))
+    refit(output, manifest['chunks'], [], ribbons, landing=False)
+
+
+def refit(output, chunks, mouths, ribbons, *, landing):
+    index=STRtree([Point(x,z).buffer(14) for x,z,*_ in mouths])
+    resolution = .75 if landing else 2.0
     for tile in chunks:
         ox,oz=tile['x'],tile['z']
         near=index.query(box(ox,oz,ox+256,oz+256),predicate='intersects')
@@ -64,7 +97,7 @@ def bake(output, manifest, tunnels, elements):
                     pad=half+4
                     refine |= ((x.min(axis=1)<coords[:,0].max()+pad)&(x.max(axis=1)>coords[:,0].min()-pad)&
                                (z.min(axis=1)<coords[:,1].max()+pad)&(z.max(axis=1)>coords[:,1].min()-pad))
-                refine &= (np.ptp(x,axis=1)>.75)|(np.ptp(z,axis=1)>.75)
+                refine &= (np.ptp(x,axis=1)>resolution)|(np.ptp(z,axis=1)>resolution)
                 ready.append(faces[~refine])
                 if not np.any(refine):break
                 a,b,c=faces[refine].transpose(1,0,2);ab=(a+b)/2;bc=(b+c)/2;ca=(c+a)/2
@@ -101,7 +134,13 @@ def bake(output, manifest, tunnels, elements):
                     t=np.where(t<ease,t*t/(2*ease),np.where(t>1-ease,
                                1-ease-(1-t)**2/(2*ease),t-ease/2))/(1-ease)
                 grade=base+(target-base)*t
-                fade=np.clip(np.minimum((length-station)/5,1-np.maximum(0,nearest-half)/3),0,1)
+                if landing:
+                    end_weight=(length-station)/5
+                    shoulder=3
+                else:
+                    end_weight=np.minimum(station,length-station)/4
+                    shoulder=.5
+                fade=np.clip(np.minimum(end_weight,1-np.maximum(0,nearest-half)/shoulder),0,1)
                 fade=fade*fade*(3-2*fade)
                 mask=(np.abs(height-grade)<4.5)&(fade>0)
                 new[mask]+=(grade[mask]-new[mask])*fade[mask]

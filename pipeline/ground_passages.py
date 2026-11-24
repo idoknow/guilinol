@@ -21,6 +21,12 @@ GARAGE = (2937485852, 1493582667)
 LONG_PASSAGE = (2515875700, 1112703462)
 
 
+def passage_road(way):
+    # The access road continues through a separate building on the approach
+    # to surface junction 14286127223. Use the same footprint and soffit rules.
+    return way.get('surfaceUnderlay') or (way['type']=='way' and way['id']==1568445637)
+
+
 def opens_road(seed, way, length):
     pair=(seed,way)
     return seed!=YARD and pair!=GARAGE and length>1 and (length<=40 or pair==LONG_PASSAGE)
@@ -100,7 +106,7 @@ def open_segments(way, coords, obstacle, curbs, paved):
 
 
 def bake(output, manifest, elements, widths, curbs):
-    roads=[w for w in elements if w.get('surfaceUnderlay') and w['tags']['highway'] not in ('footway','path','pedestrian')]
+    roads=[w for w in elements if passage_road(w) and w['tags']['highway'] not in ('footway','path','pedestrian')]
     axes=STRtree([LineString(points(w)) for w in roads])
     requests=[]
     tiles=[]
@@ -280,7 +286,7 @@ def grain_yard(output,manifest,elements,widths):
 
 def level_soffits(output, manifest, elements, widths):
     """Include crossfall in the headroom check after paving the approaches."""
-    roads=[w for w in elements if w.get('surfaceUnderlay') and
+    roads=[w for w in elements if passage_road(w) and
            w['tags']['highway'] not in ('footway','path','pedestrian') and w['id'] not in (1025751314,1034716138)]
     axes=STRtree([LineString(points(w)) for w in roads])
     work=[];samples=[]
