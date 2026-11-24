@@ -276,6 +276,7 @@ const views: View[] = [
   { key: 'live', label: '实时', icon: '●', group: '数据' },
   { key: 'server', label: '服务端', icon: '▣', group: '数据', ranged: true },
   { key: 'mp', label: '联机', icon: '⇋', group: '数据' },
+  { key: 'npc', label: '路人与车流', icon: '⇄', group: '数据' },
   { key: 'feedback', label: '反馈处理', icon: '✉', group: '运营' },
   { key: 'users', label: '用户与权限', icon: '☺', group: '运营' },
   { key: 'audit', label: '操作记录', icon: '☰', group: '运营' },
@@ -1210,6 +1211,22 @@ const pages: Record<string, (view: View) => void> = {
     }, skeleton(8))
   },
 
+  npc() {
+    paintTop(views.find(view=>view.key==='npc')!,[])
+    const form=h('form',{class:'adm-npc'});main.append(form)
+    void api('admin/npc').then(settings=>{
+      const labels:Record<string,string>={classes:'大路类别（每行一类）',carMin:'每街最少车辆',carMax:'每街最多车辆',personMin:'每街最少行人',personMax:'每街最多行人',horn:'鸣笛',mutter:'念叨',bubble:'碰撞气泡',volume:'NPC 音量',bumpSpeed:'碰撞阈值（米/秒）',bubbleSeconds:'气泡时长（秒）',bumpLines:'碰撞台词（每行一句）',mutterLines:'念叨台词（每行一句）'}
+      const readers=new Map<string,()=>unknown>()
+      for(const [key,label] of Object.entries(labels)){
+        const value=settings[key],field=Array.isArray(value)?document.createElement('textarea'):document.createElement('input')
+        if(field instanceof HTMLInputElement){field.type=typeof value==='boolean'?'checkbox':'number';field.step='any';field.checked=value===true;field.value=String(value)}else field.value=value.join('\n')
+        readers.set(key,()=>field instanceof HTMLTextAreaElement?field.value.split('\n').map(line=>line.trim()).filter(Boolean):field.type==='checkbox'?field.checked:field.valueAsNumber)
+        form.append(h('div',null,h('label',null,label,field)))
+      }
+      form.append(h('button',{type:'submit'},'保存'))
+      form.onsubmit=event=>{event.preventDefault();void api('admin/npc',Object.fromEntries([...readers].map(([key,read])=>[key,read()]))).then(()=>toast('已保存，新进场生效')).catch(()=>toast('保存失败，请检查参数'))}
+    }).catch(()=>toast('配置读取失败'))
+  },
   mp() {
     const stamp = h('span', { class: 'adm-sub adm-live-stamp' })
     paintTop(views.find((v) => v.key === 'mp')!, [h('span', { class: 'adm-live-dot', 'aria-hidden': 'true' }), stamp])
