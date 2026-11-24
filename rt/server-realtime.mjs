@@ -26,10 +26,10 @@
  *   hit.by = 出手者昵称（显示用）、hit.byId = 出手者会话 id（被打方拿它算挨打方向）
  *
  * 抽烟字段（别人也能看见你点烟/吸烟的动作）
- *   sc  = 0 没抽 / 1 正在点烟 / 2 已经点着
- *   sb  = 剩余可燃时间 × 10（0..1800）
+ *   sc  = 0 没抽 / 1 正在点烟 / 2 已经点着 / 3–8 掏盒到待点燃
+ *   sb  = 剩余烟身比例 × 1800（0..1800）
  *   sp  = 吸了几口的累计计数（0..999），换值就说明刚吸了一口
- *   br  = 品牌序号（0..3）
+ *   br  = 品牌序号（0..5），ss 是本口强度，sd 是丢弃次数
  *
  * HTTP
  *   GET  /health          → {ok:true, online, proto, maxPlayers, banned, connections}
@@ -424,7 +424,7 @@ function publicOf(p,viewer=p) {
     bike: p.bike, bx: p.bx, bz: p.bz, byaw: p.byaw,
     hb: p.hb, hx: p.hx, hz: p.hz, hyaw: p.hyaw, mv: p.mv, dn: p.dn, pn: p.pn, wl: p.wl, cr: p.cr, gr: p.gr,
     hp: p.hp, em:inEmoteRange(p,viewer)&&now()<p.emoteUntil?p.em:0, es:p.es,
-    sc: p.sc, sb: p.sb, sp: p.sp, br: p.br,
+    sc: p.sc, sb: p.sb, sp: p.sp, br: p.br, ss:p.ss, sd:p.sd, sr:p.sr,
   }
 }
 
@@ -753,7 +753,7 @@ wss.on('connection', (ws, req) => {
           sc: 0,
           sb: 0,
           sp: 0,
-          br: 0,
+          br: 0, ss:1, sd:0, sr:20,
           em:0, es:0, emoteTimes:[], emoteUntil:0,
           lastPos: 0,
           cell: '',
@@ -829,10 +829,13 @@ wss.on('connection', (ws, req) => {
         me.gr = clampNum(msg.gr, 0, 1, 1)
         // 血量：出手方靠它看到自己打掉了多少，被打的人也靠它对齐屏幕上的血条
         me.hp = clampInt(msg.hp, 0, 100, 100)
-        me.sc = clampInt(msg.sc, 0, 2)
+        me.sc = clampInt(msg.sc, 0, 8)
         me.sb = clampInt(msg.sb, 0, 1800)
         me.sp = clampInt(msg.sp, 0, 999)
-        me.br = clampInt(msg.br, 0, 3)
+        me.sr = clampInt(msg.sr, 0, 20, 20)
+        me.sd = clampInt(msg.sd, 0, 999)
+        me.ss = clampInt(msg.ss, 1, 2, 1)
+        me.br = clampInt(msg.br, 0, 5)
         aoiMove(me)
         aoiSend(me, {
           t: 'pos', id: me.id,
@@ -840,7 +843,7 @@ wss.on('connection', (ws, req) => {
           bike: me.bike, bx: me.bx, bz: me.bz, byaw: me.byaw,
           hb: me.hb, hx: me.hx, hz: me.hz, hyaw: me.hyaw, mv: me.mv, cr: me.cr, gr: me.gr, dn: me.dn, pn: me.pn, wl: me.wl,
           hp: me.hp,
-          sc: me.sc, sb: me.sb, sp: me.sp, br: me.br,
+          sc: me.sc, sb: me.sb, sp: me.sp, br: me.br, ss:me.ss, sd:me.sd, sr:me.sr,
         })
         return
       }

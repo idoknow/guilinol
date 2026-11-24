@@ -1,3 +1,5 @@
+import {smokeEnabled} from '../citizen/use-item'
+import {getActiveSaveSnapshot} from '../game/save'
 import './hotbar.css'
 import {camera} from '../gear/cameras'
 import {onPrefs, prefs} from './prefs'
@@ -6,7 +8,7 @@ import {onPrefs, prefs} from './prefs'
 // 默认空手；按 1 / 2 或点格子切换。只有选中「相机」时手上才拿机身、右臂才抬到胸前。
 // 每次进游戏都从空手开始，不记忆。
 
-export type HotbarSlot = 'hand' | 'camera'
+export type HotbarSlot = 'hand' | 'camera' | 'smoke'
 
 let slot: HotbarSlot = 'hand'
 let bar: HTMLElement | null = null
@@ -22,6 +24,7 @@ export function hotbarSlot(): HotbarSlot {
 }
 
 export function selectSlot(next: HotbarSlot) {
+  if (slot === 'smoke' && next !== slot) window.dispatchEvent(new Event('smoke:cancel'))
   slot = next
   if (!bar) return
   for (const button of Array.from(bar.querySelectorAll<HTMLButtonElement>('.hotbar-slot'))) {
@@ -56,17 +59,30 @@ export function mountHotbar() {
     <button type="button" class="hotbar-slot" data-slot="camera" title="相机（2）" aria-label="相机（2）">
       <kbd>2</kbd>${CAMERA_ICON}<span>相机</span>
     </button>`
+  if (smokeEnabled()) {
+    bar.insertAdjacentHTML('beforeend', '<button type="button" class="hotbar-slot" data-slot="smoke" aria-label="香烟"><kbd>3</kbd><b class="pack-count"></b><span>香烟</span></button><button type="button" class="hotbar-slot" data-shop="smoke">香烟铺</button>')
+    const count = bar.querySelector('.pack-count')!
+    const refresh = () => {count.textContent = String(getActiveSaveSnapshot().packs.length)}
+    refresh()
+    window.addEventListener('glol:save-written',refresh)
+    bar.querySelector('[data-shop]')!.addEventListener('click',()=>window.dispatchEvent(new Event('smoke:shop')))
+  }
   for (const button of Array.from(bar.querySelectorAll<HTMLButtonElement>('.hotbar-slot'))) {
     // 不抢焦点：点完格子 WASD 还能继续走。
     button.addEventListener('pointerdown', event => event.preventDefault())
-    button.addEventListener('click', () => selectSlot(button.dataset.slot as HotbarSlot))
+    if (button.dataset.slot) button.addEventListener('click', () => {
+      if (button.dataset.slot === 'smoke') window.dispatchEvent(new Event('smoke:slot'))
+      else selectSlot(button.dataset.slot as HotbarSlot)
+    })
   }
   window.addEventListener('keydown', event => {
     if (!bar || bar.hidden || event.repeat || event.altKey || event.ctrlKey || event.metaKey) return
     if (riding()) return // 骑行时 1–4 是档位
     const target = event.target as HTMLElement | null
     if (target && (target.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName))) return
-    if (event.code === 'Digit1') selectSlot('hand')
+    if (document.body.dataset.shopOpen) return
+    if (event.code === 'Digit3' && smokeEnabled()) window.dispatchEvent(new Event('smoke:slot'))
+    else if (event.code === 'Digit1') selectSlot('hand')
     else if (event.code === 'Digit2') selectSlot('camera')
   })
   const label = () => {
@@ -78,4 +94,12 @@ export function mountHotbar() {
   onPrefs(label)
   document.body.append(bar)
   selectSlot(slot)
+}
+
+export function showSmokeDiscard(on:boolean){
+  const button=bar?.querySelector<HTMLButtonElement>('[data-slot=smoke]')
+  if(!button || button.dataset.discard===String(on))return
+  button.dataset.discard=String(on)
+  button.setAttribute('aria-label',on?'丢弃香烟':'香烟')
+  button.querySelector('span')!.textContent=on?'丢弃':'香烟'
 }

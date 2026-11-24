@@ -1,3 +1,4 @@
+import {brandOf,rules} from '../smoke/data'
 /**
  * Universal Shop / Wardrobe / Service UI Skeleton (`web/src/ui/shop-overlay.ts`).
  *
@@ -35,7 +36,7 @@ import {
 import {getShop, type ShopTriggerDef} from '../game/shops'
 import {emit, getState, onState, setActiveShop, type GameState} from '../game/state'
 
-export type ShopOverlayMode = 'shop' | 'service' | 'wardrobe' | 'garage'
+export type ShopOverlayMode = 'smoke' | 'shop' | 'service' | 'wardrobe' | 'garage'
 export type ShopCloseReason = 'user' | 'esc' | 'fly' | 'teleport' | 'testride'
 
 export interface ShopOverlayHooks {
@@ -70,6 +71,7 @@ export interface ShopOverlayHandle {
   root: HTMLElement
   openShop: (shopId: string, initialTab?: string) => boolean
   openServiceBay: (shopId: string) => boolean
+  openSmoke: (message?:string) => boolean
   openWardrobe: () => boolean
   openGarage: () => boolean
   close: (reason?: ShopCloseReason) => void
@@ -152,7 +154,17 @@ export function mountShopOverlay(hooks: ShopOverlayHooks = {}): ShopOverlayHandl
   let selectedKey: string | null = null
   let previewSnapshot: EquippedOutfit | null = null
   let previewingLabel = ''
-  let clickSessionNonce = 0
+  const packStage = document.createElement('div')
+  packStage.className = 'pack-stage'
+  const packPreview = document.createElement('div')
+  packPreview.className = 'pack-preview'
+  for (let i=0;i<6;i++) packPreview.append(document.createElement('span'))
+  packStage.append(packPreview)
+  stageEl.append(packStage)
+  let packYaw = -18, packPitch = -10
+  const orientPack = () => {packPreview.style.transform = `rotateX(${packPitch}deg) rotateY(${packYaw}deg)`}
+  orientPack()
+  let clickSessionNonce = Date.now()
   let busyPurchasing = false
   let statusMessage = ''
   let statusTone: 'ok' | 'warn' = 'ok'
@@ -166,6 +178,7 @@ export function mountShopOverlay(hooks: ShopOverlayHooks = {}): ShopOverlayHandl
   }
 
   function tabsForMode(): {id: string; label: string}[] {
+    if (mode === 'smoke') return [{id:'packs',label:'香烟'}]
     if (mode === 'wardrobe') {
       return [
         {id: 'presets', label: '已购套装'},
@@ -204,6 +217,10 @@ export function mountShopOverlay(hooks: ShopOverlayHooks = {}): ShopOverlayHandl
   }
 
   function buildCards(s: Readonly<GameState>): RenderCard[] {
+    if (mode === 'smoke') return rules.brands.map(({id,price}) => {
+      const b = brandOf(id)
+      return {key:id,itemId:id,itemType:'cigarette_pack',name:b.name,desc:b.series+' · 每包 20 支',price,owned:false,active:false,swatchHex:b.pack}
+    })
     const ownedItems = new Set(s.wardrobe.ownedItemIds)
     const ownedPresets = new Set(s.wardrobe.ownedPresetIds)
     const ownedVehicles = Object.values(s.garage.vehicles)
@@ -449,6 +466,7 @@ export function mountShopOverlay(hooks: ShopOverlayHooks = {}): ShopOverlayHandl
         : mode === 'garage'
           ? '个人电动车库'
           : currentShop?.displayName ?? '桂林商圈'
+    if (mode === 'smoke') {badgeEl.textContent = '桂林商圈'; titleEl.textContent = '香烟铺'}
     walletValEl.textContent = fmtMoney(s.money)
 
     const tabs = tabsForMode()
@@ -530,6 +548,14 @@ export function mountShopOverlay(hooks: ShopOverlayHooks = {}): ShopOverlayHandl
         <p class="shop-card-desc">${card.desc}</p>
         ${specsHtml}
       `
+      if(card.itemType==='cigarette_pack'){
+        const thumb=el.querySelector<HTMLElement>('.shop-swatch')!
+        const b=brandOf(card.itemId)
+        thumb.classList.add('pack-thumb')
+        thumb.style.background='linear-gradient('+b.lid+' 22%, '+b.pack+' 22%)'
+        thumb.textContent=b.faceTexture?'':b.name
+        if(b.faceTexture){thumb.style.backgroundImage=`url("${b.faceTexture}")`;thumb.style.backgroundSize='cover'}
+      }
       el.onclick = () => {
         selectedKey = card.key
         setStatus('')
@@ -540,6 +566,15 @@ export function mountShopOverlay(hooks: ShopOverlayHooks = {}): ShopOverlayHandl
     }
 
     const activeCard = cards.find(c => c.key === selectedKey) ?? null
+    if (mode === 'smoke' && activeCard) {
+      const b = brandOf(activeCard.itemId)
+      packPreview.style.setProperty('--pack', b.pack)
+      packPreview.style.setProperty('--lid', b.lid)
+      const face=packPreview.firstElementChild as HTMLElement
+      face.textContent=b.faceTexture?'':b.name
+      face.style.backgroundImage=b.faceTexture?`url("${b.faceTexture}")`:''
+      face.style.backgroundSize='cover'
+    }
     const isDefaultOutfit = (Object.keys(DEFAULT_EQUIPPED_OUTFIT) as OutfitSlot[]).every(
       slot => s.wardrobe.equipped[slot] === DEFAULT_EQUIPPED_OUTFIT[slot],
     )
@@ -689,7 +724,7 @@ export function mountShopOverlay(hooks: ShopOverlayHooks = {}): ShopOverlayHandl
           } else if (res.code === 'INSUFFICIENT_FUNDS') {
             setStatus(`余额不足，还差 ${fmtMoney(res.deficit ?? 0)}。`, 'warn')
           } else if (res.code === 'ALREADY_FULL') {
-            setStatus('电量与耐久已满，无需重复养护。', 'ok')
+            setStatus(mode==='smoke'?'已持有 3 包香烟。':'电量与耐久已满，无需重复养护。', 'ok')
           } else {
             setStatus(`操作未完成（${res.code}）`, 'warn')
           }
@@ -704,6 +739,7 @@ export function mountShopOverlay(hooks: ShopOverlayHooks = {}): ShopOverlayHandl
   function openInternal(nextMode: ShopOverlayMode, shop: ShopTriggerDef | null, initialTab?: string): boolean {
     if (open) close('user')
     mode = nextMode
+    packStage.hidden = mode !== 'smoke'
     currentShop = shop
     activeTab = initialTab ?? (nextMode === 'service' ? 'service' : shop?.kind === 'ebike' || nextMode === 'garage' ? 'models' : 'presets')
     selectedKey = null
@@ -784,7 +820,8 @@ export function mountShopOverlay(hooks: ShopOverlayHooks = {}): ShopOverlayHandl
     prev.x = event.clientX
     prev.y = event.clientY
     if (stagePointers.size === 1) {
-      hooks.onOrbitDrag?.(dx, dy)
+      if (mode === 'smoke') {packYaw += dx*.8; packPitch=Math.max(-80,Math.min(80,packPitch-dy*.5));orientPack()}
+      else hooks.onOrbitDrag?.(dx, dy)
     } else if (stagePointers.size === 2) {
       const next = pinchDist()
       if (stagePinch > 0 && next > 0) hooks.onOrbitZoom?.((stagePinch - next) * 1.4)
@@ -837,6 +874,11 @@ export function mountShopOverlay(hooks: ShopOverlayHooks = {}): ShopOverlayHandl
       const shop = getShop(shopId)
       if (!shop) return false
       return openInternal('service', shop, 'service')
+    },
+    openSmoke(message) {
+      const opened=openInternal('smoke',null,'packs')
+      if(message)setStatus(message,'warn')
+      return opened
     },
     openWardrobe() {
       return openInternal('wardrobe', null, 'presets')

@@ -1,3 +1,4 @@
+import {readPacks, type Pack} from '../smoke/data'
 /**
  * Backward-compatible persistence layer for `localStorage['glol.save.v1']` (schemaVersion: 2).
  *
@@ -96,6 +97,7 @@ export interface LocalSaveV1 {
   spotsFound: string[]
   missionsDone: string[]
   updatedAt: number
+  packs: Pack[]
   wardrobe: WardrobeState
   garage: {
     activeVehicleId: string | null
@@ -296,6 +298,7 @@ function sanitizeTxRing(raw: unknown, limit = TX_HISTORY_RING_LIMIT): LedgerTxRe
 export function createDefaultSave(nowMs = Date.now()): LocalSaveV1 {
   return {
     schemaVersion: SAVE_SCHEMA_VERSION,
+    packs: [],
     money: DEFAULT_START_MONEY,
     owned: [],
     spotsFound: [],
@@ -333,6 +336,7 @@ export function cloneSave(save: LocalSaveV1): LocalSaveV1 {
   return {
     schemaVersion: SAVE_SCHEMA_VERSION,
     [AVATAR_KEY]: sanitizeAvatar(save[AVATAR_KEY]),
+    packs: readPacks(save.packs),
     money: save.money,
     owned: [...save.owned],
     spotsFound: [...save.spotsFound],
@@ -483,6 +487,7 @@ export function sanitizeSave(raw: unknown, nowMs = Date.now()): {save: LocalSave
     missionsDone,
     updatedAt,
     [AVATAR_KEY]: sanitizeAvatar(raw[AVATAR_KEY]),
+    packs: readPacks(raw.packs),
     wardrobe,
     garage: {activeVehicleId, vehicles},
     economy: {
@@ -835,6 +840,7 @@ export function mergeCloudAndLocalSave(localRaw: LocalSaveV1, cloudRaw: LocalSav
   const merged: LocalSaveV1 = {
     schemaVersion: SAVE_SCHEMA_VERSION,
     [AVATAR_KEY]: newer[AVATAR_KEY] ?? older[AVATAR_KEY],
+    packs: readPacks(newer.packs),
     money: mergedMoney,
     owned: mirrorOwnedModels(vehicles, [...cloud.owned, ...local.owned]),
     spotsFound,
@@ -861,4 +867,13 @@ export function mergeCloudAndLocalSave(localRaw: LocalSaveV1, cloudRaw: LocalSav
     },
   }
   return sanitizeSave(merged, nowMs).save
+}
+
+export function takeFromPack(brand: string): boolean {
+  const next = cloneSave(getActiveSaveSnapshot())
+  const pack = next.packs[0]
+  if (!pack || pack.brand !== brand) return false
+  if (--pack.remaining === 0) next.packs.shift()
+  next.updatedAt = Date.now()
+  return persistSaveSync(next)
 }

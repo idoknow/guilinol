@@ -9,7 +9,7 @@
     "verify:cloud-save": "tsx scripts/verify-cloud-save.mjs",
     "verify:loading": "node scripts/verify-loading.mjs",
     "verify:admin": "node scripts/auth-test.mjs --admin-ui",
-    "test:smoke": "node --test scripts/smoke-test.mjs",
+    "test:smoke": "node --import tsx --test scripts/smoke-test.mjs",
     "dev:full": "npm run build && wrangler d1 migrations apply glol --local && wrangler pages dev dist --binding EMAIL_DEV_LOG=1",
     "test:api": "node --test scripts/test-projection.mjs && node scripts/auth-test.mjs",
     "verify:feedback": "node scripts/auth-test.mjs --feedback-ui",
