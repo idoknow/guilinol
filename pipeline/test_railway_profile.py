@@ -3,7 +3,7 @@ import unittest
 import numpy as np
 from shapely import box
 
-from railways import parallel_height_audit, parallel_segments
+from railways import LEVEL, parallel_height_audit, parallel_segments
 from railway_profile import solve
 
 
@@ -31,6 +31,15 @@ class RailProfileTest(unittest.TestCase):
         h, result = self.profile(records, [([123], box(-2, -2, 15, 6))])
         self.assertTrue(result['feasible'])
         np.testing.assert_allclose(h, 12.5)
+
+    def test_whole_paved_width_stays_level_on_a_sloping_track(self):
+        coords = [(0, 0), (20, 0), (40, 0), (60, 0)]
+        pieces = [(i, i+1, 20*i, LEVEL if i==1 else 0, 1) for i in range(3)]
+        target = np.array([150., 150.2, 150.4, 150.6])
+        heights, _ = solve(coords, pieces, self.ways, target, [], [], None)
+        self.assertAlmostEqual(heights[1], heights[2], places=6)
+        self.assertGreater(heights[1], heights[0])
+        self.assertGreater(heights[3], heights[2])
 
     def test_bridge_and_underpass_do_not_change_the_rail_profile(self):
         underpass = dict(type='rail_over', roadY=145, railY=151, clearanceM=4.8)
