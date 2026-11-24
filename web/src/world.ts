@@ -360,6 +360,7 @@ export async function detail(tile:Tile, signal:AbortSignal, parseSlot?:()=>Promi
     tile, minY, maxY, midY:heights.getY(segments/2*(stride+1)),
     walls, pond:pond?.positions ?? null, bridge,
     streetSurface:streets.surface,
+    streetFence:streets.fence,
     detailCount:streets.detailCount,
     railLodCount:streets.railLodCount,
     furnitureMatrices:streets.furnitureMatrices,
@@ -370,7 +371,7 @@ export async function detail(tile:Tile, signal:AbortSignal, parseSlot?:()=>Promi
     group,groundMesh,terrain,water,rings,deck,thin,streets,batch,tunnel,railCutVertices:new Set(railCuts.map(([index])=>index)),
     dispose(){
       if(tunnel)for(const mesh of Object.values(tunnel)){mesh.geometry.dispose();if(mesh!==tunnel.fringe)mesh.material.dispose()}
-      pond?.dispose(); streets.surface?.dispose(); bridge?.dispose(); geometry.dispose(); walls?.dispose()
+      pond?.dispose(); streets.surface?.dispose(); streets.fence?.dispose(); bridge?.dispose(); geometry.dispose(); walls?.dispose()
       material.map!.image.close(); material.map!.dispose(); material.dispose()
     },
   }

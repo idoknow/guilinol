@@ -84,7 +84,7 @@ try {
           }) &&
           (manifest.landmarks ?? []).every(
             (l) =>
-              Math.hypot(p.x - l.position[0], p.y - l.position[1], p.z - l.position[2]) - l.sphere[3] > 900 ||
+              Math.hypot(p.x - l.position[0], p.y - l.position[1], p.z - l.position[2]) - l.sphere[3] > (stream.metrics?.landmarkLoadRadius ?? 580) ||
               stream.landmarks.has(l),
           )
         )
