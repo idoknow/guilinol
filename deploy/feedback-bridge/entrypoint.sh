@@ -13,7 +13,7 @@ for name in MULTICA_WORKSPACE_ID BRIDGE_TOKEN BRIDGE_ENABLED BRIDGE_PROJECT BRID
   test -s "/run/glol/$name" || exit 1
 done
 agent=$(cat /run/glol/BRIDGE_AGENT)
-test "$agent" = d0320da1-ce8c-470a-a5a7-1976261a067d
+test "$agent" = aebb81da-be04-42a7-a91b-0a68a2203ee6
 exec_clean() {
   env -i PATH=/usr/local/bin:/usr/bin:/bin HOME="$home" \
     MULTICA_CLI_PATH=/usr/local/bin/multica MULTICA_WORKSPACE_ID="$(cat /run/glol/MULTICA_WORKSPACE_ID)" \
