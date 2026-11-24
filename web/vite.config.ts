@@ -58,5 +58,7 @@ export default defineConfig({
   define: {
     __APP_VERSION__: JSON.stringify(version),
     __BUILD_TIME__: JSON.stringify(new Date().toISOString()),
+    // IDOK-204: the page compares this with /version.json to notice it is running a build that has since been replaced.
+    __BUILD_SHA__: JSON.stringify((()=>{try{return buildSha()}catch{return ''}})()),
   },
 })
