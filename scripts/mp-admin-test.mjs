@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import {createHash,createHmac,randomUUID} from 'node:crypto'
+import {createHash,createHmac,randomUUID,randomBytes} from 'node:crypto'
 import {spawn} from 'node:child_process'
 import {once} from 'node:events'
 import {createServer} from 'node:http'
@@ -36,7 +36,7 @@ test('two players: private RT state, role gate, public-safe admin state, persist
   const tokens=[]
   for(const [index,name] of ['Alice','Bob'].entries()){
     const {rows:[{uid}]}=await pool.query(`insert into users(id,email,nickname,salt,digest,verified,role) values($1,$2,$1,'','',1,$3) returning uid`,[name,name+'@example.test',index?'user':'admin'])
-    const token=randomUUID();tokens.push(token)
+    const token=randomBytes(32).toString('hex');tokens.push(token)
     await pool.query('insert into sessions values($1,$2,unixepoch()+600)',[createHash('sha256').update(token).digest('hex'),name])
     const client=new WebSocket(rt.base.replace('http','ws')+'/ws',{headers:{'x-forwarded-for':ip,'user-agent':'fixture'}});sockets.push(client);await once(client,'open')
     const body=Buffer.from(JSON.stringify({name,uid:Number(uid),exp:Math.floor(Date.now()/1000)+55})).toString('base64url')
