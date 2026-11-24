@@ -188,7 +188,12 @@ else{
   const summary={tunnelConstraintRecords:conflicts.length,partialTunnelWays:[...partialFloors].sort((a,b)=>a-b),reasons,lanes:lanes.length,wheelSamples:total,outliers,sunk,floating,p99,nonplanarFootprints:nonplanar,unresolvedTunnelWays:[...missingFloors].sort((a,b)=>a-b)}
   fs.mkdirSync(output,{recursive:true})
   fs.writeFileSync(path.join(output,'audit.json'),JSON.stringify({summary,top50,lanes:reports}))
-  execFileSync('uv',['run','--locked','python','scripts/vehicle-heatmap.py',path.join(output,'heatmap.png')],{input:JSON.stringify({extent:manifest.extent,cells:[...heat]})})
+  const rasterDir=fs.mkdtempSync(path.join(output,'heatmap-'))
+  const cells=path.join(rasterDir,'cells.json')
+  try{
+    fs.writeFileSync(cells,JSON.stringify({extent:manifest.extent,cells:[...heat]}))
+    execFileSync('uv',['run','--locked','python','scripts/vehicle-heatmap.py',path.join(output,'heatmap.png'),cells])
+  }finally{fs.rmSync(rasterDir,{recursive:true,force:true})}
   console.log(summary)
   if(!lanes.length||outliers||p99>.1||missingFloors.size||partialFloors.size||conflicts.length)process.exitCode=1
 }

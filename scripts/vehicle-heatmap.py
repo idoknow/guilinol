@@ -3,7 +3,8 @@ import json
 import sys
 from PIL import Image, ImageDraw
 
-data = json.load(sys.stdin)
+with open(sys.argv[2]) as stream:
+    data = json.load(stream)
 left, top, width, depth = (n // 32 for n in data['extent'])
 image = Image.new('RGB', (width, depth + 32), '#192027')
 for key, delta in data['cells']:
