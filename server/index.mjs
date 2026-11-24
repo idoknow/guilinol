@@ -1,3 +1,4 @@
+import {smokeDefaults,validRules} from '../lib/smoke.ts'
 import {serve} from '@hono/node-server'
 import {timingSafeEqual} from 'node:crypto'
 import pg from 'pg'
@@ -77,7 +78,19 @@ async function npcAdmin(request){
   await pool.query('insert into npc_settings(singleton,settings) values(true,$1) on conflict(singleton) do update set settings=excluded.settings',[rules])
   return json({ok:true})
 }
-const env = {...process.env, npcAdmin,mpAdmin:mp.route, perfQuery:cachedPerfQuery, DB:database(connections), FEEDBACK:bucket(process.env.S3_ENDPOINT)}
+async function readSmoke(){
+  const {rows}=await pool.query("SELECT detail FROM admin_audit WHERE target_type='smoke' AND target_id='settings' AND action='smoke.settings' ORDER BY id DESC LIMIT 1")
+  return rows[0]?.detail??smokeDefaults
+}
+async function smokeAdmin(request,user){
+  if(request.method==='GET')return json(await readSmoke())
+  if(request.method!=='POST')return json({error:'method'},405)
+  const rules=await request.json().catch(()=>null)
+  if(!validRules(rules))return json({error:'invalid smoke settings'},400)
+  await pool.query("INSERT INTO admin_audit(actor_id,action,target_type,target_id,detail) VALUES($1,'smoke.settings','smoke','settings',$2)",[user,rules])
+  return json({ok:true})
+}
+const env = {...process.env, smokeAdmin,npcAdmin,mpAdmin:mp.route, perfQuery:cachedPerfQuery, DB:database(connections), FEEDBACK:bucket(process.env.S3_ENDPOINT)}
 const origin = new URL(process.env.PUBLIC_ORIGIN).origin
 const online = presence(pool)
 const mpOnline = mpPresence()
@@ -87,6 +100,7 @@ const json=(body,status=200)=>new Response(JSON.stringify(body),{status,headers:
 const server=serve({port:Number(process.env.PORT || 3000),fetch: async request => {
   const url = new URL(request.url)
   if (!url.pathname.startsWith('/api/')) return new Response(null,{status:404})
+  if(url.pathname==='/api/smoke')return request.method==='GET'?json(await readSmoke()):json({error:'method'},405)
   if(url.pathname==='/api/npc'){
     if(request.method!=='GET')return json({error:'method'},405)
     const body=JSON.stringify(await readNpc()),etag='"'+Buffer.from(await crypto.subtle.digest('SHA-256',Buffer.from(body))).toString('hex')+'"'

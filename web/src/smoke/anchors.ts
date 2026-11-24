@@ -22,7 +22,7 @@ export const SMOKE_ANCHORS = {
 /** 第一人称视角里道具的固定位置（相机空间） */
 export const VIEW_ANCHORS = {
   /** 左手托烟盒 */
-  handL: new THREE.Vector3(-0.115, -0.165, -0.36),
+  handL: new THREE.Vector3(-0.085, -0.058, -0.36),
   /** 烟盒收回去时左手落到画面外 */
   restL: new THREE.Vector3(-0.2, -0.44, -0.3),
   /** 右手夹烟 */
@@ -30,5 +30,5 @@ export const VIEW_ANCHORS = {
   /** 点烟时打火机抬到嘴边 */
   handRLight: new THREE.Vector3(0.05, -0.06, -0.27),
   /** 嘴的位置（就是镜头底下一点） */
-  mouth: new THREE.Vector3(0.02, -0.035, -0.235),
+  mouth: new THREE.Vector3(0.018, -0.023, -0.094),
 } as const

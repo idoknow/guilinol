@@ -276,6 +276,7 @@ const views: View[] = [
   { key: 'live', label: '实时', icon: '●', group: '数据' },
   { key: 'server', label: '服务端', icon: '▣', group: '数据', ranged: true },
   { key: 'mp', label: '联机', icon: '⇋', group: '数据' },
+  { key: 'smoke', label: '香烟', icon: '▥', group: '数据' },
   { key: 'npc', label: '路人与车流', icon: '⇄', group: '数据' },
   { key: 'feedback', label: '反馈处理', icon: '✉', group: '运营' },
   { key: 'chat', label: '聊天', icon: '❝', group: '运营' },
@@ -1312,6 +1313,44 @@ const pages: Record<string, (view: View) => void> = {
     }, skeleton(8))
   },
 
+  smoke() {
+    paintTop(views.find(view=>view.key==='smoke')!)
+    const slot=h('div',{class:'adm-stack'},skeleton(6));main.append(slot)
+    void Promise.all([api('admin/smoke'),import('./smoke/data')]).then(([stored,{smokeDefaults,validRules,BRANDS}])=>{
+      const rules=structuredClone(validRules(stored)?stored:smokeDefaults)
+      const form=h('form',{class:'adm-npc'}) as HTMLFormElement
+      const field=(label:string,value:number,min:number,max:number,step:number,update:(n:number)=>void)=>{
+        const input=h('input',{type:'number',value:String(value),min:String(min),max:String(max),step:String(step),required:'',class:'adm-npc-num'}) as HTMLInputElement
+        input.oninput=()=>update(input.valueAsNumber)
+        return h('label',{class:'adm-npc-range'},label,input)
+      }
+      form.append(field('最短燃烧时间（秒）',rules.minSeconds,1,1800,1,n=>rules.minSeconds=n),
+        field('最长燃烧时间（秒）',rules.maxSeconds,1,1800,1,n=>rules.maxSeconds=n),
+        field('每口消耗（节）',rules.puffSegments,1,10,1,n=>rules.puffSegments=n),
+        field('双倍消耗概率',rules.doubleChance,0,1,.01,n=>rules.doubleChance=n),
+        field('烟雾浓度',rules.density,0,4,.05,n=>rules.density=n))
+      const catalog=BRANDS.map(b=>{
+        const row=rules.brands.find(item=>item.id===b.id)
+        const enabled=h('input',{type:'checkbox'}) as HTMLInputElement
+        enabled.checked=!!row
+        const entry={id:b.id,price:row?.price??b.price}
+        form.append(h('div',{class:'adm-npc-range'},h('label',null,enabled,b.name),field('单价',entry.price,25,50,1,n=>entry.price=n)))
+        return {enabled,entry}
+      })
+      const save=h('button',{class:'adm-btn',type:'submit'},'保存') as HTMLButtonElement
+      form.append(save)
+      form.onsubmit=async e=>{
+        e.preventDefault()
+        rules.brands=catalog.filter(b=>b.enabled.checked).map(b=>b.entry)
+        if(!validRules(rules)){toast('请检查燃烧区间，并至少选择一个品牌','error');return}
+        save.disabled=true
+        try{await api('admin/smoke',rules);toast('已保存，新进场的玩家生效')}
+        catch{toast('保存失败','error')}
+        finally{save.disabled=false}
+      }
+      slot.replaceChildren(form)
+    }).catch(error=>slot.replaceChildren(errorState(error,()=>render())))
+  },
   npc() {
     paintTop(views.find(view=>view.key==='npc')!)
     const slot=h('div',{class:'adm-stack'},skeleton(8));main.append(slot)

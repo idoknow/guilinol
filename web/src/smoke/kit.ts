@@ -69,7 +69,7 @@ const CIG_SCALE = 0.62
 const PACK_EULER = new THREE.Euler(0.06, Math.PI + 0.16, -0.24, 'YXZ')
 
 /** 叼在嘴里 / 正在点：烟身几乎水平朝前 */
-const DIP_DIR = new THREE.Vector3(0, -0.16, -0.99).normalize()
+const DIP_DIR = new THREE.Vector3(.04, -.43, -.90).normalize()
 /** 正常夹在手里：烟头朝上前方 */
 const SMOKE_DIR = new THREE.Vector3(0, 0.82, -0.57).normalize()
 const Z_AXIS = new THREE.Vector3(0, 0, 1)
@@ -86,7 +86,7 @@ export class SmokeKit {
   private packModel: PackModel
   private lighterModel: LighterModel
   private cigModel: CigaretteModel
-  private stubs: {group: THREE.Group; parts: Parts; born: number}[] = []
+  private stubs: {group: THREE.Group; parts: Parts; born: number; origin:THREE.Vector3; floor:number; heading:number}[] = []
   private scratch = new THREE.Vector3()
   private dir = new THREE.Vector3()
   private gripOffset = new THREE.Vector3()
@@ -168,7 +168,7 @@ export class SmokeKit {
     const left = this.carry > 0.02
     this.packModel.group.visible = left
     this.lighterModel.group.visible = right && view.light > 0.05
-    this.cigModel.group.visible = right && (view.cig > 0.01 || view.ember > 0.01 || view.light > 0.15)
+    this.cigModel.group.visible = right && (view.cig > 0.01 || view.ember > 0.01)
     if (!right && !left) {
       this.lighterModel.setFlame(0)
       return
@@ -179,9 +179,20 @@ export class SmokeKit {
       this.packModel.group.position.copy(anchors.handL).add(PACK_OFFSET)
       this.packModel.group.rotation.copy(PACK_EULER)
       // 取烟时掀盖 + 露一截烟头
-      this.packModel.lid.rotation.x = view.light * 1.15
-      this.packModel.peek.visible = view.light > 0.18
-      this.packModel.peek.position.y = 0.0405 + view.light * 0.016
+      const open=view.phase==='tear'?view.progress:['open','take'].includes(view.phase)?1:0
+      this.packModel.group.rotation.set(.25,.12,-.10)
+      this.packModel.group.position.z+=.035
+      this.packModel.group.position.y-=(1-this.carry)*.18
+      this.packModel.lid.rotation.x = -open * 1.85
+      this.packModel.seal.visible=open<1
+      this.packModel.seal.scale.y=1-open
+      this.packModel.seal.position.y=open*.044
+      this.packModel.peek.visible = view.phase==='open' || view.phase==='tear' && open>.7
+      const topFilter=this.packModel.filters[Math.max(0,view.remaining-1)]
+      this.packModel.peek.position.x=topFilter.position.x
+      this.packModel.peek.position.z=topFilter.position.z
+      this.packModel.filters.forEach((filter,index)=>{filter.visible=index<view.remaining})
+      this.packModel.peek.position.y = 0.0405 + open * 0.016
     }
 
     if (!right) {
@@ -191,7 +202,7 @@ export class SmokeKit {
 
     // —— 打火机：右手（只在点烟那一段出现） ——
     if (this.lighterModel.group.visible) {
-      this.lighterModel.group.position.copy(anchors.handR).add(LIGHTER_OFFSET)
+      this.lighterModel.group.position.copy(anchors.handL).add(LIGHTER_OFFSET)
       this.lighterModel.group.rotation.set(-0.12 * view.light, Math.PI - 0.2, 0.18 * view.light, 'YXZ')
       this.lighterModel.setFlame(view.flame)
     } else {
@@ -199,7 +210,7 @@ export class SmokeKit {
     }
 
     // —— 香烟：点着时夹在右手，点烟/吸的时候送到嘴边 ——
-    const atMouth = Math.min(1, Math.max(view.light, view.puff))
+    const atMouth = view.phase==='take'?view.progress:1
     this.scratch.copy(anchors.handR).lerp(anchors.mouth, atMouth)
     // 夹烟：方向跟着手走，位置从手腕挪到指缝（不然烟是从拳头正中穿出来的）
     this.dir.copy(SMOKE_DIR)
@@ -236,14 +247,15 @@ export class SmokeKit {
   }
 
   /** 在脚下扔一根烟蒂（世界坐标） */
-  dropStub(position: THREE.Vector3, heading: number) {
+  dropStub(position: THREE.Vector3, heading: number, length=0) {
     const parts = new Parts()
-    const stub = createStub(this.brand, parts)
-    stub.position.copy(position)
-    stub.position.y += 0.0075
+    const discarded=length>0?createCigarette(this.brand,parts):null
+    discarded?.setLength(length)
+    const stub=discarded?.group??createStub(this.brand,parts)
+    this.tipWorld(stub.position)
     stub.rotation.y = heading + Math.random() * Math.PI
     this.scene.add(stub)
-    this.stubs.push({group: stub, parts, born: performance.now()})
+    this.stubs.push({group: stub, parts, born: performance.now(), origin:stub.position.clone(),floor:position.y+.0075,heading})
     // 只保留最近 12 根，别让全城铺满烟屁股
     while (this.stubs.length > 12) {
       const oldest = this.stubs.shift()!
@@ -254,7 +266,12 @@ export class SmokeKit {
 
   /** 每帧收尾：两分钟后旧烟蒂自己消失 */
   tick(now: number) {
-    while (this.stubs.length && now - this.stubs[0].born > 120_000) {
+    for(const stub of this.stubs){
+      const t=Math.min((now-stub.born)/1000,Math.sqrt(Math.max(0,stub.origin.y-stub.floor)/4.9))
+      stub.group.position.set(stub.origin.x-Math.sin(stub.heading)*t*.7,Math.max(stub.floor,stub.origin.y-4.9*t*t),stub.origin.z-Math.cos(stub.heading)*t*.7)
+      stub.group.rotation.x=stub.group.position.y>stub.floor?t*7:0
+    }
+    while (this.stubs.length && now - this.stubs[0].born > 4500) {
       const oldest = this.stubs.shift()!
       this.scene.remove(oldest.group)
       oldest.parts.dispose()

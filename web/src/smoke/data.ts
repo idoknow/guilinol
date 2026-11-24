@@ -1,7 +1,10 @@
-export const BURN_TOTAL = 180
-export const PUFF_COST = 15
-export const PUFF_GAP = 15
-export type BrandId = 'plain'
-export interface BrandDef {id: BrandId; pack: string; lid: string; tip: string; ember: number}
-export const BRANDS: readonly BrandDef[] = [{id:'plain',pack:'#e3ddcc',lid:'#c9c4b6',tip:'#c9a06a',ember:0xff7a2a}]
-export const brandOf = (_id: BrandId) => BRANDS[0]
+import {BRANDS, smokeDefaults} from '../../../lib/smoke.ts'
+export {BRANDS, brandOf, smokeDefaults, validRules, type BrandDef, type BrandId} from '../../../lib/smoke.ts'
+
+export const rules = structuredClone(smokeDefaults)
+export interface Pack {brand:string; remaining:number}
+export function readPacks(raw:unknown):Pack[] {
+  if (!Array.isArray(raw)) return []
+  return raw.filter(p => p && BRANDS.some(b => b.id === p.brand) && Number.isInteger(p.remaining) && p.remaining > 0 && p.remaining <= 20)
+    .slice(0,3).map(({brand,remaining}) => ({brand,remaining}))
+}

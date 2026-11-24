@@ -11,7 +11,7 @@ import {vehicleModel} from './walk/vehicle-model'
 import {avatar as figure} from './look/avatar'
 import {touchUi} from './ui/input-mode'
 
-export interface Pose {x:number;y:number;z:number;yaw:number;v:number;gr:number;bike:string;bx:number;bz:number;byaw:number;sc:number;sb:number;sp:number;br:number}
+export interface Pose {x:number;y:number;z:number;yaw:number;v:number;gr:number;bike:string;bx:number;bz:number;byaw:number;sc:number;sb:number;sp:number;br:number;sd?:number;ss?:number;sr?:number}
 export interface Player extends Pose {em?:number;es?:number;expires?:number;id:string;uid?:number;jt?:number;name:string;avatar:Avatar}
 
 // 名牌只在「面前」显示（IDOK-222）：40 m 内、在视野里，34 m 起淡出；远近都保持约 22 px 高（贴脸时最小 0.14 m），不会缩成一粒点也不会糊满屏。
@@ -118,7 +118,7 @@ export function players(scene:THREE.Scene,clips:THREE.AnimationClip[],camera:THR
       view.emote?.tick(dt,player.v>.12)
       if(enableSmoke&&view.mixer){
         if(player.sc&&!view.kit)view.kit=smokeVisual(scene,view.root)
-        if(view.kit){view.smoke.update(player.sc,player.sb,player.sp,player.br,dt);view.kit.tick(dt,view.smoke.view())}
+        if(view.kit){view.smoke.update(player.sc,player.sb,player.sp,player.br,dt,player.ss,player.sr);view.kit.tick(dt,view.smoke.view())}
       }
     }
   }
@@ -129,6 +129,10 @@ export function players(scene:THREE.Scene,clips:THREE.AnimationClip[],camera:THR
       Object.assign(p,{em,es,expires:performance.now()+(emoteById(em)?.duration??0)*1000})},
     move(id:string,pose:Pose){const player=records.get(id);if(!player)return
       if(Math.hypot(pose.x-player.x,pose.z-player.z)>25)visible.get(id)?.root.position.set(pose.x,pose.y,pose.z)
+      if(player.sd!==undefined && pose.sd!==undefined && player.sd!==pose.sd){
+        const view=visible.get(id)
+        view?.kit?.drop(view.smoke.view().length)
+      }
       Object.assign(player,pose)},
     avatar(id:string,avatar:Avatar){const player=records.get(id);if(player){hide(id);player.avatar=avatar;nextSort=0}},
     probe:()=>[...visible].map(([id,view])=>({id,name:records.get(id)!.name,avatar:records.get(id)!.avatar,smoke:view.smoke.view().phase,puffs:view.smoke.view().puffs,clip:view.emote?.clip,ready:!!view.mixer,position:view.root.position.toArray()}))}
