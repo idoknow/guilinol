@@ -70,3 +70,7 @@ npx wrangler d1 execute glol --remote --command "UPDATE users SET role='admin' W
 ```
 
 撤权时把 `role='admin'` 改为 `role='user'`。角色变更在下次请求生效，不提供网页授权入口。迁移前的历史用户没有注册时间，统计按迁移时间计入；因此迁移后首日的 24 小时新增数包含这些账号。本地验收先构建再运行 `npm run verify:admin`；该命令只操作临时本地 D1/R2。
+
+## 许可证
+
+本仓库代码以 [GNU Affero General Public License v3.0](LICENSE)（AGPL-3.0-only）发布。第三方地图与高程数据仍按其各自许可使用，见开头的数据署名。
