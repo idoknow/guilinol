@@ -116,7 +116,16 @@ export class Traffic {
     actor.x=track.start.x+track.dx*dist-track.dz*(track.offset+actor.dodge)
     actor.z=track.start.z+track.dz*dist+track.dx*(track.offset+actor.dodge)
     const reference=trackHeight(track,dist)
-    actor.y=this.sampleGround?.(actor.x,actor.z,reference,actor.kind==='car')??reference
+    const car=actor.kind==='car'
+    actor.y=this.sampleGround?.(actor.x,actor.z,reference,car)??reference
+    if(actor.y!==reference&&this.sampleGround){
+      // The baked reference may be below a ramp. Recheck deck eligibility at the placed height.
+      for(let pass=0;pass<3;pass++){
+        const support=this.sampleGround(actor.x,actor.z,actor.y,car)
+        if(support===undefined||support===actor.y)break
+        actor.y=support
+      }
+    }
     actor.yaw=track.yaw
   }
   phase(track:Lane,time=this.time):'green'|'red'|'yellow'{
