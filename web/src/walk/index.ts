@@ -1,4 +1,4 @@
-import {cameraHoldLayer} from './camera-hold'
+import {cameraHoldLayer, DEFAULT_CAMERA_HOLD_AIM} from './camera-hold'
 import {emoteWheel} from '../emote/wheel'
 import {emotePlayback} from '../emote/playback'
 import {interrupted,emotesEnabled} from '../emote/emotes'
@@ -2654,7 +2654,7 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
     net?.tick(dt)
   }
   let cameraHold=false,camHoldBlend=0
-  let holdAim={forward:.32,up:.13,side:-.04}
+  let holdAim={...DEFAULT_CAMERA_HOLD_AIM}
   const holdLayer=cameraHoldLayer(figure),holdTarget=holdLayer.target,holdEffector=new THREE.Vector3()
   function applyCameraHold(dt:number){
     const target=cameraHold?1:0

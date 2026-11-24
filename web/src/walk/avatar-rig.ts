@@ -1,4 +1,5 @@
 import * as THREE from 'three'
+import {bindRotation, cameraAnchorLocalPose} from './camera-hold'
 
 export const AVATAR_JOINT_NAMES = [
   'Hips', 'Torso', 'Head',
@@ -417,6 +418,7 @@ export function ensureAvatarRig(root: THREE.Group, tintHex: string | null = null
   ) as AvatarJointMap
 
   // Create axis-aligned attachment anchors under `head` and `spine_02` (compensating native bone roll/tilt to -Z forward).
+  // For `hand_r`, place the anchor in the palm grip hollow and align `-Z` forward for natural ergonomic camera holding.
   function ensureBoneAttachmentAnchor(boneName: string, fallbackName: string, anchorName: string): THREE.Object3D | undefined {
     const rest = boneRestMap.get(boneName) ?? boneRestMap.get(fallbackName)
     if (!rest) return undefined
@@ -425,7 +427,18 @@ export function ensureAvatarRig(root: THREE.Group, tintHex: string | null = null
     const anchor = new THREE.Group()
     anchor.name = anchorName
     anchor.userData.isAttachmentAnchor = true
-    anchor.quaternion.copy(rest.worldRestQuat).invert()
+    if (boneName === 'hand_r') {
+      const handBind = bindRotation(root, rest.bone)
+      if (handBind) {
+        const pose = cameraAnchorLocalPose(handBind)
+        anchor.position.copy(pose.position)
+        anchor.quaternion.copy(pose.quaternion)
+      } else {
+        anchor.quaternion.copy(rest.worldRestQuat).invert()
+      }
+    } else {
+      anchor.quaternion.copy(rest.worldRestQuat).invert()
+    }
     rest.bone.add(anchor)
     return anchor
   }

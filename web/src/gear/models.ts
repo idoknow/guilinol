@@ -28,11 +28,21 @@ function loadManifest(): Promise<Manifest> {
 
 const materialCache = new Map<string, T.MeshStandardMaterial>()
 
+function tuneCameraMaterial(material: T.MeshStandardMaterial) {
+  // 主场景无 IBL envMap，高 metalness 会把漫反射压到近黑；压低金属度并加柔和自色底亮，保证白天与夜晚轮廓均清晰可辨。
+  material.metalness = Math.min(material.metalness, 0.22)
+  material.roughness = Math.max(material.roughness, 0.16)
+  material.emissive.copy(material.color)
+  material.emissiveIntensity = 0.28
+}
+
 function mat(color: string, roughness: number, metalness = 0.2): T.MeshStandardMaterial {
-  const key = `${color}|${roughness}|${metalness}`
+  const cappedMetal = Math.min(metalness, 0.28)
+  const key = `${color}|${roughness}|${cappedMetal}`
   let material = materialCache.get(key)
   if (!material) {
-    material = new T.MeshStandardMaterial({color, roughness, metalness, envMapIntensity: 0.8})
+    material = new T.MeshStandardMaterial({color, roughness, metalness: cappedMetal, envMapIntensity: 0.8})
+    tuneCameraMaterial(material)
     materialCache.set(key, material)
   }
   return material
@@ -368,6 +378,13 @@ export async function buildCameraPropAsync(body: CameraBody): Promise<T.Group> {
     const gltf = await new GLTFLoader().loadAsync(`${CAMERA_MODEL_ROOT}${body.id}.glb`)
     const root = new T.Group()
     const scene = gltf.scene
+    scene.traverse(node => {
+      if (!(node instanceof T.Mesh)) return
+      const mats = Array.isArray(node.material) ? node.material : [node.material]
+      for (const m of mats) {
+        if (m instanceof T.MeshStandardMaterial) tuneCameraMaterial(m)
+      }
+    })
     scene.scale.setScalar(entry?.scale ?? 1)
     if (entry?.handOffset) scene.position.fromArray(entry.handOffset)
     if (entry?.handRot) scene.rotation.fromArray(entry.handRot)

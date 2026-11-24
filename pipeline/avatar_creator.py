@@ -50,19 +50,24 @@ def generate(body):
                 a=len(data)+(k-1)*sides+n
                 b=len(data)+(k-1)*sides+(n+1)%sides
                 faces.extend([[a,b,a+sides],[b,b+sides,a+sides]])
-    # Sleeves share shoulder movement between the clavicle and upper arm.
-    # The cuffs end at the original wrist. The 66-bone bind transforms stay exact.
-    sleeve_rings=[(.09,.024,.040),(.145,.042,.064),(.184,.052,.075),(.222,.055,.070),
-                  (.30,.052,.060),(.438,.048,.051),(.49,.048,.050),(.61,.044,.047),
-                  (.72,.038,.044),(.747,.038,.043)]
+    # Sleeves share shoulder movement smoothly with near-round deltoid rings (no square shoulder pad
+    # bump when raising the arm) and dense smoothstep rings across the elbow (x ≈ 0.470).
+    sleeve_rings=[(.090,.024,.036),(.135,.037,.048),(.165,.046,.054),(.195,.050,.056),
+                  (.230,.051,.055),(.300,.049,.053),(.385,.048,.051),(.425,.048,.050),
+                  (.450,.048,.050),(.470,.048,.050),(.490,.047,.049),(.515,.046,.048),
+                  (.570,.044,.046),(.650,.040,.044),(.720,.036,.041),(.747,.035,.040)]
     for side,sign in [('l',1),('r',-1)]:
         first=len(data)+len(extra)
         for k,(x,ry,rz_) in enumerate(sleeve_rings):
             upper=g.joints.index(g.idx['upperarm_'+side])
             lower=g.joints.index(g.idx['lowerarm_'+side])
             clav=g.joints.index(g.idx['clavicle_'+side])
-            j1,j2=(clav,upper) if x<.23 else (upper,lower)
-            blend=np.interp(x,[.112,.222],[0,1]) if x<.23 else np.interp(x,[.438,.49],[0,1])
+            j1,j2=(clav,upper) if x<.235 else (upper,lower)
+            if x<.235:
+                t=np.clip((x-.115)/(.230-.115),0,1)
+            else:
+                t=np.clip((x-.415)/(.525-.415),0,1)
+            blend=float(t*t*(3.0-2.0*t))
             for n in range(sides):
                 angle=n*2*np.pi/sides
                 extra.append([sign*x,np.interp(x,[.09,.145,.205],[1.405,1.426,1.44])+1.16*ry*np.cos(angle),-.059+1.13*rz_*np.sin(angle),
@@ -83,8 +88,8 @@ def generate(body):
     angles=np.arange(20)*np.pi/10
     nr=.040 if body=='f' else .046
     neck_rings=[np.column_stack([nr*r*np.sin(angles),np.full(20,y),z+.86*nr*r*np.cos(angles)])
-                for y,r,z in [(1.447,1.18,-.033),(1.482,1.04,-.029),(1.522,.94,-.012),(1.560,.95,-.005)]]
-    points,tris=surface(neck_rings,[0,1.445,-.033],[0,1.561,-.005])
+                for y,r,z in [(1.447,1.15,-.033),(1.482,1.02,-.029),(1.518,.92,-.014),(1.552,.88,-.008)]]
+    points,tris=surface(neck_rings,[0,1.445,-.033],[0,1.554,-.008])
     faces.extend(tris+len(data)+len(extra))
     for point in points:
         w=np.clip((point[1]-1.50)/.055,0,1)

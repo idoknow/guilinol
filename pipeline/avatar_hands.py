@@ -46,13 +46,15 @@ def rebuild():
 
     for side, sign in [('l',1),('r',-1)]:
         hand = 'hand_'+side
-        tube([np.array([sign*x,1.438,z]) for x,z in [(.736,-.065),(.805,-.059),(.854,-.058)]],
-             [hand]*3,[.031,.055,.055],[.024,.022,.014],sign)
-        for finger, radius in [('index',.0115),('middle',.012),('ring',.011),('pinky',.009),('thumb',.014)]:
+        tube([np.array([sign*x,1.438,z]) for x,z in [(.732,-.064),(.796,-.059),(.846,-.057)]],
+             [hand]*3,[.025,.042,.041],[.017,.015,.011],sign)
+        for finger, radius in [('index',.0088),('middle',.0090),('ring',.0084),('pinky',.0070),('thumb',.0102)]:
             bones = [f'{finger}_0{i}_{side}' for i in range(1,4)]
-            centres = [world[g.idx[n]][:3,3] for n in bones+[f'{finger}_04_leaf_{side}']]
-            tube(centres,bones+[bones[-1]],np.array([1,.93,.81,.48])*radius,
-                 np.array([1,.90,.75,.43])*radius,sign)
+            centres = [world[g.idx[n]][:3,3].copy() for n in bones+[f'{finger}_04_leaf_{side}']]
+            tip_scale = 0.90 if finger == 'thumb' else 0.78
+            centres[-1] = centres[-2] + (centres[-1] - centres[-2]) * tip_scale
+            tube(centres,bones+[bones[-1]],np.array([1,.92,.80,.46])*radius,
+                 np.array([1,.88,.74,.42])*radius,sign)
     for key, values in list(data.items())+[('indices',indices)]:
         ref = mesh['indices'] if key=='indices' else attrs[key]
         acc = dict(g.j['accessors'][ref],count=len(values))
