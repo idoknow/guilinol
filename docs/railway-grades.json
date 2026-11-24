@@ -4955,7 +4955,7 @@
       "lon": 110.2582056,
       "baselineWorld": "f1453c2e",
       "status": "blocked",
-      "reason": "Retaining the independent Nanxi stream bridge conflicts with the approach grade and rail clearance.",
+      "reason": "Lowering the road bridge at the approved rail elevation requires more than the authorized 3 m of channel excavation.",
       "nearestRailheadM": 150.0988,
       "maximumRoadAtRailM": 144.3988,
       "runToAbutmentM": 6.9607,
@@ -4968,7 +4968,27 @@
       "minimumDeckLoweringAtAbutmentM": 4.5244,
       "measuredCandidateStepM": 5.235,
       "mainTerrainAtStreamM": 149.0594,
-      "waterSurfaceM": null
+      "waterSurfaceM": null,
+      "streamClearanceCheck": {
+        "centerlineWays": [
+          882767817,
+          1030723828
+        ],
+        "demSource": "raw/dem via common.load_dem(paired=True)",
+        "surveyRunEachSideM": 50,
+        "samplingIntervalM": 0.01,
+        "upstreamMinimumM": 149.04759,
+        "downstreamMinimumM": 148.9145,
+        "waterProxyM": 148.9145,
+        "bridgeThicknessM": 1.2,
+        "requiredClearanceM": 1.0,
+        "maximumDeckAtNearAbutmentM": 144.95564,
+        "abutmentToStreamAxisM": 12.51579,
+        "cutForLevelDeckM": 6.15886,
+        "cutLowerBoundIncluding8PercentDeckRiseM": 5.1576,
+        "authorizedCutLimitM": 3,
+        "appliedCutM": 0
+      }
     }
   ]
 }
