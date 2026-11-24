@@ -109,6 +109,7 @@ def bake(output, chunks, elements, widths, approaches=(), only_approaches=False,
                 if way.get('surfaceUnderlay') and tags['highway'] in ('footway','path','pedestrian'):
                     footpaths.append(corridor)
     continuous_lines={id(row[0]):k for k,row in enumerate(continuous)}
+    transition_index=STRtree([row[0].buffer(row[1]+2) for row in continuous[1:]])
     preferred_lines={id(row[0]) for row in preferred}
     fixed_grades = {id(row[0]) for row in bridge_profiles}
     grades=STRtree([line.buffer(half,quad_segs=4) for line,half,*_ in approaches])
@@ -142,6 +143,10 @@ def bake(output, chunks, elements, widths, approaches=(), only_approaches=False,
             fixed = {j for j,i in enumerate(nearby) if id(approaches[i][0]) in fixed_grades}
             overrides=[j for j,i in enumerate(nearby) if id(approaches[i][0]) in preferred_lines]
             continuous_local=sorted((j for j,i in enumerate(nearby) if id(approaches[i][0]) in continuous_lines),key=lambda j:continuous_lines[id(approaches[nearby[j]][0])])
+            # The first profile supplies the existing approach elevation beside
+            # the new transition. Do not regrade its distant, accepted junction.
+            if not len(transition_index.query(bounds,predicate='intersects')):
+                continuous_local=[]
             if patch(output/tile['file'], area, local, foot, seam,crossings,fixed,overrides,continuous_local):
                 tile['gradedCorridor']=True
             tile['bytes'] = (output/tile['file']).stat().st_size
