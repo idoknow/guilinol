@@ -157,8 +157,8 @@ try {
   await page.evaluate(() => window.viewer.walk.showFigure(true))
 
   // 3. Locate the shop on the solo map, then approach its ground trigger.
-  await page.waitForSelector('.dock-map', {timeout: 30000})
-  await page.click('.dock-map')
+  await page.waitForSelector('.minimap', {timeout: 30000})
+  await page.click('.minimap')
   await page.waitForSelector('.atlas.show', {timeout: 15000})
   const shopQuickBtn = page.locator('.atlas-shop-btn[data-shop="shop_shizijie_ebike"]')
   assert.equal(await shopQuickBtn.isVisible(), false, 'solo map must hide shop teleport shortcuts')

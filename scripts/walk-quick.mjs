@@ -397,7 +397,7 @@ try {
   await mobile.evaluate(async()=>{for(let i=0;i<4;i++)await new Promise(requestAnimationFrame)})
 
   const hud=await mobile.evaluate(()=>{
-    const selectors=['.walk-ui .joystick','.walk-ui .btn-run','.walk-ui .btn-crouch','.walk-ui .btn-jump','.walk-ui .btn-view','.dock','.sky-ui','output','.hud-me']
+    const selectors=['.walk-ui .joystick','.walk-ui .btn-hail','.walk-ui .btn-crouch','.walk-ui .btn-jump','.walk-ui .btn-view','.hotbar','.dock .minimap','.dock-buttons','.sky-ui','output','.hud-me']
     const boxes=selectors.map(sel=>{
       const el=document.querySelector(sel)
       if(!el)return {sel,missing:true}
@@ -436,11 +436,33 @@ try {
     `portrait landscape entry: ${JSON.stringify(rotateEntry)}`)
   assert(rotateEntry.gate!=='grid','portrait gate should stay dismissed after 竖屏继续')
 
-  // Tap sprint toggle so screenshot also shows active HUD harmony, then verify touch look + joystick + jump.
-  await mobile.locator('.walk-ui .btn-run').tap()
-  await mobile.waitForFunction(()=>document.querySelector('.walk-ui .btn-run')?.classList.contains('on'))
+  // IDOK-256: no 跑 button (stick at full tilt runs), the minimap is the only map entry, and 远近 is press-and-drag.
+  const removed=await mobile.evaluate(()=>({run:!!document.querySelector('.walk-ui .btn-run'),mapBtn:!!document.querySelector('.dock-map'),
+    mini:document.querySelector('.dock .minimap')?.getAttribute('aria-label')}))
+  assert(!removed.run&&!removed.mapBtn&&removed.mini==='打开地图（M）',`IDOK-256 removals: ${JSON.stringify(removed)}`)
+  const zoomTest=await mobile.evaluate(async()=>{
+    const {walk}=window.viewer, btn=document.querySelector('.walk-ui .btn-view'), r=btn.getBoundingClientRect()
+    const x=r.left+r.width/2, y=r.top+r.height/2, frames=async()=>{for(let i=0;i<2;i++){walk.tick(1/60);await new Promise(requestAnimationFrame)}}
+    const ev=(type,id,dy)=>btn.dispatchEvent(new PointerEvent(type,{pointerId:id,pointerType:'touch',clientX:x,clientY:y+dy,bubbles:true,cancelable:true}))
+    await frames();const d0=walk.probe().camDist
+    // Drag down 70 px: farther, continuously (several move steps), rail visible while held.
+    ev('pointerdown',30,0);let railShown=false
+    for(let i=1;i<=7;i++){ev('pointermove',30,i*10);await frames();railShown||=btn.classList.contains('dragging')&&getComputedStyle(btn.querySelector('.view-rail')).opacity!=='0'}
+    const dDown=walk.probe().camDist
+    // Back up 140 px: closer than where we started.
+    for(let i=1;i<=14;i++){ev('pointermove',30,70-i*10);await frames()}
+    const dUp=walk.probe().camDist
+    ev('pointerup',30,-70);await frames()
+    // Quick tap still flips between the near / far presets.
+    ev('pointerdown',31,0);ev('pointerup',31,0);await frames();const tap1=walk.probe().camDist
+    ev('pointerdown',32,0);ev('pointerup',32,0);await frames();const tap2=walk.probe().camDist
+    return {d0,dDown,dUp,tap1,tap2,railShown}
+  })
+  assert(zoomTest.dDown>zoomTest.d0+2&&zoomTest.dUp<zoomTest.d0-.5&&zoomTest.railShown&&Math.abs(zoomTest.tap1-zoomTest.tap2)>3,`远近 drag: ${JSON.stringify(zoomTest)}`)
+  await mobile.locator('.walk-ui .btn-view').dispatchEvent('pointerdown',{pointerId:33,pointerType:'touch',isPrimary:true})
   const mobileShot=`${outDir}/mobile-390x844.png`
   await mobile.screenshot({path:mobileShot,timeout:90000})
+  await mobile.locator('.walk-ui .btn-view').dispatchEvent('pointercancel',{pointerId:33,pointerType:'touch'})
 
   const touchTest=await mobile.evaluate(async()=>{
     const {walk}=window.viewer, canvas=document.querySelector('canvas'), joy=document.querySelector('.walk-ui .joystick'), jumpBtn=document.querySelector('.walk-ui .btn-jump')
@@ -482,9 +504,11 @@ try {
       canvas.dispatchEvent(new PointerEvent('pointerup',{pointerId:id,pointerType:'touch',clientX:x-60,clientY:y,bubbles:true}))
       return {onCanvas:hit===canvas,turn:+Math.abs(walk.yaw-yaw0).toFixed(3)}
     }
-    return {stick:!!document.querySelector('.look-stick'),corner:drag(w-corner[0],h-corner[1],20),blocked:drag(w-blocked[0],h-blocked[1],21)}
+    // Blocked probe: canvas just above 远近, inside its button gutter (IDOK-256 guard follows the live button rects).
+    const v=document.querySelector('.walk-ui .btn-view').getBoundingClientRect()
+    return {stick:!!document.querySelector('.look-stick'),corner:drag(w-corner[0],h-corner[1],20),blocked:drag(v.left+v.width/2,v.top-blocked,21)}
   },{w,h,corner,blocked})
-  const lookTest=await cornerDrag(mobile,390,844,[60,70],[40,230])
+  const lookTest=await cornerDrag(mobile,390,844,[60,70],8)
   assert(!lookTest.stick&&lookTest.corner.onCanvas&&lookTest.corner.turn>.2&&lookTest.blocked.onCanvas&&lookTest.blocked.turn===0,`lookTest: ${JSON.stringify(lookTest)}`)
 
   // Also verify 390x844 coexistence when standing next to a parked e-bike AND next to a boat dock (.vehicle-action visible).
@@ -501,7 +525,7 @@ try {
       const close=document.querySelector('.spot-card.show .card-close')
       if(close)close.click()
       await new Promise(r=>setTimeout(r,280))
-      const selectors=['.walk-ui .joystick','.walk-ui .btn-run','.walk-ui .btn-crouch','.walk-ui .btn-jump','.walk-ui .btn-view','.vehicle-action','.dock','.sky-ui','output','.hud-me']
+      const selectors=['.walk-ui .joystick','.walk-ui .btn-hail','.walk-ui .btn-crouch','.walk-ui .btn-jump','.walk-ui .btn-view','.vehicle-action','.dock .minimap','.dock-buttons','.sky-ui','output','.hud-me']
       const boxes=selectors.map(sel=>{const el=document.querySelector(sel);if(!el)return null;const st=getComputedStyle(el),r=el.getBoundingClientRect()
         return st.display==='none'||st.visibility==='hidden'||el.hasAttribute('hidden')?null:{sel,left:r.left,top:r.top,right:r.right,bottom:r.bottom}}).filter(Boolean)
       const overlaps=[]
@@ -524,15 +548,11 @@ try {
   if(!bikeCoexist.bikeRes?.skipped){
     assert.deepEqual(bikeCoexist.bikeRes.overlaps,[],`bike vehicle-action overlap: ${JSON.stringify(bikeCoexist.bikeRes)}`)
     await mobile.screenshot({path:`${outDir}/mobile-390x844-bike-nearby.png`,timeout:90000})
-    await mobile.locator('.walk-ui .btn-run').tap()
-    await mobile.waitForFunction(()=>document.querySelector('.walk-ui .btn-run')?.classList.contains('on'))
     await mobile.locator('.vehicle-action').tap()
     await mobile.waitForFunction(()=>window.viewer?.walk?.vehicle==='bike'&&document.body.hasAttribute('data-aboard'))
     await mobile.evaluate(()=>window.viewer.walk.tick(1/60))
     await mobile.locator('.vehicle-action').tap()
     await mobile.waitForFunction(()=>window.viewer?.walk?.vehicle==='foot'&&!document.body.hasAttribute('data-aboard'))
-    assert.equal(await mobile.evaluate(()=>document.querySelector('.walk-ui .btn-run')?.classList.contains('on')),false,'runLock should clear after boarding e-bike')
-    assert.equal(await mobile.evaluate(()=>document.querySelector('.walk-ui .btn-run')?.getAttribute('aria-pressed')),'false')
   }
   // IDOK-93 landscape phone: same controls, no hit-box overlaps, all inside the viewport.
   await mobile.setViewportSize({width:844,height:390})
@@ -541,7 +561,7 @@ try {
   await mobile.waitForFunction(()=>getComputedStyle(document.querySelector('.dock')).flexDirection!=='column',null,{timeout:15000})
   await mobile.evaluate(async()=>{for(let i=0;i<3;i++)await new Promise(requestAnimationFrame)})
   const land=await mobile.evaluate(()=>{
-    const selectors=['.walk-ui .joystick','.walk-ui .btn-run','.walk-ui .btn-crouch','.walk-ui .btn-jump','.walk-ui .btn-view','.vehicle-action','.dock','.sky-ui','.hud-stats','output','.hud-me']
+    const selectors=['.walk-ui .joystick','.walk-ui .btn-hail','.walk-ui .btn-crouch','.walk-ui .btn-jump','.walk-ui .btn-view','.hotbar','.vehicle-action','.dock .minimap','.dock-buttons','.sky-ui','.hud-stats','output','.hud-me']
     const boxes=selectors.map(sel=>{const el=document.querySelector(sel);if(!el)return null;const st=getComputedStyle(el),r=el.getBoundingClientRect()
       return st.display==='none'||st.visibility==='hidden'||el.closest('[hidden]')?null:{sel,left:r.left,top:r.top,right:r.right,bottom:r.bottom}}).filter(Boolean)
     const overlaps=[]
@@ -557,7 +577,7 @@ try {
   assert(land.sticks===1&&!land.overlaps.length&&!land.outOfBounds.length,`landscape HUD: ${JSON.stringify(land)}`)
   assert.equal(land.rotate,'none','landscape should not offer the rotate entry')
   await mobile.screenshot({path:`${outDir}/mobile-844x390.png`,timeout:90000})
-  const landLook=await cornerDrag(mobile,844,390,[55,55],[40,180])
+  const landLook=await cornerDrag(mobile,844,390,[55,55],8)
   assert(!landLook.stick&&landLook.corner.onCanvas&&landLook.corner.turn>.2&&landLook.blocked.onCanvas&&landLook.blocked.turn===0,`landscape look: ${JSON.stringify(landLook)}`)
   // IDOK-158 landscape phone: the sky panel folds down to the clock, stays hittable, remembers the
   // choice, and the fold control looks like a control (chip background + drawn chevron).
@@ -598,6 +618,59 @@ try {
   await skyTap()
   assert.equal((await skyFold()).folded,false,'tapping again unfolds it')
   assert.equal(await mobile.evaluate(()=>localStorage.getItem('glol.skyFolded')),'0','unfolding clears the flag')
+
+  // IDOK-256: 设置 → 手机按键 writes glol.prefs and drives body hooks; then every preset × size × hand at 320 / 375 / 812 wide
+  // keeps all thumb controls, the dock pieces, readouts and hud-me apart, inside the screen and off the character.
+  const settingsPath=await mobile.evaluate(async()=>{
+    document.querySelector('.dock-settings').click()
+    for(let i=0;i<2;i++)await new Promise(requestAnimationFrame)
+    const panel=document.querySelector('.set-block--thumb'), corner=panel?.querySelector('[data-thumb=corner]'), mirror=panel?.querySelector('[data-thumb-mirror]'), scale=panel?.querySelector('[data-thumb-scale]')
+    if(!corner||!mirror||!scale)return {missing:true}
+    corner.click();mirror.click();scale.value='1.1';scale.dispatchEvent(new Event('input'))
+    const stored=JSON.parse(localStorage.getItem('glol.prefs')).thumb
+    const applied={layout:document.body.dataset.thumbLayout,hand:document.body.dataset.thumbHand,scale:document.body.style.getPropertyValue('--thumb-scale')}
+    panel.querySelector('[data-thumb-reset]').click()
+    const reset={...JSON.parse(localStorage.getItem('glol.prefs')).thumb,hand:document.body.dataset.thumbHand??null}
+    document.querySelector('.settings .about-close').click()
+    return {stored,applied,reset}
+  })
+  assert.deepEqual(settingsPath,{stored:{layout:'corner',scale:1.1,mirror:true},applied:{layout:'corner',hand:'left',scale:'1.1'},reset:{layout:'arc',scale:1,mirror:false,hand:null}},`settings thumb: ${JSON.stringify(settingsPath)}`)
+  const THUMB_SEL=['.walk-ui .joystick','.walk-ui .btn-hail','.walk-ui .btn-crouch','.walk-ui .btn-jump','.walk-ui .btn-view','.emote-toggle','.hotbar','.minimap','.road-name','.dock-buttons>*','.sky-ui','.hud-me','.hud-stats','.render-entry','.vehicle-action']
+  const matrix=[], matrixStart=performance.now()
+  for(const [w,h] of [[320,640],[375,812],[812,375]]){
+    await mobile.setViewportSize({width:w,height:h})
+    await mobile.evaluate(async()=>{for(let i=0;i<4;i++)await new Promise(requestAnimationFrame)})
+    // One evaluate per size: getBoundingClientRect forces style + layout, so combos need no frame waits.
+    const results=await mobile.evaluate(({THUMB_SEL})=>{
+      const out=[], b=document.body
+      for(const layout of ['arc','column','corner'])for(const scale of [.8,1,1.15])for(const mirror of [false,true]){
+        b.dataset.thumbLayout=layout;if(mirror)b.dataset.thumbHand='left';else delete b.dataset.thumbHand;b.style.setProperty('--thumb-scale',String(scale))
+        const boxes=[]
+        for(const sel of THUMB_SEL)for(const el of document.querySelectorAll(sel)){
+          const st=getComputedStyle(el);if(st.display==='none'||st.visibility==='hidden'||el.closest('[hidden]'))continue
+          const r=el.getBoundingClientRect();if(r.width&&r.height)boxes.push({sel:sel==='.dock-buttons>*'?el.className:sel,l:r.left,t:r.top,r:r.right,b:r.bottom})
+        }
+        const W=innerWidth,H=innerHeight,bad=[]
+        for(let i=0;i<boxes.length;i++)for(let j=i+1;j<boxes.length;j++){const a=boxes[i],d=boxes[j]
+          // The road name deliberately floats over the minimap rim on short landscape phones (IDOK-146).
+          if(a.sel==='.minimap'&&d.sel==='.road-name')continue
+          const ox=Math.min(a.r,d.r)-Math.max(a.l,d.l),oy=Math.min(a.b,d.b)-Math.max(a.t,d.t);if(ox>0&&oy>0)bad.push(`${a.sel}×${d.sel}`)}
+        for(const x of boxes){
+          if(x.l<-.5||x.t<-.5||x.r>W+.5||x.b>H+.5)bad.push(`${x.sel} off-screen`)
+          // 上车/上船 prompt is meant to sit by the character; everything else stays off it.
+          if(x.sel!=='.vehicle-action'&&x.r>W*.42&&x.l<W*.58&&x.b>H*.46&&x.t<H*.62)bad.push(`${x.sel} on character`)
+        }
+        out.push({combo:`${layout} ${scale} ${mirror?'left':'right'}`,n:boxes.length,bad})
+      }
+      return out
+    },{THUMB_SEL})
+    for(const res of results){
+      matrix.push(`${w}:${res.n}`)
+      assert.deepEqual(res.bad,[],`thumb layout ${w}x${h} ${res.combo}: ${JSON.stringify(res)}`)
+    }
+  }
+  await mobile.evaluate(()=>{const b=document.body;b.dataset.thumbLayout='arc';delete b.dataset.thumbHand;b.style.setProperty('--thumb-scale','1')})
+  console.log('IDOK-256 thumb layouts OK',JSON.stringify({combos:matrix.length,boxes:[...new Set(matrix)],ms:Math.round(performance.now()-matrixStart),zoom:{d0:+zoomTest.d0.toFixed(2),down:+zoomTest.dDown.toFixed(2),up:+zoomTest.dUp.toFixed(2)}}))
 
   console.log('mobile 390x844 HUD & touch OK',JSON.stringify({run:+touchTest.dist.toFixed(2),along:+touchTest.along.toFixed(3),peak:touchTest.peakSpeed,cornerTurn:lookTest.corner.turn,landCornerTurn:landLook.corner.turn}),mobileShot)
   await mobileCtx.close()

@@ -1180,7 +1180,8 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
   let resets=0,steps=0,physicsMs=0,elapsed=0,lastHits:string[]=[],wasLandmarkHit=false
   const input=walkInput(canvas,()=>active,(dx,dy)=>{yaw-=dx*cfg.sensitivity;pitch=THREE.MathUtils.clamp(pitch+dy*cfg.sensitivity,-.8,1.3)},
     delta=>{arm=THREE.MathUtils.clamp(arm+delta*.013,cfg.zoomMin,cfg.zoomMax);if(active)follow(0,true)},
-    ()=>{arm=arm>(cfg.far+cfg.near)/2?cfg.near:cfg.far;if(active)follow(0,true)})
+    ()=>{arm=arm>(cfg.far+cfg.near)/2?cfg.near:cfg.far;if(active)follow(0,true)},
+    ()=>(arm-cfg.zoomMin)/(cfg.zoomMax-cfg.zoomMin))
   const safe=new THREE.Vector3(),posOut=new THREE.Vector3(),wish=new THREE.Vector2();const spawns:object[]=[]
   let external:{x:number,z:number,run:boolean}|null=null,blockedWater=false,held=false
   const still={right:0,forward:0,run:false,crouch:false,jump:false}

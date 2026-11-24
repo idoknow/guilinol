@@ -407,7 +407,7 @@ try {
     for (let i = 0; i < 6; i++) walk.tick(.06)
     const btnText = document.querySelector('.vehicle-action')?.textContent
     const jumpHidden = getComputedStyle(document.querySelector('.walk-ui .btn-jump')).display === 'none'
-    const runHidden = getComputedStyle(document.querySelector('.walk-ui .btn-run')).display === 'none'
+    const runHidden = !document.querySelector('.walk-ui .btn-run')
     const sels = ['.walk-ui .joystick', '.walk-ui .btn-view', '.vehicle-action', '.dock', '.sky-ui', 'output', '.hud-me']
     const boxes = sels.map(sel => {
       const el = document.querySelector(sel)

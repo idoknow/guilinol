@@ -154,6 +154,11 @@ body[data-photo=on] :is(output,.hint,footer,.sky-ui,.walk-ui,.dock,.toast,.spot-
   .book ol{grid-template-columns:1fr 1fr 1fr}.book li{flex-direction:column;text-align:center;gap:6px;padding:8px}.book li p{display:none}
 }
 @media (pointer:coarse) and (not (any-pointer:fine)) and (max-width:520px){.dock .minimap{width:108px;height:108px}}
+/* IDOK-256 竖屏手机：dock 按钮从一根长竖列（排到屏幕中下、压住跃/远近）改成右对齐的两三列小网格，地图入口只剩小圆图。 */
+@media (pointer:coarse) and (not (any-pointer:fine)) and (min-height:501px){
+  .dock-buttons{flex-direction:row;flex-wrap:wrap;justify-content:flex-end;align-content:flex-start;gap:6px;max-width:min(196px,54vw)}
+  .dock-buttons>button,.dock .btn-mode{height:36px;padding:0 12px;font-size:13px}
+}
 @media (max-width:520px){.book ol{grid-template-columns:1fr}.spot-card{width:calc(100vw - 20px)}}
 /* Short landscape phones (IDOK-146: 770x265 with browser bars, 844x390 iPhone): a column of five dock buttons
    ran into the thumb cluster (跃/远近/跑). Lay the buttons out as one row along the top edge, shrink the minimap so it
@@ -206,3 +211,12 @@ body[data-photo=on] :is(output,.hint,footer,.sky-ui,.walk-ui,.dock,.toast,.spot-
   .photo-actions{gap:8px}.photo-rec{width:40px;height:40px}
 }
 @media (pointer:coarse) and (not (any-pointer:fine)){.photo-bar{padding-right:132px}}
+/* IDOK-256 最窄 320 px：左上账号条（菜单/登录/指南/复位）有 237 px 宽，108 px 的小地图会盖住「复位」。收紧间距、小地图缩到 68 px。 */
+@media (pointer:coarse) and (not (any-pointer:fine)) and (max-width:359px){
+  .hud-me{gap:4px}
+  .dock{right:calc(6px + env(safe-area-inset-right))}
+  :root .dock .minimap{width:68px;height:68px}
+  .dock-buttons{max-width:min(196px,50vw);margin-top:8px}
+  /* 时辰条让出小地图以后只要两行，dock 按钮从它下面开始排 */
+  :root .sky-ui{max-width:calc(100vw - 104px);padding:4px 6px}
+}

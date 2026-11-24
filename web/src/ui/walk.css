@@ -1,40 +1,106 @@
 .walk-ui{position:fixed;inset:0;z-index:2;pointer-events:none}
 .walk-ui>*{pointer-events:auto}
-/* Thumb layout (IDOK-93, look stick removed in IDOK-171): move stick bottom-left, action buttons keep the arc they had
-   around the old look stick; the empty bottom-right corner is drag-to-look canvas. Box grid (no two hit boxes intersect, which walk-quick asserts). Slots: A primary (跃/翘头), B (跑/+挡), C (蹲/-挡), D (压弯), E (远近).
-   Portrait numbers first; landscape phones (max-height:500px) override below. All distances include the safe-area insets. */
-.walk-ui{--sr:env(safe-area-inset-right);--sb:env(safe-area-inset-bottom)}
-.walk-ui .joystick{left:calc(18px + env(safe-area-inset-left));bottom:calc(28px + var(--sb));width:112px;height:112px}
-.walk-ui .joystick-knob{width:46px;height:46px}
-.walk-ui :is(.btn-run,.btn-crouch,.btn-jump,.btn-view,.btn-wheelie,.btn-gear-up,.btn-gear-down,.btn-tuck,.btn-hail){position:fixed;border-radius:50%;place-items:center;padding:0;box-sizing:border-box}
-.walk-ui :is(.btn-run,.btn-crouch,.btn-jump,.btn-view,.btn-hail){display:grid}
+/* Thumb layout (IDOK-93 → IDOK-256). Move stick bottom-left, action buttons bottom-right; no two hit boxes intersect
+   (walk-quick asserts it for every preset × size × hand at 320 / 375 / 812 wide).
+   Slots: A primary (跃 / 翘头·手刹), B (叫车 / +挡), C (蹲 / -挡), D (压弯, riding only), E (远近), F (表情).
+   Every slot is x / y (px from the outer edge / bottom, before the safe area) + diameter, all multiplied by --k:
+   --thumb-scale from 设置 → 手机按键 (0.8–1.15), capped on narrow or short screens so the cluster never reaches the stick.
+   body[data-thumb-layout] picks the preset; body[data-thumb-hand=left] mirrors stick ↔ cluster. Defaults = the old arc. */
+body{--k:var(--thumb-scale,1);
+  --j-x:18px;--j-y:28px;--j-d:112px;
+  --a-x:70px;--a-y:152px;--a-d:64px;
+  --b-x:142px;--b-y:98px;--b-d:54px;
+  --c-x:146px;--c-y:40px;--c-d:46px;
+  --d-x:142px;--d-y:162px;--d-d:44px;
+  --e-x:18px;--e-y:162px;--e-d:44px;
+  --f-x:12px;--f-y:224px}
+body[data-thumb-layout=column]{
+  --a-x:18px;--a-y:148px;--a-d:60px;
+  --b-x:18px;--b-y:88px;--b-d:50px;
+  --c-x:18px;--c-y:28px;--c-d:50px;
+  --d-x:90px;--d-y:156px;--d-d:44px;
+  --e-x:26px;--e-y:218px;--e-d:44px;
+  --f-x:86px;--f-y:32px}
+body[data-thumb-layout=corner]{
+  --a-x:14px;--a-y:14px;--a-d:64px;
+  --b-x:14px;--b-y:86px;--b-d:50px;
+  --c-x:86px;--c-y:14px;--c-d:50px;
+  --d-x:144px;--d-y:14px;--d-d:44px;
+  --e-x:86px;--e-y:78px;--e-d:44px;
+  --f-x:12px;--f-y:146px}
+@media (max-width:359px){body{--k:min(var(--thumb-scale,1),.92)}}
+@media (min-width:360px) and (max-width:389px){body{--k:min(var(--thumb-scale,1),1.05)}}
+@media (max-height:400px){body{--k:min(var(--thumb-scale,1),1.05)}}
+.walk-ui{--sr:env(safe-area-inset-right);--sl:env(safe-area-inset-left);--sb:env(safe-area-inset-bottom)}
+.walk-ui .joystick{left:calc(var(--sl) + var(--j-x)*var(--k));right:auto;bottom:calc(var(--sb) + var(--j-y)*var(--k));width:calc(var(--j-d)*var(--k));height:calc(var(--j-d)*var(--k))}
+.walk-ui .joystick-knob{width:calc(var(--j-d)*var(--k)*.41);height:calc(var(--j-d)*var(--k)*.41)}
+.walk-ui :is(.btn-crouch,.btn-jump,.btn-view,.btn-wheelie,.btn-gear-up,.btn-gear-down,.btn-tuck,.btn-hail){position:fixed;border-radius:50%;place-items:center;padding:0;box-sizing:border-box;
+  left:auto;right:calc(var(--sr) + var(--x)*var(--k));bottom:calc(var(--sb) + var(--y)*var(--k));width:calc(var(--d)*var(--k));height:calc(var(--d)*var(--k));font-size:calc(var(--fs)*var(--k))}
+.walk-ui :is(.btn-crouch,.btn-jump,.btn-view,.btn-hail){display:grid}
 .walk-ui :is(.btn-wheelie,.btn-gear-up,.btn-gear-down,.btn-tuck){display:none}
-/* A */ .walk-ui :is(.btn-jump,.btn-wheelie){right:calc(70px + var(--sr));bottom:calc(152px + var(--sb));width:64px;height:64px}
-.walk-ui .btn-jump{font-size:21px}
-.walk-ui .btn-wheelie{font-size:15px;letter-spacing:.06em;border-color:rgba(214,120,92,.78)}
-/* B */ .walk-ui :is(.btn-run,.btn-gear-up){right:calc(142px + var(--sr));bottom:calc(98px + var(--sb));width:54px;height:54px}
-.walk-ui .btn-run{font-size:17px;letter-spacing:.04em}
-/* C */ .walk-ui :is(.btn-crouch,.btn-gear-down){right:calc(146px + var(--sr));bottom:calc(40px + var(--sb));width:46px;height:46px}
-.walk-ui .btn-crouch{font-size:15px;letter-spacing:.04em}
-.walk-ui :is(.btn-gear-up,.btn-gear-down){font-size:13px;letter-spacing:.02em}
-/* D (on foot: 叫车, aboard: 压弯) */ .walk-ui :is(.btn-tuck,.btn-hail){right:calc(204px + var(--sr));bottom:calc(41px + var(--sb));width:44px;height:44px;font-size:12px;letter-spacing:.02em}
-/* E */ .walk-ui .btn-view{right:calc(18px + var(--sr));bottom:calc(162px + var(--sb));width:44px;height:44px;font-size:12px;letter-spacing:.04em}
-.walk-ui .btn-run.on,.walk-ui .btn-crouch.on{background:rgba(169,80,60,.68);border-color:rgba(244,239,226,.72);box-shadow:0 0 0 2px rgba(214,120,92,.32)}
+.walk-ui :is(.btn-jump,.btn-wheelie){--x:var(--a-x);--y:var(--a-y);--d:var(--a-d)}
+.walk-ui .btn-jump{--fs:21px}
+.walk-ui .btn-wheelie{--fs:15px;letter-spacing:.06em;border-color:rgba(214,120,92,.78)}
+.walk-ui :is(.btn-hail,.btn-gear-up){--x:var(--b-x);--y:var(--b-y);--d:var(--b-d);--fs:13px;letter-spacing:.02em}
+.walk-ui :is(.btn-crouch,.btn-gear-down){--x:var(--c-x);--y:var(--c-y);--d:var(--c-d)}
+.walk-ui .btn-crouch{--fs:15px;letter-spacing:.04em}
+.walk-ui .btn-gear-down{--fs:13px;letter-spacing:.02em}
+.walk-ui .btn-tuck{--x:var(--d-x);--y:var(--d-y);--d:var(--d-d);--fs:12px;letter-spacing:.02em}
+.walk-ui .btn-view{--x:var(--e-x);--y:var(--e-y);--d:var(--e-d);--fs:12px;letter-spacing:.04em;touch-action:none}
+.walk-ui .btn-crouch.on{background:rgba(169,80,60,.68);border-color:rgba(244,239,226,.72);box-shadow:0 0 0 2px rgba(214,120,92,.32)}
+/* 左手模式：摇杆到右下，动作键到左下（同一套 x，从左边量）。 */
+body[data-thumb-hand=left] .walk-ui .joystick{left:auto;right:calc(var(--sr) + var(--j-x)*var(--k))}
+body[data-thumb-hand=left] .walk-ui :is(.btn-crouch,.btn-jump,.btn-view,.btn-wheelie,.btn-gear-up,.btn-gear-down,.btn-tuck,.btn-hail){right:auto;left:calc(var(--sl) + var(--x)*var(--k))}
+/* 远近（IDOK-256）：按住上下拖动连续变焦。按下时按钮上方展开一条竖向滑轨，圆点 = 当前视距（上近下远）。 */
+.walk-ui .btn-view{overflow:visible}
+.walk-ui .btn-view>span{pointer-events:none}
+.walk-ui .btn-view .view-rail{position:absolute;left:50%;bottom:calc(100% + 8px);width:30px;--rail-h:118px;height:var(--rail-h);margin-left:-15px;box-sizing:border-box;padding:6px 0;border-radius:15px;
+  display:flex;flex-direction:column;justify-content:space-between;align-items:center;pointer-events:none;
+  background:rgba(24,40,37,.72);border:1px solid rgba(244,239,226,.42);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);
+  opacity:0;transform:translateY(6px) scaleY(.6);transform-origin:50% 100%;transition:opacity .18s,transform .18s}
+.walk-ui .btn-view .view-rail b{font:600 11px/1 var(--ui-serif,serif);color:rgba(244,239,226,.78);letter-spacing:0}
+.walk-ui .btn-view .view-rail::before{content:"";position:absolute;left:50%;top:24px;bottom:24px;width:2px;margin-left:-1px;border-radius:1px;
+  background:repeating-linear-gradient(180deg,rgba(244,239,226,.55) 0 2px,transparent 2px 10px)}
+.walk-ui .btn-view .view-rail s{position:absolute;left:50%;top:calc(24px + (var(--rail-h) - 48px)*var(--z,.4));width:14px;height:14px;margin:-7px 0 0 -7px;border-radius:50%;
+  background:var(--ui-seal-light,#d6785c);box-shadow:0 0 0 2px rgba(244,239,226,.9),0 2px 6px rgba(0,0,0,.35)}
+.walk-ui .btn-view.dragging .view-rail{opacity:1;transform:none}
+/* 拖远近时滑轨会伸到表情键（F 槽）上方，先把表情键藏起来。 */
+body[data-zooming] .emote-toggle{visibility:hidden}
+.walk-ui .btn-view.on{background:rgba(169,80,60,.68);border-color:rgba(244,239,226,.72)}
 @media (pointer:coarse) and (not (any-pointer:fine)) and (max-height:500px){
-  .walk-ui .joystick{left:calc(22px + env(safe-area-inset-left));bottom:calc(16px + var(--sb));width:96px;height:96px}
-  .walk-ui .joystick-knob{width:40px;height:40px}
-  .walk-ui :is(.btn-jump,.btn-wheelie){right:calc(66px + var(--sr));bottom:calc(122px + var(--sb));width:56px;height:56px}
-  .walk-ui .btn-jump{font-size:19px}
-  .walk-ui :is(.btn-run,.btn-gear-up){right:calc(126px + var(--sr));bottom:calc(74px + var(--sb));width:48px;height:48px}
-  .walk-ui .btn-run{font-size:16px}
-  .walk-ui :is(.btn-crouch,.btn-gear-down){right:calc(129px + var(--sr));bottom:calc(22px + var(--sb));width:42px;height:42px}
-  .walk-ui :is(.btn-tuck,.btn-hail){right:calc(181px + var(--sr));bottom:calc(23px + var(--sb));width:40px;height:40px}
-  .walk-ui .btn-view{right:calc(22px + var(--sr));bottom:calc(130px + var(--sb));width:40px;height:40px}
+  body{--j-x:22px;--j-y:16px;--j-d:96px;
+    --a-x:66px;--a-y:122px;--a-d:56px;
+    --b-x:126px;--b-y:74px;--b-d:48px;
+    --c-x:129px;--c-y:22px;--c-d:42px;
+    --d-x:126px;--d-y:130px;--d-d:40px;
+    --e-x:22px;--e-y:130px;--e-d:40px;
+    --f-x:132px;--f-y:150px}
+  .walk-ui .btn-jump{--fs:19px}
+  body[data-thumb-layout=column]{
+    --a-x:22px;--a-y:120px;--a-d:52px;
+    --b-x:22px;--b-y:68px;--b-d:44px;
+    --c-x:22px;--c-y:16px;--c-d:44px;
+    --d-x:80px;--d-y:124px;--d-d:40px;
+    --e-x:26px;--e-y:180px;--e-d:40px;
+    --f-x:80px;--f-y:18px}
+  body[data-thumb-layout=corner]{
+    --a-x:14px;--a-y:12px;--a-d:56px;
+    --b-x:14px;--b-y:76px;--b-d:46px;
+    --c-x:78px;--c-y:12px;--c-d:46px;
+    --d-x:132px;--d-y:12px;--d-d:40px;
+    --e-x:78px;--e-y:68px;--e-d:40px;
+    --f-x:12px;--f-y:130px}
+  .walk-ui .btn-view .view-rail{--rail-h:96px}
+}
+/* 表情键跟着动作键走（F 槽），左手模式一起换边。 */
+@media (pointer:coarse) and (not (any-pointer:fine)){
+  body .emote-toggle{top:auto;margin-right:0;left:auto;right:calc(env(safe-area-inset-right) + var(--f-x)*var(--k));bottom:calc(env(safe-area-inset-bottom) + var(--f-y)*var(--k))}
+  body[data-thumb-hand=left] .emote-toggle{right:auto;left:calc(env(safe-area-inset-left) + var(--f-x)*var(--k))}
 }
 .walk-ui :is(.btn-wheelie,.btn-tuck).on{background:rgba(169,80,60,.74);border-color:rgba(244,239,226,.78);box-shadow:0 0 0 2px rgba(214,120,92,.34)}
 body[data-aboard]:is([data-ride="bike"],[data-ride="bicycle"]) .walk-ui :is(.btn-wheelie,.btn-gear-up,.btn-gear-down,.btn-tuck){display:grid}
 body[data-aboard][data-ride="car"] .walk-ui :is(.btn-wheelie,.btn-gear-up,.btn-gear-down){display:grid}
-body[data-aboard] :is(.btn-jump,.btn-run,.btn-crouch,.btn-hail){display:none}
+body[data-aboard] :is(.btn-jump,.btn-crouch,.btn-hail){display:none}
 /* 叫车 reads as a service call, not a stunt: jade ring like the shared-fleet ride tag */
 .walk-ui .btn-hail{border-color:rgba(155,235,208,.6);box-shadow:inset 0 0 0 1px rgba(56,146,118,.45)}
 .walk-ui .btn-hail:active{background:rgba(56,146,118,.78)}
@@ -119,8 +185,6 @@ body[data-home] :is(.ride-hud,.vehicle-action,.walk-ui){display:none!important}
   footer{box-sizing:border-box;left:calc(50% - 52px);max-width:calc(100vw - 364px - env(safe-area-inset-left) - env(safe-area-inset-right));font-size:8px;overflow:hidden;text-overflow:ellipsis}
   .ride-gear-btn,.ride-park,.ride-light,.ride-turn-left,.ride-turn-right,.ride-hazard,.ride-horn,.ride-cruise,.ride-sound{padding:1.5px 4px;font-size:9px}
   output{top:calc(142px + env(safe-area-inset-top));bottom:auto;left:calc(12px + env(safe-area-inset-left));max-width:124px}
-  .hud-stats,body[data-hud="street"] .hud-stats{bottom:calc(26px + env(safe-area-inset-bottom))}
-  body[data-aboard] .hud-stats,body[data-hud="street"][data-aboard] .hud-stats{left:calc(12px + env(safe-area-inset-left));bottom:calc(124px + env(safe-area-inset-bottom));transform:none;max-width:min(40vw,180px)}
 }
 @media (pointer:coarse) and (not (any-pointer:fine)) and (max-width:520px){
   html,body{overflow:hidden;max-width:100vw}
@@ -134,5 +198,24 @@ body[data-home] :is(.ride-hud,.vehicle-action,.walk-ui){display:none!important}
 @media (pointer:coarse) and (not (any-pointer:fine)) and (max-width:520px) and (min-height:501px){
   .ride-hud{box-sizing:border-box;left:calc(12px + env(safe-area-inset-left));transform:none;max-width:calc(100vw - 148px - env(safe-area-inset-left) - env(safe-area-inset-right));justify-content:flex-start}
   output{bottom:calc(376px + env(safe-area-inset-bottom))}
-  body[data-aboard] .hud-stats,body[data-hud="street"][data-aboard] .hud-stats{max-width:min(46vw,180px)}
+}
+/* IDOK-256 手机：摇杆那一侧是一根竖列——摇杆、物品栏（空手/相机）、读数条依次往上叠，左手模式整列换到右边；
+   底部正中只留给提示文字。横屏宽度够，物品栏回到底部正中，读数条仍站在摇杆上方。 */
+@media (pointer:coarse) and (not (any-pointer:fine)){
+  :root body{--stick-top:calc(env(safe-area-inset-bottom) + (var(--j-y) + var(--j-d))*var(--k))}
+  :root body .hud-stats{top:auto;right:auto;transform:none;left:calc(env(safe-area-inset-left) + var(--j-x)*var(--k) - 8px);bottom:calc(var(--stick-top) + 10px);max-width:min(58vw,250px)}
+  :root body[data-thumb-hand=left] .hud-stats{left:auto;right:calc(env(safe-area-inset-right) + var(--j-x)*var(--k) - 8px)}
+}
+@media (pointer:coarse) and (not (any-pointer:fine)) and (min-height:501px){
+  :root body .hotbar{left:calc(env(safe-area-inset-left) + var(--j-x)*var(--k) - 6px);right:auto;transform:none;bottom:calc(var(--stick-top) + 10px)}
+  :root body[data-thumb-hand=left] .hotbar{left:auto;right:calc(env(safe-area-inset-right) + var(--j-x)*var(--k) - 6px)}
+  :root body[data-hotbar=on] .hud-stats{bottom:calc(var(--stick-top) + 76px)}
+  /* 上车 / 上船提示站在读数条上方（摇杆 → 物品栏 → 读数 → 提示），不再和读数抢同一行。 */
+  :root body .vehicle-action,:root body[data-hotbar=on] .vehicle-action{bottom:calc(var(--stick-top) + 110px)}
+}
+@media (pointer:coarse) and (not (any-pointer:fine)) and (max-height:500px){
+  :root body .hud-stats{max-width:min(40vw,200px);font-size:10.5px;padding:3px 8px}
+  :root body[data-hotbar=on] .vehicle-action{bottom:calc(82px + env(safe-area-inset-bottom))}
+  /* 载入街区的小角标原本在左上第五行，左手模式下动作键会顶到那里；横屏挪到时辰条下方正中。 */
+  :root .ld-corner{left:50%;right:auto;bottom:auto;top:calc(100px + env(safe-area-inset-top));transform:translateX(-50%)}
 }

@@ -365,7 +365,7 @@ try {
     assert.deepEqual(mobileCtrlVis, [], `${label} mobile ride HUD controls must stay visible: ${JSON.stringify(mobileCtrlVis)}`)
     const hiddenCheck = await mp.evaluate(() => ({
       jumpHidden: getComputedStyle(document.querySelector('.walk-ui .btn-jump')).display === 'none',
-      runHidden: getComputedStyle(document.querySelector('.walk-ui .btn-run')).display === 'none',
+      runHidden: !document.querySelector('.walk-ui .btn-run'),
     }))
     assert(hiddenCheck.jumpHidden && hiddenCheck.runHidden, `${label} jump/run must remain hidden while riding`)
 

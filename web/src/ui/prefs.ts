@@ -5,7 +5,12 @@ export type StatsPrefs = {fps: boolean; net: boolean; online: boolean}
 export type ViewMode = 'third' | 'first'
 /** IDOK-182：相机装备。owned 是背包里的机身，equipped 是手上那台。 */
 export type GearPrefs = {equipped: import('../gear/cameras').BodyId; owned: import('../gear/cameras').BodyId[]}
-export type Prefs = {stats: StatsPrefs; view: ViewMode; keys: Record<string, string[]>; gear: GearPrefs}
+/** IDOK-256：手机按键布局。layout 是右下动作键的排法，scale 是按钮大小，mirror 把摇杆换到右边（左手模式）。 */
+export type ThumbLayout = 'arc' | 'column' | 'corner'
+export type ThumbPrefs = {layout: ThumbLayout; scale: number; mirror: boolean}
+export const THUMB_SCALE_MIN = 0.8
+export const THUMB_SCALE_MAX = 1.15
+export type Prefs = {stats: StatsPrefs; view: ViewMode; keys: Record<string, string[]>; gear: GearPrefs; thumb: ThumbPrefs}
 
 const STORAGE_KEY = 'glol.prefs'
 
@@ -14,13 +19,14 @@ export const DEFAULT_PREFS: Prefs = {
   view: 'third',
   keys: {},
   gear: {equipped: 'mirrorless', owned: ['mirrorless', 'action', 'pocket', 'thumb']},
+  thumb: {layout: 'arc', scale: 1, mirror: false},
 }
 
 let current: Prefs = load()
 const listeners = new Set<(next: Prefs) => void>()
 
 function defaults(): Prefs {
-  return {...DEFAULT_PREFS, stats: {...DEFAULT_PREFS.stats}, keys: {}, gear: {equipped: DEFAULT_PREFS.gear.equipped, owned: [...DEFAULT_PREFS.gear.owned]}}
+  return {...DEFAULT_PREFS, stats: {...DEFAULT_PREFS.stats}, keys: {}, gear: {equipped: DEFAULT_PREFS.gear.equipped, owned: [...DEFAULT_PREFS.gear.owned]}, thumb: {...DEFAULT_PREFS.thumb}}
 }
 
 function load(): Prefs {
@@ -45,10 +51,20 @@ function load(): Prefs {
       view: raw.view === 'first' ? 'first' : 'third',
       keys,
       gear: loadGear(raw.gear),
+      thumb: loadThumb(raw.thumb),
     }
   } catch {
     return defaults()
   }
+}
+
+export function loadThumb(raw: unknown): ThumbPrefs {
+  const value = (raw && typeof raw === 'object' ? raw : {}) as Partial<ThumbPrefs>
+  const layout: ThumbLayout = value.layout === 'column' || value.layout === 'corner' ? value.layout : 'arc'
+  const scale = typeof value.scale === 'number' && Number.isFinite(value.scale)
+    ? Math.round(Math.min(THUMB_SCALE_MAX, Math.max(THUMB_SCALE_MIN, value.scale)) * 100) / 100
+    : 1
+  return {layout, scale, mirror: value.mirror === true}
 }
 
 function loadGear(raw: unknown): GearPrefs {

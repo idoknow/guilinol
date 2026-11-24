@@ -39,7 +39,6 @@ function inspectHudLayoutScript() {
       '.dock',
       '.btn-mode',
       '.walk-ui .joystick',
-      '.walk-ui .btn-run',
       '.walk-ui .btn-crouch',
       '.walk-ui .btn-jump',
       '.walk-ui .btn-view',

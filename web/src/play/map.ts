@@ -257,8 +257,7 @@ export function mapView(host:Host, atlas:Atlas, ui:{slot:HTMLElement; buttons:HT
   const north = document.createElement('i'); north.textContent = '北'; mini.append(north)
   const road = document.createElement('div'); road.className = 'road-name'
   ui.slot.append(mini,road)
-  const mapButton = document.createElement('button'); mapButton.className = 'dock-map'; mapButton.textContent = '地图'
-  mapButton.setAttribute('aria-label','打开地图（M）'); mapButton.title = '打开地图（M）'; ui.buttons.append(mapButton)
+  // IDOK-256: the minimap disc is the only map entry (the old「地图」dock button opened the same atlas). M still works.
   let lastRoad = ''
   function drawMini() {
     const size = mini.clientWidth; if(!size) return
@@ -380,7 +379,7 @@ export function mapView(host:Host, atlas:Atlas, ui:{slot:HTMLElement; buttons:HT
     const before = {x:view.x+ox/view.scale,z:view.z+oy/view.scale}; view.scale *= Math.exp(-e.deltaY*.0015); clampView()
     view.x = before.x-ox/view.scale; view.z = before.z-oy/view.scale; clampView(); redraw()}
   addEventListener('resize',redraw)
-  mini.onclick = mapButton.onclick = ()=>sheet.hidden?open():close()
+  mini.onclick = ()=>sheet.hidden?open():close()
   addEventListener('keydown',e=>{
     if(e.code==='Escape'&&!sheet.hidden){close();return}
     if(e.code==='KeyM'&&!e.repeat){
