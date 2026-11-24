@@ -26,6 +26,7 @@ try {
     else void download.cancel().catch(() => {})
   })
   await page.route('**/favicon.ico', route => route.fulfill({status: 204}))
+  await page.route('**/stats.rcpd.cc/**', route => route.fulfill({status: 204, body: ''}))
   await page.route('**/api/t', route => route.fulfill({status: 204}))
   await page.route('**/api/live', route => route.fulfill({status: 200, contentType: 'application/json', body: '{"online":42}'}))
 
@@ -39,7 +40,14 @@ try {
     const hit = document.elementFromPoint(rect.x + rect.width / 2, rect.y + rect.height / 2)
     return !!hit && entry.contains(hit)
   }, null, {timeout: 120000})
-  await page.locator('canvas[data-engine]').first().click({position: {x: 640, y: 520}})
+  await page.evaluate(() => {
+    const canvas = document.querySelector('canvas[data-engine]')
+    if (canvas instanceof HTMLElement) {
+      canvas.focus()
+      canvas.dispatchEvent(new PointerEvent('pointerdown', {bubbles: true, clientX: 640, clientY: 520, pointerId: 1, pointerType: 'mouse', isPrimary: true, button: 0}))
+      canvas.dispatchEvent(new PointerEvent('pointerup', {bubbles: true, clientX: 640, clientY: 520, pointerId: 1, pointerType: 'mouse', isPrimary: true, button: 0}))
+    }
+  })
 
   const tap = async selector => {
     await page.waitForSelector(selector, {state: 'attached', timeout: 20000})

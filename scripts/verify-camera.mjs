@@ -35,6 +35,7 @@ try {
     } else void download.cancel().catch(() => {})
   })
   await page.route('**/favicon.ico', route => route.fulfill({status: 204}))
+  await page.route('**/stats.rcpd.cc/**', route => route.fulfill({status: 204, body: ''}))
   await page.route('**/api/t', route => route.fulfill({status: 204}))
   await page.route('**/api/live', route => route.fulfill({status: 200, contentType: 'application/json', body: '{"online":42}'}))
 
@@ -49,7 +50,15 @@ try {
     const hit = document.elementFromPoint(rect.x + rect.width / 2, rect.y + rect.height / 2)
     return !!hit && gear.contains(hit)
   }, null, {timeout: 120000})
-  await page.locator('canvas[data-engine]').first().click({position: {x: 640, y: 500}})
+  // swiftshader 下画布一直在重绘，Playwright 的「stable」判定会一直等；直接派发指针事件即可拿焦点。
+  await page.evaluate(() => {
+    const canvas = document.querySelector('canvas[data-engine]')
+    if (canvas instanceof HTMLElement) {
+      canvas.focus()
+      canvas.dispatchEvent(new PointerEvent('pointerdown', {bubbles: true, clientX: 640, clientY: 500, pointerId: 1, pointerType: 'mouse', isPrimary: true, button: 0}))
+      canvas.dispatchEvent(new PointerEvent('pointerup', {bubbles: true, clientX: 640, clientY: 500, pointerId: 1, pointerType: 'mouse', isPrimary: true, button: 0}))
+    }
+  })
 
   // dock 的按钮列会在图册/小地图挂上来时上下跳，Playwright 的"可点"判定会一直被打断；
   // 这里用 DOM 派发点击（走的是同一个 click handler），只跳过命中测试这一步。
@@ -85,6 +94,11 @@ try {
   assert.equal(equipped, 'thumb', 'equipping should persist to prefs')
   assert.equal(await page.evaluate(() => !!document.querySelector('.gear-card.on[data-body=thumb]')), true, 'equipped card should be marked')
   await tap('.gear-close')
+  // 物品栏由 play.tick 每帧刷新，软渲染下一次 tick 可能要等好几秒；关掉相机包后等它真的出现再断言。
+  await page.waitForFunction(() => {
+    const bar = document.querySelector('.hotbar')
+    return !!bar && !bar.hidden
+  }, null, {timeout: 90000})
 
   // 2) IDOK-238：默认空手（右臂跟走路动画），底部物品栏按 2 才拿相机，镜头朝角色前方；按 1 收起
   const handState = () => page.evaluate(() => {
