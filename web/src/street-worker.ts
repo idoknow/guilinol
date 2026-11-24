@@ -3,7 +3,7 @@ import {buildRoadBarriers} from './road-barriers'
 import * as THREE from 'three'
 import {look} from './look/config'
 type Pair=[number,number]
-type LevelPanel=[number,number,number,number,number,number]
+type LevelPanel=[startX:number,startZ:number,endX:number,endZ:number,halfWidth:number,railY:number]
 type Path=[number,...Pair[][]]
 type RoadCtrl=[number,number[]]
 type Lower=[number,Pair[],[number,number,number,number][]]
@@ -59,20 +59,7 @@ export function streetGeometry([paths,lamps,banks,signals=[],stops=[],roadCtrl,s
       }
       offset=.045+.15*distance/2
     }
-    let base=baseLevel(pt.x,pt.y)
-    if(!lowerPath&&!platformPath&&panels.length){
-      let closest=12
-      let target=base
-      for(const [ax,az,bx,bz,half,railY] of panels){
-        const dx=bx-ax,dz=bz-az,length=Math.hypot(dx,dz)
-        if(length<.001)continue
-        const along=((pt.x-ax)*dx+(pt.y-az)*dz)/length
-        const side=Math.abs((pt.y-az)*dx-(pt.x-ax)*dz)/length
-        const outside=Math.hypot(Math.max(0,-along,along-length),Math.max(0,side-half))
-        if(outside<closest){closest=outside;target=railY-.045}
-      }
-      base=THREE.MathUtils.lerp(target,base,THREE.MathUtils.smoothstep(closest,0,12))
-    }
+    const base=baseLevel(pt.x,pt.y)
     return new THREE.Vector3(pt.x,(lower&&lowerPath?lowerHeight(pt.x,pt.y,base,ground(pt.x,pt.y),lower):base)+offset,pt.y)
   }
   const surfaceKinds:number[]=[],alongVals:number[]=[]
@@ -101,7 +88,18 @@ export function streetGeometry([paths,lamps,banks,signals=[],stops=[],roadCtrl,s
     const height=[.045,.195,.065,0,.195,.06,.195][kind]
     function tessellate(a:THREE.Vector2,b:THREE.Vector2,c:THREE.Vector2){
       const ab=a.distanceToSquared(b),bc=b.distanceToSquared(c),ca=c.distanceToSquared(a)
-      if(Math.max(ab,bc,ca)<=16){triangle(vector(a,height),vector(c,height),vector(b,height),kind);return}
+      const longest=Math.max(ab,bc,ca)
+      if(longest<=16){
+        const x=(a.x+b.x+c.x)/3,z=(a.y+b.y+c.y)/3
+        const nearPanel=longest>1&&panels.some(([ax,az,bx,bz,half])=>{
+          const dx=bx-ax,dz=bz-az
+          const t=THREE.MathUtils.clamp(((x-ax)*dx+(z-az)*dz)/(dx*dx+dz*dz||1),0,1)
+          return Math.hypot(x-ax-t*dx,z-az-t*dz)<=half+4
+        })
+        // A four-metre face can bridge the curved shoulder of the flat
+        // crossing. Sample the actual fitted surface across its edge.
+        if(!nearPanel){triangle(vector(a,height),vector(c,height),vector(b,height),kind);return}
+      }
       if(bc>ab&&bc>=ca){tessellate(b,c,a);return}if(ca>ab){tessellate(c,a,b);return}
       const mid=a.clone().lerp(b,.5);tessellate(a,mid,c);tessellate(mid,b,c)
     }

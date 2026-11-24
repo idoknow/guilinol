@@ -201,7 +201,7 @@ def bake(directory, chunks, graded=None, tunnels=()):
 
 
 def bake_level_panels(directory, chunks, elements, panels):
-    """Supply the rendered road mesh with its flat plank run and both transitions."""
+    """Mark each flat plank run for finer sampling of the fitted road at its edges."""
     by_way = {w['id']: w for w in elements if w['type']=='way'}
     lines, sections = [], []
     for panel in panels:

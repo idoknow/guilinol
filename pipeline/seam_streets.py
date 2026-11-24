@@ -33,7 +33,7 @@ class Streets:
             kinds.append(kind)
         ctrl = streets[5] if len(streets)>5 else None
         grid = (np.reshape(ctrl[1], (35, 35))+ctrl[0])/1000 if ctrl else None
-        if len(streets)>12:
+        if len(streets)>12 and streets[12]:
             self.platforms[origin] = streets[12]
         if len(streets)>11 and streets[11]:
             first,corners,profile = streets[11]
