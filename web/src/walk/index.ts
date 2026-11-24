@@ -447,6 +447,17 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
   }
   const ebikeFx=createEbikeFxController()
   const ebikeAudio=createEbikeAudioEngine()
+  const prepareRideAudio=()=>{
+    if(ebikeAudio.muted)return
+    void ebikeAudio.prepare()
+    window.removeEventListener('pointerdown',prepareRideAudio,true)
+    window.removeEventListener('keydown',prepareRideAudio,true)
+  }
+  if(navigator.userActivation?.hasBeenActive)prepareRideAudio()
+  else{
+    window.addEventListener('pointerdown',prepareRideAudio,{capture:true,passive:true})
+    window.addEventListener('keydown',prepareRideAudio,true)
+  }
   window.addEventListener(RIDE_SOUND_EVENT,event=>ebikeAudio.setMuted((event as CustomEvent<boolean>).detail))
   const ZERO_RIDE_INPUT:EbikeRideControlInput={gearDelta:0,gearSelect:null,wheelie:false,tuck:false,recover:false,cycleMod:false,parkToggle:false,kickstandToggle:false,headlightCycle:false,turnLeftToggle:false,turnRightToggle:false,hazardToggle:false,horn:false,hornPulse:false,cruiseToggle:false}
   const ebikeMountStartPos=new THREE.Vector3(), ebikeMountStartRot=new Map<RiderJointName,[number,number,number]>()
@@ -1380,7 +1391,6 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
     if(active)resetWalk()
     syncSceneObstacleVolumes()
     sim.sync(x,z);if(!place(x,z,reason,override)){disconnect();window.dispatchEvent(new CustomEvent('walk:spawn-failed',{detail:{x,z,reason:'no-walkable-support'}}));return false}
-    ebikeAudio.prepare()
     active=true;rides?.show(true);requestAnimationFrame(()=>requestAnimationFrame(loadRides));figure.visible=true;firstPersonHidden=false
     yaw=heading;facing=yaw+avatar.yaw;figure.rotation.y=facing;input.show(true);accumulator=0;rig.reset(arm)
     camera.near=.08;camera.updateProjectionMatrix();follow(0,true)

@@ -42,6 +42,7 @@ try{
       new Function(code)()
       const engine=window.RideAudio.createEbikeAudioEngine()
       if(engine.muted)engine.setMuted(false)
+      await engine.prepare()
       engine.unlock()
       const base={active:true,rideKind:'bike',braking:false,parked:false,leanRisk:0,dt:1/60}
       if(run==='cruise')engine.updateContinuous({...base,speed:25/3.6,throttle:.5})

@@ -3,6 +3,7 @@ import {MAIN_DETAIL_LAYER} from '../look/mirror-layer'
 import {npcDefaults} from '../../../lib/npc'
 import {rideSoundMuted,RIDE_SOUND_EVENT,masterVolume,VOLUME_EVENT} from '../walk/ride-sound-pref'
 import type {Traffic} from './sim'
+import {existingCityAudio,prepareCityAudio,resumeCityAudio} from '../city-audio'
 import './interactions.css'
 
 type Actor=Traffic['actors'][number]
@@ -15,7 +16,8 @@ export function interactions(scene:Scene,camera:Camera,rules:typeof npcDefaults)
   const interval=(walk:boolean)=>walk?15+Math.random()*30:10+Math.random()*20
   const pick=(lines:string[])=>lines[Math.floor(Math.random()*lines.length)]
   let output:GainNode|undefined,level=masterVolume(),muted=rideSoundMuted()
-  function unlock(){if(!muted&&level>0){audio??=new AudioContext();if(!output){output=audio.createGain();output.gain.value=level;output.connect(audio.destination)}void audio.resume().catch(()=>{})}}
+  function connect(context:AudioContext|null){if(!context||muted||level<=0)return;audio=context;if(!output){output=audio.createGain();output.gain.value=level;output.connect(audio.destination)}void resumeCityAudio(audio)}
+  function unlock(){if(!muted&&level>0){const current=existingCityAudio();if(current)connect(current);else void prepareCityAudio().then(connect)}}
   window.addEventListener('pointerdown',unlock,{passive:true});window.addEventListener('keydown',unlock)
   function sync(){level=masterVolume();muted=rideSoundMuted();if(output)output.gain.value=muted?0:level;if(said)window.speechSynthesis?.cancel();if(!muted&&level>0&&audio?.state==='suspended')void audio.resume().catch(()=>{})}
   window.addEventListener(RIDE_SOUND_EVENT,sync);window.addEventListener(VOLUME_EVENT,sync)
