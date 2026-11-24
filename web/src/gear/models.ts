@@ -342,6 +342,10 @@ const builders: Record<CameraBody['id'], (body: CameraBody) => T.Group> = {
   action: buildAction,
   pocket: buildPocket,
   thumb: buildThumb,
+  // IDOK-188：三台新机身先复用同类外形（尺寸/配色按机身表走），等 sg claude 的 glTF 到货自动替换。
+  a7r2: buildMirrorless,
+  action6: buildAction,
+  pocket4pro: buildPocket,
 }
 
 /** 程序化机身：origin = 握持点（子节点整体偏移），lens 朝 -Z。 */

@@ -271,14 +271,14 @@ export function play(host:Host) {
 
   // --- Per-frame: marker placement/fade, arrival, summit pill.
   let pulse = 0
-  let camShown = false
   function tick(dt:number) {
     pulse += dt
     if(!mapRequested&&pulse>mapRetryAt){mapRequested = true; loadMap()}
     const walker = host.walker(), walking = !!walker?.active, p = walking?walker!.position:host.camera.position
-    // IDOK-182: 手上的相机只在徒步取景时出现；拍照/飞行/看相机包时收起来。
+    // IDOK-182/188: 手上的相机只在徒步取景时出现；拍照/飞行/看相机包时收起来。
+    // 每帧都喂一次 setCameraShown：walker 是首帧之后才拿到的，只在状态翻转时调用会漏掉持机姿势。
     const camOn = walking && !photo.active && !isRackOpen()
-    if(camOn!==camShown){camShown = camOn; setCameraShown(camOn, walker)}
+    setCameraShown(camOn, walker)
     for(const m of marks) {
       const d = Math.hypot(m.spot.x-p.x,m.spot.z-p.z)
       if(Number.isNaN(m.ground)&&d<600) m.ground = groundAt(m.spot.x,m.spot.z)

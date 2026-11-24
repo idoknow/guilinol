@@ -1,17 +1,16 @@
 import * as THREE from 'three'
 import type {Host} from './host'
 import {label, type Weather} from '../look/time'
-import {camera, focalLabel, focalToFov, isoLabel, meterShutter, meterStops, nearest, sensorArea, shutterLabel, WIDE_FACTOR, type BodyId, type CameraBody} from '../gear/cameras'
-import {drawGrid, encode, exposureGain, extensionFor, grade, rawSidecar, stamp, type GridMode, type ShotFormat, type ShotSettings} from '../gear/capture'
+import {camera, focalLabel, focalToFov, isoLabel, sensorArea, shutterLabel, videoPreset, type BodyId, type CameraBody} from '../gear/cameras'
+import {encode, extensionFor, grade, stamp, type ShotSettings} from '../gear/capture'
 import {canRecord, saveRecording, startRecording, type Recording} from '../gear/video'
 import {prefs} from '../ui/prefs'
 import {openRack} from '../ui/gear-rack'
 import {refreshCamera, setCameraShown} from '../gear/hand'
 
-// 拍照模式（IDOK-182 起接了相机系统）：
-//   机身来自相机包（gear-rack），参数按机型给：曝光 / ISO / 快门 / 光圈 / 焦距 / 数码变焦 /
-//   白平衡 / 广角 / 微距 / 水平仪 / 构图线 / 输出格式 / RAW；出片走 gear/capture 的统一管线。
-//   滤镜仍是 CSS filter 字符串 —— 预览（canvas 的 style.filter）和成片（ctx.filter）用同一段。
+// 拍照模式（IDOK-182 起接了相机装备，IDOK-188 又把专业参数收掉了）：
+//   机身只决定取景广角、画质基线和手上拿的那台；UI 回到「时辰 / 滤镜 / 天气 / 人物 / 落款」，
+//   按快门就出片，另外保留一颗录像键，固定录 MP4。
 const filters: [string, string][] = [
   ['原片', 'none'],
   ['青绿', 'saturate(1.18) hue-rotate(-8deg) contrast(1.04)'],
@@ -21,24 +20,11 @@ const filters: [string, string][] = [
 ]
 const skies: [string, Weather][] = [['晴', 'clear'], ['雾', 'mist'], ['雨', 'rain']]
 
-const GRIDS: [string, GridMode][] = [['关', 'none'], ['三分', 'thirds'], ['黄金', 'golden'], ['中心', 'center'], ['网格', 'grid']]
-
-type ToggleKey = 'figure' | 'sign' | 'macro' | 'wide' | 'level' | 'raw'
+type ToggleKey = 'figure' | 'sign'
 
 interface ShotState {
   filter: number
-  figure: boolean
-  sign: boolean
   body: BodyId
-  ev: number
-  iso: number
-  shutter: number
-  aperture: number | null
-  focal: number
-  zoom: number
-  wb: number
-  grid: GridMode
-  format: ShotFormat
   toggle: Record<ToggleKey, boolean>
 }
 
@@ -54,48 +40,28 @@ export function photoMode(host: Host, place: () => string, onCapture?: () => voi
   bar.innerHTML = `<div class="photo-row"><label class="photo-hour"><span></span><input type="range" min="0" max="23.9" step=".1" aria-label="时辰"></label>
       <span class="chips" data-group="sky">${skies.map(([t, v]) => `<button data-v="${v}">${t}</button>`).join('')}</span></div>
     <div class="photo-row"><span class="chips" data-group="filter">${filters.map(([t], i) => `<button data-v="${i}">${t}</button>`).join('')}</span>
-      <span class="chips" data-group="opts"><button data-v="figure">人物</button><button data-v="sign">落款</button><button data-v="sheet">参数</button></span></div>
+      <span class="chips" data-group="opts"><button data-v="figure">人物</button><button data-v="sign">落款</button><button data-v="rack">换机</button></span></div>
     <div class="photo-actions"><button class="photo-rec" aria-label="录像"><i></i></button><button class="photo-shutter" aria-label="按快门"><i></i></button></div>`
-
-  const sheet = document.createElement('aside')
-  sheet.className = 'cam-sheet'
-  sheet.hidden = true
-
-  const guides = document.createElement('div')
-  guides.className = 'cam-guides'
-  guides.hidden = true
-  guides.innerHTML = `<div class="cg-grid"></div><div class="cg-level"><i></i><b></b></div><div class="cg-readout"></div><div class="cg-rec" hidden><i></i><span>00:00</span></div>`
 
   const flash = document.createElement('div')
   flash.className = 'photo-flash'
   const shot = document.createElement('figure')
   shot.className = 'photo-shot'
   shot.hidden = true
-  document.body.append(bar, exit, sheet, guides, flash, shot)
+  const recBadge = document.createElement('div')
+  recBadge.className = 'cg-rec'
+  recBadge.hidden = true
+  recBadge.innerHTML = '<i></i><span>00:00</span>'
+  document.body.append(bar, exit, flash, shot, recBadge)
 
   const hour = bar.querySelector<HTMLInputElement>('input')!
   const hourText = bar.querySelector<HTMLElement>('.photo-hour span')!
-  const gridLayer = guides.querySelector<HTMLElement>('.cg-grid')!
-  const levelLayer = guides.querySelector<HTMLElement>('.cg-level')!
-  const readout = guides.querySelector<HTMLElement>('.cg-readout')!
-  const recBadge = guides.querySelector<HTMLElement>('.cg-rec')!
   const recText = recBadge.querySelector('span')!
 
   const state: ShotState = {
     filter: 0,
-    figure: true,
-    sign: true,
     body: prefs().gear.equipped,
-    ev: 0,
-    iso: 0,
-    shutter: 0,
-    aperture: null,
-    focal: 0,
-    zoom: 1,
-    wb: 5500,
-    grid: 'thirds',
-    format: 'jpeg',
-    toggle: {figure: true, sign: true, macro: false, wide: false, level: true, raw: true},
+    toggle: {figure: true, sign: true},
   }
 
   let active = false
@@ -104,258 +70,66 @@ export function photoMode(host: Host, place: () => string, onCapture?: () => voi
   let shotUrl = ''
 
   const body = (): CameraBody => camera(state.body)
+  const focalValue = () => body().focal.min
+  const fovNow = () => Math.min(110, Math.max(4, focalToFov(focalValue())))
 
-  function resetForBody(next: BodyId) {
-    const b = camera(next)
-    state.body = next
-    state.ev = 0
-    state.iso = 0
-    // 默认停在最接近 1/125 的那一挡（测光基准），不是表里第一挡 1/8000。
-    state.shutter = b.shutter.indexOf(meterShutter(b))
-    state.aperture = b.aperture.length ? Math.min(2, b.aperture.length - 1) : null
-    state.focal = 0
-    state.zoom = 1
-    state.wb = Math.round((b.wb.min + b.wb.max) / 200) * 100
-    state.format = b.formats[0]
-    state.toggle.raw = b.raw
-    state.toggle.wide = false
-    state.toggle.macro = false
-    state.toggle.level = b.level
-    if (!b.level) state.toggle.level = false
+  // 不暴露参数，但曝光仍然跟着时辰/天气走一档，夜里不至于全黑。
+  function autoExposure() {
+    const b = body()
+    const hourNow = host.clock.hour
+    const night = hourNow < 6.4 || hourNow > 18.6
+    const dim = host.clock.weather !== 'clear'
+    const isoFloor = night ? (dim ? 6400 : 3200) : dim ? 400 : b.iso[Math.min(1, b.iso.length - 1)]
+    const iso = b.iso[Math.max(0, b.iso.findIndex(value => value >= isoFloor))]
+    const shutterFloor = night ? 1 / 30 : dim ? 1 / 60 : 1 / 125
+    const shutter = b.shutter[Math.max(0, b.shutter.findIndex(value => value <= shutterFloor))]
+    return {iso, shutter, wb: night ? Math.max(b.wb.min, 4200) : Math.round((b.wb.min + b.wb.max) / 200) * 100}
   }
 
-  const isoValue = () => body().iso[Math.min(state.iso, body().iso.length - 1)]
-  const shutterValue = () => body().shutter[Math.min(state.shutter, body().shutter.length - 1)]
-  const apertureValue = () => (state.aperture === null ? null : body().aperture[Math.min(state.aperture, body().aperture.length - 1)])
-  const focalValue = () => {
-    const f = body().focal
-    if (f.fixed) return f.min
-    return Math.round((f.min + state.focal * f.step) * 10) / 10
-  }
-  /** 实际成像焦距：超广角开着就 ×0.7 */
-  const lensMm = () => Math.round(focalValue() * (state.toggle.wide && body().wide ? WIDE_FACTOR : 1) * 10) / 10
-  const meter = () => meterStops(body(), isoValue(), shutterValue(), apertureValue())
-
-  function settings(zoom: number): ShotSettings {
+  function settings(): ShotSettings {
+    const auto = autoExposure()
+    const b = body()
     return {
-      exposure: state.ev,
-      meter: meter(),
-      iso: isoValue(),
-      baseIso: body().baseIso,
-      sensor: sensorArea(body()),
-      shutter: shutterValue(),
-      aperture: apertureValue(),
-      wb: state.wb,
-      zoom,
-      macro: state.toggle.macro,
-      grid: state.grid,
-      format: state.toggle.raw && body().raw ? 'png' : state.format,
-      raw: state.toggle.raw && body().raw,
-      level: state.toggle.level,
+      exposure: 0,
+      // 自动曝光只挑 ISO/快门，测光基准差按 0 档算（成片亮度 = 2^exposure = 1，即「正常曝光」）
+      meter: 0,
+      iso: auto.iso,
+      baseIso: b.baseIso,
+      sensor: sensorArea(b),
+      aperture: b.aperture.length ? b.aperture[Math.floor(b.aperture.length / 2)] : null,
+      shutter: auto.shutter,
+      wb: auto.wb,
+      zoom: 1,
+      macro: false,
+      grid: 'none',
+      format: b.formats[0],
+      raw: false,
+      level: false,
     }
   }
 
-  // ---- 取景预览：FOV、CSS 滤镜、辅助线 -------------------------------------------------
+  function resetForBody(next: BodyId) {
+    state.body = camera(next).id
+  }
+
+  // ---- 取景预览 ---------------------------------------------------------------------
   function previewFilter(): string {
-    const parts: string[] = []
     const look = filters[state.filter][1]
+    const parts: string[] = []
     if (look !== 'none') parts.push(look)
-    const gain = exposureGain({exposure: state.ev, meter: meter()})
-    if (Math.abs(gain - 1) > 0.001) parts.push(`brightness(${gain.toFixed(3)})`)
-    // 白平衡近似：暖了加 sepia、冷了转蓝，只是预览提示，成片才是精确增益。
-    const wbShift = (state.wb - 5500) / 5500
-    if (Math.abs(wbShift) > 0.02) parts.push(wbShift > 0 ? `sepia(${Math.min(0.35, wbShift * 0.5).toFixed(3)})` : `hue-rotate(${Math.round(wbShift * 16)}deg)`)
-    if (state.toggle.macro) parts.push('contrast(1.04) saturate(1.05)')
+    // 夜景/雾雨按自动挡的 EV 提示一下，让预览别和成片差太远。
+    const ev = -Math.log2(autoExposure().iso / body().baseIso) * 0.35
+    if (Math.abs(ev) > 0.05) parts.push(`brightness(${Math.pow(2, ev).toFixed(3)})`)
     return parts.join(' ')
   }
 
   function applyView() {
-    const b = body()
-    const fov = focalToFov(lensMm()) / Math.max(1, state.zoom)
-    host.camera.fov = Math.min(110, Math.max(4, fov))
+    host.camera.fov = fovNow()
     host.camera.updateProjectionMatrix()
     host.renderer.domElement.style.filter = previewFilter()
   }
 
-  function applyGuides() {
-    if (!active) {
-      guides.hidden = true
-      return
-    }
-    guides.hidden = false
-    gridLayer.className = `cg-grid grid-${state.grid}`
-    levelLayer.hidden = !state.toggle.level
-  }
-
-  // ---- 参数表 -----------------------------------------------------------------------
-  function slider(row: string, caption: string, min: number, max: number, step: number, value: number, text: string, input: (v: number) => void, disabled = false) {
-    return `<label class="cs-row" data-row="${row}"><span class="cs-name">${caption}</span>
-      <input type="range" min="${min}" max="${max}" step="${step}" value="${value}" aria-label="${caption}"${disabled ? ' disabled' : ''}>
-      <b class="cs-val">${text}</b></label>`
-  }
-
-  function buildSheet() {
-    const b = body()
-    const rows: string[] = []
-    rows.push(`<header class="cs-head"><div><b>${b.name}</b><i>${b.sensor} · ${b.tagline}</i></div><button class="cs-rack">换机</button></header>`)
-    rows.push(slider('ev', '曝光', b.ev.min, b.ev.max, b.ev.step, state.ev, `${state.ev > 0 ? '+' : ''}${state.ev.toFixed(1)}EV`, v => {
-      state.ev = Math.round(v / b.ev.step) * b.ev.step
-      applyView()
-      syncSheetValues()
-    }))
-    rows.push(slider('iso', 'ISO', 0, b.iso.length - 1, 1, state.iso, isoLabel(isoValue()), v => {
-      state.iso = Math.round(v)
-      syncSheetValues()
-    }))
-    rows.push(slider('shutter', '快门', 0, b.shutter.length - 1, 1, state.shutter, shutterLabel(shutterValue()), v => {
-      state.shutter = Math.round(v)
-      syncSheetValues()
-    }))
-    if (b.aperture.length) {
-      rows.push(slider('aperture', '光圈', 0, b.aperture.length - 1, 1, state.aperture ?? 0, `f/${apertureValue()}`, v => {
-        state.aperture = Math.round(v)
-        syncSheetValues()
-      }))
-    }
-    const f = b.focal
-    const focalSteps = f.fixed ? 0 : Math.round((f.max - f.min) / f.step)
-    rows.push(slider('focal', '焦距', 0, Math.max(focalSteps, 1), 1, state.focal, focalLabel(focalValue()), v => {
-      state.focal = Math.round(v)
-      applyView()
-      syncSheetValues()
-    }, f.fixed))
-    rows.push(slider('zoom', '放大', 1, b.zoomMax, 0.1, state.zoom, `${state.zoom.toFixed(1)}×`, v => {
-      state.zoom = Math.round(v * 10) / 10
-      applyView()
-      syncSheetValues()
-    }))
-    rows.push(slider('wb', '白平衡', b.wb.min, b.wb.max, b.wb.step, state.wb, `${state.wb}K`, v => {
-      state.wb = Math.round(v)
-      applyView()
-      syncSheetValues()
-    }))
-    const toggles: [ToggleKey, string, boolean][] = [
-      ['wide', '广角', b.wide],
-      ['macro', '微距', b.macro],
-      ['level', '水平仪', b.level],
-      ['raw', 'RAW', b.raw],
-      ['figure', '人物', true],
-      ['sign', '落款', true],
-    ]
-    rows.push(`<div class="cs-toggles">${toggles
-      .filter(([, , supported]) => supported)
-      .map(([key, text]) => `<button data-toggle="${key}" class="${state.toggle[key] ? 'on' : ''}">${text}</button>`)
-      .join('')}</div>`)
-    rows.push(`<div class="cs-grids"><span class="cs-name">构图线</span>${GRIDS.map(([text, value]) => `<button data-grid="${value}" class="${state.grid === value ? 'on' : ''}">${text}</button>`).join('')}</div>`)
-    rows.push(`<div class="cs-grids"><span class="cs-name">格式</span>${b.formats.map(value => `<button data-format="${value}" class="${state.format === value ? 'on' : ''}">${value.toUpperCase()}</button>`).join('')}</div>`)
-    rows.push(`<div class="cs-foot"><span>${b.video.label} · ${canRecord(host.renderer.domElement) ? '可录像' : '当前浏览器不支持录像'}</span></div>`)
-    sheet.innerHTML = rows.join('')
-
-    sheet.querySelector<HTMLButtonElement>('.cs-rack')!.onclick = () => {
-      openRack(id => {
-        resetForBody(id)
-        buildSheet()
-        applyView()
-        refreshCamera(host.walker())
-      })
-    }
-    for (const input of Array.from(sheet.querySelectorAll<HTMLInputElement>('input[type=range]'))) {
-      const row = input.closest<HTMLElement>('.cs-row')!.dataset.row!
-      const handler = handlers[row]
-      input.oninput = () => handler(+input.value)
-    }
-    for (const button of Array.from(sheet.querySelectorAll<HTMLButtonElement>('[data-toggle]'))) {
-      button.onclick = () => {
-        const key = button.dataset.toggle as ToggleKey
-        state.toggle[key] = !state.toggle[key]
-        button.classList.toggle('on', state.toggle[key])
-        if (key === 'figure') host.walker()?.showFigure(state.toggle.figure)
-        if (key === 'macro' || key === 'wide') applyView()
-        if (key === 'level') applyGuides()
-      }
-    }
-    for (const button of Array.from(sheet.querySelectorAll<HTMLButtonElement>('[data-grid]'))) {
-      button.onclick = () => {
-        state.grid = button.dataset.grid as GridMode
-        for (const other of Array.from(sheet.querySelectorAll<HTMLButtonElement>('[data-grid]'))) other.classList.toggle('on', other === button)
-        applyGuides()
-      }
-    }
-    // RAW 开着时主文件固定无损 PNG：格式按钮跟着亮 PNG；点 JPEG 等于关 RAW。
-    const syncFormats = () => {
-      const rawOn = state.toggle.raw && body().raw
-      sheet.querySelector<HTMLButtonElement>('[data-toggle=raw]')?.classList.toggle('on', rawOn)
-      for (const other of Array.from(sheet.querySelectorAll<HTMLButtonElement>('[data-format]'))) {
-        other.classList.toggle('on', other.dataset.format === (rawOn ? 'png' : state.format))
-      }
-    }
-    for (const button of Array.from(sheet.querySelectorAll<HTMLButtonElement>('[data-format]'))) {
-      button.onclick = () => {
-        state.format = button.dataset.format as ShotFormat
-        if (state.format !== 'png') state.toggle.raw = false
-        syncFormats()
-      }
-    }
-    const rawButton = sheet.querySelector<HTMLButtonElement>('[data-toggle=raw]')
-    if (rawButton) rawButton.addEventListener('click', syncFormats)
-    syncFormats()
-  }
-
-  const handlers: Record<string, (v: number) => void> = {
-    ev: v => {
-      const b = body()
-      state.ev = Math.round(v / b.ev.step) * b.ev.step
-      applyView()
-      syncSheetValues()
-    },
-    iso: v => {
-      state.iso = Math.round(v)
-      syncSheetValues()
-    },
-    shutter: v => {
-      state.shutter = Math.round(v)
-      syncSheetValues()
-    },
-    aperture: v => {
-      state.aperture = Math.round(v)
-      syncSheetValues()
-    },
-    focal: v => {
-      state.focal = Math.round(v)
-      applyView()
-      syncSheetValues()
-    },
-    zoom: v => {
-      state.zoom = Math.round(v * 10) / 10
-      applyView()
-      syncSheetValues()
-    },
-    wb: v => {
-      state.wb = Math.round(v)
-      applyView()
-      syncSheetValues()
-    },
-  }
-
-  function syncSheetValues() {
-    // ISO / 快门 / 光圈也改亮度（meterStops），取景要跟着变。
-    applyView()
-    const set = (row: string, text: string, value?: number) => {
-      const line = sheet.querySelector<HTMLElement>(`[data-row="${row}"]`)
-      if (!line) return
-      line.querySelector<HTMLElement>('.cs-val')!.textContent = text
-      if (value !== undefined) line.querySelector<HTMLInputElement>('input')!.value = String(value)
-    }
-    set('ev', `${state.ev > 0 ? '+' : ''}${state.ev.toFixed(1)}EV`)
-    set('iso', isoLabel(isoValue()))
-    set('shutter', shutterLabel(shutterValue()))
-    if (state.aperture !== null) set('aperture', `f/${apertureValue()}`)
-    set('focal', focalLabel(focalValue()))
-    set('zoom', `${state.zoom.toFixed(1)}×`)
-    set('wb', `${state.wb}K`)
-  }
-
-  // ---- 快门 / 录像 ------------------------------------------------------------------
+  // ---- 快门 -------------------------------------------------------------------------
   function signature(g: CanvasRenderingContext2D, w: number, h: number) {
     const unit = Math.max(w, h) / 1600, x = 34 * unit, y = h - 34 * unit, s = 38 * unit
     g.save()
@@ -395,11 +169,9 @@ export function photoMode(host: Host, place: () => string, onCapture?: () => voi
     const ratio = renderer.getPixelRatio()
     const long = Math.max(innerWidth, innerHeight)
     const hi = Math.min(4096 / long, Math.max(ratio, 2560 / long))
-    const zoom = state.zoom
     renderer.setPixelRatio(hi)
     renderer.setSize(innerWidth, innerHeight, false)
-    // 高分辨率 + 宽视角渲染，再由 grade() 按数码变焦裁切 —— 与预览构图逐像素一致。
-    host.camera.fov = Math.min(110, Math.max(4, focalToFov(lensMm())))
+    host.camera.fov = fovNow()
     host.camera.updateProjectionMatrix()
     host.draw()
     const raw = document.createElement('canvas')
@@ -411,44 +183,27 @@ export function photoMode(host: Host, place: () => string, onCapture?: () => voi
     applyView()
     host.draw()
 
-    const picture = grade(raw, settings(zoom), filters[state.filter][1] === 'none' ? '' : filters[state.filter][1])
+    const settingsNow = settings()
+    const picture = grade(raw, settingsNow, filters[state.filter][1] === 'none' ? '' : filters[state.filter][1])
     const context = picture.getContext('2d')!
-    if (state.sign) signature(context, picture.width, picture.height)
-    // RAW 开着：主文件强制无损 PNG（旁车 JSON 带全部参数），JPEG/WebP 只在关 RAW 时用。
-    const rawOn = state.toggle.raw && body().raw
-    const format: ShotFormat = rawOn ? 'png' : state.format
-    const blob = await encode(picture, format)
+    if (state.toggle.sign) signature(context, picture.width, picture.height)
+    const blob = await encode(picture, settingsNow.format)
     flash.classList.remove('go')
     void flash.offsetWidth
     flash.classList.add('go')
     onCapture?.()
 
-    const name = `${fileTitle()}.${extensionFor(format)}`
+    const name = `${fileTitle()}.${extensionFor(settingsNow.format)}`
     const file = new File([blob], name, {type: blob.type})
-    const meta = {
-      place: place() || '桂林',
-      hour: host.clock.hour,
-      weather: host.clock.weather,
-      width: picture.width,
-      height: picture.height,
-      bodyId: body().id,
-      bodyName: body().name,
-      lens: focalLabel(lensMm()),
-      when: new Date().toISOString(),
-    }
-    const sidecar = rawOn ? rawSidecar(settings(zoom), body(), meta) : null
 
     if (shotUrl) URL.revokeObjectURL(shotUrl)
     shotUrl = URL.createObjectURL(blob)
     const share = navigator.canShare?.({files: [file]}) && matchMedia('(pointer:coarse)').matches
-    const sideName = `${fileTitle()}.raw.json`
     shot.innerHTML = `<img alt="刚拍的照片"><figcaption>
-      <span class="shot-meta">${body().short} · ${focalLabel(lensMm())} · ${shutterLabel(shutterValue())} · ISO ${isoValue()}${apertureValue() ? ` · f/${apertureValue()}` : ''} · ${state.wb}K</span>
-      <a download="${name}">保存</a>${sidecar ? `<a download="${sideName}">RAW</a>` : ''}${share ? '<button>分享</button>' : ''}<button class="shot-close" aria-label="收起">×</button></figcaption>`
+      <span class="shot-meta">${body().short} · ${focalLabel(focalValue())} · ${shutterLabel(settingsNow.shutter)} · ISO ${settingsNow.iso}</span>
+      <a download="${name}">保存</a>${share ? '<button>分享</button>' : ''}<button class="shot-close" aria-label="收起">×</button></figcaption>`
     shot.querySelector('img')!.src = shotUrl
-    const links = Array.from(shot.querySelectorAll<HTMLAnchorElement>('a'))
-    links[0].href = shotUrl
-    if (sidecar && links[1]) links[1].href = URL.createObjectURL(sidecar)
+    shot.querySelector<HTMLAnchorElement>('a')!.href = shotUrl
     shot.querySelector<HTMLButtonElement>('figcaption button:not(.shot-close)')?.addEventListener('click', () => void navigator.share({files: [file], title: '网上桂林'}).catch(() => {}))
     shot.querySelector<HTMLButtonElement>('.shot-close')!.onclick = () => {
       shot.hidden = true
@@ -458,10 +213,19 @@ export function photoMode(host: Host, place: () => string, onCapture?: () => voi
     void shot.offsetWidth
     shot.classList.add('in')
     Object.assign(window, {
-      lastPhoto: {name, bytes: blob.size, width: picture.width, height: picture.height, body: body().id, raw: !!sidecar, sidecarName: sidecar ? sideName : null, settings: settings(zoom)},
+      lastPhoto: {
+        name,
+        bytes: blob.size,
+        width: picture.width,
+        height: picture.height,
+        body: body().id,
+        raw: false,
+        settings: settingsNow,
+      },
     })
   }
 
+  // ---- 录像（固定 MP4，档位用机身第一档） ---------------------------------------------
   async function toggleRecording() {
     if (recording) {
       const result = await recording.stop()
@@ -469,11 +233,26 @@ export function photoMode(host: Host, place: () => string, onCapture?: () => voi
       recBadge.hidden = true
       bar.classList.remove('rec')
       const name = saveRecording(result, '网上桂林')
-      window.dispatchEvent(new CustomEvent('walk:toast', {detail: {text: `已保存录像 ${name}`, ms: 3600}}))
-      Object.assign(window, {lastClip: {...result, name, blob: undefined}})
+      const fellBack = result.container === 'webm'
+      window.dispatchEvent(new CustomEvent('walk:toast', {
+        detail: {text: fellBack ? `已保存 ${name}（这台机器编不出 MP4，存成 WebM）` : `已保存录像 ${name}`, ms: fellBack ? 5200 : 3600},
+      }))
+      Object.assign(window, {
+        lastClip: {
+          name,
+          mime: result.mime,
+          container: result.container,
+          preset: result.preset,
+          width: result.width,
+          height: result.height,
+          fps: result.fps,
+          seconds: result.seconds,
+          bytes: result.blob.size,
+        },
+      })
       return
     }
-    const started = startRecording(host.renderer.domElement, body())
+    const started = await startRecording(host.renderer.domElement, body(), videoPreset(body(), 0), 'mp4')
     if (!started) {
       window.dispatchEvent(new CustomEvent('walk:toast', {detail: {text: '这台设备不支持网页录像', ms: 3000}}))
       return
@@ -491,9 +270,8 @@ export function photoMode(host: Host, place: () => string, onCapture?: () => voi
   function refresh() {
     chips('sky', v => host.clock.weather === v)
     chips('filter', v => +v === state.filter)
-    chips('opts', v => (v === 'figure' ? state.toggle.figure : v === 'sign' ? state.toggle.sign : !sheet.hidden))
+    chips('opts', v => (v === 'figure' ? state.toggle.figure : state.toggle.sign))
     applyView()
-    applyGuides()
   }
 
   bar.addEventListener('click', event => {
@@ -504,11 +282,14 @@ export function photoMode(host: Host, place: () => string, onCapture?: () => voi
     if (group === 'sky') host.clock.weather = value as Weather
     if (group === 'filter') state.filter = +value
     if (group === 'opts') {
-      if (value === 'sheet') {
-        sheet.hidden = !sheet.hidden
-        if (!sheet.hidden) buildSheet()
+      if (value === 'rack') {
+        openRack(id => {
+          resetForBody(id)
+          applyView()
+          refreshCamera(host.walker())
+        })
       } else {
-        const key = value as 'figure' | 'sign'
+        const key = value as ToggleKey
         state.toggle[key] = !state.toggle[key]
         if (key === 'figure') host.walker()?.showFigure(state.toggle.figure)
       }
@@ -533,8 +314,6 @@ export function photoMode(host: Host, place: () => string, onCapture?: () => voi
     setCameraShown(false, host.walker())
     document.body.dataset.photo = 'on'
     bar.hidden = exit.hidden = false
-    sheet.hidden = true
-    buildSheet()
     refresh()
   }
 
@@ -553,7 +332,7 @@ export function photoMode(host: Host, place: () => string, onCapture?: () => voi
     host.camera.updateProjectionMatrix()
     host.renderer.domElement.style.filter = ''
     delete document.body.dataset.photo
-    bar.hidden = exit.hidden = sheet.hidden = guides.hidden = true
+    bar.hidden = exit.hidden = true
     shot.hidden = true
     if (shotUrl) {
       URL.revokeObjectURL(shotUrl)
@@ -562,7 +341,6 @@ export function photoMode(host: Host, place: () => string, onCapture?: () => voi
   }
 
   let shown = ''
-  const up = new THREE.Vector3()
   function tick() {
     if (!active) return
     if (document.activeElement !== hour) hour.value = String(host.clock.hour)
@@ -571,18 +349,7 @@ export function photoMode(host: Host, place: () => string, onCapture?: () => voi
       shown = text
       hourText.textContent = text
     }
-    // 水平仪：相机 up 轴的横滚
-    if (state.toggle.level && !guides.hidden) {
-      up.set(0, 1, 0).applyQuaternion(host.camera.quaternion)
-      const roll = (Math.atan2(up.x, up.y) * 180) / Math.PI
-      levelLayer.style.transform = `rotate(${roll.toFixed(2)}deg)`
-      levelLayer.classList.toggle('level-ok', Math.abs(roll) < 1.2)
-    }
     if (recording) recText.textContent = `${String(Math.floor(recording.seconds / 60)).padStart(2, '0')}:${String(Math.floor(recording.seconds % 60)).padStart(2, '0')}`
-    const flashText = state.toggle.raw && body().raw ? ' · RAW' : ''
-    const stops = state.ev + meter()
-    const meterText = Math.abs(stops) >= 0.05 ? ` · ${stops > 0 ? '+' : '−'}${Math.abs(stops).toFixed(1)}EV` : ''
-    readout.textContent = `${body().short} · ${focalLabel(lensMm())} · ${shutterLabel(shutterValue())} · ISO ${isoValue()}${apertureValue() ? ` · f/${apertureValue()}` : ''} · ${state.wb}K · ${state.zoom.toFixed(1)}×${meterText}${flashText}`
   }
 
   return {
@@ -595,6 +362,9 @@ export function photoMode(host: Host, place: () => string, onCapture?: () => voi
     },
     get body() {
       return body()
+    },
+    get recording() {
+      return !!recording
     },
     tick,
   }
