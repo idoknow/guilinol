@@ -577,11 +577,11 @@ export async function createPhysics(manifest:Manifest,stream:Stream,peaks:PeaksG
     if(!hit||hit.normal[1]>=Math.cos(maxSlope))return '' as const
     return hit.kind==='building'?'building' as const:'collision' as const
   }
-  function pathBlocked(x0:number,z0:number,x1:number,z1:number,y:number){
-    const dx=x1-x0,dz=z1-z0,len=Math.hypot(dx,dz)
+  function pathBlocked(x0:number,z0:number,x1:number,z1:number,y:number,endY=y){
+    const dx=x1-x0,dy=endY-y,dz=z1-z0,len=Math.hypot(dx,dy,dz)
     if(len<1e-3)return false
     segmentRay.origin.x=x0;segmentRay.origin.y=y;segmentRay.origin.z=z0
-    segmentRay.dir.x=dx/len;segmentRay.dir.y=0;segmentRay.dir.z=dz/len
+    segmentRay.dir.x=dx/len;segmentRay.dir.y=dy/len;segmentRay.dir.z=dz/len
     return !!world.castRay(segmentRay,len,true,undefined,undefined,capsule,undefined,wallFilter)
   }
   function freeCapsule(x:number,y:number,z:number){

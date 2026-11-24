@@ -74,7 +74,7 @@ Object.assign(waterMaterial.uniforms,atmo,{uBody:body,uSunLight:sunLight})
 waterMaterial.uniforms.tMirror.value = mirrorTarget.texture
 waterMaterial.uniforms.textureMatrix.value = textureMatrix
 
-type WaterPatch = {x:number; z:number; level:number; box:THREE.Box3}
+type WaterPatch = {x:number; z:number; level:number; box:THREE.Box3; probes:THREE.Vector3[]}
 type FarWaterPatch = {box:THREE.Box3; hidden:boolean}
 const live = new Set<WaterPatch>()
 let farPatches:FarWaterPatch[] = []
@@ -131,7 +131,14 @@ export function chunkWater(water:Int16Array, bed:Int16Array, x:number, z:number)
   if(!positions.length) return null
   const dominant = [...counts].sort((a,b)=>b[1]-a[1])[0]?.[0] ?? 0
   const box = new THREE.Box3(new THREE.Vector3(minX,minY-.5,minZ),new THREE.Vector3(maxX,maxY+.5,maxZ))
-  const patch:WaterPatch = {x, z, level:dominant, box}
+  const probes=new Map<number,THREE.Vector3>()
+  for(let offset=0;offset<positions.length;offset+=9){
+    const px=(positions[offset]+positions[offset+3]+positions[offset+6])/3
+    const pz=(positions[offset+2]+positions[offset+5]+positions[offset+8])/3
+    const cell=Math.floor((pz-z)/12)*32+Math.floor((px-x)/12)
+    if(!probes.has(cell))probes.set(cell,new THREE.Vector3(px,positions[offset+1],pz))
+  }
+  const patch:WaterPatch = {x, z, level:dominant, box,probes:[...probes.values()]}
   live.add(patch)
   return {positions:Float32Array.from(positions), level:dominant, dispose(){live.delete(patch)}}
 }
@@ -243,14 +250,28 @@ let level = 148
 const lastView=new THREE.Matrix4(), lastProjection=new THREE.Matrix4()
 let lastReflection=-Infinity, lastLevel=NaN, lastWaterFrame=0
 const lastSun=new THREE.Vector3()
-export function isWaterInView(camera:THREE.PerspectiveCamera) {
+const lastPosition=new THREE.Vector3(),lastRotation=new THREE.Quaternion()
+export function isWaterInView(camera:THREE.PerspectiveCamera, blocked?:(eye:THREE.Vector3,water:THREE.Vector3)=>boolean) {
   camera.updateMatrixWorld()
   mainFrustum.setFromProjectionMatrix(mainProj.multiplyMatrices(camera.projectionMatrix,camera.matrixWorldInverse))
-  for(const patch of live) if(mainFrustum.intersectsBox(patch.box)) return true
+  for(const patch of live){
+    if(!mainFrustum.intersectsBox(patch.box))continue
+    if(!blocked)return true
+    const eye=camera.position, {min,max}=patch.box
+    if(Math.max(min.x-eye.x,0,eye.x-max.x)**2+Math.max(min.z-eye.z,0,eye.z-max.z)**2>120**2)continue
+    for(const probe of patch.probes){
+      if((probe.x-eye.x)**2+(probe.z-eye.z)**2<=120**2 && mainFrustum.containsPoint(probe) && !blocked(eye,probe)){
+        level=probe.y
+        return true
+      }
+    }
+  }
+  if(blocked)return false
   for(const fp of farPatches) if(!fp.hidden && mainFrustum.intersectsBox(fp.box)) return true
   return false
 }
-export function currentMirrorLevel(camera:THREE.PerspectiveCamera) {
+export function currentMirrorLevel(camera:THREE.PerspectiveCamera, ground=false) {
+  if(ground)return level
   let best = Infinity
   for(const patch of live) {
     const d = patch.x+128-camera.position.x, e = patch.z+128-camera.position.z, dist = d*d+e*e
@@ -259,31 +280,34 @@ export function currentMirrorLevel(camera:THREE.PerspectiveCamera) {
   return level
 }
 // skip: the first frame is budgeted (≤2 s), so the mirror starts one frame later with a sky-tint fallback.
-export function renderMirror(renderer:THREE.WebGLRenderer, scene:THREE.Scene, camera:THREE.PerspectiveCamera, skip=false, allowReuse=false) {
+export function renderMirror(renderer:THREE.WebGLRenderer, scene:THREE.Scene, camera:THREE.PerspectiveCamera, skip:boolean, allowReuse:boolean, ground:boolean) {
   body.value.copy(env.water).convertLinearToSRGB()
   sunLight.value.copy(atmo.uSunColor.value).convertLinearToSRGB()
   if(env.night>.5) sunLight.value.setRGB(.5,.55,.65).multiplyScalar(env.night*.6)
-  currentMirrorLevel(camera)
   waterMaterial.uniforms.uMirrorLevel.value = level
-  if(skip||camera.position.y<level+.2||camera.position.y>4000||!isWaterInView(camera)) {waterMaterial.uniforms.uMirrorReady.value = 0; return}
+  if(skip||camera.position.y<level+.2||camera.position.y>4000) {waterMaterial.uniforms.uMirrorReady.value = 0; lastReflection=-Infinity; return}
   waterMaterial.uniforms.uMirrorReady.value = 1
   renderer.getDrawingBufferSize(size)
-  const w = Math.max(1,Math.round(size.x*.5)), h = Math.max(1,Math.round(size.y*.5))
+  const scale=ground ? .375 : .5
+  const w = Math.max(1,Math.round(size.x*scale)), h = Math.max(1,Math.round(size.y*scale))
   camera.updateMatrixWorld()
   const resized=mirrorTarget.width!==w||mirrorTarget.height!==h
   const now=performance.now()
   // Keep the clear-sky reflection for roughly two frames at low FPS.
   // Camera, lighting or water-level changes refresh immediately; waves
   // continue to sample the reflection with live distortion on every frame.
-  const reuseMs=Math.min(2500,Math.max(60,2*(now-lastWaterFrame)))
+  const reuseMs=ground?55:Math.min(2500,Math.max(60,2*(now-lastWaterFrame)))
   lastWaterFrame=now
   if(allowReuse && !resized && now-lastReflection<reuseMs && level===lastLevel &&
      lastSun.distanceToSquared(env.sunDir)<.00001 &&
-     camera.matrixWorld.equals(lastView) && camera.projectionMatrix.equals(lastProjection))return
+     camera.projectionMatrix.equals(lastProjection) && (ground
+       ? lastPosition.distanceToSquared(camera.position)<.75**2 && lastRotation.angleTo(camera.quaternion)<Math.PI/60
+       : camera.matrixWorld.equals(lastView)))return
   if(resized)mirrorTarget.setSize(w,h)
   lastSun.copy(env.sunDir)
   lastReflection=now;lastLevel=level
   lastView.copy(camera.matrixWorld);lastProjection.copy(camera.projectionMatrix)
+  lastPosition.copy(camera.position);lastRotation.copy(camera.quaternion)
   mirrorCamera.position.set(camera.position.x,2*level-camera.position.y,camera.position.z)
   camera.getWorldDirection(forward)
   target.copy(camera.position).add(forward); target.y = 2*level-target.y

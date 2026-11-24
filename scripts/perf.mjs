@@ -16,6 +16,15 @@ const CAMERAS = [
 ]
 
 const expansion = process.argv.includes('--expansion')
+if(process.argv.includes('--water')){
+  CAMERAS.length=0
+  for(const [id,eye,target,hour] of [
+    ['sanduo',[-1143,158,-43],[-1139,158,-55],20],
+    ['lijiang',[-265,168,15],[-145,153,45],15],
+    ['ronghu',[-1310,160,359],[-1365,145,304],15],
+    ['shanhu',[-983,157,476],[-1019,150,433],15],
+  ])CAMERAS.push({id,label:id,eye,target,mode:'walk',query:`verify&solo=1&flow=0&time=${hour}`})
+}
 if (expansion) {
   for (const id of ['balijie','zengpiyan','guilinta','eastBoundary']) {
     CAMERAS.push({id, label:id, query:`verify&cam=${id}&flow=0`, mode:'fly'})
@@ -114,15 +123,15 @@ try {
     if(process.env.PERF_CAMERA && process.env.PERF_CAMERA!==cam.id)continue
     const started = performance.now()
     await page.goto(`${baseUrl}/?${cam.query}${trafficQuery}`)
-    if(cam.id==='street-jiefang'){
+    if(cam.eye||cam.id==='street-jiefang'){
       await page.waitForFunction(()=>window.viewer?.walk?.active,null,{timeout:120000})
-      await page.evaluate(async()=>{
+      await page.evaluate(async({eye,target:look})=>{
         const viewer=window.viewer
-        if(!await viewer.walkTo(-265,15,0,'perf-jiefang'))throw Error('Could not place walker at bridge')
+        if(!await viewer.walkTo(eye[0],eye[2],0,'perf-walk'))throw Error('Could not place walker')
         const tick=viewer.walk.tick.bind(viewer.walk)
-        const target=viewer.perfTarget=[-145,153,45]
-        viewer.walk.tick=elapsed=>{tick(elapsed);viewer.camera.position.set(-265,168,15);viewer.camera.lookAt(...target);viewer.camera.updateMatrixWorld()}
-      })
+        const target=viewer.perfTarget=look
+        viewer.walk.tick=elapsed=>{tick(elapsed);viewer.camera.position.set(...eye);viewer.camera.lookAt(...target);viewer.camera.updateMatrixWorld()}
+      },{eye:cam.eye??[-265,168,15],target:cam.target??[-145,153,45]})
       if(trafficQuery)await page.waitForFunction(()=>window.viewer.trafficProbe?.loads.at(-1)?.key==='-1_0',null,{timeout:180000})
     }
     await page.waitForFunction(mode => {
@@ -152,6 +161,7 @@ try {
       const frameTimes = []
       let heapPeakBytes = 0
       let lastDraw = null
+      let maxMirrorCalls=0,maxMirrorTriangles=0
       let visibleMotors=0,visiblePeople=0,drawCalls=0,triangles=0
       const start=await nextRaf(); let last=start
       for (let i = 0; i < sampleCount || last-start<minMs; i++) {
@@ -159,6 +169,8 @@ try {
         const now=await nextRaf()
         const dt=now-last;last=now
         lastDraw = window.__glPerf.readFrame()
+        maxMirrorCalls=Math.max(maxMirrorCalls,lastDraw.mirrorCalls)
+        maxMirrorTriangles=Math.max(maxMirrorTriangles,lastDraw.mirrorTriangles)
         visibleMotors+=window.viewer.trafficProbe?.motors??0
         visiblePeople+=window.viewer.trafficProbe?.pedestrians??0
         drawCalls+=lastDraw.calls;triangles+=lastDraw.triangles
@@ -185,6 +197,7 @@ try {
         p95Ms: +p95.toFixed(2),
         calls: lastDraw.calls,
         mirrorCalls: lastDraw.mirrorCalls,
+        maxMirrorCalls,maxMirrorTriangles,
         totalCalls: lastDraw.totalCalls,
         peakCalls: peakDraws,
         triangles: lastDraw.triangles,
@@ -215,6 +228,7 @@ try {
     }
     viewpoints[cam.id] = {label: cam.label, loadMs, ...metrics}
     await saveReport()
+    if(cam.eye)await page.screenshot({path:`${outDir}/${cam.id}.png`})
     if(cam.id==='street-jiefang'&&process.env.PERF_SHOT){
       const cdp=await context.newCDPSession(page)
       const capture=async name=>writeFile(process.env.PERF_SHOT+name,Buffer.from((await cdp.send('Page.captureScreenshot',{format:'png',fromSurface:true})).data,'base64'))

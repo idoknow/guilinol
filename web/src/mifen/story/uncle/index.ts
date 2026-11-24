@@ -1,4 +1,5 @@
 import * as THREE from 'three'
+import {mainDetail} from '../../../look/mirror-layer'
 import {
   getUnclePortraitUrl,
   PLAYER_PORTRAIT,
@@ -667,6 +668,7 @@ export function createUncleNpc(opts: UncleNpcOptions = {}): UncleNpcController {
   group.add(markerPivot)
 
   if (opts.scene) opts.scene.add(group)
+  mainDetail(group)
 
   // 运行时状态
   let markerMode: UncleMarkerMode = 'new'

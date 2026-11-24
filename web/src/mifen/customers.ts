@@ -1,4 +1,5 @@
 import * as THREE from 'three'
+import {mainDetail} from '../look/mirror-layer'
 import type {
   CustomerArchetype,
   MifenRecipe,
@@ -1218,6 +1219,7 @@ export function createCustomerManager(
 
     rig.root.position.copy(spawnWorld)
     container.add(rig.root)
+    mainDetail(rig.root)
 
     // Queue overflow turnaway during peak rush (does not block forced test spawns)
     if (!forceRole && !immediate && currentQueue >= queueLimit) {

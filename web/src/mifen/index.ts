@@ -3,6 +3,7 @@ import './mifen-ui.css'
 import rawRecipes from './recipes.json'
 import type { MifenRecipesData, ShopLevel, StationKey, TianyuanShopBuildResult } from './types'
 import { buildTianyuanShopMesh, TIANYUAN_SITE } from './shop-mesh'
+import {mainDetail} from '../look/mirror-layer'
 import { computeShopBonuses, createMifenStore, formatMoney, formatRecipeTitle, type MifenSaveState } from './state'
 import {
   COOKING_STATION_LABELS,
@@ -279,6 +280,7 @@ export function mountTianyuanMifen(ctx: MifenMountContext): MifenController {
   shop = buildTianyuanShopMesh(store.getState().shopLevel)
   placeShopGroup(shop)
   ctx.scene.add(shop.group)
+  mainDetail(shop.group)
   let coords = makeCoordAdapter(shop)
 
   const uncle = createUncleNpc({ scene: ctx.scene })
@@ -503,6 +505,7 @@ export function mountTianyuanMifen(ctx: MifenMountContext): MifenController {
     shop = buildTianyuanShopMesh(nextLevel)
     placeShopGroup(shop)
     ctx.scene.add(shop.group)
+    mainDetail(shop.group)
     coords = makeCoordAdapter(shop)
     placeUncleNpc()
     customers.onShopChanged(shop, coords)

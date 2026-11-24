@@ -1,4 +1,5 @@
 import {touchUi} from '../ui/input-mode'
+import {mainDetail} from '../look/mirror-layer'
 import * as THREE from 'three'
 import {clone} from 'three/addons/utils/SkeletonUtils.js'
 import {browNames, eyeNames, faceNames, hairStyles, looks, type Avatar} from '../../../lib/avatar'
@@ -98,6 +99,7 @@ export function crowd(scene:THREE.Scene,camera:THREE.Camera,groundAt?:(x:number,
     walk&&(walk.time=Math.random()*walk.getClip().duration)
     idle?.play();idle?.setEffectiveWeight(0)
     scene.add(root)
+    mainDetail(root)
     const view={root,mixer,walk,idle,moving:true,template:index,placed:false,lastGx:NaN,lastGz:NaN,lastGy:walker.y,groundAcc:0,animAcc:0}
     active.set(walker,view)
     return view
