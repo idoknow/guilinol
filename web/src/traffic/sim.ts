@@ -14,7 +14,8 @@ function trackHeight(track:Track,dist:number){
   const index=lo*2
   return heights[index+1]+(heights[index+3]-heights[index+1])*(fraction-heights[index])/(heights[index+2]-heights[index])
 }
-type Actor = {track:Track,dist:number,speed:number,kind:'car'|'scooter'|'person',down:number,dodge:number,x:number,y:number,z:number,yaw:number,scale:number,leaving:boolean,halfWidth:number,halfLength:number,height:number,holdUntil?:number,waitingFor?:Actor,waitingSince?:number}
+export const WALK_OFFSET=.32
+type Actor = {track:Track,dist:number,speed:number,pace?:number,kind:'car'|'scooter'|'person',down:number,dodge:number,x:number,y:number,z:number,yaw:number,scale:number,leaving:boolean,halfWidth:number,halfLength:number,height:number,holdUntil?:number,waitingFor?:Actor,waitingSince?:number}
 type Position = {x:number,z:number,y:number}
 export const MAX_ACTORS=100
 export const MOBILE_ACTORS=80
@@ -260,10 +261,13 @@ export class Traffic {
       }
       actor.scale=Math.min(1,actor.scale+dt/.4)
       if(actor.holdUntil&&actor.holdUntil>performance.now()){actor.speed=0;return}
-      const maxSpeed=(person?1.4:Math.min(track.speedKmh/3.6,actor.kind==='car'?12:7))
+      const maxSpeed=(person?(actor.pace??=1.1+.6*this.random()):Math.min(track.speedKmh/3.6,actor.kind==='car'?12:7))
       let advance=Math.min(maxSpeed,actor.speed+dt*2)*dt
       if(actor.down>0){actor.down-=dt;actor.waitingFor=previousBlocker;return}
-      actor.dodge*=decay
+      let keepRight=false,passLeft=false
+      let minDodge=-WALK_OFFSET,maxDodge=WALK_OFFSET
+      const previousX=actor.x,previousZ=actor.z
+      if(!person)actor.dodge*=decay
       const left=Math.floor((actor.x-7)/16),right=Math.floor((actor.x+7)/16),top=Math.floor((actor.z-7)/16),bottom=Math.floor((actor.z+7)/16)
       nearby:for(let col=left;col<=right;col++)for(let row=top;row<=bottom;row++){
         const bin=obstacles.get(col*65536+row)
@@ -275,7 +279,26 @@ export class Traffic {
         if(Math.abs(dx)>7||Math.abs(dz)>7)continue
         const ahead=dx*track.dx+dz*track.dz,lateral=Math.abs(dx*track.dz-dz*track.dx)
         if(person){
-          if('kind' in other && other.kind==='person')continue
+          if('kind' in other && other.kind==='person'){
+            const alignment=track.dx*other.track.dx+track.dz*other.track.dz
+            if(lateral>1||Math.abs(alignment)<.8||ahead>4||ahead< -4)continue
+            if(alignment<0){if(ahead> -1)keepRight=true}
+            else {
+              const faster=maxSpeed>(other.pace??1.4)
+              if(faster&&ahead> -1.2)passLeft=true
+              if(!faster&&ahead<1.2)keepRight=true
+            }
+            if(ahead>0&&lateral<.48){
+              const gap=Math.max(0,ahead-.52)
+              advance=Math.min(advance,alignment<0?gap*.45:gap)
+            }
+            if(Math.abs(ahead)<.5&&lateral>.12){
+              const side=dz*track.dx-dx*track.dz
+              if(side>0)maxDodge=Math.min(maxDodge,actor.dodge+side-.48)
+              else minDodge=Math.max(minDodge,actor.dodge+side+.48)
+            }
+            continue
+          }
           const distanceSq=dx*dx+dz*dz
           if(distanceSq<1.44){actor.down=2;advance=0;if('kind' in other)actor.waitingFor=other;break nearby}
           if(distanceSq<16){
@@ -283,6 +306,11 @@ export class Traffic {
           }
         }else if(ahead>0&&lateral<1.8){advance=Math.min(advance,Math.max(0,ahead-5));if(advance<1e-6&&'kind' in other)actor.waitingFor=other;if(!advance)break nearby}
         }
+      }
+      if(person){
+        const target=keepRight?WALK_OFFSET:passLeft?-WALK_OFFSET:0
+        const goal=Math.max(-WALK_OFFSET,Math.min(WALK_OFFSET,Math.max(minDodge,Math.min(maxDodge,target))))
+        actor.dodge+=(goal-actor.dodge)*(1-Math.exp(-dt*(goal?3.5:1.2)))
       }
       if(!person&&this.junctions.has(track.to)&&track.length-actor.dist<9){
         const queue=this.queues.get(track.to)??[]
@@ -319,8 +347,10 @@ export class Traffic {
         const pool=onward.length?onward:choices
         const straight=pool.filter(next=>next.dx*track.dx+next.dz*track.dz>.88)
         actor.track=straight.length&&this.random()<.85?straight.reduce((best,next)=>Math.abs(next.offset-track.offset)<Math.abs(best.offset-track.offset)?next:best):pool[Math.floor(this.random()*pool.length)]
+        if(person&&actor.track.to===track.from)actor.dodge= -actor.dodge
         actor.dist=0;this.transitions++
       }
       this.position(actor)
+      if(person&&actor.track===track&&Math.hypot(actor.x-previousX,actor.z-previousZ)>1e-5)actor.yaw=Math.atan2(actor.x-previousX,actor.z-previousZ)
   }
 }

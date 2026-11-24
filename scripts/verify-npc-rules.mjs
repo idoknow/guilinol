@@ -1,6 +1,7 @@
 import {readFileSync,writeFileSync} from 'node:fs'
 import {gunzipSync} from 'node:zlib'
 import {Traffic} from '../web/src/traffic/sim.ts'
+import {sidewalk} from './ped-sidewalk.mjs'
 import {npcDefaults as rules} from '../lib/npc.ts'
 
 const graph=JSON.parse(gunzipSync(readFileSync('public/world/roads/graph.json.gz')))
@@ -36,7 +37,7 @@ for(const [label,x,z] of locations){
     sim.step(.05,{x,y:150,z})
     for(const actor of sim.actors){
       if(!['primary','secondary','trunk'].includes(actor.track.cls))illegal++
-      if(actor.kind==='person'&&(!actor.track.walk||Math.abs(actor.dodge)>.001))offTrack++
+      if(actor.kind==='person'&&(!actor.track.walk||!sidewalk(actor.x,actor.z)))offTrack++
       if(actor.kind!=='person'&&(actor.speed<0||Math.cos(actor.yaw)*actor.track.dz+Math.sin(actor.yaw)*actor.track.dx<.99))reverse++
     }
     if(tick%20!==19)continue
