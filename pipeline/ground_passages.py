@@ -24,6 +24,12 @@ def opens_road(seed, way, length):
     return seed!=YARD and pair!=GARAGE and length>1 and (length<=40 or pair==LONG_PASSAGE)
 
 
+def authorized_overlap(seed, wid, overlap, warehouse_roads):
+    if seed==21813141 and warehouse_roads is not None:
+        return overlap.intersection(warehouse_roads.buffer(.01))
+    return overlap if opens_road(seed,wid,overlap.length) else LineString()
+
+
 def footprint(row, origin):
     shell,*holes = [np.asarray(ring)/100+origin for ring in row[2]]
     return make_valid(Polygon(shell,holes))
@@ -93,10 +99,10 @@ def bake(output, manifest, elements, widths, curbs):
             poly=footprint(row,origin)
             for i in hits:
                 axis=axes.geometries[i]; way=roads[i]
-                overlap=axis.intersection(poly)
-                if not opens_road(row[5],way['id'],overlap.length):continue
+                overlap=authorized_overlap(row[5],way['id'],axis.intersection(poly),way.get('warehousePassages'))
+                if overlap.length<=1:continue
                 half=widths.get(way['id'],width(way['tags']))/2+.5
-                corridor=axis.buffer(half)
+                corridor=overlap.buffer(half) if row[5]==21813141 else axis.buffer(half)
                 start=len(requests)
                 for part in line_parts(overlap):
                     n=math.ceil(part.length/.5)
@@ -165,6 +171,12 @@ def grain_yard(output,manifest,elements,widths):
         for poly in polygons(area(way)):
             if site.covers(poly.representative_point()):
                 mapped.append((way,poly))
+    warehouse=next((p for w,p in mapped if w['id']==21813141),None)
+    if warehouse is not None:
+        for w in elements:
+            if w['type']=='way' and w['id'] in YARD_ROADS:
+                crossing=LineString(points(w)).intersection(warehouse)
+                w['warehousePassages']=union_all([part for part in line_parts(crossing) if part.length<=40])
     levels=sample_road_heights(output,manifest,[dict(x=p.representative_point().x,z=p.representative_point().y) for _,p in mapped])
     roads=union_all([LineString(points(w)).buffer(widths.get(w['id'],width(w['tags']))/2+.5)
                      for w in elements if w['type']=='way' and w['id'] in YARD_ROADS])
