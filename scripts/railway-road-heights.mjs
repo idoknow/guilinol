@@ -4,9 +4,12 @@ import {readFileSync} from 'node:fs'
 import {join} from 'node:path'
 import {gunzipSync} from 'node:zlib'
 import {Color} from 'three'
+import {railwayGeometry} from '../web/src/railways.ts'
 import {ll2xz} from '../lib/projection.ts'
 
 const [directory, inventory,check] = process.argv.slice(2)
+const grounding=check==='--audit-grounding'
+const contacts={}
 const painted=check==='--audit-painted'
 const audit=painted || check==='--audit-levels'
 const style=JSON.parse(readFileSync(new URL('../pipeline/railway-style.json',import.meta.url)))
@@ -26,7 +29,7 @@ function request(tile) {
   const n = manifest.chunkSize / manifest.grid + 1, fieldBytes = n*n*2
   const start = 24 + 2*fieldBytes + 9*data.readUInt32LE(4) + 4*data.readUInt32LE(8)
   const end = start + data.readUInt32LE(12)
-  const [,paths,thin=[],,rails=[]] = JSON.parse(data.toString('utf8', start, end))
+  const [,paths,thin=[],,rails=[],signs=[],cuts=[]] = JSON.parse(data.toString('utf8', start, end))
   const tail = end + data.readUInt32LE(16) + 18*data.readUInt32LE(20)
   if (data.toString('ascii',0,4) !== 'GL04' || ![0,fieldBytes].includes(data.length-tail))
     throw Error('Unsupported tile ' + tile.file)
@@ -55,7 +58,52 @@ function request(tile) {
   const underside=deck.slice()
   const thinSet=new Set(thin)
   for(let i=1;i<underside.length;i+=3)underside[i]-=thinSet.has(Math.floor(i/9))?.6:bridgeDepth
-  return {deck, underside, worker:{id:0, paths, rails:audit?rails.filter(section=>(section[7]&16) && (!painted || (section[7]&64))):[], step:stride*manifest.grid, elevations:Float32Array.from(elevations)}}
+  return {deck, underside, rails, signs, cuts, worker:{id:0, paths, rails:audit?rails.filter(section=>(section[7]&16) && (!painted || (section[7]&64))):[], step:stride*manifest.grid, elevations:Float32Array.from(elevations)}}
+}
+
+function groundSampler(grid,step){
+  const n=256/step+1
+  return (x,z)=>{
+    const col=Math.min(n-2,Math.max(0,Math.floor(x/step))),row=Math.min(n-2,Math.max(0,Math.floor(z/step)))
+    const i=row*n+col,u=x/step-col,v=z/step-row
+    const a=grid[i],b=grid[i+1],c=grid[i+n],d=grid[i+n+1]
+    return u+v<=1?a+(b-a)*u+(c-a)*v:d+(c-d)*(1-u)+(b-d)*(1-v)
+  }
+}
+
+function auditContacts(tile,{rails,signs,cuts,worker}){
+  for(const [index,cm] of cuts)worker.elevations[index]=cm/100
+  const ground=groundSampler(worker.elevations,worker.step)
+  function record(kind,error,x,z){
+    const stats=contacts[kind]??={count:0,over5cm:0,maxAbsM:0}
+    stats.count++;if(Math.abs(error)>.05)stats.over5cm++
+    if(Math.abs(error)>stats.maxAbsM)Object.assign(stats,{maxAbsM:Math.abs(error),worst:[tile.x+x,tile.z+z]})
+  }
+  function inspect(sections,signs){
+    const row=sections[0],bridge=row&&(row[7]&1)
+    const box=(x,y,z,w,h,d)=>{
+      const bottom=y-h/2
+      if(w===1.15 && d===1.7)record('pier',bottom-ground(x,z),x,z)
+      if(w===.065 && d===.065)record('fencePost',bottom-ground(x,z),x,z)
+      if(w===.19 && d===.2){
+        if(bridge){
+          const dx=(row[3]-row[0])/100,dz=(row[4]-row[1])/100
+          const t=((x-row[0]/100)*dx+(z-row[1]/100)*dz)/(dx*dx+dz*dz)
+          const beamBase=(row[2]+t*(row[5]-row[2]))/100-1.2
+          record('mastOnBeam',bottom-beamBase,x,z)
+        }else record('mastOnGround',bottom-ground(x,z),x,z)
+      }
+      if(!row && (w===.1||w===.09))record('crossingPost',bottom-ground(x,z),x,z)
+    }
+    const face=(a,b,c,color,along,kind)=>{
+      if(!row||bridge||kind!==7||color.getHexString()!==style.ballast.slice(1))return
+      const e=Math.min(...[a,b,c].map(p=>Math.abs(p.y-ground(p.x,p.z))))
+      record('ballastSide',e,a.x,a.z)
+    }
+    railwayGeometry(sections,signs,ground,(_x,_z,y)=>y,face,box,()=>{})
+  }
+  for(const rail of rails)inspect([rail],[])
+  inspect([],signs)
 }
 
 const bins=new WeakMap()
@@ -99,8 +147,10 @@ await import('../web/src/street-worker.ts')
 const result={}
 for(const tile of manifest.chunks){
   const local=[...nodes].filter(([,p])=>p.x>=tile.x && p.x<tile.x+256 && p.z>=tile.z && p.z<tile.z+256)
-  if(!audit && !local.length)continue
-  const {deck,underside,worker} = request(tile)
+  if(!grounding && !audit && !local.length)continue
+  const data=request(tile)
+  if(grounding){auditContacts(tile,data);continue}
+  const {deck,underside,worker}=data
   if(audit && !worker.rails.length && !local.length)continue
   self.onmessage({data:worker})
   if(audit){
@@ -113,11 +163,7 @@ for(const tile of manifest.chunks){
         const [x,y,z]=[0,1,2].map(k=>weights.reduce((v,w,j)=>v+w*triangle[j*3+k],0))
         let road=at(triangles,x,z)
         if(painted && road===null){
-          const {elevations,step}=worker,n=256/step+1
-          const col=Math.min(n-2,Math.max(0,Math.floor(x/step))),row=Math.min(n-2,Math.max(0,Math.floor(z/step)))
-          const i=row*n+col,u=x/step-col,v=z/step-row
-          const a=elevations[i],b=elevations[i+1],c=elevations[i+n],d=elevations[i+n+1]
-          road=u+v<=1?a+(b-a)*u+(c-a)*v:d+(c-d)*(1-u)+(b-d)*(1-v)
+          road=groundSampler(worker.elevations,worker.step)(x,z)
         }
         if(road===null)continue
         deviations.push({x:tile.x+x,z:tile.z+z,gap:y-road})
@@ -129,8 +175,9 @@ for(const tile of manifest.chunks){
     result[id]={road:at(triangles,lx,lz),deck:at(deck,lx,lz),soffit:at(underside,lx,lz)}
   }
 }
-if(Object.keys(result).length!==nodes.size) throw Error('Missing crossing tile')
-if(audit){
+if(!grounding && Object.keys(result).length!==nodes.size) throw Error('Missing crossing tile')
+if(grounding)console.log(JSON.stringify(contacts))
+else if(audit){
   const worst=deviations.sort((a,b)=>Math.abs(b.gap)-Math.abs(a.gap))
   console.log(JSON.stringify({samples:worst.length,over2cm:worst.filter(p=>Math.abs(p.gap)>.02).length,
     maxAbsM:Math.abs(worst[0]?.gap??0),worst:worst.slice(0,30)}))

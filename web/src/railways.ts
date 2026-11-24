@@ -121,11 +121,12 @@ export function railwayGeometry(sections:RailSection[],signs:CrossingSign[],grou
       }
     }
   }
-  for(const [cx,cz,cy,angle] of signs){
-    const x=cx/100,z=cz/100,y=cy/100,yaw=-angle/1000
+  for(const [cx,cz,,angle] of signs){
+    const x=cx/100,z=cz/100,y=ground(x,z),yaw=-angle/1000
     box(x,y+1.2,z,.1,2.4,.1,yaw,pole)
     box(x,y+2.12,z,.08,.55,.92,yaw,warning)
-    box(x+.38*Math.sin(yaw),y+1.45,z+.38*Math.cos(yaw),.09,2.9,.09,yaw,warning)
+    const gateX=x+.38*Math.sin(yaw),gateZ=z+.38*Math.cos(yaw)
+    box(gateX,ground(gateX,gateZ)+1.45,gateZ,.09,2.9,.09,yaw,warning)
   }
   return Float32Array.from(barriers)
 }
