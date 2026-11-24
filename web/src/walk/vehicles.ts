@@ -1354,7 +1354,7 @@ export async function vehicles(
     dampSpeed(stepDt: number) { return bikeCtrl.dampSpeed(stepDt) },
     dampCarSpeed(stepDt: number) { return carCtrl.dampSpeed(stepDt) },
     capSpeed(stepDt: number, limit: number) { return bikeCtrl.capSpeed(stepDt, limit) },
-    setPitch(frontY: number | undefined, backY: number | undefined, dt: number) { bikeCtrl.setPitch(frontY, backY, dt) },
+    setPitch(frontY: number | undefined, backY: number | undefined, dt: number, wheelbase: number) { bikeCtrl.setPitch(frontY, backY, dt, wheelbase) },
     setCarPitch(frontY: number | undefined, backY: number | undefined, dt: number) { carCtrl.setPitch(frontY, backY, dt) },
     setCarMode(mode: CarDriveMode) { return carCtrl.setMode(mode) },
     setCarModeByIndex(idx: number) { return carCtrl.setModeByIndex(idx) },
