@@ -1,5 +1,6 @@
 import * as THREE from 'three'
 import type {Tile} from './world'
+import railStyle from '../../pipeline/railway-style.json'
 
 type Point=[number,number,number]
 export type Tunnel={way:number,portals:[Point,Point],length:number,halfWidth:number,clearance:number,approach:number,approachEnds?:[number,number],stations:[number,number][]}
@@ -69,7 +70,7 @@ function fan(poly:Point[],out:number[]){for(let at=2;at<poly.length;at++)out.pus
 
 export function tunnelGeometry(tile:Tile,ground:THREE.PlaneGeometry,tunnels:Tunnel[]){
   const parts={floor:[] as number[],interior:[] as number[],portal:[] as number[],band:[] as number[],lamp:[] as number[],lane:[] as number[],ceiling:[] as number[]}
-  const cuts:Plane[][]=[]
+  const cuts:{planes:Plane[],minGroundY?:number}[]=[]
   const limits:Plane[]=[p=>p[0],p=>256-p[0],p=>p[2],p=>256-p[2]]
   const heights=ground.getAttribute('position'), cells=ground.parameters.widthSegments
   function groundY(point:Point){
@@ -85,7 +86,14 @@ export function tunnelGeometry(tile:Tile,ground:THREE.PlaneGeometry,tunnels:Tunn
     function local(s:number,d:number,y:number){const p=axes.point(s,d,y);p[0]-=tile.x;p[2]-=tile.z;return p}
     const station=(p:Point)=>axes.station(p[0]+tile.x,p[2]+tile.z),side=(p:Point)=>axes.lateral(p[0]+tile.x,p[2]+tile.z)
     const [first,last]=tunnel.approachEnds??[tunnel.approach,tunnel.approach]
-    for(const [from,to] of [[0,first],[tunnel.length-last,tunnel.length]])cuts.push([p=>station(p)-from,p=>to-station(p),p=>width-side(p),p=>width+side(p)])
+    const footprint=(from:number,to:number):Plane[]=>[p=>station(p)-from,p=>to-station(p),p=>width-side(p),p=>width+side(p)]
+    for(const [from,to] of [[0,first],[tunnel.length-last,tunnel.length]])cuts.push({planes:footprint(from,to)})
+    if(tunnel.approachEnds){
+      // The station bore sits above parts of the DEM. Carry the track bed
+      // across its roof, so no terrain triangle cuts through the roadway.
+      const floor=tunnel.stations.find(([s])=>Math.abs(s-first)<1e-6)![1]
+      cuts.push({planes:footprint(first,tunnel.length-last),minGroundY:floor+head+railStyle.stationLevels.structureDepth-.35})
+    }
     const quad=(points:Point[],part:keyof typeof parts)=>fan(limits.reduce((poly,plane)=>clip(poly,plane),points),parts[part])
     for(let i=1;i<tunnel.stations.length;i++){
       const [a,ay]=tunnel.stations[i-1],[b,by]=tunnel.stations[i]
@@ -114,12 +122,14 @@ export function tunnelGeometry(tile:Tile,ground:THREE.PlaneGeometry,tunnels:Tunn
   for(let at=0;at<index.count;at+=3){
     const ids=[0,1,2].map(off=>index.getX(at+off)),triangle=ids.map(id=>[pos.getX(id),pos.getY(id),pos.getZ(id)] as Point)
     let pieces=[triangle],changed=false
-    for(const planes of cuts){
+    for(const {planes,minGroundY} of cuts){
       const remaining:Point[][]=[]
       for(const piece of pieces){
         if(planes.some(plane=>piece.every(p=>plane(p)<=0))){remaining.push(piece);continue}
+        if(minGroundY!==undefined && piece.every(p=>p[1]>=minGroundY)){remaining.push(piece);continue}
         let inside=piece
         for(const plane of planes){const outside=clip(inside,p=>-plane(p));if(outside.length>=3)remaining.push(outside);inside=clip(inside,plane)}
+        if(minGroundY!==undefined && inside.length>=3)fan(inside.map(([x,y,z])=>[x,Math.max(y,minGroundY),z]),vertices)
         changed=true
       }
       pieces=remaining
