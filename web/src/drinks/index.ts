@@ -224,6 +224,7 @@ export function mountDrinksShop(ctx: DrinksMountContext): DrinksShopHandle {
       groundY = nextY
       groundSnapped = true
       shop.group.position.set(site.worldX, groundY, site.worldZ)
+      shop.group.updateMatrixWorld(true)
       return true
     }
     return false
@@ -253,6 +254,7 @@ export function mountDrinksShop(ctx: DrinksMountContext): DrinksShopHandle {
   shop.group.userData.site = site
   shop.group.position.set(site.worldX, groundY, site.worldZ)
   shop.group.rotation.y = site.worldYaw
+  shop.group.updateMatrixWorld(true)
   shop.group.visible = false
   ctx.scene.add(shop.group)
 

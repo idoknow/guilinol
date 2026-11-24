@@ -296,19 +296,16 @@ export function play(host:Host) {
     return {mifen: shopObj, drinks: drinksShopObj}
   }
   function pointInsideMifenShop(pos:THREE.Vector3, shop:THREE.Object3D) {
-    shop.updateMatrixWorld()
     shop.worldToLocal(tmpLocalA.copy(pos))
     if(Math.abs(tmpLocalA.x)>3.55||tmpLocalA.z<-7.3||tmpLocalA.z>7.15||tmpLocalA.y<-0.6||tmpLocalA.y>3.6) return false
     if(tmpLocalA.x<-1.4&&tmpLocalA.z>5.0&&Math.hypot(tmpLocalA.x+1.4,tmpLocalA.z-5.0)>2.2) return false
     return true
   }
   function pointInsideDrinksShop(pos:THREE.Vector3, shop:THREE.Object3D) {
-    shop.updateMatrixWorld()
     shop.worldToLocal(tmpLocalA.copy(pos))
     return Math.abs(tmpLocalA.x)<=6.0&&tmpLocalA.z>=-4.8&&tmpLocalA.z<=3.2&&tmpLocalA.y>=-0.5&&tmpLocalA.y<=4.6
   }
   function segmentHitsBox(camPos:THREE.Vector3, targetPos:THREE.Vector3, shop:THREE.Object3D, hx:number, yMin:number, yMax:number, zMin:number, zMax:number) {
-    shop.updateMatrixWorld()
     shop.worldToLocal(tmpLocalA.copy(camPos))
     shop.worldToLocal(tmpLocalB.copy(targetPos))
     const dx = tmpLocalB.x-tmpLocalA.x, dy = tmpLocalB.y-tmpLocalA.y, dz = tmpLocalB.z-tmpLocalA.z
