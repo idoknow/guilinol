@@ -20,7 +20,7 @@ try{
   for(let round=0;round<20;round++){
     activeRound=round+1
     if(round%5===0){
-      await page.goto(`http://127.0.0.1:${server.httpServer.address().port}/?verify&time=12&traffic=1&radius=320`)
+      await page.goto(`http://127.0.0.1:${server.httpServer.address().port}/?verify&time=12&traffic=1&radius=320`,{waitUntil:'commit',timeout:120000})
       await page.waitForFunction(()=>window.viewer?.staticAudit,null,{timeout:120000})
       await page.evaluate(()=>{
         const audit=viewer.staticAudit,check=audit.check;let count=0
