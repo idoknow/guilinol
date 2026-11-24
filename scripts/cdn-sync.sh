@@ -59,6 +59,8 @@ NO_CLEAN = PREHEAT_ONLY or INIT_BASELINE
 BATCH = int(os.environ['BATCH'])
 MAX_T = int(os.environ['MAX_TIME'])
 TOKEN = os.environ.get('CDNFLY_TOKEN', '')
+API_KEY = os.environ.get('CDNFLY_API_KEY', '')
+API_SECRET = os.environ.get('CDNFLY_API_SECRET', '')
 
 def die(msg):
     print(f'错误: {msg}', file=sys.stderr); sys.exit(3)
@@ -125,8 +127,8 @@ if STATE_ONLY:
     print(f'STATE_ONLY：只写基线 {len(now)} 条到 {STATE}，不提交任务')
     sys.exit(0)
 
-if not TOKEN:
-    die('需要 CDNFLY_TOKEN')
+if not TOKEN and not (API_KEY and API_SECRET):
+    die('需要 CDNFLY_API_KEY+CDNFLY_API_SECRET 或 CDNFLY_TOKEN')
 
 class NoRedirect(urllib.request.HTTPRedirectHandler):
     """不跟随重定向：urllib 默认会把自定义请求头（含 access-token）带到重定向目标"""
@@ -138,7 +140,10 @@ OPENER = urllib.request.build_opener(NoRedirect)
 def api(path, body=None):
     data = json.dumps(body, ensure_ascii=False).encode() if body is not None else None
     req = urllib.request.Request(API + path, data=data, method='POST' if data else 'GET')
-    req.add_header('access-token', TOKEN)       # token 只在请求头，不进进程列表
+    if API_KEY and API_SECRET:                  # 面板 API 密钥（长期有效），只在请求头
+        req.add_header('api-key', API_KEY); req.add_header('api-secret', API_SECRET)
+    else:
+        req.add_header('access-token', TOKEN)   # token 只在请求头，不进进程列表
     req.add_header('Content-Type', 'application/json')
     req.add_header('User-Agent', 'cdn-sync/4')
     try:
