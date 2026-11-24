@@ -151,8 +151,21 @@ export function tunnelGeometry(tile:Tile,ground:THREE.PlaneGeometry,tunnels:Tunn
     for(const [i,joint] of (tunnel.joints??[]).entries()){
       if(!joint?.draw)continue
       const floor=tunnel.portals[i][1]
-      quad(joint.ring.map(([x,z])=>[x-tile.x,floor,z-tile.z]),'floor')
-      if(!tunnel.mouths?.[i])quad(joint.ring.map(([x,z])=>[x-tile.x,floor+head,z-tile.z]),'ceiling')
+      const covered=(i===0?first:last)===0&&!tunnel.mouths?.[i]
+      const ring=joint.ring.map(([x,z]):Point=>[x-tile.x,floor,z-tile.z])
+      const edges=ring.map((a,n)=>[a,ring[(n+1)%ring.length]])
+      const winding=Math.sign(edges.reduce((sum,[a,b])=>sum+a[0]*b[2]-a[2]*b[0],0))
+      const planes=edges.map(([a,b])=>(p:Point)=>winding*((b[0]-a[0])*(p[2]-a[2])-(b[2]-a[2])*(p[0]-a[0])))
+      // The two rectangular strips leave a wedge at a bend. Carry the same
+      // headroom cut through that wedge as through either adjoining section.
+      cuts.push({planes,roof:covered?()=>floor+head+railStyle.stationLevels.structureDepth-.35:undefined})
+      quad(ring,'floor')
+      if(covered)quad(ring.map(([x,,z])=>[x,floor+head,z]),'ceiling')
+      for(const [a,b] of edges){
+        if(side(a)*side(b)<=0)continue
+        const top=(p:Point):Point=>[p[0],covered?floor+head:Math.max(floor,groundY(p)),p[2]]
+        quad([a,b,top(b),top(a)],covered?'interior':'portal')
+      }
     }
     for(let i=1;i<tunnel.stations.length;i++){
       const [a,ay]=tunnel.stations[i-1],[b,by]=tunnel.stations[i]

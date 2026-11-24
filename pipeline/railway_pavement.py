@@ -1,4 +1,4 @@
-"""Fill painted approaches beneath railway spans with the native drivable pavement."""
+"""Fill missing drivable pavement on rail crossings and their approaches."""
 import gzip
 import json
 import struct
@@ -20,10 +20,15 @@ def bake(directory, chunks):
     inventory = json.loads((Path(__file__).resolve().parents[1]/'docs/railway-crossings.json').read_bytes())
     sites = defaultdict(list)
     for row in inventory:
-        if row['type']=='rail_over' and all(row['roadTags'].get(k,'no')=='no' for k in ('bridge','tunnel')):
+        if row['type'] in ('level','rail_over') and all(row['roadTags'].get(k,'no')=='no' for k in ('bridge','tunnel')):
             sites[row['road']].append(Point(ll2xz(row['lat'],row['lon'])))
     shapes = []
-    for way in load_osm():
+    elements = load_osm()
+    from features import area
+    footprints = [area(w) for w in elements if w.get('tags',{}).get('building') and
+                  w['type']=='way' and len(w.get('geometry',()))>=4]
+    buildings = STRtree(footprints)
+    for way in elements:
         if way['type']!='way' or way['id'] not in sites:
             continue
         tags = way['tags']
@@ -35,8 +40,12 @@ def bake(directory, chunks):
         center = LineString(points(way))
         for site in sites[way['id']]:
             at = center.project(site)
-            face = substring(center,max(0.,at-32),min(center.length,at+32))
-            shapes.append(face.buffer(road_width/2,cap_style='flat'))
+            face = substring(center,max(0.,at-60),min(center.length,at+60)).buffer(road_width/2,cap_style='flat')
+            occupied = buildings.query(face,predicate='intersects')
+            if len(occupied):
+                face = face.difference(union_all([make_valid(footprints[i]) for i in occupied]))
+            if not face.is_empty:
+                shapes.append(face)
     tree = STRtree(shapes)
     for tile in chunks:
         x,z = tile['x'],tile['z']
