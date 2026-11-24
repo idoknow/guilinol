@@ -86,3 +86,10 @@ k wait --for=condition=Ready certificate/glol-tls --timeout=300s
 # 失败只告警，不影响发版。
 gh workflow run cdn-purge.yml -R idoknow/guilinol --ref main -f mode=sync -f sha="$tag" \
   || echo "触发 CDN 刷新失败（不影响发版）" >&2
+# 兜底（IDOK-192）：GitHub runner 连 cdn.cdn.sn 经常超时（HTTP 000），入口页在本机直接刷。
+# 密钥放在发版机 ~/.config/glol-cdn/env（CDNFLY_API_KEY / CDNFLY_API_SECRET，0600，不进仓库）。
+if [[ -r $HOME/.config/glol-cdn/env ]]; then
+  ( set -a; . "$HOME/.config/glol-cdn/env"; set +a
+    bash scripts/cdn-purge.sh url / /index.html /version.json /id.html /backpack.html /admin/ /manifest.webmanifest ) \
+    || echo "本机刷新 CDN 入口页失败（不影响发版）" >&2
+fi
