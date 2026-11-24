@@ -9,6 +9,11 @@ export function streetShading(material: T.MeshStandardMaterial, garment = false)
     schoolTop: {value: 0},
     schoolBlue: {value: new T.Color('#536e90')},
     skinTone: {value: new T.Color()},
+    // IDOK-229 starter patterns: 0 none, 1 open front, 2 plaid open overshirt, 3 track stripes, 4 shell yoke, 5 hoodie
+    pattern: {value: 0},
+    legStripe: {value: 0},
+    patA: {value: new T.Color()},
+    patB: {value: new T.Color()},
   }
   if (garment) material.userData.clothing = clothing
   material.customProgramCacheKey = () => (garment ? 'creator-cloth' : 'creator-solid')
@@ -28,12 +33,34 @@ export function streetShading(material: T.MeshStandardMaterial, garment = false)
           '#include <begin_vertex>\nzone = clothZone; rest = position;',
         )
       shader.fragmentShader =
-        'flat in float zone; varying vec3 rest; uniform float sleeve, shortHem, sandal, schoolTop; uniform vec3 skinTone, schoolBlue;\n' +
+        'flat in float zone; varying vec3 rest; uniform float sleeve, shortHem, sandal, schoolTop, pattern, legStripe; uniform vec3 skinTone, schoolBlue, patA, patB;\n' +
         shader.fragmentShader.replace(
           '#include <color_fragment>',
           `#include <color_fragment>
+        #define PAT_ARM_TOP 1.475
+        #define PAT_LEG_OUT 0.15
+        #define PAT_LEG_Z -0.014
         float x = abs(rest.x);
         if (schoolTop > 0.5 && zone == 1.0 && (x > 0.19 || rest.y > 1.37)) diffuseColor.rgb = schoolBlue;
+        if (pattern > 0.5) {
+          int pat = int(pattern + 0.5);
+          bool front = rest.z > 0.0 && x < 0.2;
+          if (zone == 1.0) {
+            if (pat == 2) {
+              vec2 q = vec2(rest.x + rest.z, rest.y) * 13.0;
+              float lx = step(abs(fract(q.x) - 0.5), 0.1), ly = step(abs(fract(q.y) - 0.5), 0.1);
+              diffuseColor.rgb = mix(diffuseColor.rgb, patB, 0.5 * max(lx, ly)) * (1.0 - 0.16 * lx * ly);
+            }
+            if ((pat == 1 || pat == 2) && front && rest.y < 1.4) {
+              if (x < 0.05) diffuseColor.rgb = patA;
+              else if (x < 0.062) diffuseColor.rgb *= 0.78;
+            }
+            if (pat == 3 && ((x > 0.2 && rest.y > PAT_ARM_TOP) || (front && x < 0.006))) diffuseColor.rgb = patA;
+            if (pat == 4 && ((rest.y > 1.31 && x < 0.34) || (front && x < 0.007))) diffuseColor.rgb = patA;
+            if (pat == 5 && front && x < 0.105 && rest.y > 1.0 && rest.y < 1.13) diffuseColor.rgb *= rest.y > 1.118 ? 0.7 : 0.88;
+          }
+        }
+        if (legStripe > 0.5 && zone == 2.0 && x > PAT_LEG_OUT && abs(rest.z - PAT_LEG_Z) < 0.022) diffuseColor.rgb = vec3(0.93, 0.93, 0.9);
         bool neck = sleeve < 0.2 && rest.z > -0.015 && rest.y > 1.365 + 0.102 * pow(min(1.0,x / 0.074),2.0);
         if ((zone == 1.0 && (x > sleeve || neck)) || (zone == 2.0 && rest.y < shortHem)) diffuseColor.rgb = skinTone;
         if (zone == 3.0 && sandal > 0.5 && rest.y > 0.026) {

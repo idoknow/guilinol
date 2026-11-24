@@ -4,6 +4,9 @@ import {
   hairNames,
   hairStyles,
   lookNames,
+  faceNames,
+  browNames,
+  eyeNames,
   looks,
   skinTones,
   type Avatar,
@@ -97,7 +100,7 @@ export async function createCharacter(
             key === 'body'
               ? 0
               : (draft.body === 'm' ? 1 : 6) + ['face', 'brows', 'eyes', 'hair', 'look'].indexOf(key)
-          pic.style.backgroundPosition = (i * 100) / 5 + '% ' + row * 10 + '%'
+          pic.style.backgroundPosition = (i * 100) / 11 + '% ' + row * 10 + '%'
           b.append(pic, document.createTextNode(names[i]))
         }
         b.onclick = () => {
@@ -119,9 +122,9 @@ export async function createCharacter(
     if (step === 0) group('选择体型', 'body', ['m', 'f'], ['男', '女'])
     if (step === 1) {
       group('肤色', 'skin', [0, 1, 2, 3, 4], ['浅暖', '暖米', '自然', '小麦', '深麦'], skinTones)
-      group('脸型', 'face', [0, 1, 2], ['圆脸', '鹅蛋脸', '方下颌'])
-      group('眉形', 'brows', [0, 1, 2], ['平直眉', '舒展眉', '微挑眉'])
-      group('眼型', 'eyes', [0, 1, 2], ['细长眼', '杏仁眼', '内双眼'])
+      group('脸型', 'face', faceNames.map((_, i) => i), faceNames)
+      group('眉形', 'brows', browNames.map((_, i) => i), browNames)
+      group('眼型', 'eyes', eyeNames.map((_, i) => i), eyeNames)
     }
     if (step === 2) {
       group('发型', 'hair', hairStyles[draft.body], hairNames[draft.body])
@@ -216,12 +219,12 @@ export async function createCharacter(
       ...draft,
       body,
       skin: r(5),
-      face: r(3),
-      brows: r(3),
-      eyes: r(3),
+      face: r(faceNames.length),
+      brows: r(browNames.length),
+      eyes: r(eyeNames.length),
       hair: hairStyles[body][r(6)],
       hairColor: r(4),
-      look: looks[r(6)],
+      look: looks[r(looks.length)],
     }
     for (const key of ['body', 'skin', 'face', 'brows', 'eyes', 'hair', 'hairColor', 'look'] as const) {
       if (id !== roll) return
