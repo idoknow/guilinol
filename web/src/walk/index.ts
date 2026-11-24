@@ -966,6 +966,12 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
       else if(hits(event.code,'useItem')){if(!cigarette.light()&&cigarette.puff())puffSeq=(puffSeq+1)%1000}
     }
     if(active)ebikeAudio.unlock()
+    if(active && event.code==='KeyL' && !event.repeat && !isGlobalHotkeyBlocked(event.target) && !isModalOrOverlayOpen() && !shopOverlay?.isOpen() && rides && !rides.bike && !rides.car && !rides.boat){
+      const position=sim.body.translation()
+      const ok=rides.hailBike({x:position.x,y:position.y-cfg.height/2,z:position.z},yaw)
+      window.dispatchEvent(new CustomEvent('walk:toast',{detail:{text:ok?'共享电车已送达，按 F 上车':'附近没有可调度的共享车或安全停车位',ms:2400}}))
+      return
+    }
     if(active&&!event.repeat&&event.code==='KeyO'&&!isGlobalHotkeyBlocked(event.target)&&!isModalOrOverlayOpen()&&!shopOverlay?.isOpen()){
       openSafeWardrobe()
       return

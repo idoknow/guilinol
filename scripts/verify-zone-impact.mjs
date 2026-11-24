@@ -4,6 +4,7 @@ import {gunzipSync, gzipSync} from 'node:zlib'
 import {preview} from 'vite'
 import {chromium} from 'playwright'
 import {browserOptions} from './qa-browser.mjs'
+import {withFixtureBays} from './ride-fixture-bays.mjs'
 
 const baked = JSON.parse(gunzipSync(await readFile('dist/world/vehicles.bin')))
 const fixtures = {quiet:[-1045.15,157.5,-498.09,1.2661,0],carFree:[-593.98,157.1,-94.94,1.7968,0]}
@@ -13,7 +14,7 @@ try {
   for (const [zone, start] of Object.entries(fixtures)) for (const kind of process.argv.slice(2)) {
     const page = await browser.newPage()
     try {
-      const fixture = {...baked,cars:[],bikes:[],sharedBikes:[],bicycles:[],[{car:'cars',bike:'bikes',bicycle:'bicycles'}[kind]]:[start]}
+      const fixture = {...(kind==='bike'?withFixtureBays(baked,[start]):baked),cars:[],bikes:[],sharedBikes:[],bicycles:[],[{car:'cars',bike:'bikes',bicycle:'bicycles'}[kind]]:[start]}
       await page.route('**/world/vehicles.bin', route => route.fulfill({body:gzipSync(JSON.stringify(fixture))}))
       await page.goto(`http://127.0.0.1:${server.httpServer.address().port}/?verify&mode=walk&flow=0`)
       await page.waitForFunction(()=>window.viewer?.walk?.active)

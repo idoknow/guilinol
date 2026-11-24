@@ -200,7 +200,7 @@ export async function vehicles(
   scene.add(group)
   const mMask = data.motorMask ? await roadBits(data.motorMask, data.maskEncoding) : mask
   const [mLeft, mTop, mWidth, mHeight, mStep] = data.motorGrid ?? data.grid
-  type Spawn = {kind: 'bike' | 'bicycle' | 'car'; row: Data['bikes'][number]; shared: boolean; pickup?: () => void}
+  type Spawn = {kind: 'bike' | 'bicycle' | 'car'; row: Data['bikes'][number]; shared: boolean; spawnKey?: string; pickup?: () => void}
   type ParkingCell = {pending: Spawn[]; group?: T.Group}
   const cells = new Map<string, ParkingCell>()
   const visibleCells = new Set<T.Group>()
@@ -250,7 +250,7 @@ export async function vehicles(
   function refreshBatch(cell: T.Group) {
     const visible = new Map<string, T.Object3D[]>()
     for (const record of cell.children) {
-      const key = record.userData.parkedModel
+      const key = record.userData.farModel || record.userData.parkedModel
       if (!record.visible || !key || record instanceof T.Mesh) continue
       const records = visible.get(key)
       if (records) records.push(record)
@@ -294,13 +294,12 @@ export async function vehicles(
     mesh.parent?.remove(mesh)
   }
 
-  function addBike(x: number, y: number, z: number, angle: number, paint: number, explicitType?: EbikeVehicleType) {
+  function addBike(x: number, y: number, z: number, angle: number, paint: number, explicitType?: EbikeVehicleType, spawnCoordKey = bikeCoordKey(x,z)) {
     const vehicleType = resolveEbikeKind(paint, explicitType)
     const isShared = vehicleType === 'shared'
     const mesh = marker('bike', paint, isShared)
     mesh.position.set(x, y, z)
     mesh.rotation.y = angle
-    const spawnCoordKey = bikeCoordKey(x, z)
     const restoredBattery = persistedBatteries.get(spawnCoordKey) ?? 100
     mesh.userData.paint = paint
     mesh.userData.shared = isShared
@@ -323,21 +322,33 @@ export async function vehicles(
     store(mesh)
   }
 
+  const occupiedBays = new Set([...data.bikes,...(data.sharedBikes??[])].map(([x,,z])=>bikeCoordKey(x,z)))
   function queueSpawns(kind: Spawn['kind'], rows: Data['bikes'], shared = false) {
-    for (const row of rows) {
+    for (const original of rows) {
+      const row = [...original] as Spawn['row']
+      const spawnKey = bikeCoordKey(row[0],row[2])
+      if (kind === 'bike' && (!pavement(row[0],row[2]) || motorPavement(row[0],row[2]))) {
+        let best = Infinity
+        for (let dc=-9; dc<=9; dc++) for (let dr=-9; dr<=9; dr++) {
+          const x = original[0] + dc*step, z = original[2] + dr*step
+          const d = dc*dc + dr*dr
+          if (d < best && pavement(x,z) && !motorPavement(x,z) && !occupiedBays.has(bikeCoordKey(x,z))) { row[0]=x; row[2]=z; best=d }
+        }
+      }
       const [x, y, z, yaw] = row
+      if (kind==='bike') occupiedBays.add(bikeCoordKey(x,z))
       // Traffic queries these solids even when the player cannot see the parked cars.
       const pickup = kind === 'car' ? pickups.add({x, y, z, yaw, halfWidth: .9, halfLength: 2.12, height: 1.5}) : undefined
-      parkingCell(x, z).pending.push({kind, row, shared, pickup})
+      parkingCell(x, z).pending.push({kind, row, shared, pickup, spawnKey})
     }
   }
 
   function loadParkingCell(cell: ParkingCell) {
     if (cell.pending.length === 0) return cell.group!
-    for (const {kind, row, shared, pickup} of cell.pending) {
+    for (const {kind, row, shared, pickup, spawnKey} of cell.pending) {
       const [x, y, z, angle, paint] = row
       if (kind === 'bike') {
-        addBike(x, y, z, angle, paint, shared ? 'shared' : undefined)
+        addBike(x, y, z, angle, paint, shared ? 'shared' : undefined, spawnKey)
       } else {
         const mesh = marker(kind, paint)
         mesh.position.set(x, y, z)
@@ -634,11 +645,8 @@ export async function vehicles(
       const isEbike = bikeCtrl.kind === 'bike'
       saveBikeInstanceState(bike, {parkLocked: isEbike, kickstandDown: true})
       bike.rotation.set(bikeCtrl.pitch, bikeCtrl.heading, isEbike ? KICKSTAND_REST_ROLL_RAD : 0, 'YXZ')
-      if (bike.userData.decorId) {
-        env?.stream.batches.returnBike(bike.userData.decorId)
-        detachMeshFromCells(bike)
-        lastBike = null
-      } else attachMeshToCell(bike)
+      if (bike.userData.decorId) bike.userData.parkedModel = 'bike:1:true'
+      attachMeshToCell(bike)
     }
     car = null
     bike = null
@@ -862,6 +870,7 @@ export async function vehicles(
   }
 
   function nearby(x: number, z: number, footY?: number) {
+    const now = performance.now()
     nearBike = null
     nearBikeDist = Infinity
     nearDownedBike = null
@@ -889,6 +898,19 @@ export async function vehicles(
           const downed = !!mesh.userData.downed
           const reach = downed ? 4.4 : isCar ? 4.6 : 4.2
           const visible = distance < 110
+          if (visible && mesh.name === 'bike' && mesh.userData.parkedModel) {
+            const farModel = distance >= 40 ? 'bike:far' : ''
+            if (farModel && !models.has(farModel)) models.set(farModel,parkedParts(vehicleModel('bike',0,{distant:true,shared:true})))
+            if (farModel !== mesh.userData.farModel) { mesh.userData.farModel=farModel; visibilityChanged=true }
+            if (distance < 18 && !downed && env?.supportYAt && now >= (mesh.userData.nextGroundProbe ?? 0)) {
+              mesh.userData.nextGroundProbe = now + 1000
+              const ground = env.supportYAt(mesh.position.x,mesh.position.z,mesh.position.y)
+              if (Number.isFinite(ground) && Math.abs(mesh.position.y-ground)>.015) {
+                mesh.position.y=ground; mesh.updateMatrix()
+                parkedCells.get(cell)!.invalidate(mesh.userData.parkedModel); visibilityChanged=true
+              }
+            }
+          }
           if (visible !== mesh.visible && mesh.userData.parkedModel) visibilityChanged = true
           mesh.visible = visible
           const vertOk = footY === undefined || Math.abs(mesh.position.y - footY) <= 1.5
@@ -997,6 +1019,33 @@ export async function vehicles(
     }
 
     const ownedBike = gs.garage.vehicles[targetId]
+    const spot = summonSpot(playerPos,playerYaw)
+    if (!spot) return {ok:false,code:'NO_SAFE_SPOT'}
+    despawnPersonalMesh()
+    const bikeYaw = playerYaw + Math.PI * 0.5
+    const mesh = buildPersonalOrTestMesh(
+      'personal',
+      ownedBike.id,
+      ownedBike.modelId,
+      spot.x,
+      spot.y,
+      spot.z,
+      bikeYaw,
+      ownedBike.batteryPct,
+      ownedBike.durabilityPct,
+      ownedBike.upgrades,
+      ownedBike.visual,
+    )
+    activePersonalMesh = mesh
+    attachMeshToCell(mesh)
+    setActiveWorldInstanceId(ownedBike.id)
+    setSummonCooldownUntil(now + SUMMON_COOLDOWN_MS)
+    emit({type: 'garage:summon', vehicleId: ownedBike.id, pos: [spot.x, spot.y, spot.z], yaw: bikeYaw})
+    nearby(playerPos.x, playerPos.z, playerPos.y)
+    return {ok: true, code: 'OK', vehicleId: ownedBike.id, pos: [spot.x, spot.y, spot.z], yaw: bikeYaw}
+  }
+
+  function summonSpot(playerPos: {x:number;y:number;z:number}, playerYaw:number) {
     const footY = playerPos.y
     const fwdX = -Math.sin(playerYaw)
     const fwdZ = -Math.cos(playerYaw)
@@ -1050,30 +1099,24 @@ export async function vehicles(
         }
       }
     }
-    if (!spot) return {ok: false, code: 'NO_SAFE_SPOT'}
+    return spot
+  }
 
-    despawnPersonalMesh()
-    const bikeYaw = playerYaw + Math.PI * 0.5
-    const mesh = buildPersonalOrTestMesh(
-      'personal',
-      ownedBike.id,
-      ownedBike.modelId,
-      spot.x,
-      spot.y,
-      spot.z,
-      bikeYaw,
-      ownedBike.batteryPct,
-      ownedBike.durabilityPct,
-      ownedBike.upgrades,
-      ownedBike.visual,
-    )
-    activePersonalMesh = mesh
-    attachMeshToCell(mesh)
-    setActiveWorldInstanceId(ownedBike.id)
-    setSummonCooldownUntil(now + SUMMON_COOLDOWN_MS)
-    emit({type: 'garage:summon', vehicleId: ownedBike.id, pos: [spot.x, spot.y, spot.z], yaw: bikeYaw})
-    nearby(playerPos.x, playerPos.z, footY)
-    return {ok: true, code: 'OK', vehicleId: ownedBike.id, pos: [spot.x, spot.y, spot.z], yaw: bikeYaw}
+  function hailBike(playerPos: {x:number;y:number;z:number}, playerYaw:number) {
+    if (!active || car || bike || route >= 0 || freeBoats?.active || env?.isFootAnimBusy?.() || isPointInQuietZone(playerPos.x,playerPos.z)) return false
+    const spot = summonSpot(playerPos,playerYaw)
+    if (!spot) return false
+    let closest: T.Object3D | undefined, best = Infinity
+    for (const cell of visibleCells) for (const record of cell.children) {
+      if (record.name !== 'bike' || !record.userData.shared || !record.userData.parkedModel || record.userData.downed || record.userData.ownership !== 'shared') continue
+      const distance = Math.hypot(record.position.x-playerPos.x,record.position.z-playerPos.z)
+      if (distance<best) { best=distance; closest=record }
+    }
+    if (!closest) return false
+    const unit=takeRecord(closest)
+    relocateParkedBike(unit,spot.x,spot.y,spot.z,playerYaw)
+    nearby(playerPos.x,playerPos.z,playerPos.y)
+    return true
   }
 
   function spawnPersonalBikeAtBay(shopId: string, vehicleId: string): boolean {
@@ -1333,6 +1376,7 @@ export async function vehicles(
     dismountDownedBike,
     relocateParkedBike,
     summonPersonalBike,
+    hailBike,
     spawnPersonalBikeAtBay,
     refreshPersonalBikeVisual,
     startTestRide,
@@ -1418,12 +1462,12 @@ export async function vehicles(
     parkedBikes() {
       const out: {x: number; y: number; z: number; paint: number; vehicleType: EbikeVehicleType; tier: EbikeTier; batteryPct: number; ownership: VehicleOwnership}[] = []
       for (const cell of cells.values()) {
-        for (const {kind, row, shared} of cell.pending) {
+        for (const {kind, row, shared, spawnKey} of cell.pending) {
           if (kind !== 'bike') continue
           const [x, y, z, , paint] = row
           const vehicleType = resolveEbikeKind(paint, shared ? 'shared' : undefined)
           out.push({x, y, z, paint, vehicleType, tier: vehicleType, ownership: 'shared',
-            batteryPct: persistedBatteries.get(bikeCoordKey(x, z)) ?? 100})
+            batteryPct: persistedBatteries.get(spawnKey ?? bikeCoordKey(x, z)) ?? 100})
         }
         for (const child of cell.group?.children ?? []) {
           if (child.name !== 'bike') continue
