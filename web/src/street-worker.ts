@@ -12,7 +12,7 @@ export interface StationPavingStyle {plaza?:Pair[]; platformEdges?:[Pair,Pair][]
 type Path=[number,...Pair[][]]
 type RoadCtrl=[number,number[]]
 type Lower=[number,Pair[],[number,number,number,number][]]
-export type Streets=[Path[],Pair[],number[][],Pair[]?,Pair[]?,(RoadCtrl|null)?,number[][]?,number[][]?,number[][]?,number[][]?,Pair[][]?,Lower?,{start:number,end:number,vertices?:[number,number,number][],packed?:string,sidewalk?:string,skirt?:string}?]
+export type Streets=[Path[],Pair[],number[][],Pair[]?,Pair[]?,(RoadCtrl|null)?,number[][]?,number[][]?,number[][]?,number[][]?,Pair[][]?,Lower?,{start:number,end:number,vertices?:[number,number,number][],packed?:string,sidewalk?:string,skirt?:string}?,Record<string,number>?]
 const colors=look.streets.surfaces.map(v=>new THREE.Color(v)),tone=Object.fromEntries((['railing','lampPole','lampHead'] as const).map(k=>[k,new THREE.Color(look.streets[k])]))
 const stoneLight=new THREE.Color(0xa6a39a),stoneMid=new THREE.Color(0x8c8981),stoneBase=new THREE.Color(0x74726b)
 const platformBrick=new THREE.Color(style.station.platformBrick)
@@ -338,11 +338,15 @@ export function streetGeometry([paths,lamps,banks,signals=[],stops=[],roadCtrl,s
   const railBarriers=railwayGeometry(rails,signs,railGround,crossingHeight,railFace,box,levelFace)
   const roadBarriers=buildRoadBarriers(decor,baseLevel)
   const detailCount=mats.length/16
-  for(const [x,z] of lamps){const px=x/10,pz=z/10,y=baseLevel(px,pz),yaw=(x*7+z*13)%6/6*Math.PI
+  const plantedLevel=(east:number,south:number)=>{
+    const mm=anchors?.[east+','+south]
+    return mm===undefined?baseLevel(east/10,south/10):mm/1000
+  }
+  for(const [x,z] of lamps){const px=x/10,pz=z/10,y=plantedLevel(x,z),yaw=(x*7+z*13)%6/6*Math.PI
     box(px,y+.3,pz,.34,.6,.34,0,tone.lampPole);box(px,y+2.9,pz,.14,5.2,.14,0,tone.lampPole);box(px,y+5.3,pz,1.6,.08,.08,yaw,tone.lampPole)
     for(const side of [-.75,.75])box(px+Math.cos(yaw)*side,y+5.05,pz-Math.sin(yaw)*side,.32,.42,.32,yaw,tone.lampHead)}
   for(const [east,south] of signals){const x=east/10,z=south/10,y=baseLevel(x,z);box(x,y+2.5,z,.16,5,.16);box(x,y+4.7,z,.4,.9,.3)}
-  for(const [east,south] of stops){const x=east/10,z=south/10,y=baseLevel(x,z);box(x,y+1.3,z,.12,2.6,.12);box(x,y+2.15,z,.65,.85,.12)}
+  for(const [east,south] of stops){const x=east/10,z=south/10,y=plantedLevel(east,south);box(x,y+1.3,z,.12,2.6,.12);box(x,y+2.15,z,.65,.85,.12)}
   let bankAlong=0
   for(const [ax,az,bx,bz,top,bottom,endTop=top] of banks){
     const a=new THREE.Vector3(ax/10,top/10,az/10),b=new THREE.Vector3(bx/10,endTop/10,bz/10)
