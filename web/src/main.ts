@@ -1,3 +1,5 @@
+import {onPrefs} from './ui/prefs'
+import {bindingLabel} from './input/keymap'
 import {nearestPlayable} from '../../lib/play-region'
 import {identifyWorld,instrument,operation,record} from './telemetry'
 import * as THREE from 'three'
@@ -331,10 +333,11 @@ async function start(loader:FullLoader,creatorSpawn=false) {
     }else if(walking&&document.body.hasAttribute('data-aboard')&&ride==='boat'){
       hint.textContent='WASD 划船 · F 靠岸下船 · 拖动转视角 · 滚轮远近 · V 起飞'
     }else{
-      hint.textContent=walking?'WASD 走 · Shift 跑 · X 蹲 · 空格 跳 · C 视距 · 滚轮远近 · V 起飞 · M 地图 · J 景册 · P 拍照':'WASD 飞 · Q/E 升降 · Shift 加速 · V 落地步行 · M 地图 · J 景册 · P 拍照 · Esc 菜单'
+      hint.textContent=walking?`WASD 走 · Shift 跑 · X 蹲 · 空格 跳 · ${bindingLabel('emote')} 表情 · C 视距 · 滚轮远近 · V 起飞 · M 地图 · J 景册 · P 拍照`:'WASD 飞 · Q/E 升降 · Shift 加速 · V 落地步行 · M 地图 · J 景册 · P 拍照 · Esc 菜单'
     }
     if(getPlayMode()==='solo')hint.textContent=hint.textContent?.replace(/ · V (起飞|飞)/g,'') ?? ''
   }
+  onPrefs(showMode)
   new MutationObserver(()=>showMode()).observe(document.body,{attributes:true,attributeFilter:['data-aboard','data-ride']})
   let toastTimer=0
   const showToast=(text:string,ms=3200)=>{toast.textContent=text;toast.classList.add('show')

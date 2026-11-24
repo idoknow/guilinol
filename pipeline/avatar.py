@@ -8,9 +8,17 @@ Colours follow docs/style.md: a warm orange shell jacket reads against the green
 import json
 import math
 import struct
+import sys
 from pathlib import Path
 
 import numpy as np
+
+# The shipped skinned figure uses the CC0 rig. Keep the original rigid avatar
+# generator below available for reproducing its separate legacy asset.
+if __name__ == '__main__' and sys.argv[1:] == ['--hands']:
+    from avatar_hands import rebuild
+    rebuild()
+    sys.exit(0)
 
 COLORS = dict(  # sRGB hex → linear factors in material()
     jacket=0xf09a4a, jacketDark=0xc06a2c, tee=0xf2efe8, jeans=0x55708f, skin=0xdcb48e, hair=0x1f1b19,

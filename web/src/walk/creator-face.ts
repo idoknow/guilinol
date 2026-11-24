@@ -1,6 +1,24 @@
 import * as T from 'three'
 import {hairColors, skinTones, type Avatar} from '../../../lib/avatar'
 
+let sharedLaugh:T.CanvasTexture|undefined
+function laughTexture(){
+  if(sharedLaugh)return sharedLaugh
+  const canvas=document.createElement('canvas')
+  canvas.width=256;canvas.height=192
+  const ctx=canvas.getContext('2d')!
+  ctx.strokeStyle='#392b26';ctx.lineWidth=8;ctx.lineCap='round'
+  for(const x of [64,192]){
+    ctx.beginPath();ctx.moveTo(x-21,68);ctx.quadraticCurveTo(x,43,x+21,68);ctx.stroke()
+  }
+  ctx.fillStyle='#763f3c';ctx.beginPath();ctx.moveTo(73,119)
+  ctx.quadraticCurveTo(128,136,183,119);ctx.bezierCurveTo(172,183,91,183,73,119);ctx.fill()
+  ctx.fillStyle='#f4e5cf';ctx.beginPath();ctx.moveTo(80,124)
+  ctx.quadraticCurveTo(128,137,176,124);ctx.quadraticCurveTo(128,153,80,124);ctx.fill()
+  sharedLaugh=new T.CanvasTexture(canvas);sharedLaugh.colorSpace=T.SRGBColorSpace
+  return sharedLaugh
+}
+
 // Match the contours of the selected face, including the square/oval jaw morph.
 function frontOfFace(geometry: T.BufferGeometry) {
   const positions = geometry.getAttribute('position'),
@@ -90,6 +108,18 @@ export function facialFeatures(geometry: T.BufferGeometry, a: Avatar) {
   g.setAttribute('position', new T.Float32BufferAttribute(positions, 3))
   g.setAttribute('color', new T.Float32BufferAttribute(colors, 3))
   g.setIndex(indices)
-  group.add(new T.Mesh(g, new T.MeshBasicMaterial({vertexColors: true, side: T.DoubleSide})))
+  const rest=new T.Mesh(g,new T.MeshBasicMaterial({vertexColors:true,side:T.DoubleSide}))
+  rest.name='rest-face'
+  group.add(rest)
+  const texture=laughTexture()
+  const surface=new T.PlaneGeometry(.145,.12,24,20)
+  const points=surface.attributes.position
+  for(let i=0;i<points.count;i++){
+    const x=points.getX(i),y=points.getY(i)+.042
+    points.setXYZ(i,x,y,front(x,y)-.002)
+  }
+  // The attachment's local +X is screen-right when viewed from behind.
+  const laugh=new T.Mesh(surface,new T.MeshBasicMaterial({map:texture,transparent:true,depthWrite:false,side:T.DoubleSide}))
+  laugh.name='laugh-face';laugh.visible=false;group.add(laugh)
   return group
 }

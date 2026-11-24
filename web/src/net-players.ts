@@ -1,3 +1,5 @@
+import {emotePlayback} from './emote/playback'
+import {emoteById,emotesEnabled} from './emote/emotes'
 import {smokeEnabled} from './citizen/use-item'
 import {RemoteSmoke} from './smoke/session'
 import {smokeVisual} from './smoke/visual'
@@ -9,7 +11,7 @@ import {vehicleModel} from './walk/vehicle-model'
 import {avatar as figure} from './look/avatar'
 
 export interface Pose {x:number;y:number;z:number;yaw:number;v:number;gr:number;bike:string;bx:number;bz:number;byaw:number;sc:number;sb:number;sp:number;br:number}
-export interface Player extends Pose {id:string;name:string;avatar:Avatar}
+export interface Player extends Pose {em?:number;es?:number;expires?:number;id:string;name:string;avatar:Avatar}
 
 // 昵称牌（IDOK-192）：墨青玻璃小签 + 宣纸色宋体字，左边一颗青玉点，和 HUD 读数同一套颜色。
 const TAG_FONT='600 30px "Noto Serif SC","Source Han Serif SC","Songti SC",serif'
@@ -44,12 +46,13 @@ type Visual=ReturnType<typeof visual>
 function visual(player:Player) {
   const root=new THREE.Group(), name=label(player.name), bike=vehicleModel('bike')
   root.position.set(player.x,player.y,player.z); root.add(name); bike.visible=false
-  return {root,name,bike,smoke:new RemoteSmoke(),kit:undefined as ReturnType<typeof smokeVisual>|undefined,mixer:undefined as THREE.AnimationMixer|undefined,action:undefined as THREE.AnimationAction|undefined,key:''}
+  return {root,name,bike,played:-1,emote:undefined as ReturnType<typeof emotePlayback>|undefined,smoke:new RemoteSmoke(),kit:undefined as ReturnType<typeof smokeVisual>|undefined,mixer:undefined as THREE.AnimationMixer|undefined,action:undefined as THREE.AnimationAction|undefined,key:''}
 }
 
-export function players(scene:THREE.Scene,clips:THREE.AnimationClip[]) {
+export function players(scene:THREE.Scene,clips:THREE.AnimationClip[],camera:THREE.Camera) {
   const records=new Map<string,Player>(), visible=new Map<string,Visual>(), templates=new Map<string,Template>()
   const limit=matchMedia('(pointer: coarse)').matches?12:30
+  const frustum=new THREE.Frustum(), projection=new THREE.Matrix4(), bounds=new THREE.Sphere(new THREE.Vector3(),1.1)
   const enableSmoke=smokeEnabled()
   let nextSort=0
   function hide(id:string) {
@@ -70,7 +73,7 @@ export function players(scene:THREE.Scene,clips:THREE.AnimationClip[]) {
     let entry=templates.get(key); if(!entry){entry={model:template(appearance),refs:0};templates.set(key,entry)}
     entry.refs++
     void entry.model.then(model=>{if(visible.get(player.id)!==view)return
-      const instance=clone(model); view.root.add(instance); view.mixer=new THREE.AnimationMixer(instance)
+      const instance=clone(model); view.root.add(instance);view.mixer=new THREE.AnimationMixer(instance);view.emote=emotePlayback(instance,undefined,view.mixer)
     }).catch(error=>console.warn('remote character unavailable',error))
   }
   function tick(dt:number,local:Pose) {
@@ -80,16 +83,28 @@ export function players(scene:THREE.Scene,clips:THREE.AnimationClip[]) {
       for(const id of visible.keys())if(!nearest.has(id))hide(id)
       for(const id of nearest)if(!visible.has(id))show(records.get(id)!)
     }
+    camera.updateWorldMatrix(true,false)
+    frustum.setFromProjectionMatrix(projection.multiplyMatrices(camera.projectionMatrix,camera.matrixWorldInverse))
+    const enabled=emotesEnabled()
     const alpha=1-Math.exp(-20*dt)
     for(const [id,view] of visible){const player=records.get(id)!,pos=view.root.position
       pos.x+=(player.x-pos.x)*alpha;pos.y+=(player.y-pos.y)*alpha;pos.z+=(player.z-pos.z)*alpha
       const angle=player.yaw-view.root.rotation.y;view.root.rotation.y+=Math.atan2(Math.sin(angle),Math.cos(angle))*alpha
       view.bike.visible=!!player.bike
       if(player.bike){view.bike.position.set(pos.x+player.bx-player.x,pos.y,pos.z+player.bz-player.z);view.bike.rotation.y=player.byaw}
+      view.emote?.reset()
+      const inRange=Math.hypot(player.x-local.x,player.z-local.z)<80
+      bounds.center.set(player.x,player.y+.9,player.z)
+      const eligible=enabled&&view.root.visible&&inRange&&frustum.intersectsSphere(bounds)&&performance.now()<(player.expires??0)
+      if(view.emote){
+        if(eligible&&player.em&&view.played!==player.es){view.emote.play(player.em,Math.max(0,(emoteById(player.em)?.duration??0)-((player.expires??0)-performance.now())/1000));view.played=player.es??0}
+        if(!eligible||!player.em){view.emote.stop();view.played=-1}
+      }
       view.kit?.resetPose()
       const name=player.bike?'sit':!player.gr?'jump':player.v>3?'run':player.v>.12?'walk':'idle'
       const clip=clips.find(item=>item.name===figure.clips[name]);if(clip&&view.mixer){const action=view.mixer.clipAction(clip)
         if(action!==view.action){view.action?.fadeOut(.12);action.reset().fadeIn(.12).play();view.action=action} view.mixer.update(dt)}
+      view.emote?.tick(dt,player.v>.12)
       if(enableSmoke&&view.mixer){
         if(player.sc&&!view.kit)view.kit=smokeVisual(scene,view.root)
         if(view.kit){view.smoke.update(player.sc,player.sb,player.sp,player.br,dt);view.kit.tick(dt,view.smoke.view())}
@@ -98,10 +113,12 @@ export function players(scene:THREE.Scene,clips:THREE.AnimationClip[]) {
   }
   function remove(id:string){hide(id);records.delete(id);nextSort=0}
   function clear(){for(const id of records.keys())remove(id)}
-  return {tick,clear,remove,add(player:Player){remove(player.id);records.set(player.id,player)},
+  return {tick,clear,remove,add(player:Player){remove(player.id);records.set(player.id,{...player,expires:performance.now()+(emoteById(player.em??0)?.duration??0)*1000})},
+    emote(id:string,em:number,es:number){const p=records.get(id);if(!p||es<=(p.es??0))return
+      Object.assign(p,{em,es,expires:performance.now()+(emoteById(em)?.duration??0)*1000})},
     move(id:string,pose:Pose){const player=records.get(id);if(!player)return
       if(Math.hypot(pose.x-player.x,pose.z-player.z)>25)visible.get(id)?.root.position.set(pose.x,pose.y,pose.z)
       Object.assign(player,pose)},
     avatar(id:string,avatar:Avatar){const player=records.get(id);if(player){hide(id);player.avatar=avatar;nextSort=0}},
-    probe:()=>[...visible].map(([id,view])=>({id,name:records.get(id)!.name,avatar:records.get(id)!.avatar,smoke:view.smoke.view().phase,puffs:view.smoke.view().puffs,ready:!!view.mixer,position:view.root.position.toArray()}))}
+    probe:()=>[...visible].map(([id,view])=>({id,name:records.get(id)!.name,avatar:records.get(id)!.avatar,smoke:view.smoke.view().phase,puffs:view.smoke.view().puffs,clip:view.emote?.clip,ready:!!view.mixer,position:view.root.position.toArray()}))}
 }
