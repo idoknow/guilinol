@@ -18,14 +18,17 @@ try {
         const token=Buffer.from(JSON.stringify({mode:'fly',x,y:205,z,lon,lat,yaw:0,pitch:-20,fov:55,alt:205,heading:0,target:null,landmark_id:null,build:'0'.repeat(40)})).toString('base64url')
         const page=await browser.newPage({viewport:{width:1280,height:800}})
         await page.addInitScript(glHookScript)
+        await page.addInitScript(()=>performance.setResourceTimingBufferSize(10000))
         await page.goto('http://127.0.0.1:'+server.httpServer.address().port+'/?verify&radius=512&time=12&flow=0&view='+token)
         await page.waitForFunction(()=>window.viewer?.stats.readyMs>0)
+        await page.waitForFunction(()=>window.viewer.stats.loaded>0 && !window.viewer.stats.pending)
+        await page.waitForLoadState('networkidle')
         const metrics=await page.evaluate(async()=>{
           const {stats,camera}=window.viewer
           const calls=[]
           for(let i=0;i<120;i++){await new Promise(requestAnimationFrame);if(i>=60)calls.push(stats.calls)}
           const bytes=performance.getEntriesByType('resource').filter(r=>r.name.includes('/world/')).reduce((a,b)=>a+b.encodedBodySize,0)
-          return {firstMs:stats.firstMs,calls:calls.sort((a,b)=>a-b)[30],bytes,vram:window.__glPerf.memory().totalBytes,camera:camera.position.toArray()}
+          return {loaded:stats.loaded,firstMs:stats.firstMs,calls:calls.sort((a,b)=>a-b)[30],bytes,vram:window.__glPerf.memory().totalBytes,camera:camera.position.toArray()}
         })
         runs.push({round,dir,name,...metrics})
         await page.close()

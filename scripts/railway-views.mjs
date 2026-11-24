@@ -19,7 +19,6 @@ try {
   page.on('console',msg=>{if(msg.text().includes('Shader Error'))errors.push(msg.text())})
   await page.goto(`http://127.0.0.1:${server.httpServer.address().port}/?verify&mode=fly&radius=256&time=12&flow=0`)
   await page.waitForFunction(()=>window.viewer?.stats.firstMs>0)
-  await page.addStyleTag({content:'body > :not(canvas):not(script){visibility:hidden} canvas{visibility:visible}'})
   const index=[]
   for(const [i,row] of cases.entries()){
     await page.evaluate(({x,z,east,south,roadY,railY})=>{

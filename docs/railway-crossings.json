@@ -427,9 +427,9 @@
     "evidence": "层级（铁路 0，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 156.051,
+    "railY": 156.0511,
     "roadY": 150.2015,
-    "designClearanceM": 4.6495
+    "designClearanceM": 4.6496
   },
   {
     "rail": 213171601,
@@ -467,9 +467,9 @@
     "evidence": "层级（铁路 0，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 155.9609,
+    "railY": 155.9612,
     "roadY": 149.9123,
-    "designClearanceM": 4.8486
+    "designClearanceM": 4.8488
   },
   {
     "rail": 213171601,
@@ -507,9 +507,9 @@
     "evidence": "层级（铁路 0，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 155.8821,
+    "railY": 155.8825,
     "roadY": 146.8085,
-    "designClearanceM": 7.8735
+    "designClearanceM": 7.8739
   },
   {
     "rail": 213171601,
@@ -586,9 +586,9 @@
     "evidence": "层级（铁路 0，道路 1）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 154.6783,
+    "railY": 154.6807,
     "roadY": 152.4274,
-    "designClearanceM": -3.4509
+    "designClearanceM": -3.4533
   },
   {
     "rail": 221803908,
@@ -628,9 +628,9 @@
     "evidence": "层级（铁路 1，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 158.2924,
+    "railY": 158.2925,
     "roadY": 152.0395,
-    "designClearanceM": 5.0529
+    "designClearanceM": 5.053
   },
   {
     "rail": 221803908,
@@ -1083,9 +1083,9 @@
     "evidence": "层级（铁路 0，道路 1）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 159.3042,
+    "railY": 159.3141,
     "roadY": 160.9712,
-    "designClearanceM": 0.467
+    "designClearanceM": 0.4571
   },
   {
     "rail": 259082251,
@@ -1129,9 +1129,9 @@
     "evidence": "层级（铁路 0，道路 1）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 159.4493,
+    "railY": 159.459,
     "roadY": 160.9596,
-    "designClearanceM": 0.3103
+    "designClearanceM": 0.3006
   },
   {
     "rail": 259082251,
@@ -1670,9 +1670,9 @@
     "evidence": "层级（铁路 2，道路 0）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 162.517,
+    "railY": 162.518,
     "roadY": 156.7263,
-    "designClearanceM": 4.5907
+    "designClearanceM": 4.5917
   },
   {
     "rail": 264922022,
@@ -1800,9 +1800,9 @@
     "evidence": "层级（铁路 1，道路 0）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 164.0038,
+    "railY": 164.0041,
     "roadY": 158.2505,
-    "designClearanceM": 4.5533
+    "designClearanceM": 4.5536
   },
   {
     "rail": 264922024,
@@ -2098,9 +2098,9 @@
     "evidence": "层级（铁路 1，道路 0）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 159.7088,
+    "railY": 159.7108,
     "roadY": 150.5181,
-    "designClearanceM": 7.9907
+    "designClearanceM": 7.9927
   },
   {
     "rail": 264922074,
@@ -2171,9 +2171,9 @@
     "evidence": "层级（铁路 1，道路 0）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 163.5516,
+    "railY": 163.5519,
     "roadY": 157.5433,
-    "designClearanceM": 4.8084
+    "designClearanceM": 4.8086
   },
   {
     "rail": 375923385,
@@ -2390,9 +2390,9 @@
     "evidence": "层级（铁路 1，道路 0）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 163.6765,
+    "railY": 163.6771,
     "roadY": 157.3991,
-    "designClearanceM": 5.0774
+    "designClearanceM": 5.078
   },
   {
     "rail": 375923389,
@@ -2424,9 +2424,9 @@
     "evidence": "层级（铁路 1，道路 0）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 161.0764,
+    "railY": 161.0842,
     "roadY": 154.9283,
-    "designClearanceM": 4.948
+    "designClearanceM": 4.9558
   },
   {
     "rail": 375923389,
@@ -2466,9 +2466,9 @@
     "evidence": "层级（铁路 1，道路 0）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 163.8283,
+    "railY": 163.8287,
     "roadY": 157.9557,
-    "designClearanceM": 4.6726
+    "designClearanceM": 4.673
   },
   {
     "rail": 375923389,
@@ -2674,9 +2674,9 @@
     "evidence": "层级（铁路 1，道路 0）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 163.4907,
+    "railY": 163.4945,
     "roadY": 156.4368,
-    "designClearanceM": 5.8538
+    "designClearanceM": 5.8576
   },
   {
     "rail": 454948576,
@@ -3202,9 +3202,9 @@
     "evidence": "层级（铁路 0，道路 1）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 150.5685,
+    "railY": 150.5702,
     "roadY": 156.5709,
-    "designClearanceM": 4.8023
+    "designClearanceM": 4.8006
   },
   {
     "rail": 617221269,
@@ -3292,9 +3292,9 @@
     "evidence": "层级（铁路 0，道路 1）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 150.5735,
+    "railY": 150.5752,
     "roadY": 157.1866,
-    "designClearanceM": 5.4131
+    "designClearanceM": 5.4114
   },
   {
     "rail": 617221272,
@@ -3360,9 +3360,9 @@
     "evidence": "层级（铁路 0，道路 1）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 149.1558,
+    "railY": 149.1576,
     "roadY": 156.0494,
-    "designClearanceM": 5.6936
+    "designClearanceM": 5.6919
   },
   {
     "rail": 617221275,
@@ -3388,9 +3388,9 @@
     "evidence": "层级（铁路 0，道路 1）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 150.5116,
+    "railY": 150.5133,
     "roadY": 156.0018,
-    "designClearanceM": 4.2902
+    "designClearanceM": 4.2885
   },
   {
     "rail": 617221275,
@@ -3740,9 +3740,9 @@
     "evidence": "层级（铁路 2，道路 0）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 163.0989,
+    "railY": 163.0999,
     "roadY": 157.2068,
-    "designClearanceM": 4.6921
+    "designClearanceM": 4.6931
   },
   {
     "rail": 631438736,
@@ -3870,9 +3870,9 @@
     "evidence": "层级（铁路 1，道路 0）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 164.011,
+    "railY": 164.0113,
     "roadY": 158.1873,
-    "designClearanceM": 4.6236
+    "designClearanceM": 4.624
   },
   {
     "rail": 667874945,
@@ -4283,9 +4283,9 @@
     "evidence": "层级（铁路 0，道路 1）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 153.9916,
+    "railY": 154.0025,
     "roadY": 158.13,
-    "designClearanceM": 2.9384
+    "designClearanceM": 2.9275
   },
   {
     "rail": 678370321,
@@ -4509,9 +4509,9 @@
     "evidence": "层级（铁路 0，道路 1）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 153.8258,
+    "railY": 153.837,
     "roadY": 158.0398,
-    "designClearanceM": 3.014
+    "designClearanceM": 3.0028
   },
   {
     "rail": 678370321,
@@ -4853,9 +4853,9 @@
     "evidence": "层级（铁路 1，道路 0）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 162.9114,
+    "railY": 162.9135,
     "roadY": 155.3909,
-    "designClearanceM": 6.3205
+    "designClearanceM": 6.3227
   },
   {
     "rail": 815078146,
@@ -4933,9 +4933,9 @@
     "evidence": "层级（铁路 1，道路 0）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 163.52,
+    "railY": 163.5211,
     "roadY": 156.5088,
-    "designClearanceM": 5.8112
+    "designClearanceM": 5.8123
   },
   {
     "rail": 815078146,
@@ -4975,9 +4975,9 @@
     "evidence": "层级（铁路 1，道路 0）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 163.6612,
+    "railY": 163.6621,
     "roadY": 157.0255,
-    "designClearanceM": 5.4357
+    "designClearanceM": 5.4366
   },
   {
     "rail": 815078146,
@@ -5013,9 +5013,9 @@
     "evidence": "层级（铁路 1，道路 0）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 160.301,
+    "railY": 160.3017,
     "roadY": 154.3043,
-    "designClearanceM": 4.7967
+    "designClearanceM": 4.7974
   },
   {
     "rail": 815078146,
@@ -5047,9 +5047,9 @@
     "evidence": "层级（铁路 1，道路 0）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 163.9011,
+    "railY": 163.9016,
     "roadY": 157.8873,
-    "designClearanceM": 4.8137
+    "designClearanceM": 4.8142
   },
   {
     "rail": 815078146,
@@ -5184,9 +5184,9 @@
     "evidence": "层级（铁路 1，道路 0）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 162.8939,
+    "railY": 162.8961,
     "roadY": 155.1995,
-    "designClearanceM": 6.4945
+    "designClearanceM": 6.4966
   },
   {
     "rail": 815078152,
@@ -5264,9 +5264,9 @@
     "evidence": "层级（铁路 1，道路 0）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 163.5215,
+    "railY": 163.5227,
     "roadY": 156.4471,
-    "designClearanceM": 5.8745
+    "designClearanceM": 5.8756
   },
   {
     "rail": 815078152,
@@ -5306,9 +5306,9 @@
     "evidence": "层级（铁路 1，道路 0）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 163.6622,
+    "railY": 163.6631,
     "roadY": 157.0141,
-    "designClearanceM": 5.4481
+    "designClearanceM": 5.449
   },
   {
     "rail": 815078152,
@@ -5344,9 +5344,9 @@
     "evidence": "层级（铁路 1，道路 0）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 160.2778,
+    "railY": 160.2785,
     "roadY": 154.3351,
-    "designClearanceM": 4.7427
+    "designClearanceM": 4.7434
   },
   {
     "rail": 815078152,
@@ -5378,9 +5378,9 @@
     "evidence": "层级（铁路 1，道路 0）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 163.9198,
+    "railY": 163.9202,
     "roadY": 157.9465,
-    "designClearanceM": 4.7733
+    "designClearanceM": 4.7738
   },
   {
     "rail": 815078152,
@@ -5552,9 +5552,9 @@
     "evidence": "层级（铁路 0，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 160.2559,
+    "railY": 160.2579,
     "roadY": 154.3658,
-    "designClearanceM": 4.6901
+    "designClearanceM": 4.6921
   },
   {
     "rail": 815078153,
@@ -5589,9 +5589,9 @@
     "evidence": "层级（铁路 0，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 160.0668,
+    "railY": 160.0692,
     "roadY": 153.7641,
-    "designClearanceM": 5.1027
+    "designClearanceM": 5.1051
   },
   {
     "rail": 815078153,
@@ -5994,9 +5994,9 @@
     "evidence": "层级（铁路 0，道路 1）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 159.3637,
+    "railY": 159.3736,
     "roadY": 160.9421,
-    "designClearanceM": 0.3784
+    "designClearanceM": 0.3685
   },
   {
     "rail": 815078170,
@@ -6040,9 +6040,9 @@
     "evidence": "层级（铁路 0，道路 1）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 159.5074,
+    "railY": 159.5171,
     "roadY": 160.9314,
-    "designClearanceM": 0.224
+    "designClearanceM": 0.2143
   },
   {
     "rail": 815078170,
@@ -6560,9 +6560,9 @@
     "evidence": "层级（铁路 0，道路 1）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 163.4237,
+    "railY": 163.4241,
     "roadY": 162.3,
-    "designClearanceM": -2.3237
+    "designClearanceM": -2.3241
   },
   {
     "rail": 824017369,
@@ -6600,9 +6600,9 @@
     "evidence": "层级（铁路 0，道路 1）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 163.5723,
+    "railY": 163.5724,
     "roadY": 162.2944,
-    "designClearanceM": -2.4778
+    "designClearanceM": -2.478
   },
   {
     "rail": 824017369,
@@ -6639,9 +6639,9 @@
     "evidence": "层级（铁路 0，道路 1）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 165.8976,
+    "railY": 165.8979,
     "roadY": 162.95,
-    "designClearanceM": -4.1476
+    "designClearanceM": -4.1479
   },
   {
     "rail": 824017369,
@@ -6676,9 +6676,9 @@
     "evidence": "层级（铁路 0，道路 1）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 156.8017,
+    "railY": 156.8172,
     "roadY": 159.65,
-    "designClearanceM": 1.6483
+    "designClearanceM": 1.6328
   },
   {
     "rail": 824017369,
@@ -6714,9 +6714,9 @@
     "evidence": "层级（铁路 0，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 163.3718,
+    "railY": 163.3723,
     "roadY": 158.499,
-    "designClearanceM": 3.6728
+    "designClearanceM": 3.6733
   },
   {
     "rail": 824017369,
@@ -6790,9 +6790,9 @@
     "evidence": "层级（铁路 0，道路 1）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 165.7931,
+    "railY": 165.7936,
     "roadY": 162.94,
-    "designClearanceM": -4.0531
+    "designClearanceM": -4.0536
   },
   {
     "rail": 824017369,
@@ -6867,9 +6867,9 @@
     "evidence": "层级（铁路 0，道路 1）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 163.4648,
+    "railY": 163.4652,
     "roadY": 162.29,
-    "designClearanceM": -2.3748
+    "designClearanceM": -2.3752
   },
   {
     "rail": 826539758,
@@ -6907,9 +6907,9 @@
     "evidence": "层级（铁路 0，道路 1）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 163.6135,
+    "railY": 163.6136,
     "roadY": 162.28,
-    "designClearanceM": -2.5335
+    "designClearanceM": -2.5336
   },
   {
     "rail": 826539758,
@@ -6946,9 +6946,9 @@
     "evidence": "层级（铁路 0，道路 1）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 165.7462,
+    "railY": 165.7465,
     "roadY": 162.94,
-    "designClearanceM": -4.0062
+    "designClearanceM": -4.0065
   },
   {
     "rail": 826539758,
@@ -6983,9 +6983,9 @@
     "evidence": "层级（铁路 0，道路 1）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 156.6972,
+    "railY": 156.7127,
     "roadY": 159.66,
-    "designClearanceM": 1.7628
+    "designClearanceM": 1.7473
   },
   {
     "rail": 826539758,
@@ -7021,9 +7021,9 @@
     "evidence": "层级（铁路 0，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 163.4126,
+    "railY": 163.4131,
     "roadY": 158.7185,
-    "designClearanceM": 3.4941
+    "designClearanceM": 3.4946
   },
   {
     "rail": 826539758,
@@ -7097,9 +7097,9 @@
     "evidence": "层级（铁路 0，道路 1）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 165.6427,
+    "railY": 165.6433,
     "roadY": 162.93,
-    "designClearanceM": -3.9128
+    "designClearanceM": -3.9133
   },
   {
     "rail": 826539758,
@@ -7176,9 +7176,9 @@
     "evidence": "层级（铁路 0，道路 1）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 163.3612,
+    "railY": 163.3616,
     "roadY": 162.32,
-    "designClearanceM": -2.2412
+    "designClearanceM": -2.2416
   },
   {
     "rail": 826539760,
@@ -7218,9 +7218,9 @@
     "evidence": "层级（铁路 0，道路 1）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 163.5099,
+    "railY": 163.51,
     "roadY": 162.3103,
-    "designClearanceM": -2.3996
+    "designClearanceM": -2.3998
   },
   {
     "rail": 826539760,
@@ -7351,9 +7351,9 @@
     "evidence": "层级（铁路 0，道路 1）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 166.0681,
+    "railY": 166.0684,
     "roadY": 162.96,
-    "designClearanceM": -4.3081
+    "designClearanceM": -4.3084
   },
   {
     "rail": 826539760,
@@ -7390,9 +7390,9 @@
     "evidence": "层级（铁路 0，道路 1）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 156.9292,
+    "railY": 156.9448,
     "roadY": 159.64,
-    "designClearanceM": 1.5108
+    "designClearanceM": 1.4952
   },
   {
     "rail": 826539760,
@@ -7430,9 +7430,9 @@
     "evidence": "层级（铁路 0，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 163.3094,
+    "railY": 163.3099,
     "roadY": 158.2695,
-    "designClearanceM": 3.8399
+    "designClearanceM": 3.8404
   },
   {
     "rail": 826539760,
@@ -7510,9 +7510,9 @@
     "evidence": "层级（铁路 0，道路 1）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 165.9647,
+    "railY": 165.9653,
     "roadY": 162.95,
-    "designClearanceM": -4.2147
+    "designClearanceM": -4.2153
   },
   {
     "rail": 826539760,
@@ -7591,9 +7591,9 @@
     "evidence": "层级（铁路 0，道路 1）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 163.6311,
+    "railY": 163.6315,
     "roadY": 162.27,
-    "designClearanceM": -2.5611
+    "designClearanceM": -2.5615
   },
   {
     "rail": 826539761,
@@ -7633,9 +7633,9 @@
     "evidence": "层级（铁路 0，道路 1）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 163.7799,
+    "railY": 163.78,
     "roadY": 162.2657,
-    "designClearanceM": -2.7141
+    "designClearanceM": -2.7143
   },
   {
     "rail": 826539761,
@@ -7679,9 +7679,9 @@
     "evidence": "层级（铁路 0，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 161.5067,
+    "railY": 161.507,
     "roadY": 155.4492,
-    "designClearanceM": 4.8575
+    "designClearanceM": 4.8579
   },
   {
     "rail": 826539761,
@@ -7766,9 +7766,9 @@
     "evidence": "层级（铁路 0，道路 1）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 165.7274,
+    "railY": 165.7277,
     "roadY": 162.93,
-    "designClearanceM": -3.9974
+    "designClearanceM": -3.9977
   },
   {
     "rail": 826539761,
@@ -7805,9 +7805,9 @@
     "evidence": "层级（铁路 0，道路 1）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 156.7299,
+    "railY": 156.7453,
     "roadY": 159.67,
-    "designClearanceM": 1.7401
+    "designClearanceM": 1.7247
   },
   {
     "rail": 826539761,
@@ -7845,9 +7845,9 @@
     "evidence": "层级（铁路 0，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 163.5787,
+    "railY": 163.5792,
     "roadY": 159.278,
-    "designClearanceM": 3.1007
+    "designClearanceM": 3.1012
   },
   {
     "rail": 826539761,
@@ -7925,9 +7925,9 @@
     "evidence": "层级（铁路 0，道路 1）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 165.625,
+    "railY": 165.6256,
     "roadY": 162.92,
-    "designClearanceM": -3.905
+    "designClearanceM": -3.9056
   },
   {
     "rail": 826539761,
@@ -7996,9 +7996,9 @@
     "evidence": "层级（铁路 0，道路 1）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 152.8696,
+    "railY": 152.8817,
     "roadY": 155.6597,
-    "designClearanceM": 1.59
+    "designClearanceM": 1.578
   },
   {
     "rail": 827587623,
@@ -8028,9 +8028,9 @@
     "evidence": "层级（铁路 0，道路 1）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 153.6825,
+    "railY": 153.6932,
     "roadY": 155.61,
-    "designClearanceM": 0.7275
+    "designClearanceM": 0.7168
   },
   {
     "rail": 827587623,
@@ -8121,9 +8121,9 @@
     "evidence": "层级（铁路 0，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 160.4481,
+    "railY": 160.4485,
     "roadY": 154.7289,
-    "designClearanceM": 4.5192
+    "designClearanceM": 4.5196
   },
   {
     "rail": 827587624,
@@ -8689,9 +8689,9 @@
     "evidence": "层级（铁路 0，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 155.4365,
+    "railY": 155.4366,
     "roadY": 149.3493,
-    "designClearanceM": 4.8872
+    "designClearanceM": 4.8873
   },
   {
     "rail": 846722263,
@@ -8729,9 +8729,9 @@
     "evidence": "层级（铁路 0，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 155.3529,
+    "railY": 155.3531,
     "roadY": 148.8905,
-    "designClearanceM": 5.2623
+    "designClearanceM": 5.2626
   },
   {
     "rail": 846722263,
@@ -8769,9 +8769,9 @@
     "evidence": "层级（铁路 0，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 155.2676,
+    "railY": 155.268,
     "roadY": 143.2182,
-    "designClearanceM": 10.8495
+    "designClearanceM": 10.8499
   },
   {
     "rail": 846722263,
@@ -8848,9 +8848,9 @@
     "evidence": "层级（铁路 0，道路 1）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 154.0203,
+    "railY": 154.0228,
     "roadY": 152.6385,
-    "designClearanceM": -2.5819
+    "designClearanceM": -2.5844
   },
   {
     "rail": 846722263,
@@ -8999,9 +8999,9 @@
     "evidence": "层级（铁路 0，道路 1）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 152.5898,
+    "railY": 152.6016,
     "roadY": 155.519,
-    "designClearanceM": 1.7292
+    "designClearanceM": 1.7174
   },
   {
     "rail": 900211381,
@@ -9031,9 +9031,9 @@
     "evidence": "层级（铁路 0，道路 1）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 153.4028,
+    "railY": 153.4132,
     "roadY": 155.4761,
-    "designClearanceM": 0.8734
+    "designClearanceM": 0.863
   },
   {
     "rail": 900211381,
@@ -9531,9 +9531,9 @@
     "evidence": "层级（铁路 0，道路 1）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 148.6524,
+    "railY": 148.6544,
     "roadY": 154.9934,
-    "designClearanceM": 5.141
+    "designClearanceM": 5.139
   },
   {
     "rail": 900211388,
@@ -9559,9 +9559,9 @@
     "evidence": "层级（铁路 0，道路 1）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 150.0062,
+    "railY": 150.0083,
     "roadY": 154.944,
-    "designClearanceM": 3.7378
+    "designClearanceM": 3.7358
   },
   {
     "rail": 900211388,
@@ -9635,9 +9635,9 @@
     "evidence": "层级（铁路 0，道路 1）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 148.6668,
+    "railY": 148.6688,
     "roadY": 155.1257,
-    "designClearanceM": 5.2589
+    "designClearanceM": 5.2569
   },
   {
     "rail": 900211389,
@@ -9663,9 +9663,9 @@
     "evidence": "层级（铁路 0，道路 1）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 150.021,
+    "railY": 150.023,
     "roadY": 155.0822,
-    "designClearanceM": 3.8612
+    "designClearanceM": 3.8591
   },
   {
     "rail": 900211389,
@@ -9954,9 +9954,9 @@
     "evidence": "层级（铁路 0，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 160.3118,
+    "railY": 160.3122,
     "roadY": 153.5707,
-    "designClearanceM": 5.5412
+    "designClearanceM": 5.5415
   },
   {
     "rail": 900211399,
@@ -10155,9 +10155,9 @@
     "evidence": "层级（铁路 0，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 160.2091,
+    "railY": 160.2112,
     "roadY": 153.8572,
-    "designClearanceM": 5.1519
+    "designClearanceM": 5.1539
   },
   {
     "rail": 900211413,
@@ -10192,9 +10192,9 @@
     "evidence": "层级（铁路 0，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 160.02,
+    "railY": 160.0223,
     "roadY": 153.5175,
-    "designClearanceM": 5.3025
+    "designClearanceM": 5.3048
   },
   {
     "rail": 900211413,
@@ -10264,9 +10264,9 @@
     "evidence": "层级（铁路 1，道路 0）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 162.9044,
+    "railY": 162.9052,
     "roadY": 157.045,
-    "designClearanceM": 4.6594
+    "designClearanceM": 4.6602
   },
   {
     "rail": 976719928,
@@ -10435,9 +10435,9 @@
     "evidence": "层级（铁路 1，道路 0）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 159.7662,
+    "railY": 159.7681,
     "roadY": 150.2115,
-    "designClearanceM": 8.3547
+    "designClearanceM": 8.3566
   },
   {
     "rail": 983755118,
@@ -12263,9 +12263,9 @@
     "evidence": "层级（铁路 0，道路 1）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 150.532,
+    "railY": 150.5338,
     "roadY": 156.1202,
-    "designClearanceM": 4.3882
+    "designClearanceM": 4.3865
   },
   {
     "rail": 983760101,
@@ -15875,9 +15875,9 @@
     "evidence": "层级（铁路 0，道路 1）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 153.7804,
+    "railY": 153.7935,
     "roadY": 157.3584,
-    "designClearanceM": 2.378
+    "designClearanceM": 2.3649
   },
   {
     "rail": 991384006,
@@ -15911,9 +15911,9 @@
     "evidence": "层级（铁路 0，道路 1）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 154.5953,
+    "railY": 154.607,
     "roadY": 157.3188,
-    "designClearanceM": 1.5236
+    "designClearanceM": 1.5118
   },
   {
     "rail": 991384006,
@@ -16057,9 +16057,9 @@
     "evidence": "层级（铁路 0，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 161.4326,
+    "railY": 161.433,
     "roadY": 155.3254,
-    "designClearanceM": 4.9072
+    "designClearanceM": 4.9075
   },
   {
     "rail": 991384008,
@@ -16105,9 +16105,9 @@
     "evidence": "层级（铁路 0，道路 1）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 150.5764,
+    "railY": 150.5781,
     "roadY": 156.7085,
-    "designClearanceM": 4.9321
+    "designClearanceM": 4.9304
   },
   {
     "rail": 991384008,
@@ -16193,9 +16193,9 @@
     "evidence": "层级（铁路 0，道路 1）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 151.0274,
+    "railY": 151.0305,
     "roadY": 157.5728,
-    "designClearanceM": 5.3455
+    "designClearanceM": 5.3424
   },
   {
     "rail": 991384011,
@@ -16355,9 +16355,9 @@
     "evidence": "层级（铁路 0，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 161.3253,
+    "railY": 161.3256,
     "roadY": 155.3442,
-    "designClearanceM": 4.7811
+    "designClearanceM": 4.7815
   },
   {
     "rail": 991385686,
@@ -16391,9 +16391,9 @@
     "evidence": "层级（铁路 0，道路 1）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 153.6786,
+    "railY": 153.6917,
     "roadY": 157.4928,
-    "designClearanceM": 2.6142
+    "designClearanceM": 2.6011
   },
   {
     "rail": 991385686,
@@ -16427,9 +16427,9 @@
     "evidence": "层级（铁路 0，道路 1）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 154.4938,
+    "railY": 154.5055,
     "roadY": 157.4429,
-    "designClearanceM": 1.7491
+    "designClearanceM": 1.7374
   },
   {
     "rail": 991385686,
@@ -16665,9 +16665,9 @@
     "evidence": "层级（铁路 1，道路 0）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 162.8054,
+    "railY": 162.8062,
     "roadY": 157.0054,
-    "designClearanceM": 4.6
+    "designClearanceM": 4.6009
   },
   {
     "rail": 991385689,
@@ -17297,9 +17297,9 @@
     "evidence": "层级（铁路 0，道路 1）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 153.3201,
+    "railY": 153.3245,
     "roadY": 158.1095,
-    "designClearanceM": 3.5894
+    "designClearanceM": 3.585
   },
   {
     "rail": 994927724,
@@ -17325,9 +17325,9 @@
     "evidence": "层级（铁路 0，道路 1）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 153.5713,
+    "railY": 153.5757,
     "roadY": 158.032,
-    "designClearanceM": 3.2607
+    "designClearanceM": 3.2562
   },
   {
     "rail": 1017576265,
@@ -17998,9 +17998,9 @@
     "evidence": "层级（铁路 0，道路 1）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 153.0578,
+    "railY": 153.0774,
     "roadY": 160.0553,
-    "designClearanceM": 5.7975
+    "designClearanceM": 5.7779
   },
   {
     "rail": 1350680813,
