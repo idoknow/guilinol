@@ -13,7 +13,7 @@ const contacts={}
 const painted=check==='--audit-painted'
 const audit=painted || check==='--audit-levels'
 const style=JSON.parse(readFileSync(new URL('../pipeline/railway-style.json',import.meta.url)))
-const steel=new Color(style.steel)
+const steel=new Color(style.crossingSteel)
 const deviations=[]
 const manifest = JSON.parse(readFileSync(join(directory, 'manifest.json')))
 const {bridgeDepth}=JSON.parse(readFileSync(new URL('../pipeline/vessel-bounds.json',import.meta.url)))
@@ -160,7 +160,7 @@ for(const tile of manifest.chunks){
   if(audit){
     const {positions,colors,kinds}=mesh
     for(let i=0;i<positions.length;i+=9){
-      if(kinds[i/3]!==7 || Math.abs(colors[i]-steel.r)>1e-6)continue
+      if(kinds[i/3]!==11 || Math.abs(colors[i]-steel.r)>1e-6)continue
       const triangle=positions.subarray(i,i+9)
       // Inspect triangle interiors as well as endpoints at street triangulation seams.
       for(const weights of [[1,0,0],[0,1,0],[0,0,1],[1/3,1/3,1/3]]){

@@ -13,7 +13,7 @@ const server=await preview({configFile:false,build:{outDir:resolve(process.env.R
 let browser
 try {
   browser=await chromium.launch(browserOptions(true))
-  const page=await browser.newPage({viewport:{width:800,height:500}})
+  const page=await browser.newPage({viewport:{width:1024,height:640}})
   const errors=[]
   page.on('pageerror',err=>errors.push(err.message))
   page.on('console',msg=>{if(msg.text().includes('Shader Error'))errors.push(msg.text())})
@@ -21,9 +21,11 @@ try {
   await page.waitForFunction(()=>window.viewer?.stats.firstMs>0)
   const index=[]
   for(const [i,row] of cases.entries()){
-    await page.evaluate(({x,z,east,south,roadY,railY})=>{
+    await page.evaluate(({x,z,east,south,roadY,railY,type,view})=>{
       const {camera,stream}=window.viewer
-      camera.position.set(x-east*14-south*9,Math.max(roadY,railY)+8,z-south*14+east*9)
+      if(view==='distant')camera.position.set(x-72,Math.max(roadY,railY)+32,z+68)
+      else if(type==='level')camera.position.set(x-east*4-south*2,roadY+6,z-south*4+east*2)
+      else camera.position.set(x-east*14-south*9,Math.max(roadY,railY)+8,z-south*14+east*9)
       camera.lookAt(x,(roadY+railY)/2,z)
       stream.prioritize(x,z)
     },row)
@@ -33,7 +35,7 @@ try {
       return stream.loaded.has(tile)
     },row,{timeout:45000})
     await page.evaluate(()=>new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r))))
-    const file=`${i+1}-${row.rail}-${row.road}.jpg`
+    const file=`${row.sharedNode??i+1}-${row.rail}-${row.road}.jpg`
     await page.screenshot({path:join(output,file),quality:84})
     index.push({...row,file})
     if(errors.length)throw Error(errors[0])

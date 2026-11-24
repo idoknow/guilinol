@@ -6,22 +6,47 @@ import {look} from './look/config'
 export type RailSection=[number,number,number,number,number,number,number,number,number?]
 export type CrossingSign=[number,number,number,number]
 type Box=(x:number,y:number,z:number,w:number,h:number,d:number,yaw:number,tint:Color,pitch?:number)=>void
-export type RailFace=(a:Vector3,b:Vector3,c:Vector3,color:Color,along:number[],kind:number)=>void
+export type RailFace=(a:Vector3,b:Vector3,c:Vector3,color:Color,along:number[],kind:number|number[])=>void
 const ballast=new Color(style.ballast),steel=new Color(style.steel),panel=new Color(style.panel)
 const pole=new Color(style.pole),wire=new Color(style.wire),fence=new Color(style.fence)
+const groove=new Color(0x312e2a),crossingSteel=new Color(style.crossingSteel)
 const sleeper=new Color(style.sleeper),warning=new Color(style.warning),concrete=new Color(look.bridgeSide)
 const BRIDGE=1,TUNNEL=2,ELECTRIC=4,FENCE=8,LEVEL=16,RESERVED=32,PAINTED=64
 
 export function railwayGeometry(sections:RailSection[],signs:CrossingSign[],ground:(x:number,z:number)=>number,
-  roadLevel:(x:number,z:number,fallback:number)=>number,face:RailFace,box:Box,levelFace:(a:Vector3,b:Vector3,c:Vector3,color:Color,h:number,painted:boolean)=>void){
+  roadLevel:(x:number,z:number,fallback:number)=>number,face:RailFace,box:Box,levelFace:(a:Vector3,b:Vector3,c:Vector3,color:Color,h:number,painted:boolean)=>void,sleeperBox:Box=box){
   const barriers:number[]=[]
+  // Adjacent panels share a mitred cross-section even where the OSM
+  // centreline turns at the crossing node.
+  const joints=new Map<string,{nx:number,nz:number,level:boolean}[]>()
+  if(sections.some(s=>s[7]&LEVEL))for(const [ax,az,ay,bx,bz,by,,flags] of sections){
+    const len=Math.hypot(bx-ax,bz-az)
+    if(len<.5)continue
+    const nx=(az-bz)/len,nz=(bx-ax)/len
+    for(const [x,z,y,sign] of [[ax,az,ay,1],[bx,bz,by,-1]]){
+      const key=`${x},${z},${y}`
+      const ends=joints.get(key)??[]
+      ends.push({nx:sign*nx,nz:sign*nz,level:!!(flags&LEVEL)})
+      joints.set(key,ends)
+    }
+  }
   for(const [ax,az,ay,bx,bz,by,chainage,flags,ends=0] of sections){
     const x=ax/100,z=az/100,dx=(bx-ax)/100,dz=(bz-az)/100
     const len=Math.hypot(dx,dz)
     if(len<.005)continue
     const nx=-dz/len,nz=dx/len,yaw=-Math.atan2(dz,dx)
+    function joint(key:string,sign:number){
+      let best=.94,ox=nx,oz=nz
+      for(const other of joints.get(key)??[]){
+        if(!(flags&LEVEL)&&!other.level)continue
+        const tx=-sign*other.nx,tz=-sign*other.nz,dot=nx*tx+nz*tz
+        if(dot>best){best=dot;ox=(nx+tx)/(1+dot);oz=(nz+tz)/(1+dot)}
+      }
+      return [ox,oz]
+    }
+    const [lx,lz]=joint(`${ax},${az},${ay}`,1),[rx,rz]=joint(`${bx},${bz},${by}`,-1)
     const at=(t:number,offset:number,h:number)=>{
-      const east=x+t*dx+nx*offset,south=z+t*dz+nz*offset
+      const east=x+t*dx+(lx+(rx-lx)*t)*offset,south=z+t*dz+(lz+(rz-lz)*t)*offset
       const y=(ay+(by-ay)*t)/100
       return new Vector3(east,((flags&LEVEL)?roadLevel(east,south,flags&PAINTED?ground(east,south):y):y)+h,south)
     }
@@ -35,8 +60,8 @@ export function railwayGeometry(sections:RailSection[],signs:CrossingSign[],grou
           levelFace(a,c,b,color,hLeft,!!(flags&PAINTED))
           levelFace(a,d,c,color,hLeft,!!(flags&PAINTED))
         }else{
-          face(a,c,b,color,[s,e,e],kind)
-          face(a,d,c,color,[s,s,e],kind)
+          face(a,c,b,color,[s,e,e],kind===8?[12,244,12]:kind)
+          face(a,d,c,color,[s,s,e],kind===8?[12,244,244]:kind)
         }
       }
     }
@@ -56,7 +81,13 @@ export function railwayGeometry(sections:RailSection[],signs:CrossingSign[],grou
       continue
     }
     if(flags&LEVEL){
-      strip(-1.7,1.7,.003,.003,panel)
+      // Adjacent bands share edges. Rail, flangeway and paving never overlap.
+      const g=style.gauge/2,w=style.headWidth,f=.095
+      const bands:[number,number,Color][]=[
+        [-1.7,-g-w,panel],[-g-w,-g,crossingSteel],[-g,-g+f,groove],
+        [-g+f,g-f,panel],[g-f,g,groove],[g,g+w,crossingSteel],[g+w,1.7,panel],
+      ]
+      for(const [lo,hi,tint] of bands)strip(lo,hi,.009,.009,tint)
     }else{
       const bed=style.ballastHalfWidth
       strip(-bed,bed,-.22,-.22,ballast,8)
@@ -82,13 +113,13 @@ export function railwayGeometry(sections:RailSection[],signs:CrossingSign[],grou
       // The far ballast shader carries the same repeat when furniture LOD drops the sleepers.
       for(let s=Math.ceil((start-.00001)/style.sleeperSpacing)*style.sleeperSpacing;s<start+len-.00001;s+=style.sleeperSpacing){
         const p=at((s-start)/len,0,-.155)
-        box(p.x,p.y,p.z,.22,.13,2.55,yaw,sleeper)
+        sleeperBox(p.x,p.y,p.z,.22,.13,2.55,yaw,sleeper)
       }
     }
-    for(const side of [-1,1]){
+    if(!(flags&LEVEL))for(const side of [-1,1]){
       const inner=side*style.gauge/2,outer=inner+side*style.headWidth
-      strip(inner,outer,.009,.009,steel)
-      if(!(flags&LEVEL))strip(outer,outer,.009,-.095,steel)
+      strip(Math.min(inner,outer),Math.max(inner,outer),.009,.009,steel,10)
+      strip(outer,outer,.009,-.095,steel,10)
     }
     if(flags&ELECTRIC && !(flags&LEVEL))beam(0,6.1,.027,.027,wire)
     if(flags&(RESERVED|LEVEL))continue
