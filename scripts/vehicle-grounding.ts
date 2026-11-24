@@ -8,11 +8,32 @@ import {poseAt,trackHeight} from '../web/src/traffic/sim'
 
 const [mode='audit',world='public/world',output='captures/vehicle-grounding']=process.argv.slice(2)
 const bake=mode==='bake'
-const data=(bake||mode==='portals')?JSON.parse(fs.readFileSync(output,'utf8')):JSON.parse(gunzipSync(fs.readFileSync(path.join(world,'roads/graph.json.gz'))).toString())
+const data=(bake||mode==='portals'||mode==='portal-check')?JSON.parse(fs.readFileSync(output,'utf8')):JSON.parse(gunzipSync(fs.readFileSync(path.join(world,'roads/graph.json.gz'))).toString())
 const manifest=data.manifest??JSON.parse(fs.readFileSync(path.join(world,'manifest.json'),'utf8'))
+if(mode==='portal-check'){
+  const surface=vehicleSurface(world,manifest),nodes=new Map(data.nodes.map(n=>[n.id,n]))
+  const checks=data.constraints.map(row=>{
+    if(row.approachCut===undefined)return row
+    const p=nodes.get(row.node),road=surface(p.x,p.z,{})
+    const difference=road-row.floor
+    return {...row,finalRoad:road,difference,reason:Math.abs(difference)<=.05?'gradedApproach':'portalMismatch'}
+  })
+  fs.writeFileSync(output,JSON.stringify(checks,null,2))
+  process.exit(0)
+}
 if(mode==='portals'){
   const surface=vehicleSurface(world,manifest),nodes=new Map(data.nodes.map(n=>[n.id,n]))
   const heights={},roofs=[]
+  // Survey final surface grades near mouths for the constrained approach solver.
+  const mouthCells=new Set<string>()
+  for(const id of data.network.portals){
+    const p=nodes.get(id),x=Math.floor(p.x/256),z=Math.floor(p.z/256)
+    for(let i=x-1;i<=x+1;i++)for(let j=z-1;j<=z+1;j++)mouthCells.add(i+','+j)
+  }
+  const guideNodes=new Set(data.guideNodes)
+  const approaches=data.nodes.filter(n=>guideNodes.has(n.id)||mouthCells.has(Math.floor(n.x/256)+','+Math.floor(n.z/256)))
+  approaches.sort((a,b)=>Math.floor(a.x/256)-Math.floor(b.x/256)||Math.floor(a.z/256)-Math.floor(b.z/256))
+  for(const n of approaches)heights[n.id]=surface(n.x,n.z,{})
   for(const edge of data.network.edges){
     const a=nodes.get(edge.a),b=nodes.get(edge.b)
     for(const node of [a,b])heights[node.id]??=surface(node.x,node.z,{})
@@ -60,14 +81,30 @@ const lanes=data.lanes.map(lane=>{
 // Store only the knots needed to reconstruct the metre samples. Distances are
 // sample-index deltas, heights are signed centimetre deltas, crossfalls int8.
 function packSurface(length:number,wheel:(d:number,r:number)=>number){
-  const count=Math.ceil(length+2*profilePad)
-  const heights=new Int32Array(count+1),cross=new Int8Array(count+1)
-  for(let i=0;i<=count;i++){
-    const d=i*(length+2*profilePad)/count-profilePad
+  const span=length+2*profilePad
+  let count=Math.ceil(span)
+  function measure(d:number){
     const left=wheel(d,-.795),right=wheel(d,.795)
-    heights[i]=Math.round((left+right)*50)
-    cross[i]=Math.max(-127,Math.min(127,Math.round((right-left)*128/1.59)))
+    return {height:Math.round((left+right)*50),
+      cross:Math.max(-127,Math.min(127,Math.round((right-left)*128/1.59)))}
   }
+  let samples=Array.from({length:count+1},(_,i)=>measure(i*span/count-profilePad))
+  // Keep the existing distance encoding. Only lanes whose midpoint heights
+  // or crossfalls depart from interpolation need a finer station grid.
+  for(let refinement=0;refinement<3;refinement++){
+    const midpoints=Array.from({length:count},(_,i)=>measure((i+.5)*span/count-profilePad))
+    if(!midpoints.some((m,i)=>Math.abs(m.height-(samples[i].height+samples[i+1].height)/2)>2
+      ||Math.abs(m.cross-(samples[i].cross+samples[i+1].cross)/2)>3))break
+    const refined=new Array(2*count+1)
+    for(let i=0;i<count;i++){
+      refined[2*i]=samples[i]
+      refined[2*i+1]=midpoints[i]
+    }
+    refined[2*count]=samples[count]
+    samples=refined
+    count*=2
+  }
+  const heights=samples.map(s=>s.height),cross=samples.map(s=>s.cross)
   const keep=new Set([0,count]),pending=[[0,count]]
   while(pending.length){
     const [a,b]=pending.pop()!
@@ -198,7 +235,8 @@ else{
   const top50=Object.fromEntries(Object.entries(worstByLane).map(([k,v])=>[k,[...v.values()].sort((a,b)=>b.error-a.error).slice(0,50)]))
   const constraintsFile=path.join(world,'vehicle-tunnel-grades.json')
   const conflicts=fs.existsSync(constraintsFile)?JSON.parse(fs.readFileSync(constraintsFile,'utf8')):[]
-  const summary={tunnelConstraintRecords:conflicts.length,partialTunnelWays:[...partialFloors].sort((a,b)=>a-b),reasons,lanes:lanes.length,wheelSamples:total,outliers,sunk,floating,p99,nonplanarFootprints:nonplanar,unresolvedTunnelWays:[...missingFloors].sort((a,b)=>a-b)}
+  const pending=conflicts.filter(row=>row.reason!=='gradedApproach')
+  const summary={tunnelConstraintRecords:pending.length,gradedApproaches:conflicts.length-pending.length,partialTunnelWays:[...partialFloors].sort((a,b)=>a-b),reasons,lanes:lanes.length,wheelSamples:total,outliers,sunk,floating,p99,nonplanarFootprints:nonplanar,unresolvedTunnelWays:[...missingFloors].sort((a,b)=>a-b)}
   fs.mkdirSync(output,{recursive:true})
   fs.writeFileSync(path.join(output,'audit.json'),JSON.stringify({summary,top50,lanes:reports}))
   const rasterDir=fs.mkdtempSync(path.join(output,'heatmap-'))
@@ -208,5 +246,5 @@ else{
     execFileSync('uv',['run','--locked','python','scripts/vehicle-heatmap.py',path.join(output,'heatmap.png'),cells])
   }finally{fs.rmSync(rasterDir,{recursive:true,force:true})}
   console.log(summary)
-  if(!lanes.length||outliers||p99>.1||missingFloors.size||partialFloors.size||conflicts.length)process.exitCode=1
+  if(!lanes.length||outliers||p99>.1||missingFloors.size||partialFloors.size||pending.length)process.exitCode=1
 }

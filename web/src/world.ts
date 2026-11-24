@@ -1,3 +1,4 @@
+import {bedPositions,type RoadBed} from './roadbed'
 import {cacheResponse} from './telemetry'
 import * as THREE from 'three'
 import {buildingGeometry,type Building} from './buildings'
@@ -393,7 +394,22 @@ export async function detail(tile:Tile, signal:AbortSignal, parseSlot?:()=>Promi
     if(tunnels?.every(t=>t.generated)){
       // A structural batch keeps ceilings, walls and lamps out of the
       // street layer. Rapier uses the corresponding unshifted source meshes.
-      group.add(tunnel.fringe)
+      // Clip fragments use the same satellite texture as the regular grid.
+      // Append them to its index so the renderer and Rapier share one surface.
+      const fragment=tunnel.fringe.geometry, extra=fragment.getAttribute('position').count
+      if(extra){
+        const base=geometry.getAttribute('position').count
+        for(const name of ['position','normal','uv']){
+          const target=geometry.getAttribute(name),source=fragment.getAttribute(name)
+          const joined=new Float32Array(target.array.length+source.array.length)
+          joined.set(target.array);joined.set(source.array,target.array.length)
+          geometry.setAttribute(name,new THREE.BufferAttribute(joined,target.itemSize))
+        }
+        geometry.setIndex([...geometry.index!.array,...Array.from({length:extra},(_,i)=>base+i)])
+        fragment.dispose()
+        tunnel.fringe.geometry=new THREE.BufferGeometry()
+        tunnel.fringe.geometry.setAttribute('position',new THREE.Float32BufferAttribute([],3))
+      }
       const geometries:THREE.BufferGeometry[]=bridge?[bridge]:[]
       for(const [part,mesh] of Object.entries(tunnel)){
         if(part==='fringe')continue
@@ -409,6 +425,16 @@ export async function detail(tile:Tile, signal:AbortSignal, parseSlot?:()=>Promi
       if(!merged)throw Error('Incompatible transport structure geometry')
       bridge?.dispose()
       bridge=merged
+      for(const [part,mesh] of Object.entries(tunnel)){
+        if(part==='fringe')continue
+        // Picking uses the detached floor in world coordinates. The physics
+        // meshes only need positions after the render batch has copied them.
+        mesh.position.set(tile.x,0,tile.z)
+        for(const name of Object.keys(mesh.geometry.attributes)){
+          if(name==='position'&&['floor','portal','interior'].includes(part))continue
+          mesh.geometry.deleteAttribute(name)
+        }
+      }
     }else group.add(...Object.values(tunnel))
   }
   const pond = chunkWater(water,underlay,tile.x,tile.z)
