@@ -38,18 +38,17 @@ if(mode==='prop-heights'){
 }
 if(mode==='portal-routes'){
   const surface=vehicleSurface(world,manifest)
-  const current=new Set(data.routes.map(site=>site.id))
-  const [x,z,width,depth]=manifest.extent
-  const baseline=JSON.parse(fs.readFileSync(new URL('./fixtures/grounding-portals.json',import.meta.url),'utf8'))
-  for(const site of baseline){
-    if(current.has(site.id)||!site.modes.every(m=>m.route.every(([px,pz])=>
-      px>=x && pz>=z && px<x+width && pz<z+depth)))continue
-    data.routes.push({...site,formerPortal:true})
-  }
-  for(const site of data.routes)for(const test of site.modes){
+  const portalIds=new Set(data.routes.map(site=>site.id))
+  const [left,top,width,depth]=manifest.extent
+  const former=JSON.parse(fs.readFileSync(new URL('./fixtures/grounding-portals.json',import.meta.url),'utf8')).filter(site=>
+    site.way!==1493582667 && !portalIds.has(site.id) && site.modes.every(m=>m.route.every(([x,z])=>
+      x>=left && z>=top && x<left+width && z<top+depth)))
+  const surfaceRoutes=[...former,...(data.yardRoutes??[])]
+  for(const site of [...data.routes,...surfaceRoutes])for(const test of site.modes){
     const [x,z,way]=test.route[0]
     test.startHeight=surface(x,z,{way,structure:test.startStructure,pedestrian:test.mode==='foot'})
   }
+  fs.writeFileSync(path.join(world,'vehicle-surface-routes.json'),JSON.stringify(surfaceRoutes))
   fs.writeFileSync(output,JSON.stringify(data.routes))
   process.exit(0)
 }

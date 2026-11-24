@@ -9,14 +9,22 @@ import {withFixtureBays} from './ride-fixture-bays.mjs'
 
 const directory=resolve(process.env.GROUNDING_DIST??'dist')
 const output=process.argv[2]??'captures/vehicle-grounding/portals.json'
-const selected=new Set(process.argv.slice(3).map(Number))
-const sites=JSON.parse(await readFile(directory+'/world/vehicle-portal-routes.json','utf8')).filter(s=>!selected.size||selected.has(s.id))
+const selected=new Set(process.argv.slice(3).filter(arg=>arg!=='--surface').map(Number))
+const sites=JSON.parse(await readFile(directory+'/world/'+(process.argv.includes('--surface')?'vehicle-surface-routes.json':'vehicle-portal-routes.json'),'utf8')).filter(s=>!selected.size||selected.has(s.id))
 if(!sites.length)throw Error('No matching portal fixtures')
 const vehicles=JSON.parse(gunzipSync(await readFile(directory+'/world/vehicles.bin')))
 const results=sites.filter(s=>!s.modes.some(m=>!m.boundary)).map(s=>({id:s.id,way:s.way,unavailable:'no permitted continuous route',links:s.links}))
 const groups=[]
 for(const site of sites)for(const {mode,route,startHeight,direction,boundary=false} of site.modes){
-  const [[x,z],[nx,nz]]=route
+  const [[x,z]]=route
+  // A two-centimetre stub at an intersection cannot define the heading
+  // of a 4.5 m parked sedan. Aim its front axle along the upcoming path.
+  let remaining=mode==='car'?3:1,nx=x,nz=z
+  for(const [ex,ez] of route.slice(1)){
+    const distance=Math.hypot(ex-nx,ez-nz)
+    if(distance>=remaining){nx+=(ex-nx)*remaining/distance;nz+=(ez-nz)*remaining/distance;break}
+    remaining-=distance;nx=ex;nz=ez
+  }
   let group=groups.find(g=>g.mode===mode&&g.tests.every(t=>Math.hypot(t.x-x,t.z-z)>65))
   if(!group){group={mode,tests:[]};groups.push(group)}
   group.tests.push({x,z,id:site.id,way:site.way,route,boundary,direction,startHeight,heading:Math.atan2(x-nx,z-nz)})
@@ -69,7 +77,9 @@ try{
           let part=1,maximum=0,previous,completed=false
           await v.freeze()
           try{
-            for(let frame=0;frame<2400;frame++){
+            const length=route.slice(1).reduce((sum,p,i)=>sum+Math.hypot(p[0]-route[i][0],p[1]-route[i][1]),0)
+            const frameLimit=Math.max(2400,Math.ceil(60*length/1.5))
+            for(let frame=0;frame<frameLimit;frame++){
               const p=w.position,[a,b]=route[part-1],[x,z]=route[part]
               const len=Math.hypot(x-a,z-b),dx=(x-a)/len,dz=(z-b)/len
               const progress=(p.x-a)*dx+(p.z-b)*dz,cross=Math.abs((p.x-a)*dz-(p.z-b)*dx)

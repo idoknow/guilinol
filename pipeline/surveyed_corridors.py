@@ -87,7 +87,7 @@ def channel_spans(elements, widths):
 
 def bake(output, chunks, elements, widths, approaches=(), only_approaches=False):
     intervals = json.loads(Path(__file__).with_name('road-corridor-survey.json').read_text())
-    shapes, footpaths = [], []
+    shapes, footpaths, passage_roads = [], [], []
     for way in elements:
         spans = intervals.get(str(way['id']))
         if way.get('surfaceUnderlay'):
@@ -104,12 +104,15 @@ def bake(output, chunks, elements, widths, approaches=(), only_approaches=False)
                 part=substring(axis,start,min(end,axis.length))
                 corridor = part.buffer(paved/2+.5,quad_segs=4)
                 shapes.append(corridor)
+                if way.get('surfaceUnderlay') and tags['highway'] not in ('path','footway','pedestrian'):
+                    passage_roads.append((part,corridor,way['id']))
                 if way.get('surfaceUnderlay') and tags['highway'] in ('footway','path','pedestrian'):
                     footpaths.append(corridor)
     grades=STRtree([line.buffer(half,quad_segs=4) for line,half,*_ in approaches])
     tree = STRtree(shapes)
     pedestrian = STRtree(footpaths)
     channels = channel_spans(elements,widths)
+    passage_index=STRtree([axis for axis,_,_ in passage_roads])
     for tile in chunks:
         x, z = tile['x'], tile['z']
         bounds = box(x,z,x+256,z+256)
@@ -130,12 +133,14 @@ def bake(output, chunks, elements, widths, approaches=(), only_approaches=False)
         if area.area > .01:
             local=[(translate(approaches[i][0],-x,-z),*approaches[i][1:]) for i in nearby]
             foot = [translate(footpaths[i],-x,-z) for i in pedestrian.query(bounds,predicate='intersects')]
-            if patch(output/tile['file'], area, local, foot, seam):
+            crossings=[(translate(passage_roads[i][0],-x,-z),translate(passage_roads[i][1],-x,-z),passage_roads[i][2])
+                       for i in passage_index.query(bounds,predicate='intersects')]
+            if patch(output/tile['file'], area, local, foot, seam,crossings):
                 tile['gradedCorridor']=True
             tile['bytes'] = (output/tile['file']).stat().st_size
 
 
-def patch(file, area, approaches=(), foot=(), seam=None):
+def patch(file, area, approaches=(), foot=(), seam=None, crossings=()):
     raw = gzip.decompress(file.read_bytes())
     n, k, size, image, deck = struct.unpack_from('<5I', raw, 4)
     start = 24+16900+9*n+4*k
@@ -153,9 +158,15 @@ def patch(file, area, approaches=(), foot=(), seam=None):
     boundary = lower[0] if lower else len(paths[0])
     # Survey buffers can extend past an existing building facade at the
     # roadside. Keep that occupied ground while preserving mapped passages.
-    solids=union_all([make_valid(Polygon(np.asarray(loops[0])/100,[np.asarray(r)/100 for r in loops[1:]]))
-                     for row in collision[0] for loops in [row[2]]
-                      if loops and len(loops[0])>=3 and not any(row[9:])])
+    from ground_passages import opens_road
+    obstacles=[]
+    for row in collision[0]:
+        loops=row[2]
+        if not loops or len(loops[0])<3 or any(row[9:]):continue
+        poly=make_valid(Polygon(np.asarray(loops[0])/100,[np.asarray(r)/100 for r in loops[1:]]))
+        cuts=[corridor for axis,corridor,wid in crossings if opens_road(row[5],wid,axis.intersection(poly).length)]
+        obstacles.append(poly.difference(union_all(cuts)) if cuts else poly)
+    solids=union_all(obstacles)
     if not solids.is_empty and solids.intersects(area):
         existing_roads=union_all([make_valid(Polygon(np.asarray(shell)/100,[np.asarray(h)/100 for h in holes]))
                                   for kind,shell,*holes in original['paths'] if kind in (0,5)])

@@ -131,6 +131,10 @@ def rongyin_sidewalk():
 
 
 def overture_geometry(row):
+    # This OSM-derived warehouse-company record is the industrial site.
+    # The traffic bake restores its individual current OSM warehouses.
+    if row['id']=='56f66428-e070-4340-a894-4f7d04c1d044':
+        return Polygon()
     shape = affine_transform(from_wkt(row['wkt']), [MLON, 0, 0, -MLAT, -LON0*MLON, LAT0*MLAT])
     if row['id'] == '94d505df-4dd6-4bdf-b242-be218cce7937':
         # IMG_1299 shows an open sidewalk at the survey point. Set the Rongyin

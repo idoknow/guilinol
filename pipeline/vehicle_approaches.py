@@ -3,31 +3,39 @@ from collections import defaultdict
 from heapq import heappop, heappush
 import math
 
-from shapely.geometry import LineString
+from shapely import STRtree
+from shapely.geometry import LineString, Point
+from road_profile import RULES
 
 from common import ll2xz
 from service_streets import width
 from vehicle_tunnels import grade_limit, underground
 
 
-def surface_guides(elements, portals, nodes):
+def surface_guides(elements, portals, nodes, bounds):
+    # Level the physical approach even where the traffic graph omits a
+    # segment for access, parking or a quiet zone further along the same way.
+    mouths=STRtree([Point(nodes[n]['x'],nodes[n]['z']) for n in portals])
     guides=[]
-    mouths=set(portals)
     for way in elements:
         tags=way.get('tags',{})
         highway=tags.get('highway')
-        pedestrian=highway in ('footway','pedestrian','path','steps')
-        restricted=tags.get('motor_vehicle') in ('private','no') or tags.get('access')=='private'
-        if (way['type']!='way' or not (pedestrian or (highway=='service' and restricted)) or underground(way) or
-                not mouths.intersection(way['nodes']) or not all(way['geometry'])):
+        if (way['type']!='way' or not highway or underground(way) or tags.get('bridge','no')!='no'
+                or tags.get('area')=='yes' or not way.get('geometry') or not all(way['geometry'])):
             continue
-        for ref,point in zip(way['nodes'],way['geometry'],strict=True):
-            x,z=ll2xz(point['lat'],point['lon'])
-            nodes.setdefault(ref,dict(id=ref,x=round(x,2),z=round(z,2),y=None))
-        for a,b in zip(way['nodes'],way['nodes'][1:]):
-            if a!=b:
-                guides.append({'from':a,'to':b,'way':way['id'],'cls':highway,'width':width(tags),'offset':0,
-                               'surfaceKind':1 if pedestrian else 0})
+        coords=[ll2xz(p['lat'],p['lon']) for p in way['geometry']]
+        if len(coords)<2 or not len(mouths.query(LineString(coords),predicate='dwithin',distance=60)):
+            continue
+        pedestrian=highway in ('footway','pedestrian','path','steps')
+        paved=width(tags) if 'width' in tags else RULES['defaultWidth'].get(highway,6 if highway=='unclassified' else width(tags))
+        for a,b,p,q in zip(way['nodes'],way['nodes'][1:],coords,coords[1:]):
+            if a==b or math.dist(p,q)<.05:continue
+            segment=LineString([p,q])
+            if not bounds.covers(segment) or not len(mouths.query(segment,predicate='dwithin',distance=60)):continue
+            for ref,(x,z) in ((a,p),(b,q)):
+                nodes.setdefault(ref,dict(id=ref,x=round(x,2),z=round(z,2),y=None))
+            guides.append({'from':a,'to':b,'way':way['id'],'cls':highway,'width':paved,'offset':0,
+                           'surfaceKind':1 if pedestrian else 0})
     return guides
 
 

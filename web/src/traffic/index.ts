@@ -10,7 +10,7 @@ import {npcDefaults,validNpc} from '../../../lib/npc'
 
 async function loadGraph(key:string,rules:typeof npcDefaults){
   const start=performance.now()
-  const response=await fetch(`/world/roads/${key}.json.gz`)
+  const response=await fetch(`/world/roads/${key}.json.gz`,{signal})
   if(!response.ok||!response.body)throw Error(`traffic graph: ${response.status}`)
   const bytes=await response.arrayBuffer()
   const downloaded=performance.now()
@@ -94,6 +94,14 @@ export async function traffic(scene:THREE.Scene,camera:THREE.Camera,verify:boole
       hide(STATIC+count,STATIC+parkCount);parkCount=count;mesh.userData.parked=count
     }).catch(error=>{if(target===parkKey){parkKey='';cache.clear()}console.warn('Parking cell unavailable',error)})
   }
+  if(verify)mesh.userData.profileMemory=()=>{
+    let encodedChars=0,decodedBytes=0
+    if(sim)for(const track of sim.allTracks()){
+      encodedChars+=track.floor?.length??0
+      decodedBytes+=track.knots?.byteLength??0
+    }
+    return {cell:key,encodedChars,decodedBytes}
+  }
   const near=(x:number,z:number,visit:(solid:Solid)=>void)=>{sim?.nearSolids(x,z,visit);staticSolids(x,z,visit)}
   let accumulator=0
   const probeIds=new WeakMap<object,number>();let nextProbeId=0
@@ -110,13 +118,16 @@ export async function traffic(scene:THREE.Scene,camera:THREE.Camera,verify:boole
     const center=player??camera.position
     const target=`${Math.floor(center.x/512)}_${Math.floor(center.z/512)}`
     if(target!==key){
+      loading?.abort()
+      const [east,south]=target.split('_').map(Number),[oldEast,oldSouth]=key.split('_').map(Number)
+      if(Math.abs(east-oldEast)>1||Math.abs(south-oldSouth)>1){sim=undefined;people.clear();walking.clear();mesh.count=0;hide(0,STATIC)}
       key=target
       if(cells.has(key))void loadGraph(key,rules).then(({sim:next,sample})=>{
         if(key!==target)return
         if(verify){mesh.userData.loads.push(sample);if(mesh.userData.loads.length>64)mesh.userData.loads.shift()}
         next.sampleGround=sampleGround
         if(sim)next.inherit(sim);sim=next
-      }).catch(error=>console.warn('Traffic cell unavailable',error))
+      }).catch(error=>{if(!controller.signal.aborted){key='';console.warn('Traffic cell unavailable',error)}})
       else {sim=undefined;people.clear();walking.clear();mesh.count=0;hide(0,STATIC)}
     }
     if(!sim){effects.clear();return}

@@ -6,7 +6,7 @@ type Lane = {id:number,from:number,to:number,offset:number,width?:number,kind:'m
 type Phase = {lanes:number[],green:number,yellow:number}
 type Signal={node:number,group:number,offset:number,phases:Phase[]}
 export type Graph = {nodes:Node[],lanes:Lane[],walks:[number,number,number,number?,number[]?][],signals:Signal[]}
-export type Track = Lane & {start:Node,end:Node,dx:number,dz:number,yaw:number,length:number,walk:boolean}
+export type Track = Lane & {knots?:Int32Array,start:Node,end:Node,dx:number,dz:number,yaw:number,length:number,walk:boolean}
 export function trackHeight(track:Track,dist:number){
   if(track.floor)return axleHeight(track,dist)
   if(track.wheelPose)return poseAt(track.wheelPose,dist/track.length,1)
@@ -107,7 +107,7 @@ export class Traffic {
       const start=nodes.get(lane.from)!,end=nodes.get(lane.to)!
       const length=Math.hypot(end.x-start.x,end.z-start.z)
       if(length<.5)return
-      const track={...lane,start,end,length,dx:(end.x-start.x)/length,dz:(end.z-start.z)/length,yaw:Math.atan2(end.x-start.x,end.z-start.z),walk}
+      const track=Object.assign({start,end,length,dx:(end.x-start.x)/length,dz:(end.z-start.z)/length,yaw:Math.atan2(end.x-start.x,end.z-start.z),walk},lane)
       const exits=this.exits.get(start.id)??[];exits.push(track);this.exits.set(start.id,exits)
       for(let col=Math.floor(Math.min(start.x,end.x)/128);col<=Math.floor(Math.max(start.x,end.x)/128);col++)for(let row=Math.floor(Math.min(start.z,end.z)/128);row<=Math.floor(Math.max(start.z,end.z)/128);row++){
         const key=`${col},${row}`,cell=this.cells.get(key)??[];cell.push(track);this.cells.set(key,cell)
