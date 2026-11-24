@@ -1221,6 +1221,10 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
       if(!found){notifyDismountBlocked();return false}
       const prevFoot=figure.position.clone(),prevYaw=figure.rotation.y
       if(!place(x,z,'dismount',true,found))return false
+      if(found.rule==='water-rescue'&&rides?.bike){
+        rides.bike.position.set(found.x,found.y-cfg.height/2-.055,found.z)
+        notifyDismountBlocked('已将你和车送回岸边')
+      }
       twoWheelOp=resolveTwoWheelTransition(twoWheelOp,{type:'dismount',kind:rides?.rideKind==='bicycle'?'bicycle':'bike'}).state
       releaseDynamicBike();input.syncRideHud(null,null)
       facing=bikeHeading+avatar.yaw
