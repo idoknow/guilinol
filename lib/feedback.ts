@@ -94,7 +94,7 @@ export async function feedback(request: Request, env: Env, path: string) {
     if (roleTarget && method==='POST') return setRole(env.DB,user,roleTarget[1],(await fields(request)).role)
     if (admin && method==='GET' && env.perfQuery && ['admin/perf','admin/perf/grid','admin/perf/server','admin/overview','admin/timeseries','admin/breakdown','admin/funnel','admin/errors','admin/live'].includes(path))
       return env.perfQuery(path,new URL(request.url).searchParams)
-    if (admin && method === 'GET' && ['admin/stats', 'admin/audit','admin/users', 'admin/feedback'].includes(path))
+    if (admin && method === 'GET' && ['admin/stats', 'admin/signups', 'admin/audit','admin/users', 'admin/feedback'].includes(path))
       return adminList(env.DB, path, new URL(request.url).searchParams)
     // 用户详情：与 admin/users/:id/role 走同一个 admin 鉴权分支（role 已是 'admin' 才走到这里）
     const userDetail = /^admin\/users\/([A-Za-z0-9-]{8,64})$/.exec(path)

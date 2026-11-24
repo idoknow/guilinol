@@ -141,6 +141,9 @@ a.adm-kpi:hover{border-color:var(--ui-jade-500);box-shadow:var(--ui-shadow-1);tr
   background:var(--ui-glass-solid);color:var(--ui-paper);font-size:12px;box-shadow:var(--ui-shadow-1);white-space:nowrap;z-index:2}
 .adm-tip b{font-weight:500;color:var(--ui-paper-dim)}
 .adm-tip i,.adm-legend i{display:inline-block;width:8px;height:8px;border-radius:2px;margin-right:6px}
+.adm-signups-bar{fill:var(--adm-c3);opacity:.85}
+.adm-signups-cap{font-family:var(--ui-serif);letter-spacing:.06em}
+.adm-signups-sum{margin:0 0 8px}
 .adm-legend{display:flex;flex-wrap:wrap;gap:6px 16px;margin-top:8px;font-size:12.5px;color:var(--ui-ink-soft)}
 .adm-summary{display:flex;flex-wrap:wrap;gap:10px 28px;padding:4px 0}
 .adm-summary div{display:grid}
