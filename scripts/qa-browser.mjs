@@ -23,3 +23,12 @@ export async function recordFrames(page) {
   })
   console.log('QA_FRAME', JSON.stringify(sample))
 }
+
+// Use the same random sequence in the two production builds of a paired run.
+export async function seedBenchmark(context){
+  if(!process.env.PERF_SEED)return
+  await context.addInitScript(initial=>{
+    let state=initial>>>0
+    Math.random=()=>{state=(Math.imul(1664525,state)+1013904223)>>>0;return state/4294967296}
+  },Number(process.env.PERF_SEED))
+}

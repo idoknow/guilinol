@@ -1,4 +1,5 @@
 import {telemetryPreview} from './telemetry-preview.mjs'
+import {seedBenchmark} from './qa-browser.mjs'
 import {glHookScript} from './gl-perf.mjs'
 import {mkdir, writeFile} from 'node:fs/promises'
 import {chromium} from 'playwright'
@@ -34,7 +35,7 @@ if (expansion) {
 
 const SAMPLE_FRAMES = Number(process.env.PERF_FRAMES ?? 60)
 const FIRST_RUNS = Number(process.env.PERF_FIRST_RUNS ?? 5)
-const trafficQuery = process.argv.includes('--traffic') ? '&traffic=1' : ''
+const trafficQuery = (process.argv.includes('--traffic')?'&traffic=1':'')+(process.env.PERF_SEED?'&time=10':'')
 const OUT_FILE = process.env.PERF_OUT ?? 'captures/perf.json'
 
 const native=process.platform==='darwin' && process.env.QA_NATIVE_GPU!=='0'
@@ -87,6 +88,7 @@ try {
 
   // 2. Measure the 5 fixed viewpoints.
   const context = await browser.newContext({viewport,deviceScaleFactor:mobile?3:1,isMobile:mobile,hasTouch:mobile})
+  await seedBenchmark(context)
   await context.addInitScript(glHookScript)
   const page = await context.newPage()
   await throttle(page)

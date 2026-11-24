@@ -14,6 +14,8 @@ import type {Peaks} from './peaks'
 import {joinPortalRoads,tunnelGeometry,type Tunnel} from './tunnels'
 import {freezeStatic} from './static-freeze'
 
+const tunnelMaterial=new THREE.MeshStandardMaterial({vertexColors:true,side:THREE.DoubleSide,roughness:.92})
+
 interface Asset {file:string; bytes:number}
 export interface Tile extends Asset {x:number; z:number; stationPaving?:StationPavingStyle; roadbeds?:number[]}
 export interface Manifest {
@@ -386,14 +388,15 @@ export async function detail(tile:Tile, signal:AbortSignal, parseSlot?:()=>Promi
   const groundMesh = new THREE.Mesh(geometry,material)
   group.add(groundMesh)
   const tunnel=tunnels?tunnelGeometry(tile,geometry,tunnels):null
+  let tunnelShell:THREE.BufferGeometry|null=null
   if(tunnel){
     tunnel.fringe.material.dispose()
     tunnel.fringe.material=material
     if(tunnels?.every(t=>t.generated)){
-      // Keep the unshifted floor and wall meshes for Rapier. Submit visible
-      // surfaces with the existing city street batch, including reflections.
+      // A structural batch keeps ceilings, walls and lamps out of the
+      // street layer. Rapier uses the corresponding unshifted source meshes.
       group.add(tunnel.fringe)
-      const geometries=streets.surface?[streets.surface]:[]
+      const geometries:THREE.BufferGeometry[]=[]
       for(const [part,mesh] of Object.entries(tunnel)){
         if(part==='fringe')continue
         const geom=mesh.geometry,count=geom.getAttribute('position').count
@@ -401,14 +404,11 @@ export async function detail(tile:Tile, signal:AbortSignal, parseSlot?:()=>Promi
         const colors=new Float32Array(count*3)
         for(let i=0;i<count;i++)mesh.material.color.toArray(colors,i*3)
         geom.setAttribute('color',new THREE.BufferAttribute(colors,3))
-        geom.setAttribute('aAlong',new THREE.Float32BufferAttribute(new Float32Array(count),1))
-        geom.setAttribute('aSurface',new THREE.Uint8BufferAttribute(new Uint8Array(count).fill(part==='floor'?0:2),1))
         geometries.push(geom)
       }
-      const combined=mergeGeometries(geometries)
-      if(!combined)throw Error('Incompatible tunnel and street geometry')
-      streets.surface?.dispose()
-      streets.surface=combined
+      tunnelShell=mergeGeometries(geometries)
+      if(!tunnelShell)throw Error('Incompatible tunnel geometry')
+      group.add(new THREE.Mesh(tunnelShell,tunnelMaterial))
     }else group.add(...Object.values(tunnel))
   }
   const pond = chunkWater(water,underlay,tile.x,tile.z)
@@ -431,13 +431,8 @@ export async function detail(tile:Tile, signal:AbortSignal, parseSlot?:()=>Promi
   return {
     group,groundMesh,terrain,underlay,water,rings,deck,thin,streets,batch,tunnel,surfaceAt,railCutVertices:new Set(railCuts.map(([index])=>index)),
     dispose(){
-      if(tunnel){
-        for(const mesh of Object.values(tunnel))if(mesh){
-          mesh.geometry.dispose()
-          if(tunnel.fringe && mesh!==tunnel.fringe)mesh.material.dispose()
-        }
-        if(!tunnel.fringe)tunnel.floor.material.dispose()
-      }
+      tunnelShell?.dispose()
+      if(tunnel)for(const mesh of Object.values(tunnel)){mesh.geometry.dispose();if(mesh!==tunnel.fringe)mesh.material.dispose()}
       pond?.dispose(); streets.surface?.dispose(); streets.fence?.dispose(); bridge?.dispose(); geometry.dispose(); walls?.dispose()
       material.map!.image.close(); material.map!.dispose(); material.dispose()
     },

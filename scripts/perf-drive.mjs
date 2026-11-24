@@ -3,7 +3,7 @@ import {mkdir, writeFile} from 'node:fs/promises'
 import {resolve} from 'node:path'
 import {preview} from 'vite'
 import {chromium} from 'playwright'
-import {browserOptions} from './qa-browser.mjs'
+import {browserOptions,seedBenchmark} from './qa-browser.mjs'
 import {glHookScript} from './gl-perf.mjs'
 
 const [mainDist, prDist] = process.argv.slice(2)
@@ -21,6 +21,7 @@ try {
   async function sample(view, side, count, round) {
     const context = await browser.newContext({viewport:{width:390,height:844},isMobile:true,hasTouch:true})
     try {
+      await seedBenchmark(context)
       await context.addInitScript(glHookScript)
       const page = await context.newPage()
       const cdp = await context.newCDPSession(page)

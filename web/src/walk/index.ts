@@ -2431,7 +2431,7 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
       if(rides?.car){
         const res=rides.resolveCarMove({
           pos,next,move,heading:rides.heading,speed:bikeSpeed,step,
-          motorPavement:(x,z)=>tunnelFloor(manifest.tunnels,x,z,foot)!==undefined||rides!.motorPavement(x,z),insideHouse:sim.insideHouse,
+          motorPavement:(x,z)=>tunnelFloor(manifest.tunnels,x,z,foot)!==undefined||rides!.motorPavement(x,z),insideHouse:(x,z)=>sim.insideHouse(x,z,foot+.8),
           carBlockedAt:(x,footY,z,hdg,sgn)=>sim.carOverlap(x,footY,z,hdg,sgn),
           collisionKind:(dirX,dirZ)=>{
             let hit:''|'collision'|'building'=''
@@ -2463,7 +2463,7 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
       else if(rides?.bike){
         const res=rides.resolveMove({
           pos,next,move,heading:rides.heading,speed:bikeSpeed,step,
-          pavement:rides.pavement,insideHouse:sim.insideHouse,
+          pavement:rides.pavement,insideHouse:(x,z)=>sim.insideHouse(x,z,foot+.8),
           blockedAt:(x,y,z)=>sim.isBlockedAt(x,y,z),
           wetSurface:sim.wet(next.x,next.z),
           collisionBlocked:substepBlocked,
