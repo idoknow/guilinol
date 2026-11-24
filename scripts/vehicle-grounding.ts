@@ -168,7 +168,7 @@ function packSurface(length:number,wheel:(d:number,r:number)=>number){
   // Keep the ordinary station spacing on smooth roads. Where the finest
   // uniform pass still crosses a sharp surface transition, bisect locally.
   const scale=16
-  let stations=samples.map((_,i)=>i)
+  const stations=samples.map((_,i)=>i)
   if(count===8*Math.ceil(span)){
     const refined=[samples[0]],ticks=[0]
     function interval(lo:number,hi:number,left:typeof samples[number],right:typeof samples[number]){
@@ -183,8 +183,37 @@ function packSurface(length:number,wheel:(d:number,r:number)=>number){
       ticks.push(hi);refined.push(right)
     }
     for(let i=0;i<count;i++)interval(i*scale,(i+1)*scale,samples[i],samples[i+1])
-    if(refined.length>samples.length){samples=refined;stations=ticks;count=refined.length-1}
+    if(refined.length>samples.length){
+      const uniform=encodeKnots(samples,stations),detailed=encodeKnots(refined,ticks)
+      // Sub-centimetre knots can straddle a hard rim. A more precise axle
+      // centre can then make the rotated tyre contact less accurate. Compare
+      // both reconstructions to the actual mesh across the full carriageway.
+      const tracks=[uniform,detailed].map(floor=>({floor,length}))
+      const steps=Math.ceil(length/.45)
+      let better=false
+      for(let i=0;i<=steps;i++){
+        const dist=length*i/steps
+        const errors=tracks.map(track=>{
+          const {y,pitch,roll}=contactPose(track,dist)
+          let worst=0
+          for(const f of [-1.31,1.34])for(const r of [-.795,.795]){
+            const side=r*Math.sin(roll),d=f*Math.cos(pitch)+side*Math.sin(pitch)
+            const road=wheel(dist+d,r*Math.cos(roll))
+            worst=Math.max(worst,Math.abs(y+side*Math.cos(pitch)-f*Math.sin(pitch)-road))
+          }
+          return worst
+        })
+        if(errors[1]>errors[0]+.025)return uniform
+        if(errors[0]>errors[1]+.025)better=true
+      }
+      return better?detailed:uniform
+    }
   }
+  return encodeKnots(samples,stations)
+}
+
+function encodeKnots(samples:{height:number,cross:number}[],stations:number[]){
+  const count=samples.length-1
   const heights=samples.map(s=>s.height),cross=samples.map(s=>s.cross)
   const keep=new Set([0,count]),pending=[[0,count]]
   while(pending.length){
