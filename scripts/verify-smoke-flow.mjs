@@ -56,13 +56,20 @@ try{
         else await page.keyboard.press('f')
       }
       async function capturePhase(name,phase,minProgress=0,puff=false){
-        await page.waitForFunction(async ({phase,minProgress,puff})=>{
+        await page.waitForFunction(({phase,minProgress,puff})=>{
           const v=window.viewer.walk.probe().smoke
+          const waiting=['sealed','open','ready','smoking'].includes(phase)&&!puff
+          if(waiting&&(v.progress<.18||document.querySelector('.smoke-hint').hidden))return false
           if(v.phase!==phase || v.progress<minProgress || (puff && v.puff<.25))return false
-          await window.viewer.freeze()
           return true
         },{phase,minProgress,puff},{polling:'raf'})
-        try{await shot(name)}finally{await page.evaluate(()=>window.viewer.resume())}
+        await page.evaluate(()=>window.viewer.freeze())
+        try{
+          assert.equal(await page.evaluate(()=>window.viewer.walk.probe().smoke.phase),phase)
+          // Let the compositor present the last WebGL frame before the screenshot.
+          await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))))
+          await shot(name)
+        }finally{await page.evaluate(()=>window.viewer.resume())}
       }
       await capturePhase('02-pack','sealed')
       await press('撕开')
