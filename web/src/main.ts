@@ -140,8 +140,30 @@ async function start(loader:FullLoader,creatorSpawn=false) {
     camera.position.set(viewX+viewWidth*.55,420,viewZ+viewDepth*.62)
     camera.lookAt(viewX+viewWidth*.47,150,viewZ+viewDepth*.45)
   }
+  const dprQuery = params.get('dpr')
+  const forcedDprParam = dprQuery && dprQuery !== 'auto' ? parseFloat(dprQuery) : NaN
+  const forcedDpr = Number.isFinite(forcedDprParam) && forcedDprParam > 0
+    ? Math.min(Math.max(forcedDprParam, 0.5), 2)
+    : null
+  const adaptiveDprEnabled = forcedDpr === null && (dprQuery === 'auto' || !params.has('verify'))
+  function dprBounds() {
+    const native = Math.max(0.5, devicePixelRatio || 1)
+    if (forcedDpr !== null) return {min: forcedDpr, max: forcedDpr}
+    const max = Math.min(native, touchUi() ? 1.25 : 1.5)
+    return {min: Math.min(1, max), max}
+  }
+  let currentDpr = dprBounds().max
+  let dprWinSum = 0, dprWinCount = 0, dprLastAdjust = 0
+  function applyDpr(next: number) {
+    const rounded = Math.round(next * 20) / 20
+    if (Math.abs(rounded - currentDpr) < 0.01) return
+    currentDpr = rounded
+    renderer.setPixelRatio(currentDpr)
+  }
   function resize() {
-    renderer.setPixelRatio(Math.min(devicePixelRatio,1.5)); renderer.setSize(innerWidth,innerHeight)
+    const {min, max} = dprBounds()
+    currentDpr = Math.min(max, Math.max(min, currentDpr))
+    renderer.setPixelRatio(currentDpr); renderer.setSize(innerWidth,innerHeight)
     camera.aspect=innerWidth/innerHeight; camera.updateProjectionMatrix()
   }
   resize(); window.addEventListener('resize',resize)
@@ -149,7 +171,7 @@ async function start(loader:FullLoader,creatorSpawn=false) {
   if(!soloStart)setPreset(camera,params.get('cam')??params.get('spawn'),bounds.bbox)
   let previous=0, first=0, frame=0, sum=0, samples=0
   const stats = {firstMs:0,readyMs:0,openingRingMs:0,firstWorldBytes:0,ms:0,calls:0,frame:0,loaded:0,pending:0,visited:0,failures:0,
-    geometries:0,textures:0}
+    geometries:0,textures:0,dpr:currentDpr}
   function markFirstFrame(){
     first=performance.now()
     stats.firstMs=first
@@ -573,8 +595,20 @@ async function start(loader:FullLoader,creatorSpawn=false) {
       }
     }
     frame++; sum+=elapsed;samples++
+    if(adaptiveDprEnabled && frame>=45 && !switching && elapsed>0 && elapsed<150){
+      dprWinSum+=elapsed; dprWinCount++
+      if(dprWinCount>=30){
+        const avgMs=dprWinSum/dprWinCount
+        dprWinSum=0; dprWinCount=0
+        const {min,max}=dprBounds()
+        if(now-dprLastAdjust>=2500){
+          if(avgMs>22 && currentDpr>min+0.01){applyDpr(Math.max(min,currentDpr-0.15)); dprLastAdjust=now}
+          else if(avgMs<13.5 && currentDpr<max-0.01){applyDpr(Math.min(max,currentDpr+0.1)); dprLastAdjust=now}
+        }
+      }
+    }
     Object.assign(stats,{ms:elapsed,calls:renderer.info.render.calls,geometries:renderer.info.memory.geometries,textures:renderer.info.memory.textures,frame,loaded:stream.loaded.size,pending:stream.pending.size,
-      visited:stream.visited.size,failures:stream.failures.size})
+      visited:stream.visited.size,failures:stream.failures.size,dpr:currentDpr})
     if(sum>=400||frame===1) {
       output.value=`${Math.round(samples*1000/(sum||16.7))} FPS · ${stats.calls} calls · ${stats.loaded} 块 · ${bytes.toLocaleString()} B`
       renderUi.refreshStats()
