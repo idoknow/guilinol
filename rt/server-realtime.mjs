@@ -397,6 +397,12 @@ const server = createServer((req, res) => {
     if (req.url === '/health') {
       res.writeHead(200, {'content-type': 'application/json'})
       // 保留 ok / online / proto 三个老字段（探针和监控在用），后面只是补容量信息
+      // loopP99 / slowSkips 是「玩家是否开始卡」的第一手信号：单进程 Node 只有一个核，
+      // CPU 百分比看不出余量，事件循环延迟超过 50ms 就已经能感觉到顿挫了。
+      const health = obs.state(players, sockets, bans, PROTO, MAX_PLAYERS).server
+      const out = health.traffic.out
+      let outPackets = 0
+      for (const key of Object.keys(out)) outPackets += out[key].packets
       res.end(JSON.stringify({
         ok: true,
         online: players.size,
@@ -404,6 +410,10 @@ const server = createServer((req, res) => {
         maxPlayers: MAX_PLAYERS,
         banned: bans.size,
         connections: sockets.size,
+        loopP99ms: +health.loopP99Ms.toFixed(1),
+        slowSkips: health.skips,
+        slowCloses: health.slowCloses,
+        outPacketsPerMin: outPackets,
       }))
       return
     }
@@ -796,6 +806,39 @@ wss.on('connection', (ws, req) => {
 setInterval(() => {
   broadcast({t: 'online', online: players.size})
 }, TICK_MS)
+
+// 全服名册：地图 / 名册面板要看到整座城的人，但 3D 场景只来自 AOI。
+// 5s 一条、只 stringify 一次，300 人约 6KB/条 ≈ 1.2 KB/s/人。
+setInterval(() => {
+  if (!players.size) return
+  const text = JSON.stringify(rosterPayload())
+  const size = Buffer.byteLength(text)
+  for (const p of players.values()) sendSlowAware(p.ws, text, 'roster', size)
+}, ROSTER_MS).unref()
+
+// 自检日志：单核 Node 的余量看 loop p99，不看 CPU 百分比
+setInterval(() => {
+  if (!players.size) return
+  const server = obs.state(players, sockets, bans, PROTO, MAX_PLAYERS).server
+  const out = server.traffic.out
+  let packets = 0
+  let bytes = 0
+  for (const key of Object.keys(out)) { packets += out[key].packets; bytes += out[key].bytes }
+  console.log(JSON.stringify({
+    scope: 'rt-stats',
+    players: players.size,
+    sockets: sockets.size,
+    loopP50ms: +server.loopP50Ms.toFixed(1),
+    loopP99ms: +server.loopP99Ms.toFixed(1),
+    outPacketsPerMin: packets,
+    outKBPerMin: Math.round(bytes / 1024),
+    slowSkips: server.skips,
+    slowCloses: server.slowCloses,
+  }))
+}, 30000).unref()
+
+// 每 10s 重置一次延迟直方图：p99 只反映最近 10 秒，不把「刚开服时 300 人涌入」的尖峰永久算进去
+setInterval(() => obs.resetLoop(), 10000).unref()
 
 // 掉线清理：浏览器直接关掉时不会有 close 帧，用 ping/pong 兜住
 setInterval(() => {

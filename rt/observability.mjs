@@ -23,6 +23,8 @@ export function joined(player,online){event('join',player);if(online>peak){peak=
 export function skipped(ws,closing){ws.skipped=(ws.skipped??0)+1;skips++;if(closing)slowCloses++}
 export function chatted(player,text){player.chats++;append(chat,{ts:Date.now(),uid:player.uid,name:player.name,text},100)}
 export function position(player,at){player.positions=player.positions.filter(ts=>ts>at-10000);player.positions.push(at)}
+/** 重置事件循环延迟直方图：p99 必须只反映「最近一个统计窗口」，否则启动/涌入的尖峰会被永久记住 */
+export function resetLoop(){delay.reset()}
 export function state(players,sockets,bans,proto,maxPlayers){
   const now=Date.now(), sec=Math.floor(now/1000),traffic={in:{},out:{}}
   for(const slot of slots)if(slot&&slot.sec>sec-60)for(const dir of ['in','out'])for(const [type,value] of Object.entries(slot[dir])){

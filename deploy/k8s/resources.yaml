@@ -404,8 +404,10 @@ spec:
         - name: RT_JOIN_SECRET
           valueFrom:
             secretKeyRef: {name: glol-env, key: RT_JOIN_SECRET, optional: true}
+        # 单进程 Node 只有一个核（事件循环），实测密集 300 人已接近天花板，先按 300 上线；
+        # 等 rt-stats 的 loopP99 证明有余量再放宽。
         - name: MAX_PLAYERS
-          value: "400"
+          value: "300"
         # 不按 IP 限制（0 = 不限）：校园网/宿舍/运营商 CGNAT 会让几十个真实玩家共用一个公网 IP。
         # 防滥用靠「同一 uid 只能 1 条在线连接」+ MAX_PLAYERS + 未 join 15 秒超时。
         - name: RT_MAX_PER_IP

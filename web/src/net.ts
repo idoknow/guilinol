@@ -10,7 +10,11 @@ function publish(detail:MpStatus){window.dispatchEvent(new CustomEvent('glol:mp-
 type State='connecting'|'online'|'offline'|'replaced'
 export function attachNet(scene:Scene,clips:AnimationClip[],getPose:()=>Pose,getAvatar:()=>Avatar,camera:Camera) {
   const peers=players(scene,clips,camera)
-  let socket:WebSocket|undefined,attempt=0,generation=0,timer=0,lastSent=-Infinity,lastRoster=-Infinity,disposed=false
+  let socket:WebSocket|undefined,attempt=0,generation=0,timer=0,lastSent=-Infinity,disposed=false
+  // 全服低频名册（5s 一条）：视野外的人只在这里出现，用来画地图点 / 名册面板；
+  // 场景里的 3D 人物仍然只来自 AOI 的 join/pos/leave。
+  const rosterOnly=new Map<string,{id:string;name:string;x:number;z:number;joinedAt?:number}>()
+  let lastRoster=0
   let state:State='offline',online=0
   const badge=new URLSearchParams(location.search).has('debug')?document.createElement('output'):null
   if(badge){badge.style.cssText='position:fixed;top:0;right:0;z-index:99;background:white;color:black';document.body.append(badge)}
@@ -65,6 +69,13 @@ export function attachNet(scene:Scene,clips:AnimationClip[],getPose:()=>Pose,get
           case 'pos':peers.move(msg.id,msg);break
           case 'emote':peers.emote(msg.from,msg.id,msg.s);break
           case 'avatar':peers.avatar(msg.id,msg.avatar);break
+          case 'roster':
+            rosterOnly.clear()
+            for(const row of msg.players||[]){
+              const [id,name,x,z,jt]=row as [string,string,number,number,number?]
+              if(id)rosterOnly.set(id,{id,name,x,z,joinedAt:jt})
+            }
+            break
         }
       }
       ws.onclose=event=>{if(version!==generation)return;socket=undefined;peers.clear()
@@ -78,11 +89,15 @@ export function attachNet(scene:Scene,clips:AnimationClip[],getPose:()=>Pose,get
         else retry()}
     }catch{if(version===generation)retry()}
   }
-  function stop(){generation++;clearTimeout(timer);socket?.close();socket=undefined;peers.clear();update('offline')}
+  function stop(){generation++;clearTimeout(timer);socket?.close();socket=undefined;peers.clear();rosterOnly.clear();update('offline')}
   function avatarChanged(){if(state==='online')send({t:'avatar',avatar:getAvatar()})}
   function tick(dt:number){if(state!=='online')return
     flushEmote();const pose=getPose(),now=performance.now();if(now-lastSent>=50){lastSent=now;send({t:'pos',...pose})}peers.tick(dt,pose)
-    if(now-lastRoster>=300){lastRoster=now;setRoster({me:{x:pose.x,z:pose.z,yaw:pose.yaw},at:now,players:peers.list().map(p=>({id:p.id,uid:p.uid,name:p.name,x:p.x,z:p.z,yaw:p.yaw,v:p.v,bike:!!p.bike,joinedAt:p.jt}))})}}
+    if(now-lastRoster>=300){lastRoster=now
+      const live=peers.list().map(p=>({id:p.id,uid:p.uid,name:p.name,x:p.x,z:p.z,yaw:p.yaw,v:p.v,bike:!!p.bike,joinedAt:p.jt}))
+      const seen=new Set(live.map(p=>p.id))
+      const far=[...rosterOnly.values()].filter(p=>!seen.has(p.id)).map(p=>({id:p.id,name:p.name,x:p.x,z:p.z,yaw:0,v:0,bike:false,joinedAt:p.joinedAt}))
+      setRoster({me:{x:pose.x,z:pose.z,yaw:pose.yaw},at:now,players:[...live,...far]})}}
   let account:string|null|undefined
   const unsubscribe=onUser(user=>{const id=user?.id??null;if(id===account)return
     account=id;stop();if(id){attempt=0;void connect()}})
