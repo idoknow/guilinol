@@ -69,10 +69,12 @@ def chunks(roads,banks,bounds,water,sample,exclude,ped_areas=(),replace_exclude=
     lane_stripes = []
     lamp_candidates = []
 
+    from shizijie_underpass import in_shizijie_clear_zone
     def emit_crosswalk(line, width, left_w, right_w, dist, sign_away, with_stop, search=0, approach=None):
         if not 0 <= dist <= line.length:
             return
         mid = np.array(line.interpolate(dist).coords[0])
+        suppress_crosswalk = in_shizijie_clear_zone(float(mid[0]), float(mid[1]))
         delta = np.subtract(line.interpolate(min(line.length, dist + .25)).coords[0], line.interpolate(max(0, dist - .25)).coords[0])
         tangent = sign_away * delta / max(.001, np.linalg.norm(delta))
         normal = np.array([-tangent[1], tangent[0]])
@@ -85,24 +87,28 @@ def chunks(roads,banks,bounds,water,sample,exclude,ped_areas=(),replace_exclude=
             low = -width/2 - (extension if sign_away < 0 else 0)
             high = width/2 + (extension if sign_away > 0 else 0)
             spans = np.linspace(low+half_bar,high-half_bar,max(2,round((high-low)/1.15)))
-        for span in spans:
-            center = mid + normal * span
-            bars.append(LineString([center - tangent * 1.9, center + tangent * 1.9]).buffer(half_bar, cap_style='flat'))
+        if not suppress_crosswalk:
+            for span in spans:
+                center = mid + normal * span
+                bars.append(LineString([center - tangent * 1.9, center + tangent * 1.9]).buffer(half_bar, cap_style='flat'))
         if with_stop:
             stop = mid + tangent * 2.5
             bars.append(LineString([stop, stop + normal * width / 2]).buffer(.22, cap_style='flat'))
+        if not bars:
+            return
         group = unary_union(bars)
         if cores.query(group, predicate='intersects').size:
             if search < 24:
                 emit_crosswalk(line, width, left_w, right_w, dist + sign_away * 2, sign_away, with_stop, search + 2, approach)
             return
-        if any(Point(mid).distance(c) < 8 for c in crossing_centres):
+        if not suppress_crosswalk and any(Point(mid).distance(c) < 8 for c in crossing_centres):
             return
         if any(group.intersects(other) for other in crosswalk_groups):
             return
-        crossing_centres.append(Point(mid))
         crosswalk_groups.append(group)
-        gaps.append(LineString([mid - normal * (width / 2 + left_w + 1), mid + normal * (width / 2 + right_w + 1)]).buffer(2.05, cap_style='flat'))
+        if not suppress_crosswalk:
+            crossing_centres.append(Point(mid))
+            gaps.append(LineString([mid - normal * (width / 2 + left_w + 1), mid + normal * (width / 2 + right_w + 1)]).buffer(2.05, cap_style='flat'))
 
     for road in roads:
         line,width,kind = road.line,road.width,road.kind

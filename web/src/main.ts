@@ -28,7 +28,7 @@ import type {FeedbackView} from '../../lib/feedback-contract'
 import {getPlayMode, onPlayMode, soloServices, trafficEnabled} from './game/play-mode'
 import {getState} from './game/state'
 import {loadLocalSave} from './game/save'
-import {isGlobalHotkeyBlocked} from './walk/input-guard'
+import {isGlobalHotkeyBlocked,isModalOrOverlayOpen} from './walk/input-guard'
 import {freezeStatic} from './static-freeze'
 
 installAtmosphere()
@@ -42,6 +42,8 @@ import {armOrientationGate} from './ui/orientation'
 import {mountStats} from './ui/stats'
 import {mountHotkeys} from './ui/hotkeys'
 import {mountTianyuanMifen} from './mifen'
+import {shouldMountDrinksShop} from './drinks/site'
+import {createTrafficDuty, DUTY_ZONES, mountAllDutyOfficers, mountShizijieSignalsOverlay, type TrafficDutyController} from './traffic-duty'
 import {mountChat} from './ui/chat'
 import {mountGuide} from './ui/guide'
 import {touchUi} from './ui/input-mode'
@@ -113,6 +115,8 @@ async function start(loader:FullLoader,creatorSpawn=false) {
   const framing = hasDowntown ? [-2304,-2560,3584,5888] : bounds.extent
   const [viewX,viewZ,viewWidth,viewDepth] = framing
   let walker:Awaited<ReturnType<typeof import('./walk').walk>>|undefined, switching=false
+  let drinks:Awaited<ReturnType<typeof import('./drinks').mountDrinksShop>>|undefined
+  let trafficDuty:TrafficDutyController|undefined
   let cinema=false
   let walkModPromise:Promise<typeof import('./walk')>|undefined
   const prefetchWalk = ()=>{
@@ -264,7 +268,7 @@ async function start(loader:FullLoader,creatorSpawn=false) {
   }
   type Walker=Awaited<ReturnType<typeof import('./walk').walk>>
   let loadingWalker:Promise<Walker>|undefined
-  function loadWalker():Promise<Walker>{return loadingWalker??=prefetchWalk().then(module=>module.walk(scene,camera,renderer.domElement,manifest,stream,peaks,params.has('verify'))).then(player=>walker=player).catch(error=>{loadingWalker=undefined;throw error})}
+  function loadWalker():Promise<Walker>{return loadingWalker??=prefetchWalk().then(module=>module.walk(scene,camera,renderer.domElement,manifest,stream,peaks,params.has('verify'))).then(player=>{walker=player;player.setDrinksBridge?.(drinks?{getCandidate:()=>drinks!.getInteractCandidate(),interact:()=>drinks!.interact()}:null);player.setTrafficDuty?.(trafficDuty??null);return player}).catch(error=>{loadingWalker=undefined;throw error})}
   async function walkTo(x:number,z:number,yaw:number,reason:string,name?:string){
     if(switching)return false
     switching=true
@@ -448,10 +452,60 @@ async function start(loader:FullLoader,creatorSpawn=false) {
     sampleGroundY: sampleMissionGroundY,
     getNightFactor: () => env.night,
   })
+  if (shouldMountDrinksShop({ isDev: import.meta.env.DEV, search: location.search })) {
+    void Promise.all([import('./drinks'), import('./drinks/hold/payment')]).then(([mod, pay]) => {
+      const mounted = mod.mountDrinksShop({
+        scene,
+        camera,
+        getPlayerPos: () => (walker?.active ? walker.position : null),
+        getWalker: () => walker,
+        getHour: () => clock.hour,
+        getNightFactor: () => env.night,
+        sampleGroundY: sampleMissionGroundY,
+        walkTo,
+        wallet: pay.mainGameDrinkWallet,
+      })
+      drinks = mounted
+      walker?.setDrinksBridge?.({
+        getCandidate: () => mounted.getInteractCandidate(),
+        interact: () => mounted.interact(),
+      })
+    }).catch(error => console.warn('Drinks shop unavailable', error))
+  }
+  const dutyGroundAt = (x: number, z: number, y?: number, car = false) => {
+    const refY = y ?? 200
+    const v = walker?.active ? (car ? walker.carSupportAt(x, z, refY) : walker.supportAt(x, z, refY))?.y : sampleMissionGroundY(x, z)
+    return typeof v === 'number' && Number.isFinite(v) ? v : undefined
+  }
+  const dutyOfficers = mountAllDutyOfficers(scene, dutyGroundAt)
+  const shizijieSignals = mountShizijieSignalsOverlay(scene, { groundAt: dutyGroundAt })
+  const dutyProjVec = new THREE.Vector3()
+  trafficDuty = createTrafficDuty({
+    getPlayerPos: () => (walker?.active ? walker.position : null),
+    isWalking: () => !!walker?.active,
+    isPaused: () => paused || !!tour?.map?.active,
+    isUiBlocked: () => isModalOrOverlayOpen() || document.body.dataset.photo === 'on',
+    projectToScreen: worldPos => {
+      dutyProjVec.set(worldPos.x, worldPos.y, worldPos.z).project(camera)
+      return {
+        x: (1 + dutyProjVec.x) * 0.5 * window.innerWidth,
+        y: (1 - dutyProjVec.y) * 0.5 * window.innerHeight,
+        visible: dutyProjVec.z >= -1 && dutyProjVec.z <= 1 && Math.abs(dutyProjVec.x) <= 1 && Math.abs(dutyProjVec.y) <= 1,
+      }
+    },
+    onDutyStateChange: active => walker?.setTrafficVolunteerMode?.(active),
+    onToast: (text, ms) => showToast(text, ms),
+    onTeleportToZone: zoneId => {
+      const z = DUTY_ZONES.find(item => item.id === zoneId) ?? DUTY_ZONES[0]
+      return walkTo(z.teleport.x, z.teleport.z, z.teleport.yaw, 'traffic-duty', z.name)
+    },
+    arbiterWired: true,
+  })
+  walker?.setTrafficDuty?.(trafficDuty)
   mountChat()
   const tourProbe = {getState, missions: {start: () => ({ok:false, code:'SOLO_MODE_REQUIRED'})}}
   let staticAudit:ReturnType<typeof import('./verify-static').staticVerifier>|undefined
-  const publishViewer=()=>Object.assign(window,{viewer:{camera,stream,manifest,stats,walkTo,staticAudit,get game(){return solo?.probe ?? tourProbe},get mifen(){return mifen.getProbe()},
+  const publishViewer=()=>Object.assign(window,{viewer:{camera,stream,manifest,stats,walkTo,staticAudit,get game(){return solo?.probe ?? tourProbe},get mifen(){return mifen.getProbe()},get drinks(){return drinks?.getProbe()??null},trafficDuty,dutyOfficers,shizijieSignals,
     get trafficCount(){return (scene.getObjectByName('G2 traffic') as THREE.InstancedMesh|undefined)?.count??0},
     get trafficProbe(){return scene.getObjectByName('G2 traffic')?.userData},
     async trafficPixels(){return (await import('./traffic/visibility-probe')).pixelVisible(renderer,scene,camera)},
@@ -556,8 +610,13 @@ async function start(loader:FullLoader,creatorSpawn=false) {
     }
     updateAtmosphere(now,elapsed)
     tour?.tick(elapsed/1000)
-    solo?.step(Math.min(0.1, elapsed/1000))
-    mifen.step(Math.min(0.1, elapsed/1000))
+    const stepDt = Math.min(0.1, elapsed/1000)
+    solo?.step(stepDt)
+    mifen.step(stepDt)
+    drinks?.step(stepDt)
+    trafficDuty?.step(stepDt)
+    dutyOfficers.update(stepDt)
+    shizijieSignals.update(walker?.active ? walker.position : camera.position, stepDt)
     persistView?.()
     draw()
     if(staticAudit && frame%30===0)staticAudit.check()

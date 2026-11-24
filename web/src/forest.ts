@@ -75,6 +75,8 @@ export async function readTrees(tile:Tile,signal:AbortSignal){
     if(treeBlocked(x,y,z))continue
     // Clear Sanduo Rd Tianyuan Mifen storefront, Lv3 expansion lot, and front viewing corridor
     if(x>=-1154&&x<=-1135&&z>=-65&&z<=-36)continue
+    // Clear Wangcheng Mall Mixue-Lincheng drinks storefront & patio apron (wangcheng_drinks_shop)
+    if(x>=-603&&x<=-587&&z>=-81&&z<=-64.4)continue
     if(y<minY)minY=y
     if(y>maxY)maxY=y
     const rawKind=data.getUint8(i+6),kind=rawKind<TREE_SPECIES_COUNT?rawKind:0

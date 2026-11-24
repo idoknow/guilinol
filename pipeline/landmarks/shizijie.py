@@ -574,12 +574,20 @@ def build_shizijie(m: ShizijieBuilder):
     # ------------------------------------------------------------------
     # 2. NW Corner Building: Nanfang Mansion (南方大厦, way/691576459)
     # ------------------------------------------------------------------
+    from shapely.geometry import Polygon as _ShapelyPolygon
+    from shizijie_underpass import SHIZIJIE_ORIGIN, STAIRWELLS, build_surface_stairwell, stair_hole_ring
+    _stairs_by_corner = {s['corner']: s for s in STAIRWELLS}
+
     nw_apron = [
-        (-87.0, -40.5), (-42.0, -30.5), (-22.0, -41.5), (-8.5, -49.5),
+        (-87.0, -40.5), (-42.0, -30.5), (-13.0, -35.0), (-8.5, -49.5),
         (5.0, -100.5), (-50.5, -117.5),
     ]
     m.follow_grade = False
-    civic_plaza(m, nw_apron)
+    civic_plaza(m, _ShapelyPolygon(nw_apron, [stair_hole_ring(_stairs_by_corner['nw'], SHIZIJIE_ORIGIN, margin=0.05)]))
+    build_surface_stairwell(
+        m, _stairs_by_corner['nw'], SHIZIJIE_ORIGIN,
+        frame_mat='alum', parapet_mat='dark', glass_mat='glass', bollard_mat='red', roof_mat='blue',
+    )
     m.prism(NW_NANFANG, -2.0, 6.8, 'dark', collide=True, cap_mat='alum', footing=True)
     m.prism(NW_NANFANG, 4.8, 20.4, 'white', collide=True, cap_mat='roof')
     m.cylinder_y(-24.5, 4.8, 22.4, -46.0, 9.6, 'glass', sections=16 if m.detail else 8, collide=True)
@@ -596,9 +604,13 @@ def build_shizijie(m: ShizijieBuilder):
     # ------------------------------------------------------------------
     se_apron = [
         (4.0, 92.5), (67.5, 108.5), (85.5, 52.5), (48.0, 42.5),
-        (32.0, 61.5), (10.5, 62.0),
+        (32.0, 39.0), (16.0, 39.5), (10.5, 62.0),
     ]
-    civic_plaza(m, se_apron)
+    civic_plaza(m, _ShapelyPolygon(se_apron, [stair_hole_ring(_stairs_by_corner['se'], SHIZIJIE_ORIGIN, margin=0.05)]))
+    build_surface_stairwell(
+        m, _stairs_by_corner['se'], SHIZIJIE_ORIGIN,
+        frame_mat='alum', parapet_mat='dark', glass_mat='glass', bollard_mat='red', roof_mat='blue',
+    )
     m.prism(SE_WENHUA, -2.0, 6.6, 'dark', collide=True, cap_mat='beige', footing=True)
     m.prism(SE_WENHUA, 4.6, 18.0, 'beige', collide=True, cap_mat='roof')
     m.cylinder_y(34.5, 4.6, 19.2, 60.5, 10.2, 'glass', sections=16 if m.detail else 8, collide=True)
@@ -618,11 +630,15 @@ def build_shizijie(m: ShizijieBuilder):
     # civic_plaza() completely paves the gap between NE_ANNEX south wall and OSM sidewalk
     # (auto-clipped against streets_mask so zero road/sidewalk overlap occurs).
     ne_apron = [
-        (46.0, -45.5), (53.5, -23.0), (63.5, -7.5),
+        (46.0, -45.5), (36.5, -31.0), (37.5, -15.0), (63.5, -7.5),
         (74.83, 7.17), (117.00, 17.12), (135.5, 16.5),
         (137.0, -2.5), (94.5, -78.5), (59.5, -87.0),
     ]
-    civic_plaza(m, ne_apron, refine_outer=True)
+    civic_plaza(m, _ShapelyPolygon(ne_apron, [stair_hole_ring(_stairs_by_corner['ne'], SHIZIJIE_ORIGIN, margin=0.05)]), refine_outer=True)
+    build_surface_stairwell(
+        m, _stairs_by_corner['ne'], SHIZIJIE_ORIGIN,
+        frame_mat='alum', parapet_mat='dark', glass_mat='glass', bollard_mat='red', roof_mat='blue',
+    )
     m.prism(NE_CORNER, -2.0, 6.4, 'dark', collide=True, cap_mat='alum', footing=True)
     m.prism(NE_CORNER, 4.4, 17.0, 'white', collide=True, cap_mat='roof')
     m.pose = (60.5, 0.0, -24.5, math.atan2(-1.0, 0.85))

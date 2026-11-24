@@ -10,7 +10,7 @@ import {countryside,setupCountryside,touchesCountryside} from './look/countrysid
 import {chunkWater, farWater} from './look/water'
 import type {TileBatchInput} from './batch'
 import type {Peaks} from './peaks'
-import {joinPortalRoads,tunnelGeometry,type Tunnel} from './tunnels'
+import {joinPortalRoads,tunnelGeometry,type GroundCutout,type ShizijieUnderpass,type Tunnel} from './tunnels'
 import {freezeStatic} from './static-freeze'
 
 interface Asset {file:string; bytes:number}
@@ -18,6 +18,8 @@ export interface Tile extends Asset {x:number; z:number}
 export interface Manifest {
   region?:import('../../lib/play-region').Region
   tunnels?:Tunnel[]
+  groundCutouts?:GroundCutout[]
+  shizijieUnderpass?:ShizijieUnderpass
   builtArea?:{type:'Polygon';coordinates:[number,number][][]}
   distantBuildings?:Asset
   landmarks?:import('./landmarks').Landmark[]
@@ -298,7 +300,7 @@ export async function overview(manifest:Manifest) {
   return startOverview(manifest).finish
 }
 
-export async function detail(tile:Tile, signal:AbortSignal, parseSlot?:()=>Promise<void>, tunnels?:Tunnel[]) {
+export async function detail(tile:Tile, signal:AbortSignal, parseSlot?:()=>Promise<void>, tunnels?:Tunnel[], groundCutouts?:GroundCutout[], underpass?:ShizijieUnderpass) {
   const compressed = await fetchAsset(tile.file,signal)
   const buffer = await new Response(new Blob([compressed]).stream().pipeThrough(new DecompressionStream('gzip'))).arrayBuffer()
   if(parseSlot) await parseSlot()
@@ -351,7 +353,7 @@ export async function detail(tile:Tile, signal:AbortSignal, parseSlot?:()=>Promi
   if(railCuts.length){geometry.computeVertexNormals();geometry.computeBoundingSphere()}
   const groundMesh = new THREE.Mesh(geometry,material)
   group.add(groundMesh)
-  const tunnel=tunnels?tunnelGeometry(tile,geometry,tunnels):null
+  const tunnel=(tunnels?.length||groundCutouts?.length||underpass)?tunnelGeometry(tile,geometry,tunnels??[],groundCutouts,underpass):null
   if(tunnel){tunnel.fringe.material.dispose();tunnel.fringe.material=material;group.add(...Object.values(tunnel))}
   const pond = chunkWater(water,underlay,tile.x,tile.z)
   const walls = vertices ? buildingGeometry(positions,normals,indices,rings) : null

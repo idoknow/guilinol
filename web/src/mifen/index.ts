@@ -1249,6 +1249,13 @@ export function mountTianyuanMifen(ctx: MifenMountContext): MifenController {
   const onWindowResize = (): void => {
     syncHudLayoutMetrics()
   }
+  const barResizeObserver =
+    typeof ResizeObserver !== 'undefined'
+      ? new ResizeObserver(() => {
+          syncHudLayoutMetrics()
+        })
+      : null
+  barResizeObserver?.observe(statusBarEl)
   window.addEventListener('keydown', onGlobalKeyDown)
   window.addEventListener('resize', onWindowResize)
   const unsubscribeStore = store.subscribe(() => renderHud())
@@ -1526,6 +1533,7 @@ export function mountTianyuanMifen(ctx: MifenMountContext): MifenController {
     },
 
     dispose() {
+      barResizeObserver?.disconnect()
       window.removeEventListener('keydown', onGlobalKeyDown)
       window.removeEventListener('resize', onWindowResize)
       window.removeEventListener(RIDE_SOUND_EVENT, onRideSoundEvent)

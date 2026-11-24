@@ -130,6 +130,18 @@ def bake(output, manifest, rendered_roads=None):
         shell, *holes = zone['rings']
         banned.append(Polygon(shell, holes))
     forbidden = prep(unary_union(banned))
+    from shizijie_underpass import (
+        SHIZIJIE_ORIGIN,
+        SHIZIJIE_UNDERPASS_WAYS,
+        STAIRWELLS,
+        UNDERPASS_DEPTH,
+        stair_for_origin,
+        stair_local_to_frame,
+    )
+    underpass_way_set = set(SHIZIJIE_UNDERPASS_WAYS)
+    underpass_node_base = 9_900_000_000_000
+    underpass_node_coords = {}
+
     nodes, lanes, walks, incoming = {}, [], [], defaultdict(list)
     elements = load_osm()
     parking_segments = []
@@ -137,6 +149,9 @@ def bake(output, manifest, rendered_roads=None):
     for way in elements:
         tags = way.get('tags', {})
         linear = way['id'] not in SPAN_WAYS and any(tags.get(key,'no')!='no' for key in ('bridge','tunnel'))
+        is_shizijie_ug = way['id'] in underpass_way_set
+        if is_shizijie_ug:
+            linear = True
         kind = tags.get('highway', '').removesuffix('_link')
         if way['type'] != 'way' or kind not in MOTOR | WALK | {'cycleway'} or tags.get('area') == 'yes' or tags.get('access') in ('no', 'private'):
             continue
@@ -170,9 +185,19 @@ def bake(output, manifest, rendered_roads=None):
             if length < .5:
                 continue
             start_id, end_id = refs[idx:idx+2]
-            for ref, (x,z) in zip((start_id,end_id),(start,end)):
-                if ref not in nodes:
-                    nodes[ref] = dict(id=ref,x=round(x,2),z=round(z,2),y=node_height(x,z,way['id']))
+            if is_shizijie_ug:
+                start_id = underpass_node_base + start_id
+                end_id = underpass_node_base + end_id
+                for ref, (x, z) in zip((start_id, end_id), (start, end)):
+                    if ref not in nodes:
+                        surf_y = node_height(x, z, way['id'])
+                        ug_y = round(surf_y - UNDERPASS_DEPTH, 2) if surf_y is not None else None
+                        nodes[ref] = dict(id=ref, x=round(x, 2), z=round(z, 2), y=ug_y)
+                        underpass_node_coords[ref] = (x, z, ug_y)
+            else:
+                for ref, (x,z) in zip((start_id,end_id),(start,end)):
+                    if ref not in nodes:
+                        nodes[ref] = dict(id=ref,x=round(x,2),z=round(z,2),y=node_height(x,z,way['id']))
             if any(nodes[ref]['y'] is None for ref in (start_id,end_id)):
                 continue
             if kind in WALK:
@@ -204,6 +229,32 @@ def bake(output, manifest, rendered_roads=None):
                         lane['gradeSeparated'] = 'linear' if linear else 'jiefang'
                     lanes.append(lane)
                     incoming[tail].append(lane)
+
+    # Connect the 4 corner staircase portals linearly from surface grade down to the -4.2m 15-way network
+    if underpass_node_coords:
+        valid_ug_nodes = [(nid, ux, uz, uy) for nid, (ux, uz, uy) in underpass_node_coords.items() if uy is not None]
+        if valid_ug_nodes:
+            stair_seq = 0
+            for stair in STAIRWELLS:
+                cx, cz, yaw = stair_for_origin(stair, (0.0, 0.0))
+                hl = stair['length'] * 0.5
+                mx, mz = stair_local_to_frame(0.0, -hl, (cx, cz), yaw)
+                dx, dz = stair_local_to_frame(0.0, hl, (cx, cz), yaw)
+                if not all(left <= p[0] < left + width and top <= p[1] < top + depth for p in ((mx, mz), (dx, dz))):
+                    continue
+                m_y = node_height(mx, mz, 985734888)
+                d_surf_y = node_height(dx, dz, 985734888)
+                if m_y is None or d_surf_y is None:
+                    continue
+                d_y = round(d_surf_y - UNDERPASS_DEPTH, 2)
+                nearest_nid = min(valid_ug_nodes, key=lambda n: math.hypot(n[1] - dx, n[2] - dz))[0]
+                stair_seq += 1
+                top_id = 9_910_000_000_000 + stair_seq * 2
+                bot_id = top_id + 1
+                nodes[top_id] = dict(id=top_id, x=round(mx, 2), z=round(mz, 2), y=round(m_y, 2))
+                nodes[bot_id] = dict(id=bot_id, x=round(dx, 2), z=round(dz, 2), y=d_y)
+                add_walk(top_id, bot_id, 0, 985734888, True)
+                add_walk(bot_id, nearest_nid, 0, 985734888, True)
 
     signals = []
     remaining = {element['id'] for element in elements if element['type']=='node'

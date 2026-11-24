@@ -13,7 +13,7 @@ import {nearestPlayable} from '../../../lib/play-region'
 import {mpEnabled} from '../ui/mp-pref'
 import * as THREE from 'three'
 import {passengerTop} from './passenger-height'
-import {tunnelFloor} from '../tunnels'
+import {tunnelFloor,underpassFloor} from '../tunnels'
 import {getCarFreeAt} from '../game/car-free'
 import {CAR_SCALE} from '../drive/scale'
 import R from '@dimforge/rapier3d-compat'
@@ -90,6 +90,8 @@ import {
   type RiderJoints,
 } from './ebike-fx'
 import type {vehicles} from './vehicles'
+import type {DrinksInteractCandidate} from '../drinks'
+import type {TrafficDutyController} from '../traffic-duty'
 
 let rapierReady:Promise<void>|undefined
 let avatarReady:Promise<GLTF>|undefined
@@ -397,6 +399,22 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
   },true)
   let smoking:ReturnType<typeof smokeVisual>|undefined,puffSeq=0,dropSeq=0
   let outfitController=styleCharacter(figure,avatarRig,profile)
+  const TRAFFIC_VOLUNTEER_OUTFIT:EquippedOutfit={
+    top:'top_traffic_volunteer',
+    bottom:'bottom_traffic_duty',
+    shoes:'shoes_traffic_duty',
+    hat:'hat_traffic_cap',
+    bag:'bag_traffic_flag',
+  }
+  let trafficVolunteerActive=false
+  let drinksBridge:{getCandidate():DrinksInteractCandidate|null;interact():boolean}|null=null
+  let trafficDutyRef:TrafficDutyController|null=null
+  function syncWalkOutfit(w=getGameState().wardrobe){
+    outfitController.applyEquipped(trafficVolunteerActive?TRAFFIC_VOLUNTEER_OUTFIT:w.equipped,{
+      ridingEbike:Boolean(rides?.bike&&rides.rideKind!=='bicycle'),
+      autoHelmetOnRide:w.autoHelmetOnRide,
+    })
+  }
   let appearanceVersion=0
   window.addEventListener('glol:avatar-change',async()=>{
     const a=currentAvatar(),version=++appearanceVersion
@@ -417,11 +435,10 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
     figure.getObjectByName('CreatorProportions')!.scale.copy(fresh.scene.getObjectByName('CreatorProportions')!.scale)
     figure.userData.creatorHair=fresh.scene.userData.creatorHair
     outfitController=styleCharacter(figure,avatarRig,a)
-    outfitController.applyEquipped(getGameState().wardrobe.equipped,{autoHelmetOnRide:getGameState().wardrobe.autoHelmetOnRide,ridingEbike:Boolean(rides?.bike&&rides.rideKind!=='bicycle')})
+    syncWalkOutfit()
   })
   {
-    const initialWardrobe=getGameState().wardrobe
-    outfitController.applyEquipped(initialWardrobe.equipped,{ridingEbike:false,autoHelmetOnRide:initialWardrobe.autoHelmetOnRide})
+    syncWalkOutfit()
   }
   const riderJoints=getAvatarJoints(figure) as RiderJoints
   const applyGripPose=createEbikeGripPose(figure)
@@ -655,20 +672,13 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
         ebikeRig.applyMods(owned.visual,(mountedStaticBike.userData.paint as number|undefined)??0)
       }
     }else if(ev.type==='outfit:equip'||ev.type==='save:loaded'){
-      const w=getGameState().wardrobe
-      outfitController.applyEquipped(w.equipped,{
-        ridingEbike:Boolean(rides?.bike&&rides.rideKind!=='bicycle'),
-        autoHelmetOnRide:w.autoHelmetOnRide,
-      })
+      syncWalkOutfit(getGameState().wardrobe)
     }
   })
 
   onState((s,changed)=>{
     if(changed.has('wardrobe')){
-      outfitController.applyEquipped(s.wardrobe.equipped,{
-        ridingEbike:Boolean(rides?.bike&&rides.rideKind!=='bicycle'),
-        autoHelmetOnRide:s.wardrobe.autoHelmetOnRide,
-      })
+      syncWalkOutfit(s.wardrobe)
     }
   })
 
@@ -920,20 +930,32 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
       aboardKind:null,tourDisembarkQueued:false,nearDownedVehicle:null,nearVehicle:null,nearBoat:null,
     }
     const soloEnabled=getPlayMode()==='solo'
+    const modalOrOverlayBlocked=isModalOrOverlayOpen()||document.body.dataset.photo==='on'||!!shopOverlay?.isOpen()
     const shopHit=soloEnabled && findNearbyShopTrigger(pos.x,pos.z,footY,{playerInQuietZone:!!quietZone})
+    const drinksCand=!shopHit?drinksBridge?.getCandidate()??null:null
+    const nearShop=shopHit
+      ? {shopId:shopHit.shop.shopId,brandName:shopHit.shop.brandName,displayName:shopHit.shop.displayName,distance:shopHit.distance}
+      : drinksCand
+        ? {shopId:drinksCand.shopId,brandName:drinksCand.brandName,displayName:drinksCand.hasReadyOrder?`取杯 · ${drinksCand.brandName}`:drinksCand.brandName,distance:drinksCand.distanceM}
+        : null
     const serviceHit=soloEnabled && findNearbyServiceBay(pos.x,pos.z,footY,{playerInQuietZone:!!quietZone})
+    const nearServiceBay=serviceHit?{shopId:serviceHit.shop.shopId,displayName:serviceHit.shop.displayName,distance:serviceHit.distance}:null
+    const crashed=!!crashSession||document.body.dataset.rideCrash==='1'
+    const standingUp=!!standUpSession
+    const pickingUpKind=pickupSession?pickupSession.rec.kind:null
+    const dutyCand=trafficDutyRef?.getInteractCandidate({
+      active,modalOrOverlayBlocked,crashed,standingUp,pickingUpKind,
+      aboardKind:vSnap.aboardKind,nearDownedVehicle:vSnap.nearDownedVehicle,nearShop,nearServiceBay,
+    })??null
     return {
-      active, soloEnabled,
-      modalOrOverlayBlocked:isModalOrOverlayOpen()||document.body.dataset.photo==='on'||!!shopOverlay?.isOpen(),
-      crashed:!!crashSession||document.body.dataset.rideCrash==='1',
-      standingUp:!!standUpSession,
-      pickingUpKind:pickupSession?pickupSession.rec.kind:null,
+      active, soloEnabled, modalOrOverlayBlocked, crashed, standingUp, pickingUpKind,
       aboardKind:vSnap.aboardKind,
       tourDisembarkQueued:vSnap.tourDisembarkQueued,
       inQuietZone:!!quietZone,
       nearDownedVehicle:vSnap.nearDownedVehicle,
-      nearShop:shopHit?{shopId:shopHit.shop.shopId,brandName:shopHit.shop.brandName,displayName:shopHit.shop.displayName,distance:shopHit.distance}:null,
-      nearServiceBay:serviceHit?{shopId:serviceHit.shop.shopId,displayName:serviceHit.shop.displayName,distance:serviceHit.distance}:null,
+      nearShop,
+      nearServiceBay,
+      nearTrafficViolator:dutyCand?{label:dutyCand.label,violation:dutyCand.violation,fineYuan:dutyCand.fineYuan}:null,
       nearVehicle:vSnap.nearVehicle,
       nearBoat:vSnap.nearBoat,
     }
@@ -942,12 +964,16 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
   const interactArbiter=createInteractArbiter({
     getContext:buildInteractionContext,
     onOpenShop(shopId){
+      if(shopId==='wangcheng_drinks_shop'){drinksBridge?.interact();return}
       const shop=getShop(shopId)
       if(!shop)return
       shopOverlay?.openShop(shop.shopId)
     },
     onOpenService(shopId){
       shopOverlay?.openServiceBay(shopId)
+    },
+    onWhistleCite(){
+      trafficDutyRef?.triggerWhistle()
     },
     onVehicleOrBoatInteract(){
       rides?.interact()
@@ -957,7 +983,7 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
     },
     onDecisionChange(decision){
       if(decision.label&&!decision.disabled){
-        const kind=decision.action==='open_shop'?'shop':decision.action==='open_service'?'service':decision.action==='dismount'?'dismount':decision.action==='pickup_downed'?'pickup':decision.action==='board_boat'?'boat':'vehicle'
+        const kind=decision.action==='open_shop'?'shop':decision.action==='open_service'?'service':decision.action==='dismount'?'dismount':decision.action==='pickup_downed'?'pickup':decision.action==='board_boat'?'boat':decision.action==='whistle_cite'?'hint':'vehicle'
         setPrompt({key:'F',text:decision.label,kind})
       }else{
         setPrompt(null)
@@ -1864,7 +1890,7 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
   function probe(){const pos=sim.body.translation(),foot=pos.y-cfg.height/2,peak=sim.surface(pos.x,pos.z,'peak')
     const tile=sim.tileAt(pos.x,pos.z),mesh=tile&&stream.loaded.get(tile)?.groundMesh
     terrainRay.ray.origin.set(pos.x,4000,pos.z);mesh?.updateWorldMatrix(true,false)
-    const inBore=tunnelFloor(manifest.tunnels,pos.x,pos.z,foot)!==undefined
+    const inBore=tunnelFloor(manifest.tunnels,pos.x,pos.z,foot)!==undefined||underpassFloor(manifest.groundCutouts,manifest.shizijieUnderpass,pos.x,pos.z,foot)!==undefined
     const floorMesh=inBore&&tile?stream.loaded.get(tile)?.tunnel?.floor:undefined
     floorMesh?.updateWorldMatrix(true,false)
     const fringe=tile&&stream.loaded.get(tile)?.tunnel?.fringe
@@ -2339,7 +2365,8 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
       wasLandmarkHit=touchedLandmark
       const nextTile=sim.tileAt(next.x,next.z)
       if(nextTile&&!stream.loaded.has(nextTile)){next.x=pos.x;next.z=pos.z;vx=vz=0;rides?.stop();bikeSpeed=0}
-      const inBore=tunnelFloor(manifest.tunnels,next.x,next.z,next.y-cfg.height/2)!==undefined
+      const nextFoot=next.y-cfg.height/2
+      const inBore=tunnelFloor(manifest.tunnels,next.x,next.z,nextFoot)!==undefined||underpassFloor(manifest.groundCutouts,manifest.shizijieUnderpass,next.x,next.z,nextFoot)!==undefined
       const ground=inBore?sim.surface(next.x,next.z,'road',next.y+1,5):sim.surface(next.x,next.z,'ground')
       if(!ground||next.y-cfg.height/2<ground.y-3){if(place(safe.x,safe.z,'rescue'))resets++;break}
       if(sim.wet(next.x,next.z)){
@@ -2864,6 +2891,10 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
     setObstacleBoxes:(id:string,boxes:readonly ObstacleBox[],origin:readonly [number,number,number]=[0,0,0],rotationY=0)=>sim.syncObstacleVolume({id,origin,rotationY,boxes}),
     removeObstacleVolume:(id:string)=>sim.removeObstacleVolume(id),
     getObstacleVolumeIds:()=>sim.getObstacleVolumeIds(),
+    get figure(){return figure},
+    setDrinksBridge(bridge:{getCandidate():DrinksInteractCandidate|null;interact():boolean}|null){drinksBridge=bridge},
+    setTrafficDuty(ctrl:TrafficDutyController|null){trafficDutyRef=ctrl},
+    setTrafficVolunteerMode(on:boolean){if(trafficVolunteerActive===on)return;trafficVolunteerActive=on;syncWalkOutfit()},
     get yaw(){return yaw},hold(on:boolean){held=on;external=null;if(on){rides?.stop();vx=vz=0}},face(heading:number,tilt=cfg.pitch){yaw=heading;pitch=tilt;if(active)follow(0,true)},showFigure(on:boolean){figure.visible=on&&active},
     // IDOK-182: 右手挂点给相机用（axis-aligned，-Z 朝前）；没有骨骼时回落到 figure 本身。
     handAnchor(){return avatarRig.attachmentAt?.('hand_r')??figure.getObjectByName('hand_r')??figure},

@@ -2,12 +2,41 @@ import * as T from 'three'
 import {mergeGeometries} from 'three/addons/utils/BufferGeometryUtils.js'
 import {shareAtmosphere} from '../look/atmosphere'
 import {CAR_SCALE} from '../drive/scale'
+import {bikeGeometry} from '../walk/ebike-geometry'
+import {accessories} from '../walk/ebike-mounts'
+import {vehicleModel} from '../walk/vehicle-model'
+import type {TrafficViolation} from './sim'
 
-// IDOK-149 交通车模: low-poly, flat-shaded street traffic in one BatchedMesh draw.
+// IDOK-149 / IDOK-283 / 辅警 2.0 交通车模: low-poly, flat-shaded street traffic in one BatchedMesh draw.
 // Every model faces +z (actor yaw = atan2(dx,dz)), stands on y = 0 and carries two vertex
 // attributes: `color` (base colour; white where the body takes the per-instance paint) and
 // `aMask` = (paint, lamp, flash). Lamps glow a little by day and properly at night (uNight);
 // flash = +1 red / -1 blue police lightbar, alternating on uTime.
+
+export type {TrafficViolation}
+export type TwoWheelSubtype = 'ebike' | 'bicycle'
+
+export interface TwoWheelActorLike {
+  kind: 'car' | 'scooter' | 'person'
+  x: number
+  y: number
+  z: number
+  yaw: number
+  speed: number
+  scale: number
+  leaving: boolean
+  down?: number
+  vehicleSubtype?: TwoWheelSubtype
+  violation?: TrafficViolation
+  stoppedUntil?: number
+  cited?: boolean
+}
+
+export function resolveTwoWheelSpec(actor: TwoWheelActorLike): {subtype: TwoWheelSubtype; violation: TrafficViolation} {
+  const violation: TrafficViolation = actor.violation ?? 'none'
+  const subtype: TwoWheelSubtype = actor.vehicleSubtype ?? (violation === 'bike_double' ? 'bicycle' : 'ebike')
+  return {subtype, violation}
+}
 
 type Mask = readonly [number,number,number]
 const NONE:Mask=[0,0,0],PAINT:Mask=[1,0,0],LAMP:Mask=[0,1,0],RED:Mask=[0,.4,1],BLUE:Mask=[0,.4,-1]
@@ -27,6 +56,35 @@ class Kit {
     for(let i=0;i<n;i++){col.set([c.r,c.g,c.b],i*3);m.set(mask,i*3)}
     g.setAttribute('color',new T.BufferAttribute(col,3));g.setAttribute('aMask',new T.BufferAttribute(m,3))
     this.parts.push(g);return g
+  }
+  addColored(raw:T.BufferGeometry,rotateY=0,classify?:(r:number,g:number,b:number,x:number,y:number,z:number)=>{color?:[number,number,number],mask:Mask}){
+    const g=raw.index?raw.toNonIndexed():raw.clone()
+    g.deleteAttribute('uv')
+    if(rotateY)g.rotateY(rotateY)
+    if(!g.attributes.normal)g.computeVertexNormals()
+    const pos=g.attributes.position,src=g.attributes.color,n=pos.count
+    const col=new Float32Array(n*3),m=new Float32Array(n*3)
+    for(let i=0;i<n;i++){
+      const r=src?src.getX(i):1,gr=src?src.getY(i):1,b=src?src.getZ(i):1
+      const res=classify?.(r,gr,b,pos.getX(i),pos.getY(i),pos.getZ(i))
+      if(res?.color)col.set(res.color,i*3);else col.set([r,gr,b],i*3)
+      m.set(res?.mask??NONE,i*3)
+    }
+    g.setAttribute('color',new T.BufferAttribute(col,3));g.setAttribute('aMask',new T.BufferAttribute(m,3))
+    this.parts.push(g);return g
+  }
+  limb(rTop:number,rBot:number,x1:number,y1:number,z1:number,x2:number,y2:number,z2:number,color:number,mask:Mask=NONE,segs=7){
+    const dx=x2-x1,dy=y2-y1,dz=z2-z1,len=Math.hypot(dx,dy,dz)
+    if(len<1e-4)return
+    const g=new T.CylinderGeometry(rTop,rBot,len,segs)
+    g.applyQuaternion(new T.Quaternion().setFromUnitVectors(new T.Vector3(0,1,0),new T.Vector3(dx/len,dy/len,dz/len)))
+    this.add(g,color,(x1+x2)/2,(y1+y2)/2,(z1+z2)/2,mask)
+    this.add(new T.SphereGeometry(rTop,6,4),color,x2,y2,z2,mask)
+  }
+  capsule(r:number,len:number,x:number,y:number,z:number,color:number,mask:Mask=NONE,rx=0,ry=0,rz=0){
+    const g=new T.CapsuleGeometry(r,Math.max(.01,len),3,7)
+    if(rx)g.rotateX(rx);if(ry)g.rotateY(ry);if(rz)g.rotateZ(rz)
+    return this.add(g,color,x,y,z,mask)
   }
   box(w:number,h:number,d:number,x:number,y:number,z:number,color:number,mask:Mask=NONE,rx=0,ry=0,rz=0){
     const g=new T.BoxGeometry(w,h,d)
@@ -186,43 +244,207 @@ function truck(){
   return k.build()
 }
 
-// IDOK-253 电动车：踏板式车身（侧面轮廓挤出，带弧形护腿板）、前大灯 + LED 条、后视镜、后扶手 / 货架，
-// 车轮带轮毂；可选前车筐、后外卖箱。骑手戴半盔，女骑手盔下露马尾。
-type ScooterOpts={box?:number,basket?:boolean,ponytail?:boolean,pants?:number}
-function scooter(bodyColor:number,helmet:number,opts:ScooterOpts={}){
-  const k=new Kit(),pants=opts.pants??0x2d3340
-  for(const z of [-.58,.6]){
-    k.add(new T.CylinderGeometry(.24,.24,.1,12).rotateZ(Math.PI/2),tire,0,.24,z)
-    for(const s of [-1,1]){k.add(new T.CylinderGeometry(.14,.14,.012,10).rotateZ(Math.PI/2),rim,s*.056,.24,z);k.add(new T.CylinderGeometry(.05,.05,.02,6).rotateZ(Math.PI/2),barrel,s*.064,.24,z)}
+// IDOK-283 电动车/单车精模复用（ebike-geometry + vehicle-model）+ 圆润低面人形骑手替身（零方块）
+function appendEbikeMesh(k:Kit,far:boolean,deliveryBox?:number){
+  const painted=bikeGeometry(0xffffff,far,undefined,true)
+  k.addColored(painted,Math.PI,()=>({color:[1,1,1],mask:PAINT}))
+  painted.dispose()
+  const base=bikeGeometry(0xffffff,far,undefined,false)
+  k.addColored(base,Math.PI,(r,g,b,_x,y,z)=>{
+    const isLamp=(r>.68&&g>.68&&b>.68&&z>.35&&(y>.95||y<.75))||(r>.3&&g<.05&&b<.05&&z<-.7)
+    return {mask:isLamp?LAMP:NONE}
+  })
+  base.dispose()
+  if(deliveryBox!==undefined){
+    const shape=new T.Shape([
+      [-.16,-.15],[.16,-.15],[.18,0],[.16,.16],[-.16,.16],[-.18,0],
+    ].map(([z,y])=>new T.Vector2(z,y)))
+    const boxGeom=new T.ExtrudeGeometry(shape,{depth:.36,steps:1,bevelEnabled:true,bevelThickness:.025,bevelSize:.022,bevelSegments:1,curveSegments:2})
+    boxGeom.translate(0,0,-.18);boxGeom.rotateY(-Math.PI/2)
+    k.add(boxGeom,deliveryBox,0,.92,-.66)
+    k.capsule(.025,.34,0,1.11,-.66,0x23272b,NONE,0,0,Math.PI/2)
   }
-  k.side([[-.78,.42],[-.8,.6],[-.66,.8],[-.1,.8],[.02,.56],[.02,.34],[-.4,.3]],.36,0,bodyColor,NONE,.04)   // rear body
-  k.side([[.02,.3],[.02,.4],[.38,.4],[.38,.3]],.32,0,0x34383c)                                            // floorboard
-  k.side([[.34,.32],[.62,.36],[.74,.62],[.74,.96],[.62,1.06],[.5,1.02],[.46,.62],[.36,.44]],.42,0,bodyColor,NONE,.05) // leg shield / apron
-  k.box(.04,.34,.12,0,.42,.62,0x3b3f42,NONE,-.35)                                                         // fork
-  k.box(.3,.06,.22,0,.3,.62,bodyColor);k.box(.26,.05,.2,0,.31,-.62,bodyColor)                             // mudguards
-  k.box(.4,.1,.56,0,.84,-.34,0x2e2a28);k.box(.42,.02,.58,0,.8,-.34,0x555049)                              // seat + piping
-  k.box(.04,.05,.36,-.2,.86,-.66,chrome);k.box(.04,.05,.36,.2,.86,-.66,chrome);k.box(.42,.05,.04,0,.86,-.84,chrome) // grab rail
-  k.box(.62,.04,.05,0,1.1,.58,0x3b3f42);for(const s of [-1,1])k.box(.1,.05,.06,s*.3,1.1,.58,0x1c1d1f)   // handlebar + grips
-  for(const s of [-1,1]){k.box(.02,.2,.02,s*.22,1.2,.56,0x3b3f42,NONE,0,0,s*.25);k.box(.1,.06,.03,s*.26,1.31,.56,0x1c1d1f)} // mirrors
-  k.box(.22,.11,.06,0,.98,.72,housing);k.box(.16,.07,.06,0,.98,.745,head,LAMP);k.box(.3,.02,.05,0,.9,.74,0xffffff,LAMP) // headlamp + LED strip
-  k.box(.16,.07,.05,0,.66,-.79,tail,LAMP);for(const s of [-1,1])k.box(.05,.04,.04,s*.17,.7,-.78,amber,LAMP)
-  if(opts.basket){k.box(.34,.02,.26,0,1.0,.86,0x3b3f42);for(const [x,z,w,d] of [[0,.99,.34,.02],[0,.73,.34,.02],[-.17,.86,.02,.26],[.17,.86,.02,.26]] as const)k.box(w,.2,d,x,1.1,z,0x4a4f54)}
-  if(opts.box!==undefined){k.box(.44,.4,.42,0,1.08,-.64,opts.box);k.box(.45,.05,.43,0,1.3,-.64,0x23272b);k.box(.3,.08,.01,0,1.12,-.86,0xf4efe2)}
-  // Rider: seated, hands on the grips, half helmet.
-  for(const s of [-1,1]){
-    k.box(.15,.14,.48,s*.12,.94,-.12,pants)                         // thighs
-    k.box(.13,.42,.14,s*.15,.68,.18,pants,NONE,.28)                 // shins
-    k.box(.13,.08,.24,s*.15,.45,.27,0x1c1c1e)                       // shoes on the floorboard
-    k.box(.1,.1,.46,s*.22,1.32,.14,0xffffff,PAINT,.38)              // sleeves
-    k.box(.08,.08,.1,s*.3,1.12,.52,skin)                            // hands
+}
+
+// 辅警 2.0 非法改装车模：复用 walk/ebike-mounts.ts 的改装件（加装强光灯/天使眼/大尾翼/金色气瓶避震/改装排气/底盘灯）
+function appendIllegalModEbikeMesh(k:Kit,far:boolean){
+  appendEbikeMesh(k,far)
+  const modCfg=far
+    ?{headlightTier:2 as const,angelEye:true,angelEyeColor:0x38d9ff,tailWing:true,underglow:true,underglowColor:0xff2ec4}
+    :{headlightTier:2 as const,angelEye:true,angelEyeColor:0x38d9ff,tailWing:true,goldShock:true,exhaust:true,underglow:true,underglowColor:0xff2ec4}
+  accessories(modCfg,0x1d232b,(joint,geom,color)=>{
+    geom.rotateY(Math.PI)
+    const isLamp=joint==='glow'||color===0xfff3d4||color===0x38d9ff
+    k.add(geom,color,0,0,0,isLamp?LAMP:NONE)
+  })
+}
+
+const BICYCLE_KEY_COLOR=new T.Color(0x5b8a72)
+function appendBicycleMesh(k:Kit,far:boolean,rearRack=false){
+  if(far){
+    for(const z of [-.54,.54]){
+      k.add(new T.TorusGeometry(.304,.026,5,10).rotateY(Math.PI/2),tire,0,.33,z)
+      k.add(new T.TorusGeometry(.26,.012,4,10).rotateY(Math.PI/2),rim,0,.33,z)
+    }
+    k.limb(.02,.02,0,.29,-.05,0,.72,-.19,0xffffff,PAINT,5)
+    k.limb(.02,.02,0,.64,.43,0,.29,-.05,0xffffff,PAINT,5)
+    k.limb(.018,.018,0,.74,.41,0,.58,-.14,0xffffff,PAINT,5)
+    k.limb(.02,.02,0,.61,.44,0,.97,.38,0xffffff,PAINT,5)
+    k.limb(.014,.014,-.24,.98,.38,.24,.98,.38,rim,NONE,5)
+    k.capsule(.05,.18,0,.84,-.22,0x423832,NONE,Math.PI/2)
+    k.capsule(.10,.08,0,.83,.56,0xa68963,NONE)
+    if(rearRack){
+      k.capsule(.075,.28,0,.70,-.48,0x25292d,NONE,Math.PI/2)
+      k.limb(.014,.014,0,.70,-.38,0,.33,-.54,0x25292d,NONE,5)
+    }
+    return
   }
-  k.box(.42,.56,.26,0,1.32,-.22,0xffffff,PAINT,-.12)                 // jacket, leaning in
-  k.box(.44,.08,.27,0,1.06,-.24,0xffffff,PAINT,-.12)                 // jacket hem
-  k.box(.1,.08,.1,0,1.64,-.16,skin)                                  // neck
-  k.add(new T.IcosahedronGeometry(.13,1),skin,0,1.76,-.12)
-  k.add(new T.SphereGeometry(.165,10,5,0,Math.PI*2,0,Math.PI*.52),helmet,0,1.78,-.14)
-  k.box(.3,.03,.12,0,1.79,.02,helmet)                                // brim
-  if(opts.ponytail){k.box(.09,.22,.09,0,1.66,-.34,hair,NONE,-.3)}
+  const mesh=vehicleModel('bicycle',0)
+  mesh.updateMatrixWorld(true)
+  mesh.traverse(obj=>{
+    if(!(obj instanceof T.Mesh))return
+    const geom=obj.geometry.clone()
+    geom.applyMatrix4(obj.matrixWorld)
+    k.addColored(geom,Math.PI,(r,g,b)=>{
+      const dr=r-BICYCLE_KEY_COLOR.r,dg=g-BICYCLE_KEY_COLOR.g,db=b-BICYCLE_KEY_COLOR.b
+      // Tighten match threshold to 0.0005 so only bike frame (#5b8a72) takes paint, preserving basket & chainring
+      return dr*dr+dg*dg+db*db<.0005?{color:[1,1,1],mask:PAINT}:{mask:NONE}
+    })
+    geom.dispose()
+  })
+  if(rearRack){
+    // Tubular rear luggage rack & cushioned passenger pad at +Z-forward rear z in [-0.64, -0.34], y ~ 0.70
+    for(const s of [-1,1]){
+      k.limb(.011,.011,s*.085,.70,-.34,s*.085,.70,-.64,0x2b2e30,NONE,5)
+      k.limb(.010,.010,s*.085,.70,-.62,s*.048,.33,-.54,0x2b2e30,NONE,5)
+      k.limb(.010,.010,s*.085,.70,-.36,s*.042,.67,-.19,0x2b2e30,NONE,5)
+      k.capsule(.016,.065,s*.11,.33,-.54,0x1f2326,NONE,0,0,Math.PI/2)
+    }
+    k.capsule(.068,.24,0,.72,-.49,0x332c28,NONE,Math.PI/2)
+  }
+}
+
+type StandinRiderOpts={
+  x:number,y:number,z:number,scale?:number,ry?:number,
+  jacket:number,pants:number,helmet?:number,hairStyle?:'short'|'pony'|'long',hairTint?:number,
+  pose:'ebike'|'child_front'|'rear_passenger'|'bicycle'|'crossbar'
+}
+function addRoundedStandinRider(k:Kit,o:StandinRiderOpts,far=false){
+  const s=o.scale??1,hc=o.hairTint??hair,shoe=0x1e2024
+  const tk=new Kit()
+  const noHelmHair=0x33261e
+  if(o.pose==='child_front'){
+    for(const side of [-1,1]){
+      tk.limb(.058,.048,side*.08,.48,0,side*.08,.06,0,o.pants)
+      tk.capsule(.045,.09,side*.08,.04,.03,shoe,NONE,Math.PI/2)
+      tk.limb(.046,.038,side*.16,1.24,0,side*.14,.92,.20,o.jacket)
+      tk.add(new T.SphereGeometry(.038,6,4),skin,side*.14,.92,.22)
+    }
+    tk.capsule(.12,.34,0,1.08,0,o.jacket,NONE,.06)
+    tk.capsule(.10,.12,0,.86,0,o.pants)
+    tk.add(new T.IcosahedronGeometry(.118,1),skin,0,1.44,.03)
+    tk.add(new T.SphereGeometry(.120,8,4,0,Math.PI*2,0,Math.PI*.44),noHelmHair,0,1.48,-.005)
+  }else if(o.pose==='rear_passenger'){
+    for(const side of [-1,1]){
+      tk.limb(.068,.056,side*.12,.86,.02,side*.18,.68,.30,o.pants)
+      tk.limb(.054,.044,side*.18,.68,.30,side*.20,.35,.18,o.pants)
+      tk.capsule(.048,.11,side*.20,.33,.21,shoe,NONE,Math.PI/2)
+      tk.limb(.048,.04,side*.18,1.30,0,side*.20,1.04,.30,o.jacket)
+      tk.add(new T.SphereGeometry(.04,6,4),skin,side*.20,1.04,.32)
+    }
+    tk.capsule(.135,.38,0,1.12,.04,o.jacket,NONE,.10)
+    tk.capsule(.115,.14,0,.86,0,o.pants)
+    tk.add(new T.IcosahedronGeometry(.122,1),skin,0,1.52,.07)
+    if(o.helmet!==undefined){
+      tk.add(new T.SphereGeometry(.152,10,5,0,Math.PI*2,0,Math.PI*.56),o.helmet,0,1.55,.06)
+      tk.capsule(.028,.15,0,1.54,.19,0x1d2329,NONE,0,0,Math.PI/2)
+    }else{
+      const hr=o.hairTint??noHelmHair
+      tk.add(new T.SphereGeometry(.122,8,4,0,Math.PI*2,0,Math.PI*.44),hr,0,1.56,.045)
+      if(o.hairStyle==='pony')tk.capsule(.04,.18,0,1.48,-.12,hr,NONE,-.45)
+      else if(o.hairStyle==='long')tk.capsule(.095,.24,0,1.40,-.07,hr,NONE,-.15)
+    }
+  }else if(o.pose==='crossbar'){
+    // Sideways crossbar passenger (local +X faces outward from bike side)
+    for(const side of [-1,1]){
+      tk.limb(.062,.05,side*.08,.76,0,side*.08,.74,.32,o.pants)
+      tk.limb(.05,.04,side*.08,.74,.32,side*.08,.36,.32,o.pants)
+      tk.capsule(.045,.1,side*.08,.33,.36,shoe,NONE,Math.PI/2)
+      tk.limb(.046,.038,side*.16,1.22,0,side*.14,.92,.20,o.jacket)
+    }
+    tk.capsule(.125,.36,0,1.06,0,o.jacket,NONE,.06)
+    tk.capsule(.105,.12,0,.80,0,o.pants)
+    tk.add(new T.IcosahedronGeometry(.118,1),skin,0,1.44,.04)
+    tk.add(new T.SphereGeometry(.120,8,4,0,Math.PI*2,0,Math.PI*.44),noHelmHair,0,1.48,.015)
+  }else{
+    const isBike=o.pose==='bicycle',spread=isBike?.14:.15,handY=isBike?.98:1.12,handZ=isBike?.58:.48,footY=isBike?.36:.32,footZ=isBike?.28:.38
+    for(const side of [-1,1]){
+      tk.limb(.068,.056,side*.10,.86,0,side*spread,.64,.30,o.pants)
+      tk.limb(.054,.044,side*spread,.64,.30,side*spread,footY,footZ,o.pants)
+      tk.capsule(.048,.11,side*spread,footY-.02,footZ+.04,shoe,NONE,Math.PI/2)
+      tk.limb(.048,.04,side*.19,1.32,.04,side*.24,handY,handZ,o.jacket)
+      tk.add(new T.SphereGeometry(.04,6,4),skin,side*.24,handY,handZ+.02)
+    }
+    tk.capsule(.138,.38,0,1.14,.04,o.jacket,NONE,.16)
+    tk.capsule(.118,.14,0,.88,0,o.pants)
+    tk.add(new T.IcosahedronGeometry(.124,1),skin,0,1.53,.11)
+    if(o.helmet!==undefined){
+      tk.add(new T.SphereGeometry(.155,10,5,0,Math.PI*2,0,Math.PI*.56),o.helmet,0,1.56,.095)
+      tk.capsule(.032,.16,0,1.545,.225,0x1d2329,NONE,0,0,Math.PI/2)
+    }else{
+      const hr=o.hairTint??noHelmHair
+      tk.add(new T.SphereGeometry(.125,8,4,0,Math.PI*2,0,Math.PI*.43),hr,0,1.57,.07)
+      if(o.hairStyle==='pony')tk.capsule(.044,.19,0,1.49,-.085,hr,NONE,-.45)
+      else if(o.hairStyle==='long')tk.capsule(.098,.25,0,1.40,-.035,hr,NONE,-.15)
+    }
+  }
+  const g=tk.build()
+  if(s!==1)g.scale(s,s,s)
+  if(o.ry)g.rotateY(o.ry)
+  g.translate(o.x,o.y,o.z)
+  k.addColored(g)
+  g.dispose()
+}
+
+type ScooterStandinOpts={
+  subtype:TwoWheelSubtype,violation:TrafficViolation,jacket:number,pants:number,
+  helmet?:number,hairStyle?:'short'|'pony'|'long',box?:number,far?:boolean
+}
+function scooter(opts:ScooterStandinOpts){
+  const k=new Kit(),far=!!opts.far
+  if(opts.subtype==='bicycle'){
+    const doubleBike=opts.violation==='bike_double'
+    appendBicycleMesh(k,far,doubleBike)
+    addRoundedStandinRider(k,{x:0,y:.03,z:-.22,scale:.93,jacket:opts.jacket,pants:opts.pants,hairStyle:opts.hairStyle,pose:'bicycle'},far)
+    if(doubleBike){
+      // Rear carrier passenger gripping driver's waist cleanly clear of rear wheel and front handlebars
+      addRoundedStandinRider(k,{x:0,y:-.04,z:-.50,scale:.88,jacket:0x728795,pants:0x2b2f36,hairStyle:'short',pose:'rear_passenger'},far)
+    }
+    return k.build()
+  }
+  if(opts.violation==='illegal_mod'){
+    appendIllegalModEbikeMesh(k,far)
+  }else{
+    appendEbikeMesh(k,far,opts.violation==='ebike_overload'?undefined:opts.box)
+  }
+  if(opts.violation==='ebike_overload'){
+    addRoundedStandinRider(k,{x:0,y:.27,z:.19,scale:.66,jacket:0xe9c46a,pants:0x2d3340,pose:'child_front'},far)
+    addRoundedStandinRider(k,{x:0,y:.02,z:-.16,scale:.94,jacket:opts.jacket,pants:opts.pants,hairStyle:opts.hairStyle,pose:'ebike'},far)
+    addRoundedStandinRider(k,{x:0,y:.02,z:-.52,scale:.90,jacket:0x8fb4c4,pants:0x262b33,hairStyle:'pony',pose:'rear_passenger'},far)
+  }else{
+    addRoundedStandinRider(k,{
+      x:0,y:0,z:-.23,scale:.94,jacket:opts.jacket,pants:opts.pants,
+      helmet:opts.violation==='no_helmet'?undefined:opts.helmet,hairStyle:opts.hairStyle,pose:'ebike',
+    },far)
+  }
+  return k.build()
+}
+
+function twoWheelBare(subtype:TwoWheelSubtype,far:boolean,box?:number,rearRack=false,illegalMod=false){
+  const k=new Kit()
+  if(subtype==='bicycle')appendBicycleMesh(k,far,rearRack)
+  else if(illegalMod)appendIllegalModEbikeMesh(k,far)
+  else appendEbikeMesh(k,far,box)
   return k.build()
 }
 
@@ -231,26 +453,29 @@ function scooter(bodyColor:number,helmet:number,opts:ScooterOpts={}){
 type PersonOpts={height?:number,stoop?:number,skirt?:number,hairColor?:number,bag?:'backpack'|'tote'|'shoulder',shoes?:number}
 function person(pants:number,style:'short'|'long'|'pony'|'bun'|'bob',opts:PersonOpts={}){
   const k=new Kit(),h=opts.height??1,hc=opts.hairColor??hair,shoe=opts.shoes??0x222224
+  k.capsule(.148,.12,0,.90,0,opts.skirt??pants,NONE)
   for(const s of [-1,1]){
-    if(opts.skirt===undefined)k.box(.15,.8,.17,s*.1,.4,0,pants)
-    else k.box(.11,.5,.12,s*.09,.25,0,skin)
-    k.box(.15,.08,.26,s*.1,.04,.04,shoe)
-    k.box(.1,.56,.12,s*.27,1.11,0,0xffffff,PAINT,0,0,s*.08)
-    k.box(.08,.1,.09,s*.29,.8,0,skin)
+    if(opts.skirt===undefined)k.limb(.076,.06,s*.1,.93,0,s*.1,.06,0,pants)
+    else k.limb(.058,.045,s*.09,.72,0,s*.09,.06,0,skin)
+    k.capsule(.052,.11,s*.1,.04,.04,shoe,NONE,Math.PI/2)
+    // Bring shoulder root inward to s*0.165 (embedding inside 0.16 torso capsule) with spherical shoulder cap
+    k.add(new T.SphereGeometry(.054,6,4),0xffffff,s*.165,1.38,0,PAINT)
+    k.limb(.050,.038,s*.165,1.38,0,s*.25,.86,0,0xffffff,PAINT)
+    k.add(new T.SphereGeometry(.04,6,4),skin,s*.25,.82,0)
   }
   if(opts.skirt!==undefined)k.add(new T.CylinderGeometry(.2,.29,.42,8),opts.skirt,0,.66,0)
-  k.box(.44,.62,.25,0,1.12,0,0xffffff,PAINT)
-  k.box(.12,.08,.12,0,1.46,0,skin)
+  k.capsule(.16,.34,0,1.14,0,0xffffff,PAINT)
+  k.add(new T.CylinderGeometry(.055,.06,.08,7),skin,0,1.46,0)
   k.add(new T.IcosahedronGeometry(.13,1),skin,0,1.58,0)
   const cap=(ext=.5)=>k.add(new T.SphereGeometry(.145,8,4,0,Math.PI*2,0,Math.PI*ext),hc,0,1.6,-.01)
   if(style==='short')cap()
-  if(style==='long'){cap(.55);k.box(.3,.34,.1,0,1.45,-.1,hc)}
-  if(style==='pony'){cap(.55);k.box(.08,.2,.08,0,1.52,-.15,hc)}
+  if(style==='long'){cap(.55);k.capsule(.10,.26,0,1.42,-.09,hc)}
+  if(style==='pony'){cap(.55);k.capsule(.04,.16,0,1.50,-.15,hc,NONE,-.4)}
   if(style==='bun'){cap(.55);k.add(new T.IcosahedronGeometry(.07,0),hc,0,1.7,-.1)}
-  if(style==='bob'){cap(.6);k.box(.32,.16,.26,0,1.52,-.02,hc)}
-  if(opts.bag==='backpack')k.box(.34,.42,.16,0,1.14,-.2,0x3e4a55)
-  if(opts.bag==='tote')k.box(.06,.3,.26,.33,.72,0,0xc9b99a)
-  if(opts.bag==='shoulder'){k.box(.06,.6,.03,0,1.15,-.12,0x2b2f33,NONE,0,0,.6);k.box(.08,.2,.24,.27,.86,0,0x5a4232)}
+  if(style==='bob'){cap(.6);k.capsule(.12,.10,0,1.52,-.02,hc,NONE,0,0,Math.PI/2)}
+  if(opts.bag==='backpack'){k.capsule(.12,.22,0,1.14,-.18,0x3e4a55);k.capsule(.08,.12,0,1.08,-.23,0x2d3640)}
+  if(opts.bag==='tote')k.capsule(.05,.22,.32,.72,0,0xc9b99a)
+  if(opts.bag==='shoulder'){k.limb(.02,.02,-.18,1.42,-.08,.24,.88,-.08,0x2b2f33);k.capsule(.06,.16,.27,.86,0,0x5a4232)}
   const g=k.build()
   if(opts.stoop){g.translate(0,-.9,0);g.rotateX(opts.stoop);g.translate(0,.9,0)}
   if(h!==1)g.scale(h,h,h)
@@ -306,6 +531,7 @@ function bakedCar(mesh:CarMesh,body?:number,extra?:(k:Kit)=>void){
 }
 
 export type Variant = {geometry:number,paint:T.Color}
+export type TwoWheelVariantPair = {full:Variant,bare:Variant}
 type Pool = {ids:number[],weights:number[],paints:{hex:number,w:number}[]}
 const pick=<V extends {w:number}>(list:V[],u:number)=>{let total=0;for(const v of list)total+=v.w;u*=total;for(const v of list){if((u-=v.w)<0)return v}return list[list.length-1]}
 
@@ -313,6 +539,8 @@ const pick=<V extends {w:number}>(list:V[],u:number)=>{let total=0;for(const v o
 const carPaints=[[0xf1f0ec,30],[0x17191c,14],[0xb9bec2,13],[0x6c7276,11],[0x2c4a6e,7],[0x9b2a26,5],[0xc9b99a,5],[0x7a5a45,3],[0x4d6b5a,3],[0xa9c7d4,3],[0xe7dcc2,3],[0x3d4b8a,3]].map(([hex,w])=>({hex,w}))
 // Same muted present-day palette as the starter looks (lib/avatar.ts lookPalette tops).
 const shirtPaints=[0xe9e7e1,0xeeeae0,0x728795,0xa5bfce,0xacb8a7,0x9b9d99,0x3f5a4c,0x6f8fae,0x9a3f35,0xd8cab0,0x28344a,0x2b2f36].map(hex=>({hex,w:1}))
+const ebikePaints=[[0xf3f1e9,28],[0x99c9de,18],[0xe4afbb,12],[0x383c40,20],[0x5e7680,14],[0x209c8e,8]].map(([hex,w])=>({hex,w}))
+const bicyclePaints=[0x5b8a72,0xc96f53,0xd8cfc0,0x5c6e7e].map(hex=>({hex,w:1}))
 
 export function trafficModels(cars:CarMesh[]=[]){
   const geometries:T.BufferGeometry[]=[]
@@ -330,9 +558,44 @@ export function trafficModels(cars:CarMesh[]=[]){
   const liteSedan=small(liteCar(sedanSpec)),liteHatch=small(liteCar(hatchSpec)),
     liteCab=small(liteCar(sedanSpec,0x2f8a7c,NONE,k=>k.box(.6,.15,.26,0,1.57,-.1,0xf2d36b,LAMP)))
   const far:Record<number,number>={[saloon]:liteSedan,[mini]:liteHatch,[coupe]:liteSedan,[sport]:liteSedan,[cab]:liteCab}
+
+  // E-bike & shared bicycle bare meshes (for near rigged rider-pool) + stand-in rider meshes + >75 m LODs
+  const ebikeBare=add(twoWheelBare('ebike',false)),ebikeFarBare=add(twoWheelBare('ebike',true))
+  const ebikeDeliveryBare=add(twoWheelBare('ebike',false,0x29343b)),ebikeDeliveryFarBare=add(twoWheelBare('ebike',true,0x29343b))
+  const ebikeModBare=add(twoWheelBare('ebike',false,undefined,false,true)),ebikeModFarBare=add(twoWheelBare('ebike',true,undefined,false,true))
+  const bicycleBare=add(twoWheelBare('bicycle',false)),bicycleFarBare=add(twoWheelBare('bicycle',true))
+  const bicycleDoubleBare=add(twoWheelBare('bicycle',false,undefined,true)),bicycleDoubleFarBare=add(twoWheelBare('bicycle',true,undefined,true))
+
+  const ebikeHelmA=add(scooter({subtype:'ebike',violation:'none',jacket:0x465460,pants:0x2d3340,helmet:0xf0f0ea}))
+  const ebikeHelmB=add(scooter({subtype:'ebike',violation:'none',jacket:0x3f5a4c,pants:0x2b2f36,helmet:0xd8423a,hairStyle:'pony'}))
+  const ebikeHelmBox=add(scooter({subtype:'ebike',violation:'none',jacket:0xd98a2b,pants:0x252a30,helmet:0xe6b235,box:0x29343b}))
+  const ebikeNoHelmA=add(scooter({subtype:'ebike',violation:'no_helmet',jacket:0x728795,pants:0x2a2c30,hairStyle:'short'}))
+  const ebikeNoHelmB=add(scooter({subtype:'ebike',violation:'no_helmet',jacket:0x9a3f35,pants:0x28344a,hairStyle:'long'}))
+  const ebikeOverload=add(scooter({subtype:'ebike',violation:'ebike_overload',jacket:0x5b6c7a,pants:0x2d3340,hairStyle:'short'}))
+  const ebikeModFull=add(scooter({subtype:'ebike',violation:'illegal_mod',jacket:0x202733,pants:0x1b1e24,helmet:0x222831}))
+
+  const ebikeFarHelm=add(scooter({subtype:'ebike',violation:'none',jacket:0x465460,pants:0x2d3340,helmet:0xf0f0ea,far:true}))
+  const ebikeFarHelmBox=add(scooter({subtype:'ebike',violation:'none',jacket:0xd98a2b,pants:0x252a30,helmet:0xe6b235,box:0x29343b,far:true}))
+  const ebikeFarNoHelm=add(scooter({subtype:'ebike',violation:'no_helmet',jacket:0x728795,pants:0x2a2c30,hairStyle:'short',far:true}))
+  const ebikeFarOverload=add(scooter({subtype:'ebike',violation:'ebike_overload',jacket:0x5b6c7a,pants:0x2d3340,hairStyle:'short',far:true}))
+  const ebikeModFarFull=add(scooter({subtype:'ebike',violation:'illegal_mod',jacket:0x202733,pants:0x1b1e24,helmet:0x222831,far:true}))
+
+  const bikeSoloA=add(scooter({subtype:'bicycle',violation:'none',jacket:0xe9e7e1,pants:0x2d3340,hairStyle:'short'}))
+  const bikeSoloB=add(scooter({subtype:'bicycle',violation:'none',jacket:0x6f8fae,pants:0x2a2c30,hairStyle:'pony'}))
+  const bikeDouble=add(scooter({subtype:'bicycle',violation:'bike_double',jacket:0xa5bfce,pants:0x2d3340,hairStyle:'short'}))
+
+  const bikeFarSolo=add(scooter({subtype:'bicycle',violation:'none',jacket:0xe9e7e1,pants:0x2d3340,hairStyle:'short',far:true}))
+  const bikeFarDouble=add(scooter({subtype:'bicycle',violation:'bike_double',jacket:0xa5bfce,pants:0x2d3340,hairStyle:'short',far:true}))
+
+  Object.assign(far,{
+    [ebikeBare]:ebikeFarBare,[ebikeDeliveryBare]:ebikeDeliveryFarBare,[ebikeModBare]:ebikeModFarBare,[bicycleBare]:bicycleFarBare,[bicycleDoubleBare]:bicycleDoubleFarBare,
+    [ebikeHelmA]:ebikeFarHelm,[ebikeHelmB]:ebikeFarHelm,[ebikeHelmBox]:ebikeFarHelmBox,
+    [ebikeNoHelmA]:ebikeFarNoHelm,[ebikeNoHelmB]:ebikeFarNoHelm,[ebikeOverload]:ebikeFarOverload,[ebikeModFull]:ebikeModFarFull,
+    [bikeSoloA]:bikeFarSolo,[bikeSoloB]:bikeFarSolo,[bikeDouble]:bikeFarDouble,
+  })
+
   const grey=0xb8b5ae,white=0xdcd9d2
-  const scooters=[add(scooter(0xeeece6,0xf0f0ea,{basket:true})),add(scooter(0x8fb4c4,0xd8423a,{ponytail:true})),add(scooter(0x2d3135,0x3e74c4)),
-    add(scooter(0x3a3e42,0xe6b23a,{box:0xe6b23a})),add(scooter(0x3a3e42,0x2f7fd0,{box:0x2f7fd0})),add(scooter(0xd9c9a8,0xf2f2ee,{basket:true,ponytail:true,pants:0x5b4a3c}))]
+  const scooters=[ebikeHelmA,ebikeHelmB,ebikeHelmBox]
   const people=[
     add(person(0x22262e,'short')),                                          // 青年男
     add(person(0x6b5a48,'long',{bag:'shoulder'})),                          // 青年女
@@ -347,7 +610,7 @@ export function trafficModels(cars:CarMesh[]=[]){
   const pools:Record<'car'|'scooter'|'person'|'parked',Pool>={
     parked:{ids:[saloon,mini,coupe,sport,suv,cab],weights:[30,16,8,8,26,10],paints:carPaints},
     car:{ids:[saloon,mini,coupe,sport,suv,van,lorry,cab],weights:[26,14,8,8,18,8,5,10],paints:carPaints},
-    scooter:{ids:scooters,weights:[3,3,2,2,2,2],paints:shirtPaints},
+    scooter:{ids:scooters,weights:[3,3,2],paints:ebikePaints},
     person:{ids:people,weights:[4,3,2,2,2,3,3,2,2],paints:shirtPaints},
   }
   const plain=new T.Color(1,1,1)
@@ -355,7 +618,25 @@ export function trafficModels(cars:CarMesh[]=[]){
     const pool=pools[kind],geometry=pick(pool.ids.map((id,i)=>({id,w:pool.weights[i]})),u).id
     return {geometry,paint:geometry===cab||geometry===patrol?plain:new T.Color(pick(pool.paints,v).hex)}
   }
-  return {geometries,variant,police:patrol,far}
+  const modPaints=[0x1f2530,0x209c8e,0x9b2a26,0x28344a].map(hex=>({hex,w:1}))
+  const twoWheelVariant=(subtype:TwoWheelSubtype,violation:TrafficViolation,u:number,v:number):TwoWheelVariantPair=>{
+    if(subtype==='bicycle'){
+      const paint=new T.Color(pick(bicyclePaints,v).hex)
+      const dbl=violation==='bike_double'
+      const fullGeom=dbl?bikeDouble:(u<.5?bikeSoloA:bikeSoloB)
+      return {full:{geometry:fullGeom,paint},bare:{geometry:dbl?bicycleDoubleBare:bicycleBare,paint}}
+    }
+    if(violation==='illegal_mod'){
+      const paint=new T.Color(pick(modPaints,v).hex)
+      return {full:{geometry:ebikeModFull,paint},bare:{geometry:ebikeModBare,paint}}
+    }
+    const paint=new T.Color(pick(ebikePaints,v).hex)
+    if(violation==='ebike_overload')return {full:{geometry:ebikeOverload,paint},bare:{geometry:ebikeBare,paint}}
+    if(violation==='no_helmet')return {full:{geometry:u<.5?ebikeNoHelmA:ebikeNoHelmB,paint},bare:{geometry:ebikeBare,paint}}
+    const hasBox=u>.7&&violation==='none'
+    return {full:{geometry:hasBox?ebikeHelmBox:(u<.35?ebikeHelmA:ebikeHelmB),paint},bare:{geometry:hasBox?ebikeDeliveryBare:ebikeBare,paint}}
+  }
+  return {geometries,variant,twoWheelVariant,police:patrol,far}
 }
 
 export function trafficMaterial(){

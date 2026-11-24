@@ -22,6 +22,7 @@ export type InteractionActionKind =
   | 'pickup_downed'
   | 'open_shop'
   | 'open_service'
+  | 'whistle_cite'
   | 'mount_vehicle'
   | 'board_boat'
 
@@ -65,6 +66,7 @@ export interface InteractionContext {
   nearDownedVehicle: VehicleCandidateSnapshot | null
   nearShop: ShopCandidateSnapshot | null
   nearServiceBay: ServiceBayCandidateSnapshot | null
+  nearTrafficViolator?: {label: string; violation: string; fineYuan: number} | null
   nearVehicle: VehicleCandidateSnapshot | null
   nearBoat: BoatCandidateSnapshot | null
 }
@@ -110,7 +112,7 @@ export function resolveInteraction(ctx: InteractionContext): InteractionDecision
           : '下车'
     const softHint =
       (ctx.aboardKind === 'bike' || ctx.aboardKind === 'bicycle' || ctx.aboardKind === 'car') &&
-      ctx.soloEnabled && !ctx.inQuietZone &&
+      (ctx.soloEnabled || ctx.nearShop?.shopId === 'wangcheng_drinks_shop') && !ctx.inQuietZone &&
       (ctx.nearShop || ctx.nearServiceBay)
         ? '先按 F 下车再进店'
         : undefined
@@ -134,11 +136,14 @@ export function resolveInteraction(ctx: InteractionContext): InteractionDecision
   }
 
   // Priority 4: On foot in shop trigger or service bay (outside quiet zone) -> suppresses vehicle mount within 4.2m
-  if (ctx.soloEnabled && !ctx.inQuietZone && ctx.nearShop) {
+  if ((ctx.soloEnabled || ctx.nearShop?.shopId === 'wangcheng_drinks_shop') && !ctx.inQuietZone && ctx.nearShop) {
+    const label = ctx.nearShop.displayName.startsWith('取杯')
+      ? ctx.nearShop.displayName
+      : `进店 · ${ctx.nearShop.brandName}`
     return {
       priority: 4,
       action: 'open_shop',
-      label: `进店 · ${ctx.nearShop.brandName}`,
+      label,
       disabled: false,
       shopId: ctx.nearShop.shopId,
     }
@@ -150,6 +155,14 @@ export function resolveInteraction(ctx: InteractionContext): InteractionDecision
       label: '充电/保养',
       disabled: false,
       shopId: ctx.nearServiceBay.shopId,
+    }
+  }
+  if (ctx.nearTrafficViolator) {
+    return {
+      priority: 4,
+      action: 'whistle_cite',
+      label: ctx.nearTrafficViolator.label,
+      disabled: false,
     }
   }
 
@@ -194,6 +207,7 @@ export interface InteractArbiterCallbacks {
   getContext: () => InteractionContext
   onOpenShop: (shopId: string) => void
   onOpenService: (shopId: string) => void
+  onWhistleCite?: () => void
   onVehicleOrBoatInteract: () => void
   onSoftHint?: (text: string) => void
   onDecisionChange?: (decision: InteractionDecision) => void
@@ -263,6 +277,10 @@ export function createInteractArbiter(callbacks: InteractArbiterCallbacks): Inte
     }
     if (decision.action === 'open_service' && decision.shopId) {
       callbacks.onOpenService(decision.shopId)
+      return decision
+    }
+    if (decision.action === 'whistle_cite') {
+      callbacks.onWhistleCite?.()
       return decision
     }
     callbacks.onVehicleOrBoatInteract()

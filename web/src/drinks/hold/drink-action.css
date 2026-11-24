@@ -1,0 +1,118 @@
+/* 手捧饮品操作条：严格沿用 --ui-* 山水印令牌，无渐变/emoji/多余文案。 */
+
+.drinks-hold-hud {
+  position: fixed;
+  left: 50%;
+  bottom: calc(80px + env(safe-area-inset-bottom));
+  transform: translateX(-50%);
+  z-index: 8;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  max-width: calc(100vw - 24px);
+  padding: 5px 6px 5px 14px;
+  border-radius: 999px;
+  background: var(--ui-glass-solid, rgba(22, 36, 33, 0.94));
+  color: var(--ui-paper, #f4efe2);
+  box-shadow: inset 0 0 0 1px rgba(244, 239, 226, 0.16);
+  font: 500 13px/1.2 var(--ui-serif, "Noto Serif SC", "Source Han Serif SC", "Songti SC", serif);
+  font-variant-numeric: tabular-nums;
+  user-select: none;
+  -webkit-user-select: none;
+  pointer-events: auto;
+}
+
+.drinks-hold-hud[hidden] {
+  display: none !important;
+}
+
+:is(body[data-photo="on"], body[data-home], body[data-shop-open="1"], body[data-drinks-ui-open="1"], body[data-aboard], body[data-mifen-cooking="1"], body[data-mifen-drawer="1"], body[data-mifen-story-active="1"]) .drinks-hold-hud {
+  display: none !important;
+}
+
+.drinks-hold-name {
+  white-space: nowrap;
+  font-weight: 600;
+}
+
+.drinks-hold-sips {
+  white-space: nowrap;
+  font-size: 12px;
+  color: rgba(244, 239, 226, 0.78);
+}
+
+.drinks-hold-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 36px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(244, 239, 226, 0.12);
+  color: var(--ui-paper, #f4efe2);
+  font: inherit;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background-color 0.08s ease;
+}
+
+.drinks-hold-btn:hover {
+  background: rgba(244, 239, 226, 0.2);
+}
+
+.drinks-hold-btn--primary {
+  background: var(--ui-seal, #a9503c);
+  color: #fbf7ee;
+  font-weight: 600;
+}
+
+.drinks-hold-btn--primary:hover {
+  background: var(--ui-seal-hi, #bd5e48);
+}
+
+.drinks-hold-key {
+  display: none;
+  font: 600 10.5px/1 ui-monospace, SFMono-Regular, Menlo, monospace;
+  padding: 2px 5px;
+  border-radius: 5px;
+  background: rgba(251, 247, 238, 0.22);
+  color: #fbf7ee;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .drinks-hold-key {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+}
+
+.drinks-hold-btn:disabled,
+.drinks-hold-btn--primary:disabled {
+  background: rgba(38, 54, 50, 0.92);
+  color: rgba(244, 239, 226, 0.88);
+  box-shadow: inset 0 0 0 1px rgba(244, 239, 226, 0.24);
+  transition: none;
+  cursor: default;
+}
+
+@media (pointer: coarse) and (not (any-pointer: fine)) {
+  .drinks-hold-btn {
+    min-height: 40px;
+  }
+}
+
+@media (max-width: 640px) and (min-height: 501px) {
+  .drinks-hold-hud {
+    bottom: calc(226px + env(safe-area-inset-bottom));
+  }
+}
+
+@media (max-height: 480px) {
+  .drinks-hold-hud {
+    bottom: calc(74px + env(safe-area-inset-bottom));
+    padding: 4px 5px 4px 12px;
+    gap: 6px;
+  }
+}

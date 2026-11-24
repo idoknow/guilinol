@@ -1276,13 +1276,16 @@ def build_nikoniko(m: Builder):
         (14.0, 48.5),
         (41.5, 55.5),
         (57.8, -1.5),
-        (54.2, -16.5),
-        (45.5, -25.2),
+        (58.5, -16.5),
+        (49.5, -35.0),
         (31.2, -36.2),
         (-18.0, -45.2),
     ]
+    from shapely.geometry import Polygon as _ShapelyPolygon
     from plaza_seam import civic_plaza
-    civic_plaza(m, apron)
+    from shizijie_underpass import NIKONIKO_ORIGIN, STAIRWELLS, stair_hole_ring
+    sw_stair = next(s for s in STAIRWELLS if s['corner'] == 'sw')
+    civic_plaza(m, _ShapelyPolygon(apron, [stair_hole_ring(sw_stair, NIKONIKO_ORIGIN, margin=0.05)]))
 
     # 2. Main 6-storey retail body extruded from exact OSM footprint
     # Note: FOOTPRINT has negative signed area so m.prism() reverses pts & wall_mask;
@@ -1373,22 +1376,13 @@ def build_nikoniko(m: Builder):
     for side in range(3):
         m.sign_arc(corner_cx, corner_cz, 8.32, 30.76, 3.95, corner_yaw + side*math.tau/3,
                    span_rad=math.tau/3, sign_key='niko_crown', segs=18 if m.detail else 10)
+    from shizijie_underpass import NIKONIKO_ORIGIN, STAIRWELLS, build_surface_stairwell
+    sw_stair = next(s for s in STAIRWELLS if s['corner'] == 'sw')
+    build_surface_stairwell(
+        m, sw_stair, NIKONIKO_ORIGIN,
+        frame_mat='alum', parapet_mat='dark', glass_mat='glass', bollard_mat='red', roof_mat='alum',
+    )
     if m.detail:
-        # Two steel-and-blue-glass underground pedestrian passage canopies on NE forecourt
-        for ux, uz, uyaw in ((52.5, -18.5, corner_yaw - 0.45), (46.2, -23.8, corner_yaw)):
-            m.pose = (ux, 0.0, uz, uyaw)
-            m.box(-1.65, 0.0, 0.0, 0.32, 1.05, 5.2, 'dark', collide=True, footing=True)
-            m.box(1.65, 0.0, 0.0, 0.32, 1.05, 5.2, 'dark', collide=True, footing=True)
-            m.box(0.0, 0.0, -2.45, 3.62, 1.05, 0.32, 'dark', collide=True, footing=True)
-            roof_v = [
-                (-1.85, 2.55, 2.65), (1.85, 2.55, 2.65),
-                (1.85, 1.25, -2.65), (-1.85, 1.25, -2.65),
-            ]
-            m.mesh(roof_v, [[0, 1, 2], [0, 2, 3]], 'glass')
-            m.beam([-1.7, 1.05, 2.4], [-1.7, 2.5, 2.4], 0.07, 'alum', sections=5)
-            m.beam([1.7, 1.05, 2.4], [1.7, 2.5, 2.4], 0.07, 'alum', sections=5)
-        m.pose = (0.0, 0.0, 0.0, 0.0)
-
         for lx, lz in ((56.8, 12.0), (52.0, 34.0), (14.0, -37.2), (-14.0, -42.5)):
             m.cluster_lamp(lx, m.surface.ground(lx,lz)+.04, lz, height=6.8, globes=5, collide=True)
 
