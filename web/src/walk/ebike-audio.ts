@@ -9,6 +9,8 @@
  * Pure WebAudio with zero external audio files and fail-safe autoplay gating.
  */
 
+import {rideSoundMuted} from './ride-sound-pref'
+
 export type RideSoundKind = 'bike' | 'bicycle'
 export type HeadlightSoundMode = 'off' | 'low' | 'high'
 
@@ -68,6 +70,13 @@ export interface EbikeAudioEngine {
   dispose: () => void
 }
 
+/**
+ * Master level and bus high-pass (IDOK-212: headphone players found the hub-motor hum
+ * and low thuds fatiguing). Everything feeds `bus` → compressor → master.
+ */
+const MASTER_LEVEL = 0.45
+const BUS_HIGHPASS_HZ = 120
+
 function getAudioContextCtor(): typeof AudioContext | null {
   if (typeof window === 'undefined') return null
   const w = window as unknown as {
@@ -97,8 +106,9 @@ export function createEbikeAudioEngine(): EbikeAudioEngine {
   let ctx: AudioContext | null = null
   let master: GainNode | null = null
   let compressor: DynamicsCompressorNode | null = null
+  let bus: BiquadFilterNode | null = null
   let noiseBuf: AudioBuffer | null = null
-  let muted = false
+  let muted = rideSoundMuted()
 
   // Continuous horn voice (ebike twin-tone electric horn)
   let hornGain: GainNode | null = null
@@ -153,8 +163,14 @@ export function createEbikeAudioEngine(): EbikeAudioEngine {
         compressor.attack.value = 0.004
         compressor.release.value = 0.14
 
+        bus = ctx.createBiquadFilter()
+        bus.type = 'highpass'
+        bus.frequency.value = BUS_HIGHPASS_HZ
+        bus.Q.value = 0.707
+        bus.connect(compressor)
+
         master = ctx.createGain()
-        master.gain.value = 0.65
+        master.gain.value = MASTER_LEVEL
         compressor.connect(master)
         master.connect(ctx.destination)
         noiseBuf = createNoiseBuffer(ctx, 1.4)
@@ -174,7 +190,7 @@ export function createEbikeAudioEngine(): EbikeAudioEngine {
   }
 
   function ensureContinuousVoices(ac: AudioContext) {
-    if (!compressor || !noiseBuf) return
+    if (!bus || !noiseBuf) return
     if (!motorOscMain) {
       motorOscMain = ac.createOscillator()
       motorOscMain.type = 'sine'
@@ -199,7 +215,7 @@ export function createEbikeAudioEngine(): EbikeAudioEngine {
       motorOscHarm.connect(harmGain)
       harmGain.connect(motorFilter)
       motorFilter.connect(motorGain)
-      motorGain.connect(compressor)
+      motorGain.connect(bus)
 
       motorOscMain.start()
       motorOscHarm.start()
@@ -219,7 +235,7 @@ export function createEbikeAudioEngine(): EbikeAudioEngine {
 
       scrubSrc.connect(scrubFilter)
       scrubFilter.connect(scrubGainNode)
-      scrubGainNode.connect(compressor)
+      scrubGainNode.connect(bus)
       scrubSrc.start()
     }
   }
@@ -234,7 +250,7 @@ export function createEbikeAudioEngine(): EbikeAudioEngine {
     filterHz?: number,
   ) {
     const ac = ensureContext()
-    if (!ac || !compressor) return
+    if (!ac || !bus) return
     const t0 = ac.currentTime + delaySec
     const osc = ac.createOscillator()
     osc.type = type
@@ -257,14 +273,14 @@ export function createEbikeAudioEngine(): EbikeAudioEngine {
     } else {
       osc.connect(gain)
     }
-    gain.connect(compressor)
+    gain.connect(bus)
     osc.start(t0)
     osc.stop(t0 + durationSec + 0.02)
   }
 
   function noiseBurst(centerHz: number, q: number, durationSec: number, peakGain: number, delaySec = 0) {
     const ac = ensureContext()
-    if (!ac || !compressor || !noiseBuf) return
+    if (!ac || !bus || !noiseBuf) return
     const t0 = ac.currentTime + delaySec
     const src = ac.createBufferSource()
     src.buffer = noiseBuf
@@ -281,7 +297,7 @@ export function createEbikeAudioEngine(): EbikeAudioEngine {
 
     src.connect(filter)
     filter.connect(gain)
-    gain.connect(compressor)
+    gain.connect(bus)
     src.start(t0, Math.random() * 0.4, durationSec + 0.02)
   }
 
@@ -295,11 +311,11 @@ export function createEbikeAudioEngine(): EbikeAudioEngine {
 
   function startElectricHorn() {
     const ac = ensureContext()
-    if (!ac || !compressor || hornOscA) return
+    if (!ac || !bus || hornOscA) return
     const t = ac.currentTime
     hornGain = ac.createGain()
     hornGain.gain.setValueAtTime(0.0001, t)
-    hornGain.gain.linearRampToValueAtTime(0.18, t + 0.014)
+    hornGain.gain.linearRampToValueAtTime(0.12, t + 0.014)
 
     const band = ac.createBiquadFilter()
     band.type = 'bandpass'
@@ -327,7 +343,7 @@ export function createEbikeAudioEngine(): EbikeAudioEngine {
     bGain.connect(band)
     band.connect(low)
     low.connect(hornGain)
-    hornGain.connect(compressor)
+    hornGain.connect(bus)
 
     hornOscA.start(t)
     hornOscB.start(t)
@@ -372,8 +388,10 @@ export function createEbikeAudioEngine(): EbikeAudioEngine {
       stopContinuous()
     }
     if (master && ctx) {
-      master.gain.setTargetAtTime(muted ? 0 : 0.65, ctx.currentTime, 0.02)
+      master.gain.setTargetAtTime(muted ? 0 : MASTER_LEVEL, ctx.currentTime, 0.02)
     }
+    // Unmuting from the HUD is a user gesture: open the context now so sound resumes mid-ride.
+    if (!muted) ensureContext()
   }
 
   function setHorn(active: boolean, kind: RideSoundKind = 'bike') {
@@ -460,7 +478,7 @@ export function createEbikeAudioEngine(): EbikeAudioEngine {
   function playCrashImpact(speedMs = 5) {
     counts.crashImpact++
     const strength = Math.min(1.3, Math.max(0.45, speedMs / 8))
-    toneBurst(128, 38, 0.22, 0.22 * strength, 'triangle', 0, 520)
+    toneBurst(128, 38, 0.22, 0.15 * strength, 'triangle', 0, 520)
     noiseBurst(760, 1.1, 0.34, 0.18 * strength, 0.01)
     noiseBurst(2100, 1.8, 0.18, 0.11 * strength, 0.04)
   }
@@ -515,8 +533,8 @@ export function createEbikeAudioEngine(): EbikeAudioEngine {
         leanWarnTimer = interval
         counts.leanWarn++
         const f = 960 + u * 340
-        toneBurst(f, f * 1.06, 0.055, 0.075 + u * 0.05, 'sine', 0, 3200)
-        if (u > 0.55) toneBurst(f * 1.25, f * 1.3, 0.045, 0.065, 'sine', 0.055, 3400)
+        toneBurst(f, f * 1.06, 0.055, 0.052 + u * 0.035, 'sine', 0, 3200)
+        if (u > 0.55) toneBurst(f * 1.25, f * 1.3, 0.045, 0.045, 'sine', 0.055, 3400)
       }
     } else {
       leanWarnTimer = 0
@@ -527,13 +545,13 @@ export function createEbikeAudioEngine(): EbikeAudioEngine {
       ? 68 + Math.min(220, absSpd * 13.5 + Math.max(0, params.throttle) * 28)
       : 0
     const targetMotorGain = targetMotorHz > 0
-      ? Math.min(0.042, 0.012 + Math.min(1, absSpd / 14) * 0.02 + Math.max(0, params.throttle) * 0.014)
+      ? Math.min(0.014, 0.004 + Math.min(1, absSpd / 14) * 0.0065 + Math.max(0, params.throttle) * 0.0045)
       : 0
 
     const scrubLevel = params.active && !params.parked && absSpd > 2.4 && params.leanRisk > 0.68
-      ? Math.min(0.09, ((params.leanRisk - 0.68) / 0.32) * 0.075 * Math.min(1.2, absSpd / 8))
+      ? Math.min(0.06, ((params.leanRisk - 0.68) / 0.32) * 0.05 * Math.min(1.2, absSpd / 8))
       : params.active && params.braking && absSpd > 5.0
-        ? Math.min(0.05, ((absSpd - 5) / 10) * 0.04)
+        ? Math.min(0.035, ((absSpd - 5) / 10) * 0.028)
         : 0
 
     currentMotorHz = targetMotorHz
@@ -604,6 +622,7 @@ export function createEbikeAudioEngine(): EbikeAudioEngine {
     try { void ctx?.close() } catch {}
     ctx = null
     compressor = null
+    bus = null
     master = null
     motorOscMain = motorOscHarm = null
     motorFilter = scrubFilter = null
