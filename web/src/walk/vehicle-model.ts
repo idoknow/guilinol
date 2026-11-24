@@ -1,6 +1,7 @@
 import {accessories,cowlLamp,steeringZ} from './ebike-mounts'
 import {bikeGeometry} from './ebike-geometry'
 import * as T from 'three'
+import {CAR_SCALE} from '../drive/scale'
 import {mergeGeometries} from 'three/addons/utils/BufferGeometryUtils.js'
 import type {TwoWheelHeadlightMode} from './ebike-state-coupling'
 import {createHeadlightBeamRig, type HeadlightBeamProbe} from './vehicle-lights.ts'
@@ -54,7 +55,7 @@ export function vehicleModel(kind:string,paint=0,options?:{shared?:boolean;dista
     : ''
   const key=effectiveKind+paint+visKey+(options?.distant?':far':'')
   if(effectiveKind==='car'){
-    if(!cache.has(key))cache.set(key,buildCarGeometry(paint))
+    if(!cache.has(key)){const g=buildCarGeometry(paint);g.scale(CAR_SCALE,CAR_SCALE,CAR_SCALE);g.computeBoundingSphere();g.computeBoundingBox();cache.set(key,g)}
     const mesh=new T.Mesh(cache.get(key),material);mesh.name=kind;mesh.userData.paint=paint;return mesh
   }
   if(!cache.has(key)){
@@ -1272,6 +1273,7 @@ export function createDynamicCar(paint = 0): CarVisualRig {
 
   const root = new T.Group()
   root.name = 'dynamic-car'
+  root.scale.setScalar(CAR_SCALE)
   const suspensionPivot = new T.Group()
   const CG_Y = .45
   suspensionPivot.position.set(0, CG_Y, 0)

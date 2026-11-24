@@ -2,7 +2,8 @@ import * as T from 'three'
 import {pickups} from '../traffic/contact'
 import type {Stream} from '../stream'
 import type {ParkedBike} from '../batch'
-import {onJiefangJunction, vehicleForbiddenAt} from '../game/car-free'
+import {onJiefangJunction} from '../game/car-free'
+import {CAR_SCALE} from '../drive/scale'
 import {ParkedBatches, parkedParts} from './parked-batches'
 import {fetchAsset} from '../world'
 import {createFreeBoats, type MooringSlot} from './boat'
@@ -271,7 +272,7 @@ export async function vehicles(
 
   function store(mesh: T.Object3D, pickup?: () => void) {
     if (mesh.name === 'car') {
-      pickupHandles.set(mesh, pickup ?? pickups.add({...mesh.position, yaw: mesh.rotation.y, halfWidth: .9, halfLength: 2.12, height: 1.5}))
+      pickupHandles.set(mesh, pickup ?? pickups.add({...mesh.position, yaw: mesh.rotation.y, halfWidth: .9 * CAR_SCALE, halfLength: 2.12 * CAR_SCALE, height: 1.5}))
     }
     const cell = parkingCell(mesh.position.x, mesh.position.z)
     if (!cell.group) {
@@ -338,7 +339,7 @@ export async function vehicles(
       const [x, y, z, yaw] = row
       if (kind==='bike') occupiedBays.add(bikeCoordKey(x,z))
       // Traffic queries these solids even when the player cannot see the parked cars.
-      const pickup = kind === 'car' ? pickups.add({x, y, z, yaw, halfWidth: .9, halfLength: 2.12, height: 1.5}) : undefined
+      const pickup = kind === 'car' ? pickups.add({x, y, z, yaw, halfWidth: .9 * CAR_SCALE, halfLength: 2.12 * CAR_SCALE, height: 1.5}) : undefined
       parkingCell(x, z).pending.push({kind, row, shared, pickup, spawnKey})
     }
   }
@@ -729,7 +730,7 @@ export async function vehicles(
       !forceBoard && board
         ? board(target.position.x, target.position.y, target.position.z)
         : {x: target.position.x, y: target.position.y, z: target.position.z, bikeY: target.position.y}
-    if (!safePos || vehicleForbiddenAt(safePos.x,safePos.z)) return false
+    if (!safePos) return false
     const targetMesh = takeRecord(target)
     targetMesh.position.set(safePos.x, safePos.bikeY, safePos.z)
     const rideKind: RideKind = targetMesh.name === 'bicycle' ? 'bicycle' : 'bike'
@@ -812,7 +813,7 @@ export async function vehicles(
       const safePos = board
         ? board(nearBike.position.x, nearBike.position.y, nearBike.position.z, 'car')
         : {x: nearBike.position.x, y: nearBike.position.y, z: nearBike.position.z, bikeY: nearBike.position.y}
-      if (!safePos || vehicleForbiddenAt(safePos.x,safePos.z)) return
+      if (!safePos) return
       car = lastCar = takeRecord(nearBike)
       car.position.set(safePos.x, safePos.bikeY, safePos.z)
       group.add(car)

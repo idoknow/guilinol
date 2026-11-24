@@ -10,6 +10,7 @@ import {probeCarDismount, probeCarMount} from './car'
 import {trafficPushGuard} from './traffic-push'
 import {probeLocalDismount, probeLocalMount} from './ride'
 import {onOldSouthSlope,yueyaShoulderHeight} from '../yueya-slope'
+import {CAR_SCALE} from '../drive/scale'
 
 type Outline = import('../buildings').Building
 type Kind = 'ground'|'overview'|'road'|'deck'|'deckThin'|'building'|'peak'|'tree'|'rail'|'sidewalk'|'landmark'
@@ -526,15 +527,15 @@ export async function createPhysics(manifest:Manifest,stream:Stream,peaks:PeaksG
   }
   function carOverlap(x:number,footY:number,z:number,heading:number,dirSign:-1|0|1=0){
     const fx=-Math.sin(heading),fz=-Math.cos(heading),rx=Math.cos(heading),rz=-Math.sin(heading)
-    const halfL=dirSign===0?2.12:1.62,shift=dirSign*.52
+    const S=CAR_SCALE,halfL=(dirSign===0?2.12:1.62)*S,shift=dirSign*.52*S
     const key=`car:${halfL.toFixed(2)}`
     let box=hullBoxes.get(key)
-    if(!box){box=new R.Cuboid(.86,.48,halfL);hullBoxes.set(key,box)}
+    if(!box){box=new R.Cuboid(.86*S,.48,halfL);hullBoxes.set(key,box)}
     const half=heading*.5
     if(world.intersectionWithShape({x:x+fx*shift,y:footY+.82,z:z+fz*shift},{x:0,y:Math.sin(half),z:0,w:Math.cos(half)},box,undefined,undefined,capsule,undefined,carWallFilter))return true
     const dirs:[number,number,number][]=[]
-    if(dirSign>=0)dirs.push([fx,fz,2.18],[fx*2.14-rx*.84,fz*2.14-rz*.84,1],[fx*2.14+rx*.84,fz*2.14+rz*.84,1])
-    if(dirSign<=0)dirs.push([-fx,-fz,2.18],[-fx*2.14-rx*.84,-fz*2.14-rz*.84,1],[-fx*2.14+rx*.84,-fz*2.14+rz*.84,1])
+    if(dirSign>=0)dirs.push([fx,fz,2.18*S],[(fx*2.14-rx*.84)*S,(fz*2.14-rz*.84)*S,1],[(fx*2.14+rx*.84)*S,(fz*2.14+rz*.84)*S,1])
+    if(dirSign<=0)dirs.push([-fx,-fz,2.18*S],[(-fx*2.14-rx*.84)*S,(-fz*2.14-rz*.84)*S,1],[(-fx*2.14+rx*.84)*S,(-fz*2.14+rz*.84)*S,1])
     for(const oy of [.65,1.15]){
       segmentRay.origin.x=x;segmentRay.origin.y=footY+oy;segmentRay.origin.z=z
       for(const [dx,dz,scale] of dirs){

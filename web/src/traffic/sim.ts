@@ -1,4 +1,5 @@
 import {nearStatic,resolveContact,staticSolids} from './contact.ts'
+import {CAR_SCALE} from '../drive/scale.ts'
 type Node = {id:number,x:number,y:number,z:number}
 type Lane = {id:number,from:number,to:number,offset:number,kind:'motor'|'bus'|'nonmotor',speedKmh:number,cls?:string,heights?:number[]}
 const tier=(cls?:string)=>cls==='primary'||cls==='trunk'?0:cls==='secondary'?1:cls==='tertiary'?2:3
@@ -27,6 +28,8 @@ function trackHeight(track:Track,dist:number){
 type Actor = {track:Track,dist:number,speed:number,kind:'car'|'scooter'|'person',down:number,dodge:number,x:number,y:number,z:number,yaw:number,scale:number,leaving:boolean,halfWidth:number,halfLength:number,height:number,holdUntil?:number,waitingFor?:Actor,waitingSince?:number}
 type Position = {x:number,z:number,y:number}
 export const MAX_ACTORS=100
+// IDOK-236 (Rock: 路上车太多): share of the motor budget actually filled; pedestrians unchanged.
+export const TRAFFIC_DENSITY=.55
 export const MOBILE_ACTORS=80
 // IDOK-160: motor actors never appear inside the view frustum closer than this,
 // except right after a cold start or teleport when the street is still empty.
@@ -79,7 +82,7 @@ export class Traffic {
         const group=tier(track.cls),radius=street&&group===0?150:185
         if(Math.abs(lateral)>=radius)continue
         const span=Math.sqrt(radius**2-lateral**2)
-        quota[group]+=Math.max(0,Math.min(track.length,center+span)-Math.max(0,center-span))*.095*density[group]
+        quota[group]+=Math.max(0,Math.min(track.length,center+span)-Math.max(0,center-span))*.095*TRAFFIC_DENSITY*density[group]
         if(street&&group===0)for(let dist=Math.max(2,center-span);dist<Math.min(track.length,center+span);dist+=7){
           this.primarySites.push({track,dist,x:track.start.x+track.dx*dist-track.dz*track.offset,y:trackHeight(track,dist),z:track.start.z+track.dz*dist+track.dx*track.offset})
         }
@@ -92,7 +95,7 @@ export class Traffic {
         }
       }
     }
-    const budget=street?this.actorLimit-(quota[0]>=60?12:20):60
+    const budget=Math.round((street?this.actorLimit-(quota[0]>=60*TRAFFIC_DENSITY?12:20):60)*TRAFFIC_DENSITY)
     const primary=street?Math.min(quota[0],budget):0
     if(street)quota[0]=0
     const factor=Math.min(1,(budget-primary)/Math.max(1,quota.reduce((a,b)=>a+b,0)))
@@ -166,7 +169,12 @@ export class Traffic {
     if(!this.lastCamera||Math.hypot(camera.x-this.lastCamera.x,camera.z-this.lastCamera.z)>TELEPORT)this.warmUntil=this.time+WARMUP_S
     this.lastCamera={x:camera.x,y:camera.y,z:camera.z}
     const warm=this.time<this.warmUntil
-    const hiddenSpawn=(point:Position)=>warm||!visible||!visible(point)||(point.x-camera.x)**2+(point.z-camera.z)**2>VISIBLE_SPAWN_MIN**2
+    // IDOK-236: also never materialise a car on top of the camera/player (the frustum test says "not visible" there).
+    const hiddenSpawn=(point:Position)=>{
+      if(warm||!visible)return true
+      const radial=(point.x-camera.x)**2+(point.z-camera.z)**2
+      return radial>VISIBLE_SPAWN_MIN**2||radial>15**2&&!visible(point)
+    }
     this.actors=this.actors.filter(actor=>(!actor.leaving||actor.scale>0)&&distanceSq(actor,camera)<210**2)
     let persons=0,scooters=0
     this.updateLimits(camera,!!visible)
@@ -184,7 +192,7 @@ export class Traffic {
       if(nearbySectors&&sectorPopulation){sectorPopulation[sector(actor,camera)]++;countNearby(actor)}
     }
     let motors=this.actors.length-persons
-    const walkers=visible&&this.limits[0]>=60?12:20
+    const walkers=visible&&this.limits[0]>=60*TRAFFIC_DENSITY?12:20,motorCap=Math.round((cap-walkers)*TRAFFIC_DENSITY),viewCap=Math.round(52*TRAFFIC_DENSITY)
     if(visible&&rebalance&&sectorPopulation&&nearbySectors){
       this.rebalanceAt=this.time+.25
       let distant:Actor|undefined,donor:Actor|undefined,inView=0
@@ -196,12 +204,12 @@ export class Traffic {
         if(visible(actor)){inView++;continue}
         if((distanceSq(actor,camera)>60**2||sectorPopulation[sector(actor,camera)]>8)&&(!distant||distanceSq(actor,camera)>distanceSq(distant,camera)))distant=actor
       }
-      if(walkers===12&&inView<52&&distant)distant.leaving=true
+      if(walkers===12&&inView<viewCap&&distant)distant.leaving=true
       else if(!canSpawn&&deficit&&donor)donor.leaving=true
     }
     for(let attempt=0;attempt<48 && this.actors.length<cap;attempt++){
-      const walk=persons<walkers && (motors>=cap-walkers||attempt%3===0)
-      if(!walk&&motors>=cap-walkers)continue
+      const walk=persons<walkers && (motors>=motorCap||attempt%3===0)
+      if(!walk&&motors>=motorCap)continue
       let bucket=attempt%8
       if(nearbySectors&&!walk&&attempt%2===0){
         for(let offset=1;offset<=8;offset++){
@@ -211,7 +219,7 @@ export class Traffic {
       }
       const samples=!walk&&nearbySectors&&nearbySectors[bucket]<6?this.samples[bucket]:null
       let target=samples?.length?samples[Math.floor(this.random()*samples.length)]:null
-      if(!walk&&visible&&this.primarySites.length&&counts[0]<this.limits[0]&&motors-outside<52&&(!target||attempt%3!==0)){
+      if(!walk&&visible&&this.primarySites.length&&counts[0]<this.limits[0]&&motors-outside<viewCap&&(!target||attempt%3!==0)){
         for(let retry=0;retry<4;retry++){
           const site=this.primarySites[Math.floor(this.random()*this.primarySites.length)]
           if(visible(site)&&hiddenSpawn(site)){target=site;break}
@@ -224,7 +232,7 @@ export class Traffic {
       const group=tier(track.cls)
       if(!walk&&!target&&counts[group]>=this.limits[group])continue
       if(track.walk!==walk || (!walk&&(track.kind==='bus'||(!scooter&&track.kind==='nonmotor'))))continue
-      const actor:Actor={track,dist:this.random()*track.length,speed:0,kind:walk?'person':scooter?'scooter':'car',down:0,dodge:0,x:0,y:0,z:0,yaw:0,scale:0,leaving:false,halfWidth:scooter?.3:.9,halfLength:scooter?.85:2.1,height:1.5}
+      const actor:Actor={track,dist:this.random()*track.length,speed:0,kind:walk?'person':scooter?'scooter':'car',down:0,dodge:0,x:0,y:0,z:0,yaw:0,scale:0,leaving:false,halfWidth:scooter?.3:.9*CAR_SCALE,halfLength:scooter?.85:2.1*CAR_SCALE,height:1.5}
       if(target)actor.dist=target.dist
       this.position(actor)
       const offscreen=!walk&&visible&&!visible(actor)

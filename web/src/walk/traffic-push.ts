@@ -1,8 +1,9 @@
 import R from '@dimforge/rapier3d-compat'
 import {walkConfig} from './config'
+import {CAR_SCALE} from '../drive/scale'
 
 export function trafficPushGuard(world:R.World,capsule:R.Collider,isObstacle:(collider:R.Collider)=>boolean,insideHouse:(x:number,z:number,y:number)=>boolean){
-  const car=new R.Cuboid(.86,.48,2.12),bike=new R.Cuboid(.32,.42,.85)
+  const car=new R.Cuboid(.86*CAR_SCALE,.48,2.12*CAR_SCALE),bike=new R.Cuboid(.32,.42,.85)
   const identity={x:0,y:0,z:0,w:1}
   return (point:R.Vector,dx:number,dz:number,yaw:number,length:number)=>{
     const foot=point.y-walkConfig.height/2
