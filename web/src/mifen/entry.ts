@@ -23,25 +23,29 @@ export function mountLazyTianyuanMifen(ctx: MifenMountContext, opts: LazyMifenOp
   let real: MifenController | null = null
   let loading: Promise<MifenController> | null = null
   let disposed = false
+  let lastDist = Infinity
 
   // 轻量占位传送胶囊（挂载真模块后立即销毁，避免未进店区域加载整套 mifen CSS/3D）
   const stubBtn = document.createElement('button')
   stubBtn.type = 'button'
   stubBtn.className = 'mifen-pill mifen-pill--lazy'
   stubBtn.setAttribute('aria-label', '前往田源米粉，快捷键 N')
-  stubBtn.innerHTML = '<span>田源米粉</span><kbd style="font:600 11px/1 ui-monospace,monospace;padding:2px 5px;border-radius:5px;background:rgba(255,255,255,.12);color:#e9e3d4">N</kbd>'
+  stubBtn.innerHTML = '<span>田源米粉</span><kbd style="font:600 11px/1 ui-monospace,monospace;padding:2px 6px;border-radius:999px;background:rgba(244,239,226,.12);color:#e9e3d4">N</kbd>'
+  const initHidden = document.body.hasAttribute('data-home') || document.body.hasAttribute('data-photo')
+  stubBtn.hidden = initHidden
   Object.assign(stubBtn.style, {
     position: 'fixed',
     left: 'calc(14px + env(safe-area-inset-left))',
     top: 'calc(58px + env(safe-area-inset-top))',
     zIndex: '9',
-    height: '32px',
-    display: 'inline-flex',
+    height: '34px',
+    display: initHidden ? 'none' : 'inline-flex',
     alignItems: 'center',
-    gap: '6px',
-    padding: '0 12px',
+    gap: '10px',
+    padding: '0 7px 0 14px',
     borderRadius: '999px',
-    border: '1px solid rgba(244,239,226,.14)',
+    border: 'none',
+    boxShadow: 'inset 0 0 0 1px rgba(244,239,226,.14)',
     background: 'rgba(22,36,33,.9)',
     color: '#f4efe2',
     font: '400 13px/1 var(--ui-serif,"Noto Serif SC","Songti SC",serif)',
@@ -59,19 +63,24 @@ export function mountLazyTianyuanMifen(ctx: MifenMountContext, opts: LazyMifenOp
   function ensureLoaded(): Promise<MifenController> {
     if (real) return Promise.resolve(real)
     if (!loading) {
-      loading = import('./index').then(mod => {
-        if (disposed) {
-          return {
-            step() {},
-            teleportToShop: async () => false,
-            getProbe: () => null as unknown as MifenDebugProbe,
-            dispose() {},
+      loading = import('./index')
+        .then(mod => {
+          if (disposed) {
+            return {
+              step() {},
+              teleportToShop: async () => false,
+              getProbe: () => null as unknown as MifenDebugProbe,
+              dispose() {},
+            }
           }
-        }
-        teardownStub()
-        real = mod.mountTianyuanMifen(ctx)
-        return real
-      })
+          teardownStub()
+          real = mod.mountTianyuanMifen(ctx)
+          return real
+        })
+        .catch(err => {
+          loading = null
+          throw err
+        })
     }
     return loading
   }
@@ -99,6 +108,31 @@ export function mountLazyTianyuanMifen(ctx: MifenMountContext, opts: LazyMifenOp
 
   if (opts.eagerVerify) void ensureLoaded()
 
+  // 未进入 140m 加载圈前对外暴露轻量代理探针，兼容 verify/QA 直接调用 teleportToShop / walkInside
+  const lazyProbe = {
+    loaded: false,
+    ensureLoaded: () => ensureLoaded().then(c => c.getProbe()),
+    teleportToShop,
+    walkInside: async (zone: 'front' | 'kitchen' | 'outside') => (await ensureLoaded()).getProbe().walkInside(zone),
+    walkToStation: async (station: Parameters<MifenDebugProbe['walkToStation']>[0]) =>
+      (await ensureLoaded()).getProbe().walkToStation(station),
+    isStoryUnlocked: () => false,
+    getState: () => ({
+      loaded: false,
+      nearShop: false,
+      insideShop: false,
+      canEarn: false,
+      storyUnlocked: false,
+      playerDistance: Number.isFinite(lastDist) ? Math.round(lastDist * 100) / 100 : Infinity,
+      playerZone: 'outside' as const,
+      queueCount: 0,
+      activeCustomers: 0,
+      seatedCount: 0,
+      cookingOpen: false,
+      cookingStage: 'idle' as const,
+    }),
+  } as unknown as MifenDebugProbe
+
   return {
     step(dt: number) {
       if (disposed) return
@@ -107,20 +141,24 @@ export function mountLazyTianyuanMifen(ctx: MifenMountContext, opts: LazyMifenOp
         return
       }
       const inHome = document.body.hasAttribute('data-home') || document.body.hasAttribute('data-photo')
-      stubBtn.hidden = inHome
-      stubBtn.style.display = inHome ? 'none' : 'inline-flex'
+      if (stubBtn.hidden !== inHome) {
+        stubBtn.hidden = inHome
+        stubBtn.style.display = inHome ? 'none' : 'inline-flex'
+      }
       if (!loading) {
         const ref = ctx.getPlayerPos() ?? ctx.camera.position
         const dx = ref.x - SHOP_CENTER_X
         const dz = ref.z - SHOP_CENTER_Z
-        if (dx * dx + dz * dz < LOAD_RADIUS_M * LOAD_RADIUS_M) {
+        const distSq = dx * dx + dz * dz
+        lastDist = Math.sqrt(distSq)
+        if (distSq < LOAD_RADIUS_M * LOAD_RADIUS_M) {
           void ensureLoaded()
         }
       }
     },
     teleportToShop,
     getProbe() {
-      return (real ? real.getProbe() : null) as MifenDebugProbe
+      return real ? real.getProbe() : lazyProbe
     },
     dispose() {
       disposed = true
