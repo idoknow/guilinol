@@ -9,6 +9,8 @@ export interface Walker {
   hold(on:boolean):void; face(yaw:number,pitch?:number):void; showFigure(on:boolean):void
   /** Right-hand attachment point for hand-held gear (IDOK-182). */
   handAnchor?():THREE.Object3D
+  /** Ground/height probe under the player (IDOK-215 无人机 placement). */
+  probe?():{surfaceY?:number; foot?:number; renderY?:number}
   /** Raise/relax the right arm while a camera is equipped (IDOK-188). */
   setCameraHold?(on:boolean,pose?:{aim?:{forward?:number;up?:number;side?:number}}):void
 }
