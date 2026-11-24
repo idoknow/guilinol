@@ -25,18 +25,32 @@ function weighted<T extends string>(table:Record<T,number>,u:number){
   return entries[entries.length-1][0]
 }
 
-export function randomPasserby(random:()=>number):Avatar{
+// IDOK-253 年龄段：学生 / 青年 / 中年 / 老人，各自的穿搭、发型、身高和体态不同，男女各半。
+export type Age='student'|'young'|'middle'|'elder'
+type Profile={w:number,looks:Partial<Record<(typeof looks)[number],number>>,hair:{m:string[],f:string[]},height:[number,number],girth:number,hairTint?:string[]}
+export const AGE_PROFILES:Record<Age,Profile>={
+  student:{w:2,looks:{campus:6,track:3,sport:3,hoodie:2},hair:{m:['m_buzz','m_crop','m_fade'],f:['f_pony','f_bangs','f_bun']},height:[.86,.93],girth:.96},
+  young:{w:4,looks:{hoodie:5,shell:4,denim:5,plaid:4,sport:3,track:3,basic:2,knit:2},hair:{m:['m_crop','m_perm','m_fade','m_mullet','m_part'],f:['f_long','f_pony','f_lob','f_wolf','f_bangs']},height:[.98,1.04],girth:1},
+  middle:{w:3,looks:{office:5,basic:4,knit:3,plaid:3,outdoor:4,chinese:2},hair:{m:['m_part','m_crop','m_buzz'],f:['f_lob','f_bun','f_long']},height:[.96,1.01],girth:1.07},
+  elder:{w:2,looks:{chinese:5,knit:4,basic:3,outdoor:3},hair:{m:['m_buzz','m_crop','m_part'],f:['f_bun','f_lob']},height:[.92,.97],girth:1.05,hairTint:['#8d8a84','#b3afa7','#d3d0c8']},
+}
+
+export function randomPasserby(random:()=>number,age?:Age):Avatar&{age:Age,height:number,girth:number,hairTint?:string}{
   const r=(n:number)=>Math.floor(random()*n)
-  const body=random()<.5?'m':'f'
-  let look=weighted(LOOK_WEIGHTS,random())
-  if(look==='campus'&&random()<.5)look='sport'
+  age??=weighted(Object.fromEntries(Object.entries(AGE_PROFILES).map(([key,p])=>[key,p.w])) as Record<Age,number>,random())
+  const profile=AGE_PROFILES[age],body=random()<.5?'m':'f'
+  const look=weighted(profile.looks as Record<(typeof looks)[number],number>,random())
+  const styles=profile.hair[body].filter(name=>(hairStyles[body] as readonly string[]).includes(name))
+  const [lo,hi]=profile.height
   return {v:1,body,skin:[0,1,1,2,2,2,3,3,4][r(9)],face:r(faceNames.length),brows:r(browNames.length),eyes:r(eyeNames.length),
-    hair:hairStyles[body][r(6)],hairColor:[0,0,0,1,1,2,3][r(7)],look,createdAt:1}
+    hair:(styles[r(styles.length)]??hairStyles[body][0]) as Avatar['hair'],hairColor:[0,0,0,1,1,2,3][r(7)],look,createdAt:1,
+    age,height:(lo+random()*(hi-lo))*(body==='f'?.96:1),girth:profile.girth,hairTint:profile.hairTint?.[r(profile.hairTint.length)]}
 }
 
 export function crowd(scene:THREE.Scene,camera:THREE.Camera,groundAt?:(x:number,z:number,y:number,car:boolean)=>number|undefined){
   const mobile=touchUi()
-  const LIMIT=mobile?6:14,RANGE=mobile?45:70,POOL=mobile?8:16
+  // IDOK-253: 每街只有 4–8 人，视距内的路人全部用带骨骼的角色，不再在近中景露出方块替身
+  const LIMIT=mobile?12:28,RANGE=mobile?80:140,POOL=mobile?10:20
   const templates:(Promise<Template>|undefined)[]=new Array(POOL),ready:(Template|undefined)[]=new Array(POOL)
   const assigned=new WeakMap<object,number>(),active=new Map<Walker,View>()
   let seed=0x2290
@@ -46,7 +60,17 @@ export function crowd(scene:THREE.Scene,camera:THREE.Camera,groundAt?:(x:number,
       const look=randomPasserby(random)
       templates[index]=import('../walk/character').then(async mod=>{
         const model=await mod.previewCharacter(look)
+        const hairMesh=model.scene.userData.creatorHair as THREE.Object3D|undefined
         model.scene.userData={}
+        // 老人白发 / 花白：发型网格的顶点色是相对底色的比例，换底色即可
+        if(look.hairTint)hairMesh?.traverse(node=>{if(node instanceof THREE.Mesh)(node.material as THREE.MeshStandardMaterial).color.set(look.hairTint!)})
+        // 身高与体型：绕脚底缩放（角色原点在脚底），不改贴地
+        model.scene.scale.set(look.girth*look.height,look.height,look.girth*look.height)
+        if(look.age==='student'){
+          const torso=model.scene.getObjectByName('attach_torso')
+          if(torso){const pack=new THREE.Mesh(new THREE.BoxGeometry(.3,.38,.14),new THREE.MeshStandardMaterial({color:[0x3e4a55,0x2f5d7c,0x7a3b35,0x3f5a4c][Math.floor(random()*4)],roughness:.85,flatShading:true}))
+            pack.position.set(0,-.02,.2);pack.name='passer-by backpack';torso.add(pack)}
+        }
         const t={scene:model.scene,clips:model.animations}
         ready[index]=t
         return t
