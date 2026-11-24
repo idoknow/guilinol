@@ -33,6 +33,10 @@ def sidewalk_faces(directory, manifest):
 
 def derive(center, surface, half_width):
     safe = surface.difference(center.buffer(half_width, cap_style='flat')).buffer(-BODY_CLEARANCE)
+    start, end = center.coords
+    east, south = ((end[axis]-start[axis])/center.length for axis in (0, 1))
+    extended = LineString([(start[0]-SEARCH_METRES*east, start[1]-SEARCH_METRES*south),
+                           (end[0]+SEARCH_METRES*east, end[1]+SEARCH_METRES*south)])
     for sign in (-1, 1):
         best = []
         for index in range(1, int(2*(SEARCH_METRES-half_width))+1):
@@ -42,6 +46,15 @@ def derive(center, surface, half_width):
             if sum(part.length for part in clipped) > sum(part.length for part in best):
                 best = clipped
         yield from best
+        if not best:
+            margin = safe.intersection(center.buffer(SEARCH_METRES))
+            for index in range(1, int(2*(SEARCH_METRES-half_width))+1):
+                candidate = extended.offset_curve(sign*(half_width+index*.5))
+                clipped = [part for part in shapely.get_parts(candidate.intersection(margin))
+                           if part.geom_type == 'LineString' and part.length >= 2]
+                if sum(part.length for part in clipped) > sum(part.length for part in best):
+                    best = clipped
+            yield from best
 
 
 def audit(directory):
