@@ -33,7 +33,7 @@ class InfeasibleApproach(ValueError):
     pass
 
 
-def fit_patch(control, mask, left, top, roads, anchors):
+def fit_patch(control, mask, left, top, roads, anchors, curvature=.005):
     distance = distance_transform_edt(~mask)*STEP
     shape = control.shape
     n = control.size
@@ -56,6 +56,13 @@ def fit_patch(control, mask, left, top, roads, anchors):
             if finite.any():
                 rows.append(matrix[finite]*sign)
                 limits.append(values[finite])
+    # Keep unsampled transverse spline coefficients within the local
+    # elevation range. Centreline constraints alone can otherwise be met
+    # by enormous opposing coefficients on a short reverse curve.
+    survey_heights = [v for anchor in anchors for v in anchor[2:] if np.isfinite(v)]
+    lower = min(float(control.min()),min(survey_heights,default=datum))-1
+    upper = max(float(control.max()),max(survey_heights,default=datum))+1
+    bounds(eye,lower-datum,upper-datum)
     if anchors:
         x,z,lo,hi = np.array(anchors).T
         bounds(basis(shape,left,top,np.column_stack((x,z))),lo-datum,hi-datum)
@@ -84,7 +91,7 @@ def fit_patch(control, mask, left, top, roads, anchors):
         valid = keep[:-1]&keep[1:]
         cap = grade_cap(tags)
         bounds(slope[valid],-cap,cap)
-        bounds(((slope[1:]-slope[:-1])/step)[valid[1:]&valid[:-1]],-.005,.005)
+        bounds(((slope[1:]-slope[:-1])/step)[valid[1:]&valid[:-1]],-curvature,curvature)
         samples.append(xy[keep])
         radii.append(np.full(keep.sum(),span))
     if not samples:
@@ -104,6 +111,10 @@ def fit_patch(control, mask, left, top, roads, anchors):
     solution = clarabel.DefaultSolver(sparse.triu(hessian).tocsc(),load,constraints,rhs,
                                      [clarabel.NonnegativeConeT(len(rhs))],settings).solve()
     if solution.status not in (clarabel.SolverStatus.Solved,clarabel.SolverStatus.AlmostSolved):
+        if curvature==.005 and solution.status==clarabel.SolverStatus.PrimalInfeasible:
+            # Close consecutive crossing panels can require a shorter vertical
+            # curve. At 0.014/m the slope changes by at most 2.8% over 2 m.
+            return fit_patch(control,mask,left,top,roads,anchors,curvature=.014)
         raise InfeasibleApproach(f'Rail approach fit at ({left},{top}): {solution.status}')
     target[free] = solution.x
     fitted = datum+target.reshape(shape)
