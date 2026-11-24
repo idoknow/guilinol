@@ -9,6 +9,7 @@ import {database, measuredConnections} from './postgres.mjs'
 import {bucket} from './bucket.mjs'
 import {createReadiness} from './readiness.mjs'
 import {presence} from './live.mjs'
+import {multiplayer} from './mp-admin.mjs'
 
 crypto.subtle.timingSafeEqual = (left,right) => left.byteLength===right.byteLength && timingSafeEqual(left,right)
 // 连接/查询都有上限：卡住的查询不能长期占着 5 连接的池子
@@ -65,7 +66,8 @@ const cachedPerfQuery = (path, params) => {
   if (!cacheableAdminPath(path)) return runPerfQuery(path, params).then(done)
   return withAdminCache(`${path}?${params}`, () => runPerfQuery(path, params)).then(done)
 }
-const env = {...process.env, perfQuery:cachedPerfQuery, DB:database(connections), FEEDBACK:bucket(process.env.S3_ENDPOINT)}
+const mp=multiplayer(pool,process.env)
+const env = {...process.env, mpAdmin:mp.route, perfQuery:cachedPerfQuery, DB:database(connections), FEEDBACK:bucket(process.env.S3_ENDPOINT)}
 const origin = new URL(process.env.PUBLIC_ORIGIN).origin
 const online = presence(pool)
 
@@ -101,6 +103,7 @@ const server=serve({port:Number(process.env.PORT || 3000),fetch: async request =
 
 // 启动后立刻探一次，别让第一个探针等到 TTL 到期
 void readiness.kick()
+const stopMp=mp.start()
 
 // 优雅退出：k8s 删 pod 时先 SIGTERM（配合 preStop 已先摘流量），等在途请求跑完再退出；
 // 20 秒兜底，避免卡住的连接把滚动更新拖成超时。
@@ -109,6 +112,7 @@ for (const signal of ['SIGTERM','SIGINT']) {
   process.on(signal, () => {
     if (closing) return
     closing=true
+    stopMp()
     setTimeout(() => process.exit(0), 20000).unref()
     server.close(async () => {
       try { await pool.end() } catch {}

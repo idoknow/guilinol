@@ -1,4 +1,5 @@
 export interface Env {
+  mpAdmin?:(path:string,request:Request,actor:string)=>Promise<Response>
   RT_JOIN_SECRET?: string
   perfQuery?:(path:string,params:URLSearchParams)=>Promise<Response>
   DB: D1Database; FEEDBACK:R2Bucket; BRIDGE_TOKEN?:string; EMAIL_DEV_LOG?: string; RESEND_API_KEY?: string
