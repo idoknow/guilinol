@@ -4,6 +4,10 @@ export type ChatAck={t:'chat_ack';cid:string;ok:boolean;mid?:string;code?:string
 type ChatEvent=ChatMessage|ChatAck|{t:'chat_hist';ch:Channel;msgs:ChatMessage[]}|{t:'chat_del';mid:string}|{t:'chat_mute';until:number;reason:string}|{t:'chat_reset'}
 const listeners=new Set<(event:ChatEvent)=>void>()
 const pending=new Map<string,(ack:ChatAck)=>void>()
+let self=0
+const selfListeners=new Set<(uid:number)=>void>()
+/** 当前联机账号 uid（welcome 里带），聊天框用它标出「我」说的话 */
+export function setChatSelf(uid:number){self=uid;for(const fn of selfListeners)fn(uid)}
 let transport:((packet:object)=>void)|undefined
 export function receiveChat(event:ChatEvent){
   if(event.t==='chat_ack')pending.get(event.cid)?.(event)
@@ -13,6 +17,7 @@ export function bindChat(next?:typeof transport){
   if(!next){for(const [cid,resolve] of pending)resolve({t:'chat_ack',cid,ok:false,code:'error'});if(transport)receiveChat({t:'chat_reset'})}transport=next
 }
 export const chatStore={
+  onSelf(fn:(uid:number)=>void){selfListeners.add(fn);fn(self);return ()=>selfListeners.delete(fn)},
   subscribe(listener:(event:ChatEvent)=>void){listeners.add(listener);return ()=>listeners.delete(listener)},
   history(ch:Channel){transport?.({t:'chat_hist',ch})},
   send(ch:Channel,text:string):Promise<ChatAck>{const cid=crypto.randomUUID();return new Promise(resolve=>{

@@ -1,0 +1,766 @@
+{
+  "shopTitle": "田源米粉 · 三多路老店",
+  "condiments": [
+    {
+      "id": "scallion",
+      "name": "葱花",
+      "color": "#4ea83b"
+    },
+    {
+      "id": "pickled_green_chili",
+      "name": "招牌腌青椒",
+      "color": "#5d7d2f"
+    },
+    {
+      "id": "sour_long_beans",
+      "name": "酸豆角",
+      "color": "#7b8a2e"
+    },
+    {
+      "id": "radish_strips",
+      "name": "萝卜丝",
+      "color": "#b87932"
+    },
+    {
+      "id": "pickled_chili",
+      "name": "泡椒",
+      "color": "#c9382b"
+    },
+    {
+      "id": "chili_oil",
+      "name": "油辣椒",
+      "color": "#b42218"
+    },
+    {
+      "id": "sour_bamboo",
+      "name": "酸笋",
+      "color": "#dfd09a"
+    }
+  ],
+  "recipes": [
+    {
+      "id": "lucai_1",
+      "name": "招牌卤菜粉（壹两）",
+      "portion": "一两",
+      "price": 4.5,
+      "ticketColor": "#f5d76e",
+      "requiredMeats": [
+        "guoshao"
+      ],
+      "brothStyle": "lucai_dry",
+      "boilTargetSec": 2.2,
+      "brineTarget": 0.6,
+      "ingredients": {
+        "noodle": 0.75,
+        "brine": 1,
+        "guoshao": 1,
+        "meat": 0,
+        "condiment": 1
+      },
+      "description": "三多路老桂林清晨标配：一两爽滑圆粉铺金黄脆皮锅烧，浇秘制老卤干拌，先嗦干粉再喝热骨汤。"
+    },
+    {
+      "id": "lucai_2",
+      "name": "招牌卤菜粉（贰两）",
+      "portion": "二两",
+      "price": 5.5,
+      "ticketColor": "#f39c6b",
+      "requiredMeats": [
+        "guoshao",
+        "beef"
+      ],
+      "brothStyle": "lucai_dry",
+      "boilTargetSec": 2.5,
+      "brineTarget": 0.68,
+      "ingredients": {
+        "noodle": 1,
+        "brine": 1,
+        "guoshao": 1,
+        "meat": 1,
+        "condiment": 1
+      },
+      "description": "田源点单率最高的二两经典：脆锅烧搭薄切卤牛肉片，老卤挂粉浓香回甘，配招牌腌青椒最对味。"
+    },
+    {
+      "id": "lucai_3",
+      "name": "招牌卤菜粉（叁两）",
+      "portion": "三两",
+      "price": 6.0,
+      "ticketColor": "#e66767",
+      "requiredMeats": [
+        "guoshao",
+        "beef",
+        "charsiu"
+      ],
+      "brothStyle": "lucai_dry",
+      "boilTargetSec": 2.8,
+      "brineTarget": 0.74,
+      "ingredients": {
+        "noodle": 1.5,
+        "brine": 1.4,
+        "guoshao": 1,
+        "meat": 2,
+        "condiment": 1
+      },
+      "description": "扎实三两管饱大碗：锅烧、卤牛肉与叉烧三拼铺面，醇厚老卤裹匀每根米粉，老街坊干活前必嗦。"
+    },
+    {
+      "id": "guoshao_bowl",
+      "name": "招牌锅烧粉",
+      "portion": "二两",
+      "price": 10.5,
+      "ticketColor": "#e8a838",
+      "requiredMeats": [
+        "guoshao"
+      ],
+      "brothStyle": "lucai_dry",
+      "boilTargetSec": 2.4,
+      "brineTarget": 0.66,
+      "ingredients": {
+        "noodle": 1,
+        "brine": 1,
+        "guoshao": 1,
+        "meat": 0,
+        "condiment": 1
+      },
+      "description": "现炸带皮五花锅烧起泡酥脆、肥而不腻，双倍厚切盖满二两米粉，干拌卤水咬下咔嚓作响。"
+    },
+    {
+      "id": "beef_soup",
+      "name": "原汤卤牛肉粉",
+      "portion": "二两",
+      "price": 11.5,
+      "ticketColor": "#63b3ed",
+      "requiredMeats": [
+        "beef"
+      ],
+      "brothStyle": "soup",
+      "boilTargetSec": 2.7,
+      "brineTarget": 0.7,
+      "ingredients": {
+        "noodle": 1,
+        "brine": 1,
+        "guoshao": 0,
+        "meat": 1,
+        "condiment": 1
+      },
+      "description": "精选牛腱慢卤入味薄切铺碗，秘制老卤打底再冲入滚烫筒骨原汤，汤鲜肉嫩暖胃舒坦。"
+    },
+    {
+      "id": "double_combo",
+      "name": "锅烧牛肉双拼粉",
+      "portion": "二两",
+      "price": 15.0,
+      "ticketColor": "#9b7ede",
+      "requiredMeats": [
+        "guoshao",
+        "beef"
+      ],
+      "brothStyle": "lucai_dry",
+      "boilTargetSec": 2.6,
+      "brineTarget": 0.76,
+      "ingredients": {
+        "noodle": 1,
+        "brine": 1,
+        "guoshao": 1,
+        "meat": 1,
+        "condiment": 1
+      },
+      "description": "外酥里嫩脆锅烧配纹路分明卤牛肉双倍加码，老卤提鲜干拌喷香，三多路打卡必点双绝。"
+    },
+    {
+      "id": "grand_feast",
+      "name": "老饕全套三拼+卤蛋+油条",
+      "portion": "三两",
+      "price": 18.5,
+      "ticketColor": "#d946ef",
+      "requiredMeats": [
+        "guoshao",
+        "beef",
+        "charsiu",
+        "egg",
+        "youtiao"
+      ],
+      "brothStyle": "lucai_dry",
+      "boilTargetSec": 3.2,
+      "brineTarget": 0.84,
+      "ingredients": {
+        "noodle": 1.5,
+        "brine": 1.4,
+        "guoshao": 1,
+        "meat": 2,
+        "condiment": 1
+      },
+      "description": "田源顶配全家福：三两米粉配锅烧、卤牛肉、叉烧三拼，再添整颗虎皮卤蛋与香脆现炸油条。"
+    },
+    {
+      "id": "sour_spicy",
+      "name": "桂林酸辣煮粉",
+      "portion": "二两",
+      "price": 9.0,
+      "ticketColor": "#ef4444",
+      "requiredMeats": [
+        "beef",
+        "charsiu"
+      ],
+      "brothStyle": "sour_spicy",
+      "boilTargetSec": 3.4,
+      "brineTarget": 0.58,
+      "ingredients": {
+        "noodle": 1,
+        "brine": 1,
+        "guoshao": 0,
+        "meat": 2,
+        "condiment": 1
+      },
+      "description": "小锅猛火现煮二两圆粉，猛下酸笋、泡椒与秘制酸辣汤底，配卤牛肉叉烧酸辣开胃、嗦到冒汗。"
+    },
+    {
+      "id": "sanxian_mifen",
+      "name": "桂林三鲜煮粉",
+      "portion": "二两",
+      "price": 13.0,
+      "ticketColor": "#38bdf8",
+      "requiredMeats": [
+        "charsiu",
+        "egg"
+      ],
+      "brothStyle": "soup",
+      "boilTargetSec": 3.0,
+      "brineTarget": 0.62,
+      "unlockAchievementId": "ach_first_rush",
+      "ingredients": {
+        "noodle": 1,
+        "brine": 1,
+        "meat": 2,
+        "condiment": 1
+      },
+      "description": "鲜肉、叉烧与卤蛋滚汤现煮，清甜筒骨底配嫩滑圆粉。"
+    },
+    {
+      "id": "brisket_lucai",
+      "name": "秘制牛腩卤菜粉",
+      "portion": "三两",
+      "price": 16.5,
+      "ticketColor": "#c084fc",
+      "requiredMeats": [
+        "beef",
+        "guoshao"
+      ],
+      "brothStyle": "lucai_dry",
+      "boilTargetSec": 2.9,
+      "brineTarget": 0.78,
+      "unlockAchievementId": "ach_delivery_pro",
+      "ingredients": {
+        "noodle": 1.5,
+        "brine": 1.5,
+        "guoshao": 1,
+        "meat": 2,
+        "condiment": 1
+      },
+      "description": "慢焖五香牛腩搭现炸锅烧，浇浓缩老卤干拌。"
+    },
+    {
+      "id": "you_cha_combo",
+      "name": "恭城油茶锅烧粉套餐",
+      "portion": "三两",
+      "price": 21.0,
+      "ticketColor": "#fbbf24",
+      "requiredMeats": [
+        "guoshao",
+        "beef",
+        "youtiao"
+      ],
+      "brothStyle": "lucai_dry",
+      "boilTargetSec": 3.1,
+      "brineTarget": 0.8,
+      "unlockAchievementId": "ach_reputation_star",
+      "ingredients": {
+        "noodle": 1.5,
+        "brine": 1.5,
+        "guoshao": 1.5,
+        "meat": 1.5,
+        "condiment": 1.5
+      },
+      "description": "三两锅烧牛肉卤菜粉配现打恭城油茶与脆油条。"
+    }
+  ],
+  "upgrades": [
+    {
+      "id": "shop_lv1",
+      "kind": "shop_level",
+      "name": "三多路初创老铺",
+      "targetLevel": 1,
+      "cost": 0,
+      "description": "三多路街角一间老门面：前厅配菜台与基础堂食方桌、后厨单口烫粉灶，地道老味道从这里起步。",
+      "effect": {
+        "maxQueue": 3,
+        "seatingCapacity": 6,
+        "spawnRateMultiplier": 1.0,
+        "revenueMultiplier": 1.0,
+        "reputationBonus": 0
+      }
+    },
+    {
+      "id": "shop_lv2",
+      "kind": "shop_level",
+      "name": "三多路双开间旺铺",
+      "targetLevel": 2,
+      "cost": 68,
+      "description": "打通隔壁门面扩建双开间前厅，增设不锈钢七格长配料台与翻台卡座，开局 2~3 分钟即可迎来首次爆单扩店。",
+      "effect": {
+        "maxQueue": 5,
+        "seatingCapacity": 12,
+        "spawnRateMultiplier": 1.35,
+        "revenueMultiplier": 1.15,
+        "reputationBonus": 12
+      }
+    },
+    {
+      "id": "shop_lv3",
+      "kind": "shop_level",
+      "name": "田源三多路旗舰大店",
+      "targetLevel": 3,
+      "cost": 188,
+      "description": "升级三多路网红旗舰总店：金字发光招牌、宽敞明档后厨、两层翻台堂食位与免费筒骨汤自助台，口碑客流双爆棚。",
+      "effect": {
+        "maxQueue": 8,
+        "seatingCapacity": 20,
+        "spawnRateMultiplier": 1.75,
+        "revenueMultiplier": 1.35,
+        "reputationBonus": 30
+      }
+    },
+    {
+      "id": "eq_twin_boiler",
+      "kind": "equipment",
+      "name": "双口猛火烫粉灶",
+      "cost": 42,
+      "description": "双口大功率猛火沸水锅并行烫粉，缩短烫粉耗时并放宽黄金火候容错区间。",
+      "effect": {
+        "boilSpeedMultiplier": 1.35,
+        "boilWindowBonus": 0.25
+      }
+    },
+    {
+      "id": "eq_master_brine",
+      "kind": "equipment",
+      "name": "秘制老卤秘方",
+      "cost": 58,
+      "description": "二十八味草果罗汉果慢熬传世老卤，放宽浇卤比例容错并大幅提升食客好评小费与单碗溢价。",
+      "effect": {
+        "brineToleranceBonus": 0.08,
+        "tipBonus": 0.22,
+        "priceMultiplier": 1.12
+      }
+    },
+    {
+      "id": "eq_master_cleaver",
+      "kind": "equipment",
+      "name": "老师傅快刀",
+      "cost": 52,
+      "description": "手起刀落薄切锅烧与牛腱片，加快切码铺肉出碗速度并提升成碗品相评分。",
+      "effect": {
+        "sliceSpeedMultiplier": 1.4,
+        "qualityBonus": 0.12
+      }
+    },
+    {
+      "id": "eq_ticket_printer",
+      "kind": "equipment",
+      "name": "分色粉票速印机",
+      "cost": 76,
+      "description": "一两黄、二两橙、三两红分色粉票秒出不乱单，延长排队耐心、增加队列容量并加快翻台来客。",
+      "effect": {
+        "patienceMultiplier": 1.3,
+        "spawnRateMultiplier": 1.2,
+        "maxQueueBonus": 2
+      }
+    },
+    {
+      "id": "eq_cold_cabinet",
+      "kind": "equipment",
+      "name": "双温保鲜冷柜",
+      "cost": 64,
+      "description": "鲜湿粉隔夜损耗减半，全原料库存上限提升。",
+      "effect": {
+        "inventoryCapBonus": 18,
+        "spoilageReduction": 0.5
+      }
+    },
+    {
+      "id": "eq_pack_station",
+      "kind": "equipment",
+      "name": "汤卤分装打包台",
+      "cost": 72,
+      "description": "每日外卖接单上限增加，分格打包耗材更省。",
+      "effect": {
+        "deliveryQuotaBonus": 4,
+        "packCostDiscount": 0.35
+      }
+    }
+  ],
+  "customerTypes": [
+    {
+      "id": "sanduo_neighbor",
+      "name": "三多路老街坊",
+      "shirtColors": [
+        "#5c7c99",
+        "#7c8b6f",
+        "#a3876a",
+        "#4e5d6c"
+      ],
+      "patienceSec": 85,
+      "tipMultiplier": 1.15,
+      "favoriteRecipes": [
+        "lucai_1",
+        "lucai_2",
+        "lucai_3",
+        "guoshao_bowl"
+      ],
+      "preferredCondiments": [
+        "scallion",
+        "pickled_green_chili",
+        "sour_long_beans",
+        "radish_strips"
+      ],
+      "praiseLines": [
+        "啧啧，还是三多路这口老卤正宗！锅烧够脆，明天一早还来嗦！",
+        "老板手艺稳咯，卤水香得刚合适，配招牌腌青椒巴适得很！",
+        "从榕湖晨练绕过来就认你家这一碗，先干拌再喝骨汤，舒服！"
+      ],
+      "impatientLines": [
+        "老板快点咯，一会还要去榕湖边打太极咧！",
+        "粉票都放台面半天咯，二两干拌麻烦先烫起！",
+        "哎呀今天排这么长队，我这肚子早咕咕叫咯。"
+      ]
+    },
+    {
+      "id": "shizijie_commuter",
+      "name": "十字街早高峰上班族",
+      "shirtColors": [
+        "#e2e8f0",
+        "#3b82f6",
+        "#334155",
+        "#64748b"
+      ],
+      "patienceSec": 58,
+      "tipMultiplier": 1.2,
+      "favoriteRecipes": [
+        "lucai_2",
+        "guoshao_bowl",
+        "beef_soup",
+        "sour_spicy"
+      ],
+      "preferredCondiments": [
+        "scallion",
+        "sour_long_beans",
+        "chili_oil",
+        "pickled_chili"
+      ],
+      "praiseLines": [
+        "出餐真快！三分钟嗦完二两卤菜粉，去十字街打卡完全不迟到！",
+        "这卤牛肉切片够厚实，油辣椒一拌提神醒脑，五星好评！",
+        "火候卡得刚刚好，米粉爽滑不坨，早高峰救星！"
+      ],
+      "impatientLines": [
+        "老板催一下呀，九点打卡快迟到了，十字街那边还堵车呢！",
+        "我的粉烫好了没？赶时间嗦两口就得冲回写字楼！",
+        "哎呀早高峰手脚麻利点嘛，再等要扣全勤啦！"
+      ]
+    },
+    {
+      "id": "xhs_tourist",
+      "name": "小红书打卡游客",
+      "shirtColors": [
+        "#f472b6",
+        "#fb923c",
+        "#facc15",
+        "#38bdf8",
+        "#a78bfa"
+      ],
+      "patienceSec": 78,
+      "tipMultiplier": 1.45,
+      "favoriteRecipes": [
+        "double_combo",
+        "grand_feast",
+        "guoshao_bowl",
+        "beef_soup"
+      ],
+      "preferredCondiments": [
+        "pickled_green_chili",
+        "sour_long_beans",
+        "scallion",
+        "chili_oil"
+      ],
+      "praiseLines": [
+        "救命也太香了吧！这锅烧牛肉双拼绝了，发小红书肯定爆赞！",
+        "桂林本地人推荐的三多路老店果然没踩雷，卤汁拌匀香迷糊了！",
+        "全套三拼加卤蛋油条才十几块，这性价比在景区哪找啊，必须二刷！"
+      ],
+      "impatientLines": [
+        "老板还有多久呀，我们拍完照还要赶去象鼻山和日月双塔呢～",
+        "请问我的双拼粉做好了吗？手机支架都架好等拍出锅啦！",
+        "排队人好多哦，好饿呀，能不能先帮我把粉烫上呀？"
+      ]
+    },
+    {
+      "id": "late_night_foodie",
+      "name": "夜宵嗦粉党",
+      "shirtColors": [
+        "#1e293b",
+        "#dc2626",
+        "#16a34a",
+        "#7c3aed"
+      ],
+      "patienceSec": 72,
+      "tipMultiplier": 1.35,
+      "favoriteRecipes": [
+        "sour_spicy",
+        "grand_feast",
+        "lucai_3",
+        "double_combo"
+      ],
+      "preferredCondiments": [
+        "sour_bamboo",
+        "pickled_chili",
+        "chili_oil",
+        "pickled_green_chili"
+      ],
+      "praiseLines": [
+        "半夜来一碗酸辣煮粉加满酸笋泡椒，爽到飞起！夜宵之神！",
+        "三两老饕全家福配热骨汤，打完球嗦这一碗简直续命！",
+        "越夜越香！三多路这盏暖灯和锅烧脆响就是桂林夜生活灵魂！"
+      ],
+      "impatientLines": [
+        "老板火开猛点！半夜饿得前胸贴后背，急需一碗热粉救命！",
+        "酸辣粉怎么还没起锅啊，我口水都要流一地了！",
+        "兄弟抓紧烫粉咯，一会哥几个还要去两江四湖吹夜风呢！"
+      ]
+    }
+  ],
+  "inventoryItems": [
+    {
+      "id": "noodle",
+      "name": "鲜湿圆粉",
+      "unit": "份",
+      "unitCost": 0.9,
+      "batchSize": 20,
+      "baseCap": 60,
+      "overnightSpoilageRate": 0.28
+    },
+    {
+      "id": "brine",
+      "name": "秘制老卤",
+      "unit": "份",
+      "unitCost": 1.0,
+      "batchSize": 20,
+      "baseCap": 75,
+      "overnightSpoilageRate": 0.05
+    },
+    {
+      "id": "guoshao",
+      "name": "脆皮锅烧",
+      "unit": "份",
+      "unitCost": 1.6,
+      "batchSize": 15,
+      "baseCap": 50,
+      "overnightSpoilageRate": 0.12
+    },
+    {
+      "id": "meat",
+      "name": "卤牛肉叉烧",
+      "unit": "份",
+      "unitCost": 1.8,
+      "batchSize": 15,
+      "baseCap": 50,
+      "overnightSpoilageRate": 0.08
+    },
+    {
+      "id": "condiment",
+      "name": "七盆小料",
+      "unit": "份",
+      "unitCost": 0.6,
+      "batchSize": 25,
+      "baseCap": 80,
+      "overnightSpoilageRate": 0.06
+    }
+  ],
+  "deliveryZones": [
+    {
+      "id": "zone_nikoniko",
+      "name": "微笑堂商厦",
+      "distanceM": 220,
+      "baseFee": 2.2,
+      "perKmRate": 2.4,
+      "deadlineSec": 45
+    },
+    {
+      "id": "zone_shizijie",
+      "name": "十字街写字楼",
+      "distanceM": 280,
+      "baseFee": 2.4,
+      "perKmRate": 2.4,
+      "deadlineSec": 50
+    },
+    {
+      "id": "zone_central_square",
+      "name": "中心广场",
+      "distanceM": 360,
+      "baseFee": 2.6,
+      "perKmRate": 2.5,
+      "deadlineSec": 55
+    },
+    {
+      "id": "zone_zhengyang",
+      "name": "正阳步行街",
+      "distanceM": 540,
+      "baseFee": 3.0,
+      "perKmRate": 2.6,
+      "deadlineSec": 65
+    },
+    {
+      "id": "zone_dongxixiang",
+      "name": "东西巷",
+      "distanceM": 580,
+      "baseFee": 3.2,
+      "perKmRate": 2.6,
+      "deadlineSec": 68
+    },
+    {
+      "id": "zone_elephant",
+      "name": "象鼻山北门",
+      "distanceM": 1120,
+      "baseFee": 3.8,
+      "perKmRate": 3.0,
+      "deadlineSec": 90
+    }
+  ],
+  "retailSkus": [
+    {
+      "id": "sku_brine_bottle",
+      "name": "浓缩老卤随身瓶",
+      "kind": "retail",
+      "price": 14.0,
+      "unitCost": 5.5,
+      "consumes": {
+        "brine": 4
+      },
+      "minShopLevel": 1,
+      "dailyCap": 6
+    },
+    {
+      "id": "sku_guoshao_box",
+      "name": "脆皮锅烧熟食盒",
+      "kind": "retail",
+      "price": 12.0,
+      "unitCost": 6.2,
+      "consumes": {
+        "guoshao": 3
+      },
+      "minShopLevel": 1,
+      "dailyCap": 6
+    },
+    {
+      "id": "sku_condiment_jar",
+      "name": "腌青椒酸豆角罐",
+      "kind": "retail",
+      "price": 9.5,
+      "unitCost": 3.5,
+      "consumes": {
+        "condiment": 3
+      },
+      "minShopLevel": 1,
+      "dailyCap": 8
+    },
+    {
+      "id": "sku_wet_noodle_pack",
+      "name": "日配鲜湿粉批发包",
+      "kind": "wholesale",
+      "price": 12.0,
+      "unitCost": 9.5,
+      "consumes": {
+        "noodle": 8
+      },
+      "minShopLevel": 2,
+      "dailyCap": 4
+    }
+  ],
+  "achievements": [
+    {
+      "id": "ach_first_rush",
+      "name": "早市开门红",
+      "metric": "totalBowlsServed",
+      "target": 12,
+      "rewardFunds": 12,
+      "unlocksRecipeId": "sanxian_mifen"
+    },
+    {
+      "id": "ach_combo_master",
+      "name": "粉票连击手",
+      "metric": "streak",
+      "target": 5,
+      "rewardFunds": 15
+    },
+    {
+      "id": "ach_delivery_pro",
+      "name": "汤卤分离达人",
+      "metric": "totalDeliveries",
+      "target": 6,
+      "rewardFunds": 18,
+      "unlocksRecipeId": "brisket_lucai"
+    },
+    {
+      "id": "ach_retail_craft",
+      "name": "老卤外带口碑",
+      "metric": "totalRetailSold",
+      "target": 8,
+      "rewardFunds": 16
+    },
+    {
+      "id": "ach_reputation_star",
+      "name": "三多路必吃老店",
+      "metric": "reputation",
+      "target": 4.7,
+      "rewardFunds": 25,
+      "unlocksRecipeId": "you_cha_combo"
+    },
+    {
+      "id": "ach_three_streams",
+      "name": "三线齐飞",
+      "metric": "threeStreamsDay",
+      "target": 1,
+      "rewardFunds": 20
+    },
+    {
+      "id": "ach_flagship_store",
+      "name": "旗舰总店开业",
+      "metric": "shopLevel",
+      "target": 3,
+      "rewardFunds": 30
+    }
+  ],
+  "economyConfig": {
+    "morningRushStartHour": 6.5,
+    "morningRushEndHour": 9.5,
+    "morningRushTrafficMultiplier": 2.0,
+    "morningRushPremiumRate": 0.15,
+    "morningRushZeroDropBonusRate": 0.15,
+    "rawCostRateNormal": 0.28,
+    "rawCostRateEmergencyBrine": 0.36,
+    "deliveryMarkupRate": 0.15,
+    "deliveryPlatformCommissionRate": 0.18,
+    "deliverySeparatedPackCost": 1.2,
+    "deliveryMixedPenalty": 1.5,
+    "deliveryDailyQuotaByLevel": {
+      "1": 8,
+      "2": 12,
+      "3": 18
+    },
+    "fixedDailyOverheadByLevel": {
+      "1": 8,
+      "2": 14,
+      "3": 22
+    }
+  }
+}

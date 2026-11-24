@@ -1,0 +1,942 @@
+/* 三多路田源米粉 HUD。规则与 DOM 契约见 docs/design-rules.md。 */
+
+:root {
+  --mf-font: var(--ui-serif, "Noto Serif SC", "Source Han Serif SC", "Songti SC", serif);
+  --mf-surface: var(--ui-glass-solid, rgba(22, 36, 33, 0.9));
+  --mf-line: rgba(244, 239, 226, 0.14);
+  --mf-fill: rgba(244, 239, 226, 0.08);
+  --mf-fill-2: rgba(244, 239, 226, 0.16);
+  --mf-text: var(--ui-paper, #f4efe2);
+  --mf-text-2: rgba(244, 239, 226, 0.66);
+  --mf-text-3: rgba(244, 239, 226, 0.4);
+  --mf-ink: var(--ui-ink-900, #14211e);
+  --mf-accent: var(--ui-seal, #a9503c);
+  --mf-accent-hi: var(--ui-seal-hi, #bd5e48);
+  --mf-accent-text: #e57f61;
+  --mf-radius: var(--ui-r-md, 12px);
+  --mf-h: 32px;
+  --mf-blur: var(--ui-blur, blur(8px) saturate(1.15));
+  --mf-ease: var(--ui-ease, cubic-bezier(0.2, 0.8, 0.2, 1));
+  --mf-fast: var(--ui-fast, 0.15s);
+}
+
+@media (pointer: coarse) {
+  :root {
+    --mf-h: 40px;
+  }
+}
+
+/* ---------- 根与基础 ---------- */
+
+.mifen-hud-root {
+  position: fixed;
+  inset: 0;
+  z-index: 9;
+  pointer-events: none;
+  font: 400 14px/1.4 var(--mf-font);
+  letter-spacing: 0.02em;
+  color: var(--mf-text);
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-font-smoothing: antialiased;
+}
+
+.mifen-hud-root *,
+.mifen-hud-root *::before,
+.mifen-hud-root *::after {
+  box-sizing: border-box;
+}
+
+.mifen-hud-root [hidden] {
+  display: none !important;
+}
+
+:is(body[data-photo="on"], body[data-home], body[data-shop-open="1"]) .mifen-hud-root {
+  display: none !important;
+}
+
+body[data-mifen-cooking="1"] :is(.hint, .vehicle-action, .walk-ui, .ride-hud),
+body[data-mifen-drawer="1"] :is(.hint, .vehicle-action, .walk-ui, .ride-hud) {
+  display: none !important;
+}
+
+:where(.mifen-hud-root) :where(h2, h3, p) {
+  margin: 0;
+  font: inherit;
+}
+
+:where(.mifen-hud-root) button {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  letter-spacing: inherit;
+  text-align: inherit;
+  cursor: pointer;
+}
+
+.mifen-hud-root button:focus-visible {
+  outline: 2px solid var(--mf-text);
+  outline-offset: 2px;
+}
+
+.mifen-hud-root kbd {
+  display: inline-grid;
+  place-items: center;
+  min-width: 20px;
+  height: 20px;
+  margin: 0;
+  padding: 0 5px;
+  border-radius: 5px;
+  box-shadow: none;
+  background: var(--mf-fill-2);
+  color: var(--mf-text-2);
+  font: 600 12px/1 var(--mf-font);
+  letter-spacing: 0;
+}
+
+.mifen-sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* 所有浮层共用一种面：玻璃底 + 一条发丝线 */
+:is(.mifen-pill, .mifen-bar, .mifen-tickets, .mifen-prompt, .mifen-toast, .mifen-panel, .mifen-cook-panel, .mifen-upgrade-drawer) {
+  pointer-events: auto;
+  background: var(--mf-surface);
+  box-shadow: inset 0 0 0 1px var(--mf-line);
+  backdrop-filter: var(--mf-blur);
+  -webkit-backdrop-filter: var(--mf-blur);
+}
+
+/* ---------- 按钮 ---------- */
+
+.mifen-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: var(--mf-h);
+  padding: 0 14px;
+  border-radius: 999px;
+  background: var(--mf-fill);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+  transition: background-color var(--mf-fast);
+}
+
+.mifen-btn:hover {
+  background: var(--mf-fill-2);
+}
+
+.mifen-btn:active {
+  transform: scale(0.97);
+}
+
+.mifen-btn:is(.mifen-btn--primary, .mifen-btn--gold) {
+  background: var(--mf-accent);
+  color: var(--mf-text);
+}
+
+.mifen-btn:is(.mifen-btn--primary, .mifen-btn--gold):hover {
+  background: var(--mf-accent-hi);
+}
+
+.mifen-btn:disabled {
+  background: none;
+  box-shadow: inset 0 0 0 1px var(--mf-line);
+  color: var(--mf-text-3);
+  cursor: default;
+  transform: none;
+}
+
+.mifen-btn[data-ready]::after {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--mf-accent-text);
+}
+
+/* ---------- 城市里的直达胶囊 ---------- */
+
+.mifen-pill {
+  position: fixed;
+  left: calc(14px + env(safe-area-inset-left));
+  top: calc(58px + env(safe-area-inset-top));
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  height: 34px;
+  padding: 0 7px 0 14px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+
+.mifen-pill:hover {
+  box-shadow: inset 0 0 0 1px var(--mf-text-3);
+}
+
+/* ---------- 经营条 ---------- */
+
+.mifen-bar {
+  position: fixed;
+  top: calc(12px + env(safe-area-inset-top));
+  left: 0;
+  right: 0;
+  width: max-content;
+  max-width: calc(100vw - 24px);
+  margin-inline: auto;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 5px 5px 16px;
+  border-radius: 999px;
+}
+
+.mifen-stat {
+  margin-right: 10px;
+  font-size: 15px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.mifen-stat b {
+  font-weight: inherit;
+}
+
+/* ---------- 粉票列表 ---------- */
+
+.mifen-tickets {
+  position: fixed;
+  left: calc(14px + env(safe-area-inset-left));
+  top: max(102px, calc(var(--mf-bar-bottom, 58px) + 8px));
+  width: 232px;
+  max-height: calc(100dvh - max(102px, var(--mf-bar-bottom, 58px) + 8px) - 24px - env(safe-area-inset-bottom));
+  overflow-y: auto;
+  scrollbar-width: thin;
+  margin: 0;
+  padding: 4px;
+  list-style: none;
+  border-radius: var(--mf-radius);
+}
+
+.mifen-tickets > li + li {
+  border-top: 1px solid var(--mf-line);
+}
+
+.mifen-ticket {
+  position: relative;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  column-gap: 10px;
+  row-gap: 3px;
+  width: 100%;
+  padding: 9px 10px 11px;
+  border-radius: 8px;
+  transition: background-color var(--mf-fast);
+}
+
+.mifen-ticket:hover,
+.mifen-ticket[aria-current="true"] {
+  background: var(--mf-fill);
+}
+
+.mifen-ticket-title {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  font-weight: 600;
+}
+
+.mifen-ticket-price {
+  font-variant-numeric: tabular-nums;
+  color: var(--mf-text-2);
+}
+
+.mifen-ticket-meta {
+  font-size: 13px;
+  color: var(--mf-text-2);
+}
+
+.mifen-ticket-state {
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.mifen-ticket.is-urgent .mifen-ticket-state {
+  color: var(--mf-accent-text);
+}
+
+.mifen-ticket-patience {
+  position: absolute;
+  left: 10px;
+  right: 10px;
+  bottom: 4px;
+  height: 2px;
+  border-radius: 1px;
+  background: var(--mf-line);
+}
+
+.mifen-ticket-patience::after {
+  content: "";
+  display: block;
+  width: calc(var(--p, 1) * 100%);
+  height: 100%;
+  border-radius: inherit;
+  background: var(--mf-text-3);
+  transition: width 0.45s linear;
+}
+
+.mifen-ticket.is-urgent .mifen-ticket-patience::after {
+  background: var(--mf-accent-text);
+}
+
+.mifen-ticket[aria-current="true"] .mifen-ticket-patience {
+  visibility: hidden;
+}
+
+.mifen-tickets-more {
+  padding: 8px 10px;
+  font-size: 13px;
+  color: var(--mf-text-2);
+}
+
+/* ---------- 近站按键 ---------- */
+
+.mifen-prompt {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: calc(112px + env(safe-area-inset-bottom));
+  width: max-content;
+  margin-inline: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  height: 36px;
+  padding: 0 16px 0 8px;
+  border-radius: 999px;
+}
+
+/* ---------- 反馈 ---------- */
+
+.mifen-toasts {
+  position: fixed;
+  z-index: 4;
+  top: 26%;
+  left: 0;
+  right: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  pointer-events: none;
+}
+
+.mifen-toast {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 12px;
+  max-width: min(520px, calc(100vw - 32px));
+  padding: 8px 16px;
+  border-radius: 999px;
+  pointer-events: none;
+  animation: mf-toast 2.6s var(--mf-ease) forwards;
+}
+
+.mifen-toast b {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.mifen-toast.is-warn b {
+  color: var(--mf-accent-text);
+}
+
+@keyframes mf-toast {
+  0% {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  10%,
+  85% {
+    opacity: 1;
+    transform: none;
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+}
+
+/* ---------- 面板（通用） ---------- */
+
+:is(.mifen-panel, .mifen-cook-panel, .mifen-upgrade-drawer) {
+  border-radius: var(--mf-radius);
+  animation: mf-panel-in 0.18s var(--mf-ease);
+}
+
+@keyframes mf-panel-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+
+:is(.mifen-panel-head, .mifen-cook-head, .mifen-drawer-head) {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+:is(.mifen-panel-head, .mifen-cook-head, .mifen-drawer-head) h3 {
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.mifen-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 4px;
+}
+
+.mifen-row + .mifen-row {
+  border-top: 1px solid var(--mf-line);
+}
+
+.mifen-row-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.mifen-row-title {
+  font-weight: 600;
+}
+
+.mifen-row-meta {
+  font-size: 13px;
+  color: var(--mf-text-2);
+}
+
+.mifen-row.is-owned {
+  color: var(--mf-text-3);
+}
+
+.mifen-row.is-owned .mifen-row-meta {
+  color: inherit;
+}
+
+/* ---------- 做粉面板 ---------- */
+
+.mifen-cook-panel {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: calc(40px + env(safe-area-inset-bottom));
+  z-index: 2;
+  width: min(560px, calc(100vw - 24px));
+  margin-inline: auto;
+  padding: 14px 16px 16px;
+}
+
+.mifen-cook-title small {
+  margin-left: 6px;
+  font-size: 13px;
+  font-weight: 400;
+  color: var(--mf-text-2);
+}
+
+.mifen-cook-steps {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  margin: 12px 0 14px;
+}
+
+.mifen-cook-steps:has(> :nth-child(4)) {
+  grid-template-columns: repeat(4, 1fr);
+}
+
+.mifen-step-pill {
+  padding-bottom: 7px;
+  border-bottom: 2px solid var(--mf-line);
+  font-size: 13px;
+  text-align: center;
+  color: var(--mf-text-3);
+}
+
+.mifen-step-pill.is-done {
+  color: var(--mf-text-2);
+}
+
+.mifen-step-pill.is-current {
+  border-bottom-color: var(--mf-text);
+  color: var(--mf-text);
+  font-weight: 600;
+}
+
+.mifen-boil-gauge,
+.mifen-brine-track {
+  position: relative;
+  height: 10px;
+  border-radius: 5px;
+  background: var(--mf-fill);
+}
+
+.mifen-boil-gauge {
+  margin: 18px 0 20px;
+}
+
+.mifen-boil-fill {
+  display: none;
+}
+
+.mifen-boil-sweetspot,
+.mifen-brine-target-mark {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  border-radius: 5px;
+  background: var(--mf-fill-2);
+  box-shadow: inset 0 0 0 1px var(--mf-text-3);
+  pointer-events: none;
+}
+
+.mifen-boil-cursor {
+  position: absolute;
+  top: -6px;
+  bottom: -6px;
+  width: 3px;
+  margin-left: -1.5px;
+  border-radius: 2px;
+  background: var(--mf-text);
+}
+
+.mifen-brine-meter {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 14px 0;
+  font-size: 13px;
+  color: var(--mf-text-2);
+  font-variant-numeric: tabular-nums;
+}
+
+.mifen-brine-track {
+  flex: 1;
+}
+
+.mifen-brine-fill {
+  height: 100%;
+  border-radius: inherit;
+  background: var(--mf-text-2);
+  transition: width 0.1s linear;
+}
+
+.mifen-topping-grid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 6px;
+  margin: 4px 0 14px;
+}
+
+.mifen-topping-btn {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  min-height: 54px;
+  padding: 6px 4px;
+  border-radius: 10px;
+  background: var(--mf-fill);
+  text-align: center;
+  transition: background-color var(--mf-fast);
+}
+
+.mifen-topping-btn:hover {
+  background: var(--mf-fill-2);
+}
+
+.mifen-topping-btn small {
+  font-size: 12px;
+  color: var(--mf-text-2);
+}
+
+.mifen-topping-btn.is-selected {
+  background: var(--mf-text);
+  color: var(--mf-ink);
+}
+
+.mifen-topping-btn.is-selected small {
+  color: inherit;
+}
+
+.mifen-topping-btn kbd {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  min-width: 16px;
+  height: 16px;
+  font-size: 11px;
+  background: none;
+  color: inherit;
+  opacity: 0.6;
+}
+
+.mifen-condiment-row {
+  display: flex;
+  margin: -4px 0 14px;
+}
+
+.mifen-condiment-chip {
+  height: var(--mf-h);
+  padding: 0 14px;
+  border-radius: 999px;
+  background: var(--mf-fill);
+}
+
+.mifen-condiment-chip:is(.is-selected, [aria-pressed="true"]) {
+  background: var(--mf-text);
+  color: var(--mf-ink);
+}
+
+.mifen-plate-summary {
+  margin: 16px 0 14px;
+}
+
+.mifen-plate-stars {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  font-size: 18px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.mifen-plate-stars span {
+  font-size: 14px;
+  font-weight: 400;
+  color: var(--mf-text-2);
+}
+
+.mifen-plate-line {
+  margin-top: 4px;
+  font-size: 13px;
+  color: var(--mf-text-2);
+}
+
+.mifen-plate-line b {
+  font-weight: 600;
+  color: var(--mf-text);
+}
+
+.mifen-cook-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.mifen-cook-hint {
+  min-width: 0;
+  font-size: 13px;
+  color: var(--mf-text-2);
+}
+
+/* ---------- 扩店账本 ---------- */
+
+:is(.mifen-upgrade-drawer, .mifen-drawer) {
+  position: fixed;
+  right: calc(176px + env(safe-area-inset-right));
+  top: max(102px, calc(var(--mf-bar-bottom, 58px) + 8px));
+  z-index: 3;
+  width: min(340px, calc(100vw - 192px));
+  max-height: calc(100dvh - max(102px, var(--mf-bar-bottom, 58px) + 8px) - 44px - env(safe-area-inset-bottom));
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+:is(.mifen-upgrade-drawer, .mifen-drawer) :is(.mifen-panel-head, .mifen-drawer-head) {
+  padding: 12px 12px 8px 16px;
+}
+
+:is(.mifen-upgrade-drawer, .mifen-drawer) :is(.mifen-panel-body, .mifen-drawer-body) {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  padding: 0 12px 8px;
+}
+
+:is(.mifen-upgrade-drawer, .mifen-drawer) .mifen-btn:is(.mifen-btn--primary, .mifen-btn--gold) {
+  background: var(--mf-text);
+  color: var(--mf-ink);
+}
+
+.mifen-panel-head h3 small {
+  margin-left: 6px;
+  font-weight: 400;
+  font-variant-numeric: tabular-nums;
+  color: var(--mf-text-2);
+}
+
+.mifen-row-value {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.mifen-row.is-low .mifen-row-meta {
+  color: var(--mf-accent-text);
+}
+
+.mifen-panel-foot {
+  display: flex;
+  justify-content: flex-end;
+  padding: 10px 4px 2px;
+  border-top: 1px solid var(--mf-line);
+}
+
+/* upgrade.ts 改用 .mifen-row 之前的旧结构 */
+.mifen-drawer-head small {
+  display: block;
+  margin-top: 2px;
+  color: var(--mf-text-2);
+}
+
+.mifen-upgrade-card {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px 4px;
+}
+
+.mifen-upgrade-card + .mifen-upgrade-card {
+  border-top: 1px solid var(--mf-line);
+}
+
+.mifen-upgrade-card.is-owned {
+  color: var(--mf-text-3);
+}
+
+.mifen-upgrade-top,
+.mifen-upgrade-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.mifen-upgrade-top strong {
+  font-weight: 600;
+}
+
+.mifen-upgrade-cost {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.mifen-upgrade-desc,
+.mifen-upgrade-card .mifen-chip {
+  font-size: 13px;
+  color: var(--mf-text-2);
+}
+
+.mifen-upgrade-card.is-owned :is(.mifen-upgrade-desc, .mifen-chip) {
+  color: inherit;
+}
+
+/* ---------- 窄屏与矮屏 ---------- */
+
+@media (max-width: 768px) {
+  .mifen-bar {
+    flex-wrap: wrap;
+    justify-content: center;
+    overflow-x: visible;
+    width: min(max-content, calc(100vw - 20px));
+    max-width: calc(100vw - 20px);
+    gap: 4px;
+    padding: 5px 8px;
+    border-radius: var(--mf-radius);
+  }
+
+  .mifen-bar .mifen-stat {
+    margin-right: 4px;
+    font-size: 13px;
+  }
+
+  .mifen-bar .mifen-btn {
+    flex: 0 0 auto;
+    padding: 0 9px;
+    font-size: 13px;
+  }
+
+  .mifen-tickets {
+    top: max(98px, calc(var(--mf-bar-bottom, 58px) + 8px));
+    bottom: auto;
+    left: calc(10px + env(safe-area-inset-left));
+    width: 200px;
+    max-height: 38dvh;
+  }
+
+  :is(.mifen-upgrade-drawer, .mifen-drawer) {
+    left: calc(10px + env(safe-area-inset-left));
+    right: calc(10px + env(safe-area-inset-right));
+    top: calc(var(--mf-bar-bottom, 58px) + 8px);
+    width: auto;
+    max-height: calc(100dvh - var(--mf-bar-bottom, 58px) - 48px - env(safe-area-inset-bottom));
+  }
+
+  .mifen-cook-panel {
+    bottom: calc(46px + env(safe-area-inset-bottom));
+  }
+
+  .mifen-topping-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+@media (max-width: 768px), (max-height: 640px) {
+  body[data-mifen-cooking="1"] .mifen-tickets,
+  body[data-mifen-drawer="1"] .mifen-tickets {
+    display: none;
+  }
+}
+
+@media (max-width: 768px), (max-height: 480px) {
+  body[data-mifen-drawer="1"] :is(.hud-me, .sky-ui, .dock, .minimap, .walk-ui, .vehicle-action, .ride-hud, .hint, .hud-stats, .gl-mission-entry, .gl-mission-hud),
+  body[data-mifen-cooking="1"] :is(.hud-me, .sky-ui, .dock, .minimap, .hint, .hud-stats, .gl-mission-entry, .gl-mission-hud) {
+    display: none !important;
+  }
+}
+
+@media (max-height: 480px) and (min-width: 640px) {
+  .mifen-bar {
+    left: calc(192px + env(safe-area-inset-left));
+    right: auto;
+    margin-inline: 0;
+    flex-wrap: wrap;
+    justify-content: flex-start;
+    overflow-x: visible;
+    width: max-content;
+    max-width: calc(100vw - 344px);
+    gap: 3px;
+    padding: 3px 6px 3px 8px;
+  }
+
+  .mifen-bar .mifen-btn {
+    flex: 0 0 auto;
+    min-height: 28px;
+    padding: 0 7px;
+    font-size: 12px;
+  }
+
+  .mifen-bar .mifen-stat {
+    margin-right: 3px;
+    font-size: 12px;
+  }
+}
+
+@media (pointer: coarse) and (max-height: 480px) and (min-width: 640px) {
+  .mifen-bar {
+    left: calc(148px + env(safe-area-inset-left));
+    max-width: calc(100vw - 566px);
+  }
+}
+
+@media (max-height: 480px) {
+  .mifen-bar {
+    top: calc(6px + env(safe-area-inset-top));
+    padding: 3px 6px 3px 10px;
+    gap: 4px;
+  }
+
+  .mifen-bar .mifen-btn {
+    min-height: 30px;
+    padding: 0 9px;
+    font-size: 13px;
+  }
+
+  .mifen-bar .mifen-stat {
+    margin-right: 4px;
+    font-size: 13px;
+  }
+
+  .mifen-pill {
+    top: calc(50px + env(safe-area-inset-top));
+  }
+
+  .mifen-tickets {
+    top: max(96px, calc(var(--mf-bar-bottom, 48px) + 6px));
+    bottom: auto;
+    max-height: calc(100dvh - max(96px, var(--mf-bar-bottom, 48px) + 6px) - 38px - env(safe-area-inset-bottom));
+  }
+
+  :is(.mifen-upgrade-drawer, .mifen-drawer) {
+    left: calc(10px + env(safe-area-inset-left));
+    right: calc(10px + env(safe-area-inset-right));
+    width: auto;
+    top: calc(var(--mf-bar-bottom, 48px) + 6px);
+    max-height: calc(100dvh - var(--mf-bar-bottom, 48px) - 40px - env(safe-area-inset-bottom));
+  }
+
+  :is(.mifen-upgrade-drawer, .mifen-drawer) :is(.mifen-panel-body, .mifen-drawer-body) {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    column-gap: 12px;
+    row-gap: 4px;
+    align-content: start;
+    padding: 0 12px 6px;
+  }
+
+  :is(.mifen-upgrade-drawer, .mifen-drawer) :is(.mifen-panel-head, .mifen-drawer-head) {
+    padding: 8px 12px 4px 14px;
+  }
+
+  :is(.mifen-upgrade-drawer, .mifen-drawer) .mifen-row {
+    --mf-h: 32px;
+    padding: 4px 2px;
+    gap: 8px;
+    border-top: 0;
+    border-bottom: 1px solid var(--mf-line);
+  }
+
+  :is(.mifen-upgrade-drawer, .mifen-drawer) .mifen-panel-foot {
+    grid-column: 1 / -1;
+  }
+
+  .mifen-cook-panel {
+    bottom: calc(36px + env(safe-area-inset-bottom));
+    padding: 8px 12px 10px;
+  }
+
+  .mifen-cook-steps {
+    margin: 8px 0 10px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mifen-hud-root *,
+  .mifen-hud-root *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+}

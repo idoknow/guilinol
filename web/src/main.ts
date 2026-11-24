@@ -41,6 +41,8 @@ import {mountDevHud} from './ui/hud-dev'
 import {armOrientationGate} from './ui/orientation'
 import {mountStats} from './ui/stats'
 import {mountHotkeys} from './ui/hotkeys'
+import {mountTianyuanMifen} from './mifen'
+import {mountChat} from './ui/chat'
 import {mountGuide} from './ui/guide'
 import {touchUi} from './ui/input-mode'
 
@@ -436,9 +438,20 @@ async function start(loader:FullLoader,creatorSpawn=false) {
   // IDOK-178：帧率/网速/在线人数读数与设置热键（都靠 localStorage 记住上次选择）。
   mountStats()
   mountHotkeys()
+  const mifen = mountTianyuanMifen({
+    scene,
+    camera,
+    clock,
+    getPlayerPos: () => (walker?.active ? walker.position : null),
+    walkTo,
+    showToast,
+    sampleGroundY: sampleMissionGroundY,
+    getNightFactor: () => env.night,
+  })
+  mountChat()
   const tourProbe = {getState, missions: {start: () => ({ok:false, code:'SOLO_MODE_REQUIRED'})}}
   let staticAudit:ReturnType<typeof import('./verify-static').staticVerifier>|undefined
-  const publishViewer=()=>Object.assign(window,{viewer:{camera,stream,manifest,stats,walkTo,staticAudit,get game(){return solo?.probe ?? tourProbe},
+  const publishViewer=()=>Object.assign(window,{viewer:{camera,stream,manifest,stats,walkTo,staticAudit,get game(){return solo?.probe ?? tourProbe},get mifen(){return mifen.getProbe()},
     get trafficCount(){return (scene.getObjectByName('G2 traffic') as THREE.InstancedMesh|undefined)?.count??0},
     get trafficProbe(){return scene.getObjectByName('G2 traffic')?.userData},
     async trafficPixels(){return (await import('./traffic/visibility-probe')).pixelVisible(renderer,scene,camera)},
@@ -544,6 +557,7 @@ async function start(loader:FullLoader,creatorSpawn=false) {
     updateAtmosphere(now,elapsed)
     tour?.tick(elapsed/1000)
     solo?.step(Math.min(0.1, elapsed/1000))
+    mifen.step(Math.min(0.1, elapsed/1000))
     persistView?.()
     draw()
     if(staticAudit && frame%30===0)staticAudit.check()

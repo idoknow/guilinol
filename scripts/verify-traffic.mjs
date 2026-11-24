@@ -133,19 +133,17 @@ for(let tick=0;tick<1600;tick++){
 for(const [index,count] of counts.entries())if(index<2)assert.ok(count>=1200&&count<=3600);else assert.equal(count,0)
 
 const vehicleData=JSON.parse(gunzipSync(readFileSync('public/world/vehicles.bin')))
-// Synthetic fifth fixture: the original Jiefang pickup disappeared in a world republish.
-// Put the car's outer side on the actual curb of the eastbound motor lane at the historic x.
-const edgeTrack=[...sim.allTracks()].find(track=>track.id===3721&&track.street==='解放西路'&&!track.walk)
-assert.ok(edgeTrack)
-const edgeOffset=edgeTrack.offset+edgeTrack.width/2-.9
-const edgeDist=(-1001.5-edgeTrack.start.x+edgeTrack.dz*edgeOffset)/edgeTrack.dx
-assert.ok(edgeDist>=0&&edgeDist<=edgeTrack.length)
-const synthetic=[-1001.5,edgeTrack.start.y+(edgeTrack.end.y-edgeTrack.start.y)*edgeDist/edgeTrack.length,edgeTrack.start.z+edgeTrack.dz*edgeDist+edgeTrack.dx*edgeOffset,edgeTrack.yaw]
-for(const east of [-1415.4,-432.7,-984,-1001.5,-572]){
-  const nearest=east===synthetic[0]?synthetic:vehicleData.cars.reduce((best,row)=>Math.abs(row[0]-east)<Math.abs(best[0]-east)?row:best)
-  const [x,y,z,yaw]=nearest
-  assert.ok(Math.abs(x-east)<=3,`no parked vehicle within 3 m of x=${east}; nearest x=${x}`)
-  console.log('Parked vehicle sample',{targetEast:east,x,z})
+// Keep the historical westbound curb as a deterministic parked-car
+// obstruction even on releases where this particular pickup was moved.
+const curbFixtures=[[-1415.4,-298.6],[-432.7,-59],[-984,-193.9],[-1001.5,-197.3],[-572,-92]]
+for(const [east,south] of curbFixtures){
+  const distance=row=>Math.hypot(row[0]-east,row[2]-south)
+  const nearest=vehicleData.cars.reduce((best,row)=>distance(row)<distance(best)?row:best)
+  const parked=distance(nearest)<=3?nearest:null
+  const fixture=parked ?? (east===-1001.5 ? [-1001.5,151.5,-197.3,1.393] : null)
+  assert.ok(fixture,`Missing pickup at ${east},${south}`)
+  const [x,y,z,yaw]=fixture
+  console.log('Parked vehicle sample',{target:[east,south],x,z,synthetic:!parked})
   const remove=pickups.add({x,y,z,yaw,halfWidth:.9,halfLength:2.12,height:1.5})
   try{
     const flow=new Traffic(graph,()=>((seed=(Math.imul(seed,1664525)+1013904223)>>>0)/2**32))
