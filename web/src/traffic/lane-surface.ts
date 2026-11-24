@@ -62,7 +62,17 @@ export function contactPose(track:LaneSurface,dist:number,front=1.34,rear=-1.31,
   }
   const cross=halfTrack?(a.cross+b.cross)/2:0
   const y=Math.abs(incline)>.1?rearY+rear*Math.sin(pitch):rearY-rear*incline
-  return {y,pitch,roll:Math.atan(cross*Math.cos(pitch))}
+  const roll=Math.atan(cross*Math.cos(pitch))
+  if(!halfTrack || Math.abs(incline)<.35 || Math.abs(a.cross-b.cross)<.25)return {y,pitch,roll}
+  // On a steep, twisted grade the left and right hubs project onto distinct
+  // longitudinal stations. Balance their residuals using the model's track.
+  const cp=Math.cos(pitch),sp=Math.sin(pitch),sr=Math.sin(roll),cr=Math.cos(roll)
+  const origins=[]
+  for(const forward of [rear,front])for(const side of [-halfTrack,halfTrack]){
+    const axle=sampleAxle(track,dist+forward*cp+side*sr*sp)
+    origins.push(axle.height+axle.cross*(side*cr-leftOffset)-side*sr*cp+forward*sp)
+  }
+  return {y:(Math.min(...origins)+Math.max(...origins))/2,pitch,roll}
 }
 export function axleHeight(track:LaneSurface,dist:number){
   return sampleAxle(track,dist).height
