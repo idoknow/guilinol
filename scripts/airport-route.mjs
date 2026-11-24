@@ -13,15 +13,18 @@ const url='http://127.0.0.1:'+server.httpServer.address().port
 let browser
 try {
   browser=await chromium.launch(browserOptions())
-  for(const mode of ['drive','walk']){
-    if(process.argv.length>2 && !process.argv.includes('--'+mode))continue
+  for(const route of ['drive','walk','lingui-walk']){
+    if(process.argv.length>2 && !process.argv.includes('--'+route))continue
+    const mode=route==='drive'?'drive':'walk'
     const corridor=(kind,start,end)=>{
       const leg=config.corridors.find(c=>c.mode===kind&&c.start===start&&c.end===end)
       assert(leg,'Missing corridor from '+start+' to '+end)
       return leg.geometry.coordinates
     }
     let path
-    if(mode==='walk'){
+    if(route==='lingui-walk'){
+      path=corridor('walk',legs[0],legs[1])
+    }else if(mode==='walk'){
       // Tower and expo are modeled as shared street corridors. Join the
       // walking polyline at actual shared vertices, with no spawn between legs.
       const tower=corridor('drive','桂林塔',legs[1])
@@ -130,7 +133,7 @@ try {
           window.viewer.resume()
         }
       },{mode,path})
-      console.log(mode,result)
+      console.log(route,result)
     }finally{await page.close()}
   }
 }finally{await browser?.close();await server.close()}

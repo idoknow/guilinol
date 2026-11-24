@@ -3,14 +3,14 @@ import {buildingColor} from './look/buildings'
 
 type Pair=[number,number]
 type Vertex=[number,number,number]
-export type Building=[number,number,Pair[][],number,number,number,number[],Pair[],number]
+export type Building=[number,number,Pair[][],number,number,number,number[],Pair[],number,boolean?]
 
 export function buildingGeometry(positions:Int16Array,normals:Int8Array,indices:Uint32Array,parts:Building[]){
   const xyz=Array.from(positions,(v,i)=>v/(i%3===1?10:100)),normal=Array.from(normals,v=>v/127),faces=Array.from(indices)
   const count=xyz.length/3,kinds=new Array<number>(count),floor=new Array<number>(count),facade=new Array<number>(count),roofs=new Array<number>(count)
   const trim:number[] = [], occlusion:number[] = []
   let cursor=0
-  for(const [base,top,loops,kind,floors,seed,anchor,rectangle,complex] of parts){
+  for(const [base,top,loops,kind,floors,seed,anchor,rectangle,complex,raised] of parts){
     const level=top/10
     function tag(index:number,isRoof:number,f:number,u:number){kinds[index]=kind;floor[index]=f;facade[index]=u;roofs[index]=isRoof}
     function face(corners:Vertex[], details=false){
@@ -41,6 +41,13 @@ export function buildingGeometry(positions:Int16Array,normals:Int8Array,indices:
         }
         u+=len
         if(!kind&&!(x===ex&&(x===0||x===256))&&!(z===ez&&(z===0||z===256)))face([[x,level,z],[x,level+.9,z],[ex,level+.9,ez],[ex,level,ez]],true)
+      }
+    }
+    if(raised){
+      const contours=loops.map(loop=>loop.map(([x,z])=>new THREE.Vector2(x/100,z/100)))
+      const vertices=contours.flat()
+      for(const triangle of THREE.ShapeUtils.triangulateShape(contours[0],contours.slice(1))){
+        face(triangle.map(i=>[vertices[i].x,base/10,vertices[i].y]))
       }
     }
     if(!anchor.length||kind>=3)continue

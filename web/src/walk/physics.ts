@@ -435,7 +435,9 @@ export async function createPhysics(manifest:Manifest,stream:Stream,peaks:PeaksG
   }))
   function insideHouse(east:number,south:number,y?:number){const tile=tileAt(east,south);if(!tile)return false
     const px=(east-tile.x)*100,pz=(south-tile.z)*100
-    const inRing=regions.get(tile)?.rings.some(([bottom,top,loops])=>{
+    const inRing=regions.get(tile)?.rings.some(ring=>{
+      const [bottom,top,loops]=ring
+      if(y===undefined && ring[9])return false
       if(y!==undefined&&(y<bottom/10||y>top/10))return false
       let inside=false
       for(const loop of loops)for(let at=0,prev=loop.length-1;at<loop.length;prev=at++){
