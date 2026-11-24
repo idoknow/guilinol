@@ -22,7 +22,9 @@ def bake(directory, chunks, graded=None, tunnels=()):
     for row in inventory:
         if row['type'] in ('level','rail_over') and all(row['roadTags'].get(k,'no')=='no' for k in ('bridge','tunnel')):
             sites[row['road']].append(Point(ll2xz(row['lat'],row['lon'])))
-    shapes = []
+    shapes, landings = [], []
+    daylight = {node for t in tunnels if t.get('openCut')
+                for node,mouth in zip(t['nodes'],t['mouths']) if mouth}
     elements = load_osm()
     from features import area
     footprints = [area(w) for w in elements if w.get('tags',{}).get('building') and
@@ -51,6 +53,11 @@ def bake(directory, chunks, graded=None, tunnels=()):
         road_width = max(width(tags),lane_width,
                          RULES['defaultWidth'].get(tags['highway'],0.))
         center = LineString(points(way))
+        for node,xy in zip(way['nodes'],center.coords):
+            if node in daylight:
+                at = center.project(Point(xy))
+                landing = substring(center,max(0,at-20),min(center.length,at+20))
+                landings.append(landing.buffer(min(road_width,lane_width)/2,cap_style='flat'))
         segments = []
         for site in sites.get(way['id'],()):
             at = center.project(site)
@@ -105,6 +112,7 @@ def bake(directory, chunks, graded=None, tunnels=()):
     cut_tree = STRtree(cuts)
     new_pavement = []
     tree = STRtree(shapes)
+    landing_tree = STRtree(landings)
     for tile in chunks:
         x,z = tile['x'],tile['z']
         bounds = box(x,z,x+256,z+256)
@@ -124,9 +132,20 @@ def bake(directory, chunks, graded=None, tunnels=()):
         streets = collision[1]
         lower = streets[11] if len(streets)>11 else None
         end = lower[0] if lower else len(streets[0])
-        existing = [make_valid(Polygon(np.array(shell)/100,[np.array(r)/100 for r in holes]))
-                    for kind,shell,*holes in streets[0][:end] if len(shell)>=3]
+        existing = [make_valid(Polygon(np.array(shell)/100,[np.array(r)/100 for r in holes])) if len(shell)>=3 else Polygon()
+                    for kind,shell,*holes in streets[0][:end]]
         missing = local.difference(union_all(existing))
+        # Where a daylight lane crosses a sidewalk polygon the old paving mask
+        # left a hole between two raised asphalt strips. Continue the motor
+        # strip along its OSM axis and rebuild the curb at its actual edge.
+        landing_hits = landing_tree.query(bounds,predicate='intersects')
+        sidewalk = None
+        if len(landing_hits):
+            inset = translate(union_all([landings[i] for i in landing_hits]),-x,-z).intersection(local)
+            walk = [poly for poly,ring in zip(existing,streets[0][:end]) if ring[0] in (1,4,6)]
+            motor = [poly for poly,ring in zip(existing,streets[0][:end]) if ring[0] in (0,5)]
+            sidewalk = inset.intersection(union_all(walk)).difference(union_all(motor))
+            missing = missing.union(sidewalk)
         if missing.is_empty:
             continue
         blocks = [make_valid(Polygon(np.asarray(loops[0])/100,[np.asarray(r)/100 for r in loops[1:]]))
@@ -137,6 +156,27 @@ def bake(directory, chunks, graded=None, tunnels=()):
         if not patches:
             continue
         new_pavement.append(translate(missing,x,z))
+        if sidewalk is not None and not sidewalk.is_empty:
+            area = sidewalk.intersection(missing)
+            rebuilt = []
+            counts = [0]
+            for ring,poly in zip(streets[0][:end],existing):
+                rebuilt.extend(rings(ring[0],poly.difference(area)) if
+                               ring[0] in (1,4,6) and poly.intersects(area) else [ring])
+                counts.append(len(rebuilt))
+            platform = streets[12] if len(streets)>12 else None
+            if platform:
+                for idx in (0,1):
+                    old = platform[idx]
+                    platform[idx] = counts[old] if old<=end else old+len(rebuilt)-end
+            streets[0][:end] = rebuilt
+            end = len(rebuilt)
+            if lower:
+                lower[0] = end
+        platform = streets[12] if len(streets)>12 else None
+        if platform and platform[0]>=end:
+            platform[0] += len(patches)
+            platform[1] += len(patches)
         streets[0][end:end] = patches
         if graded is not None and (len(streets)<6 or not streets[5]):
             # Rural tiles may first receive drivable geometry here. Encode
