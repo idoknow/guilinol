@@ -1,6 +1,5 @@
 import * as T from 'three'
 import {mergeGeometries} from 'three/addons/utils/BufferGeometryUtils.js'
-import near from './ebike-near.json'
 import far from './ebike-far.json'
 import rig from './ebike-rig.json'
 
@@ -10,7 +9,7 @@ function bytes(encoded: string) {
 
 export function bikeGeometry(paint: number, distant = false, joint?: number, paintedOnly?: boolean) {
   const parts: T.BufferGeometry[] = []
-  for (const entry of joint !== undefined ? rig : distant ? far : near) {
+  for (const entry of distant ? far : rig) {
     const [part, shade] = entry.key.split(':')
     if (joint !== undefined && Number(part) !== joint) continue
     if (paintedOnly !== undefined && paintedOnly !== (shade === 'paint')) continue

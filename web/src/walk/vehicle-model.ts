@@ -1,3 +1,4 @@
+import {accessories,cowlLamp,steeringZ} from './ebike-mounts'
 import {bikeGeometry} from './ebike-geometry'
 import * as T from 'three'
 import {mergeGeometries} from 'three/addons/utils/BufferGeometryUtils.js'
@@ -71,50 +72,7 @@ export function vehicleModel(kind:string,paint=0,options?:{shared?:boolean;dista
       const shell=bikeGeometry(color,options?.distant)
       shell.setAttribute('uv',new T.BufferAttribute(new Float32Array(shell.attributes.position.count*2),2))
       parts.push(shell)
-      if(vis){
-        // Headlight lens & optional dual-lens matrix bezel (zero dynamic lights)
-        const hlTier=vis.headlightTier??0
-        box(hlTier>=2?.22:hlTier===1?.19:.16,.09,.04,0,.74,-.53,hlTier>=1?0xfff6dc:0xe5e6dc)
-        if(hlTier>=1)for(const side of [-1,1])box(.045,.045,.03,side*.065,.74,-.55,0x6ce8ff)
-        if(vis.angelEye)part(new T.TorusGeometry(.065,.014,6,12),vis.angelEyeColor??0x6ce8ff,0,.74,-.555)
-        // Windshield (clear or sport tinted)
-        if(vis.windshield==='clear'||vis.windshield==='tinted'){
-          const wsColor=vis.windshield==='tinted'?0x1c2530:0xb8d8e6
-          const wsH=vis.windshield==='tinted'?.26:.34
-          part(new T.BoxGeometry(.38,wsH,.03).rotateX(-.24),wsColor,0,1.07+wsH*.36,-.49)
-          for(const side of [-1,1])box(.022,.16,.022,side*.14,1.08,-.46,0x3f454c)
-        }
-        // Rear topbox (commuter hardcase or insulated osmanthus-gold delivery box)
-        if(vis.topbox==='commuter'){
-          box(.34,.04,.30,0,.77,.62,0x3a3f44)
-          box(.38,.26,.34,0,.92,.64,0x2a3138)
-          box(.39,.05,.35,0,1.02,.64,color)
-        }else if(vis.topbox==='delivery'){
-          box(.42,.04,.38,0,.77,.64,0x363b40)
-          box(.46,.42,.42,0,1.00,.66,0xd99b2a)
-          box(.47,.06,.43,0,1.16,.66,0x1b2229)
-          box(.28,.08,.02,0,1.02,.88,0x20d6c1)
-        }
-        // Gold nitrogen shocks
-        if(vis.goldShock){
-          for(const side of [-1,1])part(new T.CylinderGeometry(.034,.034,.18,8).rotateX(-.32),0xe3b23c,side*.16,.52,.45)
-        }
-        // Tail wing spoiler
-        if(vis.tailWing){
-          part(new T.BoxGeometry(.52,.04,.14).rotateX(-.18),vis.angelEyeColor??0xffc53d,0,.92,.56)
-          for(const side of [-1,1])box(.035,.13,.16,side*.22,.85,.51,color)
-        }
-        // Dual sport exhaust
-        if(vis.exhaust){
-          part(new T.CylinderGeometry(.045,.036,.52,8).rotateX(Math.PI/2+.16),0xb6bec4,.22,.30,.28)
-          part(new T.CylinderGeometry(.05,.045,.10,8).rotateX(Math.PI/2+.16),0x2b2e32,.22,.35,.56)
-        }
-        // Chassis neon underglow rail strip
-        if(vis.underglow){
-          const uCol=vis.underglowColor??0x20d6c1
-          for(const side of [-1,1])box(.03,.026,.64,side*.19,.24,-.04,uCol)
-        }
-      }
+      if(vis)accessories(vis,color,(_joint,geom,tint)=>part(geom,tint,0,0,0))
     }else if(effectiveKind==='bicycle'){
       // Guilin muted city palette (sage, terracotta, linen ivory, karst slate) — no commercial bike-share brand colors or logos.
       const frameColor=[0x5b8a72,0xc96f53,0xd8cfc0,0x5c6e7e][paint%4]
@@ -821,11 +779,6 @@ export function createDynamicEbike(paint = 0, initialMods?: Partial<EbikeModConf
 
   // Rear shock slot keeps baseline struts; optional gold canisters batch into chassisModMesh.
   const shockSlot = new T.Group(); shockSlot.name = 'mod-shock'
-  for (const side of [-1, 1]) {
-    const rod = makeSolidPart(trackG(new T.CylinderGeometry(.022, .022, .34, 6)), alloyMat, side * .14, .46, .42 - REAR_Z)
-    rod.rotation.x = -.32
-    shockSlot.add(rod)
-  }
   chassis.add(shockSlot)
 
   // Named mod slots preserved on the API while visuals merge into <= 3 batched meshes (chassis / front / underglow).
@@ -849,7 +802,7 @@ export function createDynamicEbike(paint = 0, initialMods?: Partial<EbikeModConf
 
   // Front steering assembly (stem at z = -0.43 -> relative z = -0.96)
   const frontAssembly = new T.Group()
-  frontAssembly.position.set(0, 0, -.43 - REAR_Z)
+  frontAssembly.position.set(0,0,steeringZ-REAR_Z)
   wheeliePivot.add(frontAssembly)
 
   const frontWheel = new T.Group()
@@ -858,9 +811,9 @@ export function createDynamicEbike(paint = 0, initialMods?: Partial<EbikeModConf
   frontAssembly.add(frontWheel,baked(2,0,-.43,true),baked(2,0,-.43,false))
 
   const headlightSlot = new T.Group(); headlightSlot.name = 'mod-headlight'
-  const headLens = makeSolidPart(trackG(new T.BoxGeometry(.16, .09, .04)), headMat, 0, .74, -.10)
+  const headLens = makeSolidPart(trackG(new T.BoxGeometry(.16, .09, .04)), headMat, 0,cowlLamp.y,cowlLamp.z-steeringZ)
   const beamRig = createHeadlightBeamRig('bike')
-  beamRig.group.position.set(0, .74, -.13)
+  beamRig.group.position.set(0,cowlLamp.y,cowlLamp.z-steeringZ-.03)
   headlightSlot.add(headLens, beamRig.group)
   frontAssembly.add(headlightSlot)
 
@@ -906,20 +859,6 @@ export function createDynamicEbike(paint = 0, initialMods?: Partial<EbikeModConf
   wheeliePivot.add(seatAnchor)
 
   // Shared e-bike distinguishing parts: merged front wire basket + merged rear scan lock/battery trim (1 draw call each).
-  const basketParts: T.BufferGeometry[] = [
-    coloredRgbaPart(new T.BoxGeometry(.34, .03, .22), 0x6b7277, 1, 0, .82, -.19),
-  ]
-  for (const side of [-1, 1]) {
-    basketParts.push(
-      coloredRgbaPart(new T.BoxGeometry(.024, .17, .22), 0x6b7277, 1, side * .16, .91, -.19),
-      coloredRgbaPart(new T.BoxGeometry(.34, .17, .024), 0x6b7277, 1, 0, .91, -.19 + side * .10),
-    )
-  }
-  const sharedFrontBasket = new T.Group()
-  sharedFrontBasket.name = 'shared-front-basket'
-  sharedFrontBasket.add(new T.Mesh(trackG(mergeRgbaParts(basketParts)), sharedPartMat))
-  frontAssembly.add(sharedFrontBasket)
-
   const sharedTailGroup = new T.Group()
   sharedTailGroup.name = 'shared-tail-lock'
   const sharedTailParts = [
@@ -941,40 +880,12 @@ export function createDynamicEbike(paint = 0, initialMods?: Partial<EbikeModConf
   let lastMods: EbikeModPreset | Partial<EbikeModConfig> = initialMods ?? 'stock'
 
   function rebuildModMeshes(shared: boolean, cfg: EbikeModConfig, resolvedBodyColor: number) {
-    const chassisParts: T.BufferGeometry[] = []
-    if (!shared) {
-      if (cfg.goldShock) {
-        for (const side of [-1, 1]) {
-          chassisParts.push(coloredRgbaPart(new T.CylinderGeometry(.034, .034, .16, 8), 0xe3b23c, 1, side * .16, .52, .45 - REAR_Z, -.32))
-        }
-      }
-      if (cfg.tailWing) {
-        chassisParts.push(coloredRgbaPart(new T.BoxGeometry(.52, .04, .14), cfg.angelEyeColor, 1, 0, .92, .56 - REAR_Z, -.18))
-        for (const side of [-1, 1]) {
-          chassisParts.push(coloredRgbaPart(new T.BoxGeometry(.035, .13, .16), resolvedBodyColor, 1, side * .22, .85, .51 - REAR_Z))
-        }
-      }
-      if (cfg.exhaust) {
-        chassisParts.push(
-          coloredRgbaPart(new T.CylinderGeometry(.045, .036, .52, 8).rotateX(Math.PI / 2), 0xb6bec4, 1, .22, .30, .28 - REAR_Z, .16),
-          coloredRgbaPart(new T.CylinderGeometry(.05, .045, .10, 8).rotateX(Math.PI / 2), 0x2b2e32, 1, .22, .35, .56 - REAR_Z, .16),
-        )
-      }
-      if (cfg.topbox === 'commuter') {
-        chassisParts.push(
-          coloredRgbaPart(new T.BoxGeometry(.34, .04, .30), 0x2b2e32, 1, 0, .77, .62 - REAR_Z),
-          coloredRgbaPart(new T.BoxGeometry(.38, .26, .34), 0x2b2e32, 1, 0, .92, .64 - REAR_Z),
-          coloredRgbaPart(new T.BoxGeometry(.39, .05, .35), resolvedBodyColor, 1, 0, 1.02, .64 - REAR_Z),
-        )
-      } else if (cfg.topbox === 'delivery') {
-        chassisParts.push(
-          coloredRgbaPart(new T.BoxGeometry(.42, .04, .38), 0x2b2e32, 1, 0, .77, .64 - REAR_Z),
-          coloredRgbaPart(new T.BoxGeometry(.46, .42, .42), 0xd99b2a, 1, 0, 1.00, .66 - REAR_Z),
-          coloredRgbaPart(new T.BoxGeometry(.47, .06, .43), 0x2b2e32, 1, 0, 1.16, .66 - REAR_Z),
-          coloredRgbaPart(new T.BoxGeometry(.28, .08, .02), 0x20d6c1, 1, 0, 1.02, .88 - REAR_Z),
-        )
-      }
-    }
+    const chassisParts:T.BufferGeometry[]=[], frontParts:T.BufferGeometry[]=[], glowParts:T.BufferGeometry[]=[]
+    if(!shared)accessories(cfg,resolvedBodyColor,(joint,geometry,color,alpha)=>{
+      const origin=joint==='front'?steeringZ:joint==='body'?REAR_Z:0
+      const target=joint==='front'?frontParts:joint==='body'?chassisParts:glowParts
+      target.push(coloredRgbaPart(geometry,color,alpha,0,0,-origin))
+    })
     chassisModGeom?.dispose()
     if (chassisParts.length > 0) {
       chassisModGeom = mergeRgbaParts(chassisParts)
@@ -985,33 +896,7 @@ export function createDynamicEbike(paint = 0, initialMods?: Partial<EbikeModConf
       chassisModMesh.visible = false
     }
 
-    const frontParts: T.BufferGeometry[] = []
-    let hasWindshield = false
-    if (!shared) {
-      if ((cfg.headlightTier ?? 0) >= 1) {
-        for (const side of [-1, 1]) {
-          frontParts.push(coloredRgbaPart(new T.BoxGeometry(.055, .055, .035), 0xfff3d4, 1, side * .075, .74, -.115))
-        }
-      }
-      if (cfg.angelEye) {
-        frontParts.push(coloredRgbaPart(new T.TorusGeometry(.065, .014, 6, 12), cfg.angelEyeColor, 1, 0, .74, -.12))
-      }
-      if (cfg.windshield === 'clear') {
-        hasWindshield = true
-        frontParts.push(
-          coloredRgbaPart(new T.BoxGeometry(.38, .34, .028), 0xc2e0ec, .48, 0, 1.20, -.06, -.22),
-          coloredRgbaPart(new T.BoxGeometry(.022, .16, .022), 0x2b2e32, 1, -.14, 1.09, -.03),
-          coloredRgbaPart(new T.BoxGeometry(.022, .16, .022), 0x2b2e32, 1, .14, 1.09, -.03),
-        )
-      } else if (cfg.windshield === 'tinted') {
-        hasWindshield = true
-        frontParts.push(
-          coloredRgbaPart(new T.BoxGeometry(.38, .25, .028), 0x16202a, .78, 0, 1.16, -.06, -.30),
-          coloredRgbaPart(new T.BoxGeometry(.022, .14, .022), 0x2b2e32, 1, -.14, 1.08, -.03),
-          coloredRgbaPart(new T.BoxGeometry(.022, .14, .022), 0x2b2e32, 1, .14, 1.08, -.03),
-        )
-      }
-    }
+    const hasWindshield=cfg.windshield==='clear'||cfg.windshield==='tinted'
     frontModGeom?.dispose()
     if (frontParts.length > 0) {
       frontModGeom = mergeRgbaParts(frontParts)
@@ -1027,11 +912,7 @@ export function createDynamicEbike(paint = 0, initialMods?: Partial<EbikeModConf
       frontModMesh.visible = false
     }
 
-    const glowParts: T.BufferGeometry[] = []
     if (!shared && cfg.underglow) {
-      for (const side of [-1, 1]) {
-        glowParts.push(coloredRgbaPart(new T.BoxGeometry(.03, .025, .64), cfg.underglowColor, 1, side * .18, .24, -.04))
-      }
       glowParts.push(coloredRgbaPart(new T.PlaneGeometry(.72, 1.35).rotateX(-Math.PI / 2), cfg.underglowColor, .24, 0, .015, -.02))
     }
     underglowModGeom?.dispose()
@@ -1053,7 +934,6 @@ export function createDynamicEbike(paint = 0, initialMods?: Partial<EbikeModConf
     const cfg: EbikeModConfig = typeof next === 'string' ? baseCfg : {...baseCfg, ...next, preset: presetKey}
 
     const shared = currentType === 'shared'
-    sharedFrontBasket.visible = shared
     sharedTailGroup.visible = shared
 
     const stockHex = EBIKE_STOCK_PAINTS[((basePaint % 4) + 4) % 4]
