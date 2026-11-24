@@ -253,6 +253,7 @@ def patch(file, area, approaches=()):
     # overlapping junction areas, with a shared constrained level at each node.
     distance=np.full(len(levels),np.inf)
     ceiling=np.full(len(levels),np.inf)
+    transition=np.full(len(levels),np.inf)
     for line,half,ya,yb,cap,_ in approaches:
         (ax,az),(bx,bz)=line.coords
         dx,dz=bx-ax,bz-az
@@ -270,12 +271,15 @@ def patch(file, area, approaches=()):
         # alongside a deeper cut. Continue the low road smoothly through the
         # shared pavement rather than switching planes at its painted edge.
         outside=np.maximum(0,d-half)
+        transition=np.minimum(transition,target+cap*outside+.04*outside**2)
         within_corridor = outside <= .5
         ceiling[within_corridor] = np.minimum(ceiling[within_corridor],
             target[within_corridor] + cap * outside[within_corridor])
         levels[select]=target[select]
         distance[select]=d[select]
-    levels=np.minimum(levels,ceiling)
+    # Keep the owning axis where separate roads run in parallel. In the
+    # surveyed pavement between approaches, blend back to the native surface.
+    levels=np.minimum(levels,np.where(np.isfinite(distance),ceiling,transition))
     for i,y in zip(spline,levels):
         vertices[i][1] = round(float(y),4)
     # Encode in millimetres. The worker draws the exact same triangles 51 mm

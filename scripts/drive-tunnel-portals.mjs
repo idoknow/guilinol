@@ -79,7 +79,7 @@ try{
                 const lateralNext=Math.abs((p.x-x)*(nz-z)-(p.z-z)*(nx-x))/nextLength
                 // A vehicle rounding a sharp corner can enter the next leg
                 // without its centre passing through the vertex itself.
-                const rounded=alongNext>0&&lateralNext<cross&&lateralNext<2&&progress>len-5
+                const rounded=mode==='car'&&alongNext>2&&lateralNext<cross&&lateralNext<1.5&&progress>len-4
                 if((progress>len-1.2&&cross<3.5)||rounded){part++;continue}
               }
               let ahead=Math.max(0,progress)+(mode==='car'?6.5:3.5)

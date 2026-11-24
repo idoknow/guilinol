@@ -185,9 +185,8 @@ export function tunnelGeometry(tile:Tile,ground:THREE.PlaneGeometry,tunnels:Tunn
     const axes=frame(tunnel),width=tunnel.halfWidth,head=tunnel.clearance
     function local(s:number,d:number,y:number){const p=axes.point(s,d,y);p[0]-=tile.x;p[2]-=tile.z;return p}
     const station=(p:Point)=>axes.station(p[0]+tile.x,p[2]+tile.z),side=(p:Point)=>axes.lateral(p[0]+tile.x,p[2]+tile.z)
-    // The face of the retaining wall stays at the pavement edge. The
-    // outside of its lining meets the actual excavated terrain 5 cm away.
     const lining=.05
+    for(const [from,to] of [[0,openEnd(tunnel,0)],[tunnel.length-openEnd(tunnel,1),tunnel.length]])if(to>from)cuts.push([p=>station(p)-from,p=>to-station(p),p=>halfWidthAt(tunnel,station(p))+lining-side(p),p=>halfWidthAt(tunnel,station(p))+lining+side(p)])
     const openings=(tunnel.openings??[]).map(([end,dx,dz,half])=>{
       const [x,y,z]=tunnel.portals[end]
       const along=(p:Point)=>(p[0]+tile.x-x)*dx+(p[2]+tile.z-z)*dz
@@ -231,37 +230,23 @@ export function tunnelGeometry(tile:Tile,ground:THREE.PlaneGeometry,tunnels:Tunn
       if(!tunnel.mouths?.[i]&&!openEnd(tunnel,i))quad(ring.map(([x,z])=>[x-tile.x,floor+head,z-tile.z]),'ceiling')
     }
     const values=profile(tunnel)
-    const cutEnds=[openEnd(tunnel,0),tunnel.length-openEnd(tunnel,1)]
-    const sections:[number,number][]=[values.at(0)]
     for(let i=1;i<values.count;i++){
       const [a,ay]=values.at(i-1),[b,by]=values.at(i)
-      for(const at of [...new Set(cutEnds)].sort((u,v)=>u-v)){
-        if(at>a+1e-6&&at<b-1e-6)sections.push([at,ay+(by-ay)*(at-a)/(b-a)])
-      }
-      sections.push([b,by])
-    }
-    // Combine straight cut edges, keeping each change of taper as its own
-    // plane. Polygon clipping requires a linear half-space on each edge.
-    const stretches:{a:number,b:number,wa:number,wb:number}[]=[]
-    for(let i=1;i<sections.length;i++){
-      const [a,ay]=sections[i-1],[b,by]=sections[i]
-      if(b<=a)continue
-      const open=(a+b)/2<cutEnds[0]||(a+b)/2>cutEnds[1]
+      const open=((a+b)/2<openEnd(tunnel,0))||((a+b)/2>tunnel.length-openEnd(tunnel,1))
       const wa=halfWidthAt(tunnel,a),wb=halfWidthAt(tunnel,b)
-      if(open){
-        const last=stretches.at(-1)
-        if(last&&last.b===a&&wa===wb&&last.wa===wa&&last.wb===wb)last.b=b
-        else stretches.push({a,b,wa,wb})
-      }
       const al=local(a,-wa,ay),ar=local(a,wa,ay),bl=local(b,-wb,by),br=local(b,wb,by)
       quad([al,ar,br,bl],'floor')
-      const top=(p:Point):Point=>{
-        if(!open)return [p[0],p[1]+head,p[2]]
-        const outer=local(station(p),side(p)+Math.sign(side(p))*lining,p[1])
-        outer[1]=groundY(outer)
-        return outer
-      }
+      const top=(p:Point):Point=>[p[0],open?Math.max(p[1],groundY(p)):p[1]+head,p[2]]
       quad([al,bl,top(bl),top(al)],open?'portal':'interior');quad([br,ar,top(ar),top(br)],open?'portal':'interior')
+      if(open){
+        const rim=(p:Point)=>{
+          const outer=local(station(p),side(p)+Math.sign(side(p))*lining,p[1])
+          outer[1]=groundY(outer)
+          return outer
+        }
+        quad([top(al),top(bl),rim(bl),rim(al)],'portal')
+        quad([top(br),top(ar),rim(ar),rim(br)],'portal')
+      }
       if(!open)quad([top(al),top(bl),top(br),top(ar)],'ceiling')
       if(!open){
         // 青绿 glazed-tile dado, warm lamp strips and a dashed centre line (IDOK-165 visual pass)
@@ -275,10 +260,6 @@ export function tunnelGeometry(tile:Tile,ground:THREE.PlaneGeometry,tunnels:Tunn
         const l=local(s,-width,y+head),r=local(s,width,y+head)
         quad([l,r,[r[0],Math.max(r[1]+.16,groundY(r)),r[2]],[l[0],Math.max(l[1]+.16,groundY(l)),l[2]]],'portal')
       }
-    }
-    for(const {a,b,wa,wb} of stretches){
-      const widthAt=(p:Point)=>wa+lining+(wb-wa)*(station(p)-a)/(b-a)
-      cuts.push([p=>station(p)-a,p=>b-station(p),p=>widthAt(p)-side(p),p=>widthAt(p)+side(p)])
     }
     if(parts.floor.length/3>(floorRanges.at(-1)?.end??0))floorRanges.push({end:parts.floor.length/3,tunnel})
   }
@@ -300,6 +281,12 @@ export function tunnelGeometry(tile:Tile,ground:THREE.PlaneGeometry,tunnels:Tunn
     if(changed)pieces.forEach(poly=>fan(poly,vertices));else keep.push(...ids)
   }
   ground.setIndex(keep)
+  if(parts.ceiling.length && tunnels.length>1){
+    // A lower ceiling at a bend may extend into the clearance of the
+    // adjoining strip. The higher ceiling closes the union of the bores.
+    const vertices=Float32Array.from(parts.ceiling)
+    parts.ceiling=Array.from(tunnelClearanceClipper(tile,tunnels)(vertices,Array.from({length:vertices.length/3},(_,i)=>i)))
+  }
   const looks:Record<string,THREE.MeshStandardMaterial|THREE.MeshBasicMaterial>={
     road:new THREE.MeshStandardMaterial({side:THREE.DoubleSide,color:0x3b3e42,roughness:.95}),
     interior:new THREE.MeshStandardMaterial({side:THREE.DoubleSide,color:0xcfc8b8,roughness:.9}),
