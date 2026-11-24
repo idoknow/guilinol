@@ -1,0 +1,478 @@
+{
+  "459904752": {
+    "version": 3,
+    "railway": null
+  },
+  "596514970": {
+    "version": 6,
+    "railway": "level_crossing"
+  },
+  "2451958935": {
+    "version": 3,
+    "railway": "level_crossing"
+  },
+  "4505338292": {
+    "version": 2,
+    "railway": "level_crossing"
+  },
+  "4514289414": {
+    "version": 2,
+    "railway": "level_crossing"
+  },
+  "4680276120": {
+    "version": 3,
+    "railway": "level_crossing"
+  },
+  "4680276121": {
+    "version": 3,
+    "railway": "level_crossing"
+  },
+  "4680276257": {
+    "version": 1,
+    "railway": "level_crossing"
+  },
+  "4680276266": {
+    "version": 2,
+    "railway": "level_crossing"
+  },
+  "6112626492": {
+    "version": 2,
+    "railway": "level_crossing"
+  },
+  "6314352773": {
+    "version": 2,
+    "railway": "level_crossing"
+  },
+  "6533456426": {
+    "version": 2,
+    "railway": "level_crossing"
+  },
+  "6533456427": {
+    "version": 2,
+    "railway": "level_crossing"
+  },
+  "6533456428": {
+    "version": 3,
+    "railway": "level_crossing"
+  },
+  "6533456429": {
+    "version": 2,
+    "railway": "level_crossing"
+  },
+  "6533456430": {
+    "version": 2,
+    "railway": "level_crossing"
+  },
+  "6533456431": {
+    "version": 3,
+    "railway": "level_crossing"
+  },
+  "6533456432": {
+    "version": 3,
+    "railway": "level_crossing"
+  },
+  "6533456433": {
+    "version": 3,
+    "railway": "level_crossing"
+  },
+  "6533456434": {
+    "version": 2,
+    "railway": "level_crossing"
+  },
+  "6533456435": {
+    "version": 2,
+    "railway": "level_crossing"
+  },
+  "6533456436": {
+    "version": 3,
+    "railway": "level_crossing"
+  },
+  "6533456437": {
+    "version": 3,
+    "railway": "level_crossing"
+  },
+  "6533456438": {
+    "version": 2,
+    "railway": "level_crossing"
+  },
+  "6533456439": {
+    "version": 2,
+    "railway": "level_crossing"
+  },
+  "6533456440": {
+    "version": 2,
+    "railway": "level_crossing"
+  },
+  "6533456441": {
+    "version": 2,
+    "railway": "level_crossing"
+  },
+  "6533456442": {
+    "version": 3,
+    "railway": "level_crossing"
+  },
+  "6533456443": {
+    "version": 2,
+    "railway": "level_crossing"
+  },
+  "6533456444": {
+    "version": 2,
+    "railway": "level_crossing"
+  },
+  "6533456445": {
+    "version": 2,
+    "railway": "level_crossing"
+  },
+  "6533456446": {
+    "version": 2,
+    "railway": "level_crossing"
+  },
+  "6533456447": {
+    "version": 2,
+    "railway": "level_crossing"
+  },
+  "6533456448": {
+    "version": 2,
+    "railway": "level_crossing"
+  },
+  "6533456449": {
+    "version": 2,
+    "railway": "level_crossing"
+  },
+  "6533456450": {
+    "version": 2,
+    "railway": "level_crossing"
+  },
+  "6533456451": {
+    "version": 2,
+    "railway": "level_crossing"
+  },
+  "6533456452": {
+    "version": 2,
+    "railway": "level_crossing"
+  },
+  "6533456453": {
+    "version": 2,
+    "railway": "level_crossing"
+  },
+  "6533456454": {
+    "version": 2,
+    "railway": "level_crossing"
+  },
+  "6533456455": {
+    "version": 2,
+    "railway": "level_crossing"
+  },
+  "6533456456": {
+    "version": 2,
+    "railway": "level_crossing"
+  },
+  "6533456457": {
+    "version": 2,
+    "railway": "level_crossing"
+  },
+  "6533456458": {
+    "version": 2,
+    "railway": "level_crossing"
+  },
+  "6533456459": {
+    "version": 2,
+    "railway": "level_crossing"
+  },
+  "6533456460": {
+    "version": 2,
+    "railway": "level_crossing"
+  },
+  "6533456461": {
+    "version": 2,
+    "railway": "level_crossing"
+  },
+  "6533456462": {
+    "version": 2,
+    "railway": "level_crossing"
+  },
+  "6533456463": {
+    "version": 2,
+    "railway": "level_crossing"
+  },
+  "6533456464": {
+    "version": 2,
+    "railway": "level_crossing"
+  },
+  "6533456465": {
+    "version": 2,
+    "railway": "level_crossing"
+  },
+  "6533456466": {
+    "version": 2,
+    "railway": "level_crossing"
+  },
+  "6533456467": {
+    "version": 2,
+    "railway": "level_crossing"
+  },
+  "6533456468": {
+    "version": 2,
+    "railway": "level_crossing"
+  },
+  "6533456469": {
+    "version": 2,
+    "railway": "level_crossing"
+  },
+  "6533456470": {
+    "version": 2,
+    "railway": "level_crossing"
+  },
+  "6533456471": {
+    "version": 2,
+    "railway": "level_crossing"
+  },
+  "6533456472": {
+    "version": 3,
+    "railway": "level_crossing"
+  },
+  "6533456473": {
+    "version": 2,
+    "railway": "level_crossing"
+  },
+  "6533456474": {
+    "version": 3,
+    "railway": "level_crossing"
+  },
+  "6533456475": {
+    "version": 2,
+    "railway": "level_crossing"
+  },
+  "6533456476": {
+    "version": 2,
+    "railway": "level_crossing"
+  },
+  "6533456477": {
+    "version": 2,
+    "railway": "level_crossing"
+  },
+  "6533456478": {
+    "version": 2,
+    "railway": "level_crossing"
+  },
+  "6533456479": {
+    "version": 2,
+    "railway": "level_crossing"
+  },
+  "6533456480": {
+    "version": 2,
+    "railway": "level_crossing"
+  },
+  "6533456481": {
+    "version": 2,
+    "railway": "level_crossing"
+  },
+  "6533456482": {
+    "version": 2,
+    "railway": "level_crossing"
+  },
+  "6533456483": {
+    "version": 2,
+    "railway": "level_crossing"
+  },
+  "6533456484": {
+    "version": 2,
+    "railway": "level_crossing"
+  },
+  "6533456485": {
+    "version": 2,
+    "railway": "level_crossing"
+  },
+  "6533456486": {
+    "version": 2,
+    "railway": "level_crossing"
+  },
+  "6533456487": {
+    "version": 2,
+    "railway": "level_crossing"
+  },
+  "6533456488": {
+    "version": 2,
+    "railway": "level_crossing"
+  },
+  "6533456489": {
+    "version": 2,
+    "railway": "level_crossing"
+  },
+  "6533456490": {
+    "version": 2,
+    "railway": "level_crossing"
+  },
+  "6533456491": {
+    "version": 2,
+    "railway": "level_crossing"
+  },
+  "6533456492": {
+    "version": 2,
+    "railway": "level_crossing"
+  },
+  "6533456493": {
+    "version": 2,
+    "railway": "level_crossing"
+  },
+  "6533456494": {
+    "version": 2,
+    "railway": "level_crossing"
+  },
+  "6533456495": {
+    "version": 2,
+    "railway": "level_crossing"
+  },
+  "6533456496": {
+    "version": 2,
+    "railway": "level_crossing"
+  },
+  "6533456497": {
+    "version": 2,
+    "railway": "level_crossing"
+  },
+  "6533456498": {
+    "version": 6,
+    "railway": "level_crossing"
+  },
+  "6533456499": {
+    "version": 4,
+    "railway": "level_crossing"
+  },
+  "6533456500": {
+    "version": 2,
+    "railway": "level_crossing"
+  },
+  "6533456501": {
+    "version": 2,
+    "railway": "level_crossing"
+  },
+  "6533456502": {
+    "version": 2,
+    "railway": "level_crossing"
+  },
+  "6533456503": {
+    "version": 2,
+    "railway": "level_crossing"
+  },
+  "6533456504": {
+    "version": 4,
+    "railway": "level_crossing"
+  },
+  "6533456505": {
+    "version": 2,
+    "railway": "level_crossing"
+  },
+  "6533456508": {
+    "version": 2,
+    "railway": "level_crossing"
+  },
+  "6533456509": {
+    "version": 2,
+    "railway": "level_crossing"
+  },
+  "6635078447": {
+    "version": 2,
+    "railway": "level_crossing"
+  },
+  "6635078449": {
+    "version": 2,
+    "railway": "level_crossing"
+  },
+  "6635078450": {
+    "version": 2,
+    "railway": "level_crossing"
+  },
+  "6635078451": {
+    "version": 2,
+    "railway": "level_crossing"
+  },
+  "6635078452": {
+    "version": 2,
+    "railway": "level_crossing"
+  },
+  "6635078453": {
+    "version": 2,
+    "railway": "level_crossing"
+  },
+  "6635078454": {
+    "version": 2,
+    "railway": "level_crossing"
+  },
+  "7600136554": {
+    "version": 2,
+    "railway": "level_crossing"
+  },
+  "9112389304": {
+    "version": 1,
+    "railway": "level_crossing"
+  },
+  "9208999667": {
+    "version": 2,
+    "railway": "level_crossing"
+  },
+  "9385867899": {
+    "version": 1,
+    "railway": "level_crossing"
+  },
+  "9385908105": {
+    "version": 1,
+    "railway": "level_crossing"
+  },
+  "9385929286": {
+    "version": 1,
+    "railway": "level_crossing"
+  },
+  "9385930439": {
+    "version": 2,
+    "railway": "level_crossing"
+  },
+  "9385930440": {
+    "version": 2,
+    "railway": "level_crossing"
+  },
+  "9391275156": {
+    "version": 1,
+    "railway": "level_crossing"
+  },
+  "9437426818": {
+    "version": 1,
+    "railway": null
+  },
+  "9457262754": {
+    "version": 1,
+    "railway": "level_crossing"
+  },
+  "9457262755": {
+    "version": 1,
+    "railway": "level_crossing"
+  },
+  "9718586751": {
+    "version": 1,
+    "railway": "level_crossing"
+  },
+  "9718586804": {
+    "version": 1,
+    "railway": null
+  },
+  "10287194720": {
+    "version": 1,
+    "railway": "level_crossing"
+  },
+  "13619714703": {
+    "version": 2,
+    "railway": "level_crossing"
+  },
+  "13619754833": {
+    "version": 1,
+    "railway": "level_crossing"
+  },
+  "13619846085": {
+    "version": 1,
+    "railway": "level_crossing"
+  },
+  "13619846089": {
+    "version": 1,
+    "railway": "level_crossing"
+  }
+}
