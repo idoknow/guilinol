@@ -244,20 +244,42 @@ export async function adminMergeUsers(db: D1Database, actor: string, targetId: s
   for (const type of movable)
     statements.push(db.prepare('UPDATE social_identities SET user_id=? WHERE user_id=? AND type=?').bind(targetId, fromId, type))
 
-  const saves = await db.prepare('SELECT count(*) n FROM player_saves WHERE user_id=?').bind(targetId).first<{ n: number }>()
-  const tookSaves = !saves?.n
-  // 目标没有存档才接管，不会撞 user_id 主键。不要写 UPDATE OR IGNORE：SQLite 专有，生产 Postgres 直接语法错误（#146 已修过一次）
-  if (tookSaves) statements.push(db.prepare('UPDATE player_saves SET user_id=? WHERE user_id=?').bind(targetId, fromId))
+  const targetSaves = await db.prepare('SELECT count(*) n FROM player_saves WHERE user_id=?').bind(targetId).first<{ n: number }>()
+  const sourceSaves = await db.prepare('SELECT count(*) n FROM player_saves WHERE user_id=?').bind(fromId).first<{ n: number }>()
+  const force = body.force === true
+  // 两边都有存档时合并只能留一份（user_id 是主键），默认拒绝，由管理员决定；
+  // 不要用 UPDATE OR IGNORE：SQLite 专有，生产 Postgres 直接语法错误
+  if (targetSaves?.n && sourceSaves?.n && !force)
+    return json({ error: { code: 'save_conflict', message: '两个账号都有存档；确认丢弃被合并账号的存档请带 force:true 重试' } }, 409)
+  const tookSaves = !targetSaves?.n && !!sourceSaves?.n
+  // 存档：user_id 是主键，两边都有存档时只能留一份。
+  // 计数只用于决定要不要 409（让管理员知道会丢存档），真正的迁移与删除放在同一个 batch 里：
+  //   目标在「计数之后、批次执行之前」新建了存档时，先删掉来源的存档再迁移剩下的，
+  //   既不撞主键让整个合并回滚，也不把来源存档留在即将被删除的账号上。
+  // 不要用 UPDATE OR IGNORE：SQLite 专有，生产 Postgres 直接语法错误
+  statements.push(
+    db
+      .prepare('DELETE FROM player_saves WHERE user_id=? AND EXISTS(SELECT 1 FROM player_saves t WHERE t.user_id=?)')
+      .bind(fromId, targetId),
+    db.prepare('UPDATE player_saves SET user_id=? WHERE user_id=?').bind(targetId, fromId),
+  )
   // 来源是管理员而目标不是：把角色转过去，否则合并完就没人能进后台了
-  if (source.role === 'admin' && target.role !== 'admin')
+  if (source.role === 'admin' && target.role !== 'admin') {
+    // 管理员要求 verified=1：目标没验证就把角色转过去，等于谁也别想进后台
+    if (!target.verified)
+      return json({ error: { code: 'target_unverified', message: '被保留的账号未验证邮箱，先把它的邮箱验证了再合并' } }, 400)
     statements.push(db.prepare("UPDATE users SET role='admin' WHERE id=?").bind(targetId))
+  }
 
   statements.push(
-    // 幂等键 (user_id,idempotency_key) 是唯一索引：先给与目标冲突的行加后缀，再整批搬过去，
-    // 否则跳过冲突行会把这些行留在源账号上，随后 source 被删 → 流水凭空消失
+    // 幂等键 (user_id,idempotency_key) 是唯一索引：先给与目标冲突的行换一个必定不重复的键，
+    // 再整批搬过去，否则跳过冲突行会把这些行留在源账号上，随后 source 被删 → 流水凭空消失。
+    // 新键用「原键 + :merged: + 来源用户 id」，而不是 merged-<tx_id>：
+    // tx_id 只在表内唯一，原键在目标侧已存在时 merged-<tx_id> 仍可能与某个手写键撞上；
+    // 拼上来源 id 后目标侧不可能存在同样的键（一个来源账号只能合并一次，合并后即删除）。
     db
       .prepare(
-        `UPDATE player_ledger_txns SET idempotency_key = idempotency_key || '#' || tx_id
+        `UPDATE player_ledger_txns SET idempotency_key = idempotency_key || ':merged:' || user_id
          WHERE user_id=? AND idempotency_key IN (SELECT idempotency_key FROM player_ledger_txns WHERE user_id=?)`,
       )
       .bind(fromId, targetId),
@@ -275,7 +297,8 @@ export async function adminMergeUsers(db: D1Database, actor: string, targetId: s
         .prepare('UPDATE users SET email=?,salt=?,digest=?,verified=?,email_placeholder=0 WHERE id=?')
         .bind(source.email, source.salt, source.digest, source.verified, targetId),
     )
-  const detail = {from:fromId,from_email:source.email,adopted_email:adoptedEmail,moved:movable,conflicts,took_saves:tookSaves}
+  // 存档计数进审计：目标侧已有存档、来源存档被丢弃时，事后能查到丢了几个
+  const detail = {from:fromId,from_email:source.email,adopted_email:adoptedEmail,moved:movable,conflicts,took_saves:tookSaves,source_saves:sourceSaves?.n ?? 0,target_saves:targetSaves?.n ?? 0}
   // Read the resulting ban state in the same batch as the merge.
   for (const banned of [false,true]) {
     statements.push(db.prepare(`INSERT INTO admin_audit(actor_id,action,target_type,target_id,detail)

@@ -111,6 +111,12 @@ async function requireSession(db:D1Database, result:D1Result, userId:string) {
   checkBan(await db.prepare('SELECT banned_at,ban_reason FROM users WHERE id=?').bind(userId).first<BanState>())
   throw new Problem(401,'unauthorized','请重新登录')
 }
+/** 唯一约束冲突：SQLite 给消息，PostgreSQL 给 code=23505（消息里是 duplicate key）。 */
+const isUniqueViolation = (error: unknown) => {
+  const code = (error as { code?: string } | null)?.code
+  const message = error instanceof Error ? error.message : ''
+  return code === '23505' || /UNIQUE|PRIMARY KEY|duplicate key/i.test(message)
+}
 /**
  * 直接给第三方账号建号（不要求邮箱/密码）：占位邮箱 + 不可用密码 + verified=1。
  * 调用方负责消费 social_pending。
@@ -121,7 +127,7 @@ async function createSocialOnlyUser(
   socialUid: string,
   nickname: string,
   avatar: string,
-): Promise<string> {
+): Promise<{ userId: string; created: boolean }> {
   const salt = random(16)
   // 随机密码的哈希：这个账号不能走邮箱密码登录
   const digest = await passwordHash(random(32), salt)
@@ -140,16 +146,15 @@ async function createSocialOnlyUser(
           )
           .bind(type, socialUid, id, nickname, avatar, now(), now()),
       ])
-      return id
+      return { userId: id, created: true }
     } catch (error) {
-      const message = error instanceof Error ? error.message : ''
-      if (!/UNIQUE|PRIMARY KEY/i.test(message)) throw error
+      if (!isUniqueViolation(error)) throw error
       // 并发时另一个请求已经建好这个平台的绑定：直接登录到它
       const raced = await db
         .prepare('SELECT user_id FROM social_identities WHERE type=? AND social_uid=?')
         .bind(type, socialUid)
         .first<{ user_id: string }>()
-      if (raced) return raced.user_id
+      if (raced) return { userId: raced.user_id, created: false }
       // 否则是占位邮箱撞车，加随机后缀再试一次
       if (!suffix) continue
       throw new Problem(500, 'social_failed', '账号创建失败，请稍后重试')
@@ -512,7 +517,13 @@ export async function socialConfirm(env: Env, db: D1Database, request: Request):
     if (!createdPending) throw new Problem(404, 'no_pending', '授权已过期，请重新发起')
     let newUserId: string
     try {
-      newUserId = await createSocialOnlyUser(db, type, row.social_uid!, nickname, faceimg)
+      const result = await createSocialOnlyUser(db, type, row.social_uid!, nickname, faceimg)
+      // 并发下可能撞到别人已经建好的绑定：那条账号必须已验证，否则等于绕过登录检查
+      if (!result.created) {
+        const raced = await db.prepare('SELECT verified FROM users WHERE id=?').bind(result.userId).first<{ verified: number }>()
+        if (!raced?.verified) throw new Problem(403, 'unverified', '该账号尚未验证邮箱')
+      }
+      newUserId = result.userId
     } catch (error) {
       // 建号失败就把授权还回去，别让用户因为一次偶发错误重走整条授权链
       await db.prepare('UPDATE social_pending SET used=0 WHERE token=?').bind(digest).run()
@@ -611,7 +622,12 @@ export async function socialRegister(env: Env, db: D1Database, request: Request,
     if (!createdPending) throw new Problem(404, 'no_pending', '授权已过期，请重新发起')
     let newUserId: string
     try {
-      newUserId = await createSocialOnlyUser(db, type, row.social_uid, nickname, safeAvatar(row.faceimg))
+      const result = await createSocialOnlyUser(db, type, row.social_uid, nickname, safeAvatar(row.faceimg))
+      if (!result.created) {
+        const raced = await db.prepare('SELECT verified FROM users WHERE id=?').bind(result.userId).first<{ verified: number }>()
+        if (!raced?.verified) throw new Problem(403, 'unverified', '该账号尚未验证邮箱')
+      }
+      newUserId = result.userId
     } catch (error) {
       await db.prepare('UPDATE social_pending SET used=0 WHERE token=?').bind(digest).run()
       throw error
@@ -626,6 +642,8 @@ export async function socialRegister(env: Env, db: D1Database, request: Request,
   }
 
   if (email.length > 254 || email.split('@').length !== 2 || !/^\S+@[^\s@]+\.[^\s@]+$/.test(email)) invalid()
+  // 占位域名是系统给无邮箱账号用的，用户不能拿它注册（收不到验证码）
+  if (isPlaceholderEmail(email)) throw new Problem(400, 'invalid_email', '请填写真实邮箱')
   if (password.length < 8 || password.length > 256) invalid()
 
   const existing = await db.prepare('SELECT id,verified FROM users WHERE email=?').bind(email).first<{ id: string; verified: number }>()
@@ -730,7 +748,7 @@ export async function bindEmail(
 
   const email = typeof body.email === 'string' ? body.email.trim().toLowerCase() : ''
   if (email.length > 254 || email.split('@').length !== 2 || !/^\S+@[^\s@]+\.[^\s@]+$/.test(email)) invalid()
-  if (isPlaceholderEmail(email)) throw new Problem(400, 'invalid_input', '请填写真实邮箱')
+  if (isPlaceholderEmail(email)) throw new Problem(400, 'invalid_email', '请填写真实邮箱')
   const owner = await db.prepare('SELECT id FROM users WHERE email=?').bind(email).first<{ id: string }>()
   if (owner && owner.id !== account.id) throw new Problem(409, 'email_taken', '该邮箱已被其他账号使用')
 

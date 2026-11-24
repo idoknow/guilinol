@@ -110,12 +110,14 @@ async function handle(request:Request,env:Env) {
     return json({...profile(user),social},200,cookie(request.headers.get('Cookie')!.match(/(?:^|;\s*)glol_session=([a-f0-9]{64})(?:;|$)/)![1]))
   }
   const email=typeof body.email==='string'?body.email.trim().toLowerCase():''
-  // @social.invalid 是第三方专用账号的占位域名，不允许被当成真实邮箱注册
-  if(email.length>254||!/^\S+@[^\s@]+\.[^\s@]+$/.test(email)||email.split('@').length!==2||/@social\.invalid$/i.test(email)) invalid()
+  if(email.length>254||!/^\S+@[^\s@]+\.[^\s@]+$/.test(email)||email.split('@').length!==2) invalid()
   const ip=request.headers.get('CF-Connecting-IP')||'local'
   const getUser=()=>stmt('SELECT * FROM users WHERE email=?',email).first<User>()
   if(path==='auth/register'||path==='auth/resend') {
     const register=path==='auth/register', purpose=register?'verify':body.purpose
+    // 占位域名 @social.invalid 是系统给无邮箱账号用的：不能被拿来注册；
+    // 发码/登录仍走后续逻辑（占位账号由 lib/auth 的 reserveMail 返回 no_email，登录保持可用）
+    if(register&&/@social\.invalid$/i.test(email)) invalid()
     if(purpose!=='verify'&&purpose!=='reset') invalid()
     const name=register?nickname(body.nickname):'', pass=register?password(body.password):''
     await reserveMail(db,email,ip)

@@ -67,7 +67,7 @@ assert.match(nme.email,/^wx\.c0ffee0123456789abcdef@social\.invalid$/)
     const tu=(await sql(`SELECT email,email_placeholder,digest FROM users WHERE id='${nme.id}'`))[0].results[0];assert.deepEqual([tu.email,Number(tu.email_placeholder),tu.digest],['merge-src@example.test',0,'d1'])
     assert.equal(Number((await sql(`SELECT count(*) n FROM users WHERE id='${src}'`))[0].results[0].n),0)
     assert.deepEqual((await sql(`SELECT tx_id FROM player_ledger_txns WHERE user_id='${nme.id}' ORDER BY tx_id`))[0].results.map(r=>r.tx_id),['t1','t2','t3'])
-    assert.equal((await sql(`SELECT idempotency_key k FROM player_ledger_txns WHERE tx_id='t1'`))[0].results[0].k,'k1#t1')
+    assert.equal((await sql(`SELECT idempotency_key k FROM player_ledger_txns WHERE tx_id='t1'`))[0].results[0].k,'k1:merged:'+src)
     assert.equal(Number((await sql(`SELECT count(*) n FROM player_saves WHERE user_id='${nme.id}'`))[0].results[0].n),1)
     assert.equal(Number((await sql(`SELECT count(*) n FROM admin_audit WHERE action='merge_users'`))[0].results[0].n),1)
     // 运营：重置密码（无会话也要留审计）+ 改邮箱（占用 409）
