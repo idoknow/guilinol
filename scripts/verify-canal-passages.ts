@@ -41,8 +41,11 @@ for(const [id,bridgeId] of [[1025751314,1025751315],[1034716138,1034716139]]){
       let previous:number|undefined
       for(let j=0;j<=count;j++){
         const px=ax+dx*length*j/count-dz*side,pz=az+dz*length*j/count+dx*side
-        const sample={hidden:false,road:-Infinity},y=surface(px,pz,{},sample)
-        assert(Number.isFinite(sample.road)&&!sample.hidden,`Missing exposed pavement on ${id} at ${px},${pz}`)
+        // A skewed deck can already cover an outer wheel at its abutment.
+        const atJoint=Math.hypot(px-x,pz-z)<2
+        const sample={hidden:false,road:-Infinity,deck:-Infinity}
+        const y=surface(px,pz,atJoint?{structure:'bridge'}:{},sample)
+        assert(Number.isFinite(Math.max(sample.road,sample.deck))&&!sample.hidden,`Missing exposed pavement on ${id} at ${px},${pz}`)
         if(previous!==undefined)maximumGrade=Math.max(maximumGrade,Math.abs(y-previous)/(length/count))
         previous=y
         const ox=Math.floor(px/256)*256,oz=Math.floor(pz/256)*256,key=ox+','+oz
