@@ -113,10 +113,9 @@ def bake(directory, chunks, graded=None):
             control = graded.after[2][row:row+35,col:col+35]
             mm = np.rint(control*1000).astype(int)
             knots = [int(mm.min()),(mm-mm.min()).ravel().tolist()]
-            if len(streets)==5:
-                streets.append(knots)
-            else:
-                streets[5] = knots
+            while len(streets)<6:
+                streets.append(None if len(streets)==5 else [])
+            streets[5] = knots
         if lower:
             lower[0] += len(patches)
         encoded = json.dumps(collision,separators=(',',':')).encode()

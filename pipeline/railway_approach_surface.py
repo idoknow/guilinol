@@ -169,7 +169,7 @@ def grade_approach_surfaces(ways, crossings, panels, tunnels, plans, protected, 
             p = line.interpolate(at)
             # Joint targets are only meaningful at road-level abutments.
             if ways[wid]['nodes'][0 if at==stations[0] else -1] in surface_nodes:
-                anchors.append((p.x,p.y,h-.09,h-.005))
+                anchors.append((p.x,p.y,h-.047,h-.043))
     for num,(rows,cols) in enumerate(regions,1):
         if rows.stop-rows.start<4 or cols.stop-cols.start<4:
             continue
