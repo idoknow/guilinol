@@ -960,18 +960,22 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
       item.mat.opacity=inReach?.72+.18*wave:.28+.15*wave
     }
   }
+  // Shared-bike hail: L on keyboard, .btn-hail on touch (walk:hail). Returns false when not applicable on foot.
+  function hailSharedBike(boardHint:string){
+    if(!active||isModalOrOverlayOpen()||shopOverlay?.isOpen()||!rides||rides.bike||rides.car||rides.boat)return false
+    const position=sim.body.translation()
+    const ok=rides.hailBike({x:position.x,y:position.y-cfg.height/2,z:position.z},yaw)
+    window.dispatchEvent(new CustomEvent('walk:toast',{detail:{text:ok?`共享电车已送达，${boardHint}`:'附近没有可调度的共享车或安全停车位',ms:2400}}))
+    return true
+  }
+  window.addEventListener('walk:hail',()=>{hailSharedBike('点「骑电动车」出发')})
   window.addEventListener('keydown',event=>{
     if(active&&cigarette.active&&!event.repeat&&!isGlobalHotkeyBlocked(event.target)&&!isModalOrOverlayOpen()){
       if(event.code==='Escape'){cigarette.stop()}
       else if(hits(event.code,'useItem')){if(!cigarette.light()&&cigarette.puff())puffSeq=(puffSeq+1)%1000}
     }
     if(active)ebikeAudio.unlock()
-    if(active && event.code==='KeyL' && !event.repeat && !isGlobalHotkeyBlocked(event.target) && !isModalOrOverlayOpen() && !shopOverlay?.isOpen() && rides && !rides.bike && !rides.car && !rides.boat){
-      const position=sim.body.translation()
-      const ok=rides.hailBike({x:position.x,y:position.y-cfg.height/2,z:position.z},yaw)
-      window.dispatchEvent(new CustomEvent('walk:toast',{detail:{text:ok?'共享电车已送达，按 F 上车':'附近没有可调度的共享车或安全停车位',ms:2400}}))
-      return
-    }
+    if(active && event.code==='KeyL' && !event.repeat && !isGlobalHotkeyBlocked(event.target) && hailSharedBike('按 F 上车'))return
     if(active&&!event.repeat&&event.code==='KeyO'&&!isGlobalHotkeyBlocked(event.target)&&!isModalOrOverlayOpen()&&!shopOverlay?.isOpen()){
       openSafeWardrobe()
       return
