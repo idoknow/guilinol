@@ -182,28 +182,79 @@ try {
   console.log('closed', JSON.stringify(closed))
   assert.equal(closed.rc, false)
 
-  // 11) FlyCart with the car load: it is over the 200 kg rating on purpose
+  // 11) FlyCart payload gate: cargo up to the 200 kg rating flies, the 1200 kg car is refused.
   await tap('.dock-drone')
-  await tap('[data-drone="flycart200"] [data-load="car"]')
+  const overWeight = await page.evaluate(() => {
+    const card = document.querySelector('[data-drone="flycart200"]')
+    const car = card?.querySelector('[data-load="car"]')
+    car?.click()
+    return {
+      over: car?.classList.contains('over') ?? false,
+      note: (card?.querySelector('[data-load-note]')?.textContent ?? '').trim(),
+      selected: card?.querySelector('[data-load].on')?.getAttribute('data-load') ?? null,
+    }
+  })
+  console.log('overweight', JSON.stringify(overWeight))
+  assert.equal(overWeight.over, true, 'the 1200 kg car is marked over the 200 kg rating')
+  assert.match(overWeight.note, /超重/, `over-weight note: ${overWeight.note}`)
+  assert.notEqual(overWeight.selected, 'car', 'an over-weight load cannot be selected')
+
+  // Max the cargo slider: 200 kg is exactly the rating, so it must be allowed.
+  // The slider only exists once 运货 is the selected preset, so click it first and re-query.
+  await page.evaluate(() => document.querySelector('[data-drone="flycart200"] [data-load="cargo"]')?.click())
+  await page.waitForFunction(() => !!document.querySelector('[data-drone="flycart200"] [data-cargoweight]'), null, {timeout: 20000})
+  const cargo = await page.evaluate(() => {
+    const slider = document.querySelector('[data-drone="flycart200"] [data-cargoweight]')
+    if (slider) {
+      slider.value = slider.max
+      slider.dispatchEvent(new Event('input', {bubbles: true}))
+    }
+    const card = document.querySelector('[data-drone="flycart200"]')
+    return {
+      max: slider?.max ?? null,
+      chip: card?.querySelector('[data-load="cargo"]')?.textContent ?? '',
+      line: card?.querySelector('.drone-load')?.textContent ?? '',
+    }
+  })
+  console.log('cargo', JSON.stringify(cargo))
+  assert.equal(cargo.max, '200', 'the cargo slider tops out at the 200 kg rating')
+  assert.equal(cargo.chip, '运货 200 kg')
   await tap('[data-drone="flycart200"]')
   await page.waitForFunction(() => !!window.droneDebug?.().flight, null, {timeout: 30000})
   await page.waitForFunction(() => document.querySelector('.dock-drone')?.textContent.trim() === '起飞', null, {timeout: 20000})
   const cart = await page.evaluate(() => ({dock: document.querySelector('.dock-drone')?.textContent.trim(), state: window.droneDebug?.()}))
   console.log('cart', JSON.stringify(cart))
   assert.equal(cart.dock, '起飞')
+  assert.equal(cart.state.flight.load, 200, 'cargo at the rating flies at 200 kg')
   await tap('.dock-drone')
   await page.waitForSelector('.rc.rc-pro', {timeout: 20000})
+  // The telemetry line is written by the flight tick; software rendering can starve rAF, so step it.
+  await page.evaluate(() => window.droneStep(0.1, 4))
+  await page.waitForFunction(() => ((document.querySelector('.rc .rc-tele')?.textContent ?? '').trim().length > 0), null, {timeout: 60000})
   const pro = await page.evaluate(() => ({
     pro: !!document.querySelector('.rc.rc-pro'),
-    tapes: !!document.querySelector('.rc-alt') && !!document.querySelector('.rc-speed'),
+    topbar: !!document.querySelector('.rc-topbar .rc-mode') && !!document.querySelector('.rc-bars[data-kind="rc"]') && !!document.querySelector('.rc-bars[data-kind="hd"]') && !!document.querySelector('.rc-gps'),
+    tele: (document.querySelector('.rc .rc-tele')?.textContent ?? '').trim(),
+    shutter: !!document.querySelector('.rc .rc-shutter'),
+    modes: Array.from(document.querySelectorAll('.rc .rc-modes button')).map(node => node.textContent.trim()),
+    sideActions: Array.from(document.querySelectorAll('.rc .rc-side')).map(node => node.dataset.act),
     gimbal: !!document.querySelector('.rc-gimbal input'),
     load: window.droneDebug().flight.load,
   }))
   console.log('pro', JSON.stringify(pro))
   assert.equal(pro.pro, true, 'FlyCart uses the professional controller')
-  assert.equal(pro.tapes, true)
+  assert.equal(pro.topbar, true, 'professional controller shows the DJI top bar')
+  assert.match(pro.tele, /^H [\d.]+m\s+D \d+m\s+H\.S [\d.]+m\/s/, `pro telemetry line: ${pro.tele}`)
+  assert.equal(pro.shutter, true)
+  assert.deepEqual(pro.modes, ['照片', '录像'])
+  assert.deepEqual(pro.sideActions, ['rth', 'land', 'photo', 'record', 'exit'])
   assert.equal(pro.gimbal, true)
-  assert.equal(pro.load, 1200, 'car load is 1200 kg')
+  assert.equal(pro.load, 200, 'cargo at the rating is 200 kg')
+  // The 照片/录像 chips drive what the big shutter fires.
+  await tap('.rc .rc-modes [data-mode="video"]')
+  assert.equal(await page.evaluate(() => document.querySelector('.rc')?.dataset.mode), 'video')
+  await tap('.rc .rc-modes [data-mode="photo"]')
+  assert.equal(await page.evaluate(() => document.querySelector('.rc')?.dataset.mode), 'photo')
   await tap('.rc [data-act="exit"]')
 
   assert.deepEqual(errors, [], 'no page errors')

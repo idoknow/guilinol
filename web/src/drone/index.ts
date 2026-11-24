@@ -30,8 +30,13 @@ export interface DroneMode {
 }
 
 const PLACE_DISTANCE = 4.2
-const LOAD_WEIGHT:Record<LoadKind,number> = {none:0,cargo:200000,person:80000,car:1200000}
-const LOAD_LABEL:Record<LoadKind,string> = {none:'空载',cargo:'运货 200 kg',person:'运人 80 kg',car:'运车（超载）'}
+// IDOK-255: loads are weights, not fixed presets. The player may carry cargo or a car as long as
+// the total stays inside the airframe's payload (FlyCart 200 = 200 kg), so the hangar gates the
+// chips by weight instead of pretending a 1.2 t car is "超载" and letting it fly anyway.
+const LOAD_KINDS:LoadKind[] = ['none','cargo','person','car']
+const LOAD_FIXED:Record<LoadKind,number> = {none:0,cargo:0,person:80000,car:1200000}
+const LOAD_TITLE:Record<LoadKind,string> = {none:'空载',cargo:'运货',person:'运人',car:'运车'}
+const CARGO_DEFAULT = 100000
 
 export function droneMode(host:Host, deps:{groundAt:(x:number,z:number)=>number; name:()=>string}):DroneMode {
   const input = new PilotInput()
@@ -40,6 +45,7 @@ export function droneMode(host:Host, deps:{groundAt:(x:number,z:number)=>number;
   let flight:Flight|null = null
   let rc:RcView|null = null
   let loadKind:LoadKind = 'none'
+  let cargoG = CARGO_DEFAULT
   let loadMesh:THREE.Object3D|null = null
   let recording:{rec:Recording; started:number}|null = null
   let hint:HTMLElement|null = null
@@ -59,10 +65,33 @@ export function droneMode(host:Host, deps:{groundAt:(x:number,z:number)=>number;
   mask.querySelector<HTMLButtonElement>('.about-close')!.onclick = () => closeHangar()
   mask.addEventListener('pointerdown',event => { if (event.target === mask) closeHangar() })
 
+  // 载重：重量是唯一标准。货重可调，货/人/车都只在「不超过该机型载荷」时可选。
+  function payloadOf(id:DroneId|null):number { return id ? drone(id).payloadG ?? 0 : 0 }
+  function loadGrams():number {
+    if (loadKind === 'none') return 0
+    const grams = loadKind === 'cargo' ? cargoG : LOAD_FIXED[loadKind]
+    const cap = payloadOf(placed)
+    return cap ? Math.min(grams,cap) : grams
+  }
+  function loadStaysInside(kind:LoadKind,id:DroneId|null):boolean {
+    const grams = kind === 'cargo' ? cargoG : LOAD_FIXED[kind]
+    const cap = payloadOf(id)
+    return !cap || grams <= cap
+  }
+  function loadText(kind:LoadKind):string {
+    const grams = kind === 'none' ? 0 : kind === 'cargo' ? cargoG : LOAD_FIXED[kind]
+    const kg = grams >= 1000 ? `${(grams / 1000).toFixed(grams % 1000 ? 1 : 0)} kg` : `${grams} g`
+    return kind === 'none' ? '空载' : `${LOAD_TITLE[kind]} ${kg}`
+  }
+  function kgText(grams:number):string {
+    return grams % 1000 ? `${(grams / 1000).toFixed(1)} kg` : `${(grams / 1000).toFixed(0)} kg`
+  }
+
   function renderHangar() {
     grid.innerHTML = DRONE_IDS.map(id => {
       const spec = drone(id)
       const isOut = placed === id
+      const cap = spec.payloadG ?? 0
       return `<button class="drone-card${isOut ? ' out' : ''}" data-drone="${id}" type="button">
         <span class="drone-name">${spec.name}</span>
         <span class="drone-tag">${spec.tagline}</span>
@@ -76,9 +105,17 @@ export function droneMode(host:Host, deps:{groundAt:(x:number,z:number)=>number;
           <div><dt>重量</dt><dd>${(spec.weightG / 1000).toFixed(2)} kg</dd></div>
           <div><dt>遥控</dt><dd>${spec.rc === 'simple' ? '傻瓜式' : '专业遥控器'}</dd></div>
         </dl>
-        ${spec.payloadG ? `<span class="drone-load">载荷 ${spec.payloadG / 1000} kg · 当前 ${LOAD_LABEL[loadKind]}</span>
-          <span class="drone-loads">${(['none','cargo','person','car'] as LoadKind[]).map(kind =>
-            `<i data-load="${kind}" class="${kind === loadKind ? 'on' : ''}">${LOAD_LABEL[kind]}</i>`).join('')}</span>` : ''}
+        ${cap ? `<span class="drone-load">载荷 ${(cap / 1000).toFixed(0)} kg · 当前 ${loadText(loadKind)}</span>
+          <span class="drone-loads">${LOAD_KINDS.map(kind => {
+            const inside = loadStaysInside(kind,id)
+            const grams = kind === 'cargo' ? cargoG : LOAD_FIXED[kind]
+            const title = inside ? '' : ` title="超重：${kgText(grams)} 超过 ${kgText(cap)} 载荷"`
+            return `<i data-load="${kind}" data-drone-load="${id}"${title} class="${kind === loadKind ? 'on' : ''}${inside ? '' : ' over'}">${loadText(kind)}</i>`
+          }).join('')}</span>
+          ${loadKind === 'cargo' ? `<span class="drone-cargo">
+            <input type="range" data-cargoweight min="10" max="${cap / 1000}" step="10" value="${Math.min(cargoG / 1000,cap / 1000)}">
+            <b data-cargoval>${(cargoG / 1000).toFixed(0)} kg</b></span>` : ''}
+          <span class="drone-note" data-load-note hidden></span>` : ''}
         <span class="drone-cta">${isOut ? '召回' : '放到身前'}</span>
       </button>`
     }).join('')
@@ -88,9 +125,34 @@ export function droneMode(host:Host, deps:{groundAt:(x:number,z:number)=>number;
     for (const chip of Array.from(grid.querySelectorAll<HTMLElement>('[data-load]'))) {
       chip.onclick = event => {
         event.stopPropagation()
-        loadKind = chip.dataset.load as LoadKind
-        if (flight) flight.load = LOAD_WEIGHT[loadKind]
+        const id = chip.dataset.droneLoad as DroneId
+        const kind = chip.dataset.load as LoadKind
+        if (!loadStaysInside(kind,id)) {
+          const cap = payloadOf(id)
+          const grams = kind === 'cargo' ? cargoG : LOAD_FIXED[kind]
+          const note = chip.closest('.drone-card')?.querySelector<HTMLElement>('[data-load-note]')
+          if (note) {
+            note.hidden = false
+            note.textContent = `超重：${kgText(grams)} 超过 ${kgText(cap)} 载荷，飞不起来`
+          }
+          return
+        }
+        loadKind = kind
+        if (flight) flight.load = loadGrams()
         renderHangar()
+      }
+    }
+    for (const slider of Array.from(grid.querySelectorAll<HTMLInputElement>('[data-cargoweight]'))) {
+      slider.oninput = () => {
+        cargoG = Math.round(Number(slider.value) * 1000)
+        const label = slider.closest('.drone-cargo')?.querySelector<HTMLElement>('[data-cargoval]')
+        if (label) label.textContent = `${(cargoG / 1000).toFixed(0)} kg`
+        const chip = slider.closest('.drone-card')?.querySelector<HTMLElement>('[data-load="cargo"]')
+        if (chip) chip.textContent = loadText('cargo')
+        const loadLine = slider.closest('.drone-card')?.querySelector<HTMLElement>('.drone-load')
+        const cardId = slider.closest<HTMLElement>('[data-drone]')?.dataset.drone as DroneId | undefined
+        if (loadLine && cardId) loadLine.textContent = `载荷 ${kgText(payloadOf(cardId))} · 当前 ${loadText(loadKind)}`
+        if (flight && loadKind === 'cargo') flight.load = loadGrams()
       }
     }
   }
@@ -126,7 +188,7 @@ export function droneMode(host:Host, deps:{groundAt:(x:number,z:number)=>number;
     const groundY = deps.groundAt(x,z)
     const y = (Number.isFinite(groundY) ? groundY : origin.y) + spec.height * .8
     flight = createFlight(spec,new THREE.Vector3(x,y,z),yaw)
-    flight.load = LOAD_WEIGHT[loadKind]
+    flight.load = loadGrams()
     built.root.position.set(x,y,z)
     built.root.rotation.y = yaw
     showHint(`已放置 ${spec.short} · 点右上角「起飞」`)
@@ -158,11 +220,12 @@ export function droneMode(host:Host, deps:{groundAt:(x:number,z:number)=>number;
     const dark = new THREE.MeshStandardMaterial({color:'#24282a',roughness:.8,metalness:.15})
     const canvas = new THREE.MeshStandardMaterial({color:'#c96b3a',roughness:.85})
     if (loadKind === 'cargo') {
-      const crate = new THREE.Mesh(new THREE.BoxGeometry(.7,.55,.9),canvas)
-      crate.position.y = -.9
+      const scale = Math.max(.55,Math.min(1.25,Math.cbrt(Math.max(1,loadGrams()) / 100000)))
+      const crate = new THREE.Mesh(new THREE.BoxGeometry(.7 * scale,.55 * scale,.9 * scale),canvas)
+      crate.position.y = -.9 - (scale - 1) * .2
       group.add(crate)
-      const band = new THREE.Mesh(new THREE.BoxGeometry(.72,.08,.92),dark)
-      band.position.y = -.72
+      const band = new THREE.Mesh(new THREE.BoxGeometry(.72 * scale,.08,.92 * scale),dark)
+      band.position.y = -.72 - (scale - 1) * .2
       group.add(band)
     } else if (loadKind === 'person') {
       const body = new THREE.Mesh(new THREE.CapsuleGeometry(.22,.85,4,10),new THREE.MeshStandardMaterial({color:'#3d4a6a',roughness:.7}))
@@ -211,6 +274,13 @@ export function droneMode(host:Host, deps:{groundAt:(x:number,z:number)=>number;
   function enterRc() {
     if (!flight || rcActive) return
     if (flight.phase !== 'landed') return
+    const cap = flight.spec.payloadG ?? 0
+    if (cap && flight.load > cap) {
+      window.dispatchEvent(new CustomEvent('walk:toast', {
+        detail: {text: `超重 ${(flight.load / 1000).toFixed(0)} kg > ${(cap / 1000).toFixed(0)} kg 载荷，先卸货再起飞`, ms: 4200},
+      }))
+      return
+    }
     rcActive = true
     attachLoad()
     savedCamera = {pos:host.camera.position.clone(),quat:host.camera.quaternion.clone(),fov:host.camera.fov}
@@ -260,7 +330,13 @@ export function droneMode(host:Host, deps:{groundAt:(x:number,z:number)=>number;
 
   function act(action:DroneAction) {
     if (!flight || !rc) return
-    if (action === 'takeoff') { if (flight.phase === 'landed') liftOff(flight); else landNow(flight) }
+    if (action === 'takeoff') {
+      if (flight.phase === 'landed') {
+        const cap = flight.spec.payloadG ?? 0
+        if (cap && flight.load > cap) { rc.toast(`超重 ${(flight.load / 1000).toFixed(0)} kg > ${(cap / 1000).toFixed(0)} kg 载荷`); return }
+        liftOff(flight)
+      } else landNow(flight)
+    }
     if (action === 'rth') { requestHome(flight); rc.toast('自动返航') }
     if (action === 'photo') void snapshot()
     if (action === 'record') void toggleRecord()
