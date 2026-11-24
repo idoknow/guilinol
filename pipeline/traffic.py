@@ -22,7 +22,7 @@ from station_road_corridor import bake as bake_station_corridor
 from surveyed_corridors import bake as bake_surveyed_corridors, restore as restore_corridors
 import ground_passages
 import vehicle_surface_grades
-from vehicle_approaches import plan as plan_approaches, surface_guides, portal_openings
+from vehicle_approaches import cycleway_deck_profile, cycleway_grades, plan as plan_approaches, surface_guides, portal_openings
 from vehicle_tunnels import mark_underpasses, mountain_roofs, underground, sections as tunnel_sections, solve as solve_tunnels
 from service_streets import mark_drivable_services, width as minor_road_width
 from traffic_parking import allowed, bake_parking
@@ -288,10 +288,13 @@ def bake(output, manifest, rendered_roads=None):
             subprocess.run([str(ROOT/'node_modules/.bin/tsx'),str(ROOT/'scripts/vehicle-grounding.ts'),
                             'portals',str(output.resolve()),str(request)],check=True,cwd=ROOT)
             samples=json.loads(request.read_text())
+            cycleway=cycleway_deck_profile(output,manifest,elements,network,sections)
+            if cycleway:samples['approachLimits']={cycleway[0]:cycleway[3][0]}
             generated,conflicts = solve_tunnels(network,survey_nodes,samples)
             fixed={ref for way in elements if way['type']=='way' and way.get('tags',{}).get('railway')=='rail'
                    and way['tags'].get('layer','0')=='0' for ref in way['nodes']}
             access,limits=plan_approaches(conflicts,lanes+guides,survey_nodes,{int(k):v for k,v in samples['heights'].items()},fixed,sections)
+            access=cycleway_grades(cycleway,conflicts)+access
             surveyed=vehicle_surface_grades.profiles(graded_sections,native_levels,access+canal_grades+terminal_grades)
             bake_surveyed_corridors(output,manifest['chunks'],elements,sections,access+canal_grades+terminal_grades+surveyed,only_approaches=True)
             trim_portal_paving(output,manifest['chunks'],generated,elements,sections)

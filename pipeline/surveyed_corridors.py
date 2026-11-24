@@ -314,34 +314,38 @@ def patch(file, area, approaches=(), foot=(), seam=None, crossings=()):
     # Interpolate physical road and bed together. Select the closest axis in
     # overlapping junction areas, with a shared constrained level at each node.
     distance=np.full(len(levels),np.inf)
-    ceiling=np.full(len(levels),np.inf)
-    transition=np.full(len(levels),np.inf)
-    for line,half,ya,yb,cap,_ in approaches:
+    owner=np.full(len(levels),-1,dtype=int)
+    ends=defaultdict(set)
+    data=[]
+    for i,(line,half,ya,yb,cap,_) in enumerate(approaches):
         (ax,az),(bx,bz)=line.coords
+        for x,z in line.coords:ends[round(x,2),round(z,2)].add(i)
         dx,dz=bx-ax,bz-az
-        length=line.length
-        t=np.clip(((xy[:,0]-ax)*dx+(xy[:,2]-az)*dz)/length**2,0,1)
+        t=np.clip(((xy[:,0]-ax)*dx+(xy[:,2]-az)*dz)/line.length**2,0,1)
         d=np.hypot(xy[:,0]-ax-t*dx,xy[:,2]-az-t*dz)
         select=(d<=half+.01)&(d<distance)
-        blend=max(0,min(.12,1-abs(yb-ya)/(cap*length)))
+        blend=max(0,min(.12,1-abs(yb-ya)/(cap*line.length)))
         if blend>1e-6:
             f=np.where(t<blend,t*t/(2*blend),np.where(t>1-blend,1-blend-(1-t)**2/(2*blend),t-blend/2))/(1-blend)
-        else:
-            f=t
+        else:f=t
         target=ya+(yb-ya)*f-.051
-        # Across adjoining surveyed road polygons a narrow branch may run
-        # alongside a deeper cut. Continue the low road smoothly through the
-        # shared pavement rather than switching planes at its painted edge.
-        outside=np.maximum(0,d-half)
-        transition=np.minimum(transition,target+cap*outside+.04*outside**2)
-        within_corridor = outside <= .5
-        ceiling[within_corridor] = np.minimum(ceiling[within_corridor],
-            target[within_corridor] + cap * outside[within_corridor])
         levels[select]=target[select]
+        owner[select]=i
         distance[select]=d[select]
-    # Keep the owning axis where separate roads run in parallel. In the
-    # surveyed pavement between approaches, blend back to the native surface.
-    levels=np.minimum(levels,np.where(np.isfinite(distance),ceiling,transition))
+        data.append((d,target))
+    ceiling=np.full(len(levels),np.inf)
+    for i,((line,half,_,__,cap,kind),(d,target)) in enumerate(zip(approaches,data,strict=True)):
+        neighbors=set.union(*(ends[round(x,2),round(z,2)] for x,z in line.coords))-{i}
+        connected=np.isin(owner,list(neighbors))
+        outside=np.maximum(0,d-half)
+        # A connected uphill branch starts rising at the shared centreline.
+        # Holding it flat across the entire round end cap creates a step at
+        # the cap edge. Propagate the grade continuously through the junction.
+        limit=np.where(connected,target+cap*d+.04*outside**2,
+                       np.where(owner<0,target+cap*outside+.04*outside**2,
+                                np.where(outside<=.5,target,np.inf)))
+        ceiling=np.minimum(ceiling,limit)
+    levels=np.minimum(levels,ceiling)
     for i,y in zip(spline,levels):
         vertices[i][1] = round(float(y),4)
     # Encode in millimetres. The worker draws the exact same triangles 51 mm
