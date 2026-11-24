@@ -589,6 +589,12 @@ def build(bbox, output, palette, workers=4):
         protected_grades.mark_pavement(new_pavement)
         from railway_vegetation import plant_graded_approaches
         plant_graded_approaches(output,manifest,protected_grades)
+        from railway_cut_grades import paved_height, smooth_cuttings
+        cut_ways = {w['id']:w for w in load_osm() if w['type']=='way'}
+        abutments = {cut_ways[wid]['nodes'][end]:levels[end]
+                     for wid,(_,_,_,levels) in bridge_plans.items() if wid in cut_ways for end in (0,-1)}
+        smooth_cuttings(tunnels,cut_ways,paved_height(output,manifest),abutments)
+        del cut_ways
     write_city_lods(output, manifest)
     from traffic import bake as bake_traffic
     bake_traffic(output, manifest, roads,protected_grades)
