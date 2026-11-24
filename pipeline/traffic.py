@@ -77,6 +77,8 @@ def bake(output, manifest, rendered_roads=None):
     region = prep(Polygon(manifest['region']['local'])) if 'region' in manifest else None
     carriageways = {road.way: road for road in rendered_roads if road.way in RENDERED_LANE_WAYS}
     surface = Surface(output, manifest)
+    from station_levels import UNDERPASS
+    station_tunnel = next((t for t in manifest.get('tunnels', []) if t['way']==UNDERPASS), None)
     bridge = next((entry for entry in manifest['landmarks'] if entry['id'] == 'jiefang_bridge'), None)
 
     @lru_cache(maxsize=96)
@@ -198,9 +200,16 @@ def bake(output, manifest, rendered_roads=None):
                     lane = dict(id=len(lanes), to=tail, width=size, offset=round(offset,2), kind='nonmotor' if kind=='cycleway' else 'bus' if kind=='busway' else 'motor',speedKmh=number(tags.get('maxspeed'),20 if kind in ('cycleway','service') else 40),oneway=single)
                     lane['from'] = head
                     lane['cls'] = kind
-                    if not linear:
+                    if station_tunnel and way['id']==UNDERPASS:
+                        knots = station_tunnel['stations']
+                        if sign<0:
+                            knots = [(station_tunnel['length']-d,y) for d,y in reversed(knots)]
+                        lane['heights'] = [v for d,y in knots for v in (d/station_tunnel['length'],y)]
+                        lane['gradeSeparated'] = 'tunnelProfile'
+                        lane['tunnelWay'] = UNDERPASS
+                    elif not linear:
                         lane['heights'] = profile(head,tail,lane['offset'],way['id'])
-                    if linear or way['id'] in SPAN_WAYS:
+                    if 'gradeSeparated' not in lane and (linear or way['id'] in SPAN_WAYS):
                         lane['gradeSeparated'] = 'linear' if linear else 'jiefang'
                     lanes.append(lane)
                     incoming[tail].append(lane)

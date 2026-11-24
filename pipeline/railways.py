@@ -21,6 +21,8 @@ from play_region import PlayRegion
 from railway_layout import lines
 from road_profile import RULES
 from service_streets import width
+from station_levels import FOOTBRIDGE, PLATFORMS, RAIL, UNDERPASS
+from station_approaches import approach_junctions, approach_exceptions
 
 ROOT = Path(__file__).resolve().parents[1]
 BRANCH=678370321
@@ -149,30 +151,6 @@ def station_yards(ways):
         yield sorted(members), yard
 
 
-def station_clearance_bounds(ways, crossings):
-    """Intersect fixed structure bounds for a single railhead level in each yard."""
-    report = []
-    for members, yard in station_yards(ways):
-        bounds = {'rail_over': [], 'road_over': []}
-        for row in crossings:
-            if row['clearanceM'] is None or not yard.covers(Point(row['x'], row['z'])):
-                continue
-            tags = ways[row['rail']]['tags']
-            if (tags.get('bridge', 'no') != 'no' or tags.get('tunnel', 'no') != 'no'
-                    or tags.get('layer', '0') != '0'):
-                continue
-            # For an unchanged crossing structure, preserving its measured
-            # clearance imposes a lower (rail over) or upper (road over) bound
-            # equal to the baseline railhead. Keep the witness with the bound.
-            bounds[row['type']].append(row)
-        lower = max(bounds['rail_over'], key=lambda r: r['railY'], default=None)
-        upper = min(bounds['road_over'], key=lambda r: r['railY'], default=None)
-        gap = max(0., lower['railY'] - upper['railY']) if lower and upper else 0.
-        report.append(dict(platforms=sorted(members), lowerWitness=lower,
-                           upperWitness=upper, incompatibleM=round(gap, 4)))
-    return report
-
-
 def road_radius(tags):
     kind = tags['highway']
     lane_count = tags.get('lanes', '')
@@ -227,6 +205,9 @@ def bake(world_dir, manifest, inventory, samples, plan_profile=False):
     used_sites = []
     missing_signs = []
     rail_corridors = STRtree([LineString(points(w)) for w in ways.values() if w.get('tags',{}).get('railway')=='rail'])
+    yards = list(station_yards(ways))
+    station_area = next(yard for ids,yard in yards if PLATFORMS.intersection(ids))
+    station_nodes = set()
     pieces = []
     approved = json.loads((ROOT/'docs/railway-grades.json').read_bytes())['gradeConflicts']
     for row in approved:
@@ -238,6 +219,10 @@ def bake(world_dir, manifest, inventory, samples, plan_profile=False):
         original = LineString(points(way))
         for line in lines(original.intersection(region.geometry)):
             stops = stations(line, 12)
+            surface_track = all(tags.get(k,'no')=='no' for k in ('bridge','tunnel')) and tags.get('layer','0')=='0'
+            if surface_track and line.intersects(station_area):
+                for part in lines(line.intersection(station_area)):
+                    stops.update(line.project(Point(part.coords[k])) for k in (0,-1))
             gaps = []
             base = BRIDGE if tags.get('bridge','no')!='no' else 0
             if tags.get('tunnel','no')!='no': base |= TUNNEL
@@ -321,6 +306,8 @@ def bake(world_dir, manifest, inventory, samples, plan_profile=False):
                             missing_signs.append(dict(node=row['sharedNode'],approach=side))
                 soffit=hit['soffit'] if hit['soffit'] is not None else road-1.2
                 crossing_data.append((vertex(line.interpolate(at)),row,road,axis,soffit))
+                if row['road'] in (FOOTBRIDGE, UNDERPASS):
+                    continue
                 if is_level:
                     anchor_stations[row['sharedNode']] = at
                     anchors[vertex(line.interpolate(at))] = road
@@ -346,6 +333,8 @@ def bake(world_dir, manifest, inventory, samples, plan_profile=False):
                 for value in local_grade: stops.add(value)
             distances = sorted(stops)
             verts = [vertex(line.interpolate(s)) for s in distances]
+            if surface_track:
+                station_nodes.update(i for i in verts if station_area.distance(Point(coords[i]))<.001)
             if local_grade:
                 branch_stations=np.array(distances)
                 branch_vertices=np.array(verts)
@@ -422,10 +411,23 @@ def bake(world_dir, manifest, inventory, samples, plan_profile=False):
                              for n,i in zip(BRANCH_PINS,[left,right])],roadBridges=BRANCH_BRIDGES,
         minimumSoffitM=min(y for _,y in deck),plateauRailY=plateau,plateauStationsM=[bs[west],bs[east]],
         tangentPermille=[1000*down,1000*up],transitionLengthM=4)
+    before_station = height
+    # Project the baseline onto the grade envelopes from the surveyed station
+    # railheads. Only approaches outside the allowed rise change with the yard.
+    station_upper = np.full(len(ground), np.inf)
+    station_lower = np.full(len(ground), np.inf)
+    station_upper[list(station_nodes)] = RAIL
+    station_lower[list(station_nodes)] = -RAIL
+    height = np.clip(height, -envelope(graph,station_lower), envelope(graph,station_upper))
     violations=[]
     for i,bound,kind,row in constraints:
         miss=bound-height[i] if kind=='min' else height[i]-bound
         if miss>.001:
+            if abs(height[i]-before_station[i])>.0001:
+                violations.append(dict(rail=row['rail'], road=row['road'], type=row['type'],
+                                       shortfallM=round(miss,3), requiredRailY=round(bound,4),
+                                       actualRailY=round(height[i],4), stationRailY=RAIL))
+                continue
             if kind=='min':
                 source=high_origins[i]
                 witness=high_refs[source]
@@ -458,7 +460,7 @@ def bake(world_dir, manifest, inventory, samples, plan_profile=False):
         from railway_profile import solve
         profile = solve(coords, pieces, ways, ground + .35, crossing_data, measured,
                         list(station_yards(ways)), parallel_segments(pieces, coords, ways))
-        return dict(profile=profile, stationClearanceBounds=station_clearance_bounds(ways, measured))
+        return dict(profile=profile,stationRailheadM=RAIL,stationNodes=len(station_nodes))
 
     tiles=defaultdict(list)
     maximum_grade=defaultdict(float)
@@ -548,7 +550,7 @@ def bake(world_dir, manifest, inventory, samples, plan_profile=False):
         payload=data[:12]+struct.pack('<I',len(packed))+data[16:start]+packed+data[start+size:]
         file.write_bytes(gzip.compress(payload,mtime=0))
         tile['bytes']=file.stat().st_size
-    return dict(stationClearanceBounds=station_clearance_bounds(ways, measured),
+    return dict(stationRailheadM=RAIL,stationNodes=len(station_nodes),
                 parallelRailHeight=parallel_height_audit(pieces, coords, height, ways),
                 branchLocalGrade=branch_report,crossings=measured,maxEncodedGradePermille=maximum_grade,missingSigns=missing_signs,treesRemoved=trees_removed,signs=sum(map(len,sign_sites.values())),tiles=len(tiles), segments=sum(map(len,tiles.values())), fixedNodes=len(anchors),
                 maxPinErrorM=max(abs(height[i]-y) for i,y in anchors.items()), clearanceConflicts=violations)
@@ -567,6 +569,9 @@ def bake_world(directory,manifest,plan_profile=False):
         normal=np.array([-tangent[1],tangent[0]])/np.linalg.norm(tangent)
         for offset in (-.8,0,.8):
             probes.append([f'branch:{at}:{offset}',*(point+offset*normal)])
+    ways = {w['id']:w for w in load_osm() if w['type']=='way'}
+    junctions = approach_junctions(ways)
+    probes.extend([[f"station-junction:{item['junctionNode']}",item['x'],item['z']] for item in junctions])
     raw=json.loads(subprocess.check_output([ROOT/'node_modules/.bin/tsx',ROOT/'scripts/railway-road-heights.mjs',
                                             directory,inventory_file,'--branch-deck'],input=json.dumps(probes).encode()))
     samples={}
@@ -576,8 +581,12 @@ def bake_world(directory,manifest,plan_profile=False):
             samples[int(a),int(b),float(lat),float(lon)]=v
         else: samples[k]=v
     report=bake(directory,manifest,inventory,samples,plan_profile)
+    tunnel = next(t for t in manifest['tunnels'] if t['way']==UNDERPASS)
+    if 'approachEnds' in tunnel:
+        report['stationApproachExceptions'] = approach_exceptions(tunnel,junctions,samples)
     if plan_profile:
         return report
+    manifest['stationApproachExceptions'] = report.get('stationApproachExceptions', [])
     manifest['railwayBranchGrade']=report['branchLocalGrade']
     return report
 

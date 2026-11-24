@@ -7,6 +7,7 @@ from shapely import STRtree
 from shapely.geometry import LineString, Point, Polygon
 from shapely.geometry.polygon import orient
 
+from station_levels import FOOTBRIDGE, PLATFORM, SOFFIT, STYLE
 from common import load_osm
 from features import points, polygons
 from landmarks.jiefang_layout import SPAN_WAYS
@@ -25,9 +26,14 @@ def bridge_tiles(bounds, sample, routes=(), raised=(), plans=None, west_portal=N
         replace = entry.get('replace', [])
         if isinstance(replace, list):
             replaced.update(key for key in replace if isinstance(key, str))
-    for way in load_osm():
+    ways = load_osm()
+    bridge_nodes = set(next((w['nodes'] for w in ways if w.get('id')==FOOTBRIDGE and w['type']=='way'), []))
+    for way in ways:
         tags = way.get('tags', {})
-        if way['type'] != 'way' or tags.get('bridge', 'no') == 'no' or 'highway' not in tags:
+        if way['type'] != 'way' or 'highway' not in tags:
+            continue
+        station_stairs = tags['highway']=='steps' and bool(bridge_nodes.intersection(way['nodes']))
+        if not station_stairs and tags.get('bridge', 'no') == 'no':
             continue
         if f"way/{way['id']}" in replaced:
             continue
@@ -41,7 +47,23 @@ def bridge_tiles(bounds, sample, routes=(), raised=(), plans=None, west_portal=N
         if not bounds.intersects(line) or not line.length:
             continue
         sections = []
-        if plans and way['id'] in plans:
+        if way['id']==FOOTBRIDGE or station_stairs:
+            deck = SOFFIT + STYLE['structureDepth']
+            coords = np.array(line.segmentize(.25 if station_stairs else 1).coords)
+            landing = next((Point(p) for n,p in zip(way['nodes'],points(way)) if n in bridge_nodes), None)
+            middle = line.project(landing) if station_stairs else 0.
+            for index, coord in enumerate(coords):
+                tangent = coords[min(index+1,len(coords)-1)]-coords[max(0,index-1)]
+                side = np.array([-tangent[1],tangent[0]]) / np.linalg.norm(tangent) * 1.5
+                y = deck
+                if station_stairs:
+                    at = line.project(Point(coord))
+                    run = middle if at<middle else line.length-middle
+                    fraction = min(1., abs(at-middle)/max(run, .001))
+                    y -= fraction*(deck-PLATFORM)
+                sections.append((coord+side, coord-side, y))
+            crossings = []
+        elif plans and way['id'] in plans:
             pline, width, s_b, h_prof = plans[way['id']]
             zone = pline.buffer(width / 2)
             crossings = [track.intersection(zone) for track, _ in tracks if track.intersects(zone)]
@@ -103,6 +125,11 @@ def bridge_tiles(bounds, sample, routes=(), raised=(), plans=None, west_portal=N
             sections = [(left, right, height - .65 * max(0, 1 - west_portal.distance(Point((left + right) / 2)) / 18))
                         for left, right, height in sections]
         for first, second in zip(sections, sections[1:]):
+            if station_stairs:
+                rise = deck-PLATFORM
+                count = int(np.ceil(rise/.16))
+                tread = PLATFORM + rise * round(count*((first[2]+second[2])/2-PLATFORM)/rise)/count
+                first,second = (*first[:2],tread),(*second[:2],tread)
             for pts, levels in [([first[0], first[1], second[0]], [first[2], first[2], second[2]]),
                                 ([second[1], second[0], first[1]], [second[2], second[2], first[2]])]:
                 poly = Polygon(pts)

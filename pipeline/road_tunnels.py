@@ -49,7 +49,10 @@ def bake(bounds, fields, left, top, grid):
 
 def corridor_underpasses(bounds, height):
     """Two straight OSM layer -1 underpasses on the approved T2 driving route."""
-    from shapely.geometry import LineString
+    from shapely.geometry import LineString, Point
+    from station_levels import TUNNEL_FLOOR, UNDERPASS
+    import json
+    from pathlib import Path
 
     widths = {690911289: 4.5, 1494511149: 4.0}
     result = []
@@ -67,6 +70,29 @@ def corridor_underpasses(bounds, height):
         direction = (end-start)/length
         lateral = np.array([-direction[1],direction[0]])
         first,last = height(*start),height(*end)
+        if way['id'] == UNDERPASS:
+            inventory = json.loads((Path(__file__).resolve().parents[1]/'docs/railway-crossings.json').read_text())
+            track_stations = [LineString(points).project(Point(ll2xz(r['lat'],r['lon'])))
+                              for r in inventory if r['road']==UNDERPASS and r['type']=='rail_over']
+            first_cover, last_cover = min(track_stations)-2, max(track_stations)+2
+            ramps = [first_cover,length-last_cover]
+            # Preserve the surface portals at the protected road approaches.
+            # Each end has a parabolic vertical curve into and out of the grade.
+            stations = []
+            for at in sorted({0.,length,first_cover,last_cover,*np.arange(1.,length,1.)}):
+                level = TUNNEL_FLOOR
+                for distance,run,mouth in ((at,ramps[0],first),(length-at,ramps[1],last)):
+                    if distance<run:
+                        ease = min(2.,run/3)
+                        integral = (max(0,distance)**2-max(0,distance-ease)**2
+                                    -max(0,distance-run+ease)**2)/(2*ease)
+                        level = mouth + (TUNNEL_FLOOR-mouth)*integral/(run-ease)
+                stations.append([float(at),round(float(level),5)])
+            result.append(dict(way=UNDERPASS,profile_source='station_railhead',length=length,
+                               portals=[[start[0],first,start[1]],[end[0],last,end[1]]],
+                               halfWidth=widths[UNDERPASS],clearance=4.5,approach=ramps[0],
+                               approachEnds=ramps,stations=stations))
+            continue
         stations = []
         for at in sorted({0.,length,approach,length-approach,*np.arange(4.,length,4.)}):
             fraction = at/length
@@ -116,8 +142,8 @@ def clear_approach_paving(output, chunks, underpasses):
     ramps = []
     for tunnel in underpasses:
         line = LineString([(x,z) for x,_,z in tunnel['portals']])
-        approach = tunnel['approach']
-        for start,end in ((0,approach), (line.length-approach,line.length)):
+        first,last = tunnel.get('approachEnds', [tunnel['approach']]*2)
+        for start,end in ((0,first), (line.length-last,line.length)):
             segment = LineString([line.interpolate(start),line.interpolate(end)])
             ramps.append(segment.buffer(tunnel['halfWidth'], cap_style='flat'))
     cut = union_all(ramps)

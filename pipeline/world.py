@@ -298,6 +298,8 @@ def build(bbox, output, palette, workers=4):
     if play_region:
         from airport import grade_terminal_lanes
         grade_terminal_lanes(terrain,original,left,top,GRID)
+    from station_levels import grade_platforms
+    grade_platforms(terrain,original,surface,road_ctrl,left,top)
     ground_mesh_at = build_ground_mesh_lookup(original, surface, left, top, width, depth)
     if play_region:
         from road_tunnels import corridor_underpasses

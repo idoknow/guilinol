@@ -11,6 +11,7 @@ from shapely.affinity import translate
 from common import load_osm
 from features import area, points
 from railways import road_radius
+from station_levels import FOOTBRIDGE, UNDERPASS
 from service_streets import rings
 
 
@@ -18,6 +19,7 @@ def bake(output, chunks, region):
     ways = load_osm()
     crossings = json.loads((Path(__file__).resolve().parents[1]/'docs/railway-crossings.json').read_bytes())
     road_ids = {row['road'] for row in crossings if row['status']!='construction_unverified'}
+    road_ids.difference_update({FOOTBRIDGE, UNDERPASS})
     roads = [LineString(points(way)).buffer(max(4.5,road_radius(way['tags'])+1.5))
              for way in ways if way['type']=='way' and way['id'] in road_ids]
     corridors = STRtree(roads)

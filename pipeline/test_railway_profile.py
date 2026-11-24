@@ -15,7 +15,7 @@ class RailProfileTest(unittest.TestCase):
     target = np.array([10., 10., 15., 15.])
 
     def profile(self, records, yards=()):
-        crossings = [(node, r, r['roadY'], None, None) for node, r in zip((0, 3), records)]
+        crossings = [(node, r, r['roadY'], None, r.get('soffit')) for node, r in zip((0, 3), records)]
         return solve(self.xy, self.pieces, self.ways, self.target, crossings, records, yards,
                      parallel_segments(self.pieces, self.xy, self.ways))
 
@@ -36,7 +36,7 @@ class RailProfileTest(unittest.TestCase):
 
     def test_incompatible_fixed_structures_have_no_profile(self):
         underpass = dict(type='rail_over', roadY=145, railY=151, clearanceM=4.8)
-        bridge = dict(type='road_over', roadY=156, railY=149, clearanceM=5.8)
+        bridge = dict(type='road_over', soffit=154.5, roadY=156, railY=149, clearanceM=5.8)
         result = self.profile([underpass, bridge], [([123], box(-2, -2, 15, 6))])
         self.assertEqual(result['status'], 2)
         self.assertNotIn('crossings', result)
