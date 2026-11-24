@@ -15,18 +15,13 @@ env_file=$HOME/.config/glol-cdn/env
 set -a; . "$env_file"; set +a
 cd "$(dirname "$0")/.."
 
-bash scripts/cdn-purge.sh url / /index.html /version.json /id.html /backpack.html /admin/ /manifest.webmanifest
-
 state_dir=$HOME/.local/state/glol-cdn; mkdir -p "$state_dir"
 work=$(mktemp -d); trap 'rm -rf "$work"; [[ -n ${cid:-} ]] && docker rm -f "$cid" >/dev/null 2>&1 || true' EXIT
 image=ghcr.io/idoknow/glol-web:$sha
 docker pull -q "$image" >/dev/null
 cid=$(docker create "$image")
 docker cp "$cid:/usr/share/nginx/html" "$work/dist-live"
-if [[ ! -s $state_dir/hashes.json ]]; then
-  echo "没有哈希基线：只记录基线，本次只刷了入口页"
-  DIST=$work/dist-live STATE=$state_dir/hashes.json STATE_ONLY=1 bash scripts/cdn-sync.sh
-else
-  DIST=$work/dist-live STATE=$state_dir/hashes.json bash scripts/cdn-sync.sh
-fi
+# 目录级刷新：变了的顶层目录各提交 clean_dir + pre_cache_url（服务端自己展开文件），
+# 不再逐文件提交 —— 一次发版几百条任务会把预热队列堵住，反而不如不刷。
+STATE=$state_dir/dirs.json bash scripts/cdn-refresh-dirs.sh "$work/dist-live"
 echo "CDN 刷新完成 ${sha:0:7}"
