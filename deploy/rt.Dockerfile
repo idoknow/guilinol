@@ -6,7 +6,7 @@ ENV NODE_ENV=production PORT=8790
 
 COPY rt/package.json ./
 RUN npm install --omit=dev && npm cache clean --force
-COPY rt/server-realtime.mjs rt/emote.mjs rt/observability.mjs ./
+COPY rt/*.mjs ./
 
 USER node
 EXPOSE 8790

@@ -26,6 +26,10 @@ export function multiplayer(pool,env){
   }
   async function route(path,request,actor){
     const params=new URL(request.url).searchParams
+    if(path.startsWith('admin/chat/')){
+      if(!env.RT_ADMIN_TOKEN)return json({error:'chat unavailable'},503)
+      try{return await fetch(base+'/admin/chat',{method:'POST',redirect:'error',signal:AbortSignal.timeout(8000),headers:{'X-Admin-Token':env.RT_ADMIN_TOKEN,'content-type':'application/json'},body:JSON.stringify({path:path.slice(11),actor,method:request.method,params:Object.fromEntries(params),body:request.method==='GET'?{}:await request.json()})})}catch{return json({error:'chat unavailable'},503)}
+    }
     if(path==='admin/mp'&&request.method==='GET'){
       let snapshot
       try{snapshot=await state()}catch{return down()}

@@ -84,7 +84,7 @@ export async function feedback(request: Request, env: Env, path: string) {
     if (method !== 'GET' && request.headers.get('Origin') !== new URL(request.url).origin)
       throw new Problem(403, 'origin', '请求来源不符')
     const banTarget=/^admin\/users\/([\w-]+)\/(ban|unban)$/.exec(path)
-    if(admin && /^admin\/mp(?:\/|$)/.test(path) && env.mpAdmin) return env.mpAdmin(path,request,user)
+    if(admin && /^admin\/(?:mp|chat)(?:\/|$)/.test(path) && env.mpAdmin) return env.mpAdmin(path,request,user)
     if (banTarget && method==='POST') {
       const ban=banTarget[2]==='ban'
       return setBan(env.DB,user,banTarget[1]!,ban,ban?(await fields(request)).reason:null)
