@@ -510,6 +510,9 @@ def run_audit(world_dir: Path, root: Path) -> dict:
     uneven_issues = []
     gap_issues = []
     road_Elements = []
+    cut_mouth_nodes = {node for cut in manifest.get("tunnels", ()) if cut.get("openCut")
+                       for node, mouth in zip(cut["nodes"], cut["mouths"]) if mouth}
+    road_mouths = {}
     for el in load_osm():
         tags = el.get('tags', {})
         if el['type'] != 'way' or 'highway' not in tags or tags.get('tunnel', 'no') != 'no':
@@ -538,6 +541,7 @@ def run_audit(world_dir: Path, root: Path) -> dict:
         clipped = full_line.intersection(road_bounds)
         if hw == 'pedestrian' and not u_lm_replace_poly.is_empty:
             clipped = clipped.difference(u_lm_replace_poly)
+        road_mouths[el["id"]] = cut_mouth_nodes.intersection(el.get("nodes", ()))
         for seg in getattr(clipped, 'geoms', [clipped]):
             if seg.is_empty or seg.geom_type != 'LineString' or seg.length < 4.0:
                 continue
@@ -617,6 +621,7 @@ def run_audit(world_dir: Path, root: Path) -> dict:
     # Open tunnel approaches carry the surface carriageway on an explicit
     # floor mesh. Probe its deck strip and corner fans just as the renderer does.
     cut_sections = defaultdict(list)
+    mouth_floors = defaultdict(list)
     for section in manifest.get('tunnels', ()):
         if not section.get('openCut'):
             continue
@@ -627,9 +632,22 @@ def run_audit(world_dir: Path, root: Path) -> dict:
             if joint:
                 floor = floor.union(Polygon(joint['ring']))
         at,levels = np.array(section['stations']).T
-        cut_sections[section['way']].append((line, floor, section['halfWidth'], at, levels))
+        strip = (line, floor, section['halfWidth'], at, levels)
+        cut_sections[section['way']].append(strip)
+        for end, (node, mouth) in enumerate(zip(section['nodes'], section['mouths'])):
+            if mouth:
+                endpoint = Point(line.coords[0 if end == 0 else -1])
+                mouth_floors[node].append((endpoint, strip))
 
     for way_id, name, hw, is_bridge, width_m, seg in road_Elements:
+        # At a daylight junction the neighboring road also drives on the
+        # same emitted floor wherever the two carriageways overlap.
+        strips = list(cut_sections[way_id])
+        if not is_bridge:
+            for node in sorted(road_mouths[way_id]):
+                for endpoint, (axis, floor, half_width, at, levels) in mouth_floors[node]:
+                    landing = floor.intersection(endpoint.buffer(2 * max(width_m, 2 * half_width)))
+                    strips.append((axis, landing, half_width, at, levels))
         length = seg.length
         n_pts = max(2, int(math.floor(length / 2.0)) + 1)
         dists = np.linspace(0.0, length, n_pts)
@@ -641,7 +659,7 @@ def run_audit(world_dir: Path, root: Path) -> dict:
         for i, s in enumerate(dists):
             pt = seg.interpolate(s)
             xs[i], zs[i] = pt.x, pt.y
-            cut = next((section for section in cut_sections.get(way_id, ())
+            cut = next((section for section in strips
                         if section[1].covers(pt)), None)
             if cut:
                 axis, footprint, half_width, at, levels = cut
