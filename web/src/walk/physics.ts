@@ -1,4 +1,5 @@
 import {inRegion} from '../../../lib/play-region'
+import neHall from '../../../pipeline/landmarks/central_square_ne_hall.json'
 import R from '@dimforge/rapier3d-compat'
 import * as THREE from 'three'
 import type {PeakColliderData, PeaksGroup} from '../peaks'
@@ -507,11 +508,20 @@ export async function createPhysics(manifest:Manifest,stream:Stream,peaks:PeaksG
     const at=Math.round((south-tile.z)/4)*65+Math.round((east-tile.x)/4)
     return data.water[at]!==-32768&&data.water[at]-data.terrain[at]>5
   }
-  const solidLandmarks=(manifest.landmarks??[]).flatMap(entry=>(entry.solid??[]).map(([bottom,top,loop])=>{
+  const landmarkVolumes=(manifest.landmarks??[]).flatMap(entry=>{
+    const volumes=[...(entry.solid??[])]
+    if(entry.id==='central_square'){
+      const [east,elevation,south]=entry.position,angle=entry.rotation*Math.PI/180
+      const cos=Math.cos(angle),sin=Math.sin(angle)
+      volumes.push([elevation+neHall.base,elevation+neHall.roof,neHall.footprint.map(([x,z])=>[east+x*cos+z*sin,south-x*sin+z*cos])])
+    }
+    return volumes
+  })
+  const solidLandmarks=landmarkVolumes.map(([bottom,top,loop])=>{
     let minX=Infinity,maxX=-Infinity,minZ=Infinity,maxZ=-Infinity
     for(const [lx,lz] of loop){if(lx<minX)minX=lx;if(lx>maxX)maxX=lx;if(lz<minZ)minZ=lz;if(lz>maxZ)maxZ=lz}
     return {bottom,top,loop,minX,maxX,minZ,maxZ}
-  }))
+  })
   function insideHouse(east:number,south:number,y?:number){const tile=tileAt(east,south);if(!tile)return false
     const px=(east-tile.x)*100,pz=(south-tile.z)*100
     const inRing=regions.get(tile)?.rings.some(ring=>{

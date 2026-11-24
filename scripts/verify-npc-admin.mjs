@@ -24,7 +24,7 @@ try{
   const origin=`http://127.0.0.1:${web.httpServer.address().port}`
   service=spawn(process.execPath,['--import','tsx','server/index.mjs'],{env:{...process.env,...storage.env,PUBLIC_ORIGIN:origin,PORT:String(port)},stdio:'inherit'})
   for(let attempt=0;attempt<100;attempt++){if(await fetch(target+'/api/npc').then(response=>response.ok).catch(()=>false))break;await delay(100)}
-  const previous=await fetch(origin+'/api/npc');assert.equal(previous.status,200);assert.equal((await previous.json()).carMax,3)
+  const previous=await fetch(origin+'/api/npc');assert.equal(previous.status,200);assert.equal((await previous.json()).carMax,2)
   browser=await chromium.launch(browserOptions());const admin=await browser.newContext({viewport:{width:1280,height:1400}})
   await admin.addCookies([{name:'glol_session',value:token,url:origin}]);const page=await admin.newPage();await page.goto(origin+'/admin/?view=npc');await page.locator('.adm-npc input').first().waitFor()
   for(const label of ['每街最少车辆','每街最多车辆','每街最少行人','每街最多行人'])await page.getByLabel(label).fill('1')

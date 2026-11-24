@@ -98,8 +98,8 @@ bridge 请求均用 Bearer token。回写字段 `status,message,multica_issue,pr
 
 ## AI 建模链路（阶段 3）
 
-- `scripts/feedback-bridge.mjs`（Node，无依赖或仅用仓库已有依赖），在 sg 主机由 systemd user timer 每 5 分钟跑一次，配置在 `~/.config/glol-feedback-bridge/env`（BRIDGE_TOKEN、MULTICA_CLI_PATH、建模 agent、父 issue、开关 `BRIDGE_ENABLED`）。
-- 新反馈 → 下载照片到临时目录 → `multica issue create`：项目 Guilin Online，父 issue = “用户反馈建模”汇总 issue，指派默认建模 agent（mac local codex），状态 todo，附全部照片，描述用 `docs/feedback-modelling-task.md` 模板填充（位置、OSM 附近要素、EXIF 位置、用户原文、验收要求）。
+- 反馈桥（Node，无依赖或仅用仓库已有依赖），在 sg 主机由 systemd user timer 每 5 分钟跑一次，配置在 `~/.config/glol-feedback-bridge/env`（BRIDGE_TOKEN、MULTICA_CLI_PATH、建模 agent、父 issue、开关 `BRIDGE_ENABLED`）。
+- 新反馈 → 下载照片到临时目录 → `multica issue create`：项目 Guilin Online，父 issue = “用户反馈建模”汇总 issue，指派默认建模 agent（mac local codex），状态 todo，附全部照片，描述用建模任务模板填充（位置、OSM 附近要素、EXIF 位置、用户原文、验收要求）。
 - 建模 agent 的第一步是**判定**：信息不足 → 评论里写 ```feedback-status need_info``` 块和给用户的话；无效/重复 → `rejected`/`duplicate`。有效 → 按现有地标管线建模（证据先行、`npm run audit:landmarks --strict`、照片对比图、斜视总览图）。
 - bridge 读 issue 状态和这些结构化块回写反馈；建模 agent 交付时在评论里附一张对比截图，bridge 把它挂到时间线（复制到 R2 公共前缀）。
 - sg claude 照常验收 PR、合并；定时发版上线后 bridge 发现 PR 已合并且线上版本含该提交 → `live`。PR 从 Multica 关联和反馈 issue 的可信评论（协调人 / sg claude / 成员）里的 `https://github.com/idoknow/guilinol/pull/N` 链接收集——仓库没接 Multica GitHub 集成，前者恒为空；仍有 open 的 PR 不算上线；反馈 issue 须为 in_review/done。

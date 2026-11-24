@@ -35,9 +35,6 @@ replaced；断线**无限重试**，指数退避封顶 16s 加抖动，只有被
 | --- | --- |
 | `rt/server-realtime.mjs` | 服务本体：`join` / `pos` / `hit` / `revive` / `avatar` / `who` / `chat` |
 | `rt/package.json` | 唯一依赖 `ws@8` |
-| `deploy/rt.Dockerfile` | `node:20-alpine`，非 root 运行，自带 HEALTHCHECK |
-| `deploy/k8s/resources.yaml` | `Deployment glol-rt`（1 副本、`Recreate`）+ `Service glol-rt:8790` + Ingress `/ws` |
-| `.github/workflows/glol-images.yml` | 矩阵里加了 `rt`，和 api/web/probe 一起推 `ghcr.io/idoknow/glol-rt:<sha>` |
 
 ## 为什么固定 1 副本
 
@@ -58,7 +55,7 @@ replaced；断线**无限重试**，指数退避封顶 16s 加抖动，只有被
 ## 封禁
 
 ```bash
-kubectl -n idoknow exec deploy/glol-rt -- \
+kubectl -n idoknow exec deployment/glol-rt -- \
   wget -qO- --header='content-type: application/json' \
   --header="x-kick-token: $KICK_TOKEN" \
   --post-data='{"uid":100000,"reason":"违规"}' \
@@ -100,7 +97,7 @@ FROM users ORDER BY proposed_uid;
 
 ```bash
 # 健康检查（经 Ingress 不通，只能在集群内或 8080 之外直接打服务）
-kubectl -n idoknow exec deploy/glol-rt -- wget -qO- http://127.0.0.1:8790/health
+kubectl -n idoknow exec deployment/glol-rt -- wget -qO- http://127.0.0.1:8790/health
 # {"ok":true,"online":0,"proto":4,"maxPlayers":200,"banned":0,"connections":0}
 
 # WebSocket 握手（公网，期望 101 Switching Protocols）

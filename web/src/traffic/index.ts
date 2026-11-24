@@ -1,7 +1,7 @@
 import * as THREE from 'three'
 import {MAX_ACTORS,MOBILE_ACTORS,Traffic,type Graph} from './sim'
 import {curbside,staticSolids,useTrafficSolids,type Solid,contactSamples,sampleContacts} from './contact'
-import {trafficModels,trafficMaterial,type Variant} from './models'
+import {trafficModels,trafficMaterial,loadCarMeshes,type Variant} from './models'
 import {crowd} from './crowd'
 import {interactions} from './interactions'
 import {touchUi} from '../ui/input-mode'
@@ -25,6 +25,7 @@ export async function traffic(scene:THREE.Scene,camera:THREE.Camera,verify:boole
   const index=await fetch('/world/roads/cells.json')
   if(!index.ok)throw Error(`traffic cells: ${index.status}`)
   const cells=new Set<string>(await index.json())
+  const carMeshes=loadCarMeshes().catch(error=>{console.warn('Traffic car meshes unavailable, using procedural cars',error);return []})
   const settings=await fetch('/api/npc',{signal:AbortSignal.timeout(2500)}).then(response=>response.ok?response.json():null).catch(()=>null)
   const rules=validNpc(settings)?settings:npcDefaults
   const effects=interactions(scene,camera,rules)
@@ -39,7 +40,7 @@ export async function traffic(scene:THREE.Scene,camera:THREE.Camera,verify:boole
   if(verify)mesh.userData.motorIds=[]
   mesh.name='G2 traffic';mesh.count=0;mesh.visible=false;mesh.frustumCulled=false;mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);scene.add(mesh)
   const parkingIndex:Record<string,number>=await fetch('/world/roads/parking/index.json').then(r=>r.ok?r.json():{}).catch(()=>({}))
-  const models=trafficModels(),STATIC=MAX_ACTORS,SLOTS=STATIC+9*Math.max(0,...Object.values(parkingIndex))
+  const models=trafficModels(await carMeshes),STATIC=MAX_ACTORS,SLOTS=STATIC+9*Math.max(0,...Object.values(parkingIndex))
   const batch=new THREE.BatchedMesh(SLOTS,models.geometries.reduce((sum,g)=>sum+g.attributes.position.count,0),0,trafficMaterial())
   batch.name='G2 traffic visuals';batch.frustumCulled=false;batch.perObjectFrustumCulled=true;scene.add(batch)
   const geometryIds=models.geometries.map(g=>batch.addGeometry(g))
@@ -48,8 +49,10 @@ export async function traffic(scene:THREE.Scene,camera:THREE.Camera,verify:boole
   const variants=new WeakMap<object,Variant>()
   const pose=new THREE.Object3D();pose.rotation.order='YXZ'
   const transforms=new Float64Array(SLOTS*6).fill(NaN)
+  const FAR=75**2 // IDOK-253: detailed car meshes only near the camera, light stand-ins beyond 75 m
   const show=(slot:number,variant:Variant,x:number,y:number,z:number,yaw:number,scale:number,down=false)=>{
-    if(slotGeometry[slot]!==variant.geometry){batch.setGeometryIdAt(slot,geometryIds[variant.geometry]);slotGeometry[slot]=variant.geometry}
+    const lod=models.far[variant.geometry],geometry=lod!==undefined&&(x-camera.position.x)**2+(z-camera.position.z)**2>FAR?lod:variant.geometry
+    if(slotGeometry[slot]!==geometry){batch.setGeometryIdAt(slot,geometryIds[geometry]);slotGeometry[slot]=geometry}
     if(slotPaint[slot]!==variant.paint){batch.setColorAt(slot,variant.paint);slotPaint[slot]=variant.paint}
     if(!slotShown[slot]){batch.setVisibleAt(slot,true);slotShown[slot]=1}
     const offset=slot*6
@@ -60,7 +63,8 @@ export async function traffic(scene:THREE.Scene,camera:THREE.Camera,verify:boole
   }
   const hide=(from:number,to:number)=>{for(let slot=from;slot<to;slot++)if(slotShown[slot]){batch.setVisibleAt(slot,false);slotShown[slot]=0}}
   type Row=[number,number,number,number,number,string]
-  let parkKey='',parkCount=0
+  let parkKey='',parkCount=0,parkLodAt=0
+  const parkedRows:[number,Variant,number,number,number,number][]=[]
   const cache=new Map<string,Promise<Row[]>>()
   const updateParking=(east:number,south:number)=>{
     const col=Math.floor(east/256),row=Math.floor(south/256),target=`${col}_${row}`
@@ -78,12 +82,12 @@ export async function traffic(scene:THREE.Scene,camera:THREE.Camera,verify:boole
     }))
     void Promise.all([...needed].map(cell=>cache.get(cell)!)).then(groups=>{
       if(target!==parkKey)return
-      curbside.clear();let count=0
+      curbside.clear();let count=0;parkedRows.length=0
       for(const rows of groups)for(const [x,y,z,yaw,seed] of rows){
         const variant=models.variant('parked',(seed%256)/256,(seed>>>8)/256),geometry=models.geometries[variant.geometry]
         if(!geometry.boundingBox)geometry.computeBoundingBox();const {min,max}=geometry.boundingBox!
         curbside.add({x,y,z,yaw,halfWidth:Math.max(-min.x,max.x),halfLength:Math.max(-min.z,max.z),height:max.y})
-        show(STATIC+count++,variant,x,y,z,yaw,1)
+        parkedRows.push([STATIC+count,variant,x,y,z,yaw]);show(STATIC+count++,variant,x,y,z,yaw,1)
       }
       hide(STATIC+count,STATIC+parkCount);parkCount=count;mesh.userData.parked=count
     }).catch(error=>{if(target===parkKey){parkKey='';cache.clear()}console.warn('Parking cell unavailable',error)})
@@ -97,6 +101,7 @@ export async function traffic(scene:THREE.Scene,camera:THREE.Camera,verify:boole
     useTrafficSolids(enabled?near:undefined)
     if(!enabled){effects.clear();people.clear();walking.clear();mesh.count=0;hide(0,SLOTS);parkKey='';parkCount=0;curbside.clear();return}
     updateParking(camera.position.x,camera.position.z)
+    parkLodAt-=dt;if(parkLodAt<=0){parkLodAt=.5;for(const [slot,variant,x,y,z,yaw] of parkedRows)show(slot,variant,x,y,z,yaw,1)}
     if(verify&&mesh.userData.staticOnly){hide(0,STATIC);mesh.count=0;mesh.userData.allMotors=[];return}
     const center=player??camera.position
     const target=`${Math.floor(center.x/512)}_${Math.floor(center.z/512)}`

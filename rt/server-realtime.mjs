@@ -90,6 +90,15 @@ const MAX_SLOW_SKIPS = 60
 const MIN_POS_GAP_MS = 45
 /** 外形数据上限（字节），超了直接丢弃，别让畸形包把别人的客户端搞崩 */
 const MAX_AVATAR_BYTES = 512
+/**
+ * 续连宽限：CDN 的大陆节点 40–60 秒就会掐一次 WebSocket（实测香港节点 150 秒不断、
+ * 直连源站 130 秒不断），所以这条链路上长连接注定被反复断开。
+ * 客户端会自动重连，但服务端如果一断就按「离开」处理，别人会看到玩家反复进出、
+ * 本人界面也会闪「联机中」。因此异常断开先保留会话：同 uid 在宽限期内回来就原地续上
+ * （id、位置、血量都照旧，不播 leave/join），超时才真正离场。
+ */
+const RESUME_MS = Number(process.env.RT_RESUME_MS || 20000)
+const RESUMABLE = code => code === 1006 || code === 1005 || code === 1001 || code === 1011 || code == null
 
 /**
  * 协议版本。用 GET /health 就能看到线上跑的是哪一版 —— 改 `pos` / `hit` 的字段就 +1。
@@ -235,6 +244,7 @@ function sanitizeAvatar(value) {
 function send(ws, payload, type=payload.t, size) {
   if (ws.readyState === 1) {
     try {
+      if (ws.readyState !== 1) return   // 已断开（续连宽限期内被标记 dead）的连接不再写
       const text=typeof payload === 'string' ? payload : JSON.stringify(payload)
       ws.send(text)
       obs.packet(ws,'out',type,size??Buffer.byteLength(text))
@@ -591,16 +601,32 @@ wss.on('connection', (ws, req) => {
   const release = (code, reason) => {
     clearTimeout(ws.joinTimer)
     unpend()
-    const joined = players.has(id)
+    // 续连过的连接：玩家登记在原 id 上（ws.playerId），按它找
+    const pid = ws.playerId ?? id
+    const joined = players.has(pid)
     if (sockets.delete(ws)) {
       const left = (ipCounts.get(ip) || 1) - 1
       if (left > 0) ipCounts.set(ip, left)
       else ipCounts.delete(ip)
     }
     // 关闭原因必须留痕：线上「联机不稳定」时，没有这行就只能靠猜是超时、满员还是顶号
-    if (joined) console.log(JSON.stringify({scope:'rt-close',code:code??null,reason:String(reason??''),ip,uid:players.get(id)?.uid??null,players:players.size}))
+    if (joined) console.log(JSON.stringify({scope:'rt-close',code:code??null,reason:String(reason??''),ip,uid:players.get(pid)?.uid??null,players:players.size}))
     if (joined) {
-      const player=players.get(id)
+      const player=players.get(pid)
+      // 竞态：旧 socket 的 close 晚到（新 socket 已经续连上了）——绝不能把活着的会话判死
+      if (player && player.ws !== ws) {
+        console.log(JSON.stringify({scope:'rt-stale-close',uid:player.uid,pid,code:code??null}))
+        return
+      }
+      // 异常断开（CDN 掐连接、切网络、手机息屏）先保留会话，等同 uid 回来续连；
+      // 主动关闭（pagehide/dispose）、被踢被封、顶号都不保留，避免留下假在线。
+      if (player && RESUMABLE(code) && !player.kickReason && !player.replaced) {
+        player.dead = true
+        player.deadAt = now() + RESUME_MS
+        player.lastCloseCode = code ?? null
+        console.log(JSON.stringify({scope:'rt-hold',uid:player.uid,id:pid,code:code??null,holdMs:RESUME_MS,players:players.size}))
+        return
+      }
       removePlayer(player,{closeCode:code,reason:player?.kickReason||String(reason??'')})
     }
   }
@@ -611,7 +637,7 @@ wss.on('connection', (ws, req) => {
       obs.packet(ws,'in',msg?.t,raw.length)
       // null / 数组 / 标量都不是合法消息，直接忽略（否则读 msg.t 会抛）
       if (!msg || typeof msg !== 'object' || Array.isArray(msg)) return
-      const me = players.get(id)
+      const me = players.get(ws.playerId??id)
 
       if (msg.t === 'join' && !me) {
         // 已经被拒（封禁 / 顶号）的连接不再给第二次机会
@@ -641,7 +667,55 @@ wss.on('connection', (ws, req) => {
         // 原来「拒绝后来者」的写法会让用户换设备后一直连不上，还以为服务坏了。
         const previous = [...players.values()].find(p => p.uid === uid)
         if (previous && previous.ws !== ws) {
+          // 续连：上一个连接是被 CDN/网络掐断的（dead），不是顶号。原地接管，不播 leave/join。
+          if (previous.dead) {
+            const p = previous
+            const gapMs = Math.max(0, Math.round(now() - (p.deadAt - RESUME_MS)))
+            p.ws = ws
+            // 关键：这条 socket 的连接 id 是新的，后续 pos/close 必须按原玩家 id 找，
+            // 否则续连后玩家在服务端「消失了」（消息被丢弃、断开也不清理）
+            ws.playerId = p.id
+            delete p.dead
+            delete p.deadAt
+            p.ip = ip
+            p.ua = clampStr(req.headers['user-agent'], 200)
+            p.lastPos = 0            // 新连接的第一条 pos 不能被 MIN_POS_GAP_MS 挡掉
+            ws.joined = true
+            clearTimeout(ws.joinTimer)
+            unpend()
+            const { near, far } = aoiTargets(p)
+            p.far = far
+            p.visible.clear()
+            p.farSent.clear()
+            const visible = [...new Set([...near, ...far])]
+            for (const peerId of visible) {
+              p.visible.add(peerId)
+              const peer = players.get(peerId)
+              if (!peer || peer.dead) continue
+              if (!peer.visible.has(p.id)) {
+                peer.visible.add(p.id)
+                send(peer.ws, { t: 'join', player: publicOf(p, peer) })
+              }
+            }
+            send(ws, {
+              t: 'welcome',
+              me: { id: p.id, uid: p.uid, name: p.name, avatar: p.avatar, x: p.x, z: p.z, resumed: true },
+              online: players.size,
+              players: visible.map(peerId => players.get(peerId)).filter(Boolean).map(q => publicOf(q, p)),
+            })
+            send(ws, rosterPayload())
+            obs.event('resume', p)
+            console.log(JSON.stringify({
+              scope: 'rt-resume', uid, id: p.id,
+              code: p.lastCloseCode ?? null,
+              gapMs,
+              players: players.size,
+            }))
+            delete p.lastCloseCode
+            return
+          }
           previous.ws.rejected = true
+          previous.replaced = true
           // 走统一清理：网格、别人的 visible 都要摘掉，否则会留下永远不动的幽灵
           removePlayer(previous, {closeCode:4001, reason:'replaced'})
           try { previous.ws.close(4001, 'replaced') } catch { /* 忽略 */ }
@@ -724,7 +798,7 @@ wss.on('connection', (ws, req) => {
 
       if (msg.t === 'emote') {
         if (!acceptEmote(me,msg,now())) return
-        const packet=JSON.stringify({t:'emote',from:id,id:me.em,s:me.es})
+        const packet=JSON.stringify({t:'emote',from:me.id,id:me.em,s:me.es})
         for(const peerId of me.visible){const peer=players.get(peerId);if(peer&&inEmoteRange(peer,me))sendSlowAware(peer.ws,packet,'emote')}
         return
       }
@@ -761,7 +835,7 @@ wss.on('connection', (ws, req) => {
         me.br = clampInt(msg.br, 0, 3)
         aoiMove(me)
         aoiSend(me, {
-          t: 'pos', id,
+          t: 'pos', id: me.id,
           x: me.x, y: me.y, z: me.z, yaw: me.yaw, v: me.v,
           bike: me.bike, bx: me.bx, bz: me.bz, byaw: me.byaw,
           hb: me.hb, hx: me.hx, hz: me.hz, hyaw: me.hyaw, mv: me.mv, cr: me.cr, gr: me.gr, dn: me.dn, pn: me.pn, wl: me.wl,
@@ -801,7 +875,7 @@ wss.on('connection', (ws, req) => {
         const avatar = sanitizeAvatar(msg.avatar)
         if (!avatar) return
         me.avatar = avatar
-        for (const peerId of me.visible) { const peer = players.get(peerId); if (peer) sendSlowAware(peer.ws, JSON.stringify({t:'avatar',id,avatar}), 'avatar') }
+        for (const peerId of me.visible) { const peer = players.get(peerId); if (peer) sendSlowAware(peer.ws, JSON.stringify({t:'avatar',id:me.id,avatar}), 'avatar') }
         return
       }
 
@@ -846,9 +920,17 @@ setInterval(() => {
   console.log(JSON.stringify({scope: 'rt-stats', players: players.size, sockets: sockets.size, cells: grid.size, ...obs.window()}))
 }, STATS_MS)
 
+// 续连宽限期到点就真正离场：单独 1s 一次，别等 10s 的 ping 周期（否则幽灵会多站 10 秒）
+setInterval(() => {
+  const t = now()
+  for (const p of players.values()) if (p.dead && t > p.deadAt) removePlayer(p, {closeCode: 1006, reason: 'resume timeout'})
+}, 1000)
+
 // 掉线清理：浏览器直接关掉时不会有 close 帧，用 ping/pong 兜住
 setInterval(() => {
   for (const p of players.values()) {
+    // 续连宽限期内的会话：不 ping、不判死（超时清扫见下面的 1s 定时器）
+    if (p.dead) continue
     if (p.ws.isAlive === false && now()-(p.ws.lastPongAt??p.joinedAt)>=30000) {
       p.ws.terminate()
       continue

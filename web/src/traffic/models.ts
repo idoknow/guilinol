@@ -80,6 +80,21 @@ type CarSpec = {
   pillars?:number[],cladding?:boolean,rails?:boolean,lampW?:number
 }
 
+// Distance stand-in (IDOK-253 LOD): body + cabin + glass + lamps + plain wheels, ~350 tris.
+function liteCar(spec:CarSpec,body=0xffffff,mask:Mask=PAINT,extra?:(kit:Kit)=>void){
+  const k=new Kit(),{W,r,lower,cabin}=spec,[rb,rt,ft,fb]=cabin,cw=W-.2
+  const front=Math.max(...lower.map(p=>p[0])),rear=Math.min(...lower.map(p=>p[0]))
+  k.side(lower,W,0,body,mask);k.side(cabin,cw,0,body,mask)
+  k.pane(fb,ft,cw*.9,.05,glass,true,.045);k.pane(rb,rt,cw*.9,.05,glass,false,.045)
+  for(const s of [-1,1]){
+    k.side(cabin.map(([z,y])=>[z+(z>0?-.12:.12),y+(y>1.2?-.08:.07)] as Pt),.02,s*(cw/2+.03),glass)
+    k.box(.34,.1,.06,s*(W/2-.25),spec.headY,front,head,LAMP);k.box(.34,.12,.06,s*(W/2-.24),spec.tailY,rear,tail,LAMP)
+    for(const z of [spec.wf,spec.wr])k.add(new T.CylinderGeometry(r,r,.24,8).rotateZ(Math.PI/2),tire,s*(W/2-.15),r,z)
+  }
+  extra?.(k)
+  return k.build()
+}
+
 function car(spec:CarSpec,extra?:(kit:Kit,spec:CarSpec)=>void){
   const k=new Kit(),{W,r,lower,cabin}=spec
   const body=spec.body??0xffffff,cab=spec.cab??body,mask=spec.mask??PAINT,cabMask=spec.cab!==undefined?NONE:mask
@@ -254,6 +269,42 @@ const police=()=>car({...sedanSpec,body:0xf2f2ee,cab:0xf2f2ee,mask:NONE},k=>{
   k.box(.6,.1,.03,0,.72,-2.4,0x1f4f9c)
 })
 
+// IDOK-253 街车精模：scripts/build-traffic-cars.mjs 烘焙的四款车身（去尾翼、改比例、无车标），
+// 按材质槽上我们自己的扁平配色；车身槽吃每车随机车漆，车灯槽夜里发光。
+export type CarMesh={name:string,groups:{slot:number,positions:Float32Array}[]}
+const CAR_SLOTS:[number,Mask][]=[
+  [0xffffff,PAINT],[0xf1f0ec,NONE],[glass,NONE],[0xc9d3d8,NONE],[head,LAMP],[tail,LAMP],
+  [grille,NONE],[tire,NONE],[rim,NONE],[trim,NONE],[chrome,NONE],
+]
+export async function loadCarMeshes(url='/models/traffic-cars.bin'):Promise<CarMesh[]>{
+  const response=await fetch(url);if(!response.ok)throw Error(`traffic cars: ${response.status}`)
+  const view=new DataView(await response.arrayBuffer())
+  if(String.fromCharCode(...[0,1,2,3].map(i=>view.getUint8(i)))!=='GLCR')throw Error('traffic cars: bad header')
+  let at=8;const cars:CarMesh[]=[]
+  for(let c=0,count=view.getUint16(6,true);c<count;c++){
+    const length=view.getUint8(at++);const name=new TextDecoder().decode(new Uint8Array(view.buffer,at,length));at+=length
+    const groups:CarMesh['groups']=[]
+    const groupCount=view.getUint16(at,true);at+=2
+    for(let g=0;g<groupCount;g++){
+      const slot=view.getUint8(at),vertices=view.getUint32(at+1,true);at+=5
+      const positions=new Float32Array(vertices*3);for(let i=0;i<positions.length;i++,at+=2)positions[i]=view.getInt16(at,true)/1000
+      groups.push({slot,positions})
+    }
+    cars.push({name,groups})
+  }
+  return cars
+}
+function bakedCar(mesh:CarMesh,body?:number,extra?:(k:Kit)=>void){
+  const k=new Kit()
+  for(const {slot,positions} of mesh.groups){
+    const [color,mask]=CAR_SLOTS[slot]??[trim,NONE],g=new T.BufferGeometry()
+    g.setAttribute('position',new T.BufferAttribute(positions.slice(),3));g.computeVertexNormals()
+    k.add(g,slot===0&&body!==undefined?body:color,0,0,0,slot===0&&body!==undefined?NONE:mask)
+  }
+  extra?.(k)
+  return k.build()
+}
+
 export type Variant = {geometry:number,paint:T.Color}
 type Pool = {ids:number[],weights:number[],paints:{hex:number,w:number}[]}
 const pick=<V extends {w:number}>(list:V[],u:number)=>{let total=0;for(const v of list)total+=v.w;u*=total;for(const v of list){if((u-=v.w)<0)return v}return list[list.length-1]}
@@ -263,12 +314,22 @@ const carPaints=[[0xf1f0ec,30],[0x17191c,14],[0xb9bec2,13],[0x6c7276,11],[0x2c4a
 // Same muted present-day palette as the starter looks (lib/avatar.ts lookPalette tops).
 const shirtPaints=[0xe9e7e1,0xeeeae0,0x728795,0xa5bfce,0xacb8a7,0x9b9d99,0x3f5a4c,0x6f8fae,0x9a3f35,0xd8cab0,0x28344a,0x2b2f36].map(hex=>({hex,w:1}))
 
-export function trafficModels(){
+export function trafficModels(cars:CarMesh[]=[]){
   const geometries:T.BufferGeometry[]=[]
   const add=(g:T.BufferGeometry)=>geometries.push(g)-1
   const small=(g:T.BufferGeometry)=>{g.scale(CAR_SCALE,CAR_SCALE,CAR_SCALE);g.computeBoundingSphere();g.computeBoundingBox();return add(g)}
   const sedan=small(car(sedanSpec)),hatch=small(car(hatchSpec)),suv=small(car(suvSpec)),van=small(car(vanSpec)),
-    lorry=small(truck()),cab=small(taxi()),patrol=small(police())
+    lorry=small(truck()),patrol=small(police())
+  // 行驶车用精模（同屏只有几辆），停放车用 @far 轻量版（一屏可能上百辆）
+  const taxiSign=(k:Kit)=>{k.box(.6,.15,.26,0,1.52,-.25,0xf2d36b,LAMP);k.box(.64,.04,.3,0,1.44,-.25,0x2b2f33)}
+  const bake=(name:string,fallback:number,body?:number,extra?:(k:Kit)=>void)=>{const mesh=cars.find(item=>item.name===name);return mesh?small(bakedCar(mesh,body,extra)):fallback}
+  const cabFallback=small(taxi())
+  const saloon=bake('saloon',sedan),mini=bake('mini',hatch),coupe=bake('coupe',sedan),sport=bake('sport',sedan),
+    cab=bake('saloon',cabFallback,0x2f8a7c,taxiSign)            // 出租车：同款车身，桂林出租车青绿色 + 顶灯
+  // 远处（>75 m）换轻量替身；近处用精模。far[geometry] = 替身 id
+  const liteSedan=small(liteCar(sedanSpec)),liteHatch=small(liteCar(hatchSpec)),
+    liteCab=small(liteCar(sedanSpec,0x2f8a7c,NONE,k=>k.box(.6,.15,.26,0,1.57,-.1,0xf2d36b,LAMP)))
+  const far:Record<number,number>={[saloon]:liteSedan,[mini]:liteHatch,[coupe]:liteSedan,[sport]:liteSedan,[cab]:liteCab}
   const grey=0xb8b5ae,white=0xdcd9d2
   const scooters=[add(scooter(0xeeece6,0xf0f0ea,{basket:true})),add(scooter(0x8fb4c4,0xd8423a,{ponytail:true})),add(scooter(0x2d3135,0x3e74c4)),
     add(scooter(0x3a3e42,0xe6b23a,{box:0xe6b23a})),add(scooter(0x3a3e42,0x2f7fd0,{box:0x2f7fd0})),add(scooter(0xd9c9a8,0xf2f2ee,{basket:true,ponytail:true,pants:0x5b4a3c}))]
@@ -284,8 +345,8 @@ export function trafficModels(){
     add(person(0x3d3a44,'bun',{height:.93,stoop:.1,hairColor:grey,bag:'tote'})), // 老年女
   ]
   const pools:Record<'car'|'scooter'|'person'|'parked',Pool>={
-    parked:{ids:[sedan,hatch,suv,cab],weights:[42,19,29,10],paints:carPaints},
-    car:{ids:[sedan,hatch,suv,van,lorry,cab],weights:[34,17,24,8,5,10],paints:carPaints},
+    parked:{ids:[saloon,mini,coupe,sport,suv,cab],weights:[30,16,8,8,26,10],paints:carPaints},
+    car:{ids:[saloon,mini,coupe,sport,suv,van,lorry,cab],weights:[26,14,8,8,18,8,5,10],paints:carPaints},
     scooter:{ids:scooters,weights:[3,3,2,2,2,2],paints:shirtPaints},
     person:{ids:people,weights:[4,3,2,2,2,3,3,2,2],paints:shirtPaints},
   }
@@ -294,7 +355,7 @@ export function trafficModels(){
     const pool=pools[kind],geometry=pick(pool.ids.map((id,i)=>({id,w:pool.weights[i]})),u).id
     return {geometry,paint:geometry===cab||geometry===patrol?plain:new T.Color(pick(pool.paints,v).hex)}
   }
-  return {geometries,variant,police:patrol}
+  return {geometries,variant,police:patrol,far}
 }
 
 export function trafficMaterial(){
