@@ -22,8 +22,20 @@ function mirror(a: Avatar, equip: boolean) {
   loadLocalSave()
 }
 
-export async function accountCharacter(nickname: string, edit = false) {
-  const previous = await request()
+// IDOK-216: the title screen fetches the record early; the first non-edit entry reuses it if it is still fresh.
+let early: {owner: string; at: number; value: Promise<Avatar | undefined>} | undefined
+export function prefetchAvatar(owner: string) {
+  if (!early) { const value = request(); value.catch(() => {}); early = {owner, at: Date.now(), value} }
+}
+function takeEarly(owner?: string) {
+  const hit = early && owner === early.owner && Date.now() - early.at < 120_000 ? early.value : undefined
+  early = undefined
+  return hit
+}
+
+export async function accountCharacter(nickname: string, edit = false, owner?: string) {
+  const prefetched = edit ? undefined : takeEarly(owner)
+  const previous = prefetched ? await prefetched.catch(() => request()) : await request()
   if (previous && !edit) {
     const cached = sanitizeAvatar(loadLocalSave().save[AVATAR_KEY])
     if(JSON.stringify(cached)!==JSON.stringify(previous))mirror(previous, cached?.createdAt !== previous.createdAt || cached.look !== previous.look)

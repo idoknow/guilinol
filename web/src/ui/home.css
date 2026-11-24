@@ -165,3 +165,15 @@ kbd{display:inline-block;min-width:1.5em;padding:1px 5px;margin:0 1px;border-rad
 @media (max-height:520px) and (orientation:landscape){
   .home-mode--mp{grid-template-columns:auto 1fr auto;grid-template-areas:"seal text go"}.home-mode--mp .home-mode-text>span{display:none}.home-go--mp{padding:0 14px;letter-spacing:.12em}
 }
+
+/* IDOK-216 按下即反馈：进入要等登录 / 存档 / 角色几次网络往返，卡片先转起来，其它入口暂停 */
+.home-go .home-spin{width:15px;height:15px;margin-right:10px;flex:none;border-radius:50%;border:2px solid currentColor;border-right-color:transparent;opacity:.85;animation:home-spin .8s linear infinite}
+.home-go:has(.home-spin){letter-spacing:.16em;text-indent:.16em}
+.home-mode[aria-busy=true]{cursor:progress}
+.home-mode[aria-busy=true] .home-go{animation:home-breathe 1.6s ease-in-out infinite}
+.home[data-busy] .home-mode:not([aria-busy]),.home[data-busy] .home-resume{opacity:.55;pointer-events:none;transition:opacity .2s}
+.home .ui-btn[aria-busy=true]{cursor:progress;opacity:.7}
+.home .ui-btn[aria-busy=true]::after{content:"";width:11px;height:11px;border-radius:50%;border:2px solid currentColor;border-right-color:transparent;animation:home-spin .8s linear infinite}
+@keyframes home-spin{to{transform:rotate(360deg)}}
+@keyframes home-breathe{50%{filter:brightness(1.12)}}
+@media (prefers-reduced-motion:reduce){.home-go .home-spin,.home .ui-btn[aria-busy=true]::after{animation-duration:2.4s}.home-mode[aria-busy=true] .home-go{animation:none}}
