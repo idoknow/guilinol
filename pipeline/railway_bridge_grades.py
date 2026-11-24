@@ -21,6 +21,31 @@ def fit_approach(original, low, high):
     return np.clip(y,low,high)
 
 
+def smooth_raised_deck(stations, before, minimum, cap):
+    """A grade-limited upper envelope with a rounded change of slope."""
+    from scipy.ndimage import maximum_filter1d, uniform_filter1d
+
+    # A fixed station spacing makes curvature independent of OSM way nodes.
+    count = max(2,int(np.ceil(stations[-1]))+1)
+    chain = np.linspace(0,stations[-1],count)
+    step = chain[1]
+    required = np.maximum(before,minimum)
+    # Include sharp extrema between samples in the Lipschitz majorant.
+    levels = np.interp(chain,stations,required)
+    nearest = np.clip(np.rint(stations/step).astype(int),0,count-1)
+    np.maximum.at(levels,nearest,required+cap*abs(stations-chain[nearest]))
+    for i in range(1,count):
+        levels[i] = max(levels[i],levels[i-1]-cap*step)
+    for i in range(count-2,-1,-1):
+        levels[i] = max(levels[i],levels[i+1]-cap*step)
+    # Each averaged envelope sample covers the original point. This rounds
+    # crests without consuming the required headroom at the crossing.
+    window = 2*max(1,int(np.ceil(5/step)))+1
+    smoothed = uniform_filter1d(maximum_filter1d(levels,window,mode='nearest'),
+                                window,mode='nearest')
+    return np.interp(stations,chain,smoothed)
+
+
 def station_interchange_tunnels(ways, plans, control, left, top, ground_at):
     """Include bores below the roads connected to the two regraded station approaches."""
     from station_approaches import approach_junctions
@@ -189,7 +214,9 @@ def grade_railway_roads(plans, tunnels, terrain, ground, water, control, left, t
                 # short clearance plateaus as real transverse deck sections.
                 along = np.array([line.project(center.interpolate(v)) for v in knots])
                 need = np.interp(along,stations,minimum)
-                plans[wid] = center,span,knots,fit_approach(before,need,np.inf)
+                if np.any(need>before+.001):
+                    deck = smooth_raised_deck(knots,before,need,grade_cap(tags)*.98)
+                    plans[wid] = center,span,knots,deck
             continue
         ground_levels = np.array([ground_at(*p) for p in xy])
         street_levels = eval_bspline_grid(original_control,left,top,*xy.T)
