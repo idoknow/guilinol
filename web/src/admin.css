@@ -520,3 +520,76 @@ a.adm-kpi:hover{border-color:var(--ui-jade-500);box-shadow:var(--ui-shadow-1);tr
 .adm-mp-chat li span{word-break:break-word}
 .adm-mp-scroll{max-height:560px;overflow-y:auto}
 @media (max-width:760px){.adm-mp-scroll{max-height:none}}
+
+/* ── 聊天管理（IDOK-248）：频道色与游戏内一致 —— 附近青玉、世界赭黄、公告朱砂 ── */
+.adm-chat-tabs{display:flex;gap:4px;margin-bottom:16px;border-bottom:1px solid var(--ui-paper-line);overflow-x:auto}
+.adm-chat-tab{position:relative;display:inline-flex;align-items:center;gap:6px;padding:9px 14px 10px;text-decoration:none;color:var(--ui-ink-soft);font:500 14px/1.2 var(--ui-serif);letter-spacing:.1em;white-space:nowrap;border-bottom:2px solid transparent;margin-bottom:-1px}
+.adm-chat-tab:hover{color:var(--ui-ink)}
+.adm-chat-tab.is-on{color:var(--ui-jade-700);border-bottom-color:var(--ui-seal)}
+.adm-chat-tab .adm-badge{margin-left:2px}
+.adm-chat-filters{display:flex;flex-wrap:wrap;align-items:flex-end;gap:10px 12px;margin-bottom:14px;padding:12px 14px;border-radius:var(--ui-r-md);background:var(--ui-paper-3);border:1px solid var(--ui-paper-line)}
+.adm-chat-filters label{display:grid;gap:4px;font-size:12px;color:var(--ui-ink-soft);letter-spacing:.06em}
+.adm-chat-filters .adm-chat-grow{flex:1 1 160px}
+.adm-chat-filters input[type=datetime-local]{width:196px}
+.adm-chat-filters .adm-btns{margin-left:auto}
+.adm .adm-chat-input,.adm .adm-chat-num{font:14px/1.4 var(--sans);color:var(--ui-ink);background:var(--ui-paper-hi);border:1px solid var(--ui-paper-line);border-radius:var(--ui-r-sm);padding:7px 10px;min-width:0}
+.adm .adm-chat-input:focus,.adm .adm-chat-num:focus{outline:none;border-color:var(--ui-jade-500);box-shadow:0 0 0 3px rgba(79,127,122,.18)}
+.adm-chat-filters input[name=name],.adm-chat-filters input[name=uid]{width:120px}
+.adm-chat-filters .adm-chat-grow input{width:100%}
+.adm-chat-num{width:96px}
+.adm-chat-ch{display:inline-block;padding:1px 7px;border-radius:4px;font:500 12px/1.5 var(--ui-serif);letter-spacing:.08em;white-space:nowrap;color:#8a6420;background:rgba(196,154,74,.16);box-shadow:inset 0 0 0 1px rgba(196,154,74,.35)}
+.adm-chat-ch--near{color:var(--ui-jade-700);background:rgba(79,127,122,.12);box-shadow:inset 0 0 0 1px rgba(79,127,122,.3)}
+.adm-chat-ch--sys{color:var(--ui-paper);background:var(--ui-seal);box-shadow:none}
+.adm-chat-st{font-size:12px}
+.adm-chat-st--normal{background:rgba(79,127,122,.12);color:var(--ui-jade-700)}
+.adm-chat-st--pending{background:rgba(196,154,74,.2);color:#8a6420}
+.adm-chat-st--blocked{background:var(--ui-seal-wash);color:var(--ui-seal)}
+.adm-chat-st--deleted{background:rgba(60,60,50,.08);color:var(--ui-ink-soft);text-decoration:line-through}
+.adm-chat-table td{vertical-align:top}
+.adm-chat-time{white-space:nowrap}
+.adm-chat-time code,.adm-chat-time small{display:block}
+.adm-chat-time small{margin-top:3px;color:var(--ui-ink-soft)}
+.adm-chat-text{min-width:220px;max-width:420px}
+.adm-chat-text p{margin:0;white-space:pre-wrap;overflow-wrap:anywhere;font-size:14px;line-height:1.55}
+.adm-chat-why{display:block;margin-top:3px;color:var(--ui-seal);font-size:11.5px}
+.adm-chat-row.is-sys{background:var(--ui-seal-wash)}
+.adm-chat-actions{flex-wrap:wrap;gap:4px}
+.adm-chat-words tr.is-off td{opacity:.5}
+.adm-chat-words tr.is-off td:last-child{opacity:1}
+.adm-chat-word{font:600 14px/1.3 var(--sans)}
+.adm-chat-words .adm-select{padding-top:4px;padding-bottom:4px;font-size:13px}
+.adm-chat-addword{display:flex;flex-wrap:wrap;gap:8px}
+.adm-chat-addword input[name=word]{flex:1 1 160px}
+.adm-chat-addword input[name=category]{width:180px}
+.adm-chat-form{display:grid;gap:14px}
+.adm-chat-field{display:grid;grid-template-columns:150px minmax(0,1fr);align-items:center;gap:4px 12px;font-size:13.5px}
+.adm-chat-field>span{color:var(--ui-ink-soft);letter-spacing:.06em}
+.adm-chat-field>div{display:flex;align-items:center;gap:8px}
+.adm-chat-field em{font-style:normal;color:var(--ui-ink-soft);font-size:13px}
+.adm-chat-field small{grid-column:2;color:var(--ui-ink-soft)}
+.adm-chat-field input[name=steps_minutes]{width:200px}
+.adm-chat-field .adm-ok{color:var(--ui-jade-700)}
+.adm-chat-field .adm-muted,.adm-chat-field .adm-ok{background:none;padding:0;font-weight:500}
+.adm-chat-field .adm-muted{color:var(--ui-ink-soft)}
+.adm-chat-form .adm-btns{justify-content:flex-end}
+.adm .adm-chat-notice{width:100%;resize:vertical}
+.adm-chat-preview{padding:10px 12px;border-radius:12px;background:rgba(24,40,37,.86);color:var(--ui-paper);font:13px/1.45 var(--ui-serif);box-shadow:inset 2px 0 0 var(--ui-seal-light)}
+.adm-chat-preview b{margin-left:6px;color:#f3c2b1;font-size:12.5px;letter-spacing:.04em}
+.adm-chat-preview p{margin:3px 0 0;color:#fbe9e1;white-space:pre-wrap}
+.adm-chat-presets{flex-wrap:wrap}
+.adm-dialog .adm-chat-num{width:140px;margin-top:6px}
+.adm-chat-context-dialog{width:min(560px,calc(100vw - 32px))}
+.adm-chat-context{max-height:min(60vh,520px);overflow-y:auto;margin:0;padding:0;list-style:none;display:grid;gap:2px}
+.adm-chat-context li{padding:7px 10px;border-radius:8px}
+.adm-chat-context li.is-center{background:rgba(143,193,181,.18);box-shadow:inset 2px 0 0 var(--ui-jade-300)}
+.adm-chat-context li.is-sys{box-shadow:inset 2px 0 0 var(--ui-seal-light)}
+.adm-chat-context-head{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--ui-paper-dim)}
+.adm-chat-context-head b{color:var(--ui-paper);font-size:13px}
+.adm-chat-context-head time{margin-left:auto;font-family:var(--num)}
+.adm-chat-context p{margin:2px 0 0;color:var(--ui-paper);white-space:pre-wrap;overflow-wrap:anywhere}
+@media (max-width:820px){
+  .adm-chat-filters .adm-btns{margin-left:0}
+  .adm-chat-field{grid-template-columns:1fr}
+  .adm-chat-field small{grid-column:1}
+  .adm-chat-text{min-width:0}
+}

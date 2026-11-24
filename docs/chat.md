@@ -47,9 +47,9 @@
 | GET `messages` / `reviews` | `ch,uid,name,q,status,from,to,limit,offset`，时间为毫秒；reviews 固定 pending。含账号 `account`、原始发送点及审核字段。 |
 | GET `context` | `mid,n`；原频道前后各 n 条及中心，附近额外按中心发送点筛选。 |
 | POST `delete` / `approve` / `block` | `{mid,reason}`；approve/block 只处理 pending，block 可同时指定 `minutes`。 |
-| GET `mutes` | 无 uid 返回当前有效禁言，指定 `uid` 返回包括解除在内的操作历史。 |
+| GET `mutes` | 无 uid 返回当前有效禁言（附最近一次发言昵称 `name`），指定 `uid` 返回包括解除在内的操作历史。 |
 | POST `mute` / `unmute` | `{uid,minutes,reason}`；60、720、1440、10080、自定义正整数分钟或 -1；解禁忽略 minutes。 |
-| GET / POST `words` | 列表；写入 `{id?,word,category,action:'block'或'review'或'allow',enabled,reason}`；POST `words/delete` 用 `{id,reason}`。 |
+| GET / POST `words` | 列表，可选 `q`（词或类别包含）、`action`、`enabled=1/0`；写入 `{id?,word,category,action:'block'或'review'或'allow',enabled,reason}`；POST `words/delete` 用 `{id,reason}`。 |
 | GET / POST `settings` | 读取业务配置及只读 `provider`。修改示例：`{"patch":{"unmoderated_policy":"pending"},"reason":"恢复外审优先"}`；在 admin_audit 记录前后值。 |
 | POST `notice` | `{ch?,text,reason,x?,z?}`，默认世界；附近公告必须提供坐标。 |
 | GET `audit` | 聊天操作审计，含操作人、时间、目标、原因。 |
