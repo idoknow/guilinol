@@ -569,7 +569,7 @@ def build(bbox, output, palette, workers=4):
     bake_traffic(output, manifest, roads)
     from npc_network import install as install_npc
     from npc_sidewalks import audit as audit_npc
-    install_npc(output, audit_npc(output))
+    install_npc(output, audit_npc(output, manifest))
     (output/'manifest.json').write_text(json.dumps(manifest,separators=(',',':'))+'\n')
     print(f'{len(chunks)} chunks, {len(footprints)} footprints, {sum(c["bytes"] for c in chunks):,} chunk bytes')
 

@@ -57,8 +57,9 @@ def derive(center, surface, half_width):
             yield from best
 
 
-def audit(directory):
-    manifest = json.loads((directory/'manifest.json').read_bytes())
+def audit(directory, manifest=None):
+    if manifest is None:
+        manifest = json.loads((directory/'manifest.json').read_bytes())
     faces = STRtree(list(sidewalk_faces(directory, manifest)))
     roads = json.loads(gzip.decompress((directory/'roads/graph.json.gz').read_bytes()))
     nodes = {node['id']: (node['x'], node['z']) for node in roads['nodes']}
