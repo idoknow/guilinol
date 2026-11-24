@@ -295,11 +295,15 @@ def grade_railway_roads(plans, tunnels, terrain, ground, water, control, left, t
         for index,(section,end,_) in enumerate(sections):
             section.setdefault('joints',[None,None])[end] = dict(ring=ring,draw=index==0)
     from railway_approach_surface import grade_approach_surfaces
-    grade_approach_surfaces(ways,crossings,panels,tunnels,plans,protected,water)
+    cut_roads = grade_approach_surfaces(ways,crossings,panels,tunnels,plans,protected,water)
     protected.retain_foundations(crossings)
-    from station_bore_approaches import build_open_approaches
+    from station_bore_approaches import build_open_approaches, extend_to_junctions
     side_bores = {wid for wid, rows in by_road.items() if rows and all(r['type']=='road_underpass' for r in rows)}
+    from road_grading import build_ground_mesh_lookup
+    depth,width = (np.array(ground.shape)-1)*GRID
+    finished_ground = build_ground_mesh_lookup(ground,water,left,top,width,depth)
     def surface_at(x,z):
-        return max(ground_at(x,z),float(eval_bspline_grid(control,left,top,np.asarray(x),np.asarray(z))))+.045
+        return max(finished_ground(x,z),float(eval_bspline_grid(control,left,top,np.asarray(x),np.asarray(z))))+.045
     build_open_approaches(ways,tunnels,side_bores,surface_at)
+    extend_to_junctions(ways,tunnels,cut_roads,surface_at)
     return fallback_floors, crossings

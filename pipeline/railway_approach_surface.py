@@ -86,6 +86,23 @@ def fit_patch(control, mask, left, top, roads, anchors, curvature=.005):
         center = basis(shape,left,top,xy)
         cross = (basis(shape,left,top,(xy+side*span)[keep])-basis(shape,left,top,(xy-side*span)[keep]))/(2*span)
         bounds(cross,-.024,.024)
+        # A station grid can straddle a bend. Bound the crossfall on both
+        # incident segments, using their own normals up to the shared vertex.
+        coords = np.asarray(line.coords)
+        legs = np.diff(coords,axis=0)
+        lengths = np.linalg.norm(legs,axis=1)
+        if len(legs)>1:
+            ij = np.rint((coords[1:-1]-[left,top])/STEP+1).astype(int)
+            corner = distance[np.clip(ij[:,1],0,shape[0]-1),np.clip(ij[:,0],0,shape[1]-1)]<96
+            directions = legs/np.maximum(lengths[:,None],1.e-8)
+            corner &= np.sum(directions[1:]*directions[:-1],axis=1)<.999
+            for tangent in (directions[:-1][corner],directions[1:][corner]):
+                if not len(tangent):
+                    continue
+                offsets = tangent[:,::-1]*[-1.,1.]*span
+                centers = coords[1:-1][corner]
+                tilt = (basis(shape,left,top,centers+offsets)-basis(shape,left,top,centers-offsets))/(2*span)
+                bounds(tilt,-.024,.024)
         step = ds[1]
         slope = (center[1:]-center[:-1])/step
         valid = keep[:-1]&keep[1:]
@@ -148,6 +165,12 @@ def grade_approach_surfaces(ways, crossings, panels, tunnels, plans, protected, 
     for r in crossings:
         if r['type']=='rail_over' and r['surfaceRoad']:
             anchors.append((r['x'],r['z'],-np.inf,r['railY']-5.805))
+    paired = LineString(points(ways[UNDERPASS])).buffer(340)
+    lower_roads = {r['road'] for r in crossings if r['type']=='rail_over'}
+    mouths = [(t['way'],node,portal) for t in tunnels if t['way'] in lower_roads
+              for node,portal,open_end in zip(t.get('nodes',()),t['portals'],t.get('mouths',()))
+              if open_end and not paired.covers(Point(portal[0],portal[2]))]
+    cut_roads = set()
     for tunnel in tunnels:
         if tunnel['way']==UNDERPASS:
             for (x,y,z),junction in zip(tunnel['portals'],approach_junctions(ways)):
@@ -187,7 +210,19 @@ def grade_approach_surfaces(ways, crossings, panels, tunnels, plans, protected, 
                   support[round((a[1]-top)/STEP)+1,round((a[0]-left)/STEP)+1]]
         local = control[rows,cols]
         try:
-            survey = fit_patch(local,mask,left,top,roads,active)
+            def supported(x,z):
+                return region.contains(Point(x,z)) and support[round((z-top)/STEP)+1,round((x-left)/STEP)+1]
+            entries = [m for m in mouths if supported(m[2][0],m[2][2])]
+            lips = [(x,z,y-.049,y-.041) for _,_,(x,y,z) in entries]
+            try:
+                survey = fit_patch(local,mask,left,top,roads,active+lips)
+            except InfeasibleApproach:
+                if not entries:
+                    raise
+                # The surface above a separate lower carriageway cannot also
+                # carry its entrance. Grade the connected cut independently.
+                survey = fit_patch(local,mask,left,top,roads,active)
+                cut_roads.update(wid for wid,_,_ in entries)
         except InfeasibleApproach as error:
             rails = sorted({r['rail'] for r in crossings if region.covers(Point(r['x'],r['z']))})
             abutments = sorted(wid for wid,(line,_,_,_) in plans.items() if line.intersects(region))
@@ -226,3 +261,4 @@ def grade_approach_surfaces(ways, crossings, panels, tunnels, plans, protected, 
             old = field[patch]
             target = np.where(edge<1,road*10,np.minimum(old,road*10))
             old[:] = np.rint(old+blend*(target-old))
+    return cut_roads

@@ -587,6 +587,8 @@ def build(bbox, output, palette, workers=4):
         from railway_clearance import fit_rendered_underpasses
         new_pavement.extend(fit_rendered_underpasses(output,manifest,rail_crossings))
         protected_grades.mark_pavement(new_pavement)
+        from railway_vegetation import plant_graded_approaches
+        plant_graded_approaches(output,manifest,protected_grades)
     write_city_lods(output, manifest)
     from traffic import bake as bake_traffic
     bake_traffic(output, manifest, roads,protected_grades)

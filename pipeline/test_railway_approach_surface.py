@@ -52,3 +52,27 @@ class RailwayApproachSurfaceTest(unittest.TestCase):
             self.assertTrue(np.all(np.diff(s)>0))
             self.assertLessEqual(max(abs(np.diff(y)/np.diff(s))),.05)
             self.assertLess(section['halfWidth'],bore['halfWidth'])
+
+    @patch('station_bore_approaches.points', side_effect=lambda way: way['geometry'])
+    def test_open_approach_continues_through_both_junction_arms(self, _):
+        from station_bore_approaches import extend_to_junctions
+        tags = {'highway':'unclassified'}
+        ways = {1:dict(nodes=[10,11],tags={**tags,'tunnel':'yes'}),
+                2:dict(nodes=[11,12],geometry=[[0.,0.],[40.,0.]],tags=tags),
+                3:dict(nodes=[12,13],geometry=[[40.,0.],[140.,0.]],tags=tags),
+                4:dict(nodes=[14,12],geometry=[[40.,100.],[40.,0.]],tags=tags)}
+        tunnels = [dict(way=1,nodes=[10,11],mouths=[False,True],portals=[[-50.,140.,0.],[0.,140.,0.]],
+                        length=50.,halfWidth=3.,clearance=4.5)]
+        extend_to_junctions(ways,tunnels,{1},lambda x,z:148.)
+        self.assertEqual({s['way'] for s in tunnels[1:]},{2,3,4})
+        junction_heights = []
+        for section in tunnels[1:]:
+            s,y = np.array(section['stations']).T
+            self.assertLessEqual(max(abs(np.diff(y)/np.diff(s))),.08)
+            end = section['nodes'].index(12)
+            junction_heights.append(section['portals'][end][1])
+            self.assertFalse(section['mouths'][end])
+            if section['way'] in (3,4):
+                self.assertTrue(section['mouths'][1-end])
+        self.assertLess(junction_heights[0],148.)
+        np.testing.assert_allclose(junction_heights,junction_heights[0])
