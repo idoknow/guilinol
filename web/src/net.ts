@@ -63,9 +63,10 @@ export function attachNet(scene:Scene,clips:AnimationClip[],getPose:()=>Pose,get
       }
       ws.onclose=event=>{if(version!==generation)return;socket=undefined;peers.clear()
         // 4001 = 同账号在别处在线（可能只是上次的旧连接还没被服务端回收）→ 等几秒再连
-        if(event.code===4001){update('offline');retry(4000+Math.random()*2000)}
-        // 4003 有两种：票据过期（立刻重新取票重连）和被封禁（停下）
-        else if(event.code===4003){if(/banned/i.test(String(event.reason)))update('offline');else retry(1200)}
+        // 另一台设备/标签页一直在线时会持续 4001，所以从 4s 起照常指数退避，不按固定间隔轮询
+        if(event.code===4001){attempt=Math.max(attempt,2);retry()}
+        // 4003 有两种：票据过期（第一次 1.2s 后重新取票，之后指数退避，免得票据一直被拒时每秒打一次）和被封禁（停下）
+        else if(event.code===4003){if(/banned/i.test(String(event.reason)))update('offline');else retry(attempt++===0?1200:undefined)}
         else retry()}
     }catch{if(version===generation)retry()}
   }
