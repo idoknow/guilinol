@@ -161,6 +161,24 @@ export function photoMode(host: Host, place: () => string, onCapture?: () => voi
     g.restore()
   }
 
+  // IDOK-239：成片右下角常驻一行小水印（与「落款」开关无关），注明测试画面并给出访问地址，
+  // 照片被转发后别人也知道去哪玩；字小、半透明、贴角，不压主体。
+  function watermark(g: CanvasRenderingContext2D, w: number, h: number) {
+    const unit = Math.max(w, h) / 1600, pad = 22 * unit
+    g.save()
+    g.textAlign = 'right'
+    g.textBaseline = 'alphabetic'
+    g.shadowColor = 'rgba(0,0,0,.55)'
+    g.shadowBlur = 4 * unit
+    g.fillStyle = 'rgba(244,239,226,.82)'
+    g.font = `600 ${14 * unit}px "Noto Serif SC","Source Han Serif SC","Songti SC",serif`
+    g.fillText('glol.rcpd.cc', w - pad, h - pad)
+    g.fillStyle = 'rgba(244,239,226,.62)'
+    g.font = `${10.5 * unit}px "Noto Serif SC","Source Han Serif SC","Songti SC",serif`
+    g.fillText('测试画面，不代表最终画质 · 浏览器访问', w - pad, h - pad - 18 * unit)
+    g.restore()
+  }
+
   const fileTitle = (extra = '') => {
     const where = (place() || '桂林').replace(/[\\/:*?"<>|]/g, '')
     return `网上桂林-${where}${extra}-${stamp()}`
@@ -189,6 +207,7 @@ export function photoMode(host: Host, place: () => string, onCapture?: () => voi
     const picture = grade(raw, settingsNow, filters[state.filter][1] === 'none' ? '' : filters[state.filter][1])
     const context = picture.getContext('2d')!
     if (state.toggle.sign) signature(context, picture.width, picture.height)
+    watermark(context, picture.width, picture.height)
     const blob = await encode(picture, settingsNow.format)
     flash.classList.remove('go')
     void flash.offsetWidth

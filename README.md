@@ -70,3 +70,15 @@ npx wrangler d1 execute glol --remote --command "UPDATE users SET role='admin' W
 ```
 
 撤权时把 `role='admin'` 改为 `role='user'`。角色变更在下次请求生效，不提供网页授权入口。迁移前的历史用户没有注册时间，统计按迁移时间计入；因此迁移后首日的 24 小时新增数包含这些账号。本地验收先构建再运行 `npm run verify:admin`；该命令只操作临时本地 D1/R2。
+
+## 许可证
+
+本仓库为**源码公开**，不是开源软件。代码、3D 模型、贴图等原创内容以 [Business Source License 1.1](LICENSE)（BUSL-1.1）发布：
+
+- 允许：阅读、复制、修改、在本机或内网运行测试，以及向本仓库提交贡献。
+- 不允许：未经 idoknow 书面许可，把本仓库或其衍生作品作为网站、游戏服务器或其他在线服务提供给他人使用（即许可证所称的生产用途）。需要授权请通过 https://github.com/idoknow 联系。
+- 每个版本自首次公开发布起满四年，自动改按 AGPL-3.0-or-later 授权。
+- 「网上桂林」「Guilin Online」名称和 logo 不在许可范围内。
+- 第三方地图与高程数据（OpenStreetMap ODbL、Overture CC BY 4.0 等）及 `docs/credits.md` 列出的素材仍按各自许可使用，见开头的数据署名。
+
+贡献须知见 [CONTRIBUTING.md](CONTRIBUTING.md)。

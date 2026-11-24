@@ -1,6 +1,7 @@
 import * as T from 'three'
 import {mergeGeometries} from 'three/addons/utils/BufferGeometryUtils.js'
 import {shareAtmosphere} from '../look/atmosphere'
+import {CAR_SCALE} from '../drive/scale'
 
 // IDOK-149 交通车模: low-poly, flat-shaded street traffic in one BatchedMesh draw.
 // Every model faces +z (actor yaw = atan2(dx,dz)), stands on y = 0 and carries two vertex
@@ -208,8 +209,9 @@ const shirtPaints=[0xe9e7e1,0xeeeae0,0x728795,0xa5bfce,0xacb8a7,0x9b9d99,0x3f5a4
 export function trafficModels(){
   const geometries:T.BufferGeometry[]=[]
   const add=(g:T.BufferGeometry)=>geometries.push(g)-1
-  const sedan=add(car(sedanSpec)),hatch=add(car(hatchSpec)),suv=add(car(suvSpec)),van=add(car(vanSpec)),
-    lorry=add(truck()),cab=add(taxi()),patrol=add(police())
+  const small=(g:T.BufferGeometry)=>{g.scale(CAR_SCALE,CAR_SCALE,CAR_SCALE);g.computeBoundingSphere();g.computeBoundingBox();return add(g)}
+  const sedan=small(car(sedanSpec)),hatch=small(car(hatchSpec)),suv=small(car(suvSpec)),van=small(car(vanSpec)),
+    lorry=small(truck()),cab=small(taxi()),patrol=small(police())
   const scooters=[add(scooter(0xeeece6,0xf0f0ea)),add(scooter(0x8fb4c4,0xd8423a)),add(scooter(0x2d3135,0x3e74c4)),
     add(scooter(0x3a3e42,0xe6b23a,0xe6b23a)),add(scooter(0x3a3e42,0x2f7fd0,0x2f7fd0))]
   const people=[add(person(0x22262e,'short')),add(person(0x6b5a48,'long')),add(person(0x3a4250,'pony')),add(person(0x2b2d33,'bag')),add(person(0x8f8a80,'short'))]

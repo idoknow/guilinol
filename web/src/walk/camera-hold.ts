@@ -1,7 +1,23 @@
-import {MathUtils, Object3D, Quaternion, Vector3} from 'three'
+import {MathUtils, Matrix4, Object3D, Quaternion, SkinnedMesh, Vector3} from 'three'
 
-const idleGrip = new Quaternion(.011904, .632748, -.537671, .557119).normalize()
 const up = new Vector3(0, 1, 0)
+// Camera props hang on an anchor that cancels the hand's bind rotation and point their lens down the
+// anchor's -Z. Avatars face +Z, so the anchor is turned half a turn about Y: lens forward, screen to the
+// player (gear/hand.ts adds the small downward tilt on the prop itself).
+const holdFrame = new Quaternion().setFromAxisAngle(up, Math.PI)
+
+/** Bind-pose rotation of a bone in character space (root = identity), from the skin's inverse bind matrices. */
+function bindRotation(figure: Object3D, bone: Object3D) {
+  let found: Quaternion | undefined
+  figure.traverse((node) => {
+    if (found || !(node instanceof SkinnedMesh)) return
+    const index = node.skeleton.bones.indexOf(bone as never)
+    if (index < 0) return
+    const bind = new Matrix4().copy(node.skeleton.boneInverses[index]).invert()
+    found = new Quaternion().setFromRotationMatrix(bind)
+  })
+  return found
+}
 
 export function cameraHoldLayer(figure: Object3D) {
   const bone = (name: string) => figure.getObjectByName(name)!
@@ -13,6 +29,12 @@ export function cameraHoldLayer(figure: Object3D) {
   const right = new Vector3(), forward = new Vector3(), axis = new Vector3(), pole = new Vector3()
   const from = new Vector3(), to = new Vector3(), pivot = new Vector3()
   const rotation = new Quaternion(), parent = new Quaternion(), swing = new Quaternion()
+  // Wrist relative to the chest: chest⁻¹(bind) · holdFrame · hand(bind). Constant per body, so the grip
+  // rides the chest through every gait clip (IDOK-220) and the lens always looks where the body faces.
+  const chestBind = chest && bindRotation(figure, chest), handBind = wrist && bindRotation(figure, wrist)
+  const grip = chestBind && handBind
+    ? chestBind.clone().invert().multiply(holdFrame).multiply(handBind).normalize()
+    : new Quaternion(.011904, .632748, -.537671, .557119).normalize()
   let applied = false
   function reset() {
     if (applied) joints.forEach((joint, index) => joint.quaternion.copy(base[index]))
@@ -32,7 +54,8 @@ export function cameraHoldLayer(figure: Object3D) {
     applied = true
     shoulder.getWorldPosition(origin)
     right.subVectors(origin, left.getWorldPosition(pivot)).normalize()
-    forward.crossVectors(right, up).normalize()
+    // Avatars face +Z; right × up points behind the back (IDOK-238), so forward = up × right.
+    forward.crossVectors(up, right).normalize()
     chest.getWorldPosition(target).addScaledVector(forward, aim.forward).addScaledVector(up, aim.up).addScaledVector(right, aim.side)
     elbow.getWorldPosition(bend); wrist.getWorldPosition(end)
     const upper = origin.distanceTo(bend), lower = bend.distanceTo(end)
@@ -47,7 +70,7 @@ export function cameraHoldLayer(figure: Object3D) {
     bend.copy(origin).addScaledVector(axis, along).addScaledVector(pole.normalize(), Math.sqrt(Math.max(0, upper * upper - along * along)))
     end.copy(origin).addScaledVector(axis, distance)
     aimBone(shoulder, elbow, bend); aimBone(elbow, wrist, end)
-    chest.getWorldQuaternion(rotation).multiply(idleGrip)
+    chest.getWorldQuaternion(rotation).multiply(grip)
     wrist.quaternion.copy(wrist.parent!.getWorldQuaternion(parent).invert().multiply(rotation))
     if (blend < 1) joints.forEach((joint, index) => joint.quaternion.slerp(base[index], 1 - blend))
   }
