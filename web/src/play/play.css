@@ -16,7 +16,7 @@ body[data-photo=on] :is(output,.hint,footer,.sky-ui,.walk-ui,.dock,.toast,.spot-
 .minimap canvas{display:block;width:100%;height:100%}
 .minimap i{position:absolute;left:50%;top:2px;transform:translateX(-50%);font:600 10px/1 var(--serif);font-style:normal;color:var(--seal);
   background:rgba(239,232,216,.9);border-radius:6px;padding:2px 3px}
-.road-name{font:13px/1 var(--serif);letter-spacing:.12em;color:var(--paper);background:var(--glass);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);
+.road-name{font:13px/1 var(--serif);letter-spacing:.12em;color:var(--paper);background:var(--glass);
   padding:5px 10px;border-radius:12px;max-width:150px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 
 .road-name:empty{display:none}
@@ -100,12 +100,12 @@ body[data-photo=on] :is(output,.hint,footer,.sky-ui,.walk-ui,.dock,.toast,.spot-
 
 /* Summit pill */
 .summit-pill{position:fixed;left:50%;top:calc(14px + env(safe-area-inset-top));transform:translateX(-50%);z-index:5;display:flex;align-items:center;gap:10px;
-  padding:5px 6px 5px 16px;border-radius:20px;background:var(--glass);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);color:var(--paper);font:15px var(--serif);letter-spacing:.2em}
+  padding:5px 6px 5px 16px;border-radius:20px;background:var(--glass);color:var(--paper);font:15px var(--serif);letter-spacing:.2em}
 .summit-pill button{font:13px var(--serif);letter-spacing:.15em;border:0;border-radius:var(--ui-r-pill);padding:6px 12px;background:var(--seal);color:var(--paper);cursor:pointer}
 
 /* Photo mode */
 .photo-bar{position:fixed;left:50%;bottom:calc(14px + env(safe-area-inset-bottom));transform:translateX(-50%);z-index:8;box-sizing:border-box;
-  width:min(720px,calc(100vw - 24px));padding:10px 96px 10px 14px;border-radius:16px;background:var(--glass-strong);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);
+  width:min(720px,calc(100vw - 24px));padding:10px 96px 10px 14px;border-radius:16px;background:var(--glass-strong);
   color:var(--paper);font:13px var(--serif);display:flex;flex-direction:column;gap:8px;user-select:none;-webkit-user-select:none}
 .photo-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
 .photo-hour{display:flex;align-items:center;gap:10px;flex:1;min-width:220px}.photo-hour span{min-width:7.4em;letter-spacing:.06em}
@@ -117,7 +117,7 @@ body[data-photo=on] :is(output,.hint,footer,.sky-ui,.walk-ui,.dock,.toast,.spot-
 .photo-shutter i{display:block;width:50px;height:50px;border-radius:50%;background:var(--seal);transition:transform .12s}
 .photo-shutter:active i{transform:scale(.86)}
 .photo-exit{position:fixed;right:calc(14px + env(safe-area-inset-right));top:calc(12px + env(safe-area-inset-top));width:40px;height:40px;border-radius:50%;
-  border:1px solid var(--line);background:var(--glass);color:var(--paper);font-size:22px;line-height:1;cursor:pointer;backdrop-filter:blur(6px)}
+  border:1px solid var(--line);background:var(--glass);color:var(--paper);font-size:22px;line-height:1;cursor:pointer}
 .photo-flash{position:fixed;inset:0;background:#fff;opacity:0;pointer-events:none;z-index:30}
 .photo-flash.go{animation:flash .45s ease-out}
 @keyframes flash{0%{opacity:.85}100%{opacity:0}}
@@ -192,7 +192,7 @@ body[data-photo=on] :is(output,.hint,footer,.sky-ui,.walk-ui,.dock,.toast,.spot-
 .cg-rec i{width:8px;height:8px;border-radius:50%;background:#fff;animation:recblink 1s steps(2) infinite}
 @keyframes recblink{50%{opacity:.25}}
 .photo-shot .shot-meta{flex:1;font:10.5px ui-monospace,monospace;opacity:.7;line-height:1.3}
-.gear-mask{position:fixed;inset:0;z-index:92;display:grid;place-items:center;padding:16px;background:rgba(12,16,15,.5);backdrop-filter:blur(3px)}
+.gear-mask{position:fixed;inset:0;z-index:92;display:grid;place-items:center;padding:16px;background:rgba(12,16,15,.5);backdrop-filter:var(--ui-blur-mask)}
 .gear-mask[hidden]{display:none}
 .gear-panel{width:min(680px,100%);max-height:calc(100vh - 40px);overflow:auto;padding:18px 20px 20px;border-radius:16px;background:var(--ui-paper);color:var(--ink,#1d2320);box-shadow:0 24px 60px rgba(0,0,0,.4)}
 .gear-mask.in .gear-panel{animation:gearin .28s ease-out}

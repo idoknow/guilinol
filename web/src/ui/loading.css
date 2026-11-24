@@ -84,7 +84,7 @@
 /* ── 三级 · 角落 ─────────────────────────────────────────── */
 .ld-corner{position:fixed;right:16px;bottom:110px;z-index:55;display:flex;align-items:center;gap:7px;padding:6px 12px 6px 9px;
   border:1px solid var(--ui-glass-line-soft);border-radius:var(--ui-r-pill);background:var(--ui-glass);
-  -webkit-backdrop-filter:var(--ui-blur);backdrop-filter:var(--ui-blur);color:var(--ui-paper);font-size:11px;letter-spacing:.08em;
+  color:var(--ui-paper);font-size:11px;letter-spacing:.08em;
   font-variant-numeric:tabular-nums;pointer-events:none;animation:ld-in .2s var(--ui-ease)}
 .ld-corner[hidden]{display:none}
 .ld-corner i,.ld-inline[aria-busy=true]:after{content:'';display:inline-block;width:12px;height:12px;box-sizing:border-box;

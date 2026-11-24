@@ -8,14 +8,12 @@
   font-size: 12px;
   letter-spacing: .1em;
   color: #f4efe2;
-  background: rgba(28, 44, 42, .42);
+  background: rgba(24, 40, 37, .64);
   border: 1px solid rgba(244, 239, 226, .38);
   border-radius: 14px;
   padding: 4px 12px;
   white-space: nowrap;
   cursor: pointer;
-  backdrop-filter: blur(6px);
-  -webkit-backdrop-filter: blur(6px);
   touch-action: manipulation;
   user-select: none;
   -webkit-user-select: none;
@@ -49,8 +47,6 @@
   background: rgba(28, 44, 42, .76);
   color: #f4efe2;
   border: 1px solid rgba(244, 239, 226, .3);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
   box-shadow: 0 14px 36px rgba(12, 20, 20, .3);
   display: grid;
   gap: 10px;

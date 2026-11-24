@@ -13,8 +13,6 @@
   border-radius: 17px;
   border: 1px solid rgba(255, 255, 255, 0.22);
   background: rgba(14, 17, 21, 0.78);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
   color: #f6f4ef;
   font-family: "PingFang SC", "Noto Sans CJK SC", "Source Han Sans SC", system-ui, sans-serif;
   font-size: 13px;
@@ -92,8 +90,6 @@ body[data-hud="street"] .gl-mission-hud {
   border-radius: 12px;
   background: rgba(14, 17, 21, 0.80);
   border: 1px solid rgba(255, 255, 255, 0.16);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
 }
 .gl-mission-hud .st-line {
   font-size: 11px;

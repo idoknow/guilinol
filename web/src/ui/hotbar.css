@@ -1,6 +1,6 @@
 /* 物品栏（IDOK-238）：底部居中、青玉玻璃两格。选中格用朱砂描边——这是「手上拿着什么」的唯一提示。 */
 .hotbar{position:fixed;left:50%;bottom:calc(12px + env(safe-area-inset-bottom));transform:translateX(-50%);z-index:4;display:flex;gap:6px;padding:5px;
-  border-radius:var(--ui-r-md);background:var(--ui-glass);border:1px solid var(--ui-glass-line-soft);backdrop-filter:var(--ui-blur);-webkit-backdrop-filter:var(--ui-blur);
+  border-radius:var(--ui-r-md);background:var(--ui-glass);border:1px solid var(--ui-glass-line-soft);
   box-shadow:var(--ui-shadow-1);user-select:none;-webkit-user-select:none;touch-action:manipulation}
 .hotbar[hidden]{display:none}
 .hotbar-slot{position:relative;width:54px;height:50px;box-sizing:border-box;padding:6px 0 4px;margin:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;

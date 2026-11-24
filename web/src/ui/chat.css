@@ -12,7 +12,7 @@
   padding: 0 12px 0 4px; border-radius: var(--ui-r-pill);
   background: var(--ui-glass, rgba(24, 40, 37, .5)); border: 1px solid var(--ui-glass-line-soft);
   color: var(--ui-paper); font: 13px/1 var(--ui-serif); text-align: left; cursor: pointer;
-  backdrop-filter: var(--ui-blur); -webkit-backdrop-filter: var(--ui-blur); -webkit-tap-highlight-color: transparent;
+  -webkit-tap-highlight-color: transparent;
   box-shadow: var(--ui-shadow-1);
   transition: background var(--ui-fast), transform var(--ui-fast), opacity var(--ui-fast);
 }
@@ -41,9 +41,8 @@
   bottom: calc(48px + env(safe-area-inset-bottom));
   display: flex; flex-direction: column;
   width: min(340px, calc(100vw - 24px)); height: 300px; box-sizing: border-box;
-  border-radius: 16px; background: rgba(24, 40, 37, .8); border: 1px solid var(--ui-glass-line-soft);
+  border-radius: 16px; background: rgba(22, 37, 34, .88); border: 1px solid var(--ui-glass-line-soft);
   box-shadow: var(--ui-shadow-2); color: var(--ui-paper); font: 13px/1.45 var(--ui-serif);
-  backdrop-filter: blur(10px) saturate(1.15); -webkit-backdrop-filter: blur(10px) saturate(1.15);
   opacity: 0; transform: translateY(10px) scale(.98); transform-origin: left bottom; pointer-events: none; visibility: hidden;
   transition: opacity .18s var(--ui-ease), transform .18s var(--ui-ease), visibility 0s .18s;
 }
