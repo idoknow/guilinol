@@ -2,10 +2,7 @@ import * as THREE from 'three'
 import type {Tile} from './world'
 
 type Point=[number,number,number]
-import * as station from './station-tunnels'
-export type Tunnel=station.Tunnel
-export {floorLevel,nearbyTunnels} from './station-tunnels'
-
+export type Tunnel={way:number,generated?:boolean,portals:[Point,Point],length:number,halfWidth:number,clearance:number,approach:number,mouths?:[boolean,boolean],joints?:({ring:[number,number][],draw:boolean}|null)[],stations:[number,number][]}
 
 function frame(tunnel:Tunnel){
   const [start,end]=tunnel.portals, ux=(end[0]-start[0])/tunnel.length,uz=(end[2]-start[2])/tunnel.length
@@ -13,19 +10,52 @@ function frame(tunnel:Tunnel){
     lateral:(x:number,z:number)=>-(x-start[0])*uz+(z-start[2])*ux,
     point:(at:number,offset:number,y:number):Point=>[start[0]+at*ux-offset*uz,y,start[2]+at*uz+offset*ux]}
 }
-export function tunnelFloor(tunnels:Tunnel[]|undefined,x:number,z:number,foot:number){
-  const local=station.nearbyTunnels(tunnels,x,z)
-  for(const tunnel of local){
-    if(tunnel.nodes){
-      const floor=station.floorLevel(tunnel,x,z)
-      if(floor!==undefined&&foot>=floor-.75&&foot<floor+tunnel.clearance-.25)return floor
-      continue
+const binsByList=new WeakMap<Tunnel[],Map<string,Tunnel[]>>()
+export function nearbyTunnels(list:Tunnel[]|undefined,x:number,z:number){
+  if(!list||list.length<8)return list??[]
+  let bins=binsByList.get(list)
+  if(!bins){
+    bins=new Map()
+    for(const tunnel of list){
+      const [a,b]=tunnel.portals,pad=tunnel.halfWidth+32
+      for(let i=Math.floor((Math.min(a[0],b[0])-pad)/256);i<=Math.floor((Math.max(a[0],b[0])+pad)/256);i++)
+        for(let j=Math.floor((Math.min(a[2],b[2])-pad)/256);j<=Math.floor((Math.max(a[2],b[2])+pad)/256);j++){
+          const key=i+','+j
+          if(!bins.has(key))bins.set(key,[])
+          bins.get(key)!.push(tunnel)
+        }
     }
-    const axes=frame(tunnel), at=axes.station(x,z)
-    if(at<0||at>tunnel.length||Math.abs(axes.lateral(x,z))>tunnel.halfWidth)continue
-    const index=tunnel.stations.findIndex(([s])=>s>=at), [end,high]=tunnel.stations[index], [start,low]=tunnel.stations[Math.max(0,index-1)]
-    const floor=low+(high-low)*(at-start)/(end-start||1)
-    if(foot>=floor-.75&&foot<floor+tunnel.clearance-.25)return floor
+    binsByList.set(list,bins)
+  }
+  return bins.get(Math.floor(x/256)+','+Math.floor(z/256))??[]
+}
+
+export function floorLevel(tunnel:Tunnel,x:number,z:number){
+  const axes=frame(tunnel),at=axes.station(x,z)
+  if(at<0||at>tunnel.length||Math.abs(axes.lateral(x,z))>tunnel.halfWidth){
+    for(const [i,joint] of (tunnel.joints??[]).entries()){
+      if(!joint)continue
+      let positive=false,negative=false
+      const ring=joint.ring
+      for(let j=0;j<ring.length;j++){
+        const [a,b]=ring[j],[c,d]=ring[(j+1)%ring.length],cross=(c-a)*(z-b)-(d-b)*(x-a)
+        positive||=cross>.00001;negative||=cross<-.00001
+        if(positive&&negative)break
+      }
+      if(!(positive&&negative))return tunnel.portals[i][1]
+    }
+    return
+  }
+  const values=tunnel.stations
+  let lo=0,hi=values.length-1
+  while(hi-lo>1){const mid=(lo+hi)>>>1;if(values[mid][0]<=at)lo=mid;else hi=mid}
+  const [a,low]=values[lo],[b,high]=values[hi]
+  return low+(high-low)*(at-a)/(b-a)
+}
+export function tunnelFloor(tunnels:Tunnel[]|undefined,x:number,z:number,foot:number){
+  for(const tunnel of nearbyTunnels(tunnels,x,z)){
+    const floor=floorLevel(tunnel,x,z)
+    if(floor!==undefined&&foot>=floor-.75&&foot<floor+tunnel.clearance-.25)return floor
   }
   return undefined
 }
@@ -35,10 +65,10 @@ export function tunnelFloor(tunnels:Tunnel[]|undefined,x:number,z:number,foot:nu
 let registered:Tunnel[]=[]
 export function registerTunnels(list:Tunnel[]|undefined){registered=list??[]}
 export function treeBlocked(x:number,y:number,z:number){
-  for(const tunnel of station.nearbyTunnels(registered,x,z)){
+  for(const tunnel of nearbyTunnels(registered,x,z)){
     const axes=frame(tunnel),at=axes.station(x,z),side=Math.abs(axes.lateral(x,z))
     if(at< -6||at>tunnel.length+6||side>tunnel.halfWidth+3)continue
-    const open=at<tunnel.approach+2||at>tunnel.length-tunnel.approach-2
+    const open=(tunnel.mouths?.[0]!==false&&at<tunnel.approach+2)||(tunnel.mouths?.[1]!==false&&at>tunnel.length-tunnel.approach-2)
     const index=Math.max(0,tunnel.stations.findIndex(([s])=>s>=at)),floor=tunnel.stations[Math.min(index,tunnel.stations.length-1)][1]
     if(open||y<floor+tunnel.clearance+.6)return true
   }
@@ -50,7 +80,8 @@ export function joinPortalRoads(tile:Tile,tunnels:Tunnel[],buffers:Float32Array[
   for(const tunnel of tunnels){
     if(tunnel.nodes)continue
     const axes=frame(tunnel)
-    for(const portal of tunnel.portals){
+    for(const [index,portal] of tunnel.portals.entries()){
+      if(tunnel.mouths?.[index]===false)continue
       if(portal[0]<tile.x-32||portal[0]>tile.x+288||portal[2]<tile.z-32||portal[2]>tile.z+288)continue
       for(const buffer of buffers)for(let index=0;index<buffer.length;index+=3){
         const x=tile.x+buffer[index],z=tile.z+buffer[index+2],s=axes.station(x,z),d=Math.abs(axes.lateral(x,z))
@@ -99,11 +130,17 @@ export function tunnelGeometry(tile:Tile,ground:THREE.PlaneGeometry,tunnels:Tunn
     const axes=frame(tunnel),width=tunnel.halfWidth,head=tunnel.clearance
     function local(s:number,d:number,y:number){const p=axes.point(s,d,y);p[0]-=tile.x;p[2]-=tile.z;return p}
     const station=(p:Point)=>axes.station(p[0]+tile.x,p[2]+tile.z),side=(p:Point)=>axes.lateral(p[0]+tile.x,p[2]+tile.z)
-    for(const [from,to] of [[0,tunnel.approach],[tunnel.length-tunnel.approach,tunnel.length]])cuts.push([p=>station(p)-from,p=>to-station(p),p=>width-side(p),p=>width+side(p)])
+    for(const [from,to] of [[0,tunnel.mouths?.[0]===false?0:tunnel.approach],[tunnel.mouths?.[1]===false?tunnel.length:tunnel.length-tunnel.approach,tunnel.length]])if(to>from)cuts.push([p=>station(p)-from,p=>to-station(p),p=>width-side(p),p=>width+side(p)])
     const quad=(points:Point[],part:keyof typeof parts)=>fan(limits.reduce((poly,plane)=>clip(poly,plane),points),parts[part])
+    for(const [i,joint] of (tunnel.joints??[]).entries()){
+      if(!joint?.draw)continue
+      const floor=tunnel.portals[i][1]
+      quad(joint.ring.map(([x,z])=>[x-tile.x,floor,z-tile.z]),'floor')
+      if(!tunnel.mouths?.[i])quad(joint.ring.map(([x,z])=>[x-tile.x,floor+head,z-tile.z]),'ceiling')
+    }
     for(let i=1;i<tunnel.stations.length;i++){
       const [a,ay]=tunnel.stations[i-1],[b,by]=tunnel.stations[i]
-      const open=(a+b)/2<tunnel.approach||(a+b)/2>tunnel.length-tunnel.approach
+      const open=(tunnel.mouths?.[0]!==false&&(a+b)/2<tunnel.approach)||(tunnel.mouths?.[1]!==false&&(a+b)/2>tunnel.length-tunnel.approach)
       const al=local(a,-width,ay),ar=local(a,width,ay),bl=local(b,-width,by),br=local(b,width,by)
       quad([al,ar,br,bl],'floor')
       const top=(p:Point):Point=>[p[0],open?Math.max(p[1],groundY(p)):p[1]+head,p[2]]
@@ -117,7 +154,7 @@ export function tunnelGeometry(tile:Tile,ground:THREE.PlaneGeometry,tunnels:Tunn
         for(const d of [-inset+.02,inset-.02])quad([local(a,d,ay+head-.95),local(b,d,by+head-.95),local(b,d,by+head-.8),local(a,d,ay+head-.8)],'lamp')
       }
       if(Math.floor(a/6)%2===0)quad([local(a,-.08,ay+.03),local(a,.08,ay+.03),local(b,.08,by+.03),local(b,-.08,by+.03)],'lane')
-      for(const [s,y] of [[a,ay]])if(Math.abs(s-tunnel.approach)<1e-6||Math.abs(s-tunnel.length+tunnel.approach)<1e-6){
+      for(const [s,y] of [[a,ay]])if((tunnel.mouths?.[0]!==false&&Math.abs(s-tunnel.approach)<1e-6)||(tunnel.mouths?.[1]!==false&&Math.abs(s-tunnel.length+tunnel.approach)<1e-6)){
         const l=local(s,-width,y+head),r=local(s,width,y+head)
         quad([l,r,[r[0],Math.max(r[1]+.16,groundY(r)),r[2]],[l[0],Math.max(l[1]+.16,groundY(l)),l[2]]],'portal')
       }

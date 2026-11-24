@@ -40,7 +40,7 @@ const OUT_FILE = process.env.PERF_OUT ?? 'captures/perf.json'
 const native=process.platform==='darwin' && process.env.QA_NATIVE_GPU!=='0'
 const mobile=process.env.PERF_MOBILE==='1'
 const viewport=mobile?{width:844,height:390}:native?{width:1920,height:1080}:{width:960,height:540}
-const launch={headless:!native,executablePath:process.env.CHROMIUM,args:[...(native?['--enable-gpu','--use-angle=metal']:['--use-angle=swiftshader','--enable-unsafe-swiftshader']),'--enable-precise-memory-info']}
+const launch={headless:!native||process.env.PERF_HEADLESS==='1',executablePath:process.env.CHROMIUM,args:[...(native?['--enable-gpu','--use-angle=metal']:['--use-angle=swiftshader','--enable-unsafe-swiftshader']),'--enable-precise-memory-info']}
 const cpuRate = Number(process.env.PERF_CPU_RATE ?? (mobile?4:1))
 const sampleMs=Number(process.env.PERF_MS??(native?10000:0))
 async function throttle(page) {

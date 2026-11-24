@@ -1,3 +1,4 @@
+import {tunnelFloor} from '../tunnels'
 import {inRegion} from '../../../lib/play-region'
 import neHall from '../../../pipeline/landmarks/central_square_ne_hall.json'
 import R from '@dimforge/rapier3d-compat'
@@ -467,6 +468,10 @@ export async function createPhysics(manifest:Manifest,stream:Stream,peaks:PeaksG
           const desc=weldedIndexed(Float32Array.from(positions.array),indices)
           if(desc)colliders.push(add(desc.setTranslation(tile.x,0,tile.z),kind))
         }
+      }else if(data?.roadBed){
+        const geometry=data.groundMesh.geometry
+        const desc=weldedIndexed(Float32Array.from(geometry.getAttribute('position').array),Array.from(geometry.index!.array))
+        if(desc)colliders.push(add(desc.setTranslation(tile.x,0,tile.z),'ground'))
       }else{
         const ground=data?fineField(data):field(256/spacing,(col,row)=>overview[start+row*stride+col]/10)
         colliders.push(add(ground.setTranslation(tile.x+128,0,tile.z+128),data?'ground':'overview'))
@@ -733,7 +738,7 @@ export async function createPhysics(manifest:Manifest,stream:Stream,peaks:PeaksG
   function overlaps(kind:Kind){return !!world.intersectionWithShape(body.translation(),identity,shape,undefined,undefined,capsule,undefined,kind==='deck'?deckFilter:coll=>kinds.get(coll.handle)===kind)}
   function clear(){for(const region of regions.values()){region.colliders.forEach(remove);region.barrierColliders.forEach(remove)}regions.clear();mountains.forEach(remove);mountains.clear();modelMountains.forEach(list=>list.forEach(remove));modelMountains.clear();trunks.forEach(remove);trunks.clear();landmarks.forEach(colliders=>colliders.forEach(remove));landmarks.clear();landmarkBounds.clear();for(const colliders of obstacleColliders.values())colliders.forEach(remove);obstacleColliders.clear()}
   function findLocalDismount(cx:number,cz:number,heading:number,bikeY:number){
-    const local=probeLocalDismount({world,capsule,shape,kinds,stream,tileAt,surface,wet,insideHouse},cx,cz,heading,bikeY)
+    const local=probeLocalDismount({world,capsule,shape,kinds,stream,tileAt,surface,wet,insideHouse,tunnelSupport},cx,cz,heading,bikeY)
     if(local||!wet(cx,cz))return local
     const tile=tileAt(cx,cz),data=tile&&stream.loaded.get(tile)
     if(!tile||!data)return null
@@ -744,14 +749,19 @@ export async function createPhysics(manifest:Manifest,stream:Stream,peaks:PeaksG
     const shore=findWalkableSpawn(cx,cz,false,true)
     return shore&&{...shore,rule:'water-rescue'}
   }
+  function tunnelSupport(x:number,z:number,refY:number){
+    const floor=tunnelFloor(manifest.tunnels,x,z,refY)
+    if(floor===undefined)return null
+    return surface(x,z,'road',floor+.15,.3)
+  }
   function findLocalMount(px:number,py:number,pz:number,bx:number,by:number,bz:number){
-    return probeLocalMount({world,capsule,shape,kinds,stream,tileAt,surface,wet,insideHouse},px,py,pz,bx,by,bz)
+    return probeLocalMount({world,capsule,shape,kinds,stream,tileAt,surface,wet,insideHouse,tunnelSupport},px,py,pz,bx,by,bz)
   }
   function findCarDismount(cx:number,cz:number,heading:number,carY:number){
-    return probeCarDismount({world,capsule,shape,kinds,stream,tileAt,surface,wet,insideHouse},cx,cz,heading,carY)
+    return probeCarDismount({world,capsule,shape,kinds,stream,tileAt,surface,wet,insideHouse,tunnelSupport},cx,cz,heading,carY)
   }
   function findCarMount(px:number,py:number,pz:number,cx:number,cy:number,cz:number){
-    return probeCarMount({world,capsule,shape,kinds,stream,tileAt,surface,wet,insideHouse},px,py,pz,cx,cy,cz)
+    return probeCarMount({world,capsule,shape,kinds,stream,tileAt,surface,wet,insideHouse,tunnelSupport},px,py,pz,cx,cy,cz)
   }
   function carOverlap(x:number,footY:number,z:number,heading:number,dirSign:-1|0|1=0){
     const fx=-Math.sin(heading),fz=-Math.cos(heading),rx=Math.cos(heading),rz=-Math.sin(heading)

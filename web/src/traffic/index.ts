@@ -148,6 +148,8 @@ export async function traffic(scene:THREE.Scene,camera:THREE.Camera,verify:boole
       }
       let variant=variants.get(actor)
       if(!variant){variant=models.variant(actor.kind,Math.random(),Math.random());variants.set(actor,variant)
+        const axles=models.axles.get(variant.geometry)
+        if(axles)[actor.frontAxle,actor.rearAxle,actor.halfTrack]=axles
         const geometry=models.geometries[variant.geometry];if(!geometry.boundingBox)geometry.computeBoundingBox()
         const {min,max}=geometry.boundingBox!;actor.halfWidth=Math.max(-min.x,max.x);actor.halfLength=Math.max(-min.z,max.z);actor.height=max.y
       }

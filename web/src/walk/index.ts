@@ -1390,7 +1390,7 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
     }
     return ready
   }
-  async function enter(x:number,z:number,heading:number,reason:string,override=false,signal?:AbortSignal,progress?:(fraction:number,detail:string)=>void){
+  async function enter(x:number,z:number,heading:number,reason:string,override=false,signal?:AbortSignal,progress?:(fraction:number,detail:string)=>void,fixtureFloor?:number){
     if(!sim.withinBounds(x,z)){
       if(!manifest.region)return false
       const point=nearestPlayable(manifest,x,z)

@@ -1,0 +1,159 @@
+"""Build the negative-layer lane network from the same OSM ways used by traffic."""
+from collections import defaultdict
+import math
+
+from shapely.geometry import MultiPoint
+from heapq import heapify, heappop, heappush
+
+
+def underground(tags):
+    try:
+        below = float(tags.get('layer', 0)) < 0
+    except ValueError:
+        below = False
+    return tags.get('tunnel', 'no') != 'no' or below
+
+
+def sections(lanes, source_ways, existing):
+    saved = {t['way'] for t in existing}
+    edges, surface_nodes = {}, set()
+    for lane in lanes:
+        a, b = lane['from'], lane['to']
+        if lane.get('structure') != 'tunnel' or lane['way'] in saved:
+            surface_nodes.update((a, b))
+            continue
+        a, b = sorted((a, b))
+        key = lane['way'], a, b
+        edge = edges.setdefault(key, dict(way=lane['way'], a=a, b=b, halfWidth=0,
+                                          clearance=2.5, cls=lane['cls']))
+        edge['halfWidth'] = max(edge['halfWidth'], abs(lane['offset'])+lane['width']/2+.5)
+        if lane['kind'] != 'nonmotor':
+            edge['clearance'] = 4.5
+    adjacent = defaultdict(set)
+    for edge in edges.values():
+        a,b = edge['a'],edge['b']
+        adjacent[a].add(b)
+        adjacent[b].add(a)
+    # Private surface roads also identify mouths although they do not spawn traffic.
+    for way in source_ways:
+        tags=way.get('tags',{})
+        if way['type']=='way' and tags.get('highway') and not underground(tags):
+            surface_nodes.update(n for n in way['nodes'] if n in adjacent)
+    # An underground dead end without a surface connection remains an end,
+    # rather than an invented interchange with a road above it.
+    return dict(edges=list(edges.values()), portals=sorted(surface_nodes.intersection(adjacent)),
+                ends=sorted(n for n in adjacent if len(adjacent[n])==1))
+
+
+def solve(network, nodes, samples):
+    """Interpolate across connected ways. Internal OSM vertices are not portals."""
+    heights = {int(node): level for node, level in samples['heights'].items()}
+    mouths = set(network['portals'])
+    adjacency = defaultdict(list)
+    limits = {}
+    alignments = []
+    for edge, roof in zip(network['edges'], samples['roofs'], strict=True):
+        start, end = nodes[edge['a']], nodes[edge['b']]
+        length = math.hypot(end['x']-start['x'], end['z']-start['z'])
+        approach = min(length*.4, 18.)
+        count = len(roof)-1
+        # Distinct integer indices for interior samples; OSM IDs are positive.
+        keys = [edge['a']] + [-1-len(alignments)-i*len(network['edges']) for i in range(count-1)] + [edge['b']]
+        cap = {'motorway':.04, 'trunk':.04, 'primary':.05, 'secondary':.06,
+               'tertiary':.07}.get(edge['cls'], .08)
+        step = length/count
+        for i, (key, ceiling) in enumerate(zip(keys,roof)):
+            open_ramp = ((keys[0] in mouths and i*step < approach) or
+                         (keys[-1] in mouths and length-i*step < approach))
+            bound = ceiling-edge['clearance']-.05 if not open_ramp else math.inf
+            if key in mouths:
+                bound = min(bound, heights[key])
+            limits[key] = min(limits.get(key,math.inf),bound)
+            if i:
+                # Reserve slope for the short eased transitions at each knot.
+                budget = step*cap*.94
+                adjacency[key].append((keys[i-1],budget))
+                adjacency[keys[i-1]].append((key,budget))
+        alignments.append((edge,keys,length,approach,step,roof))
+
+    constraints=[]
+    seen=set()
+    for key in adjacency:
+        if key in seen:
+            continue
+        component=set()
+        pending=[key]
+        while pending:
+            node=pending.pop()
+            if node in component:
+                continue
+            component.add(node)
+            pending.extend(neighbor for neighbor,_ in adjacency[node])
+        seen.update(component)
+        portal_levels=[heights[n] for n in component & mouths]
+        if len(portal_levels)<2:
+            constraints.append(dict(reason='missingPortalAnchor',
+                                    ways=sorted({edge['way'] for edge,keys,*_ in alignments if keys[0] in component}),
+                                    surfaceNodes=sorted(component & mouths)))
+        if portal_levels:
+            for n in component:
+                limits[n]=min(limits[n],max(portal_levels))
+
+    # A multi-source shortest-path envelope respects every roof and the grade
+    # of every connecting edge. At a fixed mouth it gives the highest
+    # achievable invert, even when two connected ways have different limits.
+    queue = [(y,key) for key,y in limits.items() if math.isfinite(y)]
+    heapify(queue)
+    while queue:
+        y,key = heappop(queue)
+        if y != limits[key]:
+            continue
+        for neighbor, budget in adjacency[key]:
+            candidate = y+budget
+            if candidate < limits[neighbor]:
+                limits[neighbor] = candidate
+                heappush(queue,(candidate,neighbor))
+
+    generated, conflicts = [], constraints
+    for edge,keys,length,approach,step,roof in alignments:
+        a,b=keys[0],keys[-1]
+        for key in (a,b):
+            if key in mouths and heights[key]-limits[key]>.05:
+                conflicts.append(dict(way=edge['way'],node=key,road=heights[key],
+                                      floor=limits[key],approachCut=heights[key]-limits[key]))
+        levels = [limits[key] for key in keys]
+        stations = []
+        for i in range(len(keys)-1):
+            dy = levels[i+1]-levels[i]
+            for t in (0.,.06,.94):
+                blend = .06
+                u = (t*t/(2*blend) if t<=blend else t-blend/2)/(1-blend)
+                stations.append([round(step*(i+t),5),round(levels[i]+dy*u,5)])
+        stations.append([length,levels[-1]])
+        start,end = nodes[a],nodes[b]
+        generated.append(dict(way=edge['way'],generated=True,length=length,
+                              halfWidth=edge['halfWidth'],clearance=edge['clearance'],
+                              portals=[[start['x'],levels[0],start['z']],
+                                       [end['x'],levels[-1],end['z']]],
+                              mouths=[a in mouths,b in mouths],approach=approach,stations=stations))
+    # Fill the wedge between the two end sections on the outside of a bend.
+    # All incident strips share the node elevation. Only one draws the patch.
+    incident=defaultdict(list)
+    for tunnel,(edge,*_) in zip(generated,alignments):
+        p,q=tunnel['portals']
+        dx=(q[0]-p[0])/tunnel['length']
+        dz=(q[2]-p[2])/tunnel['length']
+        w=tunnel['halfWidth']
+        for i,(key,center) in enumerate(zip((edge['a'],edge['b']),(p,q))):
+            points=[(center[0]-side*dz*w,center[2]+side*dx*w) for side in (-1,1)]
+            incident[key].append((tunnel,i,points))
+    for entries in incident.values():
+        if len(entries)<2:
+            continue
+        hull=MultiPoint([pt for _,_,points in entries for pt in points]).convex_hull
+        if hull.area<.001:
+            continue
+        ring=[[round(x,4),round(z,4)] for x,z in list(hull.exterior.coords)[:-1]]
+        for owner,(tunnel,i,_) in enumerate(entries):
+            tunnel.setdefault('joints',[None,None])[i]=dict(ring=ring,draw=owner==0)
+    return generated,conflicts

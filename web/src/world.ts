@@ -2,7 +2,8 @@ import {cacheResponse} from './telemetry'
 import * as THREE from 'three'
 import {buildingGeometry,type Building} from './buildings'
 import {loadStreetGeometry} from './street-loader'
-import type {StationPavingStyle,Streets} from './street-worker'
+import {mergeGeometries} from 'three/addons/utils/BufferGeometryUtils.js'
+import type {Streets} from './street-worker'
 import {bridgeGeometry} from './look/bridge'
 import {look} from './look/config'
 import {nightGround} from './look/night'
@@ -353,9 +354,29 @@ export async function detail(tile:Tile, signal:AbortSignal, parseSlot?:()=>Promi
   group.add(groundMesh)
   const tunnel=tunnels?tunnelGeometry(tile,geometry,tunnels):null
   if(tunnel){
-    if(tunnel.fringe){tunnel.fringe.material.dispose();tunnel.fringe.material=material}
-    if('lining' in tunnel)group.add(tunnel.floor,tunnel.portal,tunnel.interior)
-    else group.add(...Object.values(tunnel))
+    tunnel.fringe.material.dispose()
+    tunnel.fringe.material=material
+    if(tunnels?.every(t=>t.generated)){
+      // Keep the unshifted floor and wall meshes for Rapier. Submit visible
+      // surfaces with the existing city street batch, including reflections.
+      group.add(tunnel.fringe)
+      const geometries=streets.surface?[streets.surface]:[]
+      for(const [part,mesh] of Object.entries(tunnel)){
+        if(part==='fringe')continue
+        const geom=mesh.geometry,count=geom.getAttribute('position').count
+        if(!count)continue
+        const colors=new Float32Array(count*3)
+        for(let i=0;i<count;i++)mesh.material.color.toArray(colors,i*3)
+        geom.setAttribute('color',new THREE.BufferAttribute(colors,3))
+        geom.setAttribute('aAlong',new THREE.Float32BufferAttribute(new Float32Array(count),1))
+        geom.setAttribute('aSurface',new THREE.Uint8BufferAttribute(new Uint8Array(count).fill(part==='floor'?0:2),1))
+        geometries.push(geom)
+      }
+      const combined=mergeGeometries(geometries)
+      if(!combined)throw Error('Incompatible tunnel and street geometry')
+      streets.surface?.dispose()
+      streets.surface=combined
+    }else group.add(...Object.values(tunnel))
   }
   const pond = chunkWater(water,underlay,tile.x,tile.z)
   const walls = vertices ? buildingGeometry(positions,normals,indices,rings) : null

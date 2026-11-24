@@ -4,28 +4,34 @@ import {gunzipSync} from 'node:zlib'
 import {createServer} from 'vite'
 import {chromium} from 'playwright'
 import {browserOptions} from './qa-browser.mjs'
-import {poseAt,trackHeight} from '../web/src/traffic/sim'
+import {contactPose} from '../web/src/traffic/lane-surface'
+import {trackHeight} from '../web/src/traffic/sim'
 
-const graph=JSON.parse(gunzipSync(fs.readFileSync('public/world/roads/graph.json.gz')).toString())
-const nodes=new Map(graph.nodes.map(n=>[n.id,n]))
+import path from 'node:path'
 import {sites} from './vehicle-grounding-sites'
 const output='captures/vehicle-grounding/views'
 fs.mkdirSync(output,{recursive:true})
-const server=await createServer({root:'web',configFile:'web/vite.config.ts',server:{port:0,host:'127.0.0.1'}})
-await server.listen()
+const baseline=process.argv[2]
+if(!baseline)throw Error('Pass the main checkout with its matching public/world')
 const browser=await chromium.launch(browserOptions())
-try{
+async function capture(side:'before'|'after',checkout:string){
+  const root=path.resolve(checkout)
+  const graph=JSON.parse(gunzipSync(fs.readFileSync(path.join(root,'public/world/roads/graph.json.gz'))).toString())
+  const nodes=new Map(graph.nodes.map(n=>[n.id,n]))
+  const server=await createServer({root:path.join(root,'web'),configFile:path.join(root,'web/vite.config.ts'),server:{port:0,host:'127.0.0.1'}})
+  await server.listen()
   const page=await browser.newPage({viewport:{width:800,height:500}})
+  try{
   await page.goto(server.resolvedUrls.local[0]+'?verify&flow=0&traffic=0&radius=256&time=14')
   await page.waitForFunction(()=>window.viewer?.stats.firstMs>0,null,{timeout:120000})
   await page.addStyleTag({content:'body > :not(canvas){visibility:hidden!important}'})
   for(const [name,id,f] of sites){
     const lane=graph.lanes.find(l=>l.id===id),a=nodes.get(lane.from),b=nodes.get(lane.to)
     const length=Math.hypot(b.x-a.x,b.z-a.z),dx=(b.x-a.x)/length,dz=(b.z-a.z)/length
-    const x=a.x+dx*length*f-dz*lane.offset,z=a.z+dz*length*f+dx*lane.offset,y=poseAt(lane.wheelPose,f,1)
-    for(const side of ['before','after']){
-      const pitch=side==='after'?poseAt(lane.wheelPose,f,2):0,roll=side==='after'?poseAt(lane.wheelPose,f,3):0
-      const cy=side==='after'?y:trackHeight({...lane,wheelPose:undefined,start:a,end:b,length},f*length)
+    const x=a.x+dx*length*f-dz*lane.offset,z=a.z+dz*length*f+dx*lane.offset
+    const track={...lane,length,start:a,end:b}
+    const {pitch,roll,y}=side==='after'?contactPose(track,f*length):{pitch:0,roll:0,y:trackHeight(track,f*length)}
+    const cy=y
       await page.evaluate(async({x,y,z,dx,dz,cy,pitch,roll})=>{
         const v=window.viewer,scene=v.stream.scene
         let sedan=scene.getObjectByName('grounding-fixture')
@@ -44,7 +50,8 @@ try{
       },{x,z},{timeout:120000})
       await page.evaluate(()=>new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r))))
       await page.screenshot({path:output+'/'+name+'-'+side+'.png'})
-    }
-    console.log(name)
+    console.log(name,side)
   }
-}finally{await browser.close();await server.close()}
+  }finally{await page.close();await server.close()}
+}
+try{await capture('before',baseline);await capture('after','.')}finally{await browser.close()}

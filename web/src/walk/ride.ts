@@ -199,6 +199,7 @@ export interface DismountContext {
   stream: Stream
   tileAt: (x:number, z:number)=>Tile|undefined
   surface: (x:number, z:number, kind:Kind, origin?:number, reach?:number)=>SurfaceHit
+  tunnelSupport?: (x:number,z:number,refY:number)=>SurfaceHit
   wet: (x:number, z:number)=>boolean
   insideHouse: (x:number, z:number)=>boolean
 }
@@ -333,6 +334,8 @@ function isWallBlocker(kind: Kind | undefined) {
 }
 
 function localSupport(ctx: DismountContext, x: number, z: number, refY: number) {
+  const bore=ctx.tunnelSupport?.(x,z,refY)
+  if(bore)return bore
   const deck = ctx.surface(x, z, 'deck', refY + .35, 1.4)
   const validDeck = deck && deck.y <= refY + .35 ? deck : null
   const lm = ctx.surface(x, z, 'landmark', refY + .35, 1.4)

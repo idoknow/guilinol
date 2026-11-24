@@ -109,6 +109,8 @@ function segmentBlocked(ctx: DismountContext, x0: number, z0: number, x1: number
 }
 
 function localSupport(ctx: DismountContext, x: number, z: number, refY: number) {
+  const bore=ctx.tunnelSupport?.(x,z,refY)
+  if(bore)return bore
   const deck = ctx.surface(x, z, 'deck', refY + .55, 1.8)
   const validDeck = deck && deck.y <= refY + .55 ? deck : null
   const lm = ctx.surface(x, z, 'landmark', refY + .55, 1.8)
