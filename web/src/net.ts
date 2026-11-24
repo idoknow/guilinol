@@ -86,11 +86,11 @@ export function attachNet(scene:Scene,clips:AnimationClip[],getPose:()=>Pose,get
   // 切后台/关页面时干净收尾：手机浏览器经常直接冻结 WebSocket，主动关掉能立刻把服务端名额还回去，
   // 不用等心跳超时——这也是「同一账号第二次连不上」的常见来源。
   const pageHide=()=>{
-    clearTimeout(timer)
+    clearTimeout(timer);generation++
     const ws=socket;socket=undefined
     if(ws){ws.onopen=ws.onmessage=ws.onclose=ws.onerror=null;try{ws.close(1000,'pagehide')}catch{}}
   }
-  const pageShow=()=>{if(!disposed&&!socket&&(state==='offline'||state==='connecting'))retry(500)}
+  const pageShow=()=>{if(!disposed&&!socket&&account)retry(500)}
   window.addEventListener('pagehide',pageHide)
   window.addEventListener('pageshow',pageShow)
   const manual=()=>{if(!disposed){stop();attempt=0;void connect()}}
