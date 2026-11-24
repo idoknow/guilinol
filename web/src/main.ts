@@ -503,6 +503,7 @@ async function start(loader:FullLoader,creatorSpawn=false) {
     resume(){previous=0;renderer.setAnimationLoop(animate)},
     probeFoot(){
       const ray = new THREE.Raycaster(camera.position,new THREE.Vector3(0,-1,0))
+      ray.layers.enable(MAIN_DETAIL_LAYER)
       const clearance = ray.intersectObjects(scene.children)[0]?.distance
       ray.setFromCamera(new THREE.Vector2(0,0),camera)
       const hits = ray.intersectObjects(scene.children)

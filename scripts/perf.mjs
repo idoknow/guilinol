@@ -19,9 +19,9 @@ const expansion = process.argv.includes('--expansion')
 if(process.argv.includes('--water')){
   CAMERAS.length=0
   for(const [id,eye,target,hour] of [
-    ['sanduo',[-1143,158,-43],[-1139,158,-55],20],
+    ['sanduo',[-1150,159.2,-47],[-1134,157.1,-50],20],
     ['lijiang',[-265,168,15],[-145,153,45],15],
-    ['ronghu',[-1310,160,359],[-1365,145,304],15],
+    ['ronghu',[-1385,155.5,234],[-1432,146,237],15],
     ['shanhu',[-983,157,476],[-1019,150,433],15],
   ])CAMERAS.push({id,label:id,eye,target,mode:'walk',query:`verify&solo=1&flow=0&time=${hour}`})
 }
@@ -125,13 +125,13 @@ try {
     await page.goto(`${baseUrl}/?${cam.query}${trafficQuery}`)
     if(cam.eye||cam.id==='street-jiefang'){
       await page.waitForFunction(()=>window.viewer?.walk?.active,null,{timeout:120000})
-      await page.evaluate(async({eye,target:look})=>{
+      await page.evaluate(async({eye,target:look,offsetPlayer})=>{
         const viewer=window.viewer
-        if(!await viewer.walkTo(eye[0],eye[2],0,'perf-walk'))throw Error('Could not place walker')
+        if(!await viewer.walkTo(offsetPlayer?eye[0]-6:eye[0],eye[2],0,'perf-walk'))throw Error('Could not place walker')
         const tick=viewer.walk.tick.bind(viewer.walk)
         const target=viewer.perfTarget=look
         viewer.walk.tick=elapsed=>{tick(elapsed);viewer.camera.position.set(...eye);viewer.camera.lookAt(...target);viewer.camera.updateMatrixWorld()}
-      },{eye:cam.eye??[-265,168,15],target:cam.target??[-145,153,45]})
+      },{eye:cam.eye??[-265,168,15],target:cam.target??[-145,153,45],offsetPlayer:cam.id==='sanduo'||cam.id==='ronghu'})
       if(trafficQuery)await page.waitForFunction(()=>window.viewer.trafficProbe?.loads.at(-1)?.key==='-1_0',null,{timeout:180000})
     }
     await page.waitForFunction(mode => {

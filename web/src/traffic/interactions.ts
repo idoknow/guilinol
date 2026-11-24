@@ -1,4 +1,5 @@
 import {Raycaster,Vector3,type Camera,type Scene} from 'three'
+import {MAIN_DETAIL_LAYER} from '../look/mirror-layer'
 import {npcDefaults} from '../../../lib/npc'
 import {rideSoundMuted,RIDE_SOUND_EVENT,masterVolume,VOLUME_EVENT} from '../walk/ride-sound-pref'
 import type {Traffic} from './sim'
@@ -10,6 +11,7 @@ export function interactions(scene:Scene,camera:Camera,rules:typeof npcDefaults)
   let audio:AudioContext|undefined,activeHorns=0,sequence=0,previous:Vector3|undefined,said:SpeechSynthesisUtterance|undefined
   const states=new WeakMap<Actor,State>(),bubbles=new Map<Actor,{element:HTMLElement,until:number,checkAt:number,occluded:boolean}>()
   const hotspot=new Vector3(),direction=new Vector3(),ray=new Raycaster()
+  ray.layers.enable(MAIN_DETAIL_LAYER)
   const interval=(walk:boolean)=>walk?15+Math.random()*30:10+Math.random()*20
   const pick=(lines:string[])=>lines[Math.floor(Math.random()*lines.length)]
   let output:GainNode|undefined,level=masterVolume(),muted=rideSoundMuted()
