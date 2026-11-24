@@ -40,7 +40,7 @@ export async function adminRoute({path,method,params={},body={},actor},{transact
       const id=body.id===undefined?null:integer(body.id,1,Number.MAX_SAFE_INTEGER)
       let result
       if(path==='words/delete')result=await rows('delete from chat_words where id=$1 returning *',[id]);else{
-        const word=string(body.word,100),category=string(body.category,80);check(['block','review'].includes(body.action)&&typeof body.enabled==='boolean')
+        const word=string(body.word,100),category=string(body.category,80);check(['block','review','allow'].includes(body.action)&&typeof body.enabled==='boolean')
         const args=[word,category,body.action,body.enabled,actor,Date.now()];result=id?await rows('update chat_words set word=$1,category=$2,action=$3,enabled=$4,actor=$5,updated_at=$6 where id=$7 returning *',[...args,id]):await rows('insert into chat_words(word,category,action,enabled,actor,updated_at) values($1,$2,$3,$4,$5,$6) returning *',args)
       }
       check(result[0],404);await audit(db,actor,path,result[0].id,{reason,word:result[0]});return result[0]

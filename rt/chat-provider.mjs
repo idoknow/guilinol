@@ -1,10 +1,3 @@
-const fold=text=>text.normalize('NFKC').toLowerCase().replace(/[\s\p{Cf}]/gu,'')
-export function localResult(text,words){
-  const input=fold(text),hits=words.filter(row=>row.enabled&&input.includes(fold(row.word)))
-  const hit=hits.find(row=>row.action==='block')??hits[0]
-  return hit&&{status:hit.action==='block'?'blocked':'pending',provider:'local',label:hit.action,summary:{wordId:hit.id}}
-}
-
 export function wechat(env,request=fetch){
   let token,expires=0
   const enabled=!!(env.WX_APPID&&env.WX_SECRET)
@@ -13,7 +6,7 @@ export function wechat(env,request=fetch){
     if(!response.ok)throw Error('upstream_http')
     return response.json()
   }
-  return {name:enabled?'wechat':'未启用',available:openid=>enabled&&!!openid,async check(text,openid){
+  return {name:enabled?'wechat':'未配置',available:openid=>enabled&&!!openid,async check(text,openid){
     for(let attempt=0;attempt<2;attempt++){
       if(!token||Date.now()>=expires){
         const result=await json('https://api.weixin.qq.com/cgi-bin/token?'+new URLSearchParams({grant_type:'client_credential',appid:env.WX_APPID,secret:env.WX_SECRET}))
@@ -29,8 +22,8 @@ export function wechat(env,request=fetch){
   }}
 }
 
-export async function moderate(input,words,policy,provider){
-  const local=localResult(input.text,words)
+export async function moderate(input,match,policy,provider){
+  const local=match(input.text)
   if(local)return local
   if(!provider.available(input.openid))return {provider:'none',label:policy==='local_only'?'local_only':'unavailable',status:policy==='local_only'?'normal':'pending'}
   try{
