@@ -1,7 +1,7 @@
 {
   "world": "world-a11731a5dafd",
   "main": "27dabe1",
-  "candidateRevision": "3a916e3e9dc22e81fb16d1f23b521dc1a2046e86",
+  "candidateRevision": "1e79beb615aa35afd234ace8581556e31d1fe7c7",
   "baseline": {
     "tunnelConstraintRecords": 0,
     "partialTunnelWays": [
@@ -169,24 +169,24 @@
     "gradedApproaches": 470,
     "partialTunnelWays": [],
     "reasons": {
-      "surface": 962,
+      "surface": 909,
       "tunnel": 0,
-      "fit": 19,
+      "fit": 20,
       "hidden": 0
     },
     "lanes": 88050,
     "wheelSamples": 7699956,
-    "outliers": 981,
-    "sunk": 520,
-    "floating": 461,
+    "outliers": 929,
+    "sunk": 494,
+    "floating": 435,
     "p99": 0.024,
-    "nonplanarFootprints": 199,
+    "nonplanarFootprints": 179,
     "unresolvedTunnelWays": []
   },
   "byLayer": {
-    "at-grade": 533,
+    "at-grade": 483,
     "bridge": 420,
-    "tunnel": 28
+    "tunnel": 26
   },
   "station": {
     "laneAudit": {
@@ -303,14 +303,14 @@
       "requested": 373,
       "runs": 785,
       "completed": 633,
-      "passSites": 260,
-      "overLimit": 13,
-      "maximum": 0.43007018539142905,
+      "passSites": 257,
+      "overLimit": 14,
+      "maximum": 0.43897564046790194,
       "failures": {
-        "collision": 133,
-        "tool": 19
+        "collision": 132,
+        "tool": 20
       },
-      "unavailable": 2,
+      "unavailable": 0,
       "wulingAnd385796474": [
         {
           "id": 628737319,
@@ -329,7 +329,7 @@
           "boundary": false,
           "direction": "in",
           "completed": true,
-          "maximum": 0.004923238057017443,
+          "maximum": 0.004928523976843735,
           "obstacle": ""
         },
         {
@@ -339,7 +339,7 @@
           "boundary": false,
           "direction": "out",
           "completed": true,
-          "maximum": 0.0029568543357925137,
+          "maximum": 0.002962260625935187,
           "obstacle": ""
         },
         {
@@ -369,7 +369,7 @@
           "boundary": false,
           "direction": "in",
           "completed": true,
-          "maximum": 0.02280157944005623,
+          "maximum": 0.022867072825334844,
           "obstacle": ""
         },
         {
@@ -379,7 +379,7 @@
           "boundary": false,
           "direction": "out",
           "completed": true,
-          "maximum": 0.0029568543357925137,
+          "maximum": 0.0029568543358209354,
           "obstacle": ""
         },
         {
@@ -392,7 +392,29 @@
           "maximum": 0.022939743019094294,
           "obstacle": ""
         }
-      ]
+      ],
+      "worstCompletedRun": {
+        "id": 628737326,
+        "way": 259013206,
+        "mode": "car",
+        "boundary": false,
+        "direction": "in",
+        "completed": true,
+        "maximum": 0.43897564046790194,
+        "obstacle": ""
+      },
+      "failuresByMode": {
+        "collision": {
+          "car": 127,
+          "foot": 5
+        },
+        "tool": {
+          "car": 11,
+          "bicycle": 2,
+          "bike": 2,
+          "foot": 5
+        }
+      }
     },
     "accessDecision": {
       "inputEntries": 375,
@@ -436,7 +458,7 @@
     },
     "candidate": {
       "cells": 1170,
-      "total": 14767808,
+      "total": 14755735,
       "p99": 52895
     }
   },
@@ -447,13 +469,13 @@
   "regressions": {
     "strict": {
       "main": 2922,
-      "candidate": 3437,
+      "candidate": 2969,
       "counts": {
         "streetOverflow": 0,
         "buildingOnRoad": 1175,
         "unevenRoad": 77,
-        "textureIssue": 599,
-        "otherBasic": 1586
+        "textureIssue": 72,
+        "otherBasic": 1645
       },
       "subtypes": {
         "streetOverflow": {},
@@ -470,13 +492,14 @@
         "textureIssue": {
           "roadGap": 4,
           "uvStretch": 12,
-          "zFighting": 583
+          "zFighting": 56
         },
         "otherBasic": {
           "floatingOrBuried": 74,
           "invisibleColliderOnRoad": 4,
           "landmarkOverlap": 1,
-          "propOnCarriageway": 1507
+          "propOnCarriageway": 1507,
+          "tunnelClearance": 59
         }
       }
     },
@@ -503,30 +526,14 @@
     }
   },
   "performance": {
-    "mobileFailed": [
-      {
-        "view": "palace",
-        "metric": "triangles",
-        "ratio": 1.0513037010232595
-      },
-      {
-        "view": "palace",
-        "metric": "mirrorTriangles",
-        "ratio": 1.0516911360099386
-      },
-      {
-        "view": "walk-palace",
-        "metric": "geometries",
-        "ratio": 1.051948051948052
-      }
-    ],
+    "mobileFailed": [],
     "desktopFailed": [],
     "mobileHeap": {
-      "overview": 1.0410822844568959,
-      "lijiang": 1.024993566041606,
-      "palace": 1.0148172276848983,
-      "south": 1.0199240460021821,
-      "walk-palace": 1.0053064991346934
+      "overview": 1.0437805723067213,
+      "lijiang": 1.025170582518713,
+      "palace": 0.9942602019792758,
+      "south": 1.0190733975334172,
+      "walk-palace": 1.0096879227697662
     }
   },
   "railCrossings": [
@@ -614,7 +621,7 @@
   },
   "priorityWheelSites": {
     "1024505844": 0.20123989810659282,
-    "78739": 0.010686295165186266
+    "78739": 0.008856108189689849
   },
   "round5Evidence": {
     "inherited": [
@@ -632,5 +639,95 @@
       "mobile performance"
     ],
     "strictFloorFindings": 536
+  },
+  "round6Evidence": {
+    "inherited": [
+      "desktop performance",
+      "rail crossings",
+      "station bed clearance",
+      "object relocation coordinates",
+      "view sheets"
+    ],
+    "new": [
+      "wheel audit",
+      "portal runs",
+      "fixed driving sites",
+      "strict scene audit",
+      "mobile performance"
+    ],
+    "auditCommits": [
+      "cea7e1ca",
+      "0fcda48f"
+    ],
+    "canal": [
+      {
+        "node": 9457383800,
+        "way": 1025751314,
+        "osmVersion": 2,
+        "osmTags": {
+          "highway": "service",
+          "layer": "-1"
+        },
+        "osmHistory": "https://www.openstreetmap.org/way/1025751314/history",
+        "wayLengthM": 144.21,
+        "residentialOverlapM": 9.55,
+        "classification": "undetermined"
+      },
+      {
+        "node": 9531714412,
+        "way": 1034716138,
+        "osmVersion": 3,
+        "osmTags": {
+          "highway": "service",
+          "layer": "-1"
+        },
+        "osmHistory": "https://www.openstreetmap.org/way/1034716138/history",
+        "wayLengthM": 46.42,
+        "residentialOverlapM": 11.32,
+        "classification": "undetermined"
+      }
+    ],
+    "priorityWheelRegressions": {
+      "690911289": {
+        "maximum": 0.06666868139058124,
+        "outliers": 0
+      },
+      "977910228": {
+        "maximum": 0.187372098791883,
+        "outliers": 0
+      }
+    },
+    "affectedRoads": {
+      "ways": 107,
+      "lanes": 197,
+      "mostFrequentWays": {
+        "631243399": 145,
+        "710595378": 89,
+        "988474372": 32,
+        "815075448": 32,
+        "1415311069": 31,
+        "453624505": 22,
+        "882767820": 21,
+        "1041696095": 21,
+        "368350139": 20,
+        "347655716": 20
+      }
+    },
+    "poseComparisonOnRound5World": {
+      "977910228": {
+        "round4Pose": 2.8219947877913683,
+        "round5Pose": 6.362217717802764
+      },
+      "690911289": {
+        "round4Pose": 2.0720413218019473,
+        "round5Pose": 3.8313877008508825
+      }
+    },
+    "trafficHeights": {
+      "motorLanes": 84941,
+      "errorsOver0_3m": 0,
+      "maximum": 0.03,
+      "parkingMaximum": 0.05
+    }
   }
 }
