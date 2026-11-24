@@ -11,6 +11,7 @@ assert(mainDist && prDist, 'Usage: node scripts/perf-drive.mjs MAIN_DIST PR_DIST
 const views = ['overview', 'lijiang', 'palace', 'south', 'walk-palace']
 const servers = [], raw = [], summary = []
 const quantile = (values, fraction) => [...values].sort((left, right) => left - right)[Math.ceil(values.length * fraction) - 1]
+const resourceLimit=(view,metric)=>metric==='textures'||(view==='overview'&&metric==='calls')?1:1.05
 const rounds=Number(process.env.PERF_ROUNDS??5)
 assert(Number.isInteger(rounds)&&rounds>0)
 const output = 'captures/drive-perf'
@@ -29,14 +30,19 @@ try {
       await page.goto(`${url}/?verify&flow=0&time=10&${process.env.PERF_TRAFFIC==='1'?'traffic=1&':''}${view==='walk-palace'?'mode=walk':`cam=${view}`}`)
       await page.waitForFunction(walking => {
         const viewer = window.viewer
-        if (!viewer?.stats.firstMs || viewer.stats.pending || viewer.stream.forest.pending.size || (walking && !viewer.walk?.active)) return false
+        if (!viewer?.stats.firstMs || viewer.stats.pending || viewer.stream.updateLandmarks?.pendingCount?.() || viewer.stream.forest.pending.size || (walking && !viewer.walk?.active)) return false
         const pos = walking ? viewer.walk.position : viewer.camera.position
         return viewer.manifest.chunks.every(tile => {
           const distance = Math.hypot(tile.x+128-pos.x,tile.z+128-pos.z)
           return (distance>viewer.stream.radius || viewer.stream.loaded.has(tile)) && (distance>1682 || viewer.stream.forest.loaded.has(tile))
         })
       }, view==='walk-palace', {timeout:120000})
-      await page.evaluate(async () => {for(let frame=0;frame<12;frame++) await new Promise(requestAnimationFrame)})
+      if(view==='walk-palace'&&process.env.PERF_TRAFFIC==='1'){
+        await page.waitForFunction(()=>window.viewer.trafficProbe?.allMotors?.length>0,null,{timeout:120000})
+        // Let both fleets stream their visible character templates and upload
+        // textures before recording the resident geometry and texture peaks.
+        await page.evaluate(async()=>{for(let frame=0;frame<180;frame++)await new Promise(requestAnimationFrame)})
+      }else await page.evaluate(async()=>{for(let frame=0;frame<12;frame++)await new Promise(requestAnimationFrame)})
       await cdp.send('HeapProfiler.collectGarbage')
       const heap = (await cdp.send('Runtime.getHeapUsage')).usedSize
       const frames = await page.evaluate(async count => {
@@ -52,7 +58,7 @@ try {
         return frames
       }, count)
       const sha = (await (await fetch(`${url}/version.json`)).json()).sha
-      const traffic=await page.evaluate(()=>({cameraY:window.viewer.camera.position.y,assets:performance.getEntriesByType('resource').filter(entry=>/\/roads\/|\/assets\/traffic-/.test(entry.name)).map(entry=>new URL(entry.name).pathname)}))
+      const traffic=await page.evaluate(()=>({cameraY:window.viewer.camera.position.y,crowd:window.viewer.trafficProbe?.crowd?.count,motors:window.viewer.trafficProbe?.allMotors?.length,assets:performance.getEntriesByType('resource').filter(entry=>/\/roads\/|\/assets\/traffic-/.test(entry.name)).map(entry=>new URL(entry.name).pathname)}))
       const row = {view,side:side?'PR':'main',round,sha,heap,frames,traffic}
       raw.push(row)
       await writeFile(`${output}/raw.json`,JSON.stringify(raw))
@@ -64,7 +70,7 @@ try {
     for(const metric of ['calls','mirrorCalls','triangles','mirrorTriangles','geometries','textures','heap']) {
       const measure = row => metric==='heap'?row.heap:Math.max(...row.frames.map(frame=>frame[metric]))
       const base=measure(main), result=measure(pr)
-      const cap=view==='overview' && metric==='calls'?base:base*1.05
+      const cap=base*resourceLimit(view,metric)
       summary.push({view,metric,main:base,PR:result,pass:result<=cap})
     }
   }
@@ -82,7 +88,7 @@ try {
         const values=['main','PR'].map(side=>raw.filter(row=>row.view===view&&row.side===side&&row.round>0)
           .map(row=>metric==='heap'?row.heap:Math.max(...row.frames.map(frame=>frame[metric]))))
         const [main,PR]=values.map(runs=>quantile(runs,.5))
-        summary.push({view,metric,main,PR,runs:values,pass:PR<=main*(view==='overview'&&metric==='calls'?1:1.05)})
+        summary.push({view,metric,main,PR,runs:values,pass:PR<=main*resourceLimit(view,metric)})
       }
     }
     const [base,result]=p95s.map(values=>quantile(values,.5))

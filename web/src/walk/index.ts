@@ -1397,7 +1397,7 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
       x=point.x;z=point.z
     }
     if(shopOverlay?.isOpen())shopOverlay?.close('teleport')
-    const target=new THREE.Vector3(x,0,z);destination=target
+    const target=new THREE.Vector3(x,fixtureFloor??0,z);destination=target
     stream.prioritize(x,z)
     const needed=manifest.chunks.filter(tile=>Math.hypot(Math.max(0,Math.abs(x-tile.x-128)-128),Math.max(0,Math.abs(z-tile.z-128)-128))<=cfg.search)
     // Register nearby collision surfaces before placing the capsule. The palace
@@ -1416,7 +1416,7 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
       if(destination!==target)return false
       if(progress){const tiles=needed.filter(tile=>stream.loaded.has(tile)).length,landmarks=supports.filter(entry=>stream.landmarks.has(entry)).length
         const key=`${tiles}:${landmarks}`;if(key!==reported){reported=key;progress(.3+.6*tiles/Math.max(1,needed.length)+.1*landmarks/Math.max(1,supports.length),`街区 ${tiles} / ${needed.length}`)}}
-      target.y=0;stream.tick(target)
+      target.y=fixtureFloor??0;stream.tick(target)
       for(const entry of supports)if(!stream.landmarks.has(entry)){
         target.y=entry.position[1];stream.updateLandmarks?.(target,entry)
       }
@@ -1425,7 +1425,13 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
     if(destination!==target)return false
     destination=null
     if(signal?.aborted)return false
-    if(needed.some(tile=>!stream.loaded.has(tile))||supports.some(entry=>!stream.landmarks.has(entry)))return false
+    if(needed.some(tile=>!stream.loaded.has(tile))||supports.some(entry=>!stream.landmarks.has(entry))){
+      if(verify&&fixtureFloor!==undefined){
+        const missing=[...needed.filter(t=>!stream.loaded.has(t)),...supports.filter(t=>!stream.landmarks.has(t))]
+        throw Error('Lane fixture streaming timeout: '+missing.map(t=>t.file).join(', '))
+      }
+      return false
+    }
     if(active)resetWalk()
     syncSceneObstacleVolumes()
     sim.sync(x,z);if(!place(x,z,reason,override)){disconnect();window.dispatchEvent(new CustomEvent('walk:spawn-failed',{detail:{x,z,reason:'no-walkable-support'}}));return false}
@@ -2411,10 +2417,8 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
       const nextTile=sim.tileAt(next.x,next.z)
       if(nextTile&&!stream.loaded.has(nextTile)){next.x=pos.x;next.z=pos.z;vx=vz=0;rides?.stop();bikeSpeed=0}
       const inBore=tunnelFloor(manifest.tunnels,next.x,next.z,next.y-cfg.height/2)!==undefined
-      // The shared bridge landing clips its duplicate road collider. The
-      // deck under the player's feet also supports travel across this seam.
-      const ground=(inBore?sim.surface(next.x,next.z,'road',next.y+1,5):sim.surface(next.x,next.z,'ground'))
-        ?? sim.surface(next.x,next.z,'deck',next.y-cfg.height/2+.45,1.25)
+      const localRoad=aboardGround?sim.groundSurface(next.x,next.z,next.y-cfg.height/2,.25,.9):null
+      const ground=localRoad??(inBore?sim.surface(next.x,next.z,'road',next.y+1,5):sim.surface(next.x,next.z,'ground'))
       if(!ground||next.y-cfg.height/2<ground.y-3){if(place(safe.x,safe.z,'rescue'))resets++;break}
       if(sim.wet(next.x,next.z)){
         const foot=next.y-cfg.height/2,deck=sim.surface(next.x,next.z,'deck')

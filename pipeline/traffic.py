@@ -20,7 +20,7 @@ from common import OUT, ll2xz, load_osm
 from road_tunnels import clear_approach_paving
 from station_road_corridor import bake as bake_station_corridor
 from surveyed_corridors import bake as bake_surveyed_corridors, restore as restore_corridors
-from vehicle_approaches import plan as plan_approaches, surface_guides
+from vehicle_approaches import plan as plan_approaches, surface_guides, portal_openings
 from vehicle_tunnels import underground, sections as tunnel_sections, solve as solve_tunnels
 from service_streets import mark_drivable_services, width as minor_road_width
 from traffic_parking import allowed, bake_parking
@@ -278,6 +278,7 @@ def bake(output, manifest, rendered_roads=None):
             trim_portal_paving(output,manifest['chunks'],generated,elements,sections)
             for tunnel in generated:
                 tunnel['gradedAccess']=True
+            portal_openings(generated,elements,sections)
             conflicts.extend(limits)
             manifest['tunnels'] = original_tunnels+generated
             request.write_text(json.dumps(dict(manifest=manifest,nodes=list(survey_nodes.values()),constraints=conflicts,pedestrianNodes=sorted({g[k] for g in guides if g['surfaceKind']==1 for k in ('from','to')}))))
@@ -289,7 +290,7 @@ def bake(output, manifest, rendered_roads=None):
             route_file.write_text(json.dumps(dict(manifest=manifest,routes=portal_routes(elements,network,survey_nodes))))
             subprocess.run([str(ROOT/'node_modules/.bin/tsx'),str(ROOT/'scripts/vehicle-grounding.ts'),
                             'portal-routes',str(output.resolve()),str(route_file.resolve())],check=True,cwd=ROOT)
-        print('Roadside relocations:',relocate(output,manifest,elements,surface))
+        print('Roadside relocations:',relocate(output,manifest,elements))
         request.write_text(json.dumps(dict(manifest=manifest,nodes=result['nodes'],lanes=lanes),separators=(',',':')))
         subprocess.run([str(ROOT/'node_modules/.bin/tsx'),str(ROOT/'scripts/vehicle-grounding.ts'),
                         'bake',str(output.resolve()),str(request)], check=True, cwd=ROOT)

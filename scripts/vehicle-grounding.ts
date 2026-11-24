@@ -8,8 +8,18 @@ import {poseAt,trackHeight} from '../web/src/traffic/sim'
 
 const [mode='audit',world='public/world',output='captures/vehicle-grounding']=process.argv.slice(2)
 const bake=mode==='bake'
-const data=(bake||mode==='portals'||mode==='portal-check'||mode==='portal-routes')?JSON.parse(fs.readFileSync(output,'utf8')):JSON.parse(gunzipSync(fs.readFileSync(path.join(world,'roads/graph.json.gz'))).toString())
+const data=(bake||mode==='prop-heights'||mode==='portals'||mode==='portal-check'||mode==='portal-routes')?JSON.parse(fs.readFileSync(output,'utf8')):JSON.parse(gunzipSync(fs.readFileSync(path.join(world,'roads/graph.json.gz'))).toString())
 const manifest=data.manifest??JSON.parse(fs.readFileSync(path.join(world,'manifest.json'),'utf8'))
+if(mode==='prop-heights'){
+  const surface=vehicleSurface(world,manifest)
+  const heights=data.positions.map(([x,z])=>{
+    const hit={hidden:false,road:-Infinity,terrain:-Infinity}
+    surface(x,z,{pedestrian:true},hit)
+    return Math.max(hit.road,hit.terrain)
+  })
+  fs.writeFileSync(output,JSON.stringify(heights))
+  process.exit(0)
+}
 if(mode==='portal-routes'){
   const surface=vehicleSurface(world,manifest)
   for(const site of data.routes)for(const test of site.modes){

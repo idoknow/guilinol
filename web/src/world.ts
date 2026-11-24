@@ -7,12 +7,13 @@ import {mergeGeometries} from 'three/addons/utils/BufferGeometryUtils.js'
 import type {Streets} from './street-worker'
 import {bridgeGeometry} from './look/bridge'
 import {look} from './look/config'
+import {bindStreetSurface} from './streets'
 import {nightGround} from './look/night'
 import {countryside,setupCountryside,touchesCountryside} from './look/countryside'
 import {chunkWater, farWater} from './look/water'
 import type {TileBatchInput} from './batch'
 import type {Peaks} from './peaks'
-import {joinPortalRoads,tunnelGeometry,type Tunnel} from './tunnels'
+import {joinPortalRoads,tunnelGeometry,roofLevel,type Tunnel} from './tunnels'
 import {freezeStatic} from './static-freeze'
 
 interface Asset {file:string; bytes:number}
@@ -355,6 +356,7 @@ export async function detail(tile:Tile, signal:AbortSignal, parseSlot?:()=>Promi
   group.add(groundMesh)
   const tunnel=tunnels?tunnelGeometry(tile,geometry,tunnels):null
   let bridge = deck.length ? bridgeGeometry(deck,thin,asphalt) : null
+  let tunnelFloorStart=Infinity
   if(tunnel){
     tunnel.fringe.material.dispose()
     tunnel.fringe.material=material
@@ -377,9 +379,16 @@ export async function detail(tile:Tile, signal:AbortSignal, parseSlot?:()=>Promi
         tunnel.fringe.geometry=new THREE.BufferGeometry()
         tunnel.fringe.geometry.setAttribute('position',new THREE.Float32BufferAttribute([],3))
       }
+      const floor=tunnel.floor.geometry
+      bindStreetSurface(floor,'road')
+      tunnelFloorStart=streets.surface?.getAttribute('position').count??0
+      const pavement=mergeGeometries(streets.surface?[streets.surface,floor]:[floor])
+      if(!pavement)throw Error('Incompatible tunnel pavement geometry')
+      streets.surface?.dispose()
+      streets.surface=pavement
       const geometries:THREE.BufferGeometry[]=bridge?[bridge]:[]
       for(const [part,mesh] of Object.entries(tunnel)){
-        if(part==='fringe')continue
+        if(part==='fringe'||part==='floor')continue
         const geom=mesh.geometry,count=geom.getAttribute('position').count
         if(!count)continue
         const colors=new Float32Array(count*3)
@@ -388,10 +397,12 @@ export async function detail(tile:Tile, signal:AbortSignal, parseSlot?:()=>Promi
         geom.setAttribute('aEdge',new THREE.BufferAttribute(new Float32Array(count),1))
         geometries.push(geom)
       }
-      const merged=mergeGeometries(geometries)
-      if(!merged)throw Error('Incompatible transport structure geometry')
-      bridge?.dispose()
-      bridge=merged
+      if(geometries.length){
+        const merged=mergeGeometries(geometries)
+        if(!merged)throw Error('Incompatible transport structure geometry')
+        bridge?.dispose()
+        bridge=merged
+      }
       for(const [part,mesh] of Object.entries(tunnel)){
         if(part==='fringe')continue
         // Picking uses the detached floor in world coordinates. The physics

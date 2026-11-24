@@ -4,6 +4,9 @@ import gzip
 import json
 import math
 import struct
+import subprocess
+import tempfile
+from pathlib import Path
 import zlib
 from collections import defaultdict
 from functools import lru_cache
@@ -12,7 +15,6 @@ import numpy as np
 from shapely import LineString, Point, Polygon, STRtree, box, make_valid, union_all
 
 from common import ll2xz
-from road_grading import eval_bspline_grid
 from surveyed_corridors import read_chunk, write_chunk
 
 TREE = struct.Struct('<HHhBBBBbb')
@@ -24,7 +26,7 @@ def footprints(paths, origin, kinds):
                       for k,shell,*holes in paths if k in kinds])
 
 
-def relocate(output, manifest, elements, surface):
+def relocate(output, manifest, elements):
     tiles={(t['x'],t['z']):t for t in manifest['chunks']}
     def origin(x,z):
         return (math.floor(x/256)*256,math.floor(z/256)*256)
@@ -32,7 +34,7 @@ def relocate(output, manifest, elements, surface):
     @lru_cache(maxsize=48)
     def surfaces(key):
         paths=read_chunk(output/tiles[key]['file'])[3][1]
-        return (footprints(paths[0],key,{0,5}), footprints(paths[0],key,{1,4,6}),paths[5] if len(paths)>5 else None)
+        return (footprints(paths[0],key,{0,5}), footprints(paths[0],key,{1,4,6}))
 
     lines=[LineString([ll2xz(p['lat'],p['lon']) for p in w['geometry']])
            for w in elements if w['type']=='way' and w.get('tags',{}).get('highway')
@@ -95,21 +97,64 @@ def relocate(output, manifest, elements, surface):
                 raise ValueError(f'No legal lateral position at {point}')
             shoulder,_,nx,nz=min(candidates)
             dest=origin(nx,nz)
-            ny=surface.sample(nx,nz,include_peaks=False)[0]
-            control=surfaces(dest)[2]
-            if not shoulder:
-                if control:
-                    grid=(control[0]+np.asarray(control[1]).reshape(35,35))/1000
-                    ny=max(ny,float(eval_bspline_grid(grid,0,0,np.array([nx-dest[0]]),np.array([nz-dest[1]]))[0]))
-                ny+=.195
             value=[round((nx-dest[0])*scale),round((nz-dest[1])*scale)]
-            if field:
-                anchors[dest][f"{value[0]},{value[1]}"] = round(ny*1000)
-            else:
-                value.extend((round(ny*10),*trees[i][3:]))
+            if not field:
+                value.extend(trees[i][2:])
             moves[key].append((field,i,None))
             moves[dest].append((field,None,value))
 
+    # Sample the same tessellated sidewalks and graded bed used at draw time.
+    # Also replant retained trees if their support was rebuilt by this pass.
+    positions=[]
+    placements=[]
+    for key,tile in tiles.items():
+        if not tile.get('gradedCorridor') and key not in moves:
+            continue
+        file=output/tile['file']
+        paths=read_chunk(file)[3][1]
+        repaired=None
+        if tile.get('gradedCorridor'):
+            survey=paths[12]
+            repaired=footprints(paths[0][survey['start']:survey['end']],key,{0,1}).buffer(1.05)
+        edits=moves.get(key,[])
+        removed={i for field,i,_ in edits if field==0 and i is not None}
+        tree_file=file.with_suffix('.trees')
+        if repaired is not None and tree_file.exists():
+            for i,row in enumerate(TREE.iter_unpack(gzip.decompress(tree_file.read_bytes()))):
+                x,z=key[0]+row[0]/100,key[1]+row[1]/100
+                if i not in removed and repaired.covers(Point(x,z)):
+                    positions.append([x,z])
+                    placements.append((key,0,i,list(row)))
+        for field in (1,4):
+            removed_indices={i for kind,i,_ in edits if kind==field and i is not None}
+            for i,row in enumerate(paths[field]):
+                if (i not in removed_indices and len(paths)>13 and paths[13] and
+                        f"{row[0]},{row[1]}" in paths[13]):
+                    positions.append([key[0]+row[0]/10,key[1]+row[1]/10])
+                    placements.append((key,field,i,row))
+        for field,i,row in edits:
+            if i is None:
+                scale=10 if field else 100
+                positions.append([key[0]+row[0]/scale,key[1]+row[1]/scale])
+                placements.append((key,field,None,row))
+    root=Path(__file__).resolve().parents[1]
+    retained=defaultdict(dict)
+    if positions:
+        with tempfile.TemporaryDirectory() as tmp:
+            request=Path(tmp)/'props.json'
+            request.write_text(json.dumps(dict(manifest=manifest,positions=positions)))
+            subprocess.run([root/'node_modules/.bin/tsx',root/'scripts/vehicle-grounding.ts',
+                            'prop-heights',output.resolve(),request],cwd=root,check=True)
+            heights=json.loads(request.read_text())
+        for (key,field,i,row),level in zip(placements,heights,strict=True):
+            if field:
+                anchors[key][f"{row[0]},{row[1]}"]=round(level*1000)
+            elif i is None:
+                row[2]=round(level*10)
+            elif row[2]!=round(level*10):
+                retained[key][i]=round(level*10)
+    for key in retained.keys() | anchors.keys():
+        moves.setdefault(key,[])
     for key,edits in moves.items():
         tile=tiles[key]
         file=output/tile['file']
@@ -117,14 +162,14 @@ def relocate(output, manifest, elements, surface):
         for field in (0,1,4):
             removed={i for k,i,_ in edits if k==field and i is not None}
             inserted=[v for k,_,v in edits if k==field and v is not None]
-            if not (removed or inserted):
+            if not (removed or inserted or (not field and key in retained)):
                 continue
             if field:
                 collision[1][field]=[v for i,v in enumerate(collision[1][field]) if i not in removed]+inserted
             else:
                 path=file.with_suffix('.trees')
                 records=TREE.iter_unpack(gzip.decompress(path.read_bytes())) if path.exists() else ()
-                kept=[v for i,v in enumerate(records) if i not in removed]
+                kept=[(*v[:2],retained[key].get(i,v[2]),*v[3:]) for i,v in enumerate(records) if i not in removed]
                 path.write_bytes(gzip.compress(b''.join(TREE.pack(*v) for v in kept+inserted),mtime=0))
         if key in anchors:
             paths = collision[1]

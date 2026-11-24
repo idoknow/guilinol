@@ -166,8 +166,10 @@ def patch(file, area, approaches=()):
     old_faces=set(old_bed.get('drop',()))
     vertices, drop, paved, spline = [], [], [], []
     knots=defaultdict(set)
+    anchors=set()
     for line,half,ya,yb,cap,_ in approaches:
         (ax,az),(bx,bz)=line.coords
+        anchors.update(((round(ax,4),round(az,4)),(round(bx,4),round(bz,4))))
         dx,dz=(bx-ax)/line.length,(bz-az)/line.length
         blend=max(0,min(.12,1-abs(yb-ya)/(cap*line.length)))
         run=blend*line.length
@@ -210,7 +212,7 @@ def patch(file, area, approaches=()):
                         for tri in constrained_delaunay_triangles(geom).geoms:
                             corners=list(orient(tri,sign=-1).exterior.coords)[:3]
                             interior=[point for point in sorted(knots.get((row,col),()))
-                                      if graded and tri.contains(Point(point))]
+                                      if graded and tri.contains(Point(point)) and (point in anchors or tri.boundary.distance(Point(point))>.15)]
                             if interior:
                                 coords=np.array(corners+interior)
                                 faces=[]
@@ -250,6 +252,7 @@ def patch(file, area, approaches=()):
     # Interpolate physical road and bed together. Select the closest axis in
     # overlapping junction areas, with a shared constrained level at each node.
     distance=np.full(len(levels),np.inf)
+    ceiling=np.full(len(levels),np.inf)
     for line,half,ya,yb,cap,_ in approaches:
         (ax,az),(bx,bz)=line.coords
         dx,dz=bx-ax,bz-az
@@ -262,8 +265,15 @@ def patch(file, area, approaches=()):
             f=np.where(t<blend,t*t/(2*blend),np.where(t>1-blend,1-blend-(1-t)**2/(2*blend),t-blend/2))/(1-blend)
         else:
             f=t
-        levels[select]=ya+(yb-ya)*f[select]-.051
+        target=ya+(yb-ya)*f-.051
+        # Across adjoining surveyed road polygons a narrow branch may run
+        # alongside a deeper cut. Continue the low road smoothly through the
+        # shared pavement rather than switching planes at its painted edge.
+        outside=np.maximum(0,d-half)
+        ceiling=np.minimum(ceiling,target+cap*outside+.04*outside**2)
+        levels[select]=target[select]
         distance[select]=d[select]
+    levels=np.minimum(levels,ceiling)
     for i,y in zip(spline,levels):
         vertices[i][1] = round(float(y),4)
     # Encode in millimetres. The worker draws the exact same triangles 51 mm

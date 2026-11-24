@@ -40,7 +40,10 @@ def routes(elements,network,nodes):
         tags=w.get('tags',{})
         if w['type']!='way' or not tags.get('highway') or not w.get('geometry') or not all(w['geometry']):
             continue
-        modes=tuple(m for m in ('car','foot','bicycle','bike') if permits(tags,m))
+        # Player verification may cross private ways in either direction.
+        # Keep explicit vehicle-class exclusions and normal traffic permissions.
+        test_tags={k:v for k,v in tags.items() if not (k=='access' and v=='private')}
+        modes=tuple(m for m in ('car','foot','bicycle','bike') if permits(test_tags,m))
         points=[ll2xz(p['lat'],p['lon']) for p in w['geometry']]
         for a,b,p,q in zip(w['nodes'],w['nodes'][1:],points,points[1:]):
             if not any((int(x//256),int(z//256)) in bins for x,z in (p,q)):
@@ -48,22 +51,17 @@ def routes(elements,network,nodes):
             length=math.dist(p,q)
             if length<.01:continue
             coords[a],coords[b]=p,q
-            oneway=tags.get('oneway','yes' if tags.get('junction')=='roundabout' else 'no')
-            for i,j,reverse in ((a,b,False),(b,a,True)):
-                allowed=tuple(m for m in modes if m=='foot' or
-                    (tags.get('oneway:bicycle',oneway) if m in ('bike','bicycle') else oneway)
-                    not in (('yes','1','true') if reverse else ('-1',)))
-                graph[i].append((j,length,underground(tags),w['id'],allowed,modes))
+            for i,j in ((a,b),(b,a)):
+                graph[i].append((j,length,underground(tags),w['id'],modes))
 
-    def trace(root,inside,mode,travel_out,way=None,direction=None):
+    def trace(root,inside,mode,way=None,direction=None):
         def walk(n,path,remaining,heading):
             p=coords[n]
             choices=[]
-            for j,length,sub,w,forward,modes in graph[n]:
+            for j,length,sub,w,modes in graph[n]:
                 if j in path or (len(path)==1 and (sub!=inside or (way and w!=way))):
                     continue
-                permitted=forward if travel_out else next(e[4] for e in graph[j] if e[0]==n and e[3]==w)
-                if mode not in permitted:continue
+                if mode not in modes:continue
                 q=coords[j]
                 unit=((q[0]-p[0])/length,(q[1]-p[1])/length)
                 alignment=sum(x*y for x,y in zip(heading,unit)) if heading else 0
@@ -81,28 +79,26 @@ def routes(elements,network,nodes):
         way=next(e['way'] for e in network['edges'] if n in (e['a'],e['b']))
         entry={'id':n,'way':way,'modes':[]}
         for mode in ('car','foot','bicycle','bike'):
-            for inbound in (True,False):
-                inside=trace(n,True,mode,inbound,way)
-                if not inside:continue
+            inside=trace(n,True,mode,way)
+            if inside:
                 p=coords[n];dx=p[0]-inside[0][0];dz=p[1]-inside[0][1];length=math.hypot(dx,dz)
-                outside=trace(n,False,mode,not inbound,direction=(dx/length,dz/length))
-                if not outside:continue
-                route=[*reversed(outside),(*p,way),*inside]
-                if not inbound:route.reverse()
-                entry['modes'].append(dict(mode=mode,route=route))
-                break
+                outside=trace(n,False,mode,direction=(dx/length,dz/length))
+                if outside:
+                    route=[*reversed(outside),(*p,way),*inside]
+                    entry['modes'].append(dict(mode=mode,route=route,direction='in'))
+                    entry['modes'].append(dict(mode=mode,route=route[::-1],direction='out'))
             if mode=='car':
                 if entry['modes']:
                     break
                 # An access boundary is still approachable from the legal
                 # side. Record this separately from a through traversal.
                 for inside in (True,False):
-                    side=trace(n,inside,'car',False,way if inside else None)
+                    side=trace(n,inside,'car',way if inside else None)
                     if side:
                         entry['modes'].append(dict(mode='car',boundary=True,
                             route=[*reversed(side),(*coords[n],way)]))
                         break
         if not any(not m.get('boundary') for m in entry['modes']):
-            entry['links']=[dict(way=w,underground=sub,permitted=modes) for _,_,sub,w,_,modes in graph[n]]
+            entry['links']=[dict(way=w,underground=sub,permitted=modes) for _,_,sub,w,modes in graph[n]]
         result.append(entry)
     return result

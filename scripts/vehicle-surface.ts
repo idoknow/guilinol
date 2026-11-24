@@ -54,7 +54,7 @@ function tileSurface(world,entry,tunnels){
     return u+v<=1?a+(b-a)*u+(c-a)*v:d+(c-d)*(1-u)+(b-d)*(1-v)
   }
   const streets=streetGeometry(paths,ground),roads=streets.road
-  joinPortalRoads(entry,tunnels,[roads])
+  joinPortalRoads(entry,tunnels,[roads.subarray(0,streets.legacyRoadLength)])
   const modified=bed&&new Set(bed.drop),replacement=bed&&new Triangles(bedPositions(bed))
   function visibleGround(x,z){
     if(!modified)return ground(x,z)

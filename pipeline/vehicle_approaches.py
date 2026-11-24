@@ -97,3 +97,31 @@ def plan(conflicts, lanes, nodes, levels, rail_nodes, widths):
             continue
         result.append((line,half,ya,yb,cap,kind))
     return result,failed
+
+
+def portal_openings(tunnels, elements, widths):
+    """Surface branches entering a bore sideways need an opening in its wall."""
+    mouths=defaultdict(list)
+    for t in tunnels:
+        for i,is_mouth in enumerate(t.get('mouths',())):
+            if is_mouth:
+                x,y,z=t['portals'][i]
+                mouths[round(x,2),round(z,2)].append((t,i))
+    for way in elements:
+        tags=way.get('tags',{})
+        if (way['type']!='way' or not tags.get('highway') or underground(tags)
+                or not way.get('geometry') or not all(way['geometry'])):
+            continue
+        coords=[ll2xz(p['lat'],p['lon']) for p in way['geometry']]
+        for i,(x,z) in enumerate(coords):
+            connections=mouths.get((round(x,2),round(z,2)),())
+            for t,end in connections:
+                for j in (i-1,i+1):
+                    if not 0<=j<len(coords):
+                        continue
+                    dx,dz=coords[j][0]-x,coords[j][1]-z
+                    length=math.hypot(dx,dz)
+                    if length<.01:
+                        continue
+                    half=min(t['halfWidth'],widths.get(way['id'],width(tags))/2)
+                    t.setdefault('openings',[]).append([end,round(dx/length,5),round(dz/length,5),round(half,2)])

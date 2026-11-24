@@ -1,4 +1,4 @@
-import {tunnelFloor} from '../tunnels'
+import {nearbyTunnels,tunnelClearanceClipper,tunnelFloor} from '../tunnels'
 import {inRegion} from '../../../lib/play-region'
 import neHall from '../../../pipeline/landmarks/central_square_ne_hall.json'
 import R from '@dimforge/rapier3d-compat'
@@ -208,9 +208,13 @@ function* weldedSurface(raw:Float32Array, corners:number[]|null, data:Detail, ma
     if((bz-az)*(a2x-ax)-(bx-ax)*(a2z-az)>=0)idxList.push(u,v,v2,u,v2,u2)
     else idxList.push(u,v2,v,u,u2,v2)
   }
+  if(clearance){
+    const clipped=clearance(Float32Array.from(verts),idxList)
+    return weldedIndexed(clipped,Array.from({length:clipped.length/3},(_,i)=>i))
+  }
   return R.ColliderDesc.trimesh(Float32Array.from(verts),Uint32Array.from(idxList),R.TriMeshFlags.FIX_INTERNAL_EDGES)
 }
-function houses(rings:Outline[]){
+function houses(rings:Outline[],clearance?:ReturnType<typeof tunnelClearanceClipper>){
   const verts:number[]=[], indices:number[]=[]
   for(const [bottom,top,loops] of rings){
     const shape=loops.map(loop=>loop.map(([east,south])=>new THREE.Vector2(east/100,south/100)))
@@ -222,6 +226,10 @@ function houses(rings:Outline[]){
       const curr=offset+at,next=offset+(at+1)%loop.length
       indices.push(curr,curr+size,next+size,curr,next+size,next)
     }offset+=loop.length}
+  }
+  if(clearance){
+    const clipped=clearance(Float32Array.from(verts),indices)
+    return weldedIndexed(clipped,Array.from({length:clipped.length/3},(_,i)=>i))
   }
   return R.ColliderDesc.trimesh(Float32Array.from(verts),Uint32Array.from(indices))
 }
@@ -465,7 +473,9 @@ export async function createPhysics(manifest:Manifest,stream:Stream,peaks:PeaksG
           if(!mesh)continue
           const geometry=mesh.geometry,positions=geometry.getAttribute('position');if(!positions.count)continue
           const indices=geometry.index?Array.from(geometry.index.array):Array.from({length:positions.count},(_,index)=>index)
-          const desc=weldedIndexed(Float32Array.from(positions.array),indices)
+          const coordinates=Float32Array.from(positions.array)
+          const clipped=clearance&&mesh!==data.tunnel.floor?clearance(coordinates,indices):undefined
+          const desc=clipped?weldedIndexed(clipped,Array.from({length:clipped.length/3},(_,i)=>i)):weldedIndexed(coordinates,indices)
           if(desc)colliders.push(add(desc.setTranslation(tile.x,0,tile.z),kind))
         }
       }else if(data?.roadBed){
@@ -646,6 +656,10 @@ export async function createPhysics(manifest:Manifest,stream:Stream,peaks:PeaksG
     return {bottom,top,loop,minX,maxX,minZ,maxZ}
   })
   function insideHouse(east:number,south:number,y?:number){const tile=tileAt(east,south);if(!tile)return false
+    if(y!==undefined){
+      const floor=tunnelFloor(manifest.tunnels,east,south,y)
+      if(floor!==undefined&&y>=floor)return false
+    }
     const px=(east-tile.x)*100,pz=(south-tile.z)*100
     const inRing=regions.get(tile)?.rings.some(ring=>{
       const [bottom,top,loops]=ring
