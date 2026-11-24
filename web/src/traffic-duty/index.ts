@@ -1,7 +1,7 @@
 /**
  * 解放桥 10 分钟交通劝导玩法（IDOK-284）单入口导出与热点接线说明。
  *
- * 供整合阶段在以下热点文件最小接线：
+ * 供父单 IDOK-282 整合阶段在以下热点文件最小接线（解放桥执勤区中心 (-168, 40)，半径 240 m）：
  *  1. `web/src/main.ts`：
  *     ```ts
  *     import { createTrafficDuty } from './traffic-duty'

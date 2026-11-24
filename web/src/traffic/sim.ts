@@ -57,7 +57,6 @@ export function stopActor(actor:Actor,durationSec=4,traffic?:Traffic):boolean{
   if(owner)return owner.stopActor(actor,durationSec)
   if(!actor||!Number.isFinite(durationSec)||durationSec<0)return false
   actor.holdUntil=Math.max(actor.holdUntil??0,performance.now()+durationSec*1000)
-  actor.stoppedUntil=durationSec
   actor.speed=0
   return true
 }
@@ -138,7 +137,6 @@ export class Traffic {
   private lastCamera?:Position
   private streets=new Map<string,{walk:Track[],motor:Track[],virtualNonmotor:Track[]}>()
   private nearbyRealNonmotor:Track[]=[]
-  private realNonmotorAll:Track[]=[]
   private cellKey=''
   private dutyConfig:DutyTrafficConfig={active:false}
   private dutyTracksCache?:{cx:number,cz:number,r:number,tracks:Track[]}
@@ -201,7 +199,6 @@ export class Traffic {
       if(lane.kind==='nonmotor'){
         const track=add(lane,false,false)
         if(track){
-          this.realNonmotorAll.push(track)
           const ax=track.start.x-track.dz*track.offset,az=track.start.z+track.dx*track.offset
           const bx=track.end.x-track.dz*track.offset,bz=track.end.z+track.dx*track.offset
           for(let c=Math.floor(Math.min(ax,bx)/64);c<=Math.floor(Math.max(ax,bx)/64);c++)
@@ -371,7 +368,7 @@ export class Traffic {
     this.dutyTracksCache={cx,cz,r:radius,tracks}
     return tracks
   }
-  private stepDutySpawns(camera:Position,visible:((point:Position)=>boolean)|undefined,budget:number):number{
+  private stepDutySpawns(camera:Position,visible:((point:Position)=>boolean)|undefined,budget:number,warm=false):number{
     if(!this.dutyConfig.active||budget<=0||this.actors.length>=this.actorLimit)return budget
     const center=this.dutyConfig.center??DEFAULT_DUTY_CENTER
     const radius=this.dutyConfig.radius??DEFAULT_DUTY_RADIUS
@@ -388,8 +385,9 @@ export class Traffic {
     const pool=this.collectCandidates(dutyTracks,camera)
     if(!pool.candidates.length)return budget
     const dutyHidden=(point:Position)=>{
+      if(warm||!visible)return true
       const radial=(point.x-camera.x)**2+(point.z-camera.z)**2
-      return radial>55**2||(radial>18**2&&(!visible||!visible(point)))
+      return radial>VISIBLE_SPAWN_MIN**2||(radial>18**2&&!visible(point))
     }
     for(let attempt=0;attempt<24&&existingDuty<desiredDuty&&budget>0&&this.actors.length<this.actorLimit;attempt++){
       if(this.trySpawnFromPool(pool,'scooter',camera,dutyHidden,undefined,true)){
@@ -441,8 +439,7 @@ export class Traffic {
           continue
         }
         if(realNmPool===undefined&&this.nearbyRealNonmotor.length){
-          const ref=group.motor[0],sx=(ref.start.x+ref.end.x)*.5,sz=(ref.start.z+ref.end.z)*.5
-          const localNm=this.nearbyRealNonmotor.filter(t=>((t.start.x+t.end.x)*.5-sx)**2+((t.start.z+t.end.z)*.5-sz)**2<=160**2)
+          const localNm=this.nearbyRealNonmotor.filter(t=>pointToSegmentDistSq(camera.x,camera.z,t.start.x,t.start.z,t.end.x,t.end.z)<=180**2)
           realNmPool=this.collectCandidates(localNm,camera)
         }
         if(realNmPool?.candidates.length&&this.trySpawnFromPool(realNmPool,'scooter',camera,hiddenSpawn,street)){count++;budget--;continue}
@@ -451,7 +448,7 @@ export class Traffic {
         if(this.trySpawnFromPool(motorPool,'scooter',camera,hiddenSpawn,street)){count++;budget--}
       }
     }
-    if(this.dutyConfig.active)budget=this.stepDutySpawns(camera,visible,budget)
+    if(this.dutyConfig.active)budget=this.stepDutySpawns(camera,visible,budget,warm)
     const spawned=profile?performance.now():0
     for(const [node,queue] of this.queues){
       const retained=queue.filter(actor=>this.actors.includes(actor)&&!actor.leaving&&(actor.track.to===node||actor.track.from===node&&actor.dist<6))

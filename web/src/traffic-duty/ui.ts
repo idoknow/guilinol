@@ -114,6 +114,50 @@ export function mountTrafficDutyUi(opts: TrafficDutyUiOptions): TrafficDutyUiHan
   let activeTab: 'duty' | 'rank' = 'duty'
   let lastSnapshot: TrafficDutySnapshot | null = null
   let lastLeaderboard: LeaderboardSummary = {entries: [], bestFineYuan: 0}
+  let renderedPanelSig = ''
+  let panelFineEl: HTMLElement | null = null
+  let panelMetaEl: HTMLElement | null = null
+  let renderedEntryShow = false
+  let renderedBestFine = -1
+  let renderedBarVisible = false
+  let renderedClock = ''
+  let renderedUrgent = false
+  let renderedFine = ''
+  let renderedCount = ''
+  let renderedWhistleText = ''
+
+  function renderViolationGrid(items: readonly {label: string; value: string}[]): string {
+    return `<div class="td-rules-grid">${items
+      .map(item => `<div class="td-rule-item"><span>${item.label}</span><strong>${item.value}</strong></div>`)
+      .join('')}</div>`
+  }
+
+  function leaderboardSig(lb: LeaderboardSummary): string {
+    return `${lb.bestFineYuan}|${lb.entries
+      .slice(0, 5)
+      .map(e => `${e.id}:${e.totalFineYuan}:${e.citedCount}:${e.playerName}`)
+      .join(';')}`
+  }
+
+  bodyEl.addEventListener('click', e => {
+    const btn = (e.target as HTMLElement | null)?.closest<HTMLButtonElement>('[data-td-action]')
+    if (!btn) return
+    const action = btn.dataset.tdAction
+    if (action === 'start') {
+      dialog.close()
+      opts.onStart()
+    } else if (action === 'abandon') {
+      opts.onAbandon()
+    } else if (action === 'rank') {
+      activeTab = 'rank'
+      renderPanel()
+    } else if (action === 'go-bridge') {
+      dialog.close()
+      opts.onGoBridge?.()
+    } else if (action === 'close') {
+      dialog.close()
+    }
+  })
 
   function renderPanel(): void {
     const snap = lastSnapshot
@@ -123,112 +167,115 @@ export function mountTrafficDutyUi(opts: TrafficDutyUiOptions): TrafficDutyUiHan
       btn.setAttribute('aria-selected', String(btn.dataset.tdTab === activeTab))
     }
 
+    let nextSig = ''
     if (activeTab === 'rank') {
-      const top = lb.entries.slice(0, 5)
-      const listHtml = top.length
-        ? `<ol class="td-rank-list" aria-label="本地模拟罚单排行">${top
-            .map(
-              (item, idx) => `
+      nextSig = `rank|${snap?.phase !== 'active' ? 1 : 0}|${leaderboardSig(lb)}`
+    } else if (snap?.phase === 'summary') {
+      nextSig = `summary|${snap.totalFineYuan}|${snap.citedCount}|${snap.lastRecordRank ?? ''}|${snap.breakdown.no_helmet}|${snap.breakdown.bike_double}|${snap.breakdown.ebike_overload}`
+    } else if (snap?.phase === 'active') {
+      nextSig = `active|${fines.no_helmet}|${fines.bike_double}|${fines.ebike_overload}`
+    } else {
+      nextSig = `idle|${!snap?.inDutyZone && opts.onGoBridge ? 1 : 0}|${fines.no_helmet}|${fines.bike_double}|${fines.ebike_overload}`
+    }
+
+    if (nextSig !== renderedPanelSig) {
+      renderedPanelSig = nextSig
+      panelFineEl = null
+      panelMetaEl = null
+
+      if (activeTab === 'rank') {
+        const top = lb.entries.slice(0, 5)
+        const listHtml = top.length
+          ? `<ol class="td-rank-list" aria-label="本地模拟罚单排行">${top
+              .map(
+                (item, idx) => `
               <li class="td-rank-row">
                 <span class="td-rank-no">${idx + 1}</span>
                 <span class="td-rank-name">${escapeHtml(item.playerName)}</span>
                 <span class="td-rank-count">${item.citedCount} 起</span>
                 <strong class="td-rank-fine">¥${item.totalFineYuan}</strong>
               </li>`,
-            )
-            .join('')}</ol>`
-        : `<p class="td-empty">暂无执勤记录</p>`
-      bodyEl.innerHTML = `
-        ${listHtml}
-        <footer class="td-panel-foot">
-          ${snap?.phase !== 'active' ? `<button type="button" class="td-btn td-btn--primary" data-td-action="start">开始执勤</button>` : ''}
-        </footer>
-      `
-      bindPanelActions()
-      return
-    }
-
-    const rulesHtml = `
-      <div class="td-rules-grid">
-        <div class="td-rule-item"><span>${VIOLATION_LABELS.no_helmet}</span><strong>¥${fines.no_helmet}</strong></div>
-        <div class="td-rule-item"><span>${VIOLATION_LABELS.bike_double}</span><strong>¥${fines.bike_double}</strong></div>
-        <div class="td-rule-item"><span>${VIOLATION_LABELS.ebike_overload}</span><strong>¥${fines.ebike_overload}</strong></div>
-      </div>
-    `
-
-    if (snap?.phase === 'summary') {
-      const titleText = snap.reportTitle ?? ''
-      bodyEl.innerHTML = `
-        <section class="td-summary-card" aria-label="执勤战报">
-          <div class="td-report-title" data-td-report-title="1">${escapeHtml(titleText)}</div>
-          <div class="td-summary-metrics">
-            <b>¥${snap.totalFineYuan}</b>
-            <span>劝导 ${snap.citedCount} 起${snap.lastRecordRank ? ` · 本榜第 ${snap.lastRecordRank} 名` : ''}</span>
+              )
+              .join('')}</ol>`
+          : `<p class="td-empty">暂无执勤记录</p>`
+        bodyEl.innerHTML = `
+          ${listHtml}
+          <div class="td-panel-foot">
+            ${snap?.phase !== 'active' ? `<button type="button" class="td-btn td-btn--primary" data-td-action="start">开始执勤</button>` : ''}
           </div>
-          ${rulesHtml.replace(`¥${fines.no_helmet}`, `${snap.breakdown.no_helmet} 起`).replace(`¥${fines.bike_double}`, `${snap.breakdown.bike_double} 起`).replace(`¥${fines.ebike_overload}`, `${snap.breakdown.ebike_overload} 起`)}
-        </section>
-        <footer class="td-panel-foot">
-          <button type="button" class="td-btn" data-td-action="rank">榜单</button>
-          <button type="button" class="td-btn td-btn--primary" data-td-action="start">再执一班</button>
-        </footer>
-      `
-      bindPanelActions()
-      return
-    }
-
-    if (snap?.phase === 'active') {
-      bodyEl.innerHTML = `
-        <section class="td-summary-card">
-          <div class="td-summary-metrics">
-            <b>¥${snap.totalFineYuan}</b>
-            <span>剩余 ${formatClock(snap.remainingSec)} · 劝导 ${snap.citedCount} 起</span>
-          </div>
-        </section>
-        ${rulesHtml}
-        <footer class="td-panel-foot">
-          <button type="button" class="td-btn" data-td-action="abandon">结束</button>
-          <button type="button" class="td-btn td-btn--primary" data-td-action="close">继续执勤</button>
-        </footer>
-      `
-      bindPanelActions()
-      return
-    }
-
-    const goBtn = !snap?.inDutyZone && opts.onGoBridge
-      ? `<button type="button" class="td-btn" data-td-action="go-bridge">前往解放桥</button>`
-      : ''
-
-    bodyEl.innerHTML = `
-      ${rulesHtml}
-      <footer class="td-panel-foot">
-        ${goBtn}
-        <button type="button" class="td-btn" data-td-action="rank">榜单</button>
-        <button type="button" class="td-btn td-btn--primary" data-td-action="start">开始执勤</button>
-      </footer>
-    `
-    bindPanelActions()
-  }
-
-  function bindPanelActions(): void {
-    const actionEls = Array.from(bodyEl.querySelectorAll<HTMLButtonElement>('[data-td-action]'))
-    for (const btn of actionEls) {
-      btn.onclick = () => {
-        const action = btn.dataset.tdAction
-        if (action === 'start') {
-          dialog.close()
-          opts.onStart()
-        } else if (action === 'abandon') {
-          opts.onAbandon()
-        } else if (action === 'rank') {
-          activeTab = 'rank'
-          renderPanel()
-        } else if (action === 'go-bridge') {
-          dialog.close()
-          opts.onGoBridge?.()
-        } else if (action === 'close') {
-          dialog.close()
-        }
+        `
+        return
       }
+
+      const rulesHtml = renderViolationGrid([
+        {label: VIOLATION_LABELS.no_helmet, value: `¥${fines.no_helmet}`},
+        {label: VIOLATION_LABELS.bike_double, value: `¥${fines.bike_double}`},
+        {label: VIOLATION_LABELS.ebike_overload, value: `¥${fines.ebike_overload}`},
+      ])
+
+      if (snap?.phase === 'summary') {
+        const titleText = snap.reportTitle ?? ''
+        const countsHtml = renderViolationGrid([
+          {label: VIOLATION_LABELS.no_helmet, value: `${snap.breakdown.no_helmet} 起`},
+          {label: VIOLATION_LABELS.bike_double, value: `${snap.breakdown.bike_double} 起`},
+          {label: VIOLATION_LABELS.ebike_overload, value: `${snap.breakdown.ebike_overload} 起`},
+        ])
+        bodyEl.innerHTML = `
+          <section class="td-summary-card" aria-label="执勤战报">
+            <div class="td-report-title" data-td-report-title="1">${escapeHtml(titleText)}</div>
+            <div class="td-summary-metrics">
+              <b>¥${snap.totalFineYuan}</b>
+              <span>劝导 ${snap.citedCount} 起${snap.lastRecordRank ? ` · 本榜第 ${snap.lastRecordRank} 名` : ''}</span>
+            </div>
+            ${countsHtml}
+          </section>
+          <div class="td-panel-foot">
+            <button type="button" class="td-btn" data-td-action="rank">榜单</button>
+            <button type="button" class="td-btn td-btn--primary" data-td-action="start">再执一班</button>
+          </div>
+        `
+        return
+      }
+
+      if (snap?.phase === 'active') {
+        bodyEl.innerHTML = `
+          <section class="td-summary-card">
+            <div class="td-summary-metrics">
+              <b data-td-panel-fine="1">¥${snap.totalFineYuan}</b>
+              <span data-td-panel-meta="1">剩余 ${formatClock(snap.remainingSec)} · 劝导 ${snap.citedCount} 起</span>
+            </div>
+          </section>
+          ${rulesHtml}
+          <div class="td-panel-foot">
+            <button type="button" class="td-btn" data-td-action="abandon">结束</button>
+            <button type="button" class="td-btn td-btn--primary" data-td-action="close">继续执勤</button>
+          </div>
+        `
+        panelFineEl = bodyEl.querySelector<HTMLElement>('[data-td-panel-fine]')
+        panelMetaEl = bodyEl.querySelector<HTMLElement>('[data-td-panel-meta]')
+        return
+      }
+
+      const goBtn = !snap?.inDutyZone && opts.onGoBridge
+        ? `<button type="button" class="td-btn" data-td-action="go-bridge">前往解放桥</button>`
+        : ''
+
+      bodyEl.innerHTML = `
+        ${rulesHtml}
+        <div class="td-panel-foot">
+          ${goBtn}
+          <button type="button" class="td-btn" data-td-action="rank">榜单</button>
+          <button type="button" class="td-btn td-btn--primary" data-td-action="start">开始执勤</button>
+        </div>
+      `
+      return
+    }
+
+    if (activeTab === 'duty' && snap?.phase === 'active' && panelFineEl && panelMetaEl) {
+      const fineText = `¥${snap.totalFineYuan}`
+      const metaText = `剩余 ${formatClock(snap.remainingSec)} · 劝导 ${snap.citedCount} 起`
+      if (panelFineEl.textContent !== fineText) panelFineEl.textContent = fineText
+      if (panelMetaEl.textContent !== metaText) panelMetaEl.textContent = metaText
     }
   }
 
@@ -241,28 +288,58 @@ export function mountTrafficDutyUi(opts: TrafficDutyUiOptions): TrafficDutyUiHan
     lastLeaderboard = leaderboard
 
     const showEntry = snapshot.phase !== 'active' && (opts.alwaysShowEntry || snapshot.inDutyZone)
-    entry.hidden = !showEntry
-    if (leaderboard.bestFineYuan > 0) {
-      entryBestEl.hidden = false
-      entryBestEl.textContent = `¥${leaderboard.bestFineYuan}`
-    } else {
-      entryBestEl.hidden = true
+    if (showEntry !== renderedEntryShow) {
+      renderedEntryShow = showEntry
+      entry.hidden = !showEntry
+    }
+    if (leaderboard.bestFineYuan !== renderedBestFine) {
+      renderedBestFine = leaderboard.bestFineYuan
+      if (leaderboard.bestFineYuan > 0) {
+        entryBestEl.hidden = false
+        entryBestEl.textContent = `¥${leaderboard.bestFineYuan}`
+      } else {
+        entryBestEl.hidden = true
+      }
     }
 
-    bar.hidden = snapshot.phase !== 'active'
-    if (snapshot.phase === 'active') {
-      timerEl.textContent = formatClock(snapshot.remainingSec)
-      timerEl.classList.toggle('is-urgent', snapshot.remainingSec < 30)
-      fineEl.textContent = `¥${snapshot.totalFineYuan}`
-      countEl.textContent = `${snapshot.citedCount} 起`
+    const barVisible = snapshot.phase === 'active'
+    if (barVisible !== renderedBarVisible) {
+      renderedBarVisible = barVisible
+      bar.hidden = !barVisible
+    }
+    if (barVisible) {
+      const clock = formatClock(snapshot.remainingSec)
+      if (clock !== renderedClock) {
+        renderedClock = clock
+        timerEl.textContent = clock
+      }
+      const urgent = snapshot.remainingSec < 30
+      if (urgent !== renderedUrgent) {
+        renderedUrgent = urgent
+        timerEl.classList.toggle('is-urgent', urgent)
+      }
+      const fineText = `¥${snapshot.totalFineYuan}`
+      if (fineText !== renderedFine) {
+        renderedFine = fineText
+        fineEl.textContent = fineText
+      }
+      const countText = `${snapshot.citedCount} 起`
+      if (countText !== renderedCount) {
+        renderedCount = countText
+        countEl.textContent = countText
+      }
     }
 
-    if (!opts.arbiterWired && snapshot.phase === 'active' && candidate) {
-      whistleBtn.hidden = false
-      whistleBtn.textContent = `[F] ${candidate.label}`
-      whistleBtn.setAttribute('aria-label', candidate.label)
-    } else {
-      whistleBtn.hidden = true
+    const nextWhistle = !opts.arbiterWired && snapshot.phase === 'active' && candidate ? `[F] ${candidate.label}` : ''
+    if (nextWhistle !== renderedWhistleText) {
+      renderedWhistleText = nextWhistle
+      if (nextWhistle && candidate) {
+        whistleBtn.hidden = false
+        whistleBtn.textContent = nextWhistle
+        whistleBtn.setAttribute('aria-label', candidate.label)
+      } else {
+        whistleBtn.hidden = true
+      }
     }
 
     const activeIds = new Set(snapshot.bubbles.map(b => b.id))
@@ -295,7 +372,7 @@ export function mountTrafficDutyUi(opts: TrafficDutyUiOptions): TrafficDutyUiHan
   }
 
   entry.onclick = () => {
-    activeTab = lastSnapshot?.phase === 'summary' ? 'duty' : 'duty'
+    activeTab = 'duty'
     renderPanel()
     if (!dialog.open) dialog.showModal()
   }

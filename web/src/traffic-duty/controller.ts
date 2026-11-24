@@ -65,6 +65,7 @@ export function createTrafficDutyController(
     ebike_overload: Math.max(1, Math.round(host.fineTable?.ebike_overload ?? DEFAULT_FINE_YUAN.ebike_overload)),
   }
   const leaderboard = options?.leaderboard ?? createLocalLeaderboardProvider()
+  let cachedLeaderboard = leaderboard.load()
 
   let phase: DutyPhase = 'idle'
   let remainingSec = durationSec
@@ -166,7 +167,7 @@ export function createTrafficDutyController(
   }
 
   function syncUi(): void {
-    ui?.render(getSnapshot(), leaderboard.load(), getInteractCandidate())
+    ui?.render(getSnapshot(), cachedLeaderboard, getInteractCandidate())
   }
 
   function resetCounters(): void {
@@ -188,7 +189,7 @@ export function createTrafficDutyController(
     ui?.closePanel()
     syncTrafficDutyMode(true)
     host.onDutyStateChange?.(true)
-    host.onToast?.('解放桥交通劝导已开始，靠近违规两轮车按 F 吹哨劝导', 2600)
+    host.onToast?.('解放桥交通劝导已开始，靠近违规两轮车即可吹哨劝导', 2600)
     syncUi()
     return getSnapshot()
   }
@@ -198,17 +199,23 @@ export function createTrafficDutyController(
     syncTrafficDutyMode(false)
     host.onDutyStateChange?.(false)
     reportTitle = formatDutyReportTitle(totalFineYuan)
-    const saved = leaderboard.record({
-      playerName: host.getPlayerName?.() || '桂林市民',
-      totalFineYuan,
-      citedCount,
-      breakdown: {...breakdown},
-      durationSec: Math.max(1, Math.round(elapsedSec || (completed ? durationSec : 1))),
-      completed,
-      achievedAt: Date.now(),
-    })
-    lastRecordRank = saved.rank
-    isNewRecord = saved.isNewRecord
+    if (citedCount === 0 && totalFineYuan === 0) {
+      lastRecordRank = null
+      isNewRecord = false
+    } else {
+      const saved = leaderboard.record({
+        playerName: host.getPlayerName?.() || '桂林市民',
+        totalFineYuan,
+        citedCount,
+        breakdown: {...breakdown},
+        durationSec: Math.max(1, Math.round(elapsedSec || (completed ? durationSec : 1))),
+        completed,
+        achievedAt: Date.now(),
+      })
+      cachedLeaderboard = saved.summary
+      lastRecordRank = saved.rank
+      isNewRecord = saved.isNewRecord
+    }
     ui?.openPanel('duty')
     syncUi()
     return getSnapshot()
@@ -333,9 +340,9 @@ export function createTrafficDutyController(
     return getSnapshot()
   }
 
-  if (options?.mountDom !== false && options?.mountUi && typeof document !== 'undefined') {
+  if (options?.mountUi && (options.mountDom === true || (options.mountDom !== false && typeof document !== 'undefined'))) {
     ui = options.mountUi({
-      container: host.mountContainer ?? document.body,
+      container: host.mountContainer ?? (typeof document !== 'undefined' ? document.body : (undefined as unknown as HTMLElement)),
       arbiterWired: Boolean(host.arbiterWired),
       alwaysShowEntry: Boolean(host.alwaysShowEntry),
       onStart: () => startDuty(),
@@ -357,8 +364,9 @@ export function createTrafficDutyController(
     triggerWhistle,
     getInteractCandidate,
     getSnapshot,
-    getLeaderboard: () => leaderboard.load(),
+    getLeaderboard: () => (cachedLeaderboard = leaderboard.load()),
     openPanel(tab = 'duty') {
+      cachedLeaderboard = leaderboard.load()
       ui?.openPanel(tab)
       syncUi()
     },
@@ -368,7 +376,11 @@ export function createTrafficDutyController(
     },
     isPanelOpen: () => Boolean(ui?.isPanelOpen()),
     dispose() {
-      if (phase === 'active') syncTrafficDutyMode(false)
+      if (phase === 'active') {
+        syncTrafficDutyMode(false)
+        host.onDutyStateChange?.(false)
+        phase = 'idle'
+      }
       clearBubbles()
       ui?.dispose()
       ui = undefined

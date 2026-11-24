@@ -331,6 +331,142 @@ test('controller + leaderboard handle 10-min shift, anti-farm cited guard, IDOK-
   }
 })
 
+test('regression guards: zero localStorage reads in 60 step(dt) frames, 0-cite abandon skips leaderboard, dispose resets vest, stopActor fallback avoids stoppedUntil', () => {
+  _resetGameStateForTest()
+  let getItemCalls = 0
+  const baseStore = createMemStorage()
+  const spyStore = {
+    getItem(k) {
+      getItemCalls++
+      return baseStore.getItem(k)
+    },
+    setItem(k, v) {
+      baseStore.setItem(k, v)
+    },
+    removeItem(k) {
+      baseStore.removeItem(k)
+    },
+  }
+  setLeaderboardStorageForTest(spyStore)
+
+  const vestHistory = []
+  let toastText = ''
+  const graph = JSON.parse(gunzipSync(readFileSync('public/world/roads/graph.json.gz')).toString('utf8'))
+  const sim = new Traffic(graph, makeSeededRng(303))
+  const pos = {x: -168, y: 152, z: 40}
+  let renderCalls = 0
+  const duty = createTrafficDutyController(
+    {
+      getPlayerPos: () => pos,
+      isWalking: () => true,
+      getTraffic: () => sim,
+      onDutyStateChange: active => vestHistory.push(active),
+      onToast: text => {
+        toastText = text
+      },
+    },
+    {
+      mountDom: true,
+      mountUi: () => ({
+        render: () => {
+          renderCalls++
+        },
+        openPanel: () => {},
+        closePanel: () => {},
+        isPanelOpen: () => false,
+        dispose: () => {},
+      }),
+    },
+  )
+
+  try {
+    // 60 step frames while idle/active must make 0 storage reads
+    const readsAfterInit = getItemCalls
+    for (let i = 0; i < 60; i++) duty.step(0.016)
+    assert.equal(getItemCalls, readsAfterInit, 'step(dt) hot path must not call leaderboard.load() / getItem')
+    assert.ok(renderCalls >= 60)
+
+    // Start duty -> toast should be platform-neutral (no hardcoded KeyF hint)
+    duty.startDuty()
+    assert.equal(toastText.includes('按 F'), false)
+    assert.deepEqual(vestHistory, [true])
+
+    const readsBeforeActive = getItemCalls
+    for (let i = 0; i < 60; i++) duty.step(0.016)
+    assert.equal(getItemCalls, readsBeforeActive, 'active 60fps step(dt) must trigger 0 storage reads')
+
+    // Abandon with 0 citations -> must NOT pollute leaderboard
+    const abandonSnap = duty.abandonDuty()
+    assert.equal(abandonSnap.phase, 'summary')
+    assert.equal(abandonSnap.lastRecordRank, null)
+    assert.equal(abandonSnap.isNewRecord, false)
+    assert.equal(duty.getLeaderboard().entries.length, 0, '0-cite abandon must not enter leaderboard')
+
+    // Start again and dispose -> must release volunteer vest (onDutyStateChange(false)) & duty config
+    duty.startDuty()
+    assert.deepEqual(vestHistory, [true, false, true])
+    duty.dispose()
+    assert.deepEqual(vestHistory, [true, false, true, false])
+    assert.equal(sim.getDutyConfig().active, false)
+
+    // stopActor without owning Traffic only writes holdUntil, never clock-mismatched stoppedUntil
+    const orphanActor = {
+      track: [...sim.allTracks()].find(t => !t.walk),
+      dist: 0, speed: 5, kind: 'scooter', down: 0, dodge: 0,
+      x: 0, y: 152, z: 0, yaw: 0, scale: 1, leaving: false, halfWidth: 0.3, halfLength: 0.85, height: 1.5,
+    }
+    assert.equal(stopActor(orphanActor, 3), true)
+    assert.equal(orphanActor.stoppedUntil, undefined)
+    assert.ok(orphanActor.holdUntil > performance.now() + 2000)
+  } finally {
+    setLeaderboardStorageForTest(null)
+  }
+})
+
+test('sim.ts duty mode respects VISIBLE_SPAWN_MIN (130m) post-warmup with 0 frustum pop-ins on Jiefang Bridge', () => {
+  const graph = JSON.parse(gunzipSync(readFileSync('public/world/roads/graph.json.gz')).toString('utf8'))
+  const sim = new Traffic(graph, makeSeededRng(888))
+  const cam = {x: -168, y: 152, z: 40}
+  // 90 deg FOV frustum looking East (+x)
+  const visible = p => {
+    const dx = p.x - cam.x
+    const dz = p.z - cam.z
+    return dx > 0 && Math.abs(dz) <= dx
+  }
+
+  // Warmup 2.0s before starting duty
+  for (let i = 0; i < 40; i++) {
+    sim.step(0.05, cam, undefined, visible)
+  }
+
+  sim.setDutyConfig({
+    active: true,
+    center: JIEFANG_DUTY_ZONE.center,
+    radius: JIEFANG_DUTY_ZONE.radiusM,
+    twoWheelShare: 0.7,
+  })
+
+  let prev = new Set(sim.actors)
+  let popInsUnder130 = 0
+  let totalDutyScootersSeen = 0
+  for (let i = 0; i < 1200; i++) {
+    sim.step(0.05, cam, undefined, visible)
+    for (const actor of sim.actors) {
+      if (!prev.has(actor)) {
+        const dist = Math.hypot(actor.x - cam.x, actor.z - cam.z)
+        if (visible(actor) && dist < 130) {
+          popInsUnder130++
+        }
+      }
+      if (actor.kind === 'scooter' && !actor.leaving) totalDutyScootersSeen++
+    }
+    prev = new Set(sim.actors)
+  }
+
+  assert.equal(popInsUnder130, 0, 'duty spawning post-warmup must produce 0 visible spawns within 130m')
+  assert.ok(totalDutyScootersSeen >= 1200, 'Jiefang duty mode sustains steady two-wheel traffic after warmup')
+})
+
 test('design-rules & hotkey compliance: zero private KeyF, zero emojis, zero gradients, single --ui-serif font', () => {
   const dir = new URL('./', import.meta.url)
   const files = ['types.ts', 'leaderboard.ts', 'whistle.ts', 'arbiter.ts', 'controller.ts', 'ui.ts', 'ui.css', 'index.ts']
@@ -340,6 +476,10 @@ test('design-rules & hotkey compliance: zero private KeyF, zero emojis, zero gra
     assert.equal(/linear-gradient|radial-gradient/.test(src), false, `${name} must not use gradients`)
     assert.equal(/小贴士|Tip\b/.test(src), false, `${name} must not contain tip slogans`)
     assert.equal(/\p{Emoji_Presentation}/u.test(src), false, `${name} must not contain emojis`)
+    if (name === 'ui.ts') {
+      assert.equal(src.includes('rulesHtml.replace'), false, 'ui.ts must not mutate HTML with brittle string replace')
+      assert.equal(src.includes('<footer'), false, 'ui.ts must not use <footer> which collides with hud.css fixed footer rule')
+    }
     if (name === 'ui.css') {
       assert.equal(src.includes('--ui-serif'), true)
       assert.equal(/PingFang|sans-serif|monospace/.test(src), false, 'ui.css must stick to --ui-serif only')
