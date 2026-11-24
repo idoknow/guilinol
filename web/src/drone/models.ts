@@ -323,6 +323,7 @@ export async function buildDroneAsync(id:DroneId):Promise<DroneMesh> {
     root.add(scene)
     root.name = `drone-${id}`
     root.userData.spec = id
+    root.userData.source = 'gltf'
     const props:THREE.Object3D[] = []
     scene.traverse(node => { if (/^prop/i.test(node.name)) props.push(node) })
     return {

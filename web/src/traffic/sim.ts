@@ -95,7 +95,7 @@ export class Traffic {
   }
   private rules:{classes:string[],carMin:number,carMax:number,personMin:number,personMax:number}
   private actorLimit:number
-  constructor(graph:Graph,random=Math.random,actorLimit=MAX_ACTORS,rules={classes:['trunk','primary','secondary'],carMin:1,carMax:3,personMin:4,personMax:8}){
+  constructor(graph:Graph,random=Math.random,actorLimit=MAX_ACTORS,rules={classes:['trunk','primary','secondary'],carMin:1,carMax:2,personMin:3,personMax:6}){
     this.rules=rules
     this.actorLimit=actorLimit
     this.random=random
