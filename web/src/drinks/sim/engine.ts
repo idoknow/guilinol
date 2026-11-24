@@ -1,7 +1,15 @@
-import { createDefaultDrinksLayout, DEFAULT_DRINKS_MENU, DEFAULT_INVENTORY_DEFS } from './menu.ts'
+import {
+  convertCatalogMenuToSim,
+  createDrinksLayoutFixture,
+  DEFAULT_DRINKS_MENU,
+  DEFAULT_INVENTORY_DEFS,
+  layoutFromShopAnchors,
+  validateLayoutForMenu,
+} from './menu.ts'
 import { createSeededRng } from './prng.ts'
 import { getDrinksTrafficProfile, normalizeHour } from './traffic.ts'
 import type {
+  CancelPlayerOrderResult,
   ClerkRole,
   ClerkSnapshot,
   ClerkState,
@@ -16,6 +24,8 @@ import type {
   DrinksSim,
   DrinksSimEvent,
   DrinksSimSnapshot,
+  InteractionBubbleKind,
+  InteractionGesture,
   InventoryBinState,
   InventoryItemDef,
   InvariantCheckResult,
@@ -23,7 +33,10 @@ import type {
   OrderStatus,
   PlacePlayerOrderRequest,
   PlacePlayerOrderResult,
+  PlayerPresenceInput,
   Point2D,
+  SeatOccupancyState,
+  SeatSnapshot,
 } from './types.ts'
 
 export const SIM_FIXED_DT = 0.1
@@ -45,6 +58,7 @@ interface InternalClerk {
   targetX: number
   targetZ: number
   targetYaw: number
+  waypoints: Point2D[]
   moveSpeed: number
   homePos: DirectedSpot
   actionTimer: number
@@ -56,13 +70,20 @@ interface InternalClerk {
   targetStationIndex: number
   targetCashierIndex: number
   targetBinId: string | null
+  cleaningSeatId: string | null
   restockStage: 'to_storage' | 'picking' | 'to_bar' | 'refilling'
   holdingCup: boolean
   holdingCupColor: string | null
   holdingCrate: boolean
   patrolIndex: number
   actionLabel: string
+  activeStepLabel: string | null
   pendingAfterWalk: ClerkState | null
+  interactionKind: InteractionBubbleKind | null
+  interactionGesture: InteractionGesture
+  interactionTimer: number
+  interactionTextVar: string | null
+  cashChangeText: string | null
 }
 
 interface InternalCustomer {
@@ -87,9 +108,12 @@ interface InternalCustomer {
   waitingSpotIndex: number
   waitingOrderId: string | null
   desiredItemId: string | null
+  groupId: string | null
+  chatPartnerId: string | null
   holdingCup: boolean
   cupDrinkId: string | null
   cupColor: string | null
+  cameraProp: boolean
   sipsLeft: number
   sipProgress: number
   wantsSeat: boolean
@@ -100,6 +124,17 @@ interface InternalCustomer {
   skinColor: string
   hairColor: string
   variant: number
+  interactionKind: InteractionBubbleKind | null
+  interactionGesture: InteractionGesture
+  interactionTimer: number
+  interactionTextVar: string | null
+  urgedOnce: boolean
+  tookPhotoOnce: boolean
+  chatCooldown: number
+  yieldCooldown: number
+  complainHoldTimer: number
+  handoverHoldTimer: number
+  chatHoldTimer: number
 }
 
 interface InternalOrder {
@@ -119,11 +154,25 @@ interface InternalOrder {
   pickupSlotIndex: number
   prepElapsedSec: number
   prepDurationSec: number
+  activeStepLabel: string | null
   createdAtSec: number
   prepStartedAtSec: number | null
   readyAtSec: number | null
   finishedAtSec: number | null
   ingredientsDeducted: boolean
+}
+
+interface InternalSeat {
+  id: string
+  zone: 'indoor' | 'patio'
+  x: number
+  z: number
+  yaw: number
+  state: SeatOccupancyState
+  occupantId: string | null
+  dirtyCupColor: string | null
+  dirtySinceSec: number
+  cleaningClerkId: string | null
 }
 
 const CLERK_PROFILES: readonly { id: string; name: string; role: ClerkRole }[] = [
@@ -182,6 +231,7 @@ const HAIR_COLORS = ['#1b1a1a', '#2e2219', '#4a3022', '#3c3330'] as const
 const TERMINAL_ORDER_STATUSES = new Set<OrderStatus>([
   'completed',
   'cancelled_out_of_stock',
+  'cancelled_by_player',
   'abandoned_queue',
   'abandoned_wait',
   'abandoned_unclaimed',
@@ -198,44 +248,74 @@ function yawBetween(x0: number, z0: number, x1: number, z1: number): number {
   return Math.atan2(dx, dz)
 }
 
-function normalizeMenu(menuOpt: CreateDrinksSimOptions['menu']): DrinkMenuItem[] {
+function resolveMenu(
+  menuOpt: CreateDrinksSimOptions['menu'],
+  inventoryDefs: readonly InventoryItemDef[],
+): DrinkMenuItem[] {
+  if (!menuOpt) {
+    return inventoryDefs === DEFAULT_INVENTORY_DEFS
+      ? [...DEFAULT_DRINKS_MENU]
+      : convertCatalogMenuToSim(undefined, inventoryDefs)
+  }
   const raw = Array.isArray(menuOpt)
     ? menuOpt
-    : menuOpt && 'items' in menuOpt && Array.isArray(menuOpt.items)
+    : 'items' in menuOpt && Array.isArray(menuOpt.items)
       ? menuOpt.items
-      : DEFAULT_DRINKS_MENU
-  const items = raw.length ? raw : DEFAULT_DRINKS_MENU
-  return items.map((item, idx) => ({
-    id: item.id || `drink_${idx + 1}`,
-    name: item.name || `饮品 ${idx + 1}`,
-    category: item.category ?? 'tea_shake',
-    price: Math.max(1, Number.isFinite(item.price) ? item.price : 6),
-    prepSec: Math.max(0.5, Number.isFinite(item.prepSec) ? item.prepSec : 3.0),
-    stationKind: item.stationKind ?? 'tea_shake',
-    cupColor: item.cupColor || '#f2c864',
-    accentColor: item.accentColor || '#ffffff',
-    ingredients: { ...(item.ingredients ?? { cup: 1 }) },
-    hot: item.hot,
-  }))
+      : []
+  if (raw.length === 0) {
+    throw new Error('Menu cannot be empty')
+  }
+  const invIds = new Set(inventoryDefs.map(d => d.id))
+  return raw.map((item, idx) => {
+    if (!item.id) throw new Error(`Menu item[${idx}] missing id`)
+    for (const ingId of Object.keys(item.ingredients ?? {})) {
+      if (!invIds.has(ingId)) {
+        throw new Error(`Missing inventory mapping for custom menu item '${item.id}': '${ingId}'`)
+      }
+    }
+    return {
+      ...item,
+      prepSec: Math.max(0.5, Number.isFinite(item.prepSec) ? item.prepSec : 3.0),
+      ingredients: { ...item.ingredients },
+    }
+  })
+}
+
+function resolveStepLabel(item: DrinkMenuItem, elapsed: number): string | null {
+  if (!item.steps?.length) return null
+  let acc = 0
+  for (const s of item.steps) {
+    acc += s.durationSec
+    if (elapsed <= acc) return s.label
+  }
+  return item.steps[item.steps.length - 1]!.label
 }
 
 export function createDrinksSim(options: CreateDrinksSimOptions = {}): DrinksSim {
-  const menu = normalizeMenu(options.menu)
+  const baseDefs: readonly InventoryItemDef[] = options.inventoryDefs?.length
+    ? options.inventoryDefs
+    : DEFAULT_INVENTORY_DEFS
+  const menu = resolveMenu(options.menu, baseDefs)
   const menuById = new Map<string, DrinkMenuItem>(menu.map(item => [item.id, item]))
-  const layout = createDefaultDrinksLayout(options.layout)
+  const layout: DrinkShopLayout = options.anchors
+    ? layoutFromShopAnchors(options.anchors)
+    : createDrinksLayoutFixture(options.layout)
+  validateLayoutForMenu(layout, menu)
+
   const rng = createSeededRng(options.seed)
 
   let simTimeSec = Number.isFinite(options.now) ? Number(options.now) : 0
-  const hourOfFn =
-    options.hourOf ?? ((t: number) => normalizeHour(10 + t / 3600))
+  const hourOfFn = options.hourOf ?? ((t: number) => normalizeHour(10 + t / 3600))
   const open24h = Boolean(options.open24h)
   const rejectPlayerWhenClosed = Boolean(options.rejectPlayerWhenClosed)
   const autoRestockSupply = options.autoRestockSupply !== false
   const maxCustomers = Math.max(6, Math.min(40, Math.floor(options.maxCustomers ?? 26)))
   const clerkCount = Math.max(2, Math.min(CLERK_PROFILES.length, Math.floor(options.clerkCount ?? 5)))
+  const playerUnclaimedTimeoutSec = Math.max(15, options.playerUnclaimedTimeoutSec ?? 180)
 
   let accumulator = 0
   let nextCustSeq = 1
+  let nextGroupSeq = 1
   let nextOrderSeq = 1
   let spawnBudget = 0
   let lastSupplierHourBucket = -1
@@ -244,19 +324,22 @@ export function createDrinksSim(options: CreateDrinksSimOptions = {}): DrinksSim
   let totalOrdersCreated = 0
   let ordersCompleted = 0
   let ordersCancelled = 0
+  let ordersCancelledByPlayer = 0
   let ordersAbandonedQueue = 0
   let ordersAbandonedWait = 0
   let ordersAbandonedUnclaimed = 0
   let restockCount = 0
+  let tablesCleanedCount = 0
   let deadlockRecoveries = 0
   let peakConcurrentPeople = clerkCount
   const hourlyArrivals = new Array<number>(24).fill(0)
   const hourlyOrders = new Array<number>(24).fill(0)
 
+  let playerPresence: PlayerPresenceInput | null = null
+  let playerGreetCooldown = 0
+  let cutInRemindCooldown = 0
+
   const inventory = new Map<string, InventoryBinState>()
-  const baseDefs: readonly InventoryItemDef[] = options.inventoryDefs?.length
-    ? options.inventoryDefs
-    : DEFAULT_INVENTORY_DEFS
   for (const def of baseDefs) {
     inventory.set(def.id, {
       id: def.id,
@@ -270,23 +353,6 @@ export function createDrinksSim(options: CreateDrinksSimOptions = {}): DrinksSim
       restocking: false,
     })
   }
-  for (const item of menu) {
-    for (const ingId of Object.keys(item.ingredients)) {
-      if (!inventory.has(ingId)) {
-        inventory.set(ingId, {
-          id: ingId,
-          name: ingId,
-          unit: '份',
-          binAmount: 100,
-          binCapacity: 120,
-          lowThreshold: 20,
-          backroomAmount: 1200,
-          backroomCapacity: 1600,
-          restocking: false,
-        })
-      }
-    }
-  }
 
   let minObservedInventory = Infinity
   function trackMinInventory(): void {
@@ -297,6 +363,20 @@ export function createDrinksSim(options: CreateDrinksSimOptions = {}): DrinksSim
   }
   trackMinInventory()
 
+  const seats: InternalSeat[] = layout.seats.map(s => ({
+    id: s.id,
+    zone: s.zone,
+    x: s.x,
+    z: s.z,
+    yaw: s.yaw,
+    state: 'free',
+    occupantId: null,
+    dirtyCupColor: null,
+    dirtySinceSec: 0,
+    cleaningClerkId: null,
+  }))
+  const seatById = new Map<string, InternalSeat>(seats.map(s => [s.id, s]))
+
   const clerks: InternalClerk[] = []
   for (let i = 0; i < clerkCount; i++) {
     const profile = CLERK_PROFILES[i]!
@@ -304,11 +384,11 @@ export function createDrinksSim(options: CreateDrinksSimOptions = {}): DrinksSim
       i === 0
         ? layout.cashiers[0]!.clerkPos
         : i === 1
-          ? layout.prepStations[1 % layout.prepStations.length]!
+          ? layout.prepStations[0]!
           : i === 2
             ? layout.prepStations[2 % layout.prepStations.length]!
             : i === 3
-              ? layout.pickupClerkPos
+              ? { x: 3.55, z: -1.35, yaw: 0 }
               : layout.patrolPoints[0]!
     clerks.push({
       id: profile.id,
@@ -322,7 +402,8 @@ export function createDrinksSim(options: CreateDrinksSimOptions = {}): DrinksSim
       targetX: homePos.x,
       targetZ: homePos.z,
       targetYaw: homePos.yaw,
-      moveSpeed: 2.3,
+      waypoints: [],
+      moveSpeed: 2.35,
       homePos: { ...homePos },
       actionTimer: 0,
       actionDuration: 1,
@@ -333,13 +414,20 @@ export function createDrinksSim(options: CreateDrinksSimOptions = {}): DrinksSim
       targetStationIndex: -1,
       targetCashierIndex: i === 0 ? 0 : -1,
       targetBinId: null,
+      cleaningSeatId: null,
       restockStage: 'to_storage',
       holdingCup: false,
       holdingCupColor: null,
       holdingCrate: false,
       patrolIndex: i % layout.patrolPoints.length,
       actionLabel: '待命',
+      activeStepLabel: null,
       pendingAfterWalk: null,
+      interactionKind: null,
+      interactionGesture: 'none',
+      interactionTimer: 0,
+      interactionTextVar: null,
+      cashChangeText: null,
     })
   }
 
@@ -362,10 +450,42 @@ export function createDrinksSim(options: CreateDrinksSimOptions = {}): DrinksSim
     }
   }
 
+  function setClerkInteraction(
+    clerk: InternalClerk,
+    kind: InteractionBubbleKind | null,
+    gesture: InteractionGesture,
+    durationSec = 1.6,
+    textVar: string | null = null,
+  ): void {
+    clerk.interactionKind = kind
+    clerk.interactionGesture = gesture
+    clerk.interactionTimer = durationSec
+    clerk.interactionTextVar = textVar
+  }
+
+  function setCustomerInteraction(
+    cust: InternalCustomer,
+    kind: InteractionBubbleKind | null,
+    gesture: InteractionGesture,
+    durationSec = 1.6,
+    textVar: string | null = null,
+  ): void {
+    cust.interactionKind = kind
+    cust.interactionGesture = gesture
+    cust.interactionTimer = durationSec
+    cust.interactionTextVar = textVar
+  }
+
   function releaseClerkClaims(clerk: InternalClerk): void {
     if (clerk.targetBinId) {
       const bin = inventory.get(clerk.targetBinId)
       if (bin) bin.restocking = false
+    }
+    if (clerk.cleaningSeatId) {
+      const seat = seatById.get(clerk.cleaningSeatId)
+      if (seat && seat.cleaningClerkId === clerk.id) {
+        seat.cleaningClerkId = null
+      }
     }
     if (clerk.activeOrderId) {
       const ord = ordersById.get(clerk.activeOrderId)
@@ -379,12 +499,20 @@ export function createDrinksSim(options: CreateDrinksSimOptions = {}): DrinksSim
     clerk.targetStationIndex = -1
     clerk.targetCashierIndex = -1
     clerk.targetBinId = null
+    clerk.cleaningSeatId = null
     clerk.holdingCup = false
     clerk.holdingCupColor = null
     clerk.holdingCrate = false
     clerk.pendingAfterWalk = null
     clerk.taskElapsedSec = 0
     clerk.actionTimer = 0
+    clerk.activeStepLabel = null
+    clerk.cashChangeText = null
+    if (clerk.interactionTimer <= 0) {
+      clerk.interactionKind = null
+      clerk.interactionGesture = 'none'
+      clerk.interactionTextVar = null
+    }
   }
 
   function canAffordIngredientsInBin(item: DrinkMenuItem, quantity: number): { ok: boolean; missingBinId?: string } {
@@ -442,6 +570,42 @@ export function createDrinksSim(options: CreateDrinksSimOptions = {}): DrinksSim
     }
   }
 
+  function routeCustomerWaypoints(fromX: number, fromZ: number, toX: number, toZ: number): Point2D[] {
+    const doorX = layout.entrance.x
+    const doorZ = layout.entrance.z
+    const clearX = Math.max(doorX - 0.28, Math.min(doorX + 0.28, doorX + (toX - doorX) * 0.15))
+    const outZ = doorZ + 1.35 // 4.15m: safely past open outward glass door leaves (z <= 3.73)
+    const inZ = doorZ - 0.58 // 2.22m: safely inside behind doorway sill
+    const wps: Point2D[] = []
+
+    const fromOutside = fromZ > doorZ + 0.15
+    const toOutside = toZ > doorZ + 0.15
+    const isFromPatioSeat = fromOutside && fromZ < 4.0 && Math.abs(fromX - doorX) > 1.3
+    const isToPatioSeat = toOutside && toZ < 4.0 && Math.abs(toX - doorX) > 1.3
+
+    if (fromOutside && !toOutside) {
+      if (isFromPatioSeat) {
+        const outerX = fromX < doorX ? fromX - 0.85 : fromX + 0.85
+        wps.push({ x: outerX, z: 4.85 })
+      }
+      wps.push({ x: clearX, z: outZ })
+      wps.push({ x: clearX, z: inZ })
+    } else if (!fromOutside && toOutside) {
+      wps.push({ x: clearX, z: inZ })
+      wps.push({ x: clearX, z: outZ })
+      if (isToPatioSeat) {
+        const outerX = toX < doorX ? toX - 0.85 : toX + 0.85
+        wps.push({ x: outerX, z: 4.85 })
+        wps.push({ x: outerX, z: toZ })
+      } else {
+        wps.push({ x: clearX, z: doorZ + 2.05 })
+      }
+    }
+
+    wps.push({ x: toX, z: toZ })
+    return wps
+  }
+
   function refreshQueuePositions(): void {
     for (let laneIdx = 0; laneIdx < layout.cashiers.length; laneIdx++) {
       const lane = layout.cashiers[laneIdx]!
@@ -452,7 +616,7 @@ export function createDrinksSim(options: CreateDrinksSimOptions = {}): DrinksSim
         c.queueSlot = idx
         if (c.phase === 'queuing') {
           const pos = idx === 0 ? lane.customerPos : getQueuePosition(laneIdx, idx - 1)
-          c.waypoints = [{ x: pos.x, z: pos.z }]
+          c.waypoints = routeCustomerWaypoints(c.x, c.z, pos.x, pos.z)
           c.finalYaw = lane.customerPos.yaw
         }
       })
@@ -483,17 +647,28 @@ export function createDrinksSim(options: CreateDrinksSimOptions = {}): DrinksSim
     return rng.int(0, layout.waitingSpots.length)
   }
 
-  function pickFreeSeat(): number {
-    const used = new Set<string>()
-    for (const c of customers) {
-      if (c.seatId) used.add(c.seatId)
+  function pickFreeSeat(): InternalSeat | null {
+    const free = seats.filter(s => s.state === 'free')
+    if (!free.length) return null
+    return rng.pick(free, free[0]!)
+  }
+
+  function releaseCustomerSeat(c: InternalCustomer): void {
+    if (!c.seatId) return
+    const seat = seatById.get(c.seatId)
+    c.seatId = null
+    if (!seat) return
+    if (seat.occupantId === c.id) {
+      seat.occupantId = null
+      if (c.holdingCup && seat.state === 'occupied') {
+        seat.state = 'dirty'
+        seat.dirtyCupColor = c.cupColor || '#f6df6e'
+        seat.dirtySinceSec = simTimeSec
+      } else {
+        seat.state = 'free'
+        seat.dirtyCupColor = null
+      }
     }
-    const freeIndices: number[] = []
-    layout.seats.forEach((s, idx) => {
-      if (!used.has(s.id)) freeIndices.push(idx)
-    })
-    if (!freeIndices.length) return -1
-    return rng.pick(freeIndices, freeIndices[0]!)
   }
 
   function pickPickupSlot(): number {
@@ -547,6 +722,7 @@ export function createDrinksSim(options: CreateDrinksSimOptions = {}): DrinksSim
       pickupSlotIndex: -1,
       prepElapsedSec: 0,
       prepDurationSec: opts.item.prepSec * (1 + (qty - 1) * 0.45),
+      activeStepLabel: opts.item.steps?.[0]?.label ?? null,
       createdAtSec: simTimeSec,
       prepStartedAtSec: null,
       readyAtSec: null,
@@ -595,6 +771,7 @@ export function createDrinksSim(options: CreateDrinksSimOptions = {}): DrinksSim
       })
     } else {
       if (nextStatus === 'cancelled_out_of_stock') ordersCancelled++
+      else if (nextStatus === 'cancelled_by_player') ordersCancelledByPlayer++
       else if (nextStatus === 'abandoned_queue') ordersAbandonedQueue++
       else if (nextStatus === 'abandoned_wait') ordersAbandonedWait++
       else if (nextStatus === 'abandoned_unclaimed') ordersAbandonedUnclaimed++
@@ -610,54 +787,57 @@ export function createDrinksSim(options: CreateDrinksSimOptions = {}): DrinksSim
   }
 
   function sendCustomerLeaving(c: InternalCustomer, angry: boolean): void {
+    releaseCustomerSeat(c)
     c.phase = 'leaving'
     c.angry = angry
-    c.seatId = null
+    c.cameraProp = false
     c.waitingSpotIndex = -1
     c.cashierIndex = -1
     c.queueSlot = -1
     const exitApproach = c.leaveSide < 0 ? layout.approachLeft : layout.approachRight
-    const wps: Point2D[] = []
-    if (c.z < layout.entrance.z + 0.15) {
-      wps.push({ x: layout.entrance.x + c.leaveSide * 0.35, z: layout.entrance.z + 0.8 })
+    const exitZ = exitApproach.z + rng.range(-0.2, 0.2)
+    c.waypoints = routeCustomerWaypoints(c.x, c.z, exitApproach.x, exitZ)
+    if (angry && c.waypoints.length > 0) {
+      c.yaw = yawBetween(c.x, c.z, c.waypoints[0]!.x, c.waypoints[0]!.z)
     }
-    wps.push({ x: exitApproach.x, z: exitApproach.z + rng.range(-0.35, 0.35) })
-    c.waypoints = wps
     c.finalYaw = null
     refreshQueuePositions()
   }
 
-  function spawnCustomer(hour: number, roleWeights: Record<CustomerRoleKind, number>): void {
-    if (customers.length >= maxCustomers) return
-    const roles: CustomerRoleKind[] = ['student', 'office', 'tourist', 'local', 'rider']
-    const weights = roles.map(r => roleWeights[r] ?? 1)
-    const roleKind = rng.weightedPick(roles, weights, 'student')
+  function createSingleCustomer(
+    hour: number,
+    roleKind: CustomerRoleKind,
+    side: -1 | 1,
+    offsetZ: number,
+    groupId: string | null,
+    partnerId: string | null,
+  ): InternalCustomer {
     const pal = ROLE_PALETTES[roleKind]
-    const side: -1 | 1 = rng.next() < 0.5 ? -1 : 1
     const spawnBase = side < 0 ? layout.approachLeft : layout.approachRight
     const menuSlot = rng.pick(layout.menuBoardSlots, layout.menuBoardSlots[0]!)
     const patienceMax = rng.range(pal.patience[0], pal.patience[1])
     const desiredItem = pickMenuPreference(roleKind, hour)
     const id = `cust_${nextCustSeq++}`
     const name = `${rng.pick(SURNAMES, '陈')}${rng.pick(ROLE_TITLES[roleKind], '顾客')}`
+    const spawnX = spawnBase.x
+    const spawnZ = spawnBase.z + offsetZ
+    const targetX = menuSlot.x + rng.range(-0.18, 0.18)
+    const targetZ = menuSlot.z + rng.range(-0.12, 0.12)
 
     const cust: InternalCustomer = {
       id,
       name,
       roleKind,
       phase: 'entering',
-      x: spawnBase.x,
-      z: spawnBase.z + rng.range(-0.4, 0.4),
+      x: spawnX,
+      z: spawnZ,
       yaw: side < 0 ? Math.PI * 0.5 : -Math.PI * 0.5,
       speed: 0,
       moveSpeed: rng.range(pal.speed[0], pal.speed[1]),
-      waypoints: [
-        { x: layout.entrance.x + side * 0.3, z: layout.entrance.z + 0.6 },
-        { x: menuSlot.x + rng.range(-0.18, 0.18), z: menuSlot.z + rng.range(-0.12, 0.12) },
-      ],
+      waypoints: routeCustomerWaypoints(spawnX, spawnZ, targetX, targetZ),
       finalYaw: menuSlot.yaw,
       stateTimer: 0,
-      stateDuration: rng.range(2.2, 4.4),
+      stateDuration: rng.range(2.0, 4.0),
       patienceSec: patienceMax,
       patienceMaxSec: patienceMax,
       cashierIndex: -1,
@@ -666,9 +846,12 @@ export function createDrinksSim(options: CreateDrinksSimOptions = {}): DrinksSim
       waitingSpotIndex: -1,
       waitingOrderId: null,
       desiredItemId: desiredItem.id,
+      groupId,
+      chatPartnerId: partnerId,
       holdingCup: false,
       cupDrinkId: null,
       cupColor: null,
+      cameraProp: false,
       sipsLeft: 0,
       sipProgress: 0,
       wantsSeat: roleKind === 'tourist' ? rng.next() < 0.85 : roleKind === 'local' ? rng.next() < 0.78 : rng.next() < 0.62,
@@ -679,8 +862,18 @@ export function createDrinksSim(options: CreateDrinksSimOptions = {}): DrinksSim
       skinColor: rng.pick(SKIN_TONES, '#e9c3a1'),
       hairColor: rng.pick(HAIR_COLORS, '#1b1a1a'),
       variant: rng.int(0, 4),
+      interactionKind: null,
+      interactionGesture: 'none',
+      interactionTimer: 0,
+      interactionTextVar: null,
+      urgedOnce: false,
+      tookPhotoOnce: false,
+      chatCooldown: rng.range(1.5, 4.0),
+      yieldCooldown: 0,
+      complainHoldTimer: 0,
+      handoverHoldTimer: 0,
+      chatHoldTimer: 0,
     }
-
     customers.push(cust)
     totalArrivals++
     const hBucket = Math.floor(hour) % 24
@@ -691,6 +884,30 @@ export function createDrinksSim(options: CreateDrinksSimOptions = {}): DrinksSim
       customerId: cust.id,
       detail: cust.roleKind,
     })
+    return cust
+  }
+
+  function spawnCustomerOrPair(hour: number, roleWeights: Record<CustomerRoleKind, number>): void {
+    if (customers.length >= maxCustomers) return
+    const roles: CustomerRoleKind[] = ['student', 'office', 'tourist', 'local', 'rider']
+    const weights = roles.map(r => roleWeights[r] ?? 1)
+    const roleKind = rng.weightedPick(roles, weights, 'student')
+    const side: -1 | 1 = rng.next() < 0.5 ? -1 : 1
+
+    const canPair =
+      (roleKind === 'student' || roleKind === 'tourist' || roleKind === 'local') &&
+      customers.length + 2 <= maxCustomers &&
+      rng.next() < 0.34
+
+    if (canPair) {
+      const groupId = `grp_${nextGroupSeq++}`
+      const a = createSingleCustomer(hour, roleKind, side, -0.25, groupId, null)
+      const b = createSingleCustomer(hour, roleKind, side, 0.35, groupId, a.id)
+      a.chatPartnerId = b.id
+      b.wantsSeat = true
+    } else {
+      createSingleCustomer(hour, roleKind, side, rng.range(-0.35, 0.35), null, null)
+    }
   }
 
   function moveEntityToward(
@@ -717,10 +934,58 @@ export function createDrinksSim(options: CreateDrinksSimOptions = {}): DrinksSim
     return dist - step <= 0.06
   }
 
+  function buildClerkWalkWaypoints(fromX: number, fromZ: number, toX: number, toZ: number): Point2D[] {
+    const wps: Point2D[] = []
+    const counterMinX = -3.7
+    const counterMaxX = 4.1
+    const counterZ = -0.38
+    const doorX = layout.entrance.x
+    const doorZ = layout.entrance.z
+
+    let curX = fromX
+    let curZ = fromZ
+
+    // Crossing from outside patio back inside -> route through open doorway clear of door leaves & tables
+    if (curZ > doorZ + 0.15 && toZ < doorZ - 0.15) {
+      if (curZ < 4.0 && Math.abs(curX - doorX) > 1.3) {
+        wps.push({ x: curX < doorX ? curX - 0.85 : curX + 0.85, z: 4.85 })
+      }
+      wps.push({ x: doorX, z: doorZ + 1.35 })
+      wps.push({ x: doorX, z: doorZ - 0.58 })
+      curX = doorX
+      curZ = doorZ - 0.58
+    }
+
+    // Crossing front service counter -> route cleanly around nearest open end (-4.25 or +4.45)
+    if ((curZ < counterZ && toZ > counterZ) || (curZ > counterZ && toZ < counterZ)) {
+      const goWest = toX < 0 || (curZ > counterZ && curX < 0)
+      const passX = goWest ? counterMinX - 0.55 : counterMaxX + 0.4
+      wps.push({ x: passX, z: curZ < counterZ ? -0.95 : 0.25 })
+      wps.push({ x: passX, z: toZ > counterZ ? 0.25 : -0.95 })
+      curX = passX
+      curZ = toZ > counterZ ? 0.25 : -0.95
+    }
+
+    // Crossing from indoor hall out to patio -> route through open doorway clear of door leaves & tables
+    if (curZ < doorZ - 0.15 && toZ > doorZ + 0.15) {
+      wps.push({ x: doorX, z: doorZ - 0.58 })
+      wps.push({ x: doorX, z: doorZ + 1.35 })
+      if (toZ < 4.0 && Math.abs(toX - doorX) > 1.3) {
+        const outerX = toX < doorX ? toX - 0.85 : toX + 0.85
+        wps.push({ x: outerX, z: 4.85 })
+        wps.push({ x: outerX, z: toZ })
+      }
+    }
+
+    wps.push({ x: toX, z: toZ })
+    return wps
+  }
+
   function startClerkWalk(clerk: InternalClerk, x: number, z: number, yaw: number, nextState: ClerkState, label: string): void {
     clerk.targetX = x
     clerk.targetZ = z
     clerk.targetYaw = yaw
+    clerk.waypoints = buildClerkWalkWaypoints(clerk.x, clerk.z, x, z)
     clerk.pendingAfterWalk = nextState
     clerk.state = 'walking'
     clerk.taskElapsedSec = 0
@@ -742,7 +1007,6 @@ export function createDrinksSim(options: CreateDrinksSimOptions = {}): DrinksSim
   }
 
   function findNeededRestockBin(): InventoryBinState | null {
-    // Urgent: ingredient missing for a queued order!
     for (const ord of activeOrdersList) {
       if (ord.status !== 'queued') continue
       const check = canAffordIngredientsInBin(ord.item, ord.quantity)
@@ -753,7 +1017,6 @@ export function createDrinksSim(options: CreateDrinksSimOptions = {}): DrinksSim
         }
       }
     }
-    // Routine: any bin below lowThreshold
     for (const bin of inventory.values()) {
       if (!bin.restocking && bin.binAmount <= bin.lowThreshold && (bin.backroomAmount > 0 || autoRestockSupply)) {
         return bin
@@ -773,6 +1036,15 @@ export function createDrinksSim(options: CreateDrinksSimOptions = {}): DrinksSim
     return null
   }
 
+  function findDirtySeat(): InternalSeat | null {
+    for (const seat of seats) {
+      if (seat.state === 'dirty' && !seat.cleaningClerkId) {
+        return seat
+      }
+    }
+    return null
+  }
+
   function findWaitingCashierCustomer(): { customer: InternalCustomer; laneIdx: number } | null {
     const claimed = new Set<string>()
     for (const cl of clerks) {
@@ -785,7 +1057,7 @@ export function createDrinksSim(options: CreateDrinksSimOptions = {}): DrinksSim
       if (head) {
         const lane = layout.cashiers[laneIdx]!
         const dist = Math.hypot(head.x - lane.customerPos.x, head.z - lane.customerPos.z)
-        if (dist <= 0.45) {
+        if (dist <= 0.55) {
           return { customer: head, laneIdx }
         }
       }
@@ -797,12 +1069,14 @@ export function createDrinksSim(options: CreateDrinksSimOptions = {}): DrinksSim
     const needBin = findNeededRestockBin()
     const cashierWork = findWaitingCashierCustomer()
     const prepWork = findClaimableQueuedOrder()
+    const dirtySeat = findDirtySeat()
 
     const assignRestock = (bin: InventoryBinState): boolean => {
       bin.restocking = true
       clerk.targetBinId = bin.id
       clerk.restockStage = 'to_storage'
       clerk.holdingCrate = false
+      setClerkInteraction(clerk, 'restock', 'none', 1.4, bin.name)
       startClerkWalk(clerk, layout.storagePos.x, layout.storagePos.z, layout.storagePos.yaw, 'restocking', `补料·${bin.name}`)
       return true
     }
@@ -811,10 +1085,14 @@ export function createDrinksSim(options: CreateDrinksSimOptions = {}): DrinksSim
       const lane = layout.cashiers[work.laneIdx]!
       clerk.activeCustomerId = work.customer.id
       clerk.targetCashierIndex = work.laneIdx
-      clerk.actionDuration = rng.range(1.8, 2.8)
+      clerk.actionDuration = rng.range(2.4, 3.2)
       clerk.actionTimer = 0
+      const custItem = (work.customer.desiredItemId && menuById.get(work.customer.desiredItemId)) || menu[0]!
+      const payBill = custItem.price <= 5 ? 10 : 20
+      clerk.cashChangeText = payBill > custItem.price ? `¥${payBill - custItem.price}` : '扫码'
       work.customer.phase = 'ordering'
       work.customer.speed = 0
+      work.customer.yaw = lane.customerPos.yaw
       startClerkWalk(clerk, lane.clerkPos.x, lane.clerkPos.z, lane.clerkPos.yaw, 'taking_order', '点单')
       return true
     }
@@ -827,26 +1105,51 @@ export function createDrinksSim(options: CreateDrinksSimOptions = {}): DrinksSim
       clerk.activeOrderId = ord.id
       clerk.targetStationIndex = stIdx
       clerk.targetStationId = station.id
+      clerk.activeStepLabel = ord.item.steps?.[0]?.label ?? null
       startClerkWalk(clerk, station.x, station.z, station.yaw, 'making', `制作·${ord.item.name}`)
       return true
     }
 
-    // Priority routing per role, with full cross-training fallback so no lane/station starves
+    const assignCleanTable = (seat: InternalSeat): boolean => {
+      seat.cleaningClerkId = clerk.id
+      clerk.cleaningSeatId = seat.id
+      clerk.actionDuration = 1.6
+      clerk.actionTimer = 0
+      const standX = seat.x - Math.sin(seat.yaw) * 0.25
+      const standZ = seat.z - Math.cos(seat.yaw) * 0.25
+      startClerkWalk(clerk, standX, standZ, seat.yaw, 'cleaning_table', '收桌')
+      return true
+    }
+
+    const findNearestDirtySeat = (indoorOnly: boolean): InternalSeat | null => {
+      for (const s of seats) {
+        if (s.state === 'dirty' && !s.cleaningClerkId && (!indoorOnly || s.zone === 'indoor')) return s
+      }
+      return null
+    }
+
     if (clerk.role === 'cashier') {
       if (cashierWork && assignCashier(cashierWork)) return
       if (prepWork && assignMake(prepWork)) return
       if (needBin && assignRestock(needBin)) return
+      const indoorDirty = findNearestDirtySeat(true)
+      if (indoorDirty && assignCleanTable(indoorDirty)) return
     } else if (clerk.role === 'maker') {
       if (prepWork && assignMake(prepWork)) return
       if (cashierWork && assignCashier(cashierWork)) return
       if (needBin && assignRestock(needBin)) return
-    } else if (clerk.role === 'patrol' || clerk.role === 'runner') {
+    } else if (clerk.role === 'runner') {
+      if (prepWork && assignMake(prepWork)) return
+      if (dirtySeat && assignCleanTable(dirtySeat)) return
       if (needBin && assignRestock(needBin)) return
+      if (cashierWork && assignCashier(cashierWork)) return
+    } else {
+      if (needBin && assignRestock(needBin)) return
+      if (dirtySeat && assignCleanTable(dirtySeat)) return
       if (prepWork && assignMake(prepWork)) return
       if (cashierWork && assignCashier(cashierWork)) return
     }
 
-    // Check if any queued order is blocked on stock and cancel only if impossible to supply
     for (let oi = activeOrdersList.length - 1; oi >= 0; oi--) {
       const ord = activeOrdersList[oi]!
       if (ord.status === 'queued' && !ord.clerkId && !hasPotentialSupply(ord.item, ord.quantity)) {
@@ -858,11 +1161,10 @@ export function createDrinksSim(options: CreateDrinksSimOptions = {}): DrinksSim
       }
     }
 
-    // Otherwise patrol counter periodically when open
     if (clerk.role === 'patrol' || rng.next() < 0.08) {
       clerk.patrolIndex = (clerk.patrolIndex + 1) % layout.patrolPoints.length
       const pt = layout.patrolPoints[clerk.patrolIndex]!
-      clerk.actionDuration = rng.range(1.5, 3.0)
+      clerk.actionDuration = rng.range(1.5, 2.8)
       clerk.actionTimer = 0
       startClerkWalk(clerk, pt.x, pt.z, pt.yaw, 'patrolling', '巡台')
     }
@@ -870,6 +1172,15 @@ export function createDrinksSim(options: CreateDrinksSimOptions = {}): DrinksSim
 
   function stepClerks(dt: number): void {
     for (const clerk of clerks) {
+      if (clerk.interactionTimer > 0) {
+        clerk.interactionTimer = Math.max(0, clerk.interactionTimer - dt)
+        if (clerk.interactionTimer === 0) {
+          clerk.interactionKind = null
+          clerk.interactionGesture = 'none'
+          clerk.interactionTextVar = null
+        }
+      }
+
       if (clerk.state !== 'idle') {
         clerk.taskElapsedSec += dt
         if (clerk.taskElapsedSec > 75) {
@@ -887,13 +1198,25 @@ export function createDrinksSim(options: CreateDrinksSimOptions = {}): DrinksSim
       }
 
       if (clerk.state === 'walking') {
-        const arrived = moveEntityToward(clerk, clerk.targetX, clerk.targetZ, clerk.moveSpeed, dt)
+        const wp = clerk.waypoints[0] ?? { x: clerk.targetX, z: clerk.targetZ }
+        const arrived = moveEntityToward(clerk, wp.x, wp.z, clerk.moveSpeed, dt)
         if (arrived) {
-          clerk.yaw = clerk.targetYaw
-          const nextState = clerk.pendingAfterWalk ?? 'idle'
-          clerk.pendingAfterWalk = null
-          clerk.state = nextState
-          clerk.actionTimer = 0
+          if (clerk.waypoints.length > 0) clerk.waypoints.shift()
+          if (clerk.waypoints.length === 0) {
+            clerk.yaw = clerk.targetYaw
+            const nextState = clerk.pendingAfterWalk ?? 'idle'
+            clerk.pendingAfterWalk = null
+            clerk.state = nextState
+            clerk.actionTimer = 0
+            if (nextState === 'taking_order' && clerk.activeCustomerId) {
+              const cust = customers.find(c => c.id === clerk.activeCustomerId)
+              if (cust && cust.phase === 'ordering') {
+                const custItem = (cust.desiredItemId && menuById.get(cust.desiredItemId)) || menu[0]!
+                setClerkInteraction(clerk, 'order_ask', 'talk', 1.5)
+                setCustomerInteraction(cust, 'order_reply', 'talk', 1.5, custItem.name)
+              }
+            }
+          }
         }
         continue
       }
@@ -901,8 +1224,7 @@ export function createDrinksSim(options: CreateDrinksSimOptions = {}): DrinksSim
       if (clerk.state === 'patrolling') {
         clerk.speed = 0
         clerk.actionTimer += dt
-        // Interrupt patrol immediately if urgent work appears
-        if (findWaitingCashierCustomer() || findClaimableQueuedOrder() || findNeededRestockBin()) {
+        if (findWaitingCashierCustomer() || findClaimableQueuedOrder() || findNeededRestockBin() || findDirtySeat()) {
           clerk.state = 'idle'
           clerk.taskElapsedSec = 0
           continue
@@ -915,6 +1237,35 @@ export function createDrinksSim(options: CreateDrinksSimOptions = {}): DrinksSim
         continue
       }
 
+      if (clerk.state === 'cleaning_table') {
+        clerk.speed = 0
+        const seat = clerk.cleaningSeatId ? seatById.get(clerk.cleaningSeatId) : undefined
+        if (!seat || seat.state !== 'dirty') {
+          releaseClerkClaims(clerk)
+          clerk.state = 'idle'
+          continue
+        }
+        setClerkInteraction(clerk, 'clean_table', 'clean_wipe', 0.4)
+        clerk.actionTimer += dt
+        if (clerk.actionTimer >= clerk.actionDuration) {
+          seat.state = 'free'
+          seat.dirtyCupColor = null
+          seat.occupantId = null
+          seat.cleaningClerkId = null
+          tablesCleanedCount++
+          emitEvent({
+            type: 'table_cleaned',
+            timeSec: simTimeSec,
+            clerkId: clerk.id,
+            detail: seat.id,
+          })
+          releaseClerkClaims(clerk)
+          clerk.state = 'idle'
+          clerk.actionLabel = '待命'
+        }
+        continue
+      }
+
       if (clerk.state === 'taking_order') {
         clerk.speed = 0
         const cust = customers.find(c => c.id === clerk.activeCustomerId)
@@ -922,6 +1273,11 @@ export function createDrinksSim(options: CreateDrinksSimOptions = {}): DrinksSim
           releaseClerkClaims(clerk)
           clerk.state = 'idle'
           continue
+        }
+        const halfDur = clerk.actionDuration * 0.5
+        if (clerk.actionTimer < halfDur && clerk.actionTimer + dt >= halfDur) {
+          setClerkInteraction(clerk, 'make_change', 'give_change', halfDur + 0.3, clerk.cashChangeText)
+          setCustomerInteraction(cust, 'receive_change', 'receive_change', halfDur + 0.3)
         }
         clerk.actionTimer += dt
         if (clerk.actionTimer >= clerk.actionDuration) {
@@ -966,7 +1322,6 @@ export function createDrinksSim(options: CreateDrinksSimOptions = {}): DrinksSim
         if (ord.status === 'queued') {
           const ok = consumeIngredientsAtomic(ord.item, ord.quantity)
           if (!ok) {
-            // Ingredient was grabbed by another maker while walking; release & let restock run
             releaseClerkClaims(clerk)
             clerk.state = 'idle'
             continue
@@ -985,8 +1340,13 @@ export function createDrinksSim(options: CreateDrinksSimOptions = {}): DrinksSim
         }
 
         ord.prepElapsedSec += dt
+        ord.activeStepLabel = resolveStepLabel(ord.item, ord.prepElapsedSec)
+        clerk.activeStepLabel = ord.activeStepLabel
+        if (!clerk.interactionKind) {
+          setClerkInteraction(clerk, 'making', 'none', 0.6)
+        }
+
         if (ord.prepElapsedSec >= ord.prepDurationSec) {
-          // If NPC customer already abandoned while preparing, mark unclaimed terminal cleanly
           if (ord.source === 'npc') {
             const cust = customers.find(c => c.id === ord.customerId)
             if (!cust || cust.phase === 'leaving') {
@@ -996,11 +1356,21 @@ export function createDrinksSim(options: CreateDrinksSimOptions = {}): DrinksSim
               continue
             }
           }
+          const slot = layout.pickupSlots[ord.pickupSlotIndex >= 0 ? ord.pickupSlotIndex : 0] ?? layout.pickupSlots[0]!
+          let callX = Math.max(1.35, Math.min(3.55, (layout.pickupClerkPos.x + slot.x) * 0.5))
+          for (const other of clerks) {
+            if (other.id === clerk.id) continue
+            const ox = other.state === 'walking' ? other.targetX : other.x
+            const oz = other.state === 'walking' ? other.targetZ : other.z
+            if (Math.hypot(callX - ox, layout.pickupClerkPos.z - oz) < 0.9) {
+              callX = callX < 2.4 ? Math.min(3.55, ox + 0.95) : Math.max(1.35, ox - 0.95)
+            }
+          }
           clerk.holdingCup = true
           clerk.holdingCupColor = ord.item.cupColor
           startClerkWalk(
             clerk,
-            layout.pickupClerkPos.x,
+            callX,
             layout.pickupClerkPos.z,
             layout.pickupClerkPos.yaw,
             'calling',
@@ -1013,7 +1383,7 @@ export function createDrinksSim(options: CreateDrinksSimOptions = {}): DrinksSim
       if (clerk.state === 'calling') {
         clerk.speed = 0
         const ord = clerk.activeOrderId ? ordersById.get(clerk.activeOrderId) : undefined
-        if (!ord) {
+        if (!ord || isTerminalOrderStatus(ord.status)) {
           releaseClerkClaims(clerk)
           clerk.state = 'idle'
           continue
@@ -1024,8 +1394,9 @@ export function createDrinksSim(options: CreateDrinksSimOptions = {}): DrinksSim
           ord.pickupSlotIndex = slotIdx
           ord.status = 'ready_for_pickup'
           ord.readyAtSec = simTimeSec
-          clerk.holdingCup = false
-          clerk.holdingCupColor = null
+          clerk.holdingCup = true
+          clerk.holdingCupColor = ord.item.cupColor
+          setClerkInteraction(clerk, 'call_number', 'greet_wave', 0.9, ord.ticketNo)
           emitEvent({
             type: 'order_called',
             timeSec: simTimeSec,
@@ -1035,9 +1406,20 @@ export function createDrinksSim(options: CreateDrinksSimOptions = {}): DrinksSim
             clerkId: clerk.id,
             itemName: ord.item.name,
           })
+          // Wake customer immediately for look-up animation
+          const waitCust = customers.find(c => c.waitingOrderId === ord.id)
+          if (waitCust && waitCust.phase === 'waiting_pickup') {
+            waitCust.yaw = yawBetween(waitCust.x, waitCust.z, layout.pickupClerkPos.x, layout.pickupClerkPos.z)
+            setCustomerInteraction(waitCust, 'look_up_called', 'look_up', 0.85)
+          }
+        }
+        if (clerk.actionTimer >= 0.6 && clerk.actionTimer - dt < 0.6) {
+          setClerkInteraction(clerk, 'handover_cup', 'handover_cup', 0.95, ord.item.name)
         }
         clerk.actionTimer += dt
-        if (clerk.actionTimer >= 0.9) {
+        if (clerk.actionTimer >= 1.45) {
+          clerk.holdingCup = false
+          clerk.holdingCupColor = null
           releaseClerkClaims(clerk)
           clerk.state = 'idle'
           clerk.actionLabel = '待命'
@@ -1053,6 +1435,7 @@ export function createDrinksSim(options: CreateDrinksSimOptions = {}): DrinksSim
           clerk.state = 'idle'
           continue
         }
+        setClerkInteraction(clerk, 'restock', 'none', 0.5, bin.name)
         if (clerk.restockStage === 'to_storage') {
           clerk.restockStage = 'picking'
           clerk.actionTimer = 0
@@ -1094,35 +1477,117 @@ export function createDrinksSim(options: CreateDrinksSimOptions = {}): DrinksSim
     }
   }
 
-  function applyCustomerSeparation(dt: number): void {
-    const minSep = 0.84
-    const minSepSq = minSep * minSep
-    const pushRate = 4.2 * dt
-    for (let i = 0; i < customers.length; i++) {
-      const a = customers[i]!
-      if (a.phase === 'seated' && a.waypoints.length === 0) continue
-      for (let j = i + 1; j < customers.length; j++) {
-        const b = customers[j]!
-        if (b.phase === 'seated' && b.waypoints.length === 0) continue
-        const dx = b.x - a.x
-        const dz = b.z - a.z
-        const dSq = dx * dx + dz * dz
-        if (dSq < minSepSq) {
-          const dist = Math.sqrt(dSq)
-          const nx = dist > 1e-4 ? dx / dist : 1
-          const nz = dist > 1e-4 ? dz / dist : 0
-          const overlap = (minSep - dist) * 0.5 * Math.min(1, pushRate)
-          if (a.phase !== 'ordering') {
-            a.x -= nx * overlap
-            a.z -= nz * overlap
-            if (a.z < -0.02) a.z = -0.02
-          }
-          if (b.phase !== 'ordering') {
-            b.x += nx * overlap
-            b.z += nz * overlap
-            if (b.z < -0.02) b.z = -0.02
+  function stepPairAndSocialInteractions(dt: number): void {
+    for (const c of customers) {
+      if (c.interactionTimer > 0) {
+        c.interactionTimer = Math.max(0, c.interactionTimer - dt)
+        if (c.interactionTimer === 0) {
+          c.interactionKind = null
+          c.interactionGesture = 'none'
+          c.interactionTextVar = null
+          c.cameraProp = false
+        }
+      }
+      if (c.chatCooldown > 0) c.chatCooldown = Math.max(0, c.chatCooldown - dt)
+      if (c.yieldCooldown > 0) c.yieldCooldown = Math.max(0, c.yieldCooldown - dt)
+    }
+
+    // Pair chatting when two partners are stationary near each other in same zone
+    for (const a of customers) {
+      if (!a.chatPartnerId || a.chatCooldown > 0 || a.interactionTimer > 0) continue
+      if (a.phase === 'entering' || a.phase === 'ordering' || a.phase === 'leaving' || a.phase === 'picking_up') continue
+      if (a.waypoints.length > 0) continue
+      const b = customers.find(x => x.id === a.chatPartnerId)
+      if (!b || b.waypoints.length > 0) continue
+      if (b.phase === 'entering' || b.phase === 'ordering' || b.phase === 'leaving' || b.phase === 'picking_up') continue
+      const sameZone = (a.z < layout.entrance.z - 0.3 && b.z < layout.entrance.z - 0.3) || (a.z > layout.entrance.z + 1.1 && b.z > layout.entrance.z + 1.1)
+      if (!sameZone) continue
+      const d = Math.hypot(a.x - b.x, a.z - b.z)
+      if (d >= 0.55 && d <= 2.15) {
+        a.yaw = yawBetween(a.x, a.z, b.x, b.z)
+        b.yaw = yawBetween(b.x, b.z, a.x, a.z)
+        a.chatHoldTimer = 2.0
+        b.chatHoldTimer = 2.0
+        setCustomerInteraction(a, 'chat_pair_a', 'chat_nod', 2.4)
+        setCustomerInteraction(b, 'chat_pair_b', 'chat_nod', 2.4)
+        a.chatCooldown = 8
+        b.chatCooldown = 8
+      }
+    }
+  }
+
+  function stepPlayerInteractions(): void {
+    if (!playerPresence || !playerPresence.active) return
+    const px = playerPresence.x
+    const pz = playerPresence.z
+    const nearRadius = playerPresence.nearRadius ?? 4.8
+
+    // 1. Clerk greets player when approaching shop entrance/counter (prefer free/closest front clerk)
+    const shopCenterX = layout.entrance.x
+    const shopCenterZ = (layout.entrance.z + layout.cashiers[0]!.customerPos.z) * 0.5
+    const distShop = Math.hypot(px - shopCenterX, pz - shopCenterZ)
+    if (distShop <= nearRadius && playerGreetCooldown <= 0) {
+      let bestClerk: InternalClerk | null = null
+      let bestScore = Infinity
+      for (const cl of clerks) {
+        const d = Math.hypot(cl.x - px, cl.z - pz)
+        const statePenalty = cl.state === 'idle' || cl.state === 'patrolling' ? 0 : cl.state === 'taking_order' ? 1.5 : 3.0
+        const score = d + statePenalty
+        if (score < bestScore) {
+          bestScore = score
+          bestClerk = cl
+        }
+      }
+      if (bestClerk) {
+        bestClerk.yaw = yawBetween(bestClerk.x, bestClerk.z, px, pz)
+        setClerkInteraction(bestClerk, 'clerk_greet_player', 'greet_wave', 2.8)
+        playerGreetCooldown = 10
+        emitEvent({
+          type: 'player_greeted',
+          timeSec: simTimeSec,
+          clerkId: bestClerk.id,
+        })
+      }
+    }
+
+    // 2. Cut-in reminder if player stands right in front of an occupied cashier queue
+    if (cutInRemindCooldown <= 0) {
+      for (let laneIdx = 0; laneIdx < layout.cashiers.length; laneIdx++) {
+        const lane = layout.cashiers[laneIdx]!
+        const dCashier = Math.hypot(px - lane.customerPos.x, pz - lane.customerPos.z)
+        if (dCashier <= 1.15) {
+          const laneQueued = customers.filter(c => c.phase === 'queuing' && c.cashierIndex === laneIdx)
+          if (laneQueued.length >= 1) {
+            const firstQueuer = laneQueued[0]!
+            firstQueuer.yaw = yawBetween(firstQueuer.x, firstQueuer.z, px, pz)
+            setCustomerInteraction(firstQueuer, 'remind_cut_in', 'remind_gesture', 2.2)
+            cutInRemindCooldown = 7
+            emitEvent({
+              type: 'player_cut_in_reminded',
+              timeSec: simTimeSec,
+              customerId: firstQueuer.id,
+            })
+            break
           }
         }
+      }
+    }
+
+    // 3. Queuing/standing NPCs yield space smoothly when player walks close
+    for (const c of customers) {
+      if (c.phase !== 'queuing' && c.phase !== 'waiting_pickup') continue
+      const dx = c.x - px
+      const dz = c.z - pz
+      const dist = Math.hypot(dx, dz)
+      if (dist > 0.05 && dist < 1.55 && c.yieldCooldown <= 0) {
+        const sidePush = 0.36
+        const nx = dx / dist
+        const nz = dz / dist
+        c.x += nx * sidePush
+        c.z = Math.max(0.05, c.z + nz * sidePush)
+        c.yaw = yawBetween(c.x, c.z, px, pz)
+        setCustomerInteraction(c, 'queue_yield_player', 'yield_step', 2.0)
+        c.yieldCooldown = 4.5
       }
     }
   }
@@ -1130,6 +1595,27 @@ export function createDrinksSim(options: CreateDrinksSimOptions = {}): DrinksSim
   function stepCustomers(dt: number, isOpen: boolean): void {
     for (let i = customers.length - 1; i >= 0; i--) {
       const c = customers[i]!
+
+      if (c.complainHoldTimer > 0) {
+        c.complainHoldTimer = Math.max(0, c.complainHoldTimer - dt)
+        c.speed = 0
+        if (c.complainHoldTimer === 0) {
+          sendCustomerLeaving(c, true)
+        }
+        continue
+      }
+
+      if (c.chatHoldTimer > 0) {
+        c.chatHoldTimer = Math.max(0, c.chatHoldTimer - dt)
+        c.speed = 0
+        continue
+      }
+
+      if (c.handoverHoldTimer > 0) {
+        c.handoverHoldTimer = Math.max(0, c.handoverHoldTimer - dt)
+        c.speed = 0
+        if (c.handoverHoldTimer > 0) continue
+      }
 
       if (c.waypoints.length > 0) {
         const wp = c.waypoints[0]!
@@ -1149,6 +1635,12 @@ export function createDrinksSim(options: CreateDrinksSimOptions = {}): DrinksSim
         if (c.waypoints.length === 0) {
           c.phase = 'browsing_menu'
           c.stateTimer = 0
+          // Tourists sometimes snap a quick facade photo while browsing
+          if (c.roleKind === 'tourist' && !c.tookPhotoOnce && rng.next() < 0.45) {
+            c.tookPhotoOnce = true
+            c.cameraProp = true
+            setCustomerInteraction(c, 'take_photo', 'take_photo', 2.0)
+          }
         }
         continue
       }
@@ -1179,19 +1671,20 @@ export function createDrinksSim(options: CreateDrinksSimOptions = {}): DrinksSim
         c.patienceSec -= dt * (1 + Math.max(0, c.queueSlot - 1) * 0.08)
         if (c.patienceSec <= 0) {
           ordersAbandonedQueue++
+          c.x += c.x < 0 ? 0.68 : -0.68
           sendCustomerLeaving(c, true)
+          setCustomerInteraction(c, 'complain_leave', 'angry_stamp', 2.4)
         }
         continue
       }
 
       if (c.phase === 'ordering') {
-        // Clerk drives transition to waiting_pickup
         continue
       }
 
       if (c.phase === 'waiting_pickup') {
         const ord = c.waitingOrderId ? ordersById.get(c.waitingOrderId) : undefined
-        if (!ord || ord.status === 'cancelled_out_of_stock') {
+        if (!ord || ord.status === 'cancelled_out_of_stock' || ord.status === 'cancelled_by_player') {
           sendCustomerLeaving(c, true)
           continue
         }
@@ -1204,9 +1697,21 @@ export function createDrinksSim(options: CreateDrinksSimOptions = {}): DrinksSim
           continue
         }
         c.patienceSec -= dt * 0.6
+        const ratio = c.patienceSec / Math.max(1, c.patienceMaxSec)
+        if (ratio < 0.58 && !c.urgedOnce && c.waypoints.length === 0) {
+          c.urgedOnce = true
+          c.yaw = yawBetween(c.x, c.z, layout.pickupClerkPos.x, layout.pickupClerkPos.z)
+          setCustomerInteraction(c, 'urge_order', 'urge_wave', 2.0)
+          const maker = clerks.find(cl => cl.state === 'making' || cl.role === 'maker')
+          if (maker && maker.interactionTimer <= 0) {
+            setClerkInteraction(maker, 'clerk_reassure', 'talk', 1.4)
+          }
+        }
         if (c.patienceSec <= 0 && ord.status === 'queued') {
           finishOrder(ord, 'abandoned_wait')
+          c.x += c.x < layout.entrance.x ? 0.55 : -0.55
           sendCustomerLeaving(c, true)
+          setCustomerInteraction(c, 'complain_leave', 'angry_stamp', 2.4)
         }
         continue
       }
@@ -1215,35 +1720,63 @@ export function createDrinksSim(options: CreateDrinksSimOptions = {}): DrinksSim
         if (c.waypoints.length > 0) continue
         const ord = c.waitingOrderId ? ordersById.get(c.waitingOrderId) : undefined
         if (ord && ord.status === 'ready_for_pickup') {
-          finishOrder(ord, 'completed')
-          c.holdingCup = true
-          c.cupDrinkId = ord.item.id
-          c.cupColor = ord.item.cupColor
-          c.sipsLeft = 4
-          c.sipProgress = 0
+          // Handover pause so 递杯 & 接杯 gesture is clearly rendered before leaving pickup
+          if (!c.holdingCup) {
+            finishOrder(ord, 'completed')
+            c.holdingCup = true
+            c.cupDrinkId = ord.item.id
+            c.cupColor = ord.item.cupColor
+            c.sipsLeft = ord.item.sipsCount ?? 4
+            c.sipProgress = 0
+            c.yaw = yawBetween(c.x, c.z, layout.pickupClerkPos.x, layout.pickupClerkPos.z)
+            setCustomerInteraction(c, 'receive_cup', 'receive_cup', 1.1)
+            c.handoverHoldTimer = 0.75
+            continue
+          }
         }
         c.waitingOrderId = null
-        const freeSeatIdx = c.wantsSeat ? pickFreeSeat() : -1
-        if (freeSeatIdx >= 0) {
-          const seat = layout.seats[freeSeatIdx]!
-          c.phase = 'seated'
-          c.seatId = seat.id
-          c.stateTimer = 0
-          c.stateDuration = rng.range(18, 34)
-          c.waypoints = [{ x: seat.x, z: seat.z }]
-          c.finalYaw = seat.yaw
+        if (!c.tookPhotoOnce && (c.roleKind === 'tourist' || c.roleKind === 'student') && rng.next() < 0.25) {
+          c.tookPhotoOnce = true
+          c.cameraProp = true
+          setCustomerInteraction(c, 'take_photo', 'take_photo', 2.0)
+        }
+        const freeSeat = c.wantsSeat ? pickFreeSeat() : null
+        if (freeSeat) {
+          freeSeat.state = 'reserved'
+          freeSeat.occupantId = c.id
+          c.phase = 'claiming_seat'
+          c.seatId = freeSeat.id
+          c.waypoints = routeCustomerWaypoints(c.x, c.z, freeSeat.x, freeSeat.z)
+          c.finalYaw = freeSeat.yaw
+          setCustomerInteraction(c, 'claim_seat', 'claim_wave', 1.6)
         } else {
           sendCustomerLeaving(c, false)
         }
         continue
       }
 
+      if (c.phase === 'claiming_seat') {
+        if (c.waypoints.length > 0) continue
+        const seat = c.seatId ? seatById.get(c.seatId) : undefined
+        if (!seat) {
+          sendCustomerLeaving(c, false)
+          continue
+        }
+        seat.state = 'occupied'
+        c.phase = 'seated'
+        c.stateTimer = 0
+        c.stateDuration = rng.range(16, 30)
+        setCustomerInteraction(c, 'claim_seat', 'claim_wave', 1.1)
+        continue
+      }
+
       if (c.phase === 'seated') {
         if (c.waypoints.length > 0) continue
         c.stateTimer += dt
+        const totalSips = Math.max(1, c.sipsLeft || 4)
         const ratio = Math.min(1, c.stateTimer / Math.max(1, c.stateDuration))
         c.sipProgress = (c.stateTimer * 0.45) % 1
-        c.sipsLeft = Math.max(0, Math.ceil((1 - ratio) * 4))
+        c.sipsLeft = Math.max(0, Math.ceil((1 - ratio) * totalSips))
         if (c.stateTimer >= c.stateDuration) {
           sendCustomerLeaving(c, false)
         }
@@ -1267,17 +1800,116 @@ export function createDrinksSim(options: CreateDrinksSimOptions = {}): DrinksSim
     }
   }
 
+  function applyClerkSeparation(dt: number): void {
+    const minSep = 0.88
+    const minSepSq = minSep * minSep
+    const pushRate = Math.min(1, 6.5 * dt)
+    const applyPush = (cl: InternalClerk, px: number, pz: number) => {
+      const clampBack = (cl.state === 'idle' || cl.state === 'patrolling') || (cl.pendingAfterWalk !== 'cleaning_table' && cl.z <= -0.75)
+      cl.x += px
+      cl.z = clampBack ? Math.min(-0.78, cl.z + pz) : cl.z + pz
+    }
+    for (let i = 0; i < clerks.length; i++) {
+      const a = clerks[i]!
+      for (let j = i + 1; j < clerks.length; j++) {
+        const b = clerks[j]!
+        const dx = b.x - a.x
+        const dz = b.z - a.z
+        const dSq = dx * dx + dz * dz
+        if (dSq < minSepSq) {
+          const dist = Math.sqrt(dSq)
+          const nx = dist > 1e-4 ? dx / dist : 1
+          const nz = dist > 1e-4 ? dz / dist : 0
+          const overlap = (minSep - dist) * pushRate
+          const aMovable = a.state === 'idle' || a.state === 'patrolling' || (a.state === 'walking' && a.z <= -0.75)
+          const bMovable = b.state === 'idle' || b.state === 'patrolling' || (b.state === 'walking' && b.z <= -0.75)
+          if (aMovable && bMovable) {
+            applyPush(a, -nx * overlap * 0.5, -nz * overlap * 0.5)
+            applyPush(b, nx * overlap * 0.5, nz * overlap * 0.5)
+          } else if (aMovable) {
+            applyPush(a, -nx * overlap, -nz * overlap)
+          } else if (bMovable) {
+            applyPush(b, nx * overlap, nz * overlap)
+          }
+        }
+      }
+    }
+  }
+
+  function applyCustomerSeparation(dt: number): void {
+    const minSep = 0.86
+    const minSepSq = minSep * minSep
+    const pushRate = 4.2 * dt
+    const doorX = layout.entrance.x
+    const doorZ = layout.entrance.z
+    const clampCustomerWall = (c: InternalCustomer) => {
+      if (c.z < -0.02) c.z = -0.02
+      const inDoorOpening = c.x >= doorX - 0.52 && c.x <= doorX + 0.52
+      if (!inDoorOpening && Math.abs(c.z - doorZ) < 0.34) {
+        c.z = c.z < doorZ ? doorZ - 0.34 : doorZ + 0.34
+      }
+    }
+    for (let i = 0; i < customers.length; i++) {
+      const a = customers[i]!
+      if (a.phase === 'seated' && a.waypoints.length === 0) continue
+      for (let j = i + 1; j < customers.length; j++) {
+        const b = customers[j]!
+        if (b.phase === 'seated' && b.waypoints.length === 0) continue
+        const dx = b.x - a.x
+        const dz = b.z - a.z
+        const dSq = dx * dx + dz * dz
+        if (dSq < minSepSq) {
+          const dist = Math.sqrt(dSq)
+          const nx = dist > 1e-4 ? dx / dist : 1
+          const nz = dist > 1e-4 ? dz / dist : 0
+          const overlap = (minSep - dist) * 0.5 * Math.min(1, pushRate)
+          if (a.phase !== 'ordering') {
+            a.x -= nx * overlap
+            a.z -= nz * overlap
+            clampCustomerWall(a)
+          }
+          if (b.phase !== 'ordering') {
+            b.x += nx * overlap
+            b.z += nz * overlap
+            clampCustomerWall(b)
+          }
+          // Head-on yield gesture when two moving walkers meet
+          if (a.speed > 0.25 && b.speed > 0.25 && a.yieldCooldown <= 0 && b.yieldCooldown <= 0) {
+            const dot = Math.sin(a.yaw) * Math.sin(b.yaw) + Math.cos(a.yaw) * Math.cos(b.yaw)
+            if (dot < -0.15) {
+              b.x += -nz * 0.24
+              b.z += nx * 0.24
+              clampCustomerWall(b)
+              setCustomerInteraction(b, 'yield_way', 'yield_step', 1.0)
+              b.yieldCooldown = 4.5
+              a.yieldCooldown = 4.5
+            }
+          }
+        }
+      }
+    }
+  }
+
   function stepUnclaimedOrders(): void {
     for (let oi = activeOrdersList.length - 1; oi >= 0; oi--) {
       const ord = activeOrdersList[oi]!
       if (ord.status !== 'ready_for_pickup' || ord.readyAtSec === null) continue
-      const timeout = ord.source === 'player' ? 300 : 120
+      const timeout = ord.source === 'player' ? playerUnclaimedTimeoutSec : 120
       if (simTimeSec - ord.readyAtSec >= timeout) {
         finishOrder(ord, 'abandoned_unclaimed')
         const cust = customers.find(c => c.id === ord.customerId)
         if (cust && cust.phase !== 'leaving') {
           sendCustomerLeaving(cust, true)
         }
+      }
+    }
+  }
+
+  function stepStaleDirtySeats(): void {
+    for (const seat of seats) {
+      if (seat.state === 'dirty' && !seat.cleaningClerkId && simTimeSec - seat.dirtySinceSec > 28) {
+        seat.state = 'free'
+        seat.dirtyCupColor = null
       }
     }
   }
@@ -1296,6 +1928,9 @@ export function createDrinksSim(options: CreateDrinksSimOptions = {}): DrinksSim
 
   function tickFixed(dt: number): void {
     simTimeSec += dt
+    if (playerGreetCooldown > 0) playerGreetCooldown = Math.max(0, playerGreetCooldown - dt)
+    if (cutInRemindCooldown > 0) cutInRemindCooldown = Math.max(0, cutInRemindCooldown - dt)
+
     const hour = currentHour()
     const traffic = getDrinksTrafficProfile(hour, open24h)
     maybeScheduledSupplierDelivery(hour)
@@ -1306,16 +1941,20 @@ export function createDrinksSim(options: CreateDrinksSimOptions = {}): DrinksSim
       spawnBudget += (traffic.arrivalsPerMin / 60) * dt * rateScale
       while (spawnBudget >= 1) {
         spawnBudget -= 1
-        spawnCustomer(hour, traffic.roleWeights)
+        spawnCustomerOrPair(hour, traffic.roleWeights)
       }
     } else {
       spawnBudget = 0
     }
 
     stepClerks(dt)
+    applyClerkSeparation(dt)
     stepCustomers(dt, traffic.isOpen)
+    stepPairAndSocialInteractions(dt)
+    stepPlayerInteractions()
     applyCustomerSeparation(dt)
     stepUnclaimedOrders()
+    stepStaleDirtySeats()
 
     const totalPeople = clerks.length + customers.length
     if (totalPeople > peakConcurrentPeople) {
@@ -1323,7 +1962,19 @@ export function createDrinksSim(options: CreateDrinksSimOptions = {}): DrinksSim
     }
   }
 
-  function toOrderSnapshot(ord: InternalOrder): OrderSnapshot {
+  function computeQueuePositionMap(): Map<string, number> {
+    const posMap = new Map<string, number>()
+    let pos = 1
+    for (const ord of activeOrdersList) {
+      if (ord.status === 'queued' || ord.status === 'preparing') {
+        posMap.set(ord.id, pos++)
+      }
+    }
+    return posMap
+  }
+
+  function toOrderSnapshot(ord: InternalOrder, queuePosMap?: Map<string, number>): OrderSnapshot {
+    const qPos = queuePosMap ? queuePosMap.get(ord.id) ?? 0 : ord.status === 'queued' || ord.status === 'preparing' ? 1 : 0
     return {
       id: ord.id,
       ticketNo: ord.ticketNo,
@@ -1338,12 +1989,15 @@ export function createDrinksSim(options: CreateDrinksSimOptions = {}): DrinksSim
       unitPrice: ord.unitPrice,
       totalPrice: ord.totalPrice,
       status: ord.status,
+      queuePosition: qPos,
       stationId: ord.stationId,
       clerkId: ord.clerkId,
       pickupSlotIndex: ord.pickupSlotIndex,
-      progress: ord.status === 'ready_for_pickup' || ord.status === 'completed'
-        ? 1
-        : Math.min(1, ord.prepElapsedSec / Math.max(0.01, ord.prepDurationSec)),
+      progress:
+        ord.status === 'ready_for_pickup' || ord.status === 'completed'
+          ? 1
+          : Math.min(1, ord.prepElapsedSec / Math.max(0.01, ord.prepDurationSec)),
+      activeStepLabel: ord.activeStepLabel,
       createdAtSec: ord.createdAtSec,
       prepStartedAtSec: ord.prepStartedAtSec,
       readyAtSec: ord.readyAtSec,
@@ -1358,6 +2012,7 @@ export function createDrinksSim(options: CreateDrinksSimOptions = {}): DrinksSim
     for (const [k, v] of inventory.entries()) {
       invObj[k] = { ...v }
     }
+    const qMap = computeQueuePositionMap()
     const clerkSnaps: ClerkSnapshot[] = clerks.map(c => ({
       id: c.id,
       name: c.name,
@@ -1373,7 +2028,12 @@ export function createDrinksSim(options: CreateDrinksSimOptions = {}): DrinksSim
       holdingCrate: c.holdingCrate,
       activeOrderId: c.activeOrderId,
       targetStationId: c.targetStationId,
+      cleaningSeatId: c.cleaningSeatId,
+      activeStepLabel: c.activeStepLabel,
       actionLabel: c.actionLabel,
+      interactionKind: c.interactionKind,
+      interactionGesture: c.interactionGesture,
+      interactionTextVar: c.interactionTextVar,
     }))
     const customerSnaps: CustomerSnapshot[] = customers.map(c => ({
       id: c.id,
@@ -1388,9 +2048,12 @@ export function createDrinksSim(options: CreateDrinksSimOptions = {}): DrinksSim
       seatId: c.seatId,
       waitingOrderId: c.waitingOrderId,
       desiredItemId: c.desiredItemId,
+      groupId: c.groupId,
+      chatPartnerId: c.chatPartnerId,
       holdingCup: c.holdingCup,
       cupDrinkId: c.cupDrinkId,
       cupColor: c.cupColor,
+      cameraProp: c.cameraProp,
       sipsLeft: c.sipsLeft,
       sipProgress: c.sipProgress,
       patienceRatio: Math.max(0, Math.min(1, c.patienceSec / Math.max(1, c.patienceMaxSec))),
@@ -1400,8 +2063,21 @@ export function createDrinksSim(options: CreateDrinksSimOptions = {}): DrinksSim
       skinColor: c.skinColor,
       hairColor: c.hairColor,
       variant: c.variant,
+      interactionKind: c.interactionKind,
+      interactionGesture: c.interactionGesture,
+      interactionTextVar: c.interactionTextVar,
     }))
-    const orderSnaps = orders.map(toOrderSnapshot)
+    const orderSnaps = orders.map(o => toOrderSnapshot(o, qMap))
+    const seatSnaps: SeatSnapshot[] = seats.map(s => ({
+      id: s.id,
+      zone: s.zone,
+      x: s.x,
+      z: s.z,
+      yaw: s.yaw,
+      state: s.state,
+      occupantId: s.occupantId,
+      dirtyCupColor: s.dirtyCupColor,
+    }))
     const activeOrders = activeOrdersList.length
     const queueLength = customers.reduce((n, c) => n + (c.phase === 'queuing' || c.phase === 'ordering' ? 1 : 0), 0)
 
@@ -1413,12 +2089,14 @@ export function createDrinksSim(options: CreateDrinksSimOptions = {}): DrinksSim
       clerks: clerkSnaps,
       customers: customerSnaps,
       orders: orderSnaps,
+      seats: seatSnaps,
       inventory: invObj,
       metrics: {
         totalArrivals,
         totalOrdersCreated,
         ordersCompleted,
         ordersCancelled,
+        ordersCancelledByPlayer,
         ordersAbandonedQueue,
         ordersAbandonedWait,
         ordersAbandonedUnclaimed,
@@ -1428,6 +2106,7 @@ export function createDrinksSim(options: CreateDrinksSimOptions = {}): DrinksSim
         queueLength,
         totalRevenue,
         restockCount,
+        tablesCleanedCount,
         deadlockRecoveries,
         minObservedInventory: Number.isFinite(minObservedInventory) ? minObservedInventory : 0,
         peakConcurrentPeople,
@@ -1461,6 +2140,10 @@ export function createDrinksSim(options: CreateDrinksSimOptions = {}): DrinksSim
       return getSnapshot()
     },
 
+    setPlayerPresence(player: PlayerPresenceInput | null): void {
+      playerPresence = player ? { ...player } : null
+    },
+
     placePlayerOrder(req: PlacePlayerOrderRequest): PlacePlayerOrderResult {
       if (!req || typeof req.orderKey !== 'string' || !req.orderKey.trim()) {
         return { ok: false, code: 'INVALID_ORDER_KEY', created: false, idempotentReplay: false }
@@ -1473,7 +2156,7 @@ export function createDrinksSim(options: CreateDrinksSimOptions = {}): DrinksSim
           code: 'IDEMPOTENT_REPLAY',
           created: false,
           idempotentReplay: true,
-          order: toOrderSnapshot(existing),
+          order: toOrderSnapshot(existing, computeQueuePositionMap()),
         }
       }
       if (rejectPlayerWhenClosed && !getDrinksTrafficProfile(currentHour(), open24h).isOpen) {
@@ -1500,7 +2183,7 @@ export function createDrinksSim(options: CreateDrinksSimOptions = {}): DrinksSim
         code: 'OK',
         created: true,
         idempotentReplay: false,
-        order: toOrderSnapshot(ord),
+        order: toOrderSnapshot(ord, computeQueuePositionMap()),
       }
     },
 
@@ -1520,12 +2203,36 @@ export function createDrinksSim(options: CreateDrinksSimOptions = {}): DrinksSim
       return { ok: true, code: 'OK', order: toOrderSnapshot(ord), item: ord.item }
     },
 
+    cancelPlayerOrder(orderIdOrKey: string): CancelPlayerOrderResult {
+      const resolvedId = orderIdByKey.get(orderIdOrKey) ?? orderIdOrKey
+      const ord = ordersById.get(resolvedId)
+      if (!ord) {
+        return { ok: false, code: 'ORDER_NOT_FOUND', refundable: false }
+      }
+      if (ord.source !== 'player') {
+        return { ok: false, code: 'NOT_PLAYER_ORDER', order: toOrderSnapshot(ord), refundable: false }
+      }
+      if (isTerminalOrderStatus(ord.status)) {
+        return { ok: false, code: 'ALREADY_FINISHED', order: toOrderSnapshot(ord), refundable: false }
+      }
+      if (ord.clerkId) {
+        const clerk = clerks.find(c => c.id === ord.clerkId)
+        if (clerk) {
+          releaseClerkClaims(clerk)
+          clerk.state = 'idle'
+          clerk.actionLabel = '待命'
+        }
+      }
+      finishOrder(ord, 'cancelled_by_player')
+      return { ok: true, code: 'OK', order: toOrderSnapshot(ord), refundable: true }
+    },
+
     getSnapshot,
 
     getOrder(orderIdOrKey: string): OrderSnapshot | null {
       const resolvedId = orderIdByKey.get(orderIdOrKey) ?? orderIdOrKey
       const ord = ordersById.get(resolvedId)
-      return ord ? toOrderSnapshot(ord) : null
+      return ord ? toOrderSnapshot(ord, computeQueuePositionMap()) : null
     },
 
     getMenu(): readonly DrinkMenuItem[] {

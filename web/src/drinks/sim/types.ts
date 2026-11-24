@@ -48,6 +48,33 @@ export interface DrinkShopLayout {
   patrolPoints: DirectedSpot[]
 }
 
+/**
+ * Structural anchor contract compatible with `drinks/shop/anchors.ts`.
+ */
+export interface ShopAnchorsLike {
+  width?: number
+  depth?: number
+  entrance: Point2D
+  approachLeft?: Point2D
+  approachRight?: Point2D
+  menuBoardSlots?: readonly DirectedSpot[]
+  cashiers: readonly CashierSpot[]
+  prepStations: readonly PrepStationSpot[]
+  pickupSlots: readonly DirectedSpot[]
+  pickupClerkPos: DirectedSpot
+  waitingSpots: readonly DirectedSpot[]
+  seats: readonly SeatSpot[]
+  storagePos: DirectedSpot
+  patrolPoints: readonly DirectedSpot[]
+}
+
+export interface DrinkPrepStepSim {
+  id: string
+  label: string
+  stationKind: PrepStationKind
+  durationSec: number
+}
+
 export interface DrinkMenuItem {
   id: string
   name: string
@@ -58,6 +85,8 @@ export interface DrinkMenuItem {
   cupColor: string
   accentColor: string
   ingredients: Record<string, number>
+  steps?: readonly DrinkPrepStepSim[]
+  sipsCount?: number
   hot?: boolean
 }
 
@@ -84,6 +113,48 @@ export interface InventoryBinState {
   restocking: boolean
 }
 
+export type InteractionBubbleKind =
+  | 'order_ask'
+  | 'order_reply'
+  | 'make_change'
+  | 'receive_change'
+  | 'handover_cup'
+  | 'receive_cup'
+  | 'call_number'
+  | 'look_up_called'
+  | 'urge_order'
+  | 'clerk_reassure'
+  | 'complain_leave'
+  | 'take_photo'
+  | 'chat_pair_a'
+  | 'chat_pair_b'
+  | 'yield_way'
+  | 'claim_seat'
+  | 'clean_table'
+  | 'clerk_greet_player'
+  | 'queue_yield_player'
+  | 'remind_cut_in'
+  | 'restock'
+  | 'making'
+
+export type InteractionGesture =
+  | 'none'
+  | 'talk'
+  | 'give_change'
+  | 'receive_change'
+  | 'handover_cup'
+  | 'receive_cup'
+  | 'look_up'
+  | 'urge_wave'
+  | 'angry_stamp'
+  | 'take_photo'
+  | 'chat_nod'
+  | 'yield_step'
+  | 'claim_wave'
+  | 'clean_wipe'
+  | 'greet_wave'
+  | 'remind_gesture'
+
 export type ClerkRole = 'cashier' | 'maker' | 'runner' | 'patrol'
 
 export type ClerkState =
@@ -93,6 +164,7 @@ export type ClerkState =
   | 'making'
   | 'calling'
   | 'restocking'
+  | 'cleaning_table'
   | 'patrolling'
 
 export interface ClerkSnapshot {
@@ -110,7 +182,12 @@ export interface ClerkSnapshot {
   holdingCrate: boolean
   activeOrderId: string | null
   targetStationId: string | null
+  cleaningSeatId: string | null
+  activeStepLabel: string | null
   actionLabel: string
+  interactionKind: InteractionBubbleKind | null
+  interactionGesture: InteractionGesture
+  interactionTextVar: string | null
 }
 
 export type CustomerRoleKind = 'student' | 'office' | 'tourist' | 'local' | 'rider'
@@ -122,6 +199,7 @@ export type CustomerPhase =
   | 'ordering'
   | 'waiting_pickup'
   | 'picking_up'
+  | 'claiming_seat'
   | 'seated'
   | 'leaving'
 
@@ -138,9 +216,12 @@ export interface CustomerSnapshot {
   seatId: string | null
   waitingOrderId: string | null
   desiredItemId: string | null
+  groupId: string | null
+  chatPartnerId: string | null
   holdingCup: boolean
   cupDrinkId: string | null
   cupColor: string | null
+  cameraProp: boolean
   sipsLeft: number
   sipProgress: number
   patienceRatio: number
@@ -150,6 +231,9 @@ export interface CustomerSnapshot {
   skinColor: string
   hairColor: string
   variant: number
+  interactionKind: InteractionBubbleKind | null
+  interactionGesture: InteractionGesture
+  interactionTextVar: string | null
 }
 
 export type OrderSource = 'npc' | 'player'
@@ -160,6 +244,7 @@ export type OrderStatus =
   | 'ready_for_pickup'
   | 'completed'
   | 'cancelled_out_of_stock'
+  | 'cancelled_by_player'
   | 'abandoned_queue'
   | 'abandoned_wait'
   | 'abandoned_unclaimed'
@@ -178,14 +263,29 @@ export interface OrderSnapshot {
   unitPrice: number
   totalPrice: number
   status: OrderStatus
+  queuePosition: number
   stationId: string | null
   clerkId: string | null
   pickupSlotIndex: number
   progress: number
+  activeStepLabel: string | null
   createdAtSec: number
   prepStartedAtSec: number | null
   readyAtSec: number | null
   finishedAtSec: number | null
+}
+
+export type SeatOccupancyState = 'free' | 'reserved' | 'occupied' | 'dirty'
+
+export interface SeatSnapshot {
+  id: string
+  zone: 'indoor' | 'patio'
+  x: number
+  z: number
+  yaw: number
+  state: SeatOccupancyState
+  occupantId: string | null
+  dirtyCupColor: string | null
 }
 
 export type DrinksSimEventType =
@@ -197,6 +297,9 @@ export type DrinksSimEventType =
   | 'order_completed'
   | 'order_failed'
   | 'restock_done'
+  | 'table_cleaned'
+  | 'player_greeted'
+  | 'player_cut_in_reminded'
 
 export interface DrinksSimEvent {
   type: DrinksSimEventType
@@ -214,6 +317,7 @@ export interface DrinksSimMetrics {
   totalOrdersCreated: number
   ordersCompleted: number
   ordersCancelled: number
+  ordersCancelledByPlayer: number
   ordersAbandonedQueue: number
   ordersAbandonedWait: number
   ordersAbandonedUnclaimed: number
@@ -223,6 +327,7 @@ export interface DrinksSimMetrics {
   queueLength: number
   totalRevenue: number
   restockCount: number
+  tablesCleanedCount: number
   deadlockRecoveries: number
   minObservedInventory: number
   peakConcurrentPeople: number
@@ -238,8 +343,17 @@ export interface DrinksSimSnapshot {
   clerks: ClerkSnapshot[]
   customers: CustomerSnapshot[]
   orders: OrderSnapshot[]
+  seats: SeatSnapshot[]
   inventory: Record<string, InventoryBinState>
   metrics: DrinksSimMetrics
+}
+
+export interface PlayerPresenceInput {
+  active: boolean
+  x: number
+  z: number
+  yaw?: number
+  nearRadius?: number
 }
 
 export interface PlacePlayerOrderRequest {
@@ -265,6 +379,13 @@ export interface CollectPlayerOrderResult {
   item?: DrinkMenuItem
 }
 
+export interface CancelPlayerOrderResult {
+  ok: boolean
+  code: 'OK' | 'ORDER_NOT_FOUND' | 'ALREADY_FINISHED' | 'NOT_PLAYER_ORDER'
+  order?: OrderSnapshot
+  refundable: boolean
+}
+
 export interface InvariantCheckResult {
   ok: boolean
   errors: string[]
@@ -273,6 +394,7 @@ export interface InvariantCheckResult {
 export interface CreateDrinksSimOptions {
   menu?: readonly DrinkMenuItem[] | { items: readonly DrinkMenuItem[] }
   inventoryDefs?: readonly InventoryItemDef[]
+  anchors?: ShopAnchorsLike
   layout?: Partial<DrinkShopLayout>
   seed?: number | string
   now?: number
@@ -282,6 +404,7 @@ export interface CreateDrinksSimOptions {
   rejectPlayerWhenClosed?: boolean
   autoRestockSupply?: boolean
   maxCustomers?: number
+  playerUnclaimedTimeoutSec?: number
 }
 
 export interface DrinksSim {
@@ -293,8 +416,10 @@ export interface DrinksSim {
   }
   step(dtSec: number): void
   fastForward(durationSec: number): DrinksSimSnapshot
+  setPlayerPresence(player: PlayerPresenceInput | null): void
   placePlayerOrder(req: PlacePlayerOrderRequest): PlacePlayerOrderResult
   collectPlayerOrder(orderIdOrKey: string): CollectPlayerOrderResult
+  cancelPlayerOrder(orderIdOrKey: string, reason?: string): CancelPlayerOrderResult
   getSnapshot(): DrinksSimSnapshot
   getOrder(orderIdOrKey: string): OrderSnapshot | null
   getMenu(): readonly DrinkMenuItem[]

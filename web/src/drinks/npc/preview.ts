@@ -1,8 +1,18 @@
 import * as THREE from 'three'
+import { buildDrinksShopMesh } from '../shop/mesh.ts'
 import { createDrinksSim, type DrinksSim, type DrinksSimSnapshot } from '../sim/index.ts'
 import { createDrinksNpcRenderer } from './renderer.ts'
 import { DEFAULT_DRINKS_NPC_SKIN } from './palette.ts'
 import type { DrinksNpcMetrics, DrinksNpcRenderer, DrinksNpcSkinConfig } from './types.ts'
+
+export type InteractionScenarioId =
+  | 'order'
+  | 'handover'
+  | 'call'
+  | 'complain'
+  | 'chat'
+  | 'player_greet'
+  | 'peak_30'
 
 export interface DrinksNpcPreviewHandle {
   sim: DrinksSim
@@ -11,6 +21,13 @@ export interface DrinksNpcPreviewHandle {
   camera: THREE.PerspectiveCamera
   webgl: THREE.WebGLRenderer
   advanceToPeak30(maxSimSec?: number): DrinksSimSnapshot
+  runScenario(id: InteractionScenarioId): {
+    scenario: InteractionScenarioId
+    simTimeSec: number
+    matchedKinds: string[]
+    activeTotal: number
+    visibleBadgeCount: number
+  }
   getMetrics(): DrinksNpcMetrics & {
     rendererDrawCalls: number
     rendererTriangles: number
@@ -25,163 +42,81 @@ export interface DrinksNpcPreviewHandle {
     fpsEstimate: number
     activeTotal: number
     visibleCount: number
+    visibleBadgeCount: number
     clerksCount: number
     customersCount: number
   }>
   dispose(): void
 }
 
-function createSignboardTexture(title: string, subtitle: string, bgHex: string, textHex: string): THREE.CanvasTexture {
+function createPlayerTagSprite(): THREE.Sprite {
   const canvas = document.createElement('canvas')
-  canvas.width = 1024
-  canvas.height = 192
+  canvas.width = 192
+  canvas.height = 64
   const ctx = canvas.getContext('2d')!
-  ctx.fillStyle = bgHex
-  ctx.fillRect(0, 0, canvas.width, canvas.height)
-
-  ctx.strokeStyle = '#fff5e4'
-  ctx.lineWidth = 6
-  ctx.strokeRect(12, 12, canvas.width - 24, canvas.height - 24)
-
-  ctx.fillStyle = textHex
-  ctx.textAlign = 'center'
+  ctx.clearRect(0, 0, canvas.width, canvas.height)
+  ctx.fillStyle = 'rgba(24, 18, 12, 0.94)'
+  ctx.beginPath()
+  ctx.roundRect(10, 8, 172, 48, 22)
+  ctx.fill()
+  ctx.strokeStyle = '#fbbf24'
+  ctx.lineWidth = 4
+  ctx.stroke()
+  ctx.fillStyle = '#fbbf24'
+  ctx.beginPath()
+  ctx.arc(38, 32, 8, 0, Math.PI * 2)
+  ctx.fill()
+  ctx.fillStyle = '#fef3c7'
+  ctx.font = 'bold 26px -apple-system, BlinkMacSystemFont, "PingFang SC", sans-serif'
   ctx.textBaseline = 'middle'
-  ctx.font = 'bold 74px -apple-system, BlinkMacSystemFont, "PingFang SC", sans-serif'
-  ctx.fillText(title, canvas.width * 0.5, 78)
-
-  ctx.font = '500 30px -apple-system, BlinkMacSystemFont, "PingFang SC", sans-serif'
-  ctx.fillStyle = '#ffeed8'
-  ctx.fillText(subtitle, canvas.width * 0.5, 140)
-
+  ctx.textAlign = 'left'
+  ctx.fillText('玩家', 56, 33)
   const tex = new THREE.CanvasTexture(canvas)
   tex.colorSpace = THREE.SRGBColorSpace
-  tex.needsUpdate = true
-  return tex
+  const mat = new THREE.SpriteMaterial({ map: tex, transparent: true, depthTest: true, depthWrite: false })
+  const sprite = new THREE.Sprite(mat)
+  sprite.scale.set(0.9, 0.3, 1)
+  sprite.position.set(0, 2.02, 0)
+  sprite.renderOrder = 5
+  return sprite
 }
 
-function buildShopStage(sim: DrinksSim, skin: DrinksNpcSkinConfig): { group: THREE.Group; dispose: () => void } {
-  const layout = sim.getLayout()
-  const group = new THREE.Group()
-  group.name = 'drinks-shop-preview-stage'
-  const geos: THREE.BufferGeometry[] = []
-  const mats: THREE.Material[] = []
-  const texs: THREE.Texture[] = []
+function buildPlayerAvatarMarker(): THREE.Group {
+  const g = new THREE.Group()
+  g.name = 'drinks-preview-player-marker'
+  const jacket = new THREE.MeshStandardMaterial({ color: '#f59e0b', roughness: 0.72, flatShading: true })
+  const jeans = new THREE.MeshStandardMaterial({ color: '#3b5998', roughness: 0.84, flatShading: true })
+  const skin = new THREE.MeshStandardMaterial({ color: '#dcb48e', roughness: 0.78, flatShading: true })
+  const hair = new THREE.MeshStandardMaterial({ color: '#1f1b19', roughness: 0.88, flatShading: true })
+  const ringMat = new THREE.MeshBasicMaterial({ color: '#fbbf24', side: THREE.DoubleSide })
+  const discMat = new THREE.MeshBasicMaterial({ color: '#38bdf8', transparent: true, opacity: 0.34, side: THREE.DoubleSide, depthWrite: false })
 
-  const trackGeo = <T extends THREE.BufferGeometry>(g: T): T => {
-    geos.push(g)
-    return g
-  }
-  const trackMat = <T extends THREE.Material>(m: T): T => {
-    mats.push(m)
-    return m
-  }
-  const addBox = (
-    w: number,
-    h: number,
-    d: number,
-    x: number,
-    y: number,
-    z: number,
-    color: number | string,
-    opts?: { transparent?: boolean; opacity?: number; roughness?: number; depthWrite?: boolean },
-  ): THREE.Mesh => {
-    const mat = trackMat(
-      new THREE.MeshStandardMaterial({
-        color,
-        roughness: opts?.roughness ?? 0.85,
-        metalness: 0.04,
-        flatShading: true,
-        transparent: opts?.transparent ?? false,
-        opacity: opts?.opacity ?? 1,
-        depthWrite: opts?.depthWrite ?? !(opts?.transparent ?? false),
-      }),
-    )
-    const mesh = new THREE.Mesh(trackGeo(new THREE.BoxGeometry(w, h, d)), mat)
-    mesh.position.set(x, y, z)
-    group.add(mesh)
-    return mesh
-  }
+  const torso = new THREE.Mesh(new THREE.BoxGeometry(0.46, 0.58, 0.26), jacket)
+  torso.position.y = 1.03
+  const head = new THREE.Mesh(new THREE.IcosahedronGeometry(0.15, 1), skin)
+  head.position.y = 1.5
+  const capHair = new THREE.Mesh(new THREE.SphereGeometry(0.168, 10, 6, 0, Math.PI * 2, 0, Math.PI * 0.56), hair)
+  capHair.position.set(0, 1.53, -0.01)
+  const legL = new THREE.Mesh(new THREE.BoxGeometry(0.15, 0.7, 0.16), jeans)
+  legL.position.set(-0.11, 0.35, 0)
+  const legR = new THREE.Mesh(new THREE.BoxGeometry(0.15, 0.7, 0.16), jeans)
+  legR.position.set(0.11, 0.35, 0)
+  const armL = new THREE.Mesh(new THREE.BoxGeometry(0.11, 0.46, 0.11), jacket)
+  armL.position.set(-0.28, 1.05, 0)
+  const armR = new THREE.Mesh(new THREE.BoxGeometry(0.11, 0.46, 0.11), jacket)
+  armR.position.set(0.28, 1.05, 0)
 
-  // Granite sidewalk + curb + patio strip + warm interior floor tiles
-  addBox(24, 0.08, 10, 0, -0.05, 6.4, '#8b8b87', { roughness: 0.92 })
-  addBox(12.2, 0.04, 2.3, 0, 0.0, 3.85, '#c2bcb0', { roughness: 0.9 })
-  addBox(layout.width, 0.08, 7.6, 0, -0.03, -0.9, '#ece6da', { roughness: 0.86 })
+  const ring = new THREE.Mesh(new THREE.RingGeometry(0.42, 0.56, 28), ringMat)
+  ring.rotation.x = -Math.PI * 0.5
+  ring.position.y = 0.04
+  const disc = new THREE.Mesh(new THREE.CircleGeometry(0.42, 24), discMat)
+  disc.rotation.x = -Math.PI * 0.5
+  disc.position.y = 0.035
 
-  // Side & rear walls with upper parapet rim
-  addBox(layout.width, 4.1, 0.24, 0, 2.05, -4.6, '#f4f0e8')
-  addBox(0.24, 4.1, 7.5, -layout.width * 0.5, 2.05, -0.9, '#f4f0e8')
-  addBox(0.24, 4.1, 7.5, layout.width * 0.5, 2.05, -0.9, '#f4f0e8')
-  // Side roof eaves so store reads as an architectural building shell (leaving center open for visibility)
-  addBox(layout.width + 0.4, 0.16, 1.8, 0, 4.12, -3.85, '#646b6d')
-  addBox(0.55, 0.16, 7.8, -layout.width * 0.5, 4.12, -0.9, '#646b6d')
-  addBox(0.55, 0.16, 7.8, layout.width * 0.5, 4.12, -0.9, '#646b6d')
-
-  // Front facade mullions + framed glass curtain wings (transparent depthWrite:false prevents clipping sprites!)
-  addBox(2.86, 3.35, 0.1, -4.19, 1.68, 2.8, '#cde0e8', { transparent: true, opacity: 0.22, roughness: 0.15, depthWrite: false })
-  addBox(2.86, 3.35, 0.1, 4.19, 1.68, 2.8, '#cde0e8', { transparent: true, opacity: 0.22, roughness: 0.15, depthWrite: false })
-  for (const fx of [-5.62, -2.76, 2.76, 5.62]) {
-    addBox(0.14, 3.55, 0.18, fx, 1.78, 2.8, '#363c42', { roughness: 0.55 })
-  }
-  addBox(2.86, 0.1, 0.16, -4.19, 3.4, 2.8, '#363c42', { roughness: 0.55 })
-  addBox(2.86, 0.1, 0.16, 4.19, 3.4, 2.8, '#363c42', { roughness: 0.55 })
-
-  // Flagship fascia signboard lifted to 3.92m header so clerks & back counter are 100% unobstructed!
-  addBox(layout.width, 0.88, 0.34, 0, 3.92, 2.84, skin.clerkApronColor, { roughness: 0.65 })
-  const signTex = createSignboardTexture(skin.shopBrandName, '鲜果茶 · 现磨咖啡 · 冰爽茶饮', skin.clerkApronColor, '#ffffff')
-  texs.push(signTex)
-  const signMat = trackMat(new THREE.MeshBasicMaterial({ map: signTex }))
-  const signPlane = new THREE.Mesh(trackGeo(new THREE.PlaneGeometry(layout.width * 0.9, 0.74)), signMat)
-  signPlane.position.set(0, 3.92, 3.02)
-  group.add(signPlane)
-
-  // Wall-mounted Menu Lightbox behind back bar (never blocks customer walk paths!)
-  const menuTex = createSignboardTexture('招牌饮品 · ¥4 - ¥9', '冰鲜柠檬水 ¥4  ·  满杯百香果 ¥7  ·  珍珠奶茶 ¥7  ·  杨枝甘露 ¥9', '#272f38', '#ffe49e')
-  texs.push(menuTex)
-  const menuPlane = new THREE.Mesh(trackGeo(new THREE.PlaneGeometry(5.8, 0.95)), trackMat(new THREE.MeshBasicMaterial({ map: menuTex })))
-  menuPlane.position.set(-0.2, 2.65, -4.46)
-  group.add(menuPlane)
-
-  // Compact sidewalk A-frame menu stand tucked beside left glass window (well clear of browsing spots)
-  addBox(0.62, 0.98, 0.1, -3.35, 0.49, 2.95, '#2b323b', { roughness: 0.65 })
-  addBox(0.52, 0.66, 0.12, -3.35, 0.58, 2.96, '#f6efe0', { roughness: 0.75 })
-
-  // Main front service counter (separates clerk zone z < -0.45 from customer hall z > -0.05)
-  addBox(7.8, 0.94, 0.6, 0.2, 0.47, -0.38, '#f5f1e8', { roughness: 0.72 })
-  addBox(7.86, 0.08, 0.66, 0.2, 0.96, -0.38, skin.clerkApronColor, { roughness: 0.6 })
-
-  // POS registers at cashiers
-  for (const c of layout.cashiers) {
-    addBox(0.36, 0.24, 0.26, c.clerkPos.x, 1.12, -0.38, '#232830')
-  }
-
-  // Back prep bar + beverage machines
-  addBox(8.2, 0.86, 0.72, -0.2, 0.43, -3.15, '#dce0e2', { roughness: 0.68 })
-  for (const st of layout.prepStations) {
-    addBox(0.56, 0.46, 0.46, st.x, 1.09, -3.15, st.kind === 'cream_top' ? '#f2ece2' : '#73828c')
-  }
-  // Storage crates
-  addBox(0.85, 1.3, 0.68, layout.storagePos.x - 0.65, 0.65, layout.storagePos.z, '#b7854d')
-
-  // Tables & seats (offset cleanly so seated legs don't clip central table post)
-  for (const seat of layout.seats) {
-    const dirX = Math.sin(seat.yaw)
-    const dirZ = Math.cos(seat.yaw)
-    addBox(0.42, 0.42, 0.42, seat.x, 0.21, seat.z, seat.zone === 'patio' ? '#d97b62' : '#d2c2aa')
-    const tx = seat.x + dirX * 0.78
-    const tz = seat.z + dirZ * 0.78
-    addBox(0.56, 0.045, 0.56, tx, 0.7, tz, '#f6f2e8')
-    addBox(0.07, 0.68, 0.07, tx + dirX * 0.1, 0.34, tz + dirZ * 0.1, '#434a52')
-  }
-
-  return {
-    group,
-    dispose() {
-      for (const g of geos) g.dispose()
-      for (const m of mats) m.dispose()
-      for (const t of texs) t.dispose()
-      group.removeFromParent()
-    },
-  }
+  const tagSprite = createPlayerTagSprite()
+  g.add(torso, head, capHair, legL, legR, armL, armR, ring, disc, tagSprite)
+  g.visible = false
+  return g
 }
 
 export function mountDrinksNpcPreview(
@@ -190,13 +125,17 @@ export function mountDrinksNpcPreview(
 ): DrinksNpcPreviewHandle {
   const width = opts?.width ?? Math.max(640, container.clientWidth || 1280)
   const height = opts?.height ?? Math.max(400, container.clientHeight || 720)
-  const skin: DrinksNpcSkinConfig = { ...DEFAULT_DRINKS_NPC_SKIN, ...(opts?.skin ?? {}) }
+  const skin: DrinksNpcSkinConfig = {
+    ...DEFAULT_DRINKS_NPC_SKIN,
+    greetingLine: '欢迎光临！',
+    ...(opts?.skin ?? {}),
+  }
 
   const scene = new THREE.Scene()
   scene.background = new THREE.Color('#d9e5ea')
 
   const camera = new THREE.PerspectiveCamera(46, width / height, 0.1, 120)
-  camera.position.set(2.8, 5.5, 11.4)
+  camera.position.set(2.8, 5.8, 11.4)
   camera.lookAt(-0.1, 1.3, -0.2)
   camera.updateMatrixWorld()
 
@@ -206,13 +145,21 @@ export function mountDrinksNpcPreview(
   webgl.outputColorSpace = THREE.SRGBColorSpace
   container.appendChild(webgl.domElement)
 
-  // Guilin daytime lighting (preview world sky/sun only; NPC renderer adds 0 lights)
-  const hemi = new THREE.HemisphereLight('#d6e7f2', '#7d776a', 1.35)
+  const hemi = new THREE.HemisphereLight('#d6e7f2', '#7d776a', 1.4)
   const sun = new THREE.DirectionalLight('#fff2da', 2.2)
   sun.position.set(8, 14, 9)
   scene.add(hemi, sun)
 
-  const sim = createDrinksSim({
+  // Mount real 1:1 Wangcheng shop architectural mesh in cutaway mode
+  const shopMesh = buildDrinksShopMesh({ cutaway: true })
+  shopMesh.materials.curtainGlassMat.depthWrite = false
+  shopMesh.materials.doorGlassMat.depthWrite = false
+  scene.add(shopMesh.group)
+
+  const playerMarker = buildPlayerAvatarMarker()
+  scene.add(playerMarker)
+
+  let sim: DrinksSim = createDrinksSim({
     seed: 'wangcheng-peak-30-preview',
     now: 0,
     hourOf: t => 19.5 + t / 3600,
@@ -220,16 +167,34 @@ export function mountDrinksNpcPreview(
     maxCustomers: 26,
   })
 
-  const stage = buildShopStage(sim, skin)
-  scene.add(stage.group)
-
-  const npcRenderer = createDrinksNpcRenderer({
+  let npcRenderer: DrinksNpcRenderer = createDrinksNpcRenderer({
     scene,
     sim,
     skin,
     maxNpcs: 48,
+    maxVisibleBadges: 8,
     showBadges: true,
   })
+
+  function rebuildSim(seed: string, hour = 19.5, maxCustomers = 26): void {
+    npcRenderer.dispose()
+    sim = createDrinksSim({
+      seed,
+      now: 0,
+      hourOf: () => hour,
+      clerkCount: 5,
+      maxCustomers,
+    })
+    npcRenderer = createDrinksNpcRenderer({
+      scene,
+      sim,
+      skin,
+      maxNpcs: 48,
+      maxVisibleBadges: 8,
+      showBadges: true,
+    })
+    playerMarker.visible = false
+  }
 
   function advanceToPeak30(maxSimSec = 240): DrinksSimSnapshot {
     let snap = sim.getSnapshot()
@@ -239,12 +204,352 @@ export function mountDrinksNpcPreview(
       elapsed += 2
       snap = sim.getSnapshot()
     }
+    camera.position.set(0.3, 4.1, 9.4)
+    camera.lookAt(0.1, 1.05, 0.3)
+    camera.updateMatrixWorld()
     npcRenderer.step(0, camera.position)
     webgl.render(scene, camera)
     return snap
   }
 
-  // Start immediately at peak 30 NPCs
+  function stepUntilInteraction(
+    predicate: (snap: DrinksSimSnapshot) => { x: number; z: number } | null,
+    maxSteps = 900,
+    stepDt = 0.2,
+  ): { x: number; z: number } | null {
+    for (let i = 0; i < maxSteps; i++) {
+      sim.step(stepDt)
+      const snap = sim.getSnapshot()
+      const hit = predicate(snap)
+      if (hit) return hit
+    }
+    return null
+  }
+
+  function runScenario(id: InteractionScenarioId) {
+    if (id === 'peak_30') {
+      rebuildSim('wangcheng-peak-30-preview', 19.5, 26)
+      const snap = advanceToPeak30(240)
+      const kinds = [
+        ...snap.clerks.map(c => c.interactionKind).filter(Boolean),
+        ...snap.customers.map(c => c.interactionKind).filter(Boolean),
+      ] as string[]
+      return {
+        scenario: id,
+        simTimeSec: snap.timeSec,
+        matchedKinds: kinds,
+        activeTotal: snap.clerks.length + snap.customers.length,
+        visibleBadgeCount: npcRenderer.getMetrics().visibleBadgeCount,
+      }
+    }
+
+    function pickClearCamera(
+      tx: number,
+      tz: number,
+      candidates: readonly [number, number, number][],
+      snap: DrinksSimSnapshot,
+      ignoreIds: ReadonlySet<string>,
+    ): [number, number, number] {
+      const others = [
+        ...snap.customers.filter(c => !ignoreIds.has(c.id)),
+        ...snap.clerks.filter(c => !ignoreIds.has(c.id)),
+      ]
+      let best = candidates[0]!
+      let bestScore = -Infinity
+      for (const cand of candidates) {
+        const [cx, cy, cz] = cand
+        if (cx < -5.1 || cx > 5.1) continue
+        let penalty = 0
+        const dx = tx - cx
+        const dz = tz - cz
+        const lenSq = dx * dx + dz * dz
+        if (lenSq < 1e-4) continue
+        for (const o of others) {
+          const t = Math.max(0, Math.min(1, ((o.x - cx) * dx + (o.z - cz) * dz) / lenSq))
+          const px = cx + dx * t
+          const pz = cz + dz * t
+          const distToRay = Math.hypot(o.x - px, o.z - pz)
+          if (distToRay < 0.9 && t > 0.05 && t < 0.95) {
+            penalty += (0.9 - distToRay) * 20
+          }
+          if (Math.hypot(o.x - cx, o.z - cz) < 0.85) penalty += 15
+        }
+        const score = -penalty - Math.abs(Math.hypot(dx, dz) - 2.65)
+        if (score > bestScore) {
+          bestScore = score
+          best = [cx, cy, cz]
+        }
+      }
+      return best
+    }
+
+    if (id === 'order') {
+      rebuildSim('scenario-order-v1', 15.5, 18)
+      let pair: { fx: number; fz: number; ids: Set<string>; snap: DrinksSimSnapshot } | null = null
+      stepUntilInteraction(s => {
+        const cl = s.clerks.find(c => c.interactionKind === 'order_ask' && c.speed < 0.1)
+        const cu = cl
+          ? s.customers.find(c => c.interactionKind === 'order_reply' && Math.abs(c.x - cl.x) < 0.75)
+          : undefined
+        if (!cl || !cu) return null
+        pair = { fx: (cl.x + cu.x) * 0.5, fz: (cl.z + cu.z) * 0.5, ids: new Set([cl.id, cu.id]), snap: s }
+        return { x: pair.fx, z: pair.fz }
+      })
+      if (pair) {
+        const p = pair as { fx: number; fz: number; ids: Set<string>; snap: DrinksSimSnapshot }
+        const [cx, cy, cz] = pickClearCamera(
+          p.fx,
+          p.fz,
+          [
+            [p.fx + 1.55, 1.9, Math.min(2.35, p.fz + 2.35)],
+            [p.fx - 1.55, 1.9, Math.min(2.35, p.fz + 2.35)],
+            [p.fx + 2.1, 1.88, Math.min(2.2, p.fz + 1.45)],
+          ],
+          p.snap,
+          p.ids,
+        )
+        camera.position.set(cx, cy, cz)
+        camera.lookAt(p.fx, 1.24, p.fz - 0.1)
+      } else {
+        camera.position.set(-0.95, 1.9, 1.95)
+        camera.lookAt(-2.55, 1.24, -0.4)
+      }
+    } else if (id === 'handover') {
+      rebuildSim('scenario-handover-v1', 15.5, 18)
+      let pair: { fx: number; fz: number; ids: Set<string>; snap: DrinksSimSnapshot } | null = null
+      stepUntilInteraction(s => {
+        const cl = s.clerks.find(c => c.interactionKind === 'handover_cup')
+        const cu = cl
+          ? s.customers.find(c => c.interactionKind === 'receive_cup' && Math.hypot(c.x - cl.x, c.z - cl.z) < 2.2)
+          : undefined
+        if (!cl || !cu) return null
+        pair = { fx: (cl.x + cu.x) * 0.5, fz: (cl.z + cu.z) * 0.5, ids: new Set([cl.id, cu.id]), snap: s }
+        return { x: pair.fx, z: pair.fz }
+      })
+      if (pair) {
+        const p = pair as { fx: number; fz: number; ids: Set<string>; snap: DrinksSimSnapshot }
+        const [cx, cy, cz] = pickClearCamera(
+          p.fx,
+          p.fz,
+          [
+            [p.fx + 2.35, 1.82, 1.15],
+            [p.fx - 2.35, 1.82, 1.15],
+            [p.fx + 2.05, 1.82, 1.85],
+            [p.fx - 2.05, 1.82, 1.85],
+          ],
+          p.snap,
+          p.ids,
+        )
+        camera.position.set(cx, cy, cz)
+        camera.lookAt(p.fx, 1.18, p.fz)
+      } else {
+        camera.position.set(4.3, 1.82, 1.2)
+        camera.lookAt(2.25, 1.18, -0.3)
+      }
+    } else if (id === 'call') {
+      rebuildSim('scenario-call-v1', 15.5, 18)
+      let pair: { fx: number; fz: number; ids: Set<string>; snap: DrinksSimSnapshot } | null = null
+      stepUntilInteraction(s => {
+        const cl = s.clerks.find(c => c.interactionKind === 'call_number')
+        const cu = s.customers.find(c => c.interactionKind === 'look_up_called')
+        if (!cl || !cu) return null
+        pair = { fx: (cl.x + cu.x) * 0.5, fz: (cl.z + cu.z) * 0.5, ids: new Set([cl.id, cu.id]), snap: s }
+        return { x: pair.fx, z: pair.fz }
+      })
+      if (pair) {
+        const p = pair as { fx: number; fz: number; ids: Set<string>; snap: DrinksSimSnapshot }
+        const [cx, cy, cz] = pickClearCamera(
+          p.fx,
+          p.fz,
+          [
+            [p.fx - 1.65, 1.9, 2.45],
+            [p.fx + 1.65, 1.9, 2.45],
+            [p.fx - 2.1, 1.9, 1.65],
+          ],
+          p.snap,
+          p.ids,
+        )
+        camera.position.set(cx, cy, cz)
+        camera.lookAt(p.fx + 0.05, 1.26, 0.15)
+      } else {
+        camera.position.set(0.5, 1.9, 2.45)
+        camera.lookAt(2.05, 1.26, 0.15)
+      }
+    } else if (id === 'complain') {
+      rebuildSim('scenario-complain-v1', 19.5, 26)
+      let found: { fx: number; fz: number; id: string; snap: DrinksSimSnapshot } | null = null
+      stepUntilInteraction(
+        s => {
+          const cu = s.customers.find(
+            c => c.interactionKind === 'complain_leave' && c.phase === 'leaving' && c.x > -4.6 && c.x < 4.6 && c.z < 2.2,
+          )
+          if (!cu) return null
+          found = { fx: cu.x, fz: cu.z, id: cu.id, snap: s }
+          return { x: cu.x, z: cu.z }
+        },
+        2400,
+        0.2,
+      )
+      if (found) {
+        const f = found as { fx: number; fz: number; id: string; snap: DrinksSimSnapshot }
+        const [cx, cy, cz] = pickClearCamera(
+          f.fx,
+          f.fz,
+          [
+            [f.fx + 2.35, 1.88, Math.min(2.38, f.fz + 1.25)],
+            [f.fx - 2.35, 1.88, Math.min(2.38, f.fz + 1.25)],
+            [f.fx + 1.8, 1.88, Math.min(2.38, f.fz + 1.95)],
+            [f.fx - 1.8, 1.88, Math.min(2.38, f.fz + 1.95)],
+          ],
+          f.snap,
+          new Set([f.id]),
+        )
+        camera.position.set(cx, cy, cz)
+        camera.lookAt(f.fx, 1.15, f.fz)
+      } else {
+        camera.position.set(1.2, 1.9, 2.38)
+        camera.lookAt(-1.2, 1.15, 1.2)
+      }
+    } else if (id === 'chat') {
+      rebuildSim('scenario-chat-v1', 16.0, 24)
+      let bestCam: { cam: [number, number, number]; mx: number; mz: number } | null = null
+      let fallbackCam: { cam: [number, number, number]; mx: number; mz: number } | null = null
+      const evalChatCam = (
+        a: { id: string; x: number; z: number },
+        b: { id: string; x: number; z: number },
+        s: DrinksSimSnapshot,
+      ): { cam: [number, number, number]; penalty: number } => {
+        const mx = (a.x + b.x) * 0.5
+        const mz = (a.z + b.z) * 0.5
+        const cands: [number, number, number][] = []
+        for (const dist of [3.2, 3.65, 4.0]) {
+          for (const angleDeg of [20, 45, 70, 110, 135, 160, -20, -45, -70, -110, -135, -160]) {
+            const rad = (angleDeg * Math.PI) / 180
+            const cx = mx + Math.cos(rad) * dist
+            const cz = mz + Math.sin(rad) * dist
+            if (cx < -4.95 || cx > 4.95) continue
+            if (mz < 2.5 && (cz > 2.38 || cz < 0.05)) continue
+            if (mz >= 2.5 && (cz < 3.85 || cz > 6.4)) continue
+            cands.push([cx, 2.02, cz])
+          }
+        }
+        const others = s.customers.filter(c => c.id !== a.id && c.id !== b.id)
+        let chosen: [number, number, number] = [mx + 2.8, 2.02, Math.min(2.36, mz + 1.6)]
+        let minScore = Infinity
+        let bestObstruct = Infinity
+        for (const cand of cands) {
+          const [cx, , cz] = cand
+          let pen = 0
+          for (const tgt of [a, b]) {
+            const dx = tgt.x - cx
+            const dz = tgt.z - cz
+            const lenSq = Math.max(1e-4, dx * dx + dz * dz)
+            for (const o of others) {
+              const t = Math.max(0, Math.min(1, ((o.x - cx) * dx + (o.z - cz) * dz) / lenSq))
+              const distRay = Math.hypot(o.x - (cx + dx * t), o.z - (cz + dz * t))
+              if (distRay < 1.1 && t > 0.02 && t < 0.98) {
+                pen += (1.1 - distRay) * 25
+              }
+            }
+          }
+          const align = Math.abs((b.x - a.x) * (cx - mx) + (b.z - a.z) * (cz - mz))
+          const scorePen = pen + align * 0.8
+          if (scorePen < minScore) {
+            minScore = scorePen
+            bestObstruct = pen
+            chosen = cand
+          }
+        }
+        return { cam: chosen, penalty: bestObstruct }
+      }
+
+      let chatStep = 0
+      stepUntilInteraction(s => {
+        chatStep++
+        for (const a of s.customers) {
+          if (a.interactionKind !== 'chat_pair_a' || !a.chatPartnerId) continue
+          const b = s.customers.find(c => c.id === a.chatPartnerId && c.interactionKind === 'chat_pair_b')
+          if (!b) continue
+          const mx = (a.x + b.x) * 0.5
+          const mz = (a.z + b.z) * 0.5
+          const res = evalChatCam(a, b, s)
+          fallbackCam = { cam: res.cam, mx, mz }
+          if (res.penalty <= 1.5 || chatStep >= 300) {
+            bestCam = { cam: res.cam, mx, mz }
+            return { x: mx, z: mz }
+          }
+        }
+        return null
+      }, 900)
+      const pick = bestCam ?? fallbackCam
+      if (pick) {
+        const chosen = pick as { cam: [number, number, number]; mx: number; mz: number }
+        camera.position.set(chosen.cam[0], chosen.cam[1], chosen.cam[2])
+        camera.lookAt(chosen.mx, 1.06, chosen.mz)
+      } else {
+        camera.position.set(3.4, 2.02, 2.35)
+        camera.lookAt(0.0, 1.06, 1.4)
+      }
+    } else if (id === 'player_greet') {
+      rebuildSim('scenario-player-v1', 19.5, 22)
+      sim.fastForward(28)
+      const preSnap = sim.getSnapshot()
+      const anchorCust =
+        preSnap.customers.find(c => c.phase === 'queuing' && c.z >= 0.7 && c.z <= 2.1) ??
+        preSnap.customers.find(c => c.phase === 'waiting_pickup' && c.z >= 0.7 && c.z <= 2.1)
+      const px = anchorCust ? Math.max(-2.1, Math.min(2.4, anchorCust.x + (anchorCust.x < 0 ? 0.92 : -0.92))) : -0.15
+      const pz = anchorCust ? Math.max(0.85, Math.min(2.05, anchorCust.z + 0.18)) : 1.35
+      playerMarker.position.set(px, 0, pz)
+      playerMarker.rotation.y = Math.PI
+      playerMarker.visible = true
+      sim.setPlayerPresence({ active: true, x: px, z: pz, yaw: Math.PI, nearRadius: 6.2 })
+      let clFocus = { x: -0.35, z: -0.92 }
+      let snapAfter = preSnap
+      stepUntilInteraction(
+        s => {
+          const cl = s.clerks.find(c => c.interactionKind === 'clerk_greet_player')
+          if (!cl) return null
+          clFocus = { x: cl.x, z: cl.z }
+          snapAfter = s
+          return clFocus
+        },
+        40,
+        0.1,
+      )
+      const mx = (px + clFocus.x) * 0.5
+      const mz = (pz + clFocus.z) * 0.5
+      const [cx, cy, cz] = pickClearCamera(
+        mx,
+        mz,
+        [
+          [px + 2.85, 1.92, Math.min(2.4, pz + 1.25)],
+          [px - 2.85, 1.92, Math.min(2.4, pz + 1.25)],
+          [mx + 2.95, 1.94, 2.38],
+        ],
+        snapAfter,
+        new Set(),
+      )
+      camera.position.set(cx, cy, cz)
+      camera.lookAt(mx, 0.98, mz + 0.15)
+    }
+
+    camera.updateMatrixWorld()
+    npcRenderer.step(0, camera.position)
+    webgl.render(scene, camera)
+    const snap = sim.getSnapshot()
+    const kinds = [
+      ...snap.clerks.map(c => c.interactionKind).filter(Boolean),
+      ...snap.customers.map(c => c.interactionKind).filter(Boolean),
+    ] as string[]
+    return {
+      scenario: id,
+      simTimeSec: Math.round(snap.timeSec * 10) / 10,
+      matchedKinds: kinds,
+      activeTotal: snap.clerks.length + snap.customers.length,
+      visibleBadgeCount: npcRenderer.getMetrics().visibleBadgeCount,
+    }
+  }
+
   advanceToPeak30(240)
 
   function getMetrics() {
@@ -298,6 +603,7 @@ export function mountDrinksNpcPreview(
       fpsEstimate: avgFrameMs > 0 ? Math.round((1000 / avgFrameMs) * 10) / 10 : 999,
       activeTotal: metrics.activeTotal,
       visibleCount: metrics.visibleCount,
+      visibleBadgeCount: metrics.visibleBadgeCount,
       clerksCount: metrics.clerksCount,
       customersCount: metrics.customersCount,
     }
@@ -310,11 +616,12 @@ export function mountDrinksNpcPreview(
     camera,
     webgl,
     advanceToPeak30,
+    runScenario,
     getMetrics,
     measureFrames,
     dispose() {
       npcRenderer.dispose()
-      stage.dispose()
+      shopMesh.dispose()
       webgl.dispose()
       webgl.domElement.remove()
     },

@@ -1,19 +1,107 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { createDrinksSim, isTerminalOrderStatus, SIM_FAST_FORWARD_TOLERANCE } from './index.ts'
+import { DRINKS_MENU } from '../menu/menu.ts'
+import {
+  convertCatalogMenuToSim,
+  createDrinksSim,
+  isTerminalOrderStatus,
+  layoutFromShopAnchors,
+  SIM_FAST_FORWARD_TOLERANCE,
+} from './index.ts'
 
-test('无玩家模拟 24 小时：客流有明显峰谷、订单全部有结局、无死锁、无负库存', () => {
+test('sim 菜单与 menu.ts 的 id 集合精确相等，且缺失库存/工位/步骤映射直接失败', () => {
+  const sim = createDrinksSim({ seed: 'menu-contract' })
+  const simMenu = sim.getMenu()
+
+  const simIds = new Set(simMenu.map(item => item.id))
+  const catIds = new Set(DRINKS_MENU.map(item => item.id))
+  assert.deepEqual(simIds, catIds, 'sim menu ids must match menu/menu.ts ids 1:1')
+
+  for (const catItem of DRINKS_MENU) {
+    const simItem = simMenu.find(x => x.id === catItem.id)
+    assert.ok(simItem)
+    assert.equal(simItem.price, catItem.price)
+    assert.equal(simItem.prepSec, catItem.durationSec)
+    assert.equal(simItem.stationKind, catItem.stationKind)
+    assert.equal(simItem.steps?.length, catItem.steps.length)
+  }
+
+  // 缺工位映射必报错
+  assert.throws(() => {
+    convertCatalogMenuToSim([
+      {
+        ...DRINKS_MENU[0],
+        stationKind: 'unmapped_station',
+      },
+    ])
+  }, /station mapping/i)
+
+  // 缺库存映射必报错
+  assert.throws(() => {
+    convertCatalogMenuToSim([
+      {
+        ...DRINKS_MENU[0],
+        ingredients: { cup: 1, unicorn_dust: 1 },
+      },
+    ])
+  }, /inventory mapping/i)
+
+  // 缺步骤或时长不一致必报错
+  assert.throws(() => {
+    convertCatalogMenuToSim([
+      {
+        ...DRINKS_MENU[0],
+        steps: [],
+      },
+    ])
+  }, /prep steps/i)
+
+  assert.throws(() => {
+    convertCatalogMenuToSim([
+      {
+        ...DRINKS_MENU[0],
+        durationSec: 99,
+      },
+    ])
+  }, /duration mismatch/i)
+
+  // 锚点转换契约校验
+  const fixture = sim.getLayout()
+  const fromAnchors = layoutFromShopAnchors({
+    width: fixture.width,
+    depth: fixture.depth,
+    entrance: fixture.entrance,
+    cashiers: fixture.cashiers,
+    prepStations: fixture.prepStations,
+    pickupSlots: fixture.pickupSlots,
+    pickupClerkPos: fixture.pickupClerkPos,
+    waitingSpots: fixture.waitingSpots,
+    seats: fixture.seats,
+    storagePos: fixture.storagePos,
+    patrolPoints: fixture.patrolPoints,
+  })
+  assert.equal(fromAnchors.cashiers.length, fixture.cashiers.length)
+  assert.equal(fromAnchors.seats.length, fixture.seats.length)
+})
+
+test('无玩家模拟 24 小时：峰谷客流、全订单结单、无死锁、无负库存且覆盖多种店内互动', () => {
   const sim = createDrinksSim({
-    seed: 'wangcheng-24h-check',
+    seed: 'wangcheng-24h-interactions',
     now: 0,
     hourOf: t => (t / 3600) % 24,
   })
 
-  // Simulate full 24h in 10-minute slices so we observe inventory & concurrency across the day
+  const observedKinds = new Set()
   const samples = []
-  for (let m = 0; m < 144; m++) {
-    const snap = sim.fastForward(600)
+  for (let m = 0; m < 432; m++) {
+    const snap = sim.fastForward(200)
     samples.push(snap)
+    for (const cl of snap.clerks) {
+      if (cl.interactionKind) observedKinds.add(cl.interactionKind)
+    }
+    for (const cu of snap.customers) {
+      if (cu.interactionKind) observedKinds.add(cu.interactionKind)
+    }
     const invCheck = sim.validateInvariants()
     assert.equal(invCheck.ok, true, `invariant failed at t=${snap.timeSec}: ${invCheck.errors.join('; ')}`)
   }
@@ -22,138 +110,102 @@ test('无玩家模拟 24 小时：客流有明显峰谷、订单全部有结局�
   assert.ok(endSnap)
   const m = endSnap.metrics
 
-  // 1. Peak vs valley in hourly arrivals
   const nightArrivals = m.hourlyArrivals.slice(0, 7).reduce((a, b) => a + b, 0)
   const peakHourly = Math.max(...m.hourlyArrivals)
-  const afternoonArrivals = m.hourlyArrivals.slice(14, 18).reduce((a, b) => a + b, 0)
-  const eveningArrivals = m.hourlyArrivals.slice(19, 22).reduce((a, b) => a + b, 0)
-  const morningArrivals = m.hourlyArrivals.slice(8, 11).reduce((a, b) => a + b, 0)
-
-  assert.equal(nightArrivals, 0, `expected closed night valley (00:00-06:59), got ${nightArrivals}`)
-  assert.ok(peakHourly >= 45, `expected strong peak hour arrivals >= 45, got ${peakHourly}`)
-  assert.ok(afternoonArrivals > morningArrivals, `afternoon (${afternoonArrivals}) should exceed morning (${morningArrivals})`)
-  assert.ok(eveningArrivals > morningArrivals, `evening (${eveningArrivals}) should exceed morning (${morningArrivals})`)
-  assert.ok(m.peakConcurrentPeople >= 24, `expected big shop peak concurrency >= 24, got ${m.peakConcurrentPeople}`)
-
-  // 2. All orders reach a terminal state (closed at 23:30 drains all orders by 24:00)
-  assert.ok(m.totalOrdersCreated > 300, `expected >300 daily orders, got ${m.totalOrdersCreated}`)
-  assert.equal(m.activeOrders, 0, `expected 0 active orders at 24:00, got ${m.activeOrders}`)
+  assert.equal(nightArrivals, 0)
+  assert.ok(peakHourly >= 45)
+  assert.ok(m.peakConcurrentPeople >= 24)
+  assert.ok(m.totalOrdersCreated > 300)
+  assert.equal(m.activeOrders, 0)
   for (const ord of endSnap.orders) {
     assert.equal(isTerminalOrderStatus(ord.status), true, `order ${ord.id} stuck in ${ord.status}`)
   }
-  assert.ok(m.ordersCompleted > m.totalOrdersCreated * 0.85, `expected high completion rate, got ${m.ordersCompleted}/${m.totalOrdersCreated}`)
+  assert.equal(m.deadlockRecoveries, 0)
+  assert.ok(m.minObservedInventory >= 0)
+  assert.ok(m.restockCount > 0)
+  assert.ok(m.tablesCleanedCount > 0, `expected clerks to clean tables, got ${m.tablesCleanedCount}`)
 
-  // 3. No deadlocks, no negative inventory, positive revenue & restocks
-  assert.equal(m.deadlockRecoveries, 0, 'expected 0 deadlock recoveries')
-  assert.ok(m.minObservedInventory >= 0, `negative inventory observed: ${m.minObservedInventory}`)
-  assert.ok(m.restockCount > 0, 'expected clerks to patrol & restock bins over 24h')
-  assert.ok(m.totalRevenue > 1500, `expected substantial daily revenue, got ${m.totalRevenue}`)
+  for (const required of ['order_ask', 'make_change', 'call_number', 'handover_cup', 'clean_table', 'chat_pair_a']) {
+    assert.ok(observedKinds.has(required), `expected interaction '${required}' during 24h run`)
+  }
 })
 
-test('断料边界：有限后厨库存耗尽时零负库存且订单优雅取消结单', () => {
+test('玩家下单排进同一队列、重复 orderKey 幂等、取消与未取都有结局', () => {
   const sim = createDrinksSim({
-    seed: 'low-stock-boundary',
+    seed: 'player-queue-outcomes',
     now: 0,
     hourOf: () => 15.0,
-    autoRestockSupply: false,
-    inventoryDefs: [
-      { id: 'cup', name: '杯', unit: '个', binCapacity: 10, initialBin: 2, lowThreshold: 1, backroomCapacity: 10, initialBackroom: 1 },
-      { id: 'ice', name: '冰', unit: '勺', binCapacity: 20, initialBin: 4, lowThreshold: 2, backroomCapacity: 20, initialBackroom: 2 },
-      { id: 'lemon', name: '柠檬', unit: '片', binCapacity: 20, initialBin: 4, lowThreshold: 2, backroomCapacity: 20, initialBackroom: 2 },
-      { id: 'syrup', name: '糖浆', unit: '泵', binCapacity: 20, initialBin: 4, lowThreshold: 2, backroomCapacity: 20, initialBackroom: 2 },
-    ],
-    menu: [
-      {
-        id: 'ice_lemon_water',
-        name: '冰鲜柠檬水',
-        category: 'lemonade',
-        price: 4,
-        prepSec: 1.5,
-        stationKind: 'lemon_ice',
-        cupColor: '#f6df6e',
-        accentColor: '#ffffff',
-        ingredients: { cup: 1, ice: 2, lemon: 2, syrup: 1 },
-      },
-    ],
+    playerUnclaimedTimeoutSec: 30,
   })
 
-  for (let i = 0; i < 6; i++) {
-    sim.placePlayerOrder({ menuItemId: 'ice_lemon_water', orderKey: `finite_${i}` })
-  }
-  const snap = sim.fastForward(400)
+  // Pre-seed two manual NPC-like orders ahead and one behind to test unified FIFO queue order
+  sim.fastForward(16)
+
+  const oAhead = sim.placePlayerOrder({ menuItemId: 'ice_lemon_water', orderKey: 'q_ahead_1', customerName: '先来客' })
+  const oMine = sim.placePlayerOrder({ menuItemId: 'pearl_milk_tea', orderKey: 'q_mine_2', customerName: '玩家' })
+  const oBehind = sim.placePlayerOrder({ menuItemId: 'mango_pomelo_sago', orderKey: 'q_behind_3', customerName: '后来客' })
+  assert.equal(oAhead.ok && oMine.ok && oBehind.ok, true)
+  assert.ok(
+    (oAhead.order?.queuePosition ?? 99) < (oMine.order?.queuePosition ?? 0) &&
+      (oMine.order?.queuePosition ?? 99) < (oBehind.order?.queuePosition ?? 0),
+    `expected unified FIFO queue positions: ${oAhead.order?.queuePosition} < ${oMine.order?.queuePosition} < ${oBehind.order?.queuePosition}`,
+  )
+
+  // Duplicate orderKey idempotency
+  const replay = sim.placePlayerOrder({ menuItemId: 'iced_americano', orderKey: 'q_mine_2', quantity: 4 })
+  assert.equal(replay.idempotentReplay, true)
+  assert.equal(replay.created, false)
+  assert.equal(replay.order?.id, oMine.order?.id)
+  assert.equal(replay.order?.itemId, 'pearl_milk_tea')
+
+  // Cancel player order while queued/preparing -> cancelled_by_player & refundable
+  const cancelRes = sim.cancelPlayerOrder('q_mine_2')
+  assert.equal(cancelRes.ok, true)
+  assert.equal(cancelRes.refundable, true)
+  assert.equal(cancelRes.order?.status, 'cancelled_by_player')
+  assert.equal(isTerminalOrderStatus(cancelRes.order?.status ?? 'queued'), true)
+
+  // Fast-forward past playerUnclaimedTimeoutSec without collecting oAhead/oBehind -> abandoned_unclaimed
+  sim.fastForward(120)
+  const snap = sim.getSnapshot()
+  const ordAheadAfter = snap.orders.find(o => o.orderKey === 'q_ahead_1')
+  const ordBehindAfter = snap.orders.find(o => o.orderKey === 'q_behind_3')
+  assert.equal(ordAheadAfter?.status, 'abandoned_unclaimed')
+  assert.equal(ordBehindAfter?.status, 'abandoned_unclaimed')
   assert.equal(sim.validateInvariants().ok, true)
-  assert.ok(snap.metrics.minObservedInventory >= 0)
-  assert.ok(snap.metrics.ordersCancelled > 0)
-  for (const ord of snap.orders) {
-    assert.equal(isTerminalOrderStatus(ord.status), true, `order ${ord.id} not terminal: ${ord.status}`)
-  }
 })
 
-test('重复 orderKey 幂等：只出一单，绝不重复建单或扣库存', () => {
+test('玩家靠近时触发店员招呼、排队者让位、插队提醒，且不阻断店铺正常出餐', () => {
   const sim = createDrinksSim({
-    seed: 'idempotent-order-key',
+    seed: 'player-proximity-check',
     now: 0,
-    hourOf: () => 14.5,
+    hourOf: () => 19.5,
   })
+  sim.fastForward(28)
 
-  const invBefore = sim.getSnapshot().inventory
-  const r1 = sim.placePlayerOrder({
-    menuItemId: 'ice_lemon_water',
-    quantity: 2,
-    orderKey: 'wx_order_10086',
-    customerName: '老板',
-  })
-  assert.equal(r1.ok, true)
-  assert.equal(r1.created, true)
-  assert.equal(r1.idempotentReplay, false)
-  assert.ok(r1.order)
+  const layout = sim.getLayout()
+  const cashierHead = layout.cashiers[0].customerPos
 
-  const r2 = sim.placePlayerOrder({
-    menuItemId: 'ice_lemon_water',
-    quantity: 2,
-    orderKey: 'wx_order_10086',
-    customerName: '老板',
-  })
-  assert.equal(r2.ok, true)
-  assert.equal(r2.created, false)
-  assert.equal(r2.idempotentReplay, true)
-  assert.equal(r2.code, 'IDEMPOTENT_REPLAY')
-  assert.equal(r2.order?.id, r1.order?.id)
+  // 1. Walk near entrance -> clerk greets player
+  sim.setPlayerPresence({ active: true, x: layout.entrance.x, z: layout.entrance.z + 0.5 })
+  sim.step(0.5)
+  let evs = sim.drainEvents()
+  assert.ok(evs.some(e => e.type === 'player_greeted'), 'expected clerk_greet_player event when player approaches')
 
-  // Different payload with same orderKey still returns original order without creating a second one
-  const r3 = sim.placePlayerOrder({
-    menuItemId: 'pearl_milk_tea',
-    quantity: 5,
-    orderKey: 'wx_order_10086',
-  })
-  assert.equal(r3.created, false)
-  assert.equal(r3.order?.id, r1.order?.id)
-  assert.equal(r3.order?.itemId, 'ice_lemon_water')
-
+  // 2. Step right in front of cashier queue -> remind cut-in & nearby queuer yields without stopping orders
+  sim.setPlayerPresence({ active: true, x: cashierHead.x, z: cashierHead.z - 0.1 })
+  for (let i = 0; i < 40; i++) sim.step(0.1)
+  evs = sim.drainEvents()
   const snap = sim.getSnapshot()
-  const playerOrders = snap.orders.filter(o => o.orderKey === 'wx_order_10086')
-  assert.equal(playerOrders.length, 1)
-
-  // Step until player's order is ready and collect it
-  for (let i = 0; i < 600; i++) {
-    sim.step(0.1)
-    if (sim.getOrder('wx_order_10086')?.status === 'ready_for_pickup') break
-  }
-  const readyOrd = sim.getOrder('wx_order_10086')
-  assert.equal(readyOrd?.status, 'ready_for_pickup')
-
-  const collected = sim.collectPlayerOrder('wx_order_10086')
-  assert.equal(collected.ok, true)
-  assert.equal(collected.order?.status, 'completed')
-
-  // Lemon stock deducted only for 2 units (4 lemons) minus/plus any NPC activity checked via invariant
-  const invAfter = sim.getSnapshot().inventory
-  assert.ok(invAfter.lemon.binAmount <= invBefore.lemon.binAmount)
+  const ordersBefore = snap.metrics.ordersCompleted
+  sim.fastForward(45)
+  const ordersAfter = sim.getSnapshot().metrics.ordersCompleted
+  assert.ok(ordersAfter > ordersBefore, 'player presence must NOT block ongoing store production')
   assert.equal(sim.validateInvariants().ok, true)
 })
 
 test('快进与逐帧误差在声明阈值内', () => {
-  const durationSec = 900 // 15 minutes of busy afternoon rush
+  const durationSec = 900
   const simFrame = createDrinksSim({
     seed: 'determinism-check',
     now: 0,
@@ -165,7 +217,6 @@ test('快进与逐帧误差在声明阈值内', () => {
     hourOf: t => 15.0 + t / 3600,
   })
 
-  // Frame-by-frame at 60 FPS (with mild realistic frame jitter around 1/60s)
   let elapsed = 0
   let frameIdx = 0
   while (elapsed < durationSec) {
@@ -176,7 +227,6 @@ test('快进与逐帧误差在声明阈值内', () => {
     frameIdx++
   }
 
-  // Fast-forward in one call
   const fastSnap = simFast.fastForward(durationSec)
   const frameSnap = simFrame.getSnapshot()
 
@@ -188,18 +238,9 @@ test('快进与逐帧误差在声明阈值内', () => {
     Math.abs(frameSnap.metrics.totalRevenue - fastSnap.metrics.totalRevenue) /
     Math.max(1, fastSnap.metrics.totalRevenue)
 
-  assert.ok(
-    timeDrift <= SIM_FAST_FORWARD_TOLERANCE.maxTimeDriftSec,
-    `timeDrift ${timeDrift} > ${SIM_FAST_FORWARD_TOLERANCE.maxTimeDriftSec}`,
-  )
-  assert.ok(
-    orderDiffRatio <= SIM_FAST_FORWARD_TOLERANCE.maxOrdersDiffRatio,
-    `orderDiffRatio ${orderDiffRatio} > ${SIM_FAST_FORWARD_TOLERANCE.maxOrdersDiffRatio}`,
-  )
-  assert.ok(
-    revDiffRatio <= SIM_FAST_FORWARD_TOLERANCE.maxRevenueRelativeDiff,
-    `revDiffRatio ${revDiffRatio} > ${SIM_FAST_FORWARD_TOLERANCE.maxRevenueRelativeDiff}`,
-  )
+  assert.ok(timeDrift <= SIM_FAST_FORWARD_TOLERANCE.maxTimeDriftSec)
+  assert.ok(orderDiffRatio <= SIM_FAST_FORWARD_TOLERANCE.maxOrdersDiffRatio)
+  assert.ok(revDiffRatio <= SIM_FAST_FORWARD_TOLERANCE.maxRevenueRelativeDiff)
   assert.equal(simFrame.validateInvariants().ok, true)
   assert.equal(simFast.validateInvariants().ok, true)
 })

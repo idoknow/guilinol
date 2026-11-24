@@ -1,8 +1,15 @@
 export * from './types.ts'
 export { createSeededRng, hashSeed, type SeededRng } from './prng.ts'
 export {
-  DEFAULT_DRINKS_MENU,
+  PREP_STATION_MAP,
   DEFAULT_INVENTORY_DEFS,
+  INVENTORY_DEF_BY_ID,
+  DEFAULT_DRINKS_MENU,
+  convertCatalogItemToSim,
+  convertCatalogMenuToSim,
+  validateLayoutForMenu,
+  layoutFromShopAnchors,
+  createDrinksLayoutFixture,
   createDefaultDrinksLayout,
 } from './menu.ts'
 export {

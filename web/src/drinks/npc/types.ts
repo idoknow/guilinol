@@ -1,8 +1,10 @@
 import type * as THREE from 'three'
-import type { DrinksSim } from '../sim/types.ts'
+import type { DrinksSim, InteractionBubbleKind } from '../sim/types.ts'
 
 export interface DrinksNpcSkinConfig {
   shopBrandName: string
+  greetingLine?: string
+  dialogueOverrides?: Partial<Record<InteractionBubbleKind, readonly string[]>>
   clerkShirtColor: string
   clerkApronColor: string
   clerkCapColor: string
@@ -15,6 +17,7 @@ export interface DrinksNpcRendererOptions {
   sim: DrinksSim
   skin?: Partial<DrinksNpcSkinConfig>
   maxNpcs?: number
+  maxVisibleBadges?: number
   showBadges?: boolean
   worldOrigin?: readonly [number, number, number]
   worldYaw?: number
@@ -26,8 +29,10 @@ export interface DrinksNpcMetrics {
   clerksCount: number
   customersCount: number
   visibleCount: number
+  visibleBadgeCount: number
   holdingCupCount: number
   seatedCount: number
+  dirtySeatsCount: number
   drawCallLayers: number
   lastUpdateMs: number
   peakTotal: number

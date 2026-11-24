@@ -5,6 +5,7 @@ import {
   buildNpcRenderPoseFromCustomer,
   DrinksNpcRigPool,
   type NpcRenderPose,
+  type TableCupRenderPose,
 } from './rig-pool.ts'
 import type { DrinksNpcMetrics, DrinksNpcRenderer, DrinksNpcRendererOptions, DrinksNpcSkinConfig } from './types.ts'
 
@@ -28,11 +29,16 @@ export function createDrinksNpcRenderer(options: DrinksNpcRendererOptions): Drin
   const sinY = Math.sin(worldYaw)
   const sampleGroundY = options.sampleGroundY ?? (() => origin[1])
 
-  const pool = new DrinksNpcRigPool(options.maxNpcs ?? 48, options.showBadges ?? true)
+  const pool = new DrinksNpcRigPool(
+    options.maxNpcs ?? 48,
+    options.showBadges ?? true,
+    options.maxVisibleBadges ?? 8,
+  )
   scene.add(pool.group)
 
   const smoothed = new Map<string, SmoothedTransform>()
   const poses: NpcRenderPose[] = []
+  const tableCups: TableCupRenderPose[] = []
   let peakTotal = 0
   let lastUpdateMs = 0
   let lastMetrics: DrinksNpcMetrics = {
@@ -40,8 +46,10 @@ export function createDrinksNpcRenderer(options: DrinksNpcRendererOptions): Drin
     clerksCount: 0,
     customersCount: 0,
     visibleCount: 0,
+    visibleBadgeCount: 0,
     holdingCupCount: 0,
     seatedCount: 0,
+    dirtySeatsCount: 0,
     drawCallLayers: pool.drawCallLayers,
     lastUpdateMs: 0,
     peakTotal: 0,
@@ -80,16 +88,19 @@ export function createDrinksNpcRenderer(options: DrinksNpcRendererOptions): Drin
     const alpha = dtSec > 0 ? Math.min(1, 1 - Math.exp(-16 * dtSec)) : 1
 
     poses.length = 0
+    tableCups.length = 0
     const liveKeys = new Set<string>()
     let holdingCupCount = 0
     let seatedCount = 0
+    let dirtySeatsCount = 0
 
-    for (const cl of snap.clerks) {
+    for (let i = 0; i < snap.clerks.length; i++) {
+      const cl = snap.clerks[i]!
       liveKeys.add(cl.id)
       const sm = smoothEntity(cl.id, cl.x, cl.z, cl.yaw, alpha)
       const w = toWorld(sm.x, sm.z, sm.yaw)
       if (cl.holdingCup) holdingCupCount++
-      poses.push(buildNpcRenderPoseFromClerk(cl, skin, w.wx, w.wy, w.wz, w.wyaw))
+      poses.push(buildNpcRenderPoseFromClerk(cl, skin, w.wx, w.wy, w.wz, w.wyaw, i))
     }
 
     for (const cu of snap.customers) {
@@ -98,14 +109,29 @@ export function createDrinksNpcRenderer(options: DrinksNpcRendererOptions): Drin
       const w = toWorld(sm.x, sm.z, sm.yaw)
       if (cu.holdingCup) holdingCupCount++
       if (cu.seated) seatedCount++
-      poses.push(buildNpcRenderPoseFromCustomer(cu, w.wx, w.wy, w.wz, w.wyaw))
+      poses.push(buildNpcRenderPoseFromCustomer(cu, skin, w.wx, w.wy, w.wz, w.wyaw))
+    }
+
+    for (const seat of snap.seats) {
+      if (seat.state === 'dirty' && seat.dirtyCupColor) {
+        dirtySeatsCount++
+        const lx = seat.x + Math.sin(seat.yaw) * 0.56
+        const lz = seat.z + Math.cos(seat.yaw) * 0.56
+        const w = toWorld(lx, lz, seat.yaw)
+        tableCups.push({
+          x: w.wx,
+          y: w.wy + 0.84,
+          z: w.wz,
+          cupColor: seat.dirtyCupColor,
+        })
+      }
     }
 
     for (const key of smoothed.keys()) {
       if (!liveKeys.has(key)) smoothed.delete(key)
     }
 
-    const visibleCount = pool.update(poses, snap.timeSec, cameraPos)
+    const visibleCount = pool.update(poses, snap.timeSec, cameraPos, tableCups)
     const t1 = typeof performance !== 'undefined' ? performance.now() : Date.now()
     lastUpdateMs = Math.round((t1 - t0) * 1000) / 1000
 
@@ -117,15 +143,16 @@ export function createDrinksNpcRenderer(options: DrinksNpcRendererOptions): Drin
       clerksCount: snap.clerks.length,
       customersCount: snap.customers.length,
       visibleCount,
+      visibleBadgeCount: pool.getVisibleBadgeCount(),
       holdingCupCount,
       seatedCount,
+      dirtySeatsCount,
       drawCallLayers: pool.drawCallLayers,
       lastUpdateMs,
       peakTotal,
     }
   }
 
-  // Initial sync so scene has NPCs immediately on frame 0
   step(0)
 
   return {
