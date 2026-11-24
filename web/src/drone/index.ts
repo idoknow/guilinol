@@ -27,6 +27,8 @@ export interface DroneMode {
    */
   debugStep?(dt:number, repeats?:number):Record<string,unknown>|null
   debugState?():Record<string,unknown>
+  /** Test hook: third-person chase camera on the placed / flying drone (null = normal camera). */
+  debugChase?(view:{distance:number; height:number; side:number}|null):void
 }
 
 const PLACE_DISTANCE = 4.2
@@ -154,57 +156,126 @@ export function droneMode(host:Host, deps:{groundAt:(x:number,z:number)=>number;
   function hideHint() { if (hint) hint.hidden = true }
 
   // --- Payload (FlyCart): a crate, a passenger in a harness, or a car on the sling.
+  // IDOK-275: winch mode — the cargo box comes off, a cable pays out from the `winch` node of the glTF
+  // and the load (a real passer-by figure / the street car model) rests on the ground until the
+  // cable goes taut. `rig` hangs at the cable end; `drop` is the cable length the frame loop sets.
+  let payload:{group:THREE.Group; cable:THREE.Mesh; rig:THREE.Group; maxDrop:number; below:number; token:number}|null = null
+  let payloadToken = 0
+  function hookPoint() {
+    const winch = mesh?.root.getObjectByName('winch')
+    if (!mesh || !winch) return new THREE.Vector3(0,-.25,0)
+    mesh.root.updateMatrixWorld(true)
+    return mesh.root.worldToLocal(winch.getWorldPosition(new THREE.Vector3()))
+  }
+  function setCargoBox(visible:boolean) {
+    const box = mesh?.root.getObjectByName('cargo_box')
+    if (box) box.visible = visible
+  }
   function attachLoad() {
     detachLoad()
-    if (!mesh || !flight?.spec.payloadG || loadKind === 'none') return
+    if (!mesh || !flight?.spec.payloadG || loadKind === 'none') { setCargoBox(true); return }
+    setCargoBox(false)
+    const kind = loadKind
+    const token = ++payloadToken
     const group = new THREE.Group()
-    const dark = new THREE.MeshStandardMaterial({color:'#24282a',roughness:.8,metalness:.15})
-    const canvas = new THREE.MeshStandardMaterial({color:'#c96b3a',roughness:.85})
-    if (loadKind === 'cargo') {
-      const crate = new THREE.Mesh(new THREE.BoxGeometry(.7,.55,.9),canvas)
-      crate.position.y = -.9
-      group.add(crate)
-      const band = new THREE.Mesh(new THREE.BoxGeometry(.72,.08,.92),dark)
-      band.position.y = -.72
-      group.add(band)
-    } else if (loadKind === 'person') {
-      const body = new THREE.Mesh(new THREE.CapsuleGeometry(.22,.85,4,10),new THREE.MeshStandardMaterial({color:'#3d4a6a',roughness:.7}))
-      body.position.y = -1.1
-      group.add(body)
-      const head = new THREE.Mesh(new THREE.SphereGeometry(.16,12,10),new THREE.MeshStandardMaterial({color:'#d8b08a',roughness:.7}))
-      head.position.y = -.6
-      group.add(head)
-      const rope = new THREE.Mesh(new THREE.CylinderGeometry(.012,.012,.7,6),dark)
-      rope.position.y = -.25
-      group.add(rope)
-    } else {
-      const shell = new THREE.Mesh(new THREE.BoxGeometry(1.7,.62,3.9),new THREE.MeshStandardMaterial({color:'#7d2f2a',roughness:.55,metalness:.3}))
-      shell.position.y = -1.5
-      group.add(shell)
-      const cabin = new THREE.Mesh(new THREE.BoxGeometry(1.5,.5,1.7),new THREE.MeshStandardMaterial({color:'#1b2226',roughness:.4,metalness:.4}))
-      cabin.position.set(0,-1.1,-.2)
-      group.add(cabin)
-      for (const [x,z] of [[.8,1.2],[-.8,1.2],[.8,-1.2],[-.8,-1.2]] as Array<[number,number]>) {
-        const wheel = new THREE.Mesh(new THREE.CylinderGeometry(.3,.3,.16,12),dark)
-        wheel.rotation.z = Math.PI / 2
-        wheel.position.set(x,-1.8,z)
-        group.add(wheel)
-      }
+    group.name = 'drone-payload'
+    group.position.copy(hookPoint())
+    const strap = new THREE.MeshStandardMaterial({color:'#2a2d2c',roughness:.75,metalness:.2})
+    const orange = new THREE.MeshStandardMaterial({color:'#e08a2e',roughness:.55,metalness:.1})
+    // unit-length cable, scaled to the paid-out length every frame
+    const cable = new THREE.Mesh(new THREE.CylinderGeometry(.012,.012,1,6).translate(0,-.5,0),strap)
+    group.add(cable)
+    const rig = new THREE.Group()
+    group.add(rig)
+    const hook = new THREE.Mesh(new THREE.TorusGeometry(.06,.016,6,14,Math.PI * 1.4),orange)
+    hook.rotation.z = Math.PI * .8
+    hook.position.y = -.05
+    rig.add(hook)
+    const sling = (from:THREE.Vector3,to:THREE.Vector3,r = .01) => {
+      const len = from.distanceTo(to)
+      const m = new THREE.Mesh(new THREE.CylinderGeometry(r,r,len,5),strap)
+      m.position.copy(from).add(to).multiplyScalar(.5)
+      m.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),to.clone().sub(from).normalize())
+      rig.add(m)
     }
-    const rope = new THREE.Mesh(new THREE.CylinderGeometry(.02,.02,1.4,6),dark)
-    rope.position.y = -.2
-    group.add(rope)
+    payload = {group,cable,rig,maxDrop:2.4,below:1,token}
+    if (kind === 'cargo') {
+      const canvas = new THREE.MeshStandardMaterial({color:'#c96b3a',roughness:.85})
+      const crate = new THREE.Mesh(new THREE.BoxGeometry(.7,.55,.9),canvas)
+      crate.position.y = -.62
+      rig.add(crate)
+      const band = new THREE.Mesh(new THREE.BoxGeometry(.72,.08,.92),strap)
+      band.position.y = -.44
+      rig.add(band)
+      for (const [x,z] of [[.33,.43],[-.33,.43],[.33,-.43],[-.33,-.43]]) sling(new THREE.Vector3(0,-.08,0),new THREE.Vector3(x,-.36,z))
+      payload.below = .9
+    } else if (kind === 'person') {
+      // harness: short strops from the hook to the chest; the figure itself loads async
+      for (const x of [-.12,.12]) sling(new THREE.Vector3(0,-.08,0),new THREE.Vector3(x,-.5,0),.012)
+      payload.maxDrop = 2.6
+      payload.below = 1.95
+      void Promise.all([import('../traffic/crowd'),import('../walk/character'),import('../walk/avatar-rig')]).then(async ([crowd,character,avatarRig]) => {
+        const model = await character.previewCharacter(crowd.randomPasserby(Math.random))
+        if (!payload || payload.token !== token) { character.disposeCharacterParts(model.scene); return }
+        const figure = model.scene
+        // feet hang ~1.9 m below the hook; arms reach up to the strops, legs relaxed
+        figure.position.y = -1.95
+        const joints = avatarRig.getAvatarJoints(figure)
+        joints.ArmL?.rotation.set(0,0,-2.55)
+        joints.ArmR?.rotation.set(0,0,2.55)
+        joints.ForearmL?.rotation.set(0,0,-.35)
+        joints.ForearmR?.rotation.set(0,0,.35)
+        joints.ThighL?.rotation.set(.18,0,0)
+        joints.ThighR?.rotation.set(-.08,0,0)
+        joints.ShinL?.rotation.set(-.3,0,0)
+        joints.ShinR?.rotation.set(-.12,0,0)
+        figure.userData.dronePayloadFigure = true
+        rig.add(figure)
+      }).catch(error => console.warn('drone passenger unavailable',error))
+    } else {
+      // the street car model on a four-leg sling through the wheel arches
+      payload.maxDrop = 2.2
+      void import('../walk/vehicle-model').then(({vehicleModel}) => {
+        if (!payload || payload.token !== token) return
+        const car = vehicleModel('car',Math.floor(Math.random() * 4)) as THREE.Mesh
+        car.userData.sharedGeometry = true
+        const geometry = car.geometry
+        if (!geometry.boundingBox) geometry.computeBoundingBox()
+        const bb = geometry.boundingBox!
+        const top = .6
+        car.position.y = -top - bb.max.y
+        rig.add(car)
+        const lift = -top - bb.max.y + (bb.max.y - bb.min.y) * .35
+        const hw = (bb.max.x - bb.min.x) * .5 + .04, hl = (bb.max.z - bb.min.z) * .32
+        const spreader = new THREE.Vector3(0,-.12,0)
+        for (const [x,z] of [[hw,hl],[-hw,hl],[hw,-hl],[-hw,-hl]]) sling(spreader,new THREE.Vector3(x,lift,z),.014)
+        if (payload) payload.below = top + (bb.max.y - bb.min.y)
+      }).catch(error => console.warn('drone car payload unavailable',error))
+    }
     loadMesh = group
     mesh.root.add(group)
   }
   function detachLoad() {
+    setCargoBox(true)
+    payload = null
     if (!loadMesh) return
     loadMesh.removeFromParent()
     loadMesh.traverse(node => {
       const withGeometry = node as THREE.Mesh
-      if (withGeometry.geometry) withGeometry.geometry.dispose()
+      // the street car shares its geometry with traffic — never dispose that one
+      if (withGeometry.geometry && !node.userData.sharedGeometry) withGeometry.geometry.dispose()
     })
     loadMesh = null
+  }
+  /** Cable pays out with altitude, so the load lifts off the ground instead of clipping through it. */
+  function stepPayload() {
+    if (!payload || !flight) return
+    const hookAgl = flight.agl + flight.spec.height * .5 + payload.group.position.y
+    const drop = THREE.MathUtils.clamp(hookAgl - payload.below,.15,payload.maxDrop)
+    payload.cable.scale.y = drop
+    payload.rig.position.y = -drop
+    const sway = flight.phase === 'landed' ? 0 : Math.min(1,hookAgl / 4)
+    payload.rig.rotation.z = Math.sin(flight.elapsed * 1.1) * .03 * sway
   }
 
   // --- RC session
@@ -383,6 +454,7 @@ export function droneMode(host:Host, deps:{groundAt:(x:number,z:number)=>number;
     spinProps(mesh,dt,throttle)
     mesh.gimbal.rotation.x = THREE.MathUtils.degToRad(flight.gimbal) * .35
     if (loadMesh) loadMesh.rotation.y = Math.sin(flight.elapsed * .7) * .04
+    stepPayload()
 
     if (rcActive && rc) {
       lensPose(flight,lens)
@@ -391,12 +463,25 @@ export function droneMode(host:Host, deps:{groundAt:(x:number,z:number)=>number;
       host.camera.updateMatrixWorld()
       rc.update(telemetry(flight),!!recording)
       if (flight.phase === 'returning' && entry) entry.textContent = '返航中'
+      chaseView()
     } else if (placed) {
       const d = host.walker()?.active
         ? host.walker()!.position.distanceTo(flight.pos)
         : host.camera.position.distanceTo(flight.pos)
       showHint(`${flight.spec.short} 就位 · ${flight.battery.toFixed(0)}% 电量 · 点「飞无人机」起飞${d > 60 ? '（离得有点远）' : ''}`)
+      chaseView()
     }
+  }
+
+  // Test hook (screenshots): a third-person chase camera instead of the gimbal view.
+  let chase:{distance:number; height:number; side:number}|null = null
+  function chaseView() {
+    if (!chase || !flight) return
+    const back = new THREE.Vector3(Math.sin(flight.yaw),0,Math.cos(flight.yaw))
+    const right = new THREE.Vector3(Math.cos(flight.yaw),0,-Math.sin(flight.yaw))
+    host.camera.position.copy(flight.pos).addScaledVector(back,chase.distance).addScaledVector(right,chase.side).add(new THREE.Vector3(0,chase.height,0))
+    host.camera.lookAt(flight.pos.x,flight.pos.y - chase.height * .25,flight.pos.z)
+    host.camera.updateMatrixWorld()
   }
 
   function tick(dt:number) { advance(dt) }
@@ -415,9 +500,12 @@ export function droneMode(host:Host, deps:{groundAt:(x:number,z:number)=>number;
       for (let i = 0; i < Math.max(1,repeats); i++) advance(dt)
       return flight ? telemetry(flight) : null
     },
-    debugState: () => ({placed,rc:rcActive,load:loadKind,mesh:mesh?.root.name ?? null,flight:flight ? telemetry(flight) : null,recording:!!recording}),
+    debugChase: view => { chase = view; chaseView() },
+    debugState: () => ({placed,rc:rcActive,load:loadKind,mesh:mesh?.root.name ?? null,
+      model:mesh ? {source:mesh.root.userData.source ?? 'procedural',props:mesh.props.map(node => node.name),gimbal:mesh.gimbal.name,lens:mesh.lens.name,gear:mesh.gear?.name ?? null,cargoBox:mesh.root.getObjectByName('cargo_box')?.visible ?? null} : null,
+      payload:payload ? {kind:loadKind,parts:payload.rig.children.length,figure:payload.rig.children.some(node => node.userData.dronePayloadFigure)} : null,flight:flight ? telemetry(flight) : null,recording:!!recording}),
   }
-  if (typeof window !== 'undefined') { window.droneDebug = api.debugState; window.droneStep = api.debugStep }
+  if (typeof window !== 'undefined') { window.droneDebug = api.debugState; window.droneStep = api.debugStep; window.droneChase = api.debugChase }
   return api
 }
 
@@ -431,6 +519,7 @@ declare global {
   interface Window {
     droneDebug?:() => Record<string,unknown>
     droneStep?:(dt:number, repeats?:number) => Record<string,unknown>|null
+    droneChase?:(view:{distance:number; height:number; side:number}|null) => void
     lastDronePhoto?:{name:string;bytes:number;width:number;height:number;drone:string|null}
     lastDroneClip?:{name:string;container:string;mime:string;seconds:number;width:number;height:number;fps:number}
   }
