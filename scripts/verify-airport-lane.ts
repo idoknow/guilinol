@@ -28,7 +28,9 @@ if(baseline){
   assert.equal(chain.at(-1).id,previous.lanes.find(l=>l.way===way&&l.from===first&&l.to===last)?.id)
 }
 const cell=load(path.join(world,'roads',Math.floor(-18814.81/512)+'_'+Math.floor(3934.32/512)+'.json.gz'))
-const sim=new Traffic({...cell,walks:[]},()=>.99)
+// Service streets are outside the ambient NPC spawn policy on main. Exercise
+// their streamed geometry using an explicitly routed test car.
+const sim=new Traffic({...cell,walks:[]},()=>.99,100,{classes:['service'],carMin:1,carMax:1,personMin:0,personMax:0})
 const tracks=[...sim.allTracks()]
 const lanes=chain.map(l=>{
   const track=tracks.find(t=>t.id===l.id)

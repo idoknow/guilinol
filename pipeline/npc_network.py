@@ -53,7 +53,11 @@ def install(world, report):
     for cell in json.loads((roads/'cells.json').read_bytes()):
         path = roads/f'{cell}.json.gz'
         data = json.loads(gzip.decompress(path.read_bytes()))
-        data['lanes'] = [enriched[lane['id']] for lane in data['lanes']]
+        for lane in data['lanes']:
+            annotated=enriched[lane['id']]
+            for field in ('street','sidewalkFace','npcWalks'):
+                if field in annotated:
+                    lane[field]=annotated[field]
         save(path, data)
 
 

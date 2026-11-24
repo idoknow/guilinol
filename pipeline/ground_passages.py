@@ -51,6 +51,39 @@ def line_parts(shape):
             yield from line_parts(part)
 
 
+def close_qingtian_road(elements, widths, curbs):
+    """Keep the mapped junctions and end the campus service road before the facade."""
+    ways={w['id']:w for w in elements if w['type']=='way' and w['id'] in (1487527338,1472917067)}
+    if len(ways)!=2:
+        return
+    street=ways[1487527338]
+    axis=LineString(points(street))
+    half=widths.get(street['id'],width(street['tags']))/2
+    building=area(ways[1472917067])
+    overlaps=list(line_parts(axis.intersection(building)))
+    if not overlaps:
+        return
+    protected=axis.intersection(building.buffer(half+.5))
+    closures=[part for part in line_parts(protected)
+              if any(part.intersection(overlap).length>.01 for overlap in overlaps)]
+    bounds=[]
+    for part in closures:
+        for end in (part.coords[0],part.coords[-1]):
+            station=axis.project(Point(end))
+            bounds.append(station)
+            cross=substring(axis,max(0,station-.05),min(axis.length,station+.05))
+            delta=np.diff(np.asarray(cross.coords),axis=0).sum(axis=0)
+            normal=np.array([-delta[1],delta[0]])/np.linalg.norm(delta)
+            point=np.asarray(end)
+            curbs.append(LineString([point-half*normal,point+half*normal]).buffer(.125,cap_style='flat'))
+    street['closureBounds']=bounds
+    street['openStations']=[]
+    for segment in line_parts(axis.difference(union_all(closures))):
+        if segment.length>=10:
+            street['openStations'].append(tuple(sorted(axis.project(Point(p))
+                for p in (segment.coords[0],segment.coords[-1]))))
+
+
 def garage_boundary(output, chunks, elements):
     street=next((w for w in elements if w['type']=='way' and w['id']==GARAGE[1]),None)
     if street is None:
@@ -67,6 +100,8 @@ def garage_boundary(output, chunks, elements):
 def open_segments(way, coords, obstacle, curbs, paved):
     refs=way['nodes']
     blocked=way.get('yardClosure')
+    if 'closureBounds' in way:
+        blocked=way['closureBounds']
     station=0.
     for i,(a,b) in enumerate(zip(coords,coords[1:])):
         if blocked is not None and a and b:
@@ -82,7 +117,8 @@ def open_segments(way, coords, obstacle, curbs, paved):
                     ids[side]=-3_000_000_000_000-way['id']*2-side
                     dx,dz=np.subtract(b,a)/length
                     curb=LineString([(point[0]-dz*t,point[1]+dx*t) for t in (-paved/2,paved/2)])
-                    curbs.append(curb.buffer(.125,cap_style='flat'))
+                    if 'closureBounds' not in way:
+                        curbs.append(curb.buffer(.125,cap_style='flat'))
                 yield p,q,*ids
             continue
         if way['id']!=GARAGE[1] or not a or not b or obstacle.is_empty:

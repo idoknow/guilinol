@@ -70,6 +70,7 @@ try {
       }, count)
       const sha = (await (await fetch(`${url}/version.json`)).json()).sha
       const traffic=await page.evaluate(()=>({cameraY:window.viewer.camera.position.y,crowd:window.viewer.trafficProbe?.crowd?.count,motors:window.viewer.trafficProbe?.allMotors?.length,assets:performance.getEntriesByType('resource').filter(entry=>/\/roads\/|\/assets\/traffic-/.test(entry.name)).map(entry=>new URL(entry.name).pathname)}))
+      if(process.env.PERF_PEDESTRIANS==='0')assert.equal(traffic.crowd??0,0,'Expected zero pedestrian instances')
       const inventory=await page.evaluate(()=>window.__drawInventory?.resources())
       const row = {inventory,view,side:side?'PR':'main',round,sha,heap,frames,traffic}
       raw.push(row)
