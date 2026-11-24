@@ -2,23 +2,37 @@
 import gzip
 import json
 import struct
+from pathlib import Path
 
 import numpy as np
-from shapely import Polygon, box, make_valid, union_all
+from shapely import LineString, Polygon, STRtree, box, make_valid, union_all
 from shapely.affinity import translate
 
 from common import load_osm
-from features import area
+from features import area, points
+from railways import road_radius
 from service_streets import rings
 
 
 def bake(output, chunks, region):
-    platforms = union_all([area(way) for way in load_osm()
+    ways = load_osm()
+    crossings = json.loads((Path(__file__).resolve().parents[1]/'docs/railway-crossings.json').read_bytes())
+    road_ids = {row['road'] for row in crossings if row['status']!='construction_unverified'}
+    roads = [LineString(points(way)).buffer(max(4.5,road_radius(way['tags'])+1.5))
+             for way in ways if way['type']=='way' and way['id'] in road_ids]
+    corridors = STRtree(roads)
+    platforms = union_all([area(way) for way in ways
                            if way['type'] == 'way' and way.get('tags', {}).get('railway') == 'platform'
                            and way['tags'].get('monorail') != 'yes']).intersection(region)
     for chunk in chunks:
         x, z = chunk['x'], chunk['z']
         footprint = platforms.intersection(box(x, z, x + 256, z + 256))
+        if footprint.area < .01:
+            continue
+        # GL04 bridge decks and painted roads need not have a street polygon.
+        # Keep the placeholder and its sidewalk/curb collider out of their approaches.
+        occupied_roads = corridors.query(footprint, predicate='intersects')
+        footprint = footprint.difference(union_all([roads[i] for i in occupied_roads]))
         if footprint.area < .01:
             continue
         local = translate(footprint, -x, -z)

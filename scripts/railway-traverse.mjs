@@ -68,12 +68,24 @@ try {
           const result=await page.evaluate(async({x,z,east,south,mode,roadY})=>{
             const {walk,stream}=window.viewer
             await window.viewer.freeze()
-            const key=(down)=>window.dispatchEvent(new KeyboardEvent(down?'keydown':'keyup',{code:'KeyW'}))
+            const held=new Set()
+            function key(code,down){
+              if(held.has(code)===down)return
+              if(down)held.add(code);else held.delete(code)
+              window.dispatchEvent(new KeyboardEvent(down?'keydown':'keyup',{code}))
+            }
             try {
               if(mode==='foot')walk.drive(east,south,false)
-              else key(true)
+              const initial=walk.position
+              const lateral=(initial.x-x)*south-(initial.z-z)*east
               let maxJump=0,prev,along,offset,startAlong,nearest=Infinity,roadError=Infinity
               for(let frame=0;frame<600;frame++){
+                if(mode==='car'){
+                  const pos=walk.position
+                  const angle=Math.atan2(-(x+7*east+lateral*south-pos.x),-(z+7*south-lateral*east-pos.z))
+                  const delta=angle-walk.heading,error=Math.atan2(Math.sin(delta),Math.cos(delta))
+                  key('KeyA',error>.035);key('KeyD',error<-.035);key('KeyW',Math.abs(walk.speed)<3.5)
+                }
                 walk.tick(1/60);stream.tick(walk.position)
                 const p=walk.probe(), y=mode==='car'?p.carY:p.foot
                 along=(p.x-x)*east+(p.z-z)*south
@@ -86,7 +98,7 @@ try {
                 if(frame%30===0)await new Promise(r=>setTimeout(r,0))
               }
               return {ok:nearest<.4 && roadError<1.2 && startAlong > -11 && startAlong < -3 && along>=6 && offset<=3 && maxJump<=.1,startAlong,along,offset,maxJump,roadError,obstacle:walk.obstacle}
-            }finally{key(false);walk.drive(0,0,false);window.viewer.resume()}
+            }finally{for(const code of held)key(code,false);walk.drive(0,0,false);window.viewer.resume()}
           },{x,z,east,south,mode,roadY})
           results.push({...id,mode,...result})
         }catch(e){results.push({...id,mode,ok:false,error:e.message.split('\n')[0]})}

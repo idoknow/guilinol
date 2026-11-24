@@ -6,14 +6,14 @@ import {look} from './look/config'
 export type RailSection=[number,number,number,number,number,number,number,number,number?]
 export type CrossingSign=[number,number,number,number]
 type Box=(x:number,y:number,z:number,w:number,h:number,d:number,yaw:number,tint:Color,pitch?:number)=>void
-type Face=(a:Vector3,b:Vector3,c:Vector3,color:Color,along:number[],kind:number)=>void
+export type RailFace=(a:Vector3,b:Vector3,c:Vector3,color:Color,along:number[],kind:number)=>void
 const ballast=new Color(style.ballast),steel=new Color(style.steel),panel=new Color(style.panel)
 const pole=new Color(style.pole),wire=new Color(style.wire),fence=new Color(style.fence)
 const sleeper=new Color(style.sleeper),warning=new Color(style.warning),concrete=new Color(look.bridgeSide)
-const BRIDGE=1,TUNNEL=2,ELECTRIC=4,FENCE=8,LEVEL=16,RESERVED=32
+const BRIDGE=1,TUNNEL=2,ELECTRIC=4,FENCE=8,LEVEL=16,RESERVED=32,PAINTED=64
 
 export function railwayGeometry(sections:RailSection[],signs:CrossingSign[],ground:(x:number,z:number)=>number,
-  roadLevel:(x:number,z:number,fallback:number)=>number,face:Face,box:Box){
+  roadLevel:(x:number,z:number,fallback:number)=>number,face:RailFace,box:Box,levelFace:(a:Vector3,b:Vector3,c:Vector3,color:Color,h:number,painted:boolean)=>void){
   const barriers:number[]=[]
   for(const [ax,az,ay,bx,bz,by,chainage,flags,ends=0] of sections){
     const x=ax/100,z=az/100,dx=(bx-ax)/100,dz=(bz-az)/100
@@ -23,7 +23,7 @@ export function railwayGeometry(sections:RailSection[],signs:CrossingSign[],grou
     const at=(t:number,offset:number,h:number)=>{
       const east=x+t*dx+nx*offset,south=z+t*dz+nz*offset
       const y=(ay+(by-ay)*t)/100
-      return new Vector3(east,((flags&LEVEL)?roadLevel(east,south,y):y)+h,south)
+      return new Vector3(east,((flags&LEVEL)?roadLevel(east,south,flags&PAINTED?ground(east,south):y):y)+h,south)
     }
     function strip(left:number,right:number,hLeft:number,hRight:number,color:Color,kind=7){
       const count=flags&LEVEL?Math.ceil(len/.5):1
@@ -31,8 +31,13 @@ export function railwayGeometry(sections:RailSection[],signs:CrossingSign[],grou
         const t=k/count,u=(k+1)/count
         const a=at(t,left,hLeft),b=at(u,left,hLeft),c=at(u,right,hRight),d=at(t,right,hRight)
         const s=chainage/100+t*len,e=chainage/100+u*len
-        face(a,c,b,color,[s,e,e],kind)
-        face(a,d,c,color,[s,s,e],kind)
+        if(flags&LEVEL){
+          levelFace(a,c,b,color,hLeft,!!(flags&PAINTED))
+          levelFace(a,d,c,color,hLeft,!!(flags&PAINTED))
+        }else{
+          face(a,c,b,color,[s,e,e],kind)
+          face(a,d,c,color,[s,s,e],kind)
+        }
       }
     }
     const beam=(offset:number,h:number,size:number,depth:number,color:Color)=>{

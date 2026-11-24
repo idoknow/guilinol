@@ -9,7 +9,7 @@ const {crossings} = JSON.parse(await readFile(reportPath))
 const chosen = crossings.slice().sort((a,b)=>Math.floor(a.z/256)-Math.floor(b.z/256)||a.x-b.x)
 const cases=limit ? chosen.slice(0,Number(limit)) : chosen
 await mkdir(output,{recursive:true})
-const server=await preview({configFile:false,build:{outDir:resolve('dist')},preview:{host:'127.0.0.1',port:0}})
+const server=await preview({configFile:false,build:{outDir:resolve(process.env.RAILWAY_DIST??'dist')},preview:{host:'127.0.0.1',port:0}})
 let browser
 try {
   browser=await chromium.launch(browserOptions(true))

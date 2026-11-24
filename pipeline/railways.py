@@ -22,7 +22,7 @@ from road_profile import RULES
 from service_streets import width
 
 ROOT = Path(__file__).resolve().parents[1]
-BRIDGE, TUNNEL, ELECTRIC, FENCE, LEVEL, RESERVED = 1, 2, 4, 8, 16, 32
+BRIDGE, TUNNEL, ELECTRIC, FENCE, LEVEL, RESERVED, PAINTED = 1, 2, 4, 8, 16, 32, 64
 
 
 def envelope(graph, targets):
@@ -127,6 +127,9 @@ def bake(world_dir, manifest, inventory, samples):
                     if lo-.02<=at<=hi+.02:
                         flag = (RESERVED if row['status']=='pending_road_tunnel' else
                                 LEVEL if row['type']=='level' else BRIDGE if row['type']=='rail_over' else 0)
+                        if flag==LEVEL:
+                            surface=samples[str(row['sharedNode'])]
+                            if surface['road'] is None and surface['deck'] is None: flag|=PAINTED
                         gaps.append((lo,hi,flag))
                         stops.update((lo,hi))
                 stops.add(at)
