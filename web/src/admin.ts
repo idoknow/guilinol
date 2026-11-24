@@ -52,15 +52,23 @@ const codeText: Record<string, string> = {
 let generation = 0
 async function api<T = any>(path: string, data?: unknown): Promise<T> {
   let response: Response
-  try {
-    response = await fetch(
-      `/api/${path}`,
-      data
-        ? { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) }
-        : { cache: 'no-store' },
-    )
-  } catch {
-    throw new ApiError(0, 'network', '网络连接失败，请检查网络后重试')
+  // 后台聚合查询偶尔会 5xx（服务端慢查询超时）。只重试只读请求，写请求绝不重放。
+  for (let attempt = 0; ; attempt++) {
+    try {
+      response = await fetch(
+        `/api/${path}`,
+        data
+          ? { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) }
+          : { cache: 'no-store' },
+      )
+    } catch {
+      throw new ApiError(0, 'network', '网络连接失败，请检查网络后重试')
+    }
+    if (attempt === 0 && !data && response.status >= 500) {
+      await new Promise((resolve) => setTimeout(resolve, 800))
+      continue
+    }
+    break
   }
   const result = await response.json().catch(() => null)
   if (!response.ok) {

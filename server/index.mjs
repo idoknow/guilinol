@@ -14,7 +14,9 @@ crypto.subtle.timingSafeEqual = (left,right) => left.byteLength===right.byteLeng
 // 连接/查询都有上限：卡住的查询不能长期占着 5 连接的池子
 // 后台首屏会同时发十几条聚合查询；pool 只给 5 条连接时它们要排队，光排队就能把首屏拖到几秒。
 // Postgres max_connections=100，这里给 12 条足够。
-const pool=new pg.Pool({connectionString:process.env.DATABASE_URL,max:Number(process.env.PG_POOL_MAX||12),connectionTimeoutMillis:3000,query_timeout:15000,idleTimeoutMillis:30000})
+// 慢查询不能再把请求打成 500：24h 总览单次就要 12-20s，15s 超时正好卡在边缘，
+// 抖动一下越线就抛 «Query read timeout»，前端显示「服务暂时不可用」。
+const pool=new pg.Pool({connectionString:process.env.DATABASE_URL,max:Number(process.env.PG_POOL_MAX||12),connectionTimeoutMillis:3000,query_timeout:Number(process.env.PG_QUERY_TIMEOUT||45000),idleTimeoutMillis:30000})
 // 空闲连接被服务端断开（postgres 重启/维护）时 pg.Pool 会 emit 'error'，不监听就整个进程崩溃
 pool.on('error',error=>console.error('postgres idle client error',error.code??error.message))
 const readiness=createReadiness({query:sql=>pool.query(sql)})
@@ -22,21 +24,35 @@ const metrics=monitor(pool)
 const connections=measuredConnections(pool,metrics)
 // 后台聚合查询的短期缓存：一次首屏并发十几条聚合，数据本身按分钟更新，30 秒内重复跑同一份 SQL 没意义
 // （单条网格查询 24 小时要 933ms）。只缓存只读分析类路径，admin/live 与写操作直通。
-const ADMIN_CACHE_TTL = Number(process.env.ADMIN_CACHE_TTL ?? 30000)
+const ADMIN_CACHE_TTL = Number(process.env.ADMIN_CACHE_TTL ?? 120000)
+// 过期后的这段时间里仍然先把旧结果发出去、后台再刷新：24h 总览要 12-20s，
+// 让管理员干等一个必然超时的查询，不如先给他上一次的图，同时在后台算新的。
+const ADMIN_CACHE_STALE = Number(process.env.ADMIN_CACHE_STALE ?? 900000)
 const ADMIN_CACHE_MAX = 200
 const adminCache = new Map()
+const adminPending = new Map()
 const cacheableAdminPath = path => /^admin\/(perf(\/grid|\/server)?|overview|timeseries|breakdown|funnel|errors)$/.test(path)
+function rememberAdminCache(key, response) {
+  adminCache.set(key, {response: response.clone(), expires: Date.now() + ADMIN_CACHE_TTL})
+  if (adminCache.size > ADMIN_CACHE_MAX) adminCache.delete(adminCache.keys().next().value)
+}
 function withAdminCache(key, run) {
   const now = Date.now()
   const hit = adminCache.get(key)
   if (hit && hit.expires > now) return Promise.resolve(hit.response.clone())
-  return run().then(response => {
-    if (response.ok) {
-      adminCache.set(key, {response: response.clone(), expires: now + ADMIN_CACHE_TTL})
-      if (adminCache.size > ADMIN_CACHE_MAX) adminCache.delete(adminCache.keys().next().value)
-    }
+  // 同一个 key 的并发请求只打一次库：后台首屏会同时发好几个卡片、前端还每 15s 轮询一次，
+  // 不去重就是同样一条 20s 的聚合被并行跑 N 遍，把连接池占满。
+  const pending = adminPending.get(key)
+  if (pending) return pending.then(response => response.clone())
+  // 有旧结果就立即返回，刷新在后台进行（成功后才覆盖缓存）
+  const stale = hit && hit.expires + ADMIN_CACHE_STALE > now ? hit.response.clone() : null
+  const job = run().then(response => {
+    if (response.ok) rememberAdminCache(key, response)
     return response
   })
+  adminPending.set(key, job)
+  job.then(() => adminPending.delete(key), () => adminPending.delete(key))
+  return stale ? Promise.resolve(stale) : job.then(response => response.clone())
 }
 const runPerfQuery = (path, params) => (path.startsWith('admin/perf') ? queryPerf : analytics)(connections, path, params)
 const cachedPerfQuery = (path, params) => {
