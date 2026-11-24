@@ -49,6 +49,8 @@ export async function readTrees(tile:Tile,signal:AbortSignal){
       z=start+distance*slopeRatio(distance)
     }
     if(treeBlocked(x,y,z))continue
+    // Clear Sanduo Rd Tianyuan Mifen storefront, Lv3 expansion lot, and front viewing corridor
+    if(x>=-1154&&x<=-1135&&z>=-65&&z<=-36)continue
     if(y<minY)minY=y
     if(y>maxY)maxY=y
     const rawKind=data.getUint8(i+6),kind=rawKind<TREE_SPECIES_COUNT?rawKind:0
