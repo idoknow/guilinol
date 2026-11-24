@@ -275,6 +275,7 @@ const views: View[] = [
   { key: 'errors', label: '错误', icon: '⚠', group: '数据', ranged: true },
   { key: 'live', label: '实时', icon: '●', group: '数据' },
   { key: 'server', label: '服务端', icon: '▣', group: '数据', ranged: true },
+  { key: 'mp', label: '联机', icon: '⇋', group: '数据' },
   { key: 'feedback', label: '反馈处理', icon: '✉', group: '运营' },
   { key: 'users', label: '用户与权限', icon: '☺', group: '运营' },
   { key: 'audit', label: '操作记录', icon: '☰', group: '运营' },
@@ -1209,6 +1210,42 @@ const pages: Record<string, (view: View) => void> = {
     }, skeleton(8))
   },
 
+  mp() {
+    const stamp = h('span', { class: 'adm-sub adm-live-stamp' })
+    paintTop(views.find((v) => v.key === 'mp')!, [h('span', { class: 'adm-live-dot', 'aria-hidden': 'true' }), stamp])
+    const range = ['24h', '7d', '30d'].includes(params.get('mprange') ?? '') ? params.get('mprange')! : '24h'
+    const uid = /^\d+$/.test(params.get('uid') ?? '') ? params.get('uid') : null
+    const liveSlot = h('div'), histSlot = h('div'), sessSlot = h('div')
+    main.append(h('div', { class: 'adm-stack' }, liveSlot,
+      card('同时在线历史', histSlot, { sub: '按上海时间分日；24 小时为分钟点，更长为小时均值',
+        actions: segmented(range, [['24h', '24 小时'], ['7d', '7 天'], ['30d', '30 天']], (key) => go({ mprange: key }, true), '历史范围') }),
+      card(uid ? `会话记录 · ${uid}` : '会话记录', sessSlot, { sub: '最近 100 场，每分钟同步；联机服务重启时没观测到离开的记为「未观测到离开」',
+        actions: uid ? navLink('看全部玩家', { uid: null }, { class: 'adm-link' }, true) : undefined })))
+    const mine = generation
+    const manifest = fetch('/world/manifest.json', { cache: 'no-store' }).then((res) => (res.ok ? res.json() : null)).catch(() => null)
+    let last = ''
+    const load = (first: boolean) =>
+      Promise.all([api<any>('admin/mp'), manifest]).then(([state, world]) => {
+        if (mine !== generation) return
+        stamp.textContent = `每 10 秒自动刷新 · ${when(new Date())}`
+        const json = JSON.stringify(state)
+        if (json === last) return
+        last = json
+        liveSlot.replaceChildren(paintMp(state, world, () => load(false)))
+        labelTables(liveSlot)
+      }).catch((error) => {
+        if (mine !== generation) return
+        if (error instanceof ApiError && [401, 403].includes(error.status)) return denied(error.status)
+        if (first) liveSlot.replaceChildren(errorState(error, () => load(true)))
+        else stamp.textContent = `自动刷新失败：${error.message}`
+      })
+    liveSlot.append(skeleton(6))
+    load(true)
+    refreshTimer = window.setInterval(() => document.visibilityState === 'visible' && !document.querySelector('dialog.adm-dialog') && load(false), 10000)
+    async(histSlot, () => api<any>(`admin/mp/history?range=${range}`), paintMpHistory, skeleton(5))
+    async(sessSlot, () => api<any>(`admin/mp/sessions?limit=100${uid ? `&uid=${uid}` : ''}`), paintMpSessions, skeleton(5))
+  },
+
   feedback() {
     const id = params.get('id')
     if (id) return feedbackDetail(id)
@@ -1528,6 +1565,181 @@ function paintLive(live: any) {
           serverStat('系统负载', sample.load ? Number(sample.load[0]).toFixed(2) : dash, sample.load ? `5 / 15 分钟：${Number(sample.load[1]).toFixed(2)} / ${Number(sample.load[2]).toFixed(2)}` : undefined))
       : emptyState('最近一分钟没有服务端采样', 'API 每分钟写一次；刚重启时会短暂为空'),
       { sub: server ? `采样时间 ${when(iso(server.minute))}` : undefined }))
+}
+
+/* ───────────── 联机（IDOK-222） ───────────── */
+const mpRejectText: Record<string, string> = { ticket: '票据无效', full: '满员', uidOnline: '账号已在线', banned: '联机封禁中', ipLimit: '同 IP 连接过多' }
+const mpEventText: Record<string, string> = { join: '进入', leave: '离开', kick: '踢出', reject: '拒绝' }
+const mpCloseText: Record<number, string> = { 1000: '正常关闭', 1001: '页面离开', 1005: '未给原因', 1006: '断线', 1013: '网络太慢被断开', 4001: '被同账号顶号', 4003: '被踢 / 封禁' }
+const msgText: Record<string, string> = { pos: '位置', join: '进入', welcome: '欢迎包', leave: '离开', online: '人数', avatar: '换装', who: '名册', chat: '聊天', emote: '表情', hit: '出拳', revive: '扶起', banned: '封禁通知', error: '错误', players: '名册回复', other: '其他' }
+function mpDuration(sec: number | null | undefined) {
+  if (sec == null || !Number.isFinite(sec)) return dash
+  if (sec < 60) return `${Math.round(sec)} 秒`
+  if (sec < 3600) return `${Math.floor(sec / 60)} 分`
+  return `${Math.floor(sec / 3600)} 时 ${Math.floor((sec % 3600) / 60)} 分`
+}
+const mpRegion = (r: any) => r ? [r.country === 'CN' ? '' : r.country, r.region, r.city].filter(Boolean).join(' · ') || r.country || dash : dash
+const mpUa = (ua: string | undefined) => {
+  if (!ua) return dash
+  const os = /iPhone|iPad/.test(ua) ? 'iOS' : /Android/.test(ua) ? 'Android' : /Mac OS X/.test(ua) ? 'macOS' : /Windows/.test(ua) ? 'Windows' : /Linux/.test(ua) ? 'Linux' : '其他'
+  const browser = /MicroMessenger/.test(ua) ? '微信' : /QQ\//.test(ua) ? 'QQ' : /Edg\//.test(ua) ? 'Edge' : /Chrome\//.test(ua) ? 'Chrome' : /Firefox\//.test(ua) ? 'Firefox' : /Safari\//.test(ua) ? 'Safari' : '浏览器'
+  return `${os} · ${browser}`
+}
+function mpKick(player: any, onDone: () => void) {
+  const button = h('button', { type: 'button', class: 'adm-btn adm-btn--danger adm-btn--sm' }, '踢出') as HTMLButtonElement
+  button.addEventListener('click', () => act(button, async () => {
+    const minutesField = h('select', { class: 'adm-select', 'aria-label': '禁止重连时长' },
+      [['10', '10 分钟'], ['60', '1 小时'], ['1440', '1 天'], ['10080', '7 天']].map(([v, t]) => h('option', { value: v }, t))) as HTMLSelectElement
+    const reason = await confirmDialog({
+      title: '踢出联机', tone: 'seal', confirm: '确认踢出',
+      body: h('div', null,
+        h('p', null, h('b', null, player.name), `（${player.uid}）会立即断开同城联机，期间重连会被拒绝。`),
+        h('label', { class: 'adm-dialog-field' }, h('span', null, '禁止重连'), minutesField),
+        h('p', { class: 'adm-sub' }, '只影响联机，不封账号；要封账号请到「用户与权限」。此操作会记录在「操作记录」中。')),
+      message: { label: '原因', required: true, placeholder: '例如：刷屏、骚扰其他玩家', max: 200, hint: '请填写原因，玩家会看到' },
+    })
+    if (reason == null) return
+    const result = await api<{ kicked: number }>('admin/mp/kick', { uid: player.uid, reason, minutes: Number(minutesField.value) })
+    toast(result.kicked ? `已踢出 ${player.name}` : `${player.name} 已不在线，已写入联机封禁`)
+    onDone()
+  }))
+  return button
+}
+function mpMap(players: any[], manifest: any) {
+  const extent: number[] | undefined = manifest?.extent
+  if (!extent || extent.length !== 4) return emptyState('世界清单加载失败，无法画地图')
+  const [ex, ez, ew, ed] = extent
+  // 框住所有玩家，留 600 m 边；没有玩家时看整张图
+  const xs = players.map((p) => p.x), zs = players.map((p) => p.z)
+  const pad = 600
+  let x0 = players.length ? Math.max(ex, Math.min(...xs) - pad) : ex, x1 = players.length ? Math.min(ex + ew, Math.max(...xs) + pad) : ex + ew
+  let z0 = players.length ? Math.max(ez, Math.min(...zs) - pad) : ez, z1 = players.length ? Math.min(ez + ed, Math.max(...zs) + pad) : ez + ed
+  const minSpan = 2400
+  if (x1 - x0 < minSpan) { const c = (x0 + x1) / 2; x0 = c - minSpan / 2; x1 = c + minSpan / 2 }
+  if (z1 - z0 < minSpan * 0.6) { const c = (z0 + z1) / 2; z0 = c - minSpan * 0.3; z1 = c + minSpan * 0.3 }
+  const span = Math.max(x1 - x0, z1 - z0), r = span / 120, labels: number[][] = []
+  const svg = s('svg', { viewBox: `${x0} ${z0} ${x1 - x0} ${z1 - z0}`, class: 'adm-mp-map', role: 'img', 'aria-label': '在线玩家位置' })
+  svg.append(s('image', { href: '/world/overview.png', x: ex, y: ez, width: ew, height: ed, preserveAspectRatio: 'none', class: 'adm-heat-base' }))
+  const tip = h('div', { class: 'adm-tip', hidden: true })
+  for (const p of players) {
+    const g = s('g', { class: `adm-mp-dot ${p.mode === 'bike' ? 'is-bike' : ''} ${p.dn ? 'is-down' : ''}`, transform: `translate(${p.x} ${p.z})` })
+    g.append(s('line', { x1: 0, y1: 0, x2: -Math.sin(p.yaw) * r * 2.4, y2: -Math.cos(p.yaw) * r * 2.4, 'stroke-width': r * 0.6 }))
+    g.append(s('circle', { r, 'stroke-width': r * 0.35 }))
+    // 名字互不重叠：挤在一起时只写第一个，其余看右侧「按地标」或悬停
+    const fs = r * 3, w = p.name.length * fs * 0.9, box = [p.x - w / 2, p.z - r * 2 - fs, p.x + w / 2, p.z - r * 2]
+    if (!labels.some(([a, b, c, d]) => box[0] < c && box[2] > a && box[1] < d && box[3] > b)) {
+      labels.push(box)
+      g.append(s('text', { y: -r * 2.2, 'font-size': fs, 'stroke-width': r * 0.8 }, p.name))
+    }
+    g.addEventListener('pointerenter', () => {
+      tip.hidden = false
+      tip.replaceChildren(h('b', null, `${p.name} · ${p.uid}`), h('span', null, `${p.landmark ? p.landmark + '附近' : `东 ${Math.round(p.x)} m · 南 ${Math.round(p.z)} m`}`),
+        h('span', null, `${p.mode === 'bike' ? '骑车' : '步行'} · ${fmt.num(p.v)} m/s · 延迟 ${fmt.ms(p.rttMs)}`))
+    })
+    g.addEventListener('pointermove', (event) => {
+      const box = (svg.parentElement ?? svg).getBoundingClientRect()
+      tip.style.left = `${Math.min(Math.max(event.clientX - box.left, 90), box.width - 90)}px`
+      tip.style.top = `${event.clientY - box.top + 18}px`
+    })
+    g.addEventListener('pointerleave', () => (tip.hidden = true))
+    svg.append(g)
+  }
+  return h('div', { class: 'adm-heat-stage adm-mp-stage' }, svg, tip,
+    h('p', { class: 'adm-sub adm-mp-legend' }, h('i', { class: 'is-walk' }), '步行', h('i', { class: 'is-bike' }), '骑车', h('i', { class: 'is-down' }), '倒地', ' · 短线为朝向 · 上北下南'))
+}
+function mpTable(head: string[], rows: Child[][], numCols: number[] = []) {
+  return h('div', { class: 'adm-table-wrap' }, h('table', { class: 'adm-table adm-mp-table' },
+    h('thead', null, h('tr', null, head.map((t, i) => h('th', { class: numCols.includes(i) ? 'num' : '' }, t)))),
+    h('tbody', null, rows.map((row) => h('tr', null, row.map((cell, i) => h('td', { class: numCols.includes(i) ? 'num' : '' }, cell)))))))
+}
+function paintMp(state: any, manifest: any, reload: () => void) {
+  if (state.rt !== 'up') return h('div', { class: 'adm-stack' },
+    h('div', { class: 'adm-error', role: 'alert' }, h('b', null, '联机服务连不上'), h('span', null, `${state.error ?? '未知原因'}。游戏里的同城联机此时不可用；下方历史数据仍可查看。`)))
+  const server = state.server, players: any[] = [...state.players].sort((a, b) => a.joinedAt - b.joinedAt)
+  const now = Date.now()
+  const rtts = players.map((p) => p.rttMs).filter((v): v is number => v != null).sort((a, b) => a - b)
+  const sum = (dir: 'in' | 'out') => Object.values<any>(server.traffic[dir] ?? {}).reduce((acc, v) => ({ packets: acc.packets + v.packets, bytes: acc.bytes + v.bytes }), { packets: 0, bytes: 0 })
+  const tin = sum('in'), tout = sum('out')
+  const rejects = Object.entries<number>(server.rejects ?? {}), rejectTotal = rejects.reduce((a, [, v]) => a + v, 0)
+  const kpis = h('div', { class: 'adm-kpis adm-kpis--server' },
+    serverStat('同城在线', `${fmt.int(server.online)} / ${fmt.int(server.maxPlayers)}`, `连接 ${fmt.int(server.connections)}（含未进城）`),
+    serverStat('本次启动峰值', fmt.int(server.peak), server.peakAt ? `${when(new Date(server.peakAt))}` : undefined),
+    serverStat('联机服务运行', mpDuration(server.uptimeSec), `启动于 ${when(new Date(server.startedAt))}`),
+    serverStat('延迟中位数', fmt.ms(rtts.length ? rtts[Math.floor(rtts.length / 2)] : null), rtts.length ? `最差 ${fmt.ms(rtts[rtts.length - 1])}` : '还没有测到'),
+    serverStat('下行', `${fmt.bytes(tout.bytes / 60)}/s`, `近 60 秒 ${fmt.int(tout.packets)} 包`),
+    serverStat('上行', `${fmt.bytes(tin.bytes / 60)}/s`, `近 60 秒 ${fmt.int(tin.packets)} 包`),
+    serverStat('事件循环', fmt.ms(server.loopP99Ms), `p50 ${fmt.ms(server.loopP50Ms)} · 显示 p99`),
+    serverStat('内存', `${fmt.num(server.rssMb)} MB`, `堆 ${fmt.num(server.heapMb)} MB`),
+    serverStat('拒绝连接', fmt.int(rejectTotal), rejects.filter(([, v]) => v).map(([k, v]) => `${mpRejectText[k] ?? k} ${v}`).join(' · ') || '启动以来没有'),
+    serverStat('慢客户端', fmt.int(server.skips), `被断开 ${fmt.int(server.slowCloses)} 个`))
+  const byPlace = new Map<string, any[]>()
+  for (const p of players) { const key = p.landmark ?? '野外'; byPlace.set(key, [...(byPlace.get(key) ?? []), p]) }
+  const mapCard = card('玩家在哪', h('div', { class: 'adm-heat' }, mpMap(players, manifest),
+    h('div', { class: 'adm-heat-side' },
+      h('p', { class: 'adm-heat-side-title' }, '按地标'),
+      players.length
+        ? h('ol', null, [...byPlace].sort((a, b) => b[1].length - a[1].length).map(([place, list]) =>
+            h('li', null, h('i', { style: 'background:var(--ui-jade-500)' }), h('span', null, `${place}${place === '野外' ? '' : '附近'}`, h('small', null, list.map((p) => p.name).join('、'))), h('b', null, `${list.length} 人`))))
+        : emptyState('现在没有人在联机'),
+      h('p', { class: 'adm-sub' }, '地标取世界清单里平面距离最近的一个。'))), { sub: '每 10 秒刷新 · 鼠标移到圆点上看详情' })
+  const table = card(`在线玩家（${players.length}）`, players.length ? mpTable(
+    ['玩家', '状态', '位置', '地区 / 网络', '在线', '延迟', '位置包', '上行 / 下行', '缓冲', '设备', ''],
+    players.map((p) => [
+      h('div', { class: 'adm-mp-who' }, p.account?.id ? navLink(p.name, { view: 'users', id: p.account.id }, { class: 'adm-link' }) : h('b', null, p.name),
+        h('small', null, `${p.uid}${p.account ? ` · ${p.account.signupMethod ?? ''}注册 ${when(unix(p.account.createdAt), true)}` : ''}`), p.account?.banned && h('span', { class: 'adm-pill is-bad' }, '账号已封')),
+      h('div', { class: 'adm-mp-state' }, h('span', null, `${p.mode === 'bike' ? '骑车' : p.v > 3 ? '奔跑' : p.v > 0.12 ? '步行' : '驻足'} · ${fmt.num(p.v)} m/s`),
+        h('small', null, [`HP ${p.hp}`, p.dn ? '倒地' : '', p.sc ? '抽烟' : '', p.em ? `表情 ${p.em}` : '', p.chats ? `聊天 ${p.chats}` : ''].filter(Boolean).join(' · '))),
+      h('div', null, h('span', null, p.landmark ? `${p.landmark}附近` : dash), h('small', { class: 'adm-sub' }, `东 ${Math.round(p.x)} · 南 ${Math.round(p.z)} · 高 ${Math.round(p.y)}`)),
+      h('div', null, h('span', null, mpRegion(p.region)), h('small', { class: 'adm-sub' }, p.region?.isp ?? '')),
+      mpDuration((now - p.joinedAt) / 1000),
+      h('span', { class: (p.rttMs ?? 0) > 300 ? 'is-bad' : '', title: `平均 ${fmt.ms(p.avgRttMs)}` }, fmt.ms(p.rttMs)),
+      h('span', { title: `最后一次 ${p.lastPosAt ? ago(new Date(p.lastPosAt)) : '没有'}` }, `${fmt.num(p.posHz)}/s`),
+      `${fmt.bytes(p.inBytes)} / ${fmt.bytes(p.outBytes)}`,
+      h('span', { title: `被跳过 ${p.skips} 次` }, p.bufferedAmount ? fmt.bytes(p.bufferedAmount) : '0'),
+      h('span', { title: p.ua ?? '' }, mpUa(p.ua)),
+      mpKick(p, reload),
+    ]), [4, 5, 6, 7, 8]) : emptyState('现在没有人在联机', '玩家登录并打开「同城联机」后会出现在这里'))
+  const types = [...new Set([...Object.keys(server.traffic.in ?? {}), ...Object.keys(server.traffic.out ?? {})])]
+    .map((t) => ({ t, i: server.traffic.in?.[t] ?? { packets: 0, bytes: 0 }, o: server.traffic.out?.[t] ?? { packets: 0, bytes: 0 } }))
+    .sort((a, b) => b.o.bytes + b.i.bytes - a.o.bytes - a.i.bytes)
+  const traffic = card('消息流量（近 60 秒）', types.length ? mpTable(['类型', '收到', '收到字节', '发出', '发出字节'],
+    types.map(({ t, i, o }) => [h('span', null, msgText[t] ?? t, ' ', h('code', null, t)), fmt.int(i.packets), fmt.bytes(i.bytes), fmt.int(o.packets), fmt.bytes(o.bytes)]), [1, 2, 3, 4])
+    : emptyState('近 60 秒没有消息'), { sub: '发出按每个接收方各算一次；字节不含 WebSocket 帧头' })
+  const bans = card(`联机封禁（${state.bans.length}）`, state.bans.length ? mpTable(['uid', '原因', '到期'],
+    state.bans.map((b: any) => [String(b.uid), b.reason || dash, `${when(new Date(b.until))}（${mpDuration((b.until - now) / 1000)}后）`]))
+    : emptyState('没有生效中的联机封禁'), { sub: '只存在联机服务内存里，联机服务重启后清空' })
+  const events = [...state.events].reverse()
+  const eventCard = card('最近进出', events.length ? h('ol', { class: 'adm-mp-feed' }, events.slice(0, 80).map((e: any) =>
+    h('li', { class: `is-${e.type}` }, h('time', null, when(new Date(e.ts))), h('b', null, mpEventText[e.type] ?? e.type),
+      h('span', null, e.name || (e.uid ? String(e.uid) : '未进城连接')),
+      h('small', null, [e.type === 'reject' ? mpRejectText[e.reason] ?? e.reason : e.reason, e.closeCode ? mpCloseText[e.closeCode] ?? `关闭码 ${e.closeCode}` : '', e.type === 'leave' && e.durationSec != null ? `待了 ${mpDuration(e.durationSec)}` : ''].filter(Boolean).join(' · ')))))
+    : emptyState('联机服务启动以来还没有人进出'), { sub: '最近 300 条，联机服务重启后清空' })
+  const chats = [...state.chat].reverse()
+  const chatCard = card('最近聊天', chats.length ? h('ol', { class: 'adm-mp-feed adm-mp-chat' }, chats.map((c: any) =>
+    h('li', null, h('time', null, when(new Date(c.ts))), h('b', null, c.name), h('span', null, c.text))))
+    : emptyState('还没有聊天'), { sub: '最近 100 条' })
+  return h('div', { class: 'adm-stack' }, kpis, mapCard, table, h('div', { class: 'adm-grid-2' }, traffic, bans), h('div', { class: 'adm-grid-2' }, eventCard, chatCard))
+}
+function paintMpHistory(history: any) {
+  const series: Series[] = [{ name: '在线', points: list<any>(history.series).map((row) => ({ t: new Date(row.ts), v: num(row.online) ?? 0 })) }]
+  const daily = list<any>(history.daily).slice().reverse()
+  return h('div', { class: 'adm-stack' },
+    history.peak != null && h('p', { class: 'adm-note' }, `这段时间同时在线最多 ${history.peak} 人（${when(iso(history.peakAt))}）`),
+    series[0].points.length ? lineChart(series, fmt.int, { bucket: history.grain === 'minute' ? '5m' : '1h', height: 200, gap: history.grain === 'minute' ? 60e3 : 3600e3 })
+      : emptyState('还没有采样', 'API 每分钟记一次在线人数，上线后开始积累'),
+    daily.length ? mpTable(['日期', '联机人数', '场次', '平均时长', '中位时长', '最高同时在线'],
+      daily.map((d: any) => [d.day, fmt.int(d.dau), fmt.int(d.sessions), mpDuration(num(d.avgDurationSec)), mpDuration(num(d.medianDurationSec)),
+        d.peak != null ? `${d.peak}（${iso(d.peakAt)?.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', hour12: false })}）` : dash]), [1, 2, 3, 4, 5]) : null)
+}
+function paintMpSessions(result: any) {
+  const rows = list<any>(result.sessions)
+  if (!rows.length) return emptyState('还没有会话记录')
+  return h('div', { class: 'adm-mp-scroll' }, mpTable(['玩家', '进入', '离开', '时长', '离开原因', '地区'], rows.map((r) => [
+    h('div', { class: 'adm-mp-who' }, navLink(r.name, { view: 'mp', uid: String(r.uid) }, { class: 'adm-link', title: '只看这个玩家' }, true), h('small', null, String(r.uid))),
+    when(iso(r.joinedAt)), r.leftAt ? when(iso(r.leftAt)) : h('span', { class: 'adm-pill is-good' }, '在线'),
+    mpDuration(num(r.durationSec)),
+    [r.reason && r.reason !== 'lost observation' ? r.reason : r.reason ? '未观测到离开' : '', r.closeCode ? mpCloseText[r.closeCode] ?? `关闭码 ${r.closeCode}` : ''].filter(Boolean).join(' · ') || dash,
+    mpRegion(r.region)]), [3]))
 }
 
 const socialBrand: Record<string, string> = {
