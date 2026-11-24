@@ -86,3 +86,29 @@ test('all five fingers have three weighted joints, identical hierarchy and <=220
     }
   }
 })
+
+test('the extended thumbs meet in front of the chest on the production rig', async () => {
+  const {readFile} = await import('node:fs/promises')
+  const {Vector3} = await import('three')
+  const {GLTFLoader} = await import('three/addons/loaders/GLTFLoader.js')
+  const {emotePlayback} = await import('../web/src/emote/playback.ts')
+  const bytes = await readFile('public/avatar/figure.glb')
+  const {scene} = await new GLTFLoader().parseAsync(
+    bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength),
+    '',
+  )
+  const pose = emotePlayback(scene)
+  pose.play(2)
+  pose.tick(0.5, false)
+  scene.updateMatrixWorld(true)
+  const point = (name) => scene.getObjectByName(name).getWorldPosition(new Vector3())
+  const chest = point('spine_03')
+  for (const side of ['l', 'r']) {
+    const base = point('thumb_01_' + side)
+    const tip = point('thumb_04_leaf_' + side)
+    assert(Math.abs(base.x - chest.x) < 0.025 && Math.abs(base.y - chest.y) < 0.12 && base.z - chest.z > 0.25)
+    assert(tip.z - base.z > 0.12 && Math.abs(tip.x - base.x) < 0.008 && Math.abs(tip.y - base.y) < 0.003)
+  }
+  const gap = point('thumb_04_leaf_l').distanceTo(point('thumb_04_leaf_r'))
+  assert(gap > 0.009 && gap < 0.014, 'thumb tip centre spacing: ' + gap)
+})
