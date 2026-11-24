@@ -10,7 +10,7 @@
   --ui-serif:"Noto Serif SC","Source Han Serif SC","Songti SC","STSong",serif;
   /* 青玉 */
   --ui-ink-900:#14211e;--ui-ink-800:#1c2c2a;--ui-jade-700:#2f4a45;--ui-jade-500:#4f7f7a;--ui-jade-300:#8fc1b5;
-  --ui-glass:rgba(24,40,37,.5);--ui-glass-strong:rgba(24,40,37,.74);--ui-glass-solid:rgba(22,36,33,.9);
+  --ui-glass:rgba(22,37,34,.66);--ui-glass-strong:rgba(22,37,34,.82);--ui-glass-solid:rgba(22,36,33,.9);
   --ui-glass-line:rgba(244,239,226,.3);--ui-glass-line-soft:rgba(244,239,226,.16);
   /* 宣纸 */
   --ui-paper:#f4efe2;--ui-paper-2:#e9e1cf;--ui-paper-3:#efe8d8;--ui-paper-dim:rgba(244,239,226,.7);
@@ -24,7 +24,9 @@
   /* 形状 */
   --ui-r-pill:999px;--ui-r-lg:18px;--ui-r-md:12px;--ui-r-sm:8px;--ui-r-paper:6px;
   --ui-h:38px;--ui-h-lg:48px;
-  --ui-blur:blur(8px) saturate(1.15);
+  /* 不对活画布做背景模糊（IDOK-297）：每个 backdrop-filter 元素每帧都要回读并模糊整张 WebGL 帧，
+     常驻 HUD 改为更实的青玉底 + 细描边。只有模态遮罩（dialog::backdrop、全屏 mask、加载雾幕）可用 --ui-blur-mask。 */
+  --ui-blur:none;--ui-blur-mask:blur(4px);
   --ui-shadow-1:0 4px 14px rgba(12,20,20,.22);--ui-shadow-2:0 18px 50px rgba(12,20,20,.32);
   --ui-ease:cubic-bezier(.2,.8,.2,1);--ui-fast:.15s;--ui-slow:.32s;
   --ui-track:.1em;
@@ -39,7 +41,7 @@ body{font-family:var(--ui-serif)}
 .ui-btn{display:inline-flex;align-items:center;justify-content:center;gap:.45em;box-sizing:border-box;min-height:var(--ui-h);padding:0 18px;
   font:500 14px/1 var(--ui-serif);letter-spacing:var(--ui-track);text-decoration:none;white-space:nowrap;cursor:pointer;
   color:var(--ui-paper);background:var(--ui-glass);border:1px solid var(--ui-glass-line);border-radius:var(--ui-r-pill);
-  backdrop-filter:var(--ui-blur);-webkit-backdrop-filter:var(--ui-blur);-webkit-tap-highlight-color:transparent;user-select:none;-webkit-user-select:none;
+  -webkit-tap-highlight-color:transparent;user-select:none;-webkit-user-select:none;
   transition:background var(--ui-fast),border-color var(--ui-fast),transform var(--ui-fast),box-shadow var(--ui-fast),color var(--ui-fast)}
 .ui-btn:hover{background:var(--ui-glass-strong)}
 .ui-btn:active{transform:scale(.96)}
@@ -48,7 +50,7 @@ body{font-family:var(--ui-serif)}
 .ui-btn--seal:hover{background:var(--ui-seal-hi);border-color:var(--ui-seal-hi)}
 .ui-btn--paper{background:var(--ui-paper);border-color:var(--ui-paper);color:var(--ui-ink)}
 .ui-btn--paper:hover{background:#fffaf0}
-.ui-btn--ghost{background:none;border-color:transparent;color:var(--ui-paper-dim);backdrop-filter:none;-webkit-backdrop-filter:none}
+.ui-btn--ghost{background:none;border-color:transparent;color:var(--ui-paper-dim)}
 .ui-btn--ghost:hover{background:rgba(244,239,226,.08);color:var(--ui-paper)}
 .ui-btn--lg{min-height:var(--ui-h-lg);padding:0 28px;font-size:17px;letter-spacing:.2em}
 .ui-btn--block{display:flex;width:100%}
@@ -59,9 +61,9 @@ body{font-family:var(--ui-serif)}
 
 /* --- 面板：深青玻璃对话框（关于 / 账号 / 反馈 / 玩法） --------------------------------------- */
 .ui-panel,.about-panel{box-sizing:border-box;color:var(--ui-paper);background:var(--ui-glass-solid);border:1px solid var(--ui-glass-line-soft);border-radius:var(--ui-r-lg);
-  box-shadow:var(--ui-shadow-2);backdrop-filter:var(--ui-blur);-webkit-backdrop-filter:var(--ui-blur);font-family:var(--ui-serif)}
+  box-shadow:var(--ui-shadow-2);font-family:var(--ui-serif)}
 dialog.ui-panel,dialog.about-panel{padding:0;margin:auto}
-dialog.ui-panel::backdrop,dialog.about-panel::backdrop{background:rgba(12,20,20,.5);backdrop-filter:blur(4px)}
+dialog.ui-panel::backdrop,dialog.about-panel::backdrop{background:rgba(12,20,20,.5);backdrop-filter:var(--ui-blur-mask)}
 .about-panel>header,.ui-panel>header{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:16px 18px 12px;border-bottom:1px solid var(--ui-glass-line-soft)}
 .about-panel h2,.ui-panel h2{margin:0;font-size:18px;font-weight:600;letter-spacing:.2em}
 /* every dialog's close is the same round ×; the text stays for screen readers and tests */

@@ -16,8 +16,6 @@
   box-shadow: 0 14px 36px rgba(8, 16, 14, .34);
   color: var(--ui-paper, #f4efe2);
   font: 13px/1.35 var(--ui-serif, "Noto Serif SC", serif);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
   opacity: 0;
   transform: translateY(8px);
   transition: opacity .18s ease, transform .18s ease;

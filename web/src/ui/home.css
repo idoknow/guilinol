@@ -42,7 +42,7 @@ body[data-home] :is(.hud-me,.dock,.sky-ui,.hint,footer,.walk-ui,.vehicle-action,
 .home-resume-row{margin-top:-4px}.home-resume-row[hidden]{display:none}
 .home-resume{display:flex;align-items:center;gap:12px;width:100%;box-sizing:border-box;padding:11px 18px 11px 14px;border-radius:12px;cursor:pointer;
   font:500 14.5px/1.3 var(--ui-serif);letter-spacing:.12em;color:var(--ui-paper);text-align:left;
-  background:var(--ui-glass-strong);border:1px solid var(--ui-glass-line-soft);backdrop-filter:var(--ui-blur);-webkit-backdrop-filter:var(--ui-blur);
+  background:var(--ui-glass-strong);border:1px solid var(--ui-glass-line-soft);
   transition:background var(--ui-fast),border-color var(--ui-fast),transform .25s var(--ui-ease)}
 .home-resume:hover{background:var(--ui-glass-solid);border-color:var(--ui-glass-line);transform:translateX(3px)}
 .home-resume:active{transform:scale(.985)}
@@ -56,7 +56,7 @@ body[data-home] :is(.hud-me,.dock,.sky-ui,.hint,footer,.walk-ui,.vehicle-action,
   color:var(--st-white,#f6f4ef);font-family:var(--st-sans,system-ui,sans-serif);
   background:linear-gradient(105deg,rgba(255,197,61,.10),rgba(255,197,61,0) 42%),rgba(18,21,25,.9);
   box-shadow:0 22px 56px rgba(6,8,10,.5),inset 0 0 0 1px rgba(255,255,255,.12),inset 4px 0 0 var(--gold);
-  backdrop-filter:var(--ui-blur);-webkit-backdrop-filter:var(--ui-blur);transition:transform .25s var(--ui-ease),box-shadow .25s}
+  transition:transform .25s var(--ui-ease),box-shadow .25s}
 .home-mode--solo::after{content:"";position:absolute;inset:auto 0 0 0;height:3px;pointer-events:none;
   background:repeating-linear-gradient(90deg,rgba(246,244,239,.5) 0 18px,transparent 18px 34px);opacity:.35}
 .home-mode--solo:hover{transform:translateY(-2px);box-shadow:0 26px 64px rgba(6,8,10,.6),inset 0 0 0 1px rgba(255,197,61,.45),inset 4px 0 0 var(--gold)}
@@ -73,7 +73,7 @@ body[data-home] :is(.hud-me,.dock,.sky-ui,.hint,footer,.walk-ui,.vehicle-action,
 .home-mode--solo:hover .home-go--solo{filter:brightness(1.06)}
 /* 游览模式：次要，青玉玻璃 + 线框印章。 */
 .home-mode--tour{cursor:pointer;padding:14px 16px 13px;gap:10px 14px;color:var(--ui-paper);background:var(--ui-glass-strong);
-  border:1px solid var(--ui-glass-line-soft);backdrop-filter:var(--ui-blur);-webkit-backdrop-filter:var(--ui-blur);
+  border:1px solid var(--ui-glass-line-soft);
   transition:transform .25s var(--ui-ease),background .25s,border-color .25s}
 .home-mode--tour:hover{transform:translateY(-2px);background:var(--ui-glass-solid);border-color:var(--ui-glass-line)}
 .home-mode--tour:active{transform:scale(.985)}
@@ -112,7 +112,7 @@ kbd{display:inline-block;min-width:1.5em;padding:1px 5px;margin:0 1px;border-rad
 .home-douyin{position:absolute;z-index:1;right:calc(22px + env(safe-area-inset-right));bottom:calc(58px + env(safe-area-inset-bottom));
   display:grid;grid-template-columns:auto auto;align-items:center;gap:12px;padding:10px 16px 10px 10px;cursor:pointer;text-align:left;
   font:inherit;color:var(--ui-paper);background:var(--ui-glass);border:1px solid var(--ui-glass-line-soft);border-radius:var(--ui-r-lg);
-  backdrop-filter:var(--ui-blur);-webkit-backdrop-filter:var(--ui-blur);box-shadow:var(--ui-shadow-1);-webkit-tap-highlight-color:transparent;
+  box-shadow:var(--ui-shadow-1);-webkit-tap-highlight-color:transparent;
   transition:background var(--ui-fast),border-color var(--ui-fast),transform var(--ui-fast);animation:home-rise .8s .35s var(--ui-ease) both}
 .home-douyin:hover{background:var(--ui-glass-strong);border-color:var(--ui-glass-line);transform:translateY(-2px)}
 .home-douyin:focus-visible{outline:2px solid var(--ui-jade-300);outline-offset:2px}
@@ -156,7 +156,7 @@ kbd{display:inline-block;min-width:1.5em;padding:1px 5px;margin:0 1px;border-rad
 .home-mode--mp{cursor:pointer;padding:14px 16px 13px;gap:10px 14px;color:var(--ui-paper);
   background:linear-gradient(105deg,rgba(143,193,181,.16),rgba(143,193,181,0) 46%),var(--ui-glass-strong);
   border:1px solid var(--ui-glass-line-soft);box-shadow:inset 4px 0 0 var(--ui-jade-300),var(--ui-shadow-1);
-  backdrop-filter:var(--ui-blur);-webkit-backdrop-filter:var(--ui-blur);transition:transform .25s var(--ui-ease),background .2s,border-color .2s}
+  transition:transform .25s var(--ui-ease),background .2s,border-color .2s}
 .home-mode--mp:hover{transform:translateY(-2px);background:linear-gradient(105deg,rgba(143,193,181,.22),rgba(143,193,181,0) 46%),var(--ui-glass-solid);border-color:var(--ui-glass-line)}
 .home-mode--mp:active{transform:scale(.985)}
 .home-mode--mp:focus-visible{outline:3px solid var(--ui-jade-300);outline-offset:3px}
