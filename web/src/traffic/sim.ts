@@ -2,7 +2,7 @@ import {axleHeight,contactPose} from './lane-surface.ts'
 import {nearStatic,resolveContact,staticSolids,pickups,type Solid} from './contact.ts'
 import {CAR_SCALE} from '../drive/scale.ts'
 type Node = {id:number,x:number,y:number,z:number}
-type Lane = {id:number,from:number,to:number,offset:number,width?:number,kind:'motor'|'bus'|'nonmotor',speedKmh:number,cls?:string,street?:string,npcWalks?:number[][],heights?:number[],floor?:string}
+type Lane = {privateAccess?:boolean,wheelPose?:number[],floor?:string,id:number,from:number,to:number,offset:number,width?:number,kind:'motor'|'bus'|'nonmotor',speedKmh:number,cls?:string,street?:string,npcWalks?:number[][],heights?:number[]}
 type Phase = {lanes:number[],green:number,yellow:number}
 type Signal={node:number,group:number,offset:number,phases:Phase[]}
 export type Graph = {nodes:Node[],lanes:Lane[],walks:[number,number,number,number?,number[]?][],signals:Signal[]}
@@ -18,7 +18,19 @@ export function trackHeight(track:Track,dist:number){
   return heights[index+1]+(heights[index+3]-heights[index+1])*(fraction-heights[index])/(heights[index+2]-heights[index])
 }
 export const WALK_OFFSET=.32
-type Actor = {pitch?:number,roll?:number,track:Track,dist:number,speed:number,pace?:number,kind:'car'|'scooter'|'person',down:number,dodge:number,x:number,y:number,z:number,yaw:number,scale:number,leaving:boolean,halfWidth:number,halfLength:number,height:number,holdUntil?:number,waitingFor?:Actor,waitingSince?:number}
+// Baked samples are [fraction, contact-plane height, pitch, roll] in YXZ order.
+export function poseAt(samples:number[],fraction:number,column:number){
+  fraction=Math.max(0,Math.min(1,fraction))
+  let lo=0,hi=samples.length/4-1
+  while(hi-lo>1){
+    const mid=(lo+hi)>>>1
+    if(samples[mid*4]<=fraction)lo=mid
+    else hi=mid
+  }
+  const a=4*lo,b=4*hi,t=(fraction-samples[a])/(samples[b]-samples[a])
+  return samples[a+column]+t*(samples[b+column]-samples[a+column])
+}
+type Actor = {track:Track,pitch?:number,roll?:number,frontAxle?:number,rearAxle?:number,halfTrack?:number,dist:number,speed:number,pace?:number,kind:'car'|'scooter'|'person',down:number,dodge:number,x:number,y:number,z:number,yaw:number,scale:number,leaving:boolean,halfWidth:number,halfLength:number,height:number,holdUntil?:number,waitingFor?:Actor,waitingSince?:number}
 type Position = {x:number,z:number,y:number}
 export const MAX_ACTORS=100
 export const MOBILE_ACTORS=80
@@ -296,6 +308,7 @@ export class Traffic {
     let synthNodeId=-1
     for(const lane of graph.lanes){
       if(!rules.classes.includes((lane.cls??'').replace(/_link$/,''))||lane.kind!=='motor')continue
+      if(lane.privateAccess)continue
       add(lane,false)
       const head=nodes.get(lane.from)!,tail=nodes.get(lane.to)!
       const yAt=(px:number,pz:number)=>{const dx=tail.x-head.x,dz=tail.z-head.z,d2=dx*dx+dz*dz||1;return head.y+(tail.y-head.y)*Math.max(0,Math.min(1,((px-head.x)*dx+(pz-head.z)*dz)/d2))}
@@ -364,11 +377,10 @@ export class Traffic {
       }
     }
     if(track.floor){
-      const pose=contactPose(track,dist,undefined,undefined,undefined,actor.dodge)
+      const pose=contactPose(track,dist,actor.frontAxle,actor.rearAxle,actor.halfTrack,actor.dodge)
       actor.y=pose.y;actor.pitch=pose.pitch;actor.roll=pose.roll;actor.yaw=track.yaw
       return
     }
-    actor.pitch=actor.roll=0
     const reference=trackHeight(track,dist)
     const car=actor.kind==='car'
     actor.y=this.sampleGround?.(actor.x,actor.z,reference,car)??reference
@@ -380,6 +392,12 @@ export class Traffic {
         actor.y=support
       }
     }
+    if(track.wheelPose){
+      actor.pitch=poseAt(track.wheelPose,dist/track.length,2)
+      actor.roll=poseAt(track.wheelPose,dist/track.length,3)
+      // Positive dodge moves left in model space. Extend the fitted crossfall.
+      if(actor.dodge)actor.y-=actor.dodge*Math.tan(actor.roll)/Math.cos(actor.pitch)
+    }else actor.pitch=actor.roll=0
     actor.yaw=track.yaw
   }
   phase(track:Lane,time=this.time):'green'|'red'|'yellow'{

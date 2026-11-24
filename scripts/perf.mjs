@@ -168,6 +168,7 @@ try {
       let lastDraw = null
       let maxMirrorCalls=0,maxMirrorTriangles=0
       let visibleMotors=0,visiblePeople=0,drawCalls=0,triangles=0
+      let maxCalls=0,maxTotalCalls=0
       const start=await nextRaf(); let last=start
       for (let i = 0; i < sampleCount || last-start<minMs; i++) {
         window.__glPerf.resetFrame()
@@ -179,6 +180,8 @@ try {
         visibleMotors+=window.viewer.trafficProbe?.motors??0
         visiblePeople+=window.viewer.trafficProbe?.pedestrians??0
         drawCalls+=lastDraw.calls;triangles+=lastDraw.triangles
+        maxCalls=Math.max(maxCalls,lastDraw.calls)
+        maxTotalCalls=Math.max(maxTotalCalls,lastDraw.totalCalls)
         frameTimes.push(dt)
         heapPeakBytes = Math.max(heapPeakBytes, performance.memory?.usedJSHeapSize ?? 0)
       }
@@ -200,10 +203,10 @@ try {
         meanMs: +mean.toFixed(2),
         medianMs: +median.toFixed(2),
         p95Ms: +p95.toFixed(2),
-        calls: lastDraw.calls,
-        mirrorCalls: lastDraw.mirrorCalls,
+        calls: paired?maxCalls:lastDraw.calls,
+        mirrorCalls: paired?maxMirrorCalls:lastDraw.mirrorCalls,
+        totalCalls: paired?maxTotalCalls:lastDraw.totalCalls,
         maxMirrorCalls,maxMirrorTriangles,
-        totalCalls: lastDraw.totalCalls,
         peakCalls: peakDraws,
         triangles: lastDraw.triangles,
         totalTriangles: lastDraw.totalTriangles,

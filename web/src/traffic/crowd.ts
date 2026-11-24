@@ -39,6 +39,27 @@ export const AGE_PROFILES:Record<Age,Profile>={
   elder:{w:2,looks:{chinese:5,knit:4,basic:3,outdoor:3},hair:{m:['m_buzz','m_crop','m_part'],f:['f_bun','f_lob']},height:[.92,.97],girth:1.05,hairTint:['#8d8a84','#b3afa7','#d3d0c8']},
 }
 
+// A passer-by keeps its selected outfit for the lifetime of its template.
+function batchTorsoAccessories(scene:THREE.Object3D){
+  const bone=scene.getObjectByName('attach_torso')
+  if(!bone)return
+  const meshes=bone.children.filter((m):m is THREE.Mesh=>m instanceof THREE.Mesh&&
+    !(m instanceof THREE.SkinnedMesh)&&m.visible&&!m.children.length&&
+    !Array.isArray(m.material)&&!m.material.transparent&&!Object.keys(m.geometry.morphAttributes).length)
+  if(meshes.length<2)return
+  const parts=meshes.map(mesh=>{
+    mesh.updateMatrix()
+    return mesh.geometry.clone().applyMatrix4(mesh.matrix)
+  })
+  const geometry=mergeGeometries(parts,true)
+  for(const part of parts)part.dispose()
+  if(!geometry)return
+  const merged=new THREE.Mesh(geometry,meshes.map(m=>m.material as THREE.Material))
+  merged.name='Passer-by torso accessories'
+  bone.remove(...meshes)
+  bone.add(merged)
+}
+
 export function randomPasserby(random:()=>number,age?:Age):Avatar&{age:Age,height:number,girth:number,hairTint?:string}{
   const r=(n:number)=>Math.floor(random()*n)
   age??=weighted(Object.fromEntries(Object.entries(AGE_PROFILES).map(([key,p])=>[key,p.w])) as Record<Age,number>,random())
@@ -76,6 +97,7 @@ export function crowd(scene:THREE.Scene,camera:THREE.Camera,groundAt?:(x:number,
           if(torso){const pack=new THREE.Mesh(new THREE.BoxGeometry(.3,.38,.14),new THREE.MeshStandardMaterial({color:[0x3e4a55,0x2f5d7c,0x7a3b35,0x3f5a4c][Math.floor(random()*4)],roughness:.85,flatShading:true}))
             pack.position.set(0,-.02,.2);pack.name='passer-by backpack';torso.add(pack)}
         }
+        batchTorsoAccessories(model.scene)
         const t={scene:model.scene,clips:model.animations}
         await warm?.(model.scene)
         ready[index]=t

@@ -79,7 +79,7 @@
     "test:chat": "node --test scripts/chat-test.mjs scripts/chat-lexicon-test.mjs scripts/chat-corpus-test.mjs",
     "bench:chat": "node scripts/chat-bench.mjs",
     "bench:rt": "node scripts/rt-load.mjs",
-    "audit:station-road-grades": "tsx scripts/audit-station-road-grades.ts"
+    "audit:vehicles": "tsx scripts/vehicle-grounding.ts audit"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1173.0",
