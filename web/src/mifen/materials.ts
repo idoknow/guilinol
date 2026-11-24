@@ -1426,6 +1426,73 @@ export function bindVcEmissive<T extends THREE.Material>(mat: T): T {
   return mat
 }
 
+/** 合批主材质的店内夜间程度（updateNight 写入），所有 surface master 共享 */
+export const SHOP_SURF_NIGHT: THREE.IUniform<number> = {value: 0}
+
+/** surface master 的附加贴图层：key 由被合批材质的 userData.surfTex 引用，repeat = 1 / 图案周期（米） */
+interface SurfLayer {
+  key: string
+  tex: THREE.Texture
+  periodM: PeriodM
+}
+
+/**
+ * IDOK-305：合批主材质按顶点选贴图层 + 按顶点自发光。
+ *
+ * 合批（IDOK-294）把杉木条、花岗岩、人行道砖、吊顶和灯盘都并进了几张顶点色主材质，
+ * 原来各自的贴图和"店里日光灯常亮"的自发光一起丢了。这里不加 draw call：
+ * - aSurf.x 选层：0 = 主材质自己的 map，1/2 = layers 里的贴图（几何 UV 以米为单位），3 = 纯色；
+ * - aSurf.y / aSurf.z = 白天底光 / 夜间增量，自发光 = emissive × 本色（贴图 × 顶点色）×（y + 夜间 × z），
+ *   与合批前 litSurfaces 表 + emissiveMap = map 的观感一致。
+ * 主材质自身的 emissiveMap / emissiveIntensity 不再使用（固定为 null / 1）。
+ */
+function bindSurfaceMaster(mat: THREE.MeshStandardMaterial, layers: SurfLayer[], glow: [number, number]): THREE.MeshStandardMaterial {
+  mat.userData.surfLayers = Object.fromEntries(layers.map((l, i) => [l.key, i + 1]))
+  mat.userData.glow = glow
+  mat.emissiveMap = null
+  mat.emissiveIntensity = 1
+  const l1 = layers[0] ?? null
+  const l2 = layers[1] ?? l1
+  const fallback = mat.map
+  mat.onBeforeCompile = shader => {
+    shareAtmosphere(shader)
+    shader.uniforms.uShopNight = SHOP_SURF_NIGHT
+    shader.uniforms.uSurfL1 = {value: l1?.tex ?? fallback}
+    shader.uniforms.uSurfL2 = {value: l2?.tex ?? fallback}
+    shader.uniforms.uSurfR1 = {value: new THREE.Vector2(1 / (l1?.periodM[0] ?? 1), 1 / (l1?.periodM[1] ?? 1))}
+    shader.uniforms.uSurfR2 = {value: new THREE.Vector2(1 / (l2?.periodM[0] ?? 1), 1 / (l2?.periodM[1] ?? 1))}
+    shader.vertexShader = shader.vertexShader
+      .replace('#include <common>', '#include <common>\nattribute vec3 aSurf;\nvarying vec3 vSurf;\nvarying vec2 vSurfUv;')
+      .replace('#include <uv_vertex>', '#include <uv_vertex>\nvSurf = aSurf;\nvSurfUv = uv;')
+    shader.fragmentShader = shader.fragmentShader
+      .replace(
+        '#include <common>',
+        '#include <common>\nuniform float uShopNight;\nuniform sampler2D uSurfL1;\nuniform sampler2D uSurfL2;\nuniform vec2 uSurfR1;\nuniform vec2 uSurfR2;\nvarying vec3 vSurf;\nvarying vec2 vSurfUv;',
+      )
+      .replace(
+        '#include <map_fragment>',
+        [
+          '#ifdef USE_MAP',
+          'vec4 surfT0 = texture2D( map, vMapUv );',
+          '#else',
+          'vec4 surfT0 = vec4( 1.0 );',
+          '#endif',
+          // 三层都先采样再选，避免按三角形分支时导数失效（层边缘的 mip 跳变）
+          'vec4 surfT1 = texture2D( uSurfL1, vSurfUv * uSurfR1 );',
+          'vec4 surfT2 = texture2D( uSurfL2, vSurfUv * uSurfR2 );',
+          'vec4 surfTex = vSurf.x < 0.5 ? surfT0 : vSurf.x < 1.5 ? surfT1 : vSurf.x < 2.5 ? surfT2 : vec4( 1.0 );',
+          'diffuseColor *= surfTex;',
+        ].join('\n'),
+      )
+      .replace(
+        '#include <emissivemap_fragment>',
+        '#include <emissivemap_fragment>\ntotalEmissiveRadiance = emissive * diffuseColor.rgb * ( vSurf.y + uShopNight * vSurf.z );',
+      )
+  }
+  mat.customProgramCacheKey = () => 'guilinol-mifen-surface-master'
+  return mat
+}
+
 function applyAtmoAndName<T extends THREE.Material>(mat: T, name: string, tiled: boolean): T {
   mat.name = name
   mat.userData.tiled = tiled
@@ -1756,9 +1823,11 @@ function createPack(): TianyuanMaterialPack {
   const woodCladding = bindBatch(
     pbr('tianyuan_wood_cladding', WOOD_SPECS.cedar, {emissive: 0xffe2b8, emissiveIntensity: 0}, cedarShared),
     vcWood,
-    0xc89a6a,
+    0xffffff,
   )
   woodCladding.emissiveMap = cedarShared.map
+  woodCladding.userData.surfTex = 'cedar'
+  woodCladding.userData.glow = [0.2, 0.12]
 
   const glyphs = signTex(512, 128, drawFasciaGlyphs)
   const fasciaLetters = std('tianyuan_fascia_signs', {
@@ -1818,17 +1887,23 @@ function createPack(): TianyuanMaterialPack {
     true,
   )
   const slabEdge = bindBatch(std('tianyuan_slab_edge', {color: 0xd5cebf, roughness: 0.9}, true), vcExterior, 0xd5cebf)
+  slabEdge.userData.glow = [0, 0.26]
   const roofDeck = bindBatch(std('tianyuan_roof_deck', {color: 0x9b9890, roughness: 0.92}, true), vcExterior, 0x9b9890)
   const granite = bindBatch(
     std('tianyuan_granite', {map: texAsset(tex, CONCRETE_SPECS.granite.albedo, CONCRETE_SPECS.granite.periodM, 'albedo'), roughness: 0.72}, true),
     vcStone,
-    0xc8baa4,
+    0xffffff,
   )
+  granite.userData.surfTex = 'granite'
+  granite.userData.glow = [0, 0.12]
+  const paversMap = texAsset(tex, TILE_SPECS.pavers.albedo, TILE_SPECS.pavers.periodM, 'albedo')
   const pavement = bindBatch(
-    std('tianyuan_pavers', {color: 0xa6a096, roughness: 0.88}, true),
+    std('tianyuan_pavers', {color: 0xffffff, map: paversMap, roughness: 0.88}, true),
     vcStone,
-    0x9e988e,
+    0xffffff,
   )
+  pavement.userData.surfTex = 'pavers'
+  pavement.userData.glow = [0, 0]
   const storefrontGlass = std('tianyuan_storefront_glass', {
     map: signTex(128, 256, drawStorefrontGlass),
     transparent: true,
@@ -1844,6 +1919,25 @@ function createPack(): TianyuanMaterialPack {
   )
   const aluminium = bindBatch(std('tianyuan_aluminium', {color: 0xd4d9dd, metalness: 0.26, roughness: 0.38}, true), vcMetal, 0xd4d9dd)
   const acUnit = bindBatch(std('tianyuan_ac_unit', {color: 0xe9e8e2, metalness: 0.08, roughness: 0.75}, true), vcExterior, 0xe9e8e2)
+
+  // IDOK-305：三张主材质按顶点选层 + 自发光，找回杉木条 / 花岗岩 / 人行道砖与吊顶灯盘（不加 draw call）
+  const graniteMap = granite.map as THREE.Texture
+  const cedarLayer: SurfLayer = {key: 'cedar', tex: cedarShared.map, periodM: WOOD_SPECS.cedar.periodM}
+  const graniteLayer: SurfLayer = {key: 'granite', tex: graniteMap, periodM: CONCRETE_SPECS.granite.periodM}
+  const paversLayer: SurfLayer = {key: 'pavers', tex: paversMap, periodM: TILE_SPECS.pavers.periodM}
+  bindSurfaceMaster(vcWood, [cedarLayer], [0.14, 0.1])
+  bindSurfaceMaster(vcStone, [graniteLayer, paversLayer], [0.26, 0.14])
+  bindSurfaceMaster(vcExterior, [cedarLayer, graniteLayer], [0.08, 0.22])
+  vcExterior.emissive.setHex(0xfff2e0)
+  // 被 EC/SF 统一改投 vcExterior 的金属、塑料、灯具保持纯色，并沿用原主材质的自发光
+  for (const [m, glow] of [
+    [vcMetal, [0.02, 0.06]],
+    [vcPlastic, [0.18, 0.12]],
+    [vcEmissive, [0.6, 1.4]],
+  ] as const) {
+    m.userData.surfTex = 'none'
+    m.userData.glow = glow
+  }
 
   // 4) 室内主墙与地砖（前厅/后厨共用 2 张高质量大理石地墙贴图 + 顶点色微调，省 4 张大贴图 + 2 draws）
   const wallTileHall = std(
@@ -1885,6 +1979,7 @@ function createPack(): TianyuanMaterialPack {
     0xbcb8ae,
   )
   const ceiling = bindBatch(std('tianyuan_ceiling', {color: 0xf6f3eb, roughness: 0.85}, true), vcExterior, 0xf6f3eb)
+  ceiling.userData.glow = [0.62, 0.2]
   const ceilingLamp = bindBatch(
     std('tianyuan_ceiling_lamp', {color: 0xfbfaf4, emissive: 0xfff5e0, emissiveIntensity: 0.6, roughness: 0.4}),
     vcEmissive,
@@ -1895,7 +1990,9 @@ function createPack(): TianyuanMaterialPack {
     vcEmissive,
     0xfffaf0,
   )
+  downlight.userData.glow = [0.5, 2.2]
   const quartzTop = bindBatch(std('tianyuan_quartz_top', {color: 0xf2ede3, roughness: 0.35}, true), vcStone, 0xf2ede3)
+  quartzTop.userData.glow = [0.24, 0.14]
   const stainless = bindBatch(
     std('tianyuan_stainless', {color: 0xdbe0e4, map: steelSharedMap, roughness: 0.38, metalness: 0.28, emissive: 0xfff2e2, emissiveIntensity: 0.24}, true),
     vcMetal,
@@ -1911,6 +2008,7 @@ function createPack(): TianyuanMaterialPack {
     vcWood,
     0x6b4730,
   )
+  darkWood.userData.glow = [0.12, 0.08]
   const tableWood = bindBatch(
     std('tianyuan_table_wood', {color: 0xc28f5c, map: woodSharedMap, roughness: 0.72, emissive: 0xffe4be, emissiveIntensity: 0.14}, true),
     vcWood,
@@ -2028,10 +2126,7 @@ function createPack(): TianyuanMaterialPack {
     [balconyGrille, 0, 0.18],
     [roofTile, 0, 0.34],
     [vcMetal, 0.24, 0.16],
-    [vcWood, 0.14, 0.1],
-    [vcStone, 0.26, 0.14],
     [vcPlastic, 0.18, 0.12],
-    [vcExterior, 0.08, 0.22],
     [signAtlasMat, 0.14, 0.28],
     [stainless, 0.24, 0.12],
     [stainlessDark, 0.26, 0.24],
@@ -2048,6 +2143,7 @@ function createPack(): TianyuanMaterialPack {
 
   function updateNight(night: number, boiling = false, time = 0) {
     const n = THREE.MathUtils.clamp(night, 0, 1)
+    SHOP_SURF_NIGHT.value = n
     for (const [m, day, k] of litSurfaces) m.emissiveIntensity = day + n * k
     residentialWindows.emissiveIntensity = n * 0.8
     const gap = Math.max(0, n - atmo.uNight.value)
