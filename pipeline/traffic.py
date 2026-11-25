@@ -136,11 +136,12 @@ def bake(output, manifest, rendered_roads=None):
     parking_segments = []
     sections = {road['way']:road['width'] for road in json.loads((output/'street-report.json').read_text())}
     from dingjiang_structures import motorway_sections
+    from rail_sections import motorway_sections as graded_motorways
     # Append the modeled motorway segments after the existing network so every
     # pre-existing lane keeps its ID in graph.json.gz and all streaming cells.
     existing = (way for way in elements if way.get('tags', {}).get('highway')
                 not in ('motorway', 'motorway_link'))
-    for way in chain(existing, motorway_sections(elements)):
+    for way in chain(existing, motorway_sections(elements), graded_motorways(elements)):
         tags = way.get('tags', {})
         linear = way['id'] not in SPAN_WAYS and any(tags.get(key,'no')!='no' for key in ('bridge','tunnel'))
         kind = tags.get('highway', '').removesuffix('_link')

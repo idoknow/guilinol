@@ -97,19 +97,26 @@ def bake(directory, manifest, paired_widths):
     import dingjiang_structures
     profiles.update(dingjiang_structures.road_profiles(elements, paired_widths))
     bridge_ways, landings = dingjiang_structures.raise_decks(directory, manifest, elements, profiles)
+    from rail_sections import designs, road_profiles as section_roads
+    from dingjiang import ROAD_IDS
     bake_profiles(directory, manifest, profiles, elements, bridge_ways.values(), landings)
     from dingjiang_paving import finish_paving
-    finish_paving(directory, manifest, profiles, elements)
+    finish_paving(directory, manifest, [profiles[wid] for wid in ROAD_IDS], elements)
+    ways = {way['id']: way for way in elements if way['type']=='way'}
+    for section in designs():
+        parts = section_roads(section, ways, paired_widths)
+        bake_profiles(directory, manifest, parts, elements, additional=True)
+        finish_paving(directory, manifest, list(parts.values()), elements)
 
 
-def bake_profiles(directory, manifest, profiles, elements, bridge_ways=(), landings=None):
+def bake_profiles(directory, manifest, profiles, elements, bridge_ways=(), landings=None, *, additional=False):
     import gzip
     import struct
     from collections import defaultdict
     from shapely import STRtree
 
     bores = tunnel_sections(profiles)
-    replaced = {t['way'] for t in bores}
+    replaced = set() if additional else {t['way'] for t in bores}
     manifest['tunnels'] = [t for t in manifest.get('tunnels', []) if t['way'] not in replaced] + bores
     tiles = defaultdict(list)
     def add(a, b, width, y0, y1):
@@ -140,7 +147,9 @@ def bake_profiles(directory, manifest, profiles, elements, bridge_ways=(), landi
         if len(coords)<2 or not len(near.query(LineString(coords),predicate='dwithin',distance=40)):
             continue
         profiled = profiles.get(way['id'])
-        if profiled and 'nativeRemainder' in profiled[0]:
+        if profiled and 'nativeRemainders' in profiled[0]:
+            fixed = profiled[0]['nativeRemainders']
+        elif profiled and 'nativeRemainder' in profiled[0]:
             fixed = [LineString(profiled[0]['nativeRemainder'])]
         elif profiled:
             nodes = profiled[0]['nodes']
@@ -224,7 +233,18 @@ def bake_profiles(directory, manifest, profiles, elements, bridge_ways=(), landi
         streets = collision[1]
         while len(streets)<14:
             streets.append(None if len(streets) in (5,11,12) else [])
-        if len(streets)==14:
+        if additional and len(streets)>14:
+            existing = streets[14]
+            previous = STRtree([LineString([s[:2],s[2:4]]).buffer(s[4]+6) for s in existing if s[5] is not None])
+            if any(len(previous.query(LineString([s[:2],s[2:4]]),predicate='dwithin',distance=s[4]+6))
+                   for s in segments if s[5] is not None):
+                raise ValueError(f"Overlapping graded sections require a joint design in tile {origin}")
+            guards = [s for s in existing if s[5] is not None or
+                      len(previous.query(LineString([s[:2],s[2:4]]),predicate='dwithin',distance=s[4]+6))]
+            streets[14] = guards + segments
+            if len(streets)>15:
+                cuts[origin] = streets[15] + cuts[origin]
+        elif len(streets)==14:
             streets.append(segments)
         else:
             streets[14]=segments
@@ -338,9 +358,9 @@ def grade_traffic(directory, manifest, ways):
     if north_access is not None:
         roads.append(north_access)
     for way in roads:
-        nodes = way.get('trafficNodes', way['nodes'])
-        for a,b in zip(nodes,nodes[1:]):
-            owners[a,b]=owners[b,a]=way
+        for nodes in (way['nodes'], way.get('trafficNodes', [])):
+            for a,b in zip(nodes,nodes[1:]):
+                owners[a,b]=owners[b,a]=way
     lanes = []
     for lane in graph['lanes']:
         way = owners.get((lane['from'],lane['to']))

@@ -4,6 +4,7 @@ import assert from 'node:assert/strict'
 import fs from 'node:fs'
 import path from 'node:path'
 import {gunzipSync} from 'node:zlib'
+import {sampledRailhead} from './railhead'
 import {ll2xz} from '../lib/projection'
 import {visibleSurfaces} from './dingjiang-visible-surfaces'
 import {vehicleSurface} from './vehicle-surface'
@@ -25,23 +26,7 @@ const worlds = [base, candidate].map(dir => {
   const tiles = new Map<string, any>(m.chunks.map(t => [t.x + ',' + t.z, t]))
   const tile = (x: number, z: number) => tiles.get(Math.floor(x / 256) * 256 + ',' + Math.floor(z / 256) * 256)
   const surface = vehicleSurface(dir, m)
-  function railhead(x: number, z: number) {
-    const t = tile(x, z), buf = gunzipSync(fs.readFileSync(path.join(dir, t.file)))
-    const offset = 24 + 4 * (m.chunkSize / m.grid + 1) ** 2 + 9 * buf.readUInt32LE(4) + 4 * buf.readUInt32LE(8)
-    const rails = JSON.parse(buf.toString('utf8', offset, offset + buf.readUInt32LE(12)))[4]
-    let nearest = Infinity, height = NaN
-    for (const [ax, az, ay, bx, bz, by] of rails) {
-      const dx = bx - ax, dz = bz - az, px = (x - t.x) * 100 - ax, pz = (z - t.z) * 100 - az
-      const u = Math.max(0, Math.min(1, (px * dx + pz * dz) / (dx * dx + dz * dz)))
-      const distance = Math.hypot(px - u * dx, pz - u * dz)
-      if (distance < nearest) {
-        nearest = distance
-        height = (ay + u * (by - ay)) / 100
-      }
-    }
-    assert(nearest < 2, 'Missing encoded rail at ' + [x, z])
-    return height
-  }
+  const railhead = (x:number,z:number) => sampledRailhead(dir,m,tile(x,z),x,z)
   return {tile, surface, railhead, dir, tunnels: m.tunnels}
 })
 
@@ -78,7 +63,6 @@ for (const [id, way] of ways) {
   const lane = {way: id, nodes: new Set(way.nodes), structure}
   const points = way.geometry.map(p => ll2xz(p.lat, p.lon))
   const crossing = crossingByRoad.get(id) ?? points[0]
-  const included = new Set(worlds[1].tunnels.filter(t => t.way === id).flatMap(t => t.nodes))
   let station = 0, crossingAt = 0, nearest = Infinity
   const stations = [0]
   for (let i = 1; i < points.length; i++) {
@@ -89,22 +73,21 @@ for (const [id, way] of ways) {
     station += len
     stations.push(station)
   }
-  const active = stations.filter((_,i) => included.has(way.nodes[i]))
-  // A clipped motorway approach ends inside a long native OSM chord.
-  for(const t of worlds[1].tunnels.filter(t=>t.way===id)){
-    for(const [px,,pz] of t.portals){
-      let distance=Infinity,best=0
-      for(let i=1;i<points.length;i++){
-        const a=points[i-1],b=points[i],dx=b.x-a.x,dz=b.z-a.z,len=stations[i]-stations[i-1]
-        const u=Math.max(0,Math.min(1,((px-a.x)*dx+(pz-a.z)*dz)/(len*len)))
-        const d=Math.hypot(px-a.x-u*dx,pz-a.z-u*dz)
-        if(d<distance){distance=d;best=stations[i-1]+u*len}
-      }
-      active.push(best)
+  // Separate graded intervals may share one OSM way, with native pavement
+  // between them. Audit each installed interval and all whole-way regressions.
+  function stationAt(px:number,pz:number) {
+    let distance=Infinity,best=0
+    for(let i=1;i<points.length;i++){
+      const a=points[i-1],b=points[i],dx=b.x-a.x,dz=b.z-a.z,len=stations[i]-stations[i-1]
+      if(!len)continue
+      const u=Math.max(0,Math.min(1,((px-a.x)*dx+(pz-a.z)*dz)/(len*len)))
+      const d=Math.hypot(px-a.x-u*dx,pz-a.z-u*dz)
+      if(d<distance){distance=d;best=stations[i-1]+u*len}
     }
+    return best
   }
-  const lo = structure === 'bridge' ? 0 : Math.min(...active)
-  const hi = structure === 'bridge' ? station : Math.max(...active)
+  const intervalsOnWay = structure === 'bridge' ? [[0,station]] : worlds[1].tunnels
+    .filter(t=>t.way===id).map(t=>t.portals.map(([x,,z])=>stationAt(x,z)).sort((a,b)=>a-b))
   const cap = way.tags.highway === 'service' ? .08 : .05
   let activeIntervals = 0, aboveCap = 0, raisedM = 0, loweredM = 0
   let before = 0, after = 0, intervals = 0, regressions = 0
@@ -122,7 +105,7 @@ for (const [id, way] of ways) {
       if (previous) {
         const slope = heights.map((h,k) => Math.abs(h-previous![k])/step)
         const at = stations[i-1]+step*j
-        if (lo <= at - step + .00001 && at <= hi + .00001) {
+        if (intervalsOnWay.some(([lo,hi])=>lo <= at-step+.00001 && at <= hi+.00001)) {
           activeIntervals++
           if (slope[1] > cap + .000001) aboveCap++
           if (at <= crossingAt) before = Math.max(before,slope[1])

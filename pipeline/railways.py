@@ -338,6 +338,9 @@ def bake(world_dir, manifest, inventory, samples):
     coords,pieces,height,station_corridor = fit_corridor(coords,pieces,height,ways)
     from dingjiang import fit_rail
     fit_rail(coords,pieces,height,ways)
+    from rail_sections import designs, fit_tracks
+    for section in designs():
+        fit_tracks(section, coords, pieces, height, ways)
     tiles=defaultdict(list)
     maximum_grade=defaultdict(float)
     for i,j,station,flags,way_id in pieces:
