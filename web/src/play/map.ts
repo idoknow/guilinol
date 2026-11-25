@@ -5,6 +5,7 @@ import * as THREE from 'three'
 import type {Host} from './host'
 import type {Atlas, Place} from '../map/atlas'
 import {spots, waterDocks, type Spot, type WaterDock} from './spots'
+import fishShores from '../fishing/shores.json'
 import {isGlobalHotkeyBlocked} from '../walk/input-guard'
 import {builtBoundary,loadRegional,northwest as regionNW,southeast as regionSE} from '../map/regional'
 import {ll2xz} from '../../../lib/projection'
@@ -152,10 +153,15 @@ export function mapView(host:Host, atlas:Atlas, ui:{slot:HTMLElement; buttons:HT
     for(const o of seals) taken.push([o.x-sealSize/2,o.y-sealSize/2,o.x+sealSize/2,o.y+sealSize/2])
     const shopPins = listShops().map(shop=>({shop,x:sx(shop.triggerPos[0]),y:sz(shop.triggerPos[2])})).filter(o=>o.x>-24&&o.y>-24&&o.x<w+24&&o.y<h+24)
     const shopSize = mini?14:21
+    // 钓点（IDOK-336）：青色圆印「钓」，大地图标名字
+    const fishPins = fishShores.map(f=>({f,x:sx(f.spot.x),y:sz(f.spot.z)})).filter(o=>o.x>-20&&o.y>-20&&o.x<w+20&&o.y<h+20)
+    const fishSize = mini?12:18
+    for(const o of fishPins) taken.push([o.x-fishSize/2-2,o.y-fishSize/2-2,o.x+fishSize/2+2,o.y+fishSize/2+2])
     for(const o of shopPins) taken.push([o.x-shopSize/2-2,o.y-shopSize/2-2,o.x+shopSize/2+2,o.y+shopSize/2+2])
     if(!mini) {
       for(const o of shopPins) text(o.shop.mapMarker.label,o.x,o.y+shopSize*.5+10,12.5,o.shop.kind==='ebike'?'#20d6c1':C.shopText,'700')
       for(const o of seals) text(o.s.name,o.x,o.y+sealSize*.5+10,13,C.seal,'600')
+      for(const o of fishPins) text(o.f.name.replace('漓江·','')+' 钓点',o.x,o.y+fishSize*.5+10,12,'#1d7f74','600')
       for(const p of peaks) if(p.name&&scale>.12) text(p.name,sx(p.x),sz(p.z)+12,12,C.peakDark)
       if(scale>.22) for(const p of placeLabels) {const x = sx(p.x), y = sz(p.z); if(x>0&&y>0&&x<w&&y<h) text(p.n,x,y,11.5,C.inkSoft)}
     }
@@ -175,6 +181,14 @@ export function mapView(host:Host, atlas:Atlas, ui:{slot:HTMLElement; buttons:HT
       g.fillStyle = done?C.seal:'rgba(244,239,226,.95)'; g.strokeStyle = C.seal; g.lineWidth = done?1:1.4
       g.beginPath(); g.roundRect(-s/2,-s/2,s,s,s*.16); g.fill(); g.stroke()
       g.fillStyle = done?C.paperText:C.seal; g.font = `600 ${s*.62}px ${SERIF}`; g.fillText(o.s.seal,0,s*.04); g.restore()
+    }
+    for(const o of fishPins) {
+      const s = fishSize
+      g.save(); g.translate(o.x,o.y)
+      g.fillStyle = '#20d6c1'; g.strokeStyle = '#0f3b36'; g.lineWidth = mini ? 1.4 : 2
+      g.beginPath(); g.arc(0,0,s/2,0,Math.PI*2); g.fill(); g.stroke()
+      g.fillStyle = '#0f2a27'; g.font = `700 ${Math.round(s*.6)}px ${SERIF}`; g.fillText('钓',0,s*.05)
+      g.restore()
     }
     for(const o of shopPins) {
       const s = shopSize, isEbike = o.shop.kind === 'ebike'
@@ -335,6 +349,7 @@ export function mapView(host:Host, atlas:Atlas, ui:{slot:HTMLElement; buttons:HT
       ...listShops().filter(s=>s.displayName.includes(q)||s.brandName.includes(q)||s.mapMarker.label.includes(q)||s.mapMarker.badge.includes(q)||s.mapMarker.keywords.includes(q)).map(s=>({name:s.mapMarker.label,sub:'商铺 · '+s.displayName,x:s.triggerPos[0],z:s.triggerPos[2],shop:s})),
       ...waterDocks.filter(d=>d.name.includes(q)||d.sub.includes(q)||d.keywords.includes(q)).map(d=>({name:d.name,sub:'水边开船 · '+d.badge,x:d.x,z:d.z,dock:d})),
       ...spots.filter(s=>s.name.includes(q)||s.sub.includes(q)).map(s=>({name:s.name,sub:'观景点 · '+s.sub,x:s.x,z:s.z,spot:s})),
+      ...fishShores.filter(f=>f.name.includes(q)||'钓鱼钓点渔'.includes(q)).map(f=>({name:f.name+' 钓点',sub:'钓鱼 · 走近按 4 切鱼竿',x:f.spot.x,z:f.spot.z})),
       ...atlas.search(q,8).map((p:Place)=>({name:p.n,sub:{peak:'山',scenic:'景点',gate:'城门',bridge:'桥',water:'水面',park:'公园',museum:'博物馆',memorial:'纪念地',road:'道路',school:'学校'}[p.k],x:p.x,z:p.z}))]:[]
     const seen = new Set<string>()
     results.innerHTML = ''

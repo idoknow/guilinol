@@ -118,6 +118,7 @@ export function createFishing(host:Host,verify:boolean){
   function active(){return hotbarSlot()==='fishing'&&host.canUse()}
   function toggle(){if(hotbarSlot()==='fishing'){selectSlot(previous);return}if(!host.canUse()||!spot())return
     const methods=spot()!.methods;if(!methods.includes(method))method=methods[0];q<HTMLButtonElement>('[data-method]').classList.toggle('single',methods.length===1)
+    host.face(spot()!.spot.yaw)
     previous=hotbarSlot()==='camera'?'camera':'hand';selectSlot('fishing');host.hand()?.add(rod);ui.hidden=false;document.body.dataset.fishing='on';engine.equip();options()}
   window.addEventListener('fishing:cancel',()=>{rod.removeFromParent();float.visible=line.visible=false;ui.hidden=true;closeDrawer();delete document.body.dataset.fishing;origin=undefined;engine.cancel()})
 
