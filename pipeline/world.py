@@ -118,7 +118,6 @@ def prepare_banks(bbox,bounds,layout,layers,output,mountain_trees,playable):
                             top+(row+np.arange(patch.shape[0])[:,None])*GRID)
         if wet.any():
             patch[wet] = round(np.median(terrain[row:row+patch.shape[0],col:col+patch.shape[1]][wet]))
-    apply_dams(surface, left, top)
     wet = surface != DRY
     previous_bed = np.where(wet,np.minimum(terrain,surface-20),terrain)
     output.mkdir(parents=True, exist_ok=True)
@@ -258,7 +257,10 @@ def build(bbox, output, palette, workers=4):
 
     peak_tree = STRtree(peak_shapes)
     init_footprints, _ = buildings(bounds, elevation, peak_tree, layout, carriageway_mask, sidewalk_mask, airport_buildings)
-    candidate_routes = plan_vehicles(bounds, surface, layers['road'], init_footprints, sample, grid_origin=(left,top), routes_only=True)['routes']
+    routing_surface = surface.copy()
+    apply_dams(routing_surface, left, top)
+    candidate_routes = plan_vehicles(bounds, routing_surface, layers['road'], init_footprints, sample, grid_origin=(left,top), routes_only=True)['routes']
+    del routing_surface
 
     road_ctrl, bridge_plans, finalize_bridges = solve_road_and_bridge_elevations(
         original, terrain, surface, left, top, width, depth,
@@ -313,9 +315,9 @@ def build(bbox, output, palette, workers=4):
         fubo = fubo_site(spec['eastLimit'])
     if downtown:
         downtown.blend(terrain,surface,original,road_ctrl,left,top,fubo)
-        apply_dams(surface, left, top)
-        wet[:] = surface != DRY
         downtown.peaks(output,peaks)
+    apply_dams(surface,left,top)
+    wet[:] = surface != DRY
     if fubo is not None:
         fubo.grade_bank(terrain,original,surface,left,top)
         fubo.native_grade(terrain,original,surface,left,top)
