@@ -42,7 +42,7 @@ for (const { way: id, controls, boundaryNodes, maximumGrade = 0.05, direction = 
   const xy = way.geometry.map((p) => ll2xz(p.lat, p.lon))
   const start = controls[0][0],
     end = controls.at(-1)[0]
-  let worst, worstDirection
+  let worst, worstDirection, worstRegression
   let chainage = 0,
     peakGrade = 0,
     raised = 0,
@@ -102,7 +102,10 @@ for (const { way: id, controls, boundaryNodes, maximumGrade = 0.05, direction = 
           const localCaps = sameWayProfiles.filter(r => atStation >= r.controls[0][0]
             && atStation <= r.controls.at(-1)[0]).map(r => r.maximumGrade ?? .05)
           const spanLimit = localCaps.length ? Math.min(...localCaps) : nativeLimit
-          if (slope[1] > spanLimit + 1e-6 && slope[1] > slope[0] + 1e-6) regressions++
+          if (slope[1] > spanLimit + 1e-6 && slope[1] > slope[0] + 1e-6) {
+            regressions++
+            if (!worstRegression || slope[1]>worstRegression.grade) worstRegression={atStation,grade:slope[1],previous,y,step}
+          }
         }
         previous = y
       }
@@ -187,7 +190,7 @@ for (const { way: id, controls, boundaryNodes, maximumGrade = 0.05, direction = 
   grades.push({
     way: id,
     direction,
-    directionErrors, worstDirection,
+    directionErrors, worstDirection, worstRegression,
     samples: count,
     maximumGrade: peakGrade,worst,
     limit: maximumGrade,

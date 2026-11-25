@@ -218,6 +218,8 @@ def road_profiles(section, ways, widths):
                 substring(line, a, b) for a, b in ((0, start), (stop, line.length)) if b - a > .001
             ],
         )
+        if "nativeTies" in road:
+            local["nativeTies"] = road["nativeTies"]
         if "railSideWall" in road:
             wall = road["railSideWall"]
             top = np.asarray(wall["top"])
@@ -293,7 +295,10 @@ def adjust_prior_roads(name, profiles, sections):
             limit = np.where(changed, .05 * span, np.maximum(.05 * span, inherited))
             if np.any(abs(np.diff(profile[:, 1])) > limit + 1.e-7):
                 raise ValueError(f"Road correction exceeds grade limit on {wid}")
-            profiles[wid] = dict(way, fitShoulderPlanes=True), line, profile
+            way = dict(way, fitShoulderPlanes=True)
+            if "trafficOffsets" in segment:
+                way["trafficOffsets"] = {tuple(sorted((a,b))):offset for a,b,offset in segment["trafficOffsets"]}
+            profiles[wid] = way, line, profile
 
 
 def motorway_sections(elements):

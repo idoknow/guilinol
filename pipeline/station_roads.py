@@ -246,6 +246,7 @@ def bake_profiles(directory, manifest, profiles, elements, bridge_ways=(), landi
         for end,node in enumerate(bore['nodes']):
             if landings and node in landings:
                 bore.setdefault('joints',[None,None])[end] = landings[node]
+    install_native_ties(bores, profiles)
     cuts = defaultdict(list)
     for t in bores:
         a,b=t['portals']
@@ -378,6 +379,37 @@ def bake_profiles(directory, manifest, profiles, elements, bridge_ways=(), landi
         grade_traffic(directory, manifest, [*(way for way, _, _ in profiles.values()), *bridge_ways])
 
 
+def install_native_ties(bores, profiles):
+    """Blend the surveyed native crossfall into a flat graded approach."""
+    ties = {(way["id"], int(node)): rows for way, _, _ in profiles.values()
+            for node, rows in way.get("nativeTies", {}).items()}
+    if not ties:
+        return
+    for bore in bores:
+        start, end = np.asarray(bore["portals"])[:, [0, 2]]
+        tangent = (end - start) / bore["length"]
+        normal = np.array([-tangent[1], tangent[0]])
+        for index, node in enumerate(bore["nodes"]):
+            rows = ties.get((bore["way"], node))
+            if not rows:
+                continue
+            joints = bore.setdefault("joints", [None, None])
+            if joints[index] or rows[-1][0] >= bore["length"]:
+                raise ValueError(f"Native tie overlaps a junction on {bore['way']} at {node}")
+            mesh = []
+            for distance, levels in rows:
+                axis = end - distance*tangent if index else start + distance*tangent
+                offsets = np.linspace(-bore["halfWidth"], bore["halfWidth"], len(levels))
+                mesh.append([[float(x), height, float(z)] for (x,z),height in
+                             zip(axis + offsets[:, None]*normal, levels)])
+            faces = []
+            for a,b in zip(mesh, mesh[1:]):
+                for j in range(len(a)-1):
+                    faces.extend(([a[j], b[j], b[j+1]], [a[j], b[j+1], a[j+1]]))
+            ring = [row[::2] for row in (mesh[0][0],mesh[0][-1],mesh[-1][-1],mesh[-1][0])]
+            joints[index] = dict(ring=ring, faces=faces, wedges=[], draw=True)
+
+
 def trim_joint_floors(tunnels):
     """Fill only the uncovered wedge between graded rectangular road strips."""
     from shapely import LineString, Polygon, union_all
@@ -440,7 +472,9 @@ def grade_traffic(directory, manifest, ways):
     for lane in graph['lanes']:
         way = owners.get((lane['from'],lane['to']))
         if way is not None:
-            lanes.append(dict(lane, way=way['id'],halfWidth=half_width(way),maxTrafficOffset=way.get('maxTrafficOffset'),structure=next((s for s in ('bridge','tunnel') if way['tags'].get(s)=='yes'),'surface')))
+            edge = tuple(sorted((lane['from'],lane['to'])))
+            offset = way.get('trafficOffsets', {}).get(edge, way.get('maxTrafficOffset'))
+            lanes.append(dict(lane, way=way['id'],halfWidth=half_width(way),maxTrafficOffset=offset,structure=next((s for s in ('bridge','tunnel') if way['tags'].get(s)=='yes'),'surface')))
     root=Path(__file__).resolve().parents[1]
     with NamedTemporaryFile(dir=directory,mode='w+') as payload:
         json.dump(dict(manifest=manifest,nodes=graph['nodes'],lanes=lanes),payload)
