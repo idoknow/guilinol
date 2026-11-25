@@ -16,6 +16,8 @@ export interface RcHandlers {
   exit():void
   gimbal(deg:number):void
   sticks(patch:Partial<Sticks>):void
+  /** IDOK-280: 吊人垂钓 — 抛竿 / 起竿 / 收竿（只 FlyCart 200 + 载人 时可用） */
+  fish():void
 }
 
 export interface RcView {
@@ -75,6 +77,7 @@ export function createRc(spec:DroneSpec, handlers:RcHandlers, onHold?:(held:bool
   on('[data-act="photo"]',() => handlers.photo())
   on('[data-act="record"]',() => handlers.record())
   on('[data-act="exit"]',() => handlers.exit())
+  on('[data-act="fish"]',() => handlers.fish())
 
   // --- 降落 / 返航：长按触发，按住显示进度环；降落在进度未满前松开即暂停（再按继续）。
   const hold = (selector:string, run:(held:boolean) => void) => {
@@ -201,10 +204,28 @@ export function createRc(spec:DroneSpec, handlers:RcHandlers, onHold?:(held:bool
     if (rcBars) rcBars.dataset.level = String(level)
     if (hdBars) hdBars.dataset.level = String(state.signal < 12 ? 1 : level)
     if (takeoff) takeoff.hidden = state.phase !== 'landed'
+    // IDOK-280: 钓鱼按钮 —— 吊人且在钓点（水面低空悬停）时出现；咬钩窗口变红「起竿！」
+    const fishBtn = q<HTMLElement>('[data-act="fish"]')
+    if (fishBtn) {
+      fishBtn.hidden = !state.fish
+      if (state.fish === 'bite') {
+        fishBtn.textContent = '起竿！'
+        fishBtn.dataset.hot = '1'
+      } else if (state.fish === 'ready') {
+        fishBtn.textContent = '抛竿'
+        delete fishBtn.dataset.hot
+      } else if (state.fish) {
+        fishBtn.textContent = '收竿'
+        delete fishBtn.dataset.hot
+      } else delete fishBtn.dataset.hot
+    }
     if (gimbalInput && document.activeElement !== gimbalInput) gimbalInput.value = String(state.gimbal)
     if (recording) mode = 'video'
     syncMode()
     root.dataset.phase = state.phase
+    // IDOK-278: 返航中 —— 屏幕中央绿色横幅 + 三格加载动画。
+    const rthBanner = q<HTMLElement>('.rc-rth-banner')
+    if (rthBanner) rthBanner.hidden = state.phase !== 'returning'
     // IDOK-278: 近障碍警告 —— 全屏红色边缘光 + 方向角标。
     if (state.obstacle) {
       root.dataset.obstacle = state.obstacle.side
@@ -258,6 +279,12 @@ function statusLine(state:Telemetry) {
   if (state.phase === 'takeoff') return `起飞中 · 自动爬升${load}`;
   if (state.phase === 'returning') return `自动返航中 · 请勿操作摇杆${load}`;
   if (state.phase === 'landing') return `降落中${load}`;
+  if (state.fish === 'ready') return `钓点附近 · 低空悬停即可抛竿${load}`;
+  if (state.fish) {
+    if (state.fish === 'bite') return '咬钩了！快按起竿！';
+    if (state.fish === 'waiting') return `垂钓中 · 保持悬停，漂移 ${2.5}m 脱钩${load}`;
+    if (state.fish === 'reel') return '收线中…';
+  }
   return `悬停 · GNSS 18 · 图传 ${state.signal}%${load}`;
 }
 
@@ -277,9 +304,11 @@ function proMarkup(spec:DroneSpec) {
       </div>
     </div>
     <div class="rc-status"></div>
+    <div class="rc-rth-banner" hidden><span class="rc-rth-dots"><i></i><i></i><i></i></span>返航中</div>
     <div class="rc-rail rc-rail-l">
       <button class="rc-side" data-act="rth" title="自动返航">返航</button>
       <button class="rc-side" data-act="land" title="原地降落">降落</button>
+      <button class="rc-side rc-fish" data-act="fish" title="抛竿/起竿" hidden>抛竿</button>
     </div>
     <div class="rc-rail rc-rail-r">
       <button class="rc-side" data-act="photo" title="拍照">拍照</button>
@@ -311,6 +340,7 @@ function simpleMarkup(spec:DroneSpec) {
     </div>
     <div class="rc-center"><div class="rc-reticle"></div></div>
     <div class="rc-readout"></div>
+    <div class="rc-gimbal"><span></span><input type="range" min="${spec.gimbal.tiltMin}" max="${spec.gimbal.tiltMax}" step="1" data-gimbal></div>
     <div class="rc-sticks"><div class="rc-stick" data-side="left"><i></i></div><div class="rc-stick" data-side="right"><i></i></div></div>
     <div class="rc-actions">
       <button data-act="exit">退出</button>

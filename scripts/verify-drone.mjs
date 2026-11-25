@@ -284,7 +284,7 @@ try {
   assert.match(pro.tele, /^H [\d.]+m\s+D \d+m\s+H\.S [\d.]+m\/s/, `pro telemetry line: ${pro.tele}`)
   assert.equal(pro.shutter, true)
   assert.deepEqual(pro.modes, ['照片', '录像'])
-  assert.deepEqual(pro.sideActions, ['rth', 'land', 'photo', 'record', 'exit'])
+  assert.deepEqual(pro.sideActions, ['rth', 'land', 'fish', 'photo', 'record', 'exit'])
   assert.equal(pro.gimbal, true)
   assert.equal(pro.load, 200, 'cargo at the rating is 200 kg')
   // The 照片/录像 chips drive what the big shutter fires.

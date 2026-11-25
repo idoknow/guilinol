@@ -464,6 +464,8 @@ export function droneMode(host:Host, deps:{groundAt:(x:number,z:number)=>number;
         joints.ShinR?.rotation.set(-.12,0,0)
         figure.userData.dronePayloadFigure = true
         rig.add(figure)
+        // IDOK-280: 吊人垂钓 — 钓竿 + 钓线 + 浮漂挂在乘客手边，按钓鱼状态显隐
+        if (payload) buildFishingTackle(rig)
       }).catch(error => console.warn('drone passenger unavailable',error))
     } else {
       // the street car model on a four-leg sling through the wheel arches
@@ -509,6 +511,157 @@ export function droneMode(host:Host, deps:{groundAt:(x:number,z:number)=>number;
     payload.rig.position.y = -drop
     const sway = flight.phase === 'landed' ? 0 : Math.min(1,hookAgl / 4)
     payload.rig.rotation.z = Math.sin(flight.elapsed * 1.1) * .03 * sway
+  }
+
+  // --- IDOK-280: 吊人垂钓 — FlyCart 200 吊着乘客悬停在水面低空，抛竿钓鱼。
+  // idle → cast(抛竿入水) → waiting(等咬钩 5–20s) → bite(1.5s 窗口) → reel(收鱼) / escaped。
+  const BITE_MIN = 5, BITE_MAX = 20, BITE_WINDOW = 1.5, DRIFT_LIMIT = 2.5, FISHING_AGL = 6
+  type FishingPhase = 'idle'|'cast'|'waiting'|'bite'|'reel'
+  let fishing:{phase:FishingPhase; tackle:THREE.Group; line:THREE.Mesh; float:THREE.Group; ripples:THREE.Mesh;
+    castAt:number; biteAt:number; biteUntil:number; driftFrom:THREE.Vector3; wetFactor:number}|null = null
+  let fishingScore:{count:number; totalJin:number} = {count:0,totalJin:0}
+  const jin = () => (3 + Math.random() * 9).toFixed(1)
+  function buildFishingTackle(rig:THREE.Group) {
+    const rod = new THREE.Group()
+    rod.name = 'fishing-tackle'
+    const bamboo = new THREE.Mesh(
+      new THREE.CylinderGeometry(.012,.02,1.5,6).translate(0,.6,0),
+      new THREE.MeshStandardMaterial({color:'#a67c4a',roughness:.8}))
+    bamboo.rotation.z = Math.PI * .62
+    bamboo.position.set(.18,-1.15,.05)
+    rod.add(bamboo)
+    const line = new THREE.Mesh(
+      new THREE.CylinderGeometry(.004,.004,1,5).translate(0,-.5,0),
+      new THREE.MeshBasicMaterial({color:'#f2f2e8',transparent:true,opacity:.8}))
+    line.name = 'fishing-line'
+    line.position.set(.62,-1.13,.05)
+    rod.add(line)
+    const float = new THREE.Group()
+    float.name = 'fishing-float'
+    const bulb = new THREE.Mesh(new THREE.SphereGeometry(.06,8,8),
+      new THREE.MeshStandardMaterial({color:'#e05a3a',roughness:.5}))
+    bulb.position.y = -.02
+    float.add(bulb)
+    const stick = new THREE.Mesh(new THREE.CylinderGeometry(.012,.012,.22,5),
+      new THREE.MeshStandardMaterial({color:'#f2f2e8'}))
+    stick.position.y = .1
+    float.add(stick)
+    const ripple = new THREE.Mesh(new THREE.RingGeometry(.12,.16,20).rotateX(-Math.PI/2),
+      new THREE.MeshBasicMaterial({color:'#dff0f4',transparent:true,opacity:.55,depthWrite:false}))
+    ripple.position.y = -.04
+    float.add(ripple)
+    float.position.set(.62,-1.13,.05)
+    float.visible = false
+    rod.add(float)
+    rod.visible = false
+    rig.add(rod)
+  }
+  function tackle() {
+    return fishing?.tackle ?? (mesh?.root.getObjectByName('fishing-tackle') as THREE.Group|undefined) ?? null
+  }
+  function fishingAvailable() {
+    return !!(flight && placed === 'flycart200' && loadKind === 'person' && payload &&
+      host.clock.weather !== 'rain')
+  }
+  function canFishHere() {
+    if (!fishingAvailable() || !flight || !payload) return false
+    if (flight.phase !== 'flying' || flight.agl > FISHING_AGL) return false
+    const speed = Math.hypot(flight.vel.x,flight.vel.z)
+    if (speed > 1) return false
+    return !!deps.waterAt?.(flight.pos.x,flight.pos.z)
+  }
+  function startFishing() {
+    if (!canFishHere() || fishing) return
+    const rod = tackle()
+    if (!rod) return
+    rod.visible = true
+    const float = rod.getObjectByName('fishing-float') as THREE.Group
+    float.visible = false
+    fishing = {phase:'cast',tackle:rod,line:rod.getObjectByName('fishing-line') as THREE.Mesh,float,
+      ripples:float.children[2] as THREE.Mesh,castAt:performance.now(),
+      biteAt:performance.now() + (BITE_MIN + Math.random() * (BITE_MAX - BITE_MIN)) * 1000,
+      biteUntil:0,driftFrom:flight!.pos.clone(),wetFactor:host.clock.weather === 'rain' ? 3 : 1}
+    toast('抛竿入水 · 保持悬停，漂移太远会脱钩')
+  }
+  function stopFishing(quiet = false) {
+    if (!fishing) return
+    const rod = tackle()
+    if (rod) rod.visible = false
+    fishing = null
+    if (!quiet) toast('收竿')
+  }
+  function stepFishing(dt:number) {
+    if (flight) flight.fish = fishing?.phase ?? (canFishHere() ? 'ready' : null)
+    if (!fishing || !flight || !payload) { if (fishing) stopFishing(true); return }
+    flight.fish = fishing.phase
+    const now = performance.now()
+    const rod = tackle()
+    if (!rod) { fishing = null; return }
+    // 中断条件：超出水面、太高、雨天湿透、信号丢失、撞坏
+    const overWater = !!deps.waterAt?.(flight.pos.x,flight.pos.z)
+    if (!overWater || flight.agl > FISHING_AGL + 1.5 || flight.phase !== 'flying') {
+      stopFishing(true)
+      toast('离开钓点 · 钓线收回')
+      return
+    }
+    if (fishing.phase === 'cast') {
+      // 0.8s 钓线下放动画，然后浮漂出现
+      if (now - fishing.castAt > 800) {
+        fishing.phase = 'waiting'
+        fishing.float.visible = true
+        fishing.driftFrom = flight.pos.clone()
+        toast('等鱼上钩 · 按抛竿键收竿')
+      } else {
+        const k = (now - fishing.castAt) / 800
+        fishing.line.scale.y = k * 2.2
+      }
+      return
+    }
+    if (fishing.phase === 'waiting' || fishing.phase === 'bite') {
+      // 漂移检测：离抛竿点太远 → 脱钩
+      const drift = Math.hypot(flight.pos.x - fishing.driftFrom.x,flight.pos.z - fishing.driftFrom.z)
+      if (drift > DRIFT_LIMIT) {
+        stopFishing(true)
+        toast('漂移太远 · 脱钩了，重新抛竿')
+        return
+      }
+      // 浮漂位置 = 乘客下方水面（近似：机下 + 小漂移摆动）
+      const waterY = deps.groundAt(flight.pos.x,flight.pos.z)
+      const bob = Math.sin(now / 500) * .04
+      fishing.float.position.y = -1.13 - (flight.agl - waterY > 0 ? 1.6 : 1.6) - bob * 0
+      fishing.ripples.scale.setScalar(1 + (now / 900 % 1) * 1.2)
+      ;(fishing.ripples.material as THREE.MeshBasicMaterial).opacity = .55 * (1 - now / 900 % 1)
+      if (fishing.phase === 'waiting' && now >= fishing.biteAt * fishing.wetFactor) {
+        fishing.phase = 'bite'
+        fishing.biteUntil = now + BITE_WINDOW * 1000
+        fishing.float.position.y -= .12
+        rc?.toast('咬钩了！快起竿！')
+      }
+      if (fishing.phase === 'bite' && now > fishing.biteUntil) {
+        fishing.phase = 'waiting'
+        fishing.biteAt = now + (BITE_MIN + Math.random() * (BITE_MAX - BITE_MIN)) * 1000
+        toast('鱼跑了…')
+      }
+      return
+    }
+    if (fishing.phase === 'reel') {
+      // 收鱼动画 1.2s：钓线缩短，鱼沿线上来
+      fishing.line.scale.y = Math.max(.2,fishing.line.scale.y - dt * 2)
+      if (now - fishing.castAt > 2000) {
+        const weight = jin()
+        fishingScore.count += 1
+        fishingScore.totalJin += Number(weight)
+        toast(`钓起 ${weight} 斤的鲤鱼 · 累计 ${fishingScore.count} 条 ${fishingScore.totalJin.toFixed(1)} 斤`)
+        stopFishing(true)
+      }
+      return
+    }
+  }
+  function hookFish() {
+    if (!fishing || fishing.phase !== 'bite') return
+    fishing.phase = 'reel'
+    fishing.castAt = performance.now()
+    rc?.toast('起竿！')
   }
 
   // --- RC session
@@ -566,6 +719,7 @@ export function droneMode(host:Host, deps:{groundAt:(x:number,z:number)=>number;
       exit:() => exitRc(),
       gimbal:deg => { if (flight) flight.gimbal = deg },
       sticks:patch => input.setTouch(patch),
+      fish:() => { if (fishing?.phase === 'bite') hookFish(); else if (!fishing) startFishing(); else stopFishing() },
     },held => { landHeld = held })
     document.body.append(rc.root)
     liftOff(flight)
@@ -788,7 +942,7 @@ export function droneMode(host:Host, deps:{groundAt:(x:number,z:number)=>number;
     mesh.gimbal.rotation.x = THREE.MathUtils.degToRad(flight.gimbal) * .35
     if (loadMesh) loadMesh.rotation.y = Math.sin(flight.elapsed * .7) * .04
     stepPayload()
-
+    stepFishing(dt)
     if (rcActive && rc) {
       // 长按降落键暂停下降；松开继续（holdLanding 在按键期间累积）。
       if (flight.phase === 'landing' && landHeld) holdLanding(flight,dt); else releaseLanding(flight)
@@ -800,25 +954,26 @@ export function droneMode(host:Host, deps:{groundAt:(x:number,z:number)=>number;
       if (flight.phase === 'returning' && entry) entry.textContent = '返航中'
       chaseView()
     } else if (placed) {
-      const d = host.walker()?.active
-        ? host.walker()!.position.distanceTo(flight.pos)
-        : host.camera.position.distanceTo(flight.pos)
-      // 走到已降落的飞机旁（4 米内）：按键收起。
-      if (flight.phase === 'landed' && d < 4 && !recallPrompt) {
-        recallPrompt = document.createElement('button')
-        recallPrompt.className = 'drone-recall-near'
-        recallPrompt.type = 'button'
-        recallPrompt.textContent = '收起无人机'
-        recallPrompt.onclick = () => { recall(); hideHint() }
-        document.body.append(recallPrompt)
-      } else if ((flight.phase !== 'landed' || d >= 4) && recallPrompt) {
-        recallPrompt.remove()
-        recallPrompt = null
-      }
-      if (!recallPrompt) showHint(`${flight.spec.short} 就位 · ${flight.battery.toFixed(0)}% 电量 · 点「飞无人机」起飞${d > 60 ? '（离得有点远）' : ''}`)
-      chaseView()
+    const d = host.walker()?.active
+      ? host.walker()!.position.distanceTo(flight.pos)
+      : host.camera.position.distanceTo(flight.pos)
+    // 走到已降落的飞机旁（4 米内）：按键收起。hint 一直显示（收起按钮在按钮行里，hint 不遮它）。
+    if (flight.phase === 'landed' && d < 4 && !recallPrompt) {
+      recallPrompt = document.createElement('button')
+      recallPrompt.className = 'drone-recall-near'
+      recallPrompt.type = 'button'
+      recallPrompt.textContent = '收起无人机'
+      recallPrompt.onclick = () => { recall(); hideHint() }
+      document.body.append(recallPrompt)
+      showHint(`${flight.spec.short} 就位 · 点「飞无人机」起飞或按「收起无人机」`)
+    } else if ((flight.phase !== 'landed' || d >= 4) && recallPrompt) {
+      recallPrompt.remove()
+      recallPrompt = null
     }
+    if (!recallPrompt && !hint?.hidden) showHint(`${flight.spec.short} 就位 · ${flight.battery.toFixed(0)}% 电量 · 点「飞无人机」起飞${d > 60 ? '（离得有点远）' : ''}`)
+    chaseView()
   }
+}
 
   // Test hook (screenshots): a third-person chase camera instead of the gimbal view.
   let chase:{distance:number; height:number; side:number}|null = null

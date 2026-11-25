@@ -47,7 +47,7 @@ export function liftOff(flight:Flight) {
 }
 
 declare module './flight' {}
-export interface Flight { velocityBoost?:number; crashed?:boolean; crashKind?:string; obstacle?:{dist:number; side:string}|null }
+export interface Flight { velocityBoost?:number; crashed?:boolean; crashKind?:string; obstacle?:{dist:number; side:string}|null; fish?:string|null }
 
 export function requestHome(flight:Flight) {
   if (flight.phase === 'landed' || flight.phase === 'landing') return
@@ -225,7 +225,11 @@ function homeSticks(flight:Flight, groundY:number):Sticks {
   }
   const wantYaw = Math.atan2(-toHome.x,-toHome.z)
   const delta = Math.atan2(Math.sin(wantYaw - flight.yaw),Math.cos(wantYaw - flight.yaw))
-  const throttle = flight.agl > Math.max(8, (flight.pos.y - groundY) * .4) ? .35 : (flight.agl > 3 ? 0 : -.5)
+  // 高度控制（IDOK-278）：先爬到巡航高度 30m 飞回家，到家上空（dist<8）降到 6m 再落地。
+  // 旧逻辑 agl>8 就持续 +0.35 爬升，导致返航永远升到天花板。
+  const cruise = dist > 8 ? 30 : 6
+  const err = cruise - flight.agl
+  const throttle = err > 1.5 ? Math.min(1, err * .15) : err < -1.5 ? -1 : 0
   return {throttle, yaw:THREE.MathUtils.clamp(-delta * 1.6,-1,1), pitch:dist > 4 ? .6 : 0, roll:0}
 }
 
@@ -259,5 +263,6 @@ export function telemetry(flight:Flight) {
     load:flight.load / 1000,
     maxAgl:+flight.maxAgl.toFixed(1),
     obstacle:flight.obstacle ? {dist:+flight.obstacle.dist.toFixed(1), side:flight.obstacle.side} : null,
+    fish:flight.fish ?? null,
   }
 }
