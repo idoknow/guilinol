@@ -298,6 +298,39 @@ export async function overview(manifest:Manifest) {
   return startOverview(manifest).finish
 }
 
+type SurfacePoly={kind:number,minX:number,maxX:number,minZ:number,maxZ:number,shell:[number,number][],holes:[number,number][][]}
+function pointInRing(x:number,z:number,ring:[number,number][]){
+  let hit=false
+  for(let i=0,j=ring.length-1;i<ring.length;j=i++){
+    const [ax,az]=ring[i],[bx,bz]=ring[j]
+    if((az>z)!==(bz>z)&&x<(bx-ax)*(z-az)/(bz-az)+ax)hit=!hit
+  }
+  return hit
+}
+function buildSurfaceLookup(tile:Tile,paths:Streets){
+  const polys:SurfacePoly[]=[]
+  for(const [kind,...rings] of paths[0]){
+    if(kind!==0&&kind!==1&&kind!==4&&kind!==5&&kind!==6)continue
+    const shell=rings[0]
+    if(!shell||shell.length<3)continue
+    let minX=Infinity,maxX=-Infinity,minZ=Infinity,maxZ=-Infinity
+    for(const [rx,rz] of shell){
+      if(rx<minX)minX=rx;if(rx>maxX)maxX=rx
+      if(rz<minZ)minZ=rz;if(rz>maxZ)maxZ=rz
+    }
+    polys.push({kind,minX,maxX,minZ,maxZ,shell,holes:rings.slice(1)})
+  }
+  return (wx:number,wz:number)=>{
+    const lx=(wx-tile.x)*100,lz=(wz-tile.z)*100
+    const kinds:number[]=[]
+    for(const poly of polys){
+      if(lx<poly.minX||lx>poly.maxX||lz<poly.minZ||lz>poly.maxZ)continue
+      if(pointInRing(lx,lz,poly.shell)&&!poly.holes.some(h=>pointInRing(lx,lz,h)))kinds.push(poly.kind)
+    }
+    return kinds
+  }
+}
+
 export async function detail(tile:Tile, signal:AbortSignal, parseSlot?:()=>Promise<void>, tunnels?:Tunnel[]) {
   const compressed = await fetchAsset(tile.file,signal)
   const buffer = await new Response(new Blob([compressed]).stream().pipeThrough(new DecompressionStream('gzip'))).arrayBuffer()
@@ -373,8 +406,9 @@ export async function detail(tile:Tile, signal:AbortSignal, parseSlot?:()=>Promi
     furnitureColors:streets.furnitureColors,
     parked:streets.parked,
   }
+  const surfaceAt = buildSurfaceLookup(tile, paths)
   return {
-    group,groundMesh,terrain,underlay,water,rings,deck,thin,streets,batch,tunnel,railCutVertices:new Set(railCuts.map(([index])=>index)),
+    group,groundMesh,terrain,underlay,water,rings,deck,thin,streets,batch,tunnel,surfaceAt,railCutVertices:new Set(railCuts.map(([index])=>index)),
     dispose(){
       if(tunnel){
         for(const mesh of Object.values(tunnel))if(mesh){

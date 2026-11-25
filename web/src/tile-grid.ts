@@ -14,6 +14,11 @@ export class TileGrid {
     }
   }
 
+  at(x: number, z: number) {
+    const size = this.size
+    return this.rows.get(Math.floor(z / size) * size)?.get(Math.floor(x / size) * size)
+  }
+
   *near(x: number, z: number, radius: number) {
     const size = this.size
     const first = (v: number) => Math.ceil((v - radius) / size - 0.5) * size
