@@ -1449,6 +1449,35 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
     return true
   }
   // 同城联机：首页开关随时生效（IDOK-192）。预载过就同步连上，没预载就先拉模块，回来时还在步行才连。
+  let lastMoveTs=performance.now()
+  function currentActivity(){
+    const speed=rides?.bike?Math.abs(rides.speed):Math.hypot(vx,vz)
+    if(speed>0.12)lastMoveTs=performance.now()
+    const ds=document.body.dataset
+    if(ds.drone==='rc')return {act:'drone',detail:'遥控航拍'}
+    if(ds.photo==='on')return {act:'photo',detail:'摄影模式'}
+    if(ds.fishing==='on')return {act:'fishing',detail:ds.fishMenu==='1'?'渔利背包':'岸边垂钓'}
+    if(ds.mifenCooking==='1'||ds.mifenStoryActive==='1'||ds.mifenIndoor==='1'){
+      return {act:'mifen',detail:ds.mifenCooking==='1'?'煮粉出餐':ds.mifenStoryActive==='1'?'米粉剧情':'田源米粉店'}
+    }
+    const gState=getGameState()
+    if(shopOverlay?.isOpen()||ds.shopOpen==='1'){
+      const kind=gState.activeShop?.kind
+      return {act:'shop',detail:kind==='ebike'?'电车店/改装':kind==='clothing'?'服装/换装':'逛店'}
+    }
+    if(rides?.boat){
+      const kind=rides.getInteractSnapshot?.().aboardKind
+      return {act:'boat',detail:kind==='tour_boat'?'画舫游船':'自由划船'}
+    }
+    if(rides?.car)return {act:'car',detail:'开车兜风'}
+    if(rides?.bike&&rides.rideKind==='bicycle')return {act:'bicycle',detail:'骑单车'}
+    if(rides?.bike)return {act:'ebike',detail:rides.bikeOwnership==='test_ride'?'试驾电车':rides.bikeOwnership==='personal'?'个人电车':'共享电车'}
+    if(cigarette.wire>0)return {act:'smoke',detail:'抽烟'}
+    if(gState.mission&&gState.mission.status!=='completed'&&gState.mission.status!=='failed'&&gState.mission.status!=='abandoned'){
+      return {act:'mission',detail:gState.mission.title?.slice(0,32)??'进行中'}
+    }
+    return performance.now()-lastMoveTs>15000?{act:'idle',detail:''}:{act:'walk',detail:''}
+  }
   function attachMp(){
     if(!mpEnabled()||!active||net)return
     if(!netModule){void import('../net').then(module=>{netModule=module;attachMp()}).catch(error=>console.warn('multiplayer unavailable',error));return}
@@ -1456,7 +1485,7 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
         net=netModule.attachNet(scene,model.animations,()=>({x:figure.position.x,y:figure.position.y,z:figure.position.z,
           yaw:figure.rotation.y,v:rides?.bike?Math.abs(rides.speed):Math.hypot(vx,vz),gr:Number(grounded),
           sc:cigarette.wire,sb:Math.round(cigarette.length*1800),sp:puffSeq,br:brandIndex(cigarette.brand),sd:dropSeq,ss:cigarette.strength,sr:cigarette.remaining,
-          bike:rides?.bike?'bike':'',bx:rides?.bike?.position.x??0,bz:rides?.bike?.position.z??0,byaw:rides?.heading??0}),()=>currentAvatar()??profile,camera)
+          bike:rides?.bike?'bike':'',bx:rides?.bike?.position.x??0,bz:rides?.bike?.position.z??0,byaw:rides?.heading??0}),()=>currentAvatar()??profile,camera,currentActivity)
         net.emote(emote.id);net.tick(0)
     }
   }
