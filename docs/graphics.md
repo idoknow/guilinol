@@ -4,7 +4,7 @@ The first terrain frame does not wait for effects. Subsequent main-camera frames
 
 | Tier | AO | Bloom | Daytime sun shadows | Additional |
 | --- | --- | --- | --- | --- |
-| low | half-resolution, four samples | off | off | tone mapping |
+| low | off; optional half-resolution, four samples | off | off | native tone mapping, single fullscreen grade only if needed |
 | mid | half-resolution | threshold | single 2048² by default, PCF soft | SMAA |
 | high | full-resolution | threshold | PCSS blocker search | godrays, optional depth of field, SMAA |
 
@@ -12,4 +12,6 @@ The first terrain frame does not wait for effects. Subsequent main-camera frames
 
 With `?debug`, use `window.gfx.set({shadow:{strength:0.4}})`, `window.gfx.toggle('bloom')`, or `window.gfx.select('high')`. Enable DOF in high only. Intensity and radius are independent. Tune AO first with bloom/shadows disabled, then compare shadows with identical camera and time, before enabling godrays.
 
-For repeatable comparisons use the same release world in `public/world`, build, then run `node scripts/verify-gfx.mjs`. `GFX_OUT` selects a screenshot directory and `GFX_PROJECT` points at a separately built baseline checkout. Run sequentially on the same GPU. The script reports presented FPS, calls and first-frame JS gzip (each requested asset compressed independently). Baseline Three resets draw calls per render; the graphics build counts all passes, including reflections.
+Low uses `ao.lowEnabled` (default false); `window.gfx.set({ao:{enabled:true}})` while low enables it. Sustained frame times over 25 ms demote high → mid → low → direct. Direct bypasses global grading; manually selecting a tier re-enables it. Mid shadows refresh every `shadow.updateEvery` frames (default 3), or sooner when the target moves `shadow.moveThreshold` metres. `shadow.distance` is the shadow camera width (150 m default). Global batches larger than a tile radius do not cast.
+
+Build both projects with the same release world in `public/world`, then run `GFX_BASELINE=../baseline node scripts/verify-gfx.mjs`. `GFX_OUT` selects the capture directory. Three rounds cycle baseline/low/mid/high for each hour. Each measurement discards 30 warmup frames and averages 120 frames; the report gives the median and max-minus-min across rounds. GL draw commands (counting multi-draw subdraws), triangles and runs of draws to the same framebuffer include reflections on both builds. Casters counts eligible visible meshes rather than shadow-map refreshes. JS gzip covers scripts received before the first terrain frame only. `node scripts/verify-gfx-night.mjs` checks high-tier walk interactions and captures local simulated multiplayer participants; it does not log in to production.

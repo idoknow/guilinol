@@ -16,3 +16,10 @@ test('reject malformed overrides and unsupported targets',()=>{
   }
   assert.equal(validGfx({...gfxDefaults,dof:{}}),false)
 })
+
+test('bounded shadow refresh and low AO opt-in',()=>{
+  assert.equal(gfxDefaults.ao.lowEnabled,false)
+  for(const shadow of [{updateEvery:0},{updateEvery:2.5},{updateEvery:5},{distance:0},{distance:301}]){
+    assert.equal(validGfx({...gfxDefaults,shadow:{...gfxDefaults.shadow,...shadow}}),false)
+  }
+})

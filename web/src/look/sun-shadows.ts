@@ -27,17 +27,18 @@ export function sunShadows(renderer:THREE.WebGLRenderer,scene:THREE.Scene,camera
   Object.assign(shadow.camera,{left:-100,right:100,top:100,bottom:-100,near:1,far:480});shadow.camera.updateProjectionMatrix()
   shadow.normalBias=.08;shadow.bias=-.0002
   const high={value:false},strength={value:0.5},patched=new WeakSet<THREE.Material>()
-  let scanned=-Infinity
-  return (tier:Tier,settings:Options['shadow'])=>{
+  let frames=Infinity,extent=0,casters=0
+  return (tier:Tier,settings:Options['shadow'],focus:THREE.Vector3)=>{
     const active=tier!=='low'&&settings.enabled&&env.sunDir.y>0&&env.night<.99
     light.castShadow=renderer.shadowMap.enabled=active
-    anchor.position.copy(camera.position);light.position.copy(anchor.position).addScaledVector(env.sunDir,240)
-    if(!active){scanned=-Infinity;return}
-    renderer.shadowMap.needsUpdate=true
+    if(!active){frames=Infinity;return 0}
     high.value=tier==='high';strength.value=shadow.intensity=settings.strength;shadow.radius=settings.softness
     if(shadow.mapSize.x!==settings.mapSize){shadow.map?.dispose();shadow.map=null;shadow.mapSize.setScalar(settings.mapSize)}
-    if(performance.now()-scanned<300)return
-    scanned=performance.now();scene.traverseVisible(object=>{
+    if(++frames<(tier==='high'?1:settings.updateEvery)&&anchor.position.distanceTo(focus)<settings.moveThreshold&&extent===settings.distance&&shadow.map)return casters
+    frames=0;renderer.shadowMap.needsUpdate=true
+    extent=settings.distance;anchor.position.copy(focus);light.position.copy(anchor.position).addScaledVector(env.sunDir,extent)
+    Object.assign(shadow.camera,{left:-extent/2,right:extent/2,top:extent/2,bottom:-extent/2,far:extent*2});shadow.camera.updateProjectionMatrix()
+    casters=0;scene.traverseVisible(object=>{
       const mesh=object as THREE.Mesh
       if(!mesh.isMesh)return
       const materials=Array.isArray(mesh.material)?mesh.material:[mesh.material]
@@ -47,7 +48,8 @@ export function sunShadows(renderer:THREE.WebGLRenderer,scene:THREE.Scene,camera
       if(instanced.isInstancedMesh&&!instanced.boundingSphere)instanced.computeBoundingSphere()
       if(!mesh.geometry.boundingSphere)mesh.geometry.computeBoundingSphere()
       sphere.copy(instanced.boundingSphere??mesh.geometry.boundingSphere!).applyMatrix4(mesh.matrixWorld)
-      mesh.castShadow=point.copy(sphere.center).distanceTo(camera.position)<sphere.radius+160
+      mesh.castShadow=sphere.radius<=256&&point.copy(sphere.center).distanceTo(focus)<sphere.radius+extent/2
+      if(mesh.castShadow)casters++
       for(const material of materials){
         if(patched.has(material))continue
         patched.add(material);const previous=material.onBeforeCompile,key=material.customProgramCacheKey()
@@ -57,5 +59,6 @@ export function sunShadows(renderer:THREE.WebGLRenderer,scene:THREE.Scene,camera
         material.needsUpdate=true
       }
     })
+    return casters
   }
 }

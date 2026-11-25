@@ -107,7 +107,7 @@ async function start(loader:FullLoader,creatorSpawn=false) {
   const gfx=gfxState(params)
   let post:ReturnType<typeof import('./look/post').mainPass>|undefined
   if(params.has('debug'))Object.assign(window,{gfx})
-  function drawMain(){if(post)post.render();else renderer.render(scene,camera)}
+  function drawMain(){if(post)stats.shadowCasters=post.render(walker?.active?walker.position:camera.position);else renderer.render(scene,camera)}
   renderer.info.autoReset=false
   const hemi = new THREE.HemisphereLight(look.hemiSky,look.hemiGround,look.hemiPower); scene.add(hemi)
   const arrivalReady=import('./arrival-programs').then(module=>warmPrograms(module.arrivalPrograms()))
@@ -188,7 +188,7 @@ async function start(loader:FullLoader,creatorSpawn=false) {
   const clock = skyClock(params)
   if(!soloStart)setPreset(camera,params.get('cam')??params.get('spawn'),bounds.bbox)
   let previous=0, first=0, frame=0, sum=0, samples=0
-  const stats = {firstMs:0,readyMs:0,openingRingMs:0,firstWorldBytes:0,ms:0,calls:0,frame:0,loaded:0,pending:0,visited:0,failures:0,
+  const stats = {firstMs:0,readyMs:0,openingRingMs:0,firstWorldBytes:0,ms:0,calls:0,shadowCasters:0,frame:0,loaded:0,pending:0,visited:0,failures:0,
     geometries:0,textures:0,dpr:currentDpr}
   function markFirstFrame(){
     void import('./look/post').then(module=>{post=module.mainPass(renderer,scene,camera,light,gfx)}).catch(error=>console.warn('Graphics effects unavailable',error))

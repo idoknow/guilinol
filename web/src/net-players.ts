@@ -10,6 +10,7 @@ import {previewCharacter} from './walk/character'
 import {vehicleModel} from './walk/vehicle-model'
 import {avatar as figure} from './look/avatar'
 import {touchUi} from './ui/input-mode'
+import {registerNameplate,removeNameplate} from './look/nameplates'
 
 export interface Pose {x:number;y:number;z:number;yaw:number;v:number;gr:number;bike:string;bx:number;bz:number;byaw:number;sc:number;sb:number;sp:number;br:number;sd?:number;ss?:number;sr?:number}
 export interface Player extends Pose {em?:number;es?:number;expires?:number;id:string;uid?:number;jt?:number;name:string;avatar:Avatar}
@@ -48,6 +49,7 @@ type Template={model:ReturnType<typeof template>;refs:number}
 type Visual=ReturnType<typeof visual>
 function visual(player:Player) {
   const root=new THREE.Group(), name=label(player.name), bike=vehicleModel('bike')
+  registerNameplate(name)
   root.position.set(player.x,player.y,player.z); root.add(name); bike.visible=false
   return {root,name,bike,played:-1,emote:undefined as ReturnType<typeof emotePlayback>|undefined,smoke:new RemoteSmoke(),kit:undefined as ReturnType<typeof smokeVisual>|undefined,mixer:undefined as THREE.AnimationMixer|undefined,action:undefined as THREE.AnimationAction|undefined,key:''}
 }
@@ -61,7 +63,7 @@ export function players(scene:THREE.Scene,clips:THREE.AnimationClip[],camera:THR
   function hide(id:string) {
     const view=visible.get(id); if(!view)return
     view.kit?.dispose();visible.delete(id); view.root.removeFromParent(); view.bike.removeFromParent()
-    view.name.material.map?.dispose(); view.name.material.dispose(); view.mixer?.stopAllAction()
+    removeNameplate(view.name);view.name.material.map?.dispose(); view.name.material.dispose(); view.mixer?.stopAllAction()
     view.root.traverse(node=>{if(node instanceof THREE.SkinnedMesh)node.skeleton.dispose()})
     const entry=templates.get(view.key)
     if(entry&&!--entry.refs){templates.delete(view.key); void entry.model.then(root=>{

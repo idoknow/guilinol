@@ -5,6 +5,7 @@ declare module 'n8ao' {
     constructor(scene:Scene,camera:PerspectiveCamera,width:number,height:number)
     configuration:{halfRes:boolean;intensity:number;aoRadius:number;gammaCorrection:boolean;transparencyAware:boolean;aoSamples:number;denoiseIterations:number}
     autoDetectTransparency:boolean
+    depthTexture:import('three').Texture
     setQualityMode(mode:string):void
   }
 }
