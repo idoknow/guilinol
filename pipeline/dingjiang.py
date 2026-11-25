@@ -75,7 +75,10 @@ def road_profiles(elements, paired_widths):
             _, parent, profile = profiles[459580311]
             joint = parent.project(Point(line.coords[-1]))
             end_y = np.interp(joint, profile[:, 0], profile[:, 1])
-        knots = [(0., start_y), (at-offset, level)]
+        knots = [(0., start_y)]
+        if road == 459580311:
+            knots.append((7., 155.79960))
+        knots.append((at-offset, level))
         if road == 459580311:
             # The retained east junction owns the final six metres of paving.
             # Match its native crest before the clipped floor ends at the curb.
