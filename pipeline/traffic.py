@@ -431,6 +431,8 @@ def bake(output, manifest, rendered_roads=None):
     # support too. The bounds carry actual lane heights to distinguish decks.
     manifest['nativeCarLandings'] = []
     landing_pairs = set()
+    landing_probes = []
+    landing_ranges = []
     for lane in lanes:
         pair = tuple(sorted((lane['from'],lane['to'])))
         if lane['way'] not in DINGJIANG_NATIVE or pair in landing_pairs:
@@ -439,8 +441,19 @@ def bake(output, manifest, rendered_roads=None):
         if a['id'] not in DINGJIANG_MOUTHS and b['id'] not in DINGJIANG_MOUTHS:
             continue
         landing_pairs.add(pair)
-        manifest['nativeCarLandings'].append([a['x'],a['z'],a['y'],b['x'],b['z'],b['y'],
-                                              abs(lane['offset'])+lane['width']/2+.5])
+        count = math.ceil(math.hypot(b['x']-a['x'], b['z']-a['z']) / 4)
+        start = len(landing_probes)
+        for fraction in np.linspace(0, 1, count+1):
+            landing_probes.append(dict(x=a['x']+(b['x']-a['x'])*fraction,
+                                       z=a['z']+(b['z']-a['z'])*fraction, way=lane['way']))
+        landing_ranges.append((start, start+count, abs(lane['offset'])+lane['width']/2+.5))
+    if landing_probes:
+        levels = sample_road_heights(output, manifest, landing_probes)
+        for start, end, width_limit in landing_ranges:
+            for i in range(start, end):
+                p, q = landing_probes[i:i+2]
+                manifest['nativeCarLandings'].append([p['x'],p['z'],levels[i],
+                                                      q['x'],q['z'],levels[i+1],width_limit])
     ground_passages.set_terminal_stops(nodes,lanes,node_height,profile)
     align_airport_lane(nodes, lanes, node_height, profile)
     result = dict(nodes=[node for node in nodes.values() if node['y'] is not None],lanes=lanes,signals=signals,quiet=quiet,walks=walks)
