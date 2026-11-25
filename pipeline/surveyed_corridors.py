@@ -86,11 +86,13 @@ def channel_spans(elements, widths):
 
 
 def bake(output, chunks, elements, widths, approaches=(), only_approaches=False, bridge_profiles=(), preferred=(), continuous=()):
+    from ground_passages import paved_passage
     intervals = json.loads(Path(__file__).with_name('road-corridor-survey.json').read_text())
     shapes, footpaths, passage_roads = [], [], []
     for way in elements:
         spans = intervals.get(str(way['id']))
-        if way.get('surfaceUnderlay'):
+        passage=paved_passage(way)
+        if passage:
             spans = [(0, math.inf)]
         if way['type'] != 'way' or not spans or not all(way['geometry']):
             continue
@@ -104,9 +106,9 @@ def bake(output, chunks, elements, widths, approaches=(), only_approaches=False,
                 part=substring(axis,start,min(end,axis.length))
                 corridor = part.buffer(paved/2+.5,quad_segs=4)
                 shapes.append(corridor)
-                if way.get('surfaceUnderlay') and tags['highway'] not in ('path','footway','pedestrian'):
+                if passage and tags['highway'] not in ('path','footway','pedestrian'):
                     passage_roads.append((part,corridor,way['id'],way.get('warehousePassages'),paved/2+.5))
-                if way.get('surfaceUnderlay') and tags['highway'] in ('footway','path','pedestrian'):
+                if passage and tags['highway'] in ('footway','path','pedestrian'):
                     footpaths.append(corridor)
     continuous_lines={id(row[0]):k for k,row in enumerate(continuous)}
     transition_index=STRtree([row[0].buffer(row[1]+2) for row in continuous[1:]])
