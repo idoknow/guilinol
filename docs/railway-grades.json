@@ -5056,7 +5056,9 @@
     }
   ],
   "enclosedLevelCrossings": {
-    "status": "requires_layout_review",
+    "status": "approved_enclosed_level_crossing",
+    "countInLevelTotals": true,
+    "requireDriveThrough": false,
     "warehouse": "桂林粮库公司",
     "footprintId": "56f66428-e070-4340-a894-4f7d04c1d044",
     "source": "raw/overture_buildings.csv",

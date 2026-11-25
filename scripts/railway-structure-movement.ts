@@ -4,7 +4,13 @@ import path from 'node:path'
 import {ll2xz} from '../lib/projection'
 import {vehicleSurface} from './vehicle-surface'
 
-const [main, candidate, output]=process.argv.slice(2)
+const args=process.argv.slice(2)
+const gate=args.includes('--check-grades')
+const [main, candidate, output]=args.filter(arg=>arg!=='--check-grades')
+if (!main || !candidate || !output) throw Error('Expected baseline world, candidate world and output JSON path')
+const motor = new Set(['motorway','trunk','primary','secondary','tertiary','residential','unclassified','service','living_street','road'])
+const localRoad = new Set(['residential','unclassified','service','living_street'])
+const violations = []
 const surface=(world:string)=>vehicleSurface(world,JSON.parse(fs.readFileSync(path.join(world,'manifest.json'),'utf8')))
 const before=surface(main),after=surface(candidate)
 const inventory=JSON.parse(fs.readFileSync('docs/railway-crossings.json','utf8'))
@@ -16,11 +22,17 @@ for(const row of grades.resolvedRoadStructures??[])for(const id of [row.roadWay,
 const ways=JSON.parse(fs.readFileSync('raw/osm-2026-11.json','utf8')).elements
 const result=[]
 for(const way of ways){
-  if(way.type!=='way'||!ids.has(way.id))continue
+  if(way.type!=='way'||!way.geometry?.length)continue
+  if(!ids.has(way.id) && !(gate && motor.has(way.tags?.highway?.replace(/_link$/, ''))))continue
   const structure=way.tags.tunnel&&way.tags.tunnel!=='no'?'tunnel':way.tags.bridge&&way.tags.bridge!=='no'?'bridge':'surface'
   const lane={way:way.id,structure}
   const coords=way.geometry.map(p=>ll2xz(p.lat,p.lon))
   const row={way:way.id,structure,adjustedLengthM:0,maxRoadChangeM:0,peakGrade:0,mainPeakGrade:0,mainGradeAtCandidatePeak:0,peakGradeStationM:0,fromM:0,toM:0,worst:null}
+  const kind=way.tags.highway?.replace(/_link$/, '')
+  const cap=localRoad.has(kind) ? .08 : .05
+  let failingIntervals=0
+  let largestExcess=0
+  let failure
   let station=0,previous
   for(let i=1;i<coords.length;i++){
     const {x,z}=coords[i-1],dx=coords[i].x-x,dz=coords[i].z-z,step=Math.hypot(dx,dz)
@@ -43,6 +55,15 @@ for(const way of ways){
         if(!row.adjustedLengthM)row.fromM=previous.at
         row.toM=at;row.adjustedLengthM+=run
         const grade=Math.abs(b-previous.b)/run
+        const mainGrade=Math.abs(a-previous.a)/run
+        const excess=grade-Math.max(mainGrade,cap)
+        if(motor.has(kind) && excess>1e-6){
+          failingIntervals++
+          if(excess>largestExcess){
+            largestExcess=excess
+            failure={fromM:previous.at,toM:at,x:px,z:pz,grade,mainGrade,cap}
+          }
+        }
         if(grade>row.peakGrade){
           row.peakGrade=grade
           row.mainGradeAtCandidatePeak=Math.abs(a-previous.a)/run
@@ -54,6 +75,13 @@ for(const way of ways){
     }
     station+=step
   }
+  if(failure)violations.push({way:way.id,structure,kind,failingIntervals,worst:failure})
   if(Math.abs(row.maxRoadChangeM)>.02)result.push(row)
 }
 fs.writeFileSync(output,JSON.stringify(result.sort((a,b)=>Math.abs(b.maxRoadChangeM)-Math.abs(a.maxRoadChangeM)),null,2))
+
+if(gate){
+  fs.writeFileSync(output+'.grades.json',JSON.stringify(violations,null,2))
+  console.log('Changed motor roads exceeding both the grade cap and baseline at the same station:',violations.length)
+  if(violations.length)process.exitCode=1
+}
