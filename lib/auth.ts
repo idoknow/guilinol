@@ -6,6 +6,7 @@ export interface Env {
   npcAdmin?:(request:Request)=>Promise<Response>
   RT_JOIN_SECRET?: string
   perfQuery?:(path:string,params:URLSearchParams)=>Promise<Response>
+  clientIp?: string
   DB: D1Database; FEEDBACK:R2Bucket; BRIDGE_TOKEN?:string; EMAIL_DEV_LOG?: string; RESEND_API_KEY?: string
   /** 聚合登录：全部来自 Pages 环境变量/secret，不进 D1、后台不暴露 */
   QQ_APPID?: string
@@ -21,6 +22,9 @@ export interface Env {
   SOCIAL_ENABLED?: string
   SOCIAL_HOST?: string
   SOCIAL_REDIRECT?: string
+}
+export function requestIp(request:Request, env?:Pick<Env,'clientIp'>):string {
+  return env?.clientIp || request.headers.get('CF-Connecting-IP') || 'local'
 }
 export const lifetime = 30 * 86400
 export const now = () => Math.floor(Date.now()/1000)

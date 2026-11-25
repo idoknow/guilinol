@@ -1,6 +1,6 @@
 import {oauthStart,oauthCallback,directDecision} from '../../lib/oauth'
 import {migration,allowLegacy,providers,schedule} from '../../lib/social-policy'
-import {type SessionAccount,type Env,checkBan,sessionAccount,Problem,cookie,deliver,equal,hash,invalid,lifetime,limit,newCode,now,passwordHash,random,reserveMail,sessionHash,unauthorized} from '../../lib/auth'
+import {type SessionAccount,type Env,checkBan,sessionAccount,Problem,cookie,deliver,equal,hash,invalid,lifetime,limit,newCode,now,passwordHash,random,requestIp,reserveMail,sessionHash,unauthorized} from '../../lib/auth'
 
 import {AVATAR_KEY, looks, sanitizeAvatar, starterOutfit} from '../../lib/avatar'
 import {feedback} from '../../lib/feedback'
@@ -59,7 +59,7 @@ async function handle(request:Request,env:Env) {
       if(!account?.verified) unauthorized()
       userId=account.id
     }
-    const {cookie:stateCookie,url:target,qrcode}=await startSocial(env,db,type,request.headers.get('CF-Connecting-IP')||'local',intent,userId,socialStates(request))
+    const {cookie:stateCookie,url:target,qrcode}=await startSocial(env,db,type,requestIp(request,env),intent,userId,socialStates(request))
     return json({url:target,qrcode},200,stateCookie)
   }
   if(path==='auth/logout') {
@@ -120,7 +120,7 @@ async function handle(request:Request,env:Env) {
   }
   const email=typeof body.email==='string'?body.email.trim().toLowerCase():''
   if(email.length>254||!/^\S+@[^\s@]+\.[^\s@]+$/.test(email)||email.split('@').length!==2) invalid()
-  const ip=request.headers.get('CF-Connecting-IP')||'local'
+  const ip=requestIp(request,env)
   const getUser=()=>stmt('SELECT * FROM users WHERE email=?',email).first<User>()
   if(path==='auth/register'||path==='auth/resend') {
     const register=path==='auth/register', purpose=register?'verify':body.purpose

@@ -5,6 +5,8 @@ import {analytics} from '../server/admin-analytics.mjs'
 import {summarizeDays} from '../server/day-summary.mjs'
 
 // Compare identical ranges before and after the full UTC days are summarized.
+import {verifyHourlySummaries} from './summary-hour-test.mjs'
+
 export async function verifySummaries(url){
   const pool=new pg.Pool({connectionString:url})
   try{
@@ -28,4 +30,5 @@ export async function verifySummaries(url){
     await summarizeDays(pool)
     assert.deepEqual(await Promise.all(paths.map(query)),before)
   }finally{await pool.end()}
+  await verifyHourlySummaries(url)
 }

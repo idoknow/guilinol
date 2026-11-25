@@ -49,6 +49,8 @@ async function rollup(pool) {
 export function monitor(pool){
   let routes=new Map(),queries=new Histogram(),wait=new Histogram(),cpu=process.cpuUsage(),last=performance.now(),day='',busy=false,hourTick=0
   const lag=monitorEventLoopDelay({resolution:20});lag.enable()
+  // 冷启动立即异步补算小时汇总，避免刚发版前 60 秒 24h 总览退化扫原始 perf_event
+  void summarizeHours(pool,{hours:72}).then(()=>{hourTick=Date.now()},error=>console.error('hourly summary warmup failed',error.code??error.name))
   const timer=setInterval(async()=>{
     if(busy)return
     busy=true
@@ -63,7 +65,7 @@ export function monitor(pool){
         cgroupCpuUsec:cpuStat?Number(/^usage_usec (\d+)/m.exec(cpuStat)?.[1]):null,nginx:web})
       await pool.query("INSERT INTO perf_server(minute,sample) VALUES(date_trunc('minute',$1::timestamptz),$2)",[stamp,sample])
       // 小时汇总是后台总览快慢的关键：24h 这类滚动窗口只能靠它，否则每次都要裸扫原始事件
-      if(Date.now()-hourTick>600000){hourTick=Date.now();await summarizeHours(pool,{hours:48})}
+      if(Date.now()-hourTick>600000){await summarizeHours(pool,{hours:72});hourTick=Date.now()}
       const today=new Date(stamp.getTime()-300000).toISOString().slice(0,10)
       if(today!==day){await summarizeDays(pool);await rollup(pool);day=today}
     }catch(error){console.error('telemetry minute write failed',error.code??error.name)}finally{busy=false}

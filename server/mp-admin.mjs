@@ -37,8 +37,8 @@ export function multiplayer(pool,env){
       const [accounts,lookup]=await Promise.all([pool.query(`select uid,id,created_at as "createdAt",signup_method as "signupMethod",
         banned_at<>0 as banned from users where uid=any($1::bigint[])`,[players.map(item=>item.uid)]),regions(pool,players),players.length&&loadLandmarks()])
       const byUid=new Map(accounts.rows.map(({uid,...account})=>[Number(uid),account]))
-      return json({rt:'up',server,players:players.map(({ip,...player})=>({...player,region:lookup(ip),account:byUid.get(player.uid)??null,
-        landmark:nearest(player.x,player.z)})),bans,events:events.map(({ip,...event})=>event),chat})
+      return json({rt:'up',server,players:players.map(({ip,nodeIp,...player})=>({...player,region:lookup(ip),account:byUid.get(player.uid)??null,
+        landmark:nearest(player.x,player.z)})),bans,events:events.map(({ip,nodeIp,...event})=>event),chat})
     }
     if(path==='admin/mp/kick'&&request.method==='POST'){
       const body=await request.json().catch(()=>null),uid=Number(body?.uid),minutes=body?.minutes,reason=body?.reason
