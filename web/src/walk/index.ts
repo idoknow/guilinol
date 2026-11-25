@@ -1143,7 +1143,11 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
   let fishingLoad:Promise<NonNullable<typeof fishing>>|undefined
   const loadFishing=()=>fishingLoad??=import('../fishing/session').then(module=>fishing=module.createFishing({
     canUse:()=>active&&!rides?.bike&&!rides?.boat&&!rides?.car&&!shopOverlay?.isOpen()&&!document.querySelector('.hotbar[hidden]'),
-    position:()=>sim.body.translation(),face:(angle)=>{yaw=angle+Math.PI;facing=yaw+avatar.yaw;figure.rotation.y=facing},
+    position:()=>sim.body.translation(),heading:()=>facing-avatar.yaw-Math.PI,
+    waterAt:(x,z)=>{const tile=sim.tileAt(x,z),grid=tile&&stream.loaded.get(tile)?.water
+      if(!tile||!grid)return null
+      const level=grid[Math.round((z-tile.z)/4)*65+Math.round((x-tile.x)/4)]
+      return level===-32768||level===undefined?null:level/10},face:(angle)=>{yaw=angle+Math.PI;facing=yaw+avatar.yaw;figure.rotation.y=facing},
     teleport:(x,z,angle)=>enter(x,z,angle,'fishing'),hand:()=>avatarRig.attachmentAt?.('hand_r')??figure.getObjectByName('hand_r'),scene,camera,
   },verify))
   // 钓鱼（IDOK-336）2026-11-25 按需求方要求下线重做：默认关闭，?fishing=1（或 verify）才开。

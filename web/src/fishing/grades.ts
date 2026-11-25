@@ -16,7 +16,7 @@ export function drawGrade(zone: keyof typeof probabilities, random: () => number
   return 'low';
 }
 
-const priceRanges = { legendary: [1200, 2000], high: [400, 999], medium: [52, 200], low: [20, 120] } as const;
+const priceRanges = { legendary: [150, 400], high: [40, 120], medium: [10, 30], low: [3, 12] } as const;
 
 export function basePrice(grade: Grade, weightFraction: number): number {
   const [min, max] = priceRanges[grade];

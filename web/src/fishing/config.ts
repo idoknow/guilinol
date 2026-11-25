@@ -41,3 +41,19 @@ export function chooseFish(water:Water,method:Method,baitId:string,line:number,r
 }
 export const sizes=['微型','小型','中型','大型','巨型']
 export function fishForce(row:Species){return 4+5*sizes.indexOf(row.size)+6*['low','medium','high','legendary'].indexOf(row.grade)}
+
+export const dailyIncomeLimit=800
+export const castRules={chargeSeconds:1.2,minRange:6,maxRange:30,minWetRange:4,hitSeconds:.7}
+export function chargePower(seconds:number){
+  const elapsed=seconds-castRules.chargeSeconds
+  return elapsed<=0?Math.max(0,seconds/castRules.chargeSeconds):1-.05*(1-Math.abs(elapsed%1*2-1))
+}
+export type Point={x:number,y:number,z:number}
+export function resolveCast(from:Point,angle:number,power:number,waterAt:(x:number,z:number)=>number|null){
+  if(!Number.isFinite(power)||power<0||power>1)return null
+  for(let distance=castRules.minRange+(castRules.maxRange-castRules.minRange)*power;;distance=Math.max(castRules.minWetRange,distance-.5)){
+    const x=from.x+distance*Math.sin(angle),z=from.z+distance*Math.cos(angle),y=waterAt(x,z)
+    if(y!==null)return {from,to:{x,y,z},power,distance}
+    if(distance===castRules.minWetRange)return null
+  }
+}
