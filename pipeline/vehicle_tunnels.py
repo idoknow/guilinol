@@ -6,6 +6,7 @@ import math
 
 from common import ll2xz
 from service_streets import width
+from tunnel_clearance import design_clearance
 from shapely import STRtree
 from shapely.geometry import LineString, MultiPoint, Point, Polygon
 from heapq import heapify, heappop, heappush
@@ -83,6 +84,7 @@ def mountain_roofs(network, nodes, peaks):
 
 def sections(lanes, source_ways, existing, nodes):
     saved = {t['way'] for t in existing}
+    ways = {w['id']: w for w in source_ways if w['type'] == 'way' and underground(w)}
     edges, surface_nodes = {}, set()
     for lane in lanes:
         a, b = lane['from'], lane['to']
@@ -92,10 +94,9 @@ def sections(lanes, source_ways, existing, nodes):
         a, b = sorted((a, b))
         key = lane['way'], a, b
         edge = edges.setdefault(key, dict(way=lane['way'], a=a, b=b, halfWidth=0,
-                                          clearance=2.5, cls=lane['cls']))
+                                          clearance=0., cls=lane['cls']))
         edge['halfWidth'] = max(edge['halfWidth'], abs(lane['offset'])+lane['width']/2+.5)
-        if lane['kind'] != 'nonmotor':
-            edge['clearance'] = 4.5
+        edge['clearance'] = max(edge['clearance'], design_clearance(ways[lane['way']], lane['kind'] != 'nonmotor'))
     # Follow connected private approach ramps to the actual surface junctions.
     # They provide boundary conditions without becoming traffic spawn lanes.
     ramps = defaultdict(list)
@@ -145,7 +146,7 @@ def sections(lanes, source_ways, existing, nodes):
                 a, b = sorted((start, end))
                 if a != b and math.hypot(nodes[a]['x']-nodes[b]['x'], nodes[a]['z']-nodes[b]['z']) > .01:
                     edges[way['id'], a, b] = dict(way=way['id'], a=a, b=b,
-                        halfWidth=width(way['tags'])/2+.5, clearance=4.5, cls='service')
+                        halfWidth=width(way['tags'])/2+.5, clearance=design_clearance(way, True), cls='service')
     adjacent = defaultdict(set)
     for edge in edges.values():
         a,b = edge['a'],edge['b']

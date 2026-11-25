@@ -514,6 +514,13 @@ def bake(output, manifest, rendered_roads=None):
         for lane, pose in zip(lanes,json.loads(request.read_text()),strict=True):
             if pose is not None:
                 lane.update(pose)
+    headroom = {}
+    for tunnel in manifest.get('tunnels', []):
+        wid = tunnel['way']
+        headroom[wid] = min(headroom.get(wid, math.inf), tunnel['clearance'])
+    for lane in lanes:
+        if lane.get('structure') == 'tunnel' and lane['way'] in headroom:
+            lane['clearance'] = headroom[lane['way']]
     dest.write_bytes(gzip.compress(json.dumps(result, ensure_ascii=False, separators=(',',':')).encode(),mtime=0))
     # A halo contains all spawn and retention candidates until the next cell loads.
     cells = defaultdict(lambda: dict(lanes=[],walks=[],refs=set()))

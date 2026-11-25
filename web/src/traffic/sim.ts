@@ -2,7 +2,7 @@ import {axleHeight,contactPose} from './lane-surface.ts'
 import {nearStatic,resolveContact,staticSolids,pickups,type Solid} from './contact.ts'
 import {CAR_SCALE} from '../drive/scale.ts'
 type Node = {id:number,x:number,y:number,z:number}
-type Lane = {privateAccess?:boolean,wheelPose?:number[],floor?:string,id:number,from:number,to:number,offset:number,width?:number,kind:'motor'|'bus'|'nonmotor',speedKmh:number,cls?:string,street?:string,npcWalks?:number[][],heights?:number[]}
+type Lane = {clearance?:number,privateAccess?:boolean,wheelPose?:number[],floor?:string,id:number,from:number,to:number,offset:number,width?:number,kind:'motor'|'bus'|'nonmotor',speedKmh:number,cls?:string,street?:string,npcWalks?:number[][],heights?:number[]}
 type Phase = {lanes:number[],green:number,yellow:number}
 type Signal={node:number,group:number,offset:number,phases:Phase[]}
 export type Graph = {nodes:Node[],lanes:Lane[],walks:[number,number,number,number?,number[]?][],signals:Signal[]}
@@ -41,6 +41,7 @@ const WARMUP_S=1.2,TELEPORT=60
 const distanceSq=(left:Position,right:Position)=>(left.x-right.x)**2+(left.y-right.y)**2+(left.z-right.z)**2
 
 export class Traffic {
+  prepareMotor?:(actor:Actor)=>void
   sampleGround?:(x:number,z:number,reference:number,car:boolean)=>number|undefined
   *allTracks(){for(const list of this.exits.values())yield* list}
   actors:Actor[]=[]
@@ -240,6 +241,10 @@ export class Traffic {
         }
         if(!hiddenSpawn(actor)||this.actors.some(other=>distanceSq(other,actor)<(walk?.5:5)**2))continue
         if(!walk&&nearStatic(actor.x,actor.z)&&resolveContact(actor,actor.y,actor.yaw,actor.halfWidth,actor.halfLength,staticSolids))continue
+        if(!walk){
+          this.prepareMotor?.(actor)
+          if(track.clearance!==undefined&&actor.height>track.clearance-.3)continue
+        }
         this.actors.push(actor);count++;budget--
       }
     }
@@ -288,7 +293,7 @@ export class Traffic {
       actor.waitingFor=undefined
       if(actor.leaving){actor.scale=Math.max(0,actor.scale-dt/.4);return}
       if(!person&&this.parkingHits(track).some(hit=>hit.dist>=actor.dist-2&&hit.dist<actor.dist+28)){
-        const options=this.adjacent(track),next=options.find(lane=>!this.actors.some(other=>other!==actor&&other.track===lane&&Math.abs(other.dist-actor.dist)<10))
+        const options=this.adjacent(track),next=options.find(lane=>(lane.clearance===undefined||actor.height<=lane.clearance-.3)&&!this.actors.some(other=>other!==actor&&other.track===lane&&Math.abs(other.dist-actor.dist)<10))
         if(next){actor.dodge+=track.offset-next.offset;actor.track=track=next}
         else if(!options.length&&!visible?.(actor)){actor.leaving=true;return}
       }
@@ -374,7 +379,7 @@ export class Traffic {
       }
       if(actor.dist>=track.length){
         if(!person&&this.signal.has(track.to)){this.crossed++;this.onCross?.(track,this.time)}
-        const choices=(this.exits.get(track.to)??[]).filter(next=>this.usable(next)&&(next.walk||!this.parkingHits(next).some(hit=>hit.dist<12))&&next.walk===person && next.street===track.street && (person||next.to!==track.from) && (person||next.kind==='motor'||(actor.kind==='scooter'&&next.kind==='nonmotor')))
+        const choices=(this.exits.get(track.to)??[]).filter(next=>(next.clearance===undefined||actor.height<=next.clearance-.3)&&this.usable(next)&&(next.walk||!this.parkingHits(next).some(hit=>hit.dist<12))&&next.walk===person && next.street===track.street && (person||next.to!==track.from) && (person||next.kind==='motor'||(actor.kind==='scooter'&&next.kind==='nonmotor')))
         if(!choices.length){actor.dist=track.length;actor.speed=0;actor.leaving=true;return}
         const onward=choices.filter(next=>next.to!==track.from)
         const pool=onward.length?onward:choices
