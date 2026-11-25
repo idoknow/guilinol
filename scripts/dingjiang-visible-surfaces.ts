@@ -360,7 +360,7 @@ export function visibleSurfaces(world: string, ids: Set<number>, closure: Set<nu
               z = s.z + v[0] * s.dz + v[2] * s.dx
             for (const other of local) {
               if (!s.t.nodes?.some((n) => other.t.nodes?.includes(n))) continue
-              const surface = floorLevel(other.t, x, z)
+              const surface = floorLevel(other.t, x, z, 0.0005)
               if (surface !== undefined) grade = Math.max(grade, surface)
               const at = (x - other.x) * other.dx + (z - other.z) * other.dz
               const lateral = Math.abs((z - other.z) * other.dx - (x - other.x) * other.dz)

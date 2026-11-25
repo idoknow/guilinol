@@ -46,7 +46,7 @@ function footprintPlanes(ring:[number,number][]){
   })
 }
 
-export function floorLevel(tunnel:Tunnel,x:number,z:number){
+export function floorLevel(tunnel:Tunnel,x:number,z:number,edgeToleranceM=0){
   for(const [end,joint] of (tunnel.joints??[]).entries()){
     const p=tunnel.portals[end]
     if(Math.abs(p[0]-x)>32 || Math.abs(p[2]-z)>32)continue
@@ -55,7 +55,11 @@ export function floorLevel(tunnel:Tunnel,x:number,z:number){
       const det=ux*vz-uz*vx
       if(Math.abs(det)<1e-9)continue
       const u=(dx*vz-dz*vx)/det,v=(ux*dz-uz*dx)/det
-      if(u>=-1e-7 && v>=-1e-7 && u+v<=1.0000001)return a[1]+u*(b[1]-a[1])+v*(c[1]-a[1])
+      // Rendered vertices are Float32. Compare signed edge distances in metres
+      // so even narrow triangles at native pavement ties include their rim.
+      const tolerance=edgeToleranceM/Math.abs(det)
+      if(u>=-1e-7-tolerance*Math.hypot(vx,vz) && v>=-1e-7-tolerance*Math.hypot(ux,uz) &&
+        1-u-v>=-1e-7-tolerance*Math.hypot(ux-vx,uz-vz))return a[1]+u*(b[1]-a[1])+v*(c[1]-a[1])
     }
   }
   if(tunnel.footprint&&!tunnel.footprint.some(tri=>footprintPlanes(tri).every(plane=>plane(x,z)>=-.000001)))return
