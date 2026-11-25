@@ -70,7 +70,10 @@ export function mountDrinksStaffHud(opts: DrinksStaffHudOptions): DrinksStaffHud
       return
     }
     root.hidden = false
-    titleEl.textContent = prompt.label
+    const mistake = snap.lastMistake && snap.lastMistake.expiresAtShiftSec > snap.shiftTimeSec ? snap.lastMistake : null
+    root.classList.toggle('drinks-staff-hud--mistake', Boolean(mistake))
+    titleEl.classList.toggle('drinks-staff-title--mistake', Boolean(mistake))
+    titleEl.textContent = mistake ? mistake.message : prompt.label
     ctaTextEl.textContent = prompt.ctaLabel
 
     if (snap.onDuty) {
@@ -79,7 +82,8 @@ export function mountDrinksStaffHud(opts: DrinksStaffHudOptions): DrinksStaffHud
       bgmBtn.hidden = false
       bgmBtn.textContent = opts.bgmMuted?.() ? '静音' : '音乐'
       resignBtn.hidden = false
-      const showProgress = snap.phase === 'add_toppings' || snap.phase === 'seal_cup'
+      const showProgress =
+        snap.phase === 'shake_cup' || snap.phase === 'add_toppings' || snap.phase === 'seal_cup'
       trackEl.hidden = !showProgress
       fillEl.style.width = `${Math.round(snap.stepProgress * 100)}%`
     } else {
@@ -95,7 +99,7 @@ export function mountDrinksStaffHud(opts: DrinksStaffHudOptions): DrinksStaffHud
   let holdStartPhase = opts.session.getSnapshot().phase
   let suppressNextClick = false
   const isHoldPhase = (phase: DrinksStaffStateSnapshot['phase']) =>
-    phase === 'add_toppings' || phase === 'seal_cup'
+    phase === 'shake_cup' || phase === 'add_toppings' || phase === 'seal_cup'
 
   ctaBtn.addEventListener('pointerdown', () => {
     holdStartPhase = opts.session.getSnapshot().phase

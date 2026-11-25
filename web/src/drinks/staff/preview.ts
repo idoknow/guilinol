@@ -18,8 +18,13 @@ export interface DrinksStaffPreviewHandle {
     uniformEquipped: boolean
     uniformTriangles: number
     bgmPlaying: boolean
+    bgmInsideShop: boolean
+    bgmFadeLevel: number
     audioTotalPlayed: number
     audioLastId: string | null
+    audioCounts: Record<string, number>
+    armRightPitch: number
+    headYaw: number
   }
   dispose(): void
 }
@@ -44,22 +49,31 @@ function buildArticulatedPlayerFigure(): THREE.Group {
   const shoeR = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.08, 0.22), shoeMat)
   shoeR.position.set(0.095, 0.04, -0.03)
 
-  // Torso group named `Torso` (matches `walk/avatar-rig.ts` attachment convention)
+  // Torso & articulated shoulder/elbow hierarchy aligned with `walk/avatar-rig.ts` joint names
   const torsoGroup = new THREE.Group()
   torsoGroup.name = 'Torso'
   torsoGroup.position.set(0, 1.08, 0)
   const torsoMesh = new THREE.Mesh(new THREE.BoxGeometry(0.36, 0.56, 0.2), shirtMat)
   torsoGroup.add(torsoMesh)
 
-  const armL = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.21, 0.1), shirtMat)
-  armL.position.set(-0.24, 0.145, 0)
-  const armR = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.21, 0.1), shirtMat)
-  armR.position.set(0.24, 0.145, 0)
-  const forearmL = new THREE.Mesh(new THREE.BoxGeometry(0.086, 0.22, 0.086), skinMat)
-  forearmL.position.set(-0.24, -0.065, 0)
-  const forearmR = new THREE.Mesh(new THREE.BoxGeometry(0.086, 0.22, 0.086), skinMat)
-  forearmR.position.set(0.24, -0.065, 0)
-  torsoGroup.add(armL, armR, forearmL, forearmR)
+  for (const side of ['L', 'R'] as const) {
+    const sgn = side === 'L' ? -1 : 1
+    const armPivot = new THREE.Group()
+    armPivot.name = `Arm${side}`
+    armPivot.position.set(sgn * 0.24, 0.24, 0)
+    const upperArmMesh = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.21, 0.1), shirtMat)
+    upperArmMesh.position.set(0, -0.095, 0)
+
+    const forearmPivot = new THREE.Group()
+    forearmPivot.name = `Forearm${side}`
+    forearmPivot.position.set(0, -0.2, 0)
+    const forearmMesh = new THREE.Mesh(new THREE.BoxGeometry(0.086, 0.22, 0.086), skinMat)
+    forearmMesh.position.set(0, -0.105, 0)
+    forearmPivot.add(forearmMesh)
+
+    armPivot.add(upperArmMesh, forearmPivot)
+    torsoGroup.add(armPivot)
+  }
 
   // Head group named `Head` centered at head bone (~1.568)
   const headGroup = new THREE.Group()
@@ -112,14 +126,39 @@ export function mountDrinksStaffPreview(
     seed: 'staff-dev-preview',
     now: 0,
     hourOf: () => 15.0,
-    clerkCount: 3,
+    clerkCount: 2,
     maxCustomers: 10,
   })
   sim.fastForward(20)
 
+  // While player works backstage in preview, keep one stationary cashier clerk at register 0
+  // so NPC clerks don't walk into backstage close-up camera sightlines or overlap pickup slot.
+  const npcSimProxy = {
+    ...sim,
+    getSnapshot() {
+      const snap = sim.getSnapshot()
+      const firstClerk = snap.clerks[0]
+      if (!firstClerk) return snap
+      const cashier = sim.getLayout()?.cashiers?.[0]?.clerkPos ?? { x: -2.55, z: -0.92, yaw: 0 }
+      return {
+        ...snap,
+        clerks: [
+          {
+            ...firstClerk,
+            x: cashier.x,
+            z: cashier.z,
+            yaw: cashier.yaw,
+            interactionKind: null,
+            holdingCupColor: null,
+          },
+        ],
+      }
+    },
+  }
+
   const npc = createDrinksNpcRenderer({
     scene,
-    sim,
+    sim: npcSimProxy,
     maxNpcs: 24,
     showBadges: false,
   })
@@ -190,6 +229,9 @@ export function mountDrinksStaffPreview(
     getMetrics() {
       const m = staff.stage.getMetrics()
       const a = staff.audio.getStats()
+      const bgmStats = staff.bgm.getStats()
+      const armR = playerFigure.getObjectByName('ArmR')
+      const head = playerFigure.getObjectByName('Head')
       return {
         snapshot: staff.getSnapshot(),
         stageTriangles: m.triangles,
@@ -197,8 +239,13 @@ export function mountDrinksStaffPreview(
         uniformEquipped: staff.uniform.isEquipped(),
         uniformTriangles: staff.uniform.getTriangles(),
         bgmPlaying: staff.bgm.isPlaying(),
+        bgmInsideShop: bgmStats.insideShop,
+        bgmFadeLevel: bgmStats.fadeLevel,
         audioTotalPlayed: a.totalPlayed,
         audioLastId: a.lastPlayedId,
+        audioCounts: { ...a.playedCounts },
+        armRightPitch: armR ? Math.round(armR.rotation.x * 1000) / 1000 : 0,
+        headYaw: head ? Math.round(head.rotation.y * 1000) / 1000 : 0,
       }
     },
     dispose() {

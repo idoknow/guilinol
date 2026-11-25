@@ -9,9 +9,13 @@ export interface DrinksBgmStats {
   supported: boolean
   playing: boolean
   muted: boolean
+  insideShop: boolean
   volume: number
   distanceM: number
   attenuation: number
+  fadeLevel: number
+  targetFadeLevel: number
+  effectiveLevel: number
   barsScheduled: number
 }
 
@@ -24,6 +28,8 @@ export interface DrinksBgmController {
   isPlaying(): boolean
   setVolume(volume: number): void
   setDistance(distanceM: number): void
+  setShopPresence(insideShop: boolean, fadeDurationSec?: number): void
+  setFadeTarget(targetLevel: number, fadeDurationSec?: number): void
   getStats(): DrinksBgmStats
   dispose(): void
 }
@@ -184,6 +190,10 @@ export function createDrinksBgmController(opts?: {
       : 0.28
   let distanceM = 0
   let attenuation = 1
+  let insideShop = true
+  let fadeLevel = 0
+  let targetFadeLevel = 0
+  let fadeDurationSec = 0.75
   let playing = false
   let disposed = false
   let nextBarIndex = 0
@@ -195,10 +205,16 @@ export function createDrinksBgmController(opts?: {
     return typeof document !== 'undefined' && Boolean(document.hidden)
   }
 
-  function applyGain(): void {
+  function computeEffectiveLevel(): number {
+    if (!playing || muted || isHidden()) return 0
+    return Math.max(0, Math.min(1, fadeLevel * attenuation))
+  }
+
+  function applyGain(customTauSec?: number): void {
     if (!masterGain || !ctx) return
-    const effective = playing && !muted && !isHidden() ? volume * attenuation : 0
-    masterGain.gain.setTargetAtTime(effective, ctx.currentTime, 0.08)
+    const effective = volume * computeEffectiveLevel()
+    const tau = Math.max(0.04, Math.min(0.8, (customTauSec ?? fadeDurationSec) * 0.35))
+    masterGain.gain.setTargetAtTime(effective, ctx.currentTime, tau)
   }
 
   function ensureAudio(): AudioContext | null {
@@ -270,6 +286,7 @@ export function createDrinksBgmController(opts?: {
       if (disposed) return false
       playing = true
       barProgressSec = 0
+      targetFadeLevel = insideShop ? 1 : 0.28
       if (!muted && !isHidden()) {
         if (!ensureAudio()) {
           // Even in headless / before gesture, track bar schedule state consistently
@@ -283,11 +300,26 @@ export function createDrinksBgmController(opts?: {
     },
     stop(): void {
       playing = false
-      applyGain()
+      targetFadeLevel = 0
+      fadeDurationSec = 0.45
+      applyGain(0.45)
     },
     step(dtSec: number): void {
-      if (disposed || !playing || muted || isHidden()) return
+      if (disposed) return
       const safeDt = Math.max(0, Math.min(0.5, Number.isFinite(dtSec) ? dtSec : 0))
+      if (safeDt > 0) {
+        const goal = playing ? targetFadeLevel : 0
+        const maxDelta = safeDt / Math.max(0.08, fadeDurationSec)
+        if (fadeLevel < goal) {
+          fadeLevel = Math.min(goal, fadeLevel + maxDelta)
+        } else if (fadeLevel > goal) {
+          fadeLevel = Math.max(goal, fadeLevel - maxDelta)
+        }
+      }
+      if (!playing || muted || isHidden()) {
+        applyGain()
+        return
+      }
       const ac = ensureAudio()
       if (ac) {
         scheduleIfDue()
@@ -303,7 +335,7 @@ export function createDrinksBgmController(opts?: {
     },
     setMuted(nextMuted: boolean): void {
       muted = Boolean(nextMuted)
-      applyGain()
+      applyGain(0.12)
     },
     isMuted: () => muted,
     isPlaying: () => playing,
@@ -317,13 +349,34 @@ export function createDrinksBgmController(opts?: {
       attenuation = computeBgmDistanceAttenuation(distanceM)
       applyGain()
     },
+    setShopPresence(nextInside: boolean, nextFadeSec = 0.75): void {
+      const next = Boolean(nextInside)
+      fadeDurationSec = Math.max(0.12, Math.min(2.5, Number.isFinite(nextFadeSec) ? nextFadeSec : 0.75))
+      const expectedTarget = next ? 1 : 0
+      if (insideShop === next && (!playing || targetFadeLevel === expectedTarget)) return
+      insideShop = next
+      if (playing) {
+        targetFadeLevel = expectedTarget
+      }
+      applyGain(fadeDurationSec)
+    },
+    setFadeTarget(nextTarget: number, nextFadeSec = 0.65): void {
+      const clamped = Math.max(0, Math.min(1, Number.isFinite(nextTarget) ? nextTarget : 0))
+      fadeDurationSec = Math.max(0.08, Math.min(2.5, Number.isFinite(nextFadeSec) ? nextFadeSec : 0.65))
+      targetFadeLevel = clamped
+      applyGain(fadeDurationSec)
+    },
     getStats: (): DrinksBgmStats => ({
       supported: getAudioContextCtor() !== null,
       playing,
       muted,
+      insideShop,
       volume,
       distanceM: Number.isFinite(distanceM) ? Math.round(distanceM * 100) / 100 : Infinity,
       attenuation: Math.round(attenuation * 1000) / 1000,
+      fadeLevel: Math.round(fadeLevel * 1000) / 1000,
+      targetFadeLevel: Math.round(targetFadeLevel * 1000) / 1000,
+      effectiveLevel: Math.round(computeEffectiveLevel() * 1000) / 1000,
       barsScheduled,
     }),
     dispose(): void {

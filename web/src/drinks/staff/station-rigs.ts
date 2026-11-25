@@ -1,4 +1,5 @@
 import * as THREE from 'three'
+import type { AvatarRig } from '../../walk/avatar-rig.ts'
 import {
   buildRecruitStandee,
   createDrinksEquipmentRig,
@@ -29,6 +30,113 @@ const EQUIP_ACTIONS: readonly EquipmentActionId[] = [
 function setPosOnZone(obj: THREE.Object3D, pt: StaffZonePoint, yOffset = 0): void {
   obj.position.set(pt.x, (pt.y ?? 0) + yOffset, pt.z)
   obj.rotation.y = pt.yaw
+}
+
+function getJointObj(figure: THREE.Object3D, rig: AvatarRig | undefined, name: 'Torso' | 'Head' | 'ArmL' | 'ArmR' | 'ForearmL' | 'ForearmR') {
+  return rig?.joints?.[name] ?? figure.getObjectByName(name)
+}
+
+export function resetStaffCharacterPose(figure: THREE.Object3D | null, rig?: AvatarRig | null): void {
+  if (!figure) return
+  if (rig) {
+    rig.clearPose()
+    return
+  }
+  for (const name of ['Torso', 'Head', 'ArmL', 'ArmR', 'ForearmL', 'ForearmR'] as const) {
+    figure.getObjectByName(name)?.rotation.set(0, 0, 0)
+  }
+}
+
+/**
+ * 同步五步制作手部/头部动作与做错拒绝手势（兼容宿主骨骼 `AvatarRig` 与关节模型 `preview.ts`）。
+ */
+export function syncStaffCharacterGestures(
+  figure: THREE.Object3D | null,
+  rig: AvatarRig | undefined,
+  snap: DrinksStaffStateSnapshot,
+  animTime: number,
+): void {
+  if (!figure) return
+  if (!snap.onDuty) {
+    resetStaffCharacterPose(figure, rig)
+    return
+  }
+
+  const head = getJointObj(figure, rig, 'Head')
+  const torso = getJointObj(figure, rig, 'Torso')
+  const armL = getJointObj(figure, rig, 'ArmL')
+  const armR = getJointObj(figure, rig, 'ArmR')
+  const forearmL = getJointObj(figure, rig, 'ForearmL')
+  const forearmR = getJointObj(figure, rig, 'ForearmR')
+
+  const mistakeActive = Boolean(snap.lastMistake && snap.lastMistake.expiresAtShiftSec > snap.shiftTimeSec)
+  const gestureActive = Boolean(snap.lastStepGesture && snap.lastStepGesture.untilShiftSec > snap.shiftTimeSec)
+
+  if (mistakeActive) {
+    // 清晰拒绝反馈：快速摇头 + 右手在胸前(+Z变-Z即正角+X)摆手否定
+    head?.rotation.set(0.05, Math.sin(animTime * 28) * 0.28, 0)
+    torso?.rotation.set(0, 0, Math.sin(animTime * 20) * 0.05)
+    armL?.rotation.set(0.24, 0, -0.06)
+    forearmL?.rotation.set(0.35, 0, 0)
+    armR?.rotation.set(0.78, 0, -0.14 + Math.sin(animTime * 22) * 0.22)
+    forearmR?.rotation.set(0.65, 0, Math.sin(animTime * 24) * 0.34)
+    return
+  }
+
+  if (snap.phase === 'shake_cup') {
+    const wave = Math.sin(animTime * 24)
+    const swing = Math.cos(animTime * 24)
+    head?.rotation.set(-0.08, 0, 0)
+    torso?.rotation.set(-0.06, wave * 0.06, 0)
+    armR?.rotation.set(1.06 + wave * 0.34, 0.22, -0.12)
+    forearmR?.rotation.set(0.78 + swing * 0.26, 0, 0)
+    armL?.rotation.set(0.92 - wave * 0.24, -0.22, 0.1)
+    forearmL?.rotation.set(0.68 - swing * 0.2, 0, 0)
+    return
+  }
+
+  if (snap.phase === 'add_toppings') {
+    const pourArc = Math.sin(snap.stepProgress * Math.PI)
+    const jitter = Math.sin(animTime * 11) * 0.12
+    head?.rotation.set(-0.12, -0.08, 0)
+    torso?.rotation.set(-0.07, -0.1, 0)
+    armR?.rotation.set(0.88 + pourArc * 0.42, 0.18, -0.1)
+    forearmR?.rotation.set(0.48 + jitter, 0, pourArc * 0.22)
+    armL?.rotation.set(0.44, -0.14, 0.05)
+    forearmL?.rotation.set(0.52, 0, 0)
+    return
+  }
+
+  if (snap.phase === 'seal_cup') {
+    const push = Math.sin(snap.stepProgress * Math.PI)
+    head?.rotation.set(-0.08, 0, 0)
+    torso?.rotation.set(-0.05, 0, 0)
+    armR?.rotation.set(0.76 + push * 0.32, 0.14, -0.06)
+    forearmR?.rotation.set(0.46 + push * 0.22, 0, 0)
+    armL?.rotation.set(0.32, 0, 0)
+    forearmL?.rotation.set(0.36, 0, 0)
+    return
+  }
+
+  if (snap.phase === 'call_pickup') {
+    const reach = gestureActive ? 1.06 : 0.88 + Math.sin(animTime * 4.5) * 0.08
+    head?.rotation.set(0, Math.sin(animTime * 2.5) * 0.08, 0)
+    torso?.rotation.set(-0.04, 0, 0)
+    armR?.rotation.set(reach, 0.08, -0.08)
+    forearmR?.rotation.set(0.36, 0, 0)
+    armL?.rotation.set(0.24, 0, 0)
+    forearmL?.rotation.set(0.3, 0, 0)
+    return
+  }
+
+  // `accept_order` / `idle_ready`: 站台收银点单微动作
+  const tap = gestureActive ? 0.64 + Math.sin(animTime * 12) * 0.14 : 0.34 + Math.sin(animTime * 3) * 0.05
+  head?.rotation.set(-0.04, 0, 0)
+  torso?.rotation.set(-0.02, 0, 0)
+  armR?.rotation.set(tap, 0.06, -0.04)
+  forearmR?.rotation.set(0.42, 0, 0)
+  armL?.rotation.set(0.18, 0, 0)
+  forearmL?.rotation.set(0.22, 0, 0)
 }
 
 /**
@@ -214,13 +322,16 @@ export function createDrinksStaffVisualStage(anchors: DrinksStaffAnchors): Drink
     standee.setHighlighted(snap.nearRecruit, snap.onDuty)
 
     // Guide floor ring follows target zone when on duty or right in front of recruit board
+    const mistakeActive = Boolean(snap.lastMistake && snap.lastMistake.expiresAtShiftSec > snap.shiftTimeSec)
     const zone = snap.targetZone
     if (zone && (snap.onDuty || snap.nearRecruit)) {
       guideGroup.visible = true
       guideGroup.position.set(zone.x, 0, zone.z)
-      const pulse = 1 + Math.sin(animTime * 4.5) * 0.06
+      const pulseSpeed = mistakeActive ? 16 : 4.5
+      const pulseAmp = mistakeActive ? 0.14 : 0.06
+      const pulse = 1 + Math.sin(animTime * pulseSpeed) * pulseAmp
       guideGroup.scale.set(pulse, 1, pulse)
-      ringMat.color.set(snap.onDuty ? '#e60012' : '#f6c33e')
+      ringMat.color.set(mistakeActive ? '#ff4d00' : snap.onDuty ? '#e60012' : '#f6c33e')
     } else {
       guideGroup.visible = false
     }
@@ -234,9 +345,10 @@ export function createDrinksStaffVisualStage(anchors: DrinksStaffAnchors): Drink
     if (snap.activeActionId && snap.activeTicket) {
       const rig = getOrBuildEquip(snap.activeActionId)
       const isSeal = snap.phase === 'seal_cup'
-      const station = isSeal ? null : pickPrepStationAnchor(anchors, snap.activeTicket.stationKind)
-      const anchor = isSeal ? anchors.sealStation : station!
-      const dx = !isSeal && station?.kind === 'cream_top' ? -0.76 : 0
+      const isShake = snap.phase === 'shake_cup'
+      const station = isSeal || isShake ? null : pickPrepStationAnchor(anchors, snap.activeTicket.stationKind)
+      const anchor = isSeal ? anchors.sealStation : isShake ? anchors.shakeStation : station!
+      const dx = !isSeal && !isShake && station?.kind === 'cream_top' ? -0.76 : 0
       // Sit squarely atop the open stainless prep bar deck (y = prepBarHeightM + 0.052, z ≈ -2.99)
       // with equipment facing +Z toward the player & aisle camera (rotation.y = 0)
       rig.group.position.set(anchor.x + dx, anchors.prepBarHeightM + 0.052, anchor.z - 0.64)
@@ -246,7 +358,7 @@ export function createDrinksStaffVisualStage(anchors: DrinksStaffAnchors): Drink
       rig.setProgress(snap.stepProgress)
     }
 
-    // Live work-in-progress cup shown cleanly beside prep nozzle in add_toppings and on pickup counter in call_pickup.
+    // Live work-in-progress cup shown cleanly beside active station in shake_cup/add_toppings and on pickup counter in call_pickup.
     // Hidden during seal_cup because cup_seal equipment rig already slides its own cup inside the sealer cavity!
     if (snap.activeTicket && snap.activeCupPos && snap.phase !== 'seal_cup') {
       workCup.group.visible = true
@@ -257,7 +369,8 @@ export function createDrinksStaffVisualStage(anchors: DrinksStaffAnchors): Drink
         snap.cupLidSealed,
         snap.activeCupFill,
       )
-      const bob = snap.phase === 'call_pickup' ? Math.abs(Math.sin(animTime * 4.2)) * 0.022 : 0
+      const shakeOffset = snap.phase === 'shake_cup' ? Math.abs(Math.sin(animTime * 22)) * 0.018 : 0
+      const bob = snap.phase === 'call_pickup' ? Math.abs(Math.sin(animTime * 4.2)) * 0.022 : shakeOffset
       setPosOnZone(workCup.group, snap.activeCupPos, bob)
     } else {
       workCup.group.visible = false

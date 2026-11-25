@@ -110,12 +110,30 @@ test('createDrinksBgmController 支持店内打卡启停、距离衰减与无 wi
   assert.equal(computeBgmDistanceAttenuation(30), 0)
 
   const bgm = createDrinksBgmController({ syncRidePref: false })
+  bgm.setShopPresence(true, 0.4)
   bgm.start()
   assert.equal(bgm.isPlaying(), true)
-  bgm.setDistance(12)
+  assert.equal(bgm.getStats().fadeLevel, 0)
+  bgm.step(0.2)
+  const midFadeIn = bgm.getStats().fadeLevel
+  assert.ok(midFadeIn > 0 && midFadeIn < 1)
+  bgm.step(0.35)
+  assert.equal(bgm.getStats().fadeLevel, 1)
+
+  // 出店平滑淡出至 0，再进店淡入恢复
+  bgm.setShopPresence(false, 0.5)
+  bgm.step(0.25)
+  const midFadeOut = bgm.getStats().fadeLevel
+  assert.ok(midFadeOut > 0 && midFadeOut < 1)
+  bgm.step(0.4)
+  assert.equal(bgm.getStats().fadeLevel, 0)
+  bgm.setShopPresence(true, 0.4)
   for (let i = 0; i < 12; i++) {
     bgm.step(0.4)
   }
+  assert.equal(bgm.getStats().fadeLevel, 1)
+
+  bgm.setDistance(12)
   assert.ok(bgm.getStats().barsScheduled >= 2)
   bgm.setMuted(true)
   assert.equal(bgm.isMuted(), true)

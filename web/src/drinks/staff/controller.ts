@@ -12,9 +12,14 @@ import type { DrinksSim } from '../sim/types.ts'
 import { worldToShopLocal, type DrinksSiteCandidate } from '../site.ts'
 import { resolveDrinksStaffAnchors, type DrinksStaffAnchors, type ShopWorkZonesInput } from './anchors.ts'
 import { mountDrinksStaffHud, type DrinksStaffHudController } from './staff-hud.ts'
-import { createDrinksStaffVisualStage, type DrinksStaffVisualStage } from './station-rigs.ts'
+import {
+  createDrinksStaffVisualStage,
+  resetStaffCharacterPose,
+  syncStaffCharacterGestures,
+  type DrinksStaffVisualStage,
+} from './station-rigs.ts'
 import { createStaffUniformController, type StaffUniformController, type StaffUniformPalette } from './uniform.ts'
-import { DrinksStaffSession, type DrinksStaffStateSnapshot } from './workflow.ts'
+import { DrinksStaffSession, type DrinksStaffStateSnapshot, type StaffShiftPhase } from './workflow.ts'
 
 if (typeof document !== 'undefined' && typeof window !== 'undefined' && 'CSS' in globalThis) {
   void import('./staff-hud.css')
@@ -55,7 +60,10 @@ export interface DrinksStaffController {
   handleKeyDown(code: string, target?: EventTarget | null): boolean
   applyForJob(opts?: { force?: boolean }): boolean
   resignJob(): boolean
-  performAction(opts?: { forceRecruit?: boolean }): boolean
+  enterStaff(opts?: { force?: boolean }): boolean
+  exitStaff(): boolean
+  performAction(opts?: { forceRecruit?: boolean; bypassProximity?: boolean }): boolean
+  performStationAction(step: StaffShiftPhase, opts?: { bypassProximity?: boolean }): boolean
   setHoldingAction(holding: boolean): void
   step(dtSec: number): void
   getSnapshot(): DrinksStaffStateSnapshot
@@ -101,6 +109,7 @@ export function createDrinksStaffController(opts: CreateDrinksStaffControllerOpt
 
   let boundFigure: THREE.Object3D | null = null
   let holdingAction = false
+  let animTimeSec = 0
   let disposed = false
   const hotkeyCode = opts.hotkeyCode ?? 'KeyE'
 
@@ -111,6 +120,7 @@ export function createDrinksStaffController(opts: CreateDrinksStaffControllerOpt
       uniform.equip(boundFigure, rig)
     } else if (!snap.uniformEquipped && uniform.isEquipped()) {
       uniform.unequip()
+      resetStaffCharacterPose(boundFigure, boundFigure?.userData?.avatarRig as AvatarRig | undefined)
     }
   }
 
@@ -118,6 +128,7 @@ export function createDrinksStaffController(opts: CreateDrinksStaffControllerOpt
     const sounds = session.drainSounds()
     for (const s of sounds) audio.play(s)
     const snap = session.getSnapshot()
+    bgm.setShopPresence(snap.inShopInterior)
     if (snap.onDuty && !bgm.isPlaying()) {
       bgm.start()
     } else if (!snap.onDuty && bgm.isPlaying()) {
@@ -135,11 +146,10 @@ export function createDrinksStaffController(opts: CreateDrinksStaffControllerOpt
       bgmMuted: () => bgm.isMuted(),
       onPrimaryAction: () => {
         audio.unlock()
-        if (session.performPrimaryAction()) {
-          syncUniformWithDuty()
-          flushAudioAndBgm()
-          hud?.sync()
-        }
+        session.performPrimaryAction()
+        syncUniformWithDuty()
+        flushAudioAndBgm()
+        hud?.sync()
       },
       onHoldStep: holding => {
         holdingAction = holding
@@ -166,8 +176,10 @@ export function createDrinksStaffController(opts: CreateDrinksStaffControllerOpt
 
   function setPlayerLocalPos(lx: number, lz: number, lyaw = 0): void {
     session.updatePlayerLocalPos(lx, lz, lyaw)
+    const snap = session.getSnapshot()
     const distShop = Math.hypot(lx, lz)
     bgm.setDistance(distShop)
+    bgm.setShopPresence(snap.inShopInterior)
   }
 
   function setPlayerWorldPos(wx: number, wz: number, wyaw = 0): void {
@@ -183,19 +195,17 @@ export function createDrinksStaffController(opts: CreateDrinksStaffControllerOpt
     if (disposed) return false
     audio.unlock()
     const ok = session.applyForJob(applyOpts)
-    if (ok) {
-      syncUniformWithDuty()
-      flushAudioAndBgm()
-      hud?.sync()
-    }
+    syncUniformWithDuty()
+    flushAudioAndBgm()
+    hud?.sync()
     return ok
   }
 
   function resignJob(): boolean {
     if (disposed) return false
     const ok = session.resignJob()
+    holdingAction = false
     if (ok) {
-      holdingAction = false
       syncUniformWithDuty()
       flushAudioAndBgm()
       hud?.sync()
@@ -203,15 +213,23 @@ export function createDrinksStaffController(opts: CreateDrinksStaffControllerOpt
     return ok
   }
 
-  function performAction(actOpts?: { forceRecruit?: boolean }): boolean {
+  function performAction(actOpts?: { forceRecruit?: boolean; bypassProximity?: boolean }): boolean {
     if (disposed) return false
     audio.unlock()
     const ok = session.performPrimaryAction(actOpts)
-    if (ok) {
-      syncUniformWithDuty()
-      flushAudioAndBgm()
-      hud?.sync()
-    }
+    syncUniformWithDuty()
+    flushAudioAndBgm()
+    hud?.sync()
+    return ok
+  }
+
+  function performStationAction(stepName: StaffShiftPhase, actOpts?: { bypassProximity?: boolean }): boolean {
+    if (disposed) return false
+    audio.unlock()
+    const ok = session.performStationAction(stepName, actOpts)
+    syncUniformWithDuty()
+    flushAudioAndBgm()
+    hud?.sync()
     return ok
   }
 
@@ -228,6 +246,7 @@ export function createDrinksStaffController(opts: CreateDrinksStaffControllerOpt
   function step(dtSec: number): void {
     if (disposed) return
     const dt = Math.max(0, Math.min(0.25, Number.isFinite(dtSec) ? dtSec : 0))
+    animTimeSec += dt
     if (holdingAction) {
       session.holdWork(dt)
     }
@@ -236,6 +255,7 @@ export function createDrinksStaffController(opts: CreateDrinksStaffControllerOpt
     bgm.step(dt)
     const snap = session.getSnapshot()
     stage.sync(snap, dt)
+    syncStaffCharacterGestures(boundFigure, boundFigure?.userData?.avatarRig as AvatarRig | undefined, snap, animTimeSec)
   }
 
   stage.sync(session.getSnapshot(), 0)
@@ -254,7 +274,10 @@ export function createDrinksStaffController(opts: CreateDrinksStaffControllerOpt
     handleKeyDown,
     applyForJob,
     resignJob,
+    enterStaff: applyForJob,
+    exitStaff: resignJob,
     performAction,
+    performStationAction,
     setHoldingAction(holding: boolean) {
       holdingAction = Boolean(holding)
     },
@@ -264,6 +287,7 @@ export function createDrinksStaffController(opts: CreateDrinksStaffControllerOpt
       if (disposed) return
       disposed = true
       holdingAction = false
+      resetStaffCharacterPose(boundFigure, boundFigure?.userData?.avatarRig as AvatarRig | undefined)
       hud?.dispose()
       uniform.dispose()
       stage.dispose()

@@ -217,11 +217,12 @@ export function createStaffUniformController(palettePatch?: Partial<StaffUniform
   workTeeShell.position.set(0, 0.0, 0.0)
   const collarTrim = new THREE.Mesh(ownGeo(new THREE.CylinderGeometry(0.088, 0.095, 0.032, 14)), shirtBlackMat)
   collarTrim.position.set(0, 0.285, 0.0)
+  // Short-sleeve meshes mounted dynamically onto arm bone/group when available so sleeves swing smoothly with arm gestures
   const sleeveL = new THREE.Mesh(ownGeo(new THREE.BoxGeometry(0.122, 0.228, 0.126)), shirtBlackMat)
-  sleeveL.position.set(-0.242, 0.145, 0.0)
+  sleeveL.name = 'drinks-staff-uniform-sleeve-l'
   const sleeveR = new THREE.Mesh(ownGeo(new THREE.BoxGeometry(0.122, 0.228, 0.126)), shirtBlackMat)
-  sleeveR.position.set(0.242, 0.145, 0.0)
-  torsoUniform.add(workTeeShell, collarTrim, sleeveL, sleeveR)
+  sleeveR.name = 'drinks-staff-uniform-sleeve-r'
+  torsoUniform.add(workTeeShell, collarTrim)
 
   // Apron chest bib (-Z is character front; sits cleanly outside black tee front z = -0.113)
   const apronBib = new THREE.Mesh(ownGeo(new THREE.BoxGeometry(0.256, 0.285, 0.022)), apronBlackMat)
@@ -290,8 +291,39 @@ export function createStaffUniformController(palettePatch?: Partial<StaffUniform
       torsoUniform.removeFromParent()
       torsoTarget.add(torsoUniform)
     }
+
+    // Attach short sleeves directly to articulated upper arms if present so shaking/pouring animations stay seamlessly clothed
+    const armLTarget = rig?.attachmentAt?.('upperarm_l') ?? figure.getObjectByName('ArmL')
+    const armRTarget = rig?.attachmentAt?.('upperarm_r') ?? figure.getObjectByName('ArmR')
+    if (armLTarget && armRTarget) {
+      if (sleeveL.parent !== armLTarget) {
+        sleeveL.removeFromParent()
+        armLTarget.add(sleeveL)
+      }
+      if (sleeveR.parent !== armRTarget) {
+        sleeveR.removeFromParent()
+        armRTarget.add(sleeveR)
+      }
+      const isNamedArm = !rig?.isSkinned
+      sleeveL.position.set(0, isNamedArm ? -0.095 : 0.01, 0)
+      sleeveR.position.set(0, isNamedArm ? -0.095 : 0.01, 0)
+    } else {
+      if (sleeveL.parent !== torsoUniform) {
+        sleeveL.removeFromParent()
+        torsoUniform.add(sleeveL)
+      }
+      if (sleeveR.parent !== torsoUniform) {
+        sleeveR.removeFromParent()
+        torsoUniform.add(sleeveR)
+      }
+      sleeveL.position.set(-0.242, 0.145, 0)
+      sleeveR.position.set(0.242, 0.145, 0)
+    }
+
     headUniform.visible = true
     torsoUniform.visible = true
+    sleeveL.visible = true
+    sleeveR.visible = true
     equipped = true
     return true
   }
@@ -299,12 +331,15 @@ export function createStaffUniformController(palettePatch?: Partial<StaffUniform
   function unequip(): void {
     headUniform.removeFromParent()
     torsoUniform.removeFromParent()
+    sleeveL.removeFromParent()
+    sleeveR.removeFromParent()
     equipped = false
   }
 
   function getTriangles(): number {
     let tris = 0
-    for (const root of [headUniform, torsoUniform]) {
+    for (const root of [headUniform, torsoUniform, sleeveL, sleeveR]) {
+      if (root !== headUniform && root !== torsoUniform && root.parent === torsoUniform) continue
       root.traverse(obj => {
         const m = obj as THREE.Mesh
         if (m.isMesh && m.geometry) {
@@ -320,7 +355,7 @@ export function createStaffUniformController(palettePatch?: Partial<StaffUniform
     equip,
     unequip,
     isEquipped: () => equipped,
-    getRootObjects: () => [headUniform, torsoUniform],
+    getRootObjects: () => [headUniform, torsoUniform, sleeveL, sleeveR],
     getTriangles,
     dispose() {
       if (disposed) return

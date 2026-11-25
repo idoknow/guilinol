@@ -28,16 +28,19 @@ export interface DrinksStaffAnchors {
   readonly prepBarHeightM: number
   readonly recruitStandee: StaffZonePoint
   readonly orderDesk: StaffZonePoint
+  readonly shakeStation: StaffZonePoint
   readonly prepStations: readonly StaffStationZone[]
   readonly sealStation: StaffZonePoint
   readonly pickupCounter: StaffZonePoint
   readonly pickupCupSlot: StaffZonePoint
   readonly backstageBounds: StaffBackstageBounds
+  readonly shopInteriorBounds: StaffBackstageBounds
 }
 
 export interface ShopWorkZonesInput {
   recruitStandee?: Partial<StaffZonePoint>
   orderDesk?: Partial<StaffZonePoint>
+  shakeStation?: Partial<StaffZonePoint>
   sealStation?: Partial<StaffZonePoint>
   pickupCounter?: Partial<StaffZonePoint>
   pickupCupSlot?: Partial<StaffZonePoint>
@@ -45,6 +48,7 @@ export interface ShopWorkZonesInput {
   frontCounterHeightM?: number
   prepStations?: readonly { id?: string; kind: PrepStationKind; x: number; z: number; yaw?: number; y?: number; label?: string }[]
   backstageBounds?: Partial<StaffBackstageBounds>
+  shopInteriorBounds?: Partial<StaffBackstageBounds>
 }
 
 const STATION_LABELS: Record<PrepStationKind, string> = {
@@ -99,6 +103,12 @@ export function resolveDrinksStaffAnchors(opts?: {
         ]
 
   const teaStation = prepStations.find(s => s.kind === 'tea_shake') ?? prepStations[0]!
+  const shakeStation: StaffZonePoint = {
+    x: rawShop?.shakeStation?.x ?? teaStation.x,
+    z: rawShop?.shakeStation?.z ?? teaStation.z,
+    yaw: rawShop?.shakeStation?.yaw ?? Math.PI,
+    y: rawShop?.shakeStation?.y ?? prepH,
+  }
   // Place portable sealer station cleanly in the open bay between tea_1 and tea_2 (no overlap with static shop sealer)
   const sealStation: StaffZonePoint = {
     x: rawShop?.sealStation?.x ?? (teaStation.x + 0.94),
@@ -140,17 +150,26 @@ export function resolveDrinksStaffAnchors(opts?: {
     maxZ: rawShop?.backstageBounds?.maxZ ?? -0.78,
   }
 
+  const shopInteriorBounds: StaffBackstageBounds = {
+    minX: rawShop?.shopInteriorBounds?.minX ?? -6.6,
+    maxX: rawShop?.shopInteriorBounds?.maxX ?? 6.6,
+    minZ: rawShop?.shopInteriorBounds?.minZ ?? -6.4,
+    maxZ: rawShop?.shopInteriorBounds?.maxZ ?? 2.8,
+  }
+
   return {
     candidate,
     frontCounterHeightM: rawShop?.frontCounterHeightM ?? frontH,
     prepBarHeightM: rawShop?.prepBarHeightM ?? prepH,
     recruitStandee,
     orderDesk,
+    shakeStation,
     prepStations,
     sealStation,
     pickupCounter,
     pickupCupSlot,
     backstageBounds,
+    shopInteriorBounds,
   }
 }
 
@@ -160,6 +179,11 @@ export function pickPrepStationAnchor(anchors: DrinksStaffAnchors, kind: PrepSta
 
 export function isInsideBackstageArea(x: number, z: number, anchors: DrinksStaffAnchors): boolean {
   const b = anchors.backstageBounds
+  return x >= b.minX && x <= b.maxX && z >= b.minZ && z <= b.maxZ
+}
+
+export function isInsideShopInterior(x: number, z: number, anchors: DrinksStaffAnchors): boolean {
+  const b = anchors.shopInteriorBounds
   return x >= b.minX && x <= b.maxX && z >= b.minZ && z <= b.maxZ
 }
 

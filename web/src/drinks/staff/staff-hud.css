@@ -33,6 +33,24 @@
   display: none !important;
 }
 
+@keyframes drinks-staff-shake {
+  0%, 100% { transform: translateX(-50%); }
+  20% { transform: translateX(calc(-50% - 7px)); }
+  45% { transform: translateX(calc(-50% + 7px)); }
+  70% { transform: translateX(calc(-50% - 4px)); }
+}
+
+.drinks-staff-hud--mistake {
+  box-shadow:
+    inset 0 0 0 1.5px #ff5a36,
+    0 10px 28px rgba(230, 0, 18, 0.34);
+  animation: drinks-staff-shake 0.28s ease;
+}
+
+.drinks-staff-title--mistake {
+  color: #ff8a70 !important;
+}
+
 :is(body[data-photo="on"], body[data-home], body[data-shop-open="1"], body[data-drinks-ui-open="1"], body[data-aboard]) .drinks-staff-hud {
   display: none !important;
 }
