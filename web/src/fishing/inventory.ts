@@ -2,6 +2,7 @@ import {getActiveSaveSnapshot} from '../game/save'
 import {fishingTransaction} from '../game/commerce'
 import {accessories, profile, species, tackle, waters} from './config'
 import {bait} from './bait'
+import {BAG_CAPACITY} from './limits'
 import type {Catch} from './engine'
 
 export const inventory=()=>getActiveSaveSnapshot().fishing
@@ -17,13 +18,19 @@ export function buy(id:string,key=crypto.randomUUID()){
     else if(save.owned.includes(id))return 'ALREADY_OWNED';else save.owned.push(id)
     return -item.price})
 }
-export function consume(id:string){return fishingTransaction(crypto.randomUUID(),'cast',save=>{
-  if(!(save.bait[id]>0))return 'NO_BAIT';save.bait[id]--;return 0}).ok}
+function fullBag(){if(typeof window!=='undefined')window.dispatchEvent(new CustomEvent('fishing:bag-full',{detail:{capacity:BAG_CAPACITY}}));return 'BAG_FULL'}
+export function consume(id:string,key=crypto.randomUUID()){return fishingTransaction(key,'cast',save=>{
+  if(save.bag.length>=BAG_CAPACITY)return fullBag()
+  if(!(save.bait[id]>0))return 'NO_BAIT';save.bait[id]--;return 0})}
+export function refundFullCast(baitId:string,castKey:string){return fishingTransaction(`refund:${castKey}`,'full-bag',save=>{
+  if(!save.recentActions.includes(castKey))return 'NO_LOCAL_DEBIT'
+  save.bait[baitId]=(save.bait[baitId]??0)+1;return 0})}
 export function collect(item:Catch){return fishingTransaction(item.id,'catch',save=>{
+  if(save.bag.length>=BAG_CAPACITY)return fullBag()
   if(item.speciesId){save.streak=save.lastSpot===item.water?save.streak+1:1;save.lastSpot=item.water
     if(!save.collected.includes(item.speciesId))save.collected.push(item.speciesId)
     if(item.grade==='legendary')save.legendary++;save.xp+=({low:18,medium:32,high:75,legendary:160}[item.grade]??0)}
-  save.bag.push({...item,price:item.speciesId?Math.max(1,Math.round(item.price*Math.max(.4,1-.12*(save.streak-1)))):item.price});return 0}).ok}
+  save.bag.push({...item,price:item.speciesId?Math.max(1,Math.round(item.price*Math.max(.4,1-.12*(save.streak-1)))):item.price});return 0})}
 export function removeCatch(ids:string[],sell:boolean,key=crypto.randomUUID()){
   return fishingTransaction(key,sell?'sale':'discard',save=>{
     const selected=new Set(ids),items=save.bag.filter(item=>selected.has(item.id));if(!items.length||items.length!==selected.size)return 'INVALID_ITEM'

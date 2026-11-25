@@ -2,20 +2,27 @@ import * as THREE from 'three'
 import {hotbarSlot,selectSlot} from '../ui/hotbar'
 import {FishingEngine} from './engine'
 import {nearby,tabs,waters,type Method} from './config'
-import {buy,certification,collect,consume,inventory,journal,removeCatch,shop} from './inventory'
+import {buy,certification,collect,consume,inventory,journal,refundFullCast,removeCatch,shop} from './inventory'
 import {bait} from './bait'
 
 type Host={canUse:()=>boolean,position:()=>{x:number,z:number},face:(angle:number)=>void,
   teleport:(x:number,z:number,angle:number)=>Promise<boolean>,hand:()=>THREE.Object3D|undefined,scene:THREE.Scene,camera:THREE.PerspectiveCamera}
 const textFocus=()=>document.activeElement?.matches('input,textarea,select,[contenteditable=true]')
-const terminal=['equip','land','snap','escape','miss','junk']
+const terminal=['equip','land','snap','escape','miss','junk','empty-hook']
 export function createFishing(host:Host,verify:boolean){
   const panel=document.createElement('section');panel.className='fishing-panel';panel.hidden=true
   panel.style.cssText='position:fixed;top:12%;right:1%;z-index:8;max-width:min(24rem,90vw);max-height:55vh;overflow:auto'
   panel.innerHTML='<output></output> <button data-method>路亚</button><select aria-label="鱼饵"></select><button data-cast>抛竿</button><button data-strike>提竿</button><button data-hold="-1">左</button><button data-hold="1">右</button><button data-hold="reel">收线</button><button data-menu>渔利</button><button data-close>收竿</button><div class="fishing-menu" hidden></div>'
   document.body.append(panel);const output=panel.querySelector('output')!,menu=panel.querySelector<HTMLElement>('.fishing-menu')!,baitSelect=panel.querySelector('select')!
   const signal=(name:string,detail:unknown)=>window.dispatchEvent(new CustomEvent('fishing:'+name,{detail}))
-  const engine=new FishingEngine((name,detail)=>{signal(name,detail);if(name==='state')output.textContent=String(detail)},collect)
+  let receipt:{key:string,baitId:string}|undefined
+  const engine=new FishingEngine((name,detail)=>{signal(name,detail);if(name==='state')output.textContent=detail==='empty-hook'?'空钩':String(detail)},item=>{
+    const result=collect(item)
+    if(result.code==='BAG_FULL'){
+      if(receipt)refundFullCast(receipt.baitId,receipt.key)
+      output.textContent='渔利背包已满，请收竿整理';return 'BAG_FULL'
+    }return result.ok
+  })
   const rod=new THREE.Group(),tip=new THREE.Object3D();rod.name='fishing-grip';tip.name='fishing-tip';tip.position.set(0,1.5,-.7)
   const shaft=new THREE.Mesh(new THREE.CylinderGeometry(.008,.018,tip.position.length(),6),new THREE.MeshStandardMaterial());shaft.position.copy(tip.position).multiplyScalar(.5);shaft.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),tip.position.clone().normalize());rod.add(tip,shaft)
   const coords=new THREE.BufferAttribute(new Float32Array(6),3),geometry=new THREE.BufferGeometry().setAttribute('position',coords)
@@ -26,10 +33,13 @@ export function createFishing(host:Host,verify:boolean){
   function spot(){const pos=host.position();return nearby(pos.x,pos.z)}
   function active(){return hotbarSlot()==='fishing'&&host.canUse()}
   function toggle(){if(hotbarSlot()==='fishing'){selectSlot(previous);return}if(!host.canUse()||!spot())return
+    const methods=spot()!.methods;if(!methods.includes(method))method=methods[0];panel.querySelector<HTMLButtonElement>('[data-method]')!.disabled=methods.length===1
     previous=hotbarSlot()==='camera'?'camera':'hand';selectSlot('fishing');host.hand()?.add(rod);panel.hidden=false;engine.equip();options()}
   window.addEventListener('fishing:cancel',()=>{rod.removeFromParent();float.visible=line.visible=false;panel.hidden=menu.hidden=true;origin=undefined;engine.cancel()})
   function cast(){const water=spot();if(!active()||!water||!terminal.includes(engine.stage))return false
-    const id=baitSelect.value;if(!consume(id)){output.textContent='饵料不足';return false}
+    if(!water.methods.includes(method))return false
+    const id=baitSelect.value,key=crypto.randomUUID(),debit=consume(id,key);if(!debit.ok){output.textContent=debit.code==='BAG_FULL'?'渔利背包已满':debit.code==='NO_BAIT'?'饵料不足':debit.code;return false}
+    receipt={key,baitId:id}
     const save=inventory(),tier=(prefix:string)=>Math.max(...save.owned.filter(value=>value.startsWith(prefix)).map(value=>Number(value.slice(prefix.length))))
     host.face(water.spot.yaw);origin=water;signal('camera',{target:water.spot.target,zoom:method==='台钓'})
     const result=engine.cast({water,method,bait:id,line:tier('line'),rod:tier(method==='台钓'?'pole':'lure'),float:save.owned.includes('float'),drag:save.owned.includes('drag')});options();baitSelect.value=id;return result}
