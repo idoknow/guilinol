@@ -8,6 +8,7 @@ from shapely.geometry import LineString, Point, Polygon
 from shapely.geometry.polygon import orient
 
 from common import load_osm
+import station_footbridge
 from features import points, polygons
 from landmarks.jiefang_layout import SPAN_WAYS
 
@@ -25,9 +26,14 @@ def bridge_tiles(bounds, sample, routes=(), raised=(), plans=None, west_portal=N
         replace = entry.get('replace', [])
         if isinstance(replace, list):
             replaced.update(key for key in replace if isinstance(key, str))
-    for way in load_osm():
+    ways = load_osm()
+    station_nodes = next((set(w['nodes']) for w in ways if w['type'] == 'way'
+                          and w['id'] == station_footbridge.BRIDGE), set())
+    for way in ways:
         tags = way.get('tags', {})
-        if way['type'] != 'way' or tags.get('bridge', 'no') == 'no' or 'highway' not in tags:
+        if way['type'] != 'way' or 'highway' not in tags:
+            continue
+        if tags.get('bridge', 'no') == 'no' and way['id'] not in station_footbridge.STAIRS:
             continue
         if f"way/{way['id']}" in replaced:
             continue
@@ -41,7 +47,10 @@ def bridge_tiles(bounds, sample, routes=(), raised=(), plans=None, west_portal=N
         if not bounds.intersects(line) or not line.length:
             continue
         sections = []
-        if plans and way['id'] in plans:
+        if way['id'] == station_footbridge.BRIDGE or way['id'] in station_footbridge.STAIRS:
+            sections = station_footbridge.sections(way, coords, station_nodes)
+            crossings = []
+        elif plans and way['id'] in plans:
             pline, width, s_b, h_prof = plans[way['id']]
             zone = pline.buffer(width / 2)
             crossings = [track.intersection(zone) for track, _ in tracks if track.intersects(zone)]
@@ -116,6 +125,19 @@ def bridge_tiles(bounds, sample, routes=(), raised=(), plans=None, west_portal=N
                 owners.append(way['id'])
                 profiles.append(np.linalg.solve(np.column_stack((pts, np.ones(3))), levels))
     from shapely import constrained_delaunay_triangles
+    # The detailed station landmark supplies the northern crossing once installed.
+    landmark_ids = {entry['id'] for entry in json.loads((Path(__file__).parent/'landmarks.json').read_bytes())}
+    if 'guilin_station' not in landmark_ids:
+        platforms = {w['id']:w for w in ways if w['type']=='way' and w['id'] in station_footbridge.NORTH_FLIGHTS}
+        if len(platforms)==4:
+            for face,level in station_footbridge.north_bridge(platforms):
+                if not bounds.intersects(face):
+                    continue
+                for triangle in constrained_delaunay_triangles(face).geoms:
+                    spans.append(triangle)
+                    thin_spans.append(True)
+                    owners.append(0)  # Survey geometry has no OSM bridge way.
+                    profiles.append(np.array([0,0,level]))
     for el,roof,_ in canopies:
         center = roof.representative_point()
         level = sample(center.x,center.y)[0]+6.2

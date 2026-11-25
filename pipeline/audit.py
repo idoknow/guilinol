@@ -586,7 +586,13 @@ def run_audit(world_dir: Path, root: Path) -> dict:
             pavement = Polygon(np.vstack([left_edge, right_edge[::-1]])).buffer(.025)
             interchange[way] = line, stations, datum + levels, pavement, left_edge, right_edge
 
+    from station_roads import section_sampler
+    station_surface = section_sampler(manifest.get('tunnels', ()))
+
     def road_surface_y(x: float, z: float, is_bridge: bool, way_id: int) -> float:
+        station_level = station_surface(way_id,x,z)
+        if station_level is not None:
+            return station_level
         if way_id==682893309 and 'jiefang_bridge' in landmarks:
             from east_grading import STATIONS, LEVELS, cut_weight
             station=east_axis.project(Point(x,z)); weight=cut_weight(station)
