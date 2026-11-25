@@ -126,18 +126,14 @@ def bridge_tiles(bounds, sample, routes=(), raised=(), plans=None, west_portal=N
                 profiles.append(np.linalg.solve(np.column_stack((pts, np.ones(3))), levels))
     from shapely import constrained_delaunay_triangles
     # The detailed station landmark supplies the northern crossing once installed.
-    landmark_ids = {entry['id'] for entry in json.loads((Path(__file__).parent/'landmarks.json').read_bytes())}
-    if 'guilin_station' not in landmark_ids:
-        platforms = {w['id']:w for w in ways if w['type']=='way' and w['id'] in station_footbridge.NORTH_FLIGHTS}
-        if len(platforms)==4:
-            for face,level in station_footbridge.north_bridge(platforms):
-                if not bounds.intersects(face):
-                    continue
-                for triangle in constrained_delaunay_triangles(face).geoms:
-                    spans.append(triangle)
-                    thin_spans.append(True)
-                    owners.append(0)  # Survey geometry has no OSM bridge way.
-                    profiles.append(np.array([0,0,level]))
+    for face,level in station_footbridge.fallback_north_faces(ways):
+        if not bounds.intersects(face):
+            continue
+        for triangle in constrained_delaunay_triangles(face).geoms:
+            spans.append(triangle)
+            thin_spans.append(True)
+            owners.append(0)  # Survey geometry has no OSM bridge way.
+            profiles.append(np.array([0,0,level]))
     for el,roof,_ in canopies:
         center = roof.representative_point()
         level = sample(center.x,center.y)[0]+6.2

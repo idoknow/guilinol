@@ -7,7 +7,7 @@ export const tunnelLiningMaterial=new THREE.MeshStandardMaterial({side:THREE.Dou
 export const tunnelLightMaterial=new THREE.MeshBasicMaterial({side:THREE.DoubleSide,vertexColors:true})
 
 type Point=[number,number,number]
-export type Tunnel={way:number,nodes?:[number,number],portals:[Point,Point],length:number,halfWidth:number,clearance:number,approach:number,approachEnds?:[number,number],mouths?:[boolean,boolean],openEnds?:[number,number],openCut?:boolean,footprint?:[number,number][][],joints?:({ring:[number,number][],wedges?:[number,number][][],draw:boolean}|null)[],stations:[number,number][]}
+export type Tunnel={way:number,nodes?:[number,number],portals:[Point,Point],length:number,halfWidth:number,clearance:number,approach:number,approachEnds?:[number,number],mouths?:[boolean,boolean],openEnds?:[number,number],openCut?:boolean,footprint?:[number,number][][],joints?:({ring:[number,number][],wedges?:[number,number][][],faces?:Point[][],draw:boolean}|null)[],stations:[number,number][]}
 
 function frame(tunnel:Tunnel){
   const [start,end]=tunnel.portals, ux=(end[0]-start[0])/tunnel.length,uz=(end[2]-start[2])/tunnel.length
@@ -36,8 +36,10 @@ export function nearbyTunnels(list:Tunnel[]|undefined,x:number,z:number){
 }
 
 function footprintPlanes(ring:[number,number][]){
-  const [[ax,az],[bx,bz],[cx,cz]]=ring
-  const sign=Math.sign((bx-ax)*(cz-az)-(bz-az)*(cx-ax))
+  const sign=Math.sign(ring.reduce((area,[x,z],i)=>{
+    const [u,v]=ring[(i+1)%ring.length]
+    return area+x*v-z*u
+  },0))
   return ring.map(([x,z],i)=>{
     const [u,v]=ring[(i+1)%ring.length]
     return (px:number,pz:number)=>sign*((u-x)*(pz-z)-(v-z)*(px-x))
@@ -45,13 +47,24 @@ function footprintPlanes(ring:[number,number][]){
 }
 
 export function floorLevel(tunnel:Tunnel,x:number,z:number){
+  for(const [end,joint] of (tunnel.joints??[]).entries()){
+    const p=tunnel.portals[end]
+    if(Math.abs(p[0]-x)>32 || Math.abs(p[2]-z)>32)continue
+    for(const [a,b,c] of joint?.faces??[]){
+      const dx=x-a[0],dz=z-a[2],ux=b[0]-a[0],uz=b[2]-a[2],vx=c[0]-a[0],vz=c[2]-a[2]
+      const det=ux*vz-uz*vx
+      if(Math.abs(det)<1e-9)continue
+      const u=(dx*vz-dz*vx)/det,v=(ux*dz-uz*dx)/det
+      if(u>=-1e-7 && v>=-1e-7 && u+v<=1.0000001)return a[1]+u*(b[1]-a[1])+v*(c[1]-a[1])
+    }
+  }
   if(tunnel.footprint&&!tunnel.footprint.some(tri=>footprintPlanes(tri).every(plane=>plane(x,z)>=-.000001)))return
   const axes=frame(tunnel), station=axes.station(x,z)
   // At a shared endpoint, projection onto the two normalized axes can
   // round a few micrometres outside both strips.
   if(station<-.00001||station>tunnel.length+.00001||Math.abs(axes.lateral(x,z))>tunnel.halfWidth+.00001){
     for(const [i,joint] of (tunnel.joints??[]).entries()){
-      if(!joint)continue
+      if(!joint || joint.faces)continue
       for(const ring of joint.wedges??[joint.ring]){
         let positive=false,negative=false
         for(let j=0;j<ring.length;j++){
@@ -119,11 +132,36 @@ export function tunnelGeometry(tile:Tile,ground:THREE.PlaneGeometry,tunnels:Tunn
       addCut(footprint(first,tunnel.length-last),roof)
     }
     const quad=(points:Point[],part:keyof typeof parts)=>{
-      const tilePoly=limits.reduce((poly,plane)=>clip(poly,plane),points)
-      if(tilePoly.length>=3)for(const planes of patches)fan(planes.reduce((poly,plane)=>clip(poly,plane),tilePoly),parts[part])
+      let floorParts=[points]
+      if(part==='floor'){
+        for(const joint of tunnel.joints??[]){
+          if(!joint?.faces)continue
+          const ring=joint.ring, planes=footprintPlanes(ring)
+          const outside:Point[][]=[]
+          for(let poly of floorParts){
+            if(planes.some(fn=>poly.every(p=>fn(p[0]+tile.x,p[2]+tile.z)<0))){outside.push(poly);continue}
+            for(const fn of planes){
+              const plane=(p:Point)=>fn(p[0]+tile.x,p[2]+tile.z)
+              const piece=clip(poly,p=>-plane(p))
+              if(piece.length>=3)outside.push(piece)
+              poly=clip(poly,plane)
+              if(!poly.length)break
+            }
+          }
+          floorParts=outside
+        }
+      }
+      for(const poly of floorParts){
+        const tilePoly=limits.reduce((poly,plane)=>clip(poly,plane),poly)
+        if(tilePoly.length>=3)for(const planes of patches)fan(planes.reduce((poly,plane)=>clip(poly,plane),tilePoly),parts[part])
+      }
     }
     for(const [i,joint] of (tunnel.joints??[]).entries()){
       if(!joint?.draw)continue
+      for(const tri of joint.faces??[]){
+        const local=tri.map(([x,y,z]):Point=>[x-tile.x,y,z-tile.z])
+        fan(limits.reduce((poly,plane)=>clip(poly,plane),local),parts.floor)
+      }
       const floor=tunnel.portals[i][1]
       const covered=!tunnel.openCut&&(i===0?first:last)===0&&!tunnel.mouths?.[i]
       for(const wedge of joint.wedges??[joint.ring]){
@@ -134,7 +172,7 @@ export function tunnelGeometry(tile:Tile,ground:THREE.PlaneGeometry,tunnels:Tunn
         // The two rectangular strips leave a wedge at a bend. Carry the same
         // headroom cut through that wedge as through either adjoining section.
         addCut(planes,covered?()=>floor+head+stationRoofDepth-.35:undefined)
-        quad(ring,'floor')
+        if(!joint.faces)quad(ring,'floor')
         if(covered)quad(ring.map(([x,,z])=>[x,floor+head,z]),'ceiling')
         for(const [a,b] of edges){
           if(side(a)*side(b)<=0)continue

@@ -52,11 +52,11 @@ function packSurface(length:number,wheel:(d:number,r:number)=>number){
 const profiles={}
 for(const lane of lanes){
   const {start,dx,dz,length}=lane
-  const offset=lane.offset
+  // The grounding audit reserves 1.005 m on either side of the lane centre.
+  const maxOffset=Math.max(0,lane.halfWidth-1.005)
+  const offset=Math.sign(lane.offset)*Math.min(Math.abs(lane.offset),maxOffset)
   const sample=(along:number,right:number,diagnostic?)=>surface(start.x+dx*along+dz*(right-offset),
     start.z+dz*along-dx*(right-offset),lane,diagnostic)
-  // On two-way service streets the tagged width can include the sidewalk.
-  // Keep a car on its own side and prefer the outermost supported wheel path.
-  profiles[lane.id]={floor:packSurface(length,sample)}
+  profiles[lane.id]={floor:packSurface(length,sample),offset}
 }
 fs.writeFileSync(file,JSON.stringify(profiles))

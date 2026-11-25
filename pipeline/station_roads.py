@@ -31,7 +31,7 @@ def samples(knots):
     return np.array(out)
 
 
-def road_design():
+def road_design(paired_widths=None):
     design = json.loads(Path(__file__).with_name('station-road-profiles.json').read_text())
     profiles = {}
     for way in load_osm():
@@ -41,11 +41,15 @@ def road_design():
         knots = design[str(way['id'])]
         if abs(knots[-1][0] - line.length) > .02:
             raise ValueError(f"Station road alignment changed for {way['id']}")
+        if paired_widths and way['id'] in paired_widths:
+            way=dict(way, stationWidth=paired_widths[way['id']])
         profiles[way['id']] = (way, line, samples(knots))
     return profiles
 
 
 def half_width(way):
+    if 'stationWidth' in way:
+        return way['stationWidth']/2
     tags = way['tags']
     if tags.get('width', '').replace('.', '', 1).isdecimal():
         return float(tags['width'])/2
@@ -70,6 +74,7 @@ def tunnel_sections(profiles):
             bores.append(dict(way=way['id'], nodes=way['nodes'][i:i+2], portals=portals,
                               length=end-start, halfWidth=half_width(way), clearance=4.5,
                               approach=0, openCut=not covered, openEnds=[0,0] if covered else [end-start,0], mouths=[i==0,i==len(chain)-2],
+                              pairedWidth=way.get('stationWidth'),
                               stations=np.column_stack((distances-start, levels)).tolist()))
     ends = defaultdict(list)
     for t in bores:
@@ -80,14 +85,14 @@ def tunnel_sections(profiles):
     return bores
 
 
-def bake(directory, manifest):
+def bake(directory, manifest, paired_widths):
     """Install profiles after the native rail tie-ins have been evaluated."""
     import gzip
     import struct
     from collections import defaultdict
     from shapely import STRtree
 
-    profiles = road_design()
+    profiles = road_design(paired_widths)
     bores = tunnel_sections(profiles)
     replaced = {t['way'] for t in bores}
     manifest['tunnels'] = [t for t in manifest.get('tunnels', []) if t['way'] not in replaced] + bores
@@ -125,8 +130,10 @@ def bake(directory, manifest):
             fixed_pavement.append(LineString(coords).buffer(half_width(way)+.1,cap_style='round'))
         for a,b in zip(coords,coords[1:]):
             add(a,b,half_width(way),None,None)
-    from shapely import constrained_delaunay_triangles, union_all
+    from shapely import Polygon, constrained_delaunay_triangles, union_all
     protected_paving = STRtree(fixed_pavement)
+    from station_junctions import build as build_junctions
+    build_junctions(bores,protected_paving)
     cuts = defaultdict(list)
     for t in bores:
         a,b=t['portals']
@@ -149,6 +156,28 @@ def bake(directory, manifest):
                 else:
                     for tri in t['footprint']:
                         cuts[x,z].append(entry+[[[px-x,pz-z] for px,pz in tri]])
+        # The two adjacent rectangular cuts meet at an angle. Remove the
+        # native paving from the turning wedge as well, or a sliver survives
+        # across the mouth and becomes a vertical collision edge.
+        for end, joint in enumerate(t.get('joints', ())):
+            if not joint or not joint.get('draw'):
+                continue
+            for wedge in joint.get('wedges', ()):
+                area = Polygon(wedge)
+                nearby = protected_paving.query(area, predicate='intersects')
+                if len(nearby):
+                    area = area.difference(union_all(protected_paving.geometries[nearby]))
+                for face in constrained_delaunay_triangles(area).geoms:
+                    left, top, right, bottom = face.bounds
+                    if face.area < 1.e-8:
+                        continue
+                    middle = (top+bottom)/2
+                    level = t['portals'][end][1]
+                    for col in range(math.floor(left/256),math.floor(right/256)+1):
+                        for row in range(math.floor(top/256),math.floor(bottom/256)+1):
+                            x,z = col*256,row*256
+                            cuts[x,z].append([left-x,middle-z,right-x,middle-z,(bottom-top)/2,
+                                              level,level,False,[[u-x,v-z] for u,v in list(face.exterior.coords)[:3]]])
     for chunk in manifest['chunks']:
         origin = chunk['x'],chunk['z']
         if origin not in active:
@@ -188,8 +217,8 @@ def bake(directory, manifest):
             if ay is None:
                 protected |= lateral < width+12
                 continue
-            take=(lateral<distance)&(lateral<=width+4)
-            weight=np.clip((width+4-lateral)/4,0,1)
+            take=(lateral<distance)&(lateral<=width)
+            weight=np.clip((width-lateral)/4,0,1)
             raw=grid+weight*((ay+(by-ay)*u-.06)*10-grid)
             target[take]=np.rint(raw[take]).astype('i2')
             distance[take]=lateral[take]
@@ -276,7 +305,7 @@ def grade_traffic(directory, manifest, profiles):
     for lane in graph['lanes']:
         way = owners.get((lane['from'],lane['to']))
         if way is not None:
-            lanes.append(dict(lane, way=way['id'],structure='tunnel' if way['tags'].get('tunnel')=='yes' else 'surface'))
+            lanes.append(dict(lane, way=way['id'],halfWidth=half_width(way),structure='tunnel' if way['tags'].get('tunnel')=='yes' else 'surface'))
     root=Path(__file__).resolve().parents[1]
     with NamedTemporaryFile(dir=directory,mode='w+') as payload:
         json.dump(dict(manifest=manifest,nodes=graph['nodes'],lanes=lanes),payload)
@@ -301,10 +330,20 @@ def section_sampler(sections):
     """Read the road triangles' station and footprint bounds for strict auditing."""
     from shapely import Polygon, union_all
 
+    joints=defaultdict(list)
     by_way=defaultdict(list)
     for section in sections:
         if 'openCut' not in section:
             continue
+        for end,joint in enumerate(section.get('joints', [])):
+            if not joint or not joint.get('faces'):
+                continue
+            patches=[]
+            for face in np.array(joint['faces']):
+                xy=face[:,[0,2]]
+                patches.append((Polygon(xy),xy[0],np.linalg.solve(
+                    np.column_stack((xy-xy[0],np.ones(3))),face[:,1])))
+            joints[section['way']].append((Polygon(joint['ring']).buffer(1.e-7),patches))
         a,b=section['portals']
         line=LineString([(a[0],a[2]),(b[0],b[2])])
         footprint=(union_all([Polygon(ring) for ring in section['footprint']])
@@ -313,6 +352,11 @@ def section_sampler(sections):
     def sample(way,x,z):
         if way in by_way:
             p=Point(x,z)
+            for bounds,patches in joints[way]:
+                if bounds.covers(p):
+                    for triangle,origin,level in patches:
+                        if triangle.distance(p)<1.e-7:
+                            return float(np.dot([x-origin[0],z-origin[1],1.],level))
             for line,footprint,profile in by_way[way]:
                 if footprint.covers(p):
                     return float(np.interp(line.project(p),profile[:,0],profile[:,1]))

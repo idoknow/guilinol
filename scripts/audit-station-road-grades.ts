@@ -8,10 +8,11 @@ if(!output)throw Error('Expected main world, candidate world and report path')
 const load=(file:string)=>JSON.parse(fs.readFileSync(file,'utf8'))
 const surfaces=[main,candidate].map(dir=>vehicleSurface(dir,load(path.join(dir,'manifest.json'))))
 const design=load('pipeline/station-road-profiles.json')
+const frozen=new Set(load('docs/railway-grades.json').existingRoadInterchanges.map(row=>row.lowerRoad))
 const violations=[]
 let samples=0
 for(const way of load('raw/osm-2026-11.json').elements){
-  if(way.type!=='way'||!design[way.id]||['pedestrian','footway','steps'].includes(way.tags.highway))continue
+  if(way.type!=='way'||(!design[way.id]&&!frozen.has(way.id))||['pedestrian','footway','steps'].includes(way.tags.highway))continue
   const kind=way.tags.highway.replace(/_link$/,'')
   const cap=['service','residential','unclassified','living_street'].includes(kind)?.08:.05
   const structure=way.tags.tunnel==='yes'?'tunnel':'surface'

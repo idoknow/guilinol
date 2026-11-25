@@ -18,7 +18,7 @@ function split(poly:Point[],side:(p:Point)=>number):[Point[],Point[]]{
 
 // Preserve the original triangles beyond every rebuilt strip. Covered bores
 // also keep independently supported roads overhead.
-export function stationPaving(cuts:Cut[]){
+export function stationPaving(cuts:Cut[],protectedAt?:(x:number,z:number)=>boolean){
   const bins=new Map<string,Cut[]>()
   for(const cut of cuts){
     const [ax,az,bx,bz,w]=cut
@@ -69,6 +69,9 @@ export function stationPaving(cuts:Cut[]){
       }
       polygons=remaining
     }
+    // Splitting one triangle can introduce a vertex on the other side of the curb.
+    if(protectedAt && polygons.some(poly=>poly.some(p=>
+      p!==a && p!==b && p!==c && protectedAt(p.x,p.z))))return [[a,b,c]]
     return polygons
   }
 }

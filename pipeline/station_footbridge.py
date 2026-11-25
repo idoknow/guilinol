@@ -1,5 +1,7 @@
 """Deck and platform stair sections for the mapped Guilin station footbridge."""
+import json
 import math
+from pathlib import Path
 
 import numpy as np
 from shapely import LineString, Point
@@ -83,3 +85,29 @@ def north_bridge(ways):
             a=pos+axis*(landing+(run-landing)*j/n)
             b=pos+axis*(landing+(run-landing)*(j+1)/n)
             yield Polygon([a+side,b+side,b-side,a-side]),level-(level-PLATFORM)*(j+1)/n
+
+
+def fallback_north_faces(ways):
+    entries = json.loads(Path(__file__).with_name('landmarks.json').read_text())
+    if any(entry['id'] == 'guilin_station' for entry in entries):
+        return
+    platforms = {w['id']: w for w in ways if w['type'] == 'way' and w['id'] in NORTH_FLIGHTS}
+    if platforms.keys() == NORTH_FLIGHTS.keys():
+        yield from north_bridge(platforms)
+
+
+def building_cutouts(ways, footprints, heights, index):
+    """Reserve the modeled deck and stair envelope in intersecting procedural solids."""
+    from collections import defaultdict
+    from shapely import union_all
+
+    occupied = defaultdict(list)
+    for face, level in fallback_north_faces(ways):
+        for key in index.query(face, predicate='intersects'):
+            base, roof = heights[key][:2]
+            if base < level + 2.2 and roof > level - .6:
+                occupied[key].append(face)
+    # Keep the source outline outside the modeled structure and retain its
+    # original roof height, facade seed and floor count on both sides.
+    return {key: footprints[key].difference(union_all(faces).buffer(.02))
+            for key, faces in occupied.items()}

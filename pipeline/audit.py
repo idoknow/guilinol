@@ -587,7 +587,11 @@ def run_audit(world_dir: Path, root: Path) -> dict:
             interchange[way] = line, stations, datum + levels, pavement, left_edge, right_edge
 
     from station_roads import section_sampler
-    station_surface = section_sampler(manifest.get('tunnels', ()))
+    station_sections = manifest.get('tunnels', ())
+    station_surface = section_sampler(station_sections)
+    # Paired one-way streets have independently modeled curbs. Sampling the
+    # class width here would put the outer probe on an adjacent access ramp.
+    paired_widths = {s['way']: s['pairedWidth'] for s in station_sections if s.get('pairedWidth')}
 
     def road_surface_y(x: float, z: float, is_bridge: bool, way_id: int) -> float:
         station_level = station_surface(way_id,x,z)
@@ -627,7 +631,7 @@ def run_audit(world_dir: Path, root: Path) -> dict:
         hs = np.zeros(n_pts, dtype=np.float64)
         xs = np.zeros(n_pts, dtype=np.float64)
         zs = np.zeros(n_pts, dtype=np.float64)
-        half_span = max(1.0, 0.45 * width_m)
+        half_span = max(1.0, 0.45 * paired_widths.get(way_id, width_m))
 
         for i, s in enumerate(dists):
             pt = seg.interpolate(s)

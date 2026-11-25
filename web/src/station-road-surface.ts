@@ -12,18 +12,26 @@ export function stationRoadSurface(segments:StationRoadSegment[]){
         bins.get(key)!.push(segment)
       }
   }
-  return (x:number,z:number,base:number)=>{
+  const nearby=(x:number,z:number)=>bins.get(Math.floor(x/8)+128*Math.floor(z/8))??[]
+  const protectedAt=(x:number,z:number)=>nearby(x,z).some(([ax,az,bx,bz,width,level])=>{
+    if(level!==null)return false
+    const dx=bx-ax,dz=bz-az
+    const t=Math.max(0,Math.min(1,((x-ax)*dx+(z-az)*dz)/(dx*dx+dz*dz||1)))
+    return Math.hypot(x-ax-t*dx,z-az-t*dz)<=width+.02
+  })
+  const height=(x:number,z:number,base:number)=>{
     let closest=Infinity,y=base,blend=0,protection=1
-    for(const [ax,az,bx,bz,width,ay,by] of bins.get(Math.floor(x/8)+128*Math.floor(z/8))??[]){
+    for(const [ax,az,bx,bz,width,ay,by] of nearby(x,z)){
       const dx=bx-ax,dz=bz-az
       const t=Math.max(0,Math.min(1,((x-ax)*dx+(z-az)*dz)/(dx*dx+dz*dz||1)))
       const distance=Math.hypot(x-ax-t*dx,z-az-t*dz)
       if(ay===null || by===null){protection=Math.min(protection,Math.max(0,(distance-width-4.1)/4));continue}
-      if(distance>=closest||distance>=width+4)continue
+      if(distance>=closest||distance>=width)continue
       closest=distance
       y=ay+t*(by-ay)
-      blend=Math.min(1,(width+4-distance)/4)
+      blend=Math.min(1,(width-distance)/4)
     }
     return base+(y-base)*blend*protection
   }
+  return {height,protectedAt}
 }
