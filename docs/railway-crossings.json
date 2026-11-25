@@ -1633,8 +1633,8 @@
     "nodeEvidence": null,
     "measuredClearance": null,
     "railY": 161.303,
-    "roadY": 153.8454,
-    "designClearanceM": 6.2576,
+    "roadY": 154.0801,
+    "designClearanceM": 6.0229,
     "surfaceSource": "carriageway"
   },
   {
@@ -1938,8 +1938,8 @@
     "nodeEvidence": null,
     "measuredClearance": null,
     "railY": 161.4908,
-    "roadY": 155.3958,
-    "designClearanceM": 4.8951,
+    "roadY": 155.6536,
+    "designClearanceM": 4.6372,
     "surfaceSource": "carriageway"
   },
   {
@@ -2312,8 +2312,8 @@
     "nodeEvidence": null,
     "measuredClearance": null,
     "railY": 160.6039,
-    "roadY": 150.7783,
-    "designClearanceM": 8.6256,
+    "roadY": 150.8654,
+    "designClearanceM": 8.5385,
     "surfaceSource": "carriageway"
   },
   {
@@ -3772,8 +3772,8 @@
     "nodeEvidence": null,
     "measuredClearance": null,
     "railY": 161.23,
-    "roadY": 153.4954,
-    "designClearanceM": 6.5346,
+    "roadY": 153.7132,
+    "designClearanceM": 6.3167,
     "surfaceSource": "carriageway"
   },
   {
@@ -4077,8 +4077,8 @@
     "nodeEvidence": null,
     "measuredClearance": null,
     "railY": 161.4973,
-    "roadY": 155.5817,
-    "designClearanceM": 4.7156,
+    "roadY": 155.7562,
+    "designClearanceM": 4.5411,
     "surfaceSource": "carriageway"
   },
   {
