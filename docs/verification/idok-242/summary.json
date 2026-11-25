@@ -7670,5 +7670,128 @@
         "maximum": 0.033265539722634685
       }
     }
+  },
+  "round14Evidence": {
+    "endpointCodeRevision": "f63c0afb55c430ea6a4236809922641c6bd1bb5a",
+    "runtimeRevision": "1b9bc6a3299f27023eb07050e5f1526762730c9f",
+    "pairedMain": "04036c4f78cd4d8c4993b9b338bec9097eb9964b",
+    "narrow": {
+      "requested": 13,
+      "runs": 79,
+      "completed": 79,
+      "boundaryRuns": 0,
+      "pass": 13,
+      "overLimit": 0,
+      "stalled": 0,
+      "failures": {
+        "collision": 0,
+        "tool": 0
+      },
+      "unavailable": 0,
+      "maximum": 0.06950925290584564
+    },
+    "alley1552207028": {
+      "endpointDisplacementMetres": 0.42449185759148034,
+      "from": [
+        -10467.284997195453,
+        3688.5053772001097
+      ],
+      "to": [
+        -10467.618625327988,
+        3688.242916524308
+      ],
+      "runs": [
+        {
+          "id": 1552207028,
+          "way": 1552207028,
+          "mode": "foot",
+          "boundary": false,
+          "direction": "in",
+          "completed": true,
+          "maximum": 0.032623291015625,
+          "obstacle": ""
+        },
+        {
+          "id": 1552207028,
+          "way": 1552207028,
+          "mode": "foot",
+          "boundary": false,
+          "direction": "out",
+          "completed": true,
+          "maximum": 0.0232086181640625,
+          "obstacle": ""
+        },
+        {
+          "id": 1552207028,
+          "way": 1552207028,
+          "mode": "bike",
+          "boundary": false,
+          "direction": "in",
+          "completed": true,
+          "maximum": 0.0672411685809493,
+          "obstacle": ""
+        },
+        {
+          "id": 1552207028,
+          "way": 1552207028,
+          "mode": "bike",
+          "boundary": false,
+          "direction": "out",
+          "completed": true,
+          "maximum": 0.0666804020293057,
+          "obstacle": ""
+        },
+        {
+          "id": 1552207028,
+          "way": 1552207028,
+          "mode": "bicycle",
+          "boundary": false,
+          "direction": "in",
+          "completed": true,
+          "maximum": 0.06950925290584564,
+          "obstacle": ""
+        },
+        {
+          "id": 1552207028,
+          "way": 1552207028,
+          "mode": "bicycle",
+          "boundary": false,
+          "direction": "out",
+          "completed": true,
+          "maximum": 0.06777472794055939,
+          "obstacle": ""
+        }
+      ]
+    },
+    "sitangAssessment": {
+      "tunnel": 1494508178,
+      "tags": {
+        "highway": "unclassified",
+        "layer": "-1",
+        "tunnel": "yes"
+      },
+      "clearance": 4.5,
+      "bridge": 1097830334,
+      "bridgeXZ": [
+        -18588.082521147244,
+        3987.6636096075677
+      ],
+      "bridgeY": 160.0500030517578,
+      "upper": 882310596,
+      "upperXZ": [
+        -18578.92953387987,
+        3972.5940987837744
+      ],
+      "upperY": 160.35787164843663,
+      "laneOffset": 1.5,
+      "halfTrack": 0.795,
+      "spacing": 0.01,
+      "gradeLimit": 0.08,
+      "wheelPathMetres": 26.79,
+      "pavedSamples": 2680,
+      "samples": 2680,
+      "minimumLiftMetres": 2.048931403321177
+    },
+    "geometryChanged": false
   }
 }
