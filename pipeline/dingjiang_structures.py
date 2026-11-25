@@ -30,6 +30,21 @@ APPROACHES = {
 TUNNEL = 815078159
 
 
+def motorway_sections(elements):
+    """Motorway lanes on the four raised decks and their graded approaches."""
+    for way in elements:
+        if way.get("tags", {}).get("highway") != "motorway" or way["type"] != "way":
+            continue
+        wid = way["id"]
+        if wid in BRIDGES:
+            yield way
+        elif wid in APPROACHES:
+            first, last, _, _ = APPROACHES[wid]
+            start = way["nodes"].index(first)
+            stop = way["nodes"].index(last) + 1
+            yield dict(way, nodes=way["nodes"][start:stop], geometry=way["geometry"][start:stop])
+
+
 def bridge_height(wid, line, at):
     if wid not in YARD_DECK:
         return hengliu(line.interpolate(at).y) + 8.715

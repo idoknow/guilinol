@@ -2,6 +2,7 @@ import gzip
 import json
 import math
 import re
+from itertools import chain
 from collections import defaultdict
 from functools import lru_cache
 from pathlib import Path
@@ -134,11 +135,16 @@ def bake(output, manifest, rendered_roads=None):
     elements = load_osm()
     parking_segments = []
     sections = {road['way']:road['width'] for road in json.loads((output/'street-report.json').read_text())}
-    for way in elements:
+    from dingjiang_structures import motorway_sections
+    # Append the modeled motorway segments after the existing network so every
+    # pre-existing lane keeps its ID in graph.json.gz and all streaming cells.
+    existing = (way for way in elements if way.get('tags', {}).get('highway')
+                not in ('motorway', 'motorway_link'))
+    for way in chain(existing, motorway_sections(elements)):
         tags = way.get('tags', {})
         linear = way['id'] not in SPAN_WAYS and any(tags.get(key,'no')!='no' for key in ('bridge','tunnel'))
         kind = tags.get('highway', '').removesuffix('_link')
-        if way['type'] != 'way' or kind not in MOTOR | WALK | {'cycleway'} or tags.get('area') == 'yes' or tags.get('access') in ('no', 'private'):
+        if way['type'] != 'way' or kind not in MOTOR | WALK | {'cycleway', 'motorway'} or tags.get('area') == 'yes' or tags.get('access') in ('no', 'private'):
             continue
         refs = way['nodes']
         coords = [ll2xz(pt['lat'], pt['lon']) if pt else None for pt in way['geometry']]
