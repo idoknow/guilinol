@@ -202,3 +202,15 @@ body[data-drone="rc"] :is(output,.hint,footer,.sky-ui,.walk-ui,.dock,.toast,.spo
 /* IDOK-278: 雨天禁飞 —— dock 按钮标灰降透明，提示不可用 */
 .dock-drone[data-stage="no-fly"]{background:rgba(120,124,130,.28);border-color:rgba(150,155,160,.4);opacity:.75}
 @media (max-width:640px){.drone-panel .drone-grid{grid-template-columns:1fr;max-height:62vh;overflow:auto}}
+/* IDOK-278: wreck repair �� a floating �޸� button + a 30s progress bar. */
+.drone-repair-btn{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(150px + env(safe-area-inset-bottom));padding:10px 28px;border:0;border-radius:999px;background:#2f8f5b;color:#fff;font:600 15px/1 inherit;letter-spacing:.08em;cursor:pointer;z-index:60;box-shadow:0 6px 18px rgba(0,0,0,.35)}
+.drone-repair-btn:hover{background:#37a76a}
+.drone-repair-bar{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(150px + env(safe-area-inset-bottom));width:min(280px,60vw);height:8px;border-radius:999px;background:rgba(0,0,0,.45);border:1px solid rgba(255,255,255,.3);overflow:hidden;z-index:60}
+.drone-repair-bar i{display:block;height:100%;width:0;background:linear-gradient(90deg,#3fbf74,#7fe0a6);transition:width .3s linear}
+
+/* IDOK-278: battery charging row in the hangar card. */
+.drone-batt{margin-top:8px;font-size:12.5px;color:#ffd27a;display:flex;align-items:center;gap:10px}
+.drone-batt.low{color:#ffb35c}
+.drone-batt.charging{color:#7fe0a6}
+.drone-swap{border:1px solid #7fe0a6;border-radius:999px;background:rgba(127,224,166,.12);color:#7fe0a6;padding:3px 12px;font-size:12px;cursor:pointer}
+.drone-swap:hover{background:rgba(127,224,166,.28)}

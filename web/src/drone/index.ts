@@ -108,7 +108,13 @@ export function droneMode(host:Host, deps:{groundAt:(x:number,z:number)=>number;
       // IDOK-278: a wrecked frame is repairable, a swept-away one must be replaced.
       const isWreck = wrecked !== false && wrecked.id === id && !flight
       const isLost = wrecked !== false && wrecked.id === id && overWaterLoss
-      const cta = isLost ? '补充' : isWreck ? '修复' : isOut ? '召回' : '放到身前'
+      const batt = batteryOf(id)
+      const isCharging = charging === id && !flight
+      const cta = isLost ? '补充' : isWreck ? '修复' : isCharging ? `充电中 ${batt}%` : isOut ? '召回' : '放到身前'
+      const battLine = isCharging
+        ? `<span class="drone-batt charging">充电中 ${batt}%<button class="drone-swap" data-swapbattery="${id}" type="button">更换电池</button></span>`
+        : flight && placed === id && flight.battery < 30
+          ? `<span class="drone-batt low">电量 ${batt.toFixed(0)}% · 用尽后需回机库充电</span>` : ''
       return `<button class="drone-card${isOut ? ' out' : ''}" data-drone="${id}" type="button">
         <span class="drone-name">${spec.name}</span>
         <span class="drone-tag">${spec.tagline}</span>
@@ -134,13 +140,27 @@ export function droneMode(host:Host, deps:{groundAt:(x:number,z:number)=>number;
             <b data-cargoval>${(cargoG / 1000).toFixed(0)} kg</b></span>` : ''}
           <span class="drone-note" data-load-note hidden></span>` : ''}
         <span class="drone-cta">${cta}</span>
+        ${battLine}
       </button>`
     }).join('')
     for (const card of Array.from(grid.querySelectorAll<HTMLElement>('[data-drone]'))) {
       card.onclick = () => {
         const id = card.dataset.drone as DroneId
         if (wrecked !== false && wrecked.id === id && !flight) { void replace(); closeHangar(); return }
+        if (charging === id && !flight) return
         void choose(id)
+      }
+    }
+    for (const swap of Array.from(grid.querySelectorAll<HTMLButtonElement>('[data-swapbattery]'))) {
+      swap.onclick = event => {
+        event.stopPropagation()
+        const id = swap.dataset.swapbattery as DroneId
+        if (charging === id) {
+          charging = null
+          chargeLeft = 0
+          toast(`${drone(id).short} 已更换电池，电量 100%`)
+          renderHangar()
+        }
       }
     }
     for (const chip of Array.from(grid.querySelectorAll<HTMLElement>('[data-load]'))) {
@@ -227,6 +247,84 @@ export function droneMode(host:Host, deps:{groundAt:(x:number,z:number)=>number;
   }
   let lostId:DroneId = DRONE_IDS[0]
 
+  // --- Battery: at 0% the airframe lands where it is and must recharge in the hangar.
+  // 充电按真实时间走（约 90 秒充满），点「更换电池」立刻满电。
+  const CHARGE_SECONDS = 90
+  let charging:DroneId|null = null
+  let chargeLeft = 0
+  function enterCharge(id:DroneId) {
+    charging = id
+    chargeLeft = CHARGE_SECONDS
+    toast(`${drone(id).short} 电量耗尽 · 已收进机库充电（${(CHARGE_SECONDS / 60).toFixed(0)} 分钟）· 可点「更换电池」立即满电`)
+    refreshDock()
+  }
+  function stepCharge(dt:number) {
+    if (!charging) return
+    chargeLeft = Math.max(0,chargeLeft - dt)
+    if (chargeLeft <= 0) {
+      toast(`${drone(charging).short} 充电完成，电量 100%`)
+      charging = null
+      refreshDock()
+    }
+  }
+  function batteryOf(id:DroneId) {
+    if (charging === id) return Math.round((1 - chargeLeft / CHARGE_SECONDS) * 100)
+    return flight && placed === id ? flight.battery : 100
+  }
+
+  // --- Repair: click 修复 while near the wreck → the walker stops and repairs for 30s.
+  const REPAIR_SECONDS = 30
+  let repair:{left:number; button:HTMLButtonElement; bar:HTMLDivElement}|null = null
+  function startRepair() {
+    if (repair || wrecked === false || flight) return
+    const button = document.createElement('button')
+    button.className = 'drone-repair-btn'
+    button.type = 'button'
+    button.textContent = '修复'
+    button.onclick = () => {
+      if (!wrecked) return
+      // 人物停步，进入修理状态
+      host.walker()?.hold(true)
+      const bar = document.createElement('div')
+      bar.className = 'drone-repair-bar'
+      const fill = document.createElement('i')
+      bar.append(fill)
+      document.body.append(bar)
+      repair = {left:REPAIR_SECONDS,button,bar}
+      button.remove()
+    }
+    document.body.append(button)
+  }
+  function stepRepair(dt:number) {
+    if (!repair || !wrecked) return
+    // 离得太远或进入其他状态就中断
+    const d = host.walker()?.active
+      ? host.walker()!.position.distanceTo(wrecked.pos)
+      : host.camera.position.distanceTo(wrecked.pos)
+    if (d > 7 || host.clock.weather === 'rain') {
+      repair.bar.remove()
+      repair = null
+      host.walker()?.hold(false)
+      showHint('修理中断 · 保持在残骸附近并等雨停')
+      return
+    }
+    repair.left -= dt
+    const pct = Math.max(0,Math.min(1,1 - repair.left / REPAIR_SECONDS))
+    const fill = repair.bar.querySelector('i')
+    if (fill) fill.style.width = `${(pct * 100).toFixed(1)}%`
+    showHint(`修理中 ${(repair.left).toFixed(0)}s / ${REPAIR_SECONDS}s`)
+    if (repair.left <= 0) {
+      repair.bar.remove()
+      repair = null
+      wet = 0
+      host.walker()?.hold(false)
+      toast(`${drone(wrecked.id).short} 修复完成，可重新使用`)
+      wrecked = false
+      if (wreckMarker) { host.scene.remove(wreckMarker); wreckMarker = null }
+      hideHint()
+      void replace().catch(() => {})
+    }
+  }
   function wreck(pos:THREE.Vector3) {
     if (!flight || !placed) return
     lostId = placed
@@ -419,6 +517,14 @@ export function droneMode(host:Host, deps:{groundAt:(x:number,z:number)=>number;
   function enterRc() {
     if (!flight || rcActive) return
     if (flight.phase !== 'landed') return
+    // 电量太低不放飞：必须回机库充电或更换电池。
+    if (flight.battery < 10) {
+      window.dispatchEvent(new CustomEvent('walk:toast', {
+        detail: {text: `电量仅 ${flight.battery.toFixed(0)}% · 请在机库充电或点击「更换电池」`, ms: 4200},
+      }))
+      openHangar()
+      return
+    }
     // IDOK-278: 雨天不起飞 —— DJI 安全规范里雨雪是禁飞条件，这里挡在进入遥控之前。
     if (host.clock.weather === 'rain') {
       window.dispatchEvent(new CustomEvent('walk:toast', {
@@ -605,25 +711,23 @@ export function droneMode(host:Host, deps:{groundAt:(x:number,z:number)=>number;
 
   // --- Frame
   function advance(dt:number) {
-    // Wreck lying on the ground: dry out slowly, repair when the player walks up.
+    // Wreck lying on the ground: walk up and click 修复 to repair (30s).
     if (wrecked && !flight) {
-      if (host.clock.weather !== 'rain') {
+      stepRepair(dt)
+      if (!repair) {
         const d = host.walker()?.active
           ? host.walker()!.position.distanceTo(wrecked.pos)
           : host.camera.position.distanceTo(wrecked.pos)
-        if (d < 6) {
-          wet = Math.max(0,wet - DRY_RATE * 2 * dt)
-          showHint(`${drone(wrecked.id).short} 已损坏（湿度 ${(wet * 100).toFixed(0)}%）· 靠近晾干中 · 点击「飞无人机」修复`)
-          if (wet <= 0) {
-            toast(`${drone(wrecked.id).short} 已修复，可重新使用`)
-            wrecked = false
-            if (wreckMarker) { host.scene.remove(wreckMarker); wreckMarker = null }
-            void replace().catch(() => {})
-          }
+        if (d < 6 && host.clock.weather !== 'rain') {
+          startRepair()
+          showHint(`${drone(wrecked.id).short} 已损坏 · 点击「修复」按钮开始修理`)
+        } else if (host.clock.weather === 'rain') {
+          showHint(`${drone(wrecked.id).short} 已损坏 · 雨天无法修理，等雨停`)
         } else showHint(`${drone(wrecked.id).short} 已损坏 · 走近它点击修复`)
-      } else showHint(`${drone(wrecked.id).short} 已损坏 · 雨天无法晾干，等雨停`)
+      }
     }
-    if (!flight || !mesh) return
+    // Frame: rain soak, battery empty → force-land and charge in the hangar.
+    if (!flight || !mesh) { stepCharge(dt); return }
     const gnd = (x:number,z:number) => deps.groundAt(x,z)
     // IDOK-278: rain while airborne — soak, then crash. DJI advice: land immediately.
     if (host.clock.weather === 'rain' && flight.phase !== 'landed') {
@@ -633,6 +737,20 @@ export function droneMode(host:Host, deps:{groundAt:(x:number,z:number)=>number;
     } else if (flight.phase === 'landed' && host.clock.weather !== 'rain' && wet > 0) {
       wet = Math.max(0,wet - DRY_RATE * dt)
     }
+    // 电量耗尽：强制返航就地降落，收进机库充电。
+    if (flight.battery <= 0) {
+      if (flight.phase !== 'landed' && flight.phase !== 'landing') flight.phase = 'returning'
+      stepFlight(flight,Math.min(dt,.1),{throttle:0,yaw:0,pitch:0,roll:0},gnd)
+      if (flight.phase === 'landed') {
+        const id = placed
+        teardown()
+        if (id) enterCharge(id)
+        return
+      }
+      stepCharge(dt)
+      return
+    }
+    stepCharge(dt)
     if (flight.phase !== 'landed') stepFlight(flight,Math.min(dt,.1),input.read(),gnd)
     else stepFlight(flight,Math.min(dt,.1),{throttle:0,yaw:input.read().yaw * .4,pitch:0,roll:0},gnd)
     mesh.root.position.copy(flight.pos)
