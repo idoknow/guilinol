@@ -11,6 +11,7 @@ from canal_passages import sample_road_heights
 from common import load_osm
 from features import points
 from service_streets import width
+from tunnel_clearance import clearance as required_clearance
 
 
 def measure(base, candidate):
@@ -53,10 +54,11 @@ def measure(base, candidate):
     anchor = max(i for i, (_, deck) in enumerate(decks) if deck is not None and bridge_zone.covers(probes[i]))
     surface = samples(base, manifests[0], probes, 'pavementOnly')
     upper_zone = LineString(points(upper)).buffer(width(upper['tags'])/2, cap_style='flat')
-    clearance = float(tunnel['tags'].get('maxheight', 4.5))
+    clearance = required_clearance(tunnel['tags'])
+    roof_thickness = .30
     bridge_y = decks[anchor][1]
     def lift(i):
-        return bridge_y - .08*(stations[i]-stations[anchor]) + clearance - surface[i]
+        return bridge_y - .08*(stations[i]-stations[anchor]) + clearance + roof_thickness - surface[i]
     limit = max((i for i in range(anchor, len(stations)) if surface[i] is not None
                  and upper_zone.covers(probes[i])), key=lift)
     lower = samples(candidate, manifests[1], probes[anchor:limit+1], 'pavementOnly')
@@ -65,7 +67,7 @@ def measure(base, candidate):
     point = probes[witness]
     motorway_axis = LineString(points(motorway))
     upper_axis = LineString(points(upper))
-    required = bridge_y - .08*(stations[witness]-stations[anchor]) + clearance
+    required = bridge_y - .08*(stations[witness]-stations[anchor]) + clearance + roof_thickness
     roof = max(y for y in samples(candidate, manifests[1], [point], 'roofProbe')[0] if y is not None)
     motorway_probe = dict(way=motorway['id'], xz=list(point.coords[0]),
                           wheelPathMetres=stations[witness]-stations[anchor],
@@ -86,13 +88,13 @@ def measure(base, candidate):
         section.append(dict(wheelPathMetres=distance, xz=list(point.coords[0]),
                             insideRoadEdgeMetres=half_width-point.distance(motorway_axis),
                             floorLowerBound=floor_min, visibleTop=top,
-                            minimumLift=floor_min+clearance-top))
+                            minimumLift=floor_min+clearance+roof_thickness-top))
     motorway_probe['section'] = dict(samples=len(section), roadWidth=2*half_width,
         peak=max(section, key=lambda r: r['minimumLift']),
         insideOneMetre=max((r for r in section if r['insideRoadEdgeMetres'] >= 1),
                            key=lambda r: r['minimumLift']),
         overHalfMetreSamples=sum(1 for r in section if r['minimumLift'] > .5))
-    return dict(motorwayProbe=motorway_probe, tunnel=tunnel['id'], tags=tunnel['tags'], clearance=clearance, bridge=bridge['id'],
+    return dict(motorwayProbe=motorway_probe, tunnel=tunnel['id'], tags=tunnel['tags'], clearance=clearance, roofThickness=roof_thickness, bridge=bridge['id'],
                 bridgeXZ=list(probes[anchor].coords[0]), bridgeY=bridge_y, upper=upper['id'],
                 upperXZ=list(probes[limit].coords[0]), upperY=surface[limit],
                 laneOffset=graph_offset, halfTrack=car_half_track, spacing=.01, gradeLimit=.08,

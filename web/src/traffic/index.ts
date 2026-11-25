@@ -49,6 +49,16 @@ export async function traffic(scene:THREE.Scene,camera:THREE.Camera,verify:boole
   const slotGeometry=new Int16Array(SLOTS).fill(-1),slotPaint:(THREE.Color|undefined)[]=[],slotShown=new Uint8Array(SLOTS)
   for(let slot=0;slot<SLOTS;slot++){batch.addInstance(geometryIds[0]);batch.setVisibleAt(slot,false)}
   const variants=new WeakMap<object,Variant>()
+  function actorVariant(actor:Traffic['actors'][number]){
+    let variant=variants.get(actor)
+    if(!variant){variant=models.variant(actor.kind,Math.random(),Math.random());variants.set(actor,variant)
+      const axles=models.axles.get(variant.geometry)
+      if(axles)[actor.frontAxle,actor.rearAxle,actor.halfTrack]=axles
+      const geometry=models.geometries[variant.geometry];if(!geometry.boundingBox)geometry.computeBoundingBox()
+      const {min,max}=geometry.boundingBox!;actor.halfWidth=Math.max(-min.x,max.x);actor.halfLength=Math.max(-min.z,max.z);actor.height=max.y
+    }
+    return variant
+  }
   const pose=new THREE.Object3D();pose.rotation.order='YXZ'
   const transforms=new Float64Array(SLOTS*7).fill(NaN)
   const FAR=75**2 // IDOK-253: detailed car meshes only near the camera, light stand-ins beyond 75 m
@@ -127,6 +137,7 @@ export async function traffic(scene:THREE.Scene,camera:THREE.Camera,verify:boole
       if(cells.has(key))void loadGraph(key,controller.signal,rules).then(({sim:next,sample})=>{
         if(controller.signal.aborted||key!==target)return
         if(verify){mesh.userData.loads.push(sample);if(mesh.userData.loads.length>64)mesh.userData.loads.shift()}
+        next.prepareMotor=actorVariant
         next.sampleGround=sampleGround
         next.surfaceAt=surfaceAt
         if(sim)next.inherit(sim);sim=next
@@ -168,13 +179,7 @@ export async function traffic(scene:THREE.Scene,camera:THREE.Camera,verify:boole
           gap:actor.track.length-actor.dist,green:sim!.green(actor.track)})
         if(actor.speed<.1){queued++;if(actor.track.length-actor.dist<5&&!sim!.green(actor.track))redStops++}
       }
-      let variant=variants.get(actor)
-      if(!variant){variant=models.variant(actor.kind,Math.random(),Math.random());variants.set(actor,variant)
-        const axles=models.axles.get(variant.geometry)
-        if(axles)[actor.frontAxle,actor.rearAxle,actor.halfTrack]=axles
-        const geometry=models.geometries[variant.geometry];if(!geometry.boundingBox)geometry.computeBoundingBox()
-        const {min,max}=geometry.boundingBox!;actor.halfWidth=Math.max(-min.x,max.x);actor.halfLength=Math.max(-min.z,max.z);actor.height=max.y
-      }
+      const variant=actorVariant(actor)
       if(walking.has(actor)){hide(index,index+1);return}
       show(index,variant,actor.x,actor.y,actor.z,actor.yaw,actor.scale,actor.kind==='person'&&actor.down>0,
         actor.pitch,actor.roll)

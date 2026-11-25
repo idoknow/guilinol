@@ -272,7 +272,7 @@ try {
         for (let i = 0; i < pos.count; i += 3) {
           const k = kind?.getX(i)??0
           const owner=i>=offset?ranges.find(r=>i-offset<r.end)?.tunnel:null
-          const required=owner?(passages[owner.way]??(owner.clearance<=2.5?2.5:4.5)):0
+          const required=owner?(passages[owner.way]??owner.clearance):0
           const ax = pos.getX(i)+(local?tile.x:0), ay = pos.getY(i), az = pos.getZ(i)+(local?tile.z:0)
           const bx = pos.getX(i + 1)+(local?tile.x:0), by = pos.getY(i + 1), bz = pos.getZ(i + 1)+(local?tile.z:0)
           const cx = pos.getX(i + 2)+(local?tile.x:0), cy = pos.getY(i + 2), cz = pos.getZ(i + 2)+(local?tile.z:0)
