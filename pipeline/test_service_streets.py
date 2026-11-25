@@ -31,6 +31,16 @@ class ServiceStreetTests(unittest.TestCase):
             file = Path(folder)/'test.glc'
             file.write_bytes(gzip.compress(struct.pack('<4s5I', b'GL04',0,0,len(collision),len(png.getvalue()),0)
                                            +bytes(16900)+collision+png.getvalue()))
+            footway = file.with_name('footway.glc')
+            footway.write_bytes(file.read_bytes())
+            strip = box(4,10,28,14)
+            self.assertTrue(patch_tile(footway,strip,(216,210,193),sidewalk=True))
+            raw = gzip.decompress(footway.read_bytes())
+            new_paths = json.loads(raw[16924:16924+struct.unpack_from('<I',raw,12)[0]])[1][0]
+            self.assertEqual(new_paths[:2], [road, walk])
+            self.assertEqual([kind for kind,*_ in new_paths[2:]], [1])
+            self.assertTrue(Polygon(np.array(new_paths[2][1])/100).equals(box(8,10,28,14)))
+            self.assertFalse(patch_tile(footway,strip,(216,210,193),sidewalk=True))
             self.assertTrue(patch_tile(file,box(4,10,28,14),(216,210,193)))
             data = gzip.decompress(file.read_bytes()); size, image_size = struct.unpack_from('<II',data,12)
             paths = json.loads(data[16924:16924+size])[1][0]

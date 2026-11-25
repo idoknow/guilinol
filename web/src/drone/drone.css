@@ -165,7 +165,7 @@ body[data-home] .drone-hint{display:none}
 /* 遥控时让出 HUD：与 photo 模式同一份清单，取景框里只留 RC 自己的仪表 */
 body[data-drone="rc"] :is(output,.hint,footer,.sky-ui,.walk-ui,.dock,.toast,.spot-card,.book,.summit-pill,
   .minimap,.road-name,.hud-me,.emote-toggle,.emote-overlay,.render-entry,.hud-stats,.drone-hint,.vehicle-action,
-  .ride-hud,.photo-hint,.ld-corner,.hotbar,.keys-card,.beta-note){display:none!important}
+  .ride-hud,.photo-hint,.ld-corner,.hotbar,.keys-card){display:none!important}
 /* 机库面板：五张机型卡，复用 about 弹层语言 */
 .drone-mask[hidden]{display:none}
 .drone-mask.show{opacity:1}
