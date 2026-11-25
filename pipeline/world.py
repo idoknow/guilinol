@@ -589,6 +589,9 @@ def build(bbox, output, palette, workers=4):
         verified = checked_road_pairs(output)
         remaining = [r for r in report['clearanceConflicts'] if (r['rail'],r['road']) not in verified]
         print('Railway tiles:',report['tiles'],'clearance conflicts:',len(remaining))
+    from major_roadbeds import bake as bake_major_roadbeds
+    bake_major_roadbeds(output,manifest)
+    (output/'manifest.json').write_text(json.dumps(manifest,separators=(',',':'))+'\n')
     print(f'{len(chunks)} chunks, {len(footprints)} footprints, {sum(c["bytes"] for c in chunks):,} chunk bytes')
 
 

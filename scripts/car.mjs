@@ -152,6 +152,24 @@ try {
     }, {target, maxFrames, arrive})
   }
 
+  if(process.argv.includes('--contact')){
+    const pickup=data.cars.find(row=>Math.hypot(row[0]+572,row[2]+92)<5)
+    assert(pickup);await settleAt(pickup[0],pickup[2],pickup[3]);await interactExact('开车')
+    for(const [name,target] of [['tile-seam',[-512,-73]],['bridge',[-185,34]]]){
+      const drive=await steerCarTo(target,3000,3)
+      assert(drive.targetDist<=5,JSON.stringify(drive))
+      const state=await page.evaluate(()=>{
+        const {walk,camera}=window.viewer, position=walk.position.clone(), yaw=walk.heading
+        const original=walk.tick
+        walk.tick=()=>{camera.position.set(position.x+5*Math.cos(yaw),position.y+.36,position.z-5*Math.sin(yaw));camera.lookAt(position.x,position.y+.5,position.z);camera.updateMatrixWorld()}
+        window.restoreCarTick=()=>{walk.tick=original}
+        return {vehicle:walk.vehicle,position:position.toArray()}
+      })
+      assert.equal(state.vehicle,'car');await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))))
+      await saveShot(page,'contact-'+name);console.log(name,state,drive);await page.evaluate(()=>window.restoreCarTick())
+    }
+    await page.close()
+  }else{
   // Showcase close-up shots of the 4 sedan paint colors on wide, sunlit carriageways (full 3/4 front & 3/4 rear views).
   const paintSamples = [0, 1, 2, 3].map(p =>
     data.cars.find(c => c[4] === p && (p === 1 ? c[0] < -400 : (c[0] > -780 || c[0] < -1020)) && c[0] > -1200 && c[0] < 200 && c[2] > -450 && c[2] < 450)
@@ -446,6 +464,7 @@ try {
   await mPage.close()
   }
 
+  }
   assert.deepEqual(errors, [])
   console.log('ALL CAR CHECKS PASSED')
 } finally {
