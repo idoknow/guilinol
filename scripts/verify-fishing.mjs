@@ -32,7 +32,7 @@ try {
   },seed),result)}
   await page.screenshot({path:'captures/fishing/pole.png'});await page.locator('[data-menu]').click();await page.getByRole('button',{name:'背包',exact:true}).click()
   const wallet=()=>page.evaluate(()=>JSON.parse(localStorage.getItem('glol.save.v1')))
-  const before=await wallet();await page.getByRole('button',{name:/^卖 \d/}).first().click();const after=await wallet();assert.equal(after.money-before.money,before.fishing.bag[0].price);assert.equal(after.fishing.bag.length,before.fishing.bag.length-1)
+  const before=await wallet(),sell=page.getByRole('button',{name:/^卖 \d/}).first(),soldId=await sell.getAttribute('data-sell');await sell.click();const after=await wallet();assert.equal(after.money-before.money,before.fishing.bag.find(item=>item.id===soldId).price);assert.equal(after.fishing.bag.length,before.fishing.bag.length-1)
   await page.locator('[data-close]').click();await page.evaluate(async()=>{const {walk,walkTo}=window.viewer;const target=walk.parked('bike').find(row=>Math.hypot(row[0]+539,row[2]+95)<12)??walk.parked('bike')[0];await walkTo(target[0],target[2],0,'fishing-bike');for(let index=0;index<6;index++)walk.tick(1/60)})
   await page.waitForFunction(()=>document.querySelector('.vehicle-action')?.textContent==='骑电动车');await page.keyboard.press('f');await page.waitForFunction(()=>document.body.dataset.ride==='bike');await page.evaluate(()=>window.viewer.walk.ebike.setVehicleType('normal'));await page.keyboard.press('4');await page.waitForFunction(()=>document.querySelector('.ride-gear')?.textContent==='S');assert.equal(await page.evaluate(()=>window.fishing.state().stage),'idle')
   assert.deepEqual(errors,[]);console.log('Fishing browser: shore gate, lure land/snap, float land/junk, wallet, bike gear OK')
