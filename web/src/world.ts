@@ -347,7 +347,8 @@ export async function detail(tile:Tile, signal:AbortSignal, parseSlot?:()=>Promi
   const positions = new Int16Array(buffer,offset,vertices*3); offset+=vertices*6
   const normals = new Int8Array(buffer,offset,vertices*3); offset+=vertices*3
   const indices = new Uint32Array(buffer.slice(offset,offset+count*4)); offset+=count*4
-  const [rings,paths,thinIndices=[],asphalt=[],rails=[],signs=[],railCuts=[]]:[Building[],Streets,number[]?,number[]?,import('./railways').RailSection[]?,import('./railways').CrossingSign[]?,[number,number][]?]=JSON.parse(new TextDecoder().decode(new Uint8Array(buffer,offset,collision))); offset+=collision
+  const [solids,paths,thinIndices=[],asphalt=[],rails=[],signs=[],railCuts=[],walkFloors=[]]:[Building[],Streets,number[]?,number[]?,import('./railways').RailSection[]?,import('./railways').CrossingSign[]?,[number,number][]?,Building[]?]=JSON.parse(new TextDecoder().decode(new Uint8Array(buffer,offset,collision))); offset+=collision
+  const rings=Array.isArray(walkFloors) && walkFloors.length ? solids.concat(walkFloors) : solids
   const thin=new Set(thinIndices)
   const end = offset+imageBytes, tail = end+triangles*18, extra = buffer.byteLength-tail
   if(extra!==0 && extra!==8450) throw Error('Invalid GL04 sections')
@@ -373,7 +374,7 @@ export async function detail(tile:Tile, signal:AbortSignal, parseSlot?:()=>Promi
   })
   for(const [,topLevel] of rings) if(topLevel/10+8>maxY) maxY = topLevel/10+8
   const heights = geometry.getAttribute('position')
-  const streets = await loadStreetGeometry(paths,step,heights,rails,signs,railCuts,tile.stationPaving,tile.roadbeds)
+  const streets = await loadStreetGeometry(paths,step,heights,rails,signs,railCuts,tile.stationPaving,tile.roadbeds,[tile.x,tile.z])
   if(tunnels)joinPortalRoads(tile,tunnels,[streets.road,streets.sidewalk,...(streets.surface?[streets.surface.getAttribute('position').array as Float32Array]:[])])
   signal.throwIfAborted()
   const material = await surfaceMaterial(buffer.slice(offset,end))

@@ -8,6 +8,8 @@ export interface BrandDef {
   lid: string
   tip: string
   ember: number
+  filterDot?: string
+  length?: number
   faceTexture?: string
 }
 export type BrandId = string
@@ -21,6 +23,12 @@ export const BRANDS = [
   brand('zhenlong','珍龙','广西本地',30,'#5f3546','#dfba86'),
   brand('jiatianxia','甲天霞','桂林本地',35,'#ad654d','#eed99e'),
   brand('lijiang','漓江烟雨','桂林本地',50,'#477078','#dce6d6'),
+  {...brand('yidianhong','一点虹','广西本地',12,'#a44336','#e8c89b'), filterDot:'#bc2428'},
+  brand('erwujia','二伍甲','桂林本地',25,'#71624c','#dac6a1'),
+  brand('bakuai','老八块','实惠促销',8,'#aa9770','#5d513c'),
+  {...brand('letu','乐涂·金黄叶','广西本地',20,'#ca9c48','#765231'), length:70},
+  brand('hongmei','红玫','指定流通',10,'#a15460','#ecd7be'),
+  brand('dangui','丹桂','桂林本地',22,'#ad703f','#f1d8a2'),
 ]
 export const brandOf = (id: string) => BRANDS.find(b => b.id === id) ?? BRANDS[0]
 export const smokeDefaults = {
@@ -35,6 +43,6 @@ export function validRules(value: unknown): value is typeof smokeDefaults {
     && Number.isInteger(r.puffSegments) && between(r.puffSegments,1,10)
     && between(r.doubleChance,0,1) && between(r.density,0,4)
     && Array.isArray(r.brands) && r.brands.length > 0 && r.brands.length <= BRANDS.length
-    && r.brands.every(b => b && BRANDS.some(def => def.id === b.id) && Number.isInteger(b.price) && between(b.price,25,50))
+    && r.brands.every(b => b && BRANDS.some(def => def.id === b.id) && Number.isInteger(b.price) && between(b.price,5,60))
     && new Set(r.brands.map(b => b.id)).size === r.brands.length
 }

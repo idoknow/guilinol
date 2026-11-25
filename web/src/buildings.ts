@@ -5,7 +5,7 @@ import {getBuildingOverride, type BuildingOverride} from './city-upgrade/state'
 
 type Pair=[number,number]
 type Vertex=[number,number,number]
-export type Building=[number,number,Pair[][],number,number,number,number[],Pair[],number,boolean?]
+export type Building=[number,number,Pair[][],number,number,number,number[],Pair[],number,boolean?,Vertex?]
 
 function orientedRectFromLoop(loop:Pair[]):{center:THREE.Vector2; along:THREE.Vector2; side:THREE.Vector2; halfLen:number; halfWid:number}|null{
   if(loop.length<3)return null
@@ -50,8 +50,9 @@ export function buildingGeometry(
   let cursor=0
   for(let partIdx=0;partIdx<parts.length;partIdx++){
     const part=parts[partIdx]
-    const [base,origTop,loops,origKind,origFloors,seed,anchor,rectangle,complex,raised]=part
-    const ov:BuildingOverride|undefined = tileX!==undefined && tileZ!==undefined ? getBuildingOverride(tileX,tileZ,partIdx) : undefined
+    const [base,origTop,loops,origKind,origFloors,seed,anchor,rectangle,complex,raised,walkPlane]=part
+    const startVertex=cursor
+    const ov:BuildingOverride|undefined = !walkPlane && tileX!==undefined && tileZ!==undefined ? getBuildingOverride(tileX,tileZ,partIdx) : undefined
     const baseY=base/10
     const level=ov ? baseY+ov.h : origTop/10
     const floors=ov ? ov.f : origFloors
@@ -126,6 +127,15 @@ export function buildingGeometry(
           face([[x,level,z],[x,level+.9,z],[ex,level+.9,ez],[ex,level,ez]],true)
         }
       }
+    }
+    if(walkPlane){
+      const [dx,dz,intercept]=walkPlane
+      for(let i=startVertex;i<cursor;i++){
+        const at=i*3
+        xyz[at+1]+=dx*xyz[at]+dz*xyz[at+2]+intercept-level
+        if(normal[at+1]>0){const length=Math.hypot(dx,1,dz);normal[at]=-dx/length;normal[at+1]=1/length;normal[at+2]=-dz/length}
+      }
+      continue
     }
     if(raised){
       const contours=loops.map(loop=>loop.map(([x,z])=>new THREE.Vector2(x/100,z/100)))
