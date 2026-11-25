@@ -1,8 +1,8 @@
 import {readFile,writeFile} from 'node:fs/promises'
 
 export async function saveMarketMask(page,output){
-  const grid=JSON.parse(await readFile('docs/layout/dongxi-esri-grid.json','utf8'))
-  const reference=await readFile('docs/layout/dongxi-esri-mask.png')
+  const grid=JSON.parse(await readFile('.ops-docs/layout/dongxi-esri-grid.json','utf8'))
+  const reference=await readFile('.ops-docs/layout/dongxi-esri-mask.png')
   const data=await page.evaluate(async ({grid,width,height})=>{
     const {stream}=window.viewer,canvas=document.createElement('canvas');canvas.width=width;canvas.height=height
     const ctx=canvas.getContext('2d');ctx.fillStyle='black';ctx.fillRect(0,0,width,height);ctx.fillStyle='white'

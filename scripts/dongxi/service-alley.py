@@ -23,7 +23,7 @@ def geographic(east, south):
     return np.asarray(east)/MLON+LON0, LAT0-np.asarray(south)/MLAT
 
 
-folder = root/'docs/layout'
+folder = root/'.ops-docs/layout'
 config = json.loads((folder/'dongxi-esri-grid.json').read_text())
 scale = 256*2**config['zoom']
 origin_x, origin_y = config['pixel_origin']

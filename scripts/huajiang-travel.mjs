@@ -1,3 +1,4 @@
+import './expanded-world-check.mjs'
 import assert from 'node:assert/strict'
 import {mkdir,readFile} from 'node:fs/promises'
 import {join} from 'node:path'

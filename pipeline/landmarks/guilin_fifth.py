@@ -1,6 +1,6 @@
 """桂林市第五中学 (`way/683286832`) — OSM-level campus (IDOK-80, 口径 A).
 
-Evidence and inferred attributes: docs/layout/schools/guilin_fifth.md.
+Evidence and inferred attributes: .ops-docs/layout/schools/guilin_fifth.md.
 Footprints, sports surfaces and the campus outline are OSM/Overture geometry only;
 floors, roofs and colours are inferred. One generalized street-side gate, always closed.
 """

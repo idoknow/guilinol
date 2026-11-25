@@ -181,7 +181,7 @@ def main():
     osm={f"{item['type']}/{item['id']}":item for item in load_osm()}
     manifest=json.loads((ROOT/'public/world/manifest.json').read_bytes())
     entries={item['id']:item for item in manifest['landmarks']}
-    photos=json.loads((ROOT/'docs/refs/rock/photo-locations.json').read_bytes())
+    photos=json.loads((ROOT/'.ops-docs/refs/rock/photo-locations.json').read_bytes())
     report=[]
     specs=json.loads((ROOT/'pipeline/landmarks.json').read_bytes())
     schools=[school for catalog in ('schools-g1.json','schools-g2.json')
@@ -241,7 +241,7 @@ def main():
         if key=='dongxixiang' and notes=='deferred to IDOK-44':
             row['status']='deferred';continue
         if key=='zhengyang_clock':
-            survey=json.loads((ROOT/'docs/layout/zhengyang.geojson').read_text())
+            survey=json.loads((ROOT/'.ops-docs/layout/zhengyang.geojson').read_text())
             lon,lat=next(f['geometry']['coordinates'] for f in survey['features'] if f['id']=='clock-osm')
             reference=Point((lon-LON0)*MLON,(LAT0-lat)*MLAT)
             base=footprint(ROOT/'public'/spec['model'],entry,elevation=1)
@@ -251,8 +251,8 @@ def main():
             continue
         if key=='wangcheng_market':
             # Alley/plaza aggregate with no single footprint; positions are checked by the
-            # IDOK-50 evidence-layout audit (docs/layout/dongxi-audit.md, scripts/dongxi/lane-audit.py).
-            row.update(status='deferred',alignNote=notes or 'audited by docs/layout/dongxi-audit.md (IDOK-50)');continue
+            # IDOK-50 evidence-layout audit (.ops-docs/layout/dongxi-audit.md, scripts/dongxi/lane-audit.py).
+            row.update(status='deferred',alignNote=notes or 'audited by .ops-docs/layout/dongxi-audit.md (IDOK-50)');continue
         if key=='jingjiang':
             components=[]
             for name,source,bounds,roof in (

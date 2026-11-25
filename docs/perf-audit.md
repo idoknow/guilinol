@@ -184,7 +184,7 @@ Apple M3 Pro，Chromium / SwiftShader，960 × 540，CDP CPU 节流 4×。每次
 | 龙门大桥东岸 | 飞行 | 6.86 | 84.66 | 24 | 54,868 |
 | 龙门大桥东岸 | 人视 | 10.02 | 136.47 | 29 | 189,322 |
 
-原始采样和截图在 `docs/verification/idok-114/`。SG 对照使用发布包 `world-4052da78a7e5`，最新 main 使用 `world-e054456980c8`。
+原始采样和截图在 `.ops-docs/verification/idok-114/`。SG 对照使用发布包 `world-4052da78a7e5`，最新 main 使用 `world-e054456980c8`。
 
 13 个机位全部在 120 s 内就绪，最慢为王城人视（25.455 s）。漓江主画面从 SG 上轮的 61 次 draw calls 降到本轮 41 次，两份基线均为 39 次。王城主画面 47 次，基线 45 次。峰值 JS 堆出现在王城人视，相对本次 rebase 的 main 为 1.217 倍；相对历史 SG 对照为 1.479 倍，超过 1.30。
 

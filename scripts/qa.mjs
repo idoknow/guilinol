@@ -2,6 +2,7 @@ import { spawn, execFileSync } from 'node:child_process'
 import { mkdir, writeFile, readFile } from 'node:fs/promises'
 import { createWriteStream } from 'node:fs'
 import { once } from 'node:events'
+import { hasPhotos, skipPhotos } from './photo-refs.mjs'
 
 const dir = 'captures/qa'
 const mac = process.platform === 'darwin'
@@ -86,7 +87,7 @@ for (const step of steps) {
   const then = Date.now()
   console.log(step)
   const [status, first, calls, reason] =
-    !scripts[step] && step === 'audit'
+    step === 'photo-match' && !hasPhotos ? (console.log(skipPhotos), ['跳过', '—', '—', skipPhotos]) : !scripts[step] && step === 'audit'
       ? ['跳过', '—', '—', '当前版本尚未提供 IDOK-28 audit']
       : await run(step)
   rows.push([step, status, ((Date.now() - then) / 1000).toFixed(1), first, calls, reason].join(' | '))

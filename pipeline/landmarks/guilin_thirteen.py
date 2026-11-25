@@ -1,6 +1,6 @@
 """桂林市第十三中学 (`way/669069474`) — OSM-level campus (IDOK-80, 口径 A).
 
-Evidence and inferred attributes: docs/layout/schools/guilin_thirteen.md.
+Evidence and inferred attributes: .ops-docs/layout/schools/guilin_thirteen.md.
 Footprints, sports surfaces and the campus outline are OSM/Overture geometry only;
 floors, roofs and colours are inferred. One generalized street-side gate, always closed.
 """
