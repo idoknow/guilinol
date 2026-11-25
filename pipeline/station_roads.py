@@ -117,14 +117,14 @@ def bake(directory, manifest, paired_widths):
     ways = {way['id']: way for way in elements if way['type'] == 'way'}
     joint = []
     for section in sections:
-        selected = [r for r in section["roads"] if r.get("withFirstSection")]
-        if selected:
-            for wid, profile in section_roads(dict(section, roads=selected), ways, paired_widths).items():
-                if wid in profiles:
-                    profiles[wid, section["name"]] = profile
-                else:
-                    profiles[wid] = profile
-                joint.append(profile)
+        for road in section["roads"]:
+            if not road.get("withFirstSection"):
+                continue
+            wid = road["way"]
+            profile = section_roads(dict(section, roads=[road]), ways, paired_widths)[wid]
+            key = (wid, section["name"], road["boundaryNodes"][0]) if wid in profiles else wid
+            profiles[key] = profile
+            joint.append(profile)
     bake_profiles(directory, manifest, profiles, elements, bridge_ways.values(), landings)
     from dingjiang_paving import finish_paving
     corrected = {int(wid) for section in sections for wid in section.get("priorRoadProfiles", {}).get("01", {})}

@@ -281,8 +281,14 @@ def adjust_prior_roads(name, profiles, sections):
             profile = np.vstack((before, replacement, after))
             if np.any(profile[:, 1] > np.interp(profile[:, 0], *native.T) + .001):
                 raise ValueError(f"Road correction raises {wid}")
-            if np.any(abs(np.diff(profile[:, 1])) > .05 * np.diff(profile[:, 0]) + 1.e-7):
-                raise ValueError(f"Road correction exceeds 5% on {wid}")
+            span = np.diff(profile[:, 0])
+            inherited = np.abs(np.diff(np.interp(profile[:, 0], *native.T)))
+            # Unchanged approaches may have a steeper accepted native grade.
+            # Cap replacement spans and both tie-ins, preserving native grades elsewhere.
+            changed = (profile[:-1, 0] <= end) & (profile[1:, 0] >= start)
+            limit = np.where(changed, .05 * span, np.maximum(.05 * span, inherited))
+            if np.any(abs(np.diff(profile[:, 1])) > limit + 1.e-7):
+                raise ValueError(f"Road correction exceeds grade limit on {wid}")
             profiles[wid] = dict(way, fitShoulderPlanes=True), line, profile
 
 

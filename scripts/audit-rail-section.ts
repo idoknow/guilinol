@@ -36,6 +36,8 @@ const deckChecks = []
 const coveredCrossings = new Set<number>()
 for (const { way: id, controls, boundaryNodes, maximumGrade = 0.05, direction = 'lower' } of roads) {
   const way = ways.find((w) => w.id === id)
+  const sameWayProfiles = roads.filter(r => r.way === id)
+  const nativeLimit = way.tags.highway === 'service' ? .08 : maximumGrade
   const lane = { way: id, structure: 'surface', nodes: new Set(way.nodes) }
   const xy = way.geometry.map((p) => ll2xz(p.lat, p.lon))
   const start = controls[0][0],
@@ -85,7 +87,13 @@ for (const { way: id, controls, boundaryNodes, maximumGrade = 0.05, direction = 
             peakGrade = Math.max(peakGrade, slope[1])
             count++
           }
-          if (slope[1] > maximumGrade + 1e-6 && slope[1] > slope[0] + 1e-6) regressions++
+          // A way can have several disjoint profiles with different grade caps.
+          // Each 2 m span uses its own design cap, including on another approach.
+          const atStation = chainage + at - step / 2
+          const localCaps = sameWayProfiles.filter(r => atStation >= r.controls[0][0]
+            && atStation <= r.controls.at(-1)[0]).map(r => r.maximumGrade ?? .05)
+          const spanLimit = localCaps.length ? Math.min(...localCaps) : nativeLimit
+          if (slope[1] > spanLimit + 1e-6 && slope[1] > slope[0] + 1e-6) regressions++
         }
         previous = y
       }
