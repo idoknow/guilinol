@@ -1,3 +1,4 @@
+import {stationShoulders,type ShoulderPlane} from './station-shoulders'
 import style from '../../pipeline/railway-style.json'
 import {inRing} from './polygon'
 import {stationPaving,type StationPavingCut} from './station-paving'
@@ -11,7 +12,7 @@ export interface StationPavingStyle {plaza?:Pair[]; platformEdges?:[Pair,Pair][]
 type Path=[number,...Pair[][]]
 type RoadCtrl=[number,number[]]
 type Lower=[number,Pair[],[number,number,number,number][]]
-export type Streets=[Path[],Pair[],number[][],Pair[]?,Pair[]?,(RoadCtrl|null)?,number[][]?,number[][]?,number[][]?,number[][]?,Pair[][]?,(Lower|null)?,([number,number,number]|null)?,unknown?,StationRoadSegment[]?,StationPavingCut[]?]
+export type Streets=[Path[],Pair[],number[][],Pair[]?,Pair[]?,(RoadCtrl|null)?,number[][]?,number[][]?,number[][]?,number[][]?,Pair[][]?,(Lower|null)?,([number,number,number]|null)?,unknown?,StationRoadSegment[]?,StationPavingCut[]?,ShoulderPlane[]?]
 const colors=look.streets.surfaces.map(v=>new THREE.Color(v)),tone=Object.fromEntries((['railing','lampPole','lampHead'] as const).map(k=>[k,new THREE.Color(look.streets[k])]))
 const stoneLight=new THREE.Color(0xa6a39a),stoneMid=new THREE.Color(0x8c8981),stoneBase=new THREE.Color(0x74726b)
 const platformBrick=new THREE.Color(style.station.platformBrick)
@@ -47,9 +48,10 @@ function lowerHeight(x:number,z:number,base:number,terrain:number,[,corners,prof
 }
 
 const ROAD_LIFT=.03
-export function streetGeometry([paths,lamps,banks,signals=[],stops=[],roadCtrl,stoneRails=[],beds=[],shops=[],decor=[],curbCuts=[],lower,platform,,stationRoads,stationCuts]:Streets,ground:(x:number,z:number)=>number,rails:RailSection[]=[],signs:CrossingSign[]=[],railGround:(x:number,z:number)=>number=ground,paving?:StationPavingStyle,roadbeds=new Set<number>()){
+export function streetGeometry([paths,lamps,banks,signals=[],stops=[],roadCtrl,stoneRails=[],beds=[],shops=[],decor=[],curbCuts=[],lower,platform,,stationRoads,stationCuts,shoulderPlanes]:Streets,ground:(x:number,z:number)=>number,rails:RailSection[]=[],signs:CrossingSign[]=[],railGround:(x:number,z:number)=>number=ground,paving?:StationPavingStyle,roadbeds=new Set<number>()){
   const xyz:number[]=[],rgb:number[]=[],sidewalk:number[]=[],road:number[]=[],mats:number[]=[],cols:number[]=[]
   const stationLevel=stationRoads?stationRoadSurface(stationRoads):null
+  const shoulders=shoulderPlanes && stationShoulders(shoulderPlanes)
   const remaining=stationCuts?stationPaving(stationCuts,stationLevel?.protectedAt):null
   const baseLevel=(x:number,z:number)=>{const g=ground(x,z);const level=roadCtrl?Math.max(evalRoadCtrl(roadCtrl,x,z),g):g;return stationLevel?stationLevel.height(x,z,level):level}
   const curbSegments=curbCuts.flatMap(line=>line.slice(1).map(([x,z],i)=>
@@ -93,6 +95,12 @@ export function streetGeometry([paths,lamps,banks,signals=[],stops=[],roadCtrl,s
     emit(first,second,third,kind,u1,u2,u3,vertical)
   }
   function emit(first:THREE.Vector3,second:THREE.Vector3,third:THREE.Vector3,kind:number,u1:number,u2:number,u3:number,vertical:boolean){
+    if(shoulders){
+      const polys=shoulders(first,second,third)
+      for(const poly of polys)for(let k=1;k+1<poly.length;k++)emitFace(poly[0],poly[k],poly[k+1],kind,u1,u2,u3,vertical)
+    }else emitFace(first,second,third,kind,u1,u2,u3,vertical)
+  }
+  function emitFace(first:THREE.Vector3,second:THREE.Vector3,third:THREE.Vector3,kind:number,u1:number,u2:number,u3:number,vertical:boolean){
     let p1=first,p2=second,p3=third,a1=u1,a2=u2,a3=u3
     if(kind!==3&&!vertical){
       const x1=Math.fround(p1.x),y1=Math.fround(p1.y),z1=Math.fround(p1.z)
@@ -325,7 +333,27 @@ export function streetGeometry([paths,lamps,banks,signals=[],stops=[],roadCtrl,s
     }
     for(const poly of remaining)draw(poly)
   }
-  const railBarriers=railwayGeometry(rails,signs,railGround,crossingHeight,railFace,box,levelFace)
+  // The terrain below a graded bore follows its carriageway. Track-bed slopes,
+  // masts and fences above it are supported by the tunnel roof.
+  const bores=shoulderPlanes?.length?stationCuts?.filter(([ax,az,bx,bz,,,,open,footprint])=>
+    !open&&!footprint&&shoulderPlanes.some(([x,z,u,v])=>
+      Math.abs(x-ax)+Math.abs(z-az)<1e-6 && (u-x)*(bx-ax)+(v-z)*(bz-az)>0 &&
+      Math.abs((u-x)*(bz-az)-(v-z)*(bx-ax))<1e-6)):undefined
+  const railSupport=bores?.length?(x:number,z:number)=>{
+    let height=railGround(x,z)
+    for(const [ax,az,bx,bz,width,ay,by] of bores){
+      const dx=bx-ax,dz=bz-az,length=dx*dx+dz*dz
+      if(!length)continue
+      const t=THREE.MathUtils.clamp(((x-ax)*dx+(z-az)*dz)/length,0,1)
+      const distance=Math.hypot(x-ax-t*dx,z-az-t*dz)
+      // A GL04 chord spans up to 12 m. Carry the roof beyond the wall so a
+      // chord with both ends outside the bore cannot hang through its ceiling.
+      const outside=Math.max(0,distance-width-12)
+      height=Math.max(height,ay+t*(by-ay)+style.stationLevels.roadClearance-outside)
+    }
+    return height
+  }:railGround
+  const railBarriers=railwayGeometry(rails,signs,railSupport,crossingHeight,railFace,box,levelFace)
   const roadBarriers=buildRoadBarriers(decor,baseLevel)
   const detailCount=mats.length/16
   for(const [x,z] of lamps){const px=x/10,pz=z/10,y=baseLevel(px,pz),yaw=(x*7+z*13)%6/6*Math.PI

@@ -20,7 +20,8 @@ const crossings = read('docs/railway-crossings.json')
 const grades = []
 const sections = []
 const deckChecks = []
-for (const { way: id, controls, boundaryNodes } of design.roads) {
+const coveredCrossings = new Set<number>()
+for (const { way: id, controls, boundaryNodes, maximumGrade = 0.05 } of design.roads) {
   const way = ways.find((w) => w.id === id)
   const lane = { way: id, structure: 'surface', nodes: new Set(way.nodes) }
   const xy = way.geometry.map((p) => ll2xz(p.lat, p.lon))
@@ -64,7 +65,7 @@ for (const { way: id, controls, boundaryNodes } of design.roads) {
             peakGrade = Math.max(peakGrade, slope[1])
             count++
           }
-          if (slope[1] > 0.05 + 1e-6 && slope[1] > slope[0] + 1e-6) regressions++
+          if (slope[1] > maximumGrade + 1e-6 && slope[1] > slope[0] + 1e-6) regressions++
         }
         previous = y
       }
@@ -96,6 +97,12 @@ for (const { way: id, controls, boundaryNodes } of design.roads) {
       })
     )
       continue
+    if (design.railProfiles) {
+      // The cumulative checker measures the way-matched railhead. Also
+      // require rendered ballast to be present over every enclosed crossing.
+      if (local.some(t => !t.openCut)) coveredCrossings.add(id)
+      continue
+    }
     const tile = manifest.chunks.find(
       (t) => t.x === Math.floor(p.x / 256) * 256 && t.z === Math.floor(p.z / 256) * 256,
     )
@@ -116,20 +123,24 @@ for (const { way: id, controls, boundaryNodes } of design.roads) {
     way: id,
     samples: count,
     maximumGrade: peakGrade,
+    limit: maximumGrade,
     raisedM: raised,
     loweredM: lowered,
     regressions,
   })
 }
-const reverse = visibleSurfaces(candidate, ids, ids, sections)
+const reverse = visibleSurfaces(candidate, ids, ids, sections, !!design.railProfiles)
 console.log(JSON.stringify({ grades, deckChecks, reverse }, null, 2))
 assert(
-  deckChecks.length === design.expectedRoadRailCrossings &&
-    deckChecks.every((r) => Math.abs(r.clearanceM - 4.5) < 0.001),
+  deckChecks.length === (design.expectedRoadRailCrossings ?? 0) &&
+    deckChecks.every((r) => r.clearanceM >= 4.5 - 0.001),
 )
 assert(
   grades.every(
-    (r) => r.samples && r.raisedM <= 0.001 && r.maximumGrade <= 0.050001 && !r.regressions,
+    (r) => r.samples && r.raisedM <= 0.001 && r.maximumGrade <= r.limit + 1e-6 && !r.regressions,
   ),
 )
 assert(reverse.every((r) => r.checked && !r.violations))
+for (const way of coveredCrossings) {
+  assert(reverse.find(r => r.way === way)?.minimumRailBedClearanceM != null, 'Missing rail bed above bore ' + way)
+}

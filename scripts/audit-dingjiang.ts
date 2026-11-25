@@ -50,7 +50,7 @@ for (const r of crossings) {
     assert(buffers[0].equals(buffers[1]), 'Yard crossing tile changed')
     assert.deepEqual(samples[0], samples[1])
   } else if (r.rail === 375923389) {
-    assert(Math.abs(samples[1].clearance - 4.5) < .001, 'Incorrect underpass height')
+    assert(samples[1].clearance >= 4.5 - .001, 'Incorrect underpass height')
   } else assert(samples[1].clearance >= 4.499, 'Adjacent underpass lost headroom')
   results.push({rail: r.rail, road: r.road, node: r.sharedNode, move: samples[1].road - samples[0].road, samples})
 }

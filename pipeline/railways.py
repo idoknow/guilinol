@@ -338,8 +338,10 @@ def bake(world_dir, manifest, inventory, samples):
     coords,pieces,height,station_corridor = fit_corridor(coords,pieces,height,ways)
     from dingjiang import fit_rail
     fit_rail(coords,pieces,height,ways)
-    from rail_sections import designs, fit_tracks
+    from rail_sections import designs, fit_tracks, split_profile_tiles
     for section in designs():
+        if "railProfiles" in section:
+            coords,pieces,height = split_profile_tiles(section,coords,pieces,height,ways)
         fit_tracks(section, coords, pieces, height, ways)
     tiles=defaultdict(list)
     maximum_grade=defaultdict(float)

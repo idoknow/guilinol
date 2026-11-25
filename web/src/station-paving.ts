@@ -3,7 +3,7 @@ import * as THREE from 'three'
 type Point=THREE.Vector3
 type Cut=[number,number,number,number,number,number,number,boolean,[number,number][]?]
 
-function split(poly:Point[],side:(p:Point)=>number):[Point[],Point[]]{
+export function split(poly:Point[],side:(p:Point)=>number):[Point[],Point[]]{
   const inside:Point[]=[],outside:Point[]=[]
   for(let i=0;i<poly.length;i++){
     const a=poly[i],b=poly[(i+1)%poly.length],da=side(a),db=side(b)

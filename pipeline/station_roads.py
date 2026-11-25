@@ -105,15 +105,18 @@ def bake(directory, manifest, paired_widths):
     profiles.update(road_profiles(elements, paired_widths))
     import dingjiang_structures
     profiles.update(dingjiang_structures.road_profiles(elements, paired_widths))
+    from rail_sections import adjust_prior_roads, designs, road_profiles as section_roads
+    sections = designs()
+    adjust_prior_roads("01", profiles, sections)
     bridge_ways, landings = dingjiang_structures.raise_decks(directory, manifest, elements, profiles)
-    from rail_sections import designs, road_profiles as section_roads
     from dingjiang import ROAD_IDS
     bake_profiles(directory, manifest, profiles, elements, bridge_ways.values(), landings)
     from dingjiang_paving import finish_paving
     finish_paving(directory, manifest, [profiles[wid] for wid in ROAD_IDS], elements)
     ways = {way['id']: way for way in elements if way['type']=='way'}
-    for section in designs():
+    for section in sections:
         parts = section_roads(section, ways, paired_widths)
+        adjust_prior_roads(section["name"], parts, sections)
         if not parts:
             continue
         bake_profiles(directory, manifest, parts, elements, additional=True)
@@ -140,7 +143,7 @@ def bake_profiles(directory, manifest, profiles, elements, bridge_ways=(), landi
                                    round(b[1]-z,4),round(width,3),y0,y1])
     open_lines = []
     for way, line, heights in profiles.values():
-        if way['tags'].get('tunnel')=='yes':
+        if way['tags'].get('tunnel')=='yes' and not way.get('gradeShoulders'):
             continue
         open_lines.append(line)
         width = half_width(way)
@@ -190,6 +193,9 @@ def bake_profiles(directory, manifest, profiles, elements, bridge_ways=(), landi
     for t in bores:
         a,b=t['portals']
         width=t['halfWidth']
+        if not t['openCut'] and profiles[t['way']][0].get('gradeShoulders'):
+            # Leave a centimetre for the independently encoded OSM and GL04 edges.
+            width += .01
         if t['openCut']:
             strip=LineString([(a[0],a[2]),(b[0],b[2])]).buffer(width,cap_style='flat')
             nearby=protected_paving.query(strip,predicate='intersects')
@@ -376,7 +382,7 @@ def grade_traffic(directory, manifest, ways):
     for lane in graph['lanes']:
         way = owners.get((lane['from'],lane['to']))
         if way is not None:
-            lanes.append(dict(lane, way=way['id'],halfWidth=half_width(way),structure=next((s for s in ('bridge','tunnel') if way['tags'].get(s)=='yes'),'surface')))
+            lanes.append(dict(lane, way=way['id'],halfWidth=half_width(way),maxTrafficOffset=way.get('maxTrafficOffset'),structure=next((s for s in ('bridge','tunnel') if way['tags'].get(s)=='yes'),'surface')))
     root=Path(__file__).resolve().parents[1]
     with NamedTemporaryFile(dir=directory,mode='w+') as payload:
         json.dump(dict(manifest=manifest,nodes=graph['nodes'],lanes=lanes),payload)
