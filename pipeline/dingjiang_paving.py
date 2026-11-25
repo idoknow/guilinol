@@ -15,7 +15,7 @@ def shoulder_planes(local, ways, x, z):
     """Tile-local, affine limits over the same straight chords as the road collider."""
     planes = []
     for section, a, b in local:
-        if section["way"] not in ways:
+        if (section["way"], *section["nodes"]) not in ways:
             continue
         origin = np.array([x, z])
         direction = (b - a) / section["length"]
@@ -35,9 +35,14 @@ def shoulder_planes(local, ways, x, z):
 
 
 def finish_paving(directory, manifest, profiles, elements):
-    by_way = {way["id"]: (line, heights) for way, line, heights in profiles}
-    wide_grades = {way["id"] for way, _, _ in profiles if way.get("gradeShoulders")}
-    fitted_shoulders = wide_grades | {way["id"] for way, _, _ in profiles if way.get("fitShoulderPlanes")}
+    by_way = {}
+    for way, line, heights in profiles:
+        by_way.setdefault(way["id"], []).append((line, heights, way.get("gradeShoulders")))
+    fitted_shoulders = {
+        (way["id"], u, v)
+        for way, _, _ in profiles if way.get("gradeShoulders") or way.get("fitShoulderPlanes")
+        for u, v in zip(way["nodes"], way["nodes"][1:])
+    }
     pairs = {
         (way["id"], u, v)
         for way, line, heights in profiles
@@ -130,12 +135,12 @@ def finish_paving(directory, manifest, profiles, elements):
             if section["openCut"]:
                 axes.add(key(a - [x, z], b - [x, z]))
         for wid, width in {(s["way"], s["halfWidth"]) for s, _, _ in local}:
-            line, levels = by_way[wid]
-            pts = [
-                np.asarray(line.interpolate(d).coords[0]) - [x, z] for d in levels[:, 0]
-            ]
-            for a, b in zip(pts, pts[1:]):
-                segments[key(a, b)] = (width + (15 if wid in wide_grades else 8), wid)
+            for line, levels, wide in by_way[wid]:
+                pts = [
+                    np.asarray(line.interpolate(d).coords[0]) - [x, z] for d in levels[:, 0]
+                ]
+                for a, b in zip(pts, pts[1:]):
+                    segments[key(a, b)] = (width + (15 if wide else 8), wid)
         # Elevated road decks do not own the ground-level paving beneath them.
         overhead = set()
         for line in elevated:

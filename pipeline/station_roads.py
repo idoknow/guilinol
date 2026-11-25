@@ -105,17 +105,28 @@ def bake(directory, manifest, paired_widths):
     profiles.update(road_profiles(elements, paired_widths))
     import dingjiang_structures
     profiles.update(dingjiang_structures.road_profiles(elements, paired_widths))
-    from rail_sections import adjust_prior_roads, designs, road_profiles as section_roads
+    from rail_sections import adjust_prior_roads, designs, road_phases, road_profiles as section_roads
     sections = designs()
     adjust_prior_roads("01", profiles, sections)
     bridge_ways, landings = dingjiang_structures.raise_decks(directory, manifest, elements, profiles)
     from dingjiang import ROAD_IDS
+    ways = {way['id']: way for way in elements if way['type'] == 'way'}
+    joint = []
+    for section in sections:
+        selected = [r for r in section["roads"] if r.get("withFirstSection")]
+        if selected:
+            for wid, profile in section_roads(dict(section, roads=selected), ways, paired_widths).items():
+                if wid in profiles:
+                    profiles[wid, section["name"]] = profile
+                else:
+                    profiles[wid] = profile
+                joint.append(profile)
     bake_profiles(directory, manifest, profiles, elements, bridge_ways.values(), landings)
     from dingjiang_paving import finish_paving
-    finish_paving(directory, manifest, [profiles[wid] for wid in ROAD_IDS], elements)
-    ways = {way['id']: way for way in elements if way['type']=='way'}
+    corrected = {int(wid) for section in sections for wid in section.get("priorRoadProfiles", {}).get("01", {})}
+    finish_paving(directory, manifest, [profiles[wid] for wid in sorted(set(ROAD_IDS) | corrected)] + joint, elements)
     final_traffic_ways = []
-    for section in sections:
+    for section in road_phases(sections):
         parts = section_roads(section, ways, paired_widths)
         adjust_prior_roads(section["name"], parts, sections)
         if not parts:
@@ -166,6 +177,10 @@ def bake_profiles(directory, manifest, profiles, elements, bridge_ways=(), landi
     active = set(tiles)
     near = STRtree(open_lines)
     fixed_pavement=[]
+    parts_by_way = defaultdict(list)
+    for profile in profiles.values():
+        parts_by_way[profile[0]['id']].append(profile)
+
     for way in elements:
         tags = way.get('tags',{})
         if way['type']!='way' or 'highway' not in tags or tags.get('railway')=='platform':
@@ -174,7 +189,23 @@ def bake_profiles(directory, manifest, profiles, elements, bridge_ways=(), landi
         if len(coords)<2 or not len(near.query(LineString(coords),predicate='dwithin',distance=40)):
             continue
         profiled = profiles.get(way['id'])
-        if profiled and 'nativeRemainders' in profiled[0]:
+        parts = parts_by_way[way['id']]
+        if len(parts) > 1:
+            from shapely.ops import substring
+            axis = LineString(coords)
+            spans = sorted(sorted(axis.project(Point(line.coords[i])) for i in (0, -1))
+                           for _, line, _ in parts)
+            fixed = []
+            previous = 0.
+            for start, end in spans:
+                if start < previous - .001:
+                    raise ValueError(f"Overlapping road profiles on {way['id']}")
+                if start > previous + .001:
+                    fixed.append(substring(axis, previous, start))
+                previous = end
+            if previous < axis.length - .001:
+                fixed.append(substring(axis, previous, axis.length))
+        elif profiled and 'nativeRemainders' in profiled[0]:
             fixed = profiled[0]['nativeRemainders']
         elif profiled and 'nativeRemainder' in profiled[0]:
             fixed = [LineString(profiled[0]['nativeRemainder'])]
@@ -191,7 +222,11 @@ def bake_profiles(directory, manifest, profiles, elements, bridge_ways=(), landi
             fixed = [LineString(coords)]
         for line in fixed:
             if tags.get('bridge','no')=='no' and tags.get('tunnel','no')=='no':
-                fixed_pavement.append(line.buffer(half_width(way)+.1,cap_style='round'))
+                paving = line.buffer(half_width(way)+.1, cap_style='round')
+                for part, graded, _ in parts:
+                    if part.get("flatNativeTie"):
+                        paving = paving.difference(graded.buffer(half_width(part)+.1, cap_style="flat"))
+                fixed_pavement.append(paving)
             for a,b in zip(line.coords,line.coords[1:]):
                 add(np.asarray(a),np.asarray(b),half_width(way),None,None)
     from shapely import Polygon, constrained_delaunay_triangles, union_all

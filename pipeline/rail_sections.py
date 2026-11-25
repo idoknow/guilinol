@@ -148,7 +148,7 @@ def designs():
     return [dict(json.loads(p.read_text()), name=p.stem) for p in sorted(SECTION_DIR.glob("*.json"))]
 
 
-def rounded_profile(knots, start):
+def rounded_profile(knots, start, preserve=(), lower_only=False):
     """Round interior changes of grade with tangent parabolas; sample at most 2 m apart."""
     stations, levels = knots.T
     slopes = np.diff(levels) / np.diff(stations)
@@ -159,11 +159,23 @@ def rounded_profile(knots, start):
                                           int(np.ceil((stations[-1] - start) / 2)) + 1)])
     y = np.interp(offsets, stations, levels)
     for i, (center, radius) in enumerate(zip(centers, radii)):
+        if any(abs(center - position) < .0001 for position in preserve):
+            continue
         local = abs(offsets - center) < radius
         dx = offsets[local] - center + radius
         y[local] = (levels[i + 1] - slopes[i] * radius + slopes[i] * dx
                     + (slopes[i + 1] - slopes[i]) * dx**2 / (4 * radius))
+    if lower_only:
+        y = np.minimum(y, np.interp(offsets, stations, levels))
     return np.column_stack((offsets - start, y))
+
+
+def road_phases(sections):
+    """Keep disjoint profiles on the same OSM way in separate mesh passes."""
+    for section in sections:
+        yield dict(section, roads=[r for r in section["roads"] if not r.get("withFirstSection")])
+        for group in section.get("additionalRoadGroups", []):
+            yield dict(section, roads=group)
 
 
 def road_profiles(section, ways, widths):
@@ -208,11 +220,15 @@ def road_profiles(section, ways, widths):
         )
         if "maxTrafficOffset" in road:
             local["maxTrafficOffset"] = road["maxTrafficOffset"]
+        if "width" in road:
+            local["profileWidth"] = road["width"]
         if wid in widths:
             local["stationWidth"] = widths[wid]
         if "railProfiles" in section:
             local["gradeShoulders"] = True
-            profile = rounded_profile(knots, start)
+            exact = section.get("retainRoadNodeLevels", False)
+            local["flatNativeTie"] = exact
+            profile = rounded_profile(knots, start, stations if exact else (), lower_only=exact)
         else:
             profile = samples([(s - start, y) for s, y in knots], transition=1.0)
         if np.max(abs(np.diff(profile[:, 1]) / np.diff(profile[:, 0]))) > road.get("maximumGrade", .05) + 1e-6:
@@ -247,11 +263,31 @@ def adjust_prior_roads(name, profiles, sections):
                 way = dict(way, gradeShoulders=True)
             profiles[wid] = way, line, updated
 
+        for key, segment in section.get("priorRoadProfiles", {}).get(name, {}).items():
+            wid = int(key)
+            way, line, native = profiles[wid]
+            if segment["startNode"] != way["nodes"][0]:
+                raise ValueError(f"Road profile origin changed on {wid}")
+            knots = np.asarray(segment["controls"])
+            start, end = knots[[0, -1], 0]
+            if start < -.00001 or end > line.length + .00001 or np.any(np.diff(knots[:, 0]) <= 0):
+                raise ValueError(f"Invalid replacement chainage on {wid}")
+            replacement = rounded_profile(knots, start)
+            replacement[:, 0] += start
+            before = native[native[:, 0] < start - .00001]
+            after = native[native[:, 0] > end + .00001]
+            profile = np.vstack((before, replacement, after))
+            if np.any(profile[:, 1] > np.interp(profile[:, 0], *native.T) + .001):
+                raise ValueError(f"Road correction raises {wid}")
+            if np.any(abs(np.diff(profile[:, 1])) > .05 * np.diff(profile[:, 0]) + 1.e-7):
+                raise ValueError(f"Road correction exceeds 5% on {wid}")
+            profiles[wid] = dict(way, fitShoulderPlanes=True), line, profile
+
 
 def motorway_sections(elements):
     """Append only the solved motorway chords to the optional replay network."""
     ways = {way["id"]: way for way in elements if way["type"] == "way"}
-    for section in designs():
+    for section in road_phases(designs()):
         for way, _, _ in road_profiles(section, ways, {}).values():
             if way["tags"]["highway"] in ("motorway", "motorway_link"):
                 yield way

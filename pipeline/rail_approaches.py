@@ -42,11 +42,19 @@ def measure(world, sections, *, exclude=()):
             continue
         p = axis.intersection(line)
         strips = [b for b in manifest['tunnels'] if b['way'] == road]
-        near = min(strips, key=lambda b: LineString([(x,z) for x,_,z in b['portals']]).distance(p))
-        width = near['halfWidth']
+        near = next((b for b in strips if LineString(
+            [(x, z) for x, _, z in b['portals']]
+        ).distance(p) < .002), None)
+        if near is None and tags.get("tunnel") == "yes":
+            raise ValueError(f"Missing covered road at {rail}/{road}")
+        if near is None:
+            from station_roads import half_width
+            width = half_width({"tags": tags})
+        else:
+            width = near["halfWidth"]
         # Covered bores stop at the inside face of the wall. For surface roads,
         # include the lateral verge, cycle lane and outer curb where present.
-        if near.get('openCut'):
+        if near is None or near.get('openCut'):
             section = rules['sections'].get(rules['sectionClasses'].get(tags['highway']), {})
             width += max(2., sum(section.get(key, 0.) for key in ('verge','cycle','curb')))
         road_band = axis.buffer(width, cap_style="flat")
@@ -80,7 +88,9 @@ def measure(world, sections, *, exclude=()):
                 overlap = lower.intersection(piece[0].buffer(2.05,cap_style='flat'))
                 if overlap.is_empty or overlap.area < 1e-10: continue
                 count += 1
-                for x,z in overlap.exterior.coords:
+                parts = getattr(overlap, "geoms", (overlap,))
+                corners = (xy for part in parts if part.geom_type == "Polygon" for xy in part.exterior.coords)
+                for x,z in corners:
                     y = a[1] + plane @ [x-a[0],z-a[2]]
                     gap = elevation(piece,Point(x,z))-y
                     if gap < minimum:
