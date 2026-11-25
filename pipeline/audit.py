@@ -248,7 +248,7 @@ def run_audit(world_dir: Path, root: Path) -> dict:
     @lru_cache(maxsize=24)
     def survey_mesh(key):
         entry = chunk_streets.get(key)
-        if entry and len(entry[2]) > 12 and entry[2][12]:
+        if entry and len(entry[2]) > 12 and isinstance(entry[2][12], dict):
             return SurveySurface(entry[2][12])
         return None
 
