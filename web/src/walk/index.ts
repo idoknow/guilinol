@@ -1146,8 +1146,8 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
     position:()=>sim.body.translation(),face:(angle)=>{yaw=angle+Math.PI;facing=yaw+avatar.yaw;figure.rotation.y=facing},
     teleport:(x,z,angle)=>enter(x,z,angle,'fishing'),hand:()=>avatarRig.attachmentAt?.('hand_r')??figure.getObjectByName('hand_r'),scene,camera,
   },verify))
-  // 钓鱼（IDOK-336）默认开放；?fishing=0 可临时关掉（排查问题用）。
-  const fishingOn=verify||new URLSearchParams(location.search).get('fishing')!=='0'
+  // 钓鱼（IDOK-336）2026-11-25 按需求方要求下线重做：默认关闭，?fishing=1（或 verify）才开。
+  const fishingOn=verify||new URLSearchParams(location.search).get('fishing')==='1'
   // 钓点可发现（IDOK-336 线上反馈）：40 m 内就亮出鱼竿格；没站到岸点上时按 4 先走到岸点再切竿。
   const FISH_NEAR=40
   const fishMarks=fishingOn?fishingMarks(scene):undefined
