@@ -345,8 +345,6 @@ export function tunnelGeometry(tile:Tile,ground:THREE.PlaneGeometry,tunnels:Tunn
     parts.ceiling=Array.from(tunnelClearanceClipper(tile,tunnels)(vertices,Array.from({length:vertices.length/3},(_,i)=>i)))
   }
   const looks:Record<string,THREE.MeshStandardMaterial|THREE.MeshBasicMaterial>={
-    sign:new THREE.MeshBasicMaterial({side:THREE.DoubleSide,color:0x194b75}),
-    letters:new THREE.MeshBasicMaterial({side:THREE.DoubleSide,color:0xffffff}),
     road:new THREE.MeshStandardMaterial({side:THREE.DoubleSide,color:0x3b3e42,roughness:.95}),
     interior:new THREE.MeshStandardMaterial({side:THREE.DoubleSide,color:0xcfc8b8,roughness:.9}),
     portal:new THREE.MeshStandardMaterial({side:THREE.DoubleSide,color:0xa39d90,roughness:.92}),
@@ -356,6 +354,10 @@ export function tunnelGeometry(tile:Tile,ground:THREE.PlaneGeometry,tunnels:Tunn
     lane:new THREE.MeshStandardMaterial({side:THREE.DoubleSide,color:0xeae3cf,roughness:.8}),
     terrain:new THREE.MeshStandardMaterial({side:THREE.DoubleSide,color:0x888888}),
   }
+  if(parts.sign.length){
+    looks.sign=new THREE.MeshBasicMaterial({side:THREE.DoubleSide,color:0x194b75})
+    looks.letters=new THREE.MeshBasicMaterial({side:THREE.DoubleSide,color:0xffffff})
+  }
   function mesh(values:number[],kind:string){
     const geometry=new THREE.BufferGeometry();geometry.setAttribute('position',new THREE.Float32BufferAttribute(values,3));geometry.computeVertexNormals()
     const item=new THREE.Mesh(geometry,looks[kind]);item.name=`tunnel_${kind}`;item.userData.kind=kind;return item
@@ -364,7 +366,7 @@ export function tunnelGeometry(tile:Tile,ground:THREE.PlaneGeometry,tunnels:Tunn
   const floor=mesh(parts.floor,'road')
   floor.geometry.userData.tunnelRanges=floorRanges
   return {fringe,floor,interior:mesh(parts.interior,'interior'),portal:mesh(parts.portal,'portal'),
-    sign:mesh(parts.sign,'sign'),letters:mesh(parts.letters,'letters'),band:mesh(parts.band,'band'),ceiling:mesh(parts.ceiling,'ceiling'),lamp:mesh(parts.lamp,'lamp'),lane:mesh(parts.lane,'lane')}
+    ...(parts.sign.length?{sign:mesh(parts.sign,'sign'),letters:mesh(parts.letters,'letters')}:{}),band:mesh(parts.band,'band'),ceiling:mesh(parts.ceiling,'ceiling'),lamp:mesh(parts.lamp,'lamp'),lane:mesh(parts.lane,'lane')}
 }
 
 // Clip collision triangles against the actual piecewise-linear floor and roof.

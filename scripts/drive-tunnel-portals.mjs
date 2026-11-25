@@ -9,7 +9,7 @@ import {withFixtureBays} from './ride-fixture-bays.mjs'
 
 const directory=resolve(process.env.GROUNDING_DIST??'dist')
 const output=process.argv[2]??'captures/vehicle-grounding/portals.json'
-const selected=new Set(process.argv.slice(3).filter(arg=>arg!=='--surface').map(Number))
+const selected=new Set(process.argv.slice(3).filter(arg=>arg!=='--surface'&&arg!=='--wheels').map(Number))
 const sites=JSON.parse(await readFile(process.env.GROUNDING_ROUTES_FILE??directory+'/world/'+(process.argv.includes('--surface')?'vehicle-surface-routes.json':'vehicle-portal-routes.json'),'utf8')).filter(s=>!selected.size||selected.has(s.id))
 if(!sites.length)throw Error('No matching portal fixtures')
 const vehicles=JSON.parse(gunzipSync(await readFile(directory+'/world/vehicles.bin')))
@@ -84,7 +84,7 @@ try{
           }catch(e){ready=false;setupError=e.message.split('\n')[0]}
         }
         if(!ready)throw Error(setupError??'could not reach or board lane fixture')
-        const run=await page.evaluate(async({route,mode,boundary,reverseExit,singleFile,surfaceApproach,turnAt})=>{
+        const run=await page.evaluate(async({route,mode,boundary,reverseExit,singleFile,surfaceApproach,turnAt,measureWheels})=>{
           const v=window.viewer,w=v.walk,held=new Set(),frames=[]
           const key=(code,down)=>{
             if(held.has(code)===down)return
@@ -93,6 +93,11 @@ try{
           }
           if(mode==='bike'){w.ebike.setPark(false,true);w.ebike.setKickstand(false,true)}
           const rig=mode==='foot'?null:v.stream.scene.getObjectByName('dynamic-'+(mode==='bike'?'ebike':mode))
+          const wheels=measureWheels&&mode==='car'?rig.children.filter(child=>
+            Math.abs(Math.abs(child.position.x)-.795)<1e-5&&
+            (Math.abs(child.position.z+1.34)<1e-5||Math.abs(child.position.z-1.31)<1e-5)):null
+          if(wheels&&wheels.length!==4)throw Error('Expected the four mounted sedan wheels')
+          const roll=wheels?{wheelSamples:0,missing:0,maxGap:0,maxRollErrorDegrees:0}:undefined
           const height=()=>mode==='car'||mode==='foot'?w.fixtureHeight():rig.position.y
           const initialResets=w.probe().resets
           let part=1,maximum=0,previous,completed=false,furthest=0,reversing=false,exitStation,pivot
@@ -188,6 +193,20 @@ try{
               const y=height(),next=w.position
               if(previous!==undefined)maximum=Math.max(maximum,Math.abs(y-previous))
               previous=y;frames.push([next.x,next.z,y])
+              if(wheels&&frame%6===0){
+                const centers=wheels.map(wheel=>rig.localToWorld(wheel.position.clone()))
+                const levels=centers.map(p=>w.carSupportAt(p.x,p.z,p.y-.306)?.y)
+                for(let i=0;i<4;i++){
+                  if(levels[i]===undefined){roll.missing++;continue}
+                  roll.wheelSamples++
+                  roll.maxGap=Math.max(roll.maxGap,Math.abs(centers[i].y-.306-levels[i]))
+                }
+                for(const i of [0,2])if(levels[i]!==undefined&&levels[i+1]!==undefined){
+                  const tireAngle=Math.atan2(centers[i+1].y-centers[i].y,1.59)
+                  const roadAngle=Math.atan2(levels[i+1]-levels[i],1.59)
+                  roll.maxRollErrorDegrees=Math.max(roll.maxRollErrorDegrees,180/Math.PI*Math.abs(tireAngle-roadAngle))
+                }
+              }
               if(frame%15===0)await new Promise(r=>setTimeout(r,0))
               if(frames.length>300&&Math.hypot(next.x-frames.at(-300)[0],next.z-frames.at(-300)[1])<.06&&
                 frames.slice(-300).every(([x,z])=>Math.hypot(next.x-x,next.z-z)<.06))break
@@ -204,10 +223,10 @@ try{
             probe.contactSources?.some(hit=>Math.abs(hit.normal?.y)<.5)
           if(reverseExit && probe.resets!==initialResets)completed=false
           const failure=completed?undefined:obstruction||probe.resets>initialResets?'collision':'tool'
-          return {start,completed,failure,maximum,frames,part,
+          return {start,completed,failure,maximum,frames,part,roll,
             reverseExit:reverseExit?{furthest,exitStation,resets:probe.resets-initialResets}:undefined,obstacle:w.obstacle,contacts,
             stopped:completed?undefined:{wet:probe.wet,blockedWater:probe.blockedWater,surface:probe.surfaceKind,inHouse:probe.inHouse,hits:probe.contactSources,foot:probe.foot,resets:probe.resets-initialResets,heading:w.heading}}
-        },{route,mode,boundary,reverseExit,singleFile,turnAt,surfaceApproach:!boundary&&process.argv.includes('--surface')})
+        },{route,mode,boundary,reverseExit,singleFile,turnAt,measureWheels:process.argv.includes('--wheels'),surfaceApproach:!boundary&&process.argv.includes('--surface')})
         results.push({id,way,mode,boundary,direction,...run})
       }catch(e){results.push({id,way,mode,boundary,direction,failure:"tool",unavailable:e.message.split('\n')[0]})}finally{await page.evaluate(()=>window.viewer.resume())}
     }
