@@ -59,7 +59,7 @@ const server = await preview({plugins:[telemetryPreview],root: 'web', configFile
 const port = server.httpServer.address().port
 let browser
 let browserReport
-const photo = JSON.parse(await readFile('docs/refs/rock/photo-locations.json', 'utf8'))['IMG_1299.jpg']
+const photo = JSON.parse(await readFile('.ops-docs/refs/rock/photo-locations.json', 'utf8'))['IMG_1299.jpg']
 const namedViews = [
   {id: 'shizijie', label: '十字街', x: -891, z: -165, yaw: -1.2},
   {id: 'zhongshan', label: '中山中路', x: -935, z: -20, yaw: -0.18},

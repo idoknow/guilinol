@@ -26,8 +26,8 @@ scene = trimesh.load_scene(args.glb)
 config = json.loads((root/'pipeline/landmarks.json').read_text())
 anchor = next(item['anchor'] for item in config if item['id']=='wangcheng_market')
 origin = np.array(ll2xz(*reversed(anchor)))
-features = json.loads((root/'docs/layout/dongxi-layout.geojson').read_text())['features']
-features += json.loads((root/'docs/layout/dongxi-infill.geojson').read_text())['features']
+features = json.loads((root/'.ops-docs/layout/dongxi-layout.geojson').read_text())['features']
+features += json.loads((root/'.ops-docs/layout/dongxi-infill.geojson').read_text())['features']
 
 
 def axis(polygon):

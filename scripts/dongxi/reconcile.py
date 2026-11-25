@@ -7,7 +7,7 @@ from shapely import from_wkt,union_all,make_valid
 from shapely.geometry import shape,mapping,Polygon,Point,LineString,box
 from shapely.ops import transform
 from PIL import Image
-root=Path(__file__).resolve().parents[2];folder=root/'docs/layout';sys.path.insert(0,str(root/'pipeline'));from common import MLON,MLAT,LON0,LAT0
+root=Path(__file__).resolve().parents[2];folder=root/'.ops-docs/layout';sys.path.insert(0,str(root/'pipeline'));from common import MLON,MLAT,LON0,LAT0
 def project(lon,lat):return ((np.asarray(lon)-LON0)*MLON,(LAT0-np.asarray(lat))*MLAT)
 def geographic(east,south):return (np.asarray(east)/MLON+LON0,LAT0-np.asarray(south)/MLAT)
 def pieces(poly):return [part for part in getattr(poly,'geoms',[poly]) if part.geom_type=='Polygon' and not part.is_empty]

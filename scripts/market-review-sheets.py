@@ -11,7 +11,7 @@ from common import xz2ll
 
 capture = Path(sys.argv[1])
 rgb = Image.open(sys.argv[2]).convert('RGB')
-layout = root / 'docs/layout'
+layout = root / '.ops-docs/layout'
 grid = json.loads((layout / 'dongxi-esri-grid.json').read_text())
 scale = 256 * 2**grid['zoom']
 
@@ -44,7 +44,7 @@ for batch, numbers in [('entrances', [f'Y{i:02}' for i in range(1,9)]), ('street
     pages = []
     for number in numbers:
         estimated = number.startswith('Y')
-        path = root/'docs/refs/rock'/('walk-dongxi-xiaoyao-jiefang' if estimated else 'walk-shizijie-wangcheng')
+        path = root/'.ops-docs/refs/rock'/('walk-dongxi-xiaoyao-jiefang' if estimated else 'walk-shizijie-wangcheng')
         page = Image.new('RGB', (1280,560), '#eeeae2')
         for index, file in enumerate([next(path.glob(number[-2:]+'_*.jpg')),capture/(number+'.jpg')]):
             pic = ImageOps.contain(Image.open(file), (640,510))

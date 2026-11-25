@@ -1,6 +1,6 @@
 """桂林市民族中学 (`way/647468207`, 民主路9号; 现逸仙中学初中部) full campus restoration.
 
-Evidence: docs/layout/schools/minzu_middle.md (Esri z19 imagery, OSM, Overture, public photos).
+Evidence: .ops-docs/layout/schools/minzu_middle.md (Esri z19 imagery, OSM, Overture, public photos).
 - `MZ1` north 5F white-tile teaching block (`1437fe77` = OSM `way/1474978350`), blue window
   frames and a flat entrance canopy facing the track (`ref_17`, `ref_14..16`).
 - `MZ2` NE 4F block with pale-blue roof (`89d8a68b`), `MZ3` 3F white-parapet block west of it

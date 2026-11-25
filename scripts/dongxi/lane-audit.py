@@ -40,7 +40,7 @@ def main():
     parser.add_argument('--trim', action='store_true')
     parser.add_argument('--raw-models', type=Path, help='LOD0 generator output directory (before packing)')
     args = parser.parse_args()
-    layout = ROOT / 'docs/layout'
+    layout = ROOT / '.ops-docs/layout'
     boundary = next(item['replace']['polygon'] for item in json.loads((ROOT/'pipeline/landmarks.json').read_text()) if item['id'] == 'wangcheng_market')
     district = Polygon(ring(boundary))
     ways = {}

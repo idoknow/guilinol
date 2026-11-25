@@ -6,9 +6,10 @@ import { pathToFileURL } from 'node:url'
 import { chromium } from 'playwright'
 import { preview } from 'vite'
 import {sectionCamera} from './section-camera.mjs'
+import {refs, hasPhotos, skipPhotos} from './photo-refs.mjs'
 
-const refs = resolve('docs/refs/rock'),
-  out = resolve('captures/photo-match')
+if (!hasPhotos) { console.log(skipPhotos); process.exit(0) }
+const out = resolve('captures/photo-match')
 const locations = JSON.parse(await readFile(join(refs, 'photo-locations.json')))
 const { values, positionals } = parseArgs({
   allowPositionals: true,
@@ -30,7 +31,7 @@ const selected = new Set(values.all ? keys : [])
 for (const arg of positionals) {
   const input = arg.replace(/^\.\//, '')
   const key =
-    input.startsWith('docs/refs/rock') || input.startsWith('/') ? relative(refs, resolve(input)) : input
+    input.startsWith('/') ? relative(refs, resolve(input)) : input
   const dir = key.replace(/\/$/, '')
   const id = /^IMG_(\d+)(?:\.jpg)?$/i.exec(key)?.[1]
   if (id) {

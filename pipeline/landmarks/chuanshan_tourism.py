@@ -1,6 +1,6 @@
 """桂林市旅游职业中等专业学校（穿山校区）(`way/647468198`) full campus restoration.
 
-Evidence: docs/layout/schools/chuanshan_tourism.md (Esri z19 imagery, OSM, Overture, public photo).
+Evidence: .ops-docs/layout/schools/chuanshan_tourism.md (Esri z19 imagery, OSM, Overture, public photo).
 - 20 teaching/office/hall blocks on their OSM/Overture footprints (all mapped as `building`),
   heights from imagery shadows; the large NE complex (`f49f6caa` = `relation/20180296`) keeps
   its open courtyard.

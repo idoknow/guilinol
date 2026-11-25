@@ -3,7 +3,7 @@
 Every building inside the OSM campus outline (way/380351945) keeps its exact
 OSM footprint (plus Overture-only footprints); facades follow the school's
 official campus-scenery photos (glut.edu.cn 校园景观 → 屏风校区, 11 photos, see
-docs/layout/universities/glut_pingfeng.md). The attached primary school
+.ops-docs/layout/universities/glut_pingfeng.md). The attached primary school
 (way/473969804, own landmark) and the kindergarten (way/474309073) are left to
 the base map / their own landmark. No guard post, turnstile or camera.
 """

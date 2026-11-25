@@ -1,4 +1,4 @@
-"""古南门. Dimensions and evidence in docs/layout/gunanmen.md."""
+"""古南门. Dimensions and evidence in .ops-docs/layout/gunanmen.md."""
 import math
 import random
 import sys
