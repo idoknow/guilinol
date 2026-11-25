@@ -49,6 +49,11 @@ def relocate(output, manifest, elements):
     travelled = STRtree([LineString([p[:2] for p in mode['route']]).buffer(1.6)
                          for site in routes for mode in site['modes']
                          if mode['mode']=='car' and len(mode['route'])>1])
+    # The approach to the cycleway and the pedestrian entrance both pass
+    # through the old verge. Keep the travelled strip clear of tree trunks.
+    paths_at_verge=STRtree([LineString([p[:2] for p in mode['route']]).buffer(.85)
+                            for site in routes if site['id'] in (13956749339,9349946067)
+                            for mode in site['modes'] if mode['mode'] in ('bike','bicycle','foot')])
     moves=defaultdict(list)
     anchors=defaultdict(dict)
     for key,tile in tiles.items():
@@ -65,7 +70,9 @@ def relocate(output, manifest, elements):
         if len(access):
             asphalt = footprints(paths[0][survey['start']:survey['end']],key,{0})
             added = added.union(asphalt.intersection(union_all(travelled.geometries.take(access))))
-        if added.is_empty:
+        path_hits=paths_at_verge.query(box(*key,key[0]+256,key[1]+256),predicate='intersects')
+        travelled_path=union_all(paths_at_verge.geometries.take(path_hits))
+        if added.is_empty and travelled_path.is_empty:
             continue
         trees_path=(output/tile['file']).with_suffix('.trees')
         trees=list(TREE.iter_unpack(gzip.decompress(trees_path.read_bytes()))) if trees_path.exists() else []
@@ -76,7 +83,7 @@ def relocate(output, manifest, elements):
         for field,i,lx,lz in objects:
             x,z=key[0]+lx,key[1]+lz
             point=Point(x,z)
-            if not added.covers(point):
+            if not (added.covers(point) or (field==0 and travelled_path.covers(point))):
                 continue
             if nearby is None:
                 region=box(key[0]-160,key[1]-160,key[0]+416,key[1]+416)
@@ -109,7 +116,7 @@ def relocate(output, manifest, elements):
                                 continue
                             nx,nz=np.rint(np.array(edge.coords[0])*scale)/scale
                             q=Point(nx,nz)
-                            if .5<=road.distance(q)<=1 and origin(nx,nz) in tiles:
+                            if .5<=road.distance(q)<=1 and origin(nx,nz) in tiles and not travelled_path.covers(q):
                                 candidates.append((not sidewalk.covers(q),point.distance(q),nx,nz))
             if not candidates:
                 raise ValueError(f'No legal lateral position at {point}')
