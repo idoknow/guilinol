@@ -18,6 +18,7 @@ const {
   isInShizijieNoPedZone,
   isShizijieCrosswalkRing,
   isShizijieDecorSuppressed,
+  isShizijieSignalSuppressed,
   pointInRelPoly,
   touchesShizijieTile,
 } = await import('../web/src/shizijie-zone.ts')
@@ -129,10 +130,12 @@ console.log(`  Suppressed Shizijie legacy decor: ${totalSuppressedDecor}; surrou
 // and emits 0 triangles for all Shizijie crosswalk rings.
 const mainTile = tileData[0]
 const suppressedDecorOnly = (mainTile.streets[9] ?? []).filter(d => isShizijieDecorSuppressed(mainTile.ox + d[1] / 10, mainTile.oz + d[2] / 10, d[0]))
+const suppressedSignalsOnly = (mainTile.streets[3] ?? []).filter(([e, s]) => isShizijieSignalSuppressed(mainTile.ox + e / 10, mainTile.oz + s / 10))
+assert(suppressedSignalsOnly.length >= 4, `Expected >= 4 legacy Shizijie street-worker signals suppressed, got ${suppressedSignalsOnly.length}`)
 const crosswalkPathsOnly = (mainTile.streets[0] ?? []).filter(([k, r]) => k === 2 && r?.length >= 4 && isShizijieCrosswalkRing(r.map(([x, z]) => [x / 100, z / 100]), mainTile.ox, mainTile.oz))
-const emptyStreetsWithSuppressedOnly = [[], [], [], [], [], null, [], [], [], suppressedDecorOnly, [], null, null, null, [], [], []]
+const emptyStreetsWithSuppressedOnly = [[], [], [], suppressedSignalsOnly, [], null, [], [], [], suppressedDecorOnly, [], null, null, null, [], [], []]
 const suppressedOut = streetGeometry(emptyStreetsWithSuppressedOnly, () => 151.3, [], [], () => 151.3, undefined, new Set(), [mainTile.ox, mainTile.oz])
-assert.equal(suppressedOut.furnitureMatrices.length, 0, 'Suppressed Shizijie decor must emit 0 visual furniture instances')
+assert.equal(suppressedOut.furnitureMatrices.length, 0, 'Suppressed Shizijie decor & legacy signals must emit 0 visual furniture instances')
 const crosswalkStreetsOnly = [crosswalkPathsOnly, [], [], [], [], null, [], [], [], [], [], null, null, null, [], [], []]
 const crosswalkOut = streetGeometry(crosswalkStreetsOnly, () => 151.3, [], [], () => 151.3, undefined, new Set(), [mainTile.ox, mainTile.oz])
 assert.equal(crosswalkOut.positions.length, 0, 'Shizijie crosswalk polygons must emit 0 street triangles')
@@ -155,6 +158,23 @@ const surfaceAt = (wx, wz) => {
   }
   return kinds.length ? kinds : undefined
 }
+// Verify no Shizijie curb barrier polyline encroaches on motor (kind=0) or cycle (kind=5) lanes (with 0.15 m collider margin)
+let curbEncroachments = 0
+for (const poly of SHIZIJIE_CURB_BARRIER_POLYLINES) {
+  for (let i = 1; i < poly.length; i++) {
+    const [ax, az] = poly[i - 1], [bx, bz] = poly[i]
+    const steps = Math.max(4, Math.ceil(Math.hypot(bx - ax, bz - az) * 2))
+    for (let s = 0; s <= steps; s++) {
+      const rx = ax + (bx - ax) * s / steps, rz = az + (bz - az) * s / steps
+      for (const [dx, dz] of [[0, 0], [0.15, 0], [-0.15, 0], [0, 0.15], [0, -0.15]]) {
+        const ks = surfaceAt(OX + rx + dx, OZ + rz + dz) ?? []
+        if (ks.includes(0) || ks.includes(5)) { curbEncroachments++; break }
+      }
+    }
+  }
+}
+assert.equal(curbEncroachments, 0, `Shizijie curb barrier polylines must not encroach on motor/cycle lanes, got ${curbEncroachments}`)
+
 const graph = JSON.parse(gunzipSync(await readFile('public/world/roads/-2_-1.json.gz')).toString('utf8'))
 const sim = new Traffic(graph, () => 0.42, 100, undefined, surfaceAt)
 const camShizijie = {x: OX, y: 151.3, z: OZ}
@@ -162,7 +182,7 @@ let simPedSamples = 0
 let simMaxActivePeds = 0
 let simViolations = 0
 for (let step = 0; step < 600; step++) {
-  sim.step(0.05, camShizijie, () => false)
+  sim.step(0.05, camShizijie, undefined, () => false)
   let activeNear = 0
   for (const a of sim.actors) {
     if (a.kind !== 'person') continue
@@ -175,9 +195,17 @@ for (let step = 0; step < 600; step++) {
   }
   if (activeNear > simMaxActivePeds) simMaxActivePeds = activeNear
 }
+let simStalledAtEnd = 0, simMovingAtEnd = 0
+for (const a of sim.actors) {
+  if (a.kind !== 'person') continue
+  if (Math.abs(a.x - OX) <= 105 && Math.abs(a.z - OZ) <= 95) {
+    if (a.arrived) simStalledAtEnd++; else simMovingAtEnd++
+  }
+}
 assert(simMaxActivePeds >= 1 && simPedSamples >= 50, `Expected active Shizijie sidewalk NPCs during 30s sim, got max=${simMaxActivePeds}, samples=${simPedSamples}`)
 assert.equal(simViolations, 0, `NPC entered Shizijie forbidden carriageway/crossing zone ${simViolations} times`)
-console.log(`  30s Traffic unit sim OK: maxActive=${simMaxActivePeds}, totalSamples=${simPedSamples}, violations=${simViolations}`)
+assert(simMovingAtEnd > 0 && simStalledAtEnd === 0, `Expected Shizijie NPCs to turn or reverse at corner ends instead of stalling (moving=${simMovingAtEnd}, stalled=${simStalledAtEnd})`)
+console.log(`  30s Traffic unit sim OK: maxActive=${simMaxActivePeds}, totalSamples=${simPedSamples}, violations=${simViolations}, moving=${simMovingAtEnd}, stalled=${simStalledAtEnd}`)
 
 // ---------------------------------------------------------------------------
 // 2. Live Browser E2E (Metal Headless Chromium) + Screenshots + Curb Collision
@@ -293,7 +321,7 @@ try {
     }, {x: sx, z: sz, yaw})
     assert(ok, `Failed to spawn on ${corner.label} outer sidewalk at (${sx}, ${sz})`)
 
-    await page.waitForFunction(() => !window.viewer.stats.pending, null, {timeout: 30000})
+    await page.waitForFunction(() => !window.viewer.stats.pending && !document.querySelector('.ld-skeleton'), null, {timeout: 45000})
     await page.evaluate(() => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r))))
     await page.evaluate(() => window.viewer.redrawGfx?.())
     await page.screenshot({path: join(outDir, corner.name), timeout: 60000})

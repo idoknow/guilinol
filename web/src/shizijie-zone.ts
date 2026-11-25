@@ -54,11 +54,11 @@ export const SHIZIJIE_NO_PED_CORE_POLY: readonly XZPoint[] = [
 // Outer sidewalk curb lines (nudged ~0.3 m sidewalk-side) used to emit gap-free physical `roadBarriers`
 // closing crosswalk/corner openings without intersecting any motor, nonmotor, or T-alley lane (e.g. Culture Palace Rd).
 export const SHIZIJIE_CURB_BARRIER_POLYLINES: readonly (readonly XZPoint[])[] = [
-  [[-98.0, -40.0], [-76.4, -35.3], [-70.2, -32.6], [-46.6, -29.0], [-19.5, -23.1], [-15.7, -25.7], [-13.2, -27.4], [-7.6, -46.4], [3.9, -86.4]],
-  [[43.8, -86.4], [30.9, -36.6], [28.6, -21.3], [29.5, -18.9], [34.6, -13.0], [39.3, -6.2], [41.4, -3.2], [44.0, -0.8], [55.9, 1.8], [111.8, 15.7], [124.0, 18.7]],
-  [[-13.4, 92.8], [-3.8, 64.8], [-0.4, 62.7], [5.5, 47.0], [8.4, 40.1], [13.5, 36.8], [23.3, 31.8], [28.8, 29.4], [40.9, 32.1], [43.0, 30.4], [85.5, 40.9]],
+  [[-98.0, -40.0], [-76.4, -35.6], [-70.2, -33.2], [-46.6, -29.3], [-19.5, -23.1], [-15.7, -25.7], [-13.2, -27.4], [-7.6, -46.4], [3.9, -86.4]],
+  [[44.2, -86.4], [31.2, -36.6], [28.6, -21.3], [29.5, -18.9], [34.6, -13.0], [39.3, -6.2], [41.4, -3.2], [44.0, -0.8], [55.9, 1.8], [111.8, 15.7], [124.0, 18.7]],
+  [[-12.1, 92.8], [-2.5, 64.8], [0.4, 62.7], [6.2, 47.0], [8.7, 40.1], [13.5, 36.8], [23.3, 31.8], [28.8, 29.4], [40.9, 32.3], [43.2, 30.8], [85.5, 40.9]],
   [[103.5, 45.2], [124.0, 50.3]],
-  [[-102.0, -1.0], [-76.7, 3.9], [-65.8, 14.7], [-41.2, 20.1], [-40.0, 21.4], [-38.4, 24.4], [-37.0, 26.9], [-35.5, 29.5], [-34.8, 31.6], [-40.9, 48.3], [-39.7, 52.3], [-48.6, 79.5]],
+  [[-102.0, -1.0], [-76.7, 3.9], [-65.8, 14.7], [-41.2, 20.1], [-40.0, 21.4], [-38.4, 24.4], [-37.0, 26.9], [-35.5, 29.5], [-34.8, 31.6], [-40.9, 48.3], [-40.2, 52.3], [-49.5, 79.5]],
 ]
 
 export function toShizijieRel(worldX: number, worldZ: number): [number, number] {
@@ -190,6 +190,14 @@ export function clampOutsideShizijieNoPedZone(
 
 export function isShizijieDecorSuppressed(worldX: number, worldZ: number, kind: number): boolean {
   if (kind !== 1 && kind !== 2 && kind !== 4 && kind !== 5 && kind !== 6 && kind !== 7) return false
+  const rx = worldX - SHIZIJIE_ORIGIN[0]
+  const rz = worldZ - SHIZIJIE_ORIGIN[1]
+  if (rx < -95 || rx > 140 || rz < -95 || rz > 95) return false
+  return pointInRelPoly(rx, rz, SHIZIJIE_DECOR_EXCLUSION_POLY)
+}
+
+/** Suppresses legacy placeholder `street-worker` signal poles inside the `shizijie.glb` footprint (IDOK-410-A). */
+export function isShizijieSignalSuppressed(worldX: number, worldZ: number): boolean {
   const rx = worldX - SHIZIJIE_ORIGIN[0]
   const rz = worldZ - SHIZIJIE_ORIGIN[1]
   if (rx < -95 || rx > 140 || rz < -95 || rz > 95) return false

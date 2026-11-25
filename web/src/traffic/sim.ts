@@ -1,7 +1,7 @@
 import {axleHeight,contactPose} from './lane-surface.ts'
 import {nearStatic,resolveContact,staticSolids,pickups,type Solid} from './contact.ts'
 import {CAR_SCALE} from '../drive/scale.ts'
-import {clampOutsideShizijieNoPedZone,isInShizijieNoPedZone,segmentHitsShizijieNoPedZone} from '../shizijie-zone.ts'
+import {clampOutsideShizijieNoPedZone,isInShizijieNoPedZone,isNearShizijiePrecinct,segmentHitsShizijieNoPedZone} from '../shizijie-zone.ts'
 type Node = {id:number,x:number,y:number,z:number}
 type Lane = {id:number,from:number,to:number,offset:number,width?:number,kind:'motor'|'bus'|'nonmotor',speedKmh:number,cls?:string,street?:string,npcWalks?:number[][],heights?:number[],floor?:string}
 type Phase = {lanes:number[],green:number,yellow:number}
@@ -389,6 +389,38 @@ export class Traffic {
     }
     return best
   }
+  private shizijieTurnOrReverse(track:Track){
+    const {x,z}=track.end
+    if(!isNearShizijiePrecinct(x,z,12))return undefined
+    const tolerance=4.5
+    let best:{track:Track,dist:number,gap:number}|undefined
+    for(let col=Math.floor((x-tolerance)/128);col<=Math.floor((x+tolerance)/128);col++){
+      for(let row=Math.floor((z-tolerance)/128);row<=Math.floor((z+tolerance)/128);row++){
+        for(const next of this.cells.get(`${col},${row}`)??[]){
+          if(!next.walk||next===track||next===track.pairTrack||next.dx*track.dx+next.dz*track.dz<-.75)continue
+          if(!this.usable(next))continue
+          const dist=Math.max(0,Math.min(next.length,(x-next.start.x)*next.dx+(z-next.start.z)*next.dz))
+          if(next.length-dist<WALK_MIN_LEN)continue
+          const nxPt=next.start.x+dist*next.dx,nzPt=next.start.z+dist*next.dz
+          const gap=Math.hypot(nxPt-x,nzPt-z)
+          if(gap>tolerance||(best&&gap>=best.gap))continue
+          if(segmentHitsShizijieNoPedZone(next.start.x,next.start.z,next.end.x,next.end.z)||segmentHitsShizijieNoPedZone(x,z,nxPt,nzPt))continue
+          if(gap>.5&&this.surfaceAt){
+            const midKs=this.surfaceAt((x+nxPt)*.5,(z+nzPt)*.5)
+            if(midKs&&!isSafeWalkSurface(midKs))continue
+          }
+          if(Math.abs(trackHeight(next,dist)-trackHeight(track,track.length))>.6)continue
+          best={track:next,dist,gap}
+        }
+      }
+    }
+    if(best)return best
+    const rev=track.pairTrack
+    if(rev&&this.usable(rev)&&!segmentHitsShizijieNoPedZone(rev.start.x,rev.start.z,rev.end.x,rev.end.z)){
+      return {track:rev,dist:0}
+    }
+    return undefined
+  }
   isJunction(node:number){return this.junctions.has(node)||this.signal.has(node)}
   inherit(previous:Traffic){
     this.time=previous.time
@@ -640,7 +672,7 @@ export class Traffic {
         if(resolveContact(next,next.y,track.yaw,actor.halfWidth,actor.halfLength,staticSolids)){actor.speed=0;actor.dist-=advance;return}
       }
       if(person&&actor.dist>=track.length){
-        const onward=this.onwardWalk(track)
+        const onward=this.onwardWalk(track)??this.shizijieTurnOrReverse(track)
         if(onward){actor.track=onward.track;actor.dist=onward.dist;this.transitions++}
         else{actor.dist=track.length;actor.speed=0;actor.arrived=true}
       }else if(actor.dist>=track.length){
