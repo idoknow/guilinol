@@ -1,5 +1,5 @@
 const base = {
-  exposure: 1, saturation: 1, contrast: 1, toneMapping: 'agx' as 'agx'|'aces',
+  exposure: 1, saturation: 1, contrast: 1, toneMapping: 'neutral' as 'neutral'|'agx'|'aces',
   ao: {enabled:true, lowEnabled:false, intensity:1, radius:2},
   bloom: {enabled:true, intensity:0.6, threshold:0.85},
   shadow: {enabled:true, strength:0.5, softness:1, mapSize:2048, updateEvery:3, distance:150, moveThreshold:3},
@@ -19,7 +19,7 @@ function matches(value:unknown, template:Record<string,unknown>, partial:boolean
     const expected=template[key]
     if(record(expected)) return matches(entry,expected,partial)
     if(typeof expected==='boolean') return typeof entry==='boolean'
-    if(key==='toneMapping') return entry==='agx' || entry==='aces'
+    if(key==='toneMapping') return entry==='neutral' || entry==='agx' || entry==='aces'
     if(typeof entry!=='number' || !Number.isFinite(entry) || entry<0) return false
     if(key==='mapSize') return [256,512,1024,2048,4096].includes(entry)
     if(key==='updateEvery')return Number.isInteger(entry)&&entry>=1&&entry<=4

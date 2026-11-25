@@ -31,7 +31,7 @@ export function mainPass(renderer:THREE.WebGLRenderer,scene:THREE.Scene,camera:T
     const quality=state.quality
     if(quality==='low'&&(state.direct||(!options.ao.lowEnabled&&options.saturation===1&&options.contrast===1))){
       shadows(quality,options.shadow,focus)
-      renderer.toneMapping=state.direct?THREE.NeutralToneMapping:options.toneMapping==='agx'?THREE.AgXToneMapping:THREE.ACESFilmicToneMapping
+      renderer.toneMapping=state.direct||options.toneMapping==='neutral'?THREE.NeutralToneMapping:options.toneMapping==='agx'?THREE.AgXToneMapping:THREE.ACESFilmicToneMapping
       renderer.toneMappingExposure=env.exposure*(state.direct?1:options.exposure)
       try{renderer.render(scene,camera)}finally{renderer.toneMapping=THREE.NoToneMapping}
       return 0
@@ -44,7 +44,7 @@ export function mainPass(renderer:THREE.WebGLRenderer,scene:THREE.Scene,camera:T
     }
     ao.enabled=quality==='low'?options.ao.lowEnabled:options.ao.enabled;ao.configuration.intensity=options.ao.intensity;ao.configuration.aoRadius=options.ao.radius
     glow.enabled=quality!=='low'&&options.bloom.enabled;bloom.intensity=options.bloom.intensity;bloom.luminanceMaterial.threshold=options.bloom.threshold
-    tone.mode=options.toneMapping==='agx'?ToneMappingMode.AGX:ToneMappingMode.ACES_FILMIC
+    tone.mode=options.toneMapping==='neutral'?ToneMappingMode.NEUTRAL:options.toneMapping==='agx'?ToneMappingMode.AGX:ToneMappingMode.ACES_FILMIC
     saturation.saturation=options.saturation-1;contrast.contrast=options.contrast-1
     renderer.toneMappingExposure=env.exposure*options.exposure
     const casters=shadows(quality,options.shadow,focus)
