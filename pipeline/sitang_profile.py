@@ -6,7 +6,7 @@ import tempfile
 from pathlib import Path
 
 import numpy as np
-from shapely import LineString
+from shapely import LineString, Polygon, get_parts, union_all
 from shapely.ops import substring
 
 from features import points
@@ -51,8 +51,6 @@ def install(output, manifest, elements):
         # The road ends on the bisector of the bend. The tunnel begins on
         # a perpendicular section. Close the wedge between the two cuts
         # with the actual boundary vertices, including their bank heights.
-        boundary = np.concatenate([faces[:,[0,1]], faces[:,[1,2]], faces[:,[2,0]]])
-        edges, counts = np.unique(np.sort(boundary, axis=1),axis=0,return_counts=True)
         approach = np.array(points(ways[1494508177]))
         start, end = np.array(bore['portals'])[:,[0,2]]
         near = min((q for q in approach if np.linalg.norm(q-start)>.1),key=lambda q:np.linalg.norm(q-start))
@@ -62,21 +60,32 @@ def install(output, manifest, elements):
         origin = start-np.array([ox,oz])
         bisector = incoming+forward
         bisector /= np.linalg.norm(bisector)
+        # The indexed mesh folds back under the pavement at some edges.
+        # Its topological boundary omits those parts of the visible lip.
+        coords = vertices[:,[0,2]]/1e6
+        distances = ((coords-origin)@forward)[faces]
+        last_faces = faces[(distances.min(axis=1)<1)&(distances.max(axis=1)>-1)]
+        lip = union_all([p for face in last_faces if (p:=Polygon(coords[face])).area>1e-12])
+        levels = {}
+        for x,y,z in vertices[np.unique(last_faces)]:
+            levels[x,z] = max(levels.get((x,z), y), y)
         apron = []
-        for i,j in edges[counts==1]:
-            pair=vertices[[i,j]]/1e6
-            xy=pair[:,[0,2]]-origin
-            along=xy@forward
-            lateral=xy@normal
-            if np.max(abs(xy@bisector))>.035 or max(along)>.025 or min(along)>-.0001 or np.max(abs(lateral))>3.51:
-                continue
-            seam=pair.copy()
-            seam[:,0]=origin[0]+normal[0]*lateral
-            seam[:,2]=origin[1]+normal[1]*lateral
-            seam[:,1]=bore['stations'][0][1]+bore['crossfall'][0]*lateral
-            a,b=pair
-            c,d=seam
-            apron.extend([a,b,d,a,d,c])
+        for piece in get_parts(lip):
+            ring = np.asarray(piece.exterior.coords)
+            for endpoints in zip(ring[:-1], ring[1:]):
+                xy = np.array(endpoints)-origin
+                along = xy@forward
+                lateral = xy@normal
+                if np.max(abs(xy@bisector))>.035 or max(along)>.025 or min(along)>-.0001 or np.max(abs(lateral))>3.51:
+                    continue
+                pair = np.array([[x, levels[round(x*1e6),round(z*1e6)]/1e6, z] for x,z in endpoints])
+                seam = pair.copy()
+                seam[:,0] = origin[0]+normal[0]*lateral
+                seam[:,2] = origin[1]+normal[1]*lateral
+                seam[:,1] = bore['stations'][0][1]+bore['crossfall'][0]*lateral
+                a,b = pair
+                c,d = seam
+                apron.extend([a,b,d,a,d,c])
         bank = vertices[faces].astype('<i4').tobytes()+np.rint(np.asarray(apron)*1e6).astype('<i4').tobytes()
         survey['bank'] = base64.b64encode(bank).decode()
         upper = design['upper_v'][design['upper_i']].astype('<i4').tobytes()
