@@ -77,7 +77,7 @@ try {
     await page.route('**/favicon.ico', route => route.fulfill({status: 204}))
     await page.route('**/api/t', route => route.fulfill({status: 204}))
     await page.goto(`${baseUrl}/?${urlQuery}`)
-    await page.waitForFunction(() => window.viewer?.walk?.active, null, {timeout: 90000})
+    await page.waitForFunction(() => window.viewer?.walk?.active && ![1,2].includes(window.__loading?.level), null, {timeout: 90000})
     await page.waitForSelector('.vehicle-action', {state: 'attached', timeout: 45000})
   }
 
