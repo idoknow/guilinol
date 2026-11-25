@@ -8,13 +8,14 @@ ops 仓库 docs/layout/universities/glut_pingfeng.md). The attached primary scho
 the base map / their own landmark. No guard post, turnstile or camera.
 """
 import csv
+import json
 import math
 from pathlib import Path
 import sys
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from shapely import wkt
+from shapely import wkt, from_wkb
 from shapely.geometry import Point, Polygon
 from shapely.ops import transform
 
@@ -76,6 +77,10 @@ def _local(b, x, z):
 
 
 def _campus_data():
+    if not Path(RAW).exists():
+        doc = json.loads((Path(__file__).resolve().parents[1]/'data/landmarks/glut_pingfeng.json').read_bytes())
+        rows = [(row['id'], row['osm_id'], row['tags'], from_wkb(bytes.fromhex(row['polygon']))) for row in doc['buildings']]
+        return from_wkb(bytes.fromhex(doc['campus'])), rows, tuple(doc['gate'])
     els = load_osm()
     ways = {e['id']: e for e in els if e['type'] == 'way' and 'geometry' in e}
     poly = lambda e: Polygon([ll2xz(q['lat'], q['lon']) for q in e['geometry']])

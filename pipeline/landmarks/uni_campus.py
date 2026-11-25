@@ -12,7 +12,7 @@ import math
 from pathlib import Path
 
 from shapely import wkt
-from shapely.geometry import Polygon
+from shapely.geometry import Point, Polygon
 from shapely.ops import transform
 
 from common import ll2xz, load_osm, RAW
@@ -213,9 +213,13 @@ def vocational_campus(b, campus_id, sign_key):
                  for r in cat['buildings']}
     build_records(b, campus_id, overrides=overrides)
     way = int(cat['campus_osm'].split('/')[1])
-    e = next(x for x in load_osm() if x['type'] == 'way' and x['id'] == way)
+    e = next(x for x in load_osm(campus_id) if x['type'] == 'way' and x['id'] == way)
     campus_w = Polygon([ll2xz(q['lat'], q['lon']) for q in e['geometry']])
-    p = street_gate_point(campus_w)
+    if Path(RAW).exists():
+        p = street_gate_point(campus_w)
+    else:
+        data = json.loads((ROOT/'pipeline/data/landmarks'/f'{campus_id}.json').read_bytes())
+        p = Point(data['street_gate']) if data['street_gate'] is not None else None
     if p is None:
         return
     campus_l = to_local(b, campus_w)

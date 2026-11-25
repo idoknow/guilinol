@@ -79,7 +79,7 @@ def _gate(b, campus_l, gx, gz):
 
 
 def build(b):
-    els = load_osm()
+    els = load_osm('guat_jinji')
     cat = C.catalog('guat_jinji')
     campus_l = C.to_local(b, Polygon([ll2xz(la, lo) for lo, la in cat['boundary']]))
     geo = C.footprints((r['source'] for r in cat['buildings']), 'guat_jinji')
