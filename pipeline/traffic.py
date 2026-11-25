@@ -242,9 +242,9 @@ def bake(output, manifest, rendered_roads=None):
     narrow_ways={row['way']:row['alignment'] for row in clearances}
     (output/'vehicle-narrow-streets.json').write_text(json.dumps(clearances))
     grade_airport_fork(output,manifest,elements)
-    from crossing_spans import grade_west_ring
-    grade_west_ring(output, manifest, elements, sections)
+    from crossing_spans import grade_crossings
     terminal_grades = grade_terminal_decks(output, manifest, elements)
+    terminal_grades.extend(grade_crossings(output, manifest, elements, sections))
     canal_grades = plan_canal_passages(output, manifest, elements, sections)
     from canal_east import plan as plan_east_canal
     east_canal,continuous_canal=plan_east_canal(output,manifest,elements,sections,canal_grades)
@@ -480,6 +480,7 @@ def bake(output, manifest, rendered_roads=None):
         grade_zhongshan_merge(output,manifest,elements)
         grade_airport_ramp_merge(output,manifest,elements)
         trim_bridge_endcaps(output,manifest,elements)
+        portal_landings.ground_ties(output,manifest,elements)
         road_tiles=[tile for tile in manifest['chunks'] if tile.get('gradedCorridor')]
         request.write_text(json.dumps([tile['file'] for tile in road_tiles]))
         packed=subprocess.run(['node',str(ROOT/'scripts/simplify-roadbeds.mjs'),str(output.resolve()),

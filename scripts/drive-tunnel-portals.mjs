@@ -14,6 +14,22 @@ const sites=JSON.parse(await readFile(process.env.GROUNDING_ROUTES_FILE??directo
 if(!sites.length)throw Error('No matching portal fixtures')
 const vehicles=JSON.parse(gunzipSync(await readFile(directory+'/world/vehicles.bin')))
 const results=sites.filter(s=>!s.modes.length).map(s=>({id:s.id,way:s.way,unavailable:'no permitted continuous route',links:s.links}))
+// Entering a through street from a terminating arm can require a multi-point
+// turn. Locate the measured junction on the actual motor-lane graph.
+const junctions=new Map()
+if(process.argv.includes('--surface')){
+  const ids=new Set(sites.map(site=>site.id))
+  const graph=JSON.parse(gunzipSync(await readFile(directory+'/world/roads/graph.json.gz')))
+  for(const node of graph.nodes)if(ids.has(node.id))junctions.set(node.id,{...node,roads:new Map()})
+  for(const {kind,from,to,way} of graph.lanes)if(kind==='motor'){
+    for(const [id,other] of [[from,to],[to,from]]){
+      const node=junctions.get(id)
+      if(!node)continue
+      if(!node.roads.has(way))node.roads.set(way,new Set())
+      node.roads.get(way).add(other)
+    }
+  }
+}
 const groups=[]
 for(const site of sites)for(const {mode,route,startHeight,direction,reverseExit=false,boundary=false} of site.modes){
   const [[x,z]]=route
@@ -25,9 +41,13 @@ for(const site of sites)for(const {mode,route,startHeight,direction,reverseExit=
     if(distance>=remaining){nx+=(ex-nx)*remaining/distance;nz+=(ez-nz)*remaining/distance;break}
     remaining-=distance;nx=ex;nz=ez
   }
+  const junction=junctions.get(site.id)
+  const turnAt=mode!=='car'||!junction?-1:route.findIndex(([px,pz],i)=>
+    i>0&&i+1<route.length&&Math.hypot(px-junction.x,pz-junction.z)<.03&&
+    junction.roads.get(route[i-1][2])?.size===1&&junction.roads.get(route[i+1][2])?.size>1)
   let group=groups.find(g=>g.mode===mode&&g.tests.every(t=>Math.hypot(t.x-x,t.z-z)>65))
   if(!group){group={mode,tests:[]};groups.push(group)}
-  group.tests.push({x,z,id:site.id,way:site.way,singleFile:site.singleFile,route,boundary,reverseExit,direction,startHeight,heading:Math.atan2(x-nx,z-nz)})
+  group.tests.push({x,z,turnAt,id:site.id,way:site.way,singleFile:site.singleFile,route,boundary,reverseExit,direction,startHeight,heading:Math.atan2(x-nx,z-nz)})
 }
 await mkdir(resolve(output,'..'),{recursive:true})
 const server=await preview({configFile:false,build:{outDir:directory},preview:{host:'127.0.0.1',port:0}})
@@ -41,7 +61,7 @@ try{
     await page.route('**/world/vehicles.bin',route=>route.fulfill({body:gzipSync(JSON.stringify(fleet))}))
     await page.goto('http://127.0.0.1:'+server.httpServer.address().port+'/?verify&mode=walk&radius=320&flow=0')
     await page.waitForFunction(()=>window.viewer?.walk?.active,null,{timeout:60000})
-    for(const {id,way,x,z,singleFile,route,boundary,reverseExit,direction,startHeight:y,heading} of tests){
+    for(const {id,way,x,z,turnAt,singleFile,route,boundary,reverseExit,direction,startHeight:y,heading} of tests){
       await page.evaluate(()=>window.viewer.freeze())
       try{
         let ready=false,setupError
@@ -64,7 +84,7 @@ try{
           }catch(e){ready=false;setupError=e.message.split('\n')[0]}
         }
         if(!ready)throw Error(setupError??'could not reach or board lane fixture')
-        const run=await page.evaluate(async({route,mode,boundary,reverseExit,singleFile,surfaceApproach})=>{
+        const run=await page.evaluate(async({route,mode,boundary,reverseExit,singleFile,surfaceApproach,turnAt})=>{
           const v=window.viewer,w=v.walk,held=new Set(),frames=[]
           const key=(code,down)=>{
             if(held.has(code)===down)return
@@ -75,7 +95,7 @@ try{
           const rig=mode==='foot'?null:v.stream.scene.getObjectByName('dynamic-'+(mode==='bike'?'ebike':mode))
           const height=()=>mode==='car'||mode==='foot'?w.fixtureHeight():rig.position.y
           const initialResets=w.probe().resets
-          let part=1,maximum=0,previous,completed=false,furthest=0,reversing=false,exitStation
+          let part=1,maximum=0,previous,completed=false,furthest=0,reversing=false,exitStation,pivot
           const start={x:w.position.x,z:w.position.z,y:height(),heading:w.heading}
           try{
             const length=route.slice(1).reduce((sum,p,i)=>sum+Math.hypot(p[0]-route[i][0],p[1]-route[i][1]),0)
@@ -94,6 +114,14 @@ try{
                   completed=true;exitStation=progress;break
                 }
               }
+              if(mode==='car'&&part===turnAt&&!reverseExit&&!pivot&&progress>=len-1.55){
+                const [nx,nz]=route[part+1],run=Math.hypot(nx-x,nz-z),ux=(nx-x)/run,uz=(nz-z)/run
+                if(dx*ux+dz*uz<-.65)pivot={target:Math.atan2(-ux,-uz),x:p.x,z:p.z,reverse:false}
+              }
+              if(pivot){
+                const yaw=pivot.target-w.heading
+                if(Math.abs(Math.atan2(Math.sin(yaw),Math.cos(yaw)))<.12){pivot=undefined;part++;continue}
+              }
               if(!reverseExit&&part===route.length-1&&progress>=len-(boundary&&mode==='car'?2.12*.85:0)&&cross<2){completed=true;break}
               // Aim ahead through intermediate bends while retaining the final
               // station as a real crossing gate for the measured vehicle.
@@ -105,7 +133,7 @@ try{
                 // without its centre passing through the vertex itself.
                 const rounded=mode==='car'&&alongNext>2&&lateralNext<cross&&lateralNext<1.5&&progress>len-4
                 const reached=mode==='foot'?Math.hypot(p.x-x,p.z-z)<.15:progress>len-(singleFile ? .2:1.2)&&cross<3.5
-                if(reached||rounded){part++;continue}
+                if(!pivot&&(reached||rounded)){part++;continue}
               }
               // Brake before a bend. A long look-ahead at driving speed
               // can send the front wheels across the inside curb.
@@ -129,7 +157,7 @@ try{
               let ahead=Math.max(0,progress)+(mode==='car'?carLookahead:singleFile&&mode!=='foot' ? .9:3.5)
               // A pedestrian can turn at the vertex itself. Looking beyond a hairpin
               // before reaching it can leave the walker at a stationary target.
-              if(mode==='foot'&&part<route.length-1)ahead=Math.min(len,ahead)
+              if((mode==='foot'||(sharp&&part===turnAt))&&part<route.length-1)ahead=Math.min(len,ahead)
               let tx=a+ahead*dx,tz=b+ahead*dz
               // Steer through bends within the vehicle's turning radius.
               for(let leg=part;leg<route.length-1&&ahead>0;leg++){
@@ -143,16 +171,26 @@ try{
               if(mode==='foot')w.drive(tx,tz,false)
               else{
                 const turn=Math.atan2(-tx,-tz)-w.heading,delta=Math.atan2(Math.sin(turn),Math.cos(turn))
-                key('KeyS',reversing)
-                key('KeyW',!reversing&&Math.abs(w.speed)<(bend||singleFile?1.5:Math.abs(delta)>.6?2:3.5))
-                key('KeyA',!reversing&&delta>.04);key('KeyD',!reversing&&delta<-.04)
+                if(pivot){
+                  if(Math.hypot(p.x-pivot.x,p.z-pivot.z)>1.8){
+                    pivot.reverse=!pivot.reverse;pivot.x=p.x;pivot.z=p.z
+                  }
+                  const yaw=pivot.target-w.heading,steering=Math.atan2(Math.sin(yaw),Math.cos(yaw))*(pivot.reverse?-1:1)
+                  key('KeyS',pivot.reverse&&Math.abs(w.speed)<1.5);key('KeyW',!pivot.reverse&&Math.abs(w.speed)<1.5)
+                  key('KeyA',steering>0);key('KeyD',steering<0)
+                }else{
+                  key('KeyS',reversing)
+                  key('KeyW',!reversing&&Math.abs(w.speed)<(bend||singleFile?1.5:Math.abs(delta)>.6?2:3.5))
+                  key('KeyA',!reversing&&delta>.04);key('KeyD',!reversing&&delta<-.04)
+                }
               }
               v.stream.tick(w.position);v.stream.updateLandmarks?.(w.position);w.tick(1/60)
               const y=height(),next=w.position
               if(previous!==undefined)maximum=Math.max(maximum,Math.abs(y-previous))
               previous=y;frames.push([next.x,next.z,y])
               if(frame%15===0)await new Promise(r=>setTimeout(r,0))
-              if(frames.length>300&&Math.hypot(next.x-frames.at(-300)[0],next.z-frames.at(-300)[1])<.06)break
+              if(frames.length>300&&Math.hypot(next.x-frames.at(-300)[0],next.z-frames.at(-300)[1])<.06&&
+                frames.slice(-300).every(([x,z])=>Math.hypot(next.x-x,next.z-z)<.06))break
             }
           }finally{for(const code of held)key(code,false);if(mode==='foot')w.drive(0,0,false)}
           const probe=w.probe(),p=w.position,fx=-Math.sin(w.heading),fz=-Math.cos(w.heading)
@@ -169,7 +207,7 @@ try{
           return {start,completed,failure,maximum,frames,part,
             reverseExit:reverseExit?{furthest,exitStation,resets:probe.resets-initialResets}:undefined,obstacle:w.obstacle,contacts,
             stopped:completed?undefined:{wet:probe.wet,blockedWater:probe.blockedWater,surface:probe.surfaceKind,inHouse:probe.inHouse,hits:probe.contactSources,foot:probe.foot,resets:probe.resets-initialResets,heading:w.heading}}
-        },{route,mode,boundary,reverseExit,singleFile,surfaceApproach:!boundary&&process.argv.includes('--surface')})
+        },{route,mode,boundary,reverseExit,singleFile,turnAt,surfaceApproach:!boundary&&process.argv.includes('--surface')})
         results.push({id,way,mode,boundary,direction,...run})
       }catch(e){results.push({id,way,mode,boundary,direction,failure:"tool",unavailable:e.message.split('\n')[0]})}finally{await page.evaluate(()=>window.viewer.resume())}
     }
