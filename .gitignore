@@ -10,5 +10,3 @@ out/
 .wrangler/
 .dev.vars*
 .world-cache/
-
-.ops-docs

@@ -1,4 +1,5 @@
 import {streetAreaFindings} from './street-triangulation.mjs'
+import {evidencePath} from './photo-refs.mjs'
 import {telemetryPreview} from './telemetry-preview.mjs'
 import {execFileSync} from 'node:child_process'
 import {cp, mkdir, readFile, rm, stat, writeFile} from 'node:fs/promises'
@@ -59,7 +60,8 @@ const server = await preview({plugins:[telemetryPreview],root: 'web', configFile
 const port = server.httpServer.address().port
 let browser
 let browserReport
-const photo = JSON.parse(await readFile('.ops-docs/refs/rock/photo-locations.json', 'utf8'))['IMG_1299.jpg']
+const catalog = evidencePath('refs/rock/photo-locations.json')
+const photo = catalog && JSON.parse(await readFile(catalog, 'utf8'))['IMG_1299.jpg']
 const namedViews = [
   {id: 'shizijie', label: '十字街', x: -891, z: -165, yaw: -1.2},
   {id: 'zhongshan', label: '中山中路', x: -935, z: -20, yaw: -0.18},
@@ -67,7 +69,7 @@ const namedViews = [
   {id: 'ronghu', label: '榕湖北路', x: -1360, z: 105, yaw: 1.75},
   {id: 'binjiang', label: '滨江路', x: -255, z: 95, yaw: 0.25},
   {id: 'zhengyang', label: '正阳步行街', x: -612, z: -70, yaw: 0.12},
-  {id: 'gunanmen', label: '走向古南门路口（榕荫路×三多路）', x: photo.x, z: photo.z, yaw: -photo.heading * Math.PI / 180, focal35: photo.focal35},
+  ...(photo ? [{id: 'gunanmen', label: '走向古南门路口（榕荫路×三多路）', x: photo.x, z: photo.z, yaw: -photo.heading * Math.PI / 180, focal35: photo.focal35}] : []),
 ]
 
 function pickDistinct(items, count, minSep = 15) {

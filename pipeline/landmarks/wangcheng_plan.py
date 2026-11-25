@@ -36,7 +36,7 @@ class PalacePlan:
         approach=peace_lane['geometry'][shared:shared+2]
         self.west_approach=LineString([inverse@(ll2xz(node['lat'],node['lon'])-origin) for node in approach])
         self.surface = landmark_surface('jingjiang')
-        features = json.loads((ROOT / ".ops-docs/layout/wangcheng.geojson").read_text())["features"]
+        features = json.loads((ROOT / "pipeline/data/layout/wangcheng.geojson").read_text())["features"]
         self.shapes = {}
         for feature in features:
             if "osm" not in feature["properties"]:

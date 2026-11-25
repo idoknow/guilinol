@@ -1,3 +1,6 @@
+import {evidencePath} from './photo-refs.mjs'
+const evidence1 = evidencePath('refs/rock/photo-locations.json')
+if (!evidence1) process.exit(0)
 import {chromium} from 'playwright'
 import {preview} from 'vite'
 import {mkdir, readFile} from 'node:fs/promises'
@@ -5,7 +8,7 @@ import {gunzipSync} from 'node:zlib'
 
 const out=process.env.CAPTURES??'captures/ronghu-survey'
 await mkdir(out,{recursive:true})
-const photos=JSON.parse(await readFile('.ops-docs/refs/rock/photo-locations.json'))
+const photos=JSON.parse(await readFile(evidence1))
 const world=JSON.parse(await readFile('dist/world/manifest.json'))
 const server=await preview({root:'web',configFile:'web/vite.config.ts',preview:{host:'127.0.0.1',port:0}})
 let browser

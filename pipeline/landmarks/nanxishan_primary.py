@@ -1,6 +1,6 @@
 """桂林市南溪山小学 (`way/1037119966`) full campus restoration.
 
-Evidence: .ops-docs/layout/schools/nanxishan_primary.md (Esri z19 imagery, OSM, Overture, public photos).
+Evidence: ops 仓库 docs/layout/schools/nanxishan_primary.md (Esri z19 imagery, OSM, Overture, public photos).
 - Central oval: red track (~45 x 69 m) around a green apron with two blue basketball courts
   (salmon keys) and blue small-games strips at both ends (imagery, `ref_06`, `ref_09`).
 - `E1` east 4F white block with red-brown window bays and blue column plinths, raised stage

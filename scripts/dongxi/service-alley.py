@@ -1,4 +1,8 @@
 """Restore the N022 frontage beside OSM service way 1531321008 on the registered roof mask."""
+import sys
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from ops_evidence import require_evidence
 import json
 import math
 import sys
@@ -23,7 +27,7 @@ def geographic(east, south):
     return np.asarray(east)/MLON+LON0, LAT0-np.asarray(south)/MLAT
 
 
-folder = root/'.ops-docs/layout'
+folder = require_evidence('layout')
 config = json.loads((folder/'dongxi-esri-grid.json').read_text())
 scale = 256*2**config['zoom']
 origin_x, origin_y = config['pixel_origin']
@@ -34,7 +38,7 @@ def pixel(col, row):
                  math.degrees(math.atan(math.sinh(math.pi*(1-2*(row+origin_y)/scale)))))
 
 
-path = folder/'dongxi-infill.geojson'
+path = (root/'pipeline/data/layout')/'dongxi-infill.geojson'
 catalog = json.loads(path.read_text())
 host = next(item for item in catalog['features'] if item['properties']['name']=='N022')
 source = 'IMG_1407：OSM 1531321008 两侧，按登记 Esri 屋面补齐 N022；道路轴留宽 4.6 m'

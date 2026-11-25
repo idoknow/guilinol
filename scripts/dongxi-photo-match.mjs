@@ -1,3 +1,8 @@
+import {evidencePath} from './photo-refs.mjs'
+const evidence1 = evidencePath('layout/dongxi-photo-locations.json')
+if (!evidence1) process.exit(0)
+const evidence2 = evidencePath('refs/rock/photo-locations.json')
+if (!evidence2) process.exit(0)
 import {access, mkdir, readFile, writeFile} from 'node:fs/promises'
 import {chromium} from 'playwright'
 import {preview} from 'vite'
@@ -7,16 +12,16 @@ const palaceOverview=process.argv.includes('--palace-overview')
 const planOnly=process.argv.includes('--plan-only')
 const selected=process.env.PHOTO_NUMBERS?.split(',')
 await mkdir(output,{recursive:true})
-const catalog=JSON.parse(await readFile('.ops-docs/layout/dongxi-photo-locations.json','utf8'))
-const official=JSON.parse(await readFile('.ops-docs/refs/rock/photo-locations.json','utf8'))
+const catalog=JSON.parse(await readFile(evidence1,'utf8'))
+const official=JSON.parse(await readFile(evidence2,'utf8'))
 for(const [key,shot] of Object.entries(catalog)){
   if(!key.startsWith('walk-shizijie-wangcheng/'))continue
   if(official[key]?.heading!==shot.heading || official[key]?.heading_exif!==shot.heading_exif)
     throw Error(`District and official headings differ for ${key}`)
 }
-const estimatedPath=process.env.ESTIMATED_CAMERAS??(process.argv.includes('--dongxi')?'.ops-docs/layout/dongxi-estimated-cameras.json':null)
+const estimatedPath=process.env.ESTIMATED_CAMERAS??(process.argv.includes('--dongxi')?evidencePath('layout/dongxi-estimated-cameras.json'):null)
 const estimates=estimatedPath?JSON.parse(await readFile(estimatedPath,'utf8')):{}
-const shopLayout=JSON.parse(await readFile('.ops-docs/layout/dongxi-layout.geojson','utf8'))
+const shopLayout=JSON.parse(await readFile('pipeline/data/layout/dongxi-layout.geojson','utf8'))
 const coffee=shopLayout.features.find(feature=>feature.properties.name==='星巴克')
 const server=await preview({root:'web',configFile:'web/vite.config.ts',preview:{host:'127.0.0.1',port:0}})
 let browser
@@ -43,7 +48,7 @@ try {
     if(process.argv.includes('--resume') && !['27','31','33','34','35','36'].includes(number) && await access(`${output}/${number}.jpg`).then(()=>true,()=>false)){
       trace.push({number,...shot,pitch});continue
     }
-    const bytes=await readFile(`.ops-docs/refs/rock/${file}`)
+    const bytes=await readFile(evidencePath(`refs/rock/${file}`))
     const size=await page.evaluate(async ({src,longEdge})=>{const photo=new Image();photo.src=src;await photo.decode();return {width:Math.round(longEdge*photo.width/Math.max(photo.width,photo.height)),height:Math.round(longEdge*photo.height/Math.max(photo.width,photo.height))}},{src:`data:image/jpeg;base64,${bytes.toString('base64')}`,longEdge:Number(process.env.PHOTO_SIZE??640)})
     await page.setViewportSize(size)
     await page.evaluate(({x,z})=>window.viewer.camera.position.set(x,165,z),shot)
