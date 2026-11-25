@@ -14,3 +14,8 @@ node scripts/check-dams.mjs /path/to/world-copy
 ```
 
 用 `CHROMIUM=/usr/bin/chromium node scripts/dam-views.mjs captures/dams` 对 `public/world` 拍摄木龙湖出口及虹桥坝的固定视角。拍摄修复后画面时须使用已经处理的世界副本。
+
+榕湖钢桥 `way/155148522` 的南北两端维持原落地点；在渡线穿过处，桥板、底面和步行碰撞使用相同的纵向断面。按通行需求设计，不是实测桥高。用 `node scripts/capture-ronghu-ferry.mjs` 可从打包后的模型复拍侧面和斜 45°，船使用游戏的游船模型。
+
+![钢桥侧面与游船](ronghu-ferry/side.png)
+![钢桥斜 45° 与游船](ronghu-ferry/diagonal.png)
