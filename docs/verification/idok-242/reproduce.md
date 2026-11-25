@@ -27,6 +27,12 @@ npm run audit -- --strict --no-shots --out captures/final/strict
 npm run audit:grounding
 ```
 
+定江四条道路按 IDOK-247 的交接边界保留原始底图。用同一个候选审计器运行 `npm run audit:vehicles -- "$MAIN_DIST/world" captures/final/main-wheels`。比较两份 `wheels/audit.json`（基线位于 `main-wheels`）中 `lanes` 的逐 way 结果：对 `1030049241`、`727929887`、`459580311`、`815078158` 分别求 `over` 总和及最大的 `maximum`，两项都须小于或等于基线。原始审计保留超限及缺底板记录，因此应检查 JSON。名单外的超限须为零。
+
+定江两个入口无需为本单生成底板。其接线采用原生车道剖面；同一条 `1030049241` 远端连接的另一个洞口 `9495420412` 仍按该洞口原有接线实跑，纳入名单外检查。
+
+两个定江洞口仍计入洞口全量实跑。可用 `node scripts/drive-tunnel-portals.mjs captures/final/dingjiang.json 6821480678 6821524191` 单独复查。与同版 main 在实际路面出生点的四趟记录逐方向对照，每趟须完成，且最大帧差须小于或等于该方向 main 实测值。
+
 严格审计的比较项是 audit.json 的 totalIssues 和各分类。交互测试使用同一 Chrome、同一 GPU，设置 CHROMIUM 指向本机 Chrome 可执行文件。
 
 ```sh

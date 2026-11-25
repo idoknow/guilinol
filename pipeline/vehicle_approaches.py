@@ -111,6 +111,7 @@ def plan(conflicts, lanes, nodes, levels, rail_nodes, widths):
             targets[j]=limit
             heappush(queue,(limit,j))
     result=[]
+    graded_links=set()
     for key in sorted(spans):
         a,b,way=key
         line,cap,half,kind=links[key]
@@ -123,7 +124,8 @@ def plan(conflicts, lanes, nodes, levels, rail_nodes, widths):
                                length=line.length,grade=abs(yb-ya)/line.length,limit=cap))
             continue
         result.append((line,half,ya,yb,cap,kind))
-    return result,failed
+        graded_links.add(key)
+    return result,failed,graded_links
 
 
 def ring_road_widths(elements, widths):

@@ -159,9 +159,28 @@ def round_service_corner(way, coords):
     return route[:i]+turn+route[i+1:]
 
 
+# Retain the native Dingjiang road design until the underpass is built in IDOK-247.
+DINGJIANG_NATIVE = {1030049241, 727929887, 459580311, 815078158}
+DINGJIANG_MOUTHS = {6821480678:727929887, 6821524191:727929887}
+
+
+def native_dingjiang_lanes(graph_path, elements):
+    # A full world build applies the native railway road profiles after traffic.
+    # A traffic-only rebake starts from those finished profiles. Match by OSM
+    # endpoints because the lane IDs differ between the two traffic graphs.
+    if not graph_path.exists():
+        return {}
+    pairs = {(a,b) for w in elements if w['type']=='way' and w['id'] in DINGJIANG_NATIVE
+             for a,b in zip(w['nodes'],w['nodes'][1:])}
+    graph = json.loads(gzip.decompress(graph_path.read_bytes()))
+    return {(lane['from'],lane['to']): {k:lane[k] for k in ('offset','floor','heights') if k in lane}
+            for lane in graph['lanes'] if (lane['from'],lane['to']) in pairs or (lane['to'],lane['from']) in pairs}
+
+
 def bake(output, manifest, rendered_roads=None):
     from shapely.geometry import box
     left, top, width, depth = manifest['extent']
+    native_world = rendered_roads is not None
     if rendered_roads is None:
         from features import raw_overture_footprints
         from scatter import extract_road_network
@@ -225,6 +244,8 @@ def bake(output, manifest, rendered_roads=None):
     forbidden = prep(unary_union(banned))
     nodes, lanes, walks, incoming = {}, [], [], defaultdict(list)
     elements = load_osm()
+    dest = output/'roads'/'graph.json.gz'
+    native_lanes = {} if native_world else native_dingjiang_lanes(dest, elements)
     mark_underpasses(elements)
     # Legacy expanded worlds carry the original continuous surface street
     # through both open Wuling cuttings, above the actual tunnel floor.
@@ -402,17 +423,32 @@ def bake(output, manifest, rendered_roads=None):
             group.extend(nearby)
         schedule = signal_schedule((lane for ref in group for lane in incoming[ref]), nodes)
         signals.extend(dict(node=ref,group=group[0],offset=group[0]%31,phases=schedule) for ref in group)
+    # Mark the unbuilt crossing and its immediate landings for native player
+    # support too. The bounds carry actual lane heights to distinguish decks.
+    manifest['nativeCarLandings'] = []
+    landing_pairs = set()
+    for lane in lanes:
+        pair = tuple(sorted((lane['from'],lane['to'])))
+        if lane['way'] not in DINGJIANG_NATIVE or pair in landing_pairs:
+            continue
+        a, b = nodes[lane['from']], nodes[lane['to']]
+        if a['id'] not in DINGJIANG_MOUTHS and b['id'] not in DINGJIANG_MOUTHS:
+            continue
+        landing_pairs.add(pair)
+        manifest['nativeCarLandings'].append([a['x'],a['z'],a['y'],b['x'],b['z'],b['y'],
+                                              abs(lane['offset'])+lane['width']/2+.5])
     ground_passages.set_terminal_stops(nodes,lanes,node_height,profile)
     align_airport_lane(nodes, lanes, node_height, profile)
     result = dict(nodes=[node for node in nodes.values() if node['y'] is not None],lanes=lanes,signals=signals,quiet=quiet,walks=walks)
-    dest = output/'roads'/'graph.json.gz'
     dest.parent.mkdir(exist_ok=True)
     with tempfile.TemporaryDirectory() as tmp:
         request = Path(tmp)/'request.json'
         original_tunnels = [t for t in manifest.get('tunnels',[]) if not t.get('generated')]
         manifest['tunnels'] = original_tunnels
         survey_nodes = dict(nodes)
-        network = tunnel_sections(lanes,elements,original_tunnels,survey_nodes)
+        updated_lanes = [lane for lane in lanes if lane['way'] not in DINGJIANG_NATIVE]
+        network = tunnel_sections(updated_lanes,elements,original_tunnels,survey_nodes)
+        graded_links = set()
         if network['edges']:
             mountain_roofs(network,survey_nodes,surface.peaks)
             bridge_nodes=[];bridge_samples=[]
@@ -447,7 +483,10 @@ def bake(output, manifest, rendered_roads=None):
             # when a single short OSM segment cannot absorb the height change.
             anchors=[dict(node=n,floor=h,approachCut=True) for n,h in zip(bridge_nodes,bridge_levels,strict=True)]
             approach_widths=ring_road_widths(elements,sections)
-            access,limits=plan_approaches(conflicts+anchors,lanes+guides,survey_nodes,{int(k):v for k,v in samples['heights'].items()},fixed,approach_widths)
+            # An approach belongs to its active portal. In particular the far
+            # end of 1030049241 still serves 1030049246, outside Dingjiang.
+            access,limits,graded_links=plan_approaches(conflicts+anchors,lanes+guides,survey_nodes,
+                {int(k):v for k,v in samples['heights'].items()},fixed,approach_widths)
             cycling=cycleway_grades(cycleway,conflicts)
             access=cycling+access
             surveyed=vehicle_surface_grades.profiles(graded_sections,native_levels,access+canal_grades+terminal_grades)
@@ -513,7 +552,7 @@ def bake(output, manifest, rendered_roads=None):
                         modes.append(dict(mode='car',direction=('in','out')[index],boundary=True,
                                           route=[[x,z,way['id']] for x,z in xy]))
                 yard_routes.append(dict(id=way['id'],way=way['id'],modes=modes))
-            route_file.write_text(json.dumps(dict(manifest=manifest,routes=portal_routes(elements,network,survey_nodes),yardRoutes=yard_routes,narrowRoutes=narrow_streets.driving_sites(elements,clearances,permits),campusRoutes=ground_passages.campus_boundary_routes(elements))))
+            route_file.write_text(json.dumps(dict(manifest=manifest,routes=portal_routes(elements,network,survey_nodes,DINGJIANG_MOUTHS),yardRoutes=yard_routes,narrowRoutes=narrow_streets.driving_sites(elements,clearances,permits),campusRoutes=ground_passages.campus_boundary_routes(elements))))
             subprocess.run([str(ROOT/'node_modules/.bin/tsx'),str(ROOT/'scripts/vehicle-grounding.ts'),
                             'portal-routes',str(output.resolve()),str(route_file.resolve())],check=True,cwd=ROOT)
         print('Roadside relocations:',relocate(output,manifest,elements,raised,adjoining))
@@ -523,7 +562,13 @@ def bake(output, manifest, rendered_roads=None):
         subprocess.run([str(ROOT/'node_modules/.bin/tsx'),str(ROOT/'scripts/vehicle-grounding.ts'),
                         'bake',str(output.resolve()),str(request)], check=True, cwd=ROOT)
         for lane, pose in zip(lanes,json.loads(request.read_text()),strict=True):
-            if pose is not None:
+            a,b = sorted((lane['from'],lane['to']))
+            if lane['way'] in DINGJIANG_NATIVE and (a,b,lane['way']) not in graded_links:
+                native = native_lanes.get((lane['from'],lane['to']))
+                if native is not None:
+                    lane.pop('heights', None)
+                    lane.update(native)
+            elif pose is not None:
                 lane.update(pose)
     headroom = {}
     for tunnel in manifest.get('tunnels', []):

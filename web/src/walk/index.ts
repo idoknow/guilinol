@@ -17,6 +17,7 @@ import {mpEnabled} from '../ui/mp-pref'
 import * as THREE from 'three'
 import {passengerTop} from './passenger-height'
 import {tunnelFloor} from '../tunnels'
+import {playerSupport} from './support'
 import {getCarFreeAt} from '../game/car-free'
 import {CAR_SCALE} from '../drive/scale'
 import R from '@dimforge/rapier3d-compat'
@@ -1313,6 +1314,14 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
     const validDeck=deck&&deck.y<=refY+.35?deck:null
     return validDeck??sim.surface(x,z,'sidewalk')??sim.surface(x,z,'road')??sim.surface(x,z,'ground')
   }
+  const nativeSupport=playerSupport(sim)
+  function onNativeLanding(x:number,z:number,y:number){
+    return manifest.nativeCarLandings?.some(([ax,az,ay,bx,bz,by,width])=>{
+      const dx=bx-ax,dz=bz-az
+      const t=Math.max(0,Math.min(1,((x-ax)*dx+(z-az)*dz)/(dx*dx+dz*dz)))
+      return Math.abs(y-ay-t*(by-ay))<2 && Math.hypot(x-ax-t*dx,z-az-t*dz)<=width
+    })
+  }
   function wheelSupportY(x:number,z:number,refY:number,above:number,reach:number){
     if(grounded){
       const floor=tunnelFloor(manifest.tunnels,x,z,refY)
@@ -1690,23 +1699,35 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
       mountedStaticCar.visible=false
       carRig.root.visible=true
       const fx=-Math.sin(rides.heading),fz=-Math.cos(rides.heading),baseY=footY
-      const center=wheelSupportY(pos.x,pos.z,baseY,.35,.75)
-      figure.position.y=center??baseY-.03
       let groundRoll=0,groundPitch=rides.pitch
-      if(center!==undefined){
-        const rx=-fz,rz=fx
-        const contact=(forward:number,right:number)=>wheelSupportY(
-          pos.x+fx*forward+rx*right,pos.z+fz*forward+rz*right,center,.85,1.7)
-        const frontAxle=1.34*CAR_SCALE,rearAxle=-1.31*CAR_SCALE,halfTrack=.795*CAR_SCALE
-        const fl=contact(frontAxle,-halfTrack),fr=contact(frontAxle,halfTrack)
-        const bl=contact(rearAxle,-halfTrack),br=contact(rearAxle,halfTrack)
-        if(fl!==undefined&&fr!==undefined&&bl!==undefined&&br!==undefined){
-          const front=(fl+fr)/2,back=(bl+br)/2,slope=(front-back)/(frontAxle-rearAxle)
-          groundPitch=Math.atan(slope)
-          groundRoll=Math.atan((fr+br-fl-bl)/(4*halfTrack*Math.hypot(1,slope)))
-          figure.position.y=back-rearAxle*slope
-          if(dt>0)rides.setCarPitch(front,back,dt)
-        }else if(dt>0)rides.setCarPitch(undefined,undefined,dt)
+      if(onNativeLanding(pos.x,pos.z,baseY)){
+        const support=nativeSupport.carSupportAt
+        const hit=support(pos.x,pos.z,baseY)
+        figure.position.y=hit&&baseY-hit.y<=.16&&baseY>=hit.y-.08?hit.y:baseY-.03
+        if(dt>0){
+          const half=carConfig.wheelbase*.5
+          rides.setCarPitch(support(pos.x+fx*half,pos.z+fz*half,figure.position.y)?.y,
+            support(pos.x-fx*half,pos.z-fz*half,figure.position.y)?.y,dt)
+          groundPitch=rides.pitch
+        }
+      }else{
+        const center=wheelSupportY(pos.x,pos.z,baseY,.35,.75)
+        figure.position.y=center??baseY-.03
+        if(center!==undefined){
+          const rx=-fz,rz=fx
+          const contact=(forward:number,right:number)=>wheelSupportY(
+            pos.x+fx*forward+rx*right,pos.z+fz*forward+rz*right,center,.85,1.7)
+          const frontAxle=1.34*CAR_SCALE,rearAxle=-1.31*CAR_SCALE,halfTrack=.795*CAR_SCALE
+          const fl=contact(frontAxle,-halfTrack),fr=contact(frontAxle,halfTrack)
+          const bl=contact(rearAxle,-halfTrack),br=contact(rearAxle,halfTrack)
+          if(fl!==undefined&&fr!==undefined&&bl!==undefined&&br!==undefined){
+            const front=(fl+fr)/2,back=(bl+br)/2,slope=(front-back)/(frontAxle-rearAxle)
+            groundPitch=Math.atan(slope)
+            groundRoll=Math.atan((fr+br-fl-bl)/(4*halfTrack*Math.hypot(1,slope)))
+            figure.position.y=back-rearAxle*slope
+            if(dt>0)rides.setCarPitch(front,back,dt)
+          }else if(dt>0)rides.setCarPitch(undefined,undefined,dt)
+        }
       }
       rides.park(figure.position)
       const carTel=rides.carTelemetry
