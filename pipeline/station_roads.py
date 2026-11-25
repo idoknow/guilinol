@@ -62,6 +62,7 @@ def half_width(way):
 
 def tunnel_sections(profiles):
     bores = []
+    # IDOK-371: only these opposing Cuizhu carriageways overlap at the portal; keep unrelated road widths unchanged.
     cuizhu = ((265411001, 815082649, 815082646), (815082648, 265411005, 815082645))
     opposite = {way_id: [profiles[other][1] for other in cuizhu[1-side] if other in profiles]
                 for side, carriageway in enumerate(cuizhu) for way_id in carriageway}
