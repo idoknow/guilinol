@@ -5,6 +5,7 @@
   "license": "BUSL-1.1",
   "type": "module",
   "scripts": {
+    "world:dev": "node scripts/world-dev.mjs",
     "refpack": "uv run --locked python pipeline/fetch_city_ref.py",
     "verify:mp": "node scripts/verify-mp.mjs",
     "verify:cloud-save": "tsx scripts/verify-cloud-save.mjs",
