@@ -1330,6 +1330,7 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
     return sim.groundSurface(x,z,refY,above,reach)?.y
   }
   function carSupportAt(x:number,z:number,refY:number){
+    if(onNativeLanding(x,z,refY))return nativeSupport.carSupportAt(x,z,refY)
     const bore=tunnelFloor(manifest.tunnels,x,z,refY)
     if(bore!==undefined){
       const floor=sim.surface(x,z,'road',bore+.15,.3)
@@ -2497,7 +2498,8 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
       const inBore=tunnelFloor(manifest.tunnels,next.x,next.z,next.y-cfg.height/2)!==undefined
       // A pedestrian can stand on the paved approach over an excavated
       // ground triangle before the centre of the capsule enters the bore.
-      const useLocalSupport=aboardGround||!!(nextTile&&stream.loaded.get(nextTile)?.tunnel)
+      const useLocalSupport=(aboardGround||!!(nextTile&&stream.loaded.get(nextTile)?.tunnel))&&
+        !(rides?.car&&onNativeLanding(next.x,next.z,next.y-cfg.height/2))
       const localRoad=useLocalSupport?sim.groundSurface(next.x,next.z,next.y-cfg.height/2,.25,.9):null
       const ground=localRoad??(inBore?sim.surface(next.x,next.z,'road',next.y+1,5):sim.surface(next.x,next.z,'ground'))
         ??sim.surface(next.x,next.z,'deck',next.y-cfg.height/2+.45,1.25)
