@@ -171,7 +171,7 @@ function clientIpInfo(req) {
 // 排障用：一段时间打一条「这次连接命中了哪个头」，确认 CDN 到底传了什么
 let ipDebugAt = 0
 function ipDebug(req, info) {
-  if (!process.env.RT_IP_DEBUG) return
+  if (process.env.RT_IP_DEBUG !== '1') return
   const at = now()
   if (at - ipDebugAt < 5000) return
   ipDebugAt = at

@@ -66,10 +66,10 @@ test('two players: private RT state, role gate, public-safe admin state, persist
   const uid=snapshot.players[1].uid,closed=once(sockets[1],'close')
   assert.deepEqual(await (await call('/kick',0,{uid,reason:'fixture kick',minutes:2})).json(),{ok:true,kicked:1});await closed
   assert.equal((await pool.query("select action from admin_audit where actor_id='Alice'")).rows[0].action,'mp.kick')
-  const end=await raw();assert.equal(end.players[0].ip,ip);assert.equal(end.players[0].nodeIp,'127.0.0.1')
+  const end=await raw();assert.equal(end.players[0].ip,ip);assert.equal(end.players[0].nodeIp,ip)
   await record(pool,end);await record(pool,end)
   const storedSession=(await pool.query('select client_ip,node_ip from mp_sessions where uid=$1',[uid])).rows[0]
-  assert.deepEqual(storedSession,{client_ip:ip,node_ip:'127.0.0.1'})
+  assert.deepEqual(storedSession,{client_ip:ip,node_ip:ip})
   const {sessions}=await (await call('/sessions?uid='+uid)).json();assert.equal(sessions.length,1);assert.equal(sessions[0].closeCode,4003);assert.equal(sessions[0].reason,'fixture kick')
   const history=await (await call('/history?range=24h')).json();assert.ok(history.series.length);assert.equal(history.daily.at(-1).sessions,2);assert.equal(history.daily.at(-1).dau,2)
   assert.ok((await (await call('/history?range=30d')).json()).series.length)

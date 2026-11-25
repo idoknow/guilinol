@@ -151,11 +151,17 @@ export function resolveClientIp(headers, remoteAddr, options = {}) {
 
   let nodeIp = remote
   if (isInternalIp(remote)) {
+    let foundNode = false
     for (let i = xffParts.length - 1; i >= 0; i--) {
       const hop = xffParts[i]
       if (!hop || isInternalIp(hop)) continue
-      if (hop !== clientIp) nodeIp = hop
+      nodeIp = hop
+      foundNode = true
       break
+    }
+    if (!foundNode) {
+      const realIp = normalizeIp(readHeader(headers, 'x-real-ip').split(',')[0])
+      if (realIp && !isInternalIp(realIp)) nodeIp = realIp
     }
   }
 

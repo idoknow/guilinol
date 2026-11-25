@@ -103,6 +103,20 @@ test('client-ip resolver priority, trusted proxy CIDRs, and rt parity',()=>{
       resolve({'x-forwarded-for':'bad, 202.103.225.68'},'127.0.0.1'),
       {clientIp:'127.0.0.1',nodeIp:'202.103.225.68',trusted:true},
     )
+    // 生产 Traefik 覆盖头场景：remote 为内网，cf-connecting-ip / x-real-ip / xff 均为同一个 CDN 节点 IP
+    assert.deepEqual(
+      resolve({'cf-connecting-ip':'43.248.185.1','x-real-ip':'43.248.185.1','x-forwarded-for':'43.248.185.1'},'127.0.0.1'),
+      {clientIp:'43.248.185.1',nodeIp:'43.248.185.1',trusted:true},
+    )
+    // XFF 只有内网跳时，nodeIp 回退到非内网的 x-real-ip
+    assert.deepEqual(
+      resolve({'cf-connecting-ip':'202.103.225.68','x-real-ip':'43.248.185.1','x-forwarded-for':'10.42.10.1'},'127.0.0.1'),
+      {clientIp:'202.103.225.68',nodeIp:'43.248.185.1',trusted:true},
+    )
+    assert.deepEqual(
+      resolve({'cf-connecting-ip':'202.103.225.68','x-real-ip':'10.42.10.1','x-forwarded-for':'10.42.10.1'},'127.0.0.1'),
+      {clientIp:'202.103.225.68',nodeIp:'127.0.0.1',trusted:true},
+    )
   }
 })
 test('perf cache deduplicates concurrent queries, canonicalizes param order, and serves hits/stale within ms',async()=>{

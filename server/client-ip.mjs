@@ -122,7 +122,7 @@ function readHeader(headers, name) {
  * - 只有直连 remote_addr 属于可信代理（源站 nginx/Traefik 或 TRUSTED_PROXIES）时才采信转发头；
  * - 转发头优先级：cf-connecting-ip → x-real-ip → x-client-ip → true-client-ip → x-forwarded-for 最左；
  * - 转发头必须通过合法 IP 字面量校验，不合法则回退到 remote_addr；
- * - 当 remote_addr 为集群内网代理时，尝试从 x-forwarded-for 右侧识别 CDN 节点外网 IP 作为 nodeIp。
+ * - 当 remote_addr 为集群内网代理时，优先取 x-forwarded-for 最右侧首个非内网跳作为 nodeIp，否则回退到非内网的 x-real-ip（不要求与 clientIp 不同）。
  */
 export function resolveClientIp(headers, remoteAddr, options = {}) {
   const remote = normalizeIp(remoteAddr || '')
@@ -159,11 +159,17 @@ export function resolveClientIp(headers, remoteAddr, options = {}) {
 
   let nodeIp = remote
   if (isInternalIp(remote)) {
+    let foundNode = false
     for (let i = xffParts.length - 1; i >= 0; i--) {
       const hop = xffParts[i]
       if (!hop || isInternalIp(hop)) continue
-      if (hop !== clientIp) nodeIp = hop
+      nodeIp = hop
+      foundNode = true
       break
+    }
+    if (!foundNode) {
+      const realIp = normalizeIp(readHeader(headers, 'x-real-ip').split(',')[0])
+      if (realIp && !isInternalIp(realIp)) nodeIp = realIp
     }
   }
 
