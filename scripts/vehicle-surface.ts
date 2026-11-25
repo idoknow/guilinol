@@ -33,7 +33,7 @@ class Triangles {
   }
 }
 
-function tileSurface(world,entry,tunnels){
+export function tileSurface(world,entry,tunnels, collect?:(kind:string,faces:Float32Array)=>void){
   const data=gunzipSync(fs.readFileSync(path.join(world,entry.file)))
   const [verts,indices,jsonSize,imageBytes,triangles]=[4,8,12,16,20].map(i=>data.readUInt32LE(i))
   const jsonStart=24+16900+9*verts+4*indices
@@ -62,6 +62,22 @@ function tileSurface(world,entry,tunnels){
   const streets=streetGeometry(paths,(x,z)=>interpolate(grid,x,z),Array.isArray(legacy)?legacy:[],signs,ground),roads=streets.road
   joinPortalRoads(entry,tunnels,[roads.subarray(0,streets.legacyRoadLength)])
   const modified=bed&&new Set(bed.drop),replacement=bed&&new Triangles(bedPositions(bed))
+  if(collect){
+    const positions:number[]=[]
+    for(let z=0;z<256;z+=step)for(let x=0;x<256;x+=step){
+      const first=2*(z/step*256/step+x/step)
+      for(const [index,offsets] of [[[0,0],[0,1],[1,0]],[[1,0],[0,1],[1,1]]].entries()){
+        if(modified?.has(first+index))continue
+        for(const [dx,dz] of offsets){
+          const px=x+step*dx,pz=z+step*dz
+          positions.push(px,ground(px,pz),pz)
+        }
+      }
+    }
+    collect('ground',Float32Array.from(positions))
+    if(bed)collect('ground',bedPositions(bed))
+    collect('road',roads)
+  }
   function visibleGround(x,z){
     if(!modified)return ground(x,z)
     const col=Math.min(256/step-1,Math.floor(x/step)),row=Math.min(256/step-1,Math.floor(z/step))
@@ -105,6 +121,19 @@ export function vehicleSurface(world,m,graph?){
   const reachesDeck=graph?bridgeConnections(graph):undefined
   const chunks=new Map(m.chunks.map(e=>[e.x+','+e.z,e])),cache=new Map()
   const tunnels=m.tunnels??[],landmarks=new Map<string,any[]>()
+  // A car can span a complete short OSM edge at a portal. Keep its wheel
+  // on the connected floor even when the axle centre is on the following edge.
+  const portalWays=new Map<string,Set<number>>()
+  const portalKey=(x:number,z:number)=>Math.round(x*100)+','+Math.round(z*100)
+  if(graph){
+    for(const t of tunnels)for(const [i,[x,,z]] of t.portals.entries()){
+      if(t.mouths?.[i])portalWays.set(portalKey(x,z),new Set())
+    }
+    const ends=new Map(graph.nodes.map(n=>[n.id,portalWays.get(portalKey(n.x,n.z))]))
+    for(const l of graph.lanes)if(!l.structure){
+      ends.get(l.from)?.add(l.way);ends.get(l.to)?.add(l.way)
+    }
+  }
   const roles=JSON.parse(fs.readFileSync('pipeline/seam-surfaces.json','utf8'))
   for(const entry of m.landmarks){
     const atlas=[roles.atlas[entry.id]??[]].flat().filter(part=>part.role==='road')
@@ -153,7 +182,7 @@ export function vehicleSurface(world,m,graph?){
     if(!lane.structure&&local.length&&lane.start&&lane.end){
       for(const t of local){
         if(!t.portals.some(([px,,pz],i)=>t.mouths?.[i]&&Math.hypot(x-px,z-pz)<4&&
-          [lane.start,lane.end].some(node=>Math.hypot(node.x-px,node.z-pz)<.05)))continue
+          ([lane.start,lane.end].some(node=>Math.hypot(node.x-px,node.z-pz)<.05)||portalWays.get(portalKey(px,pz))?.has(lane.way))))continue
         const floor=floorLevel(t,x,z)
         if(floor!==undefined)return floor
       }

@@ -489,6 +489,8 @@ def bake(output, manifest, rendered_roads=None):
         for tile in road_tiles:
             if tile['file'] in sizes:
                 tile['bytes']=sizes[tile['file']]
+        from sitang_profile import install as install_sitang
+        raised, adjoining = install_sitang(output, manifest, elements)
         if network['edges']:
             route_file=output/'vehicle-portal-routes.json'
             yard_routes=[]
@@ -509,7 +511,7 @@ def bake(output, manifest, rendered_roads=None):
             route_file.write_text(json.dumps(dict(manifest=manifest,routes=portal_routes(elements,network,survey_nodes),yardRoutes=yard_routes,narrowRoutes=narrow_streets.driving_sites(elements,clearances,permits),campusRoutes=ground_passages.campus_boundary_routes(elements))))
             subprocess.run([str(ROOT/'node_modules/.bin/tsx'),str(ROOT/'scripts/vehicle-grounding.ts'),
                             'portal-routes',str(output.resolve()),str(route_file.resolve())],check=True,cwd=ROOT)
-        print('Roadside relocations:',relocate(output,manifest,elements))
+        print('Roadside relocations:',relocate(output,manifest,elements,raised,adjoining))
         from junction_grades import align_service_junction
         align_service_junction(nodes,lanes,elements,node_height,profile)
         request.write_text(json.dumps(dict(manifest=manifest,nodes=result['nodes'],lanes=lanes),separators=(',',':')))

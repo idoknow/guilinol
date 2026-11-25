@@ -33,8 +33,8 @@ export async function loadStreetGeometry(paths:Streets,step:number,heights:THREE
     paths[0].splice(survey.start,count)
     const lower=paths[11]
     if(lower)lower[0]-=Math.max(0,Math.min(count,lower[0]-survey.start))
-    const {packed,vertices,sidewalk,skirt}=survey
-    paths[12]={start:0,end:0,packed,vertices,sidewalk,skirt}
+    const {packed,vertices,sidewalk,skirt,bank}=survey
+    paths[12]={start:0,end:0,packed,vertices,sidewalk,skirt,bank}
   }
   const target=streetWorker(), id=nextId++
   const data=await new Promise<StreetData>((resolve,reject)=>{
