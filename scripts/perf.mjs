@@ -16,6 +16,15 @@ const CAMERAS = [
 ]
 
 const expansion = process.argv.includes('--expansion')
+if(process.argv.includes('--water')){
+  CAMERAS.length=0
+  for(const [id,eye,target,hour] of [
+    ['sanduo',[-1150,159.2,-47],[-1134,157.1,-50],20],
+    ['lijiang',[-265,168,15],[-145,153,45],15],
+    ['ronghu',[-1385,155.5,234],[-1432,146,237],15],
+    ['shanhu',[-983,157,476],[-1019,150,433],15],
+  ])CAMERAS.push({id,label:id,eye,target,mode:'walk',query:`verify&solo=1&flow=0&time=${hour}`})
+}
 if (expansion) {
   for (const id of ['balijie','zengpiyan','guilinta','eastBoundary']) {
     CAMERAS.push({id, label:id, query:`verify&cam=${id}&flow=0`, mode:'fly'})
@@ -114,15 +123,16 @@ try {
     if(process.env.PERF_CAMERA && process.env.PERF_CAMERA!==cam.id)continue
     const started = performance.now()
     await page.goto(`${baseUrl}/?${cam.query}${trafficQuery}`)
-    if(cam.id==='street-jiefang'){
+    if(cam.eye||cam.id==='street-jiefang'){
       await page.waitForFunction(()=>window.viewer?.walk?.active,null,{timeout:120000})
-      await page.evaluate(async()=>{
+      await page.evaluate(async({eye,target:look,offsetPlayer})=>{
         const viewer=window.viewer
-        if(!await viewer.walkTo(-265,15,0,'perf-jiefang'))throw Error('Could not place walker at bridge')
+        if(!await viewer.walkTo(offsetPlayer?eye[0]-6:eye[0],eye[2],0,'perf-walk'))throw Error('Could not place walker')
         const tick=viewer.walk.tick.bind(viewer.walk)
-        viewer.walk.tick=elapsed=>{tick(elapsed);viewer.camera.position.set(-265,168,15);viewer.camera.lookAt(-145,153,45);viewer.camera.updateMatrixWorld()}
-      })
-      if(trafficQuery)await page.waitForFunction(()=>window.viewer.trafficProbe?.motors>=30,null,{timeout:180000})
+        const target=viewer.perfTarget=look
+        viewer.walk.tick=elapsed=>{tick(elapsed);viewer.camera.position.set(...eye);viewer.camera.lookAt(...target);viewer.camera.updateMatrixWorld()}
+      },{eye:cam.eye??[-265,168,15],target:cam.target??[-145,153,45],offsetPlayer:cam.id==='sanduo'||cam.id==='ronghu'})
+      if(trafficQuery)await page.waitForFunction(()=>window.viewer.trafficProbe?.loads.at(-1)?.key==='-1_0',null,{timeout:180000})
     }
     await page.waitForFunction(mode => {
       const viewer = window.viewer
@@ -146,16 +156,24 @@ try {
       }
       // Warmup frames so mirror target, LODs, and shader programs settle.
       for (let i = 0; i < 6; i++) await nextRaf()
+      await new Promise(done=>setTimeout(done,5000))
 
       const frameTimes = []
       let heapPeakBytes = 0
       let lastDraw = null
+      let maxMirrorCalls=0,maxMirrorTriangles=0
+      let visibleMotors=0,visiblePeople=0,drawCalls=0,triangles=0
       const start=await nextRaf(); let last=start
       for (let i = 0; i < sampleCount || last-start<minMs; i++) {
         window.__glPerf.resetFrame()
         const now=await nextRaf()
         const dt=now-last;last=now
         lastDraw = window.__glPerf.readFrame()
+        maxMirrorCalls=Math.max(maxMirrorCalls,lastDraw.mirrorCalls)
+        maxMirrorTriangles=Math.max(maxMirrorTriangles,lastDraw.mirrorTriangles)
+        visibleMotors+=window.viewer.trafficProbe?.motors??0
+        visiblePeople+=window.viewer.trafficProbe?.pedestrians??0
+        drawCalls+=lastDraw.calls;triangles+=lastDraw.triangles
         frameTimes.push(dt)
         heapPeakBytes = Math.max(heapPeakBytes, performance.memory?.usedJSHeapSize ?? 0)
       }
@@ -168,6 +186,8 @@ try {
       const percentile95=values=>{const sorted=[...(values??[])].sort((a,b)=>a-b);return sorted[Math.floor(sorted.length*.95)]??null}
       return {
         fps:+(1000/mean).toFixed(2), frameTimes, motors:window.viewer.trafficProbe?.motors??0,
+        fpsP50:1000/median,fpsP95:1000/sorted[Math.floor((sorted.length-1)*.05)],
+        averageVisibleMotors:visibleMotors/sorted.length,averageVisiblePeople:visiblePeople/sorted.length,averageCalls:drawCalls/sorted.length,averageTriangles:triangles/sorted.length,
         camera:window.viewer.camera.position.toArray(),
         trafficStepP95:percentile95(window.viewer.trafficProbe?.stepMs),trafficContactP95:percentile95(window.viewer.trafficProbe?.contactMs),
         trafficStepPartsP95:Object.fromEntries(Object.entries(window.viewer.trafficProbe?.stepParts??{}).map(([key,values])=>[key,percentile95(values)])),
@@ -177,6 +197,7 @@ try {
         p95Ms: +p95.toFixed(2),
         calls: lastDraw.calls,
         mirrorCalls: lastDraw.mirrorCalls,
+        maxMirrorCalls,maxMirrorTriangles,
         totalCalls: lastDraw.totalCalls,
         peakCalls: peakDraws,
         triangles: lastDraw.triangles,
@@ -207,6 +228,15 @@ try {
     }
     viewpoints[cam.id] = {label: cam.label, loadMs, ...metrics}
     await saveReport()
+    if(cam.eye)await page.screenshot({path:`${outDir}/${cam.id}.png`})
+    if(cam.id==='street-jiefang'&&process.env.PERF_SHOT){
+      const cdp=await context.newCDPSession(page)
+      const capture=async name=>writeFile(process.env.PERF_SHOT+name,Buffer.from((await cdp.send('Page.captureScreenshot',{format:'png',fromSurface:true})).data,'base64'))
+      await capture('-east.png')
+      await page.evaluate(()=>window.viewer.perfTarget.splice(0,3,-385,149,-22))
+      await page.waitForFunction(()=>window.viewer.trafficProbe.motors>0&&window.viewer.trafficProbe.pedestrians>0,null,{timeout:90000})
+      await capture('-city.png')
+    }
     console.log(
       `${cam.id.padEnd(12)} | ${String(metrics.meanMs).padStart(6)} ms (p95 ${String(metrics.p95Ms).padStart(6)} ms) | ` +
       `calls ${String(metrics.calls).padStart(3)} (total ${String(metrics.totalCalls).padStart(3)}) | ` +

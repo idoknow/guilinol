@@ -45,7 +45,10 @@ import {
 } from './state'
 import {EBIKE_UPGRADE_MAX_KMH} from '../walk/tuning'
 
+import {rules} from '../smoke/data'
+
 export type CatalogItemType =
+  | 'cigarette_pack'
   | 'outfit_item'
   | 'outfit_preset'
   | 'ebike_model'
@@ -168,6 +171,7 @@ export function quotePurchasePrice(
   save: Readonly<LocalSaveV1> = getActiveSaveSnapshot(),
 ): number | null {
   switch (itemType) {
+    case 'cigarette_pack': return rules.brands.find(b => b.id === itemId)?.price ?? null
     case 'outfit_item':
       return OUTFIT_ITEMS_BY_ID[itemId]?.price ?? null
     case 'outfit_preset':
@@ -226,7 +230,11 @@ export function executePurchase(req: PurchaseRequest): PurchaseResult {
     let createdVehicleId: string | undefined
     let postCommitEvents: (() => void)[] = []
 
-    if (req.itemType === 'outfit_item') {
+    if (req.itemType === 'cigarette_pack') {
+      realPrice = quotePurchasePrice(req.itemType, req.itemId)
+      if (nextSave.packs.length >= 3) return {ok:false,code:'ALREADY_FULL',charged:0,balanceAfter:baseSave.money}
+      nextSave.packs.push({brand:req.itemId, remaining:20})
+    } else if (req.itemType === 'outfit_item') {
       const def = OUTFIT_ITEMS_BY_ID[req.itemId]
       if (!def) return {ok: false, code: 'INVALID_ITEM', charged: 0, balanceAfter: baseSave.money}
       if (baseSave.wardrobe.ownedItemIds.includes(def.id)) {

@@ -1,0 +1,18 @@
+/* IDOK-253 路人被撞后头顶的对话气泡：宣纸底、墨字、宋体，朱砂细边，下方一个小尾巴指向说话人 */
+.npc-bubble{position:fixed;z-index:6;pointer-events:none;transform:translate(-50%,calc(-100% - 10px));
+  will-change:left,top;contain:layout style}
+.npc-bubble[hidden]{display:none}
+.npc-bubble__text{position:relative;display:block;max-width:11em;padding:7px 13px 8px;
+  font:600 15px/1.35 var(--ui-serif);letter-spacing:.06em;color:var(--ui-ink-900);text-align:center;white-space:normal;word-break:keep-all;overflow-wrap:anywhere;
+  background:var(--ui-paper);border:1.5px solid var(--ui-seal);border-radius:14px 14px 14px 14px;
+  box-shadow:0 6px 16px rgba(12,20,20,.28),inset 0 0 0 3px rgba(244,239,226,.9),inset 0 0 0 4px rgba(169,80,60,.18);
+  transform-origin:50% 120%;animation:npc-bubble-in .34s var(--ui-ease) both}
+/* 尾巴：两层三角，外层朱砂边，内层纸色 */
+.npc-bubble__text::before,.npc-bubble__text::after{content:"";position:absolute;left:50%;top:100%;width:0;height:0;border-style:solid}
+.npc-bubble__text::before{margin-left:-8px;border-width:9px 8px 0 8px;border-color:var(--ui-seal) transparent transparent transparent}
+.npc-bubble__text::after{margin-left:-6px;margin-top:-1.5px;border-width:7px 6px 0 6px;border-color:var(--ui-paper) transparent transparent transparent}
+.npc-bubble.is-leaving .npc-bubble__text{animation:npc-bubble-out .26s ease-in both}
+@keyframes npc-bubble-in{0%{opacity:0;transform:translateY(6px) scale(.6) rotate(-4deg)}60%{opacity:1;transform:translateY(-2px) scale(1.06) rotate(1.5deg)}100%{opacity:1;transform:none}}
+@keyframes npc-bubble-out{to{opacity:0;transform:translateY(-6px) scale(.92)}}
+@media (pointer:coarse){.npc-bubble__text{font-size:13.5px;max-width:9.5em;padding:6px 11px 7px}}
+@media (prefers-reduced-motion:reduce){.npc-bubble__text,.npc-bubble.is-leaving .npc-bubble__text{animation:none}}

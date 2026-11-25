@@ -33,11 +33,22 @@ function detach() {
   mount = null
 }
 
+/** 各机身在掌心挂点（attach_hand_r，+X 右侧手柄、+Y 顶面、-Z 镜头朝前）内的微调偏移与俯仰。 */
+const HAND_SEAT: Record<BodyId, {pos: readonly [number, number, number]; rot: readonly [number, number, number]}> = {
+  mirrorless: {pos: [0.006, 0.001, 0.002], rot: [-0.04, 0, 0]},
+  a7r2: {pos: [0.006, 0.001, 0.002], rot: [-0.04, 0, 0]},
+  action: {pos: [-0.020, 0.023, -0.030], rot: [-0.03, 0, 0]},
+  action6: {pos: [-0.020, 0.023, -0.030], rot: [-0.03, 0, 0]},
+  pocket: {pos: [-0.002, 0.026, -0.009], rot: [-0.02, 0, 0]},
+  pocket4pro: {pos: [-0.002, 0.026, -0.009], rot: [-0.02, 0, 0]},
+  thumb: {pos: [-0.015, 0.031, -0.030], rot: [-0.03, 0, 0]},
+}
+
 function attach(root: T.Group, id: BodyId, anchor: T.Object3D) {
-  // 机身自带 lens 朝 -Z；手上稍微往下压一点，看起来像持机取景。
-  root.rotation.x = 0.12
-  root.rotation.z = 0.08
-  root.position.set(0, 0.01, 0.02)
+  // attach_hand_r 已位于掌心并对齐 -Z 朝前，这里只做各机型的掌心落位微调。
+  const seat = HAND_SEAT[id]
+  root.rotation.set(seat.rot[0], seat.rot[1], seat.rot[2])
+  root.position.set(seat.pos[0], seat.pos[1], seat.pos[2])
   anchor.add(root)
   mount = {id, root, source: String(root.userData.source ?? 'procedural'), anchor}
   // IDOK-188：同时把右臂抬起来，机身才露在身侧看得见。

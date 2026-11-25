@@ -1,6 +1,6 @@
 """桂林技师学院 (`way/646911647`, 五里店路) full campus restoration.
 
-Evidence: docs/layout/schools/guilin_technical.md (Esri z19 imagery, OSM, Overture, official photos).
+Evidence: .ops-docs/layout/schools/guilin_technical.md (Esri z19 imagery, OSM, Overture, official photos).
 - `GT1..GT5` five identical 6F blocks west of the track (OSM `way/1488496926..30`).
 - `GT0` east main complex (OSM `relation/20317489` with its two courtyards kept open),
   6F white tile with blue banding and an 8F blue-glass centre tower facing the north gate

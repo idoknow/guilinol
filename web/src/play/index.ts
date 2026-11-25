@@ -15,6 +15,7 @@ import {mountSettingsEntry,mountViewEntry} from '../ui/settings'
 import {bindRackGuard,isRackOpen,mountRackEntry} from '../ui/gear-rack'
 import {hotbarSlot,mountHotbar,riding,showHotbar} from '../ui/hotbar'
 import {setCameraShown} from '../gear/hand'
+import {droneMode} from '../drone'
 
 const KEY = 'glol.stamps', ARRIVE = 12, REARM = 40, MARK_LAYER = 2
 const ease = (t:number)=>t<.5?4*t*t*t:1-Math.pow(-2*t+2,3)/2
@@ -252,8 +253,21 @@ export function play(host:Host) {
     }
   })
   shutter.onclick = ()=>photo.open()
+  // IDOK-215: 无人机 —— 机库/放置/起飞都在这个入口，遥控时整条 dock 让位给遥控器界面。
+  const drone = droneMode(host,{
+    groundAt:(x,z)=>{
+      const hit = groundAt(x,z)
+      if(Number.isFinite(hit)) return hit
+      const walker = host.walker()
+      const probe = walker?.probe?.() as {surfaceY?:number;foot?:number}|undefined
+      return probe?.surfaceY ?? probe?.foot ?? 0
+    },
+    name:()=>nearestName(),
+  })
+  drone.mountEntry(buttons)
   window.addEventListener('keydown',event=>{
     if(event.repeat) return
+    if(drone.active) return
     if(event.code==='Escape') {if(photo.active) photo.close(); else if(!map?.active) closeAll(); return}
     if(isGlobalHotkeyBlocked(event.target,{allowPhoto:photo.active})) return
     if(event.code==='KeyJ'&&!photo.active) sheet.hidden?openBook():closeBook()
@@ -272,6 +286,34 @@ export function play(host:Host) {
   }
 
   // --- Per-frame: marker placement/fade, arrival, summit pill.
+  // Indoor & shop-building occlusion keeps distant scenic stamps (秀/街/巷/楼) from floating through walls.
+  let shopObj:THREE.Object3D|null = null
+  const tmpLocalA = new THREE.Vector3(), tmpLocalB = new THREE.Vector3(), tmpMarkWorld = new THREE.Vector3()
+  function resolveShopObj() {
+    if(!shopObj?.parent) shopObj = host.scene.getObjectByName('tianyuan_mifen_shop') ?? null
+    return shopObj
+  }
+  function pointInsideShop(pos:THREE.Vector3, shop:THREE.Object3D) {
+    shop.worldToLocal(tmpLocalA.copy(pos))
+    if(Math.abs(tmpLocalA.x)>3.55||tmpLocalA.z<-7.3||tmpLocalA.z>7.15||tmpLocalA.y<-0.6||tmpLocalA.y>3.6) return false
+    if(tmpLocalA.x<-1.4&&tmpLocalA.z>5.0&&Math.hypot(tmpLocalA.x+1.4,tmpLocalA.z-5.0)>2.2) return false
+    return true
+  }
+  function segmentHitsShopBuilding(camPos:THREE.Vector3, targetPos:THREE.Vector3, shop:THREE.Object3D) {
+    shop.worldToLocal(tmpLocalA.copy(camPos))
+    shop.worldToLocal(tmpLocalB.copy(targetPos))
+    const dx = tmpLocalB.x-tmpLocalA.x, dy = tmpLocalB.y-tmpLocalA.y, dz = tmpLocalB.z-tmpLocalA.z
+    let tmin = 0, tmax = 1
+    const clipAxis = (p0:number, d:number, lo:number, hi:number)=>{
+      if(Math.abs(d)<1e-8) return p0>=lo&&p0<=hi
+      let t1 = (lo-p0)/d, t2 = (hi-p0)/d
+      if(t1>t2){const tmp = t1; t1 = t2; t2 = tmp}
+      if(t1>tmin) tmin = t1
+      if(t2<tmax) tmax = t2
+      return tmin<=tmax
+    }
+    return clipAxis(tmpLocalA.x,dx,-3.55,3.55)&&clipAxis(tmpLocalA.y,dy,-0.5,10.6)&&clipAxis(tmpLocalA.z,dz,-7.3,7.15)&&tmax>0&&tmin<1
+  }
   let pulse = 0
   function tick(dt:number) {
     pulse += dt
@@ -282,12 +324,19 @@ export function play(host:Host) {
     const onFoot = walking && !photo.active && !isRackOpen() && !riding()
     showHotbar(onFoot)
     setCameraShown(onFoot && hotbarSlot() === 'camera', walker)
+    const shop = resolveShopObj()
+    const indoors = document.body.dataset.mifenIndoor==='1' || (!!shop&&(pointInsideShop(host.camera.position,shop)||pointInsideShop(p,shop)))
+    const nearShop = !!shop&&host.camera.position.distanceTo(shop.position)<55
     for(const m of marks) {
       const d = Math.hypot(m.spot.x-p.x,m.spot.z-p.z)
       if(Number.isNaN(m.ground)&&d<600) m.ground = groundAt(m.spot.x,m.spot.z)
-      const show = d<1400&&!photo.active&&!Number.isNaN(m.ground)&&!(summit&&d>0)
+      const baseShow = !indoors&&d<1400&&!photo.active&&!drone.active&&!Number.isNaN(m.ground)&&!(summit&&d>0)
+      const spriteY = m.ground+9+Math.sin(pulse*1.6)*.35
+      const occluded = baseShow&&nearShop&&!!shop&&segmentHitsShopBuilding(host.camera.position,tmpMarkWorld.set(m.spot.x,spriteY,m.spot.z),shop)
+      const show = baseShow&&!occluded
       m.group.visible = show
       if(show) {
+        m.sprite.material.depthTest = nearShop
         m.group.position.y = m.ground
         m.sprite.position.y = 9+Math.sin(pulse*1.6)*.35
         // Fixed screen size close up, shrinking to a dot in the distance; fades out at the edge of range.
@@ -301,7 +350,7 @@ export function play(host:Host) {
       if(d>REARM) {m.armed = true; if(shown===m.spot&&walking) closeCard()}
     }
     if(summit&&host.camera.position.distanceTo(summit.eye)>220) leaveSummit()
-    photo.tick(); map?.tick(dt)
+    photo.tick(); map?.tick(dt); drone.tick(dt)
   }
   return {tick, spots, goTo, goPoint, openBook, photo, stamps, get map(){return map}}
 }

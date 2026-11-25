@@ -226,21 +226,25 @@ export async function runVerify(opts) {
       }
       const st = d.getState()
       const staff = st.staff ?? null
-      const promptEl = document.querySelector('[data-drinks-recruit-prompt], .drinks-recruit-prompt, [data-staff-action]')
-      const promptVisible = Boolean(promptEl && !promptEl.hasAttribute('hidden') && promptEl.getBoundingClientRect().width > 0)
+      const hudEl = document.querySelector('.drinks-staff-hud')
+      const ctaEl = document.querySelector('[data-staff-cta], [data-drinks-recruit-prompt], .drinks-recruit-prompt, [data-staff-action]')
+      const promptVisible = Boolean(
+        hudEl && !hudEl.hasAttribute('hidden') && hudEl.getBoundingClientRect().width > 0,
+      ) || Boolean(ctaEl && !ctaEl.hasAttribute('hidden') && ctaEl.getBoundingClientRect().width > 0)
       let interacted = false
       if (typeof d.interactRecruit === 'function') {
         interacted = Boolean(await d.interactRecruit())
-      } else if (promptEl instanceof HTMLElement && promptVisible) {
-        promptEl.click()
+      } else if (ctaEl instanceof HTMLElement && promptVisible) {
+        ctaEl.click()
         interacted = true
       }
       const after = d.getState()
       return {
-        visible: Boolean(staff?.recruitSignVisible ?? staff?.signVisible ?? promptVisible),
+        visible: Boolean(staff?.nearRecruit || staff?.prompt?.visible || promptVisible),
         promptVisible,
-        interactive: Boolean(interacted || staff?.nearRecruitSign || after.staff?.working),
-        workingAfter: Boolean(after.staff?.working),
+        interactive: Boolean(interacted || staff?.nearRecruit || after.staff?.onDuty),
+        onDutyAfter: Boolean(after.staff?.onDuty),
+        uniformEquipped: Boolean(after.staff?.uniformEquipped),
       }
     })
     const recruitShot = join(opts.out, '03-recruit-sign-interact.png')
@@ -265,13 +269,15 @@ export async function runVerify(opts) {
 
       const readBar = () => {
         const cur = d.getState()
-        const bar = document.querySelector('[data-drinks-energy-bar], .drinks-energy-fill, .drinks-hold-meter progress, .drinks-hold-meter-fill')
+        const meter = document.querySelector('[data-drinks-hold-meter], .drinks-hold-meter')
+        const fill = document.querySelector('[data-drinks-hold-fill], .drinks-hold-meter-fill, [data-drinks-energy-bar], .drinks-energy-fill')
         let barVal = null
-        if (bar instanceof HTMLProgressElement) barVal = bar.value
-        else if (bar instanceof HTMLElement) {
-          barVal = bar.dataset.progress ?? bar.style.width ?? bar.style.transform ?? String(Math.round(bar.getBoundingClientRect().width))
+        if (meter instanceof HTMLElement && meter.getAttribute('aria-valuenow') !== null) {
+          barVal = meter.getAttribute('aria-valuenow')
+        } else if (fill instanceof HTMLElement) {
+          barVal = fill.style.width || fill.style.transform || String(Math.round(fill.getBoundingClientRect().width))
         }
-        return { fill: cur.hold?.fillRatio ?? null, active: Boolean(cur.hold?.active), barVal }
+        return { fill: cur.hold?.fillRatio ?? cur.hold?.energy ?? null, active: Boolean(cur.hold?.active), barVal }
       }
 
       const before = readBar()
@@ -318,7 +324,7 @@ export async function runVerify(opts) {
       timestamp: new Date().toISOString(),
       targetUrl,
       beforeWalkIn,
-      shopDrawCalls: beforeWalkIn.shopMetrics?.drawCalls ?? null,
+      shopDrawCalls: beforeWalkIn.shopMetrics?.meshes ?? beforeWalkIn.shopMetrics?.drawCalls ?? null,
       autoFirstPerson,
       recruitSign,
       holdEnergy,

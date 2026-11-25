@@ -1,6 +1,6 @@
 """乐群小学 (`way/684946203`) — OSM-level campus (IDOK-80, 口径 A).
 
-Evidence and inferred attributes: docs/layout/schools/lequn_primary.md.
+Evidence and inferred attributes: .ops-docs/layout/schools/lequn_primary.md.
 Footprints, sports surfaces and the campus outline are OSM/Overture geometry only;
 floors, roofs and colours are inferred. One generalized street-side gate, always closed.
 """

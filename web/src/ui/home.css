@@ -42,7 +42,7 @@ body[data-home] :is(.hud-me,.dock,.sky-ui,.hint,footer,.walk-ui,.vehicle-action,
 .home-resume-row{margin-top:-4px}.home-resume-row[hidden]{display:none}
 .home-resume{display:flex;align-items:center;gap:12px;width:100%;box-sizing:border-box;padding:11px 18px 11px 14px;border-radius:12px;cursor:pointer;
   font:500 14.5px/1.3 var(--ui-serif);letter-spacing:.12em;color:var(--ui-paper);text-align:left;
-  background:var(--ui-glass-strong);border:1px solid var(--ui-glass-line-soft);backdrop-filter:var(--ui-blur);-webkit-backdrop-filter:var(--ui-blur);
+  background:var(--ui-glass-strong);border:1px solid var(--ui-glass-line-soft);
   transition:background var(--ui-fast),border-color var(--ui-fast),transform .25s var(--ui-ease)}
 .home-resume:hover{background:var(--ui-glass-solid);border-color:var(--ui-glass-line);transform:translateX(3px)}
 .home-resume:active{transform:scale(.985)}
@@ -56,7 +56,7 @@ body[data-home] :is(.hud-me,.dock,.sky-ui,.hint,footer,.walk-ui,.vehicle-action,
   color:var(--st-white,#f6f4ef);font-family:var(--st-sans,system-ui,sans-serif);
   background:linear-gradient(105deg,rgba(255,197,61,.10),rgba(255,197,61,0) 42%),rgba(18,21,25,.9);
   box-shadow:0 22px 56px rgba(6,8,10,.5),inset 0 0 0 1px rgba(255,255,255,.12),inset 4px 0 0 var(--gold);
-  backdrop-filter:var(--ui-blur);-webkit-backdrop-filter:var(--ui-blur);transition:transform .25s var(--ui-ease),box-shadow .25s}
+  transition:transform .25s var(--ui-ease),box-shadow .25s}
 .home-mode--solo::after{content:"";position:absolute;inset:auto 0 0 0;height:3px;pointer-events:none;
   background:repeating-linear-gradient(90deg,rgba(246,244,239,.5) 0 18px,transparent 18px 34px);opacity:.35}
 .home-mode--solo:hover{transform:translateY(-2px);box-shadow:0 26px 64px rgba(6,8,10,.6),inset 0 0 0 1px rgba(255,197,61,.45),inset 4px 0 0 var(--gold)}
@@ -73,7 +73,7 @@ body[data-home] :is(.hud-me,.dock,.sky-ui,.hint,footer,.walk-ui,.vehicle-action,
 .home-mode--solo:hover .home-go--solo{filter:brightness(1.06)}
 /* 游览模式：次要，青玉玻璃 + 线框印章。 */
 .home-mode--tour{cursor:pointer;padding:14px 16px 13px;gap:10px 14px;color:var(--ui-paper);background:var(--ui-glass-strong);
-  border:1px solid var(--ui-glass-line-soft);backdrop-filter:var(--ui-blur);-webkit-backdrop-filter:var(--ui-blur);
+  border:1px solid var(--ui-glass-line-soft);
   transition:transform .25s var(--ui-ease),background .25s,border-color .25s}
 .home-mode--tour:hover{transform:translateY(-2px);background:var(--ui-glass-solid);border-color:var(--ui-glass-line)}
 .home-mode--tour:active{transform:scale(.985)}
@@ -107,6 +107,30 @@ kbd{display:inline-block;min-width:1.5em;padding:1px 5px;margin:0 1px;border-rad
 .qq-num{font:600 19px/1.2 ui-monospace,SFMono-Regular,monospace;letter-spacing:.14em;color:var(--ui-paper);-webkit-user-select:all;user-select:all}
 .qq-copy{font-size:13px}
 
+/* 抖音官方号（IDOK-272）：右下角一张小码卡，点开放大 + 复制抖音号。码是官方分享图裁出的圆形码，白底圆，透明外圈。
+   手机竖屏/横屏底部被模式卡占满，收成左上角一枚小胶囊（和右上账号按钮对称）。 */
+.home-douyin{position:absolute;z-index:1;right:calc(22px + env(safe-area-inset-right));bottom:calc(58px + env(safe-area-inset-bottom));
+  display:grid;grid-template-columns:auto auto;align-items:center;gap:12px;padding:10px 16px 10px 10px;cursor:pointer;text-align:left;
+  font:inherit;color:var(--ui-paper);background:var(--ui-glass);border:1px solid var(--ui-glass-line-soft);border-radius:var(--ui-r-lg);
+  box-shadow:var(--ui-shadow-1);-webkit-tap-highlight-color:transparent;
+  transition:background var(--ui-fast),border-color var(--ui-fast),transform var(--ui-fast);animation:home-rise .8s .35s var(--ui-ease) both}
+.home-douyin:hover{background:var(--ui-glass-strong);border-color:var(--ui-glass-line);transform:translateY(-2px)}
+.home-douyin:focus-visible{outline:2px solid var(--ui-jade-300);outline-offset:2px}
+.home-douyin-code{display:block;width:84px;height:84px;filter:drop-shadow(0 2px 6px rgba(10,18,16,.3))}
+.home-douyin-text{display:grid;gap:5px;justify-items:start}
+.home-douyin-mark{display:block;width:auto;height:19px}
+.home-douyin-text b{font:600 14px/1.2 var(--ui-serif);letter-spacing:.04em}
+.home-douyin-text small{font-size:11.5px;letter-spacing:.1em;color:var(--ui-paper-dim)}
+.about-panel.qq--douyin .qq-code{width:min(280px,100%);max-height:none;border-radius:0}
+.qq--douyin .qq-note b{display:block;margin-bottom:2px;font-size:15px;color:var(--ui-paper);letter-spacing:.04em}
+@media (max-width:760px),(max-height:520px) and (orientation:landscape){
+  .home-douyin{right:auto;bottom:auto;top:calc(16px + env(safe-area-inset-top));left:calc(22px + env(safe-area-inset-left));
+    min-height:var(--ui-h);padding:4px 14px 4px 4px;gap:8px;border-radius:var(--ui-r-pill);border-color:var(--ui-glass-line)}
+  .home-douyin-code{width:30px;height:30px;filter:none}
+  .home-douyin-text{grid-auto-flow:column;align-items:center;gap:7px}.home-douyin-mark{height:13px}.home-douyin-text b,.home-douyin-text small{display:none}
+  .home-douyin-text::after{content:"官方号";font-size:12px;letter-spacing:.1em;color:var(--ui-paper-dim)}
+}
+
 @media (max-width:760px){
   .home-shade{background:linear-gradient(0deg,rgba(20,33,30,.92) 0,rgba(20,33,30,.7) 46%,rgba(20,33,30,.15) 74%,rgba(20,33,30,.35) 100%)}
   .home-main{justify-content:flex-end;min-height:calc(100dvh - 110px);padding-top:40px;gap:20px;width:100%}
@@ -132,7 +156,7 @@ kbd{display:inline-block;min-width:1.5em;padding:1px 5px;margin:0 1px;border-rad
 .home-mode--mp{cursor:pointer;padding:14px 16px 13px;gap:10px 14px;color:var(--ui-paper);
   background:linear-gradient(105deg,rgba(143,193,181,.16),rgba(143,193,181,0) 46%),var(--ui-glass-strong);
   border:1px solid var(--ui-glass-line-soft);box-shadow:inset 4px 0 0 var(--ui-jade-300),var(--ui-shadow-1);
-  backdrop-filter:var(--ui-blur);-webkit-backdrop-filter:var(--ui-blur);transition:transform .25s var(--ui-ease),background .2s,border-color .2s}
+  transition:transform .25s var(--ui-ease),background .2s,border-color .2s}
 .home-mode--mp:hover{transform:translateY(-2px);background:linear-gradient(105deg,rgba(143,193,181,.22),rgba(143,193,181,0) 46%),var(--ui-glass-solid);border-color:var(--ui-glass-line)}
 .home-mode--mp:active{transform:scale(.985)}
 .home-mode--mp:focus-visible{outline:3px solid var(--ui-jade-300);outline-offset:3px}

@@ -10,7 +10,7 @@ root = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(root/'pipeline'))
 from common import ll2xz, xz2ll
 
-layout = root/'docs/layout/dongxi-layout.geojson'
+layout = root/'.ops-docs/layout/dongxi-layout.geojson'
 catalog = json.loads(layout.read_text())
 features = catalog['features']
 host = next(feature for feature in features if feature['properties']['name']=='R10')

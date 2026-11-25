@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import {Traffic} from '../web/src/traffic/sim.ts'
 
 const nodes=[[0,0],[40,0],[130,0],[40,60]].map(([x,z],id)=>({id,x,y:0,z}))
-const lanes=[[0,1],[1,2],[3,1]].map(([from,to],id)=>({id,from,to,kind:'motor',cls:'service',offset:0,speedKmh:36}))
+const lanes=[[0,1],[1,2],[3,1]].map(([from,to],id)=>({id,from,to,kind:'motor',cls:'primary',offset:0,speedKmh:36}))
 const sim=new Traffic({nodes,lanes,signals:[],walks:[]},()=>.5,0)
 const track=[...sim.allTracks()][0]
 const car=dist=>({track,dist,x:dist,y:0,z:0,speed:0,kind:'car',down:0,dodge:0,yaw:track.yaw,scale:1,leaving:false,halfWidth:.9,halfLength:2.1,height:1.5})

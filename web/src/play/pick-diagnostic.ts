@@ -1,4 +1,5 @@
 import * as THREE from 'three'
+import {MAIN_DETAIL_LAYER} from '../look/mirror-layer'
 import type {HitDiagnostic} from '../../../lib/feedback-contract'
 
 export function describeHit(hit:THREE.Intersection|undefined,layer:string,owner:string):HitDiagnostic|null {
@@ -21,6 +22,7 @@ export function describeHit(hit:THREE.Intersection|undefined,layer:string,owner:
 }
 
 export function dynamicPick(scene:THREE.Scene,ray:THREE.Raycaster){
+  ray.layers.enable(MAIN_DETAIL_LAYER)
   const meshes:THREE.Mesh[]=[],owners=new Map<THREE.Object3D,string>()
   scene.traverseVisible(node=>{
     if(!(node instanceof THREE.Mesh))return

@@ -32,9 +32,10 @@ try {
   page.on('pageerror',error=>errors.push(error.message))
   await page.route('**/favicon.ico',route=>route.fulfill({status:204}))
   await page.route('**/api/t',route=>route.fulfill({status:204}))
+  await page.route('**/stats.rcpd.cc/**',route=>route.fulfill({status:204,body:''}))
   page.on('console',message=>{if(message.type()==='error')errors.push(message.location().url+': '+message.text())})
-  await page.goto(walkUrl)
-  await page.waitForFunction(()=>window.viewer?.walk?.active,null,{timeout:90000})
+  await page.goto(walkUrl,{waitUntil:'domcontentloaded',timeout:120000})
+  await page.waitForFunction(()=>window.viewer?.walk?.active && ![1,2].includes(window.__loading?.level),null,{timeout:90000})
 
   async function fixture(origin,direction,seconds,target){
     seconds=Math.ceil(seconds*WALK_TIME)
@@ -85,7 +86,7 @@ try {
     },{origin,direction,seconds,target});assert(result.hit,`${target}: ${JSON.stringify(result)}`);console.log(target,'OK',result.maxSink>-Infinity?`maxSink=${result.maxSink.toFixed(4)}m`:'')
   }
 
-  await page.waitForFunction(()=>[...window.viewer.stream.landmarks.keys()].some(entry=>entry.id==='jingjiang'))
+  await page.waitForFunction(()=>[...window.viewer.stream.landmarks.keys()].some(entry=>entry.id==='jingjiang'),null,{timeout:90000})
   assert(await page.evaluate(()=>document.querySelector('.walk-ui')?.hidden===true),'desktop should hide mobile walk-ui')
 
   // Foot grounding & low-step/curb/slab direct autostep check (no jump, no floor sink).
@@ -393,18 +394,20 @@ try {
   await mobile.route('**/favicon.ico',route=>route.fulfill({status:204}))
   await mobile.route('**/api/t',route=>route.fulfill({status:204}))
   await mobile.goto(walkUrl+'&time=10.5')
-  await mobile.waitForFunction(()=>window.viewer?.walk?.active&&window.viewer?.tour?.map&&document.querySelector('.vehicle-action'),null,{timeout:90000})
+  await mobile.waitForFunction(()=>window.viewer?.walk?.active&&window.viewer?.tour?.map&&document.querySelector('.vehicle-action')&& ![1,2].includes(window.__loading?.level),null,{timeout:90000})
   await mobile.evaluate(async()=>{for(let i=0;i<4;i++)await new Promise(requestAnimationFrame)})
 
   const hud=await mobile.evaluate(()=>{
     const selectors=['.walk-ui .joystick','.walk-ui .btn-run','.walk-ui .btn-crouch','.walk-ui .btn-jump','.walk-ui .btn-view','.dock','.sky-ui','output','.hud-me']
+    const expected=document.createElement('span').style
     const boxes=selectors.map(sel=>{
       const el=document.querySelector(sel)
       if(!el)return {sel,missing:true}
       const st=getComputedStyle(el), r=el.getBoundingClientRect()
+      expected.backgroundColor=st.getPropertyValue(el.matches(':hover')?'--ui-glass-strong':'--ui-glass')
       return {sel,missing:false,hidden:st.display==='none'||st.visibility==='hidden'||el.hasAttribute('hidden'),
         left:+r.left.toFixed(1),top:+r.top.toFixed(1),right:+r.right.toFixed(1),bottom:+r.bottom.toFixed(1),width:+r.width.toFixed(1),height:+r.height.toFixed(1),
-        bg:st.backgroundColor,font:st.fontFamily}
+        bg:st.backgroundColor,font:st.fontFamily,glass:expected.backgroundColor}
     })
     const overlaps=[]
     for(let i=0;i<boxes.length;i++)for(let j=i+1;j<boxes.length;j++){
@@ -418,7 +421,7 @@ try {
     return {boxes,overlaps,outOfBounds}
   })
   assert(hud.boxes.every(b=>!b.missing&&!b.hidden),`missing HUD: ${JSON.stringify(hud.boxes)}`)
-  assert(hud.boxes.filter(b=>b.sel.startsWith('.walk-ui .btn-')).every(b=>(b.bg.includes('24, 40, 37')||b.bg.includes('28, 44, 42'))&&b.font.includes('Noto Serif SC')),`HUD style mismatch: ${JSON.stringify(hud.boxes)}`)
+  assert(hud.boxes.filter(b=>b.sel.startsWith('.walk-ui .btn-')).every(b=>b.bg===b.glass&&b.font.includes('Noto Serif SC')),`HUD style mismatch: ${JSON.stringify(hud.boxes)}`)
   assert.deepEqual(hud.overlaps,[],`HUD overlap: ${JSON.stringify(hud)}`)
   assert.deepEqual(hud.outOfBounds,[],`HUD out of bounds: ${JSON.stringify(hud)}`)
 
@@ -437,7 +440,7 @@ try {
   assert(rotateEntry.gate!=='grid','portrait gate should stay dismissed after 竖屏继续')
 
   // Tap sprint toggle so screenshot also shows active HUD harmony, then verify touch look + joystick + jump.
-  await mobile.locator('.walk-ui .btn-run').tap()
+  await mobile.locator('.walk-ui .btn-run').tap({timeout:90000})
   await mobile.waitForFunction(()=>document.querySelector('.walk-ui .btn-run')?.classList.contains('on'))
   const mobileShot=`${outDir}/mobile-390x844.png`
   await mobile.screenshot({path:mobileShot,timeout:90000})

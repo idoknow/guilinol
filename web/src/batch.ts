@@ -3,11 +3,12 @@ import {vehicleForbiddenAt} from './game/car-free'
 import {buildingMaterial} from './look/buildings'
 import {bridgeMaterial} from './look/bridge'
 import {WATER_LAYER, waterMaterial} from './look/water'
-import {streetFurnitureGeo, streetFurnitureMat, streetSurfaceMat} from './streets'
+import {streetFenceMat, streetFurnitureGeo, streetFurnitureMat, streetSurfaceMat} from './streets'
 import type {Tile} from './world'
 import {vehicleModel} from './walk/vehicle-model'
 import {look} from './look/config'
 import {flags} from './debug'
+import {tunnelLiningMaterial,tunnelLightMaterial} from './station-tunnels'
 import {freezeStatic} from './static-freeze'
 
 export interface TileBatchInput {
@@ -18,7 +19,10 @@ export interface TileBatchInput {
   walls:THREE.BufferGeometry|null
   pond:Float32Array|null
   bridge:THREE.BufferGeometry|null
+  tunnelLining?:THREE.BufferGeometry
+  tunnelLights?:THREE.BufferGeometry
   streetSurface:THREE.BufferGeometry|null
+  streetFence?:THREE.BufferGeometry|null
   furnitureMatrices:Float32Array
   furnitureColors:Float32Array
   detailCount:number
@@ -35,6 +39,36 @@ interface IndexedSlice {
 }
 
 export type ParkedBike={id:string;x:number;y:number;z:number;yaw:number}
+
+// Clear city-generated parked e-bikes overlapping Tianyuan Mifen storefront, Lv3 outdoor apron,
+// front viewing strip (3 blue shared bikes), and west-alley shop scooters.
+const TIANYUAN_CENTER_X = -1139.2
+const TIANYUAN_CENTER_Z = -55.5
+const TIANYUAN_ROT = 2.83616 - Math.PI
+const TIANYUAN_COS = Math.cos(TIANYUAN_ROT)
+const TIANYUAN_SIN = Math.sin(TIANYUAN_ROT)
+
+export function isTianyuanExcludedParkedBike(wx:number, wz:number):boolean {
+  const dx = wx - TIANYUAN_CENTER_X, dz = wz - TIANYUAN_CENTER_Z
+  if(dx*dx + dz*dz > 225) return false
+  const lx = dx*TIANYUAN_COS - dz*TIANYUAN_SIN
+  const lz = dx*TIANYUAN_SIN + dz*TIANYUAN_COS
+  return lx>=-5.6 && lx<=4.6 && lz>=-8.5 && lz<=13.0
+}
+
+function filterExcludedParkedBikes(parked:Float32Array):Float32Array {
+  let drop = 0
+  for(let i=0;i<parked.length;i+=16) if(isTianyuanExcludedParkedBike(parked[i+12],parked[i+14])) drop++
+  if(!drop) return parked
+  const kept = new Float32Array(parked.length - drop*16)
+  let out = 0
+  for(let i=0;i<parked.length;i+=16) {
+    if(isTianyuanExcludedParkedBike(parked[i+12],parked[i+14])) continue
+    kept.set(parked.subarray(i,i+16),out)
+    out += 16
+  }
+  return kept
+}
 
 const WORLD_SPHERE = new THREE.Sphere(new THREE.Vector3(0,200,0),25000)
 
@@ -170,6 +204,12 @@ const STREET_ATTRS:AttrDef[] = [
   {name:'normal',size:3,ctor:'f32'},
   {name:'color',size:3,ctor:'f32'},
 ]
+const FENCE_ATTRS:AttrDef[] = [
+  {name:'aAlong',size:1,ctor:'f32'},
+  {name:'position',size:3,ctor:'f32'},
+  {name:'normal',size:3,ctor:'f32'},
+  {name:'color',size:3,ctor:'f32'},
+]
 
 // A bucket owns the merged geometry of a small group of tiles. Adding or dropping one tile only
 // rebuilds its own bucket, so the cost stops scaling with how far the player has already walked.
@@ -189,6 +229,7 @@ class Bucket {
   readonly water:StaticLayerBatch
   readonly bridges:StaticLayerBatch
   readonly streets:StaticLayerBatch
+  fences:StaticLayerBatch|null = null
   readonly items = new Map<Tile,TileBatchInput>()
   dirty = false
 
@@ -208,6 +249,7 @@ class Bucket {
     const waterList:{tile:Tile; geom:THREE.BufferGeometry}[] = []
     const bridgeList:{tile:Tile; geom:THREE.BufferGeometry}[] = []
     const streetList:{tile:Tile; geom:THREE.BufferGeometry}[] = []
+    const fenceList:{tile:Tile; geom:THREE.BufferGeometry}[] = []
     for(const [tile, item] of this.items) {
       if(item.walls) wallList.push({tile, geom:item.walls})
       if(item.pond?.length) {
@@ -217,11 +259,23 @@ class Bucket {
       }
       if(item.bridge) bridgeList.push({tile, geom:item.bridge})
       if(item.streetSurface) streetList.push({tile, geom:item.streetSurface})
+      if(item.streetFence) fenceList.push({tile, geom:item.streetFence})
     }
     this.buildings.rebuild(wallList)
     this.water.rebuild(waterList)
     this.bridges.rebuild(bridgeList)
     this.streets.rebuild(streetList)
+    if(fenceList.length){
+      if(!this.fences){
+        this.fences = new StaticLayerBatch(streetFenceMat,FENCE_ATTRS)
+        this.scene.add(this.fences.mesh)
+      }
+      this.fences.rebuild(fenceList)
+    }else if(this.fences){
+      this.scene.remove(this.fences.mesh)
+      this.fences.mesh.geometry.dispose()
+      this.fences = null
+    }
   }
 
   cull(visible:Set<Tile>, far:Set<Tile>, visibleStreets:Set<Tile>) {
@@ -229,13 +283,15 @@ class Bucket {
     this.water.cull(visible)
     this.bridges.cull(visible)
     this.streets.cull(visibleStreets)
+    this.fences?.cull(visibleStreets)
   }
 
   dispose() {
-    for(const mesh of [this.buildings.mesh,this.water.mesh,this.bridges.mesh,this.streets.mesh]) {
+    for(const mesh of [this.buildings.mesh,this.water.mesh,this.bridges.mesh,this.streets.mesh,...(this.fences?[this.fences.mesh]:[])]) {
       this.scene.remove(mesh)
       mesh.geometry.dispose()
     }
+    this.fences = null
   }
 }
 
@@ -268,7 +324,7 @@ export class ChunkBatcher {
         const distance=(east-x)**2+(south-z)**2
         if(distance>=best||footY!==undefined&&Math.abs(footY-height)>1.5)continue
         const id=`${tile.x}:${tile.z}:${offset/16}`
-        if(this.takenBikes.has(id)||vehicleForbiddenAt(east,south))continue
+        if(this.takenBikes.has(id)||vehicleForbiddenAt(east,south)||isTianyuanExcludedParkedBike(east,south))continue
         nearest={id,x:east,y:height,z:south,yaw:Math.atan2(parked[offset+8],parked[offset+10])};best=distance
       }
     }
@@ -281,7 +337,7 @@ export class ChunkBatcher {
     if(!Number.isInteger(index)||index<0||id!==`${east}:${south}:${index}`)return false
     for(const {tile,parked} of this.items.values()){
       if(tile.x!==east||tile.z!==south||index>=parked.length/16)continue
-      if(vehicleForbiddenAt(parked[16*index+12],parked[16*index+14]))return false
+      if(vehicleForbiddenAt(parked[16*index+12],parked[16*index+14])||isTianyuanExcludedParkedBike(parked[16*index+12],parked[16*index+14]))return false
       this.takenBikes.add(id);this.furnitureStale=true;return true
     }
     return false
@@ -292,14 +348,29 @@ export class ChunkBatcher {
   private furnitureStale = false
   private lastFurniturePos = new THREE.Vector3(Infinity,Infinity,Infinity)
 
-  constructor(private scene:THREE.Scene) {}
+  private tunnelDirty=false
+  private tunnelLining=new StaticLayerBatch(tunnelLiningMaterial,[
+    {name:'position',size:3,ctor:'f32'},{name:'normal',size:3,ctor:'f32'},{name:'color',size:3,ctor:'f32'},
+  ])
+  private tunnelLights=new StaticLayerBatch(tunnelLightMaterial,[
+    {name:'position',size:3,ctor:'f32'},{name:'color',size:3,ctor:'f32'},
+  ])
+
+  constructor(private scene:THREE.Scene) {
+    scene.add(this.tunnelLining.mesh,this.tunnelLights.mesh)
+  }
 
   add(input:TileBatchInput) {
     const {tile} = input
+    for(const geom of [input.tunnelLining,input.tunnelLights])if(geom){
+      shiftPositions(geom,tile.x,tile.z);this.tunnelDirty=true
+    }
     if(input.walls) shiftPositions(input.walls,tile.x,tile.z)
     if(input.bridge) shiftPositions(input.bridge,tile.x,tile.z)
     if(input.streetSurface) shiftPositions(input.streetSurface,tile.x,tile.z)
+    if(input.streetFence) shiftPositions(input.streetFence,tile.x,tile.z)
     for(const mats of [input.furnitureMatrices,input.parked])for(let i=0;i<mats.length;i+=16) { mats[i+12]+=tile.x; mats[i+14]+=tile.z }
+    input.parked = filterExcludedParkedBikes(input.parked)
     this.items.set(tile,input)
     const key = bucketKey(tile)
     let bucket = this.buckets.get(key)
@@ -309,6 +380,7 @@ export class ChunkBatcher {
   }
 
   remove(tile:Tile) {
+    if(this.items.get(tile)?.tunnelLining)this.tunnelDirty=true
     if(!this.items.delete(tile)) return
     const key = bucketKey(tile)
     const bucket = this.buckets.get(key)
@@ -323,11 +395,18 @@ export class ChunkBatcher {
   }
 
   private anyDirty() {
+    if(this.tunnelDirty)return true
     for(const bucket of this.buckets.values()) if(bucket.dirty) return true
     return false
   }
 
   private rebuildDirty() {
+    if(this.tunnelDirty){
+      const items=[...this.items.values()]
+      this.tunnelLining.rebuild(items.flatMap(({tile,tunnelLining:geom})=>geom?[{tile,geom}]:[]))
+      this.tunnelLights.rebuild(items.flatMap(({tile,tunnelLights:geom})=>geom?[{tile,geom}]:[]))
+      this.tunnelDirty=false
+    }
     let rebuilt = false
     for(const bucket of this.buckets.values()) if(bucket.dirty) { bucket.rebuild(); rebuilt = true }
     // Only a geometry rebuild invalidates the furniture selection; a pure camera turn must not
@@ -398,6 +477,8 @@ export class ChunkBatcher {
     }
 
     for(const bucket of this.buckets.values()) bucket.cull(visibleChunks,farBuildings,visibleStreets)
+    this.tunnelLining.cull(visibleChunks)
+    this.tunnelLights.cull(visibleStreets)
 
     if(this.furnitureStale || furnMask!==this.lastFurnitureMask || camera.position.distanceToSquared(this.lastFurniturePos)>=4) {
       this.furnitureStale = false

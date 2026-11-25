@@ -97,6 +97,8 @@ export function glowSpriteTexture(): THREE.Texture {
 
 /** 一堆几何体 + 材质 + 纹理，dispose 时统一释放 */
 export class Parts {
+  private textures: THREE.Texture[] = []
+  texture(t:THREE.Texture){this.textures.push(t);return t}
   private geometries: THREE.BufferGeometry[] = []
   private materials: THREE.Material[] = []
 
@@ -111,6 +113,8 @@ export class Parts {
   }
 
   dispose() {
+    for(const t of this.textures)t.dispose()
+    this.textures.length=0
     for (const geometry of this.geometries) geometry.dispose()
     for (const material of this.materials) material.dispose()
     this.geometries.length = 0
@@ -125,6 +129,9 @@ export interface PackModel {
   /** 盖子节点：绕 X 轴正转 = 打开 */
   lid: THREE.Group
   /** 从盒口探出来的那根烟（取烟时露头） */
+  filters: THREE.Mesh[]
+  peeled: THREE.Mesh
+  seal: THREE.Mesh
   peek: THREE.Object3D
   parts: Parts
 }
@@ -133,8 +140,14 @@ export function createPack(brand: BrandDef, parts = new Parts()): PackModel {
   const group = new THREE.Group()
   group.name = 'smoke-pack'
 
+  const canvas=makeCanvas(192,288)
+  const ctx=canvas.getContext('2d')!
+  ctx.fillStyle=brand.pack;ctx.fillRect(0,0,192,288)
+  ctx.fillStyle=brand.accent;ctx.font='bold 32px serif';ctx.textAlign='center';ctx.fillText(brand.name,96,165)
+  const face=parts.texture(brand.faceTexture?new THREE.TextureLoader().load(brand.faceTexture):new THREE.CanvasTexture(canvas))
+  face.colorSpace=THREE.SRGBColorSpace
   const front = parts.mat(
-    new THREE.MeshStandardMaterial({color: brand.pack, roughness: 0.82, metalness: 0.04}),
+    new THREE.MeshStandardMaterial({map: face, roughness: 0.82, metalness: 0.04}),
   )
   const side = parts.mat(
     new THREE.MeshStandardMaterial({color: brand.pack, roughness: 0.86, metalness: 0.02}),
@@ -161,16 +174,33 @@ export function createPack(brand: BrandDef, parts = new Parts()): PackModel {
   const peek = new THREE.Group()
   peek.position.set(0.006, PACK_H / 2 - 0.004, 0)
   const peekPaper = new THREE.Mesh(
-    parts.geo(new THREE.CylinderGeometry(CIG_RADIUS, CIG_RADIUS, 0.02, 8, 1, true)),
+    parts.geo(new THREE.CylinderGeometry(CIG_RADIUS, CIG_RADIUS, 0.05, 8, 1, true)),
     parts.mat(new THREE.MeshStandardMaterial({color: 0xf2ece0, roughness: 0.94, side: THREE.DoubleSide})),
   )
   // 圆柱默认沿 +Y，往上一挪就有一截烟头从盒口探出来
-  peekPaper.position.y = 0.008
+  peekPaper.position.y = -0.007
   peek.add(peekPaper)
   peek.visible = false
   group.add(peek)
 
-  return {group, lid, peek, parts}
+  const seal=new THREE.Mesh(parts.geo(new THREE.BoxGeometry(.003,PACK_H,.0006)),
+    parts.mat(new THREE.MeshStandardMaterial({color:0xf5ecc4,transparent:true,opacity:.65})))
+  seal.position.set(.018,0,PACK_D/2+.001);group.add(seal)
+  const peeled=new THREE.Mesh(parts.geo(new THREE.BoxGeometry(1,.003,.0006)),seal.material)
+  peeled.visible=false
+  group.add(peeled)
+  const filterGeo=parts.geo(new THREE.CylinderGeometry(.00325,.00325,.008,12))
+  const filterMat=parts.mat(new THREE.MeshStandardMaterial({color:brand.tip}))
+  const filters:THREE.Mesh[]=[]
+  for(let i=0;i<20;i++){
+    const row=Math.floor(i/7), col=i%7
+    const filter=new THREE.Mesh(filterGeo,filterMat)
+    filter.position.set((col-3+(row===2?.5:0))*.0073,.038,row*.007-.007)
+    filters.push(filter);group.add(filter)
+  }
+  const tip=new THREE.Mesh(filterGeo,filterMat)
+  tip.position.y=.022;peek.add(tip)
+  return {group, lid, peek, seal, peeled, filters,parts}
 }
 
 /* --------------------------------------------------------------- 一根香烟 */
@@ -454,23 +484,6 @@ export function createStub(brand: BrandDef, parts = new Parts()): THREE.Group {
   group.add(charred)
   // 躺在地上，稍微歪一点才不像尺子
   group.rotation.z = 0.02
-  return group
-}
-
-/* --------------------------------------------------------- 第一人称的假手 */
-
-/** 视角里那只握着东西的手：手掌 + 拇指，够用了 */
-export function createMitt(skin: string, mirror = false, parts = new Parts()): THREE.Group {
-  const group = new THREE.Group()
-  group.name = 'smoke-mitt'
-  const material = parts.mat(new THREE.MeshStandardMaterial({color: skin, roughness: 0.86}))
-  const palm = new THREE.Mesh(parts.geo(new THREE.CapsuleGeometry(0.028, 0.052, 4, 12)), material)
-  palm.rotation.z = Math.PI / 2
-  group.add(palm)
-  const thumb = new THREE.Mesh(parts.geo(new THREE.CapsuleGeometry(0.011, 0.026, 3, 8)), material)
-  thumb.position.set(mirror ? 0.026 : -0.026, 0.022, 0.012)
-  thumb.rotation.z = mirror ? -0.7 : 0.7
-  group.add(thumb)
   return group
 }
 

@@ -1,12 +1,13 @@
 import './citizen.css'
 import {backpackItems} from './items'
-import {queueCigarette} from './use-item'
+import {queueCigarette,smokeEnabled} from './use-item'
 const status=document.querySelector('#status')!,button=document.querySelector<HTMLButtonElement>('#portrait')!
 async function openBag(){
   const response=await fetch('/api/me')
   if(!response.ok)throw Error(response.status===401?'请先登录后查看背包':'暂时无法读取背包')
   const {uid}=await response.json()
   for(const item of backpackItems(uid)){
+    if(item.id==='cigarette'&&!smokeEnabled())continue
     const row=document.createElement('li'),icon=document.createElement('span'),text=document.createElement('span'),name=document.createElement('b'),note=document.createElement('small')
     row.className='cz-item';icon.setAttribute('aria-hidden','true');text.className='cz-item-text';name.textContent=item.name;text.append(name,note)
     if(item.id==='citizen-card'){
@@ -14,8 +15,8 @@ async function openBag(){
       const link=document.createElement('a');link.className='cz-btn';link.href=item.viewUrl;link.textContent='查看';row.append(icon,text,link)
     }else{
       // 抽烟入口刻意放低调：素色小图、灰字，不用朱砂主按钮（IDOK-192 Rock：入口弱化）。
-      row.classList.add('cz-item--quiet');icon.className='cz-item-icon cz-icon-cig';note.textContent='回到城里时取出一根，Y 点火'
-      const use=document.createElement('button');use.className='cz-btn cz-btn--ghost';use.textContent='取一根'
+      row.classList.add('cz-item--quiet');icon.className='cz-item-icon cz-icon-cig';note.textContent='选择物品栏第 3 格'
+      const use=document.createElement('button');use.className='cz-btn cz-btn--ghost';use.textContent='香烟'
       use.onclick=()=>{queueCigarette(sessionStorage);location.assign('/')};row.append(icon,text,use)
     }
     document.querySelector('#items')!.append(row)

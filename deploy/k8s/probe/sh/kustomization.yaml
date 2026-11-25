@@ -1,8 +1,0 @@
-resources: [../base]
-nameSuffix: -sh
-patches:
-- target: {kind: CronJob, name: glol-perf-probe}
-  patch: |-
-    - op: add
-      path: /spec/jobTemplate/spec/template/spec/nodeSelector
-      value: {kubernetes.io/hostname: cn-sh-tencent-01}

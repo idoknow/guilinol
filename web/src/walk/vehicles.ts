@@ -1057,7 +1057,7 @@ export async function vehicles(
       if (isPointInQuietZone(cx, cz)) return null
       if (requirePavement && !pavement(cx, cz)) return null
       if (env?.sim) {
-        env.sim.sync(cx, cz)
+        env.sim.sync(cx, cz, true)
         if (env.sim.insideHouse(cx, cz) || env.sim.wet(cx, cz)) return null
         const spawn = env.sim.findWalkableSpawn(cx, cz, true)
         if (!spawn) return null

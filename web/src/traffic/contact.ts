@@ -3,16 +3,18 @@ type Point={x:number,y:number,z:number}
 export const cellKey=(col:number,row:number)=>col*65536+row
 type Visit=(x:number,z:number,callback:(solid:Solid)=>void)=>void
 export class SolidGrid {
+  revision=0
   private bins=new Map<number,Set<Solid>>()
   add(solid:Solid){
+    this.revision++
     const keys:number[]=[]
     for(let east=Math.floor((solid.x-7)/16);east<=Math.floor((solid.x+7)/16);east++)for(let south=Math.floor((solid.z-7)/16);south<=Math.floor((solid.z+7)/16);south++){
       const key=cellKey(east,south);let bin=this.bins.get(key)
       if(!bin){bin=new Set();this.bins.set(key,bin)}bin.add(solid);keys.push(key)
     }
-    return ()=>{for(const key of keys){const bin=this.bins.get(key);if(bin?.delete(solid)&&!bin.size)this.bins.delete(key)}}
+    return ()=>{this.revision++;for(const key of keys){const bin=this.bins.get(key);if(bin?.delete(solid)&&!bin.size)this.bins.delete(key)}}
   }
-  clear(){this.bins.clear()}
+  clear(){this.revision++;this.bins.clear()}
   near:Visit=(x,z,callback)=>{
     const bin=this.bins.get(cellKey(Math.floor(x/16),Math.floor(z/16)));if(bin)for(const solid of bin)callback(solid)
   }

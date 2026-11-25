@@ -62,7 +62,7 @@ export async function adminUserDetail(db: D1Database, id: string) {
     .bind(id)
     .first<Record<string, unknown>>()
   if (!user) return json({ error: { code: 'not_found', message: '未找到用户' } }, 404)
-  return json({ user: { ...user, verified: !!user.verified }, social: await userSocialIdentities(db, id) })
+  return json({ user: { ...user, verified: !!user.verified }, social: await userSocialIdentities(db, id, true) })
 }
 
 export async function adminList(db: D1Database, path: string, params: URLSearchParams) {
@@ -82,6 +82,16 @@ export async function adminList(db: D1Database, path: string, params: URLSearchP
     const {results}=await db.prepare('SELECT * FROM admin_audit'+where+' ORDER BY id DESC LIMIT 51').bind(...args).all()
     return json({items:results.slice(0,50).map(row=>({...row,detail:typeof row.detail==='string'?JSON.parse(row.detail):row.detail})),
       next_cursor:results.length>50?String(results[49].id):null})
+  }
+  if (path === 'admin/signups') {
+    // 用户管理页的注册曲线：按小时分桶的新增数 + 窗口起点之前的存量（前端累加成总数曲线）。
+    const hours = Math.min(Math.max(Math.floor(Number(params.get('hours')) || 72), 1), 24 * 90)
+    const from = (Math.floor(Date.now() / 3600e3) - hours + 1) * 3600
+    const [base, rows] = await db.batch<Record<string, string | number>>([
+      db.prepare('SELECT count(*) AS n FROM users WHERE created_at<?').bind(from),
+      db.prepare('SELECT (created_at/3600)*3600 AS t,count(*) AS n FROM users WHERE created_at>=? GROUP BY (created_at/3600)*3600 ORDER BY 1').bind(from),
+    ])
+    return json({ from, hours, base: Number(base.results[0]?.n ?? 0), points: rows.results.map((row) => ({ t: Number(row.t), n: Number(row.n) })) })
   }
   if (path === 'admin/stats') {
     const [users, statuses, pending] = await db.batch<Record<string, string | number>>([
@@ -221,10 +231,10 @@ export async function adminMergeUsers(db: D1Database, actor: string, targetId: s
   if (!target || !source) return json({ error: { code: 'not_found', message: '账号不存在' } }, 404)
 
   const sourceTypes = (
-    await db.prepare('SELECT type FROM social_identities WHERE user_id=? ORDER BY type').bind(fromId).all<{ type: string }>()
+    await db.prepare('SELECT CASE WHEN channel=\'direct\' THEN \'direct:\' || type ELSE type END AS type FROM social_identities WHERE user_id=? ORDER BY type').bind(fromId).all<{ type: string }>()
   ).results.map((row) => row.type)
   const targetTypes = new Set(
-    (await db.prepare('SELECT type FROM social_identities WHERE user_id=?').bind(targetId).all<{ type: string }>()).results.map(
+    (await db.prepare('SELECT CASE WHEN channel=\'direct\' THEN \'direct:\' || type ELSE type END AS type FROM social_identities WHERE user_id=?').bind(targetId).all<{ type: string }>()).results.map(
       (row) => row.type,
     ),
   )
@@ -242,7 +252,7 @@ export async function adminMergeUsers(db: D1Database, actor: string, targetId: s
   const adoptedEmail = target.email_placeholder && !source.email_placeholder && source.verified ? source.email : ''
   // 邮箱唯一约束：必须在来源账号被删除之后才能把邮箱改到目标账号上（见语句最后一步）
   for (const type of movable)
-    statements.push(db.prepare('UPDATE social_identities SET user_id=? WHERE user_id=? AND type=?').bind(targetId, fromId, type))
+    statements.push(db.prepare('UPDATE social_identities SET user_id=? WHERE user_id=? AND channel=? AND type=?').bind(targetId, fromId, type.startsWith('direct:')?'direct':'legacy',type.replace(/^direct:/,'')))
 
   const targetSaves = await db.prepare('SELECT count(*) n FROM player_saves WHERE user_id=?').bind(targetId).first<{ n: number }>()
   const sourceSaves = await db.prepare('SELECT count(*) n FROM player_saves WHERE user_id=?').bind(fromId).first<{ n: number }>()

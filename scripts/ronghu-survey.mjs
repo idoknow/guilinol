@@ -5,7 +5,7 @@ import {gunzipSync} from 'node:zlib'
 
 const out=process.env.CAPTURES??'captures/ronghu-survey'
 await mkdir(out,{recursive:true})
-const photos=JSON.parse(await readFile('docs/refs/rock/photo-locations.json'))
+const photos=JSON.parse(await readFile('.ops-docs/refs/rock/photo-locations.json'))
 const world=JSON.parse(await readFile('dist/world/manifest.json'))
 const server=await preview({root:'web',configFile:'web/vite.config.ts',preview:{host:'127.0.0.1',port:0}})
 let browser

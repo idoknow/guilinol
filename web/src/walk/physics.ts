@@ -1,4 +1,5 @@
 import {inRegion} from '../../../lib/play-region'
+import neHall from '../../../pipeline/landmarks/central_square_ne_hall.json'
 import R from '@dimforge/rapier3d-compat'
 import * as THREE from 'three'
 import type {PeakColliderData, PeaksGroup} from '../peaks'
@@ -11,10 +12,20 @@ import {trafficPushGuard} from './traffic-push'
 import {probeLocalDismount, probeLocalMount} from './ride'
 import {onOldSouthSlope,yueyaShoulderHeight} from '../yueya-slope'
 import {CAR_SCALE} from '../drive/scale'
+import {ROAD_BARRIER_STRIDE} from '../road-barriers'
+import {
+  clampCameraToObstacleVolumes,
+  expandVolumeToCuboids,
+  resolveObstacleVolumesStep,
+  type ObstacleStepActor,
+  type ObstacleStepResult,
+  type ObstacleVolumeSpec,
+} from './obstacle-volumes'
 
 type Outline = import('../buildings').Building
 type Kind = 'ground'|'overview'|'road'|'deck'|'deckThin'|'building'|'peak'|'tree'|'rail'|'sidewalk'|'landmark'
-type Region = {fine:boolean,colliders:R.Collider[],rings:Outline[]}
+type Detail = Awaited<ReturnType<typeof import('../world').detail>>
+type Region = {data:Detail|undefined,colliders:R.Collider[],barrierColliders:R.Collider[],rings:Outline[],surfaces?:Generator<boolean>}
 const identity = {x:0,y:0,z:0,w:1}, down = {x:0,y:-1,z:0}, up = {x:0,y:1,z:0}
 const candidates = [{dx:0,dz:0}]
 for(let dx=-cfg.search;dx<=cfg.search;dx+=2) for(let dz=-cfg.search;dz<=cfg.search;dz+=2)
@@ -40,6 +51,12 @@ function fineField(data:Awaited<ReturnType<typeof import('../world').detail>>){
     const at=row*65+col, coarse=(row>>1)*stride+(col>>1)
     const visible=stride===65?positions.getY(at):(col%2&&row%2)?(positions.getY(coarse+1)+positions.getY(coarse+stride))/2:
       (positions.getY(coarse)+positions.getY(coarse+(col%2)+(row%2)*stride))/2
+    if(data.water[at]===-32768 && data.railCutVertices.size){
+      const cuts=data.railCutVertices
+      if(stride===65 ? cuts.has(at) : (col%2 && row%2)
+        ? cuts.has(coarse+1)||cuts.has(coarse+stride)
+        : cuts.has(coarse)||cuts.has(coarse+(col%2)+(row%2)*stride))return visible
+    }
     if(yueya&&data.water[at]===-32768){
       const east=tile.x+col*4,south=tile.z+row*4
       if(onOldSouthSlope(east,south))return visible
@@ -119,7 +136,7 @@ function filterBridgeOverRoad(road: Float32Array, deck: Float32Array) {
   return kept.length === road.length ? road : Float32Array.from(kept)
 }
 
-function weldedSurface(raw:Float32Array, corners:number[]|null, data:Awaited<ReturnType<typeof import('../world').detail>>, maxGap:number, minRun:number, maxRun:number, runScale:number){
+function* weldedSurface(raw:Float32Array, corners:number[]|null, data:Detail, maxGap:number, minRun:number, maxRun:number, runScale:number){
   const verts:number[]=[],idxList:number[]=[],seen=new Map<string,number>()
   const addVertex=(corner:number)=>{
     const i=3*corner
@@ -130,24 +147,27 @@ function weldedSurface(raw:Float32Array, corners:number[]|null, data:Awaited<Ret
   }
   if(corners){
     for(let t=0;t+2<corners.length;t+=3){
+      if(t&&t%1536===0)yield false
       const a=addVertex(corners[t]),b=addVertex(corners[t+1]),c=addVertex(corners[t+2])
       if(a!==b&&b!==c&&c!==a)idxList.push(a,b,c)
     }
   }else{
     for(let t=0;t+2<raw.length/3;t+=3){
+      if(t&&t%1536===0)yield false
       const a=addVertex(t),b=addVertex(t+1),c=addVertex(t+2)
       if(a!==b&&b!==c&&c!==a)idxList.push(a,b,c)
     }
   }
   if(!idxList.length)return null
   // Smooth low dry abutment/road-shoulder edges onto terrain so pedestrians and vehicles glide up without snagging.
-  const edgeCount=new Map<string,number>(), edgeTri=new Map<string,[number,number,number]>()
+  const vertexCount=verts.length/3
+  const boundary=new Map<number,[number,number,number]|null>()
   const addEdge=(u:number,v:number,w:number)=>{
-    const k=u<v?`${u}:${v}`:`${v}:${u}`
-    edgeCount.set(k,(edgeCount.get(k)??0)+1)
-    edgeTri.set(k,[u,v,w])
+    const key=Math.min(u,v)*vertexCount+Math.max(u,v)
+    boundary.set(key,boundary.has(key)?null:[u,v,w])
   }
   for(let t=0;t<idxList.length;t+=3){
+    if(t&&t%1536===0)yield false
     const a=idxList[t],b=idxList[t+1],c=idxList[t+2]
     addEdge(a,b,c);addEdge(b,c,a);addEdge(c,a,b)
   }
@@ -162,9 +182,11 @@ function weldedSurface(raw:Float32Array, corners:number[]|null, data:Awaited<Ret
     return Math.max(vis,(data.water[gi]===-32768?data.terrain[gi]:data.water[gi])/10)
   }
   const dryAt=(lx:number,lz:number)=>data.water[Math.min(64,Math.max(0,Math.round(lz/4)))*65+Math.min(64,Math.max(0,Math.round(lx/4)))]===-32768
-  for(const [k,cnt] of edgeCount){
-    if(cnt!==1)continue
-    const [u,v,w]=edgeTri.get(k)!
+  let visited=0
+  for(const edge of boundary.values()){
+    if(++visited%512===0)yield false
+    if(!edge)continue
+    const [u,v,w]=edge
     const ax=verts[u*3],ay=verts[u*3+1],az=verts[u*3+2]
     const bx=verts[v*3],by=verts[v*3+1],bz=verts[v*3+2]
     if((ax<.15&&bx<.15)||(ax>255.85&&bx>255.85)||(az<.15&&bz<.15)||(az>255.85&&bz>255.85))continue
@@ -219,16 +241,140 @@ export async function createPhysics(manifest:Manifest,stream:Stream,peaks:PeaksG
   function remove(coll:R.Collider){sources.delete(coll.handle);thinDecks.delete(coll.handle);kinds.delete(coll.handle);world.removeCollider(coll,false)}
   const trunks=new Map<import('../forest').Tree,R.Collider>()
   const landmarks=new Map<THREE.Group,R.Collider[]>()
-  function sync(east:number,south:number){
+  const landmarkBounds=new Map<THREE.Group,{minX:number,maxX:number,minZ:number,maxZ:number}>()
+  const obstacleVolumeSpecs=new Map<string,ObstacleVolumeSpec>()
+  const obstacleColliders=new Map<string,R.Collider[]>()
+  function materializeObstacleVolume(spec:ObstacleVolumeSpec){
+    const prev=obstacleColliders.get(spec.id)
+    if(prev)prev.forEach(remove)
+    const colliders:R.Collider[]=[]
+    for(const c of expandVolumeToCuboids(spec)){
+      const halfYaw=c.yaw*.5
+      const desc=R.ColliderDesc.cuboid(c.hx,c.hy,c.hz)
+        .setTranslation(c.x,c.y,c.z)
+        .setRotation({x:0,y:Math.sin(halfYaw),z:0,w:Math.cos(halfYaw)})
+      const coll=add(desc,'building')
+      sources.set(coll.handle,`${spec.id}/${c.label}`)
+      colliders.push(coll)
+    }
+    obstacleColliders.set(spec.id,colliders)
+  }
+  function removeObstacleVolume(id:string){
+    const existing=obstacleColliders.get(id)
+    if(existing)existing.forEach(remove)
+    obstacleColliders.delete(id)
+    obstacleVolumeSpecs.delete(id)
+    if(existing)world.step()
+  }
+  function syncObstacleVolume(spec:ObstacleVolumeSpec){
+    obstacleVolumeSpecs.set(spec.id,spec)
+    materializeObstacleVolume(spec)
+    world.step()
+  }
+  function getObstacleVolumeIds(){return [...obstacleVolumeSpecs.keys()]}
+  function resolveObstacleStep(
+    prev:{x:number;y:number;z:number},
+    next:{x:number;y:number;z:number},
+    actor:ObstacleStepActor,
+  ):ObstacleStepResult{
+    if(!obstacleVolumeSpecs.size)return {blocked:false,normalX:0,normalZ:0,label:''}
+    return resolveObstacleVolumesStep(prev,next,actor,obstacleVolumeSpecs.values())
+  }
+  function clampCamera(
+    playerPos:{x:number;y:number;z:number},
+    camPos:{x:number;y:number;z:number},
+    camMargin:number,
+  ){
+    if(!obstacleVolumeSpecs.size)return false
+    return clampCameraToObstacleVolumes(playerPos,camPos,camMargin,obstacleVolumeSpecs.values())
+  }
+  function buildTileRoadBarriers(tile:Tile,roadBars:Float32Array){
+    const built:R.Collider[]=[]
+    if(!roadBars.length)return built
+    const nearBoxes:{minX:number,maxX:number,minZ:number,maxZ:number}[]=[]
+    for(const b of landmarkBounds.values()){
+      if(b.maxX>=tile.x-1&&b.minX<=tile.x+257&&b.maxZ>=tile.z-1&&b.minZ<=tile.z+257)nearBoxes.push(b)
+    }
+    const pushCuboid=(wx:number,cy:number,wz:number,hx:number,hy:number,hz:number,halfYaw:number)=>{
+      const desc=R.ColliderDesc.cuboid(hx,hy,hz)
+        .setTranslation(wx,cy,wz)
+        .setRotation({x:0,y:Math.sin(halfYaw),z:0,w:Math.cos(halfYaw)})
+      const coll=add(desc,'rail')
+      sources.set(coll.handle,'road-barrier')
+      built.push(coll)
+    }
+    for(let i=0;i<roadBars.length;i+=ROAD_BARRIER_STRIDE){
+      const cx=roadBars[i],cy=roadBars[i+1],cz=roadBars[i+2]
+      const hx=roadBars[i+3],hy=roadBars[i+4],hz=roadBars[i+5],yaw=roadBars[i+6]
+      const wx=tile.x+cx,wz=tile.z+cz,halfYaw=yaw*.5
+      if(!nearBoxes.length){pushCuboid(wx,cy,wz,hx,hy,hz,halfYaw);continue}
+      const reach=hx+hz+.5
+      let touchesBox=false
+      for(const b of nearBoxes){
+        if(wx+reach>=b.minX&&wx-reach<=b.maxX&&wz+reach>=b.minZ&&wz-reach<=b.maxZ){touchesBox=true;break}
+      }
+      if(!touchesBox){pushCuboid(wx,cy,wz,hx,hy,hz,halfYaw);continue}
+      const len=hx*2,slices=Math.max(1,Math.ceil(len/2)),stepLen=len/slices
+      const tx=Math.cos(yaw),tz=-Math.sin(yaw)
+      const rot={x:0,y:Math.sin(halfYaw),z:0,w:Math.cos(halfYaw)}
+      // Lift probe bottom +0.40 m above embedded base so horizontal landmark slabs never suppress vertical guardrails.
+      const probeHy=Math.max(.15,hy-.2),probeCy=cy+.2
+      const probe=new R.Cuboid(stepLen*.5,probeHy,hz+.35)
+      let runStart=-1
+      for(let s=0;s<=slices;s++){
+        let blocked=true
+        if(s<slices){
+          const offset=-hx+(s+.5)*stepLen
+          blocked=!!world.intersectionWithShape({x:wx+tx*offset,y:probeCy,z:wz+tz*offset},rot,probe,undefined,undefined,capsule,undefined,landmarkFilter)
+        }
+        if(!blocked&&runStart<0)runStart=s
+        else if(blocked&&runStart>=0){
+          const segLen=(s-runStart)*stepLen
+          const segCenter=-hx+(runStart+s)*.5*stepLen
+          pushCuboid(wx+tx*segCenter,cy,wz+tz*segCenter,segLen*.5,hy,hz,halfYaw)
+          runStart=-1
+        }
+      }
+    }
+    return built
+  }
+  function* surfaces(tile:Tile,data:Detail,colliders:R.Collider[]){
+    const {sidewalk,road}=data.streets
+    function* install(raw:Float32Array,corners:number[]|null,kind:'sidewalk'|'road'|'deck',settings:[number,number,number,number],thin=false){
+      const desc=yield* weldedSurface(raw,corners,data,...settings)
+      if(!desc)return
+      yield true
+      const collider=add(desc.setTranslation(tile.x,0,tile.z),kind)
+      colliders.push(collider)
+      if(kind==='road')sources.set(collider.handle,tile.file)
+      if(thin)thinDecks.add(collider.handle)
+      yield true
+    }
+    if(sidewalk.length)yield* install(sidewalk,null,'sidewalk',[.65,.38,1.4,2.4])
+    if(road.length)yield* install(filterBridgeOverRoad(road,data.deck),null,'road',[.65,.8,1.8,4])
+    if(data.deck.length){
+      const indices:[number[],number[]]=[[],[]]
+      for(let face=0;face<data.deck.length/9;face++)indices[data.thin.has(face)?1:0].push(face*3,face*3+1,face*3+2)
+      for(const [thin,faces] of indices.entries())if(faces.length)yield* install(data.deck,faces,'deck',[.80,1.2,2.8,5],!!thin)
+    }
+  }
+  function sync(east:number,south:number,frame=false){
     let changed=false
+    let landmarksChanged=false
+    const dirtyLandmarkBoxes:{minX:number,maxX:number,minZ:number,maxZ:number}[]=[]
+    for(const [id,spec] of obstacleVolumeSpecs){
+      if(!obstacleColliders.has(id)){materializeObstacleVolume(spec);changed=true}
+    }
     const collisionRadius=Math.min(cfg.collisionRadius,Math.max(256,stream.radius))
     const nearLandmarks=new Set<THREE.Group>()
     for(const [entry,root] of stream.landmarks){
       if(entry.collision==='none'||Math.hypot(east-root.position.x,south-root.position.z)>collisionRadius+entry.sphere[3])continue
       nearLandmarks.add(root);if(landmarks.has(root))continue
       const colliders:R.Collider[]=[]
+      let minX=Infinity,maxX=-Infinity,minZ=Infinity,maxZ=-Infinity
       if(entry.collision==='box'){
         const bounds=new THREE.Box3().setFromObject(root,true),center=bounds.getCenter(new THREE.Vector3()),half=bounds.getSize(new THREE.Vector3()).multiplyScalar(.5)
+        minX=bounds.min.x;maxX=bounds.max.x;minZ=bounds.min.z;maxZ=bounds.max.z
         colliders.push(add(R.ColliderDesc.cuboid(half.x,half.y,half.z).setTranslation(center.x,center.y,center.z),'landmark'))
       }else root.traverse(node=>{
         if(!(node instanceof THREE.Mesh))return
@@ -251,6 +397,9 @@ export async function createPhysics(manifest:Manifest,stream:Stream,peaks:PeaksG
             if(len>1e-6&&ny/len>=.7)lowSlabs.push(i0,i1,i2)
             continue
           }
+          if(x0<minX)minX=x0;if(x0>maxX)maxX=x0;if(z0<minZ)minZ=z0;if(z0>maxZ)maxZ=z0
+          if(x1<minX)minX=x1;if(x1>maxX)maxX=x1;if(z1<minZ)minZ=z1;if(z1>maxZ)maxZ=z1
+          if(x2<minX)minX=x2;if(x2>maxX)maxX=x2;if(z2<minZ)minZ=z2;if(z2>maxZ)maxZ=z2
           filtered.push(i0,i1,i2)
         }
         const solidDesc=filtered.length?weldedIndexed(vertices,filtered):null
@@ -258,27 +407,59 @@ export async function createPhysics(manifest:Manifest,stream:Stream,peaks:PeaksG
         const slabDesc=lowSlabs.length?weldedIndexed(vertices,lowSlabs):null
         if(slabDesc)colliders.push(add(slabDesc,'sidewalk'))
       })
-      landmarks.set(root,colliders);changed=true
+      landmarks.set(root,colliders)
+      if(Number.isFinite(minX)){const box={minX,maxX,minZ,maxZ};landmarkBounds.set(root,box);dirtyLandmarkBoxes.push(box)}
+      changed=true;landmarksChanged=true
     }
-    for(const [root,colliders] of landmarks)if(!nearLandmarks.has(root)){colliders.forEach(remove);landmarks.delete(root);changed=true}
+    for(const [root,colliders] of landmarks)if(!nearLandmarks.has(root)){
+      colliders.forEach(remove);landmarks.delete(root)
+      const box=landmarkBounds.get(root);if(box){dirtyLandmarkBoxes.push(box);landmarkBounds.delete(root)}
+      changed=true;landmarksChanged=true
+    }
+    if(landmarksChanged){
+      world.step()
+      if(dirtyLandmarkBoxes.length){
+        for(const [tile,region] of regions){
+          if(!region.data)continue
+          const data=stream.loaded.get(tile)
+          if(!data||!data.streets.roadBarriers.length)continue
+          const overlapsDirty=dirtyLandmarkBoxes.some(b=>b.maxX>=tile.x-1&&b.minX<=tile.x+257&&b.maxZ>=tile.z-1&&b.minZ<=tile.z+257)
+          if(!overlapsDirty)continue
+          region.barrierColliders.forEach(remove)
+          region.barrierColliders=buildTileRoadBarriers(tile,data.streets.roadBarriers)
+          changed=true
+        }
+      }
+    }
     for(const [tree,collider] of trunks)if(Math.hypot(east-tree.x,south-tree.z)>48){remove(collider);trunks.delete(tree);changed=true}
-    const inRange=(tile:Tile)=>Math.hypot(Math.max(0,Math.abs(east-tile.x-128)-128),Math.max(0,Math.abs(south-tile.z-128)-128))<=collisionRadius
+    const distance=(tile:Tile)=>Math.hypot(Math.max(0,Math.abs(east-tile.x-128)-128),Math.max(0,Math.abs(south-tile.z-128)-128))
+    const inRange=(tile:Tile)=>distance(tile)<=collisionRadius
+    let deferred:Region|undefined,nearest=Infinity,started=false
     for(const [tile,region] of regions){
       if(inRange(tile))continue
-      region.colliders.forEach(remove);regions.delete(tile);changed=true
+      region.colliders.forEach(remove);region.barrierColliders.forEach(remove);regions.delete(tile);changed=true
     }
     for(const tile of stream.grid.near(east,south,collisionRadius+128)){
-      const near=inRange(tile)
-      const data=stream.loaded.get(tile), region=regions.get(tile)
+      const range=distance(tile),near=range<=collisionRadius,urgent=range<=(frame?12:cfg.search)
+      let data=stream.loaded.get(tile)
+      const region=regions.get(tile)
       const trees=stream.forest.loaded.get(tile)
       if(trees&&Math.max(Math.abs(east-tile.x-128),Math.abs(south-tile.z-128))<168)for(const tree of trees){
         if(tree.kind!==5&&!trunks.has(tree)&&Math.hypot(east-tree.x,south-tree.z)<40){trunks.set(tree,add(R.ColliderDesc.cylinder(1.8,.42*tree.scale).setTranslation(tree.x,tree.y+1.8,tree.z),'tree'));changed=true}}
-      if(region&&region.fine!==!!data){region.colliders.forEach(remove);regions.delete(tile);changed=true}
+      if(data&&data!==region?.data&&!urgent&&(!frame||started))continue
+      if(region&&region.data!==data){region.colliders.forEach(remove);region.barrierColliders.forEach(remove);regions.delete(tile);changed=true}
+      if(near&&region?.data===data&&region?.surfaces){
+        if(urgent){while(!region.surfaces.next().done){};region.surfaces=undefined;changed=true}
+        else if(range<nearest){deferred=region;nearest=range}
+      }
       if(!near||regions.has(tile))continue
+      if(data&&!urgent)started=true
       const spacing=manifest.overview.step,stride=width/spacing+1,start=(tile.z-top)/spacing*stride+(tile.x-left)/spacing
       const colliders:R.Collider[]=[]
+      let barrierColliders:R.Collider[]=[]
       if(data?.tunnel){
         for(const [mesh,kind] of [[data.groundMesh,'ground'],[data.tunnel.fringe,'ground'],[data.tunnel.floor,'road'],[data.tunnel.portal,'rail'],[data.tunnel.interior,'rail']] as const){
+          if(!mesh)continue
           const geometry=mesh.geometry,positions=geometry.getAttribute('position');if(!positions.count)continue
           const indices=geometry.index?Array.from(geometry.index.array):Array.from({length:positions.count},(_,index)=>index)
           const desc=weldedIndexed(Float32Array.from(positions.array),indices)
@@ -289,32 +470,33 @@ export async function createPhysics(manifest:Manifest,stream:Stream,peaks:PeaksG
         colliders.push(add(ground.setTranslation(tile.x+128,0,tile.z+128),data?'ground':'overview'))
       }
       const rings=data?.rings??[]
-      if(data){const {sidewalk,road,banks}=data.streets
-        const swDesc=sidewalk.length?weldedSurface(sidewalk,null,data,.65,.38,1.4,2.4):null
-        if(swDesc)colliders.push(add(swDesc.setTranslation(tile.x,0,tile.z),'sidewalk'))
-        const filteredRoad=filterBridgeOverRoad(road,data.deck)
-        const rdDesc=filteredRoad.length?weldedSurface(filteredRoad,null,data,.65,.8,1.8,4):null
-        if(rdDesc){const collider=add(rdDesc.setTranslation(tile.x,0,tile.z),'road');sources.set(collider.handle,tile.file);colliders.push(collider)}
+      if(data){const {banks}=data.streets
         for(const [ax,az,bx,bz,top,bottom,endTop=top] of banks){const angle=-Math.atan2(bz-az,bx-ax),height=((top+endTop)/2-bottom)/10+1.25
           colliders.push(add(R.ColliderDesc.cuboid(Math.hypot(bx-ax,bz-az)/20+.03,height/2,.09).setRotation({x:0,y:Math.sin(angle/2),z:0,w:Math.cos(angle/2)}).setTranslation(tile.x+(ax+bx)/20,bottom/10+height/2,tile.z+(az+bz)/20),'rail'))}}
-      if(rings.length)colliders.push(add(houses(rings).setTranslation(tile.x,0,tile.z),'building'))
-      if(data?.deck.length){
-        // Keep the rendered slab thickness on the collider. Rapier feature IDs
-        // on a trimesh ray hit need not index the original GL04 triangles.
-        const indices:[number[],number[]]=[[],[]]
-        for(let face=0;face<data.deck.length/9;face++){
-          indices[data.thin.has(face)?1:0].push(face*3,face*3+1,face*3+2)
+      if(data){
+        const bars=data.streets.railBarriers
+        for(let i=0;i<bars.length;i+=6){
+          const [ax,ay,az,bx,by,bz]=bars.subarray(i,i+6),yaw=-Math.atan2(bz-az,bx-ax)
+          const desc=R.ColliderDesc.cuboid(Math.hypot(bx-ax,bz-az)/2,.7,.04)
+            .setTranslation(tile.x+(ax+bx)/2,(ay+by)/2+.7,tile.z+(az+bz)/2)
+            .setRotation({x:0,y:Math.sin(yaw/2),z:0,w:Math.cos(yaw/2)})
+          colliders.push(add(desc,'rail'))
         }
-        for(const [thin,faces] of indices.entries()){
-          if(!faces.length)continue
-          const desc=weldedSurface(data.deck,faces,data,.80,1.2,2.8,5)
-          if(!desc)continue
-          const collider=add(desc.setTranslation(tile.x,0,tile.z),'deck')
-          colliders.push(collider)
-          if(thin)thinDecks.add(collider.handle)
-        }
+        barrierColliders=buildTileRoadBarriers(tile,data.streets.roadBarriers)
       }
-      regions.set(tile,{colliders,rings,fine:!!data});changed=true
+      if(rings.length)colliders.push(add(houses(rings).setTranslation(tile.x,0,tile.z),'building'))
+      const pending=data?surfaces(tile,data,colliders):undefined
+      if(urgent&&pending)while(!pending.next().done){}
+      regions.set(tile,{colliders,barrierColliders,rings,data,surfaces:urgent?undefined:pending});changed=true
+    }
+    if(frame&&!started&&deferred?.surfaces){
+      const deadline=performance.now()+2, count=deferred.colliders.length
+      do{
+        const step=deferred.surfaces.next()
+        if(step.done){deferred.surfaces=undefined;break}
+        if(step.value)break
+      }while(performance.now()<deadline)
+      if(count!==deferred.colliders.length)changed=true
     }
     for(const [peak,collider] of mountains)if(!peaks.colliders.includes(peak)){remove(collider);mountains.delete(peak);changed=true}
     for(const peak of peaks.colliders){
@@ -421,11 +603,11 @@ export async function createPhysics(manifest:Manifest,stream:Stream,peaks:PeaksG
     if(!hit||hit.normal[1]>=Math.cos(maxSlope))return '' as const
     return hit.kind==='building'?'building' as const:'collision' as const
   }
-  function pathBlocked(x0:number,z0:number,x1:number,z1:number,y:number){
-    const dx=x1-x0,dz=z1-z0,len=Math.hypot(dx,dz)
+  function pathBlocked(x0:number,z0:number,x1:number,z1:number,y:number,endY=y){
+    const dx=x1-x0,dy=endY-y,dz=z1-z0,len=Math.hypot(dx,dy,dz)
     if(len<1e-3)return false
     segmentRay.origin.x=x0;segmentRay.origin.y=y;segmentRay.origin.z=z0
-    segmentRay.dir.x=dx/len;segmentRay.dir.y=0;segmentRay.dir.z=dz/len
+    segmentRay.dir.x=dx/len;segmentRay.dir.y=dy/len;segmentRay.dir.z=dz/len
     return !!world.castRay(segmentRay,len,true,undefined,undefined,capsule,undefined,wallFilter)
   }
   function freeCapsule(x:number,y:number,z:number){
@@ -435,11 +617,20 @@ export async function createPhysics(manifest:Manifest,stream:Stream,peaks:PeaksG
     const at=Math.round((south-tile.z)/4)*65+Math.round((east-tile.x)/4)
     return data.water[at]!==-32768&&data.water[at]-data.terrain[at]>5
   }
-  const solidLandmarks=(manifest.landmarks??[]).flatMap(entry=>(entry.solid??[]).map(([bottom,top,loop])=>{
+  const landmarkVolumes=(manifest.landmarks??[]).flatMap(entry=>{
+    const volumes=[...(entry.solid??[])]
+    if(entry.id==='central_square'){
+      const [east,elevation,south]=entry.position,angle=entry.rotation*Math.PI/180
+      const cos=Math.cos(angle),sin=Math.sin(angle)
+      volumes.push([elevation+neHall.base,elevation+neHall.roof,neHall.footprint.map(([x,z])=>[east+x*cos+z*sin,south-x*sin+z*cos])])
+    }
+    return volumes
+  })
+  const solidLandmarks=landmarkVolumes.map(([bottom,top,loop])=>{
     let minX=Infinity,maxX=-Infinity,minZ=Infinity,maxZ=-Infinity
     for(const [lx,lz] of loop){if(lx<minX)minX=lx;if(lx>maxX)maxX=lx;if(lz<minZ)minZ=lz;if(lz>maxZ)maxZ=lz}
     return {bottom,top,loop,minX,maxX,minZ,maxZ}
-  }))
+  })
   function insideHouse(east:number,south:number,y?:number){const tile=tileAt(east,south);if(!tile)return false
     const px=(east-tile.x)*100,pz=(south-tile.z)*100
     const inRing=regions.get(tile)?.rings.some(ring=>{
@@ -504,7 +695,7 @@ export async function createPhysics(manifest:Manifest,stream:Stream,peaks:PeaksG
   }
   function hasDeck(east:number,south:number){const tile=tileAt(east,south);return !!(tile&&stream.loaded.get(tile)?.deck.length)}
   function overlaps(kind:Kind){return !!world.intersectionWithShape(body.translation(),identity,shape,undefined,undefined,capsule,undefined,kind==='deck'?deckFilter:coll=>kinds.get(coll.handle)===kind)}
-  function clear(){for(const region of regions.values())region.colliders.forEach(remove);regions.clear();mountains.forEach(remove);mountains.clear();modelMountains.forEach(list=>list.forEach(remove));modelMountains.clear();trunks.forEach(remove);trunks.clear();landmarks.forEach(colliders=>colliders.forEach(remove));landmarks.clear()}
+  function clear(){for(const region of regions.values()){region.colliders.forEach(remove);region.barrierColliders.forEach(remove)}regions.clear();mountains.forEach(remove);mountains.clear();modelMountains.forEach(list=>list.forEach(remove));modelMountains.clear();trunks.forEach(remove);trunks.clear();landmarks.forEach(colliders=>colliders.forEach(remove));landmarks.clear();landmarkBounds.clear();for(const colliders of obstacleColliders.values())colliders.forEach(remove);obstacleColliders.clear()}
   function findLocalDismount(cx:number,cz:number,heading:number,bikeY:number){
     const local=probeLocalDismount({world,capsule,shape,kinds,stream,tileAt,surface,wet,insideHouse},cx,cz,heading,bikeY)
     if(local||!wet(cx,cz))return local
@@ -513,6 +704,7 @@ export async function createPhysics(manifest:Manifest,stream:Stream,peaks:PeaksG
     const waterY=data.water[Math.round((cz-tile.z)/4)*65+Math.round((cx-tile.x)/4)]/10
     const tread=surface(cx,cz,'deck',bikeY+.6,1.4)??surface(cx,cz,'landmark',bikeY+.6,1.4)??surface(cx,cz,'road',bikeY+.6,1.4)
     if(tread&&tread.y>=waterY)return null
+    sync(cx,cz)
     const shore=findWalkableSpawn(cx,cz,false,true)
     return shore&&{...shore,rule:'water-rescue'}
   }
@@ -552,5 +744,5 @@ export async function createPhysics(manifest:Manifest,stream:Stream,peaks:PeaksG
       return k==='building'||k==='rail'||k==='peak'||k==='tree'||k==='landmark'
     })
   }
-  return {world,body,capsule,controller,kinds,sources,sync,clear,overlaps,tileAt,hasDeck,surface,groundSurface,waterCeiling,waterOverlap,carOverlap,raycastObstacle,bikePathBlocked,pathBlocked,freeCapsule,wet,insideHouse,withinBounds,findWalkableSpawn,findFlatGround,findLocalDismount,findLocalMount,findCarDismount,findCarMount,isBlockedAt,canTrafficPush}
+  return {world,body,capsule,controller,kinds,sources,sync,clear,overlaps,tileAt,hasDeck,surface,groundSurface,waterCeiling,waterOverlap,carOverlap,raycastObstacle,bikePathBlocked,pathBlocked,freeCapsule,wet,insideHouse,withinBounds,findWalkableSpawn,findFlatGround,findLocalDismount,findLocalMount,findCarDismount,findCarMount,isBlockedAt,canTrafficPush,syncObstacleVolume,removeObstacleVolume,getObstacleVolumeIds,resolveObstacleStep,clampCamera}
 }

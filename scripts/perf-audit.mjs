@@ -76,7 +76,7 @@ try {
             return !stream.pending.size && !stream.forest.pending.size && manifest.chunks.every(t=>{
               const d=Math.hypot(t.x+128-p.x,t.z+128-p.z)
               return (d>stream.radius || stream.loaded.has(t)) && (d>=1682 || stream.forest.loaded.has(t))
-            }) && manifest.landmarks.every(e=>Math.hypot(p.x-e.position[0],p.y-e.position[1],p.z-e.position[2])-e.sphere[3]>900 || stream.landmarks.has(e))
+            }) && manifest.landmarks.every(e=>Math.hypot(p.x-e.position[0],p.y-e.position[1],p.z-e.position[2])-e.sphere[3]>(stream.metrics?.landmarkLoadRadius??580) || stream.landmarks.has(e))
           },null,{timeout:120000})
           // Static city layers and instanced props span chunks. Charge every
           // shared slot to each resident chunk for a conservative per-pass cap.

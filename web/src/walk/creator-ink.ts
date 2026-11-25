@@ -81,21 +81,82 @@ export function streetShading(material: T.MeshStandardMaterial, garment = false)
   }
 }
 
+/** Compute position-welded smooth normals so inverted-hull outlines never crack open along color seams (ankles/waist). */
+function ensureWeldedOutlineNormals(geometry: T.BufferGeometry) {
+  if (geometry.hasAttribute('aOutlineNormal')) return
+  const pos = geometry.getAttribute('position')
+  if (!pos) return
+  const count = pos.count
+  const accum = new Map<string, [number, number, number]>()
+  const keys = new Array<string>(count)
+  for (let i = 0; i < count; i++) {
+    const k = `${Math.round(pos.getX(i) * 1e4)},${Math.round(pos.getY(i) * 1e4)},${Math.round(pos.getZ(i) * 1e4)}`
+    keys[i] = k
+    if (!accum.has(k)) accum.set(k, [0, 0, 0])
+  }
+  const index = geometry.getIndex()
+  const a = new T.Vector3(), b = new T.Vector3(), c = new T.Vector3()
+  const ab = new T.Vector3(), ac = new T.Vector3(), fn = new T.Vector3()
+  const triCount = index ? index.count : count
+  for (let t = 0; t + 2 < triCount; t += 3) {
+    const ia = index ? index.getX(t) : t
+    const ib = index ? index.getX(t + 1) : t + 1
+    const ic = index ? index.getX(t + 2) : t + 2
+    a.fromBufferAttribute(pos, ia)
+    b.fromBufferAttribute(pos, ib)
+    c.fromBufferAttribute(pos, ic)
+    ab.subVectors(b, a)
+    ac.subVectors(c, a)
+    fn.crossVectors(ab, ac)
+    if (fn.lengthSq() < 1e-14) continue
+    for (const vi of [ia, ib, ic]) {
+      const bucket = accum.get(keys[vi])!
+      bucket[0] += fn.x
+      bucket[1] += fn.y
+      bucket[2] += fn.z
+    }
+  }
+  const out = new Float32Array(count * 3)
+  const fallback = geometry.getAttribute('normal')
+  for (let i = 0; i < count; i++) {
+    const bucket = accum.get(keys[i])!
+    const len = Math.hypot(bucket[0], bucket[1], bucket[2])
+    if (len > 1e-8) {
+      out[i * 3] = bucket[0] / len
+      out[i * 3 + 1] = bucket[1] / len
+      out[i * 3 + 2] = bucket[2] / len
+    } else if (fallback) {
+      out[i * 3] = fallback.getX(i)
+      out[i * 3 + 1] = fallback.getY(i)
+      out[i * 3 + 2] = fallback.getZ(i)
+    } else {
+      out[i * 3 + 1] = 1
+    }
+  }
+  geometry.setAttribute('aOutlineNormal', new T.BufferAttribute(out, 3))
+}
+
 /** A back-facing shell shares the body's skin weights and follows the active clothing index. */
 export function addOutline(mesh: T.Mesh, width: number) {
+  ensureWeldedOutlineNormals(mesh.geometry)
   const ink = new T.MeshBasicMaterial({color: '#1f2326', side: T.BackSide})
   ink.onBeforeCompile = (shader, renderer) => {
     T.Material.prototype.onBeforeCompile.call(ink, shader, renderer)
-    shader.vertexShader = shader.vertexShader.replace(
-      '#include <begin_vertex>',
-      '#include <begin_vertex>\ntransformed += normalize(normal) * ' +
-        width.toFixed(4) +
-        (mesh instanceof T.SkinnedMesh
-          ? ' * (1.0 - 0.70 * smoothstep(0.72,0.78,abs(position.x))) * (1.0 - 0.78 * smoothstep(1.61,1.68,position.y));'
-          : ';'),
-    )
+    shader.vertexShader =
+      'attribute vec3 aOutlineNormal;\n' +
+      shader.vertexShader.replace(
+        '#include <begin_vertex>',
+        '#include <begin_vertex>\n' +
+          (mesh instanceof T.SkinnedMesh
+            ? `float _olHand = 1.0 - 0.78 * smoothstep(0.68, 0.76, abs(position.x));
+               float _olHead = 1.0 - 0.68 * smoothstep(1.44, 1.56, position.y);
+               float _olAnkle = 0.36 + 0.64 * smoothstep(0.08, 0.16, position.y);
+               float _olElbow = 1.0 - 0.38 * smoothstep(0.40, 0.46, abs(position.x)) * (1.0 - smoothstep(0.48, 0.54, abs(position.x)));
+               transformed += normalize(aOutlineNormal) * ${width.toFixed(4)} * _olHand * _olHead * _olAnkle * _olElbow;`
+            : `transformed += normalize(aOutlineNormal) * ${width.toFixed(4)};`),
+      )
   }
-  ink.customProgramCacheKey = () => 'creator-outline-' + width
+  ink.customProgramCacheKey = () => 'creator-outline-v2-' + width
   let shell: T.Mesh
   if (mesh instanceof T.SkinnedMesh) {
     const skinned = new T.SkinnedMesh(mesh.geometry, ink)

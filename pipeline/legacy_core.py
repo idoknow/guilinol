@@ -35,7 +35,7 @@ def cached_archive(digest):
     if not path.exists():
         with tempfile.TemporaryDirectory(dir=cache) as staging:
             incoming = Path(staging)/'world.tar.gz'
-            subprocess.run(['gh','release','download',release,'-R','idoknow/guilinol',
+            subprocess.run(['gh','release','download',release,'-R','idoknow/guilinol-ops',
                             '-p','world.tar.gz','-D',staging],check=True)
             if hashlib.sha256(incoming.read_bytes()).hexdigest()!=digest:
                 raise ValueError('Incorrect downtown world release checksum')

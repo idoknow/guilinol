@@ -1,10 +1,14 @@
+import {stationPaving,type StationPavingCut} from './station-paving'
+import {stationRoadSurface,type StationRoadSegment} from './station-road-surface'
+import {railwayGeometry,type RailSection,type RailFace,type CrossingSign} from './railways'
+import {buildRoadBarriers} from './road-barriers'
 import * as THREE from 'three'
 import {look} from './look/config'
 type Pair=[number,number]
 type Path=[number,...Pair[][]]
 type RoadCtrl=[number,number[]]
 type Lower=[number,Pair[],[number,number,number,number][]]
-export type Streets=[Path[],Pair[],number[][],Pair[]?,Pair[]?,(RoadCtrl|null)?,number[][]?,number[][]?,number[][]?,number[][]?,Pair[][]?,Lower?]
+export type Streets=[Path[],Pair[],number[][],Pair[]?,Pair[]?,(RoadCtrl|null)?,number[][]?,number[][]?,number[][]?,number[][]?,Pair[][]?,(Lower|null)?,([number,number,number]|null)?,unknown?,StationRoadSegment[]?,StationPavingCut[]?]
 const colors=look.streets.surfaces.map(v=>new THREE.Color(v)),tone=Object.fromEntries((['railing','lampPole','lampHead'] as const).map(k=>[k,new THREE.Color(look.streets[k])]))
 const stoneLight=new THREE.Color(0xa6a39a),stoneMid=new THREE.Color(0x8c8981),stoneBase=new THREE.Color(0x74726b)
 const parkingYellow=new THREE.Color(0xe7b62e)
@@ -37,12 +41,15 @@ function lowerHeight(x:number,z:number,base:number,terrain:number,[,corners,prof
   return terrain+factor*(base-terrain)
 }
 
-function streetGeometry([paths,lamps,banks,signals=[],stops=[],roadCtrl,stoneRails=[],beds=[],shops=[],decor=[],curbCuts=[],lower]:Streets,ground:(x:number,z:number)=>number){
+export function streetGeometry([paths,lamps,banks,signals=[],stops=[],roadCtrl,stoneRails=[],beds=[],shops=[],decor=[],curbCuts=[],lower,platform,,stationRoads,stationCuts]:Streets,ground:(x:number,z:number)=>number,rails:RailSection[]=[],signs:CrossingSign[]=[],railGround:(x:number,z:number)=>number=ground){
   const xyz:number[]=[],rgb:number[]=[],sidewalk:number[]=[],road:number[]=[],mats:number[]=[],cols:number[]=[]
-  const baseLevel=(x:number,z:number)=>{const g=ground(x,z);return roadCtrl?Math.max(evalRoadCtrl(roadCtrl,x,z),g):g}
+  const stationLevel=stationRoads?stationRoadSurface(stationRoads):null
+  const remaining=stationCuts?stationPaving(stationCuts,stationLevel?.protectedAt):null
+  const baseLevel=(x:number,z:number)=>{const g=ground(x,z);const level=roadCtrl?Math.max(evalRoadCtrl(roadCtrl,x,z),g):g;return stationLevel?stationLevel.height(x,z,level):level}
   const curbSegments=curbCuts.flatMap(line=>line.slice(1).map(([x,z],i)=>
     new THREE.Line3(new THREE.Vector3(line[i][0]/100,0,line[i][1]/100),new THREE.Vector3(x/100,0,z/100)))).filter(segment=>segment.distanceSq()>0)
   const testPoint=new THREE.Vector3(), closest=new THREE.Vector3()
+  let platformPath=false
   let lowerPath=false
   function vector(pt:THREE.Vector2,offset:number){
     if(offset===.195 && curbSegments.length){
@@ -54,11 +61,21 @@ function streetGeometry([paths,lamps,banks,signals=[],stops=[],roadCtrl,stoneRai
       }
       offset=.045+.15*distance/2
     }
+    if(platformPath && platform)return new THREE.Vector3(pt.x,platform[2]+offset-.195,pt.y)
     const base=baseLevel(pt.x,pt.y)
     return new THREE.Vector3(pt.x,(lower&&lowerPath?lowerHeight(pt.x,pt.y,base,ground(pt.x,pt.y),lower):base)+offset,pt.y)
   }
   const surfaceKinds:number[]=[],alongVals:number[]=[]
+  const fenceXyz:number[]=[],fenceRgb:number[]=[],fenceAlong:number[]=[]
   function triangle(first:THREE.Vector3,second:THREE.Vector3,third:THREE.Vector3,kind:number,u1=0,u2=0,u3=0,vertical=false){
+    if(remaining && (kind===0||kind===5) && !vertical){
+      for(const poly of remaining(first,second,third))
+        for(let k=1;k<poly.length-1;k++)emit(poly[0],poly[k],poly[k+1],kind,u1,u2,u3,false)
+      return
+    }
+    emit(first,second,third,kind,u1,u2,u3,vertical)
+  }
+  function emit(first:THREE.Vector3,second:THREE.Vector3,third:THREE.Vector3,kind:number,u1:number,u2:number,u3:number,vertical:boolean){
     let p1=first,p2=second,p3=third,a1=u1,a2=u2,a3=u3
     if(kind!==3&&!vertical){
       const x1=Math.fround(p1.x),y1=Math.fround(p1.y),z1=Math.fround(p1.z)
@@ -76,6 +93,7 @@ function streetGeometry([paths,lamps,banks,signals=[],stops=[],roadCtrl,stoneRai
     for(const pt of [p1,p2,p3]){xyz.push(pt.x,pt.y,pt.z);rgb.push(c.r,c.g,c.b);if(channel===1&&!vertical)sidewalk.push(pt.x,pt.y,pt.z);else if(channel===0&&!vertical)road.push(pt.x,pt.y,pt.z)}
   }
   for(const [index,[kind,...rings]] of paths.entries()){
+    platformPath=!!platform && index>=platform[0] && index<platform[1]
     lowerPath=!!lower && index>=lower[0]
     const loops=rings.map(ring=>ring.map(([x,z])=>new THREE.Vector2(x/100,z/100)))
     const tris=THREE.ShapeUtils.triangulateShape(loops[0],loops.slice(1)),points=loops.flat()
@@ -166,6 +184,106 @@ function streetGeometry([paths,lamps,banks,signals=[],stops=[],roadCtrl,stoneRai
       for(const corner of [-.58,.58])box(x+corner*Math.cos(angle),y+.25,z-corner*Math.sin(angle),.28,.5,.28,angle,stoneLight)
     }
   }
+  // Index the existing road surface first. Railway geometry never enters the
+  // carriageway/sidewalk arrays used by walking, driving and height sampling.
+  // Match the Float32 carriageway sent to rendering and physics at shared edges.
+  if(rails.some(section=>section[7]&16))for(let i=0;i<road.length;i++)road[i]=Math.fround(road[i])
+  const roadBins=new Map<number,number[]>()
+  if(rails.some(section=>section[7]&16))for(let i=0;i<road.length;i+=9){
+    const xs=[road[i],road[i+3],road[i+6]],zs=[road[i+2],road[i+5],road[i+8]]
+    for(let r=Math.floor(Math.min(...zs)/8);r<=Math.floor(Math.max(...zs)/8);r++){
+      for(let c=Math.floor(Math.min(...xs)/8);c<=Math.floor(Math.max(...xs)/8);c++){
+        const key=r*64+c,bin=roadBins.get(key)
+        if(bin)bin.push(i);else roadBins.set(key,[i])
+      }
+    }
+  }
+  function crossingHeight(x:number,z:number,fallback:number){
+    let level=-Infinity
+    for(const i of roadBins.get(Math.floor(z/8)*64+Math.floor(x/8))??[]){
+      const ax=road[i],az=road[i+2],dx=road[i+3]-ax,dz=road[i+5]-az,ex=road[i+6]-ax,ez=road[i+8]-az
+      const det=dx*ez-dz*ex
+      if(Math.abs(det)<1e-9)continue
+      const u=((x-ax)*ez-(z-az)*ex)/det,v=(dx*(z-az)-dz*(x-ax))/det
+      if(u>=-1e-8&&v>=-1e-8&&u+v<=1.00000001)level=Math.max(level,road[i+1]+u*(road[i+4]-road[i+1])+v*(road[i+7]-road[i+1]))
+    }
+    return Number.isFinite(level)?level:fallback
+  }
+  const railFace:RailFace=(a,b,c,color,along,kind)=>{
+    if(kind>8.5){
+      for(const p of [a,b,c]){fenceXyz.push(p.x,p.y,p.z);fenceRgb.push(color.r,color.g,color.b)}
+      fenceAlong.push(...along)
+      return
+    }
+    for(const p of [a,b,c]){xyz.push(p.x,p.y,p.z);rgb.push(color.r,color.g,color.b)}
+    alongVals.push(...along);surfaceKinds.push(kind,kind,kind)
+  }
+  // Project each part of the steel or rubber panel onto one carriageway
+  // triangle. Interpolation between two road samples can bridge a curb edge.
+  function levelFace(a:THREE.Vector3,b:THREE.Vector3,c:THREE.Vector3,color:THREE.Color,h:number,painted:boolean){
+    const original=[a,b,c]
+    const triangles=new Set<number>()
+    const xs=original.map(p=>Math.floor(p.x/8)),zs=original.map(p=>Math.floor(p.z/8))
+    for(let r=Math.min(...zs);r<=Math.max(...zs);r++)for(let col=Math.min(...xs);col<=Math.max(...xs);col++){
+      for(const i of roadBins.get(r*64+col)??[])triangles.add(i)
+    }
+    const snap=(p:THREE.Vector3)=>{
+      const x=Math.fround(p.x),z=Math.fround(p.z)
+      return new THREE.Vector3(x,crossingHeight(x,z,painted?ground(x,z):p.y-h)+h,z)
+    }
+    function emit(p:THREE.Vector3,q:THREE.Vector3,r:THREE.Vector3,depth:number){
+      if(Math.abs((q.x-p.x)*(r.z-p.z)-(r.x-p.x)*(q.z-p.z))<1e-10)return
+      const center=p.clone().add(q).add(r).multiplyScalar(1/3)
+      const y=crossingHeight(center.x,center.z,painted?ground(center.x,center.z):center.y-h)+h
+      if(depth<4 && Math.abs(y-center.y)>.009){
+        const m=snap(center)
+        emit(p,q,m,depth+1);emit(q,r,m,depth+1);emit(r,p,m,depth+1)
+      }else railFace(p,q,r,color,[0,0,0],7)
+    }
+    const draw=(poly:THREE.Vector3[])=>{
+      const vertices=poly.map(snap)
+      for(let j=1;j+1<vertices.length;j++)emit(vertices[0],vertices[j],vertices[j+1],0)
+    }
+    let remaining=[original]
+    const peak=(i:number)=>Math.max(road[i+1],road[i+4],road[i+7])
+    for(const i of [...triangles].sort((u,v)=>peak(v)-peak(u))){
+      if(!remaining.length)break
+      const polygon=[0,3,6].map(k=>new THREE.Vector3(road[i+k],road[i+k+1],road[i+k+2]))
+      const [p,q,r]=polygon,det=(q.x-p.x)*(r.z-p.z)-(r.x-p.x)*(q.z-p.z)
+      if(Math.abs(det)<1e-9)continue
+      const next:THREE.Vector3[][]=[]
+      for(const fragment of remaining){
+        let inside=fragment
+        const outside:THREE.Vector3[][]=[]
+        for(let edge=0;edge<3 && inside.length>=3;edge++){
+          const u=polygon[edge],v=polygon[(edge+1)%3],orientation=Math.sign(det)
+          const dist=(n:THREE.Vector3)=>orientation*((v.x-u.x)*(n.z-u.z)-(v.z-u.z)*(n.x-u.x))
+          const keep:THREE.Vector3[]=[],rest:THREE.Vector3[]=[]
+          for(let j=0;j<inside.length;j++){
+            const m=inside[j],n=inside[(j+1)%inside.length],dm=dist(m),dn=dist(n)
+            if(dm>=0)keep.push(m);else rest.push(m)
+            if((dm>=0)!==(dn>=0)){
+              const cut=m.clone().lerp(n,dm/(dm-dn))
+              keep.push(cut);rest.push(cut)
+            }
+          }
+          inside=keep
+          if(rest.length>=3)outside.push(rest)
+        }
+        if(inside.length<3){next.push(fragment);continue}
+        draw(inside.map(n=>{
+          const u=((n.x-p.x)*(r.z-p.z)-(n.z-p.z)*(r.x-p.x))/det
+          const v=((q.x-p.x)*(n.z-p.z)-(q.z-p.z)*(n.x-p.x))/det
+          return new THREE.Vector3(n.x,p.y+u*(q.y-p.y)+v*(r.y-p.y)+h,n.z)
+        }))
+        next.push(...outside)
+      }
+      remaining=next
+    }
+    for(const poly of remaining)draw(poly)
+  }
+  const railBarriers=railwayGeometry(rails,signs,railGround,crossingHeight,railFace,box,levelFace)
+  const roadBarriers=buildRoadBarriers(decor,baseLevel)
   const detailCount=mats.length/16
   for(const [x,z] of lamps){const px=x/10,pz=z/10,y=baseLevel(px,pz),yaw=(x*7+z*13)%6/6*Math.PI
     box(px,y+.3,pz,.34,.6,.34,0,tone.lampPole);box(px,y+2.9,pz,.14,5.2,.14,0,tone.lampPole);box(px,y+5.3,pz,1.6,.08,.08,yaw,tone.lampPole)
@@ -202,26 +320,38 @@ function streetGeometry([paths,lamps,banks,signals=[],stops=[],roadCtrl,stoneRai
   const surface=new THREE.BufferGeometry()
   surface.setAttribute('position',new THREE.BufferAttribute(positions,3))
   surface.computeVertexNormals()
+  const fencePositions=new Float32Array(fenceXyz)
+  let fenceNormals:Float32Array=new Float32Array(0)
+  if(fencePositions.length){
+    const fenceGeo=new THREE.BufferGeometry()
+    fenceGeo.setAttribute('position',new THREE.BufferAttribute(fencePositions,3))
+    fenceGeo.computeVertexNormals()
+    fenceNormals=fenceGeo.getAttribute('normal').array as Float32Array
+  }
   return {
     positions, normals:surface.getAttribute('normal').array as Float32Array,
     colors:new Float32Array(rgb), kinds:new Uint8Array(surfaceKinds), along:new Float32Array(alongVals),
-    detailCount, railLodCount, parked:Float32Array.from(parked), sidewalk:Float32Array.from(sidewalk), road:Float32Array.from(road),
+    fencePositions, fenceNormals, fenceColors:new Float32Array(fenceRgb), fenceAlong:new Float32Array(fenceAlong),
+    detailCount, railLodCount, railBarriers, roadBarriers, parked:Float32Array.from(parked), sidewalk:Float32Array.from(sidewalk), road:Float32Array.from(road),
     furnitureMatrices:Float32Array.from(mats), furnitureColors:Float32Array.from(cols),
   }
 }
 
 export type StreetData=ReturnType<typeof streetGeometry>
-export interface StreetRequest {id:number; paths:Streets; step:number; elevations:Float32Array}
+export interface StreetRequest {id:number; paths:Streets; rails?:RailSection[]; signs?:CrossingSign[]; railCuts?:[number,number][]; step:number; elevations:Float32Array}
 export type StreetResponse={id:number; data:StreetData}|{id:number; error:string}
 
-self.onmessage=({data:{id,paths,step,elevations}}:MessageEvent<StreetRequest>)=>{
+if(typeof self!=='undefined')self.onmessage=({data:{id,paths,step,elevations,rails=[],signs=[],railCuts=[]}}:MessageEvent<StreetRequest>)=>{
   try {
     const segments=256/step, stride=segments+1
-    const data=streetGeometry(paths,(x,z)=>{
+    const sample=(grid:Float32Array)=>(x:number,z:number)=>{
       const col=Math.min(segments-1,Math.max(0,Math.floor(x/step))),row=Math.min(segments-1,Math.max(0,Math.floor(z/step))),at=row*stride+col
-      const u=x/step-col,v=z/step-row,a=elevations[at],b=elevations[at+1],c=elevations[at+stride],d=elevations[at+stride+1]
+      const u=x/step-col,v=z/step-row,a=grid[at],b=grid[at+1],c=grid[at+stride],d=grid[at+stride+1]
       return u+v<=1?a+(b-a)*u+(c-a)*v:d+(c-d)*(1-u)+(b-d)*(1-v)
-    })
+    }
+    const cut=railCuts.length?elevations.slice():elevations
+    for(const [i,cm] of railCuts)cut[i]=cm/100
+    const data=streetGeometry(paths,sample(elevations),rails,signs,sample(cut))
     const transfer=Object.values(data).flatMap(value=>typeof value==='number'?[]:[value.buffer])
     self.postMessage({id,data} satisfies StreetResponse,{transfer})
   } catch(error) {

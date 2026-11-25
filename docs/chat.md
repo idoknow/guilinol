@@ -1,6 +1,6 @@
 # 游戏内聊天：接入和运维
 
-**上线前要么配好真实 provider，要么由 Rock 确认切到 `local_only`。** 配好微信不代表网页登录用户有可用的小程序 openid。默认 `pending` 是正常工作模式：没有外审能力时可以进人工复核，但不会向玩家分发。
+**默认以本地词库为主审核，不需要微信凭据。** 新库的 `unmoderated_policy=local_only`：无外审时，本地检查通过即可分发；后台显示 provider「未配置」。可显式切为 `pending`，将无外审的消息全部送人工复核。调用已启用 provider 失败或超时，两种策略都不放行。
 
 ## WS / 浏览器
 
@@ -21,14 +21,18 @@
 
 部署迁移 `deploy/postgres/015-chat.sql`，已加入 `deploy-hk.sh`、readiness 和 selfhost fixture。单副本 rt 通过 `DATABASE_URL` 读写 PG。只在事务提交后广播。短暂写库异常时按顺序重试，`GET /health` 的 `chatBacklog` 包含正在处理和排队的请求。每连接最多 4 条、全进程最多 1024 条在途，再多返回 `rate`。队列是内存队列，不保证在 PG 与 rt 同时故障时保留尚未确认的输入；已持久化消息可以按 `uid,cid` 去重。禁止多副本直接共享这个进程内广播模型。
 
-校验长度（Unicode 码点）、禁言、各频道间隔；本地词做 NFKC、小写、去空白及不可见格式符，block 优先于 review。词表每次审核读取，更新无需重启。确认违规计入窗口；pending 仅在人工拦截时计数。人工操作与审计同事务，自动禁言 `source=auto`。
+词库迁移 `016-chat-lexicon.sql` 后运行 `DATABASE_URL=… npm run chat:words:import`；部署脚本执行等价 SQL。保留 13 份固定版本的上游原文，仅从 12 类导入。网易前端词库不参与匹配；其余复核词归一化后至少 3 字，纯 ASCII 词至少 4 字符。项目覆盖文件 `third_party/sensitive-lexicon/overrides.json` 为歧义词指定跳过或复核并记录原因。升级时写一次 `chat.lexicon_policy` 审计，仅清理未被运营修改的旧种子；重导不覆盖人工改动或复活已删词条。
+
+跨分隔符形成的不超过两字的拦截命中只送复核；连续命中和三字以上的命中仍按词条动作处理。导流规则并不理解数字的含义：单独的 5–12 位、非零开头数字会按 QQ 号进复核，例如「坐标 23456」。
+
+校验 Unicode 码点长度、禁言及频率后，rt 用 Aho–Corasick 同时匹配本地词与地名。文本和词条均先做 NFKC、小写、繁转简（MIT `chinese-conv`），再去除空白、标点、符号、emoji、零宽字符。只有完全包含在 `allow` 地名中的命中才豁免，同一句其他片段仍受审。URL、QQ 号、带微信标识的账号进 review；独立违规词的 block 优先级更高。启动构建索引，后台变更后下条消息重建；外部导入最多 25 秒后在下一次匹配前刷新。确认违规计入窗口；pending 仅在人工拦截时计数。
 
 外审接口 `rt/chat-provider.mjs`：`{name,available(openid),check(text,openid)}`。首个实现调用微信 `wxa/msg_sec_check` v2，场景 2；缓存 access token，过期刷新；只认服务端签名 ticket 的 `wx_openid`，不认客户端报的 openid。网页登录目前不签发这个字段。`WX_APPID` 和 `WX_SECRET` 来自可选 k8s Secret `glol-env`，不要写进配置表。mock 用于离线测试，不提供生产环境变量来指定任意审核 URL。
 
 | 情形 | 行为 |
 |---|---|
-| 无凭据或无可信 openid，`unmoderated_policy=pending`（默认） | 本地无命中也落库 pending，不广播 |
-| 同上，管理员显式选 `local_only` | 本地无命中可发，`provider=none,label=local_only` |
+| 无凭据或无可信 openid，`unmoderated_policy=local_only`（新库默认） | 本地无命中可发，`provider=none,label=local_only` |
+| 同上，管理员显式选 `pending` | 本地无命中也落库 pending，不广播 |
 | 微信已调用但失败、超时、未知判定 | 两种策略都 pending；不回退到仅本地 |
 | `pass` / `review` / `risky` | normal / pending / blocked；记录建议、标签与 trace 摘要，不保存 token |
 
@@ -43,9 +47,9 @@
 | GET `messages` / `reviews` | `ch,uid,name,q,status,from,to,limit,offset`，时间为毫秒；reviews 固定 pending。含账号 `account`、原始发送点及审核字段。 |
 | GET `context` | `mid,n`；原频道前后各 n 条及中心，附近额外按中心发送点筛选。 |
 | POST `delete` / `approve` / `block` | `{mid,reason}`；approve/block 只处理 pending，block 可同时指定 `minutes`。 |
-| GET `mutes` | 无 uid 返回当前有效禁言，指定 `uid` 返回包括解除在内的操作历史。 |
+| GET `mutes` | 无 uid 返回当前有效禁言（附最近一次发言昵称 `name`），指定 `uid` 返回包括解除在内的操作历史。 |
 | POST `mute` / `unmute` | `{uid,minutes,reason}`；60、720、1440、10080、自定义正整数分钟或 -1；解禁忽略 minutes。 |
-| GET / POST `words` | 列表；写入 `{id?,word,category,action:'block'或'review',enabled,reason}`；POST `words/delete` 用 `{id,reason}`。 |
+| GET / POST `words` | 列表，可选 `q`（词或类别包含）、`action`、`enabled=1/0`；写入 `{id?,word,category,action:'block'或'review'或'allow',enabled,reason}`；POST `words/delete` 用 `{id,reason}`。 |
 | GET / POST `settings` | 读取业务配置及只读 `provider`。修改示例：`{"patch":{"unmoderated_policy":"pending"},"reason":"恢复外审优先"}`；在 admin_audit 记录前后值。 |
 | POST `notice` | `{ch?,text,reason,x?,z?}`，默认世界；附近公告必须提供坐标。 |
 | GET `audit` | 聊天操作审计，含操作人、时间、目标、原因。 |

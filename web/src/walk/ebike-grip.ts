@@ -7,7 +7,7 @@ const from = new Vector3(), to = new Vector3(), delta = new Quaternion(), parent
 const collar = new Vector3(), reach = new Vector3()
 const wristRotation = new Quaternion()
 
-function fingerPose(figure: Object3D, side: string, sign: number) {
+export function fingerPose(figure: Object3D, side: string, sign: number) {
   const joints = []
   for (const digit of ['index','middle','ring','pinky','thumb']) {
     const directions = digit === 'thumb'

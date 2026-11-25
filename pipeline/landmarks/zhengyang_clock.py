@@ -1,4 +1,4 @@
-"""Zhengyang bell tower at the surveyed Esri centre. See docs/layout/zhengyang.md."""
+"""Zhengyang bell tower at the surveyed Esri centre. See .ops-docs/layout/zhengyang.md."""
 import json
 import math
 import sys

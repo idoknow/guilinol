@@ -17,7 +17,7 @@ async function localPort() {
   return port
 }
 
-export async function fixture({postgresOnly=false}={}) {
+export async function fixture({postgresOnly=false,beforeSocialDirect=false}={}) {
   const ids=[],secret=randomUUID(),credentials={accessKeyId:'gloltest',secretAccessKey:secret}
   const docker=args=>execFileSync('docker',args,{encoding:'utf8'}).trim()
   function service(port,args) {
@@ -71,7 +71,7 @@ export async function fixture({postgresOnly=false}={}) {
       if(attempt>=100||minio?.exitCode!=null)throw Error('Test services not ready')
       await delay(300)
     }
-    for(const migration of ['001-schema','002-telemetry','003-admin','003-player-saves','004-social','005-social-pending','006-social-register','007-social-only','008-social-states-register','009-feedback-credit','010-user-moderation','011-player-uid','012-citizen-photo','013-perf-hour','014-mp','015-chat'])
+    for(const migration of ['001-schema','002-telemetry','003-admin','003-player-saves','004-social','005-social-pending','006-social-register','007-social-only','008-social-states-register','009-feedback-credit','010-user-moderation','011-player-uid','012-citizen-photo','013-perf-hour','014-mp','015-chat','016-chat-lexicon','017-npc',...(beforeSocialDirect?[]:['018-social-direct'])])
       await pool.query(await readFile('deploy/postgres/'+migration+'.sql','utf8'))
     if(!postgresOnly){
       const s3=new S3Client({endpoint:S3_ENDPOINT,region:'us-east-1',forcePathStyle:true,credentials})

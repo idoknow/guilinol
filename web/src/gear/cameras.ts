@@ -77,7 +77,7 @@ export const CAMERAS: Record<BodyId, CameraBody> = {
     video: {presets: [preset('4K 30', 3840, 2160, 30, 24000000), preset('4K 24', 3840, 2160, 24, 20000000), preset('1080 60', 1920, 1080, 60, 16000000)]},
     size: [0.12, 0.085, 0.065],
     lens: {length: 0.07, radius: 0.032},
-    color: {body: '#24262a', accent: '#d9d3c4', metal: '#9aa0a6', grip: '#17181b'},
+    color: {body: '#454b54', accent: '#e2dcd0', metal: '#d6dce3', grip: '#2c3037'},
   },
   action: {
     id: 'action',
@@ -102,7 +102,7 @@ export const CAMERAS: Record<BodyId, CameraBody> = {
     video: {presets: [preset('4K 60', 3840, 2160, 60, 32000000), preset('4K 30', 3840, 2160, 30, 24000000), preset('1080 120', 1920, 1080, 120, 20000000)]},
     size: [0.065, 0.045, 0.03],
     lens: {length: 0.008, radius: 0.013},
-    color: {body: '#2c3138', accent: '#e8e2d2', metal: '#6f7780', grip: '#1a1d21'},
+    color: {body: '#4a515c', accent: '#e8e2d2', metal: '#bcc3cc', grip: '#2d323a'},
   },
   pocket: {
     id: 'pocket',
@@ -127,7 +127,7 @@ export const CAMERAS: Record<BodyId, CameraBody> = {
     video: {presets: [preset('4K 60', 3840, 2160, 60, 28000000), preset('4K 30', 3840, 2160, 30, 22000000), preset('1080 120', 1920, 1080, 120, 18000000)]},
     size: [0.035, 0.125, 0.035],
     lens: {length: 0.012, radius: 0.011},
-    color: {body: '#2f3339', accent: '#efe8d8', metal: '#adb3ba', grip: '#211f1d'},
+    color: {body: '#4b525c', accent: '#efe8d8', metal: '#d6dce3', grip: '#30343a'},
   },
   thumb: {
     id: 'thumb',
@@ -152,7 +152,7 @@ export const CAMERAS: Record<BodyId, CameraBody> = {
     video: {presets: [preset('2.7K 30', 2704, 1520, 30, 16000000), preset('1080 60', 1920, 1080, 60, 12000000)]},
     size: [0.05, 0.03, 0.016],
     lens: {length: 0.004, radius: 0.006},
-    color: {body: '#31363c', accent: '#f0ead9', metal: '#8d949b', grip: '#1c1e21'},
+    color: {body: '#4a5059', accent: '#f0ead9', metal: '#c6cdd6', grip: '#2c3037'},
   },
   a7r2: {
     id: 'a7r2',
@@ -177,7 +177,7 @@ export const CAMERAS: Record<BodyId, CameraBody> = {
     video: {presets: [preset('4K 30', 3840, 2160, 30, 60000000), preset('4K 24', 3840, 2160, 24, 50000000), preset('1080 60', 1920, 1080, 60, 28000000), preset('1080 120', 1920, 1080, 120, 24000000)]},
     size: [0.127, 0.096, 0.06],
     lens: {length: 0.062, radius: 0.036},
-    color: {body: '#1b1c1f', accent: '#e6dcc8', metal: '#8e9499', grip: '#101113'},
+    color: {body: '#3d424b', accent: '#e6dcc8', metal: '#d0d6de', grip: '#25282e'},
   },
   action6: {
     id: 'action6',
@@ -202,7 +202,7 @@ export const CAMERAS: Record<BodyId, CameraBody> = {
     video: {presets: [preset('4K 120', 3840, 2160, 120, 80000000), preset('4K 60', 3840, 2160, 60, 50000000), preset('2.7K 120', 2704, 1520, 120, 45000000), preset('1080 240', 1920, 1080, 240, 30000000)]},
     size: [0.0705, 0.0485, 0.032],
     lens: {length: 0.006, radius: 0.014},
-    color: {body: '#2b2f35', accent: '#e9e3d3', metal: '#7c848c', grip: '#191b1e'},
+    color: {body: '#454c56', accent: '#e9e3d3', metal: '#c2c9d1', grip: '#2a2e34'},
   },
   pocket4pro: {
     id: 'pocket4pro',
@@ -227,7 +227,7 @@ export const CAMERAS: Record<BodyId, CameraBody> = {
     video: {presets: [preset('4K 120', 3840, 2160, 120, 90000000), preset('4K 60', 3840, 2160, 60, 55000000), preset('1080 240', 1920, 1080, 240, 32000000)]},
     size: [0.038, 0.139, 0.032],
     lens: {length: 0.011, radius: 0.012},
-    color: {body: '#3a3d42', accent: '#f2ece0', metal: '#b9bfc5', grip: '#232427'},
+    color: {body: '#4c525c', accent: '#f2ece0', metal: '#d6dce3', grip: '#303338'},
   },
 }
 

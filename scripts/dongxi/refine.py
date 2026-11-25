@@ -24,7 +24,7 @@ def geographic(east, south):
     return np.asarray(east)/MLON+LON0, LAT0-np.asarray(south)/MLAT
 
 
-folder = root/'docs/layout'
+folder = root/'.ops-docs/layout'
 grid = json.loads((folder/'dongxi-esri-grid.json').read_text())
 scale = 256*2**grid['zoom']
 

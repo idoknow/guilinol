@@ -12,9 +12,9 @@ export async function adminRoute({path,method,params={},body={},actor},{transact
     if(method==='GET'){
       const limit=integer(params.limit??50,1,200),offset=integer(params.offset??0,0,10000000)
       if(path==='settings')return {...cfg,provider:provider.name}
-      if(path==='words')return rows('select * from chat_words order by id desc limit $1 offset $2',[limit,offset])
+      if(path==='words')return rows('select * from chat_words where ($3::text is null or strpos(lower(word),lower($3))>0 or strpos(category,$3)>0) and ($4::text is null or action=$4) and ($5::text is null or enabled=($5=\'1\')) order by id desc limit $1 offset $2',[limit,offset,params.q||null,params.action||null,params.enabled||null])
       if(path==='audit')return rows("select * from admin_audit where target_type='chat' order by id desc limit $1 offset $2",[limit,offset])
-      if(path==='mutes')return params.uid?rows('select * from chat_mutes where uid=$1 order by id desc limit $2 offset $3',[integer(params.uid,1,Number.MAX_SAFE_INTEGER),limit,offset]):rows('select * from (select distinct on(uid) * from chat_mutes order by uid,id desc) latest where until_ms=-1 or until_ms>$1 order by id desc limit $2 offset $3',[Date.now(),limit,offset])
+      if(path==='mutes')return params.uid?rows('select * from chat_mutes where uid=$1 order by id desc limit $2 offset $3',[integer(params.uid,1,Number.MAX_SAFE_INTEGER),limit,offset]):rows('select latest.*,(select name from chat_messages m where m.uid=latest.uid and m.sys is null order by m.id desc limit 1) as name from (select distinct on(uid) * from chat_mutes order by uid,id desc) latest where until_ms=-1 or until_ms>$1 order by id desc limit $2 offset $3',[Date.now(),limit,offset])
       if(path==='messages'||path==='reviews')return rows(`select m.*,case when u.id is null then null else json_build_object('id',u.id,'createdAt',u.created_at,'signupMethod',u.signup_method,'banned',u.banned_at<>0) end as account from chat_messages m left join users u on u.uid=m.uid where ($1::text is null or ch=$1) and ($2::bigint is null or m.uid=$2) and ($3::text is null or strpos(lower(name),lower($3))>0) and ($4::text is null or strpos(lower(text),lower($4))>0) and ($5::text is null or status=$5) and ($6::bigint is null or m.created_at>=$6) and ($7::bigint is null or m.created_at<=$7) order by m.id desc limit $8 offset $9`,[params.ch,params.uid,params.name,params.q,path==='reviews'?'pending':params.status,params.from,params.to,limit,offset])
       if(path==='context'){
         const [center]=await rows('select * from chat_messages where id=$1',[integer(params.mid,1,Number.MAX_SAFE_INTEGER)]);check(center,404)
@@ -40,7 +40,7 @@ export async function adminRoute({path,method,params={},body={},actor},{transact
       const id=body.id===undefined?null:integer(body.id,1,Number.MAX_SAFE_INTEGER)
       let result
       if(path==='words/delete')result=await rows('delete from chat_words where id=$1 returning *',[id]);else{
-        const word=string(body.word,100),category=string(body.category,80);check(['block','review'].includes(body.action)&&typeof body.enabled==='boolean')
+        const word=string(body.word,100),category=string(body.category,80);check(['block','review','allow'].includes(body.action)&&typeof body.enabled==='boolean')
         const args=[word,category,body.action,body.enabled,actor,Date.now()];result=id?await rows('update chat_words set word=$1,category=$2,action=$3,enabled=$4,actor=$5,updated_at=$6 where id=$7 returning *',[...args,id]):await rows('insert into chat_words(word,category,action,enabled,actor,updated_at) values($1,$2,$3,$4,$5,$6) returning *',args)
       }
       check(result[0],404);await audit(db,actor,path,result[0].id,{reason,word:result[0]});return result[0]

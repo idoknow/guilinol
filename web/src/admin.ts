@@ -276,7 +276,10 @@ const views: View[] = [
   { key: 'live', label: '实时', icon: '●', group: '数据' },
   { key: 'server', label: '服务端', icon: '▣', group: '数据', ranged: true },
   { key: 'mp', label: '联机', icon: '⇋', group: '数据' },
+  { key: 'smoke', label: '香烟', icon: '▥', group: '数据' },
+  { key: 'npc', label: '路人与车流', icon: '⇄', group: '数据' },
   { key: 'feedback', label: '反馈处理', icon: '✉', group: '运营' },
+  { key: 'chat', label: '聊天', icon: '❝', group: '运营' },
   { key: 'users', label: '用户与权限', icon: '☺', group: '运营' },
   { key: 'audit', label: '操作记录', icon: '☰', group: '运营' },
 ]
@@ -605,6 +608,106 @@ function lineChart(series: Series[], format: Fmt, opts: { height?: number; bucke
   new ResizeObserver(() => draw()).observe(wrap)
   requestAnimationFrame(draw)
   return wrap
+}
+type Signups = { from: number; hours: number; base: number; points: { t: number; n: number }[] }
+/** 用户页注册曲线：上半区用户总数折线，下半区每小时新增柱，共用时间轴和悬停提示。 */
+function signupChart(data: Signups) {
+  const start = data.from * 1000,
+    have = new Map(data.points.map((p) => [p.t * 1000, p.n]))
+  let total = data.base
+  const rows = Array.from({ length: data.hours }, (_, i) => {
+    const t = start + i * 3600e3, n = have.get(t) ?? 0
+    total += n
+    return { t, n, total }
+  })
+  const wrap = h('div', { class: 'adm-chart adm-signups' })
+  const tip = h('div', { class: 'adm-tip', hidden: true })
+  const legend = h('div', { class: 'adm-legend' },
+    h('span', null, h('i', { style: 'background:var(--adm-c1)' }), '用户总数'),
+    h('span', null, h('i', { style: 'background:var(--adm-c3)' }), '每小时新注册'))
+  const draw = () => {
+    const width = Math.max(260, wrap.clientWidth || 600),
+      pad = { l: 56, r: 14 },
+      top = { y: 10, h: 150 }, low = { y: 186, h: 76 }, height = low.y + low.h + 26
+    wrap.querySelector('svg')?.remove()
+    const slot = (width - pad.l - pad.r) / rows.length,
+      x = (i: number) => pad.l + slot * (i + 0.5)
+    const lo = rows[0].total - rows[0].n, hi = rows[rows.length - 1].total
+    // 总数轴不从 0 起：从窗口起点的存量往下留一点空，增长才看得出来。
+    const span = Math.max(hi - lo, 4), tTicks = niceTicks(span, 3), tStep = tTicks[1] - tTicks[0]
+    const tMin = Math.max(0, Math.floor((lo - span * 0.05) / tStep) * tStep),
+      tMax = Math.max(tMin + tStep, Math.ceil(hi / tStep) * tStep)
+    const yT = (v: number) => top.y + (1 - (v - tMin) / (tMax - tMin)) * top.h
+    const nTicks = niceTicks(Math.max(...rows.map((r) => r.n)), 2), nMax = nTicks[nTicks.length - 1] || 1
+    const yN = (v: number) => low.y + (1 - v / nMax) * low.h
+    const svg = s('svg', { viewBox: `0 0 ${width} ${height}`, width, height, role: 'img', 'aria-label': `最近 ${data.hours} 小时注册：新增 ${hi - lo}，总数 ${hi}` })
+    const grid = (yy: number, text: string) => {
+      svg.append(s('line', { x1: pad.l, x2: width - pad.r, y1: yy, y2: yy, class: 'adm-grid' }))
+      svg.append(s('text', { x: pad.l - 8, y: yy + 4, 'text-anchor': 'end', class: 'adm-axis' }, text))
+    }
+    for (let v = tMin; v <= tMax + 1e-9; v += tStep) grid(yT(v), fmt.int(v))
+    for (const v of nTicks) grid(yN(v), fmt.int(v))
+    svg.append(s('text', { x: pad.l, y: low.y - 8, class: 'adm-axis adm-signups-cap' }, '每小时新注册'))
+    const bw = Math.max(1, Math.min(14, slot * 0.72))
+    for (const [i, r] of rows.entries())
+      if (r.n) svg.append(s('rect', { x: x(i) - bw / 2, y: yN(r.n), width: bw, height: Math.max(1, low.y + low.h - yN(r.n)), rx: Math.min(2, bw / 3), class: 'adm-signups-bar' }))
+    const d = rows.map((r, i) => `${i ? 'L' : 'M'}${x(i).toFixed(1)},${yT(r.total).toFixed(1)}`).join('')
+    svg.append(s('path', { d: `${d}L${x(rows.length - 1).toFixed(1)},${top.y + top.h}L${x(0).toFixed(1)},${top.y + top.h}Z`, class: 'adm-area' }))
+    svg.append(s('path', { d, class: 'adm-line', style: 'stroke:var(--adm-c1)' }))
+    // 时间刻度落在整点：按宽度挑 1/2/3/6/12 小时或 1/2/5/7 天一格。
+    const room = Math.max(2, Math.floor(width / (data.hours > 36 ? 110 : 70))),
+      every = [1, 2, 3, 6, 12, 24, 48, 120, 168].find((n) => rows.length / n <= room) ?? 168
+    for (const [i, r] of rows.entries()) {
+      const date = new Date(r.t), hour = date.getHours()
+      if (every < 24 ? hour % every : hour || Math.round((r.t - rows[0].t) / 86400e3) % (every / 24)) continue
+      const px = x(i)
+      if (px < pad.l + 24 || px > width - pad.r - 24) continue
+      const hh = `${String(hour).padStart(2, '0')}:00`
+      svg.append(s('text', { x: px, y: height - 6, 'text-anchor': 'middle', class: 'adm-axis' },
+        every >= 24 ? `${date.getMonth() + 1}/${date.getDate()}` : data.hours > 36 && hour === 0 ? `${date.getMonth() + 1}/${date.getDate()}` : hh))
+    }
+    const cursor = s('line', { y1: top.y, y2: low.y + low.h, class: 'adm-cursor', visibility: 'hidden' })
+    svg.append(cursor)
+    const point = (event: PointerEvent) => {
+      const box = svg.getBoundingClientRect(),
+        px = ((event.clientX - box.left) / box.width) * width,
+        i = Math.min(rows.length - 1, Math.max(0, Math.floor((px - pad.l) / slot))), r = rows[i]
+      cursor.setAttribute('x1', String(x(i)))
+      cursor.setAttribute('x2', String(x(i)))
+      cursor.setAttribute('visibility', 'visible')
+      const end = new Date(r.t + 3600e3)
+      tip.hidden = false
+      tip.replaceChildren(h('b', null, `${when(new Date(r.t))} – ${String(end.getHours()).padStart(2, '0')}:00`),
+        h('span', null, h('i', { style: 'background:var(--adm-c3)' }), `新注册 ${fmt.int(r.n)}`),
+        h('span', null, h('i', { style: 'background:var(--adm-c1)' }), `用户总数 ${fmt.int(r.total)}`))
+      tip.style.left = `${Math.min(Math.max((x(i) / width) * box.width, 80), box.width - 80)}px`
+    }
+    svg.addEventListener('pointermove', point)
+    svg.addEventListener('pointerdown', point)
+    svg.addEventListener('pointerleave', (event) => {
+      if (event.pointerType === 'touch') return
+      cursor.setAttribute('visibility', 'hidden')
+      tip.hidden = true
+    })
+    wrap.prepend(svg)
+  }
+  wrap.append(tip, legend)
+  new ResizeObserver(() => draw()).observe(wrap)
+  requestAnimationFrame(draw)
+  return wrap
+}
+const signupRanges: [string, string][] = [['24', '24 小时'], ['72', '3 天'], ['168', '7 天'], ['720', '30 天']]
+function signupCard() {
+  const pick = signupRanges.some(([k]) => k === params.get('signups')) ? params.get('signups')! : '72'
+  const slot = h('div')
+  async(slot, () => api<Signups>(`admin/signups?hours=${pick}`), (data) => {
+    const added = data.points.reduce((sum, p) => sum + p.n, 0)
+    return [h('p', { class: 'adm-sub adm-signups-sum' }, `区间内新注册 ${fmt.int(added)} 人，现有 ${fmt.int(data.base + added)} 人`), signupChart(data)]
+  }, skeleton(4))
+  return card('注册曲线', slot, {
+    sub: '按小时统计，时间为本机时区',
+    actions: segmented(pick, signupRanges, (value) => go({ signups: value === '72' ? null : value }, true, true), '注册曲线时间范围'),
+  })
 }
 function bars(rows: { label: string; value: number; note?: string }[], format: Fmt) {
   const max = Math.max(...rows.map((r) => r.value), 1)
@@ -1210,6 +1313,148 @@ const pages: Record<string, (view: View) => void> = {
     }, skeleton(8))
   },
 
+  smoke() {
+    paintTop(views.find(view=>view.key==='smoke')!)
+    const slot=h('div',{class:'adm-stack'},skeleton(6));main.append(slot)
+    void Promise.all([api('admin/smoke'),import('./smoke/data')]).then(([stored,{smokeDefaults,validRules,BRANDS}])=>{
+      const rules=structuredClone(validRules(stored)?stored:smokeDefaults)
+      const form=h('form',{class:'adm-npc'}) as HTMLFormElement
+      const field=(label:string,value:number,min:number,max:number,step:number,update:(n:number)=>void)=>{
+        const input=h('input',{type:'number',value:String(value),min:String(min),max:String(max),step:String(step),required:'',class:'adm-npc-num'}) as HTMLInputElement
+        input.oninput=()=>update(input.valueAsNumber)
+        return h('label',{class:'adm-npc-range'},label,input)
+      }
+      form.append(field('最短燃烧时间（秒）',rules.minSeconds,1,1800,1,n=>rules.minSeconds=n),
+        field('最长燃烧时间（秒）',rules.maxSeconds,1,1800,1,n=>rules.maxSeconds=n),
+        field('每口消耗（节）',rules.puffSegments,1,10,1,n=>rules.puffSegments=n),
+        field('双倍消耗概率',rules.doubleChance,0,1,.01,n=>rules.doubleChance=n),
+        field('烟雾浓度',rules.density,0,4,.05,n=>rules.density=n))
+      const catalog=BRANDS.map(b=>{
+        const row=rules.brands.find(item=>item.id===b.id)
+        const enabled=h('input',{type:'checkbox'}) as HTMLInputElement
+        enabled.checked=!!row
+        const entry={id:b.id,price:row?.price??b.price}
+        form.append(h('div',{class:'adm-npc-range'},h('label',null,enabled,b.name),field('单价',entry.price,25,50,1,n=>entry.price=n)))
+        return {enabled,entry}
+      })
+      const save=h('button',{class:'adm-btn',type:'submit'},'保存') as HTMLButtonElement
+      form.append(save)
+      form.onsubmit=async e=>{
+        e.preventDefault()
+        rules.brands=catalog.filter(b=>b.enabled.checked).map(b=>b.entry)
+        if(!validRules(rules)){toast('请检查燃烧区间，并至少选择一个品牌','error');return}
+        save.disabled=true
+        try{await api('admin/smoke',rules);toast('已保存，新进场的玩家生效')}
+        catch{toast('保存失败','error')}
+        finally{save.disabled=false}
+      }
+      slot.replaceChildren(form)
+    }).catch(error=>slot.replaceChildren(errorState(error,()=>render())))
+  },
+  npc() {
+    paintTop(views.find(view=>view.key==='npc')!)
+    const slot=h('div',{class:'adm-stack'},skeleton(8));main.append(slot)
+    void Promise.all([api('admin/npc'),import('../../lib/npc')]).then(([settings,{npcDefaults,validNpc}])=>{
+      type Rules=typeof npcDefaults
+      const stored:Rules=structuredClone(validNpc(settings)?settings:npcDefaults)
+      let saved=JSON.stringify(stored)
+      paint(stored)
+      function paint(initial:Rules){
+      let rules:Rules=structuredClone(initial)
+      const ROADS:[string,string,string][]=[['trunk','快速路','城市快速路与过境干道'],['primary','主干道','如解放路、中山路'],['secondary','次干道','连接各片区的城市道路'],['tertiary','支路','默认不开，开启后路人会进入小街']]
+      const save=h('button',{type:'submit',class:'adm-btn',form:'adm-npc-form',disabled:''},'保存') as HTMLButtonElement
+      const reset=h('button',{type:'button',class:'adm-btn adm-btn--ghost'},'恢复默认') as HTMLButtonElement
+      const state=h('span',{class:'adm-sub adm-npc-state'},'已是最新')
+      paintTop(views.find(view=>view.key==='npc')!,[state])
+      top.querySelector('.adm-top-tools')!.prepend(reset,save)
+      const problem=h('p',{class:'adm-npc-problem',role:'alert',hidden:''})
+      const form=h('form',{class:'adm-npc',id:'adm-npc-form',novalidate:''}) as HTMLFormElement
+      const number=(key:'carMin'|'carMax'|'personMin'|'personMax'|'bumpSpeed'|'bubbleSeconds',attrs:Record<string,string>)=>{
+        const input=h('input',{type:'number',class:'adm-npc-num',inputmode:'decimal',...attrs}) as HTMLInputElement
+        input.value=String(rules[key]);input.oninput=()=>{rules={...rules,[key]:input.valueAsNumber};changed()}
+        return input
+      }
+      const toggle=(key:'horn'|'mutter'|'bubble',title:string,hint:string)=>{
+        const input=h('input',{type:'checkbox',role:'switch'}) as HTMLInputElement
+        input.checked=rules[key];input.onchange=()=>{rules={...rules,[key]:input.checked};changed()}
+        return h('label',{class:'adm-npc-switch'},h('span',{class:'adm-npc-switch-text'},h('b',null,title),h('span',null,hint)),input,h('i',{'aria-hidden':'true'}))
+      }
+      const range=(label:string,unit:string,min:HTMLInputElement,max:HTMLInputElement,hint:string)=>
+        h('div',{class:'adm-npc-range'},h('span',{class:'adm-npc-label'},label),h('span',{class:'adm-npc-pair'},min,h('span',{'aria-hidden':'true'},'—'),max,h('span',{class:'adm-npc-unit'},unit)),h('span',{class:'adm-sub'},hint))
+      const roads=h('div',{class:'adm-npc-roads',role:'group','aria-label':'生成道路类别'},ROADS.map(([key,name,hint])=>{
+        const input=h('input',{type:'checkbox',value:key}) as HTMLInputElement
+        input.checked=rules.classes.includes(key);input.onchange=()=>{rules={...rules,classes:ROADS.map(([road])=>road).filter(road=>road===key?input.checked:rules.classes.includes(road))};changed()}
+        return h('label',{class:'adm-npc-road'},input,h('span',null,h('b',null,name),h('small',null,hint)))
+      }))
+      const vol=h('input',{type:'range',min:'0',max:'1',step:'0.05',class:'adm-npc-vol','aria-label':'NPC 音量'}) as HTMLInputElement
+      const volText=h('output',{class:'adm-npc-vol-text'})
+      const showVol=()=>{volText.textContent=`${Math.round(rules.volume*100)}%`;vol.style.setProperty('--fill',`${rules.volume*100}%`)}
+      vol.value=String(rules.volume);vol.oninput=()=>{rules={...rules,volume:vol.valueAsNumber};showVol();changed()};showVol()
+      const lines=(key:'bumpLines'|'mutterLines',title:string,hint:string)=>{
+        const area=h('textarea',{rows:'9',spellcheck:'false'}) as HTMLTextAreaElement,count=h('span',{class:'adm-sub'})
+        const sync=()=>{const list=area.value.split('\n').map(line=>line.trim()).filter(Boolean);count.textContent=`${list.length} 句，随机抽取`;return list}
+        area.value=rules[key].join('\n');sync();area.oninput=()=>{rules={...rules,[key]:sync()};changed()}
+        return card(title,[area,count],{sub:hint})
+      }
+      const preview=h('span',{class:'adm-npc-bubble'},rules.bumpLines[0]??'')
+      form.append(
+        h('p',{class:'adm-note'},'保存后，新进入场景的玩家立即按新设置生效；已经在场景里的玩家要重新进入后才会更新。'),
+        problem,
+        card('生成范围与密度',[
+          h('div',{class:'adm-npc-field'},h('span',{class:'adm-npc-label'},'可以生成的道路'),roads),
+          h('div',{class:'adm-npc-ranges'},
+            range('车辆','辆 / 每条街',number('carMin',{min:'1',max:'20',step:'1','aria-label':'每街最少车辆'}),number('carMax',{min:'1',max:'20',step:'1','aria-label':'每街最多车辆'}),'一条街 = 玩家 200 m 内同名的大路'),
+            range('行人','人 / 每条街',number('personMin',{min:'1',max:'20',step:'1','aria-label':'每街最少行人'}),number('personMax',{min:'1',max:'20',step:'1','aria-label':'每街最多行人'}),'只走人行道和斑马线；没有人行道的路段不放人')),
+        ],{sub:'小路、巷子、步行街始终不生成'}),
+        h('div',{class:'adm-cols adm-npc-cols'},
+          card('声音',[
+            toggle('horn','车辆鸣笛','每辆车 10–30 秒随机按一次，越远越轻'),
+            toggle('mutter','行人念叨','玩家 25 米内的路人 15–45 秒说一句，用浏览器的中文语音'),
+            h('div',{class:'adm-npc-volume'},h('span',{class:'adm-npc-label'},'NPC 音量'),vol,volText),
+            h('p',{class:'adm-sub'},'在玩家自己设置的总音量基础上再乘这个比例。'),
+          ]),
+          card('碰撞气泡',[
+            toggle('bubble','撞到路人时冒气泡','只显示文字，不播放语音；同一个路人 6 秒内只说一次'),
+            h('div',{class:'adm-npc-inline'},
+              h('label',null,h('span',{class:'adm-npc-label'},'触发速度'),h('span',{class:'adm-npc-pair'},number('bumpSpeed',{min:'0',max:'30',step:'0.1'}),h('span',{class:'adm-npc-unit'},'米/秒'))),
+              h('label',null,h('span',{class:'adm-npc-label'},'显示时长'),h('span',{class:'adm-npc-pair'},number('bubbleSeconds',{min:'0.5',max:'15',step:'0.5'}),h('span',{class:'adm-npc-unit'},'秒')))),
+            h('div',{class:'adm-npc-preview','aria-hidden':'true'},h('span',{class:'adm-sub'},'游戏里的样子'),preview),
+          ]),
+        ),
+        h('div',{class:'adm-cols adm-npc-cols'},
+          lines('bumpLines','碰撞台词','每行一句，最多 80 字；保持市井口吻，不要脏字'),
+          lines('mutterLines','念叨台词','每行一句；会用合成语音念出来，3 秒内念完为宜')),
+      )
+      function problemText(){
+        if(!rules.classes.length)return '至少选一类道路'
+        for(const [a,b,name] of [['carMin','carMax','车辆'],['personMin','personMax','行人']] as const){
+          if(![rules[a],rules[b]].every(value=>Number.isInteger(value)&&value>=1&&value<=20))return `${name}数量要是 1–20 的整数`
+          if(rules[a]>rules[b])return `${name}的最少数量不能大于最多数量`
+        }
+        if(!(rules.bumpSpeed>=0&&rules.bumpSpeed<=30))return '触发速度要在 0–30 米/秒之间'
+        if(!(rules.bubbleSeconds>.1&&rules.bubbleSeconds<=15))return '显示时长要在 0.5–15 秒之间'
+        if(!rules.bumpLines.length||!rules.mutterLines.length)return '台词至少要有一句'
+        if([...rules.bumpLines,...rules.mutterLines].some(line=>line.length>80))return '每句台词不能超过 80 字'
+        return ''
+      }
+      function changed(){
+        const error=problemText(),dirty=JSON.stringify(rules)!==saved
+        problem.textContent=error;problem.hidden=!error
+        save.disabled=!dirty||!!error;state.textContent=dirty?'有改动未保存':'已是最新';state.classList.toggle('is-dirty',dirty)
+        preview.textContent=rules.bumpLines[0]??''
+      }
+      reset.onclick=()=>paint(npcDefaults)
+      form.onsubmit=event=>{
+        event.preventDefault();if(save.disabled)return
+        save.classList.add('is-busy');save.disabled=true
+        void api('admin/npc',rules).then(()=>{saved=JSON.stringify(rules);changed();toast('已保存，新进场的玩家生效')})
+          .catch(error=>{changed();toast(error instanceof Error?error.message:'保存失败，请检查参数','error')})
+          .finally(()=>save.classList.remove('is-busy'))
+      }
+      slot.replaceChildren(form);changed()
+      }
+    }).catch(error=>slot.replaceChildren(errorState(error,()=>render())))
+  },
   mp() {
     const stamp = h('span', { class: 'adm-sub adm-live-stamp' })
     paintTop(views.find((v) => v.key === 'mp')!, [h('span', { class: 'adm-live-dot', 'aria-hidden': 'true' }), stamp])
@@ -1349,7 +1594,7 @@ const pages: Record<string, (view: View) => void> = {
       h('label', null, '已绑定', select('bound', bound, [['', '不限'], ...channels], (value) => go({ bound: value || null }, true), '已绑定渠道')),
       h('label', null, '状态', select('state', state, [['', '全部'], ['active', '正常'], ['banned', '已封禁']], (value) => go({ state: value || null }, true), '账号状态')))
     const slot = h('div')
-    main.append(statsSlot,
+    main.append(statsSlot, signupCard(),
       h('div', { class: 'adm-toolbar adm-toolbar--split' },
         segmented(role, [['', '全部'], ['admin', '管理员'], ['user', '普通用户']], (value) => go({ role: value || null }, true), '角色'), form),
       filters,
@@ -1443,16 +1688,32 @@ const pages: Record<string, (view: View) => void> = {
     }, skeleton(8))
   },
 
+  chat() {
+    const tab = ['messages', 'reviews', 'mutes', 'words', 'settings'].includes(params.get('tab') ?? '') ? params.get('tab')! : 'messages'
+    const reviewBadge = h('em', { class: 'adm-badge', hidden: true })
+    const tabs = h('nav', { class: 'adm-chat-tabs', 'aria-label': '聊天管理' },
+      ([['messages', '消息'], ['reviews', '待复核'], ['mutes', '禁言'], ['words', '敏感词'], ['settings', '设置与公告']] as [string, string][]).map(([key, text]) =>
+        navLink([text, key === 'reviews' ? reviewBadge : null], { view: 'chat', tab: key === 'messages' ? null : key }, { class: `adm-chat-tab ${key === tab ? 'is-on' : ''}`, 'aria-current': key === tab ? 'page' : undefined })))
+    main.append(tabs)
+    api<any[]>('admin/chat/reviews?limit=100').then((rows) => {
+      if (!rows.length) return
+      reviewBadge.hidden = false
+      reviewBadge.textContent = rows.length >= 100 ? '99+' : String(rows.length)
+    }).catch(() => {})
+    chatPages[tab]()
+  },
+
   audit() {
     const type = params.get('target_type') ?? ''
     const slot = h('div')
     main.append(
-      h('div', { class: 'adm-toolbar' }, segmented(type, [['', '全部'], ['user', '身份变更'], ['feedback', '反馈处理']], (value) => go({ target_type: value || null }, true), '对象类型')),
+      h('div', { class: 'adm-toolbar' }, segmented(type, [['', '全部'], ['user', '身份变更'], ['feedback', '反馈处理'], ['chat', '聊天管理']], (value) => go({ target_type: value || null }, true), '对象类型')),
       card(null, slot, { className: 'adm-card--flush' }))
     const people = new Map<string, any>()
     const actions: Record<string, string> = {
       role: '调整身份', status: '变更状态', start_ai: '发起 AI 制作', reply: '回复提交人',
       ban: '封禁账号', unban: '解除封禁', merge_users: '合并账号', reset_password: '重置密码', change_email: '修改邮箱', 'mp.kick': '踢出联机',
+      'chat.mute': '聊天禁言', 'chat.unmute': '解除禁言', 'chat.delete': '删除消息', 'chat.approve': '放行消息', 'chat.block': '拦截消息', 'chat.notice': '发布公告', 'chat.settings': '修改聊天规则', 'chat.words': '编辑敏感词', 'chat.words/delete': '删除敏感词', 'chat.lexicon_policy': '词库升级',
     }
     const body = h('tbody'),
       more = h('div', { class: 'adm-more' })
@@ -1478,10 +1739,14 @@ const pages: Record<string, (view: View) => void> = {
         : item.action === 'merge_users' ? `并入 ${detail.from_email || String(detail.from ?? '').slice(0, 8) || '另一个账号'}${Array.isArray(detail.moved) && detail.moved.length ? ` · 搬来 ${detail.moved.length} 个绑定` : ''}`
         : item.action === 'ban' ? `原因：${detail.reason || '未填写'}`
         : item.action === 'reset_password' ? (detail.generated ? '生成了新密码' : '设置了新密码')
+        : item.action === 'chat.mute' ? `${detail.until === -1 ? '永久' : detail.until ? `至 ${when(new Date(Number(detail.until)))}` : ''} · ${detail.source === 'auto' ? '自动' : ''}${detail.reason || ''}`
+        : item.action === 'chat.words' ? `「${detail.word?.word ?? ''}」→ ${chatAction[detail.word?.action] ?? ''}${detail.word?.enabled === false ? '（停用）' : ''}`
+        : item.action.startsWith('chat.') ? detail.reason || ''
         : ''
       const target = item.target_type === 'feedback'
         ? navLink('查看反馈', { view: 'feedback', id: item.target_id }, { class: 'adm-link' })
         : item.target_type === 'user' ? who(item.target_id, true)
+        : item.target_type === 'chat' ? h('code', null, ['chat.mute', 'chat.unmute'].includes(item.action) ? `UID ${item.target_id}` : `#${item.target_id}`)
         : h('code', null, String(item.target_id ?? dash))
       return h('tr', null,
         h('td', { class: 'adm-audit-time' }, when(unix(item.created_at), true)),
@@ -1516,6 +1781,360 @@ const pages: Record<string, (view: View) => void> = {
       return [h('div', { class: 'adm-table-wrap' }, h('table', { class: 'adm-table adm-audit' },
         h('thead', null, h('tr', null, ['时间', '操作人', '动作', '变化', '对象'].map((t) => h('th', null, t)))), body)), more]
     }, skeleton(8))
+  },
+}
+
+/* ───────────── 聊天管理（IDOK-248） ───────────── */
+const chatStatus: Record<string, string> = { normal: '正常', pending: '待复核', blocked: '已拦截', deleted: '已删除' }
+const chatSource: Record<string, string> = { admin: '管理员', auto: '自动' }
+const chatAction: Record<string, string> = { block: '拦截', review: '复核', allow: '白名单' }
+const chatErrors = (error: unknown) => {
+  if (error instanceof ApiError && error.status === 503) return new ApiError(503, 'chat', '聊天服务连不上（联机服务未启动或未配置）')
+  return error
+}
+const chatApi = <T = any>(path: string, data?: unknown) => api<T>(`admin/chat/${path}`, data).catch((error) => { throw chatErrors(error) })
+function chatCh(ch: string) {
+  return h('span', { class: `adm-chat-ch adm-chat-ch--${ch}` }, ch === 'near' ? '附近' : '世界')
+}
+function chatPill(status: string) {
+  return h('span', { class: `adm-pill adm-chat-st adm-chat-st--${status}` }, chatStatus[status] ?? status)
+}
+function chatUntil(until: number) {
+  if (until === -1) return '永久'
+  if (!until) return '已解除'
+  const left = until - Date.now()
+  return left <= 0 ? '已到期' : `${when(new Date(until))} 到期 · 剩 ${fmt.sec(left / 1000)}`
+}
+const contactName: Record<string, string> = { url: '网址', qq: 'QQ 号', wechat: '微信号' }
+/** 为什么被拦 / 待复核：把审核标签翻成人话。 */
+function chatWhy(row: any) {
+  const summary = typeof row.summary === 'string' ? JSON.parse(row.summary || '{}') : row.summary ?? {}
+  if (row.provider === 'local') {
+    if (summary.contact) return `疑似导流：${contactName[summary.contact] ?? summary.contact}`
+    return row.label === 'block' ? '命中拦截词' : row.label === 'review' ? '命中复核词' : row.label === 'seed_missing' ? '词库未就绪，转人工' : `本地词库：${row.label}`
+  }
+  if (row.label === 'provider_error') return `外部审核（${row.provider}）出错，转人工`
+  if (row.label === 'unavailable') return '外部审核不可用，转人工'
+  return `外部审核（${row.provider}）：${row.label === 'risky' ? '违规' : row.label === 'review' ? '疑似' : row.label}`
+}
+function chatSender(row: any) {
+  if (row.sys) return h('span', { class: 'adm-who' }, h('b', null, '系统公告'))
+  const name = row.account?.id ? navLink(row.name, { view: 'users', id: row.account.id }, { class: 'adm-link' }) : row.name
+  return h('span', { class: 'adm-who' }, h('b', null, name),
+    h('small', null, navLink(`UID ${row.uid}`, { view: 'chat', tab: null, uid: String(row.uid), name: null, q: null, status: null, ch: null, offset: null }, { class: 'adm-link', title: '只看这位玩家' }),
+      row.account?.banned ? ' · 账号已封禁' : ''))
+}
+/** 禁言对话框：档位 + 自定义分钟 + 原因。返回 null = 取消。 */
+async function chatMuteDialog(uid: number, name: string) {
+  const presets: [string, string][] = [['60', '1 小时'], ['720', '12 小时'], ['1440', '24 小时'], ['10080', '7 天'], ['-1', '永久'], ['custom', '自定义']]
+  const custom = h('input', { type: 'number', min: 1, max: 5256000, step: 1, placeholder: '分钟数', class: 'adm-chat-num', hidden: true, 'aria-label': '自定义分钟数' }) as HTMLInputElement
+  let picked = '60'
+  const seg = h('div', { class: 'adm-seg adm-chat-presets', role: 'radiogroup', 'aria-label': '禁言时长' })
+  const paint = () => {
+    seg.replaceChildren(...presets.map(([key, text]) => h('button', {
+      type: 'button', role: 'radio', 'aria-checked': String(key === picked), class: key === picked ? 'is-on' : '',
+      onclick: (() => { picked = key; custom.hidden = key !== 'custom'; paint(); if (key === 'custom') custom.focus() }) as EventListener,
+    }, text)))
+  }
+  paint()
+  const reason = await confirmDialog({
+    title: '禁言', tone: 'seal', confirm: '确认禁言',
+    body: h('div', null,
+      h('p', null, h('b', null, name || `UID ${uid}`), `（UID ${uid}）在附近和世界频道都不能发言，输入框会显示剩余时长和原因。`),
+      h('div', { class: 'adm-dialog-field' }, h('span', null, '时长'), seg, custom),
+      h('p', { class: 'adm-sub' }, '只影响聊天，不影响联机和账号。操作会记入「操作记录」。')),
+    message: { label: '原因', required: true, placeholder: '例如：辱骂其他玩家、刷屏广告', max: 200, hint: '请填写原因，玩家会看到' },
+  })
+  if (reason == null) return null
+  const minutes = picked === 'custom' ? Math.round(Number(custom.value)) : Number(picked)
+  if (!(minutes === -1 || (Number.isSafeInteger(minutes) && minutes >= 1))) { toast('自定义时长要填正整数分钟', 'error'); return null }
+  return { minutes, reason }
+}
+async function chatReason(title: string, body: Child, confirm: string, tone: 'seal' | 'jade' = 'seal') {
+  return confirmDialog({ title, tone, confirm, body, message: { label: '原因', required: true, max: 200, placeholder: '会写入操作记录', hint: '请填写原因' } })
+}
+function chatMuteButton(uid: number, name: string, onDone: () => void, label = '禁言') {
+  const button = h('button', { type: 'button', class: 'adm-btn adm-btn--sm adm-btn--ghost' }, label) as HTMLButtonElement
+  button.addEventListener('click', () => act(button, async () => {
+    const picked = await chatMuteDialog(uid, name)
+    if (!picked) return
+    await chatApi('mute', { uid, ...picked })
+    toast(`已禁言 ${name || uid}`)
+    onDone()
+  }))
+  return button
+}
+async function chatContext(row: any) {
+  const items = await chatApi<any[]>(`context?mid=${row.id}&n=8`)
+  const listNode = h('ol', { class: 'adm-chat-context' }, items.map((m) =>
+    h('li', { class: `${String(m.id) === String(row.id) ? 'is-center' : ''} ${m.sys ? 'is-sys' : ''}` },
+      h('div', { class: 'adm-chat-context-head' }, h('b', null, m.sys ? '系统公告' : m.name), m.sys ? null : h('small', null, `UID ${m.uid}`), h('time', null, when(new Date(Number(m.created_at)))),
+        m.status !== 'normal' ? chatPill(m.status) : null),
+      h('p', null, m.text))))
+  const close = h('button', { type: 'button', class: 'ui-btn adm-dialog-ok' }, '关闭')
+  const dialog = h('dialog', { class: 'ui-panel adm-dialog adm-chat-context-dialog' }, h('form', { method: 'dialog' },
+    h('header', null, h('h2', null, `上下文 · ${row.ch === 'near' ? '附近（同一地点 60 m 内）' : '世界'}`)),
+    h('div', { class: 'adm-dialog-body' }, listNode),
+    h('footer', null, close))) as HTMLDialogElement
+  document.body.append(dialog)
+  const done = () => { dialog.close(); dialog.remove() }
+  close.addEventListener('click', done)
+  dialog.addEventListener('cancel', (event) => { event.preventDefault(); done() })
+  dialog.showModal()
+  dialog.querySelector('.is-center')?.scrollIntoView({ block: 'center' })
+}
+/** 消息表（消息页和复核页共用）。 */
+function chatMessages(review: boolean) {
+  const f = { ch: params.get('ch') ?? '', status: params.get('status') ?? '', name: params.get('name') ?? '', uid: params.get('uid') ?? '', q: params.get('q') ?? '', from: params.get('from') ?? '', to: params.get('to') ?? '' }
+  const input = (name: string, value: string, placeholder: string, type = 'search') =>
+    h('input', { type, name, value, placeholder, 'aria-label': placeholder, class: 'adm-chat-input' }) as HTMLInputElement
+  const nameIn = input('name', f.name, '昵称'), uidIn = input('uid', f.uid, 'UID', 'search'), qIn = input('q', f.q, '消息关键词')
+  const local = (ms: string) => { if (!ms) return ''; const d = new Date(Number(ms)); return Number.isNaN(+d) ? '' : new Date(+d - d.getTimezoneOffset() * 60e3).toISOString().slice(0, 16) }
+  const fromIn = input('from', local(f.from), '开始时间', 'datetime-local'), toIn = input('to', local(f.to), '结束时间', 'datetime-local')
+  const form = h('form', { class: 'adm-chat-filters', role: 'search' },
+    h('label', null, '频道', select('ch', f.ch, [['', '全部'], ['world', '世界'], ['near', '附近']], (value) => go({ ch: value || null, offset: null }, true), '频道')),
+    review ? null : h('label', null, '状态', select('status', f.status, [['', '全部'], ['normal', '正常'], ['pending', '待复核'], ['blocked', '已拦截'], ['deleted', '已删除']], (value) => go({ status: value || null, offset: null }, true), '状态')),
+    h('label', null, '玩家', nameIn), h('label', null, 'UID', uidIn), h('label', { class: 'adm-chat-grow' }, '内容', qIn),
+    h('label', null, '从', fromIn), h('label', null, '到', toIn),
+    h('div', { class: 'adm-btns' },
+      h('button', { class: 'adm-btn', type: 'submit' }, '筛选'),
+      navLink('清空', { view: 'chat', tab: review ? 'reviews' : null }, { class: 'adm-btn adm-btn--ghost' })))
+  form.addEventListener('submit', (event) => {
+    event.preventDefault()
+    const ms = (v: string) => (v ? String(new Date(v).getTime()) : null)
+    go({ name: nameIn.value.trim() || null, uid: /^\d+$/.test(uidIn.value.trim()) ? uidIn.value.trim() : null, q: qIn.value.trim() || null, from: ms(fromIn.value), to: ms(toIn.value), offset: null }, true)
+  })
+  const slot = h('div')
+  main.append(form, card(null, slot, { className: 'adm-card--flush' }),
+    h('p', { class: 'adm-note' }, review
+      ? '本地词库判为「疑似」、或外部审核失败的消息会停在这里，玩家看不到。放行后按原频道补发（附近频道发给原地点 60 m 内此刻在线的人）；拦截会计入违规次数，达到阈值自动禁言。'
+      : '这里是全部聊天记录，包括被拦截和删除的，只有管理员能看到。删除会立刻从所有在线玩家的聊天框里移除。'))
+  const body = h('tbody'), more = h('div', { class: 'adm-more' })
+  const query = (offset: number) => {
+    const q = new URLSearchParams({ limit: '50', offset: String(offset) })
+    for (const [key, value] of Object.entries(f)) if (value && !(review && key === 'status')) q.set(key, value)
+    return chatApi<any[]>(`${review ? 'reviews' : 'messages'}?${q}`)
+  }
+  const reload = () => { staleAll(); render({ keepScroll: true }) }
+  const rowOf = (row: any) => {
+    const actions = h('div', { class: 'adm-btns adm-chat-actions' })
+    const ctx = h('button', { type: 'button', class: 'adm-btn adm-btn--sm adm-btn--ghost' }, '上下文') as HTMLButtonElement
+    ctx.addEventListener('click', () => act(ctx, () => chatContext(row)))
+    actions.append(ctx)
+    if (row.status === 'pending') {
+      const pass = h('button', { type: 'button', class: 'adm-btn adm-btn--sm adm-btn--jade' }, '放行') as HTMLButtonElement
+      pass.addEventListener('click', () => act(pass, async () => {
+        const reason = await chatReason('放行消息', h('p', null, '这条消息会按原频道补发出去：', h('q', null, row.text)), '放行', 'jade')
+        if (reason == null) return
+        await chatApi('approve', { mid: Number(row.id), reason }); toast('已放行'); reload()
+      }))
+      const block = h('button', { type: 'button', class: 'adm-btn adm-btn--sm adm-btn--danger' }, '拦截') as HTMLButtonElement
+      block.addEventListener('click', () => act(block, async () => {
+        const reason = await chatReason('拦截消息', h('div', null, h('p', null, h('q', null, row.text)), h('p', { class: 'adm-sub' }, '拦截会计入该玩家的违规次数，达到阈值自动禁言。要直接禁言请用「禁言」。')), '确认拦截')
+        if (reason == null) return
+        await chatApi('block', { mid: Number(row.id), reason }); toast('已拦截'); reload()
+      }))
+      actions.append(pass, block)
+    }
+    if (row.status !== 'deleted' && row.status !== 'pending') {
+      const del = h('button', { type: 'button', class: 'adm-btn adm-btn--sm adm-btn--danger' }, '删除') as HTMLButtonElement
+      del.addEventListener('click', () => act(del, async () => {
+        const reason = await chatReason('删除消息', h('div', null, h('p', null, h('q', null, row.text)), h('p', { class: 'adm-sub' }, '在线玩家的聊天框会立刻移除这条消息，历史里也不再出现。')), '删除')
+        if (reason == null) return
+        await chatApi('delete', { mid: Number(row.id), reason }); toast('已删除'); reload()
+      }))
+      actions.append(del)
+    }
+    if (!row.sys && row.uid) actions.append(chatMuteButton(Number(row.uid), row.name, reload))
+    const why = row.status !== 'normal' && row.label && !['pass', 'local_only', 'notice'].includes(row.label) ? h('small', { class: 'adm-chat-why' }, chatWhy(row)) : null
+    return h('tr', { class: `adm-chat-row ${row.sys ? 'is-sys' : ''}` },
+      h('td', { class: 'adm-chat-time' }, h('code', null, `#${row.id}`), h('small', null, when(new Date(Number(row.created_at))))),
+      h('td', null, chatCh(row.ch)),
+      h('td', null, chatSender(row)),
+      h('td', { class: 'adm-chat-text' }, h('p', null, row.text), why),
+      h('td', null, chatPill(row.status)),
+      h('td', null, actions))
+  }
+  let offset = 0
+  const paintMore = (rows: any[]) => {
+    more.replaceChildren()
+    if (rows.length < 50) return
+    const button = h('button', { class: 'adm-btn adm-btn--ghost', type: 'button' }, '加载更多') as HTMLButtonElement
+    button.addEventListener('click', () => act(button, async () => {
+      offset += 50
+      const page = await query(offset)
+      body.append(...page.map(rowOf)); labelTables(main); paintMore(page)
+    }))
+    more.append(button)
+  }
+  async(slot, () => query(0), (rows) => {
+    if (!rows.length) return review ? emptyState('没有待复核的消息', '疑似违规或外部审核失败的消息会出现在这里') : emptyState('没有符合条件的消息')
+    body.replaceChildren(...rows.map(rowOf))
+    paintMore(rows)
+    return [h('div', { class: 'adm-table-wrap' }, h('table', { class: 'adm-table adm-chat-table' },
+      h('thead', null, h('tr', null, ['消息', '频道', '发送者', '内容', '状态', '操作'].map((t) => h('th', null, t)))), body)), more]
+  }, skeleton(8))
+}
+const chatPages: Record<string, () => void> = {
+  messages: () => chatMessages(false),
+  reviews: () => chatMessages(true),
+  mutes() {
+    const uid = /^\d+$/.test(params.get('muid') ?? '') ? params.get('muid')! : ''
+    const uidIn = h('input', { type: 'search', name: 'muid', value: uid, placeholder: '输入 UID 查禁言历史 / 手动禁言', 'aria-label': 'UID', inputmode: 'numeric', class: 'adm-chat-input' }) as HTMLInputElement
+    const form = h('form', { class: 'adm-search', role: 'search' }, uidIn, h('button', { class: 'adm-btn', type: 'submit' }, '查看'))
+    form.addEventListener('submit', (event) => { event.preventDefault(); go({ muid: /^\d+$/.test(uidIn.value.trim()) ? uidIn.value.trim() : null }, true) })
+    const reload = () => { staleAll(); render({ keepScroll: true }) }
+    const activeSlot = h('div'), histSlot = h('div')
+    main.append(h('div', { class: 'adm-toolbar adm-toolbar--split' }, h('span', { class: 'adm-sub' }, '禁言对附近、世界两个频道同时生效'), form),
+      uid ? card(`UID ${uid} 的禁言记录`, histSlot, { className: 'adm-card--flush', actions: [chatMuteButton(Number(uid), '', reload, '禁言这位玩家'), navLink('返回', { muid: null }, { class: 'adm-link' }, true)] }) : '',
+      card('正在禁言', activeSlot, { className: 'adm-card--flush', sub: '每位玩家只显示最近一次禁言；永久禁言需手动解除' }))
+    const unmute = (row: any) => {
+      const button = h('button', { type: 'button', class: 'adm-btn adm-btn--sm adm-btn--jade' }, '解除') as HTMLButtonElement
+      button.addEventListener('click', () => act(button, async () => {
+        const reason = await chatReason('解除禁言', h('p', null, h('b', null, row.name || `UID ${row.uid}`), ' 会立刻可以发言。'), '解除禁言', 'jade')
+        if (reason == null) return
+        await chatApi('unmute', { uid: Number(row.uid), reason }); toast('已解除'); reload()
+      }))
+      return button
+    }
+    const table = (rows: any[], history: boolean) => h('div', { class: 'adm-table-wrap' }, h('table', { class: 'adm-table adm-chat-mutes' },
+      h('thead', null, h('tr', null, (history ? ['时间', '操作', '期限', '原因', '来源 / 操作人'] : ['玩家', '期限', '原因', '来源 / 操作人', '']).map((t) => h('th', null, t)))),
+      h('tbody', null, rows.map((row) => history
+        ? h('tr', null, h('td', null, when(new Date(Number(row.created_at)), true)), h('td', null, Number(row.until_ms) ? '禁言' : '解除'),
+            h('td', null, Number(row.until_ms) ? chatUntil(Number(row.until_ms)) : dash), h('td', null, row.reason), h('td', null, chatSource[row.source] ?? row.source, ' · ', h('code', null, String(row.actor).slice(0, 8))))
+        : h('tr', null,
+            h('td', null, h('span', { class: 'adm-who' }, h('b', null, row.name || dash), h('small', null, navLink(`UID ${row.uid}`, { muid: String(row.uid) }, { class: 'adm-link' }, true)))),
+            h('td', null, chatUntil(Number(row.until_ms))), h('td', null, row.reason),
+            h('td', null, chatSource[row.source] ?? row.source, row.source === 'admin' ? [' · ', h('code', null, String(row.actor).slice(0, 8))] : null),
+            h('td', null, unmute(row)))))))
+    async(activeSlot, () => chatApi<any[]>('mutes?limit=200'), (rows) => rows.length ? table(rows, false) : emptyState('现在没有人被禁言'), skeleton(4))
+    if (uid) async(histSlot, () => chatApi<any[]>(`mutes?uid=${uid}&limit=200`), (rows) => rows.length ? table(rows, true) : emptyState('这位玩家没有禁言记录'), skeleton(3))
+  },
+  words() {
+    const q = params.get('wq') ?? '', action = params.get('waction') ?? ''
+    const qIn = h('input', { type: 'search', name: 'wq', value: q, placeholder: '搜索词或类别', 'aria-label': '搜索敏感词', class: 'adm-chat-input' }) as HTMLInputElement
+    const form = h('form', { class: 'adm-search', role: 'search' }, qIn, h('button', { class: 'adm-btn', type: 'submit' }, '搜索'))
+    form.addEventListener('submit', (event) => { event.preventDefault(); go({ wq: qIn.value.trim() || null }, true) })
+    const reload = () => { staleAll(); render({ keepScroll: true }) }
+    // 新增
+    const word = h('input', { name: 'word', placeholder: '词', maxlength: 100, required: true, class: 'adm-chat-input', 'aria-label': '词' }) as HTMLInputElement
+    const category = h('input', { name: 'category', placeholder: '类别，例如 运营补充', maxlength: 80, value: '运营补充', class: 'adm-chat-input', 'aria-label': '类别' }) as HTMLInputElement
+    let pick = 'block'
+    const actSel = select('action', pick, [['block', '拦截'], ['review', '转复核'], ['allow', '白名单（地名等，不误判）']], (value) => (pick = value), '动作')
+    const add = h('button', { class: 'adm-btn adm-btn--jade', type: 'submit' }, '添加') as HTMLButtonElement
+    const addForm = h('form', { class: 'adm-chat-addword' }, word, category, actSel, add)
+    addForm.addEventListener('submit', (event) => {
+      event.preventDefault()
+      act(add, async () => {
+        const text = word.value.trim()
+        if (!text) return
+        await chatApi('words', { word: text, category: category.value.trim() || '运营补充', action: pick, enabled: true, reason: '后台新增' })
+        toast(`已添加「${text}」，下一条消息起生效`); word.value = ''; reload()
+      })
+    })
+    const slot = h('div')
+    main.append(
+      card('添加词条', addForm, { sub: '拦截 = 直接拒发并提示玩家；转复核 = 先不发出，进「待复核」；白名单 = 包含在其中的片段不判违规' }),
+      h('div', { class: 'adm-toolbar adm-toolbar--split' },
+        segmented(action, [['', '全部'], ['block', '拦截'], ['review', '复核'], ['allow', '白名单']], (value) => go({ waction: value || null }, true), '动作'), form),
+      card(null, slot, { className: 'adm-card--flush' }),
+      h('p', { class: 'adm-note' }, '初始词库来自开源项目 konsheng/Sensitive-lexicon（MIT），地名白名单来自世界地标与街道名。停用比删除更好：重新导入词库时不会复活停用或删除的词，也不会覆盖你改过的动作。'))
+    const row = (item: any) => {
+      const toggle = h('button', { type: 'button', class: `adm-btn adm-btn--sm ${item.enabled ? 'adm-btn--ghost' : 'adm-btn--jade'}` }, item.enabled ? '停用' : '启用') as HTMLButtonElement
+      toggle.addEventListener('click', () => act(toggle, async () => {
+        await chatApi('words', { id: Number(item.id), word: item.word, category: item.category, action: item.action, enabled: !item.enabled, reason: item.enabled ? '后台停用' : '后台启用' })
+        toast(item.enabled ? '已停用' : '已启用'); reload()
+      }))
+      const change = select('action', item.action, [['block', '拦截'], ['review', '复核'], ['allow', '白名单']], (value) => {
+        void chatApi('words', { id: Number(item.id), word: item.word, category: item.category, action: value, enabled: item.enabled, reason: '后台改动作' })
+          .then(() => { toast('已更新'); reload() }).catch((error) => toast(error instanceof Error ? error.message : '更新失败', 'error'))
+      }, '动作')
+      const del = h('button', { type: 'button', class: 'adm-btn adm-btn--sm adm-btn--danger' }, '删除') as HTMLButtonElement
+      del.addEventListener('click', () => act(del, async () => {
+        const reason = await chatReason('删除词条', h('p', null, `删除「${item.word}」？重新导入词库也不会再加回来。只想暂时不用请点「停用」。`), '删除')
+        if (reason == null) return
+        await chatApi('words/delete', { id: Number(item.id), reason }); toast('已删除'); reload()
+      }))
+      return h('tr', { class: item.enabled ? '' : 'is-off' },
+        h('td', null, h('b', { class: 'adm-chat-word' }, item.word)), h('td', null, item.category),
+        h('td', null, change), h('td', null, item.source === 'manual' || !item.source ? '手动' : h('code', null, item.source)),
+        h('td', null, when(item.updated_at ? new Date(Number(item.updated_at)) : null, true)),
+        h('td', null, h('div', { class: 'adm-btns adm-chat-actions' }, toggle, del)))
+    }
+    const body = h('tbody'), more = h('div', { class: 'adm-more' })
+    let offset = 0
+    const load = (at: number) => {
+      const p = new URLSearchParams({ limit: '100', offset: String(at) })
+      if (q) p.set('q', q)
+      if (action) p.set('action', action)
+      return chatApi<any[]>(`words?${p}`)
+    }
+    const paintMore = (rows: any[]) => {
+      more.replaceChildren()
+      if (rows.length < 100) return
+      const button = h('button', { class: 'adm-btn adm-btn--ghost', type: 'button' }, '加载更多') as HTMLButtonElement
+      button.addEventListener('click', () => act(button, async () => { offset += 100; const page = await load(offset); body.append(...page.map(row)); labelTables(main); paintMore(page) }))
+      more.append(button)
+    }
+    async(slot, () => load(0), (rows) => {
+      if (!rows.length) return emptyState(q ? `没有包含「${q}」的词条` : '词库是空的', '可以在上方添加')
+      body.replaceChildren(...rows.map(row)); paintMore(rows)
+      return [h('div', { class: 'adm-table-wrap' }, h('table', { class: 'adm-table adm-chat-words' },
+        h('thead', null, h('tr', null, ['词', '类别', '动作', '来源', '更新', ''].map((t) => h('th', null, t)))), body)), more]
+    }, skeleton(8))
+  },
+  settings() {
+    const slot = h('div'), noticeSlot = h('div')
+    main.append(h('div', { class: 'adm-grid-2 adm-chat-settings' }, card('聊天规则', slot, { sub: '改动立即生效，并记入操作记录' }), card('发系统公告', noticeSlot, { sub: '以「网上桂林」名义高亮显示在玩家聊天框里' })))
+    async(slot, () => chatApi<any>('settings'), (cfg) => {
+      const field = (key: string, label: string, value: number, unit: string, scale = 1, hint?: string) =>
+        h('label', { class: 'adm-chat-field' }, h('span', null, label), h('div', null, h('input', { type: 'number', name: key, value: +(value / scale).toFixed(2), min: 0, step: 'any', class: 'adm-chat-num' }), h('em', null, unit)), hint && h('small', null, hint))
+      const steps = h('input', { name: 'steps_minutes', value: (cfg.steps_minutes ?? []).join(', '), class: 'adm-chat-input' }) as HTMLInputElement
+      const policy = select('unmoderated_policy', cfg.unmoderated_policy, [['local_only', '本地词库通过即发出'], ['pending', '全部进人工复核']], () => {}, '无外部审核时')
+      const save = h('button', { class: 'adm-btn adm-btn--jade', type: 'submit' }, '保存') as HTMLButtonElement
+      const form = h('form', { class: 'adm-chat-form' },
+        field('radius', '附近频道半径', cfg.radius, '米'),
+        field('max_length', '单条字数上限', cfg.max_length, '字'),
+        field('near_ms', '附近频道发言间隔', cfg.near_ms, '秒', 1000),
+        field('world_ms', '世界频道发言间隔', cfg.world_ms, '秒', 1000, '防刷屏：同一玩家两条之间至少隔这么久'),
+        field('threshold', '自动禁言阈值', cfg.threshold, '次违规'),
+        field('window_hours', '违规统计窗口', cfg.window_hours, '小时'),
+        h('label', { class: 'adm-chat-field' }, h('span', null, '自动禁言阶梯'), h('div', null, steps, h('em', null, '分钟')), h('small', null, '逗号分隔，第 1 次触发用第一档，再犯逐级升级，最后一档封顶')),
+        h('label', { class: 'adm-chat-field' }, h('span', null, '无外部审核时'), policy),
+        h('div', { class: 'adm-chat-field' }, h('span', null, '外部审核'), (() => { const on = !!cfg.provider && !['none', '未配置'].includes(cfg.provider); return h('b', { class: on ? 'adm-ok' : 'adm-muted' }, on ? `已配置：${cfg.provider === 'wechat' ? '微信内容安全' : cfg.provider}（只对带微信身份的玩家生效）` : '未配置 · 只用本地词库') })()),
+        h('div', { class: 'adm-btns' }, save))
+      form.addEventListener('submit', (event) => {
+        event.preventDefault()
+        act(save, async () => {
+          const data = new FormData(form)
+          const n = (key: string, scale = 1) => Math.round(Number(data.get(key)) * scale)
+          const patch = {
+            radius: n('radius'), max_length: n('max_length'), near_ms: n('near_ms', 1000), world_ms: n('world_ms', 1000), threshold: n('threshold'), window_hours: n('window_hours'),
+            steps_minutes: String(data.get('steps_minutes')).split(/[,，\s]+/).filter(Boolean).map(Number), unmoderated_policy: String(data.get('unmoderated_policy')),
+          }
+          const reason = await chatReason('保存聊天规则', h('p', null, '新规则对之后的每条消息生效。'), '保存', 'jade')
+          if (reason == null) return
+          await chatApi('settings', { patch, reason }); toast('已保存'); staleAll()
+        })
+      })
+      return form
+    }, skeleton(6))
+    const text = h('textarea', { rows: 4, maxlength: 300, placeholder: '例如：今晚 20:00 两江四湖灯光秀，欢迎来逛', class: 'adm-chat-notice', 'aria-label': '公告内容' }) as HTMLTextAreaElement
+    const send = h('button', { class: 'adm-btn', type: 'submit' }, '发到世界频道') as HTMLButtonElement
+    const preview = h('div', { class: 'adm-chat-preview', 'aria-hidden': 'true' }, h('span', { class: 'adm-chat-ch adm-chat-ch--sys' }, '公告'), h('b', null, '网上桂林'), h('p', null, '公告会这样显示'))
+    text.addEventListener('input', () => { preview.querySelector('p')!.textContent = text.value.trim() || '公告会这样显示' })
+    const form = h('form', { class: 'adm-chat-form' }, text, preview, h('div', { class: 'adm-btns' }, send))
+    form.addEventListener('submit', (event) => {
+      event.preventDefault()
+      act(send, async () => {
+        const body = text.value.trim()
+        if (!body) return
+        const reason = await chatReason('发送公告', h('p', null, '全城在线玩家都会立即看到：', h('q', null, body)), '发送', 'jade')
+        if (reason == null) return
+        await chatApi('notice', { ch: 'world', text: body, reason }); toast('公告已发送'); text.value = ''
+      })
+    })
+    noticeSlot.append(form)
   },
 }
 

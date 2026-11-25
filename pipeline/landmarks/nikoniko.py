@@ -446,7 +446,7 @@ def build_surfaces_sheet():
                 draw.line((x, 0, x + int(rng.integers(-4, 5)), 255), fill=col, width=4)
         arr = np.asarray(panel, dtype=float) + rng.normal(0, 2.5, (256, 256, 1))
         sheet.paste(_clamp_img(arr), ((idx % 4) * 256, (idx // 4) * 256))
-    return sheet
+    return sheet.resize((512, 512), Image.Resampling.LANCZOS)
 
 
 def build_curtain_glass():

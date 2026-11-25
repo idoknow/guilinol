@@ -32,7 +32,7 @@ class Streets:
             kinds.append(kind)
         ctrl = streets[5] if len(streets)>5 else None
         grid = (np.reshape(ctrl[1], (35, 35))+ctrl[0])/1000 if ctrl else None
-        if len(streets)>11:
+        if len(streets)>11 and streets[11]:
             first,corners,profile = streets[11]
             axis = shapely.LineString(np.asarray(profile)[:,:2]+origin) if profile else None
             self.lower[origin] = first,shapely.Polygon(np.asarray(corners)+origin),axis,np.asarray(profile)

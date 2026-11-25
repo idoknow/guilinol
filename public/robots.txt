@@ -1,0 +1,8 @@
+User-agent: *
+Allow: /
+Disallow: /admin/
+Disallow: /api/
+Disallow: /backpack.html
+Disallow: /avatar-dev.html
+
+Sitemap: https://glol.rcpd.cc/sitemap.xml

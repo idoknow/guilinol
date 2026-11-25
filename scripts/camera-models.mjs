@@ -222,19 +222,20 @@ function writeGLB(root, file) {
 // material colours are authored as sRGB hex; build() converts to linear (glTF baseColorFactor is linear)
 const hexToSrgb = hex => [(hex >> 16) & 255, (hex >> 8) & 255, hex & 255].map(v => +(v / 255).toFixed(4))
 
-const GLASS = { name: 'glass', color: hexToSrgb(0x0b0d12), metallic: 0.9, roughness: 0.08 }
+const GLASS = { name: 'glass', color: hexToSrgb(0x366899), metallic: 0.22, roughness: 0.12 }
 
 // ---------------------------------------------------------------- mirrorless (full-frame, 55 mm standard zoom)
 
 function mirrorless() {
   const m = new Model('mirrorless', {
-    shell: { name: 'shell_black', color: hexToSrgb(0x1d1e21), metallic: 0.05, roughness: 0.62 },
-    metal: { name: 'metal_gunmetal', color: hexToSrgb(0x8a8d93), metallic: 0.85, roughness: 0.32 },
+    shell: { name: 'shell_graphite', color: hexToSrgb(0x565e69), metallic: 0.08, roughness: 0.48 },
+    metal: { name: 'metal_silver', color: hexToSrgb(0xe6ebf2), metallic: 0.20, roughness: 0.28 },
     glass: GLASS,
   })
   // design frame: slab centred x=0; grip on +X; origin moved to the grip centre at the end
   // --- body shell
   m.add('body', 'shell', rbox(0.120, 0.070, 0.038, 0.006), [0, -0.0075, 0.011]) // y -0.0425..0.0275, z -0.008..0.030
+  m.add('body', 'metal', box(0.116, 0.0055, 0.036), [0, 0.0252, 0.011]) // brushed silver top-plate trim
   m.add('body', 'shell', rbox(0.030, 0.064, 0.038, 0.009), [0.045, -0.0105, -0.011]) // grip, z -0.030..0.008
   m.add('body', 'shell', rbox(0.044, 0.015, 0.034, 0.004), [-0.012, 0.0335, 0.011]) // EVF hump y 0.026..0.041
   m.add('body', 'shell', plate(0.026, 0.020, 0.006, 0.004), [-0.012, 0.031, 0.032]) // eyecup → z 0.035
@@ -249,7 +250,7 @@ function mirrorless() {
 
   // --- lens mount + 55 mm standard zoom (Ø64 × 70 mm), optical axis at (-0.012, -0.006)
   const LX = -0.012, LY = -0.006
-  m.add('details', 'metal', cyl(0.0305, 0.003, 24, '-z', 0.0305, 'none'), [LX, LY, -0.0095]) // bayonet ring (side only)
+  m.add('details', 'metal', cyl(0.0312, 0.0045, 24, '-z', 0.0312, 'none'), [LX, LY, -0.0095]) // bayonet ring (side only)
   const z0 = -0.011
   m.add('lens', 'shell', lensLathe([
     [0.0302, 0], [0.0302, 0.011], [0.0296, 0.050], [0.0318, 0.0515], [0.0318, 0.068],
@@ -257,17 +258,17 @@ function mirrorless() {
   ], 24, z0), [LX, LY, 0])
   m.add('lens', 'shell', ribbed(0.032, 0.022, 32, 0.0011, 'z'), [LX, LY, z0 - 0.022]) // zoom ring
   m.add('lens', 'shell', ribbed(0.0312, 0.014, 40, 0.0007, 'z'), [LX, LY, z0 - 0.0425]) // focus ring
-  m.add('lens', 'metal', cyl(0.0303, 0.0016, 24, 'z', 0.0303, 'none'), [LX, LY, z0 - 0.0105]) // mount-side metal band
-  m.add('lens', 'metal', cyl(0.0320, 0.0012, 24, 'z', 0.0320, 'none'), [LX, LY, z0 - 0.0505]) // name ring
+  m.add('lens', 'metal', cyl(0.0310, 0.0052, 24, 'z', 0.0310, 'none'), [LX, LY, z0 - 0.0095]) // mount-side silver band
+  m.add('lens', 'metal', cyl(0.0326, 0.0052, 24, 'z', 0.0326, 'none'), [LX, LY, z0 - 0.0535]) // front silver trim ring
   m.add('lens', 'glass', halfSphere(0.0249, 16, 2, false), [LX, LY, z0 - 0.066], [-PI / 2, 0, 0], [1, 0.25, 1]) // front element (domed)
   m.add('lens', 'metal', box(0.0012, 0.003, 0.0008), [LX, LY + 0.0322, z0 - 0.0105]) // index mark
   // --- controls (top)
   m.add('controls', 'metal', cyl(0.0068, 0.0016, 16), [0.046, 0.0222, -0.017]) // on/off collar
   m.add('controls', 'metal', box(0.005, 0.0016, 0.003), [0.053, 0.0222, -0.012]) // collar lever
   m.add('controls', 'metal', cyl(0.0042, 0.0034, 12), [0.046, 0.0247, -0.017]) // shutter
-  m.add('controls', 'shell', ribbed(0.0065, 0.004, 16, 0.0006), [0.045, 0.0175, -0.031]) // front dial (in grip)
-  m.add('controls', 'shell', ribbed(0.0075, 0.0042, 20, 0.0006), [0.049, 0.0296, 0.022]) // rear dial (top-right)
-  m.add('controls', 'shell', ribbed(0.0095, 0.0065, 24, 0.0007), [-0.043, 0.0305, 0.012]) // exposure / mode dial
+  m.add('controls', 'metal', ribbed(0.0065, 0.004, 16, 0.0006), [0.045, 0.0175, -0.031]) // front dial (in grip)
+  m.add('controls', 'metal', ribbed(0.0075, 0.0042, 20, 0.0006), [0.049, 0.0296, 0.022]) // rear dial (top-right)
+  m.add('controls', 'metal', ribbed(0.0095, 0.0065, 24, 0.0007), [-0.043, 0.0305, 0.012]) // exposure / mode dial
   m.add('controls', 'metal', disc(0.0082, 16), [-0.043, 0.0339, 0.012]) // dial cap
   m.add('controls', 'metal', box(0.0008, 0.0008, 0.004), [-0.043, 0.0342, 0.0085]) // dial index
   m.add('controls', 'shell', cyl(0.0035, 0.0018, 10), [0.030, 0.0284, 0.004]) // C1
@@ -314,8 +315,8 @@ function mirrorless() {
 
 function action() {
   const m = new Model('action', {
-    shell: { name: 'shell_graphite', color: hexToSrgb(0x26282c), metallic: 0.1, roughness: 0.55 },
-    accent: { name: 'accent_red', color: hexToSrgb(0xd8322a), metallic: 0.1, roughness: 0.4 },
+    shell: { name: 'shell_graphite', color: hexToSrgb(0x565e6a), metallic: 0.08, roughness: 0.46 },
+    accent: { name: 'accent_red', color: hexToSrgb(0xf2463a), metallic: 0.05, roughness: 0.32 },
     glass: GLASS,
   })
   const W = 0.065, H = 0.045, D = 0.030
@@ -329,7 +330,7 @@ function action() {
   m.add('lens', 'shell', cyl(0.0125, 0.0045, 28, 'z', 0.0135), [LX, LY, -D / 2 - 0.006])
   m.add('lens', 'glass', cyl(0.0102, 0.0010, 28, 'z'), [LX, LY, -D / 2 - 0.0085])
   m.add('lens', 'glass', halfSphere(0.0085, 20, 3, false), [LX, LY, -D / 2 - 0.009], [-PI / 2, 0, 0], [1, 0.55, 1])
-  m.add('lens', 'accent', torus(0.0112, 0.0005, 4, 28), [LX, LY, -D / 2 - 0.0083]) // red trim ring
+  m.add('lens', 'accent', torus(0.0118, 0.0024, 5, 28), [LX, LY, -D / 2 - 0.0076]) // signature bold red trim ring
   for (const [dx, dy] of [[-1, -1], [-1, 1], [1, -1], [1, 1]]) m.add('lens', 'glass', cyl(0.0008, 0.0005, 6, '-z'), [LX + dx * 0.0125, LY + dy * 0.0125, -D / 2 - 0.0041]) // cover screws
   // front status screen
   m.add('screen', 'glass', box(0.019, 0.019, 0.0008), [-0.017, 0.004, -D / 2 - 0.0002])
@@ -366,15 +367,15 @@ function action() {
 
 function pocket() {
   const m = new Model('pocket', {
-    shell: { name: 'shell_charcoal', color: hexToSrgb(0x2c2e33), metallic: 0.15, roughness: 0.5 },
-    metal: { name: 'metal_silver', color: hexToSrgb(0xa7abb2), metallic: 0.9, roughness: 0.28 },
+    shell: { name: 'shell_charcoal', color: hexToSrgb(0x545c67), metallic: 0.08, roughness: 0.44 },
+    metal: { name: 'metal_silver', color: hexToSrgb(0xe8edf4), metallic: 0.18, roughness: 0.26 },
     glass: GLASS,
   })
   // handle: y -0.045 … 0.045, origin mid-handle
   const R = 0.013
   m.add('body', 'shell', cyl(R, 0.0845, 24), [0, 0.00275, 0])
   m.add('body', 'shell', halfSphere(R, 24, 3, true), [0, -0.0398, 0], [0, 0, 0], [1, 0.4, 1])
-  m.add('body', 'metal', cyl(R + 0.0002, 0.0012, 24), [0, 0.0442, 0]) // top trim ring
+  m.add('body', 'metal', cyl(R + 0.0005, 0.0036, 24), [0, 0.0432, 0]) // top silver collar ring
   m.add('body', 'glass', tube(R + 0.0001, 0.0006, 24), [0, -0.020, 0]) // shell seam
   // user-facing (+Z) panel: screen + joystick + two buttons
   m.add('screen', 'shell', rbox(0.019, 0.026, 0.004, 0.002), [0, 0.0255, 0.0112])
@@ -392,18 +393,18 @@ function pocket() {
   m.add('details', 'glass', box(0.0010, 0.030, 0.0006), [-R + 0.0003, -0.005, 0]) // side shell seam
   // gimbal: pan (Y) at handle top → roll (Z) behind head → tilt (X) beside head
   m.add('gimbal', 'shell', cyl(0.0105, 0.0055, 24), [0, 0.0475, 0]) // pan motor
-  m.add('gimbal', 'metal', cyl(0.0108, 0.0008, 24), [0, 0.0452, 0]) // pan joint ring
-  m.add('gimbal', 'shell', rbox(0.008, 0.009, 0.012, 0.002), [0, 0.054, 0.010]) // pan → roll riser
+  m.add('gimbal', 'metal', cyl(0.0114, 0.0028, 24), [0, 0.0458, 0]) // pan joint ring
+  m.add('gimbal', 'metal', rbox(0.0095, 0.010, 0.013, 0.002), [0, 0.054, 0.010]) // pan → roll riser
   m.add('gimbal', 'shell', cyl(0.0068, 0.0075, 20, 'z'), [0, 0.060, 0.0175]) // roll motor
-  m.add('gimbal', 'metal', cyl(0.0070, 0.0008, 20, 'z'), [0, 0.060, 0.0134]) // roll joint ring
-  m.add('gimbal', 'shell', rbox(0.021, 0.0055, 0.0055, 0.0015), [0.0085, 0.060, 0.0195]) // arm (roll → side)
-  m.add('gimbal', 'shell', rbox(0.0055, 0.012, 0.022, 0.0015), [0.0175, 0.064, 0.009]) // arm (side → tilt)
-  m.add('gimbal', 'shell', cyl(0.0068, 0.0040, 20, 'x'), [0.0165, 0.067, 0]) // tilt motor
-  m.add('gimbal', 'metal', cyl(0.0070, 0.0008, 20, 'x'), [0.0141, 0.067, 0]) // tilt joint ring
+  m.add('gimbal', 'metal', cyl(0.0076, 0.0026, 20, 'z'), [0, 0.060, 0.0134]) // roll joint ring
+  m.add('gimbal', 'metal', rbox(0.023, 0.0072, 0.0072, 0.0018), [0.009, 0.060, 0.0195]) // arm (roll → side)
+  m.add('gimbal', 'metal', rbox(0.0072, 0.013, 0.023, 0.0018), [0.0185, 0.064, 0.009]) // arm (side → tilt)
+  m.add('gimbal', 'shell', cyl(0.0068, 0.0040, 20, 'x'), [0.0175, 0.067, 0]) // tilt motor
+  m.add('gimbal', 'metal', cyl(0.0076, 0.0028, 20, 'x'), [0.0148, 0.067, 0]) // tilt joint ring
   // camera head (26 mm cube) + lens
   m.add('lens', 'shell', rbox(0.026, 0.026, 0.026, 0.004, 2), [0, 0.067, 0])
-  m.add('lens', 'shell', cyl(0.0098, 0.0020, 24, 'z', 0.0108), [0, 0.067, -0.0138])
-  m.add('lens', 'metal', torus(0.0088, 0.0005, 4, 24), [0, 0.067, -0.0149])
+  m.add('lens', 'shell', cyl(0.0100, 0.0024, 24, 'z', 0.0110), [0, 0.067, -0.0140])
+  m.add('lens', 'metal', torus(0.0094, 0.0018, 4, 24), [0, 0.067, -0.0151])
   m.add('lens', 'glass', cyl(0.0080, 0.0006, 24, 'z'), [0, 0.067, -0.0149])
   m.add('lens', 'glass', halfSphere(0.0060, 16, 2, false), [0, 0.067, -0.0151], [-PI / 2, 0, 0], [1, 0.35, 1])
   m.add('lens', 'glass', cyl(0.0009, 0.0004, 6, '-z'), [-0.0095, 0.0765, -0.0131]) // ToF / mic
@@ -414,30 +415,30 @@ function pocket() {
 
 function thumb() {
   const m = new Model('thumb', {
-    shell: { name: 'shell_white', color: hexToSrgb(0xeeeeea), metallic: 0.0, roughness: 0.42 },
-    accent: { name: 'accent_dark', color: hexToSrgb(0x2a2c30), metallic: 0.35, roughness: 0.4 },
+    shell: { name: 'shell_white', color: hexToSrgb(0xf4f3ef), metallic: 0.0, roughness: 0.36 },
+    accent: { name: 'accent_slate', color: hexToSrgb(0x282d36), metallic: 0.14, roughness: 0.36 },
     glass: GLASS,
   })
-  const W = 0.050, H = 0.030, D = 0.015
+  const W = 0.052, H = 0.031, D = 0.017
   m.add('body', 'shell', rbox(W, H, D, 0.0075, 3), [0, 0, 0])
-  // front: offset lens (−X seen from behind = right side seen from front)
-  const LX = -0.0135
-  m.add('lens', 'accent', cyl(0.0082, 0.0016, 28, '-z'), [LX, 0.001, -D / 2 - 0.0004])
-  m.add('lens', 'glass', cyl(0.0064, 0.0008, 24, '-z'), [LX, 0.001, -D / 2 - 0.0012])
-  m.add('lens', 'glass', halfSphere(0.0052, 16, 2, false), [LX, 0.001, -D / 2 - 0.0014], [-PI / 2, 0, 0], [1, 0.35, 1])
-  m.add('lens', 'shell', torus(0.0075, 0.0004, 4, 28), [LX, 0.001, -D / 2 - 0.0012]) // white trim
-  // single button + LED
-  m.add('controls', 'accent', cyl(0.0048, 0.0006, 20, '-z'), [0.0125, 0.001, -D / 2 - 0.0001])
-  m.add('controls', 'shell', cyl(0.0040, 0.0010, 20, '-z'), [0.0125, 0.001, -D / 2 - 0.0004])
+  // front: bold dark lens housing (−X seen from behind) so white body + dark eye pops even against light shirts
+  const LX = -0.0125
+  m.add('lens', 'accent', cyl(0.0106, 0.0034, 28, '-z'), [LX, 0.0008, -D / 2 - 0.0012])
+  m.add('lens', 'glass', cyl(0.0078, 0.0012, 24, '-z'), [LX, 0.0008, -D / 2 - 0.0026])
+  m.add('lens', 'glass', halfSphere(0.0066, 16, 2, false), [LX, 0.0008, -D / 2 - 0.0028], [-PI / 2, 0, 0], [1, 0.42, 1])
+  m.add('lens', 'shell', torus(0.0088, 0.0006, 4, 28), [LX, 0.0008, -D / 2 - 0.0025]) // crisp white lens lip
+  // single dark button + perimeter contrast rim
+  m.add('controls', 'accent', cyl(0.0060, 0.0012, 20, '-z'), [0.0125, 0.0008, -D / 2 - 0.0004])
+  m.add('controls', 'shell', cyl(0.0044, 0.0016, 20, '-z'), [0.0125, 0.0008, -D / 2 - 0.0008])
   // status window on top edge (named screen — no LCD on this body)
   m.add('screen', 'glass', rbox(0.010, 0.0006, 0.0035, 0.0002), [0.006, H / 2 - 0.0001, -0.0005])
   m.add('details', 'glass', cyl(0.0007, 0.0004, 8), [0.0135, H / 2 - 0.0001, -0.0005]) // LED
   // mic holes + speaker grille + charging pins
   for (let i = 0; i < 3; i++) m.add('details', 'glass', cyl(0.00045, 0.0004, 6), [-0.004 - i * 0.0018, H / 2 - 0.0002, 0.001])
   for (const x of [-0.003, 0.003]) m.add('details', 'accent', cyl(0.0008, 0.0004, 8, '-y'), [x, -H / 2 + 0.0001, 0])
-  // body seam
-  m.add('details', 'glass', box(W - 0.016, 0.0004, 0.0004), [0, H / 2 - 0.0006, 0.003])
-  m.add('details', 'glass', box(W - 0.016, 0.0004, 0.0004), [0, -H / 2 + 0.0006, 0.003])
+  // dark perimeter edge trim so white capsule separates cleanly from light shirts
+  m.add('details', 'accent', box(W - 0.012, 0.0018, 0.0024), [0, H / 2 - 0.0004, 0.0015])
+  m.add('details', 'accent', box(W - 0.012, 0.0018, 0.0024), [0, -H / 2 + 0.0004, 0.0015])
   // magnetic clip on the back (+Z): plate separated by a gap, bridged at the top
   m.add('clip', 'accent', rbox(0.040, 0.023, 0.0022, 0.0035, 2), [0, -0.0010, D / 2 + 0.0016 + 0.0011])
   m.add('clip', 'accent', rbox(0.026, 0.0040, 0.0052, 0.0012), [0, H / 2 - 0.0035, D / 2 + 0.0012])

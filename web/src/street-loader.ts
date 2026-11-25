@@ -23,14 +23,14 @@ function streetWorker(){
   return worker
 }
 
-export async function loadStreetGeometry(paths:Streets,step:number,heights:THREE.BufferAttribute|THREE.InterleavedBufferAttribute){
+export async function loadStreetGeometry(paths:Streets,step:number,heights:THREE.BufferAttribute|THREE.InterleavedBufferAttribute,rails?:StreetRequest['rails'],signs?:StreetRequest['signs'],railCuts?:StreetRequest['railCuts']){
   const elevations=Float32Array.from({length:heights.count},(_,i)=>heights.getY(i))
   const target=streetWorker(), id=nextId++
   const data=await new Promise<StreetData>((resolve,reject)=>{
-    target.postMessage({id,paths,step,elevations} satisfies StreetRequest,[elevations.buffer])
+    target.postMessage({id,paths,step,elevations,rails,signs,railCuts} satisfies StreetRequest,[elevations.buffer])
     pending.set(id,{resolve,reject})
   })
-  const {positions,normals,colors,kinds,along,...instances}=data
+  const {positions,normals,colors,kinds,along,fencePositions,fenceNormals,fenceColors,fenceAlong,...instances}=data
   const surface=positions.length?new THREE.BufferGeometry():null
   if(surface){
     surface.setAttribute('position',new THREE.BufferAttribute(positions,3))
@@ -39,5 +39,12 @@ export async function loadStreetGeometry(paths:Streets,step:number,heights:THREE
     surface.setAttribute('aSurface',new THREE.BufferAttribute(kinds,1))
     surface.setAttribute('aAlong',new THREE.BufferAttribute(along,1))
   }
-  return {...instances,banks:paths[2],surface}
+  const fence=fencePositions.length?new THREE.BufferGeometry():null
+  if(fence){
+    fence.setAttribute('position',new THREE.BufferAttribute(fencePositions,3))
+    fence.setAttribute('normal',new THREE.BufferAttribute(fenceNormals,3))
+    fence.setAttribute('color',new THREE.BufferAttribute(fenceColors,3))
+    fence.setAttribute('aAlong',new THREE.BufferAttribute(fenceAlong,1))
+  }
+  return {...instances,banks:paths[2],surface,fence}
 }
