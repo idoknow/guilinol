@@ -55,10 +55,10 @@
 import {flatDistance,inEmoteRange,acceptEmote} from './emote.mjs'
 import {createServer} from 'node:http'
 import {createHmac,timingSafeEqual} from 'node:crypto'
-import {isIP} from 'node:net'
 import {WebSocketServer} from 'ws'
 import * as obs from './observability.mjs'
 import {createChat} from './chat.mjs'
+import {resolveClientIp} from './client-ip.mjs'
 
 const PORT = Number(process.env.PORT || 8790)
 // 单进程 Node 只能用 1 核：AOI 压测 300 人密集场景已接近 1 核，先按 300 封顶（IDOK-224）
@@ -158,34 +158,19 @@ function cleanName(value) {
   return cleaned || '游客'
 }
 
-/** 反代场景取 x-forwarded-for 第一跳，但只接受合法 IP 字面量；客户端乱写头就退回 socket 地址 */
 /**
- * 取真实客户端 IP。
+ * 取真实客户端 IP 与 CDN 节点 IP。
  *
- * 线上拓扑是 CDN 节点 → Traefik → rt，而 Traefik 不信任上游的 X-Forwarded-For，
- * 会用「直连对端地址」（也就是 CDN 节点 IP）覆盖它。所以不能只信 XFF 第一个值：
- * 优先级按「离客户端最近、且中间层不会伪改」的顺序来，再退回 socket 地址。
- *
- * 注意：这些头只在 CDN 能覆盖写入时才可信。有人绕过 CDN 直连源站时能伪造成本很低的值，
- * 因此这里的结果只用于限流 / 统计 / 日志，不能当鉴权依据。
+ * 线上拓扑是 CDN 节点 → Traefik/nginx → rt，只有直连对端属于可信代理（内网/回环或 TRUSTED_PROXIES）
+ * 时才采信转发头，且头里的值必须通过合法 IP 字面量校验，不合法则回退到 socket 地址。
  */
-function clientIp(req) {
-  const header = (name) => {
-    const value = req.headers[name]
-    return typeof value === 'string' ? value.split(',')[0].trim() : ''
-  }
-  for (const name of ['cf-connecting-ip', 'x-real-ip', 'x-client-ip', 'true-client-ip']) {
-    const value = header(name)
-    if (isIP(value)) return value
-  }
-  const forwarded = header('x-forwarded-for')
-  if (isIP(forwarded)) return forwarded
-  return req.socket.remoteAddress || 'unknown'
+function clientIpInfo(req) {
+  return resolveClientIp(req.headers, req.socket.remoteAddress || '')
 }
 
 // 排障用：一段时间打一条「这次连接命中了哪个头」，确认 CDN 到底传了什么
 let ipDebugAt = 0
-function ipDebug(req, ip) {
+function ipDebug(req, info) {
   if (!process.env.RT_IP_DEBUG) return
   const at = now()
   if (at - ipDebugAt < 5000) return
@@ -193,7 +178,7 @@ function ipDebug(req, ip) {
   const names = ['cf-connecting-ip', 'x-real-ip', 'x-client-ip', 'true-client-ip', 'x-forwarded-for', 'forwarded']
   const seen = {}
   for (const name of names) if (req.headers[name] !== undefined) seen[name] = String(req.headers[name]).slice(0, 120)
-  console.log(JSON.stringify({ scope: 'rt-ip', ip, socket: req.socket.remoteAddress, headers: seen }))
+  console.log(JSON.stringify({ scope: 'rt-ip', ip: info.clientIp, nodeIp: info.nodeIp, trusted: info.trusted, socket: req.socket.remoteAddress, headers: seen }))
 }
 
 /** 每次 join 顺手清掉过期封禁，不起 setInterval（避免泄漏） */
@@ -538,9 +523,12 @@ const wss = new WebSocketServer({server, path: '/ws', maxPayload: 4096})
 
 wss.on('connection', (ws, req) => {
   let ip = 'unknown'
+  let nodeIp = null
   try {
-    ip = clientIp(req)
-    ipDebug(req, ip)
+    const ipInfo = clientIpInfo(req)
+    ip = ipInfo.clientIp
+    nodeIp = ipInfo.nodeIp
+    ipDebug(req, ipInfo)
     // 容量按「所有连接」算：只数 players 的话，握完手不 join 就能无限占连接
     if (sockets.size >= MAX_PLAYERS) {
       console.warn(JSON.stringify({scope:'rt-reject',reason:'full',ip,players:players.size,sockets:sockets.size}))
@@ -610,7 +598,7 @@ wss.on('connection', (ws, req) => {
       else ipCounts.delete(ip)
     }
     // 关闭原因必须留痕：线上「联机不稳定」时，没有这行就只能靠猜是超时、满员还是顶号
-    if (joined) console.log(JSON.stringify({scope:'rt-close',code:code??null,reason:String(reason??''),ip,uid:players.get(pid)?.uid??null,players:players.size}))
+    if (joined) console.log(JSON.stringify({scope:'rt-close',code:code??null,reason:String(reason??''),ip,nodeIp,uid:players.get(pid)?.uid??null,players:players.size}))
     if (joined) {
       const player=players.get(pid)
       // 竞态：旧 socket 的 close 晚到（新 socket 已经续连上了）——绝不能把活着的会话判死
@@ -678,6 +666,7 @@ wss.on('connection', (ws, req) => {
             delete p.dead
             delete p.deadAt
             p.ip = ip
+            p.nodeIp = nodeIp
             p.ua = clampStr(req.headers['user-agent'], 200)
             p.lastPos = 0            // 新连接的第一条 pos 不能被 MIN_POS_GAP_MS 挡掉
             ws.joined = true
@@ -722,7 +711,7 @@ wss.on('connection', (ws, req) => {
           console.log(JSON.stringify({scope: 'rt-replace', uid, oldId: previous.id, newId: id}))
         }
         const player = {
-          joinedAt:now(),ip,ua:clampStr(req.headers['user-agent'],200),positions:[],chats:0,
+          joinedAt:now(),ip,nodeIp,ua:clampStr(req.headers['user-agent'],200),positions:[],chats:0,
           id,
           ws,
           uid,

@@ -1,4 +1,4 @@
-import {type Env, Problem, cookie, hash, lifetime, limit, now, random, sessionAccount, sessionHash, unauthorized, invalid} from './auth'
+import {type Env, Problem, cookie, hash, lifetime, limit, now, random, requestIp, sessionAccount, sessionHash, unauthorized, invalid} from './auth'
 import {clearPending, socialRegister, isUniqueViolation, pendingCookie, pendingToken, safeAvatar} from './social'
 import {midnight, providers, type Provider} from './social-policy'
 
@@ -22,7 +22,7 @@ export async function oauthStart(env:Env,db:D1Database,request:Request,body:Reco
   if (!providers(env).includes(type)) throw new Problem(403,'social_disabled','该方式未启用')
   const account=intent==='login'?null:await sessionAccount(db,await sessionHash(request))
   if (intent!=='login' && !account?.verified) unauthorized()
-  const state=random(32), ip=request.headers.get('CF-Connecting-IP') || 'local'
+  const state=random(32), ip=requestIp(request,env)
   await limit(db,'oauth:start:'+ip,30,60)
   await db.batch([db.prepare('DELETE FROM social_states WHERE expires<=?').bind(now()),db.prepare("INSERT INTO social_states(channel,state,type,intent,user_id,expires,ip) VALUES('direct',?,?,?,?,?,?)").bind(state,type,intent,account?.id??null,now()+600,ip)])
   const params={response_type:'code',redirect_uri:callbackUrl(env,type,request),state}

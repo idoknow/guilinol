@@ -26,14 +26,31 @@ export async function record(pool,state,at=new Date()){
     for(const item of [...events.filter(event=>['join','leave'].includes(event.type)),...players]){
       sessions.set(item.id,item)
     }
+    const cleanIp=value=>{const s=typeof value==='string'?value.replace(/^::ffff:/,''):'';return isIP(s)?s:null}
     const lookup=await regions(client,[...sessions.values()])
     const rows=[...sessions.values()].map(item=>({id:item.id,uid:item.uid,name:item.name,joined_at:new Date(item.joinedAt),
-      left_at:item.type==='leave'?new Date(item.ts):null,last_seen:new Date(item.ts??at),reason:item.reason,close_code:item.closeCode,region:lookup(item.ip)}))
-    await client.query(`insert into mp_sessions select $1,s.* from jsonb_to_recordset($2) as s(id text,uid bigint,name text,
-      joined_at timestamptz,left_at timestamptz,last_seen timestamptz,reason text,close_code integer,region jsonb)
-      on conflict(instance,id) do update set left_at=coalesce(excluded.left_at,mp_sessions.left_at),
-      reason=coalesce(excluded.reason,mp_sessions.reason),close_code=coalesce(excluded.close_code,mp_sessions.close_code),
-      last_seen=greatest(mp_sessions.last_seen,excluded.last_seen)`,[instance,JSON.stringify(rows)])
+      left_at:item.type==='leave'?new Date(item.ts):null,last_seen:new Date(item.ts??at),reason:item.reason,close_code:item.closeCode,region:lookup(item.ip),
+      client_ip:cleanIp(item.ip),node_ip:cleanIp(item.nodeIp)}))
+    await client.query('savepoint mp_ip_cols')
+    try{
+      await client.query(`insert into mp_sessions(instance,id,uid,name,joined_at,left_at,last_seen,reason,close_code,region,client_ip,node_ip)
+        select $1,s.* from jsonb_to_recordset($2) as s(id text,uid bigint,name text,
+        joined_at timestamptz,left_at timestamptz,last_seen timestamptz,reason text,close_code integer,region jsonb,client_ip text,node_ip text)
+        on conflict(instance,id) do update set left_at=coalesce(excluded.left_at,mp_sessions.left_at),
+        reason=coalesce(excluded.reason,mp_sessions.reason),close_code=coalesce(excluded.close_code,mp_sessions.close_code),
+        last_seen=greatest(mp_sessions.last_seen,excluded.last_seen),
+        client_ip=coalesce(excluded.client_ip,mp_sessions.client_ip),node_ip=coalesce(excluded.node_ip,mp_sessions.node_ip)`,[instance,JSON.stringify(rows)])
+      await client.query('release savepoint mp_ip_cols')
+    }catch(error){
+      if(error?.code!=='42703')throw error
+      await client.query('rollback to savepoint mp_ip_cols')
+      await client.query(`insert into mp_sessions select $1,s.* from jsonb_to_recordset($2) as s(id text,uid bigint,name text,
+        joined_at timestamptz,left_at timestamptz,last_seen timestamptz,reason text,close_code integer,region jsonb)
+        on conflict(instance,id) do update set left_at=coalesce(excluded.left_at,mp_sessions.left_at),
+        reason=coalesce(excluded.reason,mp_sessions.reason),close_code=coalesce(excluded.close_code,mp_sessions.close_code),
+        last_seen=greatest(mp_sessions.last_seen,excluded.last_seen)`,[instance,JSON.stringify(rows)])
+      await client.query('release savepoint mp_ip_cols')
+    }
     await client.query(`update mp_sessions set left_at=last_seen,reason='lost observation' where left_at is null
       and (instance<>$1 or not(id=any($2::text[])))`,[instance,players.map(player=>player.id)])
     await client.query(`insert into mp_online_hour select date_trunc('hour',ts),avg(online),max(online),

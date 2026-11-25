@@ -16,8 +16,8 @@ export function packet(ws,direction,type,bytes){
   if(direction==='out'){winOut++;winOutBytes+=bytes}
 }
 export function event(type,player={},extra={}){
-  const {id,uid=null,name='',joinedAt,ip}=player,ts=Date.now()
-  append(events,{ts,type,id,uid,name,joinedAt,ip,durationSec:joinedAt?Math.floor((ts-joinedAt)/1000):null,...extra},300)
+  const {id,uid=null,name='',joinedAt,ip,nodeIp=null}=player,ts=Date.now()
+  append(events,{ts,type,id,uid,name,joinedAt,ip,nodeIp,durationSec:joinedAt?Math.floor((ts-joinedAt)/1000):null,...extra},300)
 }
 export function reject(reason,player){rejects[reason]++;event('reject',player,{reason})}
 export function joined(player,online){event('join',player);if(online>peak){peak=online;peakAt=Date.now()}}
@@ -32,9 +32,9 @@ export function state(players,sockets,bans,proto,maxPlayers){
   const {rss,heapUsed}=process.memoryUsage()
   return {server:{startedAt,uptimeSec:Math.floor((now-startedAt)/1000),proto,maxPlayers,online:players.size,connections:sockets.size,
     peak,peakAt,rssMb:rss/1048576,heapMb:heapUsed/1048576,loopP50Ms:delay.percentile(50)/1e6,loopP99Ms:delay.percentile(99)/1e6,traffic,skips,slowCloses,rejects},
-    players:[...players.values()].map(({id,uid,name,x,y,z,yaw,bike,hb,v,hp,dn,sc,em,emoteUntil,joinedAt,lastPos,positions,ws,chats,ip,ua})=>({
+    players:[...players.values()].map(({id,uid,name,x,y,z,yaw,bike,hb,v,hp,dn,sc,em,emoteUntil,joinedAt,lastPos,positions,ws,chats,ip,nodeIp=null,ua})=>({
       id,uid,name,x,y,z,yaw,mode:bike||hb?'bike':'walk',v,hp,dn,sc,em:now<emoteUntil?em:0,joinedAt,lastPosAt:lastPos||null,posHz:positions.filter(ts=>ts>now-10000).length/10,
-      inBytes:ws.inBytes??0,outBytes:ws.outBytes??0,bufferedAmount:ws.bufferedAmount,skips:ws.skipped??0,rttMs:ws.rtt??null,avgRttMs:ws.meanRtt??null,chats,ip,ua})),
+      inBytes:ws.inBytes??0,outBytes:ws.outBytes??0,bufferedAmount:ws.bufferedAmount,skips:ws.skipped??0,rttMs:ws.rtt??null,avgRttMs:ws.meanRtt??null,chats,ip,nodeIp,ua})),
     bans:[...bans].map(([uid,ban])=>({uid,...ban})),events,chat}
 }
 

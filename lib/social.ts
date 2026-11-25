@@ -1,5 +1,5 @@
 import {allowLegacy,providers,schedule} from './social-policy'
-import { type Env, type BanState, checkBan, sessionAccount, Problem, cookie, deliver, equal, hash, invalid, lifetime, limit, newCode, now, passwordHash, random, reserveMail, sessionHash } from './auth'
+import { type Env, type BanState, checkBan, sessionAccount, Problem, cookie, deliver, equal, hash, invalid, lifetime, limit, newCode, now, passwordHash, random, requestIp, reserveMail, sessionHash } from './auth'
 
 /**
  * 聚合登录（https://login.mapay.cn/doc.php）接入层。
@@ -316,7 +316,7 @@ export async function socialCallback(env: Env, db: D1Database, request: Request)
     return back('invalid')
 
   try {
-    await limit(db, `social:callback:${request.headers.get('CF-Connecting-IP') ?? 'local'}`, 20, 60)
+    await limit(db, `social:callback:${requestIp(request, env)}`, 20, 60)
   } catch {
     return back('busy')
   }
@@ -639,7 +639,7 @@ export async function socialRegister(env: Env, db: D1Database, request: Request,
   const email = typeof body.email === 'string' ? body.email.trim().toLowerCase() : ''
   const password = typeof body.password === 'string' ? body.password : ''
   const nickname = ((typeof body.nickname === 'string' ? body.nickname : '') || row.nickname || '新用户').trim().slice(0, 32)
-  const ip = request.headers.get('CF-Connecting-IP') ?? 'local'
+  const ip = requestIp(request, env)
 
   // 邮箱/密码都不填：直接用第三方注册，不强制绑定邮箱（账号用占位邮箱，之后可再绑）
   if (!email && !password) {
@@ -776,7 +776,7 @@ export async function bindEmail(
   if (owner && owner.id !== account.id) throw new Problem(409, 'email_taken', '该邮箱已被其他账号使用')
 
   if (typeof body.code !== 'string' || !/^\d{6}$/.test(body.code)) {
-    await reserveMail(db, email, request.headers.get('CF-Connecting-IP') ?? 'local')
+    await reserveMail(db, email, requestIp(request, env))
     const code = newCode()
     await db
       .prepare(

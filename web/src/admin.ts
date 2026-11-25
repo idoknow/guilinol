@@ -326,7 +326,9 @@ window.addEventListener('popstate', (event) => {
 })
 function rangeWindow() {
   const key = Object.hasOwn(ranges, params.get('range') ?? '') ? params.get('range')! : '24h'
-  const to = Math.ceil(Date.now() / 60000) * 60000
+  // 24h 及以上窗口按 5 分钟向上对齐，保证页内/跨页/多人访问共享服务端 2m TTL + 15m stale 缓存 key
+  const snap = ranges[key].ms >= 86400e3 ? 300000 : 60000
+  const to = Math.ceil(Date.now() / snap) * snap
   return { key, ...ranges[key], from: new Date(to - ranges[key].ms).toISOString(), to: new Date(to).toISOString() }
 }
 const rangeQuery = (extra: Record<string, string> = {}) => {
