@@ -8,10 +8,12 @@ import {onPrefs, prefs} from './prefs'
 // 默认空手；按 1 / 2 或点格子切换。只有选中「相机」时手上才拿机身、右臂才抬到胸前。
 // 每次进游戏都从空手开始，不记忆。
 
-export type HotbarSlot = 'hand' | 'camera' | 'smoke'
+export type HotbarSlot = 'hand' | 'camera' | 'smoke' | 'fishing'
 
 let slot: HotbarSlot = 'hand'
 let bar: HTMLElement | null = null
+let fishingButton:HTMLButtonElement|null=null
+export function showFishingSlot(near:boolean){if(fishingButton&&fishingButton.hidden===near)fishingButton.hidden=!near}
 
 /** street-hud 在徒步时写 data-ride=foot，骑车 / 开车 / 坐船时写交通工具种类。 */
 export function riding() {
@@ -24,6 +26,7 @@ export function hotbarSlot(): HotbarSlot {
 }
 
 export function selectSlot(next: HotbarSlot) {
+  if (slot === 'fishing' && next !== slot) window.dispatchEvent(new Event('fishing:cancel'))
   if (slot === 'smoke' && next !== slot) window.dispatchEvent(new Event('smoke:cancel'))
   slot = next
   if (!bar) return
@@ -36,6 +39,7 @@ export function selectSlot(next: HotbarSlot) {
 
 /** 每帧调用：只在徒步、且没有被拍照 / 相机包 / 骑行等界面占用时显示。 */
 export function showHotbar(on: boolean) {
+  if (!on && slot === 'fishing') selectSlot('hand')
   if (!bar) return
   if (bar.hidden === !on) return
   bar.hidden = !on
@@ -74,11 +78,13 @@ export function mountHotbar() {
     window.addEventListener('glol:save-written',refresh)
     bar.querySelector('[data-shop]')!.addEventListener('click',()=>window.dispatchEvent(new Event('smoke:shop')))
   }
+  bar.insertAdjacentHTML('beforeend','<button hidden type="button" class="hotbar-slot" data-slot="fishing"><kbd>4</kbd><span>鱼竿</span></button>')
+  fishingButton=bar.querySelector('[data-slot=fishing]')
   for (const button of Array.from(bar.querySelectorAll<HTMLButtonElement>('.hotbar-slot'))) {
-    // 不抢焦点：点完格子 WASD 还能继续走。
     button.addEventListener('pointerdown', event => event.preventDefault())
     if (button.dataset.slot) button.addEventListener('click', () => {
       if (button.dataset.slot === 'smoke') window.dispatchEvent(new Event('smoke:slot'))
+      else if(button.dataset.slot==='fishing')window.dispatchEvent(new Event('fishing:slot'))
       else selectSlot(button.dataset.slot as HotbarSlot)
     })
   }
@@ -91,6 +97,7 @@ export function mountHotbar() {
     if (event.code === 'Digit3' && smokeEnabled()) window.dispatchEvent(new Event('smoke:slot'))
     else if (event.code === 'Digit1') selectSlot('hand')
     else if (event.code === 'Digit2') selectSlot('camera')
+    else if (event.code === 'Digit4') window.dispatchEvent(new Event('fishing:slot'))
   })
   const label = () => {
     const name = camera(prefs().gear.equipped)?.name

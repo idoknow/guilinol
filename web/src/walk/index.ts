@@ -3,7 +3,8 @@ import {emoteWheel} from '../emote/wheel'
 import {emotePlayback} from '../emote/playback'
 import {interrupted,emotesEnabled} from '../emote/emotes'
 import {takeCigaretteIntent, smokeEnabled} from '../citizen/use-item'
-import {selectSlot,hotbarSlot,showSmokeDiscard} from '../ui/hotbar'
+import {selectSlot,hotbarSlot,showSmokeDiscard,showFishingSlot} from '../ui/hotbar'
+import fishingShores from '../fishing/shores.json'
 import {getActiveSaveSnapshot,takeFromPack} from '../game/save'
 import {rules,validRules} from '../smoke/data'
 import {createSmokePrompt} from '../smoke/prompt'
@@ -1137,6 +1138,15 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
     bicyclePedalPhase=0;bicycleFootWeight=1
     prevAudioPark=false;prevAudioGear=2;prevAudioLight='off';prevAudioBlink=false;prevAudioHorn=false
   }
+  let fishing:ReturnType<typeof import('../fishing/session').createFishing>|undefined
+  let fishingLoad:Promise<NonNullable<typeof fishing>>|undefined
+  const loadFishing=()=>fishingLoad??=import('../fishing/session').then(module=>fishing=module.createFishing({
+    canUse:()=>active&&!rides?.bike&&!rides?.boat&&!rides?.car&&!shopOverlay?.isOpen()&&!document.querySelector('.hotbar[hidden]'),
+    position:()=>sim.body.translation(),face:(angle)=>{yaw=angle+Math.PI;facing=yaw+avatar.yaw;figure.rotation.y=facing},
+    teleport:(x,z,angle)=>enter(x,z,angle,'fishing'),hand:()=>avatarRig.attachmentAt?.('hand_r')??figure.getObjectByName('hand_r'),scene,camera,
+  },verify))
+  window.addEventListener('fishing:slot',()=>{void loadFishing().then(session=>session.toggle())})
+  if(verify)Object.assign(window,{fishing:{teleportToSpot:async(id:string)=>(await loadFishing()).teleportToSpot(id)}})
   const footMetrics={soleOffset:avatarRig.soleOffset,footProbes:avatarRig.footProbes}
   let firstPersonHidden=false
   scene.add(figure);figure.visible=false;figure.scale.setScalar(1)
@@ -1943,6 +1953,7 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
   function tick(dt:number){wheel.sync();if(!active)return;emote.reset();holdLayer.reset();
     if(emote.id&&(rides?.boat||rides?.car||rides?.bike)){emote.stop();emote.tick(.24,false)}
     smoking?.resetPose();const before=performance.now(),start=rides?.boat?.position??sim.body.translation();syncSceneObstacleVolumes();sim.sync(start.x,start.z,true);const footYNow=rides?.boat?start.y:start.y-cfg.height/2;rides?.nearby(start.x,start.z,footYNow);interactArbiter.sync(actionButton);syncGameTravelState();updateShopHintRings(start.x,start.z,footYNow)
+    showFishingSlot(!rides?.bike&&!rides?.boat&&!rides?.car&&fishingShores.some(({spot,radius})=>Math.abs(start.x-spot.x)<=radius&&Math.hypot(start.x-spot.x,start.z-spot.z)<=radius))
     if(cigarette.active && (rides?.bike||rides?.boat||rides?.car)){
       cancelSmoke()
       smoking?.tick(dt,cigarette.view(),false)
@@ -2001,12 +2012,13 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
     if((rides?.car||rides?.bike)&&!vehicleCollisionReady(start.x,start.y,start.z)){
       rides.stop();vx=vz=accumulator=0;bikeObstacle='streaming';return
     }
-    const read=input.read(dt),keys=held?still:read
+    const fishingOnFoot=hotbarSlot()==='fishing'&&!rides?.bike&&!rides?.boat&&!rides?.car
+    const read=input.read(dt),keys=held||fishingOnFoot?still:read
     const rideCtrl=held?ZERO_RIDE_INPUT:input.readRideControls()
     const busyFootAnim=!!(standUpSession||pickupSession)
     wish.set(keys.right*Math.cos(yaw)-keys.forward*Math.sin(yaw),-keys.forward*Math.cos(yaw)-keys.right*Math.sin(yaw))
     if(external)wish.set(external.x,external.z)
-    if(busyFootAnim)wish.set(0,0)
+    if(busyFootAnim||fishingOnFoot)wish.set(0,0)
     const rawLen=wish.length(), inputMag=busyFootAnim?0:Math.min(1,rawLen)
     if(rawLen>1e-5)wish.divideScalar(rawLen);else wish.set(0,0)
     const maxSpeed=(external?external.run:keys.run)?cfg.run:(keys.crouch&&grounded)?cfg.crouch:cfg.walk
@@ -2717,6 +2729,7 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
     if(!standUpSession&&!pickupSession)mixer.update(dt)
     applyCameraHold(dt)
     follow(dt)
+    fishing?.tick(dt)
     if(cigarette.active&&!smoking)smoking=smokeVisual(scene,figure,camera)
     if(smoking){
       showSmokeDiscard(cigarette.inMouth)
@@ -2737,7 +2750,7 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
   let holdAim={...DEFAULT_CAMERA_HOLD_AIM}
   const holdLayer=cameraHoldLayer(figure),holdTarget=holdLayer.target,holdEffector=new THREE.Vector3()
   function applyCameraHold(dt:number){
-    const target=cameraHold?1:0
+    const target=cameraHold||hotbarSlot()==='fishing'?1:0
     camHoldBlend+=Math.sign(target-camHoldBlend)*Math.min(Math.abs(target-camHoldBlend),Math.max(dt,.001)*5)
     holdLayer.apply(camHoldBlend,holdAim)
   }
