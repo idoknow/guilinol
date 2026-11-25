@@ -2377,6 +2377,15 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
       if(spatialSubs===1){
         sim.controller.computeColliderMovement(sim.capsule,{x:stepDx,y:velocity*step,z:stepDz},undefined,undefined,filterRoad)
         move=sim.controller.computedMovement()
+        // At city-scale coordinates a downward-biased capsule sweep can stop
+        // on a coplanar triangle with no obstacle ahead. Retry the horizontal
+        // part against the same colliders when the only contact is the floor.
+        if(!aboardGround&&grounded&&horzDist>.012&&Math.hypot(move.x,move.z)<.1*horzDist&&
+           sim.controller.numComputedCollisions()===1&&sim.controller.computedCollision(0)!.normal1.y>.995){
+          sim.controller.computeColliderMovement(sim.capsule,{x:stepDx,y:0,z:stepDz},undefined,undefined,filterRoad)
+          const horizontal=sim.controller.computedMovement()
+          move=horizontal
+        }
         next={x:pos.x+move.x,y:pos.y+move.y,z:pos.z+move.z}
         if(rides?.bike&&Math.abs(bikeSpeed)>1e-4){
           const bikeSign=bikeSpeed>=0?1:-1,dirX=wish.x*bikeSign,dirZ=wish.y*bikeSign
