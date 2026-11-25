@@ -54,16 +54,27 @@ def grade_station(
     z = top + GRID * np.arange(start[1], stop[1])[:, None]
     window = np.s_[start[1] : stop[1], start[0] : stop[0]]
     extent = box(x[0], z[0, 0], x[-1], z[-1, 0])
-    rails = []
+    from station_roads import half_width
+    from traffic import MOTOR
+
+    corridors = [carriageways.intersection(extent), sidewalks.intersection(extent)]
     for way in load_osm():
-        if way.get("tags", {}).get("railway") == "rail" and way["type"] == "way":
-            line = LineString(points(way))
-            if line.intersects(extent):
-                rails.append(line.buffer(9))
-    protected = union_all(
-        [carriageways.intersection(extent), sidewalks.intersection(extent), *rails]
-    )
-    locked = intersects_xy(protected.buffer(10), x, z) | (water[window] != -32768)
+        tags = way.get("tags", {})
+        if way["type"] != "way":
+            continue
+        rail = tags.get("railway") == "rail"
+        motor = tags.get("highway", "").removesuffix("_link") in MOTOR
+        if not (rail or motor):
+            continue
+        coords = points(way)
+        if len(coords) < 2:
+            continue
+        line = LineString(coords)
+        if line.intersects(extent):
+            corridors.append(line.buffer(9 if rail else half_width(way)))
+    # Traffic and collision interpolate across the coarser chunk-edge stencil.
+    protected = union_all(corridors).buffer(32)
+    locked = intersects_xy(protected, x, z) | (water[window] != -32768)
     distance = distance_transform_edt(~locked) * GRID
     weight = np.clip(distance / 18, 0, 1) * np.clip(
         (radius - np.hypot(x - east, z - south)) / 80, 0, 1
@@ -101,11 +112,14 @@ def station_paving(plazas, bounds):
     planting = union_all([survey["planter-north"], survey["planter-south"]])
     # The retired hall outline and the open-sided bus shelter must not clip
     # the continuous sidewalk, bike lane or tactile strips passing beneath them.
-    former_shells = [area(e) for e in load_osm()
-                     if e["type"] == "way" and e["id"] in (819178841, 1017598916)]
+    former_shells = {e["id"]: area(e) for e in load_osm()
+                     if e["type"] == "way" and e["id"] in (819178841, 1017598916)}
     solid = union_all([survey[k] for k in ("wall", "north-wing", "south-wing")])
-    open_ground = union_all(former_shells).buffer(0.05).difference(solid)
-    return other, [survey["plaza"].difference(planting)], [survey["taxi"]], open_ground
+    open_ground = union_all(list(former_shells.values())).buffer(0.05).difference(solid)
+    walk = [survey["plaza"].difference(planting)]
+    if 1017598916 in former_shells:
+        walk.append(former_shells[1017598916].buffer(1.15, join_style="mitre"))
+    return other, walk, [survey["taxi"]], open_ground
 
 
 def mark_station_tiles(chunks):
