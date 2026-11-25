@@ -298,7 +298,14 @@ def grade_traffic(directory, manifest, profiles):
     graph_path = directory/'roads'/'graph.json.gz'
     graph = json.loads(gzip.decompress(graph_path.read_bytes()))
     owners = {}
-    for way,_,_ in profiles.values():
+    roads = [way for way, _, _ in profiles.values()]
+    # The north access road skirts the replaced station building. Its traffic
+    # follows the finished native pavement, which can sit above the DEM.
+    north_access = next((way for way in load_osm()
+                         if way['type'] == 'way' and way['id'] == 1017598913), None)
+    if north_access is not None:
+        roads.append(north_access)
+    for way in roads:
         for a,b in zip(way['nodes'],way['nodes'][1:]):
             owners[a,b]=owners[b,a]=way
     lanes = []

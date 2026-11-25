@@ -5,6 +5,7 @@
   "license": "BUSL-1.1",
   "type": "module",
   "scripts": {
+    "verify:fishing": "node --import tsx --test scripts/test-fishing-grades.mjs scripts/test-fishing-inventory.mjs && node scripts/verify-fishing.mjs",
     "world:dev": "node scripts/world-dev.mjs",
     "refpack": "uv run --locked python pipeline/fetch_city_ref.py",
     "verify:mp": "node scripts/verify-mp.mjs",

@@ -89,7 +89,10 @@ export interface SaveMetaBlock {
   migratedLegacyStamps: boolean
 }
 
+import {emptyFishing, readFishing, type FishingSave} from '../fishing/save-block'
+
 export interface LocalSaveV1 {
+  fishing: FishingSave
   [AVATAR_KEY]?: Avatar
   schemaVersion: 2
   money: number
@@ -297,6 +300,7 @@ function sanitizeTxRing(raw: unknown, limit = TX_HISTORY_RING_LIMIT): LedgerTxRe
 
 export function createDefaultSave(nowMs = Date.now()): LocalSaveV1 {
   return {
+    fishing: emptyFishing(),
     schemaVersion: SAVE_SCHEMA_VERSION,
     packs: [],
     money: DEFAULT_START_MONEY,
@@ -335,6 +339,7 @@ export function cloneSave(save: LocalSaveV1): LocalSaveV1 {
   }
   return {
     schemaVersion: SAVE_SCHEMA_VERSION,
+    fishing: structuredClone(save.fishing ?? emptyFishing()),
     [AVATAR_KEY]: sanitizeAvatar(save[AVATAR_KEY]),
     packs: readPacks(save.packs),
     money: save.money,
@@ -480,6 +485,7 @@ export function sanitizeSave(raw: unknown, nowMs = Date.now()): {save: LocalSave
   const migratedLegacyStamps = rawMeta && typeof rawMeta.migratedLegacyStamps === 'boolean' ? rawMeta.migratedLegacyStamps : false
 
   const save: LocalSaveV1 = {
+    fishing: readFishing(raw.fishing),
     schemaVersion: SAVE_SCHEMA_VERSION,
     money,
     owned: mirrorOwnedModels(vehicles, rawOwned),
@@ -838,6 +844,7 @@ export function mergeCloudAndLocalSave(localRaw: LocalSaveV1, cloudRaw: LocalSav
   const mergedMoney = clampMoney(newer.money + Math.min(unsyncedRewardDelta, 20_000), newer.money)
 
   const merged: LocalSaveV1 = {
+    fishing: readFishing(newer.fishing),
     schemaVersion: SAVE_SCHEMA_VERSION,
     [AVATAR_KEY]: newer[AVATAR_KEY] ?? older[AVATAR_KEY],
     packs: readPacks(newer.packs),

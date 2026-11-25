@@ -102,7 +102,10 @@ def building_cutouts(ways, footprints, heights, index):
     from shapely import union_all
 
     occupied = defaultdict(list)
-    for face, level in fallback_north_faces(ways):
+    platforms = {w['id']: w for w in ways if w['type'] == 'way' and w['id'] in NORTH_FLIGHTS}
+    if platforms.keys() != NORTH_FLIGHTS.keys():
+        return {}
+    for face, level in north_bridge(platforms):
         for key in index.query(face, predicate='intersects'):
             base, roof = heights[key][:2]
             if base < level + 2.2 and roof > level - .6:

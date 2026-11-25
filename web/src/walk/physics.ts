@@ -657,8 +657,35 @@ export async function createPhysics(manifest:Manifest,stream:Stream,peaks:PeaksG
   function withinBounds(x:number,z:number){
     return inRegion(manifest,x,z)
   }
-  function findWalkableSpawn(east:number,south:number,override=false,dryOnly=false){
-    for(const {dx,dz} of override?[candidates[0]]:candidates){const x=east+dx,z=south+dz,tile=tileAt(x,z)
+  function tryPreferredLandmark(x:number,z:number,tile:Tile,dx:number,dz:number,dryOnly:boolean,preferY:number){
+    const preferred=surface(x,z,'landmark',preferY+1,2)
+    if(!preferred||preferred.slope>cfg.slope||preferred.y<preferY-1-1e-4||preferred.y>preferY+1+1e-4)return null
+    if(insideHouse(x,z,preferred.y+.5))return null
+    if(wet(x,z)){
+      if(dryOnly)return null
+      const data=stream.loaded.get(tile),waterAt=data?data.water[Math.round((z-tile.z)/4)*65+Math.round((x-tile.x)/4)]:-32768
+      const waterY=waterAt===-32768?-Infinity:waterAt/10
+      if(preferred.y<waterY+.1)return null
+    }
+    const peak=surface(x,z,'peak');if(peak&&peak.y>preferred.y+.05)return null
+    const y=preferred.y+cfg.height/2+.055
+    if(world.intersectionWithShape({x,y,z},identity,shape,undefined,undefined,capsule))return null
+    const deck=surface(x,z,'deck')
+    return {x,y,z,rule:(dx||dz?'search-':'')+(deck||wet(x,z)?'bridge':'land')}
+  }
+  function findWalkableSpawn(east:number,south:number,override=false,dryOnly=false,preferY?:number){
+    const offsets=override?[candidates[0]]:candidates
+    if(preferY!==undefined&&Number.isFinite(preferY)&&landmarks.size){
+      for(const {dx,dz} of offsets){const x=east+dx,z=south+dz,tile=tileAt(x,z)
+        if(!withinBounds(x,z)||!tile||!stream.loaded.has(tile)||(dryOnly&&wet(x,z)))continue
+        let inBox=false
+        for(const b of landmarkBounds.values()){if(x>=b.minX&&x<=b.maxX&&z>=b.minZ&&z<=b.maxZ){inBox=true;break}}
+        if(!inBox)continue
+        const hit=tryPreferredLandmark(x,z,tile,dx,dz,dryOnly,preferY)
+        if(hit)return hit
+      }
+    }
+    for(const {dx,dz} of offsets){const x=east+dx,z=south+dz,tile=tileAt(x,z)
       if(!withinBounds(x,z)||!tile||!stream.loaded.has(tile)||(dryOnly&&wet(x,z))||insideHouse(x,z))continue
       const deck=surface(x,z,'deck'),support=deck??surface(x,z,'sidewalk')??surface(x,z,'road')??surface(x,z,'ground');if(!support||support.slope>cfg.slope||(!deck&&wet(x,z)))continue
       const peak=surface(x,z,'peak');if(peak&&peak.y>support.y+.05)continue
