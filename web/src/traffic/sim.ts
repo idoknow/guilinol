@@ -1,6 +1,7 @@
 import {axleHeight,contactPose} from './lane-surface.ts'
 import {nearStatic,resolveContact,staticSolids,pickups,type Solid} from './contact.ts'
 import {CAR_SCALE} from '../drive/scale.ts'
+import {clampOutsideShizijieNoPedZone,isInShizijieNoPedZone,segmentHitsShizijieNoPedZone} from '../shizijie-zone.ts'
 type Node = {id:number,x:number,y:number,z:number}
 type Lane = {id:number,from:number,to:number,offset:number,width?:number,kind:'motor'|'bus'|'nonmotor',speedKmh:number,cls?:string,street?:string,npcWalks?:number[][],heights?:number[],floor?:string}
 type Phase = {lanes:number[],green:number,yellow:number}
@@ -104,13 +105,25 @@ export class Traffic {
       const nx=-track.dz,nz=track.dx
       const sampleOk=(shift:number)=>{
         for(const t of [.2,.5,.8]){
-          const ks=this.surfaceAt!(track.start.x+track.dx*track.length*t+nx*shift,track.start.z+track.dz*track.length*t+nz*shift)
+          const px=track.start.x+track.dx*track.length*t+nx*shift,pz=track.start.z+track.dz*track.length*t+nz*shift
+          if(isInShizijieNoPedZone(px,pz))return false
+          const ks=this.surfaceAt!(px,pz)
           if(ks&&!isSafeWalkSurface(ks))return false
         }
         return true
       }
       if(maxD>0&&!sampleOk(maxD))maxD=sampleOk(maxD*.5)?maxD*.5:0
       if(minD<0&&!sampleOk(minD))minD=sampleOk(minD*.5)?minD*.5:0
+    }else{
+      const nx=-track.dz,nz=track.dx
+      const shizijieOk=(shift:number)=>{
+        for(const t of [.2,.5,.8]){
+          if(isInShizijieNoPedZone(track.start.x+track.dx*track.length*t+nx*shift,track.start.z+track.dz*track.length*t+nz*shift))return false
+        }
+        return true
+      }
+      if(maxD>0&&!shizijieOk(maxD))maxD=shizijieOk(maxD*.5)?maxD*.5:0
+      if(minD<0&&!shizijieOk(minD))minD=shizijieOk(minD*.5)?minD*.5:0
     }
     track.dodgeMin=minD;track.dodgeMax=maxD
     const cls=(track.cls??'').replace(/_link$/,'')
@@ -165,7 +178,7 @@ export class Traffic {
       }
       return true
     }
-    if(checkAllSafe(track.start.x,track.start.z,track.end.x,track.end.z)){
+    if(!segmentHitsShizijieNoPedZone(track.start.x,track.start.z,track.end.x,track.end.z)&&checkAllSafe(track.start.x,track.start.z,track.end.x,track.end.z)){
       this.computeWalkSafety(track)
       if(track.pairTrack)this.computeWalkSafety(track.pairTrack)
       return mark('ok')
@@ -173,6 +186,7 @@ export class Traffic {
     const wdx=track.dx,wdz=track.dz,nx=-wdz,nz=wdx
     const outSign=track.outwardSign??1
     const safePt=(px:number,pz:number)=>{
+      if(isInShizijieNoPedZone(px,pz))return false
       const ks=lookup(px,pz)
       return !!ks&&isSafeWalkSurface(ks)&&!this.hitsMotorLane(px,pz,MOTOR_CLEARANCE)&&!this.sideClearances(px,pz,wdx,wdz).betweenMotors
     }
@@ -199,7 +213,7 @@ export class Traffic {
         if(l>bestLen){bestLen=l;bestSeg=seg}
       }
     }
-    if(!bestSeg||!this.updateTrackGeometry(track,bestSeg[0],bestSeg[1],bestSeg[2],bestSeg[3]))return mark('rejected')
+    if(!bestSeg||segmentHitsShizijieNoPedZone(bestSeg[0],bestSeg[1],bestSeg[2],bestSeg[3])||!this.updateTrackGeometry(track,bestSeg[0],bestSeg[1],bestSeg[2],bestSeg[3]))return mark('rejected')
     for(const actor of this.actors){
       if(actor.track===track||actor.track===track.pairTrack){
         actor.dist=Math.min(actor.dist,Math.max(0,actor.track.length-.1))
@@ -319,7 +333,7 @@ export class Traffic {
         const wLen=Math.hypot(east-x,south-z)
         if(wLen<WALK_MIN_LEN)continue
         const wdx=(east-x)/wLen,wdz=(south-z)/wLen
-        let segs=this.extractSafeSegments(x,z,east,south,(px,pz)=>!this.hitsMotorLane(px,pz,MOTOR_CLEARANCE)&&!this.sideClearances(px,pz,wdx,wdz).betweenMotors)
+        let segs=this.extractSafeSegments(x,z,east,south,(px,pz)=>!isInShizijieNoPedZone(px,pz)&&!this.hitsMotorLane(px,pz,MOTOR_CLEARANCE)&&!this.sideClearances(px,pz,wdx,wdz).betweenMotors)
         // Fallback ONLY for roads where a stale walk centerline falls directly inside the carriageway
         // (never push divided-road median tracks blindly into off-sidewalk ground).
         if(!segs.length){
@@ -330,7 +344,7 @@ export class Traffic {
             for(const sign of [1,-1] as const){
               const sx=sign*nx*shift,sz=sign*nz*shift
               const shifted=this.extractSafeSegments(x+sx,z+sz,east+sx,south+sz,(px,pz)=>{
-                if(this.hitsMotorLane(px,pz,MOTOR_CLEARANCE)||this.sideClearances(px,pz,wdx,wdz).betweenMotors)return false
+                if(isInShizijieNoPedZone(px,pz)||this.hitsMotorLane(px,pz,MOTOR_CLEARANCE)||this.sideClearances(px,pz,wdx,wdz).betweenMotors)return false
                 if(this.surfaceAt){const ks=this.surfaceAt(px,pz);if(ks&&!isSafeWalkSurface(ks))return false}
                 return true
               })
@@ -339,6 +353,7 @@ export class Traffic {
           }
         }
         for(const [sx,sz,ex,ez] of segs){
+          if(segmentHitsShizijieNoPedZone(sx,sz,ex,ez))continue
           const from=synthNodeId--,to=synthNodeId--
           nodes.set(from,{id:from,x:sx,z:sz,y:yAt(sx,sz)});nodes.set(to,{id:to,x:ex,z:ez,y:yAt(ex,ez)})
           const fwd=add({from,to,id:from,offset:0,cls:lane.cls,street:lane.street,kind:'nonmotor',speedKmh:5},true)
@@ -364,7 +379,9 @@ export class Traffic {
           const dist=Math.max(0,Math.min(next.length,(x-next.start.x)*next.dx+(z-next.start.z)*next.dz))
           const remaining=next.length-dist
           if(remaining<WALK_MIN_LEN||(best&&remaining<=best.remaining))continue
-          if(Math.hypot(next.start.x+dist*next.dx-x,next.start.z+dist*next.dz-z)>tolerance)continue
+          const nxPt=next.start.x+dist*next.dx,nzPt=next.start.z+dist*next.dz
+          if(Math.hypot(nxPt-x,nzPt-z)>tolerance)continue
+          if(segmentHitsShizijieNoPedZone(next.start.x,next.start.z,next.end.x,next.end.z)||segmentHitsShizijieNoPedZone(x,z,nxPt,nzPt))continue
           if(Math.abs(trackHeight(next,dist)-trackHeight(track,track.length))>tolerance)continue
           best={track:next,dist,remaining}
         }
@@ -390,12 +407,16 @@ export class Traffic {
     }
     actor.x=track.start.x+track.dx*dist-track.dz*(track.offset+actor.dodge)
     actor.z=track.start.z+track.dz*dist+track.dx*(track.offset+actor.dodge)
-    if(actor.kind==='person'&&actor.dodge!==0&&(track.tightEdge||this.surfaceAt)){
+    if(actor.kind==='person'&&(actor.dodge!==0&&(track.tightEdge||this.surfaceAt)||isInShizijieNoPedZone(actor.x,actor.z))){
       const ks=this.surfaceAt?.(actor.x,actor.z)
-      if((track.tightEdge&&this.hitsMotorLane(actor.x,actor.z,.35))||(ks&&!isSafeWalkSurface(ks))){
+      if((track.tightEdge&&this.hitsMotorLane(actor.x,actor.z,.35))||(ks&&!isSafeWalkSurface(ks))||isInShizijieNoPedZone(actor.x,actor.z)){
         actor.dodge=0
         actor.x=track.start.x+track.dx*dist-track.dz*track.offset
         actor.z=track.start.z+track.dz*dist+track.dx*track.offset
+        if(isInShizijieNoPedZone(actor.x,actor.z)){
+          const [cx,cz]=clampOutsideShizijieNoPedZone(actor.x,actor.z,.3)
+          actor.x=cx;actor.z=cz
+        }
       }
     }
     if(track.floor){
