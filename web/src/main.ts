@@ -26,7 +26,17 @@ import {skyClock} from './ui/sky'
 import type {Host} from './play/host'
 import {streamIndicator,veil,type FullLoader,type Veil} from './ui/loading'
 import {loadTiles} from './look/tiles'
+import {
+  getCityUpgradeStats,
+  isCityUpgradeEnabled,
+  loadCityUpgradeTextures,
+  preloadCityUpgradeIndex,
+  setCityUpgradeEnabled,
+  syncCityUpgradeQuality,
+} from './city-upgrade/state'
+import {mountCityUpgradeProps} from './city-upgrade/props'
 import {flags} from './debug'
+import {tapFrame} from './gear/frame-tap'
 import {deriveRangeMetrics, loadRenderConfig, RenderRangeStore, type RenderRangeConfig} from './render-range'
 import {renderRangeControl} from './ui/render-range'
 import type {FeedbackView} from '../../lib/feedback-contract'
@@ -105,9 +115,11 @@ async function start(loader:FullLoader,creatorSpawn=false) {
   const light = new THREE.DirectionalLight(look.sunColor,look.sunPower)
   light.position.set(...look.sunDirection); scene.add(light)
   const gfx=gfxState(params)
+  syncCityUpgradeQuality(gfx.quality)
   let post:ReturnType<typeof import('./look/post').mainPass>|undefined
   if(params.has('debug'))Object.assign(window,{gfx})
-  function drawMain(){if(post)stats.shadowCasters=post.render(walker?.active?walker.position:camera.position);else renderer.render(scene,camera)}
+  // tapFrame：录像在这里、present 之前拷帧（IDOK-383，主画布没开 preserveDrawingBuffer）。
+  function drawMain(){if(post)stats.shadowCasters=post.render(walker?.active?walker.position:camera.position);else renderer.render(scene,camera);tapFrame(renderer.domElement)}
   renderer.info.autoReset=false
   const hemi = new THREE.HemisphereLight(look.hemiSky,look.hemiGround,look.hemiPower); scene.add(hemi)
   const arrivalReady=import('./arrival-programs').then(module=>warmPrograms(module.arrivalPrograms()))
@@ -231,7 +243,10 @@ async function start(loader:FullLoader,creatorSpawn=false) {
   }
   if(terrain){scene.add(terrain.mesh);await presentOpening()}
   async function loadFullScene(){
-    const manifest=previousWorld??await readManifest()
+    const [manifest]=await Promise.all([
+      previousWorld?Promise.resolve(previousWorld):readManifest(),
+      isCityUpgradeEnabled()?preloadCityUpgradeIndex():Promise.resolve(null),
+    ])
     playBounds=manifest
     clampOpening()
     entrySignal?.throwIfAborted()
@@ -540,9 +555,33 @@ async function start(loader:FullLoader,creatorSpawn=false) {
     }
   }
   mountChat()
+  const cityUpgradeProps = mountCityUpgradeProps(scene)
+  const syncCityUpgradeProps = (force = false) => {
+    const activeShards = stream.pruneCityUpgradeShards()
+    cityUpgradeProps.update(camera, activeShards, stream.metrics.streetRadius, force)
+  }
+  const applyCityUpgradeState = () => {
+    if (isCityUpgradeEnabled()) {
+      void loadCityUpgradeTextures(renderer).catch(error => console.warn('City upgrade textures unavailable', error))
+      void stream.ensureCityUpgradeForLoaded().then(() => {
+        stream.rebuildCityUpgradeTiles()
+        syncCityUpgradeProps(true)
+      })
+    } else {
+      stream.rebuildCityUpgradeTiles()
+      syncCityUpgradeProps(true)
+    }
+  }
+  gfx.subscribe(tier => {
+    if (syncCityUpgradeQuality(tier)) applyCityUpgradeState()
+  })
   const tourProbe = {getState, missions: {start: () => ({ok:false, code:'SOLO_MODE_REQUIRED'})}}
   let staticAudit:ReturnType<typeof import('./verify-static').staticVerifier>|undefined
   const publishViewer=()=>Object.assign(window,{viewer:{camera,stream,manifest,stats,walkTo,staticAudit,get game(){return solo?.probe ?? tourProbe},get mifen(){return mifen.getProbe()},
+    cityUpgrade: {
+      getStats: () => ({ ...getCityUpgradeStats(), mountedPropGroups: cityUpgradeProps.mountedCount() }),
+      setEnabled: (on: boolean) => { if (setCityUpgradeEnabled(on)) applyCityUpgradeState() },
+    },
     get trafficCount(){return (scene.getObjectByName('G2 traffic') as THREE.InstancedMesh|undefined)?.count??0},
     get trafficProbe(){return scene.getObjectByName('G2 traffic')?.userData},
     async trafficPixels(){return (await import('./traffic/visibility-probe')).pixelVisible(renderer,scene,camera)},
@@ -635,6 +674,10 @@ async function start(loader:FullLoader,creatorSpawn=false) {
     if(frame===2){
       peaks.loadModels(renderer)
       void loadTiles(renderer).catch(error=>console.warn('City textures unavailable',error))
+      if(isCityUpgradeEnabled()){
+        void loadCityUpgradeTextures(renderer).catch(error=>console.warn('City upgrade textures unavailable',error))
+        syncCityUpgradeProps(true)
+      }
     }
     if(frame>0&&!switching) {
       const showTraffic=trafficEnabled(getPlayMode(),trafficOverride)
@@ -646,6 +689,7 @@ async function start(loader:FullLoader,creatorSpawn=false) {
         walker?.active?walker.position:undefined,getPlayMode()==='solo',showTraffic)
       const target=walker?.destination??(walker?.active?walker.position:camera.position)
       stream.tick(target)
+      if(frame>=2) syncCityUpgradeProps()
       stream.updateLandmarks?.(target)
       if(!walkModPromise && !stream.pending.size && camera.position.y<260) void prefetchWalk()
     }

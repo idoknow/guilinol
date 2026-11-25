@@ -11,7 +11,9 @@ export function gfxState(params:URLSearchParams){
   try{stored=localStorage.getItem('glol.gfx')}catch{}
   let quality:Tier=tier(pinned)?pinned:tier(stored)?stored:matchMedia('(pointer: coarse)').matches?'low':'mid'
   let config=structuredClone(gfxDefaults), slow=0, notified=false, direct=false
-  function select(next:Tier){if(!tier(next))return;quality=next;direct=false;slow=0;try{localStorage.setItem('glol.gfx',next)}catch{}}
+  const listeners=new Set<(q:Tier)=>void>()
+  function select(next:Tier){if(!tier(next))return;const changed=quality!==next;quality=next;direct=false;slow=0;try{localStorage.setItem('glol.gfx',next)}catch{};if(changed)for(const fn of listeners)fn(next)}
+  function subscribe(fn:(q:Tier)=>void){listeners.add(fn);return()=>{listeners.delete(fn)}}
   function set(patch:GfxConfig['presets']['day']){
     const next={...config,...patch}
     for(const group of groups) if(patch[group]) Object.assign(next,{[group]:{...config[group],...patch[group]}})
@@ -20,7 +22,7 @@ export function gfxState(params:URLSearchParams){
     config=next
   }
   const ready=fetch('/api/gfx').then(response=>response.ok?response.json():null).then(value=>{if(validGfx(value))config=value}).catch(()=>{})
-  return {get quality(){return quality},get direct(){return direct},get config(){return config},ready,set,select,
+  return {get quality(){return quality},get direct(){return direct},get config(){return config},ready,set,select,subscribe,
     toggle(group:Group){if(groups.includes(group))set({[group]:{enabled:!(group==='ao'&&quality==='low'?config.ao.lowEnabled:config[group].enabled)}})},
     frame(ms:number){
       if((tier(pinned)&&params.has('verify'))||document.hidden||direct)return
