@@ -34,7 +34,23 @@ function reflectionQueue(renderer:WebGLRenderer){
   }
 }
 const queues=new WeakMap<WebGLRenderer,ReturnType<typeof reflectionQueue>>()
-export async function warmShaders(renderer:WebGLRenderer,root:Object3D,camera:Camera,scene:Scene){
+export type WarmBudget={signal:AbortSignal,progress:()=>void}
+
+export function landingWarmBudget(start:number){
+  const stop=new AbortController(),end=start+120_000
+  let timer:number
+  function progress(){
+    clearTimeout(timer)
+    const remaining=end-performance.now()
+    if(remaining<=0)stop.abort()
+    else if(!stop.signal.aborted)timer=window.setTimeout(()=>stop.abort(),Math.min(3000,remaining))
+  }
+  progress()
+  return {signal:stop.signal,progress,dispose(){clearTimeout(timer);stop.abort()}}
+}
+
+export async function warmShaders(renderer:WebGLRenderer,root:Object3D,camera:Camera,scene:Scene,budget?:WarmBudget){
+  if(budget?.signal.aborted)return
   renderer.compile(root,camera,scene)
   let enqueue=queues.get(renderer)
   if(!enqueue){enqueue=reflectionQueue(renderer);queues.set(renderer,enqueue)}
@@ -43,6 +59,6 @@ export async function warmShaders(renderer:WebGLRenderer,root:Object3D,camera:Ca
     const batch=(renderer.info.programs??[]).filter(program=>!seen.has(program))
     if(!batch.length)break
     for(const program of batch)seen.add(program)
-    await Promise.all(batch.map(enqueue))
-  }while(root===scene)
+    await Promise.all(batch.map(async program=>{await enqueue(program);budget?.progress()}))
+  }while(root===scene&&!budget?.signal.aborted)
 }

@@ -1,6 +1,22 @@
 import assert from 'node:assert/strict'
 import {test} from 'node:test'
-import {warmShaders} from '../web/src/shader-warmup.ts'
+import {landingWarmBudget,warmShaders} from '../web/src/shader-warmup.ts'
+
+test('landing warm-up renews on progress but never beyond the landing cap',t=>{
+  let now=89_000
+  t.mock.timers.enable({apis:['setTimeout']})
+  t.mock.method(performance,'now',()=>now)
+  globalThis.window=globalThis
+  const advance=ms=>{now+=ms;t.mock.timers.tick(ms)}
+  try{
+    const budget=landingWarmBudget(0)
+    for(let step=0;step<15;step++){advance(2000);budget.progress();assert.equal(budget.signal.aborted,false)}
+    advance(1000);assert.equal(budget.signal.aborted,true)
+    const stalled=landingWarmBudget(now)
+    advance(3000);assert.equal(stalled.signal.aborted,true)
+    assert.equal(landingWarmBudget(0).signal.aborted,true)
+  }finally{delete globalThis.window}
+})
 
 test('concurrent warmups share a budget, skip retired programs and wait for link readiness',async()=>{
   const frames=[],calls=[]
