@@ -3,7 +3,7 @@ import type {Tile} from './world'
 
 type Point=[number,number,number]
 type Joint={ring?:[number,number][],offsets?:string,draw:boolean,cap?:boolean}
-export type Tunnel={way:number,generated?:boolean,openings?:[number,number,number,number][],gradedAccess?:boolean,portals:[Point,Point],length:number,halfWidth:number,endWidths?:[number,number],clearance:number,approach:number,openEnds?:[number,number],mouths?:[boolean,boolean],joints?:(Joint|null)[],stations?:[number,number][],stationHeights?:string,knotHeights?:string}
+export type Tunnel={way:number,generated?:boolean,openings?:[number,number,number,number][],gradedAccess?:boolean,portals:[Point,Point],length:number,halfWidth:number,endWidths?:[number,number],clearance:number,approach:number,openEnds?:[number,number],mouths?:[boolean,boolean],joints?:(Joint|null)[],portalSign?:number[][],crossfall?:number[],carriagewayHalfWidth?:number,stations?:[number,number][],stationHeights?:string,knotHeights?:string}
 
 // Generated strips use three fixed easing samples per interval. Keep distant
 // strips encoded in the manifest and unpack only a visited strip's levels.
@@ -101,7 +101,9 @@ export function floorLevel(tunnel:Tunnel,x:number,z:number){
   let lo=0,hi=values.count-1
   while(hi-lo>1){const mid=(lo+hi)>>>1;if(values.at(mid)[0]<=at)lo=mid;else hi=mid}
   const [a,low]=values.at(lo),[b,high]=values.at(hi)
-  return low+(high-low)*(at-a)/(b-a)
+  const t=(at-a)/(b-a), slopes=tunnel.crossfall
+  const grade=slopes?slopes[lo]+(slopes[hi]-slopes[lo])*t:0
+  return low+(high-low)*t+grade*axes.lateral(x,z)
 }
 export function tunnelFloor(tunnels:Tunnel[]|undefined,x:number,z:number,foot:number){
   for(const tunnel of nearbyTunnels(tunnels,x,z)){
@@ -162,13 +164,7 @@ function clip(poly:Point[],plane:Plane){
 function fan(poly:Point[],out:number[]){for(let at=2;at<poly.length;at++)out.push(...poly[0],...poly[at-1],...poly[at])}
 
 export function tunnelGeometry(tile:Tile,ground:THREE.PlaneGeometry,tunnels:Tunnel[]){
-  const local=station.nearbyTunnels(tunnels,tile.x,tile.z)
-  if(local.some(t=>t.nodes)){
-    const mesh=station.tunnelGeometry(tile,ground,local)
-    if(mesh)return {...mesh,fringe:undefined}
-  }
-  tunnels=local.filter(t=>!t.nodes)
-  const parts={floor:[] as number[],interior:[] as number[],portal:[] as number[],band:[] as number[],lamp:[] as number[],lane:[] as number[],ceiling:[] as number[]}
+  const parts={floor:[] as number[],interior:[] as number[],portal:[] as number[],band:[] as number[],lamp:[] as number[],lane:[] as number[],sign:[] as number[],letters:[] as number[],ceiling:[] as number[]}
   const floorRanges:{end:number,tunnel:Tunnel}[]=[]
   const cuts:Plane[][]=[]
   const limits:Plane[]=[p=>p[0],p=>256-p[0],p=>p[2],p=>256-p[2]]
@@ -183,7 +179,10 @@ export function tunnelGeometry(tile:Tile,ground:THREE.PlaneGeometry,tunnels:Tunn
     const [start,end]=tunnel.portals,pad=Math.max(...(tunnel.endWidths??[tunnel.halfWidth]))+1
     if(Math.max(start[0],end[0])+pad<tile.x||Math.min(start[0],end[0])-pad>tile.x+256||Math.max(start[2],end[2])+pad<tile.z||Math.min(start[2],end[2])-pad>tile.z+256)continue
     const axes=frame(tunnel),width=tunnel.halfWidth,head=tunnel.clearance
-    function local(s:number,d:number,y:number){const p=axes.point(s,d,y);p[0]-=tile.x;p[2]-=tile.z;return p}
+    let intervalStart=0,intervalEnd=1,leftFall=0,rightFall=0
+    function local(s:number,d:number,y:number){
+      const grade=leftFall+(rightFall-leftFall)*(s-intervalStart)/(intervalEnd-intervalStart)
+      const p=axes.point(s,d,y+d*grade);p[0]-=tile.x;p[2]-=tile.z;return p}
     const station=(p:Point)=>axes.station(p[0]+tile.x,p[2]+tile.z),side=(p:Point)=>axes.lateral(p[0]+tile.x,p[2]+tile.z)
     const lining=.05
     for(const [from,to] of [[0,openEnd(tunnel,0)],[tunnel.length-openEnd(tunnel,1),tunnel.length]])if(to>from)cuts.push([p=>station(p)-from,p=>to-station(p),p=>halfWidthAt(tunnel,station(p))+lining-side(p),p=>halfWidthAt(tunnel,station(p))+lining+side(p)])
@@ -232,11 +231,14 @@ export function tunnelGeometry(tile:Tile,ground:THREE.PlaneGeometry,tunnels:Tunn
     const values=profile(tunnel)
     for(let i=1;i<values.count;i++){
       const [a,ay]=values.at(i-1),[b,by]=values.at(i)
+      intervalStart=a;intervalEnd=b;leftFall=tunnel.crossfall?.[i-1]??0;rightFall=tunnel.crossfall?.[i]??0
       const open=((a+b)/2<openEnd(tunnel,0))||((a+b)/2>tunnel.length-openEnd(tunnel,1))
       const wa=halfWidthAt(tunnel,a),wb=halfWidthAt(tunnel,b)
       const al=local(a,-wa,ay),ar=local(a,wa,ay),bl=local(b,-wb,by),br=local(b,wb,by)
       quad([al,ar,br,bl],'floor')
-      const top=(p:Point):Point=>[p[0],open?Math.max(p[1],groundY(p)):p[1]+head,p[2]]
+      const roadHalf=tunnel.carriagewayHalfWidth??width
+      const shoulderDrop=(lateral:number)=>tunnel.carriagewayHalfWidth?Math.min(.5,Math.max(0,Math.abs(lateral)-roadHalf)):0
+      const top=(p:Point):Point=>[p[0],open?Math.max(p[1],groundY(p)):p[1]+head-shoulderDrop(side(p)),p[2]]
       quad([al,bl,top(bl),top(al)],open?'portal':'interior');quad([br,ar,top(ar),top(br)],open?'portal':'interior')
       if(open){
         const rim=(p:Point)=>{
@@ -247,7 +249,13 @@ export function tunnelGeometry(tile:Tile,ground:THREE.PlaneGeometry,tunnels:Tunn
         quad([top(al),top(bl),rim(bl),rim(al)],'portal')
         quad([top(br),top(ar),rim(ar),rim(br)],'portal')
       }
-      if(!open)quad([top(al),top(bl),top(br),top(ar)],'ceiling')
+      if(!open){
+        const edges=tunnel.carriagewayHalfWidth?[-1,-roadHalf/wa,roadHalf/wa,1]:[-1,1]
+        for(let k=1;k<edges.length;k++){
+          const lo=edges[k-1],hi=edges[k]
+          quad([top(local(a,wa*lo,ay)),top(local(b,wb*lo,by)),top(local(b,wb*hi,by)),top(local(a,wa*hi,ay))],'ceiling')
+        }
+      }
       if(!open){
         // 青绿 glazed-tile dado, warm lamp strips and a dashed centre line (IDOK-165 visual pass)
         const inset=width-.04
@@ -256,7 +264,44 @@ export function tunnelGeometry(tile:Tile,ground:THREE.PlaneGeometry,tunnels:Tunn
         for(const d of [-inset+.02,inset-.02])quad([local(a,d,ay+head-.95),local(b,d,by+head-.95),local(b,d,by+head-.8),local(a,d,ay+head-.8)],'lamp')
       }
       if(Math.floor(a/6)%2===0)quad([local(a,-.08,ay+.03),local(a,.08,ay+.03),local(b,.08,by+.03),local(b,-.08,by+.03)],'lane')
-      for(const [s,y] of [[a,ay]])if((tunnel.mouths?.[0]!==false&&Math.abs(s-openEnd(tunnel,0))<1e-6)||(tunnel.mouths?.[1]!==false&&Math.abs(s-tunnel.length+openEnd(tunnel,1))<1e-6)){
+      if(i===1&&tunnel.portalSign){
+        // The portal face occupies the 30 cm structural band above the gauge.
+        // Wings flare away from the approach so their footings stay outside it.
+        const lip=(d:number)=>ay+head-shoulderDrop(d)
+        const outer=width+.35
+        for(const sign of [-1,1]){
+          const wall=sign*width,edge=sign*outer,wing=sign*(outer+1.25)
+          const face=(poly:Point[],part:'portal'|'interior')=>quad(sign<0?poly:poly.reverse(),part)
+          face([local(0,edge,ay-.12),local(0,wall,ay-.12),local(0,wall,lip(wall)),local(0,edge,lip(wall))],'portal')
+          const cap=(p:Point,offset:number,rise:number):Point=>
+            [p[0]-offset*(end[2]-start[2])/tunnel.length,p[1]+rise,p[2]+offset*(end[0]-start[0])/tunnel.length]
+          const near=local(0,edge,lip(wall)+.24),tip=local(-4.2,wing,ay+.75)
+          const low=local(0,edge,ay-.18),toe=local(-4.2,wing,ay-.18)
+          // Closed wing walls retain both banks, including the exposed toe and cap.
+          const shift=(p:Point)=>cap(p,sign*.30,0)
+          face([near,tip,toe,low],'portal')
+          face([shift(low),shift(toe),shift(tip),shift(near)],'portal')
+          face([tip,shift(tip),shift(toe),toe],'portal')
+          face([cap(near,-sign*.05,.05),cap(tip,-sign*.05,.05),
+                cap(tip,sign*.35,.05),cap(near,sign*.35,.05)],'interior')
+          face([cap(low,-sign*.06,.18),cap(toe,-sign*.06,.18),toe,low],'interior')
+          quad([local(0,wall,lip(wall)),local(0,sign*roadHalf,lip(sign*roadHalf)),
+            local(0,sign*roadHalf,ay+head+.22),local(0,edge,ay+head+.22)],'portal')
+        }
+        quad([local(0,-roadHalf,ay+head),local(0,roadHalf,ay+head),
+          local(0,roadHalf,ay+head+.22),local(0,-roadHalf,ay+head+.22)],'portal')
+        quad([local(-.06,-outer,ay+head+.22),local(-.06,outer,ay+head+.22),
+          local(-.06,outer,ay+head+.30),local(-.06,-outer,ay+head+.30)],'interior')
+        quad([local(-.06,-outer,ay+head+.30),local(.26,-outer,ay+head+.30),
+          local(.26,outer,ay+head+.30),local(-.06,outer,ay+head+.30)],'interior')
+        const base=ay+head+.03
+        quad([local(-.10,-.74,base),local(-.10,.74,base),local(-.10,.74,base+.45),local(-.10,-.74,base+.45)],'sign')
+        for(const [left,bottom,right,top] of tunnel.portalSign){
+          quad([local(-.106,left,base+bottom),local(-.106,right,base+bottom),
+            local(-.106,right,base+top),local(-.106,left,base+top)],'letters')
+        }
+      }
+      for(const [s,y] of [[a,ay]])if(!tunnel.portalSign&&((tunnel.mouths?.[0]!==false&&Math.abs(s-openEnd(tunnel,0))<1e-6)||(tunnel.mouths?.[1]!==false&&Math.abs(s-tunnel.length+openEnd(tunnel,1))<1e-6))){
         const l=local(s,-width,y+head),r=local(s,width,y+head)
         quad([l,r,[r[0],Math.max(r[1]+.16,groundY(r)),r[2]],[l[0],Math.max(l[1]+.16,groundY(l)),l[2]]],'portal')
       }
@@ -300,6 +345,8 @@ export function tunnelGeometry(tile:Tile,ground:THREE.PlaneGeometry,tunnels:Tunn
     parts.ceiling=Array.from(tunnelClearanceClipper(tile,tunnels)(vertices,Array.from({length:vertices.length/3},(_,i)=>i)))
   }
   const looks:Record<string,THREE.MeshStandardMaterial|THREE.MeshBasicMaterial>={
+    sign:new THREE.MeshBasicMaterial({side:THREE.DoubleSide,color:0x194b75}),
+    letters:new THREE.MeshBasicMaterial({side:THREE.DoubleSide,color:0xffffff}),
     road:new THREE.MeshStandardMaterial({side:THREE.DoubleSide,color:0x3b3e42,roughness:.95}),
     interior:new THREE.MeshStandardMaterial({side:THREE.DoubleSide,color:0xcfc8b8,roughness:.9}),
     portal:new THREE.MeshStandardMaterial({side:THREE.DoubleSide,color:0xa39d90,roughness:.92}),
@@ -317,7 +364,7 @@ export function tunnelGeometry(tile:Tile,ground:THREE.PlaneGeometry,tunnels:Tunn
   const floor=mesh(parts.floor,'road')
   floor.geometry.userData.tunnelRanges=floorRanges
   return {fringe,floor,interior:mesh(parts.interior,'interior'),portal:mesh(parts.portal,'portal'),
-    band:mesh(parts.band,'band'),ceiling:mesh(parts.ceiling,'ceiling'),lamp:mesh(parts.lamp,'lamp'),lane:mesh(parts.lane,'lane')}
+    sign:mesh(parts.sign,'sign'),letters:mesh(parts.letters,'letters'),band:mesh(parts.band,'band'),ceiling:mesh(parts.ceiling,'ceiling'),lamp:mesh(parts.lamp,'lamp'),lane:mesh(parts.lane,'lane')}
 }
 
 // Clip collision triangles against the actual piecewise-linear floor and roof.
@@ -326,7 +373,7 @@ export function tunnelClearanceClipper(tile:Tile,tunnels:Tunnel[],belowFloor=0,t
   type Prism={planes:Plane[];xmin:number;xmax:number;zmin:number;zmax:number}
   const bins=new Map<number,Prism[]>()
   const cell=(v:number)=>Math.max(0,Math.min(31,Math.floor(v/8)))
-  function register(ring:number[][],floor:(x:number,z:number)=>number,height:number){
+  function register(ring:number[][],floor:(x:number,z:number)=>number,height:number|((x:number,z:number)=>number)){
     const xs=ring.map(p=>p[0]),zs=ring.map(p=>p[1])
     const xmin=Math.min(...xs),xmax=Math.max(...xs),zmin=Math.min(...zs),zmax=Math.max(...zs)
     if(xmax<0||zmax<0||xmin>256||zmin>256)return
@@ -336,7 +383,7 @@ export function tunnelClearanceClipper(tile:Tile,tunnels:Tunnel[],belowFloor=0,t
       const sign=Math.sign(dx*(cz-z)-dz*(cx-x))/Math.hypot(dx,dz)
       return p=>sign*(dx*(p[2]-z)-dz*(p[0]-x))
     })
-    planes.push(p=>p[1]-floor(p[0],p[2])+belowFloor,p=>floor(p[0],p[2])+height-p[1])
+    planes.push(p=>p[1]-floor(p[0],p[2])+belowFloor,p=>floor(p[0],p[2])+(typeof height==='number'?height:height(p[0],p[2]))-p[1])
     const prism={planes,xmin,xmax,zmin,zmax}
     for(let i=cell(xmin);i<=cell(xmax);i++)for(let j=cell(zmin);j<=cell(zmax);j++){
       const key=i*32+j
@@ -351,8 +398,17 @@ export function tunnelClearanceClipper(tile:Tile,tunnels:Tunnel[],belowFloor=0,t
       const [a,low]=profileData.at(i-1),[b,high]=profileData.at(i)
       if(b<=a)continue
       const wa=halfWidthAt(tunnel,a),wb=halfWidthAt(tunnel,b)
-      register([local(a,-wa),local(b,-wb),local(b,wb),local(a,wa)],
-        (x,z)=>low+(high-low)*(axes.station(x+tile.x,z+tile.z)-a)/(b-a),tunnel.clearance)
+      const half=tunnel.carriagewayHalfWidth
+      const edges=half?[-1,-half/wa,half/wa,1]:[-1,1]
+      for(let k=1;k<edges.length;k++){
+        const left=edges[k-1],right=edges[k]
+        register([local(a,wa*left),local(b,wb*left),local(b,wb*right),local(a,wa*right)],
+          (x,z)=>{
+            const t=(axes.station(x+tile.x,z+tile.z)-a)/(b-a)
+            const q=tunnel.crossfall
+            return low+(high-low)*t+(q?q[i-1]+(q[i]-q[i-1])*t:0)*axes.lateral(x+tile.x,z+tile.z)
+          },half?(x,z)=>tunnel.clearance-Math.min(.5,Math.max(0,Math.abs(axes.lateral(x+tile.x,z+tile.z))-half)):tunnel.clearance)
+      }
     }
     // At an oblique mouth the terrain retaining face can stand outside the
     // axial bore prism, across the surface approach. Keep its paved profile.

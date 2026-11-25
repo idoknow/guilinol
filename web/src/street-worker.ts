@@ -12,7 +12,7 @@ export interface StationPavingStyle {plaza?:Pair[]; platformEdges?:[Pair,Pair][]
 type Path=[number,...Pair[][]]
 type RoadCtrl=[number,number[]]
 type Lower=[number,Pair[],[number,number,number,number][]]
-export type Streets=[Path[],Pair[],number[][],Pair[]?,Pair[]?,(RoadCtrl|null)?,number[][]?,number[][]?,number[][]?,number[][]?,Pair[][]?,Lower?,{start:number,end:number,vertices?:[number,number,number][],packed?:string,sidewalk?:string,skirt?:string}?,Record<string,number>?]
+export type Streets=[Path[],Pair[],number[][],Pair[]?,Pair[]?,(RoadCtrl|null)?,number[][]?,number[][]?,number[][]?,number[][]?,Pair[][]?,Lower?,{start:number,end:number,vertices?:[number,number,number][],packed?:string,bank?:string,sidewalk?:string,skirt?:string}?,Record<string,number>?]
 const colors=look.streets.surfaces.map(v=>new THREE.Color(v)),tone=Object.fromEntries((['railing','lampPole','lampHead'] as const).map(k=>[k,new THREE.Color(look.streets[k])]))
 const stoneLight=new THREE.Color(0xa6a39a),stoneMid=new THREE.Color(0x8c8981),stoneBase=new THREE.Color(0x74726b)
 const platformBrick=new THREE.Color(style.station.platformBrick)
@@ -84,14 +84,14 @@ export function streetGeometry([paths,lamps,banks,signals=[],stops=[],roadCtrl,s
   }
   const surfaceKinds:number[]=[],alongVals:number[]=[]
   const fenceXyz:number[]=[],fenceRgb:number[]=[],fenceAlong:number[]=[]
-  function triangle(first:THREE.Vector3,second:THREE.Vector3,third:THREE.Vector3,kind:number,u1=0,u2=0,u3=0,vertical=false,projected=false){
+  function triangle(first:THREE.Vector3,second:THREE.Vector3,third:THREE.Vector3,kind:number,u1=0,u2=0,u3=0,vertical=false,projected=false,precise=false){
     let p1=first,p2=second,p3=third,a1=u1,a2=u2,a3=u3
     if(kind!==3&&!vertical){
       const x1=Math.fround(p1.x),y1=Math.fround(p1.y),z1=Math.fround(p1.z)
       const x2=Math.fround(p2.x),y2=Math.fround(p2.y),z2=Math.fround(p2.z)
       const x3=Math.fround(p3.x),y3=Math.fround(p3.y),z3=Math.fround(p3.z)
       const ny=(z2-z1)*(x3-x1)-(x2-x1)*(z3-z1)
-      if(Math.abs(ny)<1e-4)return
+      if(Math.abs(ny)<(precise?1e-9:1e-4))return
       if(ny<0){const tmp=p2;p2=p3;p3=tmp;const tu=a2;a2=a3;a3=tu}
       void y1;void y2;void y3
     }
@@ -155,11 +155,12 @@ export function streetGeometry([paths,lamps,banks,signals=[],stops=[],roadCtrl,s
   const legacyRoadLength=road.length,legacyWalkLength=sidewalk.length,legacySurfaceLength=xyz.length
   if(surveyed){
     const a=new THREE.Vector3(),b=new THREE.Vector3(),c=new THREE.Vector3()
-    const emit=(coords:Float32Array,kind:number,vertical=false)=>{
-      for(let i=0;i<coords.length;i+=9)triangle(a.fromArray(coords,i),b.fromArray(coords,i+3),c.fromArray(coords,i+6),kind,0,0,0,vertical,true)
+    const emit=(coords:Float32Array,kind:number,vertical=false,precise=false)=>{
+      for(let i=0;i<coords.length;i+=9)triangle(a.fromArray(coords,i),b.fromArray(coords,i+3),c.fromArray(coords,i+6),kind,0,0,0,vertical,true,precise)
     }
     emit(surveyed.packed!==undefined?unpackPositions(surveyed.packed,.001)
       :Float32Array.from(surveyed.vertices!.flat(),v=>v*.001),0)
+    if(surveyed.bank)emit(unpackPositions(surveyed.bank,.000001),0,false,true)
     if(surveyed.sidewalk)emit(unpackPositions(surveyed.sidewalk,.001),1)
     if(surveyed.skirt)emit(unpackPositions(surveyed.skirt,.001),1,true)
   }

@@ -26,7 +26,9 @@ def footprints(paths, origin, kinds):
                       for k,shell,*holes in paths if k in kinds])
 
 
-def relocate(output, manifest, elements):
+def relocate(output, manifest, elements, raised=(), adjoining=()):
+    changed_roads = union_all(raised)
+    all_roads = union_all([*raised, *adjoining])
     tiles={(t['x'],t['z']):t for t in manifest['chunks']}
     def origin(x,z):
         return (math.floor(x/256)*256,math.floor(z/256)*256)
@@ -34,7 +36,8 @@ def relocate(output, manifest, elements):
     @lru_cache(maxsize=48)
     def surfaces(key):
         paths=read_chunk(output/tiles[key]['file'])[3][1]
-        return (footprints(paths[0],key,{0,5}), footprints(paths[0],key,{1,4,6}))
+        area = box(*key, key[0]+256, key[1]+256)
+        return (footprints(paths[0],key,{0,5}).union(all_roads.intersection(area)), footprints(paths[0],key,{1,4,6}))
 
     lines=[LineString([ll2xz(p['lat'],p['lon']) for p in w['geometry']])
            for w in elements if w['type']=='way' and w.get('tags',{}).get('highway')
@@ -70,6 +73,8 @@ def relocate(output, manifest, elements):
         if len(access):
             asphalt = footprints(paths[0][survey['start']:survey['end']],key,{0})
             added = added.union(asphalt.intersection(union_all(travelled.geometries.take(access))))
+        if raised:
+            added=added.union(changed_roads.intersection(box(*key,key[0]+256,key[1]+256)))
         path_hits=paths_at_verge.query(box(*key,key[0]+256,key[1]+256),predicate='intersects')
         travelled_path=union_all(paths_at_verge.geometries.take(path_hits))
         if added.is_empty and travelled_path.is_empty:
@@ -141,6 +146,8 @@ def relocate(output, manifest, elements):
         if tile.get('gradedCorridor'):
             survey=paths[12]
             repaired=footprints(paths[0][survey['start']:survey['end']],key,{0,1}).buffer(1.05)
+        if raised and repaired is not None:
+            repaired=repaired.union(changed_roads.buffer(5).intersection(box(*key,key[0]+256,key[1]+256)))
         edits=moves.get(key,[])
         removed={i for field,i,_ in edits if field==0 and i is not None}
         tree_file=file.with_suffix('.trees')
@@ -153,8 +160,9 @@ def relocate(output, manifest, elements):
         for field in (1,4):
             removed_indices={i for kind,i,_ in edits if kind==field and i is not None}
             for i,row in enumerate(paths[field]):
-                if (i not in removed_indices and len(paths)>13 and paths[13] and
-                        f"{row[0]},{row[1]}" in paths[13]):
+                if i not in removed_indices and ((len(paths)>13 and paths[13] and
+                        f"{row[0]},{row[1]}" in paths[13]) or (raised and changed_roads.distance(
+                        Point(key[0]+row[0]/10,key[1]+row[1]/10))<=5)):
                     positions.append([key[0]+row[0]/10,key[1]+row[1]/10])
                     placements.append((key,field,i,row))
         for field,i,row in edits:
