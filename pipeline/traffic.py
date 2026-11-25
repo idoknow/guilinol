@@ -414,7 +414,7 @@ def bake(output, manifest, rendered_roads=None):
             # The east service bridge cannot propagate its cut into the accepted
             # west canal road. Keep that road on its own surveyed bridge grade.
             for way in elements:
-                if way['type']!='way' or way['id'] not in (988474372,347655716,815075448,882767818):continue
+                if way['type']!='way' or way['id'] not in (988474372,347655716,815075448,882767818,835693641):continue
                 coords=ground_passages.points(way)
                 for i,j in ((0,1),(-1,-2)):
                     ref=way['nodes'][i]
