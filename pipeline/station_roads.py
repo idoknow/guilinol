@@ -105,6 +105,8 @@ def bake(directory, manifest, paired_widths):
     ways = {way['id']: way for way in elements if way['type']=='way'}
     for section in designs():
         parts = section_roads(section, ways, paired_widths)
+        if not parts:
+            continue
         bake_profiles(directory, manifest, parts, elements, additional=True)
         finish_paving(directory, manifest, list(parts.values()), elements)
 

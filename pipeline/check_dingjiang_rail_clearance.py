@@ -1,11 +1,9 @@
 """Check the contact-wire envelope where the Dingjiang viaduct crosses other tracks."""
 
 import argparse
-import gzip
 import json
 import math
 from pathlib import Path
-import struct
 import subprocess
 from tempfile import NamedTemporaryFile
 
@@ -14,6 +12,7 @@ import numpy as np
 from shapely import LineString, Point
 from shapely.ops import substring
 
+from check_rail_section_tracks import tile_rails
 from common import CHUNK, load_osm
 from dingjiang import RAIL, TIES
 from dingjiang_structures import BRIDGES, TUNNEL as ROAD_TUNNEL
@@ -24,12 +23,8 @@ from railways import BRIDGE, ELECTRIC, LEVEL, ROOT, TUNNEL
 def encoded_track(world, tile, point, alignment):
     """GL04 has no way IDs. Match both segment ends to the source alignment."""
     x, z = point.coords[0]
-    raw = gzip.decompress((world / tile["file"]).read_bytes())
-    vertices, indices, size = struct.unpack_from("<3I", raw, 4)
-    start = 16924 + 9 * vertices + 4 * indices
-    rails = json.loads(raw[start : start + size])[4]
     matches = []
-    for ax, az, ay, bx, bz, by, _, flags, *_ in rails:
+    for ax, az, ay, bx, bz, by, _, flags, *_ in tile_rails(world, tile):
         a = Point(tile["x"] + ax / 100, tile["z"] + az / 100)
         b = Point(tile["x"] + bx / 100, tile["z"] + bz / 100)
         if max(alignment.distance(a), alignment.distance(b)) > 0.001:
