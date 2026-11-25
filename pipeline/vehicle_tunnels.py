@@ -6,7 +6,7 @@ import math
 
 from common import ll2xz
 from service_streets import width
-from tunnel_clearance import design_clearance
+from tunnel_clearance import SITANG_BORE, SITANG_ROOF_THICKNESS, design_clearance
 from shapely import STRtree
 from shapely.geometry import LineString, MultiPoint, Point, Polygon
 from heapq import heapify, heappop, heappush
@@ -95,6 +95,8 @@ def sections(lanes, source_ways, existing, nodes):
         key = lane['way'], a, b
         edge = edges.setdefault(key, dict(way=lane['way'], a=a, b=b, halfWidth=0,
                                           clearance=0., cls=lane['cls']))
+        if lane['way'] == SITANG_BORE:
+            edge['roofThickness'] = SITANG_ROOF_THICKNESS
         edge['halfWidth'] = max(edge['halfWidth'], abs(lane['offset'])+lane['width']/2+.5)
         edge['clearance'] = max(edge['clearance'], design_clearance(ways[lane['way']], lane['kind'] != 'nonmotor'))
     # Follow connected private approach ramps to the actual surface junctions.
@@ -210,7 +212,7 @@ def sections(lanes, source_ways, existing, nodes):
         if spent != best[k]:
             continue
         for i,j,other,length,cap,edge in links[k]:
-            available = (edge['clearance']+.05-spent)/cap
+            available = (edge['clearance']+edge.get('roofThickness', .05)-spent)/cap
             if available <= 0:
                 continue
             extent = min(available,clear[i][j])
@@ -285,8 +287,9 @@ def solve(network, nodes, samples):
         for i, (key, ceiling) in enumerate(zip(keys,roof)):
             open_ramp = ((approach[0]>0 and i*step <= approach[0]+1e-8) or
                          (approach[1]>0 and length-i*step <= approach[1]+1e-8))
-            bound = ceiling-edge['clearance']-.05 if not open_ramp else math.inf
-            roofs[key] = min(roofs.get(key, math.inf), ceiling-edge['clearance']-.05)
+            invert = ceiling - edge['clearance'] - edge.get('roofThickness', .05)
+            bound = invert if not open_ramp else math.inf
+            roofs[key] = min(roofs.get(key, math.inf), invert)
             if key in mouths:
                 bound = min(bound, heights[key],samples.get('approachLimits',{}).get(key,math.inf))
             limits[key] = min(limits.get(key,math.inf),bound)

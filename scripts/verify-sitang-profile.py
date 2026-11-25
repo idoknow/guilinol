@@ -5,13 +5,13 @@ import json
 from pathlib import Path
 
 import numpy as np
-from shapely import LineString
+from shapely import LineString, Point
 
 from canal_passages import sample_road_heights
 from common import load_osm
 from features import points
 from service_streets import width
-from tunnel_clearance import clearance as required_clearance
+from tunnel_clearance import SITANG_ROOF_THICKNESS, clearance as required_clearance
 
 
 def measure(base, candidate):
@@ -55,7 +55,7 @@ def measure(base, candidate):
     surface = samples(base, manifests[0], probes, 'pavementOnly')
     upper_zone = LineString(points(upper)).buffer(width(upper['tags'])/2, cap_style='flat')
     clearance = required_clearance(tunnel['tags'])
-    roof_thickness = .30
+    roof_thickness = SITANG_ROOF_THICKNESS
     bridge_y = decks[anchor][1]
     def lift(i):
         return bridge_y - .08*(stations[i]-stations[anchor]) + clearance + roof_thickness - surface[i]
@@ -94,7 +94,37 @@ def measure(base, candidate):
         insideOneMetre=max((r for r in section if r['insideRoadEdgeMetres'] >= 1),
                            key=lambda r: r['minimumLift']),
         overHalfMetreSamples=sum(1 for r in section if r['minimumLift'] > .5))
-    return dict(motorwayProbe=motorway_probe, tunnel=tunnel['id'], tags=tunnel['tags'], clearance=clearance, roofThickness=roof_thickness, bridge=bridge['id'],
+    # Check the existing visible pavement right up to the inside bend. Its
+    # longitudinal section is shorter than the reference car wheel track.
+    bore = next(t for t in manifests[1]['tunnels'] if t['way'] == tunnel['id'])
+    bore_axis = LineString([(x, z) for x, _, z in bore['portals']])
+    pavement = []
+    for margin in (.50, .20, .10, .05):
+        offset = bore['halfWidth'] - margin
+        strip = LineString(coords).offset_curve(-offset, join_style='mitre')
+        pts = [strip.interpolate(s) for s in stations]
+        deck = samples(base, manifests[0], pts, 'roofProbe')
+        lip = max(i for i, (_, hit) in enumerate(deck) if hit is not None and abs(hit-bridge_y)<.01
+                  and stations[i] <= bridge_axis.length+1)
+        mouth = strip.project(Point(bore_axis.coords[0]))
+        before = [i for i in range(lip, len(pts)) if stations[i] < mouth]
+        paving = samples(candidate, manifests[1], [pts[i] for i in before], 'pavementOnly')
+        cross = [i for i in range(before[-1]+1, len(pts)) if pts[i].distance(motorway_axis) <= half_width
+                 and bore_axis.distance(pts[i]) <= bore['halfWidth']]
+        top = samples(candidate, manifests[1], [pts[i] for i in cross], 'roofProbe')
+        records = []
+        for i, hits in zip(cross, top, strict=True):
+            distance = stations[i]-stations[lip]
+            floor_min = deck[lip][1]-.08*distance
+            visible = max(h for h in hits if h is not None)
+            records.append(dict(xz=list(pts[i].coords[0]), distance=distance, floorLowerBound=floor_min,
+                                insideMotorway=half_width-pts[i].distance(motorway_axis), visibleTop=visible,
+                                lift=floor_min+clearance+roof_thickness-visible))
+        pavement.append(dict(offset=offset, insideBore=margin, bridgeXZ=list(pts[lip].coords[0]),
+                             bridgeY=deck[lip][1], approachSamples=len(paving),
+                             hits=sum(h is not None for h in paving), motorwaySamples=len(records),
+                             overCap=sum(1 for r in records if r['lift'] > .5), peak=max(records,key=lambda r:r['lift'])))
+    return dict(pavementSections=pavement,motorwayProbe=motorway_probe, tunnel=tunnel['id'], tags=tunnel['tags'], clearance=clearance, roofThickness=roof_thickness, bridge=bridge['id'],
                 bridgeXZ=list(probes[anchor].coords[0]), bridgeY=bridge_y, upper=upper['id'],
                 upperXZ=list(probes[limit].coords[0]), upperY=surface[limit],
                 laneOffset=graph_offset, halfTrack=car_half_track, spacing=.01, gradeLimit=.08,
