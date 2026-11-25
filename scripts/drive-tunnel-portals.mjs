@@ -27,7 +27,7 @@ for(const site of sites)for(const {mode,route,startHeight,direction,reverseExit=
   }
   let group=groups.find(g=>g.mode===mode&&g.tests.every(t=>Math.hypot(t.x-x,t.z-z)>65))
   if(!group){group={mode,tests:[]};groups.push(group)}
-  group.tests.push({x,z,id:site.id,way:site.way,route,boundary,reverseExit,direction,startHeight,heading:Math.atan2(x-nx,z-nz)})
+  group.tests.push({x,z,id:site.id,way:site.way,singleFile:site.singleFile,route,boundary,reverseExit,direction,startHeight,heading:Math.atan2(x-nx,z-nz)})
 }
 await mkdir(resolve(output,'..'),{recursive:true})
 const server=await preview({configFile:false,build:{outDir:directory},preview:{host:'127.0.0.1',port:0}})
@@ -41,7 +41,7 @@ try{
     await page.route('**/world/vehicles.bin',route=>route.fulfill({body:gzipSync(JSON.stringify(fleet))}))
     await page.goto('http://127.0.0.1:'+server.httpServer.address().port+'/?verify&mode=walk&radius=320&flow=0')
     await page.waitForFunction(()=>window.viewer?.walk?.active,null,{timeout:60000})
-    for(const {id,way,x,z,route,boundary,reverseExit,direction,startHeight:y,heading} of tests){
+    for(const {id,way,x,z,singleFile,route,boundary,reverseExit,direction,startHeight:y,heading} of tests){
       try{
         let ready=false,setupError
         for(const [along,side] of [[0,0],[-.9,.7],[.9,-.7],[-.8,-.65],[.8,.65],[0,1.25],[0,-1.25],[-1.8,1],[-1.8,-1]]){
@@ -63,7 +63,7 @@ try{
           }catch(e){ready=false;setupError=e.message.split('\n')[0]}
         }
         if(!ready)throw Error(setupError??'could not reach or board lane fixture')
-        const run=await page.evaluate(async({route,mode,boundary,reverseExit,surfaceApproach})=>{
+        const run=await page.evaluate(async({route,mode,boundary,reverseExit,singleFile,surfaceApproach})=>{
           const v=window.viewer,w=v.walk,held=new Set(),frames=[]
           const key=(code,down)=>{
             if(held.has(code)===down)return
@@ -103,7 +103,7 @@ try{
                 // A vehicle rounding a sharp corner can enter the next leg
                 // without its centre passing through the vertex itself.
                 const rounded=mode==='car'&&alongNext>2&&lateralNext<cross&&lateralNext<1.5&&progress>len-4
-                const reached=mode==='foot'?Math.hypot(p.x-x,p.z-z)<.15:progress>len-1.2&&cross<3.5
+                const reached=mode==='foot'?Math.hypot(p.x-x,p.z-z)<.15:progress>len-(singleFile ? .2:1.2)&&cross<3.5
                 if(reached||rounded){part++;continue}
               }
               // Brake before a bend. A long look-ahead at driving speed
@@ -125,7 +125,7 @@ try{
               if(sharp)carLookahead=7.5
               else if(bend)carLookahead=surfaceApproach?5:3.4
               else if(surfaceApproach&&cross>.4)carLookahead=3
-              let ahead=Math.max(0,progress)+(mode==='car'?carLookahead:3.5)
+              let ahead=Math.max(0,progress)+(mode==='car'?carLookahead:singleFile ? .9:3.5)
               // A pedestrian can turn at the vertex itself. Looking beyond a hairpin
               // before reaching it can leave the walker at a stationary target.
               if(mode==='foot'&&part<route.length-1)ahead=Math.min(len,ahead)
@@ -143,7 +143,7 @@ try{
               else{
                 const turn=Math.atan2(-tx,-tz)-w.heading,delta=Math.atan2(Math.sin(turn),Math.cos(turn))
                 key('KeyS',reversing)
-                key('KeyW',!reversing&&Math.abs(w.speed)<(bend?1.5:Math.abs(delta)>.6?2:3.5))
+                key('KeyW',!reversing&&Math.abs(w.speed)<(bend||singleFile?1.5:Math.abs(delta)>.6?2:3.5))
                 key('KeyA',!reversing&&delta>.04);key('KeyD',!reversing&&delta<-.04)
               }
               v.stream.tick(w.position);v.stream.updateLandmarks?.(w.position);w.tick(1/60)
@@ -168,7 +168,7 @@ try{
           return {completed,failure,maximum,frames,part,
             reverseExit:reverseExit?{furthest,exitStation,resets:probe.resets-initialResets}:undefined,obstacle:w.obstacle,contacts,
             stopped:completed?undefined:{wet:probe.wet,blockedWater:probe.blockedWater,surface:probe.surfaceKind,inHouse:probe.inHouse,hits:probe.contactSources,foot:probe.foot,resets:probe.resets-initialResets,heading:w.heading}}
-        },{route,mode,boundary,reverseExit,surfaceApproach:!boundary&&process.argv.includes('--surface')})
+        },{route,mode,boundary,reverseExit,singleFile,surfaceApproach:!boundary&&process.argv.includes('--surface')})
         results.push({id,way,mode,boundary,direction,...run})
       }catch(e){results.push({id,way,mode,boundary,direction,failure:"tool",unavailable:e.message.split('\n')[0]})}
     }

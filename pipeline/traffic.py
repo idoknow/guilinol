@@ -195,8 +195,8 @@ def bake(output, manifest, rendered_roads=None):
     from terminal_decks import grade as grade_terminal_decks, grade_airport_fork, grade_service_overpass, trim_bridge_endcaps
     ground_passages.close_qingtian_road(elements,sections,garage_curbs)
     ground_passages.grain_yard(output,manifest,elements,sections)
-    clearances=narrow_streets.classify(output,manifest['chunks'],elements,MOTOR)
-    narrow_ways={row['way'] for row in clearances}
+    clearances=narrow_streets.classify(output,manifest['chunks'],elements,MOTOR,sections)
+    narrow_ways={row['way']:row['alignment'] for row in clearances}
     (output/'vehicle-narrow-streets.json').write_text(json.dumps(clearances))
     grade_airport_fork(output,manifest,elements)
     terminal_grades = grade_terminal_decks(output, manifest, elements)
@@ -235,9 +235,15 @@ def bake(output, manifest, rendered_roads=None):
             curb = min(2.4, paved-3*count)
             size = (paved-curb)/count
         narrow=way['id'] in narrow_ways
+        two_wheel_modes=[m for m in ('bike','bicycle') if permits(tags,m)] if narrow or kind=='cycleway' else []
         if narrow:
             narrow_streets.end_curbs(LineString(coords),paved,garage_curbs)
-        for start,end,start_id,end_id in ground_passages.open_segments(way,coords,garage,garage_curbs,paved):
+        alignment=way
+        if narrow:
+            route=narrow_ways[way['id']]
+            coords=[(x,z) for x,z,_ in route]
+            alignment=dict(way,nodes=[ref for _,_,ref in route])
+        for start,end,start_id,end_id in ground_passages.open_segments(alignment,coords,garage,garage_curbs,paved):
             if not start or not end or not all(left <= x < left+width and top <= z < top+depth for x,z in (start,end)):
                 continue
             if region and not region.covers(LineString([start,end]).buffer(count*size/2+2)):
@@ -253,12 +259,21 @@ def bake(output, manifest, rendered_roads=None):
             if narrow:
                 if permits(tags,'foot'):
                     add_walk(start_id,end_id,0,way['id'],linear)
-                modes=[mode for mode in ('bike','bicycle') if permits(tags,mode)]
-                if modes:
-                    for head,tail in ((start_id,end_id),(end_id,start_id)):
+                if two_wheel_modes:
+                    for sign,head,tail in ((1,start_id,end_id),(-1,end_id,start_id)):
+                        modes=[]
+                        for mode in two_wheel_modes:
+                            rule=tags.get('oneway:bicycle',direction)
+                            if mode=='bike':
+                                rule=tags.get('oneway:electric_bicycle',rule)
+                            if (rule=='-1' and sign>0) or (rule in ('yes','true','1') and sign<0):
+                                continue
+                            modes.append(mode)
+                        if not modes:
+                            continue
                         lanes.append(dict(id=len(lanes),**{'from':head},to=tail,width=min(paved,2.22),
                                           offset=0,kind='nonmotor',cls=kind,way=way['id'],speedKmh=10,
-                                          modes=modes,oneway=False,heights=profile(head,tail,0,way['id'])))
+                                          modes=modes,oneway=single,heights=profile(head,tail,0,way['id'])))
                         incoming[tail].append(lanes[-1])
                 continue
             if kind in WALK:
@@ -268,7 +283,7 @@ def bake(output, manifest, rendered_roads=None):
                 for side in (-1,1):
                     if tags['sidewalk'] in ('both','left' if side<0 else 'right'):
                         add_walk(start_id,end_id,side*(count*size/2+1),way['id'],linear)
-            if way['id'] not in ground_passages.YARD_ROADS and not permits(tags,'bicycle' if kind=='cycleway' else 'car'):
+            if way['id'] not in ground_passages.YARD_ROADS and not (two_wheel_modes if kind=='cycleway' else permits(tags,'car')):
                 continue
             if forbidden.intersects(LineString([start,end]).buffer(count*size/2+2)):
                 continue
@@ -304,6 +319,7 @@ def bake(output, manifest, rendered_roads=None):
                             offset=(math.copysign(14.05,lateral)-lateral)/normal
                     lane = dict(id=len(lanes), to=tail, width=size, offset=round(offset,2), kind='nonmotor' if kind=='cycleway' else 'bus' if kind=='busway' else 'motor',speedKmh=number(tags.get('maxspeed'),20 if kind in ('cycleway','service') else 40),oneway=single)
                     if way['id'] in ground_passages.YARD_ROADS:lane['privateAccess']=True
+                    if kind=='cycleway':lane['modes']=two_wheel_modes
                     lane['from'] = head
                     lane['cls'] = kind
                     lane['way'] = way['id']
