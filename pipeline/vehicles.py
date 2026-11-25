@@ -131,7 +131,11 @@ def plan_vehicles(bounds, surface, roads, buildings, sample, landmark_faces=(), 
             for idx in np.atleast_1d(shores.query(location,k=min(96,len(bank)))[1]):
                 east,south = map(float,bank[idx]); point = Point(east,south)
                 if obstacles.query(point.buffer(1),predicate='intersects').size: continue
-                wx,wz = water[moorings.query((east,south))[1]]; row,col=int((wz-top)/GRID),int((wx-left)/GRID)
+                radius = moorings.query((east,south))[0]
+                candidates = moorings.query_ball_point((east,south),np.nextafter(radius,np.inf))
+                wx,wz = min((tuple(water[n]) for n in candidates),
+                            key=lambda p: ((p[0]-east)**2+(p[1]-south)**2, *p))
+                row,col=int((wz-top)/GRID),int((wx-left)/GRID)
                 docks[name]=[east,sample(east,south)[0],south];nodes[name]=ids[row,col];break
         for kind, stops in [('raft',['解放桥码头','象山渔人码头','解放桥码头']),('boat',['日月湾码头','杉湖','榕湖','桂湖','木龙湖','解放桥码头','文昌桥码头','知音台码头','日月湾码头'])]:
             for start,end in zip(stops,stops[1:]):

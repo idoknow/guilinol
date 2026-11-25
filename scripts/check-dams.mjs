@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import {createHash} from 'node:crypto'
 import {readFileSync} from 'node:fs'
 import {join} from 'node:path'
 import {gunzipSync} from 'node:zlib'
@@ -34,3 +35,15 @@ for(const [id,runs] of Object.entries(footprints)){
   console.log(`${id}: ${checked} dam samples checked`)
 }
 assert.equal(required.size,0,'Both acceptance sites must be present')
+for(const [id,passage] of Object.entries(passages)){
+  const [start,end]=passage.leg
+  const leg=vehicles.routes.find(r=>r.start===start && r.end===end && r.kind==='boat')
+  const openings=new Set(passage.cells.map(cell=>cell.join()))
+  assert(leg?.path.some(([x,,z])=>openings.has([x/4,z/4].join())),`${start} → ${end} bypasses ${id}`)
+}
+const baseline=JSON.parse(readFileSync(new URL('../pipeline/unchanged-vessel-legs.json',import.meta.url)))
+for(const [kind,start,end,expected] of baseline){
+  const leg=vehicles.routes.find(r=>r.kind===kind && r.start===start && r.end===end)
+  assert(leg,`${kind} ${start} → ${end} missing`)
+  assert.equal(createHash('sha256').update(JSON.stringify(leg.path)).digest('hex'),expected,`${start} → ${end} differs from published path`)
+}
