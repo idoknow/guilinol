@@ -1076,7 +1076,7 @@ try {
   }
 
   const preHud = await measureHud(mobile, [
-    '.walk-ui .joystick', '.walk-ui .btn-run', '.walk-ui .btn-jump',
+    '.walk-ui .joystick',  '.walk-ui .btn-jump',
     '.walk-ui .btn-view', '.vehicle-action', '.dock', '.sky-ui', 'output', '.hud-me',
   ])
   assert(preHud.boxes.some(b => b.sel === '.vehicle-action'), '手机端自由栈桥旁未显示 .vehicle-action')
@@ -1094,7 +1094,7 @@ try {
     vehicle: window.viewer.walk.vehicle,
     aboardAttr: document.body.hasAttribute('data-aboard'),
     jumpHidden: getComputedStyle(document.querySelector('.walk-ui .btn-jump')).display === 'none',
-    runHidden: getComputedStyle(document.querySelector('.walk-ui .btn-run')).display === 'none',
+    runHidden: !document.querySelector('.walk-ui .btn-run'),
     actionText: document.querySelector('.vehicle-action')?.textContent ?? '',
   }))
   assert.equal(aboardState.vehicle, 'boat', '手机端点击后应成功上船')

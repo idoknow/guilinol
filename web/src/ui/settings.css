@@ -188,6 +188,44 @@
 }
 
 /* IDOK-273 声音：总音量滑条 */
-.set-row--range { display: grid; grid-template-columns: minmax(0, 1fr) minmax(96px, 150px) 3em; }
+.set-row--range { display: grid; grid-template-columns: minmax(0, 1fr) minmax(96px, 150px) 3em; align-items: center; cursor: default; }
 .set-row--range input[type="range"] { width: 100%; margin: 0; accent-color: #a9503c; }
-.set-row--range .set-val { font: 600 12.5px/1 var(--ui-sans, system-ui, sans-serif); text-align: right; opacity: .8; }
+.set-row--range .set-val,
+.set-row--range output { font: 600 12.5px/1 var(--ui-sans, system-ui, sans-serif); text-align: right; opacity: .8; }
+/* 手机按键（IDOK-256）：三格预设，每格一张横放手机的小示意；选中格朱砂底、示意线反白。 */
+.set-seg--thumb {
+  grid-template-columns: repeat(3, 1fr);
+}
+
+.set-seg--thumb button {
+  display: grid;
+  justify-items: center;
+  gap: 4px;
+  padding: 8px 4px 7px;
+}
+
+.set-seg--thumb svg {
+  width: 54px;
+  height: 34px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.3;
+  opacity: .78;
+}
+
+.set-seg--thumb svg circle {
+  fill: currentColor;
+  fill-opacity: .18;
+}
+
+.set-seg--thumb button.on svg {
+  opacity: 1;
+}
+
+.set-seg--thumb button.on svg circle {
+  fill-opacity: .42;
+}
+
+.set-row--range output {
+  min-width: 3.2em;
+}

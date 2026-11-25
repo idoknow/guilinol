@@ -6,6 +6,7 @@ import {isGlobalHotkeyBlocked, isModalOrOverlayOpen, isTouchInControlZone} from 
 import {hits, type Action} from '../input/keymap'
 import {rideSoundMuted, setRideSoundMuted} from '../walk/ride-sound-pref'
 import {touchUi} from './input-mode'
+import {mountThumbLayout} from './thumb-layout'
 
 const MOD_LABELS = {stock: '素车', ghostfire: '鬼火', neon: '霓虹'} as const
 
@@ -13,16 +14,16 @@ function safeCapture(el:Element, pointerId:number) {
   try { el.setPointerCapture(pointerId) } catch {}
 }
 
-export function walkInput(canvas:HTMLCanvasElement,active:()=>boolean,rotate:(dx:number,dy:number)=>void,zoom:(delta:number)=>void,view:()=>void){
+export function walkInput(canvas:HTMLCanvasElement,active:()=>boolean,rotate:(dx:number,dy:number)=>void,zoom:(delta:number)=>void,view:()=>void,zoomLevel:()=>number=()=>.5){
   const keys=new Set<string>(), stick={x:0,y:0,mag:0}, panel=document.createElement('div')
 // 键位可改：keys 里存物理 code，判定时问 keymap 这个 code 现在是不是在做该动作。
 const held=(action:Action)=>{let on=false;keys.forEach(code=>{if(!on&&hits(code,action))on=true});return on}
+  mountThumbLayout()
   panel.className='walk-ui'
   panel.innerHTML='<div class="joystick" role="group" aria-label="移动"><span class="joystick-knob"></span></div>'
-    +'<button class="btn-run" type="button" aria-label="奔跑" aria-pressed="false">跑</button>'
     +'<button class="btn-crouch" type="button" aria-label="蹲伏" aria-pressed="false">蹲</button>'
     +'<button class="btn-jump" type="button" aria-label="跳">跃</button>'
-    +'<button class="btn-view" type="button" aria-label="切换视距">远近</button>'
+    +'<button class="btn-view" type="button" aria-label="视距：按住上下拖动调远近，轻点切换"><span>远近</span><i class="view-rail" aria-hidden="true"><b>近</b><s></s><b>远</b></i></button>'
     +'<button class="btn-wheelie" type="button" aria-label="翘头或扶车">翘头</button>'
     +'<button class="btn-gear-up" type="button" aria-label="升挡">+挡</button>'
     +'<button class="btn-gear-down" type="button" aria-label="降挡">-挡</button>'
@@ -60,12 +61,12 @@ const held=(action:Action)=>{let on=false;keys.forEach(code=>{if(!on&&hits(code,
   const keysEl=rideHud.querySelector<HTMLElement>('.ride-keys')!
 
   const joystick=panel.querySelector<HTMLElement>('.joystick')!, knob=panel.querySelector<HTMLElement>('.joystick-knob')!
-  const btnRun=panel.querySelector<HTMLButtonElement>('.btn-run')!, btnCrouch=panel.querySelector<HTMLButtonElement>('.btn-crouch')!, btnJump=panel.querySelector<HTMLButtonElement>('.btn-jump')!, btnView=panel.querySelector<HTMLButtonElement>('.btn-view')!
+  const btnCrouch=panel.querySelector<HTMLButtonElement>('.btn-crouch')!, btnJump=panel.querySelector<HTMLButtonElement>('.btn-jump')!, btnView=panel.querySelector<HTMLButtonElement>('.btn-view')!
   const btnWheelie=panel.querySelector<HTMLButtonElement>('.btn-wheelie')!
   const btnGearUp=panel.querySelector<HTMLButtonElement>('.btn-gear-up')!
   const btnGearDown=panel.querySelector<HTMLButtonElement>('.btn-gear-down')!
   const btnTuck=panel.querySelector<HTMLButtonElement>('.btn-tuck')!
-  let jump=false, crouch=false, runHold=false, runLock=false, runDownAt=0, stickPointer=-1, runPointer=-1
+  let jump=false, crouch=false, stickPointer=-1
   function syncCrouch(){
     btnCrouch.classList.toggle('on',crouch)
     btnCrouch.setAttribute('aria-pressed',String(crouch))
@@ -88,17 +89,16 @@ const held=(action:Action)=>{let on=false;keys.forEach(code=>{if(!on&&hits(code,
   }
   function clearTransientInput(clearKeys=true){
     if(clearKeys)keys.clear()
-    jump=false;crouch=false;syncCrouch();runHold=false;runLock=false;runPointer=-1
+    jump=false;crouch=false;syncCrouch();endView()
     resetRideTouchControls()
     touches.clear();mouseDown=false;pinchDist=0
     resetStick()
   }
 
+  // 手机端没有跑键（IDOK-256）：摇杆推到底就是跑，桌面仍是 Shift。
   function syncRun(){
-    const running=runHold||runLock||stick.mag>.9
+    const running=stick.mag>.9
     if(running&&crouch){crouch=false;syncCrouch()}
-    btnRun.classList.toggle('on',runHold||runLock)
-    btnRun.setAttribute('aria-pressed',String(runHold||runLock))
     joystick.classList.toggle('running',running&&stick.mag>.1&&!document.body.hasAttribute('data-aboard'))
   }
   function resetStick(){stick.x=stick.y=stick.mag=0;stickPointer=-1;knob.style.transform='';syncRun()}
@@ -122,22 +122,52 @@ const held=(action:Action)=>{let on=false;keys.forEach(code=>{if(!on&&hits(code,
   window.addEventListener('pointermove',event=>{if(event.pointerId===stickPointer)drag(event)})
   window.addEventListener('pointerup',event=>{
     endStick(event)
-    if(event.pointerId===runPointer)endRun(true,event.pointerId)
     if(event.pointerId===wheeliePointer){wheelieTouch=false;wheeliePointer=-1;btnWheelie.classList.remove('on')}
     if(event.pointerId===tuckPointer){tuckTouch=false;tuckPointer=-1;btnTuck.classList.remove('on');btnTuck.setAttribute('aria-pressed','false')}
     if(event.pointerId===hornPointer){hornTouch=false;hornPointer=-1;hornBtn.classList.remove('on')}
   })
   window.addEventListener('pointercancel',event=>{
     endStick(event)
-    if(event.pointerId===runPointer)endRun(false,event.pointerId)
     if(event.pointerId===wheeliePointer){wheelieTouch=false;wheeliePointer=-1;btnWheelie.classList.remove('on')}
     if(event.pointerId===tuckPointer){tuckTouch=false;tuckPointer=-1;btnTuck.classList.remove('on');btnTuck.setAttribute('aria-pressed','false')}
     if(event.pointerId===hornPointer){hornTouch=false;hornPointer=-1;hornBtn.classList.remove('on')}
   })
 
   btnJump.onpointerdown=event=>{event.preventDefault();event.stopPropagation();crouch=false;syncCrouch();jump=true}
-  btnCrouch.onpointerdown=event=>{event.preventDefault();event.stopPropagation();crouch=!crouch;if(crouch){runHold=false;runLock=false;syncRun()}syncCrouch()}
-  btnView.onpointerdown=event=>{event.preventDefault();event.stopPropagation();view()}
+  btnCrouch.onpointerdown=event=>{event.preventDefault();event.stopPropagation();crouch=!crouch;syncCrouch()}
+  // 远近（IDOK-256）：按住后上下拖动连续变焦（上近下远），轻点（<8px 且 <220ms）仍在近/远两档间切换。
+  // 按下时在按钮上方展开一条竖向滑轨，刻度跟着实际视距走；松手后 0.6 s 收起。
+  const viewDot=btnView.querySelector<HTMLElement>('.view-rail s')!
+  let viewPointer=-1, viewDownAt=0, viewStartY=0, viewLastY=0, viewMoved=false, viewFade=0
+  const paintView=()=>{viewDot.style.setProperty('--z',Math.max(0,Math.min(1,zoomLevel())).toFixed(3))}
+  function endView(){
+    if(viewPointer<0)return
+    viewPointer=-1;btnView.classList.remove('on');delete document.body.dataset.zooming
+    clearTimeout(viewFade);viewFade=window.setTimeout(()=>btnView.classList.remove('dragging'),600)
+  }
+  btnView.onpointerdown=event=>{
+    event.preventDefault();event.stopPropagation()
+    viewPointer=event.pointerId;safeCapture(btnView,event.pointerId)
+    viewDownAt=performance.now();viewStartY=viewLastY=event.clientY;viewMoved=false
+    clearTimeout(viewFade);btnView.classList.add('on','dragging');document.body.dataset.zooming='1';paintView()
+  }
+  btnView.onpointermove=event=>{
+    if(event.pointerId!==viewPointer)return
+    event.stopPropagation()
+    if(!viewMoved&&Math.abs(event.clientY-viewStartY)<8)return
+    viewMoved=true
+    // 140 px 走完整个 zoomMin→zoomMax（arm += delta*.013）。
+    zoom((event.clientY-viewLastY)*(cfg.zoomMax-cfg.zoomMin)/140/.013)
+    viewLastY=event.clientY;paintView()
+  }
+  btnView.onpointerup=event=>{
+    if(event.pointerId!==viewPointer)return
+    event.stopPropagation()
+    if(!viewMoved&&performance.now()-viewDownAt<220){view();paintView()}
+    endView()
+  }
+  btnView.onpointercancel=event=>{if(event.pointerId===viewPointer)endView()}
+  btnView.onlostpointercapture=event=>{if(event.pointerId===viewPointer)endView()}
   const btnHail=panel.querySelector<HTMLButtonElement>('.btn-hail')!
   btnHail.onpointerdown=event=>{event.preventDefault();event.stopPropagation();window.dispatchEvent(new CustomEvent('walk:hail'))}
   btnGearUp.onpointerdown=event=>{event.preventDefault();event.stopPropagation();gearDelta+=1}
@@ -189,14 +219,9 @@ const held=(action:Action)=>{let on=false;keys.forEach(code=>{if(!on&&hits(code,
   }
   stateEl.onpointerdown=event=>{event.stopPropagation()}
   stateEl.onclick=event=>{event.stopPropagation();if(document.body.dataset.rideCrash==='1')recoverPulse=true}
-  btnRun.onpointerdown=event=>{event.preventDefault();event.stopPropagation();runPointer=event.pointerId;safeCapture(btnRun,event.pointerId);runHold=true;runDownAt=performance.now();syncRun()}
-  const endRun=(toggle:boolean,pointerId?:number)=>{if(!runHold||(pointerId!==undefined&&pointerId!==runPointer))return;if(toggle&&performance.now()-runDownAt<220)runLock=!runLock;runHold=false;runPointer=-1;syncRun()}
-  btnRun.onpointerup=event=>endRun(true,event.pointerId)
-  btnRun.onpointercancel=event=>endRun(false,event.pointerId)
   new MutationObserver(()=>{
     if(document.body.dataset.photo==='on'||document.body.dataset.shopOpen==='1'){clearTransientInput(true);return}
     crouch=false;syncCrouch()
-    runHold=false;runLock=false;runPointer=-1
     resetRideTouchControls()
     resetStick()
   }).observe(document.body,{attributes:true,attributeFilter:['data-aboard','data-photo','data-shop-open']})
@@ -249,6 +274,16 @@ const held=(action:Action)=>{let on=false;keys.forEach(code=>{if(!on&&hits(code,
     clearInterval(lockWatch);lockWatch=0
     if(document.pointerLockElement===canvas)lockWatch=window.setInterval(releaseLockIfBlocked,150)
   })
+  /** Visible thumb controls for the touch guard (IDOK-256: presets / size / left-hand mode move them). */
+  function controlRects(){
+    const out:{left:number,top:number,right:number,bottom:number,stick?:boolean}[]=[]
+    if(panel.hidden)return out
+    for(const el of Array.from(panel.children) as HTMLElement[]){
+      const r=el.getBoundingClientRect()
+      if(r.width&&r.height)out.push({left:r.left,top:r.top,right:r.right,bottom:r.bottom,stick:el===joystick})
+    }
+    return out
+  }
   function touchDistance(){
     const [a,b]=[...touches.values()]
     return a&&b?Math.hypot(a.x-b.x,a.y-b.y):0
@@ -266,7 +301,7 @@ const held=(action:Action)=>{let on=false;keys.forEach(code=>{if(!on&&hits(code,
       if(isTouchInControlZone({
         clientX:event.clientX,clientY:event.clientY,innerWidth,innerHeight,
         panelVisible:!panel.hidden,photoOn:document.body.dataset.photo==='on',
-        aboard:document.body.hasAttribute('data-aboard'),target:event.target,
+        aboard:document.body.hasAttribute('data-aboard'),target:event.target,controls:controlRects(),
       }))return
       touches.set(event.pointerId,{x:event.clientX,y:event.clientY})
       safeCapture(canvas,event.pointerId)
@@ -311,20 +346,20 @@ const held=(action:Action)=>{let on=false;keys.forEach(code=>{if(!on&&hits(code,
       clearTransientInput(true)
     },
     clearTransientInput,
+    /** Kept for callers that reset sprint on boarding; on touch the stick itself is the only run input now. */
     clearRun(){
-      runHold=false;runLock=false;runPointer=-1;syncRun()
+      syncRun()
     },
     /** Movement intent for this frame. */
     read(dt?:number){
       if(isModalOrOverlayOpen()){
-        if(keys.size||jump||crouch||runHold||runLock||stick.mag>0)clearTransientInput(true)
+        if(keys.size||jump||crouch||stick.mag>0)clearTransientInput(true)
         return {right:0,forward:0,run:false,crouch:false,jump:false}
       }
-      if(document.body.hasAttribute('data-aboard')&&(runHold||runLock)){runHold=false;runLock=false;runPointer=-1;syncRun()}
       if(document.body.hasAttribute('data-aboard')&&crouch){crouch=false;syncCrouch()}
       const right=Math.max(-1,Math.min(1,+held('right')-+held('left')+stick.x))
       const forward=Math.max(-1,Math.min(1,+held('forward')-+held('back')-stick.y))
-      const run=held('run')||runHold||runLock||stick.mag>.9
+      const run=held('run')||stick.mag>.9
       if(run&&crouch){crouch=false;syncCrouch()}
       const jumped=jump;jump=false
       return {right,forward,run,crouch,jump:jumped}
