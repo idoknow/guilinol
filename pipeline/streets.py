@@ -31,6 +31,10 @@ def chunks(roads,banks,bounds,water,sample,exclude,ped_areas=(),replace_exclude=
         kerb = substring(rongyin.line,248,284).offset_curve(rongyin.width/2+2.02)
         parking_walk = kerb.buffer(4.5,single_sided=True,quad_segs=2)
     rep_excl = replace_exclude if replace_exclude is not None else Polygon()
+    from station_site import station_paving
+    ped_areas, station_walk, station_taxi, station_open = station_paving(ped_areas, bounds)
+    sidewalks.extend(station_walk)
+    surfaces.extend(station_taxi)
     for pa in ped_areas:
         clipped_pa = pa.difference(rep_excl) if not rep_excl.is_empty else pa
         if not clipped_pa.is_empty:
@@ -316,7 +320,10 @@ def chunks(roads,banks,bounds,water,sample,exclude,ped_areas=(),replace_exclude=
                                 pos_s += 3.1
 
     layers=[STRtree(values) for values in (surfaces,sidewalks,stripes,medians,gaps)]
-    obstacles = STRtree([*footprints, *water, *bridge.geometries, *polygons(exclude), *polygons(rep_excl), *clear.geometries])
+    fixed_obstacles = [*footprints, *water, *bridge.geometries, *polygons(rep_excl), *clear.geometries]
+    obstacles = STRtree([*fixed_obstacles, *polygons(exclude)])
+    paving_obstacles = (STRtree([*fixed_obstacles, *polygons(exclude.difference(station_open))])
+                        if not station_open.is_empty else obstacles)
     decor = defaultdict(list)
     parking_keepout = STRtree([
         *(gap.buffer(3) for gap in gaps),
@@ -440,7 +447,7 @@ def chunks(roads,banks,bounds,water,sample,exclude,ped_areas=(),replace_exclude=
         shapes[2]=shapes[2].difference(shapes[3])
         if modeled_paving is not None and tile.intersects(modeled_paving):
             shapes[:3]=[shape.difference(modeled_paving) for shape in shapes[:3]]
-        blocked = unary_union([shapes[0], shapes[4], clipped(obstacles, tile)])
+        blocked = unary_union([shapes[0], shapes[4], clipped(paving_obstacles, tile)])
         if modeled_paving is not None:
             blocked = blocked.union(modeled_paving.intersection(tile))
         walk, verge, cycle, tactile = [clipped(layer, tile).difference(blocked) for layer in bands]

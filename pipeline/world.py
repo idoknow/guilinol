@@ -299,6 +299,8 @@ def build(bbox, output, palette, workers=4):
     if play_region:
         from airport import grade_terminal_lanes
         grade_terminal_lanes(terrain,original,left,top,GRID)
+    from station_site import grade_station
+    grade_station(terrain, original, surface, left, top, carriageway_mask, sidewalk_mask, road_ctrl)
     ground_mesh_at = build_ground_mesh_lookup(original, surface, left, top, width, depth)
     if play_region:
         from road_tunnels import corridor_underpasses
@@ -554,6 +556,8 @@ def build(bbox, output, palette, workers=4):
     print('Terrain SHA-256:', digest.hexdigest())
     if play_region:
         manifest['region'] = play_region.manifest()
+    from station_site import mark_station_tiles
+    mark_station_tiles(chunks)
     manifest['landmarks'] = landmarks
     if tunnels:
         manifest['tunnels'] = tunnels
