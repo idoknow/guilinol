@@ -46,7 +46,7 @@
     "boundary": false,
     "direction": "in",
     "completed": true,
-    "maximum": 0.026872571009533885,
+    "maximum": 0.026864651913911075,
     "obstacle": ""
   },
   {
@@ -86,7 +86,7 @@
     "boundary": false,
     "direction": "in",
     "completed": true,
-    "maximum": 0.0046176728212401486,
+    "maximum": 0.004632812738435632,
     "obstacle": ""
   },
   {
@@ -96,7 +96,7 @@
     "boundary": false,
     "direction": "out",
     "completed": true,
-    "maximum": 0.004526365140691269,
+    "maximum": 0.004526350070847229,
     "obstacle": ""
   },
   {
@@ -106,7 +106,7 @@
     "boundary": false,
     "direction": "in",
     "completed": true,
-    "maximum": 0.014190883799017229,
+    "maximum": 0.014277077008358674,
     "obstacle": ""
   },
   {
@@ -116,7 +116,7 @@
     "boundary": false,
     "direction": "out",
     "completed": true,
-    "maximum": 0.020181348533441223,
+    "maximum": 0.02022208689135141,
     "obstacle": ""
   },
   {
@@ -126,7 +126,7 @@
     "boundary": false,
     "direction": "in",
     "completed": true,
-    "maximum": 0.0035865871157909623,
+    "maximum": 0.0035888281305176406,
     "obstacle": ""
   },
   {
@@ -146,7 +146,7 @@
     "boundary": false,
     "direction": "in",
     "completed": true,
-    "maximum": 0.005907171177398141,
+    "maximum": 0.0059222508151606235,
     "obstacle": ""
   },
   {
@@ -176,7 +176,7 @@
     "boundary": false,
     "direction": "out",
     "completed": true,
-    "maximum": 0.005493491888046265,
+    "maximum": 0.005480662156969629,
     "obstacle": ""
   },
   {
@@ -186,7 +186,7 @@
     "boundary": false,
     "direction": "in",
     "completed": true,
-    "maximum": 0.04472969961616968,
+    "maximum": 0.04473885354005347,
     "obstacle": ""
   },
   {
@@ -196,7 +196,7 @@
     "boundary": false,
     "direction": "out",
     "completed": true,
-    "maximum": 0.031094269109530615,
+    "maximum": 0.03120413308215575,
     "obstacle": ""
   },
   {
@@ -206,7 +206,7 @@
     "boundary": false,
     "direction": "in",
     "completed": true,
-    "maximum": 0.020722061753787102,
+    "maximum": 0.020534469507566655,
     "obstacle": ""
   },
   {
@@ -216,7 +216,7 @@
     "boundary": false,
     "direction": "out",
     "completed": true,
-    "maximum": 0.021478073256560037,
+    "maximum": 0.021505409108272033,
     "obstacle": ""
   },
   {
@@ -276,7 +276,7 @@
     "boundary": false,
     "direction": "out",
     "completed": true,
-    "maximum": 0.0009505636339213197,
+    "maximum": 0.0009591347295270225,
     "obstacle": ""
   },
   {
@@ -286,7 +286,7 @@
     "boundary": false,
     "direction": "in",
     "completed": true,
-    "maximum": 0.008715871257606977,
+    "maximum": 0.008344527348043584,
     "obstacle": ""
   },
   {
@@ -296,7 +296,7 @@
     "boundary": false,
     "direction": "out",
     "completed": true,
-    "maximum": 0.005198070800531696,
+    "maximum": 0.0051955248949582256,
     "obstacle": ""
   },
   {
@@ -316,7 +316,7 @@
     "boundary": false,
     "direction": "out",
     "completed": true,
-    "maximum": 0.002555558398512403,
+    "maximum": 0.002547839025680787,
     "obstacle": ""
   },
   {
@@ -356,7 +356,7 @@
     "boundary": false,
     "direction": "out",
     "completed": true,
-    "maximum": 0.0023679226424349054,
+    "maximum": 0.0023679226424064836,
     "obstacle": ""
   },
   {
@@ -366,7 +366,7 @@
     "boundary": false,
     "direction": "in",
     "completed": true,
-    "maximum": 0.004181945820249666,
+    "maximum": 0.00418194582030651,
     "obstacle": ""
   },
   {
@@ -376,7 +376,7 @@
     "boundary": false,
     "direction": "out",
     "completed": true,
-    "maximum": 0.0041326663734366775,
+    "maximum": 0.0041324962665783005,
     "obstacle": ""
   },
   {
@@ -386,7 +386,7 @@
     "boundary": false,
     "direction": "in",
     "completed": true,
-    "maximum": 0.0023860528090722255,
+    "maximum": 0.0023860489515925565,
     "obstacle": ""
   },
   {
@@ -396,7 +396,7 @@
     "boundary": false,
     "direction": "out",
     "completed": true,
-    "maximum": 0.002387027870042857,
+    "maximum": 0.002387027870071279,
     "obstacle": ""
   },
   {
@@ -406,7 +406,7 @@
     "boundary": false,
     "direction": "in",
     "completed": true,
-    "maximum": 0.0032683249049227925,
+    "maximum": 0.003251787396806094,
     "obstacle": ""
   },
   {
@@ -416,7 +416,7 @@
     "boundary": false,
     "direction": "out",
     "completed": true,
-    "maximum": 0.0038258641111781344,
+    "maximum": 0.0038441436824996345,
     "obstacle": ""
   },
   {
@@ -426,7 +426,7 @@
     "boundary": false,
     "direction": "in",
     "completed": true,
-    "maximum": 0.023500326417774886,
+    "maximum": 0.023640746480168673,
     "obstacle": ""
   },
   {
@@ -446,7 +446,7 @@
     "boundary": false,
     "direction": "in",
     "completed": true,
-    "maximum": 0.0073747382571980324,
+    "maximum": 0.007372485485916513,
     "obstacle": ""
   },
   {
@@ -466,7 +466,7 @@
     "boundary": false,
     "direction": "in",
     "completed": true,
-    "maximum": 0.0041951131248936235,
+    "maximum": 0.004180362261763548,
     "obstacle": ""
   },
   {
@@ -476,7 +476,7 @@
     "boundary": false,
     "direction": "out",
     "completed": true,
-    "maximum": 0.004243384293744157,
+    "maximum": 0.0042433842937725785,
     "obstacle": ""
   },
   {
@@ -486,7 +486,7 @@
     "boundary": false,
     "direction": "in",
     "completed": true,
-    "maximum": 0.007926218914548144,
+    "maximum": 0.007926784933744102,
     "obstacle": ""
   },
   {
@@ -496,7 +496,7 @@
     "boundary": false,
     "direction": "out",
     "completed": true,
-    "maximum": 0.007471745868912194,
+    "maximum": 0.007457693567801016,
     "obstacle": ""
   },
   {
@@ -526,7 +526,7 @@
     "boundary": false,
     "direction": "in",
     "completed": true,
-    "maximum": 0.04133631305873564,
+    "maximum": 0.03519852532528489,
     "obstacle": ""
   },
   {
@@ -536,7 +536,7 @@
     "boundary": false,
     "direction": "out",
     "completed": true,
-    "maximum": 0.03848322405005433,
+    "maximum": 0.03848512183944308,
     "obstacle": ""
   },
   {
@@ -556,7 +556,7 @@
     "boundary": false,
     "direction": "out",
     "completed": true,
-    "maximum": 0.0029612960179008496,
+    "maximum": 0.002950653958237126,
     "obstacle": ""
   },
   {
@@ -566,7 +566,7 @@
     "boundary": false,
     "direction": "in",
     "completed": true,
-    "maximum": 0.004645532676846642,
+    "maximum": 0.0046094898056310285,
     "obstacle": ""
   },
   {
@@ -576,7 +576,7 @@
     "boundary": false,
     "direction": "out",
     "completed": true,
-    "maximum": 0.005054205322323924,
+    "maximum": 0.005128633711848352,
     "obstacle": ""
   },
   {
@@ -586,7 +586,7 @@
     "boundary": false,
     "direction": "in",
     "completed": true,
-    "maximum": 0.0029858124720192336,
+    "maximum": 0.0029867499210922688,
     "obstacle": ""
   },
   {
@@ -596,7 +596,7 @@
     "boundary": false,
     "direction": "out",
     "completed": true,
-    "maximum": 0.002963973964313027,
+    "maximum": 0.002959778830444293,
     "obstacle": ""
   },
   {
@@ -616,7 +616,7 @@
     "boundary": false,
     "direction": "out",
     "completed": true,
-    "maximum": 0.002956735135200006,
+    "maximum": 0.0029552148409663914,
     "obstacle": ""
   },
   {
@@ -626,7 +626,7 @@
     "boundary": false,
     "direction": "in",
     "completed": true,
-    "maximum": 0.00496182198028805,
+    "maximum": 0.0049384565615469,
     "obstacle": ""
   },
   {
@@ -636,7 +636,7 @@
     "boundary": false,
     "direction": "out",
     "completed": true,
-    "maximum": 0.004199953089084829,
+    "maximum": 0.004383344424837787,
     "obstacle": ""
   },
   {
@@ -646,7 +646,7 @@
     "boundary": false,
     "direction": "in",
     "completed": true,
-    "maximum": 0.002387674304088705,
+    "maximum": 0.0023879744805412884,
     "obstacle": ""
   },
   {
@@ -656,7 +656,7 @@
     "boundary": false,
     "direction": "out",
     "completed": true,
-    "maximum": 0.002385048454726757,
+    "maximum": 0.0023841479818429434,
     "obstacle": ""
   },
   {
@@ -686,7 +686,7 @@
     "boundary": false,
     "direction": "in",
     "completed": true,
-    "maximum": 0.002990983298388983,
+    "maximum": 0.002991038286836556,
     "obstacle": ""
   },
   {
@@ -706,7 +706,7 @@
     "boundary": false,
     "direction": "in",
     "completed": true,
-    "maximum": 0.0029914061801434855,
+    "maximum": 0.002991406180200329,
     "obstacle": ""
   },
   {
@@ -726,7 +726,7 @@
     "boundary": false,
     "direction": "in",
     "completed": true,
-    "maximum": 0.0031005310612783887,
+    "maximum": 0.0031012721314596092,
     "obstacle": ""
   },
   {
@@ -736,7 +736,7 @@
     "boundary": false,
     "direction": "out",
     "completed": true,
-    "maximum": 0.004064800856184547,
+    "maximum": 0.0040775895924696215,
     "obstacle": ""
   },
   {
@@ -756,7 +756,7 @@
     "boundary": false,
     "direction": "out",
     "completed": true,
-    "maximum": 0.0316309463663913,
+    "maximum": 0.031639685235916204,
     "obstacle": ""
   },
   {
@@ -766,7 +766,7 @@
     "boundary": false,
     "direction": "in",
     "completed": true,
-    "maximum": 0.013375885880293481,
+    "maximum": 0.013220710294660876,
     "obstacle": ""
   },
   {
@@ -776,7 +776,7 @@
     "boundary": false,
     "direction": "out",
     "completed": true,
-    "maximum": 0.022729612151238143,
+    "maximum": 0.022770317386601846,
     "obstacle": ""
   },
   {
@@ -786,7 +786,7 @@
     "boundary": false,
     "direction": "in",
     "completed": true,
-    "maximum": 0.002383010606990865,
+    "maximum": 0.002383010607019287,
     "obstacle": ""
   },
   {
@@ -806,7 +806,7 @@
     "boundary": false,
     "direction": "in",
     "completed": true,
-    "maximum": 0.02291334113814969,
+    "maximum": 0.02288361485929613,
     "obstacle": ""
   },
   {
@@ -816,7 +816,7 @@
     "boundary": false,
     "direction": "out",
     "completed": true,
-    "maximum": 0.023349954248260474,
+    "maximum": 0.023349954271736806,
     "obstacle": ""
   },
   {
@@ -826,7 +826,7 @@
     "boundary": false,
     "direction": "in",
     "completed": true,
-    "maximum": 0.007676240633117004,
+    "maximum": 0.007696893305165986,
     "obstacle": ""
   },
   {
@@ -836,7 +836,7 @@
     "boundary": false,
     "direction": "out",
     "completed": true,
-    "maximum": 0.007114748429358997,
+    "maximum": 0.007103940777909656,
     "obstacle": ""
   },
   {
@@ -846,7 +846,7 @@
     "boundary": false,
     "direction": "in",
     "completed": true,
-    "maximum": 0.007422771168165809,
+    "maximum": 0.00515425975135031,
     "obstacle": ""
   },
   {
@@ -856,7 +856,7 @@
     "boundary": false,
     "direction": "out",
     "completed": true,
-    "maximum": 0.006836384802653583,
+    "maximum": 0.006811710556206663,
     "obstacle": ""
   },
   {
@@ -866,7 +866,7 @@
     "boundary": false,
     "direction": "in",
     "completed": true,
-    "maximum": 0.025865967493871267,
+    "maximum": 0.017130890487948136,
     "obstacle": ""
   },
   {
@@ -876,7 +876,7 @@
     "boundary": false,
     "direction": "out",
     "completed": true,
-    "maximum": 0.017613267264238175,
+    "maximum": 0.017625189170985323,
     "obstacle": ""
   },
   {
@@ -886,7 +886,7 @@
     "boundary": false,
     "direction": "in",
     "completed": true,
-    "maximum": 0.027387761892470053,
+    "maximum": 0.027420798874572938,
     "obstacle": ""
   },
   {
@@ -896,7 +896,7 @@
     "boundary": false,
     "direction": "out",
     "completed": true,
-    "maximum": 0.025965082532678707,
+    "maximum": 0.02596949108507829,
     "obstacle": ""
   },
   {
@@ -916,7 +916,7 @@
     "boundary": false,
     "direction": "out",
     "completed": true,
-    "maximum": 0.001754119261249798,
+    "maximum": 0.0017374644864389666,
     "obstacle": ""
   },
   {
@@ -936,7 +936,7 @@
     "boundary": false,
     "direction": "out",
     "completed": true,
-    "maximum": 0.002376399636489168,
+    "maximum": 0.0023763996364607465,
     "obstacle": ""
   },
   {
@@ -956,7 +956,7 @@
     "boundary": false,
     "direction": "out",
     "completed": true,
-    "maximum": 0.002376328028788066,
+    "maximum": 0.002376317229874303,
     "obstacle": ""
   },
   {
@@ -996,7 +996,7 @@
     "boundary": false,
     "direction": "out",
     "completed": true,
-    "maximum": 0.0029596145444941158,
+    "maximum": 0.0029551033027530593,
     "obstacle": ""
   },
   {
@@ -1006,7 +1006,7 @@
     "boundary": false,
     "direction": "in",
     "completed": true,
-    "maximum": 0.0030580690436750047,
+    "maximum": 0.0030817545478782904,
     "obstacle": ""
   },
   {
@@ -1016,7 +1016,7 @@
     "boundary": false,
     "direction": "out",
     "completed": true,
-    "maximum": 0.003039989746298488,
+    "maximum": 0.0030428490629503813,
     "obstacle": ""
   },
   {
@@ -1026,7 +1026,7 @@
     "boundary": false,
     "direction": "in",
     "completed": true,
-    "maximum": 0.0029888360673169245,
+    "maximum": 0.002986003898058698,
     "obstacle": ""
   },
   {
@@ -1056,7 +1056,7 @@
     "boundary": false,
     "direction": "out",
     "completed": true,
-    "maximum": 0.0029567825617107246,
+    "maximum": 0.002960527309170402,
     "obstacle": ""
   },
   {
@@ -1076,7 +1076,7 @@
     "boundary": false,
     "direction": "out",
     "completed": true,
-    "maximum": 0.0035323863075404915,
+    "maximum": 0.0035324165295662624,
     "obstacle": ""
   },
   {
@@ -1086,7 +1086,7 @@
     "boundary": false,
     "direction": "in",
     "completed": true,
-    "maximum": 0.003717945636509512,
+    "maximum": 0.0036933240301095793,
     "obstacle": ""
   },
   {
@@ -1096,7 +1096,7 @@
     "boundary": false,
     "direction": "out",
     "completed": true,
-    "maximum": 0.0037455781507276242,
+    "maximum": 0.003723927228378443,
     "obstacle": ""
   },
   {
@@ -1106,7 +1106,7 @@
     "boundary": false,
     "direction": "in",
     "completed": true,
-    "maximum": 0.007790780179931289,
+    "maximum": 0.007831671890244252,
     "obstacle": ""
   },
   {
@@ -1116,7 +1116,7 @@
     "boundary": false,
     "direction": "out",
     "completed": true,
-    "maximum": 0.005863975766061458,
+    "maximum": 0.005901452334711621,
     "obstacle": ""
   },
   {
@@ -1126,7 +1126,7 @@
     "boundary": false,
     "direction": "in",
     "completed": true,
-    "maximum": 0.027021633903927977,
+    "maximum": 0.018907885888836518,
     "obstacle": ""
   },
   {
@@ -1136,7 +1136,7 @@
     "boundary": false,
     "direction": "out",
     "completed": true,
-    "maximum": 0.014795069874452338,
+    "maximum": 0.016084954693610598,
     "obstacle": ""
   },
   {
@@ -1146,7 +1146,7 @@
     "boundary": false,
     "direction": "in",
     "completed": true,
-    "maximum": 0.03267638844266685,
+    "maximum": 0.03266773374653553,
     "obstacle": ""
   },
   {
@@ -1156,7 +1156,7 @@
     "boundary": false,
     "direction": "out",
     "completed": true,
-    "maximum": 0.03200826947835367,
+    "maximum": 0.0320312771920328,
     "obstacle": ""
   },
   {
@@ -1166,7 +1166,7 @@
     "boundary": false,
     "direction": "in",
     "completed": true,
-    "maximum": 0.006321416078606035,
+    "maximum": 0.0062693130343234316,
     "obstacle": ""
   },
   {
@@ -1176,7 +1176,7 @@
     "boundary": false,
     "direction": "out",
     "completed": true,
-    "maximum": 0.007016896083740676,
+    "maximum": 0.007028065481478052,
     "obstacle": ""
   },
   {
@@ -1186,7 +1186,7 @@
     "boundary": false,
     "direction": "in",
     "completed": true,
-    "maximum": 0.008738253404800389,
+    "maximum": 0.008725260046816175,
     "obstacle": ""
   },
   {
@@ -1196,7 +1196,7 @@
     "boundary": false,
     "direction": "out",
     "completed": true,
-    "maximum": 0.010139979455772163,
+    "maximum": 0.010111003555067555,
     "obstacle": ""
   },
   {
@@ -1206,7 +1206,7 @@
     "boundary": false,
     "direction": "in",
     "completed": true,
-    "maximum": 0.005774224649826465,
+    "maximum": 0.005766804018037419,
     "obstacle": ""
   },
   {
@@ -1216,7 +1216,7 @@
     "boundary": false,
     "direction": "out",
     "completed": true,
-    "maximum": 0.0059107754343017405,
+    "maximum": 0.00596933850545156,
     "obstacle": ""
   },
   {
@@ -1226,7 +1226,7 @@
     "boundary": false,
     "direction": "in",
     "completed": true,
-    "maximum": 0.004425785877231192,
+    "maximum": 0.004469752289423923,
     "obstacle": ""
   },
   {
@@ -1236,7 +1236,7 @@
     "boundary": false,
     "direction": "out",
     "completed": true,
-    "maximum": 0.004521099534684936,
+    "maximum": 0.004486756814031878,
     "obstacle": ""
   },
   {
@@ -1256,7 +1256,7 @@
     "boundary": false,
     "direction": "out",
     "completed": true,
-    "maximum": 0.004649064618917009,
+    "maximum": 0.004660755731094923,
     "obstacle": ""
   },
   {
@@ -1266,7 +1266,7 @@
     "boundary": false,
     "direction": "in",
     "completed": true,
-    "maximum": 0.0073546096732286514,
+    "maximum": 0.007377685251327648,
     "obstacle": ""
   },
   {
@@ -1276,7 +1276,7 @@
     "boundary": false,
     "direction": "out",
     "completed": true,
-    "maximum": 0.006955363760056343,
+    "maximum": 0.006945292694354066,
     "obstacle": ""
   },
   {
@@ -1286,7 +1286,7 @@
     "boundary": false,
     "direction": "in",
     "completed": true,
-    "maximum": 0.009615142299878698,
+    "maximum": 0.009610593032107317,
     "obstacle": ""
   },
   {
@@ -1296,7 +1296,7 @@
     "boundary": false,
     "direction": "out",
     "completed": true,
-    "maximum": 0.009205921058281774,
+    "maximum": 0.009237506909670401,
     "obstacle": ""
   },
   {
@@ -1306,7 +1306,7 @@
     "boundary": false,
     "direction": "in",
     "completed": true,
-    "maximum": 0.004596614282803557,
+    "maximum": 0.00466612676845557,
     "obstacle": ""
   },
   {
@@ -1316,7 +1316,7 @@
     "boundary": false,
     "direction": "out",
     "completed": true,
-    "maximum": 0.004619141845381591,
+    "maximum": 0.004638520374413702,
     "obstacle": ""
   },
   {
@@ -1326,7 +1326,7 @@
     "boundary": false,
     "direction": "in",
     "completed": true,
-    "maximum": 0.0024815264202970866,
+    "maximum": 0.0024910876369119705,
     "obstacle": ""
   },
   {
@@ -1336,7 +1336,7 @@
     "boundary": false,
     "direction": "out",
     "completed": true,
-    "maximum": 0.003122698265968893,
+    "maximum": 0.0031028032791482474,
     "obstacle": ""
   },
   {
@@ -1346,7 +1346,7 @@
     "boundary": false,
     "direction": "in",
     "completed": true,
-    "maximum": 0.0028501659061248574,
+    "maximum": 0.002853769771718362,
     "obstacle": ""
   },
   {
@@ -1356,7 +1356,7 @@
     "boundary": false,
     "direction": "out",
     "completed": true,
-    "maximum": 0.003549232633105248,
+    "maximum": 0.003551215993468304,
     "obstacle": ""
   },
   {
@@ -1386,7 +1386,7 @@
     "boundary": false,
     "direction": "in",
     "completed": true,
-    "maximum": 0.005447454640631122,
+    "maximum": 0.005429678868239307,
     "obstacle": ""
   },
   {
@@ -1406,7 +1406,7 @@
     "boundary": false,
     "direction": "in",
     "completed": true,
-    "maximum": 0.011361887320020969,
+    "maximum": 0.01129948721742835,
     "obstacle": ""
   },
   {
@@ -1426,7 +1426,7 @@
     "boundary": false,
     "direction": "in",
     "completed": true,
-    "maximum": 0.007497036007237057,
+    "maximum": 0.007496872600512461,
     "obstacle": ""
   },
   {
@@ -1446,7 +1446,7 @@
     "boundary": false,
     "direction": "in",
     "completed": true,
-    "maximum": 0.010506684904584063,
+    "maximum": 0.010505251335672483,
     "obstacle": ""
   },
   {
@@ -1456,7 +1456,7 @@
     "boundary": false,
     "direction": "out",
     "completed": true,
-    "maximum": 0.009984080626253444,
+    "maximum": 0.010014969690899989,
     "obstacle": ""
   },
   {
@@ -1466,7 +1466,7 @@
     "boundary": false,
     "direction": "in",
     "completed": true,
-    "maximum": 0.01977255609708095,
+    "maximum": 0.020536002458442226,
     "obstacle": ""
   },
   {
@@ -1476,7 +1476,7 @@
     "boundary": false,
     "direction": "out",
     "completed": true,
-    "maximum": 0.017502318822096186,
+    "maximum": 0.01715496982797049,
     "obstacle": ""
   },
   {
@@ -1486,7 +1486,7 @@
     "boundary": false,
     "direction": "in",
     "completed": true,
-    "maximum": 0.031141896855160667,
+    "maximum": 0.023861127079669586,
     "obstacle": ""
   },
   {
@@ -1496,7 +1496,7 @@
     "boundary": false,
     "direction": "out",
     "completed": true,
-    "maximum": 0.035494151430299326,
+    "maximum": 0.03576031844571048,
     "obstacle": ""
   },
   {
@@ -1506,7 +1506,7 @@
     "boundary": false,
     "direction": "in",
     "completed": true,
-    "maximum": 0.023289288327390523,
+    "maximum": 0.0233871710750293,
     "obstacle": ""
   },
   {
@@ -1516,7 +1516,7 @@
     "boundary": false,
     "direction": "out",
     "completed": true,
-    "maximum": 0.01967258205954181,
+    "maximum": 0.019542930486068144,
     "obstacle": ""
   },
   {
@@ -1526,7 +1526,7 @@
     "boundary": false,
     "direction": "in",
     "completed": true,
-    "maximum": 0.0064137820346843455,
+    "maximum": 0.007527805467390181,
     "obstacle": ""
   },
   {
@@ -1546,7 +1546,7 @@
     "boundary": false,
     "direction": "in",
     "completed": true,
-    "maximum": 0.018625269336183692,
+    "maximum": 0.018646476730708628,
     "obstacle": ""
   },
   {
@@ -1556,7 +1556,7 @@
     "boundary": false,
     "direction": "out",
     "completed": true,
-    "maximum": 0.021061176266300663,
+    "maximum": 0.021052020330245114,
     "obstacle": ""
   },
   {
@@ -1566,7 +1566,7 @@
     "boundary": false,
     "direction": "in",
     "completed": true,
-    "maximum": 0.00479480972828128,
+    "maximum": 0.004797820775024775,
     "obstacle": ""
   },
   {
@@ -1576,7 +1576,7 @@
     "boundary": false,
     "direction": "out",
     "completed": true,
-    "maximum": 0.0047792085514970495,
+    "maximum": 0.004782646789635692,
     "obstacle": ""
   },
   {
@@ -1586,7 +1586,7 @@
     "boundary": false,
     "direction": "in",
     "completed": true,
-    "maximum": 0.0047821909875267465,
+    "maximum": 0.00478047186837216,
     "obstacle": ""
   },
   {
@@ -1596,7 +1596,7 @@
     "boundary": false,
     "direction": "out",
     "completed": true,
-    "maximum": 0.004780927670537949,
+    "maximum": 0.00478178723008682,
     "obstacle": ""
   },
   {
@@ -1606,7 +1606,7 @@
     "boundary": false,
     "direction": "in",
     "completed": true,
-    "maximum": 0.010885056368124424,
+    "maximum": 0.010828467182477652,
     "obstacle": ""
   },
   {
@@ -1616,7 +1616,7 @@
     "boundary": false,
     "direction": "out",
     "completed": true,
-    "maximum": 0.023374173349623106,
+    "maximum": 0.02351251665459131,
     "obstacle": ""
   },
   {
@@ -1626,7 +1626,7 @@
     "boundary": false,
     "direction": "in",
     "completed": true,
-    "maximum": 0.01890908045831452,
+    "maximum": 0.018926903876717915,
     "obstacle": ""
   },
   {
@@ -1636,7 +1636,7 @@
     "boundary": false,
     "direction": "out",
     "completed": true,
-    "maximum": 0.020836244497047574,
+    "maximum": 0.027834368712035484,
     "obstacle": ""
   },
   {
@@ -1646,7 +1646,7 @@
     "boundary": false,
     "direction": "in",
     "completed": true,
-    "maximum": 0.010674779055676709,
+    "maximum": 0.010599352525957784,
     "obstacle": ""
   },
   {
@@ -1656,7 +1656,7 @@
     "boundary": false,
     "direction": "out",
     "completed": true,
-    "maximum": 0.011122592934640352,
+    "maximum": 0.01114929957097388,
     "obstacle": ""
   },
   {
@@ -1666,7 +1666,7 @@
     "boundary": false,
     "direction": "in",
     "completed": true,
-    "maximum": 0.017930910450388637,
+    "maximum": 0.017652265391433275,
     "obstacle": ""
   },
   {
@@ -1676,7 +1676,7 @@
     "boundary": false,
     "direction": "out",
     "completed": true,
-    "maximum": 0.015210907920334193,
+    "maximum": 0.015201081333316324,
     "obstacle": ""
   },
   {
@@ -1686,7 +1686,7 @@
     "boundary": false,
     "direction": "in",
     "completed": true,
-    "maximum": 0.010717263135092026,
+    "maximum": 0.010841292477522302,
     "obstacle": ""
   },
   {
@@ -1696,7 +1696,7 @@
     "boundary": false,
     "direction": "out",
     "completed": true,
-    "maximum": 0.010209328068242485,
+    "maximum": 0.010199390183117885,
     "obstacle": ""
   },
   {
@@ -1706,7 +1706,7 @@
     "boundary": false,
     "direction": "in",
     "completed": true,
-    "maximum": 0.010738503726599902,
+    "maximum": 0.013507703228384571,
     "obstacle": ""
   },
   {
@@ -1716,7 +1716,7 @@
     "boundary": false,
     "direction": "out",
     "completed": true,
-    "maximum": 0.010800517725527925,
+    "maximum": 0.01079609290479766,
     "obstacle": ""
   },
   {
@@ -1736,7 +1736,7 @@
     "boundary": false,
     "direction": "out",
     "completed": true,
-    "maximum": 0.004131710067582617,
+    "maximum": 0.004134787131363282,
     "obstacle": ""
   },
   {
@@ -1756,7 +1756,7 @@
     "boundary": false,
     "direction": "out",
     "completed": true,
-    "maximum": 0.004737402555861081,
+    "maximum": 0.00473967950244969,
     "obstacle": ""
   },
   {
@@ -1786,7 +1786,7 @@
     "boundary": false,
     "direction": "in",
     "completed": true,
-    "maximum": 0.007914391167332724,
+    "maximum": 0.007894211951338548,
     "obstacle": ""
   },
   {
@@ -1796,7 +1796,7 @@
     "boundary": false,
     "direction": "out",
     "completed": true,
-    "maximum": 0.00825964282759628,
+    "maximum": 0.008259642827511016,
     "obstacle": ""
   },
   {
@@ -1806,7 +1806,7 @@
     "boundary": false,
     "direction": "in",
     "completed": true,
-    "maximum": 0.009738272409691717,
+    "maximum": 0.009733775529156219,
     "obstacle": ""
   },
   {
@@ -1826,7 +1826,7 @@
     "boundary": false,
     "direction": "in",
     "completed": true,
-    "maximum": 0.0041888513787284865,
+    "maximum": 0.004188851108153813,
     "obstacle": ""
   },
   {
@@ -1836,7 +1836,7 @@
     "boundary": false,
     "direction": "out",
     "completed": true,
-    "maximum": 0.004146268894032801,
+    "maximum": 0.004112443640138963,
     "obstacle": ""
   },
   {
@@ -1856,7 +1856,7 @@
     "boundary": false,
     "direction": "out",
     "completed": true,
-    "maximum": 0.004146413829460016,
+    "maximum": 0.00414625719966466,
     "obstacle": ""
   },
   {
@@ -1876,7 +1876,7 @@
     "boundary": false,
     "direction": "out",
     "completed": true,
-    "maximum": 0.004144921913365351,
+    "maximum": 0.0041449338646373235,
     "obstacle": ""
   },
   {
@@ -1886,7 +1886,7 @@
     "boundary": false,
     "direction": "in",
     "completed": true,
-    "maximum": 0.004977893390588406,
+    "maximum": 0.004900672097193137,
     "obstacle": ""
   },
   {
@@ -1906,7 +1906,7 @@
     "boundary": false,
     "direction": "in",
     "completed": true,
-    "maximum": 0.03222214142405733,
+    "maximum": 0.032287030866314126,
     "obstacle": ""
   },
   {
@@ -1916,7 +1916,7 @@
     "boundary": false,
     "direction": "out",
     "completed": true,
-    "maximum": 0.031561615584394076,
+    "maximum": 0.031544775305803796,
     "obstacle": ""
   },
   {
@@ -1926,7 +1926,7 @@
     "boundary": false,
     "direction": "in",
     "completed": true,
-    "maximum": 0.025720144093043018,
+    "maximum": 0.025700555938840353,
     "obstacle": ""
   },
   {
@@ -1946,7 +1946,7 @@
     "boundary": false,
     "direction": "in",
     "completed": true,
-    "maximum": 0.003712406218085107,
+    "maximum": 0.00373330927041593,
     "obstacle": ""
   },
   {
@@ -1966,7 +1966,7 @@
     "boundary": false,
     "direction": "in",
     "completed": true,
-    "maximum": 0.0036004716495483535,
+    "maximum": 0.0036005155095608643,
     "obstacle": ""
   },
   {
@@ -1986,7 +1986,7 @@
     "boundary": false,
     "direction": "in",
     "completed": true,
-    "maximum": 0.025607092637415008,
+    "maximum": 0.025796535613608285,
     "obstacle": ""
   },
   {
@@ -1996,7 +1996,7 @@
     "boundary": false,
     "direction": "out",
     "completed": true,
-    "maximum": 0.015025337273129935,
+    "maximum": 0.015002414149051901,
     "obstacle": ""
   },
   {
@@ -2006,7 +2006,7 @@
     "boundary": false,
     "direction": "in",
     "completed": true,
-    "maximum": 0.013819546039030683,
+    "maximum": 0.013807083769307837,
     "obstacle": ""
   },
   {
@@ -2016,7 +2016,7 @@
     "boundary": false,
     "direction": "out",
     "completed": true,
-    "maximum": 0.046337856999002724,
+    "maximum": 0.04801425956330263,
     "obstacle": ""
   },
   {
@@ -2026,7 +2026,7 @@
     "boundary": false,
     "direction": "in",
     "completed": true,
-    "maximum": 0.008049801835483095,
+    "maximum": 0.008065060287151482,
     "obstacle": ""
   },
   {
@@ -2036,7 +2036,7 @@
     "boundary": false,
     "direction": "out",
     "completed": true,
-    "maximum": 0.011384910907395351,
+    "maximum": 0.011563912877477378,
     "obstacle": ""
   },
   {
@@ -2046,7 +2046,7 @@
     "boundary": false,
     "direction": "in",
     "completed": true,
-    "maximum": 0.011617780743904405,
+    "maximum": 0.011856065156337081,
     "obstacle": ""
   },
   {
@@ -2056,7 +2056,7 @@
     "boundary": false,
     "direction": "out",
     "completed": true,
-    "maximum": 0.005223121758206162,
+    "maximum": 0.005164238454796077,
     "obstacle": ""
   },
   {
@@ -2066,7 +2066,7 @@
     "boundary": false,
     "direction": "in",
     "completed": true,
-    "maximum": 0.00418213583387228,
+    "maximum": 0.004171547687292332,
     "obstacle": ""
   },
   {
@@ -2096,7 +2096,7 @@
     "boundary": false,
     "direction": "out",
     "completed": true,
-    "maximum": 0.004412661183550881,
+    "maximum": 0.004349597220141277,
     "obstacle": ""
   },
   {
@@ -2106,7 +2106,7 @@
     "boundary": false,
     "direction": "in",
     "completed": true,
-    "maximum": 0.015940727029715163,
+    "maximum": 0.015949634062423,
     "obstacle": ""
   },
   {
@@ -2116,7 +2116,7 @@
     "boundary": false,
     "direction": "out",
     "completed": true,
-    "maximum": 0.03219226232312167,
+    "maximum": 0.03166945819683065,
     "obstacle": ""
   },
   {
@@ -2126,7 +2126,7 @@
     "boundary": false,
     "direction": "in",
     "completed": true,
-    "maximum": 0.03261576098219621,
+    "maximum": 0.03233502103324781,
     "obstacle": ""
   },
   {
@@ -2136,7 +2136,7 @@
     "boundary": false,
     "direction": "out",
     "completed": true,
-    "maximum": 0.0156865500086667,
+    "maximum": 0.015126595353109451,
     "obstacle": ""
   },
   {
@@ -2146,7 +2146,7 @@
     "boundary": false,
     "direction": "in",
     "completed": true,
-    "maximum": 0.007777920421546014,
+    "maximum": 0.007129058747921135,
     "obstacle": ""
   },
   {
@@ -2186,7 +2186,7 @@
     "boundary": false,
     "direction": "in",
     "completed": true,
-    "maximum": 0.024919836448447086,
+    "maximum": 0.02488056811455408,
     "obstacle": ""
   },
   {
@@ -2206,7 +2206,7 @@
     "boundary": false,
     "direction": "in",
     "completed": true,
-    "maximum": 0.007981098809949572,
+    "maximum": 0.007804259887251419,
     "obstacle": ""
   },
   {
@@ -2216,7 +2216,7 @@
     "boundary": false,
     "direction": "out",
     "completed": true,
-    "maximum": 0.006788352283422228,
+    "maximum": 0.006837240182022697,
     "obstacle": ""
   },
   {
@@ -2236,7 +2236,7 @@
     "boundary": false,
     "direction": "out",
     "completed": true,
-    "maximum": 0.004749146738276977,
+    "maximum": 0.004730163915752428,
     "obstacle": ""
   },
   {
@@ -2246,7 +2246,7 @@
     "boundary": false,
     "direction": "in",
     "completed": true,
-    "maximum": 0.0047751454031299545,
+    "maximum": 0.004775145403101533,
     "obstacle": ""
   },
   {
@@ -2256,7 +2256,7 @@
     "boundary": false,
     "direction": "out",
     "completed": true,
-    "maximum": 0.004775162048957782,
+    "maximum": 0.004787921611210777,
     "obstacle": ""
   },
   {
@@ -2266,7 +2266,7 @@
     "boundary": false,
     "direction": "in",
     "completed": true,
-    "maximum": 0.0047491195706470535,
+    "maximum": 0.004742266081336766,
     "obstacle": ""
   },
   {
@@ -2286,7 +2286,7 @@
     "boundary": false,
     "direction": "in",
     "completed": true,
-    "maximum": 0.004762044454281522,
+    "maximum": 0.004762209401093287,
     "obstacle": ""
   },
   {
@@ -2296,7 +2296,7 @@
     "boundary": false,
     "direction": "out",
     "completed": true,
-    "maximum": 0.004690579814962348,
+    "maximum": 0.004690715452795757,
     "obstacle": ""
   },
   {
@@ -2306,7 +2306,7 @@
     "boundary": false,
     "direction": "in",
     "completed": true,
-    "maximum": 0.004737837911420684,
+    "maximum": 0.004755715362193769,
     "obstacle": ""
   },
   {
@@ -2316,7 +2316,7 @@
     "boundary": false,
     "direction": "out",
     "completed": true,
-    "maximum": 0.004658547230036447,
+    "maximum": 0.0046585472300080255,
     "obstacle": ""
   },
   {
@@ -2326,7 +2326,7 @@
     "boundary": false,
     "direction": "in",
     "completed": true,
-    "maximum": 0.004781914322137482,
+    "maximum": 0.004773743165287669,
     "obstacle": ""
   },
   {
@@ -2336,7 +2336,7 @@
     "boundary": false,
     "direction": "out",
     "completed": true,
-    "maximum": 0.004698103503045559,
+    "maximum": 0.004698116470763125,
     "obstacle": ""
   },
   {
@@ -2346,7 +2346,7 @@
     "boundary": false,
     "direction": "in",
     "completed": true,
-    "maximum": 0.004742679309060804,
+    "maximum": 0.004747378675205027,
     "obstacle": ""
   },
   {
@@ -2356,7 +2356,7 @@
     "boundary": false,
     "direction": "out",
     "completed": true,
-    "maximum": 0.00465871315046229,
+    "maximum": 0.0046586866038751396,
     "obstacle": ""
   },
   {
@@ -2366,7 +2366,7 @@
     "boundary": false,
     "direction": "in",
     "completed": true,
-    "maximum": 0.004782254962861998,
+    "maximum": 0.004782106569706457,
     "obstacle": ""
   },
   {
@@ -2386,7 +2386,7 @@
     "boundary": false,
     "direction": "in",
     "completed": true,
-    "maximum": 0.03902161856336761,
+    "maximum": 0.0390692528026193,
     "obstacle": ""
   },
   {
@@ -2396,7 +2396,7 @@
     "boundary": false,
     "direction": "out",
     "completed": true,
-    "maximum": 0.03845188695163415,
+    "maximum": 0.038478776212485855,
     "obstacle": ""
   },
   {
@@ -2406,7 +2406,7 @@
     "boundary": false,
     "direction": "in",
     "completed": true,
-    "maximum": 0.008749016047346458,
+    "maximum": 0.008776592299113872,
     "obstacle": ""
   },
   {
@@ -2416,7 +2416,7 @@
     "boundary": false,
     "direction": "out",
     "completed": true,
-    "maximum": 0.014379223037934707,
+    "maximum": 0.014128070275233995,
     "obstacle": ""
   },
   {
@@ -2436,7 +2436,7 @@
     "boundary": false,
     "direction": "out",
     "completed": true,
-    "maximum": 0.011048950618771869,
+    "maximum": 0.011020469746540584,
     "obstacle": ""
   },
   {
@@ -2446,7 +2446,7 @@
     "boundary": false,
     "direction": "in",
     "completed": true,
-    "maximum": 0.015524057451273165,
+    "maximum": 0.015524057450306827,
     "obstacle": ""
   },
   {
@@ -2456,7 +2456,7 @@
     "boundary": false,
     "direction": "out",
     "completed": true,
-    "maximum": 0.014720714837579862,
+    "maximum": 0.014736915042078635,
     "obstacle": ""
   },
   {
@@ -2466,7 +2466,7 @@
     "boundary": false,
     "direction": "in",
     "completed": true,
-    "maximum": 0.021024233509308488,
+    "maximum": 0.020974871629590552,
     "obstacle": ""
   },
   {
@@ -2476,7 +2476,7 @@
     "boundary": false,
     "direction": "out",
     "completed": true,
-    "maximum": 0.02130823002659099,
+    "maximum": 0.021449049345022786,
     "obstacle": ""
   },
   {
@@ -2486,7 +2486,7 @@
     "boundary": false,
     "direction": "in",
     "completed": true,
-    "maximum": 0.021932168440002897,
+    "maximum": 0.021912408467557043,
     "obstacle": ""
   },
   {
@@ -2506,7 +2506,7 @@
     "boundary": false,
     "direction": "in",
     "completed": true,
-    "maximum": 0.006134842814134345,
+    "maximum": 0.005949105519164277,
     "obstacle": ""
   },
   {
@@ -2526,7 +2526,7 @@
     "boundary": false,
     "direction": "in",
     "completed": true,
-    "maximum": 0.0069849091880769265,
+    "maximum": 0.006969790301241119,
     "obstacle": ""
   },
   {
@@ -2536,7 +2536,7 @@
     "boundary": false,
     "direction": "out",
     "completed": true,
-    "maximum": 0.00676662258382521,
+    "maximum": 0.006761361967818402,
     "obstacle": ""
   },
   {
@@ -2604,7 +2604,7 @@
     "boundary": false,
     "direction": "in",
     "completed": true,
-    "maximum": 0.01120589128080951,
+    "maximum": 0.011213187901489619,
     "obstacle": ""
   },
   {
@@ -2614,7 +2614,7 @@
     "boundary": false,
     "direction": "out",
     "completed": true,
-    "maximum": 0.013118328238419963,
+    "maximum": 0.011234362507764217,
     "obstacle": ""
   },
   {
@@ -2624,7 +2624,7 @@
     "boundary": false,
     "direction": "in",
     "completed": true,
-    "maximum": 0.006582527228118806,
+    "maximum": 0.006583407352565018,
     "obstacle": ""
   },
   {
@@ -2634,7 +2634,7 @@
     "boundary": false,
     "direction": "out",
     "completed": true,
-    "maximum": 0.006223479306925128,
+    "maximum": 0.016376263690460746,
     "obstacle": ""
   },
   {
@@ -2644,7 +2644,7 @@
     "boundary": false,
     "direction": "in",
     "completed": true,
-    "maximum": 0.026946482906339497,
+    "maximum": 0.08697975244163558,
     "obstacle": ""
   },
   {
@@ -2664,7 +2664,7 @@
     "boundary": false,
     "direction": "in",
     "completed": true,
-    "maximum": 0.0027902349530393167,
+    "maximum": 0.0027942827879030574,
     "obstacle": ""
   },
   {
@@ -2684,7 +2684,7 @@
     "boundary": false,
     "direction": "in",
     "completed": true,
-    "maximum": 0.004427698566672689,
+    "maximum": 0.004420796418799,
     "obstacle": ""
   },
   {
@@ -2694,7 +2694,7 @@
     "boundary": false,
     "direction": "out",
     "completed": true,
-    "maximum": 0.004526000871209135,
+    "maximum": 0.00452149218713771,
     "obstacle": ""
   },
   {
@@ -2704,7 +2704,7 @@
     "boundary": false,
     "direction": "in",
     "completed": true,
-    "maximum": 0.002383080058194764,
+    "maximum": 0.002383117790088818,
     "obstacle": ""
   },
   {
@@ -2714,7 +2714,7 @@
     "boundary": false,
     "direction": "out",
     "completed": true,
-    "maximum": 0.0026336813321847785,
+    "maximum": 0.0026142399158288754,
     "obstacle": ""
   },
   {
@@ -2744,7 +2744,7 @@
     "boundary": false,
     "direction": "in",
     "completed": true,
-    "maximum": 0.0029903813872351748,
+    "maximum": 0.002990381387206753,
     "obstacle": ""
   },
   {
@@ -2764,7 +2764,7 @@
     "boundary": false,
     "direction": "in",
     "completed": true,
-    "maximum": 0.002383126958960702,
+    "maximum": 0.0023831269589891235,
     "obstacle": ""
   },
   {
@@ -2774,7 +2774,7 @@
     "boundary": false,
     "direction": "out",
     "completed": true,
-    "maximum": 0.0023730173862190895,
+    "maximum": 0.002373189186897662,
     "obstacle": ""
   },
   {
@@ -2784,7 +2784,7 @@
     "boundary": false,
     "direction": "in",
     "completed": true,
-    "maximum": 0.01191204645837729,
+    "maximum": 0.011880289933998256,
     "obstacle": ""
   },
   {
@@ -2794,7 +2794,7 @@
     "boundary": false,
     "direction": "out",
     "completed": true,
-    "maximum": 0.011448117570722616,
+    "maximum": 0.011490967108414907,
     "obstacle": ""
   },
   {
@@ -2804,7 +2804,7 @@
     "boundary": false,
     "direction": "in",
     "completed": true,
-    "maximum": 0.011566076323390462,
+    "maximum": 0.011562173297704703,
     "obstacle": ""
   },
   {
@@ -2814,7 +2814,7 @@
     "boundary": false,
     "direction": "out",
     "completed": true,
-    "maximum": 0.011452274271334772,
+    "maximum": 0.011417103920024374,
     "obstacle": ""
   },
   {
@@ -2834,7 +2834,7 @@
     "boundary": false,
     "direction": "out",
     "completed": true,
-    "maximum": 0.00989396560868272,
+    "maximum": 0.009940254238415491,
     "obstacle": ""
   },
   {
@@ -2844,7 +2844,7 @@
     "boundary": false,
     "direction": "in",
     "completed": true,
-    "maximum": 0.013013731877720147,
+    "maximum": 0.012910628925709489,
     "obstacle": ""
   },
   {
@@ -2854,7 +2854,7 @@
     "boundary": false,
     "direction": "out",
     "completed": true,
-    "maximum": 0.013582325793919381,
+    "maximum": 0.013595993671117412,
     "obstacle": ""
   },
   {
@@ -2874,7 +2874,7 @@
     "boundary": false,
     "direction": "out",
     "completed": true,
-    "maximum": 0.009735125190815097,
+    "maximum": 0.009751733743911473,
     "obstacle": ""
   },
   {
@@ -2884,7 +2884,7 @@
     "boundary": false,
     "direction": "in",
     "completed": true,
-    "maximum": 0.00927421754261104,
+    "maximum": 0.009273497900863958,
     "obstacle": ""
   },
   {
@@ -2894,7 +2894,7 @@
     "boundary": false,
     "direction": "out",
     "completed": true,
-    "maximum": 0.008726016530459901,
+    "maximum": 0.04793624394343965,
     "obstacle": ""
   },
   {
@@ -2904,7 +2904,7 @@
     "boundary": false,
     "direction": "in",
     "completed": true,
-    "maximum": 0.018099607161758513,
+    "maximum": 0.017808758200345665,
     "obstacle": ""
   },
   {
@@ -2914,7 +2914,7 @@
     "boundary": false,
     "direction": "out",
     "completed": true,
-    "maximum": 0.01561105186056011,
+    "maximum": 0.014732082204204744,
     "obstacle": ""
   },
   {
@@ -2924,7 +2924,7 @@
     "boundary": false,
     "direction": "in",
     "completed": true,
-    "maximum": 0.01473215666922556,
+    "maximum": 0.01468332388452609,
     "obstacle": ""
   },
   {
@@ -2934,7 +2934,7 @@
     "boundary": false,
     "direction": "out",
     "completed": true,
-    "maximum": 0.01679746652018821,
+    "maximum": 0.016839561110543855,
     "obstacle": ""
   },
   {
@@ -2944,7 +2944,7 @@
     "boundary": false,
     "direction": "in",
     "completed": true,
-    "maximum": 0.014208291948961005,
+    "maximum": 0.014385886912066326,
     "obstacle": ""
   },
   {
@@ -2954,7 +2954,7 @@
     "boundary": false,
     "direction": "out",
     "completed": true,
-    "maximum": 0.03001379831783879,
+    "maximum": 0.030543472294539242,
     "obstacle": ""
   },
   {
@@ -2964,7 +2964,7 @@
     "boundary": false,
     "direction": "in",
     "completed": true,
-    "maximum": 0.013572994194163357,
+    "maximum": 0.013518905133196313,
     "obstacle": ""
   },
   {
@@ -2974,7 +2974,7 @@
     "boundary": false,
     "direction": "out",
     "completed": true,
-    "maximum": 0.013282957962871933,
+    "maximum": 0.013253069440310128,
     "obstacle": ""
   },
   {
@@ -2984,7 +2984,7 @@
     "boundary": false,
     "direction": "in",
     "completed": true,
-    "maximum": 0.005743335234456026,
+    "maximum": 0.00574336086697258,
     "obstacle": ""
   },
   {
@@ -2994,7 +2994,7 @@
     "boundary": false,
     "direction": "out",
     "completed": true,
-    "maximum": 0.005665051630671769,
+    "maximum": 0.005665081095600044,
     "obstacle": ""
   },
   {
@@ -3004,7 +3004,7 @@
     "boundary": false,
     "direction": "in",
     "completed": true,
-    "maximum": 0.028993761520723638,
+    "maximum": 0.029003900181265863,
     "obstacle": ""
   },
   {
@@ -3014,7 +3014,7 @@
     "boundary": false,
     "direction": "out",
     "completed": true,
-    "maximum": 0.027618365841050263,
+    "maximum": 0.027634668019203446,
     "obstacle": ""
   }
 ]

@@ -1,7 +1,7 @@
 {
-  "world": "City bake from baseline 04036c4f78cd4d8c4993b9b338bec9097eb9964b using candidate 87833eb62b27bfd8a50b2ee765b0669cb0700aab",
+  "world": "City bake from baseline 04036c4f78cd4d8c4993b9b338bec9097eb9964b using candidate d88122935a2f8b2cd3465e4bc02a0cc991809852",
   "main": "04036c4f78cd4d8c4993b9b338bec9097eb9964b",
-  "candidateRevision": "87833eb62b27bfd8a50b2ee765b0669cb0700aab",
+  "candidateRevision": "d88122935a2f8b2cd3465e4bc02a0cc991809852",
   "baseline": {
     "tunnelConstraintRecords": 0,
     "partialTunnelWays": [
@@ -169,23 +169,23 @@
     "gradedApproaches": 142,
     "partialTunnelWays": [],
     "reasons": {
-      "surface": 19,
+      "surface": 12,
       "tunnel": 0,
       "fit": 0,
       "hidden": 0
     },
     "lanes": 88280,
     "wheelSamples": 7705968,
-    "outliers": 19,
-    "sunk": 11,
-    "floating": 8,
+    "outliers": 12,
+    "sunk": 8,
+    "floating": 4,
     "p99": 0.023,
     "nonplanarFootprints": 0,
     "unresolvedTunnelWays": []
   },
   "byLayer": {
-    "bridge": 8,
-    "at-grade": 11
+    "bridge": 6,
+    "at-grade": 6
   },
   "station": {
     "historicWheelOutsidePavementMeters": 0.294,
@@ -233,7 +233,7 @@
       "collisions": 0,
       "tool": 0,
       "over": 0,
-      "max": 0.046337856999002724
+      "max": 0.08697975244163558
     },
     "accessDecision": {
       "actualPortals": 146,
@@ -252,7 +252,7 @@
     },
     "candidate": {
       "cells": 1170,
-      "total": 16991562,
+      "total": 16993913,
       "p99": 57857
     }
   },
@@ -274,7 +274,7 @@
       },
       "pairedRevisions": {
         "main": "04036c4f78cd4d8c4993b9b338bec9097eb9964b",
-        "candidate": "87833eb62b27bfd8a50b2ee765b0669cb0700aab"
+        "candidate": "d88122935a2f8b2cd3465e4bc02a0cc991809852"
       }
     },
     "mainExitCodes": {
@@ -286,7 +286,7 @@
       "strict": 1
     },
     "candidateExitCodes": {
-      "grounding": 1,
+      "grounding": 0,
       "walk": 1,
       "ride": 1,
       "traffic": 0,
@@ -299,8 +299,8 @@
       "drive": "drive.mjs:23 walkTo drive-start"
     },
     "pairedRevisions": {
-      "candidate": "87833eb62b27bfd8a50b2ee765b0669cb0700aab",
-      "main": "04036c4f78cd4d8c4993b9b338bec9097eb9964b"
+      "main": "04036c4f78cd4d8c4993b9b338bec9097eb9964b",
+      "candidate": "d88122935a2f8b2cd3465e4bc02a0cc991809852"
     }
   },
   "performance": {
@@ -312,7 +312,7 @@
       "sharedNode": 6533456477,
       "mode": "foot",
       "ok": true,
-      "maxJump": 0.005157470703125
+      "maxJump": 0.0031280517578125
     },
     {
       "sharedNode": 6533456477,
@@ -342,7 +342,7 @@
       "sharedNode": 6533456479,
       "mode": "car",
       "ok": true,
-      "maxJump": 0.04525679574823016
+      "maxJump": 0.04517667417255211
     },
     {
       "sharedNode": 6533456480,
@@ -354,7 +354,7 @@
       "sharedNode": 6533456480,
       "mode": "car",
       "ok": true,
-      "maxJump": 0.04673761590470349
+      "maxJump": 0.046743970322182804
     }
   ],
   "relocationVerification": {
@@ -6820,7 +6820,7 @@
       "node scripts/test-walk-streaming.mjs"
     ]
   },
-  "baselineScope": "Historical pre-fix wheel audit carried from prior rounds. Current paired main results are in round13Evidence.strict, trafficCellBytes.main, and performance.json.",
+  "baselineScope": "Historical pre-fix wheel audit. Round 15 uses the paired main revision recorded in round15Evidence.base.",
   "round13Evidence": {
     "revision": "87833eb62b27bfd8a50b2ee765b0669cb0700aab",
     "comparisonBase": "04036c4f78cd4d8c4993b9b338bec9097eb9964b",
@@ -7793,5 +7793,408 @@
       "minimumLiftMetres": 2.048931403321177
     },
     "geometryChanged": false
+  },
+  "round15Evidence": {
+    "runtimeRevision": "d88122935a2f8b2cd3465e4bc02a0cc991809852",
+    "base": "04036c4f78cd4d8c4993b9b338bec9097eb9964b",
+    "terrainSha256": "7bdf677d6bb3add409f54042f84254a8918ba52b9b46282627546edcd95c9126",
+    "previousPerformanceRevision": "87833eb62b27bfd8a50b2ee765b0669cb0700aab",
+    "wheels": {
+      "tunnelConstraintRecords": 0,
+      "gradedApproaches": 142,
+      "partialTunnelWays": [],
+      "reasons": {
+        "surface": 12,
+        "tunnel": 0,
+        "fit": 0,
+        "hidden": 0
+      },
+      "lanes": 88280,
+      "wheelSamples": 7705968,
+      "outliers": 12,
+      "sunk": 8,
+      "floating": 4,
+      "p99": 0.023,
+      "nonplanarFootprints": 0,
+      "unresolvedTunnelWays": []
+    },
+    "outliersByWay": {
+      "464498761": 2,
+      "259020549": 1,
+      "385796479": 1,
+      "1097830334": 3,
+      "842819690": 3,
+      "1486783399": 2
+    },
+    "portal": {
+      "sites": 146,
+      "passed": 146,
+      "runs": 302,
+      "completed": 302,
+      "collisions": 0,
+      "tool": 0,
+      "over": 0,
+      "max": 0.08697975244163558
+    },
+    "surface": {
+      "sites": 239,
+      "passed": 233,
+      "runs": 507,
+      "completed": 502,
+      "collisions": 5,
+      "tool": 0,
+      "over": 2,
+      "max": 0.17333984375
+    },
+    "narrow": {
+      "requested": 13,
+      "runs": 79,
+      "completed": 79,
+      "boundaryRuns": 0,
+      "pass": 13,
+      "overLimit": 0,
+      "stalled": 0,
+      "failures": {
+        "collision": 0,
+        "tool": 0
+      },
+      "unavailable": 0,
+      "maximum": 0.07073017954826355
+    },
+    "strict": 2874,
+    "sitangRiver": {
+      "measured": {
+        "motorwayProbe": {
+          "way": 882310597,
+          "xz": [
+            -18575.193215223866,
+            3961.19059393216
+          ],
+          "wheelPathMetres": 38.79,
+          "distanceToMotorwayAxis": 3.4117881508700596,
+          "outsideServiceCorridor": 6.717612122956961,
+          "roofMetres": 161.11073832321347,
+          "requiredMetres": 161.44680305175783,
+          "deficitMetres": 0.33606472854435765
+        },
+        "tunnel": 1494508178,
+        "tags": {
+          "highway": "unclassified",
+          "layer": "-1",
+          "tunnel": "yes"
+        },
+        "clearance": 4.5,
+        "bridge": 1097830334,
+        "bridgeXZ": [
+          -18588.082521147244,
+          3987.6636096075677
+        ],
+        "bridgeY": 160.0500030517578,
+        "upper": 882310596,
+        "upperXZ": [
+          -18578.92953387987,
+          3972.5940987837744
+        ],
+        "upperY": 160.35787164843663,
+        "laneOffset": 1.5,
+        "halfTrack": 0.795,
+        "spacing": 0.01,
+        "gradeLimit": 0.08,
+        "wheelPathMetres": 26.79,
+        "pavedSamples": 2680,
+        "samples": 2680,
+        "minimumLiftMetres": 2.048931403321177
+      },
+      "previewOnly": true,
+      "previewLiftMetres": 2.401027,
+      "previewLiftSamples": 4074,
+      "peakStation": -9,
+      "peakLateralOffset": 2.5,
+      "previewLengthMetres": 96.5,
+      "eachSideMetres": [
+        48,
+        48.5
+      ],
+      "previewMaxGrade": 0.06882123,
+      "drive": {
+        "requested": 3,
+        "runs": 6,
+        "completed": 4,
+        "boundaryRuns": 0,
+        "pass": 1,
+        "overLimit": 1,
+        "stalled": 2,
+        "failures": {
+          "collision": 1,
+          "tool": 1
+        },
+        "unavailable": 0,
+        "maximum": 4.732550946864933
+      },
+      "directions": [
+        {
+          "id": 13694473829,
+          "direction": "in",
+          "completed": false,
+          "maximum": 0.1320901130730192,
+          "failure": "tool"
+        },
+        {
+          "id": 13694473830,
+          "direction": "in",
+          "completed": true,
+          "maximum": 0.023032395569771325,
+          "failure": null
+        },
+        {
+          "id": 13694473829,
+          "direction": "out",
+          "completed": false,
+          "maximum": 0.4228828466725645,
+          "failure": "collision"
+        },
+        {
+          "id": 13694473830,
+          "direction": "out",
+          "completed": true,
+          "maximum": 4.732550946864933,
+          "failure": null
+        },
+        {
+          "id": 882310596,
+          "direction": "in",
+          "completed": true,
+          "maximum": 0.004113877156981971,
+          "failure": null
+        },
+        {
+          "id": 882310596,
+          "direction": "out",
+          "completed": true,
+          "maximum": 0.004242619028616446,
+          "failure": null
+        }
+      ],
+      "localWheelAudit": {
+        "tunnelConstraintRecords": 0,
+        "gradedApproaches": 142,
+        "partialTunnelWays": [],
+        "reasons": {
+          "surface": 4,
+          "tunnel": 0,
+          "fit": 0,
+          "hidden": 0
+        },
+        "lanes": 163,
+        "wheelSamples": 17104,
+        "outliers": 4,
+        "sunk": 2,
+        "floating": 2,
+        "p99": 0.028,
+        "nonplanarFootprints": 0,
+        "unresolvedTunnelWays": []
+      },
+      "renderedMotorwayAt12m": {
+        "pairedMain": 161.11073790174794,
+        "previousCandidate": 161.1107724894948
+      },
+      "surveyRevision": "d88122935a2f8b2cd3465e4bc02a0cc991809852",
+      "screenshot": "sitang-crossing.png",
+      "objectsInsideRaisedStripAndShoulders": {
+        "trees": 0,
+        "lamps": 0,
+        "stops": 0,
+        "buildingFootprints": 0
+      },
+      "previewNotInRuntime": true,
+      "upperRunMetres": 96,
+      "connectionRuns": {
+        "requested": 5,
+        "runs": 10,
+        "completed": 8,
+        "boundaryRuns": 0,
+        "pass": 3,
+        "overLimit": 2,
+        "stalled": 2,
+        "failures": {
+          "collision": 2,
+          "tool": 0
+        },
+        "unavailable": 0,
+        "maximum": 0.16387729329883882
+      },
+      "connectionDirections": [
+        {
+          "id": 10052448934,
+          "direction": "in",
+          "completed": true,
+          "maximum": 0.009538026125909482,
+          "failure": null
+        },
+        {
+          "id": 8205272841,
+          "direction": "out",
+          "completed": true,
+          "maximum": 0.003287888585418841,
+          "failure": null
+        },
+        {
+          "id": 10052448934,
+          "direction": "out",
+          "completed": true,
+          "maximum": 0.005376412283709442,
+          "failure": null
+        },
+        {
+          "id": 10052448935,
+          "direction": "in",
+          "completed": true,
+          "maximum": 0.1635186214492137,
+          "failure": null
+        },
+        {
+          "id": 10052448935,
+          "direction": "out",
+          "completed": false,
+          "maximum": 0.4166962831087915,
+          "failure": "collision"
+        },
+        {
+          "id": 3891277133,
+          "direction": "in",
+          "completed": true,
+          "maximum": 0.16387729329883882,
+          "failure": null
+        },
+        {
+          "id": 3891277133,
+          "direction": "out",
+          "completed": false,
+          "maximum": 0.4165175811299662,
+          "failure": "collision"
+        },
+        {
+          "id": 8205272840,
+          "direction": "in",
+          "completed": true,
+          "maximum": 0.00409869337983082,
+          "failure": null
+        },
+        {
+          "id": 8205272840,
+          "direction": "out",
+          "completed": true,
+          "maximum": 0.004239415110276923,
+          "failure": null
+        },
+        {
+          "id": 8205272841,
+          "direction": "in",
+          "completed": true,
+          "maximum": 0.00333389212502766,
+          "failure": null
+        }
+      ],
+      "nearbyWays": [
+        882310596,
+        882310597,
+        385796479,
+        1494503706,
+        1494508177,
+        1494508178,
+        842819690,
+        1097830333,
+        1097830334
+      ],
+      "renderedHeightSource": "Downward visible-scene intersections at x=-18575.1946, z=3961.1901"
+    },
+    "intermediate": {
+      "runtimeRevision": "da75fff04c672902fa28c03b16b81f257f3c47ad",
+      "wheels": {
+        "tunnelConstraintRecords": 0,
+        "gradedApproaches": 142,
+        "partialTunnelWays": [],
+        "reasons": {
+          "surface": 14,
+          "tunnel": 0,
+          "fit": 0,
+          "hidden": 0
+        },
+        "lanes": 88280,
+        "wheelSamples": 7705968,
+        "outliers": 14,
+        "sunk": 9,
+        "floating": 5,
+        "p99": 0.023,
+        "nonplanarFootprints": 0,
+        "unresolvedTunnelWays": []
+      },
+      "surface": {
+        "sites": 239,
+        "passed": 231,
+        "runs": 507,
+        "completed": 500,
+        "collisions": 5,
+        "tool": 2,
+        "over": 2,
+        "max": 0.17333984375
+      },
+      "portal": {
+        "sites": 146,
+        "passed": 146,
+        "runs": 302,
+        "completed": 302,
+        "collisions": 0,
+        "tool": 0,
+        "over": 0,
+        "max": 0.08708260419234648
+      }
+    },
+    "canal": [
+      {
+        "way": 1025751314,
+        "bridgeNode": 9457383800,
+        "join": 0.00036084009485648494,
+        "minimumHeadroom": 3.745650861589297,
+        "maximumGrade": 0.06676938655497067,
+        "underBuilding": 319
+      },
+      {
+        "way": 1034716138,
+        "bridgeNode": 9531714412,
+        "join": 8.255372537746553e-05,
+        "minimumHeadroom": 3.566101826830078,
+        "maximumGrade": 0.017601606157684656,
+        "underBuilding": 380
+      }
+    ],
+    "airport": {
+      "segments": 11,
+      "downstreamID": 15582,
+      "edgeSamples": 618,
+      "clearanceBeyondWheel": 0.2,
+      "ambientTraversed": true
+    },
+    "strictTunnelClearanceIssues": 0,
+    "airportDrive": {
+      "requested": 1,
+      "runs": 2,
+      "completed": 2,
+      "boundaryRuns": 0,
+      "pass": 1,
+      "overLimit": 0,
+      "stalled": 0,
+      "failures": {
+        "collision": 0,
+        "tool": 0
+      },
+      "unavailable": 0,
+      "maximum": 0.004999439783802018
+    },
+    "grounding": {
+      "landmarks": 67,
+      "failures": 0
+    },
+    "regressionBaselineLastPairedAt": "87833eb62b27bfd8a50b2ee765b0669cb0700aab"
   }
 }
