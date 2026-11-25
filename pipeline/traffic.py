@@ -452,6 +452,8 @@ def bake(output, manifest, rendered_roads=None):
             pedestrian+=junction_profiles(output,manifest,elements,sections,planned)
             from terminal_decks import pickup_merge
             pedestrian+=pickup_merge(output,manifest,elements,terminal_grades)
+            from local_junctions import profiles as connected_profiles
+            pedestrian+=connected_profiles(output, manifest, elements, sections, planned+pedestrian)
             pedestrian+=east_canal
             bake_surveyed_corridors(output,manifest['chunks'],elements,sections,planned+pedestrian,only_approaches=True,bridge_profiles=canal_grades,preferred=pedestrian+cycling,continuous=continuous_canal)
             trim_portal_paving(output,manifest['chunks'],generated,elements,sections)
