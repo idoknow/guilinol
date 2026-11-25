@@ -23,10 +23,10 @@ def station_pad(ways):
     return union_all([translate(hull, dx, dz), translate(hull, -dx, -dz)]).convex_hull
 
 
-def parallel_segments(pieces, coords, ways):
+def parallel_segments(pieces, coords, ways, *, include_structures=False):
     """Compare linear profiles at matching perpendicular chainages on both tracks."""
     surface = {wid for wid,way in ways.items() if way.get('tags',{}).get('railway')=='rail'
-               and all(way['tags'].get(k,'no')=='no' for k in ('bridge','tunnel'))}
+               and (include_structures or all(way['tags'].get(k,'no')=='no' for k in ('bridge','tunnel')))}
     rows = [piece for piece in pieces if piece[4] in surface]
     if not rows:
         return None
@@ -72,8 +72,8 @@ def parallel_segments(pieces, coords, ways):
             xy, way_ids[source], way_ids[target])
 
 
-def parallel_height_audit(pieces, coords, height, ways):
-    pairs = parallel_segments(pieces, coords, ways)
+def parallel_height_audit(pieces, coords, height, ways, *, include_structures=False):
+    pairs = parallel_segments(pieces, coords, ways, include_structures=include_structures)
     result = dict(directedSegmentPairs=0, over5cm=0, maximumM=0)
     if pairs is None:
         return result

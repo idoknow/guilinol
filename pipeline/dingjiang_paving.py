@@ -8,12 +8,21 @@ import struct
 import numpy as np
 from shapely import LineString, box
 
-from dingjiang import ROAD_IDS
 from features import points
 
 
 def finish_paving(directory, manifest, profiles, elements):
-    sections = [s for s in manifest["tunnels"] if s["way"] in ROAD_IDS]
+    by_way = {way["id"]: (line, heights) for way, line, heights in profiles}
+    pairs = {
+        (way["id"], u, v)
+        for way, line, heights in profiles
+        for u, v in zip(way["nodes"], way["nodes"][1:])
+    }
+    sections = [
+        s for s in manifest["tunnels"] if (s["way"], *s.get("nodes", ())) in pairs
+    ]
+    starts = {(way["id"], way["nodes"][0]) for way, _, _ in profiles}
+    ends = {(way["id"], way["nodes"][-1]) for way, _, _ in profiles}
     alignments = []
     for section in sections:
         section["nativePaving"] = True
@@ -31,20 +40,19 @@ def finish_paving(directory, manifest, profiles, elements):
     # graded shoulder. Retain the guard protecting the remaining native way.
     continuations = []
     for way in elements:
-        if way.get("type") != "way" or way["id"] not in ROAD_IDS:
+        if way.get("type") != "way" or way["id"] not in by_way:
             continue
-        solved = profiles[way["id"]][0]["nodes"]
         xy = np.array(points(way))
         for i, (u, v) in enumerate(zip(way["nodes"], way["nodes"][1:])):
-            if v == solved[0] or u == solved[-1]:
+            if (way["id"], v) in starts or (way["id"], u) in ends:
                 a, b = xy[i : i + 2]
                 shift = (b - a) * min(0.95, 10 / np.linalg.norm(b - a))
                 continuations.append(
                     (
                         a,
                         b,
-                        a + shift if u == solved[-1] else a,
-                        b - shift if v == solved[0] else b,
+                        a + shift if (way["id"], u) in ends else a,
+                        b - shift if (way["id"], v) in starts else b,
                     )
                 )
     for tile in manifest["chunks"]:
@@ -90,9 +98,8 @@ def finish_paving(directory, manifest, profiles, elements):
             near = distance <= shoulder + step * math.sqrt(2) + 6
             target[near] = np.minimum(target[near], bed[near])
             axes.add(key(a - [x, z], b - [x, z]))
-        for wid in {section["way"] for section, _, _ in local}:
-            _, line, levels = profiles[wid]
-            width = next(s["halfWidth"] for s, _, _ in local if s["way"] == wid)
+        for wid, width in {(s["way"], s["halfWidth"]) for s, _, _ in local}:
+            line, levels = by_way[wid]
             pts = [
                 np.asarray(line.interpolate(d).coords[0]) - [x, z] for d in levels[:, 0]
             ]
