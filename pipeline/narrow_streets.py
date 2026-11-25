@@ -4,6 +4,7 @@ import math
 import numpy as np
 from shapely import LineString, Point, STRtree, box, get_coordinates, union_all
 from shapely.affinity import affine_transform
+from shapely.ops import substring
 
 from features import points
 from ground_passages import footprint, line_parts
@@ -12,6 +13,7 @@ from vehicle_tunnels import underground
 
 CAR_CLEARANCE = 2.22
 MIN_LENGTH = 10.
+RIDER_WALL_CLEARANCE = .65
 
 
 def narrow_intervals(axis, walls):
@@ -87,7 +89,7 @@ def rider_alignment(way, walls, shared, paved):
             if gap is None:
                 raise ValueError(f'Missing riding corridor on {way["id"]} at {q}')
             lo,hi=sorted(np.dot(np.asarray(pt)-q,normal) for pt in (gap.coords[0],gap.coords[-1]))
-            margin=min(.65,(hi-lo)/2)
+            margin=min(RIDER_WALL_CLEARANCE,(hi-lo)/2)
             limits.append([lo+margin,hi-margin])
         # Anticipate each narrowing at a lateral gradient of 1:5. Preserve
         # the fixed network centres at shared junctions.
@@ -116,6 +118,58 @@ def rider_alignment(way, walls, shared, paved):
     return routed
 
 
+def driving_alignment(alignment, walls, continuations):
+    """Choose a clear rider position at each end, including the adjoining street."""
+    axis = LineString([(x, z) for x, z, _ in alignment])
+    forbidden = walls.buffer(RIDER_WALL_CLEARANCE)
+
+    def clear_stations(line):
+        return [line.project(Point(p)) for part in line_parts(line.difference(forbidden))
+                for p in (part.coords[0], part.coords[-1])]
+
+    stations = clear_stations(axis)
+    if not stations or max(stations) - min(stations) < 1:
+        raise ValueError(f'No clear start and finish for narrow street at {axis.coords[0]}')
+    start, end = min(stations), max(stations)
+    extensions = {}
+    for index, trim in ((0, start), (-1, axis.length - end)):
+        for path in continuations.get(alignment[index][2], ()):
+            if trim < .001:
+                break
+            run = substring(path, 0, min(path.length, trim))
+            if not isinstance(run, LineString):
+                continue
+            at = min(clear_stations(run), default=trim)
+            if at < trim:
+                extensions[index] = run.interpolate(at).coords[0]
+                trim = at
+    coords = list(substring(axis, 0 if 0 in extensions else start,
+                            axis.length if -1 in extensions else end).coords)
+    for index, point in extensions.items():
+        coords[index] = point
+    return coords
+
+
+def adjoining_paths(elements, way, permits):
+    ends = {way['nodes'][0], way['nodes'][-1]}
+    paths = {ref: [] for ref in ends}
+    modes = [m for m in ('foot', 'bike', 'bicycle') if permits(way['tags'], m)]
+    for other in elements:
+        tags = other.get('tags', {})
+        if (other['type'] != 'way' or other['id'] == way['id'] or not tags.get('highway')
+                or not ends.intersection(other['nodes']) or not all(permits(tags, m) for m in modes)
+                or underground(other) != underground(way)
+                or not other.get('geometry') or not all(other['geometry'])):
+            continue
+        xy = points(other)
+        for i, ref in enumerate(other['nodes']):
+            if ref in ends:
+                for arm in (xy[i:], xy[:i+1][::-1]):
+                    if len(arm) > 1:
+                        paths[ref].append(LineString(arm))
+    return paths
+
+
 def classify(output, chunks, elements, motor_classes, widths):
     solids = []
     for tile in chunks:
@@ -125,6 +179,7 @@ def classify(output, chunks, elements, motor_classes, widths):
                 solids.append(footprint(row, origin))
     from collections import Counter
     from service_streets import width
+    from portal_routes import permits
     counts=Counter(ref for w in elements if w['type']=='way' and w.get('tags',{}).get('highway')
                    for ref in set(w['nodes']))
     shared={ref for ref,n in counts.items() if n>1}
@@ -148,8 +203,14 @@ def classify(output, chunks, elements, motor_classes, widths):
             continue
         runs = narrow_intervals(axis, walls)
         if runs:
+            alignment = rider_alignment(way, walls, shared, widths.get(way['id'], width(tags)))
+            arms = adjoining_paths(elements, way, permits)
+            routes = [axis, *(substring(arm, 0, min(axis.length, arm.length))
+                              for paths in arms.values() for arm in paths)]
+            ids = index.query(union_all(routes), predicate='dwithin', distance=RIDER_WALL_CLEARANCE)
+            route_walls = union_all(index.geometries.take(ids))
             result.append(dict(way=way['id'], length=axis.length, narrowStations=runs,
-                               alignment=rider_alignment(way,walls,shared,widths.get(way['id'],width(tags)))))
+                               alignment=alignment, drivingAlignment=driving_alignment(alignment, route_walls, arms)))
     return result
 
 
@@ -174,7 +235,7 @@ def driving_sites(elements, clearances, permits):
     for w in elements:
         if w['type']!='way' or w['id'] not in by_way:
             continue
-        route = [[x,z,w['id']] for x,z,_ in by_way[w['id']]['alignment']]
+        route = [[x,z,w['id']] for x,z in by_way[w['id']]['drivingAlignment']]
         modes = [dict(mode=mode,direction=direction,route=path)
                  for mode in ('foot','bike','bicycle') if permits(w['tags'],mode)
                  for direction,path in [('in',route),('out',route[::-1])]]
