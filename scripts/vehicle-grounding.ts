@@ -125,8 +125,16 @@ if(data.lanes.some(lane=>lane.way===undefined)){
   const file=['raw/osm-2026-11.json','raw/osm.json'].find(fs.existsSync)
   if(!file)throw Error('Legacy graph needs its matching OSM snapshot to identify bridge and tunnel layers')
   const ways=new Map()
+  const sections='pipeline/rail-sections'
+  const boundaryWays=new Map<number,number>()
+  for(const name of fs.readdirSync(sections).filter(name=>name.endsWith('.json'))){
+    for(const road of JSON.parse(fs.readFileSync(path.join(sections,name),'utf8')).roads)
+      for(const node of road.boundaryNodes)boundaryWays.set(node,road.way)
+  }
+  const osm=new Map()
   for(const way of JSON.parse(fs.readFileSync(file,'utf8')).elements){
     if(way.type!=='way'||!way.tags?.highway)continue
+    osm.set(way.id,way)
     const cls=way.tags.highway.replace(/_link$/,'')
     for(let i=1;i<way.nodes.length;i++){
       const a=way.nodes[i-1],b=way.nodes[i]
@@ -135,7 +143,7 @@ if(data.lanes.some(lane=>lane.way===undefined)){
   }
   for(const lane of data.lanes){
     if(lane.way!==undefined)continue
-    const way=ways.get([Math.min(lane.from,lane.to),Math.max(lane.from,lane.to),lane.cls].join('/'))
+    const way=ways.get([Math.min(lane.from,lane.to),Math.max(lane.from,lane.to),lane.cls].join('/'))??osm.get(boundaryWays.get(lane.from)??boundaryWays.get(lane.to))
     if(!way)throw Error('Missing OSM way for lane '+lane.id)
     lane.way=way.id
     for(const key of ['bridge','tunnel'])if(way.tags[key]&&way.tags[key]!=='no')lane.structure=key
