@@ -275,10 +275,12 @@ def bake(output, manifest, rendered_roads=None):
     bake_station_corridor(output, manifest['chunks'], elements)
     bake_surveyed_corridors(output,manifest['chunks'],elements,sections)
     from dingjiang_structures import motorway_sections
-    # Keep existing lane IDs stable and append the modeled motorway deck lanes.
+    from rail_sections import motorway_sections as graded_motorways
+    # Append the modeled motorway segments after the existing network so every
+    # pre-existing lane keeps its ID in graph.json.gz and all streaming cells.
     existing = (way for way in elements if way.get('tags', {}).get('highway')
                 not in ('motorway', 'motorway_link'))
-    for way in chain(existing, motorway_sections(elements)):
+    for way in chain(existing, motorway_sections(elements), graded_motorways(elements)):
         tags = way.get('tags', {})
         linear = way['id'] not in SPAN_WAYS and (tags.get('bridge','no')!='no' or underground(way))
         kind = tags.get('highway', '').removesuffix('_link')

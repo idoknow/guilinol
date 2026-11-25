@@ -59,7 +59,7 @@ export function tileSurface(world,entry,tunnels, collect?:(kind:string,faces:Flo
     cut[s*(Math.floor(index/stride)*65+index%stride)]=cm/100
   }
   const ground=(x,z)=>interpolate(cut,x,z)
-  const streets=streetGeometry(paths,(x,z)=>interpolate(grid,x,z),Array.isArray(legacy)?legacy:[],signs,ground,entry.stationPaving),roads=streets.road
+  const streets=streetGeometry(paths,(x,z)=>interpolate(grid,x,z),Array.isArray(legacy)?legacy:[],signs,ground,entry.stationPaving,new Set<number>(entry.roadbeds)),roads=streets.road
   joinPortalRoads(entry,tunnels,[roads.subarray(0,streets.legacyRoadLength)])
   const modified=bed&&new Set(bed.drop),replacement=bed&&new Triangles(bedPositions(bed))
   if(collect){

@@ -377,7 +377,7 @@ export async function detail(tile:Tile, signal:AbortSignal, parseSlot?:()=>Promi
   })
   for(const [,topLevel] of rings) if(topLevel/10+8>maxY) maxY = topLevel/10+8
   const heights = geometry.getAttribute('position')
-  const streets = await loadStreetGeometry(paths,step,heights,rails,signs,railCuts,tile.stationPaving)
+  const streets = await loadStreetGeometry(paths,step,heights,rails,signs,railCuts,tile.stationPaving,tile.roadbeds)
   if(tunnels)joinPortalRoads(tile,tunnels,[
     streets.road.subarray(0,streets.legacyRoadLength),
     streets.sidewalk.subarray(0,streets.legacyWalkLength),
@@ -499,7 +499,7 @@ export async function detail(tile:Tile, signal:AbortSignal, parseSlot?:()=>Promi
   const surfaceAt = buildSurfaceLookup(tile, paths)
   return {
     railCutVertices:new Set(railCuts.map(([index])=>index)),tunnelFloorStart,bridgeDepth:look.bridgeDepth,
-    group,groundMesh,roadBed,terrain:terrain.slice(),water:water.slice(),rings,deck,thin,streets,batch,tunnel,
+    group,groundMesh,roadBed,underlay,terrain:terrain.slice(),water:water.slice(),rings,deck,thin,streets,batch,tunnel,
     dispose(){
       if(tunnel){
         for(const mesh of Object.values(tunnel))if(mesh){
