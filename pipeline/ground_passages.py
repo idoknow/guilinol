@@ -59,13 +59,16 @@ def line_parts(shape):
 
 def close_qingtian_road(elements, widths, curbs):
     """Keep the mapped junctions and end the campus service road before the facade."""
-    ways={w['id']:w for w in elements if w['type']=='way' and w['id'] in (1487527338,1472917067)}
-    if len(ways)!=2:
-        return
-    street=ways[1487527338]
+    ways={w['id']:w for w in elements if w['type']=='way' and w['id'] in (1487527335,1487527338,1472917067)}
+    if 1472917067 in ways:
+        for road in (1487527335,1487527338):
+            if road in ways:
+                close_wall_segment(ways[road],area(ways[1472917067]),widths,curbs)
+
+
+def close_wall_segment(street, building, widths, curbs):
     axis=LineString(points(street))
     half=widths.get(street['id'],width(street['tags']))/2
-    building=area(ways[1472917067])
     overlaps=list(line_parts(axis.intersection(building)))
     if not overlaps:
         return
@@ -88,6 +91,36 @@ def close_qingtian_road(elements, widths, curbs):
     for lo,hi in zip(stations[::2],stations[1::2]):
         if hi-lo>=10:
             street['openStations'].append((lo,hi))
+
+
+def campus_boundary_routes(elements):
+    """Approach each old crossing from the connected street or retained branch."""
+    ways={w['id']:w for w in elements if w['type']=='way' and w['id'] in
+          (1487527335,1487527336,1487527339,1472917067)}
+    branch=ways.get(1487527335,{})
+    if not branch.get('openStations'):
+        return []
+    axis=LineString(points(branch))
+    lo,hi=branch['openStations'][-1]
+    branch_approach=substring(axis,min(hi,lo+20),lo)
+    north=LineString(points(ways[1487527339]))
+    south=LineString(points(ways[1487527336]))
+    wall=area(ways[1472917067])
+    # The southern feeder reaches the outside facade before the former shared node.
+    outside=max(line_parts(south.difference(wall.buffer(2.5))),key=lambda p:p.length)
+    end=south.project(Point(outside.coords[0]))
+    approaches=[(13459484597,1487527339,substring(north,20,0)),
+                (13637474084,1487527335,branch_approach),
+                (13637474088,1487527336,substring(south,end+20,end))]
+    sites=[]
+    for node,wid,approach in approaches:
+        # Departure starts with the parked car's nose and tail clear of the kerb.
+        leave=substring(approach,approach.length-2.4,0)
+        modes=[dict(mode='car',direction=direction,boundary=direction=='in',
+                    route=[[x,z,wid] for x,z in path.coords])
+               for direction,path in [('in',approach),('out',leave)]]
+        sites.append(dict(id=node,way=branch['id'],boundaryWay=wid,modes=modes))
+    return sites
 
 
 def set_terminal_stops(nodes, lanes, height, profile):
