@@ -224,3 +224,9 @@ body[data-drone="rc"] :is(output,.hint,footer,.sky-ui,.walk-ui,.dock,.toast,.spo
 /* IDOK-278: walk up to a landed drone → a 收起 button near it. */
 .drone-recall-near{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(110px + env(safe-area-inset-bottom));padding:9px 22px;border:0;border-radius:999px;background:#2f6f8f;color:#fff;font:600 14px/1 inherit;cursor:pointer;z-index:60;box-shadow:0 6px 18px rgba(0,0,0,.35)}
 .drone-recall-near:hover{background:#3a89ad}
+/* IDOK-278: obstacle proximity warning — red edge glow + direction badge. */
+.rc .rc-obstacle-warn{position:absolute;top:calc(58px + env(safe-area-inset-top));left:50%;transform:translateX(-50%);padding:5px 14px;border-radius:999px;background:rgba(224,85,63,.85);color:#fff;font-size:12.5px;letter-spacing:.06em;pointer-events:none;z-index:8}
+.rc[data-obstacle]{box-shadow:inset 0 0 0 3px rgba(224,85,63,.75)}
+.rc[data-obstacle="front"]{box-shadow:inset 0 10px 42px -8px rgba(224,85,63,.8)}
+.rc[data-obstacle="left"]{box-shadow:inset 10px 0 42px -8px rgba(224,85,63,.8)}
+.rc[data-obstacle="right"]{box-shadow:inset -10px 0 42px -8px rgba(224,85,63,.8)}

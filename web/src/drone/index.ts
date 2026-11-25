@@ -325,7 +325,7 @@ export function droneMode(host:Host, deps:{groundAt:(x:number,z:number)=>number;
       void replace().catch(() => {})
     }
   }
-  function wreck(pos:THREE.Vector3) {
+  function wreck(pos:THREE.Vector3, reason = '淋湿损坏') {
     if (!flight || !placed) return
     lostId = placed
     overWaterLoss = deps.waterAt?.(pos.x,pos.z) ?? false
@@ -333,7 +333,7 @@ export function droneMode(host:Host, deps:{groundAt:(x:number,z:number)=>number;
     const spec = flight.spec
     if (overWaterLoss) {
       // 落水：被水冲走，丢失。机库里点「补充」换新机。
-      toast(`${spec.short} 淋湿坠水，被水冲走 · 已丢失，请在机库点击「补充」`)
+      toast(`${spec.short} ${reason}坠水，被水冲走 · 已丢失，请在机库点击「补充」`)
       teardown()
       refreshDock()
       return
@@ -341,9 +341,10 @@ export function droneMode(host:Host, deps:{groundAt:(x:number,z:number)=>number;
     // 陆地：坠机原地，可靠近点击修复。
     teardown()
     buildWreckMarker(pos)
-    toast(`${spec.short} 淋湿损坏坠机 · 靠近后点击修复`)
+    toast(`${spec.short} ${reason}坠机 · 靠近后点击修复`)
     refreshDock()
   }
+  let pedestrianHitAt = -1
   function toast(text:string) {
     window.dispatchEvent(new CustomEvent('walk:toast',{detail:{text,ms:4600}}))
   }
@@ -754,8 +755,32 @@ export function droneMode(host:Host, deps:{groundAt:(x:number,z:number)=>number;
       return
     }
     stepCharge(dt)
-    if (flight.phase !== 'landed') stepFlight(flight,Math.min(dt,.1),input.read(),gnd)
-    else stepFlight(flight,Math.min(dt,.1),{throttle:0,yaw:input.read().yaw * .4,pitch:0,roll:0},gnd)
+    // IDOK-278: 避障射线路径 —— play 层把 Rapier 墙射线暴露成 droneObstacleAt。
+    const obstacleAt = host.walker()?.droneObstacleAt
+    const hit = (x:number,y:number,z:number,dx:number,dy:number,dz:number,maxDist:number) => {
+      try { return obstacleAt?.(x,y,z,dx,dy,dz,maxDist) ?? null } catch { return null }
+    }
+    if (flight.phase !== 'landed') stepFlight(flight,Math.min(dt,.1),input.read(),gnd,hit)
+    else stepFlight(flight,Math.min(dt,.1),{throttle:0,yaw:input.read().yaw * .4,pitch:0,roll:0},gnd,hit)
+    // 撞楼撞坏：转 wreck 流程。
+    if (flight.crashed) {
+      wreck(flight.pos.clone(),`撞击${flight.crashKind === 'building' ? '建筑物' : '障碍物'}损坏`)
+      return
+    }
+    // 撞人：低速擦过行人只减速并提示；速度高也把人撞开（人被 walk 层自身机制处理）。
+    if (flight.phase !== 'landed' && flight.vel.length() > 3) {
+      const walker = host.walker()
+      if (walker?.active) {
+        const d = walker.position.distanceTo(flight.pos)
+        if (d < 1.2) {
+          flight.vel.multiplyScalar(.4)
+          if (!pedestrianHitAt || flight.elapsed - pedestrianHitAt > 4) {
+            pedestrianHitAt = flight.elapsed
+            window.dispatchEvent(new CustomEvent('walk:toast',{detail:{text:'无人机撞到行人 · 请注意避让',ms:2600}}))
+          }
+        }
+      }
+    }
     mesh.root.position.copy(flight.pos)
     mesh.root.rotation.y = flight.yaw
     const throttle = flight.phase === 'landed' ? .06 : .5 + Math.min(.5,Math.hypot(flight.vel.x,flight.vel.y,flight.vel.z) / Math.max(1,flight.spec.speed))

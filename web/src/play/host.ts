@@ -13,6 +13,8 @@ export interface Walker {
   probe?():{surfaceY?:number; foot?:number; renderY?:number}
   /** Raise/relax the right arm while a camera is equipped (IDOK-188). */
   setCameraHold?(on:boolean,pose?:{aim?:{forward?:number;up?:number;side?:number}}):void
+  /** IDOK-278: obstacle ray at an arbitrary world position (building/landmark/tree walls). */
+  droneObstacleAt?(x:number,y:number,z:number,dx:number,dy:number,dz:number,maxDist:number):{distance:number;kind:string;normal:[number,number,number]}|null
 }
 export interface Clock {hour:number; weather:Weather; flowing:boolean; goal:number|null; set(hour:number,weather?:Weather):void}
 export interface Host {

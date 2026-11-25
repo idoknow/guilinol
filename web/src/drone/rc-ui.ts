@@ -41,6 +41,11 @@ export function createRc(spec:DroneSpec, handlers:RcHandlers, onHold?:(held:bool
   const timeText = q<HTMLElement>('.rc-time')
   const readout = q<HTMLElement>('.rc-readout')
   const status = q<HTMLElement>('.rc-status')
+  // IDOK-278: 障碍警告角标（pro 布局才有）
+  const obstacleWarn = document.createElement('div')
+  obstacleWarn.className = 'rc-obstacle-warn'
+  obstacleWarn.hidden = true
+  root.append(obstacleWarn)
   const tele = q<HTMLElement>('.rc-tele')
   const gimbalValue = q<HTMLElement>('.rc-gimbalval')
   const rcBars = root.querySelector<HTMLElement>('.rc-bars[data-kind="rc"]')
@@ -200,6 +205,17 @@ export function createRc(spec:DroneSpec, handlers:RcHandlers, onHold?:(held:bool
     if (recording) mode = 'video'
     syncMode()
     root.dataset.phase = state.phase
+    // IDOK-278: 近障碍警告 —— 全屏红色边缘光 + 方向角标。
+    if (state.obstacle) {
+      root.dataset.obstacle = state.obstacle.side
+      if (obstacleWarn) {
+        obstacleWarn.hidden = false
+        obstacleWarn.textContent = `前方障碍 ${state.obstacle.dist}m`
+      }
+    } else {
+      delete root.dataset.obstacle
+      if (obstacleWarn) obstacleWarn.hidden = true
+    }
   }
 
   function setRecording(on:boolean) {

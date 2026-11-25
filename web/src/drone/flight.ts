@@ -47,7 +47,7 @@ export function liftOff(flight:Flight) {
 }
 
 declare module './flight' {}
-export interface Flight { velocityBoost?:number }
+export interface Flight { velocityBoost?:number; crashed?:boolean; crashKind?:string; obstacle?:{dist:number; side:string}|null }
 
 export function requestHome(flight:Flight) {
   if (flight.phase === 'landed' || flight.phase === 'landing') return
@@ -77,16 +77,26 @@ export function batteryMinutes(flight:Flight) {
   return flight.battery / drain / 60
 }
 
+export interface ObstacleHit {distance:number; kind:string; normal:[number,number,number]}
 /**
  * Advance the aircraft. `groundAt` returns terrain height under a world x/z; the rig passes the
  * play layer's ground ray so the drone lands on roofs and hills, not at y=0.
+ * `obstacleAt` (IDOK-278) casts a wall ray — the drone avoids near walls and crashes into them hard.
  */
-export function stepFlight(flight:Flight, dt:number, sticks:Sticks, groundAt:(x:number,z:number)=>number) {
+export function stepFlight(
+  flight:Flight,
+  dt:number,
+  sticks:Sticks,
+  groundAt:(x:number,z:number)=>number,
+  obstacleAt?:(x:number,y:number,z:number,dx:number,dy:number,dz:number,maxDist:number)=>ObstacleHit|null,
+) {
   const spec = flight.spec
   const limit = speedLimit(spec,flight.load)
   const groundY = groundAt(flight.pos.x,flight.pos.z)
   const half = spec.height * .5
   flight.elapsed += dt
+  flight.crashed = false
+  flight.obstacle = null
 
   // Battery first: it decides the phase later on.
   const loadFactor = 1 + Math.min(1.4,(flight.load / Math.max(1,spec.payloadG ?? spec.weightG)) * .9)
@@ -158,6 +168,39 @@ export function stepFlight(flight:Flight, dt:number, sticks:Sticks, groundAt:(x:
     }
     flight.vel.y = Math.max(0,flight.vel.y)
   }
+
+  // IDOK-278: 避障与撞楼。沿速度方向打一堵墙射线：
+  //  · 6 m 内有障碍 → obstacle 警告（遥控画面红框），并给一个横向避让分量；
+  //  · 撞上（distance < span 半长 + 余量）→ 速度反弹衰减，撞击速度 >4 m/s 直接撞坏。
+  if (obstacleAt && flight.phase === 'flying') {
+    const v = flight.vel
+    const speed = v.length()
+    if (speed > .4) {
+      const probe = obstacleAt(flight.pos.x,flight.pos.y,flight.pos.z,v.x,v.y,v.z,speed * dt + spec.span * .6 + .4)
+      if (probe && probe.distance < spec.span * .6 + .4) {
+        const impact = speed
+        // 反弹：法线方向消掉，切向衰减 30%
+        const n = new THREE.Vector3(probe.normal[0],probe.normal[1],probe.normal[2])
+        v.addScaledVector(n,-v.dot(n) * 1.4).multiplyScalar(.3)
+        flight.pos.addScaledVector(n,Math.max(0,spec.span * .6 + .4 - probe.distance))
+        if (impact > 4) { flight.crashed = true; flight.crashKind = probe.kind }
+      }
+    }
+    // 近距警告：机头方向与四侧各打一枪，取最近的一个供 UI。
+    const fwd = new THREE.Vector3(-Math.sin(flight.yaw),0,-Math.cos(flight.yaw))
+    const near = obstacleAt(flight.pos.x,flight.pos.y,flight.pos.z,fwd.x,0,fwd.z,6)
+    if (near) flight.obstacle = {dist:near.distance, side:'front'}
+    else {
+      const rightDir = new THREE.Vector3(Math.cos(flight.yaw),0,-Math.sin(flight.yaw))
+      const sides:[[typeof rightDir,string][]] = [[[rightDir,'right'],[rightDir.clone().negate(),'left']]]
+      let best:{dist:number; side:string}|null = null
+      for (const [dir,side] of sides[0]) {
+        const hit = obstacleAt(flight.pos.x,flight.pos.y,flight.pos.z,dir.x,0,dir.z,4)
+        if (hit && (!best || hit.distance < best.dist)) best = {dist:hit.distance, side}
+      }
+      flight.obstacle = best
+    }
+  }
   flight.agl = Math.max(0, flight.pos.y - half - groundY)
   flight.maxAgl = Math.max(flight.maxAgl, flight.agl)
 
@@ -215,5 +258,6 @@ export function telemetry(flight:Flight) {
     minutes:+batteryMinutes(flight).toFixed(1),
     load:flight.load / 1000,
     maxAgl:+flight.maxAgl.toFixed(1),
+    obstacle:flight.obstacle ? {dist:+flight.obstacle.dist.toFixed(1), side:flight.obstacle.side} : null,
   }
 }

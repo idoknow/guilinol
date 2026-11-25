@@ -2794,6 +2794,11 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
       const baseY=y??((supportAt(x,z,footY)?.y??footY)+.55)
       return sim.raycastObstacle(x,baseY,z,dx,dy,dz,maxDist)
     }:undefined,
+    // IDOK-278: 无人机避障/撞楼 —— 任意世界点打墙射线（不走玩家 capsule，距离无 160m 限制）。
+    droneObstacleAt(x:number,y:number,z:number,dx:number,dy:number,dz:number,maxDist:number){
+      sim.sync(x,z)
+      return sim.raycastObstacle(x,y,z,dx,dy,dz,maxDist)
+    },
     pavementAt:verify?(x:number,z:number)=>Boolean(rides?.pavement(x,z)):undefined,
     insideHouseAt:verify?(x:number,z:number,y?:number)=>sim.insideHouse(x,z,y):undefined,
     // IDOK-188: 持机时把右手抬到胸前；aim 是相对脊柱的身体坐标偏移（米），现场微调用。
