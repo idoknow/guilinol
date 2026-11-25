@@ -4,7 +4,7 @@ import * as THREE from 'three'
 import {buildingGeometry,type Building} from './buildings'
 import {loadStreetGeometry} from './street-loader'
 import {mergeGeometries} from 'three/addons/utils/BufferGeometryUtils.js'
-import type {Streets} from './street-worker'
+import type {StationPavingStyle,Streets} from './street-worker'
 import {bridgeGeometry} from './look/bridge'
 import {look} from './look/config'
 import {bindStreetSurface} from './streets'
@@ -376,7 +376,7 @@ export async function detail(tile:Tile, signal:AbortSignal, parseSlot?:()=>Promi
   })
   for(const [,topLevel] of rings) if(topLevel/10+8>maxY) maxY = topLevel/10+8
   const heights = geometry.getAttribute('position')
-  const streets = await loadStreetGeometry(paths,step,heights,rails,signs,railCuts)
+  const streets = await loadStreetGeometry(paths,step,heights,rails,signs,railCuts,tile.stationPaving)
   if(tunnels)joinPortalRoads(tile,tunnels,[
     streets.road.subarray(0,streets.legacyRoadLength),
     streets.sidewalk.subarray(0,streets.legacyWalkLength),
@@ -417,7 +417,9 @@ export async function detail(tile:Tile, signal:AbortSignal, parseSlot?:()=>Promi
   const tunnel=tunnels?tunnelGeometry(tile,geometry,tunnels):null
   let bridge = deck.length ? bridgeGeometry(deck,thin,asphalt) : null
   let tunnelFloorStart=Infinity
-  if(tunnel){
+  if(tunnel && 'lining' in tunnel){
+    group.add(tunnel.floor,tunnel.portal,tunnel.interior)
+  }else if(tunnel){
     tunnel.fringe.material.dispose()
     tunnel.fringe.material=material
     if(tunnels?.every(t=>t.generated)){
@@ -498,7 +500,13 @@ export async function detail(tile:Tile, signal:AbortSignal, parseSlot?:()=>Promi
     railCutVertices:new Set(railCuts.map(([index])=>index)),tunnelFloorStart,bridgeDepth:look.bridgeDepth,
     group,groundMesh,roadBed,terrain:terrain.slice(),water:water.slice(),rings,deck,thin,streets,batch,tunnel,
     dispose(){
-      if(tunnel)for(const mesh of Object.values(tunnel)){mesh.geometry.dispose();if(mesh!==tunnel.fringe)mesh.material.dispose()}
+      if(tunnel){
+        for(const mesh of Object.values(tunnel))if(mesh){
+          mesh.geometry.dispose()
+          if(tunnel.fringe && mesh!==tunnel.fringe)mesh.material.dispose()
+        }
+        if(!tunnel.fringe)tunnel.floor.material.dispose()
+      }
       pond?.dispose(); streets.surface?.dispose(); streets.fence?.dispose(); bridge?.dispose(); geometry.dispose(); walls?.dispose()
       material.map!.image.close(); material.map!.dispose(); material.dispose()
     },

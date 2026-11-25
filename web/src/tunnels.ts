@@ -2,8 +2,9 @@ import * as THREE from 'three'
 import type {Tile} from './world'
 
 type Point=[number,number,number]
-type Joint={ring?:[number,number][],offsets?:string,draw:boolean,cap?:boolean}
-export type Tunnel={way:number,generated?:boolean,openings?:[number,number,number,number][],gradedAccess?:boolean,portals:[Point,Point],length:number,halfWidth:number,endWidths?:[number,number],clearance:number,approach:number,openEnds?:[number,number],mouths?:[boolean,boolean],joints?:(Joint|null)[],portalSign?:number[][],crossfall?:number[],carriagewayHalfWidth?:number,stations?:[number,number][],stationHeights?:string,knotHeights?:string}
+import * as station from './station-tunnels'
+type Joint={wedges?:[number,number][][],faces?:Point[][],ring?:[number,number][],offsets?:string,draw:boolean,cap?:boolean}
+export type Tunnel={nodes?:[number,number],footprint?:[number,number][][],approachEnds?:[number,number],openCut?:boolean,way:number,generated?:boolean,openings?:[number,number,number,number][],gradedAccess?:boolean,portals:[Point,Point],length:number,halfWidth:number,endWidths?:[number,number],clearance:number,approach:number,openEnds?:[number,number],mouths?:[boolean,boolean],joints?:(Joint|null)[],portalSign?:number[][],crossfall?:number[],carriagewayHalfWidth?:number,stations?:[number,number][],stationHeights?:string,knotHeights?:string}
 
 // Generated strips use three fixed easing samples per interval. Keep distant
 // strips encoded in the manifest and unpack only a visited strip's levels.
@@ -82,6 +83,7 @@ export function nearbyTunnels(list:Tunnel[]|undefined,x:number,z:number){
 }
 
 export function floorLevel(tunnel:Tunnel,x:number,z:number){
+  if(tunnel.nodes)return station.floorLevel(tunnel as station.Tunnel,x,z)
   const axes=frame(tunnel),at=axes.station(x,z)
   if(at<0||at>tunnel.length||Math.abs(axes.lateral(x,z))>halfWidthAt(tunnel,at)){
     for(const [i,joint] of (tunnel.joints??[]).entries()){
@@ -134,7 +136,7 @@ export function treeBlocked(x:number,y:number,z:number){
 type Plane=(point:Point)=>number
 export function joinPortalRoads(tile:Tile,tunnels:Tunnel[],buffers:Float32Array[]){
   for(const tunnel of tunnels){
-    if(tunnel.gradedAccess)continue
+    if(tunnel.gradedAccess||tunnel.nodes)continue
     const axes=frame(tunnel)
     for(const [index,portal] of tunnel.portals.entries()){
       if(tunnel.mouths?.[index]===false)continue
@@ -164,6 +166,12 @@ function clip(poly:Point[],plane:Plane){
 function fan(poly:Point[],out:number[]){for(let at=2;at<poly.length;at++)out.push(...poly[0],...poly[at-1],...poly[at])}
 
 export function tunnelGeometry(tile:Tile,ground:THREE.PlaneGeometry,tunnels:Tunnel[]){
+  const local=nearbyTunnels(tunnels,tile.x,tile.z)
+  if(local.some(t=>t.nodes)){
+    const mesh=station.tunnelGeometry(tile,ground,local.filter(t=>t.nodes) as station.Tunnel[])
+    if(mesh)return {...mesh,fringe:undefined}
+  }
+  tunnels=local.filter(t=>!t.nodes)
   const parts={floor:[] as number[],interior:[] as number[],portal:[] as number[],band:[] as number[],lamp:[] as number[],lane:[] as number[],sign:[] as number[],letters:[] as number[],ceiling:[] as number[]}
   const floorRanges:{end:number,tunnel:Tunnel}[]=[]
   const cuts:Plane[][]=[]

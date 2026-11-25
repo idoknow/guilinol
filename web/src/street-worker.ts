@@ -12,7 +12,7 @@ export interface StationPavingStyle {plaza?:Pair[]; platformEdges?:[Pair,Pair][]
 type Path=[number,...Pair[][]]
 type RoadCtrl=[number,number[]]
 type Lower=[number,Pair[],[number,number,number,number][]]
-export type Streets=[Path[],Pair[],number[][],Pair[]?,Pair[]?,(RoadCtrl|null)?,number[][]?,number[][]?,number[][]?,number[][]?,Pair[][]?,Lower?,{start:number,end:number,vertices?:[number,number,number][],packed?:string,bank?:string,sidewalk?:string,skirt?:string}?,Record<string,number>?]
+export type Streets=[Path[],Pair[],number[][],Pair[]?,Pair[]?,(RoadCtrl|null)?,number[][]?,number[][]?,number[][]?,number[][]?,Pair[][]?,(Lower|null)?,([number,number,number]|{start:number,end:number,vertices?:[number,number,number][],packed?:string,bank?:string,sidewalk?:string,skirt?:string}|null)?,Record<string,number>?,StationRoadSegment[]?,StationPavingCut[]?,[number,number,number]?]
 const colors=look.streets.surfaces.map(v=>new THREE.Color(v)),tone=Object.fromEntries((['railing','lampPole','lampHead'] as const).map(k=>[k,new THREE.Color(look.streets[k])]))
 const stoneLight=new THREE.Color(0xa6a39a),stoneMid=new THREE.Color(0x8c8981),stoneBase=new THREE.Color(0x74726b)
 const platformBrick=new THREE.Color(style.station.platformBrick)
@@ -47,7 +47,9 @@ function lowerHeight(x:number,z:number,base:number,terrain:number,[,corners,prof
   return terrain+factor*(base-terrain)
 }
 
-export function streetGeometry([paths,lamps,banks,signals=[],stops=[],roadCtrl,stoneRails=[],beds=[],shops=[],decor=[],curbCuts=[],lower,surveyed,anchors]:Streets,ground:(x:number,z:number)=>number,rails:RailSection[]=[],signs:CrossingSign[]=[],railGround:(x:number,z:number)=>number=ground){
+export function streetGeometry([paths,lamps,banks,signals=[],stops=[],roadCtrl,stoneRails=[],beds=[],shops=[],decor=[],curbCuts=[],lower,stored,anchors,stationRoads,stationCuts,savedPlatform]:Streets,ground:(x:number,z:number)=>number,rails:RailSection[]=[],signs:CrossingSign[]=[],railGround:(x:number,z:number)=>number=ground,paving?:StationPavingStyle){
+  const platform=Array.isArray(stored)?stored:savedPlatform
+  const surveyed=Array.isArray(stored)?undefined:stored
   const xyz:number[]=[],rgb:number[]=[],sidewalk:number[]=[],road:number[]=[],mats:number[]=[],cols:number[]=[]
   const stationLevel=stationRoads?stationRoadSurface(stationRoads):null
   const remaining=stationCuts?stationPaving(stationCuts,stationLevel?.protectedAt):null
@@ -85,6 +87,14 @@ export function streetGeometry([paths,lamps,banks,signals=[],stops=[],roadCtrl,s
   const surfaceKinds:number[]=[],alongVals:number[]=[]
   const fenceXyz:number[]=[],fenceRgb:number[]=[],fenceAlong:number[]=[]
   function triangle(first:THREE.Vector3,second:THREE.Vector3,third:THREE.Vector3,kind:number,u1=0,u2=0,u3=0,vertical=false,projected=false,precise=false){
+    if(remaining && (kind===0||kind===5) && !vertical){
+      for(const poly of remaining(first,second,third))
+        for(let k=1;k<poly.length-1;k++)emit(poly[0],poly[k],poly[k+1],kind,u1,u2,u3,false,projected,precise)
+      return
+    }
+    emit(first,second,third,kind,u1,u2,u3,vertical,projected,precise)
+  }
+  function emit(first:THREE.Vector3,second:THREE.Vector3,third:THREE.Vector3,kind:number,u1:number,u2:number,u3:number,vertical:boolean,projected:boolean,precise:boolean){
     let p1=first,p2=second,p3=third,a1=u1,a2=u2,a3=u3
     if(kind!==3&&!vertical){
       const x1=Math.fround(p1.x),y1=Math.fround(p1.y),z1=Math.fround(p1.z)
@@ -104,12 +114,17 @@ export function streetGeometry([paths,lamps,banks,signals=[],stops=[],roadCtrl,s
       const nx=Math.abs(uy*vz-uz*vy),ny=Math.abs(uz*vx-ux*vz),nz=Math.abs(ux*vy-uy*vx)
       a1=a2=a3=ny>=nx&&ny>=nz?0:nx>nz?1:2
     }
-    const textureChannel=kind===6?6:channel
-    surfaceKinds.push(textureChannel,textureChannel,textureChannel);alongVals.push(a1,a2,a3)
-    const c=colors[kind]
+    const platformTop=kind===1 && platformPath && edges?.length && !vertical
+    const stone=kind===1 && paving?.plaza && inRing((p1.x+p2.x+p3.x)/3,(p1.z+p2.z+p3.z)/3,paving.plaza)
+    const textureChannel=platformTop?9:stone?10:kind===6?6:channel
+    surfaceKinds.push(textureChannel,textureChannel,textureChannel)
+    if(platformTop)alongVals.push(edgeDistance(p1),edgeDistance(p2),edgeDistance(p3))
+    else alongVals.push(a1,a2,a3)
+    const c=platformTop?platformBrick:stone?plazaStone:colors[kind]
     for(const pt of [p1,p2,p3]){xyz.push(pt.x,pt.y,pt.z);rgb.push(c.r,c.g,c.b);if(channel===1&&!vertical)sidewalk.push(pt.x,pt.y,pt.z);else if(channel===0&&!vertical)road.push(pt.x,pt.y,pt.z)}
   }
   for(const [index,[kind,...rings]] of paths.entries()){
+    platformPath=!!platform && index>=platform[0] && index<platform[1]
     if(surveyed&&index>=surveyed.start&&index<surveyed.end)continue
     lowerPath=!!lower && index>=lower[0]
     const loops=rings.map(ring=>ring.map(([x,z])=>new THREE.Vector2(x/100,z/100)))
@@ -152,6 +167,7 @@ export function streetGeometry([paths,lamps,banks,signals=[],stops=[],roadCtrl,s
       }
     }
   }
+  platformPath=false
   const legacyRoadLength=road.length,legacyWalkLength=sidewalk.length,legacySurfaceLength=xyz.length
   if(surveyed){
     const a=new THREE.Vector3(),b=new THREE.Vector3(),c=new THREE.Vector3()
@@ -396,7 +412,7 @@ export type StreetData=ReturnType<typeof streetGeometry>
 export interface StreetRequest {id:number; paths:Streets; paving?:StationPavingStyle; roadbeds?:number[]; rails?:RailSection[]; signs?:CrossingSign[]; railCuts?:[number,number][]; step:number; elevations:Float32Array}
 export type StreetResponse={id:number; data:StreetData}|{id:number; error:string}
 
-if(typeof self!=='undefined')self.onmessage=({data:{id,paths,step,elevations,rails=[],signs=[],railCuts=[]}}:MessageEvent<StreetRequest>)=>{
+if(typeof self!=='undefined')self.onmessage=({data:{id,paths,step,elevations,paving,rails=[],signs=[],railCuts=[]}}:MessageEvent<StreetRequest>)=>{
   try {
     const segments=256/step, stride=segments+1
     const sample=(grid:Float32Array)=>(x:number,z:number)=>{

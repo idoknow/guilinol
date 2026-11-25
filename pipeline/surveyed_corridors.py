@@ -51,10 +51,11 @@ def restore(output,chunks):
             paths[11][0]=original['lower']
         anchors = paths[13] if len(paths)>13 else None
         del paths[original['length']:]
+        if len(paths)>12: paths[12]=original.get('platform')
         if anchors:
             while len(paths)<14:
                 paths.append(None if len(paths) in (5,11,12,13) else [])
-            paths[12] = None
+            paths[12] = original.get('platform')
             paths[13] = anchors
         collision[7]=original['bed']
         write_chunk(file,raw,start,size,collision)
@@ -166,7 +167,7 @@ def patch(file, area, approaches=(), foot=(), seam=None, crossings=(), fixed=(),
         original=json.loads(zlib.decompress(base64.b64decode(previous)))
     else:
         original=dict(paths=paths[0],lower=paths[11][0] if len(paths)>11 and paths[11] else None,
-                      length=len(paths),bed=collision[7] if len(collision)>7 else None)
+                      platform=old if isinstance(old,list) else None,length=len(paths),bed=collision[7] if len(collision)>7 else None)
         previous=base64.b64encode(zlib.compress(json.dumps(original,separators=(',',':')).encode())).decode()
     lower = paths[11] if len(paths)>11 else None
     boundary = lower[0] if lower else len(paths[0])
@@ -195,7 +196,10 @@ def patch(file, area, approaches=(), foot=(), seam=None, crossings=(), fixed=(),
         if area.is_empty:
             return False
     rebuilt = []
+    platform=original.get('platform')
+    indices=[]
     for kind, *loops in paths[0][:boundary]:
+        indices.append(len(rebuilt))
         shape = make_valid(Polygon(np.asarray(loops[0])/100, [np.asarray(r)/100 for r in loops[1:]]))
         if kind in (0,1,4,5,6) and area.intersects(shape):
             remainder=shape.difference(area)
@@ -207,6 +211,7 @@ def patch(file, area, approaches=(), foot=(), seam=None, crossings=(), fixed=(),
                     rebuilt.extend(rings(kind,poly))
         else:
             rebuilt.append([kind,*loops])
+    indices.append(len(rebuilt))
     survey_start = len(rebuilt)
     # Keep a narrow exposed bed between the rim of the driving surface and
     # the outside retaining wall. At a tile seam the road must remain joined.
@@ -226,6 +231,11 @@ def patch(file, area, approaches=(), foot=(), seam=None, crossings=(), fixed=(),
     survey_end = len(rebuilt)
     if lower:
         lower[0] = len(rebuilt)
+    if platform:
+        def remap(i):
+            return indices[i] if i<boundary else survey_end+i-boundary
+        while len(paths)<17: paths.append(None)
+        paths[16]=[remap(platform[0]),remap(platform[1]),platform[2]]
     paths[0] = rebuilt + paths[0][boundary:]
     tail = start+size+image+18*deck
     terrain = np.frombuffer(raw,'<i2',4225,tail if len(raw)>tail else 24).reshape(65,65)/10
