@@ -5,6 +5,8 @@ export type Stage='idle'|'equip'|'cast'|'retrieve'|'approach'|'nibble'|'hit'|'fi
 export type Catch={id:string,speciesId:string,name:string,grade:string,size:string,weight:number,water:string,method:Method,time:number,price:number}
 type Setup={water:Water,method:Method,line:number,rod:number,bait:string,float:boolean,drag:boolean,distance:number}
 type Signal=(kind:string,detail:unknown)=>void
+// 品级越高鱼劲越大：冲得更猛、更频繁、体力掉得更慢（需求方 2026-11-25）
+const gradeGrit={low:1,medium:1.1,high:1.3,legendary:1.6}
 export class FishingEngine {
   stage:Stage='idle'; direction=0; distance=0; reel=false; tension=0; stamina=1; force=0
   private slack=0; private surge=0; private nibbles=0; private count=0; private jerks=0; private clock=0; private red=0; private turn=0; private fish?:Species; private setup?:Setup
@@ -65,12 +67,13 @@ export class FishingEngine {
     else if(this.stage==='hit'&&this.clock<=0){this.go('miss');this.signal('missed',{})}
     else if(this.stage==='fight'){
       this.turn-=dt;this.surge-=dt
-      if(this.turn<=0){this.surge=.6+.6*this.random();this.turn=1.5+2.5*this.random();this.direction=this.random()<.5?-1:1}
+      const grit=gradeGrit[this.fish!.grade as keyof typeof gradeGrit]??1
+      if(this.turn<=0){this.surge=(.6+.6*this.random())*Math.sqrt(grit);this.turn=(1.5+2.5*this.random())/Math.sqrt(grit);this.direction=this.random()<.5?-1:1}
       const surge=this.surge>0,easy=setup.method==='台钓'&&sizes.indexOf(this.fish!.size)<=2
-      const load=this.force/tackle[setup.rod-1].force, strength=(easy?.5:1)*(.3+load)*(.2+.8*this.stamina)
+      const load=this.force/tackle[setup.rod-1].force, strength=(easy?.5:1)*(.3+load)*(.2+.8*this.stamina)*grit
       this.tension=Math.min(1,Math.max(0,this.tension+dt*((this.reel?.20:-.45)+(surge?(this.reel?.55:.12)*strength:0))))
       if(this.reel){if(surge)this.distance+=dt*2*strength;else if(this.tension<.85)this.distance-=dt*(3+.35*setup.rod)}
-      this.stamina=Math.max(0,this.stamina-dt*(this.reel?.04:.012));if(this.tension>=.85)this.red+=dt
+      this.stamina=Math.max(0,this.stamina-dt*(this.reel?.04:.012)/Math.sqrt(grit));if(this.tension>=.85)this.red+=dt
       this.slack=this.tension<=.1?this.slack+dt:0
       this.signal('fight',{tension:this.tension,distance:this.distance,stamina:this.stamina,surge,side:surge?this.direction:0})
       if(this.red>tackle[setup.line-1].snapSeconds+(setup.drag?.4:0)+(easy?.5:0)){this.go('snap');this.signal('snap',null)}

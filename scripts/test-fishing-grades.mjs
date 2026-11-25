@@ -44,20 +44,20 @@ test('100k complete casts per enabled water and method',context=>{
   context.diagnostic('水域 | 钓法 | 传说% | 高级% | 中级% | 低级% | 空钩% | 杂物% | 未咬口/逃脱%');
   for(const [index,water] of waters.entries())for(const method of ['路亚','台钓']){
     const setup={distance:8,water,method,line:1,rod:1,bait:method==='台钓'?'bait11':'bait1',float:false,drag:false};
-    const counts={legendary:0,high:0,medium:0,low:0,'empty-hook':0,junk:0,miss:0,escape:0};
+    const counts={legendary:0,high:0,medium:0,low:0,'empty-hook':0,junk:0,miss:0,escape:0,snap:0};
     const engine=new FishingEngine(()=>{},item=>{counts[item.grade]++;return true});engine.equip();engine.setSeed(337+index);
     if(!water.methods.includes(method)){assert.equal(engine.cast(setup),false);continue}
     for(const grade of ['low','medium'])assert.ok(fish.some(row=>row.grade===grade&&row.methods.includes(method)&&water.fish.includes(row.id)),`${water.name} ${method} ${grade}`);
     for(let cast=0;cast<100000;cast++){
       assert.ok(engine.cast(setup));engine.tick(.25);engine.reel=true;engine.tick(5);
       while(['approach','nibble'].includes(engine.stage))engine.tick(.41);
-      if(engine.stage==='hit'){engine.reel=false;engine.press();for(let tick=0;engine.stage==='fight'&&tick<600;tick++){
+      if(engine.stage==='hit'){engine.reel=false;engine.press();for(let tick=0;engine.stage==='fight'&&tick<3000;tick++){
         engine.reel=engine.tension<.68;engine.tick(.1)
       }}
-      if(engine.stage!=='land'&&engine.stage!=='junk'){assert.ok(['empty-hook','miss','escape'].includes(engine.stage));counts[engine.stage]++}
+      if(engine.stage!=='land'&&engine.stage!=='junk'){assert.ok(['empty-hook','miss','escape','snap'].includes(engine.stage),engine.stage);counts[engine.stage]++}
     }
     assert.equal(Object.values(counts).reduce((sum,value)=>sum+value,0),100000);
-    const rates=[counts.legendary,counts.high,counts.medium,counts.low,counts['empty-hook'],counts.junk,counts.miss+counts.escape].map(count=>(count/1000).toFixed(3));
+    const rates=[counts.legendary,counts.high,counts.medium,counts.low,counts['empty-hook'],counts.junk,counts.miss+counts.escape+counts.snap].map(count=>(count/1000).toFixed(3));
     context.diagnostic([water.name,method,...rates].join(' | '));
   }
 });

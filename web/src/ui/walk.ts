@@ -264,6 +264,14 @@ const held=(action:Action)=>{let on=false;keys.forEach(code=>{if(!on&&hits(code,
   window.addEventListener('blur',()=>clearTransientInput(true))
   document.addEventListener('visibilitychange',()=>{if(document.hidden)clearTransientInput(true)})
 
+  // 端游：按 Alt 切换鼠标锁定（隐藏鼠标转视角 ⇄ 显示鼠标点界面）
+  window.addEventListener('keydown',event=>{
+    if((event.code!=='AltLeft'&&event.code!=='AltRight')||event.repeat||!active())return
+    event.preventDefault()
+    if(document.pointerLockElement===canvas)document.exitPointerLock?.()
+    else if(document.body.dataset.photo!=='on'&&!isModalOrOverlayOpen())(canvas.requestPointerLock() as unknown as Promise<void>|undefined)?.catch?.(()=>{})
+  })
+  window.addEventListener('keyup',event=>{if(event.code==='AltLeft'||event.code==='AltRight')event.preventDefault()})
   /** Hand the cursor back whenever a menu, dialog or photo mode needs it. */
   function releaseLockIfBlocked(){
     if(document.pointerLockElement===canvas&&(isModalOrOverlayOpen()||document.body.dataset.photo==='on'))document.exitPointerLock?.()
