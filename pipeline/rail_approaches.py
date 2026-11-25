@@ -33,11 +33,13 @@ def crossings(sections):
     return pairs
 
 
-def measure(world, sections):
+def measure(world, sections, *, exclude=()):
     manifest = json.loads((world / 'manifest.json').read_bytes())
     rules = json.loads((ROOT / 'pipeline/streets.json').read_bytes())
     probes = []
     for (rail, road), (name, line, axis, tags) in crossings(sections).items():
+        if (rail, road) in exclude:
+            continue
         p = axis.intersection(line)
         strips = [b for b in manifest['tunnels'] if b['way'] == road]
         near = min(strips, key=lambda b: LineString([(x,z) for x,_,z in b['portals']]).distance(p))
