@@ -477,7 +477,9 @@ export async function createPhysics(manifest:Manifest,stream:Stream,peaks:PeaksG
       const spacing=manifest.overview.step,stride=width/spacing+1,start=(tile.z-top)/spacing*stride+(tile.x-left)/spacing
       const colliders:R.Collider[]=[]
       let barrierColliders:R.Collider[]=[]
-      const clearance=data?.tunnel?tunnelClearanceClipper(tile,nearbyTunnels(manifest.tunnels,tile.x+128,tile.z+128)):undefined
+      const bores=data?.tunnel?nearbyTunnels(manifest.tunnels,tile.x+128,tile.z+128)
+        .filter(t=>!t.nodes||!t.openCut):[]
+      const clearance=bores.length?tunnelClearanceClipper(tile,bores):undefined
       if(data?.tunnel){
         for(const [mesh,kind] of [[data.groundMesh,'ground'],[data.tunnel.fringe,'ground'],[data.tunnel.floor,'road'],[data.tunnel.portal,'rail'],[data.tunnel.interior,'rail']] as const){
           if(!mesh)continue
