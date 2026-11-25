@@ -149,7 +149,7 @@ async function run() {
     console.log('[nikoniko-e2e] opening map')
 
     // Open full map via dock button and search for '微笑堂服装店'
-    await page.click('.dock-map')
+    await page.click('.minimap')
     await page.waitForSelector('.atlas:not([hidden]) .atlas-search input', {timeout: 15000})
     await page.fill('.atlas-search input', '微笑堂服装店')
     await page.waitForSelector('.atlas-search ol li:not(.none)', {timeout: 5000})

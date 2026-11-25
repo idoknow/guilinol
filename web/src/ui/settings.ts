@@ -1,7 +1,7 @@
 // 设置面板（IDOK-178）：读数开关、第一/第三人称、自定义键位。
 // 用现成的 .about-mask 弹层语言，好处是输入守卫会自动把移动/骑行热键挡住。
 import './settings.css'
-import {onPrefs, prefs, setPrefs, type StatsPrefs} from './prefs'
+import {DEFAULT_PREFS, onPrefs, prefs, setPrefs, THUMB_SCALE_MAX, THUMB_SCALE_MIN, type StatsPrefs, type ThumbLayout} from './prefs'
 import {ACTIONS, bindingLabel, isCustom, keyLabel, reservedFor, resetBindings, setBinding, type Action} from '../input/keymap'
 import {setViewMode, viewModeLabel} from '../walk/view-mode'
 import {masterVolume,setMasterVolume,rideSoundMuted,setRideSoundMuted,RIDE_SOUND_EVENT} from '../walk/ride-sound-pref'
@@ -10,6 +10,13 @@ const STAT_ROWS: [keyof StatsPrefs, string, string][] = [
   ['fps', '帧率', '读数条里的每秒帧数（FPS）'],
   ['net', '网速', '当前下载速度（KB/s、MB/s）'],
   ['online', '在线人数', '此刻在城里的人数，60 秒刷新'],
+]
+
+// IDOK-256：手机按键布局预设。小图是横放手机的示意：左边圆 = 摇杆，右边点 = 动作键。
+const THUMB_PRESETS: [ThumbLayout, string, string][] = [
+  ['arc', '弧形', '<circle cx="9" cy="21" r="5"/><circle cx="40" cy="13" r="3.2"/><circle cx="33" cy="19" r="2.6"/><circle cx="34" cy="25.5" r="2.4"/><circle cx="46" cy="13.5" r="2.2"/>'],
+  ['column', '单列', '<circle cx="9" cy="21" r="5"/><circle cx="46" cy="8.5" r="2.2"/><circle cx="46" cy="15" r="3"/><circle cx="46" cy="21.5" r="2.6"/><circle cx="46" cy="27.5" r="2.6"/>'],
+  ['corner', '贴右下', '<circle cx="9" cy="21" r="5"/><circle cx="45.5" cy="26" r="3.2"/><circle cx="38" cy="27" r="2.6"/><circle cx="46" cy="18.5" r="2.6"/><circle cx="38.5" cy="20" r="2.2"/>'],
 ]
 
 let mask: HTMLDivElement | undefined
@@ -56,6 +63,21 @@ function build() {
         </div>
         <p class="set-note">落地步行时生效；骑车、开车、坐船仍是第三人称。</p>
       </section>
+      <section class="set-block set-block--thumb">
+        <h3>手机按键<button type="button" class="set-reset" data-thumb-reset>恢复默认</button></h3>
+        <div class="set-seg set-seg--thumb" role="radiogroup" aria-label="按键布局">${THUMB_PRESETS.map(([id, label, dots]) => `<button type="button" data-thumb="${id}">
+          <svg viewBox="0 0 54 34" aria-hidden="true"><rect x="1" y="1" width="52" height="32" rx="6"/>${dots}</svg><span>${label}</span>
+        </button>`).join('')}</div>
+        <label class="set-row set-row--range">
+          <span class="set-what"><b>按钮大小</b><small>窄屏会自动收一点，保证不压到摇杆</small></span>
+          <input type="range" data-thumb-scale min="${THUMB_SCALE_MIN}" max="${THUMB_SCALE_MAX}" step="0.05"><output data-thumb-scale-out></output>
+        </label>
+        <label class="set-row">
+          <span class="set-what"><b>左手模式</b><small>摇杆换到右下，跃 / 蹲 / 远近换到左下</small></span>
+          <input type="checkbox" data-thumb-mirror>
+        </label>
+        <p class="set-note">只在手机、平板触屏上生效；改完立刻生效并记住。</p>
+      </section>
       <section class="set-block set-block--keys">
         <h3>键位<button type="button" class="set-reset">恢复默认</button></h3>
         <ul class="set-keys">${ACTIONS.map(action => `<li>
@@ -97,7 +119,18 @@ function build() {
   for (const button of Array.from(mask.querySelectorAll<HTMLButtonElement>('[data-view]'))) {
     button.addEventListener('click', () => setViewMode(button.dataset.view === 'first' ? 'first' : 'third'))
   }
-  mask.querySelector('.set-reset')!.addEventListener('click', () => {
+  const setThumb = (patch: Partial<ReturnType<typeof prefs>['thumb']>) =>
+    setPrefs(value => ({...value, thumb: {...value.thumb, ...patch}}))
+  for (const button of Array.from(mask.querySelectorAll<HTMLButtonElement>('[data-thumb]'))) {
+    button.addEventListener('click', () => setThumb({layout: button.dataset.thumb as ThumbLayout}))
+  }
+  const scale = mask.querySelector<HTMLInputElement>('[data-thumb-scale]')!
+  scale.addEventListener('input', () => setThumb({scale: Math.round(Number(scale.value) * 100) / 100}))
+  const mirror = mask.querySelector<HTMLInputElement>('[data-thumb-mirror]')!
+  mirror.addEventListener('change', () => setThumb({mirror: mirror.checked}))
+  mask.querySelector('[data-thumb-reset]')!.addEventListener('click', () => setThumb({...DEFAULT_PREFS.thumb}))
+  onPrefs(() => paintThumb())
+  mask.querySelector('.set-block--keys .set-reset')!.addEventListener('click', () => {
     resetBindings()
     paintKeys()
   })
@@ -150,7 +183,22 @@ function paint() {
     button.classList.toggle('on', on)
     button.setAttribute('aria-pressed', String(on))
   }
+  paintThumb()
   paintKeys()
+}
+
+function paintThumb() {
+  if (!mask) return
+  const thumb = prefs().thumb
+  for (const button of Array.from(mask.querySelectorAll<HTMLButtonElement>('[data-thumb]'))) {
+    const on = button.dataset.thumb === thumb.layout
+    button.classList.toggle('on', on)
+    button.setAttribute('aria-pressed', String(on))
+  }
+  const scale = mask.querySelector<HTMLInputElement>('[data-thumb-scale]')!
+  scale.value = String(thumb.scale)
+  mask.querySelector<HTMLOutputElement>('[data-thumb-scale-out]')!.textContent = `${Math.round(thumb.scale * 100)}%`
+  mask.querySelector<HTMLInputElement>('[data-thumb-mirror]')!.checked = thumb.mirror
 }
 
 function paintKeys() {

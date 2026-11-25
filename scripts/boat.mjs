@@ -3,6 +3,7 @@ import {readFile} from 'node:fs/promises'
 import {gunzipSync} from 'node:zlib'
 import {chromium} from 'playwright'
 import {preview} from 'vite'
+import {applyCpuThrottle} from './qa-browser.mjs'
 
 /**
  * M6-3 自由划船全自动验证脚本 (`verify:boat`)。
@@ -60,6 +61,7 @@ try {
 
   // ---------- 通用页面辅助工具 ----------
   async function attachHelpers(page) {
+    await applyCpuThrottle(page)
     await page.addInitScript(() => {
       window.__boatToasts = []
       window.addEventListener('walk:toast', ev => {
@@ -130,22 +132,46 @@ try {
       window.__offshoreReading = new Promise(resolve => {
         window.addEventListener(isTouch ? 'click' : 'keydown', () => {
           const start = performance.now()
-          let shown = null
-          function sample() {
-            const now = performance.now()
-            const toast = document.querySelector('.toast.show')
-            const visible = toast?.textContent.includes('离岸太远') && toast.checkVisibility({opacityProperty: true, visibilityProperty: true})
-            if (visible && shown === null) shown = now
-            if (shown === null ? now - start < 2000 : visible && now - shown < 1500) return
-            clearInterval(timer)
-            observer.disconnect()
-            resolve({delay: shown === null ? null : shown - start, duration: shown === null || !visible ? 0 : now - shown,
-              events: window.__boatToasts.map(({text, at}) => ({text, afterInput: at - start})),
-              toast: document.querySelector('.toast')?.outerHTML})
+          const elapsed = () => performance.now() - start
+          const trace = {input: 0, event: null, show: null, firstFrame: null, frames: []}
+          let shown = null, frame = 0
+          function onToast(event) {
+            if (event.detail?.text?.includes('离岸太远')) trace.event ??= elapsed()
           }
-          const observer = new MutationObserver(sample)
-          observer.observe(document.querySelector('.toast'), {subtree: true, attributes: true, childList: true, characterData: true})
-          const timer = setInterval(sample, 16)
+          window.addEventListener('walk:toast', onToast)
+          const observer = new MutationObserver(() => {
+            if (document.querySelector('.toast.show')?.textContent.includes('离岸太远')) trace.show ??= elapsed()
+          })
+          observer.observe(document.querySelector('.toast'), {attributes: true, childList: true, subtree: true, characterData: true})
+          function sample(stamp) {
+            const now = elapsed()
+            const toast = document.querySelector('.toast.show')
+            const bounds = toast?.getBoundingClientRect()
+            const visible = Boolean(toast?.textContent.includes('离岸太远') && toast.checkVisibility({opacityProperty: true, visibilityProperty: true}) &&
+              bounds.width > 0 && bounds.height > 0 && bounds.bottom > 0 && bounds.right > 0 && bounds.top < innerHeight && bounds.left < innerWidth)
+            trace.frames.push({raf: stamp - start, sample: now, visible, opacity: toast ? getComputedStyle(toast).opacity : null})
+            if (trace.event !== null) trace.firstFrame ??= now
+            if (visible && shown === null) shown = now
+            if (shown === null ? now - (trace.firstFrame ?? now) < 2000 : visible && now - shown < 1500) {
+              frame = requestAnimationFrame(sample)
+              return
+            }
+            finish(now, visible)
+          }
+          function finish(now, visible) {
+            cancelAnimationFrame(frame)
+            clearTimeout(deadline)
+            observer.disconnect()
+            window.removeEventListener('walk:toast', onToast)
+            const el = document.querySelector('.toast'), style = getComputedStyle(el)
+            resolve({delay: shown === null || trace.firstFrame === null ? null : shown - trace.firstFrame,
+              inputToVisible: shown, duration: shown === null || !visible ? 0 : now - shown, trace,
+              opacity: style.opacity, visibility: style.visibility, display: style.display, pageVisibility: document.visibilityState,
+              events: window.__boatToasts.map(({text, at}) => ({text, afterInput: at - start})),
+              toast: el.outerHTML})
+          }
+          const deadline = setTimeout(() => finish(elapsed(), false), 10000)
+          frame = requestAnimationFrame(sample)
         }, {capture: true, once: true})
       })
     }, mobile)
@@ -157,8 +183,9 @@ try {
     if (offshore) {
       await page.evaluate(() => window.viewer.walk.tick(1 / 60))
       const reading = await page.evaluate(() => window.__offshoreReading)
-      assert(reading.delay !== null && reading.delay <= 2000 && reading.duration >= 1500, `离岸提示显示异常: ${JSON.stringify(reading)}`)
-      console.log('离岸提示 (ms):', reading)
+      console.log('离岸提示 (ms):', JSON.stringify(reading))
+      assert(reading.trace.event !== null && reading.trace.event <= 2000 && reading.trace.show !== null &&
+        reading.delay !== null && reading.delay >= 0 && reading.delay <= 2000 && reading.duration >= 1500, '离岸提示显示异常（见逐帧记录）')
       return
     }
     await page.evaluate(async () => {
@@ -1076,7 +1103,7 @@ try {
   }
 
   const preHud = await measureHud(mobile, [
-    '.walk-ui .joystick', '.walk-ui .btn-run', '.walk-ui .btn-jump',
+    '.walk-ui .joystick',  '.walk-ui .btn-jump',
     '.walk-ui .btn-view', '.vehicle-action', '.dock', '.sky-ui', 'output', '.hud-me',
   ])
   assert(preHud.boxes.some(b => b.sel === '.vehicle-action'), '手机端自由栈桥旁未显示 .vehicle-action')
@@ -1094,7 +1121,7 @@ try {
     vehicle: window.viewer.walk.vehicle,
     aboardAttr: document.body.hasAttribute('data-aboard'),
     jumpHidden: getComputedStyle(document.querySelector('.walk-ui .btn-jump')).display === 'none',
-    runHidden: getComputedStyle(document.querySelector('.walk-ui .btn-run')).display === 'none',
+    runHidden: !document.querySelector('.walk-ui .btn-run'),
     actionText: document.querySelector('.vehicle-action')?.textContent ?? '',
   }))
   assert.equal(aboardState.vehicle, 'boat', '手机端点击后应成功上船')
