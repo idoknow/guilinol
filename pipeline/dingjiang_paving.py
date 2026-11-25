@@ -11,8 +11,33 @@ from shapely import LineString, box
 from features import points
 
 
+def shoulder_planes(local, ways, x, z):
+    """Tile-local, affine limits over the same straight chords as the road collider."""
+    planes = []
+    for section, a, b in local:
+        if section["way"] not in ways:
+            continue
+        origin = np.array([x, z])
+        direction = (b - a) / section["length"]
+        width = section["halfWidth"] + 2.08
+        sta = section["stations"]
+        start = 0
+        for i in range(1, len(sta)):
+            s, y = sta[start]
+            e, h = sta[i]
+            if i + 1 < len(sta):
+                end, high = sta[i + 1]
+                if abs(h - (y + (high - y) * (e - s) / (end - s))) < 1e-6:
+                    continue
+            planes.append([*(a-origin+direction*s), *(a-origin+direction*e), width, y+.029, h+.029])
+            start = i
+    return planes
+
+
 def finish_paving(directory, manifest, profiles, elements):
     by_way = {way["id"]: (line, heights) for way, line, heights in profiles}
+    wide_grades = {way["id"] for way, _, _ in profiles if way.get("gradeShoulders")}
+    fitted_shoulders = wide_grades | {way["id"] for way, _, _ in profiles if way.get("fitShoulderPlanes")}
     pairs = {
         (way["id"], u, v)
         for way, line, heights in profiles
@@ -25,7 +50,7 @@ def finish_paving(directory, manifest, profiles, elements):
     ends = {(way["id"], way["nodes"][-1]) for way, _, _ in profiles}
     alignments = []
     for section in sections:
-        section["nativePaving"] = True
+        section["nativePaving"] = section["openCut"]
         a, b = np.asarray(section["portals"])[:, [0, 2]]
         alignments.append((LineString([a, b]), section, a, b))
     elevated = [
@@ -72,6 +97,11 @@ def finish_paving(directory, manifest, profiles, elements):
         streets = collision[1]
         if len(streets) < 16:
             continue
+        planes = shoulder_planes(local, fitted_shoulders, x, z)
+        if planes:
+            if len(streets) == 16:
+                streets.append([])
+            streets[16].extend(planes)
         wet = np.frombuffer(raw, "<i2", 4225, 8474)
         step = 4 if np.any(wet != -32768) else 8
         zz, xx = np.mgrid[0:257:step, 0:257:step]
@@ -97,14 +127,15 @@ def finish_paving(directory, manifest, profiles, elements):
             bed += np.maximum(0, distance - shoulder - step * math.sqrt(2)) * 0.5
             near = distance <= shoulder + step * math.sqrt(2) + 6
             target[near] = np.minimum(target[near], bed[near])
-            axes.add(key(a - [x, z], b - [x, z]))
+            if section["openCut"]:
+                axes.add(key(a - [x, z], b - [x, z]))
         for wid, width in {(s["way"], s["halfWidth"]) for s, _, _ in local}:
             line, levels = by_way[wid]
             pts = [
                 np.asarray(line.interpolate(d).coords[0]) - [x, z] for d in levels[:, 0]
             ]
             for a, b in zip(pts, pts[1:]):
-                segments[key(a, b)] = (width + 8, wid)
+                segments[key(a, b)] = (width + (15 if wid in wide_grades else 8), wid)
         # Elevated road decks do not own the ground-level paving beneath them.
         overhead = set()
         for line in elevated:

@@ -12,6 +12,7 @@ from shapely.ops import substring
 
 from common import load_osm
 from features import points
+from rail_sections import tail_baseline
 from station_corridor import parallel_height_audit
 
 
@@ -32,6 +33,7 @@ def check(world, design, ways=None):
     sections = {wid: substring(line, *ties[wid]) for wid, line in alignments.items()}
     intervals = {wid: [] for wid in ties}
     positions, heights, pieces = [], [], []
+    baseline = []
     grades = dict.fromkeys(ties, 0.0)
     for tile in manifest["chunks"]:
         x, z = tile["x"], tile["z"]
@@ -53,6 +55,10 @@ def check(world, design, ways=None):
                 pieces.append((start, start + 1, lo, flags, wid))
                 positions.extend([a.coords[0], b.coords[0]])
                 heights.extend([ay / 100, by / 100])
+                if "railProfiles" in design:
+                    full = alignments[wid]
+                    baseline.extend(tail_baseline(design["railProfiles"][str(wid)],
+                                                  np.array([full.project(a), full.project(b)])))
                 grades[wid] = max(grades[wid], abs(by - ay) / (100 * a.distance(b)))
     for wid, spans in intervals.items():
         end = 0.0
@@ -63,7 +69,8 @@ def check(world, design, ways=None):
         if abs(end - sections[wid].length) > 0.002:
             raise ValueError(f"Incomplete encoded rail on {wid}")
     parallel = parallel_height_audit(
-        pieces, np.asarray(positions), np.asarray(heights), ways, include_structures=True
+        pieces, np.asarray(positions), np.asarray(heights), ways, include_structures=True,
+        baseline=np.asarray(baseline) if baseline else None,
     )
     return dict(maximumGrade=grades, parallel=parallel)
 
@@ -74,6 +81,10 @@ def load_tracks(ids):
 
 def passes(report, design):
     paired = report["parallel"]
+    if "railProfiles" in design:
+        return bool(paired["directedSegmentPairs"] and not paired["over5cmWorse"]
+                    and all(grade <= design["railProfiles"][str(wid)]["maximumGrade"] + 1e-6
+                            for wid, grade in report["maximumGrade"].items()))
     return bool(paired["directedSegmentPairs"] and not paired["over5cm"]
                 and max(report["maximumGrade"].values()) <= design["maximumGrade"] + 1e-6)
 

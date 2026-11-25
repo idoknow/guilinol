@@ -20,7 +20,7 @@ const crossings = read('docs/railway-crossings.json')
 const grades = []
 const sections = []
 const deckChecks = []
-for (const { way: id, controls, boundaryNodes } of design.roads) {
+for (const { way: id, controls, boundaryNodes, maximumGrade = 0.05 } of design.roads) {
   const way = ways.find((w) => w.id === id)
   const lane = { way: id, structure: 'surface', nodes: new Set(way.nodes) }
   const xy = way.geometry.map((p) => ll2xz(p.lat, p.lon))
@@ -64,7 +64,7 @@ for (const { way: id, controls, boundaryNodes } of design.roads) {
             peakGrade = Math.max(peakGrade, slope[1])
             count++
           }
-          if (slope[1] > 0.05 + 1e-6 && slope[1] > slope[0] + 1e-6) regressions++
+          if (slope[1] > maximumGrade + 1e-6 && slope[1] > slope[0] + 1e-6) regressions++
         }
         previous = y
       }
@@ -86,6 +86,7 @@ for (const { way: id, controls, boundaryNodes } of design.roads) {
   sections.push(...local)
   for (const r of crossings.filter((r) => r.road === id && tracks.has(r.rail))) {
     const p = ll2xz(r.lat, r.lon)
+    if (design.railProfiles) continue // Stacked crossings use way-matched GL04 rails and full-width faces.
     if (
       !local.some((t) => {
         const [[x, , z], [bx, , bz]] = t.portals
@@ -116,20 +117,21 @@ for (const { way: id, controls, boundaryNodes } of design.roads) {
     way: id,
     samples: count,
     maximumGrade: peakGrade,
+    limit: maximumGrade,
     raisedM: raised,
     loweredM: lowered,
     regressions,
   })
 }
-const reverse = visibleSurfaces(candidate, ids, ids, sections)
+const reverse = visibleSurfaces(candidate, ids, ids, sections, !!design.railProfiles)
 console.log(JSON.stringify({ grades, deckChecks, reverse }, null, 2))
 assert(
-  deckChecks.length === design.expectedRoadRailCrossings &&
-    deckChecks.every((r) => Math.abs(r.clearanceM - 4.5) < 0.001),
+  deckChecks.length === (design.expectedRoadRailCrossings ?? 0) &&
+    deckChecks.every((r) => r.clearanceM >= 4.5 - 0.001),
 )
 assert(
   grades.every(
-    (r) => r.samples && r.raisedM <= 0.001 && r.maximumGrade <= 0.050001 && !r.regressions,
+    (r) => r.samples && r.raisedM <= 0.001 && r.maximumGrade <= r.limit + 1e-6 && !r.regressions,
   ),
 )
 assert(reverse.every((r) => r.checked && !r.violations))

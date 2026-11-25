@@ -1,4 +1,5 @@
 import * as THREE from 'three'
+import {mergeVertices} from 'three/addons/utils/BufferGeometryUtils.js'
 import type {StreetData, StreetRequest, StreetResponse, Streets} from './street-worker'
 
 let worker:Worker|undefined
@@ -31,13 +32,19 @@ export async function loadStreetGeometry(paths:Streets,step:number,heights:THREE
     pending.set(id,{resolve,reject})
   })
   const {positions,normals,colors,kinds,along,fencePositions,fenceNormals,fenceColors,fenceAlong,...instances}=data
-  const surface=positions.length?new THREE.BufferGeometry():null
+  let surface=positions.length?new THREE.BufferGeometry():null
   if(surface){
     surface.setAttribute('position',new THREE.BufferAttribute(positions,3))
     surface.setAttribute('normal',new THREE.BufferAttribute(normals,3))
     surface.setAttribute('color',new THREE.BufferAttribute(colors,3))
     surface.setAttribute('aSurface',new THREE.BufferAttribute(kinds,1))
     surface.setAttribute('aAlong',new THREE.BufferAttribute(along,1))
+    if(paths[16]?.length){
+      // Adjacent clipped shoulder triangles share positions and material attributes.
+      const triangles=surface
+      surface=mergeVertices(triangles,1e-6)
+      triangles.dispose()
+    }
   }
   const fence=fencePositions.length?new THREE.BufferGeometry():null
   if(fence){

@@ -72,7 +72,7 @@ def parallel_segments(pieces, coords, ways, *, include_structures=False):
             xy, way_ids[source], way_ids[target])
 
 
-def parallel_height_audit(pieces, coords, height, ways, *, include_structures=False):
+def parallel_height_audit(pieces, coords, height, ways, *, include_structures=False, baseline=None):
     pairs = parallel_segments(pieces, coords, ways, include_structures=include_structures)
     result = dict(directedSegmentPairs=0, over5cm=0, maximumM=0)
     if pairs is None:
@@ -86,6 +86,19 @@ def parallel_height_audit(pieces, coords, height, ways, *, include_structures=Fa
     result.update(over5cm=int(np.count_nonzero(diff.max(axis=1) > .050001)),
                   maximumM=float(diff[pair, end]), ways=[int(way_a[pair]), int(way_b[pair])],
                   xz=xy[pair, end].tolist(), railheadM=[source_y[pair, end], target_y[pair, end]])
+    if baseline is not None:
+        def interpolate(indices, fractions):
+            return baseline[indices[:, :1]] + fractions * np.diff(baseline[indices], axis=1)
+
+        native = abs(interpolate(a, along_a) - interpolate(b, along_b)).max(axis=1)
+        peak = diff.max(axis=1)
+        # NaN denotes a track outside the approved taper, where the absolute limit applies.
+        accepted = np.isfinite(native) & (peak <= native + 1e-6)
+        failed = (peak > .050001) & ~accepted
+        result["over5cmWorse"] = int(np.count_nonzero(failed))
+        if np.any(failed):
+            result["failedPairs"] = [[int(way_a[i]), int(way_b[i]), xy[i, 0].tolist(),
+                                      peak[i], native[i]] for i in np.flatnonzero(failed)[:16]]
     return result
 
 

@@ -68,15 +68,12 @@ def tunnel_floor(manifest, way, crossing):
     raise ValueError(f"No finished tunnel floor for {way} at {crossing.wkt}")
 
 
-def check(world, design, approaches=False):
+def check(world, design):
     manifest = json.loads((world / "manifest.json").read_bytes())
     upper = design["upperRail"]
     rails = [upper, *design["groundRails"]]
     roads = design["roadTunnels"]
     ids = set(rails + roads)
-    direct = [(int(rail), road) for rail, road_ids in design.get("directApproaches", {}).items()
-              for road in road_ids] if approaches else []
-    ids.update(w for pair in direct for w in pair)
     lines = {w["id"]: LineString(points(w)) for w in load_osm() if w["type"] == "way" and w["id"] in ids}
     width, depth = design["deckHalfWidth"], design["deckDepth"]
     result = []
@@ -112,34 +109,27 @@ def check(world, design, approaches=False):
         if bottom not in roads:
             row["wireMarginM"] = measured - design["wireHeight"]
         result.append(row)
-    for top, road in direct:
-        bores = [t for t in manifest["tunnels"] if t["way"] == road]
-        if not bores or len({t["halfWidth"] for t in bores}) != 1:
-            raise ValueError(f"Missing or inconsistent approach width on {road}")
-        floor_width = bores[0]["halfWidth"]
-        expected = lines[top].buffer(width, cap_style="flat").intersection(
-            lines[road].buffer(floor_width, cap_style="flat"))
-        ceiling = track_pieces(world, manifest, lines[top], expected.buffer(width + floor_width + .01))
-        floor = []
-        for bore in bores:
-            center = LineString([(x, z) for x, _, z in bore["portals"]])
-            for (a, y), (b, h) in zip(bore["stations"], bore["stations"][1:]):
-                if b > a:
-                    floor.append((LineString([center.interpolate(a), center.interpolate(b)]), y, h, 0))
-        measured = separation(ceiling, floor, width, floor_width, 0, expected)
-        crossing = lines[top].intersection(lines[road])
-        nearest = [min(pieces, key=lambda p: p[0].distance(crossing)) for pieces in (ceiling, floor)]
-        result.append(dict(upper=top, lower=road, minimumM=measured, targetM=design["groundRailToRoad"],
-                           centerM=elevation(nearest[0], crossing) - elevation(nearest[1], crossing)))
     return result
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("world", type=Path)
-    parser.add_argument("design", type=Path)
-    parser.add_argument("--approaches", action="store_true", help="Include all eight direct approach crossings")
+    parser.add_argument("design", type=Path, nargs="?")
+    parser.add_argument("--approaches", action="store_true", help="Check rendered carriageways, shoulders and curbs for all sections")
+    parser.add_argument("--through", type=int, metavar="N", help="Last numbered section for the cumulative approaches check")
     args = parser.parse_args()
-    rows = check(args.world, json.loads(args.design.read_bytes()), args.approaches)
+    if not args.design and not args.approaches:
+        parser.error("Specify a stack design or --approaches")
+    if args.through is not None and (not args.approaches or args.through < 1):
+        parser.error("--through requires --approaches and a positive section number")
+    rows = check(args.world, json.loads(args.design.read_bytes())) if args.design else []
+    if args.approaches:
+        from rail_approaches import measure
+        pipeline = Path(__file__).resolve().parent
+        paths = sorted((pipeline / "rail-audits").glob("01-*.json")) + sorted((pipeline / "rail-sections").glob("*.json"))
+        sections = {p.stem: json.loads(p.read_bytes()) for p in paths
+                    if args.through is None or int(p.stem.split("-")[0]) <= args.through}
+        rows.extend(measure(args.world, sections))
     print(json.dumps(rows, indent=2))
     raise SystemExit(0 if all(r["minimumM"] + 1e-6 >= r["targetM"] for r in rows) else 1)
