@@ -88,7 +88,11 @@ def smooth_cuttings(tunnels, ways, surface_at, bridge_ends):
         for end, node in enumerate(t['nodes']):
             if t['mouths'][end]:
                 mouths[node].append(strip)
-                fixed[node] = t['portals'][end][1]
+                # The restored city tile can put the finished street above
+                # or below the design surface used to grow this cutting.
+                # Meet its actual paved level unless a bore or deck fixes it.
+                x, _, z = t['portals'][end]
+                fixed.setdefault(node, surface_at(x, z))
 
     n = len(old_height)
     for t, (at, ids) in zip(cuts, profiles):
@@ -116,7 +120,8 @@ def smooth_cuttings(tunnels, ways, surface_at, bridge_ends):
             for i, station in enumerate(at):
                 p = axis.interpolate(station)
                 for line, floor, j in connected:
-                    if floor.covers(p):
+                    # Projected OSM endpoints can miss their flat cap by roundoff.
+                    if floor.distance(p) < 1.e-5:
                         s, ids = profiles[j]
                         a = line.project(p)
                         k = np.clip(np.searchsorted(s, a) - 1, 0, len(s) - 2)
