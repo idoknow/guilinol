@@ -1,0 +1,11 @@
+{
+  "upperRail": 815078162,
+  "groundRails": [815078153, 900211413, 900211399, 827587624],
+  "roadTunnels": [815078155, 815078156],
+  "deckHalfWidth": 2.05,
+  "deckDepth": 1.2,
+  "wireHeight": 6.1,
+  "railClearance": 7.5,
+  "groundRailToRoad": 5.7,
+  "roadClearance": 4.5
+}
