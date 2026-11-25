@@ -2479,6 +2479,7 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
       const useLocalSupport=aboardGround||!!(nextTile&&stream.loaded.get(nextTile)?.tunnel)
       const localRoad=useLocalSupport?sim.groundSurface(next.x,next.z,next.y-cfg.height/2,.25,.9):null
       const ground=localRoad??(inBore?sim.surface(next.x,next.z,'road',next.y+1,5):sim.surface(next.x,next.z,'ground'))
+        ??sim.surface(next.x,next.z,'deck',next.y-cfg.height/2+.45,1.25)
       if(!ground||next.y-cfg.height/2<ground.y-3){if(place(safe.x,safe.z,'rescue'))resets++;break}
       if(sim.wet(next.x,next.z)){
         const foot=next.y-cfg.height/2,deck=sim.surface(next.x,next.z,'deck')

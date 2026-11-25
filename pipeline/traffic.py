@@ -6,6 +6,7 @@ import subprocess
 import tempfile
 from collections import defaultdict
 from functools import lru_cache
+from itertools import chain
 from pathlib import Path
 
 import numpy as np
@@ -252,11 +253,15 @@ def bake(output, manifest, rendered_roads=None):
     native_levels=sample_road_heights(output,manifest,grade_points)
     bake_station_corridor(output, manifest['chunks'], elements)
     bake_surveyed_corridors(output,manifest['chunks'],elements,sections)
-    for way in elements:
+    from dingjiang_structures import motorway_sections
+    # Keep existing lane IDs stable and append the modeled motorway deck lanes.
+    existing = (way for way in elements if way.get('tags', {}).get('highway')
+                not in ('motorway', 'motorway_link'))
+    for way in chain(existing, motorway_sections(elements)):
         tags = way.get('tags', {})
         linear = way['id'] not in SPAN_WAYS and (tags.get('bridge','no')!='no' or underground(way))
         kind = tags.get('highway', '').removesuffix('_link')
-        if way['type'] != 'way' or kind not in MOTOR | WALK | {'cycleway'} or tags.get('area') == 'yes' or (tags.get('access') in ('no', 'private') and way['id'] not in ground_passages.YARD_ROADS):
+        if way['type'] != 'way' or kind not in MOTOR | WALK | {'cycleway','motorway'} or tags.get('area') == 'yes' or (tags.get('access') in ('no', 'private') and way['id'] not in ground_passages.YARD_ROADS):
             continue
         refs = way['nodes']
         coords = [ll2xz(pt['lat'], pt['lon']) if pt else None for pt in way['geometry']]
