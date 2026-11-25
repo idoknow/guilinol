@@ -115,26 +115,47 @@ def align_airport_lane(nodes, lanes, node_height, profile):
     lane['heights'] = profile(route[-2],end_ref,lane['offset'],way)
 
 
-def align_liuma(way, coords):
-    """Follow the open carriageway past the facade on Liumashan North Alley."""
+# Surveyed motor lane centres within the final paved cross-sections.
+# (fixed vertex, station, transition start, full shift, return start, end,
+# signed lateral shift, distance between the two opposing lane centres)
+FACADE_LANES={
+    383576398:(2303787983,285.4,264.,278.,290.,310.,-1.43,2.4),
+    237982795:(9112786463,630.,592.,604.,616.,628.,1.24,2.30),
+}
+
+
+def facade_alignment(way, coords):
     axis=LineString(coords)
-    # Surveyed station 282 m leaves 1.03 m on the facade side and 3.71 m
-    # on the opposite side. The bend at 285.4 m is not a shared junction.
+    ref,station,start,full,back,end,shift,_=FACADE_LANES[way['id']]
     ds=np.r_[0.,np.cumsum(np.linalg.norm(np.diff(coords,axis=0),axis=1))]
     refs=dict(zip(ds,way['nodes'],strict=True))
-    if 2303787983 not in way['nodes'] or abs(ds[way['nodes'].index(2303787983)]-285.4)>1:
-        raise ValueError('Recheck the Liumashan North Alley facade survey')
-    stations=np.unique(np.r_[ds,np.arange(264.,311.,2.)])
+    if ref not in way['nodes'] or abs(ds[way['nodes'].index(ref)]-station)>1:
+        raise ValueError(f"Recheck the facade survey for {way['id']}")
     route=[]
-    for i,d in enumerate(stations):
+    for i,d in enumerate(np.unique(np.r_[ds,np.arange(start,end+1,2.)])):
         pt=axis.interpolate(d)
         lo=np.array(axis.interpolate(max(0,d-.2)).coords[0])
         hi=np.array(axis.interpolate(min(d+.2,axis.length)).coords[0])
         dx,dz=(hi-lo)/np.linalg.norm(hi-lo)
-        t=np.clip(min((d-264)/14,(310-d)/20),0,1)
-        shift=1.43*t*t*(3-2*t)
-        route.append((pt.x+dz*shift,pt.y-dx*shift,refs.get(d,-43_000_000_000_000-i)))
+        t=np.clip(min((d-start)/(full-start),(end-d)/(end-back)),0,1)
+        offset=shift*t*t*(3-2*t)
+        route.append((pt.x-dz*offset,pt.y+dx*offset,refs.get(d,-43_000_000_000_000-way['id']*1000-i)))
     return route
+
+
+def round_service_corner(way, coords):
+    # The car body overhangs both straight road segments at this right-angle
+    # bend. Join them with a tangent curve inside the existing asphalt.
+    i=way['nodes'].index(4138785723)
+    previous,corner,following=np.asarray(coords[i-1:i+2])
+    start=corner+4.5*(previous-corner)/np.linalg.norm(previous-corner)
+    end=corner+4.5*(following-corner)/np.linalg.norm(following-corner)
+    route=[(*xy,ref) for xy,ref in zip(coords,way['nodes'],strict=True)]
+    turn=[]
+    for j,t in enumerate(np.linspace(0,1,9)):
+        point=(1-t)**2*start+2*t*(1-t)*corner+t*t*end
+        turn.append((*point,way['nodes'][i] if j==4 else -44_000_000_000_000-j))
+    return route[:i]+turn+route[i+1:]
 
 
 def bake(output, manifest, rendered_roads=None):
@@ -261,11 +282,11 @@ def bake(output, manifest, rendered_roads=None):
         if narrow:
             narrow_streets.end_curbs(LineString(coords),paved,garage_curbs)
         alignment=way
-        if way['id']==383576398:
-            route=align_liuma(way,coords)
+        if way['id'] in FACADE_LANES or way['id']==412456970:
+            route=(facade_alignment(way,coords) if way['id'] in FACADE_LANES
+                   else round_service_corner(way,coords))
             coords=[(x,z) for x,z,_ in route]
             alignment=dict(way,nodes=[ref for _,_,ref in route])
-            size=2.4
         if narrow:
             route=narrow_ways[way['id']]
             coords=[(x,z) for x,z,_ in route]
@@ -323,6 +344,8 @@ def bake(output, manifest, rendered_roads=None):
                 for slot in range(n):
                     offset = (slot+.5-(count/2 if single else 0))*size if count>1 else 0
                     offset += shift
+                    if way['id'] in FACADE_LANES:
+                        offset=FACADE_LANES[way['id']][-1]/2
                     if not linear and kind in ('service', 'living_street'):
                         # The renderer uses a 3 m or 4 m strip for unsigned minor
                         # streets. Keep the outer contact 20 cm inside that strip.
