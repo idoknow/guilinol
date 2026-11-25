@@ -79,15 +79,22 @@ export function renderRangeControl(options: RenderRangeControlOptions): RenderRa
   `
 
   const badge = panel.querySelector<HTMLElement>('.render-badge')!
-  const gfxSelect=document.createElement('select')
+  const GFX_TIERS=[['low','低','原画 · 省电'],['mid','中','遮蔽 · 阴影'],['high','高','柔影 · 全清']] as const
+  const gfxEls:HTMLButtonElement[]=[]
   if(options.gfx){
-    const label=document.createElement('label');label.textContent='光影画质 '
-    for(const [value,text] of [['low','低'],['mid','中'],['high','高']])gfxSelect.add(new Option(text,value))
-    gfxSelect.value=options.gfx.quality;gfxSelect.onchange=()=>options.gfx?.select(gfxSelect.value as 'low'|'mid'|'high')
-    label.append(gfxSelect);panel.append(label)
+    const section=document.createElement('div');section.className='render-gfx'
+    section.innerHTML=`<span class="render-slider-row"><span>光影画质</span><strong class="render-gfx-note">卡顿时会自动降档</strong></span>
+      <div class="render-presets render-gfx-tiers" role="group" aria-label="光影画质">${GFX_TIERS.map(([id,label,summary])=>`<button type="button" data-gfx="${id}" title="${summary}"><b>${label}</b><span>${summary}</span></button>`).join('')}</div>`
+    gfxEls.push(...Array.from(section.querySelectorAll<HTMLButtonElement>('button')))
+    for(const button of gfxEls)button.onclick=()=>{options.gfx?.select(button.dataset.gfx as 'low'|'mid'|'high');syncGfx()}
+    panel.querySelector('.render-foot')!.before(section)
+  }
+  function syncGfx(){
+    if(!options.gfx)return
+    for(const button of gfxEls){const on=button.dataset.gfx===options.gfx.quality;button.classList.toggle('on',on);button.setAttribute('aria-pressed',String(on))}
   }
   const closeBtn = panel.querySelector<HTMLButtonElement>('.render-close')!
-  const presetEls = Array.from(panel.querySelectorAll<HTMLButtonElement>('.render-presets button'))
+  const presetEls = Array.from(panel.querySelectorAll<HTMLButtonElement>('.render-presets button[data-preset]'))
   const slider = panel.querySelector<HTMLInputElement>('input[type="range"]')!
   const valueEl = panel.querySelector<HTMLElement>('.render-val')!
   const statsEl = panel.querySelector<HTMLElement>('.render-stats')!
@@ -95,7 +102,7 @@ export function renderRangeControl(options: RenderRangeControlOptions): RenderRa
 
   function refreshStats() {
     if (panel.hidden) return
-    if(options.gfx)gfxSelect.value=options.gfx.quality
+    syncGfx()
     if (options.getStats) {
       const {target, loaded} = options.getStats(current.radius)
       statsEl.textContent = `目标 ${target} 块 · 已载 ${loaded} 块`
