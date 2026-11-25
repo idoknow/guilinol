@@ -231,10 +231,10 @@ export async function adminMergeUsers(db: D1Database, actor: string, targetId: s
   if (!target || !source) return json({ error: { code: 'not_found', message: '账号不存在' } }, 404)
 
   const sourceTypes = (
-    await db.prepare('SELECT type FROM social_identities WHERE user_id=? ORDER BY type').bind(fromId).all<{ type: string }>()
+    await db.prepare('SELECT CASE WHEN channel=\'direct\' THEN \'direct:\' || type ELSE type END AS type FROM social_identities WHERE user_id=? ORDER BY type').bind(fromId).all<{ type: string }>()
   ).results.map((row) => row.type)
   const targetTypes = new Set(
-    (await db.prepare('SELECT type FROM social_identities WHERE user_id=?').bind(targetId).all<{ type: string }>()).results.map(
+    (await db.prepare('SELECT CASE WHEN channel=\'direct\' THEN \'direct:\' || type ELSE type END AS type FROM social_identities WHERE user_id=?').bind(targetId).all<{ type: string }>()).results.map(
       (row) => row.type,
     ),
   )
@@ -252,7 +252,7 @@ export async function adminMergeUsers(db: D1Database, actor: string, targetId: s
   const adoptedEmail = target.email_placeholder && !source.email_placeholder && source.verified ? source.email : ''
   // 邮箱唯一约束：必须在来源账号被删除之后才能把邮箱改到目标账号上（见语句最后一步）
   for (const type of movable)
-    statements.push(db.prepare('UPDATE social_identities SET user_id=? WHERE user_id=? AND type=?').bind(targetId, fromId, type))
+    statements.push(db.prepare('UPDATE social_identities SET user_id=? WHERE user_id=? AND channel=? AND type=?').bind(targetId, fromId, type.startsWith('direct:')?'direct':'legacy',type.replace(/^direct:/,'')))
 
   const targetSaves = await db.prepare('SELECT count(*) n FROM player_saves WHERE user_id=?').bind(targetId).first<{ n: number }>()
   const sourceSaves = await db.prepare('SELECT count(*) n FROM player_saves WHERE user_id=?').bind(fromId).first<{ n: number }>()
