@@ -56,29 +56,57 @@ function gapsOf(start,end,marks,step){
  * 事件（实测 24h 总览 20s，并撞上连接池 15s 查询超时 → 前端「服务暂时不可用」）。
  * 所以 3 天以内按小时汇总，裸扫段最多 1 小时；更长窗口再退回整日表（行数少一个量级）。
  */
-export async function partitions(pool,start,end){
+export async function partitions(pool,start,end,{preferHour=false}={}){
   const lo=+new Date(start),hi=+new Date(end)
-  if(hi-lo<=3*dayMs){
+  // 3 天以内（或 7 天以内的 1h 分桶趋势）走小时汇总表，避免 7d 1h 趋势退回裸扫 7 天原始 perf_event
+  if(hi-lo<=3*dayMs||(preferHour&&hi-lo<=7*dayMs+hourMs)){
     const {rows}=await pool.query(`SELECT hour FROM perf_summary_hour
       WHERE hour >= date_trunc('hour',$1::timestamptz) AND hour < $2::timestamptz ORDER BY hour`,[new Date(lo),new Date(hi)])
     const hours=rows.map(row=>+row.hour).filter(hour=>hour>=lo&&hour+hourMs<=hi)
-    if(hours.length)return {grain:'hour',start:new Date(lo),end:new Date(hi),days:hours.map(hour=>new Date(hour)),gaps:gapsOf(lo,hi,hours,hourMs)}
+    if(hours.length)return {grain:'hour',start:new Date(lo),end:new Date(hi),days:hours.map(hour=>new Date(hour)),extraHours:[],gaps:gapsOf(lo,hi,hours,hourMs)}
   }
   const {rows}=await pool.query("SELECT day FROM perf_summary_day WHERE day >= date_trunc('day',$1::timestamptz) AND day < date_trunc('day',$2::timestamptz) ORDER BY day",[new Date(lo),new Date(hi)])
   const days=rows.map(row=>+row.day).filter(day=>day>=lo&&day+dayMs<=hi)
   if(!days.length)return null
-  return {grain:'day',start:new Date(lo),end:new Date(hi),days:days.map(day=>new Date(day)),gaps:gapsOf(lo,hi,days,dayMs)}
+  const rawGaps=gapsOf(lo,hi,days,dayMs)
+  const extraHours=[]
+  const gaps=[]
+  // 长窗口（7d/30d/90d）左右边缘空档（尤其是今天已过去的 0–23 小时）用小时汇总补齐，把裸扫段压到 <= 1 小时
+  const wideGaps=rawGaps.filter(([glo,ghi])=>ghi-glo>=hourMs)
+  let availHours=[]
+  if(wideGaps.length){
+    const minLo=Math.min(...wideGaps.map(([glo])=>glo)),maxHi=Math.max(...wideGaps.map(([,ghi])=>ghi))
+    const {rows:hRows}=await pool.query(`SELECT hour FROM perf_summary_hour
+      WHERE hour >= date_trunc('hour',$1::timestamptz) AND hour < $2::timestamptz ORDER BY hour`,[new Date(minLo),new Date(maxHi)])
+    availHours=hRows.map(row=>+row.hour)
+  }
+  for(const [glo,ghi] of rawGaps){
+    const covered=availHours.filter(h=>h>=glo&&h+hourMs<=ghi)
+    if(covered.length){
+      for(const h of covered)extraHours.push(new Date(h))
+      gaps.push(...gapsOf(glo,ghi,covered,hourMs))
+    }else{
+      gaps.push([glo,ghi])
+    }
+  }
+  return {grain:'day',start:new Date(lo),end:new Date(hi),days:days.map(day=>new Date(day)),extraHours,gaps}
 }
 
 function facts(part,type,metric){
   const args=[part.days]
   const sessions=type==='sessions'
   const hour=part.grain==='hour'
-  // 粒度由 partitions() 决定：小时表支持任意滚动窗口，整日表只用于 >3 天的长窗口
+  // 粒度由 partitions() 决定：小时表支持任意滚动窗口，整日表只用于 >3 天的长窗口（空档由 extraHours 用小时表兜底）
   const stamp=hour?'hour':'day'
   const bucketExpr=hour?hourBucket:midnight
   const fragments=[sessions?`SELECT ${stamp} AS bucket,${sessionFactCols} FROM perf_session_${stamp} WHERE ${stamp}=ANY($1)`:
     `SELECT ${stamp} AS bucket,${valueFactCols} FROM perf_value_${stamp} WHERE ${stamp}=ANY($1) ${metric?`AND metric='${metric}'`:''}`]
+  if(!hour&&part.extraHours?.length){
+    args.push(part.extraHours)
+    const idx=args.length
+    fragments.push(sessions?`SELECT hour AS bucket,${sessionFactCols} FROM perf_session_hour WHERE hour=ANY($${idx})`:
+      `SELECT hour AS bucket,${valueFactCols} FROM perf_value_hour WHERE hour=ANY($${idx}) ${metric?`AND metric='${metric}'`:''}`)
+  }
   for(const [lo,hi] of part.gaps){
     args.push(new Date(lo),new Date(hi))
     const range=`received >= $${args.length-1} AND received < $${args.length}`
@@ -113,7 +141,7 @@ export async function sessionSeries(pool,part,metric,{bucket='1h',group}={}){
   if(metric==='online')args.push(part.end)
   const step=bucket==='1h'?'1 hour':'1 day'
   const label=group?`coalesce(${group},'unknown')`:'NULL::text'
-  const aligned=(part.grain==='hour'&&bucket==='1h')||(part.grain==='day'&&bucket==='1d')
+  const aligned=(part.grain==='hour'&&bucket==='1h')||(part.grain==='day'&&bucket==='1d'&&!part.extraHours?.length)
   const timeExpr=aligned?'bucket':`date_bin(interval '${step}',bucket,'2000-01-01 UTC')`
   const bucketEnd=metric==='online'?`least(t+interval '${step}',$${args.length}::timestamptz)`:''
   const durationOnly=metric==='durationAvg'||metric==='durationP50'
@@ -144,7 +172,7 @@ export async function weighted(pool,part,metric,{series=false,group,bucket='1d'}
   const {sql,args}=facts(part,'values',metric)
   const label=group?`coalesce(${group},'unknown')`:'NULL::text'
   const step=bucket==='1h'?'1 hour':'1 day'
-  const aligned=(part.grain==='hour'&&bucket==='1h')||(part.grain==='day'&&bucket==='1d')
+  const aligned=(part.grain==='hour'&&bucket==='1h')||(part.grain==='day'&&bucket==='1d'&&!part.extraHours?.length)
   const timeExpr=series?(aligned?'bucket':`date_bin(interval '${step}',bucket,'2000-01-01 UTC')`):'NULL::timestamptz'
   const {rows}=await pool.query(`WITH facts AS (${sql}), bins AS (
     SELECT ${timeExpr} t,${label} label,metric,value,sum(n) AS n FROM facts WHERE value IS NOT NULL GROUP BY 1,2,3,4),
@@ -170,7 +198,7 @@ export async function membership(pool,part,metric,dim){
  * - 用 generate_series 对齐整点边界并把空桶（0 事件小时）也标记进 perf_summary_hour，避免反复裸扫；
  * - 最近 2 小时在单小时事务内原子删插，迟到事件能补进桶内且并发查询不会读到空档。
  */
-export async function summarizeHours(pool,{hours=72}={}){
+export async function summarizeHours(pool,{hours=168}={}){
   const client=await pool.connect()
   let locked=false
   try{
@@ -204,7 +232,7 @@ export async function summarizeHours(pool,{hours=72}={}){
       await client.query('COMMIT')
     }
     for(const table of ['perf_session_hour','perf_value_hour','perf_summary_hour'])
-      await client.query(`DELETE FROM ${table} WHERE hour<now()-interval '7 days'`)
+      await client.query(`DELETE FROM ${table} WHERE hour<now()-interval '8 days'`)
     return rows.length
   }catch(error){await client.query('ROLLBACK').catch(()=>{});throw error}finally{
     if(locked)await client.query('SELECT pg_advisory_unlock(884201)').catch(()=>{})

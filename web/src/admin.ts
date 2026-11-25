@@ -50,38 +50,73 @@ const codeText: Record<string, string> = {
   last_admin: '至少要保留一位管理员',
 }
 let generation = 0
+const inflightGet = new Map<string, Promise<any>>()
+let manifestPromise: Promise<any> | null = null
+let manifestRetryAt = 0
+function loadManifest(): Promise<any> {
+  if (manifestPromise) return manifestPromise
+  if (Date.now() < manifestRetryAt) return Promise.resolve(null)
+  manifestPromise = fetch('/world/manifest.json', { cache: 'default' })
+    .then((res) => (res.ok ? res.json() : null))
+    .catch(() => null)
+    .then((data) => {
+      if (!data) {
+        manifestPromise = null
+        manifestRetryAt = Date.now() + 60000
+      }
+      return data
+    })
+  return manifestPromise
+}
+function manifestPlaces(manifest: any): Place[] {
+  return [
+    ...(manifest?.landmarks ?? []).map((l: any) => ({ name: l.name, x: l.position?.[0], z: l.position?.[2] })),
+    ...(manifest?.peaks?.entries ?? []).map((p: any) => ({ name: p.name, x: p.center?.[0], z: p.center?.[2] })),
+  ].filter((p) => p.name && !/^auto-/.test(p.name) && Number.isFinite(p.x) && Number.isFinite(p.z))
+}
 async function api<T = any>(path: string, data?: unknown, method='POST'): Promise<T> {
-  let response: Response
-  // 后台聚合查询偶尔会 5xx（服务端慢查询超时）。只重试只读请求，写请求绝不重放。
-  for (let attempt = 0; ; attempt++) {
-    try {
-      response = await fetch(
-        `/api/${path}`,
-        data
-          ? { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) }
-          : { cache: 'no-store' },
+  if (!data) {
+    const existing = inflightGet.get(path)
+    if (existing) return existing as Promise<T>
+  }
+  const job = (async () => {
+    let response: Response
+    // 后台聚合查询偶尔会 5xx（服务端慢查询超时）。只重试只读请求，写请求绝不重放。
+    for (let attempt = 0; ; attempt++) {
+      try {
+        response = await fetch(
+          `/api/${path}`,
+          data
+            ? { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) }
+            : { cache: 'no-store' },
+        )
+      } catch {
+        throw new ApiError(0, 'network', '网络连接失败，请检查网络后重试')
+      }
+      if (attempt === 0 && !data && response.status >= 500) {
+        await new Promise((resolve) => setTimeout(resolve, 800))
+        continue
+      }
+      break
+    }
+    const result = await response.json().catch(() => null)
+    if (!response.ok) {
+      const code = result?.error?.code ?? ''
+      throw new ApiError(
+        response.status,
+        code,
+        codeText[code] ??
+          result?.error?.message ??
+          (response.status >= 500 ? '服务器出错了，请稍后再试' : `请求失败（${response.status}）`),
       )
-    } catch {
-      throw new ApiError(0, 'network', '网络连接失败，请检查网络后重试')
     }
-    if (attempt === 0 && !data && response.status >= 500) {
-      await new Promise((resolve) => setTimeout(resolve, 800))
-      continue
-    }
-    break
+    return result as T
+  })()
+  if (!data) {
+    inflightGet.set(path, job)
+    job.finally(() => { if (inflightGet.get(path) === job) inflightGet.delete(path) })
   }
-  const result = await response.json().catch(() => null)
-  if (!response.ok) {
-    const code = result?.error?.code ?? ''
-    throw new ApiError(
-      response.status,
-      code,
-      codeText[code] ??
-        result?.error?.message ??
-        (response.status >= 500 ? '服务器出错了，请稍后再试' : `请求失败（${response.status}）`),
-    )
-  }
-  return result as T
+  return job
 }
 const list = <T>(result: T[] | { items: T[] }) => (Array.isArray(result) ? result : result?.items ?? [])
 const num = (value: unknown) => (value == null || value === '' ? null : Number(value))
@@ -266,24 +301,33 @@ const ranges: Record<string, { label: string; ms: number; bucket: string }> = {
   '30d': { label: '30 天', ms: 30 * 86400e3, bucket: '1d' },
   '90d': { label: '90 天', ms: 90 * 86400e3, bucket: '1d' },
 }
-type View = { key: string; label: string; icon: string; group: string; ranged?: boolean }
+type Domain = 'biz' | 'ops'
+type View = { key: string; label: string; icon: string; domain: Domain; group: string; ranged?: boolean }
+const domainMeta: Record<Domain, { label: string; short: string; defaultView: string }> = {
+  biz: { label: '运营侧', short: '运营', defaultView: 'overview' },
+  ops: { label: '运维侧', short: '运维', defaultView: 'live' },
+}
 const views: View[] = [
-  { key: 'overview', label: '总览', icon: '◎', group: '数据', ranged: true },
-  { key: 'trends', label: '趋势', icon: '〰', group: '数据', ranged: true },
-  { key: 'breakdown', label: '分布', icon: '▤', group: '数据', ranged: true },
-  { key: 'network', label: '地区与网络', icon: '◈', group: '数据', ranged: true },
-  { key: 'errors', label: '错误', icon: '⚠', group: '数据', ranged: true },
-  { key: 'live', label: '实时', icon: '●', group: '数据' },
-  { key: 'server', label: '服务端', icon: '▣', group: '数据', ranged: true },
-  { key: 'mp', label: '联机', icon: '⇋', group: '数据' },
-  { key: 'smoke', label: '香烟', icon: '▥', group: '数据' },
-  { key: 'gfx', label: '光影', icon: '☀', group: '数据' },
-  { key: 'npc', label: '路人与车流', icon: '⇄', group: '数据' },
-  { key: 'feedback', label: '反馈处理', icon: '✉', group: '运营' },
-  { key: 'chat', label: '聊天', icon: '❝', group: '运营' },
-  { key: 'users', label: '用户与权限', icon: '☺', group: '运营' },
-  { key: 'audit', label: '操作记录', icon: '☰', group: '运营' },
+  // 运营侧：玩家、联机玩法、增长、社区与内容配置
+  { key: 'overview', label: '运营总览', icon: '◎', domain: 'biz', group: '概览与联机', ranged: true },
+  { key: 'mp', label: '联机运营', icon: '⇋', domain: 'biz', group: '概览与联机' },
+  { key: 'trends', label: '数据趋势', icon: '〰', domain: 'biz', group: '概览与联机', ranged: true },
+  { key: 'feedback', label: '反馈处理', icon: '✉', domain: 'biz', group: '用户与社区' },
+  { key: 'chat', label: '聊天管理', icon: '❝', domain: 'biz', group: '用户与社区' },
+  { key: 'users', label: '用户与权限', icon: '☺', domain: 'biz', group: '用户与社区' },
+  { key: 'audit', label: '操作记录', icon: '☰', domain: 'biz', group: '用户与社区' },
+  { key: 'npc', label: '路人与车流', icon: '⇄', domain: 'biz', group: '内容与玩法' },
+  { key: 'smoke', label: '香烟', icon: '▥', domain: 'biz', group: '内容与玩法' },
+  { key: 'gfx', label: '光影', icon: '☀', domain: 'biz', group: '内容与玩法' },
+  // 运维侧：基础设施、联机引擎、网络探针、性能分布与故障排查
+  { key: 'live', label: '实时监控', icon: '●', domain: 'ops', group: '服务监控' },
+  { key: 'server', label: 'API 服务端', icon: '▣', domain: 'ops', group: '服务监控', ranged: true },
+  { key: 'rt', label: '联机引擎', icon: '⚡', domain: 'ops', group: '服务监控' },
+  { key: 'network', label: '地区与网络', icon: '◈', domain: 'ops', group: '性能与稳定', ranged: true },
+  { key: 'breakdown', label: '性能分布', icon: '▤', domain: 'ops', group: '性能与稳定', ranged: true },
+  { key: 'errors', label: '错误与可靠性', icon: '⚠', domain: 'ops', group: '性能与稳定', ranged: true },
 ]
+const lastViewByDomain: Record<Domain, string> = { biz: 'overview', ops: 'live' }
 let me: { id: string; email: string; nickname: string; role: string }
 let params = new URLSearchParams(location.search)
 let pendingCount: number | null = null
@@ -868,14 +912,32 @@ function brand() {
 }
 function paintSide(center = false) {
   const active = currentView()
-  const groups = [...new Set(views.map((v) => v.group))]
+  const activeView = views.find((v) => v.key === active)!
+  const activeDomain: Domain = activeView.domain
+  const domainViews = views.filter((v) => v.domain === activeDomain)
+  const groups = [...new Set(domainViews.map((v) => v.group))]
   const scrollLeft = side.scrollLeft
+  const domainSwitch = h('div', { class: 'adm-domain-switch', role: 'tablist', 'aria-label': '管理视角切换' },
+    (['biz', 'ops'] as Domain[]).map((d) =>
+      h('button', {
+        type: 'button',
+        role: 'tab',
+        'aria-selected': String(d === activeDomain),
+        class: `adm-domain-btn adm-domain-btn--${d} ${d === activeDomain ? 'is-on' : ''}`,
+        onclick: (() => {
+          if (d === activeDomain) return
+          go({ view: lastViewByDomain[d] || domainMeta[d].defaultView })
+        }) as EventListener,
+      },
+      domainMeta[d].label,
+      d === 'biz' && pendingCount ? h('em', { class: 'adm-badge', title: '待处理反馈' }, pendingCount > 99 ? '99+' : pendingCount) : null)))
   side.replaceChildren(
     brand(),
+    domainSwitch,
     h('nav', null,
       groups.map((group) => [
         h('p', { class: 'adm-nav-group' }, group),
-        views.filter((v) => v.group === group).map((v) =>
+        domainViews.filter((v) => v.group === group).map((v) =>
           navLink([h('span', { class: 'adm-nav-icon', 'aria-hidden': 'true' }, v.icon), h('span', null, v.label),
             v.key === 'feedback' && pendingCount ? h('em', { class: 'adm-badge', title: '待处理反馈' }, pendingCount > 99 ? '99+' : pendingCount) : null],
           { view: v.key }, { class: `adm-nav-item ${v.key === active ? 'is-active' : ''}`, 'aria-current': v.key === active ? 'page' : undefined })),
@@ -893,7 +955,10 @@ function paintSide(center = false) {
 function paintTop(view: View, extra?: Child | Child[]) {
   const r = rangeWindow()
   top.replaceChildren(
-    h('div', { class: 'adm-title' }, h('h1', null, view.label), extra),
+    h('div', { class: 'adm-title' },
+      h('h1', null, view.label),
+      h('span', { class: `adm-domain-pill adm-domain-pill--${view.domain}` }, domainMeta[view.domain].label),
+      extra),
     view.ranged
       ? h('div', { class: 'adm-top-tools' },
           segmented(r.key, Object.entries(ranges).map(([k, v]) => [k, v.label]), (key) => go({ range: key }, true), '时间范围'),
@@ -925,6 +990,7 @@ function render(opts: { scroll?: number; keepScroll?: boolean } = {}) {
   document.querySelectorAll('dialog.adm-dialog').forEach((d) => d.remove())
   const key = currentView(),
     view = views.find((v) => v.key === key)!
+  lastViewByDomain[view.domain] = view.key
   const pageKey = `${key}|${params.get('id') ?? ''}`
   const y = window.scrollY
   paintSide(pageKey !== lastPage)
@@ -971,7 +1037,9 @@ const pages: Record<string, (view: View) => void> = {
         modes.length
           ? h('p', { class: 'adm-now-modes' }, modes.map((m) => h('span', null, `${m.label} ${m.value}`)))
           : h('p', { class: 'adm-sub' }, '暂时没有人在游玩'),
-        navLink('打开实时面板 →', { view: 'live' }, { class: 'adm-link' }),
+        h('div', { class: 'adm-toolbar' },
+          navLink('进入联机运营 →', { view: 'mp' }, { class: 'adm-link' }),
+          navLink('运维侧 · 实时监控 →', { view: 'live' }, { class: 'adm-link' })),
       ]
     }, skeleton(2))
     async(todoSlot, () => api('admin/stats'), (stats: any) => {
@@ -984,12 +1052,26 @@ const pages: Record<string, (view: View) => void> = {
         navLink(pendingCount ? '去处理 →' : '查看反馈 →', { view: 'feedback' }, { class: 'adm-link' }),
       ]
     }, skeleton(2))
-    async(kpiSlot, () => api<Record<string, { current: unknown; previous: unknown }>>('admin/overview?' + q), (data) =>
-      kpiGroups.map(([group, keys]) =>
-        h('section', { class: 'adm-kpi-group' },
-          h('h2', null, group),
-          h('div', { class: 'adm-kpis' }, keys.map((key) => kpiCard(key, data[key], r.label))))),
-      skeleton(4, 'adm-skel--kpi'))
+    async(kpiSlot, () => api<Record<string, { current: unknown; previous: unknown }>>('admin/overview?' + q), (data) => {
+      const bizGroups = kpiGroups.filter(([group]) => group === '访问' || group === '社区')
+      const errRate = num(data.errorRate?.current), rate5xx = num(data.api5xxRate?.current)
+      const healthStrip = h('div', { class: 'adm-health-strip' },
+        h('span', null, '运维侧健康摘要'),
+        h('div', { class: 'adm-health-items' },
+          h('span', { class: 'adm-health-item' }, '可玩 p50 ', h('b', null, fmt.ms(num(data.playableP50?.current)))),
+          h('span', { class: 'adm-health-item' }, '帧率 p50 ', h('b', null, fmt.fps(num(data.fpsP50?.current)))),
+          h('span', { class: 'adm-health-item' }, '瓦片 p95 ', h('b', null, fmt.ms(num(data.chunkP95?.current)))),
+          h('span', { class: 'adm-health-item' }, '出错率 ', h('b', { class: (errRate ?? 0) > 0.05 ? 'is-bad' : '' }, fmt.pct(errRate))),
+          h('span', { class: 'adm-health-item' }, '接口 5xx ', h('b', { class: (rate5xx ?? 0) > 0.01 ? 'is-bad' : '' }, fmt.pct(rate5xx)))),
+        navLink('进入运维侧详情 →', { view: 'server' }, { class: 'adm-link' }, true))
+      return [
+        ...bizGroups.map(([group, keys]) =>
+          h('section', { class: 'adm-kpi-group' },
+            h('h2', null, group === '访问' ? '访问与留存' : '社区增长'),
+            h('div', { class: 'adm-kpis' }, keys.map((key) => kpiCard(key, data[key], r.label))))),
+        healthStrip,
+      ]
+    }, skeleton(4, 'adm-skel--kpi'))
     async(trendSlot, () => Promise.all(['visitors', 'sessions'].map((metric) =>
       api<Point[]>('admin/timeseries?' + rangeQuery({ metric, bucket: r.bucket })))),
     ([visitors, sessions]) => {
@@ -1108,8 +1190,12 @@ const pages: Record<string, (view: View) => void> = {
     const breakdown = (metric: string, dim: string) => api<any[]>('admin/breakdown?' + rangeQuery({ dim, metric })).then((rows) => list(rows))
     const series = (metric: string) =>
       api<Point[]>('admin/timeseries?' + rangeQuery({ metric, bucket: r.bucket, group: 'node' })).then((rows) => list(rows))
+    // 复用意图相同的探针查询：admin/breakdown 同时返回 p50 与 p95，避免重复发 3 条探针聚合
+    const nodeTtfb = () => breakdown('probe.ttfb.p50', 'node')
+    const nodeTotal = () => breakdown('probe.total.p50', 'node')
+    const nodeFail = () => series('probeFail')
 
-    async(kpis, () => Promise.all([breakdown('probe.ttfb.p50', 'node'), breakdown('probe.total.p95', 'node'), series('probeFail')]), ([ttfb, total, fail]) => {
+    async(kpis, () => Promise.all([nodeTtfb(), nodeTotal(), nodeFail()]), ([ttfb, total, fail]) => {
       if (!ttfb.length && !fail.length) return emptyState('这段时间没有探针数据', '探针每 15 分钟运行一次')
       const failRate = (node: string) => {
         const rows = fail.filter((row) => row.group === node)
@@ -1132,7 +1218,13 @@ const pages: Record<string, (view: View) => void> = {
       return lines.length ? lineChart(lines, fmt.ms, { bucket: r.bucket, gap }) : emptyState('这段时间没有探针数据')
     }, skeleton(5))
 
-    async(phases, () => Promise.all(['dns', 'tcp', 'tls', 'ttfb', 'total'].map((k) => breakdown(`probe.${k}.p50`, 'node'))), ([dns, tcp, tls, ttfb, total]) => {
+    async(phases, () => Promise.all([
+      breakdown('probe.dns.p50', 'node'),
+      breakdown('probe.tcp.p50', 'node'),
+      breakdown('probe.tls.p50', 'node'),
+      nodeTtfb(),
+      nodeTotal(),
+    ]), ([dns, tcp, tls, ttfb, total]) => {
       const nodes = [...new Set(total.map((row) => row.label))].sort()
       if (!nodes.length) return emptyState('这段时间没有探针数据')
       const at = (rows: any[], node: string) => num(rows.find((row) => row.label === node)?.p50) ?? 0
@@ -1168,7 +1260,7 @@ const pages: Record<string, (view: View) => void> = {
         }))))
     }, skeleton(6))
 
-    async(fails, () => series('probeFail'), (rows) => {
+    async(fails, () => nodeFail(), (rows) => {
       const lines = toSeries(rows, 'node')
       return lines.length ? lineChart(lines, fmt.pct, { bucket: r.bucket, gap, height: 180 }) : emptyState('这段时间没有探针数据')
     }, skeleton(4))
@@ -1184,14 +1276,10 @@ const pages: Record<string, (view: View) => void> = {
 
     async(heat, () => Promise.all([
       api<any[]>('admin/perf/grid?' + rangeQuery()).then((rows) => list(rows)),
-      fetch('/world/manifest.json', { cache: 'no-store' }).then((res) => (res.ok ? res.json() : null)).catch(() => null),
+      loadManifest(),
     ]), ([cells, manifest]) => {
       if (!cells.length) return emptyState('这段时间没有带位置的玩家数据')
-      const places: Place[] = [
-        ...(manifest?.landmarks ?? []).map((l: any) => ({ name: l.name, x: l.position?.[0], z: l.position?.[2] })),
-        ...(manifest?.peaks?.entries ?? []).map((p: any) => ({ name: p.name, x: p.center?.[0], z: p.center?.[2] })),
-      ].filter((p) => p.name && !/^auto-/.test(p.name) && Number.isFinite(p.x) && Number.isFinite(p.z))
-      return heatmap(cells, heatKey, manifest?.extent, places)
+      return heatmap(cells, heatKey, manifest?.extent, manifestPlaces(manifest))
     }, skeleton(8))
   },
 
@@ -1236,10 +1324,10 @@ const pages: Record<string, (view: View) => void> = {
     main.append(slot)
     const mine = generation
     const load = (first: boolean) =>
-      api('admin/live').then((live: any) => {
+      Promise.all([api('admin/live'), api('admin/mp').catch(() => null)]).then(([live, mpState]: [any, any]) => {
         if (mine !== generation) return
         stamp.textContent = `每 15 秒自动刷新 · ${when(new Date())}`
-        slot.replaceChildren(paintLive(live))
+        slot.replaceChildren(paintLive(live, mpState))
       }).catch((error) => {
         if (mine !== generation) return
         if (error instanceof ApiError && [401, 403].includes(error.status)) return denied(error.status)
@@ -1258,34 +1346,58 @@ const pages: Record<string, (view: View) => void> = {
     const slot = h('div', { class: 'adm-stack' })
     if (capped) main.append(h('p', { class: 'adm-note' }, '服务端分钟数据量较大，此页最多显示最近 7 天。'))
     main.append(slot)
-    async(slot, () => api<any>('admin/perf/server?' + new URLSearchParams({ from, to: r.to })), (result) => {
-      const rows = list<any>(result).map((row) => ({ t: new Date(row.minute), s: typeof row.sample === 'string' ? JSON.parse(row.sample) : row.sample ?? {} }))
-      if (!rows.length) return emptyState('这段时间没有服务端采样')
-      // 降采样：每个点取桶内最大值（看峰值更有用）。
-      const step = r.ms <= 3600e3 ? 60e3 : r.ms <= 86400e3 ? 10 * 60e3 : 3600e3
-      const metric = (pick: (s: any) => number | null | undefined): Series[] => {
-        const buckets = new Map<number, number>()
-        for (const row of rows) {
-          const v = pick(row.s)
-          if (v == null || Number.isNaN(v)) continue
-          const key = Math.floor(+row.t / step) * step
-          buckets.set(key, Math.max(buckets.get(key) ?? -Infinity, v))
+    async(slot, () => api<any>('admin/perf/server?' + new URLSearchParams({ from, to: r.to, summary: '1' })), (result) => {
+      let step: number
+      let latest: any
+      let seriesByMetric: Record<string, Series[]>
+      let routeRows: { route: string; count: number; errors: number; p95: number; p99: number }[]
+      if (result?.summary) {
+        if (!result.count || !result.latest) return emptyState('这段时间没有服务端采样')
+        step = Number(result.stepMs) || 600e3
+        latest = result.latest.sample ?? {}
+        const wrap = (pts: { t: string; v: number }[] = []): Series[] => [{ name: '', points: pts.map((p) => ({ t: new Date(p.t), v: p.v })) }]
+        seriesByMetric = {
+          cpuCores: wrap(result.series?.cpuCores),
+          rss: wrap(result.series?.rss),
+          loopP99: wrap(result.series?.loopP99),
+          pgP95: wrap(result.series?.pgP95),
         }
-        return [{ name: '', points: [...buckets].map(([t, v]) => ({ t: new Date(t), v })) }]
+        routeRows = result.routes ?? []
+      } else {
+        const rows = list<any>(result).map((row) => ({ t: new Date(row.minute), s: typeof row.sample === 'string' ? JSON.parse(row.sample) : row.sample ?? {} }))
+        if (!rows.length) return emptyState('这段时间没有服务端采样')
+        step = r.ms <= 3600e3 ? 60e3 : r.ms <= 86400e3 ? 10 * 60e3 : 3600e3
+        const metric = (pick: (s: any) => number | null | undefined): Series[] => {
+          const buckets = new Map<number, number>()
+          for (const row of rows) {
+            const v = pick(row.s)
+            if (v == null || Number.isNaN(v)) continue
+            const key = Math.floor(+row.t / step) * step
+            buckets.set(key, Math.max(buckets.get(key) ?? -Infinity, v))
+          }
+          return [{ name: '', points: [...buckets].map(([t, v]) => ({ t: new Date(t), v })) }]
+        }
+        const routes = new Map<string, { route: string; count: number; errors: number; p95: number; p99: number }>()
+        for (const row of rows)
+          for (const route of row.s.routes ?? []) {
+            const key = route.route
+            const cur = routes.get(key) ?? { route: key, count: 0, errors: 0, p95: 0, p99: 0 }
+            cur.count += route.count
+            cur.errors += route.errors
+            cur.p95 = Math.max(cur.p95, route.p95 ?? 0)
+            cur.p99 = Math.max(cur.p99, route.p99 ?? 0)
+            routes.set(key, cur)
+          }
+        latest = rows[rows.length - 1].s
+        seriesByMetric = {
+          cpuCores: metric((s) => s.cpuCores),
+          rss: metric((s) => s.rss),
+          loopP99: metric((s) => s.loopP99),
+          pgP95: metric((s) => s.pgP95),
+        }
+        routeRows = [...routes.values()].sort((a, b) => b.count - a.count)
       }
-      const routes = new Map<string, { route: string; count: number; errors: number; p95: number; p99: number }>()
-      for (const row of rows)
-        for (const route of row.s.routes ?? []) {
-          const key = route.route
-          const cur = routes.get(key) ?? { route: key, count: 0, errors: 0, p95: 0, p99: 0 }
-          cur.count += route.count
-          cur.errors += route.errors
-          cur.p95 = Math.max(cur.p95, route.p95 ?? 0)
-          cur.p99 = Math.max(cur.p99, route.p99 ?? 0)
-          routes.set(key, cur)
-        }
       const opts = { bucket: step >= 3600e3 ? '1h' : '5m', height: 160, gap: step }
-      const latest = rows[rows.length - 1].s
       return [
         h('div', { class: 'adm-kpis adm-kpis--server' },
           serverStat('CPU', fmt.cores(latest.cpuCores), '进程占用单核比例'),
@@ -1296,24 +1408,55 @@ const pages: Record<string, (view: View) => void> = {
           serverStat('系统负载', latest.load ? latest.load[0].toFixed(2) : dash, latest.load ? `5 / 15 分钟：${latest.load[1].toFixed(2)} / ${latest.load[2].toFixed(2)}` : undefined),
           serverStat('nginx 连接', fmt.int(latest.nginx?.connections ?? null))),
         h('div', { class: 'adm-grid-2' },
-          card('CPU（峰值）', lineChart(metric((s) => s.cpuCores), fmt.cores, opts)),
-          card('进程内存（峰值）', lineChart(metric((s) => s.rss), fmt.bytes, opts)),
-          card('事件循环延迟 p99', lineChart(metric((s) => s.loopP99), fmt.ms, opts)),
-          card('数据库查询 p95', lineChart(metric((s) => s.pgP95), fmt.ms, opts))),
-        card('接口', routes.size
+          card('CPU（峰值）', lineChart(seriesByMetric.cpuCores, fmt.cores, opts)),
+          card('进程内存（峰值）', lineChart(seriesByMetric.rss, fmt.bytes, opts)),
+          card('事件循环延迟 p99', lineChart(seriesByMetric.loopP99, fmt.ms, opts)),
+          card('数据库查询 p95', lineChart(seriesByMetric.pgP95, fmt.ms, opts))),
+        card('接口', routeRows.length
           ? h('div', { class: 'adm-table-wrap' }, h('table', { class: 'adm-table' },
               h('thead', null, h('tr', null, ['路由', '请求数', '错误', '错误率', '最差 p95', '最差 p99'].map((t, i) => h('th', { class: i ? 'num' : '' }, t)))),
-              h('tbody', null, [...routes.values()].sort((a, b) => b.count - a.count).map((route) =>
+              h('tbody', null, routeRows.map((route) =>
                 h('tr', null,
                   h('td', null, h('code', null, route.route)),
                   h('td', { class: 'num' }, fmt.int(route.count)),
                   h('td', { class: 'num' }, fmt.int(route.errors)),
-                  h('td', { class: `num ${route.errors / route.count > 0.05 ? 'is-bad' : ''}` }, fmt.pct(route.errors / route.count)),
+                  h('td', { class: `num ${route.errors / Math.max(1, route.count) > 0.05 ? 'is-bad' : ''}` }, fmt.pct(route.errors / Math.max(1, route.count))),
                   h('td', { class: 'num' }, fmt.ms(route.p95)),
                   h('td', { class: 'num' }, fmt.ms(route.p99)))))))
           : emptyState('这段时间没有接口请求'), { sub: '按请求数排序，错误为 HTTP ≥ 400' }),
       ]
     }, skeleton(8))
+  },
+
+  rt() {
+    const stamp = h('span', { class: 'adm-sub adm-live-stamp' })
+    paintTop(views.find((v) => v.key === 'rt')!, [
+      h('span', { class: 'adm-live-dot', 'aria-hidden': 'true' }),
+      stamp,
+      navLink('前往运营侧 · 联机运营 →', { view: 'mp' }, { class: 'adm-link' }),
+    ])
+    const slot = h('div', { class: 'adm-stack' })
+    main.append(slot)
+    const mine = generation
+    let last = ''
+    const load = (first: boolean) =>
+      api<any>('admin/mp').then((state) => {
+        if (mine !== generation) return
+        stamp.textContent = `每 10 秒自动刷新 · ${when(new Date())}`
+        const json = JSON.stringify(state)
+        if (json === last) return
+        last = json
+        slot.replaceChildren(paintRtOps(state))
+        labelTables(slot)
+      }).catch((error) => {
+        if (mine !== generation) return
+        if (error instanceof ApiError && [401, 403].includes(error.status)) return denied(error.status)
+        if (first) slot.replaceChildren(errorState(error, () => load(true)))
+        else stamp.textContent = `自动刷新失败：${error.message}`
+      })
+    slot.append(skeleton(6))
+    load(true)
+    refreshTimer = window.setInterval(() => document.visibilityState === 'visible' && load(false), 10000)
   },
 
   gfx(){
@@ -1570,20 +1713,71 @@ const pages: Record<string, (view: View) => void> = {
   },
   mp() {
     const stamp = h('span', { class: 'adm-sub adm-live-stamp' })
-    paintTop(views.find((v) => v.key === 'mp')!, [h('span', { class: 'adm-live-dot', 'aria-hidden': 'true' }), stamp])
-    const range = ['24h', '7d', '30d'].includes(params.get('mprange') ?? '') ? params.get('mprange')! : '24h'
+    paintTop(views.find((v) => v.key === 'mp')!, [
+      h('span', { class: 'adm-live-dot', 'aria-hidden': 'true' }),
+      stamp,
+      navLink('运维侧 · 联机引擎 →', { view: 'rt' }, { class: 'adm-link' }),
+    ])
+    const range = ['24h', '7d', '30d', '90d'].includes(params.get('mprange') ?? '') ? params.get('mprange')! : '24h'
+    const gpRange = ['24h', '7d', '30d', '90d'].includes(params.get('gprange') ?? '') ? params.get('gprange')! : '7d'
+    const actRange = ['24h', '7d', '30d'].includes(params.get('actrange') ?? '') ? params.get('actrange')! : '7d'
     const uid = /^\d+$/.test(params.get('uid') ?? '') ? params.get('uid') : null
-    const liveSlot = h('div'), histSlot = h('div'), sessSlot = h('div')
-    main.append(h('div', { class: 'adm-stack' }, liveSlot,
-      card('同时在线历史', histSlot, { sub: '按上海时间分日；24 小时为分钟点，更长为小时均值',
-        actions: segmented(range, [['24h', '24 小时'], ['7d', '7 天'], ['30d', '30 天']], (key) => go({ mprange: key }, true), '历史范围') }),
-      card(uid ? `会话记录 · ${uid}` : '会话记录', sessSlot, { sub: '最近 100 场，每分钟同步；联机服务重启时没观测到离开的记为「未观测到离开」',
-        actions: uid ? navLink('看全部玩家', { uid: null }, { class: 'adm-link' }, true) : undefined })))
+    const actFilter = params.get('act') ?? ''
+    const kindFilter = params.get('actkind') ?? ''
+    const actQ = params.get('actq') ?? ''
+
+    const liveSlot = h('div')
+    const gpSlot = h('div')
+    const actSlot = h('div')
+    const histSlot = h('div')
+    const sessSlot = h('div')
+
+    const actSearchIn = h('input', { type: 'search', name: 'actq', value: actQ, placeholder: '搜昵称 / UID / 地标 / 内容', 'aria-label': '搜索活动记录' }) as HTMLInputElement
+    const actForm = h('form', { class: 'adm-mp-filters', role: 'search' },
+      h('label', null, '玩法',
+        select('act', actFilter, [['', '全部玩法'], ...Object.entries(mpActivityMeta).map(([k, v]) => [k, v.label] as [string, string])],
+          (value) => go({ act: value || null }, true, true), '按玩法筛选')),
+      h('label', null, '事件',
+        select('actkind', kindFilter, [
+          ['', '全部事件'], ['activity', '开始玩法'], ['activity_end', '结束玩法'], ['join', '进入联机'],
+          ['leave', '离开联机'], ['chat', '发言聊天'], ['emote', '使用表情'], ['avatar', '更换造型'],
+        ], (value) => go({ actkind: value || null }, true, true), '按事件类型筛选')),
+      actSearchIn,
+      h('button', { type: 'submit', class: 'adm-btn adm-btn--sm' }, '筛选'),
+      (uid || actFilter || kindFilter || actQ)
+        ? navLink('清除筛选', { uid: null, act: null, actkind: null, actq: null }, { class: 'adm-btn adm-btn--sm adm-btn--ghost' }, true)
+        : null)
+    actForm.addEventListener('submit', (event) => {
+      event.preventDefault()
+      go({ actq: actSearchIn.value.trim() || null }, true, true)
+    })
+
+    const activityCard = card(uid ? `账户最近活动记录 · UID ${uid}` : '账户最近活动记录（每个账户最近在做什么）', [actForm, actSlot], {
+      sub: '点击任意账户芯片或在线玩家可聚焦该账户的玩法与行为时间线，实时合并持久化流水与当前在线事件',
+      actions: segmented(actRange, [['24h', '24 小时'], ['7d', '7 天'], ['30d', '30 天']], (key) => go({ actrange: key }, true, true), '活动时间范围'),
+    })
+    activityCard.id = 'adm-mp-activities'
+
+    main.append(h('div', { class: 'adm-stack' },
+      liveSlot,
+      card('玩法占用玩家时间对比', gpSlot, {
+        sub: '统计每个玩法在所选时间段内占用的总玩家时长、占比、独立参与人数与趋势，方便对比哪种玩法最吸引玩家',
+        actions: segmented(gpRange, [['24h', '24 小时'], ['7d', '7 天'], ['30d', '30 天'], ['90d', '90 天']], (key) => go({ gprange: key }, true, true), '玩法分析范围'),
+      }),
+      activityCard,
+      card('同时在线历史', histSlot, {
+        sub: '按上海时间分日；24 小时为分钟点，更长为小时均值',
+        actions: segmented(range, [['24h', '24 小时'], ['7d', '7 天'], ['30d', '30 天'], ['90d', '90 天']], (key) => go({ mprange: key }, true, true), '历史范围'),
+      }),
+      card(uid ? `会话记录 · UID ${uid}` : '会话记录', sessSlot, {
+        sub: '最近 100 场，每分钟同步；联机服务重启时没观测到离开的记为「未观测到离开」',
+        actions: uid ? navLink('看全部玩家', { uid: null }, { class: 'adm-link' }, true) : undefined,
+      })))
+
     const mine = generation
-    const manifest = fetch('/world/manifest.json', { cache: 'no-store' }).then((res) => (res.ok ? res.json() : null)).catch(() => null)
     let last = ''
     const load = (first: boolean) =>
-      Promise.all([api<any>('admin/mp'), manifest]).then(([state, world]) => {
+      Promise.all([api<any>('admin/mp'), loadManifest()]).then(([state, world]) => {
         if (mine !== generation) return
         stamp.textContent = `每 10 秒自动刷新 · ${when(new Date())}`
         const json = JSON.stringify(state)
@@ -1600,6 +1794,15 @@ const pages: Record<string, (view: View) => void> = {
     liveSlot.append(skeleton(6))
     load(true)
     refreshTimer = window.setInterval(() => document.visibilityState === 'visible' && !document.querySelector('dialog.adm-dialog') && load(false), 10000)
+
+    const actParams = new URLSearchParams({ range: actRange, limit: '100' })
+    if (uid) actParams.set('uid', uid)
+    if (actFilter) actParams.set('activity', actFilter)
+    if (kindFilter) actParams.set('kind', kindFilter)
+    if (actQ) actParams.set('q', actQ)
+
+    async(gpSlot, () => api<any>(`admin/mp/gameplay?range=${gpRange}`), paintMpGameplay, skeleton(5))
+    async(actSlot, () => api<any>(`admin/mp/activities?${actParams}`), (data) => paintMpActivities(data, uid), skeleton(5))
     async(histSlot, () => api<any>(`admin/mp/history?range=${range}`), paintMpHistory, skeleton(5))
     async(sessSlot, () => api<any>(`admin/mp/sessions?limit=100${uid ? `&uid=${uid}` : ''}`), paintMpSessions, skeleton(5))
   },
@@ -1713,12 +1916,12 @@ const pages: Record<string, (view: View) => void> = {
       filters,
       card(null, slot, { className: 'adm-card--flush' }),
       h('p', { class: 'adm-note' }, '管理员可以查看全部数据、处理反馈和调整他人身份。只有已验证邮箱的用户才能设为管理员；系统始终保留至少一位管理员。封禁会立即让该用户下线，并拒绝其邮箱和第三方登录；管理员需先取消身份才能封禁。'))
-    async(statsSlot, () => Promise.all([api('admin/stats'), api<any>('admin/users?role=admin'), api<any>('admin/users?status=banned')]), ([stats, admins, banned]) => [
+    async(statsSlot, () => api<any>('admin/stats'), (stats) => [
       serverStat('用户总数', fmt.int(num(stats.total))),
       serverStat('已验证邮箱', fmt.int(num(stats.verified))),
       serverStat('24 小时新增', fmt.int(num(stats.new_24h))),
-      serverStat('管理员', admins.next_cursor ? '50+' : fmt.int(list<any>(admins).length)),
-      serverStat('已封禁', banned.next_cursor ? '50+' : fmt.int(list<any>(banned).length)),
+      serverStat('管理员', fmt.int(num(stats.admins))),
+      serverStat('已封禁', fmt.int(num(stats.banned))),
     ], skeleton(1, 'adm-skel--kpi'))
     const body = h('tbody'),
       more = h('div', { class: 'adm-more' })
@@ -1822,7 +2025,6 @@ const pages: Record<string, (view: View) => void> = {
     main.append(
       h('div', { class: 'adm-toolbar' }, segmented(type, [['', '全部'], ['user', '身份变更'], ['feedback', '反馈处理'], ['chat', '聊天管理']], (value) => go({ target_type: value || null }, true), '对象类型')),
       card(null, slot, { className: 'adm-card--flush' }))
-    const people = new Map<string, any>()
     const actions: Record<string, string> = {
       role: '调整身份', status: '变更状态', start_ai: '发起 AI 制作', reply: '回复提交人',
       ban: '封禁账号', unban: '解除封禁', merge_users: '合并账号', reset_password: '重置密码', change_email: '修改邮箱', 'mp.kick': '踢出联机',
@@ -1836,12 +2038,11 @@ const pages: Record<string, (view: View) => void> = {
       if (cursor) q.set('cursor', cursor)
       return api<{ items: any[]; next_cursor: string | null }>('admin/audit?' + q)
     }
-    const who = (id: string, link = false) => {
-      const p = people.get(id)
-      const name = p ? p.nickname || userContact(p) : `用户 ${String(id).slice(0, 8)}`
+    const who = (id: string, info?: { nickname?: string; email?: string; placeholder?: number }, link = false) => {
+      const name = info?.nickname || (info?.email && !info?.placeholder ? info.email : `用户 ${String(id).slice(0, 8)}`)
       return h('span', { class: 'adm-who' },
         h('b', null, link ? navLink(name, { view: 'users', id }, { class: 'adm-link' }) : name),
-        p && !p.email_placeholder ? h('small', null, p.email) : null)
+        info?.email && !info?.placeholder ? h('small', null, info.email) : null)
     }
     const rowsOf = (items: any[]) => items.map((item) => {
       const detail = typeof item.detail === 'string' ? JSON.parse(item.detail || '{}') : item.detail ?? {}
@@ -1858,12 +2059,12 @@ const pages: Record<string, (view: View) => void> = {
         : ''
       const target = item.target_type === 'feedback'
         ? navLink('查看反馈', { view: 'feedback', id: item.target_id }, { class: 'adm-link' })
-        : item.target_type === 'user' ? who(item.target_id, true)
+        : item.target_type === 'user' ? who(item.target_id, { nickname: item.target_nickname, email: item.target_email, placeholder: item.target_placeholder }, true)
         : item.target_type === 'chat' ? h('code', null, ['chat.mute', 'chat.unmute'].includes(item.action) ? `UID ${item.target_id}` : `#${item.target_id}`)
         : h('code', null, String(item.target_id ?? dash))
       return h('tr', null,
         h('td', { class: 'adm-audit-time' }, when(unix(item.created_at), true)),
-        h('td', { class: 'adm-audit-actor' }, who(item.actor_id)),
+        h('td', { class: 'adm-audit-actor' }, who(item.actor_id, { nickname: item.actor_nickname, email: item.actor_email, placeholder: item.actor_placeholder })),
         h('td', { class: 'adm-audit-action' }, actions[item.action] ?? item.action),
         h('td', { class: 'adm-audit-change' }, what),
         h('td', { class: 'adm-audit-target' }, target))
@@ -1880,14 +2081,7 @@ const pages: Record<string, (view: View) => void> = {
       }))
       more.append(button)
     }
-    async(slot, async () => {
-      const [page, admins] = await Promise.all([load(), api<any>('admin/users?role=admin').catch(() => ({ items: [] }))])
-      for (const p of list<any>(admins)) people.set(p.id, p)
-      // Role targets may be ordinary users: resolve those we can see on the first users page.
-      const missing = page.items.some((item: any) => item.target_type === 'user' && !people.has(item.target_id))
-      if (missing) for (const p of list<any>(await api<any>('admin/users').catch(() => ({ items: [] })))) people.set(p.id, p)
-      return page
-    }, (page) => {
+    async(slot, () => load(), (page) => {
       if (!page.items.length) return emptyState('还没有操作记录', '设置管理员、变更反馈状态、发起制作和回复都会记在这里')
       body.replaceChildren(...rowsOf(page.items))
       paintMore(page.next_cursor)
@@ -2274,18 +2468,20 @@ function kpiCard(key: string, value: { current: unknown; previous: unknown } | u
 function serverStat(name: string, value: string, hint?: string) {
   return h('div', { class: 'adm-kpi adm-kpi--static', title: hint }, h('span', { class: 'adm-kpi-label' }, name), h('b', null, value), hint && h('span', { class: 'adm-delta' }, hint))
 }
-function paintLive(live: any) {
+function paintLive(live: any, mpState?: any) {
   const online = num(live.online) ?? 0
   const modes = list<any>(live.modes).map((m) => ({ label: label('mode', m.mode), value: num(m.n) ?? 0 })).sort((a, b) => b.value - a.value)
   const regions = list<any>(live.regions).map((m) => ({ label: label('region', m.region), value: num(m.n) ?? 0 })).sort((a, b) => b.value - a.value).slice(0, 12)
   const server = live.server
   const sample = server ? (typeof server.sample === 'string' ? JSON.parse(server.sample) : server.sample) ?? {} : null
+  const rtUp = mpState?.rt === 'up'
+  const rtSrv = mpState?.server
   return h('div', { class: 'adm-live' },
     h('div', { class: 'adm-cols' },
-      card('在线人数', [h('div', { class: 'adm-now-big adm-now-big--xl' }, h('b', null, fmt.int(online)), h('span', null, '人')), h('p', { class: 'adm-sub' }, '最近 5 分钟内有活动的会话')]),
+      card('全站在线人数', [h('div', { class: 'adm-now-big adm-now-big--xl' }, h('b', null, fmt.int(online)), h('span', null, '人')), h('p', { class: 'adm-sub' }, '最近 5 分钟内有活动的会话')]),
       card('正在做什么', modes.length ? bars(modes, fmt.int) : emptyState('暂无在线玩家')),
       card('来自哪里', regions.length ? bars(regions, fmt.int) : emptyState('暂无在线玩家'))),
-    card('服务端（最近一分钟）', sample
+    card('API 服务端（最近一分钟）', sample
       ? h('div', { class: 'adm-kpis adm-kpis--server' },
           serverStat('CPU', fmt.cores(num(sample.cpuCores))),
           serverStat('进程内存', fmt.bytes(num(sample.rss))),
@@ -2296,19 +2492,63 @@ function paintLive(live: any) {
           serverStat('5xx', fmt.int(num(server.errors5xx) ?? 0)),
           serverStat('系统负载', sample.load ? Number(sample.load[0]).toFixed(2) : dash, sample.load ? `5 / 15 分钟：${Number(sample.load[1]).toFixed(2)} / ${Number(sample.load[2]).toFixed(2)}` : undefined))
       : emptyState('最近一分钟没有服务端采样', 'API 每分钟写一次；刚重启时会短暂为空'),
-      { sub: server ? `采样时间 ${when(iso(server.minute))}` : undefined }))
+      { sub: server ? `采样时间 ${when(iso(server.minute))}` : undefined, actions: navLink('查看 API 服务端曲线 →', { view: 'server' }, { class: 'adm-link' }) }),
+    card('联机引擎 RT（实时）', rtUp && rtSrv
+      ? h('div', { class: 'adm-kpis adm-kpis--server' },
+          serverStat('同城在线', `${fmt.int(rtSrv.online)} / ${fmt.int(rtSrv.maxPlayers)}`, `连接 ${fmt.int(rtSrv.connections)}`),
+          serverStat('事件循环 p99', fmt.ms(rtSrv.loopP99Ms), `p50 ${fmt.ms(rtSrv.loopP50Ms)}`),
+          serverStat('进程内存', `${fmt.num(rtSrv.rssMb)} MB`, `堆 ${fmt.num(rtSrv.heapMb)} MB`),
+          serverStat('慢客户端跳过', fmt.int(rtSrv.skips), `断开 ${fmt.int(rtSrv.slowCloses)}`),
+          serverStat('运行时长', mpDuration(rtSrv.uptimeSec)))
+      : emptyState('联机服务未连接', mpState?.error ?? '联机服务未启动或不可达'),
+      { actions: navLink('打开联机引擎详情 →', { view: 'rt' }, { class: 'adm-link' }) }))
 }
 
-/* ───────────── 联机（IDOK-222） ───────────── */
+/* ───────────── 联机运营（业务） & 联机引擎（运维） ───────────── */
 const mpRejectText: Record<string, string> = { ticket: '票据无效', full: '满员', uidOnline: '账号已在线', banned: '联机封禁中', ipLimit: '同 IP 连接过多' }
-const mpEventText: Record<string, string> = { join: '进入', leave: '离开', kick: '踢出', reject: '拒绝' }
+const mpEventText: Record<string, string> = { join: '进入', leave: '离开', resume: '续连', kick: '踢出', reject: '拒绝' }
 const mpCloseText: Record<number, string> = { 1000: '正常关闭', 1001: '页面离开', 1005: '未给原因', 1006: '断线', 1013: '网络太慢被断开', 4001: '被同账号顶号', 4003: '被踢 / 封禁' }
-const msgText: Record<string, string> = { pos: '位置', join: '进入', welcome: '欢迎包', leave: '离开', online: '人数', avatar: '换装', who: '名册', chat: '聊天', emote: '表情', hit: '出拳', revive: '扶起', banned: '封禁通知', error: '错误', players: '名册回复', other: '其他' }
+const msgText: Record<string, string> = { pos: '位置', act: '玩法状态', join: '进入', welcome: '欢迎包', leave: '离开', online: '人数', avatar: '换装', who: '名册', roster: '全服名册', chat: '聊天', emote: '表情', hit: '出拳', revive: '扶起', banned: '封禁通知', error: '错误', players: '名册回复', other: '其他' }
+const mpActivityMeta: Record<string, { label: string; color: string; dotClass: string }> = {
+  fishing: { label: '漓江钓鱼', color: '#3b82a6', dotClass: 'is-water' },
+  mifen: { label: '田源米粉店', color: '#9e5f87', dotClass: 'is-life' },
+  boat: { label: '划船 / 竹筏', color: '#2b6f8c', dotClass: 'is-water' },
+  ebike: { label: '骑电动车', color: '#c49a4a', dotClass: 'is-bike' },
+  bicycle: { label: '骑单车', color: '#d0a95f', dotClass: 'is-bike' },
+  car: { label: '开车兜风', color: '#b4783c', dotClass: 'is-bike' },
+  drone: { label: '无人机航拍', color: '#5b6fb0', dotClass: 'is-air' },
+  photo: { label: '摄影拍照', color: '#6b82b8', dotClass: 'is-air' },
+  mission: { label: '任务 / 跑腿', color: '#b25e52', dotClass: 'is-life' },
+  shop: { label: '逛店 / 车库', color: '#8f6b94', dotClass: 'is-life' },
+  smoke: { label: '抽烟休闲', color: '#7d8a84', dotClass: '' },
+  walk: { label: '步行逛城', color: '#4f7f7a', dotClass: '' },
+  idle: { label: '驻足 / 挂机', color: '#9ca39f', dotClass: '' },
+}
+const mpActKindText: Record<string, string> = {
+  join: '进入联机', leave: '离开联机', activity: '开始玩法', activity_end: '结束玩法',
+  chat: '发言聊天', emote: '使用表情', avatar: '更换造型', kick: '被踢出',
+}
+function mpActLabel(act: string | null | undefined) {
+  return (act && mpActivityMeta[act]?.label) ?? act ?? '未知'
+}
+function mpActPill(act: string | null | undefined, detail?: string | null) {
+  const meta = (act && mpActivityMeta[act]) || { label: act || '未知', color: '#6b7d78', dotClass: '' }
+  return h('span', { class: 'adm-act-pill', title: detail || undefined },
+    h('i', { style: `background:${meta.color}` }),
+    meta.label,
+    detail ? h('small', null, ` · ${detail}`) : null)
+}
 function mpDuration(sec: number | null | undefined) {
   if (sec == null || !Number.isFinite(sec)) return dash
   if (sec < 60) return `${Math.round(sec)} 秒`
-  if (sec < 3600) return `${Math.floor(sec / 60)} 分`
+  if (sec < 3600) return `${Math.floor(sec / 60)} 分 ${Math.round(sec % 60)} 秒`
   return `${Math.floor(sec / 3600)} 时 ${Math.floor((sec % 3600) / 60)} 分`
+}
+function mpDurationShort(sec: number | null | undefined) {
+  if (sec == null || !Number.isFinite(sec)) return dash
+  if (sec < 60) return `${Math.round(sec)} 秒`
+  if (sec < 3600) return `${Math.floor(sec / 60)} 分`
+  return `${(sec / 3600).toFixed(1)} 小时`
 }
 const mpRegion = (r: any) => r ? [r.country === 'CN' ? '' : r.country, r.region, r.city].filter(Boolean).join(' · ') || r.country || dash : dash
 const mpUa = (ua: string | undefined) => {
@@ -2316,6 +2556,24 @@ const mpUa = (ua: string | undefined) => {
   const os = /iPhone|iPad/.test(ua) ? 'iOS' : /Android/.test(ua) ? 'Android' : /Mac OS X/.test(ua) ? 'macOS' : /Windows/.test(ua) ? 'Windows' : /Linux/.test(ua) ? 'Linux' : '其他'
   const browser = /MicroMessenger/.test(ua) ? '微信' : /QQ\//.test(ua) ? 'QQ' : /Edg\//.test(ua) ? 'Edge' : /Chrome\//.test(ua) ? 'Chrome' : /Firefox\//.test(ua) ? 'Firefox' : /Safari\//.test(ua) ? 'Safari' : '浏览器'
   return `${os} · ${browser}`
+}
+/** 客户端地标双保险：优先服务端返回的 landmark，缺失或 auto-* 时用浏览器已拉取的 manifest 兜底计算，杜绝全员「野外」。 */
+function resolvePlayerPlace(p: any, places: Place[]): { name: string | null; dist: number | null } {
+  if (p.landmark && !/^auto-/.test(String(p.landmark))) {
+    return { name: String(p.landmark), dist: num(p.landmarkDist) }
+  }
+  if (!places.length || !Number.isFinite(p.x) || !Number.isFinite(p.z)) return { name: null, dist: null }
+  let best: Place | null = null, bestSq = Infinity
+  for (const place of places) {
+    const sq = (place.x - p.x) ** 2 + (place.z - p.z) ** 2
+    if (sq < bestSq) { bestSq = sq; best = place }
+  }
+  return best ? { name: best.name, dist: Math.round(Math.sqrt(bestSq)) } : { name: null, dist: null }
+}
+function formatPlace(place: { name: string | null; dist: number | null }) {
+  if (!place.name) return '城外'
+  if (place.dist != null && place.dist > 1500) return `距${place.name} ${(place.dist / 1000).toFixed(1)} km`
+  return place.dist != null ? `${place.name}附近（${place.dist} m）` : `${place.name}附近`
 }
 function mpKick(player: any, onDone: () => void) {
   const button = h('button', { type: 'button', class: 'adm-btn adm-btn--danger adm-btn--sm' }, '踢出') as HTMLButtonElement
@@ -2337,10 +2595,9 @@ function mpKick(player: any, onDone: () => void) {
   }))
   return button
 }
-function mpMap(players: any[], manifest: any) {
-  const extent: number[] | undefined = manifest?.extent
-  if (!extent || extent.length !== 4) return emptyState('世界清单加载失败，无法画地图')
-  const [ex, ez, ew, ed] = extent
+function mpMap(players: any[], manifest: any, places: Place[]) {
+  const hasExtent = Array.isArray(manifest?.extent) && manifest.extent.length === 4
+  const [ex, ez, ew, ed] = hasExtent ? (manifest.extent as number[]) : [-2600, -1800, 3600, 5000]
   // 框住所有玩家，留 600 m 边；没有玩家时看整张图
   const xs = players.map((p) => p.x), zs = players.map((p) => p.z)
   const pad = 600
@@ -2351,10 +2608,22 @@ function mpMap(players: any[], manifest: any) {
   if (z1 - z0 < minSpan * 0.6) { const c = (z0 + z1) / 2; z0 = c - minSpan * 0.3; z1 = c + minSpan * 0.3 }
   const span = Math.max(x1 - x0, z1 - z0), r = span / 120, labels: number[][] = []
   const svg = s('svg', { viewBox: `${x0} ${z0} ${x1 - x0} ${z1 - z0}`, class: 'adm-mp-map', role: 'img', 'aria-label': '在线玩家位置' })
-  svg.append(s('image', { href: '/world/overview.png', x: ex, y: ez, width: ew, height: ed, preserveAspectRatio: 'none', class: 'adm-heat-base' }))
+  if (hasExtent) {
+    svg.append(s('image', { href: '/world/overview.png', x: ex, y: ez, width: ew, height: ed, preserveAspectRatio: 'none', class: 'adm-heat-base' }))
+  } else {
+    // 本地预览或清单暂不可用时绘制轻量坐标网格，避免报错并保留真实相对位置
+    const step = 500
+    for (let gx = Math.ceil(x0 / step) * step; gx <= x1; gx += step)
+      svg.append(s('line', { x1: gx, y1: z0, x2: gx, y2: z1, stroke: 'rgba(60,72,66,.1)', 'stroke-width': r * 0.16 }))
+    for (let gz = Math.ceil(z0 / step) * step; gz <= z1; gz += step)
+      svg.append(s('line', { x1: x0, y1: gz, x2: x1, y2: gz, stroke: 'rgba(60,72,66,.1)', 'stroke-width': r * 0.16 }))
+  }
   const tip = h('div', { class: 'adm-tip', hidden: true })
   for (const p of players) {
-    const g = s('g', { class: `adm-mp-dot ${p.mode === 'bike' ? 'is-bike' : ''} ${p.dn ? 'is-down' : ''}`, transform: `translate(${p.x} ${p.z})` })
+    const actKey = p.activity ?? (p.mode === 'bike' ? 'ebike' : 'walk')
+    const meta = mpActivityMeta[actKey] ?? mpActivityMeta.walk
+    const place = resolvePlayerPlace(p, places)
+    const g = s('g', { class: `adm-mp-dot ${meta.dotClass} ${p.dn ? 'is-down' : ''}`, transform: `translate(${p.x} ${p.z})` })
     g.append(s('line', { x1: 0, y1: 0, x2: -Math.sin(p.yaw) * r * 2.4, y2: -Math.cos(p.yaw) * r * 2.4, 'stroke-width': r * 0.6 }))
     g.append(s('circle', { r, 'stroke-width': r * 0.35 }))
     // 名字互不重叠：挤在一起时只写第一个，其余看右侧「按地标」或悬停
@@ -2365,8 +2634,10 @@ function mpMap(players: any[], manifest: any) {
     }
     g.addEventListener('pointerenter', () => {
       tip.hidden = false
-      tip.replaceChildren(h('b', null, `${p.name} · ${p.uid}`), h('span', null, `${p.landmark ? p.landmark + '附近' : `东 ${Math.round(p.x)} m · 南 ${Math.round(p.z)} m`}`),
-        h('span', null, `${p.mode === 'bike' ? '骑车' : '步行'} · ${fmt.num(p.v)} m/s · 延迟 ${fmt.ms(p.rttMs)}`))
+      tip.replaceChildren(
+        h('b', null, `${p.name} · ${p.uid}`),
+        h('span', null, formatPlace(place)),
+        h('span', null, `${meta.label}${p.activityDetail ? `（${p.activityDetail}）` : ''} · ${fmt.num(p.v)} m/s · 延迟 ${fmt.ms(p.rttMs)}`))
     })
     g.addEventListener('pointermove', (event) => {
       const box = (svg.parentElement ?? svg).getBoundingClientRect()
@@ -2377,7 +2648,13 @@ function mpMap(players: any[], manifest: any) {
     svg.append(g)
   }
   return h('div', { class: 'adm-heat-stage adm-mp-stage' }, svg, tip,
-    h('p', { class: 'adm-sub adm-mp-legend' }, h('i', { class: 'is-walk' }), '步行', h('i', { class: 'is-bike' }), '骑车', h('i', { class: 'is-down' }), '倒地', ' · 短线为朝向 · 上北下南'))
+    h('p', { class: 'adm-sub adm-mp-legend' },
+      h('i', { class: 'is-walk' }), '步行',
+      h('i', { class: 'is-bike' }), '载具',
+      h('i', { class: 'is-water' }), '钓鱼/划船',
+      h('i', { class: 'is-life' }), '米粉/逛店/任务',
+      h('i', { class: 'is-air' }), '航拍/拍照',
+      h('i', { class: 'is-down' }), '倒地', ' · 上北下南'))
 }
 function mpTable(head: string[], rows: Child[][], numCols: number[] = []) {
   return h('div', { class: 'adm-table-wrap' }, h('table', { class: 'adm-table adm-mp-table' },
@@ -2386,7 +2663,189 @@ function mpTable(head: string[], rows: Child[][], numCols: number[] = []) {
 }
 function paintMp(state: any, manifest: any, reload: () => void) {
   if (state.rt !== 'up') return h('div', { class: 'adm-stack' },
-    h('div', { class: 'adm-error', role: 'alert' }, h('b', null, '联机服务连不上'), h('span', null, `${state.error ?? '未知原因'}。游戏里的同城联机此时不可用；下方历史数据仍可查看。`)))
+    h('div', { class: 'adm-error', role: 'alert' }, h('b', null, '联机服务连不上'), h('span', null, `${state.error ?? '未知原因'}。游戏里的同城联机此时不可用；下方玩法统计、账户记录与历史数据仍可查看。`),
+      navLink('前往运维侧排查 →', { view: 'rt' }, { class: 'adm-btn adm-btn--ghost adm-btn--sm' })))
+  const server = state.server, players: any[] = [...state.players].sort((a, b) => a.joinedAt - b.joinedAt)
+  const places = manifestPlaces(manifest)
+  const now = Date.now()
+  const rtts = players.map((p) => p.rttMs).filter((v): v is number => v != null).sort((a, b) => a - b)
+  const byPlace = new Map<string, any[]>()
+  const byAct = new Map<string, number>()
+  for (const p of players) {
+    const place = resolvePlayerPlace(p, places)
+    const key = place.name ?? '城外'
+    byPlace.set(key, [...(byPlace.get(key) ?? []), p])
+    const actKey = p.activity ?? (p.mode === 'bike' ? 'ebike' : 'walk')
+    byAct.set(actKey, (byAct.get(actKey) ?? 0) + 1)
+  }
+  const topAct = [...byAct.entries()].sort((a, b) => b[1] - a[1])[0]
+  const kpis = h('div', { class: 'adm-kpis adm-kpis--server' },
+    serverStat('同城在线', `${fmt.int(server.online)} / ${fmt.int(server.maxPlayers)}`, `连接 ${fmt.int(server.connections)}（含未进城）`),
+    serverStat('本次启动峰值', fmt.int(server.peak), server.peakAt ? `${when(new Date(server.peakAt))}` : undefined),
+    serverStat('活跃地标数', fmt.int(byPlace.size), players.length ? `已定位 ${players.filter((p) => resolvePlayerPlace(p, places).name).length}/${players.length} 人` : '暂无在线玩家'),
+    serverStat('此刻最热玩法', topAct ? mpActLabel(topAct[0]) : dash, topAct ? `${topAct[1]} 人正在参与` : '暂无在线玩家'),
+    serverStat('玩家延迟中位数', fmt.ms(rtts.length ? rtts[Math.floor(rtts.length / 2)] : null), rtts.length ? `最差 ${fmt.ms(rtts[rtts.length - 1])}` : '还没有测到'),
+    serverStat('联机引擎', server.loopP99Ms > 50 ? '负载偏高' : '运行正常', `事件循环 p99 ${fmt.ms(server.loopP99Ms)} · 详情见运维侧`))
+
+  const actBars = [...byAct.entries()].sort((a, b) => b[1] - a[1]).map(([act, count]) => ({ label: mpActLabel(act), value: count }))
+  const mapCard = card('玩家在哪 & 正在玩什么', h('div', { class: 'adm-heat' }, mpMap(players, manifest, places),
+    h('div', { class: 'adm-heat-side adm-mp-side-tabs' },
+      h('div', null,
+        h('p', { class: 'adm-heat-side-title' }, '按地标分布'),
+        players.length
+          ? h('ol', null, [...byPlace].sort((a, b) => b[1].length - a[1].length).map(([place, list]) =>
+              h('li', null, h('i', { style: 'background:var(--ui-jade-500)' }), h('span', null, `${place}${place === '城外' ? '' : '附近'}`, h('small', null, list.map((p) => p.name).join('、'))), h('b', null, `${list.length} 人`))))
+          : emptyState('现在没有人在联机')),
+      h('div', null,
+        h('p', { class: 'adm-heat-side-title' }, '此刻玩法分布'),
+        actBars.length ? bars(actBars, fmt.int) : h('p', { class: 'adm-sub' }, '暂无在线玩家')),
+      h('p', { class: 'adm-sub' }, server.landmarkSource === 'builtin'
+        ? `已启用内置桂林核心地标坐标（共 ${fmt.int(server.landmarkCount || 0)} 处）定位。`
+        : `地标取世界清单平面距离最近点（已载入 ${fmt.int(server.landmarkCount || places.length)} 个地标/山峰）。`))),
+    { sub: '每 10 秒刷新 · 鼠标移到圆点上看玩法与坐标详情' })
+
+  const signupName: Record<string, string> = { email: '邮箱', wx: '微信', qq: 'QQ' }
+  const table = card(`在线玩家（${players.length}）`, players.length ? mpTable(
+    ['玩家与账号', '当前玩法 / 状态', '位置（地标）', '本场玩法耗时', '地区 / 设备', '在线时长', '操作'],
+    players.map((p) => {
+      const place = resolvePlayerPlace(p, places)
+      const actKey = p.activity ?? (p.mode === 'bike' ? 'ebike' : 'walk')
+      const topTotals = Object.entries<number>(p.activityTotals ?? {}).filter(([, s]) => s >= 5).sort((a, b) => b[1] - a[1]).slice(0, 3)
+      const traceLink = navLink('活动轨迹', { view: 'mp', uid: String(p.uid) }, { class: 'adm-btn adm-btn--ghost adm-btn--sm' }, true)
+      const methodLabel = p.account?.signupMethod ? (signupName[p.account.signupMethod] ?? p.account.signupMethod) : ''
+      return [
+        h('div', { class: 'adm-mp-who' }, p.account?.id ? navLink(p.name, { view: 'users', id: p.account.id }, { class: 'adm-link' }) : h('b', null, p.name),
+          h('small', null, `UID ${p.uid}${p.account ? ` · ${methodLabel ? methodLabel + '注册 ' : ''}${when(unix(p.account.createdAt), true)}` : ''}`), p.account?.banned && h('span', { class: 'adm-pill is-bad' }, '账号已封')),
+        h('div', { class: 'adm-mp-state' },
+          mpActPill(actKey, p.activityDetail),
+          h('small', null, [`${fmt.num(p.v)} m/s`, `HP ${p.hp}`, p.dn ? '倒地' : '', p.sc ? '抽烟' : '', p.em ? `表情 ${p.em}` : '', p.chats ? `聊天 ${p.chats}` : ''].filter(Boolean).join(' · '))),
+        h('div', null,
+          h('span', { class: 'adm-nowrap' }, formatPlace(place)),
+          h('small', { class: 'adm-sub adm-nowrap' }, `东 ${Math.round(p.x)} · 南 ${Math.round(p.z)} · 高 ${Math.round(p.y)}`)),
+        topTotals.length
+          ? h('div', { class: 'adm-act-chips' }, topTotals.map(([a, s]) => h('span', { class: 'adm-act-chip' }, mpActLabel(a), h('b', null, mpDurationShort(s)))))
+          : h('span', { class: 'adm-act-chip' }, '刚进城'),
+        h('div', null, h('span', null, mpRegion(p.region)), h('small', { class: 'adm-sub' }, [p.region?.isp, mpUa(p.ua)].filter(Boolean).join(' · '))),
+        mpDuration((now - p.joinedAt) / 1000),
+        h('div', { class: 'adm-btns' }, traceLink, mpKick(p, reload)),
+      ]
+    }), [5]) : emptyState('现在没有人在联机', '玩家登录并打开「同城联机」后会出现在这里'))
+
+  const chats = [...state.chat].reverse()
+  const chatCard = card('最近聊天', chats.length ? h('ol', { class: 'adm-mp-feed adm-mp-chat' }, chats.map((c: any) =>
+    h('li', null, h('time', null, when(new Date(c.ts))), h('b', null, c.name), h('span', null, c.text))))
+    : emptyState('还没有聊天'), { sub: '最近 100 条', actions: navLink('前往聊天管理 →', { view: 'chat' }, { class: 'adm-link' }) })
+  const bans = card(`联机封禁（${state.bans.length}）`, state.bans.length ? mpTable(['uid', '原因', '到期'],
+    state.bans.map((b: any) => [String(b.uid), b.reason || dash, `${when(new Date(b.until))}（${mpDurationShort((b.until - now) / 1000)}后）`]))
+    : emptyState('没有生效中的联机封禁'), { sub: '只存在联机服务内存里，联机服务重启后清空' })
+  return h('div', { class: 'adm-stack' }, kpis, mapCard, table, h('div', { class: 'adm-grid-2' }, chatCard, bans))
+}
+
+function paintMpGameplay(data: any) {
+  const rows: any[] = list<any>(data.activities)
+  const totalSec = num(data.totalSeconds) ?? 0
+  const totalPlayers = num(data.totalPlayers) ?? 0
+  const top = rows[0]
+  const activeTop = [...rows].sort((a, b) => (b.activeNow ?? 0) - (a.activeNow ?? 0)).find((r) => r.activeNow > 0)
+  const summary = h('div', { class: 'adm-kpis adm-kpis--server' },
+    serverStat('累计联机玩法时长', mpDurationShort(totalSec), `${rows.length} 种玩法有记录`),
+    serverStat('参与联机账户数', fmt.int(totalPlayers), '按账号 UID 去重'),
+    serverStat('最吸引玩家玩法', top ? mpActLabel(top.activity) : dash, top ? `占 ${fmt.pct(top.share)} · 人均 ${mpDurationShort(top.avgPerPlayerSec)}` : '等待玩家联机产生数据'),
+    serverStat('此刻最多人在玩', activeTop ? mpActLabel(activeTop.activity) : dash, activeTop ? `${activeTop.activeNow} 人正在玩` : '当前无在线玩家'))
+
+  const maxSec = Math.max(...rows.map((r) => r.seconds ?? 0), 1)
+  const table = rows.length ? mpTable(
+    ['玩法', '时间占比', '总占用玩家时间', '参与账户', '人均投入', '单次平均', '此刻在玩'],
+    rows.map((r) => {
+      const meta = mpActivityMeta[r.activity] ?? { label: r.activity, color: 'var(--ui-jade-500)' }
+      return [
+        mpActPill(r.activity),
+        h('div', { class: 'adm-gp-bar' },
+          h('span', { class: 'adm-gp-track' }, h('i', { style: `width:${Math.max(2, ((r.seconds || 0) / maxSec) * 100).toFixed(1)}%;background:${meta.color}` })),
+          h('small', null, fmt.pct(r.share))),
+        mpDurationShort(r.seconds),
+        fmt.int(r.players),
+        mpDurationShort(r.avgPerPlayerSec),
+        r.avgSegmentSec != null ? mpDuration(r.avgSegmentSec) : dash,
+        r.activeNow ? h('span', { class: 'adm-pill is-good' }, `${r.activeNow} 人`) : '0',
+      ]
+    }), [2, 3, 4, 5, 6]) : emptyState('该时间段还没有联机玩法时长数据', '玩家进入联机并游玩后，系统会实时累计各玩法的占用时间')
+
+  // Top 6 玩法趋势曲线（分钟）
+  const topNames = rows.slice(0, 6).map((r) => r.activity)
+  const byAct = new Map<string, { t: Date; v: number }[]>()
+  for (const pt of list<any>(data.series)) {
+    if (!topNames.includes(pt.activity)) continue
+    const arr = byAct.get(pt.activity) ?? []
+    const t = data.grain === 'hour' ? new Date(pt.ts) : new Date(pt.ts + 'T00:00:00+08:00')
+    arr.push({ t, v: Number(pt.seconds || 0) / 60 })
+    byAct.set(pt.activity, arr)
+  }
+  const chartSeries: Series[] = topNames
+    .map((act) => ({ name: mpActLabel(act), points: byAct.get(act) ?? [] }))
+    .filter((s) => s.points.length)
+  const minFmt: Fmt = (v) => (v == null ? dash : v === 0 ? '0 分' : v >= 120 ? `${(v / 60).toFixed(1)} 时` : `${v.toFixed(v >= 10 ? 0 : 1)} 分`)
+  const trendBox = chartSeries.length
+    ? h('div', null,
+        h('p', { class: 'adm-sub', style: 'margin-bottom:6px' }, `Top ${chartSeries.length} 玩法占用时长趋势（${data.grain === 'hour' ? '按小时' : '按日'}，单位：玩家分钟）`),
+        lineChart(chartSeries, minFmt, { bucket: data.grain === 'hour' ? '1h' : '1d', height: 220 }))
+    : null
+
+  const siteModes: any[] = list<any>(data.siteModes)
+  const siteTotal = siteModes.reduce((sum, r) => sum + (r.seconds || 0), 0)
+  const siteBox = siteModes.length
+    ? h('div', { class: 'adm-health-strip' },
+        h('span', null, `全站模式耗时参考（含非联机${data.siteRange && data.siteRange !== data.range ? ` · 近 ${data.siteRange === '24h' ? '24 小时' : '7 天'}` : ''} · ${fmt.int(data.siteSessions)} 会话）`),
+        h('div', { class: 'adm-health-items' },
+          siteModes.map((m) => h('span', { class: 'adm-health-item' },
+            label('mode', m.mode), ' ',
+            h('b', null, mpDurationShort(m.seconds)),
+            h('small', null, siteTotal ? `(${fmt.pct(m.seconds / siteTotal)})` : '')))))
+    : null
+
+  return h('div', { class: 'adm-stack' }, summary, table, trendBox, siteBox)
+}
+
+function paintMpActivities(data: any, selectedUid: string | null) {
+  const accounts: any[] = list<any>(data.accounts)
+  const items: any[] = list<any>(data.items)
+  const accountStrip = accounts.length
+    ? h('div', { class: 'adm-mp-accounts' }, accounts.map((acc) => {
+        const active = selectedUid === String(acc.uid)
+        const topText = (acc.topActivities ?? []).slice(0, 2).map((a: any) => `${mpActLabel(a.activity)} ${mpDurationShort(a.seconds)}`).join(' · ')
+        return navLink([
+          h('div', { class: 'adm-mp-acct-head' },
+            h('i', { class: `adm-mp-acct-dot ${acc.online ? 'is-on' : ''}`, title: acc.online ? '在线' : '离线' }),
+            h('b', null, acc.name || `UID ${acc.uid}`),
+            h('small', null, String(acc.uid))),
+          h('small', null, [acc.currentActivity ? mpActLabel(acc.currentActivity) : '', acc.currentLandmark ? `${acc.currentLandmark}附近` : ''].filter(Boolean).join(' · ') || '暂无状态'),
+          h('small', null, topText || `最近活跃 ${ago(iso(acc.lastActiveAt))}`),
+        ], { view: 'mp', uid: active ? null : String(acc.uid) }, { class: `adm-mp-acct ${active ? 'is-on' : ''}` }, true)
+      }))
+    : null
+
+  const table = items.length
+    ? h('div', { class: 'adm-mp-scroll' }, mpTable(
+        ['时间', '账户', '行为 / 玩法', '位置', '详情 / 耗时'],
+        items.map((item) => [
+          when(iso(item.ts)),
+          h('div', { class: 'adm-mp-who' },
+            navLink(item.name || `UID ${item.uid}`, { view: 'mp', uid: String(item.uid) }, { class: 'adm-link', title: '只看该账户的活动记录' }, true),
+            h('small', null, `UID ${item.uid}`, item.accountId ? [' · ', navLink('账号详情', { view: 'users', id: item.accountId }, { class: 'adm-link' })] : null)),
+          h('div', { class: 'adm-act-chips' },
+            h('span', { class: `adm-pill ${item.kind === 'join' ? 'is-good' : item.kind === 'kick' ? 'is-bad' : ''}` }, mpActKindText[item.kind] ?? item.kind),
+            item.activity ? mpActPill(item.activity) : null),
+          item.landmark ? `${item.landmark}附近` : (item.x != null && item.z != null ? `东 ${Math.round(item.x)} · 南 ${Math.round(item.z)}` : dash),
+          [item.detail || '', item.durationSec != null ? `耗时 ${mpDuration(item.durationSec)}` : ''].filter(Boolean).join(' · ') || dash,
+        ])))
+    : emptyState('没有符合条件的账户活动记录', selectedUid ? '该账户在此时间段暂无更多记录，可切换更长时间范围' : '玩家进入联机、切换玩法、钓鱼、煮米粉、骑车或发言后会自动记录在这里')
+
+  return h('div', { class: 'adm-stack' }, accountStrip, table)
+}
+
+function paintRtOps(state: any) {
+  if (state.rt !== 'up') return h('div', { class: 'adm-error', role: 'alert' },
+    h('b', null, '联机服务连不上'), h('span', null, `${state.error ?? '未知原因'}。请检查 glol-rt Pod 与 RT_INTERNAL_URL / RT_ADMIN_TOKEN 配置。`))
   const server = state.server, players: any[] = [...state.players].sort((a, b) => a.joinedAt - b.joinedAt)
   const now = Date.now()
   const rtts = players.map((p) => p.rttMs).filter((v): v is number => v != null).sort((a, b) => a - b)
@@ -2394,63 +2853,48 @@ function paintMp(state: any, manifest: any, reload: () => void) {
   const tin = sum('in'), tout = sum('out')
   const rejects = Object.entries<number>(server.rejects ?? {}), rejectTotal = rejects.reduce((a, [, v]) => a + v, 0)
   const kpis = h('div', { class: 'adm-kpis adm-kpis--server' },
-    serverStat('同城在线', `${fmt.int(server.online)} / ${fmt.int(server.maxPlayers)}`, `连接 ${fmt.int(server.connections)}（含未进城）`),
+    serverStat('同城在线 / 上限', `${fmt.int(server.online)} / ${fmt.int(server.maxPlayers)}`, `连接 ${fmt.int(server.connections)}（含未进城）`),
     serverStat('本次启动峰值', fmt.int(server.peak), server.peakAt ? `${when(new Date(server.peakAt))}` : undefined),
-    serverStat('联机服务运行', mpDuration(server.uptimeSec), `启动于 ${when(new Date(server.startedAt))}`),
+    serverStat('运行时长', mpDurationShort(server.uptimeSec), `启动于 ${when(new Date(server.startedAt))}`),
     serverStat('延迟中位数', fmt.ms(rtts.length ? rtts[Math.floor(rtts.length / 2)] : null), rtts.length ? `最差 ${fmt.ms(rtts[rtts.length - 1])}` : '还没有测到'),
-    serverStat('下行', `${fmt.bytes(tout.bytes / 60)}/s`, `近 60 秒 ${fmt.int(tout.packets)} 包`),
-    serverStat('上行', `${fmt.bytes(tin.bytes / 60)}/s`, `近 60 秒 ${fmt.int(tin.packets)} 包`),
-    serverStat('事件循环', fmt.ms(server.loopP99Ms), `p50 ${fmt.ms(server.loopP50Ms)} · 显示 p99`),
-    serverStat('内存', `${fmt.num(server.rssMb)} MB`, `堆 ${fmt.num(server.heapMb)} MB`),
+    serverStat('下行带宽', `${fmt.bytes(tout.bytes / 60)}/s`, `近 60 秒 ${fmt.int(tout.packets)} 包`),
+    serverStat('上行带宽', `${fmt.bytes(tin.bytes / 60)}/s`, `近 60 秒 ${fmt.int(tin.packets)} 包`),
+    serverStat('事件循环 p99', fmt.ms(server.loopP99Ms), `p50 ${fmt.ms(server.loopP50Ms)}`),
+    serverStat('进程内存', `${fmt.num(server.rssMb)} MB`, `堆 ${fmt.num(server.heapMb)} MB`),
     serverStat('拒绝连接', fmt.int(rejectTotal), rejects.filter(([, v]) => v).map(([k, v]) => `${mpRejectText[k] ?? k} ${v}`).join(' · ') || '启动以来没有'),
-    serverStat('慢客户端', fmt.int(server.skips), `被断开 ${fmt.int(server.slowCloses)} 个`))
-  const byPlace = new Map<string, any[]>()
-  for (const p of players) { const key = p.landmark ?? '野外'; byPlace.set(key, [...(byPlace.get(key) ?? []), p]) }
-  const mapCard = card('玩家在哪', h('div', { class: 'adm-heat' }, mpMap(players, manifest),
-    h('div', { class: 'adm-heat-side' },
-      h('p', { class: 'adm-heat-side-title' }, '按地标'),
-      players.length
-        ? h('ol', null, [...byPlace].sort((a, b) => b[1].length - a[1].length).map(([place, list]) =>
-            h('li', null, h('i', { style: 'background:var(--ui-jade-500)' }), h('span', null, `${place}${place === '野外' ? '' : '附近'}`, h('small', null, list.map((p) => p.name).join('、'))), h('b', null, `${list.length} 人`))))
-        : emptyState('现在没有人在联机'),
-      h('p', { class: 'adm-sub' }, '地标取世界清单里平面距离最近的一个。'))), { sub: '每 10 秒刷新 · 鼠标移到圆点上看详情' })
-  const table = card(`在线玩家（${players.length}）`, players.length ? mpTable(
-    ['玩家', '状态', '位置', '地区 / 网络', '在线', '延迟', '位置包', '上行 / 下行', '缓冲', '设备', ''],
-    players.map((p) => [
-      h('div', { class: 'adm-mp-who' }, p.account?.id ? navLink(p.name, { view: 'users', id: p.account.id }, { class: 'adm-link' }) : h('b', null, p.name),
-        h('small', null, `${p.uid}${p.account ? ` · ${p.account.signupMethod ?? ''}注册 ${when(unix(p.account.createdAt), true)}` : ''}`), p.account?.banned && h('span', { class: 'adm-pill is-bad' }, '账号已封')),
-      h('div', { class: 'adm-mp-state' }, h('span', null, `${p.mode === 'bike' ? '骑车' : p.v > 3 ? '奔跑' : p.v > 0.12 ? '步行' : '驻足'} · ${fmt.num(p.v)} m/s`),
-        h('small', null, [`HP ${p.hp}`, p.dn ? '倒地' : '', p.sc ? '抽烟' : '', p.em ? `表情 ${p.em}` : '', p.chats ? `聊天 ${p.chats}` : ''].filter(Boolean).join(' · '))),
-      h('div', null, h('span', null, p.landmark ? `${p.landmark}附近` : dash), h('small', { class: 'adm-sub' }, `东 ${Math.round(p.x)} · 南 ${Math.round(p.z)} · 高 ${Math.round(p.y)}`)),
-      h('div', null, h('span', null, mpRegion(p.region)), h('small', { class: 'adm-sub' }, p.region?.isp ?? '')),
-      mpDuration((now - p.joinedAt) / 1000),
-      h('span', { class: (p.rttMs ?? 0) > 300 ? 'is-bad' : '', title: `平均 ${fmt.ms(p.avgRttMs)}` }, fmt.ms(p.rttMs)),
-      h('span', { title: `最后一次 ${p.lastPosAt ? ago(new Date(p.lastPosAt)) : '没有'}` }, `${fmt.num(p.posHz)}/s`),
-      `${fmt.bytes(p.inBytes)} / ${fmt.bytes(p.outBytes)}`,
-      h('span', { title: `被跳过 ${p.skips} 次` }, p.bufferedAmount ? fmt.bytes(p.bufferedAmount) : '0'),
-      h('span', { title: p.ua ?? '' }, mpUa(p.ua)),
-      mpKick(p, reload),
-    ]), [4, 5, 6, 7, 8]) : emptyState('现在没有人在联机', '玩家登录并打开「同城联机」后会出现在这里'))
+    serverStat('慢客户端跳过', fmt.int(server.skips), `被断开 ${fmt.int(server.slowCloses)} 个`),
+    serverStat('地标清单', `${fmt.int(server.landmarkCount ?? 0)} 个`, server.landmarkSource ? `来源 ${String(server.landmarkSource).replace(/^https?:\/\//, '')}` : '未加载'))
+
   const types = [...new Set([...Object.keys(server.traffic.in ?? {}), ...Object.keys(server.traffic.out ?? {})])]
     .map((t) => ({ t, i: server.traffic.in?.[t] ?? { packets: 0, bytes: 0 }, o: server.traffic.out?.[t] ?? { packets: 0, bytes: 0 } }))
     .sort((a, b) => b.o.bytes + b.i.bytes - a.o.bytes - a.i.bytes)
   const traffic = card('消息流量（近 60 秒）', types.length ? mpTable(['类型', '收到', '收到字节', '发出', '发出字节'],
     types.map(({ t, i, o }) => [h('span', null, msgText[t] ?? t, ' ', h('code', null, t)), fmt.int(i.packets), fmt.bytes(i.bytes), fmt.int(o.packets), fmt.bytes(o.bytes)]), [1, 2, 3, 4])
     : emptyState('近 60 秒没有消息'), { sub: '发出按每个接收方各算一次；字节不含 WebSocket 帧头' })
-  const bans = card(`联机封禁（${state.bans.length}）`, state.bans.length ? mpTable(['uid', '原因', '到期'],
-    state.bans.map((b: any) => [String(b.uid), b.reason || dash, `${when(new Date(b.until))}（${mpDuration((b.until - now) / 1000)}后）`]))
-    : emptyState('没有生效中的联机封禁'), { sub: '只存在联机服务内存里，联机服务重启后清空' })
+
+  const connTable = card(`在线连接网络明细（${players.length}）`, players.length ? mpTable(
+    ['玩家 / UID', '延迟 / 均值', '位置包', '上行 / 下行', '发送缓冲', '慢跳过', '地区 / 运营商', '客户端 UA'],
+    players.map((p) => [
+      h('div', { class: 'adm-mp-who' }, h('b', null, p.name), h('small', null, `UID ${p.uid} · #${p.id}`)),
+      h('span', { class: (p.rttMs ?? 0) > 300 ? 'is-bad' : '' }, `${fmt.ms(p.rttMs)} / ${fmt.ms(p.avgRttMs)}`),
+      h('span', { title: `最后一次 ${p.lastPosAt ? ago(new Date(p.lastPosAt)) : '没有'}` }, `${fmt.num(p.posHz)}/s`),
+      `${fmt.bytes(p.inBytes)} / ${fmt.bytes(p.outBytes)}`,
+      p.bufferedAmount ? fmt.bytes(p.bufferedAmount) : '0',
+      fmt.int(p.skips),
+      h('div', null, h('span', null, mpRegion(p.region)), h('small', { class: 'adm-sub' }, p.region?.isp ?? '')),
+      h('span', { title: p.ua ?? '' }, mpUa(p.ua)),
+    ]), [1, 2, 3, 4, 5]) : emptyState('当前没有在线连接'))
+
   const events = [...state.events].reverse()
-  const eventCard = card('最近进出', events.length ? h('ol', { class: 'adm-mp-feed' }, events.slice(0, 80).map((e: any) =>
+  const eventCard = card('连接进出与断线事件', events.length ? h('ol', { class: 'adm-mp-feed' }, events.slice(0, 80).map((e: any) =>
     h('li', { class: `is-${e.type}` }, h('time', null, when(new Date(e.ts))), h('b', null, mpEventText[e.type] ?? e.type),
       h('span', null, e.name || (e.uid ? String(e.uid) : '未进城连接')),
-      h('small', null, [e.type === 'reject' ? mpRejectText[e.reason] ?? e.reason : e.reason, e.closeCode ? mpCloseText[e.closeCode] ?? `关闭码 ${e.closeCode}` : '', e.type === 'leave' && e.durationSec != null ? `待了 ${mpDuration(e.durationSec)}` : ''].filter(Boolean).join(' · ')))))
-    : emptyState('联机服务启动以来还没有人进出'), { sub: '最近 300 条，联机服务重启后清空' })
-  const chats = [...state.chat].reverse()
-  const chatCard = card('最近聊天', chats.length ? h('ol', { class: 'adm-mp-feed adm-mp-chat' }, chats.map((c: any) =>
-    h('li', null, h('time', null, when(new Date(c.ts))), h('b', null, c.name), h('span', null, c.text))))
-    : emptyState('还没有聊天'), { sub: '最近 100 条' })
-  return h('div', { class: 'adm-stack' }, kpis, mapCard, table, h('div', { class: 'adm-grid-2' }, traffic, bans), h('div', { class: 'adm-grid-2' }, eventCard, chatCard))
+      h('small', null, [e.type === 'reject' ? mpRejectText[e.reason] ?? e.reason : e.reason, e.closeCode ? mpCloseText[e.closeCode] ?? `关闭码 ${e.closeCode}` : '', e.type === 'leave' && e.durationSec != null ? `待了 ${mpDurationShort(e.durationSec)}` : ''].filter(Boolean).join(' · ')))))
+    : emptyState('联机服务启动以来还没有人进出'), { sub: '最近 300 条，含 WS 关闭码，重启后清空' })
+  const bans = card(`联机封禁（${state.bans.length}）`, state.bans.length ? mpTable(['uid', '原因', '到期'],
+    state.bans.map((b: any) => [String(b.uid), b.reason || dash, `${when(new Date(b.until))}（${mpDurationShort((b.until - now) / 1000)}后）`]))
+    : emptyState('没有生效中的联机封禁'), { sub: '只存在联机服务内存里，重启后清空' })
+  return h('div', { class: 'adm-stack' }, kpis, connTable, h('div', { class: 'adm-grid-2' }, traffic, bans), eventCard)
 }
 function paintMpHistory(history: any) {
   const series: Series[] = [{ name: '在线', points: list<any>(history.series).map((row) => ({ t: new Date(row.ts), v: num(row.online) ?? 0 })) }]
@@ -2460,16 +2904,17 @@ function paintMpHistory(history: any) {
     series[0].points.length ? lineChart(series, fmt.int, { bucket: history.grain === 'minute' ? '5m' : '1h', height: 200, gap: history.grain === 'minute' ? 60e3 : 3600e3 })
       : emptyState('还没有采样', 'API 每分钟记一次在线人数，上线后开始积累'),
     daily.length ? mpTable(['日期', '联机人数', '场次', '平均时长', '中位时长', '最高同时在线'],
-      daily.map((d: any) => [d.day, fmt.int(d.dau), fmt.int(d.sessions), mpDuration(num(d.avgDurationSec)), mpDuration(num(d.medianDurationSec)),
+      daily.map((d: any) => [d.day, fmt.int(d.dau), fmt.int(d.sessions), mpDurationShort(num(d.avgDurationSec)), mpDurationShort(num(d.medianDurationSec)),
         d.peak != null ? `${d.peak}（${iso(d.peakAt)?.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', hour12: false })}）` : dash]), [1, 2, 3, 4, 5]) : null)
 }
 function paintMpSessions(result: any) {
   const rows = list<any>(result.sessions)
   if (!rows.length) return emptyState('还没有会话记录')
   return h('div', { class: 'adm-mp-scroll' }, mpTable(['玩家', '进入', '离开', '时长', '离开原因', '地区'], rows.map((r) => [
-    h('div', { class: 'adm-mp-who' }, navLink(r.name, { view: 'mp', uid: String(r.uid) }, { class: 'adm-link', title: '只看这个玩家' }, true), h('small', null, String(r.uid))),
+    h('div', { class: 'adm-mp-who' }, navLink(r.name, { view: 'mp', uid: String(r.uid) }, { class: 'adm-link', title: '只看这个玩家' }, true),
+      h('small', null, `UID ${r.uid}`, r.accountId ? [' · ', navLink('账号', { view: 'users', id: r.accountId }, { class: 'adm-link' })] : null)),
     when(iso(r.joinedAt)), r.leftAt ? when(iso(r.leftAt)) : h('span', { class: 'adm-pill is-good' }, '在线'),
-    mpDuration(num(r.durationSec)),
+    mpDurationShort(num(r.durationSec)),
     [r.reason && r.reason !== 'lost observation' ? r.reason : r.reason ? '未观测到离开' : '', r.closeCode ? mpCloseText[r.closeCode] ?? `关闭码 ${r.closeCode}` : ''].filter(Boolean).join(' · ') || dash,
     mpRegion(r.region)]), [3]))
 }
@@ -2802,7 +3247,7 @@ async function boot() {
   const legacy: Record<string, string> = { perf: 'breakdown', timeseries: 'trends', funnel: 'overview' }
   if (legacy[params.get('view') ?? '']) go({ view: legacy[params.get('view')!] }, false, true)
   else render()
-  refreshPending()
+  if (!['overview', 'feedback', 'users'].includes(currentView())) refreshPending()
 }
 boot()
 
