@@ -10,7 +10,7 @@ export type RailFace=(a:Vector3,b:Vector3,c:Vector3,color:Color,along:number[],k
 const ballast=new Color(style.ballast),steel=new Color(style.steel),panel=new Color(style.panel)
 const pole=new Color(style.pole),wire=new Color(style.wire),fence=new Color(style.fence)
 const sleeper=new Color(style.sleeper),warning=new Color(style.warning),concrete=new Color(look.bridgeSide)
-const BRIDGE=1,TUNNEL=2,ELECTRIC=4,FENCE=8,LEVEL=16,RESERVED=32,PAINTED=64,GRADED_LEVEL=128
+const BRIDGE=1,TUNNEL=2,ELECTRIC=4,FENCE=8,LEVEL=16,RESERVED=32,PAINTED=64
 
 export function railwayGeometry(sections:RailSection[],signs:CrossingSign[],ground:(x:number,z:number)=>number,
   roadLevel:(x:number,z:number,fallback:number)=>number,face:RailFace,box:Box,levelFace:(a:Vector3,b:Vector3,c:Vector3,color:Color,h:number,painted:boolean)=>void){
@@ -20,19 +20,18 @@ export function railwayGeometry(sections:RailSection[],signs:CrossingSign[],grou
     const len=Math.hypot(dx,dz)
     if(len<.005)continue
     const nx=-dz/len,nz=dx/len,yaw=-Math.atan2(dz,dx)
-    const legacyLevel=!!(flags&LEVEL)&&!(flags&GRADED_LEVEL)
     const at=(t:number,offset:number,h:number)=>{
       const east=x+t*dx+nx*offset,south=z+t*dz+nz*offset
       const y=(ay+(by-ay)*t)/100
-      return new Vector3(east,(legacyLevel?roadLevel(east,south,flags&PAINTED?ground(east,south):y):y)+h,south)
+      return new Vector3(east,((flags&LEVEL)?roadLevel(east,south,flags&PAINTED?ground(east,south):y):y)+h,south)
     }
     function strip(left:number,right:number,hLeft:number,hRight:number,color:Color,kind=7){
-      const count=legacyLevel?Math.ceil(len/.5):1
+      const count=flags&LEVEL?Math.ceil(len/.5):1
       for(let k=0;k<count;k++){
         const t=k/count,u=(k+1)/count
         const a=at(t,left,hLeft),b=at(u,left,hLeft),c=at(u,right,hRight),d=at(t,right,hRight)
         const s=chainage/100+t*len,e=chainage/100+u*len
-        if(legacyLevel){
+        if(flags&LEVEL){
           levelFace(a,c,b,color,hLeft,!!(flags&PAINTED))
           levelFace(a,d,c,color,hLeft,!!(flags&PAINTED))
         }else{

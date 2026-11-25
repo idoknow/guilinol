@@ -12,14 +12,5 @@
   "ballastHalfWidth": 1.7,
   "ballastSlope": 1.75,
   "sleeperSpacing": 0.6,
-  "mastSpacing": 50,
-  "stationLevels": {
-    "hallFloor": 155.05,
-    "platformRise": 0,
-    "approachGrade": 0.026,
-    "platformHeight": 1.25,
-    "structureDepth": 1.2,
-    "roadClearance": 4.5,
-    "overheadClearance": 7.5
-  }
+  "mastSpacing": 50
 }

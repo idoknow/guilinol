@@ -3,11 +3,10 @@ import {buildRoadBarriers} from './road-barriers'
 import * as THREE from 'three'
 import {look} from './look/config'
 type Pair=[number,number]
-type LevelPanel=[startX:number,startZ:number,endX:number,endZ:number,halfWidth:number,railY:number]
 type Path=[number,...Pair[][]]
 type RoadCtrl=[number,number[]]
 type Lower=[number,Pair[],[number,number,number,number][]]
-export type Streets=[Path[],Pair[],number[][],Pair[]?,Pair[]?,(RoadCtrl|null)?,number[][]?,number[][]?,number[][]?,number[][]?,Pair[][]?,(Lower|null)?,[number,number,number]?,LevelPanel[]?]
+export type Streets=[Path[],Pair[],number[][],Pair[]?,Pair[]?,(RoadCtrl|null)?,number[][]?,number[][]?,number[][]?,number[][]?,Pair[][]?,Lower?]
 const colors=look.streets.surfaces.map(v=>new THREE.Color(v)),tone=Object.fromEntries((['railing','lampPole','lampHead'] as const).map(k=>[k,new THREE.Color(look.streets[k])]))
 const stoneLight=new THREE.Color(0xa6a39a),stoneMid=new THREE.Color(0x8c8981),stoneBase=new THREE.Color(0x74726b)
 const parkingYellow=new THREE.Color(0xe7b62e)
@@ -40,16 +39,14 @@ function lowerHeight(x:number,z:number,base:number,terrain:number,[,corners,prof
   return terrain+factor*(base-terrain)
 }
 
-export function streetGeometry([paths,lamps,banks,signals=[],stops=[],roadCtrl,stoneRails=[],beds=[],shops=[],decor=[],curbCuts=[],lower,platform,panels=[]]:Streets,ground:(x:number,z:number)=>number,rails:RailSection[]=[],signs:CrossingSign[]=[],railGround:(x:number,z:number)=>number=ground){
+function streetGeometry([paths,lamps,banks,signals=[],stops=[],roadCtrl,stoneRails=[],beds=[],shops=[],decor=[],curbCuts=[],lower]:Streets,ground:(x:number,z:number)=>number,rails:RailSection[],signs:CrossingSign[],railGround:(x:number,z:number)=>number){
   const xyz:number[]=[],rgb:number[]=[],sidewalk:number[]=[],road:number[]=[],mats:number[]=[],cols:number[]=[]
   const baseLevel=(x:number,z:number)=>{const g=ground(x,z);return roadCtrl?Math.max(evalRoadCtrl(roadCtrl,x,z),g):g}
   const curbSegments=curbCuts.flatMap(line=>line.slice(1).map(([x,z],i)=>
     new THREE.Line3(new THREE.Vector3(line[i][0]/100,0,line[i][1]/100),new THREE.Vector3(x/100,0,z/100)))).filter(segment=>segment.distanceSq()>0)
   const testPoint=new THREE.Vector3(), closest=new THREE.Vector3()
-  let platformPath=false
   let lowerPath=false
   function vector(pt:THREE.Vector2,offset:number){
-    if(platformPath && platform)return new THREE.Vector3(pt.x,platform[2]+offset-.195,pt.y)
     if(offset===.195 && curbSegments.length){
       testPoint.set(pt.x,0,pt.y)
       let distance=2
@@ -82,25 +79,13 @@ export function streetGeometry([paths,lamps,banks,signals=[],stops=[],roadCtrl,s
     for(const pt of [p1,p2,p3]){xyz.push(pt.x,pt.y,pt.z);rgb.push(c.r,c.g,c.b);if(channel===1&&!vertical)sidewalk.push(pt.x,pt.y,pt.z);else if(channel===0&&!vertical)road.push(pt.x,pt.y,pt.z)}
   }
   for(const [index,[kind,...rings]] of paths.entries()){
-    platformPath=!!platform && index>=platform[0] && index<platform[1]
     lowerPath=!!lower && index>=lower[0]
     const loops=rings.map(ring=>ring.map(([x,z])=>new THREE.Vector2(x/100,z/100)))
     const tris=THREE.ShapeUtils.triangulateShape(loops[0],loops.slice(1)),points=loops.flat()
     const height=[.045,.195,.065,0,.195,.06,.195][kind]
     function tessellate(a:THREE.Vector2,b:THREE.Vector2,c:THREE.Vector2){
       const ab=a.distanceToSquared(b),bc=b.distanceToSquared(c),ca=c.distanceToSquared(a)
-      const longest=Math.max(ab,bc,ca)
-      if(longest<=16){
-        const x=(a.x+b.x+c.x)/3,z=(a.y+b.y+c.y)/3
-        const nearPanel=longest>1&&panels.some(([ax,az,bx,bz,half])=>{
-          const dx=bx-ax,dz=bz-az
-          const t=THREE.MathUtils.clamp(((x-ax)*dx+(z-az)*dz)/(dx*dx+dz*dz||1),0,1)
-          return Math.hypot(x-ax-t*dx,z-az-t*dz)<=half+4
-        })
-        // A four-metre face can bridge the curved shoulder of the flat
-        // crossing. Sample the actual fitted surface across its edge.
-        if(!nearPanel){triangle(vector(a,height),vector(c,height),vector(b,height),kind);return}
-      }
+      if(Math.max(ab,bc,ca)<=16){triangle(vector(a,height),vector(c,height),vector(b,height),kind);return}
       if(bc>ab&&bc>=ca){tessellate(b,c,a);return}if(ca>ab){tessellate(c,a,b);return}
       const mid=a.clone().lerp(b,.5);tessellate(a,mid,c);tessellate(mid,b,c)
     }
@@ -341,7 +326,7 @@ export type StreetData=ReturnType<typeof streetGeometry>
 export interface StreetRequest {id:number; paths:Streets; rails?:RailSection[]; signs?:CrossingSign[]; railCuts?:[number,number][]; step:number; elevations:Float32Array}
 export type StreetResponse={id:number; data:StreetData}|{id:number; error:string}
 
-if(typeof self!=='undefined')self.onmessage=({data:{id,paths,step,elevations,rails=[],signs=[],railCuts=[]}}:MessageEvent<StreetRequest>)=>{
+self.onmessage=({data:{id,paths,step,elevations,rails=[],signs=[],railCuts=[]}}:MessageEvent<StreetRequest>)=>{
   try {
     const segments=256/step, stride=segments+1
     const sample=(grid:Float32Array)=>(x:number,z:number)=>{

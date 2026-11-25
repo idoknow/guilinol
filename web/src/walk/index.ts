@@ -1868,7 +1868,9 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
     const inBore=tunnelFloor(manifest.tunnels,pos.x,pos.z,foot)!==undefined
     const floorMesh=inBore&&tile?stream.loaded.get(tile)?.tunnel?.floor:undefined
     floorMesh?.updateWorldMatrix(true,false)
-    const surfaces=floorMesh?[floorMesh]:mesh?[mesh]:[]
+    const fringe=tile&&stream.loaded.get(tile)?.tunnel?.fringe
+    fringe?.updateWorldMatrix(true,false)
+    const surfaces=floorMesh?[floorMesh]:[...(mesh?[mesh]:[]),...(fringe?[fringe]:[])]
     const renderY=terrainRay.intersectObjects(surfaces,false)[0]?.point.y
     const surf=sim.groundSurface(pos.x,pos.z,foot), soleY=figure.position.y+liveSoleLocalY()
     const surfaceY=surf?visualFloorAt(pos.x,pos.z,surf.y):undefined, footSink=surfaceY!==undefined?surfaceY-soleY:0

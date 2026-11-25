@@ -8,8 +8,7 @@ const root='public/world/',read=file=>JSON.parse(readFileSync(file))
 const manifest=read(root+'manifest.json'),tileIndex=new Map(manifest.chunks.map(tile=>[`${tile.x},${tile.z}`,tile]))
 const inventory=read('docs/railway-crossings.json').filter(row=>row.type==='level'&&row.status==='active')
 const crossings=new Map(inventory.map(row=>[row.sharedNode,ll2xz(row.lat,row.lon)]))
-assert.equal(inventory.length,169)
-assert.equal(crossings.size,118)
+assert.equal(crossings.size,119)
 const tileCache=new Map()
 function railsAt(x,z){
   const sections=[]

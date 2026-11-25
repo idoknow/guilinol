@@ -298,19 +298,12 @@ def build(bbox, output, palette, workers=4):
     if play_region:
         from airport import grade_terminal_lanes
         grade_terminal_lanes(terrain,original,left,top,GRID)
-    from protected_road_grades import ProtectedRoadGrades
-    protected_grades = ProtectedRoadGrades(left,top,terrain,original,road_ctrl) if play_region else None
-    from station_levels import grade_platforms
-    grade_platforms(terrain,original,surface,left,top)
-    from station_approaches import grade_station_junctions
-    grade_station_junctions(terrain,original,surface,road_ctrl,left,top)
     ground_mesh_at = build_ground_mesh_lookup(original, surface, left, top, width, depth)
     if play_region:
         from road_tunnels import corridor_underpasses
         underpasses = corridor_underpasses(bounds,ground_mesh_at)
         tunnels.extend(underpasses)
     finalize_bridges(ground_mesh_at)
-    rail_floors = {}
     if play_region:
         from road_tunnels import clear_cuizhu_overpass
         def ramp_height(x,z):
@@ -318,13 +311,6 @@ def build(bbox, output, palette, workers=4):
         clear_cuizhu_overpass(bridge_plans,ramp_height)
         from airport import grade_airport_interchange
         grade_airport_interchange(bridge_plans,ramp_height)
-        from railway_bridge_grades import grade_railway_roads
-        rail_floors, rail_crossings = grade_railway_roads(bridge_plans,tunnels,terrain,original,surface,road_ctrl,left,top,ground_mesh_at,protected_grades)
-        from nanxi_crossing import grade_channel
-        nanxi_bank = grade_channel({w["id"]:w for w in load_osm() if w["type"]=="way"},terrain,original,surface,left,top)
-        layers["water"].append(nanxi_bank)
-        wet[:] = surface != DRY
-        ground_mesh_at = build_ground_mesh_lookup(original,surface,left,top,width,depth)
 
     sw_query_tree = STRtree(list(polygons(sidewalk_mask))) if not sidewalk_mask.is_empty else None
     def tree_support_at(east: float, south: float) -> float:
@@ -426,7 +412,7 @@ def build(bbox, output, palette, workers=4):
     print('Vegetation:',dict(sorted(tree_stats.items())))
     landmark_faces = list(landmark_triangles(landmarks))
     vehicles = plan_vehicles(bounds, surface, layers['road'], footprints, sample, landmark_faces, interchange=interchange, grid_origin=(left,top))
-    decks, triangles = bridge_tiles(bounds, sample, vehicles['routes'], (), bridge_plans, west_portal=west_portal, canopies=canopies, rail_floors=rail_floors)
+    decks, triangles = bridge_tiles(bounds, sample, vehicles['routes'], (), bridge_plans, west_portal=west_portal, canopies=canopies)
     modeled_paving = unary_union([*layout.street_foundations, *rong_pavement, modeled_paving if modeled_paving is not None else ShapelyPolygon()])
     if fubo is not None:
         # The park paths are painted on the graded ground. An additional
@@ -450,8 +436,6 @@ def build(bbox, output, palette, workers=4):
             slab = xiaoyao_access.gallery_floor(east,south,entry['rotation'])
             for way in xiaoyao_access.GALLERY_PAVING_WAYS:
                 walkable_by_way[way] = walkable_by_way.get(way,ShapelyPolygon()).union(slab)
-    if play_region:
-        banks = [*banks,(nanxi_bank,"南溪","retainedChannel")]
     streets,lengths = street_chunks(roads,banks,bounds,layers['water'],sample,layout.exclude,ped_areas,comp_excl,road_ctrl,(left,top),ground_mesh_at,footprints,bands=bands,modeled_paving=modeled_paving,walkable_by_way=walkable_by_way,gate_plaza=gate_plaza,deck_mask=deck_mask)
     (output/'marking-audit.json').write_text(json.dumps(lengths.pop('markingOverlap')))
     print('Lengths (m):',lengths)
@@ -575,30 +559,16 @@ def build(bbox, output, palette, workers=4):
     bake_service_streets(output, manifest, palette)
     if play_region:
         from road_tunnels import clear_approach_paving
+        clear_approach_paving(output, chunks, underpasses)
         clear_carriageway_trees(output,chunks)
-        restore_protected_tiles(output,chunks,landmarks,protected_grades)
-        clear_approach_paving(output,chunks,underpasses+[t for t in tunnels if 'nodes' in t])
+        restore_protected_tiles(output,chunks,landmarks)
         from yulong_passage import open_passage
         open_passage(output, chunks)
         from railway_platforms import bake as bake_platforms
         bake_platforms(output, chunks, play_region.geometry)
-        from railway_pavement import bake as bake_railway_pavement, relocate_daylight_lamps
-        new_pavement = bake_railway_pavement(output,chunks,protected_grades,tunnels)
-        from railway_clearance import fit_rendered_underpasses
-        new_pavement.extend(fit_rendered_underpasses(output,manifest,rail_crossings))
-        relocate_daylight_lamps(output,chunks,tunnels)
-        protected_grades.mark_pavement(new_pavement)
-        from railway_vegetation import plant_graded_approaches
-        plant_graded_approaches(output,manifest,protected_grades)
-        from railway_cut_grades import paved_height, smooth_cuttings
-        cut_ways = {w['id']:w for w in load_osm() if w['type']=='way'}
-        abutments = {cut_ways[wid]['nodes'][end]:levels[end]
-                     for wid,(_,_,_,levels) in bridge_plans.items() if wid in cut_ways for end in (0,-1)}
-        smooth_cuttings(tunnels,cut_ways,paved_height(output,manifest),abutments)
-        del cut_ways
     write_city_lods(output, manifest)
     from traffic import bake as bake_traffic
-    bake_traffic(output, manifest, roads,protected_grades)
+    bake_traffic(output, manifest, roads)
     from npc_network import install as install_npc
     from npc_sidewalks import audit as audit_npc
     install_npc(output, audit_npc(output, manifest))

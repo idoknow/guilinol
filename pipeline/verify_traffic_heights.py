@@ -19,18 +19,9 @@ def verify():
     nodes = {node['id']:node for node in graph['nodes']}
     errors, fuxing, parking = [], [], []
     separated = []
-    tunnels = {t['way']:t for t in json.loads((WORLD/'manifest.json').read_bytes()).get('tunnels', [])}
     for lane in graph['lanes']:
         start, end = nodes[lane['from']], nodes[lane['to']]
-        if lane.get('gradeSeparated')=='tunnelProfile':
-            tunnel = tunnels[lane['tunnelWay']]
-            knots = tunnel['stations']
-            opposite = math.hypot(start['x']-tunnel['portals'][1][0],start['z']-tunnel['portals'][1][2])<.02
-            if opposite:
-                knots = [(tunnel['length']-d,y) for d,y in reversed(knots)]
-            expected = [v for d,y in knots for v in (d/tunnel['length'],y)]
-            assert expected == lane['heights'], f"Lane {lane['id']} diverges from its tunnel floor"
-        elif lane.get('gradeSeparated') and lane['gradeSeparated']!='jiefang':
+        if lane.get('gradeSeparated') and lane['gradeSeparated']!='jiefang':
             heights = lane.get('heights',[0,start['y'],1,end['y']])
             separated.append(max(abs(level-((1-fraction)*start['y']+fraction*end['y']))
                                  for fraction,level in zip(heights[::2],heights[1::2])))

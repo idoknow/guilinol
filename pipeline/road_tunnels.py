@@ -49,10 +49,7 @@ def bake(bounds, fields, left, top, grid):
 
 def corridor_underpasses(bounds, height):
     """Two straight OSM layer -1 underpasses on the approved T2 driving route."""
-    from shapely.geometry import LineString, Point
-    from station_levels import TUNNEL_FLOOR, UNDERPASS
-    import json
-    from pathlib import Path
+    from shapely.geometry import LineString
 
     widths = {690911289: 4.5, 1494511149: 4.0}
     result = []
@@ -70,29 +67,6 @@ def corridor_underpasses(bounds, height):
         direction = (end-start)/length
         lateral = np.array([-direction[1],direction[0]])
         first,last = height(*start),height(*end)
-        if way['id'] == UNDERPASS:
-            inventory = json.loads((Path(__file__).resolve().parents[1]/'docs/railway-crossings.json').read_text())
-            track_stations = [LineString(points).project(Point(ll2xz(r['lat'],r['lon'])))
-                              for r in inventory if r['road']==UNDERPASS and r['type']=='rail_over']
-            first_cover, last_cover = min(track_stations)-2, max(track_stations)+2
-            ramps = [first_cover,length-last_cover]
-            # Preserve the surface portals at the protected road approaches.
-            # Each end has a parabolic vertical curve into and out of the grade.
-            stations = []
-            for at in sorted({0.,length,first_cover,last_cover,*np.arange(1.,length,1.)}):
-                level = TUNNEL_FLOOR
-                for distance,run,mouth in ((at,ramps[0],first),(length-at,ramps[1],last)):
-                    if distance<run:
-                        ease = min(1.,run/3)
-                        integral = (max(0,distance)**2-max(0,distance-ease)**2
-                                    -max(0,distance-run+ease)**2)/(2*ease)
-                        level = mouth + (TUNNEL_FLOOR-mouth)*integral/(run-ease)
-                stations.append([float(at),round(float(level),5)])
-            result.append(dict(way=UNDERPASS,profile_source='station_railhead',length=length,
-                               portals=[[start[0],first,start[1]],[end[0],last,end[1]]],
-                               halfWidth=widths[UNDERPASS],clearance=4.5,approach=ramps[0],
-                               approachEnds=ramps,stations=stations))
-            continue
         stations = []
         for at in sorted({0.,length,approach,length-approach,*np.arange(4.,length,4.)}):
             fraction = at/length
@@ -127,12 +101,7 @@ def clear_cuizhu_overpass(plans, road_height):
         for i,s in enumerate(stations):
             point = line.interpolate(float(s))
             for center,level in targets:
-                distance = max(0.,point.distance(center)-12)
-                # Ease from the horizontal deck into the 5% approach over 12 m.
-                fall = .05*(distance**2/24 if distance<12 else distance-6)
-                floor = level-fall
-                blend = max(.6-abs(levels[i]-floor),0.)
-                levels[i] = max(levels[i],floor)+blend**2/2.4
+                levels[i] = max(levels[i],level-.05*max(0.,point.distance(center)-12))
 
 
 def clear_approach_paving(output, chunks, underpasses):
@@ -147,10 +116,8 @@ def clear_approach_paving(output, chunks, underpasses):
     ramps = []
     for tunnel in underpasses:
         line = LineString([(x,z) for x,_,z in tunnel['portals']])
-        first,last = tunnel.get('openEnds',tunnel.get('approachEnds', [tunnel['approach']]*2))
-        for mouth,(start,end) in zip(tunnel.get('mouths',(True,True)),((0,first),(line.length-last,line.length))):
-            if end<=start or not mouth and 'openEnds' not in tunnel:
-                continue
+        approach = tunnel['approach']
+        for start,end in ((0,approach), (line.length-approach,line.length)):
             segment = LineString([line.interpolate(start),line.interpolate(end)])
             ramps.append(segment.buffer(tunnel['halfWidth'], cap_style='flat'))
     cut = union_all(ramps)
@@ -167,21 +134,17 @@ def clear_approach_paving(output, chunks, underpasses):
         streets = collision[1]
         lower = streets[11] if len(streets)>11 else None
         paths = []
-        boundaries = []
-        for item in streets[0]:
-            boundaries.append(len(paths))
+        for i,item in enumerate(streets[0]):
+            if lower and i==lower[0]:
+                first_lower = len(paths)
             kind,*loops = item
             shape = make_valid(Polygon(np.asarray(loops[0])/100, [np.asarray(r)/100 for r in loops[1:]]))
             if shape.intersects(local):
                 paths.extend(rings(kind,shape.difference(local)))
             else:
                 paths.append(item)
-        boundaries.append(len(paths))
         if lower:
-            lower[0] = boundaries[lower[0]]
-        if len(streets)>12 and streets[12]:
-            platform = streets[12]
-            platform[:2] = [boundaries[i] for i in platform[:2]]
+            lower[0] = first_lower if lower[0]<len(streets[0]) else len(paths)
         streets[0] = paths
         encoded = json.dumps(collision,separators=(',',':')).encode()
         payload = raw[:12]+struct.pack('<I',len(encoded))+raw[16:start]+encoded+raw[start+size:]

@@ -21,7 +21,6 @@
     "prebuild": "npm run basis",
     "landmarks": "uv run --locked python pipeline/pack_landmarks.py",
     "world": "uv run --locked python pipeline/world.py",
-    "audit:railway-road-grades": "tsx scripts/railway-structure-movement.ts --check-grades",
     "audit:grounding": "uv run --locked python pipeline/audit_grounding.py",
     "audit:seams": "uv run --locked python pipeline/audit_seams.py",
     "audit:landmarks": "uv run --locked python pipeline/audit_landmarks.py",

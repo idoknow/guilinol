@@ -2,6 +2,7 @@
 import argparse
 from collections import defaultdict
 import gzip
+import heapq
 import json
 import math
 from pathlib import Path
@@ -10,107 +11,57 @@ import struct
 import subprocess
 
 import numpy as np
-from shapely import LineString, Point, STRtree, box, get_parts, points as point_array, union_all
-from shapely.affinity import translate
+from shapely import LineString, Point, STRtree, box, points as point_array
 
-from common import CHUNK, load_dem, load_osm, ll2xz
-from features import area, points
+from common import CHUNK, load_osm, ll2xz
+from features import points
 from landmarks.world_surface import Surface
 from play_region import PlayRegion
 from railway_layout import lines
 from road_profile import RULES
 from service_streets import width
-from station_levels import FOOTBRIDGE, PLATFORMS, RAIL, UNDERPASS
-from station_approaches import approach_junctions, approach_exceptions
 
 ROOT = Path(__file__).resolve().parents[1]
-BRIDGE, TUNNEL, ELECTRIC, FENCE, LEVEL, RESERVED, PAINTED, GRADED_LEVEL = 1, 2, 4, 8, 16, 32, 64, 128
+BRANCH=678370321
+BRANCH_PINS=(6533456498,6533456500)
+BRANCH_BRIDGES=(1017592858,213171576)
+MAIN_LINES=('衡柳','湘桂','贵广')
 
 
-def parallel_segments(pieces, coords, ways):
-    """Compare linear profiles at matching perpendicular chainages on both tracks."""
-    surface = {wid for wid,way in ways.items() if way.get('tags',{}).get('railway')=='rail'
-               and all(way['tags'].get(k,'no')=='no' for k in ('bridge','tunnel'))}
-    rows = [piece for piece in pieces if piece[4] in surface]
-    if not rows:
-        return None
-    indices = np.array([[i, j] for i, j, *_ in rows])
-    endpoints = np.asarray(coords)[indices]
-    delta = endpoints[:, 1] - endpoints[:, 0]
-    lengths = np.linalg.norm(delta, axis=1)
-    axes = delta / lengths[:, None]
-    lines = [LineString(pair) for pair in endpoints]
-    source, target = STRtree(lines).query(lines, predicate='dwithin', distance=8)
-    way_ids = np.array([row[4] for row in rows])
-    layers = np.array([ways[k]['tags'].get('layer', '0') for k in way_ids])
-    cosine = np.sum(axes[source] * axes[target], axis=1)
-    keep = ((way_ids[source] != way_ids[target]) & (layers[source] == layers[target])
-            & (abs(cosine) >= math.cos(math.radians(10))))
-    source, target = source[keep], target[keep]
-    # Clip the source segment to both the target chainage interval and its
-    # eight-metre strip. Height difference is linear between these endpoints.
-    offset = endpoints[source, 0] - endpoints[target, 0]
-    along = np.sum(offset * axes[target], axis=1)
-    normal = axes[target][:, ::-1].copy()
-    normal[:, 0] *= -1
-    across = np.sum(offset * normal, axis=1)
-    lo, hi = np.zeros(len(source)), np.ones(len(source))
-    for start, step, minimum, maximum in (
-        (along, np.sum(delta[source] * axes[target], axis=1), 0, lengths[target]),
-        (across, np.sum(delta[source] * normal, axis=1), -8, 8),
-    ):
-        moving = abs(step) > 1e-10
-        divisor = np.where(moving, step, 1)
-        a, b = (minimum - start) / divisor, (maximum - start) / divisor
-        lo = np.maximum(lo, np.where(moving, np.minimum(a, b), 0))
-        hi = np.minimum(hi, np.where(moving, np.maximum(a, b),
-                                     np.where((start >= minimum) & (start <= maximum), 1, -1)))
-    valid = hi >= lo
-    source, target = source[valid], target[valid]
-    if not len(source):
-        return None
-    fraction = np.stack((lo[valid], hi[valid]), axis=1)
-    xy = endpoints[source, :1] + fraction[:, :, None] * delta[source, None]
-    station = np.sum((xy - endpoints[target, :1]) * axes[target, None], axis=2)
-    return (indices[source], indices[target], fraction, station / lengths[target, None],
-            xy, way_ids[source], way_ids[target])
+def branch_ramp(stations, start_y, end_y, start_grade, end_grade):
+    # Integrate a continuous grade: parabolic transitions on the first and
+    # last four metres, and the least constant grade joining these endpoints.
+    length=stations[-1]-stations[0]
+    transition=min(4.,length/3)
+    grade=(end_y-start_y-transition*(start_grade+end_grade)/2)/(length-transition)
+    grades=[start_grade,grade,grade,end_grade]
+    breaks=np.array([0,transition,length-transition,length])
+    rises=np.r_[0,np.cumsum(np.diff(breaks)*(np.array(grades[:-1])+grades[1:])/2)]
+    x=stations-stations[0]
+    i=np.clip(np.searchsorted(breaks,x,side='right')-1,0,2)
+    dx=x-breaks[i]
+    y=start_y+rises[i]+dx*(np.array(grades)[i]+np.interp(x,breaks,grades))/2
+    return y,grade
 
 
-def parallel_height_audit(pieces, coords, height, ways):
-    pairs = parallel_segments(pieces, coords, ways)
-    result = dict(directedSegmentPairs=0, over5cm=0, maximumM=0)
-    if pairs is None:
-        return result
-    a, b, along_a, along_b, xy, way_a, way_b = pairs
-    result['directedSegmentPairs'] = len(a)
-    source_y = height[a[:, :1]] + along_a * np.diff(height[a], axis=1)
-    target_y = height[b[:, :1]] + along_b * np.diff(height[b], axis=1)
-    diff = abs(source_y - target_y)
-    pair, end = np.unravel_index(diff.argmax(), diff.shape)
-    result.update(over5cm=int(np.count_nonzero(diff.max(axis=1) > .050001)),
-                  maximumM=float(diff[pair, end]), ways=[int(way_a[pair]), int(way_b[pair])],
-                  xz=xy[pair, end].tolist(), railheadM=[source_y[pair, end], target_y[pair, end]])
-    return result
+BRIDGE, TUNNEL, ELECTRIC, FENCE, LEVEL, RESERVED, PAINTED = 1, 2, 4, 8, 16, 32, 64
 
 
-def station_yards(ways):
-    """Group surveyed platforms, then extend each yard 50 m along its long axis."""
-    platforms = {key: area(way) for key, way in ways.items()
-                 if way.get('tags', {}).get('railway') == 'platform'
-                 and way['tags'].get('monorail') != 'yes'}
-    # Group neighbouring platforms; use the original footprints for the actual
-    # envelope so the grouping distance does not extend the station ends.
-    groups = union_all([poly.buffer(20) for poly in platforms.values()])
-    for group in get_parts(groups):
-        members = {key: poly for key, poly in platforms.items() if group.intersects(poly)}
-        platform_hull = union_all(list(members.values())).convex_hull
-        corners = np.asarray(platform_hull.minimum_rotated_rectangle.exterior.coords)
-        edges = np.diff(corners, axis=0)
-        axis = edges[np.linalg.norm(edges, axis=1).argmax()]
-        dx, dz = axis * (50 / np.linalg.norm(axis))
-        yard = union_all([translate(platform_hull, dx, dz),
-                          translate(platform_hull, -dx, -dz)]).convex_hull
-        yield sorted(members), yard
+def envelope(graph, targets, origins=None):
+    """Highest allowed level from all upper anchors, in one graph traversal."""
+    levels = np.array(targets, dtype=float)
+    queue = [(y, i) for i,y in enumerate(levels) if math.isfinite(y)]
+    heapq.heapify(queue)
+    while queue:
+        level, i = heapq.heappop(queue)
+        if level > levels[i]:
+            continue
+        for j, rise in graph[i]:
+            if level + rise < levels[j]:
+                levels[j] = level + rise
+                if origins is not None: origins[j] = origins[i]
+                heapq.heappush(queue, (levels[j], j))
+    return levels
 
 
 def road_radius(tags):
@@ -127,8 +78,8 @@ def stations(line, interval):
     return set(vertices) | set(np.arange(0., line.length, interval))
 
 
-def bake(world_dir, manifest, inventory, samples, plan_profile=False, rail_only=False):
-    world = None if rail_only else Surface(world_dir, manifest)
+def bake(world_dir, manifest, inventory, samples):
+    world = Surface(world_dir, manifest)
     region = PlayRegion()
     ways = {way['id']:way for way in load_osm() if way['type']=='way'}
     by_way = defaultdict(list)
@@ -136,7 +87,7 @@ def bake(world_dir, manifest, inventory, samples, plan_profile=False, rail_only=
         by_way[row['rail']].append(row)
     road_zones = []
     surface_roads = []
-    for way in (() if rail_only else ways.values()):
+    for way in ways.values():
         tags = way.get('tags', {})
         if 'highway' in tags and tags['highway'] != 'construction' and len(way['geometry'])>=2:
             zone=LineString(points(way)).buffer(road_radius(tags), quad_segs=2)
@@ -144,30 +95,33 @@ def bake(world_dir, manifest, inventory, samples, plan_profile=False, rail_only=
             if tags.get('bridge','no')=='no':
                 surface_roads.append(zone)
     protected = STRtree(road_zones)
-    nodes, coords = {}, []
+    nodes, coords, ground, graph = {}, [], [], []
     def vertex(p):
         key = tuple(round(v, 4) for v in p.coords[0])
         if key not in nodes:
             nodes[key] = len(coords)
             coords.append(key)
+            ground.append(world.sample(*p.coords[0], include_peaks=False)[0])
+            graph.append([])
         return nodes[key]
 
+    anchors = {}
+    constraints = []
     crossing_data = []
     portal_nodes = set()
-    tunnels = defaultdict(list)
-    for tunnel in manifest.get('tunnels', []):
-        tunnels[tunnel['way']].append(tunnel)
+    tunnels = {t['way']:t for t in manifest.get('tunnels', [])}
     review=json.loads((ROOT/'pipeline/railway-review.json').read_bytes())
     absent_structures=set()
+    branch_report={}
     sign_sites = defaultdict(list)
     signed = set()
     used_sites = []
     missing_signs = []
     rail_corridors = STRtree([LineString(points(w)) for w in ways.values() if w.get('tags',{}).get('railway')=='rail'])
-    yards = list(station_yards(ways))
-    station_area = next(yard for ids,yard in yards if PLATFORMS.intersection(ids))
-    station_nodes = set()
     pieces = []
+    approved = json.loads((ROOT/'docs/railway-grades.json').read_bytes())['gradeConflicts']
+    for row in approved:
+        assert {row['start'],row['end']} in ({4514289414,6635078447},{4505338292,4514289414})
     for way in ways.values():
         tags = way.get('tags', {})
         if tags.get('railway') != 'rail':
@@ -175,16 +129,13 @@ def bake(world_dir, manifest, inventory, samples, plan_profile=False, rail_only=
         original = LineString(points(way))
         for line in lines(original.intersection(region.geometry)):
             stops = stations(line, 12)
-            surface_track = all(tags.get(k,'no')=='no' for k in ('bridge','tunnel')) and tags.get('layer','0')=='0'
-            if surface_track and line.intersects(station_area):
-                for part in lines(line.intersection(station_area)):
-                    stops.update(line.project(Point(part.coords[k])) for k in (0,-1))
             gaps = []
             base = BRIDGE if tags.get('bridge','no')!='no' else 0
             if tags.get('tunnel','no')!='no': base |= TUNNEL
             if tags.get('electrified') in ('yes','contact_line'): base |= ELECTRIC
             service = tags.get('service')
             if not service: base |= FENCE
+            anchor_stations = {}
             if base&TUNNEL:
                 for end in (0,-1):
                     tip = Point(original.coords[end])
@@ -197,21 +148,21 @@ def bake(world_dir, manifest, inventory, samples, plan_profile=False, rail_only=
                 at = line.project(p)
                 street = ways[row['road']]
                 zone = LineString(points(street)).buffer(road_radius(street['tags'])+1)
+                first_gap=len(gaps)
                 for overlap in lines(line.intersection(zone)):
                     lo, hi = sorted(line.project(Point(c)) for c in (overlap.coords[0],overlap.coords[-1]))
                     if lo-.02<=at<=hi+.02:
-                        flag = (RESERVED if row['status']=='pending_road_tunnel' and not tunnels.get(row['road']) else
+                        flag = (RESERVED if row['status']=='pending_road_tunnel' else
                                 LEVEL if row['type']=='level' else BRIDGE if row['type']=='rail_over' else 0)
-                        if flag==LEVEL and not rail_only:
+                        if flag==LEVEL:
                             surface=samples[str(row['sharedNode'])]
                             if surface['road'] is None and surface['deck'] is None: flag|=PAINTED
                         gaps.append((lo,hi,flag))
                         stops.update((lo,hi))
                 stops.add(at)
-                is_level = row['type']=='level'
-                if rail_only:
-                    crossing_data.append((vertex(line.interpolate(at)),row,None,None,None))
+                if row['status'] not in ('active','pending_road_structure'):
                     continue
+                is_level = row['type']=='level'
                 key = str(row['sharedNode']) if is_level else (row['rail'],row['road'],row['lat'],row['lon'])
                 hit = samples[key]
                 surface_source='carriageway'
@@ -219,16 +170,15 @@ def bake(world_dir, manifest, inventory, samples, plan_profile=False, rail_only=
                 if (row['type']=='road_over' or is_level and road is None) and hit['deck'] is not None:
                     surface_source='deck'
                     road = hit['deck']
-                sections=tunnels.get(row['road'], ()) if row['type']=='rail_over' else ()
-                for tunnel in sections:
+                tunnel=tunnels.get(row['road'])
+                if tunnel and row['type']=='rail_over':
                     ends=np.asarray(tunnel['portals'])[:,[0,2]]
                     direction=(ends[1]-ends[0])/tunnel['length']
                     offset=np.asarray(p.coords[0])-ends[0]
                     along=offset@direction
-                    if -.02<=along<=tunnel['length']+.02 and abs(offset@[-direction[1],direction[0]])<=tunnel['halfWidth']:
+                    if 0<=along<=tunnel['length'] and abs(offset@[-direction[1],direction[0]])<=tunnel['halfWidth']:
                         surface_source='tunnel_profile'
                         road=float(np.interp(along,*np.asarray(tunnel['stations']).T))
-                        break
                 if road is None and row['roadTags']['highway'] in ('footway','cycleway','path','steps','pedestrian') and hit['sidewalk'] is not None:
                     road=hit['sidewalk']
                     surface_source='sidewalk'
@@ -262,15 +212,50 @@ def bake(world_dir, manifest, inventory, samples, plan_profile=False, rail_only=
                             missing_signs.append(dict(node=row['sharedNode'],approach=side))
                 soffit=hit['soffit'] if hit['soffit'] is not None else road-1.2
                 crossing_data.append((vertex(line.interpolate(at)),row,road,axis,soffit))
-                if not is_level and row['type']=='rail_over' and row['roadTags'].get('tunnel')=='yes' and surface_source=='terrain_proxy':
-                    absent_structures.add((row['rail'],row['road']))
+                if is_level:
+                    anchor_stations[row['sharedNode']] = at
+                    anchors[vertex(line.interpolate(at))] = road
+                elif row['type']=='rail_over':
+                    if row['roadTags'].get('tunnel')=='yes' and surface_source=='terrain_proxy' and not tunnel:
+                        absent_structures.add((row['rail'],row['road']))
+                        gaps[first_gap:]=[(lo,hi,RESERVED) for lo,hi,_ in gaps[first_gap:]]
+                        continue
+                    clearance = 2.5 if row['roadTags']['highway'] in ('footway','cycleway','path','steps','pedestrian') else 4.5
+                    constraints.append((vertex(line.interpolate(at)),road+clearance+1.2,'min',row))
+                else:
+                    clearance = 6.55 if base&ELECTRIC else 5.5
+                    constraints.append((vertex(line.interpolate(at)),soffit-clearance,'max',row))
+            exceptions = []
+            for item in approved:
+                if {item['start'],item['end']} <= anchor_stations.keys():
+                    left,right=sorted((anchor_stations[item['start']],anchor_stations[item['end']]))
+                    exceptions.append((left,right,item['requiredPermille']/1000+.00001))
+            local_grade=None
+            if way['id']==BRANCH and all(node in anchor_stations for node in BRANCH_PINS):
+                local_grade=sorted(anchor_stations[node] for node in BRANCH_PINS)
+                stops.update(np.arange(local_grade[0],local_grade[1],1.))
+                for value in local_grade: stops.add(value)
             distances = sorted(stops)
             verts = [vertex(line.interpolate(s)) for s in distances]
-            if surface_track:
-                station_nodes.update(i for i in verts if station_area.distance(Point(coords[i]))<.001)
+            if local_grade:
+                branch_stations=np.array(distances)
+                branch_vertices=np.array(verts)
+                branch_interval=local_grade
             for lo,hi,i,j in zip(distances,distances[1:],verts,verts[1:]):
                 if i==j: continue
                 mid=(lo+hi)/2
+                grade=.01198
+                if service in ('spur','siding','yard','crossover') or tags.get('usage')=='branch':
+                    grade=.02498
+                if any(name in tags.get('name','') for name in MAIN_LINES) or (way['id']==BRANCH and not (local_grade and local_grade[0]<=mid<=local_grade[1])):
+                    grade=.01198
+                for left,right,g in exceptions:
+                    if left<=mid<=right: grade=g
+                # Bound the rendered chord as well as the source chainage.
+                chord=math.dist(coords[i],coords[j])
+                rise=max(0,chord*grade-.000004)
+                graph[i].append((j,rise))
+                graph[j].append((i,rise))
                 flags = base
                 for left,right,flag in gaps:
                     if left<=mid<=right:
@@ -278,44 +263,75 @@ def bake(world_dir, manifest, inventory, samples, plan_profile=False, rail_only=
                         flags &= ~FENCE
                 pieces.append((i,j,lo,flags,way['id']))
 
-    ground = load_dem(*np.asarray(coords).T, paired=True).astype(float)
-    from railway_profile import solve
-    # Dingjiang is a mapped train depot with yard tracks but no passenger
-    # platforms. Its service crossings share a single yard datum.
-    depot = ways.get(973038882)
-    if depot and depot['tags'].get('landuse') == 'railway':
-        yards.append(([depot['id']], area(depot)))
-    height, profile = solve(coords,pieces,ways,ground+.35,crossing_data,yards,parallel_segments(pieces,coords,ways))
-    if rail_only:
-        return [dict(rail=row['rail'], road=row['road'], type=row['type'], railY=float(height[node]),
-                     x=coords[node][0], z=coords[node][1], lat=row['lat'], lon=row['lon'],
-                     surfaceRoad=all(row['roadTags'].get(k,'no')=='no' for k in ('bridge','tunnel')))
-                for node,row,*_ in crossing_data], profile['panels']
+    ground = np.array(ground)
+    lows=np.full(len(ground),-np.inf)
+    highs=np.full(len(ground),np.inf)
+    low_refs,high_refs={},{}
+    for i,bound,kind,row in constraints:
+        if kind=='min' and bound>lows[i]:
+            lows[i],low_refs[i]=bound,row
+        if kind=='max' and bound<highs[i]:
+            highs[i],high_refs[i]=bound,row
+    for i,row,y,_,_ in crossing_data:
+        if row['type']=='level':
+            lows[i]=highs[i]=y
+            low_refs[i]=high_refs[i]=row
+    low_origins=np.arange(len(ground))
+    high_origins=low_origins.copy()
+    floor=-envelope(graph,-lows,low_origins)
+    ceiling=envelope(graph,highs,high_origins)
+    target=ground+.35
+    smooth=(envelope(graph,target)-envelope(graph,-target))/2
+    height=np.maximum(floor,np.minimum(smooth,ceiling))
+    # Fixed road anchors always prevail. Propagate them over the same graph
+    # to preserve track continuity and enforce the grade outside exceptions.
+    pin_upper=np.full(len(ground),np.inf)
+    pin_lower=np.full(len(ground),-np.inf)
+    for i,y in anchors.items(): pin_upper[i]=pin_lower[i]=y
+    height=np.clip(height,-envelope(graph,-pin_lower),envelope(graph,pin_upper))
+    # On the Guilin–Haiyang branch keep the entire measured bridge footprint
+    # clear, including the two rail heads. Tie back to the existing tangents.
+    bs=branch_stations
+    left,right=np.searchsorted(bs,branch_interval)
+    deck=[(float(k.split(':')[1]),v['soffit']) for k,v in samples.items()
+          if isinstance(k,str) and k.startswith('branch:') and v['soffit'] is not None]
+    west=np.searchsorted(bs,min(s for s,_ in deck)-1)-1
+    east=np.searchsorted(bs,max(s for s,_ in deck)+1)
+    plateau=min(y for _,y in deck)-5.5-.015
+    g0=(height[branch_vertices[left]]-height[branch_vertices[left-1]])/(bs[left]-bs[left-1])
+    g1=(height[branch_vertices[right+1]]-height[branch_vertices[right]])/(bs[right+1]-bs[right])
+    descent,down=branch_ramp(bs[left:west+1],height[branch_vertices[left]],plateau,g0,0)
+    ascent,up=branch_ramp(bs[east:right+1],plateau,height[branch_vertices[right]],0,g1)
+    if max(abs(down),abs(up))>.025: raise ValueError('Branch vertical curve exceeds the approved local grade')
+    fixed=np.r_[height[branch_vertices[left-1]],descent,np.full(east-west-1,plateau),ascent,height[branch_vertices[right+1]]]
+    ids=branch_vertices[left-1:right+2]
+    pin_upper[ids]=fixed
+    pin_lower[ids]=fixed
+    height=np.clip(height,-envelope(graph,-pin_lower),envelope(graph,pin_upper))
+    branch_report=dict(type='branch_local_grade',rail=BRANCH,capPermille=25,
+        endpointConstraints=[dict(node=n,stationM=round(float(bs[i]),3),roadY=round(float(height[branch_vertices[i]]),4))
+                             for n,i in zip(BRANCH_PINS,[left,right])],roadBridges=BRANCH_BRIDGES,
+        minimumSoffitM=min(y for _,y in deck),plateauRailY=plateau,plateauStationsM=[bs[west],bs[east]],
+        tangentPermille=[1000*down,1000*up],transitionLengthM=4)
     violations=[]
-    dependencies={tuple([rail,road]):int(missing) for missing,records in review['missingTunnelDependencies'].items()
-                  for rail,road,witness in records if (witness,int(missing)) in absent_structures}
-    measured=[]
-    for i,r,road,axis,soffit in crossing_data:
-        clearance = (height[i]-1.2-road if r['type']=='rail_over' else
-                     soffit-height[i] if r['type']=='road_over' else None)
-        missing=dependencies.get((r['rail'],r['road']))
-        if (r['rail'],r['road']) in absent_structures:
-            clearance=None
-        if r['type'] in ('rail_over','road_over') and clearance is not None:
-            required = 4.5 if r['type']=='rail_over' else 7.5
-            if clearance < required-.001:
-                violations.append(dict(rail=r['rail'],road=r['road'],lat=r['lat'],lon=r['lon'],
-                                       type=r['type'],shortfallM=round(required-clearance,4)))
-        measured.append(dict(originalSoffitM=round(float(soffit),4) if r['type']=='road_over' else None, roadStructureDependency=missing,surfaceSource=r['surfaceSource'],rail=r['rail'],road=r['road'],type=r['type'],sharedNode=r['sharedNode'],
-                             x=coords[i][0],z=coords[i][1],east=round(axis[0],6),south=round(axis[1],6),
-                             railY=round(height[i],4),roadY=round(road,4),
-                             clearanceM=None if clearance is None else round(clearance,4)))
-    if plan_profile:
-        from railway_road_profiles import road_profile_constraints
-        profile['roads'] = road_profile_constraints(ways,measured,profile['panels'])
-        profile['crossings'] = measured
-        return dict(profile=profile,stationRailheadM=RAIL,stationNodes=len(station_nodes),
-                    parallelRailHeight=parallel_height_audit(pieces, coords, height, ways))
+    for i,bound,kind,row in constraints:
+        miss=bound-height[i] if kind=='min' else height[i]-bound
+        if miss>.001:
+            if kind=='min':
+                source=high_origins[i]
+                witness=high_refs[source]
+                allowed=ceiling[i]-highs[source]
+                limit=ceiling[i]
+            else:
+                source=low_origins[i]
+                witness=low_refs[source]
+                allowed=lows[source]-floor[i]
+                limit=floor[i]
+            evidence={key:witness[key] for key in ('rail','road','sharedNode','type','surfaceSource','lat','lon')}
+            violations.append(dict(rail=row['rail'],road=row['road'],type=row['type'],
+                lat=row['lat'],lon=row['lon'],surfaceSource=row['surfaceSource'],shortfallM=round(miss,3),
+                requiredRailY=round(bound,4),boundDirection=kind,opposingGradeLimitY=round(limit,4),
+                permittedRiseFromWitnessM=round(allowed,4),witness=evidence))
     tiles=defaultdict(list)
     maximum_grade=defaultdict(float)
     for i,j,station,flags,way_id in pieces:
@@ -339,11 +355,9 @@ def bake(world_dir, manifest, inventory, samples, plan_profile=False, rail_only=
             # or fence and its half-width, around every active road corridor.
             safe=not len(protected.query(LineString([p+origin,q+origin]), predicate='dwithin',distance=4.5))
             localflags=flags if safe else ((flags & ~FENCE)|RESERVED)
-            if flags & LEVEL:
-                localflags |= GRADED_LEVEL
             portal = int(i in portal_nodes and s==0) + 2*int(j in portal_nodes and t==1)
             # Keep sub-centimetre rise on very short pieces at tile and road edges.
-            encoded=[round(float(v)*100,6) for v in (*p,levels[0],*q,levels[1])]
+            encoded=[round(float(v)*100,4) for v in (*p,levels[0],*q,levels[1])]
             span=math.hypot(encoded[3]-encoded[0],encoded[4]-encoded[1])
             tags=ways[way_id]['tags']
             category='branch' if tags.get('usage')=='branch' else 'service' if tags.get('service') else 'main'
@@ -406,19 +420,36 @@ def bake(world_dir, manifest, inventory, samples, plan_profile=False, rail_only=
         payload=data[:12]+struct.pack('<I',len(packed))+data[16:start]+packed+data[start+size:]
         file.write_bytes(gzip.compress(payload,mtime=0))
         tile['bytes']=file.stat().st_size
-    return dict(stationRailheadM=RAIL,stationNodes=len(station_nodes),
-                parallelRailHeight=parallel_height_audit(pieces, coords, height, ways),
-                crossings=measured,maxEncodedGradePermille=maximum_grade,missingSigns=missing_signs,treesRemoved=trees_removed,signs=sum(map(len,sign_sites.values())),tiles=len(tiles), segments=sum(map(len,tiles.values())), fixedNodes=len(station_nodes),
-                maxPinErrorM=max(abs(height[i]-RAIL) for i in station_nodes), clearanceConflicts=violations)
+    dependencies={tuple([rail,road]):int(missing) for missing,records in review['missingTunnelDependencies'].items()
+                  for rail,road,witness in records if (witness,int(missing)) in absent_structures}
+    measured=[]
+    for i,r,road,axis,soffit in crossing_data:
+        clearance = (height[i]-1.2-road if r['type']=='rail_over' else
+                     soffit-height[i] if r['type']=='road_over' else None)
+        missing=dependencies.get((r['rail'],r['road']))
+        if (r['rail'],r['road']) in absent_structures:
+            clearance=None
+        measured.append(dict(roadStructureDependency=missing,surfaceSource=r['surfaceSource'],rail=r['rail'],road=r['road'],type=r['type'],sharedNode=r['sharedNode'],
+                             x=coords[i][0],z=coords[i][1],east=round(axis[0],6),south=round(axis[1],6),
+                             railY=round(height[i],4),roadY=round(road,4),
+                             clearanceM=None if clearance is None else round(clearance,4)))
+    return dict(branchLocalGrade=branch_report,crossings=measured,maxEncodedGradePermille=maximum_grade,missingSigns=missing_signs,treesRemoved=trees_removed,signs=sum(map(len,sign_sites.values())),tiles=len(tiles), segments=sum(map(len,tiles.values())), fixedNodes=len(anchors),
+                maxPinErrorM=max(abs(height[i]-y) for i,y in anchors.items()), clearanceConflicts=violations)
 
 
-def bake_world(directory,manifest,plan_profile=False):
+def bake_world(directory,manifest):
     inventory_file=ROOT/'docs/railway-crossings.json'
     inventory=json.loads(inventory_file.read_bytes())
+    branch=next(w for w in load_osm() if w['type']=='way' and w['id']==BRANCH)
+    line=LineString(points(branch))
+    centers=[line.project(Point(ll2xz(r['lat'],r['lon']))) for r in inventory if r['rail']==BRANCH and r['road'] in BRANCH_BRIDGES]
     probes=[]
-    ways = {w['id']:w for w in load_osm() if w['type']=='way'}
-    junctions = approach_junctions(ways)
-    probes.extend([[f"station-junction:{item['junctionNode']}",item['x'],item['z']] for item in junctions])
+    for at in np.arange(math.floor(min(centers))-35,math.ceil(max(centers))+35,.5):
+        point=np.asarray(line.interpolate(at).coords[0])
+        tangent=np.asarray(line.interpolate(at+.1).coords[0])-point
+        normal=np.array([-tangent[1],tangent[0]])/np.linalg.norm(tangent)
+        for offset in (-.8,0,.8):
+            probes.append([f'branch:{at}:{offset}',*(point+offset*normal)])
     raw=json.loads(subprocess.check_output([ROOT/'node_modules/.bin/tsx',ROOT/'scripts/railway-road-heights.mjs',
                                             directory,inventory_file,'--branch-deck'],input=json.dumps(probes).encode()))
     samples={}
@@ -427,30 +458,17 @@ def bake_world(directory,manifest,plan_profile=False):
             a,b,lat,lon=k.split('/')
             samples[int(a),int(b),float(lat),float(lon)]=v
         else: samples[k]=v
-    report=bake(directory,manifest,inventory,samples,plan_profile)
-    tunnel = next(t for t in manifest['tunnels'] if t['way']==UNDERPASS)
-    if 'approachEnds' in tunnel:
-        report['stationApproachExceptions'] = approach_exceptions(tunnel,junctions,samples)
-    if plan_profile:
-        return report
-    rail_levels = [point['railY'] for point in report['crossings'] if point['road'] == UNDERPASS]
-    for approach in report.get('stationApproachExceptions', []):
-        approach['actualRailDifferenceM'] = round(max(rail_levels) - min(rail_levels), 4)
-    manifest['stationApproachExceptions'] = report.get('stationApproachExceptions', [])
-    manifest.pop('railwayBranchGrade', None)
+    report=bake(directory,manifest,inventory,samples)
+    manifest['railwayBranchGrade']=report['branchLocalGrade']
     return report
 
 
 if __name__=='__main__':
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('world',type=Path)
-    parser.add_argument('--plan-profile', action='store_true', help='Solve a rail-first profile without writing any world assets')
     args=parser.parse_args()
     path=args.world/'manifest.json'
     manifest=json.loads(path.read_bytes())
-    report=bake_world(args.world,manifest,args.plan_profile)
-    if not args.plan_profile:
-        path.write_text(json.dumps(manifest,separators=(',',':'))+'\n')
+    report=bake_world(args.world,manifest)
+    path.write_text(json.dumps(manifest,separators=(',',':'))+'\n')
     print(json.dumps(report,indent=2))
-    if args.plan_profile and (not report['profile']['feasible'] or report['profile']['roads']['conflicts']):
-        raise SystemExit(2)

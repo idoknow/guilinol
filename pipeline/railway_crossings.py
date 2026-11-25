@@ -62,32 +62,22 @@ def inventory(elements, region, node_evidence):
                 r, h = level(rt), level(ht)
                 evidence = node_evidence.get(str(shared))
                 kind = None
-                node_tag = (evidence or {}).get('railway')
-                structure = [int(tags.get('bridge', 'no') != 'no') -
-                             int(tags.get('tunnel', 'no') != 'no') for tags in (rt, ht)]
-                structured = any(tags.get(key, 'no') != 'no' for tags in (rt, ht)
-                                 for key in ('bridge', 'tunnel'))
-                different_layers = None not in (r, h) and r != h
-                if shared and (node_tag in ('level_crossing', 'crossing') or
-                               not (structured or different_layers)):
+                if shared:
                     kind = 'level'
-                    reason = f'railway={node_tag}' if node_tag else '无标签，按共享节点推定'
-                elif different_layers:
+                    tag = (evidence or {}).get('railway')
+                    reason = f'railway={tag}' if tag else '无标签，按共享节点推定'
+                elif None not in (r, h) and r != h:
                     kind = 'rail_over' if r > h else 'road_over'
                     reason = f'层级（铁路 {r}，道路 {h}）'
-                elif structure[0] != structure[1]:
-                    kind = 'rail_over' if structure[0] > structure[1] else 'road_over'
-                    reason = '按桥隧标签确定上下层'
-                elif structured and shared:
-                    raise ValueError(f'上下层无法确定：节点 {shared}，铁路 {rail["id"]}，道路 {road["id"]}')
+                elif ht.get('tunnel') == 'yes' and rt.get('tunnel', 'no') == 'no':
+                    kind = 'rail_over'
+                    reason = '道路 tunnel=yes，铁路无隧道标签'
                 else:
                     reason = '未共享节点，缺少上下层证据'
-                if shared and kind in ('rail_over', 'road_over'):
-                    reason += '；共享节点无平交标签'
                 status = 'active'
                 if road['id'] == 727929887 and kind == 'rail_over':
                     status = 'pending_road_tunnel'
-                    reason += '；下穿道路尚缺独立结构，净空待验'
+                    reason += '；IDOK-247 补建下穿道路'
                 elif road['id'] in (1030067842, 1030067843) and ht['highway'] == 'construction':
                     status = 'construction_unverified'
                     reason = '施工道路，交叉形式待核'
@@ -126,7 +116,7 @@ if __name__ == '__main__':
         for point in report['crossings']:
             by_pair[point['rail'], point['road']].append(point)
         for row in rows:
-            if row['status'] == 'construction_unverified':
+            if row['status'] != 'active':
                 continue
             position = Point(ll2xz(row['lat'],row['lon']))
             def distance(point):
@@ -136,18 +126,15 @@ if __name__ == '__main__':
                 raise ValueError(f"Absent geometry for {row['rail']} / {row['road']}")
             row.update(railY=point['railY'], roadY=point['roadY'], designClearanceM=point['clearanceM'])
             row['surfaceSource']=point['surfaceSource']
-            if row['status']=='pending_road_tunnel' and point['surfaceSource']=='tunnel_profile':
-                row['status']='active'
-                row['evidence']=row['evidence'].replace('下穿道路尚缺独立结构，净空待验','下穿路面按生成的隧道纵断面实测')
             if point['roadStructureDependency']:
                 row['status']='pending_road_structure'
                 row['deferredRoad']=point['roadStructureDependency']
-                row['evidence']+=f"；道路 {row['deferredRoad']} 的结构生成后复验"
+                row['evidence']+=f"；IDOK-247 待补道路 {row['deferredRoad']} 的结构后复验"
             conflict=conflicts.get((row['rail'],row['road'],row['lat'],row['lon']))
             if conflict:
                 row['clearanceConflict']={k:v for k,v in conflict.items() if k not in ('rail','road','lat','lon','type')}
     (docs / 'railway-crossings.json').write_text(json.dumps(rows, ensure_ascii=False, indent=2) + '\n')
-    lines = ['# 可玩区路铁交点', '', '来源为 raw-expanded-20261124。每行对应一对 way 的一个相交分量。同一地点可能有多条股道或道路分段。JSON 保留双方标签。设计净空取中心线交点处的轨面、路面和梁底高程（铁路梁高 1.20 m，道路薄桥 0.60 m），单位 m。JSON 的 clearanceConflict.shortfallM 表示当前模型低于设计净空的米数。terrain_proxy 表示下层路面尚缺独立高程证据。全宽最小净空仍待实测。', '',
+    lines = ['# 可玩区路铁交点', '', '来源为 raw-expanded-20261124。每行对应一对 way 的一个相交分量。同一地点可能有多条股道或道路分段。JSON 保留双方标签。设计净空取中心线交点处的轨面、路面和梁底高程（铁路梁高 1.20 m，道路薄桥 0.60 m），单位 m。JSON 的 clearanceConflict 给出约束来源、允许高差和相反约束位置。terrain_proxy 表示下层路面尚缺独立高程证据。全宽最小净空仍待实测。', '',
              '| 铁路 way | 道路 way | 纬度 | 经度 | 共享节点及版本 | type | 验收状态 | 设计净空 m | 证据 |',
              '|---:|---:|---:|---:|---:|---|---|---:|---|']
     for row in rows:

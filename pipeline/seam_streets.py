@@ -17,7 +17,6 @@ class Streets:
     def __init__(self, world):
         self.world = world
         self.lower = {}
-        self.platforms = {}
 
     @lru_cache(maxsize=80)
     def tile(self, origin):
@@ -33,9 +32,7 @@ class Streets:
             kinds.append(kind)
         ctrl = streets[5] if len(streets)>5 else None
         grid = (np.reshape(ctrl[1], (35, 35))+ctrl[0])/1000 if ctrl else None
-        if len(streets)>12 and streets[12]:
-            self.platforms[origin] = streets[12]
-        if len(streets)>11 and streets[11]:
+        if len(streets)>11:
             first,corners,profile = streets[11]
             axis = shapely.LineString(np.asarray(profile)[:,:2]+origin) if profile else None
             self.lower[origin] = first,shapely.Polygon(np.asarray(corners)+origin),axis,np.asarray(profile)
@@ -49,10 +46,6 @@ class Streets:
         point = shapely.Point(x,z)
         hits = tree.query(point,predicate='intersects')
         coverage = {kinds[index] for index in hits}
-        if origin in self.platforms:
-            first, end, level = self.platforms[origin]
-            if any(first<=index<end for index in hits):
-                return level, coverage
         height, _ = world.sample(x,z)
         if coverage:
             if grid is not None:

@@ -5,10 +5,9 @@ import {join} from 'node:path'
 import {gunzipSync} from 'node:zlib'
 import {Color} from 'three'
 import {railwayGeometry} from '../web/src/railways.ts'
-import {joinPortalRoads} from '../web/src/tunnels.ts'
 import {ll2xz} from '../lib/projection.ts'
 
-const [directory, inventory,check,metadata] = process.argv.slice(2)
+const [directory, inventory,check] = process.argv.slice(2)
 const grounding=check==='--audit-grounding'
 const contacts={}
 const painted=check==='--audit-painted'
@@ -16,7 +15,7 @@ const audit=painted || check==='--audit-levels'
 const style=JSON.parse(readFileSync(new URL('../pipeline/railway-style.json',import.meta.url)))
 const steel=new Color(style.steel)
 const deviations=[]
-const manifest = JSON.parse(readFileSync(metadata??join(directory, 'manifest.json')))
+const manifest = JSON.parse(readFileSync(join(directory, 'manifest.json')))
 const {bridgeDepth}=JSON.parse(readFileSync(new URL('../pipeline/vessel-bounds.json',import.meta.url)))
 const nodes = new Map()
 for (const row of JSON.parse(readFileSync(inventory))) {
@@ -158,7 +157,6 @@ for(const tile of manifest.chunks){
   const {deck,underside,worker}=data
   if(audit && !worker.rails.length && !local.length)continue
   self.onmessage({data:worker})
-  joinPortalRoads(tile,manifest.tunnels ?? [],[triangles,mesh.sidewalk])
   if(audit){
     const {positions,colors,kinds}=mesh
     for(let i=0;i<positions.length;i+=9){

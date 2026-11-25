@@ -48,17 +48,17 @@ export async function traffic(scene:THREE.Scene,camera:THREE.Camera,verify:boole
   for(let slot=0;slot<SLOTS;slot++){batch.addInstance(geometryIds[0]);batch.setVisibleAt(slot,false)}
   const variants=new WeakMap<object,Variant>()
   const pose=new THREE.Object3D();pose.rotation.order='YXZ'
-  const transforms=new Float64Array(SLOTS*8).fill(NaN)
+  const transforms=new Float64Array(SLOTS*6).fill(NaN)
   const FAR=75**2 // IDOK-253: detailed car meshes only near the camera, light stand-ins beyond 75 m
-  const show=(slot:number,variant:Variant,x:number,y:number,z:number,yaw:number,scale:number,down=false,pitch=0,roll=0)=>{
+  const show=(slot:number,variant:Variant,x:number,y:number,z:number,yaw:number,scale:number,down=false)=>{
     const lod=models.far[variant.geometry],geometry=lod!==undefined&&(x-camera.position.x)**2+(z-camera.position.z)**2>FAR?lod:variant.geometry
     if(slotGeometry[slot]!==geometry){batch.setGeometryIdAt(slot,geometryIds[geometry]);slotGeometry[slot]=geometry}
     if(slotPaint[slot]!==variant.paint){batch.setColorAt(slot,variant.paint);slotPaint[slot]=variant.paint}
     if(!slotShown[slot]){batch.setVisibleAt(slot,true);slotShown[slot]=1}
-    const offset=slot*8
-    if(transforms[offset]===x&&transforms[offset+1]===y&&transforms[offset+2]===z&&transforms[offset+3]===yaw&&transforms[offset+4]===scale&&transforms[offset+5]===Number(down)&&transforms[offset+6]===pitch&&transforms[offset+7]===roll)return
-    transforms[offset]=x;transforms[offset+1]=y;transforms[offset+2]=z;transforms[offset+3]=yaw;transforms[offset+4]=scale;transforms[offset+5]=Number(down);transforms[offset+6]=pitch;transforms[offset+7]=roll
-    pose.position.set(x,y+(down?.16:0),z);pose.rotation.set(down?-Math.PI/2:pitch,yaw,roll,'YXZ');pose.scale.setScalar(Math.max(scale,.001))
+    const offset=slot*6
+    if(transforms[offset]===x&&transforms[offset+1]===y&&transforms[offset+2]===z&&transforms[offset+3]===yaw&&transforms[offset+4]===scale&&transforms[offset+5]===Number(down))return
+    transforms[offset]=x;transforms[offset+1]=y;transforms[offset+2]=z;transforms[offset+3]=yaw;transforms[offset+4]=scale;transforms[offset+5]=Number(down)
+    pose.position.set(x,y+(down?.16:0),z);pose.rotation.set(down?-Math.PI/2:0,yaw,0);pose.scale.setScalar(Math.max(scale,.001))
     pose.updateMatrix();batch.setMatrixAt(slot,pose.matrix)
   }
   const hide=(from:number,to:number)=>{for(let slot=from;slot<to;slot++)if(slotShown[slot]){batch.setVisibleAt(slot,false);slotShown[slot]=0}}
@@ -150,7 +150,7 @@ export async function traffic(scene:THREE.Scene,camera:THREE.Camera,verify:boole
         const {min,max}=geometry.boundingBox!;actor.halfWidth=Math.max(-min.x,max.x);actor.halfLength=Math.max(-min.z,max.z);actor.height=max.y
       }
       if(walking.has(actor)){hide(index,index+1);return}
-      show(index,variant,actor.x,actor.y,actor.z,actor.yaw,actor.scale,actor.kind==='person'&&actor.down>0,actor.pitch,actor.roll)
+      show(index,variant,actor.x,actor.y,actor.z,actor.yaw,actor.scale,actor.kind==='person'&&actor.down>0)
     })
     people.animate(dt,accumulator)
     effects.tick(sim.actors,sim.time,elapsed,player,!!vehicle,actor=>variants.get(actor)?.geometry??0)

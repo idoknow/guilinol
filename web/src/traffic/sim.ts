@@ -1,14 +1,12 @@
-import {axleHeight,contactPose} from './lane-surface.ts'
 import {nearStatic,resolveContact,staticSolids,pickups,type Solid} from './contact.ts'
 import {CAR_SCALE} from '../drive/scale.ts'
 type Node = {id:number,x:number,y:number,z:number}
-type Lane = {id:number,from:number,to:number,offset:number,width?:number,kind:'motor'|'bus'|'nonmotor',speedKmh:number,cls?:string,street?:string,npcWalks?:number[][],heights?:number[],floor?:string}
+type Lane = {id:number,from:number,to:number,offset:number,width?:number,kind:'motor'|'bus'|'nonmotor',speedKmh:number,cls?:string,street?:string,npcWalks?:number[][],heights?:number[]}
 type Phase = {lanes:number[],green:number,yellow:number}
 type Signal={node:number,group:number,offset:number,phases:Phase[]}
 export type Graph = {nodes:Node[],lanes:Lane[],walks:[number,number,number,number?,number[]?][],signals:Signal[]}
 export type Track = Lane & {start:Node,end:Node,dx:number,dz:number,yaw:number,length:number,walk:boolean}
 function trackHeight(track:Track,dist:number){
-  if(track.floor)return axleHeight(track,dist)
   const fraction=Math.min(1,Math.max(0,dist/track.length)), heights=track.heights
   if(!heights)return track.start.y+(track.end.y-track.start.y)*fraction
   let lo=0,hi=heights.length/2-1
@@ -17,7 +15,7 @@ function trackHeight(track:Track,dist:number){
   return heights[index+1]+(heights[index+3]-heights[index+1])*(fraction-heights[index])/(heights[index+2]-heights[index])
 }
 export const WALK_OFFSET=.32
-type Actor = {pitch?:number,roll?:number,track:Track,dist:number,speed:number,pace?:number,kind:'car'|'scooter'|'person',down:number,dodge:number,x:number,y:number,z:number,yaw:number,scale:number,leaving:boolean,halfWidth:number,halfLength:number,height:number,holdUntil?:number,waitingFor?:Actor,waitingSince?:number}
+type Actor = {track:Track,dist:number,speed:number,pace?:number,kind:'car'|'scooter'|'person',down:number,dodge:number,x:number,y:number,z:number,yaw:number,scale:number,leaving:boolean,halfWidth:number,halfLength:number,height:number,holdUntil?:number,waitingFor?:Actor,waitingSince?:number}
 type Position = {x:number,z:number,y:number}
 export const MAX_ACTORS=100
 export const MOBILE_ACTORS=80
@@ -144,12 +142,6 @@ export class Traffic {
     const {track,dist}=actor
     actor.x=track.start.x+track.dx*dist-track.dz*(track.offset+actor.dodge)
     actor.z=track.start.z+track.dz*dist+track.dx*(track.offset+actor.dodge)
-    if(track.floor){
-      const pose=contactPose(track,dist,undefined,undefined,undefined,actor.dodge)
-      actor.y=pose.y;actor.pitch=pose.pitch;actor.roll=pose.roll;actor.yaw=track.yaw
-      return
-    }
-    actor.pitch=actor.roll=0
     const reference=trackHeight(track,dist)
     const car=actor.kind==='car'
     actor.y=this.sampleGround?.(actor.x,actor.z,reference,car)??reference

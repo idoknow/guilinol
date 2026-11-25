@@ -510,9 +510,6 @@ def run_audit(world_dir: Path, root: Path) -> dict:
     uneven_issues = []
     gap_issues = []
     road_Elements = []
-    cut_mouth_nodes = {node for cut in manifest.get("tunnels", ()) if cut.get("openCut")
-                       for node, mouth in zip(cut["nodes"], cut["mouths"]) if mouth}
-    road_mouths = {}
     for el in load_osm():
         tags = el.get('tags', {})
         if el['type'] != 'way' or 'highway' not in tags or tags.get('tunnel', 'no') != 'no':
@@ -541,7 +538,6 @@ def run_audit(world_dir: Path, root: Path) -> dict:
         clipped = full_line.intersection(road_bounds)
         if hw == 'pedestrian' and not u_lm_replace_poly.is_empty:
             clipped = clipped.difference(u_lm_replace_poly)
-        road_mouths[el["id"]] = cut_mouth_nodes.intersection(el.get("nodes", ()))
         for seg in getattr(clipped, 'geoms', [clipped]):
             if seg.is_empty or seg.geom_type != 'LineString' or seg.length < 4.0:
                 continue
@@ -618,37 +614,7 @@ def run_audit(world_dir: Path, root: Path) -> dict:
                 return dy
         return road_base_y(x, z) + 0.045
 
-    # Open tunnel approaches carry the surface carriageway on an explicit
-    # floor mesh. Probe its deck strip and corner fans just as the renderer does.
-    cut_sections = defaultdict(list)
-    mouth_floors = defaultdict(list)
-    for section in manifest.get('tunnels', ()):
-        if not section.get('openCut'):
-            continue
-        a,b = np.array(section['portals'])[:,[0,2]]
-        line = LineString([a,b])
-        floor = line.buffer(section['halfWidth'],cap_style='flat')
-        for joint in section.get('joints', ()):
-            if joint:
-                for ring in joint.get('wedges', [joint['ring']]):
-                    floor = floor.union(Polygon(ring))
-        at,levels = np.array(section['stations']).T
-        strip = (line, floor, section['halfWidth'], at, levels)
-        cut_sections[section['way']].append(strip)
-        for end, (node, mouth) in enumerate(zip(section['nodes'], section['mouths'])):
-            if mouth:
-                endpoint = Point(line.coords[0 if end == 0 else -1])
-                mouth_floors[node].append((endpoint, strip))
-
     for way_id, name, hw, is_bridge, width_m, seg in road_Elements:
-        # At a daylight junction the neighboring road also drives on the
-        # same emitted floor wherever the two carriageways overlap.
-        strips = list(cut_sections[way_id])
-        if not is_bridge:
-            for node in sorted(road_mouths[way_id]):
-                for endpoint, (axis, floor, half_width, at, levels) in mouth_floors[node]:
-                    landing = floor.intersection(endpoint.buffer(2 * max(width_m, 2 * half_width)))
-                    strips.append((axis, landing, half_width, at, levels))
         length = seg.length
         n_pts = max(2, int(math.floor(length / 2.0)) + 1)
         dists = np.linspace(0.0, length, n_pts)
@@ -660,13 +626,7 @@ def run_audit(world_dir: Path, root: Path) -> dict:
         for i, s in enumerate(dists):
             pt = seg.interpolate(s)
             xs[i], zs[i] = pt.x, pt.y
-            cut = next((section for section in strips
-                        if section[1].covers(pt)), None)
-            if cut:
-                axis, footprint, half_width, at, levels = cut
-                hs[i] = np.interp(axis.project(pt), at, levels)
-            else:
-                hs[i] = road_surface_y(pt.x, pt.y, is_bridge, way_id)
+            hs[i] = road_surface_y(pt.x, pt.y, is_bridge, way_id)
 
             # Cross-tilt check (skip bridge/landmark transitions within 2m of ends)
             p_prev = seg.interpolate(max(0.0, s - 0.5))
@@ -690,19 +650,8 @@ def run_audit(world_dir: Path, root: Path) -> dict:
                         rx, rz = .05 * left_pt + .95 * right_pt
                         span = math.hypot(rx - lx, rz - lz)
                 if bounds.contains(Point(lx, lz)) and bounds.contains(Point(rx, rz)):
-                    if cut:
-                        # The wall separates the carriageway from the adjacent
-                        # street. Sample across 90% of this emitted strip.
-                        station = axis.project(pt)
-                        center = axis.interpolate(station)
-                        vx,vz = (np.array(axis.coords[-1])-axis.coords[0])/axis.length
-                        side = np.array([-vz,vx])*.9*half_width
-                        a,b = (Point(np.array(center.coords[0])+sign*side) for sign in (-1,1))
-                        hl,hr = (np.interp(axis.project(p),at,levels) for p in (a,b))
-                        span = a.distance(b)
-                    else:
-                        hl = road_surface_y(lx, lz, False, way_id)
-                        hr = road_surface_y(rx, rz, False, way_id)
+                    hl = road_surface_y(lx, lz, False, way_id)
+                    hr = road_surface_y(rx, rz, False, way_id)
                     tilt = abs(hr - hl) / span
                     if tilt > 0.03:
                         uneven_issues.append(make_issue('crossTilt', pt.x, pt.y, tilt,
@@ -710,7 +659,7 @@ def run_audit(world_dir: Path, root: Path) -> dict:
 
             # Road gap check (1m radius around centerline must have road/bridge/landmark surface)
             if not (hw == 'pedestrian' and u_lm_replace_poly.contains(pt)):
-                if cut is None and not u_surface_check.intersects(pt.buffer(1.0)):
+                if not u_surface_check.intersects(pt.buffer(1.0)):
                     gap_issues.append(make_issue('roadGap', pt.x, pt.y, 1.0,
                                                  f'way/{way_id} {name or hw} missing road mesh within 1m', way=way_id))
 
@@ -1034,17 +983,14 @@ def run_audit(world_dir: Path, root: Path) -> dict:
 
     def summarize(items):
         by_sub = defaultdict(int)
-        by_way = defaultdict(lambda: defaultdict(int))
         sub_samples = defaultdict(list)
         for it in items:
             by_sub[it['subtype']] += 1
-            by_way[str(it.get('way','unattributed'))][it['subtype']] += 1
             if len(sub_samples[it['subtype']]) < 10:
                 sub_samples[it['subtype']].append(it)
         return {
             'count': len(items),
             'bySubtype': dict(sorted(by_sub.items())),
-            'byWaySubtype': by_way,
             'bySubtypeSamples': dict(sub_samples),
             'top20': items[:20],
             'sample100': items[:100],
