@@ -52,6 +52,8 @@ const CAMERA_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8.2
 
 // 香烟格：一包翻盖烟；香烟铺：小铺面（雨棚 + 柜台）。线条与空手 / 相机图标同粗细。
 const PACK_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="6.5" y="6" width="11" height="15" rx="1.2"/><path d="M6.5 10h11"/><path d="M9 6V3.6h1.6V6M11.6 6V3.2h1.6V6"/></svg>'
+// 鱼竿：斜挑的竿身 + 竿尖垂线和浮标，和其他格同一套 1.6 描边
+const ROD_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 20.5 19.5 4"/><path d="M19.5 4v10.2"/><path d="M18.3 14.2h2.4l-.5 3.3h-1.4z"/><circle cx="7.2" cy="16.8" r="1.6"/><path d="M3.5 20.5l2.3-2.3" stroke-width="3"/></svg>'
 const SHOP_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9.5 5.5 4h13L20 9.5"/><path d="M4 9.5c0 1.4 1.2 2.4 2.7 2.4s2.6-1 2.6-2.4c0 1.4 1.2 2.4 2.7 2.4s2.7-1 2.7-2.4c0 1.4 1.1 2.4 2.6 2.4S20 10.9 20 9.5"/><path d="M5.5 12v8h13v-8"/><path d="M10 20v-4.5h4V20"/></svg>'
 export function mountHotbar() {
   if (bar) return
@@ -78,7 +80,7 @@ export function mountHotbar() {
     window.addEventListener('glol:save-written',refresh)
     bar.querySelector('[data-shop]')!.addEventListener('click',()=>window.dispatchEvent(new Event('smoke:shop')))
   }
-  bar.insertAdjacentHTML('beforeend','<button hidden type="button" class="hotbar-slot" data-slot="fishing"><kbd>4</kbd><span>鱼竿</span></button>')
+  bar.insertAdjacentHTML('beforeend',`<button hidden type="button" class="hotbar-slot hotbar-rod" data-slot="fishing" title="鱼竿（4）" aria-label="鱼竿（4）"><kbd>4</kbd>${ROD_ICON}<span>鱼竿</span></button>`)
   fishingButton=bar.querySelector('[data-slot=fishing]')
   for (const button of Array.from(bar.querySelectorAll<HTMLButtonElement>('.hotbar-slot'))) {
     button.addEventListener('pointerdown', event => event.preventDefault())

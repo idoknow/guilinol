@@ -436,16 +436,18 @@ export async function socialPending(env: Env, db: D1Database, request: Request):
   const token = pendingToken(request)
   if (!token) return Response.json({ error: { code: 'no_pending', message: '没有待确认的授权' } }, { status: 404, headers })
   const row = await db
-    .prepare('SELECT channel,intent,type,nickname,faceimg,user_id FROM social_pending WHERE token=? AND used=0 AND expires>?')
+    .prepare('SELECT p.channel,p.intent,p.type,p.nickname,p.faceimg,p.user_id,owner.created_at AS owner_created_at FROM social_pending p LEFT JOIN users owner ON owner.id=p.previous_owner WHERE p.token=? AND p.used=0 AND p.expires>?')
     .bind(await hash(token), now())
-    .first<PendingRow & { channel: string }>()
+    .first<PendingRow & { channel: string; owner_created_at: number | null }>()
   if (!row) return Response.json({ error: { code: 'no_pending', message: '没有待确认的授权' } }, { status: 404, headers })
   const type = isSocialType(row.type) ? row.type : null
   // 新版通道：intent 为 new（这个 QQ 还没有账号）或 bind/migrate（该身份已属于另一个可接管账号，需要用户确认 takeover）
   if (row.channel === 'direct')
     return Response.json(
       { channel: 'direct', intent: row.intent, takeover: row.intent !== 'new', type: type ?? row.type,
-        label: (type ? SOCIAL_LABELS[type] : row.type) + ' 登录', nickname: row.nickname, avatar: safeAvatar(row.faceimg) },
+        label: (type ? SOCIAL_LABELS[type] : row.type) + ' 登录', nickname: row.nickname, avatar: safeAvatar(row.faceimg),
+        // 接管确认页要写清「这个 QQ 绑在 X 月 X 日新建的另一个账号上」
+        owner_created_at: row.intent !== 'new' && row.owner_created_at != null ? Number(row.owner_created_at) : null },
       { headers },
     )
   return Response.json(

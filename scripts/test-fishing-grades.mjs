@@ -3,6 +3,7 @@ import { test } from 'node:test';
 import { basePrice, drawGrade, grades, probabilities } from '../web/src/fishing/grades.ts';
 import fish from '../web/src/fishing/species.json' with {type: 'json'};
 import {bait} from '../web/src/fishing/bait.ts';
+import {FishingEngine} from '../web/src/fishing/engine.ts';
 import {waters, tabs, ranks, profile} from '../web/src/fishing/config.ts';
 
 test('water occurrence counts, tabs and ranks', () => {
@@ -38,4 +39,23 @@ test('prices interpolate between specified grade endpoints', () => {
     const [min, max] = ranges[index];
     assert.deepEqual([0, 0.5, 1].map(fraction => basePrice(grade, fraction)), [min, Math.round((min+max)/2), max]);
   });
+});
+test('100k complete casts per enabled water and method',context=>{
+  context.diagnostic('水域 | 钓法 | 传说% | 高级% | 中级% | 低级% | 空钩% | 杂物% | 未咬口/逃脱%');
+  for(const [index,water] of waters.entries())for(const method of ['路亚','台钓']){
+    const setup={water,method,line:1,rod:1,bait:method==='台钓'?'bait11':'bait1',float:false,drag:false};
+    const counts={legendary:0,high:0,medium:0,low:0,'empty-hook':0,junk:0,miss:0,escape:0};
+    const engine=new FishingEngine(()=>{},item=>{counts[item.grade]++;return true});engine.equip();engine.setSeed(337+index);
+    if(!water.methods.includes(method)){assert.equal(engine.cast(setup),false);continue}
+    for(const grade of ['low','medium'])assert.ok(fish.some(row=>row.grade===grade&&row.methods.includes(method)&&water.fish.includes(row.id)),`${water.name} ${method} ${grade}`);
+    for(let cast=0;cast<100000;cast++){
+      assert.ok(engine.cast(setup));engine.tick(.25);engine.reel=true;engine.tick(5);
+      if(engine.stage==='hook'){engine.tick(.2);for(let tick=0;engine.stage==='fight'&&tick<300;tick++){engine.pull=engine.direction;engine.tick(.2)}}
+      else if(engine.stage==='bite'){engine.strike();engine.tick(1)}
+      if(engine.stage!=='land'&&engine.stage!=='junk'){assert.ok(['empty-hook','miss','escape'].includes(engine.stage));counts[engine.stage]++}
+    }
+    assert.equal(Object.values(counts).reduce((sum,value)=>sum+value,0),100000);
+    const rates=[counts.legendary,counts.high,counts.medium,counts.low,counts['empty-hook'],counts.junk,counts.miss+counts.escape].map(count=>(count/1000).toFixed(3));
+    context.diagnostic([water.name,method,...rates].join(' | '));
+  }
 });

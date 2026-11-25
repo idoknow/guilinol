@@ -462,6 +462,8 @@ def main(out):
         NAME,
         surface=surface,
         glass_opacity=STYLE["bridgeGlassOpacity"],
+        # Lifts the shaded east facade toward the white of the 2021 photos.
+        atlas_emissive=tuple(STYLE["facadeLift"]),
         masked_atlas=True,
     )
 
