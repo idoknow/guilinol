@@ -5,6 +5,7 @@ import {interrupted,emotesEnabled} from '../emote/emotes'
 import {takeCigaretteIntent, smokeEnabled} from '../citizen/use-item'
 import {selectSlot,hotbarSlot,showSmokeDiscard,showFishingSlot} from '../ui/hotbar'
 import fishingShores from '../fishing/shores.json'
+import {fishingMarks} from '../fishing/marks'
 import {getActiveSaveSnapshot,takeFromPack} from '../game/save'
 import {rules,validRules} from '../smoke/data'
 import {createSmokePrompt} from '../smoke/prompt'
@@ -1147,7 +1148,14 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
   },verify))
   // 钓鱼（IDOK-336）默认开放；?fishing=0 可临时关掉（排查问题用）。
   const fishingOn=verify||new URLSearchParams(location.search).get('fishing')!=='0'
-  window.addEventListener('fishing:slot',()=>{if(!fishingOn)return;void loadFishing().then(session=>session.toggle())})
+  // 钓点可发现（IDOK-336 线上反馈）：40 m 内就亮出鱼竿格；没站到岸点上时按 4 先走到岸点再切竿。
+  const FISH_NEAR=40
+  const fishMarks=fishingOn?fishingMarks(scene):undefined
+  const nearestShore=(x:number,z:number)=>{let best:{id:string,d:number,radius:number}|undefined;for(const w of fishingShores){const d=Math.hypot(x-w.spot.x,z-w.spot.z);if(!best||d<best.d)best={id:w.id,d,radius:w.radius}}return best}
+  window.addEventListener('fishing:slot',()=>{if(!fishingOn)return
+    const pos=sim.body.translation(),near=nearestShore(pos.x,pos.z)
+    if(hotbarSlot()!=='fishing'&&near&&near.d>near.radius&&near.d<=FISH_NEAR&&!rides?.bike&&!rides?.boat&&!rides?.car){void loadFishing().then(async session=>{if(await session.teleportToSpot(near.id))session.toggle()});return}
+    void loadFishing().then(session=>session.toggle())})
   if(verify)Object.assign(window,{fishing:{teleportToSpot:async(id:string)=>(await loadFishing()).teleportToSpot(id)}})
   const footMetrics={soleOffset:avatarRig.soleOffset,footProbes:avatarRig.footProbes}
   let firstPersonHidden=false
@@ -1955,7 +1963,8 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
   function tick(dt:number){wheel.sync();if(!active)return;emote.reset();holdLayer.reset();
     if(emote.id&&(rides?.boat||rides?.car||rides?.bike)){emote.stop();emote.tick(.24,false)}
     smoking?.resetPose();const before=performance.now(),start=rides?.boat?.position??sim.body.translation();syncSceneObstacleVolumes();sim.sync(start.x,start.z,true);const footYNow=rides?.boat?start.y:start.y-cfg.height/2;rides?.nearby(start.x,start.z,footYNow);interactArbiter.sync(actionButton);syncGameTravelState();updateShopHintRings(start.x,start.z,footYNow)
-    showFishingSlot(fishingOn&&!rides?.bike&&!rides?.boat&&!rides?.car&&fishingShores.some(({spot,radius})=>Math.abs(start.x-spot.x)<=radius&&Math.hypot(start.x-spot.x,start.z-spot.z)<=radius))
+    showFishingSlot(fishingOn&&!rides?.bike&&!rides?.boat&&!rides?.car&&(hotbarSlot()==='fishing'||fishingShores.some(({spot})=>Math.abs(start.x-spot.x)<=FISH_NEAR&&Math.hypot(start.x-spot.x,start.z-spot.z)<=FISH_NEAR)))
+    fishMarks?.tick(start.x,start.z,dt,hotbarSlot()==='fishing',start.y)
     if(cigarette.active && (rides?.bike||rides?.boat||rides?.car)){
       cancelSmoke()
       smoking?.tick(dt,cigarette.view(),false)
