@@ -403,7 +403,10 @@ export interface CreateDrinksSimOptions {
   open24h?: boolean
   rejectPlayerWhenClosed?: boolean
   autoRestockSupply?: boolean
+  /** Hard-clamped to <= 8 (MAX_CONCURRENT_CUSTOMERS) to prevent indoor/outdoor crowding. */
   maxCustomers?: number
+  /** Hard-clamped to <= 4 (MAX_DOORWAY_QUEUE) across all cashier/doorway queues. */
+  maxQueueLength?: number
   playerUnclaimedTimeoutSec?: number
 }
 

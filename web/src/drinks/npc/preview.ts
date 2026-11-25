@@ -164,19 +164,19 @@ export function mountDrinksNpcPreview(
     now: 0,
     hourOf: t => 19.5 + t / 3600,
     clerkCount: 5,
-    maxCustomers: 26,
+    maxCustomers: 8,
   })
 
   let npcRenderer: DrinksNpcRenderer = createDrinksNpcRenderer({
     scene,
     sim,
     skin,
-    maxNpcs: 48,
-    maxVisibleBadges: 8,
+    maxNpcs: 20,
+    maxVisibleBadges: 4,
     showBadges: true,
   })
 
-  function rebuildSim(seed: string, hour = 19.5, maxCustomers = 26): void {
+  function rebuildSim(seed: string, hour = 19.5, maxCustomers = 8): void {
     npcRenderer.dispose()
     sim = createDrinksSim({
       seed,
@@ -189,8 +189,8 @@ export function mountDrinksNpcPreview(
       scene,
       sim,
       skin,
-      maxNpcs: 48,
-      maxVisibleBadges: 8,
+      maxNpcs: 20,
+      maxVisibleBadges: 4,
       showBadges: true,
     })
     playerMarker.visible = false
@@ -199,7 +199,7 @@ export function mountDrinksNpcPreview(
   function advanceToPeak30(maxSimSec = 240): DrinksSimSnapshot {
     let snap = sim.getSnapshot()
     let elapsed = 0
-    while (elapsed < maxSimSec && snap.clerks.length + snap.customers.length < 30) {
+    while (elapsed < maxSimSec && snap.customers.length < 8) {
       sim.fastForward(2)
       elapsed += 2
       snap = sim.getSnapshot()
@@ -228,7 +228,7 @@ export function mountDrinksNpcPreview(
 
   function runScenario(id: InteractionScenarioId) {
     if (id === 'peak_30') {
-      rebuildSim('wangcheng-peak-30-preview', 19.5, 26)
+      rebuildSim('wangcheng-peak-30-preview', 19.5, 8)
       const snap = advanceToPeak30(240)
       const kinds = [
         ...snap.clerks.map(c => c.interactionKind).filter(Boolean),

@@ -32,27 +32,30 @@ test('短气泡文案表与 skin 解耦：全互动类型皆有<=8字短台词�
   assert.equal(callB?.text, '请取P009')
 })
 
-test('DrinksNpcRenderer 驱动 30 人同屏、短气泡数量封顶、0 光源且可正常释放', () => {
+test('DrinksNpcRenderer 适配降人流上限（并发顾客 ≤ 8、排队 ≤ 4）、短气泡封顶、0 光源且可正常释放', () => {
   const scene = new THREE.Scene()
   const sim = createDrinksSim({
-    seed: 'npc-unit-30-interactions',
+    seed: 'npc-unit-crowd-cap',
     now: 0,
     hourOf: () => 19.5,
     clerkCount: 5,
-    maxCustomers: 26,
+    maxCustomers: 8,
   })
 
-  for (let i = 0; i < 140; i++) {
+  let maxObservedCustomers = 0
+  let maxObservedQueue = 0
+  for (let i = 0; i < 120; i++) {
     sim.fastForward(2)
     const snap = sim.getSnapshot()
-    if (snap.clerks.length + snap.customers.length >= 30) break
+    if (snap.customers.length > maxObservedCustomers) maxObservedCustomers = snap.customers.length
+    if (snap.metrics.queueLength > maxObservedQueue) maxObservedQueue = snap.metrics.queueLength
   }
 
   const renderer = createDrinksNpcRenderer({
     scene,
     sim,
-    maxNpcs: 48,
-    maxVisibleBadges: 6,
+    maxNpcs: 20,
+    maxVisibleBadges: 4,
     showBadges: false,
   })
 
@@ -62,11 +65,13 @@ test('DrinksNpcRenderer 驱动 30 人同屏、短气泡数量封顶、0 光源�
   }
 
   const m = renderer.getMetrics()
-  assert.ok(m.activeTotal >= 30, `expected >= 30 active NPCs, got ${m.activeTotal}`)
   assert.equal(m.clerksCount, 5)
-  assert.ok(m.customersCount >= 25)
+  assert.ok(maxObservedCustomers >= 5 && maxObservedCustomers <= 8, `expected peak customers in [5,8], got ${maxObservedCustomers}`)
+  assert.ok(maxObservedQueue <= 4, `expected queue <= 4, got ${maxObservedQueue}`)
+  assert.ok(m.customersCount <= 8, `expected rendered customers <= 8, got ${m.customersCount}`)
+  assert.ok(m.activeTotal >= 8 && m.activeTotal <= 13, `expected activeTotal in [8,13], got ${m.activeTotal}`)
   assert.equal(m.visibleCount, m.activeTotal)
-  assert.ok(m.visibleBadgeCount <= 6)
+  assert.ok(m.visibleBadgeCount <= 4)
   assert.ok(m.lastUpdateMs < 20)
 
   let lightCount = 0

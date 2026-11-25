@@ -30,6 +30,7 @@ import {getState} from './game/state'
 import {loadLocalSave} from './game/save'
 import {isGlobalHotkeyBlocked} from './walk/input-guard'
 import {freezeStatic} from './static-freeze'
+import {resolveDrinksSiteId, shouldMountDrinksShop} from './drinks/site'
 
 installAtmosphere()
 // The title screen (ui/home.ts) pauses the scene while it covers it: no simulation, no draws.
@@ -436,9 +437,28 @@ async function start(loader:FullLoader,creatorSpawn=false) {
   // IDOK-178：帧率/网速/在线人数读数与设置热键（都靠 localStorage 记住上次选择）。
   mountStats()
   mountHotkeys()
+  let drinksShop: Awaited<ReturnType<typeof import('./drinks').mountDrinksShop>> | undefined
+  if (shouldMountDrinksShop({ isDev: import.meta.env.DEV, search: location.search })) {
+    void import('./drinks')
+      .then(mod => {
+        drinksShop = mod.mountDrinksShop({
+          scene,
+          camera,
+          getPlayerPos: () => (walker?.active ? walker.position : null),
+          getWalker: () => walker,
+          getHour: () => clock.hour,
+          getNightFactor: () => env.night,
+          sampleGroundY: sampleMissionGroundY,
+          walkTo,
+          siteId: resolveDrinksSiteId(location.search),
+        })
+        publishViewer()
+      })
+      .catch(error => console.warn('Drinks shop unavailable', error))
+  }
   const tourProbe = {getState, missions: {start: () => ({ok:false, code:'SOLO_MODE_REQUIRED'})}}
   let staticAudit:ReturnType<typeof import('./verify-static').staticVerifier>|undefined
-  const publishViewer=()=>Object.assign(window,{viewer:{camera,stream,manifest,stats,walkTo,staticAudit,get game(){return solo?.probe ?? tourProbe},
+  const publishViewer=()=>Object.assign(window,{viewer:{camera,stream,manifest,stats,walkTo,staticAudit,get game(){return solo?.probe ?? tourProbe},get drinks(){return drinksShop?.getProbe()},
     get trafficCount(){return (scene.getObjectByName('G2 traffic') as THREE.InstancedMesh|undefined)?.count??0},
     get trafficProbe(){return scene.getObjectByName('G2 traffic')?.userData},
     async trafficPixels(){return (await import('./traffic/visibility-probe')).pixelVisible(renderer,scene,camera)},
@@ -542,6 +562,7 @@ async function start(loader:FullLoader,creatorSpawn=false) {
     updateAtmosphere(now,elapsed)
     tour?.tick(elapsed/1000)
     solo?.step(Math.min(0.1, elapsed/1000))
+    drinksShop?.step(Math.min(0.1, elapsed/1000))
     persistView?.()
     draw()
     if(staticAudit && frame%30===0)staticAudit.check()

@@ -30,9 +30,9 @@ export function createDrinksNpcRenderer(options: DrinksNpcRendererOptions): Drin
   const sampleGroundY = options.sampleGroundY ?? (() => origin[1])
 
   const pool = new DrinksNpcRigPool(
-    options.maxNpcs ?? 48,
+    Math.min(24, options.maxNpcs ?? 20),
     options.showBadges ?? true,
-    options.maxVisibleBadges ?? 8,
+    Math.min(6, options.maxVisibleBadges ?? 4),
   )
   scene.add(pool.group)
 

@@ -8,8 +8,8 @@
  */
 
 const TEXT_INPUT_SELECTOR = 'input,textarea,select,[contenteditable]'
-const MODAL_OVERLAY_SELECTOR = 'dialog[open],.about-mask:not([hidden]),.atlas.show,.book.show,.shop-overlay.show,.wardrobe-overlay.show,.garage-overlay.show'
-const TOUCH_UI_SELECTOR = '.walk-ui,.ride-hud,.vehicle-action,.dock,.sky-ui,.render-entry,.hud-me,.shop-overlay,.wardrobe-overlay,.garage-overlay,.mission-hud,.gl-mission-entry,.gl-mission-hud,.mission-board,.st-phone,.st-phone-btn,.mp-roster,.hud-stats'
+const MODAL_OVERLAY_SELECTOR = 'dialog[open],.about-mask:not([hidden]),.atlas.show,.book.show,.shop-overlay.show,.wardrobe-overlay.show,.garage-overlay.show,.drinks-order-panel:not([hidden])'
+const TOUCH_UI_SELECTOR = '.walk-ui,.ride-hud,.vehicle-action,.dock,.sky-ui,.render-entry,.hud-me,.shop-overlay,.wardrobe-overlay,.garage-overlay,.mission-hud,.gl-mission-entry,.gl-mission-hud,.mission-board,.st-phone,.st-phone-btn,.mp-roster,.hud-stats,.drinks-order-panel,.drinks-pickup-hud,.drinks-hold-hud'
 
 export function isShopOverlayOpen(doc: Document = document): boolean {
   return doc.body.dataset.shopOpen === '1' || !!doc.querySelector('.shop-overlay.show,.wardrobe-overlay.show,.garage-overlay.show')
@@ -23,6 +23,7 @@ export function isTextInputTarget(target: EventTarget | null): boolean {
 export function isModalOrOverlayOpen(doc: Document = document): boolean {
   if (doc.body.hasAttribute('data-home')) return true
   if (doc.body.dataset.shopOpen === '1') return true
+  if (doc.body.dataset.drinksUiOpen === '1') return true
   return !!doc.querySelector(MODAL_OVERLAY_SELECTOR)
 }
 

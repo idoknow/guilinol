@@ -15,6 +15,8 @@ export {
 export {
   getDrinkDayPhase,
   getDrinksTrafficProfile,
+  MAX_CONCURRENT_CUSTOMERS,
+  MAX_DOORWAY_QUEUE,
   normalizeHour,
   type TrafficProfile,
 } from './traffic.ts'

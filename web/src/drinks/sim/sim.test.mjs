@@ -93,9 +93,13 @@ test('无玩家模拟 24 小时：峰谷客流、全订单结单、无死锁、�
 
   const observedKinds = new Set()
   const samples = []
+  let maxObservedCustomers = 0
+  let maxObservedQueue = 0
   for (let m = 0; m < 432; m++) {
     const snap = sim.fastForward(200)
     samples.push(snap)
+    if (snap.customers.length > maxObservedCustomers) maxObservedCustomers = snap.customers.length
+    if (snap.metrics.queueLength > maxObservedQueue) maxObservedQueue = snap.metrics.queueLength
     for (const cl of snap.clerks) {
       if (cl.interactionKind) observedKinds.add(cl.interactionKind)
     }
@@ -113,9 +117,12 @@ test('无玩家模拟 24 小时：峰谷客流、全订单结单、无死锁、�
   const nightArrivals = m.hourlyArrivals.slice(0, 7).reduce((a, b) => a + b, 0)
   const peakHourly = Math.max(...m.hourlyArrivals)
   assert.equal(nightArrivals, 0)
-  assert.ok(peakHourly >= 45)
-  assert.ok(m.peakConcurrentPeople >= 24)
-  assert.ok(m.totalOrdersCreated > 300)
+  assert.ok(peakHourly >= 15, `expected lively peak hourly arrivals >= 15, got ${peakHourly}`)
+  assert.ok(maxObservedCustomers <= 8, `concurrent customers exceeded cap 8: ${maxObservedCustomers}`)
+  assert.ok(maxObservedQueue <= 4, `doorway/counter queue exceeded cap 4: ${maxObservedQueue}`)
+  assert.ok(m.peakConcurrentPeople <= 13, `peak people (5 clerks + <=8 customers) exceeded 13: ${m.peakConcurrentPeople}`)
+  assert.ok(m.peakConcurrentPeople >= 9, `expected peak people >= 9, got ${m.peakConcurrentPeople}`)
+  assert.ok(m.totalOrdersCreated > 150, `expected > 150 daily orders, got ${m.totalOrdersCreated}`)
   assert.equal(m.activeOrders, 0)
   for (const ord of endSnap.orders) {
     assert.equal(isTerminalOrderStatus(ord.status), true, `order ${ord.id} stuck in ${ord.status}`)
@@ -128,6 +135,33 @@ test('无玩家模拟 24 小时：峰谷客流、全订单结单、无死锁、�
   for (const required of ['order_ask', 'make_change', 'call_number', 'handover_cup', 'clean_table', 'chat_pair_a']) {
     assert.ok(observedKinds.has(required), `expected interaction '${required}' during 24h run`)
   }
+})
+
+test('客流与排队硬上限：高峰并发顾客 ≤ 8 且门口/柜台排队 ≤ 4（超限参数亦被钳制）', () => {
+  const sim = createDrinksSim({
+    seed: 'crowd-cap-stress',
+    now: 0,
+    hourOf: () => 19.5,
+    maxCustomers: 26,
+    maxQueueLength: 10,
+  })
+
+  let maxCust = 0
+  let maxQueue = 0
+  for (let i = 0; i < 3000; i++) {
+    sim.step(0.1)
+    const snap = sim.getSnapshot()
+    if (snap.customers.length > maxCust) maxCust = snap.customers.length
+    if (snap.metrics.queueLength > maxQueue) maxQueue = snap.metrics.queueLength
+    assert.ok(snap.customers.length <= 8, `tick ${i}: customers ${snap.customers.length} > 8`)
+    assert.ok(snap.metrics.queueLength <= 4, `tick ${i}: queue ${snap.metrics.queueLength} > 4`)
+  }
+
+  const endSnap = sim.getSnapshot()
+  assert.ok(maxCust >= 5 && maxCust <= 8, `expected realistic peak customers in [5,8], got ${maxCust}`)
+  assert.ok(maxQueue <= 4, `expected queue <= 4, got ${maxQueue}`)
+  assert.ok(endSnap.metrics.ordersCompleted >= 10, `expected 5min unattended orders >= 10, got ${endSnap.metrics.ordersCompleted}`)
+  assert.equal(sim.validateInvariants().ok, true)
 })
 
 test('玩家下单排进同一队列、重复 orderKey 幂等、取消与未取都有结局', () => {

@@ -1,0 +1,68 @@
+{
+  "epic": {
+    "key": "IDOK-312",
+    "id": "01a20fb8-ad1b-7a00-b823-0d749f05b9d9",
+    "projectId": "156530de-f51c-40d8-91e9-e7174ac069ad",
+    "owner": "Neon",
+    "status": "todo",
+    "title": "[蜜雪二期 · 父单] 王城蜜雪冰城 1:1 重建、地块修平、进店自动第一人称、招聘员工模式与能量条喝",
+    "prUrl": null
+  },
+  "subIssues": [
+    {
+      "stage": 1,
+      "key": "IDOK-313",
+      "id": "01a20fb8-b6c5-705d-9fd9-8ff673d9d0f4",
+      "owner": "Hy1",
+      "status": "todo",
+      "acceptanceIds": ["k51", "k52", "k53"],
+      "territory": ["web/src/drinks/site.ts", "web/src/drinks/terrain"],
+      "title": "[蜜雪二期-1 / Hy1] 王城地块模型修平与真实地图标高对齐",
+      "prUrl": null
+    },
+    {
+      "stage": 2,
+      "key": "IDOK-314",
+      "id": "01a20fb8-bfb1-77c5-b5ab-2bb2c3748173",
+      "owner": "Hy2",
+      "status": "todo",
+      "acceptanceIds": ["k54", "k55", "k56"],
+      "territory": ["web/src/drinks/shop", "docs/drinks-refs/shop"],
+      "title": "[蜜雪二期-2 / Hy2] 近 1:1 复刻王城蜜雪冰城门头、扩店与大开口",
+      "prUrl": null
+    },
+    {
+      "stage": 3,
+      "key": "IDOK-315",
+      "id": "01a20fb8-c8ba-7067-b26f-9c49a9c37807",
+      "owner": "Neon",
+      "status": "todo",
+      "acceptanceIds": ["k48", "k49", "k50"],
+      "territory": ["scripts/drinks", "docs/drinks", "web/src/drinks/index.ts", "web/src/main.ts", "web/src/walk/view-mode.ts", "web/src/traffic/crowd.ts"],
+      "title": "[蜜雪二期-3 / Neon] 蜜雪周边人流降密、进店自动第一人称与共享热点整合合流",
+      "prUrl": null
+    },
+    {
+      "stage": 4,
+      "key": "IDOK-316",
+      "id": "01a20fb8-d25f-78d8-959e-8bd00685f982",
+      "owner": "Hy3",
+      "status": "todo",
+      "acceptanceIds": ["k57"],
+      "territory": ["web/src/drinks/staff", "web/src/drinks/props", "web/src/drinks/audio", "docs/drinks-refs/recruit"],
+      "title": "[蜜雪二期-4 / Hy3] 门口蜜雪招聘立牌与员工模式全套出杯玩法",
+      "prUrl": null
+    },
+    {
+      "stage": 5,
+      "key": "IDOK-317",
+      "id": "01a20fb8-dcb3-7caf-8cbc-52df58e4cad6",
+      "owner": "Hy4",
+      "status": "todo",
+      "acceptanceIds": ["k50-hold"],
+      "territory": ["web/src/drinks/hold", "web/src/drinks/menu", "web/src/drinks/ui"],
+      "title": "[蜜雪二期-5 / Hy4] 长按能量条连续喝与精细饮品杯体打磨",
+      "prUrl": null
+    }
+  ]
+}

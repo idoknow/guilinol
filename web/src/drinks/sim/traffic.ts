@@ -35,23 +35,26 @@ interface TrafficKeyframe {
   targetCustomers: number
 }
 
-// Authentic Wangcheng flagship beverage traffic curve:
-// Deep valley overnight (0 after 23:30), gentle morning ramp, lunch bump,
-// strong afternoon tea peak (15:00), and flagship evening street-stroll peak (19:30-20:30).
+export const MAX_CONCURRENT_CUSTOMERS = 8
+export const MAX_DOORWAY_QUEUE = 4
+
+// Balanced Wangcheng beverage shop traffic curve:
+// Keeps shop lively with steady turnover while strictly respecting the comfortable
+// indoor/outdoor crowd cap (<= 8 concurrent customers, <= 4 doorway/counter queue).
 const TRAFFIC_KEYS: readonly TrafficKeyframe[] = [
   { hour: 0.0, arrivalsPerMin: 0.0, targetCustomers: 0 },
   { hour: 7.49, arrivalsPerMin: 0.0, targetCustomers: 0 },
-  { hour: 7.5, arrivalsPerMin: 1.5, targetCustomers: 4 },
-  { hour: 9.0, arrivalsPerMin: 3.2, targetCustomers: 7 },
-  { hour: 10.5, arrivalsPerMin: 4.5, targetCustomers: 10 },
-  { hour: 12.5, arrivalsPerMin: 10.5, targetCustomers: 18 },
-  { hour: 14.0, arrivalsPerMin: 9.5, targetCustomers: 17 },
-  { hour: 15.5, arrivalsPerMin: 16.5, targetCustomers: 24 },
-  { hour: 17.5, arrivalsPerMin: 11.0, targetCustomers: 18 },
-  { hour: 19.5, arrivalsPerMin: 19.0, targetCustomers: 25 },
-  { hour: 21.0, arrivalsPerMin: 14.5, targetCustomers: 21 },
-  { hour: 22.3, arrivalsPerMin: 5.5, targetCustomers: 9 },
-  { hour: 23.49, arrivalsPerMin: 1.2, targetCustomers: 3 },
+  { hour: 7.5, arrivalsPerMin: 1.4, targetCustomers: 2 },
+  { hour: 9.0, arrivalsPerMin: 2.2, targetCustomers: 3 },
+  { hour: 10.5, arrivalsPerMin: 3.0, targetCustomers: 4 },
+  { hour: 12.5, arrivalsPerMin: 4.8, targetCustomers: 6 },
+  { hour: 14.0, arrivalsPerMin: 4.5, targetCustomers: 6 },
+  { hour: 15.5, arrivalsPerMin: 5.8, targetCustomers: 7 },
+  { hour: 17.5, arrivalsPerMin: 4.8, targetCustomers: 6 },
+  { hour: 19.5, arrivalsPerMin: 6.4, targetCustomers: 8 },
+  { hour: 21.0, arrivalsPerMin: 5.0, targetCustomers: 6 },
+  { hour: 22.3, arrivalsPerMin: 2.4, targetCustomers: 3 },
+  { hour: 23.49, arrivalsPerMin: 0.9, targetCustomers: 2 },
   { hour: 23.5, arrivalsPerMin: 0.0, targetCustomers: 0 },
   { hour: 24.0, arrivalsPerMin: 0.0, targetCustomers: 0 },
 ]
@@ -74,11 +77,11 @@ export function getDrinksTrafficProfile(hour: number, open24h = false): TrafficP
     const span = Math.max(0.001, k1.hour - k0.hour)
     const t = (h - k0.hour) / span
     arrivalsPerMin = lerp(k0.arrivalsPerMin, k1.arrivalsPerMin, t)
-    targetCustomers = Math.round(lerp(k0.targetCustomers, k1.targetCustomers, t))
+    targetCustomers = Math.min(MAX_CONCURRENT_CUSTOMERS, Math.round(lerp(k0.targetCustomers, k1.targetCustomers, t)))
 
     if (open24h && (h < 7.5 || h >= 23.5)) {
       arrivalsPerMin = 0.45
-      targetCustomers = 3
+      targetCustomers = 2
     }
   }
 

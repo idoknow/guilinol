@@ -7,7 +7,12 @@ import {
   validateLayoutForMenu,
 } from './menu.ts'
 import { createSeededRng } from './prng.ts'
-import { getDrinksTrafficProfile, normalizeHour } from './traffic.ts'
+import {
+  getDrinksTrafficProfile,
+  MAX_CONCURRENT_CUSTOMERS,
+  MAX_DOORWAY_QUEUE,
+  normalizeHour,
+} from './traffic.ts'
 import type {
   CancelPlayerOrderResult,
   ClerkRole,
@@ -309,7 +314,8 @@ export function createDrinksSim(options: CreateDrinksSimOptions = {}): DrinksSim
   const open24h = Boolean(options.open24h)
   const rejectPlayerWhenClosed = Boolean(options.rejectPlayerWhenClosed)
   const autoRestockSupply = options.autoRestockSupply !== false
-  const maxCustomers = Math.max(6, Math.min(40, Math.floor(options.maxCustomers ?? 26)))
+  const maxCustomers = Math.max(1, Math.min(MAX_CONCURRENT_CUSTOMERS, Math.floor(options.maxCustomers ?? MAX_CONCURRENT_CUSTOMERS)))
+  const maxQueueLength = Math.max(1, Math.min(MAX_DOORWAY_QUEUE, Math.floor(options.maxQueueLength ?? MAX_DOORWAY_QUEUE)))
   const clerkCount = Math.max(2, Math.min(CLERK_PROFILES.length, Math.floor(options.clerkCount ?? 5)))
   const playerUnclaimedTimeoutSec = Math.max(15, options.playerUnclaimedTimeoutSec ?? 180)
 
@@ -561,12 +567,21 @@ export function createDrinksSim(options: CreateDrinksSimOptions = {}): DrinksSim
     return n
   }
 
+  function countTotalQueue(): number {
+    let n = 0
+    for (const c of customers) {
+      if (c.phase === 'queuing' || c.phase === 'ordering') n++
+    }
+    return n
+  }
+
   function getQueuePosition(cashierIndex: number, slot: number): Point2D {
     const lane = layout.cashiers[cashierIndex] ?? layout.cashiers[0]!
     const stagger = slot === 0 ? 0 : slot % 2 === 1 ? -0.24 : 0.24
+    const maxQueueZ = layout.entrance.z - 0.65
     return {
       x: lane.queueAnchor.x + lane.queueDir.x * slot + stagger,
-      z: lane.queueAnchor.z + lane.queueDir.z * slot,
+      z: Math.min(maxQueueZ, lane.queueAnchor.z + lane.queueDir.z * slot),
     }
   }
 
@@ -1655,7 +1670,9 @@ export function createDrinksSim(options: CreateDrinksSimOptions = {}): DrinksSim
           }
           const laneIdx = pickBestCashierLane()
           const laneLen = countQueueInLane(laneIdx)
-          if (laneLen >= 6) {
+          const totalQueue = countTotalQueue()
+          const maxPerLane = Math.max(1, Math.ceil(maxQueueLength / Math.max(1, layout.cashiers.length)))
+          if (totalQueue >= maxQueueLength || laneLen >= maxPerLane) {
             sendCustomerLeaving(c, false)
             continue
           }
@@ -2271,6 +2288,13 @@ export function createDrinksSim(options: CreateDrinksSimOptions = {}): DrinksSim
       }
       if (deadlockRecoveries > 0) {
         errors.push(`deadlockRecoveries > 0: ${deadlockRecoveries}`)
+      }
+      if (customers.length > maxCustomers) {
+        errors.push(`customers.length ${customers.length} exceeded maxCustomers ${maxCustomers}`)
+      }
+      const liveQueue = countTotalQueue()
+      if (liveQueue > maxQueueLength) {
+        errors.push(`queueLength ${liveQueue} exceeded maxQueueLength ${maxQueueLength}`)
       }
       return { ok: errors.length === 0, errors }
     },
