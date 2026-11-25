@@ -277,7 +277,7 @@ const views: View[] = [
   { key: 'server', label: '服务端', icon: '▣', group: '数据', ranged: true },
   { key: 'mp', label: '联机', icon: '⇋', group: '数据' },
   { key: 'smoke', label: '香烟', icon: '▥', group: '数据' },
-  { key: 'gfx', label: '光影', icon: '☀', group: '光影' },
+  { key: 'gfx', label: '光影', icon: '☀', group: '数据' },
   { key: 'npc', label: '路人与车流', icon: '⇄', group: '数据' },
   { key: 'feedback', label: '反馈处理', icon: '✉', group: '运营' },
   { key: 'chat', label: '聊天', icon: '❝', group: '运营' },
@@ -1318,25 +1318,110 @@ const pages: Record<string, (view: View) => void> = {
     paintTop(views.find(view=>view.key==='gfx')!)
     const slot=h('div',{class:'adm-stack'},skeleton(8));main.append(slot)
     void Promise.all([api('admin/gfx'),import('./look/gfx-config')]).then(([stored,{validGfx,gfxDefaults}])=>{
-      const config=structuredClone(validGfx(stored)?stored:gfxDefaults)
-      const form=h('form',{class:'adm-npc'}) as HTMLFormElement
-      function fields(values:Record<string,unknown>,path:string){
-        for(const [key,value] of Object.entries(values)){
-          if(key==='presets')continue
-          if(value&&typeof value==='object'){fields(value as Record<string,unknown>,path+key+'.');continue}
-          const input=h('input',{type:typeof value==='boolean'?'checkbox':typeof value==='number'?'number':'text',step:'any'}) as HTMLInputElement
-          input.checked=value===true;input.value=String(value)
-          input.oninput=()=>{values[key]=typeof value==='boolean'?input.checked:typeof value==='number'?input.valueAsNumber:input.value}
-          form.append(h('label',null,path+key,input))
-        }
+      type Config=typeof gfxDefaults
+      type Period='day'|'dusk'|'night'
+      let saved=JSON.stringify(validGfx(stored)?stored:gfxDefaults)
+      paint(structuredClone(validGfx(stored)?stored:gfxDefaults))
+      function paint(initial:Config){
+      let config:Config=structuredClone(initial)
+      const save=h('button',{type:'submit',class:'adm-btn',form:'adm-gfx-form',disabled:''},'保存') as HTMLButtonElement
+      const reset=h('button',{type:'button',class:'adm-btn adm-btn--ghost'},'恢复默认') as HTMLButtonElement
+      const state=h('span',{class:'adm-sub adm-npc-state'},'已是最新')
+      paintTop(views.find(view=>view.key==='gfx')!,[state])
+      top.querySelector('.adm-top-tools')!.prepend(reset,save)
+      const problem=h('p',{class:'adm-npc-problem',role:'alert',hidden:''})
+      const get=(path:string):unknown=>path.split('.').reduce<any>((node,key)=>node?.[key],config)
+      const put=(path:string,value:unknown)=>{const keys=path.split('.'),last=keys.pop()!;const node=keys.reduce<any>((at,key)=>at[key],config);node[last]=value;changed()}
+      const fmt=(value:number,step:number)=>step>=1?String(Math.round(value)):value.toFixed(step>=.1?1:2)
+      const slider=(path:string,label:string,min:number,max:number,step:number,unit='',hint='')=>{
+        const input=h('input',{type:'range',min:String(min),max:String(max),step:String(step),class:'adm-npc-vol','aria-label':label}) as HTMLInputElement
+        const out=h('output',{class:'adm-npc-vol-text'})
+        const show=()=>{const value=get(path) as number;out.textContent=fmt(value,step)+unit;input.style.setProperty('--fill',`${(value-min)/(max-min)*100}%`)}
+        input.value=String(get(path));input.oninput=()=>{put(path,input.valueAsNumber);show()};show()
+        return h('div',{class:'adm-gfx-slider'},h('span',{class:'adm-npc-label'},label),input,out,hint?h('span',{class:'adm-sub'},hint):null)
       }
-      fields(config,'')
-      const presets=h('textarea',null) as HTMLTextAreaElement;presets.value=JSON.stringify(config.presets,null,2)
-      const save=h('button',{type:'submit'},'保存') as HTMLButtonElement
-      form.append(h('label',null,'时段覆盖（day / dusk / night，留空对象表示继承）',presets),save)
-      form.onsubmit=async event=>{event.preventDefault();try{config.presets=JSON.parse(presets.value);if(!validGfx(config))throw Error()}catch{toast('参数或时段覆盖无效','error');return}
-        save.disabled=true;try{await api('admin/gfx',config,'PUT');toast('已保存，新进场时生效')}catch{toast('保存失败','error')}finally{save.disabled=false}}
-      slot.replaceChildren(form)
+      const toggle=(path:string,title:string,hint:string)=>{
+        const input=h('input',{type:'checkbox',role:'switch'}) as HTMLInputElement
+        input.checked=get(path) as boolean;input.onchange=()=>{put(path,input.checked);sync()}
+        return h('label',{class:'adm-npc-switch'},h('span',{class:'adm-npc-switch-text'},h('b',null,title),h('span',null,hint)),input,h('i',{'aria-hidden':'true'}))
+      }
+      const choice=(path:string,label:string,items:[string|number,string][])=>{
+        const wrap=h('div',{class:'adm-gfx-choice'})
+        const draw=()=>wrap.replaceChildren(h('span',{class:'adm-npc-label'},label),segmented(String(get(path)),items.map(([value,text])=>[String(value),text]),key=>{put(path,typeof items[0][0]==='number'?Number(key):key);draw()},label))
+        draw();return wrap
+      }
+      // 效果关掉时，把对应参数整体淡出但不隐藏，运营能看到关掉的是什么
+      const groups:[string,HTMLElement][]=[]
+      const effect=(key:'ao'|'bloom'|'shadow'|'godrays'|'dof',title:string,hint:string,body:HTMLElement[],sub:string)=>{
+        const params=h('div',{class:'adm-gfx-params'},...body);groups.push([key,params])
+        return card(title,[toggle(`${key}.enabled`,`开启${title}`,hint),params],{sub})
+      }
+      function sync(){for(const [key,params] of groups)params.classList.toggle('is-off',!get(`${key}.enabled`))}
+      const PERIODS:[Period,string,string][]=[['day','白天','08–16 时'],['dusk','晨昏','06 时 · 18 时'],['night','夜晚','20:30–05 时']]
+      const OVERRIDES:[string,string,number,number,number][]=[
+        ['exposure','曝光',.2,3,.05],['saturation','饱和度',0,2,.05],['contrast','对比度',0,2,.05],
+        ['ao.intensity','遮蔽强度',0,8,.1],['bloom.intensity','泛光强度',0,4,.05],['bloom.threshold','泛光阈值',0,1,.01],['shadow.strength','阴影浓度',0,1,.05]]
+      const periodTable=()=>{
+        const head=h('tr',null,h('th',null,'参数'),...PERIODS.map(([,name,time])=>h('th',null,name,h('small',null,time))))
+        const rows=OVERRIDES.map(([path,label,min,max,step])=>h('tr',null,h('th',{scope:'row'},label,h('small',null,`全局 ${fmt(get(path) as number,step)}`)),...PERIODS.map(([period])=>{
+          const keys=path.split('.'),current=keys.reduce<any>((node,key)=>node?.[key],config.presets[period])
+          const input=h('input',{type:'number',class:'adm-npc-num',min:String(min),max:String(max),step:String(step),placeholder:'跟随','aria-label':`${label}（${period}）`}) as HTMLInputElement
+          input.value=current===undefined?'':String(current)
+          input.oninput=()=>{
+            const preset:any=config.presets[period]
+            if(keys.length===1){if(input.value==='')delete preset[keys[0]];else preset[keys[0]]=input.valueAsNumber}
+            else{const group=preset[keys[0]]??={};if(input.value==='')delete group[keys[1]];else group[keys[1]]=input.valueAsNumber;if(!Object.keys(group).length)delete preset[keys[0]]}
+            input.classList.toggle('is-set',input.value!=='');changed()
+          }
+          input.classList.toggle('is-set',input.value!=='')
+          return h('td',null,input)
+        })))
+        return h('div',{class:'adm-gfx-table-wrap'},h('table',{class:'adm-gfx-table'},h('thead',null,head),h('tbody',null,...rows)))
+      }
+      const form=h('form',{class:'adm-npc adm-gfx',id:'adm-gfx-form',novalidate:''}) as HTMLFormElement
+      form.append(
+        h('p',{class:'adm-note'},'保存后新进入场景的玩家生效。手机默认「低」档，只用到「色调」和「低档也开遮蔽」；中、高档才会用到泛光与阴影，体积光与景深只在高档。'),
+        problem,
+        card('色调',[
+          choice('toneMapping','色调映射',[['neutral','中性'],['agx','AgX'],['aces','ACES']]),
+          h('div',{class:'adm-gfx-grid'},
+            slider('exposure','曝光',.2,3,.05,'×','在时间系统的曝光上再乘'),
+            slider('saturation','饱和度',0,2,.05,'×','1 = 不改'),
+            slider('contrast','对比度',0,2,.05,'×','1 = 不改')),
+        ],{sub:'中性最贴近原画面；AgX 偏淡雅、ACES 偏浓烈'}),
+        h('div',{class:'adm-cols adm-npc-cols'},
+          effect('ao','环境光遮蔽','墙角、檐下、树根加一层柔和暗部',[
+            slider('ao.intensity','强度',0,8,.1),slider('ao.radius','半径',.2,20,.1,' m'),
+            toggle('ao.lowEnabled','低档也开','手机耗电明显，默认关')],'中档半分辨率，高档全分辨率'),
+          effect('bloom','泛光','玻璃、灯笼、夜景窗灯的光晕',[
+            slider('bloom.intensity','强度',0,4,.05),slider('bloom.threshold','阈值',0,1,.01,'','越低越多地方发光')],'中、高档')),
+        h('div',{class:'adm-cols adm-npc-cols'},
+          effect('shadow','太阳阴影','跟随太阳的实时阴影，日落后自动关闭',[
+            slider('shadow.strength','浓度',0,1,.05),slider('shadow.softness','柔和度',0,16,.1),
+            choice('shadow.mapSize','精度',[[1024,'1024'],[2048,'2048'],[4096,'4096']]),
+            slider('shadow.distance','覆盖范围',10,300,10,' m','以玩家为中心'),
+            slider('shadow.updateEvery','中档刷新间隔',1,4,1,' 帧'),slider('shadow.moveThreshold','移动多远立即刷新',0,16,.5,' m')],'中档单级 PCF，高档 PCSS'),
+          h('div',{class:'adm-stack'},
+            effect('godrays','体积光','阳光穿过楼缝、树冠的光柱，夜间为 0',[slider('godrays.intensity','强度',0,4,.05)],'仅高档'),
+            effect('dof','景深','远景轻微虚化',[slider('dof.focusRange','对焦范围',0,1,.01),slider('dof.bokeh','虚化',0,8,.1)],'仅高档，默认关'))),
+        card('分时段微调',[periodTable(),h('p',{class:'adm-sub'},'空格 = 跟随全局。相邻时段之间按小时平滑过渡。')],{sub:'只填需要和全局不同的格子'}),
+      )
+      function problemText(){return validGfx(config)?'':'有参数超出范围，请检查标红的格子'}
+      function changed(){
+        const error=problemText(),dirty=JSON.stringify(config)!==saved
+        problem.textContent=error;problem.hidden=!error
+        save.disabled=!dirty||!!error;state.textContent=dirty?'有改动未保存':'已是最新';state.classList.toggle('is-dirty',dirty)
+      }
+      reset.onclick=()=>paint(structuredClone(gfxDefaults))
+      form.onsubmit=event=>{
+        event.preventDefault();if(save.disabled)return
+        save.classList.add('is-busy');save.disabled=true
+        void api('admin/gfx',config,'PUT').then(()=>{saved=JSON.stringify(config);changed();toast('已保存，新进场的玩家生效')})
+          .catch(error=>{changed();toast(error instanceof Error?error.message:'保存失败，请检查参数','error')})
+          .finally(()=>save.classList.remove('is-busy'))
+      }
+      slot.replaceChildren(form);sync();changed()
+      }
     }).catch(error=>slot.replaceChildren(errorState(error,()=>render())))
   },
   smoke() {

@@ -27,7 +27,7 @@ export function gfxState(params:URLSearchParams){
       slow=ms>25?slow+ms:0
       if(slow<3000)return
       if(quality==='low'){direct=true;slow=0}else select(quality==='high'?'mid':'low')
-      if(!notified){notified=true;const note=document.createElement('output');note.className='toast';note.textContent='已降低光影画质以保持流畅';document.body.append(note);setTimeout(()=>note.remove(),3000)}
+      if(!notified){notified=true;dispatchEvent(new CustomEvent('walk:toast',{detail:{text:quality==='low'&&direct?'画面有点卡，已关闭光影特效':`画面有点卡，光影已降到「${quality==='mid'?'中':'低'}」档 · 点「视野」可调`,ms:4200}}))}
     }}
 }
 export function sample(config:GfxConfig,hour:number):Options{
