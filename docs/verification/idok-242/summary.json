@@ -8196,5 +8196,75 @@
       "failures": 0
     },
     "regressionBaselineLastPairedAt": "87833eb62b27bfd8a50b2ee765b0669cb0700aab"
+  },
+  "round16Evidence": {
+    "runtimeRevision": "d88122935a2f8b2cd3465e4bc02a0cc991809852",
+    "main": "04036c4f78cd4d8c4993b9b338bec9097eb9964b",
+    "motorway": 882310597,
+    "motorwayLiftCapMetres": 0.5,
+    "clearanceMetres": 4.5,
+    "bridgeHeight": 160.0500030517578,
+    "wheelPathSpacingMetres": 0.01,
+    "maxDownGrade": 0.08,
+    "previousSingleProbe": {
+      "way": 882310597,
+      "xz": [
+        -18575.193215223866,
+        3961.19059393216
+      ],
+      "wheelPathMetres": 38.79,
+      "distanceToMotorwayAxis": 3.4117881508700596,
+      "outsideServiceCorridor": 6.717612122956961,
+      "roofMetres": 161.11073832321347,
+      "requiredMetres": 161.44680305175783,
+      "deficitMetres": 0.33606472854435765
+    },
+    "mainlineSection": {
+      "samples": 1474,
+      "roadWidth": 14.0,
+      "peak": {
+        "wheelPathMetres": 35.019999999999996,
+        "xz": [
+          -18576.367042001628,
+          3964.7731950397088
+        ],
+        "insideRoadEdgeMetres": 0.009030280875621521,
+        "floorLowerBound": 157.2484030517578,
+        "visibleTop": 160.84205393478376,
+        "minimumLift": 0.9063491169740416
+      },
+      "insideOneMetre": {
+        "wheelPathMetres": 36.07,
+        "xz": [
+          -18576.040114119227,
+          3963.7753883651926
+        ],
+        "insideRoadEdgeMetres": 1.005884563811092,
+        "floorLowerBound": 157.1644030517578,
+        "visibleTop": 160.91682581596032,
+        "minimumLift": 0.747577235797479
+      },
+      "overHalfMetreSamples": 269
+    },
+    "browserWitness": {
+      "xz": [
+        -18575.81709028,
+        3963.09079878
+      ],
+      "wheelPathMetres": 36.79,
+      "visibleTopMetres": 160.96820821583225,
+      "minimumLiftMetres": 0.6385948359255735
+    },
+    "transitionSurvey": {
+      "surveyLengthMetres": 200,
+      "motorwayWays": [
+        385795256,
+        882310597,
+        882310602
+      ],
+      "crossedBore": 1494508178,
+      "crossedWaterCulvert": 1545619158
+    },
+    "geometryChanged": false
   }
 }
