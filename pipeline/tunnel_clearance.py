@@ -1,6 +1,9 @@
 """Required clear height and previously verified motor-bore design heights, in metres."""
 import re
 
+SITANG_BORE = 1494508178
+SITANG_ROOF_THICKNESS = .30
+
 LOCAL_ROADS = {'unclassified', 'residential', 'service', 'living_street', 'track'}
 # These existing local-road bores already passed with 4.5 m of clear height.
 ACCEPTED_TALL_BORES = {
