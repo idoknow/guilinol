@@ -253,6 +253,8 @@ def bake(output, manifest, rendered_roads=None):
     garage=ground_passages.garage_boundary(output,manifest["chunks"],elements)
     garage_curbs=[]
     parking_segments = []
+    from dingjiang_paving import complete_merge_pavement
+    complete_merge_pavement(output, manifest, elements)
     sections = {road['way']:road['width'] for road in json.loads((output/'street-report.json').read_text())}
     restore_portal_paving(output,manifest['chunks'])
     restore_corridors(output,manifest['chunks'])
