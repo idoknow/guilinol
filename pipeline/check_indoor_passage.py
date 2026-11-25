@@ -51,6 +51,15 @@ def check(base, world, section):
         if roof_shape(old).symmetric_difference(roof_shape(new)).area > .001:
             raise ValueError(f"Changed roof footprint at {seed}")
     shell = union_all([p for _, base_y, top_y, p in new if base_y < config["ceiling"] <= top_y])
+    original = union_all([p for _, _, _, p in old])
+    cuts = original.boundary.difference(shell.buffer(.005))
+    contours = [g for g in getattr(cuts, "geoms", [cuts]) if g.length > .02]
+    mouths = [Point(main.coords[i]) for i in (0, -1)]
+    if len(contours) != 2 or any(min(g.distance(p) for g in contours) > 1.8 for p in mouths):
+        raise ValueError("Exterior wall openings must be confined to the two bridge entrances")
+    if any(not g.covered_by(p.buffer(3.5)) for g, p in
+           [(g, min(mouths,key=g.distance)) for g in contours]):
+        raise ValueError("Exterior wall breach outside a bridge entrance")
     ceiling = union_all([p for _, base_y, _, p in new if base_y == config["ceiling"]])
     for line in (main, branch):
         length = line.length - (config["endWallDepth"] if line is branch else 0)
@@ -88,7 +97,7 @@ def check(base, world, section):
     if not shell.covers(Point(end-direction*.1)):
         raise ValueError("Open terminal facade")
     return dict(mainLength=main.length, branchLength=branch.length, samples=samples,
-                minimumHeadroom=minimum, maximumRampGrade=maximum_grade, roofChanges=0)
+                minimumHeadroom=minimum, maximumRampGrade=maximum_grade, exteriorOpenings=len(contours), roofChanges=0)
 
 
 if __name__ == "__main__":
