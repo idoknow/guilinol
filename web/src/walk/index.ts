@@ -2066,7 +2066,8 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
     if((rides?.car||rides?.bike)&&!vehicleCollisionReady(start.x,start.y,start.z)){
       rides.stop();vx=vz=accumulator=0;bikeObstacle='streaming';return
     }
-    const fishingOnFoot=hotbarSlot()==='fishing'&&!rides?.bike&&!rides?.boat&&!rides?.car
+    // 拿着鱼竿也能走动（需求方：不要把人固定在原地）；抛出去后走开会自动收线
+    const fishingOnFoot=false
     const read=input.read(dt),keys=held||fishingOnFoot?still:read
     const rideCtrl=held?ZERO_RIDE_INPUT:input.readRideControls()
     const busyFootAnim=!!(standUpSession||pickupSession)

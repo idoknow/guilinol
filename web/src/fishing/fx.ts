@@ -17,8 +17,11 @@ export function createRod(tipLocal:THREE.Vector3){
   const reel=new THREE.Group();reel.position.set(0,.15,-.06);align.add(reel)
   const spool=new THREE.Mesh(new THREE.CylinderGeometry(.032,.034,.04,18),metal);spool.rotation.x=Math.PI/2;reel.add(spool)
   const body=new THREE.Mesh(new THREE.CylinderGeometry(.036,.036,.03,18),blank);body.rotation.x=Math.PI/2;body.position.z=.03;reel.add(body)
-  const crank=new THREE.Mesh(new THREE.BoxGeometry(.06,.006,.006),metal);crank.position.set(.03,0,.045);reel.add(crank)
-  const knob=new THREE.Mesh(new THREE.SphereGeometry(.009,8,6),accent);knob.position.set(.06,0,.045);reel.add(knob)
+  // 摇把：绕 X 轴（横穿轮体的轴）转，收线时像真纺车轮那样一圈圈摇
+  const crankAxle=new THREE.Group();crankAxle.position.set(.04,0,.03);reel.add(crankAxle)
+  const axle=new THREE.Mesh(new THREE.CylinderGeometry(.004,.004,.03,8),metal);axle.rotation.z=Math.PI/2;axle.position.x=-.012;crankAxle.add(axle)
+  const crank=new THREE.Mesh(new THREE.BoxGeometry(.006,.05,.006),metal);crank.position.set(.004,.025,0);crankAxle.add(crank)
+  const knob=new THREE.Mesh(new THREE.CylinderGeometry(.008,.008,.022,10),accent);knob.rotation.z=Math.PI/2;knob.position.set(.016,.05,0);crankAxle.add(knob)
   // 竿身 6 节：从轮座往上，半径 .014 → .004
   const N=6,segLen=(L-.18)/N,segs:THREE.Group[]=[]
   let parent:THREE.Object3D=align,base=.18
@@ -34,6 +37,8 @@ export function createRod(tipLocal:THREE.Vector3){
   const tipBall=new THREE.Mesh(new THREE.SphereGeometry(.012,8,6),accent);tip.add(tipBall)
   let bend=0,side=0,shake=0,clock=0
   return {root,tip,reel,
+    /** 收线：摇把绕 X 轴转 */
+    spin(dt:number){crankAxle.rotation.x-=dt*12},
     /** amount 0..1：弯向鱼线方向（竿头往前下压）；side −1..1 让竿尖左右偏；shake 竿尖抖动幅度 */
     set(amount:number,toward=0,jitter=0){bend=amount;side=toward;shake=jitter},
     tick(dt:number){clock+=dt
@@ -82,6 +87,8 @@ export function createWaterFx(scene:THREE.Scene){
     /** 抛竿：饵从竿梢沿抛物线飞到落点，落水时一圈涟漪 */
     cast(from:THREE.Vector3,to:THREE.Vector3,done?:()=>void){const d=from.distanceTo(to);fly={from:from.clone(),to:to.clone(),t:0,dur:.35+d*.022,done};lure.visible=true},
     flying(){return fly?lure.position:undefined},
+    /** 路亚饵落水后一直漂在线头上（p 为空则收起） */
+    bait(p?:THREE.Vector3){if(fly)return;lure.visible=!!p;if(p)lure.position.set(p.x,p.y+.04+Math.sin(performance.now()/260)*.02,p.z)},
     approach(target:THREE.Vector3,side:number,size:string){
       const s=sizeScale(size),dir=new THREE.Vector3(side||(Math.random()<.5?-1:1),0,Math.random()-.5).normalize()
       fish={pos:target.clone().addScaledVector(dir,4+2*s),goal:target.clone().addScaledVector(dir,.35*s),speed:1.4,size:s,fade:0,leaving:false}
@@ -104,7 +111,7 @@ export function createWaterFx(scene:THREE.Scene){
       if(pulse){pulse.t-=dt;if(pulse.t<=0){pulse.t=pulse.every;ripple(pulse.at,pulse.size,.8)}}
       if(fly){fly.t+=dt;const u=Math.min(1,fly.t/fly.dur),h=Math.max(1.5,fly.from.distanceTo(fly.to)*.28)
         lure.position.lerpVectors(fly.from,fly.to,u);lure.position.y+=Math.sin(Math.PI*u)*h
-        if(u>=1){ripple(fly.to,.7,.9);const done=fly.done;fly=undefined;lure.visible=false;done?.()}}
+        if(u>=1){splash(fly.to,.55);const done=fly.done;fly=undefined;lure.visible=false;done?.()}}
       for(const r of ripples){if(r.t>=r.dur){r.m.visible=false;continue}r.t+=dt;const u=r.t/r.dur
         r.m.scale.setScalar(.4+u*r.size*3);(r.m.material as THREE.MeshBasicMaterial).opacity=.55*(1-u)}
       for(const d of drops){if(d.t>=1){d.s.visible=false;continue}d.t+=dt*1.4;d.v.y-=9.8*dt;d.s.position.addScaledVector(d.v,dt)
