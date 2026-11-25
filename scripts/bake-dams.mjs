@@ -7,8 +7,9 @@ if(!directory)throw Error('Usage: node scripts/bake-dams.mjs <world directory>')
 const manifestFile=join(directory,'manifest.json')
 if(!existsSync(manifestFile)){console.log('No world supplied; skipping dam assembly');process.exit(0)}
 const dams=JSON.parse(readFileSync(new URL('../pipeline/dam-cells.json',import.meta.url)))
-const passages=JSON.parse(readFileSync(new URL('../pipeline/dam-passages.json',import.meta.url)))
 const manifest=JSON.parse(readFileSync(manifestFile))
+const passages=manifest.damPassageVersion===1
+  ? JSON.parse(readFileSync(new URL('../pipeline/dam-passages.json',import.meta.url))) : {}
 const origins=new Map(manifest.chunks.map(tile=>[[tile.x,tile.z].join(),tile]))
 const cache=new Map(),dry=-32768
 function samples(col,row) {

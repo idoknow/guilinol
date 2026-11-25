@@ -4,7 +4,7 @@
 
 生产构建会复用锁定的 GL04 发布包，因此 `npm run build` 的 `postbuild` 还会在 `dist/world` 对实心坝范围恢复干地和碰撞高程。此步骤不写入发布包或 `public/world`，重复执行不会继续抬高坝顶。坝顶取邻水最高值加 0.3 m，是未测量时的近似，不是实测高程。替换 OSM 快照时，运行 `uv run python pipeline/dam_cells.py` 更新 4 m 网格掩膜。
 
-验证发布包可在其独立副本上执行：
+从 raw 重建时，`world` 在末尾执行一次坝体回填。只有显式标记 `damPassageVersion: 1` 的新清单才保留通航口。旧发布包没有这个标记，仍按原有 `postbuild` 规则整坝回填。已回填的干格不再改写；复验应在产物副本上运行，避免覆盖原始输出。
 
 通航口使用 `pipeline/dam-passages.json` 的 `[col,row]` 世界网格坐标（乘 4 得米）。原始快照没有渡线，所列节点来自 OpenStreetMap `way/485320269`（木龙湖）和 `way/674893651`（春天湖）的 `/full.json`。只选中心在坝内、且格子与渡线穿坝段相交的格子，不加缓冲。木龙湖闸门 `node/6318049385` 在坝外，不是第二条穿坝通道。可用 `PYTHONPATH=pipeline uv run python -m unittest pipeline/test_dam_passages.py` 从 raw 坝面复算清单。
 

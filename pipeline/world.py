@@ -632,6 +632,7 @@ def build(bbox, output, palette, workers=4):
         print('Railway tiles:',report['tiles'],'clearance conflicts:',len(remaining))
     from major_roadbeds import bake as bake_major_roadbeds
     bake_major_roadbeds(output,manifest)
+    manifest['damPassageVersion'] = 1
     (output/'manifest.json').write_text(json.dumps(manifest,separators=(',',':'))+'\n')
     subprocess.run(['node',Path(__file__).resolve().parents[1]/'scripts/bake-dams.mjs',output],check=True)
     print(f'{len(chunks)} chunks, {len(footprints)} footprints, {sum(c["bytes"] for c in chunks):,} chunk bytes')
