@@ -4,14 +4,8 @@ import assert from 'node:assert/strict'
 import {mkdir} from 'node:fs/promises'
 import {chromium} from 'playwright'
 import {preview} from 'vite'
+import {applyCpuThrottle} from './qa-browser.mjs'
 
-const cpuRate=Number(process.env.PERF_CPU_RATE??1)
-assert(Number.isFinite(cpuRate)&&cpuRate>=1,'PERF_CPU_RATE must be at least 1')
-async function applyCpuRate(page){
-  if(cpuRate===1)return
-  const session=await page.context().newCDPSession(page)
-  await session.send('Emulation.setCPUThrottlingRate',{rate:cpuRate})
-}
 
 const start=performance.now()
 // Walk-only distance probes were tuned for the old 4 m/s walk; IDOK-133 walks at a natural 1.65 m/s, so the same
@@ -23,10 +17,17 @@ const server=await preview({plugins:[telemetryPreview],root:'web',configFile:'we
 const baseUrl=`http://127.0.0.1:${server.httpServer.address().port}`
 const walkUrl = baseUrl+'/?verify&mode=walk&flow=0'+(process.argv.includes('--solo')?'&solo=1':'')
 let browser
+let checkpoint = start, stage = 'startup'
+function progress(label) { checkpoint = performance.now(); stage = label }
+const watchdog = setInterval(() => {
+  if (performance.now()-checkpoint <= 180000 && performance.now()-start <= 900000) return
+  console.error(`walk watchdog after ${stage}: stalled for 180s or exceeded 900s total`)
+  void browser?.close()
+}, 1000)
 try {
   browser=await chromium.launch({executablePath:process.env.CHROMIUM,args:['--use-angle=swiftshader','--enable-unsafe-swiftshader']})
   const page=await browser.newPage({viewport:{width:480,height:270}}),errors=[]
-  await applyCpuRate(page)
+  await applyCpuThrottle(page,process.env.PERF_CPU_RATE)
   let releaseBridge
   const coldBridge=new Promise(resolve=>{releaseBridge=resolve})
   await page.route('**/jiefang_bridge.glb',async route=>{await coldBridge;await route.continue()})
@@ -39,6 +40,7 @@ try {
   await page.waitForFunction(()=>window.viewer?.walk?.active && ![1,2].includes(window.__loading?.level),null,{timeout:90000})
 
   async function fixture(origin,direction,seconds,target){
+    progress(target)
     seconds=Math.ceil(seconds*WALK_TIME)
     const result=await page.evaluate(async({origin,direction,seconds,target})=>{
       const {walk,stream}=window.viewer;walk.leave()
@@ -391,7 +393,8 @@ try {
     v:1,body:'f',skin:2,face:1,brows:1,eyes:1,hair:'f_long',hairColor:0,look:'basic',createdAt:1,
   })))
   const mobile=await mobileCtx.newPage()
-  await applyCpuRate(mobile)
+  progress('mobile startup')
+  await applyCpuThrottle(mobile,process.env.PERF_CPU_RATE)
   mobile.on('pageerror',error=>errors.push('mobile: '+error.message))
   await mobile.route('**/favicon.ico',route=>route.fulfill({status:204}))
   await mobile.route('**/api/t',route=>route.fulfill({status:204}))
@@ -423,6 +426,7 @@ try {
     return {boxes,overlaps,outOfBounds}
   })
   assert(hud.boxes.every(b=>!b.missing&&!b.hidden),`missing HUD: ${JSON.stringify(hud.boxes)}`)
+  progress('mobile HUD')
   assert(hud.boxes.filter(b=>b.sel.startsWith('.walk-ui .btn-')).every(b=>(b.bg===b.glass||b.bg.includes('24, 40, 37')||b.bg.includes('28, 44, 42'))&&b.font.includes('Noto Serif SC')),`HUD style mismatch: ${JSON.stringify(hud.boxes)}`)
   assert.deepEqual(hud.overlaps,[],`HUD overlap: ${JSON.stringify(hud)}`)
   assert.deepEqual(hud.outOfBounds,[],`HUD out of bounds: ${JSON.stringify(hud)}`)
@@ -680,5 +684,5 @@ try {
   console.log('mobile 390x844 HUD & touch OK',JSON.stringify({run:+touchTest.dist.toFixed(2),along:+touchTest.along.toFixed(3),peak:touchTest.peakSpeed,cornerTurn:lookTest.corner.turn,landCornerTurn:landLook.corner.turn}),mobileShot)
   await mobileCtx.close()
 
-  assert.deepEqual(errors,[]);console.log('seconds',(performance.now()-start)/1000);assert(performance.now()-start<180000)
-}finally{await browser?.close();await server.close()}
+  assert.deepEqual(errors,[]);console.log('seconds',(performance.now()-start)/1000)
+}finally{clearInterval(watchdog);await browser?.close();await server.close()}

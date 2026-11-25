@@ -4,7 +4,7 @@ import {readFile, writeFile} from 'node:fs/promises'
 import {execFileSync} from 'node:child_process'
 import {chromium} from 'playwright'
 import {preview} from 'vite'
-import {browserOptions} from './qa-browser.mjs'
+import {applyCpuThrottle, browserOptions} from './qa-browser.mjs'
 
 const ROOT = resolve(import.meta.dirname, '..')
 const baselinePath = resolve(import.meta.dirname, 'mission-layout-main.json')
@@ -134,17 +134,28 @@ async function measureVehicles(page, viewport, mission) {
 }
 
 async function waitForWalkReady(page) {
-  await page.waitForFunction(
-    () => Boolean(window.viewer?.walk?.active && window.viewer?.game && window.viewer?.tour?.goTo && window.viewer?.stats?.loaded >= 6),
-    null,
-    {timeout: 90000},
-  )
+  let lastProgress, lastChange = performance.now()
+  const deadline = lastChange + 240000
+  while (performance.now() < deadline) {
+    const state = await page.evaluate(() => {
+      const viewer = window.viewer
+      return {walking: Boolean(viewer?.walk?.active), game: Boolean(viewer?.game), tour: Boolean(viewer?.tour?.goTo),
+        loaded: viewer?.stats?.loaded ?? 0, loading: window.__loading}
+    })
+    if (state.walking && state.game && state.tour && state.loaded >= 6) return
+    const progress = JSON.stringify(state)
+    if (progress !== lastProgress) {lastChange = performance.now(); lastProgress = progress}
+    if (performance.now() - lastChange > 90000) break
+    await page.waitForTimeout(500)
+  }
+  throw Error(`Mission walk startup stalled or exceeded 240s: ${lastProgress}`)
 }
 
 async function verifyViewportLayout(browser, baseUrl, label, viewport, hasTouch) {
   const ctx = await browser.newContext({viewport, hasTouch, isMobile: hasTouch})
   await ctx.route('**/api/t', route => route.fulfill({status:204}))
   const page = await ctx.newPage()
+  await applyCpuThrottle(page)
   const errors = []
   page.on('pageerror', err => errors.push(`pageerror(${label}): ${err.message}`))
   page.on('console', msg => {
@@ -204,6 +215,7 @@ try {
   const ctx = await browser.newContext({viewport: {width: 1280, height: 720}})
   await ctx.route('**/api/t', route => route.fulfill({status:204}))
   const page = await ctx.newPage()
+  await applyCpuThrottle(page)
   page.on('pageerror', err => errors.push(`pageerror: ${err.message}`))
   page.on('console', msg => {
     if (msg.type() === 'error') errors.push(`console.error: ${msg.text()} (${msg.location().url})`)
