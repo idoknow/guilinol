@@ -24,6 +24,17 @@ class RailwayApproachSurfaceTest(unittest.TestCase):
         self.assertLessEqual(abs(ys[24]-148.9525),.00251)
         self.assertLessEqual(np.max(abs(np.diff(ys)))/2,.0501)
 
+    def test_shared_tile_chord_end_does_not_extend_the_road_excavation(self):
+        from railway_approach_surface import lower_edge_supports
+        x, z = np.meshgrid(4*np.arange(25), [0, 4])
+        levels = np.full(x.shape, 160.)
+        blend = np.zeros(x.shape)
+        levels[0, 3] = 153.
+        blend[0, 3] = 1.
+        lower_edge_supports(x, z, levels, blend, np.full(x.shape, -32768))
+        np.testing.assert_allclose(levels[0, [0, 8, 16, 24]], [152.85, 152.85, 160., 160.])
+        np.testing.assert_array_equal(blend[0, [0, 8, 16, 24]], [1., 1., 0., 0.])
+
     @patch('railway_tunnel_widths.points',side_effect=lambda way:way['geometry'])
     def test_unnamed_opposite_bores_do_not_cover_each_other(self, _):
         tags = dict(highway='trunk',tunnel='yes',oneway='yes')

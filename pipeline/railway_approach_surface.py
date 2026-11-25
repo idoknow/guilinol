@@ -246,28 +246,34 @@ def grade_approach_surfaces(ways, crossings, panels, tunnels, plans, protected, 
         edge = (d-radii[idx]).reshape(xx.shape)
         blend = np.clip((24-edge)/14,0,1)
         blend = blend**2*(3-2*blend)*(water[patch]==-32768)
+        road = eval_bspline_grid(local,left,top,xx,zz)-.24
+        lower_edge_supports(xx, zz, road, blend, water[patch])
         np.maximum(protected.paved_support[patch], np.rint(blend*255).astype(np.uint8),
                    out=protected.paved_support[patch])
-        road = eval_bspline_grid(local,left,top,xx,zz)-.24
-        # A dry tile edge is rendered as 32 m chords. Keep both chord
-        # supports below the fitted carriageway wherever it crosses that edge.
-        for coords,levels,weights,wet in (
-                (xx,road,blend,water[patch]),(zz.T,road.T,blend.T,water[patch].T)):
-            orthogonal = zz if coords is xx else xx.T
-            for row in np.flatnonzero(orthogonal[:,0]%256==0):
-                for col in np.flatnonzero(coords[row]%32==0):
-                    if col+8>=levels.shape[1]:
-                        continue
-                    section = slice(col,col+9)
-                    active = weights[row,section]>.8
-                    if not np.any(active) or np.any(wet[row,section]!=-32768):
-                        continue
-                    y = np.min(levels[row,section][active])-.15
-                    for k in (col,col+8):
-                        levels[row,k] = min(levels[row,k],y)
-                        weights[row,k] = 1.
         for field in (terrain,ground):
             old = field[patch]
             target = np.where(edge<1,road*10,np.minimum(old,road*10))
             old[:] = np.rint(old+blend*(target-old))
     return cut_roads
+
+def lower_edge_supports(xx, zz, road, blend, water):
+    """Keep each dry 32 m terrain chord below its surveyed road crossing."""
+    surveyed = blend > .8
+    reference = road.copy()
+    for along, across, levels, weights, wet, active, heights in (
+            (xx, zz, road, blend, water, surveyed, reference),
+            (zz.T, xx.T, road.T, blend.T, water.T, surveyed.T, reference.T)):
+        for row in np.flatnonzero(across[:, 0] % 256 == 0):
+            for col in np.flatnonzero(along[row] % 32 == 0):
+                if col + 8 >= levels.shape[1]:
+                    continue
+                section = slice(col, col + 9)
+                hits = active[row, section]
+                if not hits.any() or np.any(wet[row, section] != -32768):
+                    continue
+                # A shared endpoint can support two chords. Lowering it is
+                # not a survey observation for the next chord or tile axis.
+                ceiling = heights[row, section][hits].min() - .15
+                for end in (col, col + 8):
+                    levels[row, end] = min(levels[row, end], ceiling)
+                    weights[row, end] = 1.

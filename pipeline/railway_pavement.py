@@ -23,7 +23,7 @@ def bake(directory, chunks, graded=None, tunnels=()):
         if row['roadTags'].get('access') == 'private':
             continue
         if row['type'] in ('level','rail_over') and all(row['roadTags'].get(k,'no')=='no' for k in ('bridge','tunnel')):
-            sites[row['road']].append(Point(ll2xz(row['lat'],row['lon'])))
+            sites[row['road']].append((Point(ll2xz(row['lat'],row['lon'])),row['type']))
     shapes, landings = [], []
     daylight = {node for t in tunnels if t.get('openCut')
                 for node,mouth in zip(t['nodes'],t['mouths']) if mouth}
@@ -63,9 +63,16 @@ def bake(directory, chunks, graded=None, tunnels=()):
                 landing = substring(center,max(0,at-20),min(center.length,at+20))
                 landings.append(landing.buffer(min(road_width,lane_width)/2,cap_style='flat'))
         segments = []
-        for site in sites.get(way['id'],()):
+        for site, crossing_type in sites.get(way['id'],()):
             at = center.project(site)
-            segments.append(substring(center,max(0.,at-60),min(center.length,at+60)))
+            segment = substring(center,max(0.,at-60),min(center.length,at+60))
+            # A rail overpass with sufficient existing headroom can leave its
+            # original street and bridge abutments at their published height.
+            if crossing_type == 'rail_over' and graded is not None and not any(
+                    graded.affects_carriageway(a,b,road_width/2)
+                    for a,b in zip(segment.coords,list(segment.coords)[1:])):
+                continue
+            segments.append(segment)
         if graded_road:
             coords = np.asarray(center.coords)
             for a,b in zip(coords,coords[1:]):
