@@ -54,11 +54,12 @@ def bridge_height(wid, line, at):
         return hengliu(line.interpolate(at).y) + 8.715
     first, a, ya, b, yb, last = YARD_DECK[wid]
     grade = (yb - ya) / (b - a)
-    # Keep a full triangulation interval on the tangent at each crossing.
+    # The two yard railheads rise away from their old deck-centre pins.
+    # Reserve 18 cm for that rise across the full slab and cm encoding.
     return np.interp(
         at,
         [0.0, a - 5, b + 5, line.length],
-        [first, ya - 5 * grade + 0.016, yb + 5 * grade + 0.016, last],
+        [first, ya - 5 * grade + 0.18, yb + 5 * grade + 0.18, last],
     )
 
 
@@ -139,7 +140,12 @@ def raise_decks(directory, manifest, elements):
                 ends = set()
                 axis = np.subtract(line.coords[-1], line.coords[0]) / line.length
                 for vertex, p in zip(tri, xy):
-                    y = round(bridge_height(wid, line, line.project(Point(p))) * 100)
+                    along = line.project(Point(p))
+                    height = bridge_height(wid, line, along)
+                    if wid not in YARD_DECK:
+                        # Follow the Hengliu plane across the slab width as well.
+                        height += hengliu(p[1]) - hengliu(line.interpolate(along).y)
+                    y = round(height * 100)
                     if y < vertex[1]:
                         raise ValueError(f"S2201 deck lowered on {wid}")
                     vertex[1] = y
