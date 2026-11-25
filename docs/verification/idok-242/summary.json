@@ -8861,5 +8861,58 @@
         }
       }
     }
+  },
+  "round19PrePortal": {
+    "sourceRevision": "e3bf9b888e7b0c2a0fb7197487ef8b00837fdbab",
+    "scope": "Full city with the Shanghai and West Ring decks, village ties, and deterministic junction driver. Before the Sitang banked-floor trial. Tested before mechanical consolidation of the two crossing graders.",
+    "wheelAudit": {
+      "tunnelConstraintRecords": 0,
+      "gradedApproaches": 142,
+      "partialTunnelWays": [],
+      "reasons": {
+        "surface": 0,
+        "tunnel": 0,
+        "fit": 0,
+        "hidden": 0
+      },
+      "lanes": 88280,
+      "wheelSamples": 7705968,
+      "outliers": 0,
+      "sunk": 0,
+      "floating": 0,
+      "p99": 0.023,
+      "nonplanarFootprints": 0,
+      "unresolvedTunnelWays": []
+    },
+    "surface": {
+      "sites": 239,
+      "passed": 239,
+      "runs": 507,
+      "completed": 507,
+      "maximum": 0.08685222358073474
+    },
+    "node13481414402": {
+      "in": {
+        "maximum": 0.014998109048292463,
+        "frames": 731,
+        "start": {
+          "x": -14315.443359375,
+          "z": 6970.7734375,
+          "y": 154.50009888506537,
+          "heading": 0.4313533898138154
+        }
+      },
+      "out": {
+        "maximum": 0.013316209529932621,
+        "frames": 907,
+        "start": {
+          "x": -14305.9140625,
+          "z": 6943.66748046875,
+          "y": 152.1911802151039,
+          "heading": 2.0341152337446555
+        }
+      }
+    },
+    "performance": "Pending final geometry"
   }
 }
