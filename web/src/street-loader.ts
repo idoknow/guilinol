@@ -42,7 +42,7 @@ export async function loadStreetGeometry(paths:Streets,step:number,heights:THREE
     if(paths[16]?.length){
       // Adjacent clipped shoulder triangles share positions and material attributes.
       const triangles=surface
-      surface=mergeVertices(triangles,1e-6)
+      surface=mergeVertices(triangles,1e-4)
       triangles.dispose()
     }
   }
