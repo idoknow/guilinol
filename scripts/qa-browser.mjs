@@ -23,3 +23,12 @@ export async function recordFrames(page) {
   })
   console.log('QA_FRAME', JSON.stringify(sample))
 }
+
+export async function applyCpuThrottle(page, fallback = 1) {
+  const rate = Number(process.env.GLOL_CPU_THROTTLE ?? fallback)
+  if (!Number.isFinite(rate) || rate < 1) throw Error('CPU throttle rate must be at least 1')
+  if (rate === 1) return
+  const session = await page.context().newCDPSession(page)
+  await session.send('Emulation.setCPUThrottlingRate', {rate})
+  console.log(`CDP CPU throttle: ${rate}x`)
+}

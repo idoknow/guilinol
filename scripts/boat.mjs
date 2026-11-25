@@ -3,6 +3,7 @@ import {readFile} from 'node:fs/promises'
 import {gunzipSync} from 'node:zlib'
 import {chromium} from 'playwright'
 import {preview} from 'vite'
+import {applyCpuThrottle} from './qa-browser.mjs'
 
 /**
  * M6-3 自由划船全自动验证脚本 (`verify:boat`)。
@@ -60,6 +61,7 @@ try {
 
   // ---------- 通用页面辅助工具 ----------
   async function attachHelpers(page) {
+    await applyCpuThrottle(page)
     await page.addInitScript(() => {
       window.__boatToasts = []
       window.addEventListener('walk:toast', ev => {
@@ -131,21 +133,32 @@ try {
         window.addEventListener(isTouch ? 'click' : 'keydown', () => {
           const start = performance.now()
           let shown = null
+          let frame = 0, frames = 0
           function sample() {
             const now = performance.now()
             const toast = document.querySelector('.toast.show')
-            const visible = toast?.textContent.includes('离岸太远') && toast.checkVisibility({opacityProperty: true, visibilityProperty: true})
+            const bounds = toast?.getBoundingClientRect()
+            const visible = toast?.textContent.includes('离岸太远') && toast.checkVisibility({opacityProperty: true, visibilityProperty: true}) &&
+              bounds.width > 0 && bounds.height > 0 && bounds.bottom > 0 && bounds.right > 0 && bounds.top < innerHeight && bounds.left < innerWidth
+            frames++
             if (visible && shown === null) shown = now
-            if (shown === null ? now - start < 2000 : visible && now - shown < 1500) return
-            clearInterval(timer)
-            observer.disconnect()
-            resolve({delay: shown === null ? null : shown - start, duration: shown === null || !visible ? 0 : now - shown,
-              events: window.__boatToasts.map(({text, at}) => ({text, afterInput: at - start})),
-              toast: document.querySelector('.toast')?.outerHTML})
+            if (shown === null ? now - start < 2000 : visible && now - shown < 1500) {
+              frame = requestAnimationFrame(sample)
+              return
+            }
+            finish(now, visible)
           }
-          const observer = new MutationObserver(sample)
-          observer.observe(document.querySelector('.toast'), {subtree: true, attributes: true, childList: true, characterData: true})
-          const timer = setInterval(sample, 16)
+          function finish(now, visible) {
+            cancelAnimationFrame(frame)
+            clearTimeout(deadline)
+            const el = document.querySelector('.toast'), style = getComputedStyle(el)
+            resolve({delay: shown === null ? null : shown - start, duration: shown === null || !visible ? 0 : now - shown, frames,
+              opacity: style.opacity, visibility: style.visibility, display: style.display, pageVisibility: document.visibilityState,
+              events: window.__boatToasts.map(({text, at}) => ({text, afterInput: at - start})),
+              toast: el.outerHTML})
+          }
+          const deadline = setTimeout(() => finish(performance.now(), false), 5000)
+          frame = requestAnimationFrame(sample)
         }, {capture: true, once: true})
       })
     }, mobile)
