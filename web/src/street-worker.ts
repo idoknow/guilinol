@@ -1,3 +1,5 @@
+import style from '../../pipeline/railway-style.json'
+import {inRing} from './polygon'
 import {stationPaving,type StationPavingCut} from './station-paving'
 import {stationRoadSurface,type StationRoadSegment} from './station-road-surface'
 import {railwayGeometry,type RailSection,type RailFace,type CrossingSign} from './railways'
@@ -5,12 +7,15 @@ import {buildRoadBarriers} from './road-barriers'
 import * as THREE from 'three'
 import {look} from './look/config'
 type Pair=[number,number]
+export interface StationPavingStyle {plaza?:Pair[]; platformEdges?:[Pair,Pair][]}
 type Path=[number,...Pair[][]]
 type RoadCtrl=[number,number[]]
 type Lower=[number,Pair[],[number,number,number,number][]]
 export type Streets=[Path[],Pair[],number[][],Pair[]?,Pair[]?,(RoadCtrl|null)?,number[][]?,number[][]?,number[][]?,number[][]?,Pair[][]?,(Lower|null)?,([number,number,number]|null)?,unknown?,StationRoadSegment[]?,StationPavingCut[]?]
 const colors=look.streets.surfaces.map(v=>new THREE.Color(v)),tone=Object.fromEntries((['railing','lampPole','lampHead'] as const).map(k=>[k,new THREE.Color(look.streets[k])]))
 const stoneLight=new THREE.Color(0xa6a39a),stoneMid=new THREE.Color(0x8c8981),stoneBase=new THREE.Color(0x74726b)
+const platformBrick=new THREE.Color(style.station.platformBrick)
+const plazaStone=new THREE.Color(style.station.plazaStone)
 const parkingYellow=new THREE.Color(0xe7b62e)
 function evalRoadCtrl([baseMm,deltas]:RoadCtrl,lx:number,lz:number){
   const u=lx/8+1,v=lz/8+1
@@ -41,7 +46,7 @@ function lowerHeight(x:number,z:number,base:number,terrain:number,[,corners,prof
   return terrain+factor*(base-terrain)
 }
 
-export function streetGeometry([paths,lamps,banks,signals=[],stops=[],roadCtrl,stoneRails=[],beds=[],shops=[],decor=[],curbCuts=[],lower,platform,,stationRoads,stationCuts]:Streets,ground:(x:number,z:number)=>number,rails:RailSection[]=[],signs:CrossingSign[]=[],railGround:(x:number,z:number)=>number=ground){
+export function streetGeometry([paths,lamps,banks,signals=[],stops=[],roadCtrl,stoneRails=[],beds=[],shops=[],decor=[],curbCuts=[],lower,platform,,stationRoads,stationCuts]:Streets,ground:(x:number,z:number)=>number,rails:RailSection[]=[],signs:CrossingSign[]=[],railGround:(x:number,z:number)=>number=ground,paving?:StationPavingStyle){
   const xyz:number[]=[],rgb:number[]=[],sidewalk:number[]=[],road:number[]=[],mats:number[]=[],cols:number[]=[]
   const stationLevel=stationRoads?stationRoadSurface(stationRoads):null
   const remaining=stationCuts?stationPaving(stationCuts,stationLevel?.protectedAt):null
@@ -49,6 +54,17 @@ export function streetGeometry([paths,lamps,banks,signals=[],stops=[],roadCtrl,s
   const curbSegments=curbCuts.flatMap(line=>line.slice(1).map(([x,z],i)=>
     new THREE.Line3(new THREE.Vector3(line[i][0]/100,0,line[i][1]/100),new THREE.Vector3(x/100,0,z/100)))).filter(segment=>segment.distanceSq()>0)
   const testPoint=new THREE.Vector3(), closest=new THREE.Vector3()
+  const edges=paving?.platformEdges?.map(([[ax,az],[bx,bz]])=>
+    new THREE.Line3(new THREE.Vector3(ax,0,az),new THREE.Vector3(bx,0,bz)))
+  function edgeDistance(p:THREE.Vector3){
+    testPoint.set(p.x,0,p.z)
+    let distance=8
+    for(const edge of edges??[]){
+      edge.closestPointToPoint(testPoint,true,closest)
+      distance=Math.min(distance,closest.distanceTo(testPoint))
+    }
+    return distance
+  }
   let platformPath=false
   let lowerPath=false
   function vector(pt:THREE.Vector2,offset:number){
@@ -87,9 +103,13 @@ export function streetGeometry([paths,lamps,banks,signals=[],stops=[],roadCtrl,s
       void y1;void y2;void y3
     }
     const channel=kind===4||kind===6?1:kind===5?0:kind
-    const textureChannel=kind===6?6:channel
-    surfaceKinds.push(textureChannel,textureChannel,textureChannel);alongVals.push(a1,a2,a3)
-    const c=colors[kind]
+    const platformTop=kind===1 && platformPath && edges?.length && !vertical
+    const textureChannel=platformTop?9:kind===6?6:channel
+    surfaceKinds.push(textureChannel,textureChannel,textureChannel)
+    if(platformTop)alongVals.push(edgeDistance(p1),edgeDistance(p2),edgeDistance(p3))
+    else alongVals.push(a1,a2,a3)
+    const stone=kind===1 && paving?.plaza && inRing((p1.x+p2.x+p3.x)/3,(p1.z+p2.z+p3.z)/3,paving.plaza)
+    const c=platformTop?platformBrick:stone?plazaStone:colors[kind]
     for(const pt of [p1,p2,p3]){xyz.push(pt.x,pt.y,pt.z);rgb.push(c.r,c.g,c.b);if(channel===1&&!vertical)sidewalk.push(pt.x,pt.y,pt.z);else if(channel===0&&!vertical)road.push(pt.x,pt.y,pt.z)}
   }
   for(const [index,[kind,...rings]] of paths.entries()){
@@ -114,6 +134,7 @@ export function streetGeometry([paths,lamps,banks,signals=[],stops=[],roadCtrl,s
       }
     }
   }
+  platformPath=false
   const object=new THREE.Object3D()
   function box(x:number,y:number,z:number,w:number,h:number,d:number,yaw=0,tint=tone.railing,pitch=0){
     object.position.set(x,y,z);object.scale.set(w,h,d);object.rotation.set(0,yaw,pitch,'YXZ');object.updateMatrix()
@@ -338,10 +359,10 @@ export function streetGeometry([paths,lamps,banks,signals=[],stops=[],roadCtrl,s
 }
 
 export type StreetData=ReturnType<typeof streetGeometry>
-export interface StreetRequest {id:number; paths:Streets; rails?:RailSection[]; signs?:CrossingSign[]; railCuts?:[number,number][]; step:number; elevations:Float32Array}
+export interface StreetRequest {id:number; paths:Streets; paving?:StationPavingStyle; rails?:RailSection[]; signs?:CrossingSign[]; railCuts?:[number,number][]; step:number; elevations:Float32Array}
 export type StreetResponse={id:number; data:StreetData}|{id:number; error:string}
 
-if(typeof self!=='undefined')self.onmessage=({data:{id,paths,step,elevations,rails=[],signs=[],railCuts=[]}}:MessageEvent<StreetRequest>)=>{
+if(typeof self!=='undefined')self.onmessage=({data:{id,paths,step,elevations,paving,rails=[],signs=[],railCuts=[]}}:MessageEvent<StreetRequest>)=>{
   try {
     const segments=256/step, stride=segments+1
     const sample=(grid:Float32Array)=>(x:number,z:number)=>{
@@ -351,7 +372,7 @@ if(typeof self!=='undefined')self.onmessage=({data:{id,paths,step,elevations,rai
     }
     const cut=railCuts.length?elevations.slice():elevations
     for(const [i,cm] of railCuts)cut[i]=cm/100
-    const data=streetGeometry(paths,sample(elevations),rails,signs,sample(cut))
+    const data=streetGeometry(paths,sample(elevations),rails,signs,sample(cut),paving)
     const transfer=Object.values(data).flatMap(value=>typeof value==='number'?[]:[value.buffer])
     self.postMessage({id,data} satisfies StreetResponse,{transfer})
   } catch(error) {

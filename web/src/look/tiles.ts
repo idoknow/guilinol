@@ -1,4 +1,5 @@
 import * as THREE from 'three'
+import railwayStyle from '../../../pipeline/railway-style.json'
 import {shareAtmosphere} from './atmosphere'
 
 export const tileConfig={enabled:true,radius:400,metres:{wall:4,roof:4,road:6,sidewalk:2,bank:3}}
@@ -27,7 +28,7 @@ export function tileMaterial(material:THREE.Material,building:boolean){
     if(!building)shader.vertexShader=shader.vertexShader.replace('#include <common>','#include <common>\nattribute float aSurface; attribute float aAlong; varying float vSurface; varying float vAlong;').replace('#include <begin_vertex>','#include <begin_vertex>\nvSurface=aSurface; vAlong=aAlong;')
     const sample=(key:Channel,uv:string)=>`texture2D(tile_${key},(${uv})/${tileConfig.metres[key].toFixed(2)}).rgb`
     shader.fragmentShader=shader.fragmentShader.replace('#include <common>',`#include <common>\nuniform bool tilesReady;${building?'':'varying float vSurface; varying float vAlong;'}${channels.map(key=>`uniform sampler2D tile_${key};`).join('')}`)
-      .replace('#include <roughnessmap_fragment>',`#ifdef USE_FOG\n${building?'':`if(vSurface>7.5){float k=abs(fract(vAlong/.6)-.5);diffuseColor.rgb*=mix(.74,1.,smoothstep(.15,.23,k));}`}if(tilesReady && distance(vFogWorld,cameraPosition)<${tileConfig.radius.toFixed(1)}){${building?
+      .replace('#include <roughnessmap_fragment>',`#ifdef USE_FOG\n${building?'':`if(vSurface>8.5){float w=clamp(fwidth(vAlong),.015,.25);float line=1.-smoothstep(.09,.09+w,abs(vAlong-.85));diffuseColor.rgb=mix(diffuseColor.rgb,vec3(${new THREE.Color(railwayStyle.station.platformWarning).toArray().join(',')}),line);}else if(vSurface>7.5){float k=abs(fract(vAlong/.6)-.5);diffuseColor.rgb*=mix(.74,1.,smoothstep(.15,.23,k));}`}if(tilesReady && distance(vFogWorld,cameraPosition)<${tileConfig.radius.toFixed(1)}){${building?
         `diffuseColor.rgb*=vRoof<.5?${sample('wall','vec2(vFacade,vFloor*3.1)')}:${sample('roof','vFogWorld.xz')};`:
         `if(vSurface<.5)diffuseColor.rgb*=${sample('road','vFogWorld.xz')};else if(vSurface<1.5)diffuseColor.rgb*=${sample('sidewalk','vFogWorld.xz')};else if(vSurface>6.5){}else if(vSurface>5.5){float dots=length(fract(vFogWorld.xz*12.)-.5);float detail=1.-smoothstep(.02,.08,fwidth(vFogWorld.x)+fwidth(vFogWorld.z));diffuseColor.rgb*=mix(.92,1.12,(1.-smoothstep(.14,.32,dots))*detail);}else if(vSurface>2.5)diffuseColor.rgb*=${sample('bank','vec2(vAlong,vFogWorld.y)')};`}}\n#endif\n#include <roughnessmap_fragment>`)
   }

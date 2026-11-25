@@ -126,7 +126,7 @@ function createCachedKtx2Loader(basis:Awaited<ReturnType<typeof sharedKtx2Loader
   return proxy
 }
 
-function atlasStreetMesh(source:THREE.Mesh, indices:number[], role:string, color?:string){
+function atlasStreetMesh(source:THREE.Mesh, indices:number[], role:string){
   const geometry=new THREE.BufferGeometry()
   const positions=source.geometry.getAttribute('position'), normals=source.geometry.getAttribute('normal')
   const vertices=[...new Set(indices)]
@@ -140,7 +140,7 @@ function atlasStreetMesh(source:THREE.Mesh, indices:number[], role:string, color
   geometry.setAttribute('position',xyz)
   if(normals)geometry.setAttribute('normal',directions)
   geometry.setIndex(indices.map(vertex=>remap.get(vertex)!))
-  bindStreetSurface(geometry,role,color)
+  bindStreetSurface(geometry,role)
   if(source instanceof THREE.InstancedMesh){
     const mesh=new THREE.InstancedMesh(geometry,streetSurfaceMat,source.count)
     mesh.instanceMatrix.copy(source.instanceMatrix)
@@ -415,7 +415,7 @@ export function landmarkStream(
     group.position.fromArray(entry.position);group.rotation.y=THREE.MathUtils.degToRad(entry.rotation)
     const surfaces:Record<string,string>=(seamConfig.surfaces as Record<string,Record<string,string>>)[entry.id]??{}
     const exceptions=seamConfig.exceptions.filter((item:{kind?:string})=>!item.kind||item.kind==='material')
-    type AtlasRule={material:string,role:string,box:number[],color?:string}
+    type AtlasRule={material:string,role:string,box:number[]}
     const atlas=(seamConfig.atlas as Record<string,AtlasRule|AtlasRule[]>)[entry.id]
     const regions=atlas?[atlas].flat():[]
     const retired=new Set<THREE.BufferGeometry|THREE.Material|THREE.Texture>()
@@ -437,7 +437,7 @@ export function landmarkStream(
             retired.add(source)
             node.geometry=remainder
           }
-          node.add(atlasStreetMesh(node,selected,rule.role,rule.color))
+          node.add(atlasStreetMesh(node,selected,rule.role))
           remainder.setIndex(rest)
         }
       }

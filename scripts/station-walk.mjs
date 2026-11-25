@@ -2,21 +2,20 @@
 export async function stationWalk(page) {
   const result = await page.evaluate(async () => {
     const { walk, stream } = window.viewer
-    const exit = [-2169.15, 1738.87]
+    const exit = [-2169.23, 1755.27]
+    const back = [-2233.67, 1763.78]
+    const ramp = [-2234.3, 1748.0]
     const platform = [-2257.34, 1750.49]
+    const stairs = [-2261.45, 1680.5]
+    const landing = [-2259.41, 1697.55]
+    const bridge = [-2278.5, 1699.89]
+    const platformSide = [-2251.9, 1749.9]
+    const stairSide = [-2259.1, 1680.25]
     const route = [
-      [-2200.65, 1741.55],
-      [-2221.35, 1744.68],
-      platform,
-      [-2221.35, 1744.68],
-      [-2200.65, 1741.55],
-      exit,
-      [-2161.5, 1739.76],
-      [-2143.95, 1768.37],
-      [-2126.4, 1780.44],
-      [-2103, 1801.9],
-      [-2085, 1802.79],
-      [-2079, 1802.9],
+      back, ramp, platformSide, platform, platformSide, stairSide,
+      stairs, landing, bridge, landing, stairs, stairSide, platformSide,
+      ramp, back, exit, [-2143.95, 1768.37],
+      [-2098.646, 1799.15], [-2079, 1802.9],
     ]
     walk.leave()
     if (!(await walk.enter(...exit, 0, 'station')))
@@ -51,6 +50,8 @@ export async function stationWalk(page) {
             'Station route stopped ' +
               JSON.stringify({ target, remaining, probe: walk.probe() }),
           )
+        if (target === bridge && walk.probe().foot < 160)
+          throw Error('Walker did not reach the elevated footbridge')
         if (target === platform) {
           // Probe the simulated track boundary from the accessible platform.
           const rail = [-2260.98, 1750.92]

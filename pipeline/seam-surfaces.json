@@ -30,10 +30,6 @@
     "zhonghua_primary": {"campus_paving": "plaza"}
   },
   "atlas": {
-    "guilin_station": [
-      {"material": "guilin_station_atlas", "role": "sidewalk", "box": [0, 0.25, 0.25, 0.5], "color": "#ad7262"},
-      {"material": "guilin_station_atlas", "role": "marking", "box": [0.75, 0.25, 1, 0.5], "color": "#dfb44e"}
-    ],
     "guilin_theater": {"material": "guilin_theater_atlas", "role": "sidewalk", "box": [0, 0.5, 0.25, 0.75]},
     "glmu_dongcheng": {"material": "g3_atlas", "role": "sidewalk", "box": [0.125, 0.1875, 0.375, 0.28125]},
     "gunanmen": {"material": "landmark", "role": "plaza", "box": [0.875, 0.875, 1, 1]},

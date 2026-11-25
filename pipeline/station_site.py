@@ -12,7 +12,7 @@ from shapely import (
     points as grid_points,
     union_all,
 )
-from shapely.geometry import LineString, Point, Polygon, box
+from shapely.geometry import LineString, Polygon, box
 
 from common import GRID, ll2xz, load_osm
 from features import area, points
@@ -91,7 +91,7 @@ def grade_station(
 def station_paving(plazas, bounds):
     survey = footprints()
     if not survey["plaza"].intersects(bounds):
-        return plazas, [], []
+        return plazas, [], [], Polygon()
     ref = next(
         (area(e) for e in load_osm() if e["type"] == "way" and e["id"] == 1056261582),
         None,
@@ -99,32 +99,42 @@ def station_paving(plazas, bounds):
     # The old plaza stays in the grade solver. Only its render mesh is replaced.
     other = [p for p in plazas if ref is None or not p.equals(ref)]
     planting = union_all([survey["planter-north"], survey["planter-south"]])
-    return other, [survey["plaza"].difference(planting)], [survey["taxi"]]
+    # The retired hall outline and the open-sided bus shelter must not clip
+    # the continuous sidewalk, bike lane or tactile strips passing beneath them.
+    former_shells = [area(e) for e in load_osm()
+                     if e["type"] == "way" and e["id"] in (819178841, 1017598916)]
+    solid = union_all([survey[k] for k in ("wall", "north-wing", "south-wing")])
+    open_ground = union_all(former_shells).buffer(0.05).difference(solid)
+    return other, [survey["plaza"].difference(planting)], [survey["taxi"]], open_ground
+
+
+def mark_station_tiles(chunks):
+    """Material coordinates on the existing square and native platform triangles."""
+    plaza = footprints()["plaza"]
+    edges = []
+    for way in load_osm():
+        if way["type"] == "way" and way["id"] in range(376029417, 376029421):
+            ring = list(area(way).exterior.coords)
+            edges.extend(LineString([a, b]) for a, b in zip(ring, ring[1:])
+                         if abs(b[1] - a[1]) > 2 * abs(b[0] - a[0]))
+    bounds = union_all([plaza, *edges]).bounds
+    for chunk in chunks:
+        x, z = chunk["x"], chunk["z"]
+        if x + 256 < bounds[0] or z + 256 < bounds[1] or x > bounds[2] or z > bounds[3]:
+            continue
+        tile = box(x, z, x + 256, z + 256)
+        def local(ring):
+            return [[round(px - x, 3), round(pz - z, 3)] for px, pz in ring]
+        materials = {}
+        if plaza.intersects(tile):
+            materials["plaza"] = local(plaza.exterior.coords)
+        nearby = [local(edge.coords) for edge in edges if edge.distance(tile) < 8]
+        if nearby:
+            materials["platformEdges"] = nearby
+        if materials:
+            chunk["stationPaving"] = materials
 
 
 def canopy_stations(length, spacing):
     half = length / 2 - 12
     return np.linspace(-half, half, math.ceil(2 * half / spacing) + 1)
-
-
-def platform_walking_area(way):
-    platform = area(way)
-    if way["id"] not in range(376029417, 376029421):
-        return platform
-    crossing = footprints()["crossing"]
-    coordinates = np.asarray(platform.exterior.coords)
-    vectors = np.diff(coordinates, axis=0)
-    lengths = np.linalg.norm(vectors, axis=1)
-    i = int(np.argmax(lengths))
-    axis = vectors[i] / lengths[i]
-    mid = np.array(platform.centroid.coords[0])
-    style = json.loads((ROOT / "pipeline/railway-style.json").read_text())["station"]
-    # The native sidewalk ends at the visible column plinths.
-    holes = [
-        Point(mid + axis * t).buffer(0.34)
-        for t in canopy_stations(lengths[i], style["columnSpacing"])
-    ]
-    overlap = platform.intersection(crossing)
-    if not overlap.is_empty:
-        holes.append(overlap.centroid.buffer(0.46))
-    return platform.difference(union_all(holes))

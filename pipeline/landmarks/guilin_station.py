@@ -24,12 +24,6 @@ RAILWAY_STYLE = json.loads((ROOT / "pipeline/railway-style.json").read_text())
 STYLE = RAILWAY_STYLE["station"]
 LEVELS = RAILWAY_STYLE["stationLevels"]
 NAME = "guilin_station"
-PAVING = {
-    rule["role"]: rule["color"]
-    for rule in json.loads((ROOT / "pipeline/seam-surfaces.json").read_text())["atlas"][
-        NAME
-    ]
-}
 
 
 def local(poly):
@@ -39,111 +33,66 @@ def local(poly):
 def facade(b, polygon, height, curtain=False):
     ring = ccw(polygon.exterior.coords)
     top = max(b.grade(*p) for p in ring) + height
-    podium = top - 8.8 if curtain else top
-    b.prism(ring, 0, podium, "wall", cap_region="roof", collide=True, footing=True)
-    upper = (
-        ccw(polygon.buffer(-2.2, join_style="mitre").exterior.coords)
-        if curtain
-        else ring
+    floor = LEVELS["hallFloor"] - b.surface.y
+    if not curtain:
+        b.prism(ring, 0, top, "wall", cap_region="roof", collide=True, footing=True)
+        for _, a, end, length, unit, normal in edges(ring):
+            if length < 10:
+                continue
+            unit = np.asarray(unit)
+            for center in np.arange(4, length - 2, 6.5):
+                mid = a + center * unit
+                quad(b, mid - unit * 1.45, mid + unit * 1.45,
+                     top - 4.0, top - 1.65, 0.06, normal, "glass")
+        return top
+
+    # Cut the three passages through both the visible shell and its collision mesh.
+    _, a, _, length, unit, normal = max(
+        (e for e in edges(ring) if e[-1][0] > 0.8), key=lambda e: e[3]
     )
-    if curtain:
-        b.prism(upper, podium, top - podium, "wall", cap_region="roof")
-    for _, a, end, length, unit, normal in edges(upper):
-        u = np.asarray(unit)
-        glazing = curtain and length > 60
-        low, high = (
-            (podium + 0.35, top - 0.45)
-            if glazing
-            else (max(top - height + 1.05, top - 4.1), top - 1.2)
-        )
-        start, stop = a + u * 1.15, end - u * 1.15
+    unit, normal = np.asarray(unit), np.asarray(normal)
+    portals = []
+    lintel = floor + STYLE["entryHeight"]
+    for fraction in (0.18, 0.50, 0.82):
+        mid = a + unit * length * fraction
+        axis = LineString([mid + normal * 5, mid - normal * 100])
+        portals.append(axis.buffer(STYLE["entryWidth"] / 2, cap_style="flat"))
+        # Fixed glazed sidelights frame a clear double-door opening.
+        for side in (-1, 1):
+            jamb = mid + unit * side * (STYLE["entryWidth"] / 2 - 1.05)
+            p0, p1 = jamb - unit, jamb + unit
+            quad(b, p0, p1, floor, lintel, -0.35, normal, "glass")
+            quad(b, p0, p1, floor + 3.2, floor + 3.33, -0.32, normal, "frame")
+            b.hit_quad([(p[0] - normal[0] * 0.35, h, p[1] - normal[1] * 0.35)
+                        for p, h in ((p0, floor), (p1, floor), (p1, lintel), (p0, lintel))],
+                       (normal[0], 0, normal[1]))
+        if b.detail:
+            slab(b, mid - unit * 5.5, mid + unit * 5.5,
+                 lintel, 0.24, 1.3, normal, "frame")
+    for pier in get_parts(polygon.difference(union_all(portals))):
+        b.prism(pier.exterior.coords, 0, lintel, "wall", collide=True, footing=True)
+    b.prism(ring, lintel, top - lintel, "wall", cap_region="roof")
+    for clipped in get_parts(polygon.intersection(union_all(portals))):
+        for tri in constrained_delaunay_triangles(clipped).geoms:
+            b.face([(x, lintel, z) for x, z in list(tri.exterior.coords)[:3]],
+                   (0, -1, 0), "soffit")
+    for _, a, end, length, unit, normal in edges(ring):
+        if abs(normal[0]) < 0.8 or length < 60:
+            continue
+        unit = np.asarray(unit)
+        start, stop = a + unit * 2, end - unit * 2
+        low, high = top - 5.8, top - 0.6
         quad(b, start, stop, low, high, 0.06, normal, "glass")
         if b.detail:
-            for t in np.arange(2.4, length - 2.3, 2.4):
-                fin(b, start + u * t, low, high - low, 0.2, 0.14, u, normal, "frame")
-            for y in np.arange(low + 1.15, high, 1.15):
-                slab(b, start, stop, y, 0.13, 0.22, normal, "frame")
-    for _, a, end, length, unit, normal in edges(ring):
-        u = np.asarray(unit)
-        glazing = curtain and length > 60
-        if curtain:
-            start, stop = a + u * 1.6, end - u * 1.6
-            quad(b, start, stop, podium - 2.2, podium - 0.72, 0.08, normal, "glass")
-            if b.detail:
-                for t in np.arange(1.4, length - 3.2, 1.4):
-                    fin(
-                        b,
-                        start + u * t,
-                        podium - 2.2,
-                        1.48,
-                        0.22,
-                        0.22,
-                        u,
-                        normal,
-                        "wall",
-                    )
-        if glazing and normal[0] > 0.8:
-            floor = LEVELS["hallFloor"] - b.surface.y
-            for t in (0.18, 0.50, 0.82):
-                mid = a + u * length * t
-                quad(
-                    b,
-                    mid - u * 5.5,
-                    mid + u * 5.5,
-                    floor,
-                    floor + 5.2,
-                    0.06,
-                    normal,
-                    "soffit",
-                )
-                if b.detail:
-                    for offset in (-4.8, -3.2, -1.6, 0, 1.6, 3.2, 4.8):
-                        center = mid + u * offset
-                        quad(
-                            b,
-                            center - u * 0.72,
-                            center + u * 0.72,
-                            floor + 0.08,
-                            floor + 4.18,
-                            0.12,
-                            normal,
-                            "glass",
-                        )
-                        fin(
-                            b,
-                            center + u * 0.75,
-                            floor + 0.08,
-                            4.1,
-                            0.17,
-                            0.10,
-                            u,
-                            normal,
-                            "frame",
-                        )
-                    slab(
-                        b,
-                        mid - u * 5.5,
-                        mid + u * 5.5,
-                        floor + 4.28,
-                        0.13,
-                        0.20,
-                        normal,
-                        "wall",
-                    )
-                slab(
-                    b,
-                    mid - u * 5.9,
-                    mid + u * 5.9,
-                    floor + 5.2,
-                    0.35,
-                    2.8,
-                    normal,
-                    "roof",
-                )
+            for y in np.arange(low + 0.55, high, 0.55):
+                quad(b, start, stop, y, y + 0.07, 0.10, normal, "frame")
+            for offset in np.arange(4, length - 4, 4):
+                mid = a + unit * offset
+                quad(b, mid, mid + unit * 0.08, low, high, 0.11, normal, "frame")
     return top
 
 
-def platform(b, poly, streets):
+def platform(b, poly):
     ring = ccw(poly.exterior.coords)
     _, a, end, length, u, normal = max(edges(ring), key=lambda edge: edge[3])
     width = poly.area / length
@@ -151,28 +100,19 @@ def platform(b, poly, streets):
     # Frame X follows the long axis; all columns stay on the OSM platform.
     mid = np.array(poly.centroid.coords[0])
     old = b.set_frame((mid[0], 0, mid[1]), front)
-    # Follow the same GL04 surface as the walker, including the baked curb.
-    along = np.linspace(
-        -length / 2 + 0.45, length / 2 - 0.45, math.ceil(length / 4) + 1
-    )
+    # The corridor produces a level 1.25 m platform above the station railhead.
+    platform_y = LEVELS["hallFloor"] + LEVELS["platformRise"] - b.surface.y
+    along = np.linspace(-length / 2 + 0.45, length / 2 - 0.45,
+                        math.ceil(length / (12 if b.detail else 36)) + 1)
     half = width / 2 - 0.35
-    across = [-half, -half + 0.65, -half + 0.86, half - 0.86, half - 0.65, half]
+    across = [-half, half]
 
     def row_at(x):
-        row = []
-        for z in across:
-            wx, _, wz = b.xf((x, 0, z))
-            h, _ = streets.at(wx + CENTER[0], wz + CENTER[1])
-            row.append((x, h - b.surface.y + 0.035, z))
-        return row
+        return [(x, platform_y + 0.025, z) for z in across]
 
     previous = row_at(along[0])
     for x in along[1:]:
         row = row_at(x)
-        for j, finish in enumerate(("brick", "warning", "brick", "warning", "brick")):
-            b.face(
-                [previous[j], row[j], row[j + 1], previous[j + 1]], (0, 1, 0), finish
-            )
         # Masonry fascia and a sloped toe stay within the mapped platform edge.
         for index, side in ((0, -1), (-1, 1)):
             p, q = previous[index], row[index]
@@ -190,9 +130,9 @@ def platform(b, poly, streets):
             )
         previous = row
     positions = canopy_stations(length, STYLE["columnSpacing"])
-    levels = [b.grade(x, 0) + STYLE["canopyHeight"] for x in positions]
+    levels = [platform_y + STYLE["canopyHeight"]] * len(positions)
     for i, (x, y) in enumerate(zip(positions, levels)):
-        base = b.grade(x, 0) - 0.04
+        base = platform_y
         b.cylinder_y(x, base, y - base, 0, 0.30, "wall", sections=8, collide=True)
         if i:
             prev, py = positions[i - 1], levels[i - 1]
@@ -237,23 +177,26 @@ def platform_access(b, streets):
     x, z = -2247.05 - CENTER[0], 1749.50 - CENTER[1]
     outward = np.array([0.993, -0.118])
     along = np.array([0.118, 0.993])
-    points3 = []
-    for inset, offset in ((-1, -2), (-1, 2), (9, 2), (9, -2)):
-        px, pz = np.asarray((x, z)) + inset * outward + offset * along
-        height, _ = streets.at(px + CENTER[0], pz + CENTER[1])
-        points3.append((px, height - b.surface.y + 0.045, pz))
-    b.face(points3, (0, 1, 0), "frame", street_role="sidewalk")
-    b.hit_quad(points3, (0, 1, 0))
-    for i, j in ((0, 3), (1, 2)):
-        a, c = points3[i], points3[j]
-        wall = [
-            a,
-            c,
-            (c[0], b.grade(c[0], c[2]) - 0.04, c[2]),
-            (a[0], b.grade(a[0], a[2]) - 0.04, a[2]),
-        ]
-        side = -1 if i == 0 else 1
-        b.face(wall, (side * along[0], 0, side * along[1]), "frame")
+    rows = []
+    for inset in (-1.5, 1.2, 11):
+        row = []
+        for side in (-2, 2):
+            px, pz = np.asarray((x, z)) + inset * outward + side * along
+            if inset <= 1.2:
+                height = LEVELS["hallFloor"] + LEVELS["platformRise"]
+            else:
+                height, _ = streets.at(px + CENTER[0], pz + CENTER[1])
+            row.append((px, height - b.surface.y + 0.025, pz))
+        rows.append(row)
+    for near, far in zip(rows, rows[1:]):
+        floor = [near[0], near[1], far[1], far[0]]
+        b.face(floor, (0, 1, 0), "frame", street_role="sidewalk")
+        b.hit_quad(floor, (0, 1, 0))
+        for index, side in ((0, -1), (1, 1)):
+            a, c = near[index], far[index]
+            wall = [a, c, (c[0], b.grade(c[0], c[2]) - 0.04, c[2]),
+                    (a[0], b.grade(a[0], a[2]) - 0.04, a[2])]
+            b.face(wall, (side * along[0], 0, side * along[1]), "frame")
 
 
 def track_limits(ways, platforms):
@@ -275,12 +218,13 @@ def block_tracks(b, envelope):
             coordinates = list(ring.segmentize(8).coords)
             for (x, z), (xx, zz) in zip(coordinates, coordinates[1:]):
                 low, far = b.grade(x, z) - 0.08, b.grade(xx, zz) - 0.08
+                fence_top = LEVELS["hallFloor"] + LEVELS["platformRise"] + 2.2 - b.surface.y
                 b.hit_quad(
                     [
                         (x, low, z),
                         (xx, far, zz),
-                        (xx, far + 2.2, zz),
-                        (x, low + 2.2, z),
+                        (xx, max(far + 2.2, fence_top), zz),
+                        (x, max(low + 2.2, fence_top), z),
                     ],
                     (zz - z, 0, x - xx),
                 )
@@ -297,15 +241,13 @@ def main(out):
     draw = ImageDraw.Draw(image)
     rects = {}
     for i, key in enumerate(
-        ("wall", "roof", "frame", "glass", "brick", "soffit", "green", "warning")
+        ("wall", "roof", "frame", "glass", "soffit", "green")
     ):
         x, y = (i % 4) * 128, (i // 4) * 128
         rects[key] = (x, y, 128, 128)
         draw.rectangle(
             (x, y, x + 127, y + 127),
-            fill={**STYLE, "brick": PAVING["sidewalk"], "warning": PAVING["marking"]}[
-                key
-            ],
+            fill=STYLE[key],
         )
     rects["sign"] = (0, 256, 512, 128)
     draw.rectangle((0, 256, 511, 383), fill=(0, 0, 0, 0))
@@ -332,7 +274,7 @@ def main(out):
     def build(b):
         top = facade(b, site["wall"], 16.2, curtain=True)
         roof_ring = ccw(site["roof"].exterior.coords)
-        b.prism(roof_ring, top, 1.15, "soffit", cap_region="roof")
+        b.prism(roof_ring, top, STYLE["eaveThickness"], "soffit", cap_region="roof")
         b.face([(x, top, z) for x, z in roof_ring], (0, -1, 0), "soffit")
         front = max(
             edges(ccw(site["roof"].exterior.coords)), key=lambda edge: edge[-1][0]
@@ -342,7 +284,7 @@ def main(out):
         old = b.set_frame((mid[0], 0, mid[1]), normal)
         b.sign_quad(
             0,
-            top + 1.15 + STYLE["signHeight"] / 2,
+            top + STYLE["eaveThickness"] + STYLE["signHeight"] / 2,
             -0.30,
             STYLE["signWidth"],
             STYLE["signHeight"],
@@ -371,7 +313,7 @@ def main(out):
         if b.collide:
             block_tracks(b, track_envelope)
         for poly in platforms:
-            platform(b, poly, streets)
+            platform(b, poly)
         platform_access(b, streets)
         crossing = site["crossing"]
         platform_y = LEVELS["hallFloor"] + LEVELS["platformRise"] - surface.y
@@ -390,7 +332,7 @@ def main(out):
                 (end[0], y + 3.75, end[1]),
                 (a[0], y + 3.75, a[1]),
             ]
-            b.glass.add_poly(pane, (n[0], 0, n[1]), "glass")
+            (b.glass if b.detail else b.atlas).add_poly(pane, (n[0], 0, n[1]), "glass")
             if length > 20 and b.detail:
                 for t in np.arange(1.5, length, 2.5):
                     fin(
@@ -409,7 +351,7 @@ def main(out):
             if overlap.is_empty:
                 continue
             x, z = overlap.centroid.coords[0]
-            g = b.grade(x, z) - 0.04
+            g = platform_y
             b.cylinder_y(x, g, y - g, z, 0.42, "wall", collide=True)
             # Stair flights sit along the platform axis, clear of the track bed.
             _, _, _, _, axis, _ = max(
@@ -419,25 +361,31 @@ def main(out):
             # Keep the foot of the stairs at its surveyed platform position.
             length = STYLE["bridgeStairRunByPlatform"][str(way_id)]
             bottom = platform_y - 0.02
-            steps = math.ceil((y - bottom) / 0.16)
-            for k in range(steps):
+            flight = LineString([(x, z), (x + axis[0] * length, z + axis[1] * length)])
+            landing = flight.intersection(crossing).length
+            run = length - landing
+            steps = math.ceil((y + 0.55 - bottom) / 0.16)
+            for k in range(steps if b.detail else 0):
                 frac = (k + 1) / steps
                 top_step = bottom + (y + 0.55 - bottom) * frac
                 b.box(
                     0,
                     top_step - 0.2,
-                    length * (1 - (k + 0.5) / steps),
+                    length - run * (k + 0.5) / steps,
                     2.2,
                     0.2,
-                    length / steps,
+                    run / steps,
                     "roof",
                 )
+            if not b.detail:
+                b.face([(-1.1, bottom, length), (1.1, bottom, length),
+                        (1.1, y + 0.55, landing), (-1.1, y + 0.55, landing)], (0, 1, 0), "roof")
             b.hit_quad(
                 [
                     (-1.1, bottom, length),
                     (1.1, bottom, length),
-                    (1.1, y + 0.55, 0),
-                    (-1.1, y + 0.55, 0),
+                    (1.1, y + 0.55, landing),
+                    (-1.1, y + 0.55, landing),
                 ],
                 (0, 1, 0),
             )

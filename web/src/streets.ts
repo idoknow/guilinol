@@ -3,12 +3,12 @@ import {nightStreets} from './look/night'
 import {tileMaterial,wireFenceMaterial} from './look/tiles'
 import {look} from './look/config'
 
-export function bindStreetSurface(geometry:THREE.BufferGeometry,role:string,color?:string){
+export function bindStreetSurface(geometry:THREE.BufferGeometry,role:string){
   const kind=({road:0,sidewalk:1,plaza:1,curb:1,marking:2} as Record<string,number>)[role]
   if(kind===undefined)throw Error(`Unknown street surface: ${role}`)
   if(!geometry.hasAttribute('normal'))geometry.computeVertexNormals()
   const count=geometry.getAttribute('position').count,colors=new Float32Array(count*3)
-  const tone=new THREE.Color(color??look.streets.surfaces[kind]);for(let i=0;i<count;i++)tone.toArray(colors,i*3)
+  const tone=new THREE.Color(look.streets.surfaces[kind]);for(let i=0;i<count;i++)tone.toArray(colors,i*3)
   geometry.setAttribute('color',new THREE.BufferAttribute(colors,3))
   geometry.setAttribute('aSurface',new THREE.Uint8BufferAttribute(new Uint8Array(count).fill(kind),1))
   geometry.setAttribute('aAlong',new THREE.Float32BufferAttribute(new Float32Array(count),1))

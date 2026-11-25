@@ -556,6 +556,8 @@ def build(bbox, output, palette, workers=4):
     print('Terrain SHA-256:', digest.hexdigest())
     if play_region:
         manifest['region'] = play_region.manifest()
+    from station_site import mark_station_tiles
+    mark_station_tiles(chunks)
     manifest['landmarks'] = landmarks
     if tunnels:
         manifest['tunnels'] = tunnels
