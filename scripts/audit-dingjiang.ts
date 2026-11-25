@@ -5,6 +5,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import {gunzipSync} from 'node:zlib'
 import {ll2xz} from '../lib/projection'
+import {visibleSurfaces} from './dingjiang-visible-surfaces'
 import {vehicleSurface} from './vehicle-surface'
 
 const [base, candidate] = process.argv.slice(2)
@@ -140,4 +141,8 @@ for (const [id, way] of ways) {
     yardGrades.push({node, signedGrade:slopes[1]})
   }
 }
-console.log(JSON.stringify({closure: [...auditedRoads].sort((a,b)=>a-b), crossings:results, grades, yardGrades}, null, 2))
+const reverse = visibleSurfaces(candidate, roads, auditedRoads)
+console.log(JSON.stringify({reverse, closure: [...auditedRoads].sort((a,b)=>a-b), crossings:results, grades, yardGrades}, null, 2))
+
+assert(reverse.every(r => r.checked > 0 && r.groundViolations === 0), 'Ground-level faces intrude into a surveyed underpass')
+assert(reverse.every(r => r.externalBridgeViolations === 0), 'Non-closure S2201 bridge faces above the surveyed shoulder; see upperDecks')
