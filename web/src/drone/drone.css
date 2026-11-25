@@ -198,4 +198,6 @@ body[data-drone="rc"] :is(output,.hint,footer,.sky-ui,.walk-ui,.dock,.toast,.spo
 .drone-panel .drone-foot{margin:4px 18px 14px;font-size:11px;opacity:.6;line-height:1.5}
 .dock-drone[data-stage="ready"]{background:rgba(224,138,46,.32);border-color:rgba(224,138,46,.66)}
 .dock-drone[data-stage="rc"]{opacity:.6}
+/* IDOK-278: 雨天禁飞 —— dock 按钮标灰降透明，提示不可用 */
+.dock-drone[data-stage="no-fly"]{background:rgba(120,124,130,.28);border-color:rgba(150,155,160,.4);opacity:.75}
 @media (max-width:640px){.drone-panel .drone-grid{grid-template-columns:1fr;max-height:62vh;overflow:auto}}

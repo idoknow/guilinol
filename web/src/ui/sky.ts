@@ -25,7 +25,7 @@ export function skyClock(params:URLSearchParams) {
     return {group,refresh(){for(const [b,value] of buttons) b.classList.toggle('on',active(value as never))}}
   }
   const hours = row(moods,(h:number)=>{clock.goal = h},(h:number)=>{const d=Math.abs(clock.hour-h)%24;return Math.min(d,24-d)<1.25})
-  const weathers = row(skies,(w:Weather)=>{clock.weather = w},(w:Weather)=>clock.weather===w)
+  const weathers = row(skies,(w:Weather)=>{clock.weather = w; window.dispatchEvent(new CustomEvent('sky:weather',{detail:w}))},(w:Weather)=>clock.weather===w)
   flow.onclick = ()=>{clock.flowing = !clock.flowing; refresh()}
   panel.append(time,hours.group,weathers.group,flow,fold); document.body.append(panel)
   function refresh(){hours.refresh(); weathers.refresh(); flow.textContent = clock.flowing?'❚❚':'▶'
@@ -69,8 +69,12 @@ export function skyClock(params:URLSearchParams) {
       if(ahead<.02) {clock.hour = clock.goal; clock.goal = null} else clock.hour = (clock.hour+Math.min(ahead,stepH))%24
     } else if(clock.flowing) clock.hour = (clock.hour+dt*clock.rate)%24
     if(auto&&!weatherPinned&&clock.flowing&&(nextChange -= dt*clock.rate)<=0) {clock.weather = autoWeather = nextWeather(clock.hour); nextChange = spell()}
+    const state = `${clock.hour.toFixed(2)}|${clock.weather}`
+    if(state!==shown){shown = state; refresh(); window.dispatchEvent(new CustomEvent('sky:weather',{detail:clock.weather}))}
     // Self-driven changes drift in over ~20 s; anything picked by hand (photo mode) still switches in ~1 s.
     clock.blendMs = auto&&clock.weather===autoWeather?20000:1200
-    const text = label(clock.hour); if(text!==shown){shown = text; refresh()}
-  },set(hour:number,weather?:Weather){clock.hour = hour; if(weather) clock.weather = weather; clock.goal = null; refresh()}})
+  },set(hour:number,weather?:Weather){
+    clock.hour = hour; if(weather) clock.weather = weather; clock.goal = null; refresh()
+    window.dispatchEvent(new CustomEvent('sky:weather',{detail:clock.weather}))
+  }})
 }

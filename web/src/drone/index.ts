@@ -352,6 +352,13 @@ export function droneMode(host:Host, deps:{groundAt:(x:number,z:number)=>number;
   function enterRc() {
     if (!flight || rcActive) return
     if (flight.phase !== 'landed') return
+    // IDOK-278: 雨天不起飞 —— DJI 安全规范里雨雪是禁飞条件，这里挡在进入遥控之前。
+    if (host.clock.weather === 'rain') {
+      window.dispatchEvent(new CustomEvent('walk:toast', {
+        detail: {text: '雨天不能在室外起飞 · 请等天气放晴后再飞', ms: 4200},
+      }))
+      return
+    }
     const cap = flight.spec.payloadG ?? 0
     if (cap && flight.load > cap) {
       window.dispatchEvent(new CustomEvent('walk:toast', {
@@ -498,9 +505,11 @@ export function droneMode(host:Host, deps:{groundAt:(x:number,z:number)=>number;
   function refreshDock() {
     if (!entry) return
     if (placed) {
-      entry.textContent = rcActive ? '遥控中' : '飞无人机'
-      entry.dataset.stage = rcActive ? 'rc' : 'ready'
-      entry.setAttribute('aria-label',rcActive ? '遥控中' : '起飞无人机')
+      // IDOK-278: 雨天 dock 按钮标灰，点了也只弹提示
+      const grounded = host.clock.weather === 'rain'
+      entry.textContent = rcActive ? '遥控中' : grounded ? '雨天禁飞' : '飞无人机'
+      entry.dataset.stage = rcActive ? 'rc' : grounded ? 'no-fly' : 'ready'
+      entry.setAttribute('aria-label',rcActive ? '遥控中' : grounded ? '雨天不能在室外起飞' : '起飞无人机')
     } else {
       entry.textContent = '无人机'
       entry.dataset.stage = 'none'
@@ -519,6 +528,8 @@ export function droneMode(host:Host, deps:{groundAt:(x:number,z:number)=>number;
     }
     host_.append(entry)
     refreshDock()
+    // IDOK-278: 天气切换（手动或自动流转）时刷新 dock 的禁飞状态
+    window.addEventListener('sky:weather', refreshDock as EventListener)
   }
 
   // --- Frame
