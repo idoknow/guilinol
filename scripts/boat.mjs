@@ -53,7 +53,7 @@ const baseUrl = `http://127.0.0.1:${server.httpServer.address().port}`
 const errors = []
 let browser
 
-try {
+boatChecks: try {
   browser = await chromium.launch({
     executablePath: process.env.CHROMIUM,
     args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader'],
@@ -245,13 +245,15 @@ try {
 
       async function ensureTileLoaded(x, z) {
         const tile = manifest.chunks.find(t => x >= t.x && x < t.x + 256 && z >= t.z && z < t.z + 256)
-        if (!tile || stream.loaded.has(tile)) return
+        if (!tile) throw new Error(`No manifest tile at (${x}, ${z})`)
+        if (stream.loaded.has(tile)) return
         const deadline = performance.now() + 15000
         const pt = walk.position.clone().set(tile.x + 128, walk.position.y, tile.z + 128)
         while (!stream.loaded.has(tile) && performance.now() < deadline) {
           stream.tick(pt)
           await new Promise(r => setTimeout(r, 20))
         }
+        if (!stream.loaded.has(tile)) throw new Error(`tile load failed: ${JSON.stringify({tile:tile.file,x,z,timedOut:true,loaded:stream.loaded.size,queued:stream.queuedTiles,pending:stream.pending.size})}`)
       }
 
       function step(n = 1, dt = 1 / 60) {
@@ -344,10 +346,43 @@ try {
   const page = await browser.newPage({viewport: {width: 800, height: 450}})
   page.on('pageerror', err => errors.push(`desktop pageerror: ${err.message}`))
   page.on('console', msg => {
+    if (msg.text().startsWith('walk:enter-failed')) console.warn(msg.text())
     if (msg.type() === 'error') errors.push(`desktop console: ${msg.location().url}: ${msg.text()}`)
   })
   await attachHelpers(page)
   await gotoWalk(page)
+
+  async function checkMooringLandings(name) {
+    return runInPage(page, async ({walk, advance, ensureTileLoaded, arg}) => {
+      const initial = walk.freeMoorings.filter(m => !arg || m.name === arg)
+      if (!initial.length) throw new Error(`No mooring: ${arg}`)
+      for (const m of initial) {
+        const [dx, , dz] = m.dock
+        for (const ox of [-40, 0, 40]) for (const oz of [-40, 0, 40]) await ensureTileLoaded(dx + ox, dz + oz)
+        walk.leave()
+        if (!await walk.enter(dx, dz, 0, `mooring-all-${m.name}`)) throw new Error(`无法在码头 ${m.name} (${dx}, ${dz}) 附近落脚`)
+        advance(1 / 60)
+      }
+      return walk.freeMoorings
+    }, name)
+  }
+  if (process.argv.includes('--jiefang-landing')) {
+    await page.waitForFunction(() => window.viewer.walk.freeMoorings.length > 0)
+    const docks = await checkMooringLandings('解放桥码头')
+    const dock = docks.find(m => m.name === '解放桥码头')
+    const state = await page.evaluate(() => {
+      const {walk} = window.viewer
+      return {active:walk.active, vehicle:walk.vehicle, spawn:walk.spawns.at(-1), position:walk.position.toArray()}
+    })
+    assert(dock?.resolved && Array.isArray(dock.bank) && Array.isArray(dock.mooring))
+    assert(state.active && state.vehicle === 'foot')
+    assert.equal(state.spawn.reason, 'mooring-all-解放桥码头')
+    assert.deepEqual(state.spawn.from, [-156, 156])
+    assert(state.spawn.to && state.position.every(Number.isFinite))
+    assert.deepEqual(errors, [])
+    console.log('PASS jiefang-landing', JSON.stringify(state))
+    break boatChecks
+  }
 
   // --- 用例 1：防抢键回归 + 榕湖上自由小船 (rowboat) + 自由划行物理 ---
   const [autoDockX, , autoDockZ] = VEHICLES.docks['榕湖']
@@ -451,22 +486,7 @@ try {
   })
 
   // 全量检查 10 个 walk.freeMoorings 在正常水域下全部 resolved（含 1a-cache 之后的龙船坪码头）
-  const allMooringsCheck = await runInPage(page, async ({walk, advance, ensureTileLoaded}) => {
-    const initial = walk.freeMoorings
-    for (const m of initial) {
-      const [dx, , dz] = m.dock
-      for (const ox of [-40, 0, 40]) {
-        for (const oz of [-40, 0, 40]) {
-          await ensureTileLoaded(dx + ox, dz + oz)
-        }
-      }
-      walk.leave()
-      const entered = await walk.enter(dx, dz, 0, `mooring-all-${m.name}`)
-      if (!entered) throw new Error(`无法在码头 ${m.name} (${dx}, ${dz}) 附近落脚`)
-      advance(1 / 60)
-    }
-    return walk.freeMoorings
-  })
+  const allMooringsCheck = await checkMooringLandings()
   assert.equal(allMooringsCheck.length, 10, `自由码头总数应为 10，实际 ${allMooringsCheck.length}`)
   const unresolvedMoorings = allMooringsCheck.filter(m => !m.resolved || !Array.isArray(m.bank) || !Array.isArray(m.mooring))
   assert.deepEqual(unresolvedMoorings, [], `存在正常水域下未解析成功的自由码头: ${JSON.stringify(unresolvedMoorings)}`)

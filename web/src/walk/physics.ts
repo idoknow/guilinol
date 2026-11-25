@@ -682,7 +682,7 @@ export async function createPhysics(manifest:Manifest,stream:Stream,peaks:PeaksG
     const deck=surface(x,z,'deck')
     return {x,y,z,rule:(dx||dz?'search-':'')+(deck||wet(x,z)?'bridge':'land')}
   }
-  function findWalkableSpawn(east:number,south:number,override=false,dryOnly=false,preferY?:number){
+  function findWalkableSpawn(east:number,south:number,override=false,dryOnly=false,preferY?:number,reject?:(why:string,x:number,z:number,hitY?:number,slope?:number)=>void){
     const offsets=override?[candidates[0]]:candidates
     if(preferY!==undefined&&Number.isFinite(preferY)&&landmarks.size){
       for(const {dx,dz} of offsets){const x=east+dx,z=south+dz,tile=tileAt(x,z)
@@ -695,13 +695,16 @@ export async function createPhysics(manifest:Manifest,stream:Stream,peaks:PeaksG
       }
     }
     for(const {dx,dz} of offsets){const x=east+dx,z=south+dz,tile=tileAt(x,z)
-      if(!withinBounds(x,z)||!tile||!stream.loaded.has(tile)||(dryOnly&&wet(x,z))||insideHouse(x,z))continue
-      const deck=surface(x,z,'deck'),support=deck??surface(x,z,'sidewalk')??surface(x,z,'road')??surface(x,z,'ground');if(!support||support.slope>cfg.slope||(!deck&&wet(x,z)))continue
-      const peak=surface(x,z,'peak');if(peak&&peak.y>support.y+.05)continue
+      const unavailable=!withinBounds(x,z)?'outside-bounds':!tile||!stream.loaded.has(tile)?'missing-tile':dryOnly&&wet(x,z)?'wet':insideHouse(x,z)?'inside-house':null
+      if(unavailable){reject?.(unavailable,x,z);continue}
+      const deck=surface(x,z,'deck'),support=deck??surface(x,z,'sidewalk')??surface(x,z,'road')??surface(x,z,'ground')
+      if(!support){reject?.(tile&&regions.has(tile)?'ray-miss':'missing-collision',x,z);continue}
+      if(support.slope>cfg.slope||(!deck&&wet(x,z))){reject?.(support.slope>cfg.slope?'steep':'wet',x,z,support.y,support.slope);continue}
+      const peak=surface(x,z,'peak');if(peak&&peak.y>support.y+.05){reject?.('below-peak',x,z,support.y);continue}
       const tread=surface(x,z,'landmark',support.y+cfg.step+.02,cfg.step+.04)
       const floor=tread&&tread.slope<=cfg.slope?Math.max(tread.y,support.y):support.y
       const y=floor+cfg.height/2+.055
-      if(world.intersectionWithShape({x,y,z},identity,shape,undefined,undefined,capsule))continue
+      if(world.intersectionWithShape({x,y,z},identity,shape,undefined,undefined,capsule)){reject?.('capsule-blocked',x,z,floor);continue}
       return {x,y,z,rule:(dx||dz?'search-':'')+(deck?'bridge':'land')}
     }return null
   }
