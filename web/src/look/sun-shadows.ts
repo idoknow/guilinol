@@ -25,7 +25,7 @@ export function sunShadows(renderer:THREE.WebGLRenderer,scene:THREE.Scene,camera
   const shadow=light.shadow,anchor=light.target
   scene.add(anchor);renderer.shadowMap.type=THREE.PCFSoftShadowMap;renderer.shadowMap.autoUpdate=false
   Object.assign(shadow.camera,{left:-100,right:100,top:100,bottom:-100,near:1,far:480});shadow.camera.updateProjectionMatrix()
-  shadow.normalBias=.12;shadow.bias=-.00035
+  shadow.normalBias=.18;shadow.bias=-.00035
   const high={value:false},strength={value:0.5},patched=new WeakSet<THREE.Material>()
   let frames=Infinity,extent=0,casters=0
   return (tier:Tier,settings:Options['shadow'],focus:THREE.Vector3)=>{

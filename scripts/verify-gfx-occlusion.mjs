@@ -46,9 +46,17 @@ try{
       await page.goto(`http://127.0.0.1:${site.httpServer.address().port}/?verify&debug&mode=walk&gfx=${tier}&dpr=1&flow=0&time=${hour}`)
       await page.waitForFunction(()=>window.viewer?.walk?.active&&window.viewer.stats.frame>15&&!window.viewer.stats.pending,null,{timeout:180000})
       await page.evaluate(()=>window.viewer.freeze())
+      for(const pose of effect==='godrays'?['spawn','west']:effect==='ao'?['spawn','close']:['spawn']){
+      if(pose!=='spawn')await page.evaluate(pose=>{
+        const {camera,env}=window.viewer
+        if(pose==='west'){camera.position.set(-589,159.8,-185);camera.lookAt(camera.position.clone().add(env.sunDir))}
+        else {camera.position.set(-571.165,158.9,-199.902);camera.lookAt(-571.471,158.2,-197.724)}
+        camera.updateMatrixWorld()
+      },pose)
       for(const enabled of [false,true]){
-        const result=await page.evaluate(({effect,enabled})=>{
-          window.gfx.set({ao:{enabled:effect==='ao',intensity:enabled?1:0,radius:2},bloom:{enabled:false},
+        const result=await page.evaluate(({effect,enabled,pose})=>{
+          const stress=effect==='ao'&&pose==='spawn'
+          window.gfx.set({ao:{enabled:effect==='ao',intensity:enabled?(stress?8:1):0,radius:stress?12:2},bloom:{enabled:false},
             shadow:{enabled:effect!=='ao',strength:effect==='shadow'&&!enabled?0:1,distance:300},godrays:{enabled:effect==='godrays'&&enabled}})
           window.viewer.redrawGfx()
           const canvas=document.querySelector('canvas'),copy=document.createElement('canvas');copy.width=canvas.width;copy.height=canvas.height
@@ -57,10 +65,25 @@ try{
           if(!enabled)window.occlusionReference=bytes
           let changed=0
           for(let index=0;index<bytes.length;index+=4)if([0,1,2].some(ch=>Math.abs(bytes[index+ch]-window.occlusionReference[index+ch])>8))changed++
-          return {changed,percent:400*changed/bytes.length,image:copy.toDataURL().split(',')[1]}
-        },{effect,enabled})
-        await writeFile(join(out,`${effect}-${enabled?'on':'off'}.png`),Buffer.from(result.image,'base64'))
-        if(enabled){console.log(effect,result.changed,result.percent);if(result.percent<=(effect==='ao'?3:0))process.exitCode=1}
+          let original=0,current=0
+          for(let y=50;y<140;y++)for(let x=40;x<260;x++){
+            const index=(y*canvas.width+x)*4
+            for(const [ch,weight] of [.2126,.7152,.0722].entries()){
+              original+=weight*window.occlusionReference[index+ch];current+=weight*bytes[index+ch]
+            }
+          }
+          let groundPeak=0
+          if(effect==='shadow')for(let y=320;y<430;y++)for(let x=50;x<750;x++){
+            const index=(y*canvas.width+x)*4
+            for(let ch=0;ch<3;ch++)groundPeak=Math.max(groundPeak,Math.abs(bytes[index+ch]-window.occlusionReference[index+ch]))
+          }
+          return {changed,percent:400*changed/bytes.length,groundPeak,wallDelta:100*Math.abs(current-original)/Math.max(1,original),image:copy.toDataURL().split(',')[1]}
+        },{effect,enabled,pose})
+        await writeFile(join(out,`${effect}-${pose}-${enabled?'on':'off'}.png`),Buffer.from(result.image,'base64'))
+        if(enabled){console.log(effect,pose,result.changed,result.percent,'wall luminance %',result.wallDelta,'ground peak',result.groundPeak)
+          if(effect==='shadow'&&result.groundPeak>2)process.exitCode=1
+          if(effect==='ao'?result.percent<3:effect==='godrays'&&pose==='spawn'?result.wallDelta>=5:!result.changed)process.exitCode=1}
+      }
       }
       assert.deepEqual(errors,[])
     }finally{await page.close()}
