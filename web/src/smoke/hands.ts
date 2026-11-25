@@ -75,8 +75,10 @@ export function smokingHand(figure:T.Object3D,side:'l'|'r'){
   wrist.add(attachment)
   function aim(joint:T.Object3D,end:T.Object3D,destination:T.Vector3){
     joint.getWorldPosition(pivot)
-    a.subVectors(end.getWorldPosition(a),pivot).normalize()
-    b.subVectors(destination,pivot).normalize()
+    a.subVectors(end.getWorldPosition(a),pivot)
+    b.subVectors(destination,pivot)
+    if(a.lengthSq()<1e-12||b.lengthSq()<1e-12)return
+    a.normalize();b.normalize()
     rotation.setFromUnitVectors(a,b)
     joint.parent!.getWorldQuaternion(parent)
     joint.quaternion.premultiply(rotation.premultiply(inverse.copy(parent).invert()).multiply(parent))
@@ -87,11 +89,14 @@ export function smokingHand(figure:T.Object3D,side:'l'|'r'){
   function aimHinge(joint:T.Object3D,child:T.Object3D,tip:T.Vector3,pole:T.Vector3,remaining:number){
     joint.getWorldPosition(start)
     const proximal=start.distanceTo(child.getWorldPosition(a))
+    if(proximal<1e-6)return
     axis.subVectors(tip,start)
+    if(axis.lengthSq()<1e-12)return
     const distance=T.MathUtils.clamp(axis.length(),Math.abs(proximal-remaining)+1e-6,proximal+remaining-1e-6)
     axis.normalize()
     bend.subVectors(pole,start).addScaledVector(axis,-bend.dot(axis))
     if(bend.lengthSq()<1e-9)bend.subVectors(a,start).addScaledVector(axis,-bend.dot(axis))
+    if(bend.lengthSq()<1e-12)return
     const along=(distance*distance+proximal*proximal-remaining*remaining)/(2*distance)
     jointTarget.copy(start).addScaledVector(axis,along).addScaledVector(bend.normalize(),Math.sqrt(Math.max(0,proximal*proximal-along*along)))
     aim(joint,child,jointTarget)
@@ -100,7 +105,10 @@ export function smokingHand(figure:T.Object3D,side:'l'|'r'){
     if(applied)joints.forEach((j,i)=>j.quaternion.copy(base[i]))
     applied=false
   }
-  function apply(name:keyof typeof poses,frame:T.Object3D){
+  function apply(name:keyof typeof poses,frame:T.Object3D,blend=1){
+    const weight=T.MathUtils.clamp(blend,0,1)
+    if(weight<=0){reset();return}
+    if(applied)reset()
     joints.forEach((j,i)=>base[i].copy(j.quaternion))
     applied=true
     const pose=poses[name],point=(p:Point)=>frame.localToWorld(new T.Vector3(...p).multiplyScalar(.001))
@@ -124,6 +132,7 @@ export function smokingHand(figure:T.Object3D,side:'l'|'r'){
       aimHinge(chain[1],chain[2],tip,pole,distal)
       aim(chain[2],end,tip)
     })
+    if(weight<1)joints.forEach((j,i)=>j.quaternion.slerp(base[i],1-weight))
   }
   return {apply,reset,attachment,dispose(){reset();attachment.removeFromParent()}}
 }
