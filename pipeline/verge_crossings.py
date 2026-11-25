@@ -3,7 +3,8 @@ import math
 from collections import defaultdict
 
 import numpy as np
-from shapely import LineString, STRtree, box, union_all
+from shapely import LineString, Point, STRtree, box, union_all
+from shapely.ops import substring
 
 from features import points
 from service_streets import width
@@ -12,12 +13,31 @@ from surveyed_corridors import read_chunk, write_chunk
 
 def open_verges(output, manifest, elements, widths):
     corridors=[]
+    mouths=set()
     for way in elements:
         if not way.get('surfaceUnderlay'):
             continue
         axis=LineString(points(way))
         half=widths.get(way['id'],width(way['tags']))/2+.5
         corridors.append(axis.buffer(half,quad_segs=4))
+        mouths.update((way['nodes'][0],way['nodes'][-1]))
+    # The same access can continue on a short untagged arm before it reaches
+    # an arterial verge. Preserve the crossing throughout its approach.
+    for way in elements:
+        if (way['type']!='way' or way.get('surfaceUnderlay') or
+                way.get('tags',{}).get('highway') not in ('service','living_street','cycleway') or
+                way['tags'].get('layer','0')!='0' or way['tags'].get('bridge','no')!='no' or
+                not way.get('geometry') or not all(way['geometry'])):
+            continue
+        refs=mouths.intersection(way['nodes'])
+        if not refs:continue
+        coords=points(way)
+        axis=LineString(coords)
+        half=widths.get(way['id'],width(way['tags']))/2+.5
+        for ref in refs:
+            at=axis.project(Point(coords[way['nodes'].index(ref)]))
+            arm=substring(axis,max(0,at-22),min(axis.length,at+22))
+            corridors.append(arm.buffer(half,quad_segs=4))
     tree=STRtree(corridors)
     moved=defaultdict(list)
     changed={}
