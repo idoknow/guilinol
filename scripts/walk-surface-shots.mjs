@@ -17,10 +17,10 @@ try {
   await page.addStyleTag({content:'body > :not(canvas){visibility:hidden!important}'})
   for (const [name,eye,look] of [
     ['shanhu-west',[-1041,179,404],[-1057,153,376]],
-    ['shanhu-south',[-1055,173,689],[-1036,153,671]],
-    ['elephant',[-915,193,934],[-880,155,1030]],
+    ['shanhu-south',[-1039,157,679],[-1035.55,149,670.64]],
+    ['elephant',[-941,168,1110],[-965,146,1095]],
     ['ronghu',[-1560,198,352],[-1480,153,305]],
-    ['overview',[-500,1100,2600],[-500,180,-300]],
+    ['overview',[-820,352,1110],[-1230,150,375]],
   ]) {
     const mark = await page.evaluate(({eye,look})=>{
       const {camera,stats} = window.viewer

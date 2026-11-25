@@ -57,18 +57,30 @@ class ServiceStreetTests(unittest.TestCase):
             blocked = file.with_name('protected.glc')
             building = [[1000,900],[1600,1350],[1200,1600]]
             data = bytearray(gzip.decompress(file.read_bytes()))
-            data[8474+2*(3*65+5):8476+2*(3*65+5)] = struct.pack('<h',1500)
+            struct.pack_into('<I',data,20,1)
+            deck = np.array([[1600,15500,800],[2400,15500,800],[1600,15500,1600]],dtype='<i2')
+            data.extend(deck.tobytes())
             protected = json.dumps([[[0,10,[building]]], [[road,walk],[],[]],[],[]]).encode()
             struct.pack_into('<I',data,12,len(protected))
             data[16924:16924+len(collision)] = protected
             blocked.write_bytes(gzip.compress(data))
-            self.assertTrue(patch_tile(blocked,strip,(216,210,193),sidewalk=True))
+            shore = Polygon([(25,10),(28,10),(28,14)])
+            self.assertTrue(patch_tile(blocked,strip,(216,210,193),sidewalk=True,excluded=shore))
             data = gzip.decompress(blocked.read_bytes())
             created = json.loads(data[16924:16924+struct.unpack_from('<I',data,12)[0]])[1][0][2:]
             for _, shell, *holes in created:
                 shape = Polygon(np.array(shell)/100,[np.array(hole)/100 for hole in holes])
                 self.assertEqual(shape.intersection(Polygon(np.array(building)/100)).area, 0)
-                self.assertEqual(shape.intersection(box(16,8,24,16)).area, 0)
+                self.assertEqual(shape.intersection(Polygon(deck[:,::2]/100)).area, 0)
+                self.assertEqual(shape.intersection(shore).area, 0)
+            campus = file.with_name('campus.glc')
+            campus.write_bytes(file.read_bytes())
+            self.assertTrue(patch_tile(campus,strip,(216,210,193),sidewalk=True,excluded=strip))
+            self.assertFalse(patch_tile(campus,strip,(216,210,193),sidewalk=True,excluded=strip))
+            data = gzip.decompress(campus.read_bytes()); size,image_size = struct.unpack_from('<II',data,12)
+            self.assertEqual(json.loads(data[16924:16924+size])[1][0],[road,walk])
+            image = Image.open(io.BytesIO(data[16924+size:16924+size+image_size]))
+            self.assertEqual(image.getpixel((16,11)),(179,177,156))
             self.assertTrue(patch_tile(file,box(4,10,28,14),(216,210,193)))
             data = gzip.decompress(file.read_bytes()); size, image_size = struct.unpack_from('<II',data,12)
             paths = json.loads(data[16924:16924+size])[1][0]
