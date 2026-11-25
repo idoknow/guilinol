@@ -382,7 +382,7 @@ def grade_traffic(directory, manifest, ways):
     for lane in graph['lanes']:
         way = owners.get((lane['from'],lane['to']))
         if way is not None:
-            lanes.append(dict(lane, way=way['id'],halfWidth=half_width(way),structure=next((s for s in ('bridge','tunnel') if way['tags'].get(s)=='yes'),'surface')))
+            lanes.append(dict(lane, way=way['id'],halfWidth=half_width(way),maxTrafficOffset=way.get('maxTrafficOffset'),structure=next((s for s in ('bridge','tunnel') if way['tags'].get(s)=='yes'),'surface')))
     root=Path(__file__).resolve().parents[1]
     with NamedTemporaryFile(dir=directory,mode='w+') as payload:
         json.dump(dict(manifest=manifest,nodes=graph['nodes'],lanes=lanes),payload)

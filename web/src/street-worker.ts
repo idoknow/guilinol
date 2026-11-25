@@ -333,7 +333,27 @@ export function streetGeometry([paths,lamps,banks,signals=[],stops=[],roadCtrl,s
     }
     for(const poly of remaining)draw(poly)
   }
-  const railBarriers=railwayGeometry(rails,signs,railGround,crossingHeight,railFace,box,levelFace)
+  // The terrain below a graded bore follows its carriageway. Track-bed slopes,
+  // masts and fences above it are supported by the tunnel roof.
+  const bores=shoulderPlanes?.length?stationCuts?.filter(([ax,az,bx,bz,,,,open,footprint])=>
+    !open&&!footprint&&shoulderPlanes.some(([x,z,u,v])=>
+      Math.abs(x-ax)+Math.abs(z-az)<1e-6 && (u-x)*(bx-ax)+(v-z)*(bz-az)>0 &&
+      Math.abs((u-x)*(bz-az)-(v-z)*(bx-ax))<1e-6)):undefined
+  const railSupport=bores?.length?(x:number,z:number)=>{
+    let height=railGround(x,z)
+    for(const [ax,az,bx,bz,width,ay,by] of bores){
+      const dx=bx-ax,dz=bz-az,length=dx*dx+dz*dz
+      if(!length)continue
+      const t=THREE.MathUtils.clamp(((x-ax)*dx+(z-az)*dz)/length,0,1)
+      const distance=Math.hypot(x-ax-t*dx,z-az-t*dz)
+      // A GL04 chord spans up to 12 m. Carry the roof beyond the wall so a
+      // chord with both ends outside the bore cannot hang through its ceiling.
+      const outside=Math.max(0,distance-width-12)
+      height=Math.max(height,ay+t*(by-ay)+style.stationLevels.roadClearance-outside)
+    }
+    return height
+  }:railGround
+  const railBarriers=railwayGeometry(rails,signs,railSupport,crossingHeight,railFace,box,levelFace)
   const roadBarriers=buildRoadBarriers(decor,baseLevel)
   const detailCount=mats.length/16
   for(const [x,z] of lamps){const px=x/10,pz=z/10,y=baseLevel(px,pz),yaw=(x*7+z*13)%6/6*Math.PI

@@ -26,12 +26,12 @@ function clip(poly: Vertex[], side: Cut) {
   return result
 }
 
-export function tileFaces(world: string, tile: any, tunnels: Tunnel[], visit: (p: Vertex[], role: string) => void) {
+export function tileFaces(world: string, tile: any, tunnels: Tunnel[], visit: (p: Vertex[], role: string) => void, includeRailBed = false) {
   const raw = gunzipSync(fs.readFileSync(path.join(world, tile.file)))
   const [v, i, n, image, deck] = [4, 8, 12, 16, 20].map((k) => raw.readUInt32LE(k))
   const off = 16924 + 9 * v + 4 * i,
     tail = off + n + image + 18 * deck
-  const [, paths, thin = [], asphalt = [], , , railCuts = []] = JSON.parse(raw.toString('utf8', off, off + n))
+  const [, paths, thin = [], asphalt = [], rails = [], , railCuts = []] = JSON.parse(raw.toString('utf8', off, off + n))
   const base = raw.length === tail ? 24 : tail
   const wet = (r: number, c: number) => raw.readInt16LE(8474 + 2 * (65 * r + c)) !== -32768
   const step = Array.from({ length: 4225 }, (_, i) => wet(Math.floor(i / 65), i % 65)).some(Boolean) ? 4 : 8
@@ -67,7 +67,7 @@ export function tileFaces(world: string, tile: any, tunnels: Tunnel[], visit: (p
     const a = at(k), b = at(k + 1), c = at(k + stride), d = at(k + stride + 1)
     return u + v <= 1 ? a + (b - a) * u + (c - a) * v : d + (c - d) * (1 - u) + (b - d) * (1 - v)
   }
-  const street = streetGeometry(paths, sample(false), [], [], sample(true), tile.stationPaving, new Set(tile.roadbeds))
+  const street = streetGeometry(paths, sample(false), includeRailBed ? rails : [], [], sample(true), tile.stationPaving, new Set(tile.roadbeds))
   joinPortalRoads(tile, tunnels, [street.positions])
   for (let t = 0; t < street.positions.length; t += 9) {
     visit(
@@ -76,7 +76,7 @@ export function tileFaces(world: string, tile: any, tunnels: Tunnel[], visit: (p
         street.positions[t + off + 1],
         tile.z + street.positions[t + off + 2],
       ]),
-      'paving-' + street.kinds[t / 3],
+      includeRailBed && (street.kinds[t / 3] === 7 || street.kinds[t / 3] === 8) ? 'rail-bed' : 'paving-' + street.kinds[t / 3],
     )
   }
   for (const [k, y] of railCuts) positions.setY(k, y / 100)
@@ -200,6 +200,8 @@ export function visibleSurfaces(world: string, ids: Set<number>, closure: Set<nu
           }
         >,
         upperDecks: {} as Record<number, { faces: number; minSeparationM: number; maxSeparationM: number }>,
+        minimumRailBedClearanceM: null as number | null,
+        railBedIntrusions: 0,
         maxGroundExcessM: 0,
         worst: null as any,
         byRole: {} as Record<string, number>,
@@ -214,6 +216,7 @@ export function visibleSurfaces(world: string, ids: Set<number>, closure: Set<nu
     const faces: { points: Vertex[]; role: string; owner?: number }[] = []
     tileFaces(world, tile, manifest.tunnels, (points, role) =>
       faces.push({ points, role, owner: role === 'deck' ? deckOwner(points) : undefined }),
+      coveredRoads,
     )
     const nearTunnels = (manifest.tunnels as Tunnel[]).filter(t => {
       const [a,b]=t.portals, pad=t.halfWidth+2
@@ -256,10 +259,12 @@ export function visibleSurfaces(world: string, ids: Set<number>, closure: Set<nu
           y,
           (z - s.z) * s.dx - (x - s.x) * s.dz,
         ]
+        if (role === 'rail-bed' && s.t.openCut) continue
+        const halfWidth = role === 'rail-bed' ? s.t.halfWidth : s.w
         let poly = points.map(project)
         poly = clip(
-          clip(poly, (p) => s.w - p[2]),
-          (p) => s.w + p[2],
+          clip(poly, (p) => halfWidth - p[2]),
+          (p) => halfWidth + p[2],
         )
         if (!poly.length) continue
         const lo = Math.min(...poly.map((v) => v[0])),
@@ -353,6 +358,11 @@ export function visibleSurfaces(world: string, ids: Set<number>, closure: Set<nu
           }
         }
         if (!where) continue
+        if (role === 'rail-bed') {
+          report.minimumRailBedClearanceM = Math.min(report.minimumRailBedClearanceM ?? Infinity, lowest)
+          if (lowest < s.t.clearance - 1e-5) report.railBedIntrusions++
+          continue
+        }
         if (bridgeWay !== undefined) {
           const upper = (report.upperDecks[bridgeWay] ??= {
             faces: 0,
@@ -384,6 +394,6 @@ export function visibleSurfaces(world: string, ids: Set<number>, closure: Set<nu
     ...fields,
     groundViolations: violations,
     externalBridgeViolations,
-    violations: violations + externalBridgeViolations,
+    violations: violations + externalBridgeViolations + fields.railBedIntrusions,
   }))
 }

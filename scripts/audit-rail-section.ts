@@ -20,6 +20,7 @@ const crossings = read('docs/railway-crossings.json')
 const grades = []
 const sections = []
 const deckChecks = []
+const coveredCrossings = new Set<number>()
 for (const { way: id, controls, boundaryNodes, maximumGrade = 0.05 } of design.roads) {
   const way = ways.find((w) => w.id === id)
   const lane = { way: id, structure: 'surface', nodes: new Set(way.nodes) }
@@ -86,7 +87,6 @@ for (const { way: id, controls, boundaryNodes, maximumGrade = 0.05 } of design.r
   sections.push(...local)
   for (const r of crossings.filter((r) => r.road === id && tracks.has(r.rail))) {
     const p = ll2xz(r.lat, r.lon)
-    if (design.railProfiles) continue // Stacked crossings use way-matched GL04 rails and full-width faces.
     if (
       !local.some((t) => {
         const [[x, , z], [bx, , bz]] = t.portals
@@ -97,6 +97,12 @@ for (const { way: id, controls, boundaryNodes, maximumGrade = 0.05 } of design.r
       })
     )
       continue
+    if (design.railProfiles) {
+      // The cumulative checker measures the way-matched railhead. Also
+      // require rendered ballast to be present over every enclosed crossing.
+      if (local.some(t => !t.openCut)) coveredCrossings.add(id)
+      continue
+    }
     const tile = manifest.chunks.find(
       (t) => t.x === Math.floor(p.x / 256) * 256 && t.z === Math.floor(p.z / 256) * 256,
     )
@@ -135,3 +141,6 @@ assert(
   ),
 )
 assert(reverse.every((r) => r.checked && !r.violations))
+for (const way of coveredCrossings) {
+  assert(reverse.find(r => r.way === way)?.minimumRailBedClearanceM != null, 'Missing rail bed above bore ' + way)
+}

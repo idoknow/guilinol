@@ -206,6 +206,8 @@ def road_profiles(section, ways, widths):
                 substring(line, a, b) for a, b in ((0, start), (stop, line.length)) if b - a > .001
             ],
         )
+        if "maxTrafficOffset" in road:
+            local["maxTrafficOffset"] = road["maxTrafficOffset"]
         if wid in widths:
             local["stationWidth"] = widths[wid]
         if "railProfiles" in section:
