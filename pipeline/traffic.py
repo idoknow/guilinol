@@ -242,6 +242,8 @@ def bake(output, manifest, rendered_roads=None):
     narrow_ways={row['way']:row['alignment'] for row in clearances}
     (output/'vehicle-narrow-streets.json').write_text(json.dumps(clearances))
     grade_airport_fork(output,manifest,elements)
+    from crossing_spans import grade_west_ring
+    grade_west_ring(output, manifest, elements, sections)
     terminal_grades = grade_terminal_decks(output, manifest, elements)
     canal_grades = plan_canal_passages(output, manifest, elements, sections)
     from canal_east import plan as plan_east_canal
