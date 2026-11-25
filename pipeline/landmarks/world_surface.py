@@ -53,6 +53,7 @@ class Surface:
             manifest = json.loads((self.directory / 'manifest.json').read_text())
         self.left, self.top, self.width, self.depth = manifest['extent']
         self.size = manifest['chunkSize']
+        self.dev_source = manifest.get('source_world', {}) if 'dev_bbox' in manifest else {}
         self.grid = manifest['grid']
         self.files = {(c['x'], c['z']): c['file'] for c in manifest['chunks']}
         self.entries = {p['id']: p for p in manifest['landmarks']}
@@ -130,13 +131,27 @@ class LandmarkSurface:
     def __init__(self, surface, landmark):
         self.name = landmark
         self.surface = surface
-        entry = surface.entries[landmark]
+        self.model_terrain = None
+        if landmark not in surface.entries and surface.dev_source and landmark.isidentifier():
+            path = Path(__file__).resolve().parents[1]/'data/landmarks'/f'{landmark}-terrain.json'
+            if path.is_file():
+                from model_terrain import ModelTerrain
+                document = json.loads(path.read_bytes())
+                if document['source_world'] != surface.dev_source['sha256'] or document['model'] != landmark:
+                    raise ValueError(f'Model terrain source mismatch: {landmark}')
+                self.model_terrain = ModelTerrain(document)
+                entry = document['placement']
+            else:
+                entry = surface.entries[landmark]
+        else:
+            entry = surface.entries[landmark]
         self.x, self.y, self.z = entry['position']
         angle = math.radians(entry['rotation'])
         self.cos, self.sin = math.cos(angle), math.sin(angle)
 
     def sample(self, x, z):
-        ground, water = self.surface.sample(self.x+self.cos*x+self.sin*z, self.z-self.sin*x+self.cos*z)
+        terrain = self.model_terrain or self.surface
+        ground, water = terrain.sample(self.x+self.cos*x+self.sin*z, self.z-self.sin*x+self.cos*z)
         return ground-self.y, None if water is None else water-self.y
 
     def roof(self,x,z):
