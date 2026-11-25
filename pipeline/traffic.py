@@ -444,9 +444,10 @@ def bake(output, manifest, rendered_roads=None):
             cycling=cycleway_grades(cycleway,conflicts)
             access=cycling+access
             surveyed=vehicle_surface_grades.profiles(graded_sections,native_levels,access+canal_grades+terminal_grades)
-            from pedestrian_approaches import profiles as path_profiles
+            from pedestrian_approaches import profiles as path_profiles, footbridge_landing
             planned=access+canal_grades+terminal_grades+surveyed
-            pedestrian=path_profiles(output,manifest,elements,sections,planned)
+            landing=footbridge_landing(output,manifest,elements,planned)
+            pedestrian=landing+path_profiles(output,manifest,elements,sections,planned+landing)
             pedestrian+=cycleway_street_tie(output,manifest,elements,sections,cycleway)
             from junction_grades import profiles as junction_profiles
             pedestrian+=junction_profiles(output,manifest,elements,sections,planned)
