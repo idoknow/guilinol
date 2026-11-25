@@ -366,6 +366,8 @@ def bake(output, manifest, rendered_roads=None):
             pedestrian+=cycleway_street_tie(output,manifest,elements,sections,cycleway)
             from junction_grades import profiles as junction_profiles
             pedestrian+=junction_profiles(output,manifest,elements,sections,planned)
+            from terminal_decks import pickup_merge
+            pedestrian+=pickup_merge(output,manifest,elements,terminal_grades)
             pedestrian+=east_canal
             bake_surveyed_corridors(output,manifest['chunks'],elements,sections,planned+pedestrian,only_approaches=True,bridge_profiles=canal_grades,preferred=pedestrian+cycling,continuous=continuous_canal)
             trim_portal_paving(output,manifest['chunks'],generated,elements,sections)

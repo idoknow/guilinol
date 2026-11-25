@@ -115,6 +115,45 @@ def grade(output, manifest, elements):
     return approaches
 
 
+
+def pickup_merge(output, manifest, elements, landings):
+    """Join the last 90 m of the arrivals road to the departures ramp."""
+    from canal_passages import sample_road_heights
+    ways={w['id']:w for w in elements if w['type']=='way' and w['id'] in (843500807,631243400)}
+    if len(ways)!=2 or not landings:
+        return []
+    branch,trunk=(LineString(points(ways[wid])) for wid in (843500807,631243400))
+    joint=ways[843500807]['nodes'][-1]
+    if joint not in ways[631243400]['nodes'] or branch.length<91:
+        return []
+    def position(distance):
+        return branch.interpolate(branch.length-distance)
+    def ramp(distance):
+        point=trunk.interpolate(trunk.project(position(distance)))
+        line,_,start,end,*_=min(landings,key=lambda r:r[0].distance(point))
+        return start+(end-start)*line.project(point,normalized=True)
+    # The two pavement polygons overlap for 18 m. Follow the existing ramp
+    # there, matching its derivative at the start of the connecting curve.
+    overlap=18.
+    run=90.-overlap
+    level=ramp(overlap)
+    slope=level-ramp(overlap-1)
+    probes=[position(d) for d in (90,91)]
+    end,adjacent=sample_road_heights(output,manifest,[dict(x=p.x,z=p.y,way=843500807) for p in probes])
+    def height(distance):
+        if distance<=overlap:
+            return ramp(distance)
+        t=(distance-overlap)/run
+        return (level*(1-3*t*t+2*t**3)+end*(3*t*t-2*t**3)
+                +run*(slope*t*(1-t)**2-(adjacent-end)*t*t*(1-t)))
+    chainage=np.r_[0,np.cumsum(np.linalg.norm(np.diff(np.asarray(branch.coords),axis=0),axis=1))]
+    samples=sorted({90.,*np.arange(0,90,2),*(branch.length-s for s in chainage if 0<=branch.length-s<90)})
+    result=[]
+    for a,b in zip(samples,samples[1:]):
+        if b-a>.01:
+            result.append((LineString([position(a),position(b)]),3.75,height(a),height(b),.05,0))
+    return result
+
 def grade_airport_fork(output, manifest, elements):
     """Keep the branching ramp at the through deck height across their shared fork."""
     from canal_passages import sample_road_heights
