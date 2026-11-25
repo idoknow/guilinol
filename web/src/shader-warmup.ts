@@ -35,7 +35,7 @@ function reflectionQueue(renderer:WebGLRenderer){
 }
 const queues=new WeakMap<WebGLRenderer,ReturnType<typeof reflectionQueue>>()
 export async function warmShaders(renderer:WebGLRenderer,root:Object3D,camera:Camera,scene:Scene){
-  await renderer.compileAsync(root,camera,scene)
+  renderer.compile(root,camera,scene)
   let enqueue=queues.get(renderer)
   if(!enqueue){enqueue=reflectionQueue(renderer);queues.set(renderer,enqueue)}
   const seen=new Set<Program>()

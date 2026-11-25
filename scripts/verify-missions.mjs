@@ -418,12 +418,17 @@ try {
     const guilin = window.viewer.game.quiet.findQuietZoneAt(-1231, -370)
     // Teleport onto a known walkable spot (duxiu) to verify ¥120 spot bounty + reload idempotency
     const duxiu = window.viewer.tour.spots.find(s => s.id === 'duxiu')
-    await window.viewer.walkTo(duxiu.x,duxiu.z,0,'e2e-walk-to-stamp')
+    const {game,walk}=window.viewer,events=[]
+    const off=game.onEvent(event=>events.push(event))
+    const arrived=await window.viewer.walkTo(duxiu.x,duxiu.z,0,'e2e-walk-to-stamp')
     await new Promise(r => setTimeout(r, 300))
     const moneyAfterSpot = window.viewer.game.getState().money
+    off()
+    const diagnostic={arrived,landing:walk.spawns.at(-1),events,ledger:game.save.getSnapshot().economy.txHistoryRing}
     const secondTry = window.viewer.game.commerce.claimSpotBounty('duxiu')
-    return {libinId: libin?.id, guilinId: guilin?.id, moneyAfterSpot, secondCode: secondTry.code}
+    return {libinId: libin?.id, guilinId: guilin?.id, moneyAfterSpot, secondCode: secondTry.code,diagnostic}
   })
+  console.log('独秀峰首次打卡',JSON.stringify(quietAndSpotCheck))
   assert.equal(quietAndSpotCheck.libinId, 'libin_middle')
   assert.equal(quietAndSpotCheck.guilinId, 'guilin_middle')
   assert.equal(quietAndSpotCheck.moneyAfterSpot, 500, '380 + 120 duxiu spot bounty = 500')

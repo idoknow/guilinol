@@ -423,6 +423,8 @@ export function createFreeBoats(env: BoatEnv) {
     const support = deck ?? sim.surface(x, z, 'sidewalk') ?? sim.surface(x, z, 'road') ?? sim.surface(x, z, 'ground')
     if (!support || support.slope > cfg.slope) return null
     if (!deck && sim.wet(x, z)) return null
+    if (!deck && refWaterY !== undefined &&
+        [sim.wet(x-cfg.radius,z),sim.wet(x+cfg.radius,z),sim.wet(x,z-cfg.radius),sim.wet(x,z+cfg.radius)].some(Boolean)) return null
     if (deck && refWaterY !== undefined && deck.y <= refWaterY + 0.15) return null
     if (refWaterY !== undefined && support.y < refWaterY - 0.1) return null
     const peak = sim.surface(x, z, 'peak')

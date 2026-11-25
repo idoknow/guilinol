@@ -8,7 +8,7 @@ test('concurrent warmups share a budget, skip retired programs and wait for link
   const frame=()=>{assert.equal(frames.length,1);frames.shift()()}
   const program=(name,isReady=()=>true)=>({isReady,getUniforms(){calls.push(name);now+=8},getAttributes(){}})
   const first=program('first'),late=program('late',()=>ready),retired=program('retired')
-  const scene={},renderer={info:{programs:[first,late,retired]},compileAsync:async()=>{}}
+  const scene={},renderer={info:{programs:[first,late,retired]},compile:()=>{}}
   const clock=Object.getOwnPropertyDescriptor(globalThis,'performance')
   Object.defineProperty(globalThis,'performance',{configurable:true,value:{now:()=>now}})
   globalThis.requestAnimationFrame=callback=>frames.push(callback)
