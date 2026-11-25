@@ -350,15 +350,21 @@ try {
               const hits=heightsAt(terrainBins,lx,lz,footprint).concat(heightsAt(obstructionBins,lx,lz,footprint))
               // Compare at the millimetre precision of the baked road meshes.
               const headroom=Math.min(...hits.filter(h=>h>=y).map(h=>Math.round((h-y)*1000)/1000))
-              if(headroom<required&&(!violation||headroom<violation.headroom))
-                violation={headroom,x,z}
+              let gauge=required
+              if(owner.carriagewayHalfWidth){
+                const [a,b]=owner.portals
+                const side=Math.abs((z-a[2])*(b[0]-a[0])-(x-a[0])*(b[2]-a[2]))/owner.length
+                gauge-=Math.min(.5,Math.max(0,side-owner.carriagewayHalfWidth))
+              }
+              if(headroom<gauge&&(!violation||gauge-headroom>violation.gauge-violation.headroom))
+                violation={headroom,gauge,x,z}
               continue
             }
             const diff = y-groundAt(lx,lz)
             if (diff < minDiff) { minDiff = diff; worstPt = s }
           }
           if(violation)clearanceFindings.push({subtype:'tunnelClearance',x:violation.x,z:violation.z,
-            value:required-violation.headroom,detail:`Tunnel ${owner.way} headroom ${violation.headroom} m, required ${required} m`})
+            value:violation.gauge-violation.headroom,detail:`Tunnel ${owner.way} headroom ${violation.headroom} m, required ${violation.gauge} m`})
           if (minDiff < 0.03) {
             zFight.push({
               subtype: 'zFighting', x: +worstPt[0].toFixed(2), z: +worstPt[2].toFixed(2),
