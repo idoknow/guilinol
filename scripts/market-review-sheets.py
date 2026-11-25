@@ -1,4 +1,5 @@
 """Usage: python scripts/market-review-sheets.py CAPTURE ESRI_RGB"""
+from ops_evidence import require_evidence
 import json
 import math
 import sys
@@ -11,7 +12,7 @@ from common import xz2ll
 
 capture = Path(sys.argv[1])
 rgb = Image.open(sys.argv[2]).convert('RGB')
-layout = root / '.ops-docs/layout'
+layout = require_evidence('layout')
 grid = json.loads((layout / 'dongxi-esri-grid.json').read_text())
 scale = 256 * 2**grid['zoom']
 
@@ -24,7 +25,7 @@ def pixel(lon, lat):
 plan = Image.new('RGB', rgb.size, '#ddd8c9')
 pen = ImageDraw.Draw(plan)
 for source, color in [('layout', '#62594f'), ('infill', '#866644')]:
-    for feature in json.loads((layout / f'dongxi-{source}.geojson').read_text())['features']:
+    for feature in json.loads(((root/'pipeline/data/layout')/f'dongxi-{source}.geojson').read_text())['features']:
         coords = feature['geometry']['coordinates']
         kind = feature['properties']['kind']
         if kind in ('roof', 'mall'):
@@ -44,7 +45,7 @@ for batch, numbers in [('entrances', [f'Y{i:02}' for i in range(1,9)]), ('street
     pages = []
     for number in numbers:
         estimated = number.startswith('Y')
-        path = root/'.ops-docs/refs/rock'/('walk-dongxi-xiaoyao-jiefang' if estimated else 'walk-shizijie-wangcheng')
+        path = require_evidence('refs/rock')/('walk-dongxi-xiaoyao-jiefang' if estimated else 'walk-shizijie-wangcheng')
         page = Image.new('RGB', (1280,560), '#eeeae2')
         for index, file in enumerate([next(path.glob(number[-2:]+'_*.jpg')),capture/(number+'.jpg')]):
             pic = ImageOps.contain(Image.open(file), (640,510))

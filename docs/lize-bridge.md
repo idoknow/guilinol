@@ -24,4 +24,4 @@ Rock 确认的参照物是榕湖北路 15 号的桂林图书馆榕湖分部（`w
 | 翊武路青砖老楼 | 2,707 | 2 | 95,620 |
 | 单层粉篷、双层蓝腰线游船 | 2,542 | 1 | 81,980 |
 
-原对照册共 23 页（21 页实拍配对，另有侧景、夜景）。补册仅含新定位的四张：`CHROMIUM=/usr/bin/chromium VIEWS=1344,1351,1352,1353 node scripts/lize-views.mjs`，再运行 `uv run python scripts/lize-panels.py .ops-docs/refs/rock supplement.pdf 1344 1351 1352 1353`。`uv run python scripts/check-yiwu-frontages.py` 检查模型外包轮廓与生成后的街面、人行道之间的净距。
+原对照册共 23 页（21 页实拍配对，另有侧景、夜景）。补册仅含新定位的四张：`CHROMIUM=/usr/bin/chromium VIEWS=1344,1351,1352,1353 node scripts/lize-views.mjs`，再运行 `uv run python scripts/lize-panels.py ops 仓库 docs/refs/rock supplement.pdf 1344 1351 1352 1353`。`uv run python scripts/check-yiwu-frontages.py` 检查模型外包轮廓与生成后的街面、人行道之间的净距。

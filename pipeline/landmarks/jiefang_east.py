@@ -12,7 +12,7 @@ from common import load_osm, ll2xz
 
 
 def portal_furniture(model, frame):
-    way=next(item for item in load_osm() if item['type']=='way' and item['id']==682893309)
+    way=next(item for item in load_osm('jiefang_bridge') if item['type']=='way' and item['id']==682893309)
     axis=LineString([ll2xz(item['lat'],item['lon']) for item in way['geometry']])
     rotation=np.array([[frame.cos,frame.sin],[-frame.sin,frame.cos]])
     def site(station,offset):

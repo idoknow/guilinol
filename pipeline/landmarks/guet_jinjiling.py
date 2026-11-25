@@ -111,7 +111,7 @@ def _pool(b, x, z):
 
 
 def build(b):
-    els = load_osm()
+    els = load_osm('guet_jinjiling')
     camp = next(e for e in els if e['type'] == 'way' and e['id'] == CAMPUS)
     campus_l = C.to_local(b, Polygon([ll2xz(q['lat'], q['lon']) for q in camp['geometry']]))
     heroes = {'way/621423424': _library, 'way/621423420': _qinzheng}

@@ -27,7 +27,7 @@ class PalacePlan:
         c, s = math.cos(angle), math.sin(angle)
         inverse = np.array([[c, -s], [s, c]])
         self.world_to_local = [c,-s,s,c,*(-inverse@origin)]
-        snapshot = {way['id']:way for way in load_osm() if way['type']=='way'}
+        snapshot = {way['id']:way for way in load_osm('jingjiang') if way['type']=='way'}
         route = snapshot[1008909371]
         assert route['tags']['layer']=='1'
         self.walk = LineString([inverse @ (ll2xz(node['lat'],node['lon'])-origin) for node in route['geometry']])
@@ -36,7 +36,7 @@ class PalacePlan:
         approach=peace_lane['geometry'][shared:shared+2]
         self.west_approach=LineString([inverse@(ll2xz(node['lat'],node['lon'])-origin) for node in approach])
         self.surface = landmark_surface('jingjiang')
-        features = json.loads((ROOT / ".ops-docs/layout/wangcheng.geojson").read_text())["features"]
+        features = json.loads((ROOT / "pipeline/data/layout/wangcheng.geojson").read_text())["features"]
         self.shapes = {}
         for feature in features:
             if "osm" not in feature["properties"]:

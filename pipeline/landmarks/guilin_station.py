@@ -6,6 +6,7 @@ from pathlib import Path
 import sys
 
 import numpy as np
+from shapely import from_wkb
 from PIL import Image, ImageDraw
 from shapely import constrained_delaunay_triangles, get_parts, union_all
 from shapely.geometry import LineString
@@ -249,13 +250,22 @@ def block_tracks(b, envelope):
                 )
 
 
-def main(out):
-    site = {k: local(v) for k, v in footprints().items()}
+def station_geometry():
+    if not (ROOT/'raw').exists():
+        document=json.loads((ROOT/'pipeline/data/landmarks/guilin_station.json').read_bytes())
+        return ([from_wkb(bytes.fromhex(value)) for value in document['platforms']],
+                *(from_wkb(bytes.fromhex(document[key])) for key in ('track_envelope','annex','bus_shelter')))
     ways = {e["id"]: e for e in load_osm() if e["type"] == "way"}
     platforms = [local(area(ways[i])) for i in range(376029417, 376029421)]
     track_envelope = track_limits(ways, platforms)
     annex = local(area(ways[1017598908]))
     bus_shelter = local(area(ways[1017598916]))
+    return platforms, track_envelope, annex, bus_shelter
+
+
+def main(out):
+    site = {k: local(v) for k, v in footprints().items()}
+    platforms, track_envelope, annex, bus_shelter = station_geometry()
     image = Image.new("RGBA", (512, 512), "#ffffff")
     draw = ImageDraw.Draw(image)
     rects = {}

@@ -7,6 +7,7 @@ Strictly adheres to Standard A (口径 A):
 - School gate location (closed gate, plaque only)
 - Zero forbidden keywords (no 教学, 宿舍, 实验, 图书, 办公, 食堂, etc.)
 """
+from ops_evidence import require_evidence
 import sys
 from pathlib import Path
 from PIL import Image, ImageDraw, ImageFont
@@ -37,7 +38,7 @@ def font(size):
             continue
     return ImageFont.load_default()
 
-out_dir = Path(__file__).resolve().parents[1] / '.ops-docs/layout/schools'
+out_dir = require_evidence('layout/schools')
 out_dir.mkdir(parents=True, exist_ok=True)
 
 class MapCanvas:

@@ -1,4 +1,8 @@
 """Clip weakly supported outline extensions to Esri eaves; retain signed wall segments."""
+import sys
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from ops_evidence import require_evidence
 import json
 import math
 import sys
@@ -24,7 +28,7 @@ def geographic(east, south):
     return np.asarray(east)/MLON+LON0, LAT0-np.asarray(south)/MLAT
 
 
-folder = root/'.ops-docs/layout'
+folder = require_evidence('layout')
 grid = json.loads((folder/'dongxi-esri-grid.json').read_text())
 scale = 256*2**grid['zoom']
 
@@ -38,7 +42,7 @@ mask = np.asarray(Image.open(folder/'dongxi-esri-mask.png'))
 trace = union_all([transform(project,shape(geom)) for geom, value in shapes(mask.astype('uint8'), mask=mask) if value])
 market = next(item for item in json.loads((root/'pipeline/landmarks.json').read_text()) if item['id']=='wangcheng_market')
 region = transform(world, Polygon(market['replace']['polygon']))
-layout = folder/'dongxi-layout.geojson'
+layout = (root/'pipeline/data/layout')/'dongxi-layout.geojson'
 catalog = json.loads(layout.read_text())
 features = catalog['features']
 for feature in features:

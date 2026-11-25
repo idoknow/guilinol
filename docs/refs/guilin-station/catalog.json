@@ -3,7 +3,7 @@
   "station_osm": "node/626322669",
   "buildings": [
     {
-      "source": "docs/layout/guilin-station.geojson#wall",
+      "source": "pipeline/data/layout/guilin-station.geojson#wall",
       "name": "站房",
       "confidence": "photo",
       "photos": [
@@ -64,7 +64,7 @@
       ]
     },
     {
-      "source": "docs/layout/guilin-station.geojson#plaza",
+      "source": "pipeline/data/layout/guilin-station.geojson#plaza",
       "name": "站前广场与交通",
       "confidence": "photo",
       "photos": [

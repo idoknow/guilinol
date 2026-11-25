@@ -85,7 +85,7 @@ def _gate_stone(b, campus_l, gx, gz):
 
 
 def build(b):
-    els = load_osm()
+    els = load_osm('guet_huajiang')
     camp = next(e for e in els if e['type'] == 'way' and e['id'] == CAMPUS)
     campus_l = C.to_local(b, Polygon([ll2xz(q['lat'], q['lon']) for q in camp['geometry']]))
     C.build_records(b, 'guet_huajiang', heroes={'05d68d98-09ab-4af4-818e-61b78b620331': _library},

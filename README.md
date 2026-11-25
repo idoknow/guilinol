@@ -5,7 +5,7 @@
 - 方案：three.js + 离线数据预处理 + 256 m 分块流式加载，桌面和手机都能玩。
 - 原始数据（OSM / Overture / Terrarium DEM）不入库，放 `raw/`。
 
-数据署名：© OpenStreetMap contributors (ODbL)；Overture Maps Foundation / Zenodo 8174931 建筑数据 (CC BY 4.0)；Mapzen Terrarium 高程瓦片。
+数据署名：© OpenStreetMap contributors (ODbL)；Overture Maps Foundation 的 Buildings 主题按 ODbL 提供，校园建筑分片逐条保留来源：Qian Shi 等的东亚建筑数据（Zenodo 8174931，CC BY 4.0）或 OpenStreetMap（ODbL）。详见 [Overture 官方署名表](https://docs.overturemaps.org/attribution/)。高程来自 Mapzen Terrarium。
 
 ## 本地开发
 
@@ -79,6 +79,6 @@ npx wrangler d1 execute glol --remote --command "UPDATE users SET role='admin' W
 - 不允许：未经 idoknow 书面许可，把本仓库或其衍生作品作为网站、游戏服务器或其他在线服务提供给他人使用（即许可证所称的生产用途）。需要授权请通过 https://github.com/idoknow 联系。
 - 每个版本自首次公开发布起满四年，自动改按 AGPL-3.0-or-later 授权。
 - 「网上桂林」「Guilin Online」名称和 logo 不在许可范围内。
-- 第三方地图与高程数据（OpenStreetMap ODbL、Overture CC BY 4.0 等）及 `docs/credits.md` 列出的素材仍按各自许可使用，见开头的数据署名。
+- 第三方地图与高程数据及 `docs/credits.md` 列出的素材仍按各自许可使用，见开头的数据署名。
 
 贡献须知见 [CONTRIBUTING.md](CONTRIBUTING.md)。

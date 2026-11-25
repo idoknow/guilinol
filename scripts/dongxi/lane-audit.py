@@ -1,4 +1,8 @@
 """Check registered roof footprints against all mapped walking axes in the replacement area."""
+import sys
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from ops_evidence import require_evidence
 import argparse
 import json
 import math
@@ -40,7 +44,7 @@ def main():
     parser.add_argument('--trim', action='store_true')
     parser.add_argument('--raw-models', type=Path, help='LOD0 generator output directory (before packing)')
     args = parser.parse_args()
-    layout = ROOT / '.ops-docs/layout'
+    layout = require_evidence('layout')
     boundary = next(item['replace']['polygon'] for item in json.loads((ROOT/'pipeline/landmarks.json').read_text()) if item['id'] == 'wangcheng_market')
     district = Polygon(ring(boundary))
     ways = {}
@@ -63,7 +67,7 @@ def main():
     setback = unary_union(setbacks).intersection(district.buffer(1.5))
     roofs = {}
     for filename in ('dongxi-layout.geojson', 'dongxi-infill.geojson'):
-        path=layout/filename
+        path=ROOT/'pipeline/data/layout'/filename
         catalog=json.loads(path.read_text())
         output=[]
         for feature in catalog['features']:

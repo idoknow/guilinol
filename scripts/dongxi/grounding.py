@@ -22,7 +22,7 @@ for name in ('dongxixiang', 'wangcheng_market'):
         from shapely.geometry import Point
         corners=[]
         for source in ('layout','infill'):
-            for feature in json.loads((ROOT/f'.ops-docs/layout/dongxi-{source}.geojson').read_text())['features']:
+            for feature in json.loads((ROOT/f'pipeline/data/layout/dongxi-{source}.geojson').read_text())['features']:
                 if feature['properties']['kind']!='roof':continue
                 for ring in feature['geometry']['coordinates']:
                     for lon,lat in ring[:-1]:

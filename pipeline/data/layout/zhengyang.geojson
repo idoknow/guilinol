@@ -1,0 +1,2380 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "id": "way/221821082",
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            110.2939344,
+            25.2808583
+          ],
+          [
+            110.2939188,
+            25.2807739
+          ],
+          [
+            110.2939061,
+            25.280705
+          ],
+          [
+            110.293783,
+            25.2800382
+          ],
+          [
+            110.2936501,
+            25.2791443
+          ],
+          [
+            110.2935232,
+            25.2782902
+          ]
+        ]
+      },
+      "properties": {
+        "kind": "pedestrian",
+        "name": "正阳步行街",
+        "source": "OSM",
+        "status": "待定"
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "way/675600128",
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            110.2934849,
+            25.2781262
+          ],
+          [
+            110.2933588,
+            25.277819
+          ],
+          [
+            110.2933328,
+            25.2777549
+          ],
+          [
+            110.2929657,
+            25.2768501
+          ],
+          [
+            110.2928421,
+            25.2765453
+          ],
+          [
+            110.2927293,
+            25.2762673
+          ],
+          [
+            110.2922386,
+            25.275092
+          ]
+        ]
+      },
+      "properties": {
+        "kind": "pedestrian",
+        "name": "正阳步行街",
+        "source": "OSM",
+        "status": "待定"
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "way/264901525",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              110.2940844,
+              25.2806401
+            ],
+            [
+              110.2946058,
+              25.2805267
+            ],
+            [
+              110.2944823,
+              25.2800244
+            ],
+            [
+              110.2942466,
+              25.2800648
+            ],
+            [
+              110.2941894,
+              25.2800259
+            ],
+            [
+              110.2940741,
+              25.2800466
+            ],
+            [
+              110.2939352,
+              25.2800706
+            ],
+            [
+              110.2938502,
+              25.2800855
+            ],
+            [
+              110.2939339,
+              25.2804877
+            ],
+            [
+              110.2940408,
+              25.2804671
+            ],
+            [
+              110.2940844,
+              25.2806401
+            ]
+          ]
+        ]
+      },
+      "properties": {
+        "kind": "building",
+        "source": "OSM",
+        "name": "王城商厦",
+        "levels": 9,
+        "roof": null,
+        "arcade": null,
+        "retail": true,
+        "status": "轮廓与层数已核",
+        "overture_id": "f7b6eace-debc-40fe-a2c7-4f70b0e7ce16",
+        "overture_source": "OpenStreetMap",
+        "footprint_iou": 1.0,
+        "level_source": "Rock 06/09；IDOK-51 dongxi-layout",
+        "esri_review": "主屋顶及内院可辨，北侧及西侧屋顶线相对轮廓内缩",
+        "footprint_axis_deg": 12.6
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "way/675094455",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              110.2913091,
+              25.2761675
+            ],
+            [
+              110.2913825,
+              25.2761646
+            ],
+            [
+              110.2914727,
+              25.2762168
+            ],
+            [
+              110.2915642,
+              25.2762584
+            ],
+            [
+              110.2916606,
+              25.2762963
+            ],
+            [
+              110.2917688,
+              25.2763234
+            ],
+            [
+              110.2918776,
+              25.2763395
+            ],
+            [
+              110.2919831,
+              25.2763418
+            ],
+            [
+              110.2920919,
+              25.2763387
+            ],
+            [
+              110.2922057,
+              25.2763134
+            ],
+            [
+              110.2923788,
+              25.2763215
+            ],
+            [
+              110.2923877,
+              25.2761248
+            ],
+            [
+              110.2924702,
+              25.2761279
+            ],
+            [
+              110.2924711,
+              25.2760176
+            ],
+            [
+              110.2924381,
+              25.2760171
+            ],
+            [
+              110.2923006,
+              25.2757092
+            ],
+            [
+              110.2917909,
+              25.2757068
+            ],
+            [
+              110.2917931,
+              25.2756208
+            ],
+            [
+              110.2915732,
+              25.2756204
+            ],
+            [
+              110.2915698,
+              25.2757057
+            ],
+            [
+              110.2914845,
+              25.2757053
+            ],
+            [
+              110.2914843,
+              25.2757357
+            ],
+            [
+              110.2911556,
+              25.2757342
+            ],
+            [
+              110.2911545,
+              25.2759191
+            ],
+            [
+              110.2911841,
+              25.2759192
+            ],
+            [
+              110.2913091,
+              25.2761675
+            ]
+          ]
+        ]
+      },
+      "properties": {
+        "kind": "building",
+        "source": "OSM",
+        "name": null,
+        "levels": null,
+        "roof": null,
+        "arcade": null,
+        "retail": null,
+        "status": "待定",
+        "overture_id": "fb2a54fb-44e0-47f5-aa9f-89b8421f4df5",
+        "overture_source": "OpenStreetMap",
+        "footprint_iou": 1.0,
+        "esri_review": "屋顶阵列可见，西侧超出本图范围",
+        "footprint_axis_deg": 89.6
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "way/675106655",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              110.2921315,
+              25.2765295
+            ],
+            [
+              110.2925828,
+              25.2763815
+            ],
+            [
+              110.2925705,
+              25.2763474
+            ],
+            [
+              110.2926105,
+              25.2763345
+            ],
+            [
+              110.292717,
+              25.2763782
+            ],
+            [
+              110.2927326,
+              25.2764113
+            ],
+            [
+              110.2927084,
+              25.2764204
+            ],
+            [
+              110.2928503,
+              25.2767523
+            ],
+            [
+              110.2928284,
+              25.2767633
+            ],
+            [
+              110.2928462,
+              25.2768004
+            ],
+            [
+              110.2928257,
+              25.2768358
+            ],
+            [
+              110.2928364,
+              25.2768599
+            ],
+            [
+              110.2925045,
+              25.2769783
+            ],
+            [
+              110.2924877,
+              25.2769418
+            ],
+            [
+              110.292345,
+              25.276985
+            ],
+            [
+              110.2923293,
+              25.2770169
+            ],
+            [
+              110.2922499,
+              25.2769906
+            ],
+            [
+              110.2922595,
+              25.2769647
+            ],
+            [
+              110.2922371,
+              25.2769561
+            ],
+            [
+              110.292114,
+              25.2766353
+            ],
+            [
+              110.2921272,
+              25.2766133
+            ],
+            [
+              110.2920962,
+              25.276598
+            ],
+            [
+              110.2921315,
+              25.2765295
+            ]
+          ]
+        ]
+      },
+      "properties": {
+        "kind": "building",
+        "source": "OSM",
+        "name": null,
+        "levels": null,
+        "roof": null,
+        "arcade": null,
+        "retail": null,
+        "status": "待定",
+        "overture_id": "8c18f097-7f44-4c13-84af-4565d3f6baa7",
+        "overture_source": "OpenStreetMap",
+        "footprint_iou": 1.0,
+        "esri_review": "两条浅色长屋面与院落轮廓相符",
+        "footprint_axis_deg": 109.6
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "way/675106657",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              110.2929299,
+              25.2765547
+            ],
+            [
+              110.2931917,
+              25.2764665
+            ],
+            [
+              110.2932721,
+              25.2766615
+            ],
+            [
+              110.2930102,
+              25.2767497
+            ],
+            [
+              110.2929299,
+              25.2765547
+            ]
+          ]
+        ]
+      },
+      "properties": {
+        "kind": "building",
+        "source": "OSM",
+        "name": null,
+        "levels": null,
+        "roof": null,
+        "arcade": null,
+        "retail": null,
+        "status": "待定",
+        "overture_id": "ec0403f5-f671-4381-8b2c-ccbe1577d300",
+        "overture_source": "OpenStreetMap",
+        "footprint_iou": 1.0,
+        "esri_review": "中央条纹屋面可辨，四边待定",
+        "footprint_axis_deg": 110.3
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "way/675106664",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              110.2932219,
+              25.2772971
+            ],
+            [
+              110.2934671,
+              25.2772126
+            ],
+            [
+              110.2933674,
+              25.2769892
+            ],
+            [
+              110.2934694,
+              25.2769532
+            ],
+            [
+              110.2934105,
+              25.2768168
+            ],
+            [
+              110.2931222,
+              25.2769185
+            ],
+            [
+              110.2931628,
+              25.2770126
+            ],
+            [
+              110.2931145,
+              25.2770297
+            ],
+            [
+              110.2932219,
+              25.2772971
+            ]
+          ]
+        ]
+      },
+      "properties": {
+        "kind": "building",
+        "source": "OSM",
+        "name": null,
+        "levels": null,
+        "roof": null,
+        "arcade": null,
+        "retail": null,
+        "status": "待定",
+        "overture_id": "3822e653-760a-4f18-aea3-51a39a0ecfe7",
+        "overture_source": "OpenStreetMap",
+        "footprint_iou": 1.0,
+        "esri_review": "南段有缺角，北侧连续屋面",
+        "footprint_axis_deg": 20.8
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "way/675170617",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              110.2928224,
+              25.2754305
+            ],
+            [
+              110.292805,
+              25.2753896
+            ],
+            [
+              110.2927971,
+              25.2753705
+            ],
+            [
+              110.2926353,
+              25.2754258
+            ],
+            [
+              110.292615,
+              25.2754327
+            ],
+            [
+              110.2925943,
+              25.2754664
+            ],
+            [
+              110.2925791,
+              25.2754911
+            ],
+            [
+              110.2928068,
+              25.2760385
+            ],
+            [
+              110.2928714,
+              25.2760165
+            ],
+            [
+              110.2927252,
+              25.2756651
+            ],
+            [
+              110.292712,
+              25.2756335
+            ],
+            [
+              110.2926511,
+              25.2754898
+            ],
+            [
+              110.2928224,
+              25.2754305
+            ]
+          ]
+        ]
+      },
+      "properties": {
+        "kind": "building",
+        "source": "OSM",
+        "name": null,
+        "levels": null,
+        "roof": null,
+        "arcade": null,
+        "retail": null,
+        "status": "待定",
+        "overture_id": "48e96695-5a4e-4117-b572-eb2d55ea2af5",
+        "overture_source": "OpenStreetMap",
+        "footprint_iou": 1.0,
+        "esri_review": "折线穿过浅色场地，不能确认为屋顶",
+        "footprint_axis_deg": 20.7
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "way/675170618",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              110.2923237,
+              25.2756662
+            ],
+            [
+              110.2924408,
+              25.2756251
+            ],
+            [
+              110.2923751,
+              25.2754712
+            ],
+            [
+              110.2923059,
+              25.2754955
+            ],
+            [
+              110.2922574,
+              25.2755125
+            ],
+            [
+              110.2923237,
+              25.2756662
+            ]
+          ]
+        ]
+      },
+      "properties": {
+        "kind": "building",
+        "source": "OSM",
+        "name": null,
+        "levels": null,
+        "roof": null,
+        "arcade": null,
+        "retail": null,
+        "status": "待定",
+        "overture_id": "5eeed446-8b3d-471f-afff-4cb802b194a6",
+        "overture_source": "OpenStreetMap",
+        "footprint_iou": 1.0,
+        "esri_review": "可辨矩形屋面和南侧端部",
+        "footprint_axis_deg": 21.2
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "way/675170619",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              110.2923513,
+              25.27573
+            ],
+            [
+              110.292468,
+              25.2756891
+            ],
+            [
+              110.2924408,
+              25.2756251
+            ],
+            [
+              110.2923237,
+              25.2756662
+            ],
+            [
+              110.2923513,
+              25.27573
+            ]
+          ]
+        ]
+      },
+      "properties": {
+        "kind": "building",
+        "source": "OSM",
+        "name": null,
+        "levels": null,
+        "roof": null,
+        "arcade": null,
+        "retail": null,
+        "status": "待定",
+        "overture_id": "c4462106-7bfe-4f5e-b9ee-5896deca7721",
+        "overture_source": "OpenStreetMap",
+        "footprint_iou": 1.0,
+        "esri_review": "树影遮挡",
+        "footprint_axis_deg": 111.1
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "way/675170620",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              110.2924158,
+              25.2758798
+            ],
+            [
+              110.292532,
+              25.2758392
+            ],
+            [
+              110.292468,
+              25.2756891
+            ],
+            [
+              110.2923513,
+              25.27573
+            ],
+            [
+              110.2924158,
+              25.2758798
+            ]
+          ]
+        ]
+      },
+      "properties": {
+        "kind": "building",
+        "source": "OSM",
+        "name": null,
+        "levels": null,
+        "roof": null,
+        "arcade": null,
+        "retail": null,
+        "status": "待定",
+        "overture_id": "8c5cad64-f56a-4575-8619-0201b5ac70e9",
+        "overture_source": "OpenStreetMap",
+        "footprint_iou": 1.0,
+        "esri_review": "树影遮挡",
+        "footprint_axis_deg": 21.2
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "way/675170621",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              110.2924444,
+              25.2759463
+            ],
+            [
+              110.2925604,
+              25.2759058
+            ],
+            [
+              110.292532,
+              25.2758392
+            ],
+            [
+              110.2924158,
+              25.2758798
+            ],
+            [
+              110.2924444,
+              25.2759463
+            ]
+          ]
+        ]
+      },
+      "properties": {
+        "kind": "building",
+        "source": "OSM",
+        "name": null,
+        "levels": null,
+        "roof": null,
+        "arcade": null,
+        "retail": null,
+        "status": "待定",
+        "overture_id": "c7f7728b-eb60-487e-9536-a9b460ccb135",
+        "overture_source": "OpenStreetMap",
+        "footprint_iou": 1.0,
+        "esri_review": "屋顶外缘较弱",
+        "footprint_axis_deg": 111.0
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "way/675170622",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              110.2924444,
+              25.2759463
+            ],
+            [
+              110.2924711,
+              25.2760088
+            ],
+            [
+              110.2925065,
+              25.2760914
+            ],
+            [
+              110.2925379,
+              25.2760804
+            ],
+            [
+              110.2926224,
+              25.2760509
+            ],
+            [
+              110.2925604,
+              25.2759058
+            ],
+            [
+              110.2924444,
+              25.2759463
+            ]
+          ]
+        ]
+      },
+      "properties": {
+        "kind": "building",
+        "source": "OSM",
+        "name": null,
+        "levels": null,
+        "roof": null,
+        "arcade": null,
+        "retail": null,
+        "status": "待定",
+        "overture_id": "895304c2-e9c9-4368-a92b-4294eefe41a6",
+        "overture_source": "OpenStreetMap",
+        "footprint_iou": 1.0,
+        "esri_review": "浅色屋面相对轮廓偏移",
+        "footprint_axis_deg": 21.2
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "way/675170623",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              110.2925309,
+              25.2762338
+            ],
+            [
+              110.292476,
+              25.2762525
+            ],
+            [
+              110.292499,
+              25.2763077
+            ],
+            [
+              110.2926106,
+              25.2762697
+            ],
+            [
+              110.2926191,
+              25.2760834
+            ],
+            [
+              110.2925379,
+              25.2760804
+            ],
+            [
+              110.2925309,
+              25.2762338
+            ]
+          ]
+        ]
+      },
+      "properties": {
+        "kind": "building",
+        "source": "OSM",
+        "name": null,
+        "levels": null,
+        "roof": null,
+        "arcade": null,
+        "retail": null,
+        "status": "待定",
+        "overture_id": "2664b957-8faa-4018-a484-e918fb9f7eab",
+        "overture_source": "OpenStreetMap",
+        "footprint_iou": 1.0,
+        "esri_review": "南北条状屋面及转折可辨",
+        "footprint_axis_deg": 177.6
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "way/675177178",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              110.2924738,
+              25.2771655
+            ],
+            [
+              110.2926682,
+              25.2770993
+            ],
+            [
+              110.2929145,
+              25.2772002
+            ],
+            [
+              110.2929042,
+              25.2772268
+            ],
+            [
+              110.293007,
+              25.2774892
+            ],
+            [
+              110.293037,
+              25.2775053
+            ],
+            [
+              110.2929321,
+              25.2777251
+            ],
+            [
+              110.2927343,
+              25.2777937
+            ],
+            [
+              110.2924966,
+              25.2776861
+            ],
+            [
+              110.2925049,
+              25.2776489
+            ],
+            [
+              110.2923963,
+              25.2773972
+            ],
+            [
+              110.2923688,
+              25.2773777
+            ],
+            [
+              110.2924738,
+              25.2771655
+            ]
+          ]
+        ]
+      },
+      "properties": {
+        "kind": "building",
+        "source": "OSM",
+        "name": null,
+        "levels": null,
+        "roof": null,
+        "arcade": null,
+        "retail": null,
+        "status": "待定",
+        "overture_id": "16b51b40-035e-45fa-95a9-8b886b6e2689",
+        "overture_source": "OpenStreetMap",
+        "footprint_iou": 1.0,
+        "esri_review": "体育馆主屋面，和外圈建筑属于同一场馆",
+        "footprint_axis_deg": 20.6
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "way/675177179",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              110.2925659,
+              25.2778514
+            ],
+            [
+              110.2927343,
+              25.2777937
+            ],
+            [
+              110.2929321,
+              25.2777251
+            ],
+            [
+              110.2931396,
+              25.2776467
+            ],
+            [
+              110.2931782,
+              25.2777378
+            ],
+            [
+              110.2932474,
+              25.2777186
+            ],
+            [
+              110.2929358,
+              25.2769425
+            ],
+            [
+              110.2928668,
+              25.2769651
+            ],
+            [
+              110.2928898,
+              25.2770205
+            ],
+            [
+              110.292743,
+              25.2770665
+            ],
+            [
+              110.2927352,
+              25.2770425
+            ],
+            [
+              110.2926774,
+              25.2770592
+            ],
+            [
+              110.2924769,
+              25.2771248
+            ],
+            [
+              110.2922917,
+              25.2771839
+            ],
+            [
+              110.2923315,
+              25.277284
+            ],
+            [
+              110.2923688,
+              25.2773777
+            ],
+            [
+              110.2924966,
+              25.2776861
+            ],
+            [
+              110.292536,
+              25.27778
+            ],
+            [
+              110.2925659,
+              25.2778514
+            ]
+          ]
+        ]
+      },
+      "properties": {
+        "kind": "building",
+        "source": "OSM",
+        "name": "桂林市体育馆",
+        "levels": null,
+        "roof": null,
+        "arcade": null,
+        "retail": null,
+        "status": "待定",
+        "overture_id": "16b51b40-035e-45fa-95a9-8b886b6e2689",
+        "overture_source": "OpenStreetMap",
+        "footprint_iou": 0.631,
+        "esri_review": "包围主屋面及侧翼的外轮廓，不能将两面分别拉伸为完整楼体",
+        "footprint_axis_deg": 20.0
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "way/675183658",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              110.2932219,
+              25.2772971
+            ],
+            [
+              110.2934671,
+              25.2772126
+            ],
+            [
+              110.2935485,
+              25.2774022
+            ],
+            [
+              110.2933041,
+              25.277488
+            ],
+            [
+              110.2932219,
+              25.2772971
+            ]
+          ]
+        ]
+      },
+      "properties": {
+        "kind": "building",
+        "source": "OSM",
+        "name": null,
+        "levels": null,
+        "roof": null,
+        "arcade": null,
+        "retail": null,
+        "status": "待定",
+        "overture_id": "35863642-1681-4692-ac96-7cc599192fc2",
+        "overture_source": "OpenStreetMap",
+        "footprint_iou": 1.0,
+        "esri_review": "树冠覆盖，外缘待定",
+        "footprint_axis_deg": 111.1
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "way/675183659",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              110.2933041,
+              25.277488
+            ],
+            [
+              110.2935485,
+              25.2774022
+            ],
+            [
+              110.2936585,
+              25.2776641
+            ],
+            [
+              110.2934135,
+              25.2777528
+            ],
+            [
+              110.2933041,
+              25.277488
+            ]
+          ]
+        ]
+      },
+      "properties": {
+        "kind": "building",
+        "source": "OSM",
+        "name": null,
+        "levels": null,
+        "roof": null,
+        "arcade": null,
+        "retail": null,
+        "status": "待定",
+        "overture_id": "ceb5466d-eeed-4491-9bed-43562304b027",
+        "overture_source": "OpenStreetMap",
+        "footprint_iou": 1.0,
+        "esri_review": "树冠覆盖，外缘待定",
+        "footprint_axis_deg": 20.9
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "way/675586425",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              110.2935582,
+              25.2780845
+            ],
+            [
+              110.2936477,
+              25.2780576
+            ],
+            [
+              110.2936755,
+              25.2780725
+            ],
+            [
+              110.2936862,
+              25.278105
+            ],
+            [
+              110.2939344,
+              25.2780624
+            ],
+            [
+              110.2939139,
+              25.2779672
+            ],
+            [
+              110.2937402,
+              25.2779961
+            ],
+            [
+              110.2937232,
+              25.2779528
+            ],
+            [
+              110.2938263,
+              25.2779169
+            ],
+            [
+              110.2937447,
+              25.277722
+            ],
+            [
+              110.2934458,
+              25.2778227
+            ],
+            [
+              110.2935582,
+              25.2780845
+            ]
+          ]
+        ]
+      },
+      "properties": {
+        "kind": "building",
+        "source": "OSM",
+        "name": null,
+        "levels": null,
+        "roof": null,
+        "arcade": null,
+        "retail": null,
+        "status": "待定",
+        "overture_id": "c9423775-bfbb-4b7a-95a2-6a6b6282f593",
+        "overture_source": "OpenStreetMap",
+        "footprint_iou": 1.0,
+        "esri_review": "可见内院，部分边缘被树冠遮挡",
+        "footprint_axis_deg": 20.3
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "way/675591853",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              110.2937518,
+              25.2794243
+            ],
+            [
+              110.29401,
+              25.279399
+            ],
+            [
+              110.2941006,
+              25.2799321
+            ],
+            [
+              110.2940555,
+              25.2799351
+            ],
+            [
+              110.2940741,
+              25.2800466
+            ],
+            [
+              110.2939352,
+              25.2800706
+            ],
+            [
+              110.2939184,
+              25.2799563
+            ],
+            [
+              110.2938342,
+              25.2799665
+            ],
+            [
+              110.2937518,
+              25.2794243
+            ]
+          ]
+        ]
+      },
+      "properties": {
+        "kind": "building",
+        "source": "OSM",
+        "name": null,
+        "levels": null,
+        "roof": null,
+        "arcade": null,
+        "retail": null,
+        "status": "待定",
+        "overture_id": "8632b401-9ba5-4b65-bb34-869536d50eef",
+        "overture_source": "OpenStreetMap",
+        "footprint_iou": 1.0,
+        "esri_review": "南北向相连屋面，分栋界线待定",
+        "footprint_axis_deg": 7.9
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "way/1493030771",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              110.2929349,
+              25.2782698
+            ],
+            [
+              110.2928393,
+              25.2779874
+            ],
+            [
+              110.2930508,
+              25.2779249
+            ],
+            [
+              110.2930627,
+              25.2779537
+            ],
+            [
+              110.2930777,
+              25.2779492
+            ],
+            [
+              110.2930724,
+              25.2779141
+            ],
+            [
+              110.293324,
+              25.2778343
+            ],
+            [
+              110.2934187,
+              25.2780919
+            ],
+            [
+              110.2933928,
+              25.2780997
+            ],
+            [
+              110.2934018,
+              25.2781243
+            ],
+            [
+              110.2933244,
+              25.2781477
+            ],
+            [
+              110.2933318,
+              25.2781758
+            ],
+            [
+              110.2931244,
+              25.2782287
+            ],
+            [
+              110.2931154,
+              25.2782002
+            ],
+            [
+              110.2930977,
+              25.2782054
+            ],
+            [
+              110.2931031,
+              25.2782294
+            ],
+            [
+              110.2929349,
+              25.2782698
+            ]
+          ]
+        ]
+      },
+      "properties": {
+        "kind": "building",
+        "source": "OSM",
+        "name": null,
+        "levels": null,
+        "roof": null,
+        "arcade": null,
+        "retail": null,
+        "status": "待定",
+        "overture_id": "2c136332-fd97-4972-bf49-95fccf6bc7b7",
+        "overture_source": "OpenStreetMap",
+        "footprint_iou": 1.0,
+        "esri_review": "浅色带退台屋面，北侧轮廓吻合，东侧有偏移",
+        "footprint_axis_deg": 108.5
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "6c8b3dce-ab90-4464-bccc-bc35f0e1728b",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              110.2935424,
+              25.2806096
+            ],
+            [
+              110.2937889,
+              25.2805569
+            ],
+            [
+              110.2938196,
+              25.2806755
+            ],
+            [
+              110.2935731,
+              25.2807283
+            ],
+            [
+              110.2935424,
+              25.2806096
+            ]
+          ]
+        ]
+      },
+      "properties": {
+        "kind": "candidate_building",
+        "source": "doi:10.5281/zenodo.8174931",
+        "levels": 8,
+        "roof": null,
+        "arcade": null,
+        "retail": null,
+        "status": "八层体量已核",
+        "esri_review": "与港舍屋顶的大堂一侧重合，北缘较露台内缩约6米",
+        "footprint_axis_deg": 103.2,
+        "name": "港舍屋顶观景酒店",
+        "model_ref": "wangcheng_market/R2"
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "2bf05675-49d3-4d0a-a1cb-3833d82deffb",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              110.2937871,
+              25.2804952
+            ],
+            [
+              110.2935517,
+              25.2805292
+            ],
+            [
+              110.2935283,
+              25.2803954
+            ],
+            [
+              110.293749,
+              25.2803636
+            ],
+            [
+              110.2937327,
+              25.2802699
+            ],
+            [
+              110.2937474,
+              25.2802678
+            ],
+            [
+              110.2937871,
+              25.2804952
+            ]
+          ]
+        ]
+      },
+      "properties": {
+        "kind": "candidate_building",
+        "source": "doi:10.5281/zenodo.8174931",
+        "levels": null,
+        "roof": null,
+        "arcade": null,
+        "retail": null,
+        "status": "待定",
+        "esri_review": "红色屋面主体可辨，东南附属部分边缘待定",
+        "footprint_axis_deg": 9.0
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "a49d4f04-5d9f-4daa-8e54-12a9a11b8fed",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              110.2935217,
+              25.2799861
+            ],
+            [
+              110.2935181,
+              25.2799456
+            ],
+            [
+              110.2936963,
+              25.2799325
+            ],
+            [
+              110.2936999,
+              25.279973
+            ],
+            [
+              110.2935217,
+              25.2799861
+            ]
+          ]
+        ]
+      },
+      "properties": {
+        "kind": "candidate_building",
+        "source": "doi:10.5281/zenodo.8174931",
+        "levels": null,
+        "roof": null,
+        "arcade": null,
+        "retail": null,
+        "status": "待定",
+        "esri_review": "轮廓小或遮挡，无法从本图独立确认外缘",
+        "footprint_axis_deg": 94.6
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "d9ff56e4-8cc5-4203-9c6f-bda88a80d3e9",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              110.2937294,
+              25.2800596
+            ],
+            [
+              110.2937446,
+              25.2801944
+            ],
+            [
+              110.293626,
+              25.2802054
+            ],
+            [
+              110.2936108,
+              25.2800707
+            ],
+            [
+              110.2937294,
+              25.2800596
+            ]
+          ]
+        ]
+      },
+      "properties": {
+        "kind": "candidate_building",
+        "source": "doi:10.5281/zenodo.8174931",
+        "levels": null,
+        "roof": null,
+        "arcade": null,
+        "retail": null,
+        "status": "待定",
+        "esri_review": "蓝白相间屋面，局部外缘可辨",
+        "footprint_axis_deg": 5.9
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "f3df2ccb-d725-43aa-839a-db4b3c4721c7",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              110.2938607,
+              25.2792529
+            ],
+            [
+              110.2939352,
+              25.279253
+            ],
+            [
+              110.2939352,
+              25.2792666
+            ],
+            [
+              110.2938607,
+              25.2792664
+            ],
+            [
+              110.2938607,
+              25.2792529
+            ]
+          ]
+        ]
+      },
+      "properties": {
+        "kind": "candidate_building",
+        "source": "doi:10.5281/zenodo.8174931",
+        "levels": null,
+        "roof": null,
+        "arcade": null,
+        "retail": null,
+        "status": "待定",
+        "esri_review": "轮廓小或遮挡，无法从本图独立确认外缘",
+        "footprint_axis_deg": 89.9
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "5e698181-0afc-4687-92c8-45d54948a25d",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              110.2938628,
+              25.2791119
+            ],
+            [
+              110.2938692,
+              25.2790643
+            ],
+            [
+              110.2939424,
+              25.2790725
+            ],
+            [
+              110.293936,
+              25.27912
+            ],
+            [
+              110.2938628,
+              25.2791119
+            ]
+          ]
+        ]
+      },
+      "properties": {
+        "kind": "candidate_building",
+        "source": "doi:10.5281/zenodo.8174931",
+        "levels": null,
+        "roof": null,
+        "arcade": null,
+        "retail": null,
+        "status": "待定",
+        "esri_review": "轮廓小或遮挡，无法从本图独立确认外缘",
+        "footprint_axis_deg": 83.0
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "d2d9c15b-682f-4b6e-b3bf-ecf1edb06598",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              110.2938221,
+              25.2783517
+            ],
+            [
+              110.2938593,
+              25.2784104
+            ],
+            [
+              110.2937947,
+              25.2784442
+            ],
+            [
+              110.2937576,
+              25.2783855
+            ],
+            [
+              110.2938221,
+              25.2783517
+            ]
+          ]
+        ]
+      },
+      "properties": {
+        "kind": "candidate_building",
+        "source": "doi:10.5281/zenodo.8174931",
+        "levels": null,
+        "roof": null,
+        "arcade": null,
+        "retail": null,
+        "status": "待定",
+        "esri_review": "轮廓小或遮挡，无法从本图独立确认外缘",
+        "footprint_axis_deg": 119.9
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "4a99f1d5-8e69-4637-94ca-51920a257da9",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              110.2937708,
+              25.2782475
+            ],
+            [
+              110.2938079,
+              25.2782814
+            ],
+            [
+              110.2937631,
+              25.278322
+            ],
+            [
+              110.293726,
+              25.278288
+            ],
+            [
+              110.2937708,
+              25.2782475
+            ]
+          ]
+        ]
+      },
+      "properties": {
+        "kind": "candidate_building",
+        "source": "doi:10.5281/zenodo.8174931",
+        "levels": null,
+        "roof": null,
+        "arcade": null,
+        "retail": null,
+        "status": "待定",
+        "esri_review": "轮廓小或遮挡，无法从本图独立确认外缘",
+        "footprint_axis_deg": 134.8
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "7d4fdda0-8e2b-4b4c-9061-eb6364e50e03",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              110.2937457,
+              25.2792477
+            ],
+            [
+              110.2937537,
+              25.2793287
+            ],
+            [
+              110.2936944,
+              25.2793335
+            ],
+            [
+              110.2936864,
+              25.2792526
+            ],
+            [
+              110.2937457,
+              25.2792477
+            ]
+          ]
+        ]
+      },
+      "properties": {
+        "kind": "candidate_building",
+        "source": "doi:10.5281/zenodo.8174931",
+        "levels": null,
+        "roof": null,
+        "arcade": null,
+        "retail": null,
+        "status": "待定",
+        "esri_review": "轮廓小或遮挡，无法从本图独立确认外缘",
+        "footprint_axis_deg": 5.1
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "9a23bc94-fd93-43dc-8c18-1b3de0efe1e9",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              110.2935755,
+              25.2793692
+            ],
+            [
+              110.2935169,
+              25.2793793
+            ],
+            [
+              110.2935002,
+              25.2792995
+            ],
+            [
+              110.2935588,
+              25.2792894
+            ],
+            [
+              110.2935755,
+              25.2793692
+            ]
+          ]
+        ]
+      },
+      "properties": {
+        "kind": "candidate_building",
+        "source": "doi:10.5281/zenodo.8174931",
+        "levels": null,
+        "roof": null,
+        "arcade": null,
+        "retail": null,
+        "status": "待定",
+        "esri_review": "轮廓小或遮挡，无法从本图独立确认外缘",
+        "footprint_axis_deg": 10.8
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "88d9f94d-b4b1-46f7-92c7-93278025f4d0",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              110.2931758,
+              25.2794643
+            ],
+            [
+              110.2935723,
+              25.2794026
+            ],
+            [
+              110.2935999,
+              25.2795495
+            ],
+            [
+              110.2932035,
+              25.2796112
+            ],
+            [
+              110.2931758,
+              25.2794643
+            ]
+          ]
+        ]
+      },
+      "properties": {
+        "kind": "candidate_building",
+        "source": "doi:10.5281/zenodo.8174931",
+        "levels": null,
+        "roof": null,
+        "arcade": null,
+        "retail": null,
+        "status": "待定",
+        "esri_review": "东西向白色长屋面仅占候选面的部分面积",
+        "footprint_axis_deg": 99.7
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "cd9ca60c-61d0-4b34-b9fd-afc4dd5cb1dd",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              110.2934282,
+              25.278946
+            ],
+            [
+              110.2935163,
+              25.278932
+            ],
+            [
+              110.2935444,
+              25.2790788
+            ],
+            [
+              110.2928693,
+              25.2791858
+            ],
+            [
+              110.2928514,
+              25.2790924
+            ],
+            [
+              110.2934385,
+              25.2789993
+            ],
+            [
+              110.2934282,
+              25.278946
+            ]
+          ]
+        ]
+      },
+      "properties": {
+        "kind": "candidate_building",
+        "source": "doi:10.5281/zenodo.8174931",
+        "levels": null,
+        "roof": null,
+        "arcade": null,
+        "retail": null,
+        "status": "待定",
+        "esri_review": "连续东西向屋面，独立分栋待定",
+        "footprint_axis_deg": 99.9
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "871b4860-de8b-4d42-9e08-c657a5bbcc39",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              110.2932317,
+              25.2789572
+            ],
+            [
+              110.2932088,
+              25.2788786
+            ],
+            [
+              110.2934969,
+              25.2788094
+            ],
+            [
+              110.2935197,
+              25.2788879
+            ],
+            [
+              110.2932317,
+              25.2789572
+            ]
+          ]
+        ]
+      },
+      "properties": {
+        "kind": "candidate_building",
+        "source": "doi:10.5281/zenodo.8174931",
+        "levels": null,
+        "roof": null,
+        "arcade": null,
+        "retail": null,
+        "status": "待定",
+        "esri_review": "东西向屋面与边缘相邻树冠",
+        "footprint_axis_deg": 104.8
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "3d8407ad-4d80-47e0-ad62-59cc43a1e60d",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              110.2933729,
+              25.2787438
+            ],
+            [
+              110.2933716,
+              25.2786289
+            ],
+            [
+              110.293498,
+              25.2786278
+            ],
+            [
+              110.2934993,
+              25.2787427
+            ],
+            [
+              110.2933729,
+              25.2787438
+            ]
+          ]
+        ]
+      },
+      "properties": {
+        "kind": "candidate_building",
+        "source": "doi:10.5281/zenodo.8174931",
+        "levels": null,
+        "roof": null,
+        "arcade": null,
+        "retail": null,
+        "status": "待定",
+        "esri_review": "轮廓小或遮挡，无法从本图独立确认外缘",
+        "footprint_axis_deg": 0.6
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "e6b5c574-b7a7-4f0f-a4e8-aa84ef1595b7",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              110.2935043,
+              25.2785093
+            ],
+            [
+              110.2935089,
+              25.2785769
+            ],
+            [
+              110.2933751,
+              25.2785844
+            ],
+            [
+              110.2933705,
+              25.2785168
+            ],
+            [
+              110.2935043,
+              25.2785093
+            ]
+          ]
+        ]
+      },
+      "properties": {
+        "kind": "candidate_building",
+        "source": "doi:10.5281/zenodo.8174931",
+        "levels": null,
+        "roof": null,
+        "arcade": null,
+        "retail": null,
+        "status": "待定",
+        "esri_review": "轮廓小或遮挡，无法从本图独立确认外缘",
+        "footprint_axis_deg": 93.5
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "3ff54759-a791-427c-8acf-ea012fc4ee26",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              110.2933753,
+              25.2784951
+            ],
+            [
+              110.2933506,
+              25.2783478
+            ],
+            [
+              110.2934537,
+              25.2783335
+            ],
+            [
+              110.2934784,
+              25.2784808
+            ],
+            [
+              110.2933753,
+              25.2784951
+            ]
+          ]
+        ]
+      },
+      "properties": {
+        "kind": "candidate_building",
+        "source": "doi:10.5281/zenodo.8174931",
+        "levels": null,
+        "roof": null,
+        "arcade": null,
+        "retail": null,
+        "status": "待定",
+        "esri_review": "轮廓小或遮挡，无法从本图独立确认外缘",
+        "footprint_axis_deg": 8.7
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "2881df93-cfbe-45f2-9c83-41ec7164bae2",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              110.2931966,
+              25.2777099
+            ],
+            [
+              110.2930569,
+              25.2773814
+            ],
+            [
+              110.2930986,
+              25.2773668
+            ],
+            [
+              110.2932383,
+              25.2776952
+            ],
+            [
+              110.2931966,
+              25.2777099
+            ]
+          ]
+        ]
+      },
+      "properties": {
+        "kind": "candidate_building",
+        "source": "doi:10.5281/zenodo.8174931",
+        "levels": null,
+        "roof": null,
+        "arcade": null,
+        "retail": null,
+        "status": "待定",
+        "esri_review": "轮廓小或遮挡，无法从本图独立确认外缘",
+        "footprint_axis_deg": 21.1
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "3557eee6-8b10-443b-9bfb-ccef006a263c",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              110.2929061,
+              25.2764943
+            ],
+            [
+              110.2927524,
+              25.2761317
+            ],
+            [
+              110.2936117,
+              25.2758339
+            ],
+            [
+              110.2937654,
+              25.2761965
+            ],
+            [
+              110.2929061,
+              25.2764943
+            ]
+          ],
+          [
+            [
+              110.2933381,
+              25.2760999
+            ],
+            [
+              110.2930951,
+              25.2761851
+            ],
+            [
+              110.2931211,
+              25.2762456
+            ],
+            [
+              110.2933641,
+              25.2761604
+            ],
+            [
+              110.2933381,
+              25.2760999
+            ]
+          ]
+        ]
+      },
+      "properties": {
+        "kind": "candidate_building",
+        "source": "OpenStreetMap",
+        "levels": null,
+        "roof": null,
+        "arcade": null,
+        "retail": null,
+        "status": "待定",
+        "esri_review": "可辨围合内院及东侧附楼",
+        "footprint_axis_deg": 110.9
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "north",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          110.2939344,
+          25.2808583
+        ]
+      },
+      "properties": {
+        "kind": "street_end",
+        "source": "OSM way/221821082",
+        "status": "待定"
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "south",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          110.2922386,
+          25.275092
+        ]
+      },
+      "properties": {
+        "kind": "street_end",
+        "source": "OSM way/675600128",
+        "status": "待定"
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "gangshe-roof",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              110.29357520023132,
+              25.28078201981884
+            ],
+            [
+              110.2938494598985,
+              25.280718021691396
+            ],
+            [
+              110.29388706001416,
+              25.280668023130833
+            ],
+            [
+              110.29385167167,
+              25.2805540263357
+            ],
+            [
+              110.2935265412581,
+              25.280620024493302
+            ],
+            [
+              110.29357520023132,
+              25.28078201981884
+            ]
+          ]
+        ]
+      },
+      "properties": {
+        "kind": "building_roof",
+        "name": "港舍屋顶观景酒店",
+        "source": "Esri 屋顶点取；百度解放东路15号及大堂 POI；Rock 09 西侧转角",
+        "status": "八层体量已核",
+        "levels": 8,
+        "roof": "屋顶露台",
+        "arcade": null,
+        "retail": null,
+        "floor_evidence": "桂林晚报 2025-05-30：3至8楼为客房；实拍09可见玻璃幕墙和屋顶露台",
+        "footprint_axis_deg": 104.4,
+        "model_ref": "wangcheng_market/R2"
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "clock-baidu",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          110.2934890948,
+          25.2781610681
+        ]
+      },
+      "properties": {
+        "kind": "poi",
+        "source": "百度地图 正阳钟塔",
+        "status": "核名",
+        "geometric_control": false
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "clock-esri",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          110.29349115291396,
+          25.278232068303158
+        ]
+      },
+      "properties": {
+        "kind": "clock",
+        "source": "Esri World Imagery；环形铺装与塔身交叠区域，人工点取",
+        "status": "定位采用",
+        "height_m": 17.5,
+        "clock_face_center_m": 11.5,
+        "base_section_m": [
+          4.5,
+          4.5
+        ],
+        "axis_deg": 9.6,
+        "dimensions_source": "总高据桂林摄影旅游，基柱轴距与钟面高度为89738/89739照片比例，轴线沿步行街"
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "clock-osm",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          110.2935074,
+          25.2782077
+        ]
+      },
+      "properties": {
+        "kind": "clock_check",
+        "source": "OSM node/6326899999",
+        "tower:type": "bell_tower",
+        "status": "独立几何复核",
+        "residual_m": 3.16
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "north-stele",
+      "geometry": null,
+      "properties": {
+        "kind": "street_fixture",
+        "name": "正阳步行街石碑",
+        "source": "Rock 09",
+        "status": "位置待定"
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "north-greenery",
+      "geometry": null,
+      "properties": {
+        "kind": "street_fixture",
+        "name": "路口绿化带",
+        "source": "Rock 04/09",
+        "status": "位置待定"
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "north-railing",
+      "geometry": null,
+      "properties": {
+        "kind": "street_fixture",
+        "name": "解放东路隔离栏",
+        "source": "Rock 06/09",
+        "status": "位置待定"
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "south-stone",
+      "geometry": null,
+      "properties": {
+        "kind": "street_fixture",
+        "name": "曲水流觞石雕",
+        "source": "桂林摄影旅游 / 现场游记",
+        "status": "位置待定"
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "south-statue",
+      "geometry": null,
+      "properties": {
+        "kind": "street_fixture",
+        "name": "马君武铜像",
+        "source": "马君武故居旧址现场游记",
+        "status": "位置待定"
+      }
+    }
+  ]
+}

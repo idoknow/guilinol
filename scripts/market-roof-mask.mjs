@@ -1,8 +1,14 @@
+import {evidencePath} from './photo-refs.mjs'
 import {readFile,writeFile} from 'node:fs/promises'
 
 export async function saveMarketMask(page,output){
-  const grid=JSON.parse(await readFile('.ops-docs/layout/dongxi-esri-grid.json','utf8'))
-  const reference=await readFile('.ops-docs/layout/dongxi-esri-mask.png')
+  const evidence1 = evidencePath('layout/dongxi-esri-grid.json')
+  if (!evidence1) return
+  const evidence2 = evidencePath('layout/dongxi-esri-mask.png')
+  if (!evidence2) return
+
+  const grid=JSON.parse(await readFile(evidence1,'utf8'))
+  const reference=await readFile(evidence2)
   const data=await page.evaluate(async ({grid,width,height})=>{
     const {stream}=window.viewer,canvas=document.createElement('canvas');canvas.width=width;canvas.height=height
     const ctx=canvas.getContext('2d');ctx.fillStyle='black';ctx.fillRect(0,0,width,height);ctx.fillStyle='white'

@@ -15,7 +15,7 @@ from common import ll2xz
 
 neighbors = dict(R2='zhengyang', R19='zhengyang', R61='zhengyang', R15='zhongshan_road',
                  R54='zhongshan_road', R36='zhuangyuan_gallery')
-layout = json.loads((root / '.ops-docs/layout/dongxi-layout.geojson').read_text())['features']
+layout = json.loads((root / 'pipeline/data/layout/dongxi-layout.geojson').read_text())['features']
 source_ids = {feature['properties']['evidence'][0].split()[1]: feature['properties']['name']
               for feature in layout if feature['properties']['name'] in neighbors}
 with (root / 'raw/overture_buildings.csv').open() as source:

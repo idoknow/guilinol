@@ -22,4 +22,4 @@ for chunk in json.loads((world/'manifest.json').read_text())['chunks']:
     heights=np.frombuffer(gzip.decompress((world/chunk['file']).read_bytes()),'<i2',65*65,24).reshape(65,65)
     grid[slices(lower)]=heights[slices(start)]
 assert grid.min()>-32768
-np.savez_compressed(root/'.ops-docs/layout/dongxi-ground.npz',lower=lower,heights=grid)
+np.savez_compressed(root/'pipeline/data/layout/dongxi-ground.npz',lower=lower,heights=grid)
