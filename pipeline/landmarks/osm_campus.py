@@ -2,7 +2,7 @@
 
 Every structure comes from mapped data only:
 - buildings: OSM / Overture footprints listed in the school module (no added blocks);
-  floors, roof and colours are inferred and documented in .ops-docs/layout/schools/<id>.md;
+  floors, roof and colours are inferred and documented in ops 仓库 docs/layout/schools/<id>.md;
 - sports: OSM `leisure=track` / `leisure=pitch` geometry only, non-overlapping;
 - perimeter: the OSM campus outline inset 0.8 m and cut back from public roads and
   neighbouring footprints; one generalized street-side gate, always closed;

@@ -88,7 +88,7 @@ def summit(model):
     vertices=np.frombuffer(payload,'<i2',lod['vertices']*3,lod['offset']).reshape(-1,3)/100
     vertices += np.subtract(peak['center'],[surface.x,surface.y,surface.z])
     rings=vertices[:-1].reshape(12,-1,3); tip=vertices[-1]; count=rings.shape[1]
-    pois=json.loads((ROOT/'.ops-docs/layout/wangcheng.geojson').read_text())['features']
+    pois=json.loads((ROOT/'pipeline/data/layout/wangcheng.geojson').read_text())['features']
     def cliff_column(name):
         poi=next(f for f in pois if f['properties']['name']==name)
         east,south=ll2xz(*reversed(poi['geometry']['coordinates']))

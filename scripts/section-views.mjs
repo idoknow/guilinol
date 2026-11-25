@@ -1,10 +1,13 @@
+import {evidencePath} from './photo-refs.mjs'
+const evidence1 = evidencePath('refs/rock/photo-locations.json')
+if (!evidence1) process.exit(0)
 import {mkdir,readFile} from 'node:fs/promises'
 import {chromium} from 'playwright'
 import {preview} from 'vite'
 import {sectionCamera} from './section-camera.mjs'
 
 const output=process.argv[2]??'captures/sections'
-const locations=JSON.parse(await readFile(new URL('../.ops-docs/refs/rock/photo-locations.json',import.meta.url),'utf8'))
+const locations=JSON.parse(await readFile(evidence1,'utf8'))
 // Acceptance-only offsets: 1299 ESE 3.22 m to the corner; 1365 SSW 13.49 m to the
 // sidewalk edge; 1380 SSW 9.26 m to the nearest cycle lane; 1301 WSW 1.97 m
 // beside the banyan pit; 1384 NNE 5.36 m to the sidewalk. Original EXIF is unchanged.

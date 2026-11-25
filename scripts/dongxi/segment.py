@@ -5,7 +5,7 @@ import onnxruntime as ort
 from PIL import Image,ImageDraw
 from scipy.special import expit,softmax
 
-root=Path(__file__).resolve().parents[2];folder=root/'.ops-docs/layout';bounds=next(e['replace']['polygon'] for e in json.loads((root/'pipeline/landmarks.json').read_text()) if e['id']=='wangcheng_market')
+root=Path(__file__).resolve().parents[2];folder=root/'pipeline/data/layout';bounds=next(e['replace']['polygon'] for e in json.loads((root/'pipeline/landmarks.json').read_text()) if e['id']=='wangcheng_market')
 zoom=19
 def absolute(lon,lat):return np.asarray([(lon+180)/360,(1-math.asinh(math.tan(math.radians(lat)))/math.pi)/2])*256*2**zoom
 lower=np.floor(np.min([absolute(*p) for p in bounds],axis=0)).astype(int)-64
@@ -22,7 +22,7 @@ for row in sorted(set(min(r,size[1]-256) for r in range(0,size[1],192))):
 out/=counts;np.savez_compressed('density-logits.npz',logits=out,lower=lower,zoom=zoom)
 for kind in ['roof','lane']:
     mask=Image.new('1',size);draw=ImageDraw.Draw(mask)
-    for feat in json.loads((folder/'dongxi-layout.geojson').read_text())['features']:
+    for feat in json.loads(((root/'pipeline/data/layout')/'dongxi-layout.geojson').read_text())['features']:
         if feat['properties']['kind']!=kind:continue
         coords=feat['geometry']['coordinates'];draw.polygon([pixel(p) for p in coords[0]],fill=1) if kind=='roof' else draw.line([pixel(p) for p in coords],fill=1,width=4)
     selected=np.asarray(mask);print(kind,'sigmoid',expit(out[:,selected]).mean(1),'softmax',softmax(out[:,selected],axis=0).mean(1),flush=True)

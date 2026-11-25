@@ -181,7 +181,11 @@ def main():
     osm={f"{item['type']}/{item['id']}":item for item in load_osm()}
     manifest=json.loads((ROOT/'public/world/manifest.json').read_bytes())
     entries={item['id']:item for item in manifest['landmarks']}
-    photos=json.loads((ROOT/'.ops-docs/refs/rock/photo-locations.json').read_bytes())
+    root = os.environ.get('GLOL_OPS_ROOT')
+    catalog = Path(root) / 'docs/refs/rock/photo-locations.json' if root else None
+    photos = json.loads(catalog.read_bytes()) if catalog and catalog.is_file() else None
+    if photos is None:
+        print('SKIP: GLOL_OPS_ROOT 未配置或缺少实拍目录；仅执行非照片检查。')
     report=[]
     specs=json.loads((ROOT/'pipeline/landmarks.json').read_bytes())
     schools=[school for catalog in ('schools-g1.json','schools-g2.json')
@@ -241,7 +245,7 @@ def main():
         if key=='dongxixiang' and notes=='deferred to IDOK-44':
             row['status']='deferred';continue
         if key=='zhengyang_clock':
-            survey=json.loads((ROOT/'.ops-docs/layout/zhengyang.geojson').read_text())
+            survey=json.loads((ROOT/'pipeline/data/layout/zhengyang.geojson').read_text())
             lon,lat=next(f['geometry']['coordinates'] for f in survey['features'] if f['id']=='clock-osm')
             reference=Point((lon-LON0)*MLON,(LAT0-lat)*MLAT)
             base=footprint(ROOT/'public'/spec['model'],entry,elevation=1)
@@ -251,8 +255,8 @@ def main():
             continue
         if key=='wangcheng_market':
             # Alley/plaza aggregate with no single footprint; positions are checked by the
-            # IDOK-50 evidence-layout audit (.ops-docs/layout/dongxi-audit.md, scripts/dongxi/lane-audit.py).
-            row.update(status='deferred',alignNote=notes or 'audited by .ops-docs/layout/dongxi-audit.md (IDOK-50)');continue
+            # IDOK-50 evidence-layout audit (ops 仓库 docs/layout/dongxi-audit.md, scripts/dongxi/lane-audit.py).
+            row.update(status='deferred',alignNote=notes or 'audited by ops 仓库 docs/layout/dongxi-audit.md (IDOK-50)');continue
         if key=='jingjiang':
             components=[]
             for name,source,bounds,roof in (
@@ -333,7 +337,7 @@ def main():
                 if not parts:components.append(dict(component=name,reference=source,status='no-overlap'));continue
                 shape=union_all(parts);iou,center,delta=metrics(shape,target)
                 if name=='island':delta=abs((shoreline_axis(shape)-shoreline_axis(target)+90)%180-90)
-                views={str(number):photo_hits(shape,photos[f'IMG_{number}.jpg']) for number in PHOTO_TARGETS.get(key+':'+name,())}
+                views={str(number):photo_hits(shape,photos[f'IMG_{number}.jpg']) for number in PHOTO_TARGETS.get(key+':'+name,()) if photos is not None}
                 components.append(dict(component=name,reference=source,iou=round(iou,3),centroidM=round(center,2),angleDeg=round(delta,2),photos=views,
                                        status='pass' if iou>=.7 and center<=5 and delta<=5 and photos_pass(views,spec.get('photoExifSuspect')) else 'fail'))
             row.update(components=components,status='pass' if all(item['status']=='pass' for item in components) else 'fail');continue
@@ -471,7 +475,7 @@ def main():
         if reference.is_empty:reference=LineString(points(element))
         if key in BRIDGES:
             row.update(reference=ref,measurement='water-span axis and endpoint distances',**bridge_report(key,ROOT/'public'/spec['model'],entry,reference))
-            row['photos']={str(number):photo_hits(shape,photos[f'IMG_{number}.jpg']) for number in PHOTO_TARGETS.get(key,())}
+            row['photos']={str(number):photo_hits(shape,photos[f'IMG_{number}.jpg']) for number in PHOTO_TARGETS.get(key,()) if photos is not None}
             if not photos_pass(row['photos']):row['status']='fail'
             continue
         if key=='zhuangyuan_gallery':row['measurement']='gallery roof projection'
@@ -484,7 +488,7 @@ def main():
         row['angleDeg']=round(delta,2)
         passed=center<=5 and (iou is None or iou>=.7) and delta<=5
         group=key+':'+row['component'] if 'component' in row else key
-        row['photos']={str(number):photo_hits(shape,photos[f'IMG_{number}.jpg']) for number in PHOTO_TARGETS.get(group,())}
+        row['photos']={str(number):photo_hits(shape,photos[f'IMG_{number}.jpg']) for number in PHOTO_TARGETS.get(group,()) if photos is not None}
         row['status']='pass' if passed and photos_pass(row['photos'],spec.get('photoExifSuspect')) else 'fail'
     text=json.dumps(report,indent=2,ensure_ascii=False)
     if args.out:args.out.write_text(text+'\n')

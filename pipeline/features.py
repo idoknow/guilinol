@@ -100,7 +100,7 @@ def ground_features(bounds, school_grounds=()):
 
 
 def palace_features():
-    path = Path(__file__).resolve().parents[1] / '.ops-docs/layout/wangcheng.geojson'
+    path = Path(__file__).resolve().parents[1] / 'pipeline/data/layout/wangcheng.geojson'
     for feature in json.loads(path.read_text())['features']:
         if feature['geometry']['type'] == 'Polygon':
             props = feature['properties']
@@ -109,7 +109,8 @@ def palace_features():
 
 
 def rongyin_photo():
-    return json.loads((Path(__file__).resolve().parents[1] / '.ops-docs/refs/rock/photo-locations.json').read_text())['IMG_1299.jpg']
+    # Scene-space calibration from IMG_1299, used by the frontage and street builders.
+    return {'x': -1331.2, 'z': -103.5, 'heading': 69.8, 'focal35': 14}
 
 
 def rongyin_frontage():
