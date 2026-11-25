@@ -346,7 +346,7 @@ export async function detail(tile:Tile, signal:AbortSignal, parseSlot?:()=>Promi
   const normals = new Int8Array(buffer,offset,vertices*3); offset+=vertices*3
   const indices = new Uint32Array(buffer.slice(offset,offset+count*4)); offset+=count*4
   const [solids,paths,thinIndices=[],asphalt=[],rails=[],signs=[],railCuts=[],walkFloors=[]]:[Building[],Streets,number[]?,number[]?,import('./railways').RailSection[]?,import('./railways').CrossingSign[]?,[number,number][]?,Building[]?]=JSON.parse(new TextDecoder().decode(new Uint8Array(buffer,offset,collision))); offset+=collision
-  const rings=walkFloors.length ? solids.concat(walkFloors) : solids
+  const rings=Array.isArray(walkFloors) && walkFloors.length ? solids.concat(walkFloors) : solids
   const thin=new Set(thinIndices)
   const end = offset+imageBytes, tail = end+triangles*18, extra = buffer.byteLength-tail
   if(extra!==0 && extra!==8450) throw Error('Invalid GL04 sections')

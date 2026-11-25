@@ -31,7 +31,7 @@ def read_geometry(world, bounds, seeds):
         for ring in content[0]:
             if ring[5] in seeds:
                 buildings.append((ring[5], ring[0]/10, ring[1]/10, footprint(ring)))
-        for ring in content[7] if len(content) > 7 else []:
+        for ring in content[7] if len(content) > 7 and isinstance(content[7], list) else []:
             floors.append((footprint(ring), origin, np.array(ring[10])))
     return buildings, floors
 
