@@ -1,7 +1,8 @@
 import {prepareCityAudioDuringLoad} from './city-audio'
 import {onPrefs} from './ui/prefs'
 import {bindingLabel, hits} from './input/keymap'
-import {nearestPlayable} from '../../lib/play-region'
+import {inRegion,nearestPlayable} from '../../lib/play-region'
+import {installGeolocation} from './geolocation'
 import {identifyWorld,instrument,operation,record} from './telemetry'
 import * as THREE from 'three'
 import {landingWarmBudget,warmShaders,type WarmBudget} from './shader-warmup'
@@ -325,17 +326,17 @@ async function start(loader:FullLoader,creatorSpawn=false) {
   function loadWalker():Promise<Walker>{return loadingWalker??=prefetchWalk().then(module=>module.walk(scene,camera,renderer.domElement,manifest,stream,peaks,params.has('verify'))).then(player=>walker=player).catch(error=>{loadingWalker=undefined;throw error})}
   let checkedCards=false
   let landingQueue=Promise.resolve()
-  function walkTo(x:number,z:number,yaw:number,reason:string,name?:string){
+  function walkTo(x:number,z:number,yaw:number,reason:string,name?:string,request?:AbortSignal){
     const parent=titleTransition
-    const result=landingQueue.then(()=>land(x,z,yaw,reason,name,parent))
+    const result=landingQueue.then(()=>request?.aborted?false:land(x,z,yaw,reason,name,parent,request))
     landingQueue=result.then(()=>{},()=>{})
     return result
   }
-  async function land(x:number,z:number,yaw:number,reason:string,name:string|undefined,transition:typeof titleTransition){
+  async function land(x:number,z:number,yaw:number,reason:string,name:string|undefined,transition:typeof titleTransition,request?:AbortSignal){
     switching=true
     const start=performance.now()
     let completed=false
-    const controller=new AbortController(),signal=transition?AbortSignal.any([transition.signal,controller.signal]):controller.signal
+    const controller=new AbortController(),signal=AbortSignal.any([controller.signal,...(transition?[transition.signal]:[]),...(request?[request]:[])])
     let stage='stream'
     const deadline=window.setTimeout(()=>controller.abort(new Error(`Landing timed out (${reason}, ${x},${z}, ${stage})`)),90000)
     const interrupted=new Promise<never>((_,reject)=>signal.addEventListener('abort',()=>reject(signal.reason),{once:true}))
@@ -350,6 +351,7 @@ async function start(loader:FullLoader,creatorSpawn=false) {
       if(signal.aborted)return false
       cover.progress(.3,'步行模块已就绪')
       completed=await player.enter(x,z,yaw,reason,false,signal,cover.progress)
+      if(completed&&request){stream.tick(player.position);stream.updateLandmarks?.(player.position);cover.progress(1);return true}
       signal.throwIfAborted()
       if(completed){
         stage='landing content'
@@ -657,10 +659,17 @@ async function start(loader:FullLoader,creatorSpawn=false) {
     return {mode,x:position.x,z:position.z,chunks:stream.loaded.size}
   })
   let playable=false
+  const geoTick=installGeolocation({
+    ready:()=>!!walker?.active&&!walker.geoHeld&&walker.vehicle==='foot'&&!walker.shop.isOpen()&&!switching&&!cinema&&!paused&&!tour?.map?.active,
+    inside:point=>inRegion(manifest,point.x,point.z),position:()=>walker!.position,
+    land:(point,yaw,signal)=>walkTo(point.x,point.z,yaw??walker!.yaw,'geolocation','我的位置',signal),
+    drive:(x,z)=>walker!.drive(x,z,false),release:()=>walker?.releaseDrive(),face:yaw=>walker?.face(yaw),
+  })
   let trafficTick:Awaited<ReturnType<typeof import('./traffic').traffic>>|undefined
   let trafficRequested=false
   const trafficOverride=params.get('traffic')
   function animate(now:number){
+    geoTick()
     if(getPlayMode()==='solo'&&!walker?.active)return
     if((paused||tour?.map?.active)&&frame>2){previous=0;return}
     const elapsed = previous?now-previous:0;previous=now

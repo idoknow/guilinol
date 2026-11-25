@@ -26,6 +26,8 @@ function row(label: string, hint: string) {
   return `<span class="set-what"><b>${label}</b><small>${hint}</small></span>`
 }
 
+import {geoActive,geoStatus,geoUI,requestGeo} from '../geolocation'
+
 function build() {
   mask = document.createElement('div')
   mask.className = 'about-mask'
@@ -33,6 +35,11 @@ function build() {
   mask.innerHTML = `<div class="about-panel settings" role="dialog" aria-modal="true" aria-labelledby="settings-title">
     <header><h2 id="settings-title">设置</h2><button type="button" class="about-close" aria-label="关闭">关闭</button></header>
     <div class="set-body">
+      <section class="set-block"><h3>我的位置</h3>
+        <p class="set-note">允许定位后，人物会移动到你的真实位置。经纬度仅在本机使用；联机玩家可从人物位置推知你的实际位置。</p>
+        <div class="set-seg"><button type="button" data-geo-once>定位到我</button><button type="button" data-geo-follow>跟随定位</button></div>
+        <p class="set-note" role="status" data-geo-status></p>
+      </section>
       <section class="set-block"><h3>声音</h3>
         <label class="set-row set-row--range"><span class="set-what"><b>总音量</b><small>骑车、鸣笛和路人念叨</small></span><input data-volume type="range" min="0" max="1" step="0.01"><span class="set-val" data-volume-out></span></label>
         <label class="set-row"><span class="set-what"><b>静音</b><small>关闭全部游戏音效</small></span><input data-mute type="checkbox"></label>
@@ -90,6 +97,10 @@ function build() {
     </div>
   </div>`
   const fullscreen = mask.querySelector<HTMLInputElement>('[data-fullscreen]')!
+  const once=mask.querySelector<HTMLButtonElement>('[data-geo-once]')!, follow=mask.querySelector<HTMLButtonElement>('[data-geo-follow]')!
+  const status=mask.querySelector<HTMLElement>('[data-geo-status]')!
+  function paintGeo(){status.textContent=geoStatus;once.disabled=geoActive;follow.textContent=geoActive?'停止定位':'跟随定位';follow.classList.toggle('on',geoActive)}
+  once.onclick=()=>requestGeo(false);follow.onclick=()=>requestGeo(true);geoUI.addEventListener('change',paintGeo);paintGeo()
   fullscreen.onchange = () => setPrefs(value => ({...value, autoFullscreen: fullscreen.checked}))
   const emotes=mask.querySelector<HTMLInputElement>('[data-emotes]')!
   const volume=mask.querySelector<HTMLInputElement>('[data-volume]')!,mute=mask.querySelector<HTMLInputElement>('[data-mute]')!

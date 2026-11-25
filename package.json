@@ -10,6 +10,7 @@
     "world:dev": "node scripts/world-dev.mjs",
     "refpack": "uv run --locked python pipeline/fetch_city_ref.py",
     "verify:mp": "node scripts/verify-mp.mjs",
+    "verify:geolocation": "node --import tsx scripts/verify-geolocation.mjs",
     "verify:cloud-save": "tsx scripts/verify-cloud-save.mjs",
     "verify:loading": "node scripts/verify-loading.mjs",
     "verify:admin": "node scripts/auth-test.mjs --admin-ui",
