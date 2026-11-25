@@ -1,0 +1,37 @@
+// Positions are tile-local metres. Null levels mark protected main pavement.
+export type StationRoadSegment=[number,number,number,number,number,number|null,number|null]
+
+export function stationRoadSurface(segments:StationRoadSegment[]){
+  const bins=new Map<number,StationRoadSegment[]>()
+  for(const segment of segments){
+    const [ax,az,bx,bz,width]=segment
+    for(let ix=Math.floor((Math.min(ax,bx)-width-4)/8);ix<=Math.floor((Math.max(ax,bx)+width+4)/8);ix++)
+      for(let iz=Math.floor((Math.min(az,bz)-width-4)/8);iz<=Math.floor((Math.max(az,bz)+width+4)/8);iz++){
+        const key=ix+iz*128
+        if(!bins.has(key))bins.set(key,[])
+        bins.get(key)!.push(segment)
+      }
+  }
+  const nearby=(x:number,z:number)=>bins.get(Math.floor(x/8)+128*Math.floor(z/8))??[]
+  const protectedAt=(x:number,z:number)=>nearby(x,z).some(([ax,az,bx,bz,width,level])=>{
+    if(level!==null)return false
+    const dx=bx-ax,dz=bz-az
+    const t=Math.max(0,Math.min(1,((x-ax)*dx+(z-az)*dz)/(dx*dx+dz*dz||1)))
+    return Math.hypot(x-ax-t*dx,z-az-t*dz)<=width+.02
+  })
+  const height=(x:number,z:number,base:number)=>{
+    let closest=Infinity,y=base,blend=0,protection=1
+    for(const [ax,az,bx,bz,width,ay,by] of nearby(x,z)){
+      const dx=bx-ax,dz=bz-az
+      const t=Math.max(0,Math.min(1,((x-ax)*dx+(z-az)*dz)/(dx*dx+dz*dz||1)))
+      const distance=Math.hypot(x-ax-t*dx,z-az-t*dz)
+      if(ay===null || by===null){protection=Math.min(protection,Math.max(0,(distance-width-4.1)/4));continue}
+      if(distance>=closest||distance>=width)continue
+      closest=distance
+      y=ay+t*(by-ay)
+      blend=Math.min(1,(width-distance)/4)
+    }
+    return base+(y-base)*blend*protection
+  }
+  return {height,protectedAt}
+}

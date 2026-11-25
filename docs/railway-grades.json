@@ -291,5 +291,19 @@
     ],
     "transitionLengthM": 4
   },
-  "tunnelSurfaceConflicts": []
+  "tunnelSurfaceConflicts": [],
+  "existingRoadInterchanges": [
+    {
+      "lowerRoad": 226672185,
+      "bridge": 259020549,
+      "status": "既有公路立交净空不足，转 IDOK-329",
+      "issue": "IDOK-329"
+    },
+    {
+      "lowerRoad": 226672185,
+      "bridge": 246520670,
+      "status": "既有公路立交净空不足，转 IDOK-329",
+      "issue": "IDOK-329"
+    }
+  ]
 }

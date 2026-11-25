@@ -332,6 +332,10 @@ def bake(world_dir, manifest, inventory, samples):
                 lat=row['lat'],lon=row['lon'],surfaceSource=row['surfaceSource'],shortfallM=round(miss,3),
                 requiredRailY=round(bound,4),boundDirection=kind,opposingGradeLimitY=round(limit,4),
                 permittedRiseFromWitnessM=round(allowed,4),witness=evidence))
+    # Apply the station override after the native network and branch profiles
+    # are complete, so all other lines retain their original elevations.
+    from station_corridor import fit_corridor
+    coords,pieces,height,station_corridor = fit_corridor(coords,pieces,height,ways)
     tiles=defaultdict(list)
     maximum_grade=defaultdict(float)
     for i,j,station,flags,way_id in pieces:
@@ -433,7 +437,7 @@ def bake(world_dir, manifest, inventory, samples):
                              x=coords[i][0],z=coords[i][1],east=round(axis[0],6),south=round(axis[1],6),
                              railY=round(height[i],4),roadY=round(road,4),
                              clearanceM=None if clearance is None else round(clearance,4)))
-    return dict(branchLocalGrade=branch_report,crossings=measured,maxEncodedGradePermille=maximum_grade,missingSigns=missing_signs,treesRemoved=trees_removed,signs=sum(map(len,sign_sites.values())),tiles=len(tiles), segments=sum(map(len,tiles.values())), fixedNodes=len(anchors),
+    return dict(stationCorridor=station_corridor,branchLocalGrade=branch_report,crossings=measured,maxEncodedGradePermille=maximum_grade,missingSigns=missing_signs,treesRemoved=trees_removed,signs=sum(map(len,sign_sites.values())),tiles=len(tiles), segments=sum(map(len,tiles.values())), fixedNodes=len(anchors),
                 maxPinErrorM=max(abs(height[i]-y) for i,y in anchors.items()), clearanceConflicts=violations)
 
 
@@ -460,6 +464,7 @@ def bake_world(directory,manifest):
         else: samples[k]=v
     report=bake(directory,manifest,inventory,samples)
     manifest['railwayBranchGrade']=report['branchLocalGrade']
+    manifest['stationCorridor']=report['stationCorridor']
     return report
 
 

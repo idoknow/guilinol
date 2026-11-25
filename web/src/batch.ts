@@ -8,6 +8,7 @@ import type {Tile} from './world'
 import {vehicleModel} from './walk/vehicle-model'
 import {look} from './look/config'
 import {flags} from './debug'
+import {tunnelLiningMaterial,tunnelLightMaterial} from './station-tunnels'
 import {freezeStatic} from './static-freeze'
 
 export interface TileBatchInput {
@@ -18,6 +19,8 @@ export interface TileBatchInput {
   walls:THREE.BufferGeometry|null
   pond:Float32Array|null
   bridge:THREE.BufferGeometry|null
+  tunnelLining?:THREE.BufferGeometry
+  tunnelLights?:THREE.BufferGeometry
   streetSurface:THREE.BufferGeometry|null
   streetFence?:THREE.BufferGeometry|null
   furnitureMatrices:Float32Array
@@ -345,10 +348,23 @@ export class ChunkBatcher {
   private furnitureStale = false
   private lastFurniturePos = new THREE.Vector3(Infinity,Infinity,Infinity)
 
-  constructor(private scene:THREE.Scene) {}
+  private tunnelDirty=false
+  private tunnelLining=new StaticLayerBatch(tunnelLiningMaterial,[
+    {name:'position',size:3,ctor:'f32'},{name:'normal',size:3,ctor:'f32'},{name:'color',size:3,ctor:'f32'},
+  ])
+  private tunnelLights=new StaticLayerBatch(tunnelLightMaterial,[
+    {name:'position',size:3,ctor:'f32'},{name:'color',size:3,ctor:'f32'},
+  ])
+
+  constructor(private scene:THREE.Scene) {
+    scene.add(this.tunnelLining.mesh,this.tunnelLights.mesh)
+  }
 
   add(input:TileBatchInput) {
     const {tile} = input
+    for(const geom of [input.tunnelLining,input.tunnelLights])if(geom){
+      shiftPositions(geom,tile.x,tile.z);this.tunnelDirty=true
+    }
     if(input.walls) shiftPositions(input.walls,tile.x,tile.z)
     if(input.bridge) shiftPositions(input.bridge,tile.x,tile.z)
     if(input.streetSurface) shiftPositions(input.streetSurface,tile.x,tile.z)
@@ -364,6 +380,7 @@ export class ChunkBatcher {
   }
 
   remove(tile:Tile) {
+    if(this.items.get(tile)?.tunnelLining)this.tunnelDirty=true
     if(!this.items.delete(tile)) return
     const key = bucketKey(tile)
     const bucket = this.buckets.get(key)
@@ -378,11 +395,18 @@ export class ChunkBatcher {
   }
 
   private anyDirty() {
+    if(this.tunnelDirty)return true
     for(const bucket of this.buckets.values()) if(bucket.dirty) return true
     return false
   }
 
   private rebuildDirty() {
+    if(this.tunnelDirty){
+      const items=[...this.items.values()]
+      this.tunnelLining.rebuild(items.flatMap(({tile,tunnelLining:geom})=>geom?[{tile,geom}]:[]))
+      this.tunnelLights.rebuild(items.flatMap(({tile,tunnelLights:geom})=>geom?[{tile,geom}]:[]))
+      this.tunnelDirty=false
+    }
     let rebuilt = false
     for(const bucket of this.buckets.values()) if(bucket.dirty) { bucket.rebuild(); rebuilt = true }
     // Only a geometry rebuild invalidates the furniture selection; a pure camera turn must not
@@ -453,6 +477,8 @@ export class ChunkBatcher {
     }
 
     for(const bucket of this.buckets.values()) bucket.cull(visibleChunks,farBuildings,visibleStreets)
+    this.tunnelLining.cull(visibleChunks)
+    this.tunnelLights.cull(visibleStreets)
 
     if(this.furnitureStale || furnMask!==this.lastFurnitureMask || camera.position.distanceToSquared(this.lastFurniturePos)>=4) {
       this.furnitureStale = false

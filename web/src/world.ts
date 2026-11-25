@@ -352,7 +352,11 @@ export async function detail(tile:Tile, signal:AbortSignal, parseSlot?:()=>Promi
   const groundMesh = new THREE.Mesh(geometry,material)
   group.add(groundMesh)
   const tunnel=tunnels?tunnelGeometry(tile,geometry,tunnels):null
-  if(tunnel){tunnel.fringe.material.dispose();tunnel.fringe.material=material;group.add(...Object.values(tunnel))}
+  if(tunnel){
+    if(tunnel.fringe){tunnel.fringe.material.dispose();tunnel.fringe.material=material}
+    if('lining' in tunnel)group.add(tunnel.floor,tunnel.portal,tunnel.interior)
+    else group.add(...Object.values(tunnel))
+  }
   const pond = chunkWater(water,underlay,tile.x,tile.z)
   const walls = vertices ? buildingGeometry(positions,normals,indices,rings) : null
   const bridge = deck.length ? bridgeGeometry(deck,thin,asphalt) : null
@@ -360,6 +364,8 @@ export async function detail(tile:Tile, signal:AbortSignal, parseSlot?:()=>Promi
     tile, minY, maxY, midY:heights.getY(segments/2*(stride+1)),
     walls, pond:pond?.positions ?? null, bridge,
     streetSurface:streets.surface,
+    tunnelLining:tunnel && 'lining' in tunnel?tunnel.lining.geometry:undefined,
+    tunnelLights:tunnel && 'lights' in tunnel?tunnel.lights.geometry:undefined,
     streetFence:streets.fence,
     detailCount:streets.detailCount,
     railLodCount:streets.railLodCount,
@@ -370,7 +376,13 @@ export async function detail(tile:Tile, signal:AbortSignal, parseSlot?:()=>Promi
   return {
     group,groundMesh,terrain,water,rings,deck,thin,streets,batch,tunnel,railCutVertices:new Set(railCuts.map(([index])=>index)),
     dispose(){
-      if(tunnel)for(const mesh of Object.values(tunnel)){mesh.geometry.dispose();if(mesh!==tunnel.fringe)mesh.material.dispose()}
+      if(tunnel){
+        for(const mesh of Object.values(tunnel))if(mesh){
+          mesh.geometry.dispose()
+          if(tunnel.fringe && mesh!==tunnel.fringe)mesh.material.dispose()
+        }
+        if(!tunnel.fringe)tunnel.floor.material.dispose()
+      }
       pond?.dispose(); streets.surface?.dispose(); streets.fence?.dispose(); bridge?.dispose(); geometry.dispose(); walls?.dispose()
       material.map!.image.close(); material.map!.dispose(); material.dispose()
     },

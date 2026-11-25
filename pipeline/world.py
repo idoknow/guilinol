@@ -26,6 +26,7 @@ from karst import generate
 from peak_sectors import overview_step, write_city_lods
 from landmarks.jiefang_layout import bank_paving, grade_banks, grade_binjiang_streets
 from bridges import bridge_tiles
+from station_footbridge import building_cutouts
 from road_grading import build_ground_mesh_lookup, eval_bspline_grid, solve_road_and_bridge_elevations
 from scatter import CONFIG, extract_road_network, scatter
 from streets import chunks as street_chunks
@@ -367,6 +368,7 @@ def build(bbox, output, palette, workers=4):
         structural_footprint(data,structural_ground,ShapelyPolygon()) for data in structures.values())])
     footprints, heights = buildings(bounds, ground_mesh_at, peak_tree, layout, carriageway_mask, sidewalk_mask, airport_buildings)
     index = STRtree(footprints)
+    bridge_cutouts = building_cutouts(road_net[0], footprints, heights, index)
     shop_rows = shopfronts(footprints, heights, roads)
     for campus in layout.allow_unmapped_court:
         if not bounds.covers(campus) or any(campus.covers(field.representative_point())
@@ -472,7 +474,7 @@ def build(bbox, output, palette, workers=4):
                 if play_region and not bounds.covers(tile):
                     tile = tile.intersection(bounds)
                 parts = ((poly,heights[key]) for key in sorted(index.query(tile))
-                         for poly in polygons(footprints[key].intersection(tile)) if poly.area >= .01)
+                         for poly in polygons(bridge_cutouts.get(key, footprints[key]).intersection(tile)) if poly.area >= .01)
                 vertices, normals, indices, rings = building_mesh(parts, origin)
                 deck, thin, asphalt = decks(tile, origin)
                 st_data = streets(tile, origin)
@@ -576,6 +578,8 @@ def build(bbox, output, palette, workers=4):
     if play_region:
         from railways import bake_world as bake_railways
         report = bake_railways(output,manifest)
+        from station_roads import bake as bake_station_roads
+        bake_station_roads(output,manifest,{road.way:road.width for road in roads if road.source=='paired'})
         print('Railway tiles:',report['tiles'],'clearance conflicts:',len(report['clearanceConflicts']))
         (output/'manifest.json').write_text(json.dumps(manifest,separators=(',',':'))+'\n')
     print(f'{len(chunks)} chunks, {len(footprints)} footprints, {sum(c["bytes"] for c in chunks):,} chunk bytes')

@@ -1,0 +1,304 @@
+import {mergeVertices} from 'three/addons/utils/BufferGeometryUtils.js'
+import * as THREE from 'three'
+import type {Tile} from './world'
+const stationRoofDepth = 1.2
+
+export const tunnelLiningMaterial=new THREE.MeshStandardMaterial({side:THREE.DoubleSide,vertexColors:true,roughness:.9})
+export const tunnelLightMaterial=new THREE.MeshBasicMaterial({side:THREE.DoubleSide,vertexColors:true})
+
+type Point=[number,number,number]
+export type Tunnel={way:number,nodes?:[number,number],portals:[Point,Point],length:number,halfWidth:number,clearance:number,approach:number,approachEnds?:[number,number],mouths?:[boolean,boolean],openEnds?:[number,number],openCut?:boolean,footprint?:[number,number][][],joints?:({ring:[number,number][],wedges?:[number,number][][],faces?:Point[][],draw:boolean}|null)[],stations:[number,number][]}
+
+function frame(tunnel:Tunnel){
+  const [start,end]=tunnel.portals, ux=(end[0]-start[0])/tunnel.length,uz=(end[2]-start[2])/tunnel.length
+  return {station:(x:number,z:number)=>(x-start[0])*ux+(z-start[2])*uz,
+    lateral:(x:number,z:number)=>-(x-start[0])*uz+(z-start[2])*ux,
+    point:(at:number,offset:number,y:number):Point=>[start[0]+at*ux-offset*uz,y,start[2]+at*uz+offset*ux]}
+}
+const binsByList=new WeakMap<Tunnel[],Map<string,Tunnel[]>>()
+export function nearbyTunnels(list:Tunnel[]|undefined,x:number,z:number){
+  if(!list||list.length<8)return list??[]
+  let bins=binsByList.get(list)
+  if(!bins){
+    bins=new Map()
+    for(const tunnel of list){
+      const [a,b]=tunnel.portals,pad=tunnel.halfWidth+32
+      for(let i=Math.floor((Math.min(a[0],b[0])-pad)/256);i<=Math.floor((Math.max(a[0],b[0])+pad)/256);i++)
+        for(let j=Math.floor((Math.min(a[2],b[2])-pad)/256);j<=Math.floor((Math.max(a[2],b[2])+pad)/256);j++){
+          const key=i+','+j
+          if(!bins.has(key))bins.set(key,[])
+          bins.get(key)!.push(tunnel)
+        }
+    }
+    binsByList.set(list,bins)
+  }
+  return bins.get(Math.floor(x/256)+','+Math.floor(z/256))??[]
+}
+
+function footprintPlanes(ring:[number,number][]){
+  const sign=Math.sign(ring.reduce((area,[x,z],i)=>{
+    const [u,v]=ring[(i+1)%ring.length]
+    return area+x*v-z*u
+  },0))
+  return ring.map(([x,z],i)=>{
+    const [u,v]=ring[(i+1)%ring.length]
+    return (px:number,pz:number)=>sign*((u-x)*(pz-z)-(v-z)*(px-x))
+  })
+}
+
+export function floorLevel(tunnel:Tunnel,x:number,z:number){
+  for(const [end,joint] of (tunnel.joints??[]).entries()){
+    const p=tunnel.portals[end]
+    if(Math.abs(p[0]-x)>32 || Math.abs(p[2]-z)>32)continue
+    for(const [a,b,c] of joint?.faces??[]){
+      const dx=x-a[0],dz=z-a[2],ux=b[0]-a[0],uz=b[2]-a[2],vx=c[0]-a[0],vz=c[2]-a[2]
+      const det=ux*vz-uz*vx
+      if(Math.abs(det)<1e-9)continue
+      const u=(dx*vz-dz*vx)/det,v=(ux*dz-uz*dx)/det
+      if(u>=-1e-7 && v>=-1e-7 && u+v<=1.0000001)return a[1]+u*(b[1]-a[1])+v*(c[1]-a[1])
+    }
+  }
+  if(tunnel.footprint&&!tunnel.footprint.some(tri=>footprintPlanes(tri).every(plane=>plane(x,z)>=-.000001)))return
+  const axes=frame(tunnel), station=axes.station(x,z)
+  // At a shared endpoint, projection onto the two normalized axes can
+  // round a few micrometres outside both strips.
+  if(station<-.00001||station>tunnel.length+.00001||Math.abs(axes.lateral(x,z))>tunnel.halfWidth+.00001){
+    for(const [i,joint] of (tunnel.joints??[]).entries()){
+      if(!joint || joint.faces)continue
+      for(const ring of joint.wedges??[joint.ring]){
+        let positive=false,negative=false
+        for(let j=0;j<ring.length;j++){
+          const [a,b]=ring[j],[c,d]=ring[(j+1)%ring.length],cross=(c-a)*(z-b)-(d-b)*(x-a)
+          positive||=cross>.00001;negative||=cross<-.00001
+          if(positive&&negative)break
+        }
+        if(!(positive&&negative))return tunnel.portals[i][1]
+      }
+    }
+    return
+  }
+  const at=Math.max(0,Math.min(tunnel.length,station))
+  const index=tunnel.stations.findIndex(([s])=>s>=at)
+  if(index<0)return tunnel.portals[1][1]
+  const [end,high]=tunnel.stations[index],[start,low]=tunnel.stations[Math.max(0,index-1)]
+  return low+(high-low)*(at-start)/(end-start||1)
+}
+
+type Plane=(point:Point)=>number
+
+function clip(poly:Point[],plane:Plane){
+  const result:Point[]=[]
+  for(let index=0;index<poly.length;index++){
+    const a=poly[index],b=poly[(index+1)%poly.length],da=plane(a),db=plane(b)
+    if(da>=0)result.push(a)
+    if((da<0)!==(db<0))result.push(a.map((value,k)=>value+(b[k]-value)*da/(da-db)) as Point)
+  }
+  return result
+}
+function fan(poly:Point[],out:number[]){for(let at=2;at<poly.length;at++)out.push(...poly[0],...poly[at-1],...poly[at])}
+
+export function tunnelGeometry(tile:Tile,ground:THREE.PlaneGeometry,tunnels:Tunnel[]){
+  const parts={floor:[] as number[],interior:[] as number[],portal:[] as number[],band:[] as number[],lamp:[] as number[],lane:[] as number[],ceiling:[] as number[]}
+  const cuts:{planes:Plane[],roof?:(point:Point)=>number}[]=[]
+  const limits:Plane[]=[p=>p[0],p=>256-p[0],p=>p[2],p=>256-p[2]]
+  const heights=ground.getAttribute('position'), cells=ground.parameters.widthSegments
+  function groundY(point:Point){
+    const x=THREE.MathUtils.clamp(point[0]/256*cells,0,cells),z=THREE.MathUtils.clamp(point[2]/256*cells,0,cells)
+    const col=Math.min(cells-1,Math.floor(x)),row=Math.min(cells-1,Math.floor(z)),u=x-col,v=z-row,idx=row*(cells+1)+col
+    const a=heights.getY(idx),b=heights.getY(idx+1),c=heights.getY(idx+cells+1),d=heights.getY(idx+cells+2)
+    return u+v<=1?a+(b-a)*u+(c-a)*v:d+(c-d)*(1-u)+(b-d)*(1-v)
+  }
+  for(const tunnel of tunnels){
+    const [start,end]=tunnel.portals,pad=tunnel.halfWidth+1
+    if(Math.max(start[0],end[0])+pad<tile.x||Math.min(start[0],end[0])-pad>tile.x+256||Math.max(start[2],end[2])+pad<tile.z||Math.min(start[2],end[2])-pad>tile.z+256)continue
+    const axes=frame(tunnel),width=tunnel.halfWidth,head=tunnel.clearance
+    function local(s:number,d:number,y:number){const p=axes.point(s,d,y);p[0]-=tile.x;p[2]-=tile.z;return p}
+    const station=(p:Point)=>axes.station(p[0]+tile.x,p[2]+tile.z),side=(p:Point)=>axes.lateral(p[0]+tile.x,p[2]+tile.z)
+    const [first,last]=tunnel.openEnds??tunnel.approachEnds??[tunnel.mouths?.[0]===false?0:tunnel.approach,tunnel.mouths?.[1]===false?0:tunnel.approach]
+    const footprint=(from:number,to:number):Plane[]=>[p=>station(p)-from,p=>to-station(p),p=>width-side(p),p=>width+side(p)]
+    const patches=tunnel.footprint?.map(ring=>footprintPlanes(ring).map(fn=>(p:Point)=>fn(p[0]+tile.x,p[2]+tile.z)))??[[]]
+    const addCut=(planes:Plane[],roof?: (p:Point)=>number)=>{for(const patch of patches)cuts.push({planes:[...planes,...patch],roof})}
+    for(const [from,to] of [[0,first],[tunnel.length-last,tunnel.length]])if(to>from)addCut(footprint(from,to))
+    if((tunnel.approachEnds||tunnel.mouths)&&first+last<tunnel.length){
+      // Carry the upper ground mesh over the entire headroom envelope. A
+      // shallow DEM triangle across the entrance otherwise blocks the car.
+      const roof=(p:Point)=>{
+        const at=THREE.MathUtils.clamp(station(p),0,tunnel.length)
+        let lo=0,hi=tunnel.stations.length-1
+        while(hi-lo>1){const mid=(lo+hi)>>>1;if(tunnel.stations[mid][0]<=at)lo=mid;else hi=mid}
+        const [a,y]=tunnel.stations[lo],[b,h]=tunnel.stations[hi]
+        return y+(h-y)*(at-a)/(b-a)+head+stationRoofDepth-.35
+      }
+      addCut(footprint(first,tunnel.length-last),roof)
+    }
+    const quad=(points:Point[],part:keyof typeof parts)=>{
+      let floorParts=[points]
+      if(part==='floor'){
+        for(const joint of tunnel.joints??[]){
+          if(!joint?.faces)continue
+          const ring=joint.ring, planes=footprintPlanes(ring)
+          const outside:Point[][]=[]
+          for(let poly of floorParts){
+            if(planes.some(fn=>poly.every(p=>fn(p[0]+tile.x,p[2]+tile.z)<0))){outside.push(poly);continue}
+            for(const fn of planes){
+              const plane=(p:Point)=>fn(p[0]+tile.x,p[2]+tile.z)
+              const piece=clip(poly,p=>-plane(p))
+              if(piece.length>=3)outside.push(piece)
+              poly=clip(poly,plane)
+              if(!poly.length)break
+            }
+          }
+          floorParts=outside
+        }
+      }
+      for(const poly of floorParts){
+        const tilePoly=limits.reduce((poly,plane)=>clip(poly,plane),poly)
+        if(tilePoly.length>=3)for(const planes of patches)fan(planes.reduce((poly,plane)=>clip(poly,plane),tilePoly),parts[part])
+      }
+    }
+    for(const [i,joint] of (tunnel.joints??[]).entries()){
+      if(!joint?.draw)continue
+      for(const tri of joint.faces??[]){
+        const local=tri.map(([x,y,z]):Point=>[x-tile.x,y,z-tile.z])
+        fan(limits.reduce((poly,plane)=>clip(poly,plane),local),parts.floor)
+      }
+      const floor=tunnel.portals[i][1]
+      const covered=!tunnel.openCut&&(i===0?first:last)===0&&!tunnel.mouths?.[i]
+      for(const wedge of joint.wedges??[joint.ring]){
+        const ring=wedge.map(([x,z]):Point=>[x-tile.x,floor,z-tile.z])
+        const edges=ring.map((a,n)=>[a,ring[(n+1)%ring.length]])
+        const winding=Math.sign(edges.reduce((sum,[a,b])=>sum+a[0]*b[2]-a[2]*b[0],0))
+        const planes=edges.map(([a,b])=>(p:Point)=>winding*((b[0]-a[0])*(p[2]-a[2])-(b[2]-a[2])*(p[0]-a[0])))
+        // The two rectangular strips leave a wedge at a bend. Carry the same
+        // headroom cut through that wedge as through either adjoining section.
+        addCut(planes,covered?()=>floor+head+stationRoofDepth-.35:undefined)
+        if(!joint.faces)quad(ring,'floor')
+        if(covered)quad(ring.map(([x,,z])=>[x,floor+head,z]),'ceiling')
+        for(const [a,b] of edges){
+          if(side(a)*side(b)<=0)continue
+          if(joint.wedges){
+            // An edge against an existing driving strip is an internal seam.
+            const mx=(a[0]+b[0])/2+tile.x,mz=(a[2]+b[2])/2+tile.z
+            if(!joint.ring.some(([x,z],i)=>{
+              const [xx,zz]=joint.ring[(i+1)%joint.ring.length]
+              const dx=xx-x,dz=zz-z
+              const t=THREE.MathUtils.clamp(((mx-x)*dx+(mz-z)*dz)/(dx*dx+dz*dz||1),0,1)
+              return Math.hypot(mx-x-t*dx,mz-z-t*dz)<.001
+            }))continue
+          }
+          const top=(p:Point):Point=>[p[0],covered?floor+head:Math.max(floor,groundY(p)),p[2]]
+          quad([a,b,top(b),top(a)],covered?'interior':'portal')
+        }
+      }
+    }
+    for(let i=1;i<tunnel.stations.length;i++){
+      const [a,ay]=tunnel.stations[i-1],[b,by]=tunnel.stations[i]
+      const open=(a+b)/2<first||(a+b)/2>tunnel.length-last
+      const al=local(a,-width,ay),ar=local(a,width,ay),bl=local(b,-width,by),br=local(b,width,by)
+      quad([al,ar,br,bl],'floor')
+      const top=(p:Point):Point=>[p[0],open?Math.max(p[1],groundY(p)):p[1]+head,p[2]]
+      quad([al,bl,top(bl),top(al)],open?'portal':'interior');quad([br,ar,top(ar),top(br)],open?'portal':'interior')
+      if(!open)quad([top(al),top(bl),top(br),top(ar)],'ceiling')
+      if(!open){
+        // 青绿 glazed-tile dado, warm lamp strips and a dashed centre line (IDOK-165 visual pass)
+        const inset=width-.04
+        quad([local(a,-inset,ay),local(b,-inset,by),local(b,-inset,by+1.3),local(a,-inset,ay+1.3)],'band')
+        quad([local(b,inset,by),local(a,inset,ay),local(a,inset,ay+1.3),local(b,inset,by+1.3)],'band')
+        for(const d of [-inset+.02,inset-.02])quad([local(a,d,ay+head-.95),local(b,d,by+head-.95),local(b,d,by+head-.8),local(a,d,ay+head-.8)],'lamp')
+      }
+      if(Math.floor(a/6)%2===0)quad([local(a,-.08,ay+.03),local(a,.08,ay+.03),local(b,.08,by+.03),local(b,-.08,by+.03)],'lane')
+      for(const [s,y] of [[a,ay]])if(first>0&&Math.abs(s-first)<1e-6||last>0&&Math.abs(s-tunnel.length+last)<1e-6){
+        const l=local(s,-width,y+head),r=local(s,width,y+head)
+        quad([l,r,[r[0],Math.max(r[1]+.16,groundY(r)),r[2]],[l[0],Math.max(l[1]+.16,groundY(l)),l[2]]],'portal')
+      }
+    }
+  }
+  if(!parts.floor.length)return null
+  const pos=ground.getAttribute('position'),index=ground.index!,vertices:number[]=[],keep:number[]=[]
+  for(let at=0;at<index.count;at+=3){
+    const ids=[0,1,2].map(off=>index.getX(at+off)),triangle=ids.map(id=>[pos.getX(id),pos.getY(id),pos.getZ(id)] as Point)
+    let pieces=[triangle],changed=false
+    for(const {planes,roof} of cuts){
+      const remaining:Point[][]=[]
+      for(const piece of pieces){
+        if(planes.some(plane=>piece.every(p=>plane(p)<=0))){remaining.push(piece);continue}
+        if(roof && piece.every(p=>p[1]>=roof(p))){remaining.push(piece);continue}
+        let inside=piece
+        for(const plane of planes){const outside=clip(inside,p=>-plane(p));if(outside.length>=3)remaining.push(outside);inside=clip(inside,plane)}
+        if(roof && inside.length>=3)fan(inside.map(p=>[p[0],Math.max(p[1],roof(p)),p[2]]),vertices)
+        changed=true
+      }
+      pieces=remaining
+    }
+    if(changed)pieces.forEach(poly=>fan(poly,vertices));else keep.push(...ids)
+  }
+  // Retain the original grid vertices for height lookups and append the
+  // clipped boundary triangles to the same terrain draw and collision mesh.
+  if(vertices.length){
+    const patch=new THREE.BufferGeometry()
+    const positions:number[]=[], uv:number[]=[], indices:number[]=[]
+    const shared=new Map<string,number>()
+    for(let i=0;i<vertices.length;i+=3){
+      const x=Math.fround(vertices[i]), y=Math.fround(vertices[i+1]), z=Math.fround(vertices[i+2])
+      const key=x+','+y+','+z
+      let id=shared.get(key)
+      if(id===undefined){
+        id=positions.length/3
+        shared.set(key,id)
+        positions.push(x,y,z)
+        uv.push(x/256,1-z/256)
+      }
+      indices.push(id)
+    }
+    patch.setAttribute('position',new THREE.Float32BufferAttribute(positions,3))
+    patch.setAttribute('uv',new THREE.Float32BufferAttribute(uv,2))
+    patch.setIndex(indices)
+    patch.computeVertexNormals()
+    for(const name of ['position','normal','uv']){
+      const grid=ground.getAttribute(name),extra=patch.getAttribute(name)
+      const data=new Float32Array(grid.array.length+extra.array.length)
+      data.set(grid.array);data.set(extra.array,grid.array.length)
+      ground.setAttribute(name,new THREE.BufferAttribute(data,grid.itemSize))
+    }
+    for(const index of indices)keep.push(pos.count+index)
+    patch.dispose()
+  }
+  ground.setIndex(keep)
+  ground.computeBoundingSphere()
+  function mesh(values:number[],material:THREE.Material,kind:string){
+    const geometry=new THREE.BufferGeometry()
+    geometry.setAttribute('position',new THREE.Float32BufferAttribute(values,3))
+    geometry.computeVertexNormals()
+    const item=new THREE.Mesh(geometry,material)
+    item.name=`tunnel_${kind}`;item.userData.kind=kind
+    return item
+  }
+  const collisionMaterial=new THREE.MeshBasicMaterial({side:THREE.DoubleSide})
+  function collider(values:number[],kind:string){
+    const result=mesh(values,collisionMaterial,kind)
+    result.visible=false
+    return result
+  }
+  const palette={floor:0x3b3e42,interior:0xcfc8b8,portal:0xa39d90,band:0x4d7466,
+    lane:0xeae3cf,ceiling:0x9c968a,lamp:0xffd9a6}
+  function batch(keys:(keyof typeof parts)[],material:THREE.Material,kind:string){
+    const positions:number[]=[],colors:number[]=[]
+    for(const key of keys){
+      const color=new THREE.Color(palette[key])
+      for(let i=0;i<parts[key].length;i+=3){
+        positions.push(parts[key][i],parts[key][i+1],parts[key][i+2])
+        colors.push(color.r,color.g,color.b)
+      }
+    }
+    const result=mesh(positions,material,kind)
+    result.geometry.setAttribute('color',new THREE.Float32BufferAttribute(colors,3))
+    const triangles=result.geometry
+    result.geometry=mergeVertices(triangles,1e-6)
+    triangles.dispose()
+    return result
+  }
+  const lining=batch(['floor','interior','portal','band','lane'],
+    tunnelLiningMaterial,'lining')
+  const lights=batch(['ceiling','lamp'],tunnelLightMaterial,'lighting')
+  return {lining,lights,floor:collider(parts.floor,'road'),interior:collider(parts.interior,'interior'),portal:collider(parts.portal,'portal')}
+}
