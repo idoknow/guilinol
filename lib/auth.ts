@@ -6,6 +6,14 @@ export interface Env {
   perfQuery?:(path:string,params:URLSearchParams)=>Promise<Response>
   DB: D1Database; FEEDBACK:R2Bucket; BRIDGE_TOKEN?:string; EMAIL_DEV_LOG?: string; RESEND_API_KEY?: string
   /** 聚合登录：全部来自 Pages 环境变量/secret，不进 D1、后台不暴露 */
+  QQ_APPID?: string
+  QQ_APPKEY?: string
+  QQ_REDIRECT?: string
+  WX_APPID?: string
+  WX_SECRET?: string
+  WX_REDIRECT?: string
+  SOCIAL_LEGACY_CUTOFF?: string
+  SOCIAL_LEGACY_SUNSET?: string
   SOCIAL_APPID?: string
   SOCIAL_APPKEY?: string
   SOCIAL_ENABLED?: string

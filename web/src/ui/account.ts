@@ -5,8 +5,8 @@ import './account.css'
 // 账号：登录 / 注册（填写 → 邮箱验证 → 完成）/ 忘记密码 / 我的账号。
 // Playing requires an account (IDOK-99): the title screen asks for a login before the city boots, see requireUser().
 type Screen='login'|'register'|'verify'|'forgot'|'reset'|'profile'|'social'|'bindmail'
-export type SocialBinding={type:string;label:string;nickname:string;avatar:string;uid:string}
-export type User={id:string,uid:number,email:string,nickname:string,notify_email:boolean;email_placeholder?:boolean;social?:SocialBinding[]}
+export type SocialBinding={channel?:string;type:string;label:string;nickname:string;avatar:string;uid:string}
+export type User={id:string,uid:number,email:string,nickname:string,notify_email:boolean;email_placeholder?:boolean;social?:SocialBinding[];migration?:{blocking:boolean;options:string[]}}
 const titles:Record<Screen,string>={login:'登录',register:'注册账号',verify:'验证邮箱',forgot:'忘记密码',reset:'重置密码',profile:'我的账号',social:'第三方账号',bindmail:'绑定邮箱'}
 const submits:Record<Screen,string>={login:'登录',register:'注册账号',verify:'验证邮箱',forgot:'发送重置验证码',reset:'重置密码',profile:'保存设置',social:'确认',bindmail:'发送验证码'}
 async function api(path:string,method='GET',data?:object) {
@@ -24,13 +24,14 @@ type SocialIntentForUi='login'|'bind'|'register'
 type SocialOption={type:string;label:string}
 type SocialPending={intent:'login'|'bind'|'register';type:string;label:string;nickname:string;avatar:string}
 let socialOptions:SocialOption[]|null=null
+let directOptions:SocialOption[]=[],legacyPhase='before',legacyCutoff:string|null=null
 let pendingSocial:SocialPending|null=null
 let socialPhase:'send'|'code'='send'
 let bindPhase:'send'|'code'='send'
 async function loadSocialOptions(){
   if(socialOptions)return socialOptions
-  try{socialOptions=(await api('auth/social/config') as {enabled?:SocialOption[]}).enabled??[]}catch{socialOptions=[]}
-  socialOptions=[...socialOptions].sort((a,b)=>socialRank(a.type)-socialRank(b.type))
+  try{const config=await api('auth/social/config');directOptions=config.direct??[];legacyPhase=config.migration?.phase??'before';legacyCutoff=config.migration?.cutoff??null;socialOptions=config.legacy??config.enabled??[]}catch{socialOptions=[]}
+  socialOptions=[...(socialOptions??[])].sort((a,b)=>socialRank(a.type)-socialRank(b.type))
   return socialOptions
 }
 type SocialTicket={url:string;at:number}
@@ -92,6 +93,7 @@ async function loadPendingSocial(){
   return pendingSocial
 }
 const socialNotes:Record<string,{screen:Screen;text:string;ok?:boolean}>={
+  migrated:{screen:'profile',text:'迁移完成'},already_bound:{screen:'profile',text:'该身份已绑定其他账号'},legacy_sunset:{screen:'login',text:'旧版通道已停用'},legacy_closed:{screen:'login',text:'旧版通道仅供已有账号登录'},
   login:{screen:'profile',text:'已通过第三方账号登录',ok:true},
   bound:{screen:'profile',text:'第三方账号已绑定',ok:true},
   registered:{screen:'profile',text:'注册成功，第三方账号已绑定',ok:true},
@@ -112,6 +114,7 @@ const listeners=new Set<(user:User|null)=>void>()
 let cloudReady=Promise.resolve()
 const setUser=(value:User|null)=>{
   user=value
+  if(value?.migration?.blocking) setTimeout(()=>{if(user===value && !document.querySelector('[data-oauth-panel]'))migrationPanel(value)},0)
   if(value?.id || localStorage.getItem('glol.save.owner'))cloudReady=import('../game/cloud-session').then(module=>{
     if(user===value)return module.setCloudAccount(value?.id??null)
   }).catch(()=>{})
@@ -181,6 +184,7 @@ if(bootSocial){
     await ready
     build()
     dialog!.showModal()
+    if(bootSocial==='new'||bootSocial==='takeover'){await loadSocialOptions();decisionPanel(bootSocial);return}
     if(bootSocial==='confirm'){
       try{await loadPendingSocial();render!('social')}
       catch(error){render!('login',error instanceof Error?error.message:'授权已过期，请重新发起')}
@@ -193,6 +197,38 @@ if(bootSocial){
     render!(notice?.screen??'login',notice?.text??'第三方登录未完成，请重新发起')
     record('funnel',{step:'loginOpen'})
   })()
+}
+
+async function startDirect(type:string,intent:string){location.assign((await api('auth/oauth/start','POST',{type,intent})).url)}
+function actionPanel(title:string){
+  const panel=document.createElement('dialog'),message=document.createElement('p')
+  panel.dataset.oauthPanel='';panel.setAttribute('aria-label',title);panel.append(document.createTextNode(title),message)
+  panel.oncancel=event=>event.preventDefault();document.body.append(panel);panel.showModal()
+  function button(label:string,action:()=>Promise<void>){const item=document.createElement('button');item.type='button';item.textContent=label;item.onclick=async()=>{item.disabled=true;try{await action()}catch(error){message.textContent=error instanceof Error?error.message:'操作失败'}finally{item.disabled=false}};panel.append(item)}
+  return {panel,message,button}
+}
+function decisionPanel(reason:string){
+  const {button}=actionPanel(reason==='new'?'此身份还没有账号':'此身份已绑定另一个账号。确认转移到当前账号？')
+  const decide=(body:object)=>api('auth/social/confirm','POST',body)
+  if(reason==='new'){
+    button('我是新玩家',async()=>location.assign((await decide({choice:'register'})).redirect))
+    if(socialOptions?.length)button(`我${legacyCutoff?'在 '+legacyCutoff+' 前':''}玩过`,async()=>{const {type}=await decide({choice:'legacy'});if(socialOptions?.some(option=>option.type===type))await startSocial(type,'login');else location.assign('/')})
+  }else button('确认转移',async()=>location.assign((await decide({takeover:true})).redirect))
+  button('返回',async()=>location.assign('/'))
+}
+function migrationPanel(account:User){
+  const {panel,message,button}=actionPanel('请绑定新版登录方式或邮箱，以保留账号访问权')
+  for(const type of account.migration!.options){
+    if(type!=='email'){button(type==='qq'?'新版 QQ':'新版微信',()=>startDirect(type,'migrate'));continue}
+    button('绑定邮箱和密码',async()=>{
+      panel.replaceChildren(message);message.textContent='验证邮箱并设置密码'
+      const input=(label:string,type:string)=>{const element=document.createElement('input');element.type=type;element.placeholder=label;element.setAttribute('aria-label',label);panel.append(element);return element}
+      const email=input('邮箱','email'),password=input('密码（至少 8 位）','password'),code=input('验证码','text')
+      const bind=(verify:boolean)=>api('auth/email/bind','POST',{email:email.value,password:password.value,migrate:true,...(verify?{code:code.value}:{})})
+      button('发送验证码',async()=>{await bind(false);message.textContent='请查收验证码'})
+      button('完成迁移',async()=>{if(!/^\d{6}$/.test(code.value))throw Error('请输入六位验证码');location.assign((await bind(true)).redirect)})
+    })
+  }
 }
 
 function build(){
@@ -270,6 +306,10 @@ function build(){
     quick.append(row,or);quick.hidden=false
   }
   async function socialButtons(next:Screen){
+    await loadSocialOptions()
+    if(screen!==next)return
+    for(const option of directOptions){if(next==='profile'&&user?.social?.some(item=>item.channel==='direct'&&item.type===option.type))continue;link(option.label,()=>void submit(()=>startDirect(option.type,next==='profile'?'bind':'login')))}
+    if(next!=='login'&&legacyPhase!=='before')return
     if(next==='login'||next==='register'){
       if(socialOptions){quickLogin(next,socialOptions);return}
       const options=await loadSocialOptions()
@@ -278,7 +318,7 @@ function build(){
     }
     const options=await loadSocialOptions()
     if(!options.length||!d.open||screen!==next)return
-    const bound=new Set((user?.social??[]).map(item=>item.type)),
+    const bound=new Set((user?.social??[]).filter(item=>item.channel!=='direct').map(item=>item.type)),
       visible=options.filter(option=>!bound.has(option.type)),
       row=document.createElement('div')
     row.className='acc-social'
