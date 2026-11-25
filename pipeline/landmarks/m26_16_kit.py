@@ -509,6 +509,7 @@ def export_landmark_glb(
     surface=None,
     masked_atlas=False,
     glass_opacity=.43,
+    atlas_emissive=(0.0, 0.0, 0.0),
 ):
     atlas_size = image.width
     hi = SceneBuilder(rects, atlas_size=atlas_size, lod=0, collide=True)
@@ -522,7 +523,7 @@ def export_landmark_glb(
     for lod_name, b in (('lod0', hi), ('lod1', lo)):
         scene.graph.update(frame_from=base, frame_to=lod_name)
         m_atlas = bucket_to_trimesh(
-            b.atlas, image, f'{mat_prefix}_atlas', (0, 0, 0), atlas_metallic, atlas_roughness, double_sided=double_sided
+            b.atlas, image, f'{mat_prefix}_atlas', atlas_emissive, atlas_metallic, atlas_roughness, double_sided=double_sided
         )
         if m_atlas is not None:
             if masked_atlas:
