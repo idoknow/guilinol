@@ -36,11 +36,14 @@
     "platformWarning": "#dfb44e",
     "entryWidth": 9.0,
     "eaveThickness": 1.15,
+    "plazaSlabMetres": [2.4, 1.2],
     "plazaStone": "#dad7cb",
     "bridgeGlassOpacity": 0.43,
     "signHeight": 3.2,
     "signWidth": 16.0,
     "canopyHeight": 5.6,
+    "columnPlinth": 0.72,
+    "bridgePlinth": 0.96,
     "columnSpacing": 18,
     "bridgeStairRunByPlatform": {"376029417": 15.0756, "376029418": 16.5925, "376029419": 14.6420, "376029420": 14.6615}
   }

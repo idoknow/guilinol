@@ -35,15 +35,25 @@ def facade(b, polygon, height, curtain=False):
     top = max(b.grade(*p) for p in ring) + height
     floor = LEVELS["hallFloor"] - b.surface.y
     if not curtain:
-        b.prism(ring, 0, top, "wall", cap_region="roof", collide=True, footing=True)
-        for _, a, end, length, unit, normal in edges(ring):
-            if length < 10:
-                continue
-            unit = np.asarray(unit)
+        sill, head = top - 4.0, top - 1.65
+        base = min(b.grade(*p) for p in ring) - 0.045
+        b.prism(ring, base, sill - base, "wall", collide=True, footing=True)
+        b.prism(ring, head, top - head, "wall", cap_region="roof")
+        for _, a, end, length, unit, normal in edges(ring, min_len=0.05):
+            unit, normal = np.asarray(unit), np.asarray(normal)
+            last = a
             for center in np.arange(4, length - 2, 6.5):
-                mid = a + center * unit
-                quad(b, mid - unit * 1.45, mid + unit * 1.45,
-                     top - 4.0, top - 1.65, 0.06, normal, "glass")
+                left, right = a + unit * (center - 1.45), a + unit * (center + 1.45)
+                quad(b, last, left, sill, head, 0, normal, "wall")
+                quad(b, left, right, sill, head, -0.22, normal, "glass")
+                if b.detail:
+                    quad(b, left, left - 0.22 * normal, sill, head, 0, unit, "wall")
+                    quad(b, right, right - 0.22 * normal, sill, head, 0, -unit, "wall")
+                last = right
+            quad(b, last, end, sill, head, 0, normal, "wall")
+            b.hit_quad([(p[0], h, p[1]) for p, h in
+                        ((a, sill), (end, sill), (end, top), (a, top))],
+                       (normal[0], 0, normal[1]))
         return top
 
     # Cut the three passages through both the visible shell and its collision mesh.
@@ -92,6 +102,14 @@ def facade(b, polygon, height, curtain=False):
     return top
 
 
+def plinth(b, x, z, width, top):
+    half = width / 2
+    ring = [(x - half, z - half), (x + half, z - half),
+            (x + half, z + half), (x - half, z + half)]
+    low = min(b.grade(*p) for p in ring) - 0.05
+    b.prism(ring, low, max(0.05, top - low), "frame", footing=True)
+
+
 def platform(b, poly):
     ring = ccw(poly.exterior.coords)
     _, a, end, length, u, normal = max(edges(ring), key=lambda edge: edge[3])
@@ -132,7 +150,8 @@ def platform(b, poly):
     positions = canopy_stations(length, STYLE["columnSpacing"])
     levels = [platform_y + STYLE["canopyHeight"]] * len(positions)
     for i, (x, y) in enumerate(zip(positions, levels)):
-        base = platform_y
+        base = platform_y + 0.11
+        plinth(b, x, 0, STYLE["columnPlinth"], base)
         b.cylinder_y(x, base, y - base, 0, 0.30, "wall", sections=8, collide=True)
         if i:
             prev, py = positions[i - 1], levels[i - 1]
@@ -351,13 +370,14 @@ def main(out):
             if overlap.is_empty:
                 continue
             x, z = overlap.centroid.coords[0]
-            g = platform_y
+            g = platform_y + 0.11
             b.cylinder_y(x, g, y - g, z, 0.42, "wall", collide=True)
             # Stair flights sit along the platform axis, clear of the track bed.
             _, _, _, _, axis, _ = max(
                 edges(ccw(poly.exterior.coords)), key=lambda edge: edge[3]
             )
             old = b.set_frame((x, 0, z), axis)
+            plinth(b, 0, 0, STYLE["bridgePlinth"], g)
             # Keep the foot of the stairs at its surveyed platform position.
             length = STYLE["bridgeStairRunByPlatform"][str(way_id)]
             bottom = platform_y - 0.02
@@ -365,18 +385,29 @@ def main(out):
             landing = flight.intersection(crossing).length
             run = length - landing
             steps = math.ceil((y + 0.55 - bottom) / 0.16)
-            for k in range(steps if b.detail else 0):
-                frac = (k + 1) / steps
-                top_step = bottom + (y + 0.55 - bottom) * frac
-                b.box(
-                    0,
-                    top_step - 0.2,
-                    length - run * (k + 0.5) / steps,
-                    2.2,
-                    0.2,
-                    run / steps,
-                    "roof",
-                )
+            if b.detail:
+                rise = (y + 0.55 - bottom) / steps
+                tread = run / steps
+                for k in range(steps):
+                    toe, heel = length - k * tread, length - (k + 1) * tread
+                    lower, upper = bottom + k * rise, bottom + (k + 1) * rise
+                    b.face([(-1.1, upper, toe), (1.1, upper, toe),
+                            (1.1, upper, heel), (-1.1, upper, heel)], (0, 1, 0), "roof")
+                    b.face([(-1.1, lower, toe), (1.1, lower, toe),
+                            (1.1, upper, toe), (-1.1, upper, toe)], (0, 0, 1), "frame")
+                    for side in (-1, 1):
+                        edge = side * 1.1
+                        b.face([(edge, lower - 0.18, toe), (edge, upper, toe),
+                                (edge, upper, heel), (edge, upper - 0.18, heel)],
+                               (side, 0, 0), "wall")
+                b.face([(-1.1, bottom - 0.18, length), (1.1, bottom - 0.18, length),
+                        (1.1, y + 0.37, landing), (-1.1, y + 0.37, landing)],
+                       (0, -1, 0), "soffit")
+                # The first tread bears on a landing built up from the terrain.
+                foot_ring = [(-1.1, length + 0.6), (1.1, length + 0.6),
+                             (1.1, length), (-1.1, length)]
+                low = min(b.grade(*p) for p in foot_ring) - 0.04
+                b.prism(foot_ring, low, bottom - low, "frame", footing=True)
             if not b.detail:
                 b.face([(-1.1, bottom, length), (1.1, bottom, length),
                         (1.1, y + 0.55, landing), (-1.1, y + 0.55, landing)], (0, 1, 0), "roof")

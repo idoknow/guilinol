@@ -104,11 +104,11 @@ export function streetGeometry([paths,lamps,banks,signals=[],stops=[],roadCtrl,s
     }
     const channel=kind===4||kind===6?1:kind===5?0:kind
     const platformTop=kind===1 && platformPath && edges?.length && !vertical
-    const textureChannel=platformTop?9:kind===6?6:channel
+    const stone=kind===1 && paving?.plaza && inRing((p1.x+p2.x+p3.x)/3,(p1.z+p2.z+p3.z)/3,paving.plaza)
+    const textureChannel=platformTop?9:stone?10:kind===6?6:channel
     surfaceKinds.push(textureChannel,textureChannel,textureChannel)
     if(platformTop)alongVals.push(edgeDistance(p1),edgeDistance(p2),edgeDistance(p3))
     else alongVals.push(a1,a2,a3)
-    const stone=kind===1 && paving?.plaza && inRing((p1.x+p2.x+p3.x)/3,(p1.z+p2.z+p3.z)/3,paving.plaza)
     const c=platformTop?platformBrick:stone?plazaStone:colors[kind]
     for(const pt of [p1,p2,p3]){xyz.push(pt.x,pt.y,pt.z);rgb.push(c.r,c.g,c.b);if(channel===1&&!vertical)sidewalk.push(pt.x,pt.y,pt.z);else if(channel===0&&!vertical)road.push(pt.x,pt.y,pt.z)}
   }

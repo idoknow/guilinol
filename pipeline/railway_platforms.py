@@ -12,6 +12,7 @@ from common import load_osm
 from features import area, points
 from railways import road_radius
 from service_streets import rings
+from station_site import platform_walking_area
 
 
 def bake(output, chunks, region):
@@ -21,7 +22,7 @@ def bake(output, chunks, region):
     roads = [LineString(points(way)).buffer(max(4.5,road_radius(way['tags'])+1.5))
              for way in ways if way['type']=='way' and way['id'] in road_ids]
     corridors = STRtree(roads)
-    platforms = union_all([area(way) for way in ways
+    platforms = union_all([platform_walking_area(way) for way in ways
                            if way['type'] == 'way' and way.get('tags', {}).get('railway') == 'platform'
                            and way['tags'].get('monorail') != 'yes']).intersection(region)
     station = union_all([area(w) for w in ways if w['type']=='way' and w['id'] in (376029417,376029418,376029419,376029420)])

@@ -27,7 +27,7 @@ Esri 对本站返回的源信息为 Vantor WV03，拍摄于 2024-12-24，源分�
 
 `npm run landmarks -- guilin_station` 在已有 GL04 地形与街道三角面上生成模型。重建世界后再运行一次可使站台边缘与最终铺面标高一致。站名的文字、占位字体、字牌宽高及颜色在 `pipeline/railway-style.json` 的 `station` 字段。北翼和南翼按屋顶位置命名，附属楼采用 OSM way/1017598908 的外轮廓。
 
-`node scripts/station-views.mjs dist captures/station` 输出相同投影和时间的机位图，以及每张图的相机坐标、首帧、draw calls 和显存采样。东北、东、东南、西南、西、西北六个方向和俯视用于地形对照。近景用于核对实拍的朝向及构件，原照片没有相机坐标时，机位为近似匹配。
+`node scripts/station-views.mjs dist captures/station` 输出相同投影和时间的机位图，以及每张图的相机坐标、首帧、draw calls 和显存采样。六个斜视机位距站房中心 221–233 m，镜头比同机重建的 440af6ea 地面高 50 m。两套世界共用绝对坐标，另保留俯视图。近景用于核对实拍的朝向及构件，原照片没有相机坐标时，机位为近似匹配。
 
 ## 站坪标高与南侧天桥
 

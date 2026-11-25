@@ -138,3 +138,26 @@ def mark_station_tiles(chunks):
 def canopy_stations(length, spacing):
     half = length / 2 - 12
     return np.linspace(-half, half, math.ceil(2 * half / spacing) + 1)
+
+
+def platform_walking_area(way):
+    platform = area(way)
+    if way["id"] not in range(376029417, 376029421):
+        return platform
+    coords = np.asarray(platform.exterior.coords)
+    edges = np.diff(coords, axis=0)
+    lengths = np.linalg.norm(edges, axis=1)
+    i = lengths.argmax()
+    axis = edges[i] / lengths[i]
+    side = np.array([-axis[1], axis[0]])
+    mid = np.asarray(platform.centroid.coords[0])
+    style = json.loads((ROOT / "pipeline/railway-style.json").read_text())["station"]
+    def plinth(center, width):
+        return Polygon([center + (dx * axis + dz * side) * width / 2
+                        for dx, dz in ((-1, -1), (1, -1), (1, 1), (-1, 1))])
+    holes = [plinth(mid + axis * t, style["columnPlinth"])
+             for t in canopy_stations(lengths[i], style["columnSpacing"])]
+    overlap = platform.intersection(footprints()["crossing"])
+    if not overlap.is_empty:
+        holes.append(plinth(np.asarray(overlap.centroid.coords[0]), style["bridgePlinth"]))
+    return platform.difference(union_all(holes))

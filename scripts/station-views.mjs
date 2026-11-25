@@ -8,11 +8,12 @@ import { glHookScript } from './gl-perf.mjs'
 const [build = 'dist', output = 'captures/station'] = process.argv.slice(2)
 const east = (110.278235 - 110.3) * 111320 * Math.cos((25.28 * Math.PI) / 180)
 const south = (25.28 - 25.263846) * 110574
-// Eye and target are east, absolute elevation, south. Identical for both builds.
+// Eye and target use east, absolute elevation and south. The six oblique eyes
+// are 50 m above the rebuilt 440af6ea terrain; both builds share these poses.
 const views = [
   ['front', [60, 156.7, -8], [0, 161, 0], 12],
   ['square', [100, 186, 64], [-12, 154, -5], 12],
-  ['eaves', [56, 155, 67], [0, 161, -6], 12],
+  ['eaves', [56, 157.3, 67], [0, 161, -6], 12],
   ['taxi', [90, 157, -50], [18, 152, 4], 12],
   ['canopies', [-128, 170, 105], [-81, 156, -62], 12],
   ['bridge', [-135, 165, -125], [-58, 160, -86], 12],
@@ -23,10 +24,10 @@ const views = [
   ['west', [-222, 203.6, -15], [0, 155, 0], 12],
   ['northwest', [-160, 204.12, -160], [0, 155, 0], 12],
   ['plan', [0, 1080, 0], [0, 150, -0.01], 12],
-  ['platform-night', [-89.6, 153.6, 45], [-101.8, 154.6, -55], 21],
-  ['platform-day', [-56.5, 153.0, 45], [-68.5, 154.4, -55], 12],
-  ['platform-across', [-76.4, 152.8, 45], [-100.5, 155, -37], 12],
-  ['stairs', [-110, 155, -105], [-107, 159, -84], 12],
+  ['platform-night', [-89.6, 156.75, 45], [-101.8, 157.4, -55], 21],
+  ['platform-day', [-56.5, 156.75, 45], [-68.5, 157.1, -55], 12],
+  ['platform-across', [-76.4, 156.75, 45], [-100.5, 158, -37], 12],
+  ['stairs', [-110, 156.75, -105], [-107, 159, -84], 12],
   ['front-night', [60, 156.7, -8], [0, 161, 0], 21],
 ]
 await mkdir(output, { recursive: true })
