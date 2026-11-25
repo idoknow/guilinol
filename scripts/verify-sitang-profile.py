@@ -101,8 +101,11 @@ def measure(base, candidate, csv_path=None):
     bore_axis = LineString([(x, z) for x, _, z in bore['portals']])
     pavement = []
     survey_rows = []
-    for margin in (.50, .20, .10, .05):
+    bore_lanes = [l for l in lanes if l.get('way') == tunnel['id'] and l['kind'] == 'motor']
+    carriage_half = max(abs(l['offset']) + l['width']/2 for l in bore_lanes)
+    for margin in (.50, .60, .70, .20, .10, .05):
         offset = bore['halfWidth'] - margin
+        required = 3.0 if clearance == 3.5 and offset > carriage_half else clearance
         strip = LineString(coords).offset_curve(-offset, join_style='mitre')
         pts = [strip.interpolate(s) for s in stations]
         deck = samples(base, manifests[0], pts, 'roofProbe')
@@ -113,7 +116,7 @@ def measure(base, candidate, csv_path=None):
         paving = samples(candidate, manifests[1], [pts[i] for i in before], 'pavementOnly')
         over_service = [i for i in range(before[-1]+1,len(pts)) if upper_zone.covers(pts[i])]
         surface_hits = samples(base, manifests[0], [pts[i] for i in over_service], 'pavementOnly')
-        service_bounds = [deck[lip][1]-.08*(stations[i]-stations[lip])+clearance+roof_thickness-y
+        service_bounds = [deck[lip][1]-.08*(stations[i]-stations[lip])+required+roof_thickness-y
                           for i,y in zip(over_service,surface_hits,strict=True) if y is not None]
         cross = [i for i in range(before[-1]+1, len(pts)) if pts[i].distance(motorway_axis) <= half_width
                  and bore_axis.distance(pts[i]) <= bore['halfWidth']]
@@ -125,10 +128,10 @@ def measure(base, candidate, csv_path=None):
             visible = max(h for h in hits if h is not None)
             records.append(dict(xz=list(pts[i].coords[0]), distance=distance, floorLowerBound=floor_min,
                                 insideMotorway=half_width-pts[i].distance(motorway_axis), visibleTop=visible,
-                                lift=floor_min+clearance+roof_thickness-visible))
-        survey_rows.extend((offset, margin, *r['xz'], r['distance'], r['insideMotorway'], r['floorLowerBound'],
+                                lift=floor_min+required+roof_thickness-visible))
+        survey_rows.extend((offset, margin, required, *r['xz'], r['distance'], r['insideMotorway'], r['floorLowerBound'],
                             r['visibleTop'], r['lift']) for r in records)
-        pavement.append(dict(offset=offset, insideBore=margin, bridgeXZ=list(pts[lip].coords[0]),
+        pavement.append(dict(offset=offset, requiredClearance=required, insideBore=margin, bridgeXZ=list(pts[lip].coords[0]),
                              bridgeY=deck[lip][1], approachSamples=len(paving),
                              hits=sum(h is not None for h in paving), motorwaySamples=len(records),
                              servicePavingSamples=len(service_bounds), serviceLiftLowerBound=max(service_bounds,default=None),
@@ -142,12 +145,30 @@ def measure(base, candidate, csv_path=None):
     level_section = dict(carriagewayWidth=2*pavement[0]['offset'], xz=lane_edge['xz'],
                          stationDifference=axis_delta, floorLowerBound=lane_min,
                          minimumLift=lane_min+clearance+roof_thickness-lane_edge['visibleTop'])
+    # An upper corner chamfer changes the intrados only. The same floor
+    # station still spans both lanes and both shoulders.
+    shoulder_point = Point(wall['xz'])
+    checked = []
+    for offset, margin, required, x, z, dist, inside, floor, top, strip_lift in survey_rows:
+        ds = abs(bore_axis.project(Point(x,z))-bore_axis.project(shoulder_point))
+        minimum = max(floor,wall['floorLowerBound']-.08*ds)
+        checked.append(dict(offset=offset, required=required, x=x, z=z, insideMotorway=inside,
+                            floor=minimum, top=top, lift=minimum+required+roof_thickness-top))
+    zones = {}
+    for name, rows in [('carriageway',[r for r in checked if r['offset']<=carriage_half]),
+                       ('shoulder',[r for r in checked if r['offset']>carriage_half])]:
+        zones[name] = dict(samples=len(rows), overCap=sum(1 for r in rows if r['lift']>.5),
+                           worst=max(rows,key=lambda r:r['lift']),
+                           sections=[dict(offset=offset,peakLift=max(r['lift'] for r in rows if r['offset']==offset))
+                                     for offset in sorted({r['offset'] for r in rows})])
+    level_section['zones']=zones
     if csv_path:
         with csv_path.open('w', newline='') as stream:
             writer = csv.writer(stream)
-            writer.writerow(('offset_m', 'distance_inside_bore_m', 'x', 'z', 'distance_from_bridge_m',
-                             'distance_inside_motorway_m', 'floor_lower_bound_m', 'visible_motorway_m', 'minimum_lift_m'))
-            writer.writerows(survey_rows)
+            writer.writerow(('offset_m', 'distance_inside_bore_m', 'required_clearance_m', 'x', 'z', 'distance_from_bridge_m',
+                             'distance_inside_motorway_m', 'floor_lower_bound_m', 'visible_motorway_m', 'strip_lift_m',
+                             'shared_floor_lower_bound_m', 'shared_floor_lift_m'))
+            writer.writerows((*row,r['floor'],r['lift']) for row,r in zip(survey_rows,checked,strict=True))
     return dict(levelCrossSection=level_section,pavementSections=pavement,motorwayProbe=motorway_probe, tunnel=tunnel['id'], tags=tunnel['tags'], clearance=clearance, roofThickness=roof_thickness, bridge=bridge['id'],
                 bridgeXZ=list(probes[anchor].coords[0]), bridgeY=bridge_y, upper=upper['id'],
                 upperXZ=list(probes[limit].coords[0]), upperY=surface[limit],
