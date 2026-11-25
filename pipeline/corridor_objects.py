@@ -97,6 +97,8 @@ def relocate(output, manifest, elements, raised=(), adjoining=()):
            and (w['tags'].get('layer','0')=='0' or w.get('surfaceUnderlay')) and w['tags'].get('bridge','no')=='no'
            and w.get('geometry') and len(w['geometry'])>1 and all(w['geometry'])]
     axes=STRtree(lines)
+    bore_axes=STRtree([LineString([(x,z) for x,_,z in tunnel['portals']])
+                       for tunnel in manifest.get('tunnels', ()) if not tunnel.get('openCut')])
     # A paved access junction can retain an old tree from before its
     # resurfacing. Include the travelled lane on both sides of the junction,
     # even where the repaired asphalt overlaps the original footprint.
@@ -163,8 +165,12 @@ def relocate(output, manifest, elements, raised=(), adjoining=()):
             # the station fixed on either axis and use the nearest legal curb.
             road_axes=axes.query(point.buffer(max(3.,lines[nearest].distance(point)+.01)),
                                 predicate='intersects')
-            for index in road_axes:
-                line=lines[index]
+            alignments=[lines[index] for index in road_axes]
+            if field==0 and roof_zone.covers(point):
+                # Hillside trees can be far from any surface highway. Move
+                # them laterally to the bore itself, including on curved bores.
+                alignments.append(bore_axes.geometries[bore_axes.nearest(point)])
+            for line in alignments:
                 t=line.project(point)
                 a,b=line.interpolate(max(0,t-.01)),line.interpolate(min(line.length,t+.01))
                 dx,dz=b.x-a.x,b.y-a.y
