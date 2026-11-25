@@ -1,6 +1,7 @@
 import {cacheResponse} from './telemetry'
 import * as THREE from 'three'
 import {buildingGeometry,type Building} from './buildings'
+import {ensureShardForTile,hasShardForTile} from './city-upgrade/state'
 import {loadStreetGeometry} from './street-loader'
 import type {StationPavingStyle,Streets} from './street-worker'
 import {bridgeGeometry} from './look/bridge'
@@ -332,6 +333,7 @@ function buildSurfaceLookup(tile:Tile,paths:Streets){
 }
 
 export async function detail(tile:Tile, signal:AbortSignal, parseSlot?:()=>Promise<void>, tunnels?:Tunnel[]) {
+  const shardReady = ensureShardForTile(tile.x,tile.z)
   const compressed = await fetchAsset(tile.file,signal)
   const buffer = await new Response(new Blob([compressed]).stream().pipeThrough(new DecompressionStream('gzip'))).arrayBuffer()
   if(parseSlot) await parseSlot()
@@ -392,7 +394,18 @@ export async function detail(tile:Tile, signal:AbortSignal, parseSlot?:()=>Promi
     else group.add(...Object.values(tunnel))
   }
   const pond = chunkWater(water,underlay,tile.x,tile.z)
-  const walls = vertices ? buildingGeometry(positions,normals,indices,rings) : null
+  await shardReady
+  signal.throwIfAborted()
+  const hasUpgradeShard = hasShardForTile(tile.x,tile.z)
+  const cityUpgradeRaw = hasUpgradeShard && vertices ? {
+    positions: new Int16Array(positions),
+    normals: new Int8Array(normals),
+    indices: new Uint32Array(indices),
+    origRings: rings.map(b => [...b] as Building),
+  } : undefined
+  const activeRings = hasUpgradeShard ? rings.map(b => [...b] as Building) : rings
+  const walls = vertices ? buildingGeometry(positions,normals,indices,activeRings,tile.x,tile.z) : null
+  for(const [,topLevel] of activeRings) if(topLevel/10+8>maxY) maxY = topLevel/10+8
   const bridge = deck.length ? bridgeGeometry(deck,thin,asphalt) : null
   const batch:TileBatchInput = {
     tile, minY, maxY, midY:heights.getY(segments/2*(stride+1)),
@@ -409,7 +422,7 @@ export async function detail(tile:Tile, signal:AbortSignal, parseSlot?:()=>Promi
   }
   const surfaceAt = buildSurfaceLookup(tile, paths)
   return {
-    group,groundMesh,terrain,underlay,water,rings,deck,thin,streets,batch,tunnel,surfaceAt,railCutVertices:new Set(railCuts.map(([index])=>index)),
+    group,groundMesh,terrain,underlay,water,rings:activeRings,deck,thin,streets,batch,tunnel,surfaceAt,cityUpgradeRaw,railCutVertices:new Set(railCuts.map(([index])=>index)),
     dispose(){
       if(tunnel){
         for(const mesh of Object.values(tunnel))if(mesh){
@@ -418,7 +431,7 @@ export async function detail(tile:Tile, signal:AbortSignal, parseSlot?:()=>Promi
         }
         if(!tunnel.fringe)tunnel.floor.material.dispose()
       }
-      pond?.dispose(); streets.surface?.dispose(); streets.fence?.dispose(); bridge?.dispose(); geometry.dispose(); walls?.dispose()
+      pond?.dispose(); streets.surface?.dispose(); streets.fence?.dispose(); bridge?.dispose(); geometry.dispose(); batch.walls?.dispose()
       material.map!.image.close(); material.map!.dispose(); material.dispose()
     },
   }

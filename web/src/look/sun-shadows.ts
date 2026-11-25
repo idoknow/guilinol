@@ -46,7 +46,7 @@ export function sunShadows(renderer:THREE.WebGLRenderer,scene:THREE.Scene,camera
       const materials=Array.isArray(mesh.material)?mesh.material:[mesh.material]
       if(!materials.some(mat=>!mat.transparent && ('isMeshStandardMaterial' in mat||'isMeshPhongMaterial' in mat||'isMeshLambertMaterial' in mat||'isMeshToonMaterial' in mat)))return
       mesh.receiveShadow=true
-      mesh.castShadow=camera.layers.test(mesh.layers)&&frustum.intersectsObject(mesh)&&mesh.geometry.drawRange.count>0
+      mesh.castShadow=mesh.userData.noShadowCast!==true&&camera.layers.test(mesh.layers)&&frustum.intersectsObject(mesh)&&mesh.geometry.drawRange.count>0
       if(mesh.castShadow)casters++
       for(const material of materials){
         if(patched.has(material))continue
