@@ -218,6 +218,7 @@ def bake(directory, chunks, graded=None, tunnels=()):
         tile['bytes'] = file.stat().st_size
     if graded is not None:
         bake_level_panels(directory, chunks, elements, graded.level_panels)
+    set_back_roadside_props(directory, chunks, new_pavement)
     return new_pavement
 
 
@@ -257,6 +258,51 @@ def bake_level_panels(directory, chunks, elements, panels):
         file.write_bytes(gzip.compress(raw[:12]+struct.pack('<I',len(payload))+raw[16:off]+
                                        payload+raw[off+size:],compresslevel=5,mtime=0))
         tile['bytes'] = file.stat().st_size
+
+
+def set_back_roadside_props(directory, chunks, new_pavement):
+    """Keep roadside furniture on the verge when pavement reaches its old position."""
+    from shapely.ops import nearest_points
+
+    footprint = STRtree(new_pavement)
+    for tile in chunks:
+        x,z = tile['x'],tile['z']
+        if not len(footprint.query(box(x,z,x+256,z+256), predicate='intersects')):
+            continue
+        file = directory/tile['file']
+        raw = gzip.decompress(file.read_bytes())
+        v,i,size = struct.unpack_from('<3I',raw,4)
+        off = 16924+9*v+4*i
+        collision = json.loads(raw[off:off+size])
+        streets = collision[1]
+        affected = [prop for field in (1,3,4) if len(streets)>field
+                    for prop in streets[field] if len(footprint.query(
+                        Point(x+prop[0]/10,z+prop[1]/10),predicate='intersects'))]
+        if not affected:
+            continue
+        faces = [(kind,make_valid(Polygon(np.asarray(shell)/100,[np.asarray(r)/100 for r in holes])))
+                 for kind,shell,*holes in streets[0]]
+        asphalt = union_all([face for kind,face in faces if kind in (0,5)])
+        blocks = [make_valid(Polygon(np.asarray(loops[0])/100,[np.asarray(r)/100 for r in loops[1:]]))
+                  for _,_,loops,*_ in collision[0] if loops and len(loops[0])>=3]
+        verge = box(.15,.15,255.85,255.85).difference(union_all([asphalt,*blocks]).buffer(.4))
+        sidewalk = union_all([face for kind,face in faces if kind in (1,4,6)]).intersection(verge)
+        if verge.is_empty:
+            continue
+        changed = False
+        for prop in affected:
+            p = Point(prop[0]/10,prop[1]/10)
+            if not asphalt.covers(p):
+                continue
+            target = sidewalk if not sidewalk.is_empty and p.distance(sidewalk)<=8 else verge
+            q = nearest_points(p,target)[1]
+            prop[:2] = [round(10*q.x),round(10*q.y)]
+            changed = True
+        if changed:
+            payload = json.dumps(collision,separators=(',',':')).encode()
+            file.write_bytes(gzip.compress(raw[:12]+struct.pack('<I',len(payload))+raw[16:off]+
+                                           payload+raw[off+size:],compresslevel=5,mtime=0))
+            tile['bytes'] = file.stat().st_size
 
 
 def relocate_daylight_lamps(directory, chunks, tunnels):
