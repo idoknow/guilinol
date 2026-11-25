@@ -69,8 +69,9 @@ def open_straight_passage(b, ring, spec, axis, half, highest_road, build):
         side=axis.offset_curve(sign*half).intersection(footprint)
         for line in getattr(side,'geoms',[side]):
             for p,q in zip(line.coords,list(line.coords)[1:]):
-                h=min(b.surface.ground(*p),b.surface.ground(*q),highest_road)-.5
+                hp=b.surface.ground(*p)-.025
+                hq=b.surface.ground(*q)-.025
                 top=ceiling if upper else roof
-                panel([(p[0],h,p[1]),(q[0],h,q[1]),(q[0],top,q[1]),(p[0],top,p[1])],
+                panel([(p[0],hp,p[1]),(q[0],hq,q[1]),(q[0],top,q[1]),(p[0],top,p[1])],
                       (-sign*normal[0],0,-sign*normal[1]))
     print(f'Campus passage: roof clearance {roof-highest_road:.3f} m, opening {ceiling-highest_road:.3f} m, class {"A" if upper else "B"}')
