@@ -55,11 +55,13 @@ if(mode==='portal-routes'){
   const former=JSON.parse(fs.readFileSync(new URL('./fixtures/grounding-portals.json',import.meta.url),'utf8')).filter(site=>
     site.way!==1493582667 && !portalIds.has(site.id) && site.modes.every(m=>m.route.every(([x,z])=>
       x>=left && z>=top && x<left+width && z<top+depth)))
-  const surfaceRoutes=[...former,...(data.yardRoutes??[])]
-  for(const site of [...data.routes,...surfaceRoutes])for(const test of site.modes){
+  const campus=new Map((data.campusRoutes??[]).map(site=>[site.id,site]))
+  const surfaceRoutes=[...former.map(site=>campus.get(site.id)??site),...(data.yardRoutes??[])]
+  for(const site of [...data.routes,...surfaceRoutes,...(data.narrowRoutes??[])])for(const test of site.modes){
     const [x,z,way]=test.route[0]
     test.startHeight=surface(x,z,{way,structure:test.startStructure,pedestrian:test.mode==='foot'})
   }
+  fs.writeFileSync(path.join(world,'vehicle-narrow-routes.json'),JSON.stringify(data.narrowRoutes??[]))
   fs.writeFileSync(path.join(world,'vehicle-surface-routes.json'),JSON.stringify(surfaceRoutes))
   fs.writeFileSync(output,JSON.stringify(data.routes))
   process.exit(0)
@@ -141,10 +143,11 @@ const lanes=data.lanes.map(lane=>{
 
 // Store only the knots needed to reconstruct the metre samples. Distances are
 // sample-index deltas, heights are signed centimetre deltas, crossfalls int8.
-function packSurface(length:number,wheel:(d:number,r:number)=>number){
+function packSurface(length:number,wheel:(d:number,r:number)=>number,singleTrack=false){
   const span=length+2*profilePad
   let count=Math.ceil(span)
   function measure(d:number){
+    if(singleTrack)return {height:Math.round(wheel(d,0)*100),cross:0}
     const left=wheel(d,-.795),right=wheel(d,.795)
     return {height:Math.round((left+right)*50),
       cross:Math.max(-127,Math.min(127,Math.round((right-left)*128/1.59)))}
@@ -323,56 +326,60 @@ for(const lane of lanes){
     if(bake){profiles[lane.id]=null;continue}
   }
   // Wheel centers of the 4.48 x 1.82 m reference car (mountWheel in vehicle-model.ts).
-  const front=1.34,rear=-1.31,halfWidth=.795,span=front-rear
   const wheel=(along,right)=>surface(start.x+dx*along+dz*(right-offset),start.z+dz*along-dx*(right-offset),lane)
-  if(bake){profiles[lane.id]={floor:packSurface(length,wheel),offset};continue}
+  if(bake){profiles[lane.id]={floor:packSurface(length,wheel,!!lane.modes),offset};continue}
   const active=mode==='baseline'?{...lane,wheelPose:undefined,floor:undefined}:lane
   const count=Math.ceil(length/2)
   let maximum=0,over=0
-  for(let i=0;i<=count;i++){
-    const f=i/count,dist=f*length
-    const fr=wheel(dist+front,halfWidth),fl=wheel(dist+front,-halfWidth)
-    const br=wheel(dist+rear,halfWidth),bl=wheel(dist+rear,-halfWidth)
-    const {y,pitch,roll}=active.floor?contactPose(active,dist):{
-      y:trackHeight(active,dist),pitch:active.wheelPose?poseAt(active.wheelPose,f,2):0,roll:active.wheelPose?poseAt(active.wheelPose,f,3):0}
-    let uneven:boolean|undefined
-    // Intersect under the rotated contact, including its horizontal displacement.
-    for(const forward of [rear,front])for(const right of [-halfWidth,halfWidth]){
-      const rx=right*Math.cos(roll),ry=right*Math.sin(roll)
-      const rz=ry*Math.sin(pitch)+forward*Math.cos(pitch)
-      const x=start.x+dx*(dist+rz)+dz*(rx-offset),z=start.z+dz*(dist+rz)-dx*(rx-offset)
-      const diagnostic={hidden:false,missingFloor:false}
-      const roadY=surface(x,z,lane,diagnostic),gap=y+ry*Math.cos(pitch)-forward*Math.sin(pitch)-roadY,error=Math.abs(gap)
-      if(diagnostic.missingFloor)partialFloors.add(lane.way)
-      maximum=Math.max(maximum,error)
-      const mm=Math.ceil(error*1000);hist.set(mm,(hist.get(mm)??0)+1);total++
-      const key=Math.floor(x/32)+','+Math.floor(z/32)
-      heat.set(key,Math.max(heat.get(key)??0,error))
-      if(error>.25){
-        over++;outliers++;if(gap>0)floating++;else sunk++
-        // A full-width broken bridge approach can leave four coplanar
-        // corner samples while an axle crosses a vertical edge inside them.
-        // Probe the two wheel paths and both axle midpoints before blaming
-        // profile interpolation for a defect in the underlying surface.
-        if(uneven===undefined){
-          const mid=dist+(front+rear)/2
-          uneven=Math.abs(fr+bl-fl-br)/4>.25 ||
-            Math.abs(wheel(mid,halfWidth)-(fr+br)/2)>.25 ||
-            Math.abs(wheel(mid,-halfWidth)-(fl+bl)/2)>.25 ||
-            Math.abs(wheel(dist+front,0)-(fl+fr)/2)>.25 ||
-            Math.abs(wheel(dist+rear,0)-(bl+br)/2)>.25
+  for(const vehicleMode of lane.modes??[null]){
+    const front=vehicleMode==='bike'?.66:vehicleMode==='bicycle'?.54:1.34
+    const rear=vehicleMode==='bike'?-.62:vehicleMode==='bicycle'?-.54:-1.31
+    const halfWidth=vehicleMode?0:.795
+    for(let i=0;i<=count;i++){
+      const f=i/count,dist=f*length
+      const fr=wheel(dist+front,halfWidth),fl=wheel(dist+front,-halfWidth)
+      const br=wheel(dist+rear,halfWidth),bl=wheel(dist+rear,-halfWidth)
+      const {y,pitch,roll}=active.floor?contactPose(active,dist,front,rear,halfWidth):{
+        y:trackHeight(active,dist),pitch:active.wheelPose?poseAt(active.wheelPose,f,2):0,roll:active.wheelPose?poseAt(active.wheelPose,f,3):0}
+      let uneven:boolean|undefined
+      // Intersect under the rotated contact, including its horizontal displacement.
+      for(const forward of [rear,front])for(const right of halfWidth?[-halfWidth,halfWidth]:[0]){
+        const rx=right*Math.cos(roll),ry=right*Math.sin(roll)
+        const rz=ry*Math.sin(pitch)+forward*Math.cos(pitch)
+        const x=start.x+dx*(dist+rz)+dz*(rx-offset),z=start.z+dz*(dist+rz)-dx*(rx-offset)
+        const diagnostic={hidden:false,missingFloor:false}
+        const roadY=surface(x,z,lane,diagnostic),gap=y+ry*Math.cos(pitch)-forward*Math.sin(pitch)-roadY,error=Math.abs(gap)
+        if(diagnostic.missingFloor)partialFloors.add(lane.way)
+        maximum=Math.max(maximum,error)
+        const mm=Math.ceil(error*1000);hist.set(mm,(hist.get(mm)??0)+1);total++
+        const key=Math.floor(x/32)+','+Math.floor(z/32)
+        heat.set(key,Math.max(heat.get(key)??0,error))
+        if(error>.25){
+          over++;outliers++;if(gap>0)floating++;else sunk++
+          // A full-width broken bridge approach can leave four coplanar
+          // corner samples while an axle crosses a vertical edge inside them.
+          // Probe the two wheel paths and both axle midpoints before blaming
+          // profile interpolation for a defect in the underlying surface.
+          if(uneven===undefined){
+            const mid=dist+(front+rear)/2
+            uneven=Math.abs(fr+bl-fl-br)/4>.25 ||
+              Math.abs(wheel(mid,halfWidth)-(fr+br)/2)>.25 ||
+              Math.abs(wheel(mid,-halfWidth)-(fl+bl)/2)>.25 ||
+              Math.abs(wheel(dist+front,0)-(fl+fr)/2)>.25 ||
+              Math.abs(wheel(dist+rear,0)-(bl+br)/2)>.25
+          }
+          const reason=unresolved||diagnostic.missingFloor?'tunnel':diagnostic.hidden?'hidden':uneven?'surface':'fit'
+          reasons[reason]++
+          const point={lane:lane.id,way:lane.way,kind:vehicleMode??lane.kind,reason,x,z,dist,gap,error}
+          problemBuffer+=JSON.stringify(point)+'\n'
+          if(problemBuffer.length>=262144)flushProblems()
+          const group=worstByLane[lane.structure==='tunnel'?'tunnel':'surface']
+          if(!group.has(lane.id)||error>group.get(lane.id).error)group.set(lane.id,point)
         }
-        const reason=unresolved||diagnostic.missingFloor?'tunnel':diagnostic.hidden?'hidden':uneven?'surface':'fit'
-        reasons[reason]++
-        const point={lane:lane.id,way:lane.way,kind:lane.kind,reason,x,z,dist,gap,error}
-        problemBuffer+=JSON.stringify(point)+'\n'
-        if(problemBuffer.length>=262144)flushProblems()
-        const group=worstByLane[lane.structure==='tunnel'?'tunnel':'surface']
-        if(!group.has(lane.id)||error>group.get(lane.id).error)group.set(lane.id,point)
-      }
 
+      }
+      if(Math.abs(fr+bl-fl-br)/4>.25)nonplanar++
     }
-    if(Math.abs(fr+bl-fl-br)/4>.25)nonplanar++
   }
   reports.push({lane:lane.id,way:lane.way??null,kind:lane.kind,maximum,over,unresolvedTunnelFloor:unresolved})
 }

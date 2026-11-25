@@ -15,7 +15,7 @@ if(!sites.length)throw Error('No matching portal fixtures')
 const vehicles=JSON.parse(gunzipSync(await readFile(directory+'/world/vehicles.bin')))
 const results=sites.filter(s=>!s.modes.length).map(s=>({id:s.id,way:s.way,unavailable:'no permitted continuous route',links:s.links}))
 const groups=[]
-for(const site of sites)for(const {mode,route,startHeight,direction,boundary=false} of site.modes){
+for(const site of sites)for(const {mode,route,startHeight,direction,reverseExit=false,boundary=false} of site.modes){
   const [[x,z]]=route
   // A two-centimetre stub at an intersection cannot define the heading
   // of a 4.5 m parked sedan. Aim its front axle along the upcoming path.
@@ -27,7 +27,7 @@ for(const site of sites)for(const {mode,route,startHeight,direction,boundary=fal
   }
   let group=groups.find(g=>g.mode===mode&&g.tests.every(t=>Math.hypot(t.x-x,t.z-z)>65))
   if(!group){group={mode,tests:[]};groups.push(group)}
-  group.tests.push({x,z,id:site.id,way:site.way,route,boundary,direction,startHeight,heading:Math.atan2(x-nx,z-nz)})
+  group.tests.push({x,z,id:site.id,way:site.way,route,boundary,reverseExit,direction,startHeight,heading:Math.atan2(x-nx,z-nz)})
 }
 await mkdir(resolve(output,'..'),{recursive:true})
 const server=await preview({configFile:false,build:{outDir:directory},preview:{host:'127.0.0.1',port:0}})
@@ -41,7 +41,7 @@ try{
     await page.route('**/world/vehicles.bin',route=>route.fulfill({body:gzipSync(JSON.stringify(fleet))}))
     await page.goto('http://127.0.0.1:'+server.httpServer.address().port+'/?verify&mode=walk&radius=320&flow=0')
     await page.waitForFunction(()=>window.viewer?.walk?.active,null,{timeout:60000})
-    for(const {id,way,x,z,route,boundary,direction,startHeight:y,heading} of tests){
+    for(const {id,way,x,z,route,boundary,reverseExit,direction,startHeight:y,heading} of tests){
       try{
         let ready=false,setupError
         for(const [along,side] of [[0,0],[-.9,.7],[.9,-.7],[-.8,-.65],[.8,.65],[0,1.25],[0,-1.25],[-1.8,1],[-1.8,-1]]){
@@ -63,7 +63,7 @@ try{
           }catch(e){ready=false;setupError=e.message.split('\n')[0]}
         }
         if(!ready)throw Error(setupError??'could not reach or board lane fixture')
-        const run=await page.evaluate(async({route,mode,boundary,surfaceApproach})=>{
+        const run=await page.evaluate(async({route,mode,boundary,reverseExit,surfaceApproach})=>{
           const v=window.viewer,w=v.walk,held=new Set(),frames=[]
           const key=(code,down)=>{
             if(held.has(code)===down)return
@@ -74,7 +74,7 @@ try{
           const rig=mode==='foot'?null:v.stream.scene.getObjectByName('dynamic-'+(mode==='bike'?'ebike':mode))
           const height=()=>mode==='car'||mode==='foot'?w.fixtureHeight():rig.position.y
           const initialResets=w.probe().resets
-          let part=1,maximum=0,previous,completed=false
+          let part=1,maximum=0,previous,completed=false,furthest=0,reversing=false,exitStation
           await v.freeze()
           try{
             const length=route.slice(1).reduce((sum,p,i)=>sum+Math.hypot(p[0]-route[i][0],p[1]-route[i][1]),0)
@@ -83,7 +83,17 @@ try{
               const p=w.position,[a,b]=route[part-1],[x,z]=route[part]
               const len=Math.hypot(x-a,z-b),dx=(x-a)/len,dz=(z-b)/len
               const progress=(p.x-a)*dx+(p.z-b)*dz,cross=Math.abs((p.x-a)*dz-(p.z-b)*dx)
-              if(part===route.length-1&&progress>=len-(boundary&&mode==='car'?2.12*.85:0)&&cross<2){completed=true;break}
+              if(reverseExit){
+                furthest=Math.max(furthest,progress)
+                // Reverse with ordinary driving controls once inside the pinch,
+                // or once contact has stopped further progress.
+                if(progress>=len || (furthest>.5 && frames.length>150 &&
+                  Math.hypot(p.x-frames.at(-120)[0],p.z-frames.at(-120)[1])<.06))reversing=true
+                if(reversing && progress < -2.25 && cross<2){
+                  completed=true;exitStation=progress;break
+                }
+              }
+              if(!reverseExit&&part===route.length-1&&progress>=len-(boundary&&mode==='car'?2.12*.85:0)&&cross<2){completed=true;break}
               // Aim ahead through intermediate bends while retaining the final
               // station as a real crossing gate for the measured vehicle.
               if(part<route.length-1){
@@ -132,8 +142,9 @@ try{
               if(mode==='foot')w.drive(tx,tz,false)
               else{
                 const turn=Math.atan2(-tx,-tz)-w.heading,delta=Math.atan2(Math.sin(turn),Math.cos(turn))
-                key('KeyW',Math.abs(w.speed)<(bend?1.5:Math.abs(delta)>.6?2:3.5))
-                key('KeyA',delta>.04);key('KeyD',delta<-.04)
+                key('KeyS',reversing)
+                key('KeyW',!reversing&&Math.abs(w.speed)<(bend?1.5:Math.abs(delta)>.6?2:3.5))
+                key('KeyA',!reversing&&delta>.04);key('KeyD',!reversing&&delta<-.04)
               }
               v.stream.tick(w.position);v.stream.updateLandmarks?.(w.position);w.tick(1/60)
               const y=height(),next=w.position
@@ -152,10 +163,12 @@ try{
             hit.point?.y>probe.foot+.5&&hit.point.y<probe.foot+(mode==='car'?2:2.5))
           const obstruction=contacts?.some(Boolean)||w.obstacle==='collision'||headContact||
             probe.contactSources?.some(hit=>Math.abs(hit.normal?.y)<.5)
+          if(reverseExit && probe.resets!==initialResets)completed=false
           const failure=completed?undefined:obstruction||probe.resets>initialResets?'collision':'tool'
-          return {completed,failure,maximum,frames,part,obstacle:w.obstacle,contacts,
-            stopped:completed?undefined:{hits:probe.contactSources,foot:probe.foot,resets:probe.resets-initialResets,heading:w.heading}}
-        },{route,mode,boundary,surfaceApproach:!boundary&&process.argv.includes('--surface')})
+          return {completed,failure,maximum,frames,part,
+            reverseExit:reverseExit?{furthest,exitStation,resets:probe.resets-initialResets}:undefined,obstacle:w.obstacle,contacts,
+            stopped:completed?undefined:{wet:probe.wet,blockedWater:probe.blockedWater,surface:probe.surfaceKind,inHouse:probe.inHouse,hits:probe.contactSources,foot:probe.foot,resets:probe.resets-initialResets,heading:w.heading}}
+        },{route,mode,boundary,reverseExit,surfaceApproach:!boundary&&process.argv.includes('--surface')})
         results.push({id,way,mode,boundary,direction,...run})
       }catch(e){results.push({id,way,mode,boundary,direction,failure:"tool",unavailable:e.message.split('\n')[0]})}
     }

@@ -20,6 +20,7 @@ from common import OUT, ll2xz, load_osm
 from road_tunnels import clear_approach_paving
 from station_road_corridor import bake as bake_station_corridor
 from surveyed_corridors import bake as bake_surveyed_corridors, restore as restore_corridors
+import narrow_streets
 import ground_passages
 import vehicle_surface_grades
 import portal_landings
@@ -194,6 +195,9 @@ def bake(output, manifest, rendered_roads=None):
     from terminal_decks import grade as grade_terminal_decks, grade_airport_fork, grade_service_overpass, trim_bridge_endcaps
     ground_passages.close_qingtian_road(elements,sections,garage_curbs)
     ground_passages.grain_yard(output,manifest,elements,sections)
+    clearances=narrow_streets.classify(output,manifest['chunks'],elements,MOTOR)
+    narrow_ways={row['way'] for row in clearances}
+    (output/'vehicle-narrow-streets.json').write_text(json.dumps(clearances))
     grade_airport_fork(output,manifest,elements)
     terminal_grades = grade_terminal_decks(output, manifest, elements)
     canal_grades = plan_canal_passages(output, manifest, elements, sections)
@@ -230,6 +234,9 @@ def bake(output, manifest, rendered_roads=None):
                 allowed(tags, 'right' if curb_sign > 0 else 'left', kind)):
             curb = min(2.4, paved-3*count)
             size = (paved-curb)/count
+        narrow=way['id'] in narrow_ways
+        if narrow:
+            narrow_streets.end_curbs(LineString(coords),paved,garage_curbs)
         for start,end,start_id,end_id in ground_passages.open_segments(way,coords,garage,garage_curbs,paved):
             if not start or not end or not all(left <= x < left+width and top <= z < top+depth for x,z in (start,end)):
                 continue
@@ -242,6 +249,17 @@ def bake(output, manifest, rendered_roads=None):
                 if ref not in nodes:
                     nodes[ref] = dict(id=ref,x=round(x,2),z=round(z,2),y=node_height(x,z,way['id']))
             if any(nodes[ref]['y'] is None for ref in (start_id,end_id)):
+                continue
+            if narrow:
+                if permits(tags,'foot'):
+                    add_walk(start_id,end_id,0,way['id'],linear)
+                modes=[mode for mode in ('bike','bicycle') if permits(tags,mode)]
+                if modes:
+                    for head,tail in ((start_id,end_id),(end_id,start_id)):
+                        lanes.append(dict(id=len(lanes),**{'from':head},to=tail,width=min(paved,2.22),
+                                          offset=0,kind='nonmotor',cls=kind,way=way['id'],speedKmh=10,
+                                          modes=modes,oneway=False,heights=profile(head,tail,0,way['id'])))
+                        incoming[tail].append(lanes[-1])
                 continue
             if kind in WALK:
                 add_walk(start_id,end_id,0,way['id'],linear)
@@ -415,7 +433,7 @@ def bake(output, manifest, rendered_roads=None):
                         modes.append(dict(mode='car',direction=('in','out')[index],boundary=True,
                                           route=[[x,z,way['id']] for x,z in xy]))
                 yard_routes.append(dict(id=way['id'],way=way['id'],modes=modes))
-            route_file.write_text(json.dumps(dict(manifest=manifest,routes=portal_routes(elements,network,survey_nodes),yardRoutes=yard_routes)))
+            route_file.write_text(json.dumps(dict(manifest=manifest,routes=portal_routes(elements,network,survey_nodes),yardRoutes=yard_routes,narrowRoutes=narrow_streets.driving_sites(elements,clearances,permits),campusRoutes=ground_passages.campus_boundary_routes(elements))))
             subprocess.run([str(ROOT/'node_modules/.bin/tsx'),str(ROOT/'scripts/vehicle-grounding.ts'),
                             'portal-routes',str(output.resolve()),str(route_file.resolve())],check=True,cwd=ROOT)
         print('Roadside relocations:',relocate(output,manifest,elements))
