@@ -171,3 +171,46 @@ def refit(output, chunks, mouths, ribbons, *, landing, cut_only=False):
         if changed:
             write_chunk(file,raw,start,size,c)
             tile['bytes']=file.stat().st_size
+
+
+def ground_ties(output, manifest, elements):
+    """Continue the roadbed through the village path junction and bridge approach."""
+    # Surveyed contacts on the final visible road and terrain meshes.
+    ties = [(1013429170, (4923.94, 6477.96)), (923425799, (4923.94, 6477.96)),
+            (1084347077, (-2336.10, 9100.28)), (1461975711, (-17030.62, 7577.76))]
+    ids = {wid for wid, _ in ties} | {1461975712}
+    ways = {w['id']: w for w in elements if w['type'] == 'way' and w['id'] in ids}
+    x, z, w, h = manifest['extent']
+    bounds = box(x, z, x + w, z + h)
+    ribbons = []
+    for wid, contact in ties:
+        if wid not in ways or not bounds.covers(Point(contact)):
+            continue
+        way = ways[wid]
+        coords = points(way)
+        bridge = wid == 1461975711
+        if bridge:
+            other = ways.get(1461975712)
+            if not other or way['nodes'][-1] != other['nodes'][0]:
+                raise ValueError('Resurvey the village bridge approach')
+            coords = coords + points(other)[1:]
+        axis = LineString(coords)
+        station = axis.project(Point(contact))
+        start, end = max(0, station - 14), min(axis.length, station + 14)
+        if wid == 1013429170:
+            start, end = 0, min(axis.length, 16)
+        section = substring(axis, start, end)
+        coords = np.array(section.coords)
+        if bridge:
+            px, pz = axis.interpolate(station + 2).coords[0]
+            _, deck = sample_road_heights(output, manifest, [dict(x=px, z=pz, roofProbe=True)])[0]
+            if deck is None:
+                raise ValueError('Missing deck at the village bridge approach')
+            levels = [deck, deck]
+        else:
+            levels = sample_road_heights(output, manifest,
+                        [dict(x=px, z=pz, way=wid) for px, pz in (coords[0], coords[-1])])
+        half = width(way['tags']) / 2 + .5
+        ribbons.append((wid, coords, section.length, half, *levels, .08))
+    if ribbons:
+        refit(output, manifest['chunks'], [], ribbons, landing=False)

@@ -1,4 +1,4 @@
-"""Grade the West Ring deck over the traffic lanes below it."""
+"""Grade the West Ring and Shanghai Road decks over the traffic lanes below them."""
 import numpy as np
 from shapely import LineString, Point, box, union_all
 
@@ -10,13 +10,27 @@ from terminal_decks import update_slabs
 from vehicle_tunnels import grade_limit
 
 
-def grade_west_ring(output, manifest, elements, widths):
-    bridge = 464498761
-    roads = (464498744, 575608293, 685161916)
-    ids = {bridge, *roads}
-    ways = {e['id']: e for e in elements if e['type'] == 'way' and e['id'] in ids}
-    if ways.keys() != ids:
-        return
+SPANS = {
+    464498761: (464498744, 575608293, 685161916),
+    259020549: (259020522, 246520667, 259020536, 259020560),
+    246520670: (259020522, 246520667, 259020536, 259020560),
+}
+
+# Shanghai Road is mapped as two separate carriageways at both bridge ends.
+OPPOSITE = {259020564: 259925407, 259925407: 259020564,
+            259020555: 246520669, 246520669: 259020555}
+
+
+def grade_crossings(output, manifest, elements, widths):
+    ways = {e['id']: e for e in elements if e['type'] == 'way'}
+    landings = []
+    for bridge, roads in SPANS.items():
+        if bridge in ways and all(i in ways for i in roads):
+            grade_deck(output, manifest, ways, widths, bridge, roads, landings)
+    return landings
+
+
+def grade_deck(output, manifest, ways, widths, bridge, roads, landings):
     axis = LineString(points(ways[bridge]))
     x, z, w, h = manifest['extent']
     if not box(x, z, x + w, z + h).covers(axis):
@@ -49,7 +63,7 @@ def grade_west_ring(output, manifest, elements, widths):
     if not np.any(present):
         return
     if not np.all(present[2:-2]):
-        raise ValueError('Resurvey the West Ring deck')
+        raise ValueError(f'Resurvey the deck of {bridge}')
     deck = np.interp(stations, stations[present], deck[present])
     same_slab = np.abs(hits[:, :, 1] - deck[:, None]) < .3
     underneath = np.reshape(inside, same_slab.shape) & same_slab
@@ -64,7 +78,29 @@ def grade_west_ring(output, manifest, elements, widths):
         height[i] = max(height[i], height[i + 1] - budgets[i])
     if np.max(height - deck) < .01:
         return
-    if max(height[0] - deck[0], height[-1] - deck[-1]) > .02:
-        raise ValueError('Resurvey the West Ring approach heights')
+    for i in (0, -1):
+        if height[i] - deck[i] < .02:
+            continue
+        ref = ways[bridge]['nodes'][i]
+        arms = [w for w in ways.values() if w['id'] in OPPOSITE
+                and ref in (w['nodes'][0], w['nodes'][-1])]
+        if len(arms) != 1:
+            raise ValueError(f'Resurvey the bridge approach at {ref}')
+        arm = arms[0]
+        coords = points(arm)
+        line = LineString(coords if arm['nodes'][0] == ref else coords[::-1])
+        parallel = LineString(points(ways[OPPOSITE[arm['id']]]))
+        steps = np.linspace(0, line.length, int(np.ceil(line.length / 2)) + 1)
+        pts = [line.interpolate(d) for d in steps]
+        end = pts[-1]
+        target, = sample_road_heights(output, manifest, [dict(x=end.x, z=end.y, way=arm['id'])])
+        profile = height[i] + (target - height[i]) * steps / line.length
+        if abs(target - height[i]) > grade * line.length:
+            raise ValueError(f'Extend the grade of {bridge} past {arm["id"]}')
+        half = widths.get(arm['id'], RULES['defaultWidth'][arm['tags']['highway']]) / 2
+        for a, b, y, h in zip(pts, pts[1:], profile, profile[1:]):
+            segment = LineString([a, b])
+            radius = min(half, segment.interpolate(.5, normalized=True).distance(parallel) / 2)
+            landings.append((segment, radius, y, h, grade, 0))
     update_slabs(output, manifest['chunks'], {bridge: axis}, {bridge: stations},
                  {bridge: height}, spans=(bridge,))
