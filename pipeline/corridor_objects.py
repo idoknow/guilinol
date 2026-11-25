@@ -26,9 +26,7 @@ def footprints(paths, origin, kinds):
                       for k,shell,*holes in paths if k in kinds])
 
 
-def relocate(output, manifest, elements, raised=(), adjoining=()):
-    changed_roads = union_all(raised)
-    all_roads = union_all([*raised, *adjoining])
+def roof_exclusions(manifest):
     roof_sections = []
     for tunnel in manifest.get('tunnels', ()):
         if tunnel.get('openCut'):
@@ -39,16 +37,51 @@ def relocate(output, manifest, elements, raised=(), adjoining=()):
             continue
         axis = (b-a)/length
         normal = np.array([-axis[1],axis[0]])
-        lo, end = tunnel.get('openEnds', (0,0))
+        defaults = [tunnel.get('approach',0) if mouth else 0 for mouth in tunnel.get('mouths',(True,True))]
+        lo, end = tunnel.get('openEnds', defaults)
         hi = length-end
         if hi<=lo:
             continue
-        widths = tunnel.get('endWidths', [tunnel['halfWidth']]*2)
+        half = tunnel['halfWidth']
+        widths = tunnel.get('endWidths', [half,half])
+        stations = [lo, hi]
+        if widths != [half,half]:
+            if tunnel.get('stations'):
+                samples = (s for s,_ in tunnel['stations'])
+            else:
+                knots = len(base64.b64decode(tunnel.get('knotHeights') or tunnel['stationHeights']))//4
+                intervals = knots-1 if tunnel.get('knotHeights') else (knots-1)//3
+                samples = (round((i+f)*length/intervals,5) for i in range(intervals) for f in (0,.06,.94))
+            stations += [s for s in samples if lo<s<hi]
+        stations.sort()
+        run = min(8,length/2)
+        def taper(distance):
+            t = min(1,max(0,distance/run))
+            return 1-t*t*(3-2*t)
+
         def edge(station, side):
-            width = widths[0]+(widths[1]-widths[0])*station/length
+            width = half+(widths[0]-half)*taper(station)+(widths[1]-half)*taper(length-station)
             return a+axis*station+side*normal*width
-        roof_sections.append(Polygon([edge(lo,-1),edge(hi,-1),edge(hi,1),edge(lo,1)]).buffer(1))
-    roofs = STRtree(roof_sections)
+        strip = Polygon([edge(s,-1) for s in stations]+[edge(s,1) for s in reversed(stations)])
+        if tunnel.get('footprint'):
+            strip=strip.intersection(union_all([Polygon(ring) for ring in tunnel['footprint']]))
+        roof_sections.append(strip.buffer(1))
+        for i,joint in enumerate(tunnel.get('joints', ())):
+            if not joint or not joint.get('draw') or tunnel.get('mouths',(True,True))[i]:
+                continue
+            ring=joint.get('ring')
+            if not ring and joint.get('offsets'):
+                x,_,z=tunnel['portals'][i]
+                ring=np.frombuffer(base64.b64decode(joint['offsets']),'<i4').reshape(-1,2)/10000+[x,z]
+            if ring is not None and len(ring)>2:
+                roof_sections.append(Polygon(ring).buffer(1))
+    return STRtree(roof_sections)
+
+
+def relocate(output, manifest, elements, raised=(), adjoining=()):
+    changed_roads = union_all(raised)
+    all_roads = union_all([*raised, *adjoining])
+    roofs=roof_exclusions(manifest)
     tiles={(t['x'],t['z']):t for t in manifest['chunks']}
     def origin(x,z):
         return (math.floor(x/256)*256,math.floor(z/256)*256)

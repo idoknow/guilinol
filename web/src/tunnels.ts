@@ -261,7 +261,7 @@ export function tunnelGeometry(tile:Tile,ground:THREE.PlaneGeometry,tunnels:Tunn
         const edges=tunnel.carriagewayHalfWidth?[-1,-roadHalf/wa,roadHalf/wa,1]:[-1,1]
         for(let k=1;k<edges.length;k++){
           const lo=edges[k-1],hi=edges[k]
-          quad([top(local(a,wa*lo,ay)),top(local(b,wb*lo,by)),top(local(b,wb*hi,by)),top(local(a,wa*hi,ay))],tunnel.portalSign?'portal':'ceiling')
+          quad([top(local(a,wa*lo,ay)),top(local(b,wb*lo,by)),top(local(b,wb*hi,by)),top(local(a,wa*hi,ay))],tunnel.portalSign?'portal':'ceiling',!!tunnel.portalSign)
         }
       }
       if(!open&&!tunnel.portalSign){
@@ -285,18 +285,17 @@ export function tunnelGeometry(tile:Tile,ground:THREE.PlaneGeometry,tunnels:Tunn
             quad([front[j],back[j],back[k],front[k]],'portal',true)
           }
         }
-        const masonry=(s:number,d:number,y:number)=>local(s,d,y)
         const crest=(s:number,d:number)=>Math.max(crown,groundY(local(s,d,ay))+.03)
         for(const sign of [-1,1]){
           const wall=sign*width,edge=sign*outer
-          const pier=(s:number)=>[masonry(s,wall,ay-.35),masonry(s,edge,ay-.35),
-            masonry(s,edge,crest(s,edge)),masonry(s,wall,crest(s,wall))]
+          const pier=(s:number)=>[local(s,wall,ay-.35),local(s,edge,ay-.35),
+            local(s,edge,crest(s,edge)),local(s,wall,crest(s,wall))]
           solid(pier(0),pier(depth))
           const wing=(s:number,d:number,h:number)=>{
             const outside=d+sign*.8
             const bottom=Math.min(ay-.4,groundY(local(s,outside,ay))-.35)
-            return [masonry(s,d,bottom),masonry(s,outside,bottom),
-              masonry(s,outside,h),masonry(s,d,h)]
+            return [local(s,d,bottom),local(s,outside,bottom),
+              local(s,outside,h),local(s,d,h)]
           }
           const tip=sign*(outer+1.3)
           solid(wing(0,edge-sign*.8,crest(0,edge)),wing(-4.2,tip,
@@ -305,12 +304,12 @@ export function tunnelGeometry(tile:Tile,ground:THREE.PlaneGeometry,tunnels:Tunn
         const offsets=[-width,-roadHalf,roadHalf,width]
         for(let k=1;k<offsets.length;k++){
           const l=offsets[k-1],r=offsets[k]
-          const lintel=(s:number)=>[masonry(s,l,ay+head-shoulderDrop(l)),masonry(s,r,ay+head-shoulderDrop(r)),
-            masonry(s,r,crest(s,r)),masonry(s,l,crest(s,l))]
+          const lintel=(s:number)=>[local(s,l,ay+head-shoulderDrop(l)),local(s,r,ay+head-shoulderDrop(r)),
+            local(s,r,crest(s,r)),local(s,l,crest(s,l))]
           solid(lintel(0),lintel(depth))
         }
-        const coping=(s:number)=>[masonry(s,-outer,crest(s,-outer)),masonry(s,outer,crest(s,outer)),
-          masonry(s,outer,crest(s,outer)+.10),masonry(s,-outer,crest(s,-outer)+.10)]
+        const coping=(s:number)=>[local(s,-outer,crest(s,-outer)),local(s,outer,crest(s,outer)),
+          local(s,outer,crest(s,outer)+.10),local(s,-outer,crest(s,-outer)+.10)]
         solid(coping(-.07),coping(depth+.07))
         const base=ay+head+.03
         quad([local(-.10,-.74,base),local(-.10,.74,base),local(-.10,.74,base+.45),local(-.10,-.74,base+.45)],'sign')
