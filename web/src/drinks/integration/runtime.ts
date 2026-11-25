@@ -97,8 +97,10 @@ export interface HeldDrinkPauseDecision {
  * opening photo mode, vehicle shop, or order drawer also pauses hand-hold until back on foot.
  */
 export function resolveHeldDrinkPause(ctx: HeldDrinkPauseContext): HeldDrinkPauseDecision {
-  const onVehicle = Boolean(ctx.aboardAttr) || (typeof ctx.vehicle === 'string' && ctx.vehicle !== 'foot' && ctx.vehicle !== '')
-  const paused = !ctx.walkerActive || onVehicle || Boolean(ctx.photoOn) || Boolean(ctx.shopOpen) || Boolean(ctx.drinksUiOpen)
+  const onVehicle =
+    Boolean(ctx.aboardAttr) || (typeof ctx.vehicle === 'string' && ctx.vehicle !== 'foot' && ctx.vehicle !== '')
+  const paused =
+    !ctx.walkerActive || onVehicle || Boolean(ctx.photoOn) || Boolean(ctx.shopOpen) || Boolean(ctx.drinksUiOpen)
   return {
     paused,
     stowedForRide: onVehicle,
@@ -142,6 +144,25 @@ export function mapSimEventToSound(
   return null
 }
 
+export interface DebugProbePolicyInput {
+  readonly isProd: boolean
+  readonly search?: string | null
+  readonly explicit?: boolean
+}
+
+/**
+ * 生产环境默认严禁挂载任何调试/验证探针接口（返回 `false`）。
+ * 仅在非生产构建（DEV / 单测）或显式带 `?verify` 自动化门禁参数（或显式 `explicit: true`）时启用只读受控探针。
+ */
+export function shouldExposeDrinksDebugProbe(input: DebugProbePolicyInput): boolean {
+  if (typeof input.explicit === 'boolean') return input.explicit
+  if (!input.isProd) return true
+  const rawSearch = input.search ?? ''
+  const query = rawSearch.startsWith('?') ? rawSearch.slice(1) : rawSearch
+  const params = new URLSearchParams(query)
+  return params.has('verify')
+}
+
 export {
   createDrinksIndoorViewController,
   isLocalPointInsideDrinksShop,
@@ -153,3 +174,27 @@ export {
   type DrinksViewMode,
   type DrinksViewModeAdapter,
 } from './indoor-view.ts'
+
+export {
+  bindTerrainRefitSync,
+  measureSceneGroupsAlignment,
+  setDrinksSceneGroupsVisible,
+  syncDrinksSceneGroups,
+  type DrinksFourSceneGroups,
+  type DrinksGroupAlignmentReport,
+} from './scene-groups.ts'
+
+export {
+  createStaffToHoldBridge,
+  type StaffToHoldBridge,
+  type StaffToHoldBridgeOptions,
+} from './workflow-bridge.ts'
+
+export {
+  buildDrinksShopObstacleVolume,
+  createDrinksHostWorldBridge,
+  DRINKS_OBSTACLE_VOLUME_ID,
+  type HostWorldBridge,
+  type HostWorldBridgeOptions,
+  type ObstacleAwareWalker,
+} from './host-world-bridge.ts'

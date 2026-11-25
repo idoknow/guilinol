@@ -1,5 +1,6 @@
 import * as THREE from 'three'
 import type { Walker } from '../play/host.ts'
+import type { ObstacleVolumeSpec } from '../walk/obstacle-volumes.ts'
 import { mainDetail } from '../look/mirror-layer.ts'
 import { isGlobalHotkeyBlocked, isModalOrOverlayOpen } from '../walk/input-guard.ts'
 import { createDrinksAudio, type DrinksAudioController, type DrinksAudioStats } from './audio/index.ts'
@@ -45,17 +46,28 @@ import {
 } from './site.ts'
 import { fitDrinksPlot, type FitDrinksPlotResult } from './terrain/index.ts'
 import {
-  createDrinksStaffController,
+  dispose as disposeDrinksStaff,
+  enterStaff,
+  exitStaff,
+  mount as mountDrinksStaff,
   type DrinksStaffController,
   type DrinksStaffStateSnapshot,
 } from './staff/index.ts'
 import {
+  bindTerrainRefitSync,
   computeDistanceXZ,
+  createDrinksHostWorldBridge,
   createDrinksIndoorViewController,
   createDrinksLodController,
+  createStaffToHoldBridge,
   DEFAULT_DRINKS_LOD_CONFIG,
   mapSimEventToSound,
+  measureSceneGroupsAlignment,
   resolveHeldDrinkPause,
+  setDrinksSceneGroupsVisible,
+  shouldExposeDrinksDebugProbe,
+  syncDrinksSceneGroups,
+  type DrinksFourSceneGroups,
   type DrinksIndoorViewController,
   type DrinksIndoorViewState,
   type DrinksLodConfig,
@@ -77,6 +89,13 @@ export {
   type DrinksSiteCandidate,
   type DrinksSiteId,
 } from './site.ts'
+
+export {
+  measureSceneGroupsAlignment,
+  shouldExposeDrinksDebugProbe,
+  type DrinksFourSceneGroups,
+  type DrinksGroupAlignmentReport,
+} from './integration/runtime.ts'
 
 if (typeof document !== 'undefined' && typeof window !== 'undefined' && 'CSS' in globalThis) {
   void import('./ui/order-panel.css')
@@ -102,6 +121,9 @@ function updateSceneCrowdThinning(scene: THREE.Scene, zone: CrowdThinningZoneLik
     map.set(DRINKS_CROWD_ZONE_ID, zone)
   } else if (existing) {
     existing.delete(DRINKS_CROWD_ZONE_ID)
+    if (existing.size === 0) {
+      delete scene.userData[CROWD_THINNING_KEY]
+    }
   }
 }
 
@@ -118,6 +140,10 @@ function createMemoryViewModeAdapter(): DrinksViewModeAdapter {
 export interface DrinksWalkerLike extends Walker {
   readonly vehicle?: 'foot' | 'bike' | 'bicycle' | 'car' | 'boat' | string
   readonly figure?: THREE.Object3D
+  drive?: (dx: number, dz: number, run?: boolean) => void
+  tick?: (dtSec: number) => void
+  syncObstacleVolume?: (spec: ObstacleVolumeSpec) => void
+  removeObstacleVolume?: (id: string) => void
 }
 
 export interface DrinksMountContext {
@@ -141,6 +167,9 @@ export interface DrinksMountContext {
   clerkCount?: number
   maxCustomers?: number
   showNpcBadges?: boolean
+  isProd?: boolean
+  search?: string | null
+  enableDebugProbe?: boolean
 }
 
 export interface DrinksTerrainSummary {
@@ -183,12 +212,11 @@ export interface DrinksProbeState {
   audioStats: DrinksAudioStats
 }
 
+/**
+ * 只读观测与受控验收探针（仅在 DEV 或 `?verify` 下创建；生产环境默认不挂载，且绝不暴露内部可变实例或免扣款作弊入口）。
+ */
 export interface DrinksDebugProbe {
   readonly site: DrinksSiteCandidate
-  readonly sim: DrinksSim
-  readonly holdSession: DrinkHoldSession
-  readonly staff: DrinksStaffController
-  readonly terrain: FitDrinksPlotResult
   getState(): DrinksProbeState
   teleportToShop(): Promise<boolean>
   walkInside(): Promise<boolean>
@@ -218,11 +246,13 @@ export interface DrinksShopHandle {
   readonly orderPanel: DrinksOrderPanelController | null
   readonly pickupHud: DrinksPickupHudController | null
   readonly holdHud: DrinkHoldHudController | null
+  enterStaff(opts?: { force?: boolean }): boolean
+  exitStaff(): boolean
   step(dtSec: number): void
   fastForward(seconds: number): void
   isVisualActive(): boolean
   isDisposed(): boolean
-  getProbe(): DrinksDebugProbe
+  getProbe(): DrinksDebugProbe | undefined
   dispose(): void
 }
 
@@ -237,14 +267,22 @@ function isCupAttachedToWalker(walker: DrinksWalkerLike | null | undefined): boo
   return anchor.children.some(child => child.name === 'drinks-held-cup')
 }
 
+function detectProdRuntime(explicit?: boolean): boolean {
+  if (typeof explicit === 'boolean') return explicit
+  const env = (import.meta as unknown as { env?: { DEV?: boolean; PROD?: boolean } }).env
+  return Boolean(env?.PROD) && !env?.DEV
+}
+
 /**
  * Mounts the Wangcheng Mixue Phase 2 flagship beverage shop into the host world:
- * - Fits plot plinth + apron slope (`fitDrinksPlot`) to eliminate terrain subsidence.
- * - Renders 1:1 Wangcheng storefront + enlarged interior (`buildDrinksShopMesh`, <=30 draw calls) on `MAIN_DETAIL_LAYER`.
- * - Thins nearby street crowd density and caps in-shop customers (<=8) & doorway queue (<=4).
- * - Automatically switches to first-person on stepping inside the doorway and restores prior view outside.
- * - Wires storefront recruit standee + full staff shift workflow/uniform/BGM (`createDrinksStaffController`).
- * - Wires press-and-hold continuous energy-bar drinking (`DrinkHoldSession` + `mountDrinkHoldHud`).
+ * - Unifies `shop.group`, `terrain.plinthGroup`, `staff.group`, and `npc.group` under a single parent (`ctx.scene`)
+ *   with single-pass `(worldX, groundY, worldZ)` + `worldYaw` transforms and automatic `terrain.refit` synchronization.
+ * - Bridges host Rapier plinth floor support + Wangcheng podium doorway carve so players walk smoothly through the
+ *   2.8m doorway to indoor prep stations without terrain sink or legacy shell collision.
+ * - Wires full end-to-end loop: doorway auto-FP -> recruit standee -> uniform -> 5-step drink prep -> call number ->
+ *   cup handoff to player hand -> press-and-hold energy-bar drinking -> exit restores prior view mode.
+ * - Guarantees zero node/DOM/listener leaks across repeated `mount`/`dispose` cycles, and never exposes debug probes
+ *   by default in production builds.
  */
 export function mountDrinksShop(ctx: DrinksMountContext): DrinksShopHandle {
   const site = ctx.site ?? resolveDrinksSite(ctx.siteId ?? DEFAULT_DRINKS_SITE_ID)
@@ -276,42 +314,44 @@ export function mountDrinksShop(ctx: DrinksMountContext): DrinksShopHandle {
     maxCustomers: clampedMaxCustomers,
   })
 
+  // 1) shop.group：直接且仅挂载一次于 ctx.scene（保持纯净不混入台基/员工/NPC 网格，确保 shop.getMetrics().meshes <= 30）
   const shopCandidate = site.id === 'zhengyang_208' ? 'poi_zhengyang208' : 'wangcheng_mall'
   const shop = buildDrinksShopMesh({
     candidate: shopCandidate,
     layout: sim.getLayout(),
   })
   shop.group.name = 'wangcheng_drinks_shop'
-  shop.group.position.set(site.worldX, site.fallbackGroundY, site.worldZ)
-  shop.group.rotation.y = site.worldYaw
-  shop.group.visible = false
   mainDetail(shop.group)
   ctx.scene.add(shop.group)
 
+  // 2) terrain.plinthGroup：由 fitDrinksPlot 直接且仅挂载一次于 ctx.scene
   const terrain = fitDrinksPlot({
     site,
+    scene: ctx.scene,
     shopGroup: shop.group,
     sampleGroundY: ctx.sampleGroundY,
   })
-  terrain.plinthGroup.position.set(0, 0, 0)
-  terrain.plinthGroup.rotation.set(0, 0, 0)
   mainDetail(terrain.plinthGroup)
-  shop.group.add(terrain.plinthGroup)
 
   let groundY = terrain.plotY
   let groundSnapped = Boolean(ctx.sampleGroundY)
+  const localCamPos = new THREE.Vector3()
 
+  // 3) npc.group：内部保持 shop-local 零旋转原点（worldOrigin=[0,0,0], worldYaw=0），
+  //    由 npc.group 自身唯一承担一次 shop-local -> world 位姿变换，与其余三组严格同构
   const npc = createDrinksNpcRenderer({
     scene: ctx.scene,
     sim,
-    worldOrigin: [site.worldX, groundY, site.worldZ],
-    worldYaw: site.worldYaw,
-    sampleGroundY: (wx: number, wz: number) => terrain.samplePlotSurfaceY(wx, wz),
+    worldOrigin: [0, 0, 0],
+    worldYaw: 0,
+    sampleGroundY: (lx: number, lz: number) => {
+      const w = shopLocalToWorld(site, lx, lz)
+      return terrain.samplePlotSurfaceY(w.x, w.z) - groundY
+    },
     maxNpcs: Math.min(20, Math.max(16, (ctx.clerkCount ?? 5) + clampedMaxCustomers + 4)),
     showBadges: ctx.showNpcBadges ?? true,
   })
   npc.group.name = 'wangcheng_drinks_npcs'
-  npc.group.visible = false
   mainDetail(npc.group)
 
   const audio = createDrinksAudio()
@@ -321,7 +361,8 @@ export function mountDrinksShop(ctx: DrinksMountContext): DrinksShopHandle {
   const hasDom = typeof document !== 'undefined' && ctx.container !== null
   const uiContainer = hasDom ? (ctx.container ?? document.body) : null
 
-  const staff = createDrinksStaffController({
+  // 4) staff.group：由冻结契约 mountDrinksStaff 直接且仅挂载一次于 ctx.scene（无二次重挂）
+  const staff = mountDrinksStaff({
     scene: ctx.scene,
     sim,
     worldOrigin: [site.worldX, groundY, site.worldZ],
@@ -329,15 +370,41 @@ export function mountDrinksShop(ctx: DrinksMountContext): DrinksShopHandle {
     audio,
     container: uiContainer,
   })
-  // 归入 shop.group 本地坐标系，保持顶层 scene 节点整洁并自动继承显隐与地基标高
-  staff.group.removeFromParent()
-  staff.group.position.set(0, 0, 0)
-  staff.group.rotation.set(0, 0, 0)
   mainDetail(staff.group)
-  shop.group.add(staff.group)
   if (staff.hud && staff.hud.root.hidden) {
     staff.hud.root.remove()
   }
+
+  const sceneGroups: DrinksFourSceneGroups = {
+    shopGroup: shop.group,
+    plinthGroup: terrain.plinthGroup,
+    staffGroup: staff.group,
+    npcGroup: npc.group,
+  }
+  syncDrinksSceneGroups(site, groundY, sceneGroups)
+  setDrinksSceneGroupsVisible(sceneGroups, false)
+
+  function syncLocalCameraVec(): THREE.Vector3 {
+    const cl = worldToShopLocal(site, ctx.camera.position.x, ctx.camera.position.z)
+    return localCamPos.set(cl.x, ctx.camera.position.y - groundY, cl.z)
+  }
+
+  const hostBridge = createDrinksHostWorldBridge({
+    scene: ctx.scene,
+    site,
+    getGroundY: () => groundY,
+    getWalker: () => ctx.getWalker?.(),
+    excludedRoots: [shop.group, terrain.plinthGroup, staff.group, npc.group],
+  })
+
+  bindTerrainRefitSync(terrain, site, sceneGroups, nextPlotY => {
+    groundY = nextPlotY
+    groundSnapped = true
+    npc.step(0, syncLocalCameraVec())
+    if (lod.isVisualActive()) {
+      hostBridge.sync(true)
+    }
+  })
 
   const indoorView = createDrinksIndoorViewController({
     site,
@@ -368,12 +435,6 @@ export function mountDrinksShop(ctx: DrinksMountContext): DrinksShopHandle {
     if (!Number.isFinite(centerY) && !Number.isFinite(frontY)) return false
     const prevY = groundY
     terrain.refit(ctx.sampleGroundY)
-    terrain.plinthGroup.position.set(0, 0, 0)
-    terrain.plinthGroup.rotation.set(0, 0, 0)
-    mainDetail(terrain.plinthGroup)
-    groundY = terrain.plotY
-    groundSnapped = true
-    shop.group.position.set(site.worldX, groundY, site.worldZ)
     return Math.abs(groundY - prevY) > 1e-3
   }
 
@@ -389,6 +450,15 @@ export function mountDrinksShop(ctx: DrinksMountContext): DrinksShopHandle {
   let lastOrderPanelOpenState: boolean | null = null
   let hudSyncAccum = 0
   let disposed = false
+
+  const staffToHoldBridge = createStaffToHoldBridge({
+    drainStaffEvents: () => staff.session.drainEvents(),
+    holdSession,
+    onCupHandedOff() {
+      firstSipPending = true
+      orderPanel?.close()
+    },
+  })
 
   function performSip(): DrinkSipResult {
     const res = holdSession.sip()
@@ -501,8 +571,9 @@ export function mountDrinksShop(ctx: DrinksMountContext): DrinksShopHandle {
     const walker = ctx.getWalker?.()
     if (walker && walker.vehicle && walker.vehicle !== 'foot') return
 
-    // 优先响应门口招聘立牌与在岗员工工位交互
+    // 优先响应门口招聘立牌与在岗员工五步工位交互，并立即桥接出杯叫号到手持饮品
     if (staff.handleKeyDown(event.code, event.target)) {
+      staffToHoldBridge.flush()
       event.preventDefault()
       return
     }
@@ -546,12 +617,6 @@ export function mountDrinksShop(ctx: DrinksMountContext): DrinksShopHandle {
     })
     stowedForRide = pauseDecision.stowedForRide
     holdSession.setPaused(pauseDecision.paused)
-    holdVisual.bindWalker(walker, walker?.figure ?? null)
-    const finishedDrinkNow = holdVisual.step(dtSec)
-    if (finishedDrinkNow) {
-      firstSipPending = false
-      audio.play('cup_drop')
-    }
 
     const onFoot = Boolean(playerPos) && (!walker?.vehicle || walker.vehicle === 'foot')
     indoorView.update(onFoot ? playerPos : null, onFoot && !photoOn && !homeOpen && !shopOpen)
@@ -566,29 +631,48 @@ export function mountDrinksShop(ctx: DrinksMountContext): DrinksShopHandle {
 
     if (lodState.visualActive) {
       const snappedNow = !groundSnapped && trySnapGroundY()
-      if (!shop.group.visible) shop.group.visible = true
-      if (!npc.group.visible) npc.group.visible = true
+      if (!shop.group.visible) {
+        setDrinksSceneGroupsVisible(sceneGroups, true)
+      }
+      hostBridge.sync(true)
       const snapDt = lodState.visualEntered || snappedNow ? 0 : dtSec
       const night = readNight()
       shop.step(snapDt, sim.getSnapshot().timeSec, night)
-      npc.step(snapDt, ctx.camera.position)
+      npc.step(snapDt, syncLocalCameraVec())
       staff.bindWalker(walker, walker?.figure ?? null)
       if (playerPos && onFoot) {
-        staff.setPlayerWorldPos(playerPos.x, playerPos.z, walker?.yaw ?? 0)
+        // 单次 world -> shop-local 坐标换算
+        const localPlayer = worldToShopLocal(site, playerPos.x, playerPos.z)
+        staff.setPlayerLocalPos(localPlayer.x, localPlayer.z, (walker?.yaw ?? 0) - site.worldYaw)
       } else {
         staff.setPlayerLocalPos(999, 999, 0)
       }
       staff.step(snapDt)
+      staffToHoldBridge.flush()
+
       if (staff.hud && uiContainer) {
         const shouldMountStaffHud = !staff.hud.root.hidden
-        const isAttached = Boolean((staff.hud.root as unknown as { parentNode?: unknown; parent?: unknown }).parentNode || (staff.hud.root as unknown as { parent?: unknown }).parent)
+        const isAttached = Boolean(
+          (staff.hud.root as unknown as { parentNode?: unknown; parent?: unknown }).parentNode ||
+            (staff.hud.root as unknown as { parent?: unknown }).parent,
+        )
         if (shouldMountStaffHud && !isAttached) uiContainer.append(staff.hud.root)
         else if (!shouldMountStaffHud && isAttached) staff.hud.root.remove()
       }
     } else {
-      if (shop.group.visible) shop.group.visible = false
-      if (npc.group.visible) npc.group.visible = false
+      if (shop.group.visible) {
+        setDrinksSceneGroupsVisible(sceneGroups, false)
+      }
+      hostBridge.sync(false)
       if (staff.hud) staff.hud.root.remove()
+    }
+
+    // 在 staff.step 之后执行手持杯同步，确保右手捧杯姿态与手指握姿不被离线骨骼清理覆盖
+    holdVisual.bindWalker(walker, walker?.figure ?? null)
+    const finishedDrinkNow = holdVisual.step(dtSec)
+    if (finishedDrinkNow) {
+      firstSipPending = false
+      audio.play('cup_drop')
     }
 
     if (pickupHud) {
@@ -700,6 +784,44 @@ export function mountDrinksShop(ctx: DrinksMountContext): DrinksShopHandle {
 
   async function walkInside(): Promise<boolean> {
     if (disposed || !ctx.walkTo) return false
+    const walker = ctx.getWalker?.()
+    // 真实物理步行引擎下：先落在门前解放东路人行道齐平衔接位并挂载台面碰撞板，再沿 2.8m 正门步入室内，避免落入底层 DEM 凹坑
+    if (walker && typeof walker.drive === 'function' && typeof walker.tick === 'function') {
+      const curPos = ctx.getPlayerPos()
+      const curLocal = curPos ? worldToShopLocal(site, curPos.x, curPos.z) : null
+      const alreadyOnDeck =
+        Boolean(curPos && curLocal) &&
+        Math.abs(curLocal!.x) <= 7.0 &&
+        curLocal!.z >= -6.4 &&
+        curLocal!.z <= 6.5 &&
+        curPos!.y >= groundY - 0.35
+      if (!alreadyOnDeck) {
+        const approach = shopLocalToWorld(site, 0.2, 5.6)
+        const landed = await ctx.walkTo(approach.x, approach.z, site.worldYaw, 'drinks-shop-door')
+        if (!landed) return false
+      }
+      trySnapGroundY()
+      updateVisualAndUi(0, true)
+      hostBridge.sync(true)
+
+      const targetWorld = shopLocalToWorld(site, 0.2, 1.35)
+      walker.face(site.worldYaw)
+      for (let i = 0; i < 80; i++) {
+        const p = ctx.getPlayerPos()
+        if (!p) break
+        const dx = targetWorld.x - p.x
+        const dz = targetWorld.z - p.z
+        const dist = Math.hypot(dx, dz)
+        if (dist <= 0.18) break
+        walker.drive(dx / dist, dz / dist, false)
+        walker.tick(1 / 20)
+        updateVisualAndUi(1 / 20, false)
+      }
+      walker.drive(0, 0, false)
+      updateVisualAndUi(0, true)
+      return indoorView.isInside()
+    }
+
     const inside = shopLocalToWorld(site, 0.0, 1.2)
     const ok = await ctx.walkTo(inside.x, inside.z, site.worldYaw, 'drinks-shop-inside')
     if (ok) {
@@ -711,8 +833,36 @@ export function mountDrinksShop(ctx: DrinksMountContext): DrinksShopHandle {
 
   async function walkToRecruitSign(): Promise<boolean> {
     if (disposed || !ctx.walkTo) return false
-    const stand = shopLocalToWorld(site, -1.42, 4.95)
-    const ok = await ctx.walkTo(stand.x, stand.z, site.worldYaw, 'drinks-recruit-sign')
+    const walker = ctx.getWalker?.()
+    const targetWorld = shopLocalToWorld(site, -1.42, 4.95)
+    if (walker && typeof walker.drive === 'function' && typeof walker.tick === 'function') {
+      const curPos = ctx.getPlayerPos()
+      if (!curPos || Math.hypot(curPos.x - site.worldX, curPos.z - site.worldZ) > 14 || curPos.y < groundY - 0.35) {
+        const front = shopLocalToWorld(site, -1.2, 5.8)
+        const landed = await ctx.walkTo(front.x, front.z, site.worldYaw, 'drinks-recruit-approach')
+        if (!landed) return false
+      }
+      trySnapGroundY()
+      updateVisualAndUi(0, true)
+      hostBridge.sync(true)
+      for (let i = 0; i < 45; i++) {
+        const p = ctx.getPlayerPos()
+        if (!p) break
+        const dx = targetWorld.x - p.x
+        const dz = targetWorld.z - p.z
+        const dist = Math.hypot(dx, dz)
+        if (dist <= 0.16) break
+        walker.drive(dx / dist, dz / dist, false)
+        walker.tick(1 / 20)
+        updateVisualAndUi(1 / 20, false)
+      }
+      walker.drive(0, 0, false)
+      walker.face(site.worldYaw)
+      updateVisualAndUi(0, true)
+      return true
+    }
+
+    const ok = await ctx.walkTo(targetWorld.x, targetWorld.z, site.worldYaw, 'drinks-recruit-sign')
     if (ok) {
       trySnapGroundY()
       updateVisualAndUi(0, true)
@@ -721,61 +871,67 @@ export function mountDrinksShop(ctx: DrinksMountContext): DrinksShopHandle {
   }
 
   async function placeQuickOrder(drinkId = 'ice_lemon_water'): Promise<boolean> {
-    if (disposed) return false
-    if (orderPanel) {
-      orderPanel.open(drinkId)
-      const res = await orderPanel.submitOrder()
-      orderPanel.close()
-      if (res.ok) return true
-    }
-    const item = DRINKS_MENU.find(m => m.id === drinkId) ?? DRINKS_MENU[0]
-    if (!item) return false
-    const placed = sim.placePlayerOrder({ menuItemId: item.id, orderKey: `quick-${Date.now()}` })
-    return Boolean(placed.ok)
+    if (disposed || !orderPanel) return false
+    orderPanel.open(drinkId)
+    const res = await orderPanel.submitOrder()
+    orderPanel.close()
+    return Boolean(res.ok)
   }
 
   trySnapGroundY()
   updateVisualAndUi(0, true)
 
-  const probe: DrinksDebugProbe = {
-    site,
-    sim,
-    holdSession,
-    staff,
-    terrain,
-    getState: getProbeState,
-    teleportToShop,
-    walkInside,
-    walkToRecruitSign,
-    interactRecruit() {
-      if (disposed) return false
-      return staff.performAction({ forceRecruit: false })
-    },
-    openOrder(drinkId?: string) {
-      if (disposed || !orderPanel) return false
-      orderPanel.open(drinkId)
-      return true
-    },
-    closeOrder() {
-      orderPanel?.close()
-    },
-    placeQuickOrder,
-    collectReady,
-    startHoldSip() {
-      if (disposed) return { ok: false, code: 'NO_DRINK', energy: 0 }
-      return holdSession.startDrinking()
-    },
-    stopHoldSip() {
-      if (disposed) return false
-      return holdSession.stopDrinking()
-    },
-    sip: performSip,
-    discard: performDiscard,
-    fastForward(seconds: number) {
-      fastForward(seconds)
-      return getProbeState()
-    },
-  }
+  const runtimeSearch =
+    ctx.search !== undefined
+      ? ctx.search
+      : typeof location !== 'undefined' && typeof location?.search === 'string'
+        ? location.search
+        : ''
+  const exposeDebugProbe = shouldExposeDrinksDebugProbe({
+    isProd: detectProdRuntime(ctx.isProd),
+    search: runtimeSearch,
+    explicit: ctx.enableDebugProbe,
+  })
+
+  const probe: DrinksDebugProbe | undefined = exposeDebugProbe
+    ? Object.freeze<DrinksDebugProbe>({
+        site,
+        getState: getProbeState,
+        teleportToShop,
+        walkInside,
+        walkToRecruitSign,
+        interactRecruit() {
+          if (disposed) return false
+          const ok = staff.performAction({ forceRecruit: false })
+          staffToHoldBridge.flush()
+          return ok
+        },
+        openOrder(drinkId?: string) {
+          if (disposed || !orderPanel) return false
+          orderPanel.open(drinkId)
+          return true
+        },
+        closeOrder() {
+          orderPanel?.close()
+        },
+        placeQuickOrder,
+        collectReady,
+        startHoldSip(): DrinkHoldStartResult {
+          if (disposed) return { ok: false, code: 'NO_DRINK', energy: 0 }
+          return holdSession.startDrinking()
+        },
+        stopHoldSip() {
+          if (disposed) return false
+          return holdSession.stopDrinking()
+        },
+        sip: performSip,
+        discard: performDiscard,
+        fastForward(seconds: number) {
+          fastForward(seconds)
+          return getProbeState()
+        },
+      })
+    : undefined
 
   return {
     site,
@@ -790,11 +946,13 @@ export function mountDrinksShop(ctx: DrinksMountContext): DrinksShopHandle {
     orderPanel,
     pickupHud,
     holdHud,
+    enterStaff: opts => enterStaff(staff, opts),
+    exitStaff: () => exitStaff(staff),
     step,
     fastForward,
     isVisualActive: () => lod.isVisualActive(),
     isDisposed: () => disposed,
-    getProbe: () => probe,
+    getProbe: () => (disposed ? undefined : probe),
     dispose() {
       if (disposed) return
       disposed = true
@@ -802,8 +960,10 @@ export function mountDrinksShop(ctx: DrinksMountContext): DrinksShopHandle {
         window.removeEventListener('keydown', onKeyDown)
       }
       updateSceneCrowdThinning(ctx.scene, null)
+      hostBridge.dispose()
       indoorView.dispose()
-      staff.dispose()
+      disposeDrinksStaff(staff)
+      staffToHoldBridge.reset()
       orderPanel?.dispose()
       pickupHud?.dispose()
       holdHud?.dispose()

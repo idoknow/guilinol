@@ -18,7 +18,13 @@ import {
   worldXZToLonLat,
 } from '../site.ts'
 import { mountDrinksShop } from '../index.ts'
-import { createDrinksIndoorViewController, mapSimEventToSound, resolveHeldDrinkPause } from './runtime.ts'
+import {
+  createDrinksIndoorViewController,
+  mapSimEventToSound,
+  measureSceneGroupsAlignment,
+  resolveHeldDrinkPause,
+  shouldExposeDrinksDebugProbe,
+} from './runtime.ts'
 
 function installMockDom() {
   const winListeners = new Map()
@@ -249,9 +255,19 @@ function createMockWallet(initialMoney) {
 function createMockWalker(pos) {
   const handAnchorObj = new THREE.Group()
   handAnchorObj.name = 'hand_r'
+  const head = new THREE.Group()
+  head.name = 'Head'
+  const torso = new THREE.Group()
+  torso.name = 'Torso'
+  const armL = new THREE.Group()
+  armL.name = 'ArmL'
+  const armR = new THREE.Group()
+  armR.name = 'ArmR'
+  torso.add(armL, armR)
   const figure = new THREE.Group()
-  figure.add(handAnchorObj)
+  figure.add(head, torso, handAnchorObj)
   const holdCalls = []
+  const syncedVolumes = new Map()
   return {
     walker: {
       active: true,
@@ -260,15 +276,26 @@ function createMockWalker(pos) {
       position: pos,
       figure,
       hold() {},
-      face() {},
+      face(nextYaw) {
+        this.yaw = nextYaw
+      },
       showFigure() {},
       handAnchor: () => handAnchorObj,
       setCameraHold(on, pose) {
         holdCalls.push({ on, pose })
       },
+      syncObstacleVolume(spec) {
+        syncedVolumes.set(spec.id, spec)
+      },
+      removeObstacleVolume(id) {
+        syncedVolumes.delete(id)
+      },
     },
     handAnchorObj,
+    head,
+    torso,
     holdCalls,
+    syncedVolumes,
   }
 }
 
@@ -430,7 +457,7 @@ test('重复挂载与 dispose 完整释放：无场景节点/DOM/事件监听器
 
     for (let round = 0; round < 3; round++) {
       const playerPos = new THREE.Vector3(SITE.worldX, 156, SITE.worldZ - 4)
-      const { walker } = createMockWalker(playerPos)
+      const { walker, syncedVolumes } = createMockWalker(playerPos)
       const { wallet } = createMockWallet(50)
       const handle = mountDrinksShop({
         scene,
@@ -445,8 +472,10 @@ test('重复挂载与 dispose 完整释放：无场景节点/DOM/事件监听器
       })
 
       handle.step(0.1)
-      assert.equal(scene.children.length, baseSceneChildren + 2)
+      // 四组统一直接挂于同一父节点 scene（无二次嵌套、无残留）
+      assert.equal(scene.children.length, baseSceneChildren + 4)
       assert.equal(dom.body.children.length, baseDomChildren + 3)
+      assert.equal(syncedVolumes.size, 1)
 
       handle.orderPanel.open()
       assert.equal(dom.body.dataset.drinksUiOpen, '1')
@@ -456,11 +485,15 @@ test('重复挂载与 dispose 完整释放：无场景节点/DOM/事件监听器
       handle.step(0.5) // 释放后 step 安全空转
 
       assert.equal(handle.isDisposed(), true)
+      assert.equal(handle.getProbe(), undefined)
       assert.equal(scene.children.length, baseSceneChildren)
       assert.equal(dom.body.children.length, baseDomChildren)
       assert.equal(dom.win.listenerCount('keydown'), baseKeyListeners)
+      assert.equal(syncedVolumes.size, 0)
+      assert.equal(scene.userData.crowdThinningZones, undefined)
       assert.equal(dom.body.dataset.drinksUiOpen, undefined)
       assert.equal(dom.body.dataset.drinksHold, undefined)
+      assert.equal(dom.body.dataset.drinksIndoor, undefined)
     }
   } finally {
     dom.cleanup()
@@ -693,6 +726,273 @@ test('集成态客流与排队上限：5 分钟无人值守订单持续完成，
     assert.ok(maxQueueSeen <= 4, `peak queue ${maxQueueSeen}`)
     assert.ok(end.metrics.ordersCompleted >= 10, `5min unattended orders ${end.metrics.ordersCompleted} < 10`)
     assert.equal(handle.sim.validateInvariants().ok, true)
+    handle.dispose()
+  } finally {
+    dom.cleanup()
+  }
+})
+
+test('四组世界坐标与父节点严格统一（误差 ≤ 0.01m，无二次偏移/叠加旋转）且 terrain.refit 后四组实时同步跟随', () => {
+  const dom = installMockDom()
+  try {
+    const scene = new THREE.Scene()
+    const camera = new THREE.PerspectiveCamera(50, 16 / 9, 0.1, 1000)
+    const nearWorld = shopLocalToWorld(SITE, 0.2, 4.5)
+    const playerPos = new THREE.Vector3(nearWorld.x, 157.4, nearWorld.z)
+    const { walker } = createMockWalker(playerPos)
+    const { wallet } = createMockWallet(100)
+
+    let currentElevation = 157.38
+    const handle = mountDrinksShop({
+      scene,
+      camera,
+      getPlayerPos: () => playerPos,
+      getWalker: () => walker,
+      getHour: () => 14.5,
+      sampleGroundY: () => currentElevation,
+      container: dom.body,
+      wallet,
+      showNpcBadges: false,
+      seed: 'four-groups-coord-sync',
+    })
+    handle.step(0.05)
+
+    const fourGroups = {
+      shopGroup: handle.shop.group,
+      plinthGroup: handle.terrain.plinthGroup,
+      staffGroup: handle.staff.group,
+      npcGroup: handle.npc.group,
+    }
+
+    // 1. 同一父节点（scene），无交叉嵌套污染 shop.getMetrics().meshes
+    assert.equal(handle.shop.group.parent, scene)
+    assert.equal(handle.terrain.plinthGroup.parent, scene)
+    assert.equal(handle.staff.group.parent, scene)
+    assert.equal(handle.npc.group.parent, scene)
+    assert.ok(handle.shop.getMetrics().meshes <= 30, `shop meshes ${handle.shop.getMetrics().meshes} > 30`)
+
+    const alignBefore = measureSceneGroupsAlignment(fourGroups)
+    assert.equal(alignBefore.sameParent, true)
+    assert.ok(alignBefore.maxOriginErrorM <= 0.01, `origin error ${alignBefore.maxOriginErrorM}m > 0.01m`)
+    assert.ok(alignBefore.maxSamplePointErrorM <= 0.01, `sample error ${alignBefore.maxSamplePointErrorM}m > 0.01m`)
+    assert.ok(alignBefore.maxYawErrorRad <= 1e-6, `yaw error ${alignBefore.maxYawErrorRad}rad`)
+
+    // 验证招聘牌（staff 组内）世界坐标与 shopLocalToWorld 完全一致（无二次旋转偏移）
+    const standeeWorld = new THREE.Vector3()
+    handle.staff.stage.standee.group.getWorldPosition(standeeWorld)
+    const expectedStandee = shopLocalToWorld(SITE, handle.staff.session.anchors.recruitStandee.x, handle.staff.session.anchors.recruitStandee.z)
+    assert.ok(Math.hypot(standeeWorld.x - expectedStandee.x, standeeWorld.z - expectedStandee.z) <= 0.01)
+    assert.ok(Math.abs(standeeWorld.y - handle.terrain.plotY) <= 0.01)
+
+    // 验证 NPC 实例的世界坐标与 sim 局部锚点换算完全一致（无二次偏移或叠加旋转）
+    const snap = handle.sim.getSnapshot()
+    assert.ok(snap.clerks.length > 0)
+    const clerk0 = snap.clerks[0]
+    const expectedClerk0 = shopLocalToWorld(SITE, clerk0.x, clerk0.z)
+    const instMesh = handle.npc.group.children.find(c => c.isInstancedMesh)
+    assert.ok(instMesh)
+    const mInst = new THREE.Matrix4()
+    instMesh.getMatrixAt(0, mInst)
+    const instWorld = new THREE.Vector3().setFromMatrixPosition(mInst).applyMatrix4(handle.npc.group.matrixWorld)
+    assert.ok(
+      Math.hypot(instWorld.x - expectedClerk0.x, instWorld.z - expectedClerk0.z) <= 0.01,
+      `npc world drift: got (${instWorld.x.toFixed(3)}, ${instWorld.z.toFixed(3)}) vs (${expectedClerk0.x.toFixed(3)}, ${expectedClerk0.z.toFixed(3)})`,
+    )
+
+    // 2. 直接调用 terrain.refit 到新标高 161.25m：四组无需额外手动干预即同步跟随
+    currentElevation = 161.25
+    handle.terrain.refit(() => currentElevation)
+    assert.ok(Math.abs(handle.terrain.plotY - 161.25) <= 0.01)
+    assert.ok(Math.abs(handle.getProbe().getState().groundY - 161.25) <= 0.01)
+
+    const alignAfter = measureSceneGroupsAlignment(fourGroups)
+    assert.equal(alignAfter.sameParent, true)
+    assert.ok(alignAfter.maxOriginErrorM <= 0.01, `post-refit origin error ${alignAfter.maxOriginErrorM}m > 0.01m`)
+    assert.ok(alignAfter.maxSamplePointErrorM <= 0.01, `post-refit sample error ${alignAfter.maxSamplePointErrorM}m > 0.01m`)
+    for (const g of [handle.shop.group, handle.terrain.plinthGroup, handle.staff.group, handle.npc.group]) {
+      const wp = g.getWorldPosition(new THREE.Vector3())
+      assert.ok(Math.abs(wp.x - SITE.worldX) <= 0.01)
+      assert.ok(Math.abs(wp.y - 161.25) <= 0.01)
+      assert.ok(Math.abs(wp.z - SITE.worldZ) <= 0.01)
+    }
+
+    handle.dispose()
+  } finally {
+    dom.cleanup()
+  }
+})
+
+test('生产环境默认零调试接口挂载：isProd=true 且无 ?verify 时 getProbe() 返回 undefined，探针零内部可变实例泄漏', () => {
+  assert.equal(shouldExposeDrinksDebugProbe({ isProd: true, search: '' }), false)
+  assert.equal(shouldExposeDrinksDebugProbe({ isProd: true, search: '?solo=1&mode=walk&drinks=1' }), false)
+  assert.equal(shouldExposeDrinksDebugProbe({ isProd: true, search: '?verify=&drinks=1' }), true)
+  assert.equal(shouldExposeDrinksDebugProbe({ isProd: false, search: '' }), true)
+
+  const dom = installMockDom()
+  try {
+    const scene = new THREE.Scene()
+    const camera = new THREE.PerspectiveCamera(50, 16 / 9, 0.1, 1000)
+    const playerPos = new THREE.Vector3(SITE.worldX, 157.4, SITE.worldZ)
+    const { walker } = createMockWalker(playerPos)
+
+    const prodHandle = mountDrinksShop({
+      scene,
+      camera,
+      getPlayerPos: () => playerPos,
+      getWalker: () => walker,
+      container: dom.body,
+      isProd: true,
+      search: '?drinks=1',
+    })
+    assert.equal(prodHandle.getProbe(), undefined)
+    assert.equal('viewer' in dom.win, false)
+    prodHandle.dispose()
+
+    const verifyHandle = mountDrinksShop({
+      scene,
+      camera,
+      getPlayerPos: () => playerPos,
+      getWalker: () => walker,
+      container: dom.body,
+      isProd: true,
+      search: '?verify=&drinks=1',
+    })
+    const verifyProbe = verifyHandle.getProbe()
+    assert.ok(verifyProbe)
+    assert.equal(Object.isFrozen(verifyProbe), true)
+    // 严禁暴露内部可变对象或刷钱作弊方法
+    for (const forbidden of ['sim', 'holdSession', 'staff', 'terrain', 'grantFunds', 'completeActiveOrderPerfect', 'setShopLevel']) {
+      assert.equal(forbidden in verifyProbe, false, `forbidden key ${forbidden} on probe`)
+    }
+    verifyHandle.dispose()
+  } finally {
+    dom.cleanup()
+  }
+})
+
+test('全链路打通：门口 -> 穿过 2.8m 门洞自动切第一人称 -> 招聘牌互动 -> 换员工服 -> 五步制作出1杯饮品 -> 叫号交接 -> 手捧长按喝能量条连续走动 -> 出门恢复原视角', () => {
+  const dom = installMockDom()
+  try {
+    const scene = new THREE.Scene()
+    const camera = new THREE.PerspectiveCamera(50, 16 / 9, 0.1, 1000)
+    let viewModeState = 'third'
+    const viewMode = {
+      isFirstPerson: () => viewModeState === 'first',
+      setViewMode: next => { viewModeState = next },
+    }
+
+    const startWorld = shopLocalToWorld(SITE, 0.2, 5.2)
+    const playerPos = new THREE.Vector3(startWorld.x, 157.4, startWorld.z)
+    const { walker, handAnchorObj, head, torso } = createMockWalker(playerPos)
+    const { wallet } = createMockWallet(100)
+
+    const moveLocal = (lx, lz) => {
+      const w = shopLocalToWorld(SITE, lx, lz)
+      playerPos.set(w.x, 157.4, w.z)
+    }
+
+    const handle = mountDrinksShop({
+      scene,
+      camera,
+      getPlayerPos: () => playerPos,
+      getWalker: () => walker,
+      getHour: () => 14.5,
+      viewMode,
+      container: dom.body,
+      wallet,
+      showNpcBadges: false,
+      seed: 'full-loop-e2e',
+    })
+
+    // 1. 走到门口：初始第三人称，门洞净宽 2.8m (>= 2.4m)
+    handle.step(0.05)
+    assert.equal(handle.shop.doorway.widthM >= 2.8, true)
+    assert.equal(handle.getProbe().getState().viewMode, 'third')
+    assert.equal(handle.getProbe().getState().insideShop, false)
+
+    // 2. 穿过 2.8m 门洞进入店内迎宾位 (-0.85, 2.35)：自动切第一人称，且透过橱窗靠近招聘牌 (距离 <= 2.35m)
+    moveLocal(-0.85, 2.35)
+    handle.step(0.05)
+    const afterEnter = handle.getProbe().getState()
+    assert.equal(afterEnter.insideShop, true)
+    assert.equal(afterEnter.viewMode, 'first')
+    assert.equal(afterEnter.staff.nearRecruit, true)
+
+    // 3. 看招聘牌互动 -> 应聘上岗并自动穿上蜜雪自建员工服
+    assert.equal(handle.getProbe().interactRecruit(), true)
+    handle.step(0.05)
+    const afterHire = handle.getProbe().getState()
+    assert.equal(afterHire.staff.onDuty, true)
+    assert.equal(afterHire.staff.uniformEquipped, true)
+    assert.equal(head.children.some(c => c.name === 'drinks-staff-uniform-head'), true)
+    assert.equal(torso.children.some(c => c.name === 'drinks-staff-uniform-torso'), true)
+    assert.equal(afterHire.staff.phase, 'accept_order')
+
+    // 4. 按 targetZone 指引依次走完制作台五步工序：接单 -> 摇杯 -> 加料 -> 封口 -> 叫号出杯
+    const anchors = handle.staff.session.anchors
+    moveLocal(anchors.orderDesk.x, anchors.orderDesk.z)
+    handle.step(0.05)
+    assert.equal(handle.staff.performAction(), true)
+    assert.equal(handle.staff.getSnapshot().phase, 'shake_cup')
+
+    moveLocal(anchors.shakeStation.x, anchors.shakeStation.z)
+    handle.step(0.05)
+    handle.staff.setHoldingAction(true)
+    for (let i = 0; i < 12; i++) handle.step(0.1)
+    handle.staff.setHoldingAction(false)
+    assert.equal(handle.staff.getSnapshot().phase, 'add_toppings')
+
+    const prepTarget = handle.staff.getSnapshot().targetZone
+    assert.ok(prepTarget)
+    moveLocal(prepTarget.x, prepTarget.z)
+    handle.step(0.05)
+    handle.staff.setHoldingAction(true)
+    for (let i = 0; i < 14; i++) handle.step(0.1)
+    handle.staff.setHoldingAction(false)
+    assert.equal(handle.staff.getSnapshot().phase, 'seal_cup')
+
+    moveLocal(anchors.sealStation.x, anchors.sealStation.z)
+    handle.step(0.05)
+    handle.staff.setHoldingAction(true)
+    for (let i = 0; i < 12; i++) handle.step(0.1)
+    handle.staff.setHoldingAction(false)
+    assert.equal(handle.staff.getSnapshot().phase, 'call_pickup')
+
+    // 5. 到取餐台出杯叫号 -> 叫号音效响起，且饮品自动交接到玩家右手供长按饮用
+    moveLocal(anchors.pickupCounter.x, anchors.pickupCounter.z)
+    handle.step(0.05)
+    assert.equal(handle.staff.performAction(), true)
+    handle.step(0.05)
+    const afterCall = handle.getProbe().getState()
+    assert.equal(afterCall.staff.cupsServed, 1)
+    assert.ok(afterCall.staff.lastCalledTicketNo)
+    assert.ok((afterCall.audioStats.playedCounts.call_number ?? 0) >= 1)
+    assert.equal(afterCall.hold.active, true)
+    assert.equal(afterCall.cupAttached, true)
+    assert.equal(handAnchorObj.children.some(c => c.name === 'drinks-held-cup'), true)
+    assert.equal(afterCall.holdHudVisible, true)
+
+    // 6. 手捧杯长按喝：能量条连续平滑下降，松手即停
+    const energyBefore = afterCall.hold.energy
+    const startSip = handle.getProbe().startHoldSip()
+    assert.equal(startSip.ok, true)
+    for (let i = 0; i < 12; i++) handle.step(0.1)
+    const energyDuring = handle.getProbe().getState().hold.energy
+    assert.ok(energyBefore - energyDuring > 0.08, `expected energy drop > 0.08, got ${energyBefore} -> ${energyDuring}`)
+    assert.equal(handle.getProbe().stopHoldSip(), true)
+    for (let i = 0; i < 5; i++) handle.step(0.1)
+    const energyFrozen = handle.getProbe().getState().hold.energy
+    assert.ok(Math.abs(energyDuring - energyFrozen) < 1e-4)
+
+    // 7. 手捧饮品走出 2.8m 门洞回到门外 -> 自动恢复进店前原第三人称视角，饮品依然握在手中
+    moveLocal(0.2, 4.6)
+    handle.step(0.05)
+    const afterExit = handle.getProbe().getState()
+    assert.equal(afterExit.insideShop, false)
+    assert.equal(afterExit.viewMode, 'third')
+    assert.equal(afterExit.hold.active, true)
+    assert.equal(afterExit.cupAttached, true)
+
     handle.dispose()
   } finally {
     dom.cleanup()
