@@ -308,6 +308,7 @@ async function start(loader:FullLoader,creatorSpawn=false) {
   type Walker=Awaited<ReturnType<typeof import('./walk').walk>>
   let loadingWalker:Promise<Walker>|undefined
   function loadWalker():Promise<Walker>{return loadingWalker??=prefetchWalk().then(module=>module.walk(scene,camera,renderer.domElement,manifest,stream,peaks,params.has('verify'))).then(player=>walker=player).catch(error=>{loadingWalker=undefined;throw error})}
+  let checkedCards=false
   let landingQueue=Promise.resolve()
   function walkTo(x:number,z:number,yaw:number,reason:string,name?:string){
     const parent=titleTransition
@@ -349,7 +350,10 @@ async function start(loader:FullLoader,creatorSpawn=false) {
         }
         await Promise.race([warmPrograms(scene),interrupted]);walkProgramsReady=true
       }
-      if(completed)cover.progress(1)
+      if(completed){
+        cover.progress(1)
+        if(!checkedCards){checkedCards=true; void import('./ui/update-cards').then(module=>module.startCards(params.has('verify'))).catch(()=>{})}
+      }
       return completed
     }catch(error){completed=false;if(signal.aborted&&signal.reason?.name==='AbortError')return false;throw error}
     finally{clearTimeout(deadline);controller.abort();operation('teleport',start,completed);switching=false;showMode();if(!parent)await cover.done()}

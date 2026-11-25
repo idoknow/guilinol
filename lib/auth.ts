@@ -1,4 +1,5 @@
 export interface Env {
+  updateCards?:(request:Request, path:string)=>Promise<Response>
   mpAdmin?:(path:string,request:Request,actor:string)=>Promise<Response>
   smokeAdmin?:(request:Request,user:string)=>Promise<Response>
   gfxAdmin?:(request:Request,user:string)=>Promise<Response>
