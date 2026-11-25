@@ -1,9 +1,16 @@
 import { DRINKS_MENU, type DrinkCatalogItem } from '../menu/menu.ts'
+import {
+  DRINKS_DOORWAY_CLEARANCE,
+  DRINKS_TACTILE_STRIP_BAND,
+  isInDoorwayClearance,
+} from './traffic.ts'
 import type {
+  DirectedSpot,
   DrinkMenuItem,
   DrinkPrepStepSim,
   DrinkShopLayout,
   InventoryItemDef,
+  Point2D,
   PrepStationKind,
   ShopAnchorsLike,
 } from './types.ts'
@@ -171,26 +178,47 @@ export function validateLayoutForMenu(layout: DrinkShopLayout, menu: readonly Dr
   }
 }
 
+function clampPointOffTactileStrip<T extends Point2D>(pt: T): T {
+  const maxSafeZ = DRINKS_TACTILE_STRIP_BAND.safeMaxZ - 0.15
+  if (pt.z <= maxSafeZ) return { ...pt }
+  return { ...pt, z: maxSafeZ }
+}
+
+function sanitizeSpotOutOfDoorway(spot: DirectedSpot, entrance: Point2D, index: number): DirectedSpot {
+  const safe = clampPointOffTactileStrip(spot)
+  if (!isInDoorwayClearance(safe.x, safe.z, entrance)) return safe
+  const side = safe.x < entrance.x ? -1 : safe.x > entrance.x ? 1 : index % 2 === 0 ? -1 : 1
+  const clearedX = entrance.x + side * (DRINKS_DOORWAY_CLEARANCE.halfWidthM + 0.35 + (index % 2) * 0.65)
+  const clearedZ = Math.min(safe.z, entrance.z - DRINKS_DOORWAY_CLEARANCE.innerDepthM - 0.12)
+  return {
+    ...safe,
+    x: Math.round(clearedX * 100) / 100,
+    z: Math.round(clearedZ * 100) / 100,
+  }
+}
+
 export function layoutFromShopAnchors(anchors: ShopAnchorsLike): DrinkShopLayout {
   if (!anchors || !anchors.entrance || !anchors.cashiers?.length || !anchors.prepStations?.length) {
     throw new Error('Invalid shop anchors: missing entrance, cashiers, or prepStations')
   }
   const width = anchors.width ?? 11.4
   const depth = anchors.depth ?? 9.8
+  const entrance = { ...anchors.entrance }
+  const rawMenuSlots = anchors.menuBoardSlots?.length
+    ? anchors.menuBoardSlots
+    : [
+        { x: -3.15, z: 1.65, yaw: Math.PI },
+        { x: -2.05, z: 1.55, yaw: Math.PI },
+        { x: 2.15, z: 1.55, yaw: Math.PI },
+        { x: 3.25, z: 1.65, yaw: Math.PI },
+      ]
   return {
     width,
     depth,
-    entrance: { ...anchors.entrance },
-    approachLeft: anchors.approachLeft ? { ...anchors.approachLeft } : { x: -7.6, z: 4.6 },
-    approachRight: anchors.approachRight ? { ...anchors.approachRight } : { x: 7.8, z: 4.6 },
-    menuBoardSlots: anchors.menuBoardSlots?.length
-      ? anchors.menuBoardSlots.map(s => ({ ...s }))
-      : [
-          { x: -2.05, z: 3.18, yaw: Math.PI },
-          { x: -1.1, z: 2.02, yaw: Math.PI },
-          { x: 1.25, z: 2.02, yaw: Math.PI },
-          { x: 2.3, z: 3.18, yaw: Math.PI },
-        ],
+    entrance,
+    approachLeft: clampPointOffTactileStrip(anchors.approachLeft ? { ...anchors.approachLeft } : { x: -7.6, z: 4.82 }),
+    approachRight: clampPointOffTactileStrip(anchors.approachRight ? { ...anchors.approachRight } : { x: 7.8, z: 4.82 }),
+    menuBoardSlots: rawMenuSlots.map((s, idx) => sanitizeSpotOutOfDoorway(s, entrance, idx)),
     cashiers: anchors.cashiers.map(c => ({
       id: c.id,
       clerkPos: { ...c.clerkPos },
@@ -201,8 +229,8 @@ export function layoutFromShopAnchors(anchors: ShopAnchorsLike): DrinkShopLayout
     prepStations: anchors.prepStations.map(s => ({ ...s })),
     pickupSlots: anchors.pickupSlots.map(s => ({ ...s })),
     pickupClerkPos: { ...anchors.pickupClerkPos },
-    waitingSpots: anchors.waitingSpots.map(s => ({ ...s })),
-    seats: anchors.seats.map(s => ({ ...s })),
+    waitingSpots: anchors.waitingSpots.map((s, idx) => sanitizeSpotOutOfDoorway(s, entrance, idx + 1)),
+    seats: anchors.seats.map(s => clampPointOffTactileStrip(s)),
     storagePos: { ...anchors.storagePos },
     patrolPoints: anchors.patrolPoints.map(p => ({ ...p })),
   }
@@ -212,17 +240,18 @@ export function layoutFromShopAnchors(anchors: ShopAnchorsLike): DrinkShopLayout
  * 离线测试夹具布局（仅作测试夹具或外部 `shop/anchors.ts` 未注入时的兜底）。
  */
 export function createDrinksLayoutFixture(overrides?: Partial<DrinkShopLayout>): DrinkShopLayout {
+  const entrance = overrides?.entrance ? { ...overrides.entrance } : { x: 0.2, z: 2.8 }
   const base: DrinkShopLayout = {
     width: 11.4,
     depth: 9.8,
-    entrance: { x: 0.2, z: 2.8 },
-    approachLeft: { x: -7.6, z: 4.95 },
-    approachRight: { x: 7.8, z: 4.95 },
+    entrance,
+    approachLeft: { x: -7.6, z: 4.82 },
+    approachRight: { x: 7.8, z: 4.82 },
     menuBoardSlots: [
-      { x: -1.7, z: 2.05, yaw: Math.PI },
-      { x: -0.55, z: 2.05, yaw: Math.PI },
-      { x: 0.55, z: 2.05, yaw: Math.PI },
-      { x: 1.65, z: 2.05, yaw: Math.PI },
+      { x: -3.15, z: 1.65, yaw: Math.PI },
+      { x: -2.05, z: 1.55, yaw: Math.PI },
+      { x: 2.15, z: 1.55, yaw: Math.PI },
+      { x: 3.25, z: 1.65, yaw: Math.PI },
     ],
     cashiers: [
       {
@@ -258,9 +287,9 @@ export function createDrinksLayoutFixture(overrides?: Partial<DrinkShopLayout>):
       { x: 2.25, z: 1.15, yaw: Math.PI },
       { x: 3.15, z: 1.15, yaw: Math.PI },
       { x: 4.0, z: 1.15, yaw: Math.PI },
-      { x: 1.65, z: 2.05, yaw: Math.PI },
-      { x: 2.6, z: 2.05, yaw: Math.PI },
-      { x: 3.55, z: 2.05, yaw: Math.PI },
+      { x: 2.1, z: 1.95, yaw: Math.PI },
+      { x: 2.85, z: 2.05, yaw: Math.PI },
+      { x: 3.65, z: 2.05, yaw: Math.PI },
       { x: 4.45, z: 2.05, yaw: Math.PI },
     ],
     seats: [
@@ -288,12 +317,15 @@ export function createDrinksLayoutFixture(overrides?: Partial<DrinkShopLayout>):
   return {
     ...base,
     ...overrides,
+    entrance,
+    approachLeft: clampPointOffTactileStrip(overrides.approachLeft ?? base.approachLeft),
+    approachRight: clampPointOffTactileStrip(overrides.approachRight ?? base.approachRight),
     cashiers: overrides.cashiers ?? base.cashiers,
     prepStations: overrides.prepStations ?? base.prepStations,
     pickupSlots: overrides.pickupSlots ?? base.pickupSlots,
-    waitingSpots: overrides.waitingSpots ?? base.waitingSpots,
-    seats: overrides.seats ?? base.seats,
-    menuBoardSlots: overrides.menuBoardSlots ?? base.menuBoardSlots,
+    waitingSpots: (overrides.waitingSpots ?? base.waitingSpots).map((s, idx) => sanitizeSpotOutOfDoorway(s, entrance, idx + 1)),
+    seats: (overrides.seats ?? base.seats).map(s => clampPointOffTactileStrip(s)),
+    menuBoardSlots: (overrides.menuBoardSlots ?? base.menuBoardSlots).map((s, idx) => sanitizeSpotOutOfDoorway(s, entrance, idx)),
     patrolPoints: overrides.patrolPoints ?? base.patrolPoints,
   }
 }

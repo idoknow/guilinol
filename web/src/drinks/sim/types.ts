@@ -214,6 +214,7 @@ export interface CustomerSnapshot {
   speed: number
   seated: boolean
   seatId: string | null
+  cashierIndex: number
   waitingOrderId: string | null
   desiredItemId: string | null
   groupId: string | null
@@ -335,11 +336,21 @@ export interface DrinksSimMetrics {
   hourlyOrders: number[]
 }
 
+export interface DrinksDistrictCrowdThinning {
+  readonly districtId: string
+  readonly x: number
+  readonly z: number
+  readonly outerRadius: number
+  readonly innerRadius: number
+  readonly maxInOuter: number
+}
+
 export interface DrinksSimSnapshot {
   timeSec: number
   hour: number
   phase: DrinkDayPhase
   isOpen: boolean
+  playerOnDuty: boolean
   clerks: ClerkSnapshot[]
   customers: CustomerSnapshot[]
   orders: OrderSnapshot[]
@@ -354,6 +365,10 @@ export interface PlayerPresenceInput {
   z: number
   yaw?: number
   nearRadius?: number
+  /** True when player is clocked in on duty as shop staff. */
+  onDuty?: boolean
+  /** Optional role hint; 'staff' is equivalent to onDuty = true. */
+  role?: 'customer' | 'staff'
 }
 
 export interface PlacePlayerOrderRequest {
@@ -407,6 +422,10 @@ export interface CreateDrinksSimOptions {
   maxCustomers?: number
   /** Hard-clamped to <= 4 (MAX_DOORWAY_QUEUE) across all cashier/doorway queues. */
   maxQueueLength?: number
+  /** Hard-clamped to <= 3 (MAX_OUTDOOR_CUSTOMERS) on the storefront plaza/patio. */
+  maxOutdoorCustomers?: number
+  /** Hard-clamped to <= 2 (MAX_PATIO_SEATED) seated simultaneously outdoors. */
+  maxPatioSeated?: number
   playerUnclaimedTimeoutSec?: number
 }
 
@@ -420,6 +439,8 @@ export interface DrinksSim {
   step(dtSec: number): void
   fastForward(durationSec: number): DrinksSimSnapshot
   setPlayerPresence(player: PlayerPresenceInput | null): void
+  setPlayerStaffMode(onDuty: boolean): void
+  isPlayerStaffMode(): boolean
   placePlayerOrder(req: PlacePlayerOrderRequest): PlacePlayerOrderResult
   collectPlayerOrder(orderIdOrKey: string): CollectPlayerOrderResult
   cancelPlayerOrder(orderIdOrKey: string, reason?: string): CancelPlayerOrderResult

@@ -8,9 +8,15 @@ import {
 } from './menu.ts'
 import { createSeededRng } from './prng.ts'
 import {
+  DRINKS_DOORWAY_CLEARANCE,
+  DRINKS_TACTILE_STRIP_BAND,
   getDrinksTrafficProfile,
+  isInDoorwayClearance,
+  isInTactileStripBand,
   MAX_CONCURRENT_CUSTOMERS,
   MAX_DOORWAY_QUEUE,
+  MAX_OUTDOOR_CUSTOMERS,
+  MAX_PATIO_SEATED,
   normalizeHour,
 } from './traffic.ts'
 import type {
@@ -316,6 +322,11 @@ export function createDrinksSim(options: CreateDrinksSimOptions = {}): DrinksSim
   const autoRestockSupply = options.autoRestockSupply !== false
   const maxCustomers = Math.max(1, Math.min(MAX_CONCURRENT_CUSTOMERS, Math.floor(options.maxCustomers ?? MAX_CONCURRENT_CUSTOMERS)))
   const maxQueueLength = Math.max(1, Math.min(MAX_DOORWAY_QUEUE, Math.floor(options.maxQueueLength ?? MAX_DOORWAY_QUEUE)))
+  const maxOutdoorCustomers = Math.max(
+    1,
+    Math.min(MAX_OUTDOOR_CUSTOMERS, Math.floor(options.maxOutdoorCustomers ?? MAX_OUTDOOR_CUSTOMERS)),
+  )
+  const maxPatioSeated = Math.max(0, Math.min(MAX_PATIO_SEATED, Math.floor(options.maxPatioSeated ?? MAX_PATIO_SEATED)))
   const clerkCount = Math.max(2, Math.min(CLERK_PROFILES.length, Math.floor(options.clerkCount ?? 5)))
   const playerUnclaimedTimeoutSec = Math.max(15, options.playerUnclaimedTimeoutSec ?? 180)
 
@@ -342,8 +353,13 @@ export function createDrinksSim(options: CreateDrinksSimOptions = {}): DrinksSim
   const hourlyOrders = new Array<number>(24).fill(0)
 
   let playerPresence: PlayerPresenceInput | null = null
+  let playerStaffMode = false
   let playerGreetCooldown = 0
   let cutInRemindCooldown = 0
+
+  function isPlayerOnDuty(): boolean {
+    return playerStaffMode || Boolean(playerPresence?.onDuty) || playerPresence?.role === 'staff'
+  }
 
   const inventory = new Map<string, InventoryBinState>()
   for (const def of baseDefs) {
@@ -575,33 +591,61 @@ export function createDrinksSim(options: CreateDrinksSimOptions = {}): DrinksSim
     return n
   }
 
+  function countOutdoorCustomers(): number {
+    let n = 0
+    for (const c of customers) {
+      if (c.z > layout.entrance.z + 0.1) n++
+    }
+    return n
+  }
+
+  function countOccupiedPatioSeats(): number {
+    let n = 0
+    for (const s of seats) {
+      if (s.zone === 'patio' && (s.state === 'occupied' || s.state === 'reserved')) n++
+    }
+    return n
+  }
+
   function getQueuePosition(cashierIndex: number, slot: number): Point2D {
     const lane = layout.cashiers[cashierIndex] ?? layout.cashiers[0]!
-    const stagger = slot === 0 ? 0 : slot % 2 === 1 ? -0.24 : 0.24
-    const maxQueueZ = layout.entrance.z - 0.65
+    const stagger = slot === 0 ? 0 : slot % 2 === 1 ? -0.18 : 0.18
+    const maxQueueZ = Math.min(layout.entrance.z - DRINKS_DOORWAY_CLEARANCE.innerDepthM - 0.1, 1.65)
+    const rawZ = lane.queueAnchor.z + lane.queueDir.z * slot
+    if (rawZ <= maxQueueZ) {
+      return {
+        x: lane.queueAnchor.x + lane.queueDir.x * slot + stagger,
+        z: rawZ,
+      }
+    }
+    // 队列长度超过门口安全界时向西侧收折，不堵 2.8m 门洞净空区
+    const overflowStep = Math.max(1, Math.ceil((rawZ - maxQueueZ) / Math.max(0.5, Math.abs(lane.queueDir.z) || 1)))
+    const bendX = Math.max(-4.1, lane.queueAnchor.x - overflowStep * 0.82)
     return {
-      x: lane.queueAnchor.x + lane.queueDir.x * slot + stagger,
-      z: Math.min(maxQueueZ, lane.queueAnchor.z + lane.queueDir.z * slot),
+      x: bendX,
+      z: maxQueueZ,
     }
   }
 
   function routeCustomerWaypoints(fromX: number, fromZ: number, toX: number, toZ: number): Point2D[] {
     const doorX = layout.entrance.x
     const doorZ = layout.entrance.z
-    const clearX = Math.max(doorX - 0.28, Math.min(doorX + 0.28, doorX + (toX - doorX) * 0.15))
-    const outZ = doorZ + 1.35 // 4.15m: safely past open outward glass door leaves (z <= 3.73)
-    const inZ = doorZ - 0.58 // 2.22m: safely inside behind doorway sill
+    const clearX = Math.max(doorX - 0.65, Math.min(doorX + 0.65, doorX + (toX - doorX) * 0.18))
+    const outZ = Math.min(DRINKS_TACTILE_STRIP_BAND.safeMaxZ - 0.85, doorZ + 1.55) // ~4.35m: clear of outward door leaves (<=4.01) & south of tactile strip (>=5.40)
+    const outerWalkZ = Math.min(DRINKS_TACTILE_STRIP_BAND.safeMaxZ - 0.4, doorZ + 2.02) // ~4.82m: inner plaza walkway, well south of tactile strip
+    const inZ = doorZ - 0.72 // ~2.08m: clear indoor approach through 2.8m doorway
+    const safeToZ = Math.min(DRINKS_TACTILE_STRIP_BAND.safeMaxZ - 0.12, toZ)
     const wps: Point2D[] = []
 
     const fromOutside = fromZ > doorZ + 0.15
-    const toOutside = toZ > doorZ + 0.15
+    const toOutside = safeToZ > doorZ + 0.15
     const isFromPatioSeat = fromOutside && fromZ < 4.0 && Math.abs(fromX - doorX) > 1.3
-    const isToPatioSeat = toOutside && toZ < 4.0 && Math.abs(toX - doorX) > 1.3
+    const isToPatioSeat = toOutside && safeToZ < 4.0 && Math.abs(toX - doorX) > 1.3
 
     if (fromOutside && !toOutside) {
       if (isFromPatioSeat) {
         const outerX = fromX < doorX ? fromX - 0.85 : fromX + 0.85
-        wps.push({ x: outerX, z: 4.85 })
+        wps.push({ x: outerX, z: outerWalkZ })
       }
       wps.push({ x: clearX, z: outZ })
       wps.push({ x: clearX, z: inZ })
@@ -610,14 +654,14 @@ export function createDrinksSim(options: CreateDrinksSimOptions = {}): DrinksSim
       wps.push({ x: clearX, z: outZ })
       if (isToPatioSeat) {
         const outerX = toX < doorX ? toX - 0.85 : toX + 0.85
-        wps.push({ x: outerX, z: 4.85 })
-        wps.push({ x: outerX, z: toZ })
+        wps.push({ x: outerX, z: outerWalkZ })
+        wps.push({ x: outerX, z: safeToZ })
       } else {
-        wps.push({ x: clearX, z: doorZ + 2.05 })
+        wps.push({ x: clearX, z: outerWalkZ })
       }
     }
 
-    wps.push({ x: toX, z: toZ })
+    wps.push({ x: toX, z: safeToZ })
     return wps
   }
 
@@ -631,8 +675,14 @@ export function createDrinksSim(options: CreateDrinksSimOptions = {}): DrinksSim
         c.queueSlot = idx
         if (c.phase === 'queuing') {
           const pos = idx === 0 ? lane.customerPos : getQueuePosition(laneIdx, idx - 1)
+          const counterYaw = yawBetween(pos.x, pos.z, lane.clerkPos.x, lane.clerkPos.z)
           c.waypoints = routeCustomerWaypoints(c.x, c.z, pos.x, pos.z)
-          c.finalYaw = lane.customerPos.yaw
+          c.finalYaw = counterYaw
+          if (c.speed === 0) {
+            c.yaw = yawBetween(c.x, c.z, lane.clerkPos.x, lane.clerkPos.z)
+          }
+        } else if (c.phase === 'ordering') {
+          c.yaw = yawBetween(c.x, c.z, lane.clerkPos.x, lane.clerkPos.z)
         }
       })
     }
@@ -663,9 +713,20 @@ export function createDrinksSim(options: CreateDrinksSimOptions = {}): DrinksSim
   }
 
   function pickFreeSeat(): InternalSeat | null {
-    const free = seats.filter(s => s.state === 'free')
-    if (!free.length) return null
-    return rng.pick(free, free[0]!)
+    const indoorFree = seats.filter(s => s.state === 'free' && s.zone === 'indoor')
+    const patioFree = countOccupiedPatioSeats() < maxPatioSeated
+      ? seats.filter(s => s.state === 'free' && s.zone === 'patio')
+      : []
+    if (indoorFree.length > 0 && (patioFree.length === 0 || rng.next() < 0.72)) {
+      return rng.pick(indoorFree, indoorFree[0]!)
+    }
+    if (patioFree.length > 0) {
+      return rng.pick(patioFree, patioFree[0]!)
+    }
+    if (indoorFree.length > 0) {
+      return rng.pick(indoorFree, indoorFree[0]!)
+    }
+    return null
   }
 
   function releaseCustomerSeat(c: InternalCustomer): void {
@@ -810,7 +871,7 @@ export function createDrinksSim(options: CreateDrinksSimOptions = {}): DrinksSim
     c.cashierIndex = -1
     c.queueSlot = -1
     const exitApproach = c.leaveSide < 0 ? layout.approachLeft : layout.approachRight
-    const exitZ = exitApproach.z + rng.range(-0.2, 0.2)
+    const exitZ = Math.min(DRINKS_TACTILE_STRIP_BAND.safeMaxZ - 0.15, exitApproach.z + rng.range(-0.18, 0.18))
     c.waypoints = routeCustomerWaypoints(c.x, c.z, exitApproach.x, exitZ)
     if (angry && c.waypoints.length > 0) {
       c.yaw = yawBetween(c.x, c.z, c.waypoints[0]!.x, c.waypoints[0]!.z)
@@ -835,9 +896,13 @@ export function createDrinksSim(options: CreateDrinksSimOptions = {}): DrinksSim
     const id = `cust_${nextCustSeq++}`
     const name = `${rng.pick(SURNAMES, '陈')}${rng.pick(ROLE_TITLES[roleKind], '顾客')}`
     const spawnX = spawnBase.x
-    const spawnZ = spawnBase.z + offsetZ
-    const targetX = menuSlot.x + rng.range(-0.18, 0.18)
-    const targetZ = menuSlot.z + rng.range(-0.12, 0.12)
+    const spawnZ = Math.min(DRINKS_TACTILE_STRIP_BAND.safeMaxZ - 0.15, spawnBase.z + offsetZ)
+    let targetX = menuSlot.x + rng.range(-0.14, 0.14)
+    let targetZ = menuSlot.z + rng.range(-0.1, 0.1)
+    if (isInDoorwayClearance(targetX, targetZ, layout.entrance)) {
+      targetX = menuSlot.x
+      targetZ = Math.min(menuSlot.z, layout.entrance.z - DRINKS_DOORWAY_CLEARANCE.innerDepthM - 0.12)
+    }
 
     const cust: InternalCustomer = {
       id,
@@ -904,6 +969,8 @@ export function createDrinksSim(options: CreateDrinksSimOptions = {}): DrinksSim
 
   function spawnCustomerOrPair(hour: number, roleWeights: Record<CustomerRoleKind, number>): void {
     if (customers.length >= maxCustomers) return
+    const outdoorNow = countOutdoorCustomers()
+    if (outdoorNow >= maxOutdoorCustomers) return
     const roles: CustomerRoleKind[] = ['student', 'office', 'tourist', 'local', 'rider']
     const weights = roles.map(r => roleWeights[r] ?? 1)
     const roleKind = rng.weightedPick(roles, weights, 'student')
@@ -912,16 +979,17 @@ export function createDrinksSim(options: CreateDrinksSimOptions = {}): DrinksSim
     const canPair =
       (roleKind === 'student' || roleKind === 'tourist' || roleKind === 'local') &&
       customers.length + 2 <= maxCustomers &&
+      outdoorNow + 2 <= maxOutdoorCustomers &&
       rng.next() < 0.34
 
     if (canPair) {
       const groupId = `grp_${nextGroupSeq++}`
-      const a = createSingleCustomer(hour, roleKind, side, -0.25, groupId, null)
-      const b = createSingleCustomer(hour, roleKind, side, 0.35, groupId, a.id)
+      const a = createSingleCustomer(hour, roleKind, side, -0.2, groupId, null)
+      const b = createSingleCustomer(hour, roleKind, side, 0.22, groupId, a.id)
       a.chatPartnerId = b.id
       b.wantsSeat = true
     } else {
-      createSingleCustomer(hour, roleKind, side, rng.range(-0.35, 0.35), null, null)
+      createSingleCustomer(hour, roleKind, side, rng.range(-0.22, 0.22), null, null)
     }
   }
 
@@ -961,38 +1029,41 @@ export function createDrinksSim(options: CreateDrinksSimOptions = {}): DrinksSim
     let curZ = fromZ
 
     // Crossing from outside patio back inside -> route through open doorway clear of door leaves & tables
-    if (curZ > doorZ + 0.15 && toZ < doorZ - 0.15) {
+    const outerWalkZ = Math.min(DRINKS_TACTILE_STRIP_BAND.safeMaxZ - 0.4, doorZ + 2.02)
+    const outZ = Math.min(DRINKS_TACTILE_STRIP_BAND.safeMaxZ - 0.85, doorZ + 1.55)
+    const safeToZ = Math.min(DRINKS_TACTILE_STRIP_BAND.safeMaxZ - 0.12, toZ)
+    if (curZ > doorZ + 0.15 && safeToZ < doorZ - 0.15) {
       if (curZ < 4.0 && Math.abs(curX - doorX) > 1.3) {
-        wps.push({ x: curX < doorX ? curX - 0.85 : curX + 0.85, z: 4.85 })
+        wps.push({ x: curX < doorX ? curX - 0.85 : curX + 0.85, z: outerWalkZ })
       }
-      wps.push({ x: doorX, z: doorZ + 1.35 })
-      wps.push({ x: doorX, z: doorZ - 0.58 })
+      wps.push({ x: doorX, z: outZ })
+      wps.push({ x: doorX, z: doorZ - 0.72 })
       curX = doorX
-      curZ = doorZ - 0.58
+      curZ = doorZ - 0.72
     }
 
     // Crossing front service counter -> route cleanly around nearest open end (-4.25 or +4.45)
-    if ((curZ < counterZ && toZ > counterZ) || (curZ > counterZ && toZ < counterZ)) {
+    if ((curZ < counterZ && safeToZ > counterZ) || (curZ > counterZ && safeToZ < counterZ)) {
       const goWest = toX < 0 || (curZ > counterZ && curX < 0)
       const passX = goWest ? counterMinX - 0.55 : counterMaxX + 0.4
       wps.push({ x: passX, z: curZ < counterZ ? -0.95 : 0.25 })
-      wps.push({ x: passX, z: toZ > counterZ ? 0.25 : -0.95 })
+      wps.push({ x: passX, z: safeToZ > counterZ ? 0.25 : -0.95 })
       curX = passX
-      curZ = toZ > counterZ ? 0.25 : -0.95
+      curZ = safeToZ > counterZ ? 0.25 : -0.95
     }
 
     // Crossing from indoor hall out to patio -> route through open doorway clear of door leaves & tables
-    if (curZ < doorZ - 0.15 && toZ > doorZ + 0.15) {
-      wps.push({ x: doorX, z: doorZ - 0.58 })
-      wps.push({ x: doorX, z: doorZ + 1.35 })
-      if (toZ < 4.0 && Math.abs(toX - doorX) > 1.3) {
+    if (curZ < doorZ - 0.15 && safeToZ > doorZ + 0.15) {
+      wps.push({ x: doorX, z: doorZ - 0.72 })
+      wps.push({ x: doorX, z: outZ })
+      if (safeToZ < 4.0 && Math.abs(toX - doorX) > 1.3) {
         const outerX = toX < doorX ? toX - 0.85 : toX + 0.85
-        wps.push({ x: outerX, z: 4.85 })
-        wps.push({ x: outerX, z: toZ })
+        wps.push({ x: outerX, z: outerWalkZ })
+        wps.push({ x: outerX, z: safeToZ })
       }
     }
 
-    wps.push({ x: toX, z: toZ })
+    wps.push({ x: toX, z: safeToZ })
     return wps
   }
 
@@ -1501,6 +1572,10 @@ export function createDrinksSim(options: CreateDrinksSimOptions = {}): DrinksSim
           c.interactionGesture = 'none'
           c.interactionTextVar = null
           c.cameraProp = false
+          if ((c.phase === 'queuing' || c.phase === 'ordering') && c.waypoints.length === 0) {
+            const lane = layout.cashiers[c.cashierIndex] ?? layout.cashiers[0]!
+            c.yaw = yawBetween(c.x, c.z, lane.clerkPos.x, lane.clerkPos.z)
+          }
         }
       }
       if (c.chatCooldown > 0) c.chatCooldown = Math.max(0, c.chatCooldown - dt)
@@ -1508,13 +1583,32 @@ export function createDrinksSim(options: CreateDrinksSimOptions = {}): DrinksSim
     }
 
     // Pair chatting when two partners are stationary near each other in same zone
+    // Exclude queuing (must keep facing counter) and doorway/tactile clearance zones
     for (const a of customers) {
       if (!a.chatPartnerId || a.chatCooldown > 0 || a.interactionTimer > 0) continue
-      if (a.phase === 'entering' || a.phase === 'ordering' || a.phase === 'leaving' || a.phase === 'picking_up') continue
+      if (
+        a.phase === 'entering' ||
+        a.phase === 'queuing' ||
+        a.phase === 'ordering' ||
+        a.phase === 'leaving' ||
+        a.phase === 'picking_up'
+      ) {
+        continue
+      }
       if (a.waypoints.length > 0) continue
+      if (isInDoorwayClearance(a.x, a.z, layout.entrance) || a.z >= DRINKS_TACTILE_STRIP_BAND.safeMaxZ - 0.1) continue
       const b = customers.find(x => x.id === a.chatPartnerId)
       if (!b || b.waypoints.length > 0) continue
-      if (b.phase === 'entering' || b.phase === 'ordering' || b.phase === 'leaving' || b.phase === 'picking_up') continue
+      if (
+        b.phase === 'entering' ||
+        b.phase === 'queuing' ||
+        b.phase === 'ordering' ||
+        b.phase === 'leaving' ||
+        b.phase === 'picking_up'
+      ) {
+        continue
+      }
+      if (isInDoorwayClearance(b.x, b.z, layout.entrance) || b.z >= DRINKS_TACTILE_STRIP_BAND.safeMaxZ - 0.1) continue
       const sameZone = (a.z < layout.entrance.z - 0.3 && b.z < layout.entrance.z - 0.3) || (a.z > layout.entrance.z + 1.1 && b.z > layout.entrance.z + 1.1)
       if (!sameZone) continue
       const d = Math.hypot(a.x - b.x, a.z - b.z)
@@ -1536,6 +1630,11 @@ export function createDrinksSim(options: CreateDrinksSimOptions = {}): DrinksSim
     const px = playerPresence.x
     const pz = playerPresence.z
     const nearRadius = playerPresence.nearRadius ?? 4.8
+    const onDuty = isPlayerOnDuty()
+    const behindCounter = pz < -0.25
+
+    // 玩家在岗当员工时不触发迎客/插队/挤开排队顾客，保证顾客照常排队、面向柜台并正常下单
+    if (onDuty) return
 
     // 1. Clerk greets player when approaching shop entrance/counter (prefer free/closest front clerk)
     const shopCenterX = layout.entrance.x
@@ -1565,6 +1664,8 @@ export function createDrinksSim(options: CreateDrinksSimOptions = {}): DrinksSim
       }
     }
 
+    if (behindCounter) return
+
     // 2. Cut-in reminder if player stands right in front of an occupied cashier queue
     if (cutInRemindCooldown <= 0) {
       for (let laneIdx = 0; laneIdx < layout.cashiers.length; laneIdx++) {
@@ -1588,18 +1689,23 @@ export function createDrinksSim(options: CreateDrinksSimOptions = {}): DrinksSim
       }
     }
 
-    // 3. Queuing/standing NPCs yield space smoothly when player walks close
+    // 3. Queuing/standing NPCs yield space smoothly when player walks close (staying clear of doorway & tactile strip)
+    const maxYieldZ = Math.min(layout.entrance.z - DRINKS_DOORWAY_CLEARANCE.innerDepthM - 0.1, 1.65)
     for (const c of customers) {
       if (c.phase !== 'queuing' && c.phase !== 'waiting_pickup') continue
       const dx = c.x - px
       const dz = c.z - pz
       const dist = Math.hypot(dx, dz)
       if (dist > 0.05 && dist < 1.55 && c.yieldCooldown <= 0) {
-        const sidePush = 0.36
+        const sidePush = 0.32
         const nx = dx / dist
         const nz = dz / dist
-        c.x += nx * sidePush
-        c.z = Math.max(0.05, c.z + nz * sidePush)
+        const nextX = c.x + nx * sidePush
+        const nextZ = Math.min(maxYieldZ, Math.max(0.08, c.z + nz * sidePush))
+        if (!isInDoorwayClearance(nextX, nextZ, layout.entrance)) {
+          c.x = nextX
+          c.z = nextZ
+        }
         c.yaw = yawBetween(c.x, c.z, px, pz)
         setCustomerInteraction(c, 'queue_yield_player', 'yield_step', 2.0)
         c.yieldCooldown = 4.5
@@ -1673,6 +1779,11 @@ export function createDrinksSim(options: CreateDrinksSimOptions = {}): DrinksSim
           const totalQueue = countTotalQueue()
           const maxPerLane = Math.max(1, Math.ceil(maxQueueLength / Math.max(1, layout.cashiers.length)))
           if (totalQueue >= maxQueueLength || laneLen >= maxPerLane) {
+            if (countOutdoorCustomers() >= maxOutdoorCustomers && c.patienceSec > 8) {
+              c.patienceSec = Math.max(0, c.patienceSec - 2.0)
+              c.stateTimer = Math.max(0, c.stateDuration - 1.4)
+              continue
+            }
             sendCustomerLeaving(c, false)
             continue
           }
@@ -1685,6 +1796,15 @@ export function createDrinksSim(options: CreateDrinksSimOptions = {}): DrinksSim
       }
 
       if (c.phase === 'queuing') {
+        const lane = layout.cashiers[c.cashierIndex] ?? layout.cashiers[0]!
+        if (c.waypoints.length === 0) {
+          if (c.queueSlot === 0 && Math.hypot(c.x - lane.customerPos.x, c.z - lane.customerPos.z) > 0.35) {
+            c.waypoints = [{ x: lane.customerPos.x, z: lane.customerPos.z }]
+            c.finalYaw = yawBetween(lane.customerPos.x, lane.customerPos.z, lane.clerkPos.x, lane.clerkPos.z)
+          } else if (c.interactionKind !== 'remind_cut_in' && c.interactionKind !== 'queue_yield_player') {
+            c.yaw = yawBetween(c.x, c.z, lane.clerkPos.x, lane.clerkPos.z)
+          }
+        }
         c.patienceSec -= dt * (1 + Math.max(0, c.queueSlot - 1) * 0.08)
         if (c.patienceSec <= 0) {
           ordersAbandonedQueue++
@@ -1696,6 +1816,8 @@ export function createDrinksSim(options: CreateDrinksSimOptions = {}): DrinksSim
       }
 
       if (c.phase === 'ordering') {
+        const lane = layout.cashiers[c.cashierIndex] ?? layout.cashiers[0]!
+        c.yaw = yawBetween(c.x, c.z, lane.clerkPos.x, lane.clerkPos.z)
         continue
       }
 
@@ -1795,6 +1917,9 @@ export function createDrinksSim(options: CreateDrinksSimOptions = {}): DrinksSim
         c.sipProgress = (c.stateTimer * 0.45) % 1
         c.sipsLeft = Math.max(0, Math.ceil((1 - ratio) * totalSips))
         if (c.stateTimer >= c.stateDuration) {
+          if (c.z < layout.entrance.z && countOutdoorCustomers() >= maxOutdoorCustomers && c.stateTimer < c.stateDuration + 3.0) {
+            continue
+          }
           sendCustomerLeaving(c, false)
         }
         continue
@@ -1824,7 +1949,7 @@ export function createDrinksSim(options: CreateDrinksSimOptions = {}): DrinksSim
     const applyPush = (cl: InternalClerk, px: number, pz: number) => {
       const clampBack = (cl.state === 'idle' || cl.state === 'patrolling') || (cl.pendingAfterWalk !== 'cleaning_table' && cl.z <= -0.75)
       cl.x += px
-      cl.z = clampBack ? Math.min(-0.78, cl.z + pz) : cl.z + pz
+      cl.z = Math.min(DRINKS_TACTILE_STRIP_BAND.safeMaxZ, clampBack ? Math.min(-0.78, cl.z + pz) : cl.z + pz)
     }
     for (let i = 0; i < clerks.length; i++) {
       const a = clerks[i]!
@@ -1850,6 +1975,20 @@ export function createDrinksSim(options: CreateDrinksSimOptions = {}): DrinksSim
           }
         }
       }
+      // 玩家在岗操作水吧时，空闲/巡台店员轻柔避让玩家身体，不阻断制作与点单
+      if (playerPresence?.active && isPlayerOnDuty() && playerPresence.z <= -0.25) {
+        if (a.state === 'idle' || a.state === 'patrolling') {
+          const dx = a.x - playerPresence.x
+          const dz = a.z - playerPresence.z
+          const dSq = dx * dx + dz * dz
+          if (dSq < 0.85 * 0.85) {
+            const dist = Math.sqrt(dSq)
+            const nx = dist > 1e-4 ? dx / dist : 1
+            const nz = dist > 1e-4 ? dz / dist : 0
+            applyPush(a, nx * (0.85 - dist) * pushRate, nz * (0.85 - dist) * pushRate)
+          }
+        }
+      }
     }
   }
 
@@ -1861,9 +2000,32 @@ export function createDrinksSim(options: CreateDrinksSimOptions = {}): DrinksSim
     const doorZ = layout.entrance.z
     const clampCustomerWall = (c: InternalCustomer) => {
       if (c.z < -0.02) c.z = -0.02
-      const inDoorOpening = c.x >= doorX - 0.52 && c.x <= doorX + 0.52
+      if (c.z > DRINKS_TACTILE_STRIP_BAND.safeMaxZ) c.z = DRINKS_TACTILE_STRIP_BAND.safeMaxZ
+      if (c.phase === 'queuing' || c.phase === 'ordering' || c.phase === 'browsing_menu') {
+        const maxIndoorFrontZ = Math.min(doorZ - DRINKS_DOORWAY_CLEARANCE.innerDepthM - 0.05, 1.7)
+        if (c.z > maxIndoorFrontZ) c.z = maxIndoorFrontZ
+      }
+      const inDoorOpening = c.x >= doorX - 1.25 && c.x <= doorX + 1.25
       if (!inDoorOpening && Math.abs(c.z - doorZ) < 0.34) {
         c.z = c.z < doorZ ? doorZ - 0.34 : doorZ + 0.34
+      }
+      // 静止顾客绝不被分离力推入门洞净空走廊
+      const isStationary =
+        c.waypoints.length === 0 &&
+        (c.phase === 'browsing_menu' ||
+          c.phase === 'queuing' ||
+          c.phase === 'ordering' ||
+          c.phase === 'waiting_pickup' ||
+          c.phase === 'seated')
+      if (isStationary && isInDoorwayClearance(c.x, c.z, layout.entrance)) {
+        if (c.z <= doorZ) {
+          c.z = Math.min(c.z, doorZ - DRINKS_DOORWAY_CLEARANCE.innerDepthM - 0.08)
+        } else {
+          c.x =
+            c.x < doorX
+              ? doorX - DRINKS_DOORWAY_CLEARANCE.halfWidthM - 0.15
+              : doorX + DRINKS_DOORWAY_CLEARANCE.halfWidthM + 0.15
+        }
       }
     }
     for (let i = 0; i < customers.length; i++) {
@@ -2063,6 +2225,7 @@ export function createDrinksSim(options: CreateDrinksSimOptions = {}): DrinksSim
       speed: c.speed,
       seated: c.phase === 'seated' && c.waypoints.length === 0,
       seatId: c.seatId,
+      cashierIndex: c.cashierIndex,
       waitingOrderId: c.waitingOrderId,
       desiredItemId: c.desiredItemId,
       groupId: c.groupId,
@@ -2103,6 +2266,7 @@ export function createDrinksSim(options: CreateDrinksSimOptions = {}): DrinksSim
       hour,
       phase: traffic.phase,
       isOpen: traffic.isOpen,
+      playerOnDuty: isPlayerOnDuty(),
       clerks: clerkSnaps,
       customers: customerSnaps,
       orders: orderSnaps,
@@ -2159,6 +2323,14 @@ export function createDrinksSim(options: CreateDrinksSimOptions = {}): DrinksSim
 
     setPlayerPresence(player: PlayerPresenceInput | null): void {
       playerPresence = player ? { ...player } : null
+    },
+
+    setPlayerStaffMode(onDuty: boolean): void {
+      playerStaffMode = Boolean(onDuty)
+    },
+
+    isPlayerStaffMode(): boolean {
+      return isPlayerOnDuty()
     },
 
     placePlayerOrder(req: PlacePlayerOrderRequest): PlacePlayerOrderResult {
@@ -2295,6 +2467,37 @@ export function createDrinksSim(options: CreateDrinksSimOptions = {}): DrinksSim
       const liveQueue = countTotalQueue()
       if (liveQueue > maxQueueLength) {
         errors.push(`queueLength ${liveQueue} exceeded maxQueueLength ${maxQueueLength}`)
+      }
+      for (const cl of clerks) {
+        if (isInTactileStripBand(cl.z)) {
+          errors.push(`clerk ${cl.id} intruded tactile strip band at z=${cl.z.toFixed(2)}`)
+        }
+      }
+      for (const c of customers) {
+        if (isInTactileStripBand(c.z)) {
+          errors.push(`customer ${c.id} intruded tactile strip band at z=${c.z.toFixed(2)}`)
+        }
+        const stationary =
+          c.waypoints.length === 0 &&
+          c.speed === 0 &&
+          c.phase !== 'entering' &&
+          c.phase !== 'leaving'
+        if (stationary && isInDoorwayClearance(c.x, c.z, layout.entrance)) {
+          errors.push(`stationary customer ${c.id} (${c.phase}) blocked doorway at (${c.x.toFixed(2)}, ${c.z.toFixed(2)})`)
+        }
+        if (
+          stationary &&
+          (c.phase === 'queuing' || c.phase === 'ordering') &&
+          c.interactionKind !== 'remind_cut_in' &&
+          c.interactionKind !== 'queue_yield_player'
+        ) {
+          const lane = layout.cashiers[c.cashierIndex] ?? layout.cashiers[0]!
+          const targetYaw = yawBetween(c.x, c.z, lane.clerkPos.x, lane.clerkPos.z)
+          const alignDot = Math.cos(c.yaw - targetYaw)
+          if (alignDot < 0.9) {
+            errors.push(`queuing customer ${c.id} not facing counter: dot=${alignDot.toFixed(3)}`)
+          }
+        }
       }
       return { ok: errors.length === 0, errors }
     },

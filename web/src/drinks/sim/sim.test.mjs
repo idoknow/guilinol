@@ -1,11 +1,22 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { DRINKS_MENU } from '../menu/menu.ts'
+import { DRINKS_SHOP_ANCHORS } from '../shop/blueprint.ts'
+import { DRINKS_SITE_CANDIDATES, SITE } from '../site.ts'
+import { DrinksStaffSession } from '../staff/workflow.ts'
 import {
+  buildDrinksDistrictCrowdThinning,
   convertCatalogMenuToSim,
   createDrinksSim,
+  DRINKS_DOORWAY_CLEARANCE,
+  DRINKS_TACTILE_STRIP_BAND,
+  isInDoorwayClearance,
+  isInTactileStripBand,
   isTerminalOrderStatus,
   layoutFromShopAnchors,
+  MAX_DOORWAY_QUEUE,
+  MAX_OUTDOOR_CUSTOMERS,
+  MAX_PATIO_SEATED,
   SIM_FAST_FORWARD_TOLERANCE,
 } from './index.ts'
 
@@ -277,4 +288,216 @@ test('快进与逐帧误差在声明阈值内', () => {
   assert.ok(revDiffRatio <= SIM_FAST_FORWARD_TOLERANCE.maxRevenueRelativeDiff)
   assert.equal(simFrame.validateInvariants().ok, true)
   assert.equal(simFast.validateInvariants().ok, true)
+})
+
+test('店外按片区降密度 + 门洞与盲道永不堵塞（兼容实景 blueprint 锚点）', () => {
+  // 1. 片区降密配置校验：王城商厦内圈覆盖门洞+外摆+盲道，正阳路片区独立配额
+  const wangchengZone = buildDrinksDistrictCrowdThinning(DRINKS_SITE_CANDIDATES.wangcheng_mall)
+  const zhengyangZone = buildDrinksDistrictCrowdThinning(DRINKS_SITE_CANDIDATES.zhengyang_208)
+  assert.equal(wangchengZone.districtId, 'wangcheng_mall')
+  assert.ok(wangchengZone.innerRadius >= 9.0, `wangcheng innerRadius must clear doorway+patio+tactile strip, got ${wangchengZone.innerRadius}`)
+  assert.ok(wangchengZone.outerRadius >= 20 && wangchengZone.maxInOuter <= 2)
+  assert.equal(zhengyangZone.districtId, 'zhengyang_208')
+  assert.ok(zhengyangZone.innerRadius >= 8.0 && zhengyangZone.maxInOuter <= 3)
+
+  // 2. 使用实景 DRINKS_SHOP_ANCHORS 构造模拟：menuBoardSlots / waitingSpots 应自动避开门洞净空走廊
+  const sim = createDrinksSim({
+    seed: 'doorway-tactile-clearance',
+    anchors: DRINKS_SHOP_ANCHORS,
+    now: 0,
+    hourOf: () => 19.5,
+  })
+  const layout = sim.getLayout()
+  for (const slot of [...layout.menuBoardSlots, ...layout.waitingSpots]) {
+    assert.equal(
+      isInDoorwayClearance(slot.x, slot.z, layout.entrance),
+      false,
+      `layout spot (${slot.x}, ${slot.z}) overlaps 2.8m doorway clearance`,
+    )
+    assert.equal(isInTactileStripBand(slot.z), false, `layout spot z=${slot.z} overlaps tactile strip`)
+  }
+  assert.ok(layout.approachLeft.z <= DRINKS_TACTILE_STRIP_BAND.safeMaxZ)
+  assert.ok(layout.approachRight.z <= DRINKS_TACTILE_STRIP_BAND.safeMaxZ)
+
+  // 3. 晚高峰连续运行 5 分钟（3000 步），逐帧核查门洞、盲道与店外人数上限
+  let maxOutdoor = 0
+  let maxPatioSeated = 0
+  for (let i = 0; i < 3000; i++) {
+    sim.step(0.1)
+    const snap = sim.getSnapshot()
+    let outdoorCount = 0
+    let patioSeated = 0
+    for (const cl of snap.clerks) {
+      assert.equal(isInTactileStripBand(cl.z), false, `tick ${i}: clerk ${cl.id} stepped onto tactile strip z=${cl.z}`)
+    }
+    for (const cu of snap.customers) {
+      assert.equal(isInTactileStripBand(cu.z), false, `tick ${i}: customer ${cu.id} stepped onto tactile strip z=${cu.z}`)
+      assert.ok(cu.z <= DRINKS_TACTILE_STRIP_BAND.safeMaxZ + 1e-6, `tick ${i}: customer ${cu.id} exceeded safeMaxZ (${cu.z})`)
+      if (cu.z > layout.entrance.z + 0.1) outdoorCount++
+      if (cu.speed === 0 && cu.phase !== 'entering' && cu.phase !== 'leaving') {
+        assert.equal(
+          isInDoorwayClearance(cu.x, cu.z, layout.entrance),
+          false,
+          `tick ${i}: stationary customer ${cu.id} (${cu.phase}) blocked doorway at (${cu.x.toFixed(2)}, ${cu.z.toFixed(2)})`,
+        )
+      }
+    }
+    for (const s of snap.seats) {
+      if (s.zone === 'patio' && (s.state === 'occupied' || s.state === 'reserved')) patioSeated++
+    }
+    if (outdoorCount > maxOutdoor) maxOutdoor = outdoorCount
+    if (patioSeated > maxPatioSeated) maxPatioSeated = patioSeated
+    if (i % 50 === 0) {
+      const inv = sim.validateInvariants()
+      assert.equal(inv.ok, true, `tick ${i} invariant failed: ${inv.errors.join('; ')}`)
+    }
+  }
+  assert.ok(maxPatioSeated <= MAX_PATIO_SEATED, `patio seated ${maxPatioSeated} exceeded ${MAX_PATIO_SEATED}`)
+  assert.ok(maxOutdoor <= MAX_OUTDOOR_CUSTOMERS + 2, `outdoor plaza crowd too dense: ${maxOutdoor}`)
+  assert.ok(sim.getSnapshot().metrics.ordersCompleted >= 12)
+})
+
+test('排队 ≤ 4 人且全程朝向柜台（含单收银队列折弯与路过干扰后自动回正）', () => {
+  // 单收银高负载布局：即使 4 人挤向同一收银台也不越过门洞净空线且全部朝向柜台
+  const baseSim = createDrinksSim({ seed: 'single-lane-base' })
+  const baseLayout = baseSim.getLayout()
+  const sim = createDrinksSim({
+    seed: 'queue-facing-counter',
+    now: 0,
+    hourOf: () => 19.5,
+    layout: {
+      cashiers: [baseLayout.cashiers[1]], // 靠门洞右侧收银台（最严格测试门洞避让）
+    },
+    maxQueueLength: 8, // 应被硬钳制为 4
+  })
+  const layout = sim.getLayout()
+  const cashier = layout.cashiers[0]
+
+  let observedQueueSamples = 0
+  let maxQueue = 0
+  for (let i = 0; i < 3000; i++) {
+    // 中途模拟普通顾客模式玩家擦肩而过触发让位，再离开验证排队者回正朝向柜台
+    if (i >= 900 && i < 930) {
+      sim.setPlayerPresence({ active: true, x: cashier.customerPos.x + 0.35, z: cashier.customerPos.z + 0.45 })
+    } else if (i === 930) {
+      sim.setPlayerPresence(null)
+    }
+
+    sim.step(0.1)
+    const snap = sim.getSnapshot()
+    if (snap.metrics.queueLength > maxQueue) maxQueue = snap.metrics.queueLength
+    assert.ok(snap.metrics.queueLength <= MAX_DOORWAY_QUEUE, `tick ${i}: queue ${snap.metrics.queueLength} > 4`)
+
+    for (const cu of snap.customers) {
+      if ((cu.phase === 'queuing' || cu.phase === 'ordering') && cu.speed === 0) {
+        assert.equal(
+          isInDoorwayClearance(cu.x, cu.z, layout.entrance),
+          false,
+          `tick ${i}: queuing customer ${cu.id} entered doorway clearance (${cu.x.toFixed(2)}, ${cu.z.toFixed(2)})`,
+        )
+        assert.ok(
+          cu.z <= layout.entrance.z - DRINKS_DOORWAY_CLEARANCE.innerDepthM + 0.05,
+          `tick ${i}: queuer z=${cu.z.toFixed(2)} encroached doorway buffer`,
+        )
+        if (cu.interactionKind !== 'remind_cut_in' && cu.interactionKind !== 'queue_yield_player') {
+          const dx = cashier.clerkPos.x - cu.x
+          const dz = cashier.clerkPos.z - cu.z
+          const len = Math.hypot(dx, dz)
+          const dot = (Math.sin(cu.yaw) * dx + Math.cos(cu.yaw) * dz) / Math.max(1e-6, len)
+          assert.ok(dot >= 0.94, `tick ${i}: queuing customer ${cu.id} not facing counter (dot=${dot.toFixed(3)})`)
+          observedQueueSamples++
+        }
+      }
+    }
+  }
+
+  assert.ok(maxQueue >= 1 && maxQueue <= 4, `expected realistic queue in [1,4], got ${maxQueue}`)
+  assert.ok(observedQueueSamples >= 50, `expected >= 50 stationary counter-facing queue samples, got ${observedQueueSamples}`)
+  assert.equal(sim.validateInvariants().ok, true)
+})
+
+test('玩家当员工时顾客照常下单（联调 DrinksStaffSession 换装做杯，零插队误报且持续出单）', () => {
+  const sim = createDrinksSim({
+    seed: 'staff-mode-normal-orders',
+    anchors: DRINKS_SHOP_ANCHORS,
+    now: 0,
+    hourOf: () => 19.5,
+  })
+  const staff = new DrinksStaffSession({ sim })
+
+  // 1. 玩家在门口应聘上岗进入员工模式
+  const recruit = staff.anchors.recruitStandee
+  staff.updatePlayerLocalPos(recruit.x, recruit.z + 0.5, Math.PI)
+  assert.equal(staff.applyForJob(), true)
+  assert.equal(staff.getSnapshot().onDuty, true)
+  sim.setPlayerStaffMode(true)
+  assert.equal(sim.isPlayerStaffMode(), true)
+  assert.equal(sim.getSnapshot().playerOnDuty, true)
+
+  // 2. 员工玩家依次站在收银点单台、制冰台、封口台、出杯叫号台做完 1 杯并持续在岗 5 分钟
+  const stations = [
+    staff.anchors.orderDesk,
+    staff.anchors.prepStations[0],
+    staff.anchors.sealStation,
+    staff.anchors.pickupCounter,
+  ]
+
+  let falseCutInEvents = 0
+  let falseGreetEvents = 0
+  let staffTicketCompleted = false
+
+  for (let i = 0; i < 3000; i++) {
+    const st = stations[Math.floor(i / 250) % stations.length]
+    staff.updatePlayerLocalPos(st.x, st.z, st.yaw)
+    sim.setPlayerPresence({ active: true, x: st.x, z: st.z, yaw: st.yaw, onDuty: true })
+
+    // 完成 1 轮完整员工接单 -> 加料 -> 封口 -> 出杯叫号
+    if (!staffTicketCompleted && i === 120) {
+      staff.updatePlayerLocalPos(staff.anchors.orderDesk.x, staff.anchors.orderDesk.z, 0)
+      assert.ok(staff.acceptNextOrder())
+    }
+    if (!staffTicketCompleted && i > 120) {
+      const sSnap = staff.getSnapshot()
+      if (sSnap.phase === 'shake_cup' || sSnap.phase === 'add_toppings' || sSnap.phase === 'seal_cup') {
+        if (sSnap.targetZone) staff.updatePlayerLocalPos(sSnap.targetZone.x, sSnap.targetZone.z, 0)
+        staff.holdWork(0.1)
+      } else if (sSnap.phase === 'call_pickup') {
+        staff.updatePlayerLocalPos(staff.anchors.pickupCounter.x, staff.anchors.pickupCounter.z, 0)
+        assert.equal(staff.completeCallPickup(), true)
+        staffTicketCompleted = true
+      }
+    }
+
+    staff.step(0.1)
+    sim.step(0.1)
+
+    for (const ev of sim.drainEvents()) {
+      if (ev.type === 'player_cut_in_reminded') falseCutInEvents++
+      if (ev.type === 'player_greeted') falseGreetEvents++
+    }
+  }
+
+  const endSnap = sim.getSnapshot()
+  assert.equal(staffTicketCompleted, true, 'player staff should complete a full cup during shift')
+  assert.equal(staff.getSnapshot().cupsServed, 1)
+  assert.equal(falseCutInEvents, 0, 'on-duty player behind counter must never trigger cut-in reminders')
+  assert.equal(falseGreetEvents, 0, 'on-duty player must not be greeted as a newly arrived customer')
+  assert.ok(
+    endSnap.metrics.totalOrdersCreated >= 14,
+    `customers must keep ordering normally during staff shift, got totalOrdersCreated=${endSnap.metrics.totalOrdersCreated}`,
+  )
+  assert.ok(
+    endSnap.metrics.ordersCompleted >= 12,
+    `customers must keep completing orders during staff shift, got ordersCompleted=${endSnap.metrics.ordersCompleted}`,
+  )
+  assert.equal(endSnap.metrics.deadlockRecoveries, 0)
+  assert.equal(sim.validateInvariants().ok, true)
+
+  // 3. 下班后恢复顾客模式
+  assert.equal(staff.resignJob(), true)
+  sim.setPlayerStaffMode(false)
+  sim.setPlayerPresence({ active: true, x: SITE.id ? 0.2 : 0.2, z: 3.1, onDuty: false })
+  assert.equal(sim.isPlayerStaffMode(), false)
+  sim.step(0.5)
+  assert.ok(sim.drainEvents().some(e => e.type === 'player_greeted'), 'off-duty customer mode should restore greeting')
 })

@@ -1,4 +1,4 @@
-import type { CustomerRoleKind, DrinkDayPhase } from './types.ts'
+import type { CustomerRoleKind, DrinkDayPhase, DrinksDistrictCrowdThinning, Point2D } from './types.ts'
 
 export interface TrafficProfile {
   phase: DrinkDayPhase
@@ -37,6 +37,68 @@ interface TrafficKeyframe {
 
 export const MAX_CONCURRENT_CUSTOMERS = 8
 export const MAX_DOORWAY_QUEUE = 4
+export const MAX_OUTDOOR_CUSTOMERS = 3
+export const MAX_PATIO_SEATED = 2
+
+/**
+ * 2.80m 宽玻璃双开正门无遮挡净空走廊（相对 entrance 中心点）：
+ * - halfWidthM = 1.55m -> 覆盖 [-1.35, +1.75]（门洞 [-1.20, +1.60] + 两侧 0.15m 余量）
+ * - innerDepthM = 1.05m -> 门内至 z = 1.75m 禁止静止停留/排队
+ * - outerDepthM = 1.55m -> 门外至 z = 4.35m（避让外开玻璃门扇 z <= 4.01m）
+ */
+export const DRINKS_DOORWAY_CLEARANCE = Object.freeze({
+  halfWidthM: 1.55,
+  innerDepthM: 1.05,
+  outerDepthM: 1.55,
+})
+
+/**
+ * 解放东路门前黄色盲道 [39]（局部 z ∈ [+5.50, +6.05]）禁占区：
+ * 门店所有顾客/店员活动与外摆路径均限制在 safeMaxZ (5.22m) 以南，绝不占用盲道。
+ */
+export const DRINKS_TACTILE_STRIP_BAND = Object.freeze({
+  minZ: 5.4,
+  maxZ: 6.2,
+  safeMaxZ: 5.22,
+})
+
+export function isInDoorwayClearance(x: number, z: number, entrance: Point2D): boolean {
+  return (
+    Math.abs(x - entrance.x) <= DRINKS_DOORWAY_CLEARANCE.halfWidthM &&
+    z >= entrance.z - DRINKS_DOORWAY_CLEARANCE.innerDepthM &&
+    z <= entrance.z + DRINKS_DOORWAY_CLEARANCE.outerDepthM
+  )
+}
+
+export function isInTactileStripBand(z: number): boolean {
+  return z >= DRINKS_TACTILE_STRIP_BAND.minZ && z <= DRINKS_TACTILE_STRIP_BAND.maxZ
+}
+
+export const DRINKS_DISTRICT_THINNING_DEFAULTS: Readonly<
+  Record<string, { readonly outerRadius: number; readonly innerRadius: number; readonly maxInOuter: number }>
+> = Object.freeze({
+  // 王城商厦北侧转角（解放东路+十字街）：内圈 9.5m 覆盖门洞、外摆与盲道 [39]，外圈 24m 最多保留 2 名路人
+  wangcheng_mall: Object.freeze({ innerRadius: 9.5, outerRadius: 24, maxInOuter: 2 }),
+  // 正阳路步行街片区：内圈 8.5m 净空，外圈 20m 最多保留 3 名路人
+  zhengyang_208: Object.freeze({ innerRadius: 8.5, outerRadius: 20, maxInOuter: 3 }),
+})
+
+export function buildDrinksDistrictCrowdThinning(site: {
+  readonly id?: string
+  readonly worldX: number
+  readonly worldZ: number
+}): DrinksDistrictCrowdThinning {
+  const districtId = site.id && site.id in DRINKS_DISTRICT_THINNING_DEFAULTS ? site.id : 'wangcheng_mall'
+  const preset = DRINKS_DISTRICT_THINNING_DEFAULTS[districtId]!
+  return {
+    districtId,
+    x: site.worldX,
+    z: site.worldZ,
+    innerRadius: preset.innerRadius,
+    outerRadius: preset.outerRadius,
+    maxInOuter: preset.maxInOuter,
+  }
+}
 
 // Balanced Wangcheng beverage shop traffic curve:
 // Keeps shop lively with steady turnover while strictly respecting the comfortable
