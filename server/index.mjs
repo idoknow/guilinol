@@ -9,6 +9,7 @@ import {receive,queryPerf} from './telemetry.mjs'
 import {onRequest} from '../functions/api/[[path]].ts'
 import {database, measuredConnections} from './postgres.mjs'
 import {bucket} from './bucket.mjs'
+import {cardRoutes} from './update-cards.mjs'
 import {createReadiness} from './readiness.mjs'
 import {presence, mpPresence} from './live.mjs'
 import {multiplayer} from './mp-admin.mjs'
@@ -105,6 +106,7 @@ async function gfxAdmin(request,user){
 }
 const env = {...process.env, gfxAdmin,smokeAdmin,npcAdmin,mpAdmin:mp.route, perfQuery:cachedPerfQuery, DB:database(connections), FEEDBACK:bucket(process.env.S3_ENDPOINT)}
 const origin = new URL(process.env.PUBLIC_ORIGIN).origin
+env.updateCards=cardRoutes(pool,env)
 const online = presence(pool)
 const mpOnline = mpPresence()
 
