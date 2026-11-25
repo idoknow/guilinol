@@ -1,3 +1,4 @@
+import {mergeVertices} from 'three/addons/utils/BufferGeometryUtils.js'
 import * as THREE from 'three'
 import type {Tile} from './world'
 const stationRoofDepth = 1.2
@@ -253,6 +254,9 @@ export function tunnelGeometry(tile:Tile,ground:THREE.PlaneGeometry,tunnels:Tunn
     }
     const result=mesh(positions,material,kind)
     result.geometry.setAttribute('color',new THREE.Float32BufferAttribute(colors,3))
+    const triangles=result.geometry
+    result.geometry=mergeVertices(triangles,1e-6)
+    triangles.dispose()
     return result
   }
   const lining=batch(['floor','interior','portal','band','lane'],
