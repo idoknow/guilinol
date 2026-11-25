@@ -6,6 +6,7 @@ import {chargePower,resolveCast,type Point,nearestFishingShore,nearby,species,ta
 import {buy,certification,collect,consume,inventory,journal,refundFullCast,removeCatch,shop} from './inventory'
 import {bait} from './bait'
 import {fishThumb} from './fish-model'
+import {reportCatch} from './report'
 import {createRod,createWaterFx} from './fx'
 import './fishing.css'
 
@@ -132,6 +133,7 @@ export function createFishing(host:Host,verify:boolean){
   let cardTimer=0
   function toast(text:string,tone:'bad'|'dim'){card.hidden=false;card.className=`fx-catch fx-toast ${tone}`;card.innerHTML=`<p>${esc(text)}</p>`;clearTimeout(cardTimer);cardTimer=window.setTimeout(()=>{card.hidden=true},2600)}
   function showCatch(item:Catch){
+    reportCatch(item)
     const row=species.find(s=>s.id===item.speciesId),fresh=row&&inventory().bag.filter(b=>b.speciesId===row.id).length===1
     card.hidden=false;card.className=`fx-catch ${gradeClass(item.grade)}`
     card.innerHTML=row?`<img alt="" src="${fishThumb(row.id)}"><div><p class="fc-no">${row.number}${fresh?' · <b>新图鉴</b>':''}</p><h3>${esc(row.name)}</h3>

@@ -28,6 +28,15 @@ async function handle(request:Request,env:Env) {
   if(env.updateCards && /^(?:admin\/)?updates(?:\/|$)/.test(path)) return env.updateCards(request,path)
   if(/^(feedback|bridge|admin)(\/|$)/.test(path)) return feedback(request,env,path)
   if(path==='me/save')return cloudSave(request,env)
+  if(env.fishing && path==='fishing/boards' && method==='GET'){
+    const boards=await env.fishing.boards(url.searchParams.get('zone'));if(!boards)invalid();return json(boards)
+  }
+  if(env.fishing && path==='fishing/catch' && method==='POST'){
+    if(request.headers.get('Origin')!==url.origin)throw new Problem(403,'origin','请求来源不符')
+    const account=await sessionAccount(db,await sessionHash(request));if(!account)unauthorized()
+    if(request.headers.get('X-Fishing-Owner') && request.headers.get('X-Fishing-Owner')!==account.id)unauthorized()
+    return json(await env.fishing.record(account.id,await request.json().catch(()=>null)))
+  }
   if(path.startsWith('citizen/'))return citizen(request,env,path)
   if(!Object.hasOwn(methods,path)) throw new Problem(404,'not_found','接口不存在')
   if(!methods[path].includes(method)) throw new Problem(405,'method','不支持的请求方式')

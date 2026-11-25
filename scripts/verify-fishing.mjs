@@ -4,18 +4,20 @@ import {preview} from 'vite'
 import {chromium} from 'playwright'
 import {verifyZones} from './fishing-zone-probes.mjs'
 
+export async function verifyFishing(setup){
 const server=await preview({root:'web',configFile:'web/vite.config.ts',preview:{host:'127.0.0.1',port:0}})
 let browser
 try {
   await mkdir('captures/fishing',{recursive:true})
   browser=await chromium.launch({executablePath:process.env.CHROMIUM,args:['--use-angle=swiftshader','--enable-unsafe-swiftshader']})
   const page=await browser.newPage({viewport:{width:640,height:360}})
+  const checkBoard=await setup?.(page,`http://127.0.0.1:${server.httpServer.address().port}`)
   const errors=[];page.on('pageerror',error=>{errors.push(error.message);console.error(error.message)})
   await page.goto(`http://127.0.0.1:${server.httpServer.address().port}/?verify&mode=walk&flow=0`)
   await page.waitForFunction(()=>window.viewer?.walk?.active && ![1,2].includes(window.__loading?.level) && document.querySelector('.hotbar:not([hidden])'),null,{timeout:90000})
   console.log('Walk ready',await page.evaluate(()=>({ride:document.body.dataset.ride,focus:document.activeElement.tagName,pos:window.viewer.walk.position.toArray(),shop:document.body.dataset.shopOpen})))
   await page.keyboard.press('4');await page.keyboard.press('Space');await page.waitForFunction(()=>window.fishing?.state?.().stage==='idle')
-  await verifyZones(page)
+  if(!checkBoard)await verifyZones(page)
   assert(await page.evaluate(()=>window.fishing.teleportToSpot('lijiang_xiangbi')))
   await page.keyboard.press('4');await page.waitForFunction(()=>window.fishing.state().stage==='equip')
   await page.evaluate(()=>{
@@ -39,6 +41,7 @@ try {
     release();return fishing.state().phase
   },{mode,first})
   assert.equal(await fight('land',true),'land');await page.screenshot({path:'captures/fishing/lure.png'})
+  if(checkBoard){await checkBoard();return}
   assert.equal(await fight('snap'),'snap');assert.equal(await fight('escape'),'escape')
   await page.locator('[data-method]').click()
   const phases=await page.evaluate(()=>{
@@ -62,3 +65,5 @@ try {
   await page.waitForFunction(()=>document.querySelector('.vehicle-action')?.textContent==='骑电动车');await page.keyboard.press('f');await page.waitForFunction(()=>document.body.dataset.ride==='bike');await page.evaluate(()=>window.viewer.walk.ebike.setVehicleType('normal'));await page.keyboard.press('4');await page.waitForFunction(()=>document.querySelector('.ride-gear')?.textContent==='S');assert.equal(await page.evaluate(()=>window.fishing.state().stage),'idle')
   assert.deepEqual(errors,[]);console.log('Fishing browser: shore gate, lure land/snap, slack escape, float spook/miss, invalid cast, wallet, bike gear OK')
 }finally{await browser?.close();await server.close()}
+}
+if(import.meta.filename===process.argv[1])await verifyFishing()

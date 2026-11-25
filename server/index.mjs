@@ -16,6 +16,7 @@ import {multiplayer} from './mp-admin.mjs'
 import {npcDefaults,validNpc} from '../lib/npc.ts'
 import {resolveClientIp} from './client-ip.mjs'
 import {createPerfCache} from './perf-cache.mjs'
+import {fishingStore} from './fishing.mjs'
 
 crypto.subtle.timingSafeEqual = (left,right) => left.byteLength===right.byteLength && timingSafeEqual(left,right)
 // 连接/查询都有上限：卡住的查询不能长期占着 5 连接的池子
@@ -68,6 +69,7 @@ async function gfxAdmin(request,user){
 const env = {...process.env, gfxAdmin,smokeAdmin,npcAdmin,mpAdmin:mp.route, perfQuery:cachedPerfQuery, DB:database(connections), FEEDBACK:bucket(process.env.S3_ENDPOINT)}
 const origin = new URL(process.env.PUBLIC_ORIGIN).origin
 env.updateCards=cardRoutes(pool,env)
+env.fishing=fishingStore(connections)
 const online = presence(pool)
 const mpOnline = mpPresence()
 
