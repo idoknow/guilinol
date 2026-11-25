@@ -63,7 +63,7 @@ try{
           }catch(e){ready=false;setupError=e.message.split('\n')[0]}
         }
         if(!ready)throw Error(setupError??'could not reach or board lane fixture')
-        const run=await page.evaluate(async({route,mode,boundary})=>{
+        const run=await page.evaluate(async({route,mode,boundary,surfaceApproach})=>{
           const v=window.viewer,w=v.walk,held=new Set(),frames=[]
           const key=(code,down)=>{
             if(held.has(code)===down)return
@@ -108,7 +108,13 @@ try{
               }
               // Anticipate hairpins. At ordinary right-angle junctions the shorter
               // lookahead keeps the car on the paved inside corner.
-              const carLookahead=sharp?7.5:bend?3.4:6.5
+              // Ground intersections can have a kerb on the outside of the
+              // turn. Start the steering arc earlier, then reacquire the
+              // lane centre before resuming the normal straight lookahead.
+              let carLookahead=6.5
+              if(sharp)carLookahead=7.5
+              else if(bend)carLookahead=surfaceApproach?5:3.4
+              else if(surfaceApproach&&cross>.4)carLookahead=3
               let ahead=Math.max(0,progress)+(mode==='car'?carLookahead:3.5)
               // A pedestrian can turn at the vertex itself. Looking beyond a hairpin
               // before reaching it can leave the walker at a stationary target.
@@ -149,7 +155,7 @@ try{
           const failure=completed?undefined:obstruction||probe.resets>initialResets?'collision':'tool'
           return {completed,failure,maximum,frames,part,obstacle:w.obstacle,contacts,
             stopped:completed?undefined:{hits:probe.contactSources,foot:probe.foot,resets:probe.resets-initialResets,heading:w.heading}}
-        },{route,mode,boundary})
+        },{route,mode,boundary,surfaceApproach:process.argv.includes('--surface')})
         results.push({id,way,mode,boundary,direction,...run})
       }catch(e){results.push({id,way,mode,boundary,direction,failure:"tool",unavailable:e.message.split('\n')[0]})}
     }
