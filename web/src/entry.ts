@@ -2,6 +2,9 @@ import {getPlayMode, lastPlayMode, linkedPlayMode, setPlayMode, type PlayMode} f
 import './telemetry'
 import './ui/theme.css'
 import './ui/hud.css'
+// 禁止右键菜单和长按菜单（输入框除外），避免手机长按按钮弹出复制/保存图片
+document.addEventListener('contextmenu',event=>{if(!(event.target as Element|null)?.closest?.('input,textarea,[contenteditable]:not([contenteditable=false])'))event.preventDefault()})
+document.addEventListener('dragstart',event=>{if((event.target as Element|null)?.tagName==='IMG')event.preventDefault()})
 import {home} from './ui/home'
 import {accountEntry, consumeCreatorSpawn, onUser, requireUser} from './ui/account'
 import {isDeepLink} from './deeplink'

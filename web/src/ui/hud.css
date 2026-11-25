@@ -1,5 +1,9 @@
 /* In-game HUD on the 山水印 tokens (theme.css). Left column = 你自己（菜单、账号、时辰天气）, right column = 游戏工具. */
-html,body{overflow:hidden}body{margin:0;background:var(--ui-ink-900)}canvas{display:block;touch-action:none}
+html,body{overflow:hidden}
+/* 游戏页禁止选中文字 / 长按复制菜单 / 系统长按预览（手机长按按钮会弹出复制），输入框除外 */
+html,body{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;-webkit-tap-highlight-color:transparent}
+:is(input,textarea,[contenteditable]:not([contenteditable=false])){-webkit-user-select:text;user-select:text;-webkit-touch-callout:default}
+img{-webkit-user-drag:none;user-drag:none}body{margin:0;background:var(--ui-ink-900)}canvas{display:block;touch-action:none}
 
 /* 一套玻璃按钮：所有浮在画面上的控件共用同一材质、同一按下态 */
 .walk-ui button,.btn-mode,.btn-menu,.account-entry,.vehicle-action,.dock-buttons>button,.photo-exit{font-family:var(--ui-serif);color:var(--ui-paper);background:var(--ui-glass);
