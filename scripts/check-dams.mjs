@@ -6,8 +6,12 @@ import {gunzipSync} from 'node:zlib'
 const directory=process.argv[2]??'dist/world'
 const manifest=JSON.parse(readFileSync(join(directory,'manifest.json')))
 const footprints=JSON.parse(readFileSync(new URL('../pipeline/dam-cells.json',import.meta.url)))
+const passages=JSON.parse(readFileSync(new URL('../pipeline/dam-passages.json',import.meta.url)))
+const vehicles=JSON.parse(gunzipSync(readFileSync(join(directory,manifest.vehicles.file))))
+const routes=new Set(vehicles.routes.flatMap(leg=>leg.path.map(([x,,z])=>[x/4,z/4].join())))
 const required=new Set(['way/1008909377','way/1008909373'])
 for(const [id,runs] of Object.entries(footprints)){
+  const openings=new Set((passages[id]?.cells??[]).map(pair=>pair.join()))
   let checked=0
   for(const tile of manifest.chunks){
     const relevant=runs.filter(([row,start,end])=>row*4>=tile.z&&row*4<=tile.z+256&&end*4>=tile.x&&start*4<=tile.x+256)
@@ -17,10 +21,16 @@ for(const [id,runs] of Object.entries(footprints)){
     for(const [row,start,end] of relevant)for(let col=start;col<=end;col++){
       if(col*4<tile.x||col*4>tile.x+256)continue
       const index=(row-tile.z/4)*65+col-tile.x/4
-      assert.equal(data.readInt16LE(8474+2*index),-32768,`${id} still wet at ${col},${row}`);checked++
+      const key=[col,row].join(),water=data.readInt16LE(8474+2*index)
+      if(openings.has(key))assert.notEqual(water,-32768,`${id} ferry passage dry at ${key}`)
+      else {
+        assert.equal(water,-32768,`${id} still wet at ${key}`)
+        assert(!routes.has(key),`${id} route crosses solid dam at ${key}`)
+      }
+      checked++
     }
   }
   if(checked)required.delete(id)
-  console.log(`${id}: ${checked} dry samples`)
+  console.log(`${id}: ${checked} dam samples checked`)
 }
 assert.equal(required.size,0,'Both acceptance sites must be present')

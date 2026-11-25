@@ -6,6 +6,8 @@
 
 验证发布包可在其独立副本上执行：
 
+通航口使用 `pipeline/dam-passages.json` 的 `[col,row]` 世界网格坐标（乘 4 得米）。原始快照没有渡线，所列节点来自 OpenStreetMap `way/485320269`（木龙湖）和 `way/674893651`（春天湖）的 `/full.json`。只选中心在坝内、且格子与渡线穿坝段相交的格子，不加缓冲。木龙湖闸门 `node/6318049385` 在坝外，不是第二条穿坝通道。可用 `PYTHONPATH=pipeline uv run python -m unittest pipeline/test_dam_passages.py` 从 raw 坝面复算清单。
+
 ```sh
 node scripts/bake-dams.mjs /path/to/world-copy
 node scripts/check-dams.mjs /path/to/world-copy

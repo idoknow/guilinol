@@ -9,6 +9,7 @@ import io
 import json
 import math
 import struct
+import subprocess
 from pathlib import Path
 from overview_water import water_mask
 from sections import section_layers, shopfronts, RULES
@@ -38,6 +39,7 @@ from clearance import landmark_triangles
 from landmarks.rong_ground import GATE_PLAZA, grade_landings
 from landmarks import xiaoyao_access
 from shoreline import correct_water, contour_ronghu
+from dam_passages import apply_dams
 from landmark_layout import Layout
 from landmark_solids import load_landmark_meshes, structural_footprint, slice_tris_at_y
 from landmarks.world_surface import PeakSurface
@@ -105,7 +107,7 @@ def build(bbox, output, palette, workers=4):
     start = np.floor(np.array(ll2xz(north, west))/CHUNK).astype(int)*CHUNK
     end = np.ceil(np.array(ll2xz(south, east))/CHUNK).astype(int)*CHUNK
     west0,north0,w0,h0 = DOWNTOWN
-    downtown = Downtown() if (start[0]<west0 and start[1]<north0 and end[0]>west0+w0 and end[1]>north0+h0) else None
+    downtown = Downtown() if (start[0]<=west0 and start[1]<=north0 and end[0]>=west0+w0 and end[1]>=north0+h0) else None
     left, top = map(int,start)
     width, depth = map(int,end-start)
     terrain = np.rint(load_dem(np.arange(left,left+width+1,GRID),np.arange(top,top+depth+1,GRID))*10).astype('<i2')
@@ -125,6 +127,7 @@ def build(bbox, output, palette, workers=4):
                             top+(row+np.arange(patch.shape[0])[:,None])*GRID)
         if wet.any():
             patch[wet] = round(np.median(terrain[row:row+patch.shape[0],col:col+patch.shape[1]][wet]))
+    apply_dams(surface, left, top)
     wet = surface != DRY
     previous_bed = np.where(wet,np.minimum(terrain,surface-20),terrain)
     output.mkdir(parents=True, exist_ok=True)
@@ -277,6 +280,7 @@ def build(bbox, output, palette, workers=4):
         fubo = fubo_site(spec['eastLimit'])
     if downtown:
         downtown.blend(terrain,surface,original,road_ctrl,left,top,fubo)
+        apply_dams(surface, left, top)
         wet[:] = surface != DRY
         downtown.peaks(output,peaks)
     if fubo is not None:
@@ -594,6 +598,7 @@ def build(bbox, output, palette, workers=4):
     from major_roadbeds import bake as bake_major_roadbeds
     bake_major_roadbeds(output,manifest)
     (output/'manifest.json').write_text(json.dumps(manifest,separators=(',',':'))+'\n')
+    subprocess.run(['node',Path(__file__).resolve().parents[1]/'scripts/bake-dams.mjs',output],check=True)
     print(f'{len(chunks)} chunks, {len(footprints)} footprints, {sum(c["bytes"] for c in chunks):,} chunk bytes')
 
 
