@@ -65,8 +65,18 @@ export function nativeTerrainIndices(segments:number,heights:{getY:(i:number)=>n
     for(let j=0;j<n;j++)if(used[corner(x+n-j,z)])ring.push(corner(x+n-j,z))
     if(ring.length===4)indices.push(a,b,d,b,c,d)
     else{
-      const center=corner(x+n/2,z+n/2)
-      for(let i=0;i<ring.length;i++)indices.push(center,ring[i],ring[(i+1)%ring.length])
+      // Use the a–c diagonal. Each half has two subdivided perimeter
+      // edges. Fan the first edge to the first vertex past its corner,
+      // then cover the rest from the start. This keeps every shared edge
+      // without the two extra triangles a centre fan would require.
+      function half(perimeter:number[],cornerIndex:number){
+        const pivot=perimeter[cornerIndex+1]
+        for(let i=0;i<cornerIndex;i++)indices.push(perimeter[i],perimeter[i+1],pivot)
+        for(let i=cornerIndex+1;i+1<perimeter.length;i++)indices.push(perimeter[0],perimeter[i],perimeter[i+1])
+      }
+      const diagonal=ring.indexOf(c)
+      half(ring.slice(0,diagonal+1),ring.indexOf(b))
+      half([...ring.slice(diagonal),a],ring.indexOf(d)-diagonal)
     }
   }
   return indices
