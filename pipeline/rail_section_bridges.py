@@ -49,7 +49,7 @@ def clipped_faces(face, tile):
                         for x, z in (ring[0], a, b)])
 
 
-def grade_decks(directory, manifest, designs, ways, profiles):
+def grade_decks(directory, manifest, designs, ways, profiles, passage=None):
     axes = {d["way"]: LineString(points(ways[d["way"]])) for d in designs}
     patches = {}
     abutments = {}
@@ -71,6 +71,11 @@ def grade_decks(directory, manifest, designs, ways, profiles):
             direction = center - line.coords[j]
             direction /= np.linalg.norm(direction)
             top = levels[i, 1]
+            if passage and node in passage.entrances:
+                if abs(top - passage.entrances[node][3]) > .005:
+                    raise ValueError(f"Passage entrance does not meet bridge {wid}")
+                patches[node] = []
+                continue
             if "approachWay" in access:
                 _, approach, samples = profiles[access["approachWay"]]
                 landing = center + access["length"] * direction

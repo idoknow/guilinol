@@ -1029,6 +1029,16 @@
       "direction": "raise"
     }
   ],
+  "indoorPassage": {
+    "ways": [1332733828, 1332733829],
+    "buildingSeeds": [3074411851, 2053243945],
+    "width": 3.0,
+    "floor": 159.2,
+    "ceiling": 162.0,
+    "entranceLength": 5.6,
+    "entranceLevels": [158.821001, 158.866643],
+    "endWallDepth": 0.2
+  },
   "roadDecks": [
     {
       "way": 253928003,
@@ -1215,7 +1225,7 @@
         {
           "kind": "ramp",
           "length": 5.6,
-          "landing": 158.89
+          "landing": 159.2
         },
         {
           "kind": "stairs",
@@ -1324,7 +1334,7 @@
         {
           "kind": "ramp",
           "length": 5.6,
-          "landing": 158.78
+          "landing": 159.2
         }
       ]
     }

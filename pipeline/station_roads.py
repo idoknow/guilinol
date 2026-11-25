@@ -123,7 +123,9 @@ def bake(directory, manifest, paired_widths):
         bridges, joints = [], {}
         if section.get("roadDecks"):
             from rail_section_bridges import grade_decks
-            bridges, joints = grade_decks(directory, manifest, section["roadDecks"], ways, parts)
+            from indoor_passage import IndoorPassage
+            passage = IndoorPassage(section["indoorPassage"], ways) if "indoorPassage" in section else None
+            bridges, joints = grade_decks(directory, manifest, section["roadDecks"], ways, parts, passage)
         bake_profiles(directory, manifest, parts, elements, bridges, joints, additional=True,
                       sample_traffic=not bridges)
         finish_paving(directory, manifest, list(parts.values()), elements)
