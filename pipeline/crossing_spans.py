@@ -95,7 +95,15 @@ def grade_deck(output, manifest, ways, widths, bridge, roads, landings):
         pts = [line.interpolate(d) for d in steps]
         end = pts[-1]
         target, = sample_road_heights(output, manifest, [dict(x=end.x, z=end.y, way=arm['id'])])
-        profile = height[i] + (target - height[i]) * steps / line.length
+        # Match the bridge downgrade, then join the native road with a
+        # parabolic vertical curve. Carrying the lift to the far end of the
+        # approach leaves a retaining step across the station exit sidewalk.
+        native = deck[i] + (target - deck[i]) * steps / line.length
+        descent = height[i] - grade * steps
+        band = min(.08, height[i]-deck[i], target-descent[-1])
+        profile = np.maximum(native, descent)
+        if band > 0:
+            profile += np.maximum(0, band-np.abs(native-descent))**2/(4*band)
         if abs(target - height[i]) > grade * line.length:
             raise ValueError(f'Extend the grade of {bridge} past {arm["id"]}')
         half = widths.get(arm['id'], RULES['defaultWidth'][arm['tags']['highway']]) / 2
