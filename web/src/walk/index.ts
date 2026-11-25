@@ -3,7 +3,8 @@ import {emoteWheel} from '../emote/wheel'
 import {emotePlayback} from '../emote/playback'
 import {interrupted,emotesEnabled} from '../emote/emotes'
 import {takeCigaretteIntent, smokeEnabled} from '../citizen/use-item'
-import {selectSlot,hotbarSlot,showSmokeDiscard} from '../ui/hotbar'
+import {selectSlot,hotbarSlot,showSmokeDiscard,showFishingSlot} from '../ui/hotbar'
+import fishingShores from '../fishing/shores.json'
 import {getActiveSaveSnapshot,takeFromPack} from '../game/save'
 import {rules,validRules} from '../smoke/data'
 import {createSmokePrompt} from '../smoke/prompt'
@@ -1952,6 +1953,7 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
   function tick(dt:number){wheel.sync();if(!active)return;emote.reset();holdLayer.reset();
     if(emote.id&&(rides?.boat||rides?.car||rides?.bike)){emote.stop();emote.tick(.24,false)}
     smoking?.resetPose();const before=performance.now(),start=rides?.boat?.position??sim.body.translation();syncSceneObstacleVolumes();sim.sync(start.x,start.z,true);const footYNow=rides?.boat?start.y:start.y-cfg.height/2;rides?.nearby(start.x,start.z,footYNow);interactArbiter.sync(actionButton);syncGameTravelState();updateShopHintRings(start.x,start.z,footYNow)
+    showFishingSlot(!rides?.bike&&!rides?.boat&&!rides?.car&&fishingShores.some(({spot,radius})=>Math.abs(start.x-spot.x)<=radius&&Math.hypot(start.x-spot.x,start.z-spot.z)<=radius))
     if(cigarette.active && (rides?.bike||rides?.boat||rides?.car)){
       cancelSmoke()
       smoking?.tick(dt,cigarette.view(),false)

@@ -12,6 +12,8 @@ export type HotbarSlot = 'hand' | 'camera' | 'smoke' | 'fishing'
 
 let slot: HotbarSlot = 'hand'
 let bar: HTMLElement | null = null
+let fishingButton:HTMLButtonElement|null=null
+export function showFishingSlot(near:boolean){if(fishingButton&&fishingButton.hidden===near)fishingButton.hidden=!near}
 
 /** street-hud 在徒步时写 data-ride=foot，骑车 / 开车 / 坐船时写交通工具种类。 */
 export function riding() {
@@ -76,7 +78,8 @@ export function mountHotbar() {
     window.addEventListener('glol:save-written',refresh)
     bar.querySelector('[data-shop]')!.addEventListener('click',()=>window.dispatchEvent(new Event('smoke:shop')))
   }
-  bar.insertAdjacentHTML('beforeend','<button type="button" class="hotbar-slot" data-slot="fishing"><kbd>4</kbd><span>鱼竿</span></button>')
+  bar.insertAdjacentHTML('beforeend','<button hidden type="button" class="hotbar-slot" data-slot="fishing"><kbd>4</kbd><span>鱼竿</span></button>')
+  fishingButton=bar.querySelector('[data-slot=fishing]')
   for (const button of Array.from(bar.querySelectorAll<HTMLButtonElement>('.hotbar-slot'))) {
     button.addEventListener('pointerdown', event => event.preventDefault())
     if (button.dataset.slot) button.addEventListener('click', () => {
