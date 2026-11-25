@@ -42,41 +42,65 @@ for(const tunnel of manifest.tunnels??[])if(tunnel.nodes)ids.add(tunnel.way)
 const grades=JSON.parse(fs.readFileSync('docs/railway-grades.json','utf8'))
 for(const row of grades.resolvedRoadStructures??[])for(const id of [row.roadWay,row.bridgeWay])if(id)ids.add(id)
 const ways=JSON.parse(fs.readFileSync('raw/osm-2026-11.json','utf8')).elements
-const result=[]
+type Lane = {way:number,structure:string,nodes:Set<number>}
+type Probe = {x:number,z:number,at:number,lane:Lane,connected:boolean,before:number,after:number}
+const byTile=new Map<string,Probe[]>()
+const surveys:{way:any,structure:string,probes:Probe[]}[]=[]
+
 for(const way of ways){
   if(way.type!=='way'||!way.geometry?.length)continue
-  if(!ids.has(way.id) && !(gate && motor.has(way.tags?.highway?.replace(/_link$/, ''))))continue
+  const kind=way.tags?.highway?.replace(/_link$/, '')
+  if(!ids.has(way.id) && !(gate && motor.has(kind)))continue
   const structure=way.tags.tunnel&&way.tags.tunnel!=='no'?'tunnel':way.tags.bridge&&way.tags.bridge!=='no'?'bridge':'surface'
-  const lane={way:way.id,structure}
+  const lane={way:way.id,structure,nodes:new Set<number>(way.nodes)}
   const coords=way.geometry.map(p=>ll2xz(p.lat,p.lon))
+  const probes:Probe[]=[]
+  let station=0,connected=false
+  for(let i=1;i<coords.length;i++){
+    const {x,z}=coords[i-1],dx=coords[i].x-x,dz=coords[i].z-z,step=Math.hypot(dx,dz)
+    if(step<.001)continue
+    if(!gate||overlapsChange(x,z,dx,dz)){
+      const count=Math.ceil(step/2)
+      for(let j=connected?1:0;j<=count;j++){
+        const f=j/count,px=x+f*dx,pz=z+f*dz,at=station+f*step
+        const key=Math.floor(px/256)*256+','+Math.floor(pz/256)*256
+        if(!oldTiles.has(key)||!newTiles.has(key)){connected=false;continue}
+        const point={x:px,z:pz,at,lane,connected,before:0,after:0}
+        probes.push(point)
+        if(!byTile.has(key))byTile.set(key,[])
+        byTile.get(key)!.push(point)
+        connected=true
+      }
+    }else connected=false
+    station+=step
+  }
+  if(probes.length)surveys.push({way,structure,probes})
+}
+
+// Build the two collision meshes only once per tile, regardless of way order.
+for(const probes of byTile.values())for(const p of probes){
+  p.before=before(p.x,p.z,p.lane)
+  p.after=after(p.x,p.z,p.lane)
+}
+const result=[]
+for(const {way,structure,probes} of surveys){
   const row={way:way.id,structure,adjustedLengthM:0,maxRoadChangeM:0,peakGrade:0,mainPeakGrade:0,mainGradeAtCandidatePeak:0,peakGradeStationM:0,fromM:0,toM:0,worst:null}
   const kind=way.tags.highway?.replace(/_link$/, '')
   const cap=localRoad.has(kind) ? .08 : .05
   let failingIntervals=0
   let largestExcess=0
   let failure
-  let station=0,previous
-  for(let i=1;i<coords.length;i++){
-    const {x,z}=coords[i-1],dx=coords[i].x-x,dz=coords[i].z-z,step=Math.hypot(dx,dz)
-    if(step<.001)continue
-    if(gate&&!overlapsChange(x,z,dx,dz)){station+=step;previous=undefined;continue}
-    const count=Math.ceil(step/2)
-    for(let j=previous?1:0;j<=count;j++){
-      const f=j/count,px=x+f*dx,pz=z+f*dz,at=station+f*step
-      let a,b
-      try{a=before(px,pz,lane);b=after(px,pz,lane)}catch(error){
-        if(!String(error).includes('No rendered chunk'))throw error
-        previous=undefined
-        continue
-      }
+  for(const [index,p] of probes.entries()){
+    const {x:px,z:pz,at,before:a,after:b}=p
+    const previous=p.connected?probes[index-1]:undefined
       const delta=b-a
       if(Math.abs(delta)>Math.abs(row.maxRoadChangeM)){
         row.maxRoadChangeM=delta;row.worst={x:px,z:pz,stationM:at,oldM:a,newM:b}
       }
       if(previous){
         const run=at-previous.at
-        const grade=Math.abs(b-previous.b)/run
-        const mainGrade=Math.abs(a-previous.a)/run
+        const grade=Math.abs(b-previous.after)/run
+        const mainGrade=Math.abs(a-previous.before)/run
         const excess=grade-Math.max(mainGrade,cap)
         if(motor.has(kind) && excess>1e-6){
           failingIntervals++
@@ -85,7 +109,7 @@ for(const way of ways){
             failure={fromM:previous.at,toM:at,x:px,z:pz,grade,mainGrade,cap}
           }
         }
-        if(Math.abs(delta)>.02||Math.abs(previous.delta)>.02){
+        if(Math.abs(delta)>.02||Math.abs(previous.after-previous.before)>.02){
           if(!row.adjustedLengthM)row.fromM=previous.at
           row.toM=at
           row.adjustedLengthM+=run
@@ -97,9 +121,6 @@ for(const way of ways){
           row.mainPeakGrade=Math.max(row.mainPeakGrade,mainGrade)
         }
       }
-      previous={at,a,b,delta}
-    }
-    station+=step
   }
   if(Math.abs(row.maxRoadChangeM)>.02){
     result.push(row)

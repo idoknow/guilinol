@@ -33,7 +33,7 @@ class InfeasibleApproach(ValueError):
     pass
 
 
-def fit_patch(control, mask, left, top, roads, anchors, curvature=.005):
+def fit_patch(control, mask, left, top, roads, anchors, curvature=.005, grade_reserve=.90):
     distance = distance_transform_edt(~mask)*STEP
     shape = control.shape
     n = control.size
@@ -108,7 +108,7 @@ def fit_patch(control, mask, left, top, roads, anchors, curvature=.005):
         valid = keep[:-1]&keep[1:]
         # Leave headroom for centimetre deck vertices, the 4 m street
         # tessellation, and interpolation across bends between survey stations.
-        cap = .90 * grade_cap(tags)
+        cap = grade_reserve * grade_cap(tags)
         bounds(slope[valid],-cap,cap)
         bounds(((slope[1:]-slope[:-1])/step)[valid[1:]&valid[:-1]],-curvature,curvature)
         samples.append(xy[keep])
@@ -133,7 +133,11 @@ def fit_patch(control, mask, left, top, roads, anchors, curvature=.005):
         if curvature==.005 and solution.status==clarabel.SolverStatus.PrimalInfeasible:
             # Close consecutive crossing panels can require a shorter vertical
             # curve. At 0.014/m the slope changes by at most 2.8% over 2 m.
-            return fit_patch(control,mask,left,top,roads,anchors,curvature=.014)
+            return fit_patch(control,mask,left,top,roads,anchors,curvature=.014,grade_reserve=grade_reserve)
+        if grade_reserve<1 and solution.status==clarabel.SolverStatus.PrimalInfeasible:
+            # Where the hard crossing datums consume the interpolation reserve,
+            # fit to the actual class limit and check the emitted triangles.
+            return fit_patch(control,mask,left,top,roads,anchors,curvature=curvature,grade_reserve=1.)
         raise InfeasibleApproach(f'Rail approach fit at ({left},{top}): {solution.status}')
     target[free] = solution.x
     fitted = datum+target.reshape(shape)

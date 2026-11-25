@@ -23,6 +23,7 @@ class ProtectedRoadGrades:
 
         rail = STRtree([Point(r['x'],r['z']) for r in crossings])
         specs = json.loads(Path(__file__).with_name('landmarks.json').read_bytes())
+        foundations = []
         for spec in specs:
             coords = spec.get('flatten', {}).get('polygon', ())
             if len(coords)<3:
@@ -30,6 +31,18 @@ class ProtectedRoadGrades:
             foundation = Polygon([ll2xz(lat,lon) for lon,lat in coords])
             if len(rail.query(foundation,predicate='dwithin',distance=64)):
                 continue
+            foundations.append(foundation)
+        # The closed freight yard has a retained warehouse floor. Preserve
+        # its base across all four private approaches, including archive tiles.
+        import csv
+        from common import RAW
+        from features import overture_geometry
+        report = json.loads((Path(__file__).resolve().parents[1]/'docs/railway-grades.json').read_bytes())
+        depot = report['enclosedLevelCrossings']
+        with (Path(RAW)/'overture_buildings.csv').open() as source:
+            warehouse = next(r for r in csv.DictReader(source,delimiter='\t') if r['id']==depot['footprintId'])
+        foundations.append(overture_geometry(warehouse))
+        for foundation in foundations:
             xmin,zmin,xmax,zmax = foundation.buffer(60).bounds
             for step,field,old in zip((4,4,8),self.after,self.before):
                 # The road control grid carries a one-knot halo.

@@ -145,7 +145,10 @@ def bake(directory, chunks, graded=None, tunnels=()):
         end = lower[0] if lower else len(streets[0])
         existing = [make_valid(Polygon(np.array(shell)/100,[np.array(r)/100 for r in holes])) if len(shell)>=3 else Polygon()
                     for kind,shell,*holes in streets[0][:end]]
-        missing = local.difference(union_all(existing))
+        # Painted lines are thin overlay meshes and do not support vehicles.
+        # Lay asphalt beneath them when filling a missing piece of a street.
+        covering = [poly for poly,ring in zip(existing,streets[0][:end]) if ring[0]!=2]
+        missing = local.difference(union_all(covering))
         # Where a daylight lane crosses a sidewalk polygon the old paving mask
         # left a hole between two raised asphalt strips. Continue the motor
         # strip along its OSM axis and rebuild the curb at its actual edge.

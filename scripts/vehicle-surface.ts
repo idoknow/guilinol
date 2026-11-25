@@ -112,6 +112,25 @@ export function vehicleSurface(world,m){
       const floor=floorLevel(t,x,z)
       if(floor!==undefined)return floor
     }
+    // A surface way can share the actual floor of the adjoining cut across
+    // a daylight junction. Ground below that floor is not wheel support.
+    if(!lane.structure||lane.structure==='surface'){
+      for(const t of local){
+        if(!t.nodes)continue
+        const onLanding=t.nodes.some((node,end)=>{
+          if(!t.mouths?.[end]||!(node===lane.from||node===lane.to||lane.nodes?.has(node)))return false
+          const [px,,pz]=t.portals[end]
+          return Math.hypot(x-px,z-pz)<=4*t.halfWidth
+        })
+        if(onLanding){
+          const floor=floorLevel(t,x,z)
+          if(floor!==undefined){
+            if(diagnostic)diagnostic.road=floor
+            return floor
+          }
+        }
+      }
+    }
     if(lane.structure==='tunnel'&&lane.start&&lane.end){
       const along=(x-lane.start.x)*lane.dx+(z-lane.start.z)*lane.dz
       const end=along<0?lane.start:along>lane.length?lane.end:null
