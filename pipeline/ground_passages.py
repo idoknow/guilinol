@@ -21,10 +21,16 @@ GARAGE = (2937485852, 1493582667)
 LONG_PASSAGE = (2515875700, 1112703462)
 
 
+def paved_passage(way):
+    # The last 13.62 m of this alley enters a 12.4 m building. Bake the
+    # surface and the clear opening together, including room for the last axle.
+    return way.get('surfaceUnderlay') or (way['type']=='way' and way['id']==454929209)
+
+
 def passage_road(way):
     # The access road continues through a separate building on the approach
     # to surface junction 14286127223. Use the same footprint and soffit rules.
-    return way.get('surfaceUnderlay') or (way['type']=='way' and way['id']==1568445637)
+    return paved_passage(way) or (way['type']=='way' and way['id']==1568445637)
 
 
 def opens_road(seed, way, length):
