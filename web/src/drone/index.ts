@@ -974,6 +974,8 @@ export function droneMode(host:Host, deps:{groundAt:(x:number,z:number)=>number;
       host.camera.rotation.set(lens.pitch,lens.yaw,0,'YXZ')
       host.camera.updateMatrixWorld()
       rc.update(telemetry(flight),!!recording)
+      // IDOK-282: 水平仪 —— 用云台俯仰作为倾斜量（悬停时机身近似水平）。
+      rc.setHorizon(flight.gimbal)
       if (flight.phase === 'returning' && entry) entry.textContent = '返航中'
       chaseView()
     } else if (placed) {

@@ -29,6 +29,8 @@ export interface RcView {
   toast(text:string):void
   /** IDOK-281: 更新遥控连接按钮的文案（源名/未连接/隐藏）。 */
   setLinkLabel(text:string|null):void
+  /** IDOK-282: 水平仪 —— 倾斜角（度）。0 = 水平线正中。 */
+  setHorizon(deg:number):void
 }
 
 type Mode = 'photo' | 'video'
@@ -274,7 +276,17 @@ export function createRc(spec:DroneSpec, handlers:RcHandlers, onHold?:(held:bool
     linkBtn.classList.toggle('on',text.includes('已连接') || text.includes('DJI RC ·'))
   }
 
-  return {root,update,setRecording,toast,setLinkLabel}
+  // IDOK-282: 水平仪 —— 中央横线随飞机滚转/俯仰倾斜，刻度显示倾斜量。
+  const horizon = q<HTMLElement>('.rc-horizon')
+  let horizonDeg = 0
+  function setHorizon(deg:number) {
+    if (!horizon || !Number.isFinite(deg)) return
+    horizonDeg = Math.max(-45,Math.min(45,deg))
+    horizon.style.transform = `translate(-50%,-50%) rotate(${horizonDeg}deg)`
+    horizon.dataset.tilt = Math.abs(horizonDeg) > 5 ? '1' : '0'
+  }
+
+  return {root,update,setRecording,toast,setLinkLabel,setHorizon}
 }
 
 function round(value:number) { return Math.round(value * 100) / 100 }
@@ -333,7 +345,7 @@ function proMarkup(spec:DroneSpec) {
       <button class="rc-side" data-act="record" title="录像">录像</button>
       <button class="rc-side" data-act="exit" title="退出遥控">退出</button>
     </div>
-    <div class="rc-center"><div class="rc-reticle"></div></div>
+    <div class="rc-center"><div class="rc-reticle"></div><div class="rc-horizon"><i></i><i></i></div></div>
     <div class="rc-gimbal"><span>云台 <b class="rc-gimbalval"></b></span><input type="range" step="1" aria-label="云台俯仰"></div>
     <div class="rc-bottom">
       <div class="rc-tele"></div>
@@ -356,7 +368,7 @@ function simpleMarkup(spec:DroneSpec) {
       <span class="rc-batt"><i></i></span>
       <span class="rc-battval"></span>
     </div>
-    <div class="rc-center"><div class="rc-reticle"></div></div>
+    <div class="rc-center"><div class="rc-reticle"></div><div class="rc-horizon"><i></i><i></i></div></div>
     <div class="rc-readout"></div>
     <div class="rc-gimbal"><span></span><input type="range" min="${spec.gimbal.tiltMin}" max="${spec.gimbal.tiltMax}" step="1" data-gimbal></div>
     <div class="rc-sticks"><div class="rc-stick" data-side="left"><i></i></div><div class="rc-stick" data-side="right"><i></i></div></div>
