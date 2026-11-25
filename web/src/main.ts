@@ -301,24 +301,36 @@ async function start(loader:FullLoader,creatorSpawn=false) {
   type Walker=Awaited<ReturnType<typeof import('./walk').walk>>
   let loadingWalker:Promise<Walker>|undefined
   function loadWalker():Promise<Walker>{return loadingWalker??=prefetchWalk().then(module=>module.walk(scene,camera,renderer.domElement,manifest,stream,peaks,params.has('verify'))).then(player=>walker=player).catch(error=>{loadingWalker=undefined;throw error})}
-  async function walkTo(x:number,z:number,yaw:number,reason:string,name?:string){
-    if(switching)return false
+  let landingQueue=Promise.resolve()
+  function walkTo(x:number,z:number,yaw:number,reason:string,name?:string){
+    const parent=titleTransition
+    const result=landingQueue.then(()=>land(x,z,yaw,reason,name,parent))
+    landingQueue=result.then(()=>{},()=>{})
+    return result
+  }
+  async function land(x:number,z:number,yaw:number,reason:string,name:string|undefined,transition:typeof titleTransition){
     switching=true
     const start=performance.now()
     let completed=false
-    const controller=new AbortController(),signal=titleTransition?.signal??controller.signal
-    const parent=titleTransition?.view
+    const controller=new AbortController(),signal=transition?AbortSignal.any([transition.signal,controller.signal]):controller.signal
+    let stage='stream'
+    const deadline=window.setTimeout(()=>controller.abort(new Error(`Landing timed out (${reason}, ${x},${z}, ${stage})`)),90000)
+    const interrupted=new Promise<never>((_,reject)=>signal.addEventListener('abort',()=>reject(signal.reason),{once:true}))
+    void interrupted.catch(()=>{})
+    const parent=transition?.view
     const cover=parent??veil(reason==='flight'||reason.startsWith('solo')?'正在落地':reason==='creator'?'正在进入桂林':`正在前往${name?' '+name:'目的地'}`,{onCancel:titleTransition?.cancel??(()=>controller.abort()),destination:name})
     try{
       signal.throwIfAborted();primeLanding(x,z,signal)
-      const player=await loadWalker()
+      const player=await Promise.race([loadWalker(),interrupted])
       // Travel: let the haze close fully before the camera jumps, so the cut is never seen.
       if(name&&!parent&&!matchMedia('(prefers-reduced-motion: reduce)').matches)await new Promise(resolve=>setTimeout(resolve,450))
       if(signal.aborted)return false
       cover.progress(.3,'步行模块已就绪')
       completed=await player.enter(x,z,yaw,reason,false,signal,cover.progress)
+      signal.throwIfAborted()
       if(completed){
-        await prepareLandingContent?.()
+        stage='landing content'
+        await Promise.race([prepareLandingContent?.(),interrupted]);stage='shader warm-up'
         stream.tick(player.position)
         stream.updateLandmarks?.(player.position)
         if(!walkProgramsReady){
@@ -326,13 +338,14 @@ async function start(loader:FullLoader,creatorSpawn=false) {
           parked.setColorAt(0,new THREE.Color(0xffffff))
           const variants=new THREE.Group(),mapped=new THREE.MeshStandardMaterial({map:new THREE.Texture(),flatShading:true})
           variants.add(parked,new THREE.Mesh(bike.geometry,mapped))
-          try{await warmPrograms(variants)}finally{parked.dispose()}
+          try{await Promise.race([warmPrograms(variants),interrupted])}finally{parked.dispose();mapped.dispose()}
         }
-        await warmPrograms(scene);walkProgramsReady=true
+        await Promise.race([warmPrograms(scene),interrupted]);walkProgramsReady=true
       }
       if(completed)cover.progress(1)
       return completed
-    }finally{controller.abort();operation('teleport',start,completed);switching=false;showMode();if(!parent)await cover.done()}
+    }catch(error){completed=false;if(signal.aborted&&signal.reason?.name==='AbortError')return false;throw error}
+    finally{clearTimeout(deadline);controller.abort();operation('teleport',start,completed);switching=false;showMode();if(!parent)await cover.done()}
   }
   async function landSolo(initial:boolean) {
     if(walker?.active)return
