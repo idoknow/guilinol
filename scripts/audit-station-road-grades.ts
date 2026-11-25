@@ -26,6 +26,9 @@ for(const way of load('raw/osm-2026-11.json').elements){
     for(let j=1;j<=count;j++){
       const at=j/count
       const heights=surfaces.map(sample=>sample(x+at*dx,z+at*dz,lane))
+      if(![...previous,...heights].every(Number.isFinite)){
+        throw Error('Missing rendered road surface on way '+way.id+' at '+(chain+j*step)+' m')
+      }
       const [base,grade]=heights.map((h,k)=>Math.abs(h-previous[k])/step)
       if(grade>cap+.000001&&grade>base+.000001)violations.push({way:way.id,at:chain+(j-1)*step,step,base,grade,cap})
       previous=heights
