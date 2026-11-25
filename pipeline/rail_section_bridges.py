@@ -53,6 +53,7 @@ def grade_decks(directory, manifest, designs, ways, profiles):
     axes = {d["way"]: LineString(points(ways[d["way"]])) for d in designs}
     patches = {}
     abutments = {}
+    deck_ends = {}
     found = set()
     for d in designs:
         wid = d["way"]
@@ -76,6 +77,8 @@ def grade_decks(directory, manifest, designs, ways, profiles):
                 y = np.interp(approach.project(Point(landing)), samples[:, 0], samples[:, 1])
                 access = dict(access, kind="ramp", landing=y)
                 abutments[node] = []
+                deck_ends[node] = LineString([center, center - access["length"] * direction]).buffer(
+                    d["halfWidthM"], cap_style="flat")
             patches[node] = access_faces(center, direction, d["halfWidthM"], top, access)
 
     for chunk in manifest["chunks"]:
@@ -107,6 +110,12 @@ def grade_decks(directory, manifest, designs, ways, profiles):
                 if np.any(y < triangle[:, 1]):
                     raise ValueError(f"Road bridge {wid} would be lowered")
                 triangle[:, 1] = y
+                # A wheel or transverse grade probe at an oblique joint can land
+                # on either side of the abutment. Include the actual deck there.
+                for node in (ways[wid]["nodes"][0], ways[wid]["nodes"][-1]):
+                    if node in deck_ends:
+                        face = triangle.astype(float) / 100 + origin
+                        abutments[node].extend(p.tolist() for p in clipped_faces(face, deck_ends[node]))
                 found.add(wid)
                 changed = True
             for node in (ways[wid]["nodes"][0], ways[wid]["nodes"][-1]):
