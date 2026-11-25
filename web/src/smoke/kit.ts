@@ -121,6 +121,14 @@ export class SmokeKit {
     this.cigModel.group.visible = false
   }
 
+  resetState() {
+    this.hold = 0
+    this.carry = 0
+    this.hasOpenFilter = false
+    this.hideAll()
+    this.lighterModel.setFlame(0)
+  }
+
   /**
    * 按当前视图摆好道具。
    * @param view 状态机给的视图
@@ -132,8 +140,9 @@ export class SmokeKit {
     // 自己做低通是因为远端玩家上报的是 0/1 的硬状态。
     this.hold += (view.hold - this.hold) * 0.18
     this.carry += (view.carry - this.carry) * 0.18
+    if (view.phase === 'ready' || view.phase === 'light' || view.lit || view.phase === 'idle') this.carry = 0
     const right = this.hold > 0.02
-    const left = this.carry > 0.02
+    const left = this.carry > 0.02 && view.carry > 0.01
     this.packModel.group.visible = left
     this.lighterModel.group.visible = right && view.light > 0.05
     this.cigModel.group.visible = right && (view.cig > 0.01 || view.ember > 0.01)

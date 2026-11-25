@@ -79,6 +79,8 @@ export function players(scene:THREE.Scene,clips:THREE.AnimationClip[],camera:THR
     entry.refs++
     void entry.model.then(model=>{if(visible.get(player.id)!==view)return
       const instance=clone(model); view.root.add(instance);view.mixer=new THREE.AnimationMixer(instance);view.emote=emotePlayback(instance,undefined,view.mixer)
+      const idleClip=clips.find(item=>item.name===figure.clips.idle)
+      if(idleClip){const idleAct=view.mixer.clipAction(idleClip);idleAct.reset().setEffectiveWeight(1).play();view.action=idleAct;view.mixer.update(0)}
     }).catch(error=>console.warn('remote character unavailable',error))
   }
   function tick(dt:number,local:Pose) {
@@ -105,6 +107,8 @@ export function players(scene:THREE.Scene,clips:THREE.AnimationClip[],camera:THR
         view.name.scale.set(height*view.name.userData.aspect,height,1);view.name.position.y=NAME_Y+height/2-NAME_H/2
         view.name.material.opacity=Math.min(1,(NAME_FAR-away)/(NAME_FAR-NAME_NEAR))
       }
+      // Reverse LIFO reset: apply order below is emote.tick() -> kit.tick().
+      view.kit?.resetPose()
       view.emote?.reset()
       const inRange=Math.hypot(player.x-local.x,player.z-local.z)<80
       bounds.center.set(player.x,player.y+.9,player.z)
@@ -113,10 +117,14 @@ export function players(scene:THREE.Scene,clips:THREE.AnimationClip[],camera:THR
         if(eligible&&player.em&&view.played!==player.es){view.emote.play(player.em,Math.max(0,(emoteById(player.em)?.duration??0)-((player.expires??0)-performance.now())/1000));view.played=player.es??0}
         if(!eligible||!player.em){view.emote.stop();view.played=-1}
       }
-      view.kit?.resetPose()
       const name=player.bike?'sit':!player.gr?'jump':player.v>3?'run':player.v>.12?'walk':'idle'
       const clip=clips.find(item=>item.name===figure.clips[name]);if(clip&&view.mixer){const action=view.mixer.clipAction(clip)
-        if(action!==view.action){view.action?.fadeOut(.12);action.reset().fadeIn(.12).play();view.action=action} view.mixer.update(dt)}
+        if(!view.action||!view.action.isRunning()){
+          action.reset().setEffectiveWeight(1).play();view.action=action
+        }else if(action!==view.action){
+          view.action.fadeOut(.12);action.reset().setEffectiveWeight(1).fadeIn(.12).play();view.action=action
+        }
+        view.mixer.update(dt)}
       view.emote?.tick(dt,player.v>.12)
       if(enableSmoke&&view.mixer){
         if(player.sc&&!view.kit)view.kit=smokeVisual(scene,view.root)

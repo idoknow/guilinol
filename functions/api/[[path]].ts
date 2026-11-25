@@ -69,6 +69,9 @@ async function handle(request:Request,env:Env) {
   if(path==='me' || path==='auth/me' || path==='me/avatar' || path==='rt/ticket') {
     const digest=await sessionHash(request)
     const user=await sessionAccount(db,digest)
+    if(!user && method==='GET' && (path==='me'||path==='auth/me') && /(?:^|;\s*)glol_session=/.test(request.headers.get('Cookie')??'')){
+      return json({error:{code:'unauthorized',message:'请先登录'}},401,cookie('',0))
+    }
     if(!user) unauthorized()
     if(path==='rt/ticket') {
       if(!user.verified) unauthorized()

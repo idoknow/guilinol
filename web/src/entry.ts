@@ -5,6 +5,7 @@ import './ui/hud.css'
 // 禁止右键菜单和长按菜单（输入框除外），避免手机长按按钮弹出复制/保存图片
 document.addEventListener('contextmenu',event=>{if(!(event.target as Element|null)?.closest?.('input,textarea,[contenteditable]:not([contenteditable=false])'))event.preventDefault()})
 document.addEventListener('dragstart',event=>{if((event.target as Element|null)?.tagName==='IMG')event.preventDefault()})
+import {fullscreenOnEntry} from './ui/orientation'
 import {home} from './ui/home'
 import {accountEntry, consumeCreatorSpawn, onUser, requireUser} from './ui/account'
 import {isDeepLink} from './deeplink'
@@ -25,7 +26,10 @@ let engine: Promise<typeof import('./main')> | undefined
 const loadEngine = () => engine ??= import('./main')
 let started = false
 
-const title = home(mode => void enter(mode))
+const title = home(mode => {
+  if (!started && !entering) fullscreenOnEntry()
+  void enter(mode)
+})
 window.addEventListener('glol:registered',()=>void enter(lastPlayMode()))
 let entering = false
 async function enter(mode: PlayMode, remember = true) {
