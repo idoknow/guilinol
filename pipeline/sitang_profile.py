@@ -46,7 +46,38 @@ def install(output, manifest, elements):
         survey = collision[1][12]
         # Millimetre pavement encoding cannot represent the change in bank
         # across the short, skewed bridge joint. Store those faces in microns.
-        bank = design['bank_v'][design['bank_i']].astype('<i4').tobytes()
+        vertices = design['bank_v']
+        faces = design['bank_i'].reshape(-1,3)
+        # The road ends on the bisector of the bend. The tunnel begins on
+        # a perpendicular section. Close the wedge between the two cuts
+        # with the actual boundary vertices, including their bank heights.
+        boundary = np.concatenate([faces[:,[0,1]], faces[:,[1,2]], faces[:,[2,0]]])
+        edges, counts = np.unique(np.sort(boundary, axis=1),axis=0,return_counts=True)
+        approach = np.array(points(ways[1494508177]))
+        start, end = np.array(bore['portals'])[:,[0,2]]
+        near = min((q for q in approach if np.linalg.norm(q-start)>.1),key=lambda q:np.linalg.norm(q-start))
+        forward = (end-start)/np.linalg.norm(end-start)
+        incoming = (start-near)/np.linalg.norm(start-near)
+        normal = np.array([-forward[1],forward[0]])
+        origin = start-np.array([ox,oz])
+        bisector = incoming+forward
+        bisector /= np.linalg.norm(bisector)
+        apron = []
+        for i,j in edges[counts==1]:
+            pair=vertices[[i,j]]/1e6
+            xy=pair[:,[0,2]]-origin
+            along=xy@forward
+            lateral=xy@normal
+            if np.max(abs(xy@bisector))>.035 or max(along)>.025 or min(along)>-.0001 or np.max(abs(lateral))>3.51:
+                continue
+            seam=pair.copy()
+            seam[:,0]=origin[0]+normal[0]*lateral
+            seam[:,2]=origin[1]+normal[1]*lateral
+            seam[:,1]=bore['stations'][0][1]+bore['crossfall'][0]*lateral
+            a,b=pair
+            c,d=seam
+            apron.extend([a,b,d,a,d,c])
+        bank = vertices[faces].astype('<i4').tobytes()+np.rint(np.asarray(apron)*1e6).astype('<i4').tobytes()
         survey['bank'] = base64.b64encode(bank).decode()
         upper = design['upper_v'][design['upper_i']].astype('<i4').tobytes()
         survey['packed'] = base64.b64encode(base64.b64decode(survey['packed']) + upper).decode()
