@@ -42,7 +42,7 @@ def install(output, manifest, elements):
             portal[1] = station[1]
 
         path = output / tile['file']
-        raw, start, size, collision = read_chunk(path)
+        raw, payload_offset, size, collision = read_chunk(path)
         survey = collision[1][12]
         # Millimetre pavement encoding cannot represent the change in bank
         # across the short, skewed bridge joint. Store those faces in microns.
@@ -81,7 +81,7 @@ def install(output, manifest, elements):
         survey['bank'] = base64.b64encode(bank).decode()
         upper = design['upper_v'][design['upper_i']].astype('<i4').tobytes()
         survey['packed'] = base64.b64encode(base64.b64decode(survey['packed']) + upper).decode()
-        write_chunk(path, raw, start, size, collision)
+        write_chunk(path, raw, payload_offset, size, collision)
     with tempfile.TemporaryDirectory() as temp:
         request = Path(temp) / 'portal.json'
         request.write_text(json.dumps(dict(tile=tile, bore=bore, upper=base64.b64encode(upper).decode())))
