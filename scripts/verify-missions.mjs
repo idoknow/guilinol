@@ -347,7 +347,7 @@ try {
   assert(await page.evaluate(b => window.viewer.walkTo(b[0], b[2], 0, 'e2e-mount-bike'), parkedBike))
   await page.waitForFunction(() => document.querySelector('.vehicle-action')?.dataset.interactAction === 'mount_vehicle', null, {timeout:8000})
   await page.keyboard.press('KeyF')
-  await page.waitForFunction(() => window.viewer.walk.vehicle === 'bike', null, {timeout: 8000})
+  await page.waitForFunction(() => window.viewer.walk.vehicle === 'bike' && window.viewer.walk.ebike.state !== null, null, {timeout: 8000})
 
   const crashSoupCheck = await page.evaluate(async () => {
     const runFrames = async n => {
@@ -355,12 +355,14 @@ try {
     }
     window.viewer.walk.ebike.triggerCrash('lowside', 1)
     await runFrames(20)
+    const flow=window.viewer.walk.probe().twoWheelFlow
     const soupAfterCrashFrames = window.viewer.game.missions.status().soup
     window.viewer.walk.ebike.recover()
     await runFrames(20)
     const soupDuringRecover = window.viewer.game.missions.status().soup
-    return {soupAfterCrashFrames, soupDuringRecover}
+    return {soupAfterCrashFrames, soupDuringRecover,flow}
   })
+  assert.equal(crashSoupCheck.flow, 'crashed', 'the mounted rider must enter the crash state')
   assert.equal(crashSoupCheck.soupAfterCrashFrames, 0.75, 'crash must deduct exactly ONE -25% (not per-frame drain)')
   assert.equal(crashSoupCheck.soupDuringRecover, 0.75, 'standup recovery frames must NOT deduct extra soup')
 
@@ -416,12 +418,17 @@ try {
     const guilin = window.viewer.game.quiet.findQuietZoneAt(-1231, -370)
     // Teleport onto a known walkable spot (duxiu) to verify ¥120 spot bounty + reload idempotency
     const duxiu = window.viewer.tour.spots.find(s => s.id === 'duxiu')
-    await window.viewer.walkTo(duxiu.x,duxiu.z,0,'e2e-walk-to-stamp')
+    const {game,walk}=window.viewer,events=[]
+    const off=game.onEvent(event=>events.push(event))
+    const arrived=await window.viewer.walkTo(duxiu.x,duxiu.z,0,'e2e-walk-to-stamp')
     await new Promise(r => setTimeout(r, 300))
     const moneyAfterSpot = window.viewer.game.getState().money
+    off()
+    const diagnostic={arrived,landing:walk.spawns.at(-1),events,ledger:game.save.getSnapshot().economy.txHistoryRing}
     const secondTry = window.viewer.game.commerce.claimSpotBounty('duxiu')
-    return {libinId: libin?.id, guilinId: guilin?.id, moneyAfterSpot, secondCode: secondTry.code}
+    return {libinId: libin?.id, guilinId: guilin?.id, moneyAfterSpot, secondCode: secondTry.code,diagnostic}
   })
+  console.log('独秀峰首次打卡',JSON.stringify(quietAndSpotCheck))
   assert.equal(quietAndSpotCheck.libinId, 'libin_middle')
   assert.equal(quietAndSpotCheck.guilinId, 'guilin_middle')
   assert.equal(quietAndSpotCheck.moneyAfterSpot, 500, '380 + 120 duxiu spot bounty = 500')
