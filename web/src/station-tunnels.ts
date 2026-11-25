@@ -7,7 +7,7 @@ export const tunnelLiningMaterial=new THREE.MeshStandardMaterial({side:THREE.Dou
 export const tunnelLightMaterial=new THREE.MeshBasicMaterial({side:THREE.DoubleSide,vertexColors:true})
 
 type Point=[number,number,number]
-export type Tunnel={way:number,nodes?:[number,number],portals:[Point,Point],length:number,halfWidth:number,clearance:number,approach:number,approachEnds?:[number,number],mouths?:[boolean,boolean],openEnds?:[number,number],nativePaving?:boolean,openCut?:boolean,footprint?:[number,number][][],joints?:({ring:[number,number][],wedges?:[number,number][][],faces?:Point[][],draw:boolean}|null)[],stations:[number,number][]}
+export type Tunnel={way:number,nodes?:[number,number],portals:[Point,Point],length:number,halfWidth:number,clearance:number,approach:number,approachEnds?:[number,number],mouths?:[boolean,boolean],openEnds?:[number,number],nativePaving?:boolean,wallSide?:number,wallTop?:number[],openCut?:boolean,footprint?:[number,number][][],joints?:({ring:[number,number][],wedges?:[number,number][][],faces?:Point[][],draw:boolean}|null)[],stations:[number,number][]}
 
 function frame(tunnel:Tunnel){
   const [start,end]=tunnel.portals, ux=(end[0]-start[0])/tunnel.length,uz=(end[2]-start[2])/tunnel.length
@@ -214,7 +214,19 @@ export function tunnelGeometry(tile:Tile,ground:THREE.PlaneGeometry,tunnels:Tunn
       const al=local(a,-width,ay),ar=local(a,width,ay),bl=local(b,-width,by),br=local(b,width,by)
       quad([al,ar,br,bl],'floor')
       const top=(p:Point):Point=>[p[0],open?Math.max(p[1],groundY(p)):p[1]+head,p[2]]
-      quad([al,bl,top(bl),top(al)],open?'portal':'interior');quad([br,ar,top(ar),top(br)],open?'portal':'interior')
+      const leftA=top(al),leftB=top(bl),rightA=top(ar),rightB=top(br)
+      if(open && tunnel.wallTop && tunnel.wallSide){
+        const side=tunnel.wallSide, ends=side>0?[rightA,rightB]:[leftA,leftB]
+        ends[0][1]=Math.max(ends[0][1],tunnel.wallTop[i-1])
+        ends[1][1]=Math.max(ends[1][1],tunnel.wallTop[i])
+        if(tunnel.wallTop[i-1]>ay+.02 || tunnel.wallTop[i]>by+.02){
+          const edge=side*(width+.18)
+          const oa=local(a,edge,ends[0][1]), ob=local(b,edge,ends[1][1])
+          quad([ends[0],ends[1],ob,oa],'portal')
+          quad([oa,ob,local(b,edge,by),local(a,edge,ay)],'portal')
+        }
+      }
+      quad([al,bl,leftB,leftA],open?'portal':'interior');quad([br,ar,rightA,rightB],open?'portal':'interior')
       if(!open)quad([top(al),top(bl),top(br),top(ar)],'ceiling')
       if(!open){
         // 青绿 glazed-tile dado, warm lamp strips and a dashed centre line (IDOK-165 visual pass)

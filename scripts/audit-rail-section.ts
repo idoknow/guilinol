@@ -42,11 +42,12 @@ for (const { way: id, controls, boundaryNodes, maximumGrade = 0.05, direction = 
   const xy = way.geometry.map((p) => ll2xz(p.lat, p.lon))
   const start = controls[0][0],
     end = controls.at(-1)[0]
-  let worst
+  let worst, worstDirection
   let chainage = 0,
     peakGrade = 0,
     raised = 0,
     lowered = 0,
+    directionErrors = 0,
     regressions = 0,
     count = 0
   for (let i = 1; i < xy.length; i++) {
@@ -78,6 +79,14 @@ for (const { way: id, controls, boundaryNodes, maximumGrade = 0.05, direction = 
           continue
         }
         const y = heights.map((h) => h(x, z, lane))
+        const station = chainage + at
+        const profile = sameWayProfiles.find(r => r.controls[0][0] - 1e-5 <= station && station <= r.controls.at(-1)[0] + 1e-5)
+        const movement = y[1] - y[0]
+        const mode = profile?.direction ?? (profile ? 'lower' : direction === 'raise' ? 'raise' : 'lower')
+        if ((mode === 'lower' && movement > .001) || (mode === 'raise' && movement < -.001)) {
+          directionErrors++
+          if (!worstDirection || Math.abs(movement)>Math.abs(worstDirection.movement)) worstDirection={station,movement,x,z}
+        }
         raised = Math.max(raised, y[1] - y[0])
         lowered = Math.max(lowered, y[0] - y[1])
         if (previous) {
@@ -178,6 +187,7 @@ for (const { way: id, controls, boundaryNodes, maximumGrade = 0.05, direction = 
   grades.push({
     way: id,
     direction,
+    directionErrors, worstDirection,
     samples: count,
     maximumGrade: peakGrade,worst,
     limit: maximumGrade,
@@ -194,7 +204,7 @@ assert(
 )
 assert(
   grades.every(
-    (r) => r.samples && (r.direction === 'raise' ? r.loweredM : r.raisedM) <= 0.001 && r.maximumGrade <= r.limit + 1e-6 && !r.regressions,
+    (r) => r.samples && !r.directionErrors && r.maximumGrade <= r.limit + 1e-6 && !r.regressions,
   ),
 )
 assert(reverse.every((r) => r.checked && !r.violations))

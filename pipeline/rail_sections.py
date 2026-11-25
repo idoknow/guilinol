@@ -218,6 +218,10 @@ def road_profiles(section, ways, widths):
                 substring(line, a, b) for a, b in ((0, start), (stop, line.length)) if b - a > .001
             ],
         )
+        if "railSideWall" in road:
+            wall = road["railSideWall"]
+            top = np.asarray(wall["top"])
+            local["railSideWall"] = (wall["side"], top[:, 0] - start, top[:, 1])
         if "maxTrafficOffset" in road:
             local["maxTrafficOffset"] = road["maxTrafficOffset"]
         if road.get("stackedRoad"):

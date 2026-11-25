@@ -88,6 +88,10 @@ def tunnel_sections(profiles):
                               approach=0, openCut=not covered, openEnds=[0,0] if covered else [end-start,0], mouths=mouths,
                               pairedWidth=way.get('stationWidth'),
                               stations=np.column_stack((distances-start, levels)).tolist()))
+            if "railSideWall" in way:
+                side, at, top = way["railSideWall"]
+                bores[-1]["wallSide"] = side
+                bores[-1]["wallTop"] = np.interp(distances, at, top).tolist()
     joined = {way["id"] for way, _, _ in profiles.values() if way.get("flatNativeTie")}
     for t in bores:
         if t["way"] in joined and t["openCut"]:
