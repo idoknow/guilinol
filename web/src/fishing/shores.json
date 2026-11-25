@@ -1,0 +1,212 @@
+[
+  {
+    "id": "lijiang_xiangbi",
+    "name": "漓江·象鼻山段",
+    "spot": {
+      "x": -656,
+      "z": 1124,
+      "yaw": -1.5708,
+      "target": [
+        -664,
+        143.9,
+        1124
+      ]
+    },
+    "radius": 2.5,
+    "circle": {
+      "x": -664,
+      "z": 1124,
+      "radius": 24,
+      "color": "red"
+    }
+  },
+  {
+    "id": "lijiang_jiefang",
+    "name": "漓江·解放桥段",
+    "spot": {
+      "x": -200,
+      "z": -120,
+      "yaw": 1.5708,
+      "target": [
+        -192,
+        143.9,
+        -120
+      ]
+    },
+    "radius": 2.5,
+    "circle": {
+      "x": -192,
+      "z": -120,
+      "radius": 24,
+      "color": "blue"
+    }
+  },
+  {
+    "id": "lijiang_fubo",
+    "name": "漓江·伏波山段",
+    "spot": {
+      "x": 52,
+      "z": -716,
+      "yaw": 1.5708,
+      "target": [
+        60,
+        143.9,
+        -716
+      ]
+    },
+    "radius": 2.5,
+    "circle": {
+      "x": 60,
+      "z": -716,
+      "radius": 24,
+      "color": "green"
+    }
+  },
+  {
+    "id": "taohuajiang",
+    "name": "桃花江",
+    "spot": {
+      "x": -1172,
+      "z": 1052,
+      "yaw": 3.14159,
+      "target": [
+        -1172,
+        145.0,
+        1040
+      ]
+    },
+    "radius": 2.5,
+    "circle": {
+      "x": -1172,
+      "z": 1040,
+      "radius": 24,
+      "color": "red"
+    }
+  },
+  {
+    "id": "ronghu",
+    "name": "榕湖",
+    "spot": {
+      "x": -1352,
+      "z": 280,
+      "yaw": 0.0,
+      "target": [
+        -1352,
+        148.1,
+        288
+      ]
+    },
+    "radius": 2.5,
+    "circle": {
+      "x": -1352,
+      "z": 288,
+      "radius": 24,
+      "color": "blue"
+    }
+  },
+  {
+    "id": "shanhu",
+    "name": "杉湖",
+    "spot": {
+      "x": -1040,
+      "z": 448,
+      "yaw": 0.9273,
+      "target": [
+        -1024,
+        148.1,
+        460
+      ]
+    },
+    "radius": 2.5,
+    "circle": {
+      "x": -1024,
+      "z": 460,
+      "radius": 24,
+      "color": "green"
+    }
+  },
+  {
+    "id": "guihu",
+    "name": "桂湖",
+    "spot": {
+      "x": -1500,
+      "z": -272,
+      "yaw": -1.5708,
+      "target": [
+        -1508,
+        149.5,
+        -272
+      ]
+    },
+    "radius": 2.5,
+    "circle": {
+      "x": -1508,
+      "z": -272,
+      "radius": 24,
+      "color": "red"
+    }
+  },
+  {
+    "id": "mulonghu",
+    "name": "木龙湖",
+    "spot": {
+      "x": -484,
+      "z": -1624,
+      "yaw": -0.24498,
+      "target": [
+        -488,
+        149.5,
+        -1608
+      ]
+    },
+    "radius": 2.5,
+    "circle": {
+      "x": -488,
+      "z": -1608,
+      "radius": 24,
+      "color": "blue"
+    }
+  },
+  {
+    "id": "xiaodongjiang",
+    "name": "小东江·花桥段",
+    "spot": {
+      "x": 424,
+      "z": 368,
+      "yaw": -2.67795,
+      "target": [
+        420,
+        143.9,
+        360
+      ]
+    },
+    "radius": 2.5,
+    "circle": {
+      "x": 420,
+      "z": 360,
+      "radius": 24,
+      "color": "green"
+    }
+  },
+  {
+    "id": "lijiang_diecai",
+    "name": "漓江·叠彩山段",
+    "spot": {
+      "x": 140,
+      "z": -1480,
+      "yaw": -1.10715,
+      "target": [
+        132,
+        143.9,
+        -1476
+      ]
+    },
+    "radius": 2.5,
+    "circle": {
+      "x": 132,
+      "z": -1476,
+      "radius": 24,
+      "color": "red"
+    }
+  }
+]
