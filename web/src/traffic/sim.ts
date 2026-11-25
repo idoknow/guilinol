@@ -623,9 +623,11 @@ export class Traffic {
         if(onward){actor.track=onward.track;actor.dist=onward.dist;this.transitions++}
         else{actor.dist=track.length;actor.speed=0;actor.arrived=true}
       }else if(actor.dist>=track.length){
-        if(!person&&this.signal.has(track.to)){this.crossed++;this.onCross?.(track,this.time)}
-        const choices=(this.exits.get(track.to)??[]).filter(next=>!next.walk&&next.street===track.street&&next.to!==track.from&&(next.kind==='motor'||(actor.kind==='scooter'&&next.kind==='nonmotor'))&&this.usable(next)&&!this.parkingHits(next).some(hit=>hit.dist<12))
-        if(!choices.length){actor.dist=track.length;actor.speed=0;actor.leaving=true;return}
+        const exits=(this.exits.get(track.to)??[]).filter(next=>!next.walk&&next.to!==track.from&&(next.kind==='motor'||(actor.kind==='scooter'&&next.kind==='nonmotor'))&&this.usable(next)&&!this.parkingHits(next).some(hit=>hit.dist<12))
+        const sameStreet=exits.filter(next=>next.street===track.street)
+        const choices=sameStreet.length?sameStreet:exits
+        if(!choices.length){actor.dist=track.length;actor.speed=0;this.position(actor);actor.leaving=!visible?.(actor);return}
+        if(this.signal.has(track.to)){this.crossed++;this.onCross?.(track,this.time)}
         const pool=choices
         const straight=pool.filter(next=>next.dx*track.dx+next.dz*track.dz>.88)
         actor.track=straight.length&&this.random()<.85?straight.reduce((best,next)=>Math.abs(next.offset-track.offset)<Math.abs(best.offset-track.offset)?next:best):pool[Math.floor(this.random()*pool.length)]
