@@ -1,21 +1,21 @@
 import {chooseFish,fishForce,junk,sizes,tackle,type Method,type Species,type Water} from './config.ts'
 import {basePrice} from './grades.ts'
 
-export type Stage='idle'|'equip'|'cast'|'retrieve'|'hook'|'fight'|'wait'|'bite'|'strike'|'land'|'snap'|'escape'|'miss'|'junk'
+export type Stage='idle'|'equip'|'cast'|'retrieve'|'hook'|'fight'|'wait'|'bite'|'strike'|'land'|'snap'|'escape'|'miss'|'junk'|'empty-hook'
 export type Catch={id:string,speciesId:string,name:string,grade:string,size:string,weight:number,water:string,method:Method,time:number,price:number}
 type Setup={water:Water,method:Method,line:number,rod:number,bait:string,float:boolean,drag:boolean}
 type Signal=(kind:string,detail:unknown)=>void
 export class FishingEngine {
   stage:Stage='idle'; direction=0; pull=0; reel=false; tension=0; stamina=1; force=0
   private clock=0; private red=0; private turn=0; private fish?:Species; private setup?:Setup
-  private random:()=>number; private signal:Signal; private accept:(item:Catch)=>boolean
-  constructor(signal:Signal,accept:(item:Catch)=>boolean,random=Math.random){this.signal=signal;this.accept=accept;this.random=random}
+  private random:()=>number; private signal:Signal; private accept:(item:Catch)=>boolean|'BAG_FULL'
+  constructor(signal:Signal,accept:(item:Catch)=>boolean|'BAG_FULL',random=Math.random){this.signal=signal;this.accept=accept;this.random=random}
   setSeed(seed:number){this.random=()=>((seed=(Math.imul(seed,1664525)+1013904223)>>>0)/2**32)}
   private go(stage:Stage,seconds=0){this.stage=stage;this.clock=seconds;this.signal('state',stage)}
   equip(){this.go('equip')}
   cancel(){this.setup=undefined;this.reel=false;this.pull=0;this.go('idle');this.signal('float',null)}
   cast(setup:Setup){
-    if(!['equip','land','snap','escape','miss','junk'].includes(this.stage))return false
+    if(!setup.water.methods.includes(setup.method)||!['equip','land','snap','escape','miss','junk','empty-hook'].includes(this.stage))return false
     this.setup=setup;this.tension=.2;this.stamina=1;this.red=0;this.turn=0;this.pull=0;this.reel=false
     this.fish=undefined;this.go('cast',.2);this.signal('float',{target:setup.water.spot.target,sunk:false});return true
   }
@@ -24,8 +24,8 @@ export class FishingEngine {
     const setup=this.setup
     if(!force&&this.random()>(setup.method==='路亚'?.92:.7)){this.go(setup.method==='路亚'?'escape':'miss');return}
     this.fish=chooseFish(setup.water,setup.method,setup.bait,setup.line,this.random)
+    if(!this.fish){this.go('empty-hook');return}
     if(setup.method==='路亚'){
-      if(!this.fish){this.go('escape');return}
       this.force=fishForce(this.fish);this.go('hook',.15)
     }else{this.go('bite',Math.min(1.2,.5+.6*this.random()+(setup.float?.12:0)));this.signal('float',{target:setup.water.spot.target,sunk:true})}
   }
@@ -37,7 +37,9 @@ export class FishingEngine {
     const item:Catch={id:crypto.randomUUID(),speciesId:trash?'':fish!.id,name:trash?junk[Math.floor(this.random()*junk.length)]:fish!.name,
       grade:trash?'junk':fish!.grade,size:trash?'':fish!.size,weight:trash?0:Math.round((.1+fraction)*[.1,.7,3,16,70][size]*100)/100,
       water:setup.water.id,method:setup.method,time:Date.now(),price:trash?1+Math.floor(this.random()*5):basePrice(fish!.grade,fraction)}
-    if(!this.accept(item)){this.go('miss');return}
+    const accepted=this.accept(item)
+    if(accepted==='BAG_FULL'){this.setup=undefined;return}
+    if(!accepted){this.go('miss');return}
     this.go(trash?'junk':'land');this.signal('catch',item)
   }
   tick(dt:number){

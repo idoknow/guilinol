@@ -13,7 +13,7 @@ const waterIndices = [
 ]
 export const waters = shoreData.map((shore,index) => ({...shore,
   zone:shore.circle.color as keyof typeof probabilities,
-  methods:['路亚','台钓'] as Method[], depth:index < 3 || index === 9 ? [2,8] : [1,4],
+  methods:(['lijiang_xiangbi','ronghu','xiaodongjiang'].includes(shore.id)?['路亚','台钓']:['路亚']) as Method[], depth:index < 3 || index === 9 ? [2,8] : [1,4],
   fish:species.filter((_,i)=>waterIndices[i].includes(String(index))).map(row=>row.id),
 }))
 export type Water = typeof waters[number]

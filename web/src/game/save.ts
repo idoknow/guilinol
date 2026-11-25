@@ -837,7 +837,7 @@ export function mergeCloudAndLocalSave(localRaw: LocalSaveV1, cloudRaw: LocalSav
   const newerTxIds = new Set(newer.economy.txHistoryRing.map(tx => tx.txId))
   let unsyncedRewardDelta = 0
   for (const tx of older.economy.txHistoryRing) {
-    if (tx.kind === 'reward' && tx.delta > 0 && !newerTxIds.has(tx.txId)) {
+    if (tx.kind === 'reward' && tx.delta > 0 && !tx.refId.startsWith('fishing:') && !newerTxIds.has(tx.txId)) {
       unsyncedRewardDelta += tx.delta
     }
   }
