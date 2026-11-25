@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import {readFile} from 'node:fs/promises'
 import {spawn} from 'node:child_process'
 import {createHash,randomBytes} from 'node:crypto'
 import {once} from 'node:events'
@@ -144,14 +145,16 @@ export async function socialTest({api,origin,sql,env}) {
   const detail=await api(`admin/users/${id}`)
   for(const key of ['salt','digest','failures','locked_until'])assert.equal(key in detail.user,false,key)
   assert.deepEqual(detail.social.map(({type,label,nickname,avatar,uid})=>({type,label,nickname,avatar,uid})),[
-    {type:'wx',label:'微信（旧版）',nickname:'漓江',avatar:'https://thirdwx.qlogo.cn/a/0',uid:'…F60718'},
-    {type:'qq',label:'QQ（旧版）',nickname:'象山',avatar:'',uid:'…AAAAAA'}])
+    {type:'wx',label:'微信',nickname:'漓江',avatar:'https://thirdwx.qlogo.cn/a/0',uid:'…F60718'},
+    {type:'qq',label:'QQ',nickname:'象山',avatar:'',uid:'…AAAAAA'}])
   await api('admin/users/no-such-user-x',null,404,'not_found')
   await sql(`DELETE FROM social_identities`);await sql(`UPDATE users SET role='user' WHERE id='${id}'`)
   await api('auth/logout',{});await api(`admin/users/${id}`,null,401,'unauthorized')
   await configuredTest({sql,env})
-  const directFixture=await (await import('./selfhost-test.mjs')).fixture({postgresOnly:true,beforeSocialDirect:true})
-  try {await (await import('./social-direct-test.mjs')).testDirect(directFixture.env.DATABASE_URL)}
-  finally {await directFixture.close()}
+  const identities=()=>sql('SELECT * FROM social_identities ORDER BY type,social_uid').then(rows=>rows[0].results)
+  const before=await identities()
+  assert.ok(before.length>0)
+  await sql(await readFile('deploy/postgres/020-social-direct-revert.sql','utf8'))
+  assert.deepEqual(await identities(),before)
   console.log('Social: unconfigured 503/302 disabled, cross-site callback not rejected, admin detail 403→200 with masked uid + avatar allowlist, 404, 401')
 }

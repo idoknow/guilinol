@@ -1,4 +1,3 @@
-import {allowLegacy,providers,schedule} from './social-policy'
 import { type Env, type BanState, checkBan, sessionAccount, Problem, cookie, deliver, equal, hash, invalid, lifetime, limit, newCode, now, passwordHash, random, requestIp, reserveMail, sessionHash } from './auth'
 
 /**
@@ -113,7 +112,7 @@ async function requireSession(db:D1Database, result:D1Result, userId:string) {
   throw new Problem(401,'unauthorized','请重新登录')
 }
 /** 唯一约束冲突：SQLite 给消息，PostgreSQL 给 code=23505（消息里是 duplicate key）。 */
-export const isUniqueViolation = (error: unknown) => {
+const isUniqueViolation = (error: unknown) => {
   const code = (error as { code?: string } | null)?.code
   const message = error instanceof Error ? error.message : ''
   return code === '23505' || /UNIQUE|PRIMARY KEY|duplicate key/i.test(message)
@@ -122,14 +121,12 @@ export const isUniqueViolation = (error: unknown) => {
  * 直接给第三方账号建号（不要求邮箱/密码）：占位邮箱 + 不可用密码 + verified=1。
  * 调用方负责消费 social_pending。
  */
-export async function createSocialOnlyUser(
+async function createSocialOnlyUser(
   db: D1Database,
   type: SocialType,
   socialUid: string,
   nickname: string,
   avatar: string,
-  channel = 'legacy',
-  unionid: string|null = null,
 ): Promise<{ userId: string; created: boolean }> {
   const salt = random(16)
   // 随机密码的哈希：这个账号不能走邮箱密码登录
@@ -145,17 +142,17 @@ export async function createSocialOnlyUser(
           .bind(id, email, nickname || '新用户', salt, digest,type),
         db
           .prepare(
-            'INSERT INTO social_identities(channel,unionid,type,social_uid,user_id,nickname,faceimg,created_at,last_login_at) VALUES(?,?,?,?,?,?,?,?,?)',
+            'INSERT INTO social_identities(type,social_uid,user_id,nickname,faceimg,created_at,last_login_at) VALUES(?,?,?,?,?,?,?)',
           )
-          .bind(channel,unionid,type, socialUid, id, nickname, avatar, now(), now()),
+          .bind(type, socialUid, id, nickname, avatar, now(), now()),
       ])
       return { userId: id, created: true }
     } catch (error) {
       if (!isUniqueViolation(error)) throw error
       // 并发时另一个请求已经建好这个平台的绑定：直接登录到它
       const raced = await db
-        .prepare('SELECT user_id FROM social_identities WHERE channel=? AND type=? AND social_uid=?')
-        .bind(channel,type, socialUid)
+        .prepare('SELECT user_id FROM social_identities WHERE type=? AND social_uid=?')
+        .bind(type, socialUid)
         .first<{ user_id: string }>()
       if (raced) return { userId: raced.user_id, created: false }
       // 否则是占位邮箱撞车，加随机后缀再试一次
@@ -212,17 +209,17 @@ async function callUpstream(env: Env, action: 'login' | 'callback', params: Reco
 const stateCookie = (states: string[]) =>
   `glol_social=${states.join('.')}; Path=/; Max-Age=${STATE_TTL}; HttpOnly; Secure; SameSite=Lax`
 
-export const pendingCookie = (token: string, age = PENDING_TTL) =>
+const pendingCookie = (token: string, age = PENDING_TTL) =>
   `glol_social_pending=${token}; Path=/; Max-Age=${age}; HttpOnly; Secure; SameSite=Lax`
 
-export const clearPending = () => 'glol_social_pending=; Path=/; Max-Age=0; HttpOnly; Secure; SameSite=Lax'
+const clearPending = () => 'glol_social_pending=; Path=/; Max-Age=0; HttpOnly; Secure; SameSite=Lax'
 
 export const socialStates = (request: Request): string[] =>
   (request.headers.get('Cookie')?.match(/(?:^|;\s*)glol_social=([a-f0-9.]+)(?:;|$)/)?.[1] ?? '')
     .split('.')
     .filter((state) => /^[a-f0-9]{64}$/.test(state))
 
-export const pendingToken = (request: Request): string =>
+const pendingToken = (request: Request): string =>
   request.headers.get('Cookie')?.match(/(?:^|;\s*)glol_social_pending=([a-f0-9]{64})(?:;|$)/)?.[1] ?? ''
 
 /* ───────────── start ───────────── */
@@ -241,14 +238,13 @@ export async function startSocial(
   userId?: string,
   existingStates: string[] = [],
 ) {
-  allowLegacy(env,intent)
   if (!socialConfigured(env)) throw new Problem(503, 'social_unconfigured', '第三方登录尚未启用')
   if (!enabledTypes(env).includes(type)) throw new Problem(400, 'social_disabled', '该登录方式未启用')
   if (intent === 'bind' && !userId) throw new Problem(401, 'unauthorized', '请先登录')
   if (intent === 'bind' && userId) {
     // 已经绑过就别再走一遍授权：之前只在回调里判冲突，用户会白跑一次授权页
     const bound = await db
-      .prepare('SELECT 1 AS hit FROM social_identities WHERE channel=\'legacy\' AND user_id=? AND type=?')
+      .prepare('SELECT 1 AS hit FROM social_identities WHERE user_id=? AND type=?')
       .bind(userId, type)
       .first<{ hit: number }>()
     if (bound) throw new Problem(409, 'already_bound', '这个平台已经绑定过账号了')
@@ -306,7 +302,6 @@ export async function socialCallback(env: Env, db: D1Database, request: Request)
       status: 302,
       headers: { Location: new URL(`/?social=${reason}`, url.origin).toString(), 'Cache-Control': 'no-store', ...headers },
     })
-  if (schedule(env).phase==='sunset') return back('legacy_sunset')
   if (!socialConfigured(env)) return back('disabled')
 
   // 上游是 302 跳回来的跨站导航，不能用 Sec-Fetch-Site 拦；CSRF 由「cookie 里的 state + 一次性 pending」保证
@@ -326,7 +321,7 @@ export async function socialCallback(env: Env, db: D1Database, request: Request)
   let matched: StateRow | null = null
   for (const state of states) {
     const row = await db
-      .prepare('SELECT state,intent,user_id FROM social_states WHERE channel=\'legacy\' AND state=? AND type=? AND used=0 AND expires>?')
+      .prepare('SELECT state,intent,user_id FROM social_states WHERE state=? AND type=? AND used=0 AND expires>?')
       .bind(state, type, now())
       .first<StateRow>()
     if (row) {
@@ -337,7 +332,6 @@ export async function socialCallback(env: Env, db: D1Database, request: Request)
   if (!matched) return back('expired')
   const intent: SocialIntent = matched.intent === 'bind' ? 'bind' : matched.intent === 'register' ? 'register' : 'login'
 
-  if (schedule(env).phase!=='before' && intent!=='login') return back('legacy_closed')
   let profile: Upstream
   try {
     profile = await callUpstream(env, 'callback', { type, code })
@@ -384,11 +378,10 @@ export async function socialCallback(env: Env, db: D1Database, request: Request)
   const digest = await sessionHash(request)
   const current = await sessionAccount(db,digest)
   const identity = await db
-    .prepare('SELECT user_id,nickname,faceimg FROM social_identities WHERE channel=\'legacy\' AND type=? AND social_uid=?')
+    .prepare('SELECT user_id,nickname,faceimg FROM social_identities WHERE type=? AND social_uid=?')
     .bind(type, socialUid)
     .first<Identity>()
 
-  if (!identity && schedule(env).phase!=='before') return back('legacy_closed')
   let target: string
   if (intent === 'register') {
     // 注册流程：此时还不能建号，等用户填完邮箱+密码并通过验证码
@@ -431,25 +424,16 @@ type PendingRow = { intent: string; type: string; social_uid?: string; nickname:
 /** 供前端确认框展示：这次授权解析出的是谁（不消费）。 */
 export async function socialPending(env: Env, db: D1Database, request: Request): Promise<Response> {
   const headers = { 'Cache-Control': 'no-store' }
-  if (!socialConfigured(env) && !providers(env).length)
+  if (!socialConfigured(env))
     return Response.json({ error: { code: 'social_unconfigured', message: '第三方登录尚未启用' } }, { status: 503, headers })
   const token = pendingToken(request)
   if (!token) return Response.json({ error: { code: 'no_pending', message: '没有待确认的授权' } }, { status: 404, headers })
   const row = await db
-    .prepare('SELECT p.channel,p.intent,p.type,p.nickname,p.faceimg,p.user_id,owner.created_at AS owner_created_at FROM social_pending p LEFT JOIN users owner ON owner.id=p.previous_owner WHERE p.token=? AND p.used=0 AND p.expires>?')
+    .prepare('SELECT intent,type,nickname,faceimg,user_id FROM social_pending WHERE token=? AND used=0 AND expires>?')
     .bind(await hash(token), now())
-    .first<PendingRow & { channel: string; owner_created_at: number | null }>()
+    .first<PendingRow>()
   if (!row) return Response.json({ error: { code: 'no_pending', message: '没有待确认的授权' } }, { status: 404, headers })
   const type = isSocialType(row.type) ? row.type : null
-  // 新版通道：intent 为 new（这个 QQ 还没有账号）或 bind/migrate（该身份已属于另一个可接管账号，需要用户确认 takeover）
-  if (row.channel === 'direct')
-    return Response.json(
-      { channel: 'direct', intent: row.intent, takeover: row.intent !== 'new', type: type ?? row.type,
-        label: (type ? SOCIAL_LABELS[type] : row.type) + ' 登录', nickname: row.nickname, avatar: safeAvatar(row.faceimg),
-        // 接管确认页要写清「这个 QQ 绑在 X 月 X 日新建的另一个账号上」
-        owner_created_at: row.intent !== 'new' && row.owner_created_at != null ? Number(row.owner_created_at) : null },
-      { headers },
-    )
   return Response.json(
     {
       intent: row.intent === 'bind' ? 'bind' : row.intent === 'register' ? 'register' : 'login',
@@ -477,14 +461,13 @@ export async function socialConfirm(env: Env, db: D1Database, request: Request):
   const digest = await hash(token)
   // 先读不消费：校验没通过的请求不能把别人的授权烧掉
   const row = await db
-    .prepare('SELECT intent,type,social_uid,nickname,faceimg,user_id FROM social_pending WHERE channel=\'legacy\' AND token=? AND used=0 AND expires>?')
+    .prepare('SELECT intent,type,social_uid,nickname,faceimg,user_id FROM social_pending WHERE token=? AND used=0 AND expires>?')
     .bind(digest, now())
     .first<PendingRow>()
   if (!row) throw new Problem(404, 'no_pending', '授权已过期，请重新发起')
   const intent: SocialIntent = row.intent === 'bind' ? 'bind' : row.intent === 'register' ? 'register' : 'login'
   const type = isSocialType(row.type) ? row.type : null
   if (!type) throw new Problem(400, 'invalid_input', '不受支持的登录方式')
-  allowLegacy(env,intent)
   if (intent === 'register') throw new Problem(400, 'register_incomplete', '请填写邮箱和密码完成注册')
   const nickname = (row.nickname ?? '').slice(0, 32),
     faceimg = safeAvatar(row.faceimg)
@@ -522,11 +505,10 @@ export async function socialConfirm(env: Env, db: D1Database, request: Request):
   }
 
   const identity = await db
-    .prepare('SELECT user_id FROM social_identities WHERE channel=\'legacy\' AND type=? AND social_uid=?')
+    .prepare('SELECT user_id FROM social_identities WHERE type=? AND social_uid=?')
     .bind(type, row.social_uid!)
     .first<{ user_id: string }>()
   if (!identity) {
-    allowLegacy(env,'register')
     // 首次用第三方登录、且这个平台账号没绑过任何用户：直接建号（不再强制先绑邮箱）
     const createdPending = await db
       .prepare("UPDATE social_pending SET used=1 WHERE token=? AND used=0 AND intent='login' RETURNING token")
@@ -573,9 +555,8 @@ export async function socialConfirm(env: Env, db: D1Database, request: Request):
     db.prepare('DELETE FROM sessions WHERE digest=? AND user_id=?').bind(previous, identity.user_id),
     socialSession(db,sessionDigestNew,identity.user_id),
     db
-      .prepare('UPDATE social_identities SET nickname=?,faceimg=?,last_login_at=? WHERE channel=\'legacy\' AND type=? AND social_uid=? AND changes()=1')
+      .prepare('UPDATE social_identities SET nickname=?,faceimg=?,last_login_at=? WHERE type=? AND social_uid=? AND changes()=1')
       .bind(nickname, faceimg, now(), type, row.social_uid!),
-    db.prepare('INSERT INTO social_legacy_sessions(digest) SELECT digest FROM sessions WHERE digest=?').bind(sessionDigestNew),
   ])
   await requireSession(db,issued,identity.user_id)
   return Response.json(
@@ -590,15 +571,10 @@ export async function socialConfirm(env: Env, db: D1Database, request: Request):
 export function socialConfig(env: Env): Response {
   const headers = { 'Cache-Control': 'no-store' }
   const enabled = socialConfigured(env) ? enabledTypes(env).map((type) => ({ type, label: SOCIAL_LABELS[type] })) : []
-  const migration=schedule(env), direct=providers(env).map(type=>({type,label:SOCIAL_LABELS[type]+' 登录'}))
-  if (direct.length || migration.cutoff || migration.sunset) {
-    const legacy=migration.phase==='sunset'?[]:enabled.map(({type,label})=>({type,label:'旧版'+label}))
-    return Response.json({enabled:migration.phase==='sunset'?[]:enabled,direct,legacy,migration},{headers})
-  }
   return Response.json({ enabled }, { headers })
 }
 
-type PendingRegisterRow = { channel:string; unionid:string|null; intent: string; type: string; social_uid: string; nickname: string; faceimg: string }
+type PendingRegisterRow = { intent: string; type: string; social_uid: string; nickname: string; faceimg: string }
 
 /**
  * 第三方注册：账号只有在「邮箱通过验证码 + 密码已设置」之后才创建。
@@ -610,28 +586,24 @@ type PendingRegisterRow = { channel:string; unionid:string|null; intent: string;
  */
 export async function socialRegister(env: Env, db: D1Database, request: Request, body: Record<string, unknown>): Promise<Response> {
   const headers = { 'Cache-Control': 'no-store' }
-  if (!socialConfigured(env) && !providers(env).length)
+  if (!socialConfigured(env))
     return Response.json({ error: { code: 'social_unconfigured', message: '第三方登录尚未启用' } }, { status: 503, headers })
 
   const token = pendingToken(request)
   if (!token) throw new Problem(404, 'no_pending', '授权已过期，请重新发起')
   const digest = await hash(token)
   const row = await db
-    .prepare('SELECT channel,unionid,intent,type,social_uid,nickname,faceimg FROM social_pending WHERE token=? AND used=0 AND expires>?')
+    .prepare('SELECT intent,type,social_uid,nickname,faceimg FROM social_pending WHERE token=? AND used=0 AND expires>?')
     .bind(digest, now())
     .first<PendingRegisterRow>()
   if (!row) throw new Problem(404, 'no_pending', '授权已过期，请重新发起')
-  if (row.channel==='legacy') {
-    allowLegacy(env,'register')
-    if (!socialConfigured(env)) throw new Problem(503,'social_unconfigured','旧版通道未配置')
-  } else if (!providers(env).some(provider=>provider===row.type)) throw new Problem(403,'social_disabled','该方式未启用')
-  if (row.intent !== (row.channel==='direct'?'new':'register')) throw new Problem(400, 'invalid_intent', '请从注册入口重新发起')
+  if (row.intent !== 'register') throw new Problem(400, 'invalid_intent', '请从注册入口重新发起')
   const type = isSocialType(row.type) ? row.type : null
   if (!type) throw new Problem(400, 'invalid_input', '不受支持的登录方式')
 
   const taken = await db
-    .prepare('SELECT user_id FROM social_identities WHERE channel=? AND type=? AND social_uid=?')
-    .bind(row.channel,type, row.social_uid)
+    .prepare('SELECT user_id FROM social_identities WHERE type=? AND social_uid=?')
+    .bind(type, row.social_uid)
     .first<{ user_id: string }>()
   if (taken) checkBan(await db.prepare('SELECT banned_at,ban_reason FROM users WHERE id=?').bind(taken.user_id).first<BanState>())
   if (taken) throw new Problem(409, 'conflict', '该平台账号已经绑定过其它用户，请直接登录')
@@ -644,13 +616,13 @@ export async function socialRegister(env: Env, db: D1Database, request: Request,
   // 邮箱/密码都不填：直接用第三方注册，不强制绑定邮箱（账号用占位邮箱，之后可再绑）
   if (!email && !password) {
     const createdPending = await db
-      .prepare("UPDATE social_pending SET used=1 WHERE token=? AND used=0 AND expires>? AND intent=? RETURNING token")
-      .bind(digest,now(),row.intent)
+      .prepare("UPDATE social_pending SET used=1 WHERE token=? AND used=0 AND intent='register' RETURNING token")
+      .bind(digest)
       .first<{ token: string }>()
     if (!createdPending) throw new Problem(404, 'no_pending', '授权已过期，请重新发起')
     let newUserId: string
     try {
-      const result = await createSocialOnlyUser(db, type, row.social_uid, nickname, safeAvatar(row.faceimg),row.channel,row.unionid)
+      const result = await createSocialOnlyUser(db, type, row.social_uid, nickname, safeAvatar(row.faceimg))
       if (!result.created) {
         const raced = await db.prepare('SELECT verified FROM users WHERE id=?').bind(result.userId).first<{ verified: number }>()
         if (!raced?.verified) throw new Problem(403, 'unverified', '该账号尚未验证邮箱')
@@ -714,20 +686,27 @@ export async function socialRegister(env: Env, db: D1Database, request: Request,
     throw new Problem(400, 'password_mismatch', '两次填写的密码不一致，请重新填写')
 
   checkBan(user)
-  const sessionToken = random(32)
+  const verified = await db.prepare('UPDATE users SET verified=1, failures=0, locked_until=0 WHERE id=? AND verified=0 AND banned_at=0').bind(user.id).run()
+  if (!verified.meta.changes) throw new Problem(409, 'email_taken', '该邮箱已被激活，请直接登录')
+
   try {
-    const [,verified,,,issued] = await db.batch([
-      db.prepare('UPDATE social_pending SET used=1 WHERE token=? AND used=0 AND expires>?').bind(digest,now()),
-      db.prepare('UPDATE users SET verified=1,failures=0,locked_until=0 WHERE changes()=1 AND id=? AND verified=0 AND banned_at=0 AND digest=? AND EXISTS(SELECT 1 FROM email_codes WHERE email=? AND purpose=? AND digest=? AND expires>?)').bind(user.id,user.digest,email,'verify',record.digest,now()),
-      db.prepare('INSERT INTO social_identities(channel,unionid,type,social_uid,user_id,nickname,faceimg,created_at,last_login_at) SELECT ?,?,?,?,?,?,?,?,? WHERE changes()=1').bind(row.channel,row.unionid,type,row.social_uid,user.id,(row.nickname??'').slice(0,32),safeAvatar(row.faceimg),now(),now()),
-      db.prepare('DELETE FROM email_codes WHERE changes()=1 AND email=? AND purpose=?').bind(email,'verify'),
-      db.prepare('INSERT INTO sessions(digest,user_id,expires) SELECT ?,?,? WHERE changes()=1').bind(await hash(sessionToken),user.id,now()+lifetime),
-    ])
-    if (!verified.meta.changes || !issued.meta.changes) throw new Problem(409,'conflict','授权或验证码已失效，请重新注册')
+    await db
+      .prepare('INSERT INTO social_identities(type,social_uid,user_id,nickname,faceimg,created_at,last_login_at) VALUES(?,?,?,?,?,?,?)')
+      .bind(type, row.social_uid, user.id, (row.nickname ?? '').slice(0, 32), safeAvatar(row.faceimg), now(), now())
+      .run()
   } catch (error) {
-    if (isUniqueViolation(error)) throw new Problem(409,'conflict','该平台账号已经绑定过其它用户')
+    const message = error instanceof Error ? error.message : ''
+    if (/UNIQUE|PRIMARY KEY/i.test(message)) throw new Problem(409, 'conflict', '该平台账号已经绑定过其它用户')
     throw error
   }
+
+  const sessionToken = random(32)
+  const [,,issued] = await db.batch([
+    db.prepare('UPDATE social_pending SET used=1 WHERE token=?').bind(digest),
+    db.prepare('DELETE FROM email_codes WHERE email=? AND purpose=?').bind(email, 'verify'),
+    socialSession(db,await hash(sessionToken),user.id),
+  ])
+  await requireSession(db,issued,user.id)
   return Response.json(
     { ok: true, redirect: '/?social=registered', email, nickname },
     // 两条独立 Set-Cookie：拼成一条时 Max-Age=0 会把新会话删掉
@@ -736,15 +715,14 @@ export async function socialRegister(env: Env, db: D1Database, request: Request,
 }
 
 /** 后台用：某个账号绑定的第三方平台（平台名、平台用户名、头像）。 */
-/** legacyTag：新版通道已启用或迁移已开始时，旧版绑定的名称带上「（旧版）」；之前保持原名，避免没有新版时就让用户困惑。 */
-export async function userSocialIdentities(db: D1Database, userId: string, legacyTag = false) {
+export async function userSocialIdentities(db: D1Database, userId: string) {
   const { results } = await db
-    .prepare('SELECT channel,type,social_uid,nickname,faceimg,created_at,last_login_at FROM social_identities WHERE user_id=? ORDER BY created_at')
+    .prepare('SELECT type,social_uid,nickname,faceimg,created_at,last_login_at FROM social_identities WHERE user_id=? ORDER BY created_at')
     .bind(userId)
-    .all<{ channel: string; type: string; social_uid: string; nickname: string; faceimg: string; created_at: number; last_login_at: number }>()
+    .all<{ type: string; social_uid: string; nickname: string; faceimg: string; created_at: number; last_login_at: number }>()
   return results.map((row) => ({
-    type: row.type, channel: row.channel,
-    label: (isSocialType(row.type) ? SOCIAL_LABELS[row.type] : row.type)+(legacyTag&&row.channel==='legacy'?'（旧版）':''),
+    type: row.type,
+    label: isSocialType(row.type) ? SOCIAL_LABELS[row.type] : row.type,
     nickname: row.nickname,
     avatar: safeAvatar(row.faceimg),
     uid: maskUid(row.social_uid),
@@ -768,7 +746,6 @@ export async function bindEmail(
   const account = await sessionAccount(db,digest)
   if (!account) throw new Problem(401, 'unauthorized', '请先登录')
 
-  if (body.migrate===true && (typeof body.password!=='string' || !body.password)) throw new Problem(400,'password_required','迁移时请设置密码')
   const email = typeof body.email === 'string' ? body.email.trim().toLowerCase() : ''
   if (email.length > 254 || email.split('@').length !== 2 || !/^\S+@[^\s@]+\.[^\s@]+$/.test(email)) invalid()
   if (isPlaceholderEmail(email)) throw new Problem(400, 'invalid_email', '请填写真实邮箱')
@@ -809,5 +786,5 @@ export async function bindEmail(
   }
   await db.batch(writes)
   logSocial({ action: 'bind_email', password: !!password })
-  return Response.json({ ok: true, email, password_set: !!password, ...(body.migrate===true?{redirect:'/?social=migrated'}:{}) }, { headers })
+  return Response.json({ ok: true, email, password_set: !!password }, { headers })
 }
