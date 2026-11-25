@@ -23,26 +23,41 @@
 
 ## 操作与接口
 
-徒步站在岸点 2.5 米内，按 **4**（或点鱼竿格）装备，再按一次收回。骑车时 4 仍为挡位。选钓法和饵料后按空格或点「抛竿」。路亚按住鼠标左键收线，用 A/D、移动鼠标或左/右按钮匹配发力方向，松开方向键回中；台钓等 `bite` 后按空格或「提竿」。渔利菜单提供背包、出售、丢弃、商店与图鉴。
+入口默认关闭，仅 `?fishing=1` 或 verify 开启。徒步到岸点按 4 装备。空格、画布左键、触屏按钮共用同一动作：按住 1.2 秒蓄满，松开抛竿。路亚按住收线引鱼，台钓静候；两者都必须在真咬钩后的 0.7 秒内重新按下提竿。角力时按住收线，松开放线；避免持续高拉力或连续松线 2.5 秒，拉到 1.5 米内上岸。
 
-`window.fishing` 在钓鱼模块加载后提供 `waters`（世界 X/Z 米、游戏水深、分区圆和岸点）、`state()`、`profile()`、`journal({rarity,size,water,method})`、`inspect(id)`。`?verify&mode=walk` 额外开放 `teleportToSpot(waterId)`、`forceBite()`、`setSeed(n)`。`fishing:state` 携带阶段，`fishing:force` 携带 direction（−1/0/+1）与 force，`fishing:tension` 携带 tension 与 stamina（0–1）。`float`、`camera` 事件提供浮标与镜头目标；`catch` 提供渔获记录，`snap` 表示断线，事件名均以 `fishing:` 开头。
+事件均派发至 `window`，以 `fishing:` 为前缀。
+
+|事件|detail|
+|---|---|
+|charge|`{power}`，0–1|
+|cast|`{from,to,power,distance}`，两点均为世界 `{x,y,z}`，距离单位米|
+|cast-blocked|`{reason:'no-open-water'}`，沿朝向回收到 4 米仍没有合格落点；不扣饵|
+|approach / nibble|`{side,size}` / `{n}`（从 1 计数）|
+|hit / hooked / spooked / missed|窗口开启 / 提竿成功 / 惊鱼重等 / 窗口过期|
+|fight|`{tension,distance,stamina,surge,side}`，拉力与体力归一化，side 仅供绘制|
+|state / catch / snap|阶段名 / 渔获记录 / 断线|
+
+`window.fishing.state()` 返回 phase、tension、distance、stamina。verify 另有 `teleportToSpot(id)`、`charge(power)`（以指定力度释放）、`forceApproach()`、`forceHit()`、`setSeed(n)`。
 
 ## 配置与扩展
+
+玩家不必走到指定站位：人在钓区内的干岸上，30 米内有可抛水面即可原地装备。离开范围或进入水中自动收竿。`shores.json` 的 `banks` 为岸线采样点，`radius` 为各岸点覆盖半径，`outlines` 是这些圆并集的世界 X/Z 轮廓（多边形 → 外环与内环 → 点）。`nearestFishingShore(x,z)` 返回 `{id,shore,distance,inZone}`；`spot` 保留为默认定位点，不是玩法门槛。
+
+落点取保守子集：覆盖其 1 米邻域的网格必须全部有水，渲染水面须高于河床和最终地面，且没有桥面、码头等上方碰撞体。缺图块或岸边混合格一律拒绝。浏览器验证每处抽样 2000 个合法落点，用实际已生成的水面三角形和地形逐点复核。
 
 - `web/src/fishing/species.json` 定义编号、稀有度、体型、品级、钓法与出没数量。`config.ts` 中 `waterIndices` 按图鉴顺序对应 `shores.json` 的水域索引，本表 10 处水域足以容纳所有任务书数量。增加鱼种时同步更新索引、饵料适配、图鉴断言，并将模型置于 `public/models/fish/<id>.glb`；未提供时检视器用椭球。
 - `bait.ts` 用图鉴 ID 指定适配对象；`grades.ts` 固定基础品级概率，再在该水域、钓法的同品级鱼池中按线级和饵料选种。若抽中品级无适配鱼，不重抽品级。加钓法需扩展 `Method`、`engine.ts` 的阶段转换和 `session.ts` 输入绑定。
 - `config.ts` 的 `tackle`、`accessories`、`xpThresholds` 与 `ranks` 分别定义装备、配件、独立经验和认证。自动使用已拥有的最高级鱼线和当前钓法的最高级竿。模型检视按需加载并缓存，转动/滚轮缩放，关闭时释放视图。
-- `glol.save.v1` 内的 `fishing.version=1` 子块兼容旧存档。每次成功抛竿扣 1 份饵；同点连续渔获价格从 100% 每条降低 12 个百分点，最低 40%。交易按北京时间日期累计，整批超额时不删鱼、不入账。
+- `glol.save.v1` 内的 `fishing.version=2` 子块读入旧背包时按重量重算单价，保留可推算的同点折价。每日卖鱼上限 800。每次成功抛竿扣 1 份饵；同点连续渔获价格从 100% 每条降低 12 个百分点，最低 40%。交易按北京时间日期累计，整批超额时不删鱼、不入账。
 - 固定世界版本后运行 `uv run --locked python scripts/fishing-shores.py` 重新生成站位；`npm run build` 后运行 `npm run verify:fishing`。浏览器截图写入 `captures/fishing/`，不入库。
 
 ## 容量、合并与空钩
 
 渔利背包最多 60 条（鱼和杂物共用，见 `limits.ts`）。满包抛竿返回 `BAG_FULL` 并派发 `fishing:bag-full`，不扣饵、不进入抛竿状态；整理背包后再试。旧草稿中已超额的背包可出售或丢弃，不会静默删鱼。抛竿、钓获和丢弃等零金额操作只记录在钓鱼块最近 64 个幂等键中，不占用钱包账本。双设备合并沿用较新一方的余额和渔获；不再单独补发旧设备卖鱼收入，以免既保留鱼又保留卖鱼款。
 
-所有 10 处水域开放路亚；仅漓江·象鼻山段、榕湖和小东江·花桥段开放台钓。每个开放组合至少有低级和中级鱼。稀有品级若没有匹配鱼种，返回 `empty-hook`（空钩），不重抽、不算错过咬口、不转为杂物。`verify:fishing` 输出每处水域 × 已开放钓法各十万次的结果表；分母是所有抛竿，基础线竿、通用饵、及时提竿和顺向牵引。
+所有 10 处水域开放路亚；仅漓江·象鼻山段、榕湖和小东江·花桥段开放台钓。每个开放组合至少有低级和中级鱼。稀有品级若没有匹配鱼种，返回 `empty-hook`（空钩），不重抽、不算错过咬口、不转为杂物。`verify:fishing` 输出每处水域 × 已开放钓法各十万次的结果表；分母是所有抛竿，基础线竿、通用饵、及时提竿和单键控线。
 
 ## 视觉
 
 - 鱼模：`web/src/fishing/fish-model.ts` 按物种参数（体高、体宽、头型、斑纹、鳍形、尾型、须）程序化生成，每条约 6.3k–7.1k 三角形，不依赖外部模型文件；检视和图鉴 / 背包缩略图共用同一套参数。新增鱼种时在 `looks` 里加一行。
 - 鱼竿（软木握把、轮座、纺车轮、导环）、浮标、下垂鱼线在 `session.ts`；HUD 与渔利面板样式在 `fishing.css`。场景内 HUD 用青玉玻璃 + 宋体，渔利抽屉沿用商店的沥青抽屉 + 黑体；稀有度色 常见灰 / 稀有青 / 典藏金，分区色红 / 蓝 / 绿只用于钓鱼地图。
-- `?fishing=0` 临时关闭钓鱼入口。

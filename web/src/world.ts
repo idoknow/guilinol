@@ -374,7 +374,7 @@ export async function detail(tile:Tile, signal:AbortSignal, parseSlot?:()=>Promi
     parked:streets.parked,
   }
   return {
-    group,groundMesh,terrain,water,rings,deck,thin,streets,batch,tunnel,railCutVertices:new Set(railCuts.map(([index])=>index)),
+    group,groundMesh,terrain,underlay,water,rings,deck,thin,streets,batch,tunnel,railCutVertices:new Set(railCuts.map(([index])=>index)),
     dispose(){
       if(tunnel){
         for(const mesh of Object.values(tunnel))if(mesh){

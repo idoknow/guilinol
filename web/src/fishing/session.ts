@@ -2,33 +2,19 @@ import * as THREE from 'three'
 import {hotbarSlot,selectSlot} from '../ui/hotbar'
 import {getActiveSaveSnapshot} from '../game/save'
 import {FishingEngine,type Catch} from './engine'
-import {nearby,species,tabs,waters,xpThresholds,type Method} from './config'
+import {chargePower,resolveCast,type Point,nearestFishingShore,nearby,species,tabs,waters,xpThresholds,type Method} from './config'
 import {buy,certification,collect,consume,inventory,journal,refundFullCast,removeCatch,shop} from './inventory'
 import {bait} from './bait'
 import {fishThumb} from './fish-model'
 import './fishing.css'
 
-type Host={canUse:()=>boolean,position:()=>{x:number,z:number},face:(angle:number)=>void,
+type Host={canUse:()=>boolean,position:()=>Point,heading:()=>number,onLand:(x:number,z:number)=>boolean,waterAt:(x:number,z:number)=>number|null,face:(angle:number)=>void,
   teleport:(x:number,z:number,angle:number)=>Promise<boolean>,hand:()=>THREE.Object3D|undefined,scene:THREE.Scene,camera:THREE.PerspectiveCamera}
 const textFocus=()=>document.activeElement?.matches('input,textarea,select,[contenteditable=true]')
 const terminal=['equip','land','snap','escape','miss','junk','empty-hook']
 const gradeClass=(grade:string)=>grade==='legendary'?'g-l':grade==='high'?'g-r':grade==='junk'?'g-j':'g-c'
 const zoneName={red:'红区 · 传说出没',blue:'蓝区 · 高级鱼',green:'绿区 · 常见鱼'} as Record<string,string>
 const esc=(text:string)=>text.replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'})[c]!)
-const coarse=()=>matchMedia('(pointer:coarse) and (not (any-pointer:fine))').matches
-
-// 三向鱼力轮盘：上 = 中，右下 = 右，左下 = 左；外圈 270° 是拉力，最后 20% 为红区。
-function sector(center:number){
-  const r0=25,r1=43,a0=(center-56)*Math.PI/180,a1=(center+56)*Math.PI/180,p=(r:number,a:number)=>`${(r*Math.cos(a)).toFixed(2)} ${(r*Math.sin(a)).toFixed(2)}`
-  return `M${p(r1,a0)}A${r1} ${r1} 0 0 1 ${p(r1,a1)}L${p(r0,a1)}A${r0} ${r0} 0 0 0 ${p(r0,a0)}Z`
-}
-const WHEEL=`<svg viewBox="-62 -62 124 124" aria-hidden="true">
-  <circle class="fw-track" r="53" pathLength="100" stroke-dasharray="75 100" transform="rotate(135)"/>
-  <circle class="fw-red" r="53" pathLength="100" stroke-dasharray="15 100" stroke-dashoffset="-60" transform="rotate(135)"/>
-  <circle class="fw-tension" r="53" pathLength="100" stroke-dasharray="0 100" transform="rotate(135)"/>
-  <path class="fw-sec" data-dir="0" d="${sector(-90)}"/><path class="fw-sec" data-dir="1" d="${sector(30)}"/><path class="fw-sec" data-dir="-1" d="${sector(150)}"/>
-  <text class="fw-lab" x="0" y="-31">中</text><text class="fw-lab" x="29" y="20">右</text><text class="fw-lab" x="-29" y="20">左</text>
-  <text class="fw-stamina" x="0" y="4">100</text><text class="fw-cap" x="0" y="15">体力</text></svg>`
 const BAG_ICON='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12c3-4.5 8.5-6 13-3l4-3v12l-4-3c-4.5 3-10 1.5-13-3z"/><circle cx="7.5" cy="11.2" r=".9"/></svg>'
 
 function makeRod(tipLocal:THREE.Vector3){
@@ -74,15 +60,10 @@ export function createFishing(host:Host,verify:boolean){
       <button type="button" data-menu class="fx-menu">${BAG_ICON}<span>渔利</span></button>
     </div>
     <p class="fx-where"></p>
-    <div class="fx-wheel" hidden>${WHEEL}</div>
     <div class="fx-cue" hidden></div>
     <p class="fx-hint"></p>
     <div class="fx-act">
-      <button type="button" class="fx-dir" data-hold="-1" aria-label="向左牵引">◀</button>
-      <button type="button" class="fx-main" data-cast>抛竿</button>
-      <button type="button" class="fx-main" data-strike>提竿</button>
-      <button type="button" class="fx-main fx-reel" data-hold="reel">收线</button>
-      <button type="button" class="fx-dir" data-hold="1" aria-label="向右牵引">▶</button>
+      <button type="button" class="fx-main" data-action data-cast style="display:block">按住蓄力</button>
     </div>
     <div class="fx-catch" hidden></div>`
   const drawer=document.createElement('aside');drawer.className='fx-drawer';drawer.hidden=true
@@ -90,8 +71,9 @@ export function createFishing(host:Host,verify:boolean){
     <nav class="fd-tabs" aria-label="渔利分类"></nav><div class="fd-body"></div><footer class="fd-foot" hidden></footer>`
   document.body.append(ui,drawer)
   const q=<T extends HTMLElement>(sel:string,root:HTMLElement=ui)=>root.querySelector<T>(sel)!
-  const baitSelect=q<HTMLSelectElement>('select'),where=q('.fx-where'),hint=q('.fx-hint'),wheel=q('.fx-wheel'),cue=q('.fx-cue'),card=q('.fx-catch')
-  const tension=wheel.querySelector('.fw-tension')!,stamina=wheel.querySelector('.fw-stamina')!
+  const baitSelect=q<HTMLSelectElement>('select'),where=q('.fx-where'),hint=q('.fx-hint'),cue=q('.fx-cue'),card=q('.fx-catch')
+  const action=q<HTMLButtonElement>('[data-action]')
+  let chargeStart:number|null=null,owner:string|null=null,target:Point|undefined
   const signal=(name:string,detail:unknown)=>window.dispatchEvent(new CustomEvent('fishing:'+name,{detail}))
   const engine=new FishingEngine((name,detail)=>{signal(name,detail);if(name==='state')stageChanged(String(detail));else if(name==='catch')showCatch(detail as Catch);else if(name==='snap')toast('断线了 · 鱼带着饵跑了','bad')},item=>{
     const result=collect(item)
@@ -114,24 +96,30 @@ export function createFishing(host:Host,verify:boolean){
     const rank=certification(),water=spot()
     where.textContent=water?`${water.name} · ${zoneName[water.zone]} · ${rank.rank} Lv ${rank.level}`:''
   }
-  function spot(){const pos=host.position();return nearby(pos.x,pos.z)}
+  let bankCache:{x:number,z:number,angle:number,water:ReturnType<typeof nearby>}|undefined
+  function spot(){
+    const pos=host.position();if(!host.onLand(pos.x,pos.z))return undefined
+    if(bankCache&&bankCache.x===pos.x&&bankCache.z===pos.z&&bankCache.water)return bankCache.water
+    const water=nearby(pos.x,pos.z);if(!water)return undefined
+    const {shore}=nearestFishingShore(pos.x,pos.z),aim=Math.atan2(shore.target[0]-pos.x,shore.target[2]-pos.z)
+    for(let turn=0;turn<32;turn++){
+      const angle=aim+Math.ceil(turn/2)*(turn%2?1:-1)*Math.PI/16
+      if(resolveCast(pos,angle,1,host.waterAt)){bankCache={x:pos.x,z:pos.z,angle,water};return water}
+    }
+  }
   function active(){return hotbarSlot()==='fishing'&&host.canUse()}
   function toggle(){if(hotbarSlot()==='fishing'){selectSlot(previous);return}if(!host.canUse()||!spot())return
     const methods=spot()!.methods;if(!methods.includes(method))method=methods[0];q<HTMLButtonElement>('[data-method]').classList.toggle('single',methods.length===1)
-    host.face(spot()!.spot.yaw)
+    host.face(bankCache!.angle)
     previous=hotbarSlot()==='camera'?'camera':'hand';selectSlot('fishing');host.hand()?.add(rod);ui.hidden=false;document.body.dataset.fishing='on';engine.equip();options()}
-  window.addEventListener('fishing:cancel',()=>{rod.removeFromParent();float.visible=line.visible=false;ui.hidden=true;closeDrawer();delete document.body.dataset.fishing;origin=undefined;engine.cancel()})
+  window.addEventListener('fishing:cancel',()=>{resetInput();rod.removeFromParent();float.visible=line.visible=false;ui.hidden=true;closeDrawer();delete document.body.dataset.fishing;origin=undefined;engine.cancel()})
 
   function stageChanged(stage:string){
     ui.dataset.stage=stage
-    const lure=method==='路亚',fightOn=stage==='fight'||stage==='hook'
-    wheel.hidden=!fightOn
-    cue.hidden=!(stage==='wait'||stage==='bite');cue.className='fx-cue'+(stage==='bite'?' bite':'');cue.textContent=stage==='bite'?'浮标下沉 · 提竿！':'静候咬口…'
-    const touch=coarse()
-    hint.textContent=terminal.includes(stage)?(touch?'':'左键 / 空格 抛竿 · 4 收竿')
-      :stage==='retrieve'?(touch?'':'按住左键收线，引鱼咬钩')
-      :fightOn?(touch?'':'A / D 顺着鱼的发力方向牵引 · 按住左键收线 · 拉力进红区别久留')
-      :stage==='bite'?(touch?'':'空格 提竿'):stage==='wait'?(touch?'':'看好浮标，一沉就提'):''
+    const lure=method==='路亚'
+    action.textContent=terminal.includes(stage)?'按住蓄力':stage==='fight'?'按住收线':stage==='hit'?'提竿！':lure?'收线':'提竿'
+    cue.hidden=stage!=='hit'&&stage!=='nibble';cue.textContent=stage==='hit'?'咬钩 · 提竿！':'试探…'
+    hint.textContent=terminal.includes(stage)?'按住蓄力，松开抛竿':stage==='fight'?'按住收线，松开放线':lure?'收线引鱼，咬钩后再按一次提竿':'等到咬钩再提竿'
     if(stage==='empty-hook')toast('空钩 · 这一竿没上鱼','dim')
     else if(stage==='escape')toast(lure?'鱼脱钩了':'没等到咬口','dim')
     else if(stage==='miss')toast('提竿慢了，鱼溜了','dim')
@@ -149,20 +137,22 @@ export function createFishing(host:Host,verify:boolean){
   }
   card.addEventListener('click',event=>{const id=(event.target as HTMLElement).dataset.inspect;if(id){card.hidden=true;void inspect(id)}})
 
-  function cast(){const water=spot();if(!active()||!water||!terminal.includes(engine.stage))return false
+  function cast(power:number){const water=spot();if(!active()||!water||!terminal.includes(engine.stage))return false
     if(!water.methods.includes(method))return false
+    const pos=host.position(),landing=resolveCast({x:pos.x,y:pos.y,z:pos.z},host.heading(),power,host.waterAt)
+    if(!landing){signal('cast-blocked',{reason:'no-open-water'});toast('抛到岸上了 · 未消耗饵','dim');return false}
     const id=baitSelect.value,key=crypto.randomUUID(),debit=consume(id,key);if(!debit.ok){toast(debit.code==='BAG_FULL'?'渔利背包已满 · 先去出售或丢弃':debit.code==='NO_BAIT'?'这款饵用完了 · 去渔利补货':debit.code,'dim');return false}
     receipt={key,baitId:id}
     const save=inventory(),tier=(prefix:string)=>Math.max(...save.owned.filter(value=>value.startsWith(prefix)).map(value=>Number(value.slice(prefix.length))))
-    host.face(water.spot.yaw);origin=water;card.hidden=true;signal('camera',{target:water.spot.target,zoom:method==='台钓'})
-    const result=engine.cast({water,method,bait:id,line:tier('line'),rod:tier(method==='台钓'?'pole':'lure'),float:save.owned.includes('float'),drag:save.owned.includes('drag')});options();return result}
+    target=landing.to;origin=water;card.hidden=true;signal('cast',landing);signal('camera',{target:[target.x,target.y,target.z],zoom:method==='台钓'})
+    const result=engine.cast({distance:landing.distance,water,method,bait:id,line:tier('line'),rod:tier(method==='台钓'?'pole':'lure'),float:save.owned.includes('float'),drag:save.owned.includes('drag')});options();return result}
   const inspect=(id:string)=>import('./inspect').then(module=>module.inspect(id))
 
   // —— 渔利：商店五类 + 背包 + 图鉴 + 钓鱼地图 ——
   const tabList=[...tabs,'背包','图鉴','地图'] as string[]
   q('.fd-tabs',drawer).innerHTML=tabList.map(name=>`<button type="button" data-tab="${name}"${['背包','图鉴','地图'].includes(name)?' class="fd-own"':''}>${name}</button>`).join('')
   const body=q('.fd-body',drawer),foot=q('.fd-foot',drawer)
-  function openDrawer(){drawer.hidden=false;document.body.dataset.fishMenu='1';render()}
+  function openDrawer(){resetInput();drawer.hidden=false;document.body.dataset.fishMenu='1';render()}
   function closeDrawer(){drawer.hidden=true;delete document.body.dataset.fishMenu}
   const say=(code:string)=>({OK:'',locked:'段位不够，先去钓几条',INSUFFICIENT_FUNDS:'钱不够',ALREADY_OWNED:'已经有了',IN_FLIGHT:'',PERSIST_FAILED:'存档失败，稍后再试'} as Record<string,string>)[code]??code
   let note=''
@@ -230,41 +220,44 @@ export function createFishing(host:Host,verify:boolean){
   })
 
   ui.addEventListener('click',event=>{const el=(event.target as HTMLElement).closest<HTMLElement>('button');if(!el)return
-    if(el.hasAttribute('data-close'))selectSlot(previous);if(el.hasAttribute('data-cast'))cast();if(el.hasAttribute('data-strike'))engine.strike()
+    if(el.hasAttribute('data-close'))selectSlot(previous)
     if(el.hasAttribute('data-method')&&terminal.includes(engine.stage)&&(spot()?.methods.length??0)>1){method=method==='路亚'?'台钓':'路亚';options();stageChanged(engine.stage)}
     if(el.hasAttribute('data-menu')){if(drawer.hidden)openDrawer();else closeDrawer()}})
-  ui.addEventListener('pointerdown',event=>{const el=(event.target as HTMLElement).closest<HTMLElement>('[data-hold]'),action=el?.dataset.hold;if(!el||!action)return
-    event.preventDefault();el.setPointerCapture(event.pointerId);el.classList.add('held');if(action==='reel')engine.reel=true;else engine.pull=Number(action)})
-  ui.addEventListener('lostpointercapture',event=>{const el=event.target as HTMLElement;el.classList.remove('held');if(el.dataset.hold==='reel')engine.reel=false;else engine.pull=0})
-  const mouse=(event:PointerEvent)=>active()&&!textFocus()&&event.pointerType==='mouse'&&(event.target as HTMLElement).tagName==='CANVAS'
-  window.addEventListener('pointerdown',event=>{if(event.button===0&&mouse(event)&&drawer.hidden){event.stopImmediatePropagation();event.preventDefault();if(terminal.includes(engine.stage))cast();else if(engine.stage==='bite')engine.strike();else engine.reel=true}},true)
-  window.addEventListener('pointermove',event=>{if(mouse(event)&&engine.stage==='fight'&&event.movementX)engine.pull=Math.sign(event.movementX)},true)
-  window.addEventListener('pointerup',event=>{if(event.pointerType==='mouse')engine.reel=false})
-  const key=(event:KeyboardEvent)=>{if(!active()||textFocus()||!drawer.hidden||!['KeyA','KeyD','Space'].includes(event.code))return
-    event.stopImmediatePropagation();event.preventDefault();const down=event.type==='keydown';if(event.code==='Space'){if(down&&!event.repeat){if(engine.stage==='bite')engine.strike();else cast()}}else engine.pull=down?(event.code==='KeyA'?-1:1):0}
-  window.addEventListener('keydown',key,true);window.addEventListener('keyup',key,true);window.addEventListener('blur',()=>{engine.reel=false;engine.pull=0})
+  function resetInput(){owner=null;chargeStart=null;engine.reel=false}
+  function press(id:string){if(owner!==null)return;owner=id
+    if(terminal.includes(engine.stage)){chargeStart=performance.now();signal('charge',{power:0})}else engine.press()}
+  function release(id:string,cancel=false){if(id!==owner)return;const start=chargeStart;resetInput()
+    if(start!==null&&!cancel)cast(chargePower((performance.now()-start)/1000))}
+  window.addEventListener('pointerdown',event=>{
+    if(!active()||!drawer.hidden||event.button!==0)return
+    const el=event.target as HTMLElement
+    if(el!==action&&!(el.tagName==='CANVAS'&&event.pointerType==='mouse'))return
+    event.preventDefault();event.stopImmediatePropagation();el.setPointerCapture(event.pointerId);press(String(event.pointerId))
+  },true)
+  for(const type of ['pointerup','pointercancel','lostpointercapture'] as const)window.addEventListener(type,event=>release(String(event.pointerId),type!=='pointerup'),true)
+  function key(event:KeyboardEvent){if(event.code!=='Space'||!active()||textFocus()||!drawer.hidden)return
+    event.stopImmediatePropagation();event.preventDefault();if(event.type==='keyup')release('space');else if(!event.repeat)press('space')}
+  window.addEventListener('keydown',key,true);window.addEventListener('keyup',key,true);window.addEventListener('blur',resetInput)
 
   function tick(dt:number){if(hotbarSlot()!=='fishing')return;if(!active()||!spot()){selectSlot(previous);return}
+    if(chargeStart!==null){const power=chargePower((performance.now()-chargeStart)/1000);signal('charge',{power});action.textContent=`蓄力 ${Math.round(100*power)}%`}
     clock+=dt;engine.tick(dt);line.visible=!!origin&&!terminal.includes(engine.stage);float.visible=line.visible&&method==='台钓'
     reel.rotation.y+=engine.reel?dt*14:0
-    if(line.visible&&origin){
-      tip.getWorldPosition(tipWorld);const [x,y,z]=origin.spot.target,fight=engine.stage==='fight'
+    if(line.visible&&origin&&target){
+      tip.getWorldPosition(tipWorld);const {x,y,z}=target,fight=engine.stage==='fight'
       // 鱼线：竿梢到入水点的下垂弧，角力时绷直、随拉力抖动
       const sag=fight?.05*(1-engine.tension):.45,shake=fight?Math.sin(clock*40)*.03*engine.tension:0
-      const end=new THREE.Vector3(x+(fight?engine.direction*.8:0),y,z)
+      const end=new THREE.Vector3(x,y,z)
       for(let i=0;i<SEG;i++){const u=i/(SEG-1);mid.lerpVectors(tipWorld,end,u);mid.y-=Math.sin(Math.PI*u)*sag*tipWorld.distanceTo(end)*.1;mid.x+=Math.sin(Math.PI*u)*shake;coords.setXYZ(i,mid.x,mid.y,mid.z)}
       coords.needsUpdate=true
       if(method==='台钓'){
-        const bite=engine.stage==='bite',bob=bite?-.09-.03*Math.sin(clock*18):Math.sin(clock*2.2)*.012+(engine.stage==='wait'&&Math.sin(clock*7.3)>.96?-.02:0)
+        const bite=engine.stage==='hit',bob=bite?-.09-.03*Math.sin(clock*18):Math.sin(clock*2.2)*.012+(engine.stage==='wait'&&Math.sin(clock*7.3)>.96?-.02:0)
         float.position.set(x,y+.02+bob,z);float.rotation.z=Math.sin(clock*1.7)*.06
-        host.camera.position.set((origin.spot.x+x)/2,y+2.2,(origin.spot.z+z)/2);host.camera.lookAt(x,y,z)}}
-    if(engine.stage==='fight'){
-      tension.setAttribute('stroke-dasharray',`${(engine.tension*75).toFixed(1)} 100`);wheel.classList.toggle('red',engine.tension>=.8)
-      stamina.textContent=String(Math.max(0,Math.round(engine.stamina*100)))
-      wheel.querySelectorAll<SVGElement>('.fw-sec').forEach(p=>{const dir=Number(p.dataset.dir);p.classList.toggle('fish',dir===engine.direction);p.classList.toggle('pull',dir===engine.pull)})
-    }}
-  const teleportToSpot=async(id:string)=>{const water=waters.find(row=>row.id===id);return !!water&&await host.teleport(water.spot.x,water.spot.z,water.spot.yaw)}
-  Object.assign(window,{fishing:{waters,journal,profile:certification,inspect,state:()=>({stage:engine.stage,direction:engine.direction,tension:engine.tension,method,spot:spot()?.id,inventory:structuredClone(inventory())}),
-    ...(verify?{teleportToSpot,forceBite:()=>engine.bite(true),setSeed:(seed:number)=>engine.setSeed(seed),openMenu:(name?:string)=>{if(name)tab=name;openDrawer()}}:{})}})
+        host.camera.position.set((host.position().x+x)/2,y+2.2,(host.position().z+z)/2);host.camera.lookAt(x,y,z)}}
+    if(engine.stage==='fight')hint.textContent=`拉力 ${Math.round(engine.tension*100)}% · 距岸 ${engine.distance.toFixed(1)} m`
+  }
+  const teleportToSpot=async(id:string,index=0)=>{const bank=waters.find(row=>row.id===id)?.banks[index];return !!bank&&await host.teleport(bank.x,bank.z,bank.yaw)}
+  Object.assign(window,{fishing:{waters,journal,profile:certification,inspect,state:()=>({stage:engine.stage,phase:chargeStart!==null?'charge':engine.stage,distance:engine.distance,stamina:engine.stamina,direction:engine.direction,tension:engine.tension,method,spot:spot()?.id,inventory:structuredClone(inventory())}),
+    ...(verify?{teleportToSpot,waterAt:host.waterAt,onLand:host.onLand,charge:(power:number)=>cast(power),forceApproach:()=>engine.approach(true),forceHit:()=>{engine.approach(true);engine.hit()},setSeed:(seed:number)=>engine.setSeed(seed),openMenu:(name?:string)=>{if(name)tab=name;openDrawer()}}:{})}})
   return {toggle,tick,teleportToSpot}
 }

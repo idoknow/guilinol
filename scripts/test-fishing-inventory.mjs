@@ -7,23 +7,23 @@ import {cloneSave,getActiveSaveSnapshot,mergeCloudAndLocalSave,persistSaveSync,r
 
 test('migration, lock gate, idempotency, streak floor and atomic daily cap',()=>{
   const legacy=sanitizeSave({money:120,schemaVersion:2}).save
-  assert.equal(legacy.fishing.version,1);assert.equal(legacy.money,120)
+  assert.equal(legacy.fishing.version,2);assert.equal(legacy.money,120)
   const storage={getItem:()=>null,setItem:()=>{}};setSaveStorageForTest(storage);resetSaveForTesting(100,storage)
   assert.equal(buy('line2','locked-line').code,'locked')
   assert.equal(buy('bait1','purchase-1').delta,-3);assert.equal(buy('bait1','purchase-1').code,'IDEMPOTENT_REPLAY')
-  const fish={speciesId:'008',name:'鲻鱼',grade:'low',weight:1,price:100,size:'中型',time:Date.now(),water:'ronghu',method:'路亚'}
+  const fish={speciesId:'008',name:'鲻鱼',grade:'low',weight:1,price:12,size:'中型',time:Date.now(),water:'ronghu',method:'路亚'}
   for(let index=0;index<7;index++)assert.ok(collect({...fish,id:`catch-${index}`}).ok)
-  assert.deepEqual(inventory().bag.map(item=>item.price),[100,88,76,64,52,40,40])
+  assert.deepEqual(inventory().bag.map(item=>item.price),[12,11,9,8,6,5,5])
   assert.equal(inventory().collected.length,1)
-  assert.equal(removeCatch(['catch-0','catch-1'],true,'sale-1').delta,188)
+  assert.equal(removeCatch(['catch-0','catch-1'],true,'sale-1').delta,23)
   assert.equal(removeCatch(['catch-0','catch-1'],true,'sale-1').code,'IDEMPOTENT_REPLAY')
-  const next=cloneSave(getActiveSaveSnapshot());next.fishing.income=4999;persistSaveSync(next)
+  const next=cloneSave(getActiveSaveSnapshot());next.fishing.income=792;persistSaveSync(next)
   assert.equal(removeCatch(['catch-2'],true,'sale-2').code,'今日渔获收入已达上限');assert.equal(inventory().bag.length,5)
   const before=structuredClone(getActiveSaveSnapshot());storage.setItem=()=>{throw Error('storage unavailable')}
   assert.equal(removeCatch(['catch-2'],false,'discard-1').code,'PERSIST_FAILED');assert.deepEqual(getActiveSaveSnapshot(),before)
 })
 
-const specimen=()=>({id:crypto.randomUUID(),speciesId:'021',name:'蓝宝石雷龙鱼',grade:'legendary',weight:0.49,price:1600,size:'小型',time:Date.now(),water:'lijiang_xiangbi',method:'台钓'})
+const specimen=()=>({id:crypto.randomUUID(),speciesId:'021',name:'蓝宝石雷龙鱼',grade:'legendary',weight:0.49,price:300,size:'小型',time:Date.now(),water:'lijiang_xiangbi',method:'台钓'})
 function fresh(){setSaveStorageForTest({getItem:()=>null,setItem:()=>{}});resetSaveForTesting(1000)}
 test('100 cast/catch/discard cycles retain a paid transaction and bound separate replay keys',()=>{
   fresh();const seed=cloneSave(getActiveSaveSnapshot());seed.fishing.bait.bait1=100;persistSaveSync(seed)
@@ -54,4 +54,11 @@ test('a full-bag race refunds only the original cast, once',()=>{
   const synced=cloneSave(getActiveSaveSnapshot());synced.fishing.bag=Array.from({length:BAG_CAPACITY},specimen);persistSaveSync(synced)
   assert.equal(collect(specimen()).code,'BAG_FULL');assert.equal(refundFullCast('bait1','other-device').code,'NO_LOCAL_DEBIT');assert.ok(refundFullCast('bait1',key).ok)
   assert.equal(refundFullCast('bait1',key).code,'IDEMPOTENT_REPLAY');assert.equal(inventory().bait.bait1,count);assert.equal(inventory().xp,0)
+})
+
+test('v1 backpack is repriced once, including zero-value junk',()=>{
+  const legacy={...specimen(),weight:.42,price:1600};const save=cloneSave(getActiveSaveSnapshot())
+  save.fishing={...save.fishing,version:1,bag:[legacy,{...legacy,grade:'junk',price:0}]}
+  const migrated=sanitizeSave(save).save
+  assert.deepEqual(migrated.fishing.bag.map(item=>item.price),[275,0]);assert.deepEqual(sanitizeSave(migrated).save.fishing,migrated.fishing)
 })

@@ -4,7 +4,8 @@ import {emotePlayback} from '../emote/playback'
 import {interrupted,emotesEnabled} from '../emote/emotes'
 import {takeCigaretteIntent, smokeEnabled} from '../citizen/use-item'
 import {selectSlot,hotbarSlot,showSmokeDiscard,showFishingSlot} from '../ui/hotbar'
-import fishingShores from '../fishing/shores.json'
+import {nearestFishingShore} from '../fishing/zones'
+import {openWater} from '../fishing/surface'
 import {fishingMarks} from '../fishing/marks'
 import {getActiveSaveSnapshot,takeFromPack} from '../game/save'
 import {rules,validRules} from '../smoke/data'
@@ -1141,18 +1142,23 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
   let fishingLoad:Promise<NonNullable<typeof fishing>>|undefined
   const loadFishing=()=>fishingLoad??=import('../fishing/session').then(module=>fishing=module.createFishing({
     canUse:()=>active&&!rides?.bike&&!rides?.boat&&!rides?.car&&!shopOverlay?.isOpen()&&!document.querySelector('.hotbar[hidden]'),
-    position:()=>sim.body.translation(),face:(angle)=>{yaw=angle+Math.PI;facing=yaw+avatar.yaw;figure.rotation.y=facing},
+    position:()=>sim.body.translation(),heading:()=>facing-avatar.yaw-Math.PI,
+    onLand:(x,z)=>{const tile=sim.tileAt(x,z),data=tile&&stream.loaded.get(tile)
+      return !!tile&&!!data&&data.water[Math.round((z-tile.z)/4)*65+Math.round((x-tile.x)/4)]===-32768},
+    waterAt:(x,z)=>openWater(x,z,(west,north)=>{
+      const tile=sim.tileAt(west,north),data=tile&&stream.loaded.get(tile)
+      if(!tile||!data?.batch.pond)return
+      const heights=data.groundMesh.geometry.getAttribute('position')
+      return {corner:(north-tile.z)/4*65+(west-tile.x)/4,water:data.water,bed:data.underlay,ground:index=>heights.getY(index)}
+    },sim.coveredWater),face:(angle)=>{yaw=angle+Math.PI;facing=yaw+avatar.yaw;figure.rotation.y=facing},
     teleport:(x,z,angle)=>enter(x,z,angle,'fishing'),hand:()=>avatarRig.attachmentAt?.('hand_r')??figure.getObjectByName('hand_r'),scene,camera,
   },verify))
   // 钓鱼（IDOK-336）2026-11-25 按需求方要求下线重做：默认关闭，?fishing=1（或 verify）才开。
   const fishingOn=verify||new URLSearchParams(location.search).get('fishing')==='1'
-  // 钓点可发现（IDOK-336 线上反馈）：40 m 内就亮出鱼竿格；没站到岸点上时按 4 先走到岸点再切竿。
+  // 钓点可发现（IDOK-336 线上反馈）：40 m 内就亮出鱼竿格；切竿不移动玩家。
   const FISH_NEAR=40
   const fishMarks=fishingOn?fishingMarks(scene):undefined
-  const nearestShore=(x:number,z:number)=>{let best:{id:string,d:number,radius:number}|undefined;for(const w of fishingShores){const d=Math.hypot(x-w.spot.x,z-w.spot.z);if(!best||d<best.d)best={id:w.id,d,radius:w.radius}}return best}
   window.addEventListener('fishing:slot',()=>{if(!fishingOn)return
-    const pos=sim.body.translation(),near=nearestShore(pos.x,pos.z)
-    if(hotbarSlot()!=='fishing'&&near&&near.d>near.radius&&near.d<=FISH_NEAR&&!rides?.bike&&!rides?.boat&&!rides?.car){void loadFishing().then(async session=>{if(await session.teleportToSpot(near.id))session.toggle()});return}
     void loadFishing().then(session=>session.toggle())})
   if(verify)Object.assign(window,{fishing:{teleportToSpot:async(id:string)=>(await loadFishing()).teleportToSpot(id)}})
   const footMetrics={soleOffset:avatarRig.soleOffset,footProbes:avatarRig.footProbes}
@@ -1990,7 +1996,7 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
   function tick(dt:number){wheel.sync();if(!active)return;emote.reset();smoking?.resetPose();holdLayer.reset();
     if(emote.id&&(rides?.boat||rides?.car||rides?.bike)){emote.stop();emote.tick(.24,false)}
     const before=performance.now(),start=rides?.boat?.position??sim.body.translation();syncSceneObstacleVolumes();sim.sync(start.x,start.z,true);const footYNow=rides?.boat?start.y:start.y-cfg.height/2;rides?.nearby(start.x,start.z,footYNow);interactArbiter.sync(actionButton);syncGameTravelState();updateShopHintRings(start.x,start.z,footYNow)
-    showFishingSlot(fishingOn&&!rides?.bike&&!rides?.boat&&!rides?.car&&(hotbarSlot()==='fishing'||fishingShores.some(({spot})=>Math.abs(start.x-spot.x)<=FISH_NEAR&&Math.hypot(start.x-spot.x,start.z-spot.z)<=FISH_NEAR)))
+    showFishingSlot(fishingOn&&!rides?.bike&&!rides?.boat&&!rides?.car&&(hotbarSlot()==='fishing'||nearestFishingShore(start.x,start.z).distance<=FISH_NEAR))
     fishMarks?.tick(start.x,start.z,dt,hotbarSlot()==='fishing',start.y)
     if(cigarette.active && (rides?.bike||rides?.boat||rides?.car)){
       cancelSmoke()

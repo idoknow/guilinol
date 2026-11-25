@@ -563,6 +563,12 @@ export async function createPhysics(manifest:Manifest,stream:Stream,peaks:PeaksG
     if(slope>cfg.slope+.18)return null
     return {y:origin-hit.timeOfImpact,slope,kind:kinds.get(hit.collider.handle)!}
   }
+  const fishingColumn=new R.Cuboid(1,150,1)
+  function coveredWater(x:number,z:number,height:number){
+    return !!world.intersectionWithShape({x,y:height+150-.02,z},identity,fishingColumn,undefined,undefined,capsule,undefined,coll=>{
+      const kind=kinds.get(coll.handle);return !!kind&&kind!=='ground'&&kind!=='overview'
+    })
+  }
   function waterCeiling(east:number,south:number,waterY:number){
     let bottom=Infinity
     if(hasDeck(east,south)){
@@ -774,5 +780,5 @@ export async function createPhysics(manifest:Manifest,stream:Stream,peaks:PeaksG
       return k==='building'||k==='rail'||k==='peak'||k==='tree'||k==='landmark'
     })
   }
-  return {world,body,capsule,controller,kinds,sources,sync,clear,overlaps,tileAt,hasDeck,surface,groundSurface,waterCeiling,waterOverlap,carOverlap,raycastObstacle,bikePathBlocked,pathBlocked,freeCapsule,wet,insideHouse,withinBounds,findWalkableSpawn,findFlatGround,findLocalDismount,findLocalMount,findCarDismount,findCarMount,isBlockedAt,canTrafficPush,syncObstacleVolume,removeObstacleVolume,getObstacleVolumeIds,resolveObstacleStep,clampCamera}
+  return {world,body,capsule,controller,kinds,sources,sync,clear,overlaps,tileAt,hasDeck,surface,groundSurface,coveredWater,waterCeiling,waterOverlap,carOverlap,raycastObstacle,bikePathBlocked,pathBlocked,freeCapsule,wet,insideHouse,withinBounds,findWalkableSpawn,findFlatGround,findLocalDismount,findLocalMount,findCarDismount,findCarMount,isBlockedAt,canTrafficPush,syncObstacleVolume,removeObstacleVolume,getObstacleVolumeIds,resolveObstacleStep,clampCamera}
 }

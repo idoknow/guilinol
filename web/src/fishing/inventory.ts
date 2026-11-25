@@ -1,6 +1,6 @@
 import {getActiveSaveSnapshot} from '../game/save'
 import {fishingTransaction} from '../game/commerce'
-import {accessories, profile, species, tackle, waters} from './config'
+import {dailyIncomeLimit, accessories, profile, species, tackle, waters} from './config'
 import {bait} from './bait'
 import {BAG_CAPACITY} from './limits'
 import type {Catch} from './engine'
@@ -36,7 +36,7 @@ export function removeCatch(ids:string[],sell:boolean,key=crypto.randomUUID()){
     const selected=new Set(ids),items=save.bag.filter(item=>selected.has(item.id));if(!items.length||items.length!==selected.size)return 'INVALID_ITEM'
     let delta=0
     if(sell){const day=new Date(Date.now()+8*3600000).toISOString().slice(0,10);if(day!==save.day){save.day=day;save.income=0}
-      delta=items.reduce((sum,item)=>sum+item.price,0);if(delta+save.income>5000)return '今日渔获收入已达上限';save.income+=delta}
+      delta=items.reduce((sum,item)=>sum+item.price,0);if(delta+save.income>dailyIncomeLimit)return '今日渔获收入已达上限';save.income+=delta}
     save.bag=save.bag.filter(item=>!selected.has(item.id));return delta})
 }
 export function journal(filters:{rarity?:string,size?:string,water?:string,method?:string}={}){
