@@ -1,5 +1,9 @@
 ## Main-camera graphics
 
+Scene materials apply native tone mapping (`neutral` by default) **before** the existing display-space atmosphere, including when rendering into the composer's FP16 target. Three r180 normally disables both native tone mapping and display conversion for offscreen draws. `DisplayScenePass` scopes Three's presentation-target flag (`isXRRenderTarget`) and output color space to the scene draw only. It does not start an XR session or change material hooks. The scene color is decoded back to linear for AO/bloom, or folded into grading when no intervening effect needs it. The last pass encodes to the display. SMAA stays off when the other effects and grading adjustments are off: even SMAA alone intentionally changes edge pixels. Mid/high still use the composer in that state.
+
+After building, `node scripts/verify-gfx-parity.mjs` freezes each camera at DPR 1 and compares 800×450 canvas pixels against neutral low direct. A pixel differs when any RGB channel differs by more than 8; more than 1% fails. Captures include Elephant Trunk Hill at noon and night and a separate night street with effects on and with just AO disabled.
+
 The first terrain frame does not wait for effects. Subsequent main-camera frames use N8AO, threshold bloom, the selected tone mapper and (except on low) SMAA. Offscreen callers still render directly. Desktop defaults to mid; coarse-pointer devices default to low. The graphics selector in the range panel is independent of tile radius. `?gfx=low|mid|high` overrides `glol.gfx` at entry. A continuous three seconds below 40 FPS lowers the tier; `?verify&gfx=…` pins the benchmark tier.
 
 | Tier | AO | Bloom | Daytime sun shadows | Additional |

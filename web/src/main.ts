@@ -554,6 +554,7 @@ async function start(loader:FullLoader,creatorSpawn=false) {
       gl.readPixels(0,0,1,1,gl.RGBA,gl.UNSIGNED_BYTE,new Uint8Array(4))
       resolve()
     }))},
+    ...(params.has('verify')?{redrawGfx(){if(!post)throw Error('Graphics pipeline not ready');drawMain()}}:{}),
     resume(){previous=0;renderer.setAnimationLoop(animate)},
     probeFoot(){
       const ray = new THREE.Raycaster(camera.position,new THREE.Vector3(0,-1,0))
