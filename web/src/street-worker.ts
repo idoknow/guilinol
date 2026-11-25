@@ -13,7 +13,8 @@ export interface StationPavingStyle {plaza?:Pair[]; platformEdges?:[Pair,Pair][]
 type Path=[number,...Pair[][]]
 type RoadCtrl=[number,number[]]
 type Lower=[number,Pair[],[number,number,number,number][]]
-export type Streets=[Path[],Pair[],number[][],Pair[]?,Pair[]?,(RoadCtrl|null)?,number[][]?,number[][]?,number[][]?,number[][]?,Pair[][]?,(Lower|null)?,([number,number,number]|null)?,unknown?,StationRoadSegment[]?,StationPavingCut[]?,ShoulderPlane[]?]
+type LayeredRoad = [...ShoulderPlane, number]
+export type Streets=[Path[],Pair[],number[][],Pair[]?,Pair[]?,(RoadCtrl|null)?,number[][]?,number[][]?,number[][]?,number[][]?,Pair[][]?,(Lower|null)?,([number,number,number]|null)?,unknown?,StationRoadSegment[]?,StationPavingCut[]?,ShoulderPlane[]?,LayeredRoad[]?]
 const colors=look.streets.surfaces.map(v=>new THREE.Color(v)),tone=Object.fromEntries((['railing','lampPole','lampHead'] as const).map(k=>[k,new THREE.Color(look.streets[k])]))
 const stoneLight=new THREE.Color(0xa6a39a),stoneMid=new THREE.Color(0x8c8981),stoneBase=new THREE.Color(0x74726b)
 const platformBrick=new THREE.Color(style.station.platformBrick)
@@ -49,7 +50,7 @@ function lowerHeight(x:number,z:number,base:number,terrain:number,[,corners,prof
 }
 
 const ROAD_LIFT=.03
-export function streetGeometry([paths,lamps,banks,signals=[],stops=[],roadCtrl,stoneRails=[],beds=[],shops=[],decor=[],curbCuts=[],lower,platform,,stationRoads,stationCuts,shoulderPlanes]:Streets,ground:(x:number,z:number)=>number,rails:RailSection[]=[],signs:CrossingSign[]=[],railGround:(x:number,z:number)=>number=ground,paving?:StationPavingStyle,roadbeds=new Set<number>(),origin?:readonly [number,number]){
+export function streetGeometry([paths,lamps,banks,signals=[],stops=[],roadCtrl,stoneRails=[],beds=[],shops=[],decor=[],curbCuts=[],lower,platform,,stationRoads,stationCuts,shoulderPlanes,layeredRoads]:Streets,ground:(x:number,z:number)=>number,rails:RailSection[]=[],signs:CrossingSign[]=[],railGround:(x:number,z:number)=>number=ground,paving?:StationPavingStyle,roadbeds=new Set<number>(),origin?:readonly [number,number]){
   const xyz:number[]=[],rgb:number[]=[],sidewalk:number[]=[],road:number[]=[],mats:number[]=[],cols:number[]=[]
   const stationLevel=stationRoads?stationRoadSurface(stationRoads):null
   const shoulders=shoulderPlanes && stationShoulders(shoulderPlanes)
@@ -259,7 +260,27 @@ export function streetGeometry([paths,lamps,banks,signals=[],stops=[],roadCtrl,s
       }
     }
   }
+  const upperRoads = layeredRoads?.filter(row => !row[7])
+  const coveredRoads = layeredRoads?.filter(row => row[7])
+  function layerHeight(rows: LayeredRoad[], x:number, z:number, pad:number) {
+    let closest=Infinity, level=-Infinity
+    for (const [ax,az,bx,bz,width,low,high] of rows) {
+      const dx=bx-ax,dz=bz-az,length=dx*dx+dz*dz
+      if (!length) continue
+      const t=THREE.MathUtils.clamp(((x-ax)*dx+(z-az)*dz)/length,0,1)
+      const distance=Math.hypot(x-ax-t*dx,z-az-t*dz)
+      if (distance <= width+pad && distance < closest) {
+        closest=distance; level=low+t*(high-low)
+      }
+    }
+    return level
+  }
   function crossingHeight(x:number,z:number,fallback:number){
+    const lower = coveredRoads?.length ? layerHeight(coveredRoads,x,z,8) : -Infinity
+    if (upperRoads?.length && Number.isFinite(lower)) {
+      const upper=layerHeight(upperRoads,x,z,2)
+      if (Number.isFinite(upper)) return upper
+    }
     let level=-Infinity
     for(const i of roadBins.get(Math.floor(z/8)*64+Math.floor(x/8))??[]){
       const ax=road[i],az=road[i+2],dx=road[i+3]-ax,dz=road[i+5]-az,ex=road[i+6]-ax,ez=road[i+8]-az
@@ -268,7 +289,7 @@ export function streetGeometry([paths,lamps,banks,signals=[],stops=[],roadCtrl,s
       const u=((x-ax)*ez-(z-az)*ex)/det,v=(dx*(z-az)-dz*(x-ax))/det
       if(u>=-1e-8&&v>=-1e-8&&u+v<=1.00000001)level=Math.max(level,road[i+1]+u*(road[i+4]-road[i+1])+v*(road[i+7]-road[i+1]))
     }
-    return Number.isFinite(level)?level:fallback
+    return Math.max(Number.isFinite(level)?level:fallback,lower+style.stationLevels.roadClearance+.15)
   }
   const railFace:RailFace=(a,b,c,color,along,kind)=>{
     if(kind>8.5){
@@ -349,9 +370,9 @@ export function streetGeometry([paths,lamps,banks,signals=[],stops=[],roadCtrl,s
     !open&&!footprint&&shoulderPlanes.some(([x,z,u,v])=>
       Math.abs(x-ax)+Math.abs(z-az)<1e-6 && (u-x)*(bx-ax)+(v-z)*(bz-az)>0 &&
       Math.abs((u-x)*(bz-az)-(v-z)*(bx-ax))<1e-6)):undefined
-  const railSupport=bores?.length?(x:number,z:number)=>{
+  const railSupport=bores?.length||coveredRoads?.length?(x:number,z:number)=>{
     let height=railGround(x,z)
-    for(const [ax,az,bx,bz,width,ay,by] of bores){
+    for(const [ax,az,bx,bz,width,ay,by] of bores??[]){
       const dx=bx-ax,dz=bz-az,length=dx*dx+dz*dz
       if(!length)continue
       const t=THREE.MathUtils.clamp(((x-ax)*dx+(z-az)*dz)/length,0,1)
@@ -360,6 +381,12 @@ export function streetGeometry([paths,lamps,banks,signals=[],stops=[],roadCtrl,s
       // chord with both ends outside the bore cannot hang through its ceiling.
       const outside=Math.max(0,distance-width-12)
       height=Math.max(height,ay+t*(by-ay)+style.stationLevels.roadClearance-outside)
+    }
+    if (coveredRoads?.length) {
+      const floor=layerHeight(coveredRoads,x,z,12)
+      // The rendered ballast toe sits 3 cm below its support. Keep both
+      // endpoints above the soffit throughout a full GL04 chord.
+      height=Math.max(height,floor+style.stationLevels.roadClearance+.15)
     }
     return height
   }:railGround

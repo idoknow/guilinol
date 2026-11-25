@@ -103,7 +103,23 @@ for (const { way: id, controls, boundaryNodes, maximumGrade = 0.05, direction = 
       if (i) distance += Math.hypot(xy[i].x-xy[i-1].x, xy[i].z-xy[i-1].z)
       along.set(way.nodes[i], distance)
     }
-    local.push(...strips.filter(t => along.get(t.nodes?.[0]) < end && along.get(t.nodes?.[1]) > start))
+    for (const t of strips) {
+      const origin=along.get(t.nodes?.[0]), last=along.get(t.nodes?.[1])
+      if (origin===undefined || last===undefined || origin>=end || last<=start) continue
+      const lo=Math.max(0,start-origin), hi=Math.min(t.length,end-origin)
+      if (hi<=lo) continue
+      const point=(at:number) => {
+        const i=t.stations.findIndex(([d])=>d>=at-1e-9)
+        const [a,y]=t.stations[Math.max(0,i-1)], [b,h]=t.stations[i<0?t.stations.length-1:i]
+        const [p,q]=t.portals
+        return [p[0]+(q[0]-p[0])*at/t.length,y+(h-y)*(at-a)/(b-a||1),p[2]+(q[2]-p[2])*at/t.length]
+      }
+      const portals=[point(lo),point(hi)]
+      local.push({...t,portals,length:hi-lo,
+        nodes:[lo>1e-6?`start-${id}`:t.nodes[0],hi<t.length-1e-6?`end-${id}`:t.nodes[1]],
+        joints:[lo>1e-6?null:t.joints?.[0],hi<t.length-1e-6?null:t.joints?.[1]],
+        stations:[[0,portals[0][1]],...t.stations.filter(([d])=>d>lo&&d<hi).map(([d,h])=>[d-lo,h]),[hi-lo,portals[1][1]]]})
+    }
     assert(local.length, "Missing prior road profile on " + id)
   } else {
     const first = strips.find((t) => t.nodes?.[0] === boundaryNodes[0])

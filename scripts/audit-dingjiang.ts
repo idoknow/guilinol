@@ -176,7 +176,20 @@ for(const [bridge,start,end] of [[983781246,983781245,500400552],[983781248,5005
   }
 }
 const mainReverse=visibleSurfaces(base,paved,auditedRoads,reference)
-const reverse = visibleSurfaces(candidate, paved, auditedRoads)
+// Subsequent phases can add an enclosed crossing inside these original
+// approaches. Resolve its upper road, roof and adjacent portal separately.
+const laterBores=worlds[1].tunnels.some(t=>t.gradedLanding)
+const closure=new Set(auditedRoads)
+if (laterBores) {
+  for (const file of fs.readdirSync('pipeline/rail-sections').filter(f => f.endsWith('.json'))) {
+    const section=json(path.join('pipeline/rail-sections',file))
+    for (const road of [...section.roads,...(section.additionalRoadGroups ?? []).flat()]) {
+      if (road.stackedRoad && worlds[1].tunnels.some(t=>t.way===road.way && t.nodes?.[0]===road.boundaryNodes[0]))
+        closure.add(road.way)
+    }
+  }
+}
+const reverse = visibleSurfaces(candidate, paved, closure, undefined, laterBores)
 console.log(JSON.stringify({abutments, mainReverse, reverse, closure: [...auditedRoads].sort((a,b)=>a-b), crossings:results, grades, yardGrades}, null, 2))
 
 assert(reverse.every(r => r.checked > 0 && r.groundViolations === 0), 'Ground-level faces intrude into a surveyed underpass')

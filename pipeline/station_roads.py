@@ -88,6 +88,10 @@ def tunnel_sections(profiles):
                               approach=0, openCut=not covered, openEnds=[0,0] if covered else [end-start,0], mouths=mouths,
                               pairedWidth=way.get('stationWidth'),
                               stations=np.column_stack((distances-start, levels)).tolist()))
+    joined = {way["id"] for way, _, _ in profiles.values() if way.get("flatNativeTie")}
+    for t in bores:
+        if t["way"] in joined and t["openCut"]:
+            t["gradedLanding"] = True
     ends = defaultdict(list)
     for t in bores:
         for idx,node in enumerate(t["nodes"]):
@@ -125,7 +129,8 @@ def bake(directory, manifest, paired_widths):
     from dingjiang_paving import finish_paving
     corrected = {int(wid) for section in sections for wid in section.get("priorRoadProfiles", {}).get("01", {})}
     finish_paving(directory, manifest, [profiles[wid] for wid in sorted(set(ROAD_IDS) | corrected)] + joint, elements)
-    final_traffic_ways = []
+    final_traffic_ways = [way for way, _, _ in joint]
+    final_traffic_ways.extend(profiles[wid][0] for wid in sorted(corrected))
     for section in road_phases(sections):
         parts = section_roads(section, ways, paired_widths)
         adjust_prior_roads(section["name"], parts, sections)
@@ -140,7 +145,7 @@ def bake(directory, manifest, paired_widths):
         bake_profiles(directory, manifest, parts, elements, bridges, joints, additional=True,
                       sample_traffic=not bridges)
         finish_paving(directory, manifest, list(parts.values()), elements)
-        if bridges:
+        if bridges or section.get("retainRoadNodeLevels"):
             final_traffic_ways.extend(way for way, _, _ in parts.values())
             final_traffic_ways.extend(bridges)
     return final_traffic_ways

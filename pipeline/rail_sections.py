@@ -220,6 +220,8 @@ def road_profiles(section, ways, widths):
         )
         if "maxTrafficOffset" in road:
             local["maxTrafficOffset"] = road["maxTrafficOffset"]
+        if road.get("stackedRoad"):
+            local["stackedRoad"] = True
         if "width" in road:
             local["profileWidth"] = road["width"]
         if wid in widths:

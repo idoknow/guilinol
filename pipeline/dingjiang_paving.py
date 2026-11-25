@@ -11,7 +11,7 @@ from shapely import LineString, box
 from features import points
 
 
-def shoulder_planes(local, ways, x, z):
+def grade_planes(local, ways, x, z, *, width_pad=2.08, lift=.029, mark_layer=False):
     """Tile-local, affine limits over the same straight chords as the road collider."""
     planes = []
     for section, a, b in local:
@@ -19,7 +19,7 @@ def shoulder_planes(local, ways, x, z):
             continue
         origin = np.array([x, z])
         direction = (b - a) / section["length"]
-        width = section["halfWidth"] + 2.08
+        width = section["halfWidth"] + width_pad
         sta = section["stations"]
         start = 0
         for i in range(1, len(sta)):
@@ -29,7 +29,10 @@ def shoulder_planes(local, ways, x, z):
                 end, high = sta[i + 1]
                 if abs(h - (y + (high - y) * (e - s) / (end - s))) < 1e-6:
                     continue
-            planes.append([*(a-origin+direction*s), *(a-origin+direction*e), width, y+.029, h+.029])
+            plane = [*(a-origin+direction*s), *(a-origin+direction*e), width, y+lift, h+lift]
+            if mark_layer:
+                plane.append(int(not section["openCut"]))
+            planes.append(plane)
             start = i
     return planes
 
@@ -51,6 +54,8 @@ def finish_paving(directory, manifest, profiles, elements):
     sections = [
         s for s in manifest["tunnels"] if (s["way"], *s.get("nodes", ())) in pairs
     ]
+    layered = {(way["id"], u, v) for way, _, _ in profiles if way.get("stackedRoad")
+               for u, v in zip(way["nodes"], way["nodes"][1:])}
     starts = {(way["id"], way["nodes"][0]) for way, _, _ in profiles}
     ends = {(way["id"], way["nodes"][-1]) for way, _, _ in profiles}
     alignments = []
@@ -102,11 +107,18 @@ def finish_paving(directory, manifest, profiles, elements):
         streets = collision[1]
         if len(streets) < 16:
             continue
-        planes = shoulder_planes(local, fitted_shoulders, x, z)
+        planes = grade_planes(local, fitted_shoulders, x, z)
         if planes:
             if len(streets) == 16:
                 streets.append([])
             streets[16].extend(planes)
+        # Keep the two roadway levels distinct at a level crossing over a bore.
+        # Each short plane follows the section's actual floor, including curves.
+        layers = grade_planes(local, layered, x, z, width_pad=0, lift=0, mark_layer=True)
+        if layers:
+            while len(streets) <= 17:
+                streets.append([])
+            streets[17].extend(layers)
         wet = np.frombuffer(raw, "<i2", 4225, 8474)
         step = 4 if np.any(wet != -32768) else 8
         zz, xx = np.mgrid[0:257:step, 0:257:step]
