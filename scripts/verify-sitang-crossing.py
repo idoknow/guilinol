@@ -108,7 +108,11 @@ def bank_survey(world, manifest, ways, bore):
                 else:
                     hits = index.query(Point(p), predicate='intersects')
                     if not len(hits):
-                        raise ValueError(f'Missing banked pavement at {p}')
+                        nearest = index.nearest(Point(p))
+                        distance = index.geometries[nearest].distance(Point(p))
+                        if distance > .000025:
+                            raise ValueError(f'Missing banked pavement at {p}, nearest face {distance} m, edge {k}, track {off}')
+                        hits = [nearest]
                     levels = faces[hits, 0, 1] + ((p-xy[hits, 0])*gradients[hits]).sum(axis=1)
                     top = np.argmax(levels)
                     level, bank = levels[top], gradients[hits[top]] @ normal[k]
