@@ -1,3 +1,5 @@
+import {SHIZIJIE_CURB_BARRIER_POLYLINES, SHIZIJIE_ORIGIN, touchesShizijieTile} from './shizijie-zone.ts'
+
 export const ROAD_BARRIER_STRIDE = 7
 
 interface BarrierSpec {
@@ -56,6 +58,22 @@ function normalizeHalfCircle(angle: number): number {
   return a
 }
 
+function clipSegmentToChunk(ax: number, az: number, bx: number, bz: number): [number, number, number, number] | null {
+  let t0 = 0, t1 = 1
+  const dx = bx - ax, dz = bz - az
+  for (const [p, q] of [[-dx, ax], [dx, 256 - ax], [-dz, az], [dz, 256 - az]] as const) {
+    if (Math.abs(p) < 1e-8) {
+      if (q < 0) return null
+    } else {
+      const r = q / p
+      if (p < 0) { if (r > t1) return null; if (r > t0) t0 = r }
+      else { if (r < t0) return null; if (r < t1) t1 = r }
+    }
+  }
+  if (t1 <= t0) return null
+  return [ax + t0 * dx, az + t0 * dz, ax + t1 * dx, az + t1 * dz]
+}
+
 /**
  * Extracts compact, collinear-merged Rapier cuboid definitions for blocking road decor in one 256 m chunk.
  * Output stride is ROAD_BARRIER_STRIDE (7): [cx, cy, cz, hx, hy, hz, yaw] in chunk-local X/Z and world Y.
@@ -63,8 +81,10 @@ function normalizeHalfCircle(angle: number): number {
 export function buildRoadBarriers(
   decor: readonly (readonly number[])[],
   baseLevel: (x: number, z: number) => number,
+  origin?: readonly [number, number],
 ): Float32Array {
-  if (!decor.length) return new Float32Array(0)
+  const addShizijieCurbs = !!origin && touchesShizijieTile(origin[0], origin[1])
+  if (!decor.length && !addShizijieCurbs) return new Float32Array(0)
   const raw: RawBarrier[] = []
   for (const item of decor) {
     const kind = item[0], east = item[1], south = item[2], heading = item[3], span = item[4] ?? 0
@@ -98,6 +118,53 @@ export function buildRoadBarriers(
       maxBaseY: Math.max(yMid, yA, yB),
       topOffset: spec.topOffset,
     })
+  }
+  if (addShizijieCurbs && origin) {
+    // Seal sidewalk-to-carriageway/cycleway edges continuously around Shizijie (IDOK-412)
+    // so foot/sprint/jump cannot cross roadway gaps; `physics.ts` trims slices overlapped by landmarks.
+    for (const poly of SHIZIJIE_CURB_BARRIER_POLYLINES) {
+      for (let i = 1; i < poly.length; i++) {
+        const ax = SHIZIJIE_ORIGIN[0] + poly[i - 1][0] - origin[0]
+        const az = SHIZIJIE_ORIGIN[1] + poly[i - 1][1] - origin[1]
+        const bx = SHIZIJIE_ORIGIN[0] + poly[i][0] - origin[0]
+        const bz = SHIZIJIE_ORIGIN[1] + poly[i][1] - origin[1]
+        const clipped = clipSegmentToChunk(ax, az, bx, bz)
+        if (!clipped) continue
+        const [sx, sz, ex, ez] = clipped
+        const segLen = Math.hypot(ex - sx, ez - sz)
+        if (segLen < .15) continue
+        const pieces = Math.max(1, Math.ceil(segLen / 8))
+        for (let k = 0; k < pieces; k++) {
+          const u0 = k / pieces, u1 = (k + 1) / pieces
+          const px0 = sx + (ex - sx) * u0, pz0 = sz + (ez - sz) * u0
+          const px1 = sx + (ex - sx) * u1, pz1 = sz + (ez - sz) * u1
+          const len = Math.hypot(px1 - px0, pz1 - pz0)
+          if (len < .1) continue
+          const ux = (px1 - px0) / len, uz = (pz1 - pz0) / len
+          const a = normalizeHalfCircle(-Math.atan2(uz, ux))
+          const tx = Math.cos(a), tz = -Math.sin(a)
+          const nx = Math.sin(a), nz = Math.cos(a)
+          const cx = (px0 + px1) * .5, cz = (pz0 + pz1) * .5
+          const halfL = len * .5 + .10
+          const yMid = baseLevel(cx, cz), yA = baseLevel(px0, pz0), yB = baseLevel(px1, pz1)
+          raw.push({
+            group: 9,
+            a,
+            tx,
+            tz,
+            nx,
+            nz,
+            cx,
+            cz,
+            halfL,
+            hz: .12,
+            minBaseY: Math.min(yMid, yA, yB),
+            maxBaseY: Math.max(yMid, yA, yB),
+            topOffset: 1.28,
+          })
+        }
+      }
+    }
   }
   if (!raw.length) return new Float32Array(0)
 
