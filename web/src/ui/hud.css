@@ -52,7 +52,9 @@ footer{left:auto;right:10px;bottom:10px;font-size:10px;opacity:.75}
 .hint{left:50%;bottom:36px;transform:translateX(-50%);font-size:12px;line-height:1.5;letter-spacing:.06em;padding:5px 16px;white-space:nowrap;opacity:.92}
 .toast{position:fixed;left:50%;top:18%;z-index:30;transform:translate(-50%,-8px);background:var(--ui-glass-strong);color:var(--ui-paper);font-size:15px;letter-spacing:.08em;padding:10px 20px;border-radius:var(--ui-r-md);
   border:1px solid var(--ui-glass-line-soft);opacity:0;pointer-events:none;transition:opacity .35s,transform .35s}
-.toast.show{opacity:1;transform:translate(-50%,0)}
+/* IDOK-349：入场时文字立即可读，只保留 8px 下落位移；退场仍按上面的 .35s 淡出。
+   在主线程繁忙时，Chromium 的 opacity 过渡可能迟迟不开始，提示会在若干帧里保持完全透明。 */
+.toast.show{opacity:1;transform:translate(-50%,0);transition:transform .35s}
 
 /* 载具上下车 */
 .vehicle-action{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(78px + env(safe-area-inset-bottom));padding:10px 24px;border-radius:var(--ui-r-pill);z-index:2;font-size:15px;letter-spacing:.12em;
