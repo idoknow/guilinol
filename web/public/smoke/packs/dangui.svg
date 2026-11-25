@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="384" height="576" viewBox="0 0 192 288">
+<defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff" stop-opacity=".10"/><stop offset=".55" stop-color="#fff" stop-opacity="0"/><stop offset="1" stop-color="#000" stop-opacity=".12"/></linearGradient></defs>
+<rect width="192" height="288" fill="#21483b"/>
+
+<path d="M40 128 C60 100 78 92 96 60 C110 84 132 96 152 128" fill="none" stroke="#e9c46a" stroke-width="1.4" opacity=".6"/>
+<g fill="#e9a23b"><g transform="translate(70 70)"><circle r="3.2"/><circle cx="4" r="3.2"/><circle cx="2" cy="-3.4" r="3.2"/><circle cx="2" cy="3" r="3.2"/></g><g transform="translate(88 54)"><circle r="3.2"/><circle cx="4" r="3.2"/><circle cx="2" cy="-3.4" r="3.2"/><circle cx="2" cy="3" r="3.2"/></g><g transform="translate(108 66)"><circle r="3.2"/><circle cx="4" r="3.2"/><circle cx="2" cy="-3.4" r="3.2"/><circle cx="2" cy="3" r="3.2"/></g><g transform="translate(122 84)"><circle r="3.2"/><circle cx="4" r="3.2"/><circle cx="2" cy="-3.4" r="3.2"/><circle cx="2" cy="3" r="3.2"/></g><g transform="translate(80 92)"><circle r="3.2"/><circle cx="4" r="3.2"/><circle cx="2" cy="-3.4" r="3.2"/><circle cx="2" cy="3" r="3.2"/></g><g transform="translate(100 100)"><circle r="3.2"/><circle cx="4" r="3.2"/><circle cx="2" cy="-3.4" r="3.2"/><circle cx="2" cy="3" r="3.2"/></g><g transform="translate(62 104)"><circle r="3.2"/><circle cx="4" r="3.2"/><circle cx="2" cy="-3.4" r="3.2"/><circle cx="2" cy="3" r="3.2"/></g><g transform="translate(130 108)"><circle r="3.2"/><circle cx="4" r="3.2"/><circle cx="2" cy="-3.4" r="3.2"/><circle cx="2" cy="3" r="3.2"/></g></g>
+<g stroke="#5f8f5a" stroke-width="2" fill="none"><path d="M96 128 C92 104 88 82 96 60"/></g>
+<rect x="7" y="7" width="178" height="274" fill="none" stroke="#e9c46a" stroke-width="1.6"/>
+<rect x="11" y="11" width="170" height="266" fill="none" stroke="#e9c46a" stroke-width=".6" opacity=".8"/>
+<text x="96" y="178" text-anchor="middle" font-family="'Songti SC','STSong','Noto Serif CJK SC','Source Han Serif SC',serif" font-weight="700" font-size="44" letter-spacing="4" fill="#e9c46a">丹桂</text>
+<line x1="56" y1="192" x2="136" y2="192" stroke="#e9c46a" stroke-width=".8"/>
+<text x="96" y="206" text-anchor="middle" font-family="'Songti SC','STSong','Noto Serif CJK SC','Source Han Serif SC',serif" font-size="11" letter-spacing="3" fill="#e9c46a" opacity=".9">桂林本地 · 20支</text>
+<rect x="11" y="240" width="170" height="37" fill="#f4efe2"/>
+<text x="96" y="265" text-anchor="middle" font-family="'Songti SC','STSong','Noto Serif CJK SC','Source Han Serif SC',serif" font-weight="700" font-size="15" letter-spacing="2" fill="#2b2b2b">吸烟有害健康</text>
+<rect width="192" height="288" fill="url(#g)"/>
+</svg>

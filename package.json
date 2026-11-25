@@ -70,6 +70,7 @@
     "verify:telemetry": "node scripts/verify-telemetry.mjs",
     "test": "python3 scripts/test-perf-region.py && node --test scripts/telemetry-test.mjs scripts/mp-admin-test.mjs && npm run test:api",
     "verify:modes": "node scripts/verify-modes.mjs",
+    "verify:home": "node scripts/verify-home-mp.mjs",
     "verify:qq": "node scripts/verify-qq-entry.mjs",
     "verify:hud": "node scripts/verify-hud-extras.mjs",
     "verify:camera": "node --experimental-strip-types --test scripts/camera-hold-test.mjs && node scripts/verify-camera.mjs",
