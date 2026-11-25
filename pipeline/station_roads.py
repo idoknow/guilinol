@@ -96,11 +96,11 @@ def bake(directory, manifest, paired_widths):
     profiles.update(road_profiles(elements, paired_widths))
     import dingjiang_structures
     profiles.update(dingjiang_structures.road_profiles(elements, paired_widths))
-    bridge_ways = dingjiang_structures.raise_decks(directory, manifest, elements)
-    bake_profiles(directory, manifest, profiles, elements, bridge_ways.values())
+    bridge_ways, landings = dingjiang_structures.raise_decks(directory, manifest, elements)
+    bake_profiles(directory, manifest, profiles, elements, bridge_ways.values(), landings)
 
 
-def bake_profiles(directory, manifest, profiles, elements, bridge_ways=()):
+def bake_profiles(directory, manifest, profiles, elements, bridge_ways=(), landings=None):
     import gzip
     import struct
     from collections import defaultdict
@@ -158,6 +158,10 @@ def bake_profiles(directory, manifest, profiles, elements, bridge_ways=()):
     protected_paving = STRtree(fixed_pavement)
     from station_junctions import build as build_junctions
     build_junctions(bores,protected_paving)
+    for bore in bores:
+        for end,node in enumerate(bore['nodes']):
+            if landings and node in landings:
+                bore.setdefault('joints',[None,None])[end] = landings[node]
     cuts = defaultdict(list)
     for t in bores:
         a,b=t['portals']

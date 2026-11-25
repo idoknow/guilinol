@@ -4,7 +4,7 @@ import gzip
 import struct
 
 import numpy as np
-from shapely import LineString, Point, box
+from shapely import LineString, MultiPoint, Point, box
 
 from dingjiang import hengliu
 from features import points
@@ -42,7 +42,11 @@ def motorway_sections(elements):
             first, last, _, _ = APPROACHES[wid]
             start = way["nodes"].index(first)
             stop = way["nodes"].index(last) + 1
-            yield dict(way, nodes=way["nodes"][start:stop], geometry=way["geometry"][start:stop])
+            yield dict(
+                way,
+                nodes=way["nodes"][start:stop],
+                geometry=way["geometry"][start:stop],
+            )
 
 
 def bridge_height(wid, line, at):
@@ -104,6 +108,14 @@ def raise_decks(directory, manifest, elements):
     ways = {w["id"]: w for w in elements if w["type"] == "way" and w["id"] in BRIDGES}
     lines = {wid: LineString(points(w)) for wid, w in ways.items()}
     found = {wid: 0 for wid in ways}
+    faces = {
+        node: []
+        for way in ways.values()
+        for node in (way["nodes"][0], way["nodes"][-1])
+    }
+    footprints = {
+        wid: line.buffer(5.02, cap_style="square") for wid, line in lines.items()
+    }
     for chunk in manifest["chunks"]:
         x, z = chunk["x"], chunk["z"]
         bounds = box(x, z, x + 256, z + 256)
@@ -122,26 +134,27 @@ def raise_decks(directory, manifest, elements):
             xy = tri[:, [0, 2]] / 100 + [x, z]
             for wid, line in local.items():
                 # Every original bridge vertex is within the 10 m wide span.
-                if not all(line.distance(Point(p)) <= 5.02 for p in xy):
+                if not all(footprints[wid].covers(Point(p)) for p in xy):
                     continue
+                ends = set()
+                axis = np.subtract(line.coords[-1], line.coords[0]) / line.length
                 for vertex, p in zip(tri, xy):
                     y = round(bridge_height(wid, line, line.project(Point(p))) * 100)
                     if y < vertex[1]:
                         raise ValueError(f"S2201 deck lowered on {wid}")
                     vertex[1] = y
-                    # The cm-encoded deck must cover its shared OSM endpoint.
-                    # Overlap the approach by 3 cm to absorb XY rounding.
-                    along = line.project(Point(p))
-                    if along < 0.012 or line.length - along < 0.012:
-                        delta = np.subtract(line.coords[-1], line.coords[0])
-                        outward = (
-                            delta
-                            / np.linalg.norm(delta)
-                            * (-0.03 if along < 0.012 else 0.03)
+                    # The approach and deck share an abutment slab wide enough
+                    # to support both axles while a vehicle straddles the joint.
+                    along = (p - line.coords[0]) @ axis
+                    if along < 0.012 or along > line.length - 0.012:
+                        first = along < 0.012
+                        target = -2.5 if first else line.length + 2.5
+                        vertex[[0, 2]] = np.rint(
+                            (p + (target - along) * axis - [x, z]) * 100
                         )
-                        vertex[[0, 2]] = np.rint((p + outward - [x, z]) * 100).astype(
-                            "<i2"
-                        )
+                        ends.add(ways[wid]["nodes"][0 if first else -1])
+                for node in ends:
+                    faces[node].append((tri / 100 + [x, 0, z]).tolist())
                 found[wid] += 1
                 changed = True
                 break
@@ -150,4 +163,14 @@ def raise_decks(directory, manifest, elements):
             chunk["bytes"] = path.stat().st_size
     if not all(found.values()):
         raise ValueError(f"Missing S2201 deck faces: {found}")
-    return ways
+    landings = {}
+    for node, triangles in faces.items():
+        if not triangles:
+            raise ValueError(f"Missing bridge abutment at {node}")
+        ring = MultiPoint(np.array(triangles).reshape(-1, 3)[:, [0, 2]]).convex_hull
+        # The deck already draws these faces. Sharing their exact positions
+        # clips the overlapping road floor and gives both ways the same support.
+        landings[node] = dict(
+            ring=list(ring.exterior.coords)[:-1], faces=triangles, draw=False
+        )
+    return ways, landings
