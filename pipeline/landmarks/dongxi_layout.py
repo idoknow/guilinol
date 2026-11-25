@@ -271,7 +271,7 @@ def registered_market(model, slabs):
     from plaza_seam import drape_walkways
     boundary = Polygon([point(coords) for coords in MARKET['replace']['polygon']])
     carriageways = [profile(LineString(np.asarray(points(way))-ORIGIN), way['tags'], STRtree([]), way['id'])
-                    for way in load_osm() if way['type']=='way' and way['id'] in (258909993,259020569)]
+                    for way in load_osm('wangcheng_market') if way['type']=='way' and way['id'] in (258909993,259020569)]
     if len(carriageways)!=2:raise ValueError('Missing Jiefang East carriageway')
     boundary=boundary.difference(unary_union([road.pavement for road in pair_carriageways(carriageways)]))
     terrain=np.load(ROOT/'pipeline/data/layout/dongxi-ground.npz');grid=terrain['heights']/10

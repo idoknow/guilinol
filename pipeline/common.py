@@ -51,7 +51,13 @@ def load_dem(gx=None, gz=None):
             raise ValueError('Aligned bbox is outside supplied DEM coverage or has missing tiles')
     return result
 
-def load_osm():
+def load_osm(model=None):
     snapshot = os.path.join(RAW, 'osm-2026-11.json')
-    with open(snapshot if os.path.isfile(snapshot) else os.path.join(RAW, 'osm.json')) as source:
+    if not os.path.isfile(snapshot):
+        snapshot = os.path.join(RAW, 'osm.json')
+    if model is not None and not os.path.exists(RAW):
+        if not model.isidentifier():
+            raise ValueError('Expected a model identifier')
+        snapshot = os.path.join(os.path.dirname(__file__), 'data', 'landmarks', model + '.json')
+    with open(snapshot) as source:
         return json.load(source)['elements']
