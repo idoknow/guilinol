@@ -15,7 +15,7 @@ export function playerSupport(sim:Awaited<ReturnType<typeof createPhysics>>){
     const lm=sim.surface(x,z,'landmark',refY+.55,1.8)
     const validLm=lm&&lm.y<=refY+.55&&lm.slope<=cfg.slope?lm:null
     const bridgeHit=validDeck&&validLm?(validLm.y>validDeck.y?validLm:validDeck):(validDeck??validLm)
-    return bridgeHit??sim.surface(x,z,'road')??sim.surface(x,z,'ground')??sim.surface(x,z,'sidewalk')
+    return bridgeHit??sim.surface(x,z,'road',refY+.55,1.8)??sim.surface(x,z,'road')??sim.surface(x,z,'ground')??sim.surface(x,z,'sidewalk')
   }
   return {supportAt,carSupportAt}
 }
