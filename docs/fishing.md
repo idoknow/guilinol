@@ -31,6 +31,7 @@
 |---|---|
 |charge|`{power}`，0–1|
 |cast|`{from,to,power,distance}`，两点均为世界 `{x,y,z}`，距离单位米|
+|cast-blocked|`{reason:'no-open-water'}`，沿朝向回收到 4 米仍没有合格落点；不扣饵|
 |approach / nibble|`{side,size}` / `{n}`（从 1 计数）|
 |hit / hooked / spooked / missed|窗口开启 / 提竿成功 / 惊鱼重等 / 窗口过期|
 |fight|`{tension,distance,stamina,surge,side}`，拉力与体力归一化，side 仅供绘制|
@@ -39,6 +40,10 @@
 `window.fishing.state()` 返回 phase、tension、distance、stamina。verify 另有 `teleportToSpot(id)`、`charge(power)`（以指定力度释放）、`forceApproach()`、`forceHit()`、`setSeed(n)`。
 
 ## 配置与扩展
+
+玩家不必走到指定站位：人在钓区内的干岸上，30 米内有可抛水面即可原地装备。离开范围或进入水中自动收竿。`shores.json` 的 `banks` 为岸线采样点，`radius` 为各岸点覆盖半径，`outlines` 是这些圆并集的世界 X/Z 轮廓（多边形 → 外环与内环 → 点）。`nearestFishingShore(x,z)` 返回 `{id,shore,distance,inZone}`；`spot` 保留为默认定位点，不是玩法门槛。
+
+落点取保守子集：覆盖其 1 米邻域的网格必须全部有水，渲染水面须高于河床和最终地面，且没有桥面、码头等上方碰撞体。缺图块或岸边混合格一律拒绝。浏览器验证每处抽样 2000 个合法落点，用实际已生成的水面三角形和地形逐点复核。
 
 - `web/src/fishing/species.json` 定义编号、稀有度、体型、品级、钓法与出没数量。`config.ts` 中 `waterIndices` 按图鉴顺序对应 `shores.json` 的水域索引，本表 10 处水域足以容纳所有任务书数量。增加鱼种时同步更新索引、饵料适配、图鉴断言，并将模型置于 `public/models/fish/<id>.glb`；未提供时检视器用椭球。
 - `bait.ts` 用图鉴 ID 指定适配对象；`grades.ts` 固定基础品级概率，再在该水域、钓法的同品级鱼池中按线级和饵料选种。若抽中品级无适配鱼，不重抽品级。加钓法需扩展 `Method`、`engine.ts` 的阶段转换和 `session.ts` 输入绑定。

@@ -6,7 +6,7 @@ import struct
 from pathlib import Path
 
 import numpy as np
-from shapely import Point, Polygon, STRtree
+from shapely import Point, Polygon, STRtree, union_all
 
 world = Path('public/world')
 manifest = json.loads((world / 'manifest.json').read_text())
@@ -66,7 +66,19 @@ for index, (key, name, x, z) in enumerate(anchors):
         near.extend(cache[tile['file']])
     spot = min(near, key=lambda point: math.hypot(point['x']-x, point['z']-z))
     assert math.hypot(spot['x']-x, spot['z']-z) < 250, name
-    output.append(dict(id=key, name=name, spot=spot, radius=2.5,
+    banks = [spot]
+    for point in sorted(near, key=lambda p: math.hypot(p['x']-spot['x'], p['z']-spot['z'])):
+        if math.hypot(point['x']-spot['x'], point['z']-spot['z']) > 120:
+            break
+        if abs(point['target'][1]-spot['target'][1]) > .5:
+            continue
+        if all(math.hypot(point['x']-p['x'], point['z']-p['z']) >= 12 for p in banks):
+            banks.append(point)
+    region = union_all([Point(p['x'], p['z']).buffer(32, quad_segs=6) for p in banks])
+    parts = region.geoms if region.geom_type == 'MultiPolygon' else [region]
+    outlines = [[[[round(px, 2), round(pz, 2)] for px, pz in ring.coords]
+                 for ring in [part.exterior, *part.interiors]] for part in parts]
+    output.append(dict(id=key, name=name, spot=spot, radius=32, banks=banks, outlines=outlines,
                        circle=dict(x=spot['target'][0], z=spot['target'][2], radius=24,
                                    color=['red', 'blue', 'green'][index % 3])))
 Path('web/src/fishing/shores.json').write_text(json.dumps(output, ensure_ascii=False, indent=2)+'\n')

@@ -2,13 +2,13 @@ import * as THREE from 'three'
 import {hotbarSlot,selectSlot} from '../ui/hotbar'
 import {getActiveSaveSnapshot} from '../game/save'
 import {FishingEngine,type Catch} from './engine'
-import {chargePower,resolveCast,type Point,nearby,species,tabs,waters,xpThresholds,type Method} from './config'
+import {chargePower,resolveCast,type Point,nearestFishingShore,nearby,species,tabs,waters,xpThresholds,type Method} from './config'
 import {buy,certification,collect,consume,inventory,journal,refundFullCast,removeCatch,shop} from './inventory'
 import {bait} from './bait'
 import {fishThumb} from './fish-model'
 import './fishing.css'
 
-type Host={canUse:()=>boolean,position:()=>Point,heading:()=>number,waterAt:(x:number,z:number)=>number|null,face:(angle:number)=>void,
+type Host={canUse:()=>boolean,position:()=>Point,heading:()=>number,onLand:(x:number,z:number)=>boolean,waterAt:(x:number,z:number)=>number|null,face:(angle:number)=>void,
   teleport:(x:number,z:number,angle:number)=>Promise<boolean>,hand:()=>THREE.Object3D|undefined,scene:THREE.Scene,camera:THREE.PerspectiveCamera}
 const textFocus=()=>document.activeElement?.matches('input,textarea,select,[contenteditable=true]')
 const terminal=['equip','land','snap','escape','miss','junk','empty-hook']
@@ -96,11 +96,21 @@ export function createFishing(host:Host,verify:boolean){
     const rank=certification(),water=spot()
     where.textContent=water?`${water.name} · ${zoneName[water.zone]} · ${rank.rank} Lv ${rank.level}`:''
   }
-  function spot(){const pos=host.position();return nearby(pos.x,pos.z)}
+  let bankCache:{x:number,z:number,angle:number,water:ReturnType<typeof nearby>}|undefined
+  function spot(){
+    const pos=host.position();if(!host.onLand(pos.x,pos.z))return undefined
+    if(bankCache&&bankCache.x===pos.x&&bankCache.z===pos.z&&bankCache.water)return bankCache.water
+    const water=nearby(pos.x,pos.z);if(!water)return undefined
+    const {shore}=nearestFishingShore(pos.x,pos.z),aim=Math.atan2(shore.target[0]-pos.x,shore.target[2]-pos.z)
+    for(let turn=0;turn<32;turn++){
+      const angle=aim+Math.ceil(turn/2)*(turn%2?1:-1)*Math.PI/16
+      if(resolveCast(pos,angle,1,host.waterAt)){bankCache={x:pos.x,z:pos.z,angle,water};return water}
+    }
+  }
   function active(){return hotbarSlot()==='fishing'&&host.canUse()}
   function toggle(){if(hotbarSlot()==='fishing'){selectSlot(previous);return}if(!host.canUse()||!spot())return
     const methods=spot()!.methods;if(!methods.includes(method))method=methods[0];q<HTMLButtonElement>('[data-method]').classList.toggle('single',methods.length===1)
-    host.face(spot()!.spot.yaw)
+    host.face(bankCache!.angle)
     previous=hotbarSlot()==='camera'?'camera':'hand';selectSlot('fishing');host.hand()?.add(rod);ui.hidden=false;document.body.dataset.fishing='on';engine.equip();options()}
   window.addEventListener('fishing:cancel',()=>{resetInput();rod.removeFromParent();float.visible=line.visible=false;ui.hidden=true;closeDrawer();delete document.body.dataset.fishing;origin=undefined;engine.cancel()})
 
@@ -130,7 +140,7 @@ export function createFishing(host:Host,verify:boolean){
   function cast(power:number){const water=spot();if(!active()||!water||!terminal.includes(engine.stage))return false
     if(!water.methods.includes(method))return false
     const pos=host.position(),landing=resolveCast({x:pos.x,y:pos.y,z:pos.z},host.heading(),power,host.waterAt)
-    if(!landing){toast('抛到岸上了 · 未消耗饵','dim');return false}
+    if(!landing){signal('cast-blocked',{reason:'no-open-water'});toast('抛到岸上了 · 未消耗饵','dim');return false}
     const id=baitSelect.value,key=crypto.randomUUID(),debit=consume(id,key);if(!debit.ok){toast(debit.code==='BAG_FULL'?'渔利背包已满 · 先去出售或丢弃':debit.code==='NO_BAIT'?'这款饵用完了 · 去渔利补货':debit.code,'dim');return false}
     receipt={key,baitId:id}
     const save=inventory(),tier=(prefix:string)=>Math.max(...save.owned.filter(value=>value.startsWith(prefix)).map(value=>Number(value.slice(prefix.length))))
@@ -237,17 +247,17 @@ export function createFishing(host:Host,verify:boolean){
       tip.getWorldPosition(tipWorld);const {x,y,z}=target,fight=engine.stage==='fight'
       // 鱼线：竿梢到入水点的下垂弧，角力时绷直、随拉力抖动
       const sag=fight?.05*(1-engine.tension):.45,shake=fight?Math.sin(clock*40)*.03*engine.tension:0
-      const end=new THREE.Vector3(x+(fight?engine.direction*.8:0),y,z)
+      const end=new THREE.Vector3(x,y,z)
       for(let i=0;i<SEG;i++){const u=i/(SEG-1);mid.lerpVectors(tipWorld,end,u);mid.y-=Math.sin(Math.PI*u)*sag*tipWorld.distanceTo(end)*.1;mid.x+=Math.sin(Math.PI*u)*shake;coords.setXYZ(i,mid.x,mid.y,mid.z)}
       coords.needsUpdate=true
       if(method==='台钓'){
         const bite=engine.stage==='hit',bob=bite?-.09-.03*Math.sin(clock*18):Math.sin(clock*2.2)*.012+(engine.stage==='wait'&&Math.sin(clock*7.3)>.96?-.02:0)
         float.position.set(x,y+.02+bob,z);float.rotation.z=Math.sin(clock*1.7)*.06
-        host.camera.position.set((origin.spot.x+x)/2,y+2.2,(origin.spot.z+z)/2);host.camera.lookAt(x,y,z)}}
+        host.camera.position.set((host.position().x+x)/2,y+2.2,(host.position().z+z)/2);host.camera.lookAt(x,y,z)}}
     if(engine.stage==='fight')hint.textContent=`拉力 ${Math.round(engine.tension*100)}% · 距岸 ${engine.distance.toFixed(1)} m`
   }
-  const teleportToSpot=async(id:string)=>{const water=waters.find(row=>row.id===id);return !!water&&await host.teleport(water.spot.x,water.spot.z,water.spot.yaw)}
+  const teleportToSpot=async(id:string,index=0)=>{const bank=waters.find(row=>row.id===id)?.banks[index];return !!bank&&await host.teleport(bank.x,bank.z,bank.yaw)}
   Object.assign(window,{fishing:{waters,journal,profile:certification,inspect,state:()=>({stage:engine.stage,phase:chargeStart!==null?'charge':engine.stage,distance:engine.distance,stamina:engine.stamina,direction:engine.direction,tension:engine.tension,method,spot:spot()?.id,inventory:structuredClone(inventory())}),
-    ...(verify?{teleportToSpot,charge:(power:number)=>cast(power),forceApproach:()=>engine.approach(true),forceHit:()=>{engine.approach(true);engine.hit()},setSeed:(seed:number)=>engine.setSeed(seed),openMenu:(name?:string)=>{if(name)tab=name;openDrawer()}}:{})}})
+    ...(verify?{teleportToSpot,waterAt:host.waterAt,onLand:host.onLand,charge:(power:number)=>cast(power),forceApproach:()=>engine.approach(true),forceHit:()=>{engine.approach(true);engine.hit()},setSeed:(seed:number)=>engine.setSeed(seed),openMenu:(name?:string)=>{if(name)tab=name;openDrawer()}}:{})}})
   return {toggle,tick,teleportToSpot}
 }

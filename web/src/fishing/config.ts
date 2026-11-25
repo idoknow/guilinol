@@ -1,3 +1,5 @@
+import {nearestFishingShore} from './zones.ts'
+export {nearestFishingShore}
 import speciesData from './species.json' with {type:'json'}
 import shoreData from './shores.json' with {type:'json'}
 import {bait} from './bait.ts'
@@ -18,7 +20,7 @@ export const waters = shoreData.map((shore,index) => ({...shore,
 }))
 export type Water = typeof waters[number]
 export function nearby(x:number,z:number) {
-  return waters.find(({spot,radius})=>Math.hypot(spot.x-x,spot.z-z)<=radius)
+  const near=nearestFishingShore(x,z);return near.inZone?waters.find(row=>row.id===near.id):undefined
 }
 export const ranks=['钓鱼新手','入门钓手','进阶钓手','资深钓手','钓鱼大师','钓鱼宗师']
 export const xpThresholds=Array.from({length:50},(_,i)=>12*i*(i+1))
