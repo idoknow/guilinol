@@ -50,13 +50,22 @@ export function stationPaving(cuts:Cut[]){
       const remaining:Point[][]=[]
       for(const polygon of polygons){
         if(planes.some(plane=>polygon.every(p=>plane(p)<=0))){remaining.push(polygon);continue}
+        const fragments:Point[][]=[]
         let part=polygon
         for(const plane of planes){
           const [inside,outside]=split(part,plane)
-          if(outside.length>=3)remaining.push(outside)
+          if(outside.length>=3)fragments.push(outside)
           part=inside
           if(part.length<3)break
         }
+        // Splitting against half-planes can subdivide a triangle far from
+        // the actual cut. Keep it intact unless a positive area is removed.
+        const area=part.reduce((sum,p,i)=>{
+          const q=part[(i+1)%part.length]
+          return sum+p.x*q.z-q.x*p.z
+        },0)
+        if(Math.abs(area)>1e-9)remaining.push(...fragments)
+        else remaining.push(polygon)
       }
       polygons=remaining
     }
