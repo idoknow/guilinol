@@ -8703,5 +8703,163 @@
       "runs": 8
     },
     "previousPairedPerformanceRevision": "d88122935a2f8b2cd3465e4bc02a0cc991809852"
+  },
+  "round18Evidence": {
+    "runtimeRevision": "2068d8761ef1430027e4f03e5a565f5f427d5b51",
+    "base": "04036c4f78cd4d8c4993b9b338bec9097eb9964b",
+    "geometryChanged": false,
+    "roofThickness": 0.3,
+    "maxGrade": 0.08,
+    "motorwayLiftCap": 0.5,
+    "sampleSpacingMetres": 0.01,
+    "crossSection": {
+      "carriagewayWidth": 6.0,
+      "xz": [
+        -18577.111804858516,
+        3964.782002332356
+      ],
+      "stationDifference": 0.14947217534536428,
+      "floorLowerBound": 157.5572452777302,
+      "minimumLift": 0.5158958433104033,
+      "zones": {
+        "carriageway": {
+          "samples": 4424,
+          "overCap": 27,
+          "worst": {
+            "offset": 3.0,
+            "required": 3.5,
+            "x": -18577.111804858516,
+            "z": 3964.782002332356,
+            "insideMotorway": 0.00238307450929387,
+            "floor": 157.5572452777302,
+            "top": 160.8413494344198,
+            "lift": 0.5158958433104033
+          },
+          "sections": [
+            {
+              "offset": 2.8,
+              "peakLift": 0.509506634296855
+            },
+            {
+              "offset": 2.9,
+              "peakLift": 0.5127012388036576
+            },
+            {
+              "offset": 3.0,
+              "peakLift": 0.5158958433104033
+            }
+          ]
+        },
+        "shoulder": {
+          "samples": 4424,
+          "overCap": 0,
+          "worst": {
+            "offset": 3.45,
+            "required": 3.0,
+            "x": -18577.58599296334,
+            "z": 3964.7839845920676,
+            "insideMotorway": 0.0017761195064229796,
+            "floor": 157.56920305175782,
+            "top": 160.84120074074394,
+            "lift": 0.028002311013892722
+          },
+          "sections": [
+            {
+              "offset": 3.3,
+              "peakLift": 0.02396682177936782
+            },
+            {
+              "offset": 3.4,
+              "peakLift": 0.025648591235778895
+            },
+            {
+              "offset": 3.45,
+              "peakLift": 0.028002311013892722
+            }
+          ]
+        }
+      }
+    },
+    "serviceStripBounds": [
+      {
+        "offset": 3.0,
+        "requiredClearance": 3.5,
+        "servicePavingSamples": 427,
+        "serviceLiftLowerBound": 1.5496647853085221
+      },
+      {
+        "offset": 2.9,
+        "requiredClearance": 3.5,
+        "servicePavingSamples": 427,
+        "serviceLiftLowerBound": 1.521439128309936
+      },
+      {
+        "offset": 2.8,
+        "requiredClearance": 3.5,
+        "servicePavingSamples": 428,
+        "serviceLiftLowerBound": 1.4932134713113214
+      },
+      {
+        "offset": 3.3,
+        "requiredClearance": 3.0,
+        "servicePavingSamples": 428,
+        "serviceLiftLowerBound": 1.1357348172329864
+      },
+      {
+        "offset": 3.4,
+        "requiredClearance": 3.0,
+        "servicePavingSamples": 428,
+        "serviceLiftLowerBound": 1.1639614134205942
+      },
+      {
+        "offset": 3.45,
+        "requiredClearance": 3.0,
+        "servicePavingSamples": 428,
+        "serviceLiftLowerBound": 1.1787673613011975
+      }
+    ],
+    "colocatedRoadFixture": {
+      "node": 13481414402,
+      "r17Frames": {
+        "batch": {
+          "start": [
+            -14305.8974609375,
+            6943.6240234375,
+            152.23480483518455
+          ],
+          "frame": 213,
+          "before": [
+            -14310.423828125,
+            6944.37451171875,
+            152.71285913080538
+          ],
+          "after": [
+            -14310.4521484375,
+            6944.4150390625,
+            152.84462301236277
+          ],
+          "delta": 0.13176388155739005
+        },
+        "single": {
+          "start": [
+            -14305.91015625,
+            6943.65771484375,
+            152.23629475280924
+          ],
+          "frame": 170,
+          "before": [
+            -14309.515625,
+            6943.88818359375,
+            152.52755831704948
+          ],
+          "after": [
+            -14309.515625,
+            6943.919921875,
+            152.622325067925
+          ],
+          "delta": 0.09476675087552167
+        }
+      }
+    }
   }
 }
