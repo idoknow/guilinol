@@ -4,7 +4,7 @@ import type {Tile} from './world'
 type Point=[number,number,number]
 import * as station from './station-tunnels'
 type Joint={wedges?:[number,number][][],faces?:Point[][],ring?:[number,number][],offsets?:string,draw:boolean,cap?:boolean}
-export type Tunnel={nodes?:[number,number],footprint?:[number,number][][],approachEnds?:[number,number],openCut?:boolean,way:number,generated?:boolean,openings?:[number,number,number,number][],gradedAccess?:boolean,portals:[Point,Point],length:number,halfWidth:number,endWidths?:[number,number],clearance:number,approach:number,openEnds?:[number,number],mouths?:[boolean,boolean],joints?:(Joint|null)[],portalSign?:number[][],crossfall?:number[],carriagewayHalfWidth?:number,stations?:[number,number][],stationHeights?:string,knotHeights?:string}
+export type Tunnel={nativePaving?:boolean,nodes?:[number,number],footprint?:[number,number][][],approachEnds?:[number,number],openCut?:boolean,way:number,generated?:boolean,openings?:[number,number,number,number][],gradedAccess?:boolean,portals:[Point,Point],length:number,halfWidth:number,endWidths?:[number,number],clearance:number,approach:number,openEnds?:[number,number],mouths?:[boolean,boolean],joints?:(Joint|null)[],portalSign?:number[][],crossfall?:number[],carriagewayHalfWidth?:number,stations?:[number,number][],stationHeights?:string,knotHeights?:string}
 
 // Generated strips use three fixed easing samples per interval. Keep distant
 // strips encoded in the manifest and unpack only a visited strip's levels.
