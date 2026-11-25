@@ -14,7 +14,7 @@
   --dr-accent-text: #e57f61;
   --dr-radius: var(--ui-r-md, 12px);
   --dr-h: 34px;
-  --dr-blur: var(--ui-blur, blur(8px) saturate(1.15));
+  --dr-blur: var(--ui-blur, none);
 }
 
 @media (pointer: coarse) {

@@ -15,8 +15,8 @@
   background: var(--ui-glass-solid, rgba(22, 36, 33, 0.92));
   color: var(--ui-paper, #f4efe2);
   box-shadow: inset 0 0 0 1px rgba(244, 239, 226, 0.16);
-  backdrop-filter: var(--ui-blur, blur(8px) saturate(1.15));
-  -webkit-backdrop-filter: var(--ui-blur, blur(8px) saturate(1.15));
+  backdrop-filter: var(--ui-blur, none);
+  -webkit-backdrop-filter: var(--ui-blur, none);
   font: 500 13px/1.2 var(--ui-serif, "Noto Serif SC", "Source Han Serif SC", "Songti SC", serif);
   font-variant-numeric: tabular-nums;
   user-select: none;
@@ -74,9 +74,20 @@
   border-radius: 999px;
   transform-origin: left center;
   background: var(--ui-paper, #f4efe2);
+  transition: opacity 0.1s ease, background-color 0.12s ease;
 }
 
-.drinks-hold-hud.is-drinking .drinks-hold-meter-fill {
+.drinks-hold-hud[data-phase="priming"] .drinks-hold-meter-fill {
+  opacity: 0.72;
+}
+
+.drinks-hold-hud[data-low="1"] .drinks-hold-sips {
+  color: #e57f61;
+  font-weight: 600;
+}
+
+.drinks-hold-hud.is-drinking .drinks-hold-meter-fill,
+.drinks-hold-hud[data-low="1"] .drinks-hold-meter-fill {
   background: var(--ui-seal-hi, #d0694c);
 }
 

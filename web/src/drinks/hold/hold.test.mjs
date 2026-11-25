@@ -15,6 +15,8 @@ import {
   DRINK_FINISH_FADE_SEC,
   DRINK_HOLD_STORAGE_KEY,
   DRINK_SIP_HOTKEY,
+  DRINK_SIP_LATENCY_SEC,
+  DRINK_SIP_RAMP_SEC,
   DrinkHoldSession,
   ORIGIN_MAIN_KEY_AUDIT,
   evaluateHoldHostAction,
@@ -23,8 +25,8 @@ import {
   resolveCupEmptyDurationSec,
 } from './hold-controller.ts'
 import { createDrinkCupModel } from './cup-model.ts'
-import { createDrinkStrawAudio } from './straw-audio.ts'
-import { DEFAULT_DRINKS_SKIN, getDrinkById } from '../menu/menu.ts'
+import { createDrinkStrawAudio, DRINK_LOW_ENERGY_THRESHOLD } from './straw-audio.ts'
+import { DEFAULT_DRINKS_SKIN, DRINKS_MENU, getDrinkById } from '../menu/menu.ts'
 
 function createMockWallet(initialMoney, opts) {
   let persisted = { money: initialMoney, updatedAt: 1000, economy: { txHistoryRing: [] } }
@@ -363,11 +365,16 @@ test('长按持续喝能量条连续扣减 + 松手即停 + 3D杯液面同步下
   assert.equal(s0.fillRatio, 1)
   assert.equal(s0.drinking, false)
 
-  // 长按开始持续喝 -> 连续推帧 0.25s × 4 = 1.0s
+  // 长按开始持续喝 -> 前 DRINK_SIP_LATENCY_SEC 内抬杯蓄压不秒掉能量，随后平滑连续消耗
   assert.equal(session.startDrinking().ok, true)
   assert.equal(session.startDrinking().code, 'ALREADY_DRINKING')
   audio.triggerStrawPoke()
   audio.setDrinking(true, 1)
+
+  // 验证起吸延迟手感（0.10s < 0.14s 抬杯阶段：手臂抬起但余量暂稳在 100%）
+  session.step(0.1)
+  assert.equal(session.getSnapshot().energy, 1)
+  assert.ok(session.getSnapshot().sipProgress > 0.5)
 
   const energies = []
   for (let i = 0; i < 4; i++) {
@@ -375,10 +382,12 @@ test('长按持续喝能量条连续扣减 + 松手即停 + 3D杯液面同步下
     energies.push(session.getSnapshot().energy)
     cup.setFillRatio(session.getSnapshot().fillRatio)
   }
-  // 验证能量严格连续递减（非整口阶跃），约下降 1 / 5.4
+  // 验证能量严格连续递减（非整口阶跃），且符合蓄压曲线积分
   assert.ok(energies[0] > energies[1] && energies[1] > energies[2] && energies[2] > energies[3])
-  const expectedAfter1s = 1 - 1 / resolveCupEmptyDurationSec(lemon)
-  assert.ok(Math.abs(energies[3] - expectedAfter1s) < 1e-4)
+  const totalElapsed = 0.1 + 4 * 0.25
+  const effectiveSec = totalElapsed - DRINK_SIP_LATENCY_SEC - DRINK_SIP_RAMP_SEC * 0.5
+  const expectedAfter = 1 - effectiveSec / resolveCupEmptyDurationSec(lemon)
+  assert.ok(Math.abs(energies[3] - expectedAfter) < 1e-4)
   assert.ok(session.getSnapshot().sipProgress > 0.8)
 
   // 松手立即停止：继续空转 2.0s 能量与液面一丝不动
@@ -394,6 +403,7 @@ test('长按持续喝能量条连续扣减 + 松手即停 + 3D杯液面同步下
   assert.equal(audio.getStats().active, false)
   assert.equal(audio.getStats().pokeCount, 1)
   assert.equal(audio.getStats().drawPulseCount, 1)
+  assert.equal(audio.getStats().lowWarningCount, 0)
 
   // 暂停保护期间不可喝
   session.setPaused(true)
@@ -401,15 +411,22 @@ test('长按持续喝能量条连续扣减 + 松手即停 + 3D杯液面同步下
   assert.equal(session.sip().code, 'PAUSED')
   session.setPaused(false)
 
-  // 继续长按直到能量耗尽 -> 喝空自动收回
+  // 继续长按跨过 DRINK_LOW_ENERGY_THRESHOLD -> 触发快空预警音一次且不刷屏 -> 喝空收回
   assert.equal(session.startDrinking().ok, true)
-  audio.setDrinking(true, session.getSnapshot().energy)
+  let lowTriggeredCountDuringSip = 0
   let finishedNow = false
   for (let i = 0; i < 40; i++) {
     if (session.step(0.2)) finishedNow = true
-    cup.setFillRatio(session.getSnapshot().fillRatio)
+    const snapNow = session.getSnapshot()
+    if (snapNow.drinking) {
+      audio.setDrinking(true, snapNow.energy)
+      if (snapNow.energy <= DRINK_LOW_ENERGY_THRESHOLD) lowTriggeredCountDuringSip += 1
+    }
+    cup.setFillRatio(snapNow.fillRatio)
   }
   assert.equal(finishedNow, true)
+  assert.ok(lowTriggeredCountDuringSip >= 1)
+  assert.equal(audio.getStats().lowWarningCount, 1)
   audio.triggerComplete()
   const endSnap = session.getSnapshot()
   assert.equal(endSnap.state, 'idle')
@@ -418,6 +435,26 @@ test('长按持续喝能量条连续扣减 + 松手即停 + 3D杯液面同步下
   assert.equal(endSnap.fillRatio, 0)
   assert.equal(endSnap.syncState.holding, false)
   assert.equal(audio.getStats().completeCount, 1)
+
+  // 10 款饮品均可在 3D 杯模正常切换，且冷饮含冷凝水珠、热饮/圣代关闭冷珠并切出瓦楞/碗型
+  for (const item of DRINKS_MENU) {
+    cup.setDrink(item)
+    cup.setFillRatio(0.42)
+    const cond = cup.group.getObjectByName('drinks-condensation')
+    const ribs = cup.group.getObjectByName('drinks-corrugated-ribs')
+    assert.ok(cond)
+    assert.ok(ribs)
+    if (item.id === 'brown_sugar_milk') {
+      assert.equal(cond.visible, false)
+      assert.equal(ribs.visible, true)
+    } else if (item.id === 'sundae_cup') {
+      assert.equal(cond.visible, false)
+      assert.equal(ribs.visible, false)
+    } else {
+      assert.equal(cond.visible, true)
+      assert.equal(ribs.visible, false)
+    }
+  }
 
   // 主动收起
   session.pickup(lemon)
@@ -435,7 +472,7 @@ test('手捧饮品刷新恢复(连续能量) + 键位避让(KeyY/KeyH让位给Ke
     removeItem: k => { mem.delete(k) },
   }
 
-  // 1) 刷新恢复：拿 ¥7 珍珠奶茶 (4.5s 喝完) 长按喝 1.35s (~70%) 松手 -> 重建 session 精确恢复约 70%
+  // 1) 刷新恢复：拿 ¥7 珍珠奶茶 (4.5s 喝完) 长按喝 1.35s 松手 -> 重建 session 精确恢复对应百分比
   const milkTea = getDrinkById('pearl_milk_tea')
   const s1 = new DrinkHoldSession({ storage, resolveDrink: getDrinkById })
   s1.pickup(milkTea, { ice: '少冰', sugar: '七分糖' }, 'ord_refresh_1')
@@ -443,7 +480,8 @@ test('手捧饮品刷新恢复(连续能量) + 键位避让(KeyY/KeyH让位给Ke
   for (let k = 0; k < 9; k++) s1.step(0.15)
   s1.stopDrinking()
   const savedPct = s1.getSnapshot().energyPct
-  assert.equal(savedPct, 70)
+  const expectedSavedPct = Math.round((1 - (1.35 - DRINK_SIP_LATENCY_SEC - DRINK_SIP_RAMP_SEC * 0.5) / 4.5) * 100)
+  assert.equal(savedPct, expectedSavedPct)
   assert.ok(mem.has(DRINK_HOLD_STORAGE_KEY))
 
   const restored = new DrinkHoldSession({ storage, resolveDrink: getDrinkById })
@@ -451,7 +489,7 @@ test('手捧饮品刷新恢复(连续能量) + 键位避让(KeyY/KeyH让位给Ke
   assert.equal(rSnap.active, true)
   assert.equal(rSnap.state, 'holding')
   assert.equal(rSnap.drink?.id, 'pearl_milk_tea')
-  assert.equal(rSnap.energyPct, 70)
+  assert.equal(rSnap.energyPct, expectedSavedPct)
   assert.equal(rSnap.customization?.ice, '少冰')
 
   // 收杯后清档，刷新不再恢复
@@ -541,7 +579,8 @@ test('手捧饮品刷新恢复(连续能量) + 键位避让(KeyY/KeyH让位给Ke
     s2.pickup(milkTea)
     const hudAudio = createDrinkStrawAudio({ muted: true })
     const hud = mountDrinkHoldHud({ session: s2, strawAudio: hudAudio })
-    assert.equal(hud.hotkey, 'KeyI')
+    try {
+      assert.equal(hud.hotkey, 'KeyI')
     assert.equal(hud.root.hidden, false)
 
     const fireWin = (type, code) => {
@@ -568,27 +607,39 @@ test('手捧饮品刷新恢复(连续能量) + 键位避让(KeyY/KeyH让位给Ke
     hud.syncHostState()
     assert.equal(hud.root.hidden, false)
 
-    // KeyI 长按 -> step 连续掉量 -> 松手停止
+    // KeyI 长按 -> step 连续掉量 (首帧 0.08s 处于起吸延迟期 data-phase=priming) -> 连续掉量 -> 松手停止
     fireWin('keydown', 'KeyI')
     assert.equal(s2.getSnapshot().drinking, true)
     assert.equal(hudAudio.getStats().active, true)
+    s2.step(0.08)
+    assert.equal(hud.root.dataset.phase, 'priming')
     s2.step(0.25)
     s2.step(0.25)
+    assert.equal(hud.root.dataset.phase, 'drawing')
     const afterHalfSec = s2.getSnapshot().energyPct
-    assert.ok(afterHalfSec < 95 && afterHalfSec > 80)
+    assert.ok(afterHalfSec < 96 && afterHalfSec > 80)
+    // 推进至 <= 18% 快空区间 -> 触发一次低液位预警音与 data-low="1"
+    for (let j = 0; j < 32 && s2.getSnapshot().energy > 0.14; j++) {
+      s2.step(0.15)
+    }
+    assert.equal(hud.root.dataset.low, '1')
+    assert.equal(hud.root.dataset.phase, 'low')
+    assert.equal(hudAudio.getStats().lowWarningCount, 1)
     fireWin('keyup', 'KeyI')
     assert.equal(s2.getSnapshot().drinking, false)
     assert.equal(hudAudio.getStats().active, false)
+    const frozenPct = s2.getSnapshot().energyPct
     s2.step(0.25)
-    assert.equal(s2.getSnapshot().energyPct, afterHalfSec)
+    assert.equal(s2.getSnapshot().energyPct, frozenPct)
 
     // 触屏按钮 pointerdown 长按 -> pointerup 松手停止
     const sipBtn = hud.root.querySelector('[data-drinks-action="sip"]')
     sipBtn.dispatch('pointerdown')
     assert.equal(s2.getSnapshot().drinking, true)
-    s2.step(0.25)
+    s2.step(0.2)
+    s2.step(0.2)
     const afterTouchHold = s2.getSnapshot().energyPct
-    assert.ok(afterTouchHold < afterHalfSec)
+    assert.ok(afterTouchHold > 0 && afterTouchHold < frozenPct)
     sipBtn.dispatch('pointerup')
     assert.equal(s2.getSnapshot().drinking, false)
     s2.step(0.25)
@@ -611,11 +662,12 @@ test('手捧饮品刷新恢复(连续能量) + 键位避让(KeyY/KeyH让位给Ke
     assert.equal(s2.getSnapshot().energyPct, afterTouchHold)
     assert.equal(hud.root.hidden, false)
 
-    s2.discard()
-    assert.equal(mem.has(DRINK_HOLD_STORAGE_KEY), false)
-
-    hud.dispose()
-    hudAudio.dispose()
+      s2.discard()
+      assert.equal(mem.has(DRINK_HOLD_STORAGE_KEY), false)
+    } finally {
+      hud.dispose()
+      hudAudio.dispose()
+    }
   } finally {
     globalThis.document = prevDoc
     globalThis.window = prevWin

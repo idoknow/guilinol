@@ -6,6 +6,7 @@
 
 const RIDE_SOUND_STORAGE_KEY = 'glol.rideSoundMuted'
 const RIDE_SOUND_EVENT = 'glol:ride-sound'
+export const DRINK_LOW_ENERGY_THRESHOLD = 0.18
 
 function readMutedPref(): boolean {
   if (typeof window === 'undefined') return false
@@ -45,6 +46,7 @@ export interface DrinkStrawAudioStats {
   pokeCount: number
   drawPulseCount: number
   bubbleCount: number
+  lowWarningCount: number
   completeCount: number
 }
 
@@ -52,6 +54,7 @@ export interface DrinkStrawAudioController {
   unlock(): boolean
   triggerStrawPoke(): boolean
   setDrinking(active: boolean, fillRatio?: number): void
+  triggerLowWarning(): boolean
   triggerComplete(): boolean
   setMuted(muted: boolean): void
   isMuted(): boolean
@@ -74,10 +77,12 @@ export function createDrinkStrawAudio(opts?: { muted?: boolean; volume?: number 
 
   let active = false
   let currentFill = 1
+  let lowWarnedForCup = false
   let disposed = false
   let pokeCount = 0
   let drawPulseCount = 0
   let bubbleCount = 0
+  let lowWarningCount = 0
   let completeCount = 0
 
   function isDocHidden(): boolean {
@@ -172,12 +177,12 @@ export function createDrinkStrawAudio(opts?: { muted?: boolean; volume?: number 
 
       const filter = ac.createBiquadFilter()
       filter.type = 'bandpass'
-      filter.Q.value = currentFill <= 0.14 ? 3.4 : 2.5
-      filter.frequency.setValueAtTime(currentFill <= 0.14 ? 2150 : 1650, t)
+      filter.Q.value = currentFill <= DRINK_LOW_ENERGY_THRESHOLD ? 3.6 : 2.5
+      filter.frequency.setValueAtTime(currentFill <= DRINK_LOW_ENERGY_THRESHOLD ? 2250 : 1650, t)
 
       const gain = ac.createGain()
       gain.gain.setValueAtTime(0.0001, t)
-      gain.gain.linearRampToValueAtTime(currentFill <= 0.14 ? 0.16 : 0.11, t + 0.04)
+      gain.gain.linearRampToValueAtTime(currentFill <= DRINK_LOW_ENERGY_THRESHOLD ? 0.16 : 0.11, t + 0.14)
 
       src.connect(filter)
       filter.connect(gain)
@@ -191,13 +196,14 @@ export function createDrinkStrawAudio(opts?: { muted?: boolean; volume?: number 
 
     bubbleTimer = setInterval(() => {
       if (!active || disposed || muted || isDocHidden()) return
-      const lowFluid = currentFill <= 0.14
+      const lowFluid = currentFill <= DRINK_LOW_ENERGY_THRESHOLD
       scheduleBubble(lowFluid)
       if (loopFilter && ctx) {
-        const freq = lowFluid ? 2150 + Math.random() * 400 : 1550 + Math.random() * 320
+        const freq = lowFluid ? 2250 + Math.random() * 420 : 1550 + Math.random() * 320
         loopFilter.frequency.setTargetAtTime(freq, ctx.currentTime, 0.03)
       }
-    }, 150)
+    }, currentFill <= DRINK_LOW_ENERGY_THRESHOLD ? 115 : 150)
+    ;(bubbleTimer as unknown as { unref?: () => void }).unref?.()
   }
 
   const onRideSound = (ev: Event) => {
@@ -241,10 +247,42 @@ export function createDrinkStrawAudio(opts?: { muted?: boolean; volume?: number 
       return true
     },
 
+    triggerLowWarning() {
+      if (disposed) return false
+      lowWarningCount += 1
+      const ac = ensureAudio()
+      if (!ac || !masterGain) return false
+      const t = ac.currentTime
+      const osc = ac.createOscillator()
+      const g = ac.createGain()
+      osc.type = 'sine'
+      osc.frequency.setValueAtTime(1180, t)
+      osc.frequency.exponentialRampToValueAtTime(720, t + 0.085)
+      osc.frequency.setValueAtTime(1340, t + 0.105)
+      osc.frequency.exponentialRampToValueAtTime(860, t + 0.185)
+      g.gain.setValueAtTime(0.0001, t)
+      g.gain.linearRampToValueAtTime(0.14, t + 0.01)
+      g.gain.exponentialRampToValueAtTime(0.001, t + 0.09)
+      g.gain.linearRampToValueAtTime(0.11, t + 0.11)
+      g.gain.exponentialRampToValueAtTime(0.0001, t + 0.19)
+      osc.connect(g)
+      g.connect(masterGain)
+      osc.start(t)
+      osc.stop(t + 0.2)
+      return true
+    },
+
     setDrinking(nextActive, fillRatio = 1) {
       currentFill = Math.max(0, Math.min(1, Number.isFinite(fillRatio) ? fillRatio : 1))
+      if (currentFill > 0.9) {
+        lowWarnedForCup = false
+      }
       if (nextActive && !disposed && !isDocHidden()) {
         if (!active) startLoop()
+        if (currentFill > 0.002 && currentFill <= DRINK_LOW_ENERGY_THRESHOLD && !lowWarnedForCup) {
+          lowWarnedForCup = true
+          this.triggerLowWarning()
+        }
       } else {
         stopLoop()
       }
@@ -253,6 +291,7 @@ export function createDrinkStrawAudio(opts?: { muted?: boolean; volume?: number 
     triggerComplete() {
       if (disposed) return false
       stopLoop()
+      lowWarnedForCup = false
       completeCount += 1
       const ac = ensureAudio()
       if (!ac || !masterGain) return false
@@ -286,6 +325,7 @@ export function createDrinkStrawAudio(opts?: { muted?: boolean; volume?: number 
       pokeCount,
       drawPulseCount,
       bubbleCount,
+      lowWarningCount,
       completeCount,
     }),
 

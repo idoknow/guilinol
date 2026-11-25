@@ -3,7 +3,7 @@ import type { Walker } from '../../play/host.ts'
 import { getDrinkById, type DrinkCatalogItem, type DrinkCustomization } from '../menu/menu.ts'
 import { DEFAULT_MASTER_DRINKS_SKIN, type DrinksMasterSkin } from '../menu/skin.ts'
 import { createDrinkCupModel, type DrinkCupVisual } from './cup-model.ts'
-import { createDrinkStrawAudio, type DrinkStrawAudioController } from './straw-audio.ts'
+import { createDrinkStrawAudio, DRINK_LOW_ENERGY_THRESHOLD, type DrinkStrawAudioController } from './straw-audio.ts'
 
 export type DrinkHoldState = 'idle' | 'holding' | 'drinking' | 'finishing'
 
@@ -24,6 +24,8 @@ export const ORIGIN_MAIN_KEY_AUDIT = Object.freeze({
 })
 
 export const DRINK_SIP_DURATION_SEC = 1.2
+export const DRINK_SIP_LATENCY_SEC = 0.14
+export const DRINK_SIP_RAMP_SEC = 0.16
 export const DRINK_FINISH_FADE_SEC = 0.25
 
 export const HOLD_AIM_REST = { forward: 0.25, up: 0.02, side: 0.13 } as const
@@ -123,6 +125,21 @@ export function resolveCupEmptyDurationSec(drink: Pick<DrinkCatalogItem, 'volume
   return 4.5
 }
 
+/** 分段蓄压曲线积分：按下前 DRINK_SIP_LATENCY_SEC 抬杯起吸不扣液量，随后平滑渐入满速吸入 */
+function suctionIntegralSec(elapsedSec: number): number {
+  if (elapsedSec <= DRINK_SIP_LATENCY_SEC) return 0
+  const rampEnd = DRINK_SIP_LATENCY_SEC + DRINK_SIP_RAMP_SEC
+  if (elapsedSec < rampEnd) {
+    const u = elapsedSec - DRINK_SIP_LATENCY_SEC
+    return (u * u) / (2 * DRINK_SIP_RAMP_SEC)
+  }
+  return DRINK_SIP_RAMP_SEC * 0.5 + (elapsedSec - rampEnd)
+}
+
+function computeSuctionDrawDt(prevElapsedSec: number, nextElapsedSec: number): number {
+  return Math.max(0, suctionIntegralSec(nextElapsedSec) - suctionIntegralSec(prevElapsedSec))
+}
+
 /**
  * 连续能量条手持饮品状态机：
  * - 支持 `startDrinking()` / `stopDrinking()`：按住连续扣能量并降液面，松手即刻冻结余量
@@ -137,6 +154,7 @@ export class DrinkHoldSession {
   private sipsTotal = 0
   private energy = 0
   private armBlend = 0
+  private drinkHoldElapsed = 0
   private pulseStopEnergy: number | null = null
   private finishElapsed = 0
   private lastPersistedEnergy = 1
@@ -228,6 +246,7 @@ export class DrinkHoldSession {
       this.sipsTotal = sipsTotal
       this.energy = restoredEnergy
       this.armBlend = 0
+      this.drinkHoldElapsed = 0
       this.pulseStopEnergy = null
       this.finishElapsed = 0
       this.lastPersistedEnergy = restoredEnergy
@@ -299,6 +318,7 @@ export class DrinkHoldSession {
     this.sipsTotal = Math.max(1, drink.sipsCount)
     this.energy = 1
     this.armBlend = 0
+    this.drinkHoldElapsed = 0
     this.pulseStopEnergy = null
     this.finishElapsed = 0
     this.persistNow()
@@ -315,13 +335,14 @@ export class DrinkHoldSession {
     this.paused = computedPaused
     if (this.paused && this.state === 'drinking') {
       this.state = 'holding'
+      this.drinkHoldElapsed = 0
       this.pulseStopEnergy = null
       this.persistNow()
     }
     this.emit()
   }
 
-  /** 长按开始持续喝：进入连续吸饮态，每帧随 step(dt) 持续扣减能量与液位 */
+  /** 长按开始持续喝：进入连续吸饮态，经历短暂抬杯起吸延迟后平滑扣减能量与液位 */
   startDrinking(): DrinkHoldStartResult {
     if (this.state === 'idle' || this.state === 'finishing' || !this.drink || this.energy <= 0.002) {
       return { ok: false, code: 'NO_DRINK', energy: 0 }
@@ -332,6 +353,7 @@ export class DrinkHoldSession {
     if (this.state === 'drinking') {
       return { ok: false, code: 'ALREADY_DRINKING', energy: this.energy }
     }
+    this.drinkHoldElapsed = 0
     this.pulseStopEnergy = null
     this.state = 'drinking'
     this.emit()
@@ -341,6 +363,7 @@ export class DrinkHoldSession {
   /** 松手立即停止：冻结当前能量与液位，落盘保存，手臂平滑收回休息位 */
   stopDrinking(): boolean {
     if (this.state !== 'drinking') return false
+    this.drinkHoldElapsed = 0
     this.pulseStopEnergy = null
     if (this.energy <= 0.002) {
       this.energy = 0
@@ -380,6 +403,7 @@ export class DrinkHoldSession {
 
     const stepFrac = 1 / Math.max(1, this.sipsTotal)
     const targetEnergy = Math.max(0, this.energy - stepFrac)
+    this.drinkHoldElapsed = 0
     this.pulseStopEnergy = targetEnergy <= 0.002 ? 0 : targetEnergy
     this.state = 'drinking'
     this.emit()
@@ -410,6 +434,7 @@ export class DrinkHoldSession {
     this.sipsTotal = 0
     this.energy = 0
     this.armBlend = 0
+    this.drinkHoldElapsed = 0
     this.pulseStopEnergy = null
     this.finishElapsed = 0
     this.persistNow()
@@ -423,12 +448,16 @@ export class DrinkHoldSession {
     const dt = Math.min(0.25, Math.max(0, Number.isFinite(dtSec) ? dtSec : 0))
 
     if (this.state === 'drinking' && !this.paused && this.drink) {
-      this.armBlend = clamp01(this.armBlend + dt * 5.5)
+      const prevElapsed = this.drinkHoldElapsed
+      this.drinkHoldElapsed += dt
+      this.armBlend = clamp01(this.armBlend + dt * 6.5)
       const drainRate = 1 / resolveCupEmptyDurationSec(this.drink)
-      const nextEnergy = Math.max(0, this.energy - drainRate * dt)
+      const effectiveDt = computeSuctionDrawDt(prevElapsed, this.drinkHoldElapsed)
+      const nextEnergy = Math.max(0, this.energy - drainRate * effectiveDt)
 
       if (this.pulseStopEnergy !== null && nextEnergy <= this.pulseStopEnergy) {
         this.energy = this.pulseStopEnergy
+        this.drinkHoldElapsed = 0
         this.pulseStopEnergy = null
         if (this.energy <= 0.002) {
           this.energy = 0
@@ -445,6 +474,7 @@ export class DrinkHoldSession {
       this.energy = nextEnergy
       if (this.energy <= 0.002) {
         this.energy = 0
+        this.drinkHoldElapsed = 0
         this.state = 'finishing'
         this.finishElapsed = 0
         this.persistNow()
@@ -710,6 +740,10 @@ export function mountDrinkHoldHud(opts: DrinkHoldHudOptions): DrinkHoldHudContro
     if (orderTag !== lastOrderTag) {
       lastOrderTag = orderTag
       pokedForCup = snap.energy < 0.99
+      if (snap.energy > 0.9) {
+        strawAudio?.setDrinking(false, 1)
+        wasDrinkingAudio = false
+      }
     }
 
     if (snap.drinking) {
@@ -729,9 +763,28 @@ export function mountDrinkHoldHud(opts: DrinkHoldHudOptions): DrinkHoldHudContro
     const show = snap.active && !snap.paused
     root.hidden = !show
     if (show) document.body.dataset.drinksHold = '1'
-    else delete document.body.dataset.drinksHold
+    else {
+      delete document.body.dataset.drinksHold
+      delete root.dataset.phase
+      delete root.dataset.low
+    }
 
     if (!show || !snap.drink) return
+    const isPriming = snap.drinking && snap.energy > 0.002 && snap.sipProgress < 0.76
+    const isLow = snap.energy > 0 && snap.energy <= DRINK_LOW_ENERGY_THRESHOLD
+    root.dataset.phase =
+      snap.state === 'finishing'
+        ? 'empty'
+        : snap.drinking
+          ? isPriming
+            ? 'priming'
+            : isLow
+              ? 'low'
+              : 'drawing'
+          : 'idle'
+    if (isLow) root.dataset.low = '1'
+    else delete root.dataset.low
+
     nameEl.textContent = snap.drink.name
     pctEl.textContent = `${snap.energyPct}%`
     meterEl.setAttribute('aria-valuenow', String(snap.energyPct))
@@ -741,7 +794,14 @@ export function mountDrinkHoldHud(opts: DrinkHoldHudOptions): DrinkHoldHudContro
     root.classList.toggle('is-drinking', snap.drinking)
     sipBtn.disabled = snap.state === 'finishing'
     sipBtn.setAttribute('aria-pressed', String(snap.drinking))
-    const btnText = snap.state === 'finishing' ? '喝完' : snap.drinking ? '饮用中' : '按住喝'
+    const btnText =
+      snap.state === 'finishing'
+        ? '喝完'
+        : snap.drinking
+          ? isPriming
+            ? '起吸'
+            : '饮用中'
+          : '按住喝'
     sipBtn.innerHTML = `${btnText}<kbd class="drinks-hold-key" aria-hidden="true">${keyLabel}</kbd>`
     sipBtn.setAttribute('aria-label', `${snap.drink.name}，余 ${snap.energyPct}%，按住${keyLabel}或按钮持续喝`)
   })
