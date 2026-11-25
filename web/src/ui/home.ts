@@ -26,7 +26,18 @@ export function home(play:(mode:PlayMode)=>void):Home {
   <div class="home-bg" aria-hidden="true">${slides.map(([file],i)=>`<img alt="" decoding="async" ${i?'data-src':'src'}="./home/${file}.webp"${i?'':' class="on"'}>`).join('')}</div>
   <div class="home-shade" aria-hidden="true"></div>
   <header class="home-top">
-    <button type="button" class="ui-btn home-account" data-umami-event="home-account"></button>
+    <nav class="home-social" aria-label="官方社群">
+       <button type="button" class="home-social-item home-social-official" data-act="douyin" data-umami-event="home-douyin" aria-label="打开抖音官方号二维码">
+         <img src="./icons/douyin-mark.webp" width="72" height="30" alt=""><span>抖音官号<small>扫码关注</small></span>
+       </button>
+       <button type="button" class="home-social-item" data-act="qq" data-umami-event="home-qq" aria-label="打开 QQ 群二维码">
+         <i class="home-social-glyph home-social-glyph--qq">Q</i><span>QQ群<small>扫码或链接加入</small></span>
+       </button>
+       <button type="button" class="home-social-item" data-act="douyin-group" data-umami-event="home-douyin-group" aria-label="打开抖音群二维码">
+         <img class="home-social-code" src="./icons/douyin-group.webp" width="560" height="560" alt=""><span>抖音群<small>扫码或链接加入</small></span>
+       </button>
+     </nav>
+     <button type="button" class="ui-btn home-account" data-umami-event="home-account"></button>
   </header>
   <div class="home-main">
     <div class="home-title">
@@ -62,14 +73,10 @@ export function home(play:(mode:PlayMode)=>void):Home {
     <nav class="home-links">
       <button type="button" class="ui-btn ui-btn--ghost" data-act="guide" data-umami-event="home-guide">玩法说明</button>
       <button type="button" class="ui-btn ui-btn--ghost" data-act="about" data-umami-event="home-about">关于游戏</button>
-      <button type="button" class="ui-btn ui-btn--ghost" data-act="qq" data-umami-event="home-qq">QQ 群</button>
       <a class="ui-btn ui-btn--ghost" href="${SOURCE_URL}" target="_blank" rel="noopener" data-umami-event="home-source-link">源代码 ↗</a>
     </nav>
   </div>
-  <button type="button" class="home-douyin" data-umami-event="home-douyin" aria-label="抖音官方号 ${DOUYIN_NAME}，点开看二维码">
-    <img class="home-douyin-code" src="./icons/douyin-code.webp" width="560" height="560" decoding="async" loading="lazy" alt="">
-    <span class="home-douyin-text"><img class="home-douyin-mark" src="./icons/douyin-mark.webp" width="284" height="120" alt=""><b>${DOUYIN_NAME}</b><small>官方号 · 扫码关注</small></span>
-  </button>
+  <!-- 社群入口已移动到左上角 home-social -->
   <div class="home-foot"><span class="home-caption" aria-live="off"></span><span class="home-credit">受 <a href="https://nanningol.com" target="_blank" rel="noopener" data-umami-event="home-thanks-nanning">网上南宁</a> 启发 · 地图数据 © OpenStreetMap 贡献者 · v${__APP_VERSION__}</span></div>`
   const progress = root.querySelector('.home-progress')!
   progress.textContent = stamps ? `已集 ${Math.min(stamps,spots.length)} / ${spots.length} 枚印章` : ''
@@ -105,7 +112,8 @@ export function home(play:(mode:PlayMode)=>void):Home {
   const about = root.querySelector<HTMLButtonElement>('[data-act=about]')!
   about.onclick = ()=>pending(about,()=>import('./about').then(m=>m.openAbout()))
   root.querySelector<HTMLButtonElement>('[data-act=qq]')!.onclick = ()=>qqGroup()
-  root.querySelector<HTMLButtonElement>('.home-douyin')!.onclick = ()=>douyin()
+  root.querySelector<HTMLButtonElement>('[data-act=douyin]')!.onclick = ()=>douyin()
+  root.querySelector<HTMLButtonElement>('[data-act=douyin-group]')!.onclick = ()=>douyinGroup()
   // IDOK-192 联机模式：街头玩法 + 同城联机。单人/游览会把联机关掉，walk 那边当场连上或断开。
   const mp = root.querySelector<HTMLButtonElement>('.home-mode--mp')!, mpGo = root.querySelector('.home-go--mp')!
   const mpLive = root.querySelector<HTMLElement>('.home-mp-live')!
@@ -173,11 +181,15 @@ function ago(t:number){
 // 手机上没法扫自己的屏幕，所以号码必须能复制出来；复制失败（非 https / 老浏览器）就把号码选中，让玩家自己按。
 interface CodeCard {key:string; title:string; img:string; w:number; h:number; alt:string; note:string; num:string; copyLabel:string}
 const QQ_GROUP = '1137384288', DOUYIN_ID = '65873904990', DOUYIN_NAME = '@网上桂林official'
+const QQ_GROUP_URL = 'https://qm.qq.com/q/gD64ZbmYMM'
+const DOUYIN_GROUP_ID = '837801239688', DOUYIN_GROUP_URL = 'https://v.douyin.com/group/837801239688'
 const QQ_CARD:CodeCard = {key:'qq',title:'QQ 群',img:'./icons/qq-group.webp',w:881,h:1101,alt:`网上桂林 QQ 群二维码，群号 ${QQ_GROUP}`,
-  note:'用 QQ 扫一扫，或在 QQ 里搜群号加入。',num:QQ_GROUP,copyLabel:'复制群号'}
+  note:`用 QQ 扫一扫，或在 QQ 里搜群号加入。<br><a href="${QQ_GROUP_URL}" target="_blank" rel="noopener">打开 QQ 群链接 ↗</a>`,num:QQ_GROUP,copyLabel:'复制群号'}
 const DOUYIN_CARD:CodeCard = {key:'douyin',title:'抖音官方号',img:'./icons/douyin-code.webp',w:560,h:560,alt:`网上桂林抖音官方号 ${DOUYIN_NAME} 二维码，抖音号 ${DOUYIN_ID}`,
   note:`<b>${DOUYIN_NAME}</b>打开抖音，在搜索页点扫一扫；或搜索抖音号关注。`,num:DOUYIN_ID,copyLabel:'复制抖音号'}
-const qqGroup = ()=>codeCard(QQ_CARD), douyin = ()=>codeCard(DOUYIN_CARD)
+const DOUYIN_GROUP_CARD:CodeCard = {key:'douyin-group',title:'抖音群',img:'./icons/douyin-group.webp',w:560,h:560,alt:`网上桂林抖音群二维码，群号 ${DOUYIN_GROUP_ID}`,
+  note:`抖音群号 ${DOUYIN_GROUP_ID}，也可以直接打开群链接加入。<br><a href="${DOUYIN_GROUP_URL}" target="_blank" rel="noopener">打开抖音群链接 ↗</a>`,num:DOUYIN_GROUP_ID,copyLabel:'复制群号'}
+const qqGroup = ()=>codeCard(QQ_CARD), douyin = ()=>codeCard(DOUYIN_CARD), douyinGroup = ()=>codeCard(DOUYIN_GROUP_CARD)
 const codeMasks = new Map<string,HTMLDivElement>()
 function codeCard(card:CodeCard) {
   let mask = codeMasks.get(card.key)

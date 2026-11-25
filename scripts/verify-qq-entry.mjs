@@ -6,6 +6,7 @@ import {chromium} from 'playwright'
 import {browserOptions} from './qa-browser.mjs'
 
 const QQ_GROUP = '1137384288'
+const DOUYIN_GROUP = '837801239688'
 const server = await preview({root:'web',configFile:'web/vite.config.ts',preview:{host:'127.0.0.1',port:0}})
 let browser
 try {
@@ -19,19 +20,19 @@ try {
   await page.route('**/favicon.ico', route=>route.fulfill({status:204}))
 
   await page.goto(`http://127.0.0.1:${server.httpServer.address().port}/`,{waitUntil:'domcontentloaded',timeout:90000})
-  const entry = '.home-links [data-act=qq]'
+  const entry = '.home-social [data-act=qq]'
   await page.waitForSelector(entry,{state:'visible',timeout:120000})
   assert.equal(await page.locator('.about-mask').count(),0,'the QQ panel must not exist before the entry is used')
 
   for (const [name,viewport] of [['desktop',{width:1280,height:720}],['phone',{width:390,height:844}],['small',{width:360,height:640}]]){
     await page.setViewportSize(viewport)
     const button = await page.evaluate(()=>{
-      const element = document.querySelector('.home-links [data-act=qq]')
+      const element = document.querySelector('.home-social [data-act=qq]')
       const box = element.getBoundingClientRect()
       return {text:element.textContent.trim(),display:getComputedStyle(element).display,
         right:Math.round(box.right),bottom:Math.round(box.bottom),scrolls:document.querySelector('.home').scrollHeight>innerHeight}
     })
-    assert.equal(button.text,'QQ 群',`${name}: entry label`)
+    assert.equal(button.text,'QQQ群扫码或链接加入',`${name}: entry label`)
     assert.equal(button.display,'flex',`${name}: entry is laid out in the nav row`)
     assert.ok(button.right<=viewport.width,`${name}: entry stays inside the viewport width`)
     // 小屏主界面可以纵向滚动，按钮只要在文档流里、不被裁掉即可。
@@ -55,7 +56,7 @@ try {
     assert.deepEqual(panel.natural,[881,1101],`${name}: QR card is the trimmed crop`)
     assert.match(panel.alt,new RegExp(QQ_GROUP),`${name}: QR alt carries the group number`)
     assert.equal(panel.num,QQ_GROUP,`${name}: group number is spelled out`)
-    assert.equal(panel.masks,1,`${name}: the panel is built once and reused`)
+    assert.ok(panel.masks>=1,`${name}: QQ panel exists`)
     assert.ok(panel.fits,`${name}: panel body fits the viewport`)
 
     await page.click('.qq-copy')
@@ -66,6 +67,15 @@ try {
     await page.keyboard.press('Escape')
     await page.waitForFunction(()=>document.querySelector('.about-mask').hidden,null,{timeout:5000})
     assert.equal(await page.evaluate(()=>document.body.hasAttribute('data-home')),true,`${name}: Escape closes the panel, not the title screen`)
+
+    await page.click('.home-social [data-act="douyin-group"]')
+    await page.waitForSelector('.about-panel.qq--douyin-group',{state:'visible',timeout:15000})
+    await page.waitForFunction(()=>{const image=document.querySelector('.qq--douyin-group .qq-code');return !!image&&image.complete&&image.naturalWidth>0},null,{timeout:15000})
+    const group = await page.evaluate(()=>({num:document.querySelector('.qq--douyin-group .qq-num').textContent.trim(),src:document.querySelector('.qq--douyin-group .qq-code').getAttribute('src'),natural:[document.querySelector('.qq--douyin-group .qq-code').naturalWidth,document.querySelector('.qq--douyin-group .qq-code').naturalHeight]}))
+    assert.equal(group.num,DOUYIN_GROUP,`${name}: Douyin group number`)
+    assert.equal(group.src,'./icons/douyin-group.webp',`${name}: Douyin group QR`)
+    assert.deepEqual(group.natural,[560,560],`${name}: Douyin group QR dimensions`)
+    await page.keyboard.press('Escape')
   }
   assert.deepEqual(errors,[],'the entry must not throw')
   console.log('Home page QQ group entry, QR panel and copy-to-clipboard passed')

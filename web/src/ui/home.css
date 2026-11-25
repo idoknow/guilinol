@@ -109,7 +109,7 @@ kbd{display:inline-block;min-width:1.5em;padding:1px 5px;margin:0 1px;border-rad
 
 /* 抖音官方号（IDOK-272）：右下角一张小码卡，点开放大 + 复制抖音号。码是官方分享图裁出的圆形码，白底圆，透明外圈。
    手机竖屏/横屏底部被模式卡占满，收成左上角一枚小胶囊（和右上账号按钮对称）。 */
-.home-douyin{position:absolute;z-index:1;right:calc(22px + env(safe-area-inset-right));bottom:calc(58px + env(safe-area-inset-bottom));
+.home-douyin{display:none;position:absolute;z-index:1;right:calc(22px + env(safe-area-inset-right));bottom:calc(58px + env(safe-area-inset-bottom));
   display:grid;grid-template-columns:auto auto;align-items:center;gap:12px;padding:10px 16px 10px 10px;cursor:pointer;text-align:left;
   font:inherit;color:var(--ui-paper);background:var(--ui-glass);border:1px solid var(--ui-glass-line-soft);border-radius:var(--ui-r-lg);
   backdrop-filter:var(--ui-blur);-webkit-backdrop-filter:var(--ui-blur);box-shadow:var(--ui-shadow-1);-webkit-tap-highlight-color:transparent;
@@ -191,3 +191,21 @@ kbd{display:inline-block;min-width:1.5em;padding:1px 5px;margin:0 1px;border-rad
 @keyframes home-spin{to{transform:rotate(360deg)}}
 @keyframes home-breathe{50%{filter:brightness(1.12)}}
 @media (prefers-reduced-motion:reduce){.home-go .home-spin,.home .ui-btn[aria-busy=true]::after{animation-duration:2.4s}.home-mode[aria-busy=true] .home-go{animation:none}}
+
+/* IDOK-283: 官方社群统一放在首页左上角，与账号入口分列。 */
+.home-social{position:absolute;z-index:3;left:calc(22px + env(safe-area-inset-left));top:calc(16px + env(safe-area-inset-top));display:flex;align-items:center;gap:7px}
+.home-social-item{display:flex;align-items:center;gap:8px;min-height:40px;padding:5px 11px 5px 7px;border:1px solid var(--ui-glass-line-soft);border-radius:var(--ui-r-pill);color:var(--ui-paper);background:var(--ui-glass);backdrop-filter:var(--ui-blur);-webkit-backdrop-filter:var(--ui-blur);cursor:pointer;text-align:left;font:inherit;transition:background var(--ui-fast),border-color var(--ui-fast),transform var(--ui-fast)}
+.home-social-item:hover{background:var(--ui-glass-strong);border-color:var(--ui-glass-line);transform:translateY(-1px)}
+.home-social-item:focus-visible{outline:2px solid var(--ui-jade-300);outline-offset:2px}
+.home-social-item>span{display:grid;gap:1px;font:600 13px/1.2 var(--ui-serif);letter-spacing:.06em;white-space:nowrap}
+.home-social-item small{font:400 10px/1.2 var(--ui-sans,system-ui,sans-serif);letter-spacing:.02em;color:var(--ui-paper-dim)}
+.home-social-item>img:first-child{display:block;width:49px;height:21px;object-fit:contain}
+.home-social-code{width:29px!important;height:29px!important;border-radius:50%;object-fit:cover!important;background:#fff}
+.home-social-glyph{width:29px;height:29px;display:grid;place-items:center;border-radius:50%;font:800 17px/1 Arial,sans-serif;color:#fff;background:linear-gradient(145deg,#12b7f5,#1877f2)}
+@media (max-width:760px),(max-height:520px) and (orientation:landscape){
+  .home-social{left:calc(10px + env(safe-area-inset-left));top:calc(10px + env(safe-area-inset-top));right:calc(8px + env(safe-area-inset-right));gap:4px}
+  .home-social-item{min-height:34px;padding:3px 7px 3px 5px;gap:5px}
+  .home-social-item>span{font-size:11px}.home-social-item small{display:none}
+  .home-social-item>img:first-child{width:38px;height:17px}.home-social-code,.home-social-glyph{width:25px!important;height:25px!important}
+  .home-social-glyph{font-size:14px}
+}
