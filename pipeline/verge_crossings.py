@@ -20,7 +20,7 @@ def open_verges(output, manifest, elements, widths):
         axis=LineString(points(way))
         half=widths.get(way['id'],width(way['tags']))/2+.5
         corridors.append(axis.buffer(half,quad_segs=4))
-        mouths.update((way['nodes'][0],way['nodes'][-1]))
+        mouths.update(way['nodes'])
     # The same access can continue on a short untagged arm before it reaches
     # an arterial verge. Preserve the crossing throughout its approach.
     for way in elements:

@@ -65,19 +65,75 @@ def narrow_intervals(axis, walls):
     return [r for r in runs if r[1]-r[0]>MIN_LENGTH]
 
 
-def classify(output, chunks, elements, motor_classes):
+def rider_alignment(way, walls, shared, paved):
+    """Keep the two-wheel path clear of the wall even when OSM hugs one side."""
+    routed=[]
+    serial=0
+    xy=points(way)
+    for index,(start,end) in enumerate(zip(xy,xy[1:])):
+        a,b=np.asarray(start),np.asarray(end)
+        length=np.linalg.norm(b-a)
+        if length<.01:
+            continue
+        tangent=(b-a)/length
+        normal=np.array([-tangent[1],tangent[0]])
+        stations=np.linspace(0,length,math.ceil(length)+1)
+        limits=[]
+        for d in stations:
+            q=a+d*tangent
+            half=paved/2+.5
+            cross=LineString([q-half*normal,q+half*normal])
+            gap=min(line_parts(cross.difference(walls)),key=lambda line:line.distance(Point(q)),default=None)
+            if gap is None:
+                raise ValueError(f'Missing riding corridor on {way["id"]} at {q}')
+            lo,hi=sorted(np.dot(np.asarray(pt)-q,normal) for pt in (gap.coords[0],gap.coords[-1]))
+            margin=min(.65,(hi-lo)/2)
+            limits.append([lo+margin,hi-margin])
+        # Anticipate each narrowing at a lateral gradient of 1:5. Preserve
+        # the fixed network centres at shared junctions.
+        for order in (range(1,len(stations)),range(len(stations)-2,-1,-1)):
+            for j in order:
+                k=j-order.step
+                step=abs(stations[j]-stations[k])*.2
+                limits[j][0]=max(limits[j][0],limits[k][0]-step)
+                limits[j][1]=min(limits[j][1],limits[k][1]+step)
+        offsets=[np.clip(0,lo,hi) if lo<=hi else (lo+hi)/2 for lo,hi in limits]
+        for j,ref in ((0,way['nodes'][index]),(-1,way['nodes'][index+1])):
+            if ref in shared:
+                offsets[j]=0.
+        curve=LineString([a+d*tangent+v*normal for d,v in zip(stations,offsets)]).simplify(.015)
+        for j,(x,z) in enumerate(curve.coords):
+            if j==0 and routed:
+                continue
+            if j==0:
+                ref=way['nodes'][index]
+            elif j==len(curve.coords)-1:
+                ref=way['nodes'][index+1]
+            else:
+                serial+=1
+                ref=-50_000_000_000_000-way['id']*10000-serial
+            routed.append([x,z,ref])
+    return routed
+
+
+def classify(output, chunks, elements, motor_classes, widths):
     solids = []
     for tile in chunks:
         origin = np.array([tile['x'], tile['z']])
         for row in read_chunk(output / tile['file'])[3][0]:
             if not any(row[9:]):
                 solids.append(footprint(row, origin))
+    from collections import Counter
+    from service_streets import width
+    counts=Counter(ref for w in elements if w['type']=='way' and w.get('tags',{}).get('highway')
+                   for ref in set(w['nodes']))
+    shared={ref for ref,n in counts.items() if n>1}
     index = STRtree(solids)
     result = []
     for way in elements:
         tags = way.get('tags', {})
         if (way['type']!='way' or tags.get('highway','').removesuffix('_link') not in motor_classes
-                or tags.get('bridge','no')!='no' or underground(way) or way.get('surfaceUnderlay')
+                or tags.get('bridge','no')!='no' or underground(way)
                 or tags.get('area')=='yes' or not way.get('geometry') or not all(way['geometry'])):
             continue
         axis = LineString(points(way))
@@ -92,7 +148,8 @@ def classify(output, chunks, elements, motor_classes):
             continue
         runs = narrow_intervals(axis, walls)
         if runs:
-            result.append(dict(way=way['id'], length=axis.length, narrowStations=runs))
+            result.append(dict(way=way['id'], length=axis.length, narrowStations=runs,
+                               alignment=rider_alignment(way,walls,shared,widths.get(way['id'],width(tags)))))
     return result
 
 
@@ -117,7 +174,7 @@ def driving_sites(elements, clearances, permits):
     for w in elements:
         if w['type']!='way' or w['id'] not in by_way:
             continue
-        route = [[x,z,w['id']] for x,z in points(w)]
+        route = [[x,z,w['id']] for x,z,_ in by_way[w['id']]['alignment']]
         modes = [dict(mode=mode,direction=direction,route=path)
                  for mode in ('foot','bike','bicycle') if permits(w['tags'],mode)
                  for direction,path in [('in',route),('out',route[::-1])]]
@@ -126,6 +183,6 @@ def driving_sites(elements, clearances, permits):
             axis = LineString(points(w))
             target = axis.interpolate(by_way[w['id']]['narrowStations'][0][0]+1)
             modes.append(dict(mode='car',direction='reverse-exit',reverseExit=True,
-                              route=[route[0],[target.x,target.y,w['id']]]))
-        sites.append(dict(id=w['id'],way=w['id'],modes=modes))
+                              route=[[*axis.coords[0],w['id']],[target.x,target.y,w['id']]]))
+        sites.append(dict(id=w['id'],way=w['id'],singleFile=True,modes=modes))
     return sites
