@@ -3,7 +3,7 @@ const base = {
   ao: {enabled:true, lowEnabled:false, intensity:1, radius:2},
   bloom: {enabled:true, intensity:0.6, threshold:0.85},
   shadow: {enabled:true, strength:0.5, softness:1, mapSize:2048, updateEvery:3, distance:150, moveThreshold:3},
-  godrays: {enabled:true, intensity:1}, dof: {enabled:false, focusRange:0.1, bokeh:1},
+  godrays: {enabled:false, intensity:1}, dof: {enabled:false, focusRange:0.1, bokeh:1},
 }
 type Settings = typeof base
 type Override = {[Key in keyof Settings]?: Settings[Key] extends object ? Partial<Settings[Key]> : Settings[Key]}
