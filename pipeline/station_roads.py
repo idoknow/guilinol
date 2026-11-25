@@ -94,10 +94,13 @@ def bake(directory, manifest, paired_widths):
     elements = load_osm()
     profiles = road_design(paired_widths, elements)
     profiles.update(road_profiles(elements, paired_widths))
-    bake_profiles(directory, manifest, profiles, elements)
+    import dingjiang_structures
+    profiles.update(dingjiang_structures.road_profiles(elements, paired_widths))
+    bridge_ways = dingjiang_structures.raise_decks(directory, manifest, elements)
+    bake_profiles(directory, manifest, profiles, elements, bridge_ways.values())
 
 
-def bake_profiles(directory, manifest, profiles, elements):
+def bake_profiles(directory, manifest, profiles, elements, bridge_ways=()):
     import gzip
     import struct
     from collections import defaultdict
@@ -269,7 +272,7 @@ def bake_profiles(directory, manifest, profiles, elements):
             if np.any(moved):
                 stems[moved,2]=(stems[moved,2].view('<i2')+np.rint(10*(new_y[moved]-native_y[moved]))).astype('<i2')
                 treefile.write_bytes(gzip.compress(stems.tobytes(),mtime=0))
-    grade_traffic(directory,manifest,profiles)
+    grade_traffic(directory, manifest, [*(way for way, _, _ in profiles.values()), *bridge_ways])
 
 
 def trim_joint_floors(tunnels):
@@ -311,7 +314,7 @@ def stitch(ends,joints):
 
 
 
-def grade_traffic(directory, manifest, profiles):
+def grade_traffic(directory, manifest, ways):
     import gzip
     import subprocess
     from tempfile import NamedTemporaryFile
@@ -319,7 +322,7 @@ def grade_traffic(directory, manifest, profiles):
     graph_path = directory/'roads'/'graph.json.gz'
     graph = json.loads(gzip.decompress(graph_path.read_bytes()))
     owners = {}
-    roads = [way for way, _, _ in profiles.values()]
+    roads = list(ways)
     # The north access road skirts the replaced station building. Its traffic
     # follows the finished native pavement, which can sit above the DEM.
     north_access = next((way for way in load_osm()
@@ -334,7 +337,7 @@ def grade_traffic(directory, manifest, profiles):
     for lane in graph['lanes']:
         way = owners.get((lane['from'],lane['to']))
         if way is not None:
-            lanes.append(dict(lane, way=way['id'],halfWidth=half_width(way),structure='tunnel' if way['tags'].get('tunnel')=='yes' else 'surface'))
+            lanes.append(dict(lane, way=way['id'],halfWidth=half_width(way),structure=next((s for s in ('bridge','tunnel') if way['tags'].get(s)=='yes'),'surface')))
     root=Path(__file__).resolve().parents[1]
     with NamedTemporaryFile(dir=directory,mode='w+') as payload:
         json.dump(dict(manifest=manifest,nodes=graph['nodes'],lanes=lanes),payload)

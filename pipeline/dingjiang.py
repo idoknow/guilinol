@@ -10,13 +10,13 @@ from common import xz2ll
 from features import points
 
 RAIL = 375923389
-TIES = (1231.212624, 2203.212589)
+TIES = (835.212615, 2203.212589)
 # Road way, rail chainage, railhead, road chainage.
 CROSSINGS = (
-    (983781242, 1497.648526, 159.7840, 1335.244),
-    (983781244, 1533.597362, 159.3534, 1719.381),
-    (1550293846, 1723.464147, 157.0789, 5.447),
-    (459580311, 1924.662941, 154.6686, 2946.736),
+    (983781242, 1497.648526, 164.5600, 1335.244),
+    (983781244, 1533.597362, 164.1500, 1719.381),
+    (1550293846, 1723.464147, 161.9500, 5.447),
+    (459580311, 1924.662941, 159.5900, 2946.736),
 )
 ROAD_IDS = {row[0] for row in CROSSINGS}
 
@@ -29,12 +29,42 @@ def fit_rail(coords, pieces, height, ways):
     if any(abs(at[i] - tie) > .002 for i, tie in zip(ends, TIES)):
         raise ValueError('Dingjiang native tie vertex missing')
     first, last = ends
-    stations = [at[first], *(r[1] for r in CROSSINGS), at[last]]
-    levels = [height[nodes[first]], *(r[2] for r in CROSSINGS), height[nodes[last]]]
+    east = abs(at-2119.212646).argmin()
+    neighbor = LineString(points(ways[375923385]))
+    neighbor_nodes = sorted({n for i,j,_,_,way in pieces if way==375923385 for n in (i,j)},
+                key=lambda n: neighbor.project(Point(coords[n])))
+    neighbor_at = [neighbor.project(Point(coords[n])) for n in neighbor_nodes]
+    east_nodes = sorted((i for i,s in enumerate(at) if at[east] <= s < at[last]),
+                        key=lambda i: at[i])
+    # Match the other track until the fixed eastern railhead requires a climb.
+    # The grade envelope reaches that tie without moving the adjoining section.
+    matched = [max(np.interp(neighbor.project(Point(coords[nodes[i]])),neighbor_at,height[neighbor_nodes])+.008,
+                   height[nodes[last]]-.01195*(at[last]-at[i])) for i in east_nodes]
+    stations = [at[first],1315.212601,1339.2126,*(r[1] for r in CROSSINGS),
+                *(at[i] for i in east_nodes),at[last]]
+    levels = [height[nodes[first]],166.381,166.381,*(r[2] for r in CROSSINGS),
+              *matched,height[nodes[last]]]
     if np.max(abs(np.diff(levels) / np.diff(stations))) > .012:
         raise ValueError('Dingjiang rail profile exceeds the main-line grade limit')
     active = (at > stations[0]) & (at < stations[-1])
     height[np.asarray(nodes)[active]] = np.interp(at[active], stations, levels)
+
+    # Match the two lower tracks to one longitudinal plane. The 12 per mille
+    # bound also holds on a curved track because distance exceeds |delta z|.
+    for wid in (259082251, 815078170):
+        lower = np.array(sorted({n for i,j,_,_,way in pieces if way == wid for n in (i,j)}))
+        z = coords[lower, 1]
+        in_section = z < -9200
+        design = hengliu(z)
+        # Tie to native at the clipped north edge and the first intersection
+        # with the unchanged descending grade south of the road tunnel.
+        north_ramp = 157.46 - .005 * (z + 9976.)
+        cap = np.maximum(north_ramp, design)
+        height[lower[in_section]] = np.minimum(height[lower[in_section]], cap[in_section])
+
+
+def hengliu(z):
+    return 157.620 + .01192 * (z + 9888.)
 
 
 def road_profiles(elements, paired_widths):
@@ -48,7 +78,7 @@ def road_profiles(elements, paired_widths):
         983781242: (9096632919, 155.04343, 9096632923, 159.85444),
         983781244: (9096632966, 160.13599, 9096632971, 154.93321),
         459580311: (9096622970, 155.79481, 4553929619, 158.71084),
-        1550293846: (14100547688, 151.3789, 14100547694, None),
+        1550293846: (14100547688, 156.2500, 14100547694, None),
     }
     controls = {road: (at, rail - 5.7) for road, _, rail, at in CROSSINGS}
     profiles = {}

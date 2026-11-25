@@ -67,7 +67,7 @@ def check(world):
                 clear = upper - 1.20 - lower
                 checks.append(dict(lowerWay=wid, stationM=tracks[RAIL].project(p),
                                    x=p.x, z=p.y, upperRailM=upper, lowerRailM=lower,
-                                   soffitClearanceM=clear, wireHeadroomM=clear-6.10))
+                                   targetM=7.5, soffitClearanceM=clear, wireHeadroomM=clear-6.10))
     return sorted(checks, key=lambda r: r['stationM'])
 
 
@@ -77,4 +77,6 @@ if __name__ == '__main__':
     args = parser.parse_args()
     rows = check(args.world)
     print(json.dumps(rows, indent=2))
-    raise SystemExit(any(r['wireHeadroomM'] < 0 for r in rows))
+    expected = {259082251, 815078170, 983856620, 983856621, 983856622, 983856623}
+    raise SystemExit({r['lowerWay'] for r in rows} != expected or
+                     any(r['soffitClearanceM'] < r['targetM'] for r in rows))
