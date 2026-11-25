@@ -251,7 +251,7 @@ def main():
                     components.append(dict(component=name, iou=round(iou, 3),
                                            centroidM=round(center, 3), angleDeg=round(angle, 2),
                                            status='pass' if iou >= .85 and center <= 2 else 'fail'))
-            row.update(reference='docs/layout/guilin-station.geojson + OSM', components=components,
+            row.update(reference='pipeline/data/layout/guilin-station.geojson + OSM', components=components,
                        status='pass' if all(c['status'] == 'pass' for c in components) else 'fail')
             continue
         if key=='zhengyang':

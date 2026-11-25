@@ -24,7 +24,7 @@ CENTER = ll2xz(*reversed(ANCHOR))
 
 
 def footprints():
-    features = json.loads((ROOT / "docs/layout/guilin-station.geojson").read_text())[
+    features = json.loads((ROOT / "pipeline/data/layout/guilin-station.geojson").read_text())[
         "features"
     ]
     return {
