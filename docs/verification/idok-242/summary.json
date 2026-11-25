@@ -1,7 +1,7 @@
 {
-  "world": "City bake from baseline 04036c4f78cd4d8c4993b9b338bec9097eb9964b using candidate b945226962971c02f6ccba25ee60134a7d27c04a",
+  "world": "City bake from baseline 04036c4f78cd4d8c4993b9b338bec9097eb9964b using candidate 87833eb62b27bfd8a50b2ee765b0669cb0700aab",
   "main": "04036c4f78cd4d8c4993b9b338bec9097eb9964b",
-  "candidateRevision": "b945226962971c02f6ccba25ee60134a7d27c04a",
+  "candidateRevision": "87833eb62b27bfd8a50b2ee765b0669cb0700aab",
   "baseline": {
     "tunnelConstraintRecords": 0,
     "partialTunnelWays": [
@@ -169,23 +169,23 @@
     "gradedApproaches": 142,
     "partialTunnelWays": [],
     "reasons": {
-      "surface": 50,
+      "surface": 19,
       "tunnel": 0,
-      "fit": 1,
+      "fit": 0,
       "hidden": 0
     },
-    "lanes": 88126,
-    "wheelSamples": 7705352,
-    "outliers": 51,
-    "sunk": 27,
-    "floating": 24,
+    "lanes": 88280,
+    "wheelSamples": 7705968,
+    "outliers": 19,
+    "sunk": 11,
+    "floating": 8,
     "p99": 0.023,
-    "nonplanarFootprints": 8,
+    "nonplanarFootprints": 0,
     "unresolvedTunnelWays": []
   },
   "byLayer": {
-    "bridge": 9,
-    "at-grade": 42
+    "bridge": 8,
+    "at-grade": 11
   },
   "station": {
     "historicWheelOutsidePavementMeters": 0.294,
@@ -200,7 +200,7 @@
       }
     },
     "worstLaneOnWay": {
-      "lane": 52621,
+      "lane": 52721,
       "way": 1017598912,
       "kind": "motor",
       "maximum": 0.0050783123015776255,
@@ -209,7 +209,7 @@
     },
     "priorBedMeasurementLastReportedAt": "e227a774",
     "laneAudit": {
-      "lane": 52622,
+      "lane": 52722,
       "way": 1017598912,
       "kind": "motor",
       "maximum": 0.0035615083336608677,
@@ -233,7 +233,7 @@
       "collisions": 0,
       "tool": 0,
       "over": 0,
-      "max": 0.061893552204338675
+      "max": 0.046337856999002724
     },
     "accessDecision": {
       "actualPortals": 146,
@@ -252,8 +252,8 @@
     },
     "candidate": {
       "cells": 1170,
-      "total": 16994630,
-      "p99": 57786
+      "total": 16991562,
+      "p99": 57857
     }
   },
   "driving": {
@@ -263,46 +263,45 @@
   "regressions": {
     "strict": {
       "base": 2920,
-      "candidate": 2883,
+      "candidate": 2874,
       "limit": 2920,
       "counts": {
         "streetOverflow": 0,
-        "buildingOnRoad": 1216,
-        "unevenRoad": 26,
+        "buildingOnRoad": 1217,
+        "unevenRoad": 17,
         "textureIssue": 65,
-        "otherBasic": 1576
+        "otherBasic": 1575
       },
       "pairedRevisions": {
         "main": "04036c4f78cd4d8c4993b9b338bec9097eb9964b",
-        "candidate": "b945226962971c02f6ccba25ee60134a7d27c04a"
+        "candidate": "87833eb62b27bfd8a50b2ee765b0669cb0700aab"
       }
     },
     "mainExitCodes": {
-      "strict": 1,
-      "ride": 1,
-      "traffic": 1,
-      "drive": 0,
       "grounding": 0,
-      "walk": 1
+      "walk": 1,
+      "ride": 1,
+      "traffic": 0,
+      "drive": 1,
+      "strict": 1
     },
     "candidateExitCodes": {
-      "strict": 1,
+      "grounding": 1,
+      "walk": 1,
       "ride": 1,
-      "traffic": 1,
-      "drive": 0,
-      "grounding": 0,
-      "walk": 1
+      "traffic": 0,
+      "drive": 1,
+      "strict": 1
     },
     "matchingFailures": {
-      "ride": "Mobile pre-mount HUD: btn-run / vehicle-action overlap 2322 px²",
-      "walk": "Dock vehicle action overlaps joystick (1320.5 px²) and run button (2322 px²)",
-      "traffic": "Missing parked-car fixture at verify-traffic.mjs:140"
+      "walk": "Mobile walk HUD style assertion",
+      "ride": "No harbor landing at -115,-798",
+      "drive": "drive.mjs:23 walkTo drive-start"
     },
     "pairedRevisions": {
-      "candidate": "e227a7744ebdc406ad5b2c29810b6d8967900fb7",
-      "main": "27dabe1c3608cb9597af1facfea8b9adb778b5cc"
-    },
-    "priorRuntimeChecksRevision": "e227a7744ebdc406ad5b2c29810b6d8967900fb7"
+      "candidate": "87833eb62b27bfd8a50b2ee765b0669cb0700aab",
+      "main": "04036c4f78cd4d8c4993b9b338bec9097eb9964b"
+    }
   },
   "performance": {
     "desktopFailed": [],
@@ -313,7 +312,7 @@
       "sharedNode": 6533456477,
       "mode": "foot",
       "ok": true,
-      "maxJump": 0.0031280517578125
+      "maxJump": 0.005157470703125
     },
     {
       "sharedNode": 6533456477,
@@ -331,13 +330,13 @@
       "sharedNode": 6533456478,
       "mode": "car",
       "ok": true,
-      "maxJump": 0.04769246094633672
+      "maxJump": 0.047705057207139134
     },
     {
       "sharedNode": 6533456479,
       "mode": "foot",
       "ok": true,
-      "maxJump": 0.0276336669921875
+      "maxJump": 0.02825927734375
     },
     {
       "sharedNode": 6533456479,
@@ -6821,5 +6820,855 @@
       "node scripts/test-walk-streaming.mjs"
     ]
   },
-  "baselineScope": "Historical pre-fix wheel audit carried from prior rounds. Current paired main results are in round12Evidence.strict, trafficCellBytes.main, and performance.json."
+  "baselineScope": "Historical pre-fix wheel audit carried from prior rounds. Current paired main results are in round13Evidence.strict, trafficCellBytes.main, and performance.json.",
+  "round13Evidence": {
+    "revision": "87833eb62b27bfd8a50b2ee765b0669cb0700aab",
+    "comparisonBase": "04036c4f78cd4d8c4993b9b338bec9097eb9964b",
+    "terrainSha256": "7bdf677d6bb3add409f54042f84254a8918ba52b9b46282627546edcd95c9126",
+    "pedestrians": 0,
+    "seed": 242,
+    "wayAudits": {
+      "258899702": {
+        "lanes": 9,
+        "wheelOutliers": 0,
+        "maximum": 0.035195283185231574
+      },
+      "1552207023": {
+        "lanes": 8,
+        "wheelOutliers": 0,
+        "maximum": 0.051758679045690315
+      },
+      "383576398": {
+        "lanes": 86,
+        "wheelOutliers": 0,
+        "maximum": 0.18190777643854972
+      },
+      "479448411": {
+        "lanes": 14,
+        "wheelOutliers": 0,
+        "maximum": 0.0442826470198554
+      },
+      "759349523": {
+        "lanes": 7,
+        "wheelOutliers": 0,
+        "maximum": 0.011445263097868974
+      },
+      "237982795": {
+        "lanes": 76,
+        "wheelOutliers": 0,
+        "maximum": 0.19925903401977507
+      },
+      "412456970": {
+        "lanes": 24,
+        "wheelOutliers": 0,
+        "maximum": 0.21339044845328203
+      },
+      "1487527338": {
+        "lanes": 0,
+        "wheelOutliers": 0,
+        "maximum": null
+      },
+      "1487527335": {
+        "lanes": 4,
+        "wheelOutliers": 0,
+        "maximum": 0.011853895645003831
+      },
+      "1487527349": {
+        "lanes": 2,
+        "wheelOutliers": 0,
+        "maximum": 0.01094023361773111
+      },
+      "1025751314": {
+        "lanes": 4,
+        "wheelOutliers": 0,
+        "maximum": 0.011569979965031507
+      },
+      "1025751317": {
+        "lanes": 2,
+        "wheelOutliers": 0,
+        "maximum": 0.143310202676048
+      },
+      "1034716138": {
+        "lanes": 2,
+        "wheelOutliers": 0,
+        "maximum": 0.025891255168403404
+      },
+      "1551968223": {
+        "lanes": 20,
+        "wheelOutliers": 0,
+        "maximum": 0.0904412733979143
+      },
+      "385796480": {
+        "lanes": 40,
+        "wheelOutliers": 0,
+        "maximum": 0.12275961239024014
+      },
+      "385796474": {
+        "lanes": 2,
+        "wheelOutliers": 0,
+        "maximum": 0.018062778862343976
+      },
+      "1024505844": {
+        "lanes": 16,
+        "wheelOutliers": 0,
+        "maximum": 0.14917460804159077
+      },
+      "977910228": {
+        "lanes": 374,
+        "wheelOutliers": 0,
+        "maximum": 0.06254246911279893
+      },
+      "690911289": {
+        "lanes": 1,
+        "wheelOutliers": 0,
+        "maximum": 0.06666868139058124
+      },
+      "727687393": {
+        "lanes": 13,
+        "wheelOutliers": 0,
+        "maximum": 0.08580777029752085
+      },
+      "727687399": {
+        "lanes": 11,
+        "wheelOutliers": 0,
+        "maximum": 0.019911439571046685
+      },
+      "1014678255": {
+        "lanes": 184,
+        "wheelOutliers": 0,
+        "maximum": 0.17828606222397525
+      },
+      "454929209": {
+        "lanes": 4,
+        "wheelOutliers": 0,
+        "maximum": 0.013526536755847474
+      },
+      "843500807": {
+        "lanes": 15,
+        "wheelOutliers": 0,
+        "maximum": 0.01656316073126618
+      }
+    },
+    "eastBridge": {
+      "westernTransitionMetres": 20,
+      "additionalEastTransitionMetres": 5.855,
+      "easternServiceWay": 1551968223,
+      "verticalAdjustmentMetres": -0.602,
+      "survey": [
+        {
+          "way": 1025751314,
+          "bridgeNode": 9457383800,
+          "join": 0.00036084009485648494,
+          "minimumHeadroom": 3.745650861589297,
+          "maximumGrade": 0.06676938655497067,
+          "underBuilding": 319
+        },
+        {
+          "way": 1034716138,
+          "bridgeNode": 9531714412,
+          "join": 8.255372537746553e-05,
+          "minimumHeadroom": 3.566101826830078,
+          "maximumGrade": 0.017601606157684656,
+          "underBuilding": 380
+        }
+      ]
+    },
+    "campus": {
+      "closedWay": 1487527338,
+      "remainingPavementStubLengthsMetres": [
+        7.585,
+        5.095
+      ],
+      "curbs": 2,
+      "branch": 1487527335,
+      "branchCentreOverlapMetres": [
+        0.414,
+        6.26
+      ],
+      "branchSweptLengthAtHalfWidth2_5Metres": 57.53,
+      "shortPassageWay": 1487527349,
+      "clearanceMetres": 3.51,
+      "branchBoundaryRuns": {
+        "requested": 4,
+        "runs": 8,
+        "completed": 8,
+        "boundaryRuns": 3,
+        "pass": 4,
+        "overLimit": 0,
+        "stalled": 0,
+        "failures": {
+          "collision": 0,
+          "tool": 0
+        },
+        "unavailable": 0,
+        "maximum": 0.03326682167232775
+      },
+      "branchOutsideLaneMetres": 61.515,
+      "droppedDeadStubMetres": 0.301
+    },
+    "airport": {
+      "segments": 11,
+      "downstreamID": 15582,
+      "edgeSamples": 618,
+      "clearanceBeyondWheel": 0.2,
+      "ambientTraversed": true,
+      "routeFile": "../results/airport-route.json"
+    },
+    "airportDrive": {
+      "requested": 1,
+      "runs": 2,
+      "completed": 2,
+      "boundaryRuns": 0,
+      "pass": 1,
+      "overLimit": 0,
+      "stalled": 0,
+      "failures": {
+        "collision": 0,
+        "tool": 0
+      },
+      "unavailable": 0,
+      "maximum": 0.004918805945607119
+    },
+    "strict": {
+      "base": 2920,
+      "candidate": 2874,
+      "limit": 2920,
+      "tunnelClearanceIssues": 0
+    },
+    "portal": {
+      "sites": 146,
+      "passed": 146,
+      "runs": 302,
+      "completed": 302,
+      "collisions": 0,
+      "tool": 0,
+      "over": 0,
+      "max": 0.046337856999002724
+    },
+    "surface": {
+      "sites": 239,
+      "passed": 222,
+      "runs": 507,
+      "completed": 491,
+      "collisions": 13,
+      "tool": 3,
+      "over": 7,
+      "max": 0.23928794827102706
+    },
+    "priorityDrives": [
+      {
+        "id": 9457383802,
+        "way": 1025751314,
+        "mode": "car",
+        "direction": "in",
+        "maximum": 0.005062,
+        "completed": true,
+        "failure": null
+      },
+      {
+        "id": 9531714411,
+        "way": 1034716138,
+        "mode": "car",
+        "direction": "in",
+        "maximum": 0.012733,
+        "completed": true,
+        "failure": null
+      },
+      {
+        "id": 13637474088,
+        "way": 1487527335,
+        "mode": "car",
+        "direction": "in",
+        "maximum": 0.005807,
+        "completed": true,
+        "failure": null
+      },
+      {
+        "id": 13677190462,
+        "way": 1492542119,
+        "mode": "car",
+        "direction": "in",
+        "maximum": 0.002842,
+        "completed": true,
+        "failure": null
+      },
+      {
+        "id": 9457383802,
+        "way": 1025751314,
+        "mode": "car",
+        "direction": "out",
+        "maximum": 0.005131,
+        "completed": true,
+        "failure": null
+      },
+      {
+        "id": 9531714411,
+        "way": 1034716138,
+        "mode": "car",
+        "direction": "out",
+        "maximum": 0.012925,
+        "completed": true,
+        "failure": null
+      },
+      {
+        "id": 13637474088,
+        "way": 1487527335,
+        "mode": "car",
+        "direction": "out",
+        "maximum": 0.005963,
+        "completed": true,
+        "failure": null
+      },
+      {
+        "id": 13677190462,
+        "way": 1492542119,
+        "mode": "car",
+        "direction": "out",
+        "maximum": 0.002697,
+        "completed": true,
+        "failure": null
+      },
+      {
+        "id": 13459484597,
+        "way": 1487527335,
+        "mode": "car",
+        "direction": "in",
+        "maximum": 0.032509,
+        "completed": true,
+        "failure": null
+      },
+      {
+        "id": 13531477585,
+        "way": 1474958000,
+        "mode": "car",
+        "direction": "in",
+        "maximum": 0.0022,
+        "completed": true,
+        "failure": null
+      },
+      {
+        "id": 13637474367,
+        "way": 1487527349,
+        "mode": "car",
+        "direction": "in",
+        "maximum": 0.014322,
+        "completed": true,
+        "failure": null
+      },
+      {
+        "id": 13459484597,
+        "way": 1487527335,
+        "mode": "car",
+        "direction": "out",
+        "maximum": 0.033266,
+        "completed": true,
+        "failure": null
+      },
+      {
+        "id": 13531477585,
+        "way": 1474958000,
+        "mode": "car",
+        "direction": "out",
+        "maximum": 0.002514,
+        "completed": true,
+        "failure": null
+      },
+      {
+        "id": 13637474367,
+        "way": 1487527349,
+        "mode": "car",
+        "direction": "out",
+        "maximum": 0.013889,
+        "completed": true,
+        "failure": null
+      },
+      {
+        "id": 13531477590,
+        "way": 1474958000,
+        "mode": "car",
+        "direction": "in",
+        "maximum": 0.009085,
+        "completed": true,
+        "failure": null
+      },
+      {
+        "id": 13637474084,
+        "way": 1487527335,
+        "mode": "car",
+        "direction": "in",
+        "maximum": 0.00077,
+        "completed": true,
+        "failure": null
+      },
+      {
+        "id": 13637474368,
+        "way": 1487527349,
+        "mode": "car",
+        "direction": "in",
+        "maximum": 0.014067,
+        "completed": true,
+        "failure": null
+      },
+      {
+        "id": 13531477590,
+        "way": 1474958000,
+        "mode": "car",
+        "direction": "out",
+        "maximum": 0.008152,
+        "completed": true,
+        "failure": null
+      },
+      {
+        "id": 13637474084,
+        "way": 1487527335,
+        "mode": "car",
+        "direction": "out",
+        "maximum": 0.000909,
+        "completed": true,
+        "failure": null
+      },
+      {
+        "id": 13637474368,
+        "way": 1487527349,
+        "mode": "car",
+        "direction": "out",
+        "maximum": 0.030205,
+        "completed": true,
+        "failure": null
+      },
+      {
+        "id": 9457383800,
+        "way": 1025751314,
+        "mode": "car",
+        "direction": "in",
+        "maximum": 0.005137,
+        "completed": true,
+        "failure": null
+      },
+      {
+        "id": 9457773705,
+        "way": 1539622609,
+        "mode": "car",
+        "direction": "in",
+        "maximum": 0.028493,
+        "completed": true,
+        "failure": null
+      },
+      {
+        "id": 9457383800,
+        "way": 1025751314,
+        "mode": "car",
+        "direction": "out",
+        "maximum": 0.005987,
+        "completed": true,
+        "failure": null
+      },
+      {
+        "id": 9457773705,
+        "way": 1539622609,
+        "mode": "car",
+        "direction": "out",
+        "maximum": 0.026205,
+        "completed": true,
+        "failure": null
+      }
+    ],
+    "yard": {
+      "sites": 9,
+      "passed": 9,
+      "runs": 18,
+      "completed": 18,
+      "collisions": 0,
+      "tool": 0,
+      "over": 0,
+      "max": 0.009280562288381589
+    },
+    "narrowStreets": {
+      "count": 13,
+      "ways": [
+        {
+          "way": 454918236,
+          "narrowStations": [
+            [
+              69.5065181681465,
+              162.9550444072643
+            ]
+          ]
+        },
+        {
+          "way": 454956903,
+          "narrowStations": [
+            [
+              92.43893317257461,
+              164.97968219613387
+            ]
+          ]
+        },
+        {
+          "way": 1550763691,
+          "narrowStations": [
+            [
+              6.736741465429745,
+              58.159266320768374
+            ]
+          ]
+        },
+        {
+          "way": 1551964123,
+          "narrowStations": [
+            [
+              96.910183332445,
+              150.59235456652914
+            ]
+          ]
+        },
+        {
+          "way": 1551964124,
+          "narrowStations": [
+            [
+              46.80527933033659,
+              105.32624863561696
+            ]
+          ]
+        },
+        {
+          "way": 1552207023,
+          "narrowStations": [
+            [
+              4.489221366567043,
+              70.10047736421973
+            ]
+          ]
+        },
+        {
+          "way": 1552207028,
+          "narrowStations": [
+            [
+              62.216819613769154,
+              74.25216310517902
+            ]
+          ]
+        },
+        {
+          "way": 1552207030,
+          "narrowStations": [
+            [
+              6.70528279438804,
+              84.6230252753212
+            ]
+          ]
+        },
+        {
+          "way": 1552207033,
+          "narrowStations": [
+            [
+              5.851905099628889,
+              83.7170678578841
+            ]
+          ]
+        },
+        {
+          "way": 1552207034,
+          "narrowStations": [
+            [
+              15.580904367786289,
+              27.159185020338356
+            ]
+          ]
+        },
+        {
+          "way": 1552207042,
+          "narrowStations": [
+            [
+              5.7420103387850645,
+              58.035721250774614
+            ]
+          ]
+        },
+        {
+          "way": 1552207063,
+          "narrowStations": [
+            [
+              6.2001151444085,
+              36.43145131331599
+            ]
+          ]
+        },
+        {
+          "way": 1552207064,
+          "narrowStations": [
+            [
+              1.2969586706374625,
+              55.39480519616063
+            ],
+            [
+              66.79893804254465,
+              151.81093640239305
+            ]
+          ]
+        }
+      ],
+      "motorLanes": 0,
+      "passedRuns": 77,
+      "runs": 79,
+      "remaining": {
+        "way": 1552207028,
+        "node": 14121760276,
+        "modes": [
+          "bike",
+          "bicycle"
+        ],
+        "direction": "in",
+        "nodeDistanceToFacadeMetres": 0.226559,
+        "connectingWay": 1552207031,
+        "routeOnlyTrial": {
+          "connectingWayStationMetres": 0.62,
+          "fromNode": 14121760276,
+          "passedRuns": 6,
+          "totalRuns": 6,
+          "maximumFrameDeltaMetres": 0.0710673481,
+          "appliedToGraph": false
+        }
+      }
+    },
+    "serviceAlley": [
+      {
+        "id": 1552207023,
+        "way": 1552207023,
+        "mode": "foot",
+        "boundary": false,
+        "direction": "in",
+        "completed": true,
+        "maximum": 0.024169921875,
+        "obstacle": ""
+      },
+      {
+        "id": 1552207023,
+        "way": 1552207023,
+        "mode": "foot",
+        "boundary": false,
+        "direction": "out",
+        "completed": true,
+        "maximum": 0.0318756103515625,
+        "obstacle": ""
+      },
+      {
+        "id": 1552207023,
+        "way": 1552207023,
+        "mode": "bike",
+        "boundary": false,
+        "direction": "in",
+        "completed": true,
+        "maximum": 0.03593423776328564,
+        "obstacle": ""
+      },
+      {
+        "id": 1552207023,
+        "way": 1552207023,
+        "mode": "bike",
+        "boundary": false,
+        "direction": "out",
+        "completed": true,
+        "maximum": 0.03633078886196017,
+        "obstacle": ""
+      },
+      {
+        "id": 1552207023,
+        "way": 1552207023,
+        "mode": "bicycle",
+        "boundary": false,
+        "direction": "in",
+        "completed": true,
+        "maximum": 0.03527604043483734,
+        "obstacle": ""
+      },
+      {
+        "id": 1552207023,
+        "way": 1552207023,
+        "mode": "bicycle",
+        "boundary": false,
+        "direction": "out",
+        "completed": true,
+        "maximum": 0.03497520089149475,
+        "obstacle": ""
+      },
+      {
+        "id": 1552207023,
+        "way": 1552207023,
+        "mode": "car",
+        "boundary": false,
+        "direction": "reverse-exit",
+        "completed": true,
+        "maximum": 0.03947142497548839,
+        "reverseExit": {
+          "furthest": 2.306684425465427,
+          "exitStation": -2.265407090466919,
+          "resets": 0
+        },
+        "obstacle": ""
+      }
+    ],
+    "adjacentJunctions": [
+      {
+        "id": 13531477585,
+        "way": 1474958000,
+        "mode": "car",
+        "direction": "in",
+        "maximum": 0.0022,
+        "completed": true,
+        "failure": null
+      },
+      {
+        "id": 13531477585,
+        "way": 1474958000,
+        "mode": "car",
+        "direction": "out",
+        "maximum": 0.002514,
+        "completed": true,
+        "failure": null
+      },
+      {
+        "id": 13531477590,
+        "way": 1474958000,
+        "mode": "car",
+        "direction": "in",
+        "maximum": 0.009085,
+        "completed": true,
+        "failure": null
+      },
+      {
+        "id": 13531477590,
+        "way": 1474958000,
+        "mode": "car",
+        "direction": "out",
+        "maximum": 0.008152,
+        "completed": true,
+        "failure": null
+      }
+    ],
+    "sitangRiverTie": {
+      "bridge": 1097830334,
+      "bore": 1494508178,
+      "portal": 13694473829,
+      "upperStreet": 882310596,
+      "bridgeMetres": 160.05,
+      "portalMetres": 155.618483,
+      "routeMetres": 33.125056,
+      "gradeLimit": 0.08,
+      "minimumPortalAtOriginalBridgeMetres": 157.4,
+      "maximumPortalFromUpperPavementMetres": 155.900284,
+      "upperSampleMetres": 160.360284,
+      "upperSampleStationMetres": 0.5,
+      "upperSampleXZ": [
+        -18580.180533,
+        3972.55548
+      ],
+      "clearanceMetres": 4.5,
+      "lowerPortalDeficitMetres": 1.4997160000000065,
+      "sampledWorldRevision": "04036c4f78cd4d8c4993b9b338bec9097eb9964b"
+    },
+    "outliersByWay": [
+      {
+        "way": 1028568322,
+        "count": 2,
+        "maximumMetres": 1.1914095960573547
+      },
+      {
+        "way": 988474372,
+        "count": 2,
+        "maximumMetres": 0.5721887052856118
+      },
+      {
+        "way": 464498761,
+        "count": 2,
+        "maximumMetres": 0.5001934552082332
+      },
+      {
+        "way": 259020549,
+        "count": 1,
+        "maximumMetres": 0.4760456592736375
+      },
+      {
+        "way": 842819690,
+        "count": 3,
+        "maximumMetres": 0.31108907178045797
+      },
+      {
+        "way": 1097830334,
+        "count": 3,
+        "maximumMetres": 0.3107574089887635
+      },
+      {
+        "way": 1082716283,
+        "count": 3,
+        "maximumMetres": 0.2806647120062564
+      },
+      {
+        "way": 385796479,
+        "count": 1,
+        "maximumMetres": 0.2677623237974558
+      },
+      {
+        "way": 1486783399,
+        "count": 2,
+        "maximumMetres": 0.2584548777016096
+      }
+    ],
+    "previousLargestSurfaceRunRound12": {
+      "node": 13531477585,
+      "way": 1474958000,
+      "approachWay": 1474958001,
+      "frame": 349,
+      "routeStationMetres": 18.49,
+      "distanceFromRouteMetres": 0.093,
+      "visibleHeightAtCentreTwoFramesMetres": [
+        160.12838,
+        160.12733
+      ],
+      "visibleHeightAtEstimatedWheelPositionsMetres": [
+        [
+          161.649,
+          161.696,
+          160.129,
+          160.102
+        ],
+        [
+          161.649,
+          161.696,
+          160.128,
+          160.102
+        ]
+      ],
+      "frameStepSeconds": 0.016666666666666666
+    },
+    "baselineTerrainSha256": "7bdf677d6bb3add409f54042f84254a8918ba52b9b46282627546edcd95c9126",
+    "groundingBeforeWallFix": {
+      "landmarks": 67,
+      "mainFailures": 0,
+      "candidateFailures": 1,
+      "landmark": "guat_jinji",
+      "component": 26389,
+      "maximumPenetrationMetres": 0.565
+    },
+    "wallFix": {
+      "revision": "1b9bc6a3299f27023eb07050e5f1526762730c9f",
+      "landmarks": 67,
+      "groundingFailures": 0,
+      "campusDrives": {
+        "requested": 6,
+        "runs": 12,
+        "completed": 12,
+        "boundaryRuns": 3,
+        "pass": 6,
+        "overLimit": 0,
+        "stalled": 0,
+        "failures": {
+          "collision": 0,
+          "tool": 0
+        },
+        "unavailable": 0,
+        "maximum": 0.033265539722634685
+      }
+    }
+  }
 }

@@ -3,17 +3,17 @@
   "pedestrians": 0,
   "order": "alternating main then candidate, three pairs",
   "main": "04036c4f78cd4d8c4993b9b338bec9097eb9964b",
-  "candidate": "b945226962971c02f6ccba25ee60134a7d27c04a",
+  "candidate": "87833eb62b27bfd8a50b2ee765b0669cb0700aab",
   "primarySampleMs": 10000,
   "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M3 Pro, Unspecified Version)",
   "desktop": {
     "main": [
       {
         "overview": {
-          "p95Ms": 16.8,
+          "p95Ms": 16.7,
           "calls": 14,
           "mirrorCalls": 13,
-          "heapPeakBytes": 109399820,
+          "heapPeakBytes": 109511260,
           "triangles": 61768,
           "maxMirrorTriangles": 54368,
           "averageVisiblePeople": 0,
@@ -23,7 +23,7 @@
           "p95Ms": 16.8,
           "calls": 35,
           "mirrorCalls": 32,
-          "heapPeakBytes": 279060640,
+          "heapPeakBytes": 277388900,
           "triangles": 372994,
           "maxMirrorTriangles": 363243,
           "averageVisiblePeople": 0,
@@ -33,17 +33,17 @@
           "p95Ms": 16.7,
           "calls": 53,
           "mirrorCalls": 48,
-          "heapPeakBytes": 326587437,
+          "heapPeakBytes": 331048646,
           "triangles": 452927,
           "maxMirrorTriangles": 447602,
           "averageVisiblePeople": 0,
           "averageVisibleMotors": 0
         },
         "south": {
-          "p95Ms": 16.8,
+          "p95Ms": 16.7,
           "calls": 34,
           "mirrorCalls": 31,
-          "heapPeakBytes": 107813672,
+          "heapPeakBytes": 108113624,
           "triangles": 239659,
           "maxMirrorTriangles": 224696,
           "averageVisiblePeople": 0,
@@ -53,83 +53,21 @@
           "p95Ms": 16.7,
           "calls": 100,
           "mirrorCalls": 0,
-          "heapPeakBytes": 415405911,
+          "heapPeakBytes": 408459737,
           "triangles": 734336,
           "maxMirrorTriangles": 0,
           "averageVisiblePeople": 0,
-          "averageVisibleMotors": 0.9251247920133111
+          "averageVisibleMotors": 0.930116472545757
         },
         "street-jiefang": {
           "p95Ms": 16.7,
           "calls": 61,
           "mirrorCalls": 55,
-          "heapPeakBytes": 398354683,
+          "heapPeakBytes": 394019977,
           "triangles": 596890,
           "maxMirrorTriangles": 578966,
           "averageVisiblePeople": 0,
-          "averageVisibleMotors": 1.4043261231281199
-        }
-      },
-      {
-        "overview": {
-          "p95Ms": 16.8,
-          "calls": 14,
-          "mirrorCalls": 13,
-          "heapPeakBytes": 109987428,
-          "triangles": 61768,
-          "maxMirrorTriangles": 54368,
-          "averageVisiblePeople": 0,
-          "averageVisibleMotors": 0
-        },
-        "lijiang": {
-          "p95Ms": 16.7,
-          "calls": 35,
-          "mirrorCalls": 32,
-          "heapPeakBytes": 285580685,
-          "triangles": 372994,
-          "maxMirrorTriangles": 363243,
-          "averageVisiblePeople": 0,
-          "averageVisibleMotors": 0
-        },
-        "palace": {
-          "p95Ms": 16.7,
-          "calls": 53,
-          "mirrorCalls": 48,
-          "heapPeakBytes": 325430507,
-          "triangles": 452927,
-          "maxMirrorTriangles": 447602,
-          "averageVisiblePeople": 0,
-          "averageVisibleMotors": 0
-        },
-        "south": {
-          "p95Ms": 16.8,
-          "calls": 34,
-          "mirrorCalls": 31,
-          "heapPeakBytes": 107918920,
-          "triangles": 239659,
-          "maxMirrorTriangles": 224696,
-          "averageVisiblePeople": 0,
-          "averageVisibleMotors": 0
-        },
-        "walk-palace": {
-          "p95Ms": 16.8,
-          "calls": 100,
-          "mirrorCalls": 0,
-          "heapPeakBytes": 411420080,
-          "triangles": 734336,
-          "maxMirrorTriangles": 0,
-          "averageVisiblePeople": 0,
-          "averageVisibleMotors": 0.5990016638935108
-        },
-        "street-jiefang": {
-          "p95Ms": 16.7,
-          "calls": 61,
-          "mirrorCalls": 55,
-          "heapPeakBytes": 399050629,
-          "triangles": 596890,
-          "maxMirrorTriangles": 578966,
-          "averageVisiblePeople": 0,
-          "averageVisibleMotors": 1.475873544093178
+          "averageVisibleMotors": 2
         }
       },
       {
@@ -137,7 +75,7 @@
           "p95Ms": 16.7,
           "calls": 14,
           "mirrorCalls": 13,
-          "heapPeakBytes": 109403852,
+          "heapPeakBytes": 109348844,
           "triangles": 61768,
           "maxMirrorTriangles": 54368,
           "averageVisiblePeople": 0,
@@ -147,27 +85,27 @@
           "p95Ms": 16.7,
           "calls": 35,
           "mirrorCalls": 32,
-          "heapPeakBytes": 278983836,
+          "heapPeakBytes": 279061192,
           "triangles": 372994,
           "maxMirrorTriangles": 363243,
           "averageVisiblePeople": 0,
           "averageVisibleMotors": 0
         },
         "palace": {
-          "p95Ms": 16.7,
+          "p95Ms": 16.8,
           "calls": 53,
           "mirrorCalls": 48,
-          "heapPeakBytes": 330743904,
+          "heapPeakBytes": 326665757,
           "triangles": 452927,
           "maxMirrorTriangles": 447602,
           "averageVisiblePeople": 0,
           "averageVisibleMotors": 0
         },
         "south": {
-          "p95Ms": 16.7,
+          "p95Ms": 16.8,
           "calls": 34,
           "mirrorCalls": 31,
-          "heapPeakBytes": 107772804,
+          "heapPeakBytes": 107997536,
           "triangles": 239659,
           "maxMirrorTriangles": 224696,
           "averageVisiblePeople": 0,
@@ -177,31 +115,93 @@
           "p95Ms": 16.7,
           "calls": 100,
           "mirrorCalls": 0,
-          "heapPeakBytes": 410506440,
+          "heapPeakBytes": 405115401,
           "triangles": 734336,
           "maxMirrorTriangles": 0,
           "averageVisiblePeople": 0,
-          "averageVisibleMotors": 1.3211314475873543
+          "averageVisibleMotors": 0.9900166389351082
         },
         "street-jiefang": {
           "p95Ms": 16.7,
           "calls": 61,
           "mirrorCalls": 55,
-          "heapPeakBytes": 402613602,
+          "heapPeakBytes": 395851513,
           "triangles": 596890,
           "maxMirrorTriangles": 578966,
           "averageVisiblePeople": 0,
-          "averageVisibleMotors": 1.5757071547420964
+          "averageVisibleMotors": 1.3610648918469217
+        }
+      },
+      {
+        "overview": {
+          "p95Ms": 16.7,
+          "calls": 14,
+          "mirrorCalls": 13,
+          "heapPeakBytes": 109497624,
+          "triangles": 61768,
+          "maxMirrorTriangles": 54368,
+          "averageVisiblePeople": 0,
+          "averageVisibleMotors": 0
+        },
+        "lijiang": {
+          "p95Ms": 16.8,
+          "calls": 35,
+          "mirrorCalls": 32,
+          "heapPeakBytes": 281179825,
+          "triangles": 372994,
+          "maxMirrorTriangles": 363243,
+          "averageVisiblePeople": 0,
+          "averageVisibleMotors": 0
+        },
+        "palace": {
+          "p95Ms": 16.7,
+          "calls": 53,
+          "mirrorCalls": 48,
+          "heapPeakBytes": 326861218,
+          "triangles": 452927,
+          "maxMirrorTriangles": 447602,
+          "averageVisiblePeople": 0,
+          "averageVisibleMotors": 0
+        },
+        "south": {
+          "p95Ms": 16.7,
+          "calls": 34,
+          "mirrorCalls": 31,
+          "heapPeakBytes": 107458108,
+          "triangles": 239659,
+          "maxMirrorTriangles": 224696,
+          "averageVisiblePeople": 0,
+          "averageVisibleMotors": 0
+        },
+        "walk-palace": {
+          "p95Ms": 16.7,
+          "calls": 100,
+          "mirrorCalls": 0,
+          "heapPeakBytes": 409125391,
+          "triangles": 734336,
+          "maxMirrorTriangles": 0,
+          "averageVisiblePeople": 0,
+          "averageVisibleMotors": 0.6206322795341098
+        },
+        "street-jiefang": {
+          "p95Ms": 16.8,
+          "calls": 61,
+          "mirrorCalls": 55,
+          "heapPeakBytes": 393469911,
+          "triangles": 596890,
+          "maxMirrorTriangles": 578966,
+          "averageVisiblePeople": 0,
+          "averageVisibleMotors": 1.9301164725457571
         }
       }
     ],
     "candidate": [
       {
         "overview": {
-          "p95Ms": 16.7,
+          "p95Ms": 16.8,
           "calls": 14,
           "mirrorCalls": 13,
-          "heapPeakBytes": 109183869,
+          "heapPeakBytes": 111189805,
           "triangles": 61768,
           "maxMirrorTriangles": 54368,
           "averageVisiblePeople": 0,
@@ -211,9 +211,9 @@
           "p95Ms": 16.7,
           "calls": 35,
           "mirrorCalls": 32,
-          "heapPeakBytes": 284784058,
-          "triangles": 378371,
-          "maxMirrorTriangles": 368620,
+          "heapPeakBytes": 288237985,
+          "triangles": 378343,
+          "maxMirrorTriangles": 368592,
           "averageVisiblePeople": 0,
           "averageVisibleMotors": 0
         },
@@ -221,9 +221,9 @@
           "p95Ms": 16.7,
           "calls": 53,
           "mirrorCalls": 48,
-          "heapPeakBytes": 321181159,
-          "triangles": 467238,
-          "maxMirrorTriangles": 461913,
+          "heapPeakBytes": 321093767,
+          "triangles": 467186,
+          "maxMirrorTriangles": 461861,
           "averageVisiblePeople": 0,
           "averageVisibleMotors": 0
         },
@@ -231,7 +231,7 @@
           "p95Ms": 16.7,
           "calls": 34,
           "mirrorCalls": 31,
-          "heapPeakBytes": 109068563,
+          "heapPeakBytes": 109167591,
           "triangles": 239659,
           "maxMirrorTriangles": 224696,
           "averageVisiblePeople": 0,
@@ -241,83 +241,21 @@
           "p95Ms": 16.7,
           "calls": 100,
           "mirrorCalls": 0,
-          "heapPeakBytes": 414291363,
-          "triangles": 733635,
+          "heapPeakBytes": 417066379,
+          "triangles": 733665,
           "maxMirrorTriangles": 0,
           "averageVisiblePeople": 0,
-          "averageVisibleMotors": 2
+          "averageVisibleMotors": 0.064891846921797
         },
         "street-jiefang": {
           "p95Ms": 16.7,
           "calls": 61,
           "mirrorCalls": 55,
-          "heapPeakBytes": 405792688,
-          "triangles": 596366,
-          "maxMirrorTriangles": 578442,
+          "heapPeakBytes": 406023415,
+          "triangles": 596628,
+          "maxMirrorTriangles": 578448,
           "averageVisiblePeople": 0,
-          "averageVisibleMotors": 1.8369384359400998
-        }
-      },
-      {
-        "overview": {
-          "p95Ms": 16.8,
-          "calls": 14,
-          "mirrorCalls": 13,
-          "heapPeakBytes": 111202029,
-          "triangles": 61768,
-          "maxMirrorTriangles": 54368,
-          "averageVisiblePeople": 0,
-          "averageVisibleMotors": 0
-        },
-        "lijiang": {
-          "p95Ms": 16.8,
-          "calls": 35,
-          "mirrorCalls": 32,
-          "heapPeakBytes": 287691887,
-          "triangles": 378371,
-          "maxMirrorTriangles": 368620,
-          "averageVisiblePeople": 0,
-          "averageVisibleMotors": 0
-        },
-        "palace": {
-          "p95Ms": 16.7,
-          "calls": 53,
-          "mirrorCalls": 48,
-          "heapPeakBytes": 320932727,
-          "triangles": 467238,
-          "maxMirrorTriangles": 461913,
-          "averageVisiblePeople": 0,
-          "averageVisibleMotors": 0
-        },
-        "south": {
-          "p95Ms": 16.8,
-          "calls": 34,
-          "mirrorCalls": 31,
-          "heapPeakBytes": 109137579,
-          "triangles": 239659,
-          "maxMirrorTriangles": 224696,
-          "averageVisiblePeople": 0,
-          "averageVisibleMotors": 0
-        },
-        "walk-palace": {
-          "p95Ms": 16.7,
-          "calls": 100,
-          "mirrorCalls": 0,
-          "heapPeakBytes": 408110854,
-          "triangles": 733635,
-          "maxMirrorTriangles": 0,
-          "averageVisiblePeople": 0,
-          "averageVisibleMotors": 1.0748752079866888
-        },
-        "street-jiefang": {
-          "p95Ms": 16.7,
-          "calls": 61,
-          "mirrorCalls": 55,
-          "heapPeakBytes": 406749045,
-          "triangles": 596366,
-          "maxMirrorTriangles": 578442,
-          "averageVisiblePeople": 0,
-          "averageVisibleMotors": 1.5773710482529117
+          "averageVisibleMotors": 1.124792013311148
         }
       },
       {
@@ -325,19 +263,19 @@
           "p95Ms": 16.7,
           "calls": 14,
           "mirrorCalls": 13,
-          "heapPeakBytes": 111204821,
+          "heapPeakBytes": 109299517,
           "triangles": 61768,
           "maxMirrorTriangles": 54368,
           "averageVisiblePeople": 0,
           "averageVisibleMotors": 0
         },
         "lijiang": {
-          "p95Ms": 16.8,
+          "p95Ms": 16.7,
           "calls": 35,
           "mirrorCalls": 32,
-          "heapPeakBytes": 289892066,
-          "triangles": 378371,
-          "maxMirrorTriangles": 368620,
+          "heapPeakBytes": 286237788,
+          "triangles": 378343,
+          "maxMirrorTriangles": 368592,
           "averageVisiblePeople": 0,
           "averageVisibleMotors": 0
         },
@@ -345,17 +283,17 @@
           "p95Ms": 16.7,
           "calls": 53,
           "mirrorCalls": 48,
-          "heapPeakBytes": 321037639,
-          "triangles": 467238,
-          "maxMirrorTriangles": 461913,
+          "heapPeakBytes": 319721700,
+          "triangles": 467186,
+          "maxMirrorTriangles": 461861,
           "averageVisiblePeople": 0,
           "averageVisibleMotors": 0
         },
         "south": {
-          "p95Ms": 16.7,
+          "p95Ms": 16.8,
           "calls": 34,
           "mirrorCalls": 31,
-          "heapPeakBytes": 109099307,
+          "heapPeakBytes": 108732303,
           "triangles": 239659,
           "maxMirrorTriangles": 224696,
           "averageVisiblePeople": 0,
@@ -365,21 +303,83 @@
           "p95Ms": 16.7,
           "calls": 100,
           "mirrorCalls": 0,
-          "heapPeakBytes": 412777706,
-          "triangles": 733635,
+          "heapPeakBytes": 407899717,
+          "triangles": 733665,
           "maxMirrorTriangles": 0,
           "averageVisiblePeople": 0,
-          "averageVisibleMotors": 1.3510815307820299
+          "averageVisibleMotors": 1
         },
         "street-jiefang": {
           "p95Ms": 16.7,
           "calls": 61,
           "mirrorCalls": 55,
-          "heapPeakBytes": 405871293,
-          "triangles": 596366,
-          "maxMirrorTriangles": 578442,
+          "heapPeakBytes": 403645614,
+          "triangles": 596628,
+          "maxMirrorTriangles": 578448,
           "averageVisiblePeople": 0,
-          "averageVisibleMotors": 1.9650582362728786
+          "averageVisibleMotors": 1.56738768718802
+        }
+      },
+      {
+        "overview": {
+          "p95Ms": 16.8,
+          "calls": 14,
+          "mirrorCalls": 13,
+          "heapPeakBytes": 109209325,
+          "triangles": 61768,
+          "maxMirrorTriangles": 54368,
+          "averageVisiblePeople": 0,
+          "averageVisibleMotors": 0
+        },
+        "lijiang": {
+          "p95Ms": 16.8,
+          "calls": 35,
+          "mirrorCalls": 32,
+          "heapPeakBytes": 284759900,
+          "triangles": 378343,
+          "maxMirrorTriangles": 368592,
+          "averageVisiblePeople": 0,
+          "averageVisibleMotors": 0
+        },
+        "palace": {
+          "p95Ms": 16.7,
+          "calls": 53,
+          "mirrorCalls": 48,
+          "heapPeakBytes": 320830459,
+          "triangles": 467186,
+          "maxMirrorTriangles": 461861,
+          "averageVisiblePeople": 0,
+          "averageVisibleMotors": 0
+        },
+        "south": {
+          "p95Ms": 16.8,
+          "calls": 34,
+          "mirrorCalls": 31,
+          "heapPeakBytes": 109054399,
+          "triangles": 239659,
+          "maxMirrorTriangles": 224696,
+          "averageVisiblePeople": 0,
+          "averageVisibleMotors": 0
+        },
+        "walk-palace": {
+          "p95Ms": 16.8,
+          "calls": 100,
+          "mirrorCalls": 0,
+          "heapPeakBytes": 408722935,
+          "triangles": 733665,
+          "maxMirrorTriangles": 0,
+          "averageVisiblePeople": 0,
+          "averageVisibleMotors": 0.07820299500831947
+        },
+        "street-jiefang": {
+          "p95Ms": 16.7,
+          "calls": 61,
+          "mirrorCalls": 55,
+          "heapPeakBytes": 400919109,
+          "triangles": 596628,
+          "maxMirrorTriangles": 578448,
+          "averageVisiblePeople": 0,
+          "averageVisibleMotors": 1.875207986688852
         }
       }
     ]
@@ -387,9 +387,9 @@
   "desktopMedians": {
     "overview": {
       "p95Ms": {
-        "main": 16.8,
-        "candidate": 16.7,
-        "ratio": 0.994047619047619
+        "main": 16.7,
+        "candidate": 16.8,
+        "ratio": 1.005988023952096
       },
       "calls": {
         "main": 14,
@@ -402,9 +402,9 @@
         "ratio": 1.0
       },
       "heapPeakBytes": {
-        "main": 109403852,
-        "candidate": 111202029,
-        "ratio": 1.0164361397439645
+        "main": 109497624,
+        "candidate": 109299517,
+        "ratio": 0.9981907643950338
       },
       "triangles": {
         "main": 61768,
@@ -429,9 +429,9 @@
     },
     "lijiang": {
       "p95Ms": {
-        "main": 16.7,
-        "candidate": 16.8,
-        "ratio": 1.005988023952096
+        "main": 16.8,
+        "candidate": 16.7,
+        "ratio": 0.994047619047619
       },
       "calls": {
         "main": 35,
@@ -444,19 +444,19 @@
         "ratio": 1.0
       },
       "heapPeakBytes": {
-        "main": 279060640,
-        "candidate": 287691887,
-        "ratio": 1.0309296466889777
+        "main": 279061192,
+        "candidate": 286237788,
+        "ratio": 1.0257169259135108
       },
       "triangles": {
         "main": 372994,
-        "candidate": 378371,
-        "ratio": 1.0144157814871018
+        "candidate": 378343,
+        "ratio": 1.0143407132554412
       },
       "maxMirrorTriangles": {
         "main": 363243,
-        "candidate": 368620,
-        "ratio": 1.0148027628887548
+        "candidate": 368592,
+        "ratio": 1.0147256795038033
       },
       "averageVisiblePeople": {
         "main": 0,
@@ -486,19 +486,19 @@
         "ratio": 1.0
       },
       "heapPeakBytes": {
-        "main": 326587437,
-        "candidate": 321037639,
-        "ratio": 0.9830067008976834
+        "main": 326861218,
+        "candidate": 320830459,
+        "ratio": 0.9815494813459332
       },
       "triangles": {
         "main": 452927,
-        "candidate": 467238,
-        "ratio": 1.0315967032214903
+        "candidate": 467186,
+        "ratio": 1.0314818944333193
       },
       "maxMirrorTriangles": {
         "main": 447602,
-        "candidate": 461913,
-        "ratio": 1.0319726006586207
+        "candidate": 461861,
+        "ratio": 1.0318564260213314
       },
       "averageVisiblePeople": {
         "main": 0,
@@ -513,9 +513,9 @@
     },
     "south": {
       "p95Ms": {
-        "main": 16.8,
-        "candidate": 16.7,
-        "ratio": 0.994047619047619
+        "main": 16.7,
+        "candidate": 16.8,
+        "ratio": 1.005988023952096
       },
       "calls": {
         "main": 34,
@@ -528,9 +528,9 @@
         "ratio": 1.0
       },
       "heapPeakBytes": {
-        "main": 107813672,
-        "candidate": 109099307,
-        "ratio": 1.0119246008057308
+        "main": 107997536,
+        "candidate": 109054399,
+        "ratio": 1.0097859917841088
       },
       "triangles": {
         "main": 239659,
@@ -570,14 +570,14 @@
         "ratio": null
       },
       "heapPeakBytes": {
-        "main": 411420080,
-        "candidate": 412777706,
-        "ratio": 1.0032998535219768
+        "main": 408459737,
+        "candidate": 408722935,
+        "ratio": 1.000644367060345
       },
       "triangles": {
         "main": 734336,
-        "candidate": 733635,
-        "ratio": 0.9990453961129511
+        "candidate": 733665,
+        "ratio": 0.9990862493463483
       },
       "maxMirrorTriangles": {
         "main": 0,
@@ -590,9 +590,9 @@
         "ratio": null
       },
       "averageVisibleMotors": {
-        "main": 0.9251247920133111,
-        "candidate": 1.3510815307820299,
-        "ratio": 1.460431654676259
+        "main": 0.930116472545757,
+        "candidate": 0.07820299500831947,
+        "ratio": 0.08407871198568874
       }
     },
     "street-jiefang": {
@@ -612,19 +612,19 @@
         "ratio": 1.0
       },
       "heapPeakBytes": {
-        "main": 399050629,
-        "candidate": 405871293,
-        "ratio": 1.0170922271619824
+        "main": 394019977,
+        "candidate": 403645614,
+        "ratio": 1.0244293121208927
       },
       "triangles": {
         "main": 596890,
-        "candidate": 596366,
-        "ratio": 0.9991221163028363
+        "candidate": 596628,
+        "ratio": 0.9995610581514182
       },
       "maxMirrorTriangles": {
         "main": 578966,
-        "candidate": 578442,
-        "ratio": 0.9990949382174428
+        "candidate": 578448,
+        "ratio": 0.9991053015202965
       },
       "averageVisiblePeople": {
         "main": 0,
@@ -632,9 +632,9 @@
         "ratio": null
       },
       "averageVisibleMotors": {
-        "main": 1.475873544093178,
-        "candidate": 1.8369384359400998,
-        "ratio": 1.2446448703494926
+        "main": 1.9301164725457571,
+        "candidate": 1.56738768718802,
+        "ratio": 0.8120689655172413
       }
     }
   },
@@ -756,18 +756,18 @@
     {
       "view": "walk-palace",
       "metric": "heap",
-      "main": 110882804,
-      "PR": 110002448,
+      "main": 109755324,
+      "PR": 109664864,
       "runs": [
         [
-          110882804,
-          109735676,
-          111313064
+          109755324,
+          111857620,
+          109691892
         ],
         [
-          110002448,
-          111195816,
-          109964564
+          109901188,
+          109664864,
+          109565964
         ]
       ],
       "pass": true
@@ -775,19 +775,19 @@
     {
       "view": "walk-palace",
       "metric": "p95 ms",
-      "main": 16.800000000000182,
+      "main": 16.799999999999272,
       "PR": 16.800000000000182,
       "noise": 9.094947017729282e-13,
       "p95s": [
         [
           16.800000000000182,
-          16.800000000000182,
+          16.799999999999272,
           16.799999999999272
         ],
         [
+          16.700000000000728,
           16.800000000000182,
-          16.800000000000182,
-          16.700000000000728
+          16.800000000000182
         ]
       ],
       "pass": true
@@ -955,18 +955,18 @@
     {
       "view": "overview",
       "metric": "heap",
-      "main": 15113824,
-      "PR": 15308772,
+      "main": 15101820,
+      "PR": 15309620,
       "runs": [
         [
-          15117628,
-          15113824,
-          15083640
+          15108480,
+          15100416,
+          15101820
         ],
         [
-          15290688,
-          15324280,
-          15308772
+          15309620,
+          15335228,
+          15299528
         ]
       ],
       "pass": true
@@ -974,19 +974,19 @@
     {
       "view": "overview",
       "metric": "p95 ms",
-      "main": 16.799999999999727,
-      "PR": 16.700000000000273,
-      "noise": 0.0999999999994543,
+      "main": 16.700000000000273,
+      "PR": 16.799999999999955,
+      "noise": 0,
       "p95s": [
         [
-          16.799999999999727,
           16.700000000000273,
-          16.799999999999727
+          16.700000000000273,
+          16.700000000000273
         ],
         [
           16.700000000000273,
-          16.700000000000273,
-          16.799999999999727
+          16.800000000000182,
+          16.799999999999955
         ]
       ],
       "pass": true
@@ -1108,18 +1108,18 @@
     {
       "view": "lijiang",
       "metric": "heap",
-      "main": 25384652,
-      "PR": 25476580,
+      "main": 25427800,
+      "PR": 25485964,
       "runs": [
         [
-          25384652,
-          25410828,
-          25352396
+          25504336,
+          25420276,
+          25427800
         ],
         [
-          25476580,
-          25528932,
-          25472920
+          25490968,
+          25478776,
+          25485964
         ]
       ],
       "pass": true
@@ -1127,19 +1127,19 @@
     {
       "view": "lijiang",
       "metric": "p95 ms",
-      "main": 16.700000000000273,
+      "main": 16.799999999999727,
       "PR": 16.700000000000273,
-      "noise": 0,
+      "noise": 0.0999999999994543,
       "p95s": [
         [
-          16.700000000000273,
-          16.700000000000273,
+          16.799999999999727,
+          16.799999999999727,
           16.700000000000273
         ],
         [
           16.700000000000273,
           16.700000000000273,
-          16.700000000000273
+          16.799999999999727
         ]
       ],
       "pass": true
@@ -1186,7 +1186,7 @@
       "view": "palace",
       "metric": "triangles",
       "main": 298458,
-      "PR": 312769,
+      "PR": 312717,
       "runs": [
         [
           298458,
@@ -1194,9 +1194,9 @@
           298458
         ],
         [
-          312769,
-          312769,
-          312769
+          312717,
+          312717,
+          312717
         ]
       ],
       "pass": true
@@ -1205,7 +1205,7 @@
       "view": "palace",
       "metric": "mirrorTriangles",
       "main": 296221,
-      "PR": 310532,
+      "PR": 310480,
       "runs": [
         [
           296221,
@@ -1213,9 +1213,9 @@
           296221
         ],
         [
-          310532,
-          310532,
-          310532
+          310480,
+          310480,
+          310480
         ]
       ],
       "pass": true
@@ -1261,18 +1261,18 @@
     {
       "view": "palace",
       "metric": "heap",
-      "main": 42380808,
-      "PR": 42502060,
+      "main": 42412472,
+      "PR": 42474512,
       "runs": [
         [
-          42386008,
-          42288500,
-          42380808
+          42276048,
+          42461252,
+          42412472
         ],
         [
-          42461956,
-          42502060,
-          42522512
+          42512296,
+          42474512,
+          42398592
         ]
       ],
       "pass": true
@@ -1280,19 +1280,19 @@
     {
       "view": "palace",
       "metric": "p95 ms",
-      "main": 16.799999999999727,
+      "main": 16.700000000000273,
       "PR": 16.700000000000273,
       "noise": 0.09999999999990905,
       "p95s": [
         [
-          16.799999999999727,
+          16.700000000000273,
           16.800000000000182,
           16.700000000000273
         ],
         [
           16.700000000000273,
           16.700000000000273,
-          16.700000000000273
+          16.799999999999727
         ]
       ],
       "pass": true
@@ -1414,18 +1414,18 @@
     {
       "view": "south",
       "metric": "heap",
-      "main": 19311224,
-      "PR": 19478876,
+      "main": 19344188,
+      "PR": 19522328,
       "runs": [
         [
-          19311224,
-          19360264,
-          19298812
+          19344188,
+          19363700,
+          19298200
         ],
         [
-          19477356,
-          19486620,
-          19478876
+          19522328,
+          19534956,
+          19493932
         ]
       ],
       "pass": true
@@ -1433,18 +1433,18 @@
     {
       "view": "south",
       "metric": "p95 ms",
-      "main": 16.799999999999727,
+      "main": 16.700000000000273,
       "PR": 16.700000000000273,
       "noise": 0.0999999999994543,
       "p95s": [
         [
-          16.799999999999727,
+          16.700000000000273,
           16.700000000000273,
           16.799999999999727
         ],
         [
           16.700000000000273,
-          16.700000000000273,
+          16.799999999999727,
           16.700000000000273
         ]
       ],
@@ -1567,18 +1567,18 @@
     {
       "view": "walk-palace",
       "metric": "heap",
-      "main": 110992880,
-      "PR": 111211880,
+      "main": 111035528,
+      "PR": 111151556,
       "runs": [
         [
-          111081532,
-          110992880,
-          110944080
+          111035528,
+          111095472,
+          110926716
         ],
         [
-          111157056,
-          111211880,
-          111284704
+          111137200,
+          111151556,
+          111388648
         ]
       ],
       "pass": true
@@ -1586,19 +1586,19 @@
     {
       "view": "walk-palace",
       "metric": "p95 ms",
-      "main": 16.799999999999272,
+      "main": 16.800000000000182,
       "PR": 16.799999999999272,
       "noise": 0.0999999999994543,
       "p95s": [
         [
+          16.800000000000182,
+          16.800000000000182,
+          16.700000000000728
+        ],
+        [
           16.700000000000728,
           16.800000000000182,
           16.799999999999272
-        ],
-        [
-          16.800000000000182,
-          16.799999999999272,
-          16.699999999999818
         ]
       ],
       "pass": true
