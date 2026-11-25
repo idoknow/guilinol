@@ -42,6 +42,7 @@ try{
     await page.goto('http://127.0.0.1:'+server.httpServer.address().port+'/?verify&mode=walk&radius=320&flow=0')
     await page.waitForFunction(()=>window.viewer?.walk?.active,null,{timeout:60000})
     for(const {id,way,x,z,singleFile,route,boundary,reverseExit,direction,startHeight:y,heading} of tests){
+      await page.evaluate(()=>window.viewer.freeze())
       try{
         let ready=false,setupError
         for(const [along,side] of [[0,0],[-.9,.7],[.9,-.7],[-.8,-.65],[.8,.65],[0,1.25],[0,-1.25],[-1.8,1],[-1.8,-1]]){
@@ -53,9 +54,9 @@ try{
             },{x:x-Math.sin(heading)*along+Math.cos(heading)*side,z:z-Math.cos(heading)*along-Math.sin(heading)*side,y,heading})
             if(!ready)continue
             if(mode!=='foot'){
-              await page.waitForFunction(({mode,x,z})=>window.viewer.walk.parked(mode)
-                .some(([px,,pz])=>Math.hypot(px-x,pz-z)<2),{mode,x,z},{timeout:5000})
-              await page.waitForFunction(()=>!!document.querySelector('.vehicle-action:not([hidden])')?.textContent,null,{timeout:3000})
+              await page.waitForFunction(({mode,x,z})=>{const w=window.viewer.walk;w.tick(1/60);return w.parked(mode)
+                .some(([px,,pz])=>Math.hypot(px-x,pz-z)<2)},{mode,x,z},{timeout:5000})
+              await page.waitForFunction(()=>{window.viewer.walk.tick(1/60);return !!document.querySelector('.vehicle-action:not([hidden])')?.textContent},null,{timeout:3000})
               await page.keyboard.press('f')
               await page.waitForFunction(k=>window.viewer.walk.vehicle===k,mode,{timeout:3000})
             }
@@ -75,7 +76,7 @@ try{
           const height=()=>mode==='car'||mode==='foot'?w.fixtureHeight():rig.position.y
           const initialResets=w.probe().resets
           let part=1,maximum=0,previous,completed=false,furthest=0,reversing=false,exitStation
-          await v.freeze()
+          const start={x:w.position.x,z:w.position.z,y:height(),heading:w.heading}
           try{
             const length=route.slice(1).reduce((sum,p,i)=>sum+Math.hypot(p[0]-route[i][0],p[1]-route[i][1]),0)
             const frameLimit=Math.max(2400,Math.ceil(60*length/(singleFile ? .75 : 1.5)))
@@ -153,7 +154,7 @@ try{
               if(frame%15===0)await new Promise(r=>setTimeout(r,0))
               if(frames.length>300&&Math.hypot(next.x-frames.at(-300)[0],next.z-frames.at(-300)[1])<.06)break
             }
-          }finally{for(const code of held)key(code,false);if(mode==='foot')w.drive(0,0,false);v.resume()}
+          }finally{for(const code of held)key(code,false);if(mode==='foot')w.drive(0,0,false)}
           const probe=w.probe(),p=w.position,fx=-Math.sin(w.heading),fz=-Math.cos(w.heading)
           const contacts=completed?undefined:[-.85,0,.85].map(side=>w.raycastObstacle(
             p.x+fz*side,probe.foot+.8,p.z-fx*side,fx,0,fz,4))
@@ -165,12 +166,12 @@ try{
             probe.contactSources?.some(hit=>Math.abs(hit.normal?.y)<.5)
           if(reverseExit && probe.resets!==initialResets)completed=false
           const failure=completed?undefined:obstruction||probe.resets>initialResets?'collision':'tool'
-          return {completed,failure,maximum,frames,part,
+          return {start,completed,failure,maximum,frames,part,
             reverseExit:reverseExit?{furthest,exitStation,resets:probe.resets-initialResets}:undefined,obstacle:w.obstacle,contacts,
             stopped:completed?undefined:{wet:probe.wet,blockedWater:probe.blockedWater,surface:probe.surfaceKind,inHouse:probe.inHouse,hits:probe.contactSources,foot:probe.foot,resets:probe.resets-initialResets,heading:w.heading}}
         },{route,mode,boundary,reverseExit,singleFile,surfaceApproach:!boundary&&process.argv.includes('--surface')})
         results.push({id,way,mode,boundary,direction,...run})
-      }catch(e){results.push({id,way,mode,boundary,direction,failure:"tool",unavailable:e.message.split('\n')[0]})}
+      }catch(e){results.push({id,way,mode,boundary,direction,failure:"tool",unavailable:e.message.split('\n')[0]})}finally{await page.evaluate(()=>window.viewer.resume())}
     }
     await writeFile(output+'.gz',gzipSync(JSON.stringify(results)))
     await page.close()
