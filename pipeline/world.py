@@ -612,6 +612,10 @@ def build(bbox, output, palette, workers=4):
         from station_roads import grade_traffic
         grade_traffic(output, manifest, bridge_traffic)
     (output/'manifest.json').write_text(json.dumps(manifest,separators=(',',':'))+'\n')
+    if play_region:
+        from rail_earthworks import bake as bake_rail_earthworks
+        bake_rail_earthworks(output, manifest)
+        (output/'manifest.json').write_text(json.dumps(manifest,separators=(',',':'))+'\n')
     print(f'{len(chunks)} chunks, {len(footprints)} footprints, {sum(c["bytes"] for c in chunks):,} chunk bytes')
 
 
