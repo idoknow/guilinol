@@ -431,16 +431,23 @@ type PendingRow = { intent: string; type: string; social_uid?: string; nickname:
 /** 供前端确认框展示：这次授权解析出的是谁（不消费）。 */
 export async function socialPending(env: Env, db: D1Database, request: Request): Promise<Response> {
   const headers = { 'Cache-Control': 'no-store' }
-  if (!socialConfigured(env))
+  if (!socialConfigured(env) && !providers(env).length)
     return Response.json({ error: { code: 'social_unconfigured', message: '第三方登录尚未启用' } }, { status: 503, headers })
   const token = pendingToken(request)
   if (!token) return Response.json({ error: { code: 'no_pending', message: '没有待确认的授权' } }, { status: 404, headers })
   const row = await db
-    .prepare('SELECT intent,type,nickname,faceimg,user_id FROM social_pending WHERE channel=\'legacy\' AND token=? AND used=0 AND expires>?')
+    .prepare('SELECT channel,intent,type,nickname,faceimg,user_id FROM social_pending WHERE token=? AND used=0 AND expires>?')
     .bind(await hash(token), now())
-    .first<PendingRow>()
+    .first<PendingRow & { channel: string }>()
   if (!row) return Response.json({ error: { code: 'no_pending', message: '没有待确认的授权' } }, { status: 404, headers })
   const type = isSocialType(row.type) ? row.type : null
+  // 新版通道：intent 为 new（这个 QQ 还没有账号）或 bind/migrate（该身份已属于另一个可接管账号，需要用户确认 takeover）
+  if (row.channel === 'direct')
+    return Response.json(
+      { channel: 'direct', intent: row.intent, takeover: row.intent !== 'new', type: type ?? row.type,
+        label: (type ? SOCIAL_LABELS[type] : row.type) + ' 登录', nickname: row.nickname, avatar: safeAvatar(row.faceimg) },
+      { headers },
+    )
   return Response.json(
     {
       intent: row.intent === 'bind' ? 'bind' : row.intent === 'register' ? 'register' : 'login',
@@ -727,14 +734,15 @@ export async function socialRegister(env: Env, db: D1Database, request: Request,
 }
 
 /** 后台用：某个账号绑定的第三方平台（平台名、平台用户名、头像）。 */
-export async function userSocialIdentities(db: D1Database, userId: string) {
+/** legacyTag：新版通道已启用或迁移已开始时，旧版绑定的名称带上「（旧版）」；之前保持原名，避免没有新版时就让用户困惑。 */
+export async function userSocialIdentities(db: D1Database, userId: string, legacyTag = false) {
   const { results } = await db
     .prepare('SELECT channel,type,social_uid,nickname,faceimg,created_at,last_login_at FROM social_identities WHERE user_id=? ORDER BY created_at')
     .bind(userId)
     .all<{ channel: string; type: string; social_uid: string; nickname: string; faceimg: string; created_at: number; last_login_at: number }>()
   return results.map((row) => ({
     type: row.type, channel: row.channel,
-    label: (isSocialType(row.type) ? SOCIAL_LABELS[row.type] : row.type)+(row.channel==='legacy'?'（旧版）':''),
+    label: (isSocialType(row.type) ? SOCIAL_LABELS[row.type] : row.type)+(legacyTag&&row.channel==='legacy'?'（旧版）':''),
     nickname: row.nickname,
     avatar: safeAvatar(row.faceimg),
     uid: maskUid(row.social_uid),

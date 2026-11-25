@@ -62,7 +62,7 @@ export async function adminUserDetail(db: D1Database, id: string) {
     .bind(id)
     .first<Record<string, unknown>>()
   if (!user) return json({ error: { code: 'not_found', message: '未找到用户' } }, 404)
-  return json({ user: { ...user, verified: !!user.verified }, social: await userSocialIdentities(db, id) })
+  return json({ user: { ...user, verified: !!user.verified }, social: await userSocialIdentities(db, id, true) })
 }
 
 export async function adminList(db: D1Database, path: string, params: URLSearchParams) {

@@ -1,5 +1,5 @@
 import {oauthStart,oauthCallback,directDecision} from '../../lib/oauth'
-import {migration,allowLegacy} from '../../lib/social-policy'
+import {migration,allowLegacy,providers,schedule} from '../../lib/social-policy'
 import {type SessionAccount,type Env,checkBan,sessionAccount,Problem,cookie,deliver,equal,hash,invalid,lifetime,limit,newCode,now,passwordHash,random,reserveMail,sessionHash,unauthorized} from '../../lib/auth'
 
 import {AVATAR_KEY, looks, sanitizeAvatar, starterOutfit} from '../../lib/avatar'
@@ -111,7 +111,7 @@ async function handle(request:Request,env:Env) {
     }
     if(!(await db.batch(writes))[0].meta.changes) unauthorized()
     // 带上已绑定的第三方平台，账号面板据此显示「已绑定」而不是还让用户去绑
-    const social=await userSocialIdentities(db,user.id)
+    const social=await userSocialIdentities(db,user.id,providers(env).length>0||schedule(env).phase!=='before')
     return json({...profile(user),social,migration:migration(env,user,social)},200,cookie(request.headers.get('Cookie')!.match(/(?:^|;\s*)glol_session=([a-f0-9]{64})(?:;|$)/)![1]))
   }
   const email=typeof body.email==='string'?body.email.trim().toLowerCase():''
