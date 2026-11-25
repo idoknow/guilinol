@@ -156,7 +156,7 @@ export class SmokeKit {
       this.packModel.group.position.copy(anchors.handL).add(PACK_OFFSET)
       const {phase,progress}=view
       const draw=phase==='draw'||phase==='drawOpened'
-      const open=draw?THREE.MathUtils.smoothstep(progress,.32,.95)
+      const open=draw?THREE.MathUtils.smoothstep(progress,.43,.91)
         :phase==='take'?1-THREE.MathUtils.smoothstep(progress,.65,.79):1
       this.pack.rotation.set(.57,.12,-.10)
       this.pack.position.z+=.035
@@ -223,7 +223,7 @@ export class SmokeKit {
       out.copy(this.packModel.peek.position)
       out.y+=.022
     }else if(view.phase==='draw'||view.phase==='drawOpened'||view.phase==='take'){
-      out.set(0,-.008,.024).applyQuaternion(this.packModel.lid.quaternion).add(this.packModel.lid.position)
+      out.set(.011,view.phase==='take'?-.0135:-.0165,.024).applyQuaternion(this.packModel.lid.quaternion).add(this.packModel.lid.position)
     }else{
       const tear=view.phase==='tear'?view.progress:0
       out.set(.028-.056*tear,this.packModel.rim-.001,.009)

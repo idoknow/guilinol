@@ -174,6 +174,7 @@ export function createPack(brand: BrandDef, parts = new Parts()): PackModel {
     panel(group,.0006,.014,PACK_D,sign*(PACK_W/2-.0004),rim-.007,0,top)
   }
   const lid = new THREE.Group()
+  lid.name = 'smoke-lid'
   lid.position.set(0,rim,-PACK_D/2)
   panel(lid,PACK_W+.002,.001,PACK_D+.002,0,.002,PACK_D/2,side)
   panel(lid,PACK_W+.002,.016,.001,0,-.0055,PACK_D+.001,side)

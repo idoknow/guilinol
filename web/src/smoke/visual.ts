@@ -47,7 +47,7 @@ export function smokeVisual(scene:THREE.Scene,figure:THREE.Object3D,camera?:THRE
       kit.root.position.copy(figure.worldToLocal(eye))
       kit.root.quaternion.copy(figure.getWorldQuaternion(parent).invert().multiply(rotation))
       handL.copy(VIEW_ANCHORS.restL).lerp(VIEW_ANCHORS.handL,view.carry)
-      if((view.phase==='draw'||view.phase==='drawOpened'))handL.lerpVectors(VIEW_ANCHORS.restL,VIEW_ANCHORS.handL,view.progress)
+      if((view.phase==='draw'||view.phase==='drawOpened'))handL.lerpVectors(VIEW_ANCHORS.restL,VIEW_ANCHORS.handL,THREE.MathUtils.smoothstep(view.progress,0,.35))
       // Lower the box into the chest workspace; preserve visibility in the eye camera.
       // 第一人称：烟盒要举到画面下 1/3 内、物品栏之上，正面看得见（手机上物品栏更占地方）
       handL.y-=(fp ? -.045 : .16)*view.carry
@@ -94,7 +94,10 @@ export function smokeVisual(scene:THREE.Scene,figure:THREE.Object3D,camera?:THRE
           :(view.phase==='draw'||view.phase==='drawOpened')?THREE.MathUtils.smoothstep(view.progress,0,.22)
           :view.phase==='take'?THREE.MathUtils.smoothstep(view.carry,.01,.3)
           :1
-        right.apply(view.lit?'puff':'pinch',pinch,rightBlend)
+        const pushing=view.phase==='draw'||view.phase==='drawOpened'
+        if(pushing)pinch.quaternion.copy(kit.pack.quaternion)
+        else pinch.quaternion.identity()
+        right.apply(pushing?'push':view.lit?'puff':'pinch',pinch,rightBlend)
       }
       if(left && kit.pack.visible)left.attachment.attach(kit.pack)
       if(left && kit.lighter.visible)left.attachment.attach(kit.lighter)
