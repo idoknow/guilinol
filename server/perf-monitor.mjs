@@ -18,8 +18,10 @@ export class Histogram {
   }
 }
 export function route(path){
-  if(/^\/api\/(?:me|unsubscribe|health|t|auth\/(?:register|resend|verify|reset|login|logout)|admin\/(?:stats|users|feedback|overview|timeseries|breakdown|funnel|errors|live|audit|perf(?:\/grid|\/server)?)|bridge\/pending|feedback)$/.test(path))return path
-  if(/^\/api\/admin\/users\/[\w-]+\/role$/.test(path))return '/api/admin/users/:id/role'
+  if(/^\/api\/(?:me|unsubscribe|health|ready|live|t|smoke|gfx|npc|auth\/(?:register|resend|verify|reset|login|logout)|admin\/(?:stats|signups|users|feedback|overview|timeseries|breakdown|funnel|errors|live|audit|smoke|gfx|npc|updates|perf(?:\/grid|\/server)?|mp(?:\/(?:history|sessions|activities|gameplay|kick))?)|bridge\/pending|feedback)$/.test(path))return path
+  if(/^\/api\/admin\/chat\/(?:messages|reviews|mutes|words(?:\/delete)?|settings|audit|context|mute|unmute|delete|approve|block|notice)$/.test(path))return path
+  if(/^\/api\/admin\/users\/[\w-]+\/(?:role|ban|unban|merge|password|email)$/.test(path))return '/api/admin/users/:id/'+path.split('/').at(-1)
+  if(/^\/api\/admin\/users\/[\w-]+$/.test(path))return '/api/admin/users/:id'
   const detail=/^(\/api\/(?:admin\/|bridge\/)?feedback)\/[\w-]+(?:\/(submit|supplement|status|messages|relayed|bind|view-shot|photos\/\d+))?$/.exec(path)
   if(detail)return detail[1]+'/:id'+(detail[2]?'/'+detail[2].replace(/\d+$/,':n'):'')
   if(/^\/api\/(bridge|feedback)\/comparisons\/[a-f0-9]{64}$/.test(path))return path.split('/').slice(0,-1).join('/')+'/:sha'
@@ -46,11 +48,27 @@ async function rollup(pool) {
       ON CONFLICT(day,world,device,kind) DO UPDATE SET samples=excluded.samples,p50=excluded.p50,p75=excluded.p75,p95=excluded.p95`)
   await pool.query("DELETE FROM perf_event WHERE received < now()-interval '90 days'")
 }
-export function monitor(pool){
+async function ensureAdminIndexes(pool){
+  const statements=[
+    'CREATE INDEX CONCURRENTLY IF NOT EXISTS users_created_at ON users (created_at)',
+    'CREATE INDEX CONCURRENTLY IF NOT EXISTS feedback_submitted_at ON feedback (submitted_at) WHERE submitted_at IS NOT NULL',
+    "CREATE INDEX CONCURRENTLY IF NOT EXISTS feedback_messages_unread ON feedback_messages (feedback_id, id) WHERE author_kind = 'user'",
+    'CREATE INDEX CONCURRENTLY IF NOT EXISTS admin_audit_type_id ON admin_audit (target_type, id DESC)',
+    "CREATE INDEX CONCURRENTLY IF NOT EXISTS chat_messages_pending ON chat_messages (id DESC) WHERE status = 'pending'",
+    'CREATE INDEX CONCURRENTLY IF NOT EXISTS chat_messages_uid_id ON chat_messages (uid, id DESC) WHERE sys IS NULL',
+    'CREATE INDEX CONCURRENTLY IF NOT EXISTS mp_sessions_window ON mp_sessions (joined_at, last_seen)',
+    'CREATE INDEX CONCURRENTLY IF NOT EXISTS mp_sessions_open ON mp_sessions (instance, id) WHERE left_at IS NULL',
+  ]
+  for(const sql of statements){
+    try{await pool.query(sql)}catch{}
+  }
+}
+export function monitor(pool,{onHourlyReady}={}){
   let routes=new Map(),queries=new Histogram(),wait=new Histogram(),cpu=process.cpuUsage(),last=performance.now(),day='',busy=false,hourTick=0
   const lag=monitorEventLoopDelay({resolution:20});lag.enable()
-  // 冷启动立即异步补算小时汇总，避免刚发版前 60 秒 24h 总览退化扫原始 perf_event
-  void summarizeHours(pool,{hours:72}).then(()=>{hourTick=Date.now()},error=>console.error('hourly summary warmup failed',error.code??error.name))
+  // 冷启动异步补齐高频管理索引与最近 7 天小时汇总，避免刚发版 24h/7d 查询退化扫原始表
+  void ensureAdminIndexes(pool)
+  void summarizeHours(pool,{hours:168}).then(()=>{hourTick=Date.now();onHourlyReady?.()},error=>console.error('hourly summary warmup failed',error.code??error.name))
   const timer=setInterval(async()=>{
     if(busy)return
     busy=true
@@ -64,8 +82,8 @@ export function monitor(pool){
       Object.assign(sample,{load:load?.trim().split(/\s+/).slice(0,3).map(Number),cgroupMemory:memoryCurrent?Number(memoryCurrent):null,
         cgroupCpuUsec:cpuStat?Number(/^usage_usec (\d+)/m.exec(cpuStat)?.[1]):null,nginx:web})
       await pool.query("INSERT INTO perf_server(minute,sample) VALUES(date_trunc('minute',$1::timestamptz),$2)",[stamp,sample])
-      // 小时汇总是后台总览快慢的关键：24h 这类滚动窗口只能靠它，否则每次都要裸扫原始事件
-      if(Date.now()-hourTick>600000){await summarizeHours(pool,{hours:72});hourTick=Date.now()}
+      // 小时汇总是后台总览与 7d 趋势快慢的关键：滚动窗口靠它把裸扫段压到 <= 1 小时
+      if(Date.now()-hourTick>600000){await summarizeHours(pool,{hours:168});hourTick=Date.now()}
       const today=new Date(stamp.getTime()-300000).toISOString().slice(0,10)
       if(today!==day){await summarizeDays(pool);await rollup(pool);day=today}
     }catch(error){console.error('telemetry minute write failed',error.code??error.name)}finally{busy=false}

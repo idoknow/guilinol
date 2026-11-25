@@ -122,15 +122,41 @@ export async function verifyHourlySummaries(url){
     const afterLateOverview=await query('overview')
     assert.equal(afterLateOverview.sessions.current,beforeLateOverview.sessions.current+1)
 
-    // 5) 窗口超过 3 天时回到日表（> 3 * 86400s）
+    // 5) 窗口超过 3 天时回到日表（> 3 * 86400s），并用小时表补齐边缘空档
     const oldDay=new Date(Math.floor((nowMs-5*dayMs)/dayMs)*dayMs+3600000)
-    await seedEvent(pool,oldDay,crypto.randomUUID(),crypto.randomUUID(),'desktop','上海',oldDay.toISOString().slice(0,10))
+    await seedEvent(pool,oldDay,crypto.randomUUID(),crypto.randomUUID(),'desktop','上海',oldDay.toISOString().slice(0,10),
+      [['failure',{category:'chunk'}],['retry',{category:'landmark'}]])
+    const midDay=new Date(Math.floor((nowMs-2*dayMs)/dayMs)*dayMs+2*3600000)
+    await seedEvent(pool,midDay,crypto.randomUUID(),crypto.randomUUID(),'mobile','广西',midDay.toISOString().slice(0,10),
+      [['failure',{category:'chunk'}]])
     await summarizeDays(pool)
+    await summarizeHours(pool,{hours:168})
+
     const longEnd=new Date(Math.floor(nowMs/dayMs)*dayMs)
     const longStart=new Date(+longEnd-4*dayMs)
     const longPart=await partitions(pool,+longStart,+longEnd)
     assert.equal(longPart.grain,'day')
     assert.ok(longPart.days.length>=1)
+
+    // 6) 跨 5 天窗口（>3 天）：默认按日表 + extraHours 补齐今日/首日整点（把边缘裸扫压到 <= 1h）；
+    //    preferHour=true（7 天以内 1h 趋势）直接走 168h 小时表
+    const weekEnd=new Date(currentHour+23*60000)
+    const weekStart=new Date(+oldDay-20*60000)
+    const weekDayPart=await partitions(pool,+weekStart,+weekEnd)
+    assert.equal(weekDayPart.grain,'day')
+    assert.ok(weekDayPart.extraHours.length>=1)
+    assert.ok(weekDayPart.gaps.every(([lo,hi])=>hi-lo<=hourMs))
+    const weekHourPart=await partitions(pool,+weekStart,+weekEnd,{preferHour:true})
+    assert.equal(weekHourPart.grain,'hour')
+    assert.ok(weekHourPart.days.length>=96)
+
+    // 7) 可靠性指标（failure.chunk / retry.landmark）精确命中索引过滤并返回准确计数
+    const relParams=new URLSearchParams({from:new Date(+oldDay-hourMs).toISOString(),to:weekEnd.toISOString(),bucket:'1d',metric:'failure.chunk'})
+    const failRows=await (await analytics(pool,'admin/timeseries',relParams)).json()
+    assert.equal(failRows.reduce((s,r)=>s+Number(r.value||0),0),2)
+    relParams.set('metric','retry.landmark')
+    const retryRows=await (await analytics(pool,'admin/timeseries',relParams)).json()
+    assert.equal(retryRows.reduce((s,r)=>s+Number(r.value||0),0),1)
   }finally{
     await pool.end()
   }

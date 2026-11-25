@@ -158,6 +158,41 @@ function cleanName(value) {
   return cleaned || '游客'
 }
 
+const VALID_ACTIVITIES = new Set(['walk', 'idle', 'ebike', 'bicycle', 'car', 'boat', 'fishing', 'mifen', 'drone', 'photo', 'shop', 'mission', 'smoke'])
+const TRACKED_GAMEPLAY = new Set(['ebike', 'bicycle', 'car', 'boat', 'fishing', 'mifen', 'drone', 'photo', 'shop', 'mission', 'smoke'])
+function cleanDetail(value) {
+  return typeof value === 'string'
+    ? value.replace(/[\u0000-\u001f\u007f-\u009f\u200b-\u200f\u2028\u2029]/g, '').trim().slice(0, 48)
+    : ''
+}
+function setActivity(p, nextAct, nextDetail = '', at = now()) {
+  if (!VALID_ACTIVITIES.has(nextAct)) return
+  const detail = cleanDetail(nextDetail)
+  const prevAct = p.activity || 'walk'
+  const prevDetail = p.activityDetail || ''
+  if (prevAct === nextAct && prevDetail === detail) return
+  const durSec = Math.max(0, Math.round((at - (p.activitySince || p.joinedAt || at)) / 1000))
+  if (prevAct && durSec > 0) {
+    p.activityTotals[prevAct] = (p.activityTotals[prevAct] ?? 0) + durSec
+  }
+  p.activity = nextAct
+  p.activityDetail = detail
+  p.activitySince = at
+  if (prevAct !== nextAct) {
+    // 结束一个专项玩法（且持续 >= 5 秒）时落一条带时长的结束记录，方便回看该账号刚玩了多久
+    if (TRACKED_GAMEPLAY.has(prevAct) && durSec >= 5) {
+      obs.activity(p, { kind: 'activity_end', activity: prevAct, detail: prevDetail, durationSec: durSec, ts: at })
+    }
+    // 跳过 walk <-> idle 频繁抖动，仅在切到专项玩法或显著变化时记入开始记录
+    const quietBounce = (prevAct === 'walk' && nextAct === 'idle') || (prevAct === 'idle' && nextAct === 'walk')
+    if (!quietBounce) {
+      obs.activity(p, { kind: 'activity', activity: nextAct, detail, ts: at })
+    }
+  } else if (TRACKED_GAMEPLAY.has(nextAct) && detail && detail !== prevDetail) {
+    obs.activity(p, { kind: 'activity', activity: nextAct, detail, ts: at })
+  }
+}
+
 /**
  * 取真实客户端 IP 与 CDN 节点 IP。
  *
@@ -383,6 +418,10 @@ function aoiSend(p, payload) {
  */
 function removePlayer(p, extra = {}) {
   if (!p || !players.has(p.id)) return false
+  const at = now()
+  const finalTotals = obs.liveTotals(p, at)
+  p.activityTotals = finalTotals
+  p.activitySince = at
   gridDel(p)
   for (const peerId of [...p.visible]) {
     const peer = players.get(peerId)
@@ -391,7 +430,14 @@ function removePlayer(p, extra = {}) {
   p.visible.clear()
   p.farSent.clear()
   players.delete(p.id)
-  obs.event('leave', p, extra)
+  obs.event('leave', p, { ...extra, activityTotals: finalTotals })
+  obs.activity(p, {
+    kind: 'leave',
+    activity: p.activity ?? null,
+    detail: extra?.reason ? String(extra.reason) : '',
+    durationSec: p.joinedAt ? Math.floor((at - p.joinedAt) / 1000) : null,
+    ts: at,
+  })
   broadcast({ t: 'online', online: players.size })
   return true
 }
@@ -486,7 +532,7 @@ const server = createServer(async(req, res) => {
           if(minutes!==undefined&&(!Number.isInteger(minutes)||minutes<1||minutes>10080)){res.writeHead(400);res.end('{}');return}
           bans.set(uid, {until: now() + (minutes===undefined?KICK_BAN_SECONDS:minutes*60) * 1000, reason})
           const target=[...players.values()].find(p=>p.uid===uid)
-          obs.event('kick',target??{uid},{reason});if(target)target.kickReason=reason
+          obs.event('kick',target??{uid},{reason});obs.activity(target??{uid,name:''},{kind:'kick',detail:reason});if(target)target.kickReason=reason
           let kicked = 0
           for (const p of players.values()) {
             if (p.uid !== uid) continue
@@ -710,8 +756,13 @@ wss.on('connection', (ws, req) => {
           try { previous.ws.close(4001, 'replaced') } catch { /* 忽略 */ }
           console.log(JSON.stringify({scope: 'rt-replace', uid, oldId: previous.id, newId: id}))
         }
+        const initAct = VALID_ACTIVITIES.has(msg.act) ? msg.act : 'walk'
+        const initDetail = cleanDetail(msg.actDetail)
+        const joinedAt = now()
         const player = {
-          joinedAt:now(),ip,nodeIp,ua:clampStr(req.headers['user-agent'],200),positions:[],chats:0,
+          joinedAt,ip,nodeIp,ua:clampStr(req.headers['user-agent'],200),positions:[],chats:0,
+          activity: initAct, activityDetail: initDetail, activitySince: joinedAt, activityTotals: {},
+          activityExplicit: VALID_ACTIVITIES.has(msg.act), lastMoveAt: joinedAt, lastActAt: 0,
           id,
           ws,
           uid,
@@ -787,8 +838,19 @@ wss.on('connection', (ws, req) => {
 
       if (msg.t === 'emote') {
         if (!acceptEmote(me,msg,now())) return
+        obs.activity(me,{kind:'emote',activity:me.activity,detail:`表情 #${me.em}`})
         const packet=JSON.stringify({t:'emote',from:me.id,id:me.em,s:me.es})
         for(const peerId of me.visible){const peer=players.get(peerId);if(peer&&inEmoteRange(peer,me))sendSlowAware(peer.ws,packet,'emote')}
+        return
+      }
+
+      if (msg.t === 'act') {
+        const at = now()
+        if (!VALID_ACTIVITIES.has(msg.act)) return
+        if (at - (me.lastActAt || 0) < 200) return
+        me.lastActAt = at
+        me.activityExplicit = true
+        setActivity(me, msg.act, msg.detail, at)
         return
       }
 
@@ -825,6 +887,11 @@ wss.on('connection', (ws, req) => {
         me.sd = clampInt(msg.sd, 0, 999)
         me.ss = clampInt(msg.ss, 1, 2, 1)
         me.br = clampInt(msg.br, 0, 5)
+        if (me.v > 0.12) me.lastMoveAt = at
+        if (!me.activityExplicit) {
+          const inferred = me.bike || me.hb ? 'ebike' : me.sc > 0 ? 'smoke' : me.v > 0.12 ? 'walk' : (at - (me.lastMoveAt || me.joinedAt) > 15000 ? 'idle' : me.activity)
+          setActivity(me, inferred, '', at)
+        }
         aoiMove(me)
         aoiSend(me, {
           t: 'pos', id: me.id,
@@ -867,6 +934,7 @@ wss.on('connection', (ws, req) => {
         const avatar = sanitizeAvatar(msg.avatar)
         if (!avatar) return
         me.avatar = avatar
+        obs.activity(me,{kind:'avatar',activity:me.activity,detail:avatar.look})
         for (const peerId of me.visible) { const peer = players.get(peerId); if (peer) sendSlowAware(peer.ws, JSON.stringify({t:'avatar',id:me.id,avatar}), 'avatar') }
         return
       }

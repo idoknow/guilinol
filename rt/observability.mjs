@@ -2,10 +2,10 @@ import {monitorEventLoopDelay} from 'node:perf_hooks'
 
 const startedAt=Date.now(), delay=monitorEventLoopDelay({resolution:20})
 delay.enable()
-const slots=[], events=[], chat=[]
-const known=new Set('join pos avatar who chat emote hit revive welcome leave online banned error players roster'.split(' '))
+const slots=[], events=[], chat=[], activities=[]
+const known=new Set('join pos act avatar who chat emote hit revive welcome leave online banned error players roster'.split(' '))
 const rejects={ticket:0,full:0,uidOnline:0,banned:0,ipLimit:0}
-let peak=0,peakAt=startedAt,skips=0,slowCloses=0
+let peak=0,peakAt=startedAt,skips=0,slowCloses=0,activitySeq=0
 function append(list,item,max){list.push(item);if(list.length>max)list.shift()}
 export function packet(ws,direction,type,bytes){
   const sec=Math.floor(Date.now()/1000), index=sec%60
@@ -15,14 +15,43 @@ export function packet(ws,direction,type,bytes){
   ws[direction+'Bytes']=(ws[direction+'Bytes']??0)+bytes
   if(direction==='out'){winOut++;winOutBytes+=bytes}
 }
+export function activity(player={},entry={}){
+  const {id='',uid=null,name='',x,z}=player
+  if(uid==null)return
+  const ts=entry.ts??Date.now()
+  append(activities,{
+    seq:++activitySeq,ts,sessionId:String(id||''),uid,name:String(name||''),
+    kind:String(entry.kind||'activity'),activity:entry.activity??null,
+    detail:entry.detail?String(entry.detail).slice(0,80):'',
+    durationSec:Number.isFinite(entry.durationSec)?Math.max(0,Math.round(entry.durationSec)):null,
+    x:Number.isFinite(x)?Math.round(x*10)/10:null,
+    z:Number.isFinite(z)?Math.round(z*10)/10:null,
+  },600)
+}
+export function liveTotals(player,at=Date.now()){
+  const totals={...(player.activityTotals??{})}
+  const cur=player.activity??(player.bike||player.hb?'ebike':'walk')
+  const since=player.activitySince??player.joinedAt??at
+  const extra=Math.max(0,Math.round((at-since)/1000))
+  if(extra>0)totals[cur]=(totals[cur]??0)+extra
+  return totals
+}
 export function event(type,player={},extra={}){
   const {id,uid=null,name='',joinedAt,ip,nodeIp=null}=player,ts=Date.now()
   append(events,{ts,type,id,uid,name,joinedAt,ip,nodeIp,durationSec:joinedAt?Math.floor((ts-joinedAt)/1000):null,...extra},300)
 }
 export function reject(reason,player){rejects[reason]++;event('reject',player,{reason})}
-export function joined(player,online){event('join',player);if(online>peak){peak=online;peakAt=Date.now()}}
+export function joined(player,online){
+  event('join',player)
+  activity(player,{kind:'join',activity:player.activity??'walk',detail:player.activityDetail??''})
+  if(online>peak){peak=online;peakAt=Date.now()}
+}
 export function skipped(ws,closing){ws.skipped=(ws.skipped??0)+1;skips++;winSkips++;if(closing)slowCloses++}
-export function chatted(player,text){player.chats++;append(chat,{ts:Date.now(),uid:player.uid,name:player.name,text},100)}
+export function chatted(player,text){
+  player.chats++
+  append(chat,{ts:Date.now(),uid:player.uid,name:player.name,text},100)
+  activity(player,{kind:'chat',activity:player.activity??null,detail:String(text??'').slice(0,60)})
+}
 export function position(player,at){player.positions=player.positions.filter(ts=>ts>at-10000);player.positions.push(at)}
 export function state(players,sockets,bans,proto,maxPlayers){
   const now=Date.now(), sec=Math.floor(now/1000),traffic={in:{},out:{}}
@@ -32,10 +61,16 @@ export function state(players,sockets,bans,proto,maxPlayers){
   const {rss,heapUsed}=process.memoryUsage()
   return {server:{startedAt,uptimeSec:Math.floor((now-startedAt)/1000),proto,maxPlayers,online:players.size,connections:sockets.size,
     peak,peakAt,rssMb:rss/1048576,heapMb:heapUsed/1048576,loopP50Ms:delay.percentile(50)/1e6,loopP99Ms:delay.percentile(99)/1e6,traffic,skips,slowCloses,rejects},
-    players:[...players.values()].map(({id,uid,name,x,y,z,yaw,bike,hb,v,hp,dn,sc,em,emoteUntil,joinedAt,lastPos,positions,ws,chats,ip,nodeIp=null,ua})=>({
-      id,uid,name,x,y,z,yaw,mode:bike||hb?'bike':'walk',v,hp,dn,sc,em:now<emoteUntil?em:0,joinedAt,lastPosAt:lastPos||null,posHz:positions.filter(ts=>ts>now-10000).length/10,
-      inBytes:ws.inBytes??0,outBytes:ws.outBytes??0,bufferedAmount:ws.bufferedAmount,skips:ws.skipped??0,rttMs:ws.rtt??null,avgRttMs:ws.meanRtt??null,chats,ip,nodeIp,ua})),
-    bans:[...bans].map(([uid,ban])=>({uid,...ban})),events,chat}
+    players:[...players.values()].map(player=>{
+      const {id,uid,name,x,y,z,yaw,bike,hb,v,hp,dn,sc,em,emoteUntil,joinedAt,lastPos,positions,ws,chats,ip,nodeIp=null,ua}=player
+      const act=player.activity??(bike||hb?'ebike':'walk')
+      return {
+        id,uid,name,x,y,z,yaw,mode:bike||hb?'bike':'walk',v,hp,dn,sc,em:now<emoteUntil?em:0,joinedAt,lastPosAt:lastPos||null,posHz:positions.filter(ts=>ts>now-10000).length/10,
+        activity:act,activityDetail:player.activityDetail??'',activitySince:player.activitySince??joinedAt,activityTotals:liveTotals(player,now),
+        inBytes:ws.inBytes??0,outBytes:ws.outBytes??0,bufferedAmount:ws.bufferedAmount,skips:ws.skipped??0,rttMs:ws.rtt??null,avgRttMs:ws.meanRtt??null,chats,ip,nodeIp,ua
+      }
+    }),
+    bans:[...bans].map(([uid,ban])=>({uid,...ban})),events,chat,activities}
 }
 
 // rt-stats 窗口：自上次调用以来的事件循环延迟、发送量、慢客户端跳过数；调用后清零重新统计

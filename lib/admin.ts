@@ -72,14 +72,19 @@ export async function adminList(db: D1Database, path: string, params: URLSearchP
     const cursor=params.get('cursor')
     if(cursor!==null){
       if(!/^\d+$/.test(cursor)||!Number.isSafeInteger(Number(cursor)))invalid()
-      filters.push('id<?');args.push(Number(cursor))
+      filters.push('aa.id<?');args.push(Number(cursor))
     }
     for(const key of ['target_type','target_id']){
       const value=params.get(key)
-      if(value!==null){filters.push(key+'=?');args.push(value)}
+      if(value!==null){filters.push('aa.'+key+'=?');args.push(value)}
     }
     const where=filters.length?' WHERE '+filters.join(' AND '):''
-    const {results}=await db.prepare('SELECT * FROM admin_audit'+where+' ORDER BY id DESC LIMIT 51').bind(...args).all()
+    const {results}=await db.prepare(`SELECT aa.*,
+      a.nickname AS actor_nickname,a.email AS actor_email,a.email_placeholder AS actor_placeholder,
+      t.nickname AS target_nickname,t.email AS target_email,t.email_placeholder AS target_placeholder
+      FROM admin_audit aa
+      LEFT JOIN users a ON a.id=aa.actor_id
+      LEFT JOIN users t ON aa.target_type='user' AND t.id=aa.target_id${where} ORDER BY aa.id DESC LIMIT 51`).bind(...args).all()
     return json({items:results.slice(0,50).map(row=>({...row,detail:typeof row.detail==='string'?JSON.parse(row.detail):row.detail})),
       next_cursor:results.length>50?String(results[49].id):null})
   }
@@ -96,7 +101,8 @@ export async function adminList(db: D1Database, path: string, params: URLSearchP
   if (path === 'admin/stats') {
     const [users, statuses, pending] = await db.batch<Record<string, string | number>>([
       db.prepare(
-        'SELECT count(*) AS total,count(*) FILTER(WHERE verified=1) AS verified,count(*) FILTER(WHERE created_at>=unixepoch()-86400) AS new_24h FROM users',
+        `SELECT count(*) AS total,count(*) FILTER(WHERE verified=1) AS verified,count(*) FILTER(WHERE created_at>=unixepoch()-86400) AS new_24h,
+        count(*) FILTER(WHERE role='admin') AS admins,count(*) FILTER(WHERE banned_at<>0) AS banned FROM users`,
       ),
       db.prepare('SELECT status,count(*) AS count FROM feedback GROUP BY status'),
       db.prepare(`SELECT count(*) n FROM feedback f WHERE ${pendingFilter}`),
