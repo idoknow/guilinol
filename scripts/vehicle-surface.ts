@@ -148,6 +148,16 @@ export function vehicleSurface(world,m,graph?){
       const floor=floorLevel(t,x,z)
       if(floor!==undefined)return floor
     }
+    // A tyre can enter an adjoining bore before the axle centre crosses a
+    // skewed mouth. Its actual contact lies on the rendered floor triangle.
+    if(!lane.structure&&local.length&&lane.start&&lane.end){
+      for(const t of local){
+        if(!t.portals.some(([px,,pz],i)=>t.mouths?.[i]&&Math.hypot(x-px,z-pz)<4&&
+          [lane.start,lane.end].some(node=>Math.hypot(node.x-px,node.z-pz)<.05)))continue
+        const floor=floorLevel(t,x,z)
+        if(floor!==undefined)return floor
+      }
+    }
     if(lane.structure==='tunnel'&&lane.start&&lane.end){
       const along=(x-lane.start.x)*lane.dx+(z-lane.start.z)*lane.dz
       const end=along<0?lane.start:along>lane.length?lane.end:null
