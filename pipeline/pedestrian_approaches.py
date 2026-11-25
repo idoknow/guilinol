@@ -67,19 +67,61 @@ def profiles(output, manifest, elements, widths, existing):
                 line,_,a,b,*_=min(hits,key=lambda row:row[0].distance(p))
                 level=a+(b-a)*line.project(p,normalized=True)
             ends.append(level)
-        a,b=ends
-        if abs(b-a)>.08*axis.length:continue
-        blend=max(0,min(.12,1-abs(b-a)/(.08*axis.length)))
-        knots=sorted({0.,axis.length,*np.arange(2,axis.length,2),
-                      *(axis.project(Point(xy)) for xy in axis.coords)})
-        previous=None
-        for s in knots:
-            t=s/axis.length
-            if blend:
-                t=(t*t/(2*blend) if t<blend else 1-blend-(1-t)**2/(2*blend)
-                   if t>1-blend else t-blend/2)/(1-blend)
-            point=axis.interpolate(s).coords[0];height=a+(b-a)*t
-            if previous and math.dist(previous[0],point)>.01:
-                grades.append((LineString([previous[0],point]),half,previous[1],height,.08,kind))
-            previous=point,height
+        grades.extend(graded_arm(axis, half, kind, *ends))
     return grades
+
+
+def graded_arm(axis, half, kind, a, b):
+    if abs(b-a)>.08*axis.length:return []
+    blend=max(0,min(.12,1-abs(b-a)/(.08*axis.length)))
+    knots=sorted({0.,axis.length,*np.arange(2,axis.length,2),
+                  *(axis.project(Point(xy)) for xy in axis.coords)})
+    grades=[]
+    previous=None
+    for s in knots:
+        t=s/axis.length
+        if blend:
+            t=(t*t/(2*blend) if t<blend else 1-blend-(1-t)**2/(2*blend)
+               if t>1-blend else t-blend/2)/(1-blend)
+        point=axis.interpolate(s).coords[0];height=a+(b-a)*t
+        if previous and math.dist(previous[0],point)>.01:
+            grades.append((LineString([previous[0],point]),half,previous[1],height,.08,kind))
+        previous=point,height
+    return grades
+
+def footbridge_landing(output, manifest, elements, existing):
+    """Meet the actual deck lip at the interior junction on the service road."""
+    ways = {w['id']:w for w in elements if w['type']=='way' and w['id'] in (403448112,1471513684)}
+    if len(ways)!=2:
+        return []
+    road, bridge = ways[1471513684], ways[403448112]
+    common, = set(road['nodes']).intersection(bridge['nodes'])
+    axis = LineString(points(road))
+    lip = Point(points(road)[road['nodes'].index(common)])
+    x,z,w,h=manifest['extent']
+    if not box(x,z,x+w,z+h).covers(lip):
+        return []
+    station = axis.project(lip)
+    # Keep the western branch junction at its old height. To the east the
+    # road needs the full 50 m to descend within 8%; its side arm is graded
+    # from this profile by profiles() above.
+    west = axis.project(Point(points(road)[road['nodes'].index(13503178786)]))
+    arms = [substring(axis,west,station),substring(axis,station,min(axis.length,station+50))]
+    outer = [Point(arms[0].coords[0]),Point(arms[1].coords[-1])]
+    probe = [dict(x=p.x,z=p.y,way=road['id']) for p in outer]
+    levels = sample_road_heights(output,manifest,[*probe,dict(x=lip.x,z=lip.y,roofProbe=True)])
+    deck = levels[-1][1]
+    if deck is None:
+        raise ValueError('Missing deck at the mapped footbridge landing')
+    for i,point in enumerate(outer):
+        hits = [row for row in existing if row[0].distance(point)<.03]
+        if hits:
+            line,_,a,b,*_ = min(hits,key=lambda row:row[0].distance(point))
+            levels[i]=a+(b-a)*line.project(point,normalized=True)
+    result = []
+    for arm,begin,end in zip(arms,(levels[0],deck),(deck,levels[1]),strict=True):
+        rows=graded_arm(arm,3.5,0,begin,end)
+        if not rows:
+            raise ValueError('Footbridge landing exceeds the service-road grade limit')
+        result.extend(rows)
+    return result
