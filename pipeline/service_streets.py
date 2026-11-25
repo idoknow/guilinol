@@ -68,7 +68,7 @@ def clean_texture(data, footprint, color):
     return encoded.getvalue()
 
 
-def patch_tile(file, footprint, color, *, sidewalk=False):
+def patch_tile(file, footprint, color, tile=None, *, sidewalk=False):
     raw = gzip.decompress(file.read_bytes())
     vertices, indices, size, png_size = struct.unpack_from('<4I', raw, 4)
     start = 24+16900+9*vertices+4*indices
@@ -76,13 +76,15 @@ def patch_tile(file, footprint, color, *, sidewalk=False):
     paths = streets[0]
     lower = streets[11] if len(streets)>11 else None
     boundary = lower[0] if lower else len(paths)
-    rebuilt, occupied = [], []
+    rebuilt, occupied, offsets = [], [], []
     for kind, *loops in paths[:boundary]:
+        offsets.append(len(rebuilt))
         shape = make_valid(Polygon(np.asarray(loops[0])/100, [np.asarray(loop)/100 for loop in loops[1:]]))
         if not sidewalk and kind in (1, 4, 5, 6) and shape.intersects(footprint):
             rebuilt.extend(rings(kind, shape.difference(footprint)))
         else:
             rebuilt.append([kind, *loops]); occupied.append(shape)
+    offsets.append(len(rebuilt))
     fresh = set_precision(footprint.difference(union_all(occupied)), .01)
     if fresh.area < .01:
         return False
@@ -95,6 +97,9 @@ def patch_tile(file, footprint, color, *, sidewalk=False):
                 rebuilt.extend(rings(0, fresh.intersection(box(east,south,east+16,south+16))))
     if lower:
         lower[0] = len(rebuilt)
+    from major_roadbeds import remap_paths
+    suffix=list(range(len(rebuilt),len(rebuilt)+len(paths)-boundary))
+    remap_paths(tile,offsets[:-1]+suffix,offsets[1:]+[i+1 for i in suffix])
     streets[0] = rebuilt + paths[boundary:]
     encoded = json.dumps(collision,separators=(',', ':')).encode()
     image_start = start+size
@@ -165,7 +170,7 @@ def bake_footprints(output, manifest, palette, tree, *, sidewalk=False):
                 continue
         shape = translate(clipped, -east,-south)
         file = output/tile['file']
-        if patch_tile(file, shape, ImageColor.getrgb(palette['road']), sidewalk=sidewalk):
+        if patch_tile(file, shape, ImageColor.getrgb(palette['road']), tile, sidewalk=sidewalk):
             changed += 1; tile['bytes'] = file.stat().st_size
     label = 'Shanhu walks' if sidewalk else 'Minor streets'
     print(f'{label}: {len(tree.geometries)} ways, {changed} changed chunks')
@@ -179,3 +184,36 @@ if __name__ == '__main__':
     compile_streets = bake_shanhu_walks if args.shanhu_walks_only else bake
     compile_streets(output, manifest, json.loads(Path(__file__).with_name('palette.json').read_text()))
     file.write_text(json.dumps(manifest,separators=(',',':'))+'\n')
+
+
+def mark_drivable_services(output, elements, lanes):
+    """Extend the player mask to the service carriageways that carry traffic."""
+    import base64
+    from shapely import intersects_xy
+    from common import ll2xz
+    file = output/'vehicles.bin'
+    data = json.loads(gzip.decompress(file.read_bytes()))
+    left,top,cols,rows,step = data['motorGrid']
+    packed = base64.b64decode(data['motorMask'])
+    compressed = data.get('maskEncoding')=='gzip'
+    mask = np.frombuffer(gzip.decompress(packed) if compressed else packed, dtype='u1').copy()
+    eligible = {(lane['way'],min(lane['from'],lane['to']),max(lane['from'],lane['to']))
+                for lane in lanes if lane['cls']=='service' and not lane.get('structure')}
+    for way in elements:
+        if way.get('tags',{}).get('highway')!='service':
+            continue
+        half_width = width(way['tags'])/2
+        for i,(a,b) in enumerate(zip(way['nodes'],way['nodes'][1:])):
+            if (way['id'],min(a,b),max(a,b)) not in eligible:
+                continue
+            ends=[ll2xz(p['lat'],p['lon']) for p in way['geometry'][i:i+2]]
+            strip=LineString(ends).buffer(half_width,quad_segs=3)
+            x0,z0,x1,z1=strip.bounds
+            c=np.arange(max(0,math.ceil((x0-left)/step)),min(cols,math.floor((x1-left)/step)+1))
+            r=np.arange(max(0,math.ceil((z0-top)/step)),min(rows,math.floor((z1-top)/step)+1))
+            j,k=np.nonzero(intersects_xy(strip,left+c[None,:]*step,top+r[:,None]*step))
+            index=r[j]*cols+c[k]
+            np.bitwise_or.at(mask,index>>3,(128>>(index&7)).astype('u1'))
+    raw=mask.tobytes()
+    data['motorMask']=base64.b64encode(gzip.compress(raw,mtime=0) if compressed else raw).decode()
+    file.write_bytes(gzip.compress(json.dumps(data,ensure_ascii=False,separators=(',',':')).encode(),mtime=0))

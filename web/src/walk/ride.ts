@@ -199,8 +199,9 @@ export interface DismountContext {
   stream: Stream
   tileAt: (x:number, z:number)=>Tile|undefined
   surface: (x:number, z:number, kind:Kind, origin?:number, reach?:number)=>SurfaceHit
+  tunnelSupport?: (x:number,z:number,refY:number)=>SurfaceHit
   wet: (x:number, z:number)=>boolean
-  insideHouse: (x:number, z:number)=>boolean
+  insideHouse: (x:number, z:number, y?:number)=>boolean
 }
 
 export interface BikeMoveContext {
@@ -211,7 +212,7 @@ export interface BikeMoveContext {
   speed: number
   step: number
   pavement: (x:number, z:number)=>boolean
-  insideHouse: (x:number, z:number)=>boolean
+  insideHouse: (x:number, z:number, y?:number)=>boolean
   blockedAt: (x:number, y:number, z:number)=>boolean
   collisionKind: (dirX:number, dirZ:number)=>'building'|'collision'|''
   collisionBlocked?: boolean
@@ -333,12 +334,14 @@ function isWallBlocker(kind: Kind | undefined) {
 }
 
 function localSupport(ctx: DismountContext, x: number, z: number, refY: number) {
+  const bore=ctx.tunnelSupport?.(x,z,refY)
+  if(bore)return bore
   const deck = ctx.surface(x, z, 'deck', refY + .35, 1.4)
   const validDeck = deck && deck.y <= refY + .35 ? deck : null
   const lm = ctx.surface(x, z, 'landmark', refY + .35, 1.4)
   const validLm = lm && lm.slope <= wcfg.slope && lm.y <= refY + .35 ? lm : null
   const bridgeDeck = validDeck && validLm ? (validLm.y > validDeck.y ? validLm : validDeck) : (validDeck ?? validLm)
-  const support = bridgeDeck ?? ctx.surface(x, z, 'sidewalk') ?? ctx.surface(x, z, 'road') ?? ctx.surface(x, z, 'ground')
+  const support = bridgeDeck ?? ctx.surface(x, z, 'sidewalk', refY+.55, 1.8) ?? ctx.surface(x, z, 'road', refY+.55, 1.8) ?? ctx.surface(x, z, 'ground', refY+.55, 1.8)
   if (!support || support.slope > wcfg.slope || (!bridgeDeck && ctx.wet(x, z))) return null
   const peak = ctx.surface(x, z, 'peak')
   if (peak && peak.y > support.y + .05) return null
@@ -373,7 +376,7 @@ export function probeLocalDismount(ctx: DismountContext, cx: number, cz: number,
     const dx = side * rx + fwd * fx, dz = side * rz + fwd * fz
     const x = cx + dx, z = cz + dz
     const tile = ctx.tileAt(x, z)
-    if (!tile || !ctx.stream.loaded.has(tile) || ctx.insideHouse(x, z)) continue
+    if (!tile || !ctx.stream.loaded.has(tile) || ctx.insideHouse(x, z, bikeY+.8)) continue
     const support = localSupport(ctx, x, z, bikeY)
     if (!support || Math.abs(support.y - bikeY) > .85) continue
     if (segmentBlocked(ctx, cx, cz, x, z, Math.max(bikeY, support.y))) continue
@@ -391,8 +394,8 @@ export function probeLocalMount(ctx: DismountContext, px: number, py: number, pz
 
   const tryPlace = (x: number, z: number, shifted: boolean): MountCheckResult | null => {
     const tile = ctx.tileAt(x, z)
-    if (!tile || !ctx.stream.loaded.has(tile) || ctx.insideHouse(x, z)) return null
-    const support = localSupport(ctx, x, z, by)
+    if (!tile || !ctx.stream.loaded.has(tile) || ctx.insideHouse(x, z, by+.8)) return null
+    const support = localSupport(ctx, x, z, Math.max(py, by))
     if (!support || Math.abs(support.y - by) > .85) return null
     if (shifted && (
       segmentBlocked(ctx, px, pz, x, z, Math.max(py, support.y))
@@ -1645,10 +1648,10 @@ export function createBikeControl() {
 
       return speed
     },
-    setPitch(frontY: number | undefined, backY: number | undefined, dt: number) {
+    setPitch(frontY: number | undefined, backY: number | undefined, dt: number, wheelbase: number) {
       const s = spec()
       const target = frontY !== undefined && backY !== undefined && Math.abs(frontY - backY) < .45
-        ? T.MathUtils.clamp(Math.atan2(frontY - backY, 1.1), -s.pitchMax, s.pitchMax)
+        ? T.MathUtils.clamp(Math.atan2(frontY - backY, wheelbase), -s.pitchMax, s.pitchMax)
         : 0
       pitch = T.MathUtils.damp(pitch, target, s.pitchDamp, Math.min(.12, Math.max(0, dt)))
     },

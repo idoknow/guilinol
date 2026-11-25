@@ -17,6 +17,7 @@ import {mpEnabled} from '../ui/mp-pref'
 import * as THREE from 'three'
 import {passengerTop} from './passenger-height'
 import {tunnelFloor} from '../tunnels'
+import {playerSupport} from './support'
 import {getCarFreeAt} from '../game/car-free'
 import {CAR_SCALE} from '../drive/scale'
 import R from '@dimforge/rapier3d-compat'
@@ -30,7 +31,6 @@ import {currentAvatar,characterModel,disposeCharacterParts,styleCharacter} from 
 import {avatar} from '../look/avatar'
 import {bikeConfig, carConfig, walkConfig as cfg, type CarDriveMode, type EbikeHeadlightMode, type EbikeTurnSignal, type EbikeUpgradeMods} from './config'
 import {createPhysics} from './physics'
-import {playerSupport} from './support'
 import {
   buildTianyuanObstacleVolume,
   TIANYUAN_VOLUME_ID,
@@ -1304,7 +1304,45 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
   const still={right:0,forward:0,run:false,crouch:false,jump:false}
   function setSnap(on:boolean){if(snapEnabled===on)return;snapEnabled=on;if(on)sim.controller.enableSnapToGround(cfg.snap);else sim.controller.disableSnapToGround()}
   function resetMotion(){vx=vz=velocity=coyoteTimer=jumpTimer=bankLean=strideLean=prevSpeed=jumpStageTimer=0;grounded=false;wasGroundedFoot=true;crouching=false;wasLandmarkHit=false;jumpStage='none';setSnap(true);figure.rotation.x=figure.rotation.z=0;if(traveller)traveller.rotation.set(0,0,0)}
-  const {supportAt,carSupportAt}=playerSupport(sim)
+  function supportAt(x:number,z:number,refY:number){
+    const bore=tunnelFloor(manifest.tunnels,x,z,refY)
+    if(bore!==undefined){
+      const floor=sim.surface(x,z,'road',bore+.15,.3)
+      if(floor)return floor
+    }
+    const deck=sim.surface(x,z,'deck',refY+.35,1.4)
+    const validDeck=deck&&deck.y<=refY+.35?deck:null
+    return validDeck??sim.surface(x,z,'sidewalk')??sim.surface(x,z,'road')??sim.surface(x,z,'ground')
+  }
+  const nativeSupport=playerSupport(sim)
+  function onNativeLanding(x:number,z:number,y:number){
+    return manifest.nativeCarLandings?.some(([ax,az,ay,bx,bz,by,width])=>{
+      const dx=bx-ax,dz=bz-az
+      const t=Math.max(0,Math.min(1,((x-ax)*dx+(z-az)*dz)/(dx*dx+dz*dz)))
+      return Math.abs(y-ay-t*(by-ay))<2 && Math.hypot(x-ax-t*dx,z-az-t*dz)<=width
+    })
+  }
+  function wheelSupportY(x:number,z:number,refY:number,above:number,reach:number){
+    if(grounded){
+      const floor=tunnelFloor(manifest.tunnels,x,z,refY)
+      if(floor!==undefined)return floor
+    }
+    return sim.groundSurface(x,z,refY,above,reach)?.y
+  }
+  function carSupportAt(x:number,z:number,refY:number){
+    if(onNativeLanding(x,z,refY))return nativeSupport.carSupportAt(x,z,refY)
+    const bore=tunnelFloor(manifest.tunnels,x,z,refY)
+    if(bore!==undefined){
+      const floor=sim.surface(x,z,'road',bore+.15,.3)
+      if(floor)return floor
+    }
+    const deck=sim.surface(x,z,'deck',refY+.55,1.8)
+    const validDeck=deck&&deck.y<=refY+.55?deck:null
+    const lm=sim.surface(x,z,'landmark',refY+.55,1.8)
+    const validLm=lm&&lm.y<=refY+.55&&lm.slope<=cfg.slope?lm:null
+    const bridgeHit=validDeck&&validLm?(validLm.y>validDeck.y?validLm:validDeck):(validDeck??validLm)
+    return bridgeHit??sim.groundSurface(x,z,refY,.55,1.8)
+  }
   function loadRides(){if(loading||rides||!active||!manifest.vehicles)return;loading=true
     const file=manifest.vehicles.file
     void import('./vehicles').then(module=>module.vehicles(scene,file,(x,z,bikeHeading,bikeY,kind)=>{sim.sync(x,z,bikeHeading!==undefined)
@@ -1390,14 +1428,14 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
     }
     return ready
   }
-  async function enter(x:number,z:number,heading:number,reason:string,override=false,signal?:AbortSignal,progress?:(fraction:number,detail:string)=>void){
+  async function enter(x:number,z:number,heading:number,reason:string,override=false,signal?:AbortSignal,progress?:(fraction:number,detail:string)=>void,fixtureFloor?:number){
     if(!sim.withinBounds(x,z)){
       if(!manifest.region)return false
       const point=nearestPlayable(manifest,x,z)
       x=point.x;z=point.z
     }
     if(shopOverlay?.isOpen())shopOverlay?.close('teleport')
-    const target=new THREE.Vector3(x,0,z);destination=target
+    const target=new THREE.Vector3(x,fixtureFloor??0,z);destination=target
     stream.prioritize(x,z)
     const needed=manifest.chunks.filter(tile=>Math.hypot(Math.max(0,Math.abs(x-tile.x-128)-128),Math.max(0,Math.abs(z-tile.z-128)-128))<=cfg.search)
     // Register nearby collision surfaces before placing the capsule. The palace
@@ -1416,7 +1454,7 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
       if(destination!==target)return false
       if(progress){const tiles=needed.filter(tile=>stream.loaded.has(tile)).length,landmarks=supports.filter(entry=>stream.landmarks.has(entry)).length
         const key=`${tiles}:${landmarks}`;if(key!==reported){reported=key;progress(.3+.6*tiles/Math.max(1,needed.length)+.1*landmarks/Math.max(1,supports.length),`街区 ${tiles} / ${needed.length}`)}}
-      target.y=0;stream.tick(target)
+      target.y=fixtureFloor??0;stream.tick(target)
       for(const entry of supports)if(!stream.landmarks.has(entry)){
         target.y=entry.position[1];stream.updateLandmarks?.(target,entry)
       }
@@ -1425,10 +1463,34 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
     if(destination!==target)return false
     destination=null
     if(signal?.aborted)return false
-    if(needed.some(tile=>!stream.loaded.has(tile))||supports.some(entry=>!stream.landmarks.has(entry)))return false
+    if(needed.some(tile=>!stream.loaded.has(tile))||supports.some(entry=>!stream.landmarks.has(entry))){
+      if(verify&&fixtureFloor!==undefined){
+        const missing=[...needed.filter(t=>!stream.loaded.has(t)),...supports.filter(t=>!stream.landmarks.has(t))]
+        throw Error('Lane fixture streaming timeout: '+missing.map(t=>t.file).join(', '))
+      }
+      return false
+    }
     if(active)resetWalk()
     syncSceneObstacleVolumes()
-    sim.sync(x,z);if(!place(x,z,reason,override)){disconnect();window.dispatchEvent(new CustomEvent('walk:spawn-failed',{detail:{x,z,reason:'no-walkable-support'}}));return false}
+    sim.sync(x,z)
+    let fixtureSpawn
+    if(verify&&fixtureFloor!==undefined){
+      // Approach a parked vehicle from an adjacent point on the same lane.
+      for(const along of [0,-.8,.8,-1.6,1.6]){
+        const east=x-along*Math.sin(heading),south=z-along*Math.cos(heading)
+        const support=sim.groundSurface(east,south,fixtureFloor,.45,.9)
+        if(!support)continue
+        const y=support.y+cfg.height/2+.055
+        if(!sim.freeCapsule(east,y,south))continue
+        fixtureSpawn={x:east,y,z:south,rule:'lane-fixture'}
+        break
+      }
+      if(!fixtureSpawn){
+        const road=sim.surface(x,z,'road',fixtureFloor+1,2),ground=sim.surface(x,z,'ground',fixtureFloor+1,2)
+        throw Error('No clear lane spawn '+JSON.stringify({x,z,fixtureFloor,road,ground,bore:tunnelFloor(manifest.tunnels,x,z,fixtureFloor)}))
+      }
+    }
+    if(!place(x,z,reason,override,fixtureSpawn)){disconnect();window.dispatchEvent(new CustomEvent('walk:spawn-failed',{detail:{x,z,reason:'no-walkable-support'}}));return false}
     active=true;rides?.show(true);requestAnimationFrame(()=>requestAnimationFrame(loadRides));figure.visible=true;firstPersonHidden=false
     yaw=heading;facing=yaw+avatar.yaw;figure.rotation.y=facing;input.show(true);accumulator=0;rig.reset(arm)
     restoreFootLocomotion(avatar.clips.idle)
@@ -1638,21 +1700,42 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
       mountedStaticCar.visible=false
       carRig.root.visible=true
       const fx=-Math.sin(rides.heading),fz=-Math.cos(rides.heading),baseY=footY
-      const cSup=carSupportAt(pos.x,pos.z,baseY)
-      const groundY=cSup&&baseY-cSup.y<=.16&&baseY>=cSup.y-.08?cSup.y:baseY-.03
-      figure.position.y=groundY
-      if(dt>0){
-        const halfWb=carConfig.wheelbase*.5
-        const fSup=carSupportAt(pos.x+fx*halfWb,pos.z+fz*halfWb,groundY)
-        const bSup=carSupportAt(pos.x-fx*halfWb,pos.z-fz*halfWb,groundY)
-        rides.setCarPitch(fSup?.y,bSup?.y,dt)
+      let groundRoll=0,groundPitch=rides.pitch
+      if(onNativeLanding(pos.x,pos.z,baseY)){
+        const support=nativeSupport.carSupportAt
+        const hit=support(pos.x,pos.z,baseY)
+        figure.position.y=hit&&baseY-hit.y<=.16&&baseY>=hit.y-.08?hit.y:baseY-.03
+        if(dt>0){
+          const half=carConfig.wheelbase*.5
+          rides.setCarPitch(support(pos.x+fx*half,pos.z+fz*half,figure.position.y)?.y,
+            support(pos.x-fx*half,pos.z-fz*half,figure.position.y)?.y,dt)
+          groundPitch=rides.pitch
+        }
+      }else{
+        const center=wheelSupportY(pos.x,pos.z,baseY,.35,.75)
+        figure.position.y=center??baseY-.03
+        if(center!==undefined){
+          const rx=-fz,rz=fx
+          const contact=(forward:number,right:number)=>wheelSupportY(
+            pos.x+fx*forward+rx*right,pos.z+fz*forward+rz*right,center,.85,1.7)
+          const frontAxle=1.34*CAR_SCALE,rearAxle=-1.31*CAR_SCALE,halfTrack=.795*CAR_SCALE
+          const fl=contact(frontAxle,-halfTrack),fr=contact(frontAxle,halfTrack)
+          const bl=contact(rearAxle,-halfTrack),br=contact(rearAxle,halfTrack)
+          if(fl!==undefined&&fr!==undefined&&bl!==undefined&&br!==undefined){
+            const front=(fl+fr)/2,back=(bl+br)/2,slope=(front-back)/(frontAxle-rearAxle)
+            groundPitch=Math.atan(slope)
+            groundRoll=Math.atan((fr+br-fl-bl)/(4*halfTrack*Math.hypot(1,slope)))
+            figure.position.y=back-rearAxle*slope
+            if(dt>0)rides.setCarPitch(front,back,dt)
+          }else if(dt>0)rides.setCarPitch(undefined,undefined,dt)
+        }
       }
       rides.park(figure.position)
       const carTel=rides.carTelemetry
       carRig.update({
         pos:figure.position,
         heading:rides.heading,
-        groundPitch:rides.pitch,
+        groundPitch,groundRoll,
         speed:rides.speed,
         steerInput:rides.steerInput,
         braking:carTel?.braking??lastCarBraking,
@@ -1673,13 +1756,19 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
     }else if(rides?.bike){
       releaseDynamicCar()
       const fx=-Math.sin(rides.heading),fz=-Math.cos(rides.heading),baseY=footY
-      const cSup=supportAt(pos.x,pos.z,baseY)
-      const groundY=cSup&&baseY-cSup.y<=.12&&baseY>=cSup.y-.05?cSup.y:baseY-.03
-      figure.position.y=groundY
-      if(dt>0){
-        const fSup=supportAt(pos.x+fx*.55,pos.z+fz*.55,groundY)
-        const bSup=supportAt(pos.x-fx*.55,pos.z-fz*.55,groundY)
-        rides.setPitch(fSup?.y,bSup?.y,dt)
+      const center=wheelSupportY(pos.x,pos.z,baseY,.25,.55)
+      figure.position.y=center??baseY-.03
+      let wheelPitch=rides.pitch
+      if(center!==undefined){
+        const front=rides.rideKind==='bike'?.66:.54,rear=rides.rideKind==='bike'?.62:.54
+        const f=wheelSupportY(pos.x+fx*front,pos.z+fz*front,center,.5,1)
+        const b=wheelSupportY(pos.x-fx*rear,pos.z-fz*rear,center,.5,1)
+        if(f!==undefined&&b!==undefined){
+          const slope=(f-b)/(front+rear)
+          wheelPitch=Math.atan(slope)
+          figure.position.y=b+rear*slope
+        }
+        if(dt>0)rides.setPitch(f,b,dt,front+rear)
       }
       rides.park(figure.position)
       if(mountedStaticBike!==rides.bike){
@@ -1748,7 +1837,7 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
           rig:ebikeRig,
           basePos:figure.position,
           heading:rides.heading,
-          groundPitch:rides.pitch,
+          groundPitch:wheelPitch,
           snapMountBlend:mountBlend,
           mountStartPos:ebikeMountStartPos,
           mountStartYaw:ebikeMountStartYaw,
@@ -1775,7 +1864,7 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
         bicycleRig.update({
           pos:figure.position,
           heading:rides.heading,
-          groundPitch:rides.pitch,
+          groundPitch:wheelPitch,
           lean:totalLean,
           wheelie:totalWheelie,
           steerInput:rides.steerInput,
@@ -2100,7 +2189,7 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
     if(rides?.bike&&!wasBike){
       const bx=rides.bike.position.x,bz=rides.bike.position.z,cur=sim.body.translation()
       sim.sync(bx,bz,true)
-      const sup=supportAt(bx,bz,rides.bike.position.y)
+      const sup=sim.groundSurface(bx,bz,rides.bike.position.y,.55,1.8)??supportAt(bx,bz,rides.bike.position.y)
       const by=sup?sup.y:rides.bike.position.y
       ridePose.startMount({x:cur.x,y:cur.y-cfg.height/2,z:cur.z},figure.rotation.y)
       ebikeMountStartPos.set(cur.x,cur.y-cfg.height/2,cur.z)
@@ -2310,6 +2399,15 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
       if(spatialSubs===1){
         sim.controller.computeColliderMovement(sim.capsule,{x:stepDx,y:velocity*step,z:stepDz},undefined,undefined,filterRoad)
         move=sim.controller.computedMovement()
+        // At city-scale coordinates a downward-biased capsule sweep can stop
+        // on a coplanar triangle with no obstacle ahead. Retry the horizontal
+        // part against the same colliders when the only contact is the floor.
+        if(!aboardGround&&grounded&&horzDist>.012&&Math.hypot(move.x,move.z)<.1*horzDist&&
+           sim.controller.numComputedCollisions()===1&&sim.controller.computedCollision(0)!.normal1.y>.995){
+          sim.controller.computeColliderMovement(sim.capsule,{x:stepDx,y:0,z:stepDz},undefined,undefined,filterRoad)
+          const horizontal=sim.controller.computedMovement()
+          move=horizontal
+        }
         next={x:pos.x+move.x,y:pos.y+move.y,z:pos.z+move.z}
         if(rides?.bike&&Math.abs(bikeSpeed)>1e-4){
           const bikeSign=bikeSpeed>=0?1:-1,dirX=wish.x*bikeSign,dirZ=wish.y*bikeSign
@@ -2398,10 +2496,13 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
       const nextTile=sim.tileAt(next.x,next.z)
       if(nextTile&&!stream.loaded.has(nextTile)){next.x=pos.x;next.z=pos.z;vx=vz=0;rides?.stop();bikeSpeed=0}
       const inBore=tunnelFloor(manifest.tunnels,next.x,next.z,next.y-cfg.height/2)!==undefined
-      // The shared bridge landing clips its duplicate road collider. The
-      // deck under the player's feet also supports travel across this seam.
-      const ground=(inBore?sim.surface(next.x,next.z,'road',next.y+1,5):sim.surface(next.x,next.z,'ground'))
-        ?? sim.surface(next.x,next.z,'deck',next.y-cfg.height/2+.45,1.25)
+      // A pedestrian can stand on the paved approach over an excavated
+      // ground triangle before the centre of the capsule enters the bore.
+      const useLocalSupport=(aboardGround||!!(nextTile&&stream.loaded.get(nextTile)?.tunnel))&&
+        !(rides?.car&&onNativeLanding(next.x,next.z,next.y-cfg.height/2))
+      const localRoad=useLocalSupport?sim.groundSurface(next.x,next.z,next.y-cfg.height/2,.25,.9):null
+      const ground=localRoad??(inBore?sim.surface(next.x,next.z,'road',next.y+1,5):sim.surface(next.x,next.z,'ground'))
+        ??sim.surface(next.x,next.z,'deck',next.y-cfg.height/2+.45,1.25)
       if(!ground||next.y-cfg.height/2<ground.y-3){if(place(safe.x,safe.z,'rescue'))resets++;break}
       if(sim.wet(next.x,next.z)){
         const foot=next.y-cfg.height/2,deck=sim.surface(next.x,next.z,'deck')
@@ -2418,7 +2519,7 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
       if(rides?.car){
         const res=rides.resolveCarMove({
           pos,next,move,heading:rides.heading,speed:bikeSpeed,step,
-          motorPavement:(x,z)=>tunnelFloor(manifest.tunnels,x,z,foot)!==undefined||rides!.motorPavement(x,z),insideHouse:sim.insideHouse,
+          motorPavement:(x,z)=>tunnelFloor(manifest.tunnels,x,z,foot)!==undefined||rides!.motorPavement(x,z),insideHouse:(x,z)=>sim.insideHouse(x,z,foot+.8),
           carBlockedAt:(x,footY,z,hdg,sgn)=>sim.carOverlap(x,footY,z,hdg,sgn),
           collisionKind:(dirX,dirZ)=>{
             let hit:''|'collision'|'building'=''
@@ -2450,7 +2551,7 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
       else if(rides?.bike){
         const res=rides.resolveMove({
           pos,next,move,heading:rides.heading,speed:bikeSpeed,step,
-          pavement:rides.pavement,insideHouse:sim.insideHouse,
+          pavement:rides.pavement,insideHouse:(x,z)=>sim.insideHouse(x,z,foot+.8),
           blockedAt:(x,y,z)=>sim.isBlockedAt(x,y,z),
           wetSurface:sim.wet(next.x,next.z),
           collisionBlocked:substepBlocked,
@@ -2850,7 +2951,8 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
   function findUnstuck(from?:{x:number,z:number}){if(!active)return null;const p=from??rides?.boat?.position??sim.body.translation();sim.sync(p.x,p.z);const spot=sim.findFlatGround(p.x,p.z)
     if(verify)spawns.push({reason:'unstuck-probe',from:[p.x,p.z],to:spot?[spot.x,spot.z]:null,distance:spot?Math.hypot(spot.x-p.x,spot.z-p.z):null,rule:spot?.rule??'none'})
     return spot&&{x:spot.x,z:spot.z,distance:Math.hypot(spot.x-p.x,spot.z-p.z),rule:spot.rule}}
-  return {supportAt,carSupportAt,emote,get net(){return net},photoSupport,enter,leave,tick,findUnstuck,get destination(){return destination},spawns,probe,boatClearance,parked(kind?:import('./ride').RideKind|'car'){return rides?.parked(kind)??[]},get freeMoorings(){return rides?.freeMoorings()??[]},get boatKind(){return rides?.freeKind??null},get obstacle(){return bikeObstacle},get vehicle(){return rides?.car?'car':rides?.bike?(rides.rideKind==='bicycle'?'bicycle':'bike'):rides?.boat?'boat':'foot'},get heading(){return rides?.heading??0},get speed(){return rides?.speed??0},get active(){return active},drive(x:number,z:number,run=true){external={x,z,run}},
+  return {supportAt,carSupportAt,fixtureHeight:verify?()=>rides?.car?rides.carY:sim.body.translation().y-cfg.height/2:undefined,
+    enterLaneFixture:verify?(x:number,y:number,z:number,heading:number)=>enter(x,z,heading,'lane-fixture',true,undefined,undefined,y):undefined,emote,get net(){return net},photoSupport,enter,leave,tick,findUnstuck,get destination(){return destination},spawns,probe,boatClearance,parked(kind?:import('./ride').RideKind|'car'){return rides?.parked(kind)??[]},get freeMoorings(){return rides?.freeMoorings()??[]},get boatKind(){return rides?.freeKind??null},get obstacle(){return bikeObstacle},get vehicle(){return rides?.car?'car':rides?.bike?(rides.rideKind==='bicycle'?'bicycle':'bike'):rides?.boat?'boat':'foot'},get heading(){return rides?.heading??0},get speed(){return rides?.speed??0},get active(){return active},drive(x:number,z:number,run=true){external={x,z,run}},
     ebike:{
       get state(){return ebikeState},
       triggerCrash(reason:Exclude<EbikeCrashReason,''>='lowside',side:-1|1=1){if(rides?.bike)triggerTwoWheelCrash(reason,side)},

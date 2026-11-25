@@ -25,6 +25,25 @@ function streetWorker(){
 
 export async function loadStreetGeometry(paths:Streets,step:number,heights:THREE.BufferAttribute|THREE.InterleavedBufferAttribute,rails?:StreetRequest['rails'],signs?:StreetRequest['signs'],railCuts?:StreetRequest['railCuts'],paving?:StreetRequest['paving'],roadbeds?:number[]){
   const elevations=Float32Array.from({length:heights.count},(_,i)=>heights.getY(i))
+  // Surveyed rings are replaced by packed triangles. The compressed
+  // restore snapshot belongs to the offline baker and can be discarded here.
+  const survey=paths[12]
+  if(survey && !Array.isArray(survey)){
+    const count=survey.end-survey.start
+    paths[0].splice(survey.start,count)
+    roadbeds=roadbeds?.flatMap(flag=>{
+      const index=flag<0?-flag-1:flag
+      if(index<survey.start)return [flag]
+      if(index<survey.end)return []
+      return [flag<0?flag+count:flag-count]
+    })
+    const lower=paths[11]
+    if(lower)lower[0]-=Math.max(0,Math.min(count,lower[0]-survey.start))
+    const platform=paths[16]
+    if(platform)for(const edge of [0,1])platform[edge]-=Math.max(0,Math.min(count,platform[edge]-survey.start))
+    const {packed,vertices,sidewalk,skirt,bank}=survey
+    paths[12]={start:0,end:0,packed,vertices,sidewalk,skirt,bank}
+  }
   const target=streetWorker(), id=nextId++
   const data=await new Promise<StreetData>((resolve,reject)=>{
     target.postMessage({id,paths,step,elevations,rails,signs,railCuts,paving,roadbeds} satisfies StreetRequest,[elevations.buffer])

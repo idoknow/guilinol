@@ -5,13 +5,14 @@ import {stationRoadSurface,type StationRoadSegment} from './station-road-surface
 import {railwayGeometry,type RailSection,type RailFace,type CrossingSign} from './railways'
 import {buildRoadBarriers} from './road-barriers'
 import * as THREE from 'three'
+import {positions as unpackPositions} from './roadbed'
 import {look} from './look/config'
 type Pair=[number,number]
 export interface StationPavingStyle {plaza?:Pair[]; platformEdges?:[Pair,Pair][]}
 type Path=[number,...Pair[][]]
 type RoadCtrl=[number,number[]]
 type Lower=[number,Pair[],[number,number,number,number][]]
-export type Streets=[Path[],Pair[],number[][],Pair[]?,Pair[]?,(RoadCtrl|null)?,number[][]?,number[][]?,number[][]?,number[][]?,Pair[][]?,(Lower|null)?,([number,number,number]|null)?,unknown?,StationRoadSegment[]?,StationPavingCut[]?]
+export type Streets=[Path[],Pair[],number[][],Pair[]?,Pair[]?,(RoadCtrl|null)?,number[][]?,number[][]?,number[][]?,number[][]?,Pair[][]?,(Lower|null)?,([number,number,number]|{start:number,end:number,vertices?:[number,number,number][],packed?:string,bank?:string,sidewalk?:string,skirt?:string}|null)?,Record<string,number>?,StationRoadSegment[]?,StationPavingCut[]?,[number,number,number]?]
 const colors=look.streets.surfaces.map(v=>new THREE.Color(v)),tone=Object.fromEntries((['railing','lampPole','lampHead'] as const).map(k=>[k,new THREE.Color(look.streets[k])]))
 const stoneLight=new THREE.Color(0xa6a39a),stoneMid=new THREE.Color(0x8c8981),stoneBase=new THREE.Color(0x74726b)
 const platformBrick=new THREE.Color(style.station.platformBrick)
@@ -47,7 +48,9 @@ function lowerHeight(x:number,z:number,base:number,terrain:number,[,corners,prof
 }
 
 const ROAD_LIFT=.03
-export function streetGeometry([paths,lamps,banks,signals=[],stops=[],roadCtrl,stoneRails=[],beds=[],shops=[],decor=[],curbCuts=[],lower,platform,,stationRoads,stationCuts]:Streets,ground:(x:number,z:number)=>number,rails:RailSection[]=[],signs:CrossingSign[]=[],railGround:(x:number,z:number)=>number=ground,paving?:StationPavingStyle,roadbeds=new Set<number>()){
+export function streetGeometry([paths,lamps,banks,signals=[],stops=[],roadCtrl,stoneRails=[],beds=[],shops=[],decor=[],curbCuts=[],lower,stored,anchors,stationRoads,stationCuts,savedPlatform]:Streets,ground:(x:number,z:number)=>number,rails:RailSection[]=[],signs:CrossingSign[]=[],railGround:(x:number,z:number)=>number=ground,paving?:StationPavingStyle,roadbeds=new Set<number>()){
+  const platform=Array.isArray(stored)?stored:savedPlatform
+  const surveyed=Array.isArray(stored)?undefined:stored
   const xyz:number[]=[],rgb:number[]=[],sidewalk:number[]=[],road:number[]=[],mats:number[]=[],cols:number[]=[]
   const stationLevel=stationRoads?stationRoadSurface(stationRoads):null
   const remaining=stationCuts?stationPaving(stationCuts,stationLevel?.protectedAt):null
@@ -84,26 +87,34 @@ export function streetGeometry([paths,lamps,banks,signals=[],stops=[],roadCtrl,s
   }
   const surfaceKinds:number[]=[],alongVals:number[]=[]
   const fenceXyz:number[]=[],fenceRgb:number[]=[],fenceAlong:number[]=[]
-  function triangle(first:THREE.Vector3,second:THREE.Vector3,third:THREE.Vector3,kind:number,u1=0,u2=0,u3=0,vertical=false){
+  function triangle(first:THREE.Vector3,second:THREE.Vector3,third:THREE.Vector3,kind:number,u1=0,u2=0,u3=0,vertical=false,projected=false,precise=false){
     if(remaining && (kind===0||kind===5) && !vertical){
       for(const poly of remaining(first,second,third))
-        for(let k=1;k<poly.length-1;k++)emit(poly[0],poly[k],poly[k+1],kind,u1,u2,u3,false)
+        for(let k=1;k<poly.length-1;k++)emit(poly[0],poly[k],poly[k+1],kind,u1,u2,u3,false,projected,precise)
       return
     }
-    emit(first,second,third,kind,u1,u2,u3,vertical)
+    emit(first,second,third,kind,u1,u2,u3,vertical,projected,precise)
   }
-  function emit(first:THREE.Vector3,second:THREE.Vector3,third:THREE.Vector3,kind:number,u1:number,u2:number,u3:number,vertical:boolean){
+  function emit(first:THREE.Vector3,second:THREE.Vector3,third:THREE.Vector3,kind:number,u1:number,u2:number,u3:number,vertical:boolean,projected:boolean,precise:boolean){
     let p1=first,p2=second,p3=third,a1=u1,a2=u2,a3=u3
     if(kind!==3&&!vertical){
       const x1=Math.fround(p1.x),y1=Math.fround(p1.y),z1=Math.fround(p1.z)
       const x2=Math.fround(p2.x),y2=Math.fround(p2.y),z2=Math.fround(p2.z)
       const x3=Math.fround(p3.x),y3=Math.fround(p3.y),z3=Math.fround(p3.z)
       const ny=(z2-z1)*(x3-x1)-(x2-x1)*(z3-z1)
-      if(Math.abs(ny)<1e-4)return
+      if(Math.abs(ny)<(precise?1e-9:1e-4))return
       if(ny<0){const tmp=p2;p2=p3;p3=tmp;const tu=a2;a2=a3;a3=tu}
       void y1;void y2;void y3
     }
     const channel=kind===4||kind===6?1:kind===5?0:kind
+    // Roads and sidewalks do not use the bank-wall distance attribute.
+    // Store a constant projection axis per surveyed triangle in that slot.
+    if(projected){
+      const ux=p2.x-p1.x,uy=p2.y-p1.y,uz=p2.z-p1.z
+      const vx=p3.x-p1.x,vy=p3.y-p1.y,vz=p3.z-p1.z
+      const nx=Math.abs(uy*vz-uz*vy),ny=Math.abs(uz*vx-ux*vz),nz=Math.abs(ux*vy-uy*vx)
+      a1=a2=a3=ny>=nx&&ny>=nz?0:nx>nz?1:2
+    }
     const platformTop=kind===1 && platformPath && edges?.length && !vertical
     const stone=kind===1 && paving?.plaza && inRing((p1.x+p2.x+p3.x)/3,(p1.z+p2.z+p3.z)/3,paving.plaza)
     const textureChannel=platformTop?9:stone?10:kind===6?6:channel
@@ -115,6 +126,7 @@ export function streetGeometry([paths,lamps,banks,signals=[],stops=[],roadCtrl,s
   }
   for(const [index,[kind,...rings]] of paths.entries()){
     platformPath=!!platform && index>=platform[0] && index<platform[1]
+    if(surveyed&&index>=surveyed.start&&index<surveyed.end)continue
     lowerPath=!!lower && index>=lower[0]
     const loops=rings.map(ring=>ring.map(([x,z])=>new THREE.Vector2(x/100,z/100)))
     const tris=THREE.ShapeUtils.triangulateShape(loops[0],loops.slice(1)),points=loops.flat()
@@ -157,6 +169,18 @@ export function streetGeometry([paths,lamps,banks,signals=[],stops=[],roadCtrl,s
     }
   }
   platformPath=false
+  const legacyRoadLength=road.length,legacyWalkLength=sidewalk.length,legacySurfaceLength=xyz.length
+  if(surveyed){
+    const a=new THREE.Vector3(),b=new THREE.Vector3(),c=new THREE.Vector3()
+    const emit=(coords:Float32Array,kind:number,vertical=false,precise=false)=>{
+      for(let i=0;i<coords.length;i+=9)triangle(a.fromArray(coords,i),b.fromArray(coords,i+3),c.fromArray(coords,i+6),kind,0,0,0,vertical,true,precise)
+    }
+    emit(surveyed.packed!==undefined?unpackPositions(surveyed.packed,.001)
+      :Float32Array.from(surveyed.vertices!.flat(),v=>v*.001),0)
+    if(surveyed.bank)emit(unpackPositions(surveyed.bank,.000001),0,false,true)
+    if(surveyed.sidewalk)emit(unpackPositions(surveyed.sidewalk,.001),1)
+    if(surveyed.skirt)emit(unpackPositions(surveyed.skirt,.001),1,true)
+  }
   const object=new THREE.Object3D()
   function box(x:number,y:number,z:number,w:number,h:number,d:number,yaw=0,tint=tone.railing,pitch=0){
     object.position.set(x,y,z);object.scale.set(w,h,d);object.rotation.set(0,yaw,pitch,'YXZ');object.updateMatrix()
@@ -328,11 +352,15 @@ export function streetGeometry([paths,lamps,banks,signals=[],stops=[],roadCtrl,s
   const railBarriers=railwayGeometry(rails,signs,railGround,crossingHeight,railFace,box,levelFace)
   const roadBarriers=buildRoadBarriers(decor,baseLevel)
   const detailCount=mats.length/16
-  for(const [x,z] of lamps){const px=x/10,pz=z/10,y=baseLevel(px,pz),yaw=(x*7+z*13)%6/6*Math.PI
+  const plantedLevel=(east:number,south:number)=>{
+    const mm=anchors?.[east+','+south]
+    return mm===undefined?baseLevel(east/10,south/10):mm/1000
+  }
+  for(const [x,z] of lamps){const px=x/10,pz=z/10,y=plantedLevel(x,z),yaw=(x*7+z*13)%6/6*Math.PI
     box(px,y+.3,pz,.34,.6,.34,0,tone.lampPole);box(px,y+2.9,pz,.14,5.2,.14,0,tone.lampPole);box(px,y+5.3,pz,1.6,.08,.08,yaw,tone.lampPole)
     for(const side of [-.75,.75])box(px+Math.cos(yaw)*side,y+5.05,pz-Math.sin(yaw)*side,.32,.42,.32,yaw,tone.lampHead)}
   for(const [east,south] of signals){const x=east/10,z=south/10,y=baseLevel(x,z);box(x,y+2.5,z,.16,5,.16);box(x,y+4.7,z,.4,.9,.3)}
-  for(const [east,south] of stops){const x=east/10,z=south/10,y=baseLevel(x,z);box(x,y+1.3,z,.12,2.6,.12);box(x,y+2.15,z,.65,.85,.12)}
+  for(const [east,south] of stops){const x=east/10,z=south/10,y=plantedLevel(east,south);box(x,y+1.3,z,.12,2.6,.12);box(x,y+2.15,z,.65,.85,.12)}
   let bankAlong=0
   for(const [ax,az,bx,bz,top,bottom,endTop=top] of banks){
     const a=new THREE.Vector3(ax/10,top/10,az/10),b=new THREE.Vector3(bx/10,endTop/10,bz/10)
@@ -372,6 +400,7 @@ export function streetGeometry([paths,lamps,banks,signals=[],stops=[],roadCtrl,s
     fenceNormals=fenceGeo.getAttribute('normal').array as Float32Array
   }
   return {
+    legacyRoadLength,legacyWalkLength,legacySurfaceLength,
     positions, normals:surface.getAttribute('normal').array as Float32Array,
     colors:new Float32Array(rgb), kinds:new Uint8Array(surfaceKinds), along:new Float32Array(alongVals),
     fencePositions, fenceNormals, fenceColors:new Float32Array(fenceRgb), fenceAlong:new Float32Array(fenceAlong),

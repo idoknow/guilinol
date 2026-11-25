@@ -347,7 +347,28 @@ export function trafficModels(cars:CarMesh[]=[]){
     lorry=small(truck()),patrol=small(police())
   // 行驶车用精模（同屏只有几辆），停放车用 @far 轻量版（一屏可能上百辆）
   const taxiSign=(k:Kit)=>{k.box(.6,.15,.26,0,1.52,-.25,0xf2d36b,LAMP);k.box(.64,.04,.3,0,1.44,-.25,0x2b2f33)}
-  const bake=(name:string,fallback:number,body?:number,extra?:(k:Kit)=>void)=>{const mesh=cars.find(item=>item.name===name);return mesh?small(bakedCar(mesh,body,extra)):fallback}
+  const axles=new Map<number,[number,number,number]>()
+  const bake=(name:string,fallback:number,body?:number,extra?:(k:Kit)=>void)=>{
+    const mesh=cars.find(item=>item.name===name)
+    if(!mesh)return fallback
+    const geometry=small(bakedCar(mesh,body,extra))
+    // Measure the tyre contact patches in the packed model, whose front is +z.
+    // Some source meshes assign underbody trim to the tyre material too.
+    const tyres=mesh.groups.find(group=>group.slot===7)?.positions
+    if(tyres){
+      const patches=[new T.Box2(),new T.Box2()]
+      const contact=new T.Vector2()
+      for(let i=0;i<tyres.length;i+=3){
+        const x=Math.abs(tyres[i]),y=tyres[i+1],z=tyres[i+2]
+        if(y<=.04&&x>.4)patches[Number(z<0)].expandByPoint(contact.set(x,z))
+      }
+      if(patches.every(p=>!p.isEmpty())){
+        const [front,rear]=patches.map(p=>p.getCenter(new T.Vector2()).multiplyScalar(CAR_SCALE))
+        axles.set(geometry,[front.y,rear.y,(front.x+rear.x)/2])
+      }
+    }
+    return geometry
+  }
   const cabFallback=small(taxi())
   const saloon=bake('saloon',sedan),mini=bake('mini',hatch),coupe=bake('coupe',sedan),sport=bake('sport',sedan),
     cab=bake('saloon',cabFallback,0x2f8a7c,taxiSign)            // 出租车：同款车身，桂林出租车青绿色 + 顶灯
@@ -380,7 +401,12 @@ export function trafficModels(cars:CarMesh[]=[]){
     const pool=pools[kind],geometry=pick(pool.ids.map((id,i)=>({id,w:pool.weights[i]})),u).id
     return {geometry,paint:geometry===cab||geometry===patrol?plain:new T.Color(pick(pool.paints,v).hex)}
   }
-  return {geometries,variant,police:patrol,far}
+  for(const [geometry,spec] of [[sedan,sedanSpec],[hatch,hatchSpec],[suv,suvSpec],[van,vanSpec],[cabFallback,sedanSpec],[patrol,sedanSpec]] as const){
+    axles.set(geometry,[spec.wf*CAR_SCALE,spec.wr*CAR_SCALE,(spec.W/2-.15)*CAR_SCALE])
+  }
+  axles.set(lorry,[2.05*CAR_SCALE,-1.7*CAR_SCALE,.82*CAR_SCALE])
+  for(const id of scooters)axles.set(id,[.6,-.58,0])
+  return {geometries,variant,far,axles,police:patrol}
 }
 
 export function trafficMaterial(){

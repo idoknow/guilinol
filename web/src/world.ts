@@ -1,10 +1,13 @@
+import {bedPositions,nativeTerrainIndices,type RoadBed} from './roadbed'
 import {cacheResponse} from './telemetry'
 import * as THREE from 'three'
 import {buildingGeometry,type Building} from './buildings'
 import {loadStreetGeometry} from './street-loader'
+import {mergeGeometries} from 'three/addons/utils/BufferGeometryUtils.js'
 import type {StationPavingStyle,Streets} from './street-worker'
 import {bridgeGeometry} from './look/bridge'
 import {look} from './look/config'
+import {bindStreetSurface} from './streets'
 import {nightGround} from './look/night'
 import {countryside,setupCountryside,touchesCountryside} from './look/countryside'
 import {chunkWater, farWater} from './look/water'
@@ -17,6 +20,7 @@ interface Asset {file:string; bytes:number}
 export interface Tile extends Asset {x:number; z:number; stationPaving?:StationPavingStyle; roadbeds?:number[]}
 export interface Manifest {
   region?:import('../../lib/play-region').Region
+  nativeCarLandings?:[number,number,number,number,number,number,number][]
   tunnels?:Tunnel[]
   builtArea?:{type:'Polygon';coordinates:[number,number][][]}
   distantBuildings?:Asset
@@ -312,7 +316,9 @@ export async function detail(tile:Tile, signal:AbortSignal, parseSlot?:()=>Promi
   const positions = new Int16Array(buffer,offset,vertices*3); offset+=vertices*6
   const normals = new Int8Array(buffer,offset,vertices*3); offset+=vertices*3
   const indices = new Uint32Array(buffer.slice(offset,offset+count*4)); offset+=count*4
-  const [rings,paths,thinIndices=[],asphalt=[],rails=[],signs=[],railCuts=[]]:[Building[],Streets,number[]?,number[]?,import('./railways').RailSection[]?,import('./railways').CrossingSign[]?,[number,number][]?]=JSON.parse(new TextDecoder().decode(new Uint8Array(buffer,offset,collision))); offset+=collision
+  const [rings,paths,thinIndices=[],asphalt=[],legacy=[],signs=[],railCuts=[],savedBed]:[Building[],Streets,number[]?,number[]?,(RoadBed|import('./railways').RailSection[])?,import('./railways').CrossingSign[]?,[number,number][]?,RoadBed?]=JSON.parse(new TextDecoder().decode(new Uint8Array(buffer,offset,collision))); offset+=collision
+  const bed=savedBed??(legacy&&!Array.isArray(legacy)?legacy:undefined)
+  const rails=Array.isArray(legacy)?legacy:[]
   const thin=new Set(thinIndices)
   const end = offset+imageBytes, tail = end+triangles*18, extra = buffer.byteLength-tail
   if(extra!==0 && extra!==8450) throw Error('Invalid GL04 sections')
@@ -339,7 +345,11 @@ export async function detail(tile:Tile, signal:AbortSignal, parseSlot?:()=>Promi
   for(const [,topLevel] of rings) if(topLevel/10+8>maxY) maxY = topLevel/10+8
   const heights = geometry.getAttribute('position')
   const streets = await loadStreetGeometry(paths,step,heights,rails,signs,railCuts,tile.stationPaving,tile.roadbeds)
-  if(tunnels)joinPortalRoads(tile,tunnels,[streets.road,streets.sidewalk,...(streets.surface?[streets.surface.getAttribute('position').array as Float32Array]:[])])
+  if(tunnels)joinPortalRoads(tile,tunnels,[
+    streets.road.subarray(0,streets.legacyRoadLength),
+    streets.sidewalk.subarray(0,streets.legacyWalkLength),
+    ...(streets.surface?[(streets.surface.getAttribute('position').array as Float32Array).subarray(0,streets.legacySurfaceLength)]:[])
+  ])
   signal.throwIfAborted()
   const material = await surfaceMaterial(buffer.slice(offset,end))
   if(touchesCountryside(tile.x,tile.z))countryside(material)
@@ -349,17 +359,97 @@ export async function detail(tile:Tile, signal:AbortSignal, parseSlot?:()=>Promi
   // Cut after street construction to preserve the original carriageway grade.
   for(const [index,cm] of railCuts)heights.setY(index,cm/100)
   if(railCuts.length){geometry.computeVertexNormals();geometry.computeBoundingSphere()}
+  let roadBed:Uint8Array|undefined
+  if(bed){
+    const index=geometry.index!
+    const faces=roadBed=new Uint8Array(Math.ceil(index.count/24))
+    for(const face of bed.drop)faces[face>>3]|=1<<(face&7)
+    const keep=nativeTerrainIndices(segments,heights,faces)
+    const extra=bedPositions(bed),original=heights.count
+    const combined=new Float32Array(heights.array.length+extra.length)
+    combined.set(heights.array);combined.set(extra,heights.array.length)
+    geometry.setAttribute('position',new THREE.BufferAttribute(combined,3))
+    const uv=geometry.getAttribute('uv'),texcoords=new Float32Array(uv.array.length+extra.length/3*2)
+    texcoords.set(uv.array)
+    for(let i=0;i<extra.length/3;i++){
+      texcoords[uv.array.length+2*i]=extra[3*i]/256
+      texcoords[uv.array.length+2*i+1]=1-extra[3*i+2]/256
+      keep.push(original+i)
+    }
+    geometry.setAttribute('uv',new THREE.BufferAttribute(texcoords,2))
+    geometry.setIndex(keep)
+    geometry.deleteAttribute('normal');geometry.computeVertexNormals()
+  }
   const groundMesh = new THREE.Mesh(geometry,material)
   group.add(groundMesh)
   const tunnel=tunnels?tunnelGeometry(tile,geometry,tunnels):null
-  if(tunnel){
-    if(tunnel.fringe){tunnel.fringe.material.dispose();tunnel.fringe.material=material}
-    if('lining' in tunnel)group.add(tunnel.floor,tunnel.portal,tunnel.interior)
-    else group.add(...Object.values(tunnel))
+  let bridge = deck.length ? bridgeGeometry(deck,thin,asphalt) : null
+  let tunnelFloorStart=Infinity
+  if(tunnel && 'lining' in tunnel){
+    group.add(tunnel.floor,tunnel.portal,tunnel.interior)
+  }else if(tunnel){
+    tunnel.fringe.material.dispose()
+    tunnel.fringe.material=material
+    if(tunnels?.every(t=>t.generated)){
+      // A structural batch keeps ceilings, walls and lamps out of the
+      // street layer. Rapier uses the corresponding unshifted source meshes.
+      // Clip fragments use the same satellite texture as the regular grid.
+      // Append them to its index so the renderer and Rapier share one surface.
+      const fragment=tunnel.fringe.geometry, extra=fragment.getAttribute('position').count
+      if(extra){
+        const base=geometry.getAttribute('position').count
+        for(const name of ['position','normal','uv']){
+          const target=geometry.getAttribute(name),source=fragment.getAttribute(name)
+          const joined=new Float32Array(target.array.length+source.array.length)
+          joined.set(target.array);joined.set(source.array,target.array.length)
+          geometry.setAttribute(name,new THREE.BufferAttribute(joined,target.itemSize))
+        }
+        geometry.setIndex([...geometry.index!.array,...Array.from({length:extra},(_,i)=>base+i)])
+        fragment.dispose()
+        tunnel.fringe.geometry=new THREE.BufferGeometry()
+        tunnel.fringe.geometry.setAttribute('position',new THREE.Float32BufferAttribute([],3))
+      }
+      const floor=tunnel.floor.geometry
+      bindStreetSurface(floor,'road')
+      tunnelFloorStart=streets.surface?.getAttribute('position').count??0
+      const pavement=mergeGeometries(streets.surface?[streets.surface,floor]:[floor])
+      if(!pavement)throw Error('Incompatible tunnel pavement geometry')
+      streets.surface?.dispose()
+      streets.surface=pavement
+      const geometries:THREE.BufferGeometry[]=bridge?[bridge]:[]
+      let clearanceFacesEnd=bridge?.getAttribute('position').count??0
+      for(const [part,mesh] of Object.entries(tunnel)){
+        if(part==='fringe'||part==='floor')continue
+        const geom=mesh.geometry,count=geom.getAttribute('position').count
+        if(!count)continue
+        const colors=new Float32Array(count*3)
+        for(let i=0;i<count;i++)mesh.material.color.toArray(colors,i*3)
+        geom.setAttribute('color',new THREE.BufferAttribute(colors,3))
+        geom.setAttribute('aEdge',new THREE.BufferAttribute(new Float32Array(count),1))
+        if(part!=='lane')clearanceFacesEnd+=count
+        geometries.push(geom)
+      }
+      if(geometries.length){
+        const merged=mergeGeometries(geometries)
+        if(!merged)throw Error('Incompatible transport structure geometry')
+        bridge?.dispose()
+        merged.userData.clearanceFacesEnd=clearanceFacesEnd
+        bridge=merged
+      }
+      for(const [part,mesh] of Object.entries(tunnel)){
+        if(part==='fringe')continue
+        // Picking uses the detached floor in world coordinates. The physics
+        // meshes only need positions after the render batch has copied them.
+        mesh.position.set(tile.x,0,tile.z)
+        for(const name of Object.keys(mesh.geometry.attributes)){
+          if(name==='position'&&['floor','portal','interior'].includes(part))continue
+          mesh.geometry.deleteAttribute(name)
+        }
+      }
+    }else group.add(...Object.values(tunnel))
   }
   const pond = chunkWater(water,underlay,tile.x,tile.z)
   const walls = vertices ? buildingGeometry(positions,normals,indices,rings) : null
-  const bridge = deck.length ? bridgeGeometry(deck,thin,asphalt) : null
   const batch:TileBatchInput = {
     tile, minY, maxY, midY:heights.getY(segments/2*(stride+1)),
     walls, pond:pond?.positions ?? null, bridge,
@@ -374,7 +464,8 @@ export async function detail(tile:Tile, signal:AbortSignal, parseSlot?:()=>Promi
     parked:streets.parked,
   }
   return {
-    group,groundMesh,terrain,underlay,water,rings,deck,thin,streets,batch,tunnel,railCutVertices:new Set(railCuts.map(([index])=>index)),
+    railCutVertices:new Set(railCuts.map(([index])=>index)),tunnelFloorStart,bridgeDepth:look.bridgeDepth,
+    group,groundMesh,roadBed,underlay,terrain:terrain.slice(),water:water.slice(),rings,deck,thin,streets,batch,tunnel,
     dispose(){
       if(tunnel){
         for(const mesh of Object.values(tunnel))if(mesh){

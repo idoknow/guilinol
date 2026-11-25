@@ -305,7 +305,12 @@ def bridge(model):
             return .046-.05*drop
         for left,right,offset in ((-21.5,-16.2,.14),(-16.2,16.2,0),(16.2,21.5,.14)):
             corners=[(along,landing(along)+offset,side) for along,side in ((start,left),(start,right),(start+1,right),(start+1,left))]
-            model.solid.append(np.asarray(corners)[[[0,1,2],[0,2,3]]])
+            if offset==0:
+                # The two carriageways meet the landward pavement on this ramp.
+                # The east abutment has a gap between native asphalt polygons.
+                model.mesh(corners,[[0,1,2],[0,2,3]],'road',True)
+            else:
+                model.solid.append(np.asarray(corners)[[[0,1,2],[0,2,3]]])
     for pier in springings[1:-1]:
         for side in (-1,1):
             z=side*21.28

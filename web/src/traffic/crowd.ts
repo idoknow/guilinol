@@ -1,6 +1,7 @@
 import {touchUi} from '../ui/input-mode'
 import {mainDetail} from '../look/mirror-layer'
 import * as THREE from 'three'
+import {mergeGeometries} from 'three/addons/utils/BufferGeometryUtils.js'
 import {clone} from 'three/addons/utils/SkeletonUtils.js'
 import {browNames, eyeNames, faceNames, hairStyles, looks, type Avatar} from '../../../lib/avatar'
 import {avatar as figure} from '../look/avatar'
@@ -34,6 +35,27 @@ export const AGE_PROFILES:Record<Age,Profile>={
   young:{w:4,looks:{hoodie:5,shell:4,denim:5,plaid:4,sport:3,track:3,basic:2,knit:2},hair:{m:['m_crop','m_perm','m_fade','m_mullet','m_part'],f:['f_long','f_pony','f_lob','f_wolf','f_bangs']},height:[.98,1.04],girth:1},
   middle:{w:3,looks:{office:5,basic:4,knit:3,plaid:3,outdoor:4,chinese:2},hair:{m:['m_part','m_crop','m_buzz'],f:['f_lob','f_bun','f_long']},height:[.96,1.01],girth:1.07},
   elder:{w:2,looks:{chinese:5,knit:4,basic:3,outdoor:3},hair:{m:['m_buzz','m_crop','m_part'],f:['f_bun','f_lob']},height:[.92,.97],girth:1.05,hairTint:['#8d8a84','#b3afa7','#d3d0c8']},
+}
+
+// A passer-by keeps its selected outfit for the lifetime of its template.
+function batchTorsoAccessories(scene:THREE.Object3D){
+  const bone=scene.getObjectByName('attach_torso')
+  if(!bone)return
+  const meshes=bone.children.filter((m):m is THREE.Mesh=>m instanceof THREE.Mesh&&
+    !(m instanceof THREE.SkinnedMesh)&&m.visible&&!m.children.length&&
+    !Array.isArray(m.material)&&!m.material.transparent&&!Object.keys(m.geometry.morphAttributes).length)
+  if(meshes.length<2)return
+  const parts=meshes.map(mesh=>{
+    mesh.updateMatrix()
+    return mesh.geometry.clone().applyMatrix4(mesh.matrix)
+  })
+  const geometry=mergeGeometries(parts,true)
+  for(const part of parts)part.dispose()
+  if(!geometry)return
+  const merged=new THREE.Mesh(geometry,meshes.map(m=>m.material as THREE.Material))
+  merged.name='Passer-by torso accessories'
+  bone.remove(...meshes)
+  bone.add(merged)
 }
 
 export function randomPasserby(random:()=>number,age?:Age):Avatar&{age:Age,height:number,girth:number,hairTint?:string}{
@@ -73,6 +95,7 @@ export function crowd(scene:THREE.Scene,camera:THREE.Camera,groundAt?:(x:number,
           if(torso){const pack=new THREE.Mesh(new THREE.BoxGeometry(.3,.38,.14),new THREE.MeshStandardMaterial({color:[0x3e4a55,0x2f5d7c,0x7a3b35,0x3f5a4c][Math.floor(random()*4)],roughness:.85,flatShading:true}))
             pack.position.set(0,-.02,.2);pack.name='passer-by backpack';torso.add(pack)}
         }
+        batchTorsoAccessories(model.scene)
         const t={scene:model.scene,clips:model.animations}
         await warm?.(model.scene)
         ready[index]=t
@@ -84,7 +107,9 @@ export function crowd(scene:THREE.Scene,camera:THREE.Camera,groundAt?:(x:number,
   }
   function release(walker:Walker,view:View){
     active.delete(walker);view.root.removeFromParent();view.mixer?.stopAllAction()
-    view.root.traverse(node=>{if(node instanceof THREE.SkinnedMesh)node.skeleton.dispose()})
+    const skeletons=new Set<THREE.Skeleton>()
+    view.root.traverse(node=>{if(node instanceof THREE.SkinnedMesh)skeletons.add(node.skeleton)})
+    for(const skeleton of skeletons)skeleton.dispose()
   }
   function build(walker:Walker):View|undefined{
     let index=assigned.get(walker)
@@ -92,6 +117,29 @@ export function crowd(scene:THREE.Scene,camera:THREE.Camera,groundAt?:(x:number,
     const t=template(index);if(!t)return
     const root=new THREE.Group(),instance=clone(t.scene)
     root.name='G2 passer-by';root.add(instance)
+    // Cloned avatar parts include offscreen skirts and outline shells with
+    // culling disabled. A conservative walking envelope works for both cameras.
+    // SkeletonUtils clones each mesh's palette, including outlines and
+    // clothes driven by the same bones. One GPU bone texture serves the rig.
+    const palettes:THREE.Skeleton[]=[]
+    instance.traverse(part=>{
+      if(!(part instanceof THREE.SkinnedMesh))return
+      const rig=part.skeleton
+      const shared=palettes.find(other=>other.bones.length===rig.bones.length&&
+        rig.bones.every((bone,i)=>bone===other.bones[i]&&rig.boneInverses[i].equals(other.boneInverses[i])))
+      if(shared)part.skeleton=shared
+      else palettes.push(rig)
+    })
+    instance.updateMatrixWorld(true)
+    instance.traverse(part=>{
+      if(!(part instanceof THREE.SkinnedMesh)||part.frustumCulled)return
+      part.computeBoundingSphere()
+      const worldScale=part.getWorldScale(new THREE.Vector3())
+      const smallest=Math.min(Math.abs(worldScale.x),Math.abs(worldScale.y),Math.abs(worldScale.z))
+      if(!smallest||!part.boundingSphere||part.boundingSphere.isEmpty())return
+      part.boundingSphere.radius+=1/smallest
+      part.frustumCulled=true
+    })
     const mixer=new THREE.AnimationMixer(instance)
     const clip=(name:string)=>t.clips.find(item=>item.name===name)
     const walkClip=clip(figure.clips.walk),idleClip=clip(figure.clips.idle)

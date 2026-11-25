@@ -3,15 +3,19 @@ import {mkdir, writeFile} from 'node:fs/promises'
 import {resolve} from 'node:path'
 import {preview} from 'vite'
 import {chromium} from 'playwright'
-import {browserOptions} from './qa-browser.mjs'
+import {browserOptions,seedBenchmark} from './qa-browser.mjs'
+import {installDrawInventory} from './scene-draw-inventory.mjs'
 import {glHookScript} from './gl-perf.mjs'
 
 const [mainDist, prDist] = process.argv.slice(2)
 assert(mainDist && prDist, 'Usage: node scripts/perf-drive.mjs MAIN_DIST PR_DIST')
-const views = ['overview', 'lijiang', 'palace', 'south', 'walk-palace']
+const views = process.env.PERF_VIEW ? [process.env.PERF_VIEW] : ['overview', 'lijiang', 'palace', 'south', 'walk-palace']
 const servers = [], raw = [], summary = []
 const quantile = (values, fraction) => [...values].sort((left, right) => left - right)[Math.ceil(values.length * fraction) - 1]
-const output = 'captures/drive-perf'
+const resourceLimit=(view,metric)=>metric==='textures'||(view==='overview'&&metric==='calls')?1:1.05
+const rounds=Number(process.env.PERF_ROUNDS??5)
+assert(Number.isInteger(rounds)&&rounds>0)
+const output = process.env.PERF_OUTPUT ?? 'captures/drive-perf'
 await mkdir(output, {recursive:true})
 const browser = await chromium.launch(browserOptions())
 try {
@@ -19,64 +23,90 @@ try {
   async function sample(view, side, count, round) {
     const context = await browser.newContext({viewport:{width:390,height:844},isMobile:true,hasTouch:true})
     try {
+      await seedBenchmark(context)
       await context.addInitScript(glHookScript)
       const page = await context.newPage()
       const cdp = await context.newCDPSession(page)
       const url = `http://127.0.0.1:${servers[side].httpServer.address().port}`
-      await page.goto(`${url}/?verify&flow=0&time=10&${process.env.PERF_TRAFFIC==='1'?'traffic=1&':''}${view==='walk-palace'?'mode=walk':`cam=${view}`}`)
-      await page.waitForFunction(walking => {
+      await page.goto(`${url}/?verify&flow=0&time=10&${process.env.PERF_TRAFFIC===undefined?'':'traffic='+Number(process.env.PERF_TRAFFIC==='1')+'&'}cam=${view==='walk-palace'?'palace':view}`)
+      const settled=walking => {
         const viewer = window.viewer
-        if (!viewer?.stats.firstMs || viewer.stats.pending || viewer.stream.forest.pending.size || (walking && !viewer.walk?.active)) return false
+        if (!viewer?.stats.firstMs || viewer.stats.pending || viewer.stream.updateLandmarks?.pendingCount?.() || viewer.stream.forest.pending.size || (walking && !viewer.walk?.active)) return false
         const pos = walking ? viewer.walk.position : viewer.camera.position
         return viewer.manifest.chunks.every(tile => {
           const distance = Math.hypot(tile.x+128-pos.x,tile.z+128-pos.z)
           return (distance>viewer.stream.radius || viewer.stream.loaded.has(tile)) && (distance>1682 || viewer.stream.forest.loaded.has(tile))
         })
-      }, view==='walk-palace', {timeout:120000})
-      await page.evaluate(async () => {for(let frame=0;frame<12;frame++) await new Promise(requestAnimationFrame)})
+      }
+      // A cold deep link sometimes renders the initial flight scene before
+      // walking starts. Upload that same scene on both builds before landing.
+      await page.waitForFunction(settled,false,{timeout:120000})
+      if(view==='walk-palace'){
+        await page.evaluate(async()=>{for(let i=0;i<30;i++)await new Promise(requestAnimationFrame)})
+        assert(await page.evaluate(()=>window.viewer.walkTo(-588,-212,Math.PI,'benchmark')))
+        await page.waitForFunction(settled,true,{timeout:120000})
+      }
+      if(view==='walk-palace'&&process.env.PERF_TRAFFIC==='1'){
+        await page.waitForFunction(()=>window.viewer.trafficProbe?.allMotors?.length>0,null,{timeout:120000})
+        // Let both fleets stream their visible character templates and upload
+        // textures before recording the resident geometry and texture peaks.
+        await page.evaluate(async()=>{for(let frame=0;frame<180;frame++)await new Promise(requestAnimationFrame)})
+      }else await page.evaluate(async()=>{for(let frame=0;frame<12;frame++)await new Promise(requestAnimationFrame)})
       await cdp.send('HeapProfiler.collectGarbage')
       const heap = (await cdp.send('Runtime.getHeapUsage')).usedSize
+      if(process.env.PERF_INVENTORY==='1')await page.evaluate(installDrawInventory)
       const frames = await page.evaluate(async count => {
         const frames = []
         let last = await new Promise(requestAnimationFrame)
         for(let index=0;index<count;index++) {
+          window.__drawInventory?.start()
           window.__glPerf.resetFrame()
           const now = await new Promise(requestAnimationFrame)
           const {geometries,textures} = window.viewer.stats
-          frames.push({ms:now-last, ...window.__glPerf.readFrame(), geometries, textures})
+          frames.push({ms:now-last, ...window.__glPerf.readFrame(), meshes:window.__drawInventory?.frame(), geometries, textures})
           last = now
         }
         return frames
       }, count)
       const sha = (await (await fetch(`${url}/version.json`)).json()).sha
-      const traffic=await page.evaluate(()=>({cameraY:window.viewer.camera.position.y,assets:performance.getEntriesByType('resource').filter(entry=>/\/roads\/|\/assets\/traffic-/.test(entry.name)).map(entry=>new URL(entry.name).pathname)}))
-      const row = {view,side:side?'PR':'main',round,sha,heap,frames,traffic}
+      const traffic=await page.evaluate(()=>({cameraY:window.viewer.camera.position.y,crowd:window.viewer.trafficProbe?.crowd?.count,motors:window.viewer.trafficProbe?.allMotors?.length,assets:performance.getEntriesByType('resource').filter(entry=>/\/roads\/|\/assets\/traffic-/.test(entry.name)).map(entry=>new URL(entry.name).pathname)}))
+      if(process.env.PERF_PEDESTRIANS==='0')assert.equal(traffic.crowd??0,0,'Expected zero pedestrian instances')
+      const inventory=await page.evaluate(()=>window.__drawInventory?.resources())
+      const row = {inventory,view,side:side?'PR':'main',round,sha,heap,frames,traffic}
       raw.push(row)
       await writeFile(`${output}/raw.json`,JSON.stringify(raw))
       return row
     } finally { await context.close() }
   }
-  for(const view of views) {
+  if(!process.env.PERF_ROUNDS)for(const view of views) {
     const main = await sample(view,0,16,0), pr = await sample(view,1,16,0)
     for(const metric of ['calls','mirrorCalls','triangles','mirrorTriangles','geometries','textures','heap']) {
       const measure = row => metric==='heap'?row.heap:Math.max(...row.frames.map(frame=>frame[metric]))
       const base=measure(main), result=measure(pr)
-      const cap=view==='overview' && metric==='calls'?base:base*1.05
+      const cap=base*resourceLimit(view,metric)
       summary.push({view,metric,main:base,PR:result,pass:result<=cap})
     }
   }
   await writeFile(`${output}/summary.json`,JSON.stringify(summary,null,2))
   console.table(summary)
-  assert(summary.every(row=>row.pass),'Deterministic gate failed; see raw and summary JSON')
+  if(!process.env.PERF_ROUNDS)assert(summary.every(row=>row.pass),'Deterministic gate failed; see raw and summary JSON')
   for(const view of views) {
     const p95s=[[],[]]
-    for(let round=1;round<=5;round++) for(const side of [0,1]) {
+    for(let round=1;round<=rounds;round++) for(const side of [0,1]) {
       const row=await sample(view,side,60,round)
       p95s[side].push(quantile(row.frames.map(frame=>frame.ms),.95))
     }
+    if(process.env.PERF_ROUNDS){
+      for(const metric of ['calls','mirrorCalls','triangles','mirrorTriangles','geometries','textures','heap']){
+        const values=['main','PR'].map(side=>raw.filter(row=>row.view===view&&row.side===side&&row.round>0)
+          .map(row=>metric==='heap'?row.heap:Math.max(...row.frames.map(frame=>frame[metric]))))
+        const [main,PR]=values.map(runs=>quantile(runs,.5))
+        summary.push({view,metric,main,PR,runs:values,pass:PR<=main*resourceLimit(view,metric)})
+      }
+    }
     const [base,result]=p95s.map(values=>quantile(values,.5))
     const noise=Math.max(...p95s[0])-Math.min(...p95s[0])
-    summary.push({view,metric:'p95 ms',main:base,PR:result,noise,p95s,pass:result-base<=Math.max(.05*base,noise)})
+    summary.push({view,metric:'p95 ms',main:base,PR:result,noise,p95s,pass:process.env.PERF_ROUNDS?result<=1.05*base:result-base<=Math.max(.05*base,noise)})
     await writeFile(`${output}/summary.json`,JSON.stringify(summary,null,2))
   }
   console.table(summary.slice(-views.length))

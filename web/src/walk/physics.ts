@@ -1,3 +1,4 @@
+import {nearbyTunnels,tunnelClearanceClipper,tunnelFloor} from '../tunnels'
 import {inRegion} from '../../../lib/play-region'
 import neHall from '../../../pipeline/landmarks/central_square_ne_hall.json'
 import R from '@dimforge/rapier3d-compat'
@@ -136,7 +137,7 @@ function filterBridgeOverRoad(road: Float32Array, deck: Float32Array) {
   return kept.length === road.length ? road : Float32Array.from(kept)
 }
 
-function* weldedSurface(raw:Float32Array, corners:number[]|null, data:Detail, maxGap:number, minRun:number, maxRun:number, runScale:number){
+function* weldedSurface(raw:Float32Array, corners:number[]|null, data:Detail, maxGap:number, minRun:number, maxRun:number, runScale:number,clearance?:ReturnType<typeof tunnelClearanceClipper>){
   const verts:number[]=[],idxList:number[]=[],seen=new Map<string,number>()
   const addVertex=(corner:number)=>{
     const i=3*corner
@@ -181,6 +182,12 @@ function* weldedSurface(raw:Float32Array, corners:number[]|null, data:Detail, ma
     const gi=Math.min(64,Math.max(0,Math.round(lz/4)))*65+Math.min(64,Math.max(0,Math.round(lx/4)))
     return Math.max(vis,(data.water[gi]===-32768?data.terrain[gi]:data.water[gi])/10)
   }
+  function replacedBed(lx:number,lz:number){
+    if(!data.roadBed)return false
+    const c=Math.min(stride-2,Math.max(0,Math.floor(lx/step))),r=Math.min(stride-2,Math.max(0,Math.floor(lz/step)))
+    const face=2*(r*(stride-1)+c)+Number(lx/step-c+lz/step-r>1)
+    return !!(data.roadBed[face>>3]&(1<<(face&7)))
+  }
   const dryAt=(lx:number,lz:number)=>data.water[Math.min(64,Math.max(0,Math.round(lz/4)))*65+Math.min(64,Math.max(0,Math.round(lx/4)))]===-32768
   let visited=0
   for(const edge of boundary.values()){
@@ -200,6 +207,9 @@ function* weldedSurface(raw:Float32Array, corners:number[]|null, data:Detail, ma
     const a2x=ax+nx*run, a2z=az+nz*run, b2x=bx+nx*run, b2z=bz+nz*run
     if(a2x<.1||a2x>255.9||b2x<.1||b2x>255.9||a2z<.1||a2z>255.9||b2z<.1||b2z>255.9)continue
     if(!dryAt(ax,az)||!dryAt(bx,bz)||!dryAt(mx,mz)||!dryAt(a2x,a2z)||!dryAt(b2x,b2z)||!dryAt(mx+nx*run,mz+nz*run))continue
+    // The surveyed pavement already has a welded bed and a closed rim.
+    // A ramp to the superseded heightfield can protrude into the driving lane.
+    if(!corners&&(replacedBed(mx,mz)||replacedBed(mx+nx*run,mz+nz*run)))continue
     const gA2=groundAt(a2x,a2z), gB2=groundAt(b2x,b2z)
     if(Math.max(ay-gA2,by-gB2)>maxGap)continue
     const u2=verts.length/3; verts.push(a2x,Math.min(ay-.02,gA2-.04),a2z)
@@ -207,9 +217,13 @@ function* weldedSurface(raw:Float32Array, corners:number[]|null, data:Detail, ma
     if((bz-az)*(a2x-ax)-(bx-ax)*(a2z-az)>=0)idxList.push(u,v,v2,u,v2,u2)
     else idxList.push(u,v2,v,u,u2,v2)
   }
+  if(clearance){
+    const clipped=clearance(Float32Array.from(verts),idxList)
+    return weldedIndexed(clipped,Array.from({length:clipped.length/3},(_,i)=>i))
+  }
   return R.ColliderDesc.trimesh(Float32Array.from(verts),Uint32Array.from(idxList),R.TriMeshFlags.FIX_INTERNAL_EDGES)
 }
-function houses(rings:Outline[]){
+function houses(rings:Outline[],clearance?:ReturnType<typeof tunnelClearanceClipper>){
   const verts:number[]=[], indices:number[]=[]
   for(const [bottom,top,loops] of rings){
     const shape=loops.map(loop=>loop.map(([east,south])=>new THREE.Vector2(east/100,south/100)))
@@ -221,6 +235,10 @@ function houses(rings:Outline[]){
       const curr=offset+at,next=offset+(at+1)%loop.length
       indices.push(curr,curr+size,next+size,curr,next+size,next)
     }offset+=loop.length}
+  }
+  if(clearance){
+    const clipped=clearance(Float32Array.from(verts),indices)
+    return weldedIndexed(clipped,Array.from({length:clipped.length/3},(_,i)=>i))
   }
   return R.ColliderDesc.trimesh(Float32Array.from(verts),Uint32Array.from(indices))
 }
@@ -339,10 +357,10 @@ export async function createPhysics(manifest:Manifest,stream:Stream,peaks:PeaksG
     }
     return built
   }
-  function* surfaces(tile:Tile,data:Detail,colliders:R.Collider[]){
+  function* surfaces(tile:Tile,data:Detail,colliders:R.Collider[],clearance?:ReturnType<typeof tunnelClearanceClipper>){
     const {sidewalk,road}=data.streets
     function* install(raw:Float32Array,corners:number[]|null,kind:'sidewalk'|'road'|'deck',settings:[number,number,number,number],thin=false){
-      const desc=yield* weldedSurface(raw,corners,data,...settings)
+      const desc=yield* weldedSurface(raw,corners,data,...settings,clearance)
       if(!desc)return
       yield true
       const collider=add(desc.setTranslation(tile.x,0,tile.z),kind)
@@ -459,14 +477,23 @@ export async function createPhysics(manifest:Manifest,stream:Stream,peaks:PeaksG
       const spacing=manifest.overview.step,stride=width/spacing+1,start=(tile.z-top)/spacing*stride+(tile.x-left)/spacing
       const colliders:R.Collider[]=[]
       let barrierColliders:R.Collider[]=[]
+      const bores=data?.tunnel?nearbyTunnels(manifest.tunnels,tile.x+128,tile.z+128)
+        .filter(t=>!t.nativePaving||!t.openCut):[]
+      const clearance=bores.length?tunnelClearanceClipper(tile,bores):undefined
       if(data?.tunnel){
         for(const [mesh,kind] of [[data.groundMesh,'ground'],[data.tunnel.fringe,'ground'],[data.tunnel.floor,'road'],[data.tunnel.portal,'rail'],[data.tunnel.interior,'rail']] as const){
           if(!mesh)continue
           const geometry=mesh.geometry,positions=geometry.getAttribute('position');if(!positions.count)continue
           const indices=geometry.index?Array.from(geometry.index.array):Array.from({length:positions.count},(_,index)=>index)
-          const desc=weldedIndexed(Float32Array.from(positions.array),indices)
+          const coordinates=Float32Array.from(positions.array)
+          const clipped=clearance&&mesh!==data.tunnel.floor?clearance(coordinates,indices):undefined
+          const desc=clipped?weldedIndexed(clipped,Array.from({length:clipped.length/3},(_,i)=>i)):weldedIndexed(coordinates,indices)
           if(desc)colliders.push(add(desc.setTranslation(tile.x,0,tile.z),kind))
         }
+      }else if(data?.roadBed){
+        const geometry=data.groundMesh.geometry
+        const desc=weldedIndexed(Float32Array.from(geometry.getAttribute('position').array),Array.from(geometry.index!.array))
+        if(desc)colliders.push(add(desc.setTranslation(tile.x,0,tile.z),'ground'))
       }else{
         const ground=data?fineField(data):field(256/spacing,(col,row)=>overview[start+row*stride+col]/10)
         colliders.push(add(ground.setTranslation(tile.x+128,0,tile.z+128),data?'ground':'overview'))
@@ -474,7 +501,16 @@ export async function createPhysics(manifest:Manifest,stream:Stream,peaks:PeaksG
       const rings=data?.rings??[]
       if(data){const {banks}=data.streets
         for(const [ax,az,bx,bz,top,bottom,endTop=top] of banks){const angle=-Math.atan2(bz-az,bx-ax),height=((top+endTop)/2-bottom)/10+1.25
-          colliders.push(add(R.ColliderDesc.cuboid(Math.hypot(bx-ax,bz-az)/20+.03,height/2,.09).setRotation({x:0,y:Math.sin(angle/2),z:0,w:Math.cos(angle/2)}).setTranslation(tile.x+(ax+bx)/20,bottom/10+height/2,tile.z+(az+bz)/20),'rail'))}}
+          const halfLength=Math.hypot(bx-ax,bz-az)/20+.03
+          const x=(ax+bx)/20,z=(az+bz)/20,y=bottom/10+height/2
+          if(clearance){
+            const box=new THREE.BoxGeometry(halfLength*2,height,.18)
+            box.rotateY(angle);box.translate(x,y,z)
+            const vertices=clearance(Float32Array.from(box.getAttribute('position').array),Array.from(box.index!.array))
+            box.dispose()
+            const desc=weldedIndexed(vertices,Array.from({length:vertices.length/3},(_,i)=>i))
+            if(desc)colliders.push(add(desc.setTranslation(tile.x,0,tile.z),'rail'))
+          }else colliders.push(add(R.ColliderDesc.cuboid(halfLength,height/2,.09).setRotation({x:0,y:Math.sin(angle/2),z:0,w:Math.cos(angle/2)}).setTranslation(tile.x+x,y,tile.z+z),'rail'))}}
       if(data){
         const bars=data.streets.railBarriers
         for(let i=0;i<bars.length;i+=6){
@@ -486,8 +522,8 @@ export async function createPhysics(manifest:Manifest,stream:Stream,peaks:PeaksG
         }
         barrierColliders=buildTileRoadBarriers(tile,data.streets.roadBarriers)
       }
-      if(rings.length)colliders.push(add(houses(rings).setTranslation(tile.x,0,tile.z),'building'))
-      const pending=data?surfaces(tile,data,colliders):undefined
+      if(rings.length){const desc=houses(rings,clearance);if(desc)colliders.push(add(desc.setTranslation(tile.x,0,tile.z),'building'))}
+      const pending=data?surfaces(tile,data,colliders,clearance):undefined
       if(urgent&&pending)while(!pending.next().done){}
       regions.set(tile,{colliders,barrierColliders,rings,data,surfaces:urgent?undefined:pending});changed=true
     }
@@ -554,10 +590,10 @@ export async function createPhysics(manifest:Manifest,stream:Stream,peaks:PeaksG
     const thin=!!hit&&(thinDecks.has(hit.collider.handle)||kinds.get(hit.collider.handle)==='deckThin')
     return hit?{y:origin-hit.timeOfImpact,slope:Math.acos(Math.min(1,Math.abs(hit.normal.y))),thin}:null
   }
-  function groundSurface(east:number,south:number,footY:number){
-    const origin=footY+.18
+  function groundSurface(east:number,south:number,footY:number,above=.18,reach=.5){
+    const origin=footY+above
     surfaceRay.origin.x=east;surfaceRay.origin.y=origin;surfaceRay.origin.z=south
-    const hit=world.castRayAndGetNormal(surfaceRay,.5,false,undefined,undefined,capsule,undefined,walkableFilter)
+    const hit=world.castRayAndGetNormal(surfaceRay,reach,false,undefined,undefined,capsule,undefined,walkableFilter)
     if(!hit)return null
     const slope=Math.acos(Math.min(1,Math.abs(hit.normal.y)))
     if(slope>cfg.slope+.18)return null
@@ -641,6 +677,10 @@ export async function createPhysics(manifest:Manifest,stream:Stream,peaks:PeaksG
     return {bottom,top,loop,minX,maxX,minZ,maxZ}
   })
   function insideHouse(east:number,south:number,y?:number){const tile=tileAt(east,south);if(!tile)return false
+    if(y!==undefined){
+      const floor=tunnelFloor(manifest.tunnels,east,south,y)
+      if(floor!==undefined&&y>=floor)return false
+    }
     const px=(east-tile.x)*100,pz=(south-tile.z)*100
     const inRing=regions.get(tile)?.rings.some(ring=>{
       const [bottom,top,loops]=ring
@@ -733,7 +773,7 @@ export async function createPhysics(manifest:Manifest,stream:Stream,peaks:PeaksG
   function overlaps(kind:Kind){return !!world.intersectionWithShape(body.translation(),identity,shape,undefined,undefined,capsule,undefined,kind==='deck'?deckFilter:coll=>kinds.get(coll.handle)===kind)}
   function clear(){for(const region of regions.values()){region.colliders.forEach(remove);region.barrierColliders.forEach(remove)}regions.clear();mountains.forEach(remove);mountains.clear();modelMountains.forEach(list=>list.forEach(remove));modelMountains.clear();trunks.forEach(remove);trunks.clear();landmarks.forEach(colliders=>colliders.forEach(remove));landmarks.clear();landmarkBounds.clear();for(const colliders of obstacleColliders.values())colliders.forEach(remove);obstacleColliders.clear()}
   function findLocalDismount(cx:number,cz:number,heading:number,bikeY:number){
-    const local=probeLocalDismount({world,capsule,shape,kinds,stream,tileAt,surface,wet,insideHouse},cx,cz,heading,bikeY)
+    const local=probeLocalDismount({world,capsule,shape,kinds,stream,tileAt,surface,wet,insideHouse,tunnelSupport},cx,cz,heading,bikeY)
     if(local||!wet(cx,cz))return local
     const tile=tileAt(cx,cz),data=tile&&stream.loaded.get(tile)
     if(!tile||!data)return null
@@ -744,14 +784,19 @@ export async function createPhysics(manifest:Manifest,stream:Stream,peaks:PeaksG
     const shore=findWalkableSpawn(cx,cz,false,true)
     return shore&&{...shore,rule:'water-rescue'}
   }
+  function tunnelSupport(x:number,z:number,refY:number){
+    const floor=tunnelFloor(manifest.tunnels,x,z,refY)
+    if(floor===undefined)return null
+    return surface(x,z,'road',floor+.15,.3)
+  }
   function findLocalMount(px:number,py:number,pz:number,bx:number,by:number,bz:number){
-    return probeLocalMount({world,capsule,shape,kinds,stream,tileAt,surface,wet,insideHouse},px,py,pz,bx,by,bz)
+    return probeLocalMount({world,capsule,shape,kinds,stream,tileAt,surface,wet,insideHouse,tunnelSupport},px,py,pz,bx,by,bz)
   }
   function findCarDismount(cx:number,cz:number,heading:number,carY:number){
-    return probeCarDismount({world,capsule,shape,kinds,stream,tileAt,surface,wet,insideHouse},cx,cz,heading,carY)
+    return probeCarDismount({world,capsule,shape,kinds,stream,tileAt,surface,wet,insideHouse,tunnelSupport},cx,cz,heading,carY)
   }
   function findCarMount(px:number,py:number,pz:number,cx:number,cy:number,cz:number){
-    return probeCarMount({world,capsule,shape,kinds,stream,tileAt,surface,wet,insideHouse},px,py,pz,cx,cy,cz)
+    return probeCarMount({world,capsule,shape,kinds,stream,tileAt,surface,wet,insideHouse,tunnelSupport},px,py,pz,cx,cy,cz)
   }
   function carOverlap(x:number,footY:number,z:number,heading:number,dirSign:-1|0|1=0){
     const fx=-Math.sin(heading),fz=-Math.cos(heading),rx=Math.cos(heading),rz=-Math.sin(heading)

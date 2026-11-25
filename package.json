@@ -48,7 +48,7 @@
     "verify:ride-audio": "node scripts/ride-audio-levels.mjs",
     "verify:car": "node scripts/car.mjs",
     "verify:drive": "node scripts/drive.mjs && npm run verify:car && node scripts/verify-zone-impact.mjs car",
-    "verify:traffic": "tsx scripts/test-traffic-wall.ts && node --experimental-strip-types scripts/verify-traffic-recovery.mjs && node --experimental-strip-types scripts/verify-traffic.mjs && node --experimental-strip-types scripts/verify-traffic-popin.mjs && node scripts/traffic-street.mjs",
+    "verify:traffic": "tsx scripts/test-traffic-headroom.ts && tsx scripts/test-traffic-wall.ts && node --experimental-strip-types scripts/verify-traffic-recovery.mjs && node --experimental-strip-types scripts/verify-traffic.mjs && node --experimental-strip-types scripts/verify-traffic-popin.mjs && node scripts/traffic-street.mjs",
     "verify:traffic-heights": "uv run python pipeline/verify_traffic_heights.py",
     "verify:boat": "node scripts/boat.mjs",
     "perf": "node scripts/perf.mjs",
@@ -77,6 +77,7 @@
     "test:chat": "node --test scripts/chat-test.mjs scripts/chat-lexicon-test.mjs scripts/chat-corpus-test.mjs",
     "bench:chat": "node scripts/chat-bench.mjs",
     "bench:rt": "node scripts/rt-load.mjs",
+    "audit:vehicles": "tsx scripts/vehicle-grounding.ts audit",
     "audit:station-road-grades": "tsx scripts/audit-station-road-grades.ts"
   },
   "dependencies": {
@@ -97,6 +98,7 @@
   "devDependencies": {
     "@cloudflare/workers-types": "5.20261119.1",
     "@types/three": "0.180.0",
+    "meshoptimizer": "0.22.0",
     "playwright": "^1.56.1",
     "typescript": "~5.9.3",
     "vite": "^7.2.0",

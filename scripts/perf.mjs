@@ -1,4 +1,5 @@
 import {telemetryPreview} from './telemetry-preview.mjs'
+import {seedBenchmark} from './qa-browser.mjs'
 import {glHookScript} from './gl-perf.mjs'
 import {mkdir, writeFile} from 'node:fs/promises'
 import {chromium} from 'playwright'
@@ -34,13 +35,13 @@ if (expansion) {
 
 const SAMPLE_FRAMES = Number(process.env.PERF_FRAMES ?? 60)
 const FIRST_RUNS = Number(process.env.PERF_FIRST_RUNS ?? 5)
-const trafficQuery = process.argv.includes('--traffic') ? '&traffic=1' : ''
+const trafficQuery = (process.argv.includes('--traffic')?'&traffic=1':'')+(process.env.PERF_SEED?'&time=10':'')
 const OUT_FILE = process.env.PERF_OUT ?? 'captures/perf.json'
 
 const native=process.platform==='darwin' && process.env.QA_NATIVE_GPU!=='0'
 const mobile=process.env.PERF_MOBILE==='1'
 const viewport=mobile?{width:844,height:390}:native?{width:1920,height:1080}:{width:960,height:540}
-const launch={headless:!native,executablePath:process.env.CHROMIUM,args:[...(native?['--enable-gpu','--use-angle=metal']:['--use-angle=swiftshader','--enable-unsafe-swiftshader']),'--enable-precise-memory-info']}
+const launch={headless:!native||process.env.PERF_HEADLESS==='1',executablePath:process.env.CHROMIUM,args:[...(native?['--enable-gpu','--use-angle=metal']:['--use-angle=swiftshader','--enable-unsafe-swiftshader']),'--enable-precise-memory-info']}
 const cpuRate = Number(process.env.PERF_CPU_RATE ?? (mobile?4:1))
 const sampleMs=Number(process.env.PERF_MS??(native?10000:0))
 async function throttle(page) {
@@ -87,9 +88,12 @@ try {
 
   // 2. Measure the 5 fixed viewpoints.
   const context = await browser.newContext({viewport,deviceScaleFactor:mobile?3:1,isMobile:mobile,hasTouch:mobile})
+  await seedBenchmark(context)
   await context.addInitScript(glHookScript)
   const page = await context.newPage()
   await throttle(page)
+  const paired=!!process.env.PERF_SEED
+  const cdp=paired?await context.newCDPSession(page):null
   const errors = []
   page.on('pageerror', err => {
     errors.push(err.message)
@@ -150,7 +154,8 @@ try {
 
     const loadMs = Math.round(performance.now()-started)
     if(process.env.PERF_TRACE)await browser.startTracing(page,{path:`${process.env.PERF_TRACE}-${cam.id}.json`,categories:['devtools.timeline','blink.user_timing','disabled-by-default-v8.cpu_profiler']})
-    const metrics = await page.evaluate(async ([sampleCount,minMs]) => {
+    if(cdp)await cdp.send('HeapProfiler.collectGarbage')
+    const metrics = await page.evaluate(async ([sampleCount,minMs,paired]) => {
       function nextRaf() {
         return new Promise(resolve => requestAnimationFrame(resolve))
       }
@@ -163,6 +168,7 @@ try {
       let lastDraw = null
       let maxMirrorCalls=0,maxMirrorTriangles=0
       let visibleMotors=0,visiblePeople=0,drawCalls=0,triangles=0
+      let maxCalls=0,maxTotalCalls=0
       const start=await nextRaf(); let last=start
       for (let i = 0; i < sampleCount || last-start<minMs; i++) {
         window.__glPerf.resetFrame()
@@ -174,6 +180,8 @@ try {
         visibleMotors+=window.viewer.trafficProbe?.motors??0
         visiblePeople+=window.viewer.trafficProbe?.pedestrians??0
         drawCalls+=lastDraw.calls;triangles+=lastDraw.triangles
+        maxCalls=Math.max(maxCalls,lastDraw.calls)
+        maxTotalCalls=Math.max(maxTotalCalls,lastDraw.totalCalls)
         frameTimes.push(dt)
         heapPeakBytes = Math.max(heapPeakBytes, performance.memory?.usedJSHeapSize ?? 0)
       }
@@ -195,10 +203,10 @@ try {
         meanMs: +mean.toFixed(2),
         medianMs: +median.toFixed(2),
         p95Ms: +p95.toFixed(2),
-        calls: lastDraw.calls,
-        mirrorCalls: lastDraw.mirrorCalls,
+        calls: paired?maxCalls:lastDraw.calls,
+        mirrorCalls: paired?maxMirrorCalls:lastDraw.mirrorCalls,
+        totalCalls: paired?maxTotalCalls:lastDraw.totalCalls,
         maxMirrorCalls,maxMirrorTriangles,
-        totalCalls: lastDraw.totalCalls,
         peakCalls: peakDraws,
         triangles: lastDraw.triangles,
         totalTriangles: lastDraw.totalTriangles,
@@ -207,7 +215,7 @@ try {
         bufferMB: mem.bufferMB,
         textureMB: mem.textureMB,
       }
-    }, [SAMPLE_FRAMES,sampleMs])
+    }, [SAMPLE_FRAMES,sampleMs,paired])
     if(process.env.PERF_TRACE)await browser.stopTracing()
 
     if (expansion) {
@@ -226,6 +234,7 @@ try {
       }
       await page.screenshot({path:`${dir}/${cam.id}.png`})
     }
+    if(process.env.PERF_PEDESTRIANS==='0')assert.equal(metrics.averageVisiblePeople,0,'Expected zero visible pedestrians')
     viewpoints[cam.id] = {label: cam.label, loadMs, ...metrics}
     await saveReport()
     if(cam.eye)await page.screenshot({path:`${outDir}/${cam.id}.png`})

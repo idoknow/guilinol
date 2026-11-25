@@ -20,9 +20,11 @@ from shapely.ops import nearest_points, polygonize, unary_union
 from landmark_solids import load_landmark_meshes, structural_footprint, slice_tris_at_y, solid_projection
 
 from landmarks.jiefang_layout import SPAN_WAYS, world_road_sections
+from canal_passages import sample_road_heights
 from common import CHUNK, GRID, OUT, load_osm, xz2ll
 from features import area, points, polygons
 from road_profile import RULES
+from survey_surface import SurveySurface
 
 
 def read_tile_metres(root: Path) -> dict[str, float]:
@@ -185,12 +187,12 @@ def run_audit(world_dir: Path, root: Path) -> dict:
         rings, streets, *_ = json.loads(blob[c_off:c_off + c_size])
         chunk_streets[(ci, cj)] = (tx, tz, streets, rings, b_pos, b_idx)
 
-        for base, roof, loops, kind, floors, seed, *_ in rings:
+        for base, roof, loops, kind, floors, seed, *attributes in rings:
             pts = [np.asarray(lp, dtype=float) / 100.0 + [tx, tz] for lp in loops]
             if len(pts[0]) >= 3:
                 poly = Polygon(pts[0], pts[1:]).buffer(0)
                 if not poly.is_empty:
-                    by_bldg[(seed, base, roof)].append(poly)
+                    by_bldg[(seed, base, roof, any(attributes[3:]))].append(poly)
                     bldg_chunk_parts.append((tx, tz, base / 10.0, roof / 10.0, kind, floors, loops, poly))
 
         for path_index, (skind, *loops) in enumerate(streets[0]):
@@ -242,6 +244,18 @@ def run_audit(world_dir: Path, root: Path) -> dict:
             for off in range(0, len(tblob), 12):
                 lx, lz, ly, tkind, tscale, *_ = struct.unpack_from('<HHhBBBBbb', tblob, off)
                 trees.append((tx + lx / 100.0, ly / 10.0, tz + lz / 100.0, tkind, tscale / 100.0))
+
+    @lru_cache(maxsize=24)
+    def survey_mesh(key):
+        entry = chunk_streets.get(key)
+        if entry and len(entry[2]) > 12 and isinstance(entry[2][12], dict):
+            return SurveySurface(entry[2][12])
+        return None
+
+    def survey_hit(x, z):
+        ci, cj = math.floor((x-left)/CHUNK), math.floor((z-top)/CHUNK)
+        mesh = survey_mesh((ci, cj))
+        return mesh.hit(x-left-ci*CHUNK, z-top-cj*CHUNK) if mesh else None
 
     def ground_mesh_y(x: float, z: float) -> float:
         ci = int(np.clip(math.floor((x - left) / CHUNK), 0, nx_chunks - 1))
@@ -409,21 +423,44 @@ def run_audit(world_dir: Path, root: Path) -> dict:
     # =========================================================================
     bldg_issues = []
     proc_bldg_polys = []
-    for (seed, base, roof), parts in by_bldg.items():
+    ceiling_checks = []
+    ceiling_samples = []
+    for (seed, base, roof, elevated), parts in by_bldg.items():
         poly = unary_union(parts).buffer(0)
         if poly.is_empty:
             continue
         proc_bldg_polys.append(poly)
-        inter_road = poly.intersection(u_carriageway) if u_carriageway.intersects(poly) else Polygon()
-        if inter_road.area > 0.5:
-            rp = inter_road.representative_point()
-            bldg_issues.append(make_issue('proceduralOnCarriageway', rp.x, rp.y, inter_road.area,
-                                          f'procedural building seed={seed} overlaps carriageway {inter_road.area:.1f} m²'))
-        inter_sw = poly.intersection(u_sidewalk) if u_sidewalk.intersects(poly) else Polygon()
-        if inter_sw.area > 0.5:
-            rp = inter_sw.representative_point()
-            bldg_issues.append(make_issue('proceduralOnSidewalk', rp.x, rp.y, inter_sw.area,
-                                          f'procedural building seed={seed} overlaps sidewalk {inter_sw.area:.1f} m²'))
+        for surface, subtype in ((u_carriageway, 'proceduralOnCarriageway'), (u_sidewalk, 'proceduralOnSidewalk')):
+            if not surface.intersects(poly):
+                continue
+            overlap = poly.intersection(surface)
+            if overlap.area <= 0.5:
+                continue
+            rp = overlap.representative_point()
+            issue = make_issue(subtype, rp.x, rp.y, overlap.area,
+                               f'procedural building seed={seed} overlaps {subtype[12:]} {overlap.area:.1f} m²')
+            if not elevated:
+                bldg_issues.append(issue)
+                continue
+            start = len(ceiling_samples)
+            for part in polygons(overlap):
+                # Include thin edge slivers between the half-metre interior samples.
+                samples = [part.representative_point().coords[0]]
+                for ring in (part.exterior, *part.interiors):
+                    samples.extend(ring.segmentize(0.5).coords)
+                x0,z0,x1,z1 = part.bounds
+                xx,zz = np.meshgrid(np.arange(x0+.25,x1,.5), np.arange(z0+.25,z1,.5))
+                inside = contains_xy(part, xx, zz)
+                samples.extend(zip(xx[inside], zz[inside]))
+                ceiling_samples.extend(dict(x=x,z=z,passageClearance=True) for x,z in samples)
+            ceiling_checks.append((start,len(ceiling_samples),base / 10,issue))
+    if ceiling_samples:
+        elevations = sample_road_heights(world_dir, manifest, ceiling_samples)
+        for start,end,ceiling,issue in ceiling_checks:
+            clearance = ceiling - max(elevations[start:end])
+            if clearance < 3.5:
+                issue['detail'] += f', clearance {clearance:.3f} m'
+                bldg_issues.append(issue)
 
     lm_block_footprints = {}
     for lid, ldata in landmarks.items():
@@ -473,6 +510,17 @@ def run_audit(world_dir: Path, root: Path) -> dict:
             from common import ll2xz
             landmark_polygons.append(Polygon([ll2xz(lat, lon) for lon, lat in rep['polygon']]).buffer(0))
     u_lm_replace_poly = unary_union(landmark_polygons).buffer(1.1) if landmark_polygons else Polygon()
+    # Negative-layer highways can be covered by a rendered tunnel floor.
+    # Use only that way's own strip so a nearby or overlying road cannot
+    # supply coverage for a missing segment of the underground carriageway.
+    floor_strips = defaultdict(list)
+    for tunnel in manifest.get('tunnels', []):
+        if not tunnel.get('generated'):
+            continue
+        a, b = tunnel['portals']
+        axis = LineString([(a[0], a[2]), (b[0], b[2])])
+        floor_strips[tunnel['way']].append(axis.buffer(tunnel['halfWidth'], cap_style='flat'))
+    floor_coverage = {way: unary_union(parts) for way, parts in floor_strips.items()}
     u_surface_check = unary_union([u_all_road_surface, u_lm_walk])
     prepare(u_surface_check)
 
@@ -625,6 +673,7 @@ def run_audit(world_dir: Path, root: Path) -> dict:
         return road_base_y(x, z) + 0.045
 
     for way_id, name, hw, is_bridge, width_m, seg in road_Elements:
+        coverage = floor_coverage.get(way_id, u_surface_check)
         length = seg.length
         n_pts = max(2, int(math.floor(length / 2.0)) + 1)
         dists = np.linspace(0.0, length, n_pts)
@@ -669,7 +718,7 @@ def run_audit(world_dir: Path, root: Path) -> dict:
 
             # Road gap check (1m radius around centerline must have road/bridge/landmark surface)
             if not (hw == 'pedestrian' and u_lm_replace_poly.contains(pt)):
-                if not u_surface_check.intersects(pt.buffer(1.0)):
+                if not coverage.intersects(pt.buffer(1.0)):
                     gap_issues.append(make_issue('roadGap', pt.x, pt.y, 1.0,
                                                  f'way/{way_id} {name or hw} missing road mesh within 1m', way=way_id))
 
@@ -773,6 +822,9 @@ def run_audit(world_dir: Path, root: Path) -> dict:
                 dz_dx = (road_base_y(x0_s + step, z0_s) - y00) / step
                 dz_dy = (road_base_y(x0_s, z0_s + step) - y00) / step
                 cos_slope = 1.0 / math.sqrt(1.0 + dz_dx ** 2 + dz_dy ** 2)
+                hit = survey_hit(cx, cz)
+                if hit is not None:
+                    cos_slope = 1.0 / hit[1]
                 if cos_slope < 0.5:
                     texture_issues.append(make_issue('uvStretch', cx, cz, 1.0 / cos_slope,
                                                      f'Steep road slope foreshortens xz UV by {1.0/cos_slope:.2f}x (>2x)'))
@@ -827,6 +879,9 @@ def run_audit(world_dir: Path, root: Path) -> dict:
             gm = ground_mesh_y(tx_i, tz_i)
             offset = 0.195 if on_sw[i] else 0.045 if on_rd[i] else 0.060 if on_cycle[i] else None
             sup = road_base_y(tx_i, tz_i) + offset if offset is not None else gm
+            sampled = survey_hit(tx_i, tz_i)
+            if sampled is not None:
+                sup = sampled[0]
             if in_peak[i]:
                 py_m = nearest_peak_y(tx_i, ty_i, tz_i)
                 if py_m is not None and abs(ty_i - py_m) < abs(ty_i - sup):

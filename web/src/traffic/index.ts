@@ -8,15 +8,16 @@ import {interactions} from './interactions'
 import {touchUi} from '../ui/input-mode'
 import {npcDefaults,validNpc} from '../../../lib/npc'
 
-async function loadGraph(key:string,rules:typeof npcDefaults){
+async function loadGraph(key:string,signal:AbortSignal,rules:typeof npcDefaults){
   const start=performance.now()
-  const response=await fetch(`/world/roads/${key}.json.gz`)
+  const response=await fetch(`/world/roads/${key}.json.gz`,{signal})
   if(!response.ok||!response.body)throw Error(`traffic graph: ${response.status}`)
   const bytes=await response.arrayBuffer()
   const downloaded=performance.now()
   const signature=new Uint8Array(bytes,0,2)
   const body=signature[0]===31&&signature[1]===139?new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip')):bytes
   const decoded=await new Response(body).arrayBuffer()
+  signal.throwIfAborted()
   const graph:Graph=JSON.parse(new TextDecoder().decode(decoded)),sim=new Traffic(graph,Math.random,touchUi()?MOBILE_ACTORS:MAX_ACTORS,rules)
   const timing=performance.getEntriesByName(response.url).at(-1) as PerformanceResourceTiming|undefined
   return {sim,sample:{key,encodedBytes:timing?.encodedBodySize||bytes.byteLength,decodedBytes:decoded.byteLength,downloadMs:downloaded-start,parseAndIndexMs:performance.now()-downloaded}}
@@ -30,7 +31,7 @@ export async function traffic(scene:THREE.Scene,camera:THREE.Camera,verify:boole
   const settings=await fetch('/api/npc',{signal:AbortSignal.timeout(2500)}).then(response=>response.ok?response.json():null).catch(()=>null)
   const rules=validNpc(settings)?settings:npcDefaults
   const effects=interactions(scene,camera,rules)
-  let sim:Traffic|undefined,key=''
+  let sim:Traffic|undefined,key='',loading:AbortController|undefined
   const mesh=new THREE.InstancedMesh(new THREE.BoxGeometry(),new THREE.MeshLambertMaterial({color:0x999999}),MAX_ACTORS)
   const frustum=new THREE.Frustum(),projection=new THREE.Matrix4(),point=new THREE.Vector3()
   const visible=(actor:{x:number,y:number,z:number})=>frustum.containsPoint(point.set(actor.x,actor.y+.7,actor.z))
@@ -48,6 +49,16 @@ export async function traffic(scene:THREE.Scene,camera:THREE.Camera,verify:boole
   const slotGeometry=new Int16Array(SLOTS).fill(-1),slotPaint:(THREE.Color|undefined)[]=[],slotShown=new Uint8Array(SLOTS)
   for(let slot=0;slot<SLOTS;slot++){batch.addInstance(geometryIds[0]);batch.setVisibleAt(slot,false)}
   const variants=new WeakMap<object,Variant>()
+  function actorVariant(actor:Traffic['actors'][number]){
+    let variant=variants.get(actor)
+    if(!variant){variant=models.variant(actor.kind,Math.random(),Math.random());variants.set(actor,variant)
+      const axles=models.axles.get(variant.geometry)
+      if(axles)[actor.frontAxle,actor.rearAxle,actor.halfTrack]=axles
+      const geometry=models.geometries[variant.geometry];if(!geometry.boundingBox)geometry.computeBoundingBox()
+      const {min,max}=geometry.boundingBox!;actor.halfWidth=Math.max(-min.x,max.x);actor.halfLength=Math.max(-min.z,max.z);actor.height=max.y
+    }
+    return variant
+  }
   const pose=new THREE.Object3D();pose.rotation.order='YXZ'
   const transforms=new Float64Array(SLOTS*8).fill(NaN)
   const FAR=75**2 // IDOK-253: detailed car meshes only near the camera, light stand-ins beyond 75 m
@@ -94,6 +105,14 @@ export async function traffic(scene:THREE.Scene,camera:THREE.Camera,verify:boole
       hide(STATIC+count,STATIC+parkCount);parkCount=count;mesh.userData.parked=count
     }).catch(error=>{if(target===parkKey){parkKey='';cache.clear()}console.warn('Parking cell unavailable',error)})
   }
+  if(verify)mesh.userData.profileMemory=()=>{
+    let encodedChars=0,decodedBytes=0
+    if(sim)for(const track of sim.allTracks()){
+      encodedChars+=track.floor?.length??0
+      decodedBytes+=track.knots?.byteLength??0
+    }
+    return {cell:key,encodedChars,decodedBytes}
+  }
   const near=(x:number,z:number,visit:(solid:Solid)=>void)=>{sim?.nearSolids(x,z,visit);staticSolids(x,z,visit)}
   let accumulator=0
   const probeIds=new WeakMap<object,number>();let nextProbeId=0
@@ -103,20 +122,25 @@ export async function traffic(scene:THREE.Scene,camera:THREE.Camera,verify:boole
   let walking=new Set<object>()
   return (dt:number,vehicle?:THREE.Vector3,player?:THREE.Vector3,_solo=false,enabled=true)=>{
     useTrafficSolids(enabled?near:undefined)
-    if(!enabled){effects.clear();people.clear();walking.clear();mesh.count=0;hide(0,SLOTS);parkKey='';parkCount=0;curbside.clear();return}
+    if(!enabled){effects.clear();loading?.abort();loading=undefined;sim=undefined;key='';people.clear();walking.clear();mesh.count=0;hide(0,SLOTS);parkKey='';parkCount=0;curbside.clear();return}
     updateParking(camera.position.x,camera.position.z)
     parkLodAt-=dt;if(parkLodAt<=0){parkLodAt=.5;for(const [slot,variant,x,y,z,yaw] of parkedRows)show(slot,variant,x,y,z,yaw,1)}
     if(verify&&mesh.userData.staticOnly){hide(0,STATIC);mesh.count=0;mesh.userData.allMotors=[];return}
     const center=player??camera.position
     const target=`${Math.floor(center.x/512)}_${Math.floor(center.z/512)}`
     if(target!==key){
+      loading?.abort()
+      const [east,south]=target.split('_').map(Number),[oldEast,oldSouth]=key.split('_').map(Number)
+      if(Math.abs(east-oldEast)>1||Math.abs(south-oldSouth)>1){sim=undefined;people.clear();walking.clear();mesh.count=0;hide(0,STATIC)}
       key=target
-      if(cells.has(key))void loadGraph(key,rules).then(({sim:next,sample})=>{
-        if(key!==target)return
+      const controller=loading=new AbortController()
+      if(cells.has(key))void loadGraph(key,controller.signal,rules).then(({sim:next,sample})=>{
+        if(controller.signal.aborted||key!==target)return
         if(verify){mesh.userData.loads.push(sample);if(mesh.userData.loads.length>64)mesh.userData.loads.shift()}
+        next.prepareMotor=actorVariant
         next.sampleGround=sampleGround
         if(sim)next.inherit(sim);sim=next
-      }).catch(error=>console.warn('Traffic cell unavailable',error))
+      }).catch(error=>{if(!controller.signal.aborted){key='';console.warn('Traffic cell unavailable',error)}})
       else {sim=undefined;people.clear();walking.clear();mesh.count=0;hide(0,STATIC)}
     }
     if(!sim){effects.clear();return}
@@ -146,13 +170,9 @@ export async function traffic(scene:THREE.Scene,camera:THREE.Camera,verify:boole
           gap:actor.track.length-actor.dist,green:sim!.green(actor.track)})
         if(actor.speed<.1){queued++;if(actor.track.length-actor.dist<5&&!sim!.green(actor.track))redStops++}
       }
-      let variant=variants.get(actor)
-      if(!variant){variant=models.variant(actor.kind,Math.random(),Math.random());variants.set(actor,variant)
-        const geometry=models.geometries[variant.geometry];if(!geometry.boundingBox)geometry.computeBoundingBox()
-        const {min,max}=geometry.boundingBox!;actor.halfWidth=Math.max(-min.x,max.x);actor.halfLength=Math.max(-min.z,max.z);actor.height=max.y
-      }
+      const variant=actorVariant(actor)
       if(walking.has(actor)){hide(index,index+1);return}
-      show(index,variant,actor.x,actor.y,actor.z,actor.yaw,actor.scale,actor.kind==='person'&&actor.down>0,actor.pitch,actor.roll,actor.kind==='person'?undefined:actor.kind)
+      show(index,variant,actor.x,actor.y,actor.z,actor.yaw,actor.scale,actor.kind==='person'&&actor.down>0,actor.pitch,actor.roll,actor.kind==='person'||actor.track.floor||actor.track.wheelPose?undefined:actor.kind)
     })
     people.animate(dt,accumulator)
     effects.tick(sim.actors,sim.time,elapsed,player,!!vehicle,actor=>variants.get(actor)?.geometry??0)

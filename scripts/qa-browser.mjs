@@ -23,3 +23,26 @@ export async function recordFrames(page) {
   })
   console.log('QA_FRAME', JSON.stringify(sample))
 }
+
+// Use the same random sequence in the two production builds of a paired run.
+export async function seedBenchmark(context){
+  if(process.env.PERF_PEDESTRIANS==='0'){
+    // The baseline must run unmodified. Apply the same sidewalk-track control
+    // after the production decoder reads each cell, keeping motor lanes intact.
+    await context.addInitScript(()=>{
+      const parse=JSON.parse
+      JSON.parse=function(text,reviver){
+        const value=parse(text,reviver)
+        if(Array.isArray(value?.lanes)&&Array.isArray(value.nodes)&&Array.isArray(value.signals)){
+          for(const lane of value.lanes)delete lane.npcWalks
+        }
+        return value
+      }
+    })
+  }
+  if(!process.env.PERF_SEED)return
+  await context.addInitScript(initial=>{
+    let state=initial>>>0
+    Math.random=()=>{state=(Math.imul(1664525,state)+1013904223)>>>0;return state/4294967296}
+  },Number(process.env.PERF_SEED))
+}

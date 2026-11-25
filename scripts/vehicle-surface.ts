@@ -1,5 +1,6 @@
 // Vertical intersections with the triangles used by the fine-detail renderer.
 import fs from 'node:fs'
+import {bedPositions} from '../web/src/roadbed'
 import path from 'node:path'
 import {execFileSync} from 'node:child_process'
 import {gunzipSync} from 'node:zlib'
@@ -32,11 +33,11 @@ class Triangles {
   }
 }
 
-function tileSurface(world,entry,tunnels){
+export function tileSurface(world,entry,tunnels, collect?:(kind:string,faces:Float32Array)=>void){
   const data=gunzipSync(fs.readFileSync(path.join(world,entry.file)))
   const [verts,indices,jsonSize,imageBytes,triangles]=[4,8,12,16,20].map(i=>data.readUInt32LE(i))
   const jsonStart=24+16900+9*verts+4*indices
-  const [,paths,,,legacy,,,savedBed]=JSON.parse(data.toString('utf8',jsonStart,jsonStart+jsonSize))
+  const [,paths,,,legacy,signs=[],railCuts=[],savedBed]=JSON.parse(data.toString('utf8',jsonStart,jsonStart+jsonSize))
   const bed=savedBed??(legacy&&!Array.isArray(legacy)?legacy:undefined)
   const deckStart=jsonStart+jsonSize+imageBytes,tail=deckStart+18*triangles
   const groundStart=data.length===tail?24:tail
@@ -47,14 +48,36 @@ function tileSurface(world,entry,tunnels){
     for(let i=0;i<64;i++){const j=base+(i&~7)*stride;grid[base+i*stride]=grid[j]+(grid[j+8*stride]-grid[j])*(i%8)/8}
   }
   const step=wet.some(Boolean)?4:8,s=step/4
-  function ground(x,z){
+  function interpolate(field,x,z){
     const col=Math.max(0,Math.min(256/step-1,Math.floor(x/step))),row=Math.max(0,Math.min(256/step-1,Math.floor(z/step)))
-    const i=(row*65+col)*s,u=x/step-col,v=z/step-row,a=grid[i],b=grid[i+s],c=grid[i+s*65],d=grid[i+s*66]
+    const i=(row*65+col)*s,u=x/step-col,v=z/step-row,a=field[i],b=field[i+s],c=field[i+s*65],d=field[i+s*66]
     return u+v<=1?a+(b-a)*u+(c-a)*v:d+(c-d)*(1-u)+(b-d)*(1-v)
   }
-  const roads=streetGeometry(paths,ground).road
-  joinPortalRoads(entry,tunnels,[roads])
-  const modified=bed&&new Set(bed.drop),replacement=bed&&new Triangles(Float32Array.from(bed.vertices.flat()))
+  const cut=railCuts.length?grid.slice():grid
+  for(const [index,cm] of railCuts){
+    const stride=256/step+1
+    cut[s*(Math.floor(index/stride)*65+index%stride)]=cm/100
+  }
+  const ground=(x,z)=>interpolate(cut,x,z)
+  const streets=streetGeometry(paths,(x,z)=>interpolate(grid,x,z),Array.isArray(legacy)?legacy:[],signs,ground,entry.stationPaving,new Set<number>(entry.roadbeds)),roads=streets.road
+  joinPortalRoads(entry,tunnels,[roads.subarray(0,streets.legacyRoadLength)])
+  const modified=bed&&new Set(bed.drop),replacement=bed&&new Triangles(bedPositions(bed))
+  if(collect){
+    const positions:number[]=[]
+    for(let z=0;z<256;z+=step)for(let x=0;x<256;x+=step){
+      const first=2*(z/step*256/step+x/step)
+      for(const [index,offsets] of [[[0,0],[0,1],[1,0]],[[1,0],[0,1],[1,1]]].entries()){
+        if(modified?.has(first+index))continue
+        for(const [dx,dz] of offsets){
+          const px=x+step*dx,pz=z+step*dz
+          positions.push(px,ground(px,pz),pz)
+        }
+      }
+    }
+    collect('ground',Float32Array.from(positions))
+    if(bed)collect('ground',bedPositions(bed))
+    collect('road',roads)
+  }
   function visibleGround(x,z){
     if(!modified)return ground(x,z)
     const col=Math.min(256/step-1,Math.floor(x/step)),row=Math.min(256/step-1,Math.floor(z/step))
@@ -63,12 +86,54 @@ function tileSurface(world,entry,tunnels){
     const hits=replacement.hits(x,z)
     return hits.length?Math.max(...hits):ground(x,z)
   }
-  return {ground:visibleGround,road:new Triangles(roads),deck:new Triangles(Float32Array.from({length:triangles*9},(_,i)=>data.readInt16LE(deckStart+2*i)/100))}
+  return {ground:visibleGround,sidewalk:new Triangles(streets.sidewalk),road:new Triangles(roads),deck:new Triangles(Float32Array.from({length:triangles*9},(_,i)=>data.readInt16LE(deckStart+2*i)/100))}
 }
 
-export function vehicleSurface(world,m){
+// Follow the connected carriageway when a wheel extends across a joint.
+// A deck crossing above an unrelated road does not share an OSM endpoint.
+function bridgeConnections(graph){
+  const nodes=new Map(graph.nodes.map(n=>[n.id,n]))
+  const links=new Map()
+  for(const lane of graph.lanes){
+    if(lane.structure!=='bridge')continue
+    for(const [a,b] of [[lane.from,lane.to],[lane.to,lane.from]]){
+      if(!links.has(a))links.set(a,new Map())
+      const spans=links.get(a),p=nodes.get(a),q=nodes.get(b),width=Math.abs(lane.offset)+lane.width/2+.5
+      if(!spans.has(b)||spans.get(b).width<width)spans.set(b,{p,q,width})
+    }
+  }
+  return (lane,x,z)=>{
+    if(lane.structure||lane.from===undefined)return false
+    for(const node of [lane.from,lane.to]){
+      const spans=links.get(node)
+      if(!spans)continue
+      for(const {p,q,width} of spans.values()){
+        const dx=q.x-p.x,dz=q.z-p.z,length=Math.hypot(dx,dz)
+        const along=((x-p.x)*dx+(z-p.z)*dz)/length
+        if(along>=0&&along<=Math.min(length,8)&&Math.abs((x-p.x)*dz-(z-p.z)*dx)<=width*length)return true
+      }
+    }
+    return false
+  }
+}
+
+export function vehicleSurface(world,m,graph?){
+  const reachesDeck=graph?bridgeConnections(graph):undefined
   const chunks=new Map(m.chunks.map(e=>[e.x+','+e.z,e])),cache=new Map()
   const tunnels=m.tunnels??[],landmarks=new Map<string,any[]>()
+  // A car can span a complete short OSM edge at a portal. Keep its wheel
+  // on the connected floor even when the axle centre is on the following edge.
+  const portalWays=new Map<string,Set<number>>()
+  const portalKey=(x:number,z:number)=>Math.round(x*100)+','+Math.round(z*100)
+  if(graph){
+    for(const t of tunnels)for(const [i,[x,,z]] of t.portals.entries()){
+      if(t.mouths?.[i])portalWays.set(portalKey(x,z),new Set())
+    }
+    const ends=new Map(graph.nodes.map(n=>[n.id,portalWays.get(portalKey(n.x,n.z))]))
+    for(const l of graph.lanes)if(!l.structure){
+      ends.get(l.from)?.add(l.way);ends.get(l.to)?.add(l.way)
+    }
+  }
   const roles=JSON.parse(fs.readFileSync('pipeline/seam-surfaces.json','utf8'))
   for(const entry of m.landmarks){
     const atlas=[roles.atlas[entry.id]??[]].flat().filter(part=>part.role==='road')
@@ -131,6 +196,16 @@ export function vehicleSurface(world,m){
         }
       }
     }
+    // A tyre can enter an adjoining bore before the axle centre crosses a
+    // skewed mouth. Its actual contact lies on the rendered floor triangle.
+    if(!lane.structure&&local.length&&lane.start&&lane.end){
+      for(const t of local){
+        if(!t.portals.some(([px,,pz],i)=>t.mouths?.[i]&&Math.hypot(x-px,z-pz)<4&&
+          ([lane.start,lane.end].some(node=>Math.hypot(node.x-px,node.z-pz)<.05)||portalWays.get(portalKey(px,pz))?.has(lane.way))))continue
+        const floor=floorLevel(t,x,z)
+        if(floor!==undefined)return floor
+      }
+    }
     if(lane.structure==='tunnel'&&lane.start&&lane.end){
       const along=(x-lane.start.x)*lane.dx+(z-lane.start.z)*lane.dz
       const end=along<0?lane.start:along>lane.length?lane.end:null
@@ -142,7 +217,7 @@ export function vehicleSurface(world,m){
         }
       }else if(diagnostic)diagnostic.missingFloor=true
     }
-    const terrain=tile.ground(lx,lz),road=Math.max(...tile.road.hits(lx,lz))
+    const terrain=tile.ground(lx,lz),road=Math.max(...tile.road.hits(lx,lz),...(lane.pedestrian?tile.sidewalk.hits(lx,lz):[]))
     let y=Math.max(terrain,road)
     for(const mesh of landmarks.get(key)??[]){
       if(mesh.bikeDeck&&lane.way!==1531308751&&lane.way!==1531308752)continue
@@ -154,7 +229,7 @@ export function vehicleSurface(world,m){
         if(lower<y+2)y=Math.max(y,lower)
       }else y=Math.max(y,...hits)
     }
-    if(lane.structure==='bridge'){
+    if(lane.structure==='bridge'||reachesDeck?.(lane,x,z)){
       const deck=Math.max(...tile.deck.hits(lx,lz))
       if(diagnostic)diagnostic.deck=deck
       y=Math.max(y,deck)

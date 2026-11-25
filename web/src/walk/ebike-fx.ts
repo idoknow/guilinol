@@ -632,7 +632,8 @@ export function applyEbikeVisualAndRider(params: {
 
   const bikeX = basePos.x + crash.bikeOffset.x
   const bikeZ = basePos.z + crash.bikeOffset.z
-  const bikeY = supportY ? supportY(bikeX, bikeZ, basePos.y) : basePos.y
+  const displaced = crash.bikeOffset.x !== 0 || crash.bikeOffset.z !== 0
+  const bikeY = displaced && supportY ? supportY(bikeX, bikeZ, basePos.y) : basePos.y
 
   rig.update({
     pos: _gripL.set(bikeX, bikeY, bikeZ),

@@ -238,6 +238,9 @@ export async function vehicles(
     if (record instanceof T.Mesh) return record
     const mesh = makeVehicleMesh(record.name, record.userData.paint, {shared: record.userData.shared})
     mesh.position.copy(record.position)
+    // Controllers read yaw and pitch after unbatching. With XYZ Euler order
+    // a heading past 90 degrees reappears as a flipped pitch and roll.
+    mesh.rotation.order='YXZ'
     mesh.quaternion.copy(record.quaternion)
     Object.assign(mesh.userData, record.userData)
     const saved = bikeStates.get(record)
@@ -1351,7 +1354,7 @@ export async function vehicles(
     dampSpeed(stepDt: number) { return bikeCtrl.dampSpeed(stepDt) },
     dampCarSpeed(stepDt: number) { return carCtrl.dampSpeed(stepDt) },
     capSpeed(stepDt: number, limit: number) { return bikeCtrl.capSpeed(stepDt, limit) },
-    setPitch(frontY: number | undefined, backY: number | undefined, dt: number) { bikeCtrl.setPitch(frontY, backY, dt) },
+    setPitch(frontY: number | undefined, backY: number | undefined, dt: number, wheelbase: number) { bikeCtrl.setPitch(frontY, backY, dt, wheelbase) },
     setCarPitch(frontY: number | undefined, backY: number | undefined, dt: number) { carCtrl.setPitch(frontY, backY, dt) },
     setCarMode(mode: CarDriveMode) { return carCtrl.setMode(mode) },
     setCarModeByIndex(idx: number) { return carCtrl.setModeByIndex(idx) },

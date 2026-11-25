@@ -16,7 +16,11 @@ import sys
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from shapely.geometry import Polygon
+from shapely.geometry import Polygon, LineString
+from campus_passage import open_straight_passage
+from canal_passages import sample_road_heights
+import json
+from world_surface import WORLD
 
 from common import ll2xz, load_osm
 from g3_kit import export_school
@@ -94,7 +98,22 @@ def build(b):
     overrides.update({'way/680695951': dict(style='balcony', wall='white', accent='white'),
                       'way/680695956': dict(style='ribbon', wall='white', accent='granite'),
                       'a58c9bc2-83c6-4f1c-afe7-bf2f3ee41cdc': dict(style='ribbon', wall='white', accent='white')})
-    C.build_records(b, 'guat_jinji', heroes={'way/1472913840': _wentian, 'way/724360581': _museum},
+    road=next(w for w in els if w['type']=='way' and w['id']==1487527349)
+    axis=LineString([ll2xz(g['lat'],g['lon']) for g in road['geometry']])
+    def passage(builder, ring, spec):
+        local=C.to_local(builder,axis)
+        across=Polygon(ring).intersection(local.buffer(2.5,cap_style='flat'))
+        probes=[dict(x=builder.surface.x+x,z=builder.surface.z+z,way=road['id'])
+                for x,z in across.exterior.coords]
+        for side in (-2.5,0,2.5):
+            track=local.offset_curve(side).intersection(across) if side else local.intersection(across)
+            if track.is_empty:continue
+            for i in range(math.ceil(track.length)+1):
+                point=track.interpolate(i)
+                probes.append(dict(x=builder.surface.x+point.x,z=builder.surface.z+point.y,way=road['id']))
+        highest=max(sample_road_heights(WORLD,json.loads((WORLD/'manifest.json').read_text()),probes))-builder.surface.y
+        open_straight_passage(builder,ring,spec,local,2.5,highest,U.building)
+    C.build_records(b, 'guat_jinji', heroes={'way/1472913840': _wentian, 'way/724360581': _museum,'way/1472913843':passage},
                     overrides=overrides)
     nodes = {e['id']: e for e in els if e['type'] == 'node' and any(e['id'] in g for g in GATES)}
     for pair in GATES:

@@ -159,3 +159,33 @@ def finish_paving(directory, manifest, profiles, elements):
         )
         path.write_bytes(gzip.compress(payload, mtime=0))
         tile["bytes"] = path.stat().st_size
+
+
+def complete_merge_pavement(directory, manifest, elements):
+    """Close native pavement gaps at the two merging S2201 profile ends."""
+    from PIL import ImageColor
+    from pathlib import Path
+    from shapely import Point
+    from shapely.affinity import translate
+    from shapely.ops import substring
+    from service_streets import patch_tile
+
+    ends = {500571918, 553364493}
+    axes = {way['id']: LineString(points(way)) for way in elements
+            if way['type'] == 'way' and way['id'] in ends}
+    color = ImageColor.getrgb(json.loads(Path(__file__).with_name('palette.json').read_text())['road'])
+    for section in manifest.get('tunnels', []):
+        if not section.get('nativePaving') or section['way'] not in axes:
+            continue
+        axis = axes[section['way']]
+        x, _, z = section['portals'][-1]
+        end = axis.project(Point(x, z))
+        area = substring(axis, end - 12, end + 8).buffer(section['halfWidth'] + .5, cap_style='flat')
+        for tile in manifest['chunks']:
+            tx, tz = tile['x'], tile['z']
+            bounds = box(tx, tz, tx+256, tz+256)
+            if not area.intersects(bounds):
+                continue
+            file = directory/tile['file']
+            if patch_tile(file, translate(area.intersection(bounds), -tx, -tz), color, tile):
+                tile['bytes'] = file.stat().st_size
