@@ -72,6 +72,26 @@ def measure(base, candidate):
                           distanceToMotorwayAxis=point.distance(motorway_axis),
                           outsideServiceCorridor=point.distance(upper_axis)-width(upper['tags'])/2-.5,
                           roofMetres=roof, requiredMetres=required, deficitMetres=required-roof)
+    # ground_features paints the unbridged motorway on a 14 m wide strip.
+    half_width = 7.
+    indices = [i for i in range(limit, len(stations))
+               if probes[i].distance(motorway_axis) <= half_width]
+    roofs = samples(candidate, manifests[1], [probes[i] for i in indices], 'roofProbe')
+    section = []
+    for i, hits in zip(indices, roofs, strict=True):
+        point = probes[i]
+        distance = stations[i]-stations[anchor]
+        floor_min = bridge_y-.08*distance
+        top = max(y for y in hits if y is not None)
+        section.append(dict(wheelPathMetres=distance, xz=list(point.coords[0]),
+                            insideRoadEdgeMetres=half_width-point.distance(motorway_axis),
+                            floorLowerBound=floor_min, visibleTop=top,
+                            minimumLift=floor_min+clearance-top))
+    motorway_probe['section'] = dict(samples=len(section), roadWidth=2*half_width,
+        peak=max(section, key=lambda r: r['minimumLift']),
+        insideOneMetre=max((r for r in section if r['insideRoadEdgeMetres'] >= 1),
+                           key=lambda r: r['minimumLift']),
+        overHalfMetreSamples=sum(1 for r in section if r['minimumLift'] > .5))
     return dict(motorwayProbe=motorway_probe, tunnel=tunnel['id'], tags=tunnel['tags'], clearance=clearance, bridge=bridge['id'],
                 bridgeXZ=list(probes[anchor].coords[0]), bridgeY=bridge_y, upper=upper['id'],
                 upperXZ=list(probes[limit].coords[0]), upperY=surface[limit],
