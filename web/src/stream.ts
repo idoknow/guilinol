@@ -167,6 +167,12 @@ export class Stream {
     return (this.updateLandmarks?.busyPriorityCount?.()??0)>0
   }
 
+  surfaceAt(x:number,z:number){
+    const tile=this.grid.at(x,z)
+    if(!tile)return undefined
+    return this.loaded.get(tile)?.surfaceAt(x,z)
+  }
+
   private enqueue(tile:Tile, inner:boolean){
     const controller = new AbortController()
     if(this.failures.has(tile))record('retry',{category:'chunk'})

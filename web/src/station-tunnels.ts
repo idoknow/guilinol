@@ -1,7 +1,7 @@
 import {mergeVertices} from 'three/addons/utils/BufferGeometryUtils.js'
 import * as THREE from 'three'
 import type {Tile} from './world'
-const stationRoofDepth = 1.2
+export const stationRoofDepth = 1.2
 
 export const tunnelLiningMaterial=new THREE.MeshStandardMaterial({side:THREE.DoubleSide,vertexColors:true,roughness:.9})
 export const tunnelLightMaterial=new THREE.MeshBasicMaterial({side:THREE.DoubleSide,vertexColors:true})
@@ -86,6 +86,23 @@ export function floorLevel(tunnel:Tunnel,x:number,z:number){
 
 type Plane=(point:Point)=>number
 
+function openEnds(tunnel:Tunnel){
+  return tunnel.openEnds??tunnel.approachEnds??[tunnel.mouths?.[0]===false?0:tunnel.approach,tunnel.mouths?.[1]===false?0:tunnel.approach]
+}
+
+export function tunnelCeiling(sections:Tunnel[],x:number,z:number,footY:number){
+  let ceiling=Infinity
+  for(const section of nearbyTunnels(sections,x,z)){
+    if(section.openCut)continue
+    const [first,last]=openEnds(section),at=frame(section).station(x,z)
+    if(first+last>=section.length || (first>0&&at<first) || (last>0&&at>section.length-last))continue
+    const floor=floorLevel(section,x,z)
+    if(floor===undefined || footY<floor-.75 || footY>=floor+section.clearance)continue
+    ceiling=Math.min(ceiling,floor+section.clearance-stationRoofDepth)
+  }
+  return ceiling
+}
+
 function clip(poly:Point[],plane:Plane){
   const result:Point[]=[]
   for(let index=0;index<poly.length;index++){
@@ -114,7 +131,7 @@ export function tunnelGeometry(tile:Tile,ground:THREE.PlaneGeometry,tunnels:Tunn
     const axes=frame(tunnel),width=tunnel.halfWidth,head=tunnel.clearance
     function local(s:number,d:number,y:number){const p=axes.point(s,d,y);p[0]-=tile.x;p[2]-=tile.z;return p}
     const station=(p:Point)=>axes.station(p[0]+tile.x,p[2]+tile.z),side=(p:Point)=>axes.lateral(p[0]+tile.x,p[2]+tile.z)
-    const [first,last]=tunnel.openEnds??tunnel.approachEnds??[tunnel.mouths?.[0]===false?0:tunnel.approach,tunnel.mouths?.[1]===false?0:tunnel.approach]
+    const [first,last]=openEnds(tunnel)
     const footprint=(from:number,to:number):Plane[]=>[p=>station(p)-from,p=>to-station(p),p=>width-side(p),p=>width+side(p)]
     const patches=tunnel.footprint?.map(ring=>footprintPlanes(ring).map(fn=>(p:Point)=>fn(p[0]+tile.x,p[2]+tile.z)))??[[]]
     const addCut=(planes:Plane[],roof?: (p:Point)=>number)=>{for(const patch of patches)cuts.push({planes:[...planes,...patch],roof})}

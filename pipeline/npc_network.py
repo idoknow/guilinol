@@ -35,8 +35,12 @@ def annotate(graph, elements, report):
     for row in report:
         lane = by_id[row['lane']]
         lane['sidewalkFace'] = row['tileSidewalk']
-        lane['npcWalks'] = [[round(value, 4) for point in (coords[0], coords[-1]) for value in point]
-                            for coords in row['tracks']]
+        lane['npcWalks'] = [
+            [round(value, 4) for point in (a, b) for value in point]
+            for coords in row['tracks']
+            for a, b in zip(coords, coords[1:])
+            if ((b[0] - a[0]) ** 2 + (b[1] - a[1]) ** 2) >= 4.0
+        ]
     return by_id
 
 
