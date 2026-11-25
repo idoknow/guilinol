@@ -81,8 +81,8 @@ function patternShade(look:FishLook,t:number,v:number,a:number,spots:number[][])
 }
 
 function bodyGeometry(look:FishLook){
-  const S=64,R=40,{hh,ww,cy}=profile(look)
-  const pos:number[]=[],col:number[]=[],idx:number[]=[]
+  const S=112,R=56,{hh,ww,cy}=profile(look)
+  const pos:number[]=[],col:number[]=[],idx:number[]=[],uv:number[]=[]
   const back=new THREE.Color(look.back),belly=new THREE.Color(look.belly),pc=new THREE.Color(look.pc??0x222222)
   const r=rng(Number(Object.keys(looks).find(k=>looks[k]===look)??7)*977)
   const count=look.pattern==='reticulate'?(look.n??12)*3:look.pattern==='spots'?Math.round(40*(look.n??2)):0
@@ -92,11 +92,14 @@ function bodyGeometry(look:FishLook){
     for(let j=0;j<=R;j++){
       const a=j/R*Math.PI*2, s=Math.sin(a), k=Math.cos(a)
       const y=c+h*s*(s<0?.92:1), z=w*k
-      pos.push(x,y,z)
+      pos.push(x,y,z);uv.push(t,j/R)
       const v=(s+1)/2
       color.copy(belly).lerp(back,smooth(.3,.78,v))
       // 鳃盖：头后一道浅暗线；侧线：一条极淡的亮线
-      if(t>.19&&t<.215)color.multiplyScalar(.82)
+      // 鳃盖后缘：一道弧形暗线 + 前方略亮的鳃盖面；吻端嘴线
+      const gill=.2+.03*Math.cos(a)**2
+      if(t>gill-.012&&t<gill)color.multiplyScalar(.72);else if(t>.1&&t<gill-.012)color.lerp(tmp.set(0xffffff),.05)
+      if(t<.07&&Math.abs(s-(-.05))<.06)color.multiplyScalar(.55)
       if(Math.abs(v-.66)<.012&&t>.22)color.lerp(tmp.set(0xffffff),.12)
       const p=patternShade(look,t,v,a,spots);if(p>0)color.lerp(pc,p)
       if(look.pattern==='scales'){
@@ -110,8 +113,24 @@ function bodyGeometry(look:FishLook){
   }
   for(let i=0;i<S;i++)for(let j=0;j<R;j++){const a=i*(R+1)+j,b=a+R+1;idx.push(a,b,a+1,b,b+1,a+1)}
   const g=new THREE.BufferGeometry()
-  g.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));g.setAttribute('color',new THREE.Float32BufferAttribute(col,3))
+  g.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));g.setAttribute('color',new THREE.Float32BufferAttribute(col,3));g.setAttribute('uv',new THREE.Float32BufferAttribute(uv,2))
   g.setIndex(idx);g.computeVertexNormals();return g
+}
+
+// 鳞片凹凸：一张错位排列的鳞弧灰度图，作为 bumpMap 让高光沿鳞片断开（不改颜色）
+let scaleBump:THREE.CanvasTexture|undefined
+function scaleTexture(){
+  if(scaleBump)return scaleBump
+  const c=document.createElement('canvas');c.width=512;c.height=256;const g=c.getContext('2d')!
+  g.fillStyle='#808080';g.fillRect(0,0,512,256)
+  const cols=64,rows=24,w=512/cols,h=256/rows
+  for(let row=-1;row<=rows;row++)for(let col=-1;col<=cols;col++){
+    const x=col*w+(row%2?w/2:0),y=row*h
+    const grad=g.createRadialGradient(x+w*.2,y+h/2,1,x+w*.2,y+h/2,w*.95)
+    grad.addColorStop(0,'#b8b8b8');grad.addColorStop(.75,'#8a8a8a');grad.addColorStop(1,'#505050')
+    g.fillStyle=grad;g.beginPath();g.ellipse(x+w*.2,y+h/2,w*.95,h*.75,0,-Math.PI/2,Math.PI/2);g.fill()
+  }
+  scaleBump=new THREE.CanvasTexture(c);scaleBump.wrapS=scaleBump.wrapT=THREE.RepeatWrapping;scaleBump.anisotropy=4;return scaleBump
 }
 
 /** 一片鳍：沿 base 点列向 tip 点列铺条带，顶点色做出鳍条明暗。 */
@@ -129,7 +148,7 @@ function finStrip(base:THREE.Vector3[],tip:THREE.Vector3[],tint:number,rays=true
 }
 
 function dorsalFin(look:FishLook,fin:Fin,bottom:boolean){
-  const {hh,cy}=profile(look),K=fin.shape==='finlets'?40:16,base:THREE.Vector3[]=[],tip:THREE.Vector3[]=[],sign=bottom?-1:1
+  const {hh,cy}=profile(look),K=fin.shape==='finlets'?60:32,base:THREE.Vector3[]=[],tip:THREE.Vector3[]=[],sign=bottom?-1:1
   for(let i=0;i<=K;i++){
     const u=i/K,t=fin.from+(fin.to-fin.from)*u,y=cy(t)+sign*hh(t)*(bottom?.9:.97)
     let h:number
@@ -148,7 +167,7 @@ function dorsalFin(look:FishLook,fin:Fin,bottom:boolean){
 
 function tailFin(look:FishLook){
   const {hh,cy}=profile(look),ped=hh(1),x0=-.5,y0=cy(1),S=(look.tailSize??1)*Math.max(.11,look.h*.55),T=S*1.05
-  const K=24,base:THREE.Vector3[]=[],tip:THREE.Vector3[]=[]
+  const K=44,base:THREE.Vector3[]=[],tip:THREE.Vector3[]=[]
   // 外缘：从上叶尖经缺刻到下叶尖，按尾型给出 (dx, dy)
   const edge=(u:number):[number,number]=>{ // u 0 上 → 1 下
     const s=1-2*u, a=Math.abs(s)
@@ -168,7 +187,7 @@ function tailFin(look:FishLook){
 
 function sideFin(look:FishLook,t:number,size:number,down:boolean,side:1|-1,wide=false){
   const {hh,ww,cy}=profile(look),x=.5-t,y=cy(t)-hh(t)*(down?.85:.35),z=ww(t)*(down?.5:.92)*side
-  const K=8,base:THREE.Vector3[]=[],tip:THREE.Vector3[]=[],L=size*(look.h/.25*.4+.6)
+  const K=16,base:THREE.Vector3[]=[],tip:THREE.Vector3[]=[],L=size*(look.h/.25*.4+.6)
   for(let i=0;i<=K;i++){const u=i/K
     base.push(new THREE.Vector3(x-u*L*.18,y,z))
     const r=L*(wide?.9+.2*Math.sin(Math.PI*u):1-.5*u)
@@ -183,7 +202,8 @@ export function buildFish(id:string){
   const hit=cache.get(id);if(hit)return hit.clone()
   const look=looks[id]??looks['001'],group=new THREE.Group();group.name='fish-'+id
   const shine=look.shine??.25
-  const bodyMat=new THREE.MeshStandardMaterial({vertexColors:true,roughness:.55-.3*shine,metalness:.08+.35*shine})
+  const bodyMat=new THREE.MeshPhysicalMaterial({vertexColors:true,roughness:.5-.28*shine,metalness:.06+.3*shine,clearcoat:.55,clearcoatRoughness:.35,
+    bumpMap:look.pattern==='reticulate'||look.snout==='shark'||look.barbels?undefined:scaleTexture(),bumpScale:.0025})
   const finMat=new THREE.MeshStandardMaterial({vertexColors:true,roughness:.7,metalness:0,side:THREE.DoubleSide,transparent:true,opacity:.88,depthWrite:false})
   const add=(g:THREE.BufferGeometry,m:THREE.Material,name:string)=>{const mesh=new THREE.Mesh(g,m);mesh.name=name;group.add(mesh);return mesh}
   add(bodyGeometry(look),bodyMat,'body')
@@ -199,9 +219,11 @@ export function buildFish(id:string){
   const eyeWhite=new THREE.MeshStandardMaterial({color:look.snout==='shark'?0x1a1d1f:0xd8c98a,roughness:.25,metalness:.1})
   const pupil=new THREE.MeshStandardMaterial({color:0x050607,roughness:.05,metalness:.3})
   for(const side of [1,-1]){
-    const eye=new THREE.Mesh(new THREE.SphereGeometry(er,16,12),eyeWhite),p=new THREE.Mesh(new THREE.SphereGeometry(er*.6,12,8),pupil)
+    const eye=new THREE.Mesh(new THREE.SphereGeometry(er,24,16),eyeWhite),p=new THREE.Mesh(new THREE.SphereGeometry(er*.6,20,14),pupil)
     eye.position.set(.5-et,cy(et)+hh(et)*.28,ww(et)*.78*side);p.position.copy(eye.position).add(new THREE.Vector3(0,0,er*.55*side))
-    eye.name=p.name='eye';group.add(eye,p)
+    const rim=new THREE.Mesh(new THREE.TorusGeometry(er*1.02,er*.14,8,24),new THREE.MeshStandardMaterial({color:new THREE.Color(look.back).multiplyScalar(.6),roughness:.6}));rim.position.copy(eye.position);rim.position.z+=er*.2*side
+    const glint=new THREE.Mesh(new THREE.SphereGeometry(er*.16,8,6),new THREE.MeshBasicMaterial({color:0xffffff}));glint.position.copy(p.position).add(new THREE.Vector3(er*.18,er*.22,er*.32*side))
+    eye.name=p.name=rim.name=glint.name='eye';group.add(eye,p,rim,glint)
   }
   if(look.snout==='long'){ // 象鼻鱼：下弯的长吻
     const curve=new THREE.QuadraticBezierCurve3(new THREE.Vector3(.49,cy(0),0),new THREE.Vector3(.6,cy(0)-.01,0),new THREE.Vector3(.66,cy(0)-.07,0))
