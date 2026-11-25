@@ -23,10 +23,11 @@ def tile_rails(world, tile):
     return collision[4] if len(collision) > 4 else []
 
 
-def check(world, design):
+def check(world, design, ways=None):
     manifest = json.loads((world / "manifest.json").read_text())
     ties = {int(key): sorted(pair) for key, pair in design["railTies"].items()}
-    ways = {w["id"]: w for w in load_osm() if w["type"] == "way" and w["id"] in ties}
+    if ways is None:
+        ways = load_tracks(ties)
     alignments = {wid: LineString(points(ways[wid])) for wid in ties}
     sections = {wid: substring(line, *ties[wid]) for wid, line in alignments.items()}
     intervals = {wid: [] for wid in ties}
@@ -67,15 +68,41 @@ def check(world, design):
     return dict(maximumGrade=grades, parallel=parallel)
 
 
+def load_tracks(ids):
+    return {w["id"]: w for w in load_osm() if w["type"] == "way" and w["id"] in ids}
+
+
+def passes(report, design):
+    paired = report["parallel"]
+    return bool(paired["directedSegmentPairs"] and not paired["over5cm"]
+                and max(report["maximumGrade"].values()) <= design["maximumGrade"] + 1e-6)
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("world", type=Path)
-    parser.add_argument("design", type=Path)
+    inputs = parser.add_mutually_exclusive_group(required=True)
+    inputs.add_argument("design", type=Path, nargs="?")
+    inputs.add_argument("--all", action="store_true", help="Include every section and both first-section alignments")
     args = parser.parse_args()
+    if args.all:
+        pipeline = Path(__file__).resolve().parent
+        first_section = pipeline / "rail-audits"
+        paths = [
+            first_section / "01-upper.json",
+            first_section / "01-hengliu.json",
+            *sorted((pipeline / "rail-sections").glob("*.json")),
+        ]
+        designs = {path.stem: json.loads(path.read_text()) for path in paths}
+        ways = load_tracks({int(wid) for design in designs.values() for wid in design["railTies"]})
+        reports = {}
+        for name, design in designs.items():
+            report = check(args.world, design, ways)
+            reports[name] = dict(**report, passed=passes(report, design))
+        print(json.dumps(reports, indent=2))
+        raise SystemExit(0 if reports and all(row["passed"] for row in reports.values()) else 1)
+
     design = json.loads(args.design.read_text())
     report = check(args.world, design)
     print(json.dumps(report, indent=2))
-    paired = report["parallel"]
-    passed = (paired["directedSegmentPairs"] and not paired["over5cm"]
-              and max(report["maximumGrade"].values()) <= design["maximumGrade"] + 1e-6)
-    raise SystemExit(0 if passed else 1)
+    raise SystemExit(0 if passes(report, design) else 1)
