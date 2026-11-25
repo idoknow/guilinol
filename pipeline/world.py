@@ -118,24 +118,13 @@ def build(bbox, output, palette, workers=4):
     layout = Layout()
     layers = ground_features(bounds,layout.school_grounds)
     surface = np.full_like(terrain, DRY)
-    texture = Image.new('RGB',(width,depth),palette['ground'])
-    for region in layout.school_grounds:
-        for part in polygons(region.intersection(bounds)):
-            for surface_area, color in ((part, palette['green']), (part.buffer(-3), '#bdbcb5')):
-                for paved in polygons(surface_area):
-                    mask, corner = stencil(paved,left,top,1)
-                    texture.paste(color,corner,mask)
-    for layer, features in layers.items():
-        for poly in features:
-            mask, corner = stencil(poly,left,top,1)
-            texture.paste(palette[layer],corner,mask)
-            if layer == 'water':
-                mask, (col,row) = stencil(poly,left,top,GRID)
-                patch = surface[row:row+mask.height,col:col+mask.width]
-                wet = intersects_xy(poly, left+(col+np.arange(patch.shape[1]))*GRID,
-                                    top+(row+np.arange(patch.shape[0])[:,None])*GRID)
-                if wet.any():
-                    patch[wet] = round(np.median(terrain[row:row+patch.shape[0],col:col+patch.shape[1]][wet]))
+    for poly in layers['water']:
+        mask, (col,row) = stencil(poly,left,top,GRID)
+        patch = surface[row:row+mask.height,col:col+mask.width]
+        wet = intersects_xy(poly, left+(col+np.arange(patch.shape[1]))*GRID,
+                            top+(row+np.arange(patch.shape[0])[:,None])*GRID)
+        if wet.any():
+            patch[wet] = round(np.median(terrain[row:row+patch.shape[0],col:col+patch.shape[1]][wet]))
     wet = surface != DRY
     previous_bed = np.where(wet,np.minimum(terrain,surface-20),terrain)
     output.mkdir(parents=True, exist_ok=True)
@@ -372,6 +361,17 @@ def build(bbox, output, palette, workers=4):
     index = STRtree(footprints)
     bridge_cutouts = building_cutouts(road_net[0], footprints, heights, index)
     shop_rows = shopfronts(footprints, heights, roads)
+    texture = Image.new('RGB',(width,depth),palette['ground'])
+    for region in layout.school_grounds:
+        for part in polygons(region.intersection(bounds)):
+            for surface_area, color in ((part, palette['green']), (part.buffer(-3), '#bdbcb5')):
+                for paved in polygons(surface_area):
+                    mask, corner = stencil(paved,left,top,1)
+                    texture.paste(color,corner,mask)
+    for layer, features in layers.items():
+        for poly in features:
+            mask, corner = stencil(poly,left,top,1)
+            texture.paste(palette[layer],corner,mask)
     for campus in layout.allow_unmapped_court:
         if not bounds.covers(campus) or any(campus.covers(field.representative_point())
                 for layer in ('schoolTrack','schoolCourt') for field in layers[layer]):
