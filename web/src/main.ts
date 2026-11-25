@@ -4,7 +4,7 @@ import {bindingLabel, hits} from './input/keymap'
 import {nearestPlayable} from '../../lib/play-region'
 import {identifyWorld,instrument,operation,record} from './telemetry'
 import * as THREE from 'three'
-import {warmShaders} from './shader-warmup'
+import {landingWarmBudget,warmShaders,type WarmBudget} from './shader-warmup'
 import {vehicleModel} from './walk/vehicle-model'
 import {bytes, fetchAsset, measureFirstWorldBytes, openingTerrain, startOverview, type Manifest} from './world'
 import {Stream} from './stream'
@@ -90,8 +90,8 @@ async function start(loader:FullLoader,creatorSpawn=false) {
   const bounds=terrain??previousWorld!
   const renderer = new THREE.WebGLRenderer({antialias:false,powerPreference:'high-performance'})
   renderer.debug.checkShaderErrors = import.meta.env.DEV || params.has('debug')
-  const warmPrograms=async(root:THREE.Object3D)=>{
-    try{await warmShaders(renderer,root,camera,scene)}catch(error){console.warn('Shader warmup unavailable',error)}
+  const warmPrograms=async(root:THREE.Object3D,budget?:WarmBudget)=>{
+    try{await warmShaders(renderer,root,camera,scene,budget)}catch(error){console.warn('Shader warmup unavailable',error)}
   }
   renderer.toneMapping = THREE.NoToneMapping; renderer.toneMappingExposure = look.exposure
   document.body.prepend(renderer.domElement)
@@ -338,17 +338,23 @@ async function start(loader:FullLoader,creatorSpawn=false) {
       signal.throwIfAborted()
       if(completed){
         stage='landing content'
-        await Promise.race([prepareLandingContent?.(),interrupted]);stage='shader warm-up'
+        await Promise.race([prepareLandingContent?.(),interrupted]);clearTimeout(deadline)
         stream.tick(player.position)
         stream.updateLandmarks?.(player.position)
-        if(!walkProgramsReady){
-          const bike=vehicleModel('bike',1),parked=new THREE.InstancedMesh(bike.geometry,bike.material,1)
-          parked.setColorAt(0,new THREE.Color(0xffffff))
-          const variants=new THREE.Group(),mapped=new THREE.MeshStandardMaterial({map:new THREE.Texture(),flatShading:true})
-          variants.add(parked,new THREE.Mesh(bike.geometry,mapped))
-          try{await Promise.race([warmPrograms(variants),interrupted])}finally{parked.dispose();mapped.dispose()}
-        }
-        await Promise.race([warmPrograms(scene),interrupted]);walkProgramsReady=true
+        const budget=landingWarmBudget(start)
+        const skipped=new Promise<void>(resolve=>budget.signal.aborted?resolve():budget.signal.addEventListener('abort',()=>resolve(),{once:true}))
+        try{
+          if(!walkProgramsReady&&!budget.signal.aborted){
+            const bike=vehicleModel('bike',1),parked=new THREE.InstancedMesh(bike.geometry,bike.material,1)
+            parked.setColorAt(0,new THREE.Color(0xffffff))
+            const variants=new THREE.Group(),mapped=new THREE.MeshStandardMaterial({map:new THREE.Texture(),flatShading:true})
+            variants.add(parked,new THREE.Mesh(bike.geometry,mapped))
+            try{await Promise.race([warmPrograms(variants,budget),skipped,interrupted])}finally{parked.dispose();mapped.dispose()}
+          }
+          signal.throwIfAborted()
+          await Promise.race([warmPrograms(scene,budget),skipped,interrupted]);signal.throwIfAborted()
+          walkProgramsReady=true
+        }finally{budget.dispose()}
       }
       if(completed){
         cover.progress(1)
