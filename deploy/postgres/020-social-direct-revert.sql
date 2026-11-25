@@ -1,8 +1,8 @@
 BEGIN;
-LOCK TABLE social_identities, social_states, social_pending IN ACCESS EXCLUSIVE MODE;
 DO $$
 BEGIN
   IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema=current_schema() AND table_name='social_identities' AND column_name='channel') THEN
+    LOCK TABLE social_identities, social_states, social_pending IN ACCESS EXCLUSIVE MODE;
     IF EXISTS (SELECT 1 FROM social_identities WHERE channel='direct') THEN
       RAISE EXCEPTION 'Direct social identities exist; review before rollback';
     END IF;

@@ -16,6 +16,7 @@ let child,browser,logs='',closed,storage,site
 async function sql(command){return storage.sql(command)}
 try {
   storage=await fixture()
+  if(!ui)await (await import('./social-test.mjs')).testSocialUpgrade(storage)
   if(!ui)await (await import('./player-uid-test.mjs')).testPlayerUid(storage.env.DATABASE_URL)
   const probe=createServer();probe.listen(0,'127.0.0.1');await once(probe,'listening');const port=probe.address().port;await new Promise(resolve=>probe.close(resolve))
   const staticDir=ui?'dist':join(state,'empty-site');if(!ui)await mkdir(staticDir)

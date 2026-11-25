@@ -162,3 +162,21 @@ async function checkRollbackReplay(sql) {
   await sql(await readFile('deploy/postgres/020-social-direct-revert.sql','utf8'))
   assert.deepEqual(await identities(),before)
 }
+
+export async function testSocialUpgrade({sql,replay}) {
+  const indexes=async()=> (await sql(`SELECT indexrelid AS oid, pg_get_indexdef(indexrelid) AS definition FROM pg_index WHERE indrelid='social_identities'::regclass AND indisunique ORDER BY indisprimary DESC`))[0].results
+  const checkKeys=async()=>{
+    const keys=await indexes()
+    assert.equal(keys.length,2)
+    assert.match(keys[0].definition,/\(type, social_uid\)$/)
+    assert.match(keys[1].definition,/social_owner .*\(user_id, type\)$/)
+    return keys
+  }
+  await checkKeys()
+  await sql(await readFile('deploy/postgres/018-social-direct.sql','utf8'))
+  assert.match((await indexes())[0].definition,/\(channel, type, social_uid\)$/)
+  await replay()
+  const restored=await checkKeys()
+  await replay()
+  assert.deepEqual(await checkKeys(),restored)
+}
