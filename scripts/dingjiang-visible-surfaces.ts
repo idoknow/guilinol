@@ -26,7 +26,7 @@ function clip(poly: Vertex[], side: Cut) {
   return result
 }
 
-export function tileFaces(world: string, tile: any, tunnels: Tunnel[], visit: (p: Vertex[], role: string, floorOwner?: number) => void, includeRailBed = false) {
+export function tileFaces(world: string, tile: any, tunnels: Tunnel[], visit: (p: Vertex[], role: string, floorOwner?: number) => void, includeRailBed = false, trackAudit = false) {
   const raw = gunzipSync(fs.readFileSync(path.join(world, tile.file)))
   const [v, i, n, image, deck] = [4, 8, 12, 16, 20].map((k) => raw.readUInt32LE(k))
   const off = 16924 + 9 * v + 4 * i,
@@ -69,6 +69,24 @@ export function tileFaces(world: string, tile: any, tunnels: Tunnel[], visit: (p
   }
   const street = streetGeometry(paths, sample(false), includeRailBed ? rails : [], [], sample(true), tile.stationPaving, new Set(tile.roadbeds))
   joinPortalRoads(tile, tunnels, [street.positions])
+  if (trackAudit) {
+    const coords = (p: THREE.Vector3): Vertex => [tile.x+p.x,p.y,tile.z+p.z]
+    streetGeometry(paths,sample(false),rails,[],sample(true),tile.stationPaving,new Set(tile.roadbeds),
+      [tile.x,tile.z],(a,b,c)=>visit([a,b,c].map(coords),'rail-slope'))
+    // Replay just the barrier furniture using the same pavement heights and transforms.
+    const barriers = [...paths]
+    for (const slot of [1,3,4,7,8]) barriers[slot]=[]
+    barriers[9]=(paths[9]??[]).filter(([kind])=>[1,2,5,6,8].includes(kind))
+    const furniture = streetGeometry(barriers as typeof paths,sample(false),[],[],sample(true),tile.stationPaving,new Set(tile.roadbeds),[tile.x,tile.z])
+    const cube = new THREE.BoxGeometry(1,1,1)
+    const verts=cube.getAttribute('position'), indices=cube.index!, matrix=new THREE.Matrix4()
+    for(let k=0;k<furniture.furnitureMatrices.length;k+=16) {
+      matrix.fromArray(furniture.furnitureMatrices,k)
+      for(let j=0;j<indices.count;j+=3) visit([0,1,2].map(n=>coords(new THREE.Vector3()
+        .fromBufferAttribute(verts,indices.getX(j+n)).applyMatrix4(matrix))), 'road-barrier')
+    }
+    cube.dispose()
+  }
   for (let t = 0; t < street.positions.length; t += 9) {
     visit(
       [0, 3, 6].map((off) => [
@@ -80,7 +98,7 @@ export function tileFaces(world: string, tile: any, tunnels: Tunnel[], visit: (p
     )
   }
   for (const [k, y] of railCuts) positions.setY(k, y / 100)
-  const originalGround = includeRailBed ? g.clone() : undefined
+  const originalGround = includeRailBed || trackAudit ? g.clone() : undefined
   const tunnel = tunnelGeometry(tile, g, tunnels)
   function mesh(geometry: THREE.BufferGeometry, role: string, owner?: number) {
     const p = geometry.getAttribute('position'),
@@ -99,7 +117,10 @@ export function tileFaces(world: string, tile: any, tunnels: Tunnel[], visit: (p
     function inspect(parts: typeof tunnel, owner?: number) {
       if (!parts || !('lining' in parts)) return
       mesh(parts.floor.geometry, 'graded-floor', owner)
-      mesh(parts.lining.geometry, 'tunnel-lining', owner)
+      if(trackAudit){
+        mesh(parts.portal.geometry,'retaining-wall',owner)
+        mesh(parts.interior.geometry,'tunnel-interior',owner)
+      } else mesh(parts.lining.geometry, 'tunnel-lining', owner)
       mesh(parts.lights.geometry, 'tunnel-lights', owner)
     }
     if (!originalGround) inspect(tunnel)

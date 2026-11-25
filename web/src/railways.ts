@@ -13,7 +13,7 @@ const sleeper=new Color(style.sleeper),warning=new Color(style.warning),concrete
 const BRIDGE=1,TUNNEL=2,ELECTRIC=4,FENCE=8,LEVEL=16,RESERVED=32,PAINTED=64
 
 export function railwayGeometry(sections:RailSection[],signs:CrossingSign[],ground:(x:number,z:number)=>number,
-  roadLevel:(x:number,z:number,fallback:number)=>number,face:RailFace,box:Box,levelFace:(a:Vector3,b:Vector3,c:Vector3,color:Color,h:number,painted:boolean)=>void){
+  roadLevel:(x:number,z:number,fallback:number)=>number,face:RailFace,box:Box,levelFace:(a:Vector3,b:Vector3,c:Vector3,color:Color,h:number,painted:boolean)=>void, inspectSlope?:(a:Vector3,b:Vector3,c:Vector3)=>void){
   const barriers:number[]=[]
   for(const [ax,az,ay,bx,bz,by,chainage,flags,ends=0] of sections){
     const x=ax/100,z=az/100,dx=(bx-ax)/100,dz=(bz-az)/100
@@ -75,6 +75,7 @@ export function railwayGeometry(sections:RailSection[],signs:CrossingSign[],grou
           }
           const a=toe(l),b=toe(r)
           face(l,r,b,ballast,[0,0,0],7);face(l,b,a,ballast,[0,0,0],7)
+          inspectSlope?.(l,r,b);inspectSlope?.(l,b,a)
         }
       }
       if(flags&BRIDGE)strip(-2.05,2.05,-1.2,-1.2,concrete)

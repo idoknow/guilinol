@@ -1,4 +1,5 @@
 {
+  "gradeTrackTerrain": true,
   "maximumGrade": 0.012,
   "railTies": {
     "259082251": [

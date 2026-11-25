@@ -74,6 +74,11 @@ type Peak = {
   railM: number
   faceM: number
 }
+// Optional intermediate for the A/B/C/D audit. Keep the clipped polygon so
+// category boundaries can be tested even when they bisect a triangle.
+const facesPath = process.argv[3]
+const output = facesPath ? fs.openSync(facesPath, 'w') : undefined
+let batch = ''
 const reports = Object.fromEntries(
   Object.entries(sections).map(([name, rows]) => [
     name,
@@ -87,61 +92,116 @@ const reports = Object.fromEntries(
 )
 for (const tile of manifest.chunks) {
   if (!tiles.has(tile.x / 256 + ',' + tile.z / 256)) continue
-  tileFaces(world, tile, manifest.tunnels, (face, role) => {
-    const ids = new Set(
-      bounds(
-        face.map((p) => p[0]),
-        face.map((p) => p[2]),
-        0,
-        16,
-      ).flatMap((k) => bins.get(k) ?? []),
-    )
-    for (const i of ids) {
-      const {
-          section,
-          row: [way, x, z, h, bx, bz, bh],
-        } = all[i],
-        report = reports[section]
-      const length = Math.hypot(bx - x, bz - z),
-        dx = (bx - x) / length,
-        dz = (bz - z) / length
-      let polygon = face.map(
-        ([px, py, pz]) =>
-          [
-            (px - x) * dx + (pz - z) * dz,
-            py,
-            (pz - z) * dx - (px - x) * dz,
-          ] as Vertex,
+  tileFaces(
+    world,
+    tile,
+    manifest.tunnels,
+    (face, role, owner) => {
+      // A collapsed portal wall has no rendered area.
+      const [a, b, c] = face
+      const ux = b[0] - a[0],
+        uy = b[1] - a[1],
+        uz = b[2] - a[2]
+      const vx = c[0] - a[0],
+        vy = c[1] - a[1],
+        vz = c[2] - a[2]
+      if (
+        Math.hypot(uy * vz - uz * vy, uz * vx - ux * vz, ux * vy - uy * vx) <
+        1e-10
       )
-      polygon = clip(
-        clip(clip(clip(polygon, 0, 1, 0), 0, -1, length), 2, 1, -width),
-        2,
-        -1,
-        width,
+        return
+      const ids = new Set(
+        bounds(
+          face.map((p) => p[0]),
+          face.map((p) => p[2]),
+          0,
+          16,
+        ).flatMap((k) => bins.get(k) ?? []),
       )
-      if (!polygon.length) continue
-      report.intersections++
-      let peak: Peak | undefined
-      for (const [s, y, u] of polygon) {
-        const railM = h + ((bh - h) * s) / length,
-          excessM = y - railM
-        if (excessM > 0.05 && (!peak || excessM > peak.excessM))
-          peak = {
-            excessM,
-            way,
-            x: x + dx * s - dz * u,
-            z: z + dz * s + dx * u,
-            railM,
-            faceM: y,
+      for (const i of ids) {
+        const {
+            section,
+            row: [way, x, z, h, bx, bz, bh],
+          } = all[i],
+          report = reports[section]
+        const length = Math.hypot(bx - x, bz - z),
+          dx = (bx - x) / length,
+          dz = (bz - z) / length
+        let polygon = face.map(
+          ([px, py, pz]) =>
+            [
+              (px - x) * dx + (pz - z) * dz,
+              py,
+              (pz - z) * dx - (px - x) * dz,
+            ] as Vertex,
+        )
+        polygon = clip(
+          clip(clip(clip(polygon, 0, 1, 0), 0, -1, length), 2, 1, -width),
+          2,
+          -1,
+          width,
+        )
+        if (!polygon.length) continue
+        report.intersections++
+        let peak: Peak | undefined
+        for (const [s, y, u] of polygon) {
+          const railM = h + ((bh - h) * s) / length,
+            excessM = y - railM
+          if (excessM > 0.05 && (!peak || excessM > peak.excessM))
+            peak = {
+              excessM,
+              way,
+              x: x + dx * s - dz * u,
+              z: z + dz * s + dx * u,
+              railM,
+              faceM: y,
+            }
+        }
+        if (
+          output !== undefined &&
+          (peak ||
+            ['paving-0', 'graded-floor', 'retaining-wall'].includes(role))
+        ) {
+          const vertices = polygon.map(([s, y, u]) => [
+            x + s * dx - u * dz,
+            z + s * dz + u * dx,
+            y,
+            y - (h + ((bh - h) * s) / length),
+          ])
+          const normalY = uz * vx - ux * vz
+          const gradient =
+            Math.abs(normalY) > 1e-9
+              ? [-(uy * vz - uz * vy) / normalY, -(ux * vy - uy * vx) / normalY]
+              : null
+          batch +=
+            JSON.stringify([
+              section,
+              i,
+              all[i].row,
+              role,
+              owner ?? null,
+              vertices,
+              gradient,
+            ]) + '\n'
+          if (batch.length > 524288) {
+            fs.writeSync(output, batch)
+            batch = ''
           }
+        }
+        if (!peak) continue
+        report.above.add(i)
+        const entry = (report.roles[role] ??= { hits: 0, worst: peak })
+        entry.hits++
+        if (entry.worst.excessM < peak.excessM) entry.worst = peak
       }
-      if (!peak) continue
-      report.above.add(i)
-      const entry = (report.roles[role] ??= { hits: 0, worst: peak })
-      entry.hits++
-      if (entry.worst.excessM < peak.excessM) entry.worst = peak
-    }
-  })
+    },
+    false,
+    output !== undefined,
+  )
+}
+if (output !== undefined) {
+  fs.writeSync(output, batch)
+  fs.closeSync(output)
 }
 console.log(
   JSON.stringify(
@@ -156,7 +216,7 @@ console.log(
   ),
 )
 process.exitCode = Object.values(reports).some(
-  (r) => r.above.size || !r.intersections,
+  (r) => (output === undefined && r.above.size > 0) || !r.intersections,
 )
   ? 1
   : 0
