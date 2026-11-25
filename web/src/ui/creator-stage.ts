@@ -195,7 +195,10 @@ export function creatorStage(host: HTMLElement, reduced: boolean, capture = fals
             ),
           )
           .play()
-        mixer.clipAction(wave).setLoop(T.LoopOnce, 1).play()
+        const waveAction = mixer.clipAction(wave).reset().setLoop(T.LoopOnce, 1)
+        waveAction.clampWhenFinished = true
+        waveAction.play()
+        mixer.update(0)
         await new Promise((r) => setTimeout(r, 1200))
       }
       finishing = true

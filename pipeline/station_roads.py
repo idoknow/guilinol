@@ -62,6 +62,10 @@ def half_width(way):
 
 def tunnel_sections(profiles):
     bores = []
+    # IDOK-371: only these opposing Cuizhu carriageways overlap at the portal; keep unrelated road widths unchanged.
+    cuizhu = ((265411001, 815082649, 815082646), (815082648, 265411005, 815082645))
+    opposite = {way_id: [profiles[other][1] for other in cuizhu[1-side] if other in profiles]
+                for side, carriageway in enumerate(cuizhu) for way_id in carriageway}
     for way, line, heights in profiles.values():
         covered = way['tags'].get('tunnel') == 'yes'
         if way['tags']['highway'] in ('footway','pedestrian'):
@@ -74,8 +78,13 @@ def tunnel_sections(profiles):
             levels = np.interp(distances, at, heights[:,1])
             portals = [[*p[:1], float(y), p[1]] for p,y in zip(coords[i:i+2], levels[[0,-1]])]
             mouths = [False, False] if way.get('surfaceApproach') else [i==0, i==len(chain)-2]
+            width = half_width(way)
+            if opposite.get(way['id']):
+                segment = LineString(coords[i:i+2])
+                if segment.distance(Point(-2395, 1935)) < 160:
+                    width = min(width, min(segment.distance(other) for other in opposite[way['id']])/2)
             bores.append(dict(way=way['id'], nodes=way['nodes'][i:i+2], portals=portals,
-                              length=end-start, halfWidth=half_width(way), clearance=4.5,
+                              length=end-start, halfWidth=width, clearance=4.5,
                               approach=0, openCut=not covered, openEnds=[0,0] if covered else [end-start,0], mouths=mouths,
                               pairedWidth=way.get('stationWidth'),
                               stations=np.column_stack((distances-start, levels)).tolist()))

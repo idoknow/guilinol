@@ -118,8 +118,10 @@ export function players(scene:THREE.Scene,clips:THREE.AnimationClip[],camera:THR
         if(!eligible||!player.em){view.emote.stop();view.played=-1}
       }
       const name=player.bike?'sit':!player.gr?'jump':player.v>3?'run':player.v>.12?'walk':'idle'
-      const clip=clips.find(item=>item.name===figure.clips[name]);if(clip&&view.mixer){const action=view.mixer.clipAction(clip)
-        if(!view.action||!view.action.isRunning()){
+      const clip=clips.find(item=>item.name===figure.clips[name])??clips.find(item=>item.name===figure.clips.idle)
+      if(clip&&view.mixer){const action=view.mixer.clipAction(clip)
+        if(!view.action||!view.action.isRunning()||!view.action.enabled){
+          view.mixer.stopAllAction()
           action.reset().setEffectiveWeight(1).play();view.action=action
         }else if(action!==view.action){
           view.action.fadeOut(.12);action.reset().setEffectiveWeight(1).fadeIn(.12).play();view.action=action
