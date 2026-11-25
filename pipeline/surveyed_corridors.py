@@ -16,6 +16,7 @@ from shapely.affinity import translate
 from shapely.geometry.polygon import orient
 from shapely.ops import substring
 
+from major_roadbeds import remap_paths
 from common import ll2xz
 from features import polygons
 from road_grading import eval_bspline_grid
@@ -47,6 +48,8 @@ def restore(output,chunks):
         previous=paths[12]['input']
         original=json.loads(zlib.decompress(base64.b64decode(previous)))
         paths[0]=original['paths']
+        if 'roadbeds' in original:
+            tile['roadbeds']=original['roadbeds']
         if len(paths)>11 and paths[11]:
             paths[11][0]=original['lower']
         anchors = paths[13] if len(paths)>13 else None
@@ -150,12 +153,12 @@ def bake(output, chunks, elements, widths, approaches=(), only_approaches=False,
             # the new transition. Do not regrade its distant, accepted junction.
             if not len(transition_index.query(bounds,predicate='intersects')):
                 continuous_local=[]
-            if patch(output/tile['file'], area, local, foot, seam,crossings,fixed,overrides,continuous_local):
+            if patch(output/tile['file'], area, local, foot, seam,crossings,fixed,overrides,continuous_local,tile):
                 tile['gradedCorridor']=True
             tile['bytes'] = (output/tile['file']).stat().st_size
 
 
-def patch(file, area, approaches=(), foot=(), seam=None, crossings=(), fixed=(), overrides=(), continuous=()):
+def patch(file, area, approaches=(), foot=(), seam=None, crossings=(), fixed=(), overrides=(), continuous=(), tile=None):
     raw = gzip.decompress(file.read_bytes())
     n, k, size, image, deck = struct.unpack_from('<5I', raw, 4)
     start = 24+16900+9*n+4*k
@@ -168,6 +171,8 @@ def patch(file, area, approaches=(), foot=(), seam=None, crossings=(), fixed=(),
     else:
         original=dict(paths=paths[0],lower=paths[11][0] if len(paths)>11 and paths[11] else None,
                       platform=old if isinstance(old,list) else None,length=len(paths),bed=collision[7] if len(collision)>7 else None)
+        if tile and 'roadbeds' in tile:
+            original['roadbeds']=tile['roadbeds']
         previous=base64.b64encode(zlib.compress(json.dumps(original,separators=(',',':')).encode())).decode()
     lower = paths[11] if len(paths)>11 else None
     boundary = lower[0] if lower else len(paths[0])
@@ -236,6 +241,8 @@ def patch(file, area, approaches=(), foot=(), seam=None, crossings=(), fixed=(),
             return indices[i] if i<boundary else survey_end+i-boundary
         while len(paths)<17: paths.append(None)
         paths[16]=[remap(platform[0]),remap(platform[1]),platform[2]]
+    suffix = list(range(survey_end, survey_end + len(paths[0]) - boundary))
+    remap_paths(tile, indices[:-1] + suffix, indices[1:] + [i+1 for i in suffix])
     paths[0] = rebuilt + paths[0][boundary:]
     tail = start+size+image+18*deck
     terrain = np.frombuffer(raw,'<i2',4225,tail if len(raw)>tail else 24).reshape(65,65)/10

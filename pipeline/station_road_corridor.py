@@ -29,7 +29,7 @@ def bake(output, chunks, ways):
             continue
         area=translate(corridor,xoff=-x,yoff=-z).intersection(box(0,0,256,256))
         file=output/tile['file']
-        patch_tile(file,area,ImageColor.getrgb(palette['road']))
+        patch_tile(file,area,ImageColor.getrgb(palette['road']),tile)
         raw=gzip.decompress(file.read_bytes())
         verts,indices,size,image,deck=struct.unpack_from('<5I',raw,4)
         offset=24+16900+9*verts+4*indices

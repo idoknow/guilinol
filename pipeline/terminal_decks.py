@@ -423,6 +423,8 @@ def trim_bridge_endcaps(output, manifest, elements):
         if len(paths)>11 and paths[11]:
             paths[11][0]=offsets[paths[11][0]]
         survey['start'],survey['end']=offsets[survey['start']],offsets[survey['end']]
+        from major_roadbeds import remap_paths
+        remap_paths(tile,offsets[:-1],offsets[1:])
         paths[0]=rebuilt
         write_chunk(path,raw,start,size,c)
         tile['bytes']=path.stat().st_size

@@ -133,8 +133,10 @@ def clear_approach_paving(output, chunks, underpasses):
         collision = json.loads(raw[start:start+size])
         streets = collision[1]
         lower = streets[11] if len(streets)>11 else None
+        offsets = []
         paths = []
         for i,item in enumerate(streets[0]):
+            offsets.append(len(paths))
             if lower and i==lower[0]:
                 first_lower = len(paths)
             kind,*loops = item
@@ -145,6 +147,9 @@ def clear_approach_paving(output, chunks, underpasses):
                 paths.append(item)
         if lower:
             lower[0] = first_lower if lower[0]<len(streets[0]) else len(paths)
+        from major_roadbeds import remap_paths
+        offsets.append(len(paths))
+        remap_paths(tile,offsets[:-1],offsets[1:])
         streets[0] = paths
         encoded = json.dumps(collision,separators=(',',':')).encode()
         payload = raw[:12]+struct.pack('<I',len(encoded))+raw[16:start]+encoded+raw[start+size:]

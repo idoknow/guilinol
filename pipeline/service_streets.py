@@ -68,7 +68,7 @@ def clean_texture(data, footprint, color):
     return encoded.getvalue()
 
 
-def patch_tile(file, footprint, color, *, sidewalk=False):
+def patch_tile(file, footprint, color, tile=None, *, sidewalk=False):
     raw = gzip.decompress(file.read_bytes())
     vertices, indices, size, png_size = struct.unpack_from('<4I', raw, 4)
     start = 24+16900+9*vertices+4*indices
@@ -76,13 +76,15 @@ def patch_tile(file, footprint, color, *, sidewalk=False):
     paths = streets[0]
     lower = streets[11] if len(streets)>11 else None
     boundary = lower[0] if lower else len(paths)
-    rebuilt, occupied = [], []
+    rebuilt, occupied, offsets = [], [], []
     for kind, *loops in paths[:boundary]:
+        offsets.append(len(rebuilt))
         shape = make_valid(Polygon(np.asarray(loops[0])/100, [np.asarray(loop)/100 for loop in loops[1:]]))
         if not sidewalk and kind in (1, 4, 5, 6) and shape.intersects(footprint):
             rebuilt.extend(rings(kind, shape.difference(footprint)))
         else:
             rebuilt.append([kind, *loops]); occupied.append(shape)
+    offsets.append(len(rebuilt))
     fresh = set_precision(footprint.difference(union_all(occupied)), .01)
     if fresh.area < .01:
         return False
@@ -95,6 +97,9 @@ def patch_tile(file, footprint, color, *, sidewalk=False):
                 rebuilt.extend(rings(0, fresh.intersection(box(east,south,east+16,south+16))))
     if lower:
         lower[0] = len(rebuilt)
+    from major_roadbeds import remap_paths
+    suffix=list(range(len(rebuilt),len(rebuilt)+len(paths)-boundary))
+    remap_paths(tile,offsets[:-1]+suffix,offsets[1:]+[i+1 for i in suffix])
     streets[0] = rebuilt + paths[boundary:]
     encoded = json.dumps(collision,separators=(',', ':')).encode()
     image_start = start+size
@@ -165,7 +170,7 @@ def bake_footprints(output, manifest, palette, tree, *, sidewalk=False):
                 continue
         shape = translate(clipped, -east,-south)
         file = output/tile['file']
-        if patch_tile(file, shape, ImageColor.getrgb(palette['road']), sidewalk=sidewalk):
+        if patch_tile(file, shape, ImageColor.getrgb(palette['road']), tile, sidewalk=sidewalk):
             changed += 1; tile['bytes'] = file.stat().st_size
     label = 'Shanhu walks' if sidewalk else 'Minor streets'
     print(f'{label}: {len(tree.geometries)} ways, {changed} changed chunks')
