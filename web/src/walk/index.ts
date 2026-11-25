@@ -9,7 +9,7 @@ import {openWater} from '../fishing/surface'
 import {fishingMarks} from '../fishing/marks'
 import '../fishing/report'
 import {createSteles} from '../fishing/steles'
-import {getActiveSaveSnapshot,takeFromPack} from '../game/save'
+import {getActiveSaveSnapshot,openPack,takeFromPack} from '../game/save'
 import {rules,validRules} from '../smoke/data'
 import {createSmokePrompt} from '../smoke/prompt'
 import {SmokeSession,brandIndex} from '../smoke/session'
@@ -376,7 +376,7 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
     }
     if(cigarette.active)return
     const pack=getActiveSaveSnapshot().packs[0]
-    if(!cigarette.start(pack?.brand,pack?.remaining)){
+    if(!cigarette.start(pack?.brand,pack?.remaining,pack?.opened)){
       void openSmokeShop('没有香烟了，去旁边的香烟铺买')
       return
     }
@@ -385,7 +385,7 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
   function smokeAction(){
     if(!usable()||!cigarette.prompt)return
     const puffs=cigarette.puffs
-    cigarette.act(()=>takeFromPack(cigarette.brand))
+    cigarette.act(()=>takeFromPack(cigarette.brand),()=>openPack(cigarette.brand))
     if(cigarette.puffs!==puffs)puffSeq=(puffSeq+1)%1000
     smokeHint.hidden=true
     updateSmokePrompt('')
@@ -2833,7 +2833,7 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
       showSmokeDiscard(cigarette.inMouth)
       const label=cigarette.prompt
       smokeHint.hidden=!label||!usable()
-      const hint=touchUi()?label:({'':'',撕开:'请按 F 键撕开烟盒封条',拿取:'请按 F 键拿取香烟',点燃:'请按 F 键点燃香烟',吸一口:'F 键吸一口'}[label]).replace('F',bindingLabel('interact'))
+      const hint=touchUi()?label:({'':'',撕开:'请按 F 键撕开封条',拿取:'请按 F 键拿取香烟',点燃:'请按 F 键点燃香烟',吸一口:'F 键吸一口'}[label]).replace('F',bindingLabel('interact'))
       updateSmokePrompt(smokeHint.hidden||touchUi()?'':hint)
       if(smokeHint.textContent!==hint)smokeHint.textContent=hint
       if(cigarette.advance(dt))smoking.drop()

@@ -57,7 +57,7 @@ async function verify(){
       await page.route('**/favicon.ico',route=>route.fulfill({status:204}))
       await page.setViewportSize({width:680,height:420})
       await page.addInitScript(()=>localStorage.setItem('glol.prefs',JSON.stringify({view:'first'})))
-      await page.addInitScript(()=>{if(!localStorage.getItem('glol.save.v1'))localStorage.setItem('glol.save.v1',JSON.stringify({schemaVersion:2,money:200,packs:[{brand:'lijiang',remaining:20}]}))})
+      await page.addInitScript(()=>{if(!localStorage.getItem('glol.save.v1'))localStorage.setItem('glol.save.v1',JSON.stringify({schemaVersion:2,money:200,packs:[{brand:'dangui',remaining:20}]}))})
       await page.goto(origin+'/backpack.html');await page.getByRole('button',{name:'香烟'}).click();await page.waitForURL(origin+'/')
       await page.goto(origin+'/?verify&play=tour&mp=1&time=12&flow=0');await page.waitForFunction(()=>window.viewer?.walkTo)
       assert(await page.evaluate(name=>window.viewer.walkTo(-309,name==='alice'?-1:1,name==='alice'?Math.PI:0,'smoke-test'),name));console.log(name,'entered')
@@ -78,7 +78,22 @@ async function verify(){
     await mkdir('captures/mp',{recursive:true})
     await Promise.all(pages.map(async(page,index)=>{
       await page.waitForFunction(()=>window.viewer.walk.net.probe().some(peer=>peer.puffs===1));await page.screenshot({path:`captures/mp/smoke-${index}.png`})
-    }));console.log('Both pages received the other player’s lit state and puff');return
+    }))
+    for(const page of pages)await page.keyboard.press('3')
+    for(const page of pages)await page.waitForFunction(()=>window.viewer.walk.net.probe().some(peer=>peer.smoke==='idle'))
+    for(const page of pages)await page.keyboard.press('3')
+    for(const page of pages){
+      await page.waitForFunction(()=>window.viewer.walk.net.probe().some(peer=>peer.smoke==='open'))
+      const brands=await page.evaluate(()=>{
+        const ids=[]
+        window.viewer.camera.parent.traverse(object=>{
+          if(object.name==='smoke-pack' && object.visible)ids.push(object.children[0].material[4].map.image?.src)
+        })
+        return ids
+      })
+      assert(brands.length>=2 && brands.every(src=>src?.endsWith('/dangui.svg')),JSON.stringify(brands))
+    }
+    console.log('Both peers lit, puffed and reopened their saved pack with the correct brand');return
   }
   const solo=await pageFor('solo',false);assert.equal(await solo.evaluate(()=>performance.getEntriesByType('resource').some(entry=>/\/net-[^/]+\.js|\/api\/rt\/ticket/.test(entry.name))),false);console.log('solo frame ms',await frameSample(solo));await solo.close()
   const alice=await pageFor('alice',true);await alice.evaluate(()=>window.viewer.freeze())

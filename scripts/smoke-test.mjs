@@ -8,7 +8,7 @@ test('same-tab backpack intent can only be consumed once',()=>{
   queueCigarette(storage);assert.equal(takeCigaretteIntent(storage),true);assert.equal(takeCigaretteIntent(storage),false)
 })
 import {executePurchase} from '../web/src/game/commerce.ts'
-import {resetSaveForTesting,getActiveSaveSnapshot,takeFromPack,loadLocalSave,setSaveStorageForTest} from '../web/src/game/save.ts'
+import {resetSaveForTesting,getActiveSaveSnapshot,openPack,takeFromPack,loadLocalSave,setSaveStorageForTest} from '../web/src/game/save.ts'
 function buy(id,key){
   return executePurchase({shopId:'smoke',itemType:'cigarette_pack',itemId:id,expectedPrice:25,idempotencyKey:key})
 }
@@ -20,9 +20,9 @@ test('shop caps inventory atomically and discard never charges a second cigarett
   assert.equal(buy('bailong','4').code,'ALREADY_FULL')
   assert.equal(getActiveSaveSnapshot().money,25)
   session.start('bailong')
-  session.advance(1)
+  session.advance(1.5)
   const take=()=>takeFromPack('bailong')
-  session.act(take);session.advance(1);session.act(take);session.advance(1)
+  session.act(take);session.advance(1.5);session.act(take);session.advance(1.5)
   session.stop()
   assert.equal(getActiveSaveSnapshot().packs[0].remaining,19)
   resetSaveForTesting(0)
@@ -37,9 +37,9 @@ test('seeded burn interval and ten segments with single and double puffs',()=>{
     session.start('hehua')
     assert(session.total>=150 && session.total<=180)
     for(const phase of ['sealed','open','ready']){
-      session.advance(1);assert.equal(session.phase,phase);assert(session.act(()=>true))
+      session.advance(1.5);assert.equal(session.phase,phase);assert(session.act(()=>true))
     }
-    session.advance(1)
+    session.advance(1.5)
     assert(session.lit)
     session.act(()=>true)
     counts.add(session.strength)
@@ -49,12 +49,13 @@ test('seeded burn interval and ten segments with single and double puffs',()=>{
   }
   assert.deepEqual(counts,new Set([1,2]))
 })
-test('remote displays the six brands and all preparation stages',()=>{
+test('remote keeps legacy wire codes and decodes reopened packs and new brands',()=>{
   const peer=new RemoteSmoke()
-  for(const [i,phase] of ['idle','light','smoking','draw','sealed','tear','open','take','ready'].entries()){
-    peer.update(i,1800,0,5,.1)
+  for(const [i,phase] of ['idle','light','smoking','draw','sealed','tear','open','take','ready','drawOpened'].entries()){
+    const brand=i===9?11:5
+    peer.update(i,1800,0,brand,.1)
     assert.equal(peer.view().phase,phase)
-    assert.equal(peer.view().brand,'lijiang')
+    assert.equal(peer.view().brand,i===9?'dangui':'lijiang')
   }
 })
 
@@ -66,11 +67,13 @@ test('mixed packs survive reload and an empty pack advances to the next brand',(
   loadLocalSave(storage)
   assert.equal(buy('bailong','first').code,'OK')
   assert.equal(executePurchase({shopId:'smoke',itemType:'cigarette_pack',itemId:'hehua',expectedPrice:38,idempotencyKey:'second'}).code,'OK')
+  assert(openPack('bailong'))
+  assert.deepEqual(loadLocalSave(storage).save.packs[0],{brand:'bailong',remaining:20,opened:true})
   for(let i=0;i<19;i++)assert(takeFromPack('bailong'))
-  assert.deepEqual(loadLocalSave(storage).save.packs,[{brand:'bailong',remaining:1},{brand:'hehua',remaining:20}])
+  assert.deepEqual(loadLocalSave(storage).save.packs,[{brand:'bailong',remaining:1,opened:true},{brand:'hehua',remaining:20,opened:false}])
   assert(takeFromPack('bailong'))
   assert(!takeFromPack('bailong'))
-  assert.deepEqual(loadLocalSave(storage).save.packs,[{brand:'hehua',remaining:20}])
+  assert.deepEqual(loadLocalSave(storage).save.packs,[{brand:'hehua',remaining:20,opened:false}])
 })
 
 import {readFileSync} from 'node:fs'
@@ -244,17 +247,17 @@ test('SmokeKit hides pack immediately on ready/light/smoking and resets carry ac
     }
     const session=new SmokeSession(()=>0.5)
     session.start('bailong',20)
-    session.advance(1) // sealed
+    session.advance(1.5) // sealed
     for(let i=0;i<15;i++)kit.apply(session.view(),anchors)
     assert.equal(kit.pack.visible,true)
 
-    session.act(()=>true);session.advance(1) // open
-    session.act(()=>true);session.advance(1) // ready (skipping gradual carry decay at low FPS)
+    session.act(()=>true);session.advance(1.5) // open
+    session.act(()=>true);session.advance(1.5) // ready (skipping gradual carry decay at low FPS)
     kit.apply(session.view(),anchors)
     assert.equal(kit.pack.visible,false,'pack must not linger into ready phase')
     assert.equal(kit.lighter.visible,true)
 
-    session.act(()=>true);session.advance(1) // smoking
+    session.act(()=>true);session.advance(1.5) // smoking
     kit.apply(session.view(),anchors)
     assert.equal(kit.pack.visible,false,'pack must never resurface during smoking idle')
     assert.equal(kit.lighter.visible,false,'lighter must hide during smoking idle')
@@ -266,5 +269,24 @@ test('SmokeKit hides pack immediately on ready/light/smoking and resets carry ac
   }finally{
     if(prevDoc===undefined)delete globalThis.document
     else globalThis.document=prevDoc
+  }
+})
+
+
+import {readPacks,brandOf,validRules,smokeDefaults} from '../web/src/smoke/data.ts'
+test('opened full and legacy partial packs skip the foil',()=>{
+  for(const [remaining,opened,phase] of [[20,false,'sealed'],[20,true,'open'],[19,undefined,'open']]){
+    const [pack]=readPacks([{brand:'dangui',remaining,opened}])
+    const session=new SmokeSession()
+    session.start(pack.brand,pack.remaining,pack.opened)
+    session.advance(1)
+    assert.equal(session.phase,phase)
+  }
+})
+test('brand details and inclusive shop price limits',()=>{
+  assert.equal(brandOf('letu').length,70)
+  assert.equal(brandOf('yidianhong').filterDot,'#bc2428')
+  for(const price of [4,5,60,61]){
+    assert.equal(validRules({...smokeDefaults,brands:[{id:'letu',price}]}),price>=5&&price<=60)
   }
 })
