@@ -45,6 +45,10 @@ function build() {
         </label>
       </section>
       <section class="set-block">
+        <h3>画面</h3>
+        <label class="set-row"><span class="set-what"><b>进入时自动全屏</b><small>触屏设备进入游戏时尝试切到横屏</small></span><input data-fullscreen type="checkbox"></label>
+      </section>
+      <section class="set-block">
         <h3>视角</h3>
         <div class="set-seg" role="radiogroup" aria-label="视角">
           <button type="button" data-view="third">第三人称</button>
@@ -63,6 +67,8 @@ function build() {
       </section>
     </div>
   </div>`
+  const fullscreen = mask.querySelector<HTMLInputElement>('[data-fullscreen]')!
+  fullscreen.onchange = () => setPrefs(value => ({...value, autoFullscreen: fullscreen.checked}))
   const emotes=mask.querySelector<HTMLInputElement>('[data-emotes]')!
   const volume=mask.querySelector<HTMLInputElement>('[data-volume]')!,mute=mask.querySelector<HTMLInputElement>('[data-mute]')!
   const volumeOut=mask.querySelector<HTMLElement>('[data-volume-out]')!,showVolume=()=>{volumeOut.textContent=`${Math.round(volume.valueAsNumber*100)}%`}
@@ -135,6 +141,7 @@ function build() {
 function paint() {
   if (!mask) return
   const current = prefs()
+  mask.querySelector<HTMLInputElement>('[data-fullscreen]')!.checked = current.autoFullscreen
   for (const input of Array.from(mask.querySelectorAll<HTMLInputElement>('[data-stat]'))) {
     input.checked = current.stats[input.dataset.stat as keyof StatsPrefs]
   }

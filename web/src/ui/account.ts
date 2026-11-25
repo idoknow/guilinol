@@ -163,10 +163,11 @@ const setUser=(value:User|null)=>{
   for(const listen of listeners)listen(user)
 }
 let sessionUnknown=false
-const refresh=()=>api('me').then(r=>{sessionUnknown=false;setUser(r&&typeof r.nickname==='string'?r:null)}).catch(error=>{
+let checking:Promise<void>|undefined
+const refresh=()=>checking??=api('me').then(r=>{sessionUnknown=false;setUser(r&&typeof r.nickname==='string'?r:null)}).catch(error=>{
   sessionUnknown=error.code!=='unauthorized'
   if(!sessionUnknown)setUser(null)
-})
+}).finally(()=>{checking=undefined})
 const ready=refresh()
 // IDOK-216: warm what the first click needs while the player reads the title screen — the login dialog's
 // social buttons for guests, the avatar module + record for signed-in players — so entering is one wait, not four.
@@ -187,7 +188,10 @@ let gate:((user:User|null)=>void)|undefined
 /** 已登录去「我的账号」，必须迁移的去迁移面板，没登录去登录页。 */
 const home=():Screen=>user?(user.migration?.blocking?'migrate':'profile'):'login'
 export async function openAccount(){
-  build();await Promise.all([ready,socialConfigSoon()]);render!(home());dialog!.showModal();if(!user)record('funnel',{step:'loginOpen'})
+  const openingLogin=!user
+  await refresh()
+  if(openingLogin && user && !sessionUnknown && !user.migration?.blocking)return
+  build();await socialConfigSoon();render!(sessionUnknown?'login':home());dialog!.showModal();if(!user)record('funnel',{step:'loginOpen'})
 }
 /** 迁移面板：已经停在迁移流程里（包括正在填邮箱）就不打断。 */
 async function showMigration(){
@@ -198,7 +202,7 @@ async function showMigration(){
 }
 /** Resolve with the signed-in user, opening the login dialog first if needed; null if the player closes it without signing in. */
 async function signIn():Promise<User|null>{
-  await ready;if(user)return user
+  await refresh();if(user && !sessionUnknown)return user
   build();gate?.(null);await socialConfigSoon()
   return new Promise(resolve=>{gate=resolve;render!('login');dialog!.showModal();if(!user)record('funnel',{step:'loginOpen'})})
 }
@@ -226,6 +230,14 @@ export function accountEntry(parent:HTMLElement){
 }
 
 
+function resumeSocialLogin(){
+  settlePendingLogin(!!user && !sessionUnknown)
+  if(!user || sessionUnknown || user.migration?.blocking)return false
+  if(dialog?.open)dialog.close()
+  window.dispatchEvent(new Event('glol:registered'))
+  return true
+}
+
 /* 从第三方回调回来（?social=...）：直接在账号面板里把结果展示出来。 */
 const bootSocial=new URLSearchParams(location.search).get('social')
 if(bootSocial){
@@ -234,6 +246,8 @@ if(bootSocial){
   history.replaceState(null,'',clean.pathname+clean.search+clean.hash)
   void (async()=>{
     await ready
+    const returningLogin=bootSocial==='login'||bootSocial==='registered'
+    if(returningLogin && resumeSocialLogin())return
     build()
     await socialConfigSoon()
     dialog!.showModal()
@@ -242,8 +256,8 @@ if(bootSocial){
       catch(error){render!(home(),'授权已过期，请重新点一次',undefined,'error')}
       return
     }
-    if(bootSocial==='login'||bootSocial==='registered')settlePendingLogin(true)
-    else if(bootSocial!=='bound'&&bootSocial!=='migrated')settlePendingLogin(false)
+    if(returningLogin && !user){render!('login','请重新登录',undefined,'info');return}
+    if(!returningLogin && bootSocial!=='bound'&&bootSocial!=='migrated')settlePendingLogin(false)
     if(bootSocial==='migrated'){render!('migrated');return}
     const notice=socialNotes[bootSocial]
     render!(notice?.screen==='home'?home():notice?.screen??'login',notice?.text()??'第三方登录未完成，请重新发起',undefined,notice?.kind??'error')
@@ -587,9 +601,8 @@ function build(){
       }
       const result=await api('auth/social/confirm','POST',{}) as {intent?:string}
       if(result.intent==='login'){
-        settlePendingLogin(true)
-        setUser(await api('me') as User)
-        render!(home(),home()==='migrate'?'':'已通过第三方账号登录')
+        await refresh()
+        if(!resumeSocialLogin())render!(sessionUnknown?'login':home())
         return
       }
       setUser(await api('me') as User)
@@ -629,7 +642,7 @@ function build(){
   d.addEventListener('cancel',event=>{if(d.hasAttribute('data-locked'))event.preventDefault()})
   d.querySelector('.acc-join')!.addEventListener('click',()=>{if(!busy)render!('register')})
   d.addEventListener('close',()=>{if(d.hasAttribute('data-locked')&&user?.migration?.blocking){queueMicrotask(()=>{if(!d.open)d.showModal()});return}
-    verificationPassword='';form.reset();const resolve=gate;gate=undefined;resolve?.(user)})
+    verificationPassword='';form.reset();const resolve=gate;gate=undefined;resolve?.(sessionUnknown?null:user)})
   d.addEventListener('click',event=>{if(event.target===d&&!d.hasAttribute('data-locked'))d.close()})
   for(const type of ['keydown','keyup'])d.addEventListener(type,event=>event.stopPropagation())
   document.body.append(d)

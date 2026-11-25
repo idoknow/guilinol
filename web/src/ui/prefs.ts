@@ -5,11 +5,12 @@ export type StatsPrefs = {fps: boolean; net: boolean; online: boolean}
 export type ViewMode = 'third' | 'first'
 /** IDOK-182：相机装备。owned 是背包里的机身，equipped 是手上那台。 */
 export type GearPrefs = {equipped: import('../gear/cameras').BodyId; owned: import('../gear/cameras').BodyId[]}
-export type Prefs = {stats: StatsPrefs; view: ViewMode; keys: Record<string, string[]>; gear: GearPrefs}
+export type Prefs = {autoFullscreen: boolean; stats: StatsPrefs; view: ViewMode; keys: Record<string, string[]>; gear: GearPrefs}
 
 const STORAGE_KEY = 'glol.prefs'
 
 export const DEFAULT_PREFS: Prefs = {
+  autoFullscreen: true,
   stats: {fps: true, net: true, online: true},
   view: 'third',
   keys: {},
@@ -42,6 +43,7 @@ function load(): Prefs {
         net: typeof stats.net === 'boolean' ? stats.net : DEFAULT_PREFS.stats.net,
         online: typeof stats.online === 'boolean' ? stats.online : DEFAULT_PREFS.stats.online,
       },
+      autoFullscreen: raw.autoFullscreen !== false,
       view: raw.view === 'first' ? 'first' : 'third',
       keys,
       gear: loadGear(raw.gear),

@@ -1,4 +1,5 @@
 import './orientation.css'
+import {prefs} from './prefs'
 
 // Phones play in landscape (IDOK-144). Browsers cannot rotate a page for us: Android Chrome may lock orientation only
 // inside fullscreen, and iOS Safari supports neither. So once the city is running, a portrait phone gets a full-screen
@@ -59,16 +60,24 @@ export function mountLandscapeEntry(host:HTMLElement){
   host.append(entry)
 }
 
-async function lockLandscape():Promise<boolean>{
+export function fullscreenOnEntry() {
+  if (prefs().autoFullscreen && navigator.maxTouchPoints > 0 &&
+      matchMedia('(pointer: coarse)').matches && !matchMedia('(any-pointer: fine)').matches) {
+    void lockLandscape(true)
+  }
+}
+
+async function lockLandscape(keepFullscreen = false):Promise<boolean>{
   const orientation=screen.orientation as ScreenOrientation&{lock?:(o:string)=>Promise<void>}|undefined
   const root=document.documentElement
-  if(!orientation?.lock||!root.requestFullscreen)return false
+  if((!keepFullscreen && !orientation?.lock)||!root.requestFullscreen)return false
   try{
     if(!document.fullscreenElement)await root.requestFullscreen({navigationUI:'hide'})
+    if(!orientation?.lock)return false
     await orientation.lock('landscape')
     return true
   }catch{
-    if(document.fullscreenElement)await document.exitFullscreen().catch(()=>{})
+    if(!keepFullscreen && document.fullscreenElement)await document.exitFullscreen().catch(()=>{})
     return false
   }
 }
