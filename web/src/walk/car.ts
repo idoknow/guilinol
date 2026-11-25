@@ -116,7 +116,7 @@ function localSupport(ctx: DismountContext, x: number, z: number, refY: number) 
   const lm = ctx.surface(x, z, 'landmark', refY + .55, 1.8)
   const validLm = lm && lm.y <= refY + .55 && lm.slope <= wcfg.slope ? lm : null
   const bridgeHit = validDeck && validLm ? (validLm.y > validDeck.y ? validLm : validDeck) : (validDeck ?? validLm)
-  const support = bridgeHit ?? ctx.surface(x, z, 'road', refY+.55, 1.8) ?? ctx.surface(x, z, 'sidewalk', refY+.55, 1.8) ?? ctx.surface(x, z, 'ground', refY+.55, 1.8)
+  const support = bridgeHit ?? ctx.surface(x, z, 'road', refY + .85, 1.7) ?? ctx.surface(x, z, 'sidewalk', refY + .85, 1.7) ?? ctx.surface(x, z, 'ground', refY + .85, 1.7)
   if (!support || support.slope > wcfg.slope || (!bridgeHit && ctx.wet(x, z))) return null
   const peak = ctx.surface(x, z, 'peak')
   if (peak && peak.y > support.y + .05) return null

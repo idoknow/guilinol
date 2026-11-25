@@ -115,6 +115,22 @@ export function tunnelFloor(tunnels:Tunnel[]|undefined,x:number,z:number,foot:nu
   return undefined
 }
 
+export function tunnelCeiling(tunnels:Tunnel[],x:number,z:number,footY:number){
+  let ceiling=Infinity
+  for(const tunnel of nearbyTunnels(tunnels,x,z)){
+    if(tunnel.openCut)continue
+    if(tunnel.nodes){
+      ceiling=Math.min(ceiling,station.tunnelCeiling([tunnel as station.Tunnel],x,z,footY))
+      continue
+    }
+    const at=frame(tunnel).station(x,z)
+    if(at<openEnd(tunnel,0)||at>tunnel.length-openEnd(tunnel,1))continue
+    const floor=floorLevel(tunnel,x,z)
+    if(floor!==undefined&&footY>=floor-.75&&footY<floor+tunnel.clearance)ceiling=Math.min(ceiling,floor+tunnel.clearance)
+  }
+  return ceiling
+}
+
 // Trees from the base map can stand in a portal cutting or inside the bore; the
 // world package predates the tunnel, so clear them at load time (IDOK-165).
 let registered:Tunnel[]=[]

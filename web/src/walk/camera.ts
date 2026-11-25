@@ -3,7 +3,7 @@ import R from '@dimforge/rapier3d-compat'
 import * as THREE from 'three'
 import {look} from '../look/config'
 import {walkConfig as cfg} from './config'
-import {nearbyTunnels,tunnelCeiling,type Tunnel} from '../station-tunnels'
+import {nearbyTunnels,tunnelCeiling,type Tunnel} from '../tunnels'
 import type {createPhysics} from './physics'
 import driveCamera from '../drive/camera.json' with {type:'json'}
 

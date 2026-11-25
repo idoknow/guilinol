@@ -6,7 +6,20 @@ type Lane = {clearance?:number,privateAccess?:boolean,wheelPose?:number[],floor?
 type Phase = {lanes:number[],green:number,yellow:number}
 type Signal={node:number,group:number,offset:number,phases:Phase[]}
 export type Graph = {nodes:Node[],lanes:Lane[],walks:[number,number,number,number?,number[]?][],signals:Signal[]}
-export type Track = Lane & {knots?:Int32Array,start:Node,end:Node,dx:number,dz:number,yaw:number,length:number,walk:boolean}
+export type SurfaceLookup = (x:number,z:number)=>readonly number[]|undefined
+export type Track = Lane & {
+  knots?:Int32Array,
+  start:Node,end:Node,dx:number,dz:number,yaw:number,length:number,walk:boolean,
+  outwardSign?:1|-1,dodgeMin?:number,dodgeMax?:number,tightEdge?:boolean,
+  surfaceState?:'pending'|'ok'|'rejected',suspectVerge?:boolean,pairTrack?:Track,
+}
+type MotorSeg = {id:number,cls?:string,street?:string,ax:number,az:number,bx:number,bz:number,dx:number,dz:number,len:number,halfW:number}
+const MOTOR_CLEARANCE=.45
+const MEDIAN_HALF_SPAN=10
+const WALK_MIN_LEN=2
+const WALK_EDGE_KEEP=.45
+const isSafeWalkSurface=(kinds:readonly number[])=>(kinds.includes(1)||kinds.includes(6))&&!kinds.includes(0)&&!kinds.includes(5)
+const isVergeSurface=(kinds:readonly number[])=>kinds.includes(4)&&!kinds.includes(1)&&!kinds.includes(6)
 export function trackHeight(track:Track,dist:number){
   if(track.floor)return axleHeight(track,dist)
   if(track.wheelPose)return poseAt(track.wheelPose,dist/track.length,1)
@@ -285,14 +298,19 @@ export class Traffic {
     this.random=random
     this.surfaceAt=surfaceAt
     const nodes=new Map(graph.nodes.map(node=>[node.id,node]))
-    const add=(lane:Lane,walk:boolean)=>{
-      const start=nodes.get(lane.from)!,end=nodes.get(lane.to)!
-      const length=Math.hypot(end.x-start.x,end.z-start.z)
-      if(length<.5)return
-      const track=Object.assign({start,end,length,dx:(end.x-start.x)/length,dz:(end.z-start.z)/length,yaw:Math.atan2(end.x-start.x,end.z-start.z),walk},lane)
-      const exits=this.exits.get(start.id)??[];exits.push(track);this.exits.set(start.id,exits)
-      for(let col=Math.floor(Math.min(start.x,end.x)/128);col<=Math.floor(Math.max(start.x,end.x)/128);col++)for(let row=Math.floor(Math.min(start.z,end.z)/128);row<=Math.floor(Math.max(start.z,end.z)/128);row++){
-        const key=`${col},${row}`,cell=this.cells.get(key)??[];cell.push(track);this.cells.set(key,cell)
+    // Index every motor/bus lane in the graph (all road classes) to enforce strict pedestrian carriageway exclusion.
+    for(const lane of graph.lanes){
+      if(lane.kind!=='motor'&&lane.kind!=='bus')continue
+      const a=nodes.get(lane.from),b=nodes.get(lane.to)
+      if(!a||!b)continue
+      const len=Math.hypot(b.x-a.x,b.z-a.z)
+      if(len<.5)continue
+      const dx=(b.x-a.x)/len,dz=(b.z-a.z)/len,off=lane.offset||0,w=lane.width??3
+      const seg:MotorSeg={id:lane.id,cls:lane.cls,street:lane.street,ax:a.x-dz*off,az:a.z+dx*off,bx:b.x-dz*off,bz:b.z+dx*off,dx,dz,len,halfW:w/2}
+      const x0=Math.floor((Math.min(seg.ax,seg.bx)-16)/64),x1=Math.floor((Math.max(seg.ax,seg.bx)+16)/64)
+      const z0=Math.floor((Math.min(seg.az,seg.bz)-16)/64),z1=Math.floor((Math.max(seg.az,seg.bz)+16)/64)
+      for(let gx=x0;gx<=x1;gx++)for(let gz=z0;gz<=z1;gz++){
+        const k=gx*65536+gz,arr=this.motorGrid.get(k)??[];arr.push(seg);this.motorGrid.set(k,arr)
       }
     }
     const add=(lane:Lane,walk:boolean):Track|undefined=>{

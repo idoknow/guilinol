@@ -11,7 +11,7 @@ def annotate(graph, elements, report):
     ways = {tuple(sorted(pair)): way['tags'] for way in elements if way['type'] == 'way'
             and 'highway' in way.get('tags', {}) for pair in zip(way['nodes'], way['nodes'][1:])}
     way_tags = {way['id']: way['tags'] for way in elements if way['type'] == 'way'
-                and 'highway' in way.get('tags', {})}
+                and 'id' in way and 'highway' in way.get('tags', {})}
     parents = {}
 
     def root(key):

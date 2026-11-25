@@ -499,7 +499,7 @@ export async function detail(tile:Tile, signal:AbortSignal, parseSlot?:()=>Promi
   const surfaceAt = buildSurfaceLookup(tile, paths)
   return {
     railCutVertices:new Set(railCuts.map(([index])=>index)),tunnelFloorStart,bridgeDepth:look.bridgeDepth,
-    group,groundMesh,roadBed,underlay,terrain:terrain.slice(),water:water.slice(),rings,deck,thin,streets,batch,tunnel,
+    surfaceAt,group,groundMesh,roadBed,underlay,terrain:terrain.slice(),water:water.slice(),rings,deck,thin,streets,batch,tunnel,
     dispose(){
       if(tunnel){
         for(const mesh of Object.values(tunnel))if(mesh){

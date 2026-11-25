@@ -8,7 +8,7 @@ import {interactions} from './interactions'
 import {touchUi} from '../ui/input-mode'
 import {npcDefaults,validNpc} from '../../../lib/npc'
 
-async function loadGraph(key:string,signal:AbortSignal,rules:typeof npcDefaults){
+async function loadGraph(key:string,signal:AbortSignal,rules:typeof npcDefaults,surfaceAt?:Traffic['surfaceAt']){
   const start=performance.now()
   const response=await fetch(`/world/roads/${key}.json.gz`,{signal})
   if(!response.ok||!response.body)throw Error(`traffic graph: ${response.status}`)
@@ -18,7 +18,7 @@ async function loadGraph(key:string,signal:AbortSignal,rules:typeof npcDefaults)
   const body=signature[0]===31&&signature[1]===139?new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip')):bytes
   const decoded=await new Response(body).arrayBuffer()
   signal.throwIfAborted()
-  const graph:Graph=JSON.parse(new TextDecoder().decode(decoded)),sim=new Traffic(graph,Math.random,touchUi()?MOBILE_ACTORS:MAX_ACTORS,rules)
+  const graph:Graph=JSON.parse(new TextDecoder().decode(decoded)),sim=new Traffic(graph,Math.random,touchUi()?MOBILE_ACTORS:MAX_ACTORS,rules,surfaceAt)
   const timing=performance.getEntriesByName(response.url).at(-1) as PerformanceResourceTiming|undefined
   return {sim,sample:{key,encodedBytes:timing?.encodedBodySize||bytes.byteLength,decodedBytes:decoded.byteLength,downloadMs:downloaded-start,parseAndIndexMs:performance.now()-downloaded}}
 }
@@ -134,7 +134,7 @@ export async function traffic(scene:THREE.Scene,camera:THREE.Camera,verify:boole
       if(Math.abs(east-oldEast)>1||Math.abs(south-oldSouth)>1){sim=undefined;people.clear();walking.clear();mesh.count=0;hide(0,STATIC)}
       key=target
       const controller=loading=new AbortController()
-      if(cells.has(key))void loadGraph(key,controller.signal,rules).then(({sim:next,sample})=>{
+      if(cells.has(key))void loadGraph(key,controller.signal,rules,surfaceAt).then(({sim:next,sample})=>{
         if(controller.signal.aborted||key!==target)return
         if(verify){mesh.userData.loads.push(sample);if(mesh.userData.loads.length>64)mesh.userData.loads.shift()}
         next.prepareMotor=actorVariant
