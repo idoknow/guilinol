@@ -424,6 +424,8 @@ export function landmarkStream(
       if(/^collision/i.test(node.name))node.visible=false
       if(!(node instanceof THREE.Mesh))return
       const original=node.material,kind=surfaces[original.name]
+      // These panes are single sheets seen from either side of the footbridge.
+      if(original.name==='guilin_station_glass')original.forceSinglePass=true
       if(original===streetSurfaceMat)return
       const rules=regions.filter(rule=>rule.material===original.name)
       if(rules.length&&!exceptions.some(item=>item.id===entry.id&&item.material===original.name)){

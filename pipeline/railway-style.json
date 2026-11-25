@@ -12,5 +12,39 @@
   "ballastHalfWidth": 1.7,
   "ballastSlope": 1.75,
   "sleeperSpacing": 0.6,
-  "mastSpacing": 50
+  "mastSpacing": 50,
+  "stationLevels": {
+    "hallFloor": 155.05,
+    "platformRise": 0,
+    "platformHeight": 1.25,
+    "structureDepth": 1.2,
+    "roadClearance": 4.5,
+    "overheadClearance": 7.5
+  },
+  "station": {
+    "wall": "#e5e5df",
+    "roof": "#bfc3c1",
+    "glass": "#59777e",
+    "frame": "#8d989a",
+    "soffit": "#484e51",
+    "green": "#647757",
+    "signColor": "#af342e",
+    "signText": "桂林站",
+    "signFont": {"size": 104, "bold": true, "sans": true},
+    "entryHeight": 4.8,
+    "platformBrick": "#ad7262",
+    "platformWarning": "#dfb44e",
+    "entryWidth": 9.0,
+    "eaveThickness": 1.15,
+    "plazaSlabMetres": [2.4, 1.2],
+    "plazaStone": "#dad7cb",
+    "bridgeGlassOpacity": 0.43,
+    "signHeight": 3.2,
+    "signWidth": 16.0,
+    "canopyHeight": 5.6,
+    "columnPlinth": 0.72,
+    "bridgePlinth": 0.96,
+    "columnSpacing": 18,
+    "bridgeStairRunByPlatform": {"376029417": 15.0756, "376029418": 16.5925, "376029419": 14.6420, "376029420": 14.6615}
+  }
 }

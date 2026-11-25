@@ -1,5 +1,6 @@
 {
   "surfaces": {
+    "guilin_station": {"sidewalk": "sidewalk"},
     "gunanmen": {"sidewalk": "sidewalk"},
     "ronghu": {"sidewalk": "sidewalk"},
     "guilin_book_market": {"road": "road", "sidewalk": "sidewalk", "curb": "curb"},

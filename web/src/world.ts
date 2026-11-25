@@ -2,7 +2,7 @@ import {cacheResponse} from './telemetry'
 import * as THREE from 'three'
 import {buildingGeometry,type Building} from './buildings'
 import {loadStreetGeometry} from './street-loader'
-import type {Streets} from './street-worker'
+import type {StationPavingStyle,Streets} from './street-worker'
 import {bridgeGeometry} from './look/bridge'
 import {look} from './look/config'
 import {nightGround} from './look/night'
@@ -14,7 +14,7 @@ import {joinPortalRoads,tunnelGeometry,type Tunnel} from './tunnels'
 import {freezeStatic} from './static-freeze'
 
 interface Asset {file:string; bytes:number}
-export interface Tile extends Asset {x:number; z:number}
+export interface Tile extends Asset {x:number; z:number; stationPaving?:StationPavingStyle}
 export interface Manifest {
   region?:import('../../lib/play-region').Region
   tunnels?:Tunnel[]
@@ -338,7 +338,7 @@ export async function detail(tile:Tile, signal:AbortSignal, parseSlot?:()=>Promi
   })
   for(const [,topLevel] of rings) if(topLevel/10+8>maxY) maxY = topLevel/10+8
   const heights = geometry.getAttribute('position')
-  const streets = await loadStreetGeometry(paths,step,heights,rails,signs,railCuts)
+  const streets = await loadStreetGeometry(paths,step,heights,rails,signs,railCuts,tile.stationPaving)
   if(tunnels)joinPortalRoads(tile,tunnels,[streets.road,streets.sidewalk,...(streets.surface?[streets.surface.getAttribute('position').array as Float32Array]:[])])
   signal.throwIfAborted()
   const material = await surfaceMaterial(buffer.slice(offset,end))

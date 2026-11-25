@@ -1145,7 +1145,9 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
     position:()=>sim.body.translation(),face:(angle)=>{yaw=angle+Math.PI;facing=yaw+avatar.yaw;figure.rotation.y=facing},
     teleport:(x,z,angle)=>enter(x,z,angle,'fishing'),hand:()=>avatarRig.attachmentAt?.('hand_r')??figure.getObjectByName('hand_r'),scene,camera,
   },verify))
-  window.addEventListener('fishing:slot',()=>{void loadFishing().then(session=>session.toggle())})
+  // 钓鱼视觉（IDOK-336）定稿前只在 ?fishing 或 verify 下开放，避免占位面板随发版上线。
+  const fishingOn=verify||new URLSearchParams(location.search).has('fishing')
+  window.addEventListener('fishing:slot',()=>{if(!fishingOn)return;void loadFishing().then(session=>session.toggle())})
   if(verify)Object.assign(window,{fishing:{teleportToSpot:async(id:string)=>(await loadFishing()).teleportToSpot(id)}})
   const footMetrics={soleOffset:avatarRig.soleOffset,footProbes:avatarRig.footProbes}
   let firstPersonHidden=false
@@ -1953,7 +1955,7 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
   function tick(dt:number){wheel.sync();if(!active)return;emote.reset();holdLayer.reset();
     if(emote.id&&(rides?.boat||rides?.car||rides?.bike)){emote.stop();emote.tick(.24,false)}
     smoking?.resetPose();const before=performance.now(),start=rides?.boat?.position??sim.body.translation();syncSceneObstacleVolumes();sim.sync(start.x,start.z,true);const footYNow=rides?.boat?start.y:start.y-cfg.height/2;rides?.nearby(start.x,start.z,footYNow);interactArbiter.sync(actionButton);syncGameTravelState();updateShopHintRings(start.x,start.z,footYNow)
-    showFishingSlot(!rides?.bike&&!rides?.boat&&!rides?.car&&fishingShores.some(({spot,radius})=>Math.abs(start.x-spot.x)<=radius&&Math.hypot(start.x-spot.x,start.z-spot.z)<=radius))
+    showFishingSlot(fishingOn&&!rides?.bike&&!rides?.boat&&!rides?.car&&fishingShores.some(({spot,radius})=>Math.abs(start.x-spot.x)<=radius&&Math.hypot(start.x-spot.x,start.z-spot.z)<=radius))
     if(cigarette.active && (rides?.bike||rides?.boat||rides?.car)){
       cancelSmoke()
       smoking?.tick(dt,cigarette.view(),false)
