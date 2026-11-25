@@ -3,7 +3,7 @@ import {vehicleForbiddenAt} from './game/car-free'
 import {buildingMaterial} from './look/buildings'
 import {bridgeMaterial} from './look/bridge'
 import {WATER_LAYER, waterMaterial} from './look/water'
-import {streetFurnitureGeo, streetFurnitureMat, streetSurfaceMat} from './streets'
+import {streetFenceMat, streetFurnitureGeo, streetFurnitureMat, streetSurfaceMat} from './streets'
 import type {Tile} from './world'
 import {vehicleModel} from './walk/vehicle-model'
 import {look} from './look/config'
@@ -22,6 +22,7 @@ export interface TileBatchInput {
   tunnelLining?:THREE.BufferGeometry
   tunnelLights?:THREE.BufferGeometry
   streetSurface:THREE.BufferGeometry|null
+  streetFence?:THREE.BufferGeometry|null
   furnitureMatrices:Float32Array
   furnitureColors:Float32Array
   detailCount:number
@@ -203,6 +204,12 @@ const STREET_ATTRS:AttrDef[] = [
   {name:'normal',size:3,ctor:'f32'},
   {name:'color',size:3,ctor:'f32'},
 ]
+const FENCE_ATTRS:AttrDef[] = [
+  {name:'aAlong',size:1,ctor:'f32'},
+  {name:'position',size:3,ctor:'f32'},
+  {name:'normal',size:3,ctor:'f32'},
+  {name:'color',size:3,ctor:'f32'},
+]
 
 // A bucket owns the merged geometry of a small group of tiles. Adding or dropping one tile only
 // rebuilds its own bucket, so the cost stops scaling with how far the player has already walked.
@@ -222,6 +229,7 @@ class Bucket {
   readonly water:StaticLayerBatch
   readonly bridges:StaticLayerBatch
   readonly streets:StaticLayerBatch
+  fences:StaticLayerBatch|null = null
   readonly items = new Map<Tile,TileBatchInput>()
   dirty = false
 
@@ -241,6 +249,7 @@ class Bucket {
     const waterList:{tile:Tile; geom:THREE.BufferGeometry}[] = []
     const bridgeList:{tile:Tile; geom:THREE.BufferGeometry}[] = []
     const streetList:{tile:Tile; geom:THREE.BufferGeometry}[] = []
+    const fenceList:{tile:Tile; geom:THREE.BufferGeometry}[] = []
     for(const [tile, item] of this.items) {
       if(item.walls) wallList.push({tile, geom:item.walls})
       if(item.pond?.length) {
@@ -250,11 +259,23 @@ class Bucket {
       }
       if(item.bridge) bridgeList.push({tile, geom:item.bridge})
       if(item.streetSurface) streetList.push({tile, geom:item.streetSurface})
+      if(item.streetFence) fenceList.push({tile, geom:item.streetFence})
     }
     this.buildings.rebuild(wallList)
     this.water.rebuild(waterList)
     this.bridges.rebuild(bridgeList)
     this.streets.rebuild(streetList)
+    if(fenceList.length){
+      if(!this.fences){
+        this.fences = new StaticLayerBatch(streetFenceMat,FENCE_ATTRS)
+        this.scene.add(this.fences.mesh)
+      }
+      this.fences.rebuild(fenceList)
+    }else if(this.fences){
+      this.scene.remove(this.fences.mesh)
+      this.fences.mesh.geometry.dispose()
+      this.fences = null
+    }
   }
 
   cull(visible:Set<Tile>, far:Set<Tile>, visibleStreets:Set<Tile>) {
@@ -262,13 +283,15 @@ class Bucket {
     this.water.cull(visible)
     this.bridges.cull(visible)
     this.streets.cull(visibleStreets)
+    this.fences?.cull(visibleStreets)
   }
 
   dispose() {
-    for(const mesh of [this.buildings.mesh,this.water.mesh,this.bridges.mesh,this.streets.mesh]) {
+    for(const mesh of [this.buildings.mesh,this.water.mesh,this.bridges.mesh,this.streets.mesh,...(this.fences?[this.fences.mesh]:[])]) {
       this.scene.remove(mesh)
       mesh.geometry.dispose()
     }
+    this.fences = null
   }
 }
 
@@ -345,6 +368,7 @@ export class ChunkBatcher {
     if(input.walls) shiftPositions(input.walls,tile.x,tile.z)
     if(input.bridge) shiftPositions(input.bridge,tile.x,tile.z)
     if(input.streetSurface) shiftPositions(input.streetSurface,tile.x,tile.z)
+    if(input.streetFence) shiftPositions(input.streetFence,tile.x,tile.z)
     for(const mats of [input.furnitureMatrices,input.parked])for(let i=0;i<mats.length;i+=16) { mats[i+12]+=tile.x; mats[i+14]+=tile.z }
     input.parked = filterExcludedParkedBikes(input.parked)
     this.items.set(tile,input)

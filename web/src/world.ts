@@ -361,6 +361,7 @@ export async function detail(tile:Tile, signal:AbortSignal, parseSlot?:()=>Promi
     walls, pond:pond?.positions ?? null, bridge,
     streetSurface:streets.surface,
     tunnelLining:tunnel?.lining.geometry, tunnelLights:tunnel?.lights.geometry,
+    streetFence:streets.fence,
     detailCount:streets.detailCount,
     railLodCount:streets.railLodCount,
     furnitureMatrices:streets.furnitureMatrices,
@@ -374,7 +375,7 @@ export async function detail(tile:Tile, signal:AbortSignal, parseSlot?:()=>Promi
         for(const mesh of Object.values(tunnel))mesh.geometry.dispose()
         tunnel.floor.material.dispose()
       }
-      pond?.dispose(); streets.surface?.dispose(); bridge?.dispose(); geometry.dispose(); walls?.dispose()
+      pond?.dispose(); streets.surface?.dispose(); streets.fence?.dispose(); bridge?.dispose(); geometry.dispose(); walls?.dispose()
       material.map!.image.close(); material.map!.dispose(); material.dispose()
     },
   }

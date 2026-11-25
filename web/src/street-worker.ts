@@ -63,6 +63,7 @@ export function streetGeometry([paths,lamps,banks,signals=[],stops=[],roadCtrl,s
     return new THREE.Vector3(pt.x,(lower&&lowerPath?lowerHeight(pt.x,pt.y,base,ground(pt.x,pt.y),lower):base)+offset,pt.y)
   }
   const surfaceKinds:number[]=[],alongVals:number[]=[]
+  const fenceXyz:number[]=[],fenceRgb:number[]=[],fenceAlong:number[]=[]
   function triangle(first:THREE.Vector3,second:THREE.Vector3,third:THREE.Vector3,kind:number,u1=0,u2=0,u3=0,vertical=false){
     let p1=first,p2=second,p3=third,a1=u1,a2=u2,a3=u3
     if(kind!==3&&!vertical){
@@ -209,6 +210,11 @@ export function streetGeometry([paths,lamps,banks,signals=[],stops=[],roadCtrl,s
     return Number.isFinite(level)?level:fallback
   }
   const railFace:RailFace=(a,b,c,color,along,kind)=>{
+    if(kind>8.5){
+      for(const p of [a,b,c]){fenceXyz.push(p.x,p.y,p.z);fenceRgb.push(color.r,color.g,color.b)}
+      fenceAlong.push(...along)
+      return
+    }
     for(const p of [a,b,c]){xyz.push(p.x,p.y,p.z);rgb.push(color.r,color.g,color.b)}
     alongVals.push(...along);surfaceKinds.push(kind,kind,kind)
   }
@@ -314,9 +320,18 @@ export function streetGeometry([paths,lamps,banks,signals=[],stops=[],roadCtrl,s
   const surface=new THREE.BufferGeometry()
   surface.setAttribute('position',new THREE.BufferAttribute(positions,3))
   surface.computeVertexNormals()
+  const fencePositions=new Float32Array(fenceXyz)
+  let fenceNormals:Float32Array=new Float32Array(0)
+  if(fencePositions.length){
+    const fenceGeo=new THREE.BufferGeometry()
+    fenceGeo.setAttribute('position',new THREE.BufferAttribute(fencePositions,3))
+    fenceGeo.computeVertexNormals()
+    fenceNormals=fenceGeo.getAttribute('normal').array as Float32Array
+  }
   return {
     positions, normals:surface.getAttribute('normal').array as Float32Array,
     colors:new Float32Array(rgb), kinds:new Uint8Array(surfaceKinds), along:new Float32Array(alongVals),
+    fencePositions, fenceNormals, fenceColors:new Float32Array(fenceRgb), fenceAlong:new Float32Array(fenceAlong),
     detailCount, railLodCount, railBarriers, roadBarriers, parked:Float32Array.from(parked), sidewalk:Float32Array.from(sidewalk), road:Float32Array.from(road),
     furnitureMatrices:Float32Array.from(mats), furnitureColors:Float32Array.from(cols),
   }
