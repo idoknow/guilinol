@@ -30,7 +30,7 @@ export function mainPass(renderer:THREE.WebGLRenderer,scene:THREE.Scene,camera:T
   const composer=new EffectComposer(renderer,{frameBufferType:THREE.HalfFloatType})
   renderer.autoClear=true
   const shadows=sunShadows(renderer,scene,camera,light)
-  const ao=new N8AOPostPass(scene,camera,1,1)
+  const ao=new N8AOPostPass(new THREE.Scene(),camera,1,1)
   ao.autoDetectTransparency=false;ao.configuration.transparencyAware=false;ao.configuration.gammaCorrection=false
   const bloom=new BloomEffect({mipmapBlur:true}), glow=new EffectPass(camera,bloom)
   const scenePass=new DisplayScenePass(scene,camera)
@@ -71,7 +71,7 @@ export function mainPass(renderer:THREE.WebGLRenderer,scene:THREE.Scene,camera:T
     if(high){
       high.rays.enabled=quality==='high'&&light.castShadow&&options.godrays.enabled&&env.sunUp>0
       const next=Math.round(options.godrays.intensity*env.sunUp*1000)/1000
-      if(next!==density){density=next;high.rays.setParams({density:next/128,gammaCorrection:false})}
+      if(next!==density){density=next;high.scattering.value=next/128}
       high.focus.enabled=quality==='high'&&options.dof.enabled;high.dof.bokehScale=options.dof.bokeh;high.dof.cocMaterial.focusRange=options.dof.focusRange
     }
     renderer.autoClear=false

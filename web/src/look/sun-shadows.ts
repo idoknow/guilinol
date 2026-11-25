@@ -22,10 +22,10 @@ const blockerFilter=`
     return mix(1.0,coverage/12.0,uShadowStrength);
   }`
 export function sunShadows(renderer:THREE.WebGLRenderer,scene:THREE.Scene,camera:THREE.PerspectiveCamera,light:THREE.DirectionalLight){
-  const shadow=light.shadow,anchor=light.target,point=new THREE.Vector3(),sphere=new THREE.Sphere()
+  const shadow=light.shadow,anchor=light.target
   scene.add(anchor);renderer.shadowMap.type=THREE.PCFSoftShadowMap;renderer.shadowMap.autoUpdate=false
   Object.assign(shadow.camera,{left:-100,right:100,top:100,bottom:-100,near:1,far:480});shadow.camera.updateProjectionMatrix()
-  shadow.normalBias=.08;shadow.bias=-.0002
+  shadow.normalBias=.12;shadow.bias=-.00035
   const high={value:false},strength={value:0.5},patched=new WeakSet<THREE.Material>()
   let frames=Infinity,extent=0,casters=0
   return (tier:Tier,settings:Options['shadow'],focus:THREE.Vector3)=>{
@@ -38,17 +38,15 @@ export function sunShadows(renderer:THREE.WebGLRenderer,scene:THREE.Scene,camera
     frames=0;renderer.shadowMap.needsUpdate=true
     extent=settings.distance;anchor.position.copy(focus);light.position.copy(anchor.position).addScaledVector(env.sunDir,extent)
     Object.assign(shadow.camera,{left:-extent/2,right:extent/2,top:extent/2,bottom:-extent/2,far:extent*2});shadow.camera.updateProjectionMatrix()
+    light.updateWorldMatrix(true,false);anchor.updateWorldMatrix(true,false);shadow.updateMatrices(light)
+    const frustum=shadow.getFrustum()
     casters=0;scene.traverseVisible(object=>{
       const mesh=object as THREE.Mesh
       if(!mesh.isMesh)return
       const materials=Array.isArray(mesh.material)?mesh.material:[mesh.material]
       if(!materials.some(mat=>!mat.transparent && ('isMeshStandardMaterial' in mat||'isMeshPhongMaterial' in mat||'isMeshLambertMaterial' in mat||'isMeshToonMaterial' in mat)))return
       mesh.receiveShadow=true
-      const instanced=mesh as THREE.InstancedMesh
-      if(instanced.isInstancedMesh&&!instanced.boundingSphere)instanced.computeBoundingSphere()
-      if(!mesh.geometry.boundingSphere)mesh.geometry.computeBoundingSphere()
-      sphere.copy(instanced.boundingSphere??mesh.geometry.boundingSphere!).applyMatrix4(mesh.matrixWorld)
-      mesh.castShadow=sphere.radius<=256&&point.copy(sphere.center).distanceTo(focus)<sphere.radius+extent/2
+      mesh.castShadow=camera.layers.test(mesh.layers)&&frustum.intersectsObject(mesh)&&mesh.geometry.drawRange.count>0
       if(mesh.castShadow)casters++
       for(const material of materials){
         if(patched.has(material))continue
