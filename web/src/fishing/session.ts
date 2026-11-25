@@ -1,5 +1,6 @@
 import * as THREE from 'three'
 import {hotbarSlot,selectSlot} from '../ui/hotbar'
+import {prefs} from '../ui/prefs'
 import {getActiveSaveSnapshot} from '../game/save'
 import {FishingEngine,type Catch} from './engine'
 import {chargePower,resolveCast,type Point,nearestFishingShore,nearby,species,tabs,waters,xpThresholds,type Method} from './config'
@@ -68,7 +69,9 @@ export function createFishing(host:Host,verify:boolean){
   const rodKit=createRod(tipLocal),rod=rodKit.root,tip=rodKit.tip,reel=rodKit.reel;rod.name='fishing-grip'
   const fx=createWaterFx(host.scene),targetVec=new THREE.Vector3(),endVec=new THREE.Vector3()
   let flying=false,fightSurge=false,castFrom:{x:number,z:number}|undefined
-  const rodDir=new THREE.Vector3(),UP=new THREE.Vector3(0,1,0),camGoal=new THREE.Vector3()
+  const rodDir=new THREE.Vector3(),UP=new THREE.Vector3(0,1,0),camGoal=new THREE.Vector3(),camLook=new THREE.Vector3(),camFwd=new THREE.Vector3()
+  let camBlend=0
+  const firstPerson=()=>prefs().view==='first'
   function visual(name:string,detail:unknown){
     const d=(detail??{}) as {side?:number,size?:string,surge?:boolean}
     if(name==='fight'){const was=fightSurge;fightSurge=!!d.surge;if(fightSurge&&!was&&target)fx.surge(endVec)}
@@ -124,7 +127,7 @@ export function createFishing(host:Host,verify:boolean){
     cue.textContent=stage==='hit'?'咬钩了 · 快提竿！':stage==='nibble'?'有鱼在试探 · 别动':'鱼游过来了…'
     fightBox.hidden=stage!=='fight'
     const sp=coarse()?'':'空格'
-    hint.textContent=terminal.includes(stage)?`按住${sp||'按钮'}蓄力，松开抛竿`:stage==='fight'?`按住${sp||'按钮'}收线，松开放线`:stage==='hit'?`咬钩了！马上按一下${sp||'提竿'}`:stage==='nibble'?'鱼在试探，先别动':stage==='approach'?'有鱼靠近了，稳住':lure?`按住${sp||'按钮'}收线引鱼，咬钩后松开再按一下提竿`:'盯住浮标，猛地一沉再提竿'
+    hint.textContent=terminal.includes(stage)?`按住${sp||'按钮'}蓄力，松开抛竿`:stage==='fight'?`按住${sp||'按钮'}收线，松开放线`:stage==='hit'?`咬钩了！马上按一下${sp||'提竿'}`:stage==='nibble'?'鱼在试探，先别动':stage==='approach'?'有鱼靠近了，稳住':lure?`等鱼来咬（按住${sp||'按钮'}收线能引鱼更快），咬钩后按一下提竿`:'盯住浮标，猛地一沉再提竿'
     if(stage==='empty-hook')toast('空钩 · 这一竿没上鱼','dim')
     else if(stage==='escape')toast(lure?'鱼脱钩了':'没等到咬口','dim')
     else if(stage==='miss')toast('提竿慢了，鱼溜了','dim')
@@ -280,7 +283,13 @@ export function createFishing(host:Host,verify:boolean){
       if(!flying&&['wait','retrieve','approach','nibble','hit','fight'].includes(st)){
         const p=host.position(),k=method==='台钓'?.55:.5
         camGoal.set(p.x+(x-p.x)*k,y+5.5,p.z+(z-p.z)*k)
-        host.camera.position.lerp(camGoal,Math.min(1,dt*3));host.camera.lookAt(x,y,z)}}
+        // 行走相机每帧都会把镜头放回角色身后，所以这里按自己的混合度在「跟随位」和「看水位」之间插值，
+        // 不能拿上一帧的镜头去 lerp（那会每帧来回跳，看起来像人在抽搐）；第一人称不接管镜头。
+        if(!firstPerson()){camBlend=Math.min(1,camBlend+dt*1.6);const e=camBlend*camBlend*(3-2*camBlend)
+          camLook.copy(host.camera.position).addScaledVector(camFwd.set(0,0,-1).applyQuaternion(host.camera.quaternion),10)
+          host.camera.position.lerp(camGoal,e);camLook.lerp(endVec,e);host.camera.lookAt(camLook)}}
+      else camBlend=Math.max(0,camBlend-dt*2)}
+      else camBlend=0
     // 抛竿后走开超过 1.5 m：自动收线（不把人钉在原地）
     if(castFrom&&!terminal.includes(engine.stage)){const p=host.position();if(Math.hypot(p.x-castFrom.x,p.z-castFrom.z)>1.5){const lost=engine.stage==='fight';castFrom=undefined;fx.clear();flying=false;line.visible=float.visible=false;origin=undefined;engine.cancel();engine.equip();toast(lost?'走开了 · 鱼跑了':'走动了 · 已收线','dim')}}
     if(engine.stage==='fight'){

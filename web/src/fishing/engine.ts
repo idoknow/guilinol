@@ -54,8 +54,8 @@ export class FishingEngine {
   }
   tick(dt:number){
     const setup=this.setup;if(!setup)return
-    if(this.stage==='retrieve'&&!this.reel)return
-    this.clock-=dt
+    // 路亚抛出后不收线也会有鱼游过来（需求方：抛竿后自动来咬）；边收线边引诱会来得更快
+    this.clock-=dt*(this.stage==='retrieve'&&this.reel?1.6:1)
     if(this.stage==='cast'&&this.clock<=0){
       const range=Math.max(0,(setup.distance-6)/24)
       this.go(setup.method==='路亚'?'retrieve':'wait',(1.5+this.random()*3)*(1-.3*range))
