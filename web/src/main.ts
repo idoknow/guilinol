@@ -266,7 +266,7 @@ async function start(loader:FullLoader,creatorSpawn=false) {
   function ensureLandmarks(){
     if(!manifest.landmarks?.length) return Promise.resolve()
     landmarksPromise ??= import('./landmarks').then(module=>{
-      cullLandmarks=module.landmarkCulling()
+      cullLandmarks=module.landmarkCulling(stream)
       stream.updateLandmarks=module.landmarkStream(scene,renderer,manifest.landmarks!,stream.landmarks,{
         camera,
         onMount:group=>cullLandmarks?.warm(group),
