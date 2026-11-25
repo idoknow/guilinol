@@ -39,10 +39,24 @@ def catalog(campus_id):
     return json.loads((ROOT / 'docs/refs/campus' / campus_id / 'catalog.json').read_text())
 
 
-def footprints(sources):
+def footprints(sources, campus_id):
     """source id -> world-space shapely Polygon (OSM way or Overture id)."""
     want = set(sources)
     out = {}
+    if not Path(RAW).exists():
+        data = json.loads((ROOT/'pipeline/data/landmarks'/f'{campus_id}-footprints.json').read_bytes())
+        for key in want:
+            row = data['buildings'][key]
+            if key.startswith('way/'):
+                shape = Polygon([ll2xz(lat, lon) for lat, lon in row['geometry']])
+                tags = {}
+            else:
+                shape = transform(lambda x, y, z=None: ll2xz(y, x), wkt.loads(row['wkt']))
+                tags = {'building': 'yes'}
+            if row['levels']:
+                tags['building:levels'] = row['levels']
+            out[key] = shape, tags
+        return out
     for e in load_osm():
         key = f"way/{e['id']}" if e['type'] == 'way' else None
         if key in want and 'geometry' in e and len(e['geometry']) >= 4:
@@ -107,7 +121,7 @@ def build_records(b, campus_id, heroes=None, overrides=None, skip=()):
     heroes, overrides = heroes or {}, overrides or {}
     cat = catalog(campus_id)
     recs = [r for r in cat['buildings'] if r['source'] not in skip]
-    geo = footprints(r['source'] for r in recs)
+    geo = footprints((r['source'] for r in recs), campus_id)
     built = []
     # Catalogs list OSM ways and Overture rows side by side; when both describe the
     # same footprint (>=90% overlap) build it once, preferring the OSM way.
