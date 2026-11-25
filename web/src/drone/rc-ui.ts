@@ -27,7 +27,7 @@ export interface RcView {
 
 type Mode = 'photo' | 'video'
 
-export function createRc(spec:DroneSpec, handlers:RcHandlers):RcView {
+export function createRc(spec:DroneSpec, handlers:RcHandlers, onHold?:(held:boolean) => void):RcView {
   const simple = spec.rc === 'simple'
   const root = document.createElement('div')
   root.className = `rc rc-${simple ? 'simple' : 'pro'}`
@@ -67,11 +67,46 @@ export function createRc(spec:DroneSpec, handlers:RcHandlers):RcView {
     if (node) node.onclick = run
   }
   on('[data-act="takeoff"]',() => handlers.takeoff())
-  on('[data-act="land"]',() => handlers.land())
-  on('[data-act="rth"]',() => handlers.rth())
   on('[data-act="photo"]',() => handlers.photo())
   on('[data-act="record"]',() => handlers.record())
   on('[data-act="exit"]',() => handlers.exit())
+
+  // --- 降落 / 返航：长按触发，按住显示进度环；降落在进度未满前松开即暂停（再按继续）。
+  const hold = (selector:string, run:(held:boolean) => void) => {
+    const node = root.querySelector<HTMLElement>(selector)
+    if (!node) return
+    // 进度环：按钮外圈
+    const ring = document.createElement('i')
+    ring.className = 'rc-hold-ring'
+    node.classList.add('rc-hold')
+    node.append(ring)
+    let timer:number|undefined
+    let full = false
+    const start = () => {
+      if (full) return
+      node.classList.add('holding')
+      onHold?.(true)
+      timer = window.setTimeout(() => {
+        full = true
+        node.classList.remove('holding')
+        onHold?.(false)
+        run(false)
+        window.setTimeout(() => { full = false; ring.style.setProperty('--p','0%') },600)
+      },900)
+      run(true)
+    }
+    const stop = () => {
+      node.classList.remove('holding')
+      onHold?.(false)
+      if (timer) { window.clearTimeout(timer); timer = undefined }
+    }
+    node.addEventListener('pointerdown',event => { node.setPointerCapture(event.pointerId); start(); event.preventDefault() })
+    node.addEventListener('pointerup',stop)
+    node.addEventListener('pointercancel',stop)
+    node.addEventListener('pointerleave',stop)
+  }
+  hold('[data-act="land"]',held => { if (!held) handlers.land() })
+  hold('[data-act="rth"]',held => { if (!held) handlers.rth() })
 
   // Idle camera mode on the professional controller: the big shutter fires whichever mode is lit.
   let mode:Mode = 'photo'
@@ -160,7 +195,7 @@ export function createRc(spec:DroneSpec, handlers:RcHandlers):RcView {
     const level = Math.max(1,Math.min(4,Math.round(state.signal / 25)))
     if (rcBars) rcBars.dataset.level = String(level)
     if (hdBars) hdBars.dataset.level = String(state.signal < 12 ? 1 : level)
-    if (takeoff) takeoff.textContent = state.phase === 'landed' ? '起飞' : '降落'
+    if (takeoff) takeoff.hidden = state.phase !== 'landed'
     if (gimbalInput && document.activeElement !== gimbalInput) gimbalInput.value = String(state.gimbal)
     if (recording) mode = 'video'
     syncMode()
@@ -246,7 +281,7 @@ function proMarkup(spec:DroneSpec) {
         </div>
         <button class="rc-shutter" aria-label="快门"><i></i></button>
       </div>
-      <button class="rc-takeoff" data-act="takeoff">起飞</button>
+      <button class="rc-takeoff" data-act="takeoff" hidden>起飞</button>
     </div>
     <div class="rc-sticks"><div class="rc-stick" data-side="left"><i></i></div><div class="rc-stick" data-side="right"><i></i></div></div>`
 }

@@ -58,6 +58,21 @@ try {
       return true
     }, selector)
   }
+  // 降落/返航改为长按触发：按住 1 秒（进度环满）再松开。
+  const hold = async selector => {
+    await page.waitForSelector(selector, {state: 'attached', timeout: 20000})
+    return page.evaluate(sel => {
+      const element = document.querySelector(sel)
+      if (!element) throw Error(`missing ${sel}`)
+      const rect = element.getBoundingClientRect()
+      const opts = {bubbles: true, pointerId: 1, clientX: rect.x + 5, clientY: rect.y + 5}
+      element.dispatchEvent(new PointerEvent('pointerdown', opts))
+      return new Promise(resolve => setTimeout(() => {
+        element.dispatchEvent(new PointerEvent('pointerup', opts))
+        resolve(true)
+      }, 1100))
+    }, selector)
+  }
 
   // 1) hangar
   await tap('.dock-drone')
@@ -73,7 +88,7 @@ try {
   console.log('hangar', JSON.stringify(hangar))
   assert.equal(hangar.open, true, 'hangar should open')
   assert.equal(hangar.cards, 4, 'four aircraft')
-  assert.deepEqual(hangar.names, ['DJI Mavic 4 Pro','DJI Mini 5 Pro','DJI Air 3S','DJI FlyCart 200'])
+  assert.deepEqual(hangar.names, ['GLI Mavic 4 Pro','GLI Mini 5 Pro','GLI Air 3S','GLI FlyCart 200'])
   assert.equal(hangar.loads, 4, 'FlyCart exposes four load presets')
 
   // 2) place the Mini 5 Pro
@@ -173,8 +188,8 @@ try {
     console.log('clip skipped: this machine’s encoder emits empty data at 720p (environment, not the code path)')
   }
 
-  // 9) RTH asks the aircraft home
-  await tap('.rc [data-act="rth"]')
+  // 9) RTH asks the aircraft home (hold the button until the progress ring completes)
+  await hold('.rc [data-act="rth"]')
   const home = await step(0.1, 4)
   console.log('rth', JSON.stringify(home.phase))
   assert.equal(home.phase, 'returning', 'RTH switches to the returning phase')

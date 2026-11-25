@@ -214,3 +214,13 @@ body[data-drone="rc"] :is(output,.hint,footer,.sky-ui,.walk-ui,.dock,.toast,.spo
 .drone-batt.charging{color:#7fe0a6}
 .drone-swap{border:1px solid #7fe0a6;border-radius:999px;background:rgba(127,224,166,.12);color:#7fe0a6;padding:3px 12px;font-size:12px;cursor:pointer}
 .drone-swap:hover{background:rgba(127,224,166,.28)}
+
+/* IDOK-278: hold-to-trigger buttons (land / rth) — a conic progress ring fills while held. */
+.rc-hold{position:relative}
+.rc-hold .rc-hold-ring{position:absolute;inset:-3px;border-radius:inherit;pointer-events:none;background:conic-gradient(#7fe0a6 var(--p,0%),transparent 0);opacity:0;transition:opacity .15s}
+.rc-hold.holding .rc-hold-ring{opacity:1;animation:rc-hold-fill .9s linear forwards}
+@keyframes rc-hold-fill{from{--p:0%}to{--p:100%}}
+@property --p{syntax:'<percentage>';inherits:false;initial-value:0%}
+/* IDOK-278: walk up to a landed drone → a 收起 button near it. */
+.drone-recall-near{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(110px + env(safe-area-inset-bottom));padding:9px 22px;border:0;border-radius:999px;background:#2f6f8f;color:#fff;font:600 14px/1 inherit;cursor:pointer;z-index:60;box-shadow:0 6px 18px rgba(0,0,0,.35)}
+.drone-recall-near:hover{background:#3a89ad}

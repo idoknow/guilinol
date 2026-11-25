@@ -37,7 +37,7 @@ export interface DroneSpec {
 
 export const DRONES:Record<DroneId,DroneSpec> = {
   mavic4pro:{
-    id:'mavic4pro', name:'DJI Mavic 4 Pro', short:'Mavic 4 Pro', maker:'DJI',
+    id:'mavic4pro', name:'GLI Mavic 4 Pro', short:'Mavic 4 Pro', maker:'GLI',
     tagline:'三摄旗舰，万物皆可入画', weightG:1063, flightMin:51, speed:25, ascent:10, descent:10,
     ceiling:6000, wind:12, rangeKm:41, transmitKm:30,
     gimbal:{tiltMin:-90, tiltMax:70},
@@ -48,7 +48,7 @@ export const DRONES:Record<DroneId,DroneSpec> = {
     notes:'51 分钟续航、25 m/s、6000 m 升限、O4+ 30 km。',
   },
   mini5pro:{
-    id:'mini5pro', name:'DJI Mini 5 Pro', short:'Mini 5 Pro', maker:'DJI',
+    id:'mini5pro', name:'GLI Mini 5 Pro', short:'Mini 5 Pro', maker:'GLI',
     tagline:'249 克，一英寸，随手起飞', weightG:249, flightMin:52, speed:19, ascent:10, descent:8,
     ceiling:6000, wind:10.7, rangeKm:32, transmitKm:20,
     gimbal:{tiltMin:-90, tiltMax:55},
@@ -59,7 +59,7 @@ export const DRONES:Record<DroneId,DroneSpec> = {
     notes:'52 分钟（Plus 电池）、19 m/s、6000 m 升限、O4+ 20 km；遥控界面走傻瓜式。',
   },
   air3s:{
-    id:'air3s', name:'DJI Air 3S', short:'Air 3S', maker:'DJI',
+    id:'air3s', name:'GLI Air 3S', short:'Air 3S', maker:'GLI',
     tagline:'双摄旅行机，日夜都稳', weightG:724, flightMin:45, speed:21, ascent:10, descent:10,
     ceiling:6000, wind:12, rangeKm:32, transmitKm:20,
     gimbal:{tiltMin:-90, tiltMax:60},
@@ -70,7 +70,7 @@ export const DRONES:Record<DroneId,DroneSpec> = {
     notes:'45 分钟、21 m/s、6000 m、O4 20 km。',
   },
   flycart200:{
-    id:'flycart200', name:'DJI FlyCart 200', short:'FlyCart 200', maker:'DJI',
+    id:'flycart200', name:'GLI FlyCart 200', short:'FlyCart 200', maker:'GLI',
     tagline:'重载运力机，200 公斤班组搬运', weightG:98800, payloadG:200000, flightMin:25, speed:25, ascent:5, descent:5,
     ceiling:6000, wind:12, rangeKm:36, transmitKm:40,
     gimbal:{tiltMin:-90, tiltMax:30},

@@ -57,6 +57,15 @@ export function requestHome(flight:Flight) {
 export function landNow(flight:Flight) {
   if (flight.phase === 'landed' || flight.phase === 'landing') return
   flight.phase = 'landing'
+  flight.landing = 0
+}
+
+/** 长按暂停降落（松开继续）；传入 dt 累积暂停时长。 */
+export function holdLanding(flight:Flight, dt:number) {
+  if (flight.phase === 'landing') flight.landing += dt
+}
+export function releaseLanding(flight:Flight) {
+  if (flight.phase === 'landing') flight.landing = 0
 }
 
 export function speedNow(flight:Flight) {
@@ -103,7 +112,9 @@ export function stepFlight(flight:Flight, dt:number, sticks:Sticks, groundAt:(x:
     return flight
   }
 
-  const ctrl = flight.phase === 'returning' ? homeSticks(flight,groundY) : sticks
+  const ctrl:Sticks = flight.phase === 'returning' ? homeSticks(flight,groundY)
+    // 信号丢失（<4%）：飞机失联不可操控，原地悬停漂移。
+    : flight.signal < .04 ? CENTER : sticks
   const speed = Math.min(limit, Math.hypot(ctrl.pitch,ctrl.roll) * limit)
 
   // Horizontal: velocity chases the stick vector in the aircraft's own frame.
@@ -120,21 +131,25 @@ export function stepFlight(flight:Flight, dt:number, sticks:Sticks, groundAt:(x:
 
   // Vertical: left stick. Braking/landing overrides it.
   let climbTarget = ctrl.throttle > 0 ? ctrl.throttle * spec.ascent : ctrl.throttle * spec.descent
-  if (flight.phase === 'landing') climbTarget = -Math.min(spec.descent, 1.6)
+  // 降落：快速垂直落地；landing>0 表示暂停中（长按释放才继续）。
+  if (flight.phase === 'landing') climbTarget = flight.landing > 0 ? 0 : -Math.min(spec.descent * 2.4, 5)
   flight.vel.y += (climbTarget - flight.vel.y) * Math.min(1, 4 * dt)
 
   // Stick right (+1) turns clockwise seen from above, i.e. towards decreasing yaw.
   flight.yaw -= THREE.MathUtils.degToRad(90) * ctrl.yaw * dt
 
   // Wind: published resistance is the point where the aircraft holds position, so drift is gentle.
-  const wind = Math.sin(flight.elapsed * .21) * spec.wind * .06
-  flight.pos.x += wind * dt
+  // gustLayer gives an extra slow sway so the aircraft visibly reacts to wind.
+  const windX = Math.sin(flight.elapsed * .21) * spec.wind * .06
+  const windZ = Math.cos(flight.elapsed * .13) * spec.wind * .04
+  flight.pos.x += windX * dt
+  flight.pos.z += windZ * dt
   flight.pos.addScaledVector(flight.vel,dt)
 
   // Ceiling: 500 m above the takeoff point, and never below the terrain.
   const maxY = flight.home.y + MAX_AGL
   if (flight.pos.y > maxY) { flight.pos.y = maxY; flight.vel.y = Math.min(0,flight.vel.y) }
-  const floor = groundY + half
+  const floor = groundY + half + Math.max(.1,spec.height * .3)
   if (flight.pos.y <= floor) {
     flight.pos.y = floor
     if (flight.phase === 'landing' && Math.abs(flight.vel.y) < 1.4) {

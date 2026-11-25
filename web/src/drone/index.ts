@@ -3,7 +3,7 @@ import type {Host} from '../play/host'
 import './drone.css'
 import {DRONE_IDS, drone, type DroneId} from './specs'
 import {buildDroneAsync, disposeDrone, spinProps, type DroneMesh} from './models'
-import {createFlight, landNow, lensPose, liftOff, requestHome, stepFlight, telemetry, type Flight, type Sticks} from './flight'
+import {createFlight, holdLanding, landNow, lensPose, liftOff, releaseLanding, requestHome, stepFlight, telemetry, type Flight, type Sticks} from './flight'
 import {PilotInput, type DroneAction} from './input'
 import {createRc, type RcView} from './rc-ui'
 import {startRecording, saveRecording, type Recording} from '../gear/video'
@@ -367,6 +367,7 @@ export function droneMode(host:Host, deps:{groundAt:(x:number,z:number)=>number;
 
   function recall() {
     if (rcActive) exitRc()
+    if (recallPrompt) { recallPrompt.remove(); recallPrompt = null }
     if (mesh) { disposeDrone(mesh); mesh = null }
     detachLoad()
     flight = null
@@ -511,6 +512,8 @@ export function droneMode(host:Host, deps:{groundAt:(x:number,z:number)=>number;
 
   // --- RC session
   let rcActive = false
+  let landHeld = false   // 长按降落键期间为 true：下降暂停
+  let recallPrompt:HTMLButtonElement|null = null
   let ownsPhotoFlag = false
   let savedCamera:{pos:THREE.Vector3; quat:THREE.Quaternion; fov:number}|null = null
 
@@ -562,7 +565,7 @@ export function droneMode(host:Host, deps:{groundAt:(x:number,z:number)=>number;
       exit:() => exitRc(),
       gimbal:deg => { if (flight) flight.gimbal = deg },
       sticks:patch => input.setTouch(patch),
-    })
+    },held => { landHeld = held })
     document.body.append(rc.root)
     liftOff(flight)
     refreshDock()
@@ -762,6 +765,8 @@ export function droneMode(host:Host, deps:{groundAt:(x:number,z:number)=>number;
     stepPayload()
 
     if (rcActive && rc) {
+      // 长按降落键暂停下降；松开继续（holdLanding 在按键期间累积）。
+      if (flight.phase === 'landing' && landHeld) holdLanding(flight,dt); else releaseLanding(flight)
       lensPose(flight,lens)
       host.camera.position.copy(lens.pos)
       host.camera.rotation.set(lens.pitch,lens.yaw,0,'YXZ')
@@ -773,7 +778,19 @@ export function droneMode(host:Host, deps:{groundAt:(x:number,z:number)=>number;
       const d = host.walker()?.active
         ? host.walker()!.position.distanceTo(flight.pos)
         : host.camera.position.distanceTo(flight.pos)
-      showHint(`${flight.spec.short} 就位 · ${flight.battery.toFixed(0)}% 电量 · 点「飞无人机」起飞${d > 60 ? '（离得有点远）' : ''}`)
+      // 走到已降落的飞机旁（4 米内）：按键收起。
+      if (flight.phase === 'landed' && d < 4 && !recallPrompt) {
+        recallPrompt = document.createElement('button')
+        recallPrompt.className = 'drone-recall-near'
+        recallPrompt.type = 'button'
+        recallPrompt.textContent = '收起无人机'
+        recallPrompt.onclick = () => { recall(); hideHint() }
+        document.body.append(recallPrompt)
+      } else if ((flight.phase !== 'landed' || d >= 4) && recallPrompt) {
+        recallPrompt.remove()
+        recallPrompt = null
+      }
+      if (!recallPrompt) showHint(`${flight.spec.short} 就位 · ${flight.battery.toFixed(0)}% 电量 · 点「飞无人机」起飞${d > 60 ? '（离得有点远）' : ''}`)
       chaseView()
     }
   }
