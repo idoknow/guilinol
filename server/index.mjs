@@ -44,14 +44,18 @@ async function npcAdmin(request){
 }
 async function readSmoke(){
   const {rows}=await pool.query("SELECT detail FROM admin_audit WHERE target_type='smoke' AND target_id='settings' AND action='smoke.settings' ORDER BY id DESC LIMIT 1")
-  return rows[0]?.detail??smokeDefaults
+  const stored=rows[0]?.detail
+  if(!stored)return smokeDefaults
+  if(stored.catalogVersion===2)return stored
+  // Pre-expansion settings could only contain the original six brands.
+  return {...stored,brands:[...stored.brands,...smokeDefaults.brands.slice(6)]}
 }
 async function smokeAdmin(request,user){
   if(request.method==='GET')return json(await readSmoke())
   if(request.method!=='POST')return json({error:'method'},405)
   const rules=await request.json().catch(()=>null)
   if(!validRules(rules))return json({error:'invalid smoke settings'},400)
-  await pool.query("INSERT INTO admin_audit(actor_id,action,target_type,target_id,detail) VALUES($1,'smoke.settings','smoke','settings',$2)",[user,rules])
+  await pool.query("INSERT INTO admin_audit(actor_id,action,target_type,target_id,detail) VALUES($1,'smoke.settings','smoke','settings',$2)",[user,{...rules,catalogVersion:2}])
   return json({ok:true})
 }
 async function readGfx(){

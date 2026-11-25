@@ -154,25 +154,26 @@ export class SmokeKit {
     // —— 烟盒：左手（点着之后就收回兜里，不再挡在胸前） ——
     if (left) {
       this.packModel.group.position.copy(anchors.handL).add(PACK_OFFSET)
-      // 取烟时掀盖 + 露一截烟头
-      const open=view.phase==='tear'?view.progress:['open','take'].includes(view.phase)?1:0
-      this.packModel.group.rotation.set(.25,.12,-.10)
-      this.packModel.group.position.z+=.035
-      this.packModel.group.position.y-=(1-this.carry)*.18
-      this.packModel.lid.rotation.x = -open * 1.85
-      this.packModel.seal.visible=open<1
-      this.packModel.seal.scale.y=1-open
-      this.packModel.seal.position.y=-open*.044
-      const peeled=this.packModel.peeled
-      peeled.visible=view.phase==='tear' && open>0
-      peeled.position.set(.018+.026*open,.044-.088*open,.013)
-      peeled.scale.x=.052*open
-      this.packModel.peek.visible = view.phase==='open' || view.phase==='tear' && open>.7
-      const topFilter=this.packModel.filters[Math.max(0,view.remaining-1)]
-      this.packModel.peek.position.x=topFilter.position.x
-      this.packModel.peek.position.z=topFilter.position.z
-      this.packModel.filters.forEach((filter,index)=>{filter.visible=index<view.remaining})
-      this.packModel.peek.position.y = 0.0405 + open * 0.016
+      const {phase,progress}=view
+      const draw=phase==='draw'||phase==='drawOpened'
+      const open=draw?THREE.MathUtils.smoothstep(progress,.32,.95)
+        :phase==='take'?1-THREE.MathUtils.smoothstep(progress,.65,.79):1
+      this.pack.rotation.set(.57,.12,-.10)
+      this.pack.position.z+=.035
+      this.pack.position.y-=(1-this.carry)*.18
+      const {lid,seal,peeled,peek,filters,rim}=this.packModel
+      lid.rotation.x=-open*THREE.MathUtils.degToRad(106)
+      const tear=phase==='tear'?progress:0
+      seal.visible=phase==='draw'||phase==='sealed'||phase==='tear'
+      seal.scale.x=1-tear
+      seal.position.x=-.028*tear
+      peeled.visible=phase==='tear'
+      peeled.position.set(.028-.056*tear,rim-.0005,0)
+      peek.visible=phase==='open'
+      const topIndex=Math.max(0,view.remaining-1)
+      peek.position.copy(filters[topIndex].position)
+      peek.position.y=rim-.026+THREE.MathUtils.smoothstep(progress,0,.18)*.016
+      filters.forEach((filter,index)=>{filter.visible=index<view.remaining && !(peek.visible&&index===topIndex)})
       if(view.phase==='open'){
         this.pinchPoint(view,this.openFilter)
         this.hasOpenFilter=true
@@ -188,13 +189,13 @@ export class SmokeKit {
     if (this.lighterModel.group.visible) {
       this.lighterModel.group.position.copy(anchors.handL).add(LIGHTER_OFFSET)
       this.lighterModel.group.rotation.copy(LIGHTER_ROTATION)
-      this.lighterModel.setFlame(view.flame)
+      this.lighterModel.setFlame(view.flame,view.phase==='light'?THREE.MathUtils.smoothstep(view.progress,.20,.34):0)
     } else {
       this.lighterModel.setFlame(0)
     }
 
     // —— 香烟：点着时夹在右手，点烟/吸的时候送到嘴边 ——
-    const atMouth = view.phase==='take'?view.progress:1
+    const atMouth = view.phase==='take'?THREE.MathUtils.smoothstep(view.progress,0,.48):1
     const start=view.phase==='take' && this.hasOpenFilter?this.openFilter:anchors.handR
     this.scratch.copy(start).lerp(anchors.mouth,atMouth)
     if(view.phase==='take')this.scratch.y+=.035*Math.sin(atMouth*Math.PI)
@@ -204,7 +205,7 @@ export class SmokeKit {
     // 注意：烟的原点就在「过滤嘴中心」（filter 在 z=-0.020..0.005，烟纸从 z=0.005 往 +Z 长），
     // 所以位置一定要留在指缝上。之前为了让烟纸露出来额外加了 4 cm 前移，
     // 等于把过滤嘴推出指缝、让手指夹到烟纸上——这就是「捏的是烟草那截」的原因，已经删掉。
-    this.cigModel.group.position.copy(this.scratch).addScaledVector(this.dir,.015*atMouth)
+    this.cigModel.group.position.copy(this.scratch).addScaledVector(this.dir,.0135*atMouth)
     this.quat.setFromUnitVectors(Z_AXIS, this.dir)
     this.cigModel.group.quaternion.copy(this.quat)
     // 点着之后每吸一口短一截；点烟阶段是整根新的。
@@ -221,9 +222,11 @@ export class SmokeKit {
     if(view.phase==='open'){
       out.copy(this.packModel.peek.position)
       out.y+=.022
+    }else if(view.phase==='draw'||view.phase==='drawOpened'||view.phase==='take'){
+      out.set(0,-.008,.024).applyQuaternion(this.packModel.lid.quaternion).add(this.packModel.lid.position)
     }else{
       const tear=view.phase==='tear'?view.progress:0
-      out.set(.018+.052*tear,.044-.088*tear,.013)
+      out.set(.028-.056*tear,this.packModel.rim-.001,.009)
     }
     return out.applyQuaternion(this.pack.quaternion).add(this.pack.position)
   }

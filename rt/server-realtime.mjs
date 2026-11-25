@@ -818,13 +818,13 @@ wss.on('connection', (ws, req) => {
         me.gr = clampNum(msg.gr, 0, 1, 1)
         // 血量：出手方靠它看到自己打掉了多少，被打的人也靠它对齐屏幕上的血条
         me.hp = clampInt(msg.hp, 0, 100, 100)
-        me.sc = clampInt(msg.sc, 0, 8)
+        me.sc = clampInt(msg.sc, 0, 9)
         me.sb = clampInt(msg.sb, 0, 1800)
         me.sp = clampInt(msg.sp, 0, 999)
         me.sr = clampInt(msg.sr, 0, 20, 20)
         me.sd = clampInt(msg.sd, 0, 999)
         me.ss = clampInt(msg.ss, 1, 2, 1)
-        me.br = clampInt(msg.br, 0, 5)
+        me.br = clampInt(msg.br, 0, 11)
         aoiMove(me)
         aoiSend(me, {
           t: 'pos', id: me.id,

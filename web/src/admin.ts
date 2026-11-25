@@ -1447,7 +1447,7 @@ const pages: Record<string, (view: View) => void> = {
         const enabled=h('input',{type:'checkbox'}) as HTMLInputElement
         enabled.checked=!!row
         const entry={id:b.id,price:row?.price??b.price}
-        form.append(h('div',{class:'adm-npc-range'},h('label',null,enabled,b.name),field('单价',entry.price,25,50,1,n=>entry.price=n)))
+        form.append(h('div',{class:'adm-npc-range'},h('label',null,enabled,b.name),field('单价',entry.price,5,60,1,n=>entry.price=n)))
         return {enabled,entry}
       })
       const save=h('button',{class:'adm-btn',type:'submit'},'保存') as HTMLButtonElement

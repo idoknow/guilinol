@@ -1,11 +1,11 @@
 import {BRANDS, rules, type BrandId} from './data.ts'
 
 // Keep the original wire codes for idle, ignition and burning.
-const phases = ['idle','light','smoking','draw','sealed','tear','open','take','ready'] as const
+const phases = ['idle','light','smoking','draw','sealed','tear','open','take','ready','drawOpened'] as const
 export type SmokePhase = typeof phases[number]
 export const brandIndex = (id:string) => Math.max(0, BRANDS.findIndex(b => b.id === id))
-const duration = {draw:0.55, tear:0.75, take:0.85, light:0.9}
-const nextPhase = {draw:'sealed', tear:'open', take:'ready', light:'smoking'} as const
+const duration = {draw:0.95, drawOpened:0.95, tear:0.75, take:1.45, light:1.45}
+const nextPhase = {draw:'sealed', drawOpened:'open', tear:'open', take:'ready', light:'smoking'} as const
 const prompts = {sealed:'撕开', open:'拿取', ready:'点燃', smoking:'吸一口'} as const
 export interface SmokeView {
   phase:SmokePhase; progress:number; hold:number; carry:number; light:number; puff:number; ember:number
@@ -13,11 +13,11 @@ export interface SmokeView {
 }
 function render(phase:SmokePhase,progress:number,length:number,burn:number,puffs:number,puff:number,brand:string,strength:number,remaining=20):SmokeView {
   const taking = phase === 'take', lighting = phase === 'light', lit = phase === 'smoking'
-  const pack = ['draw','sealed','tear','open'].includes(phase)
-  return {phase,progress,hold:phase==='idle'?0:1,carry:pack?1:taking?Math.min(1,Math.max(0,(.8-progress)/.35)):0,
+  const pack = ['draw','drawOpened','sealed','tear','open'].includes(phase)
+  return {phase,progress,hold:phase==='idle'?0:1,carry:pack?1:taking?Math.min(1,Math.max(0,(.95-progress)/.18)):0,
     light:phase==='ready'?1:lighting?Math.min(1,(1-progress)*5):taking?Math.max(0,(progress-.72)/.28):0,
     cig:lit || lighting || phase==='ready' || taking?1:0, puff,ember:lit || lighting && progress>.62?1:0,
-    flame:lighting?Math.max(0,Math.sin((progress-.22)/.78*Math.PI)):0, lit,length,burn,puffs,brand,strength,remaining}
+    flame:lighting?Math.max(0,Math.sin((progress-.32)/.68*Math.PI)):0, lit,length,burn,puffs,brand,strength,remaining}
 }
 export const IDLE_VIEW = render('idle',0,0,0,0,0,BRANDS[0].id,1)
 export class SmokeSession {
@@ -38,11 +38,11 @@ export class SmokeSession {
   get length(){return this.total?this.burn/this.total:0}
   get inMouth(){return this.phase==='light'||this.phase==='ready'||this.lit}
   get prompt(){return this.puffTime===0 && this.phase in prompts ? prompts[this.phase as keyof typeof prompts] : ''}
-  start(brand:string|undefined,remaining=20){
+  start(brand:string|undefined,remaining=20,opened=false){
     if(!brand||this.active)return false
     this.remaining=remaining
     this.brand=brand
-    this.phase='draw'
+    this.phase=opened || remaining<20?'drawOpened':'draw'
     this.elapsed=0
     this.total=rules.minSeconds+(rules.maxSeconds-rules.minSeconds)*this.random()
     this.burn=this.total
@@ -51,9 +51,12 @@ export class SmokeSession {
     return true
   }
   stop(){this.phase='idle';this.elapsed=this.puffTime=this.burn=0}
-  act(take:()=>boolean){
+  act(take:()=>boolean,unseal:()=>boolean=()=>true){
     if(!this.prompt)return false
-    if(this.phase==='sealed')this.phase='tear'
+    if(this.phase==='sealed'){
+      if(!unseal())return false
+      this.phase='tear'
+    }
     else if(this.phase==='open'){
       if(!take())return false
       this.remaining--

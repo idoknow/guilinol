@@ -16,9 +16,9 @@ def rebuild():
     indices = list(indices.flatten())
     world = g.world(g.R, g.T)
 
-    def tube(centres, bones, widths, depths, sign):
+    def tube(centres, bones, widths, depths, sign, blends=None):
         rings = []
-        profile = ([(-.78,-.82),(.58,-1),(1,.05),(.42,1),(-.86,.78)] if len(bones)==3
+        profile = ([(-.78,-.82),(.58,-1),(1,.05),(.42,1),(-.86,.78)] if blends is not None
                    else [(-.76,-.85),(.76,-.9),(.8,.88),(-.74,.88)])
         sides = len(profile)
         for centre, bone, width, depth in zip(centres, bones, widths, depths):
@@ -34,8 +34,9 @@ def rebuild():
                 data['POSITION'].append(point)
                 data['NORMAL'].append(normal)
                 data['COLOR_0'].append(skin)
-                data['JOINTS_0'].append([g.joints.index(g.idx[bones[i]]),0,0,0])
-                data['WEIGHTS_0'].append([1,0,0,0])
+                other, weight = blends[i] if blends else (bones[i], 0.)
+                data['JOINTS_0'].append([g.joints.index(g.idx[bones[i]]),g.joints.index(g.idx[other]),0,0])
+                data['WEIGHTS_0'].append([1-weight,weight,0,0])
         for i in range(len(rings)-1):
             for k in range(sides):
                 j=(k+1)%sides
@@ -53,8 +54,22 @@ def rebuild():
             centres = [world[g.idx[n]][:3,3].copy() for n in bones+[f'{finger}_04_leaf_{side}']]
             tip_scale = 0.90 if finger == 'thumb' else 0.78
             centres[-1] = centres[-2] + (centres[-1] - centres[-2]) * tip_scale
-            tube(centres,bones+[bones[-1]],np.array([1,.92,.80,.46])*radius,
-                 np.array([1,.88,.74,.42])*radius,sign)
+            # Support rings on both sides of each hinge preserve the knuckle
+            # volume when two neighbouring phalanges point in different directions.
+            axis = np.array([0,.78,1,1.22,1.78,2,2.22,3])
+            rings = np.array([np.interp(axis, range(4), v) for v in np.array(centres).T]).T
+            widths = np.interp(axis,range(4),[1,.92,.80,.46])*radius
+            depths = np.interp(axis,range(4),[1,.88,.74,.42])*radius
+            primary = [bones[min(int(v),2)] for v in axis]
+            blends = [(hand,.48) if v==0 else (bones[int(v)-1],.48) if v in (1,2)
+                      else (bone,0.) for v,bone in zip(axis,primary)]
+            # The palm stops before the knuckle origins. Root the first ring
+            # inside the palm so a bent finger cannot expose its open base.
+            palm = np.array([sign*(.765 if finger=='thumb' else .825),1.438,-.057])
+            root = .55 * centres[0] + .45 * palm
+            root[0] = palm[0]
+            tube(np.vstack([root,rings]),[hand]+primary,np.r_[radius,widths],
+                 np.r_[radius,depths],sign,[(hand,0.)]+blends)
     for key, values in list(data.items())+[('indices',indices)]:
         ref = mesh['indices'] if key=='indices' else attrs[key]
         acc = dict(g.j['accessors'][ref],count=len(values))

@@ -23,7 +23,7 @@ export const CIG_RADIUS = 0.00395
 export const CIG_FILTER = 0.025
 /** 手指夹持点在过滤嘴中间，所以纸烟从 z=0.005 开始 */
 const PAPER_START = 0.005
-const PAPER_FULL = CIG_LENGTH - CIG_FILTER
+export const cigaretteLength = (brand:BrandDef) => brand.length ? brand.length / 1000 : CIG_LENGTH
 export const PACK_W = 0.058
 export const PACK_H = 0.089
 export const PACK_D = 0.023
@@ -127,6 +127,7 @@ export class Parts {
 export interface PackModel {
   group: THREE.Group
   /** 盖子节点：绕 X 轴正转 = 打开 */
+  rim: number
   lid: THREE.Group
   /** 从盒口探出来的那根烟（取烟时露头） */
   filters: THREE.Mesh[]
@@ -155,19 +156,29 @@ export function createPack(brand: BrandDef, parts = new Parts()): PackModel {
   const top = parts.mat(new THREE.MeshStandardMaterial({color: brand.lid, roughness: 0.88}))
   const bottom = parts.mat(new THREE.MeshStandardMaterial({color: brand.pack, roughness: 0.9}))
   // BoxGeometry 的材质顺序：+X, -X, +Y, -Y, +Z(正面), -Z(背面)
-  const bodyGeometry = parts.geo(new THREE.BoxGeometry(PACK_W, PACK_H - 0.006, PACK_D))
-  const body = new THREE.Mesh(bodyGeometry, [side, side, top, bottom, front, side])
-  body.position.y = -0.003
+  const height = PACK_H + cigaretteLength(brand) - CIG_LENGTH
+  const rim = height / 2 - .003
+  const shoulder = rim - .014
+  const bodyHeight = height / 2 + shoulder
+  const body = new THREE.Mesh(parts.geo(new THREE.BoxGeometry(PACK_W, bodyHeight, PACK_D)), [side,side,top,bottom,front,side])
+  body.position.y = shoulder - bodyHeight / 2
   group.add(body)
 
-  // 盖子：铰链在后上方，绕 X 轴负向转起来（往背后翻）
-  const lidHeight = 0.019
+  function panel(parent:THREE.Group,w:number,h:number,d:number,x:number,y:number,z:number,mat:THREE.Material){
+    const mesh = new THREE.Mesh(parts.geo(new THREE.BoxGeometry(w,h,d)),mat)
+    mesh.position.set(x,y,z)
+    parent.add(mesh)
+  }
+  for(const sign of [-1,1]){
+    panel(group,PACK_W,.014,.0006,0,rim-.007,sign*(PACK_D/2-.0004),top)
+    panel(group,.0006,.014,PACK_D,sign*(PACK_W/2-.0004),rim-.007,0,top)
+  }
   const lid = new THREE.Group()
-  lid.position.set(0, PACK_H / 2 - 0.003 - lidHeight, PACK_D / 2)
-  const lidGeometry = parts.geo(new THREE.BoxGeometry(PACK_W + 0.0006, lidHeight, PACK_D + 0.0006))
-  const lidMesh = new THREE.Mesh(lidGeometry, [side, side, top, top, front, side])
-  lidMesh.position.set(0, lidHeight / 2, -PACK_D / 2)
-  lid.add(lidMesh)
+  lid.position.set(0,rim,-PACK_D/2)
+  panel(lid,PACK_W+.002,.001,PACK_D+.002,0,.002,PACK_D/2,side)
+  panel(lid,PACK_W+.002,.016,.001,0,-.0055,PACK_D+.001,side)
+  for(const sign of [-1,1])
+    panel(lid,.001,.016,PACK_D+.002,sign*(PACK_W/2+.0006),-.0055,PACK_D/2,side)
   group.add(lid)
 
   // 盒口探出的烟头：取烟动画时露出来，平时缩进去
@@ -183,24 +194,29 @@ export function createPack(brand: BrandDef, parts = new Parts()): PackModel {
   peek.visible = false
   group.add(peek)
 
-  const seal=new THREE.Mesh(parts.geo(new THREE.BoxGeometry(.003,PACK_H,.0006)),
-    parts.mat(new THREE.MeshStandardMaterial({color:0xf5ecc4,transparent:true,opacity:.65})))
-  seal.position.set(.018,0,PACK_D/2+.001);group.add(seal)
-  const peeled=new THREE.Mesh(parts.geo(new THREE.BoxGeometry(1,.003,.0006)),seal.material)
+  const foil = parts.mat(new THREE.MeshStandardMaterial({color:0xe3dfd2,roughness:.43,metalness:.48}))
+  const seal = new THREE.Mesh(parts.geo(new THREE.BoxGeometry(PACK_W-.002,.0004,PACK_D-.001)),foil)
+  seal.position.y = rim-.002
+  group.add(seal)
+  const peeled = new THREE.Mesh(parts.geo(new THREE.CylinderGeometry(.0016,.0016,PACK_D-.001,10).rotateX(Math.PI/2)),foil)
   peeled.visible=false
   group.add(peeled)
   const filterGeo=parts.geo(new THREE.CylinderGeometry(.00325,.00325,.008,12))
   const filterMat=parts.mat(new THREE.MeshStandardMaterial({color:brand.tip}))
+  const cap = filterFace(brand,parts,.00325)
+  cap.rotation.x = -Math.PI/2
+  cap.position.y = .0041
   const filters:THREE.Mesh[]=[]
   for(let i=0;i<20;i++){
     const row=Math.floor(i/7), col=i%7
     const filter=new THREE.Mesh(filterGeo,filterMat)
-    filter.position.set((col-3+(row===2?.5:0))*.0073,.038,row*.007-.007)
+    filter.position.set((col-3+(row===2?.5:0))*.0073,rim-.008,row*.007-.007)
+    filter.add(cap.clone())
     filters.push(filter);group.add(filter)
   }
   const tip=new THREE.Mesh(filterGeo,filterMat)
-  tip.position.y=.022;peek.add(tip)
-  return {group, lid, peek, seal, peeled, filters,parts}
+  tip.add(cap.clone());tip.position.y=.022;peek.add(tip)
+  return {group, rim, lid, peek, seal, peeled, filters,parts}
 }
 
 /* --------------------------------------------------------------- 一根香烟 */
@@ -216,6 +232,18 @@ export interface CigaretteModel {
   parts: Parts
 }
 
+function filterFace(brand:BrandDef,parts:Parts,radius:number){
+  const disk=new THREE.Mesh(parts.geo(new THREE.CircleGeometry(radius,16)),
+    parts.mat(new THREE.MeshStandardMaterial({color:0xfff1d7,map:filterTexture(),roughness:1})))
+  if(brand.filterDot){
+    const dot=new THREE.Mesh(parts.geo(new THREE.CircleGeometry(radius*.33,12)),
+      parts.mat(new THREE.MeshStandardMaterial({color:brand.filterDot})))
+    dot.position.z=.00005
+    disk.add(dot)
+  }
+  return disk
+}
+
 export function createCigarette(brand: BrandDef, parts = new Parts()): CigaretteModel {
   const group = new THREE.Group()
   group.name = 'smoke-cigarette'
@@ -227,6 +255,10 @@ export function createCigarette(brand: BrandDef, parts = new Parts()): Cigarette
   )
   filter.position.z = PAPER_START - CIG_FILTER / 2
   group.add(filter)
+  const end=filterFace(brand,parts,CIG_RADIUS)
+  end.rotation.y=Math.PI
+  end.position.z=PAPER_START-CIG_FILTER-.00005
+  group.add(end)
 
   // 过滤嘴和烟纸之间的金圈
   const band = new THREE.Mesh(
@@ -282,7 +314,8 @@ export function createCigarette(brand: BrandDef, parts = new Parts()): Cigarette
   group.add(glow)
 
   let emberStrength = 0
-  let paperLength = PAPER_FULL
+  const fullLength = cigaretteLength(brand) - CIG_FILTER
+  let paperLength = fullLength
   let lastLength = 1
 
   function layout() {
@@ -308,7 +341,7 @@ export function createCigarette(brand: BrandDef, parts = new Parts()): Cigarette
       const next = Math.max(0, Math.min(1, t))
       if (Math.abs(next - lastLength) < 0.0015) return
       lastLength = next
-      paperLength = PAPER_FULL * next
+      paperLength = fullLength * next
       layout()
     },
     setEmber(on: number) {
@@ -336,7 +369,7 @@ export function createCigarette(brand: BrandDef, parts = new Parts()): Cigarette
 export interface LighterModel {
   group: THREE.Group
   /** 0..1 火焰强度 */
-  setFlame(value: number): void
+  setFlame(value: number,strike?:number): void
   /** 火焰尖端（点烟时用来对齐香烟） */
   tipWorld(out: THREE.Vector3): THREE.Vector3
   parts: Parts
@@ -453,7 +486,8 @@ export function createLighter(parts = new Parts()): LighterModel {
 
   return {
     group,
-    setFlame(value: number) {
+    setFlame(value: number,strike=0) {
+      wheel.rotation.x=-strike*1.6
       intensity = Math.max(0, Math.min(1, value))
       apply()
     },
@@ -476,6 +510,10 @@ export function createStub(brand: BrandDef, parts = new Parts()): THREE.Group {
     parts.mat(new THREE.MeshStandardMaterial({map: filterTexture(), color: brand.tip, roughness: 0.95})),
   )
   group.add(filter)
+  const end=filterFace(brand,parts,CIG_RADIUS)
+  end.rotation.y=Math.PI
+  end.position.z=PAPER_START-CIG_FILTER-.00005
+  group.add(end)
   const charred = new THREE.Mesh(
     parts.geo(new THREE.CylinderGeometry(CIG_RADIUS * 0.96, CIG_RADIUS * 0.96, 0.008, 8).rotateZ(Math.PI / 2)),
     parts.mat(new THREE.MeshStandardMaterial({color: 0x241f1b, roughness: 1})),

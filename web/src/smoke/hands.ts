@@ -21,8 +21,8 @@ const box:Pose = {
 const lighter:Pose = {
   wrist:[-44,-43,24],
   digits:[
-    [[-23,3,16],[-19,30,6],[-2,31,1]],
-    ...[12,1,-10,-20].map((y,i):Digit=>[[9,y,21],[19,y,10],[18,y+1,-6+i]]),
+    [[-23,3,16],[-19,30,6],[-2,40,2]],
+    ...[12,1,-10,-20].map((y,i):Digit=>[[9,y,21],[17,y,7],[10,y+1,-9+i*.4]]),
   ],
 }
 const pinch:Pose = {
@@ -105,7 +105,7 @@ export function smokingHand(figure:T.Object3D,side:'l'|'r'){
     if(applied)joints.forEach((j,i)=>j.quaternion.copy(base[i]))
     applied=false
   }
-  function apply(name:keyof typeof poses,frame:T.Object3D,blend=1){
+  function apply(name:keyof typeof poses,frame:T.Object3D,blend=1,strike=0){
     const weight=T.MathUtils.clamp(blend,0,1)
     if(weight<=0){reset();return}
     if(applied)reset()
@@ -126,6 +126,7 @@ export function smokingHand(figure:T.Object3D,side:'l'|'r'){
       if(name==='pinch'&&i>1 || name==='puff'&&i!==1&&i!==2)return
       const [,hinge,pad]=pose.digits[i],end=chain[3]
       const pole=point(hinge),tip=point(pad)
+      if(name==='lighter'&&i===0)tip.copy(point([pad[0],pad[1]-6*strike,pad[2]+5*strike]))
       const distal=chain[2].getWorldPosition(a).distanceTo(end.getWorldPosition(b))
       const medial=chain[1].getWorldPosition(a).distanceTo(chain[2].getWorldPosition(b))
       aimHinge(chain[0],chain[1],tip,pole,(medial+distal)*.95)
