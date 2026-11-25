@@ -76,11 +76,12 @@
 .rc .rc-reticle::before{left:50%;top:-10px;width:1px;height:8px}
 .rc .rc-reticle::after{top:50%;left:-10px;height:1px;width:8px}
 .rc .rc-gimbal{position:absolute;right:calc(16px + env(safe-area-inset-right));
-  bottom:calc(96px + env(safe-area-inset-bottom));display:flex;align-items:center;gap:8px;pointer-events:auto;
-  font-size:10.5px;padding:5px 10px;border-radius:8px;background:rgba(0,0,0,.34);
+  bottom:calc(96px + env(safe-area-inset-bottom));display:flex;flex-direction:column;align-items:center;gap:6px;pointer-events:auto;
+  font-size:10.5px;padding:8px 10px;border-radius:8px;background:rgba(0,0,0,.34);
   border:1px solid rgba(244,239,226,.14)}
 .rc .rc-gimbal b{font-weight:600;font-variant-numeric:tabular-nums}
-.rc .rc-gimbal input{width:92px;accent-color:#f4efe2}
+/* IDOK-278: 云台俯仰轮竖放 —— 上推抬头、下拉低头，跟真机云台拨轮方向一致 */
+.rc .rc-gimbal input{writing-mode:vertical-lr;direction:rtl;width:24px;height:110px;accent-color:#f4efe2}
 
 .rc .rc-actions{position:absolute;left:50%;bottom:calc(14px + env(safe-area-inset-bottom));transform:translateX(-50%);
   display:flex;gap:8px;flex-wrap:wrap;justify-content:center;max-width:min(560px,92vw)}
