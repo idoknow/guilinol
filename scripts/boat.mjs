@@ -1026,6 +1026,7 @@ try {
   })
   await attachHelpers(mobile)
   await gotoWalk(mobile)
+  await mobile.getByRole('button', {name: '竖屏继续'}).tap()
 
   await enterSpot(mobile, ...FREE_DOCKS.ronghu.freeBank, 0, 'mobile-ronghu-bank')
   await closeSpotCard(mobile)
