@@ -67,7 +67,7 @@ def main():
     setback = unary_union(setbacks).intersection(district.buffer(1.5))
     roofs = {}
     for filename in ('dongxi-layout.geojson', 'dongxi-infill.geojson'):
-        path=layout/filename
+        path=ROOT/'pipeline/data/layout'/filename
         catalog=json.loads(path.read_text())
         output=[]
         for feature in catalog['features']:
