@@ -6,6 +6,9 @@ import struct
 import numpy as np
 from shapely import LineString, MultiPoint, Point, box
 
+from shapely.ops import substring
+
+from common import xz2ll
 from dingjiang import hengliu
 from features import points
 from station_roads import samples
@@ -16,17 +19,29 @@ YARD_DECK = {
     983781250: (160.92, 23.9011, 160.3891, 29.7878, 160.3298, 161.10),
     983781252: (161.10, 29.3699, 160.2656, 35.5002, 160.3273, 160.92),
 }
+ROAD_SPANS = {983781246: (160.20, 159.95), 983781248: (159.95, 160.20)}
 BRIDGES = {500400553, 500400554, *YARD_DECK}
 APPROACHES = {
     205756891: (1869164152, 1869155088, 162.800, None),
     500400555: (1869105879, 1869164132, None, 162.433),
     983781249: (9096632979, 2157336104, 161.10, None),
     983781251: (2157336106, 9096632980, None, 161.10),
-    983781245: (1869155282, 13681251548, 160.92, 160.200),
-    983781247: (13681251549, 1331240999, 160.200, 160.92),
+    983781245: (1869155282, 9096632976, 160.92, 160.20),
+    983781247: (9096632977, 1331240999, 160.20, 160.92),
+    500400552: (9096632975, 3101394803, 159.95, 160.0),
+    500571918: (3101394796, 9096632978, 159.50, 159.95),
     459580310: (9344231203, 7613431624, 160.587, None),
     815078158: (7613431623, 6821480678, None, 159.812),
 }
+# The traffic network retains its released extent. The new short bridge
+# approaches only change surface geometry and player vehicle support.
+TRAFFIC_ENDS = {
+    983781245: (1869155282, 13681251548),
+    983781247: (13681251549, 1331240999),
+}
+# Native terrain vertices on the carriageways. Place the transverse tie
+# through each vertex without moving the source centreline in plan.
+OUTER_TIES = {500400552: (-136, -9568), 500571918: (-128, -9560)}
 TUNNEL = 815078159
 
 
@@ -38,8 +53,8 @@ def motorway_sections(elements):
         wid = way["id"]
         if wid in BRIDGES:
             yield way
-        elif wid in APPROACHES:
-            first, last, _, _ = APPROACHES[wid]
+        elif wid in APPROACHES and wid not in OUTER_TIES:
+            first, last = TRAFFIC_ENDS.get(wid, APPROACHES[wid][:2])
             start = way["nodes"].index(first)
             stop = way["nodes"].index(last) + 1
             yield dict(
@@ -50,6 +65,8 @@ def motorway_sections(elements):
 
 
 def bridge_height(wid, line, at):
+    if wid in ROAD_SPANS:
+        return np.interp(at, [0, line.length], ROAD_SPANS[wid])
     if wid not in YARD_DECK:
         return hengliu(line.interpolate(at).y) + 8.715
     first, a, ya, b, yb, last = YARD_DECK[wid]
@@ -87,6 +104,23 @@ def road_profiles(elements, widths):
                 surfaceApproach=True,
             )
             line = LineString(points(local))
+            if wid in OUTER_TIES:
+                # These native OSM chords extend hundreds of metres beyond
+                # the abutment. Clip each landing at its surveyed native tie.
+                full = LineString(points(way))
+                at_start = wid == 500400552
+                boundary = full.project(Point(OUTER_TIES[wid]))
+                tie = full.interpolate(boundary)
+                lat, lon = xz2ll(tie.x, tie.y)
+                index = -1 if at_start else 0
+                local["nodes"][index] = -wid
+                local["geometry"][index] = {"lat": lat, "lon": lon}
+                local["nativeRemainder"] = list(
+                    substring(full, boundary, full.length).coords
+                    if at_start
+                    else substring(full, 0, boundary).coords
+                )
+                line = LineString(points(local))
             levels = [ya, yb]
             for end in (0, 1):
                 if levels[end] is None:
@@ -95,6 +129,14 @@ def road_profiles(elements, widths):
                         -5.7 if wid in (459580310, 815078158) else 8.715
                     )
             knots = [(0.0, levels[0])]
+            if wid == 983781245:
+                knots.extend([(95.63, 160.20), (line.length - 5, 160.20)])
+            if wid == 983781247:
+                knots.extend([(5, 160.20), (144.96, 160.20)])
+            if wid == 500400552:
+                knots.append((5, 159.95))
+            if wid == 500571918:
+                knots.append((line.length - 5, 159.95))
             if wid == 500400555:
                 knots.append((line.length - 6, 162.28425))
             heights = samples([*knots, (line.length, levels[1])], transition=1.0)
@@ -105,8 +147,12 @@ def road_profiles(elements, widths):
 
 
 def raise_decks(directory, manifest, elements, profiles):
-    """Raise only the four existing GL04 deck meshes after the native rail solve."""
-    ways = {w["id"]: w for w in elements if w["type"] == "way" and w["id"] in BRIDGES}
+    """Fit the six existing GL04 road decks and stitch their approaches."""
+    ways = {
+        w["id"]: w
+        for w in elements
+        if w["type"] == "way" and w["id"] in BRIDGES | ROAD_SPANS.keys()
+    }
     lines = {wid: LineString(points(w)) for wid, w in ways.items()}
     approaches = {}
     for road, alignment, levels in profiles.values():
@@ -148,7 +194,7 @@ def raise_decks(directory, manifest, elements, profiles):
                     native_cm = int(vertex[1])
                     along = line.project(Point(p))
                     height = bridge_height(wid, line, along)
-                    if wid not in YARD_DECK:
+                    if wid not in YARD_DECK and wid not in ROAD_SPANS:
                         # Follow the Hengliu plane across the slab width as well.
                         height += hengliu(p[1]) - hengliu(line.interpolate(along).y)
                     y = round(height * 100)

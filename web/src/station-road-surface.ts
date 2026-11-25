@@ -40,6 +40,7 @@ export function stationRoadSurface(segments:StationRoadSegment[]){
     // At an at-grade fork, blend both carriageways across their shared
     // shoulder before returning to the independent longitudinal profiles.
     if(precise && grades && grades.size>1)for(const grade of grades.values()){
+      blend=Math.max(blend,Math.min(1,(grade.width-grade.distance)/4))
       const weight=Math.min(1,(grade.width-grade.distance)/3)
       y=Math.min(y,y+(grade.level-y)*weight)
     }

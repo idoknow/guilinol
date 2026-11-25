@@ -5,6 +5,7 @@ import path from 'node:path'
 import { gunzipSync } from 'node:zlib'
 import * as THREE from 'three'
 import { ll2xz } from '../lib/projection'
+import vesselBounds from '../pipeline/vessel-bounds.json'
 import streetRules from '../pipeline/streets.json'
 import { bridgeGeometry } from '../web/src/look/bridge'
 import { streetGeometry } from '../web/src/street-worker'
@@ -108,9 +109,37 @@ function tileFaces(world: string, tile: any, tunnels: Tunnel[], visit: (p: Verte
   }
 }
 
-export function visibleSurfaces(world: string, ids: Set<number>, closure: Set<number>) {
+// Intersect a rendered lower face with the entire deck triangle in plan.
+// At each vertex of the intersection the difference between the two planes
+// is exact. Subtract the slab thickness across its interior as at its fascia.
+function underDeck(points: Vertex[], deck: Vertex[], depth: number) {
+  const [a, b, c] = deck,
+    ux = b[0] - a[0],
+    uz = b[2] - a[2],
+    vx = c[0] - a[0],
+    vz = c[2] - a[2]
+  const det = ux * vz - uz * vx
+  if (Math.abs(det) < 1e-8) return Infinity
+  let poly = points
+  for (let i = 0; i < 3; i++) {
+    const p = deck[i],
+      q = deck[(i + 1) % 3]
+    poly = clip(poly, (v) => Math.sign(det) * ((q[0] - p[0]) * (v[2] - p[2]) - (q[2] - p[2]) * (v[0] - p[0])))
+  }
+  let least = Infinity
+  for (const p of poly) {
+    const dx = p[0] - a[0],
+      dz = p[2] - a[2]
+    const u = (dx * vz - dz * vx) / det,
+      v = (ux * dz - uz * dx) / det
+    least = Math.min(least, a[1] + u * (b[1] - a[1]) + v * (c[1] - a[1]) - depth - p[1])
+  }
+  return least
+}
+
+export function visibleSurfaces(world: string, ids: Set<number>, closure: Set<number>, reference?: Tunnel[]) {
   const manifest = JSON.parse(fs.readFileSync(path.join(world, 'manifest.json'), 'utf8'))
-  const strips = (manifest.tunnels as Tunnel[])
+  const strips = (reference ?? (manifest.tunnels as Tunnel[]))
     .filter((t) => ids.has(t.way))
     .map((t) => {
       const [[x, , z], [bx, , bz]] = t.portals,
@@ -159,6 +188,16 @@ export function visibleSurfaces(world: string, ids: Set<number>, closure: Set<nu
         checked: 0,
         violations: 0,
         externalBridgeViolations: 0,
+        roadBridges: {} as Record<
+          number,
+          {
+            minClearanceM: number
+            intersections: number
+            targetM: number
+            belowTargetFaces: number
+            groundHits: number
+          }
+        >,
         upperDecks: {} as Record<number, { faces: number; minSeparationM: number; maxSeparationM: number }>,
         maxGroundExcessM: 0,
         worst: null as any,
@@ -171,8 +210,19 @@ export function visibleSurfaces(world: string, ids: Set<number>, closure: Set<nu
       (s) => s.left <= tile.x + 256 && s.right >= tile.x && s.top <= tile.z + 256 && s.bottom >= tile.z,
     )
     if (!local.length) continue
-    tileFaces(world, tile, manifest.tunnels, (points, role) => {
-      const bridgeWay = role === 'deck' ? deckOwner(points) : undefined
+    const faces: { points: Vertex[]; role: string; owner?: number }[] = []
+    tileFaces(world, tile, manifest.tunnels, (points, role) =>
+      faces.push({ points, role, owner: role === 'deck' ? deckOwner(points) : undefined }),
+    )
+    const decks = faces.filter(
+      (f) =>
+        f.owner !== undefined &&
+        Math.abs(
+          (f.points[1][0] - f.points[0][0]) * (f.points[2][2] - f.points[0][2]) -
+            (f.points[1][2] - f.points[0][2]) * (f.points[2][0] - f.points[0][0]),
+        ) > 0.000001,
+    )
+    for (const { points, role, owner: bridgeWay } of faces) {
       for (const s of local) {
         if (
           points.every((p) => p[0] < s.left) ||
@@ -195,6 +245,38 @@ export function visibleSurfaces(world: string, ids: Set<number>, closure: Set<nu
         const lo = Math.min(...poly.map((v) => v[0])),
           hi = Math.max(...poly.map((v) => v[0]))
         const report = reports.get(s.t.way)!
+        const targetM = s.t.way === 459580311 ? 5 : 4.5
+        const entry = (id: number) =>
+          (report.roadBridges[id] ??= {
+            minClearanceM: Infinity,
+            intersections: 0,
+            targetM,
+            belowTargetFaces: 0,
+            groundHits: 0,
+          })
+        const overlaps = new Set<number>()
+        if (role !== 'deck') {
+          const inStrip = clip(
+            clip(poly, (p) => p[0]),
+            (p) => s.t.length - p[0],
+          ).map(([d, y, w]): Vertex => [s.x + d * s.dx - w * s.dz, y, s.z + d * s.dz + w * s.dx])
+          for (const deck of decks) {
+            if (![983781246, 983781248, 983781250, 983781252].includes(deck.owner!)) continue
+            if (
+              inStrip.every((p) => deck.points.every((q) => p[0] < q[0])) ||
+              inStrip.every((p) => deck.points.every((q) => p[0] > q[0])) ||
+              inStrip.every((p) => deck.points.every((q) => p[2] < q[2])) ||
+              inStrip.every((p) => deck.points.every((q) => p[2] > q[2]))
+            )
+              continue
+            const gap = underDeck(inStrip, deck.points, vesselBounds.bridgeDepth)
+            if (!Number.isFinite(gap)) continue
+            const row = entry(deck.owner!)
+            overlaps.add(deck.owner!)
+            row.intersections++
+            row.minClearanceM = Math.min(row.minClearanceM, gap)
+          }
+        }
         let lowest = Infinity,
           worst = -Infinity,
           where: Vertex | undefined
@@ -260,11 +342,14 @@ export function visibleSurfaces(world: string, ids: Set<number>, closure: Set<nu
           upper.faces++
           upper.minSeparationM = Math.min(upper.minSeparationM, lowest)
           upper.maxSeparationM = Math.max(upper.maxSeparationM, worst)
+          if ([983781246, 983781248, 983781250, 983781252].includes(bridgeWay) && lowest < targetM)
+            entry(bridgeWay).belowTargetFaces++
           if (!closure.has(bridgeWay) && worst > 0.05001) report.externalBridgeViolations++
           continue
         }
         report.checked++
         if (worst > 0.05001) {
+          for (const id of overlaps) entry(id).groundHits++
           report.violations++
           report.byRole[role] = (report.byRole[role] ?? 0) + 1
         }
@@ -273,7 +358,7 @@ export function visibleSurfaces(world: string, ids: Set<number>, closure: Set<nu
           report.worst = { role, where }
         }
       }
-    })
+    }
   }
   return [...reports.values()].map(({ violations, externalBridgeViolations, ...fields }) => ({
     ...fields,

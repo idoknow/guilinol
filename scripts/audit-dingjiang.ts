@@ -12,7 +12,8 @@ const [base, candidate] = process.argv.slice(2)
 if (!candidate) throw Error('Expected baseline and candidate world directories')
 const json = (p: string) => JSON.parse(fs.readFileSync(p, 'utf8'))
 const roads = new Set([983781242, 983781244, 1550293846, 459580311])
-const auditedRoads = new Set([...roads, 500400553, 500400554, 983781250, 983781252,
+const paved = new Set([...roads,1030049241,983781243])
+const auditedRoads = new Set([...paved,983781246,983781248,500400552,500571918, 500400553, 500400554, 983781250, 983781252,
   205756891, 500400555, 983781249, 983781251, 983781245, 983781247,
   459580310, 815078158, 815078159])
 const yard = new Set([6635078452, 6635078453, 6635078454])
@@ -89,6 +90,19 @@ for (const [id, way] of ways) {
     stations.push(station)
   }
   const active = stations.filter((_,i) => included.has(way.nodes[i]))
+  // A clipped motorway approach ends inside a long native OSM chord.
+  for(const t of worlds[1].tunnels.filter(t=>t.way===id)){
+    for(const [px,,pz] of t.portals){
+      let distance=Infinity,best=0
+      for(let i=1;i<points.length;i++){
+        const a=points[i-1],b=points[i],dx=b.x-a.x,dz=b.z-a.z,len=stations[i]-stations[i-1]
+        const u=Math.max(0,Math.min(1,((px-a.x)*dx+(pz-a.z)*dz)/(len*len)))
+        const d=Math.hypot(px-a.x-u*dx,pz-a.z-u*dz)
+        if(d<distance){distance=d;best=stations[i-1]+u*len}
+      }
+      active.push(best)
+    }
+  }
   const lo = structure === 'bridge' ? 0 : Math.min(...active)
   const hi = structure === 'bridge' ? station : Math.max(...active)
   const cap = way.tags.highway === 'service' ? .08 : .05
@@ -141,8 +155,51 @@ for (const [id, way] of ways) {
     yardGrades.push({node, signedGrade:slopes[1]})
   }
 }
-const reverse = visibleSurfaces(candidate, roads, auditedRoads)
-console.log(JSON.stringify({reverse, closure: [...auditedRoads].sort((a,b)=>a-b), crossings:results, grades, yardGrades}, null, 2))
+// Native main has no Dingjiang profile records. Compare exactly the same
+// XY strips using heights from main's own rendered carriageway.
+const reference=worlds[1].tunnels.filter(t=>paved.has(t.way)).map(t=>{
+  const [[x,,z],[bx,,bz]]=t.portals
+  const surface=(at:number)=>worlds[0].surface(x+(bx-x)*at/t.length,z+(bz-z)*at/t.length,
+    {way:t.way,structure:'surface',nodes:new Set(t.nodes)})
+  return {...t,footprint:undefined,joints:undefined,stations:t.stations.map(([at])=>[at,surface(at)]),
+    portals:t.portals.map(([x,,z],i)=>[x,surface(i*t.length),z])}
+})
+// Sample both sides of each abutment on the actual incident way. A
+// per-way maximum alone can miss the step between the last two vertices.
+const abutments=[]
+for(const [bridge,start,end] of [[983781246,983781245,500400552],[983781248,500571918,983781247]]){
+  const span=ways.get(bridge)
+  for(const [i,approach] of [start,end].entries()){
+    const node=span.nodes[i?span.nodes.length-1:0]
+    const arm=ways.get(approach)
+    const ray=(way,structure)=>{
+      const at=way.nodes.indexOf(node)
+      assert(at===0 || at===way.nodes.length-1,'Missing abutment endpoint')
+      const a=ll2xz(way.geometry[at].lat,way.geometry[at].lon)
+      const p=way.geometry[at+(at===0?1:-1)],b=ll2xz(p.lat,p.lon)
+      const dx=b.x-a.x,dz=b.z-a.z,length=Math.hypot(dx,dz)
+      return (world,d)=>world.surface(a.x+d*dx/length,a.z+d*dz/length,
+        {way:way.id,structure,nodes:new Set(way.nodes)})
+    }
+    const upper=ray(span,'bridge'),landing=ray(arm,'surface')
+    const samples=worlds.map(world=>{
+      const atNodeM=Math.abs(upper(world,0)-landing(world,0))
+      const heights=Array.from({length:21},(_,j)=>j<10?landing(world,20-2*j):upper(world,2*j-20))
+      const maxGrade=Math.max(...heights.slice(1).map((y,i)=>Math.abs(y-heights[i])/2))
+      return {atNodeM,maxGrade}
+    })
+    abutments.push({bridge,approach,node,main:samples[0],candidate:samples[1]})
+    assert(samples[1].atNodeM<=.01 && samples[1].maxGrade<=.050001,'Abutment step or grade on '+bridge)
+  }
+}
+const mainReverse=visibleSurfaces(base,paved,auditedRoads,reference)
+const reverse = visibleSurfaces(candidate, paved, auditedRoads)
+console.log(JSON.stringify({abutments, mainReverse, reverse, closure: [...auditedRoads].sort((a,b)=>a-b), crossings:results, grades, yardGrades}, null, 2))
 
 assert(reverse.every(r => r.checked > 0 && r.groundViolations === 0), 'Ground-level faces intrude into a surveyed underpass')
 assert(reverse.every(r => r.externalBridgeViolations === 0), 'Non-closure S2201 bridge faces above the surveyed shoulder; see upperDecks')
+for(const [lower,bridge] of [[459580311,983781246],[459580311,983781248],[983781242,983781250],[983781242,983781252],[983781244,983781250],[983781244,983781252]]){
+  const row=reverse.find(r=>r.way===lower)?.roadBridges[bridge]
+  assert(row && row.intersections>0 && row.minClearanceM>=row.targetM && row.belowTargetFaces===0 && row.groundHits===0,
+    'Road bridge clearance failed on '+bridge+' over '+lower)
+}

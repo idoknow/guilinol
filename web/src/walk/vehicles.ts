@@ -817,6 +817,9 @@ export async function vehicles(
       car = lastCar = takeRecord(nearBike)
       car.position.set(safePos.x, safePos.bikeY, safePos.z)
       group.add(car)
+      // A parked marker is restored from a quaternion. Extract yaw before
+      // pitch so entering the car preserves headings past a quarter turn.
+      car.rotation.reorder('YXZ')
       carCtrl.mount(car.rotation.y, car.rotation.x)
       syncHud()
     } else if (nearBike) {

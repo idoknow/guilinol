@@ -140,7 +140,9 @@ def bake_profiles(directory, manifest, profiles, elements, bridge_ways=(), landi
         if len(coords)<2 or not len(near.query(LineString(coords),predicate='dwithin',distance=40)):
             continue
         profiled = profiles.get(way['id'])
-        if profiled:
+        if profiled and 'nativeRemainder' in profiled[0]:
+            fixed = [LineString(profiled[0]['nativeRemainder'])]
+        elif profiled:
             nodes = profiled[0]['nodes']
             if nodes == way['nodes']:
                 continue

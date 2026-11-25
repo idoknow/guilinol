@@ -4,6 +4,9 @@ Stations refer to the complete OSM way, including its unplayable end.
 The two tie points are native rail vertices. Interior controls are the
 accepted rail-first solution, ordered from the north-east boundary.
 """
+import json
+from pathlib import Path
+
 import numpy as np
 from shapely import LineString, Point
 from common import xz2ll
@@ -18,7 +21,8 @@ CROSSINGS = (
     (1550293846, 1723.464147, 161.9500, 5.447),
     (459580311, 1924.662941, 159.5900, 2946.736),
 )
-ROAD_IDS = {row[0] for row in CROSSINGS}
+ROAD_DESIGN = json.loads(Path(__file__).with_name("dingjiang-road-profiles.json").read_text())
+ROAD_IDS = {row["way"] for row in ROAD_DESIGN}
 
 
 def fit_rail(coords, pieces, height, ways):
@@ -71,18 +75,12 @@ def road_profiles(elements, paired_widths):
     from station_roads import samples
 
     ways = {w['id']: w for w in elements if w['type'] == 'way' and w['id'] in ROAD_IDS}
-    # Tie to existing carriageway vertices sampled on the baseline road mesh.
-    # The service-road cul-de-sac and its junction with Changfeng are both
-    # inside the cut. Give the junction the same elevation on both ways.
-    bounds = {
-        983781242: (9096632919, 155.04343, 9096632923, 159.85444),
-        983781244: (9096632966, 160.13599, 9096632971, 154.93321),
-        459580311: (9096622970, 155.79481, 4553929619, 158.71084),
-        1550293846: (14100547688, 156.2500, 14100547694, None),
-    }
     controls = {road: (at, rail - 5.7) for road, _, rail, at in CROSSINGS}
     profiles = {}
-    for road, (start, start_y, end, end_y) in bounds.items():
+    for design in ROAD_DESIGN:
+        road = design["way"]
+        start, start_y = design["start"]
+        end, end_y = design["end"]
         way = ways[road]
         i, j = way['nodes'].index(start), way['nodes'].index(end)
         whole = LineString(points(way))
@@ -100,27 +98,30 @@ def road_profiles(elements, paired_widths):
             nodes = [-start, *nodes]
             line = LineString([tip, *line.coords])
             offset -= 3
-        at, level = controls[road]
         if end_y is None:
             _, parent, profile = profiles[459580311]
             joint = parent.project(Point(line.coords[-1]))
             end_y = np.interp(joint, profile[:, 0], profile[:, 1])
-        knots = [(0., start_y)]
-        if road == 459580311:
-            knots.append((7., 155.79960))
-        if road == 983781244:
-            # Keep the approach below the two native sags on either side.
-            knots.extend([(6., 159.91), (1647.0-offset, 158.45)])
-        knots.append((at-offset, level))
-        if road == 983781244:
-            knots.extend([(1829.0-offset, 154.985), (1839.0-offset, 154.910)])
+        knots = [(0., start_y), *design["knots"], (line.length, end_y)]
         if road == 983781242:
-            knots.append((1406.0-offset, 158.44))
-        if road == 459580311:
-            # The retained east junction owns the final six metres of paving.
-            # Match its native crest before the clipped floor ends at the curb.
-            knots.append((line.length-8., 158.79226))
-        heights = samples([*knots, (line.length, end_y)], transition=16.)
+            # Continue the road under both axles when a vehicle reaches the
+            # lowered cul-de-sac. Keep the native terminal knot level.
+            a, b = np.asarray(line.coords[-2:])
+            tip = b + 3 * (b-a) / np.linalg.norm(b-a)
+            lat, lon = xz2ll(*tip)
+            geometry = [*geometry, dict(lat=lat, lon=lon)]
+            nodes = [*nodes, -end]
+            line = LineString([*line.coords, tip])
+            knots.append((line.length, end_y))
+        if road in controls:
+            at, level = controls[road]
+            knots.append((at-offset, level))
+        heights = samples(sorted(knots, key=lambda knot: knot[0]), transition=design["transition"])
+        keep = np.r_[True, np.diff(heights[:, 0]) > 1.e-8]
+        heights = heights[keep]
+        cap = .08 if way['tags']['highway'] == 'service' else .05
+        if np.max(np.abs(np.diff(heights[:, 1])/np.diff(heights[:, 0]))) > cap:
+            raise ValueError(f"Road {road} exceeds its approach grade")
         local = dict(way, nodes=nodes, geometry=geometry, surfaceApproach=True,
                      trafficNodes=way['nodes'][max(0, i-1):j+2])
         if way['tags']['highway'] == 'service':
