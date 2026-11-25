@@ -1796,6 +1796,48 @@ function named<T extends THREE.Object3D>(obj: T, name: string): T {
   return obj
 }
 
+// Static Batch.flush meshes have identity transforms and non-indexed triangles
+// in shop-local space. Two sections can share a draw even when either section
+// can be hidden: both visible ranges and either individual range are contiguous.
+function batchShopSections(root: THREE.Group, sections: THREE.Group[]) {
+  const byMaterial = new Map<THREE.Material, THREE.Mesh[]>()
+  for (const section of sections) {
+    for (const mesh of section.children) {
+      if (!(mesh instanceof THREE.Mesh) || Array.isArray(mesh.material) || mesh.material.transparent) continue
+      const list = byMaterial.get(mesh.material) ?? []
+      list.push(mesh)
+      byMaterial.set(mesh.material, list)
+    }
+  }
+  const updates: (() => void)[] = []
+  for (const [material, meshes] of byMaterial) {
+    if (meshes.length !== 2) continue
+    const [first, second] = meshes
+    const a = first.parent!, b = second.parent!
+    const geometry = mergeGeometries([first.geometry, second.geometry], false)
+    if (!geometry) continue
+    const split = first.geometry.getAttribute('position').count
+    const total = geometry.getAttribute('position').count
+    const mesh = new THREE.Mesh(geometry, material)
+    mesh.name = 'tianyuan.shared:' + material.name
+    mesh.matrixAutoUpdate = false
+    root.add(mesh)
+    for (const source of meshes) {
+      source.removeFromParent()
+      source.geometry.dispose()
+    }
+    updates.push(() => {
+      const start = a.visible ? 0 : split
+      const end = b.visible ? total : split
+      mesh.visible = end > start
+      geometry.setDrawRange(start, end - start)
+    })
+  }
+  const sync = () => { for (const update of updates) update() }
+  sync()
+  return sync
+}
+
 export function buildTianyuanShopMesh(level: ShopLevel = 1): TianyuanShopBuildResult {
   const lv: ShopLevel = level === 3 ? 3 : level === 2 ? 2 : 1
   const M = acquireTianyuanMaterials()
@@ -1829,6 +1871,7 @@ export function buildTianyuanShopMesh(level: ShopLevel = 1): TianyuanShopBuildRe
   EC.flush(exterior, 'tianyuan.exterior')
   SF.flush(storefront, 'tianyuan.storefront')
   IW.flush(interior, 'tianyuan.interior')
+  const syncSectionBatches = batchShopSections(group, [exterior, storefront, interior])
   for (const grp of [storefront, interior]) {
     grp.traverse(o => {
       const mesh = o as THREE.Mesh
@@ -2158,6 +2201,7 @@ export function buildTianyuanShopMesh(level: ShopLevel = 1): TianyuanShopBuildRe
     cut = next
     exterior.visible = !cut
     ceilingGroup.visible = !cut
+    syncSectionBatches()
     group.userData.cutaway = cut
   }
 
@@ -2612,7 +2656,10 @@ export function buildTianyuanShopMesh(level: ShopLevel = 1): TianyuanShopBuildRe
 
     setDetailVisible(visible: boolean) {
       dynamic.visible = visible
-      interior.visible = visible
+      if (interior.visible !== visible) {
+        interior.visible = visible
+        syncSectionBatches()
+      }
       if (fan) fan.visible = visible
     },
 
