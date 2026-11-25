@@ -119,7 +119,11 @@ def bake(directory, manifest, paired_widths):
         adjust_prior_roads(section["name"], parts, sections)
         if not parts:
             continue
-        bake_profiles(directory, manifest, parts, elements, additional=True)
+        bridges, joints = [], {}
+        if section.get("roadDecks"):
+            from rail_section_bridges import grade_decks
+            bridges, joints = grade_decks(directory, manifest, section["roadDecks"], ways, parts)
+        bake_profiles(directory, manifest, parts, elements, bridges, joints, additional=True)
         finish_paving(directory, manifest, list(parts.values()), elements)
 
 
