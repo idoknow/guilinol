@@ -7,7 +7,7 @@ export const tunnelLiningMaterial=new THREE.MeshStandardMaterial({side:THREE.Dou
 export const tunnelLightMaterial=new THREE.MeshBasicMaterial({side:THREE.DoubleSide,vertexColors:true})
 
 type Point=[number,number,number]
-export type Tunnel={way:number,nodes?:[number,number],portals:[Point,Point],length:number,halfWidth:number,clearance:number,approach:number,approachEnds?:[number,number],mouths?:[boolean,boolean],openEnds?:[number,number],openCut?:boolean,footprint?:[number,number][][],joints?:({ring:[number,number][],wedges?:[number,number][][],faces?:Point[][],draw:boolean}|null)[],stations:[number,number][]}
+export type Tunnel={way:number,nodes?:[number,number],portals:[Point,Point],length:number,halfWidth:number,clearance:number,approach:number,approachEnds?:[number,number],mouths?:[boolean,boolean],openEnds?:[number,number],nativePaving?:boolean,openCut?:boolean,footprint?:[number,number][][],joints?:({ring:[number,number][],wedges?:[number,number][][],faces?:Point[][],draw:boolean}|null)[],stations:[number,number][]}
 
 function frame(tunnel:Tunnel){
   const [start,end]=tunnel.portals, ux=(end[0]-start[0])/tunnel.length,uz=(end[2]-start[2])/tunnel.length
@@ -206,7 +206,7 @@ export function tunnelGeometry(tile:Tile,ground:THREE.PlaneGeometry,tunnels:Tunn
         quad([local(b,inset,by),local(a,inset,ay),local(a,inset,ay+1.3),local(b,inset,by+1.3)],'band')
         for(const d of [-inset+.02,inset-.02])quad([local(a,d,ay+head-.95),local(b,d,by+head-.95),local(b,d,by+head-.8),local(a,d,ay+head-.8)],'lamp')
       }
-      if(Math.floor(a/6)%2===0)quad([local(a,-.08,ay+.03),local(a,.08,ay+.03),local(b,.08,by+.03),local(b,-.08,by+.03)],'lane')
+      if(!tunnel.nativePaving && Math.floor(a/6)%2===0)quad([local(a,-.08,ay+.03),local(a,.08,ay+.03),local(b,.08,by+.03),local(b,-.08,by+.03)],'lane')
       for(const [s,y] of [[a,ay]])if(first>0&&Math.abs(s-first)<1e-6||last>0&&Math.abs(s-tunnel.length+last)<1e-6){
         const l=local(s,-width,y+head),r=local(s,width,y+head)
         quad([l,r,[r[0],Math.max(r[1]+.16,groundY(r)),r[2]],[l[0],Math.max(l[1]+.16,groundY(l)),l[2]]],'portal')

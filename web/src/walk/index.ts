@@ -2355,7 +2355,10 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
       const nextTile=sim.tileAt(next.x,next.z)
       if(nextTile&&!stream.loaded.has(nextTile)){next.x=pos.x;next.z=pos.z;vx=vz=0;rides?.stop();bikeSpeed=0}
       const inBore=tunnelFloor(manifest.tunnels,next.x,next.z,next.y-cfg.height/2)!==undefined
-      const ground=inBore?sim.surface(next.x,next.z,'road',next.y+1,5):sim.surface(next.x,next.z,'ground')
+      // The shared bridge landing clips its duplicate road collider. The
+      // deck under the player's feet also supports travel across this seam.
+      const ground=(inBore?sim.surface(next.x,next.z,'road',next.y+1,5):sim.surface(next.x,next.z,'ground'))
+        ?? sim.surface(next.x,next.z,'deck',next.y-cfg.height/2+.45,1.25)
       if(!ground||next.y-cfg.height/2<ground.y-3){if(place(safe.x,safe.z,'rescue'))resets++;break}
       if(sim.wet(next.x,next.z)){
         const foot=next.y-cfg.height/2,deck=sim.surface(next.x,next.z,'deck')

@@ -12,11 +12,11 @@ from features import points
 from road_profile import RULES
 
 
-def samples(knots):
+def samples(knots, transition=2.):
     out = [knots[0]]
     for (s, y), (t, z) in zip(knots, knots[1:]):
         length = t - s
-        ease = min(2., .15 * length)
+        ease = min(transition, .15 * length)
         tangent = (z - y) / (length - ease)
         # A parabolic vertical curve at each end joins the central tangent.
         for x in np.unique(np.r_[np.linspace(0, length, math.ceil(length / 2) + 1),
@@ -31,10 +31,10 @@ def samples(knots):
     return np.array(out)
 
 
-def road_design(paired_widths=None):
+def road_design(paired_widths=None, elements=None):
     design = json.loads(Path(__file__).with_name('station-road-profiles.json').read_text())
     profiles = {}
-    for way in load_osm():
+    for way in elements if elements is not None else load_osm():
         if way['type'] != 'way' or str(way['id']) not in design:
             continue
         line = LineString(points(way))
@@ -48,6 +48,8 @@ def road_design(paired_widths=None):
 
 
 def half_width(way):
+    if 'profileWidth' in way:
+        return way['profileWidth']/2
     if 'stationWidth' in way:
         return way['stationWidth']/2
     tags = way['tags']
@@ -71,9 +73,10 @@ def tunnel_sections(profiles):
             distances = np.r_[start, at[(at > start+.001) & (at < end-.001)], end]
             levels = np.interp(distances, at, heights[:,1])
             portals = [[*p[:1], float(y), p[1]] for p,y in zip(coords[i:i+2], levels[[0,-1]])]
+            mouths = [False, False] if way.get('surfaceApproach') else [i==0, i==len(chain)-2]
             bores.append(dict(way=way['id'], nodes=way['nodes'][i:i+2], portals=portals,
                               length=end-start, halfWidth=half_width(way), clearance=4.5,
-                              approach=0, openCut=not covered, openEnds=[0,0] if covered else [end-start,0], mouths=[i==0,i==len(chain)-2],
+                              approach=0, openCut=not covered, openEnds=[0,0] if covered else [end-start,0], mouths=mouths,
                               pairedWidth=way.get('stationWidth'),
                               stations=np.column_stack((distances-start, levels)).tolist()))
     ends = defaultdict(list)
@@ -87,12 +90,24 @@ def tunnel_sections(profiles):
 
 def bake(directory, manifest, paired_widths):
     """Install profiles after the native rail tie-ins have been evaluated."""
+    from dingjiang import road_profiles
+    elements = load_osm()
+    profiles = road_design(paired_widths, elements)
+    profiles.update(road_profiles(elements, paired_widths))
+    import dingjiang_structures
+    profiles.update(dingjiang_structures.road_profiles(elements, paired_widths))
+    bridge_ways, landings = dingjiang_structures.raise_decks(directory, manifest, elements, profiles)
+    bake_profiles(directory, manifest, profiles, elements, bridge_ways.values(), landings)
+    from dingjiang_paving import finish_paving
+    finish_paving(directory, manifest, profiles, elements)
+
+
+def bake_profiles(directory, manifest, profiles, elements, bridge_ways=(), landings=None):
     import gzip
     import struct
     from collections import defaultdict
     from shapely import STRtree
 
-    profiles = road_design(paired_widths)
     bores = tunnel_sections(profiles)
     replaced = {t['way'] for t in bores}
     manifest['tunnels'] = [t for t in manifest.get('tunnels', []) if t['way'] not in replaced] + bores
@@ -117,23 +132,40 @@ def bake(directory, manifest, paired_widths):
     active = set(tiles)
     near = STRtree(open_lines)
     fixed_pavement=[]
-    for way in load_osm():
+    for way in elements:
         tags = way.get('tags',{})
-        if way['type']!='way' or way['id'] in profiles or 'highway' not in tags:
-            continue
-        if tags.get('railway')=='platform':
+        if way['type']!='way' or 'highway' not in tags or tags.get('railway')=='platform':
             continue
         coords = points(way)
         if len(coords)<2 or not len(near.query(LineString(coords),predicate='dwithin',distance=40)):
             continue
-        if tags.get('bridge','no')=='no' and tags.get('tunnel','no')=='no':
-            fixed_pavement.append(LineString(coords).buffer(half_width(way)+.1,cap_style='round'))
-        for a,b in zip(coords,coords[1:]):
-            add(a,b,half_width(way),None,None)
+        profiled = profiles.get(way['id'])
+        if profiled and 'nativeRemainder' in profiled[0]:
+            fixed = [LineString(profiled[0]['nativeRemainder'])]
+        elif profiled:
+            nodes = profiled[0]['nodes']
+            if nodes == way['nodes']:
+                continue
+            # The native continuation owns the road edge and its supporting
+            # terrain past the tie, even when it has the same OSM way ID.
+            changed = set(zip(nodes,nodes[1:]))
+            fixed = [LineString([a,b]) for a,b,i,j in
+                     zip(coords,coords[1:],way['nodes'],way['nodes'][1:]) if (i,j) not in changed]
+        else:
+            fixed = [LineString(coords)]
+        for line in fixed:
+            if tags.get('bridge','no')=='no' and tags.get('tunnel','no')=='no':
+                fixed_pavement.append(line.buffer(half_width(way)+.1,cap_style='round'))
+            for a,b in zip(line.coords,line.coords[1:]):
+                add(np.asarray(a),np.asarray(b),half_width(way),None,None)
     from shapely import Polygon, constrained_delaunay_triangles, union_all
     protected_paving = STRtree(fixed_pavement)
     from station_junctions import build as build_junctions
     build_junctions(bores,protected_paving)
+    for bore in bores:
+        for end,node in enumerate(bore['nodes']):
+            if landings and node in landings:
+                bore.setdefault('joints',[None,None])[end] = landings[node]
     cuts = defaultdict(list)
     for t in bores:
         a,b=t['portals']
@@ -248,7 +280,7 @@ def bake(directory, manifest, paired_widths):
             if np.any(moved):
                 stems[moved,2]=(stems[moved,2].view('<i2')+np.rint(10*(new_y[moved]-native_y[moved]))).astype('<i2')
                 treefile.write_bytes(gzip.compress(stems.tobytes(),mtime=0))
-    grade_traffic(directory,manifest,profiles)
+    grade_traffic(directory, manifest, [*(way for way, _, _ in profiles.values()), *bridge_ways])
 
 
 def trim_joint_floors(tunnels):
@@ -290,7 +322,7 @@ def stitch(ends,joints):
 
 
 
-def grade_traffic(directory, manifest, profiles):
+def grade_traffic(directory, manifest, ways):
     import gzip
     import subprocess
     from tempfile import NamedTemporaryFile
@@ -298,7 +330,7 @@ def grade_traffic(directory, manifest, profiles):
     graph_path = directory/'roads'/'graph.json.gz'
     graph = json.loads(gzip.decompress(graph_path.read_bytes()))
     owners = {}
-    roads = [way for way, _, _ in profiles.values()]
+    roads = list(ways)
     # The north access road skirts the replaced station building. Its traffic
     # follows the finished native pavement, which can sit above the DEM.
     north_access = next((way for way in load_osm()
@@ -306,13 +338,14 @@ def grade_traffic(directory, manifest, profiles):
     if north_access is not None:
         roads.append(north_access)
     for way in roads:
-        for a,b in zip(way['nodes'],way['nodes'][1:]):
+        nodes = way.get('trafficNodes', way['nodes'])
+        for a,b in zip(nodes,nodes[1:]):
             owners[a,b]=owners[b,a]=way
     lanes = []
     for lane in graph['lanes']:
         way = owners.get((lane['from'],lane['to']))
         if way is not None:
-            lanes.append(dict(lane, way=way['id'],halfWidth=half_width(way),structure='tunnel' if way['tags'].get('tunnel')=='yes' else 'surface'))
+            lanes.append(dict(lane, way=way['id'],halfWidth=half_width(way),structure=next((s for s in ('bridge','tunnel') if way['tags'].get(s)=='yes'),'surface')))
     root=Path(__file__).resolve().parents[1]
     with NamedTemporaryFile(dir=directory,mode='w+') as payload:
         json.dump(dict(manifest=manifest,nodes=graph['nodes'],lanes=lanes),payload)
