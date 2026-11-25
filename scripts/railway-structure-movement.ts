@@ -73,10 +73,8 @@ for(const way of ways){
       if(Math.abs(delta)>Math.abs(row.maxRoadChangeM)){
         row.maxRoadChangeM=delta;row.worst={x:px,z:pz,stationM:at,oldM:a,newM:b}
       }
-      if(previous&&(Math.abs(delta)>.02||Math.abs(previous.delta)>.02)){
+      if(previous){
         const run=at-previous.at
-        if(!row.adjustedLengthM)row.fromM=previous.at
-        row.toM=at;row.adjustedLengthM+=run
         const grade=Math.abs(b-previous.b)/run
         const mainGrade=Math.abs(a-previous.a)/run
         const excess=grade-Math.max(mainGrade,cap)
@@ -87,19 +85,26 @@ for(const way of ways){
             failure={fromM:previous.at,toM:at,x:px,z:pz,grade,mainGrade,cap}
           }
         }
-        if(grade>row.peakGrade){
-          row.peakGrade=grade
-          row.mainGradeAtCandidatePeak=Math.abs(a-previous.a)/run
-          row.peakGradeStationM=(at+previous.at)/2
+        if(Math.abs(delta)>.02||Math.abs(previous.delta)>.02){
+          if(!row.adjustedLengthM)row.fromM=previous.at
+          row.toM=at
+          row.adjustedLengthM+=run
+          if(grade>row.peakGrade){
+            row.peakGrade=grade
+            row.mainGradeAtCandidatePeak=mainGrade
+            row.peakGradeStationM=(at+previous.at)/2
+          }
+          row.mainPeakGrade=Math.max(row.mainPeakGrade,mainGrade)
         }
-        row.mainPeakGrade=Math.max(row.mainPeakGrade,Math.abs(a-previous.a)/run)
       }
       previous={at,a,b,delta}
     }
     station+=step
   }
-  if(failure)violations.push({way:way.id,structure,kind,failingIntervals,worst:failure})
-  if(Math.abs(row.maxRoadChangeM)>.02)result.push(row)
+  if(Math.abs(row.maxRoadChangeM)>.02){
+    result.push(row)
+    if(failure)violations.push({way:way.id,structure,kind,failingIntervals,worst:failure})
+  }
 }
 fs.writeFileSync(output,JSON.stringify(result.sort((a,b)=>Math.abs(b.maxRoadChangeM)-Math.abs(a.maxRoadChangeM)),null,2))
 
