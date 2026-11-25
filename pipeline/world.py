@@ -585,7 +585,7 @@ def build(bbox, output, palette, workers=4):
         from railways import bake_world as bake_railways
         report = bake_railways(output,manifest)
         from station_roads import bake as bake_station_roads
-        bake_station_roads(output,manifest,{road.way:road.width for road in roads if road.source=='paired'})
+        bridge_traffic = bake_station_roads(output,manifest,{road.way:road.width for road in roads if road.source=='paired'})
         (output/'manifest.json').write_text(json.dumps(manifest,separators=(',',':'))+'\n')
         from check_dingjiang_rail_clearance import checked_road_pairs
         verified = checked_road_pairs(output)
@@ -593,6 +593,10 @@ def build(bbox, output, palette, workers=4):
         print('Railway tiles:',report['tiles'],'clearance conflicts:',len(remaining))
     from major_roadbeds import bake as bake_major_roadbeds
     bake_major_roadbeds(output,manifest)
+    if play_region and bridge_traffic:
+        # Wheel samples at bridge ends straddle the slab and the final arterial roadbed.
+        from station_roads import grade_traffic
+        grade_traffic(output, manifest, bridge_traffic)
     (output/'manifest.json').write_text(json.dumps(manifest,separators=(',',':'))+'\n')
     print(f'{len(chunks)} chunks, {len(footprints)} footprints, {sum(c["bytes"] for c in chunks):,} chunk bytes')
 

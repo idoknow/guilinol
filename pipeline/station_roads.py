@@ -114,6 +114,7 @@ def bake(directory, manifest, paired_widths):
     from dingjiang_paving import finish_paving
     finish_paving(directory, manifest, [profiles[wid] for wid in ROAD_IDS], elements)
     ways = {way['id']: way for way in elements if way['type']=='way'}
+    final_traffic_ways = []
     for section in sections:
         parts = section_roads(section, ways, paired_widths)
         adjust_prior_roads(section["name"], parts, sections)
@@ -123,11 +124,17 @@ def bake(directory, manifest, paired_widths):
         if section.get("roadDecks"):
             from rail_section_bridges import grade_decks
             bridges, joints = grade_decks(directory, manifest, section["roadDecks"], ways, parts)
-        bake_profiles(directory, manifest, parts, elements, bridges, joints, additional=True)
+        bake_profiles(directory, manifest, parts, elements, bridges, joints, additional=True,
+                      sample_traffic=not bridges)
         finish_paving(directory, manifest, list(parts.values()), elements)
+        if bridges:
+            final_traffic_ways.extend(way for way, _, _ in parts.values())
+            final_traffic_ways.extend(bridges)
+    return final_traffic_ways
 
 
-def bake_profiles(directory, manifest, profiles, elements, bridge_ways=(), landings=None, *, additional=False):
+def bake_profiles(directory, manifest, profiles, elements, bridge_ways=(), landings=None, *,
+                  additional=False, sample_traffic=True):
     import gzip
     import struct
     from collections import defaultdict
@@ -321,7 +328,8 @@ def bake_profiles(directory, manifest, profiles, elements, bridge_ways=(), landi
             if np.any(moved):
                 stems[moved,2]=(stems[moved,2].view('<i2')+np.rint(10*(new_y[moved]-native_y[moved]))).astype('<i2')
                 treefile.write_bytes(gzip.compress(stems.tobytes(),mtime=0))
-    grade_traffic(directory, manifest, [*(way for way, _, _ in profiles.values()), *bridge_ways])
+    if sample_traffic:
+        grade_traffic(directory, manifest, [*(way for way, _, _ in profiles.values()), *bridge_ways])
 
 
 def trim_joint_floors(tunnels):
