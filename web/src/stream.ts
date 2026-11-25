@@ -27,6 +27,7 @@ type TerrainLayer = {mesh:THREE.Object3D; toggle(tile:Tile, show:boolean):void}
 
 export class Stream {
   private distant?:DistantBuildings
+  get tileRevision(){return this.revision}
   private revision=0
   readonly grid: TileGrid
   private parseSlot = frameSlots(streamBudget.parseMs)

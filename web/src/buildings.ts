@@ -1,4 +1,5 @@
 import * as THREE from 'three'
+import type {Wall} from './wall-occlusion'
 import {buildingColor} from './look/buildings'
 
 type Pair=[number,number]
@@ -9,6 +10,7 @@ export function buildingGeometry(positions:Int16Array,normals:Int8Array,indices:
   const xyz=Array.from(positions,(v,i)=>v/(i%3===1?10:100)),normal=Array.from(normals,v=>v/127),faces=Array.from(indices)
   const count=xyz.length/3,kinds=new Array<number>(count),floor=new Array<number>(count),facade=new Array<number>(count),roofs=new Array<number>(count)
   const trim:number[] = [], occlusion:number[] = []
+  const occluders:Wall[]=[]
   let cursor=0
   for(const [base,top,loops,kind,floors,seed,anchor,rectangle,complex,raised] of parts){
     const level=top/10
@@ -31,6 +33,10 @@ export function buildingGeometry(positions:Int16Array,normals:Int8Array,indices:
            positions[at]!==loop[i][0] || positions[at+2]!==loop[i][1] ||
            positions[at+6]!==loop[(i+1)%loop.length][0] ||
            positions[at+8]!==loop[(i+1)%loop.length][1])continue
+        // GL04 packs each opaque quad as bottom A, top A, top B, bottom B.
+        const low=Math.max(xyz[at+1],xyz[at+10])
+        const high=Math.min(xyz[at+4],xyz[at+7])
+        if(len>=3&&high-low>=2)occluders.push([x,z,ex,ez,low,high])
         for(const end of [false,false,true,true]){
           const index=cursor++, height=xyz[3*index+1]-base/10
           tag(index,0,height/3.1,end?u+len:u)
@@ -73,6 +79,7 @@ export function buildingGeometry(positions:Int16Array,normals:Int8Array,indices:
     const shade=occlusion[i]??1
     for(let channel=0;channel<3;channel++)colors[i*3+channel]*=shade
   })
+  geom.userData.occluders=occluders
   geom.userData.farIndexCount=faces.length
   for(const [name,values,size] of [['position',xyz,3],['normal',normal,3],['color',colors,3],['aFloor',floor,1],['aFacade',facade,1]] as const)
     geom.setAttribute(name,new THREE.Float32BufferAttribute(values,size))
