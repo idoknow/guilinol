@@ -182,6 +182,12 @@ function* weldedSurface(raw:Float32Array, corners:number[]|null, data:Detail, ma
     const gi=Math.min(64,Math.max(0,Math.round(lz/4)))*65+Math.min(64,Math.max(0,Math.round(lx/4)))
     return Math.max(vis,(data.water[gi]===-32768?data.terrain[gi]:data.water[gi])/10)
   }
+  function replacedBed(lx:number,lz:number){
+    if(!data.roadBed)return false
+    const c=Math.min(stride-2,Math.max(0,Math.floor(lx/step))),r=Math.min(stride-2,Math.max(0,Math.floor(lz/step)))
+    const face=2*(r*(stride-1)+c)+Number(lx/step-c+lz/step-r>1)
+    return !!(data.roadBed[face>>3]&(1<<(face&7)))
+  }
   const dryAt=(lx:number,lz:number)=>data.water[Math.min(64,Math.max(0,Math.round(lz/4)))*65+Math.min(64,Math.max(0,Math.round(lx/4)))]===-32768
   let visited=0
   for(const edge of boundary.values()){
@@ -201,6 +207,9 @@ function* weldedSurface(raw:Float32Array, corners:number[]|null, data:Detail, ma
     const a2x=ax+nx*run, a2z=az+nz*run, b2x=bx+nx*run, b2z=bz+nz*run
     if(a2x<.1||a2x>255.9||b2x<.1||b2x>255.9||a2z<.1||a2z>255.9||b2z<.1||b2z>255.9)continue
     if(!dryAt(ax,az)||!dryAt(bx,bz)||!dryAt(mx,mz)||!dryAt(a2x,a2z)||!dryAt(b2x,b2z)||!dryAt(mx+nx*run,mz+nz*run))continue
+    // The surveyed pavement already has a welded bed and a closed rim.
+    // A ramp to the superseded heightfield can protrude into the driving lane.
+    if(!corners&&(replacedBed(mx,mz)||replacedBed(mx+nx*run,mz+nz*run)))continue
     const gA2=groundAt(a2x,a2z), gB2=groundAt(b2x,b2z)
     if(Math.max(ay-gA2,by-gB2)>maxGap)continue
     const u2=verts.length/3; verts.push(a2x,Math.min(ay-.02,gA2-.04),a2z)

@@ -391,9 +391,15 @@ export async function detail(tile:Tile, signal:AbortSignal, parseSlot?:()=>Promi
   // Cut after street construction to preserve the original carriageway grade.
   for(const [index,cm] of railCuts)heights.setY(index,cm/100)
   if(railCuts.length){geometry.computeVertexNormals();geometry.computeBoundingSphere()}
+  let roadBed:Uint8Array|undefined
   if(bed){
-    const drop=new Set(bed.drop),index=geometry.index!
-    const keep=Array.from(index.array).filter((_,i)=>!drop.has(Math.floor(i/3)))
+    const index=geometry.index!
+    const faces=roadBed=new Uint8Array(Math.ceil(index.count/24))
+    for(const face of bed.drop)faces[face>>3]|=1<<(face&7)
+    const keep=Array.from(index.array).filter((_,i)=>{
+      const face=Math.floor(i/3)
+      return !(faces[face>>3]&(1<<(face&7)))
+    })
     const extra=bedPositions(bed),original=heights.count
     const combined=new Float32Array(heights.array.length+extra.length)
     combined.set(heights.array);combined.set(extra,heights.array.length)
@@ -493,7 +499,7 @@ export async function detail(tile:Tile, signal:AbortSignal, parseSlot?:()=>Promi
   const surfaceAt = buildSurfaceLookup(tile, paths)
   return {
     railCutVertices:new Set(railCuts.map(([index])=>index)),tunnelFloorStart,bridgeDepth:look.bridgeDepth,
-    group,groundMesh,roadBed:!!bed,terrain:terrain.slice(),water:water.slice(),rings,deck,thin,streets,batch,tunnel,
+    group,groundMesh,roadBed,terrain:terrain.slice(),water:water.slice(),rings,deck,thin,streets,batch,tunnel,
     dispose(){
       if(tunnel)for(const mesh of Object.values(tunnel)){mesh.geometry.dispose();if(mesh!==tunnel.fringe)mesh.material.dispose()}
       pond?.dispose(); streets.surface?.dispose(); streets.fence?.dispose(); bridge?.dispose(); geometry.dispose(); walls?.dispose()
