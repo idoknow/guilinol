@@ -93,39 +93,41 @@ for(const {way,structure,probes} of surveys){
   for(const [index,p] of probes.entries()){
     const {x:px,z:pz,at,before:a,after:b}=p
     const previous=p.connected?probes[index-1]:undefined
-      const delta=b-a
-      if(Math.abs(delta)>Math.abs(row.maxRoadChangeM)){
-        row.maxRoadChangeM=delta;row.worst={x:px,z:pz,stationM:at,oldM:a,newM:b}
-      }
-      if(previous){
-        const run=at-previous.at
-        const grade=Math.abs(b-previous.after)/run
-        const mainGrade=Math.abs(a-previous.before)/run
-        const excess=grade-Math.max(mainGrade,cap)
-        if(motor.has(kind) && excess>1e-6){
-          failingIntervals++
-          if(excess>largestExcess){
-            largestExcess=excess
-            failure={fromM:previous.at,toM:at,x:px,z:pz,grade,mainGrade,cap}
-          }
-        }
-        if(Math.abs(delta)>.02||Math.abs(previous.after-previous.before)>.02){
-          if(!row.adjustedLengthM)row.fromM=previous.at
-          row.toM=at
-          row.adjustedLengthM+=run
-          if(grade>row.peakGrade){
-            row.peakGrade=grade
-            row.mainGradeAtCandidatePeak=mainGrade
-            row.peakGradeStationM=(at+previous.at)/2
-          }
-          row.mainPeakGrade=Math.max(row.mainPeakGrade,mainGrade)
+    const delta=b-a
+    if(Math.abs(delta)>Math.abs(row.maxRoadChangeM)){
+      row.maxRoadChangeM=delta;row.worst={x:px,z:pz,stationM:at,oldM:a,newM:b}
+    }
+    if(previous){
+      const run=at-previous.at
+      const grade=Math.abs(b-previous.after)/run
+      const mainGrade=Math.abs(a-previous.before)/run
+      const excess=grade-Math.max(mainGrade,cap)
+      if(motor.has(kind) && excess>1e-6){
+        failingIntervals++
+        if(excess>largestExcess){
+          largestExcess=excess
+          failure={fromM:previous.at,toM:at,x:px,z:pz,grade,mainGrade,cap}
         }
       }
+      if(Math.abs(delta)>.02||Math.abs(previous.after-previous.before)>.02){
+        if(!row.adjustedLengthM)row.fromM=previous.at
+        row.toM=at
+        row.adjustedLengthM+=run
+        if(grade>row.peakGrade){
+          row.peakGrade=grade
+          row.mainGradeAtCandidatePeak=mainGrade
+          row.peakGradeStationM=(at+previous.at)/2
+        }
+        row.mainPeakGrade=Math.max(row.mainPeakGrade,mainGrade)
+      }
+    }
   }
   if(Math.abs(row.maxRoadChangeM)>.02){
     result.push(row)
-    if(failure)violations.push({way:way.id,structure,kind,failingIntervals,worst:failure})
   }
+  // The movement inventory uses 2 cm for reporting. The grade gate also
+  // catches smaller displacements on short intervals at the class limit.
+  if(failure)violations.push({way:way.id,structure,kind,failingIntervals,worst:failure})
 }
 fs.writeFileSync(output,JSON.stringify(result.sort((a,b)=>Math.abs(b.maxRoadChangeM)-Math.abs(a.maxRoadChangeM)),null,2))
 
