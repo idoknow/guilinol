@@ -155,7 +155,7 @@ try{
           const failure=completed?undefined:obstruction||probe.resets>initialResets?'collision':'tool'
           return {completed,failure,maximum,frames,part,obstacle:w.obstacle,contacts,
             stopped:completed?undefined:{hits:probe.contactSources,foot:probe.foot,resets:probe.resets-initialResets,heading:w.heading}}
-        },{route,mode,boundary,surfaceApproach:process.argv.includes('--surface')})
+        },{route,mode,boundary,surfaceApproach:!boundary&&process.argv.includes('--surface')})
         results.push({id,way,mode,boundary,direction,...run})
       }catch(e){results.push({id,way,mode,boundary,direction,failure:"tool",unavailable:e.message.split('\n')[0]})}
     }
