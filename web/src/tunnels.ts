@@ -202,9 +202,9 @@ export function tunnelGeometry(tile:Tile,ground:THREE.PlaneGeometry,tunnels:Tunn
         (p:Point)=>half-side(p),(p:Point)=>half+side(p),
         (p:Point)=>p[1]-y+1,(p:Point)=>y+head+.08*Math.max(0,along(p))-p[1]]
     })
-    function quad(points:Point[],part:keyof typeof parts){
+    function quad(points:Point[],part:keyof typeof parts,structural=false){
       let pieces=[limits.reduce((poly,plane)=>clip(poly,plane),points)]
-      if(part==='interior'||part==='portal'||part==='band'||part==='lamp'){
+      if(!structural&&(part==='interior'||part==='portal'||part==='band'||part==='lamp')){
         for(const planes of openings){
           const kept:Point[][]=[]
           for(let piece of pieces){
@@ -247,7 +247,7 @@ export function tunnelGeometry(tile:Tile,ground:THREE.PlaneGeometry,tunnels:Tunn
       const roadHalf=tunnel.carriagewayHalfWidth??width
       const shoulderDrop=(lateral:number)=>tunnel.carriagewayHalfWidth?Math.min(.5,Math.max(0,Math.abs(lateral)-roadHalf)):0
       const top=(p:Point):Point=>[p[0],open?Math.max(p[1],groundY(p)):p[1]+head-shoulderDrop(side(p)),p[2]]
-      quad([al,bl,top(bl),top(al)],open?'portal':'interior');quad([br,ar,top(ar),top(br)],open?'portal':'interior')
+      quad([al,bl,top(bl),top(al)],open||tunnel.portalSign?'portal':'interior');quad([br,ar,top(ar),top(br)],open||tunnel.portalSign?'portal':'interior')
       if(open){
         const rim=(p:Point)=>{
           const outer=local(station(p),side(p)+Math.sign(side(p))*lining,p[1])
@@ -261,10 +261,10 @@ export function tunnelGeometry(tile:Tile,ground:THREE.PlaneGeometry,tunnels:Tunn
         const edges=tunnel.carriagewayHalfWidth?[-1,-roadHalf/wa,roadHalf/wa,1]:[-1,1]
         for(let k=1;k<edges.length;k++){
           const lo=edges[k-1],hi=edges[k]
-          quad([top(local(a,wa*lo,ay)),top(local(b,wb*lo,by)),top(local(b,wb*hi,by)),top(local(a,wa*hi,ay))],'ceiling')
+          quad([top(local(a,wa*lo,ay)),top(local(b,wb*lo,by)),top(local(b,wb*hi,by)),top(local(a,wa*hi,ay))],tunnel.portalSign?'portal':'ceiling')
         }
       }
-      if(!open){
+      if(!open&&!tunnel.portalSign){
         // 青绿 glazed-tile dado, warm lamp strips and a dashed centre line (IDOK-165 visual pass)
         const inset=width-.04
         quad([local(a,-inset,ay),local(b,-inset,by),local(b,-inset,by+1.3),local(a,-inset,ay+1.3)],'band')
@@ -273,35 +273,45 @@ export function tunnelGeometry(tile:Tile,ground:THREE.PlaneGeometry,tunnels:Tunn
       }
       if(Math.floor(a/6)%2===0)quad([local(a,-.08,ay+.03),local(a,.08,ay+.03),local(b,.08,by+.03),local(b,-.08,by+.03)],'lane')
       if(i===1&&tunnel.portalSign){
-        // The portal face occupies the 30 cm structural band above the gauge.
-        // Wings flare away from the approach so their footings stay outside it.
-        const lip=(d:number)=>ay+head-shoulderDrop(d)
-        const outer=width+.35
-        for(const sign of [-1,1]){
-          const wall=sign*width,edge=sign*outer,wing=sign*(outer+1.25)
-          const face=(poly:Point[],part:'portal'|'interior')=>quad(sign<0?poly:poly.reverse(),part)
-          face([local(0,edge,ay-.12),local(0,wall,ay-.12),local(0,wall,lip(wall)),local(0,edge,lip(wall))],'portal')
-          const cap=(p:Point,offset:number,rise:number):Point=>
-            [p[0]-offset*(end[2]-start[2])/tunnel.length,p[1]+rise,p[2]+offset*(end[0]-start[0])/tunnel.length]
-          const near=local(0,edge,lip(wall)+.24),tip=local(-4.2,wing,ay+.75)
-          const low=local(0,edge,ay-.18),toe=local(-4.2,wing,ay-.18)
-          // Closed wing walls retain both banks, including the exposed toe and cap.
-          const shift=(p:Point)=>cap(p,sign*.30,0)
-          face([near,tip,toe,low],'portal')
-          face([shift(low),shift(toe),shift(tip),shift(near)],'portal')
-          face([tip,shift(tip),shift(toe),toe],'portal')
-          face([cap(near,-sign*.05,.05),cap(tip,-sign*.05,.05),
-                cap(tip,sign*.35,.05),cap(near,sign*.35,.05)],'interior')
-          face([cap(low,-sign*.06,.18),cap(toe,-sign*.06,.18),toe,low],'interior')
-          quad([local(0,wall,lip(wall)),local(0,sign*roadHalf,lip(sign*roadHalf)),
-            local(0,sign*roadHalf,ay+head+.22),local(0,edge,ay+head+.22)],'portal')
+        // Extrude complete masonry sections into the bank. The lintel's
+        // underside follows the carriageway/shoulder clearance envelope.
+        const outer=width+2.1, depth=.8
+        const crown=ay+head+.30
+        function solid(front:Point[],back:Point[]){
+          quad(front,'portal',true)
+          quad([...back].reverse(),'portal',true)
+          for(let j=0;j<front.length;j++){
+            const k=(j+1)%front.length
+            quad([front[j],back[j],back[k],front[k]],'portal',true)
+          }
         }
-        quad([local(0,-roadHalf,ay+head),local(0,roadHalf,ay+head),
-          local(0,roadHalf,ay+head+.22),local(0,-roadHalf,ay+head+.22)],'portal')
-        quad([local(-.06,-outer,ay+head+.22),local(-.06,outer,ay+head+.22),
-          local(-.06,outer,ay+head+.30),local(-.06,-outer,ay+head+.30)],'interior')
-        quad([local(-.06,-outer,ay+head+.30),local(.26,-outer,ay+head+.30),
-          local(.26,outer,ay+head+.30),local(-.06,outer,ay+head+.30)],'interior')
+        const masonry=(s:number,d:number,y:number)=>local(s,d,y)
+        const crest=(s:number,d:number)=>Math.max(crown,groundY(local(s,d,ay))+.03)
+        for(const sign of [-1,1]){
+          const wall=sign*width,edge=sign*outer
+          const pier=(s:number)=>[masonry(s,wall,ay-.35),masonry(s,edge,ay-.35),
+            masonry(s,edge,crest(s,edge)),masonry(s,wall,crest(s,wall))]
+          solid(pier(0),pier(depth))
+          const wing=(s:number,d:number,h:number)=>{
+            const outside=d+sign*.8
+            const bottom=Math.min(ay-.4,groundY(local(s,outside,ay))-.35)
+            return [masonry(s,d,bottom),masonry(s,outside,bottom),
+              masonry(s,outside,h),masonry(s,d,h)]
+          }
+          const tip=sign*(outer+1.3)
+          solid(wing(0,edge-sign*.8,crest(0,edge)),wing(-4.2,tip,
+            Math.max(ay+.75,groundY(local(-4.2,tip,ay))+.08)))
+        }
+        const offsets=[-width,-roadHalf,roadHalf,width]
+        for(let k=1;k<offsets.length;k++){
+          const l=offsets[k-1],r=offsets[k]
+          const lintel=(s:number)=>[masonry(s,l,ay+head-shoulderDrop(l)),masonry(s,r,ay+head-shoulderDrop(r)),
+            masonry(s,r,crest(s,r)),masonry(s,l,crest(s,l))]
+          solid(lintel(0),lintel(depth))
+        }
+        const coping=(s:number)=>[masonry(s,-outer,crest(s,-outer)),masonry(s,outer,crest(s,outer)),
+          masonry(s,outer,crest(s,outer)+.10),masonry(s,-outer,crest(s,-outer)+.10)]
+        solid(coping(-.07),coping(depth+.07))
         const base=ay+head+.03
         quad([local(-.10,-.74,base),local(-.10,.74,base),local(-.10,.74,base+.45),local(-.10,-.74,base+.45)],'sign')
         for(const [left,bottom,right,top] of tunnel.portalSign){

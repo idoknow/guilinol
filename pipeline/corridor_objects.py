@@ -29,6 +29,26 @@ def footprints(paths, origin, kinds):
 def relocate(output, manifest, elements, raised=(), adjoining=()):
     changed_roads = union_all(raised)
     all_roads = union_all([*raised, *adjoining])
+    roof_sections = []
+    for tunnel in manifest.get('tunnels', ()):
+        if tunnel.get('openCut'):
+            continue
+        a, b = np.asarray(tunnel['portals'])[:, [0, 2]]
+        length = np.linalg.norm(b-a)
+        if length < .001:
+            continue
+        axis = (b-a)/length
+        normal = np.array([-axis[1],axis[0]])
+        lo, end = tunnel.get('openEnds', (0,0))
+        hi = length-end
+        if hi<=lo:
+            continue
+        widths = tunnel.get('endWidths', [tunnel['halfWidth']]*2)
+        def edge(station, side):
+            width = widths[0]+(widths[1]-widths[0])*station/length
+            return a+axis*station+side*normal*width
+        roof_sections.append(Polygon([edge(lo,-1),edge(hi,-1),edge(hi,1),edge(lo,1)]).buffer(1))
+    roofs = STRtree(roof_sections)
     tiles={(t['x'],t['z']):t for t in manifest['chunks']}
     def origin(x,z):
         return (math.floor(x/256)*256,math.floor(z/256)*256)
@@ -60,24 +80,29 @@ def relocate(output, manifest, elements, raised=(), adjoining=()):
     moves=defaultdict(list)
     anchors=defaultdict(dict)
     for key,tile in tiles.items():
-        if not tile.get('gradedCorridor'):
+        region=box(*key,key[0]+256,key[1]+256)
+        roof_ids=roofs.query(region,predicate='intersects')
+        if not tile.get('gradedCorridor') and not len(roof_ids):
             continue
         paths=read_chunk(output/tile['file'])[3][1]
-        survey=paths[12]
-        original=json.loads(zlib.decompress(base64.b64decode(survey['input'])))
-        # Include the 40 mm bed exposed beneath the repaired asphalt rim.
-        # Otherwise objects on the former road edge survive next to the curb.
-        added=footprints(paths[0][survey['start']:survey['end']],key,{0}).buffer(.041).difference(
-            footprints(original['paths'],key,{0,5}))
+        added=Polygon()
+        if tile.get('gradedCorridor'):
+            survey=paths[12]
+            original=json.loads(zlib.decompress(base64.b64decode(survey['input'])))
+            # Include the 40 mm bed exposed beneath the repaired asphalt rim.
+            # Otherwise objects on the former road edge survive next to the curb.
+            added=footprints(paths[0][survey['start']:survey['end']],key,{0}).buffer(.041).difference(
+                footprints(original['paths'],key,{0,5}))
         access = travelled.query(box(*key,key[0]+256,key[1]+256),predicate='intersects')
-        if len(access):
+        if len(access) and tile.get('gradedCorridor'):
             asphalt = footprints(paths[0][survey['start']:survey['end']],key,{0})
             added = added.union(asphalt.intersection(union_all(travelled.geometries.take(access))))
         if raised:
             added=added.union(changed_roads.intersection(box(*key,key[0]+256,key[1]+256)))
         path_hits=paths_at_verge.query(box(*key,key[0]+256,key[1]+256),predicate='intersects')
         travelled_path=union_all(paths_at_verge.geometries.take(path_hits))
-        if added.is_empty and travelled_path.is_empty:
+        roof_zone=union_all(roofs.geometries.take(roof_ids))
+        if added.is_empty and travelled_path.is_empty and roof_zone.is_empty:
             continue
         trees_path=(output/tile['file']).with_suffix('.trees')
         trees=list(TREE.iter_unpack(gzip.decompress(trees_path.read_bytes()))) if trees_path.exists() else []
@@ -88,7 +113,7 @@ def relocate(output, manifest, elements, raised=(), adjoining=()):
         for field,i,lx,lz in objects:
             x,z=key[0]+lx,key[1]+lz
             point=Point(x,z)
-            if not (added.covers(point) or (field==0 and travelled_path.covers(point))):
+            if not (added.covers(point) or (field==0 and (travelled_path.covers(point) or roof_zone.covers(point)))):
                 continue
             if nearby is None:
                 region=box(key[0]-160,key[1]-160,key[0]+416,key[1]+416)
@@ -96,6 +121,8 @@ def relocate(output, manifest, elements, raised=(), adjoining=()):
                         if (k:=(key[0]+dx,key[1]+dz)) in tiles]
                 nearby=[union_all([b[j].intersection(region) for b in blocks]) for j in (0,1)]
             road,sidewalk=nearby
+            if not field and len(roof_ids):
+                road=road.union(union_all(roofs.geometries.take(roofs.query(point.buffer(151),predicate='intersects'))))
             candidates=[]
             scale=10 if field else 100
             nearest=axes.nearest(point)
@@ -121,7 +148,7 @@ def relocate(output, manifest, elements, raised=(), adjoining=()):
                                 continue
                             nx,nz=np.rint(np.array(edge.coords[0])*scale)/scale
                             q=Point(nx,nz)
-                            if .5<=road.distance(q)<=1 and origin(nx,nz) in tiles and not travelled_path.covers(q):
+                            if .5<=road.distance(q)<=1 and origin(nx,nz) in tiles and not travelled_path.covers(q) and (field or not len(roofs.query(q,predicate='intersects'))):
                                 candidates.append((not sidewalk.covers(q),point.distance(q),nx,nz))
             if not candidates:
                 raise ValueError(f'No legal lateral position at {point}')
