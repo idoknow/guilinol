@@ -24,7 +24,7 @@ try{
     INSERT INTO users VALUES ('player',0,1,'','',1,'user',0,0,0,'');`)
   await pool.query(await readFile('deploy/postgres/019-update-cards.sql','utf8'))
   await pool.query(`INSERT INTO sessions VALUES('player',$1,4102444800)`,[createHash('sha256').update(cookie).digest('hex')])
-  const bundle=(await build({stdin:{contents:`import {startCards} from './web/src/ui/update-cards'; startCards(true).then(()=>window.finished=true)`,resolveDir:process.cwd()},bundle:true,write:false})).outputFiles[0].text
+  const bundle=(await build({stdin:{contents:`import {startCards} from './web/src/ui/update-cards'; startCards(true).then(()=>window.finished=true)`,resolveDir:process.cwd()},bundle:true,write:false,loader:{'.css':'empty'}})).outputFiles[0].text
   server=serve({hostname:'127.0.0.1',port:0,fetch:request=>{
     const path=new URL(request.url).pathname
     if(path==='/')return new Response('<body><script src="/ui.js"></script></body>',{headers:{'content-type':'text/html'}})
@@ -41,7 +41,7 @@ try{
   const empty=async()=>{await page.goto(origin);await page.waitForFunction(()=>window.finished);assert.equal(await page.locator('dialog').count(),0)}
   await empty();assert.equal((await pool.query('select first_game_entry from users')).rows[0].first_game_entry,null)
   await page.context().addCookies([{url:origin,name:'glol_session',value:cookie}]);await empty()
-  const first=await publish('first');await page.goto(origin);await page.getByRole('heading',{name:'first'}).waitFor();await page.getByText('下一张').click();await page.waitForFunction(()=>window.finished);await empty()
+  const first=await publish('first');await page.goto(origin);await page.getByRole('heading',{name:'first'}).waitFor();await page.locator('.update-cards-next').click();await page.waitForFunction(()=>window.finished);await empty()
   const seen=()=>fetch(`${origin}/api/updates/${first.id}/seen`,{method:'POST',headers:{origin,cookie:`glol_session=${cookie}`},body:JSON.stringify({action:'skipped'})})
   assert.equal((await seen()).status,200);assert.deepEqual((await pool.query('SELECT action FROM update_card_views')).rows,[{action:'viewed'}])
   for(const name of ['one','two','three','off'])await publish(name)

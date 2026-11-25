@@ -22,7 +22,7 @@ node scripts/publish-update-card.mjs --kind modeling --title '广场开放' \
 - `GET /api/updates/unseen` → 卡片数组，含 `id,slug,kind,title,summary,how_to,images,release_sha,published_at,active`。`images` 是同源 URL 数组。
 - `POST /api/updates/:id/seen`，JSON `{ "action": "viewed" }` 或 `skipped`。玩家使用原有登录 cookie，写请求需要同源 Origin。重复请求保留首次动作。
 - `GET/POST /api/admin/updates` 列表/发布，`POST /api/admin/updates/:slug/deactivate` 下线。支持已验证管理员会话或卡片专用 Bearer。发布字段与卡片一致，但不接受客户端指定的 ID、发布时间或状态，`images` 传 Base64 WebP 数据。
-- `.update-cards` 是无自定义样式的原生模态框，包含 `.update-card`、`.update-card-how`、状态消息和 `.update-cards-nav`。每次开关对 `window` 派发 `updates:open` / `updates:close`。前后翻时同一卡只发一次回执；跳过全部会继续处理后续页。写失败保留弹层，按钮可重试。
+- 弹层 `.update-cards`（样式在 `web/src/ui/update-cards.css`，随懒加载模块一起加载）沿用商店的沥青风格：沥青黑面板，桂花金只用在「下一张 / 知道了」，类型徽标 `新玩法` 用漓江青、`新建模` 用桂花金。卡片自上而下依次是 16:9 大图（多张时可横滑，带圆点）、标题、说明和「怎么体验」框。手机竖屏为底部抽屉，横屏为左图右文。左右方向键或在文字区左右滑动可以翻页；最后一张按钮变成「知道了」，同时隐藏「跳过全部」。卡片数据里的 `kind` 决定配色，模拟卡可以不带，默认按 `gameplay` 处理。每次开关对 `window` 派发 `updates:open` / `updates:close`。前后翻时同一卡只发一次回执；跳过全部会继续处理后续页。写失败保留弹层，按钮可重试。
 - `?verify` 落地后用 `window.updateCards.mock([{id:'demo',title:'广场',summary:'新广场开放',how_to:'去车站',images:[]}]); window.updateCards.open()` 预览。模拟卡不写回执。
 
 ## 本地验证
