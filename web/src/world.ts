@@ -20,6 +20,7 @@ interface Asset {file:string; bytes:number}
 export interface Tile extends Asset {x:number; z:number; stationPaving?:StationPavingStyle; roadbeds?:number[]}
 export interface Manifest {
   region?:import('../../lib/play-region').Region
+  nativeCarLandings?:[number,number,number,number,number,number,number][]
   tunnels?:Tunnel[]
   builtArea?:{type:'Polygon';coordinates:[number,number][][]}
   distantBuildings?:Asset

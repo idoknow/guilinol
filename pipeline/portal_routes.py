@@ -26,8 +26,8 @@ def permits(tags,mode):
     return defaults[mode]
 
 
-def routes(elements,network,nodes):
-    mouths=set(network['portals'])
+def routes(elements,network,nodes,retained_mouths):
+    mouths=set(network['portals']) | (nodes.keys() & retained_mouths.keys())
     centers=[(nodes[n]['x'],nodes[n]['z']) for n in mouths]
     bins=defaultdict(list)
     for x,z in centers:
@@ -78,7 +78,7 @@ def routes(elements,network,nodes):
 
     result=[]
     for n in sorted(mouths):
-        way=next(e['way'] for e in network['edges'] if n in (e['a'],e['b']))
+        way=retained_mouths.get(n) or next(e['way'] for e in network['edges'] if n in (e['a'],e['b']))
         entry={'id':n,'way':way,'modes':[]}
         for mode in ('car','foot','bicycle','bike'):
             inside=trace(n,True,mode,way)
