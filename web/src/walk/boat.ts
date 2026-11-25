@@ -1023,7 +1023,7 @@ export function createFreeBoats(env: BoatEnv) {
     if (!slot) return null
     // Arrest fast boat motion immediately and sync nearby colliders before probing local banks.
     vx = vz = vLong = vLat = angVel = 0
-    sim.sync(boatX, boatZ)
+    sim.sync(boatX, boatZ, true)
 
     const candidates: [number, number][] = []
     for (const other of slots) {

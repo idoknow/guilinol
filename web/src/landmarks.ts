@@ -1,5 +1,6 @@
 import {record} from './telemetry'
 import * as THREE from 'three'
+import {warmShaders} from './shader-warmup'
 import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js'
 import {MeshoptDecoder} from 'three/addons/libs/meshopt_decoder.module.js'
 import {nightLit} from './look/night'
@@ -173,7 +174,7 @@ function batchRepeatedMeshes(root:THREE.Group){
 // Fade the last available LOD before its stream cutoff. Only transition states
 // (coverage < 1) bind this discard variant; steady-state coverage === 1 renders
 // with the clean opaque material so hardware Early-Z remains enabled.
-function fadeMaterial(material:THREE.Material,coverage:THREE.IUniform<number>){
+export function fadeMaterial(material:THREE.Material,coverage:THREE.IUniform<number>){
   const previous=material.onBeforeCompile, key=material.customProgramCacheKey()
   material.onBeforeCompile=function(shader,renderer){
     previous.call(this,shader,renderer)
@@ -362,7 +363,7 @@ export function landmarkStream(
         proxy.add(dummy)
       }
     }
-    void renderer.compileAsync(proxy,camera,scene).finally(()=>{
+    void warmShaders(renderer,proxy,camera,scene).finally(()=>{
       for(const child of proxy.children)if(child instanceof THREE.InstancedMesh)child.dispose()
       state.fadeCompiling=false
       state.fadeReady=true
@@ -487,7 +488,7 @@ export function landmarkStream(
     const camera=options?.camera
     if(camera&&typeof renderer.compileAsync==='function'){
       compiling=true
-      void renderer.compileAsync(group,camera,scene).then(()=>{
+      void warmShaders(renderer,group,camera,scene).then(()=>{
         compiling=false
         attachQueue.push({entry,group,state,isPriority})
         schedulePump()

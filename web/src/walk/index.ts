@@ -447,6 +447,7 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
   }
   const ebikeFx=createEbikeFxController()
   const ebikeAudio=createEbikeAudioEngine()
+  void ebikeAudio.prepare()
   window.addEventListener(RIDE_SOUND_EVENT,event=>ebikeAudio.setMuted((event as CustomEvent<boolean>).detail))
   const ZERO_RIDE_INPUT:EbikeRideControlInput={gearDelta:0,gearSelect:null,wheelie:false,tuck:false,recover:false,cycleMod:false,parkToggle:false,kickstandToggle:false,headlightCycle:false,turnLeftToggle:false,turnRightToggle:false,hazardToggle:false,horn:false,hornPulse:false,cruiseToggle:false}
   const ebikeMountStartPos=new THREE.Vector3(), ebikeMountStartRot=new Map<RiderJointName,[number,number,number]>()
@@ -1258,7 +1259,7 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
   const {supportAt,carSupportAt}=playerSupport(sim)
   function loadRides(){if(loading||rides||!active||!manifest.vehicles)return;loading=true
     const file=manifest.vehicles.file
-    void import('./vehicles').then(module=>module.vehicles(scene,file,(x,z,bikeHeading,bikeY,kind)=>{sim.sync(x,z)
+    void import('./vehicles').then(module=>module.vehicles(scene,file,(x,z,bikeHeading,bikeY,kind)=>{sim.sync(x,z,bikeHeading!==undefined)
       if(bikeHeading===undefined)return place(x,z,'dismount')
       if(kind==='car'){
         const carY=bikeY??safe.y-cfg.height/2
@@ -1287,7 +1288,7 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
       releaseDynamicBike();input.syncRideHud(null,null)
       facing=bikeHeading+avatar.yaw
       ridePose.startDismount(prevFoot,prevYaw);input.clearRun();return true
-    },(bx,by,bz,kind)=>{sim.sync(bx,bz)
+    },(bx,by,bz,kind)=>{sim.sync(bx,bz,true)
       const cur=sim.body.translation()
       if(kind==='car'){
         const check=sim.findCarMount(cur.x,cur.y-cfg.height/2,cur.z,bx,by,bz)
@@ -2017,7 +2018,7 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
     }
     if(rides?.car&&!wasCar){
       const cx=rides.car.position.x,cz=rides.car.position.z,cur=sim.body.translation()
-      sim.sync(cx,cz)
+      sim.sync(cx,cz,true)
       const sup=carSupportAt(cx,cz,rides.car.position.y)
       const cy=sup?sup.y:rides.car.position.y
       driverPose.startMount({x:cur.x,y:cur.y-cfg.height/2,z:cur.z},figure.rotation.y)
@@ -2039,7 +2040,7 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
     }
     if(rides?.bike&&!wasBike){
       const bx=rides.bike.position.x,bz=rides.bike.position.z,cur=sim.body.translation()
-      sim.sync(bx,bz)
+      sim.sync(bx,bz,true)
       const sup=supportAt(bx,bz,rides.bike.position.y)
       const by=sup?sup.y:rides.bike.position.y
       ridePose.startMount({x:cur.x,y:cur.y-cfg.height/2,z:cur.z},figure.rotation.y)
