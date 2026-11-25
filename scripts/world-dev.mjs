@@ -1,6 +1,6 @@
 import {createHash} from 'node:crypto'
 import {execFileSync} from 'node:child_process'
-import {createWriteStream} from 'node:fs'
+import {createReadStream, createWriteStream} from 'node:fs'
 import {mkdtemp, readFile, rename, rm, stat} from 'node:fs/promises'
 import {join} from 'node:path'
 import {Transform} from 'node:stream'
@@ -10,14 +10,18 @@ const pin = new URL('../world-dev.sha256', import.meta.url)
 const digest = (await readFile(pin, 'utf8')).trim()
 if (!/^[a-f0-9]{64}$/.test(digest)) throw Error('Invalid development world checksum')
 const tag = `world-dev-${digest.slice(0, 12)}`
-const response = await fetch(`https://github.com/idoknow/guilinol/releases/download/${tag}/world.tar.gz`)
-if (!response.ok || !response.body) throw Error(`${tag}: HTTP ${response.status}`)
+async function source() {
+  if (process.env.WORLD_DEV_ARCHIVE) return createReadStream(process.env.WORLD_DEV_ARCHIVE)
+  const response = await fetch(`https://github.com/idoknow/guilinol/releases/download/${tag}/world.tar.gz`)
+  if (!response.ok || !response.body) throw Error(`${tag}: HTTP ${response.status}`)
+  return response.body
+}
 const staging = await mkdtemp('public/.world-install-')
 const archive = join(staging, 'world.tar.gz')
 let keepBackup = false
 try {
   const hash = createHash('sha256')
-  await pipeline(response.body, new Transform({transform(chunk, _, done) {
+  await pipeline(await source(), new Transform({transform(chunk, _, done) {
     hash.update(chunk); done(null, chunk)
   }}), createWriteStream(archive, {flags: 'wx'}))
   if (hash.digest('hex') !== digest) throw Error(`${tag}: SHA-256 mismatch`)
