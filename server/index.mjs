@@ -1,4 +1,5 @@
 import {smokeDefaults,validRules} from '../lib/smoke.ts'
+import {gfxDefaults,validGfx} from '../lib/gfx.ts'
 import {serve} from '@hono/node-server'
 import {timingSafeEqual} from 'node:crypto'
 import pg from 'pg'
@@ -90,7 +91,19 @@ async function smokeAdmin(request,user){
   await pool.query("INSERT INTO admin_audit(actor_id,action,target_type,target_id,detail) VALUES($1,'smoke.settings','smoke','settings',$2)",[user,rules])
   return json({ok:true})
 }
-const env = {...process.env, smokeAdmin,npcAdmin,mpAdmin:mp.route, perfQuery:cachedPerfQuery, DB:database(connections), FEEDBACK:bucket(process.env.S3_ENDPOINT)}
+async function readGfx(){
+  const {rows}=await pool.query("SELECT detail FROM admin_audit WHERE target_type='gfx' AND target_id='settings' AND action='gfx.settings' ORDER BY id DESC LIMIT 1")
+  return validGfx(rows[0]?.detail)?rows[0].detail:gfxDefaults
+}
+async function gfxAdmin(request,user){
+  if(request.method==='GET')return json(await readGfx())
+  if(request.method!=='PUT')return json({error:'method'},405)
+  const config=await request.json().catch(()=>null)
+  if(!validGfx(config))return json({error:'invalid gfx settings'},400)
+  await pool.query("INSERT INTO admin_audit(actor_id,action,target_type,target_id,detail) VALUES($1,'gfx.settings','gfx','settings',$2)",[user,config])
+  return json({ok:true})
+}
+const env = {...process.env, gfxAdmin,smokeAdmin,npcAdmin,mpAdmin:mp.route, perfQuery:cachedPerfQuery, DB:database(connections), FEEDBACK:bucket(process.env.S3_ENDPOINT)}
 const origin = new URL(process.env.PUBLIC_ORIGIN).origin
 const online = presence(pool)
 const mpOnline = mpPresence()
@@ -101,6 +114,7 @@ const server=serve({port:Number(process.env.PORT || 3000),fetch: async request =
   const url = new URL(request.url)
   if (!url.pathname.startsWith('/api/')) return new Response(null,{status:404})
   if(url.pathname==='/api/smoke')return request.method==='GET'?json(await readSmoke()):json({error:'method'},405)
+  if(url.pathname==='/api/gfx')return request.method==='GET'?json(await readGfx()):json({error:'method'},405)
   if(url.pathname==='/api/npc'){
     if(request.method!=='GET')return json({error:'method'},405)
     const body=JSON.stringify(await readNpc()),etag='"'+Buffer.from(await crypto.subtle.digest('SHA-256',Buffer.from(body))).toString('hex')+'"'

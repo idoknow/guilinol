@@ -12,6 +12,7 @@ import {
 } from '../render-config'
 
 export interface RenderRangeControlOptions {
+  gfx?:Pick<ReturnType<typeof import('../look/gfx-state').gfxState>,'quality'|'select'>
   initial: RenderRangeConfig
   onPreview: (config: RenderRangeConfig) => void
   onCommit: (config: RenderRangeConfig) => RenderRangeConfig
@@ -78,6 +79,13 @@ export function renderRangeControl(options: RenderRangeControlOptions): RenderRa
   `
 
   const badge = panel.querySelector<HTMLElement>('.render-badge')!
+  const gfxSelect=document.createElement('select')
+  if(options.gfx){
+    const label=document.createElement('label');label.textContent='光影画质 '
+    for(const [value,text] of [['low','低'],['mid','中'],['high','高']])gfxSelect.add(new Option(text,value))
+    gfxSelect.value=options.gfx.quality;gfxSelect.onchange=()=>options.gfx?.select(gfxSelect.value as 'low'|'mid'|'high')
+    label.append(gfxSelect);panel.append(label)
+  }
   const closeBtn = panel.querySelector<HTMLButtonElement>('.render-close')!
   const presetEls = Array.from(panel.querySelectorAll<HTMLButtonElement>('.render-presets button'))
   const slider = panel.querySelector<HTMLInputElement>('input[type="range"]')!
@@ -87,6 +95,7 @@ export function renderRangeControl(options: RenderRangeControlOptions): RenderRa
 
   function refreshStats() {
     if (panel.hidden) return
+    if(options.gfx)gfxSelect.value=options.gfx.quality
     if (options.getStats) {
       const {target, loaded} = options.getStats(current.radius)
       statsEl.textContent = `目标 ${target} 块 · 已载 ${loaded} 块`

@@ -10,6 +10,7 @@ import {bytes, fetchAsset, measureFirstWorldBytes, openingTerrain, startOverview
 import {Stream} from './stream'
 import {flight} from './flight'
 import {look} from './look/config'
+import {gfxState} from './look/gfx-state'
 import {installAtmosphere, outerGround, sky} from './look/atmosphere'
 import {startPeaks} from './peaks'
 import {presets,setPreset,pickSpawn,spawnPool} from './presets'
@@ -88,11 +89,11 @@ async function start(loader:FullLoader,creatorSpawn=false) {
   await prepareCityAudioDuringLoad()
   const bounds=terrain??previousWorld!
   const renderer = new THREE.WebGLRenderer({antialias:false,powerPreference:'high-performance'})
-  renderer.debug.checkShaderErrors = import.meta.env.DEV
+  renderer.debug.checkShaderErrors = import.meta.env.DEV || params.has('debug')
   const warmPrograms=async(root:THREE.Object3D)=>{
     try{await warmShaders(renderer,root,camera,scene)}catch(error){console.warn('Shader warmup unavailable',error)}
   }
-  renderer.toneMapping = THREE.NeutralToneMapping; renderer.toneMappingExposure = look.exposure
+  renderer.toneMapping = THREE.NoToneMapping; renderer.toneMappingExposure = look.exposure
   document.body.prepend(renderer.domElement)
   const camera = new THREE.PerspectiveCamera(55,1,1,Math.max(look.fogHorizonTo,initialMetrics.fogHorizonTo)+1200)
   const scene = new THREE.Scene()
@@ -103,6 +104,11 @@ async function start(loader:FullLoader,creatorSpawn=false) {
   camera.layers.enable(MAIN_DETAIL_LAYER)
   const light = new THREE.DirectionalLight(look.sunColor,look.sunPower)
   light.position.set(...look.sunDirection); scene.add(light)
+  const gfx=gfxState(params)
+  let post:ReturnType<typeof import('./look/post').mainPass>|undefined
+  if(params.has('debug'))Object.assign(window,{gfx})
+  function drawMain(){if(post)stats.shadowCasters=post.render(walker?.active?walker.position:camera.position);else renderer.render(scene,camera)}
+  renderer.info.autoReset=false
   const hemi = new THREE.HemisphereLight(look.hemiSky,look.hemiGround,look.hemiPower); scene.add(hemi)
   const arrivalReady=import('./arrival-programs').then(module=>warmPrograms(module.arrivalPrograms()))
   const [left,top,width,depth] = bounds.extent
@@ -182,9 +188,10 @@ async function start(loader:FullLoader,creatorSpawn=false) {
   const clock = skyClock(params)
   if(!soloStart)setPreset(camera,params.get('cam')??params.get('spawn'),bounds.bbox)
   let previous=0, first=0, frame=0, sum=0, samples=0
-  const stats = {firstMs:0,readyMs:0,openingRingMs:0,firstWorldBytes:0,ms:0,calls:0,frame:0,loaded:0,pending:0,visited:0,failures:0,
+  const stats = {firstMs:0,readyMs:0,openingRingMs:0,firstWorldBytes:0,ms:0,calls:0,shadowCasters:0,frame:0,loaded:0,pending:0,visited:0,failures:0,
     geometries:0,textures:0,dpr:currentDpr}
   function markFirstFrame(){
+    void import('./look/post').then(module=>{post=module.mainPass(renderer,scene,camera,light,gfx)}).catch(error=>console.warn('Graphics effects unavailable',error))
     first=performance.now()
     stats.firstMs=first
     measureFirstWorldBytes(first,total=>{stats.firstWorldBytes=total})
@@ -194,7 +201,7 @@ async function start(loader:FullLoader,creatorSpawn=false) {
   function updateAtmosphere(now:number,elapsed:number){
     clock.tick(elapsed/1000); evaluate(clock.hour,clock.weather,1-Math.exp(-elapsed/clock.blendMs))
     atmo.uTime.value = now/1000
-    light.position.copy(env.sunDir); light.color.copy(env.sunColor); light.intensity = env.sunPower
+    light.position.copy(light.target.position).addScaledVector(env.sunDir,240); light.color.copy(env.sunColor); light.intensity = env.sunPower
     hemi.color.copy(env.hemiSky); hemi.groundColor.copy(env.hemiGround); hemi.intensity = env.hemiPower
     renderer.toneMappingExposure = env.exposure; windowLight.value = env.night
     dome.update(); drops.update()
@@ -217,7 +224,7 @@ async function start(loader:FullLoader,creatorSpawn=false) {
         controls(elapsed/1000)
         updateAtmosphere(now,elapsed)
         openingStream?.updateBatches(camera.position)
-        renderer.render(scene,camera)
+        renderer.info.reset();drawMain()
         rendered=true
       })
     })
@@ -486,6 +493,7 @@ async function start(loader:FullLoader,creatorSpawn=false) {
   let walkProgramsReady=false,prepareLandingContent:(()=>Promise<void>)|undefined
   await syncSolo()
   const renderUi = renderRangeControl({
+    gfx,
     initial:rangeStore.getConfig(),
     onPreview:(next:RenderRangeConfig)=>{stream.setRenderRange(next,{persist:false,source:next.source})},
     onCommit:(next:RenderRangeConfig)=>{stream.setRenderRange(next.radius,{persist:true});return rangeStore.getConfig()},
@@ -546,6 +554,7 @@ async function start(loader:FullLoader,creatorSpawn=false) {
       gl.readPixels(0,0,1,1,gl.RGBA,gl.UNSIGNED_BYTE,new Uint8Array(4))
       resolve()
     }))},
+    ...(params.has('verify')?{redrawGfx(){if(!post)throw Error('Graphics pipeline not ready');drawMain()}}:{}),
     resume(){previous=0;renderer.setAnimationLoop(animate)},
     probeFoot(){
       const ray = new THREE.Raycaster(camera.position,new THREE.Vector3(0,-1,0))
@@ -574,6 +583,7 @@ async function start(loader:FullLoader,creatorSpawn=false) {
     readLastViewNow:()=>readLastView(),
     applyLastViewNow:(view:FeedbackView)=>getPlayMode()==='solo'?{ok:false,code:'FLIGHT_DISABLED_IN_SOLO'}:restoreOpening(view)}})
   function draw(){
+    renderer.info.reset()
     base.update(camera)
     const metrics=stream.metrics
     const ground=!!walker?.active && !cinema
@@ -585,7 +595,7 @@ async function start(loader:FullLoader,creatorSpawn=false) {
     // mirror costs the most, and a frame-old reflection is invisible under the ripple distortion.
     renderMirror(renderer,scene,camera,mirror,ground||(!cinema&&clock.weather==='clear'),ground)
     cullLandmarks?.pass(false)
-    renderer.render(scene,camera)
+    drawMain()
   }
   const host:Host={scene,camera,renderer,manifest,stream,peaks,clock,walker:()=>walker,walkTo,draw,refreshMode:showMode,
     captureView:async()=>(await import('./play/feedback-view')).capture(host),
@@ -605,6 +615,7 @@ async function start(loader:FullLoader,creatorSpawn=false) {
     if(getPlayMode()==='solo'&&!walker?.active)return
     if((paused||tour?.map?.active)&&frame>2){previous=0;return}
     const elapsed = previous?now-previous:0;previous=now
+    gfx.frame(elapsed)
     if(!switching){if(walker?.active)walker.tick(elapsed/1000);else {controls(elapsed/1000);clampOpening()}}
     if(frame===1) {
       if(!first)markFirstFrame()

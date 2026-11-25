@@ -50,7 +50,7 @@ const codeText: Record<string, string> = {
   last_admin: '至少要保留一位管理员',
 }
 let generation = 0
-async function api<T = any>(path: string, data?: unknown): Promise<T> {
+async function api<T = any>(path: string, data?: unknown, method='POST'): Promise<T> {
   let response: Response
   // 后台聚合查询偶尔会 5xx（服务端慢查询超时）。只重试只读请求，写请求绝不重放。
   for (let attempt = 0; ; attempt++) {
@@ -58,7 +58,7 @@ async function api<T = any>(path: string, data?: unknown): Promise<T> {
       response = await fetch(
         `/api/${path}`,
         data
-          ? { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) }
+          ? { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) }
           : { cache: 'no-store' },
       )
     } catch {
@@ -277,6 +277,7 @@ const views: View[] = [
   { key: 'server', label: '服务端', icon: '▣', group: '数据', ranged: true },
   { key: 'mp', label: '联机', icon: '⇋', group: '数据' },
   { key: 'smoke', label: '香烟', icon: '▥', group: '数据' },
+  { key: 'gfx', label: '光影', icon: '☀', group: '光影' },
   { key: 'npc', label: '路人与车流', icon: '⇄', group: '数据' },
   { key: 'feedback', label: '反馈处理', icon: '✉', group: '运营' },
   { key: 'chat', label: '聊天', icon: '❝', group: '运营' },
@@ -1313,6 +1314,31 @@ const pages: Record<string, (view: View) => void> = {
     }, skeleton(8))
   },
 
+  gfx(){
+    paintTop(views.find(view=>view.key==='gfx')!)
+    const slot=h('div',{class:'adm-stack'},skeleton(8));main.append(slot)
+    void Promise.all([api('admin/gfx'),import('./look/gfx-config')]).then(([stored,{validGfx,gfxDefaults}])=>{
+      const config=structuredClone(validGfx(stored)?stored:gfxDefaults)
+      const form=h('form',{class:'adm-npc'}) as HTMLFormElement
+      function fields(values:Record<string,unknown>,path:string){
+        for(const [key,value] of Object.entries(values)){
+          if(key==='presets')continue
+          if(value&&typeof value==='object'){fields(value as Record<string,unknown>,path+key+'.');continue}
+          const input=h('input',{type:typeof value==='boolean'?'checkbox':typeof value==='number'?'number':'text',step:'any'}) as HTMLInputElement
+          input.checked=value===true;input.value=String(value)
+          input.oninput=()=>{values[key]=typeof value==='boolean'?input.checked:typeof value==='number'?input.valueAsNumber:input.value}
+          form.append(h('label',null,path+key,input))
+        }
+      }
+      fields(config,'')
+      const presets=h('textarea',null) as HTMLTextAreaElement;presets.value=JSON.stringify(config.presets,null,2)
+      const save=h('button',{type:'submit'},'保存') as HTMLButtonElement
+      form.append(h('label',null,'时段覆盖（day / dusk / night，留空对象表示继承）',presets),save)
+      form.onsubmit=async event=>{event.preventDefault();try{config.presets=JSON.parse(presets.value);if(!validGfx(config))throw Error()}catch{toast('参数或时段覆盖无效','error');return}
+        save.disabled=true;try{await api('admin/gfx',config,'PUT');toast('已保存，新进场时生效')}catch{toast('保存失败','error')}finally{save.disabled=false}}
+      slot.replaceChildren(form)
+    }).catch(error=>slot.replaceChildren(errorState(error,()=>render())))
+  },
   smoke() {
     paintTop(views.find(view=>view.key==='smoke')!)
     const slot=h('div',{class:'adm-stack'},skeleton(6));main.append(slot)

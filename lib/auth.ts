@@ -1,6 +1,7 @@
 export interface Env {
   mpAdmin?:(path:string,request:Request,actor:string)=>Promise<Response>
   smokeAdmin?:(request:Request,user:string)=>Promise<Response>
+  gfxAdmin?:(request:Request,user:string)=>Promise<Response>
   npcAdmin?:(request:Request)=>Promise<Response>
   RT_JOIN_SECRET?: string
   perfQuery?:(path:string,params:URLSearchParams)=>Promise<Response>
