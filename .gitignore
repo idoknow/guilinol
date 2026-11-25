@@ -10,3 +10,5 @@ out/
 .wrangler/
 .dev.vars*
 .world-cache/
+
+.tmp/

@@ -62,6 +62,14 @@ export function play(host:Host) {
     down.ray.origin.set(x,3000,z)
     return down.intersectObject(host.peaks,true)[0]?.point.y ?? NaN
   }
+  // IDOK-278: water test for the drone rig — the same 4 m/px water array the walk rig uses.
+  function waterAt(x:number,z:number) {
+    const tile = host.manifest.chunks.find(t=>x>=t.x&&x<t.x+256&&z>=t.z&&z<t.z+256)
+    const data = tile&&host.stream.loaded.get(tile)
+    if(!tile||!data||!data.water||!data.terrain) return false
+    const at = Math.round((z-tile.z)/4)*65+Math.round((x-tile.x)/4)
+    return data.water[at]!==-32768&&data.water[at]-data.terrain[at]>5
+  }
 
   // --- HUD dock (top right): mode button lives here too, so mobile has one column of controls.
   const dock = document.createElement('nav'); dock.className = 'dock'
@@ -263,6 +271,7 @@ export function play(host:Host) {
       return probe?.surfaceY ?? probe?.foot ?? 0
     },
     name:()=>nearestName(),
+    waterAt,
   })
   drone.mountEntry(buttons)
   window.addEventListener('keydown',event=>{

@@ -41,7 +41,7 @@ const LOAD_FIXED:Record<LoadKind,number> = {none:0,cargo:0,person:80000,car:1200
 const LOAD_TITLE:Record<LoadKind,string> = {none:'空载',cargo:'运货',person:'运人',car:'运车'}
 const CARGO_DEFAULT = 100000
 
-export function droneMode(host:Host, deps:{groundAt:(x:number,z:number)=>number; name:()=>string}):DroneMode {
+export function droneMode(host:Host, deps:{groundAt:(x:number,z:number)=>number; name:()=>string; waterAt?:(x:number,z:number)=>boolean}):DroneMode {
   const input = new PilotInput()
   let placed:DroneId|null = null
   let mesh:DroneMesh|null = null
@@ -53,6 +53,16 @@ export function droneMode(host:Host, deps:{groundAt:(x:number,z:number)=>number;
   let recording:{rec:Recording; started:number}|null = null
   let hint:HTMLElement|null = null
   const lens = {pos:new THREE.Vector3(),yaw:0,pitch:0}
+
+  // IDOK-278: rain exposure. Flying in the rain soaks the airframe; at 100% it crashes.
+  // A wrecked drone sits where it fell — walk up and tap to repair. Over water it is swept
+  // away and lost; the hangar then offers 补充 to buy a replacement.
+  const WET_RATE = .055          // soak %/s while airborne in rain
+  const DRY_RATE = .09           // dry %/s while landed in the clear
+  let wet = 0                    // 0..1
+  let wrecked:false|{pos:THREE.Vector3; id:DroneId} = false
+  let wreckMarker:THREE.Object3D|null = null
+  let overWaterLoss = false      // true = swept into the river, only 补充 brings it back
 
   // --- Hangar (机库): pick an aircraft, it lands a few metres ahead.
   const mask = document.createElement('div')
@@ -95,6 +105,10 @@ export function droneMode(host:Host, deps:{groundAt:(x:number,z:number)=>number;
       const spec = drone(id)
       const isOut = placed === id
       const cap = spec.payloadG ?? 0
+      // IDOK-278: a wrecked frame is repairable, a swept-away one must be replaced.
+      const isWreck = wrecked !== false && wrecked.id === id && !flight
+      const isLost = wrecked !== false && wrecked.id === id && overWaterLoss
+      const cta = isLost ? '补充' : isWreck ? '修复' : isOut ? '召回' : '放到身前'
       return `<button class="drone-card${isOut ? ' out' : ''}" data-drone="${id}" type="button">
         <span class="drone-name">${spec.name}</span>
         <span class="drone-tag">${spec.tagline}</span>
@@ -119,11 +133,15 @@ export function droneMode(host:Host, deps:{groundAt:(x:number,z:number)=>number;
             <input type="range" data-cargoweight min="10" max="${cap / 1000}" step="10" value="${Math.min(cargoG / 1000,cap / 1000)}">
             <b data-cargoval>${(cargoG / 1000).toFixed(0)} kg</b></span>` : ''}
           <span class="drone-note" data-load-note hidden></span>` : ''}
-        <span class="drone-cta">${isOut ? '召回' : '放到身前'}</span>
+        <span class="drone-cta">${cta}</span>
       </button>`
     }).join('')
     for (const card of Array.from(grid.querySelectorAll<HTMLElement>('[data-drone]'))) {
-      card.onclick = () => void choose(card.dataset.drone as DroneId)
+      card.onclick = () => {
+        const id = card.dataset.drone as DroneId
+        if (wrecked !== false && wrecked.id === id && !flight) { void replace(); closeHangar(); return }
+        void choose(id)
+      }
     }
     for (const chip of Array.from(grid.querySelectorAll<HTMLElement>('[data-load]'))) {
       chip.onclick = event => {
@@ -196,8 +214,57 @@ export function droneMode(host:Host, deps:{groundAt:(x:number,z:number)=>number;
     flight.load = loadGrams()
     built.root.position.set(x,y,z)
     built.root.rotation.y = yaw
+    wet = 0
     showHint(`已放置 ${spec.short} · 点「飞无人机」进遥控画面`)
     refreshDock()
+  }
+
+  // IDOK-278: replace a lost (swept away) airframe — the hangar CTA becomes 补充.
+  async function replace() {
+    wrecked = false
+    if (wreckMarker) { host.scene.remove(wreckMarker); wreckMarker = null }
+    await place(lostId)
+  }
+  let lostId:DroneId = DRONE_IDS[0]
+
+  function wreck(pos:THREE.Vector3) {
+    if (!flight || !placed) return
+    lostId = placed
+    overWaterLoss = deps.waterAt?.(pos.x,pos.z) ?? false
+    wrecked = {pos:pos.clone(),id:placed}
+    const spec = flight.spec
+    if (overWaterLoss) {
+      // 落水：被水冲走，丢失。机库里点「补充」换新机。
+      toast(`${spec.short} 淋湿坠水，被水冲走 · 已丢失，请在机库点击「补充」`)
+      teardown()
+      refreshDock()
+      return
+    }
+    // 陆地：坠机原地，可靠近点击修复。
+    teardown()
+    buildWreckMarker(pos)
+    toast(`${spec.short} 淋湿损坏坠机 · 靠近后点击修复`)
+    refreshDock()
+  }
+  function toast(text:string) {
+    window.dispatchEvent(new CustomEvent('walk:toast',{detail:{text,ms:4600}}))
+  }
+  function teardown() {
+    if (rcActive) exitRc()
+    if (mesh) { disposeDrone(mesh); mesh = null }
+    detachLoad()
+    flight = null
+    placed = null
+    hideHint()
+  }
+  function buildWreckMarker(pos:THREE.Vector3) {
+    if (wreckMarker) host.scene.remove(wreckMarker)
+    const ring = new THREE.Mesh(
+      new THREE.RingGeometry(.5,.72,28).rotateX(-Math.PI/2),
+      new THREE.MeshBasicMaterial({color:'#e05a3a',transparent:true,opacity:.85,depthWrite:false}))
+    ring.position.set(pos.x,pos.y - drone(lostId).height * .4 + .05,pos.z)
+    host.scene.add(ring)
+    wreckMarker = ring
   }
 
   function recall() {
@@ -510,6 +577,10 @@ export function droneMode(host:Host, deps:{groundAt:(x:number,z:number)=>number;
       entry.textContent = rcActive ? '遥控中' : grounded ? '雨天禁飞' : '飞无人机'
       entry.dataset.stage = rcActive ? 'rc' : grounded ? 'no-fly' : 'ready'
       entry.setAttribute('aria-label',rcActive ? '遥控中' : grounded ? '雨天不能在室外起飞' : '起飞无人机')
+    } else if (wrecked !== false) {
+      entry.textContent = overWaterLoss ? '补充无人机' : '修复无人机'
+      entry.dataset.stage = 'wreck'
+      entry.setAttribute('aria-label',overWaterLoss ? '无人机已丢失，补充新机' : '无人机已损坏，走近修复')
     } else {
       entry.textContent = '无人机'
       entry.dataset.stage = 'none'
@@ -534,8 +605,34 @@ export function droneMode(host:Host, deps:{groundAt:(x:number,z:number)=>number;
 
   // --- Frame
   function advance(dt:number) {
+    // Wreck lying on the ground: dry out slowly, repair when the player walks up.
+    if (wrecked && !flight) {
+      if (host.clock.weather !== 'rain') {
+        const d = host.walker()?.active
+          ? host.walker()!.position.distanceTo(wrecked.pos)
+          : host.camera.position.distanceTo(wrecked.pos)
+        if (d < 6) {
+          wet = Math.max(0,wet - DRY_RATE * 2 * dt)
+          showHint(`${drone(wrecked.id).short} 已损坏（湿度 ${(wet * 100).toFixed(0)}%）· 靠近晾干中 · 点击「飞无人机」修复`)
+          if (wet <= 0) {
+            toast(`${drone(wrecked.id).short} 已修复，可重新使用`)
+            wrecked = false
+            if (wreckMarker) { host.scene.remove(wreckMarker); wreckMarker = null }
+            void replace().catch(() => {})
+          }
+        } else showHint(`${drone(wrecked.id).short} 已损坏 · 走近它点击修复`)
+      } else showHint(`${drone(wrecked.id).short} 已损坏 · 雨天无法晾干，等雨停`)
+    }
     if (!flight || !mesh) return
     const gnd = (x:number,z:number) => deps.groundAt(x,z)
+    // IDOK-278: rain while airborne — soak, then crash. DJI advice: land immediately.
+    if (host.clock.weather === 'rain' && flight.phase !== 'landed') {
+      wet = Math.min(1,wet + WET_RATE * dt)
+      if (rc && wet > .12 && Math.floor(flight.elapsed) % 5 === 0) { rc.toast(`机身淋湿 ${(wet * 100).toFixed(0)}% · 请尽快降落`) }
+      if (wet >= 1) { wreck(flight.pos.clone()); return }
+    } else if (flight.phase === 'landed' && host.clock.weather !== 'rain' && wet > 0) {
+      wet = Math.max(0,wet - DRY_RATE * dt)
+    }
     if (flight.phase !== 'landed') stepFlight(flight,Math.min(dt,.1),input.read(),gnd)
     else stepFlight(flight,Math.min(dt,.1),{throttle:0,yaw:input.read().yaw * .4,pitch:0,roll:0},gnd)
     mesh.root.position.copy(flight.pos)
