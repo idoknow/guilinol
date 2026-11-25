@@ -68,7 +68,7 @@ def clean_texture(data, footprint, color):
     return encoded.getvalue()
 
 
-def patch_tile(file, footprint, color):
+def patch_tile(file, footprint, color, *, sidewalk=False):
     raw = gzip.decompress(file.read_bytes())
     vertices, indices, size, png_size = struct.unpack_from('<4I', raw, 4)
     start = 24+16900+9*vertices+4*indices
@@ -79,17 +79,20 @@ def patch_tile(file, footprint, color):
     rebuilt, occupied = [], []
     for kind, *loops in paths[:boundary]:
         shape = make_valid(Polygon(np.asarray(loops[0])/100, [np.asarray(loop)/100 for loop in loops[1:]]))
-        if kind in (1, 4, 5, 6) and shape.intersects(footprint):
+        if not sidewalk and kind in (1, 4, 5, 6) and shape.intersects(footprint):
             rebuilt.extend(rings(kind, shape.difference(footprint)))
         else:
             rebuilt.append([kind, *loops]); occupied.append(shape)
     fresh = set_precision(footprint.difference(union_all(occupied)), .01)
     if fresh.area < .01:
         return False
-    xmin, zmin, xmax, zmax = fresh.bounds
-    for east in range(math.floor(xmin/16)*16, math.ceil(xmax/16)*16, 16):
-        for south in range(math.floor(zmin/16)*16, math.ceil(zmax/16)*16, 16):
-            rebuilt.extend(rings(0, fresh.intersection(box(east,south,east+16,south+16))))
+    if sidewalk:
+        rebuilt.extend(rings(1, fresh))
+    else:
+        xmin, zmin, xmax, zmax = fresh.bounds
+        for east in range(math.floor(xmin/16)*16, math.ceil(xmax/16)*16, 16):
+            for south in range(math.floor(zmin/16)*16, math.ceil(zmax/16)*16, 16):
+                rebuilt.extend(rings(0, fresh.intersection(box(east,south,east+16,south+16))))
     if lower:
         lower[0] = len(rebuilt)
     streets[0] = rebuilt + paths[boundary:]
@@ -134,7 +137,20 @@ def bake(output, manifest, palette):
     if 'region' in manifest:
         corridors = json.loads(Path(__file__).with_name('region.json').read_bytes())['corridors']
         connectors = {way for c in corridors if c['mode']=='drive' and c['end']=='两江机场' for way in c['ways']}
-    tree = footprints(load_osm(), connectors); changed = 0
+    bake_footprints(output, manifest, palette, footprints(load_osm(), connectors))
+
+
+def bake_shanhu_walks(output, manifest, palette):
+    ways = {230580631, 259219619, 687400118}
+    lanes = [LineString(points(way)).buffer(1.5, quad_segs=3) for way in load_osm()
+             if way['type']=='way' and way['id'] in ways and way.get('tags', {}).get('highway')=='footway'
+             and all(way['tags'].get(tag, 'no')=='no' for tag in ('area','bridge','tunnel','indoor'))
+             and way['tags'].get('layer', '0')=='0' and len(points(way))>1]
+    bake_footprints(output, manifest, palette, STRtree(lanes), sidewalk=True)
+
+
+def bake_footprints(output, manifest, palette, tree, *, sidewalk=False):
+    changed = 0
     region = Polygon(manifest['region']['local']) if 'region' in manifest else None
     for tile in manifest['chunks']:
         east, south = tile['x'], tile['z']
@@ -149,14 +165,17 @@ def bake(output, manifest, palette):
                 continue
         shape = translate(clipped, -east,-south)
         file = output/tile['file']
-        if patch_tile(file, shape, ImageColor.getrgb(palette['road'])):
+        if patch_tile(file, shape, ImageColor.getrgb(palette['road']), sidewalk=sidewalk):
             changed += 1; tile['bytes'] = file.stat().st_size
-    print(f'Minor streets: {len(tree.geometries)} ways, {changed} changed chunks')
+    label = 'Shanhu walks' if sidewalk else 'Minor streets'
+    print(f'{label}: {len(tree.geometries)} ways, {changed} changed chunks')
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(); parser.add_argument('--output',type=Path,default=Path(OUT))
-    output = parser.parse_args().output; file = output/'manifest.json'
+    parser.add_argument('--shanhu-walks-only', action='store_true')
+    args = parser.parse_args(); output = args.output; file = output/'manifest.json'
     manifest = json.loads(file.read_text())
-    bake(output, manifest, json.loads(Path(__file__).with_name('palette.json').read_text()))
+    compile_streets = bake_shanhu_walks if args.shanhu_walks_only else bake
+    compile_streets(output, manifest, json.loads(Path(__file__).with_name('palette.json').read_text()))
     file.write_text(json.dumps(manifest,separators=(',',':'))+'\n')
