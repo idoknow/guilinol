@@ -360,6 +360,11 @@ def build(bbox, output, palette, workers=4):
     footprints, heights = buildings(bounds, ground_mesh_at, peak_tree, layout, carriageway_mask, sidewalk_mask, airport_buildings)
     index = STRtree(footprints)
     bridge_cutouts = building_cutouts(road_net[0], footprints, heights, index)
+    from rail_sections import designs
+    from indoor_passage import IndoorPassage
+    passage_ways = {w['id']: w for w in road_net[0] if w['type']=='way'}
+    passages = [IndoorPassage(section['indoorPassage'], passage_ways) for section in designs()
+                if play_region and 'indoorPassage' in section]
     shop_rows = shopfronts(footprints, heights, roads)
     texture = Image.new('RGB',(width,depth),palette['ground'])
     for region in layout.school_grounds:
@@ -477,6 +482,9 @@ def build(bbox, output, palette, workers=4):
                     tile = tile.intersection(bounds)
                 parts = ((poly,heights[key]) for key in sorted(index.query(tile))
                          for poly in polygons(bridge_cutouts.get(key, footprints[key]).intersection(tile)) if poly.area >= .01)
+                for passage in passages:
+                    if tile.intersects(passage.opening):
+                        parts = passage.tile_parts(list(parts), tile)
                 vertices, normals, indices, rings = building_mesh(parts, origin)
                 deck, thin, asphalt = decks(tile, origin)
                 st_data = streets(tile, origin)
@@ -485,7 +493,13 @@ def build(bbox, output, palette, workers=4):
                         while len(st_data)<=slot:
                             st_data.append(None if len(st_data)==5 else [])
                         st_data[slot]=rows[origin]
-                collision = json.dumps([rings, st_data, thin, asphalt], separators=(',', ':')).encode()
+                geometry = [rings, st_data, thin, asphalt]
+                if rings and len(rings[-1]) > 10:
+                    # Walkable slabs share the GL04 vertex buffer but are not building solids.
+                    floors = [ring for ring in rings if len(ring) > 10]
+                    geometry[0] = rings[:-len(floors)]
+                    geometry.extend([[], [], [], floors])
+                collision = json.dumps(geometry, separators=(',', ':')).encode()
                 tbuf = trees[origin]
                 if tbuf and pavement is not None and pavement.intersects(tile):
                     tbuf = clear_pavement_trees(tbuf,origin,pavement)
@@ -585,7 +599,7 @@ def build(bbox, output, palette, workers=4):
         from railways import bake_world as bake_railways
         report = bake_railways(output,manifest)
         from station_roads import bake as bake_station_roads
-        bake_station_roads(output,manifest,{road.way:road.width for road in roads if road.source=='paired'})
+        bridge_traffic = bake_station_roads(output,manifest,{road.way:road.width for road in roads if road.source=='paired'})
         (output/'manifest.json').write_text(json.dumps(manifest,separators=(',',':'))+'\n')
         from check_dingjiang_rail_clearance import checked_road_pairs
         verified = checked_road_pairs(output)
@@ -593,6 +607,10 @@ def build(bbox, output, palette, workers=4):
         print('Railway tiles:',report['tiles'],'clearance conflicts:',len(remaining))
     from major_roadbeds import bake as bake_major_roadbeds
     bake_major_roadbeds(output,manifest)
+    if play_region and bridge_traffic:
+        # Wheel samples at bridge ends straddle the slab and the final arterial roadbed.
+        from station_roads import grade_traffic
+        grade_traffic(output, manifest, bridge_traffic)
     (output/'manifest.json').write_text(json.dumps(manifest,separators=(',',':'))+'\n')
     print(f'{len(chunks)} chunks, {len(footprints)} footprints, {sum(c["bytes"] for c in chunks):,} chunk bytes')
 

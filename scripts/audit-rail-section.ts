@@ -21,7 +21,7 @@ const grades = []
 const sections = []
 const deckChecks = []
 const coveredCrossings = new Set<number>()
-for (const { way: id, controls, boundaryNodes, maximumGrade = 0.05 } of design.roads) {
+for (const { way: id, controls, boundaryNodes, maximumGrade = 0.05, direction = 'lower' } of design.roads) {
   const way = ways.find((w) => w.id === id)
   const lane = { way: id, structure: 'surface', nodes: new Set(way.nodes) }
   const xy = way.geometry.map((p) => ll2xz(p.lat, p.lon))
@@ -121,6 +121,7 @@ for (const { way: id, controls, boundaryNodes, maximumGrade = 0.05 } of design.r
   }
   grades.push({
     way: id,
+    direction,
     samples: count,
     maximumGrade: peakGrade,
     limit: maximumGrade,
@@ -137,7 +138,7 @@ assert(
 )
 assert(
   grades.every(
-    (r) => r.samples && r.raisedM <= 0.001 && r.maximumGrade <= r.limit + 1e-6 && !r.regressions,
+    (r) => r.samples && (r.direction === 'raise' ? r.loweredM : r.raisedM) <= 0.001 && r.maximumGrade <= r.limit + 1e-6 && !r.regressions,
   ),
 )
 assert(reverse.every((r) => r.checked && !r.violations))

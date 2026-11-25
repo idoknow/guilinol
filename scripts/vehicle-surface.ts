@@ -37,7 +37,9 @@ function tileSurface(world,entry,tunnels){
   const [verts,indices,jsonSize,imageBytes,triangles]=[4,8,12,16,20].map(i=>data.readUInt32LE(i))
   const jsonStart=24+16900+9*verts+4*indices
   const [,paths,,,legacy,,,savedBed]=JSON.parse(data.toString('utf8',jsonStart,jsonStart+jsonSize))
-  const bed=savedBed??(legacy&&!Array.isArray(legacy)?legacy:undefined)
+  // Historical terrain replacements are objects. New GL04 walking floors are
+  // polygon arrays and do not replace any vehicle ground triangles.
+  const bed=(Array.isArray(savedBed)?undefined:savedBed)??(legacy&&!Array.isArray(legacy)?legacy:undefined)
   const deckStart=jsonStart+jsonSize+imageBytes,tail=deckStart+18*triangles
   const groundStart=data.length===tail?24:tail
   const grid=new Float32Array(4225),wet=new Uint8Array(4225)
