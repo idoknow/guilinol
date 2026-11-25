@@ -20,6 +20,38 @@ SPANS = (631243399, 710595378, 710595379)
 LANDINGS = (631243400, 631243401, 710595377)
 
 
+def complete_lower_paving(output, manifest, elements):
+    """Restore the lower carriageway where native deck clipping removed asphalt."""
+    from PIL import ImageColor
+    from shapely.affinity import translate
+    from shapely.ops import substring
+    from service_streets import patch_tile
+
+    # Measured chainages and full carriageway widths at the stacked crossings.
+    spans = {256943438: [(290, 388, 6)], 710598125: [(615, 670, 6), (785, 914, 6), (1010, 1070, 6)],
+             843500807: [(0, 122, 6)], 1034238750: [(392, 413, 6.5)],
+             575608293: [(1752, 1796, 10.5)], 464498744: [(1076, 1120, 10.5)],
+             1382497593: [(80, 136, 5)]}
+    areas = []
+    for way in elements:
+        if way['type'] == 'way' and way['id'] in spans:
+            axis = LineString(points(way))
+            areas.extend(substring(axis, start, stop).buffer(size/2+.5)
+                         for start, stop, size in spans[way['id']])
+    index = shapely.STRtree(areas)
+    color = ImageColor.getrgb(json.loads(Path(__file__).with_name('palette.json').read_text())['road'])
+    for tile in manifest['chunks']:
+        x, z = tile['x'], tile['z']
+        bounds = box(x, z, x+256, z+256)
+        hits = index.query(bounds, predicate='intersects')
+        if not len(hits):
+            continue
+        local = translate(shapely.union_all(index.geometries.take(hits)).intersection(bounds), -x, -z)
+        file = output/tile['file']
+        if patch_tile(file, local, color, tile):
+            tile['bytes'] = file.stat().st_size
+
+
 def grade(output, manifest, elements):
     ways={e['id']:e for e in elements if e['type']=='way' and e['id'] in SPANS+LANDINGS}
     if len(ways)!=len(SPANS+LANDINGS):
