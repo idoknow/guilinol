@@ -234,6 +234,41 @@ def grade_service_overpass(output, manifest, elements):
                  {bridge_id:levels},spans=(bridge_id,))
 
 
+def grade_airport_ramp_merge(output, manifest, elements):
+    """Match both running surfaces through the overlap of the airport ramps."""
+    from canal_passages import sample_road_heights
+    from vehicle_tunnels import grade_limit
+
+    ramp,through=759349523,759349520
+    ways={w['id']:w for w in elements if w['type']=='way' and w['id'] in (ramp,through)}
+    if len(ways)!=2:
+        return
+    axis=LineString(points(ways[ramp])).reverse()
+    main=LineString(points(ways[through]))
+    x,z,w,h=manifest['extent']
+    if not box(x,z,x+w,z+h).covers(axis):
+        return
+    if ways[ramp]['nodes'][-1] not in ways[through]['nodes'] or axis.length<100:
+        raise ValueError('Recheck the airport ramp merge survey')
+    stations=np.arange(0.,101.,2.)
+    centres=[axis.interpolate(d) for d in stations]
+    parallel=[main.interpolate(main.project(p)) for p in centres]
+    queries=[dict(x=p.x,z=p.y,roofProbe=True) for p in centres+parallel]
+    hits=np.asarray(sample_road_heights(output,manifest,queries),dtype=float)
+    native,adjacent=np.split(hits[:,1],2)
+    if not np.isfinite(hits[:,1]).all():
+        raise ValueError('Missing the visible deck at the airport merge')
+    # The two decks' edges touch until their axes separate by 8.5 m.
+    end=max(d for d,p in zip(stations,centres,strict=True) if p.distance(main)<8.5)
+    if end>=stations[-1]:
+        raise ValueError('The ramp has no run to regain its original grade')
+    t=np.clip((stations-end)/(stations[-1]-end),0,1)
+    levels=adjacent+(native-adjacent)*t*t*(3-2*t)
+    if np.max(np.abs(np.diff(levels)/np.diff(stations)))>grade_limit('primary'):
+        raise ValueError('Airport merge exceeds the primary ramp grade')
+    update_slabs(output,manifest['chunks'],{ramp:axis},{ramp:stations},{ramp:levels},spans=(ramp,))
+
+
 def grade_zhongshan_merge(output, manifest, elements):
     """Tie each bridge lane to the parallel ground carriageway at its fork."""
     from canal_passages import sample_road_heights
