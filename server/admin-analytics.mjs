@@ -47,10 +47,12 @@ export async function analytics(pool,path,params){
   const args=[new Date(start),new Date(end)], range='received >= $1 AND received < $2'
   const rows=async(sql,values=args)=>(await pool.query(sql,values)).rows
   if(path==='admin/live'){
-    const people=await rows(`WITH latest AS (SELECT DISTINCT ON(session) mode,region FROM perf_event
-      WHERE received>=now()-interval '5 minutes' AND kind<>'probe' ORDER BY session,received DESC,batch_position DESC)
-      SELECT mode,region,grouping(mode,region) AS level,count(*) AS n FROM latest GROUP BY GROUPING SETS ((),(mode),(region))`,[])
-    const server=await rows(`SELECT minute,sample,errors5xx FROM perf_server WHERE minute>=date_trunc('minute',now())-interval '1 minute' ORDER BY minute DESC LIMIT 1`,[])
+    const [people,server]=await Promise.all([
+      rows(`WITH latest AS (SELECT DISTINCT ON(session) mode,region FROM perf_event
+        WHERE received>=now()-interval '5 minutes' AND kind<>'probe' ORDER BY session,received DESC,batch_position DESC)
+        SELECT mode,region,grouping(mode,region) AS level,count(*) AS n FROM latest GROUP BY GROUPING SETS ((),(mode),(region))`,[]),
+      rows(`SELECT minute,sample,errors5xx FROM perf_server WHERE minute>=date_trunc('minute',now())-interval '1 minute' ORDER BY minute DESC LIMIT 1`,[]),
+    ])
     return json({online:people.find(r=>r.level===3).n,modes:people.filter(r=>r.level===1),regions:people.filter(r=>r.level===2),server:server[0]??null})
   }
   if(path==='admin/errors')return json(await rows(`SELECT fields->>'errorKind' AS kind,fields->>'signature' AS signature,build,
@@ -85,7 +87,7 @@ export async function analytics(pool,path,params){
   const result=[]
   const eventNames=names.filter(key=>!Object.hasOwn(global,key))
   if(!overview && group!=='node' && (bucket==='1d'||bucket==='1h')){
-    const part=await partitions(pool,start,end)
+    const part=await partitions(pool,start,end,{preferHour:bucket==='1h'})
     if(part && (bucket==='1d'||part.grain==='hour')){
       if(primary){
         const data=await weighted(pool,part,m.base,{series:true,group,bucket})
@@ -125,7 +127,8 @@ export async function analytics(pool,path,params){
       const metric=measurement(key)
       return (metric?percentile(metric.q,metric.expr)+` filter(where ${metric.where})`:(kpis[key]??reliability[key]))+` AS "v${i}"`
     })
-    const predicate=!overview&&m?' AND '+m.where+' AND '+m.expr+' IS NOT NULL':!overview&&name.startsWith('duration')?" AND kind='session'":!overview&&name==='probeFail'?" AND kind='probe'":" AND kind<>'probe'"
+    const relMatch=!overview&&Object.hasOwn(reliability,name)?name.split('.'):null
+    const predicate=!overview&&m?' AND '+m.where+' AND '+m.expr+' IS NOT NULL':!overview&&name.startsWith('duration')?" AND kind='session'":!overview&&name==='probeFail'?" AND kind='probe'":relMatch?` AND kind='${relMatch[0]}' AND fields->>'category'='${relMatch[1]}'`:" AND kind<>'probe'"
     const data=await rows(`WITH events AS (SELECT received,fields,session,kind,context,${time('received')} AS t,
       ${group?`coalesce(${dimensions[group]},'unknown')`:'NULL::text'} AS label FROM perf_event WHERE ${range}${predicate}),
       ranked AS (SELECT *,${overview?'CASE WHEN t=$1 THEN $3::timestamptz ELSE $2::timestamptz END':`least(t+interval '${interval[bucket]}',$2::timestamptz)`} AS bucket_end${rankings} FROM events),
@@ -136,8 +139,9 @@ export async function analytics(pool,path,params){
   const globalTasks=names.filter(k=>Object.hasOwn(global,k)).map(async key=>{
     const [table,col]=global[key],server=key==='api5xxRate',stamp=server?col:`to_timestamp(${col})`
     const expr=server?`sum(errors5xx)::float/nullif(sum(requests),0)`:'count(*)'
+    const whereRange=server?`${col}>=$1 AND ${col}<$2`:`${col}>=extract(epoch from $1::timestamptz) AND ${col}<extract(epoch from $2::timestamptz)`
     const data=await rows(`SELECT ${time(stamp)} t,${expr} value,${server?'sum(requests)::bigint':'count(*)'} samples FROM ${table}
-      WHERE ${stamp}>=$1 AND ${stamp}<$2 GROUP BY 1 ORDER BY 1`,values)
+      WHERE ${whereRange} GROUP BY 1 ORDER BY 1`,values)
     return data.map(row=>({...row,key,...(group?{group:'unknown'}:{})}))
   })
   const [,globalGroups]=await Promise.all([eventTask,Promise.all(globalTasks)])

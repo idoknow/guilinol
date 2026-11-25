@@ -117,7 +117,35 @@ export async function queryPerf(pool,path,params) {
   if(!Number.isFinite(start+end)||start>=end||end-start>90*86400000)return invalid()
   const args=[new Date(start),new Date(end)]
   let sql
-  if(path==='admin/perf/server')sql='SELECT minute,sample FROM perf_server WHERE minute >= $1 AND minute < $2 ORDER BY minute'
+  if(path==='admin/perf/server'){
+    const {rows}=await pool.query('SELECT minute,sample FROM perf_server WHERE minute >= $1 AND minute < $2 ORDER BY minute',args)
+    if(params.get('summary')==='1'){
+      const span=end-start,stepMs=span<=3600e3?60e3:span<=86400e3?600e3:3600e3
+      const buckets={cpuCores:new Map(),rss:new Map(),loopP99:new Map(),pgP95:new Map()}
+      const routes=new Map()
+      let latest=null
+      for(const row of rows){
+        const ts=+new Date(row.minute),s=typeof row.sample==='string'?JSON.parse(row.sample):row.sample??{}
+        latest={minute:row.minute,sample:s}
+        const key=Math.floor(ts/stepMs)*stepMs
+        for(const name of ['cpuCores','rss','loopP99','pgP95']){
+          const v=s[name]
+          if(v!=null&&Number.isFinite(v))buckets[name].set(key,Math.max(buckets[name].get(key)??-Infinity,v))
+        }
+        for(const route of s.routes??[]){
+          const cur=routes.get(route.route)??{route:route.route,count:0,errors:0,p95:0,p99:0}
+          cur.count+=route.count??0;cur.errors+=route.errors??0
+          cur.p95=Math.max(cur.p95,route.p95??0);cur.p99=Math.max(cur.p99,route.p99??0)
+          routes.set(route.route,cur)
+        }
+      }
+      const toPoints=map=>[...map.entries()].map(([t,v])=>({t:new Date(t).toISOString(),v}))
+      return Response.json({summary:true,stepMs,count:rows.length,latest,
+        series:{cpuCores:toPoints(buckets.cpuCores),rss:toPoints(buckets.rss),loopP99:toPoints(buckets.loopP99),pgP95:toPoints(buckets.pgP95)},
+        routes:[...routes.values()].sort((a,b)=>b.count-a.count)},{headers:{'Cache-Control':'private, no-store'}})
+    }
+    return Response.json({items:rows},{headers:{'Cache-Control':'private, no-store'}})
+  }
   else if(path==='admin/perf/grid'){
     args.push(params.get('world'))
     sql=`SELECT grid,count(distinct session) AS visits,
