@@ -119,6 +119,7 @@ for (const [id, way] of ways) {
       previous = heights
     }
   }
+  if (roads.has(id) || id === 815078159) assert(raisedM < .001, 'Underpass pavement raised on '+id)
   grades.push({road:id, intervals, activeIntervals, aboveCap, regressions, before, after, raisedM, loweredM})
   assert(activeIntervals > 0, 'No intervals in the solved extent on ' + id)
   assert.equal(aboveCap, 0, 'Road grade limit exceeded inside the closure on ' + id)

@@ -108,7 +108,14 @@ def road_profiles(elements, paired_widths):
         knots = [(0., start_y)]
         if road == 459580311:
             knots.append((7., 155.79960))
+        if road == 983781244:
+            # Keep the approach below the two native sags on either side.
+            knots.extend([(6., 159.91), (1647.0-offset, 158.45)])
         knots.append((at-offset, level))
+        if road == 983781244:
+            knots.extend([(1829.0-offset, 154.985), (1839.0-offset, 154.910)])
+        if road == 983781242:
+            knots.append((1406.0-offset, 158.44))
         if road == 459580311:
             # The retained east junction owns the final six metres of paving.
             # Match its native crest before the clipped floor ends at the curb.
