@@ -44,11 +44,12 @@ export const INTERIOR_ATLAS_RECTS = Object.freeze({
 })
 
 export const MALL_ATLAS_RECTS = Object.freeze({
-  curtainPlain: [0.0, 0.0, 0.48, 1.0] as AtlasRect,
-  curvedCornerFloors: [0.48, 0.0, 0.84, 1.0] as AtlasRect,
-  // [0.84..1.0, 0..0.28] 164x286 / 若改宽牌则放底部 [0..0.48, 0.82..1.0] 专供屋顶横招「GD 王城商厦」
-  rooftopKingBanner: [0.84, 0.0, 1.0, 0.45] as AtlasRect,
-  supermarketRiser: [0.84, 0.5, 1.0, 1.0] as AtlasRect,
+  curtainPlain: [0.0, 0.0, 0.48, 0.84] as AtlasRect,
+  curvedCornerFloors: [0.48, 0.0, 0.78, 1.0] as AtlasRect,
+  // 宽幅横招 [0..0.48, 0.84..1.0] -> 492x164 (3.0:1) 匹配屋顶「GD 王城·商厦」宽横牌
+  rooftopKingBanner: [0.0, 0.84, 0.48, 1.0] as AtlasRect,
+  // 东侧突翼 [0.78..1.0, 0.52..0.98] -> 225x471，高清晰不糊字
+  supermarketRiser: [0.78, 0.52, 1.0, 0.98] as AtlasRect,
 })
 
 export interface DrinksShopMaterialPack {
@@ -277,132 +278,142 @@ export function createDrinksShopMaterials(skinOverride?: Partial<DrinkSkinConfig
     return m
   }
 
-  // ─── 1. 外立面招牌图集 (`exteriorSignAtlas` 2048x1024 -> 1 次合批) ───
-  const exteriorAtlasTex = ownTex(
-    makeCanvas(2048, 1024, (ctx, w, h) => {
-      ctx.fillStyle = MIXUE_RED
-      ctx.fillRect(0, 0, w, h)
+  // ─── 1. 外立面招牌图集 (`exteriorSignAtlas` 2048x1024 + 分级夜景发光遮罩 -> 1 次合批) ───
+  const drawExteriorCanvas = (ctx: CanvasRenderingContext2D, w: number, h: number, isEmissive: boolean) => {
+    const bgRed = isEmissive ? '#4c0208' : '#cc0c1b'
+    const bannerRed = isEmissive ? '#820510' : MIXUE_RED
+    const inkWhite = '#ffffff'
 
-      // A [0..0.16, 0..1.0]: 转角竖排红柱「蜜 雪 冰 城」（328x1024 -> 比例 1:3.12 零压扁）
-      const colW = Math.round(w * 0.16)
-      ctx.fillStyle = MIXUE_RED
-      ctx.fillRect(0, 0, colW, h)
-      ctx.strokeStyle = '#ffffff'
-      ctx.lineWidth = 8
-      ctx.strokeRect(10, 12, colW - 20, h - 24)
-      drawSnowflake(ctx, colW * 0.5, 76, 32, '#ffffff', 0.85)
-      ctx.fillStyle = '#ffffff'
-      ctx.textAlign = 'center'
-      ctx.textBaseline = 'middle'
-      ctx.font = 'bold 148px "PingFang SC", "Noto Sans SC", sans-serif'
-      ;['蜜', '雪', '冰', '城'].forEach((ch, idx) => ctx.fillText(ch, colW * 0.5, 224 + idx * 204))
+    ctx.fillStyle = bgRed
+    ctx.fillRect(0, 0, w, h)
 
-      // B [0.16..1.0, 0..0.38]: 主巨幅正红横招（1720x389 -> 4.42:1；雪花严格避让笔画）
-      const bx0 = colW
-      const bw = w - colW
-      const bh = Math.round(h * 0.38)
-      ctx.fillStyle = MIXUE_RED
-      ctx.fillRect(bx0, 0, bw, bh)
-      ctx.strokeStyle = '#ffffff'
-      ctx.lineWidth = 12
-      ctx.strokeRect(bx0 + 14, 14, bw - 28, bh - 28)
-      // 雪花置于四角外缘留白，绝不压汉字
-      for (const [sx, sy, sr] of [
-        [bx0 + 68, 56, 20],
-        [w - 72, 58, 22],
-        [w - 110, 260, 18],
-      ] as const) {
-        drawSnowflake(ctx, sx, sy, sr, '#ffffff', 0.82)
+    // A [0..0.16, 0..1.0]: 转角竖排红柱「蜜 雪 冰 城」（328x1024 -> 比例 1:3.12 零压扁）
+    const colW = Math.round(w * 0.16)
+    ctx.fillStyle = bgRed
+    ctx.fillRect(0, 0, colW, h)
+    ctx.strokeStyle = inkWhite
+    ctx.lineWidth = isEmissive ? 10 : 8
+    ctx.strokeRect(10, 12, colW - 20, h - 24)
+    drawSnowflake(ctx, colW * 0.5, 76, 32, inkWhite, isEmissive ? 1.0 : 0.9)
+    drawSnowflake(ctx, colW * 0.5, h - 68, 28, inkWhite, isEmissive ? 1.0 : 0.85)
+    ctx.fillStyle = inkWhite
+    ctx.textAlign = 'center'
+    ctx.textBaseline = 'middle'
+    ctx.font = 'bold 156px "PingFang SC", "Noto Sans SC", sans-serif'
+    ;['蜜', '雪', '冰', '城'].forEach((ch, idx) => ctx.fillText(ch, colW * 0.5, 226 + idx * 204))
+
+    // B [0.16..1.0, 0..0.38]: 主巨幅正红横招（1720x389 -> 4.42:1；严格对标桂林王城红墙大字+圆形雪王）
+    const bx0 = colW
+    const bw = w - colW
+    const bh = Math.round(h * 0.38)
+    ctx.fillStyle = bgRed
+    ctx.fillRect(bx0, 0, bw, bh)
+    if (!isEmissive) {
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.28)'
+      ctx.lineWidth = 4
+      for (let gx = bx0 + 280; gx < w; gx += 286) {
+        ctx.beginPath()
+        ctx.moveTo(gx, 0)
+        ctx.lineTo(gx, bh)
+        ctx.stroke()
       }
-      drawSnowKingAvatar(ctx, bx0 + 210, bh * 0.5, 102, true)
-      ctx.fillStyle = '#ffffff'
-      ctx.textAlign = 'left'
-      ctx.textBaseline = 'middle'
-      ctx.font = 'bold 142px "PingFang SC", "Noto Sans SC", sans-serif'
-      ctx.fillText('蜜雪冰城', bx0 + 368, 134)
-      ctx.fillStyle = '#fff5ea'
-      ctx.font = 'bold 42px "PingFang SC", sans-serif'
-      ctx.fillText('MIXUE · SINCE 1997 · ICE CREAM & TEA', bx0 + 372, 246)
-      ctx.fillStyle = '#ffffff'
-      ctx.fillRect(bx0 + 370, 298, 1210, 46)
-      ctx.fillStyle = MIXUE_RED
-      ctx.textAlign = 'center'
-      ctx.font = 'bold 28px "PingFang SC", sans-serif'
-      ctx.fillText(`你爱我 ♥ 我爱你  蜜雪冰城甜蜜蜜 · ${skin.subLabel}`, bx0 + 975, 322, 1180)
+    }
+    ctx.strokeStyle = inkWhite
+    ctx.lineWidth = isEmissive ? 10 : 8
+    ctx.strokeRect(bx0 + 12, 12, bw - 24, bh - 24)
+    for (const [sx, sy, sr] of [
+      [bx0 + 68, 56, 22],
+      [w - 72, 58, 24],
+      [w - 130, 312, 20],
+      [bx0 + 78, 326, 18],
+    ] as const) {
+      drawSnowflake(ctx, sx, sy, sr, inkWhite, isEmissive ? 1.0 : 0.9)
+    }
+    drawSnowKingAvatar(ctx, bx0 + 245, bh * 0.5, 118, !isEmissive)
+    ctx.fillStyle = inkWhite
+    ctx.textAlign = 'left'
+    ctx.textBaseline = 'middle'
+    ctx.font = 'bold 172px "PingFang SC", "Noto Sans SC", sans-serif'
+    ctx.fillText('蜜雪冰城', bx0 + 425, 152)
+    ctx.fillStyle = isEmissive ? '#ffeed8' : '#fff5ea'
+    ctx.font = 'bold 50px "PingFang SC", sans-serif'
+    ctx.fillText('MIXUE · SINCE 1997 · ICE CREAM & TEA', bx0 + 432, 294)
 
-      // C [0.16..0.44, 0.38..0.94]: 1:1 正方白底雪王方牌（573x573，零椭圆）
-      const cx0 = colW
-      const cy0 = bh
-      const cw = Math.round(w * 0.28)
-      const ch = Math.round(h * 0.56)
-      ctx.fillStyle = '#ffffff'
-      ctx.fillRect(cx0, cy0, cw, ch)
-      ctx.strokeStyle = MIXUE_RED
-      ctx.lineWidth = 14
-      ctx.strokeRect(cx0 + 16, cy0 + 16, cw - 32, ch - 32)
-      drawSnowKingAvatar(ctx, cx0 + cw * 0.5, cy0 + ch * 0.42, 138, true)
-      ctx.fillStyle = MIXUE_RED
-      ctx.font = 'bold 58px "PingFang SC", sans-serif'
-      ctx.fillText('MIXUE · 雪王驾到', cx0 + cw * 0.5, cy0 + ch * 0.84)
+    // C [0.16..0.44, 0.38..0.94]: 1:1 正方雪王品牌方牌（573x573）
+    const cx0 = colW
+    const cy0 = bh
+    const cw = Math.round(w * 0.28)
+    const ch = Math.round(h * 0.56)
+    ctx.fillStyle = '#ffffff'
+    ctx.fillRect(cx0, cy0, cw, ch)
+    ctx.strokeStyle = isEmissive ? '#ff3a4c' : MIXUE_RED
+    ctx.lineWidth = 14
+    ctx.strokeRect(cx0 + 16, cy0 + 16, cw - 32, ch - 32)
+    drawSnowKingAvatar(ctx, cx0 + cw * 0.5, cy0 + ch * 0.42, 138, true)
+    ctx.fillStyle = isEmissive ? '#ff293c' : MIXUE_RED
+    ctx.textAlign = 'center'
+    ctx.font = 'bold 56px "PingFang SC", sans-serif'
+    ctx.fillText('MIXUE · 雪王驾到', cx0 + cw * 0.5, cy0 + ch * 0.84)
 
-      // D [0.44..1.0, 0.38..0.62]: 1F 入口上方横幅灯箱（1147x246 -> 4.66:1）
-      const dx0 = cx0 + cw
-      const dw = w - dx0
-      const dh = Math.round(h * 0.24)
-      ctx.fillStyle = MIXUE_RED
-      ctx.fillRect(dx0, cy0, dw, dh)
-      ctx.strokeStyle = '#ffffff'
-      ctx.lineWidth = 8
-      ctx.strokeRect(dx0 + 10, cy0 + 10, dw - 20, dh - 20)
-      drawSnowKingAvatar(ctx, dx0 + 116, cy0 + dh * 0.5, 68, true)
-      ctx.textAlign = 'left'
-      ctx.fillStyle = '#ffffff'
-      ctx.font = 'bold 82px "PingFang SC", "Noto Sans SC", sans-serif'
-      ctx.fillText('蜜雪冰城', dx0 + 216, cy0 + dh * 0.38)
-      ctx.fillStyle = MIXUE_GOLD
-      ctx.font = 'bold 34px "PingFang SC", sans-serif'
-      ctx.fillText('SINCE 1997 · 冰鲜柠檬水 ¥4 · 新鲜冰淇淋 ¥2', dx0 + 218, cy0 + dh * 0.77, dw - 245)
+    // D [0.44..1.0, 0.38..0.62]: 1F 深挑雨棚门头横幅灯箱（1147x246 -> 4.66:1，对标 ref-22/29 桂林旗舰店）
+    const dx0 = cx0 + cw
+    const dw = w - dx0
+    const dh = Math.round(h * 0.24)
+    ctx.fillStyle = bannerRed
+    ctx.fillRect(dx0, cy0, dw, dh)
+    ctx.strokeStyle = inkWhite
+    ctx.lineWidth = 8
+    ctx.strokeRect(dx0 + 10, cy0 + 10, dw - 20, dh - 20)
+    drawSnowKingAvatar(ctx, dx0 + 114, cy0 + dh * 0.5, 68, true)
+    ctx.textAlign = 'left'
+    ctx.fillStyle = inkWhite
+    ctx.font = 'bold 78px "PingFang SC", "Noto Sans SC", sans-serif'
+    ctx.fillText(`蜜雪冰城 · ${skin.subLabel}`, dx0 + 206, cy0 + dh * 0.4, dw - 235)
+    ctx.fillStyle = isEmissive ? '#ffe07d' : MIXUE_GOLD
+    ctx.font = 'bold 34px "PingFang SC", sans-serif'
+    ctx.fillText('MIXUE SINCE 1997 · 1F 饮品区 24H · 冰鲜柠檬水 ¥4', dx0 + 208, cy0 + dh * 0.78, dw - 235)
 
-      // E [0.44..0.72, 0.62..1.0]: 门前红框 A 字立牌（573x389 -> 高锐度，控制发光不过曝）
-      const ey0 = cy0 + dh
-      const ew = Math.round(w * 0.28)
-      const eh = h - ey0
-      ctx.fillStyle = '#ffffff'
-      ctx.fillRect(dx0, ey0, ew, eh)
-      ctx.strokeStyle = MIXUE_RED
-      ctx.lineWidth = 10
-      ctx.strokeRect(dx0 + 10, ey0 + 10, ew - 20, eh - 20)
-      ctx.fillStyle = MIXUE_RED
-      ctx.fillRect(dx0 + 18, ey0 + 18, ew - 36, 84)
-      ctx.fillStyle = '#ffffff'
-      ctx.textAlign = 'center'
-      ctx.font = 'bold 46px "PingFang SC", sans-serif'
-      ctx.fillText('雪王热销榜', dx0 + ew * 0.5, ey0 + 60)
-      ctx.fillStyle = '#b91c1c'
-      ctx.font = 'bold 46px "PingFang SC", sans-serif'
-      ctx.fillText('冰鲜柠檬水  ¥4', dx0 + ew * 0.5, ey0 + 165)
-      ctx.fillText('新鲜冰淇淋  ¥2', dx0 + ew * 0.5, ey0 + 235)
-      ctx.fillStyle = '#1e293b'
-      ctx.font = 'bold 34px "PingFang SC", sans-serif'
-      ctx.fillText('扫码点单 · 欢迎进店', dx0 + ew * 0.5, ey0 + 322)
+    // E [0.44..0.72, 0.62..1.0]: 高对比巨字极简热销海报（远景也能一眼辨识 `雪王热销 / ¥4 / ¥2`，绝非细碎密集字块）
+    const ey0 = cy0 + dh
+    const ew = Math.round(w * 0.28)
+    const eh = h - ey0
+    ctx.fillStyle = isEmissive ? '#5e5e5e' : '#ffffff'
+    ctx.fillRect(dx0, ey0, ew, eh)
+    ctx.strokeStyle = isEmissive ? '#ff293c' : MIXUE_RED
+    ctx.lineWidth = 12
+    ctx.strokeRect(dx0 + 10, ey0 + 10, ew - 20, eh - 20)
+    ctx.fillStyle = bannerRed
+    ctx.fillRect(dx0 + 18, ey0 + 18, ew - 36, 98)
+    ctx.fillStyle = inkWhite
+    ctx.textAlign = 'center'
+    ctx.font = 'bold 62px "PingFang SC", sans-serif'
+    ctx.fillText('雪王热销', dx0 + ew * 0.5, ey0 + 68)
+    ctx.fillStyle = isEmissive ? '#d81b28' : '#b91c1c'
+    ctx.font = 'bold 74px "PingFang SC", sans-serif'
+    ctx.fillText('¥4 柠檬水', dx0 + ew * 0.5, ey0 + 186)
+    ctx.fillStyle = isEmissive ? '#111827' : '#1e293b'
+    ctx.font = 'bold 66px "PingFang SC", sans-serif'
+    ctx.fillText('¥2 冰淇淋', dx0 + ew * 0.5, ey0 + 298)
 
-      // F [0.72..1.0, 0.62..1.0]: 「始于1997」红底白字复古方牌
-      const fx0 = dx0 + ew
-      const fw = w - fx0
-      ctx.fillStyle = MIXUE_RED
-      ctx.fillRect(fx0, ey0, fw, eh)
-      ctx.strokeStyle = MIXUE_CREAM
-      ctx.lineWidth = 8
-      ctx.strokeRect(fx0 + 14, ey0 + 14, fw - 28, eh - 28)
-      ctx.fillStyle = '#ffffff'
-      ctx.font = 'bold 74px "PingFang SC", sans-serif'
-      ctx.fillText('始于 1997', fx0 + fw * 0.5, ey0 + 110)
-      ctx.fillStyle = MIXUE_GOLD
-      ctx.font = 'bold 36px "PingFang SC", sans-serif'
-      ctx.fillText('高质平价 · 现制饮品', fx0 + fw * 0.5, ey0 + 188)
-      drawSnowKingAvatar(ctx, fx0 + fw * 0.5, ey0 + 298, 56, true)
-    }),
-  )
+    // F [0.72..1.0, 0.62..1.0]: 「始于1997」红底白字复古方牌
+    const fx0 = dx0 + ew
+    const fw = w - fx0
+    ctx.fillStyle = bannerRed
+    ctx.fillRect(fx0, ey0, fw, eh)
+    ctx.strokeStyle = MIXUE_CREAM
+    ctx.lineWidth = 8
+    ctx.strokeRect(fx0 + 14, ey0 + 14, fw - 28, eh - 28)
+    ctx.fillStyle = inkWhite
+    ctx.font = 'bold 74px "PingFang SC", sans-serif'
+    ctx.fillText('始于 1997', fx0 + fw * 0.5, ey0 + 110)
+    ctx.fillStyle = isEmissive ? '#ffe07d' : MIXUE_GOLD
+    ctx.font = 'bold 36px "PingFang SC", sans-serif'
+    ctx.fillText('高质平价 · 现制饮品', fx0 + fw * 0.5, ey0 + 188)
+    drawSnowKingAvatar(ctx, fx0 + fw * 0.5, ey0 + 298, 56, true)
+  }
+
+  const exteriorAtlasTex = ownTex(makeCanvas(2048, 1024, (ctx, w, h) => drawExteriorCanvas(ctx, w, h, false)))
+  const exteriorEmissiveTex = ownTex(makeCanvas(2048, 1024, (ctx, w, h) => drawExteriorCanvas(ctx, w, h, true)))
 
   // ─── 2. 室内发光菜单灯箱/叫号屏/吧台贴图集 (`interiorSignAtlas` 2048x1024 -> 1 次合批) ───
   const interiorAtlasTex = ownTex(
@@ -539,36 +550,36 @@ export function createDrinksShopMaterials(skinOverride?: Partial<DrinkSkinConfig
       ctx.fillRect(mx0, cy0 + ch - 30, mw, 10)
       drawSnowKingAvatar(ctx, mx0 + mw * 0.5, cy0 + ch * 0.5, 114, true)
 
-      // 前吧台左收银卡 [0.67..1.0, 0.38..0.53] (675x154 -> 4.38:1，匹配 2.4m x 0.54m!)
+      // 前吧台左点单灯带 [0.67..1.0, 0.38..0.53] (对标 ref-33 跌级「点餐」红横带)
       const px0 = mx0 + mw
       const pw = w - px0
       const pHalfH = Math.round(ch * 0.5)
       ctx.fillStyle = MIXUE_RED
       ctx.fillRect(px0, cy0, pw, pHalfH)
       ctx.strokeStyle = '#ffffff'
-      ctx.lineWidth = 6
+      ctx.lineWidth = 5
       ctx.strokeRect(px0 + 8, cy0 + 8, pw - 16, pHalfH - 16)
       ctx.fillStyle = '#ffffff'
       ctx.textAlign = 'center'
-      ctx.font = 'bold 54px "PingFang SC", sans-serif'
-      ctx.fillText('◀ 收银点单 · ORDER', px0 + pw * 0.5, cy0 + pHalfH * 0.38, pw - 40)
+      ctx.font = 'bold 62px "PingFang SC", sans-serif'
+      ctx.fillText('点餐 · ORDER', px0 + pw * 0.5, cy0 + pHalfH * 0.46, pw - 40)
       ctx.fillStyle = MIXUE_GOLD
-      ctx.font = 'bold 30px "PingFang SC", sans-serif'
-      ctx.fillText('扫码点单 · 冰鲜柠檬水 ¥4', px0 + pw * 0.5, cy0 + pHalfH * 0.78, pw - 40)
+      ctx.font = 'bold 24px "PingFang SC", sans-serif'
+      ctx.fillText('扫码点单 · 现制饮品 ¥2 起', px0 + pw * 0.5, cy0 + pHalfH * 0.82, pw - 40)
 
-      // 前吧台右取餐卡 [0.67..1.0, 0.53..0.68] (675x154 -> 4.38:1，匹配 2.4m x 0.54m!)
+      // 前吧台右取餐灯带 [0.67..1.0, 0.53..0.68]
       const p2y = cy0 + pHalfH
-      ctx.fillStyle = '#1e293b'
+      ctx.fillStyle = MIXUE_RED
       ctx.fillRect(px0, p2y, pw, ch - pHalfH)
-      ctx.strokeStyle = MIXUE_RED
-      ctx.lineWidth = 6
+      ctx.strokeStyle = '#ffffff'
+      ctx.lineWidth = 5
       ctx.strokeRect(px0 + 8, p2y + 8, pw - 16, ch - pHalfH - 16)
-      ctx.fillStyle = MIXUE_GOLD
-      ctx.font = 'bold 54px "PingFang SC", sans-serif'
-      ctx.fillText('取餐出杯 · COLLECT ▶', px0 + pw * 0.5, p2y + pHalfH * 0.38, pw - 40)
       ctx.fillStyle = '#ffffff'
-      ctx.font = 'bold 30px "PingFang SC", sans-serif'
-      ctx.fillText('雪王推荐 · 现场现制取杯', px0 + pw * 0.5, p2y + pHalfH * 0.78, pw - 40)
+      ctx.font = 'bold 58px "PingFang SC", sans-serif'
+      ctx.fillText('取餐 · PICKUP', px0 + pw * 0.5, p2y + pHalfH * 0.46, pw - 40)
+      ctx.fillStyle = MIXUE_GOLD
+      ctx.font = 'bold 24px "PingFang SC", sans-serif'
+      ctx.fillText('凭号取杯 · 冰鲜柠檬水 ¥4', px0 + pw * 0.5, p2y + pHalfH * 0.82, pw - 40)
 
       // 后墙制茶三区高亮灯箱 [0..1.0, 0.68..0.85]
       const zy0 = Math.round(h * 0.68)
@@ -600,123 +611,162 @@ export function createDrinksShopMaterials(skinOverride?: Partial<DrinkSkinConfig
         ctx.fillText(sub, hx + hw * 0.5, py0 + ph * 0.74, hw - 40)
       }
 
-      // 室内红墙标语「我在蜜雪等着你」+ 营业执照 SOP 框 [0.5..1.0, 0.85..1.0]
+      // 室内侧墙浅奶油规范公示牌 [0.5..1.0, 0.85..1.0]（白底细红框，彻底消除隔窗遥望时的纯红矩形块感）
       const sx0 = Math.round(w * 0.5)
-      ctx.fillStyle = MIXUE_RED
+      ctx.fillStyle = '#fff9f5'
       ctx.fillRect(sx0, py0, w - sx0, ph)
-      ctx.fillStyle = '#ffffff'
+      ctx.strokeStyle = MIXUE_RED
+      ctx.lineWidth = 10
+      ctx.strokeRect(sx0 + 8, py0 + 8, w - sx0 - 16, ph - 16)
+      ctx.fillStyle = MIXUE_RED
       ctx.textAlign = 'left'
-      ctx.font = 'bold 46px "PingFang SC", sans-serif'
-      ctx.fillText('我在蜜雪等着你 ♥ 食品经营规范公示', sx0 + 36, py0 + ph * 0.36, w - sx0 - 60)
-      ctx.fillStyle = MIXUE_GOLD
+      ctx.font = 'bold 48px "PingFang SC", sans-serif'
+      ctx.fillText('我在蜜雪等着你 · 食品经营规范公示', sx0 + 36, py0 + ph * 0.36, w - sx0 - 60)
+      ctx.fillStyle = '#334155'
       ctx.font = 'bold 28px "PingFang SC", sans-serif'
       ctx.fillText('现切鲜果 · 净水制冰 · 营业执照 / 健康证 / SOP', sx0 + 36, py0 + ph * 0.74, w - sx0 - 60)
     }),
   )
+  // 室内灯箱专用平衡发光遮罩：保留干净纯白底的同时压制自发光，保证中右菜单屏小字高对比不发虚
+  const interiorEmissiveTex = ownTex(
+    makeCanvas(1024, 512, (ctx, w, h) => {
+      ctx.fillStyle = '#5a5a5a'
+      ctx.fillRect(0, 0, w, h)
+      const menuH = Math.round(h * 0.38)
+      const panelW = w / 4
+      for (let i = 0; i < 4; i++) {
+        ctx.fillStyle = '#e03546'
+        ctx.fillRect(i * panelW + 4, 4, panelW - 8, 34)
+      }
+      ctx.fillStyle = '#e03546'
+      ctx.fillRect(0, menuH, Math.round(w * 0.52), 32)
+      ctx.fillStyle = '#ef3c4d'
+      ctx.fillRect(Math.round(w * 0.67), menuH, Math.round(w * 0.33), Math.round(h * 0.3))
+      ctx.fillStyle = '#cf2a3a'
+      ctx.fillRect(Math.round(w * 0.5), Math.round(h * 0.85), Math.round(w * 0.5), Math.round(h * 0.15))
+    }),
+  )
 
-  // ─── 3. 王城·商厦 1-8F 玻璃幕墙与真实转角店招图集 (`mallFacade` 1024x1024 -> 1 次合批) ───
-  const mallTex = ownTex(
-    makeCanvas(1024, 1024, (ctx, w, h) => {
-      // [0..0.48, 0..1]: 深灰黑框蓝灰玻璃幕墙
-      const leftW = Math.round(w * 0.48)
-      ctx.fillStyle = '#334556'
-      ctx.fillRect(0, 0, leftW, h)
-      const grad = ctx.createLinearGradient(0, 0, leftW, h)
+  // ─── 3. 王城·商厦 1-8F 玻璃幕墙与真实转角店招图集 (`mallFacade` 1024x1024 + 夜间分窗发光贴图) ───
+  const drawMallCanvas = (ctx: CanvasRenderingContext2D, w: number, h: number, isEmissive: boolean) => {
+    // [0..0.48, 0..0.84]: 深灰黑框蓝灰玻璃幕墙（夜间暗蓝玻璃仅亮少数办公窗）
+    const leftW = Math.round(w * 0.48)
+    const upperCurtH = Math.round(h * 0.84)
+    ctx.fillStyle = isEmissive ? '#080e16' : '#314355'
+    ctx.fillRect(0, 0, leftW, upperCurtH)
+    if (!isEmissive) {
+      const grad = ctx.createLinearGradient(0, 0, leftW, upperCurtH)
       grad.addColorStop(0, 'rgba(186, 218, 240, 0.24)')
       grad.addColorStop(0.5, 'rgba(65, 90, 114, 0.08)')
       grad.addColorStop(1, 'rgba(205, 229, 245, 0.2)')
       ctx.fillStyle = grad
-      ctx.fillRect(0, 0, leftW, h)
-      for (let row = 0; row < 4; row++) {
-        const yBase = Math.round((row * h) / 4)
-        ctx.fillStyle = '#1d242c'
-        ctx.fillRect(0, yBase, leftW, 12)
-        ctx.fillStyle = '#242c36'
-        ctx.fillRect(0, yBase + Math.round(h / 4) - 46, leftW, 46)
+      ctx.fillRect(0, 0, leftW, upperCurtH)
+    } else {
+      // 零星夜间亮灯写字楼窗格
+      ctx.fillStyle = '#6b5732'
+      for (const [wx, wy] of [
+        [28, 84],
+        [270, 290],
+        [145, 510],
+        [390, 490],
+      ] as const) {
+        ctx.fillRect(wx, wy, Math.round(leftW / 4) - 18, 95)
       }
-      ctx.fillStyle = '#1a2026'
-      for (let x = 0; x <= leftW; x += Math.round(leftW / 4)) {
-        ctx.fillRect(Math.max(0, x - 5), 0, 10, h)
-      }
+    }
+    for (let row = 0; row < 4; row++) {
+      const yBase = Math.round((row * upperCurtH) / 4)
+      ctx.fillStyle = isEmissive ? '#04060a' : '#1d242c'
+      ctx.fillRect(0, yBase, leftW, 12)
+      ctx.fillStyle = isEmissive ? '#05070c' : '#242c36'
+      ctx.fillRect(0, yBase + Math.round(upperCurtH / 4) - 42, leftW, 42)
+    }
+    ctx.fillStyle = isEmissive ? '#04060a' : '#1a2026'
+    for (let x = 0; x <= leftW; x += Math.round(leftW / 4)) {
+      ctx.fillRect(Math.max(0, x - 5), 0, 10, upperCurtH)
+    }
 
-      // [0.48..0.84, 0..1]: 王城·商厦 8 格弧角 1–8F 幕墙与转角招牌（完整无遮挡！）
-      const cx0 = leftW
-      const cw = Math.round(w * 0.36)
-      ctx.fillStyle = '#35485b'
-      ctx.fillRect(cx0, 0, cw, h)
-      const rowH = h / 8
-      for (let f = 0; f < 8; f++) {
-        const fy = Math.round(f * rowH)
-        ctx.fillStyle = f >= 6 ? '#3a4f62' : '#2f4152'
-        ctx.fillRect(cx0, fy, cw, rowH)
-        ctx.fillStyle = '#1c222a'
-        ctx.fillRect(cx0, fy, cw, 10)
-        ctx.fillRect(cx0, fy + rowH - 24, cw, 24)
-      }
-      ctx.fillStyle = '#171c22'
-      for (let k = 0; k <= 4; k++) {
-        ctx.fillRect(cx0 + Math.round((k * cw) / 4) - 4, 0, 8, h)
-      }
-      // 2F 亮橱窗毛绒雪王展台（ref/04_IMG_1393）
-      ctx.fillStyle = '#e0f2fe'
-      ctx.fillRect(cx0 + 12, Math.round(6 * rowH + 14), cw - 24, rowH - 42)
-      drawSnowKingAvatar(ctx, cx0 + cw * 0.35, 6 * rowH + 58, 28, false)
-      drawSnowKingAvatar(ctx, cx0 + cw * 0.65, 6 * rowH + 62, 24, false)
-      // 3F KING'S PLAZA + 王城·商厦
-      ctx.fillStyle = '#ffffff'
-      ctx.textAlign = 'center'
-      ctx.textBaseline = 'middle'
-      ctx.font = 'bold 42px "PingFang SC", sans-serif'
-      ctx.fillText('王城·商厦', cx0 + cw * 0.5, 5 * rowH + 46, cw - 24)
-      ctx.font = 'bold 20px sans-serif'
-      ctx.fillText("KING'S PLAZA", cx0 + cw * 0.5, 5 * rowH + 102, cw - 24)
-      // 4F 王城电脑城 5/6楼
-      ctx.fillStyle = '#facc15'
-      ctx.font = 'bold 40px "PingFang SC", sans-serif'
-      ctx.fillText('王城电脑城', cx0 + cw * 0.5, 4 * rowH + 48, cw - 24)
-      ctx.font = 'bold 22px "PingFang SC", sans-serif'
-      ctx.fillText('5 / 6 楼', cx0 + cw * 0.5, 4 * rowH + 92, cw - 24)
-      // 5F 飞扬美学
-      ctx.fillStyle = '#f8fafc'
-      ctx.font = 'bold 34px "PingFang SC", sans-serif'
-      ctx.fillText('飞扬美学', cx0 + cw * 0.5, 3 * rowH + 54, cw - 24)
-      // 6F DJI 大疆
-      ctx.fillStyle = '#e2e8f0'
-      ctx.font = 'bold 34px "PingFang SC", sans-serif'
-      ctx.fillText('DJI 大疆', cx0 + cw * 0.5, 2 * rowH + 54, cw - 24)
+    // [0..0.48, 0.84..1.0]: 屋顶宽幅横牌「GD 王城·商厦」（492x164 -> 3.0:1，对齐实拍 #030）
+    const ry0 = upperCurtH
+    const rh = h - ry0
+    ctx.fillStyle = isEmissive ? '#3a0409' : '#1b2028'
+    ctx.fillRect(0, ry0, leftW, rh)
+    ctx.fillStyle = isEmissive ? '#f22436' : MIXUE_RED
+    ctx.fillRect(8, ry0 + 12, leftW - 16, rh - 24)
+    ctx.fillStyle = '#ffffff'
+    ctx.textAlign = 'center'
+    ctx.textBaseline = 'middle'
+    ctx.font = 'bold 64px "PingFang SC", sans-serif'
+    ctx.fillText('GD · 王城·商厦', leftW * 0.5, ry0 + rh * 0.5, leftW - 36)
 
-      // [0.84..1.0, 0..1]: 屋顶「GD 王城商厦」方版 + 东翼「王城超市」（1:1 比例方框无压扁！）
-      const rx0 = cx0 + cw
-      const rw = w - rx0
-      // 上部 [0.84..1.0, 0..0.45]: 屋顶牌（匹配 6.8m x 2.3m 比例则绘制竖向/分两行大字? 不, 写醒目红底两行「GD · 王城商厦」）
-      ctx.fillStyle = '#1e242d'
-      ctx.fillRect(rx0, 0, rw, Math.round(h * 0.45))
-      ctx.fillStyle = MIXUE_RED
-      ctx.fillRect(rx0 + 6, 12, rw - 12, Math.round(h * 0.45) - 24)
-      ctx.fillStyle = '#ffffff'
-      ctx.font = 'bold 38px "PingFang SC", sans-serif'
-      ctx.fillText('GD', rx0 + rw * 0.5, 90, rw - 20)
-      ctx.font = 'bold 34px "PingFang SC", sans-serif'
-      ctx.fillText('王城', rx0 + rw * 0.5, 210, rw - 20)
-      ctx.fillText('商厦', rx0 + rw * 0.5, 330, rw - 20)
+    // [0.48..0.78, 0..1]: 王城·商厦 8 格弧角 1–8F 幕墙与转角招牌
+    const cx0 = leftW
+    const cw = Math.round(w * 0.3)
+    ctx.fillStyle = isEmissive ? '#091019' : '#35485b'
+    ctx.fillRect(cx0, 0, cw, h)
+    const rowH = h / 8
+    for (let f = 0; f < 8; f++) {
+      const fy = Math.round(f * rowH)
+      ctx.fillStyle = isEmissive ? (f === 7 ? '#4a351e' : '#080e16') : f >= 6 ? '#3a4f62' : '#2f4152'
+      ctx.fillRect(cx0, fy, cw, rowH)
+      ctx.fillStyle = isEmissive ? '#04060a' : '#1c222a'
+      ctx.fillRect(cx0, fy, cw, 10)
+      ctx.fillRect(cx0, fy + rowH - 24, cw, 24)
+    }
+    ctx.fillStyle = isEmissive ? '#04060a' : '#171c22'
+    for (let k = 0; k <= 4; k++) {
+      ctx.fillRect(cx0 + Math.round((k * cw) / 4) - 4, 0, 8, h)
+    }
+    // 2F 转角暗调玻璃底衬（由 mesh.ts 前方实心 3D 展示台架+立体迷你雪王+外层透明玻璃呈现真实 3D 橱窗纵深！）
+    ctx.fillStyle = isEmissive ? '#080e16' : '#0f1a24'
+    ctx.fillRect(cx0 + 12, Math.round(6 * rowH + 14), cw - 24, rowH - 42)
+    ctx.fillStyle = isEmissive ? '#241b12' : '#1b2836'
+    ctx.fillRect(cx0 + 18, Math.round(6 * rowH + 20), cw - 36, rowH - 54)
+    // 3F KING'S PLAZA + 王城·商厦
+    ctx.fillStyle = '#ffffff'
+    ctx.textAlign = 'center'
+    ctx.textBaseline = 'middle'
+    ctx.font = 'bold 32px "PingFang SC", sans-serif'
+    ctx.fillText('王城·商厦', cx0 + cw * 0.5, 5 * rowH + 44, cw - 24)
+    ctx.font = 'bold 17px sans-serif'
+    ctx.fillText("KING'S PLAZA", cx0 + cw * 0.5, 5 * rowH + 88, cw - 24)
+    // 4F 王城电脑城 5/6楼
+    ctx.fillStyle = '#facc15'
+    ctx.font = 'bold 26px "PingFang SC", sans-serif'
+    ctx.fillText('王城电脑城', cx0 + cw * 0.5, 4 * rowH + 44, cw - 24)
+    ctx.font = 'bold 18px "PingFang SC", sans-serif'
+    ctx.fillText('5 / 6 楼', cx0 + cw * 0.5, 4 * rowH + 86, cw - 24)
+    // 5F 飞扬美学
+    ctx.fillStyle = '#f8fafc'
+    ctx.font = 'bold 26px "PingFang SC", sans-serif'
+    ctx.fillText('飞扬美学', cx0 + cw * 0.5, 3 * rowH + 54, cw - 24)
+    // 6F DJI 大疆
+    ctx.fillStyle = '#e2e8f0'
+    ctx.font = 'bold 26px "PingFang SC", sans-serif'
+    ctx.fillText('DJI 大疆', cx0 + cw * 0.5, 2 * rowH + 54, cw - 24)
 
-      // 下部 [0.84..1.0, 0.50..1.0]: 「王城超市」方形蓝底广告牌（贴于 2.4m x 2.6m 方形看板，1:1 不拉扁！）
-      const sy0 = Math.round(h * 0.5)
-      const sh = h - sy0
-      ctx.fillStyle = '#1d4ed8'
-      ctx.fillRect(rx0, sy0, rw, sh)
-      ctx.strokeStyle = '#ffffff'
-      ctx.lineWidth = 6
-      ctx.strokeRect(rx0 + 8, sy0 + 8, rw - 16, sh - 16)
-      ctx.fillStyle = '#ffffff'
-      ctx.font = 'bold 36px "PingFang SC", sans-serif'
-      ctx.fillText('王城', rx0 + rw * 0.5, sy0 + sh * 0.34, rw - 24)
-      ctx.fillText('超市', rx0 + rw * 0.5, sy0 + sh * 0.58, rw - 24)
-      ctx.fillStyle = '#facc15'
-      ctx.font = 'bold 26px "PingFang SC", sans-serif'
-      ctx.fillText('M 麦当劳', rx0 + rw * 0.5, sy0 + sh * 0.82, rw - 24)
-    }),
-  )
+    // [0.78..1.0, 0.52..0.98]: 东翼「王城超市 / M 麦当劳」高对比不饱和蓝底白字大招牌
+    const rx0 = cx0 + cw
+    const rw = w - rx0
+    ctx.fillStyle = isEmissive ? '#080d14' : '#1e242d'
+    ctx.fillRect(rx0, 0, rw, Math.round(h * 0.52))
+    const sy0 = Math.round(h * 0.52)
+    const sh = Math.round(h * 0.46)
+    ctx.fillStyle = isEmissive ? '#0e2868' : '#14388c'
+    ctx.fillRect(rx0, sy0, rw, sh)
+    ctx.strokeStyle = isEmissive ? '#cbd5e1' : '#ffffff'
+    ctx.lineWidth = 6
+    ctx.strokeRect(rx0 + 10, sy0 + 10, rw - 20, sh - 20)
+    ctx.fillStyle = '#ffffff'
+    ctx.font = 'bold 54px "PingFang SC", sans-serif'
+    ctx.fillText('王城', rx0 + rw * 0.5, sy0 + sh * 0.28, rw - 30)
+    ctx.fillText('超市', rx0 + rw * 0.5, sy0 + sh * 0.54, rw - 30)
+    ctx.fillStyle = '#facc15'
+    ctx.font = 'bold 34px "PingFang SC", sans-serif'
+    ctx.fillText('麦当劳 M', rx0 + rw * 0.5, sy0 + sh * 0.8, rw - 28)
+  }
+
+  const mallTex = ownTex(makeCanvas(1024, 1024, (ctx, w, h) => drawMallCanvas(ctx, w, h, false)))
+  const mallEmissiveTex = ownTex(makeCanvas(1024, 1024, (ctx, w, h) => drawMallCanvas(ctx, w, h, true)))
 
   // 红白相间雨棚（仅 poi_zhengyang208 使用）
   const awningTex = ownTex(
@@ -818,30 +868,63 @@ export function createDrinksShopMaterials(skinOverride?: Partial<DrinkSkinConfig
     curbTex.repeat.set(6.5, 1)
   }
 
-  const roofMat = std({ color: '#e6e1d8', roughness: 0.86, emissive: '#645e56' }, 0.02, 0.14)
-  const wallCreamMat = std({ ...(wallTileTex ? { map: wallTileTex } : {}), color: 0xffffff, roughness: 0.42, emissive: '#fff6ea' }, 0.05, 0.32)
-  const wainscotWoodMat = std({ color: '#d8bc93', roughness: 0.65, emissive: '#e6c99b' }, 0.03, 0.25)
-  const floorTileMat = std({ ...(floorTex ? { map: floorTex } : {}), color: 0xffffff, roughness: 0.66, emissive: '#fff4df' }, 0.04, 0.28)
-  const sidewalkMat = std({ ...(sidewalkTex ? { map: sidewalkTex } : {}), color: 0xffffff, roughness: 0.9, emissive: '#585752' }, 0, 0.1)
-  const curbStripeMat = std({ ...(curbTex ? { map: curbTex } : {}), color: 0xffffff, roughness: 0.85, emissive: '#5a5020' }, 0, 0.1)
-  const podiumRedMat = std({ color: MIXUE_RED, roughness: 0.46, emissive: MIXUE_RED }, 0.12, 0.48)
-  const podiumTrimCreamMat = std({ color: MIXUE_CREAM, roughness: 0.45, emissive: '#fff5e6' }, 0.08, 0.36)
-  const curtainMullionMat = std({ color: '#1e232a', roughness: 0.42, metalness: 0.38, emissive: '#1e2228' }, 0, 0.1)
-  const curtainGlassMat = std({ color: '#dff1f7', roughness: 0.1, metalness: 0.08, transparent: true, opacity: 0.18, emissive: '#ffefd4' }, 0.02, 0.12)
-  const counterTopMat = std({ color: '#f3f5f7', roughness: 0.32, emissive: '#fffbf2' }, 0.05, 0.32)
-  const stainlessMat = std({ color: '#c1c9d0', roughness: 0.28, metalness: 0.62, emissive: '#98a1a8' }, 0.02, 0.22)
-  const darkEquipmentMat = std({ color: '#242a33', roughness: 0.52, metalness: 0.2, emissive: '#343c47' }, 0.02, 0.18)
-  const goldAccentMat = std({ color: MIXUE_GOLD, roughness: 0.34, metalness: 0.32, emissive: MIXUE_GOLD }, 0.08, 0.44)
-  const chairPatioMat = std({ color: MIXUE_ORANGE, roughness: 0.62, emissive: MIXUE_ORANGE }, 0.04, 0.24)
+  const roofMat = std({ color: '#f2ede4', roughness: 0.9, emissive: '#fff4e2' }, 0.24, 0.34)
+  const wallCreamMat = std({ ...(wallTileTex ? { map: wallTileTex } : {}), color: 0xffffff, roughness: 0.42, emissive: '#fff4e4' }, 0.08, 0.44)
+  const wainscotWoodMat = std({ color: '#d8bc93', roughness: 0.65, emissive: '#e6c99b' }, 0.03, 0.28)
+  const floorTileMat = std({ ...(floorTex ? { map: floorTex } : {}), color: 0xffffff, roughness: 0.64, emissive: '#fff2db' }, 0.06, 0.4)
+  const sidewalkMat = std({ ...(sidewalkTex ? { map: sidewalkTex } : {}), color: 0xffffff, roughness: 0.9, emissive: '#282b30' }, 0.0, 0.05)
+  const curbStripeMat = std({ ...(curbTex ? { map: curbTex } : {}), color: 0xffffff, roughness: 0.85, emissive: '#3a3314' }, 0.0, 0.06)
+  // 夜间红色铝塑板饱和深正红受光泛红（emissive=#900611，夜间不过曝粉白）
+  const podiumRedMat = std({ color: '#d40d1d', roughness: 0.42, emissive: '#900611' }, 0.06, 0.58)
+  const podiumTrimCreamMat = std({ color: MIXUE_CREAM, roughness: 0.44, emissive: '#fff3e2' }, 0.08, 0.42)
+  const curtainMullionMat = std({ color: '#1b2027', roughness: 0.42, metalness: 0.38, emissive: '#10141a' }, 0, 0.04)
+  const curtainGlassMat = std({ color: '#dff1f7', roughness: 0.08, metalness: 0.08, transparent: true, opacity: 0.16, emissive: '#ffdfba' }, 0.03, 0.22)
+  const counterTopMat = std({ color: '#f3f5f7', roughness: 0.32, emissive: '#fff8ec' }, 0.06, 0.38)
+  const stainlessMat = std({ color: '#c1c9d0', roughness: 0.28, metalness: 0.62, emissive: '#8f98a0' }, 0.03, 0.24)
+  const darkEquipmentMat = std({ color: '#242a33', roughness: 0.52, metalness: 0.2, emissive: '#2b323c' }, 0.02, 0.14)
+  const goldAccentMat = std({ color: MIXUE_GOLD, roughness: 0.34, metalness: 0.32, emissive: MIXUE_GOLD }, 0.08, 0.46)
+  const chairPatioMat = std({ color: MIXUE_ORANGE, roughness: 0.62, emissive: MIXUE_ORANGE }, 0.04, 0.22)
   const crateMat = std({ color: '#c4834b', roughness: 0.82, emissive: '#8e5e32' }, 0.02, 0.16)
   const awningStripeMat = std({ ...(awningTex ? { map: awningTex } : {}), color: 0xffffff, roughness: 0.72, emissive: '#fff0dc' }, 0.04, 0.28)
-  const ceilingLampMat = std({ color: '#fffdf7', roughness: 0.2, emissive: '#fff3d6' }, 0.72, 1.0)
-  const iceCrownMat = std({ color: '#ffffff', roughness: 0.26, metalness: 0.05, emissive: '#fff7ea' }, 0.1, 0.42)
+  const ceilingLampMat = std({ color: '#fffef9', roughness: 0.16, emissive: '#fff1cc' }, 0.86, 1.55)
+  // 压低夜间白模自发光，靠真实顶灯/漫反射呈现清晰头部、腕间与肚皮立体光影（告别夜间平白）
+  const iceCrownMat = std({ color: '#ffffff', roughness: 0.38, metalness: 0.04, emissive: '#fff4e6' }, 0.03, 0.1)
 
-  // 适度自发光：室外招牌夜亮日不刺眼过曝（base=0.22），室内菜单灯箱常亮清晰（base=0.42）
-  const exteriorSignAtlasMat = std({ ...(exteriorAtlasTex ? { map: exteriorAtlasTex } : {}), color: 0xffffff, roughness: 0.38, emissive: 0xffffff }, 0.22, 0.88)
-  const interiorSignAtlasMat = std({ ...(interiorAtlasTex ? { map: interiorAtlasTex } : {}), color: 0xffffff, roughness: 0.34, emissive: 0xffffff }, 0.42, 0.88)
-  const mallFacadeMat = std({ ...(mallTex ? { map: mallTex } : {}), color: 0xffffff, roughness: 0.28, metalness: 0.32, emissive: 0xffffff }, 0.1, 0.38)
+  // 分级自发光：室外白字雪花灯箱夜间强自发光（海报浅底压控防过曝）、室内菜单屏兼顾清晰字迹对比
+  const exteriorSignAtlasMat = std(
+    {
+      ...(exteriorAtlasTex ? { map: exteriorAtlasTex } : {}),
+      ...(exteriorEmissiveTex ? { emissiveMap: exteriorEmissiveTex } : {}),
+      color: 0xffffff,
+      roughness: 0.36,
+      emissive: 0xffffff,
+    },
+    0.16,
+    0.96,
+  )
+  const interiorSignAtlasMat = std(
+    {
+      ...(interiorAtlasTex ? { map: interiorAtlasTex } : {}),
+      ...(interiorEmissiveTex ? { emissiveMap: interiorEmissiveTex } : {}),
+      color: 0xffffff,
+      roughness: 0.32,
+      emissive: 0xffffff,
+    },
+    0.34,
+    0.58,
+  )
+  const mallFacadeMat = std(
+    {
+      ...(mallTex ? { map: mallTex } : {}),
+      ...(mallEmissiveTex ? { emissiveMap: mallEmissiveTex } : {}),
+      color: 0xffffff,
+      roughness: 0.26,
+      metalness: 0.34,
+      emissive: 0xffffff,
+    },
+    0.08,
+    0.96,
+  )
 
   return {
     skin,

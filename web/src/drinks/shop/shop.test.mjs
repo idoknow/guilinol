@@ -103,7 +103,13 @@ test('双候选建筑合批后 draw calls ≤ 30、零灯光、门洞 ≥ 2.4m �
       assert.equal(insideCollider(x, DRINKS_STAFF_OPERATION_ZONE.backAisleZ), undefined, `${candidate} back aisle x=${x} blocked`)
     }
 
+    built.setNight(0)
+    const dayExtEmissive = built.materials.exteriorSignAtlasMat.emissiveIntensity
+    const dayIntEmissive = built.materials.interiorSignAtlasMat.emissiveIntensity
     built.setNight(1)
+    assert.ok(built.materials.exteriorSignAtlasMat.emissiveIntensity > dayExtEmissive + 0.6, `${candidate} night exterior signage emissive boost too weak`)
+    assert.ok(built.materials.interiorSignAtlasMat.emissiveIntensity > dayIntEmissive + 0.5, `${candidate} night menu lightbox emissive boost too weak`)
+    assert.ok(built.materials.podiumRedMat.emissiveIntensity > 0.4, `${candidate} night red facade should keep warm red glow`)
     built.setCutaway(true)
     built.setCutaway(false)
     built.dispose()

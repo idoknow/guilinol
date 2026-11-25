@@ -242,9 +242,9 @@ function addSnowKingSculpture(
       batch.add(new THREE.SphereGeometry(0.11, 8, 6), mats.iceCrownMat, px, py, pz, rotY, 0, 0, scale, 0.75 * scale, 1.25 * scale)
     }
   } else {
-    // 浮雕底部红白承托半圆形小台沿（防止视觉像裸球浮贴在墙上）
-    const [px, py, pz] = pt(0, 0.04, 0.05)
-    batch.addCyl(0.48 * scale, 0.52 * scale, 0.12 * scale, px, py, pz, mats.podiumRedMat, 12)
+    // 王城 2–5F 外立面半身坐姿雪王：红披风贴墙向下展开，胖圆肚皮无缝坐于雨棚顶缘（无悬空圆盘！）
+    const [sbx, sby, sbz] = pt(0, 0.16, 0.06)
+    batch.addCyl(0.46 * scale, 0.5 * scale, 0.22 * scale, sbx, sby, sbz, mats.podiumRedMat, 12)
   }
 
   // 圆润雪白躯干 + 红色披风后摆（ref-14/04）
@@ -277,8 +277,19 @@ function addSnowKingSculpture(
       scale,
       scale,
     )
-    const [clX, clY, clZ] = pt(0, mode === 'standing' ? 1.07 : 0.96, 0.03)
-    batch.addCyl(0.3 * scale, 0.39 * scale, 0.12 * scale, clX, clY, clZ, mats.podiumRedMat, 14)
+    if (mode === 'relief') {
+      // 王城半身雪王实拍两侧舒展宽阔的大红披风双翼（外包深暗背托影边 + 浅金饰边，在同色红墙上清晰立体跃出！）
+      for (const side of [-1, 1] as const) {
+        const [bx, by, bz] = pt(side * 0.48, 0.56, -0.02)
+        batch.addBox(0.42 * scale, 0.82 * scale, 0.05 * scale, bx, by, bz, mats.curtainMullionMat, rotY + side * 0.14, 0, -side * 0.26)
+        const [wx, wy, wz] = pt(side * 0.47, 0.56, 0.03)
+        batch.addBox(0.4 * scale, 0.78 * scale, 0.11 * scale, wx, wy, wz, mats.podiumRedMat, rotY + side * 0.14, 0, -side * 0.26)
+        const [gx, gy, gz] = pt(side * 0.36, 0.56, 0.09)
+        batch.addBox(0.055 * scale, 0.72 * scale, 0.04 * scale, gx, gy, gz, mats.goldAccentMat, rotY + side * 0.14, 0, -side * 0.26)
+      }
+    }
+    const [clX, clY, clZ] = pt(0, mode === 'standing' ? 1.07 : 0.96, 0.05)
+    batch.addCyl(0.32 * scale, 0.42 * scale, 0.13 * scale, clX, clY, clZ, mats.podiumRedMat, 14)
   }
 
   // 圆头 + 灵动黑眼 + 橙鼻 + 细深色弯月微笑线（绝非香肠红唇）+ 三齿白冠
@@ -351,24 +362,26 @@ function addSnowKingSculpture(
     }
   }
 
-  // 双臂 + 华夫软冰淇淋权杖
+  // 双臂：站立雪王保留华夫冰淇淋权杖；王城外立面半身雪王严格还原双手张开无甜筒（ref-22/25）
   {
     const armY = mode === 'standing' ? 0.84 : 0.72
     const [lax, lay, laz] = pt(-0.44, armY + 0.06, 0.08)
-    batch.add(new THREE.SphereGeometry(0.11, 8, 6), mats.iceCrownMat, lax, lay, laz, rotY, 0, 0, scale * 1.15, scale * 0.85, scale * 0.85)
-    const [rax, ray, raz] = pt(0.43, armY, 0.14)
-    batch.add(new THREE.SphereGeometry(0.11, 8, 6), mats.iceCrownMat, rax, ray, raz, rotY, 0, 0, scale * 1.1, scale * 0.9, scale * 0.9)
+    batch.add(new THREE.SphereGeometry(0.11, 8, 6), mats.iceCrownMat, lax, lay, laz, rotY, 0, 0, scale * 1.18, scale * 0.88, scale * 0.88)
+    const [rax, ray, raz] = pt(0.44, armY + 0.04, 0.12)
+    batch.add(new THREE.SphereGeometry(0.11, 8, 6), mats.iceCrownMat, rax, ray, raz, rotY, 0, 0, scale * 1.18, scale * 0.9, scale * 0.9)
 
-    const sx = 0.48
-    const sz = mode === 'relief' ? 0.22 : 0.18
-    const [stx, sty, stz] = pt(sx, armY + 0.06, sz)
-    batch.addCyl(0.024 * scale, 0.024 * scale, 0.94 * scale, stx, sty, stz, mats.podiumTrimCreamMat, 8)
-    const [cnx, cny, cnz] = pt(sx, armY + 0.58, sz)
-    batch.addCyl(0.105 * scale, 0.012 * scale, 0.24 * scale, cnx, cny, cnz, mats.chairPatioMat, 8)
-    const [s1x, s1y, s1z] = pt(sx, armY + 0.73, sz)
-    batch.add(new THREE.SphereGeometry(0.11, 10, 8), mats.iceCrownMat, s1x, s1y, s1z, 0, 0, 0, scale, scale * 0.8, scale)
-    const [s2x, s2y, s2z] = pt(sx, armY + 0.84, sz)
-    batch.add(new THREE.SphereGeometry(0.075, 8, 6), mats.iceCrownMat, s2x, s2y, s2z, 0, 0, 0, scale, scale * 0.9, scale)
+    if (mode === 'standing') {
+      const sx = 0.48
+      const sz = 0.18
+      const [stx, sty, stz] = pt(sx, armY + 0.06, sz)
+      batch.addCyl(0.024 * scale, 0.024 * scale, 0.94 * scale, stx, sty, stz, mats.podiumTrimCreamMat, 8)
+      const [cnx, cny, cnz] = pt(sx, armY + 0.58, sz)
+      batch.addCyl(0.105 * scale, 0.012 * scale, 0.24 * scale, cnx, cny, cnz, mats.chairPatioMat, 8)
+      const [s1x, s1y, s1z] = pt(sx, armY + 0.73, sz)
+      batch.add(new THREE.SphereGeometry(0.11, 10, 8), mats.iceCrownMat, s1x, s1y, s1z, 0, 0, 0, scale, scale * 0.8, scale)
+      const [s2x, s2y, s2z] = pt(sx, armY + 0.84, sz)
+      batch.add(new THREE.SphereGeometry(0.075, 8, 6), mats.iceCrownMat, s2x, s2y, s2z, 0, 0, 0, scale, scale * 0.9, scale)
+    }
   }
 }
 
@@ -402,12 +415,12 @@ export function buildDrinksShopMesh(options: DrinksShopBuildOptions = {}): Drink
   const zFront = DRINKS_SHOP_INTERIOR.maxZ // +2.80 m
   const zDepthIn = DRINKS_SHOP_INTERIOR.depthM // 9.20 m
   const zCenterIn = (zBack + zFront) * 0.5 // -1.80 m
-  const H1 = DRINKS_SHOP_INTERIOR.heightM // 3.60 m
+  const H1 = candidate === 'wangcheng_mall' ? bp.floor1_height.valueM : DRINKS_SHOP_INTERIOR.heightM
   const wallT = 0.22
 
   const doorHalfW = DRINKS_SHOP_DOORWAY.widthM * 0.5 // 1.40 m
   const doorCx = DRINKS_SHOP_DOORWAY.centerX // 0.20 m
-  const doorH = DRINKS_SHOP_DOORWAY.heightM // 2.75 m
+  const doorH = candidate === 'wangcheng_mall' ? 2.9 : DRINKS_SHOP_DOORWAY.heightM // 2.90m / 2.75m
   const doorMinX = doorCx - doorHalfW // -1.20 m
   const doorMaxX = doorCx + doorHalfW // +1.60 m
 
@@ -431,29 +444,30 @@ export function buildDrinksShopMesh(options: DrinksShopBuildOptions = {}): Drink
 
   const pillarW = candidate === 'wangcheng_mall' ? bp.corner_pillar_width.valueM : 0.56
   const glassRightMax = halfW - (candidate === 'wangcheng_mall' ? pillarW : 0.42)
+  const frontGlassTop = candidate === 'wangcheng_mall' ? 3.55 : H1
   const leftGlassW = doorMinX - -halfW
   const leftGlassCx = (-halfW + doorMinX) * 0.5
-  baseBatch.addBox(leftGlassW, H1 - 0.1, 0.06, leftGlassCx, H1 * 0.5, zFront, mats.curtainGlassMat)
+  baseBatch.addBox(leftGlassW, frontGlassTop - 0.1, 0.06, leftGlassCx, frontGlassTop * 0.5, zFront, mats.curtainGlassMat)
   baseBatch.addBox(leftGlassW, 0.14, 0.14, leftGlassCx, 0.07, zFront, mats.curtainMullionMat)
-  baseBatch.addBox(leftGlassW, 0.14, 0.14, leftGlassCx, H1 - 0.07, zFront, mats.curtainMullionMat)
+  baseBatch.addBox(leftGlassW, 0.14, 0.14, leftGlassCx, frontGlassTop - 0.07, zFront, mats.curtainMullionMat)
   addCol(-halfW, doorMinX, zFront - 0.1, zFront + 0.1, 'facade:glass-west')
 
   const rightGlassW = glassRightMax - doorMaxX
   const rightGlassCx = (doorMaxX + glassRightMax) * 0.5
-  baseBatch.addBox(rightGlassW, H1 - 0.1, 0.06, rightGlassCx, H1 * 0.5, zFront, mats.curtainGlassMat)
+  baseBatch.addBox(rightGlassW, frontGlassTop - 0.1, 0.06, rightGlassCx, frontGlassTop * 0.5, zFront, mats.curtainGlassMat)
   baseBatch.addBox(rightGlassW, 0.14, 0.14, rightGlassCx, 0.07, zFront, mats.curtainMullionMat)
-  baseBatch.addBox(rightGlassW, 0.14, 0.14, rightGlassCx, H1 - 0.07, zFront, mats.curtainMullionMat)
+  baseBatch.addBox(rightGlassW, 0.14, 0.14, rightGlassCx, frontGlassTop - 0.07, zFront, mats.curtainMullionMat)
   addCol(doorMaxX, glassRightMax, zFront - 0.1, zFront + 0.1, 'facade:glass-east')
 
   const bayW = bp.curtain_bay_width.valueM
   for (let x = -halfW + bayW; x < doorMinX - 0.25; x += bayW) {
-    baseBatch.addBox(0.06, H1, 0.12, x, H1 * 0.5, zFront, mats.curtainMullionMat)
+    baseBatch.addBox(0.06, frontGlassTop, 0.12, x, frontGlassTop * 0.5, zFront, mats.curtainMullionMat)
   }
   for (let x = doorMaxX + bayW; x < glassRightMax - 0.25; x += bayW) {
-    baseBatch.addBox(0.06, H1, 0.12, x, H1 * 0.5, zFront, mats.curtainMullionMat)
+    baseBatch.addBox(0.06, frontGlassTop, 0.12, x, frontGlassTop * 0.5, zFront, mats.curtainMullionMat)
   }
 
-  // 2.80m 宽全透玻璃对开正门（95° 外开，竖向 LED 门框灯带 + 干净透明门扇，无突出红板！）
+  // 2.80m 宽全透玻璃对开正门（95° 外开，竖向 LED 门框灯带 + 干净透明门扇）
   for (const [hx, sign] of [
     [doorMinX - 0.04, -1],
     [doorMaxX + 0.04, 1],
@@ -468,44 +482,54 @@ export function buildDrinksShopMesh(options: DrinksShopBuildOptions = {}): Drink
     baseBatch.addBox(0.04, 0.54, 0.03, leafX - sign * 0.05, 1.15, zFront + 1.02, mats.stainlessMat)
   }
   // 门洞上方透明玻璃亮窗
-  baseBatch.addBox(doorHalfW * 2, H1 - doorH - 0.1, 0.06, doorCx, (doorH + H1) * 0.5, zFront, mats.curtainGlassMat)
+  baseBatch.addBox(doorHalfW * 2, frontGlassTop - doorH - 0.1, 0.06, doorCx, (doorH + frontGlassTop) * 0.5, zFront, mats.curtainGlassMat)
   baseBatch.addBox(doorHalfW * 2, 0.1, 0.14, doorCx, doorH + 0.04, zFront, mats.curtainMullionMat)
 
-  // 1F 天花顶板（cutaway）+ 4 条亮白嵌顶 LED 灯带
+  // 1F 天花顶板（cutaway）+ 4 条亮白嵌顶 LED 灯带（前后两区均布，避让吧台跌级吊顶区零共面重叠）
   upperBatch.addBox(W, 0.18, zDepthIn, 0, H1 + 0.09, zCenterIn, mats.roofMat)
-  for (const lz of [-5.1, -2.9, -0.5, 1.7]) {
+  for (const lz of [-5.1, -2.9, 0.9, 2.05]) {
     baseBatch.addBox(9.8, 0.04, 0.16, 0, H1 - 0.02, lz, mats.ceilingLampMat)
   }
 
   // ─── 3. 候选点位外立面建造 ───
   if (candidate === 'wangcheng_mall') {
     const HRedTop = 14.5 // 1–5F 红色蜜雪盒顶缘（留出 6F–8F 三层高幕墙比例！）
-    const upperWallH = 9.9 // 6F–8F 三层（3 × 3.30m）-> 总高 24.40 m
-    const totalMallH = HRedTop + upperWallH // 24.40 m
+    const upperWallH = 10.2 // 6F–8F 三层（3 × 3.40m）-> 总高 24.70 m
+    const totalMallH = HRedTop + upperWallH // 24.70 m
 
-    // 1F 入口上方红条发光副招置于雨棚之上（y ∈ [3.08, 3.60]，雨棚置于 y=2.90 绝不相撞）
-    baseBatch.addBox(doorHalfW * 2 + 1.1, 0.56, 0.16, doorCx, 3.32, zFront + 0.06, mats.podiumRedMat)
-    baseBatch.addAtlasPlane(doorHalfW * 2 + 0.9, 0.48, EXTERIOR_ATLAS_RECTS.entranceHeader, doorCx, 3.32, zFront + 0.15, mats.exteriorSignAtlasMat)
-    upperBatch.addBox(doorHalfW * 2 + 1.2, 0.06, 0.92, doorCx, 2.9, zFront + 0.46, mats.curtainMullionMat)
+    // 1F 全幅深挑正红发光雨棚（y ∈ [3.55, 4.23]，挑深 1.32m；前立面「蜜雪冰城 桂林王城旗舰店」，底面嵌 8 盏暖白筒灯）
+    const canopyW = W - 0.2
+    const canopyCx = 0.0
+    const canopyD = bp.awning_projection.valueM // 1.32 m
+    const canopyH = 0.68
+    const canopyY = frontGlassTop + canopyH * 0.5 // 3.89 m
+    baseBatch.addBox(canopyW, canopyH, canopyD, canopyCx, canopyY, zFront + canopyD * 0.5 - 0.04, mats.podiumRedMat)
+    baseBatch.addBox(canopyW + 0.08, 0.08, canopyD + 0.08, canopyCx, frontGlassTop + canopyH + 0.02, zFront + canopyD * 0.5 - 0.04, mats.podiumTrimCreamMat)
+    baseBatch.addAtlasPlane(4.9, 1.05, EXTERIOR_ATLAS_RECTS.entranceHeader, doorCx, canopyY, zFront + canopyD - 0.03, mats.exteriorSignAtlasMat)
+    // 雨棚底面 8 盏暖白嵌入式大筒灯 + 门楣内侧洗墙光带（仰视清晰发亮照亮 1F 幕墙与街道，0 新增 draw call）
+    for (let i = 0; i < 8; i++) {
+      const lx = -halfW + 1.05 + i * 1.58
+      const lz = zFront + canopyD * 0.56
+      baseBatch.addCyl(0.24, 0.24, 0.025, lx, frontGlassTop - 0.015, lz, mats.curtainMullionMat, 12)
+      baseBatch.addCyl(0.19, 0.19, 0.045, lx, frontGlassTop - 0.032, lz, mats.ceilingLampMat, 12)
+    }
+    baseBatch.addBox(canopyW - 0.6, 0.045, 0.16, canopyCx, frontGlassTop - 0.03, zFront + canopyD - 0.18, mats.ceilingLampMat)
 
-    // 右侧外凸两跨竖排「蜜雪冰城」红柱（y=0..14.5m，正侧面+下段正方白雪王牌）
+    // 右侧外凸两跨竖排「蜜雪冰城」红柱（1F 保持透明玻璃转角延续，2–5F 红柱含正侧面发光竖字，y ∈ [3.55..14.50]）
     const cornerCx = glassRightMax + pillarW * 0.5 // +5.675 m
-    baseBatch.addBox(pillarW, 0.24, 0.52, cornerCx, 0.12, zFront + 0.1, mats.podiumRedMat)
-    baseBatch.addBox(pillarW, H1 - 0.24, 0.06, cornerCx, 0.24 + (H1 - 0.24) * 0.5, zFront, mats.curtainGlassMat)
-    upperBatch.addBox(pillarW, HRedTop - 0.24, 0.62, cornerCx, 0.24 + (HRedTop - 0.24) * 0.5, zFront + 0.22, mats.podiumRedMat)
-    upperBatch.addBox(pillarW + 0.08, 0.18, 0.68, cornerCx, H1 - 0.08, zFront + 0.22, mats.podiumTrimCreamMat)
-    upperBatch.addBox(pillarW + 0.08, 0.2, 0.68, cornerCx, HRedTop + 0.08, zFront + 0.22, mats.podiumTrimCreamMat)
-    upperBatch.addAtlasPlane(1.66, 5.2, EXTERIOR_ATLAS_RECTS.verticalPillar, cornerCx, 10.6, zFront + 0.54, mats.exteriorSignAtlasMat)
-    upperBatch.addAtlasPlane(1.42, 1.42, EXTERIOR_ATLAS_RECTS.squareBadge, cornerCx, 5.2, zFront + 0.545, mats.exteriorSignAtlasMat)
-    upperBatch.addAtlasPlane(1.4, 4.4, EXTERIOR_ATLAS_RECTS.verticalPillar, halfW + 0.2, 10.6, zFront - 0.08, mats.exteriorSignAtlasMat, Math.PI * 0.5)
-    upperBatch.addAtlasPlane(1.15, 1.15, EXTERIOR_ATLAS_RECTS.squareBadge, halfW + 0.205, 5.2, zFront - 0.08, mats.exteriorSignAtlasMat, Math.PI * 0.5)
+    baseBatch.addBox(pillarW, 0.18, 0.42, cornerCx, 0.09, zFront + 0.05, mats.curtainMullionMat)
+    baseBatch.addBox(pillarW, frontGlassTop - 0.18, 0.06, cornerCx, 0.18 + (frontGlassTop - 0.18) * 0.5, zFront, mats.curtainGlassMat)
+    upperBatch.addBox(pillarW, HRedTop - H1 + 0.35, 0.66, cornerCx, H1 - 0.35 + (HRedTop - H1 + 0.35) * 0.5, zFront + 0.24, mats.podiumRedMat)
+    upperBatch.addBox(pillarW + 0.08, 0.16, 0.72, cornerCx, HRedTop + 0.08, zFront + 0.24, mats.podiumTrimCreamMat)
+    upperBatch.addAtlasPlane(1.66, 5.2, EXTERIOR_ATLAS_RECTS.verticalPillar, cornerCx, 9.6, zFront + 0.585, mats.exteriorSignAtlasMat)
+    upperBatch.addAtlasPlane(1.4, 4.4, EXTERIOR_ATLAS_RECTS.verticalPillar, halfW + 0.2, 9.6, zFront - 0.06, mats.exteriorSignAtlasMat, Math.PI * 0.5)
     addCol(glassRightMax, halfW, zFront - 0.15, zFront + 0.36, 'facade:corner-pillar')
 
-    // 2–5F 主红看板体量（x ∈ [-6.60, +4.75]）
+    // 2–5F 主红看板体量（x ∈ [-6.60, +4.75], y ∈ [4.25, 14.50]）
     const fasciaW = W - pillarW // 11.35 m
     const fasciaCx = (-halfW + glassRightMax) * 0.5 // -0.925 m
-    const redBoxH = HRedTop - H1 // 10.90 m
-    const redMidY = H1 + redBoxH * 0.5 // 9.05 m
+    const redBoxH = HRedTop - H1 // 10.25 m
+    const redMidY = H1 + redBoxH * 0.5 // 9.375 m
 
     upperBatch.addBox(W, redBoxH, wallT, 0, redMidY, zBack, mats.curtainMullionMat)
     upperBatch.addBox(wallT, redBoxH, zDepthIn, -halfW, redMidY, zCenterIn, mats.curtainMullionMat)
@@ -514,21 +538,40 @@ export function buildDrinksShopMesh(options: DrinksShopBuildOptions = {}): Drink
     upperBatch.addBox(fasciaW + 0.1, 0.22, 0.44, fasciaCx, HRedTop + 0.08, zFront + 0.12, mats.podiumTrimCreamMat)
     upperBatch.addBox(fasciaW + 0.1, 0.18, 0.44, fasciaCx, H1 + 0.06, zFront + 0.12, mats.podiumTrimCreamMat)
 
-    upperBatch.addAtlasPlane(5.8, 1.32, EXTERIOR_ATLAS_RECTS.mainFascia, -3.45, 5.15, zFront + 0.285, mats.exteriorSignAtlasMat)
+    // 实拍白色建筑铝板分缝线条（ref-22 / ref-25）+ 左中大号高亮「蜜雪冰城 + 雪王圆徽标」+ 雪花贴花
+    for (const sy of [6.8, 9.35, 11.9]) {
+      upperBatch.addBox(fasciaW - 0.2, 0.03, 0.02, fasciaCx, sy, zFront + 0.28, mats.podiumTrimCreamMat)
+    }
+    for (const sx of [-4.4, -2.05, 0.3, 2.6]) {
+      upperBatch.addBox(0.03, redBoxH - 0.4, 0.02, sx, redMidY, zFront + 0.28, mats.podiumTrimCreamMat)
+    }
+    upperBatch.addAtlasPlane(6.1, 1.38, EXTERIOR_ATLAS_RECTS.mainFascia, -3.25, 9.45, zFront + 0.3, mats.exteriorSignAtlasMat)
+    // 墙面白色六瓣小雪花浮雕点缀（0 新增 draw call）
+    for (const [fx, fy, fr] of [
+      [-5.6, 12.9, 0.42],
+      [-1.0, 13.1, 0.36],
+      [-5.3, 5.6, 0.34],
+      [4.05, 12.6, 0.38],
+    ] as const) {
+      for (const ang of [0, Math.PI / 3, (Math.PI * 2) / 3]) {
+        upperBatch.addBox(fr * 2, 0.055, 0.03, fx, fy, zFront + 0.295, mats.iceCrownMat, 0, 0, ang)
+      }
+    }
     for (let i = 0; i < 5; i++) {
       const lx = -5.4 + i * 2.45
       upperBatch.addBox(0.06, 0.08, 0.55, lx, HRedTop + 0.16, zFront + 0.44, mats.curtainMullionMat)
       upperBatch.addBox(0.18, 0.1, 0.16, lx, HRedTop + 0.1, zFront + 0.7, mats.curtainMullionMat)
     }
 
-    addSnowKingSculpture(upperBatch, mats, 2.15, 4.9, zFront + 0.48, 3.85, -0.06, 'relief')
+    // 巨型 3D 半身雪王（无甜筒、胖圆肚皮直接坐于雨棚上方红墙下缘 y=4.22m）
+    addSnowKingSculpture(upperBatch, mats, 2.05, 4.22, zFront + 0.44, 4.35, -0.06, 'relief')
 
-    const hostMidY = HRedTop + upperWallH * 0.5 // 19.45 m
+    const hostMidY = HRedTop + upperWallH * 0.5 // 19.60 m
     upperBatch.addAtlasBox(W + 3.6, upperWallH, zDepthIn + 0.2, MALL_ATLAS_RECTS.curtainPlain, -1.6, hostMidY, zCenterIn, mats.mallFacadeMat)
     upperBatch.addBox(W + 3.7, 0.36, zDepthIn + 0.36, -1.6, totalMallH + 0.18, zCenterIn, mats.curtainMullionMat)
     upperBatch.addAtlasBox(3.6, HRedTop, zDepthIn, MALL_ATLAS_RECTS.curtainPlain, -halfW - 1.8, HRedTop * 0.5, zCenterIn, mats.mallFacadeMat)
 
-    // 东侧 8 格平滑弧形转角玻璃幕墙：竖梃内收、外挂式弧角招牌面片置于弧线外缘彻底消除竖梃切字！
+    // 东侧 8 格平滑弧形转角玻璃幕墙
     const curveR = 5.0
     const curveCx = halfW
     const curveCz = zFront - curveR // -2.20 m
@@ -553,7 +596,7 @@ export function buildDrinksShopMesh(options: DrinksShopBuildOptions = {}): Drink
       upperBatch.addBox(0.06, totalMallH, 0.16, ax + Math.cos(tm) * chordW * 0.5, totalMallH * 0.5, az - Math.sin(tm) * chordW * 0.5, mats.curtainMullionMat, tm)
       upperBatch.addBox(chordW, 0.34, 0.3, ax, totalMallH + 0.17, az, mats.curtainMullionMat, tm)
       if (seg >= 1 && seg <= 6) {
-        upperBatch.addBox(chordW, 0.1, 0.66, ax + Math.sin(tm) * 0.32, 3.05, az + Math.cos(tm) * 0.32, mats.curtainMullionMat, tm)
+        upperBatch.addBox(chordW, 0.1, 0.66, ax + Math.sin(tm) * 0.32, 3.55, az + Math.cos(tm) * 0.32, mats.curtainMullionMat, tm)
       }
     }
     const signCenterA = curveSpan * 0.5
@@ -561,15 +604,35 @@ export function buildDrinksShopMesh(options: DrinksShopBuildOptions = {}): Drink
     const szA = curveCz + Math.cos(signCenterA) * (curveR + 0.22)
     upperBatch.addAtlasPlane(3.8, totalMallH - 0.6, MALL_ATLAS_RECTS.curvedCornerFloors, sxA, 0.45 + (totalMallH - 0.45) * 0.5, szA, mats.mallFacadeMat, signCenterA)
 
-    // 东侧突翼（「王城超市 / M 麦当劳」正平贴于突翼正前立面 z=curveCz+1.44，绝不旋转穿入实体盒内！）
+    // 2F 弧角真实 3D 凹陷式雪王展示橱窗（外框黑铝楣 + 暖白底座 + 2 尊 3D 迷你雪王实体 + 外覆真透光幕墙玻璃！）
+    const sinC = Math.sin(signCenterA)
+    const cosC = Math.cos(signCenterA)
+    const txDir = cosC
+    const tzDir = -sinC
+    const winCx = curveCx + sinC * (curveR + 0.34)
+    const winCz = curveCz + cosC * (curveR + 0.34)
+    upperBatch.addBox(3.55, 0.14, 0.38, winCx, 4.35, winCz, mats.curtainMullionMat, signCenterA)
+    upperBatch.addBox(3.55, 0.14, 0.38, winCx, 6.75, winCz, mats.curtainMullionMat, signCenterA)
+    upperBatch.addBox(3.15, 0.16, 0.26, winCx, 4.5, winCz, mats.podiumTrimCreamMat, signCenterA)
+    for (const offX of [-0.62, 0.62]) {
+      const mx = winCx + txDir * offX
+      const mz = winCz + tzDir * offX
+      upperBatch.add(new THREE.SphereGeometry(0.32, 10, 8), mats.iceCrownMat, mx, 4.92, mz)
+      upperBatch.add(new THREE.SphereGeometry(0.24, 10, 8), mats.iceCrownMat, mx, 5.4, mz)
+      upperBatch.addCyl(0.16, 0.22, 0.14, mx, 5.14, mz, mats.podiumRedMat, 8)
+    }
+    upperBatch.addBox(3.35, 2.25, 0.04, curveCx + sinC * (curveR + 0.52), 5.55, curveCz + cosC * (curveR + 0.52), mats.curtainGlassMat, signCenterA)
+
+    // 东侧突翼（「王城超市 / M 麦当劳」垫深灰底框独立成块，防止贴墙溢白糊字）
     const riserX = halfW + curveR + 0.65
     upperBatch.addAtlasBox(2.4, totalMallH, 3.6, MALL_ATLAS_RECTS.curtainPlain, riserX, totalMallH * 0.5, curveCz - 0.4, mats.mallFacadeMat)
-    upperBatch.addAtlasPlane(2.3, 2.6, MALL_ATLAS_RECTS.supermarketRiser, riserX, 3.8, curveCz + 1.44, mats.mallFacadeMat)
+    upperBatch.addBox(2.26, 3.2, 0.14, riserX, 3.8, curveCz + 1.44, mats.curtainMullionMat)
+    upperBatch.addAtlasPlane(2.1, 3.05, MALL_ATLAS_RECTS.supermarketRiser, riserX, 3.8, curveCz + 1.525, mats.mallFacadeMat)
 
-    upperBatch.addBox(5.6, 0.28, 0.28, halfW + 1.2, totalMallH + 0.9, zFront - 0.5, mats.curtainMullionMat, 0.38)
-    upperBatch.addBox(2.6, 3.2, 0.28, halfW + 1.2, totalMallH + 2.1, zFront - 0.5, mats.podiumRedMat, 0.38)
-    upperBatch.addAtlasPlane(2.2, 2.8, MALL_ATLAS_RECTS.rooftopKingBanner, halfW + 1.25, totalMallH + 2.1, zFront - 0.34, mats.mallFacadeMat, 0.38)
-    upperBatch.addCyl(0.04, 0.07, 3.8, halfW + 1.2, totalMallH + 4.4, zFront - 0.5, mats.curtainMullionMat, 6)
+    // 屋顶宽幅横排发光大字牌「GD · 王城·商厦」（对齐实拍 #030）
+    upperBatch.addBox(6.8, 0.26, 0.28, halfW + 0.6, totalMallH + 0.45, zFront - 0.45, mats.curtainMullionMat, 0.34)
+    upperBatch.addBox(6.2, 2.0, 0.28, halfW + 0.6, totalMallH + 1.48, zFront - 0.45, mats.podiumRedMat, 0.34)
+    upperBatch.addAtlasPlane(5.9, 1.9, MALL_ATLAS_RECTS.rooftopKingBanner, halfW + 0.65, totalMallH + 1.48, zFront - 0.29, mats.mallFacadeMat, 0.34)
   } else {
     // 候选点位 A (`poi_zhengyang208`)：红白遮阳雨棚高抬至 y=3.38m，彻底高过 2.75m 门洞与 2.98m 遮阳伞！
     const HParapet = bp.parapet_height.valueM // 5.15 m
@@ -599,22 +662,32 @@ export function buildDrinksShopMesh(options: DrinksShopBuildOptions = {}): Drink
     upperBatch.addBox(W + 0.16, 0.14, 0.38, 0, HParapet + 0.04, zFront + 0.1, mats.podiumTrimCreamMat)
   }
 
-  // ─── 4. 前厅点单收银与取餐组合吧台 + 上方 4 联发光菜单墙与叫号屏（1:1 比例贴图 + 背面金属封壳）───
+  // ─── 4. 前厅点单收银与取餐组合吧台 + 上方白色光滑跌级吊顶与「点餐」发光横带 + 高亮菜单大屏 ───
   const frontLen = bp.front_counter_length.valueM // 8.20 m
   const frontH = bp.front_counter_height.valueM // 0.96 m
   const frontD = bp.front_counter_depth.valueM // 0.64 m
   const frontCx = 0.4 // x ∈ [-3.70, +4.50]
   const frontZ = -0.46 // z ∈ [-0.78, -0.14]
-  baseBatch.addBox(frontLen, frontH - 0.08, frontD, frontCx, (frontH - 0.08) * 0.5, frontZ, mats.podiumTrimCreamMat)
-  baseBatch.addBox(frontLen + 0.08, 0.08, frontD + 0.08, frontCx, frontH - 0.04, frontZ, mats.counterTopMat)
-  // 白色百叶吧台前 3 道实测亮红横线（ref-16，全实心几何线条，绝不随贴图拉伸！）
-  for (const ry of [0.04, 0.36, 0.66, 0.86]) {
-    baseBatch.addBox(frontLen - 0.06, ry === 0.04 ? 0.06 : 0.03, 0.03, frontCx, ry, frontZ + frontD * 0.5 + 0.01, mats.podiumRedMat)
+  if (candidate === 'wangcheng_mall') {
+    // 桂林王城 1F 吧台实拍造型（ref-33）：干净浅灰米白实面板 + 底部正红踢脚线 + 台面下红收边压条 + 居中精致小徽章
+    baseBatch.addBox(frontLen, frontH - 0.08, frontD, frontCx, (frontH - 0.08) * 0.5, frontZ, mats.podiumTrimCreamMat)
+    baseBatch.addBox(frontLen + 0.08, 0.08, frontD + 0.08, frontCx, frontH - 0.04, frontZ, mats.counterTopMat)
+    baseBatch.addBox(frontLen - 0.04, 0.14, 0.03, frontCx, 0.07, frontZ + frontD * 0.5 + 0.01, mats.podiumRedMat)
+    baseBatch.addBox(frontLen + 0.02, 0.045, 0.03, frontCx, frontH - 0.105, frontZ + frontD * 0.5 + 0.012, mats.podiumRedMat)
+    baseBatch.addAtlasPlane(0.52, 0.52, INTERIOR_ATLAS_RECTS.counterCenterMedallion, frontCx, 0.48, frontZ + frontD * 0.5 + 0.022, mats.interiorSignAtlasMat)
+    // 西侧端头红柱队列导流标识（避让所有收银与通行路线）
+    baseBatch.addCyl(0.035, 0.035, 0.86, -3.76, 0.43, 0.24, mats.podiumRedMat, 8)
+    baseBatch.addCyl(0.11, 0.13, 0.04, -3.76, 0.02, 0.24, mats.stainlessMat, 8)
+  } else {
+    baseBatch.addBox(frontLen, frontH - 0.08, frontD, frontCx, (frontH - 0.08) * 0.5, frontZ, mats.podiumTrimCreamMat)
+    baseBatch.addBox(frontLen + 0.08, 0.08, frontD + 0.08, frontCx, frontH - 0.04, frontZ, mats.counterTopMat)
+    for (const ry of [0.04, 0.36, 0.66, 0.86]) {
+      baseBatch.addBox(frontLen - 0.06, ry === 0.04 ? 0.06 : 0.03, 0.03, frontCx, ry, frontZ + frontD * 0.5 + 0.01, mats.podiumRedMat)
+    }
+    baseBatch.addAtlasPlane(0.64, 0.64, INTERIOR_ATLAS_RECTS.counterCenterMedallion, frontCx, 0.5, frontZ + frontD * 0.5 + 0.022, mats.interiorSignAtlasMat)
+    baseBatch.addAtlasPlane(2.5, 0.56, INTERIOR_ATLAS_RECTS.counterOrderPlate, frontCx - 2.35, 0.5, frontZ + frontD * 0.5 + 0.022, mats.interiorSignAtlasMat)
+    baseBatch.addAtlasPlane(2.5, 0.56, INTERIOR_ATLAS_RECTS.counterCollectPlate, frontCx + 2.35, 0.5, frontZ + frontD * 0.5 + 0.022, mats.interiorSignAtlasMat)
   }
-  // 居中正圆 1:1 雪王徽章（0.64m × 0.64m）+ 左右等比点餐/取餐铭牌（2.50m × 0.56m = 4.46:1，匹配 4.38:1 图集！）
-  baseBatch.addAtlasPlane(0.64, 0.64, INTERIOR_ATLAS_RECTS.counterCenterMedallion, frontCx, 0.5, frontZ + frontD * 0.5 + 0.022, mats.interiorSignAtlasMat)
-  baseBatch.addAtlasPlane(2.5, 0.56, INTERIOR_ATLAS_RECTS.counterOrderPlate, frontCx - 2.35, 0.5, frontZ + frontD * 0.5 + 0.022, mats.interiorSignAtlasMat)
-  baseBatch.addAtlasPlane(2.5, 0.56, INTERIOR_ATLAS_RECTS.counterCollectPlate, frontCx + 2.35, 0.5, frontZ + frontD * 0.5 + 0.022, mats.interiorSignAtlasMat)
   addCol(frontCx - frontLen * 0.5, frontCx + frontLen * 0.5, frontZ - frontD * 0.5, frontZ + frontD * 0.5, 'counter:front')
 
   for (const c of layout.cashiers) {
@@ -631,26 +704,43 @@ export function buildDrinksShopMesh(options: DrinksShopBuildOptions = {}): Drink
     baseBatch.addCyl(0.054, 0.054, 0.03, slot.x, frontH + 0.22, frontZ + 0.04, mats.podiumTrimCreamMat, 8)
   }
 
-  // 上方 4 联发光菜单墙 + 叫号屏（严实厚黑金属机壳封背，背面绝对不露画面！）
-  baseBatch.addBox(5.1, 0.98, 0.16, -1.25, 2.86, frontZ - 0.04, mats.darkEquipmentMat)
-  baseBatch.addAtlasPlane(2.42, 0.9, INTERIOR_ATLAS_RECTS.menuPanelLeft, -2.5, 2.86, frontZ + 0.05, mats.interiorSignAtlasMat)
-  baseBatch.addAtlasPlane(2.42, 0.9, INTERIOR_ATLAS_RECTS.menuPanelRight, 0.0, 2.86, frontZ + 0.05, mats.interiorSignAtlasMat)
+  if (candidate === 'wangcheng_mall') {
+    // 桂林王城 1F 上方光滑白色跌级吊顶围挡 + 正红「点餐 / 取餐」导视横带 + 紧贴嵌入的菜单热销屏与叫号屏（避开顶灯零 z-fighting）
+    const soffitW = frontLen + 0.4
+    baseBatch.addBox(soffitW, 0.66, 0.88, frontCx, H1 - 0.39, frontZ - 0.08, mats.podiumTrimCreamMat)
+    baseBatch.addBox(soffitW - 0.1, 0.42, 0.06, frontCx, H1 - 0.42, frontZ + 0.39, mats.podiumRedMat)
+    baseBatch.addAtlasPlane(2.15, 0.42, INTERIOR_ATLAS_RECTS.counterOrderPlate, -1.55, H1 - 0.42, frontZ + 0.43, mats.interiorSignAtlasMat)
+    baseBatch.addAtlasPlane(2.15, 0.42, INTERIOR_ATLAS_RECTS.counterCollectPlate, 2.55, H1 - 0.42, frontZ + 0.43, mats.interiorSignAtlasMat)
 
-  baseBatch.addBox(2.96, 0.86, 0.16, 2.88, 2.86, frontZ - 0.04, mats.darkEquipmentMat)
-  baseBatch.addAtlasPlane(2.8, 0.78, INTERIOR_ATLAS_RECTS.callScreen, 2.88, 2.86, frontZ + 0.05, mats.interiorSignAtlasMat)
+    // 跌级下方嵌入式高亮度电子菜单大屏 + 取餐叫号屏（无黑吊杆！画面洁白锐利高亮）
+    baseBatch.addBox(5.1, 1.0, 0.14, -1.25, 2.98, frontZ - 0.04, mats.podiumTrimCreamMat)
+    baseBatch.addAtlasPlane(2.44, 0.92, INTERIOR_ATLAS_RECTS.menuPanelLeft, -2.5, 2.98, frontZ + 0.04, mats.interiorSignAtlasMat)
+    baseBatch.addAtlasPlane(2.44, 0.92, INTERIOR_ATLAS_RECTS.menuPanelRight, 0.0, 2.98, frontZ + 0.04, mats.interiorSignAtlasMat)
 
-  baseBatch.addBox(1.48, 0.42, 0.06, -1.45, 2.16, frontZ + 0.12, mats.darkEquipmentMat)
-  baseBatch.addAtlasPlane(1.42, 0.36, INTERIOR_ATLAS_RECTS.hangingOrder, -1.45, 2.16, frontZ + 0.16, mats.interiorSignAtlasMat)
-  baseBatch.addBox(1.48, 0.42, 0.06, 2.88, 2.16, frontZ + 0.12, mats.darkEquipmentMat)
-  baseBatch.addAtlasPlane(1.42, 0.36, INTERIOR_ATLAS_RECTS.hangingCollect, 2.88, 2.16, frontZ + 0.16, mats.interiorSignAtlasMat)
-  for (const sx of [-3.3, -1.2, 0.95, 2.0, 3.8]) {
-    baseBatch.addBox(0.04, 0.36, 0.04, sx, 3.42, frontZ - 0.02, mats.curtainMullionMat)
+    baseBatch.addBox(2.96, 0.88, 0.14, 2.88, 2.98, frontZ - 0.04, mats.podiumTrimCreamMat)
+    baseBatch.addAtlasPlane(2.8, 0.8, INTERIOR_ATLAS_RECTS.callScreen, 2.88, 2.98, frontZ + 0.04, mats.interiorSignAtlasMat)
+  } else {
+    // 正阳店标准吊挂四联灯箱 + 胶囊导视牌
+    baseBatch.addBox(5.1, 0.98, 0.16, -1.25, 2.86, frontZ - 0.04, mats.darkEquipmentMat)
+    baseBatch.addAtlasPlane(2.42, 0.9, INTERIOR_ATLAS_RECTS.menuPanelLeft, -2.5, 2.86, frontZ + 0.05, mats.interiorSignAtlasMat)
+    baseBatch.addAtlasPlane(2.42, 0.9, INTERIOR_ATLAS_RECTS.menuPanelRight, 0.0, 2.86, frontZ + 0.05, mats.interiorSignAtlasMat)
+
+    baseBatch.addBox(2.96, 0.86, 0.16, 2.88, 2.86, frontZ - 0.04, mats.darkEquipmentMat)
+    baseBatch.addAtlasPlane(2.8, 0.78, INTERIOR_ATLAS_RECTS.callScreen, 2.88, 2.86, frontZ + 0.05, mats.interiorSignAtlasMat)
+
+    baseBatch.addBox(1.48, 0.42, 0.06, -1.45, 2.16, frontZ + 0.12, mats.darkEquipmentMat)
+    baseBatch.addAtlasPlane(1.42, 0.36, INTERIOR_ATLAS_RECTS.hangingOrder, -1.45, 2.16, frontZ + 0.16, mats.interiorSignAtlasMat)
+    baseBatch.addBox(1.48, 0.42, 0.06, 2.88, 2.16, frontZ + 0.12, mats.darkEquipmentMat)
+    baseBatch.addAtlasPlane(1.42, 0.36, INTERIOR_ATLAS_RECTS.hangingCollect, 2.88, 2.16, frontZ + 0.16, mats.interiorSignAtlasMat)
+    for (const sx of [-3.3, -1.2, 0.95, 2.0, 3.8]) {
+      baseBatch.addBox(0.04, 0.36, 0.04, sx, 3.42, frontZ - 0.02, mats.curtainMullionMat)
+    }
+
+    // 入口左侧 A 字点单热销立牌（正阳店沿街摆牌）
+    baseBatch.addBox(0.84, 0.88, 0.1, -2.05, 0.44, zFront + 0.34, mats.podiumRedMat, 0.12)
+    baseBatch.addAtlasPlane(0.78, 0.56, EXTERIOR_ATLAS_RECTS.aFramePoster, -2.04, 0.52, zFront + 0.4, mats.exteriorSignAtlasMat, 0.12)
+    addCol(-2.48, -1.62, zFront + 0.12, zFront + 0.56, 'decor:menu-aframe')
   }
-
-  // 入口左侧 A 字点单热销立牌（避开门洞 [-1.20,+1.60] 及 approachLeft，w=0.78m × h=0.62m 匹配 1.47:1 锐利排版）
-  baseBatch.addBox(0.84, 0.88, 0.1, -2.05, 0.44, zFront + 0.34, mats.podiumRedMat, 0.12)
-  baseBatch.addAtlasPlane(0.78, 0.56, EXTERIOR_ATLAS_RECTS.aFramePoster, -2.04, 0.52, zFront + 0.4, mats.exteriorSignAtlasMat, 0.12)
-  addCol(-2.48, -1.62, zFront + 0.12, zFront + 0.56, 'decor:menu-aframe')
 
   // ─── 5. 放大员工操作区：中央三区水吧岛台 + 后场 1.8m 双向走廊 + 后墙洗消冷柜货架 ───
   const prepLen = bp.prep_bar_length.valueM // 8.20 m
@@ -725,9 +815,9 @@ export function buildDrinksShopMesh(options: DrinksShopBuildOptions = {}): Drink
     baseBatch.addAtlasPlane(2.78, 0.7, rect, zx, 2.86, zBack + 0.21, mats.interiorSignAtlasMat)
   }
 
-  // 室内西侧「我在蜜雪等着你 · SOP」及东侧「始于1997」装饰框（严格保持比例防拉扁！）
-  baseBatch.addBox(0.06, 0.62, 3.2, -halfW + 0.16, 2.15, 0.9, mats.podiumRedMat)
-  baseBatch.addAtlasPlane(3.08, 0.54, INTERIOR_ATLAS_RECTS.wallSloganAndLicense, -halfW + 0.2, 2.15, 0.9, mats.interiorSignAtlasMat, Math.PI * 0.5)
+  // 室内西侧浅框规范公示与东侧「始于1997」装饰框（避开左侧落地玻璃透视，改为轻盈白框防遮挡感）
+  baseBatch.addBox(0.04, 0.6, 3.16, -halfW + 0.15, 2.15, 0.25, mats.podiumTrimCreamMat)
+  baseBatch.addAtlasPlane(3.08, 0.54, INTERIOR_ATLAS_RECTS.wallSloganAndLicense, -halfW + 0.19, 2.15, 0.25, mats.interiorSignAtlasMat, Math.PI * 0.5)
   baseBatch.addBox(0.06, 0.74, 1.02, halfW - 0.16, 2.05, -2.1, mats.podiumRedMat)
   baseBatch.addAtlasPlane(0.94, 0.64, EXTERIOR_ATLAS_RECTS.columnIconsAndRetro, halfW - 0.2, 2.05, -2.1, mats.exteriorSignAtlasMat, -Math.PI * 0.5)
 
@@ -757,6 +847,8 @@ export function buildDrinksShopMesh(options: DrinksShopBuildOptions = {}): Drink
   addCol(-6.45, -5.82, 0.02, 1.94, 'seating:west-booth')
 
   for (const seat of layout.seats) {
+    // 王城旗舰门前实拍无高伞外摆胶椅压挤门面，仅保留室内客座与紧凑外区长凳块（不遮挡视线）
+    if (candidate === 'wangcheng_mall' && seat.zone === 'patio') continue
     const chairMat = seat.zone === 'patio' ? mats.chairPatioMat : mats.chairIndoorMat
     baseBatch.addBox(0.42, 0.06, 0.42, seat.x, seatH, seat.z, chairMat, seat.yaw)
     baseBatch.addBox(0.06, seatH, 0.06, seat.x - 0.15, seatH * 0.5, seat.z - 0.15, mats.curtainMullionMat)
@@ -782,12 +874,50 @@ export function buildDrinksShopMesh(options: DrinksShopBuildOptions = {}): Drink
   addCafeTable(4.22, 0.45, 0.42, 0.42, false)
   addCafeTable(4.22, 1.45, 0.42, 0.42, false)
   addCafeTable(4.22, 2.35, 0.42, 0.42, false)
-  addCafeTable(-3.3, 4.3, 1.36, 0.56, true)
-  addCafeTable(3.1, 4.3, 1.3, 0.56, true)
 
-  // 西侧门前 3D 站立「雪王」迎宾雕塑（x=-5.35, z=3.34，避让 approachLeft->door 动线）
-  addSnowKingSculpture(baseBatch, mats, -5.35, 0, 3.34, 1.02, 0.24, 'standing')
-  addCol(-5.95, -4.75, 2.8, 3.9, 'decor:snow-king-statue')
+  if (candidate === 'wangcheng_mall') {
+    // 王城店开敞铺装广场，不设遮阳红伞桌；室内东南落地窗旁设红波浪底座立式雪王（面向厅内与来客）+ 明亮醒目的红白弧形旋转楼梯（ref-32/34）
+    addSnowKingSculpture(baseBatch, mats, 5.66, 0.0, 1.84, 0.92, -2.05, 'standing')
+    addCol(5.12, 6.26, 1.24, 2.4, 'decor:indoor-snow-king-podium')
+
+    // 东侧通往 2F 舒展宽踏步红白弧形旋转楼梯（x ∈ [5.18, 6.42], z ∈ [-2.02, +0.76]，9 级白踏步 + 连续红色弧栏立柱扶手，全视野清晰且零碰撞）
+    const stCx = 6.38
+    const stCz = -0.62
+    baseBatch.addCyl(0.22, 0.24, H1 - 0.08, stCx - 0.2, (H1 - 0.08) * 0.5, stCz, mats.podiumRedMat, 10)
+    const stairR = 0.88
+    for (let s = 0; s < 9; s++) {
+      const ang = Math.PI * 0.68 + s * 0.3
+      const sy = 0.22 + s * 0.34
+      const sx = stCx + Math.cos(ang) * stairR
+      const sz = stCz + Math.sin(ang) * stairR
+      // 宽厚奶油白旋转踏步 + 正红斜切侧板与弧栏杆立柱
+      baseBatch.addBox(0.76, 0.1, 0.34, sx, sy, sz, mats.podiumTrimCreamMat, -ang)
+      baseBatch.addBox(0.78, 0.04, 0.04, sx, sy - 0.04, sz + 0.14, mats.podiumRedMat, -ang)
+      const postX = stCx + Math.cos(ang) * (stairR + 0.32)
+      const postZ = stCz + Math.sin(ang) * (stairR + 0.32)
+      baseBatch.addCyl(0.032, 0.032, 0.72, postX, sy + 0.38, postZ, mats.podiumRedMat, 6)
+      baseBatch.addBox(0.06, 0.06, 0.42, postX, sy + 0.75, postZ, mats.podiumRedMat, -ang + 0.15)
+    }
+    addCol(5.15, 6.45, -2.05, 0.85, 'decor:spiral-stair-2f')
+
+    // 西南落地窗旁双面立式发光巨字热销灯箱竖屏（主面正朝街道与 2.80m 入口）
+    const lbX = -5.78
+    const lbZ = 2.18
+    const lbRot = -0.26
+    baseBatch.addBox(0.96, 1.84, 0.14, lbX, 0.92, lbZ, mats.podiumRedMat, lbRot)
+    const nx = Math.sin(lbRot) * 0.085
+    const nz = Math.cos(lbRot) * 0.085
+    baseBatch.addAtlasPlane(0.86, 0.58, EXTERIOR_ATLAS_RECTS.aFramePoster, lbX + nx, 1.4, lbZ + nz, mats.exteriorSignAtlasMat, lbRot)
+    baseBatch.addAtlasPlane(0.86, 0.58, EXTERIOR_ATLAS_RECTS.columnIconsAndRetro, lbX + nx, 0.7, lbZ + nz, mats.exteriorSignAtlasMat, lbRot)
+    baseBatch.addAtlasPlane(0.86, 0.58, EXTERIOR_ATLAS_RECTS.aFramePoster, lbX - nx, 1.4, lbZ - nz, mats.exteriorSignAtlasMat, lbRot + Math.PI)
+    addCol(-6.28, -5.28, 1.82, 2.54, 'decor:indoor-vertical-lightbox')
+  } else {
+    // 街铺正阳店保留门口外摆红伞桌与门前站立迎宾雪王
+    addCafeTable(-3.3, 4.3, 1.36, 0.56, true)
+    addCafeTable(3.1, 4.3, 1.3, 0.56, true)
+    addSnowKingSculpture(baseBatch, mats, -5.35, 0, 3.34, 1.02, 0.24, 'standing')
+    addCol(-5.95, -4.75, 2.8, 3.9, 'decor:snow-king-statue')
+  }
 
   baseBatch.flush(group, mergedGeos)
   upperBatch.flush(upperCutawayGroup, mergedGeos)
