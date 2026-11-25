@@ -3,7 +3,7 @@ import type {Host} from './host'
 import {label, type Weather} from '../look/time'
 import {camera, focalLabel, focalToFov, isoLabel, sensorArea, shutterLabel, videoPreset, type BodyId, type CameraBody} from '../gear/cameras'
 import {encode, extensionFor, grade, stamp, type ShotSettings} from '../gear/capture'
-import {canRecord, saveRecording, startRecording, type Recording} from '../gear/video'
+import {canRecord, recordingProblem, saveRecording, startRecording, type Recording} from '../gear/video'
 import {prefs} from '../ui/prefs'
 import {openRack} from '../ui/gear-rack'
 import {refreshCamera, setCameraShown} from '../gear/hand'
@@ -255,8 +255,10 @@ export function photoMode(host: Host, place: () => string, onCapture?: () => voi
       bar.classList.remove('rec')
       const name = saveRecording(result, '网上桂林')
       if (!name) {
+        const problem = recordingProblem(result) ?? '录像保存失败'
+        Object.assign(window, {lastClipProblem: problem})
         window.dispatchEvent(new CustomEvent('walk:toast', {
-          detail: {text: '这台机器录不出画面（浏览器编码器没有输出），换个浏览器再试', ms: 5200},
+          detail: {text: problem, ms: 5200},
         }))
         return
       }

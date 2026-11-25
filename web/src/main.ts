@@ -36,6 +36,7 @@ import {
 } from './city-upgrade/state'
 import {mountCityUpgradeProps} from './city-upgrade/props'
 import {flags} from './debug'
+import {tapFrame} from './gear/frame-tap'
 import {deriveRangeMetrics, loadRenderConfig, RenderRangeStore, type RenderRangeConfig} from './render-range'
 import {renderRangeControl} from './ui/render-range'
 import type {FeedbackView} from '../../lib/feedback-contract'
@@ -117,7 +118,8 @@ async function start(loader:FullLoader,creatorSpawn=false) {
   syncCityUpgradeQuality(gfx.quality)
   let post:ReturnType<typeof import('./look/post').mainPass>|undefined
   if(params.has('debug'))Object.assign(window,{gfx})
-  function drawMain(){if(post)stats.shadowCasters=post.render(walker?.active?walker.position:camera.position);else renderer.render(scene,camera)}
+  // tapFrame：录像在这里、present 之前拷帧（IDOK-383，主画布没开 preserveDrawingBuffer）。
+  function drawMain(){if(post)stats.shadowCasters=post.render(walker?.active?walker.position:camera.position);else renderer.render(scene,camera);tapFrame(renderer.domElement)}
   renderer.info.autoReset=false
   const hemi = new THREE.HemisphereLight(look.hemiSky,look.hemiGround,look.hemiPower); scene.add(hemi)
   const arrivalReady=import('./arrival-programs').then(module=>warmPrograms(module.arrivalPrograms()))
