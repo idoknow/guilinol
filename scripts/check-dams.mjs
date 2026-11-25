@@ -47,3 +47,13 @@ for(const [kind,start,end,expected] of baseline){
   assert(leg,`${kind} ${start} → ${end} missing`)
   assert.equal(createHash('sha256').update(JSON.stringify(leg.path)).digest('hex'),expected,`${start} → ${end} differs from published path`)
 }
+if(process.argv[3]){
+  const referenceDirectory=process.argv[3]
+  const referenceManifest=JSON.parse(readFileSync(join(referenceDirectory,'manifest.json')))
+  const reference=JSON.parse(gunzipSync(readFileSync(join(referenceDirectory,referenceManifest.vehicles.file))))
+  assert.equal(Object.keys(vehicles.docks).length,10,'Expected ten docks')
+  assert.equal(vehicles.routes.length,10,'Expected ten vessel legs')
+  assert.deepEqual(vehicles.docks,reference.docks,'Dock coordinates differ across extents')
+  assert.deepEqual(vehicles.routes,reference.routes,'Vessel paths differ across extents')
+  console.log('10 docks and 10 three-dimensional paths match the reference world')
+}
