@@ -104,10 +104,15 @@ def road_profiles(elements, widths):
     return profiles
 
 
-def raise_decks(directory, manifest, elements):
+def raise_decks(directory, manifest, elements, profiles):
     """Raise only the four existing GL04 deck meshes after the native rail solve."""
     ways = {w["id"]: w for w in elements if w["type"] == "way" and w["id"] in BRIDGES}
     lines = {wid: LineString(points(w)) for wid, w in ways.items()}
+    approaches = {}
+    for road, alignment, levels in profiles.values():
+        if road["id"] in APPROACHES and road["tags"]["highway"] == "motorway":
+            for node in (road["nodes"][0], road["nodes"][-1]):
+                approaches[node] = alignment, levels
     found = {wid: 0 for wid in ways}
     faces = {
         node: []
@@ -140,14 +145,13 @@ def raise_decks(directory, manifest, elements):
                 ends = set()
                 axis = np.subtract(line.coords[-1], line.coords[0]) / line.length
                 for vertex, p in zip(tri, xy):
+                    native_cm = int(vertex[1])
                     along = line.project(Point(p))
                     height = bridge_height(wid, line, along)
                     if wid not in YARD_DECK:
                         # Follow the Hengliu plane across the slab width as well.
                         height += hengliu(p[1]) - hengliu(line.interpolate(along).y)
                     y = round(height * 100)
-                    if y < vertex[1]:
-                        raise ValueError(f"S2201 deck lowered on {wid}")
                     vertex[1] = y
                     # The approach and deck share an abutment slab wide enough
                     # to support both axles while a vehicle straddles the joint.
@@ -158,7 +162,17 @@ def raise_decks(directory, manifest, elements):
                         vertex[[0, 2]] = np.rint(
                             (p + (target - along) * axis - [x, z]) * 100
                         )
-                        ends.add(ways[wid]["nodes"][0 if first else -1])
+                        node = ways[wid]["nodes"][0 if first else -1]
+                        approach, levels = approaches[node]
+                        at = approach.project(
+                            Point(vertex[0] / 100 + x, vertex[2] / 100 + z)
+                        )
+                        vertex[1] = round(
+                            np.interp(at, levels[:, 0], levels[:, 1]) * 100
+                        )
+                        ends.add(node)
+                    if vertex[1] < native_cm:
+                        raise ValueError(f"S2201 deck lowered on {wid}")
                 for node in ends:
                     faces[node].append((tri / 100 + [x, 0, z]).tolist())
                 found[wid] += 1

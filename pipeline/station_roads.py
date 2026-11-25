@@ -96,7 +96,7 @@ def bake(directory, manifest, paired_widths):
     profiles.update(road_profiles(elements, paired_widths))
     import dingjiang_structures
     profiles.update(dingjiang_structures.road_profiles(elements, paired_widths))
-    bridge_ways, landings = dingjiang_structures.raise_decks(directory, manifest, elements)
+    bridge_ways, landings = dingjiang_structures.raise_decks(directory, manifest, elements, profiles)
     bake_profiles(directory, manifest, profiles, elements, bridge_ways.values(), landings)
 
 
