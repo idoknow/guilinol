@@ -48,7 +48,7 @@ export function randomPasserby(random:()=>number,age?:Age):Avatar&{age:Age,heigh
     age,height:(lo+random()*(hi-lo))*(body==='f'?.96:1),girth:profile.girth,hairTint:profile.hairTint?.[r(profile.hairTint.length)]}
 }
 
-export function crowd(scene:THREE.Scene,camera:THREE.Camera,groundAt?:(x:number,z:number,y:number,car:boolean)=>number|undefined){
+export function crowd(scene:THREE.Scene,camera:THREE.Camera,groundAt?:(x:number,z:number,y:number,car:boolean)=>number|undefined,warm?:(root:THREE.Object3D)=>Promise<void>){
   const mobile=touchUi()
   // IDOK-253: 每街只有 4–8 人，视距内的路人全部用带骨骼的角色，不再在近中景露出方块替身
   const LIMIT=mobile?12:28,RANGE=mobile?80:140,POOL=mobile?10:20
@@ -74,6 +74,7 @@ export function crowd(scene:THREE.Scene,camera:THREE.Camera,groundAt?:(x:number,
             pack.position.set(0,-.02,.2);pack.name='passer-by backpack';torso.add(pack)}
         }
         const t={scene:model.scene,clips:model.animations}
+        await warm?.(model.scene)
         ready[index]=t
         return t
       })

@@ -1,8 +1,11 @@
+import {prepareCityAudioDuringLoad} from './city-audio'
 import {onPrefs} from './ui/prefs'
 import {bindingLabel, hits} from './input/keymap'
 import {nearestPlayable} from '../../lib/play-region'
 import {identifyWorld,instrument,operation,record} from './telemetry'
 import * as THREE from 'three'
+import {warmShaders} from './shader-warmup'
+import {vehicleModel} from './walk/vehicle-model'
 import {bytes, fetchAsset, measureFirstWorldBytes, openingTerrain, startOverview, type Manifest} from './world'
 import {Stream} from './stream'
 import {flight} from './flight'
@@ -81,8 +84,14 @@ async function start(loader:FullLoader,creatorSpawn=false) {
     : null
   const previousWorld=terrain?null:await readManifest()
   entrySignal?.throwIfAborted()
+  await loader.showBeforeBlockingWork()
+  await prepareCityAudioDuringLoad()
   const bounds=terrain??previousWorld!
   const renderer = new THREE.WebGLRenderer({antialias:false,powerPreference:'high-performance'})
+  renderer.debug.checkShaderErrors = import.meta.env.DEV
+  const warmPrograms=async(root:THREE.Object3D)=>{
+    try{await warmShaders(renderer,root,camera,scene)}catch(error){console.warn('Shader warmup unavailable',error)}
+  }
   renderer.toneMapping = THREE.NeutralToneMapping; renderer.toneMappingExposure = look.exposure
   document.body.prepend(renderer.domElement)
   const camera = new THREE.PerspectiveCamera(55,1,1,Math.max(look.fogHorizonTo,initialMetrics.fogHorizonTo)+1200)
@@ -95,6 +104,7 @@ async function start(loader:FullLoader,creatorSpawn=false) {
   const light = new THREE.DirectionalLight(look.sunColor,look.sunPower)
   light.position.set(...look.sunDirection); scene.add(light)
   const hemi = new THREE.HemisphereLight(look.hemiSky,look.hemiGround,look.hemiPower); scene.add(hemi)
+  const arrivalReady=import('./arrival-programs').then(module=>warmPrograms(module.arrivalPrograms()))
   const [left,top,width,depth] = bounds.extent
   scene.add(freezeStatic(outerGround(bounds.extent)))
   // IDOK-105: choose the opening camera pose. The camera is NOT touched here — `flight()` below sets
@@ -180,7 +190,7 @@ async function start(loader:FullLoader,creatorSpawn=false) {
     measureFirstWorldBytes(first,total=>{stats.firstWorldBytes=total})
     if(stats.openingRingMs)void finishLoading()
   }
-  async function finishLoading(){loader.stage('frame',1,1);await loader.finish();stats.readyMs=performance.now()}
+  async function finishLoading(){await arrivalReady;loader.stage('frame',1,1);await loader.finish();stats.readyMs=performance.now()}
   function updateAtmosphere(now:number,elapsed:number){
     clock.tick(elapsed/1000); evaluate(clock.hour,clock.weather,1-Math.exp(-elapsed/clock.blendMs))
     atmo.uTime.value = now/1000
@@ -307,6 +317,19 @@ async function start(loader:FullLoader,creatorSpawn=false) {
       if(signal.aborted)return false
       cover.progress(.3,'步行模块已就绪')
       completed=await player.enter(x,z,yaw,reason,false,signal,cover.progress)
+      if(completed){
+        await prepareLandingContent?.()
+        stream.tick(player.position)
+        stream.updateLandmarks?.(player.position)
+        if(!walkProgramsReady){
+          const bike=vehicleModel('bike',1),parked=new THREE.InstancedMesh(bike.geometry,bike.material,1)
+          parked.setColorAt(0,new THREE.Color(0xffffff))
+          const variants=new THREE.Group(),mapped=new THREE.MeshStandardMaterial({map:new THREE.Texture(),flatShading:true})
+          variants.add(parked,new THREE.Mesh(bike.geometry,mapped))
+          try{await warmPrograms(variants)}finally{parked.dispose()}
+        }
+        await warmPrograms(scene);walkProgramsReady=true
+      }
       if(completed)cover.progress(1)
       return completed
     }finally{controller.abort();operation('teleport',start,completed);switching=false;showMode();if(!parent)await cover.done()}
@@ -447,6 +470,7 @@ async function start(loader:FullLoader,creatorSpawn=false) {
       showMode()
     })()
   })
+  let walkProgramsReady=false,prepareLandingContent:(()=>Promise<void>)|undefined
   await syncSolo()
   const renderUi = renderRangeControl({
     initial:rangeStore.getConfig(),
@@ -477,6 +501,13 @@ async function start(loader:FullLoader,creatorSpawn=false) {
     },
     { eagerVerify: params.has('mifen') },
   )
+  prepareLandingContent=async()=>{
+    mifen.step(0)
+    const probe=mifen.getProbe() as ReturnType<typeof mifen.getProbe>&{ensureLoaded?:()=>Promise<unknown>}
+    if(probe.ensureLoaded&&probe.getState().playerDistance<140){
+      await probe.ensureLoaded().catch(error=>console.warn('Landing content unavailable',error))
+    }
+  }
   mountChat()
   const tourProbe = {getState, missions: {start: () => ({ok:false, code:'SOLO_MODE_REQUIRED'})}}
   let staticAudit:ReturnType<typeof import('./verify-static').staticVerifier>|undefined
@@ -575,7 +606,7 @@ async function start(loader:FullLoader,creatorSpawn=false) {
       const showTraffic=trafficEnabled(getPlayMode(),trafficOverride)
       if(showTraffic&&!trafficRequested && camera.position.y<250 && !stream.pending.size){
         trafficRequested=true
-        void import('./traffic').then(mod=>mod.traffic(scene,camera,params.has('verify'),(x,z,y,car)=>(car?walker?.carSupportAt(x,z,y):walker?.supportAt(x,z,y))?.y)).then(tick=>{trafficTick=tick}).catch(error=>console.warn('Traffic unavailable',error))
+        void import('./traffic').then(mod=>mod.traffic(scene,camera,params.has('verify'),(x,z,y,car)=>(car?walker?.carSupportAt(x,z,y):walker?.supportAt(x,z,y))?.y,warmPrograms)).then(tick=>{trafficTick=tick}).catch(error=>console.warn('Traffic unavailable',error))
       }
       trafficTick?.(elapsed/1000,walker?.active&&walker.vehicle!=='foot'?walker.position:undefined,
         walker?.active?walker.position:undefined,getPlayMode()==='solo',showTraffic)
@@ -629,6 +660,7 @@ async function start(loader:FullLoader,creatorSpawn=false) {
     const {makeStaticVerifier}=await import('./verify-static')
     staticAudit=await makeStaticVerifier(host);publishViewer()
   }
+  if(!walkProgramsReady)await warmPrograms(scene)
   renderer.setAnimationLoop(animate)
   // IDOK-105: keep the last view fresh so "回到上次离开的地方" can restore it. Deep-linked
   // sessions (`?verify`, `?slot`, shares…) never write it — tests and shared links must not pollute.

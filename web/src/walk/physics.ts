@@ -446,7 +446,7 @@ export async function createPhysics(manifest:Manifest,stream:Stream,peaks:PeaksG
       const trees=stream.forest.loaded.get(tile)
       if(trees&&Math.max(Math.abs(east-tile.x-128),Math.abs(south-tile.z-128))<168)for(const tree of trees){
         if(tree.kind!==5&&!trunks.has(tree)&&Math.hypot(east-tree.x,south-tree.z)<40){trunks.set(tree,add(R.ColliderDesc.cylinder(1.8,.42*tree.scale).setTranslation(tree.x,tree.y+1.8,tree.z),'tree'));changed=true}}
-      if(data&&data!==region?.data&&!urgent&&(!frame||started))data=undefined
+      if(data&&data!==region?.data&&!urgent&&(!frame||started))continue
       if(region&&region.data!==data){region.colliders.forEach(remove);region.barrierColliders.forEach(remove);regions.delete(tile);changed=true}
       if(near&&region?.data===data&&region?.surfaces){
         if(urgent){while(!region.surfaces.next().done){};region.surfaces=undefined;changed=true}
@@ -703,6 +703,7 @@ export async function createPhysics(manifest:Manifest,stream:Stream,peaks:PeaksG
     const waterY=data.water[Math.round((cz-tile.z)/4)*65+Math.round((cx-tile.x)/4)]/10
     const tread=surface(cx,cz,'deck',bikeY+.6,1.4)??surface(cx,cz,'landmark',bikeY+.6,1.4)??surface(cx,cz,'road',bikeY+.6,1.4)
     if(tread&&tread.y>=waterY)return null
+    sync(cx,cz)
     const shore=findWalkableSpawn(cx,cz,false,true)
     return shore&&{...shore,rule:'water-rescue'}
   }
