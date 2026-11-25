@@ -87,6 +87,9 @@ def grade_railway_roads(plans, tunnels, terrain, ground, water, control, left, t
     from railways import bake, road_radius
     inventory = json.loads((Path(__file__).resolve().parents[1]/'docs/railway-crossings.json').read_bytes())
     crossings, panels = bake(None, {}, inventory, {}, rail_only=True)
+    depot = json.loads((Path(__file__).resolve().parents[1]/'docs/railway-grades.json').read_bytes())['enclosedLevelCrossings']
+    exempt = {r['road'] for r in depot['records']}
+    panels = [p for p in panels if p['road'] not in exempt]
     protected.level_panels = panels
     by_road = defaultdict(list)
     for row in crossings:
@@ -216,7 +219,7 @@ def grade_railway_roads(plans, tunnels, terrain, ground, water, control, left, t
                 along = np.array([line.project(center.interpolate(v)) for v in knots])
                 need = np.interp(along,stations,minimum)
                 if np.any(need>before+.001):
-                    deck = smooth_raised_deck(knots,before,need,grade_cap(tags)*.98)
+                    deck = smooth_raised_deck(knots,before,need,grade_cap(tags)*.88)
                     plans[wid] = center,span,knots,deck
             continue
         ground_levels = np.array([ground_at(*p) for p in xy])

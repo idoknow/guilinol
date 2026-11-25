@@ -112,6 +112,27 @@ def stitch(ends,joints):
             for k,(t,idx) in enumerate(sections):
                 t.setdefault('joints',[None,None])[idx] = dict(ring=list(hull.exterior.coords)[:-1],draw=k==0)
 
+def trim_joint_floors(tunnels):
+    """Fill only the uncovered wedge between graded rectangular road strips."""
+    from shapely import LineString, Polygon, union_all
+
+    ends = defaultdict(list)
+    for t in tunnels:
+        for end,node in enumerate(t.get('nodes', ())):
+            ends[node].append((t,end))
+    for sections in ends.values():
+        joints = [t['joints'][end] for t,end in sections if t.get('joints') and t['joints'][end]]
+        if not joints:
+            continue
+        strips = [LineString([(x,z) for x,_,z in t['portals']]).buffer(t['halfWidth'], cap_style='flat')
+                  for t,_ in sections]
+        gap = Polygon(joints[0]['ring']).difference(union_all(strips))
+        wedges = [list(poly.exterior.coords)[:-1] for poly in getattr(gap,'geoms',[gap])
+                  if poly.geom_type=='Polygon' and poly.area>.00001]
+        for joint in joints:
+            joint['wedges'] = wedges
+
+
 def extend_to_junctions(ways,tunnels,bore_ids,surface_at,bridge_levels=None):
     """Propagate the cut through surface junctions until every arm reaches grade."""
     import heapq

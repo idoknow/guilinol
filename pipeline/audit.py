@@ -630,7 +630,8 @@ def run_audit(world_dir: Path, root: Path) -> dict:
         floor = line.buffer(section['halfWidth'],cap_style='flat')
         for joint in section.get('joints', ()):
             if joint:
-                floor = floor.union(Polygon(joint['ring']))
+                for ring in joint.get('wedges', [joint['ring']]):
+                    floor = floor.union(Polygon(ring))
         at,levels = np.array(section['stations']).T
         strip = (line, floor, section['halfWidth'], at, levels)
         cut_sections[section['way']].append(strip)

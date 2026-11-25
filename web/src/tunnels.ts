@@ -6,7 +6,7 @@ export const tunnelLiningMaterial=new THREE.MeshStandardMaterial({side:THREE.Dou
 export const tunnelLightMaterial=new THREE.MeshBasicMaterial({side:THREE.DoubleSide,vertexColors:true})
 
 type Point=[number,number,number]
-export type Tunnel={way:number,nodes?:[number,number],portals:[Point,Point],length:number,halfWidth:number,clearance:number,approach:number,approachEnds?:[number,number],mouths?:[boolean,boolean],openEnds?:[number,number],openCut?:boolean,joints?:({ring:[number,number][],draw:boolean}|null)[],stations:[number,number][]}
+export type Tunnel={way:number,nodes?:[number,number],portals:[Point,Point],length:number,halfWidth:number,clearance:number,approach:number,approachEnds?:[number,number],mouths?:[boolean,boolean],openEnds?:[number,number],openCut?:boolean,joints?:({ring:[number,number][],wedges?:[number,number][][],draw:boolean}|null)[],stations:[number,number][]}
 
 function frame(tunnel:Tunnel){
   const [start,end]=tunnel.portals, ux=(end[0]-start[0])/tunnel.length,uz=(end[2]-start[2])/tunnel.length
@@ -41,14 +41,15 @@ export function floorLevel(tunnel:Tunnel,x:number,z:number){
   if(station<-.00001||station>tunnel.length+.00001||Math.abs(axes.lateral(x,z))>tunnel.halfWidth+.00001){
     for(const [i,joint] of (tunnel.joints??[]).entries()){
       if(!joint)continue
-      let positive=false,negative=false
-      const ring=joint.ring
-      for(let j=0;j<ring.length;j++){
-        const [a,b]=ring[j],[c,d]=ring[(j+1)%ring.length],cross=(c-a)*(z-b)-(d-b)*(x-a)
-        positive||=cross>.00001;negative||=cross<-.00001
-        if(positive&&negative)break
+      for(const ring of joint.wedges??[joint.ring]){
+        let positive=false,negative=false
+        for(let j=0;j<ring.length;j++){
+          const [a,b]=ring[j],[c,d]=ring[(j+1)%ring.length],cross=(c-a)*(z-b)-(d-b)*(x-a)
+          positive||=cross>.00001;negative||=cross<-.00001
+          if(positive&&negative)break
+        }
+        if(!(positive&&negative))return tunnel.portals[i][1]
       }
-      if(!(positive&&negative))return tunnel.portals[i][1]
     }
     return
   }
@@ -85,13 +86,16 @@ type Plane=(point:Point)=>number
 export function joinPortalRoads(tile:Tile,tunnels:Tunnel[],buffers:Float32Array[]){
   for(const tunnel of tunnels){
     const axes=frame(tunnel)
-    const stitch=20
+    // The baked approaches already share their end elevation with the bore.
+    // Only weld the mesh overlap at the lip; a 20 m deformation here pulls
+    // the upper carriageway into unrelated tunnels on the level below.
+    const stitch=tunnel.nodes ? .15 : 20
     const margin=stitch+12
     for(const [end,portal] of tunnel.portals.entries()){
       if(tunnel.mouths?.[end]===false)continue
       let open=tunnel.openEnds?.[end]??0
       if(tunnel.openCut)open=0
-      else if(tunnel.nodes)open=tunnel.length/2
+
       if(portal[0]<tile.x-margin-open||portal[0]>tile.x+256+margin+open||portal[2]<tile.z-margin-open||portal[2]>tile.z+256+margin+open)continue
       for(const buffer of buffers)for(let index=0;index<buffer.length;index+=3){
         const x=tile.x+buffer[index],z=tile.z+buffer[index+2],s=axes.station(x,z),d=Math.abs(axes.lateral(x,z))
@@ -155,19 +159,31 @@ export function tunnelGeometry(tile:Tile,ground:THREE.PlaneGeometry,tunnels:Tunn
       if(!joint?.draw)continue
       const floor=tunnel.portals[i][1]
       const covered=!tunnel.openCut&&(i===0?first:last)===0&&!tunnel.mouths?.[i]
-      const ring=joint.ring.map(([x,z]):Point=>[x-tile.x,floor,z-tile.z])
-      const edges=ring.map((a,n)=>[a,ring[(n+1)%ring.length]])
-      const winding=Math.sign(edges.reduce((sum,[a,b])=>sum+a[0]*b[2]-a[2]*b[0],0))
-      const planes=edges.map(([a,b])=>(p:Point)=>winding*((b[0]-a[0])*(p[2]-a[2])-(b[2]-a[2])*(p[0]-a[0])))
-      // The two rectangular strips leave a wedge at a bend. Carry the same
-      // headroom cut through that wedge as through either adjoining section.
-      cuts.push({planes,roof:covered?()=>floor+head+railStyle.stationLevels.structureDepth-.35:undefined})
-      quad(ring,'floor')
-      if(covered)quad(ring.map(([x,,z])=>[x,floor+head,z]),'ceiling')
-      for(const [a,b] of edges){
-        if(side(a)*side(b)<=0)continue
-        const top=(p:Point):Point=>[p[0],covered?floor+head:Math.max(floor,groundY(p)),p[2]]
-        quad([a,b,top(b),top(a)],covered?'interior':'portal')
+      for(const wedge of joint.wedges??[joint.ring]){
+        const ring=wedge.map(([x,z]):Point=>[x-tile.x,floor,z-tile.z])
+        const edges=ring.map((a,n)=>[a,ring[(n+1)%ring.length]])
+        const winding=Math.sign(edges.reduce((sum,[a,b])=>sum+a[0]*b[2]-a[2]*b[0],0))
+        const planes=edges.map(([a,b])=>(p:Point)=>winding*((b[0]-a[0])*(p[2]-a[2])-(b[2]-a[2])*(p[0]-a[0])))
+        // The two rectangular strips leave a wedge at a bend. Carry the same
+        // headroom cut through that wedge as through either adjoining section.
+        cuts.push({planes,roof:covered?()=>floor+head+railStyle.stationLevels.structureDepth-.35:undefined})
+        quad(ring,'floor')
+        if(covered)quad(ring.map(([x,,z])=>[x,floor+head,z]),'ceiling')
+        for(const [a,b] of edges){
+          if(side(a)*side(b)<=0)continue
+          if(joint.wedges){
+            // An edge against an existing driving strip is an internal seam.
+            const mx=(a[0]+b[0])/2+tile.x,mz=(a[2]+b[2])/2+tile.z
+            if(!joint.ring.some(([x,z],i)=>{
+              const [xx,zz]=joint.ring[(i+1)%joint.ring.length]
+              const dx=xx-x,dz=zz-z
+              const t=THREE.MathUtils.clamp(((mx-x)*dx+(mz-z)*dz)/(dx*dx+dz*dz||1),0,1)
+              return Math.hypot(mx-x-t*dx,mz-z-t*dz)<.001
+            }))continue
+          }
+          const top=(p:Point):Point=>[p[0],covered?floor+head:Math.max(floor,groundY(p)),p[2]]
+          quad([a,b,top(b),top(a)],covered?'interior':'portal')
+        }
       }
     }
     for(let i=1;i<tunnel.stations.length;i++){

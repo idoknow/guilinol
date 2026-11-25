@@ -10,6 +10,7 @@ class ProtectedRoadGrades:
     def __init__(self, left, top, terrain, underlay, control):
         self.pavement = None
         self.level_panels = []
+        self.paved_support = np.zeros_like(underlay, dtype=np.uint8)
         self.left, self.top = left, top
         self.after = (terrain, underlay, control)
         self.before = tuple(grid.copy() for grid in self.after)
@@ -42,7 +43,10 @@ class ProtectedRoadGrades:
                 xs,zs = np.meshgrid(ox+step*np.arange(x,xx),oz+step*np.arange(z,zz))
                 gap = distance(points(xs,zs),foundation)
                 blend = np.clip((gap-16)/40,0,1)
-                y = old[patch]+blend**2*(3-2*blend)*(field[patch].astype(float)-old[patch])
+                weight = blend**2*(3-2*blend)
+                if field is self.after[1]:
+                    self.paved_support[patch] = np.rint(self.paved_support[patch]*weight)
+                y = old[patch]+weight*(field[patch].astype(float)-old[patch])
                 field[patch] = np.rint(y) if step==4 else y
 
     def mark_pavement(self, patches):
@@ -83,7 +87,9 @@ class ProtectedRoadGrades:
             i,j = (x-self.left)//step,(z-self.top)//step
             patch = np.s_[j:j+size,i:i+size]
             windows.append((grid[patch], old[patch]))
-        if all(np.array_equal(after,before) for after,before in windows):
+        i,j = (x-self.left)//4,(z-self.top)//4
+        support = self.paved_support[j:j+65,i:i+65] / 255.
+        if not support.any() and all(np.array_equal(after,before) for after,before in windows):
             return data
         raw = gzip.decompress(data)
         magic, verts, indices, size, image, decks = struct.unpack_from('<4s5I',raw)
@@ -99,8 +105,14 @@ class ProtectedRoadGrades:
             after,before = pair
             return np.where(after>before,np.maximum(field,after),
                             np.where(after<before,np.minimum(field,after),field))
-        surface = apply_bound(surface, windows[0]).astype('<i2')
-        underlay = apply_bound(underlay, windows[1]).astype('<i2')
+        # Archive tiles can have a different original terrain to the current
+        # DEM. On a fitted carriageway carry its actual foundation across the
+        # seam, even where the archive originally lay below the design level.
+        def transfer(field, pair):
+            bounded = apply_bound(field,pair)
+            return np.rint(bounded + support * (pair[0].astype(float)-bounded)).astype('<i2')
+        surface = transfer(surface, windows[0])
+        underlay = transfer(underlay, windows[1])
         collision = json.loads(raw[start:end])
         streets = collision[1]
         if len(streets)>5 and streets[5] and not np.array_equal(*windows[2]):

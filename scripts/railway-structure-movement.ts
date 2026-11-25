@@ -3,6 +3,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import {ll2xz} from '../lib/projection'
 import {vehicleSurface} from './vehicle-surface'
+import {nearbyTunnels} from '../web/src/tunnels'
 
 const args=process.argv.slice(2)
 const gate=args.includes('--check-grades')
@@ -11,11 +12,32 @@ if (!main || !candidate || !output) throw Error('Expected baseline world, candid
 const motor = new Set(['motorway','trunk','primary','secondary','tertiary','residential','unclassified','service','living_street','road'])
 const localRoad = new Set(['residential','unclassified','service','living_street'])
 const violations = []
-const surface=(world:string)=>vehicleSurface(world,JSON.parse(fs.readFileSync(path.join(world,'manifest.json'),'utf8')))
-const before=surface(main),after=surface(candidate)
+const readManifest=(world:string)=>JSON.parse(fs.readFileSync(path.join(world,'manifest.json'),'utf8'))
+const original=readManifest(main),manifest=readManifest(candidate)
+const before=vehicleSurface(main,original),after=vehicleSurface(candidate,manifest)
+const tileMap=(entries:any[])=>new Map(entries.map(t=>[t.x+','+t.z,t]))
+const oldTiles=tileMap(original.chunks),newTiles=tileMap(manifest.chunks)
+const sameLandmarks=JSON.stringify(original.landmarks)===JSON.stringify(manifest.landmarks)
+const changedTiles=new Map<string,boolean>()
+function changedTile(x:number,z:number){
+  const key=x+','+z
+  if(changedTiles.has(key))return changedTiles.get(key)
+  const old=oldTiles.get(key),now=newTiles.get(key)
+  if(!old&&!now){changedTiles.set(key,false);return false}
+  const changed=!sameLandmarks || !old || !now || old.bytes!==now.bytes ||
+    JSON.stringify(nearbyTunnels(original.tunnels,x,z))!==JSON.stringify(nearbyTunnels(manifest.tunnels,x,z)) ||
+    !fs.readFileSync(path.join(main,old.file)).equals(fs.readFileSync(path.join(candidate,now.file)))
+  changedTiles.set(key,changed)
+  return changed
+}
+function overlapsChange(x:number,z:number,dx:number,dz:number){
+  for(let tx=Math.floor(Math.min(x,x+dx)/256);tx<=Math.floor(Math.max(x,x+dx)/256);tx++)
+    for(let tz=Math.floor(Math.min(z,z+dz)/256);tz<=Math.floor(Math.max(z,z+dz)/256);tz++)
+      if(changedTile(tx*256,tz*256))return true
+  return false
+}
 const inventory=JSON.parse(fs.readFileSync('docs/railway-crossings.json','utf8'))
 const ids=new Set(inventory.filter(row=>row.type).map(row=>row.road))
-const manifest=JSON.parse(fs.readFileSync(path.join(candidate,'manifest.json'),'utf8'))
 for(const tunnel of manifest.tunnels??[])if(tunnel.nodes)ids.add(tunnel.way)
 const grades=JSON.parse(fs.readFileSync('docs/railway-grades.json','utf8'))
 for(const row of grades.resolvedRoadStructures??[])for(const id of [row.roadWay,row.bridgeWay])if(id)ids.add(id)
@@ -37,6 +59,7 @@ for(const way of ways){
   for(let i=1;i<coords.length;i++){
     const {x,z}=coords[i-1],dx=coords[i].x-x,dz=coords[i].z-z,step=Math.hypot(dx,dz)
     if(step<.001)continue
+    if(gate&&!overlapsChange(x,z,dx,dz)){station+=step;previous=undefined;continue}
     const count=Math.ceil(step/2)
     for(let j=previous?1:0;j<=count;j++){
       const f=j/count,px=x+f*dx,pz=z+f*dz,at=station+f*step

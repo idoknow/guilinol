@@ -46,6 +46,8 @@ def paved_height(directory, manifest):
 
 
 def smooth_cuttings(tunnels, ways, surface_at, bridge_ends):
+    from station_bore_approaches import trim_joint_floors
+    trim_joint_floors(tunnels)
     cuts = [t for t in tunnels if t.get('openCut')]
     if not cuts:
         return
@@ -67,7 +69,8 @@ def smooth_cuttings(tunnels, ways, surface_at, bridge_ends):
         floor = line.buffer(t['halfWidth'], cap_style='flat')
         for joint in t.get('joints', ()):
             if joint:
-                floor = floor.union(Polygon(joint['ring']))
+                for ring in joint.get('wedges', [joint['ring']]):
+                    floor = floor.union(Polygon(ring))
         sample = np.linspace(0, t['length'], max(3, math.ceil(t['length'] / 2) + 1))
         levels = np.interp(sample, *np.array(t['stations']).T)
         indices = []

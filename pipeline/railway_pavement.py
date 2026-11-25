@@ -20,6 +20,8 @@ def bake(directory, chunks, graded=None, tunnels=()):
     inventory = json.loads((Path(__file__).resolve().parents[1]/'docs/railway-crossings.json').read_bytes())
     sites = defaultdict(list)
     for row in inventory:
+        if row['roadTags'].get('access') == 'private':
+            continue
         if row['type'] in ('level','rail_over') and all(row['roadTags'].get(k,'no')=='no' for k in ('bridge','tunnel')):
             sites[row['road']].append(Point(ll2xz(row['lat'],row['lon'])))
     shapes, landings = [], []
@@ -39,8 +41,10 @@ def bake(directory, chunks, graded=None, tunnels=()):
         tags = way['tags']
         # The city road layer also omits motorway carriageways and slip roads.
         # Regraded stretches need asphalt supported by the fitted road grid.
-        missing_layer = tags['highway'] in ('service','unclassified','living_street','motorway','motorway_link')
-        graded_road = graded is not None and missing_layer and all(
+        motor = tags['highway'].removesuffix('_link') in {
+            'motorway','trunk','primary','secondary','tertiary','residential',
+            'service','unclassified','living_street','road'}
+        graded_road = graded is not None and motor and all(
             tags.get(k,'no')=='no' for k in ('bridge','tunnel')) and tags.get('access') not in ('no','private')
         if way['id'] not in sites and not graded_road:
             continue
@@ -66,7 +70,12 @@ def bake(directory, chunks, graded=None, tunnels=()):
             coords = np.asarray(center.coords)
             for a,b in zip(coords,coords[1:]):
                 if graded.affects_carriageway(a,b,road_width/2):
-                    segments.append(LineString([a,b]))
+                    segment = LineString([a,b])
+                    segments.append(segment)
+                    # The drivable OSM axis can run through an old sidewalk
+                    # polygon. Retain the outer sidewalk and clip its curb at
+                    # the edge of the continuous, graded motor strip.
+                    landings.append(segment.buffer(min(road_width,lane_width)/2,cap_style='flat'))
         for segment in segments:
             face = segment.buffer(road_width/2,cap_style='flat')
             # Join consecutive road sections through the wheel turning area.
@@ -105,10 +114,12 @@ def bake(directory, chunks, graded=None, tunnels=()):
     # alongside a cutting. At a daylight mouth the two road edges meet.
     cuts = []
     for tunnel in tunnels:
-        if not tunnel.get('openCut'):
-            continue
         axis = LineString([(x,z) for x,_,z in tunnel['portals']])
-        cuts.append(axis.buffer(tunnel['halfWidth'],cap_style='flat'))
+        first,last = tunnel.get('openEnds',(0,0))
+        for start,stop in ((0,first),(axis.length-last,axis.length)):
+            if stop-start>.001:
+                cut = substring(axis,max(0,start),min(axis.length,stop))
+                cuts.append(cut.buffer(tunnel['halfWidth'],cap_style='flat'))
     cut_tree = STRtree(cuts)
     new_pavement = []
     tree = STRtree(shapes)

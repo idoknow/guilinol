@@ -70,10 +70,10 @@ def fit_patch(control, mask, left, top, roads, anchors, curvature=.005):
     for line,tags in roads:
         if line.length<.1:
             continue
-        ds = np.linspace(0,line.length,max(2,math.ceil(line.length/3)+1))
+        ds = np.linspace(0,line.length,max(2,math.ceil(line.length/2)+1))
         xy = get_coordinates(line_interpolate_point(line,ds))
         ij = np.rint((xy-[left,top])/STEP+1).astype(int)
-        keep = distance[np.clip(ij[:,1],0,shape[0]-1),np.clip(ij[:,0],0,shape[1]-1)] < 96
+        keep = distance[np.clip(ij[:,1],0,shape[0]-1),np.clip(ij[:,0],0,shape[1]-1)] < 128
         if not keep.any():
             continue
         direction = np.gradient(xy,axis=0)
@@ -93,7 +93,7 @@ def fit_patch(control, mask, left, top, roads, anchors, curvature=.005):
         lengths = np.linalg.norm(legs,axis=1)
         if len(legs)>1:
             ij = np.rint((coords[1:-1]-[left,top])/STEP+1).astype(int)
-            corner = distance[np.clip(ij[:,1],0,shape[0]-1),np.clip(ij[:,0],0,shape[1]-1)]<96
+            corner = distance[np.clip(ij[:,1],0,shape[0]-1),np.clip(ij[:,0],0,shape[1]-1)]<128
             directions = legs/np.maximum(lengths[:,None],1.e-8)
             corner &= np.sum(directions[1:]*directions[:-1],axis=1)<.999
             for tangent in (directions[:-1][corner],directions[1:][corner]):
@@ -106,7 +106,9 @@ def fit_patch(control, mask, left, top, roads, anchors, curvature=.005):
         step = ds[1]
         slope = (center[1:]-center[:-1])/step
         valid = keep[:-1]&keep[1:]
-        cap = grade_cap(tags)
+        # Leave headroom for centimetre deck vertices, the 4 m street
+        # tessellation, and interpolation across bends between survey stations.
+        cap = .90 * grade_cap(tags)
         bounds(slope[valid],-cap,cap)
         bounds(((slope[1:]-slope[:-1])/step)[valid[1:]&valid[:-1]],-curvature,curvature)
         samples.append(xy[keep])
@@ -135,8 +137,9 @@ def fit_patch(control, mask, left, top, roads, anchors, curvature=.005):
         raise InfeasibleApproach(f'Rail approach fit at ({left},{top}): {solution.status}')
     target[free] = solution.x
     fitted = datum+target.reshape(shape)
-    blend = np.clip((136-distance)/40,0,1)
-    control += (fitted-control)*blend**2*(3-2*blend)
+    # The outer knots are fixed in the solve. A second blend after solving
+    # shortens the tie-in and changes the already constrained derivative.
+    control[:] = fitted
     return np.vstack(samples),np.concatenate(radii)
 
 
@@ -239,6 +242,8 @@ def grade_approach_surfaces(ways, crossings, panels, tunnels, plans, protected, 
         edge = (d-radii[idx]).reshape(xx.shape)
         blend = np.clip((24-edge)/14,0,1)
         blend = blend**2*(3-2*blend)*(water[patch]==-32768)
+        np.maximum(protected.paved_support[patch], np.rint(blend*255).astype(np.uint8),
+                   out=protected.paved_support[patch])
         road = eval_bspline_grid(local,left,top,xx,zz)-.24
         # A dry tile edge is rendered as 32 m chords. Keep both chord
         # supports below the fitted carriageway wherever it crosses that edge.
