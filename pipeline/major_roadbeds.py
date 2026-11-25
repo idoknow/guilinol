@@ -15,6 +15,18 @@ from features import points, polygons
 from road_profile import RULES, profile
 
 
+def remap_paths(tile, starts, ends):
+    """Carry each native roadbed flag to every surviving piece of its source."""
+    if not tile or 'roadbeds' not in tile:
+        return
+    mapped = []
+    for flag in tile['roadbeds']:
+        index = flag if flag >= 0 else -flag - 1
+        mapped.extend(child if flag >= 0 else -child - 1
+                      for child in range(starts[index], ends[index]))
+    tile['roadbeds'] = mapped
+
+
 def bake(directory, manifest):
     eligible, elevated, positive_bridges = [], [], []
     empty = STRtree([])

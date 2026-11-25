@@ -68,7 +68,7 @@ def clean_texture(data, footprint, color):
     return encoded.getvalue()
 
 
-def patch_tile(file, footprint, color, *, sidewalk=False, excluded=None):
+def patch_tile(file, footprint, color, tile=None, *, sidewalk=False):
     raw = gzip.decompress(file.read_bytes())
     vertices, indices, size, png_size = struct.unpack_from('<4I', raw, 4)
     start = 24+16900+9*vertices+4*indices
@@ -76,34 +76,17 @@ def patch_tile(file, footprint, color, *, sidewalk=False, excluded=None):
     paths = streets[0]
     lower = streets[11] if len(streets)>11 else None
     boundary = lower[0] if lower else len(paths)
-    rebuilt, occupied = [], []
+    rebuilt, occupied, offsets = [], [], []
     for kind, *loops in paths[:boundary]:
+        offsets.append(len(rebuilt))
         shape = make_valid(Polygon(np.asarray(loops[0])/100, [np.asarray(loop)/100 for loop in loops[1:]]))
         if not sidewalk and kind in (1, 4, 5, 6) and shape.intersects(footprint):
             rebuilt.extend(rings(kind, shape.difference(footprint)))
         else:
             rebuilt.append([kind, *loops]); occupied.append(shape)
-    if sidewalk:
-        deck_count, = struct.unpack_from('<I', raw, 20)
-        deck = np.frombuffer(raw, '<i2', deck_count*9, start+size+png_size).reshape(-1,3,3)
-        occupied.extend(Polygon(face[:,::2]/100) for face in deck)
-        for _, _, loops, *_ in collision[0]:
-            occupied.append(make_valid(Polygon(np.asarray(loops[0])/100, [np.asarray(loop)/100 for loop in loops[1:]])))
-        if excluded is not None:
-            occupied.append(excluded)
-    obstacles = union_all([part for shape in occupied for part in polygons(shape)]) if sidewalk else union_all(occupied)
-    if sidewalk:
-        footprint = set_precision(footprint, .01)
-    mask = obstacles.buffer(.02) if sidewalk else obstacles
-    fresh = set_precision(footprint.difference(mask), .01)
-    if sidewalk and any(set_precision(part, 0).intersection(obstacles).area > 1e-10 for part in polygons(fresh)):
-        raise ValueError(f'Quantized walk overlaps protected geometry: {file}')
-    image_start = start+size
-    original = raw[image_start:image_start+png_size]
-    if fresh.area < .01 and not sidewalk:
-        return False
-    image = clean_texture(original, footprint, color)
-    if fresh.area < .01 and image == original:
+    offsets.append(len(rebuilt))
+    fresh = set_precision(footprint.difference(union_all(occupied)), .01)
+    if fresh.area < .01:
         return False
     if sidewalk:
         rebuilt.extend(rings(1, fresh))
@@ -114,6 +97,9 @@ def patch_tile(file, footprint, color, *, sidewalk=False, excluded=None):
                 rebuilt.extend(rings(0, fresh.intersection(box(east,south,east+16,south+16))))
     if lower:
         lower[0] = len(rebuilt)
+    from major_roadbeds import remap_paths
+    suffix=list(range(len(rebuilt),len(rebuilt)+len(paths)-boundary))
+    remap_paths(tile,offsets[:-1]+suffix,offsets[1:]+[i+1 for i in suffix])
     streets[0] = rebuilt + paths[boundary:]
     encoded = json.dumps(collision,separators=(',', ':')).encode()
     payload = raw[:12]+struct.pack('<II',len(encoded),len(image))+raw[20:start]+encoded+image+raw[image_start+png_size:]
@@ -212,11 +198,7 @@ def bake_footprints(output, manifest, palette, tree, *, sidewalk=False, protecte
                 continue
         shape = translate(clipped, -east,-south)
         file = output/tile['file']
-        excluded = None
-        if protected is not None:
-            obstacles = protected.geometries.take(protected.query(bounds, predicate='intersects'))
-            excluded = translate(union_all(obstacles).intersection(bounds), -east, -south)
-        if patch_tile(file, shape, ImageColor.getrgb(palette['road']), sidewalk=sidewalk, excluded=excluded):
+        if patch_tile(file, shape, ImageColor.getrgb(palette['road']), tile, sidewalk=sidewalk):
             changed += 1; tile['bytes'] = file.stat().st_size
     label = 'City walks' if sidewalk else 'Minor streets'
     print(f'{label}: {len(tree.geometries)} ways, {changed} changed chunks')

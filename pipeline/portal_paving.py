@@ -5,6 +5,7 @@ import math
 import numpy as np
 from shapely import LineString, Polygon, STRtree, box, make_valid, set_precision, union_all
 from shapely.affinity import translate
+from major_roadbeds import remap_paths
 from common import ll2xz
 from vehicle_tunnels import underground
 from service_streets import rings, width
@@ -42,7 +43,9 @@ def restore(output, chunks):
         file = output / tile['file']
         raw, start, size, collision = read_chunk(file)
         paths = collision[1]
-        paths[0], lower = inputs[tile['file']]
+        paths[0], lower, *saved = inputs[tile['file']]
+        if saved:
+            tile['roadbeds'] = saved[0]
         if len(paths) > 11 and paths[11]:
             paths[11][0] = lower
         write_chunk(file, raw, start, size, collision)
@@ -95,6 +98,9 @@ def trim(output,chunks,tunnels,elements,widths):
             continue
         if not tile.get('gradedCorridor'):
             inputs[tile['file']] = [paths[0], lower[0] if lower else None]
+            if 'roadbeds' in tile:
+                inputs[tile['file']].append(tile['roadbeds'])
+        remap_paths(tile,offsets[:-1],offsets[1:])
         if lower:lower[0]=offsets[lower[0]]
         if survey:
             survey['start']=offsets[survey['start']]
