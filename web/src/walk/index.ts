@@ -1145,8 +1145,8 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
     position:()=>sim.body.translation(),face:(angle)=>{yaw=angle+Math.PI;facing=yaw+avatar.yaw;figure.rotation.y=facing},
     teleport:(x,z,angle)=>enter(x,z,angle,'fishing'),hand:()=>avatarRig.attachmentAt?.('hand_r')??figure.getObjectByName('hand_r'),scene,camera,
   },verify))
-  // 钓鱼视觉（IDOK-336）定稿前只在 ?fishing 或 verify 下开放，避免占位面板随发版上线。
-  const fishingOn=verify||new URLSearchParams(location.search).has('fishing')
+  // 钓鱼（IDOK-336）默认开放；?fishing=0 可临时关掉（排查问题用）。
+  const fishingOn=verify||new URLSearchParams(location.search).get('fishing')!=='0'
   window.addEventListener('fishing:slot',()=>{if(!fishingOn)return;void loadFishing().then(session=>session.toggle())})
   if(verify)Object.assign(window,{fishing:{teleportToSpot:async(id:string)=>(await loadFishing()).teleportToSpot(id)}})
   const footMetrics={soleOffset:avatarRig.soleOffset,footProbes:avatarRig.footProbes}
