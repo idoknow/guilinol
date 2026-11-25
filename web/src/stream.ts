@@ -47,6 +47,7 @@ export class Stream {
   private priorityUntil = 0
   private lastPosition = new THREE.Vector3(Infinity,0,0)
   private queue:Tile[]=[]
+  get queuedTiles(){return this.queue.length}
   private queueIsInner=false
   private innerPending = new Set<Tile>()
 

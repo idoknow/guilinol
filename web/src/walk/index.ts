@@ -1366,7 +1366,7 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
   const boatBoardFrom=new THREE.Vector3(), boatLandFrom=new THREE.Vector3()
   let boatBoardElapsed=BOAT_BOARD_DUR, boatBoardYaw=0, boatLandElapsed=BOAT_LAND_DUR, boatLandYaw=0
   let wasBoat=false,wasBike=false,wasCar=false,bikeObstacle=''
-  function place(x:number,z:number,reason:string,override=false,prefound?:ReturnType<typeof sim.findWalkableSpawn>){const found=prefound??sim.findWalkableSpawn(x,z,override)
+  function place(x:number,z:number,reason:string,override=false,prefound?:ReturnType<typeof sim.findWalkableSpawn>,reject?:Parameters<typeof sim.findWalkableSpawn>[5]){const found=prefound??sim.findWalkableSpawn(x,z,override,false,undefined,reject)
     if(verify)spawns.push({reason,from:[x,z],to:found?[found.x,found.z]:null,distance:found?Math.hypot(found.x-x,found.z-z):null,rule:found?.rule??'none'})
     if(!found)return false
     sim.body.setTranslation(found,true);sim.body.setNextKinematicTranslation(found);sim.world.step();safe.set(found.x,found.y,found.z);resetMotion();return true}
@@ -1391,8 +1391,13 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
     return ready
   }
   async function enter(x:number,z:number,heading:number,reason:string,override=false,signal?:AbortSignal,progress?:(fraction:number,detail:string)=>void){
+    const started=performance.now()
+    function fail(cause:string,detail:object={}){
+      console.warn('walk:enter-failed',JSON.stringify({reason,x,z,cause,elapsedMs:Math.round(performance.now()-started),loaded:stream.loaded.size,queued:stream.queuedTiles,pending:stream.pending.size,...detail}))
+      return false
+    }
     if(!sim.withinBounds(x,z)){
-      if(!manifest.region)return false
+      if(!manifest.region)return fail('outside-bounds')
       const point=nearestPlayable(manifest,x,z)
       x=point.x;z=point.z
     }
@@ -1412,8 +1417,8 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
     const deadline=performance.now()+(signal?60000:15000)
     let reported=''
     while((needed.some(tile=>!stream.loaded.has(tile))||supports.some(entry=>!stream.landmarks.has(entry)))&&performance.now()<deadline){
-      if(signal?.aborted){if(destination===target)destination=null;return false}
-      if(destination!==target)return false
+      if(signal?.aborted){if(destination===target)destination=null;return fail('aborted')}
+      if(destination!==target)return fail('superseded')
       if(progress){const tiles=needed.filter(tile=>stream.loaded.has(tile)).length,landmarks=supports.filter(entry=>stream.landmarks.has(entry)).length
         const key=`${tiles}:${landmarks}`;if(key!==reported){reported=key;progress(.3+.6*tiles/Math.max(1,needed.length)+.1*landmarks/Math.max(1,supports.length),`街区 ${tiles} / ${needed.length}`)}}
       target.y=0;stream.tick(target)
@@ -1422,13 +1427,17 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
       }
       await new Promise(resolve=>setTimeout(resolve,12))
     }
-    if(destination!==target)return false
+    if(destination!==target)return fail('superseded')
     destination=null
-    if(signal?.aborted)return false
-    if(needed.some(tile=>!stream.loaded.has(tile))||supports.some(entry=>!stream.landmarks.has(entry)))return false
+    if(signal?.aborted)return fail('aborted')
+    const missingTiles=needed.filter(tile=>!stream.loaded.has(tile)).map(tile=>tile.file),missingLandmarks=supports.filter(entry=>!stream.landmarks.has(entry)).map(entry=>entry.id)
+    if(missingTiles.length||missingLandmarks.length)return fail('collision-load-timeout',{missingTiles,missingLandmarks})
     if(active)resetWalk()
     syncSceneObstacleVolumes()
-    sim.sync(x,z);if(!place(x,z,reason,override)){disconnect();window.dispatchEvent(new CustomEvent('walk:spawn-failed',{detail:{x,z,reason:'no-walkable-support'}}));return false}
+    const rejected:Record<string,{count:number,x:number,z:number,hitY:number|null,slope?:number}>={}
+    sim.sync(x,z);if(!place(x,z,reason,override,undefined,(why,cx,cz,hitY,slope)=>{
+      const sample=rejected[why]??={count:0,x:cx,z:cz,hitY:hitY??null,slope};sample.count++
+    })){disconnect();window.dispatchEvent(new CustomEvent('walk:spawn-failed',{detail:{x,z,reason:'no-walkable-support'}}));return fail('no-walkable-support',{rejected})}
     active=true;rides?.show(true);requestAnimationFrame(()=>requestAnimationFrame(loadRides));figure.visible=true;firstPersonHidden=false
     yaw=heading;facing=yaw+avatar.yaw;figure.rotation.y=facing;input.show(true);accumulator=0;rig.reset(arm)
     restoreFootLocomotion(avatar.clips.idle)
