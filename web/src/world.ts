@@ -1,4 +1,4 @@
-import {bedPositions,type RoadBed} from './roadbed'
+import {bedPositions,nativeTerrainIndices,type RoadBed} from './roadbed'
 import {cacheResponse} from './telemetry'
 import * as THREE from 'three'
 import {buildingGeometry,type Building} from './buildings'
@@ -396,10 +396,7 @@ export async function detail(tile:Tile, signal:AbortSignal, parseSlot?:()=>Promi
     const index=geometry.index!
     const faces=roadBed=new Uint8Array(Math.ceil(index.count/24))
     for(const face of bed.drop)faces[face>>3]|=1<<(face&7)
-    const keep=Array.from(index.array).filter((_,i)=>{
-      const face=Math.floor(i/3)
-      return !(faces[face>>3]&(1<<(face&7)))
-    })
+    const keep=nativeTerrainIndices(segments,heights,faces)
     const extra=bedPositions(bed),original=heights.count
     const combined=new Float32Array(heights.array.length+extra.length)
     combined.set(heights.array);combined.set(extra,heights.array.length)
