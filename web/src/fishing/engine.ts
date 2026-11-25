@@ -1,4 +1,4 @@
-import {castRules,chooseFish,fishForce,junk,sizes,tackle,type Method,type Species,type Water} from './config.ts'
+import {castRules,chooseFish,fishForce,junk,sizes,tackle,weightScale,type Method,type Species,type Water} from './config.ts'
 import {basePrice} from './grades.ts'
 
 export type Stage='idle'|'equip'|'cast'|'retrieve'|'approach'|'nibble'|'hit'|'fight'|'wait'|'land'|'snap'|'escape'|'miss'|'junk'|'empty-hook'
@@ -45,7 +45,7 @@ export class FishingEngine {
     if(!fish&&!trash){this.go('miss');return}
     const fraction=this.random(), size=fish?sizes.indexOf(fish.size):0
     const item:Catch={id:crypto.randomUUID(),speciesId:trash?'':fish!.id,name:trash?junk[Math.floor(this.random()*junk.length)]:fish!.name,
-      grade:trash?'junk':fish!.grade,size:trash?'':fish!.size,weight:trash?0:Math.round((.1+fraction)*[.1,.7,3,16,70][size]*100)/100,
+      grade:trash?'junk':fish!.grade,size:trash?'':fish!.size,weight:trash?0:Math.round((.1+fraction)*weightScale[size]*100)/100,
       water:setup.water.id,method:setup.method,time:Date.now(),price:trash?Math.floor(this.random()*3):basePrice(fish!.grade,fraction)}
     const accepted=this.accept(item)
     if(accepted==='BAG_FULL'){this.setup=undefined;this.go('miss');return}

@@ -7,6 +7,8 @@ import {selectSlot,hotbarSlot,showSmokeDiscard,showFishingSlot} from '../ui/hotb
 import {nearestFishingShore} from '../fishing/zones'
 import {openWater} from '../fishing/surface'
 import {fishingMarks} from '../fishing/marks'
+import '../fishing/report'
+import {createSteles} from '../fishing/steles'
 import {getActiveSaveSnapshot,takeFromPack} from '../game/save'
 import {rules,validRules} from '../smoke/data'
 import {createSmokePrompt} from '../smoke/prompt'
@@ -1158,6 +1160,7 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
   // 钓点可发现（IDOK-336 线上反馈）：40 m 内就亮出鱼竿格；切竿不移动玩家。
   const FISH_NEAR=40
   const fishMarks=fishingOn?fishingMarks(scene):undefined
+  const steles=fishingOn?createSteles(scene,sim.syncObstacleVolume):undefined
   window.addEventListener('fishing:slot',()=>{if(!fishingOn)return
     void loadFishing().then(session=>session.toggle())})
   if(verify)Object.assign(window,{fishing:{teleportToSpot:async(id:string)=>(await loadFishing()).teleportToSpot(id)}})
@@ -2007,6 +2010,7 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
     const before=performance.now(),start=rides?.boat?.position??sim.body.translation();syncSceneObstacleVolumes();sim.sync(start.x,start.z,true);const footYNow=rides?.boat?start.y:start.y-cfg.height/2;rides?.nearby(start.x,start.z,footYNow);interactArbiter.sync(actionButton);syncGameTravelState();updateShopHintRings(start.x,start.z,footYNow)
     showFishingSlot(fishingOn&&!rides?.bike&&!rides?.boat&&!rides?.car&&(hotbarSlot()==='fishing'||nearestFishingShore(start.x,start.z).distance<=FISH_NEAR))
     fishMarks?.tick(start.x,start.z,dt,hotbarSlot()==='fishing',start.y)
+    steles?.tick(start.x,start.z)
     if(cigarette.active && (rides?.bike||rides?.boat||rides?.car)){
       cancelSmoke()
       smoking?.tick(dt,cigarette.view(),false)

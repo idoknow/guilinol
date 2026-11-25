@@ -42,6 +42,7 @@ export function chooseFish(water:Water,method:Method,baitId:string,line:number,r
   return pool.find((_,i)=>(cursor-=weights[i])<0)
 }
 export const sizes=['微型','小型','中型','大型','巨型']
+export const weightScale=[.1,.7,3,16,70]
 export function fishForce(row:Species){return 4+5*sizes.indexOf(row.size)+6*['low','medium','high','legendary'].indexOf(row.grade)}
 
 export const dailyIncomeLimit=800
