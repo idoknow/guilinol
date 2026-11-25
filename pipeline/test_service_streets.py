@@ -10,10 +10,21 @@ import numpy as np
 from PIL import Image
 from shapely import Polygon, box, union_all
 
-from service_streets import patch_tile, width
+from service_streets import patch_tile, walk_lines, width
 
 
 class ServiceStreetTests(unittest.TestCase):
+    def test_walk_selection(self):
+        def spans(tags):
+            way = dict(type='way', geometry=[dict(lat=25, lon=110), dict(lat=25.001, lon=110)], tags=tags)
+            return [span for _, span in walk_lines([way])]
+        for highway, span in [('footway',3), ('path',2), ('pedestrian',4)]:
+            self.assertEqual(spans({'highway': highway}), [span])
+        self.assertEqual(spans({'highway':'path','width':'8 ft'}), [8*.3048])
+        for extra in [dict(highway='steps'), dict(footway='sidewalk'), dict(footway='crossing'),
+                      dict(layer='-1'), dict(bridge='yes'), dict(tunnel='yes'), dict(indoor='yes'), dict(area='yes')]:
+            self.assertEqual(spans({'highway':'footway', **extra}), [])
+
     def test_width(self):
         self.assertEqual(width({}), 4)
         self.assertEqual(width({'service':'driveway'}), 3)
@@ -30,7 +41,7 @@ class ServiceStreetTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as folder:
             file = Path(folder)/'test.glc'
             file.write_bytes(gzip.compress(struct.pack('<4s5I', b'GL04',0,0,len(collision),len(png.getvalue()),0)
-                                           +bytes(16900)+collision+png.getvalue()))
+                                           +bytes(8450)+np.full(4225,-32768,dtype='<i2').tobytes()+collision+png.getvalue()))
             footway = file.with_name('footway.glc')
             footway.write_bytes(file.read_bytes())
             strip = box(4,10,28,14)
@@ -39,8 +50,25 @@ class ServiceStreetTests(unittest.TestCase):
             new_paths = json.loads(raw[16924:16924+struct.unpack_from('<I',raw,12)[0]])[1][0]
             self.assertEqual(new_paths[:2], [road, walk])
             self.assertEqual([kind for kind,*_ in new_paths[2:]], [1])
-            self.assertTrue(Polygon(np.array(new_paths[2][1])/100).equals(box(8,10,28,14)))
+            paved_walk = Polygon(np.array(new_paths[2][1])/100)
+            self.assertTrue(paved_walk.equals(box(8.02,10,28,14)))
+            self.assertEqual(paved_walk.intersection(box(0,0,6,30)).area, 0)
             self.assertFalse(patch_tile(footway,strip,(216,210,193),sidewalk=True))
+            blocked = file.with_name('protected.glc')
+            building = [[1000,900],[1600,1350],[1200,1600]]
+            data = bytearray(gzip.decompress(file.read_bytes()))
+            data[8474+2*(3*65+5):8476+2*(3*65+5)] = struct.pack('<h',1500)
+            protected = json.dumps([[[0,10,[building]]], [[road,walk],[],[]],[],[]]).encode()
+            struct.pack_into('<I',data,12,len(protected))
+            data[16924:16924+len(collision)] = protected
+            blocked.write_bytes(gzip.compress(data))
+            self.assertTrue(patch_tile(blocked,strip,(216,210,193),sidewalk=True))
+            data = gzip.decompress(blocked.read_bytes())
+            created = json.loads(data[16924:16924+struct.unpack_from('<I',data,12)[0]])[1][0][2:]
+            for _, shell, *holes in created:
+                shape = Polygon(np.array(shell)/100,[np.array(hole)/100 for hole in holes])
+                self.assertEqual(shape.intersection(Polygon(np.array(building)/100)).area, 0)
+                self.assertEqual(shape.intersection(box(16,8,24,16)).area, 0)
             self.assertTrue(patch_tile(file,box(4,10,28,14),(216,210,193)))
             data = gzip.decompress(file.read_bytes()); size, image_size = struct.unpack_from('<II',data,12)
             paths = json.loads(data[16924:16924+size])[1][0]
