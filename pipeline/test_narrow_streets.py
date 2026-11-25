@@ -2,7 +2,7 @@ import unittest
 
 from shapely import LineString, Polygon, box, union_all
 
-from narrow_streets import narrow_intervals
+from narrow_streets import driving_alignment, narrow_intervals
 
 
 class NarrowStreetTests(unittest.TestCase):
@@ -12,6 +12,15 @@ class NarrowStreetTests(unittest.TestCase):
             with self.subTest(width=width, length=length):
                 walls = union_all([box(0, -4, length, -width / 2), box(0, width / 2, length, 4)])
                 self.assertEqual(narrow_intervals(axis, walls), expected)
+
+    def test_rider_finishes_on_the_nearest_clear_adjoining_street(self):
+        route = [(0, 0, 1), (10, 0, 2), (20, 0, 3)]
+        wall = box(11, .2, 22, 1)
+        exits = {3: [LineString([(20, 0), (20, -4)])]}
+        result = driving_alignment(route, wall, exits)
+        self.assertEqual(result[:-1], [(0, 0), (10, 0)])
+        self.assertAlmostEqual(result[-1][0], 20)
+        self.assertAlmostEqual(result[-1][1], -.45)
 
     def test_open_courtyard_interrupts_a_pinch(self):
         axis = LineString([(0, 0), (5, 0), (20, 0)])
