@@ -1,359 +1,385 @@
 {
-  "renderer": {
-    "width": 1920,
-    "height": 1080,
-    "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M3 Pro, Unspecified Version)",
-    "dpr": 1
-  },
-  "primarySampleMs": 10000,
-  "primaryMinFrames": 60,
   "seed": 242,
-  "order": [
-    "main",
-    "candidate",
-    "main",
-    "candidate",
-    "main",
-    "candidate"
-  ],
+  "pedestrians": 0,
+  "order": "alternating main then candidate, three pairs",
+  "main": "04036c4f78cd4d8c4993b9b338bec9097eb9964b",
+  "candidate": "b945226962971c02f6ccba25ee60134a7d27c04a",
+  "primarySampleMs": 10000,
+  "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M3 Pro, Unspecified Version)",
   "desktop": {
-    "candidate": [
-      {
-        "overview": {
-          "p95Ms": 16.8,
-          "meanMs": 16.67,
-          "calls": 14,
-          "mirrorCalls": 13,
-          "heapPeakBytes": 108366370,
-          "motors": 0,
-          "loadedChunks": 12
-        },
-        "lijiang": {
-          "p95Ms": 16.7,
-          "meanMs": 16.72,
-          "calls": 43,
-          "mirrorCalls": 40,
-          "heapPeakBytes": 323931290,
-          "motors": 0,
-          "loadedChunks": 11
-        },
-        "palace": {
-          "p95Ms": 16.8,
-          "meanMs": 16.75,
-          "calls": 63,
-          "mirrorCalls": 57,
-          "heapPeakBytes": 428619319,
-          "motors": 2,
-          "loadedChunks": 12
-        },
-        "south": {
-          "p95Ms": 16.8,
-          "meanMs": 16.67,
-          "calls": 41,
-          "mirrorCalls": 38,
-          "heapPeakBytes": 117770286,
-          "motors": 3,
-          "loadedChunks": 12
-        },
-        "walk-palace": {
-          "p95Ms": 16.8,
-          "meanMs": 16.67,
-          "calls": 117,
-          "mirrorCalls": 106,
-          "heapPeakBytes": 460675050,
-          "motors": 4,
-          "loadedChunks": 12
-        },
-        "street-jiefang": {
-          "p95Ms": 16.8,
-          "meanMs": 17.21,
-          "calls": 65,
-          "mirrorCalls": 59,
-          "heapPeakBytes": 471132046,
-          "motors": 24,
-          "loadedChunks": 13
-        }
-      },
-      {
-        "overview": {
-          "p95Ms": 16.8,
-          "meanMs": 16.67,
-          "calls": 14,
-          "mirrorCalls": 13,
-          "heapPeakBytes": 108483986,
-          "motors": 0,
-          "loadedChunks": 12
-        },
-        "lijiang": {
-          "p95Ms": 16.8,
-          "meanMs": 16.67,
-          "calls": 46,
-          "mirrorCalls": 43,
-          "heapPeakBytes": 348214085,
-          "motors": 0,
-          "loadedChunks": 11
-        },
-        "palace": {
-          "p95Ms": 16.7,
-          "meanMs": 16.72,
-          "calls": 61,
-          "mirrorCalls": 56,
-          "heapPeakBytes": 441233175,
-          "motors": 5,
-          "loadedChunks": 12
-        },
-        "south": {
-          "p95Ms": 16.7,
-          "meanMs": 16.67,
-          "calls": 41,
-          "mirrorCalls": 38,
-          "heapPeakBytes": 191951094,
-          "motors": 4,
-          "loadedChunks": 12
-        },
-        "walk-palace": {
-          "p95Ms": 16.8,
-          "meanMs": 17.18,
-          "calls": 126,
-          "mirrorCalls": 103,
-          "heapPeakBytes": 521736195,
-          "motors": 3,
-          "loadedChunks": 12
-        },
-        "street-jiefang": {
-          "p95Ms": 16.8,
-          "meanMs": 17.24,
-          "calls": 65,
-          "mirrorCalls": 59,
-          "heapPeakBytes": 477946472,
-          "motors": 27,
-          "loadedChunks": 13
-        }
-      },
-      {
-        "overview": {
-          "p95Ms": 16.8,
-          "meanMs": 16.67,
-          "calls": 14,
-          "mirrorCalls": 13,
-          "heapPeakBytes": 108542791,
-          "motors": 0,
-          "loadedChunks": 12
-        },
-        "lijiang": {
-          "p95Ms": 16.7,
-          "meanMs": 16.69,
-          "calls": 44,
-          "mirrorCalls": 41,
-          "heapPeakBytes": 326949655,
-          "motors": 0,
-          "loadedChunks": 11
-        },
-        "palace": {
-          "p95Ms": 16.7,
-          "meanMs": 16.67,
-          "calls": 61,
-          "mirrorCalls": 56,
-          "heapPeakBytes": 431886422,
-          "motors": 4,
-          "loadedChunks": 12
-        },
-        "south": {
-          "p95Ms": 16.8,
-          "meanMs": 16.67,
-          "calls": 41,
-          "mirrorCalls": 38,
-          "heapPeakBytes": 154983081,
-          "motors": 2,
-          "loadedChunks": 12
-        },
-        "walk-palace": {
-          "p95Ms": 16.7,
-          "meanMs": 16.72,
-          "calls": 111,
-          "mirrorCalls": 100,
-          "heapPeakBytes": 473113467,
-          "motors": 6,
-          "loadedChunks": 12
-        },
-        "street-jiefang": {
-          "p95Ms": 16.8,
-          "meanMs": 17.21,
-          "calls": 64,
-          "mirrorCalls": 58,
-          "heapPeakBytes": 506104052,
-          "motors": 26,
-          "loadedChunks": 13
-        }
-      }
-    ],
     "main": [
       {
         "overview": {
-          "p95Ms": 16.7,
-          "meanMs": 16.67,
+          "p95Ms": 16.8,
           "calls": 14,
           "mirrorCalls": 13,
-          "heapPeakBytes": 108365021,
-          "motors": 0,
-          "loadedChunks": 12
+          "heapPeakBytes": 109399820,
+          "triangles": 61768,
+          "maxMirrorTriangles": 54368,
+          "averageVisiblePeople": 0,
+          "averageVisibleMotors": 0
         },
         "lijiang": {
-          "p95Ms": 16.7,
-          "meanMs": 16.69,
-          "calls": 57,
-          "mirrorCalls": 54,
-          "heapPeakBytes": 315834539,
-          "motors": 0,
-          "loadedChunks": 11
+          "p95Ms": 16.8,
+          "calls": 35,
+          "mirrorCalls": 32,
+          "heapPeakBytes": 279060640,
+          "triangles": 372994,
+          "maxMirrorTriangles": 363243,
+          "averageVisiblePeople": 0,
+          "averageVisibleMotors": 0
         },
         "palace": {
-          "p95Ms": 16.8,
-          "meanMs": 16.72,
-          "calls": 56,
-          "mirrorCalls": 51,
-          "heapPeakBytes": 429221391,
-          "motors": 3,
-          "loadedChunks": 12
-        },
-        "south": {
           "p95Ms": 16.7,
-          "meanMs": 16.67,
-          "calls": 41,
-          "mirrorCalls": 38,
-          "heapPeakBytes": 176442544,
-          "motors": 2,
-          "loadedChunks": 12
-        },
-        "walk-palace": {
-          "p95Ms": 16.8,
-          "meanMs": 16.69,
-          "calls": 115,
-          "mirrorCalls": 108,
-          "heapPeakBytes": 457519815,
-          "motors": 0,
-          "loadedChunks": 12
-        },
-        "street-jiefang": {
-          "p95Ms": 16.7,
-          "meanMs": 16.72,
-          "calls": 72,
-          "mirrorCalls": 66,
-          "heapPeakBytes": 450534549,
-          "motors": 25,
-          "loadedChunks": 13
-        }
-      },
-      {
-        "overview": {
-          "p95Ms": 16.7,
-          "meanMs": 16.67,
-          "calls": 14,
-          "mirrorCalls": 13,
-          "heapPeakBytes": 108383001,
-          "motors": 0,
-          "loadedChunks": 12
-        },
-        "lijiang": {
-          "p95Ms": 16.8,
-          "meanMs": 16.75,
-          "calls": 59,
-          "mirrorCalls": 56,
-          "heapPeakBytes": 319153232,
-          "motors": 0,
-          "loadedChunks": 11
-        },
-        "palace": {
-          "p95Ms": 16.8,
-          "meanMs": 17.24,
-          "calls": 69,
-          "mirrorCalls": 61,
-          "heapPeakBytes": 436581113,
-          "motors": 4,
-          "loadedChunks": 12
-        },
-        "south": {
-          "p95Ms": 16.8,
-          "meanMs": 16.67,
-          "calls": 41,
-          "mirrorCalls": 38,
-          "heapPeakBytes": 172882292,
-          "motors": 5,
-          "loadedChunks": 12
-        },
-        "walk-palace": {
-          "p95Ms": 16.7,
-          "meanMs": 16.69,
-          "calls": 114,
-          "mirrorCalls": 105,
-          "heapPeakBytes": 453156418,
-          "motors": 0,
-          "loadedChunks": 12
-        },
-        "street-jiefang": {
-          "p95Ms": 16.8,
-          "meanMs": 16.67,
-          "calls": 77,
-          "mirrorCalls": 71,
-          "heapPeakBytes": 451885879,
-          "motors": 27,
-          "loadedChunks": 13
-        }
-      },
-      {
-        "overview": {
-          "p95Ms": 16.7,
-          "meanMs": 16.67,
-          "calls": 14,
-          "mirrorCalls": 13,
-          "heapPeakBytes": 107945257,
-          "motors": 0,
-          "loadedChunks": 12
-        },
-        "lijiang": {
-          "p95Ms": 16.8,
-          "meanMs": 16.72,
           "calls": 53,
-          "mirrorCalls": 50,
-          "heapPeakBytes": 313155877,
-          "motors": 0,
-          "loadedChunks": 11
-        },
-        "palace": {
-          "p95Ms": 16.8,
-          "meanMs": 17.18,
-          "calls": 56,
-          "mirrorCalls": 51,
-          "heapPeakBytes": 414333002,
-          "motors": 6,
-          "loadedChunks": 12
+          "mirrorCalls": 48,
+          "heapPeakBytes": 326587437,
+          "triangles": 452927,
+          "maxMirrorTriangles": 447602,
+          "averageVisiblePeople": 0,
+          "averageVisibleMotors": 0
         },
         "south": {
           "p95Ms": 16.8,
-          "meanMs": 16.67,
-          "calls": 41,
-          "mirrorCalls": 38,
-          "heapPeakBytes": 148695486,
-          "motors": 2,
-          "loadedChunks": 12
+          "calls": 34,
+          "mirrorCalls": 31,
+          "heapPeakBytes": 107813672,
+          "triangles": 239659,
+          "maxMirrorTriangles": 224696,
+          "averageVisiblePeople": 0,
+          "averageVisibleMotors": 0
         },
         "walk-palace": {
           "p95Ms": 16.7,
-          "meanMs": 16.69,
-          "calls": 126,
-          "mirrorCalls": 121,
-          "heapPeakBytes": 462353203,
-          "motors": 0,
-          "loadedChunks": 12
+          "calls": 100,
+          "mirrorCalls": 0,
+          "heapPeakBytes": 415405911,
+          "triangles": 734336,
+          "maxMirrorTriangles": 0,
+          "averageVisiblePeople": 0,
+          "averageVisibleMotors": 0.9251247920133111
         },
         "street-jiefang": {
+          "p95Ms": 16.7,
+          "calls": 61,
+          "mirrorCalls": 55,
+          "heapPeakBytes": 398354683,
+          "triangles": 596890,
+          "maxMirrorTriangles": 578966,
+          "averageVisiblePeople": 0,
+          "averageVisibleMotors": 1.4043261231281199
+        }
+      },
+      {
+        "overview": {
           "p95Ms": 16.8,
-          "meanMs": 16.72,
-          "calls": 71,
-          "mirrorCalls": 65,
-          "heapPeakBytes": 451153467,
-          "motors": 28,
-          "loadedChunks": 13
+          "calls": 14,
+          "mirrorCalls": 13,
+          "heapPeakBytes": 109987428,
+          "triangles": 61768,
+          "maxMirrorTriangles": 54368,
+          "averageVisiblePeople": 0,
+          "averageVisibleMotors": 0
+        },
+        "lijiang": {
+          "p95Ms": 16.7,
+          "calls": 35,
+          "mirrorCalls": 32,
+          "heapPeakBytes": 285580685,
+          "triangles": 372994,
+          "maxMirrorTriangles": 363243,
+          "averageVisiblePeople": 0,
+          "averageVisibleMotors": 0
+        },
+        "palace": {
+          "p95Ms": 16.7,
+          "calls": 53,
+          "mirrorCalls": 48,
+          "heapPeakBytes": 325430507,
+          "triangles": 452927,
+          "maxMirrorTriangles": 447602,
+          "averageVisiblePeople": 0,
+          "averageVisibleMotors": 0
+        },
+        "south": {
+          "p95Ms": 16.8,
+          "calls": 34,
+          "mirrorCalls": 31,
+          "heapPeakBytes": 107918920,
+          "triangles": 239659,
+          "maxMirrorTriangles": 224696,
+          "averageVisiblePeople": 0,
+          "averageVisibleMotors": 0
+        },
+        "walk-palace": {
+          "p95Ms": 16.8,
+          "calls": 100,
+          "mirrorCalls": 0,
+          "heapPeakBytes": 411420080,
+          "triangles": 734336,
+          "maxMirrorTriangles": 0,
+          "averageVisiblePeople": 0,
+          "averageVisibleMotors": 0.5990016638935108
+        },
+        "street-jiefang": {
+          "p95Ms": 16.7,
+          "calls": 61,
+          "mirrorCalls": 55,
+          "heapPeakBytes": 399050629,
+          "triangles": 596890,
+          "maxMirrorTriangles": 578966,
+          "averageVisiblePeople": 0,
+          "averageVisibleMotors": 1.475873544093178
+        }
+      },
+      {
+        "overview": {
+          "p95Ms": 16.7,
+          "calls": 14,
+          "mirrorCalls": 13,
+          "heapPeakBytes": 109403852,
+          "triangles": 61768,
+          "maxMirrorTriangles": 54368,
+          "averageVisiblePeople": 0,
+          "averageVisibleMotors": 0
+        },
+        "lijiang": {
+          "p95Ms": 16.7,
+          "calls": 35,
+          "mirrorCalls": 32,
+          "heapPeakBytes": 278983836,
+          "triangles": 372994,
+          "maxMirrorTriangles": 363243,
+          "averageVisiblePeople": 0,
+          "averageVisibleMotors": 0
+        },
+        "palace": {
+          "p95Ms": 16.7,
+          "calls": 53,
+          "mirrorCalls": 48,
+          "heapPeakBytes": 330743904,
+          "triangles": 452927,
+          "maxMirrorTriangles": 447602,
+          "averageVisiblePeople": 0,
+          "averageVisibleMotors": 0
+        },
+        "south": {
+          "p95Ms": 16.7,
+          "calls": 34,
+          "mirrorCalls": 31,
+          "heapPeakBytes": 107772804,
+          "triangles": 239659,
+          "maxMirrorTriangles": 224696,
+          "averageVisiblePeople": 0,
+          "averageVisibleMotors": 0
+        },
+        "walk-palace": {
+          "p95Ms": 16.7,
+          "calls": 100,
+          "mirrorCalls": 0,
+          "heapPeakBytes": 410506440,
+          "triangles": 734336,
+          "maxMirrorTriangles": 0,
+          "averageVisiblePeople": 0,
+          "averageVisibleMotors": 1.3211314475873543
+        },
+        "street-jiefang": {
+          "p95Ms": 16.7,
+          "calls": 61,
+          "mirrorCalls": 55,
+          "heapPeakBytes": 402613602,
+          "triangles": 596890,
+          "maxMirrorTriangles": 578966,
+          "averageVisiblePeople": 0,
+          "averageVisibleMotors": 1.5757071547420964
+        }
+      }
+    ],
+    "candidate": [
+      {
+        "overview": {
+          "p95Ms": 16.7,
+          "calls": 14,
+          "mirrorCalls": 13,
+          "heapPeakBytes": 109183869,
+          "triangles": 61768,
+          "maxMirrorTriangles": 54368,
+          "averageVisiblePeople": 0,
+          "averageVisibleMotors": 0
+        },
+        "lijiang": {
+          "p95Ms": 16.7,
+          "calls": 35,
+          "mirrorCalls": 32,
+          "heapPeakBytes": 284784058,
+          "triangles": 378371,
+          "maxMirrorTriangles": 368620,
+          "averageVisiblePeople": 0,
+          "averageVisibleMotors": 0
+        },
+        "palace": {
+          "p95Ms": 16.7,
+          "calls": 53,
+          "mirrorCalls": 48,
+          "heapPeakBytes": 321181159,
+          "triangles": 467238,
+          "maxMirrorTriangles": 461913,
+          "averageVisiblePeople": 0,
+          "averageVisibleMotors": 0
+        },
+        "south": {
+          "p95Ms": 16.7,
+          "calls": 34,
+          "mirrorCalls": 31,
+          "heapPeakBytes": 109068563,
+          "triangles": 239659,
+          "maxMirrorTriangles": 224696,
+          "averageVisiblePeople": 0,
+          "averageVisibleMotors": 0
+        },
+        "walk-palace": {
+          "p95Ms": 16.7,
+          "calls": 100,
+          "mirrorCalls": 0,
+          "heapPeakBytes": 414291363,
+          "triangles": 733635,
+          "maxMirrorTriangles": 0,
+          "averageVisiblePeople": 0,
+          "averageVisibleMotors": 2
+        },
+        "street-jiefang": {
+          "p95Ms": 16.7,
+          "calls": 61,
+          "mirrorCalls": 55,
+          "heapPeakBytes": 405792688,
+          "triangles": 596366,
+          "maxMirrorTriangles": 578442,
+          "averageVisiblePeople": 0,
+          "averageVisibleMotors": 1.8369384359400998
+        }
+      },
+      {
+        "overview": {
+          "p95Ms": 16.8,
+          "calls": 14,
+          "mirrorCalls": 13,
+          "heapPeakBytes": 111202029,
+          "triangles": 61768,
+          "maxMirrorTriangles": 54368,
+          "averageVisiblePeople": 0,
+          "averageVisibleMotors": 0
+        },
+        "lijiang": {
+          "p95Ms": 16.8,
+          "calls": 35,
+          "mirrorCalls": 32,
+          "heapPeakBytes": 287691887,
+          "triangles": 378371,
+          "maxMirrorTriangles": 368620,
+          "averageVisiblePeople": 0,
+          "averageVisibleMotors": 0
+        },
+        "palace": {
+          "p95Ms": 16.7,
+          "calls": 53,
+          "mirrorCalls": 48,
+          "heapPeakBytes": 320932727,
+          "triangles": 467238,
+          "maxMirrorTriangles": 461913,
+          "averageVisiblePeople": 0,
+          "averageVisibleMotors": 0
+        },
+        "south": {
+          "p95Ms": 16.8,
+          "calls": 34,
+          "mirrorCalls": 31,
+          "heapPeakBytes": 109137579,
+          "triangles": 239659,
+          "maxMirrorTriangles": 224696,
+          "averageVisiblePeople": 0,
+          "averageVisibleMotors": 0
+        },
+        "walk-palace": {
+          "p95Ms": 16.7,
+          "calls": 100,
+          "mirrorCalls": 0,
+          "heapPeakBytes": 408110854,
+          "triangles": 733635,
+          "maxMirrorTriangles": 0,
+          "averageVisiblePeople": 0,
+          "averageVisibleMotors": 1.0748752079866888
+        },
+        "street-jiefang": {
+          "p95Ms": 16.7,
+          "calls": 61,
+          "mirrorCalls": 55,
+          "heapPeakBytes": 406749045,
+          "triangles": 596366,
+          "maxMirrorTriangles": 578442,
+          "averageVisiblePeople": 0,
+          "averageVisibleMotors": 1.5773710482529117
+        }
+      },
+      {
+        "overview": {
+          "p95Ms": 16.7,
+          "calls": 14,
+          "mirrorCalls": 13,
+          "heapPeakBytes": 111204821,
+          "triangles": 61768,
+          "maxMirrorTriangles": 54368,
+          "averageVisiblePeople": 0,
+          "averageVisibleMotors": 0
+        },
+        "lijiang": {
+          "p95Ms": 16.8,
+          "calls": 35,
+          "mirrorCalls": 32,
+          "heapPeakBytes": 289892066,
+          "triangles": 378371,
+          "maxMirrorTriangles": 368620,
+          "averageVisiblePeople": 0,
+          "averageVisibleMotors": 0
+        },
+        "palace": {
+          "p95Ms": 16.7,
+          "calls": 53,
+          "mirrorCalls": 48,
+          "heapPeakBytes": 321037639,
+          "triangles": 467238,
+          "maxMirrorTriangles": 461913,
+          "averageVisiblePeople": 0,
+          "averageVisibleMotors": 0
+        },
+        "south": {
+          "p95Ms": 16.7,
+          "calls": 34,
+          "mirrorCalls": 31,
+          "heapPeakBytes": 109099307,
+          "triangles": 239659,
+          "maxMirrorTriangles": 224696,
+          "averageVisiblePeople": 0,
+          "averageVisibleMotors": 0
+        },
+        "walk-palace": {
+          "p95Ms": 16.7,
+          "calls": 100,
+          "mirrorCalls": 0,
+          "heapPeakBytes": 412777706,
+          "triangles": 733635,
+          "maxMirrorTriangles": 0,
+          "averageVisiblePeople": 0,
+          "averageVisibleMotors": 1.3510815307820299
+        },
+        "street-jiefang": {
+          "p95Ms": 16.7,
+          "calls": 61,
+          "mirrorCalls": 55,
+          "heapPeakBytes": 405871293,
+          "triangles": 596366,
+          "maxMirrorTriangles": 578442,
+          "averageVisiblePeople": 0,
+          "averageVisibleMotors": 1.9650582362728786
         }
       }
     ]
@@ -361,14 +387,9 @@
   "desktopMedians": {
     "overview": {
       "p95Ms": {
-        "main": 16.7,
-        "candidate": 16.8,
-        "ratio": 1.006
-      },
-      "meanMs": {
-        "main": 16.67,
-        "candidate": 16.67,
-        "ratio": 1.0
+        "main": 16.8,
+        "candidate": 16.7,
+        "ratio": 0.994047619047619
       },
       "calls": {
         "main": 14,
@@ -381,208 +402,442 @@
         "ratio": 1.0
       },
       "heapPeakBytes": {
-        "main": 108365021,
-        "candidate": 108483986,
-        "ratio": 1.0011
+        "main": 109403852,
+        "candidate": 111202029,
+        "ratio": 1.0164361397439645
       },
-      "motors": {
+      "triangles": {
+        "main": 61768,
+        "candidate": 61768,
+        "ratio": 1.0
+      },
+      "maxMirrorTriangles": {
+        "main": 54368,
+        "candidate": 54368,
+        "ratio": 1.0
+      },
+      "averageVisiblePeople": {
         "main": 0,
         "candidate": 0,
         "ratio": null
       },
-      "loadedChunks": {
-        "main": 12,
-        "candidate": 12,
-        "ratio": 1.0
+      "averageVisibleMotors": {
+        "main": 0,
+        "candidate": 0,
+        "ratio": null
       }
     },
     "lijiang": {
       "p95Ms": {
-        "main": 16.8,
-        "candidate": 16.7,
-        "ratio": 0.994
-      },
-      "meanMs": {
-        "main": 16.72,
-        "candidate": 16.69,
-        "ratio": 0.9982
+        "main": 16.7,
+        "candidate": 16.8,
+        "ratio": 1.005988023952096
       },
       "calls": {
-        "main": 57,
-        "candidate": 44,
-        "ratio": 0.7719
+        "main": 35,
+        "candidate": 35,
+        "ratio": 1.0
       },
       "mirrorCalls": {
-        "main": 54,
-        "candidate": 41,
-        "ratio": 0.7593
+        "main": 32,
+        "candidate": 32,
+        "ratio": 1.0
       },
       "heapPeakBytes": {
-        "main": 315834539,
-        "candidate": 326949655,
-        "ratio": 1.0352
+        "main": 279060640,
+        "candidate": 287691887,
+        "ratio": 1.0309296466889777
       },
-      "motors": {
+      "triangles": {
+        "main": 372994,
+        "candidate": 378371,
+        "ratio": 1.0144157814871018
+      },
+      "maxMirrorTriangles": {
+        "main": 363243,
+        "candidate": 368620,
+        "ratio": 1.0148027628887548
+      },
+      "averageVisiblePeople": {
         "main": 0,
         "candidate": 0,
         "ratio": null
       },
-      "loadedChunks": {
-        "main": 11,
-        "candidate": 11,
-        "ratio": 1.0
+      "averageVisibleMotors": {
+        "main": 0,
+        "candidate": 0,
+        "ratio": null
       }
     },
     "palace": {
       "p95Ms": {
-        "main": 16.8,
+        "main": 16.7,
         "candidate": 16.7,
-        "ratio": 0.994
-      },
-      "meanMs": {
-        "main": 17.18,
-        "candidate": 16.72,
-        "ratio": 0.9732
+        "ratio": 1.0
       },
       "calls": {
-        "main": 56,
-        "candidate": 61,
-        "ratio": 1.0893
+        "main": 53,
+        "candidate": 53,
+        "ratio": 1.0
       },
       "mirrorCalls": {
-        "main": 51,
-        "candidate": 56,
-        "ratio": 1.098
+        "main": 48,
+        "candidate": 48,
+        "ratio": 1.0
       },
       "heapPeakBytes": {
-        "main": 429221391,
-        "candidate": 431886422,
-        "ratio": 1.0062
+        "main": 326587437,
+        "candidate": 321037639,
+        "ratio": 0.9830067008976834
       },
-      "motors": {
-        "main": 4,
-        "candidate": 4,
-        "ratio": 1.0
+      "triangles": {
+        "main": 452927,
+        "candidate": 467238,
+        "ratio": 1.0315967032214903
       },
-      "loadedChunks": {
-        "main": 12,
-        "candidate": 12,
-        "ratio": 1.0
+      "maxMirrorTriangles": {
+        "main": 447602,
+        "candidate": 461913,
+        "ratio": 1.0319726006586207
+      },
+      "averageVisiblePeople": {
+        "main": 0,
+        "candidate": 0,
+        "ratio": null
+      },
+      "averageVisibleMotors": {
+        "main": 0,
+        "candidate": 0,
+        "ratio": null
       }
     },
     "south": {
       "p95Ms": {
         "main": 16.8,
-        "candidate": 16.8,
-        "ratio": 1.0
-      },
-      "meanMs": {
-        "main": 16.67,
-        "candidate": 16.67,
-        "ratio": 1.0
+        "candidate": 16.7,
+        "ratio": 0.994047619047619
       },
       "calls": {
-        "main": 41,
-        "candidate": 41,
+        "main": 34,
+        "candidate": 34,
         "ratio": 1.0
       },
       "mirrorCalls": {
-        "main": 38,
-        "candidate": 38,
+        "main": 31,
+        "candidate": 31,
         "ratio": 1.0
       },
       "heapPeakBytes": {
-        "main": 172882292,
-        "candidate": 154983081,
-        "ratio": 0.8965
+        "main": 107813672,
+        "candidate": 109099307,
+        "ratio": 1.0119246008057308
       },
-      "motors": {
-        "main": 2,
-        "candidate": 3,
-        "ratio": 1.5
-      },
-      "loadedChunks": {
-        "main": 12,
-        "candidate": 12,
+      "triangles": {
+        "main": 239659,
+        "candidate": 239659,
         "ratio": 1.0
+      },
+      "maxMirrorTriangles": {
+        "main": 224696,
+        "candidate": 224696,
+        "ratio": 1.0
+      },
+      "averageVisiblePeople": {
+        "main": 0,
+        "candidate": 0,
+        "ratio": null
+      },
+      "averageVisibleMotors": {
+        "main": 0,
+        "candidate": 0,
+        "ratio": null
       }
     },
     "walk-palace": {
       "p95Ms": {
         "main": 16.7,
-        "candidate": 16.8,
-        "ratio": 1.006
-      },
-      "meanMs": {
-        "main": 16.69,
-        "candidate": 16.72,
-        "ratio": 1.0018
+        "candidate": 16.7,
+        "ratio": 1.0
       },
       "calls": {
-        "main": 115,
-        "candidate": 117,
-        "ratio": 1.0174
+        "main": 100,
+        "candidate": 100,
+        "ratio": 1.0
       },
       "mirrorCalls": {
-        "main": 108,
-        "candidate": 103,
-        "ratio": 0.9537
-      },
-      "heapPeakBytes": {
-        "main": 457519815,
-        "candidate": 473113467,
-        "ratio": 1.0341
-      },
-      "motors": {
         "main": 0,
-        "candidate": 4,
+        "candidate": 0,
         "ratio": null
       },
-      "loadedChunks": {
-        "main": 12,
-        "candidate": 12,
-        "ratio": 1.0
+      "heapPeakBytes": {
+        "main": 411420080,
+        "candidate": 412777706,
+        "ratio": 1.0032998535219768
+      },
+      "triangles": {
+        "main": 734336,
+        "candidate": 733635,
+        "ratio": 0.9990453961129511
+      },
+      "maxMirrorTriangles": {
+        "main": 0,
+        "candidate": 0,
+        "ratio": null
+      },
+      "averageVisiblePeople": {
+        "main": 0,
+        "candidate": 0,
+        "ratio": null
+      },
+      "averageVisibleMotors": {
+        "main": 0.9251247920133111,
+        "candidate": 1.3510815307820299,
+        "ratio": 1.460431654676259
       }
     },
     "street-jiefang": {
       "p95Ms": {
-        "main": 16.8,
-        "candidate": 16.8,
+        "main": 16.7,
+        "candidate": 16.7,
         "ratio": 1.0
-      },
-      "meanMs": {
-        "main": 16.72,
-        "candidate": 17.21,
-        "ratio": 1.0293
       },
       "calls": {
-        "main": 72,
-        "candidate": 65,
-        "ratio": 0.9028
+        "main": 61,
+        "candidate": 61,
+        "ratio": 1.0
       },
       "mirrorCalls": {
-        "main": 66,
-        "candidate": 59,
-        "ratio": 0.8939
+        "main": 55,
+        "candidate": 55,
+        "ratio": 1.0
       },
       "heapPeakBytes": {
-        "main": 451153467,
-        "candidate": 477946472,
-        "ratio": 1.0594
+        "main": 399050629,
+        "candidate": 405871293,
+        "ratio": 1.0170922271619824
       },
-      "motors": {
-        "main": 27,
-        "candidate": 26,
-        "ratio": 0.963
+      "triangles": {
+        "main": 596890,
+        "candidate": 596366,
+        "ratio": 0.9991221163028363
       },
-      "loadedChunks": {
-        "main": 13,
-        "candidate": 13,
-        "ratio": 1.0
+      "maxMirrorTriangles": {
+        "main": 578966,
+        "candidate": 578442,
+        "ratio": 0.9990949382174428
+      },
+      "averageVisiblePeople": {
+        "main": 0,
+        "candidate": 0,
+        "ratio": null
+      },
+      "averageVisibleMotors": {
+        "main": 1.475873544093178,
+        "candidate": 1.8369384359400998,
+        "ratio": 1.2446448703494926
       }
     }
   },
-  "mobile": [
+  "mobileTraffic0": [
+    {
+      "view": "walk-palace",
+      "metric": "calls",
+      "main": 61,
+      "PR": 61,
+      "runs": [
+        [
+          61,
+          61,
+          61
+        ],
+        [
+          61,
+          61,
+          61
+        ]
+      ],
+      "pass": true
+    },
+    {
+      "view": "walk-palace",
+      "metric": "mirrorCalls",
+      "main": 0,
+      "PR": 0,
+      "runs": [
+        [
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          0
+        ]
+      ],
+      "pass": true
+    },
+    {
+      "view": "walk-palace",
+      "metric": "triangles",
+      "main": 376128,
+      "PR": 375799,
+      "runs": [
+        [
+          376128,
+          376128,
+          376128
+        ],
+        [
+          375799,
+          375799,
+          375799
+        ]
+      ],
+      "pass": true
+    },
+    {
+      "view": "walk-palace",
+      "metric": "mirrorTriangles",
+      "main": 0,
+      "PR": 0,
+      "runs": [
+        [
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          0
+        ]
+      ],
+      "pass": true
+    },
+    {
+      "view": "walk-palace",
+      "metric": "geometries",
+      "main": 84,
+      "PR": 84,
+      "runs": [
+        [
+          84,
+          84,
+          84
+        ],
+        [
+          84,
+          84,
+          84
+        ]
+      ],
+      "pass": true
+    },
+    {
+      "view": "walk-palace",
+      "metric": "textures",
+      "main": 71,
+      "PR": 71,
+      "runs": [
+        [
+          71,
+          71,
+          71
+        ],
+        [
+          71,
+          71,
+          71
+        ]
+      ],
+      "pass": true
+    },
+    {
+      "view": "walk-palace",
+      "metric": "heap",
+      "main": 110882804,
+      "PR": 110002448,
+      "runs": [
+        [
+          110882804,
+          109735676,
+          111313064
+        ],
+        [
+          110002448,
+          111195816,
+          109964564
+        ]
+      ],
+      "pass": true
+    },
+    {
+      "view": "walk-palace",
+      "metric": "p95 ms",
+      "main": 16.800000000000182,
+      "PR": 16.800000000000182,
+      "noise": 9.094947017729282e-13,
+      "p95s": [
+        [
+          16.800000000000182,
+          16.800000000000182,
+          16.799999999999272
+        ],
+        [
+          16.800000000000182,
+          16.800000000000182,
+          16.700000000000728
+        ]
+      ],
+      "pass": true
+    }
+  ],
+  "mobilePopulation0": [
+    {
+      "view": "walk-palace",
+      "round": 1,
+      "side": "main",
+      "crowd": null,
+      "motors": null
+    },
+    {
+      "view": "walk-palace",
+      "round": 1,
+      "side": "PR",
+      "crowd": null,
+      "motors": null
+    },
+    {
+      "view": "walk-palace",
+      "round": 2,
+      "side": "main",
+      "crowd": null,
+      "motors": null
+    },
+    {
+      "view": "walk-palace",
+      "round": 2,
+      "side": "PR",
+      "crowd": null,
+      "motors": null
+    },
+    {
+      "view": "walk-palace",
+      "round": 3,
+      "side": "main",
+      "crowd": null,
+      "motors": null
+    },
+    {
+      "view": "walk-palace",
+      "round": 3,
+      "side": "PR",
+      "crowd": null,
+      "motors": null
+    }
+  ],
+  "mobileTraffic1": [
     {
       "view": "overview",
       "metric": "calls",
@@ -700,18 +955,18 @@
     {
       "view": "overview",
       "metric": "heap",
-      "main": 13912304,
-      "PR": 14087388,
+      "main": 15113824,
+      "PR": 15308772,
       "runs": [
         [
-          13913724,
-          13912304,
-          13903112
+          15117628,
+          15113824,
+          15083640
         ],
         [
-          14090920,
-          14087372,
-          14087388
+          15290688,
+          15324280,
+          15308772
         ]
       ],
       "pass": true
@@ -719,19 +974,19 @@
     {
       "view": "overview",
       "metric": "p95 ms",
-      "main": 16.700000000000273,
+      "main": 16.799999999999727,
       "PR": 16.700000000000273,
-      "noise": 0.09999999999968168,
+      "noise": 0.0999999999994543,
       "p95s": [
         [
-          16.799999999999955,
+          16.799999999999727,
           16.700000000000273,
-          16.700000000000273
+          16.799999999999727
         ],
         [
           16.700000000000273,
           16.700000000000273,
-          16.700000000000273
+          16.799999999999727
         ]
       ],
       "pass": true
@@ -777,18 +1032,18 @@
     {
       "view": "lijiang",
       "metric": "triangles",
-      "main": 300146,
-      "PR": 307834,
+      "main": 295596,
+      "PR": 298322,
       "runs": [
         [
-          300146,
-          300146,
-          300146
+          295596,
+          295596,
+          295596
         ],
         [
-          307834,
-          307834,
-          307834
+          298322,
+          298322,
+          298322
         ]
       ],
       "pass": true
@@ -796,18 +1051,18 @@
     {
       "view": "lijiang",
       "metric": "mirrorTriangles",
-      "main": 293225,
-      "PR": 300913,
+      "main": 288675,
+      "PR": 291401,
       "runs": [
         [
-          293225,
-          293225,
-          293225
+          288675,
+          288675,
+          288675
         ],
         [
-          300913,
-          300913,
-          300913
+          291401,
+          291401,
+          291401
         ]
       ],
       "pass": true
@@ -834,18 +1089,18 @@
     {
       "view": "lijiang",
       "metric": "textures",
-      "main": 29,
-      "PR": 29,
+      "main": 50,
+      "PR": 50,
       "runs": [
         [
-          29,
-          29,
-          29
+          50,
+          50,
+          50
         ],
         [
-          29,
-          29,
-          29
+          50,
+          50,
+          50
         ]
       ],
       "pass": true
@@ -853,18 +1108,18 @@
     {
       "view": "lijiang",
       "metric": "heap",
-      "main": 26046808,
-      "PR": 26183544,
+      "main": 25384652,
+      "PR": 25476580,
       "runs": [
         [
-          26016568,
-          26162908,
-          26046808
+          25384652,
+          25410828,
+          25352396
         ],
         [
-          26075888,
-          26183544,
-          26223444
+          25476580,
+          25528932,
+          25472920
         ]
       ],
       "pass": true
@@ -874,15 +1129,15 @@
       "metric": "p95 ms",
       "main": 16.700000000000273,
       "PR": 16.700000000000273,
-      "noise": 0.0999999999994543,
+      "noise": 0,
       "p95s": [
         [
           16.700000000000273,
-          16.799999999999727,
+          16.700000000000273,
           16.700000000000273
         ],
         [
-          16.800000000000182,
+          16.700000000000273,
           16.700000000000273,
           16.700000000000273
         ]
@@ -896,13 +1151,13 @@
       "PR": 49,
       "runs": [
         [
-          52,
+          49,
           49,
           49
         ],
         [
           49,
-          50,
+          49,
           49
         ]
       ],
@@ -915,13 +1170,13 @@
       "PR": 44,
       "runs": [
         [
-          47,
+          44,
           44,
           44
         ],
         [
           44,
-          45,
+          44,
           44
         ]
       ],
@@ -931,39 +1186,39 @@
       "view": "palace",
       "metric": "triangles",
       "main": 298458,
-      "PR": 315194,
+      "PR": 312769,
       "runs": [
         [
-          308142,
+          298458,
           298458,
           298458
         ],
         [
-          315194,
-          316378,
-          315194
+          312769,
+          312769,
+          312769
         ]
       ],
-      "pass": false
+      "pass": true
     },
     {
       "view": "palace",
       "metric": "mirrorTriangles",
       "main": 296221,
-      "PR": 312957,
+      "PR": 310532,
       "runs": [
         [
-          305905,
+          296221,
           296221,
           296221
         ],
         [
-          312957,
-          314141,
-          312957
+          310532,
+          310532,
+          310532
         ]
       ],
-      "pass": false
+      "pass": true
     },
     {
       "view": "palace",
@@ -972,13 +1227,13 @@
       "PR": 50,
       "runs": [
         [
-          52,
+          50,
           50,
           50
         ],
         [
           50,
-          51,
+          50,
           50
         ]
       ],
@@ -987,18 +1242,18 @@
     {
       "view": "palace",
       "metric": "textures",
-      "main": 35,
-      "PR": 35,
+      "main": 64,
+      "PR": 64,
       "runs": [
         [
-          37,
-          35,
-          35
+          64,
+          64,
+          64
         ],
         [
-          35,
-          35,
-          35
+          64,
+          64,
+          64
         ]
       ],
       "pass": true
@@ -1006,18 +1261,18 @@
     {
       "view": "palace",
       "metric": "heap",
-      "main": 52448164,
-      "PR": 52417740,
+      "main": 42380808,
+      "PR": 42502060,
       "runs": [
         [
-          53459688,
-          52310336,
-          52448164
+          42386008,
+          42288500,
+          42380808
         ],
         [
-          52383000,
-          53633212,
-          52417740
+          42461956,
+          42502060,
+          42522512
         ]
       ],
       "pass": true
@@ -1026,18 +1281,18 @@
       "view": "palace",
       "metric": "p95 ms",
       "main": 16.799999999999727,
-      "PR": 16.799999999999727,
-      "noise": 0.0999999999994543,
+      "PR": 16.700000000000273,
+      "noise": 0.09999999999990905,
       "p95s": [
         [
-          16.700000000000273,
           16.799999999999727,
-          16.799999999999727
+          16.800000000000182,
+          16.700000000000273
         ],
         [
-          16.799999999999727,
-          16.799999999999727,
-          16.800000000000182
+          16.700000000000273,
+          16.700000000000273,
+          16.700000000000273
         ]
       ],
       "pass": true
@@ -1159,18 +1414,18 @@
     {
       "view": "south",
       "metric": "heap",
-      "main": 31246472,
-      "PR": 31445260,
+      "main": 19311224,
+      "PR": 19478876,
       "runs": [
         [
-          31231748,
-          31246472,
-          31297348
+          19311224,
+          19360264,
+          19298812
         ],
         [
-          31445260,
-          38426768,
-          31432912
+          19477356,
+          19486620,
+          19478876
         ]
       ],
       "pass": true
@@ -1178,224 +1433,23 @@
     {
       "view": "south",
       "metric": "p95 ms",
-      "main": 16.700000000000273,
+      "main": 16.799999999999727,
       "PR": 16.700000000000273,
-      "noise": 4.547473508864641e-13,
+      "noise": 0.0999999999994543,
       "p95s": [
         [
+          16.799999999999727,
           16.700000000000273,
-          16.700000000000273,
-          16.700000000000728
+          16.799999999999727
         ],
         [
           16.700000000000273,
-          16.700000000000728,
+          16.700000000000273,
           16.700000000000273
         ]
       ],
       "pass": true
     },
-    {
-      "view": "walk-palace",
-      "metric": "calls",
-      "main": 72,
-      "PR": 65,
-      "runs": [
-        [
-          72,
-          74,
-          72
-        ],
-        [
-          65,
-          68,
-          62
-        ]
-      ],
-      "pass": true
-    },
-    {
-      "view": "walk-palace",
-      "metric": "mirrorCalls",
-      "main": 62,
-      "PR": 56,
-      "runs": [
-        [
-          62,
-          64,
-          62
-        ],
-        [
-          57,
-          56,
-          56
-        ]
-      ],
-      "pass": true
-    },
-    {
-      "view": "walk-palace",
-      "metric": "triangles",
-      "main": 394701,
-      "PR": 385962,
-      "runs": [
-        [
-          394701,
-          406199,
-          394701
-        ],
-        [
-          385962,
-          387008,
-          376724
-        ]
-      ],
-      "pass": true
-    },
-    {
-      "view": "walk-palace",
-      "metric": "mirrorTriangles",
-      "main": 386728,
-      "PR": 370535,
-      "runs": [
-        [
-          386728,
-          398226,
-          386728
-        ],
-        [
-          371273,
-          370535,
-          370535
-        ]
-      ],
-      "pass": true
-    },
-    {
-      "view": "walk-palace",
-      "metric": "geometries",
-      "main": 99,
-      "PR": 92,
-      "runs": [
-        [
-          99,
-          99,
-          99
-        ],
-        [
-          92,
-          93,
-          90
-        ]
-      ],
-      "pass": true
-    },
-    {
-      "view": "walk-palace",
-      "metric": "textures",
-      "main": 55,
-      "PR": 51,
-      "runs": [
-        [
-          55,
-          56,
-          55
-        ],
-        [
-          51,
-          51,
-          50
-        ]
-      ],
-      "pass": true
-    },
-    {
-      "view": "walk-palace",
-      "metric": "heap",
-      "main": 115476616,
-      "PR": 114744180,
-      "runs": [
-        [
-          115476616,
-          115292988,
-          115764488
-        ],
-        [
-          115314588,
-          114744180,
-          114639976
-        ]
-      ],
-      "pass": true
-    },
-    {
-      "view": "walk-palace",
-      "metric": "p95 ms",
-      "main": 16.799999999999272,
-      "PR": 16.799999999999272,
-      "noise": 0,
-      "p95s": [
-        [
-          16.799999999999272,
-          16.799999999999272,
-          16.799999999999272
-        ],
-        [
-          16.799999999999272,
-          16.80000000000109,
-          16.799999999999272
-        ]
-      ],
-      "pass": true
-    }
-  ],
-  "desktopBuilds": {
-    "candidate": "e227a7744ebdc406ad5b2c29810b6d8967900fb7",
-    "main": "27dabe1c3608cb9597af1facfea8b9adb778b5cc"
-  },
-  "mobileBuilds": {
-    "main": "27dabe1c3608cb9597af1facfea8b9adb778b5cc",
-    "candidate": "e227a7744ebdc406ad5b2c29810b6d8967900fb7"
-  },
-  "mobileWalkPopulation": [
-    {
-      "side": "main",
-      "round": 1,
-      "crowd": 2,
-      "motors": 2
-    },
-    {
-      "side": "PR",
-      "round": 1,
-      "crowd": 2,
-      "motors": 12
-    },
-    {
-      "side": "main",
-      "round": 2,
-      "crowd": 3,
-      "motors": 3
-    },
-    {
-      "side": "PR",
-      "round": 2,
-      "crowd": 1,
-      "motors": 12
-    },
-    {
-      "side": "main",
-      "round": 3,
-      "crowd": 2,
-      "motors": 2
-    },
-    {
-      "side": "PR",
-      "round": 3,
-      "crowd": 1,
-      "motors": 12
-    }
-  ],
-  "trafficOffWalk": [
     {
       "view": "walk-palace",
       "metric": "calls",
@@ -1418,18 +1472,18 @@
     {
       "view": "walk-palace",
       "metric": "mirrorCalls",
-      "main": 55,
-      "PR": 55,
+      "main": 0,
+      "PR": 0,
       "runs": [
         [
-          55,
-          55,
-          55
+          0,
+          0,
+          0
         ],
         [
-          55,
-          55,
-          55
+          0,
+          0,
+          0
         ]
       ],
       "pass": true
@@ -1437,18 +1491,18 @@
     {
       "view": "walk-palace",
       "metric": "triangles",
-      "main": 375363,
-      "PR": 375540,
+      "main": 376128,
+      "PR": 375799,
       "runs": [
         [
-          375363,
-          375363,
-          375363
+          376128,
+          376128,
+          376128
         ],
         [
-          375540,
-          375540,
-          375540
+          375799,
+          375799,
+          375799
         ]
       ],
       "pass": true
@@ -1456,18 +1510,18 @@
     {
       "view": "walk-palace",
       "metric": "mirrorTriangles",
-      "main": 369174,
-      "PR": 369351,
+      "main": 0,
+      "PR": 0,
       "runs": [
         [
-          369174,
-          369174,
-          369174
+          0,
+          0,
+          0
         ],
         [
-          369351,
-          369351,
-          369351
+          0,
+          0,
+          0
         ]
       ],
       "pass": true
@@ -1475,18 +1529,18 @@
     {
       "view": "walk-palace",
       "metric": "geometries",
-      "main": 88,
-      "PR": 88,
+      "main": 85,
+      "PR": 85,
       "runs": [
         [
-          88,
-          88,
-          88
+          85,
+          85,
+          85
         ],
         [
-          88,
-          88,
-          88
+          85,
+          85,
+          85
         ]
       ],
       "pass": true
@@ -1494,18 +1548,18 @@
     {
       "view": "walk-palace",
       "metric": "textures",
-      "main": 47,
-      "PR": 47,
+      "main": 74,
+      "PR": 74,
       "runs": [
         [
-          47,
-          47,
-          47
+          74,
+          74,
+          74
         ],
         [
-          47,
-          47,
-          47
+          74,
+          74,
+          74
         ]
       ],
       "pass": true
@@ -1513,18 +1567,18 @@
     {
       "view": "walk-palace",
       "metric": "heap",
-      "main": 111640532,
-      "PR": 111922648,
+      "main": 110992880,
+      "PR": 111211880,
       "runs": [
         [
-          111614832,
-          111656964,
-          111640532
+          111081532,
+          110992880,
+          110944080
         ],
         [
-          112855604,
-          111922648,
-          111715484
+          111157056,
+          111211880,
+          111284704
         ]
       ],
       "pass": true
@@ -1532,269 +1586,234 @@
     {
       "view": "walk-palace",
       "metric": "p95 ms",
-      "main": 16.800000000000182,
-      "PR": 16.700000000000728,
-      "noise": 9.094947017729282e-13,
-      "p95s": [
-        [
-          16.800000000000182,
-          16.799999999999272,
-          16.800000000000182
-        ],
-        [
-          16.700000000000728,
-          16.800000000000182,
-          16.700000000000728
-        ]
-      ],
-      "pass": true
-    }
-  ],
-  "trafficOnWalkInventory": [
-    {
-      "view": "walk-palace",
-      "metric": "calls",
-      "main": 70,
-      "PR": 64,
-      "runs": [
-        [
-          70,
-          64,
-          72
-        ],
-        [
-          62,
-          67,
-          64
-        ]
-      ],
-      "pass": true
-    },
-    {
-      "view": "walk-palace",
-      "metric": "mirrorCalls",
-      "main": 62,
-      "PR": 56,
-      "runs": [
-        [
-          62,
-          58,
-          62
-        ],
-        [
-          56,
-          56,
-          58
-        ]
-      ],
-      "pass": true
-    },
-    {
-      "view": "walk-palace",
-      "metric": "triangles",
-      "main": 394231,
-      "PR": 378646,
-      "runs": [
-        [
-          394231,
-          385047,
-          394701
-        ],
-        [
-          376724,
-          384724,
-          378646
-        ]
-      ],
-      "pass": true
-    },
-    {
-      "view": "walk-palace",
-      "metric": "mirrorTriangles",
-      "main": 386728,
-      "PR": 370535,
-      "runs": [
-        [
-          386728,
-          378858,
-          386728
-        ],
-        [
-          370535,
-          370089,
-          372457
-        ]
-      ],
-      "pass": true
-    },
-    {
-      "view": "walk-palace",
-      "metric": "geometries",
-      "main": 95,
-      "PR": 93,
-      "runs": [
-        [
-          95,
-          91,
-          97
-        ],
-        [
-          90,
-          94,
-          93
-        ]
-      ],
-      "pass": true
-    },
-    {
-      "view": "walk-palace",
-      "metric": "textures",
-      "main": 55,
-      "PR": 51,
-      "runs": [
-        [
-          55,
-          52,
-          55
-        ],
-        [
-          50,
-          51,
-          51
-        ]
-      ],
-      "pass": true
-    },
-    {
-      "view": "walk-palace",
-      "metric": "heap",
-      "main": 114708600,
-      "PR": 115266800,
-      "runs": [
-        [
-          115000460,
-          114546612,
-          114708600
-        ],
-        [
-          114398112,
-          115359128,
-          115266800
-        ]
-      ],
-      "pass": true
-    },
-    {
-      "view": "walk-palace",
-      "metric": "p95 ms",
-      "main": 16.80000000000109,
+      "main": 16.799999999999272,
       "PR": 16.799999999999272,
-      "noise": 0.1000000000003638,
+      "noise": 0.0999999999994543,
       "p95s": [
         [
-          16.80000000000109,
-          16.80000000000109,
-          16.700000000000728
+          16.700000000000728,
+          16.800000000000182,
+          16.799999999999272
         ],
         [
-          16.700000000000728,
+          16.800000000000182,
           16.799999999999272,
-          16.799999999999272
+          16.699999999999818
         ]
       ],
       "pass": true
     }
   ],
-  "desktopPalaceDrawSources": [
+  "mobilePopulation1": [
     {
+      "view": "overview",
       "round": 1,
-      "calls": [
-        59,
-        56
-      ],
-      "mirrorCalls": [
-        54,
-        51
-      ],
-      "motors": [
-        6,
-        6
-      ],
-      "meshDelta": {
-        "main G2 passer-by/Scene/Traveller/CreatorProportions/Armature/root/pelvis/spine_01/spine_02/spine_03/neck_01/head/attach_head/creator-hair/creator-outline": 3,
-        "mirror G2 traffic visuals": -1,
-        "mirror Mesh": -32,
-        "mirror lod0/lod0_brick/mesh_3": -1,
-        "mirror lod0/lod0_joinery/mesh_0": -3,
-        "mirror lod0/lod0_pave/mesh_3_instance_0": -1,
-        "mirror lod0/lod0_rock/mesh_1": -1,
-        "mirror lod0/lod0_stone/mesh_2": -2,
-        "mirror lod1": -5,
-        "mirror lod1/lod1_base/mesh_9": -1,
-        "mirror peaks-lod0": -1,
-        "mirror peaks-lod1": -1
-      }
+      "side": "main",
+      "crowd": null,
+      "motors": null
     },
     {
+      "view": "overview",
+      "round": 1,
+      "side": "PR",
+      "crowd": null,
+      "motors": null
+    },
+    {
+      "view": "overview",
       "round": 2,
-      "calls": [
-        65,
-        60
-      ],
-      "mirrorCalls": [
-        60,
-        55
-      ],
-      "motors": [
-        3,
-        3
-      ],
-      "meshDelta": {
-        "main G2 passer-by/Scene/Traveller/CreatorProportions/Armature/Walker": -2,
-        "main G2 passer-by/Scene/Traveller/CreatorProportions/Armature/Walker/creator-body-outline": -2,
-        "main G2 passer-by/Scene/Traveller/CreatorProportions/Armature/root/pelvis/spine_01/spine_02/spine_03/neck_01/head/attach_head/creator-hair/creator-outline": -1,
-        "mirror G2 passer-by/Scene/Traveller/CreatorProportions/Armature/Walker": 1,
-        "mirror G2 passer-by/Scene/Traveller/CreatorProportions/Armature/Walker/creator-body-outline": 1,
-        "mirror G2 passer-by/Scene/Traveller/CreatorProportions/Armature/creator-skirt": 1,
-        "mirror G2 passer-by/Scene/Traveller/CreatorProportions/Armature/root/pelvis/spine_01/spine_02/spine_03/neck_01/head/attach_head/creator-face/rest-face": 1,
-        "mirror G2 passer-by/Scene/Traveller/CreatorProportions/Armature/root/pelvis/spine_01/spine_02/spine_03/neck_01/head/attach_head/creator-hair": 1,
-        "mirror G2 passer-by/Scene/Traveller/CreatorProportions/Armature/root/pelvis/spine_01/spine_02/spine_03/neck_01/head/attach_head/creator-hair/creator-outline": 2,
-        "mirror G2 traffic visuals": 1,
-        "mirror Mesh": 32,
-        "mirror lod0/lod0_brick/mesh_3": 1,
-        "mirror lod0/lod0_joinery/mesh_0": 3,
-        "mirror lod0/lod0_pave/mesh_3_instance_0": 1,
-        "mirror lod0/lod0_rock/mesh_1": 1,
-        "mirror lod0/lod0_stone/mesh_2": 2,
-        "mirror lod1": 5,
-        "mirror lod1/lod1_base/mesh_9": 1,
-        "mirror peaks-lod0": 1,
-        "mirror peaks-lod1": 1
-      }
+      "side": "main",
+      "crowd": null,
+      "motors": null
     },
     {
+      "view": "overview",
+      "round": 2,
+      "side": "PR",
+      "crowd": null,
+      "motors": null
+    },
+    {
+      "view": "overview",
       "round": 3,
-      "calls": [
-        56,
-        55
-      ],
-      "mirrorCalls": [
-        51,
-        50
-      ],
-      "motors": [
-        4,
-        4
-      ],
-      "meshDelta": {
-        "main G2 passer-by/Scene/Traveller/CreatorProportions/Armature/Walker": -1,
-        "main G2 passer-by/Scene/Traveller/CreatorProportions/Armature/Walker/creator-body-outline": -1,
-        "main G2 passer-by/Scene/Traveller/CreatorProportions/Armature/root/pelvis/spine_01/spine_02/spine_03/neck_01/head/attach_head/creator-hair/creator-outline": 1,
-        "mirror G2 passer-by/Scene/Traveller/CreatorProportions/Armature/Walker": -1,
-        "mirror G2 passer-by/Scene/Traveller/CreatorProportions/Armature/Walker/creator-body-outline": -1,
-        "mirror G2 passer-by/Scene/Traveller/CreatorProportions/Armature/root/pelvis/spine_01/spine_02/spine_03/neck_01/head/attach_head/creator-hair/creator-outline": 1
-      }
+      "side": "main",
+      "crowd": null,
+      "motors": null
+    },
+    {
+      "view": "overview",
+      "round": 3,
+      "side": "PR",
+      "crowd": null,
+      "motors": null
+    },
+    {
+      "view": "lijiang",
+      "round": 1,
+      "side": "main",
+      "crowd": 0,
+      "motors": 0
+    },
+    {
+      "view": "lijiang",
+      "round": 1,
+      "side": "PR",
+      "crowd": 0,
+      "motors": 0
+    },
+    {
+      "view": "lijiang",
+      "round": 2,
+      "side": "main",
+      "crowd": 0,
+      "motors": 0
+    },
+    {
+      "view": "lijiang",
+      "round": 2,
+      "side": "PR",
+      "crowd": 0,
+      "motors": 0
+    },
+    {
+      "view": "lijiang",
+      "round": 3,
+      "side": "main",
+      "crowd": 0,
+      "motors": 0
+    },
+    {
+      "view": "lijiang",
+      "round": 3,
+      "side": "PR",
+      "crowd": 0,
+      "motors": 0
+    },
+    {
+      "view": "palace",
+      "round": 1,
+      "side": "main",
+      "crowd": 0,
+      "motors": 0
+    },
+    {
+      "view": "palace",
+      "round": 1,
+      "side": "PR",
+      "crowd": 0,
+      "motors": 0
+    },
+    {
+      "view": "palace",
+      "round": 2,
+      "side": "main",
+      "crowd": 0,
+      "motors": 0
+    },
+    {
+      "view": "palace",
+      "round": 2,
+      "side": "PR",
+      "crowd": 0,
+      "motors": 0
+    },
+    {
+      "view": "palace",
+      "round": 3,
+      "side": "main",
+      "crowd": 0,
+      "motors": 0
+    },
+    {
+      "view": "palace",
+      "round": 3,
+      "side": "PR",
+      "crowd": 0,
+      "motors": 0
+    },
+    {
+      "view": "south",
+      "round": 1,
+      "side": "main",
+      "crowd": 0,
+      "motors": 0
+    },
+    {
+      "view": "south",
+      "round": 1,
+      "side": "PR",
+      "crowd": 0,
+      "motors": 0
+    },
+    {
+      "view": "south",
+      "round": 2,
+      "side": "main",
+      "crowd": 0,
+      "motors": 0
+    },
+    {
+      "view": "south",
+      "round": 2,
+      "side": "PR",
+      "crowd": 0,
+      "motors": 0
+    },
+    {
+      "view": "south",
+      "round": 3,
+      "side": "main",
+      "crowd": 0,
+      "motors": 0
+    },
+    {
+      "view": "south",
+      "round": 3,
+      "side": "PR",
+      "crowd": 0,
+      "motors": 0
+    },
+    {
+      "view": "walk-palace",
+      "round": 1,
+      "side": "main",
+      "crowd": 0,
+      "motors": 1
+    },
+    {
+      "view": "walk-palace",
+      "round": 1,
+      "side": "PR",
+      "crowd": 0,
+      "motors": 1
+    },
+    {
+      "view": "walk-palace",
+      "round": 2,
+      "side": "main",
+      "crowd": 0,
+      "motors": 1
+    },
+    {
+      "view": "walk-palace",
+      "round": 2,
+      "side": "PR",
+      "crowd": 0,
+      "motors": 1
+    },
+    {
+      "view": "walk-palace",
+      "round": 3,
+      "side": "main",
+      "crowd": 0,
+      "motors": 1
+    },
+    {
+      "view": "walk-palace",
+      "round": 3,
+      "side": "PR",
+      "crowd": 0,
+      "motors": 1
     }
-  ],
-  "desktopPalaceDrawSourceSampling": "Supplementary peak-frame inventory. Reflection is not refreshed in every sampled frame. Compare the main-pass entries across all three pairs; use desktopMedians for the official mirror gate."
+  ]
 }

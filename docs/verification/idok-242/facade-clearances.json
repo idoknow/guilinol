@@ -1,0 +1,25 @@
+{
+  "campus": {
+    "branch": 1487527335,
+    "closedWay": 1487527338,
+    "sharedNodes": [
+      13637474084
+    ],
+    "centrelineInsideWallMetres": [
+      0.4142785296631041,
+      6.260608307402665
+    ],
+    "distanceToClosedOverlapMetres": 10.22326241188827,
+    "lengthWithinCarHalfWidthMetres": 30.04723014145226,
+    "lengthWithinCorridorHalfWidthMetres": 57.529516258802104
+  },
+  "alley": {
+    "way": 1552207023,
+    "lengthMetres": 104.31899416609204,
+    "stationSpacingMetres": 0.2495669716892154,
+    "crossSections": 419,
+    "minimumFreeWidthMetres": 1.4792026800838154,
+    "minimumAtMetres": 4.741772462095093,
+    "approximateLengthBelow2_22Metres": 65.63611355426364
+  }
+}
