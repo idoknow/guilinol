@@ -110,14 +110,15 @@ def relocate(output, manifest, elements, raised=(), adjoining=()):
     # The approach to the cycleway and the pedestrian entrance both pass
     # through the old verge. Keep the travelled strip clear of tree trunks.
     paths_at_verge=STRtree([LineString([p[:2] for p in mode['route']]).buffer(.85)
-                            for site in routes if site['id'] in (13956749339,9349946067)
+                            for site in routes
                             for mode in site['modes'] if mode['mode'] in ('bike','bicycle','foot')])
     moves=defaultdict(list)
     anchors=defaultdict(dict)
     for key,tile in tiles.items():
         region=box(*key,key[0]+256,key[1]+256)
         roof_ids=roofs.query(region,predicate='intersects')
-        if not tile.get('gradedCorridor') and not len(roof_ids):
+        path_hits=paths_at_verge.query(region,predicate='intersects')
+        if not tile.get('gradedCorridor') and not len(roof_ids) and not len(path_hits):
             continue
         paths=read_chunk(output/tile['file'])[3][1]
         added=Polygon()
@@ -134,7 +135,6 @@ def relocate(output, manifest, elements, raised=(), adjoining=()):
             added = added.union(asphalt.intersection(union_all(travelled.geometries.take(access))))
         if raised:
             added=added.union(changed_roads.intersection(box(*key,key[0]+256,key[1]+256)))
-        path_hits=paths_at_verge.query(box(*key,key[0]+256,key[1]+256),predicate='intersects')
         travelled_path=union_all(paths_at_verge.geometries.take(path_hits))
         roof_zone=union_all(roofs.geometries.take(roof_ids))
         if added.is_empty and travelled_path.is_empty and roof_zone.is_empty:
