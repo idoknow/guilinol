@@ -78,7 +78,7 @@ try{
           await v.freeze()
           try{
             const length=route.slice(1).reduce((sum,p,i)=>sum+Math.hypot(p[0]-route[i][0],p[1]-route[i][1]),0)
-            const frameLimit=Math.max(2400,Math.ceil(60*length/1.5))
+            const frameLimit=Math.max(2400,Math.ceil(60*length/(singleFile ? .75 : 1.5)))
             for(let frame=0;frame<frameLimit;frame++){
               const p=w.position,[a,b]=route[part-1],[x,z]=route[part]
               const len=Math.hypot(x-a,z-b),dx=(x-a)/len,dz=(z-b)/len
@@ -125,7 +125,7 @@ try{
               if(sharp)carLookahead=7.5
               else if(bend)carLookahead=surfaceApproach?5:3.4
               else if(surfaceApproach&&cross>.4)carLookahead=3
-              let ahead=Math.max(0,progress)+(mode==='car'?carLookahead:singleFile ? .9:3.5)
+              let ahead=Math.max(0,progress)+(mode==='car'?carLookahead:singleFile&&mode!=='foot' ? .9:3.5)
               // A pedestrian can turn at the vertex itself. Looking beyond a hairpin
               // before reaching it can leave the walker at a stationary target.
               if(mode==='foot'&&part<route.length-1)ahead=Math.min(len,ahead)
