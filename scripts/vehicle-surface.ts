@@ -59,7 +59,7 @@ export function tileSurface(world,entry,tunnels, collect?:(kind:string,faces:Flo
     cut[s*(Math.floor(index/stride)*65+index%stride)]=cm/100
   }
   const ground=(x,z)=>interpolate(cut,x,z)
-  const streets=streetGeometry(paths,(x,z)=>interpolate(grid,x,z),Array.isArray(legacy)?legacy:[],signs,ground),roads=streets.road
+  const streets=streetGeometry(paths,(x,z)=>interpolate(grid,x,z),Array.isArray(legacy)?legacy:[],signs,ground,entry.stationPaving),roads=streets.road
   joinPortalRoads(entry,tunnels,[roads.subarray(0,streets.legacyRoadLength)])
   const modified=bed&&new Set(bed.drop),replacement=bed&&new Triangles(bedPositions(bed))
   if(collect){
@@ -176,6 +176,25 @@ export function vehicleSurface(world,m,graph?){
       if(t.way!==lane.way)continue
       const floor=floorLevel(t,x,z)
       if(floor!==undefined)return floor
+    }
+    // A surface way can share the actual floor of the adjoining cut across
+    // a daylight junction. Ground below that floor is not wheel support.
+    if(!lane.structure||lane.structure==='surface'){
+      for(const t of local){
+        if(!t.nodes)continue
+        const onLanding=t.nodes.some((node,end)=>{
+          if(!t.mouths?.[end]||!(node===lane.from||node===lane.to||lane.nodes?.has(node)))return false
+          const [px,,pz]=t.portals[end]
+          return Math.hypot(x-px,z-pz)<=4*t.halfWidth
+        })
+        if(onLanding){
+          const floor=floorLevel(t,x,z)
+          if(floor!==undefined){
+            if(diagnostic)diagnostic.road=floor
+            return floor
+          }
+        }
+      }
     }
     // A tyre can enter an adjoining bore before the axle centre crosses a
     // skewed mouth. Its actual contact lies on the rendered floor triangle.
