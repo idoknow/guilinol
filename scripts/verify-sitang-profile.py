@@ -14,9 +14,9 @@ from service_streets import width
 
 
 def measure(base, candidate):
-    ids = (1097830334, 842819690, 1494508177, 1494508178, 882310596)
+    ids = (1097830334, 842819690, 1494508177, 1494508178, 882310596, 882310597)
     ways = {w['id']: w for w in load_osm() if w['type'] == 'way' and w['id'] in ids}
-    bridge, road, tie, tunnel, upper = (ways[i] for i in ids)
+    bridge, road, tie, tunnel, upper, motorway = (ways[i] for i in ids)
     ref = 10052448934
     coords = []
     inside_lanes = set()
@@ -60,7 +60,19 @@ def measure(base, candidate):
     limit = max((i for i in range(anchor, len(stations)) if surface[i] is not None
                  and upper_zone.covers(probes[i])), key=lift)
     lower = samples(candidate, manifests[1], probes[anchor:limit+1], 'pavementOnly')
-    return dict(tunnel=tunnel['id'], tags=tunnel['tags'], clearance=clearance, bridge=bridge['id'],
+    # Continue on the same wheel strip to a point inside the parallel motorway.
+    witness = limit + 1200
+    point = probes[witness]
+    motorway_axis = LineString(points(motorway))
+    upper_axis = LineString(points(upper))
+    required = bridge_y - .08*(stations[witness]-stations[anchor]) + clearance
+    roof = max(y for y in samples(candidate, manifests[1], [point], 'roofProbe')[0] if y is not None)
+    motorway_probe = dict(way=motorway['id'], xz=list(point.coords[0]),
+                          wheelPathMetres=stations[witness]-stations[anchor],
+                          distanceToMotorwayAxis=point.distance(motorway_axis),
+                          outsideServiceCorridor=point.distance(upper_axis)-width(upper['tags'])/2-.5,
+                          roofMetres=roof, requiredMetres=required, deficitMetres=required-roof)
+    return dict(motorwayProbe=motorway_probe, tunnel=tunnel['id'], tags=tunnel['tags'], clearance=clearance, bridge=bridge['id'],
                 bridgeXZ=list(probes[anchor].coords[0]), bridgeY=bridge_y, upper=upper['id'],
                 upperXZ=list(probes[limit].coords[0]), upperY=surface[limit],
                 laneOffset=graph_offset, halfTrack=car_half_track, spacing=.01, gradeLimit=.08,

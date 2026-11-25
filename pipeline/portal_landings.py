@@ -67,9 +67,23 @@ def carriageways(output, manifest, elements, widths):
         if abs(end-start) <= limit*length:
             ribbons.append((way, coords, length, half, start, end, limit))
     refit(output, manifest['chunks'], [], ribbons, landing=False)
+    # The service-road deck spans lower pavement and terrain that protrude
+    # through the middle of the span. Preserve all surfaces below the deck.
+    for way in elements:
+        if way['type'] != 'way' or way['id'] != 988474372:
+            continue
+        axis = LineString(points(way))
+        samples = [dict(x=p.x, z=p.y, roofProbe=True) for p in
+                   (axis.interpolate(.5), axis.interpolate(axis.length-.5))]
+        decks = [hit[1] for hit in sample_road_heights(output, manifest, samples)]
+        if all(y is not None for y in decks):
+            strip = (way['id'], np.asarray(axis.coords), axis.length,
+                     widths.get(way['id'], width(way['tags']))/2+.5,
+                     decks[0]-.03, decks[1]-.03, grade_limit(way['tags']['highway']))
+            refit(output, manifest['chunks'], [], [strip], landing=False, cut_only=True)
 
 
-def refit(output, chunks, mouths, ribbons, *, landing):
+def refit(output, chunks, mouths, ribbons, *, landing, cut_only=False):
     index=STRtree([Point(x,z).buffer(14) for x,z,*_ in mouths])
     resolution = .75 if landing else 2.0
     for tile in chunks:
@@ -143,6 +157,8 @@ def refit(output, chunks, mouths, ribbons, *, landing):
                 fade=np.clip(np.minimum(end_weight,1-np.maximum(0,nearest-half)/shoulder),0,1)
                 fade=fade*fade*(3-2*fade)
                 mask=(np.abs(height-grade)<4.5)&(fade>0)
+                if cut_only:
+                    mask &= new > grade
                 new[mask]+=(grade[mask]-new[mask])*fade[mask]
             ys=np.rint((new+offset)*scale).astype('<i4')
             if not np.any(ys!=xyz[:,1]):return data
