@@ -96,10 +96,13 @@ export function drainPerSecond(spec:DroneSpec, loadG = 0) {
 }
 
 /** Ground speed limit for the current load, m/s. */
-export function speedLimit(spec:DroneSpec, loadG = 0) {
-  if(!spec.payloadG) return spec.speed
+export function speedLimit(spec:DroneSpec, loadG = 0, mode:'C'|'N'|'S'|null = null) {
+  // IDOK-281: flight-mode dial — C cinematic (slower), N normal, S sport. Real RC sets it;
+  // keyboard/touch default to N.
+  const factor = mode === 'C' ? .6 : mode === 'S' ? 1.2 : 1
+  if(!spec.payloadG) return spec.speed * factor
   const ratio = Math.min(1, Math.max(0, loadG) / spec.payloadG)
-  return spec.speed - (spec.speed - 20) * ratio
+  return (spec.speed - (spec.speed - 20) * ratio) * factor
 }
 
 export const RC_LABEL:RcUi[] = ['simple','pro']

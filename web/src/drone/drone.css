@@ -237,3 +237,6 @@ body[data-drone="rc"] :is(output,.hint,footer,.sky-ui,.walk-ui,.dock,.toast,.spo
 .rc .rc-rth-dots i:nth-child(2){animation-delay:.18s}
 .rc .rc-rth-dots i:nth-child(3){animation-delay:.36s}
 @keyframes rc-rth-dot{0%,80%,100%{opacity:.25;transform:scale(.8)}40%{opacity:1;transform:scale(1.15)}}
+/* IDOK-281: RC link button — top-right, shows connection state. */
+.rc .rc-link{position:absolute;top:calc(10px + env(safe-area-inset-top));right:calc(12px + env(safe-area-inset-right));z-index:45;padding:6px 14px;border:1px solid rgba(244,239,226,.3);border-radius:999px;background:rgba(0,0,0,.4);color:#f4efe2;font:600 12px/1 inherit;cursor:pointer;pointer-events:auto}
+.rc .rc-link.on{border-color:rgba(103,214,143,.6);color:#7fe0a6}

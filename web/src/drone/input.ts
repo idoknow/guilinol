@@ -2,10 +2,11 @@
 // Gamepad covers DJI RC-N series on Windows (they enumerate as HID gamepads); WebHID is the
 // fallback for vendor HID collections that the Gamepad API never surfaces.
 import {CENTER, type Sticks} from './flight'
+import {RcInput} from './rc-input'
 
 export type DroneAction = 'takeoff' | 'land' | 'rth' | 'photo' | 'record' | 'stop'
 
-export interface Sources { keyboard:boolean; touch:boolean; gamepad:string|null; hid:string|null }
+export interface Sources { keyboard:boolean; touch:boolean; gamepad:string|null; hid:string|null; serial:string|null }
 
 const KEY_AXES:Record<string,keyof Sticks> = {
   KeyW:'pitch', KeyS:'pitch', KeyA:'roll', KeyD:'roll',
@@ -14,6 +15,8 @@ const KEY_AXES:Record<string,keyof Sticks> = {
 
 export class PilotInput {
   enabled = false
+  /** IDOK-281: DJI RC over Web Serial + gamepad shaping + C/N/S mode (from rc-input). */
+  readonly rc = new RcInput()
   private keys = new Set<string>()
   private touch:Sticks = {...CENTER}
   private invert = {throttle:false, yaw:false, pitch:false, roll:false}
@@ -159,6 +162,12 @@ export class PilotInput {
 
   read():Sticks {
     const out:Sticks = {...CENTER}
+    // IDOK-281: DJI RC over Web Serial (DUML) — highest priority, mode 2 axis layout.
+    if (this.rc.source === 'serial') {
+      const s = this.rc.sticks
+      const stick = {throttle:s.lv, yaw:s.lh, pitch:s.rv, roll:s.rh}
+      if (stick.throttle || stick.yaw || stick.pitch || stick.roll) return stick
+    }
     // Keyboard
     let throttle = 0, yaw = 0, pitch = 0, roll = 0
     if (this.keys.has('ArrowUp')) throttle += 1
@@ -171,20 +180,13 @@ export class PilotInput {
     if (this.keys.has('KeyA')) roll -= 1
     if (throttle || yaw || pitch || roll) return {throttle,yaw,pitch,roll}
 
-    // Real RC over Gamepad API (DJI RC-N3 on Windows shows up here).
+    // Real RC over Gamepad API (DJI RC-N3 on Windows shows up here) — shaped via rc-input.
     const pad = this.pad()
-    if (pad) {
-      const dead = .12
-      const axis = (index:number,invert:boolean) => {
-        const raw = pad.axes[index] ?? 0
-        const value = Math.abs(raw) < dead ? 0 : (raw - Math.sign(raw) * dead) / (1 - dead)
-        return clamp(value * (invert ? -1 : 1))
-      }
-      const left = {x:axis(0,this.invert.yaw),y:axis(1,!this.invert.throttle)}
-      const right = {x:axis(2,this.invert.roll),y:axis(3,!this.invert.pitch)}
-      if (left.x || left.y || right.x || right.y) {
-        return {throttle:left.y,yaw:left.x,pitch:right.y,roll:right.x}
-      }
+    if (pad && this.rc.source === 'gamepad') {
+      const s = this.rc.sticks
+      const stick = {throttle:s.lv * (this.invert.throttle ? -1 : 1), yaw:s.lh * (this.invert.yaw ? -1 : 1),
+        pitch:s.rv * (this.invert.pitch ? -1 : 1), roll:s.rh * (this.invert.roll ? -1 : 1)}
+      if (stick.throttle || stick.yaw || stick.pitch || stick.roll) return stick
     }
 
     // Vendor HID stick, if the pilot calibrated one.
@@ -208,8 +210,9 @@ export class PilotInput {
     return {
       keyboard:this.bound,
       touch:!!(this.touch.throttle || this.touch.yaw || this.touch.pitch || this.touch.roll),
-      gamepad:this.pad()?.id ?? null,
+      gamepad:this.rc.source === 'gamepad' ? (this.rc.sourceName || (this.pad()?.id ?? null)) : (this.pad()?.id ?? null),
       hid:this.hidReady ? (this.hidName ?? 'HID') : (this.hidName ?? null),
+      serial:this.rc.source === 'serial' ? 'DJI RC (Web Serial)' : null,
     }
   }
 }

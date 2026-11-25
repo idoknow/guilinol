@@ -47,7 +47,7 @@ export function liftOff(flight:Flight) {
 }
 
 declare module './flight' {}
-export interface Flight { velocityBoost?:number; crashed?:boolean; crashKind?:string; obstacle?:{dist:number; side:string}|null; fish?:string|null }
+export interface Flight { velocityBoost?:number; crashed?:boolean; crashKind?:string; obstacle?:{dist:number; side:string}|null; fish?:string|null; mode?:'C'|'N'|'S'|null }
 
 export function requestHome(flight:Flight) {
   if (flight.phase === 'landed' || flight.phase === 'landing') return
@@ -91,7 +91,7 @@ export function stepFlight(
   obstacleAt?:(x:number,y:number,z:number,dx:number,dy:number,dz:number,maxDist:number)=>ObstacleHit|null,
 ) {
   const spec = flight.spec
-  const limit = speedLimit(spec,flight.load)
+  const limit = speedLimit(spec,flight.load,flight.mode)
   const groundY = groundAt(flight.pos.x,flight.pos.z)
   const half = spec.height * .5
   flight.elapsed += dt
@@ -264,5 +264,6 @@ export function telemetry(flight:Flight) {
     maxAgl:+flight.maxAgl.toFixed(1),
     obstacle:flight.obstacle ? {dist:+flight.obstacle.dist.toFixed(1), side:flight.obstacle.side} : null,
     fish:flight.fish ?? null,
+    mode:flight.mode ?? null,
   }
 }

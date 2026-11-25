@@ -18,6 +18,8 @@ export interface RcHandlers {
   sticks(patch:Partial<Sticks>):void
   /** IDOK-280: 吊人垂钓 — 抛竿 / 起竿 / 收竿（只 FlyCart 200 + 载人 时可用） */
   fish():void
+  /** IDOK-281: 连接/断开实体遥控（DJI RC Web Serial）。 */
+  link():void
 }
 
 export interface RcView {
@@ -25,6 +27,8 @@ export interface RcView {
   update(telemetry:Telemetry, recording:boolean):void
   setRecording(on:boolean):void
   toast(text:string):void
+  /** IDOK-281: 更新遥控连接按钮的文案（源名/未连接/隐藏）。 */
+  setLinkLabel(text:string|null):void
 }
 
 type Mode = 'photo' | 'video'
@@ -35,6 +39,13 @@ export function createRc(spec:DroneSpec, handlers:RcHandlers, onHold?:(held:bool
   root.className = `rc rc-${simple ? 'simple' : 'pro'}`
   root.dataset.ui = spec.rc
   root.innerHTML = simple ? simpleMarkup(spec) : proMarkup(spec)
+  // IDOK-281: 实体遥控连接按钮 —— Web Serial（DJI RC-N3）可用时显示在右上角。
+  const linkBtn = document.createElement('button')
+  linkBtn.className = 'rc-link'
+  linkBtn.type = 'button'
+  linkBtn.textContent = '连接遥控'
+  linkBtn.onclick = () => handlers.link()
+  root.append(linkBtn)
 
   const q = <T extends HTMLElement>(selector:string) => root.querySelector<T>(selector)
   const batteryBar = q<HTMLElement>('.rc-batt i')
@@ -256,7 +267,14 @@ export function createRc(spec:DroneSpec, handlers:RcHandlers, onHold?:(held:bool
     toastTimer = window.setTimeout(() => toastBox.classList.remove('show'),2600)
   }
 
-  return {root,update,setRecording,toast}
+  function setLinkLabel(text:string|null) {
+    if (!text) { linkBtn.hidden = true; return }
+    linkBtn.hidden = false
+    linkBtn.textContent = text
+    linkBtn.classList.toggle('on',text.includes('已连接') || text.includes('DJI RC ·'))
+  }
+
+  return {root,update,setRecording,toast,setLinkLabel}
 }
 
 function round(value:number) { return Math.round(value * 100) / 100 }

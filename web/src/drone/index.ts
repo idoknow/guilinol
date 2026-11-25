@@ -710,6 +710,22 @@ export function droneMode(host:Host, deps:{groundAt:(x:number,z:number)=>number;
     input.enabled = true
     input.attach()
     input.onAction(act)
+    // IDOK-281: DJI RC / gamepad buttons + C/N/S mode dial.
+    input.rc.onButton = name => {
+      if (!flight) return
+      if (name === 'photo') void snapshot()
+      else if (name === 'rth') { requestHome(flight); rc?.toast('自动返航') }
+      else if (name === 'camera' || name === 'fn') void toggleRecord()
+      else if (name === 'takeoff') { if (flight.phase === 'landed') liftOff(flight); else landNow(flight) }
+      else if (name === 'land') landNow(flight)
+      else if (name === 'modeUp' && flight.mode !== 'S') { flight.mode = flight.mode === 'C' ? 'N' : 'S'; rc?.toast(`飞行模式 ${flight.mode}`) }
+      else if (name === 'modeDown' && flight.mode !== 'C') { flight.mode = flight.mode === 'S' ? 'N' : 'C'; rc?.toast(`飞行模式 ${flight.mode}`) }
+    }
+    input.rc.onMode = m => { if (flight) { flight.mode = m; rc?.toast(`飞行模式 ${m}`) } }
+    void input.rc.serial.autoConnect().then(ok => {
+      if (ok) { rc?.setLinkLabel(input.rc.status()); rc?.toast('DJI 遥控器已连接') }
+      else rc?.setLinkLabel(input.rc.serialSupported ? '连接遥控' : null)
+    })
     rc = createRc(flight.spec,{
       takeoff:() => { if (!flight) return; if (flight.phase === 'landed') liftOff(flight); else landNow(flight) },
       land:() => { if (flight) landNow(flight) },
@@ -720,6 +736,13 @@ export function droneMode(host:Host, deps:{groundAt:(x:number,z:number)=>number;
       gimbal:deg => { if (flight) flight.gimbal = deg },
       sticks:patch => input.setTouch(patch),
       fish:() => { if (fishing?.phase === 'bite') hookFish(); else if (!fishing) startFishing(); else stopFishing() },
+      link:() => {
+        if (input.rc.source === 'serial') { void input.rc.disconnectSerial(); rc?.setLinkLabel('连接遥控'); return }
+        void input.rc.connectSerial().then(() => {
+          rc?.setLinkLabel(input.rc.status())
+          rc?.toast(input.rc.status())
+        }).catch(() => rc?.toast('未连上遥控器'))
+      },
     },held => { landHeld = held })
     document.body.append(rc.root)
     liftOff(flight)
