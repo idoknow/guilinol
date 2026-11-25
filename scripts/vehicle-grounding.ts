@@ -56,14 +56,21 @@ if(mode==='portal-routes'){
     site.way!==1493582667 && !portalIds.has(site.id) && site.modes.every(m=>m.route.every(([x,z])=>
       x>=left && z>=top && x<left+width && z<top+depth)))
   const campus=new Map((data.campusRoutes??[]).map(site=>[site.id,site]))
-  const surfaceRoutes=[...former.map(site=>campus.get(site.id)??site),...(data.yardRoutes??[])]
-  for(const site of [...data.routes,...surfaceRoutes,...(data.narrowRoutes??[])])for(const test of site.modes){
+  // Native station bores already have a floor. Their entrances still
+  // require the same two-direction traversal as pipeline-generated bores.
+  const nativePortals=new Set<number>()
+  for(const tunnel of manifest.tunnels??[])if(tunnel.nodes&&!tunnel.openCut){
+    tunnel.nodes.forEach((node,index)=>{if(tunnel.mouths?.[index])nativePortals.add(node)})
+  }
+  const routes=[...data.routes,...former.filter(site=>nativePortals.has(site.id))]
+  const surfaceRoutes=[...former.filter(site=>!nativePortals.has(site.id)).map(site=>campus.get(site.id)??site),...(data.yardRoutes??[])]
+  for(const site of [...routes,...surfaceRoutes,...(data.narrowRoutes??[])])for(const test of site.modes){
     const [x,z,way]=test.route[0]
     test.startHeight=surface(x,z,{way,structure:test.startStructure,pedestrian:test.mode==='foot'})
   }
   fs.writeFileSync(path.join(world,'vehicle-narrow-routes.json'),JSON.stringify(data.narrowRoutes??[]))
   fs.writeFileSync(path.join(world,'vehicle-surface-routes.json'),JSON.stringify(surfaceRoutes))
-  fs.writeFileSync(output,JSON.stringify(data.routes))
+  fs.writeFileSync(output,JSON.stringify(routes))
   process.exit(0)
 }
 if(mode==='portal-check'){
