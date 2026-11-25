@@ -74,6 +74,7 @@
     "verify:hud": "node scripts/verify-hud-extras.mjs",
     "verify:camera": "node --experimental-strip-types --test scripts/camera-hold-test.mjs && node scripts/verify-camera.mjs",
     "verify:drone": "node scripts/verify-drone.mjs",
+    "verify:recording": "node scripts/verify-recording.mjs",
     "verify:creator": "tsx scripts/verify-creator.mjs",
     "test:emote": "node --experimental-strip-types --test scripts/emote-test.mjs",
     "test:rt-aoi": "node scripts/rt-aoi-check.mjs",
