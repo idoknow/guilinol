@@ -115,6 +115,28 @@ def align_airport_lane(nodes, lanes, node_height, profile):
     lane['heights'] = profile(route[-2],end_ref,lane['offset'],way)
 
 
+def align_liuma(way, coords):
+    """Follow the open carriageway past the facade on Liumashan North Alley."""
+    axis=LineString(coords)
+    # Surveyed station 282 m leaves 1.03 m on the facade side and 3.71 m
+    # on the opposite side. The bend at 285.4 m is not a shared junction.
+    ds=np.r_[0.,np.cumsum(np.linalg.norm(np.diff(coords,axis=0),axis=1))]
+    refs=dict(zip(ds,way['nodes'],strict=True))
+    if 2303787983 not in way['nodes'] or abs(ds[way['nodes'].index(2303787983)]-285.4)>1:
+        raise ValueError('Recheck the Liumashan North Alley facade survey')
+    stations=np.unique(np.r_[ds,np.arange(264.,311.,2.)])
+    route=[]
+    for i,d in enumerate(stations):
+        pt=axis.interpolate(d)
+        lo=np.array(axis.interpolate(max(0,d-.2)).coords[0])
+        hi=np.array(axis.interpolate(min(d+.2,axis.length)).coords[0])
+        dx,dz=(hi-lo)/np.linalg.norm(hi-lo)
+        t=np.clip(min((d-264)/14,(310-d)/20),0,1)
+        shift=1.43*t*t*(3-2*t)
+        route.append((pt.x+dz*shift,pt.y-dx*shift,refs.get(d,-43_000_000_000_000-i)))
+    return route
+
+
 def bake(output, manifest, rendered_roads=None):
     from shapely.geometry import box
     left, top, width, depth = manifest['extent']
@@ -239,6 +261,11 @@ def bake(output, manifest, rendered_roads=None):
         if narrow:
             narrow_streets.end_curbs(LineString(coords),paved,garage_curbs)
         alignment=way
+        if way['id']==383576398:
+            route=align_liuma(way,coords)
+            coords=[(x,z) for x,z,_ in route]
+            alignment=dict(way,nodes=[ref for _,_,ref in route])
+            size=2.4
         if narrow:
             route=narrow_ways[way['id']]
             coords=[(x,z) for x,z,_ in route]
