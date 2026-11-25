@@ -53,6 +53,7 @@
     "verify:npc-pose": "node scripts/verify-npc-scarecrow-sidewalk.mjs",
     "verify:traffic-heights": "uv run python pipeline/verify_traffic_heights.py",
     "verify:boat": "node scripts/boat.mjs",
+    "verify:jiefang-landing": "node scripts/boat.mjs --jiefang-landing",
     "perf": "node scripts/perf.mjs",
     "shoot": "node scripts/shoot.mjs",
     "audit": "node scripts/audit.mjs",
