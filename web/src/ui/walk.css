@@ -213,6 +213,16 @@ body[data-home] :is(.ride-hud,.vehicle-action,.walk-ui){display:none!important}
   :root body[data-hotbar=on] .hud-stats{bottom:calc(var(--stick-top) + 76px)}
   /* 上车 / 上船提示站在读数条上方（摇杆 → 物品栏 → 读数 → 提示），不再和读数抢同一行。 */
   :root body .vehicle-action,:root body[data-hotbar=on] .vehicle-action{bottom:calc(var(--stick-top) + 110px)}
+  /* IDOK-256 × IDOK-238：竖屏物品栏站在摇杆上方，slot 收小一点、整体再抬 8 px，右缘别顶到跃/叫车。 */
+  :root body .hotbar{bottom:calc(var(--stick-top) + 18px)}
+  .hotbar{gap:4px;padding:4px}
+  .hotbar-slot{width:44px;height:44px}
+}
+@media (pointer:coarse) and (not (any-pointer:fine)) and (max-width:359px){
+  /* 320 px：物品栏再收一格，读数条右缘让开 dock 网格。 */
+  .hotbar{gap:3px;padding:4px}
+  .hotbar-slot{width:40px;height:40px}
+  output{max-width:calc(100vw - 190px)}
 }
 @media (pointer:coarse) and (not (any-pointer:fine)) and (max-height:500px){
   :root body .hud-stats{max-width:min(40vw,200px);font-size:10.5px;padding:3px 8px}
