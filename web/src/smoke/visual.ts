@@ -19,6 +19,7 @@ export function smokeVisual(scene:THREE.Scene,figure:THREE.Object3D,camera?:THRE
   const rotation=new THREE.Quaternion(),parent=new THREE.Quaternion(),eye=new THREE.Vector3()
   let mist=0,lastPuffs:number|undefined
   function resetPose(){left?.reset();right?.reset()}
+  function setFirstPerson(on:boolean){mask?.show(on)}
   function freeProps(){
     for(const prop of [kit.pack,kit.lighter,kit.cigarette])if(prop.parent!==kit.root){kit.root.add(prop);prop.scale.setScalar(1)}
   }
@@ -28,7 +29,9 @@ export function smokeVisual(scene:THREE.Scene,figure:THREE.Object3D,camera?:THRE
     kit.setBrand(view.brand)
     const visible=view.phase!=='idle'
     kit.root.visible=visible
-    if(visible){
+    if(!visible){
+      kit.resetState()
+    }else{
       const lips=figure.getObjectByName('smoke-lips')??figure.getObjectByName('head')??figure
       if(fp&&camera){
         camera.getWorldPosition(eye);camera.getWorldQuaternion(rotation)
@@ -55,8 +58,15 @@ export function smokeVisual(scene:THREE.Scene,figure:THREE.Object3D,camera?:THRE
       kit.apply(view,{handL,handR,mouth,forward})
       // Drive the original mesh and its skeleton, then mount each prop onto
       // the corresponding animated bone, preserving its solved world pose.
-      const withLighter=view.light>view.carry,prop=withLighter?kit.lighter:kit.pack
-      if(prop.visible&&left)left.apply(withLighter?'lighter':'box',prop)
+      const withLighter=view.light>view.carry&&view.light>.05
+      if(left){
+        if(withLighter&&kit.lighter.visible){
+          left.apply('lighter',kit.lighter,THREE.MathUtils.smoothstep(view.light,.05,.25))
+        }else if(!withLighter&&kit.pack.visible&&view.carry>.01){
+          const packBlend=view.phase==='draw'?THREE.MathUtils.smoothstep(view.progress,0,.22):THREE.MathUtils.smoothstep(view.carry,.01,.25)
+          left.apply('box',kit.pack,packBlend)
+        }
+      }
       if((view.carry>.01||view.puff>.01)&&right){
         if(view.phase==='take'||view.lit){
           pinch.position.copy(kit.cigarette.position)
@@ -67,7 +77,12 @@ export function smokeVisual(scene:THREE.Scene,figure:THREE.Object3D,camera?:THRE
             pinch.position.y-=(1-view.puff)*.10
           }
         }else kit.pinchPoint(view,pinch.position)
-        right.apply(view.lit?'puff':'pinch',pinch)
+        const rightBlend=view.lit
+          ?THREE.MathUtils.smoothstep(view.puff,.01,.35)
+          :view.phase==='draw'?THREE.MathUtils.smoothstep(view.progress,0,.22)
+          :view.phase==='take'?THREE.MathUtils.smoothstep(view.carry,.01,.3)
+          :1
+        right.apply(view.lit?'puff':'pinch',pinch,rightBlend)
       }
       if(left && kit.pack.visible)left.attachment.attach(kit.pack)
       if(left && kit.lighter.visible)left.attachment.attach(kit.lighter)
@@ -78,6 +93,6 @@ export function smokeVisual(scene:THREE.Scene,figure:THREE.Object3D,camera?:THRE
     }
     lastPuffs=view.puffs;plume.update(dt);kit.tick(performance.now())
   }
-  return {tick,resetPose,drop:(length=0)=>kit.dropStub(figure.position,length),
+  return {tick,resetPose,setFirstPerson,drop:(length=0)=>kit.dropStub(figure.position,length),
     dispose(){freeProps();mask?.dispose();left?.dispose();right?.dispose();kit.dispose();plume.dispose()}}
 }

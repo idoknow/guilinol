@@ -48,5 +48,12 @@ export function firstPersonArms(figure:T.Object3D,props:T.Object3D){
       restore.push(()=>{node.layers.mask=mask})
     })
   }
-  return {show,dispose(){show(false);for(const subset of cache.values())subset.dispose()}}
+  return {show,dispose(){
+    show(false)
+    for(const subset of cache.values()){
+      for(const name of Object.keys(subset.attributes))subset.deleteAttribute(name)
+      subset.dispose()
+    }
+    cache.clear()
+  }}
 }

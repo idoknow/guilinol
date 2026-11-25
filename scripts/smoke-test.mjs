@@ -72,3 +72,199 @@ test('mixed packs survive reload and an empty pack advances to the next brand',(
   assert(!takeFromPack('bailong'))
   assert.deepEqual(loadLocalSave(storage).save.packs,[{brand:'hehua',remaining:20}])
 })
+
+import {readFileSync} from 'node:fs'
+import {fileURLToPath} from 'node:url'
+import {dirname,join} from 'node:path'
+import * as THREE from 'three'
+import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js'
+import {fingerPose} from '../web/src/walk/ebike-grip.ts'
+import {cameraHoldLayer,DEFAULT_CAMERA_HOLD_AIM} from '../web/src/walk/camera-hold.ts'
+import {smokingHand} from '../web/src/smoke/hands.ts'
+import {firstPersonArms} from '../web/src/smoke/first-person-arms.ts'
+import {SmokeKit,VIEW_ANCHORS} from '../web/src/smoke/kit.ts'
+import {emotePlayback} from '../web/src/emote/playback.ts'
+import {ensureAvatarRig} from '../web/src/walk/avatar-rig.ts'
+
+async function loadCreatorFigure(file='figure_m.glb'){
+  const avatarDir=join(dirname(fileURLToPath(import.meta.url)),'../public/avatar')
+  const origLoad=THREE.FileLoader.prototype.load
+  THREE.FileLoader.prototype.load=function(url,onLoad){
+    const name=String(url).replace(/^.*\//,'')
+    const raw=readFileSync(join(avatarDir,name))
+    const ab=raw.buffer.slice(raw.byteOffset,raw.byteOffset+raw.byteLength)
+    setImmediate(()=>onLoad(ab))
+  }
+  try{
+    const raw=readFileSync(join(avatarDir,file))
+    const ab=raw.buffer.slice(raw.byteOffset,raw.byteOffset+raw.byteLength)
+    return await new Promise((resolve,reject)=>new GLTFLoader().parse(ab,'avatar/',resolve,reject))
+  }finally{
+    THREE.FileLoader.prototype.load=origLoad
+  }
+}
+
+function quatDiff(a,b){
+  return a.clone().normalize().angleTo(b.clone().normalize())
+}
+
+test('fingerPose reads bind pose even when constructed mid-idle or mid-cameraHold',async()=>{
+  const bindModel=await loadCreatorFigure('figure_m.glb')
+  const posedModel=await loadCreatorFigure('figure_m.glb')
+  ensureAvatarRig(bindModel.scene)
+  ensureAvatarRig(posedModel.scene)
+
+  const bindCurlR=fingerPose(bindModel.scene,'r',1)
+  const bindCurlL=fingerPose(bindModel.scene,'l',-1)
+
+  const mixer=new THREE.AnimationMixer(posedModel.scene)
+  const idle=mixer.clipAction(posedModel.animations.find(c=>c.name==='idle'))
+  idle.reset().setEffectiveWeight(1).play()
+  mixer.update(0.25)
+  const hold=cameraHoldLayer(posedModel.scene)
+  hold.apply(1,{...DEFAULT_CAMERA_HOLD_AIM})
+
+  const posedCurlR=fingerPose(posedModel.scene,'r',1)
+  const posedCurlL=fingerPose(posedModel.scene,'l',-1)
+  assert.equal(posedCurlR.length,bindCurlR.length)
+  assert.equal(posedCurlL.length,bindCurlL.length)
+  for(let i=0;i<bindCurlR.length;i++){
+    assert(quatDiff(bindCurlR[i].rotation,posedCurlR[i].rotation)<1e-4,`right finger ${i} curl drifted from bind pose`)
+    assert(quatDiff(bindCurlL[i].rotation,posedCurlL[i].rotation)<1e-4,`left finger ${i} curl drifted from bind pose`)
+  }
+})
+
+test('smokingHand apply is idempotent, supports smooth blend, and LIFO resets with cameraHold + emote',async()=>{
+  const model=await loadCreatorFigure('figure_m.glb')
+  const fig=model.scene
+  ensureAvatarRig(fig)
+  const mixer=new THREE.AnimationMixer(fig)
+  const idle=mixer.clipAction(model.animations.find(c=>c.name==='idle'))
+  idle.reset().setEffectiveWeight(1).play()
+  mixer.update(0.2)
+
+  const boneNames=['upperarm_r','lowerarm_r','hand_r','index_01_r','middle_01_r','ring_01_r','pinky_01_r','thumb_01_r']
+  const idleQuats=boneNames.map(n=>fig.getObjectByName(n).quaternion.clone())
+
+  const hold=cameraHoldLayer(fig)
+  const handR=smokingHand(fig,'r')
+  const emote=emotePlayback(fig,undefined,mixer)
+  assert(handR)
+
+  const target=new THREE.Group()
+  target.position.set(0.06,1.46,-0.22)
+  fig.add(target)
+  fig.updateMatrixWorld(true)
+
+  // Smooth blend: blend=0.5 sits strictly between idle and blend=1.0
+  handR.apply('puff',target,1)
+  const fullUpper=fig.getObjectByName('upperarm_r').quaternion.clone()
+  handR.reset()
+  handR.apply('puff',target,0.5)
+  const midUpper=fig.getObjectByName('upperarm_r').quaternion.clone()
+  assert(quatDiff(midUpper,idleQuats[0])>0.05,'half-blended puff must move away from idle')
+  assert(quatDiff(midUpper,fullUpper)>0.05,'half-blended puff must not snap to full puff')
+
+  // Idempotent double apply must still restore exact idle pose on reset()
+  handR.apply('puff',target,1)
+  handR.apply('puff',target,1)
+  handR.reset()
+  boneNames.forEach((n,i)=>{
+    assert(quatDiff(fig.getObjectByName(n).quaternion,idleQuats[i])<1e-5,`${n} leaked after double smokingHand.apply`)
+  })
+
+  // Overlapping cameraHold -> smokingHand -> emote with strict LIFO reset never bakes finger pose
+  emote.play(1)
+  for(let f=0;f<5;f++){
+    emote.reset()
+    handR.reset()
+    hold.reset()
+    mixer.update(1/60)
+    hold.apply(f<3?0.6:0,{...DEFAULT_CAMERA_HOLD_AIM})
+    if(f<4)handR.apply('puff',target,0.8)
+    emote.tick(1/60,false)
+  }
+  emote.stop()
+  emote.reset()
+  handR.reset()
+  hold.reset()
+  const nextIdle=boneNames.map(n=>fig.getObjectByName(n).quaternion.clone())
+  // Finger tracks are constant in idle; verify exact preservation against initial idleQuats
+  for(let i=3;i<boneNames.length;i++){
+    assert(quatDiff(nextIdle[i],idleQuats[i])<1e-5,`${boneNames[i]} drifted after overlapping hold/smoke/emote`)
+  }
+  handR.dispose()
+})
+
+test('firstPersonArms dispose preserves original SkinnedMesh shared BufferAttributes',async()=>{
+  const model=await loadCreatorFigure('figure_m.glb')
+  const fig=model.scene
+  const props=new THREE.Group()
+  fig.add(props)
+  const mesh=fig.getObjectByProperty('isSkinnedMesh',true)
+  const origGeom=mesh.geometry
+  const origAttrs=Object.entries(origGeom.attributes)
+  const mask=firstPersonArms(fig,props)
+  mask.show(true)
+  assert.notEqual(mesh.geometry,origGeom)
+  const subset=mesh.geometry
+  let origDisposed=false
+  origGeom.addEventListener('dispose',()=>{origDisposed=true})
+  mask.dispose()
+  assert.equal(mesh.geometry,origGeom,'original geometry must be restored')
+  assert.equal(origDisposed,false,'original geometry must not be disposed')
+  assert.equal(Object.keys(subset.attributes).length,0,'subset must detach borrowed attributes before dispose')
+  for(const [name,attr] of origAttrs){
+    assert.equal(origGeom.getAttribute(name),attr,`original attribute ${name} must stay attached`)
+  }
+})
+
+test('SmokeKit hides pack immediately on ready/light/smoking and resets carry across sessions',()=>{
+  const noop=()=>{}
+  const ctxStub={
+    fillStyle:'',strokeStyle:'',lineWidth:1,font:'',textAlign:'',textBaseline:'',globalAlpha:1,
+    fillRect:noop,strokeRect:noop,clearRect:noop,beginPath:noop,closePath:noop,moveTo:noop,lineTo:noop,
+    arc:noop,ellipse:noop,fill:noop,stroke:noop,fillText:noop,save:noop,restore:noop,translate:noop,rotate:noop,scale:noop,
+    quadraticCurveTo:noop,bezierCurveTo:noop,roundRect:noop,
+    createLinearGradient:()=>({addColorStop:noop}),
+    createRadialGradient:()=>({addColorStop:noop}),
+    measureText:()=>({width:20}),
+  }
+  const prevDoc=globalThis.document
+  const makeEl=()=>({width:0,height:0,getContext:()=>ctxStub,addEventListener:noop,removeEventListener:noop})
+  globalThis.document={createElement:makeEl,createElementNS:(_ns,_tag)=>makeEl()}
+  try{
+    const scene=new THREE.Scene()
+    const kit=new SmokeKit(scene,'bailong')
+    const anchors={
+      handL:VIEW_ANCHORS.handL.clone(),
+      handR:VIEW_ANCHORS.handR.clone(),
+      mouth:new THREE.Vector3(0,-0.044,-0.08),
+      forward:new THREE.Vector3(0,-0.08,-1).normalize(),
+    }
+    const session=new SmokeSession(()=>0.5)
+    session.start('bailong',20)
+    session.advance(1) // sealed
+    for(let i=0;i<15;i++)kit.apply(session.view(),anchors)
+    assert.equal(kit.pack.visible,true)
+
+    session.act(()=>true);session.advance(1) // open
+    session.act(()=>true);session.advance(1) // ready (skipping gradual carry decay at low FPS)
+    kit.apply(session.view(),anchors)
+    assert.equal(kit.pack.visible,false,'pack must not linger into ready phase')
+    assert.equal(kit.lighter.visible,true)
+
+    session.act(()=>true);session.advance(1) // smoking
+    kit.apply(session.view(),anchors)
+    assert.equal(kit.pack.visible,false,'pack must never resurface during smoking idle')
+    assert.equal(kit.lighter.visible,false,'lighter must hide during smoking idle')
+    assert.equal(kit.cigarette.visible,true)
+
+    kit.resetState()
+    assert.equal(kit.cigarette.visible,false)
+    kit.dispose()
+  }finally{
+    if(prevDoc===undefined)delete globalThis.document
+    else globalThis.document=prevDoc
+  }
+})
