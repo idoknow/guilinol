@@ -1,5 +1,6 @@
 """Measure the lift needed above the existing inside wheel path at the Sitang River bore."""
 import argparse
+import csv
 import gzip
 import json
 from pathlib import Path
@@ -14,7 +15,7 @@ from service_streets import width
 from tunnel_clearance import SITANG_ROOF_THICKNESS, clearance as required_clearance
 
 
-def measure(base, candidate):
+def measure(base, candidate, csv_path=None):
     ids = (1097830334, 842819690, 1494508177, 1494508178, 882310596, 882310597)
     ways = {w['id']: w for w in load_osm() if w['type'] == 'way' and w['id'] in ids}
     bridge, road, tie, tunnel, upper, motorway = (ways[i] for i in ids)
@@ -99,6 +100,7 @@ def measure(base, candidate):
     bore = next(t for t in manifests[1]['tunnels'] if t['way'] == tunnel['id'])
     bore_axis = LineString([(x, z) for x, _, z in bore['portals']])
     pavement = []
+    survey_rows = []
     for margin in (.50, .20, .10, .05):
         offset = bore['halfWidth'] - margin
         strip = LineString(coords).offset_curve(-offset, join_style='mitre')
@@ -109,6 +111,10 @@ def measure(base, candidate):
         mouth = strip.project(Point(bore_axis.coords[0]))
         before = [i for i in range(lip, len(pts)) if stations[i] < mouth]
         paving = samples(candidate, manifests[1], [pts[i] for i in before], 'pavementOnly')
+        over_service = [i for i in range(before[-1]+1,len(pts)) if upper_zone.covers(pts[i])]
+        surface_hits = samples(base, manifests[0], [pts[i] for i in over_service], 'pavementOnly')
+        service_bounds = [deck[lip][1]-.08*(stations[i]-stations[lip])+clearance+roof_thickness-y
+                          for i,y in zip(over_service,surface_hits,strict=True) if y is not None]
         cross = [i for i in range(before[-1]+1, len(pts)) if pts[i].distance(motorway_axis) <= half_width
                  and bore_axis.distance(pts[i]) <= bore['halfWidth']]
         top = samples(candidate, manifests[1], [pts[i] for i in cross], 'roofProbe')
@@ -120,11 +126,29 @@ def measure(base, candidate):
             records.append(dict(xz=list(pts[i].coords[0]), distance=distance, floorLowerBound=floor_min,
                                 insideMotorway=half_width-pts[i].distance(motorway_axis), visibleTop=visible,
                                 lift=floor_min+clearance+roof_thickness-visible))
+        survey_rows.extend((offset, margin, *r['xz'], r['distance'], r['insideMotorway'], r['floorLowerBound'],
+                            r['visibleTop'], r['lift']) for r in records)
         pavement.append(dict(offset=offset, insideBore=margin, bridgeXZ=list(pts[lip].coords[0]),
                              bridgeY=deck[lip][1], approachSamples=len(paving),
                              hits=sum(h is not None for h in paving), motorwaySamples=len(records),
+                             servicePavingSamples=len(service_bounds), serviceLiftLowerBound=max(service_bounds,default=None),
                              overCap=sum(1 for r in records if r['lift'] > .5), peak=max(records,key=lambda r:r['lift'])))
-    return dict(pavementSections=pavement,motorwayProbe=motorway_probe, tunnel=tunnel['id'], tags=tunnel['tags'], clearance=clearance, roofThickness=roof_thickness, bridge=bridge['id'],
+    # The current renderer stores one floor elevation per station across the
+    # bore. Propagate the inside pavement bound to the actual 6 m carriageway.
+    wall = pavement[-1]['peak']
+    lane_edge = pavement[0]['peak']
+    axis_delta = bore_axis.project(Point(lane_edge['xz']))-bore_axis.project(Point(wall['xz']))
+    lane_min = wall['floorLowerBound']-.08*abs(axis_delta)
+    level_section = dict(carriagewayWidth=2*pavement[0]['offset'], xz=lane_edge['xz'],
+                         stationDifference=axis_delta, floorLowerBound=lane_min,
+                         minimumLift=lane_min+clearance+roof_thickness-lane_edge['visibleTop'])
+    if csv_path:
+        with csv_path.open('w', newline='') as stream:
+            writer = csv.writer(stream)
+            writer.writerow(('offset_m', 'distance_inside_bore_m', 'x', 'z', 'distance_from_bridge_m',
+                             'distance_inside_motorway_m', 'floor_lower_bound_m', 'visible_motorway_m', 'minimum_lift_m'))
+            writer.writerows(survey_rows)
+    return dict(levelCrossSection=level_section,pavementSections=pavement,motorwayProbe=motorway_probe, tunnel=tunnel['id'], tags=tunnel['tags'], clearance=clearance, roofThickness=roof_thickness, bridge=bridge['id'],
                 bridgeXZ=list(probes[anchor].coords[0]), bridgeY=bridge_y, upper=upper['id'],
                 upperXZ=list(probes[limit].coords[0]), upperY=surface[limit],
                 laneOffset=graph_offset, halfTrack=car_half_track, spacing=.01, gradeLimit=.08,
@@ -136,5 +160,6 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('base_world', type=Path)
     parser.add_argument('candidate_world', type=Path)
+    parser.add_argument('--section-csv', type=Path)
     args = parser.parse_args()
-    print(json.dumps(measure(args.base_world, args.candidate_world), indent=2))
+    print(json.dumps(measure(args.base_world, args.candidate_world, args.section_csv), indent=2))
