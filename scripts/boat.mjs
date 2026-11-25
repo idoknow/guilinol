@@ -132,17 +132,27 @@ try {
       window.__offshoreReading = new Promise(resolve => {
         window.addEventListener(isTouch ? 'click' : 'keydown', () => {
           const start = performance.now()
-          let shown = null
-          let frame = 0, frames = 0
-          function sample() {
-            const now = performance.now()
+          const elapsed = () => performance.now() - start
+          const trace = {input: 0, event: null, show: null, firstFrame: null, frames: []}
+          let shown = null, frame = 0
+          function onToast(event) {
+            if (event.detail?.text?.includes('离岸太远')) trace.event ??= elapsed()
+          }
+          window.addEventListener('walk:toast', onToast)
+          const observer = new MutationObserver(() => {
+            if (document.querySelector('.toast.show')?.textContent.includes('离岸太远')) trace.show ??= elapsed()
+          })
+          observer.observe(document.querySelector('.toast'), {attributes: true, childList: true, subtree: true, characterData: true})
+          function sample(stamp) {
+            const now = elapsed()
             const toast = document.querySelector('.toast.show')
             const bounds = toast?.getBoundingClientRect()
-            const visible = toast?.textContent.includes('离岸太远') && toast.checkVisibility({opacityProperty: true, visibilityProperty: true}) &&
-              bounds.width > 0 && bounds.height > 0 && bounds.bottom > 0 && bounds.right > 0 && bounds.top < innerHeight && bounds.left < innerWidth
-            frames++
+            const visible = Boolean(toast?.textContent.includes('离岸太远') && toast.checkVisibility({opacityProperty: true, visibilityProperty: true}) &&
+              bounds.width > 0 && bounds.height > 0 && bounds.bottom > 0 && bounds.right > 0 && bounds.top < innerHeight && bounds.left < innerWidth)
+            trace.frames.push({raf: stamp - start, sample: now, visible, opacity: toast ? getComputedStyle(toast).opacity : null})
+            if (trace.event !== null) trace.firstFrame ??= now
             if (visible && shown === null) shown = now
-            if (shown === null ? now - start < 2000 : visible && now - shown < 1500) {
+            if (shown === null ? now - (trace.firstFrame ?? now) < 2000 : visible && now - shown < 1500) {
               frame = requestAnimationFrame(sample)
               return
             }
@@ -151,13 +161,16 @@ try {
           function finish(now, visible) {
             cancelAnimationFrame(frame)
             clearTimeout(deadline)
+            observer.disconnect()
+            window.removeEventListener('walk:toast', onToast)
             const el = document.querySelector('.toast'), style = getComputedStyle(el)
-            resolve({delay: shown === null ? null : shown - start, duration: shown === null || !visible ? 0 : now - shown, frames,
+            resolve({delay: shown === null || trace.firstFrame === null ? null : shown - trace.firstFrame,
+              inputToVisible: shown, duration: shown === null || !visible ? 0 : now - shown, trace,
               opacity: style.opacity, visibility: style.visibility, display: style.display, pageVisibility: document.visibilityState,
               events: window.__boatToasts.map(({text, at}) => ({text, afterInput: at - start})),
               toast: el.outerHTML})
           }
-          const deadline = setTimeout(() => finish(performance.now(), false), 5000)
+          const deadline = setTimeout(() => finish(elapsed(), false), 10000)
           frame = requestAnimationFrame(sample)
         }, {capture: true, once: true})
       })
@@ -170,8 +183,9 @@ try {
     if (offshore) {
       await page.evaluate(() => window.viewer.walk.tick(1 / 60))
       const reading = await page.evaluate(() => window.__offshoreReading)
-      assert(reading.delay !== null && reading.delay <= 2000 && reading.duration >= 1500, `离岸提示显示异常: ${JSON.stringify(reading)}`)
-      console.log('离岸提示 (ms):', reading)
+      console.log('离岸提示 (ms):', JSON.stringify(reading))
+      assert(reading.trace.event !== null && reading.trace.event <= 2000 && reading.trace.show !== null &&
+        reading.delay !== null && reading.delay >= 0 && reading.delay <= 2000 && reading.duration >= 1500, '离岸提示显示异常（见逐帧记录）')
       return
     }
     await page.evaluate(async () => {
