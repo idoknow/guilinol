@@ -339,7 +339,7 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
   const [sim,source,model,preloadedNet]=await Promise.all([createPhysics(manifest,stream,peaks,rapierReady),avatarReady,characterModel(profile),mpEnabled()?import('../net'):undefined])
   let netModule=preloadedNet
   model.animations.push(...source.animations.filter(c=>!model.animations.some(other=>other.name===c.name)))
-  const rig=createCameraRig(sim)
+  const rig=createCameraRig(sim,manifest.tunnels)
   const figure=model.scene,legacySkinned=mergeAvatar(figure,avatar.color),avatarRig=ensureAvatarRig(figure,avatar.color),skinned=legacySkinned??avatarRig.skinnedMesh,traveller=figure.getObjectByName('Traveller')??avatarRig.traveller,ridePose=createRiderPose(figure),driverPose=createDriverPose(figure)
   const cigarette=new SmokeSession()
   const updateSmokePrompt=smokeEnabled()?createSmokePrompt(scene,camera):()=>{}
