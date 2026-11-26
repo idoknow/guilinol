@@ -295,6 +295,11 @@ material.onBeforeCompile = shader=>{
   float fade = smoothstep(max(60., uTreeFar-120.), uTreeFar, distance(vFogWorld,cameraPosition));
   if(fade > fract(52.9829189 * fract(dot(gl_FragCoord.xy,vec2(.06711056,.00583715))))) discard;
 #endif`)
+    .replace('#include <opaque_fragment>',`#if NUM_HEMI_LIGHTS > 0
+  outgoingLight = max(outgoingLight, diffuseColor.rgb * hemisphereLights[0].skyColor * ${look.treeShadeFloor.toFixed(3)});
+#endif
+#include <opaque_fragment>`)
+  if(!shader.fragmentShader.includes('hemisphereLights[0].skyColor'))throw Error('Tree shade floor did not patch the fragment shader')
 }
 
 export const builders = specs.map(spec => () => ({
