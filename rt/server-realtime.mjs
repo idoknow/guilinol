@@ -747,6 +747,7 @@ wss.on('connection', (ws, req) => {
         sweepBans()
         // 客户端能力位：支持增量名册的客户端才收 roster2，老客户端继续收全量
         ws.roster2 = Array.isArray(msg.caps) && msg.caps.includes('roster2')
+        ws.caps3 = Array.isArray(msg.caps) && msg.caps.includes('roster3')
         const claims = identity(msg.ticket)
         if (!claims) { obs.reject('ticket');ws.rejected = true; ws.close(4003, 'ticket rejected'); return }
         const uid = claims.uid
@@ -890,8 +891,8 @@ wss.on('connection', (ws, req) => {
           online: players.size,
           players: visible.map(peerId => players.get(peerId)).filter(Boolean).map(p=>publicOf(p,player)),
         })
-        // 全服名册立刻给一份，不用等下一个 5s 周期
-        send(ws, rosterPayload())
+        // 全服名册立刻给一份（仅老客户端；roster3 客户端按需订阅，不预发 50KB）
+        if (!ws.caps3) send(ws, rosterPayload())
         broadcast({t: 'online', online: players.size})
         return
       }
@@ -1073,7 +1074,7 @@ setInterval(() => {
   const size = Buffer.byteLength(text)
   for (const p of players.values()) {
     const ws = p.ws
-    if (!ws || ws.rosterSub) continue
+    if (!ws || ws.rosterSub || ws.caps3) continue   // roster3 客户端只在订阅期间收
     sendSlowAware(ws, text, 'roster', size)
   }
 }, ROSTER_FULL_MS)
