@@ -84,6 +84,7 @@ export async function feedback(request: Request, env: Env, path: string) {
     if (method !== 'GET' && request.headers.get('Origin') !== new URL(request.url).origin)
       throw new Problem(403, 'origin', '请求来源不符')
     const banTarget=/^admin\/users\/([\w-]+)\/(ban|unban)$/.exec(path)
+    if(admin && env.traceAdmin && ['admin/trace','admin/trace/action'].includes(path)) return env.traceAdmin(path,request,user)
     if(admin&&path==='admin/smoke'&&env.smokeAdmin)return env.smokeAdmin(request,user)
     if(admin&&path==='admin/gfx'&&env.gfxAdmin)return env.gfxAdmin(request,user)
     if(admin&&path==='admin/npc'&&env.npcAdmin)return env.npcAdmin(request)

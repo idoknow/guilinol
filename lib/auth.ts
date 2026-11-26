@@ -1,4 +1,6 @@
 export interface Env {
+  traceTile?:(uid:number)=>Promise<Response>
+  traceAdmin?:(path:string,request:Request,actor:string)=>Promise<Response>
   helicopter?:(user:string,action:string,body:Record<string,unknown>)=>Promise<unknown>
   fishing?:{record:(user:string,body:unknown)=>Promise<unknown>,boards:(zone:string|null)=>Promise<unknown>}
   updateCards?:(request:Request, path:string)=>Promise<Response>

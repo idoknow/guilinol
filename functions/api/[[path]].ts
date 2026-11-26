@@ -31,6 +31,11 @@ async function handle(request:Request,env:Env) {
   const stmt=(sql:string,...args:(string|number)[])=>db.prepare(sql).bind(...args)
   if(method==='GET'&&path==='unsubscribe')return unsubscribe(env,url)
   if(method==='GET'&&path==='contributors')return feedbackContributors(env)
+  if(path==='trace/tile' && env.traceTile){
+    if(method!=='GET')throw new Problem(405,'method','需要 GET')
+    const account=await sessionAccount(db,await sessionHash(request));if(!account?.verified)unauthorized()
+    return env.traceTile(Number(account.uid))
+  }
   if(env.updateCards && /^(?:admin\/)?updates(?:\/|$)/.test(path)) return env.updateCards(request,path)
   if(/^(feedback|bridge|admin)(\/|$)/.test(path)) return feedback(request,env,path)
   if(path==='me/save')return cloudSave(request,env)
