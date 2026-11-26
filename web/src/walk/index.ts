@@ -1527,7 +1527,7 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
         net=netModule.attachNet(scene,model.animations,()=>({x:figure.position.x,y:figure.position.y+combat.drop,z:figure.position.z,
           foot:!rides?.bike&&!rides?.car&&!rides?.boat&&document.body.dataset.drone!=='rc',yaw:figure.rotation.y,v:rides?.bike?Math.abs(rides.speed):Math.hypot(vx,vz),gr:Number(grounded),
           sc:cigarette.wire,sb:Math.round(cigarette.length*1800),sp:puffSeq,br:brandIndex(cigarette.brand),sd:dropSeq,ss:cigarette.strength,sr:cigarette.remaining,
-          bike:rides?.bike?'bike':'',bx:rides?.bike?.position.x??0,bz:rides?.bike?.position.z??0,byaw:rides?.heading??0}),()=>currentAvatar()??profile,camera,currentActivity,combat.receive)
+          bike:rides?.bike?'bike':'',bx:rides?.bike?.position.x??0,bz:rides?.bike?.position.z??0,byaw:rides?.heading??0}),()=>currentAvatar()??profile,camera,currentActivity,combat.receive,(x,y,z)=>{figure.position.set(x,Math.max(0,y-combat.drop),z);vx=0;vz=0})
         net.emote(emote.id);net.tick(0)
     }
   }
