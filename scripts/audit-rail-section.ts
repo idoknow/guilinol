@@ -200,7 +200,12 @@ for (const { way: id, controls, boundaryNodes, maximumGrade = 0.05, direction = 
   })
 }
 const reverse = visibleSurfaces(candidate, ids, ids, sections, !!design.railProfiles, design.roadOverpasses)
-console.log(JSON.stringify({ grades, deckChecks, reverse }, null, 2))
+const hasCurbReturns = Object.values(design.priorRoadProfiles?.['01'] ?? {}).some(profile =>
+  typeof profile === 'object' && profile !== null && 'curbReturns' in profile)
+const carriagewayReverse = hasCurbReturns
+  ? visibleSurfaces(candidate, ids, ids, sections, !!design.railProfiles, design.roadOverpasses, 0)
+  : undefined
+console.log(JSON.stringify({ grades, deckChecks, reverse, carriagewayReverse }, null, 2))
 for(const bridge of design.roadOverpasses ?? []) for(const way of bridge.lower) {
   const clearance=reverse.find(r=>r.way===way)?.roadBridges[bridge.way]
   assert(clearance?.intersections && Number.isFinite(clearance.minClearanceM) && clearance.minClearanceM >= bridge.minimumM-1e-5 &&
