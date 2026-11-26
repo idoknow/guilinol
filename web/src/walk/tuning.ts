@@ -55,6 +55,7 @@ export interface ResolvedEbikeProfile {
   compliantCapKmh: number
   defaultGear: number
   allowUpgrades: boolean
+  allowWheelie?: boolean
   capacityScale: number
   accelMul: number
   drainMul: number
@@ -68,7 +69,7 @@ export const EBIKE_COMPLIANT_CAP_KMH = 25
 export const EBIKE_DEFAULT_GEAR = 2
 export const BICYCLE_DEFAULT_GEAR = 2
 export const EBIKE_STANDARD_MAX_KMH = 50
-export const EBIKE_SHARED_MAX_KMH = 40
+export const EBIKE_SHARED_MAX_KMH = 18
 /** Hard anti-tunneling top-speed ceiling for personal upgraded e-bikes (IDOK-91 gate <= 70 km/h). */
 export const EBIKE_UPGRADE_MAX_KMH = 70
 
@@ -104,12 +105,12 @@ export const ebikeTierConfigs: Record<EbikeVehicleType, {
     badge: '共享',
     stockMaxKmh: EBIKE_SHARED_MAX_KMH,
     allowUpgrades: false,
-    capacityScale: .72,
+    capacityScale: .48,
     gears: [
-      {id: 1, label: 'D1', hint: '缓行', maxKmh: 15, accelScale: .54, launchTorque: .58, throttleExp: 1.42, leanScale: .70, wheelieGain: .22, uphillMul: 1.20, drainScale: .58},
-      {id: 2, label: 'D2', hint: '合规', maxKmh: EBIKE_COMPLIANT_CAP_KMH, accelScale: .92, launchTorque: .90, throttleExp: 1.14, leanScale: .90, wheelieGain: .56, uphillMul: 1.00, drainScale: .95},
-      {id: 3, label: 'D3', hint: '畅行', maxKmh: 33, accelScale: 1.22, launchTorque: 1.18, throttleExp: .98,  leanScale: 1.08, wheelieGain: .88, uphillMul: .90, drainScale: 1.65},
-      {id: 4, label: 'S',  hint: '极速', maxKmh: EBIKE_SHARED_MAX_KMH, accelScale: 1.48, launchTorque: 1.42, throttleExp: .86, leanScale: 1.22, wheelieGain: 1.12, uphillMul: .80, drainScale: 2.75},
+      {id: 1, label: 'D1', hint: '缓行', maxKmh: 12, accelScale: .36, launchTorque: .40, throttleExp: 1.50, leanScale: .64, wheelieGain: 0, uphillMul: 1.65, drainScale: .72},
+      {id: 2, label: 'D2', hint: '代步', maxKmh: 16, accelScale: .48, launchTorque: .52, throttleExp: 1.28, leanScale: .80, wheelieGain: 0, uphillMul: 1.50, drainScale: 1.15},
+      {id: 3, label: 'D3', hint: '畅行', maxKmh: EBIKE_SHARED_MAX_KMH, accelScale: .56, launchTorque: .60, throttleExp: 1.12, leanScale: .90, wheelieGain: 0, uphillMul: 1.40, drainScale: 1.75},
+      {id: 4, label: 'S',  hint: '限速', maxKmh: EBIKE_SHARED_MAX_KMH, accelScale: .60, launchTorque: .64, throttleExp: 1.04, leanScale: .96, wheelieGain: 0, uphillMul: 1.35, drainScale: 2.60},
     ],
   },
 }
@@ -162,10 +163,11 @@ export function resolveEbikeProfile(vehicleType: EbikeVehicleType, mods?: EbikeU
       compliantCapKmh: EBIKE_COMPLIANT_CAP_KMH,
       defaultGear: EBIKE_DEFAULT_GEAR,
       allowUpgrades: false,
+      allowWheelie: false,
       capacityScale: base.capacityScale,
-      accelMul: 1,
-      drainMul: 1,
-      wheelieTorqueMul: 1,
+      accelMul: .62,
+      drainMul: 1.15,
+      wheelieTorqueMul: 0,
       gears: base.gears,
       upgrades: {motorLevel: 0, controllerLevel: 0, batteryLevel: 0, topKmhBonus: 0, accelMul: 1, capacityScale: 1, drainMul: 1},
       upgraded: false,

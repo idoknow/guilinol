@@ -1059,13 +1059,14 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
     window.dispatchEvent(new CustomEvent('walk:toast',{detail:{text:ok?`共享电车已送达，${boardHint}`:'附近没有可调度的共享车或安全停车位',ms:2400}}))
     return true
   }
-  window.addEventListener('walk:hail',()=>{hailSharedBike('点「骑电动车」出发')})
+  let sharedWheelieHintAt=0
+  window.addEventListener('walk:hail',()=>{hailSharedBike(getPlayMode()==='solo'?'点「解锁共享电动车（¥2）」出发':'点「骑电动车」出发')})
   window.addEventListener('keydown',event=>{
     if(active&&cigarette.active&&!event.repeat&&!isGlobalHotkeyBlocked(event.target)&&!isModalOrOverlayOpen()){
       if(event.code==='Escape'){selectSlot('hand')}
     }
     if(active)ebikeAudio.unlock()
-    if(active && event.code==='KeyL' && !event.repeat && !isGlobalHotkeyBlocked(event.target) && hailSharedBike('按 F 上车'))return
+    if(active && event.code==='KeyL' && !event.repeat && !isGlobalHotkeyBlocked(event.target) && hailSharedBike(getPlayMode()==='solo'?'按 F 付 ¥2 解锁':'按 F 上车'))return
     if(active&&!event.repeat&&event.code==='KeyO'&&!isGlobalHotkeyBlocked(event.target)&&!isModalOrOverlayOpen()&&!shopOverlay?.isOpen()){
       openSafeWardrobe()
       return
@@ -2662,10 +2663,18 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
         if(wantStandUp){crashRecoverQueued=false;beginStandUpFromCrash()}
       }else if(rides.rideKind==='bike'){
         if(rideCtrl.cycleMod){
-          const nextPreset=ebikeFx.cycleModPreset()
-          rides.setEbikeUpgrades(ebikeModUpgrades(ebikeFx.vehicleType,nextPreset))
-          ebikeRig.applyMods(ebikeFx.customMods??nextPreset,(mountedStaticBike?.userData.paint as number|undefined)??0)
-          if(mountedStaticBike)mountedStaticBike.userData.modPreset=nextPreset
+          if(ebikeFx.vehicleType==='shared'){
+            window.dispatchEvent(new CustomEvent('walk:toast',{detail:{text:'共享电动车不支持改装，去十字街车行购置专属电摩吧',ms:2400}}))
+          }else{
+            const nextPreset=ebikeFx.cycleModPreset()
+            rides.setEbikeUpgrades(ebikeModUpgrades(ebikeFx.vehicleType,nextPreset))
+            ebikeRig.applyMods(ebikeFx.customMods??nextPreset,(mountedStaticBike?.userData.paint as number|undefined)??0)
+            if(mountedStaticBike)mountedStaticBike.userData.modPreset=nextPreset
+          }
+        }
+        if(ebikeFx.vehicleType==='shared'&&rideCtrl.wheelie&&(rides.ebikeTelemetry?.speed??0)>=1.5&&performance.now()-sharedWheelieHintAt>3200){
+          sharedWheelieHintAt=performance.now()
+          window.dispatchEvent(new CustomEvent('walk:toast',{detail:{text:'共享电动车限速 18 km/h 且禁止翘头，去十字街买个人电摩吧',ms:2200}}))
         }
         const rawTel=rides.ebikeTelemetry
         if(rawTel){

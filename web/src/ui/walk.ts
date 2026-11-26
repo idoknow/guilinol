@@ -429,9 +429,11 @@ const held=(action:Action)=>{let on=false;keys.forEach(code=>{if(!on&&hits(code,
         gearEl.textContent=state.parkLocked?'P':state.gearLabel
         gearEl.title=state.parkLocked
           ?`${state.vehicleLabel} · P档驻车（按 0/P/K 或 E 解除）`
-          :`${state.vehicleLabel} · 本挡限速 ${Math.round(state.maxKmh)} km/h（1-4 / Q·E 换挡）`
+          :`${state.vehicleLabel} · 本挡限速 ${Math.round(state.maxKmh)} km/h（1-4 / Q·E 换挡）${state.vehicleType==='shared'?' · 单次代步':''}`
         const lightTag=state.headlight==='high'?'远光':state.headlight==='low'?'近光':'关灯'
-        keysEl.textContent='0/P驻车 · K撑 · L灯 · Z/X/B · H喇叭 · U定速 · G改 · Shift压弯'
+        keysEl.textContent=state.vehicleType==='shared'
+          ?'0/P驻车 · K撑 · L灯 · Z/X/B · H喇叭 · U定速 · 单次代步限18(禁翘头)'
+          :'0/P驻车 · K撑 · L灯 · Z/X/B · H喇叭 · U定速 · G改 · Shift压弯'
         parkBtn.classList.toggle('on',!!state.parkLocked)
         parkBtn.setAttribute('aria-pressed',String(!!state.parkLocked))
         lightBtn.textContent=lightTag
@@ -471,6 +473,9 @@ const held=(action:Action)=>{let on=false;keys.forEach(code=>{if(!on&&hits(code,
       const leanDeg=Math.round(Math.abs(state.lean)*180/Math.PI)
       const wheelieDeg=Math.round(Math.max(0,state.wheelie)*180/Math.PI)
       const crashed=state.crashPhase==='crashed'
+      const wheelieBlocked=rideKind==='bike'&&state.vehicleType==='shared'&&!crashed
+      btnWheelie.dataset.locked=wheelieBlocked?'1':'0'
+      btnWheelie.setAttribute('aria-disabled',wheelieBlocked?'true':'false')
       document.body.dataset.rideCrash=crashed?'1':'0'
       if(crashed){
         stateEl.hidden=false;stateEl.dataset.warn='1'
@@ -481,8 +486,8 @@ const held=(action:Action)=>{let on=false;keys.forEach(code=>{if(!on&&hits(code,
         stateEl.textContent='爬起中…'
         btnWheelie.textContent='翘头'
       }else{
-        btnWheelie.textContent='翘头'
-        btnWheelie.classList.toggle('on',wheelieTouch||keys.has('Space'))
+        btnWheelie.textContent=wheelieBlocked?'禁翘头':'翘头'
+        btnWheelie.classList.toggle('on',!wheelieBlocked&&(wheelieTouch||keys.has('Space')))
         if(rideKind==='bike'&&state.parkLocked){
           stateEl.hidden=false;stateEl.dataset.warn='0'
           stateEl.textContent=state.kickstandDown?'P档 · 边撑已放':'P档驻车'
@@ -507,6 +512,9 @@ const held=(action:Action)=>{let on=false;keys.forEach(code=>{if(!on&&hits(code,
         }else if(rideKind==='bike'&&state.lowBattery){
           stateEl.hidden=false;stateEl.dataset.warn='1'
           stateEl.textContent='低电预警'
+        }else if(rideKind==='bike'&&state.vehicleType==='shared'){
+          stateEl.hidden=false;stateEl.dataset.warn='0'
+          stateEl.textContent='单次代步 · 限18'
         }else{
           stateEl.hidden=true;stateEl.dataset.warn='0'
         }

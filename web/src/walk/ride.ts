@@ -1518,8 +1518,10 @@ export function createBikeControl() {
       longPitch = T.MathUtils.damp(longPitch, targetLongPitch, 11, cdt)
 
       // Active wheelie pitch physics driven by throttle torque + gear wheelie gain.
-      const torqueBias = gSpec.wheelieGain * (kind === 'bike' ? profile.wheelieTorqueMul : 1)
-      if (wheelieLoad > .05 && speed >= s.crash.wheelieMinSpeedMs && !braking) {
+      // Shared commuter e-bikes prohibit wheelies regardless of speed or throttle input.
+      const canWheelie = kind === 'bicycle' || (profile.vehicleType !== 'shared' && profile.allowWheelie !== false)
+      const torqueBias = canWheelie ? gSpec.wheelieGain * (kind === 'bike' ? profile.wheelieTorqueMul : 1) : 0
+      if (canWheelie && wheelieLoad > .05 && speed >= s.crash.wheelieMinSpeedMs && !braking) {
         const speedEase = T.MathUtils.clamp(speed / 3.8, .48, 1.25)
         // IDOK-153: half the old lift rate and a softer ramp, so the front comes up gradually.
         const liftAccel = s.crash.wheelieRaiseRate * wheelieLoad * torqueBias * speedEase * WHEELIE_SENSITIVITY
