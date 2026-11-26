@@ -41,6 +41,7 @@ import {
 import {mountCityUpgradeProps} from './city-upgrade/props'
 import {flags} from './debug'
 import {tapFrame} from './gear/frame-tap'
+import {sessionMarkPass} from './look/session-mark-gl'
 import {deriveRangeMetrics, loadRenderConfig, RenderRangeStore, type RenderRangeConfig} from './render-range'
 import {renderRangeControl} from './ui/render-range'
 import type {FeedbackView} from '../../lib/feedback-contract'
@@ -145,7 +146,8 @@ async function start(loader:FullLoader,creatorSpawn=false) {
   if(params.has('debug'))Object.assign(window,{gfx})
   // tapFrame：录像在这里、present 之前拷帧（IDOK-383，主画布没开 preserveDrawingBuffer）。
   let cabinCruise=false
-  function drawMain(){if(post)stats.shadowCasters=post.render(walker?.active?walker.position:camera.position,cabinCruise);else renderer.render(scene,camera);tapFrame(renderer.domElement)}
+  const stamp=sessionMarkPass(renderer)
+  function drawMain(){if(post)stats.shadowCasters=post.render(walker?.active?walker.position:camera.position,cabinCruise);else renderer.render(scene,camera);stamp();tapFrame(renderer.domElement)}
   renderer.info.autoReset=false
   const hemi = new THREE.HemisphereLight(look.hemiSky,look.hemiGround,look.hemiPower); scene.add(hemi)
   const arrivalReady=import('./arrival-programs').then(module=>warmPrograms(module.arrivalPrograms()))
@@ -931,7 +933,7 @@ async function start(loader:FullLoader,creatorSpawn=false) {
     readLastViewNow:()=>readLastView(),
     applyLastViewNow:(view:FeedbackView)=>getPlayMode()==='solo'?{ok:false,code:'FLIGHT_DISABLED_IN_SOLO'}:restoreOpening(view)}})
   function draw(){
-    if(xxg.render()||szj.render())return
+    if(xxg.render()||szj.render()){stamp();return}
     renderer.info.reset()
     base.update(camera,heli.phase==='cruise')
     const metrics=stream.metrics

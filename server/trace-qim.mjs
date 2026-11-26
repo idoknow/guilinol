@@ -12,8 +12,9 @@ export function encodeTile(uid,seconds,key) {
   const gray=Buffer.alloc(512*512,128)
   for(let top=0;top<512;top+=8) for(let left=0;left<512;left+=8) {
     const block=new Float64Array(64).fill(128)
-    for(let freq=0;freq<4;freq++) if(bitAt(record,slot(left,top,freq))) {
-      for(let index=0;index<64;index++) block[index]+=140*basis[freq][index]
+    for(let freq=0;freq<4;freq++){
+      const amplitude=bitAt(record,slot(left,top,freq))?140:-120
+      for(let index=0;index<64;index++)block[index]+=amplitude*basis[freq][index]
     }
     if(block.some(value=>value<0||value>255)) continue
     for(let index=0;index<64;index++) gray[(top+(index>>3))*512+left+index%8]=Math.round(block[index])
@@ -41,10 +42,18 @@ function verifyVotes(votes,key) {
   return result && timingSafeEqual(signature(payload,key),record.subarray(13)) ? result : null
 }
 
-export function decodePeriodic(gray,width,height,key){
+export function decodePeriodic(gray,width,height,key,weighted=false,detailBand=false){
   const periodX=128,periodY=32
   if(width<periodX||height<periodY)return null
-  const folded=new Float64Array(periodX*periodY), counts=new Uint32Array(folded.length)
+  const folded=new Float64Array(periodX*periodY), counts=new Float64Array(folded.length)
+  if(weighted){
+    for(let top=0;top+8<=height;top+=8)for(let left=0;left+8<=width;left+=8){
+      let sum=0,square=0
+      for(let index=0;index<64;index++){const value=gray[(top+(index>>3))*width+left+index%8];sum+=value;square+=value*value}
+      const mean=sum/64, weight=1/Math.max(1,square/64-mean*mean)**1.5
+      for(let index=0;index<64;index++){const row=top+(index>>3),col=left+index%8,dest=(row%periodY)*periodX+col%periodX;folded[dest]+=weight*(gray[row*width+col]-mean);counts[dest]+=weight}
+    }
+  }else
   for(let row=0;row<height;row++)for(let col=0;col<width;col++){
     const index=(row%periodY)*periodX+col%periodX
     folded[index]+=gray[row*width+col];counts[index]++
@@ -55,7 +64,8 @@ export function decodePeriodic(gray,width,height,key){
     for(let top=0;top<periodY;top+=8)for(let left=0;left<periodX;left+=8){
       for(let freq=0;freq<4;freq++){
         let sum=0
-        for(let index=0;index<64;index++)sum+=basis[freq][index]*folded[((phaseY+top+(index>>3))%periodY)*periodX+(phaseX+left+index%8)%periodX]
+        const pattern=basis[freq]
+        for(let index=0;index<64;index++)sum+=pattern[index]*folded[((phaseY+top+(index>>3))%periodY)*periodX+(phaseX+left+index%8)%periodX]
         coefficients[slot(left,top,freq)]=sum
       }
     }
@@ -65,7 +75,7 @@ export function decodePeriodic(gray,width,height,key){
       const votes=new Float64Array(256)
       for(let bit=0;bit<256;bit++){
         const source=(((bit>>6)+shiftY)%4)*64+((((bit>>2)%16)+shiftX)%16)*4+bit%4
-        votes[bit]=Math.abs(coefficients[source])-level*.5
+        votes[bit]=detailBand?coefficients[source]:Math.abs(coefficients[source])-level*.5
         if(bit<24 && (votes[bit]>0)!==Boolean(bitAt(header,bit)))break
         if(bit===255){const result=verifyVotes(votes,key);if(result)return result}
       }
