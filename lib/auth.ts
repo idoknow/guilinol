@@ -1,4 +1,5 @@
 export interface Env {
+  helicopter?:(user:string,action:string,body:Record<string,unknown>)=>Promise<unknown>
   fishing?:{record:(user:string,body:unknown)=>Promise<unknown>,boards:(zone:string|null)=>Promise<unknown>}
   updateCards?:(request:Request, path:string)=>Promise<Response>
   mpAdmin?:(path:string,request:Request,actor:string)=>Promise<Response>

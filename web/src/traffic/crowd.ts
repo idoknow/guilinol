@@ -213,7 +213,7 @@ export function crowd(scene:THREE.Scene,camera:THREE.Camera,groundAt?:(x:number,
     /** Picks which pedestrians get a character this step; returns the set the batch must hide. */
     select(actors:readonly Walker[]){
       const cx=camera.position.x,cz=camera.position.z
-      const near=actors.filter(a=>a.kind==='person'&&!a.down&&(a.x-cx)**2+(a.z-cz)**2<RANGE**2)
+      const near=actors.filter(a=>a.kind==='person'&&!a.down&&(a.x-cx)**2+(a.z-cz)**2+(a.y-camera.position.y)**2<RANGE**2)
         .sort((a,b)=>((a.x-cx)**2+(a.z-cz)**2)-((b.x-cx)**2+(b.z-cz)**2)).slice(0,LIMIT)
       const keep=new Set(near)
       for(const [walker,view] of active)if(!keep.has(walker))release(walker,view)

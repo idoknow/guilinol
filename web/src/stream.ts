@@ -8,6 +8,7 @@ import {setFogMetrics} from './look/time'
 import {currentMirrorLevel, isWaterInView} from './look/water'
 import {
   RENDER_RADIUS_DEFAULT,
+  deriveRangeMetrics,
   RenderRangeStore,
   type RenderConfigSource,
   type RenderRangeConfig,
@@ -212,9 +213,11 @@ export class Stream {
     }
   }
 
-  tick(position:THREE.Vector3) {
+  private readonly aerialBudget=deriveRangeMetrics(256)
+  tick(position:THREE.Vector3, aerial=false) {
     this.lastPosition.copy(position)
-    const metrics = this.rangeStore.getMetrics()
+    const configured=this.rangeStore.getMetrics()
+    const metrics = aerial&&configured.radius>this.aerialBudget.radius?this.aerialBudget:configured
     const now = performance.now()
     if(this.priorityTarget){
       const movedAway = Math.hypot(position.x-this.priorityTarget.x,position.z-this.priorityTarget.z)>Math.max(metrics.radius,320)
@@ -242,7 +245,7 @@ export class Stream {
       }
     }
 
-    this.updateBatches(position)
+    this.updateBatches(position,metrics)
 
     for(const [tile,controller] of this.pending){
       const keepInner = tileEdgeDistance(tile,focus.x,focus.z)<=innerEdge || tileEdgeDistance(tile,position.x,position.z)<=innerEdge
@@ -262,8 +265,7 @@ export class Stream {
     this.forest.tick(position,innerBusy)
   }
 
-  updateBatches(position:THREE.Vector3){
-    const metrics=this.metrics
+  updateBatches(position:THREE.Vector3,metrics=this.metrics){
     this.batches.update(position,this.camera,isWaterInView(this.camera)?currentMirrorLevel(this.camera):-Infinity,{
       cullHorizon:metrics.cullHorizon,
       buildingFarLod:metrics.buildingFarLod,
