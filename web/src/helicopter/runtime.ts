@@ -6,7 +6,11 @@ import {spots} from '../play/spots'
 import {modes,tourRoute,canDisembark,type TourMode} from './route'
 import {helipad} from './site'
 import {helicopterModel} from './model'
-import profiles from './clearance.json'
+import {queueCommand,type QueueState} from './queue'
+import {aircraftPose,routeFor} from './flight'
+import {routeVersion} from '../../../lib/helicopter-clock'
+import {mpEnabled} from '../ui/mp-pref'
+import {remoteSeat} from './remote-seat'
 
 type Phase='idle'|'board'|'start'|'ascend'|'cruise'|'descend'|'stop'|'landed'|'exit'
 type Walker=Awaited<ReturnType<typeof import('../walk').walk>>
@@ -21,32 +25,56 @@ export function helicopter(scene:THREE.Scene,camera:THREE.PerspectiveCamera,walk
   for(const element of [notice,hint]){element.hidden=true;Object.assign(element.style,{position:'fixed',top:'36%',left:'50%',transform:'translateX(-50%)',zIndex:'12'})}
   panel.innerHTML=`<form method="dialog"><button aria-label="关闭">关闭</button></form><h2>直升机观光</h2><svg class="heli-map" viewBox="-1550 -1550 1650 2870" width="120" height="180"></svg><ol>${spots.map(spot=>`<li>${spot.name}</li>`).join('')}</ol><select aria-label="观光模式">${Object.entries(modes).map(([id,mode])=>`<option value="${id}">${mode.label}：${mode.description}</option>`).join('')}</select><p class="heli-price"></p><button class="heli-confirm">确认旅行</button><p role="status"></p>`
   document.body.append(hint,notice,panel)
-  let phase:Phase='idle',clock=0,mode:TourMode='low',route:ReturnType<typeof tourRoute>|undefined,rate=1,first=false,near=false,fare=0,key='',heading=0,lastHeading=0
+  let phase:Phase='idle',clock=0,mode:TourMode='low',route:ReturnType<typeof tourRoute>|undefined,first=false,near=false,fare=0,heading=0
+  let queue:QueueState|undefined,offset=0,lastPoll=-Infinity,busy=false,sessionFlight:QueueState['flight']=null
+  const status=document.createElement('p'),leave=document.createElement('button'),alert=document.createElement('output');status.className='heli-queue-status';leave.className='heli-queue-leave';leave.textContent='退出排队';alert.className='heli-queue-notice';document.body.append(alert);panel.append(status,leave)
+  const confirm=panel.querySelector<HTMLButtonElement>('.heli-confirm')!
+  function accept(state:QueueState,start:number){
+    if(state.mine?.offered&&!state.flight&&!queue?.mine?.offered)alert.textContent='轮到你了，请在 60 秒内回到停机坪确认登机'
+    if(!state.mine||state.flight&&state.mine.offered)alert.textContent=''
+    if(state.code==='INSUFFICIENT_FUNDS')alert.textContent='余额不足，已跳过本班，请充值后重新排队'
+    if(state.code==='SAVE_NOT_READY')alert.textContent='账号存档未同步，请同步后重新排队'
+    queue=state;offset=state.now-(start+Date.now())/2
+    status.textContent=`${({idle:'空闲',boarding:'登机中',flying:'执飞中',landing:'降落中',unloading:'下机中'} as Record<string,string>)[state.state]} · 前面 ${state.ahead} 人 · 预计等待 ${state.eta} 秒`
+    leave.hidden=!state.mine||!!state.flight&&state.mine.offered;confirm.disabled=!!state.mine&&!state.mine.offered;confirm.textContent=state.mine?.offered?'确认登机':state.mine?'排队中':'加入队列'
+  }
+  async function command(action:string,fields:Record<string,string>={}){if(busy||!soloServices())return;busy=true;const start=Date.now();try{const state=action==='confirm'?await soloServices()!.commerce.confirmHelicopterTicket(fields.ticket):await queueCommand(action,fields);accept(state,start);return state}catch(error){status.textContent=(error as Error).message}finally{busy=false}}
+  leave.onclick=()=>{if(queue?.mine)void command('leave',{ticket:queue.mine.ticket})}
   const from=new THREE.Vector3(),ground=new THREE.Vector3(),seat=new THREE.Vector3(),step=new THREE.Vector3(),actor=new THREE.Vector3(),eye=new THREE.Vector3(),target=new THREE.Vector3(),ahead=new THREE.Vector3()
   const previousPosition=craft.position.clone();let measuredSpeed=0,rotorPower=0
   const stopped=()=>canDisembark(phase,Math.abs(point('skid_contact',target).y-helipad.y)<.02,rotorPower===0,measuredSpeed)
   const durations={board:4,start:3,ascend:11,descend:11,stop:4,exit:4}
   const setPhase=(next:Phase)=>{phase=next;clock=0;if(next==='idle')delete document.body.dataset.helicopter;else document.body.dataset.helicopter=next}
-  function newRoute(id:TourMode){const profile=profiles[id];return tourRoute(helipad,id,(_x,_z,time)=>THREE.MathUtils.lerp(profile[Math.floor(time)],profile[Math.ceil(time)],time%1))}
-  function show(){if(phase!=='idle'||!near||!soloServices())return;const commerce=soloServices()!.commerce;fare=commerce.quotePurchasePrice('helicopter_tour','ticket')!;panel.querySelector('.heli-price')!.textContent=fare?`本次 ¥${fare}`:'首次免费';panel.querySelector('[role=status]')!.textContent='';key=crypto.randomUUID();panel.showModal()}
+  const newRoute=routeFor
+  function show(){if(phase!=='idle'||!near&&!queue?.mine||!soloServices())return;const commerce=soloServices()!.commerce;fare=commerce.quotePurchasePrice('helicopter_tour','ticket')!;panel.querySelector('.heli-price')!.textContent=fare?`本次 ¥${fare}`:'首次免费';panel.querySelector('[role=status]')!.textContent='';panel.showModal();void command('ping')}
   const select=panel.querySelector('select')!
   function map(){mode=select.value as TourMode;route=newRoute(mode);const points=[];for(let time=0;time<=route.duration;time++) {const pos=route.pose(time);points.push(`${pos.x},${pos.z}`)}panel.querySelector('svg')!.innerHTML=`<polyline points="${points.join(' ')}" fill="none" stroke="currentColor" stroke-width="12"/>${spots.map((spot,index)=>`<text x="${spot.x}" y="${spot.z}" font-size="100">${index+1}</text>`).join('')}`}
   select.onchange=map;panel.addEventListener('close',()=>{hint.blur()})
-  panel.querySelector<HTMLButtonElement>('.heli-confirm')!.onclick=()=>{
+  confirm.onclick=async()=>{
     const player=walker(),services=soloServices();if(!panel.open||!player||!services||phase!=='idle'||!player.heli.available())return
-    const result=services.commerce.executePurchase({itemType:'helicopter_tour',itemId:'ticket',shopId:'helipad',expectedPrice:fare,idempotencyKey:key})
-    if(result.code!=='OK'){panel.querySelector('[role=status]')!.textContent=result.code==='INSUFFICIENT_FUNDS'?'余额不足，无法登机':'价格已变更或交易未完成，请重新打开面板';return}
+    if(!queue?.mine){await command('join',{mode});return}if(!near||!queue.mine.offered)return
+    const result=await command('confirm',{ticket:queue.mine.ticket});if(!result)return
+    if(result.code!=='OK'||!result.flight){panel.querySelector('[role=status]')!.textContent=result.code==='INSUFFICIENT_FUNDS'?'余额不足，已跳过':'存档未同步或登机资格已过期';return}
+    sessionFlight=result.flight;mode=result.flight.mode;route=newRoute(mode)
     from.copy(player.heli.figure.position);player.heli.begin();setPhase('board');panel.close()
   }
-  const interact=()=>{if(stopped())setPhase('exit');else if(phase==='idle'&&near&&soloServices()){map();show()}}
+  const interact=()=>{if(stopped())setPhase('exit');else if(phase==='idle'&&(near||queue?.mine)&&soloServices()){map();show()}}
   hint.onclick=interact
   window.addEventListener('keydown',event=>{if(isGlobalHotkeyBlocked(event.target,{allowPhoto:true})||event.repeat)return
     if(phase!=='idle'&&hits(event.code,'view')){first=!first;event.stopImmediatePropagation();event.preventDefault()}
     if((phase!=='idle'||near&&soloServices())&&hits(event.code,'interact')){event.stopImmediatePropagation();event.preventDefault();interact()}
   },true)
-  function tick(dt:number){const player=walker(),locked=phase!=='idle';if(!locked){near=model.loaded&&!!player?.heli.available()&&player.position.distanceTo(point('step_L',step))<4.5;notice.hidden=!near||getPlayMode()!=='tour';hint.hidden=!near||!soloServices()||panel.open;hint.textContent='观光直升机';if(panel.open&&(!near||!soloServices()))panel.close();model.animate(dt,0,0,camera.position.distanceTo(craft.position),'idle');return}
+  const padDoor=new THREE.Vector3(helipad.x+1.19,helipad.y+.56,helipad.z-.4)
+  alert.onclick=()=>{if(queue?.mine&&!panel.open)show()}
+  function tick(dt:number){const player=walker();if(soloServices()&&performance.now()-lastPoll>2500&&!busy){lastPoll=performance.now();void command('ping')}
+    const flight=sessionFlight??(soloServices()?queue?.flight:null),pose=flight?.version===routeVersion?aircraftPose(Date.now()+offset,flight.t0,flight.mode):null
+    craft.position.set(pose?.x??helipad.x,pose?.y??helipad.y,pose?.z??helipad.z);craft.rotation.set(pose?.pitch??0,pose?.yaw??0,-(pose?.roll??0),'YXZ');craft.visible=!flight||!!sessionFlight||mpEnabled()
+    remoteSeat.uid=pose&&flight&&model.loaded&&mpEnabled()?flight.passengerUid:0
+    if(remoteSeat.uid){point('seat_pax_1',seat);Object.assign(remoteSeat,{x:seat.x,y:seat.y-.65,z:seat.z,yaw:craft.rotation.y})}
+    if(phase==='idle'&&player?.active&&model.loaded&&queue?.mine?.offered&&queue.flight&&pose&&pose.phase!=='ended'){sessionFlight=queue.flight;mode=sessionFlight.mode;route=newRoute(mode);from.copy(player.heli.figure.position);player.heli.begin();setPhase(pose.phase)}
+    if(phase==='idle'){near=!!player?.heli.available()&&player.position.distanceTo(padDoor)<4.5;notice.hidden=!near||getPlayMode()!=='tour';hint.hidden=(!near&&!queue?.mine)||!soloServices()||panel.open;hint.textContent=queue?.mine?'查看排队':flight?'直升机执飞中 · 排队':'观光直升机';if(panel.open&&(!near&&!queue?.mine||!soloServices()))panel.close();model.animate(dt,pose?.rpm??0,0,camera.position.distanceTo(craft.position),pose?'cruise':'idle');return}
     if(!player||!route)return
-    notice.hidden=true;hint.hidden=!stopped();hint.textContent='按 F 键下机';clock+=Math.min(1,dt)*rate
+    notice.hidden=true;hint.hidden=!stopped();hint.textContent='按 F 键下机';if(phase==='exit')clock+=dt;else if(pose){if(pose.phase==='ended'){setPhase('exit')}else{setPhase(pose.phase);clock=pose.clock}}
     const duration=phase==='cruise'?route.duration:phase==='landed'?Infinity:durations[phase as keyof typeof durations],fraction=clamp(clock/duration),smooth=ease(fraction)
     let rpm=1,door=0,clip='sit',orbit=true
     if(phase==='board'||phase==='exit'){
@@ -54,10 +82,7 @@ export function helicopter(scene:THREE.Scene,camera:THREE.PerspectiveCamera,walk
       point('step_L',step);point('seat_pax_1',seat);seat.y-=.65;ground.copy(step);ground.x+=.7;ground.y=helipad.y
       if(progress<.27)actor.lerpVectors(phase==='board'?from:ground,ground,ease(progress/.27));else if(progress<.57)actor.lerpVectors(ground,step,ease((progress-.27)/.3));else actor.lerpVectors(step,seat,ease((progress-.57)/.28));actor.y+=.06*Math.sin(Math.PI*clamp((progress-.3)/.45));heading=THREE.MathUtils.lerp(Math.PI/2,craft.rotation.y,ease((progress-.58)/.28))
     }else{
-      const begin=route.pose(0),end=route.pose(route.duration);if(phase==='ascend'||phase==='descend'){
-        const lift=phase==='ascend'?smooth:1-smooth;craft.position.y=THREE.MathUtils.lerp(helipad.y,phase==='ascend'?begin.y:end.y,lift);craft.rotation.x=(phase==='ascend'?1:-1)*.06*Math.sin(Math.PI*fraction)**2
-        craft.rotation.y=phase==='ascend'?route.pose(.2).yaw*smooth:lastHeading*(1-smooth)
-      }else if(phase==='cruise'){const pose=route.pose(clock);craft.position.set(pose.x,pose.y,pose.z);craft.rotation.set(pose.pitch,pose.yaw,-pose.roll,'YXZ');lastHeading=pose.yaw;const future=route.pose(clock+2);ahead.set(future.x,future.y,future.z)}
+      if(phase==='cruise'){const future=route.pose(clock+2);ahead.set(future.x,future.y,future.z)}
       else if(phase==='start')rpm=smooth;else if(phase==='stop')rpm=1-smooth;else if(phase==='landed')rpm=0
       point('seat_pax_1',actor);actor.y-=.65;heading=craft.rotation.y
     }
@@ -70,7 +95,7 @@ export function helicopter(scene:THREE.Scene,camera:THREE.PerspectiveCamera,walk
       const {yaw,pitch,arm}=player.heli.view();if(first&&orbit){point('cam_pax_1',camera.position);camera.rotation.set(-pitch,yaw+craft.rotation.y+Math.PI,0,'YXZ')}
       else{target.copy(orbit?craft.position:actor);target.y+=1;const radius=orbit?9+arm:4;eye.set(Math.sin(yaw)*Math.cos(pitch),Math.sin(pitch),Math.cos(yaw)*Math.cos(pitch)).multiplyScalar(radius);camera.position.copy(target).add(eye);camera.lookAt(target)}
     }
-    if(clock>=duration){if(phase==='exit'){player.heli.end(ground);first=false;setPhase('idle')}else{const next:Partial<Record<Phase,Phase>>={board:'start',start:'ascend',ascend:'cruise',cruise:'descend',descend:'stop',stop:'landed'};setPhase(next[phase]!)}}
+    if(phase==='exit'&&clock>=duration){if(queue?.mine?.offered&&queue.flight?.t0===sessionFlight?.t0){if(!busy)void command('unload',{ticket:queue.mine.ticket});return}player.heli.end(ground);first=false;sessionFlight=null;setPhase('idle')}
   }
-  return {tick,get active(){return phase!=='idle'},get lookAhead(){return phase==='cruise'?ahead:null},get phase(){return phase},get mode(){return mode},get first(){return first},...(verify?{rate:(scale:number)=>{rate=Math.max(1,Math.min(120,scale))}}:{})}
+  return {tick,get active(){return phase!=='idle'},get lookAhead(){return phase==='cruise'?ahead:null},get phase(){return phase},get mode(){return mode},get first(){return first},...(verify?{queue:()=>queue,positionAt:(time:number)=>queue?.flight&&aircraftPose(time,queue.flight.t0,queue.flight.mode),visible:()=>craft.visible}: {})}
 }

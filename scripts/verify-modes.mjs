@@ -25,6 +25,7 @@ try {
     await page.screenshot({path:`${process.env.MODE_CAPTURES}/${mode}.png`})
   }
   const originUrl = `http://127.0.0.1:${server.httpServer.address().port}`
+  if(!process.env.VERIFY_TOUR_ONLY){
   await page.goto(originUrl)
   await page.waitForFunction(()=>document.activeElement?.getAttribute('data-umami-event')==='home-mp')
   await page.goto(`${originUrl}/?play&verify`)
@@ -37,6 +38,7 @@ try {
   await page.reload()
   await page.waitForFunction(()=>document.activeElement?.getAttribute('data-umami-event')==='home-mp')
   assert.equal(await page.evaluate(()=>localStorage.getItem('glol.playMode')),'solo')
+  }else await page.goto(originUrl)
   await page.evaluate(()=>localStorage.clear())
   requests.length=0
   await page.goto(`${originUrl}/?verify&flow=0&time=10.5&radius=480`)
@@ -53,6 +55,7 @@ try {
   }
   assert.equal(await page.evaluate(()=>localStorage.getItem('glol.save.v1')),null)
   assert.deepEqual(requests.filter(url=>/\/(solo-layer|mission-ui|commerce|shop-overlay)[.-]/.test(url)),[])
+  if(process.env.VERIFY_TOUR_ONLY){console.log('Tour flight, empty save and lazy-module assertions passed')}else{
   await go(shops[0])
   await capture('tour')
   const origin = await page.evaluate(()=>performance.timeOrigin)
@@ -126,6 +129,7 @@ try {
   assert.equal(await page.evaluate(()=>window.viewer.walk.active),true)
   assert.equal(await page.evaluate(()=>document.body.dataset.mode),'walk')
   console.log('Tour and solo entry, shop triggers, lazy loading, delivery and in-place resume passed')
+  }
 } finally {
   await browser?.close()
   await server.close()

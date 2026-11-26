@@ -1,9 +1,10 @@
 import {spots} from '../play/spots'
+import {cruiseSeconds} from '../../../lib/helicopter-clock'
 
 export const modes = {
-  low: {label:'低空观览', description:'贴近景点，看建筑和街景', seconds:360},
-  high: {label:'高空观览', description:'高空俯瞰城市与山水', seconds:280},
-  dynamic: {label:'动态观览', description:'景点降高慢行，开阔段拔高提速', seconds:330},
+  low: {label:'低空观览', description:'贴近景点，看建筑和街景', seconds:cruiseSeconds.low},
+  high: {label:'高空观览', description:'高空俯瞰城市与山水', seconds:cruiseSeconds.high},
+  dynamic: {label:'动态观览', description:'景点降高慢行，开阔段拔高提速', seconds:cruiseSeconds.dynamic},
 }
 export type TourMode = keyof typeof modes
 interface Point {x:number; z:number}

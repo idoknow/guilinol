@@ -2955,6 +2955,7 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
         figure.position.copy(point);figure.rotation.set(0,angle,0);figure.visible=!hidden;const next=actions.get(clip)
         if(next&&action!==next)forceLocomotionClip(next);mixer.update(dt);avatarRig.syncPose()
         const body={x:point.x,y:point.y+cfg.height/2,z:point.z};sim.body.setTranslation(body,true);sim.body.setNextKinematicTranslation(body)
+        net?.tick(dt)
       },end(point:THREE.Vector3){figure.visible=true;sim.sync(point.x,point.z);place(point.x,point.z,'heli-exit');resetMotion();restoreFootLocomotion(avatar.clips.idle);follow(0,true)}},
     ebike:{
       get state(){return ebikeState},
