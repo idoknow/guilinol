@@ -12,7 +12,7 @@ import numpy as np
 from shapely.geometry import LineString, Point
 from shapely.ops import nearest_points
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from common import load_osm
+from common import RAW, load_osm
 from features import area, points
 
 from xiaoyao_tower import generate
@@ -71,9 +71,11 @@ def grotto(model,half,height,depth):
 
 def stair_flight(model,surface):
     """Stone treads on the climbing section, with risers bearing on GL04."""
-    from fubo_site import fubo_site
-    site = fubo_site(-50.92)
-    line = site.steps
+    if Path(RAW).exists():
+        from fubo_site import fubo_site
+        line = fubo_site(-50.92).steps
+    else:
+        line = LineString(fubo_input()['steps'])
     model.pose = (0,0,0,0)
     pairs = []
     # Keep joints at OSM corners and share vertices between neighbouring treads.
@@ -104,10 +106,14 @@ def stair_flight(model,surface):
                         [2,7,3],[2,6,7],[3,4,0],[3,7,4]],'granite',False)
 
 
-def build(model):
-    surface=landmark_surface('fubo')
-    stair_flight(model,surface)
-    rings,tip=mountain('伏波山');model.pose=(*tip,0);pavilion(model,5.2,3.6,surface)
+def fubo_input():
+    return json.loads((Path(__file__).resolve().parents[1]/'data/landmarks/fubo.json').read_bytes())
+
+
+def boardwalk_frame(surface,rings):
+    if not Path(RAW).exists():
+        document=fubo_input()
+        return np.array(document['center']),np.array(document['forward'])
     base=rings[rings[:,0].argmax()] if rings.ndim==2 else rings[1,0]
     elements = load_osm()
     river = area(next(e for e in elements if e['id']==2339020 and e['type']=='relation'))
@@ -129,8 +135,6 @@ def build(model):
     dry_paths = [LineString(points(e)) for e in elements if e['type']=='way'
                  and e.get('tags',{}).get('highway') and len(points(e))>1
                  and park.distance(LineString(points(e)))<5]
-    def local(along,across):
-        return center+forward*along+normal*across-[surface.x,surface.z]
     # Include both pile lines and the overhanging deck in the clearance.
     for shift in range(25):
         deck = LineString([center-19*forward,center+19*forward]).buffer(2)
@@ -139,6 +143,17 @@ def build(model):
         center += normal
     else:
         raise ValueError('No clear riverside boardwalk alignment')
+    return center,forward
+
+
+def build(model):
+    surface=landmark_surface('fubo')
+    stair_flight(model,surface)
+    rings,tip=mountain('伏波山');model.pose=(*tip,0);pavilion(model,5.2,3.6,surface)
+    center,forward=boardwalk_frame(surface,rings)
+    normal=np.array([forward[1],-forward[0]])
+    def local(along,across):
+        return center+forward*along+normal*across-[surface.x,surface.z]
     def platform(along,across):
         x,z=local(along,across)
         ground,water=surface.sample(x,z)

@@ -59,10 +59,10 @@ export function deriveRangeMetrics(config: Pick<RenderRangeConfig, 'preset' | 'r
   const nearConcurrency = r <= 320 ? 3 : 4
   const outerConcurrency = r >= 768 ? 3 : 2
 
-  const landmarkLoadRadius = Math.round(piecewiseLerp(r, 540, 900, 1650))
-  const landmarkUnloadRadius = landmarkLoadRadius + 160
-  const landmarkLod0 = Math.round(piecewiseLerp(r, 180, 350, 720))
-  const landmarkLod1 = Math.round(piecewiseLerp(r, 360, 650, 1280))
+  const landmarkLoadRadius = Math.round(piecewiseLerp(r, 380, 580, 1200))
+  const landmarkUnloadRadius = landmarkLoadRadius + 140
+  const landmarkLod0 = Math.round(piecewiseLerp(r, 150, 260, 560))
+  const landmarkLod1 = Math.round(piecewiseLerp(r, 320, 520, 1080))
   const landmarkConcurrency = r >= 768 ? 3 : 2
 
   // Match forest range closer to loaded terrain on low presets so distant crowns do not float over coarse overview.

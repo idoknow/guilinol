@@ -3,7 +3,7 @@
 .rotate-gate{display:none}
 @media (orientation:portrait) and (pointer:coarse) and (not (any-pointer:fine)) and (max-width:600px){
   .rotate-gate{display:grid;position:fixed;inset:0;z-index:60;place-items:center;padding:24px calc(24px + env(safe-area-inset-right)) calc(24px + env(safe-area-inset-bottom)) calc(24px + env(safe-area-inset-left));
-    background:radial-gradient(120% 80% at 50% 35%,rgba(47,74,69,.82),rgba(20,33,30,.94));backdrop-filter:blur(10px) saturate(1.1);-webkit-backdrop-filter:blur(10px) saturate(1.1);
+    background:radial-gradient(120% 80% at 50% 35%,rgba(47,74,69,.9),rgba(20,33,30,.97));
     touch-action:none;overscroll-behavior:contain}
   body[data-home] .rotate-gate{display:none}
 }

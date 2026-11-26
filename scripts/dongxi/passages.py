@@ -39,7 +39,7 @@ def reserve_passages(features):
 
 
 if __name__=='__main__':
-    path = root/'docs/layout/dongxi-infill.geojson'
+    path = root/'pipeline/data/layout/dongxi-infill.geojson'
     catalog = json.loads(path.read_text())
     catalog['features'] = reserve_passages(catalog['features'])
     path.write_text(json.dumps(catalog,ensure_ascii=False,separators=(',',':'))+'\n')

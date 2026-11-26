@@ -171,6 +171,13 @@ export const OUTFIT_ITEMS: readonly OutfitItemDef[] = [
   {id: 'bottom_night_moto', slot: 'bottom', name: '夜巡护具骑行长裤', tier: 3, price: 540, colorHex: '#181c22', accentHex: '#20d6c1', description: '高弹性护膝反光拼接骑行裤'},
   {id: 'shoes_night_moto', slot: 'shoes', name: '碳纹疾风骑行靴', tier: 3, price: 480, colorHex: '#171a1f', accentHex: '#ffc53d', description: '加硬脚踝保护疾风骑行靴'},
   {id: 'hat_night_visor', slot: 'hat', name: '夜航全覆光镜盔', tier: 3, price: 320, colorHex: '#151920', accentHex: '#20d6c1', description: '流线型防风全盔配青色镜片'},
+
+  // Traffic volunteer / persuasion duty kit (compliant public-web design: no real police emblem/ID)
+  {id: 'top_traffic_volunteer', slot: 'top', name: '文明劝导反光背心', tier: 0, price: 0, colorHex: '#e2f524', accentHex: '#eef4f8', description: '荧光黄高反光交通劝导背心，含双银反光条与志愿袖标（无真实警徽警号）', defaultOwned: true},
+  {id: 'bottom_traffic_duty', slot: 'bottom', name: '深蓝执勤长裤', tier: 0, price: 0, colorHex: '#1b2330', accentHex: '#dce6ee', description: '深蓝修身志愿劝导长裤，配简洁反光滚边', defaultOwned: true},
+  {id: 'shoes_traffic_duty', slot: 'shoes', name: '黑色防滑执勤鞋', tier: 0, price: 0, colorHex: '#16191e', accentHex: '#2f3844', description: '轻量防滑全黑劝导执勤鞋', defaultOwned: true},
+  {id: 'hat_traffic_cap', slot: 'hat', name: '桂林志愿劝导帽', tier: 0, price: 0, colorHex: '#1b2636', accentHex: '#e2f524', description: '深蓝荧光黄滚边交通劝导帽（无真实警徽警号）', defaultOwned: true},
+  {id: 'bag_traffic_flag', slot: 'bag', name: '劝导小黄旗腰包', tier: 0, price: 0, colorHex: '#1d2735', accentHex: '#f5d226', description: '志愿反光腰包与随身劝导小黄旗', defaultOwned: true},
 ] as const
 
 export {starterOutfit}
@@ -282,6 +289,22 @@ export const OUTFIT_PRESETS: readonly OutfitPresetDef[] = [
       hat: 'hat_night_visor',
       bag: 'bag_none',
     },
+  },
+  {
+    id: 'outfit_traffic_volunteer',
+    name: '交通文明劝导志愿套',
+    tier: 0,
+    price: 0,
+    summary: '荧光黄反光劝导背心配深蓝长袖与袖标（+0 Draw Call，无真实警徽警号）。',
+    tag: '志愿 · 劝导',
+    items: {
+      top: 'top_traffic_volunteer',
+      bottom: 'bottom_traffic_duty',
+      shoes: 'shoes_traffic_duty',
+      hat: 'hat_none',
+      bag: 'bag_none',
+    },
+    defaultOwned: true,
   },
 ] as const
 

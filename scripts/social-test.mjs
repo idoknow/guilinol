@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import {readFile} from 'node:fs/promises'
 import {spawn} from 'node:child_process'
 import {createHash,randomBytes} from 'node:crypto'
 import {once} from 'node:events'
@@ -120,6 +121,7 @@ assert.match(nme.email,/^wx\.c0ffee0123456789abcdef@social\.invalid$/)
     assert.equal(Number((await sql(`SELECT count(*) n FROM email_codes WHERE email='${reg.email}'`))[0].results[0].n),0)
     assert.equal((await sql(`SELECT signup_method FROM users WHERE id='${me.id}'`))[0].results[0].signup_method,'qq')
     const tr2=await pending2('register','FEDCBA9876543210AAAAAA')
+    await checkRollbackReplay(sql)
     assert.equal((await call('auth/social/register',{method:'POST',cookie:`glol_social_pending=${tr2}`,body:{email:'x2@example.test',password:'social-password-1'}})).status,409)
     await sql(`DELETE FROM social_identities`);await sql(`DELETE FROM social_pending`);await sql(`DELETE FROM sessions WHERE user_id IN (SELECT id FROM users WHERE email='${reg.email}')`);await sql(`DELETE FROM users WHERE email='${reg.email}'`);await sql(`DELETE FROM mail_events WHERE email='${reg.email}'`);await sql(`DELETE FROM sessions WHERE user_id='${b}'`);await sql(`DELETE FROM users WHERE id='${b}'`)
     console.log('Social configured: start 502 w/o orphan state (login + register intent), cross-site callback→expired, bind confirm 403 (not consumed)/200/404 replay, re-bind start 409 already_bound, /api/me social list, social-only auto-create (placeholder email), admin merge on Postgres (moved/conflicts/adopted email/saves/ledger key-skip/audit) + reset password (audit w/o sessions, login works) + change email (409/200/audit), login confirm sets 2 cookies + working session; register 2-phase (409 email_taken/conflict, password mismatch 400, 2 cookies, verified+bound, code deleted)')
@@ -151,4 +153,30 @@ export async function socialTest({api,origin,sql,env}) {
   await api('auth/logout',{});await api(`admin/users/${id}`,null,401,'unauthorized')
   await configuredTest({sql,env})
   console.log('Social: unconfigured 503/302 disabled, cross-site callback not rejected, admin detail 403→200 with masked uid + avatar allowlist, 404, 401')
+}
+
+async function checkRollbackReplay(sql) {
+  const identities=()=>sql('SELECT * FROM social_identities ORDER BY type,social_uid').then(rows=>rows[0].results)
+  const before=await identities()
+  assert.ok(before.length>0)
+  await sql(await readFile('deploy/postgres/020-social-direct-revert.sql','utf8'))
+  assert.deepEqual(await identities(),before)
+}
+
+export async function testSocialUpgrade({sql,replay}) {
+  const indexes=async()=> (await sql(`SELECT indexrelid AS oid, pg_get_indexdef(indexrelid) AS definition FROM pg_index WHERE indrelid='social_identities'::regclass AND indisunique ORDER BY indisprimary DESC`))[0].results
+  const checkKeys=async()=>{
+    const keys=await indexes()
+    assert.equal(keys.length,2)
+    assert.match(keys[0].definition,/\(type, social_uid\)$/)
+    assert.match(keys[1].definition,/social_owner .*\(user_id, type\)$/)
+    return keys
+  }
+  await checkKeys()
+  await sql(await readFile('deploy/postgres/018-social-direct.sql','utf8'))
+  assert.match((await indexes())[0].definition,/\(channel, type, social_uid\)$/)
+  await replay()
+  const restored=await checkKeys()
+  await replay()
+  assert.deepEqual(await checkKeys(),restored)
 }

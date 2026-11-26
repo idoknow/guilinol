@@ -1,5 +1,6 @@
 /* 主界面：实景截图做底，左侧暗渐变托住文字。品牌（桂字印、衬线大标题）保留山水印；
-   第二期主玩法“单人模式”用街头 HUD 的语言（沥青、桂花金、无衬线），游览模式退为次要的青玉玻璃卡。 */
+   IDOK-392 主推“联机模式”为视觉主卡（深青沥青、亮青玉主按钮 + 街头标线 + 钱包进度），
+   游览模式保留为次要青玉玻璃横条，单人模式弱化为沉静紧凑入口但随时可进。 */
 .home{position:fixed;inset:0;z-index:80;overflow:hidden auto;color:var(--ui-paper);font-family:var(--ui-serif);background:var(--ui-ink-900);
   opacity:0;transition:opacity .45s ease}
 .home.show{opacity:1}
@@ -12,24 +13,25 @@ body[data-home] :is(.hud-me,.dock,.sky-ui,.hint,footer,.walk-ui,.vehicle-action,
   background:linear-gradient(90deg,rgba(20,33,30,.86) 0,rgba(20,33,30,.62) 34%,rgba(20,33,30,.12) 62%,rgba(20,33,30,0) 80%),
     linear-gradient(0deg,rgba(20,33,30,.7) 0,rgba(20,33,30,0) 26%),linear-gradient(180deg,rgba(20,33,30,.45) 0,rgba(20,33,30,0) 18%)}
 
-.home-top{position:relative;display:flex;justify-content:flex-end;align-items:center;gap:12px;
+.home-top{position:absolute;inset:0 0 auto 0;z-index:2;pointer-events:none;display:flex;justify-content:flex-end;align-items:center;gap:12px;
   padding:calc(16px + env(safe-area-inset-top)) calc(22px + env(safe-area-inset-right)) 0 calc(22px + env(safe-area-inset-left))}
+.home-top>*{pointer-events:auto}
 .home-account{padding:0 16px 0 12px}
 .home-avatar{width:26px;height:26px;margin-left:-6px;border-radius:50%;display:grid;place-items:center;font:600 13px/1 var(--ui-serif);font-style:normal;background:var(--ui-jade-500);letter-spacing:0}
 
-.home-main{position:relative;box-sizing:border-box;min-height:calc(100dvh - 140px);display:flex;flex-direction:column;justify-content:center;gap:28px;
-  width:min(540px,100%);padding:20px calc(22px + env(safe-area-inset-right)) 24px calc(clamp(22px,6vw,88px) + env(safe-area-inset-left))}
+.home-main{position:relative;box-sizing:border-box;min-height:calc(100dvh - 38px);display:flex;flex-direction:column;justify-content:center;gap:16px;
+  width:min(570px,100%);padding:22px calc(22px + env(safe-area-inset-right)) 14px calc(clamp(22px,6vw,88px) + env(safe-area-inset-left))}
 .home-title{position:relative;animation:home-rise .8s var(--ui-ease) both}
-/* 成员设计的像素 Logo（IDOK-148）：贴在一小张宣纸上，压在标题左上角 */
-.home-seal{position:absolute;left:-4px;top:-76px;display:block;padding:6px 9px 4px;border-radius:var(--ui-r-paper);background:var(--ui-paper);
+/* 成员设计的像素 Logo（IDOK-148）：贴在一小张宣纸上，正常文档流置于标题上方，避免矮屏裁切或压住顶部胶囊 */
+.home-seal{position:relative;display:block;width:fit-content;margin:0 0 10px -4px;padding:5px 8px 4px;border-radius:var(--ui-r-paper);background:var(--ui-paper);
   box-shadow:var(--ui-shadow-1),inset 0 0 0 1px var(--ui-paper-line);transform:rotate(-3deg);transform-origin:left bottom}
-.home-seal img{display:block;width:138px;height:auto;mix-blend-mode:multiply}
-.home-title h1{margin:0;font:700 clamp(44px,7.4vw,76px)/1.05 var(--ui-serif);letter-spacing:.16em;text-shadow:0 4px 30px rgba(10,18,16,.45)}
-.home-tag{margin:16px 0 0;font-size:clamp(15px,1.6vw,18px);line-height:1.8;letter-spacing:.08em;color:rgba(244,239,226,.92);text-shadow:0 2px 12px rgba(10,18,16,.5)}
-.home-meta{display:flex;flex-wrap:wrap;gap:6px 14px;margin:14px 0 0;font-size:12.5px;letter-spacing:.12em;color:var(--ui-paper-dim)}
+.home-seal img{display:block;width:116px;height:auto;mix-blend-mode:multiply}
+.home-title h1{margin:0;font:700 clamp(42px,5.6vw,64px)/1.05 var(--ui-serif);letter-spacing:.16em;text-shadow:0 4px 30px rgba(10,18,16,.45)}
+.home-tag{margin:10px 0 0;font-size:clamp(14.5px,1.35vw,16px);line-height:1.65;letter-spacing:.05em;color:rgba(244,239,226,.92);text-shadow:0 2px 12px rgba(10,18,16,.5)}
+.home-meta{display:flex;flex-wrap:wrap;gap:6px 14px;margin:10px 0 0;font-size:12.5px;letter-spacing:.1em;color:rgba(244,239,226,.84);text-shadow:0 1px 8px rgba(10,18,16,.55)}
 .home-meta span::before{content:"";display:inline-block;width:5px;height:5px;margin:0 7px 2px 0;border-radius:50%;background:var(--ui-seal-light)}
 
-.home-modes{display:grid;gap:12px;animation:home-rise .8s .12s var(--ui-ease) both}
+.home-modes{display:grid;gap:8px;animation:home-rise .8s .12s var(--ui-ease) both}
 .home-mode{display:grid;grid-template-columns:auto 1fr;grid-template-areas:"seal text" "go go";align-items:center;gap:12px 16px;width:100%;box-sizing:border-box;padding:18px 18px 16px;
   text-align:left;font-family:var(--ui-serif);border-radius:var(--ui-r-lg);border:0;-webkit-tap-highlight-color:transparent}
 .home-mode-seal{grid-area:seal;width:52px;height:52px;display:grid;place-items:center;border-radius:8px;font:700 28px/1 var(--ui-serif);transform:rotate(-4deg)}
@@ -37,60 +39,99 @@ body[data-home] :is(.hud-me,.dock,.sky-ui,.hint,footer,.walk-ui,.vehicle-action,
 .home-mode-text b{display:flex;align-items:center;gap:8px;font-size:21px;font-weight:700;letter-spacing:.18em}
 .home-mode-text>span{font-size:13.5px;line-height:1.65;letter-spacing:.04em}
 .home-progress,.home-wallet{font-size:12px;letter-spacing:.1em}.home-progress:empty,.home-wallet:empty{display:none}
-.home-go{grid-area:go;width:100%}
+.home-go{grid-area:go;display:flex;align-items:center;justify-content:center;width:100%;min-height:46px;box-sizing:border-box;border-radius:var(--ui-r-pill);pointer-events:none}
 /* IDOK-105 续游条：游览卡下方一条青玉玻璃窄条，像压在宣纸下的书签；只有存过位置才出现。 */
 .home-resume-row{margin-top:-4px}.home-resume-row[hidden]{display:none}
-.home-resume{display:flex;align-items:center;gap:12px;width:100%;box-sizing:border-box;padding:11px 18px 11px 14px;border-radius:12px;cursor:pointer;
-  font:500 14.5px/1.3 var(--ui-serif);letter-spacing:.12em;color:var(--ui-paper);text-align:left;
-  background:var(--ui-glass-strong);border:1px solid var(--ui-glass-line-soft);backdrop-filter:var(--ui-blur);-webkit-backdrop-filter:var(--ui-blur);
+.home-resume{display:flex;align-items:center;gap:12px;width:100%;box-sizing:border-box;padding:10px 16px 10px 14px;border-radius:12px;cursor:pointer;
+  font:500 14px/1.3 var(--ui-serif);letter-spacing:.12em;color:var(--ui-paper);text-align:left;
+  background:var(--ui-glass-strong);border:1px solid var(--ui-glass-line-soft);
   transition:background var(--ui-fast),border-color var(--ui-fast),transform .25s var(--ui-ease)}
 .home-resume:hover{background:var(--ui-glass-solid);border-color:var(--ui-glass-line);transform:translateX(3px)}
 .home-resume:active{transform:scale(.985)}
 .home-resume:focus-visible{outline:2px solid var(--ui-jade-300);outline-offset:2px}
-.home-resume i{flex:none;width:26px;height:26px;border-radius:50%;background:var(--ui-jade-500) center/14px no-repeat;
+.home-resume i{flex:none;width:24px;height:24px;border-radius:50%;background:var(--ui-jade-500) center/13px no-repeat;
   background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%23f4efe2' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3 8a5 5 0 1 0 1.6-3.7'/%3E%3Cpath d='M3 2.5V5h2.5'/%3E%3C/svg%3E")}
 .home-resume span{flex:1;min-width:0}
 .home-resume small{flex:none;font-size:12px;letter-spacing:.08em;color:var(--ui-paper-dim)}
-/* 单人模式：沥青卡，左侧一条桂花金，按钮是金底黑字。 */
-.home-mode--solo{--gold:var(--st-gold,#ffc53d);--asphalt:var(--st-asphalt-solid,#121519);cursor:pointer;position:relative;overflow:hidden;
+/* 联机模式（IDOK-392 主推）：深青沥青 Hero 卡，青玉亮边 + 底部街头标线 + 推荐/在线标识 + 全宽青玉主按钮。 */
+.home-mode--mp{--mp-jade:var(--ui-jade-300,#8fc1b5);--mp-jade-hi:#a7d8cc;--gold:var(--st-gold,#ffc53d);--asphalt:var(--st-asphalt-solid,#121519);
+  cursor:pointer;position:relative;overflow:hidden;padding:16px 18px 15px;gap:11px 15px;
   color:var(--st-white,#f6f4ef);font-family:var(--st-sans,system-ui,sans-serif);
-  background:linear-gradient(105deg,rgba(255,197,61,.10),rgba(255,197,61,0) 42%),rgba(18,21,25,.9);
-  box-shadow:0 22px 56px rgba(6,8,10,.5),inset 0 0 0 1px rgba(255,255,255,.12),inset 4px 0 0 var(--gold);
-  backdrop-filter:var(--ui-blur);-webkit-backdrop-filter:var(--ui-blur);transition:transform .25s var(--ui-ease),box-shadow .25s}
-.home-mode--solo::after{content:"";position:absolute;inset:auto 0 0 0;height:3px;pointer-events:none;
-  background:repeating-linear-gradient(90deg,rgba(246,244,239,.5) 0 18px,transparent 18px 34px);opacity:.35}
-.home-mode--solo:hover{transform:translateY(-2px);box-shadow:0 26px 64px rgba(6,8,10,.6),inset 0 0 0 1px rgba(255,197,61,.45),inset 4px 0 0 var(--gold)}
-.home-mode--solo:active{transform:scale(.985)}
-.home-mode--solo:focus-visible{outline:none;box-shadow:0 22px 56px rgba(6,8,10,.5),inset 0 0 0 2px var(--gold),inset 4px 0 0 var(--gold)}
-.home-mode--solo .home-mode-seal{border-radius:10px;transform:none;font:900 27px/1 var(--st-sans,sans-serif);color:var(--asphalt);background:var(--gold);
-  box-shadow:0 3px 0 rgba(0,0,0,.45)}
-.home-mode--solo .home-mode-text b{font-family:var(--st-sans,sans-serif);font-weight:900;letter-spacing:.14em}
-.home-mode--solo .home-mode-text>span{color:var(--st-dim,rgba(246,244,239,.72));letter-spacing:.02em}
-.home-mode--solo .home-wallet{font:700 13px/1.2 var(--st-num,sans-serif);letter-spacing:.04em;color:var(--gold)}
-.home-go{display:flex;align-items:center;justify-content:center;min-height:46px;box-sizing:border-box;border-radius:var(--ui-r-pill);pointer-events:none}
-.home-go--solo{font:900 16px/1 var(--st-sans,sans-serif);letter-spacing:.3em;text-indent:.3em;color:var(--asphalt);background:var(--gold);
-  box-shadow:0 3px 0 rgba(120,82,0,.85),0 10px 24px rgba(255,197,61,.22)}
-.home-mode--solo:hover .home-go--solo{filter:brightness(1.06)}
-/* 游览模式：次要，青玉玻璃 + 线框印章。 */
-.home-mode--tour{cursor:pointer;padding:14px 16px 13px;gap:10px 14px;color:var(--ui-paper);background:var(--ui-glass-strong);
-  border:1px solid var(--ui-glass-line-soft);backdrop-filter:var(--ui-blur);-webkit-backdrop-filter:var(--ui-blur);
+  background:radial-gradient(120% 145% at 0% 0%,rgba(143,193,181,.24),rgba(143,193,181,.04) 48%,transparent 76%),rgba(16,25,24,.92);
+  box-shadow:0 24px 58px rgba(6,10,10,.56),inset 0 0 0 1px rgba(143,193,181,.34),inset 4px 0 0 var(--mp-jade);
+  transition:transform .25s var(--ui-ease),box-shadow .25s,background .25s}
+.home-mode--mp::after{content:"";position:absolute;inset:auto 0 0 0;height:3px;pointer-events:none;
+  background:repeating-linear-gradient(90deg,rgba(143,193,181,.55) 0 18px,transparent 18px 34px);opacity:.4}
+.home-mode--mp:hover{transform:translateY(-2px);
+  box-shadow:0 28px 66px rgba(6,10,10,.64),inset 0 0 0 1px rgba(167,216,204,.6),inset 4px 0 0 var(--mp-jade-hi)}
+.home-mode--mp:active{transform:scale(.985)}
+.home-mode--mp:focus-visible{outline:none;box-shadow:0 24px 58px rgba(6,10,10,.56),inset 0 0 0 2px var(--mp-jade-hi),inset 4px 0 0 var(--mp-jade-hi)}
+.home-mode--mp .home-mode-seal{width:54px;height:54px;border-radius:11px;transform:none;
+  font:900 28px/1 var(--st-sans,sans-serif);color:var(--ui-ink-900);
+  background:linear-gradient(180deg,var(--mp-jade-hi),var(--mp-jade));
+  box-shadow:0 3px 0 rgba(12,38,34,.75),0 8px 20px rgba(143,193,181,.24)}
+.home-mode--mp .home-mode-text{gap:6px}
+.home-mode--mp .home-mode-text b{display:flex;align-items:center;flex-wrap:wrap;gap:8px;white-space:nowrap;
+  font:900 22px/1.15 var(--st-sans,sans-serif);letter-spacing:.12em;color:var(--st-white,#f6f4ef)}
+.home-mode--mp .home-mode-text>span{font-size:13.5px;line-height:1.65;letter-spacing:.02em;color:rgba(244,239,226,.82)}
+.home-mode--mp .home-wallet{font:700 13px/1.2 var(--st-num,sans-serif);letter-spacing:.04em;color:var(--gold)}
+.home-mp-badge{display:inline-flex;align-items:center;padding:3px 8px;border-radius:999px;white-space:nowrap;
+  font:700 11px/1.1 var(--st-sans,sans-serif);font-style:normal;letter-spacing:.08em;color:var(--asphalt);background:var(--gold)}
+.home-mp-live{font:600 11.5px/1 var(--st-sans,sans-serif);font-style:normal;letter-spacing:.05em;padding:4px 9px 4px 20px;border-radius:999px;position:relative;white-space:nowrap;
+  color:var(--mp-jade-hi);background:rgba(143,193,181,.16);box-shadow:inset 0 0 0 1px rgba(143,193,181,.32)}
+.home-mp-live::before{content:"";position:absolute;left:7px;top:50%;width:6px;height:6px;margin-top:-3px;border-radius:50%;
+  background:var(--mp-jade-hi);box-shadow:0 0 0 3px rgba(143,193,181,.24);animation:home-live-pulse 2.2s ease-in-out infinite}
+.home-mp-live::after{content:" 人在线"}
+.home-mp-live[hidden]{display:none}
+.home-go--mp{min-height:44px;font:900 16px/1 var(--st-sans,sans-serif);letter-spacing:.26em;text-indent:.26em;color:var(--ui-ink-900);
+  background:linear-gradient(180deg,var(--mp-jade-hi),var(--mp-jade));
+  box-shadow:0 3px 0 rgba(20,58,52,.9),0 12px 28px rgba(143,193,181,.26);transition:filter .15s ease}
+.home-mode--mp:hover .home-go--mp{filter:brightness(1.06)}
+/* 游览模式：次要紧凑横条，青玉玻璃 + 朱砂线框印章。 */
+.home-mode--tour{cursor:pointer;grid-template-columns:auto 1fr auto;grid-template-areas:"seal text go";
+  padding:10px 14px;gap:8px 13px;color:var(--ui-paper);background:var(--ui-glass-strong);
+  border:1px solid var(--ui-glass-line-soft);
   transition:transform .25s var(--ui-ease),background .25s,border-color .25s}
-.home-mode--tour:hover{transform:translateY(-2px);background:var(--ui-glass-solid);border-color:var(--ui-glass-line)}
+.home-mode--tour:hover,.home-mode--tour.is-current{background:var(--ui-glass-solid);border-color:var(--ui-glass-line)}
+.home-mode--tour:hover{transform:translateY(-1px)}
 .home-mode--tour:active{transform:scale(.985)}
-.home-mode--tour:focus-visible{outline:3px solid var(--ui-jade-300);outline-offset:3px}
-.home-mode--tour .home-mode-seal{width:44px;height:44px;font-size:23px;color:var(--ui-seal-light);border:2px solid var(--ui-seal-light)}
-.home-mode--tour .home-mode-text b{font-size:18px}
-.home-mode--tour .home-mode-text>span{color:var(--ui-paper-dim)}
-.home-mode--tour .home-progress{color:var(--ui-seal-light)}
-.home-go--tour{min-height:40px;font:500 14.5px/1 var(--ui-serif);letter-spacing:.24em;color:var(--ui-paper);border:1px solid var(--ui-glass-line)}
+.home-mode--tour:focus-visible{outline:2px solid var(--ui-jade-300);outline-offset:2px}
+.home-mode--tour .home-mode-seal{width:40px;height:40px;font-size:21px;color:var(--ui-seal-light);border:1.5px solid var(--ui-seal-light)}
+.home-mode--tour .home-mode-text{gap:3px}
+.home-mode--tour .home-mode-text b{font-size:16.5px;font-weight:600;letter-spacing:.14em}
+.home-mode--tour .home-mode-text>span{font-size:12.5px;line-height:1.45;color:var(--ui-paper-dim)}
+.home-mode--tour .home-progress{font-weight:500;color:var(--ui-seal-light)}
+.home-go--tour{width:auto;min-height:36px;padding:0 15px;white-space:nowrap;
+  font:500 13.5px/1 var(--ui-serif);letter-spacing:.14em;text-indent:.14em;color:var(--ui-paper);border:1px solid var(--ui-glass-line)}
 .home-mode--tour:hover .home-go--tour{background:rgba(244,239,226,.08)}
+/* 单人模式（IDOK-392 弱化保留）：沉静的低存在感窄条，不再抢夺主视觉，但清晰保留离线入口。 */
+.home-mode--solo{cursor:pointer;grid-template-columns:auto 1fr auto;grid-template-areas:"seal text go";
+  padding:8px 14px;gap:8px 12px;border-radius:var(--ui-r-md);color:rgba(244,239,226,.82);
+  background:rgba(20,33,30,.52);border:1px solid rgba(244,239,226,.12);
+  transition:background .2s,border-color .2s,color .2s,transform .2s var(--ui-ease)}
+.home-mode--solo:hover,.home-mode--solo.is-current{color:var(--ui-paper);background:var(--ui-glass-strong);border-color:rgba(244,239,226,.28)}
+.home-mode--solo:active{transform:scale(.988)}
+.home-mode--solo:focus-visible{outline:2px solid var(--ui-jade-300);outline-offset:2px}
+.home-mode--solo .home-mode-seal{width:34px;height:34px;border-radius:7px;transform:none;
+  font:600 17px/1 var(--ui-serif);color:var(--ui-paper-dim);background:rgba(244,239,226,.04);border:1px solid rgba(244,239,226,.22)}
+.home-mode--solo:hover .home-mode-seal,.home-mode--solo.is-current .home-mode-seal{color:var(--ui-paper);border-color:rgba(244,239,226,.42)}
+.home-mode--solo .home-mode-text{gap:2px}
+.home-mode--solo .home-mode-text b{font-size:15px;font-weight:500;letter-spacing:.12em}
+.home-mode--solo .home-mode-text>span{font-size:12px;line-height:1.4;letter-spacing:.03em;color:rgba(244,239,226,.64)}
+.home-go--solo{width:auto;min-height:32px;padding:0 13px;white-space:nowrap;
+  font:500 13px/1 var(--ui-serif);letter-spacing:.12em;text-indent:.12em;
+  color:var(--ui-paper-dim);background:transparent;border:1px solid rgba(244,239,226,.2);
+  transition:color .15s,border-color .15s,background .15s}
+.home-mode--solo:hover .home-go--solo,.home-mode--solo.is-current .home-go--solo{
+  color:var(--ui-paper);border-color:var(--ui-glass-line);background:rgba(244,239,226,.07)}
 
 .home-links{display:flex;flex-wrap:wrap;gap:4px;margin-left:-10px;animation:home-rise .8s .22s var(--ui-ease) both}
-.home-links .ui-btn{color:rgba(244,239,226,.86);font-size:14px}
+.home-links .ui-btn{min-height:34px;padding:0 12px;color:rgba(244,239,226,.86);font-size:13.5px}
 
 .home-foot{position:relative;display:flex;justify-content:space-between;align-items:flex-end;gap:12px;
-  padding:0 calc(22px + env(safe-area-inset-right)) calc(14px + env(safe-area-inset-bottom)) calc(clamp(22px,6vw,88px) + env(safe-area-inset-left));font-size:11px;letter-spacing:.08em;color:var(--ui-paper-dim)}
+  padding:0 calc(22px + env(safe-area-inset-right)) calc(12px + env(safe-area-inset-bottom)) calc(clamp(22px,6vw,88px) + env(safe-area-inset-left));font-size:11px;letter-spacing:.08em;color:var(--ui-paper-dim)}
 .home-credit a{color:inherit;text-decoration:underline;text-decoration-color:var(--ui-seal-light);text-underline-offset:3px}.home-credit a:hover{color:var(--ui-paper)}
+.home-ver{white-space:nowrap}
 .home-caption{font-size:13px;letter-spacing:.24em;color:var(--ui-paper);display:flex;align-items:center;gap:10px}
 .home-caption::before{content:"";width:22px;height:1px;background:var(--ui-seal-light)}
 @keyframes home-rise{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
@@ -112,7 +153,7 @@ kbd{display:inline-block;min-width:1.5em;padding:1px 5px;margin:0 1px;border-rad
 .home-douyin{position:absolute;z-index:1;right:calc(22px + env(safe-area-inset-right));bottom:calc(58px + env(safe-area-inset-bottom));
   display:grid;grid-template-columns:auto auto;align-items:center;gap:12px;padding:10px 16px 10px 10px;cursor:pointer;text-align:left;
   font:inherit;color:var(--ui-paper);background:var(--ui-glass);border:1px solid var(--ui-glass-line-soft);border-radius:var(--ui-r-lg);
-  backdrop-filter:var(--ui-blur);-webkit-backdrop-filter:var(--ui-blur);box-shadow:var(--ui-shadow-1);-webkit-tap-highlight-color:transparent;
+  box-shadow:var(--ui-shadow-1);-webkit-tap-highlight-color:transparent;
   transition:background var(--ui-fast),border-color var(--ui-fast),transform var(--ui-fast);animation:home-rise .8s .35s var(--ui-ease) both}
 .home-douyin:hover{background:var(--ui-glass-strong);border-color:var(--ui-glass-line);transform:translateY(-2px)}
 .home-douyin:focus-visible{outline:2px solid var(--ui-jade-300);outline-offset:2px}
@@ -133,55 +174,70 @@ kbd{display:inline-block;min-width:1.5em;padding:1px 5px;margin:0 1px;border-rad
 
 @media (max-width:760px){
   .home-shade{background:linear-gradient(0deg,rgba(20,33,30,.92) 0,rgba(20,33,30,.7) 46%,rgba(20,33,30,.15) 74%,rgba(20,33,30,.35) 100%)}
-  .home-main{justify-content:flex-end;min-height:calc(100dvh - 110px);padding-top:40px;gap:20px;width:100%}
-  .home-seal{top:-64px}.home-seal img{width:112px}
+  .home-top{position:relative;pointer-events:auto}
+  .home-main{justify-content:flex-end;min-height:calc(100dvh - 102px);padding-top:12px;padding-bottom:12px;gap:14px;width:100%}
+  .home-seal{margin:0 0 8px -2px}.home-seal img{width:98px}
   .home-tag{font-size:14.5px}
-  .home-mode{padding:14px;gap:10px 12px}.home-mode-seal{width:44px;height:44px;font-size:23px}.home-mode-text b{font-size:18px}
-  .home-mode--tour{grid-template-columns:auto 1fr auto;grid-template-areas:"seal text go";padding:11px 12px}.home-mode--tour .home-mode-seal{width:36px;height:36px;font-size:19px}
-  .home-mode--tour .home-mode-text>span{display:none}.home-go--tour{min-height:36px;padding:0 14px;letter-spacing:.12em;text-indent:0}
-  .home-links{justify-content:center;margin-left:0}
+  .home-mode--mp{padding:15px 15px 14px;gap:11px 12px}
+  .home-mode--mp .home-mode-seal{width:46px;height:46px;font-size:24px}
+  .home-mode--mp .home-mode-text b{font-size:19px;letter-spacing:.08em;gap:6px}
+  .home-mode--mp .home-mode-text>span{font-size:13px;line-height:1.55}
+  .home-mp-badge{padding:2.5px 7px;font-size:10.5px}
+  .home-mp-live{padding:3px 7px 3px 16px;font-size:11px}.home-mp-live::before{left:6px}.home-mp-live::after{content:" 人"}
+  .home-go--mp{min-height:44px;font-size:15.5px;letter-spacing:.22em;text-indent:.22em}
+  .home-mode--tour{padding:10px 12px;gap:8px 10px}.home-mode--tour .home-mode-seal{width:36px;height:36px;font-size:19px}
+  .home-mode--tour .home-mode-text b{font-size:16px}.home-mode--tour .home-mode-text>span{display:none}
+  .home-go--tour{min-height:34px;padding:0 13px;font-size:13px;letter-spacing:.12em;text-indent:.12em}
+  .home-mode--solo{padding:8px 12px;gap:8px 10px}.home-mode--solo .home-mode-seal{width:30px;height:30px;font-size:15px}
+  .home-mode--solo .home-mode-text b{font-size:14.5px}.home-mode--solo .home-mode-text>span{display:none}
+  .home-go--solo{min-height:30px;padding:0 12px;font-size:12.5px;letter-spacing:.1em;text-indent:.1em}
+  .home-links{justify-content:center;margin-left:0;gap:2px}
+  .home-links .ui-btn{padding:0 10px;font-size:13px;min-height:34px}
   .home-foot{flex-direction:column;align-items:center;gap:4px}.home-caption{display:none}.home-credit{text-align:center}
 }
-/* 横屏手机：标题和模式左右排 */
+/* 矮屏手机（如 360x640）：进一步收敛字号与间距，保证首屏不与顶部胶囊重叠且完整落屏 */
+@media (max-width:760px) and (max-height:700px){
+  .home-top{padding-top:calc(10px + env(safe-area-inset-top))}
+  .home-douyin{top:calc(10px + env(safe-area-inset-top))}
+  .home-main{min-height:calc(100dvh - 84px);padding-top:8px;padding-bottom:8px;gap:10px}
+  .home-seal{margin-bottom:6px;padding:4px 7px 3px}.home-seal img{width:80px}
+  .home-title h1{font-size:36px}
+  .home-tag{margin-top:6px;font-size:13.5px;line-height:1.5}
+  .home-meta{margin-top:6px;gap:4px 10px;font-size:11.5px;letter-spacing:.05em}
+  .home-modes{gap:6px}
+  .home-mode--mp{padding:11px 13px;gap:8px 11px}.home-mode--mp .home-mode-seal{width:42px;height:42px;font-size:22px}
+  .home-mode--mp .home-mode-text{gap:4px}.home-mode--mp .home-mode-text b{font-size:18px}
+  .home-mode--mp .home-mode-text>span{font-size:12.5px;line-height:1.45}.home-go--mp{min-height:40px;font-size:15px}
+  .home-mode--tour{padding:8px 11px}.home-mode--solo{padding:7px 11px}
+  .home-resume{padding:8px 12px;font-size:13px}
+  .home-links .ui-btn{padding:0 8px;font-size:12.5px;min-height:32px}
+  .home-foot{padding-bottom:calc(8px + env(safe-area-inset-bottom))}
+}
+/* 横屏手机：标题和模式左右排，联机卡保持主推展开，游览/单人保持紧凑单行 */
 @media (max-height:520px) and (orientation:landscape){
-  .home-main{width:100%;min-height:calc(100dvh - 90px);display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.1fr);align-content:center;column-gap:28px;row-gap:8px;padding-top:12px}
-  .home-title h1{font-size:40px}.home-seal{display:none}.home-tag{margin-top:8px;font-size:13.5px;line-height:1.6}.home-meta{display:none}
-  .home-modes{grid-row:span 2;gap:8px}.home-mode{padding:12px 14px;gap:8px 12px}.home-mode-seal{width:40px;height:40px;font-size:22px}
-  .home-mode-text>span{font-size:12.5px;line-height:1.5}.home-go{min-height:38px}
-  .home-mode--tour{grid-template-columns:auto 1fr auto;grid-template-areas:"seal text go"}.home-mode--tour .home-mode-text>span{display:none}.home-go--tour{padding:0 14px;letter-spacing:.12em;text-indent:0}.home-links{margin-left:-10px}
-  .ui-btn--lg{min-height:42px}.home-foot{padding-bottom:8px}
+  .home-top{position:relative;pointer-events:auto;padding-top:calc(10px + env(safe-area-inset-top))}
+  .home-douyin{top:calc(10px + env(safe-area-inset-top))}
+  .home-main{width:100%;min-height:calc(100dvh - 78px);display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.15fr);align-content:center;column-gap:24px;row-gap:10px;padding-top:6px;padding-bottom:8px}
+  .home-title h1{font-size:40px}.home-seal{display:none}.home-tag{margin-top:8px;font-size:13.5px;line-height:1.55}.home-meta{display:none}
+  .home-modes{grid-row:span 2;gap:6px}
+  .home-mode--mp{padding:11px 13px 10px;gap:7px 11px}.home-mode--mp .home-mode-seal{width:42px;height:42px;font-size:22px}
+  .home-mode--mp .home-mode-text{gap:3px}.home-mode--mp .home-mode-text b{font-size:18px;letter-spacing:.08em;gap:6px}.home-mode--mp .home-mode-text>span{font-size:12.5px;line-height:1.45}
+  .home-mp-live::after{content:" 人"}.home-go--mp{min-height:36px;font-size:14.5px}
+  .home-mode--tour{padding:7px 11px;gap:8px 10px}.home-mode--tour .home-mode-seal{width:34px;height:34px;font-size:18px}
+  .home-mode--tour .home-mode-text b{font-size:15px}.home-mode--tour .home-mode-text>span{display:none}
+  .home-go--tour{min-height:32px;padding:0 12px;font-size:12.5px;letter-spacing:.12em;text-indent:.12em}
+  .home-mode--solo{padding:6px 11px;gap:8px 10px}.home-mode--solo .home-mode-seal{width:30px;height:30px;font-size:15px}
+  .home-mode--solo .home-mode-text b{font-size:14px}.home-mode--solo .home-mode-text>span{display:none}
+  .home-go--solo{min-height:30px;padding:0 11px;font-size:12px;letter-spacing:.1em;text-indent:.1em}
+  .home-resume{padding:7px 12px;font-size:13px}
+  .home-links{margin-left:-8px;gap:2px;align-self:end}.home-links .ui-btn{padding:0 9px;font-size:12.5px;min-height:32px}
+  .ui-btn--lg{min-height:42px}.home-foot{padding-bottom:calc(8px + env(safe-area-inset-bottom))}
   .home-shade{background:linear-gradient(90deg,rgba(20,33,30,.85) 0,rgba(20,33,30,.55) 50%,rgba(20,33,30,.7) 100%)}
-}
-/* IDOK-192 联机模式：青玉卡，左侧一条青玉色，和单人（桂花金）、游览（朱砂印）三张卡各一种主色。 */
-.home-mode--mp{cursor:pointer;padding:14px 16px 13px;gap:10px 14px;color:var(--ui-paper);
-  background:linear-gradient(105deg,rgba(143,193,181,.16),rgba(143,193,181,0) 46%),var(--ui-glass-strong);
-  border:1px solid var(--ui-glass-line-soft);box-shadow:inset 4px 0 0 var(--ui-jade-300),var(--ui-shadow-1);
-  backdrop-filter:var(--ui-blur);-webkit-backdrop-filter:var(--ui-blur);transition:transform .25s var(--ui-ease),background .2s,border-color .2s}
-.home-mode--mp:hover{transform:translateY(-2px);background:linear-gradient(105deg,rgba(143,193,181,.22),rgba(143,193,181,0) 46%),var(--ui-glass-solid);border-color:var(--ui-glass-line)}
-.home-mode--mp:active{transform:scale(.985)}
-.home-mode--mp:focus-visible{outline:3px solid var(--ui-jade-300);outline-offset:3px}
-.home-mode--mp .home-mode-seal{width:44px;height:44px;font-size:23px;color:var(--ui-ink-900);background:var(--ui-jade-300);transform:rotate(-4deg)}
-.home-mode--mp .home-mode-text b{font-size:18px}
-.home-mode--mp .home-mode-text>span{color:var(--ui-paper-dim)}
-.home-mp-live{font:500 11.5px/1 var(--ui-serif);font-style:normal;letter-spacing:.06em;padding:4px 8px 4px 18px;border-radius:999px;position:relative;
-  color:var(--ui-jade-300);background:rgba(143,193,181,.14)}
-.home-mp-live::before{content:"";position:absolute;left:7px;top:50%;width:6px;height:6px;margin-top:-3px;border-radius:50%;background:var(--ui-jade-300);box-shadow:0 0 0 3px rgba(143,193,181,.2)}
-.home-mp-live::after{content:" 人在线"}
-.home-mp-live[hidden]{display:none}
-.home-mode--mp .home-mode-text b{white-space:nowrap}.home-mp-live{white-space:nowrap}
-.home-go--mp{min-height:40px;font:600 14.5px/1 var(--ui-serif);letter-spacing:.24em;color:var(--ui-ink-900);background:var(--ui-jade-300);border:0}
-.home-mode--mp:hover .home-go--mp{background:#a3d0c5}
-@media (max-width:760px){
-  .home-mode--mp{grid-template-columns:auto 1fr auto;grid-template-areas:"seal text go";padding:11px 12px}.home-mode--mp .home-mode-seal{width:36px;height:36px;font-size:19px}
-  .home-mode--mp .home-mode-text>span{display:none}.home-go--mp{min-height:36px;padding:0 14px;letter-spacing:.12em}
-  .home-mode--mp .home-mode-text b{letter-spacing:.1em;gap:6px}.home-mp-live{padding:3px 7px 3px 16px}.home-mp-live::after{content:" 人"}
-}
-@media (max-height:520px) and (orientation:landscape){
-  .home-mode--mp{grid-template-columns:auto 1fr auto;grid-template-areas:"seal text go"}.home-mode--mp .home-mode-text>span{display:none}.home-go--mp{padding:0 14px;letter-spacing:.12em}
 }
 
 /* IDOK-216 按下即反馈：进入要等登录 / 存档 / 角色几次网络往返，卡片先转起来，其它入口暂停 */
 .home-go .home-spin{width:15px;height:15px;margin-right:10px;flex:none;border-radius:50%;border:2px solid currentColor;border-right-color:transparent;opacity:.85;animation:home-spin .8s linear infinite}
+.home-mode--tour .home-spin,.home-mode--solo .home-spin{width:13px;height:13px;margin-right:6px}
 .home-go:has(.home-spin){letter-spacing:.16em;text-indent:.16em}
 .home-mode[aria-busy=true]{cursor:progress}
 .home-mode[aria-busy=true] .home-go{animation:home-breathe 1.6s ease-in-out infinite}
@@ -190,4 +246,5 @@ kbd{display:inline-block;min-width:1.5em;padding:1px 5px;margin:0 1px;border-rad
 .home .ui-btn[aria-busy=true]::after{content:"";width:11px;height:11px;border-radius:50%;border:2px solid currentColor;border-right-color:transparent;animation:home-spin .8s linear infinite}
 @keyframes home-spin{to{transform:rotate(360deg)}}
 @keyframes home-breathe{50%{filter:brightness(1.12)}}
-@media (prefers-reduced-motion:reduce){.home-go .home-spin,.home .ui-btn[aria-busy=true]::after{animation-duration:2.4s}.home-mode[aria-busy=true] .home-go{animation:none}}
+@keyframes home-live-pulse{0%,100%{box-shadow:0 0 0 3px rgba(143,193,181,.24)}50%{box-shadow:0 0 0 6px rgba(143,193,181,.06)}}
+@media (prefers-reduced-motion:reduce){.home-go .home-spin,.home .ui-btn[aria-busy=true]::after{animation-duration:2.4s}.home-mode[aria-busy=true] .home-go,.home-mp-live::before{animation:none}}

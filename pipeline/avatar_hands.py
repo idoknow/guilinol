@@ -16,13 +16,24 @@ def rebuild():
     indices = list(indices.flatten())
     world = g.world(g.R, g.T)
 
-    def tube(centres, bones, widths, depths, sign):
+    def tube(centres, bones, widths, depths, sign, finger=False):
         rings = []
-        profile = ([(-.78,-.82),(.58,-1),(1,.05),(.42,1),(-.86,.78)] if len(bones)==3
-                   else [(-.76,-.85),(.76,-.9),(.8,.88),(-.74,.88)])
+        profile = [(-.78,-.85),(.78,-.85),(.78,.85),(-.78,.85)]
         sides = len(profile)
-        for centre, bone, width, depth in zip(centres, bones, widths, depths):
-            rings.append([centre + [0, y*depth, z*width] for y,z in profile])
+        for i,(centre,width,depth) in enumerate(zip(centres,widths,depths)):
+            up = np.array([0.,1.,0.])
+            across = np.array([0.,0.,1.])
+            if finger:
+                # Use the digit's own section plane, especially for the thumb
+                # which points across the palm instead of along the forearm.
+                axis = centres[min(i+1,len(centres)-1)] - centres[max(0,i-1)]
+                axis /= np.linalg.norm(axis)
+                across = sign*np.cross(axis,up)
+                across /= np.linalg.norm(across)
+                up = sign*np.cross(across,axis)
+            rings.append([centre+y*depth*up+z*width*across for y,z in profile])
+        if finger:
+            rings[0] = [centres[0]]*sides  # taper the buried root into the palm
         def triangle(corners):
             if sign < 0:
                 corners = corners[::-1]
@@ -39,20 +50,30 @@ def rebuild():
         for i in range(len(rings)-1):
             for k in range(sides):
                 j=(k+1)%sides
-                triangle([(i,k),(i,j),(i+1,k)])
+                if i or not finger:
+                    triangle([(i,k),(i,j),(i+1,k)])
                 triangle([(i,j),(i+1,j),(i+1,k)])
         for k in range(1,sides-1):
             triangle([(-1,0),(-1,k),(-1,k+1)])
 
     for side, sign in [('l',1),('r',-1)]:
         hand = 'hand_'+side
-        tube([np.array([sign*x,1.438,z]) for x,z in [(.736,-.065),(.805,-.059),(.854,-.058)]],
-             [hand]*3,[.031,.055,.055],[.024,.022,.014],sign)
-        for finger, radius in [('index',.0115),('middle',.012),('ring',.011),('pinky',.009),('thumb',.014)]:
+        tube([np.array([sign*x,1.438,z]) for x,z in [(.732,-.064),(.796,-.059),(.846,-.057)]],
+             [hand]*3,[.025,.042,.041],[.017,.015,.011],sign)
+        for finger, radius in [('index',.0088),('middle',.0090),('ring',.0084),('pinky',.0070),('thumb',.0102)]:
             bones = [f'{finger}_0{i}_{side}' for i in range(1,4)]
-            centres = [world[g.idx[n]][:3,3] for n in bones+[f'{finger}_04_leaf_{side}']]
-            tube(centres,bones+[bones[-1]],np.array([1,.93,.81,.48])*radius,
-                 np.array([1,.90,.75,.43])*radius,sign)
+            centres = [world[g.idx[n]][:3,3].copy() for n in bones+[f'{finger}_04_leaf_{side}']]
+            tip_scale = 0.90 if finger == 'thumb' else 0.78
+            centres[-1] = centres[-2] + (centres[-1] - centres[-2]) * tip_scale
+            # Keep the four vertices of each section shared by both adjacent
+            # segments under animation. The root extends into the palm, with a
+            # tapered buried end to preserve the per-hand triangle budget.
+            palm = np.array([sign*(.765 if finger=='thumb' else .825),1.438,-.057])
+            root = .55*centres[0]+.45*palm
+            root[0] = palm[0]
+            widths = radius*np.array([1,1,.96,.85,.50])
+            depths = radius*np.array([1,1,.95,.83,.48])
+            tube(np.vstack([root,centres]),[hand,*bones,bones[-1]],widths,depths,sign,finger=True)
     for key, values in list(data.items())+[('indices',indices)]:
         ref = mesh['indices'] if key=='indices' else attrs[key]
         acc = dict(g.j['accessors'][ref],count=len(values))

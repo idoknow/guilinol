@@ -72,7 +72,7 @@ def footing(model, z, width, depth, top, color, surface, collide=False):
 def teaching(model):
     anchor=np.asarray(ll2xz(25.2854676,110.2934274))
     surface=landmark_surface('wangcheng_teaching')
-    for way in load_osm():
+    for way in load_osm('wangcheng_teaching'):
         if way['type']!='way' or way['id'] not in (674165595,674165596,674165597,679734456,679734455,679734418):continue
         outline=Polygon([ll2xz(vertex['lat'],vertex['lon']) for vertex in way['geometry']])
         rectangle=outline.minimum_rotated_rectangle

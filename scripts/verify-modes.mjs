@@ -26,7 +26,7 @@ try {
   }
   const originUrl = `http://127.0.0.1:${server.httpServer.address().port}`
   await page.goto(originUrl)
-  await page.waitForFunction(()=>document.activeElement?.getAttribute('data-umami-event')==='home-solo')
+  await page.waitForFunction(()=>document.activeElement?.getAttribute('data-umami-event')==='home-mp')
   await page.goto(`${originUrl}/?play&verify`)
   await page.waitForFunction(()=>window.viewer?.walk?.active && window.viewer.trafficCount>0,null,{timeout:120000})
   await switchTo('tour')
@@ -35,7 +35,7 @@ try {
   await page.waitForFunction(()=>document.activeElement?.getAttribute('data-umami-event')==='home-tour')
   await page.evaluate(()=>localStorage.setItem('glol.playMode','story'))
   await page.reload()
-  await page.waitForFunction(()=>document.activeElement?.getAttribute('data-umami-event')==='home-solo')
+  await page.waitForFunction(()=>document.activeElement?.getAttribute('data-umami-event')==='home-mp')
   assert.equal(await page.evaluate(()=>localStorage.getItem('glol.playMode')),'solo')
   await page.evaluate(()=>localStorage.clear())
   requests.length=0

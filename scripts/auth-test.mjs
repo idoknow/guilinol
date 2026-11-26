@@ -16,6 +16,7 @@ let child,browser,logs='',closed,storage,site
 async function sql(command){return storage.sql(command)}
 try {
   storage=await fixture()
+  if(!ui)await (await import('./social-test.mjs')).testSocialUpgrade(storage)
   if(!ui)await (await import('./player-uid-test.mjs')).testPlayerUid(storage.env.DATABASE_URL)
   const probe=createServer();probe.listen(0,'127.0.0.1');await once(probe,'listening');const port=probe.address().port;await new Promise(resolve=>probe.close(resolve))
   const staticDir=ui?'dist':join(state,'empty-site');if(!ui)await mkdir(staticDir)
@@ -80,7 +81,7 @@ try {
     for(let attempt=1;attempt<=5;attempt++)await api('auth/login',{email,password:'incorrect'},attempt===5?429:401,attempt===5?'locked':'credentials');await api('auth/login',login,429,'locked')
     await sql('UPDATE mail_events SET sent=sent-61');await api('auth/resend',{email,purpose:'reset'});const reset={email,code:await code('reset'),password:'new-password'};await api('auth/reset',reset);await api('me',null,401,'unauthorized');await api('auth/reset',reset,400,'invalid_code');await api('auth/login',login,401,'credentials');await api('auth/login',reset)
     for(let index=0;index<7;index++)await api('auth/resend',{email:`other${index}@example.test`,purpose:'reset'});await api('auth/resend',{email:'capped@example.test',purpose:'reset'},429,'rate_limited')
-    await Promise.all(['first','second'].map(label=>api('auth/register',{...register,email:`${label}@race.test`},200,null,{headers:{'CF-Connecting-IP':'uid-race'}})))
+    await Promise.all(['first','second'].map(label=>api('auth/register',{...register,email:`${label}@race.test`},200,null,{headers:{'CF-Connecting-IP':'192.0.2.83'}})))
     const race=(await sql("SELECT uid FROM users WHERE email LIKE '%@race.test' ORDER BY uid"))[0].results.map(row=>Number(row.uid));assert.equal(race.length,2);assert.equal(race[1],race[0]+1)
   }
   console.log(adminUI?'Admin access, lists, photo viewer, status timeline and three screenshots passed':ui?'UI registration, login and mobile screenshots passed':'API lifecycle, storage, lockout, cooldown, IP limit and Origin passed')

@@ -9,7 +9,7 @@
 
 const TEXT_INPUT_SELECTOR = 'input,textarea,select,[contenteditable]'
 const MODAL_OVERLAY_SELECTOR = 'dialog[open],.about-mask:not([hidden]),.atlas.show,.book.show,.shop-overlay.show,.wardrobe-overlay.show,.garage-overlay.show,.mifen-story-dialog:not([hidden]),[data-story-dialog="1"]:not([hidden])'
-const TOUCH_UI_SELECTOR = '.walk-ui,.ride-hud,.vehicle-action,.dock,.sky-ui,.render-entry,.hud-me,.shop-overlay,.wardrobe-overlay,.garage-overlay,.mission-hud,.gl-mission-entry,.gl-mission-hud,.mission-board,.st-phone,.st-phone-btn,.mp-roster,.hud-stats,.mifen-story-dialog,.mifen-story-skip,.chat-dock'
+const TOUCH_UI_SELECTOR = '.hotbar,.smoke-hint,.walk-ui,.ride-hud,.vehicle-action,.dock,.sky-ui,.render-entry,.hud-me,.shop-overlay,.wardrobe-overlay,.garage-overlay,.mission-hud,.gl-mission-entry,.gl-mission-hud,.mission-board,.st-phone,.st-phone-btn,.mp-roster,.hud-stats,.mifen-story-dialog,.mifen-story-skip,.chat-dock'
 
 export function isShopOverlayOpen(doc: Document = document): boolean {
   return doc.body.dataset.shopOpen === '1' || !!doc.querySelector('.shop-overlay.show,.wardrobe-overlay.show,.garage-overlay.show')
@@ -91,7 +91,16 @@ export interface TouchZoneContext {
   photoOn: boolean
   aboard: boolean
   target?: EventTarget | null
+  /**
+   * IDOK-256: live rects of the visible thumb controls (stick first). With presets, button size and left-hand mode
+   * the cluster moves, so when they are given the guard follows them instead of the fixed right-hand geometry below.
+   */
+  controls?: {left: number; top: number; right: number; bottom: number; stick?: boolean}[]
 }
+
+/** Gutter (px) around a button, and around the stick, that still counts as a near-miss rather than a camera drag. */
+const BUTTON_GUTTER = 14
+const STICK_GUTTER = 40
 
 /**
  * Returns true when a touch start falls on an interactive HUD control or inside the protected
@@ -102,6 +111,12 @@ export function isTouchInControlZone(ctx: TouchZoneContext): boolean {
     if ((ctx.target as Element).closest(TOUCH_UI_SELECTOR)) return true
   }
   if (!ctx.panelVisible || ctx.photoOn) return false
+  if (ctx.controls?.length) {
+    return ctx.controls.some(rect => {
+      const pad = rect.stick ? STICK_GUTTER : BUTTON_GUTTER
+      return ctx.clientX >= rect.left - pad && ctx.clientX <= rect.right + pad && ctx.clientY >= rect.top - pad && ctx.clientY <= rect.bottom + pad
+    })
+  }
   // Bottom-left virtual joystick zone
   if (ctx.clientX < ctx.innerWidth * .45 && ctx.clientY > ctx.innerHeight * .55) return true
   // Bottom-right jump/run/view or wheelie/gear/tuck thumb gutter (slot D reaches ~245 px in from the right while riding).

@@ -1,5 +1,6 @@
 import {randomUUID, createHmac, randomBytes} from 'node:crypto'
 import {isIP} from 'node:net'
+import {resolveClientIp} from './client-ip.mjs'
 
 const numeric = 'cores memory width height dpr rtt downlink ms dns tcp tls ttfb dcl load count bytes cache p50 p95 fps frameP95 longFrames calls triangles geometries textures chunks heap total status'.split(' ')
 const sessionKeys=['total','visible','grids','teleports','mapOpens',...['walk','menu','fly','drive','map'].flatMap(m=>[m+'Meters',m+'Seconds'])]
@@ -47,11 +48,40 @@ function allow(ip) {
   if(n>=90||(!n&&limits.size>=8192))return false
   limits.set(key,n+1);return true
 }
-export async function receive(request,pool,origin) {
+const legacyPools=new WeakMap()
+async function insertEvents(pool,params){
+  const legacySql=`WITH location AS (
+    SELECT country,region,city,isp FROM perf_network WHERE prefix >>= $1::inet ORDER BY masklen(prefix) DESC LIMIT 1
+  ) INSERT INTO perf_event(batch,session,build,world,device,gpu,country,region,city,isp,kind,mode,grid,context,fields,batch_position)
+  SELECT $2,$3,$4,$5,$6,$7,coalesce(location.country,$8),region,city,isp,e->>'kind',e->>'mode',nullif(e->>'grid',''),$9,e,ord
+  FROM jsonb_array_elements($10::jsonb) WITH ORDINALITY AS events(e,ord) LEFT JOIN location ON true`
+  const withIpSql=`WITH location AS (
+    SELECT country,region,city,isp FROM perf_network WHERE prefix >>= $1::inet ORDER BY masklen(prefix) DESC LIMIT 1
+  ) INSERT INTO perf_event(batch,session,build,world,device,gpu,country,region,city,isp,kind,mode,grid,context,fields,batch_position,client_ip,node_ip)
+  SELECT $2,$3,$4,$5,$6,$7,coalesce(location.country,$8),region,city,isp,e->>'kind',e->>'mode',nullif(e->>'grid',''),$9,e,ord,$11,$12
+  FROM jsonb_array_elements($10::jsonb) WITH ORDINALITY AS events(e,ord) LEFT JOIN location ON true`
+  const retryAt=pool&&typeof pool==='object'?legacyPools.get(pool):0
+  if(retryAt&&Date.now()<retryAt)return pool.query(legacySql,params.slice(0,10))
+  try{
+    const res=await pool.query(withIpSql,params)
+    if(pool&&typeof pool==='object')legacyPools.delete(pool)
+    return res
+  }catch(error){
+    if(error?.code==='42703'){
+      if(pool&&typeof pool==='object')legacyPools.set(pool,Date.now()+60000)
+      return pool.query(legacySql,params.slice(0,10))
+    }
+    throw error
+  }
+}
+export async function receive(request,pool,origin,meta={}) {
   if(request.method!=='POST')return new Response(null,{status:405})
   if(request.headers.get('Origin') && request.headers.get('Origin')!==origin)return new Response(null,{status:403})
-  const ip=request.headers.get('CF-Connecting-IP')??''
-  if(!allow(ip))return new Response(null,{status:429})
+  const remoteAddr=typeof meta==='string'?meta:(meta?.remoteAddr??'')
+  const options=typeof meta==='object'&&meta?.trustedProxies!==undefined?{trustedProxies:meta.trustedProxies}:undefined
+  const resolved=resolveClientIp(request.headers,remoteAddr,options)
+  const ip=resolved.clientIp
+  if(!allow(ip==='unknown'?(resolved.nodeIp??'unknown'):ip))return new Response(null,{status:429})
   const chunks=[]
   let length=0
   for await(const part of request.body??[]) {
@@ -61,14 +91,12 @@ export async function receive(request,pool,origin) {
   }
   let body
   try {body=JSON.parse(Buffer.concat(chunks));if(!validate(body))throw Error()}catch{return new Response(null,{status:400})}
-  const cf=request.headers.get('CF-IPCountry')??''
+  const cf=resolved.trusted?(request.headers.get('CF-IPCountry')??''):''
+  const clientIp=isIP(ip)?ip:null
+  const nodeIp=resolved.nodeIp&&isIP(resolved.nodeIp)?resolved.nodeIp:null
   const {sid,context:c,rows}=body
-  await pool.query(`WITH location AS (
-    SELECT country,region,city,isp FROM perf_network WHERE prefix >>= $1::inet ORDER BY masklen(prefix) DESC LIMIT 1
-  ) INSERT INTO perf_event(batch,session,build,world,device,gpu,country,region,city,isp,kind,mode,grid,context,fields,batch_position)
-  SELECT $2,$3,$4,$5,$6,$7,coalesce(location.country,$8),region,city,isp,e->>'kind',e->>'mode',nullif(e->>'grid',''),$9,e,ord
-  FROM jsonb_array_elements($10::jsonb) WITH ORDINALITY AS events(e,ord) LEFT JOIN location ON true`,[isIP(ip)?ip:null,randomUUID(),sid,c.build,c.world,c.device,c.gpu,
-    /^[A-Z]{2}$/.test(cf)?cf:null,c,JSON.stringify(rows)])
+  await insertEvents(pool,[clientIp,randomUUID(),sid,c.build,c.world,c.device,c.gpu,
+    /^[A-Z]{2}$/.test(cf)?cf:null,c,JSON.stringify(rows),clientIp,nodeIp])
   return new Response(null,{status:204})
 }
 
@@ -89,7 +117,35 @@ export async function queryPerf(pool,path,params) {
   if(!Number.isFinite(start+end)||start>=end||end-start>90*86400000)return invalid()
   const args=[new Date(start),new Date(end)]
   let sql
-  if(path==='admin/perf/server')sql='SELECT minute,sample FROM perf_server WHERE minute >= $1 AND minute < $2 ORDER BY minute'
+  if(path==='admin/perf/server'){
+    const {rows}=await pool.query('SELECT minute,sample FROM perf_server WHERE minute >= $1 AND minute < $2 ORDER BY minute',args)
+    if(params.get('summary')==='1'){
+      const span=end-start,stepMs=span<=3600e3?60e3:span<=86400e3?600e3:3600e3
+      const buckets={cpuCores:new Map(),rss:new Map(),loopP99:new Map(),pgP95:new Map()}
+      const routes=new Map()
+      let latest=null
+      for(const row of rows){
+        const ts=+new Date(row.minute),s=typeof row.sample==='string'?JSON.parse(row.sample):row.sample??{}
+        latest={minute:row.minute,sample:s}
+        const key=Math.floor(ts/stepMs)*stepMs
+        for(const name of ['cpuCores','rss','loopP99','pgP95']){
+          const v=s[name]
+          if(v!=null&&Number.isFinite(v))buckets[name].set(key,Math.max(buckets[name].get(key)??-Infinity,v))
+        }
+        for(const route of s.routes??[]){
+          const cur=routes.get(route.route)??{route:route.route,count:0,errors:0,p95:0,p99:0}
+          cur.count+=route.count??0;cur.errors+=route.errors??0
+          cur.p95=Math.max(cur.p95,route.p95??0);cur.p99=Math.max(cur.p99,route.p99??0)
+          routes.set(route.route,cur)
+        }
+      }
+      const toPoints=map=>[...map.entries()].map(([t,v])=>({t:new Date(t).toISOString(),v}))
+      return Response.json({summary:true,stepMs,count:rows.length,latest,
+        series:{cpuCores:toPoints(buckets.cpuCores),rss:toPoints(buckets.rss),loopP99:toPoints(buckets.loopP99),pgP95:toPoints(buckets.pgP95)},
+        routes:[...routes.values()].sort((a,b)=>b.count-a.count)},{headers:{'Cache-Control':'private, no-store'}})
+    }
+    return Response.json({items:rows},{headers:{'Cache-Control':'private, no-store'}})
+  }
   else if(path==='admin/perf/grid'){
     args.push(params.get('world'))
     sql=`SELECT grid,count(distinct session) AS visits,

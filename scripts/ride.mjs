@@ -10,7 +10,7 @@ import {withFixtureBays} from './ride-fixture-bays.mjs'
 
 const data=JSON.parse(gunzipSync(await readFile('dist/world/vehicles.bin')))
 const jiefangBike=[-539,157.1,-95,1.57,0]
-const crossroadsBike=[-539,157.1,-87,0,0]
+const crossroadsBike=[-537,156.5,-76,-1.83,0]
 const slopeBike=[-322,146.4,94,-Math.PI/2,0]
 // These three route fixtures start at exact poses. Give the synthetic bays
 // matching sidewalk cells so real-world roadside snapping does not move them.
@@ -28,11 +28,11 @@ console.log(`航线经过 ${bridges.length} 座桥；最小净空：${minimum===
 try{
   for(const mobile of [false,true]){
     const page=await browser.newPage({viewport:mobile?{width:390,height:844}:{width:800,height:450},hasTouch:mobile,isMobile:mobile})
-    page.on('pageerror',error=>errors.push(error.message))
+    page.on('pageerror',error=>{errors.push(error.message);console.error(error)})
     if(process.env.TRACE_BRIDGE)page.on('console',message=>{if(message.text().startsWith('bridge-trace'))console.log(mobile?'mobile':'desktop',message.text())})
     await page.route('**/world/vehicles.bin',route=>route.fulfill({body:rideVehicles}))
     await page.goto(`http://127.0.0.1:${server.httpServer.address().port}/?mode=walk&verify&radius=480`)
-    await page.waitForFunction(()=>window.viewer?.walk?.active,null,{timeout:90000})
+    await page.waitForFunction(()=>window.viewer?.walk?.active && ![1,2].includes(window.__loading?.level),null,{timeout:90000})
     if(mobile)await page.getByRole('button',{name:'竖屏继续'}).tap()
     await recordFrames(page)
     if(!mobile){const boat=await lakeChecks(page,data,output);assert(boat.roof<=bounds.boat.roof+1e-6&&boat.head<=bounds.boat.head+1e-6)}
@@ -92,7 +92,7 @@ try{
         const btn=document.querySelector('.vehicle-action')
         const before=btn?getComputedStyle(btn,'::before').content:''
         const shortcut=btn?.getAttribute('aria-keyshortcuts'),text=btn?.textContent
-        const sels=['.walk-ui .joystick','.walk-ui .btn-run','.walk-ui .btn-jump','.walk-ui .btn-view','.vehicle-action','.dock','.sky-ui','output','.hud-me']
+        const sels=['.walk-ui .joystick','.walk-ui .btn-jump','.walk-ui .btn-view','.vehicle-action','.dock','.sky-ui','output','.hud-me']
         const boxes=sels.map(sel=>{const el=document.querySelector(sel);if(!el)return null;const st=getComputedStyle(el),r=el.getBoundingClientRect()
           return st.display==='none'||st.visibility==='hidden'||el.hasAttribute('hidden')?null:{sel,left:r.left,top:r.top,right:r.right,bottom:r.bottom}}).filter(Boolean)
         const overlaps=[]
@@ -125,7 +125,7 @@ try{
         const {walk}=window.viewer, joy=document.querySelector('.walk-ui .joystick')
         for(let i=0;i<5;i++)walk.tick(.06)
         const jumpHidden=getComputedStyle(document.querySelector('.walk-ui .btn-jump')).display==='none'
-        const runHidden=getComputedStyle(document.querySelector('.walk-ui .btn-run')).display==='none'
+        const runHidden=!document.querySelector('.walk-ui .btn-run')
         const aboard=document.body.hasAttribute('data-aboard')
         const sels=['.walk-ui .joystick','.walk-ui .btn-view','.vehicle-action','.dock','.sky-ui','output','.hud-me']
         const boxes=sels.map(sel=>{const el=document.querySelector(sel);if(!el)return null;const st=getComputedStyle(el),r=el.getBoundingClientRect()

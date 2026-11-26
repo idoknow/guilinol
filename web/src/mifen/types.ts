@@ -56,6 +56,8 @@ export interface TianyuanShopVisualsCtx {
   stepProgress?: number
   activeMeats?: readonly string[]
   holdingStage?: 'none' | 'boiled' | 'meated' | 'brined'
+  /** 当前相机世界坐标（用于自动屋顶剖切与后厨动态件近距显隐） */
+  cameraPos?: THREE.Vector3
 }
 
 /** 剖切模式：auto 按玩家与相机位置判断；true / false 强制开关 */
@@ -87,6 +89,10 @@ export interface TianyuanShopBuildResult {
   setCutaway?(mode: ShopCutawayMode): void
   /** 当前是否处于剖切状态 */
   isCutaway?(): boolean
+  /** 远距 LOD：距离 >35m 时隐藏室内动态件，保留完整建筑外观与门面 */
+  setDetailVisible?(visible: boolean): void
+  /** 中距（35~165m）仅刷新建筑外立面与门面夜景自发光 */
+  updateNight?(night: number, time?: number): void
   dispose(): void
 }
 

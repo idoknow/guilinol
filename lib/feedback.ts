@@ -84,6 +84,8 @@ export async function feedback(request: Request, env: Env, path: string) {
     if (method !== 'GET' && request.headers.get('Origin') !== new URL(request.url).origin)
       throw new Problem(403, 'origin', '请求来源不符')
     const banTarget=/^admin\/users\/([\w-]+)\/(ban|unban)$/.exec(path)
+    if(admin&&path==='admin/smoke'&&env.smokeAdmin)return env.smokeAdmin(request,user)
+    if(admin&&path==='admin/gfx'&&env.gfxAdmin)return env.gfxAdmin(request,user)
     if(admin&&path==='admin/npc'&&env.npcAdmin)return env.npcAdmin(request)
     if(admin && /^admin\/(?:mp|chat)(?:\/|$)/.test(path) && env.mpAdmin) return env.mpAdmin(path,request,user)
     if (banTarget && method==='POST') {
@@ -94,8 +96,12 @@ export async function feedback(request: Request, env: Env, path: string) {
     if (roleTarget && method==='POST') return setRole(env.DB,user,roleTarget[1],(await fields(request)).role)
     if (admin && method==='GET' && env.perfQuery && ['admin/perf','admin/perf/grid','admin/perf/server','admin/overview','admin/timeseries','admin/breakdown','admin/funnel','admin/errors','admin/live'].includes(path))
       return env.perfQuery(path,new URL(request.url).searchParams)
-    if (admin && method === 'GET' && ['admin/stats', 'admin/signups', 'admin/audit','admin/users', 'admin/feedback'].includes(path))
-      return adminList(env.DB, path, new URL(request.url).searchParams)
+    if (admin && method === 'GET' && ['admin/stats', 'admin/signups', 'admin/audit','admin/users', 'admin/feedback'].includes(path)) {
+      const search = new URL(request.url).searchParams
+      if (env.perfQuery && (path === 'admin/stats' || path === 'admin/signups'))
+        return env.perfQuery(path, search, (p, q) => adminList(env.DB, p, q))
+      return adminList(env.DB, path, search)
+    }
     // 用户详情：与 admin/users/:id/role 走同一个 admin 鉴权分支（role 已是 'admin' 才走到这里）
     const userDetail = /^admin\/users\/([A-Za-z0-9-]{8,64})$/.exec(path)
     if (userDetail && method === 'GET') return adminUserDetail(env.DB, userDetail[1]!)

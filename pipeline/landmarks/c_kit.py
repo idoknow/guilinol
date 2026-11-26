@@ -927,8 +927,23 @@ def export_landmark(path, image, builders):
             geometry = _trimesh_of(builder.parts[key], texture, mat_name, emissive, metallic, roughness)
             if geometry is not None:
                 scene.add_geometry(geometry, node_name=f'{name}_{key}', parent_node_name=name)
-    hit = _trimesh_of(builders[0][1].hit, image, 'collision_mat', (0, 0, 0), 0, 1)
-    if hit is not None:
+    if builders[0][1].hit.faces:
+        hit_mesh = builders[0][1].hit
+        hit = trimesh.Trimesh(
+            vertices=np.asarray(hit_mesh.pos, np.float32),
+            faces=np.asarray(hit_mesh.faces, np.int64),
+            vertex_normals=np.asarray(hit_mesh.nrm, np.float32),
+            process=False,
+        )
+        hit.visual = trimesh.visual.TextureVisuals(
+            material=trimesh.visual.material.PBRMaterial(
+                name='collision_mat',
+                baseColorFactor=[128, 128, 128, 255],
+                metallicFactor=0.0,
+                roughnessFactor=1.0,
+                doubleSided=False,
+            ),
+        )
         scene.add_geometry(hit, node_name='collision_body')
     scene.export(path)
     return scene

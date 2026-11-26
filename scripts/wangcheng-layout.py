@@ -1,4 +1,5 @@
 """Render the IDOK-44 pre-model layout sheet; source rasters stay outside git."""
+from ops_evidence import require_evidence
 import argparse
 import json
 import math
@@ -18,7 +19,7 @@ parser.add_argument('output')
 parser.add_argument('--font', default='/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc')
 args = parser.parse_args()
 photos = {int(Path(key).name[:2]): value for key, value in json.loads(
-    (ROOT / 'docs/refs/rock/photo-locations.json').read_text()).items() if key.startswith('walk-shizijie-wangcheng/')}
+    (require_evidence('refs/rock/photo-locations.json')).read_text()).items() if key.startswith('walk-shizijie-wangcheng/')}
 assert sorted(photos) == list(range(1, 39))
 ways = {element['id']: element for element in load_osm() if element['type'] == 'way' and 'geometry' in element}
 features = {264901525:'王城商厦', 1008248059:'正阳门', 1008248065:'承运门', 674165595:'四教楼',

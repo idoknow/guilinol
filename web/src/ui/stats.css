@@ -11,7 +11,7 @@
   box-sizing: border-box;
   padding: 4px 10px;
   border-radius: 12px;
-  background: rgba(28, 44, 42, .42);
+  background: rgba(22, 37, 34, .86);
   border: 1px solid rgba(244, 239, 226, .28);
   color: #f4efe2;
   font: 11.5px/1.2 ui-monospace, SFMono-Regular, Menlo, monospace;
@@ -22,8 +22,6 @@
   pointer-events: none;
   user-select: none;
   -webkit-user-select: none;
-  backdrop-filter: blur(6px);
-  -webkit-backdrop-filter: blur(6px);
 }
 
 .hud-stat[hidden] {

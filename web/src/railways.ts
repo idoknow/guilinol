@@ -4,6 +4,8 @@ import {look} from './look/config'
 
 /** Local x,z,y at both ends in cm, chainage in cm, flags and optional portal bits. */
 export type RailSection=[number,number,number,number,number,number,number,number,number?]
+/** Local centimetre endpoints and the finished crossing pavement elevation in metres. */
+export type CrossingPanel=[number,number,number,number,number]
 export type CrossingSign=[number,number,number,number]
 type Box=(x:number,y:number,z:number,w:number,h:number,d:number,yaw:number,tint:Color,pitch?:number)=>void
 export type RailFace=(a:Vector3,b:Vector3,c:Vector3,color:Color,along:number[],kind:number)=>void
@@ -13,9 +15,10 @@ const sleeper=new Color(style.sleeper),warning=new Color(style.warning),concrete
 const BRIDGE=1,TUNNEL=2,ELECTRIC=4,FENCE=8,LEVEL=16,RESERVED=32,PAINTED=64
 
 export function railwayGeometry(sections:RailSection[],signs:CrossingSign[],ground:(x:number,z:number)=>number,
-  roadLevel:(x:number,z:number,fallback:number)=>number,face:RailFace,box:Box,levelFace:(a:Vector3,b:Vector3,c:Vector3,color:Color,h:number,painted:boolean)=>void){
+  roadLevel:(x:number,z:number,fallback:number)=>number,face:RailFace,box:Box,levelFace:(a:Vector3,b:Vector3,c:Vector3,color:Color,h:number,painted:boolean)=>void, inspectSlope?:(a:Vector3,b:Vector3,c:Vector3)=>void, panels:CrossingPanel[]=[]){
   const barriers:number[]=[]
   for(const [ax,az,ay,bx,bz,by,chainage,flags,ends=0] of sections){
+    const fitted=flags&LEVEL ? panels.find(p=>p[0]===ax && p[1]===az && p[2]===bx && p[3]===bz) : undefined
     const x=ax/100,z=az/100,dx=(bx-ax)/100,dz=(bz-az)/100
     const len=Math.hypot(dx,dz)
     if(len<.005)continue
@@ -23,7 +26,7 @@ export function railwayGeometry(sections:RailSection[],signs:CrossingSign[],grou
     const at=(t:number,offset:number,h:number)=>{
       const east=x+t*dx+nx*offset,south=z+t*dz+nz*offset
       const y=(ay+(by-ay)*t)/100
-      return new Vector3(east,((flags&LEVEL)?roadLevel(east,south,flags&PAINTED?ground(east,south):y):y)+h,south)
+      return new Vector3(east,(fitted?fitted[4]:(flags&LEVEL)?roadLevel(east,south,flags&PAINTED?ground(east,south):y):y)+h,south)
     }
     function strip(left:number,right:number,hLeft:number,hRight:number,color:Color,kind=7){
       const count=flags&LEVEL?Math.ceil(len/.5):1
@@ -31,7 +34,7 @@ export function railwayGeometry(sections:RailSection[],signs:CrossingSign[],grou
         const t=k/count,u=(k+1)/count
         const a=at(t,left,hLeft),b=at(u,left,hLeft),c=at(u,right,hRight),d=at(t,right,hRight)
         const s=chainage/100+t*len,e=chainage/100+u*len
-        if(flags&LEVEL){
+        if((flags&LEVEL) && !fitted){
           levelFace(a,c,b,color,hLeft,!!(flags&PAINTED))
           levelFace(a,d,c,color,hLeft,!!(flags&PAINTED))
         }else{
@@ -39,6 +42,17 @@ export function railwayGeometry(sections:RailSection[],signs:CrossingSign[],grou
           face(a,d,c,color,[s,s,e],kind)
         }
       }
+    }
+    function ballastSide(side:number,width:number){
+      const left=at(0,side*width,-.22),right=at(1,side*width,-.22)
+      const toe=(p:Vector3)=>{
+        const span=Math.max(.52,(p.y-ground(p.x,p.z))*style.ballastSlope)
+        const east=p.x+side*nx*span,south=p.z+side*nz*span
+        return new Vector3(east,ground(east,south)-.03,south)
+      }
+      const a=toe(left),b=toe(right)
+      face(left,right,b,ballast,[0,0,0],7);face(left,b,a,ballast,[0,0,0],7)
+      inspectSlope?.(left,right,b);inspectSlope?.(left,b,a)
     }
     const beam=(offset:number,h:number,size:number,depth:number,color:Color)=>{
       const mid=at(.5,offset,h)
@@ -55,26 +69,29 @@ export function railwayGeometry(sections:RailSection[],signs:CrossingSign[],grou
       }
       continue
     }
-    if(flags&LEVEL){
+    if(fitted){
+      // Three flush slabs leave a flangeway beside each steel head. Fill the
+      // slot below the rail, and carry the exposed slab edges down to ballast.
+      const inner=style.gauge/2, outer=inner+style.headWidth, width=style.ballastHalfWidth
+      strip(-width,width,-.07,-.07,ballast)
+      strip(-width,-outer-.015,.003,.003,panel)
+      strip(-inner+.045,inner-.045,.003,.003,panel)
+      strip(outer+.015,width,.003,.003,panel)
+      for(const side of [-1,1]){
+        strip(side*width,side*width,.003,-.22,concrete)
+        ballastSide(side,width)
+      }
+    }else if(flags&LEVEL){
       strip(-1.7,1.7,.003,.003,panel)
     }else{
       const bed=style.ballastHalfWidth
       strip(-bed,bed,-.22,-.22,ballast,8)
       for(const side of [-1,1]){
-        const l=at(0,side*bed,-.22),r=at(1,side*bed,-.22)
         if(flags&BRIDGE){
           strip(side*bed,side*2.05,-.22,-.48,ballast)
           strip(side*2.05,side*2.05,-.48,-1.2,concrete)
         }else{
-          function toe(p:Vector3){
-            let y=ground(p.x,p.z)
-            const span=Math.max(.52,(p.y-y)*style.ballastSlope)
-            const east=p.x+side*nx*span,south=p.z+side*nz*span
-            y=ground(east,south)
-            return new Vector3(east,y-.03,south)
-          }
-          const a=toe(l),b=toe(r)
-          face(l,r,b,ballast,[0,0,0],7);face(l,b,a,ballast,[0,0,0],7)
+          ballastSide(side,bed)
         }
       }
       if(flags&BRIDGE)strip(-2.05,2.05,-1.2,-1.2,concrete)

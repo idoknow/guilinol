@@ -8,14 +8,12 @@
   font-size: 12px;
   letter-spacing: .1em;
   color: #f4efe2;
-  background: rgba(28, 44, 42, .42);
+  background: rgba(24, 40, 37, .64);
   border: 1px solid rgba(244, 239, 226, .38);
   border-radius: 14px;
   padding: 4px 12px;
   white-space: nowrap;
   cursor: pointer;
-  backdrop-filter: blur(6px);
-  -webkit-backdrop-filter: blur(6px);
   touch-action: manipulation;
   user-select: none;
   -webkit-user-select: none;
@@ -49,8 +47,6 @@
   background: rgba(28, 44, 42, .76);
   color: #f4efe2;
   border: 1px solid rgba(244, 239, 226, .3);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
   box-shadow: 0 14px 36px rgba(12, 20, 20, .3);
   display: grid;
   gap: 10px;
@@ -302,4 +298,24 @@ body[data-hud="street"] .render-pop {
     max-height: calc(100vh - 162px);
     overflow: auto;
   }
+}
+
+/* 光影画质（IDOK-291）：和视野档位同款按钮，单独一节，用细线隔开 */
+.render-gfx {
+  display: grid;
+  gap: 6px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(244, 239, 226, .14);
+}
+
+.render-gfx-note {
+  font-size: 10.5px;
+  font-weight: 400;
+  letter-spacing: .04em;
+  opacity: .6;
+}
+
+.render-gfx-tiers button span {
+  font: 10.5px/1.25 var(--ui-serif, serif);
+  letter-spacing: .02em;
 }

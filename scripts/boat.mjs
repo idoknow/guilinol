@@ -3,6 +3,7 @@ import {readFile} from 'node:fs/promises'
 import {gunzipSync} from 'node:zlib'
 import {chromium} from 'playwright'
 import {preview} from 'vite'
+import {applyCpuThrottle} from './qa-browser.mjs'
 
 /**
  * M6-3 自由划船全自动验证脚本 (`verify:boat`)。
@@ -52,7 +53,7 @@ const baseUrl = `http://127.0.0.1:${server.httpServer.address().port}`
 const errors = []
 let browser
 
-try {
+boatChecks: try {
   browser = await chromium.launch({
     executablePath: process.env.CHROMIUM,
     args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader'],
@@ -60,6 +61,7 @@ try {
 
   // ---------- 通用页面辅助工具 ----------
   async function attachHelpers(page) {
+    await applyCpuThrottle(page)
     await page.addInitScript(() => {
       window.__boatToasts = []
       window.addEventListener('walk:toast', ev => {
@@ -77,7 +79,7 @@ try {
     await page.route('**/favicon.ico', route => route.fulfill({status: 204}))
     await page.route('**/api/t', route => route.fulfill({status: 204}))
     await page.goto(`${baseUrl}/?${urlQuery}`)
-    await page.waitForFunction(() => window.viewer?.walk?.active, null, {timeout: 90000})
+    await page.waitForFunction(() => window.viewer?.walk?.active && ![1,2].includes(window.__loading?.level), null, {timeout: 90000})
     await page.waitForSelector('.vehicle-action', {state: 'attached', timeout: 45000})
   }
 
@@ -130,22 +132,46 @@ try {
       window.__offshoreReading = new Promise(resolve => {
         window.addEventListener(isTouch ? 'click' : 'keydown', () => {
           const start = performance.now()
-          let shown = null
-          function sample() {
-            const now = performance.now()
-            const toast = document.querySelector('.toast.show')
-            const visible = toast?.textContent.includes('离岸太远') && toast.checkVisibility({opacityProperty: true, visibilityProperty: true})
-            if (visible && shown === null) shown = now
-            if (shown === null ? now - start < 2000 : visible && now - shown < 1500) return
-            clearInterval(timer)
-            observer.disconnect()
-            resolve({delay: shown === null ? null : shown - start, duration: shown === null || !visible ? 0 : now - shown,
-              events: window.__boatToasts.map(({text, at}) => ({text, afterInput: at - start})),
-              toast: document.querySelector('.toast')?.outerHTML})
+          const elapsed = () => performance.now() - start
+          const trace = {input: 0, event: null, show: null, firstFrame: null, frames: []}
+          let shown = null, frame = 0
+          function onToast(event) {
+            if (event.detail?.text?.includes('离岸太远')) trace.event ??= elapsed()
           }
-          const observer = new MutationObserver(sample)
-          observer.observe(document.querySelector('.toast'), {subtree: true, attributes: true, childList: true, characterData: true})
-          const timer = setInterval(sample, 16)
+          window.addEventListener('walk:toast', onToast)
+          const observer = new MutationObserver(() => {
+            if (document.querySelector('.toast.show')?.textContent.includes('离岸太远')) trace.show ??= elapsed()
+          })
+          observer.observe(document.querySelector('.toast'), {attributes: true, childList: true, subtree: true, characterData: true})
+          function sample(stamp) {
+            const now = elapsed()
+            const toast = document.querySelector('.toast.show')
+            const bounds = toast?.getBoundingClientRect()
+            const visible = Boolean(toast?.textContent.includes('离岸太远') && toast.checkVisibility({opacityProperty: true, visibilityProperty: true}) &&
+              bounds.width > 0 && bounds.height > 0 && bounds.bottom > 0 && bounds.right > 0 && bounds.top < innerHeight && bounds.left < innerWidth)
+            trace.frames.push({raf: stamp - start, sample: now, visible, opacity: toast ? getComputedStyle(toast).opacity : null})
+            if (trace.event !== null) trace.firstFrame ??= now
+            if (visible && shown === null) shown = now
+            if (shown === null ? now - (trace.firstFrame ?? now) < 2000 : visible && now - shown < 1500) {
+              frame = requestAnimationFrame(sample)
+              return
+            }
+            finish(now, visible)
+          }
+          function finish(now, visible) {
+            cancelAnimationFrame(frame)
+            clearTimeout(deadline)
+            observer.disconnect()
+            window.removeEventListener('walk:toast', onToast)
+            const el = document.querySelector('.toast'), style = getComputedStyle(el)
+            resolve({delay: shown === null || trace.firstFrame === null ? null : shown - trace.firstFrame,
+              inputToVisible: shown, duration: shown === null || !visible ? 0 : now - shown, trace,
+              opacity: style.opacity, visibility: style.visibility, display: style.display, pageVisibility: document.visibilityState,
+              events: window.__boatToasts.map(({text, at}) => ({text, afterInput: at - start})),
+              toast: el.outerHTML})
+          }
+          const deadline = setTimeout(() => finish(elapsed(), false), 10000)
+          frame = requestAnimationFrame(sample)
         }, {capture: true, once: true})
       })
     }, mobile)
@@ -157,8 +183,9 @@ try {
     if (offshore) {
       await page.evaluate(() => window.viewer.walk.tick(1 / 60))
       const reading = await page.evaluate(() => window.__offshoreReading)
-      assert(reading.delay !== null && reading.delay <= 2000 && reading.duration >= 1500, `离岸提示显示异常: ${JSON.stringify(reading)}`)
-      console.log('离岸提示 (ms):', reading)
+      console.log('离岸提示 (ms):', JSON.stringify(reading))
+      assert(reading.trace.event !== null && reading.trace.event <= 2000 && reading.trace.show !== null &&
+        reading.delay !== null && reading.delay >= 0 && reading.delay <= 2000 && reading.duration >= 1500, '离岸提示显示异常（见逐帧记录）')
       return
     }
     await page.evaluate(async () => {
@@ -218,13 +245,15 @@ try {
 
       async function ensureTileLoaded(x, z) {
         const tile = manifest.chunks.find(t => x >= t.x && x < t.x + 256 && z >= t.z && z < t.z + 256)
-        if (!tile || stream.loaded.has(tile)) return
+        if (!tile) throw new Error(`No manifest tile at (${x}, ${z})`)
+        if (stream.loaded.has(tile)) return
         const deadline = performance.now() + 15000
         const pt = walk.position.clone().set(tile.x + 128, walk.position.y, tile.z + 128)
         while (!stream.loaded.has(tile) && performance.now() < deadline) {
           stream.tick(pt)
           await new Promise(r => setTimeout(r, 20))
         }
+        if (!stream.loaded.has(tile)) throw new Error(`tile load failed: ${JSON.stringify({tile:tile.file,x,z,timedOut:true,loaded:stream.loaded.size,queued:stream.queuedTiles,pending:stream.pending.size})}`)
       }
 
       function step(n = 1, dt = 1 / 60) {
@@ -317,10 +346,43 @@ try {
   const page = await browser.newPage({viewport: {width: 800, height: 450}})
   page.on('pageerror', err => errors.push(`desktop pageerror: ${err.message}`))
   page.on('console', msg => {
+    if (msg.text().startsWith('walk:enter-failed')) console.warn(msg.text())
     if (msg.type() === 'error') errors.push(`desktop console: ${msg.location().url}: ${msg.text()}`)
   })
   await attachHelpers(page)
   await gotoWalk(page)
+
+  async function checkMooringLandings(name) {
+    return runInPage(page, async ({walk, advance, ensureTileLoaded, arg}) => {
+      const initial = walk.freeMoorings.filter(m => !arg || m.name === arg)
+      if (!initial.length) throw new Error(`No mooring: ${arg}`)
+      for (const m of initial) {
+        const [dx, , dz] = m.dock
+        for (const ox of [-40, 0, 40]) for (const oz of [-40, 0, 40]) await ensureTileLoaded(dx + ox, dz + oz)
+        walk.leave()
+        if (!await walk.enter(dx, dz, 0, `mooring-all-${m.name}`)) throw new Error(`无法在码头 ${m.name} (${dx}, ${dz}) 附近落脚`)
+        advance(1 / 60)
+      }
+      return walk.freeMoorings
+    }, name)
+  }
+  if (process.argv.includes('--jiefang-landing')) {
+    await page.waitForFunction(() => window.viewer.walk.freeMoorings.length > 0)
+    const docks = await checkMooringLandings('解放桥码头')
+    const dock = docks.find(m => m.name === '解放桥码头')
+    const state = await page.evaluate(() => {
+      const {walk} = window.viewer
+      return {active:walk.active, vehicle:walk.vehicle, spawn:walk.spawns.at(-1), position:walk.position.toArray()}
+    })
+    assert(dock?.resolved && Array.isArray(dock.bank) && Array.isArray(dock.mooring))
+    assert(state.active && state.vehicle === 'foot')
+    assert.equal(state.spawn.reason, 'mooring-all-解放桥码头')
+    assert.deepEqual(state.spawn.from, [-156, 156])
+    assert(state.spawn.to && state.position.every(Number.isFinite))
+    assert.deepEqual(errors, [])
+    console.log('PASS jiefang-landing', JSON.stringify(state))
+    break boatChecks
+  }
 
   // --- 用例 1：防抢键回归 + 榕湖上自由小船 (rowboat) + 自由划行物理 ---
   const [autoDockX, , autoDockZ] = VEHICLES.docks['榕湖']
@@ -424,22 +486,7 @@ try {
   })
 
   // 全量检查 10 个 walk.freeMoorings 在正常水域下全部 resolved（含 1a-cache 之后的龙船坪码头）
-  const allMooringsCheck = await runInPage(page, async ({walk, advance, ensureTileLoaded}) => {
-    const initial = walk.freeMoorings
-    for (const m of initial) {
-      const [dx, , dz] = m.dock
-      for (const ox of [-40, 0, 40]) {
-        for (const oz of [-40, 0, 40]) {
-          await ensureTileLoaded(dx + ox, dz + oz)
-        }
-      }
-      walk.leave()
-      const entered = await walk.enter(dx, dz, 0, `mooring-all-${m.name}`)
-      if (!entered) throw new Error(`无法在码头 ${m.name} (${dx}, ${dz}) 附近落脚`)
-      advance(1 / 60)
-    }
-    return walk.freeMoorings
-  })
+  const allMooringsCheck = await checkMooringLandings()
   assert.equal(allMooringsCheck.length, 10, `自由码头总数应为 10，实际 ${allMooringsCheck.length}`)
   const unresolvedMoorings = allMooringsCheck.filter(m => !m.resolved || !Array.isArray(m.bank) || !Array.isArray(m.mooring))
   assert.deepEqual(unresolvedMoorings, [], `存在正常水域下未解析成功的自由码头: ${JSON.stringify(unresolvedMoorings)}`)
@@ -1026,6 +1073,7 @@ try {
   })
   await attachHelpers(mobile)
   await gotoWalk(mobile)
+  await mobile.getByRole('button', {name: '竖屏继续'}).tap()
 
   await enterSpot(mobile, ...FREE_DOCKS.ronghu.freeBank, 0, 'mobile-ronghu-bank')
   await closeSpotCard(mobile)
@@ -1075,7 +1123,7 @@ try {
   }
 
   const preHud = await measureHud(mobile, [
-    '.walk-ui .joystick', '.walk-ui .btn-run', '.walk-ui .btn-jump',
+    '.walk-ui .joystick',  '.walk-ui .btn-jump',
     '.walk-ui .btn-view', '.vehicle-action', '.dock', '.sky-ui', 'output', '.hud-me',
   ])
   assert(preHud.boxes.some(b => b.sel === '.vehicle-action'), '手机端自由栈桥旁未显示 .vehicle-action')
@@ -1093,7 +1141,7 @@ try {
     vehicle: window.viewer.walk.vehicle,
     aboardAttr: document.body.hasAttribute('data-aboard'),
     jumpHidden: getComputedStyle(document.querySelector('.walk-ui .btn-jump')).display === 'none',
-    runHidden: getComputedStyle(document.querySelector('.walk-ui .btn-run')).display === 'none',
+    runHidden: !document.querySelector('.walk-ui .btn-run'),
     actionText: document.querySelector('.vehicle-action')?.textContent ?? '',
   }))
   assert.equal(aboardState.vehicle, 'boat', '手机端点击后应成功上船')
