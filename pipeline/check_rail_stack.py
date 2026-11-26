@@ -102,12 +102,23 @@ def check(world, design):
             target = design["groundRailToRoad"]
         if bottom not in roads:
             floor = track_pieces(world, manifest, lines[bottom], area)
-            if not floor or not all(piece[3] & ELECTRIC for piece in floor):
-                raise ValueError(f"Expected an electrified lower track on {bottom}")
+            electrified = bottom not in design.get("unelectrifiedGroundRails", ())
+            if not floor or any(bool(piece[3] & ELECTRIC) != electrified for piece in floor):
+                raise ValueError(f"Missing track or unexpected electrification on lower track {bottom}")
+            # At a bend, GL04 renders square-ended girders on each chord.
+            # Check both spines for missing chords before measuring their girder edges.
+            upper_spine = union_all([piece[0] for piece in ceiling])
+            lower_spine = union_all([piece[0] for piece in floor])
+            upper_crossing = lines[top].intersection(lines[bottom].buffer(width))
+            if (not upper_spine.buffer(.002).covers(upper_crossing)
+                    or not lower_spine.buffer(.002).covers(expected)):
+                raise ValueError(f"Incomplete rail alignment at {top}/{bottom}")
+            girders = union_all([piece[0].buffer(width, cap_style="flat") for piece in ceiling])
+            expected = girders.intersection(lines[bottom])
         measured = separation(ceiling, floor, width, floor_width, deduction, expected)
         row = dict(upper=top, lower=bottom, minimumM=measured, targetM=target)
         if bottom not in roads:
-            row["wireMarginM"] = measured - design["wireHeight"]
+            row["wireMarginM"] = measured - design["wireHeight"] if electrified else None
         result.append(row)
     return result
 

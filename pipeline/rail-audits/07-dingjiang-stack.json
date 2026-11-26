@@ -1,0 +1,9 @@
+{
+  "upperRail": 815078162,
+  "groundRails": [815078180, 815078174, 815078171],
+  "unelectrifiedGroundRails": [815078180, 815078174, 815078171],
+  "roadTunnels": [],
+  "deckHalfWidth": 2.05,
+  "deckDepth": 1.2,
+  "railClearance": 7.5
+}
