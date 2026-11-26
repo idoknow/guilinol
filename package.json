@@ -95,7 +95,6 @@
     "heic2any": "^0.0.4",
     "n8ao": "2.1.0",
     "pg": "^8.23.1",
-    "polygon-clipping": "^0.15.7",
     "postprocessing": "6.39.6",
     "qrcode-generator": "2.0.4",
     "three": "0.180.0",
