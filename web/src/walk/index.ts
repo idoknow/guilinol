@@ -14,6 +14,7 @@ import {openWater} from '../fishing/surface'
 import {fishingMarks} from '../fishing/marks'
 import '../fishing/report'
 import {createSteles} from '../fishing/steles'
+import {createSpotSigns} from '../play/spot-signs'
 import {getActiveSaveSnapshot,openPack,takeFromPack} from '../game/save'
 import {rules,validRules} from '../smoke/data'
 import {createSmokePrompt} from '../smoke/prompt'
@@ -1256,6 +1257,7 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
   const FISH_NEAR=40
   const fishMarks=fishingOn?fishingMarks(scene):undefined
   const steles=fishingOn?createSteles(scene,sim.syncObstacleVolume):undefined
+  const spotSigns=createSpotSigns(scene,sim.syncObstacleVolume)
   window.addEventListener('fishing:slot',()=>{if(!fishingOn)return
     void loadFishing().then(session=>session.toggle())})
   if(verify)Object.assign(window,{fishing:{teleportToSpot:async(id:string)=>(await loadFishing()).teleportToSpot(id)}})
@@ -2196,6 +2198,7 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
     showFishingSlot(fishingOn&&!rides?.bike&&!rides?.boat&&!rides?.car&&(hotbarSlot()==='fishing'||nearestFishingShore(start.x,start.z).distance<=FISH_NEAR))
     fishMarks?.tick(start.x,start.z,dt,hotbarSlot()==='fishing',start.y)
     steles?.tick(start.x,start.z)
+    spotSigns.tick(start.x,start.z)
     if(isDutyScopeActive()){
       if(cigarette.active||hotbarSlot()==='smoke'){
         cancelSmokeForDuty(cigarette.active,dt)
