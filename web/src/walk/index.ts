@@ -1518,13 +1518,14 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
     })
     const deadline=performance.now()+(signal?60000:15000)
     let reported=''
-    while((needed.some(tile=>!stream.loaded.has(tile))||supports.some(entry=>!stream.landmarks.has(entry)))&&performance.now()<deadline){
+    const collisionReady=(entry:typeof supports[number])=>stream.collisionLandmarks.has(entry)
+    while((needed.some(tile=>!stream.loaded.has(tile))||!supports.every(collisionReady))&&performance.now()<deadline){
       if(signal?.aborted){if(destination===target)destination=null;return fail('aborted')}
       if(destination!==target)return fail('superseded')
-      if(progress){const tiles=needed.filter(tile=>stream.loaded.has(tile)).length,landmarks=supports.filter(entry=>stream.landmarks.has(entry)).length
+      if(progress){const tiles=needed.filter(tile=>stream.loaded.has(tile)).length,landmarks=supports.filter(collisionReady).length
         const key=`${tiles}:${landmarks}`;if(key!==reported){reported=key;progress(.3+.6*tiles/Math.max(1,needed.length)+.1*landmarks/Math.max(1,supports.length),`街区 ${tiles} / ${needed.length}`)}}
       target.y=0;stream.tick(target)
-      for(const entry of supports)if(!stream.landmarks.has(entry)){
+      for(const entry of supports)if(!collisionReady(entry)){
         target.y=entry.position[1];stream.updateLandmarks?.(target,entry)
       }
       await new Promise(resolve=>setTimeout(resolve,12))
@@ -1532,7 +1533,7 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
     if(destination!==target)return fail('superseded')
     destination=null
     if(signal?.aborted)return fail('aborted')
-    const missingTiles=needed.filter(tile=>!stream.loaded.has(tile)).map(tile=>tile.file),missingLandmarks=supports.filter(entry=>!stream.landmarks.has(entry)).map(entry=>entry.id)
+    const missingTiles=needed.filter(tile=>!stream.loaded.has(tile)).map(tile=>tile.file),missingLandmarks=supports.filter(entry=>!collisionReady(entry)).map(entry=>entry.id)
     if(missingTiles.length||missingLandmarks.length)return fail('collision-load-timeout',{missingTiles,missingLandmarks})
     let gpsSpot:ReturnType<typeof sim.findWalkableSpawn>|undefined
     if(reason==='geolocation'){
@@ -1548,6 +1549,7 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
     active=true;rides?.show(true);requestAnimationFrame(()=>requestAnimationFrame(loadRides));figure.visible=true;firstPersonHidden=false
     yaw=heading;facing=yaw+avatar.yaw;figure.rotation.y=facing;input.show(true);accumulator=0;rig.reset(arm)
     restoreFootLocomotion(avatar.clips.idle)
+    syncGameTravelState()
     camera.near=.08;camera.updateProjectionMatrix();follow(0,true)
     if(takeCigaretteIntent(sessionStorage)&&smokeEnabled()){
       chooseSmoke()

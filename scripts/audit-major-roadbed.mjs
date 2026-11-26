@@ -8,8 +8,12 @@ const directory=process.env.WORLD_DIR??'public/world'
 const manifest=JSON.parse(readFileSync(`${directory}/manifest.json`))
 const buckets=new Map(manifest.chunks.map(tile=>[`${tile.x},${tile.z}`,{tile,probes:[]}]))
 const stations=JSON.parse(execFileSync('uv',['run','--locked','python','pipeline/major_road_stations.py'],{maxBuffer:128e6}))
-const stats={},causes={},landmarks=new Map();let metres=0
+const bounds=process.env.AUDIT_BBOX?.split(',').map(Number)
+if(bounds&&(bounds.length!==4||!bounds.every(Number.isFinite)||bounds[0]>=bounds[2]||bounds[1]>=bounds[3]))throw Error('AUDIT_BBOX expects minEast,minSouth,maxEast,maxSouth')
+const stats={},causes={},tiles={},landmarks=new Map();let metres=0,stationCount=0
 for(const [id,[way,x,z,nx,nz,width,length,structure]] of stations.entries()){
+  if(bounds&&(x<bounds[0]||z<bounds[1]||x>=bounds[2]||z>=bounds[3]))continue
+  stationCount++
   metres+=length
   for(const side of [-1,0,1]){
     const east=x+side*nx*(width/2-.03),south=z+side*nz*(width/2-.03)
@@ -23,6 +27,8 @@ function record(name,probe,delta){
   const key=probe.structure+'.'+name,data=stats[key]??={samples:0,affected:new Set(),worst:[]};data.samples++;data.affected.add(probe.id)
   const severity=name==='overlap'?-Math.abs(delta):Math.abs(delta)
   if(probe.structure==='ground'&&['overlap','openEdge','voidCandidate'].includes(name)){
+    const tileKey=[Math.floor(probe.east/256)*256,Math.floor(probe.south/256)*256].join(',')
+    const counts=tiles[tileKey]??={};counts[name]=(counts[name]??0)+1
     const cause=Number.isFinite(probe.deck)?'deck intersection':Number.isFinite(probe.landmark)?'landmark intersection':Number.isFinite(probe.building)?'building intersection':probe.section??'unmapped section'
     const item=causes[name+'.'+cause]??={samples:0,affected:new Set(),worst:[]};item.samples++;item.affected.add(probe.id)
     if(!item.worst.some(point=>point.way===probe.way)){item.worst.push({...probe,delta,severity});item.worst.sort((left,right)=>right.severity-left.severity);item.worst.splice(3)}
@@ -136,5 +142,5 @@ for(const {tile,probes} of buckets.values()){
 for(const key of ['ground.overlap','ground.openEdge','ground.voidCandidate'])stats[key]??={samples:0,affected:new Set(),worst:[]}
 for(const data of [...Object.values(stats),...Object.values(causes)]){data.length=[...data.affected].reduce((sum,id)=>sum+stations[id][6],0);data.fraction=data.length/metres;delete data.affected}
 const output={scope:'Native carriageways; building shell, landmark collision, deck, foundation and terrain supports. Open edges sampled at intersections with native polygon rings, excluding tile cuts. Non-ground structures reported separately. Missing-axis and landmark-at-miss counts require semantic review.',metres,stations:stations.length,stats}
-writeFileSync(process.argv[2]??'roadbed-report.json',JSON.stringify({...output,causes},null,2)+'\n')
+writeFileSync(process.argv[2]??'roadbed-report.json',JSON.stringify({...output,stations:stationCount,bounds,causes,tiles},null,2)+'\n')
 console.table(Object.entries(stats).map(([name,{samples,length,fraction}])=>({name,samples,length,fraction})))

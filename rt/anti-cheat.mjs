@@ -28,6 +28,18 @@ export const LIMITS = Object.freeze({
 /** 空中/载具：不限制向上速度，按载具上限放行（直升机刚上线，乘客的 foot 会被置 false） */
 const airborne = (p) => p.foot === false || Boolean(p.bike) || p.activity === 'drone'
 const AUTOBAN = process.env.RT_AC_AUTOBAN === '1'
+// 阈值按"合法玩家 0~5 次/10 分钟、脚本 150+ 次"的实测分布取，宁可漏也不误封：
+// 40 次 → 3 分钟（强制下线冷静一下）；150 次 → 1 小时；300 次 → 24 小时
+const num = (value, fallback) => (Number.isFinite(Number(value)) && Number(value) > 0 ? Number(value) : fallback)
+const BAN = {
+  windowMs: 600000,
+  l1: num(process.env.RT_AC_BAN_1, 40),
+  l1Min: num(process.env.RT_AC_BAN_1_MIN, 3),
+  l2: num(process.env.RT_AC_BAN_2, 150),
+  l2Min: num(process.env.RT_AC_BAN_2_MIN, 60),
+  l3: num(process.env.RT_AC_BAN_3, 300),
+  l3Min: num(process.env.RT_AC_BAN_3_MIN, 1440),
+}
 
 /** 当前允许的速度（m/s）。客户端上报的 v 永不参与判定。 */
 export function speedCap(p, at) {
@@ -211,17 +223,26 @@ export function createBanStore(env = process.env, log = () => {}) {
       ).catch(() => {})
     }
     if (uid == null || !AUTOBAN) return null   // 首版只记录不自动封（默认关），用真实数据调参后再开
-    const hits = (recent.count.get(uid) ?? 0) + 1
-    recent.count.set(uid, hits)
-    const now = Date.now()
-    for (const [id, at] of recent.at) if (now - at > 600000) { recent.at.delete(id); recent.count.delete(id) }
-    recent.at.set(uid, now)
-    if (hits === 8) { await ban({ uid, fp, minutes: 10, reason: '检测到异常移动（自动）', actor: 'auto' }); return { banned: 600 } }
-    if (hits === 20) { await ban({ uid, fp, minutes: 1440, reason: '反复异常移动（自动）', actor: 'auto' }); return { banned: 86400 } }
-    return null
+    // 滑动窗口（10 分钟）：只统计最近 10 分钟的违规次数
+    const at = Date.now()
+    const list = (recent.get(uid) ?? []).filter((t) => at - t < BAN.windowMs)
+    list.push(at)
+    recent.set(uid, list)
+    if (recent.size > 500) for (const [id, times] of recent) if (!times.length || at - times[times.length - 1] > BAN.windowMs) recent.delete(id)
+
+    if (check(uid, fp)) return null                  // 已经在封禁里，不重复封
+    const hits = list.length
+    const level = hits >= BAN.l3 ? 3 : hits >= BAN.l2 ? 2 : hits >= BAN.l1 ? 1 : 0
+    if (!level) return null
+    const minutes = level === 3 ? BAN.l3Min : level === 2 ? BAN.l2Min : BAN.l1Min
+    const reason = `异常移动 ${hits} 次/10 分钟（自动·${level} 级）`
+    // 轻罚只封号（可以申诉、换设备也认账）；2 级以上才连设备一起封
+    await ban({ uid, fp: level >= 2 ? fp : '', minutes, reason, actor: 'auto', level })
+    return { banned: minutes * 60, level, hits }
   }
 
-  const recent = { count: new Map(), at: new Map() }
+  /** uid → 最近 10 分钟内的违规时间戳 */
+  const recent = new Map()
 
   if (pool) void hydrate()
   return { pool, refresh, hydrate, check, ban, unban, list, violation, noteDevice, deviceAccounts }

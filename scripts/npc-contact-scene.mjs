@@ -16,8 +16,10 @@ function contacts(mesh,kind) {
   const groups=new Map(), positions=mesh.attributes.position, color=mesh.attributes.color
   const expected=new THREE.Color(kind==='person'?mesh.userData.shoeColor:0x1d1f22)
   for(let index=0;index<positions.count;index++){
-    if(Math.abs(color.getX(index)-expected.r)>1e-6||Math.abs(color.getY(index)-expected.g)>1e-6||Math.abs(color.getZ(index)-expected.b)>1e-6)continue
     const vertex=new THREE.Vector3().fromBufferAttribute(positions,index)
+    if(kind==='scooter'){
+      if(!mesh.userData.wheels.some(axle=>vertex.y<=axle.y+.14&&Math.abs(vertex.z-axle.z)<.32&&Math.abs(vertex.x-axle.x)<.2))continue
+    }else if(Math.abs(color.getX(index)-expected.r)>1e-6||Math.abs(color.getY(index)-expected.g)>1e-6||Math.abs(color.getZ(index)-expected.b)>1e-6)continue
     if(kind==='car'&&(vertex.x===0||vertex.z===0))continue
     const key=kind==='person'?Math.sign(vertex.x):kind==='scooter'?Math.sign(vertex.z):`${Math.sign(vertex.x)},${Math.sign(vertex.z)}`
     if(!groups.has(key))groups.set(key,[])

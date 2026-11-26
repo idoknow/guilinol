@@ -318,6 +318,7 @@ async function start(loader:FullLoader,creatorSpawn=false) {
     landmarksPromise ??= import('./landmarks').then(module=>{
       cullLandmarks=module.landmarkCulling(stream)
       stream.updateLandmarks=module.landmarkStream(scene,renderer,manifest.landmarks!,stream.landmarks,{
+        collisionLandmarks:stream.collisionLandmarks,
         camera,
         onMount:group=>cullLandmarks?.warm(group),
         getMetrics:()=>stream.metrics,
