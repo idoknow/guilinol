@@ -1,4 +1,5 @@
 import './citizen.css'
+import {setMarkUser} from '../session-mark'
 import {backpackItems} from './items'
 import {queueCigarette,smokeEnabled} from './use-item'
 const status=document.querySelector('#status')!,button=document.querySelector<HTMLButtonElement>('#portrait')!
@@ -6,6 +7,7 @@ async function openBag(){
   const response=await fetch('/api/me')
   if(!response.ok)throw Error(response.status===401?'请先登录后查看背包':'暂时无法读取背包')
   const {uid}=await response.json()
+  setMarkUser(uid)
   for(const item of backpackItems(uid)){
     if(item.id==='cigarette'&&!smokeEnabled())continue
     const row=document.createElement('li'),icon=document.createElement('span'),text=document.createElement('span'),name=document.createElement('b'),note=document.createElement('small')

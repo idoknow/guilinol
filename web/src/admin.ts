@@ -315,7 +315,7 @@ const views: View[] = [
   { key: 'feedback', label: '反馈处理', icon: '✉', domain: 'biz', group: '用户与社区' },
   { key: 'chat', label: '聊天管理', icon: '❝', domain: 'biz', group: '用户与社区' },
   { key: 'users', label: '用户与权限', icon: '☺', domain: 'biz', group: '用户与社区' },
-  { key: 'bans', label: '封禁管理', icon: '⊘', domain: 'biz', group: '用户与社区' },
+  { key: 'security', label: '安全中心', icon: '⊘', domain: 'biz', group: '用户与社区' },
   { key: 'audit', label: '操作记录', icon: '☰', domain: 'biz', group: '用户与社区' },
   { key: 'npc', label: '路人与车流', icon: '⇄', domain: 'biz', group: '内容与玩法' },
   { key: 'smoke', label: '香烟', icon: '▥', domain: 'biz', group: '内容与玩法' },
@@ -329,7 +329,7 @@ const views: View[] = [
   { key: 'errors', label: '错误与可靠性', icon: '⚠', domain: 'ops', group: '性能与稳定', ranged: true },
 ]
 const lastViewByDomain: Record<Domain, string> = { biz: 'overview', ops: 'live' }
-let me: { id: string; email: string; nickname: string; role: string }
+let me: { id: string; uid:number; email: string; nickname: string; role: string }
 let params = new URLSearchParams(location.search)
 let pendingCount: number | null = null
 let lastStats: any = null
@@ -1712,7 +1712,7 @@ const pages: Record<string, (view: View) => void> = {
       }
     }).catch(error=>slot.replaceChildren(errorState(error,()=>render())))
   },
-  bans() {
+  security() {
     const banSlot = h('div')
     const banUidIn = h('input', { type: 'search', name: 'banuid', placeholder: '例如 102276', 'aria-label': '封禁 UID' }) as HTMLInputElement
     const banFpIn = h('input', { type: 'search', name: 'banfp', placeholder: '例如 6f771cf0012fec6b', 'aria-label': '封禁设备指纹' }) as HTMLInputElement
@@ -1867,9 +1867,9 @@ const pages: Record<string, (view: View) => void> = {
       h('thead', null, h('tr', null, ...['防护项', '状态', '说明'].map((label) => h('th', null, label)))),
       h('tbody', null, ...protections.map(([name, status, note]) => h('tr', null,
         h('td', { class: 'adm-nowrap' }, h('b', null, name)), h('td', { class: 'adm-nowrap' }, h('span', { class: `adm-pill ${tone(status)}` }, status)), h('td', { class: 'adm-sub' }, note))))))
-    paintTop(views.find((v) => v.key === 'bans')!, [h('span', { class: 'adm-live-dot', 'aria-hidden': 'true' }), h('span', { class: 'adm-sub adm-live-stamp' }, '每 10 秒刷新'),
+    paintTop(views.find((v) => v.key === 'security')!, [h('span', { class: 'adm-live-dot', 'aria-hidden': 'true' }), h('span', { class: 'adm-sub adm-live-stamp' }, '每 10 秒刷新'),
       navLink('联机概况 →', { view: 'mp' }, { class: 'adm-link' })])
-    main.append(h('div', { class: 'adm-stack' }, banStats, reviewCardWrap, banCard, manualCard,
+    main.append(h('div', { class: 'adm-stack' }, banStats, reviewCardWrap, banCard, manualCard,traceCard(loadBans),
       card('当前防护项', protectionTable, { sub: '按本版本代码核对，不代表线上 CDN 或 WAF 实时状态；网站入口防护见 IDOK-462。' })))
     void loadBans()
     refreshTimer = window.setInterval(() => {
@@ -1881,7 +1881,7 @@ const pages: Record<string, (view: View) => void> = {
     paintTop(views.find((v) => v.key === 'mp')!, [
       h('span', { class: 'adm-live-dot', 'aria-hidden': 'true' }),
       stamp,
-      navLink('封禁管理 →', { view: 'bans' }, { class: 'adm-link' }),
+      navLink('安全中心 →', { view: 'security' }, { class: 'adm-link' }),
       navLink('运维侧 · 联机引擎 →', { view: 'rt' }, { class: 'adm-link' }),
     ])
     const range = ['24h', '7d', '30d', '90d'].includes(params.get('mprange') ?? '') ? params.get('mprange')! : '24h'
@@ -2905,7 +2905,7 @@ function paintMp(state: any, manifest: any, reload: () => void) {
     : emptyState('还没有聊天'), { sub: '最近 100 条', actions: navLink('前往聊天管理 →', { view: 'chat' }, { class: 'adm-link' }) })
   const bans = card(`联机封禁（${state.bans.length}）`, state.bans.length ? mpTable(['uid', '原因', '到期'],
     state.bans.map((b: any) => [String(b.uid), b.reason || dash, `${when(new Date(b.until))}（${mpDurationShort((b.until - now) / 1000)}后）`]))
-    : emptyState('没有生效中的联机封禁'), { sub: '只存在联机服务内存里，联机服务重启后清空' })
+    : h('p',{class:'adm-sub'},'没有生效中的联机封禁'), { actions:navLink(`封禁 ${state.bans.length} · 管理 →`,{view:'security'},{class:'adm-btn adm-btn--ghost adm-btn--sm'}) })
   return h('div', { class: 'adm-stack' }, kpis, mapCard, table, h('div', { class: 'adm-grid-2' }, chatCard, bans))
 }
 
@@ -3404,6 +3404,34 @@ function compose(path: string) {
 }
 
 /* ───────────── boot ───────────── */
+import {setMarkUser} from './session-mark'
+function traceCard(reload:()=>void){
+  const file=h('input',{type:'file',accept:'image/png,image/jpeg','aria-label':'选择截图'}) as HTMLInputElement
+  const output=h('div'), note=(text:string)=>h('p',{class:'adm-sub'},text)
+  file.onchange=async()=>{
+    const image=file.files?.[0];if(!image)return
+    file.disabled=true;output.replaceChildren(note('正在解析…'))
+    try{
+      const response=await fetch('/api/admin/trace',{method:'POST',body:image}),result=await response.json()
+      if(!response.ok)throw Error(`解析失败（${response.status}）`)
+      if(!result.ok){output.replaceChildren(note('未识别到有效标识'));return}
+      const reason=h('input',{placeholder:'必填原因','aria-label':'处置原因',maxLength:200}) as HTMLInputElement
+      const minutes=h('select',{'aria-label':'时长'},...[[0,'永久'],[10,'10 分钟'],[60,'1 小时'],[1440,'24 小时']].map(([value,label])=>h('option',{value},String(label)))) as HTMLSelectElement
+      const status=note('请独立核实违规事实，标识不证明上传者身份。')
+      const controls=h('fieldset',{class:'adm-mp-filters'},reason,minutes) as HTMLFieldSetElement
+      for(const [scope,label] of [['mp','只封联机'],['account','封禁账户'],['both','两者都封']])controls.append(h('button',{type:'button',class:'adm-btn adm-btn--sm',onclick:async()=>{
+        if(!reason.value.trim()){status.textContent='请填写原因';return}
+        if(scope!=='mp'&&minutes.value!=='0'){status.textContent='账户封禁只支持永久';return}
+        if(!confirm(`${label} UID ${result.uid}（${minutes.selectedOptions[0].text}）？`))return
+        controls.disabled=true
+        try{await api('admin/trace/action',{scope,uid:result.uid,minutes:Number(minutes.value),reason:reason.value.trim()});status.textContent='处置成功';reload()}catch(error){status.textContent=String(error)}finally{controls.disabled=false}
+      }},label))
+      const devices=result.devices as Record<string,unknown>[]
+      output.replaceChildren(note(`UID ${result.uid} · ${when(unix(result.from),true)} 至 ${when(unix(result.to),true)}`),note(`账号：${result.account?.nickname??dash} · 注册渠道：${result.account?.signupMethod??dash} · 最近登录：${when(unix(result.account?.lastLogin),true)}`),note(`同设备其他账号：${result.sameDeviceUids.join('、')||'无'}`),devices.length?h('div',{class:'adm-table-wrap'},h('table',{class:'adm-table'},h('thead',null,h('tr',null,...['型号','浏览器','屏幕','网段','运营商','城市','首次','最近'].map(title=>h('th',null,title)))),h('tbody',null,...devices.map(device=>h('tr',null,...['model','browser','screen','ip24','isp','city','first','last'].map(field=>h('td',null,field==='first'||field==='last'?when(new Date(Number(device[field])),true):String(device[field]??dash)))))))):note('暂无设备记录'),controls,status)
+    }catch(error){output.replaceChildren(note(String(error)))}finally{file.disabled=false;file.value=''}
+  }
+  return card('截图溯源',[file,output])
+}
 async function boot() {
   try {
     me = await api('me')
@@ -3411,8 +3439,9 @@ async function boot() {
     return denied(error instanceof ApiError && error.status === 403 ? 403 : 401)
   }
   if (me.role !== 'admin') return denied(403)
+  setMarkUser(me.uid)
   // Legacy links: ?view=perf / ?view=timeseries etc.
-  const legacy: Record<string, string> = { perf: 'breakdown', timeseries: 'trends', funnel: 'overview' }
+  const legacy: Record<string, string> = { bans:'security',perf: 'breakdown', timeseries: 'trends', funnel: 'overview' }
   if (legacy[params.get('view') ?? '']) go({ view: legacy[params.get('view')!] }, false, true)
   else render()
   if (!['overview', 'feedback', 'users'].includes(currentView())) refreshPending()

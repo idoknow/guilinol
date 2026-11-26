@@ -1,4 +1,6 @@
 import './citizen.css'
+import {setMarkUser} from '../session-mark'
+void fetch('/api/me').then(async response=>{if(response.ok)setMarkUser((await response.json()).uid)}).catch(()=>{})
 import qrCode from 'qrcode-generator'
 import {cardUrl} from './items'
 
