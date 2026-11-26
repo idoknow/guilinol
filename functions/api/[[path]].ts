@@ -1,5 +1,5 @@
 import {type SessionAccount,type Env,checkBan,sessionAccount,Problem,cookie,deliver,equal,hash,invalid,lifetime,limit,newCode,now,passwordHash,random,requestIp,reserveMail,sessionHash,unauthorized} from '../../lib/auth'
-import {trustedLoginIp,checkLoginIp,failedLoginIp} from '../../lib/auth'
+import {checkLoginIp,failedLoginIp} from '../../lib/auth'
 
 import {AVATAR_KEY, looks, sanitizeAvatar, starterOutfit} from '../../lib/avatar'
 import {feedback} from '../../lib/feedback'
@@ -160,8 +160,8 @@ async function handle(request:Request,env:Env) {
     return json({ok:true})
   }
   const login=path==='auth/login', reset=path==='auth/reset'
-  const loginIp=login && env.acceptsVerifiedIp===true ? trustedLoginIp(request):null
-  if(!login) await limit(db,`code:${ip}`,60,900)
+  const loginIp=login?ip:null
+  if(!login && ip) await limit(db,`code:${ip}`,60,900)
   else if(loginIp) {
     await limit(db,`login:${loginIp}`,60,900)
     await checkLoginIp(db,loginIp)

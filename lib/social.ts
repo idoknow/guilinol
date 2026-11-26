@@ -233,7 +233,7 @@ export async function startSocial(
   env: Env,
   db: D1Database,
   type: SocialType,
-  ip: string,
+  ip: string|null,
   intent: SocialIntent = 'login',
   userId?: string,
   existingStates: string[] = [],
@@ -250,7 +250,7 @@ export async function startSocial(
     if (bound) throw new Problem(409, 'already_bound', '这个平台已经绑定过账号了')
   }
   if (intent === 'register' && userId) throw new Problem(400, 'invalid_input', '注册流程不需要登录')
-  await limit(db, `social:start:${ip}`, 60, 60)
+  if(ip) await limit(db, `social:start:${ip}`, 60, 60)
 
   const state = random(32)
   await db.batch([
@@ -259,7 +259,7 @@ export async function startSocial(
     db.prepare('DELETE FROM rate_limits WHERE key IN (SELECT key FROM rate_limits WHERE until<=? LIMIT 200)').bind(now()),
     db
       .prepare('INSERT INTO social_states(state,type,intent,user_id,expires,used,ip) VALUES(?,?,?,?,?,0,?)')
-      .bind(state, type, intent, intent === 'bind' ? (userId ?? null) : null, now() + STATE_TTL, ip),
+      .bind(state, type, intent, intent === 'bind' ? (userId ?? null) : null, now() + STATE_TTL, ip??''),
   ])
 
   let body: Upstream
@@ -311,7 +311,8 @@ export async function socialCallback(env: Env, db: D1Database, request: Request)
     return back('invalid')
 
   try {
-    await limit(db, `social:callback:${requestIp(request, env)}`, 20, 60)
+    const ip=requestIp(request,env)
+    if(ip) await limit(db, `social:callback:${ip}`, 20, 60)
   } catch {
     return back('busy')
   }

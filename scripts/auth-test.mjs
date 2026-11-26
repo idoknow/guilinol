@@ -22,7 +22,7 @@ try {
   const staticDir=ui?'dist':join(state,'empty-site');if(!ui)await mkdir(staticDir)
   site=await preview({configFile:false,build:{outDir:staticDir},preview:{host:'127.0.0.1',port:0,proxy:{'/api':`http://127.0.0.1:${port}`}}})
   const origin=`http://127.0.0.1:${site.httpServer.address().port}`
-  child=spawn(process.execPath,['--import','tsx','server/index.mjs'],{env:{...process.env,...storage.env,PORT:String(port),PUBLIC_ORIGIN:origin,BRIDGE_TOKEN:'local-test',EMAIL_DEV_LOG:'1'},stdio:['ignore','pipe','pipe'],detached:true});closed=once(child,'exit')
+  child=spawn(process.execPath,['--import','tsx','server/index.mjs'],{env:{...process.env,...storage.env,PORT:String(port),PUBLIC_ORIGIN:origin,BRIDGE_TOKEN:'local-test',EMAIL_DEV_LOG:'1',VERIFIED_LOGIN_IP:'1'},stdio:['ignore','pipe','pipe'],detached:true});closed=once(child,'exit')
   for(const stream of [child.stdout,child.stderr])stream.on('data',chunk=>logs+=chunk)
   for(let attempt=0;attempt<200;attempt++) {
     if(await fetch(origin+'/api/me').then(response=>response.status===401).catch(()=>false))break
@@ -55,7 +55,7 @@ try {
     let cookie=''
     async function api(path,data,status=200,code,options={}){
       const method=options.method??(data?'POST':'GET')
-      const response=await fetch(origin+'/api/'+path,{method,headers:{Origin:origin,Cookie:cookie,'Content-Type':'application/json',...options.headers},body:data?JSON.stringify(data):undefined})
+      const response=await fetch(origin+'/api/'+path,{method,headers:{Origin:origin,Cookie:cookie,'Content-Type':'application/json','X-Glol-Ip-Trusted':'1','CF-Connecting-IP':'192.0.2.1',...options.headers},body:data?JSON.stringify(data):undefined})
       const result=await response.json();assert.equal(response.status,status,`${path}: ${JSON.stringify(result)}`);if(code)assert.equal(result.error.code,code)
       const set=response.headers.get('set-cookie');if(set){assert.match(set,/HttpOnly; Secure; SameSite=Lax/);cookie=set.split(';')[0]}
       return result
@@ -78,9 +78,13 @@ try {
     await (await import('./social-test.mjs')).socialTest({api,origin,sql,env:storage.env});await api('auth/login',login)
     if(process.env.GLOL_BRIDGE_TEST) await (await import(process.env.GLOL_BRIDGE_TEST)).bridgeTest({api,origin,cookie,state,staticDir,sql,mailLog:()=>logs})
     else await (await import('./feedback-test.mjs')).apiTest({api,origin,cookie,sql,getCookie:()=>cookie})
-    for(let attempt=1;attempt<=8;attempt++)await api('auth/login',{email,password:'incorrect'},attempt===8?429:401,attempt===8?'locked':'credentials');await api('auth/login',login,429,'locked')
+    const untrusted={headers:{'X-Glol-Ip-Trusted':'0','CF-Connecting-IP':'192.0.2.222'}}
+    for(let attempt=1;attempt<=8;attempt++)await api('auth/login',{email,password:'incorrect'},attempt===8?429:401,attempt===8?'locked':'credentials',untrusted);await api('auth/login',login,429,'locked')
     await sql('UPDATE mail_events SET sent=sent-61');await api('auth/resend',{email,purpose:'reset'});const reset={email,code:await code('reset'),password:'new-password'};await api('auth/reset',reset);await api('me',null,401,'unauthorized');await api('auth/reset',reset,400,'invalid_code');await api('auth/login',login,401,'credentials');await api('auth/login',reset)
     for(let index=0;index<7;index++)await api('auth/resend',{email:`other${index}@example.test`,purpose:'reset'});await api('auth/resend',{email:'capped@example.test',purpose:'reset'},429,'rate_limited')
+    for(let index=0;index<12;index++)await api('auth/resend',{email:`shared${index}@example.test`,purpose:'reset'},200,null,untrusted)
+    await api('auth/resend',{email:'shared0@example.test',purpose:'reset'},429,'rate_limited',untrusted)
+    assert.equal((await sql("SELECT key FROM rate_limits WHERE key LIKE '%192.0.2.222'"))[0].results.length,0)
     await Promise.all(['first','second'].map(label=>api('auth/register',{...register,email:`${label}@race.test`},200,null,{headers:{'CF-Connecting-IP':'192.0.2.83'}})))
     const race=(await sql("SELECT uid FROM users WHERE email LIKE '%@race.test' ORDER BY uid"))[0].results.map(row=>Number(row.uid));assert.equal(race.length,2);assert.equal(race[1],race[0]+1)
   }

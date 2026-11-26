@@ -18,8 +18,8 @@ export interface Env {
   SOCIAL_HOST?: string
   SOCIAL_REDIRECT?: string
 }
-export function requestIp(request:Request, env?:Pick<Env,'clientIp'>):string {
-  return env?.clientIp || request.headers.get('CF-Connecting-IP') || 'local'
+export function requestIp(request:Request, env:Pick<Env,'acceptsVerifiedIp'>):string|null {
+  return env.acceptsVerifiedIp===true ? trustedLoginIp(request) : null
 }
 export function trustedLoginIp(request:Request):string|null {
   return request.headers.get('X-Glol-Ip-Trusted')==='1' ? request.headers.get('CF-Connecting-IP') : null
@@ -79,14 +79,14 @@ export async function limit(db:D1Database,key:string,max:number,seconds:number) 
     WHERE rate_limits.until<=? OR rate_limits.hits<?`).bind(key,time+seconds,time,time,time,max).run()
   if (!result.meta.changes) limited()
 }
-export async function reserveMail(db:D1Database,email:string,ip:string) {
+export async function reserveMail(db:D1Database,email:string,ip:string|null) {
   // 第三方专用账号的占位邮箱（*@social.invalid）收不到信：找回密码/重发验证码一律拒绝，不去打 Resend
   if(/@social\.invalid$/i.test(email)) throw new Problem(400,'no_email','该账号还没有绑定邮箱，请用第三方登录后在「我的账号」里绑定')
   const time=now()
   const [,result]=await db.batch([db.prepare('DELETE FROM mail_events WHERE sent<=?').bind(time-3600),
     db.prepare(`INSERT INTO mail_events SELECT ?,?,? WHERE NOT EXISTS
       (SELECT 1 FROM mail_events WHERE email=? AND sent>?) AND
-      (SELECT COUNT(*) FROM mail_events WHERE ip=?)<10`).bind(ip,email,time,email,time-60,ip)])
+      (?='' OR (SELECT COUNT(*) FROM mail_events WHERE ip=?)<10)`).bind(ip??'',email,time,email,time-60,ip??'',ip??'')])
   if (!result.meta.changes) limited()
 }
 export function newCode() {
