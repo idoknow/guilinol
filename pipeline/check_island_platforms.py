@@ -65,7 +65,7 @@ def transects(polygon, axes):
         yield probes, left, right
 
 
-def inspect(base, world, polygon, material):
+def inspect(base, world, polygon, material, boarding_step=None):
     region = polygon.buffer(16)
     old = rail_chords(base, region)
     new = old if base == world else rail_chords(world, region)
@@ -112,13 +112,16 @@ def inspect(base, world, polygon, material):
             record('surfaceGrade', peak)
             counts['surfaceGrade'] += int(peak > .020001)
         ends = both[[0,-1]]
+        if boarding_step is not None:
+            ends = covered[[0, -1]]
         if np.any(ends):
-            error = np.max(abs(now[[0,-1]][ends]-ref[[0,-1]][ends]-(rail-native)[ends]))
+            target = ref[[0, -1]] - native if boarding_step is None else np.full(2, boarding_step)
+            error = np.max(abs(now[[0, -1]][ends] - rail[ends] - target[ends]))
             record('edgeError', error)
             counts['edgeError'] += int(error > .020001)
         if np.all(np.isfinite(ref[[0,-1]])):
             floor_pairs += 1
-            if not np.all(np.isfinite(ref)):
+            if boarding_step is not None or not np.all(np.isfinite(ref)):
                 continue
             steps = ref[[0,-1]] - native
             mismatch = abs(steps[1]-steps[0])
@@ -126,7 +129,7 @@ def inspect(base, world, polygon, material):
             record('minimumRailGapAt2Percent', max(0, mismatch-.02*width-.04))
     if not floor_pairs:
         counts['missingFloor'] += 1
-    return dict(**result, status='island', material=material, nativeDoubleEdges=floor_pairs, violations=counts, worst=worst)
+    return dict(**result, status='island', material=material, targetStepM=boarding_step, nativeDoubleEdges=floor_pairs, violations=counts, worst=worst)
 
 
 if __name__ == '__main__':
@@ -151,7 +154,11 @@ if __name__ == '__main__':
             # Guilin station has dedicated passenger slabs. Generic sidewalks
             # beneath them also appear in plan and are several metres lower.
             material = 'paving-9' if way['id'] in range(376029417, 376029421) else 'paving-1'
-            result = inspect(args.base.resolve(), args.world.resolve(), polygon, material)
+            # Measured on both finished Guilin corridor islands (376029419/420).
+            passenger_islands = {375922212, 375922214, 375922215, 375922217, 375922218,
+                                  375922219, 375922220, 376029419, 376029420}
+            step = 1.2500030517578125 if way['id'] in passenger_islands else None
+            result = inspect(args.base.resolve(), args.world.resolve(), polygon, material, step)
         report[way['id']] = result
     print(json.dumps(report, indent=2, allow_nan=False))
     raise SystemExit(any(any(row.get('violations', {}).values()) for row in report.values()))
