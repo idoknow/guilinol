@@ -121,7 +121,8 @@ const banStore = createBanStore(process.env, (...args) => console.warn('[anti-ch
 let nextId = 1
 
 const now = () => Date.now()
-import {grantTravel} from './travel.mjs'
+import {grantTravel,leaveHistory,precheckLeave} from './travel.mjs'
+const travelHistory=leaveHistory()
 import {ipGate,tooFast} from './protocol-guard.mjs'
 const rosterCoordinate = value => Math.round(value/128)*128
 function rosterPoint(player,at=now()) {
@@ -451,6 +452,7 @@ function aoiSend(p, payload) {
 function removePlayer(p, extra = {}) {
   if (!p || !players.has(p.id)) return false
   const at = now()
+  travelHistory.save(p,at)
   if(p.helping)fight.cancel(p,at)
   if(p.helper){const helper=players.get(p.helper);if(helper)fight.cancel(helper,at)}
   const finalTotals = obs.liveTotals(p, at)
@@ -1019,6 +1021,7 @@ wss.on('connection', (ws, req) => {
         ws.joined = true
         clearTimeout(ws.joinTimer)
         unpend()
+        const relocated=travelHistory.restore(player,joinedAt)
         player.fp = ws.fp ?? ''
         players.set(id, player)
         void chat.joined(player)
@@ -1040,6 +1043,7 @@ wss.on('connection', (ws, req) => {
         obs.joined(player,players.size)
         send(ws, {
           t: 'welcome',
+          relocated,
           me: {...combatSnapshot(player,now()), id, uid: player.uid, name: player.name, avatar: player.avatar},
           online: players.size,
           players: visible.map(peerId => players.get(peerId)).filter(Boolean).map(p=>publicOf(p,player)),
@@ -1052,7 +1056,12 @@ wss.on('connection', (ws, req) => {
 
       if (!me || me.ws!==ws) return
       if ((msg.uid!=null && String(msg.uid)!==String(me.uid)) || ['pull_player','teleport_player'].includes(msg.t) || (msg.t==='pos' && [msg.id,msg.target,msg.playerId].some(value=>value!=null && value!==me.id))){recordAttack('foreign_position');return}
-      if(msg.t==='travel'){send(ws,{t:'travel_result',seq:Number.isSafeInteger(msg.seq)?msg.seq:undefined,ok:grantTravel(me,msg.reason,msg.target,now())});return}
+      if(msg.t==='travel'){
+        let result
+        if(msg.precheck===true && msg.target===null)result=precheckLeave(me,now())
+        else {const code=grantTravel(me,msg.reason,msg.target,now());result={ok:code==='ok',code}}
+        send(ws,{t:'travel_result',seq:Number.isSafeInteger(msg.seq)?msg.seq:undefined,...result});return
+      }
       const recordMove = (kind,detail) => {
         me.cheatTimes ??= new Map()
         if (now()-(me.cheatTimes.get(kind)??0)<2000) return

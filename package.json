@@ -80,7 +80,7 @@
     "verify:creator": "tsx scripts/verify-creator.mjs",
     "test:emote": "node --experimental-strip-types --test scripts/emote-test.mjs",
     "test:rt-aoi": "node scripts/rt-aoi-check.mjs",
-    "test:rt-moderation": "node rt/protocol-test.mjs && node rt/anti-cheat-autoban-test.mjs && node rt/review-test.mjs && node rt/anti-cheat-test.mjs && node rt/roster-sub-test.mjs",
+    "test:rt-moderation": "node rt/protocol-test.mjs && node --import tsx scripts/test-mp-landing.mjs && node rt/anti-cheat-autoban-test.mjs && node rt/review-test.mjs && node rt/anti-cheat-test.mjs && node rt/roster-sub-test.mjs",
     "chat:words:import": "node scripts/chat-words-import.mjs",
     "test:chat": "node --test scripts/chat-test.mjs scripts/chat-lexicon-test.mjs scripts/chat-corpus-test.mjs",
     "bench:chat": "node scripts/chat-bench.mjs",
