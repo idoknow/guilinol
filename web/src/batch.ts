@@ -8,7 +8,23 @@ import type {Tile} from './world'
 import {vehicleModel} from './walk/vehicle-model'
 import {look} from './look/config'
 import {flags} from './debug'
+import {tunnelLiningMaterial,tunnelLightMaterial} from './station-tunnels'
 import {freezeStatic} from './static-freeze'
+import {isCityUpgradeEnabled,isCoordInUpgradedTile} from './city-upgrade/state'
+
+function isCityUpgradeExcludedShopBox(matrices:Float32Array, index:number):boolean {
+  const o = index * 16
+  if (!isCoordInUpgradedTile(matrices[o + 12], matrices[o + 14])) return false
+  const sy = matrices[o + 5]
+  const sz = Math.hypot(matrices[o + 8], matrices[o + 10])
+  // Hide procedural plastic awnings & grey rolling shutters (street-worker.ts:225-226) in city-upgrade tiles
+  return (
+    (Math.abs(sy - 0.12) < 0.015 && Math.abs(sz - 1.1) < 0.08) ||
+    (Math.abs(sy - 0.53) < 0.02 && Math.abs(sz - 0.12) < 0.02) ||
+    (Math.abs(sy - 2.32) < 0.05 && Math.abs(sz - 0.06) < 0.015) ||
+    (Math.abs(sy - 0.035) < 0.008 && Math.abs(sz - 0.03) < 0.008)
+  )
+}
 
 export interface TileBatchInput {
   tile:Tile
@@ -18,6 +34,8 @@ export interface TileBatchInput {
   walls:THREE.BufferGeometry|null
   pond:Float32Array|null
   bridge:THREE.BufferGeometry|null
+  tunnelLining?:THREE.BufferGeometry
+  tunnelLights?:THREE.BufferGeometry
   streetSurface:THREE.BufferGeometry|null
   streetFence?:THREE.BufferGeometry|null
   furnitureMatrices:Float32Array
@@ -358,10 +376,23 @@ export class ChunkBatcher {
   private furnitureStale = false
   private lastFurniturePos = new THREE.Vector3(Infinity,Infinity,Infinity)
 
-  constructor(private scene:THREE.Scene) {}
+  private tunnelDirty=false
+  private tunnelLining=new StaticLayerBatch(tunnelLiningMaterial,[
+    {name:'position',size:3,ctor:'f32'},{name:'normal',size:3,ctor:'f32'},{name:'color',size:3,ctor:'f32'},
+  ])
+  private tunnelLights=new StaticLayerBatch(tunnelLightMaterial,[
+    {name:'position',size:3,ctor:'f32'},{name:'color',size:3,ctor:'f32'},
+  ])
+
+  constructor(private scene:THREE.Scene) {
+    scene.add(this.tunnelLining.mesh,this.tunnelLights.mesh)
+  }
 
   add(input:TileBatchInput) {
     const {tile} = input
+    for(const geom of [input.tunnelLining,input.tunnelLights])if(geom){
+      shiftPositions(geom,tile.x,tile.z);this.tunnelDirty=true
+    }
     if(input.walls) shiftPositions(input.walls,tile.x,tile.z)
     if(input.bridge) shiftPositions(input.bridge,tile.x,tile.z)
     if(input.streetSurface) shiftPositions(input.streetSurface,tile.x,tile.z)
@@ -376,7 +407,27 @@ export class ChunkBatcher {
     bucket.dirty = true
   }
 
+  replaceWalls(tile:Tile, nextWalls:THREE.BufferGeometry|null, nextMaxY?:number) {
+    const item = this.items.get(tile)
+    if(!item) return
+    const prev = item.walls
+    if(nextWalls) shiftPositions(nextWalls, tile.x, tile.z)
+    item.walls = nextWalls
+    if(nextMaxY !== undefined) item.maxY = nextMaxY
+    prev?.dispose()
+    const bucket = this.buckets.get(bucketKey(tile))
+    if(bucket) bucket.dirty = true
+    this.furnitureStale = true
+    this.lastFocus.set(Infinity, Infinity, Infinity)
+  }
+
+  invalidateFurniture() {
+    this.furnitureStale = true
+    this.lastFocus.set(Infinity, Infinity, Infinity)
+  }
+
   remove(tile:Tile) {
+    if(this.items.get(tile)?.tunnelLining)this.tunnelDirty=true
     if(!this.items.delete(tile)) return
     const key = bucketKey(tile)
     const bucket = this.buckets.get(key)
@@ -391,11 +442,18 @@ export class ChunkBatcher {
   }
 
   private anyDirty() {
+    if(this.tunnelDirty)return true
     for(const bucket of this.buckets.values()) if(bucket.dirty) return true
     return false
   }
 
   private rebuildDirty() {
+    if(this.tunnelDirty){
+      const items=[...this.items.values()]
+      this.tunnelLining.rebuild(items.flatMap(({tile,tunnelLining:geom})=>geom?[{tile,geom}]:[]))
+      this.tunnelLights.rebuild(items.flatMap(({tile,tunnelLights:geom})=>geom?[{tile,geom}]:[]))
+      this.tunnelDirty=false
+    }
     let rebuilt = false
     for(const bucket of this.buckets.values()) if(bucket.dirty) { bucket.rebuild(); rebuilt = true }
     // Only a geometry rebuild invalidates the furniture selection; a pure camera turn must not
@@ -466,6 +524,8 @@ export class ChunkBatcher {
     }
 
     for(const bucket of this.buckets.values()) bucket.cull(visibleChunks,farBuildings,visibleStreets)
+    this.tunnelLining.cull(visibleChunks)
+    this.tunnelLights.cull(visibleStreets)
 
     if(this.furnitureStale || furnMask!==this.lastFurnitureMask || camera.position.distanceToSquared(this.lastFurniturePos)>=4) {
       this.furnitureStale = false
@@ -483,8 +543,12 @@ export class ChunkBatcher {
           for(let index=0;index<item.railLodCount;index++)if(near(item.furnitureMatrices,index,120))boxes.push(index)
         }
         if(tileDistance<=32){
+          const hideOldShops = isCityUpgradeEnabled()
           for(let index=0;index<item.parked.length/16;index++)if(near(item.parked,index)&&(!this.takenBikes.size||!this.takenBikes.has(`${tile.x}:${tile.z}:${index}`)))bikes.push(index)
-          for(let index=item.railLodCount;index<item.detailCount;index++)if(near(item.furnitureMatrices,index))boxes.push(index)
+          for(let index=item.railLodCount;index<item.detailCount;index++){
+            if(hideOldShops && isCityUpgradeExcludedShopBox(item.furnitureMatrices,index))continue
+            if(near(item.furnitureMatrices,index))boxes.push(index)
+          }
         }
         return {item,bikes,boxes}
       })

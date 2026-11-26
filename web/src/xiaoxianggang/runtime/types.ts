@@ -1,0 +1,116 @@
+import rawStage1Layout from './stage1-layout.json' with { type: 'json' }
+import {
+  XXG_BUDGET,
+  XXG_CONTRACT_VERSION,
+  XXG_FRAME,
+  XXG_LAYOUT_LIMITS,
+  XXG_PLAYER,
+  XXG_PORTALS,
+  XXG_PORTAL_IDS,
+  XXG_PORTAL_TRIGGER,
+  XXG_TIMING,
+  XXG_TRANSITIONS,
+  canTransition,
+  getPortal,
+  indoorToWorld,
+  portalLanding,
+  rotateLocal,
+  shouldEnterPortal,
+  validateXxgLayout,
+  worldToIndoor,
+  worldToPortalLocal,
+  yawFacing,
+  type XxgCorridor,
+  type XxgExit,
+  type XxgHostContext,
+  type XxgIndoorMetrics,
+  type XxgIndoorScene,
+  type XxgLayout,
+  type XxgPortal,
+  type XxgPortalId,
+  type XxgRect,
+  type XxgShop,
+  type XxgState,
+  type XxgXZ,
+} from '../contract.ts'
+
+export {
+  XXG_BUDGET,
+  XXG_CONTRACT_VERSION,
+  XXG_FRAME,
+  XXG_LAYOUT_LIMITS,
+  XXG_PLAYER,
+  XXG_PORTALS,
+  XXG_PORTAL_IDS,
+  XXG_PORTAL_TRIGGER,
+  XXG_TIMING,
+  XXG_TRANSITIONS,
+  canTransition,
+  getPortal,
+  indoorToWorld,
+  portalLanding,
+  rotateLocal,
+  shouldEnterPortal,
+  validateXxgLayout,
+  worldToIndoor,
+  worldToPortalLocal,
+  yawFacing,
+  type XxgCorridor,
+  type XxgExit,
+  type XxgHostContext,
+  type XxgIndoorMetrics,
+  type XxgIndoorScene,
+  type XxgLayout,
+  type XxgPortal,
+  type XxgPortalId,
+  type XxgRect,
+  type XxgShop,
+  type XxgState,
+  type XxgXZ,
+}
+
+export function normalizeAngleRad(angle: number): number {
+  let a = angle
+  while (a <= -Math.PI) a += Math.PI * 2
+  while (a > Math.PI) a -= Math.PI * 2
+  return a
+}
+
+export function assertValidXxgLayout(raw: unknown): XxgLayout {
+  const errs = validateXxgLayout(raw)
+  if (errs.length > 0) {
+    throw new Error(`Invalid XxgLayout: ${errs.join('; ')}`)
+  }
+  return raw as XxgLayout
+}
+
+export const STAGE1_GREYBOX_LAYOUT: XxgLayout = assertValidXxgLayout(rawStage1Layout)
+
+export interface CreateXxgIndoorSceneOptions {
+  readonly layout?: XxgLayout
+  /** Override veilFadeInMs in unit tests; defaults to XXG_TIMING.veilFadeInMs (280ms). */
+  readonly veilFadeInMs?: number
+  /** Override reenterCooldownMs in unit tests; defaults to XXG_TIMING.reenterCooldownMs (1500ms). */
+  readonly reenterCooldownMs?: number
+  readonly now?: () => number
+}
+
+export interface XxgPlayerSnapshot {
+  readonly x: number
+  readonly y: number
+  readonly z: number
+  readonly eyeY: number
+  readonly yaw: number
+  readonly pitch: number
+  readonly ceilingClearanceM: number
+  readonly activePortalId: XxgPortalId | null
+  readonly activeShopId: string | null
+  readonly collisionContacts: number
+}
+
+export interface XxgExtendedIndoorScene extends XxgIndoorScene {
+  /** Renders indoor.scene with indoor.camera via host renderer when state is inside or exiting. */
+  renderFrame(): boolean
+  getPlayerSnapshot(): XxgPlayerSnapshot
+  getLayout(): XxgLayout
+}

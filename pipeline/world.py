@@ -9,7 +9,9 @@ import io
 import json
 import math
 import struct
+import subprocess
 from pathlib import Path
+from tempfile import TemporaryDirectory
 from overview_water import water_mask
 from sections import section_layers, shopfronts, RULES
 
@@ -26,6 +28,7 @@ from karst import generate
 from peak_sectors import overview_step, write_city_lods
 from landmarks.jiefang_layout import bank_paving, grade_banks, grade_binjiang_streets
 from bridges import bridge_tiles
+from station_footbridge import building_cutouts
 from road_grading import build_ground_mesh_lookup, eval_bspline_grid, solve_road_and_bridge_elevations
 from scatter import CONFIG, extract_road_network, scatter
 from streets import chunks as street_chunks
@@ -37,6 +40,7 @@ from clearance import landmark_triangles
 from landmarks.rong_ground import GATE_PLAZA, grade_landings
 from landmarks import xiaoyao_access
 from shoreline import correct_water, contour_ronghu
+from dam_passages import apply_dams
 from landmark_layout import Layout
 from landmark_solids import load_landmark_meshes, structural_footprint, slice_tris_at_y
 from landmarks.world_surface import PeakSurface
@@ -92,55 +96,33 @@ def write_chunk(output, name, payload, trees, origin):
     return dict(x=origin[0], z=origin[1], file=name, bytes=len(compressed))
 
 
-def build(bbox, output, palette, workers=4):
-    if workers < 1:
-        raise ValueError('workers must be positive')
-    play_region = PlayRegion() if bbox is None else None
-    if play_region:
-        bbox = play_region.bbox
+def grid_extent(bbox):
     south, west, north, east = bbox
     if not (south < north and west < east):
         raise ValueError('Expected bbox: south west north east')
     start = np.floor(np.array(ll2xz(north, west))/CHUNK).astype(int)*CHUNK
     end = np.ceil(np.array(ll2xz(south, east))/CHUNK).astype(int)*CHUNK
-    west0,north0,w0,h0 = DOWNTOWN
-    downtown = Downtown() if (start[0]<west0 and start[1]<north0 and end[0]>west0+w0 and end[1]>north0+h0) else None
+    return start,end
+
+
+def prepare_banks(bbox,bounds,layout,layers,output,mountain_trees,playable):
+    start,end = grid_extent(bbox)
     left, top = map(int,start)
     width, depth = map(int,end-start)
     terrain = np.rint(load_dem(np.arange(left,left+width+1,GRID),np.arange(top,top+depth+1,GRID))*10).astype('<i2')
-    raster_bounds = box(*start,*end)
-    bounds = play_region.geometry if play_region else raster_bounds
-    def elevation(east,south):
-        row = np.clip(round((south-top)/GRID),0,depth//GRID)
-        col = np.clip(round((east-left)/GRID),0,width//GRID)
-        return original[row,col]/10
-    layout = Layout()
-    layers = ground_features(bounds,layout.school_grounds)
     surface = np.full_like(terrain, DRY)
-    texture = Image.new('RGB',(width,depth),palette['ground'])
-    for region in layout.school_grounds:
-        for part in polygons(region.intersection(bounds)):
-            for surface_area, color in ((part, palette['green']), (part.buffer(-3), '#bdbcb5')):
-                for paved in polygons(surface_area):
-                    mask, corner = stencil(paved,left,top,1)
-                    texture.paste(color,corner,mask)
-    for layer, features in layers.items():
-        for poly in features:
-            mask, corner = stencil(poly,left,top,1)
-            texture.paste(palette[layer],corner,mask)
-            if layer == 'water':
-                mask, (col,row) = stencil(poly,left,top,GRID)
-                patch = surface[row:row+mask.height,col:col+mask.width]
-                wet = intersects_xy(poly, left+(col+np.arange(patch.shape[1]))*GRID,
-                                    top+(row+np.arange(patch.shape[0])[:,None])*GRID)
-                if wet.any():
-                    patch[wet] = round(np.median(terrain[row:row+patch.shape[0],col:col+patch.shape[1]][wet]))
+    for poly in layers['water']:
+        mask, (col,row) = stencil(poly,left,top,GRID)
+        patch = surface[row:row+mask.height,col:col+mask.width]
+        wet = intersects_xy(poly, left+(col+np.arange(patch.shape[1]))*GRID,
+                            top+(row+np.arange(patch.shape[0])[:,None])*GRID)
+        if wet.any():
+            patch[wet] = round(np.median(terrain[row:row+patch.shape[0],col:col+patch.shape[1]][wet]))
     wet = surface != DRY
     previous_bed = np.where(wet,np.minimum(terrain,surface-20),terrain)
     output.mkdir(parents=True, exist_ok=True)
     original = previous_bed.copy()
-    mountain_trees = []
-    peaks, peak_shapes = generate(original,terrain,left,top,bbox,output,wet,mountain_trees,CONFIG['peakAreaPerTree'],play_region.geometry if play_region else None)
+    peaks, peak_shapes = generate(original,terrain,left,top,bbox,output,wet,mountain_trees,CONFIG['peakAreaPerTree'],playable)
     for region,level in layout.flatten:
         for part in polygons(region.intersection(bounds)):
             col, row = math.floor((part.bounds[0]-left)/GRID), math.floor((part.bounds[1]-top)/GRID)
@@ -149,7 +131,50 @@ def build(bbox, output, palette, workers=4):
             window = np.s_[row:end_row+1, col:end_col+1]
             mask = terrain_stencil(part, left, top, col, row, terrain[window].shape)
             terrain[window][mask] = original[window][mask] = round(level*10)
-    correct_water(surface, terrain, original, raster_bounds, stencil)
+    return terrain,original,surface,previous_bed,peaks,peak_shapes
+
+
+def city_water_window(region, layout, start, end):
+    """Solve connected basins on the city's source domain before selecting the output window."""
+    city_start,city_end = grid_extent(region.bbox)
+    low,high = np.maximum(start,city_start),np.minimum(end,city_end)
+    if np.any(low>high) or not region.geometry.intersects(box(*start,*end)):
+        return None
+    layers = ground_features(region.geometry,layout.school_grounds)
+    with TemporaryDirectory() as directory:
+        terrain,original,water,*_ = prepare_banks(region.bbox,region.geometry,layout,layers,Path(directory),None,region.geometry)
+    correct_water(water,terrain,original,box(*city_start,*city_end),stencil)
+    def window(origin):
+        west,north = (low-origin)//GRID
+        east,south = (high-origin)//GRID
+        return np.s_[north:south+1,west:east+1]
+    return window(start),water[window(city_start)].copy()
+
+
+def build(bbox, output, palette, workers=4):
+    if workers < 1:
+        raise ValueError('workers must be positive')
+    city = PlayRegion()
+    play_region = city if bbox is None else None
+    if play_region:
+        bbox = play_region.bbox
+    start,end = grid_extent(bbox)
+    west0,north0,w0,h0 = DOWNTOWN
+    downtown = Downtown() if (start[0]<=west0 and start[1]<=north0 and end[0]>=west0+w0 and end[1]>=north0+h0) else None
+    left,top = map(int,start)
+    width,depth = map(int,end-start)
+    raster_bounds = box(*start,*end)
+    bounds = play_region.geometry if play_region else raster_bounds
+    layout = Layout()
+    reference = None if play_region else city_water_window(city,layout,start,end)
+    layers = ground_features(bounds,layout.school_grounds)
+    mountain_trees = []
+    terrain,original,surface,previous_bed,peaks,peak_shapes = prepare_banks(bbox,bounds,layout,layers,output,mountain_trees,play_region.geometry if play_region else None)
+    def elevation(east,south):
+        row = np.clip(round((south-top)/GRID),0,depth//GRID)
+        col = np.clip(round((east-left)/GRID),0,width//GRID)
+        return original[row,col]/10
+    correct_water(surface, terrain, original, raster_bounds, stencil, reference=reference)
     wet = surface != DRY
     terrain[wet] = original[wet] = np.minimum(terrain[wet], surface[wet] - 20)
 
@@ -232,7 +257,10 @@ def build(bbox, output, palette, workers=4):
 
     peak_tree = STRtree(peak_shapes)
     init_footprints, _ = buildings(bounds, elevation, peak_tree, layout, carriageway_mask, sidewalk_mask, airport_buildings)
-    candidate_routes = plan_vehicles(bounds, surface, layers['road'], init_footprints, sample, grid_origin=(left,top), routes_only=True)['routes']
+    routing_surface = surface.copy()
+    apply_dams(routing_surface, left, top)
+    candidate_routes = plan_vehicles(bounds, routing_surface, layers['road'], init_footprints, sample, grid_origin=(left,top), routes_only=True)['routes']
+    del routing_surface
 
     road_ctrl, bridge_plans, finalize_bridges = solve_road_and_bridge_elevations(
         original, terrain, surface, left, top, width, depth,
@@ -287,8 +315,9 @@ def build(bbox, output, palette, workers=4):
         fubo = fubo_site(spec['eastLimit'])
     if downtown:
         downtown.blend(terrain,surface,original,road_ctrl,left,top,fubo)
-        wet[:] = surface != DRY
         downtown.peaks(output,peaks)
+    apply_dams(surface,left,top)
+    wet[:] = surface != DRY
     if fubo is not None:
         fubo.grade_bank(terrain,original,surface,left,top)
         fubo.native_grade(terrain,original,surface,left,top)
@@ -298,6 +327,8 @@ def build(bbox, output, palette, workers=4):
     if play_region:
         from airport import grade_terminal_lanes
         grade_terminal_lanes(terrain,original,left,top,GRID)
+    from station_site import grade_station
+    grade_station(terrain, original, surface, left, top, carriageway_mask, sidewalk_mask, road_ctrl)
     ground_mesh_at = build_ground_mesh_lookup(original, surface, left, top, width, depth)
     if play_region:
         from road_tunnels import corridor_underpasses
@@ -367,7 +398,24 @@ def build(bbox, output, palette, workers=4):
         structural_footprint(data,structural_ground,ShapelyPolygon()) for data in structures.values())])
     footprints, heights = buildings(bounds, ground_mesh_at, peak_tree, layout, carriageway_mask, sidewalk_mask, airport_buildings)
     index = STRtree(footprints)
+    bridge_cutouts = building_cutouts(road_net[0], footprints, heights, index)
+    from rail_sections import designs
+    from indoor_passage import IndoorPassage
+    passage_ways = {w['id']: w for w in road_net[0] if w['type']=='way'}
+    passages = [IndoorPassage(section['indoorPassage'], passage_ways) for section in designs()
+                if play_region and 'indoorPassage' in section]
     shop_rows = shopfronts(footprints, heights, roads)
+    texture = Image.new('RGB',(width,depth),palette['ground'])
+    for region in layout.school_grounds:
+        for part in polygons(region.intersection(bounds)):
+            for surface_area, color in ((part, palette['green']), (part.buffer(-3), '#bdbcb5')):
+                for paved in polygons(surface_area):
+                    mask, corner = stencil(paved,left,top,1)
+                    texture.paste(color,corner,mask)
+    for layer, features in layers.items():
+        for poly in features:
+            mask, corner = stencil(poly,left,top,1)
+            texture.paste(palette[layer],corner,mask)
     for campus in layout.allow_unmapped_court:
         if not bounds.covers(campus) or any(campus.covers(field.representative_point())
                 for layer in ('schoolTrack','schoolCourt') for field in layers[layer]):
@@ -472,7 +520,10 @@ def build(bbox, output, palette, workers=4):
                 if play_region and not bounds.covers(tile):
                     tile = tile.intersection(bounds)
                 parts = ((poly,heights[key]) for key in sorted(index.query(tile))
-                         for poly in polygons(footprints[key].intersection(tile)) if poly.area >= .01)
+                         for poly in polygons(bridge_cutouts.get(key, footprints[key]).intersection(tile)) if poly.area >= .01)
+                for passage in passages:
+                    if tile.intersects(passage.opening):
+                        parts = passage.tile_parts(list(parts), tile)
                 vertices, normals, indices, rings = building_mesh(parts, origin)
                 deck, thin, asphalt = decks(tile, origin)
                 st_data = streets(tile, origin)
@@ -481,7 +532,13 @@ def build(bbox, output, palette, workers=4):
                         while len(st_data)<=slot:
                             st_data.append(None if len(st_data)==5 else [])
                         st_data[slot]=rows[origin]
-                collision = json.dumps([rings, st_data, thin, asphalt], separators=(',', ':')).encode()
+                geometry = [rings, st_data, thin, asphalt]
+                if rings and len(rings[-1]) > 10:
+                    # Walkable slabs share the GL04 vertex buffer but are not building solids.
+                    floors = [ring for ring in rings if len(ring) > 10]
+                    geometry[0] = rings[:-len(floors)]
+                    geometry.extend([[], [], [], floors])
+                collision = json.dumps(geometry, separators=(',', ':')).encode()
                 tbuf = trees[origin]
                 if tbuf and pavement is not None and pavement.intersects(tile):
                     tbuf = clear_pavement_trees(tbuf,origin,pavement)
@@ -552,6 +609,8 @@ def build(bbox, output, palette, workers=4):
     print('Terrain SHA-256:', digest.hexdigest())
     if play_region:
         manifest['region'] = play_region.manifest()
+    from station_site import mark_station_tiles
+    mark_station_tiles(chunks)
     manifest['landmarks'] = landmarks
     if tunnels:
         manifest['tunnels'] = tunnels
@@ -568,6 +627,8 @@ def build(bbox, output, palette, workers=4):
         bake_platforms(output, chunks, play_region.geometry)
     from shizijie_underpass import apply_world as apply_shizijie_underpass
     apply_shizijie_underpass(output, roads, bake_roads=False)
+    from service_streets import bake_walks
+    bake_walks(output, manifest, palette, [layout.exclude, *layout.school_grounds, *layers['water']])
     write_city_lods(output, manifest)
     from traffic import bake as bake_traffic
     bake_traffic(output, manifest, roads)
@@ -578,8 +639,27 @@ def build(bbox, output, palette, workers=4):
     if play_region:
         from railways import bake_world as bake_railways
         report = bake_railways(output,manifest)
-        print('Railway tiles:',report['tiles'],'clearance conflicts:',len(report['clearanceConflicts']))
+        from station_roads import bake as bake_station_roads
+        bridge_traffic = bake_station_roads(output,manifest,{road.way:road.width for road in roads if road.source=='paired'})
         (output/'manifest.json').write_text(json.dumps(manifest,separators=(',',':'))+'\n')
+        from check_dingjiang_rail_clearance import checked_road_pairs
+        verified = checked_road_pairs(output)
+        remaining = [r for r in report['clearanceConflicts'] if (r['rail'],r['road']) not in verified]
+        print('Railway tiles:',report['tiles'],'clearance conflicts:',len(remaining))
+    from major_roadbeds import bake as bake_major_roadbeds
+    bake_major_roadbeds(output,manifest)
+    if play_region and bridge_traffic:
+        # Wheel samples at bridge ends straddle the slab and the final arterial roadbed.
+        from station_roads import grade_traffic
+        grade_traffic(output, manifest, bridge_traffic)
+    (output/'manifest.json').write_text(json.dumps(manifest,separators=(',',':'))+'\n')
+    if play_region:
+        from rail_earthworks import bake as bake_rail_earthworks
+        bake_rail_earthworks(output, manifest)
+        (output/'manifest.json').write_text(json.dumps(manifest,separators=(',',':'))+'\n')
+    manifest['damPassageVersion'] = 1
+    (output/'manifest.json').write_text(json.dumps(manifest,separators=(',',':'))+'\n')
+    subprocess.run(['node',Path(__file__).resolve().parents[1]/'scripts/bake-dams.mjs',output],check=True)
     print(f'{len(chunks)} chunks, {len(footprints)} footprints, {sum(c["bytes"] for c in chunks):,} chunk bytes')
 
 

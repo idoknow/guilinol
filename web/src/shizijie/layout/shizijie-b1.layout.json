@@ -1,0 +1,1576 @@
+{
+  "version": 1,
+  "units": "m",
+  "ceilingHeight": 3.15,
+  "bounds": {
+    "minX": -68.0,
+    "maxX": 60.0,
+    "minZ": -61.0,
+    "maxZ": 60.0
+  },
+  "corridors": [
+    {
+      "id": "corr-ring-985734888",
+      "kind": "ring",
+      "points": [
+        {
+          "x": -10.116,
+          "z": -19.422
+        },
+        {
+          "x": -15.059,
+          "z": -15.121
+        },
+        {
+          "x": -18.713,
+          "z": -11.494
+        },
+        {
+          "x": -20.756,
+          "z": -7.867
+        },
+        {
+          "x": -23.232,
+          "z": -1.2
+        },
+        {
+          "x": -22.94,
+          "z": 8.077
+        },
+        {
+          "x": -21.954,
+          "z": 10.621
+        },
+        {
+          "x": -19.709,
+          "z": 16.094
+        },
+        {
+          "x": -12.582,
+          "z": 22.574
+        },
+        {
+          "x": -6.452,
+          "z": 24.741
+        },
+        {
+          "x": 1.429,
+          "z": 24.597
+        },
+        {
+          "x": 8.174,
+          "z": 22.795
+        },
+        {
+          "x": 12.129,
+          "z": 20.528
+        },
+        {
+          "x": 16.166,
+          "z": 17.498
+        },
+        {
+          "x": 18.36,
+          "z": 12.135
+        },
+        {
+          "x": 20.253,
+          "z": 7.204
+        },
+        {
+          "x": 20.404,
+          "z": 0.393
+        },
+        {
+          "x": 19.92,
+          "z": -4.981
+        },
+        {
+          "x": 16.468,
+          "z": -10.941
+        },
+        {
+          "x": 10.62,
+          "z": -17.587
+        },
+        {
+          "x": 4.348,
+          "z": -20.196
+        },
+        {
+          "x": -4.832,
+          "z": -20.019
+        },
+        {
+          "x": -10.116,
+          "z": -19.422
+        }
+      ],
+      "width": 5.6
+    },
+    {
+      "id": "corr-hub-nw-se",
+      "kind": "main",
+      "points": [
+        {
+          "x": -12.703,
+          "z": -38.85
+        },
+        {
+          "x": -4.832,
+          "z": -20.019
+        },
+        {
+          "x": 2.376,
+          "z": -2.792
+        },
+        {
+          "x": 4.721,
+          "z": 2.814
+        },
+        {
+          "x": 12.129,
+          "z": 20.528
+        },
+        {
+          "x": 20.323,
+          "z": 40.133
+        }
+      ],
+      "width": 4.6
+    },
+    {
+      "id": "corr-hub-nw",
+      "kind": "main",
+      "points": [
+        {
+          "x": -16.458,
+          "z": -33.797
+        },
+        {
+          "x": -10.116,
+          "z": -19.422
+        },
+        {
+          "x": -1.711,
+          "z": -0.37
+        }
+      ],
+      "width": 4.4
+    },
+    {
+      "id": "corr-hub-se",
+      "kind": "main",
+      "points": [
+        {
+          "x": 0.846,
+          "z": 5.125
+        },
+        {
+          "x": 8.174,
+          "z": 22.795
+        },
+        {
+          "x": 16.196,
+          "z": 42.112
+        }
+      ],
+      "width": 4.4
+    },
+    {
+      "id": "corr-hub-sw-n",
+      "kind": "main",
+      "points": [
+        {
+          "x": -39.2,
+          "z": 19.9
+        },
+        {
+          "x": -21.954,
+          "z": 10.621
+        },
+        {
+          "x": -1.711,
+          "z": -0.37
+        }
+      ],
+      "width": 4.4
+    },
+    {
+      "id": "corr-hub-sw-s",
+      "kind": "main",
+      "points": [
+        {
+          "x": -47.602,
+          "z": 30.447
+        },
+        {
+          "x": -38.432,
+          "z": 26.09
+        },
+        {
+          "x": -19.709,
+          "z": 16.094
+        },
+        {
+          "x": 0.846,
+          "z": 5.125
+        }
+      ],
+      "width": 4.4
+    },
+    {
+      "id": "corr-hub-ne-n",
+      "kind": "main",
+      "points": [
+        {
+          "x": 2.376,
+          "z": -2.792
+        },
+        {
+          "x": 16.468,
+          "z": -10.941
+        },
+        {
+          "x": 38.542,
+          "z": -24.299
+        }
+      ],
+      "width": 4.4
+    },
+    {
+      "id": "corr-hub-ne-s",
+      "kind": "main",
+      "points": [
+        {
+          "x": 4.721,
+          "z": 2.814
+        },
+        {
+          "x": 19.92,
+          "z": -4.981
+        },
+        {
+          "x": 41.975,
+          "z": -17.543
+        }
+      ],
+      "width": 4.4
+    },
+    {
+      "id": "corr-hub-center",
+      "kind": "main",
+      "points": [
+        {
+          "x": -1.711,
+          "z": -0.37
+        },
+        {
+          "x": 2.376,
+          "z": -2.792
+        },
+        {
+          "x": 4.721,
+          "z": 2.814
+        },
+        {
+          "x": 0.846,
+          "z": 5.125
+        },
+        {
+          "x": -1.711,
+          "z": -0.37
+        }
+      ],
+      "width": 5.0
+    },
+    {
+      "id": "corr-gallery-nw",
+      "kind": "alley",
+      "points": [
+        {
+          "x": -40.928,
+          "z": -27.074
+        },
+        {
+          "x": -29.986,
+          "z": -28.622
+        },
+        {
+          "x": -16.458,
+          "z": -33.797
+        },
+        {
+          "x": -12.703,
+          "z": -38.85
+        },
+        {
+          "x": -9.16,
+          "z": -43.616
+        },
+        {
+          "x": -5.174,
+          "z": -51.721
+        },
+        {
+          "x": -3.432,
+          "z": -56.719
+        }
+      ],
+      "width": 3.6
+    },
+    {
+      "id": "corr-gallery-ne-n",
+      "kind": "alley",
+      "points": [
+        {
+          "x": 36.137,
+          "z": -50.859
+        },
+        {
+          "x": 35.09,
+          "z": -41.891
+        },
+        {
+          "x": 36.831,
+          "z": -29.142
+        },
+        {
+          "x": 38.542,
+          "z": -24.299
+        }
+      ],
+      "width": 3.6
+    },
+    {
+      "id": "corr-gallery-ne-s",
+      "kind": "alley",
+      "points": [
+        {
+          "x": 41.975,
+          "z": -17.543
+        },
+        {
+          "x": 47.239,
+          "z": -11.041
+        },
+        {
+          "x": 52.272,
+          "z": -8.276
+        }
+      ],
+      "width": 3.6
+    },
+    {
+      "id": "corr-gallery-sw",
+      "kind": "alley",
+      "points": [
+        {
+          "x": -63.486,
+          "z": 7.923
+        },
+        {
+          "x": -51.165,
+          "z": 12.058
+        },
+        {
+          "x": -43.5,
+          "z": 14.5
+        },
+        {
+          "x": -39.2,
+          "z": 19.9
+        },
+        {
+          "x": -38.432,
+          "z": 26.09
+        },
+        {
+          "x": -36.761,
+          "z": 28.091
+        },
+        {
+          "x": -35.2,
+          "z": 36.196
+        },
+        {
+          "x": -33.983,
+          "z": 44.987
+        }
+      ],
+      "width": 2.8
+    },
+    {
+      "id": "corr-gallery-se",
+      "kind": "alley",
+      "points": [
+        {
+          "x": 4.026,
+          "z": 56.022
+        },
+        {
+          "x": 12.361,
+          "z": 43.959
+        },
+        {
+          "x": 16.196,
+          "z": 42.112
+        },
+        {
+          "x": 20.323,
+          "z": 40.133
+        },
+        {
+          "x": 27.46,
+          "z": 36.716
+        },
+        {
+          "x": 37.345,
+          "z": 33.443
+        },
+        {
+          "x": 50.017,
+          "z": 34.471
+        }
+      ],
+      "width": 3.6
+    },
+    {
+      "id": "corr-stair-nw",
+      "kind": "main",
+      "points": [
+        {
+          "x": -18.2202,
+          "z": -37.4094
+        },
+        {
+          "x": -16.7937,
+          "z": -36.9459
+        },
+        {
+          "x": -14.6,
+          "z": -36.23
+        },
+        {
+          "x": -16.458,
+          "z": -33.797
+        }
+      ],
+      "width": 4.2
+    },
+    {
+      "id": "corr-stair-nw-east",
+      "kind": "main",
+      "points": [
+        {
+          "x": -14.6,
+          "z": -36.23
+        },
+        {
+          "x": -12.703,
+          "z": -38.85
+        }
+      ],
+      "width": 4.2
+    },
+    {
+      "id": "corr-stair-ne",
+      "kind": "main",
+      "points": [
+        {
+          "x": 39.818,
+          "z": -19.818
+        },
+        {
+          "x": 38.7574,
+          "z": -18.7574
+        },
+        {
+          "x": 36.2,
+          "z": -16.2
+        },
+        {
+          "x": 41.975,
+          "z": -17.543
+        }
+      ],
+      "width": 4.2
+    },
+    {
+      "id": "corr-stair-ne-north",
+      "kind": "main",
+      "points": [
+        {
+          "x": 36.2,
+          "z": -16.2
+        },
+        {
+          "x": 34.4,
+          "z": -20.5
+        },
+        {
+          "x": 38.542,
+          "z": -24.299
+        }
+      ],
+      "width": 4.0
+    },
+    {
+      "id": "corr-stair-se",
+      "kind": "main",
+      "points": [
+        {
+          "x": 20.8143,
+          "z": 42.3277
+        },
+        {
+          "x": 20.2524,
+          "z": 40.9369
+        },
+        {
+          "x": 20.323,
+          "z": 40.133
+        }
+      ],
+      "width": 4.2
+    },
+    {
+      "id": "corr-stair-sw",
+      "kind": "main",
+      "points": [
+        {
+          "x": -49.5106,
+          "z": 18.6018
+        },
+        {
+          "x": -50.6392,
+          "z": 17.6137
+        },
+        {
+          "x": -53.2,
+          "z": 15.37
+        },
+        {
+          "x": -51.165,
+          "z": 12.058
+        }
+      ],
+      "width": 4.0
+    }
+  ],
+  "shops": [
+    {
+      "id": "szj-shop-01",
+      "kind": "shop",
+      "no": "B1-001",
+      "rect": {
+        "x": -1.0,
+        "z": -24.3,
+        "w": 3.4,
+        "d": 2.5
+      },
+      "frontage": "corr-ring-985734888",
+      "category": "snack",
+      "name": "漓江老巷米粉",
+      "lookKey": "shopNoodle",
+      "npcSpots": [
+        {
+          "role": "keeper",
+          "pose": "tidy",
+          "x": -1.0,
+          "z": -23.47,
+          "yaw": -3.141593
+        },
+        {
+          "role": "customer",
+          "pose": "chat",
+          "x": -0.942,
+          "z": -22.392,
+          "yaw": 0.030389
+        }
+      ]
+    },
+    {
+      "id": "szj-shop-02",
+      "kind": "shop",
+      "no": "B1-002",
+      "rect": {
+        "x": 4.2,
+        "z": -24.4,
+        "w": 3.2,
+        "d": 2.5
+      },
+      "frontage": "corr-ring-985734888",
+      "category": "drink",
+      "name": "阳朔鲜果茶室",
+      "lookKey": "shopTea",
+      "npcSpots": [
+        {
+          "role": "keeper",
+          "pose": "idle",
+          "x": 4.2,
+          "z": -23.57,
+          "yaw": -3.141593
+        },
+        {
+          "role": "customer",
+          "pose": "browse",
+          "x": 4.205,
+          "z": -22.48,
+          "yaw": 0.002604
+        }
+      ]
+    },
+    {
+      "id": "szj-shop-03",
+      "kind": "shop",
+      "no": "B1-003",
+      "rect": {
+        "x": 9.6,
+        "z": -23.0,
+        "w": 3.0,
+        "d": 2.4
+      },
+      "frontage": "corr-ring-985734888",
+      "category": "snack",
+      "name": "象山手作麻薯",
+      "lookKey": "shopMochi",
+      "npcSpots": [
+        {
+          "role": "keeper",
+          "pose": "tidy",
+          "x": 9.6,
+          "z": -22.22,
+          "yaw": -3.141593
+        }
+      ]
+    },
+    {
+      "id": "szj-shop-04",
+      "kind": "shop",
+      "no": "B1-004",
+      "rect": {
+        "x": -15.6,
+        "z": -21.1,
+        "w": 3.2,
+        "d": 2.4
+      },
+      "frontage": "corr-ring-985734888",
+      "category": "clothing",
+      "name": "港风复古穿搭馆",
+      "lookKey": "shopClothingHk",
+      "npcSpots": [
+        {
+          "role": "keeper",
+          "pose": "idle",
+          "x": -14.42,
+          "z": -21.1,
+          "yaw": -1.570796
+        },
+        {
+          "role": "customer",
+          "pose": "chat",
+          "x": -13.372,
+          "z": -20.996,
+          "yaw": 1.524152
+        }
+      ]
+    },
+    {
+      "id": "szj-shop-05",
+      "kind": "shop",
+      "no": "B1-005",
+      "rect": {
+        "x": 24.6,
+        "z": 3.6,
+        "w": 2.6,
+        "d": 3.2
+      },
+      "frontage": "corr-ring-985734888",
+      "category": "phone",
+      "name": "象山数码配件站",
+      "lookKey": "shopPhone",
+      "npcSpots": [
+        {
+          "role": "keeper",
+          "pose": "tidy",
+          "x": 23.72,
+          "z": 3.6,
+          "yaw": 1.570796
+        },
+        {
+          "role": "customer",
+          "pose": "browse",
+          "x": 22.64,
+          "z": 3.545,
+          "yaw": -1.59885
+        }
+      ]
+    },
+    {
+      "id": "szj-shop-06",
+      "kind": "shop",
+      "no": "B1-006",
+      "rect": {
+        "x": 24.5,
+        "z": 9.0,
+        "w": 2.6,
+        "d": 3.0
+      },
+      "frontage": "corr-ring-985734888",
+      "category": "drink",
+      "name": "桂花冰室甜品",
+      "lookKey": "shopDessert",
+      "npcSpots": [
+        {
+          "role": "keeper",
+          "pose": "idle",
+          "x": 23.62,
+          "z": 9.0,
+          "yaw": 1.570796
+        }
+      ]
+    },
+    {
+      "id": "szj-shop-07",
+      "kind": "shop",
+      "no": "B1-007",
+      "rect": {
+        "x": 22.5,
+        "z": 14.3,
+        "w": 2.5,
+        "d": 3.0
+      },
+      "frontage": "corr-ring-985734888",
+      "category": "phone",
+      "name": "漓江快充贴膜社",
+      "lookKey": "shopPhoneCare",
+      "npcSpots": [
+        {
+          "role": "keeper",
+          "pose": "tidy",
+          "x": 21.67,
+          "z": 14.3,
+          "yaw": 1.570796
+        }
+      ]
+    },
+    {
+      "id": "szj-shop-08",
+      "kind": "shop",
+      "no": "B1-008",
+      "rect": {
+        "x": 24.6,
+        "z": -1.9,
+        "w": 2.6,
+        "d": 3.0
+      },
+      "frontage": "corr-ring-985734888",
+      "category": "clothing",
+      "name": "榕城潮流衣社",
+      "lookKey": "shopClothingBoutique",
+      "npcSpots": [
+        {
+          "role": "keeper",
+          "pose": "idle",
+          "x": 23.72,
+          "z": -1.9,
+          "yaw": 1.570796
+        },
+        {
+          "role": "customer",
+          "pose": "browse",
+          "x": 22.642,
+          "z": -1.842,
+          "yaw": -1.541183
+        }
+      ]
+    },
+    {
+      "id": "szj-shop-09",
+      "kind": "shop",
+      "no": "B1-009",
+      "rect": {
+        "x": -1.0,
+        "z": 28.9,
+        "w": 3.2,
+        "d": 2.5
+      },
+      "frontage": "corr-ring-985734888",
+      "category": "accessory",
+      "name": "手作银饰工坊",
+      "lookKey": "shopSilver",
+      "npcSpots": [
+        {
+          "role": "keeper",
+          "pose": "tidy",
+          "x": -1.0,
+          "z": 28.07,
+          "yaw": -0.0
+        },
+        {
+          "role": "customer",
+          "pose": "browse",
+          "x": -1.055,
+          "z": 26.99,
+          "yaw": -3.112805
+        }
+      ]
+    },
+    {
+      "id": "szj-shop-10",
+      "kind": "shop",
+      "no": "B1-010",
+      "rect": {
+        "x": -6.4,
+        "z": 28.9,
+        "w": 3.2,
+        "d": 2.5
+      },
+      "frontage": "corr-ring-985734888",
+      "category": "beauty",
+      "name": "花香美妆集合店",
+      "lookKey": "shopBeauty",
+      "npcSpots": [
+        {
+          "role": "keeper",
+          "pose": "idle",
+          "x": -6.4,
+          "z": 28.07,
+          "yaw": -0.0
+        }
+      ]
+    },
+    {
+      "id": "szj-shop-11",
+      "kind": "shop",
+      "no": "B1-011",
+      "rect": {
+        "x": 4.4,
+        "z": 28.5,
+        "w": 3.2,
+        "d": 2.5
+      },
+      "frontage": "corr-ring-985734888",
+      "category": "shoes",
+      "name": "街头运动潮鞋馆",
+      "lookKey": "shopShoes",
+      "npcSpots": [
+        {
+          "role": "keeper",
+          "pose": "tidy",
+          "x": 4.4,
+          "z": 27.67,
+          "yaw": -0.0
+        },
+        {
+          "role": "customer",
+          "pose": "browse",
+          "x": 4.325,
+          "z": 26.6,
+          "yaw": -3.102139
+        }
+      ]
+    },
+    {
+      "id": "szj-shop-12",
+      "kind": "shop",
+      "no": "B1-012",
+      "rect": {
+        "x": -15.2,
+        "z": 26.5,
+        "w": 3.0,
+        "d": 2.4
+      },
+      "frontage": "corr-ring-985734888",
+      "category": "toy",
+      "name": "正阳潮玩盲盒社",
+      "lookKey": "shopToy",
+      "npcSpots": [
+        {
+          "role": "keeper",
+          "pose": "idle",
+          "x": -15.2,
+          "z": 25.72,
+          "yaw": -0.0
+        }
+      ]
+    },
+    {
+      "id": "szj-shop-13",
+      "kind": "shop",
+      "no": "B1-013",
+      "rect": {
+        "x": -27.3,
+        "z": 3.2,
+        "w": 2.5,
+        "d": 3.2
+      },
+      "frontage": "corr-ring-985734888",
+      "category": "other",
+      "name": "十字街便民驿站",
+      "lookKey": "shopMart",
+      "npcSpots": [
+        {
+          "role": "keeper",
+          "pose": "tidy",
+          "x": -26.47,
+          "z": 3.2,
+          "yaw": -1.570796
+        },
+        {
+          "role": "customer",
+          "pose": "chat",
+          "x": -25.391,
+          "z": 3.143,
+          "yaw": 1.600646
+        }
+      ]
+    },
+    {
+      "id": "szj-shop-14",
+      "kind": "shop",
+      "no": "B1-014",
+      "rect": {
+        "x": -27.4,
+        "z": -2.4,
+        "w": 2.5,
+        "d": 3.0
+      },
+      "frontage": "corr-ring-985734888",
+      "category": "accessory",
+      "name": "晴岚眼镜工坊",
+      "lookKey": "shopOptics",
+      "npcSpots": [
+        {
+          "role": "keeper",
+          "pose": "idle",
+          "x": -26.57,
+          "z": -2.4,
+          "yaw": -1.570796
+        }
+      ]
+    },
+    {
+      "id": "szj-shop-15",
+      "kind": "shop",
+      "no": "B1-015",
+      "rect": {
+        "x": -25.4,
+        "z": -8.7,
+        "w": 2.5,
+        "d": 3.0
+      },
+      "frontage": "corr-ring-985734888",
+      "category": "clothing",
+      "name": "青岚棉麻女装",
+      "lookKey": "shopClothingLinen",
+      "npcSpots": [
+        {
+          "role": "keeper",
+          "pose": "tidy",
+          "x": -24.57,
+          "z": -8.7,
+          "yaw": -1.570796
+        }
+      ]
+    },
+    {
+      "id": "szj-shop-16",
+      "kind": "shop",
+      "no": "B1-016",
+      "rect": {
+        "x": -27.2,
+        "z": 8.6,
+        "w": 2.6,
+        "d": 3.0
+      },
+      "frontage": "corr-ring-985734888",
+      "category": "toy",
+      "name": "复古黑胶明信片",
+      "lookKey": "shopVinyl",
+      "npcSpots": [
+        {
+          "role": "keeper",
+          "pose": "idle",
+          "x": -26.32,
+          "z": 8.6,
+          "yaw": -1.570796
+        }
+      ]
+    },
+    {
+      "id": "szj-shop-17",
+      "kind": "stall",
+      "no": "B1-017",
+      "rect": {
+        "x": -11.3,
+        "z": -12.3,
+        "w": 2.6,
+        "d": 2.2
+      },
+      "frontage": "corr-ring-985734888",
+      "category": "clothing",
+      "name": "精选好物女装摊",
+      "lookKey": "stallPromoWarm",
+      "npcSpots": [
+        {
+          "role": "keeper",
+          "pose": "tidy",
+          "x": -11.3,
+          "z": -12.98,
+          "yaw": -0.0
+        }
+      ]
+    },
+    {
+      "id": "szj-shop-18",
+      "kind": "stall",
+      "no": "B1-018",
+      "rect": {
+        "x": -9.9,
+        "z": -9.2,
+        "w": 2.4,
+        "d": 2.4
+      },
+      "frontage": "corr-hub-nw",
+      "category": "accessory",
+      "name": "港街精品银饰档",
+      "lookKey": "stallPromoBlue",
+      "npcSpots": [
+        {
+          "role": "keeper",
+          "pose": "idle",
+          "x": -9.12,
+          "z": -9.2,
+          "yaw": -1.570796
+        }
+      ]
+    },
+    {
+      "id": "szj-shop-19",
+      "kind": "shop",
+      "no": "B1-019",
+      "rect": {
+        "x": 3.7,
+        "z": -15.5,
+        "w": 2.8,
+        "d": 2.4
+      },
+      "frontage": "corr-ring-985734888",
+      "category": "shoes",
+      "name": "踏青手工皮鞋坊",
+      "lookKey": "shopLeatherShoes",
+      "npcSpots": [
+        {
+          "role": "keeper",
+          "pose": "tidy",
+          "x": 3.7,
+          "z": -16.28,
+          "yaw": -0.0
+        }
+      ]
+    },
+    {
+      "id": "szj-shop-20",
+      "kind": "shop",
+      "no": "B1-020",
+      "rect": {
+        "x": 8.9,
+        "z": -12.3,
+        "w": 2.8,
+        "d": 2.4
+      },
+      "frontage": "corr-ring-985734888",
+      "category": "other",
+      "name": "漓畔手作礼坊",
+      "lookKey": "shopSouvenir",
+      "npcSpots": [
+        {
+          "role": "keeper",
+          "pose": "idle",
+          "x": 9.88,
+          "z": -12.3,
+          "yaw": -1.570796
+        }
+      ]
+    },
+    {
+      "id": "szj-shop-21",
+      "kind": "stall",
+      "no": "B1-021",
+      "rect": {
+        "x": 15.5,
+        "z": 6.9,
+        "w": 2.6,
+        "d": 2.2
+      },
+      "frontage": "corr-ring-985734888",
+      "category": "drink",
+      "name": "双虹糖水冷饮铺",
+      "lookKey": "shopTea",
+      "npcSpots": [
+        {
+          "role": "keeper",
+          "pose": "tidy",
+          "x": 16.38,
+          "z": 6.9,
+          "yaw": -1.570796
+        },
+        {
+          "role": "customer",
+          "pose": "browse",
+          "x": 17.452,
+          "z": 6.971,
+          "yaw": 1.534439
+        }
+      ]
+    },
+    {
+      "id": "szj-shop-22",
+      "kind": "stall",
+      "no": "B1-022",
+      "rect": {
+        "x": 13.4,
+        "z": 2.8,
+        "w": 2.4,
+        "d": 2.4
+      },
+      "frontage": "corr-hub-ne-s",
+      "category": "beauty",
+      "name": "桂语香氛试妆台",
+      "lookKey": "shopBeauty",
+      "npcSpots": [
+        {
+          "role": "keeper",
+          "pose": "idle",
+          "x": 13.4,
+          "z": 2.02,
+          "yaw": -0.0
+        }
+      ]
+    },
+    {
+      "id": "szj-shop-23",
+      "kind": "shop",
+      "no": "B1-023",
+      "rect": {
+        "x": -3.4,
+        "z": 20.6,
+        "w": 2.8,
+        "d": 2.2
+      },
+      "frontage": "corr-ring-985734888",
+      "category": "clothing",
+      "name": "靖江潮搭小铺",
+      "lookKey": "shopClothingBoutique",
+      "npcSpots": [
+        {
+          "role": "keeper",
+          "pose": "tidy",
+          "x": -3.4,
+          "z": 21.28,
+          "yaw": -3.141593
+        }
+      ]
+    },
+    {
+      "id": "szj-shop-24",
+      "kind": "stall",
+      "no": "B1-024",
+      "rect": {
+        "x": 2.0,
+        "z": 18.1,
+        "w": 2.4,
+        "d": 2.4
+      },
+      "frontage": "corr-hub-se",
+      "category": "toy",
+      "name": "叠彩盲盒扭蛋亭",
+      "lookKey": "shopToy",
+      "npcSpots": [
+        {
+          "role": "keeper",
+          "pose": "idle",
+          "x": 2.78,
+          "z": 18.1,
+          "yaw": -1.570796
+        }
+      ]
+    },
+    {
+      "id": "szj-shop-25",
+      "kind": "stall",
+      "no": "B1-025",
+      "rect": {
+        "x": -16.5,
+        "z": -40.7,
+        "w": 2.6,
+        "d": 2.2
+      },
+      "frontage": "corr-stair-nw",
+      "category": "drink",
+      "name": "北口鲜榨柠檬亭",
+      "lookKey": "shopTea",
+      "npcSpots": [
+        {
+          "role": "keeper",
+          "pose": "tidy",
+          "x": -16.5,
+          "z": -40.02,
+          "yaw": -3.141593
+        },
+        {
+          "role": "customer",
+          "pose": "chat",
+          "x": -16.569,
+          "z": -38.947,
+          "yaw": -0.039341
+        }
+      ]
+    },
+    {
+      "id": "szj-shop-26",
+      "kind": "stall",
+      "no": "B1-026",
+      "rect": {
+        "x": 35.8,
+        "z": -9.5,
+        "w": 2.6,
+        "d": 2.2
+      },
+      "frontage": "corr-hub-ne-s",
+      "category": "phone",
+      "name": "正阳口快充便民亭",
+      "lookKey": "shopPhoneCare",
+      "npcSpots": [
+        {
+          "role": "keeper",
+          "pose": "idle",
+          "x": 35.8,
+          "z": -10.18,
+          "yaw": -0.0
+        }
+      ]
+    },
+    {
+      "id": "szj-shop-27",
+      "kind": "stall",
+      "no": "B1-027",
+      "rect": {
+        "x": 29.1,
+        "z": 39.8,
+        "w": 2.6,
+        "d": 2.2
+      },
+      "frontage": "corr-gallery-se",
+      "category": "snack",
+      "name": "南口油茶麻薯亭",
+      "lookKey": "shopMochi",
+      "npcSpots": [
+        {
+          "role": "keeper",
+          "pose": "tidy",
+          "x": 29.1,
+          "z": 39.12,
+          "yaw": -0.0
+        }
+      ]
+    },
+    {
+      "id": "szj-shop-28",
+      "kind": "stall",
+      "no": "B1-028",
+      "rect": {
+        "x": -56.5,
+        "z": 13.5,
+        "w": 2.6,
+        "d": 2.2
+      },
+      "frontage": "corr-stair-sw",
+      "category": "other",
+      "name": "西口桂花手信亭",
+      "lookKey": "shopMart",
+      "npcSpots": [
+        {
+          "role": "keeper",
+          "pose": "idle",
+          "x": -55.62,
+          "z": 13.5,
+          "yaw": -1.570796
+        }
+      ]
+    }
+  ],
+  "walkers": [
+    {
+      "id": "walker-ring-loop",
+      "points": [
+        {
+          "x": -10.116,
+          "z": -19.422
+        },
+        {
+          "x": -15.059,
+          "z": -15.121
+        },
+        {
+          "x": -18.713,
+          "z": -11.494
+        },
+        {
+          "x": -20.756,
+          "z": -7.867
+        },
+        {
+          "x": -23.232,
+          "z": -1.2
+        },
+        {
+          "x": -22.94,
+          "z": 8.077
+        },
+        {
+          "x": -21.954,
+          "z": 10.621
+        },
+        {
+          "x": -19.709,
+          "z": 16.094
+        },
+        {
+          "x": -12.582,
+          "z": 22.574
+        },
+        {
+          "x": -6.452,
+          "z": 24.741
+        },
+        {
+          "x": 1.429,
+          "z": 24.597
+        },
+        {
+          "x": 8.174,
+          "z": 22.795
+        },
+        {
+          "x": 12.129,
+          "z": 20.528
+        },
+        {
+          "x": 16.166,
+          "z": 17.498
+        },
+        {
+          "x": 18.36,
+          "z": 12.135
+        },
+        {
+          "x": 20.253,
+          "z": 7.204
+        },
+        {
+          "x": 20.404,
+          "z": 0.393
+        },
+        {
+          "x": 19.92,
+          "z": -4.981
+        },
+        {
+          "x": 16.468,
+          "z": -10.941
+        },
+        {
+          "x": 10.62,
+          "z": -17.587
+        },
+        {
+          "x": 4.348,
+          "z": -20.196
+        },
+        {
+          "x": -4.832,
+          "z": -20.019
+        }
+      ],
+      "loop": true,
+      "count": 6
+    },
+    {
+      "id": "walker-nw-se",
+      "points": [
+        {
+          "x": -16.7937,
+          "z": -36.9459
+        },
+        {
+          "x": -14.6,
+          "z": -36.23
+        },
+        {
+          "x": -12.703,
+          "z": -38.85
+        },
+        {
+          "x": -4.832,
+          "z": -20.019
+        },
+        {
+          "x": 2.376,
+          "z": -2.792
+        },
+        {
+          "x": 4.721,
+          "z": 2.814
+        },
+        {
+          "x": 12.129,
+          "z": 20.528
+        },
+        {
+          "x": 20.323,
+          "z": 40.133
+        },
+        {
+          "x": 20.2524,
+          "z": 40.9369
+        }
+      ],
+      "loop": false,
+      "count": 2
+    },
+    {
+      "id": "walker-sw-ne",
+      "points": [
+        {
+          "x": -50.6392,
+          "z": 17.6137
+        },
+        {
+          "x": -53.2,
+          "z": 15.37
+        },
+        {
+          "x": -51.165,
+          "z": 12.058
+        },
+        {
+          "x": -43.5,
+          "z": 14.5
+        },
+        {
+          "x": -39.2,
+          "z": 19.9
+        },
+        {
+          "x": -21.954,
+          "z": 10.621
+        },
+        {
+          "x": -1.711,
+          "z": -0.37
+        },
+        {
+          "x": 2.376,
+          "z": -2.792
+        },
+        {
+          "x": 16.468,
+          "z": -10.941
+        },
+        {
+          "x": 38.542,
+          "z": -24.299
+        },
+        {
+          "x": 34.4,
+          "z": -20.5
+        },
+        {
+          "x": 36.2,
+          "z": -16.2
+        },
+        {
+          "x": 38.7574,
+          "z": -18.7574
+        }
+      ],
+      "loop": false,
+      "count": 2
+    }
+  ],
+  "columns": {
+    "xs": [
+      -27.0,
+      -19.0,
+      17.0,
+      24.0
+    ],
+    "zs": [
+      -27.0,
+      -20.0,
+      1.0,
+      24.0
+    ],
+    "size": 0.52
+  },
+  "exits": [
+    {
+      "stairId": "nw",
+      "center": {
+        "x": -22.5,
+        "z": -38.8
+      },
+      "yaw": 1.2566370614359172,
+      "foot": {
+        "x": -16.7937,
+        "z": -36.9459
+      }
+    },
+    {
+      "stairId": "ne",
+      "center": {
+        "x": 43.0,
+        "z": -23.0
+      },
+      "yaw": -0.7853981633974483,
+      "foot": {
+        "x": 38.7574,
+        "z": -18.7574
+      }
+    },
+    {
+      "stairId": "se",
+      "center": {
+        "x": 22.5,
+        "z": 46.5
+      },
+      "yaw": -2.7576202181510405,
+      "foot": {
+        "x": 20.2524,
+        "z": 40.9369
+      }
+    },
+    {
+      "stairId": "sw",
+      "center": {
+        "x": -46.2,
+        "z": 21.5
+      },
+      "yaw": -2.28987197861656,
+      "foot": {
+        "x": -50.6392,
+        "z": 17.6137
+      }
+    }
+  ],
+  "sources": [
+    "web/src/shizijie/contract.ts (v1) & docs/shizijie/contract.md: SZJ_FRAME(originWorld=[-879.7502,-169.6260], surfaceY=151.3, depth=4.2), SZJ_STAIRWELLS(nw/ne/se/sw 4口精确坐标、yawDeg、28×0.15m×0.30m 踏步与 footIndoor 落脚点), SZJ_BUDGET(npcMax=48), validateSzjLayout.",
+    "guilinol-xp-overnight/raw/osm-2026-11.json & pipeline/shizijie_underpass.py (只读参照): OSM 15条 tunnel=yes/layer=-1 地下通道 (ring way/985734888 周长141.82m 及 985734873..985734886 交叉主廊与四角联络道).",
+    "guilinol-xp-overnight/docs/research/shizijie-underground.md (IDOK-324): 1999年十字街「小香港」A/B/C/D高密度格子铺环廊+中庭岛屿形制，3.15m人防净层高与无阻塞结构柱网。",
+    "/Users/pan-work/z-test/shizijie-ref-pack & raw/refpack/shizijie-underpass-gaps/run-edf7pq6w: 百度全景(十字街中心/解放西/解放东/南方大厦/正阳/文化大厦)四季斜坡网格玻璃雨棚、立式「地下通道 TUNNEL」灯箱与地面出入口方位校准；Wikimedia Commons CC0与B站BV1GuW9zJEQT商厦尺度和导视配色提取。",
+    "web/src/shizijie/look/palette.ts & web/src/shizijie/crowd/types.ts: SZJ_SIGN_ATLAS_RECTS 30组原创桂林风物店招槽位(零现实商标)与 keeper/customer/walker(<=48) 非交互人群规格。"
+  ]
+}

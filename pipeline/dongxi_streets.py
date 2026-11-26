@@ -14,7 +14,7 @@ FRONTAGES = {1008909364: 'R41', 1554170681: 'R41', 1554170682: 'R41',
 
 @lru_cache(maxsize=1)
 def frontage_limits():
-    path = Path(__file__).resolve().parents[1] / 'docs/layout/dongxi-layout.geojson'
+    path = Path(__file__).resolve().parents[1] / 'pipeline/data/layout/dongxi-layout.geojson'
     return {feature['properties']['name']: Polygon([
         ll2xz(lat, lon) for lon, lat in feature['geometry']['coordinates'][0]
     ]).buffer(.15, join_style='mitre') for feature in json.loads(path.read_text())['features']

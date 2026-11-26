@@ -180,6 +180,8 @@ function createDecorMats(M: Pack): DecorMats {
   cedarLit.userData.keepOwnTarget = M.facadeWood
   const graniteLit = tag('tianyuan_granite_warm', 0xc8baa4, bm?.vcStone ?? M.granite, {emissive: 0xffc682, emissiveIntensity: 0})
   graniteLit.userData.tiled = true
+  graniteLit.userData.surfTex = 'granite'
+  graniteLit.userData.glow = [0, 0.16]
   const wainscotTile = tag('tianyuan_wainscot_tile', 0xdccdb3, M.wallTileHall, {emissive: 0xffe4be, emissiveIntensity: 0})
   wainscotTile.userData.tiled = true
   const groutSeam = tag('tianyuan_floor_grout', 0x9b9284, M.floorHall, {roughness: 0.92, emissive: 0xffe4bc, emissiveIntensity: 0})
@@ -187,6 +189,8 @@ function createDecorMats(M: Pack): DecorMats {
   const chromeTrim = tag('tianyuan_chrome_trim', 0xebeef2, bm?.vcMetal ?? M.aluminium, {metalness: 0.28, roughness: 0.24})
   const brassGold = tag('tianyuan_brass_gold_signs', 0xe7c14e, bm?.vcMetal ?? M.aluminium, {metalness: 0.28, roughness: 0.3, emissive: 0xffcd48, emissiveIntensity: 0.15})
   const warmLed = tag('tianyuan_warm_led_signs', 0xfff7e2, bm?.vcEmissive ?? M.ceilingLamp, {emissive: 0xffcc70, emissiveIntensity: 0.72, roughness: 0.28})
+  warmLed.userData.glow = [0.72, 1.6]
+  brassGold.userData.glow = [0.15, 1.0]
   const awningCanopy = tag('tianyuan_awning_canopy', 0x3b444d, bm?.vcExterior ?? M.doorCurtain, {roughness: 0.78, side: THREE.DoubleSide})
   const pvcCurtain = tag('tianyuan_pvc_curtain', 0xe3f2ef, bm?.vcGlass ?? M.thermalCurtain, {transparent: true, opacity: 0.46, side: THREE.DoubleSide})
   const linenValance = tag('tianyuan_linen_valance', 0xb2362a, bm?.vcPlastic ?? M.doorCurtain, {roughness: 0.85, side: THREE.DoubleSide})
@@ -284,7 +288,7 @@ class Mesher {
 }
 
 const isTiled = (mat: THREE.Material) => mat.userData.tiled === true
-const KEEP_ATTRS = new Set(['position', 'normal', 'uv', 'color'])
+const KEEP_ATTRS = new Set(['position', 'normal', 'uv', 'color', 'aSurf'])
 const BATCH_TMP_COLOR = new THREE.Color()
 
 function scaleUv(g: THREE.BufferGeometry, su: number, sv: number) {
@@ -355,7 +359,8 @@ class Batch {
       }
     }
 
-    let target: THREE.Material = (mat.userData.batchTarget as THREE.Material | undefined) ?? mat
+    const ownTarget: THREE.Material = (mat.userData.batchTarget as THREE.Material | undefined) ?? mat
+    let target: THREE.Material = ownTarget
     if (atlasRect && this.atlasTarget) {
       target = this.atlasTarget
     } else if (
@@ -382,6 +387,21 @@ class Batch {
       g.setAttribute('color', new THREE.BufferAttribute(cols, 3))
     } else if (g.getAttribute('color')) {
       g.deleteAttribute('color')
+    }
+
+    // IDOK-305：surface master 按顶点记录贴图层与自发光（见 materials.ts bindSurfaceMaster）
+    const surfLayers = target.userData.surfLayers as Record<string, number> | undefined
+    if (surfLayers) {
+      const key = (mat.userData.surfTex ?? ownTarget.userData.surfTex) as string | undefined
+      const layer = key === 'none' ? 3 : key && surfLayers[key] ? surfLayers[key] : 0
+      const glow = (mat.userData.glow ?? ownTarget.userData.glow ?? target.userData.glow ?? [0, 0]) as [number, number]
+      const surf = new Float32Array(vCount * 3)
+      for (let i = 0; i < vCount; i++) {
+        surf[i * 3] = layer
+        surf[i * 3 + 1] = glow[0]
+        surf[i * 3 + 2] = glow[1]
+      }
+      g.setAttribute('aSurf', new THREE.BufferAttribute(surf, 3))
     }
 
     g.clearGroups()
@@ -1776,6 +1796,48 @@ function named<T extends THREE.Object3D>(obj: T, name: string): T {
   return obj
 }
 
+// Static Batch.flush meshes have identity transforms and non-indexed triangles
+// in shop-local space. Two sections can share a draw even when either section
+// can be hidden: both visible ranges and either individual range are contiguous.
+function batchShopSections(root: THREE.Group, sections: THREE.Group[]) {
+  const byMaterial = new Map<THREE.Material, THREE.Mesh[]>()
+  for (const section of sections) {
+    for (const mesh of section.children) {
+      if (!(mesh instanceof THREE.Mesh) || Array.isArray(mesh.material) || mesh.material.transparent) continue
+      const list = byMaterial.get(mesh.material) ?? []
+      list.push(mesh)
+      byMaterial.set(mesh.material, list)
+    }
+  }
+  const updates: (() => void)[] = []
+  for (const [material, meshes] of byMaterial) {
+    if (meshes.length !== 2) continue
+    const [first, second] = meshes
+    const a = first.parent!, b = second.parent!
+    const geometry = mergeGeometries([first.geometry, second.geometry], false)
+    if (!geometry) continue
+    const split = first.geometry.getAttribute('position').count
+    const total = geometry.getAttribute('position').count
+    const mesh = new THREE.Mesh(geometry, material)
+    mesh.name = 'tianyuan.shared:' + material.name
+    mesh.matrixAutoUpdate = false
+    root.add(mesh)
+    for (const source of meshes) {
+      source.removeFromParent()
+      source.geometry.dispose()
+    }
+    updates.push(() => {
+      const start = a.visible ? 0 : split
+      const end = b.visible ? total : split
+      mesh.visible = end > start
+      geometry.setDrawRange(start, end - start)
+    })
+  }
+  const sync = () => { for (const update of updates) update() }
+  sync()
+  return sync
+}
+
 export function buildTianyuanShopMesh(level: ShopLevel = 1): TianyuanShopBuildResult {
   const lv: ShopLevel = level === 3 ? 3 : level === 2 ? 2 : 1
   const M = acquireTianyuanMaterials()
@@ -1809,6 +1871,7 @@ export function buildTianyuanShopMesh(level: ShopLevel = 1): TianyuanShopBuildRe
   EC.flush(exterior, 'tianyuan.exterior')
   SF.flush(storefront, 'tianyuan.storefront')
   IW.flush(interior, 'tianyuan.interior')
+  const syncSectionBatches = batchShopSections(group, [exterior, storefront, interior])
   for (const grp of [storefront, interior]) {
     grp.traverse(o => {
       const mesh = o as THREE.Mesh
@@ -2138,6 +2201,7 @@ export function buildTianyuanShopMesh(level: ShopLevel = 1): TianyuanShopBuildRe
     cut = next
     exterior.visible = !cut
     ceilingGroup.visible = !cut
+    syncSectionBatches()
     group.userData.cutaway = cut
   }
 
@@ -2592,7 +2656,10 @@ export function buildTianyuanShopMesh(level: ShopLevel = 1): TianyuanShopBuildRe
 
     setDetailVisible(visible: boolean) {
       dynamic.visible = visible
-      interior.visible = visible
+      if (interior.visible !== visible) {
+        interior.visible = visible
+        syncSectionBatches()
+      }
       if (fan) fan.visible = visible
     },
 

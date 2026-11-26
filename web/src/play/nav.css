@@ -1,0 +1,51 @@
+/* IDOK-350 导航卡：漓江青 = 路线（docs/style.md）。沥青底 + 青色转向块，数字用等宽粗体，
+   和第二期街头 HUD 同一套材质；默认（M4 墨色）HUD 下也成立，所以变量自带，不依赖 street-hud.css。 */
+.nav-card{
+  --nav-jade:#20d6c1;--nav-ink:#0e1215;--nav-panel:rgba(14,17,21,.82);--nav-white:#f6f4ef;--nav-dim:rgba(246,244,239,.68);
+  --nav-sans:"PingFang SC","HarmonyOS Sans SC","Noto Sans CJK SC","Source Han Sans SC","Microsoft YaHei",system-ui,sans-serif;
+  --nav-num:"Bahnschrift","DIN Alternate","Roboto Condensed","Arial Narrow",var(--nav-sans);
+  position:fixed;left:50%;top:calc(14px + env(safe-area-inset-top));transform:translateX(-50%);z-index:7;
+  display:grid;grid-template-columns:auto minmax(0,1fr) auto;grid-template-rows:auto auto;column-gap:12px;row-gap:2px;align-items:center;
+  width:max-content;min-width:300px;max-width:min(480px,calc(100vw - 340px));box-sizing:border-box;padding:8px 8px 8px 8px;
+  border-radius:14px;background:var(--nav-panel);color:var(--nav-white);font-family:var(--nav-sans);
+  box-shadow:inset 0 0 0 1px rgba(255,255,255,.1),0 10px 28px rgba(0,0,0,.38);pointer-events:auto;user-select:none;-webkit-user-select:none;
+  animation:nav-in .28s cubic-bezier(.2,.9,.3,1.2)}
+.nav-card[hidden]{display:none}
+@keyframes nav-in{from{opacity:0;transform:translate(-50%,-10px)}to{opacity:1;transform:translate(-50%,0)}}
+.nav-glyph{grid-row:1 / 3;display:grid;place-items:center;width:54px;height:54px;border-radius:10px;background:var(--nav-jade);color:var(--nav-ink);
+  box-shadow:inset 0 -3px 0 rgba(0,0,0,.18)}
+.nav-glyph svg{width:34px;height:34px;fill:none;stroke:currentColor;stroke-width:2.6;stroke-linecap:round;stroke-linejoin:round}
+.nav-card[data-kind=lost] .nav-glyph{background:#ffc53d}
+.nav-main{display:flex;align-items:baseline;gap:9px;min-width:0}
+.nav-dist{flex:none;font:700 24px/1.05 var(--nav-num);font-variant-numeric:tabular-nums;letter-spacing:.01em;color:var(--nav-white)}
+.nav-what{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:15px;font-weight:700;letter-spacing:.04em}
+.nav-meta{grid-column:2;display:flex;gap:10px;min-width:0;font-size:12px;font-weight:600;letter-spacing:.04em;color:var(--nav-dim);white-space:nowrap}
+.nav-left{font-variant-numeric:tabular-nums;color:var(--nav-jade)}
+.nav-dest{min-width:0;overflow:hidden;text-overflow:ellipsis}
+.nav-stop{grid-column:3;grid-row:1 / 3;align-self:stretch;width:34px;border:0;border-left:1px solid rgba(255,255,255,.14);background:none;
+  color:var(--nav-dim);font:400 22px/1 var(--nav-sans);cursor:pointer;padding:0 0 0 6px}
+.nav-stop:hover{color:var(--nav-white)}
+/* photo mode / drone / home screen hide it like the other HUD */
+body[data-photo=on] .nav-card,body[data-home] .nav-card{display:none}
+
+/* 手机：右侧 dock 整列是保留区；左上依次是菜单、商铺/时辰条、视野按钮、载入街区提示，卡片排在它们下面、dock 左侧 */
+@media (pointer:coarse) and (not (any-pointer:fine)),(max-width:560px){
+  .nav-card{left:calc(10px + env(safe-area-inset-left));top:calc(234px + env(safe-area-inset-top));transform:none;animation:none;
+    min-width:0;width:calc(100vw - 136px - env(safe-area-inset-left) - env(safe-area-inset-right));max-width:none;
+    column-gap:8px;padding:6px;border-radius:12px}
+  .nav-glyph{width:42px;height:42px;border-radius:8px}
+  .nav-glyph svg{width:27px;height:27px}
+  .nav-main{flex-direction:column;align-items:flex-start;gap:1px}
+  .nav-dist{font-size:19px}
+  .nav-what{font-size:12.5px;max-width:100%}
+  .nav-meta{grid-column:1 / 3;font-size:11px;gap:8px}
+  .nav-left{flex:none}
+  .nav-stop{width:26px;font-size:19px;padding-left:4px}
+}
+/* street HUD on phones: minimap sits under the cash on the left, so the card takes the top row instead */
+@media (pointer:coarse) and (not (any-pointer:fine)),(max-width:560px){
+  body[data-hud=street] .nav-card{top:calc(12px + env(safe-area-inset-top));width:calc(100vw - 150px - env(safe-area-inset-left) - env(safe-area-inset-right))}
+}
+/* desktop street HUD: keep clear of the 安静区 tag line */
+body[data-hud=street] .nav-card{top:calc(18px + env(safe-area-inset-top))}
+@media (pointer:coarse) and (not (any-pointer:fine)),(max-width:560px){body[data-hud=street] .nav-card{top:calc(12px + env(safe-area-inset-top))}}

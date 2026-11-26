@@ -176,7 +176,11 @@ export function cameraHoldLayer(figure: Object3D) {
     joint.quaternion.copy(joint.parent!.getWorldQuaternion(parent).invert().multiply(rotation))
   }
   function apply(blend: number, aim: {forward: number; up: number; side: number}) {
-    if (!blend || joints.length !== 3 || !left || !chest) return
+    if (!blend || joints.length !== 3 || !left || !chest) {
+      reset()
+      return
+    }
+    if (applied) reset()
     joints.forEach((joint, index) => { base[index].copy(joint.quaternion); joint.quaternion.copy(rest[index]) })
     for (const entry of fingers) entry.base.copy(entry.bone.quaternion)
     applied = true

@@ -1,0 +1,561 @@
+{
+  "version": 1,
+  "units": "m",
+  "ceilingHeight": 2.9,
+  "bounds": {
+    "minX": -85.5,
+    "maxX": -12.5,
+    "minZ": -33.5,
+    "maxZ": 33.5
+  },
+  "corridors": [
+    {
+      "id": "corr-main-ew",
+      "kind": "main",
+      "from": { "x": -79.0, "z": 0.0 },
+      "to": { "x": -15.5, "z": 0.0 },
+      "width": 6.2
+    },
+    {
+      "id": "corr-atrium-hub",
+      "kind": "main",
+      "from": { "x": -50.5, "z": 0.0 },
+      "to": { "x": -40.5, "z": 0.0 },
+      "width": 10.2
+    },
+    {
+      "id": "corr-atrium-ns",
+      "kind": "main",
+      "from": { "x": -45.0, "z": -21.0 },
+      "to": { "x": -45.0, "z": 21.0 },
+      "width": 4.8
+    },
+    {
+      "id": "corr-skylight-ns",
+      "kind": "main",
+      "from": { "x": -36.0, "z": -29.0 },
+      "to": { "x": -36.0, "z": 28.0 },
+      "width": 4.6
+    },
+    {
+      "id": "corr-west-ns",
+      "kind": "main",
+      "from": { "x": -74.0, "z": -22.5 },
+      "to": { "x": -74.0, "z": 22.5 },
+      "width": 4.2
+    },
+    {
+      "id": "corr-east-ns",
+      "kind": "main",
+      "from": { "x": -18.0, "z": -21.0 },
+      "to": { "x": -18.0, "z": 28.5 },
+      "width": 4.4
+    },
+    {
+      "id": "corr-ne-escalator",
+      "kind": "main",
+      "from": { "x": -38.2, "z": -26.5 },
+      "to": { "x": -24.2, "z": -26.5 },
+      "width": 4.8
+    },
+    {
+      "id": "corr-ne-link",
+      "kind": "alley",
+      "from": { "x": -26.5, "z": -28.0 },
+      "to": { "x": -26.5, "z": -18.5 },
+      "width": 3.4
+    },
+    {
+      "id": "corr-north-terrazzo",
+      "kind": "alley",
+      "from": { "x": -76.0, "z": -19.5 },
+      "to": { "x": -16.0, "z": -19.5 },
+      "width": 3.2
+    },
+    {
+      "id": "corr-north-retro",
+      "kind": "alley",
+      "from": { "x": -76.0, "z": -9.8 },
+      "to": { "x": -16.0, "z": -9.8 },
+      "width": 2.6
+    },
+    {
+      "id": "corr-south-mid",
+      "kind": "alley",
+      "from": { "x": -76.0, "z": 9.8 },
+      "to": { "x": -16.0, "z": 9.8 },
+      "width": 3.2
+    },
+    {
+      "id": "corr-south-boutique",
+      "kind": "alley",
+      "from": { "x": -76.0, "z": 19.5 },
+      "to": { "x": -16.0, "z": 19.5 },
+      "width": 3.6
+    }
+  ],
+  "shops": [
+    {
+      "id": "shop-hengdeli",
+      "no": "M-100",
+      "rect": { "x": -81.9, "z": 0.0, "w": 5.4, "d": 5.8 },
+      "frontage": "corr-main-ew",
+      "name": "亨得利眼镜 旗舰店",
+      "lookKey": "safetyExit"
+    },
+    {
+      "id": "shop-west-nw",
+      "no": "A-101",
+      "rect": { "x": -79.2, "z": -14.4, "w": 5.8, "d": 5.0 },
+      "frontage": "corr-west-ns",
+      "name": "A区西口精选服饰",
+      "lookKey": "rollerShutterCream"
+    },
+    {
+      "id": "shop-west-sw",
+      "no": "B-175",
+      "rect": { "x": -79.2, "z": 14.4, "w": 5.8, "d": 5.0 },
+      "frontage": "corr-west-ns",
+      "name": "B区西口潮包专柜",
+      "lookKey": "wallBoutiquePink"
+    },
+    {
+      "id": "shop-mingshi",
+      "no": "M-101",
+      "rect": { "x": -68.0, "z": -5.75, "w": 6.2, "d": 3.9 },
+      "frontage": "corr-main-ew",
+      "name": "铭仕鞋业",
+      "lookKey": "floorRenovated"
+    },
+    {
+      "id": "shop-belle-bags",
+      "no": "M-103",
+      "rect": { "x": -62.825, "z": -5.75, "w": 3.05, "d": 3.9 },
+      "frontage": "corr-main-ew",
+      "name": "丝语皮具包袋",
+      "lookKey": "rollerShutterSilver"
+    },
+    {
+      "id": "shop-hk-street-men",
+      "no": "M-105",
+      "rect": { "x": -59.575, "z": -5.75, "w": 3.05, "d": 3.9 },
+      "frontage": "corr-main-ew",
+      "name": "港潮男装集合",
+      "lookKey": "wallCorridor"
+    },
+    {
+      "id": "shop-chuanshenme",
+      "no": "M-107",
+      "rect": { "x": -54.4, "z": -5.75, "w": 6.2, "d": 3.9 },
+      "frontage": "corr-main-ew",
+      "name": "穿什么 买手女装",
+      "lookKey": "lightStripWarm"
+    },
+    {
+      "id": "shop-zuding",
+      "no": "M-102",
+      "rect": { "x": -68.0, "z": 5.65, "w": 6.2, "d": 3.7 },
+      "frontage": "corr-main-ew",
+      "name": "足鼎鞋业",
+      "lookKey": "floorRenovated"
+    },
+    {
+      "id": "shop-yafeng-shoes",
+      "no": "M-104",
+      "rect": { "x": -62.825, "z": 5.65, "w": 3.05, "d": 3.7 },
+      "frontage": "corr-main-ew",
+      "name": "雅风女鞋馆",
+      "lookKey": "storefrontGlass"
+    },
+    {
+      "id": "shop-retro-digital",
+      "no": "M-106",
+      "rect": { "x": -59.575, "z": 5.65, "w": 3.05, "d": 3.7 },
+      "frontage": "corr-main-ew",
+      "name": "胶片数码配饰站",
+      "lookKey": "rollerShutterSilver"
+    },
+    {
+      "id": "shop-tiaodiao",
+      "no": "M-108",
+      "rect": { "x": -54.4, "z": 5.65, "w": 6.2, "d": 3.7 },
+      "frontage": "corr-main-ew",
+      "name": "我的调调 概念中庭馆",
+      "lookKey": "atriumTiaodiao"
+    },
+    {
+      "id": "shop-sweet",
+      "no": "M-109",
+      "rect": { "x": -31.0, "z": -5.75, "w": 3.5, "d": 3.9 },
+      "frontage": "corr-main-ew",
+      "name": "Sweet 甜心轻奢",
+      "lookKey": "wallBoutiquePink"
+    },
+    {
+      "id": "shop-silver-craft",
+      "no": "M-111",
+      "rect": { "x": -26.825, "z": -5.75, "w": 3.85, "d": 3.9 },
+      "frontage": "corr-main-ew",
+      "name": "正阳手作银饰坊",
+      "lookKey": "lightStripWarm"
+    },
+    {
+      "id": "shop-guilin-gifts",
+      "no": "M-113",
+      "rect": { "x": -22.775, "z": -5.75, "w": 3.85, "d": 3.9 },
+      "frontage": "corr-main-ew",
+      "name": "漓江风物手信铺",
+      "lookKey": "wallCorridor"
+    },
+    {
+      "id": "shop-tea-bar",
+      "no": "M-110",
+      "rect": { "x": -31.0, "z": 5.65, "w": 3.5, "d": 3.7 },
+      "frontage": "corr-main-ew",
+      "name": "桂香鲜茶饮品屋",
+      "lookKey": "lightStripWarm"
+    },
+    {
+      "id": "shop-24h-mart",
+      "no": "M-112",
+      "rect": { "x": -26.825, "z": 5.65, "w": 3.85, "d": 3.7 },
+      "frontage": "corr-main-ew",
+      "name": "24H 地下便民小铺",
+      "lookKey": "storefrontGlass"
+    },
+    {
+      "id": "shop-snack-oden",
+      "no": "M-114",
+      "rect": { "x": -22.775, "z": 5.65, "w": 3.85, "d": 3.7 },
+      "frontage": "corr-main-ew",
+      "name": "桂林风味轻食小吃档",
+      "lookKey": "rollerShutterCream"
+    },
+    {
+      "id": "shop-a312",
+      "no": "A-312",
+      "rect": { "x": -69.625, "z": -23.7, "w": 3.05, "d": 3.6 },
+      "frontage": "corr-north-terrazzo",
+      "name": "港岛潮袜格子屋",
+      "lookKey": "rollerShutterCream"
+    },
+    {
+      "id": "shop-a314",
+      "no": "A-314",
+      "rect": { "x": -66.375, "z": -23.7, "w": 3.05, "d": 3.6 },
+      "frontage": "corr-north-terrazzo",
+      "name": "依诺韩版配饰",
+      "lookKey": "floorTerrazzo"
+    },
+    {
+      "id": "shop-yuyu",
+      "no": "A-315",
+      "rect": { "x": -62.825, "z": -23.7, "w": 3.05, "d": 3.6 },
+      "frontage": "corr-north-terrazzo",
+      "name": "优优家 YuYu",
+      "lookKey": "boutiqueYuyu"
+    },
+    {
+      "id": "shop-a316-jiulin",
+      "no": "A-316",
+      "rect": { "x": -59.575, "z": -23.7, "w": 3.05, "d": 3.6 },
+      "frontage": "corr-north-terrazzo",
+      "name": "玖琳 JIULIN",
+      "lookKey": "boutiqueJiulin"
+    },
+    {
+      "id": "shop-a318",
+      "no": "A-318",
+      "rect": { "x": -56.025, "z": -23.7, "w": 3.05, "d": 3.6 },
+      "frontage": "corr-north-terrazzo",
+      "name": "花漾轻甜女装",
+      "lookKey": "storefrontGlass"
+    },
+    {
+      "id": "shop-a320",
+      "no": "A-320",
+      "rect": { "x": -52.775, "z": -23.7, "w": 3.05, "d": 3.6 },
+      "frontage": "corr-north-terrazzo",
+      "name": "初遇手作美饰",
+      "lookKey": "rollerShutterSilver"
+    },
+    {
+      "id": "shop-a322",
+      "no": "A-322",
+      "rect": { "x": -49.2, "z": -23.7, "w": 3.1, "d": 3.6 },
+      "frontage": "corr-north-terrazzo",
+      "name": "丝路小香风馆",
+      "lookKey": "wallCorridor"
+    },
+    {
+      "id": "shop-a326",
+      "no": "A-326",
+      "rect": { "x": -40.8, "z": -15.85, "w": 3.1, "d": 2.5 },
+      "frontage": "corr-north-terrazzo",
+      "name": "采光井手信杂货",
+      "lookKey": "skylightGlass"
+    },
+    {
+      "id": "shop-a301-mart",
+      "no": "A-301",
+      "rect": { "x": -69.625, "z": -15.85, "w": 3.05, "d": 2.5 },
+      "frontage": "corr-north-terrazzo",
+      "name": "十元百货老铺",
+      "lookKey": "rollerShutterCream"
+    },
+    {
+      "id": "shop-a303-snack",
+      "no": "A-303",
+      "rect": { "x": -66.375, "z": -15.85, "w": 3.05, "d": 2.5 },
+      "frontage": "corr-north-terrazzo",
+      "name": "桂味酸嘢零嘴档",
+      "lookKey": "rollerShutterCream"
+    },
+    {
+      "id": "shop-a305",
+      "no": "A-305",
+      "rect": { "x": -62.825, "z": -15.85, "w": 3.05, "d": 2.5 },
+      "frontage": "corr-north-terrazzo",
+      "name": "千禧水洗牛仔铺",
+      "lookKey": "floorTerrazzo"
+    },
+    {
+      "id": "shop-a307",
+      "no": "A-307",
+      "rect": { "x": -59.575, "z": -15.85, "w": 3.05, "d": 2.5 },
+      "frontage": "corr-north-terrazzo",
+      "name": "水磨石针织集合",
+      "lookKey": "rollerShutterSilver"
+    },
+    {
+      "id": "shop-hk-street",
+      "no": "A-901",
+      "rect": { "x": -69.625, "z": -13.15, "w": 3.05, "d": 2.5 },
+      "frontage": "corr-north-retro",
+      "name": "港街 FASHION 韩国女装",
+      "lookKey": "alleyHkStreet"
+    },
+    {
+      "id": "shop-discount-19",
+      "no": "A-903",
+      "rect": { "x": -66.375, "z": -13.15, "w": 3.05, "d": 2.5 },
+      "frontage": "corr-north-retro",
+      "name": "19元特价淘货架",
+      "lookKey": "discountTag19"
+    },
+    {
+      "id": "shop-milky-way",
+      "no": "A-905",
+      "rect": { "x": -62.825, "z": -13.15, "w": 3.05, "d": 2.5 },
+      "frontage": "corr-north-retro",
+      "name": "Milky way",
+      "lookKey": "boutiqueJiulin"
+    },
+    {
+      "id": "shop-discount-29",
+      "no": "A-908",
+      "rect": { "x": -59.575, "z": -13.15, "w": 3.05, "d": 2.5 },
+      "frontage": "corr-north-retro",
+      "name": "29元韩范卫衣铺",
+      "lookKey": "discountTag29"
+    },
+    {
+      "id": "shop-discount-39",
+      "no": "A-910",
+      "rect": { "x": -56.025, "z": -13.15, "w": 3.05, "d": 2.5 },
+      "frontage": "corr-north-retro",
+      "name": "39元断码捡漏档",
+      "lookKey": "discountTag39"
+    },
+    {
+      "id": "shop-discount-49",
+      "no": "A-912",
+      "rect": { "x": -52.775, "z": -13.15, "w": 3.05, "d": 2.5 },
+      "frontage": "corr-north-retro",
+      "name": "49元帆布鞋包区",
+      "lookKey": "discountTag49"
+    },
+    {
+      "id": "shop-zone2-mid20",
+      "no": "二区中20号",
+      "rect": { "x": -31.0, "z": -13.15, "w": 3.5, "d": 2.5 },
+      "frontage": "corr-north-retro",
+      "name": "二区连廊精品档",
+      "lookKey": "rollerShutterCream"
+    },
+    {
+      "id": "shop-cb2-03",
+      "no": "CB2-3",
+      "rect": { "x": -22.775, "z": -13.15, "w": 3.85, "d": 2.5 },
+      "frontage": "corr-north-retro",
+      "name": "CB3号港式甜品铺",
+      "lookKey": "rollerShutterCream"
+    },
+    {
+      "id": "shop-welcome-nails",
+      "no": "CB3-4",
+      "rect": { "x": -31.0, "z": -31.45, "w": 3.5, "d": 3.5 },
+      "frontage": "corr-ne-escalator",
+      "name": "三区扶梯美甲美睫",
+      "lookKey": "atriumTiaodiao"
+    },
+    {
+      "id": "shop-yilian-suits",
+      "no": "CB3-2",
+      "rect": { "x": -26.7, "z": -31.45, "w": 4.1, "d": 3.5 },
+      "frontage": "corr-ne-escalator",
+      "name": "依恋职业装",
+      "lookKey": "storefrontGlass"
+    },
+    {
+      "id": "shop-yilian-mid12",
+      "no": "中区12号",
+      "rect": { "x": -66.375, "z": 13.25, "w": 3.05, "d": 2.3 },
+      "frontage": "corr-south-mid",
+      "name": "依莲 yilian",
+      "lookKey": "stallYilianMid12"
+    },
+    {
+      "id": "shop-hk-gallery-d",
+      "no": "中区10号",
+      "rect": { "x": -69.625, "z": 13.25, "w": 3.05, "d": 2.3 },
+      "frontage": "corr-south-mid",
+      "name": "香港街 D区穿搭档",
+      "lookKey": "alleyHkStreet"
+    },
+    {
+      "id": "shop-cb2-mid",
+      "no": "CB2-2",
+      "rect": { "x": -62.825, "z": 13.25, "w": 3.05, "d": 2.3 },
+      "frontage": "corr-south-mid",
+      "name": "CB2号日韩发饰",
+      "lookKey": "rollerShutterSilver"
+    },
+    {
+      "id": "shop-cb5-mid",
+      "no": "CB2-5",
+      "rect": { "x": -56.025, "z": 13.25, "w": 3.05, "d": 2.3 },
+      "frontage": "corr-south-mid",
+      "name": "CB5号毛绒文创格",
+      "lookKey": "rollerShutterCream"
+    },
+    {
+      "id": "shop-cb6-mid",
+      "no": "CB2-6",
+      "rect": { "x": -52.775, "z": 13.25, "w": 3.05, "d": 2.3 },
+      "frontage": "corr-south-mid",
+      "name": "CB6号伴手贴纸铺",
+      "lookKey": "rollerShutterCream"
+    },
+    {
+      "id": "shop-1987",
+      "no": "B-179",
+      "rect": { "x": -66.375, "z": 15.75, "w": 3.05, "d": 2.3 },
+      "frontage": "corr-south-boutique",
+      "name": "1987 女装",
+      "lookKey": "store1987"
+    },
+    {
+      "id": "shop-b177",
+      "no": "B-177",
+      "rect": { "x": -69.625, "z": 15.75, "w": 3.05, "d": 2.3 },
+      "frontage": "corr-south-boutique",
+      "name": "简素设计工作室",
+      "lookKey": "storefrontGlass"
+    },
+    {
+      "id": "shop-b181",
+      "no": "B181",
+      "rect": { "x": -62.825, "z": 15.75, "w": 3.05, "d": 2.3 },
+      "frontage": "corr-south-boutique",
+      "name": "QUEEN.SHANSHAN.",
+      "lookKey": "boutiqueB181"
+    },
+    {
+      "id": "shop-zhencai",
+      "no": "B-183",
+      "rect": { "x": -59.575, "z": 15.75, "w": 3.05, "d": 2.3 },
+      "frontage": "corr-south-boutique",
+      "name": "zhencai 花艺女装",
+      "lookKey": "wallBoutiquePink"
+    },
+    {
+      "id": "shop-b182-fitting",
+      "no": "B-182",
+      "rect": { "x": -68.0, "z": 24.25, "w": 6.2, "d": 4.3 },
+      "frontage": "corr-south-boutique",
+      "name": "星光精选试衣大店",
+      "lookKey": "lightStripWarm"
+    },
+    {
+      "id": "shop-b184-studio",
+      "no": "B-184",
+      "rect": { "x": -62.825, "z": 24.25, "w": 3.05, "d": 4.3 },
+      "frontage": "corr-south-boutique",
+      "name": "韩范潮搭集合店",
+      "lookKey": "storefrontGlass"
+    },
+    {
+      "id": "shop-b186-knit",
+      "no": "B-186",
+      "rect": { "x": -59.575, "z": 24.25, "w": 3.05, "d": 4.3 },
+      "frontage": "corr-south-boutique",
+      "name": "浅灰羊绒质感馆",
+      "lookKey": "wallCorridor"
+    },
+    {
+      "id": "shop-b188-silver",
+      "no": "B-188",
+      "rect": { "x": -54.4, "z": 24.25, "w": 6.2, "d": 4.3 },
+      "frontage": "corr-south-boutique",
+      "name": "南庭服饰与银饰集合",
+      "lookKey": "lightStripWarm"
+    },
+    {
+      "id": "shop-east-gallery",
+      "no": "E-101",
+      "rect": { "x": -13.9, "z": 5.65, "w": 2.5, "d": 3.7 },
+      "frontage": "corr-east-ns",
+      "name": "体育馆侧十号文创亭",
+      "lookKey": "rollerShutterSilver"
+    }
+  ],
+  "columns": {
+    "xs": [-71.4, -64.6, -57.8, -51.0, -39.0, -33.0, -29.0, -20.6, -15.4],
+    "zs": [-29.4, -21.6, -17.4, -11.6, -8.0, -3.5, 3.5, 7.8, 11.8, 17.2, 21.8, 29.4],
+    "size": 0.44
+  },
+  "exits": [
+    {
+      "portalId": "E1",
+      "foot": { "x": -18.0, "z": 26.5 },
+      "yaw": 0.0,
+      "stair": { "x": -23.0, "z": 26.5, "w": 4.6, "d": 3.4 }
+    },
+    {
+      "portalId": "E2",
+      "foot": { "x": -25.8, "z": -26.5 },
+      "yaw": 1.5707963267948966,
+      "stair": { "x": -21.0, "z": -26.5, "w": 4.8, "d": 3.6 }
+    },
+    {
+      "portalId": "W1",
+      "foot": { "x": -74.5, "z": 19.5 },
+      "yaw": -1.5707963267948966,
+      "stair": { "x": -79.4, "z": 19.5, "w": 4.8, "d": 3.4 }
+    },
+    {
+      "portalId": "W2",
+      "foot": { "x": -74.5, "z": -19.5 },
+      "yaw": -1.5707963267948966,
+      "stair": { "x": -79.4, "z": -19.5, "w": 4.8, "d": 3.4 }
+    }
+  ],
+  "sources": [
+    "pipeline/landmarks/central_square.py#L53-L97,L266-L287: 广场轴向 AXIS_YAW、E1/E2/W1/W2 四下沉口 (-22,±26.5)/(-78,±19.5) 与双玻璃金字塔 (-38,±28) 坐标及踏步局部几何。",
+    "docs/xiaoxianggang/contract.md & web/src/xiaoxianggang/contract.ts (v1): XXG_FRAME 坐标系、XXG_PORTALS、XXG_LAYOUT_LIMITS 与 validateXxgLayout 约束。",
+    "docs/xiaoxianggang/refs/README.md & refs/01..10: 18号/17号直跑下沉梯、10号玻璃长廊、玻璃拱顶双排扶梯 Welcome 门厅及双玻璃金字塔 7.5–9m 挑空采光井结构尺度。",
+    "docs/xiaoxianggang/refs/11..20 & look/palette.ts: 600mm 地砖/扣板吊顶模数、6.2m 主廊(铭仕/足鼎/亨得利)、100m2 翻新中庭(我的调调/穿什么/Sweet)、3.2m 水磨石支巷(优优家/玖琳A316)、3.6m 精品廊(1987/#B181 QUEEN.SHANSHAN./zhencai)、3.2m 中区档口(依莲中区12号/CB2/CB5/CB6)、2.6m 淘货窄巷(港街/Milky way/19-49元区)。",
+    "guilinol-xp-overnight/docs/research/shizijie-underground.md (IDOK-324 考据): 桂林「小香港」A/B/中区格子铺紧凑咬合形制、2.7–2.9m 通道吊顶净空（卷帘横梁压低约 2.2–2.3m）、轻食/百货/鞋包/银饰复合业态与无阻塞柱网模数。"
+  ]
+}

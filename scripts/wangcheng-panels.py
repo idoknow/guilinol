@@ -1,4 +1,5 @@
 """Assemble prints from wangcheng-photo-match.mjs. All satellite pixels remain view-only."""
+from ops_evidence import require_evidence
 import argparse
 from pathlib import Path
 import json
@@ -14,7 +15,7 @@ font=ImageFont.truetype('NotoSansCJK-Regular.ttc',21)
 pages=[]
 for camera in json.loads((capture/'cameras.json').read_text()):
     number=camera['number']
-    photo=next(Path('docs/refs/rock/walk-shizijie-wangcheng').glob(number+'_*.jpg'))
+    photo=next(require_evidence('refs/rock/walk-shizijie-wangcheng').glob(number+'_*.jpg'))
     page=Image.new('RGB',(1280,920),'#f8f6ef'); draw=ImageDraw.Draw(page)
     for left,file in [(0,photo),(640,capture/(number+'.jpg'))]:
         picture=ImageOps.contain(Image.open(file),(640,840));page.paste(picture,(left+(640-picture.width)//2,55+(840-picture.height)//2))

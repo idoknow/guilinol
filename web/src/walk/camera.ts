@@ -4,22 +4,24 @@ import * as THREE from 'three'
 import {look} from '../look/config'
 import {underpassFloor} from '../tunnels'
 import {walkConfig as cfg} from './config'
+import {nearbyTunnels,tunnelCeiling,type Tunnel} from '../station-tunnels'
 import type {createPhysics} from './physics'
 import driveCamera from '../drive/camera.json' with {type:'json'}
 
 type Physics = Awaited<ReturnType<typeof createPhysics>>
 const identity = {x:0,y:0,z:0,w:1}
 
-export function createCameraRig(sim:Physics) {
+export function createCameraRig(sim:Physics, tunnels:Tunnel[] = []) {
+  const roofs=tunnels.filter(section=>!section.openCut)
   const ball = new R.Ball(cfg.camRadius), ray = new R.Ray({x:0,y:0,z:0},{x:0,y:1,z:0})
   const focus = new THREE.Vector3(), dir = new THREE.Vector3(), goal = new THREE.Vector3(), check = new THREE.Vector3()
   const filter = (coll:R.Collider)=>{const kind=sim.kinds.get(coll.handle);return kind!==undefined&&kind!=='tree'}
   let currentDist = cfg.far, lastClipped = false, lastBlocked = false, lastCeiling = Infinity, initialized = false
 
   function ceilingAt(x:number, z:number, footY:number) {
-    const deck = sim.surface(x,z,'deck',footY+18,20)
-    if(!deck || footY>=deck.y-.55) return Infinity
-    return deck.y-(deck.thin?.6:look.bridgeDepth)-cfg.camRadius
+    const deck = sim.hasDeck(x,z)?sim.surface(x,z,'deck',footY+18,20):null
+    const underside=deck && footY<deck.y-.55?deck.y-(deck.thin?.6:look.bridgeDepth):Infinity
+    return Math.min(underside,tunnelCeiling(roofs,x,z,footY))-cfg.camRadius
   }
 
   function castClear(direction:THREE.Vector3, maxDist:number) {
@@ -53,7 +55,7 @@ export function createCameraRig(sim:Physics) {
     const footY = figurePos.y
     let focusY = footY+(driving?driveCamera.height:1.4)
     const hasStartDeck = sim.hasDeck(figurePos.x,figurePos.z)
-    const headCeil = hasStartDeck?ceilingAt(figurePos.x,figurePos.z,footY):Infinity
+    const headCeil = ceilingAt(figurePos.x,figurePos.z,footY)
     if(Number.isFinite(headCeil)) focusY = Math.max(footY+.85,Math.min(focusY,headCeil-.04))
     ray.origin.x = figurePos.x; ray.origin.y = footY+.55; ray.origin.z = figurePos.z
     ray.dir.x = 0; ray.dir.y = 1; ray.dir.z = 0
@@ -66,8 +68,9 @@ export function createCameraRig(sim:Physics) {
     goal.copy(focus).addScaledVector(dir,desiredDist)
 
     const anyDeck = hasStartDeck||sim.hasDeck(goal.x,goal.z)||sim.hasDeck((focus.x+goal.x)*.5,(focus.z+goal.z)*.5)
+    const anyRoof = anyDeck || nearbyTunnels(roofs,focus.x,focus.z).length>0 || nearbyTunnels(roofs,goal.x,goal.z).length>0
     let activeCeil = headCeil
-    if(anyDeck) {
+    if(anyRoof) {
       const span = Math.hypot(goal.x-focus.x,goal.z-focus.z), samples = Math.max(4,Math.min(20,Math.ceil(span/1.1)))
       for(let i=1;i<=samples;i++) {
         const frac = i/samples
@@ -104,7 +107,8 @@ export function createCameraRig(sim:Physics) {
     function resolveCamBounds(cx:number, cz:number, baseCeil:number) {
       const camDeck = anyDeck ? sim.surface(cx, cz, 'deck', footY + 18, 20) : null
       const underDeck = !!camDeck && footY < camDeck.y - .55
-      const ceilCap = Math.min(baseCeil, ceilingAt(cx, cz, footY), ugCeilLimit)
+      const roofCeil = anyRoof ? Math.min(baseCeil, ceilingAt(cx, cz, footY)) : Infinity
+      const ceilCap = Math.min(roofCeil, ugCeilLimit)
       let floor: {y:number} | null = null
       if (!underDeck && camDeck) {
         floor = camDeck
@@ -146,7 +150,7 @@ export function createCameraRig(sim:Physics) {
       }
     }
 
-    const finalCeil = anyDeck?Math.min(activeCeil,ceilingAt(camera.position.x,camera.position.z,footY)):Infinity
+    const finalCeil = Math.min(anyRoof?Math.min(activeCeil,ceilingAt(camera.position.x,camera.position.z,footY)):Infinity, ugCeilLimit)
     lastCeiling = Number.isFinite(finalCeil)?finalCeil+cfg.camRadius-camera.position.y:Infinity
     check.subVectors(camera.position,focus)
     const losLen = check.length()

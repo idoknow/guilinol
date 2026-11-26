@@ -2,7 +2,9 @@ import * as THREE from 'three'
 import type {Tile} from './world'
 
 type Point=[number,number,number]
-export type Tunnel={way:number,portals:[Point,Point],length:number,halfWidth:number,clearance:number,approach:number,stations:[number,number][]}
+import * as station from './station-tunnels'
+export type Tunnel=station.Tunnel
+export {floorLevel,nearbyTunnels} from './station-tunnels'
 export type GroundCutout={
   id:string,corner?:string,kind?:string,center:Point,yaw:number,width:number,length:number,
   topY:number,floorY:number,polygon:[number,number][]
@@ -50,7 +52,13 @@ function frame(tunnel:Tunnel){
     point:(at:number,offset:number,y:number):Point=>[start[0]+at*ux-offset*uz,y,start[2]+at*uz+offset*ux]}
 }
 export function tunnelFloor(tunnels:Tunnel[]|undefined,x:number,z:number,foot:number){
-  for(const tunnel of tunnels??[]){
+  const local=station.nearbyTunnels(tunnels,x,z)
+  for(const tunnel of local){
+    if(tunnel.nodes){
+      const floor=station.floorLevel(tunnel,x,z)
+      if(floor!==undefined&&foot>=floor-.75&&foot<floor+tunnel.clearance-.25)return floor
+      continue
+    }
     const axes=frame(tunnel), at=axes.station(x,z)
     if(at<0||at>tunnel.length||Math.abs(axes.lateral(x,z))>tunnel.halfWidth)continue
     const index=tunnel.stations.findIndex(([s])=>s>=at), [end,high]=tunnel.stations[index], [start,low]=tunnel.stations[Math.max(0,index-1)]
@@ -287,7 +295,7 @@ export function registerTunnels(list:Tunnel[]|undefined,cutouts?:GroundCutout[],
   }
 }
 export function treeBlocked(x:number,y:number,z:number){
-  for(const tunnel of registered){
+  for(const tunnel of station.nearbyTunnels(registered,x,z)){
     const axes=frame(tunnel),at=axes.station(x,z),side=Math.abs(axes.lateral(x,z))
     if(at< -6||at>tunnel.length+6||side>tunnel.halfWidth+3)continue
     const open=at<tunnel.approach+2||at>tunnel.length-tunnel.approach-2
@@ -308,6 +316,7 @@ export function treeBlocked(x:number,y:number,z:number){
 type Plane=(point:Point)=>number
 export function joinPortalRoads(tile:Tile,tunnels:Tunnel[],buffers:Float32Array[]){
   for(const tunnel of tunnels){
+    if(tunnel.nodes)continue
     const axes=frame(tunnel)
     for(const portal of tunnel.portals){
       if(portal[0]<tile.x-32||portal[0]>tile.x+288||portal[2]<tile.z-32||portal[2]>tile.z+288)continue
@@ -401,8 +410,15 @@ function getShopAtlasMaterial(shops:ShizijieShop[]){
 
 export function tunnelGeometry(
   tile:Tile,ground:THREE.PlaneGeometry,tunnels:Tunnel[],
+  panels:import('./railways').CrossingPanel[]=[],
   groundCutouts?:GroundCutout[],underpass?:ShizijieUnderpass,
 ){
+  const local=station.nearbyTunnels(tunnels,tile.x,tile.z)
+  if(local.some(t=>t.nodes)){
+    const mesh=station.tunnelGeometry(tile,ground,local,panels)
+    if(mesh)return {...mesh,fringe:undefined}
+  }
+  tunnels=local.filter(t=>!t.nodes)
   const baseCutouts=groundCutouts??registeredCutouts
   const extraCutouts=(registeredLandmarkUnderground?.cutouts??[]).filter(
     ec=>!baseCutouts.some(bc=>Math.hypot(bc.center[0]-ec.center[0],bc.center[2]-ec.center[2])<3.0),

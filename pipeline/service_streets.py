@@ -16,14 +16,14 @@ from shapely import (LineString, Polygon, STRtree, box, intersects_xy, make_vali
 from shapely.affinity import translate
 
 from common import OUT, load_osm
-from features import points, polygons
+from features import area, points, polygons
 
 
-def width(tags):
+def width(tags, default=None):
     match = re.fullmatch(r'\s*(\d+(?:\.\d+)?)\s*(m|ft)?\s*', str(tags.get('width', '')))
     if match and float(match[1]) > 0:
         return float(match[1]) * (.3048 if match[2] == 'ft' else 1)
-    return 3 if tags.get('service') in ('driveway', 'parking_aisle') else 4
+    return default if default is not None else (3 if tags.get('service') in ('driveway', 'parking_aisle') else 4)
 
 
 def footprints(elements, connector_ids=()):
@@ -68,7 +68,7 @@ def clean_texture(data, footprint, color):
     return encoded.getvalue()
 
 
-def patch_tile(file, footprint, color):
+def patch_tile(file, footprint, color, *, sidewalk=False, excluded=None):
     raw = gzip.decompress(file.read_bytes())
     vertices, indices, size, png_size = struct.unpack_from('<4I', raw, 4)
     start = 24+16900+9*vertices+4*indices
@@ -79,23 +79,43 @@ def patch_tile(file, footprint, color):
     rebuilt, occupied = [], []
     for kind, *loops in paths[:boundary]:
         shape = make_valid(Polygon(np.asarray(loops[0])/100, [np.asarray(loop)/100 for loop in loops[1:]]))
-        if kind in (1, 4, 5, 6) and shape.intersects(footprint):
+        if not sidewalk and kind in (1, 4, 5, 6) and shape.intersects(footprint):
             rebuilt.extend(rings(kind, shape.difference(footprint)))
         else:
             rebuilt.append([kind, *loops]); occupied.append(shape)
-    fresh = set_precision(footprint.difference(union_all(occupied)), .01)
-    if fresh.area < .01:
+    if sidewalk:
+        deck_count, = struct.unpack_from('<I', raw, 20)
+        deck = np.frombuffer(raw, '<i2', deck_count*9, start+size+png_size).reshape(-1,3,3)
+        occupied.extend(Polygon(face[:,::2]/100) for face in deck)
+        for _, _, loops, *_ in collision[0]:
+            occupied.append(make_valid(Polygon(np.asarray(loops[0])/100, [np.asarray(loop)/100 for loop in loops[1:]])))
+        if excluded is not None:
+            occupied.append(excluded)
+    obstacles = union_all([part for shape in occupied for part in polygons(shape)]) if sidewalk else union_all(occupied)
+    if sidewalk:
+        footprint = set_precision(footprint, .01)
+    mask = obstacles.buffer(.02) if sidewalk else obstacles
+    fresh = set_precision(footprint.difference(mask), .01)
+    if sidewalk and any(set_precision(part, 0).intersection(obstacles).area > 1e-10 for part in polygons(fresh)):
+        raise ValueError(f'Quantized walk overlaps protected geometry: {file}')
+    image_start = start+size
+    original = raw[image_start:image_start+png_size]
+    if fresh.area < .01 and not sidewalk:
         return False
-    xmin, zmin, xmax, zmax = fresh.bounds
-    for east in range(math.floor(xmin/16)*16, math.ceil(xmax/16)*16, 16):
-        for south in range(math.floor(zmin/16)*16, math.ceil(zmax/16)*16, 16):
-            rebuilt.extend(rings(0, fresh.intersection(box(east,south,east+16,south+16))))
+    image = clean_texture(original, footprint, color)
+    if fresh.area < .01 and image == original:
+        return False
+    if sidewalk:
+        rebuilt.extend(rings(1, fresh))
+    else:
+        xmin, zmin, xmax, zmax = fresh.bounds
+        for east in range(math.floor(xmin/16)*16, math.ceil(xmax/16)*16, 16):
+            for south in range(math.floor(zmin/16)*16, math.ceil(zmax/16)*16, 16):
+                rebuilt.extend(rings(0, fresh.intersection(box(east,south,east+16,south+16))))
     if lower:
         lower[0] = len(rebuilt)
     streets[0] = rebuilt + paths[boundary:]
     encoded = json.dumps(collision,separators=(',', ':')).encode()
-    image_start = start+size
-    image = clean_texture(raw[image_start:image_start+png_size], footprint, color)
     payload = raw[:12]+struct.pack('<II',len(encoded),len(image))+raw[20:start]+encoded+image+raw[image_start+png_size:]
     file.write_bytes(gzip.compress(payload, compresslevel=5, mtime=0))
     return True
@@ -134,7 +154,50 @@ def bake(output, manifest, palette):
     if 'region' in manifest:
         corridors = json.loads(Path(__file__).with_name('region.json').read_bytes())['corridors']
         connectors = {way for c in corridors if c['mode']=='drive' and c['end']=='两江机场' for way in c['ways']}
-    tree = footprints(load_osm(), connectors); changed = 0
+    bake_footprints(output, manifest, palette, footprints(load_osm(), connectors))
+
+
+def walk_lines(elements):
+    defaults = {'footway': 3, 'path': 2, 'pedestrian': 4}
+    for way in elements:
+        tags = way.get('tags', {})
+        highway = tags.get('highway')
+        if (way['type'] != 'way' or highway not in defaults or tags.get('footway') in ('sidewalk','crossing')
+                or tags.get('layer', '0') != '0' or any(tags.get(key, 'no') != 'no' for key in ('area','bridge','tunnel','indoor'))):
+            continue
+        coords = points(way)
+        if len(coords) > 1:
+            yield LineString(coords), width(tags, defaults[highway])
+
+
+def occupied_walk_areas(elements):
+    for element in elements:
+        tags = element.get('tags', {})
+        if element['type'] in ('relation', 'way') and (tags.get('man_made') == 'bridge'
+                or tags.get('area:highway') in ('footway','pedestrian','steps','cycleway')
+                or tags.get('area') == 'yes' and tags.get('highway') in ('footway','path','pedestrian','steps')
+                or tags.get('place') == 'square'):
+            yield from polygons(area(element))
+
+
+def bake_walks(output, manifest, palette, exclusions=None):
+    if exclusions is None:
+        from landmark_layout import Layout
+        from features import ground_features
+        layout = Layout()
+        left, top, span, depth = manifest['extent']
+        bounds = box(left, top, left+span, top+depth)
+        exclusions = [layout.exclude, *layout.school_grounds, *ground_features(bounds)['water']]
+    elements = load_osm()
+    protected = STRtree([*(part for shape in exclusions for part in polygons(shape)), *occupied_walk_areas(elements)])
+    lines = list(walk_lines(elements))
+    print(f'Walk inputs: {len(lines)} ways, {sum(line.length for line, _ in lines)/1000:.3f} km')
+    lanes = STRtree([line.buffer(span/2, quad_segs=3) for line, span in lines])
+    return bake_footprints(output, manifest, palette, lanes, sidewalk=True, protected=protected)
+
+
+def bake_footprints(output, manifest, palette, tree, *, sidewalk=False, protected=None):
+    changed = 0
     region = Polygon(manifest['region']['local']) if 'region' in manifest else None
     for tile in manifest['chunks']:
         east, south = tile['x'], tile['z']
@@ -149,14 +212,22 @@ def bake(output, manifest, palette):
                 continue
         shape = translate(clipped, -east,-south)
         file = output/tile['file']
-        if patch_tile(file, shape, ImageColor.getrgb(palette['road'])):
+        excluded = None
+        if protected is not None:
+            obstacles = protected.geometries.take(protected.query(bounds, predicate='intersects'))
+            excluded = translate(union_all(obstacles).intersection(bounds), -east, -south)
+        if patch_tile(file, shape, ImageColor.getrgb(palette['road']), sidewalk=sidewalk, excluded=excluded):
             changed += 1; tile['bytes'] = file.stat().st_size
-    print(f'Minor streets: {len(tree.geometries)} ways, {changed} changed chunks')
+    label = 'City walks' if sidewalk else 'Minor streets'
+    print(f'{label}: {len(tree.geometries)} ways, {changed} changed chunks')
+    return changed
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(); parser.add_argument('--output',type=Path,default=Path(OUT))
-    output = parser.parse_args().output; file = output/'manifest.json'
+    parser.add_argument('--walks-only', action='store_true')
+    args = parser.parse_args(); output = args.output; file = output/'manifest.json'
     manifest = json.loads(file.read_text())
-    bake(output, manifest, json.loads(Path(__file__).with_name('palette.json').read_text()))
+    compile_streets = bake_walks if args.walks_only else bake
+    compile_streets(output, manifest, json.loads(Path(__file__).with_name('palette.json').read_text()))
     file.write_text(json.dumps(manifest,separators=(',',':'))+'\n')

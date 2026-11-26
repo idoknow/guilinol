@@ -16,6 +16,7 @@ import {bindRackGuard,isRackOpen,mountRackEntry} from '../ui/gear-rack'
 import {hotbarSlot,mountHotbar,riding,showHotbar} from '../ui/hotbar'
 import {setCameraShown} from '../gear/hand'
 import {droneMode} from '../drone'
+import {navigation} from './nav'
 
 const KEY = 'glol.stamps', ARRIVE = 12, REARM = 40, MARK_LAYER = 2
 const ease = (t:number)=>t<.5?4*t*t*t:1-Math.pow(-2*t+2,3)/2
@@ -134,7 +135,8 @@ export function play(host:Host) {
   // Atlas loads only after the scene has been running a couple of seconds, never inside the first-frame budget.
   let mapLoading:Promise<ReturnType<typeof mapView>|undefined>|undefined
   const ensureMap = ()=>{if(mapLoading)return mapLoading;const done=inlineBusy(slot,'载入地图');return mapLoading = import('../map/atlas').then(m=>m.loadAtlas(host.manifest)).then(loaded=>{
-    atlas = loaded; return map = mapView(host,loaded,{slot,buttons,stamps,goPoint:(x,z,n)=>void goPoint(x,z,n),goSpot:s=>void goTo(s),goDock:d=>void goDock(d),goShop:sh=>void goShop(sh)})
+    atlas = loaded; return map = mapView(host,loaded,{slot,buttons,stamps,goPoint:(x,z,n)=>void goPoint(x,z,n),goSpot:s=>void goTo(s),goDock:d=>void goDock(d),goShop:sh=>void goShop(sh),
+      onNav:target=>nav.set(target),navPath:()=>nav.path()})
   }).catch(error=>{console.warn('atlas',error); mapLoading = undefined
     // IDOK-204: a failed load used to leave the minimap gone for the rest of the session. Retry with backoff, and
     // ask whether the site was redeployed under us (old chunks 404 after a release) so the player can refresh.
@@ -265,6 +267,8 @@ export function play(host:Host) {
     name:()=>nearestName(),
   })
   drone.mountEntry(buttons)
+  // IDOK-350: 街景导航（路网寻路 + 场景路线 + 转向提示）；入口仍是地图面板的「标记导航」。
+  const nav = navigation(host,{visible:()=>!photo.active&&!drone.active&&document.body.dataset.photo!=='on',onEnd:()=>map?.setNavTarget(null,false)})
   window.addEventListener('keydown',event=>{
     if(event.repeat) return
     if(drone.active) return
@@ -363,7 +367,7 @@ export function play(host:Host) {
       if(d>REARM) {m.armed = true; if(shown===m.spot&&walking) closeCard()}
     }
     if(summit&&host.camera.position.distanceTo(summit.eye)>220) leaveSummit()
-    photo.tick(); map?.tick(dt); drone.tick(dt)
+    photo.tick(); nav.tick(dt); map?.tick(dt); drone.tick(dt)
   }
-  return {tick, spots, goTo, goPoint, openBook, photo, stamps, get map(){return map}}
+  return {tick, spots, goTo, goPoint, openBook, photo, stamps, nav, get map(){return map}}
 }

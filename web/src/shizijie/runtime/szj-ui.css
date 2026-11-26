@@ -1,0 +1,116 @@
+/* 十字街地下街 B1 运行态交互层 —— 严格仅引用 theme.css 山水印令牌 */
+
+.szj-root {
+  position: fixed;
+  inset: 0;
+  z-index: 45;
+  pointer-events: none;
+  font-family: var(--ui-serif);
+}
+
+.szj-root[hidden],
+.szj-veil[hidden],
+.szj-prompt[hidden],
+body[data-szj-active="1"] .mifen-hud-root,
+body[data-szj-active="1"] .xxg-root,
+body[data-szj-active="1"] .gl-mission-entry,
+body[data-szj-active="1"] .gl-mission-hud,
+body[data-szj-active="1"] .hud-me,
+body[data-szj-active="1"] .sky-ui,
+body[data-szj-active="1"] .render-entry,
+body[data-szj-active="1"] .render-pop,
+body[data-szj-active="1"] .dock,
+body[data-szj-active="1"] .minimap,
+body[data-szj-active="1"] .road-name,
+body[data-szj-active="1"] .emote-toggle,
+body[data-szj-active="1"] .emote-overlay,
+body[data-szj-active="1"] .vehicle-action,
+body[data-szj-active="1"] .ride-hud,
+body[data-szj-active="1"] .keys-card,
+body[data-szj-active="1"] .hotbar,
+body[data-szj-active="1"] .btn-mode,
+body[data-szj-active="1"] .btn-unstuck,
+body[data-szj-active="1"] .hint,
+body[data-szj-indoor="1"] .mifen-hud-root,
+body[data-szj-indoor="1"] .xxg-root,
+body[data-szj-indoor="1"] .gl-mission-entry,
+body[data-szj-indoor="1"] .gl-mission-hud,
+body[data-szj-indoor="1"] .hud-me,
+body[data-szj-indoor="1"] .sky-ui,
+body[data-szj-indoor="1"] .render-entry,
+body[data-szj-indoor="1"] .render-pop,
+body[data-szj-indoor="1"] .dock,
+body[data-szj-indoor="1"] .minimap,
+body[data-szj-indoor="1"] .road-name,
+body[data-szj-indoor="1"] .emote-toggle,
+body[data-szj-indoor="1"] .emote-overlay,
+body[data-szj-indoor="1"] .vehicle-action,
+body[data-szj-indoor="1"] .ride-hud,
+body[data-szj-indoor="1"] .keys-card,
+body[data-szj-indoor="1"] .hotbar,
+body[data-szj-indoor="1"] .btn-mode,
+body[data-szj-indoor="1"] .btn-unstuck,
+body[data-szj-indoor="1"] .hint {
+  display: none;
+}
+
+body[data-szj-active="1"] .mifen-pill,
+body[data-szj-active="1"] .mifen-pill--lazy,
+body[data-szj-active="1"] .xxg-pill,
+body[data-szj-active="1"] .xxg-pill--lazy,
+body[data-szj-indoor="1"] .mifen-pill,
+body[data-szj-indoor="1"] .mifen-pill--lazy,
+body[data-szj-indoor="1"] .xxg-pill,
+body[data-szj-indoor="1"] .xxg-pill--lazy {
+  visibility: hidden;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.szj-veil {
+  position: fixed;
+  inset: 0;
+  z-index: 96;
+  background: var(--ui-glass-solid);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 90ms var(--ui-ease);
+}
+
+.szj-veil.is-active {
+  opacity: 1;
+}
+
+.szj-prompt {
+  position: fixed;
+  left: 50%;
+  bottom: calc(108px + env(safe-area-inset-bottom, 0px));
+  transform: translateX(-50%);
+  height: var(--ui-h, 36px);
+  padding: 0 16px;
+  border: 0;
+  border-radius: var(--ui-r-pill, 999px);
+  background: var(--ui-glass-solid);
+  box-shadow: inset 0 0 0 1px var(--ui-glass-line-soft);
+  color: var(--ui-paper);
+  font: 500 13.5px/1 var(--ui-serif);
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+  pointer-events: auto;
+  cursor: pointer;
+}
+
+.szj-prompt:hover {
+  background: var(--ui-glass-strong);
+}
+
+.szj-prompt:focus-visible {
+  outline: none;
+  box-shadow: inset 0 0 0 1.5px var(--ui-paper);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .szj-veil {
+    transition: none;
+  }
+}

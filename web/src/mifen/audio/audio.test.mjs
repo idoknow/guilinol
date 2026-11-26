@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
+import {existingCityAudio, prepareCityAudioDuringLoad} from '../../city-audio.ts'
 import { STORY_BEATS, getStoryBeat, getStoryBeatByTrigger } from '../story/script.ts'
 import { SOUND_CATALOG, SOUND_IDS, computeMifenDistanceGain, createMifenAudio, encodeWavMono16 } from './index.ts'
 
@@ -232,7 +233,7 @@ function installFakeAudioEnv() {
 
   class FakeAudioContext {
     constructor() {
-      this.state = 'running'
+      this.state = 'suspended'
       this.sampleRate = 44100
       this.currentTime = 0
       this.destination = new FakeNode()
@@ -318,12 +319,14 @@ test('computeMifenDistanceGain 在 >=12m 衰减为 0 且 1.5m 内保持 1', () =
   assert.equal(computeMifenDistanceGain(18.5), 0)
 })
 
-test('syncCooking 边沿音效触发、离店 >=12m 静默与关面板/取消单/切后台停循环', t => {
+test('syncCooking 边沿音效触发、离店 >=12m 静默与关面板/取消单/切后台停循环', async t => {
   const env = installFakeAudioEnv()
   t.after(() => env.restore())
 
   const audio = createMifenAudio()
-  t.after(() => audio.dispose())
+  assert.equal(audio.unlock(), false)
+  await prepareCityAudioDuringLoad()
+  t.after(() => {audio.dispose(); assert.equal(existingCityAudio()?.state,'running')})
   assert.equal(audio.unlock(), true)
 
   // 1) 进入煮锅阶段 -> boil_dip + boil_bubbling 循环开启

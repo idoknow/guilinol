@@ -16,7 +16,7 @@ try{
       const page=await browser.newPage({viewport:{width,height},hasTouch:touch,isMobile:touch})
       page.setDefaultTimeout(30000)
       page.on('pageerror',error=>console.error('page error:',error.message))
-      const dir=`captures/smoke-flow/round-3/${width}-${view}`
+      const dir=`captures/smoke-flow/round-4/${width}-${view}`
       await mkdir(dir,{recursive:true})
       await page.addInitScript(view=>localStorage.setItem('glol.prefs',JSON.stringify({view})),view)
       if(width===740)await page.addInitScript(()=>localStorage.setItem('glol.avatar.v1',JSON.stringify({body:'f',v:1,createdAt:123,skin:3,face:1,brows:0,eyes:0,hair:'f_bun',hairColor:1,look:'hoodie'})))
@@ -41,6 +41,7 @@ try{
       }
       await select()
       await shop.waitFor()
+      await shop.locator('.shop-card').filter({hasText:'一点虹'}).click()
       await shop.locator('.shop-act-primary').click()
       await page.waitForFunction(()=>JSON.parse(localStorage.getItem('glol.save.v1')).packs.length===1)
       await shot('01-shop')
@@ -92,7 +93,7 @@ try{
           }
           const mount=await page.evaluate(phase=>{
             const scene=window.viewer.camera.parent
-            const name=['sealed','tear','open'].includes(phase)?'smoke-pack':phase==='take'||phase==='smoking'?'smoke-cigarette':'smoke-lighter'
+            const name=['draw','sealed','tear','open'].includes(phase)?'smoke-pack':phase==='take'||phase==='smoking'?'smoke-cigarette':'smoke-lighter'
             return scene.getObjectByName(name)?.parent?.name
           },phase)
           assert.equal(mount,phase==='take'?'smoke-grip-r':phase==='smoking'?'smoke-lips':'smoke-grip-l')
@@ -155,8 +156,24 @@ try{
           // Let the compositor present the last WebGL frame before the screenshot.
           await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))))
           await shot(name)
+          if(view==='third' && width===1440 && name==='06-mouth'){
+            await page.evaluate(()=>{
+              const c=window.viewer.camera,lips=c.parent.getObjectByName('smoke-lips')
+              const aim=lips.getWorldPosition(c.position.clone())
+              const side=c.position.clone().set(.24,.035,-.075).applyQuaternion(lips.getWorldQuaternion(c.quaternion.clone()))
+              window.restoreMouthCamera={position:c.position.clone(),quaternion:c.quaternion.clone(),view:{...c.view}}
+              c.clearViewOffset();c.position.copy(aim).add(side);c.lookAt(aim);c.updateMatrixWorld(true)
+              window.viewer.redrawGfx()
+            })
+            await shot('06a-lip-contact')
+            await page.evaluate(()=>{
+              const c=window.viewer.camera,{position,quaternion,view}=window.restoreMouthCamera
+              c.position.copy(position);c.quaternion.copy(quaternion);c.view=view;c.updateProjectionMatrix();c.updateMatrixWorld(true)
+            })
+          }
         }finally{await page.evaluate(()=>window.viewer.resume())}
       }
+      await capturePhase('02a-thumb-opening','draw',.46)
       if(width===1440 && view==='third'){
         await page.waitForFunction(()=>window.viewer.walk.probe().smoke.phase==='sealed')
         await page.evaluate(()=>{
@@ -187,12 +204,32 @@ try{
           c.setViewOffset(w,h,(p.x+1)*w/2-w*.52/scale,(1-p.y)*h/2-h*.40/scale,w/scale,h/scale)
         })
       }
+      await page.evaluate(()=>{
+        const walk=window.viewer.walk
+        window.smokeWalkStart=walk.probe().figPos
+        walk.drive(0,-1,false)
+      })
+      await page.waitForFunction(()=>{
+        const {walk,camera}=window.viewer
+        const position=walk.probe().figPos
+        const plume=camera.parent.getObjectByName('smoke-plume')
+        const alpha=plume.geometry.getAttribute('aAlpha')
+        const offset=plume.geometry.getAttribute('aOffset')
+        const cig=camera.parent.getObjectByName('smoke-lips').getObjectByName('smoke-cigarette')
+        if(!cig || Math.hypot(position[0]-window.smokeWalkStart[0],position[2]-window.smokeWalkStart[2])<.5)return false
+        const mouth=cig.getWorldPosition(camera.position.clone())
+        for(let i=0;i<alpha.count;i++){
+          if(alpha.getX(i)>.05 && Math.hypot(offset.getX(i)-mouth.x,offset.getZ(i)-mouth.z)>.25)return true
+        }
+        return false
+      })
       await capturePhase('08-lit','smoking')
       for(const name of ['09-puff','10-puff','11-puff']){
         await press('吸一口')
         await capturePhase(name,'smoking',0,true)
       }
       await page.evaluate(()=>{
+        window.viewer.walk.drive(0,0,false)
         window.viewer.camera.clearViewOffset()
         // Timestamp the actual scene insertion, independent of keyboard/tap latency.
         const scene=window.viewer.camera.parent
@@ -234,6 +271,10 @@ try{
         await page.keyboard.press('f')
         assert.equal(await page.evaluate(()=>window.worldInteractions),1)
       }
+      await page.evaluate(()=>window.viewer.camera.clearViewOffset())
+      await select()
+      await capturePhase('14-opened-pack','open')
+      assert(await page.evaluate(()=>JSON.parse(localStorage.getItem('glol.save.v1')).packs[0].opened))
       console.log(dir)
       await page.close()
     }

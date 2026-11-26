@@ -1,8 +1,9 @@
 import {cacheResponse} from './telemetry'
 import * as THREE from 'three'
 import {buildingGeometry,type Building} from './buildings'
+import {ensureShardForTile,hasShardForTile} from './city-upgrade/state'
 import {loadStreetGeometry} from './street-loader'
-import type {Streets} from './street-worker'
+import type {StationPavingStyle,Streets} from './street-worker'
 import {bridgeGeometry} from './look/bridge'
 import {look} from './look/config'
 import {nightGround} from './look/night'
@@ -10,11 +11,11 @@ import {countryside,setupCountryside,touchesCountryside} from './look/countrysid
 import {chunkWater, farWater} from './look/water'
 import type {TileBatchInput} from './batch'
 import type {Peaks} from './peaks'
-import {joinPortalRoads,tunnelGeometry,type GroundCutout,type ShizijieUnderpass,type Tunnel} from './tunnels'
+import {getRegisteredShizijieUnderground,joinPortalRoads,tunnelGeometry,type GroundCutout,type ShizijieUnderpass,type Tunnel} from './tunnels'
 import {freezeStatic} from './static-freeze'
 
 interface Asset {file:string; bytes:number}
-export interface Tile extends Asset {x:number; z:number}
+export interface Tile extends Asset {x:number; z:number; stationPaving?:StationPavingStyle; roadbeds?:number[]}
 export interface Manifest {
   region?:import('../../lib/play-region').Region
   tunnels?:Tunnel[]
@@ -300,7 +301,41 @@ export async function overview(manifest:Manifest) {
   return startOverview(manifest).finish
 }
 
+type SurfacePoly={kind:number,minX:number,maxX:number,minZ:number,maxZ:number,shell:[number,number][],holes:[number,number][][]}
+function pointInRing(x:number,z:number,ring:[number,number][]){
+  let hit=false
+  for(let i=0,j=ring.length-1;i<ring.length;j=i++){
+    const [ax,az]=ring[i],[bx,bz]=ring[j]
+    if((az>z)!==(bz>z)&&x<(bx-ax)*(z-az)/(bz-az)+ax)hit=!hit
+  }
+  return hit
+}
+function buildSurfaceLookup(tile:Tile,paths:Streets){
+  const polys:SurfacePoly[]=[]
+  for(const [kind,...rings] of paths[0]){
+    if(kind!==0&&kind!==1&&kind!==4&&kind!==5&&kind!==6)continue
+    const shell=rings[0]
+    if(!shell||shell.length<3)continue
+    let minX=Infinity,maxX=-Infinity,minZ=Infinity,maxZ=-Infinity
+    for(const [rx,rz] of shell){
+      if(rx<minX)minX=rx;if(rx>maxX)maxX=rx
+      if(rz<minZ)minZ=rz;if(rz>maxZ)maxZ=rz
+    }
+    polys.push({kind,minX,maxX,minZ,maxZ,shell,holes:rings.slice(1)})
+  }
+  return (wx:number,wz:number)=>{
+    const lx=(wx-tile.x)*100,lz=(wz-tile.z)*100
+    const kinds:number[]=[]
+    for(const poly of polys){
+      if(lx<poly.minX||lx>poly.maxX||lz<poly.minZ||lz>poly.maxZ)continue
+      if(pointInRing(lx,lz,poly.shell)&&!poly.holes.some(h=>pointInRing(lx,lz,h)))kinds.push(poly.kind)
+    }
+    return kinds
+  }
+}
+
 export async function detail(tile:Tile, signal:AbortSignal, parseSlot?:()=>Promise<void>, tunnels?:Tunnel[], groundCutouts?:GroundCutout[], underpass?:ShizijieUnderpass) {
+  const shardReady = ensureShardForTile(tile.x,tile.z)
   const compressed = await fetchAsset(tile.file,signal)
   const buffer = await new Response(new Blob([compressed]).stream().pipeThrough(new DecompressionStream('gzip'))).arrayBuffer()
   if(parseSlot) await parseSlot()
@@ -314,7 +349,8 @@ export async function detail(tile:Tile, signal:AbortSignal, parseSlot?:()=>Promi
   const positions = new Int16Array(buffer,offset,vertices*3); offset+=vertices*6
   const normals = new Int8Array(buffer,offset,vertices*3); offset+=vertices*3
   const indices = new Uint32Array(buffer.slice(offset,offset+count*4)); offset+=count*4
-  const [rings,paths,thinIndices=[],asphalt=[],rails=[],signs=[],railCuts=[]]:[Building[],Streets,number[]?,number[]?,import('./railways').RailSection[]?,import('./railways').CrossingSign[]?,[number,number][]?]=JSON.parse(new TextDecoder().decode(new Uint8Array(buffer,offset,collision))); offset+=collision
+  const [solids,paths,thinIndices=[],asphalt=[],rails=[],signs=[],railCuts=[],walkFloors=[]]:[Building[],Streets,number[]?,number[]?,import('./railways').RailSection[]?,import('./railways').CrossingSign[]?,[number,number][]?,Building[]?]=JSON.parse(new TextDecoder().decode(new Uint8Array(buffer,offset,collision))); offset+=collision
+  const rings=Array.isArray(walkFloors) && walkFloors.length ? solids.concat(walkFloors) : solids
   const thin=new Set(thinIndices)
   const end = offset+imageBytes, tail = end+triangles*18, extra = buffer.byteLength-tail
   if(extra!==0 && extra!==8450) throw Error('Invalid GL04 sections')
@@ -340,7 +376,7 @@ export async function detail(tile:Tile, signal:AbortSignal, parseSlot?:()=>Promi
   })
   for(const [,topLevel] of rings) if(topLevel/10+8>maxY) maxY = topLevel/10+8
   const heights = geometry.getAttribute('position')
-  const streets = await loadStreetGeometry(paths,step,heights,rails,signs,railCuts)
+  const streets = await loadStreetGeometry(paths,step,heights,rails,signs,railCuts,tile.stationPaving,tile.roadbeds,[tile.x,tile.z])
   if(tunnels)joinPortalRoads(tile,tunnels,[streets.road,streets.sidewalk,...(streets.surface?[streets.surface.getAttribute('position').array as Float32Array]:[])])
   signal.throwIfAborted()
   const material = await surfaceMaterial(buffer.slice(offset,end))
@@ -353,15 +389,34 @@ export async function detail(tile:Tile, signal:AbortSignal, parseSlot?:()=>Promi
   if(railCuts.length){geometry.computeVertexNormals();geometry.computeBoundingSphere()}
   const groundMesh = new THREE.Mesh(geometry,material)
   group.add(groundMesh)
-  const tunnel=(tunnels?.length||groundCutouts?.length||underpass)?tunnelGeometry(tile,geometry,tunnels??[],groundCutouts,underpass):null
-  if(tunnel){tunnel.fringe.material.dispose();tunnel.fringe.material=material;group.add(...Object.values(tunnel))}
+  const tunnel=(tunnels?.length||groundCutouts?.length||underpass||getRegisteredShizijieUnderground())
+    ?tunnelGeometry(tile,geometry,tunnels??[],paths[18],groundCutouts,underpass)
+    :null
+  if(tunnel){
+    if(tunnel.fringe){tunnel.fringe.material.dispose();tunnel.fringe.material=material}
+    if('lining' in tunnel)group.add(tunnel.floor,tunnel.portal,tunnel.interior)
+    else group.add(...Object.values(tunnel).filter((m):m is THREE.Mesh<THREE.BufferGeometry,THREE.Material>=>Boolean(m)))
+  }
   const pond = chunkWater(water,underlay,tile.x,tile.z)
-  const walls = vertices ? buildingGeometry(positions,normals,indices,rings) : null
+  await shardReady
+  signal.throwIfAborted()
+  const hasUpgradeShard = hasShardForTile(tile.x,tile.z)
+  const cityUpgradeRaw = hasUpgradeShard && vertices ? {
+    positions: new Int16Array(positions),
+    normals: new Int8Array(normals),
+    indices: new Uint32Array(indices),
+    origRings: rings.map(b => [...b] as Building),
+  } : undefined
+  const activeRings = hasUpgradeShard ? rings.map(b => [...b] as Building) : rings
+  const walls = vertices ? buildingGeometry(positions,normals,indices,activeRings,tile.x,tile.z) : null
+  for(const [,topLevel] of activeRings) if(topLevel/10+8>maxY) maxY = topLevel/10+8
   const bridge = deck.length ? bridgeGeometry(deck,thin,asphalt) : null
   const batch:TileBatchInput = {
     tile, minY, maxY, midY:heights.getY(segments/2*(stride+1)),
     walls, pond:pond?.positions ?? null, bridge,
     streetSurface:streets.surface,
+    tunnelLining:tunnel && 'lining' in tunnel?tunnel.lining.geometry:undefined,
+    tunnelLights:tunnel && 'lights' in tunnel?tunnel.lights.geometry:undefined,
     streetFence:streets.fence,
     detailCount:streets.detailCount,
     railLodCount:streets.railLodCount,
@@ -369,11 +424,18 @@ export async function detail(tile:Tile, signal:AbortSignal, parseSlot?:()=>Promi
     furnitureColors:streets.furnitureColors,
     parked:streets.parked,
   }
+  const surfaceAt = buildSurfaceLookup(tile, paths)
   return {
-    group,groundMesh,terrain,water,rings,deck,thin,streets,batch,tunnel,railCutVertices:new Set(railCuts.map(([index])=>index)),
+    group,groundMesh,terrain,underlay,water,rings:activeRings,deck,thin,streets,batch,tunnel,surfaceAt,cityUpgradeRaw,railCutVertices:new Set(railCuts.map(([index])=>index)),
     dispose(){
-      if(tunnel)for(const mesh of Object.values(tunnel)){mesh.geometry.dispose();if(mesh!==tunnel.fringe)mesh.material.dispose()}
-      pond?.dispose(); streets.surface?.dispose(); streets.fence?.dispose(); bridge?.dispose(); geometry.dispose(); walls?.dispose()
+      if(tunnel){
+        for(const mesh of Object.values(tunnel))if(mesh){
+          mesh.geometry.dispose()
+          if(tunnel.fringe && mesh!==tunnel.fringe)mesh.material.dispose()
+        }
+        if(!tunnel.fringe)tunnel.floor.material.dispose()
+      }
+      pond?.dispose(); streets.surface?.dispose(); streets.fence?.dispose(); bridge?.dispose(); geometry.dispose(); batch.walls?.dispose()
       material.map!.image.close(); material.map!.dispose(); material.dispose()
     },
   }

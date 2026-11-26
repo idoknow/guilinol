@@ -1,12 +1,17 @@
+import {prepareCityAudioDuringLoad} from './city-audio'
 import {onPrefs} from './ui/prefs'
 import {bindingLabel, hits} from './input/keymap'
-import {nearestPlayable} from '../../lib/play-region'
+import {inRegion,nearestPlayable} from '../../lib/play-region'
+import {installGeolocation} from './geolocation'
 import {identifyWorld,instrument,operation,record} from './telemetry'
 import * as THREE from 'three'
+import {landingWarmBudget,warmShaders,type WarmBudget} from './shader-warmup'
+import {vehicleModel} from './walk/vehicle-model'
 import {bytes, fetchAsset, measureFirstWorldBytes, openingTerrain, startOverview, type Manifest} from './world'
 import {Stream} from './stream'
 import {flight} from './flight'
 import {look} from './look/config'
+import {gfxState} from './look/gfx-state'
 import {installAtmosphere, outerGround, sky} from './look/atmosphere'
 import {startPeaks} from './peaks'
 import {presets,setPreset,pickSpawn,spawnPool} from './presets'
@@ -22,7 +27,17 @@ import {skyClock} from './ui/sky'
 import type {Host} from './play/host'
 import {streamIndicator,veil,type FullLoader,type Veil} from './ui/loading'
 import {loadTiles} from './look/tiles'
+import {
+  getCityUpgradeStats,
+  isCityUpgradeEnabled,
+  loadCityUpgradeTextures,
+  preloadCityUpgradeIndex,
+  setCityUpgradeEnabled,
+  syncCityUpgradeQuality,
+} from './city-upgrade/state'
+import {mountCityUpgradeProps} from './city-upgrade/props'
 import {flags} from './debug'
+import {tapFrame} from './gear/frame-tap'
 import {deriveRangeMetrics, loadRenderConfig, RenderRangeStore, type RenderRangeConfig} from './render-range'
 import {renderRangeControl} from './ui/render-range'
 import type {FeedbackView} from '../../lib/feedback-contract'
@@ -43,6 +58,8 @@ import {armOrientationGate} from './ui/orientation'
 import {mountStats} from './ui/stats'
 import {mountHotkeys} from './ui/hotkeys'
 import {mountLazyTianyuanMifen} from './mifen/entry'
+import {mountLazyXiaoxianggang} from './xiaoxianggang/entry'
+import {mountLazyShizijie} from './shizijie/entry'
 import {shouldMountDrinksShop} from './drinks/site'
 import {
   createJiefangRailingsVisual,
@@ -100,9 +117,15 @@ async function start(loader:FullLoader,creatorSpawn=false) {
     : null
   const previousWorld=terrain?null:await readManifest()
   entrySignal?.throwIfAborted()
+  await loader.showBeforeBlockingWork()
+  await prepareCityAudioDuringLoad()
   const bounds=terrain??previousWorld!
-  const renderer = new THREE.WebGLRenderer({antialias:false,powerPreference:'high-performance'})
-  renderer.toneMapping = THREE.NeutralToneMapping; renderer.toneMappingExposure = look.exposure
+  const renderer = new THREE.WebGLRenderer({antialias:false,powerPreference:'high-performance',preserveDrawingBuffer:params.has('verify')})
+  renderer.debug.checkShaderErrors = import.meta.env.DEV || params.has('debug')
+  const warmPrograms=async(root:THREE.Object3D,budget?:WarmBudget)=>{
+    try{await warmShaders(renderer,root,camera,scene,budget)}catch(error){console.warn('Shader warmup unavailable',error)}
+  }
+  renderer.toneMapping = THREE.NoToneMapping; renderer.toneMappingExposure = look.exposure
   document.body.prepend(renderer.domElement)
   const camera = new THREE.PerspectiveCamera(55,1,1,Math.max(look.fogHorizonTo,initialMetrics.fogHorizonTo)+1200)
   const scene = new THREE.Scene()
@@ -113,7 +136,15 @@ async function start(loader:FullLoader,creatorSpawn=false) {
   camera.layers.enable(MAIN_DETAIL_LAYER)
   const light = new THREE.DirectionalLight(look.sunColor,look.sunPower)
   light.position.set(...look.sunDirection); scene.add(light)
+  const gfx=gfxState(params)
+  syncCityUpgradeQuality(gfx.quality)
+  let post:ReturnType<typeof import('./look/post').mainPass>|undefined
+  if(params.has('debug'))Object.assign(window,{gfx})
+  // tapFrame：录像在这里、present 之前拷帧（IDOK-383，主画布没开 preserveDrawingBuffer）。
+  function drawMain(){if(post)stats.shadowCasters=post.render(walker?.active?walker.position:camera.position);else renderer.render(scene,camera);tapFrame(renderer.domElement)}
+  renderer.info.autoReset=false
   const hemi = new THREE.HemisphereLight(look.hemiSky,look.hemiGround,look.hemiPower); scene.add(hemi)
+  const arrivalReady=import('./arrival-programs').then(module=>warmPrograms(module.arrivalPrograms()))
   const [left,top,width,depth] = bounds.extent
   scene.add(freezeStatic(outerGround(bounds.extent)))
   // IDOK-105: choose the opening camera pose. The camera is NOT touched here — `flight()` below sets
@@ -193,19 +224,20 @@ async function start(loader:FullLoader,creatorSpawn=false) {
   const clock = skyClock(params)
   if(!soloStart)setPreset(camera,params.get('cam')??params.get('spawn'),bounds.bbox)
   let previous=0, first=0, frame=0, sum=0, samples=0
-  const stats = {firstMs:0,readyMs:0,openingRingMs:0,firstWorldBytes:0,ms:0,calls:0,frame:0,loaded:0,pending:0,visited:0,failures:0,
+  const stats = {firstMs:0,readyMs:0,openingRingMs:0,firstWorldBytes:0,ms:0,calls:0,shadowCasters:0,frame:0,loaded:0,pending:0,visited:0,failures:0,
     geometries:0,textures:0,dpr:currentDpr}
   function markFirstFrame(){
+    void import('./look/post').then(module=>{post=module.mainPass(renderer,scene,camera,light,gfx)}).catch(error=>console.warn('Graphics effects unavailable',error))
     first=performance.now()
     stats.firstMs=first
     measureFirstWorldBytes(first,total=>{stats.firstWorldBytes=total})
     if(stats.openingRingMs)void finishLoading()
   }
-  async function finishLoading(){loader.stage('frame',1,1);await loader.finish();stats.readyMs=performance.now()}
+  async function finishLoading(){await arrivalReady;loader.stage('frame',1,1);await loader.finish();stats.readyMs=performance.now()}
   function updateAtmosphere(now:number,elapsed:number){
     clock.tick(elapsed/1000); evaluate(clock.hour,clock.weather,1-Math.exp(-elapsed/clock.blendMs))
     atmo.uTime.value = now/1000
-    light.position.copy(env.sunDir); light.color.copy(env.sunColor); light.intensity = env.sunPower
+    light.position.copy(light.target.position).addScaledVector(env.sunDir,240); light.color.copy(env.sunColor); light.intensity = env.sunPower
     hemi.color.copy(env.hemiSky); hemi.groundColor.copy(env.hemiGround); hemi.intensity = env.hemiPower
     renderer.toneMappingExposure = env.exposure; windowLight.value = env.night
     dome.update(); drops.update()
@@ -228,14 +260,17 @@ async function start(loader:FullLoader,creatorSpawn=false) {
         controls(elapsed/1000)
         updateAtmosphere(now,elapsed)
         openingStream?.updateBatches(camera.position)
-        renderer.render(scene,camera)
+        renderer.info.reset();drawMain()
         rendered=true
       })
     })
   }
   if(terrain){scene.add(terrain.mesh);await presentOpening()}
   async function loadFullScene(){
-    const manifest=previousWorld??await readManifest()
+    const [manifest]=await Promise.all([
+      previousWorld?Promise.resolve(previousWorld):readManifest(),
+      isCityUpgradeEnabled()?preloadCityUpgradeIndex():Promise.resolve(null),
+    ])
     playBounds=manifest
     clampOpening()
     entrySignal?.throwIfAborted()
@@ -277,7 +312,7 @@ async function start(loader:FullLoader,creatorSpawn=false) {
   function ensureLandmarks(){
     if(!manifest.landmarks?.length) return Promise.resolve()
     landmarksPromise ??= import('./landmarks').then(module=>{
-      cullLandmarks=module.landmarkCulling()
+      cullLandmarks=module.landmarkCulling(stream)
       stream.updateLandmarks=module.landmarkStream(scene,renderer,manifest.landmarks!,stream.landmarks,{
         camera,
         onMount:group=>cullLandmarks?.warm(group),
@@ -312,22 +347,55 @@ async function start(loader:FullLoader,creatorSpawn=false) {
   type Walker=Awaited<ReturnType<typeof import('./walk').walk>>
   let loadingWalker:Promise<Walker>|undefined
   function loadWalker():Promise<Walker>{return loadingWalker??=prefetchWalk().then(module=>module.walk(scene,camera,renderer.domElement,manifest,stream,peaks,params.has('verify'))).then(player=>{walker=player;player.setDrinksBridge?.(drinks?{getCandidate:()=>drinks!.getInteractCandidate(),interact:()=>drinks!.interact()}:null);player.setTrafficDuty?.(trafficDuty??null);return player}).catch(error=>{loadingWalker=undefined;throw error})}
-  async function walkTo(x:number,z:number,yaw:number,reason:string,name?:string,targetY?:number){
-    if(switching)return false
+  let checkedCards=false
+  let landingQueue=Promise.resolve()
+  function walkTo(x:number,z:number,yaw:number,reason:string,name?:string,request?:AbortSignal,targetY?:number){
+    const parent=titleTransition
+    const result=landingQueue.then(()=>request?.aborted?false:land(x,z,yaw,reason,name,parent,request,targetY))
+    landingQueue=result.then(()=>{},()=>{})
+    return result
+  }
+  async function land(x:number,z:number,yaw:number,reason:string,name:string|undefined,transition:typeof titleTransition,request?:AbortSignal,targetY?:number){
     switching=true
     const start=performance.now()
     let completed=false
-    const controller=new AbortController(),signal=titleTransition?.signal??controller.signal
-    const parent=titleTransition?.view
+    const controller=new AbortController(),signal=AbortSignal.any([controller.signal,...(transition?[transition.signal]:[]),...(request?[request]:[])])
+    let stage='stream'
+    const deadline=window.setTimeout(()=>controller.abort(new Error(`Landing timed out (${reason}, ${x},${z}, ${stage})`)),90000)
+    const interrupted=new Promise<never>((_,reject)=>signal.addEventListener('abort',()=>reject(signal.reason),{once:true}))
+    void interrupted.catch(()=>{})
+    const parent=transition?.view
     const cover=parent??veil(reason==='flight'||reason.startsWith('solo')?'正在落地':reason==='creator'?'正在进入桂林':`正在前往${name?' '+name:'目的地'}`,{onCancel:titleTransition?.cancel??(()=>controller.abort()),destination:name})
     try{
       signal.throwIfAborted();primeLanding(x,z,signal)
-      const player=await loadWalker()
+      const player=await Promise.race([loadWalker(),interrupted])
       // Travel: let the haze close fully before the camera jumps, so the cut is never seen.
       if(name&&!parent&&!matchMedia('(prefers-reduced-motion: reduce)').matches)await new Promise(resolve=>setTimeout(resolve,450))
       if(signal.aborted)return false
       cover.progress(.3,'步行模块已就绪')
       completed=await player.enter(x,z,yaw,reason,false,signal,cover.progress)
+      if(completed&&request){stream.tick(player.position);stream.updateLandmarks?.(player.position);cover.progress(1);return true}
+      signal.throwIfAborted()
+      if(completed){
+        stage='landing content'
+        await Promise.race([prepareLandingContent?.(),interrupted]);clearTimeout(deadline)
+        stream.tick(player.position)
+        stream.updateLandmarks?.(player.position)
+        const budget=landingWarmBudget(start)
+        const skipped=new Promise<void>(resolve=>budget.signal.aborted?resolve():budget.signal.addEventListener('abort',()=>resolve(),{once:true}))
+        try{
+          if(!walkProgramsReady&&!budget.signal.aborted){
+            const bike=vehicleModel('bike',1),parked=new THREE.InstancedMesh(bike.geometry,bike.material,1)
+            parked.setColorAt(0,new THREE.Color(0xffffff))
+            const variants=new THREE.Group(),mapped=new THREE.MeshStandardMaterial({map:new THREE.Texture(),flatShading:true})
+            variants.add(parked,new THREE.Mesh(bike.geometry,mapped))
+            try{await Promise.race([warmPrograms(variants,budget),skipped,interrupted])}finally{parked.dispose();mapped.dispose()}
+          }
+          signal.throwIfAborted()
+          await Promise.race([warmPrograms(scene,budget),skipped,interrupted]);signal.throwIfAborted()
+          walkProgramsReady=true
+        }finally{budget.dispose()}
+      }
       if(completed){
         const desiredY=typeof targetY==='number'&&Number.isFinite(targetY)
           ? targetY
@@ -346,9 +414,11 @@ async function start(loader:FullLoader,creatorSpawn=false) {
           }
         }
         cover.progress(1)
+        if(!checkedCards){checkedCards=true; void import('./ui/update-cards').then(module=>module.startCards(params.has('verify'))).catch(()=>{})}
       }
       return completed
-    }finally{controller.abort();operation('teleport',start,completed);switching=false;showMode();if(!parent)await cover.done()}
+    }catch(error){completed=false;if(signal.aborted&&signal.reason?.name==='AbortError')return false;throw error}
+    finally{clearTimeout(deadline);controller.abort();operation('teleport',start,completed);switching=false;showMode();if(!parent)await cover.done()}
   }
   async function landSolo(initial:boolean) {
     if(walker?.active)return
@@ -488,8 +558,10 @@ async function start(loader:FullLoader,creatorSpawn=false) {
       showMode()
     })()
   })
+  let walkProgramsReady=false,prepareLandingContent:(()=>Promise<void>)|undefined
   await syncSolo()
   const renderUi = renderRangeControl({
+    gfx,
     initial:rangeStore.getConfig(),
     onPreview:(next:RenderRangeConfig)=>{stream.setRenderRange(next,{persist:false,source:next.source})},
     onCommit:(next:RenderRangeConfig)=>{stream.setRenderRange(next.radius,{persist:true});return rangeStore.getConfig()},
@@ -668,15 +740,139 @@ async function start(loader:FullLoader,creatorSpawn=false) {
     onToast: (text, ms) => showToast(text, ms),
     onTeleportToZone: zoneId => {
       const z = DUTY_ZONES.find(item => item.id === zoneId) ?? DUTY_ZONES[0]
-      return walkTo(z.teleport.x, z.teleport.z, z.teleport.yaw, 'traffic-duty', z.name, z.teleport.y)
+      return walkTo(z.teleport.x, z.teleport.z, z.teleport.yaw, 'traffic-duty', z.name, undefined, z.teleport.y)
     },
     arbiterWired: true,
   })
   walker?.setTrafficDuty?.(trafficDuty)
+  let xxgPrevPos: { x: number; z: number } | null = null
+  const xxg = mountLazyXiaoxianggang(
+    {
+      renderer,
+      worldCamera: camera,
+      bodyFlag: 'xxgActive',
+      getWalker: () => {
+        if (!walker?.active || walker.vehicle !== 'foot') {
+          xxgPrevPos = null
+          return null
+        }
+        const p = walker.position
+        const vel = xxgPrevPos ? { x: p.x - xxgPrevPos.x, z: p.z - xxgPrevPos.z } : { x: 0, z: 0 }
+        xxgPrevPos = { x: p.x, z: p.z }
+        return { position: { x: p.x, y: p.y, z: p.z }, velocity: vel }
+      },
+      openVeil: () => {
+        const el = document.createElement('div')
+        el.className = 'xxg-veil is-active'
+        document.body.append(el)
+        return { async done() { el.remove() } }
+      },
+      suspendWorld: () => {
+        walker?.hold(true)
+        walker?.showFigure(false)
+      },
+      resumeWorldAt: async pt => {
+        xxgPrevPos = { x: pt.x, z: pt.z }
+        if (!walker) return false
+        walker.hold(false)
+        walker.showFigure(true)
+        return walker.enter(pt.x, pt.z, pt.yaw, 'xxg-exit', false)
+      },
+    },
+    { eager: params.has('xxg'), veilFadeInMs: 80 },
+  )
+  let szjPrevPos: { x: number; z: number } | null = null
+  let szjHoodsLoading: Promise<void> | null = null
+  const ensureSzjHoods = () => {
+    if (szjHoodsLoading) return
+    szjHoodsLoading = import('./shizijie/look/index')
+      .then(mod => {
+        const pack = mod.createShizijieMaterials()
+        const hoods = mod.createSurfaceStairwellHoods(pack, { worldSpace: true })
+        for (const child of hoods.children) {
+          const gy = sampleMissionGroundY(child.position.x, child.position.z)
+          if (Number.isFinite(gy)) child.position.y = gy
+        }
+        scene.add(hoods)
+      })
+      .catch(error => {
+        szjHoodsLoading = null
+        console.warn('Shizijie surface canopies unavailable', error)
+      })
+  }
+  if (params.has('szj')) ensureSzjHoods()
+  const szj = mountLazyShizijie(
+    {
+      renderer,
+      worldCamera: camera,
+      bodyFlag: 'szjActive',
+      getWalker: () => {
+        if (!walker?.active || walker.vehicle !== 'foot') {
+          szjPrevPos = null
+          return null
+        }
+        const p = walker.position
+        if (Math.hypot(p.x + 879.75, p.z + 169.63) < 160) ensureSzjHoods()
+        const vel = szjPrevPos ? { x: p.x - szjPrevPos.x, z: p.z - szjPrevPos.z } : { x: 0, z: 0 }
+        szjPrevPos = { x: p.x, z: p.z }
+        return { position: { x: p.x, y: p.y - walkConfig.height * 0.5, z: p.z }, velocity: vel }
+      },
+      openVeil: () => {
+        const el = document.createElement('div')
+        el.className = 'szj-veil is-active'
+        document.body.append(el)
+        return { async done() { el.remove() } }
+      },
+      suspendWorld: () => {
+        walker?.hold(true)
+        walker?.showFigure(false)
+      },
+      resumeWorldAt: async pt => {
+        szjPrevPos = { x: pt.x, z: pt.z }
+        if (!walker) return false
+        walker.hold(false)
+        walker.showFigure(true)
+        return walker.enter(pt.x, pt.z, pt.yaw, 'szj-exit', false)
+      },
+    },
+    { eager: params.has('szj'), veilFadeInMs: 80 },
+  )
+  prepareLandingContent=async()=>{
+    mifen.step(0)
+    const probe=mifen.getProbe() as ReturnType<typeof mifen.getProbe>&{ensureLoaded?:()=>Promise<unknown>}
+    if(probe.ensureLoaded&&probe.getState().playerDistance<140){
+      await probe.ensureLoaded().catch(error=>console.warn('Landing content unavailable',error))
+    }
+  }
   mountChat()
+  const cityUpgradeProps = mountCityUpgradeProps(scene)
+  const syncCityUpgradeProps = (force = false) => {
+    const activeShards = stream.pruneCityUpgradeShards()
+    cityUpgradeProps.update(camera, activeShards, stream.metrics.streetRadius, force)
+  }
+  const applyCityUpgradeState = () => {
+    if (isCityUpgradeEnabled()) {
+      void loadCityUpgradeTextures(renderer).catch(error => console.warn('City upgrade textures unavailable', error))
+      void stream.ensureCityUpgradeForLoaded().then(() => {
+        stream.rebuildCityUpgradeTiles()
+        syncCityUpgradeProps(true)
+      })
+    } else {
+      stream.rebuildCityUpgradeTiles()
+      syncCityUpgradeProps(true)
+    }
+  }
+  gfx.subscribe(tier => {
+    if (syncCityUpgradeQuality(tier)) applyCityUpgradeState()
+  })
   const tourProbe = {getState, missions: {start: () => ({ok:false, code:'SOLO_MODE_REQUIRED'})}}
   let staticAudit:ReturnType<typeof import('./verify-static').staticVerifier>|undefined
-  const publishViewer=()=>Object.assign(window,{viewer:{camera,stream,manifest,stats,walkTo,staticAudit,get game(){return solo?.probe ?? tourProbe},get mifen(){return mifen.getProbe()},get drinks(){return drinks?.getProbe()??null},trafficDuty,dutyTraffic,jiefangRailings,dutyOfficers,shizijieSignals,knockdown,openFineTerminal,getActiveFineTerminalSession,
+  const publishViewer=()=>Object.assign(window,{viewer:{camera,stream,manifest,stats,walkTo,staticAudit,get game(){return solo?.probe ?? tourProbe},get mifen(){return mifen.getProbe()},get xxg(){return xxg.getProbe()},get szj(){return szj.getProbe()},
+    cityUpgrade: {
+      getStats: () => ({ ...getCityUpgradeStats(), mountedPropGroups: cityUpgradeProps.mountedCount() }),
+      setEnabled: (on: boolean) => { if (setCityUpgradeEnabled(on)) applyCityUpgradeState() },
+    },
+    get drinks(){return drinks?.getProbe()??null},trafficDuty,dutyTraffic,jiefangRailings,dutyOfficers,shizijieSignals,knockdown,openFineTerminal,getActiveFineTerminalSession,
     get trafficCount(){return (scene.getObjectByName('G2 traffic') as THREE.InstancedMesh|undefined)?.count??0},
     get trafficProbe(){return scene.getObjectByName('G2 traffic')?.userData},
     async trafficPixels(){return (await import('./traffic/visibility-probe')).pixelVisible(renderer,scene,camera)},
@@ -698,6 +894,7 @@ async function start(loader:FullLoader,creatorSpawn=false) {
       gl.readPixels(0,0,1,1,gl.RGBA,gl.UNSIGNED_BYTE,new Uint8Array(4))
       resolve()
     }))},
+    ...(params.has('verify')?{redrawGfx(){if(!post)throw Error('Graphics pipeline not ready');drawMain()}}:{}),
     resume(){previous=0;renderer.setAnimationLoop(animate)},
     probeFoot(){
       const ray = new THREE.Raycaster(camera.position,new THREE.Vector3(0,-1,0))
@@ -726,6 +923,8 @@ async function start(loader:FullLoader,creatorSpawn=false) {
     readLastViewNow:()=>readLastView(),
     applyLastViewNow:(view:FeedbackView)=>getPlayMode()==='solo'?{ok:false,code:'FLIGHT_DISABLED_IN_SOLO'}:restoreOpening(view)}})
   function draw(){
+    if(xxg.render()||szj.render())return
+    renderer.info.reset()
     base.update(camera)
     const metrics=stream.metrics
     const ground=!!walker?.active && !cinema
@@ -737,7 +936,7 @@ async function start(loader:FullLoader,creatorSpawn=false) {
     // mirror costs the most, and a frame-old reflection is invisible under the ripple distortion.
     renderMirror(renderer,scene,camera,mirror,ground||(!cinema&&clock.weather==='clear'),ground)
     cullLandmarks?.pass(false)
-    renderer.render(scene,camera)
+    drawMain()
   }
   const host:Host={scene,camera,renderer,manifest,stream,peaks,clock,walker:()=>walker,walkTo,draw,refreshMode:showMode,
     captureView:async()=>(await import('./play/feedback-view')).capture(host),
@@ -750,14 +949,23 @@ async function start(loader:FullLoader,creatorSpawn=false) {
     return {mode,x:position.x,z:position.z,chunks:stream.loaded.size}
   })
   let playable=false
+  const geoTick=installGeolocation({
+    ready:()=>!!walker?.active&&!walker.geoHeld&&walker.vehicle==='foot'&&!walker.shop.isOpen()&&!switching&&!cinema&&!paused&&!tour?.map?.active,
+    inside:point=>inRegion(manifest,point.x,point.z),position:()=>walker!.position,
+    land:(point,yaw,signal)=>walkTo(point.x,point.z,yaw??walker!.yaw,'geolocation','我的位置',signal),
+    drive:(x,z)=>walker!.drive(x,z,false),release:()=>walker?.releaseDrive(),face:yaw=>walker?.face(yaw),
+  })
   let trafficTick:Awaited<ReturnType<typeof import('./traffic').traffic>>|undefined
   let trafficRequested=false
   const trafficOverride=params.get('traffic')
   function animate(now:number){
+    geoTick()
     if(getPlayMode()==='solo'&&!walker?.active)return
     if((paused||tour?.map?.active)&&frame>2){previous=0;return}
     const elapsed = previous?now-previous:0;previous=now
-    if(!switching){if(walker?.active)walker.tick(elapsed/1000);else {controls(elapsed/1000);clampOpening()}}
+    gfx.frame(elapsed)
+    const anyIndoor=xxg.isIndoor()||szj.isIndoor()
+    if(!switching&&!anyIndoor){if(walker?.active)walker.tick(elapsed/1000);else {controls(elapsed/1000);clampOpening()}}
     if(frame===1) {
       if(!first)markFirstFrame()
       void import('./play').then(mod=>{tour=mod.play(host)})
@@ -766,35 +974,44 @@ async function start(loader:FullLoader,creatorSpawn=false) {
     if(frame===2){
       peaks.loadModels(renderer)
       void loadTiles(renderer).catch(error=>console.warn('City textures unavailable',error))
+      if(isCityUpgradeEnabled()){
+        void loadCityUpgradeTextures(renderer).catch(error=>console.warn('City upgrade textures unavailable',error))
+        syncCityUpgradeProps(true)
+      }
     }
-    if(frame>0&&!switching) {
+    if(frame>0&&!switching&&!anyIndoor) {
       const showTraffic=trafficEnabled(getPlayMode(),trafficOverride)
       if(showTraffic&&!trafficRequested && camera.position.y<250 && !stream.pending.size){
         trafficRequested=true
-        void import('./traffic').then(mod=>mod.traffic(scene,camera,params.has('verify'),(x,z,y,car)=>(car?walker?.carSupportAt(x,z,y):walker?.supportAt(x,z,y))?.y)).then(tick=>{trafficTick=tick}).catch(error=>console.warn('Traffic unavailable',error))
+        void import('./traffic').then(mod=>mod.traffic(scene,camera,params.has('verify'),(x,z,y,car)=>(car?walker?.carSupportAt(x,z,y):walker?.supportAt(x,z,y))?.y,warmPrograms,(x,z)=>stream.surfaceAt(x,z))).then(tick=>{trafficTick=tick}).catch(error=>console.warn('Traffic unavailable',error))
       }
       trafficTick?.(elapsed/1000,walker?.active&&walker.vehicle!=='foot'?walker.position:undefined,
         walker?.active?walker.position:undefined,getPlayMode()==='solo',showTraffic)
       const target=walker?.destination??(walker?.active?walker.position:camera.position)
       stream.tick(target)
+      if(frame>=2) syncCityUpgradeProps()
       stream.updateLandmarks?.(target)
       if(!walkModPromise && !stream.pending.size && camera.position.y<260) void prefetchWalk()
     }
     updateAtmosphere(now,elapsed)
-    tour?.tick(elapsed/1000)
     const stepDt = Math.min(0.1, elapsed/1000)
-    solo?.step(stepDt)
-    mifen.step(stepDt)
-    drinks?.step(stepDt)
-    dutyTraffic.step(stepDt, walker?.active ? walker.position : null, {
-      officerActive: trafficDuty?.getSnapshot().phase === 'active',
-      officerYaw: walker?.yaw ?? 0,
-      officerRunning: Boolean(walker?.active && walker.vehicle === 'foot' && (walker.footSpeed ?? 0) > 4.6),
-      vehiclePos: walker?.active && walker.vehicle !== 'foot' ? walker.position : undefined,
-    })
-    trafficDuty?.step(stepDt)
-    dutyOfficers.update(stepDt)
-    shizijieSignals.update(walker?.active ? walker.position : camera.position, stepDt)
+    if(!anyIndoor){
+      tour?.tick(elapsed/1000)
+      solo?.step(stepDt)
+      mifen.step(stepDt)
+      drinks?.step(stepDt)
+      dutyTraffic.step(stepDt, walker?.active ? walker.position : null, {
+        officerActive: trafficDuty?.getSnapshot().phase === 'active',
+        officerYaw: walker?.yaw ?? 0,
+        officerRunning: Boolean(walker?.active && walker.vehicle === 'foot' && (walker.footSpeed ?? 0) > 4.6),
+        vehiclePos: walker?.active && walker.vehicle !== 'foot' ? walker.position : undefined,
+      })
+      trafficDuty?.step(stepDt)
+      dutyOfficers.update(stepDt)
+      shizijieSignals.update(walker?.active ? walker.position : camera.position, stepDt)
+    }
+    if(!szj.isIndoor())xxg.step(stepDt)
+    if(!xxg.isIndoor())szj.step(stepDt)
     persistView?.()
     draw()
     if(staticAudit && frame%30===0)staticAudit.check()
@@ -836,6 +1053,7 @@ async function start(loader:FullLoader,creatorSpawn=false) {
     const {makeStaticVerifier}=await import('./verify-static')
     staticAudit=await makeStaticVerifier(host);publishViewer()
   }
+  if(!walkProgramsReady)await warmPrograms(scene)
   renderer.setAnimationLoop(animate)
   // IDOK-105: keep the last view fresh so "回到上次离开的地方" can restore it. Deep-linked
   // sessions (`?verify`, `?slot`, shares…) never write it — tests and shared links must not pollute.

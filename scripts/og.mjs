@@ -7,8 +7,8 @@ import {dirname, join} from 'node:path'
 import {fileURLToPath} from 'node:url'
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..')
-const out = process.env.OG_OUT ?? join(root, 'public/og.jpg')
 const distOut = join(root, 'dist/og.jpg')
+const out = process.env.OG_OUT ?? (process.argv.includes('--update-public') ? join(root, 'public/og.jpg') : distOut)
 
 const server = await preview({root: 'web', configFile: 'web/vite.config.ts', preview: {host: '127.0.0.1', port: 0}})
 let browser
@@ -33,7 +33,7 @@ try {
   })
   await mkdir(dirname(out), {recursive: true})
   await page.screenshot({path: out, type: 'jpeg', quality: 82})
-  try { await copyFile(out, distOut) } catch {}
+  if (out !== distOut) { try { await copyFile(out, distOut) } catch {} }
   console.log('og.jpg', out)
 } finally {
   await browser?.close()

@@ -10,9 +10,9 @@
  {"id":"guilin_fifth","name":"桂林市第五中学","osm":["way/683286832"],"group":"G1","facade":"schematic","viewOnly":true,"refs":[
   {"title":"桂林市第五中学鸟瞰图（报道配图，仅作整体配色参考）","year":2024,"page":"https://epaper.guilinlife.com/glrbpc/glrb/20240708/Articel06001NR.htm","thumb":"https://epaper.guilinlife.com/glrbpc/glrb/20240708/06_06_3697.jpg","viewOnly":true}]},
  {"id":"kuiguang_school","name":"桂林市奎光学校","osm":["way/253811717"],"group":"G1","viewOnly":true,"refs":[
-  {"title":"临街建筑外观","page":"docs/refs/rock/IMG_1295.jpg","author":"Chin Rock","viewOnly":true},
-  {"title":"树木、绿篱与红砖色调","page":"docs/refs/rock/IMG_1297.jpg","author":"Chin Rock","viewOnly":true},
-  {"title":"球场配色和四层外廊立面","page":"docs/refs/rock/IMG_1298.jpg","author":"Chin Rock","viewOnly":true}]},
+  {"title":"临街建筑外观","page":"ops 仓库 docs/refs/rock/IMG_1295.jpg","author":"Chin Rock","viewOnly":true},
+  {"title":"树木、绿篱与红砖色调","page":"ops 仓库 docs/refs/rock/IMG_1297.jpg","author":"Chin Rock","viewOnly":true},
+  {"title":"球场配色和四层外廊立面","page":"ops 仓库 docs/refs/rock/IMG_1298.jpg","author":"Chin Rock","viewOnly":true}]},
  {
   "id": "jingjiang",
   "name": "靖江王城（王府）",

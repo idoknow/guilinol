@@ -1,3 +1,7 @@
+import sys
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from ops_evidence import require_evidence
 import csv,json,math,sys,xml.etree.ElementTree as xml
 from pathlib import Path
 import numpy as np
@@ -7,11 +11,11 @@ from shapely import from_wkt,union_all,make_valid
 from shapely.geometry import shape,mapping,Polygon,Point,LineString,box
 from shapely.ops import transform
 from PIL import Image
-root=Path(__file__).resolve().parents[2];folder=root/'docs/layout';sys.path.insert(0,str(root/'pipeline'));from common import MLON,MLAT,LON0,LAT0
+root=Path(__file__).resolve().parents[2];folder=require_evidence('layout');sys.path.insert(0,str(root/'pipeline'));from common import MLON,MLAT,LON0,LAT0
 def project(lon,lat):return ((np.asarray(lon)-LON0)*MLON,(LAT0-np.asarray(lat))*MLAT)
 def geographic(east,south):return (np.asarray(east)/MLON+LON0,LAT0-np.asarray(south)/MLAT)
 def pieces(poly):return [part for part in getattr(poly,'geoms',[poly]) if part.geom_type=='Polygon' and not part.is_empty]
-config=json.loads((root/'pipeline/landmarks.json').read_text());market=next(r for r in config if r['id']=='wangcheng_market');boundary=transform(project,Polygon(market['replace']['polygon']));features=json.loads((folder/'dongxi-layout.geojson').read_text())['features'];data=np.load('density-logits.npz');lower=data['lower'];scale=256*2**int(data['zoom'])
+config=json.loads((root/'pipeline/landmarks.json').read_text());market=next(r for r in config if r['id']=='wangcheng_market');boundary=transform(project,Polygon(market['replace']['polygon']));features=json.loads(((root/'pipeline/data/layout')/'dongxi-layout.geojson').read_text())['features'];data=np.load('density-logits.npz');lower=data['lower'];scale=256*2**int(data['zoom'])
 def to_world(col,row):
     lon=(np.asarray(col)+lower[0])/scale*360-180;lat=np.rad2deg(np.arctan(np.sinh(np.pi*(1-2*(np.asarray(row)+lower[1])/scale))));return project(lon,lat)
 mask=expit(data['logits'][0])>=.4371;Image.fromarray(mask).save(folder/'dongxi-esri-mask.png');(folder/'dongxi-esri-grid.json').write_text(json.dumps(dict(pixel_origin=lower.tolist(),zoom=int(data['zoom'])))+'\n');trace=union_all([transform(to_world,shape(g)) for g,v in shapes(mask.astype('uint8'),mask=mask) if v]);lanes=union_all([transform(project,shape(f['geometry'])).buffer(f['properties']['width_m']/2+.35) for f in features if f['properties']['kind']=='lane']);sight=union_all([LineString([(-548,-113),(-538,-109),(-532,-107)]).buffer(2.3),LineString([(-541.9,-131.5),(-558,-136),(-562,-137)]).buffer(2.1)]);clear=lanes.union(sight).union(box(-514,-186,-496,-174));occupied=union_all([transform(project,shape(f['geometry'])) for f in features if f['properties']['kind'] in ('roof','mall')]);terrain=np.load(folder/'dongxi-ground.npz');rows=[];sources=[]
@@ -39,4 +43,4 @@ for part in pieces(trace.intersection(boundary)):
     if part.area>=9:add(part,'Esri','影像屋面候选；单体边界和高度估计')
 from passages import reserve_passages
 rows=reserve_passages(rows)
-(folder/'dongxi-infill.geojson').write_text(json.dumps(dict(type='FeatureCollection',features=rows),ensure_ascii=False,separators=(',',':'))+'\n');(folder/'dongxi-source-audit.json').write_text(json.dumps(sources,ensure_ascii=False,indent=2)+'\n');print('sources',len(sources),'new roofs',len(rows),'maximum envelope vertices',max(len(f['geometry']['coordinates'][0]) for f in rows));print('layout predicted XOR',trace.symmetric_difference(occupied).intersection(boundary).area/boundary.area)
+((root/'pipeline/data/layout')/'dongxi-infill.geojson').write_text(json.dumps(dict(type='FeatureCollection',features=rows),ensure_ascii=False,separators=(',',':'))+'\n');(folder/'dongxi-source-audit.json').write_text(json.dumps(sources,ensure_ascii=False,indent=2)+'\n');print('sources',len(sources),'new roofs',len(rows),'maximum envelope vertices',max(len(f['geometry']['coordinates'][0]) for f in rows));print('layout predicted XOR',trace.symmetric_difference(occupied).intersection(boundary).area/boundary.area)

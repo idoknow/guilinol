@@ -1,4 +1,6 @@
 import assert from 'node:assert/strict'
+import {readFileSync} from 'node:fs'
+import {gunzipSync} from 'node:zlib'
 import {Traffic} from '../web/src/traffic/sim.ts'
 
 const nodes=[[0,0],[40,0],[130,0],[40,60]].map(([x,z],id)=>({id,x,y:0,z}))
@@ -35,3 +37,25 @@ const held=new Traffic({nodes,lanes:[lanes[0]],signals:[],walks:[]},()=>.5,0)
 const patient=car(32);patient.track=[...held.allTracks()][0];held.actors.push(patient)
 for(let tick=0;tick<1600;tick++)held.step(.05,camera,{x:34,y:0,z:0},()=>true)
 assert.ok(!patient.leaving&&patient.x===32,'do not withdraw a car waiting for the player')
+
+const junction=JSON.parse(gunzipSync(readFileSync('public/world/roads/-4_1.json.gz')))
+const junctionCamera={x:-1566,y:157,z:883}
+for(const [kind,lane] of [['car',9735],['scooter',10791]]){
+  const traffic=new Traffic(junction,()=>.5,0)
+  const incoming=[...traffic.allTracks()].find(track=>track.id===lane)
+  const actor={...car(incoming.length-.05),kind,track:incoming,speed:4}
+  actor.x=incoming.end.x;actor.y=incoming.end.y;actor.z=incoming.end.z
+  traffic.actors.push(actor)
+  while(!traffic.green(incoming))traffic.time+=.05
+  for(let tick=0;tick<15;tick++)traffic.step(.05,junctionCamera,undefined,()=>true)
+  assert.equal(actor.track.from,incoming.to,`${kind} must continue from the connected node`)
+  assert.equal(actor.scale,1);assert.ok(traffic.actors.includes(actor)&&!actor.leaving)
+  assert.notEqual(actor.track.street,incoming.street)
+}
+
+const terminal=new Traffic({nodes,lanes:[lanes[0]],signals:[],walks:[]},()=>.5,0)
+const stopped=car(39.99);stopped.track=[...terminal.allTracks()][0];stopped.speed=4;terminal.actors.push(stopped)
+for(let tick=0;tick<20;tick++)terminal.step(.05,camera,undefined,()=>true)
+assert.ok(!stopped.leaving&&stopped.scale===1&&stopped.dist===40)
+for(let tick=0;tick<20;tick++)terminal.step(.05,camera,undefined,()=>false)
+assert.equal(terminal.actors.length,0)

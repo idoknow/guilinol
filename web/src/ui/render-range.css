@@ -299,3 +299,23 @@ body[data-hud="street"] .render-pop {
     overflow: auto;
   }
 }
+
+/* 光影画质（IDOK-291）：和视野档位同款按钮，单独一节，用细线隔开 */
+.render-gfx {
+  display: grid;
+  gap: 6px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(244, 239, 226, .14);
+}
+
+.render-gfx-note {
+  font-size: 10.5px;
+  font-weight: 400;
+  letter-spacing: .04em;
+  opacity: .6;
+}
+
+.render-gfx-tiers button span {
+  font: 10.5px/1.25 var(--ui-serif, serif);
+  letter-spacing: .02em;
+}

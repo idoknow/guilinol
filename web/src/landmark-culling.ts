@@ -1,5 +1,7 @@
 import * as THREE from 'three'
 import {look} from './look/config'
+import {wallShadows} from './wall-occlusion'
+import type {Stream} from './stream'
 
 const LOD_NAMES = ['lod0', 'lod1', 'lod2'] as const
 const lodCache = new WeakMap<THREE.Object3D, Partial<Record<(typeof LOD_NAMES)[number], THREE.Object3D>>>()
@@ -103,13 +105,15 @@ function prepare(mesh:THREE.Mesh, unique:boolean):Draw {
   return draw
 }
 
-export function landmarkCulling(){
+export function landmarkCulling(stream:Stream){
   const prepared=new WeakMap<THREE.Object3D,Draw[]>(), active=new WeakSet<THREE.Object3D>()
   const frustum=new THREE.Frustum(), reflection=new THREE.Frustum(), matrix=new THREE.Matrix4()
   // For translations up to this distance, the expanded planes still enclose
   // the current view (also after reflecting across a fixed water plane).
-  const margin=8
+  const margin=2
+  let tileRevision=-1,hidden:(box:THREE.Box3)=>boolean=()=>false
   const anchor=new THREE.Vector3(Infinity,0,0), rotation=new THREE.Quaternion()
+  const shadowAnchor=anchor.clone()
   const projection=new THREE.Matrix4(), reflect=new THREE.Matrix4().makeScale(1,-1,1)
   let lastMirror=NaN, lastHorizon=NaN
   const layers:Draw[][]=[]
@@ -135,9 +139,19 @@ export function landmarkCulling(){
     },
     update(roots:Iterable<THREE.Group>,camera:THREE.PerspectiveCamera,mirror:number,cullHorizon=look.fogHorizonTo){
       camera.updateMatrixWorld()
-      const moved=anchor.distanceToSquared(camera.position)>=margin*margin ||
-        !rotation.equals(camera.quaternion) || !projection.equals(camera.projectionMatrix) || mirror!==lastMirror || cullHorizon!==lastHorizon
+      const projectionChanged=!projection.equals(camera.projectionMatrix)
+      const refreshShadows=tileRevision!==stream.tileRevision || projectionChanged ||
+        shadowAnchor.distanceToSquared(camera.position)>=margin*margin
+      const moved=refreshShadows || anchor.distanceToSquared(camera.position)>=margin*margin ||
+        !rotation.equals(camera.quaternion) || mirror!==lastMirror || cullHorizon!==lastHorizon
       if(moved){
+        if(refreshShadows){
+          shadowAnchor.copy(camera.position)
+          const m=camera.projectionMatrix.elements
+          const nearRadius=camera.near*Math.hypot(1,(1+Math.abs(m[8]))/m[0],(1+Math.abs(m[9]))/m[5])
+          hidden=wallShadows(stream,shadowAnchor,margin,nearRadius)
+          tileRevision=stream.tileRevision
+        }
         anchor.copy(camera.position);rotation.copy(camera.quaternion);projection.copy(camera.projectionMatrix);lastMirror=mirror;lastHorizon=cullHorizon
         matrix.multiplyMatrices(projection,camera.matrixWorldInverse)
         frustum.setFromProjectionMatrix(matrix)
@@ -150,7 +164,7 @@ export function landmarkCulling(){
       }
       const classify=(box:THREE.Box3)=>{
         if(box.distanceToPoint(anchor)>cullHorizon+margin)return 0
-        return Number(frustum.intersectsBox(box))+
+        return Number(frustum.intersectsBox(box)&&!hidden(box))+
           (Number.isFinite(mirror)&&box.max.y>=mirror&&reflection.intersectsBox(box)?2:0)
       }
       layers.length=0

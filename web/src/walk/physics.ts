@@ -24,7 +24,8 @@ import {
 
 type Outline = import('../buildings').Building
 type Kind = 'ground'|'overview'|'road'|'deck'|'deckThin'|'building'|'peak'|'tree'|'rail'|'sidewalk'|'landmark'
-type Region = {fine:boolean,colliders:R.Collider[],barrierColliders:R.Collider[],rings:Outline[]}
+type Detail = Awaited<ReturnType<typeof import('../world').detail>>
+type Region = {data:Detail|undefined,colliders:R.Collider[],barrierColliders:R.Collider[],rings:Outline[],surfaces?:Generator<boolean>}
 const identity = {x:0,y:0,z:0,w:1}, down = {x:0,y:-1,z:0}, up = {x:0,y:1,z:0}
 const candidates = [{dx:0,dz:0}]
 for(let dx=-cfg.search;dx<=cfg.search;dx+=2) for(let dz=-cfg.search;dz<=cfg.search;dz+=2)
@@ -135,7 +136,7 @@ function filterBridgeOverRoad(road: Float32Array, deck: Float32Array) {
   return kept.length === road.length ? road : Float32Array.from(kept)
 }
 
-function weldedSurface(raw:Float32Array, corners:number[]|null, data:Awaited<ReturnType<typeof import('../world').detail>>, maxGap:number, minRun:number, maxRun:number, runScale:number){
+function* weldedSurface(raw:Float32Array, corners:number[]|null, data:Detail, maxGap:number, minRun:number, maxRun:number, runScale:number){
   const verts:number[]=[],idxList:number[]=[],seen=new Map<string,number>()
   const addVertex=(corner:number)=>{
     const i=3*corner
@@ -146,24 +147,27 @@ function weldedSurface(raw:Float32Array, corners:number[]|null, data:Awaited<Ret
   }
   if(corners){
     for(let t=0;t+2<corners.length;t+=3){
+      if(t&&t%1536===0)yield false
       const a=addVertex(corners[t]),b=addVertex(corners[t+1]),c=addVertex(corners[t+2])
       if(a!==b&&b!==c&&c!==a)idxList.push(a,b,c)
     }
   }else{
     for(let t=0;t+2<raw.length/3;t+=3){
+      if(t&&t%1536===0)yield false
       const a=addVertex(t),b=addVertex(t+1),c=addVertex(t+2)
       if(a!==b&&b!==c&&c!==a)idxList.push(a,b,c)
     }
   }
   if(!idxList.length)return null
   // Smooth low dry abutment/road-shoulder edges onto terrain so pedestrians and vehicles glide up without snagging.
-  const edgeCount=new Map<string,number>(), edgeTri=new Map<string,[number,number,number]>()
+  const vertexCount=verts.length/3
+  const boundary=new Map<number,[number,number,number]|null>()
   const addEdge=(u:number,v:number,w:number)=>{
-    const k=u<v?`${u}:${v}`:`${v}:${u}`
-    edgeCount.set(k,(edgeCount.get(k)??0)+1)
-    edgeTri.set(k,[u,v,w])
+    const key=Math.min(u,v)*vertexCount+Math.max(u,v)
+    boundary.set(key,boundary.has(key)?null:[u,v,w])
   }
   for(let t=0;t<idxList.length;t+=3){
+    if(t&&t%1536===0)yield false
     const a=idxList[t],b=idxList[t+1],c=idxList[t+2]
     addEdge(a,b,c);addEdge(b,c,a);addEdge(c,a,b)
   }
@@ -178,9 +182,11 @@ function weldedSurface(raw:Float32Array, corners:number[]|null, data:Awaited<Ret
     return Math.max(vis,(data.water[gi]===-32768?data.terrain[gi]:data.water[gi])/10)
   }
   const dryAt=(lx:number,lz:number)=>data.water[Math.min(64,Math.max(0,Math.round(lz/4)))*65+Math.min(64,Math.max(0,Math.round(lx/4)))]===-32768
-  for(const [k,cnt] of edgeCount){
-    if(cnt!==1)continue
-    const [u,v,w]=edgeTri.get(k)!
+  let visited=0
+  for(const edge of boundary.values()){
+    if(++visited%512===0)yield false
+    if(!edge)continue
+    const [u,v,w]=edge
     const ax=verts[u*3],ay=verts[u*3+1],az=verts[u*3+2]
     const bx=verts[v*3],by=verts[v*3+1],bz=verts[v*3+2]
     if((ax<.15&&bx<.15)||(ax>255.85&&bx>255.85)||(az<.15&&bz<.15)||(az>255.85&&bz>255.85))continue
@@ -205,10 +211,11 @@ function weldedSurface(raw:Float32Array, corners:number[]|null, data:Awaited<Ret
 }
 function houses(rings:Outline[]){
   const verts:number[]=[], indices:number[]=[]
-  for(const [bottom,top,loops] of rings){
+  for(const ring of rings){
+    const [bottom,top,loops]=ring, plane=ring[10]
     const shape=loops.map(loop=>loop.map(([east,south])=>new THREE.Vector2(east/100,south/100)))
     const faces=THREE.ShapeUtils.triangulateShape(shape[0],shape.slice(1)),start=verts.length/3,size=shape.flat().length
-    for(const level of [bottom,top])for(const loop of shape)for(const pt of loop)verts.push(pt.x,level/10,pt.y)
+    for(const level of [bottom,top])for(const loop of shape)for(const pt of loop)verts.push(pt.x,plane ? plane[0]*pt.x+plane[1]*pt.y+plane[2]+(level-top)/10 : level/10,pt.y)
     for(const [first,second,third] of faces)indices.push(start+first,start+second,start+third,start+size+third,start+size+second,start+size+first)
     let offset=start
     for(const loop of shape){for(let at=0;at<loop.length;at++){
@@ -232,7 +239,8 @@ export async function createPhysics(manifest:Manifest,stream:Stream,peaks:PeaksG
   function add(desc:R.ColliderDesc,kind:Kind){const coll=world.createCollider(desc);kinds.set(coll.handle,kind);return coll}
   const thinDecks=new Set<number>()
   const sources=new Map<number,string>()
-  function remove(coll:R.Collider){sources.delete(coll.handle);thinDecks.delete(coll.handle);kinds.delete(coll.handle);world.removeCollider(coll,false)}
+  const bridgeSurfaces=new Set<number>()
+  function remove(coll:R.Collider){bridgeSurfaces.delete(coll.handle);sources.delete(coll.handle);thinDecks.delete(coll.handle);kinds.delete(coll.handle);world.removeCollider(coll,false)}
   const trunks=new Map<import('../forest').Tree,R.Collider>()
   const landmarks=new Map<THREE.Group,R.Collider[]>()
   const landmarkBounds=new Map<THREE.Group,{minX:number,maxX:number,minZ:number,maxZ:number}>()
@@ -332,7 +340,27 @@ export async function createPhysics(manifest:Manifest,stream:Stream,peaks:PeaksG
     }
     return built
   }
-  function sync(east:number,south:number){
+  function* surfaces(tile:Tile,data:Detail,colliders:R.Collider[]){
+    const {sidewalk,road}=data.streets
+    function* install(raw:Float32Array,corners:number[]|null,kind:'sidewalk'|'road'|'deck',settings:[number,number,number,number],thin=false){
+      const desc=yield* weldedSurface(raw,corners,data,...settings)
+      if(!desc)return
+      yield true
+      const collider=add(desc.setTranslation(tile.x,0,tile.z),kind)
+      colliders.push(collider)
+      if(kind==='road')sources.set(collider.handle,tile.file)
+      if(thin)thinDecks.add(collider.handle)
+      yield true
+    }
+    if(sidewalk.length)yield* install(sidewalk,null,'sidewalk',[.65,.38,1.4,2.4])
+    if(road.length)yield* install(filterBridgeOverRoad(road,data.deck),null,'road',[.65,.8,1.8,4])
+    if(data.deck.length){
+      const indices:[number[],number[]]=[[],[]]
+      for(let face=0;face<data.deck.length/9;face++)indices[data.thin.has(face)?1:0].push(face*3,face*3+1,face*3+2)
+      for(const [thin,faces] of indices.entries())if(faces.length)yield* install(data.deck,faces,'deck',[.80,1.2,2.8,5],!!thin)
+    }
+  }
+  function sync(east:number,south:number,frame=false){
     let changed=false
     let landmarksChanged=false
     const dirtyLandmarkBoxes:{minX:number,maxX:number,minZ:number,maxZ:number}[]=[]
@@ -377,7 +405,8 @@ export async function createPhysics(manifest:Manifest,stream:Stream,peaks:PeaksG
           filtered.push(i0,i1,i2)
         }
         const solidDesc=filtered.length?weldedIndexed(vertices,filtered):null
-        if(solidDesc){const collider=add(solidDesc,'landmark');sources.set(collider.handle,`${entry.id}/${parent.name}/${node.name}`);colliders.push(collider)}
+        if(solidDesc){const collider=add(solidDesc,'landmark');sources.set(collider.handle,`${entry.id}/${parent.name}/${node.name}`);colliders.push(collider)
+          if(entry.id==='jiefang_bridge'&&parent.name==='collision_surface')bridgeSurfaces.add(collider.handle)}
         const slabDesc=lowSlabs.length?weldedIndexed(vertices,lowSlabs):null
         if(slabDesc)colliders.push(add(slabDesc,'sidewalk'))
       })
@@ -394,7 +423,7 @@ export async function createPhysics(manifest:Manifest,stream:Stream,peaks:PeaksG
       world.step()
       if(dirtyLandmarkBoxes.length){
         for(const [tile,region] of regions){
-          if(!region.fine)continue
+          if(!region.data)continue
           const data=stream.loaded.get(tile)
           if(!data||!data.streets.roadBarriers.length)continue
           const overlapsDirty=dirtyLandmarkBoxes.some(b=>b.maxX>=tile.x-1&&b.minX<=tile.x+257&&b.maxZ>=tile.z-1&&b.minZ<=tile.z+257)
@@ -406,24 +435,34 @@ export async function createPhysics(manifest:Manifest,stream:Stream,peaks:PeaksG
       }
     }
     for(const [tree,collider] of trunks)if(Math.hypot(east-tree.x,south-tree.z)>48){remove(collider);trunks.delete(tree);changed=true}
-    const inRange=(tile:Tile)=>Math.hypot(Math.max(0,Math.abs(east-tile.x-128)-128),Math.max(0,Math.abs(south-tile.z-128)-128))<=collisionRadius
+    const distance=(tile:Tile)=>Math.hypot(Math.max(0,Math.abs(east-tile.x-128)-128),Math.max(0,Math.abs(south-tile.z-128)-128))
+    const inRange=(tile:Tile)=>distance(tile)<=collisionRadius
+    let deferred:Region|undefined,nearest=Infinity,started=false
     for(const [tile,region] of regions){
       if(inRange(tile))continue
       region.colliders.forEach(remove);region.barrierColliders.forEach(remove);regions.delete(tile);changed=true
     }
     for(const tile of stream.grid.near(east,south,collisionRadius+128)){
-      const near=inRange(tile)
-      const data=stream.loaded.get(tile), region=regions.get(tile)
+      const range=distance(tile),near=range<=collisionRadius,urgent=range<=(frame?12:cfg.search)
+      let data=stream.loaded.get(tile)
+      const region=regions.get(tile)
       const trees=stream.forest.loaded.get(tile)
       if(trees&&Math.max(Math.abs(east-tile.x-128),Math.abs(south-tile.z-128))<168)for(const tree of trees){
         if(tree.kind!==5&&!trunks.has(tree)&&Math.hypot(east-tree.x,south-tree.z)<40){trunks.set(tree,add(R.ColliderDesc.cylinder(1.8,.42*tree.scale).setTranslation(tree.x,tree.y+1.8,tree.z),'tree'));changed=true}}
-      if(region&&region.fine!==!!data){region.colliders.forEach(remove);region.barrierColliders.forEach(remove);regions.delete(tile);changed=true}
+      if(data&&data!==region?.data&&!urgent&&(!frame||started))continue
+      if(region&&region.data!==data){region.colliders.forEach(remove);region.barrierColliders.forEach(remove);regions.delete(tile);changed=true}
+      if(near&&region?.data===data&&region?.surfaces){
+        if(urgent){while(!region.surfaces.next().done){};region.surfaces=undefined;changed=true}
+        else if(range<nearest){deferred=region;nearest=range}
+      }
       if(!near||regions.has(tile))continue
+      if(data&&!urgent)started=true
       const spacing=manifest.overview.step,stride=width/spacing+1,start=(tile.z-top)/spacing*stride+(tile.x-left)/spacing
       const colliders:R.Collider[]=[]
       let barrierColliders:R.Collider[]=[]
       if(data?.tunnel){
         for(const [mesh,kind] of [[data.groundMesh,'ground'],[data.tunnel.fringe,'ground'],[data.tunnel.floor,'road'],[data.tunnel.portal,'rail'],[data.tunnel.interior,'rail']] as const){
+          if(!mesh)continue
           const geometry=mesh.geometry,positions=geometry.getAttribute('position');if(!positions.count)continue
           const indices=geometry.index?Array.from(geometry.index.array):Array.from({length:positions.count},(_,index)=>index)
           const desc=weldedIndexed(Float32Array.from(positions.array),indices)
@@ -434,12 +473,7 @@ export async function createPhysics(manifest:Manifest,stream:Stream,peaks:PeaksG
         colliders.push(add(ground.setTranslation(tile.x+128,0,tile.z+128),data?'ground':'overview'))
       }
       const rings=data?.rings??[]
-      if(data){const {sidewalk,road,banks}=data.streets
-        const swDesc=sidewalk.length?weldedSurface(sidewalk,null,data,.65,.38,1.4,2.4):null
-        if(swDesc)colliders.push(add(swDesc.setTranslation(tile.x,0,tile.z),'sidewalk'))
-        const filteredRoad=filterBridgeOverRoad(road,data.deck)
-        const rdDesc=filteredRoad.length?weldedSurface(filteredRoad,null,data,.65,.8,1.8,4):null
-        if(rdDesc){const collider=add(rdDesc.setTranslation(tile.x,0,tile.z),'road');sources.set(collider.handle,tile.file);colliders.push(collider)}
+      if(data){const {banks}=data.streets
         for(const [ax,az,bx,bz,top,bottom,endTop=top] of banks){const angle=-Math.atan2(bz-az,bx-ax),height=((top+endTop)/2-bottom)/10+1.25
           colliders.push(add(R.ColliderDesc.cuboid(Math.hypot(bx-ax,bz-az)/20+.03,height/2,.09).setRotation({x:0,y:Math.sin(angle/2),z:0,w:Math.cos(angle/2)}).setTranslation(tile.x+(ax+bx)/20,bottom/10+height/2,tile.z+(az+bz)/20),'rail'))}}
       if(data){
@@ -453,24 +487,24 @@ export async function createPhysics(manifest:Manifest,stream:Stream,peaks:PeaksG
         }
         barrierColliders=buildTileRoadBarriers(tile,data.streets.roadBarriers)
       }
-      if(rings.length)colliders.push(add(houses(rings).setTranslation(tile.x,0,tile.z),'building'))
-      if(data?.deck.length){
-        // Keep the rendered slab thickness on the collider. Rapier feature IDs
-        // on a trimesh ray hit need not index the original GL04 triangles.
-        const indices:[number[],number[]]=[[],[]]
-        for(let face=0;face<data.deck.length/9;face++){
-          indices[data.thin.has(face)?1:0].push(face*3,face*3+1,face*3+2)
-        }
-        for(const [thin,faces] of indices.entries()){
-          if(!faces.length)continue
-          const desc=weldedSurface(data.deck,faces,data,.80,1.2,2.8,5)
-          if(!desc)continue
-          const collider=add(desc.setTranslation(tile.x,0,tile.z),'deck')
-          colliders.push(collider)
-          if(thin)thinDecks.add(collider.handle)
-        }
+      if(rings.length){
+        const passageFloors=rings.filter(r=>r[10])
+        const solids=passageFloors.length?rings.filter(r=>!r[10]):rings
+        if(solids.length)colliders.push(add(houses(solids).setTranslation(tile.x,0,tile.z),'building'))
+        if(passageFloors.length)colliders.push(add(houses(passageFloors).setTranslation(tile.x,0,tile.z),'sidewalk'))
       }
-      regions.set(tile,{colliders,barrierColliders,rings,fine:!!data});changed=true
+      const pending=data?surfaces(tile,data,colliders):undefined
+      if(urgent&&pending)while(!pending.next().done){}
+      regions.set(tile,{colliders,barrierColliders,rings,data,surfaces:urgent?undefined:pending});changed=true
+    }
+    if(frame&&!started&&deferred?.surfaces){
+      const deadline=performance.now()+2, count=deferred.colliders.length
+      do{
+        const step=deferred.surfaces.next()
+        if(step.done){deferred.surfaces=undefined;break}
+        if(step.value)break
+      }while(performance.now()<deadline)
+      if(count!==deferred.colliders.length)changed=true
     }
     for(const [peak,collider] of mountains)if(!peaks.colliders.includes(peak)){remove(collider);mountains.delete(peak);changed=true}
     for(const peak of peaks.colliders){
@@ -519,9 +553,10 @@ export async function createPhysics(manifest:Manifest,stream:Stream,peaks:PeaksG
   const canTrafficPush=trafficPushGuard(world,capsule,bikeWallFilter,insideHouse)
   const landmarkFilter=(coll:R.Collider)=>kinds.get(coll.handle)==='landmark'
   const walkableFilter=(coll:R.Collider)=>{const k=kinds.get(coll.handle);return k==='deck'||k==='deckThin'||k==='sidewalk'||k==='road'||k==='ground'||k==='overview'||k==='landmark'}
-  function surface(east:number,south:number,kind:Kind,origin=4000,reach=6000){
+  function surface(east:number,south:number,kind:Kind|'bridgeSurface',origin=4000,reach=6000){
+    if(kind==='bridgeSurface'&&!bridgeSurfaces.size)return null
     surfaceRay.origin.x=east;surfaceRay.origin.y=origin;surfaceRay.origin.z=south
-    const hit=world.castRayAndGetNormal(surfaceRay,reach,false,undefined,undefined,capsule,undefined,kind==='deck'?deckFilter:coll=>kinds.get(coll.handle)===kind)
+    const hit=world.castRayAndGetNormal(surfaceRay,reach,false,undefined,undefined,capsule,undefined,kind==='deck'?deckFilter:kind==='bridgeSurface'?coll=>bridgeSurfaces.has(coll.handle):coll=>kinds.get(coll.handle)===kind)
     const thin=!!hit&&(thinDecks.has(hit.collider.handle)||kinds.get(hit.collider.handle)==='deckThin')
     return hit?{y:origin-hit.timeOfImpact,slope:Math.acos(Math.min(1,Math.abs(hit.normal.y))),thin}:null
   }
@@ -533,6 +568,12 @@ export async function createPhysics(manifest:Manifest,stream:Stream,peaks:PeaksG
     const slope=Math.acos(Math.min(1,Math.abs(hit.normal.y)))
     if(slope>cfg.slope+.18)return null
     return {y:origin-hit.timeOfImpact,slope,kind:kinds.get(hit.collider.handle)!}
+  }
+  const fishingColumn=new R.Cuboid(1,150,1)
+  function coveredWater(x:number,z:number,height:number){
+    return !!world.intersectionWithShape({x,y:height+150-.02,z},identity,fishingColumn,undefined,undefined,capsule,undefined,coll=>{
+      const kind=kinds.get(coll.handle);return !!kind&&kind!=='ground'&&kind!=='overview'
+    })
   }
   function waterCeiling(east:number,south:number,waterY:number){
     let bottom=Infinity
@@ -609,6 +650,7 @@ export async function createPhysics(manifest:Manifest,stream:Stream,peaks:PeaksG
     const px=(east-tile.x)*100,pz=(south-tile.z)*100
     const inRing=regions.get(tile)?.rings.some(ring=>{
       const [bottom,top,loops]=ring
+      if(ring[10])return false
       if(y===undefined && ring[9])return false
       if(y!==undefined&&(y<bottom/10||y>top/10))return false
       let inside=false
@@ -631,15 +673,45 @@ export async function createPhysics(manifest:Manifest,stream:Stream,peaks:PeaksG
   function withinBounds(x:number,z:number){
     return inRegion(manifest,x,z)
   }
-  function findWalkableSpawn(east:number,south:number,override=false,dryOnly=false){
-    for(const {dx,dz} of override?[candidates[0]]:candidates){const x=east+dx,z=south+dz,tile=tileAt(x,z)
-      if(!withinBounds(x,z)||!tile||!stream.loaded.has(tile)||(dryOnly&&wet(x,z))||insideHouse(x,z))continue
-      const deck=surface(x,z,'deck'),support=deck??surface(x,z,'sidewalk')??surface(x,z,'road')??surface(x,z,'ground');if(!support||support.slope>cfg.slope||(!deck&&wet(x,z)))continue
-      const peak=surface(x,z,'peak');if(peak&&peak.y>support.y+.05)continue
+  function tryPreferredLandmark(x:number,z:number,tile:Tile,dx:number,dz:number,dryOnly:boolean,preferY:number){
+    const preferred=surface(x,z,'landmark',preferY+1,2)
+    if(!preferred||preferred.slope>cfg.slope||preferred.y<preferY-1-1e-4||preferred.y>preferY+1+1e-4)return null
+    if(insideHouse(x,z,preferred.y+.5))return null
+    if(wet(x,z)){
+      if(dryOnly)return null
+      const data=stream.loaded.get(tile),waterAt=data?data.water[Math.round((z-tile.z)/4)*65+Math.round((x-tile.x)/4)]:-32768
+      const waterY=waterAt===-32768?-Infinity:waterAt/10
+      if(preferred.y<waterY+.1)return null
+    }
+    const peak=surface(x,z,'peak');if(peak&&peak.y>preferred.y+.05)return null
+    const y=preferred.y+cfg.height/2+.055
+    if(world.intersectionWithShape({x,y,z},identity,shape,undefined,undefined,capsule))return null
+    const deck=surface(x,z,'deck')
+    return {x,y,z,rule:(dx||dz?'search-':'')+(deck||wet(x,z)?'bridge':'land')}
+  }
+  function findWalkableSpawn(east:number,south:number,override=false,dryOnly=false,preferY?:number,reject?:(why:string,x:number,z:number,hitY?:number,slope?:number)=>void){
+    const offsets=override?[candidates[0]]:candidates
+    if(preferY!==undefined&&Number.isFinite(preferY)&&landmarks.size){
+      for(const {dx,dz} of offsets){const x=east+dx,z=south+dz,tile=tileAt(x,z)
+        if(!withinBounds(x,z)||!tile||!stream.loaded.has(tile)||(dryOnly&&wet(x,z)))continue
+        let inBox=false
+        for(const b of landmarkBounds.values()){if(x>=b.minX&&x<=b.maxX&&z>=b.minZ&&z<=b.maxZ){inBox=true;break}}
+        if(!inBox)continue
+        const hit=tryPreferredLandmark(x,z,tile,dx,dz,dryOnly,preferY)
+        if(hit)return hit
+      }
+    }
+    for(const {dx,dz} of offsets){const x=east+dx,z=south+dz,tile=tileAt(x,z)
+      const unavailable=!withinBounds(x,z)?'outside-bounds':!tile||!stream.loaded.has(tile)?'missing-tile':dryOnly&&wet(x,z)?'wet':insideHouse(x,z)?'inside-house':null
+      if(unavailable){reject?.(unavailable,x,z);continue}
+      const deck=surface(x,z,'deck'),support=deck??surface(x,z,'sidewalk')??surface(x,z,'road')??surface(x,z,'ground')
+      if(!support){reject?.(tile&&regions.has(tile)?'ray-miss':'missing-collision',x,z);continue}
+      if(support.slope>cfg.slope||(!deck&&wet(x,z))){reject?.(support.slope>cfg.slope?'steep':'wet',x,z,support.y,support.slope);continue}
+      const peak=surface(x,z,'peak');if(peak&&peak.y>support.y+.05){reject?.('below-peak',x,z,support.y);continue}
       const tread=surface(x,z,'landmark',support.y+cfg.step+.02,cfg.step+.04)
       const floor=tread&&tread.slope<=cfg.slope?Math.max(tread.y,support.y):support.y
       const y=floor+cfg.height/2+.055
-      if(world.intersectionWithShape({x,y,z},identity,shape,undefined,undefined,capsule))continue
+      if(world.intersectionWithShape({x,y,z},identity,shape,undefined,undefined,capsule)){reject?.('capsule-blocked',x,z,floor);continue}
       return {x,y,z,rule:(dx||dz?'search-':'')+(deck?'bridge':'land')}
     }return null
   }
@@ -678,6 +750,7 @@ export async function createPhysics(manifest:Manifest,stream:Stream,peaks:PeaksG
     const waterY=data.water[Math.round((cz-tile.z)/4)*65+Math.round((cx-tile.x)/4)]/10
     const tread=surface(cx,cz,'deck',bikeY+.6,1.4)??surface(cx,cz,'landmark',bikeY+.6,1.4)??surface(cx,cz,'road',bikeY+.6,1.4)
     if(tread&&tread.y>=waterY)return null
+    sync(cx,cz)
     const shore=findWalkableSpawn(cx,cz,false,true)
     return shore&&{...shore,rule:'water-rescue'}
   }
@@ -717,5 +790,5 @@ export async function createPhysics(manifest:Manifest,stream:Stream,peaks:PeaksG
       return k==='building'||k==='rail'||k==='peak'||k==='tree'||k==='landmark'
     })
   }
-  return {world,body,capsule,controller,kinds,sources,sync,clear,overlaps,tileAt,hasDeck,surface,groundSurface,waterCeiling,waterOverlap,carOverlap,raycastObstacle,bikePathBlocked,pathBlocked,freeCapsule,wet,insideHouse,withinBounds,findWalkableSpawn,findFlatGround,findLocalDismount,findLocalMount,findCarDismount,findCarMount,isBlockedAt,canTrafficPush,syncObstacleVolume,removeObstacleVolume,getObstacleVolumeIds,resolveObstacleStep,clampCamera}
+  return {world,body,capsule,controller,kinds,sources,sync,clear,overlaps,tileAt,hasDeck,surface,groundSurface,coveredWater,waterCeiling,waterOverlap,carOverlap,raycastObstacle,bikePathBlocked,pathBlocked,freeCapsule,wet,insideHouse,withinBounds,findWalkableSpawn,findFlatGround,findLocalDismount,findLocalMount,findCarDismount,findCarMount,isBlockedAt,canTrafficPush,syncObstacleVolume,removeObstacleVolume,getObstacleVolumeIds,resolveObstacleStep,clampCamera}
 }

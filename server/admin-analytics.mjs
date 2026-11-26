@@ -1,4 +1,4 @@
-import {firstVisit,partitions,sessionTotals,weighted,membership} from './day-summary.mjs'
+import {firstVisit,isSessionMetric,partitions,sessionSeries,sessionTotals,weighted,membership} from './day-summary.mjs'
 import {metrics} from './telemetry.mjs'
 
 const dimensions={region:'region',city:'city',isp:'isp',device:'device',gpu:'gpu',build:'build',mode:'mode'}
@@ -47,10 +47,12 @@ export async function analytics(pool,path,params){
   const args=[new Date(start),new Date(end)], range='received >= $1 AND received < $2'
   const rows=async(sql,values=args)=>(await pool.query(sql,values)).rows
   if(path==='admin/live'){
-    const people=await rows(`WITH latest AS (SELECT DISTINCT ON(session) mode,region FROM perf_event
-      WHERE received>=now()-interval '5 minutes' AND kind<>'probe' ORDER BY session,received DESC,batch_position DESC)
-      SELECT mode,region,grouping(mode,region) AS level,count(*) AS n FROM latest GROUP BY GROUPING SETS ((),(mode),(region))`,[])
-    const server=await rows(`SELECT minute,sample,errors5xx FROM perf_server WHERE minute>=date_trunc('minute',now())-interval '1 minute' ORDER BY minute DESC LIMIT 1`,[])
+    const [people,server]=await Promise.all([
+      rows(`WITH latest AS (SELECT DISTINCT ON(session) mode,region FROM perf_event
+        WHERE received>=now()-interval '5 minutes' AND kind<>'probe' ORDER BY session,received DESC,batch_position DESC)
+        SELECT mode,region,grouping(mode,region) AS level,count(*) AS n FROM latest GROUP BY GROUPING SETS ((),(mode),(region))`,[]),
+      rows(`SELECT minute,sample,errors5xx FROM perf_server WHERE minute>=date_trunc('minute',now())-interval '1 minute' ORDER BY minute DESC LIMIT 1`,[]),
+    ])
     return json({online:people.find(r=>r.level===3).n,modes:people.filter(r=>r.level===1),regions:people.filter(r=>r.level===2),server:server[0]??null})
   }
   if(path==='admin/errors')return json(await rows(`SELECT fields->>'errorKind' AS kind,fields->>'signature' AS signature,build,
@@ -84,23 +86,31 @@ export async function analytics(pool,path,params){
   const time=col=>overview?`CASE WHEN ${col}<$3 THEN $1::timestamptz ELSE $3::timestamptz END`:`date_bin(interval '${interval[bucket]}',${col},'2000-01-01 UTC')`
   const result=[]
   const eventNames=names.filter(key=>!Object.hasOwn(global,key))
-  if(!overview && primary && bucket==='1d'){
-    const part=await partitions(pool,start,end)
-    if(part){
-      const data=await weighted(pool,part,m.base,{series:true,group})
-      const totals=new Map()
-      for(const row of data)totals.set(row.label,(totals.get(row.label)??0)+row.samples)
-      const top=[...totals.keys()].sort((a,b)=>totals.get(b)-totals.get(a)||String(a).localeCompare(String(b))).slice(0,6)
-      return json(data.filter(r=>top.includes(r.label)).map(r=>({t:r.t,value:m.q===.5?r.p50:r.p95,samples:r.samples,...(group?{group:r.label}:{})})))
+  if(!overview && group!=='node' && (bucket==='1d'||bucket==='1h')){
+    const part=await partitions(pool,start,end,{preferHour:bucket==='1h'})
+    if(part && (bucket==='1d'||part.grain==='hour')){
+      if(primary){
+        const data=await weighted(pool,part,m.base,{series:true,group,bucket})
+        const totals=new Map()
+        for(const row of data)totals.set(row.label,(totals.get(row.label)??0)+row.samples)
+        const top=[...totals.keys()].sort((a,b)=>totals.get(b)-totals.get(a)||String(a).localeCompare(String(b))).slice(0,6)
+        return json(data.filter(r=>top.includes(r.label)).map(r=>({t:r.t,value:m.q===.5?r.p50:r.p95,samples:r.samples,...(group?{group:r.label}:{})})))
+      }
+      if(isSessionMetric(name)){
+        return json(await sessionSeries(pool,part,name,{bucket,group}))
+      }
     }
   }
   if(overview){
-    // Use daily facts even when one comparison period is empty or entirely raw.
-    const current=await partitions(pool,start,end),previous=await partitions(pool,start-(end-start),start)
+    // Use summary facts even when one comparison period is empty or partially raw, and run both periods concurrently.
+    const [current,previous]=await Promise.all([partitions(pool,start,end),partitions(pool,start-(end-start),start)])
     if(current||previous){
-      for(const [summary,lo,hi] of [[previous,start-(end-start),start],[current,start,end]]){
+      const periods=await Promise.all([[previous,start-(end-start),start],[current,start,end]].map(async([summary,lo,hi])=>{
         const part=summary??{start:new Date(lo),end:new Date(hi),days:[],gaps:[[lo,hi]]}
         const [counts,stats]=await Promise.all([sessionTotals(pool,part),weighted(pool,part,null)])
+        return {part,counts,stats}
+      }))
+      for(const {part,counts,stats} of periods){
         for(const [key,value] of Object.entries(counts))result.push({key,t:part.start,value})
         for(const [key,metric] of Object.entries(aliases)){
           const [base,q]=metric.split('.')
@@ -110,27 +120,32 @@ export async function analytics(pool,path,params){
       eventNames.length=0
     }
   }
-  if(eventNames.length){
+  const eventTask=(async()=>{
+    if(!eventNames.length)return
     const rankings=eventNames.some(k=>k.startsWith('duration'))?',row_number() OVER(PARTITION BY t,label,session,kind ORDER BY received DESC) AS latest':''
     const fields=eventNames.map((key,i)=>{
       const metric=measurement(key)
       return (metric?percentile(metric.q,metric.expr)+` filter(where ${metric.where})`:(kpis[key]??reliability[key]))+` AS "v${i}"`
     })
-    const predicate=!overview&&m?' AND '+m.where+' AND '+m.expr+' IS NOT NULL':!overview&&name.startsWith('duration')?" AND kind='session'":!overview&&name==='probeFail'?" AND kind='probe'":" AND kind<>'probe'"
+    const relMatch=!overview&&Object.hasOwn(reliability,name)?name.split('.'):null
+    const predicate=!overview&&m?' AND '+m.where+' AND '+m.expr+' IS NOT NULL':!overview&&name.startsWith('duration')?" AND kind='session'":!overview&&name==='probeFail'?" AND kind='probe'":relMatch?` AND kind='${relMatch[0]}' AND fields->>'category'='${relMatch[1]}'`:" AND kind<>'probe'"
     const data=await rows(`WITH events AS (SELECT received,fields,session,kind,context,${time('received')} AS t,
       ${group?`coalesce(${dimensions[group]},'unknown')`:'NULL::text'} AS label FROM perf_event WHERE ${range}${predicate}),
       ranked AS (SELECT *,${overview?'CASE WHEN t=$1 THEN $3::timestamptz ELSE $2::timestamptz END':`least(t+interval '${interval[bucket]}',$2::timestamptz)`} AS bucket_end${rankings} FROM events),
       series AS (SELECT t,label,${fields.join(',')},count(*) AS samples FROM ranked GROUP BY t,label)
       SELECT * FROM series ${group?'WHERE label IN (SELECT label FROM series GROUP BY label ORDER BY sum(samples) DESC,label LIMIT 6)':''} ORDER BY t,label`,values)
     for(const row of data)eventNames.forEach((key,i)=>result.push({key,t:row.t,value:row['v'+i],samples:row.samples,...(group?{group:row.label}:{})}))
-  }
-  for(const key of names.filter(k=>Object.hasOwn(global,k))){
+  })()
+  const globalTasks=names.filter(k=>Object.hasOwn(global,k)).map(async key=>{
     const [table,col]=global[key],server=key==='api5xxRate',stamp=server?col:`to_timestamp(${col})`
     const expr=server?`sum(errors5xx)::float/nullif(sum(requests),0)`:'count(*)'
+    const whereRange=server?`${col}>=$1 AND ${col}<$2`:`${col}>=extract(epoch from $1::timestamptz) AND ${col}<extract(epoch from $2::timestamptz)`
     const data=await rows(`SELECT ${time(stamp)} t,${expr} value,${server?'sum(requests)::bigint':'count(*)'} samples FROM ${table}
-      WHERE ${stamp}>=$1 AND ${stamp}<$2 GROUP BY 1 ORDER BY 1`,values)
-    result.push(...data.map(row=>({...row,key,...(group?{group:'unknown'}:{})})))
-  }
+      WHERE ${whereRange} GROUP BY 1 ORDER BY 1`,values)
+    return data.map(row=>({...row,key,...(group?{group:'unknown'}:{})}))
+  })
+  const [,globalGroups]=await Promise.all([eventTask,Promise.all(globalTasks)])
+  for(const items of globalGroups)result.push(...items)
   if(!overview)return json(result.map(({key,...row})=>row))
   if(end-start<300000){
     for(const hi of [start,end]){

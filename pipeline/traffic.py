@@ -2,6 +2,7 @@ import gzip
 import json
 import math
 import re
+from itertools import chain
 from collections import defaultdict
 from functools import lru_cache
 from pathlib import Path
@@ -14,6 +15,26 @@ from shapely.prepared import prep
 from common import OUT, ll2xz, load_osm
 from traffic_parking import allowed, bake_parking
 from landmarks.jiefang_layout import SPAN_WAYS, deck_level
+
+# Keep surface pedestrian tracks strictly on outer sidewalks around Shizijie (IDOK-412;
+# IDOK-301 underground passage replaces surface street crossings).
+SHIZIJIE_ORIGIN = (-879.7502021582604, -169.62604470000713)
+SHIZIJIE_NO_PED_CORE = prep(Polygon([
+    (SHIZIJIE_ORIGIN[0] + x, SHIZIJIE_ORIGIN[1] + z)
+    for x, z in [
+        (4.6, -86.5), (-6.3, -46.2), (-7.2, -46.1), (-12.6, -27.0), (-15.3, -24.9), (-19.2, -22.3),
+        (-46.5, -28.2), (-70.0, -32.0), (-76.1, -34.6), (-102.0, -39.5),
+        (-102.0, -0.5),
+        (-76.3, 3.3), (-65.4, 14.0), (-40.6, 19.4), (-37.6, 24.0), (-34.1, 31.4),
+        (-40.3, 48.2), (-39.0, 52.3), (-48.9, 81.0),
+        (-10.0, 82.0),
+        (-3.2, 64.5), (0.2, 62.4), (6.0, 46.7), (8.6, 39.5), (13.4, 36.2), (23.2, 31.1),
+        (28.8, 28.7), (41.0, 31.4), (43.0, 29.7), (85.0, 40.2),
+        (85.0, 9.8),
+        (55.5, 2.5), (43.4, -0.1), (40.6, -2.9), (38.8, -5.8), (34.0, -13.2),
+        (28.8, -19.0), (27.9, -21.4), (26.8, -24.3), (30.4, -36.6), (43.3, -86.5),
+    ]
+]))
 from landmarks.world_surface import Surface
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -118,6 +139,14 @@ def bake(output, manifest, rendered_roads=None):
         return simplify_profile(samples)
 
     def add_walk(head, tail, offset, way, linear):
+        a, b = nodes[head], nodes[tail]
+        east, south = b['x'] - a['x'], b['z'] - a['z']
+        length = math.hypot(east, south)
+        if length >= .5:
+            sx = a['x'] - south / length * offset
+            sz = a['z'] + east / length * offset
+            if SHIZIJIE_NO_PED_CORE.intersects(LineString([(sx, sz), (sx + east, sz + south)])):
+                return
         walk = [head,tail,offset,len(walks)]
         if not linear:
             walk.append(profile(head,tail,offset,way))
@@ -146,14 +175,20 @@ def bake(output, manifest, rendered_roads=None):
     elements = load_osm()
     parking_segments = []
     sections = {road['way']:road['width'] for road in json.loads((output/'street-report.json').read_text())}
-    for way in elements:
+    from dingjiang_structures import motorway_sections
+    from rail_sections import motorway_sections as graded_motorways
+    # Append the modeled motorway segments after the existing network so every
+    # pre-existing lane keeps its ID in graph.json.gz and all streaming cells.
+    existing = (way for way in elements if way.get('tags', {}).get('highway')
+                not in ('motorway', 'motorway_link'))
+    for way in chain(existing, motorway_sections(elements), graded_motorways(elements)):
         tags = way.get('tags', {})
         linear = way['id'] not in SPAN_WAYS and any(tags.get(key,'no')!='no' for key in ('bridge','tunnel'))
         is_shizijie_ug = way['id'] in underpass_way_set
         if is_shizijie_ug:
             linear = True
         kind = tags.get('highway', '').removesuffix('_link')
-        if way['type'] != 'way' or kind not in MOTOR | WALK | {'cycleway'} or tags.get('area') == 'yes' or tags.get('access') in ('no', 'private'):
+        if way['type'] != 'way' or kind not in MOTOR | WALK | {'cycleway', 'motorway'} or tags.get('area') == 'yes' or tags.get('access') in ('no', 'private'):
             continue
         refs = way['nodes']
         coords = [ll2xz(pt['lat'], pt['lon']) if pt else None for pt in way['geometry']]

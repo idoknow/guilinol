@@ -24,18 +24,20 @@ Yangqiao Commons series (00..11-2024.jpg) and 2018–2025 street views:
   阳桥), and Yangqiao municipal blue road sign gantry.
 """
 from collections import defaultdict
+import json
+from types import SimpleNamespace
 import math
 from pathlib import Path
 import sys
 
 import numpy as np
-from shapely import STRtree
+from shapely import STRtree, from_wkb
 from shapely.affinity import translate
 from shapely.geometry import LineString, Point, box
 from shapely.ops import unary_union
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from common import ll2xz, load_osm  # noqa: E402
+from common import RAW, ll2xz, load_osm  # noqa: E402
 from features import points  # noqa: E402
 from road_profile import RULES, pair_carriageways, profile  # noqa: E402
 
@@ -104,6 +106,10 @@ def _iter_lines(geom):
 
 def _load_zhongshan_street_profile():
     """Load paired Road profiles and intersection masks from OSM via road_profile.py."""
+    if not Path(RAW).exists():
+        doc = json.loads((Path(__file__).resolve().parents[1]/'data/landmarks/zhongshan_road.json').read_bytes())
+        roads = {int(key): SimpleNamespace(line=LineString(row['line']), width=row['width'], right=row['right'], lanes=row['lanes']) for key,row in doc['roads'].items()}
+        return roads, from_wkb(bytes.fromhex(doc['junction_mask']))
     raw_roads = []
     empty_index = STRtree([])
     signal_pts = []

@@ -1,4 +1,4 @@
-import {type SessionAccount,type Env,checkBan,sessionAccount,Problem,cookie,deliver,equal,hash,invalid,lifetime,limit,newCode,now,passwordHash,random,reserveMail,sessionHash,unauthorized} from '../../lib/auth'
+import {type SessionAccount,type Env,checkBan,sessionAccount,Problem,cookie,deliver,equal,hash,invalid,lifetime,limit,newCode,now,passwordHash,random,requestIp,reserveMail,sessionHash,unauthorized} from '../../lib/auth'
 
 import {AVATAR_KEY, looks, sanitizeAvatar, starterOutfit} from '../../lib/avatar'
 import {feedback} from '../../lib/feedback'
@@ -25,8 +25,18 @@ async function handle(request:Request,env:Env) {
   const stmt=(sql:string,...args:(string|number)[])=>db.prepare(sql).bind(...args)
   if(method==='GET'&&path==='unsubscribe')return unsubscribe(env,url)
   if(method==='GET'&&path==='contributors')return feedbackContributors(env)
+  if(env.updateCards && /^(?:admin\/)?updates(?:\/|$)/.test(path)) return env.updateCards(request,path)
   if(/^(feedback|bridge|admin)(\/|$)/.test(path)) return feedback(request,env,path)
   if(path==='me/save')return cloudSave(request,env)
+  if(env.fishing && path==='fishing/boards' && method==='GET'){
+    const boards=await env.fishing.boards(url.searchParams.get('zone'));if(!boards)invalid();return json(boards)
+  }
+  if(env.fishing && path==='fishing/catch' && method==='POST'){
+    if(request.headers.get('Origin')!==url.origin)throw new Problem(403,'origin','请求来源不符')
+    const account=await sessionAccount(db,await sessionHash(request));if(!account)unauthorized()
+    if(request.headers.get('X-Fishing-Owner') && request.headers.get('X-Fishing-Owner')!==account.id)unauthorized()
+    return json(await env.fishing.record(account.id,await request.json().catch(()=>null)))
+  }
   if(path.startsWith('citizen/'))return citizen(request,env,path)
   if(!Object.hasOwn(methods,path)) throw new Problem(404,'not_found','接口不存在')
   if(!methods[path].includes(method)) throw new Problem(405,'method','不支持的请求方式')
@@ -53,7 +63,7 @@ async function handle(request:Request,env:Env) {
       if(!account?.verified) unauthorized()
       userId=account.id
     }
-    const {cookie:stateCookie,url:target,qrcode}=await startSocial(env,db,type,request.headers.get('CF-Connecting-IP')||'local',intent,userId,socialStates(request))
+    const {cookie:stateCookie,url:target,qrcode}=await startSocial(env,db,type,requestIp(request,env),intent,userId,socialStates(request))
     return json({url:target,qrcode},200,stateCookie)
   }
   if(path==='auth/logout') {
@@ -63,6 +73,9 @@ async function handle(request:Request,env:Env) {
   if(path==='me' || path==='auth/me' || path==='me/avatar' || path==='rt/ticket') {
     const digest=await sessionHash(request)
     const user=await sessionAccount(db,digest)
+    if(!user && method==='GET' && (path==='me'||path==='auth/me') && /(?:^|;\s*)glol_session=/.test(request.headers.get('Cookie')??'')){
+      return json({error:{code:'unauthorized',message:'请先登录'}},401,cookie('',0))
+    }
     if(!user) unauthorized()
     if(path==='rt/ticket') {
       if(!user.verified) unauthorized()
@@ -111,7 +124,7 @@ async function handle(request:Request,env:Env) {
   }
   const email=typeof body.email==='string'?body.email.trim().toLowerCase():''
   if(email.length>254||!/^\S+@[^\s@]+\.[^\s@]+$/.test(email)||email.split('@').length!==2) invalid()
-  const ip=request.headers.get('CF-Connecting-IP')||'local'
+  const ip=requestIp(request,env)
   const getUser=()=>stmt('SELECT * FROM users WHERE email=?',email).first<User>()
   if(path==='auth/register'||path==='auth/resend') {
     const register=path==='auth/register', purpose=register?'verify':body.purpose

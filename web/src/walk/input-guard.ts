@@ -8,9 +8,9 @@
  */
 
 const TEXT_INPUT_SELECTOR = 'input,textarea,select,[contenteditable]'
-const BASE_MODAL_OVERLAY_SELECTOR = 'dialog[open],.about-mask:not([hidden]),.atlas.show,.book.show,.shop-overlay.show,.wardrobe-overlay.show,.garage-overlay.show,.mifen-story-dialog:not([hidden]),[data-story-dialog="1"]:not([hidden]),.td-story-dialog:not([hidden]),.drinks-order-panel:not([hidden])'
+const BASE_MODAL_OVERLAY_SELECTOR = 'dialog[open],.about-mask:not([hidden]),.atlas.show,.book.show,.shop-overlay.show,.wardrobe-overlay.show,.garage-overlay.show,.fx-drawer:not([hidden]),.mifen-story-dialog:not([hidden]),[data-story-dialog="1"]:not([hidden]),.td-story-dialog:not([hidden]),.drinks-order-panel:not([hidden])'
 const MODAL_OVERLAY_SELECTOR = `${BASE_MODAL_OVERLAY_SELECTOR},.td-fine-terminal:not([hidden])`
-const TOUCH_UI_SELECTOR = '.hotbar,.smoke-hint,.walk-ui,.ride-hud,.vehicle-action,.dock,.sky-ui,.render-entry,.hud-me,.shop-overlay,.wardrobe-overlay,.garage-overlay,.mission-hud,.gl-mission-entry,.gl-mission-hud,.mission-board,.st-phone,.st-phone-btn,.mp-roster,.hud-stats,.mifen-story-dialog,.mifen-story-skip,.chat-dock,.drinks-panel,.drinks-hold-hud,.drinks-pickup-hud,.td-entry,.td-bar,.td-officer-marker,.td-signal-dock,.td-bounds-banner,.td-story-dialog,.td-story-letterbox,.td-fine-terminal,.td-fine-fallback,.td-duty-keys-dock,.td-duty-key-btn,.td-whistle-btn,.td-panel,.knockdown-hud'
+const TOUCH_UI_SELECTOR = '.hotbar,.smoke-hint,.walk-ui,.ride-hud,.vehicle-action,.dock,.sky-ui,.render-entry,.hud-me,.shop-overlay,.wardrobe-overlay,.garage-overlay,.fishing-ui,.fx-drawer,.nav-card,.mission-hud,.gl-mission-entry,.gl-mission-hud,.mission-board,.st-phone,.st-phone-btn,.mp-roster,.hud-stats,.mifen-story-dialog,.mifen-story-skip,.chat-dock,.drinks-panel,.drinks-hold-hud,.drinks-pickup-hud,.td-entry,.td-bar,.td-officer-marker,.td-signal-dock,.td-bounds-banner,.td-story-dialog,.td-story-letterbox,.td-fine-terminal,.td-fine-fallback,.td-duty-keys-dock,.td-duty-key-btn,.td-whistle-btn,.td-panel,.knockdown-hud'
 
 export function isShopOverlayOpen(doc: Document = document): boolean {
   return doc.body.dataset.shopOpen === '1' || !!doc.querySelector('.shop-overlay.show,.wardrobe-overlay.show,.garage-overlay.show')
@@ -40,6 +40,7 @@ export function isTextInputTarget(target: EventTarget | null): boolean {
 export function isModalOrOverlayOpen(doc: Document = document): boolean {
   if (doc.body.hasAttribute('data-home')) return true
   if (doc.body.dataset.shopOpen === '1') return true
+  if (doc.body.dataset.fishMenu === '1') return true
   if (doc.body.dataset.mifenStoryActive === '1') return true
   if (doc.body.dataset.tdStoryActive === '1') return true
   if (doc.body.dataset.drinksUiOpen === '1') return true
@@ -108,7 +109,16 @@ export interface TouchZoneContext {
   photoOn: boolean
   aboard: boolean
   target?: EventTarget | null
+  /**
+   * IDOK-256: live rects of the visible thumb controls (stick first). With presets, button size and left-hand mode
+   * the cluster moves, so when they are given the guard follows them instead of the fixed right-hand geometry below.
+   */
+  controls?: {left: number; top: number; right: number; bottom: number; stick?: boolean}[]
 }
+
+/** Gutter (px) around a button, and around the stick, that still counts as a near-miss rather than a camera drag. */
+const BUTTON_GUTTER = 14
+const STICK_GUTTER = 40
 
 /**
  * Returns true when a touch start falls on an interactive HUD control or inside the protected
@@ -119,6 +129,12 @@ export function isTouchInControlZone(ctx: TouchZoneContext): boolean {
     if ((ctx.target as Element).closest(TOUCH_UI_SELECTOR)) return true
   }
   if (!ctx.panelVisible || ctx.photoOn) return false
+  if (ctx.controls?.length) {
+    return ctx.controls.some(rect => {
+      const pad = rect.stick ? STICK_GUTTER : BUTTON_GUTTER
+      return ctx.clientX >= rect.left - pad && ctx.clientX <= rect.right + pad && ctx.clientY >= rect.top - pad && ctx.clientY <= rect.bottom + pad
+    })
+  }
   // Bottom-left virtual joystick zone
   if (ctx.clientX < ctx.innerWidth * .45 && ctx.clientY > ctx.innerHeight * .55) return true
   // Bottom-right jump/run/view or wheelie/gear/tuck thumb gutter (slot D reaches ~245 px in from the right while riding).

@@ -86,7 +86,7 @@ const SHOT_FOV: Record<DutyShotId, number> = {
   wide: 48,
   officer: 38,
   player: 35,
-  two: 46,
+  two: 40,
   bridge: 50,
 }
 
@@ -217,26 +217,27 @@ export function computeDutyShotPose(shot: DutyShotId, anchor: DutyShotAnchor): D
   }
 
   if (shot === 'two') {
-    // Guarantee BOTH officer and player sit cleanly inside safe inner horizontal NDC (|x| <= 0.65)
-    // across all valid talk distances (up to 5m) and well above the bridge guardrail & bottom dialogue card.
+    // Chest-up level two-shot framing: keeps BOTH officer & player cleanly inside safe inner NDC (|x| <= 0.68)
+    // across all talk distances (1.5m..5m) while pushing low bridge/stair handrails (<= +1.1m) cleanly below the
+    // bottom dialogue bar so no metal rail cuts across legs or between characters.
     const mx = (nx + px) * 0.5
     const mz = (nz + pz) * 0.5
     const baseY = Math.min(ny, playerFootY)
-    const halfSep = Math.max(0.75, sep * 0.5)
+    const halfSep = Math.max(0.72, sep * 0.5)
     const tanHalfV = Math.tan(((SHOT_FOV.two * 0.5) * Math.PI) / 180)
     const minAspect = 1.5
     const tanHalfH = tanHalfV * minAspect
-    const requiredDist = (halfSep + 0.52) / (tanHalfH * 0.68)
-    const dist = Math.max(2.6, Math.min(5.8, requiredDist))
+    const requiredDist = (halfSep + 0.34) / (tanHalfH * 0.75)
+    const dist = Math.max(2.4, Math.min(5.8, requiredDist))
     const rawPos: [number, number, number] = [
       mx + rx * dist,
-      baseY + 1.68,
+      baseY + 1.46,
       mz + rz * dist,
     ]
     return {
       shot,
       position: clampPoseToBridgeDeck(rawPos, minSafeY),
-      lookAt: [mx, baseY + 1.32, mz],
+      lookAt: [mx, baseY + 1.50, mz],
       fov: SHOT_FOV.two,
     }
   }

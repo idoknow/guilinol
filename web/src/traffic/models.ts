@@ -76,6 +76,7 @@ const tire=0x1d1f22,rim=0xb4bbc1,glass=0x1f2c34,trim=0x25282b,grille=0x16181a,he
 
 class Kit {
   parts:T.BufferGeometry[]=[]
+  wheels:{x:number,y:number,z:number}[]=[]
   add(raw:T.BufferGeometry,color:number,x=0,y=0,z=0,mask:Mask=NONE){
     const g=raw.index?raw.toNonIndexed():raw
     if(g!==raw)raw.dispose()
@@ -138,10 +139,14 @@ class Kit {
     const g=new T.BoxGeometry(width,len-2*trimEnds,thick).rotateX(Math.atan2(dz,dy))
     return this.add(g,color,0,(a[1]+b[1])/2+ny*out,(a[0]+b[0])/2+nz*out,mask)
   }
+  tread(r:number,w:number,x:number,z:number,segments:number){
+    const tread=this.add(new T.CylinderGeometry(r,r,w,segments).rotateZ(Math.PI/2),tire,x,r,z)
+    tread.computeBoundingBox();this.wheels.push({x,y:tread.boundingBox!.min.y,z})
+  }
   // IDOK-253 精模轮：14 段胎、深色轮辋筒、5 辐、亮色轮圈和轮毂盖，外侧朝车外
   wheel(r:number,w:number,x:number,z:number,hub=rim,spokes=5){
     const s=Math.sign(x)||1,face=x+s*w/2,turn=s*Math.PI/2
-    this.add(new T.CylinderGeometry(r,r,w,14).rotateZ(Math.PI/2),tire,x,r,z)
+    this.tread(r,w,x,z,14)
     this.add(new T.CylinderGeometry(r*.64,r*.64,.016,12).rotateZ(Math.PI/2),barrel,face+s*.006,r,z)
     this.add(new T.RingGeometry(r*.55,r*.66,12,1).rotateY(turn),hub,face+s*.016,r,z)
     for(let i=0;i<spokes;i++)this.add(new T.BoxGeometry(.016,r*.5,r*.16).translate(0,r*.3,0).rotateX(i*Math.PI*2/spokes),hub,face+s*.018,r,z)
@@ -154,6 +159,7 @@ class Kit {
   }
   build(){
     const g=mergeGeometries(this.parts)!
+    g.userData.wheels=this.wheels
     for(const p of this.parts)p.dispose()
     g.computeBoundingSphere();g.computeBoundingBox();return g
   }
@@ -284,6 +290,8 @@ function appendEbikeMesh(k:Kit,far:boolean,deliveryBox?:number){
     return {mask:isLamp?LAMP:NONE}
   })
   base.dispose()
+  // Wheel contact patches for alignWheels() slope matching on ramps/bridges
+  k.wheels.push({x:0,y:0,z:-.56},{x:0,y:0,z:.56})
   if(deliveryBox!==undefined){
     const shape=new T.Shape([
       [-.16,-.15],[.16,-.15],[.18,0],[.16,.16],[-.16,.16],[-.18,0],
@@ -326,6 +334,7 @@ function appendBicycleMesh(k:Kit,far:boolean,rearRack=false){
       k.capsule(.075,.28,0,.70,-.48,0x25292d,NONE,Math.PI/2)
       k.limb(.014,.014,0,.70,-.38,0,.33,-.54,0x25292d,NONE,5)
     }
+    k.wheels.push({x:0,y:0,z:-.54},{x:0,y:0,z:.54})
     return
   }
   const mesh=vehicleModel('bicycle',0)
@@ -341,6 +350,7 @@ function appendBicycleMesh(k:Kit,far:boolean,rearRack=false){
     })
     geom.dispose()
   })
+  k.wheels.push({x:0,y:0,z:-.54},{x:0,y:0,z:.54})
   if(rearRack){
     // Tubular rear luggage rack & cushioned passenger pad at +Z-forward rear z in [-0.64, -0.34], y ~ 0.70
     for(const s of [-1,1]){
@@ -506,6 +516,7 @@ function person(pants:number,style:'short'|'long'|'pony'|'bun'|'bob',opts:Person
   if(opts.bag==='tote')k.capsule(.05,.22,.32,.72,0,0xc9b99a)
   if(opts.bag==='shoulder'){k.limb(.02,.02,-.18,1.42,-.08,.24,.88,-.08,0x2b2f33);k.capsule(.06,.16,.27,.86,0,0x5a4232)}
   const g=k.build()
+  g.userData.shoeColor=shoe
   if(opts.stoop){g.translate(0,-.9,0);g.rotateX(opts.stoop);g.translate(0,.9,0)}
   if(h!==1)g.scale(h,h,h)
   g.computeBoundingSphere();g.computeBoundingBox()
@@ -553,10 +564,28 @@ function bakedCar(mesh:CarMesh,body?:number,extra?:(k:Kit)=>void){
   for(const {slot,positions} of mesh.groups){
     const [color,mask]=CAR_SLOTS[slot]??[trim,NONE],g=new T.BufferGeometry()
     g.setAttribute('position',new T.BufferAttribute(positions.slice(),3));g.computeVertexNormals()
+    if(slot===7){
+      const patches=Array.from({length:4},()=>new T.Box3())
+      const point=new T.Vector3(),lowest=[Infinity,Infinity,Infinity,Infinity]
+      for(let offset=0;offset<positions.length;offset+=3){
+        point.fromArray(positions,offset)
+        const quadrant=Number(point.x>0)*2+Number(point.z>0)
+        lowest[quadrant]=Math.min(lowest[quadrant],point.y)
+      }
+      for(let offset=0;offset<positions.length;offset+=3){
+        point.fromArray(positions,offset)
+        const quadrant=Number(point.x>0)*2+Number(point.z>0)
+        if(point.y<=lowest[quadrant]+.003)patches[quadrant].expandByPoint(point)
+      }
+      for(const [index,patch] of patches.entries()){
+        if(patch.isEmpty())throw Error(`Missing wheel on ${mesh.name}`)
+        const center=patch.getCenter(new T.Vector3());k.wheels.push({x:center.x,y:lowest[index],z:center.z})
+      }
+    }
     k.add(g,slot===0&&body!==undefined?body:color,0,0,0,slot===0&&body!==undefined?NONE:mask)
   }
   extra?.(k)
-  return k.build()
+  const geometry=k.build();geometry.name=extra?`${mesh.name}-taxi`:mesh.name;return geometry
 }
 
 export type Variant = {geometry:number,paint:T.Color}
@@ -574,7 +603,7 @@ const bicyclePaints=[0x5b8a72,0xc96f53,0xd8cfc0,0x5c6e7e].map(hex=>({hex,w:1}))
 export function trafficModels(cars:CarMesh[]=[]){
   const geometries:T.BufferGeometry[]=[]
   const add=(g:T.BufferGeometry)=>geometries.push(g)-1
-  const small=(g:T.BufferGeometry)=>{g.scale(CAR_SCALE,CAR_SCALE,CAR_SCALE);g.computeBoundingSphere();g.computeBoundingBox();return add(g)}
+  const small=(g:T.BufferGeometry)=>{g.scale(CAR_SCALE,CAR_SCALE,CAR_SCALE);for(const wheel of g.userData.wheels){wheel.x*=CAR_SCALE;wheel.y*=CAR_SCALE;wheel.z*=CAR_SCALE}g.computeBoundingSphere();g.computeBoundingBox();return add(g)}
   const sedan=small(car(sedanSpec)),hatch=small(car(hatchSpec)),suv=small(car(suvSpec)),van=small(car(vanSpec)),
     lorry=small(truck()),patrol=small(police())
   // 行驶车用精模（同屏只有几辆），停放车用 @far 轻量版（一屏可能上百辆）

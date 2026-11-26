@@ -55,7 +55,7 @@ def _add_soffit(model, poly, y, mat='beige'):
 
 def mall(model):
     model.surface = landmark_surface('wangcheng_mall')
-    way = next((item for item in load_osm() if item['type']=='way' and item['id']==264901525), None)
+    way = next((item for item in load_osm('wangcheng_mall') if item['type']=='way' and item['id']==264901525), None)
     if way is not None:
         footprint = np.array([ll2xz(v['lat'],v['lon']) for v in way['geometry'][:-1]])
     else:

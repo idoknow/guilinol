@@ -1,0 +1,70 @@
+{
+  "route": "A",
+  "worktree": "/Users/pan-work/guilinol-xxg",
+  "branch": "feat/xiaoxianggang-indoor",
+  "baseCommit": "d700104f",
+  "reuseAuditCommentId": "01a2125a-e7ee-7a61-baca-cdab0b93bae9",
+  "epic": {
+    "key": "IDOK-361",
+    "id": "01a21259-f038-71b0-86b9-195f85ecdd54",
+    "projectId": "156530de-f51c-40d8-91e9-e7174ac069ad",
+    "status": "in_progress",
+    "title": "[小香港A线 · 父单] 中心广场「小香港地下商业城」独立室内场景（路线 A：Stage 0→1→2 串行门禁）",
+    "prUrl": null
+  },
+  "stages": [
+    {
+      "stage": 0,
+      "multicaBarrier": 1,
+      "key": "IDOK-362",
+      "id": "01a2125a-813f-7c81-b28d-c2d7b6ec0f72",
+      "owner": "Hy2",
+      "status": "done",
+      "blockedBy": [],
+      "blocks": ["IDOK-363"],
+      "deliverables": [
+        "/Users/pan-work/z-test/xiaoxianggang/README.md",
+        "/Users/pan-work/z-test/xiaoxianggang/refs"
+      ],
+      "title": "[小香港A线 · Stage 0 / Hy2] 中心广场地基与 4 处下沉入口体检及实拍调研",
+      "prUrl": null
+    },
+    {
+      "stage": 1,
+      "multicaBarrier": 2,
+      "key": "IDOK-363",
+      "id": "01a2125a-8cc5-7a66-ab6a-9c6533f7943c",
+      "owner": "Carbon + 克劳德 + Neon",
+      "status": "in_progress",
+      "blockedBy": ["IDOK-362"],
+      "blocks": ["IDOK-364"],
+      "acceptanceIds": ["k94", "k95", "k96", "k97", "k98", "k99"],
+      "deliverables": [
+        "docs/xiaoxianggang/contract.md",
+        "web/src/xiaoxianggang/contract.ts",
+        "web/src/xiaoxianggang/runtime/",
+        "web/src/xiaoxianggang/index.ts",
+        "scripts/xiaoxianggang/verify-xxg-indoor.mjs"
+      ],
+      "title": "[小香港A线 · Stage 1 / Carbon+克劳德] 接口契约冻结与独立室内灰盒骨架",
+      "prUrl": null
+    },
+    {
+      "stage": 2,
+      "multicaBarrier": 3,
+      "key": "IDOK-364",
+      "id": "01a2125a-9699-7a56-bd7e-b7b4e1551f30",
+      "owner": "TBD (Stage 1 结单后派工)",
+      "status": "blocked",
+      "blockedBy": ["IDOK-363"],
+      "blocks": [],
+      "deliverables": [
+        "主街布局与采光井",
+        "水磨石/方灯材质灯光",
+        "首批 3 家店铺（服装/小饰品/小吃）与限流人流"
+      ],
+      "title": "[小香港A线 · Stage 2] 地下主街布局、材质灯光与首批 3 家店铺（阻塞于 Stage 1）",
+      "prUrl": null
+    }
+  ]
+}
