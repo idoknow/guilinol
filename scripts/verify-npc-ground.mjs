@@ -13,7 +13,7 @@ try{
   page.on('console',m=>{if(m.type()==='error')console.error(m.text())})
   await page.route('**/ground-check',route=>route.fulfill({contentType:'text/html',body:'<!doctype html><title>Ground audit</title>'}))
   await page.goto(new URL('ground-check',server.resolvedUrls.local[0]).href)
-  const report=await page.evaluate(async()=>{
+  const report=await page.evaluate(async(checkPullOver)=>{
     const [{detail},{createPhysics},{playerSupport},{Traffic},{trafficModels}]=await Promise.all([
       '/src/world.ts','/src/walk/physics.ts','/src/walk/support.ts','/src/traffic/sim.ts','/src/traffic/models.ts',
     ].map(path=>import(new URL(path,location.href).href).catch(e=>{throw Error(`${path}: ${e}`)})))
@@ -39,10 +39,21 @@ try{
         batches.get(key).push({track,dist})
       }
     }
-    let samples=0,failed=0,missing=0;const worst=[]
+    let samples=0,failed=0,missing=0,pullOver=null;const worst=[]
     for(const [key,points] of batches){
       const tile=tiles.get(key),data=tile&&await detail(tile,new AbortController().signal,undefined,manifest.tunnels).catch(e=>{throw Error(`${key}: ${e.stack}`)})
       if(data){loaded.set(tile,data);physics.sync(tile.x+128,tile.z+128)}
+      if(checkPullOver&&key==='-2560,1792'){
+        const duty=new Traffic(graph,()=>.5,1),track=[...duty.allTracks()].find(track=>track.id===39656&&!track.walk)
+        const dist=(-2384.5373-track.start.x)*track.dx+(1936.9227-track.start.z)*track.dz
+        const actor={track,dist,kind:'scooter',wrongWay:true,dodge:0,speed:1,scale:1}
+        duty.sampleGround=traffic.sampleGround;duty.position(actor);duty.actors.push(actor)
+        const camera={x:actor.x,y:actor.y,z:actor.z}
+        if(!duty.pullOverViolator(actor))throw Error('pull-over rejected')
+        for(let frame=0;frame<60;frame++)duty.step(1/30,camera,undefined,()=>true)
+        const floor=supportAt(actor.x,actor.z,actor.y)?.y
+        pullOver={lane:track.id,state:actor.dutyState,halted:actor.haltedByDuty,dodge:actor.dodge,speed:actor.speed,y:actor.y,floor}
+      }
       for(const {track,dist} of points)for(const kind of track.walk?['person']:['car','scooter']){
         const actor={track,dist,kind,dodge:0};traffic.position(actor)
         const {x,y,z}=actor,ground=data&&(kind==='car'?carSupportAt:supportAt)(x,z,y)
@@ -54,7 +65,11 @@ try{
       }
       physics.clear();loaded.clear();data?.dispose()
     }
-    return {tiles:batches.size,samples,failed,missing,worst}
-  })
+    return {tiles:batches.size,samples,failed,missing,worst,pullOver}
+  },process.argv.includes('--pull-over'))
   console.log(JSON.stringify(report,null,2));assert.ok(report.samples>0&&report.failed===0)
+  if(process.argv.includes('--pull-over')){
+    const stop=report.pullOver
+    assert.ok(stop&&stop.state==='pulled_over'&&stop.halted&&stop.speed===0&&stop.dodge>0&&Math.abs(stop.y-stop.floor)<.001)
+  }
 }finally{await browser?.close();await server.close()}
