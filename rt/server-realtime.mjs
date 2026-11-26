@@ -987,7 +987,6 @@ wss.on('connection', (ws, req) => {
 
       if (msg.t === 'roster_sub') {
         ws.rosterSub = { at: now() }
-        console.log(JSON.stringify({ scope: 'rt-roster', ev: 'sub', id: me.id, uid: me.uid, since: msg.since ?? null, caps3: !!ws.caps3, players: players.size }))
         send(ws, nearPayload(me))
         if (typeof msg.since === 'number' && replaySince(ws, msg.since)) return
         fullQueue.push(ws)
@@ -1072,7 +1071,6 @@ setInterval(() => {
   for (let i = 0; i < ROSTER_FULL_QPS && fullQueue.length; i++) {
     const ws = fullQueue.shift()
     if (!ws) continue
-    console.log(JSON.stringify({ scope: 'rt-roster', ev: 'full', bytes: size, players: players.size }))
     sendSlowAware(ws, text, 'roster', size)
   }
 }, 1000)
