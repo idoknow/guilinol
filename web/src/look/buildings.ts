@@ -176,8 +176,9 @@ if (vRoof < .5) {
       if (h > .8) glass = mix(wall * .78, glass, box1(fl, .34, .62));
     }
     vec3 c = mix(wall, glass, win);
+    bool cuSuppressLegacySigns = uCityUpgradeEnabled > 0.5 && uFacadeReady;
     float bayHash = facadeHash(vec3(bi, 7., vCell.x * 7. + vCell.y * 131.));
-    if (!glazed && !school && vKind < 3.5 && bayHash > .83 && f > 1.15 && f < 3.9) {
+    if (!cuSuppressLegacySigns && !glazed && !school && vKind < 3.5 && bayHash > .83 && f > 1.15 && f < 3.9) {
       float blade = box1(bx, .43, .57) * step(.14, fract(f * 2.));
       int bladeIdx = int(min(5., floor(fract(bayHash * 13.7) * 6.)));
       c = mix(c, mix(uSigns[bladeIdx], vec3(1.), .12), blade);
@@ -200,14 +201,20 @@ if (vRoof < .5) {
     }
     else if (fi < .5 && !glazed) {
       float front = box1(fl, .08, .64) * box1(bx, .06, .94);
-      int signIdx = int(min(5., floor(fract(h * 7.31) * 6.)));
-      vec3 sign = uSigns[signIdx];
-      float band = box1(fl, .7, .88) * box1(bx, .03, .97) * step(.3, h);
       c = mix(uShop, mix(uGlassLit, uShop, .4), front);
-      c = mix(c, h > .3 ? mix(sign, wall, .08) : wall * .9, box1(fl, .7, .88) * box1(bx, .03, .97));
-      avg = mix(uShop, sign, .25); win = front;
-      float tube = band * max(box1(fl, .7, .72) + box1(fl, .86, .88), box1(bx, .03, .05) + box1(bx, .95, .97));
-      neonGlow += uNeon[signIdx] * (band * 1.1 + tube * 2.2) + uShopGlow * front * .6 + uNeon[signIdx] * .12;
+      if (cuSuppressLegacySigns) {
+        c = mix(c, wall * .88, box1(fl, .7, .88) * box1(bx, .03, .97));
+        avg = mix(uShop, wall * .9, .25); win = front;
+        neonGlow += uShopGlow * front * .55;
+      } else {
+        int signIdx = int(min(5., floor(fract(h * 7.31) * 6.)));
+        vec3 sign = uSigns[signIdx];
+        float band = box1(fl, .7, .88) * box1(bx, .03, .97) * step(.3, h);
+        c = mix(c, h > .3 ? mix(sign, wall, .08) : wall * .9, box1(fl, .7, .88) * box1(bx, .03, .97));
+        avg = mix(uShop, sign, .25); win = front;
+        float tube = band * max(box1(fl, .7, .72) + box1(fl, .86, .88), box1(bx, .03, .05) + box1(bx, .95, .97));
+        neonGlow += uNeon[signIdx] * (band * 1.1 + tube * 2.2) + uShopGlow * front * .6 + uNeon[signIdx] * .12;
+      }
     }
     float fw = max(fwidth(u), fwidth(f));
     neonGlow *= 1. - .8 * smoothstep(.18, .45, fw);
@@ -246,7 +253,7 @@ if (spActive) {
   totalEmissiveRadiance += uWarm * uWindowLight * step(.45, winHash) * winMask + neonGlow * uWindowLight;
 }`)
 }
-buildingMaterial.customProgramCacheKey = () => 'guilinol-facade-city-upgrade-1'
+buildingMaterial.customProgramCacheKey = () => 'guilinol-facade-city-upgrade-2'
 tileMaterial(buildingMaterial,true)
 
 // Vertex colours for GL04 building meshes: roofs by kind, parapets and roof boxes keep the wall colour.
