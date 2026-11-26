@@ -180,6 +180,15 @@ export class Stream {
     return this.loaded.get(tile)?.surfaceAt(x,z)
   }
 
+  // Fine-terrain height in metres, or undefined until that tile has streamed in.
+  groundAt(x:number,z:number){
+    const tile=this.grid.at(x,z), underlay=tile&&this.loaded.get(tile)?.underlay
+    if(!tile||!underlay)return undefined
+    const u=Math.min(64,Math.max(0,(x-tile.x)/4)), w=Math.min(64,Math.max(0,(z-tile.z)/4))
+    const col=Math.min(63,Math.floor(u)), row=Math.min(63,Math.floor(w)), fu=u-col, fw=w-row, i=row*65+col
+    return ((underlay[i]*(1-fu)+underlay[i+1]*fu)*(1-fw)+(underlay[i+65]*(1-fu)+underlay[i+66]*fu)*fw)/10
+  }
+
   private enqueue(tile:Tile, inner:boolean){
     const controller = new AbortController()
     if(this.failures.has(tile))record('retry',{category:'chunk'})
@@ -217,7 +226,8 @@ export class Stream {
   }
 
   private readonly aerialBudget=deriveRangeMetrics(256)
-  tick(position:THREE.Vector3, aerial=false) {
+  /** `ahead`: a second streaming centre in front of a free-flight camera (see flight-focus.ts). */
+  tick(position:THREE.Vector3, aerial=false, ahead?:THREE.Vector3) {
     this.lastPosition.copy(position)
     const configured=this.rangeStore.getMetrics()
     const metrics = aerial&&configured.radius>this.aerialBudget.radius?this.aerialBudget:configured
@@ -231,6 +241,8 @@ export class Stream {
     }
     const focus = this.priorityTarget ?? position
     const innerEdge = metrics.spawnRingEdge
+    const keep = (tile:Tile)=>tileEdgeDistance(tile,focus.x,focus.z)<=innerEdge || tileEdgeDistance(tile,position.x,position.z)<=innerEdge
+      || tileCenterDistance(tile,position)<=metrics.unloadRadius || (!!ahead && tileCenterDistance(tile,ahead)<=metrics.unloadRadius)
 
     let waitingForInner=false
     const innerTiles:Tile[] = []
@@ -242,8 +254,7 @@ export class Stream {
     const innerBusy = waitingForInner || (this.updateLandmarks?.busyPriorityCount?.()??0)>0
 
     for(const [tile,item] of this.loaded){
-      const keepInner = tileEdgeDistance(tile,focus.x,focus.z)<=innerEdge || tileEdgeDistance(tile,position.x,position.z)<=innerEdge
-      if(!keepInner && tileCenterDistance(tile,position)>metrics.unloadRadius){
+      if(!keep(tile)){
         this.batches.remove(tile);this.base.toggle(tile,true);this.scene.remove(item.group);item.dispose();this.loaded.delete(tile);this.revision++
       }
     }
@@ -251,16 +262,18 @@ export class Stream {
     this.updateBatches(position,metrics)
 
     for(const [tile,controller] of this.pending){
-      const keepInner = tileEdgeDistance(tile,focus.x,focus.z)<=innerEdge || tileEdgeDistance(tile,position.x,position.z)<=innerEdge
-      if(!keepInner && tileCenterDistance(tile,position)>metrics.unloadRadius) controller.abort()
+      if(!keep(tile)) controller.abort()
     }
 
     this.queueIsInner=innerBusy
     if(innerBusy){
       this.queue=innerTiles.sort((a,b)=>tileEdgeDistance(b,focus.x,focus.z)-tileEdgeDistance(a,focus.x,focus.z))
     }else{
-      this.queue=Array.from(this.grid.near(position.x,position.z,metrics.radius))
-        .filter(tile=>!this.loaded.has(tile)&&!this.pending.has(tile)&&(this.failures.get(tile)??0)<=now && tileCenterDistance(tile,position)<=metrics.radius)
+      const wanted=new Set<Tile>()
+      for(const tile of this.grid.near(position.x,position.z,metrics.radius))if(tileCenterDistance(tile,position)<=metrics.radius)wanted.add(tile)
+      if(ahead)for(const tile of this.grid.near(ahead.x,ahead.z,metrics.radius))if(tileCenterDistance(tile,ahead)<=metrics.radius)wanted.add(tile)
+      this.queue=Array.from(wanted)
+        .filter(tile=>!this.loaded.has(tile)&&!this.pending.has(tile)&&(this.failures.get(tile)??0)<=now)
         .sort((a,b)=>tileCenterDistance(b,position)-tileCenterDistance(a,position))
     }
     this.fillRequests()
