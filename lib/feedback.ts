@@ -88,7 +88,7 @@ export async function feedback(request: Request, env: Env, path: string) {
     if(admin&&path==='admin/smoke'&&env.smokeAdmin)return env.smokeAdmin(request,user)
     if(admin&&path==='admin/gfx'&&env.gfxAdmin)return env.gfxAdmin(request,user)
     if(admin&&path==='admin/npc'&&env.npcAdmin)return env.npcAdmin(request)
-    if(admin && /^admin\/(?:mp|chat|bans|ban|unban)(?:\/|$)/.test(path) && env.mpAdmin) return env.mpAdmin(path,request,user)
+    if(admin && /^admin\/(?:mp|chat|bans|ban|unban|user-search)(?:\/|$)/.test(path) && env.mpAdmin) return env.mpAdmin(path,request,user)
     if (banTarget && method==='POST') {
       const ban=banTarget[2]==='ban'
       return setBan(env.DB,user,banTarget[1]!,ban,ban?(await fields(request)).reason:null)
