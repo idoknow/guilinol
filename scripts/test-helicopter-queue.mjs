@@ -4,6 +4,7 @@ import {execFileSync} from 'node:child_process'
 import {randomBytes} from 'node:crypto'
 import pg from 'pg'
 import {helicopterStore} from '../server/helicopter.mjs'
+import {services} from '../lib/helicopter-clock.ts'
 
 export async function withQueueDatabase(run){
   const password=randomBytes(18).toString('hex'),container=execFileSync('docker',['run','--rm','-d','--label','project=idoknow/guilinol','-p','127.0.0.1::5432','-e',`POSTGRES_PASSWORD=${password}`,'postgres:16'],{encoding:'utf8'}).trim()
@@ -33,5 +34,13 @@ if(import.meta.url===new URL(process.argv[1],'file:').href)await withQueueDataba
   assert.ok(skipped);assert.equal((await ping('C')).mine,null)
   const again=await join(second);await confirm(second,again.mine.ticket)
   const ledger=await pool.query('SELECT delta FROM player_ledger_txns ORDER BY created_at');assert.deepEqual(ledger.rows.map(row=>row.delta),[0,0,-88])
+  for(const [mode,plan] of Object.entries(services)){
+    await pool.query('TRUNCATE helicopter_queue');await pool.query(`UPDATE player_saves SET payload_json=jsonb_set(payload_json::jsonb,'{money}','500')::text`)
+    const active=await command('A','join',{mode});await command('B','join',{mode})
+    assert.equal((await ping('B')).eta,plan.total)
+    const result=await command('A','confirm',{ticket:active.mine.ticket,seat:3});assert.equal(result.flight.seat,3)
+    now=result.flight.t0-plan.start*1000;assert.equal((await ping('B')).eta,plan.total)
+    now+=17000;assert.equal((await ping('B')).eta,plan.total-17);assert.equal((await ping('B')).flight.seat,3)
+  }
   console.log('Concurrent FIFO, duplicate protection, 60s timeout, restart, disconnected passenger, insufficient funds, idempotent fares passed')
 })

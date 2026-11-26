@@ -12,7 +12,7 @@ export function aircraftPose(now:number,t0:number,mode:FlightMode){
   if(phase==='cruise')return {...route.pose(clock),phase,clock,duration,rpm:1}
   const fraction=Math.min(1,clock/(duration||1)),smooth=fraction**3*(10-15*fraction+6*fraction*fraction),ascent=phase==='ascend',descent=phase==='descend',vertical=ascent||descent?climbFraction(clock,duration,route.pose(descent?route.duration:0).y-helipad.y):0,lift=ascent?vertical:descent?1-vertical:0
   const end=route.pose(descent?route.duration:0),bearing=route.pose(descent?route.duration-.1:.1).yaw
-  return {x:helipad.x,z:helipad.z,y:helipad.y+(end.y-helipad.y)*lift,yaw:bearing*lift,roll:0,pitch:(ascent?1:descent?-1:0)*.06*Math.sin(Math.PI*fraction)**2,speed:0,phase,clock,duration,rpm:ascent||descent?1:phase==='start'?smooth:phase==='stop'?1-smooth:0}
+  return {x:helipad.x,z:helipad.z,y:helipad.y+(end.y-helipad.y)*lift,yaw:bearing*lift,roll:0,pitch:(ascent?1:descent?-1:0)*.06*Math.sin(Math.PI*fraction)**2,speed:0,load:ascent||descent?1:0,phase,clock,duration,rpm:ascent||descent?1:phase==='start'?smooth:phase==='stop'?1-smooth:0}
 }
 
 export function flightReplica(){

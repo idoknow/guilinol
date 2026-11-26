@@ -35,6 +35,6 @@ export function flightTable(duration:number,target:(time:number)=>Point,ground:n
     const index=Math.min(rows.length-1,Math.max(0,time/step)),lower=Math.floor(index),fraction=index-lower
     const left=rows[lower],right=rows[Math.min(lower+1,rows.length-1)]
     const mix=(key:keyof typeof left)=>left[key]+(right[key]-left[key])*fraction
-    return {x:mix('x'),y:left.y+step*(left.vy*fraction+(right.vy-left.vy)*fraction*fraction/2),z:mix('z'),yaw:mix('yaw'),roll:mix('roll'),pitch:mix('pitch'),speed:mix('speed')}
+    return {x:mix('x'),y:left.y+step*(left.vy*fraction+(right.vy-left.vy)*fraction*fraction/2),z:mix('z'),yaw:mix('yaw'),roll:mix('roll'),pitch:mix('pitch'),speed:mix('speed'),load:(1+(right.vy-left.vy)/(gravity*step))/Math.cos(mix('roll'))}
   }
 }

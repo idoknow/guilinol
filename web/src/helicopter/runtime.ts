@@ -99,7 +99,7 @@ export function helicopter(scene:THREE.Scene,camera:THREE.PerspectiveCamera,walk
     sound.update(craft.visible?(pose?.rpm??0):0,first&&!!sessionFlight,camera.position.distanceTo(craft.position))
     if(remoteSeat.uid){point(cabin.seat,seat);passengerOrientation(model.anchor(cabin.seat),remoteSeat.orientation);Object.assign(remoteSeat,{x:seat.x,y:seat.y-.65,z:seat.z})}
     if(phase==='idle'&&player?.active&&model.loaded&&queue?.mine?.offered&&queue.flight&&pose&&pose.phase!=='ended'){sessionFlight=queue.flight;mode=sessionFlight.mode;route=newRoute(mode);from.copy(player.heli.figure.position);player.heli.begin();setPhase(pose.phase)}
-    if(phase==='idle'){near=!!player?.heli.available()&&player.position.distanceTo(padDoor)<4.5;notice.hidden=!near||getPlayMode()!=='tour';hint.hidden=(!near&&!queue?.mine)||!soloServices()||panel.open;hint.textContent=queue?.mine?'查看排队':flight?'直升机执飞中 · 排队':'观光直升机';if(panel.open&&(!near&&!queue?.mine||!soloServices()))panel.close();model.animate(dt,pose?.rpm??0,0,camera.position.distanceTo(craft.position),pose?'cruise':'idle');return}
+    if(phase==='idle'){near=!!player?.heli.available()&&player.position.distanceTo(padDoor)<4.5;notice.hidden=!near||getPlayMode()!=='tour';hint.hidden=(!near&&!queue?.mine)||!soloServices()||panel.open;hint.textContent=queue?.mine?'查看排队':flight?'直升机执飞中 · 排队':'观光直升机';if(panel.open&&(!near&&!queue?.mine||!soloServices()))panel.close();model.animate(dt,pose?.rpm??0,pose?.phase==='board'?ease((pose.clock/4-.23)/.18)*(1-ease((pose.clock/4-.77)/.2)):0,camera.position.distanceTo(craft.position),pose?'cruise':'idle',false,cabin.door,pose?.load??0);return}
     if(!player||!route)return
     notice.hidden=true;hint.hidden=!stopped();hint.textContent='按 F 键下机';if(phase==='exit')clock+=dt;else if(pose){if(pose.phase==='ended'){setPhase('exit')}else{setPhase(pose.phase);clock=pose.clock}}
     const duration=phase==='cruise'?route.duration:phase==='landed'?Infinity:(pose&&pose.phase===phase?pose.duration:(durations[phase as keyof typeof durations]??1)),fraction=clamp(clock/duration),smooth=ease(fraction)
@@ -115,7 +115,7 @@ export function helicopter(scene:THREE.Scene,camera:THREE.PerspectiveCamera,walk
     }
     measuredSpeed=craft.position.distanceTo(previousPosition)/Math.max(.001,dt);previousPosition.copy(craft.position);rotorPower=rpm
     craft.rotation.z=phase==='cruise'?-route.pose(clock).roll:0;craft.rotation.z+=.0016*rpm*Math.sin(clock*8)
-    model.animate(dt,rpm,door,camera.position.distanceTo(craft.position),phase==='start'?'startup':phase==='cruise'||phase==='ascend'?'cruise':phase==='descend'||phase==='stop'?'landing':'idle',phase==='cruise'&&!first,cabin.door);player.heli.pose(actor,heading,clip,dt,first&&orbit,clip==='sit'?passengerOrientation(model.anchor(cabin.seat),orientation):undefined)
+    model.animate(dt,rpm,door,camera.position.distanceTo(craft.position),phase==='start'?'startup':phase==='cruise'||phase==='ascend'?'cruise':phase==='descend'||phase==='stop'?'landing':'idle',phase==='cruise'&&!first,cabin.door,pose?.load??0);player.heli.pose(actor,heading,clip,dt,first&&orbit,clip==='sit'?passengerOrientation(model.anchor(cabin.seat),orientation):undefined)
     if(clip==='sit'){player.heli.arms.left(point(`hand_rest_pax_${cabin.number}_L`,target));player.heli.arms.right(point(`hand_rest_pax_${cabin.number}_R`,target))}
     else if(door>.05){point(cabin.door,target);target.y+=.66;player.heli.arms.right(target)}
     if(document.body.dataset.photo!=='on'){
