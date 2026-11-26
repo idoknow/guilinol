@@ -113,7 +113,14 @@ export function emoteWheel(allowed: () => boolean, play: (id: number) => void) {
   })
   window.addEventListener('blur', close)
   return {
+    open,
     close,
+    get shown() {
+      return !overlay.hidden
+    },
+    get ready() {
+      return allowed() && emotesEnabled()
+    },
     sync() {
       const visible = allowed() && emotesEnabled()
       if (toggle.hidden === visible) toggle.hidden = !visible

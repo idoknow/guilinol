@@ -8,10 +8,12 @@ import {prefs} from '../ui/prefs'
 import {openRack} from '../ui/gear-rack'
 import {refreshCamera, setCameraShown} from '../gear/hand'
 import {touchUi} from '../ui/input-mode'
+import {poseView} from './photo-pose'
 
 // 拍照模式（IDOK-182 起接了相机装备，IDOK-211 又把专业参数收掉了）：
 //   机身只决定取景广角、画质基线和手上拿的那台；UI 回到「时辰 / 滤镜 / 天气 / 人物 / 落款」，
 //   按快门就出片，另外保留一颗录像键，固定录 MP4。
+// IDOK-226：「动作」键打开走路层同一只表情轮盘摆姿势；快门/录像期间键和轮盘收起，动作照常播。
 const filters: [string, string][] = [
   ['原片', 'none'],
   ['青绿', 'saturate(1.18) hue-rotate(-8deg) contrast(1.04)'],
@@ -41,7 +43,7 @@ export function photoMode(host: Host, place: () => string, onCapture?: () => voi
   bar.innerHTML = `<div class="photo-row"><label class="photo-hour"><span></span><input type="range" min="0" max="23.9" step=".1" aria-label="时辰"></label>
       <span class="chips" data-group="sky">${skies.map(([t, v]) => `<button data-v="${v}">${t}</button>`).join('')}</span></div>
     <div class="photo-row"><span class="chips" data-group="filter">${filters.map(([t], i) => `<button data-v="${i}">${t}</button>`).join('')}</span>
-      <span class="chips" data-group="opts"><button data-v="figure">人物</button><button data-v="sign">落款</button><button data-v="rack">换机</button></span></div>
+      <span class="chips" data-group="opts"><button data-v="figure">人物</button><button data-v="pose">动作</button><button data-v="sign">落款</button><button data-v="rack">换机</button></span></div>
     <div class="photo-actions"><button class="photo-rec" aria-label="录像"><i></i></button><button class="photo-shutter" aria-label="按快门"><i></i></button></div>`
 
   const flash = document.createElement('div')
@@ -56,6 +58,7 @@ export function photoMode(host: Host, place: () => string, onCapture?: () => voi
   document.body.append(bar, exit, flash, shot, recBadge)
 
   const hour = bar.querySelector<HTMLInputElement>('input')!
+  const poseButton = bar.querySelector<HTMLButtonElement>('[data-v="pose"]')!
   const hourText = bar.querySelector<HTMLElement>('.photo-hour span')!
   const recText = recBadge.querySelector('span')!
 
@@ -68,6 +71,7 @@ export function photoMode(host: Host, place: () => string, onCapture?: () => voi
   let active = false
   let saved = {fov: 55, flowing: true}
   let recording: Recording | null = null
+  let capturing = false
   let shotUrl = ''
 
   const body = (): CameraBody => camera(state.body)
@@ -185,6 +189,17 @@ export function photoMode(host: Host, place: () => string, onCapture?: () => voi
   }
 
   async function capture() {
+    capturing = true
+    syncPose()
+    try {
+      await shoot()
+    } finally {
+      capturing = false
+      syncPose()
+    }
+  }
+
+  async function shoot() {
     const renderer = host.renderer
     const ratio = renderer.getPixelRatio()
     const long = Math.max(innerWidth, innerHeight)
@@ -251,6 +266,7 @@ export function photoMode(host: Host, place: () => string, onCapture?: () => voi
     if (recording) {
       const result = await recording.stop()
       recording = null
+      syncPose()
       recBadge.hidden = true
       bar.classList.remove('rec')
       const name = saveRecording(result, '网上桂林')
@@ -287,6 +303,7 @@ export function photoMode(host: Host, place: () => string, onCapture?: () => voi
       return
     }
     recording = started
+    syncPose()
     recBadge.hidden = false
     bar.classList.add('rec')
   }
@@ -296,10 +313,27 @@ export function photoMode(host: Host, place: () => string, onCapture?: () => voi
     for (const button of Array.from(bar.querySelectorAll<HTMLButtonElement>(`[data-group="${group}"] button`))) button.classList.toggle('on', on(button.dataset.v!))
   }
 
+  // 快门/录像期间「动作」键用 visibility 收起（不挤动同排的键），已开的轮盘一并关掉。
+  let poseKey = ''
+  function syncPose() {
+    const wheel = host.walker()?.emotes
+    const view = poseView({figure: state.toggle.figure, capturing, recording: !!recording, ready: !!wheel?.ready})
+    if (!view.wheel && wheel?.shown) wheel.close()
+    const key = `${view.busy}|${view.enabled}`
+    if (key === poseKey) return view
+    poseKey = key
+    poseButton.disabled = !view.enabled
+    poseButton.style.visibility = view.button ? '' : 'hidden'
+    if (view.busy) document.body.dataset.photoBusy = view.busy
+    else delete document.body.dataset.photoBusy
+    return view
+  }
+
   function refresh() {
     chips('sky', v => host.clock.weather === v)
     chips('filter', v => +v === state.filter)
-    chips('opts', v => (v === 'figure' ? state.toggle.figure : state.toggle.sign))
+    chips('opts', v => (v === 'figure' || v === 'sign') && state.toggle[v])
+    syncPose()
     applyView()
   }
 
@@ -317,6 +351,8 @@ export function photoMode(host: Host, place: () => string, onCapture?: () => voi
           applyView()
           refreshCamera(host.walker())
         })
+      } else if (value === 'pose') {
+        if (syncPose().wheel) host.walker()?.emotes?.open()
       } else {
         const key = value as ToggleKey
         state.toggle[key] = !state.toggle[key]
@@ -341,6 +377,8 @@ export function photoMode(host: Host, place: () => string, onCapture?: () => voi
     host.clock.flowing = false
     host.walker()?.hold(true)
     setCameraShown(false, host.walker())
+    host.walker()?.emotes?.close()
+    poseKey = ''
     document.body.dataset.photo = 'on'
     bar.hidden = exit.hidden = false
     refresh()
@@ -352,6 +390,9 @@ export function photoMode(host: Host, place: () => string, onCapture?: () => voi
     recording = null
     recBadge.hidden = true
     bar.classList.remove('rec')
+    host.walker()?.emotes?.close()
+    delete document.body.dataset.photoBusy
+    poseKey = ''
     active = false
     host.clock.flowing = saved.flowing
     host.walker()?.hold(false)
@@ -371,6 +412,7 @@ export function photoMode(host: Host, place: () => string, onCapture?: () => voi
   let shown = ''
   function tick() {
     if (!active) return
+    syncPose()
     if (document.activeElement !== hour) hour.value = String(host.clock.hour)
     const text = label(host.clock.hour)
     if (text !== shown) {

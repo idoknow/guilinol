@@ -159,7 +159,7 @@ try {
   assert.equal(opened.bar, true, 'photo bar should show')
   assert.deepEqual(opened.sky, ['晴', '雾', '雨'], 'sky chips should stay')
   assert.deepEqual(opened.filters, ['原片', '青绿', '胶片', '暮金', '水墨'], 'filter chips should stay')
-  assert.deepEqual(opened.opts, ['人物', '落款', '换机'], 'opts should be 人物 / 落款 / 换机')
+  assert.deepEqual(opened.opts, ['人物', '动作', '落款', '换机'], 'opts should be 人物 / 动作 / 落款 / 换机')
   assert.equal(opened.shutter, true, 'shutter should stay')
   assert.equal(opened.rec, true, 'record button should stay')
   assert.equal(opened.sheet, false, 'professional parameter sheet must be gone')

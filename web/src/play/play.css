@@ -8,7 +8,9 @@
 .dock-buttons>button{box-sizing:border-box;height:var(--ui-h);border-radius:var(--ui-r-pill);padding:0 16px;font-size:14px;letter-spacing:var(--ui-track);display:flex;align-items:center;gap:6px}
 .dock small{font:600 11px/1 var(--ui-serif);letter-spacing:0;background:var(--seal);border-radius:var(--ui-r-pill);padding:3px 7px}
 .dock .btn-mode{position:static;height:var(--ui-h);padding:0 16px}
-body[data-photo=on] :is(output,.hint,footer,.sky-ui,.walk-ui,.dock,.toast,.spot-card,.book,.summit-pill,.minimap,.road-name,.hud-me,.emote-toggle,.emote-overlay){display:none!important}
+body[data-photo=on] :is(output,.hint,footer,.sky-ui,.walk-ui,.dock,.toast,.spot-card,.book,.summit-pill,.minimap,.road-name,.hud-me,.emote-toggle){display:none!important}
+/* IDOK-226：拍照里「动作」键借用表情轮盘；快门/录像期间收起。 */
+body[data-photo-busy] .emote-overlay{display:none!important}
 
 /* Minimap: a paper disc with a thin jade rim; north tick on top. */
 .minimap{position:relative;width:132px;height:132px;padding:0;border-radius:50%;overflow:hidden;cursor:pointer;background:#efe8d8;
@@ -113,6 +115,7 @@ body[data-photo=on] :is(output,.hint,footer,.sky-ui,.walk-ui,.dock,.toast,.spot-
 .chips{display:flex;gap:2px;padding:2px;border-radius:13px;background:rgba(244,239,226,.08)}
 .chips button{font:13px var(--serif);color:var(--paper);background:none;border:0;border-radius:11px;padding:4px 9px;cursor:pointer;opacity:.72;-webkit-tap-highlight-color:transparent}
 .chips button:hover{opacity:1}.chips button.on{background:rgba(169,80,60,.75);opacity:1}
+.chips button:disabled{opacity:.3;cursor:default}
 .photo-shutter{position:absolute;right:14px;top:50%;transform:translateY(-50%);width:64px;height:64px;border-radius:50%;border:3px solid var(--paper);background:none;padding:0;cursor:pointer;display:grid;place-items:center}
 .photo-shutter i{display:block;width:50px;height:50px;border-radius:50%;background:var(--seal);transition:transform .12s}
 .photo-shutter:active i{transform:scale(.86)}
