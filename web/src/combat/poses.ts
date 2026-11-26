@@ -1,0 +1,71 @@
+import { Vector3, type Object3D } from 'three'
+import type { AvatarRig, AvatarJointName } from '../walk/avatar-rig'
+import type { Fighter, Phase } from './state'
+const point = new Vector3()
+function groundDrop(rig: AvatarRig, root: Object3D, fallback: number) {
+  root.updateWorldMatrix(true, false)
+  const ground = root.matrixWorld.elements[13] - rig.soleOffset
+  let lowest = Infinity
+  for (const { joint, points } of rig.footProbes) {
+    joint.updateWorldMatrix(true, false)
+    for (const probe of points) lowest = Math.min(lowest, point.copy(probe).applyMatrix4(joint.matrixWorld).y)
+  }
+  for (const name of ['calf_l', 'calf_r', 'hand_l', 'hand_r']) {
+    const bone = root.getObjectByName(name)
+    if (bone)
+      lowest = Math.min(lowest, bone.getWorldPosition(point).y - (name.startsWith('calf') ? 0.065 : 0.055))
+  }
+  return Number.isFinite(lowest) ? lowest - ground : fallback
+}
+export function pose(rig: AvatarRig, f: Fighter, phase: Phase, t: number, yaw: number, root?: Object3D) {
+  const set = (name: AvatarJointName, x: number, y = 0, z = 0) => rig.joints[name]?.rotation.set(x, y, z)
+  let drop = 0
+  rig.batch?.(true)
+  try {
+    if (phase === 'stagger') {
+      const u = (t - f.struck) / (f.heavy ? 410 : 280)
+      const recoil = Math.sin(Math.PI * Math.sqrt(Math.min(1, u))) * (f.heavy ? 0.65 : 0.36)
+      set('Torso', recoil * Math.cos(f.dir - yaw), 0, -recoil * Math.sin(f.dir - yaw))
+    } else if (['windup', 'strike', 'recover'].includes(phase)) {
+      const age = t - f.punched,
+        left = f.side === 'l',
+        sign = left ? 1 : -1
+      const extend = age < 100 ? (age / 100) * 0.35 : age < 160 ? 1 : Math.max(0, 1 - (age - 160) / 180)
+      set('Torso', -0.09 * extend, sign * 0.28 * extend)
+      set(left ? 'ArmL' : 'ArmR', 1.6 * extend, sign * (f.kind === 'hook' ? 0.48 : 0.12) * extend)
+      set(left ? 'ForearmL' : 'ForearmR', age < 100 ? 0.9 : 0.12)
+    } else if (phase === 'reviving') {
+      const lift = Math.min(1, (1 - f.assistProgress) * 4)
+      set('Torso', -0.85 * lift)
+      set('ThighL', 0.55)
+      set('ThighR', 0.55)
+      set('ShinL', -0.8)
+      set('ShinR', -0.8)
+      set('ArmL', 1.2 * lift)
+      set('ArmR', 1.2 * lift)
+      drop = 0.18 * lift
+    } else if (phase !== 'idle') {
+      const weight =
+        phase === 'falling'
+          ? Math.min(1, (t - f.fallen) / 320)
+          : phase === 'rising'
+            ? f.riseWeight * Math.max(0, 1 - (t - f.risen) / 420)
+            : 1
+      const w = weight * (phase === 'being_revived' ? 1 - 0.45 * f.progress : 1)
+      const step = phase === 'crawling' ? Math.sin(t * 0.008) * 0.19 : 0
+      set('Hips', -0.92 * w)
+      set('Torso', -0.46 * w)
+      set('Head', 0.38 * w)
+      set('ThighL', 1.25 * w + step)
+      set('ThighR', 1.25 * w - step)
+      set('ShinL', -1.95 * w)
+      set('ShinR', -1.95 * w)
+      set('ArmL', 1.52 * w - step)
+      set('ArmR', 1.52 * w + step)
+      drop = 0.58 * w
+    }
+  } finally {
+    rig.batch?.(false)
+  }
+  return drop && root ? groundDrop(rig, root, drop) : drop
+}

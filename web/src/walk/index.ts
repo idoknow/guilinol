@@ -1,3 +1,5 @@
+import {combatController} from '../combat/controller'
+import {config as combatConfig} from '../combat/net'
 import {cameraHoldLayer, DEFAULT_CAMERA_HOLD_AIM} from './camera-hold'
 import {emoteWheel} from '../emote/wheel'
 import {emotePlayback} from '../emote/playback'
@@ -352,7 +354,7 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
   if(smokeEnabled()){
     void fetch('/api/smoke').then(r=>r.json()).then(data=>{if(validRules(data))Object.assign(rules,data)}).catch(()=>{})
   }
-  function usable(){return active && !rides?.bike && !rides?.car && !rides?.boat && !isModalOrOverlayOpen() && !document.body.dataset.shopOpen && document.body.dataset.photo!=='on'}
+  function usable(){return active && !combat.f.down && !rides?.bike && !rides?.car && !rides?.boat && !isModalOrOverlayOpen() && !document.body.dataset.shopOpen && document.body.dataset.photo!=='on'}
   function cancelSmoke(){showSmokeDiscard(false);cigarette.stop();smokeHint.hidden=true;updateSmokePrompt('')}
   async function openSmokeShop(message?:string){
     if(!usable()||!smokeEnabled())return
@@ -928,7 +930,7 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
     const serviceHit=soloEnabled && findNearbyServiceBay(pos.x,pos.z,footY,{playerInQuietZone:!!quietZone})
     return {
       active, soloEnabled,
-      modalOrOverlayBlocked:isModalOrOverlayOpen()||document.body.dataset.photo==='on'||!!shopOverlay?.isOpen(),
+      modalOrOverlayBlocked:combat.f.down||!!combat.f.helping||isModalOrOverlayOpen()||document.body.dataset.photo==='on'||!!shopOverlay?.isOpen(),
       crashed:!!crashSession||document.body.dataset.rideCrash==='1',
       standingUp:!!standUpSession,
       pickingUpKind:pickupSession?pickupSession.rec.kind:null,
@@ -945,6 +947,8 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
 
   const interactArbiter=createInteractArbiter({
     getContext:buildInteractionContext,
+    startRescue:limit=>combat.start(limit),
+    stopRescue:()=>combat.stop(),
     onOpenShop(shopId){
       const shop=getShop(shopId)
       if(!shop)return
@@ -1143,7 +1147,7 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
   let fishing:ReturnType<typeof import('../fishing/session').createFishing>|undefined
   let fishingLoad:Promise<NonNullable<typeof fishing>>|undefined
   const loadFishing=()=>fishingLoad??=import('../fishing/session').then(module=>fishing=module.createFishing({
-    canUse:()=>active&&!rides?.bike&&!rides?.boat&&!rides?.car&&!shopOverlay?.isOpen()&&!document.querySelector('.hotbar[hidden]'),
+    canUse:()=>active&&!combat.f.down&&!rides?.bike&&!rides?.boat&&!rides?.car&&!shopOverlay?.isOpen()&&!document.querySelector('.hotbar[hidden]'),
     position:()=>sim.body.translation(),heading:()=>facing-avatar.yaw-Math.PI,
     onLand:(x,z)=>{const tile=sim.tileAt(x,z),data=tile&&stream.loaded.get(tile)
       return !!tile&&!!data&&data.water[Math.round((z-tile.z)/4)*65+Math.round((x-tile.x)/4)]===-32768},
@@ -1292,7 +1296,7 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
     forceLocomotionClip(target,isOneShot,action===target)
   }
   const emote=emotePlayback(figure,id=>net?.emote(id),mixer)
-  const canEmote=()=>active&&!rides?.bike&&!rides?.boat&&!rides?.car&&!cigarette.active&&!isFirstPerson()&&!isModalOrOverlayOpen()
+  const canEmote=()=>active&&!combat.f.down&&!combat.f.helping&&!rides?.bike&&!rides?.boat&&!rides?.car&&!cigarette.active&&!isFirstPerson()&&!isModalOrOverlayOpen()
   const wheel=emoteWheel(canEmote,id=>emote.play(id))
   canvas.addEventListener('pointerdown',event=>{if(event.pointerType==='mouse'&&event.button===0)emote.stop()})
   let vx=0,vz=0,velocity=0,grounded=false,wasGroundedFoot=true,crouching=false,jumpStage:'none'|'start'|'air'|'land'='none',jumpStageTimer=0,snapEnabled=true,coyoteTimer=0,jumpTimer=0,accumulator=0
@@ -1486,21 +1490,36 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
     }
     return performance.now()-lastMoveTs>15000?{act:'idle',detail:''}:{act:'walk',detail:''}
   }
+  const combat=combatController({canvas,figure,camera,rig:avatarRig,
+    allowed:()=>usable()&&grounded&&!held&&!crashSession&&!standUpSession&&!pickupSession&&!emote.id&&
+      !document.querySelector('.emote-overlay:not([hidden])')&&hotbarSlot()==='hand'&&!cigarette.active&&document.body.dataset.drone!=='rc',
+    peers:()=>net?.list()??[],send:p=>net?.send(p),
+    onDown(){fishing?.interruptCast();emote.stop();wheel.close();cancelSmoke();selectSlot('hand');window.dispatchEvent(new Event('combat:down'));jumpTimer=0;vx=vz=0},
+    align(p){
+      const x=p.x-.6*Math.sin(p.yaw),z=p.z-.6*Math.cos(p.yaw),pos=sim.body.translation()
+      const support=supportAt(x,z,pos.y-cfg.height/2)
+      if(!support||Math.abs(support.y-pos.y+cfg.height/2)>.35||sim.wet(x,z)||sim.pathBlocked(pos.x,pos.z,x,z,pos.y,pos.y))return false
+      const dest={x,y:support.y+cfg.height/2+.02,z}
+      sim.body.setTranslation(dest,true);sim.body.setNextKinematicTranslation(dest)
+      facing=Math.atan2(x-p.x,z-p.z);figure.rotation.y=facing
+      vx=vz=0;return true
+    },
+  })
   function attachMp(){
     if(!mpEnabled()||!active||net)return
     if(!netModule){void import('../net').then(module=>{netModule=module;attachMp()}).catch(error=>console.warn('multiplayer unavailable',error));return}
     {
-        net=netModule.attachNet(scene,model.animations,()=>({x:figure.position.x,y:figure.position.y,z:figure.position.z,
-          yaw:figure.rotation.y,v:rides?.bike?Math.abs(rides.speed):Math.hypot(vx,vz),gr:Number(grounded),
+        net=netModule.attachNet(scene,model.animations,()=>({x:figure.position.x,y:figure.position.y+combat.drop,z:figure.position.z,
+          foot:!rides?.bike&&!rides?.car&&!rides?.boat&&document.body.dataset.drone!=='rc',yaw:figure.rotation.y,v:rides?.bike?Math.abs(rides.speed):Math.hypot(vx,vz),gr:Number(grounded),
           sc:cigarette.wire,sb:Math.round(cigarette.length*1800),sp:puffSeq,br:brandIndex(cigarette.brand),sd:dropSeq,ss:cigarette.strength,sr:cigarette.remaining,
-          bike:rides?.bike?'bike':'',bx:rides?.bike?.position.x??0,bz:rides?.bike?.position.z??0,byaw:rides?.heading??0}),()=>currentAvatar()??profile,camera,currentActivity)
+          bike:rides?.bike?'bike':'',bx:rides?.bike?.position.x??0,bz:rides?.bike?.position.z??0,byaw:rides?.heading??0}),()=>currentAvatar()??profile,camera,currentActivity,combat.receive)
         net.emote(emote.id);net.tick(0)
     }
   }
   addEventListener('glol:mp-pref',()=>{if(mpEnabled())attachMp();else disconnect()})
-  function disconnect(){net?.dispose();net=undefined}
+  function disconnect(){combat.reset();net?.dispose();net=undefined}
   function leave(){disconnect();resetWalk()}
-  function resetWalk(){cancelSmoke();if(hotbarSlot()==='smoke')selectSlot('hand');emote.stop();emote.reset();smoking?.dispose();smoking=undefined;holdLayer.reset();camHoldBlend=0;wheel.close();cigarette.stop();if(shopOverlay?.isOpen())shopOverlay?.close('fly');outfitController.setRidingEbike(false);finishActiveTestRide('mode_switch');shopHintGroup.visible=false;ebikeShowroomGroup.visible=false;shopEbikeShowcaseRig.root.visible=false;for(const item of showroomBikes)item.snapped=false;destination=null;active=false;crashSession=null;standUpSession=null;pickupSession=null;crashRecoverQueued=false;twoWheelOp=createInitialTwoWheelOpState();carHeadlight='off';carHeadlightManual=false;clearAllDowned();releaseDynamicCar();releaseDynamicBike();input.syncRideHud(null,null);rides?.clearBoatPose(figure);rides?.show(false);actionButton.hidden=true;setPrompt(null);updateTravel('fly',null);if(wasCar||wasBike)applyFootController();wasBoat=wasBike=wasCar=false;bikeObstacle='';boatBoardElapsed=BOAT_BOARD_DUR;boatLandElapsed=BOAT_LAND_DUR;ridePose.reset();driverPose.reset(false);clearAvatarPose(figure);stopLocomotionActions();mixer.stopAllAction();resetMotion();figure.visible=false;input.show(false);external=null;lastTianyuanSyncKey='';tianyuanShopRef=null;sim.clear();camera.near=1;camera.updateProjectionMatrix()}
+  function resetWalk(){combat.hide();cancelSmoke();if(hotbarSlot()==='smoke')selectSlot('hand');emote.stop();emote.reset();smoking?.dispose();smoking=undefined;holdLayer.reset();camHoldBlend=0;wheel.close();cigarette.stop();if(shopOverlay?.isOpen())shopOverlay?.close('fly');outfitController.setRidingEbike(false);finishActiveTestRide('mode_switch');shopHintGroup.visible=false;ebikeShowroomGroup.visible=false;shopEbikeShowcaseRig.root.visible=false;for(const item of showroomBikes)item.snapped=false;destination=null;active=false;crashSession=null;standUpSession=null;pickupSession=null;crashRecoverQueued=false;twoWheelOp=createInitialTwoWheelOpState();carHeadlight='off';carHeadlightManual=false;clearAllDowned();releaseDynamicCar();releaseDynamicBike();input.syncRideHud(null,null);rides?.clearBoatPose(figure);rides?.show(false);actionButton.hidden=true;setPrompt(null);updateTravel('fly',null);if(wasCar||wasBike)applyFootController();wasBoat=wasBike=wasCar=false;bikeObstacle='';boatBoardElapsed=BOAT_BOARD_DUR;boatLandElapsed=BOAT_LAND_DUR;ridePose.reset();driverPose.reset(false);clearAvatarPose(figure);stopLocomotionActions();mixer.stopAllAction();resetMotion();figure.visible=false;input.show(false);external=null;lastTianyuanSyncKey='';tianyuanShopRef=null;sim.clear();camera.near=1;camera.updateProjectionMatrix()}
   function canPlaceCrashOffset(x:number,z:number,refY:number,fromX?:number,fromZ?:number){
     if(!sim.withinBounds(x,z))return false
     if(sim.insideHouse(x,z,refY+.4))return false
@@ -1940,7 +1959,7 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
     const shakePitch=rides?.car&&carShake>.01?Math.cos(carShakePhase*1.3)*carShake*.012:0
     // IDOK-178: 第一人称只在落地步行时生效，骑车/开车/坐船一律回到第三人称，免得镜头钻进车壳。
     const firstPerson=isFirstPerson()&&!rides?.bike&&!rides?.car&&!rides?.boat
-    rig.update(camera,figure.position,yaw+shakeYaw,pitch+shakePitch,arm+ridePose.cameraArm(!!rides?.bike,dt,snap)+driverPose.cameraArm(!!rides?.car,dt,snap)+(rides?.car?carSpeedArm:0),dt,snap,!!rides?.car,firstPerson)
+    rig.update(camera,figure.position,yaw+shakeYaw,pitch+shakePitch,arm+ridePose.cameraArm(!!rides?.bike,dt,snap)+driverPose.cameraArm(!!rides?.car,dt,snap)+(rides?.car?carSpeedArm:0),dt,snap,!!rides?.car,firstPerson,combat.f.down ? .72 : 0)
     if(sim.clampCamera(figure.position,camera.position,firstPerson?.18:cfg.camRadius)&&!firstPerson){
       camera.lookAt(rig.focus)
     }
@@ -2039,7 +2058,7 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
     sim.syncObstacleVolume(buildTianyuanObstacleVolume([p.x,p.y,p.z],tianyuanShopRef.rotation.y,level,extra))
   }
   // Reverse LIFO reset: apply order below is holdLayer.apply() -> smoking.tick() -> emote.tick().
-  function tick(dt:number){wheel.sync();if(!active)return;emote.reset();smoking?.resetPose();holdLayer.reset();
+  function tick(dt:number){wheel.sync();if(!active)return;combat.resetPose();emote.reset();smoking?.resetPose();holdLayer.reset();
     if(emote.id&&(rides?.boat||rides?.car||rides?.bike)){emote.stop();emote.tick(.24,false)}
     const before=performance.now(),start=rides?.boat?.position??sim.body.translation();syncSceneObstacleVolumes();sim.sync(start.x,start.z,true);const footYNow=rides?.boat?start.y:start.y-cfg.height/2;rides?.nearby(start.x,start.z,footYNow);interactArbiter.sync(actionButton);syncGameTravelState();updateShopHintRings(start.x,start.z,footYNow)
     showFishingSlot(fishingOn&&!rides?.bike&&!rides?.boat&&!rides?.car&&(hotbarSlot()==='fishing'||nearestFishingShore(start.x,start.z).distance<=FISH_NEAR))
@@ -2050,7 +2069,7 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
       smoking?.tick(dt,cigarette.view(),false)
       selectSlot('hand')
     }
-    if(shopOverlay?.isOpen()){smoking?.setFirstPerson(false);updateShopShowcaseCamera();return}
+    if(shopOverlay?.isOpen()){combat.hide();net?.tick(dt);smoking?.setFirstPerson(false);updateShopShowcaseCamera();return}
     // Test-ride 90s timer & 350m / quiet-zone boundary watchdog (with 1.5s gentle decel when >15 km/h)
     const activeTr=getGameState().garage.activeTestRide
     if(activeTr){
@@ -2097,9 +2116,9 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
       const bpos=rides.freeBoat.position, bp=rides.boatProbe(), wy=bp?bp.y:bpos.y
       sim.body.setTranslation({x:bpos.x,y:wy+cfg.height/2,z:bpos.z},true)
       sim.body.setNextKinematicTranslation({x:bpos.x,y:wy+cfg.height/2,z:bpos.z})
-      wasBoat=true;follow(dt,false);return
+      wasBoat=true;follow(dt,false);combat.hide();net?.tick(dt);return
     }
-    if(rides?.boat){releaseDynamicBike();input.syncRideHud(null,'boat');if(!held)rides.advance(Math.min(.25,dt));if(!wasBoat){if(wasCar||wasBike){applyFootController();wasCar=wasBike=false;driverPose.reset(active)}yaw=rides.heading+.95;sit()}wasBoat=!!rides.boat;follow(dt);return}
+    if(rides?.boat){releaseDynamicBike();input.syncRideHud(null,'boat');if(!held)rides.advance(Math.min(.25,dt));if(!wasBoat){if(wasCar||wasBike){applyFootController();wasCar=wasBike=false;driverPose.reset(active)}yaw=rides.heading+.95;sit()}wasBoat=!!rides.boat;follow(dt);combat.hide();net?.tick(dt);return}
     if(wasBoat){wasBoat=false;clearAvatarPose(figure);restoreFootLocomotion(avatar.clips.idle)}
     if((rides?.car||rides?.bike)&&!vehicleCollisionReady(start.x,start.y,start.z)){
       rides.stop();vx=vz=accumulator=0;bikeObstacle='streaming';return
@@ -2114,7 +2133,7 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
     if(busyFootAnim||fishingOnFoot)wish.set(0,0)
     const rawLen=wish.length(), inputMag=busyFootAnim?0:Math.min(1,rawLen)
     if(rawLen>1e-5)wish.divideScalar(rawLen);else wish.set(0,0)
-    const maxSpeed=(external?external.run:keys.run)?cfg.run:(keys.crouch&&grounded)?cfg.crouch:cfg.walk
+    const maxSpeed=combat.f.down?Math.min(combatConfig.crawlSpeed,cfg.walk*.30):combat.f.phase(performance.now(),false)==='stagger'?cfg.walk*.55:(external?external.run:keys.run)?cfg.run:(keys.crouch&&grounded)?cfg.crouch:cfg.walk
     crouching=!rides?.car&&!rides?.bike&&!rides?.boat&&!busyFootAnim&&grounded&&!!keys.crouch&&!keys.run&&!external?.run
     const step=1/60;let traveled=0,simSteps=0;lastHits=[];blockedWater=false
     let bikeSpeed=(rides?.car||rides?.bike)?rides.speed:0
@@ -2242,7 +2261,7 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
       else if(rideCtrl.gearDelta!==0)rides.shiftCarMode(rideCtrl.gearDelta)
     }
     const aboardGround=wasCar||wasBike
-    if(keys.jump&&!aboardGround&&!busyFootAnim)jumpTimer=cfg.jumpBuffer
+    if(keys.jump&&!combat.f.down&&!combat.f.helping&&!aboardGround&&!busyFootAnim)jumpTimer=cfg.jumpBuffer
     accumulator+=Math.min(.12,dt)
     while(accumulator>=step-1e-7){accumulator=Math.max(0,accumulator-step);steps++;simSteps++;elapsed+=step
       if(grounded)coyoteTimer=cfg.coyote;else coyoteTimer=Math.max(0,coyoteTimer-step)
@@ -2429,6 +2448,12 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
           stream.updateLandmarks?.(bridgeEye.set(pos.x,pos.y,pos.z),bridge)
           const ahead=bridgeDistance(next.x,next.z)
           if(ahead<=0&&ahead<distance){next.x=pos.x;next.z=pos.z}
+        }
+      }
+      if(combat.f.down){
+        const floor=sim.groundSurface(next.x,next.z,pos.y-cfg.height/2)
+        if(!floor||floor.slope>cfg.slope||Math.abs(floor.y-(pos.y-cfg.height/2))>.16){
+          next.x=pos.x;next.z=pos.z;vx=vz=0
         }
       }
       const nowGrounded=sim.controller.computedGrounded()
@@ -2847,6 +2872,7 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
     const emoteMoving=!!(keys.right||keys.forward||external?.x||external?.z)
     if(emote.id&&interrupted(emote.id,emoteMoving,!emotesEnabled()||!canEmote()||keys.jump||!grounded))emote.stop()
     emote.tick(dt,emoteMoving)
+    combat.tick(actualSpeed>.12)
     net?.tick(dt)
   }
   let cameraHold=false,camHoldBlend=0

@@ -191,6 +191,8 @@ export function resolveInteraction(ctx: InteractionContext): InteractionDecision
 }
 
 export interface InteractArbiterCallbacks {
+  startRescue?:(closerThan:number)=>boolean
+  stopRescue?:()=>void
   getContext: () => InteractionContext
   onOpenShop: (shopId: string) => void
   onOpenService: (shopId: string) => void
@@ -270,6 +272,18 @@ export function createInteractArbiter(callbacks: InteractArbiterCallbacks): Inte
   }
 
   const onKeyDown = (event: KeyboardEvent) => {
+    if (hits(event.code, 'rescue') && !event.repeat && !isGlobalHotkeyBlocked(event.target)) {
+      let closerThan = Infinity
+      if (hits(event.code, 'interact')) {
+        const ctx = callbacks.getContext()
+        const decision = resolveInteraction(ctx)
+        const candidates = {pickup_downed:ctx.nearDownedVehicle,open_shop:ctx.nearShop,
+          open_service:ctx.nearServiceBay,mount_vehicle:ctx.nearVehicle,board_boat:ctx.nearBoat}
+        const action = decision.action
+        if (action in candidates) closerThan = candidates[action as keyof typeof candidates]?.distance ?? Infinity
+      }
+      if (callbacks.startRescue?.(closerThan)) {event.preventDefault();return}
+    }
     if (!hits(event.code, 'interact') || event.repeat) return
     if (isGlobalHotkeyBlocked(event.target)) return
     const decision = trigger()
@@ -278,6 +292,8 @@ export function createInteractArbiter(callbacks: InteractArbiterCallbacks): Inte
     }
   }
 
+  const release=(e:KeyboardEvent)=>{if(hits(e.code,'rescue'))callbacks.stopRescue?.()}
+  window.addEventListener('keyup',release)
   window.addEventListener('keydown', onKeyDown)
 
   return {
@@ -285,6 +301,7 @@ export function createInteractArbiter(callbacks: InteractArbiterCallbacks): Inte
     trigger,
     getLastDecision: () => lastDecision,
     dispose: () => {
+      window.removeEventListener('keyup',release)
       window.removeEventListener('keydown', onKeyDown)
     },
   }
