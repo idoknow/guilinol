@@ -197,7 +197,7 @@ export type Actor = {
   pitch?:number,roll?:number,arrived?:boolean,
   track:Track,dist:number,speed:number,pace?:number,kind:'car'|'scooter'|'person',down:number,dodge:number,
   x:number,y:number,z:number,yaw:number,scale:number,leaving:boolean,halfWidth:number,halfLength:number,height:number,
-  holdUntil?:number,waitingFor?:Actor,waitingSince?:number,waitingAtGate?:boolean,
+  holdUntil?:number,waitingFor?:Actor,waitingSince?:number,waitingAtGate?:boolean,squeeze?:number,
   violation?:TrafficViolation,violations?:ActiveTrafficViolation[],vehicleSubtype?:VehicleSubtype,stoppedUntil?:number,cited?:boolean,
   wrongWay?:boolean,redLightActive?:boolean,redLightTrailDist?:number,
   dutyState?:DutyBehaviorState,fleeUntil?:number,haltedByDuty?:boolean,brakingForOfficer?:boolean,lastPlayerHitAt?:number,
@@ -384,7 +384,7 @@ export class Traffic {
       if(s.posD<minPos)minPos=s.posD
       if(s.negD<minNeg)minNeg=s.negD
     }
-    const maxShift=track.corridor?2*WALK_OFFSET:WALK_OFFSET
+    const maxShift=WALK_OFFSET
     let maxD=Number.isFinite(minPos)?Math.min(maxShift,Math.max(0,minPos-WALK_EDGE_KEEP)):maxShift
     let minD=Number.isFinite(minNeg)?-Math.min(maxShift,Math.max(0,minNeg-WALK_EDGE_KEEP)):-maxShift
     if(this.surfaceAt){
@@ -860,7 +860,7 @@ export class Traffic {
       if(seen.has(track))continue
       seen.add(track)
       if(!track.walk&&track.kind==='nonmotor'&&!track.virtual)this.nearbyRealNonmotor.push(track)
-      if(!track.street)continue
+      if(!track.street||track.link)continue
       let group=this.streets.get(track.street)
       if(!group){group={walk:[],motor:[],virtualNonmotor:[]};this.streets.set(track.street,group)}
       if(track.walk)group.walk.push(track)
@@ -1093,7 +1093,7 @@ export class Traffic {
   }
   private position(actor:Actor){
     const {track,dist}=actor
-    if(actor.kind==='person'&&actor.dodge!==0){
+    if(actor.kind==='person'&&actor.dodge!==0&&!actor.squeeze){
       const lo=track.dodgeMin??-WALK_OFFSET,hi=track.dodgeMax??WALK_OFFSET
       actor.dodge=Math.max(lo,Math.min(hi,actor.dodge))
     }
@@ -1103,7 +1103,7 @@ export class Traffic {
     if(actor.kind!=='person')this.dutyConfig.constrainActorPosition?.(actor)
     if(actor.kind==='person'&&(actor.dodge!==0&&(track.tightEdge||this.surfaceAt)||isInShizijieNoPedZone(actor.x,actor.z))){
       const ks=this.surfaceAt?.(actor.x,actor.z)
-      if((track.tightEdge&&this.hitsMotorLane(actor.x,actor.z,.35))||(ks&&!track.painted&&!isSafeWalkSurface(ks))||isInShizijieNoPedZone(actor.x,actor.z)){
+      if((track.tightEdge&&!actor.squeeze&&this.hitsMotorLane(actor.x,actor.z,.35))||(ks&&!track.painted&&!isSafeWalkSurface(ks))||isInShizijieNoPedZone(actor.x,actor.z)){
         actor.dodge=0
         actor.x=track.start.x+track.dx*dist-track.dz*track.offset
         actor.z=track.start.z+track.dz*dist+track.dx*track.offset
@@ -1861,9 +1861,12 @@ export class Traffic {
       const narrow=person&&track.corridor?.profile[1].length?passage(actor,this.actors):undefined
       if(person)actor.waitingAtGate=Boolean(narrow&&narrow.limit<=.01)
       if(narrow)advance=Math.min(advance,narrow.limit)
-      const room=person&&track.corridor?clearance(track.corridor,actor.dist+advance):undefined
+      const squeeze=narrow?.squeeze??0
+      if(person)actor.squeeze=squeeze
+      if(squeeze)advance=Math.min(advance,.5*dt)
+      const room=narrow&&track.corridor?clearance(track.corridor,actor.dist+advance,.25-.049*squeeze):undefined
       const safeMinDodge=person?Math.max(track.dodgeMin??-WALK_OFFSET,room?.[0]??-Infinity):-WALK_OFFSET
-      const safeMaxDodge=person?Math.min(track.dodgeMax??WALK_OFFSET,room?.[1]??Infinity):WALK_OFFSET
+      const safeMaxDodge=person?Math.min(squeeze?2*WALK_OFFSET:track.dodgeMax??WALK_OFFSET,room?.[1]??Infinity):WALK_OFFSET
       let minDodge=safeMinDodge,maxDodge=safeMaxDodge
       const previousX=actor.x,previousZ=actor.z
       if(!person&&actor.dutyState!=='fleeing'&&actor.dutyState!=='halted'&&actor.dutyState!=='pulled_over')actor.dodge*=decay
@@ -1888,7 +1891,7 @@ export class Traffic {
               if(faster&&ahead> -1.2)passLeft=true
               if(!faster&&ahead<1.2)keepRight=true
             }
-            if(ahead>0&&lateral<.48){
+            if(ahead>0&&(lateral<.48||alignment>0&&narrow?.singleFile)&&!(squeeze&&alignment<0&&lateral>=.45)){
               const gap=Math.max(0,ahead-.52)
               advance=Math.min(advance,alignment<0?gap*.45:gap)
             }
@@ -1933,7 +1936,7 @@ export class Traffic {
         else if(target<safeMinDodge&&safeMaxDodge>0)target=safeMaxDodge
         const clampedLow=Math.max(safeMinDodge,Math.min(safeMaxDodge,minDodge))
         const clampedHigh=Math.max(clampedLow,Math.min(safeMaxDodge,maxDodge))
-        const goal=narrow?.singleFile?0:Math.max(safeMinDodge,Math.min(safeMaxDodge,Math.max(clampedLow,Math.min(clampedHigh,target))))
+        const goal=squeeze?safeMaxDodge*squeeze:narrow?.singleFile?0:Math.max(safeMinDodge,Math.min(safeMaxDodge,Math.max(clampedLow,Math.min(clampedHigh,target))))
         actor.dodge+=(goal-actor.dodge)*(1-Math.exp(-dt*(goal?3.5:1.2)))
         if(room)actor.dodge=Math.max(safeMinDodge,Math.min(safeMaxDodge,actor.dodge))
       }

@@ -13,7 +13,7 @@ export {blendPasserbyWeights, syncPasserbyActions}
 // and starter looks as players, and actually walk (walk clip, stride matched to their speed). Far
 // pedestrians stay in the traffic BatchedMesh as one-draw stand-ins.
 
-type Walker = {x:number,y:number,z:number,yaw:number,speed:number,scale:number,down:number,kind:string,leaving:boolean}
+type Walker = {x:number,y:number,z:number,yaw:number,speed:number,scale:number,down:number,kind:string,leaving:boolean,squeeze?:number}
 type Template = {scene:THREE.Object3D,clips:THREE.AnimationClip[]}
 type View = {root:THREE.Group,mixer?:THREE.AnimationMixer,walk?:THREE.AnimationAction,idle?:THREE.AnimationAction,
   moving:boolean,walkWeight:number,template:number,placed:boolean,lastGx:number,lastGz:number,lastGy:number,groundAcc:number,animAcc:number}

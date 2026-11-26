@@ -66,6 +66,6 @@ const bodyOutside=JSON.parse(execFileSync('uv',['run','--locked','python','scrip
 reports.forEach((row,index)=>{row.bodyOutside=bodyOutside[index]})
 console.table(reports)
 const corridorResults=verifyCorridors(graph,sim,tracks)
-assert.ok(corridorResults.every(row=>row.passed&&!row.overlap&&!row.stalls&&row.maxWait<=15&&!row.narrowBodyOutside))
+assert.ok(corridorResults.every(row=>row.passed&&!row.overlap&&!row.stalls&&row.maxWait<=15&&!row.narrowBodyOutside&&!row.centerOutside&&row.maxExcess<=.05))
 if(process.argv[2])writeFileSync(process.argv[2],JSON.stringify(trace))
 assert.ok(reports.every(row=>row.passes+row.exited+row.unfinished>0&&!row.stall&&!row.overlap&&!row.outside))

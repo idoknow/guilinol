@@ -25,6 +25,16 @@ export function verifyCorridors(graph,sim,tracks){
     if(profiles.size===4)break
   }
   const results=[]
+  for(const id of [27672,56082,11018,1226]){
+    const lane=graph.lanes.find(lane=>lane.id===id)
+    const track=tracks.find(track=>track.corridor?.direction===1&&lane.pedProfiles.includes(track.corridor.profile)&&track.corridor.profile[1].some(([a,b,l,r])=>(l===null||r===null)&&2*(b-a)>20))
+    assert.ok(track,`missing measured track ${id}`)
+    const span=track.corridor.profile[1].find(([a,b,l,r])=>(l===null||r===null)&&2*(b-a)>20)
+    const mid=span[0]+span[1]-track.corridor.origin
+    assert.ok(mid>=5&&mid<=track.length-5)
+    const start=id===1226?[32,track.length-36]:[mid-5,track.length-mid-5]
+    cases.push({track,label:`${track.street} ${id}`,span,start})
+  }
   for(const {track,label,start,span} of cases){
     const actors=start.map((dist,index)=>({id:`ped-${index}`,track:index?track.pairTrack:track,dist,kind:'person',pace:1.4,speed:1.4,scale:1,dodge:0,down:0,leaving:false}))
     sim.actors=actors.slice();actors.forEach(actor=>sim.position(actor))
@@ -42,7 +52,7 @@ export function verifyCorridors(graph,sim,tracks){
         longest=Math.max(longest,wait[index])
         if(span&&active.includes(actor)&&actor.track.corridor?.profile===track.corridor.profile){
           const along=actor.track.corridor.origin+actor.dist*actor.track.corridor.direction
-          if(along>=2*span[0]&&along<=2*span[1])inside.push([actor.x,actor.z])
+          if(along>=2*span[0]&&along<=2*span[1])inside.push([actor.x,actor.z,actor.squeeze])
         }
       }
       frames.push(inside)
@@ -54,9 +64,9 @@ export function verifyCorridors(graph,sim,tracks){
         if(span&&dist<5)trace.push(actors.map(({x,y,z,yaw,speed})=>({x,y,z,yaw,speed})))
       }
     }
-    const [outside]=span?JSON.parse(execFileSync('uv',['run','--locked','python','scripts/ped-envelope.py'],{input:JSON.stringify([frames])})):[0]
-    if(trace.length&&process.env.PED_NARROW_TRACE)writeFileSync(process.env.PED_NARROW_TRACE,JSON.stringify(trace))
-    results.push({label,passed,closest:+closest.toFixed(3),overlap,stalls,maxWait:longest*.05,narrowBodyOutside:outside})
+    const [[squeezeFrames,maxExcess,narrowBodyOutside,centerOutside]]=span?JSON.parse(execFileSync('uv',['run','--locked','python','scripts/ped-envelope.py','--squeeze'],{input:JSON.stringify([frames])})):[[0,0,0,0]]
+    if(label==='六合路'&&trace.length&&process.env.PED_NARROW_TRACE)writeFileSync(process.env.PED_NARROW_TRACE,JSON.stringify(trace))
+    results.push({label,passed,closest:+closest.toFixed(3),overlap,stalls,maxWait:longest*.05,squeezeFrames,maxExcess,narrowBodyOutside,centerOutside})
   }
   console.table(results)
   return results
