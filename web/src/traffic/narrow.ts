@@ -3,7 +3,7 @@ type Span = [number,number,number|null,number|null]
 export type Profile = [Station[],Span[]]
 export type Corridor = {profile:Profile,length:number,origin:number,direction:number}
 
-type Walker = {id?:string,dist:number,pace?:number,arrived?:boolean,leaving:boolean,track:{corridor?:Corridor}}
+type Walker = {id?:string,dist:number,pace?:number,arrived?:boolean,leaving:boolean,track:{corridor?:Corridor,length?:number}}
 const station = (corridor:Corridor,index:number)=>Math.min(corridor.length,index*2)
 const offset = (corridor:Corridor,dist:number)=>corridor.origin+corridor.direction*dist
 
@@ -24,6 +24,56 @@ export function pinches(profile:Profile){
   }
   pinchCache.set(profile,result)
   return result
+}
+
+type Retreat={target:number,other:Walker,corridor:Corridor}
+const retreats=new WeakMap<Walker,Retreat>()
+export function needsAdmission(corridor:Corridor,pinch:Pinch){
+  const gates=Number(pinch.left!==null)+Number(pinch.right!==null)
+  return !gates||station(corridor,pinch.right??pinch.last)-station(corridor,pinch.left??pinch.first)>8*gates
+}
+export function canRoute(corridor:Corridor|undefined,dist:number,actors:readonly Walker[]){
+  if(!corridor)return true
+  const along=offset(corridor,dist),direction=corridor.direction
+  return !pinches(corridor.profile).some(pinch=>{
+    if(!needsAdmission(corridor,pinch))return false
+    const near=station(corridor,direction>0?pinch.first:pinch.last),far=station(corridor,direction>0?pinch.last:pinch.first)
+    if((far-along)*direction<0)return false
+    return actors.some(other=>{
+      const reverse=other.track.corridor
+      return !other.arrived&&!other.leaving&&reverse?.profile===corridor.profile&&reverse.direction!==direction&&(offset(reverse,other.dist)-near)*direction>=0
+    })
+  })
+}
+function retreatDistance(actor:Walker,pinch:Pinch){
+  const corridor=actor.track.corridor!,entry=corridor.direction>0?pinch.left:pinch.right
+  if(entry===null)return Infinity
+  const distance=(offset(corridor,actor.dist)-station(corridor,entry))*corridor.direction
+  return distance>=0&&distance<=8&&distance<=actor.dist?distance:Infinity
+}
+function retreatState(actor:Walker,actors:readonly Walker[],corridor:Corridor){
+  const along=offset(corridor,actor.dist),direction=corridor.direction
+  let state=retreats.get(actor)
+  if(state){
+    const reverse=state.other.track.corridor
+    if(state.corridor===corridor&&reverse?.profile===corridor.profile&&!state.other.arrived&&!state.other.leaving&&actors.includes(state.other)&&(offset(reverse,state.other.dist)-along)*direction>-.7)return state
+    retreats.delete(actor)
+  }
+  for(const pinch of pinches(corridor.profile)){
+    const start=station(corridor,pinch.first),end=station(corridor,pinch.last)
+    if(along<start||along>end)continue
+    const back=retreatDistance(actor,pinch)
+    if(!Number.isFinite(back))continue
+    for(const other of actors){
+      const reverse=other.track.corridor
+      if(!reverse||other.arrived||other.leaving||retreats.has(other)||reverse.profile!==corridor.profile||direction===reverse.direction)continue
+      const opposite=offset(reverse,other.dist)
+      if(opposite<start||opposite>end||(opposite-along)*direction<=0)continue
+      const theirBack=retreatDistance(other,pinch)
+      if(back>theirBack||back===theirBack&&String(actor.id??actors.indexOf(actor))>String(other.id??actors.indexOf(other)))continue
+      state={target:actor.dist-back,other,corridor};retreats.set(actor,state);return state
+    }
+  }
 }
 
 function pinchLimit(actor:Walker,actors:readonly Walker[],corridor:Corridor){
@@ -51,12 +101,14 @@ function pinchLimit(actor:Walker,actors:readonly Walker[],corridor:Corridor){
   return limit
 }
 
-export function clearance(corridor:Corridor,dist:number,margin=.25):[number,number]{
+export function clearance(corridor:Corridor,dist:number,margin=.25,atBay=false):[number,number]{
   const along=offset(corridor,dist),samples=corridor.profile[0]
   const index=Math.max(0,Math.min(samples.length-1,Math.floor(along/2)))
   const current=samples[index],next=samples[Math.min(samples.length-1,index+1)]
   if(!current||!next)return [0,0]
-  const room=[0,1].map(side=>Math.max(0,Math.min(current[side],next[side])/1000-margin))
+  const fraction=Math.min(1,Math.max(0,(along-station(corridor,index))/(station(corridor,index+1)-station(corridor,index)||1)))
+  const roundingGuard=pinches(corridor.profile).length&&margin>=.25?.001:0
+  const room=[0,1].map(side=>Math.max(0,(atBay?current[side]+fraction*(next[side]-current[side]):Math.min(current[side],next[side]))/1000-margin-roundingGuard))
   return corridor.direction>0?[-room[0],room[1]]:[-room[1],room[0]]
 }
 
@@ -70,19 +122,33 @@ export function passage(actor:Walker,actors:readonly Walker[]){
     const gate=gateIndex===null?(direction>0?start:end):station(corridor,gateIndex)
     const remaining=(gate-along)*direction
     const exit=direction>0?(right===null?end:station(corridor,right)):(left===null?start:station(corridor,left))
-    if(remaining>5||(exit-along)*direction<-.5)continue
+    const nearbyPinches=pinches(corridor.profile).filter(pinch=>pinch.first>=first&&pinch.last<=last)
+    if(remaining>5||(exit-along)*direction<(nearbyPinches.length?-3:-.5))continue
     const singleFile=along>=start&&along<=end
     if((left===null||right===null||end-start>14)&&!corridor.profile[0].slice(first,last+1).some(sample=>sample&&sample[0]+sample[1]<450)){
-      let squeeze=0
+      let squeeze=0,atGate=false
       for(const other of actors){
         const reverse=other.track.corridor
         if(other.arrived||other.leaving||reverse?.profile!==corridor.profile||reverse.direction===direction)continue
         const gap=(offset(reverse,other.dist)-along)*direction
+        if(gap>=-1.2&&gap<=3&&nearbyPinches.some(pinch=>[pinch.left,pinch.right].some(index=>index!==null&&Math.abs(along+direction*gap/2-station(corridor,index))<=3))){
+          atGate=true;squeeze=Math.max(squeeze,Math.min(1,3-gap,2+gap))
+        }
         if(gap>=-1&&gap<=3&&along+direction*gap/2>=start-.5&&along+direction*gap/2<=end+.5){
           squeeze=Math.max(squeeze,Math.min(1,3-gap,1+gap))
         }
       }
-      return {singleFile,limit:pinchLimit(actor,actors,corridor),squeeze}
+      const retreat=retreatState(actor,actors,corridor)
+      if(retreat){
+        const back=Math.max(0,actor.dist-retreat.target)
+        return {singleFile,limit:0,squeeze:back>.01?0:1,back,atBay:true}
+      }
+      const yielding=actors.find(other=>retreats.get(other)?.other===actor)
+      if(yielding){
+        const target=retreats.get(yielding)!.target
+        squeeze=yielding.dist-target>.01?0:1
+      }
+      return {singleFile,limit:pinchLimit(actor,actors,corridor),squeeze,atBay:Boolean(yielding)||atGate}
     }
     let limit=Infinity
     if(remaining>=-.01){
