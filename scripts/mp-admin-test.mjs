@@ -111,3 +111,19 @@ test('two players: private RT state, role gate, public-safe admin state, persist
   if(process.env.MP_SAMPLE_FILE)await writeFile(process.env.MP_SAMPLE_FILE,JSON.stringify({snapshot,history},null,2))
   const exit=once(rt.child,'exit');rt.child.kill();await exit;assert.equal((await (await call()).json()).rt,'down')
 })
+
+test('active bans resolve offline account IDs and names, never device owners',async context=>{
+  const {multiplayer}=await import('../server/mp-admin.mjs')
+  const storage=await fixture({postgresOnly:true}),pool=new pg.Pool({connectionString:storage.env.DATABASE_URL})
+  context.after(async()=>{await pool.end();await storage.close()})
+  const {rows:[{uid}]}=await pool.query("insert into users(id,email,nickname,salt,digest) values('offline','offline@example.test','测试昵称','','') returning uid")
+  const bans=[{kind:'uid',value:uid},{kind:'uid',value:'999999999'},{kind:'fp',value:uid}]
+  context.mock.method(globalThis,'fetch',async()=>Response.json({bans}))
+  const {route}=multiplayer(pool,{RT_ADMIN_TOKEN:'fixture'})
+  const response=await route('admin/bans',new Request('http://localhost/api/admin/bans'),'admin')
+  assert.equal(response.status,200)
+  const active=(await response.json()).bans
+  assert.deepEqual(active[0].account,{id:'offline',nickname:'测试昵称'})
+  assert.equal(active[1].account,null)
+  assert.equal(active[2].account,undefined)
+})
