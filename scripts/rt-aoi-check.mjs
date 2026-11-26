@@ -18,22 +18,22 @@ import WebSocket from 'ws'
 const SECRET = randomBytes(24).toString('base64url')
 const PORT = 20000 + Math.floor(Math.random() * 20000)
 const server = spawn(process.execPath, [fileURLToPath(new URL('../rt/server-realtime.mjs', import.meta.url))], {
-  env: { ...process.env, PORT: String(PORT), RT_JOIN_SECRET: SECRET, RT_ROSTER_MS: '500', RT_STATS_MS: '600000', RT_RESUME_MS: '1500' },
+  env: { ...process.env, DATABASE_URL:'', PORT: String(PORT), RT_JOIN_SECRET: SECRET, RT_ROSTER_FULL_MS: '500', RT_STATS_MS: '600000', RT_RESUME_MS: '1500' },
   stdio: ['ignore', 'pipe', 'inherit'],
 })
 await new Promise((resolve) => server.stdout.once('data', resolve))
 server.stdout.resume()
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
-const mint = (uid, name) => {
-  const payload = Buffer.from(JSON.stringify({ uid, name, exp: Math.floor(Date.now() / 1000) + 60 })).toString('base64url')
+const mint = (uid, name,x,z) => {
+  const payload = Buffer.from(JSON.stringify({ uid, name,spawn:{x,z},destination:{x:3,z:2}, exp: Math.floor(Date.now() / 1000) + 60 })).toString('base64url')
   return `${payload}.${createHmac('sha256', SECRET).update(payload).digest('base64url')}`
 }
 function client(uid, name, x, z) {
   return new Promise((resolve) => {
     const ws = new WebSocket(`ws://127.0.0.1:${PORT}/ws`)
     const c = { ws, id: '', x, z, log: [], roster: [], welcome: null, closed: null }
-    ws.on('open', () => ws.send(JSON.stringify({ t: 'join', ticket: mint(uid, name), x, y: 30, z, yaw: 0 })))
+    ws.on('open', () => ws.send(JSON.stringify({ t: 'join', ticket: mint(uid, name,x,z), x, y: 30, z, yaw: 0 })))
     ws.on('message', (raw) => {
       const msg = JSON.parse(String(raw))
       if (msg.t === 'welcome') { c.id = msg.me.id; c.welcome = msg; resolve(c) }
@@ -44,8 +44,8 @@ function client(uid, name, x, z) {
   })
 }
 const move = async (c, x, z) => { c.x = x; c.z = z; c.ws.send(JSON.stringify({ t: 'pos', x, y: 30, z, yaw: 0, v: 3 })); await sleep(50) }
-async function walk(c, toX, toZ, step = 8) {
-  const n = Math.ceil(Math.hypot(toX - c.x, toZ - c.z) / step)
+async function walk(c, toX, toZ, step = 1) {
+  const n = Math.ceil(Math.hypot(toX - c.x, toZ - c.z) / Math.min(step,1))
   const fx = c.x, fz = c.z
   for (let i = 1; i <= n; i++) await move(c, fx + ((toX - fx) * i) / n, fz + ((toZ - fz) * i) / n)
   await sleep(150)
@@ -61,6 +61,7 @@ const B = await client(910002, 'B', 600, 0)
 await sleep(700)
 check('1) 600m 外不进场景', count(A, 'join', B.id) === 0 && !B.welcome.players.some((p) => p.id === A.id), `join=${count(A, 'join', B.id)}`)
 check('1) 但在全服 roster 里', A.roster.some(([id]) => id === B.id), `roster=${A.roster.length}`)
+check('远端名册只给网格，不给实际坐标',A.roster.find(([id])=>id===B.id)?.[2]===640)
 
 reset(A); await walk(B, 80, 0)
 check('2) 走近到 80m → join = 1', count(A, 'join', B.id) === 1, `join=${count(A, 'join', B.id)}`)

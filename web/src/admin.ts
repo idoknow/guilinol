@@ -1800,11 +1800,21 @@ const pages: Record<string, (view: View) => void> = {
       try {
         const data = await api<any>('admin/bans', undefined, 'GET')
         const rows = (data?.bans ?? []) as any[]
-        if (!rows.length) { banSlot.replaceChildren(h('p', { class: 'adm-sub' }, '当前没有生效中的封禁')); return }
+        const reviews=(data.reviews??[]).map((review:any)=>h('details',null,
+          h('summary',null,`UID ${review.uid} · ${when(new Date(Number(review.opened_ms)))} · 查看证据`),
+          h('pre',null,JSON.stringify(review.evidence,null,2)),
+          h('button',{type:'button',onclick:async()=>{
+            const reason=window.prompt(`确认违规并按上方所选时长「${banMinSel.selectedOptions[0]?.text}」封禁 UID ${review.uid}？请输入原因`)
+            if(!reason?.trim())return
+            try {await api('admin/ban',{uid:review.uid,reviewId:review.id,minutes:Number(banMinSel.value),reason});await loadBans()} catch(error){alert(String(error))}
+          }},'确认违规'),h('button',{type:'button',onclick:async()=>{
+            if(!confirm('结束复核，不处罚且不改变已有封禁？'))return
+            try {await api('admin/unban',{uid:review.uid,reviewId:review.id,dismiss:true});await loadBans()} catch(error){alert(String(error))}
+          }},'不处罚')))
         const table = h('table', { class: 'adm-table' },
           h('thead', null, h('tr', null, ['类型', '对象', '到期', '原因', ''].map((t) => h('th', null, t)))),
           h('tbody', null, ...rows.map(banRow)))
-        banSlot.replaceChildren(h('div', { class: 'adm-table-wrap' }, table))
+        banSlot.replaceChildren(h('p',null,`生效封禁 ${rows.length} · ${when(new Date())} 刷新`),table,h('h3',null,`待复核 ${reviews.length}`),...reviews,navLink('全部封禁管理记录',{view:'audit',target_type:'mp'},{class:'adm-link'}))
       } catch (error) { banSlot.replaceChildren(errorState(error as Error, () => void loadBans())) }
     }
     banForms.addEventListener('submit', async (event) => {
@@ -1863,7 +1873,7 @@ const pages: Record<string, (view: View) => void> = {
       })
     liveSlot.append(skeleton(6))
     load(true)
-    refreshTimer = window.setInterval(() => document.visibilityState === 'visible' && !document.querySelector('dialog.adm-dialog') && load(false), 10000)
+    refreshTimer = window.setInterval(() => {if(document.visibilityState==='visible'&&!document.querySelector('dialog.adm-dialog')){void load(false);if(!banSlot.querySelector('details[open]'))void loadBans()}}, 10000)
 
     const actParams = new URLSearchParams({ range: actRange, limit: '100' })
     if (uid) actParams.set('uid', uid)
@@ -2097,7 +2107,7 @@ const pages: Record<string, (view: View) => void> = {
       card(null, slot, { className: 'adm-card--flush' }))
     const actions: Record<string, string> = {
       role: '调整身份', status: '变更状态', start_ai: '发起 AI 制作', reply: '回复提交人',
-      ban: '封禁账号', unban: '解除封禁', merge_users: '合并账号', reset_password: '重置密码', change_email: '修改邮箱', 'mp.kick': '踢出联机',
+      ban: '封禁账号', unban: '解除封禁', merge_users: '合并账号', reset_password: '重置密码', change_email: '修改邮箱', 'mp.kick': '踢出联机','mp.ban':'联机封禁','mp.unban':'联机解封','mp.dismiss':'复核不处罚',
       'chat.mute': '聊天禁言', 'chat.unmute': '解除禁言', 'chat.delete': '删除消息', 'chat.approve': '放行消息', 'chat.block': '拦截消息', 'chat.notice': '发布公告', 'chat.settings': '修改聊天规则', 'chat.words': '编辑敏感词', 'chat.words/delete': '删除敏感词', 'chat.lexicon_policy': '词库升级',
     }
     const body = h('tbody'),
@@ -2125,6 +2135,7 @@ const pages: Record<string, (view: View) => void> = {
         : item.action === 'reset_password' ? (detail.generated ? '生成了新密码' : '设置了新密码')
         : item.action === 'chat.mute' ? `${detail.until === -1 ? '永久' : detail.until ? `至 ${when(new Date(Number(detail.until)))}` : ''} · ${detail.source === 'auto' ? '自动' : ''}${detail.reason || ''}`
         : item.action === 'chat.words' ? `「${detail.word?.word ?? ''}」→ ${chatAction[detail.word?.action] ?? ''}${detail.word?.enabled === false ? '（停用）' : ''}`
+        : item.action.startsWith('mp.') ? [detail.reason,detail.recordId,detail.reviewId].filter(Boolean).join(' · ')
         : item.action.startsWith('chat.') ? detail.reason || ''
         : ''
       const target = item.target_type === 'feedback'

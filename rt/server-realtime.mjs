@@ -55,7 +55,7 @@
 import {combat, config as combatConfig, snapshot as combatSnapshot} from './combat.mjs'
 import {flatDistance,inEmoteRange,acceptEmote} from './emote.mjs'
 import {createServer} from 'node:http'
-import {createHmac,timingSafeEqual} from 'node:crypto'
+import {createHmac,timingSafeEqual,randomUUID} from 'node:crypto'
 import {WebSocketServer} from 'ws'
 import * as obs from './observability.mjs'
 import {createChat} from './chat.mjs'
@@ -121,6 +121,14 @@ const banStore = createBanStore(process.env, (...args) => console.warn('[anti-ch
 let nextId = 1
 
 const now = () => Date.now()
+const systemGate = {x:-588,z:-212}
+const rosterCoordinate = value => Math.round(value/128)*128
+function rosterPoint(player,at=now()) {
+  if(!player.mapPoint || at-player.mapPoint.at>=ROSTER_SUB_MS) {
+    player.mapPoint={at,x:rosterCoordinate(player.x),z:rosterCoordinate(player.z)}
+  }
+  return player.mapPoint
+}
 const clampNum = (value, min, max, fallback = 0) => {
   const n = Number(value)
   return Number.isFinite(n) ? Math.min(max, Math.max(min, n)) : fallback
@@ -292,6 +300,9 @@ function send(ws, payload, type=payload.t, size) {
       /* 单个连接写失败就忽略，别影响别人 */
     }
   }
+}
+function notifyBan(ws, ban) {
+  send(ws,{t:'banned',recordId:ban.recordId,reason:ban.reason,until:Number.isFinite(ban.until)?ban.until:null})
 }
 
 /**
@@ -466,7 +477,7 @@ function removePlayer(p, extra = {}) {
 /** 全服用低频名册：地图/名册面板要看到整座城的人，3D 场景仍然只来自 AOI */
 function rosterPayload() {
   const list = []
-  for (const p of players.values()) list.push([p.id, p.name, Math.round(p.x), Math.round(p.z), p.joinedAt])
+  for (const p of players.values()) {const {x,z}=rosterPoint(p);list.push([p.id,p.name,x,z,p.joinedAt])}
   return { t: 'roster', players: list }
 }
 
@@ -492,7 +503,7 @@ function rosterDelta() {
   const add = [], up = [], del = []
   const next = new Map()
   for (const p of players.values()) {
-    const x = Math.round(p.x), z = Math.round(p.z)
+    const {x,z}=rosterPoint(p)
     const prev = rosterSnap.get(p.id)
     next.set(p.id, { x, z, name: p.name })
     if (!prev || prev.name !== p.name) add.push([p.id, p.name, x, z])
@@ -514,8 +525,9 @@ function nearPayload(me) {
   const near = []
   for (const p of players.values()) {
     if (me && p.id === me.id) continue
-    if (me && flatDistance(p, me) > ROSTER_SUB_RADIUS) continue
-    near.push([p.id, p.name, Math.round(p.x), Math.round(p.z)])
+    const point=rosterPoint(p)
+    if (me && flatDistance(point,rosterPoint(me)) > ROSTER_SUB_RADIUS) continue
+    near.push([p.id,p.name,point.x,point.z])
   }
   return { t: 'roster3', v: rosterV, near, total: players.size, radius: ROSTER_SUB_RADIUS }
 }
@@ -570,7 +582,8 @@ const server = createServer(async(req, res) => {
     })
     if (req.url === '/admin/bans' && req.method === 'GET') {
       if (!adminAuthorized) { res.writeHead(403); res.end(); return }
-      void banStore.refresh()
+      const reviews = await banStore.refresh().then(()=>banStore.reviews()).catch(()=>null)
+      if (!reviews) { res.writeHead(503); res.end('{"error":"review store unavailable"}'); return }
       res.writeHead(200, {'content-type': 'application/json', 'cache-control': 'no-store'})
       const bans = banStore.list()
       // 指纹封禁带上设备画像（型号/浏览器/屏幕/运营商/关联账号），运营才好判断是不是误封
@@ -580,7 +593,7 @@ const server = createServer(async(req, res) => {
         return { ...row, devices }
       }))
       res.end(JSON.stringify({
-        bans: enriched,
+        bans: enriched, reviews,
         live: [...players.values()].filter((p) => p.ws).map((p) => ({ uid: p.uid, name: p.name, id: p.id })),
       }))
       return
@@ -602,8 +615,9 @@ const server = createServer(async(req, res) => {
       }
       try {
         if (req.url === '/admin/unban') {
-          const result = await banStore.unban({uid, fp, actor: clampStr(body.actor, 64)})
-          bans.delete(uid)   // 同步清掉进程内快速封禁
+          const actor=clampStr(body.actor,64)
+          const result = body.dismiss===true ? await banStore.dismiss(uid,body.reviewId,actor) : await banStore.unban({uid,fp,actor})
+          if(body.dismiss!==true)bans.delete(uid)
           res.writeHead(200, {'content-type': 'application/json'})
           res.end(JSON.stringify({ok: true, ...result}))
           return
@@ -615,11 +629,11 @@ const server = createServer(async(req, res) => {
           return
         }
         const reason = clampStr(body.reason, 200).trim() || '违反联机规则'
-        const result = await banStore.ban({uid, fp, minutes, reason, actor: clampStr(body.actor, 64), level: Number(body.level) || 0})
+        const result = await banStore.ban({uid, fp, minutes, reason, reviewId:body.reviewId, actor: clampStr(body.actor, 64), level: Number(body.level) || 0})
         // 立即踢掉在线命中者（封了还挂着就没意义）
         for (const p of [...players.values()]) {
           const hit = (uid != null && p.uid === uid) || (fp && (p.fp === fp || p.ws?.fp === fp))
-          if (hit) { try { p.ws?.close(4003, 'banned') } catch { /* 忽略 */ } }
+          if (hit) { notifyBan(p.ws,result); p.ws?.close(4003,'banned') }
         }
         res.writeHead(200, {'content-type': 'application/json'})
         res.end(JSON.stringify({ok: true, ...result}))
@@ -687,13 +701,13 @@ const server = createServer(async(req, res) => {
           // 只写内存封禁表（带 TTL），重启即失，够用来挡住「被踢后立刻重连」
           const minutes=body.minutes
           if(minutes!==undefined&&(!Number.isInteger(minutes)||minutes<1||minutes>10080)){res.writeHead(400);res.end('{}');return}
-          bans.set(uid, {until: now() + (minutes===undefined?KICK_BAN_SECONDS:minutes*60) * 1000, reason})
+          bans.set(uid, {until: now() + (minutes===undefined?KICK_BAN_SECONDS:minutes*60) * 1000, reason,recordId:randomUUID()})
           const target=[...players.values()].find(p=>p.uid===uid)
           obs.event('kick',target??{uid},{reason});obs.activity(target??{uid,name:''},{kind:'kick',detail:reason});if(target)target.kickReason=reason
           let kicked = 0
           for (const p of players.values()) {
             if (p.uid !== uid) continue
-            send(p.ws, {t: 'banned', reason})
+            notifyBan(p.ws,bans.get(uid))
             setTimeout(() => { try { p.ws.close(4003, 'banned') } catch { /* 忽略 */ } }, 60)
             kicked++
           }
@@ -824,7 +838,7 @@ wss.on('connection', (ws, req) => {
     }
   }
 
-  ws.on('message', raw => {
+  ws.on('message', async raw => {
     try {
       const msg = JSON.parse(String(raw))
       obs.packet(ws,'in',msg?.t,raw.length)
@@ -834,7 +848,7 @@ wss.on('connection', (ws, req) => {
 
       if (msg.t === 'join' && !me) {
         // 已经被拒（封禁 / 顶号）的连接不再给第二次机会
-        if (ws.rejected) return
+        if (ws.rejected || ws.joining) return
         // join 时再查一次：握手到 join 之间可能已经挤满
         if (players.size >= MAX_PLAYERS) {
           obs.reject('full')
@@ -858,12 +872,15 @@ wss.on('connection', (ws, req) => {
           const dev = parseDev(ws.dev, ua)
           void banStore.noteDevice(uid, {fp, ua, ip, ip24, ...dev})
         }
-        void banStore.refresh()
+        ws.joining=true
+        try {await banStore.refresh()} catch {ws.close(1013,'join unavailable');return}
+        if(ws.readyState!==1)return
+        if(players.size>=MAX_PLAYERS){ws.close(1013,'full');return}
         const persistent = banStore.check(uid, fp)
         if (persistent) {
           obs.reject('banned', {uid, name: cleanName(claims.name)})
           ws.rejected = true
-          send(ws, {t: 'banned', reason: persistent.reason || '账号已被封禁'})
+          notifyBan(ws,persistent)
           setTimeout(() => { try { ws.close(4003, 'banned') } catch { /* 忽略 */ } }, 60)
           return
         }
@@ -871,7 +888,7 @@ wss.on('connection', (ws, req) => {
         if (ban && ban.until > now()) {
           obs.reject('banned',{uid,name:cleanName(claims.name)})
           ws.rejected = true
-          send(ws, {t: 'banned', reason: ban.reason || '账号已被封禁'})
+          notifyBan(ws,ban)
           setTimeout(() => { try { ws.close(4003, 'banned') } catch { /* 忽略 */ } }, 60)
           return
         }
@@ -935,11 +952,13 @@ wss.on('connection', (ws, req) => {
           try { previous.ws.close(4001, 'replaced') } catch { /* 忽略 */ }
           console.log(JSON.stringify({scope: 'rt-replace', uid, oldId: previous.id, newId: id}))
         }
+        const start = previous ?? claims.spawn ?? systemGate
+        const destination = claims.destination
         const initAct = VALID_ACTIVITIES.has(msg.act) ? msg.act : 'walk'
         const initDetail = cleanDetail(msg.actDetail)
         const joinedAt = now()
         const player = {
-          joinedAt,ip,nodeIp,ua:clampStr(req.headers['user-agent'],200),positions:[],chats:0,
+          joinedAt,posAt:joinedAt,ip,nodeIp,ua:clampStr(req.headers['user-agent'],200),positions:[],chats:0,
           activity: initAct, activityDetail: initDetail, activitySince: joinedAt, activityTotals: {},
           activityExplicit: VALID_ACTIVITIES.has(msg.act), lastMoveAt: joinedAt, lastActAt: 0,
           id,
@@ -948,9 +967,10 @@ wss.on('connection', (ws, req) => {
           name: cleanName(claims.name),
           openid: typeof claims.wx_openid==='string'?claims.wx_openid:undefined,
           avatar: sanitizeAvatar(msg.avatar),
-          x: clampNum(msg.x, -1e5, 1e5),
+          x: clampNum(start.x, -1e5, 1e5),
           y: clampNum(msg.y, -1000, 8000),
-          z: clampNum(msg.z, -1e5, 1e5),
+          z: clampNum(start.z, -1e5, 1e5),
+          travel:destination ? {x:destination.x,z:destination.z,until:claims.exp*1000} : null,
           yaw: clampNum(msg.yaw, -10, 10),
           v: 0,
           bike: '',
@@ -1010,11 +1030,24 @@ wss.on('connection', (ws, req) => {
         })
         // 全服名册立刻给一份（仅老客户端；roster3 客户端按需订阅，不预发 50KB）
         if (!ws.caps3) send(ws, rosterPayload())
+        if(Math.hypot(msg.x-player.x,msg.z-player.z)>2)send(ws,{t:'setback',kind:'system_spawn',x:player.x,y:player.y,z:player.z})
         broadcast({t: 'online', online: players.size})
         return
       }
 
-      if (!me) return
+      if (!me || me.ws!==ws) return
+      const recordMove = (kind,detail) => {
+        me.cheatTimes ??= new Map()
+        if (now()-(me.cheatTimes.get(kind)??0)<2000) return
+        me.cheatTimes.set(kind,now())
+        void banStore.violation({uid:me.uid,fp:ws.fp??'',kind,detail:{from:[me.x,me.y,me.z],...detail},ua:me.ua??''}).then(ban=>{
+          if (ban) { notifyBan(ws,ban); ws.close(4003,'banned') }
+        }).catch(error=>console.warn('[anti-cheat]',error.message))
+      }
+      if (msg.t==='mount_player' && me.visible.has(msg.target) && players.has(msg.target) && msg.target!==me.id) {
+        if(!me.mountPending){me.mountPending=true;void banStore.violation({uid:me.uid,fp:ws.fp??'',kind:'mount_player',detail:{target:msg.target,from:[me.x,me.y,me.z]}}).then(ban=>{if(ban){notifyBan(ws,ban);ws.close(4003,'banned')}}).catch(error=>console.warn('[anti-cheat]',error.message)).finally(()=>{me.mountPending=false})}
+        return
+      }
 
       if (msg.t === 'emote') {
         if (!acceptEmote(me,msg,now())) return
@@ -1039,9 +1072,22 @@ wss.on('connection', (ws, req) => {
         if (at - me.lastPos < MIN_POS_GAP_MS) return
         me.lastPos = at
         obs.position(me,at)
+        if ([msg.id,msg.target,msg.playerId].some(value=>value!=null && value!==me.id) || (msg.uid!=null && String(msg.uid)!==String(me.uid))) {
+          recordMove('foreign_position',{}); return
+        }
+        if (![msg.x,msg.y,msg.z].every(Number.isFinite)) return
         const nx = clampNum(msg.x, -1e5, 1e5)
         const ny = clampNum(msg.y, -1000, 8000)
         const nz = clampNum(msg.z, -1e5, 1e5)
+        if(me.headTrack || Math.abs(ny-me.y)>0.5){
+          const peer=me.headTrack ? players.get(me.headTrack.id) : [...me.visible].map(id=>players.get(id)).find(other=>other && Math.hypot(nx-other.x,nz-other.z)<0.35 && ny-other.y>1.4 && ny-other.y<2.2)
+          if(peer && Math.hypot(nx-peer.x,nz-peer.z)<0.35 && ny-peer.y>1.4 && ny-peer.y<2.2){
+            me.headTrack??={id:peer.id,at,x:peer.x,z:peer.z}
+            if(at-me.headTrack.at>1000 && Math.hypot(peer.x-me.headTrack.x,peer.z-me.headTrack.z)>2){
+              recordMove('head_overlap',{to:[nx,ny,nz],peer:peer.id});send(ws,{t:'setback',kind:'head_overlap',x:me.x,y:me.y,z:me.z});return
+            }
+          }else me.headTrack=null
+        }
         // 移动合法性由服务端判定：超速 / 飞天 / 非法瞬移一律拒包，客户端收 setback 拉回
         const stepDt = Math.max((at - (me.posAt ?? at)) / 1000, 0.02)
         const stepLen = Math.hypot(nx - me.x, nz - me.z)
@@ -1051,18 +1097,12 @@ wss.on('connection', (ws, req) => {
         const verdict = checkMove(me, nx, ny, nz, at)
         if (verdict.reject) {
           send(ws, {t: 'setback', x: me.x, y: me.y, z: me.z, kind: verdict.kind})
-          if (at - (me.cheatAt ?? 0) > 2000) {
-            me.cheatAt = at
-            void banStore.violation({
-              uid: me.uid, fp: ws.fp ?? '', kind: verdict.kind,
-              detail: {overflow: Math.round(verdict.overflow ?? 0), x: Math.round(nx), z: Math.round(nz)},
-              ua: me.ua ?? '',
-            })
-          }
+          recordMove(verdict.kind,{to:[nx,ny,nz],overflow:verdict.overflow})
           return
         }
         // 过去 1 秒跑过步（超过走路上限）→ 短暂禁止出拳/扶人（防"切车瞬移贴脸出拳"）
         if (stepLen / stepDt > LIMITS.walk) me.fastAt = at
+        if (verdict.observation) recordMove(verdict.observation,{to:[nx,ny,nz]})
         me.posAt = at
         me.x = nx
         me.y = ny
@@ -1089,12 +1129,15 @@ wss.on('connection', (ws, req) => {
         me.hyaw = clampNum(msg.hyaw, -20, 20)
         me.cr = clampNum(msg.cr, 0, 1)
         me.gr = clampNum(msg.gr, 0, 1, 1)
+        if (at-(me.smokeAt??0)>=500) {
+        me.smokeAt=at
         me.sc = clampInt(msg.sc, 0, 9)
         me.sb = clampInt(msg.sb, 0, 1800)
         me.sp = clampInt(msg.sp, 0, 999)
         me.sr = clampInt(msg.sr, 0, 20, 20)
         me.sd = clampInt(msg.sd, 0, 999)
         me.ss = clampInt(msg.ss, 1, 2, 1)
+        }
         me.br = clampInt(msg.br, 0, 11)
         if (me.v > 0.12) me.lastMoveAt = at
         if (!me.activityExplicit) {
@@ -1128,6 +1171,8 @@ wss.on('connection', (ws, req) => {
       }
 
       if (msg.t === 'roster_sub') {
+        if (now()-(ws.lastRosterSub??0)<ROSTER_SUB_MS) return
+        ws.lastRosterSub=now()
         ws.rosterSub = { at: now() }
         send(ws, nearPayload(me))
         if (typeof msg.since === 'number' && replaySince(ws, msg.since)) return
@@ -1212,7 +1257,7 @@ setInterval(() => {
   const size = Buffer.byteLength(text)
   for (let i = 0; i < ROSTER_FULL_QPS && fullQueue.length; i++) {
     const ws = fullQueue.shift()
-    if (!ws) continue
+    if (!ws?.rosterSub) continue
     sendSlowAware(ws, text, 'roster', size)
   }
 }, 1000)

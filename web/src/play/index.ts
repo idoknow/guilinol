@@ -145,6 +145,15 @@ export function play(host:Host) {
   const loadMap = ()=>void ensureMap(true)
   let mapRequested = !(host.manifest as {atlas?:unknown}).atlas
   const feedbackEntry=button('反馈','反馈','dock-feedback');buttons.append(feedbackEntry)
+  window.addEventListener('glol:mp-ban',event=>{
+    const {reason,until,recordId}=(event as CustomEvent).detail
+    document.getElementById('mp-ban-notice')?.remove()
+    const notice=document.createElement('dialog'),appeal=document.createElement('button'),close=document.createElement('button')
+    notice.id='mp-ban-notice';notice.textContent=`联机已封禁：${reason}。截止：${until==null?'永久':new Date(until).toLocaleString()}。记录 ID：${recordId}。`
+    appeal.textContent='申诉';close.textContent='关闭';close.onclick=()=>notice.close();notice.onclose=()=>notice.remove()
+    appeal.onclick=()=>{notice.close();void import('../ui/feedback').then(module=>module.openFeedback(host,()=>ensureMap(),undefined,recordId))}
+    notice.append(appeal,close);document.body.append(notice);notice.showModal()
+  })
   feedbackEntry.onclick=()=>void import('../ui/feedback').then(module=>module.openFeedback(host,()=>{mapRequested = true; return ensureMap()}))
   const feedbackId=new URLSearchParams(location.search).get('feedback');if(feedbackId&&/^[\w-]{1,128}$/.test(feedbackId))void import('../ui/feedback').then(module=>module.openFeedback(host,()=>{mapRequested=true;return ensureMap()},feedbackId))
   // IDOK-144: portrait phones can tap back into landscape after dismissing the gate (see ui/orientation.ts).

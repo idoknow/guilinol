@@ -83,6 +83,7 @@ export function attachNet(scene:Scene,clips:AnimationClip[],getPose:()=>Pose,get
         if(version!==generation)return
         const msg=JSON.parse(event.data)
         switch(msg.t){
+          case 'banned':window.dispatchEvent(new CustomEvent('glol:mp-ban',{detail:msg}));break
           case 'chat':case 'chat_hist':case 'chat_del':case 'chat_mute':case 'chat_ack':receiveChat(msg);break
           case 'combat': {
             const old=peers.list().find(p=>p.id===msg.id)?.helper

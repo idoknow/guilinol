@@ -8,7 +8,7 @@ const ADMIN = 'admin-token'
 const PORT = 8897
 const URL = `ws://127.0.0.1:${PORT}/ws`
 const mint = (uid, name) => {
-  const p = Buffer.from(JSON.stringify({uid, name, exp: Math.floor(Date.now() / 1000) + 50})).toString('base64url')
+  const p = Buffer.from(JSON.stringify({uid,name,spawn:{x:0,z:0},destination:{x:600,z:600},exp:Math.floor(Date.now()/1000)+50})).toString('base64url')
   return `${p}.${createHmac('sha256', SECRET).update(p).digest('base64url')}`
 }
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
@@ -73,7 +73,7 @@ ok(flyerOk.setbacks() === 0, '直升机爬升 40 m/s：无误报')
 console.log('\n[2] 作弊必须被拦')
 const cheat = client(900201, 'cheat')
 await cheat.ready; cheat.join(); await sleep(400)
-cheat.pos(1000, 3, 0)          // 第一次近似"合法传送"（静止、无战斗）会放行
+cheat.pos(1000, 3, 0)
 await sleep(200)
 cheat.pos(2500, 3, 0)          // 3 秒内第二次 → 必须拦
 await sleep(300)
@@ -84,7 +84,7 @@ await flyer.ready; flyer.join(); await sleep(400)
 flyer.pos(0, 3, 0); await sleep(80)
 flyer.pos(0, 60, 0)
 await sleep(300)
-ok(flyer.setbacks() >= 1, '飞天（y 3→60 一帧）：被拉回')
+ok(flyer.setbacks() === 0, '没有服务端高度：只记录，不处罚')
 
 const speeder = client(900203, 'speed')
 await speeder.ready; speeder.join(); await sleep(400)
@@ -99,7 +99,7 @@ await jumper.ready; jumper.join(); await sleep(400)
 const before = jumper.setbacks()
 jumper.pos(600, 3, 600)
 await sleep(300)
-ok(jumper.setbacks() === before, '静止状态瞬移 800m：允许（地图/传送）')
+ok(jumper.setbacks() === before, '静止状态：允许系统票据指定的目的地')
 const target = client(900302, 'target')
 await target.ready; target.join(undefined); await sleep(200)
 target.pos(601, 3, 600); await sleep(120)
@@ -118,7 +118,7 @@ ok(ban.status === 200 && ban.body.ok, '按 UID 封禁成功')
 await sleep(200)
 const again = client(900401, 'banned')
 await again.ready; again.join(); await sleep(600)
-ok(again.got.some((m) => m.t === 'banned') || again.ws.readyState !== 1, '被封 UID 重连：被拦')
+ok(again.got.some(m=>m.t==='banned'&&m.reason==='测试'&&m.until>Date.now()&&m.recordId===ban.body.recordId), '重连收到同一封禁 ID、原因和截止时间')
 const unban = await adminPost('/admin/unban', {uid: 900401, actor: 'test'})
 ok(unban.status === 200 && unban.body.ok, '人工解封成功')
 const back = client(900401, 'banned')
