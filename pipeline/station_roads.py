@@ -90,6 +90,9 @@ def tunnel_sections(profiles):
                               **({'fittedCarriageway': True} if chord in way.get('pavedChords', ()) else {}),
                               pairedWidth=way.get('stationWidth'),
                               stations=np.column_stack((distances-start, levels)).tolist()))
+            apron_nodes = set(chord).intersection(way.get("turningAprons", ()))
+            if apron_nodes:
+                bores[-1]["turningAprons"] = sorted(apron_nodes)
             if "railSideWall" in way:
                 side, at, top = way["railSideWall"]
                 bores[-1]["wallSide"] = side

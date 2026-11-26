@@ -15,7 +15,12 @@ BALLAST_TOP = -0.22
 
 def cut_high_terrain(world, manifest):
     sections = section_strips(world, design_flag="cutHighTerrain")
-    rows = np.asarray([row for tracks in sections.values() for row in tracks if not int(row[7]) & 2])
+    rows = [row for tracks in sections.values() for row in tracks if not int(row[7]) & 2]
+    # Locally excavate the measured portal approaches. Leave the rest of
+    # each railway tunnel and the terrain above it intact.
+    portals = section_strips(world, design_flag="tunnelPortalTerrainTies")
+    rows.extend(row for tracks in portals.values() for row in tracks if int(row[7]) & 2)
+    rows = np.asarray(rows)
     if not len(rows):
         return
     start, end = rows[:, [1, 2]], rows[:, [4, 5]]

@@ -347,6 +347,8 @@ def bake(world_dir, manifest, inventory, samples):
         if "railProfiles" in section:
             coords,pieces,height = split_profile_tiles(section,coords,pieces,height,ways)
         fit_tracks(section, coords, pieces, height, ways)
+    from station_rail_reference import locked_heights, verify_tiles
+    frozen = locked_heights()
     tiles=defaultdict(list)
     maximum_grade=defaultdict(float)
     for i,j,station,flags,way_id in pieces:
@@ -378,6 +380,11 @@ def bake(world_dir, manifest, inventory, samples):
             portal = int(i in portal_nodes and s==0) + 2*int(j in portal_nodes and t==1)
             # Keep sub-centimetre rise on very short pieces at tile and road edges.
             encoded=[round(float(v)*100,4) for v in (*p,levels[0],*q,levels[1])]
+            for offset in (0, 3):
+                xy = (round(key[0] + encoded[offset] / 100, 6),
+                      round(key[1] + encoded[offset + 1] / 100, 6))
+                if xy in frozen:
+                    encoded[offset + 2] = frozen[xy]
             span=math.hypot(encoded[3]-encoded[0],encoded[4]-encoded[1])
             tags=ways[way_id]['tags']
             category='branch' if tags.get('usage')=='branch' else 'service' if tags.get('service') else 'main'
@@ -385,6 +392,7 @@ def bake(world_dir, manifest, inventory, samples):
                 maximum_grade[category]=max(maximum_grade[category],1000*abs(encoded[5]-encoded[2])/span)
             tiles[key].append([*encoded,
                                round((station+s*length)*100),localflags,portal])
+    verify_tiles(tiles)
     # Cut terrain only where GL04 ground triangles are free to change. The
     # diagonal of an 8 m cell bounds the influence of one moved vertex.
     road_tree=STRtree(surface_roads)
