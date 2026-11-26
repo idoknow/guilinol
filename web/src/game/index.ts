@@ -57,6 +57,7 @@ export function createGameDebugProbe(extra?: {missions?: Record<string, unknown>
       claimSpotBounty: commerce.claimSpotBounty,
       computeMissionPayout: commerce.computeMissionPayout,
       settleMissionReward: commerce.settleMissionReward,
+      unlockSharedEbike: commerce.unlockSharedEbike,
       chargeSharedRideFee: commerce.chargeSharedRideFee,
       getActiveDeliverySoupSpillMultiplier: commerce.getActiveDeliverySoupSpillMultiplier,
     }),

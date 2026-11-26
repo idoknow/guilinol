@@ -31,6 +31,7 @@ export interface VehicleCandidateSnapshot {
   distance: number
   ownership?: 'shared' | 'personal' | 'test_ride'
   ebikeTier?: 'shared' | 'normal'
+  alreadyUnlocked?: boolean
 }
 
 export interface BoatCandidateSnapshot {
@@ -156,9 +157,8 @@ export function resolveInteraction(ctx: InteractionContext): InteractionDecision
   // Priority 5: On foot near mountable vehicle
   if (ctx.nearVehicle) {
     const v = ctx.nearVehicle
-    // Keep exact legacy label `'骑电动车'` / `'骑单车'` / `'开车'` for non-personal roadside vehicles so existing
-    // Playwright harnesses (`ride.mjs`, `car.mjs`, `jiefang-crossing.mjs`) stay 100% green, while personal rides
-    // display `'骑我的电摩'`.
+    // In Solo economy mode, rentable shared e-bikes clearly display the ¥2 unlock fee;
+    // Tour mode (no wallet) and personal/bicycle/car keep their original concise prompts.
     const label =
       v.kind === 'car'
         ? '开车'
@@ -166,7 +166,11 @@ export function resolveInteraction(ctx: InteractionContext): InteractionDecision
           ? '骑单车'
           : v.ownership === 'personal'
             ? '骑我的电摩'
-            : '骑电动车'
+            : ctx.soloEnabled && v.ownership !== 'test_ride'
+              ? v.alreadyUnlocked
+                ? '继续骑共享电车'
+                : '解锁共享电动车（¥2）'
+              : '骑电动车'
     return {
       priority: 5,
       action: 'mount_vehicle',

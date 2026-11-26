@@ -24,7 +24,7 @@ export interface EbikeVehicleProfile {
 
 export const EBIKE_VEHICLE_PROFILES: Record<EbikeVehicleType, EbikeVehicleProfile> = {
   normal: {type: 'normal', label: '普通电动车', badge: '电摩', maxKmh: 50, gearCaps: [18, 25, 38, 50], drainBase: .24},
-  shared: {type: 'shared', label: '共享电动车', badge: '共享', maxKmh: 40, gearCaps: [18, 25, 32, 40], drainBase: .34},
+  shared: {type: 'shared', label: '共享电动车', badge: '共享', maxKmh: 18, gearCaps: [12, 16, 18, 18], drainBase: .42},
 }
 
 export interface EbikeGearSpec {
@@ -397,7 +397,7 @@ export function createEbikeFxController() {
     } else {
       // Local presentation state machine when Hy2 physics telemetry isn't attached yet.
       if (crashPhase === 'none') {
-        if (input.wheelie && base.speed > 1.2) {
+        if (input.wheelie && vehicleType !== 'shared' && base.speed > 1.2) {
           // IDOK-153: presentation-only fallback — slow rise to the 52° max, never crashes by itself
           // (the physics path in ride.ts owns the hard-turn-in-wheelie tip-over).
           const cap = 52 * Math.PI / 180

@@ -34,6 +34,7 @@ import {getShop} from '../game/shops'
 import {isPointInQuietZone} from '../game/quiet-zones'
 import {emit, getState, setActiveTestRide, setActiveWorldInstanceId, setSummonCooldownUntil,
   type PersistedEbikeVisual, type PersonalEbikeModelId, type VehicleOwnership} from '../game/state'
+import {requestSharedEbikeReturn, requestSharedEbikeUnlock} from './shared-ebike-unlock'
 
 const SUMMON_COOLDOWN_MS = 10_000
 const TEST_RIDE_DURATION_MS = 90_000
@@ -75,7 +76,6 @@ export interface StartTestRideResult {
 const ROADSIDE_BATTERY_KEY = 'glol.ebike.batteries.v1'
 const MAX_PERSISTED_BATTERIES = 50
 const bikeCoordKey = (x: number, z: number) => `${Math.round(x * 10)},${Math.round(z * 10)}`
-const isVerifyMode = () => typeof location !== 'undefined' && new URLSearchParams(location.search).has('verify')
 const isVerifySilentMode = () =>
   typeof location !== 'undefined' && (() => {
     const p = new URLSearchParams(location.search)
@@ -216,9 +216,46 @@ export async function vehicles(
 
   let activePersonalMesh: T.Mesh | null = null
   let activeTestRideMesh: T.Mesh | null = null
-  let sharedRideElapsedSec = 0
-  let sharedRideBilled = false
   let sharedRideSessionId = 0
+  const sharedUnlockBootNonce = `${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`
+  type UnlockedSharedSession = {
+    sessionKey: string
+    bikeId: string
+    mesh: T.Object3D | null
+    decorId?: string
+  }
+  let activeUnlockedShared: UnlockedSharedSession | null = null
+
+  const isSoloActive = () => Boolean(soloServices())
+  function resolveEffectiveRoadsideType(
+    paint: number,
+    ownership: VehicleOwnership,
+    savedType?: EbikeVehicleType,
+    explicitType?: unknown,
+  ): EbikeVehicleType {
+    if (ownership === 'personal' || ownership === 'test_ride') return 'normal'
+    if (isSoloActive()) return 'shared'
+    return savedType ?? resolveEbikeKind(paint, explicitType as EbikeVehicleType | 'normal' | 'shared' | undefined)
+  }
+  function isTargetSharedUnlocked(target: T.Object3D | null): boolean {
+    if (!target || !activeUnlockedShared) return false
+    return (
+      activeUnlockedShared.mesh === target ||
+      (typeof target.userData.sharedUnlockSession === 'string' &&
+        target.userData.sharedUnlockSession === activeUnlockedShared.sessionKey)
+    )
+  }
+  function clearUnlockedSharedSession(): void {
+    if (!activeUnlockedShared) return
+    const prev = activeUnlockedShared
+    activeUnlockedShared = null
+    if (prev.mesh?.userData) delete prev.mesh.userData.sharedUnlockSession
+    requestSharedEbikeReturn({
+      bikeId: prev.bikeId,
+      sessionKey: prev.sessionKey,
+      soloEnabled: isSoloActive(),
+    })
+  }
 
   const parkedCells = new WeakMap<T.Group, ParkedBatches>()
   const pickupHandles=new WeakMap<T.Object3D,()=>void>()
@@ -296,7 +333,7 @@ export async function vehicles(
   }
 
   function addBike(x: number, y: number, z: number, angle: number, paint: number, explicitType?: EbikeVehicleType, spawnCoordKey = bikeCoordKey(x,z)) {
-    const vehicleType = resolveEbikeKind(paint, explicitType)
+    const vehicleType = resolveEffectiveRoadsideType(paint, 'shared', undefined, explicitType)
     const isShared = vehicleType === 'shared'
     const mesh = marker('bike', paint, isShared)
     mesh.position.set(x, y, z)
@@ -455,6 +492,12 @@ export async function vehicles(
     const preferFree = !!nearFree.slot && (nearRoute < 0 || nearFree.distance + 1 < nearRouteDist)
     const freePrompt = nearFree.slot ? (nearFree.slot.kind === 'freeRaft' ? '划竹筏 · ' : '划小船 · ') + nearFree.slot.name : ''
     const activeTarget = nearDownedBike ?? nearBike
+    const targetOwnership: VehicleOwnership | undefined = activeTarget
+      ? ((activeTarget.userData.ownership as VehicleOwnership | undefined) ?? (activeTarget.name === 'bike' ? 'shared' : undefined))
+      : nearDecor
+        ? 'shared'
+        : undefined
+    const targetUnlocked = activeTarget ? isTargetSharedUnlocked(activeTarget) : false
     const ridePrompt = activeTarget
       ? activeTarget.name === 'car'
         ? '开车'
@@ -466,8 +509,16 @@ export async function vehicles(
             ? '骑单车'
             : activeTarget.userData.ownership === 'personal'
               ? '骑我的电摩'
-              : '骑电动车'
-      : ''
+              : isSoloActive() && targetOwnership !== 'test_ride'
+                ? targetUnlocked
+                  ? '继续骑共享电车'
+                  : '解锁共享电动车（¥2）'
+                : '骑电动车'
+      : nearDecor
+        ? isSoloActive()
+          ? '解锁共享电动车（¥2）'
+          : '骑电动车'
+        : ''
     const crashedRide = document.body.dataset.rideCrash === '1'
     const label = car
       ? '下车'
@@ -483,9 +534,15 @@ export async function vehicles(
               : '下站下船'
             : ridePrompt || (preferFree ? freePrompt : nearRoute >= 0 ? '上船 · ' + routes[nearRoute].start : '')
     if (activeTarget?.name === 'bike') {
-      button.dataset.ebikeTier =
-        (activeTarget.userData.vehicleType as EbikeVehicleType | undefined) ??
-        resolveEbikeKind((activeTarget.userData.paint as number | undefined) ?? 0)
+      const targetOwn = (activeTarget.userData.ownership as VehicleOwnership | undefined) ?? 'shared'
+      button.dataset.ebikeTier = resolveEffectiveRoadsideType(
+        (activeTarget.userData.paint as number | undefined) ?? 0,
+        targetOwn,
+        activeTarget.userData.vehicleType as EbikeVehicleType | undefined,
+        activeTarget.userData.ebikeTier,
+      )
+    } else if (nearDecor) {
+      button.dataset.ebikeTier = 'shared'
     } else {
       delete button.dataset.ebikeTier
     }
@@ -548,6 +605,9 @@ export async function vehicles(
       const saved = bikeStates.get(mesh)
       if (saved) bikeStates.set(record, saved)
       mesh.removeFromParent()
+    }
+    if (activeUnlockedShared && record.userData.sharedUnlockSession === activeUnlockedShared.sessionKey) {
+      activeUnlockedShared.mesh = record
     }
     store(record)
     const cell = record.parent as T.Group
@@ -643,6 +703,7 @@ export async function vehicles(
       attachMeshToCell(car)
     }
     if (bike) {
+      delete bike.userData.sharedUnlockSession
       const isEbike = bikeCtrl.kind === 'bike'
       saveBikeInstanceState(bike, {parkLocked: isEbike, kickstandDown: true})
       bike.rotation.set(bikeCtrl.pitch, bikeCtrl.heading, isEbike ? KICKSTAND_REST_ROLL_RAD : 0, 'YXZ')
@@ -655,8 +716,7 @@ export async function vehicles(
     nearFree = {slot: null, distance: Infinity, atBank: false}
     disembark = false
     segment = 1
-    sharedRideElapsedSec = 0
-    sharedRideBilled = false
+    clearUnlockedSharedSession()
     delete document.body.dataset.ebikeTier
     delete document.body.dataset.rideType
     delete document.body.dataset.vehicleOwnership
@@ -696,9 +756,10 @@ export async function vehicles(
     mesh.userData.downed = false
     if (mesh.name === 'bike') {
       const prev = bikeStates.get(mesh)
+      const prevOwnership = prev?.ownership ?? ((mesh.userData.ownership as VehicleOwnership | undefined) ?? 'shared')
       const nextState: BikeInstanceState = {
-        vehicleType: prev?.vehicleType ?? resolveEbikeKind((mesh.userData.paint as number | undefined) ?? 0, mesh.userData.vehicleType ?? mesh.userData.ebikeTier),
-        ownership: prev?.ownership ?? ((mesh.userData.ownership as VehicleOwnership | undefined) ?? 'shared'),
+        vehicleType: resolveEffectiveRoadsideType((mesh.userData.paint as number | undefined) ?? 0, prevOwnership, prev?.vehicleType, mesh.userData.vehicleType ?? mesh.userData.ebikeTier),
+        ownership: prevOwnership,
         instanceId: prev?.instanceId ?? (mesh.userData.instanceId as string | undefined),
         modelId: prev?.modelId ?? (mesh.userData.modelId as PersonalEbikeModelId | undefined),
         batteryPct: prev?.batteryPct ?? (mesh.userData.battery as number | undefined) ?? 100,
@@ -731,6 +792,43 @@ export async function vehicles(
         ? board(target.position.x, target.position.y, target.position.z)
         : {x: target.position.x, y: target.position.y, z: target.position.z, bikeY: target.position.y}
     if (!safePos) return false
+    const preSaved = bikeStates.get(target) ?? bikeCoordStates.get(prevKey)
+    const preOwnership: VehicleOwnership = (target.userData.ownership as VehicleOwnership | undefined) ?? preSaved?.ownership ?? 'shared'
+    const preRideKind: RideKind = target.name === 'bicycle' ? 'bicycle' : 'bike'
+
+    let unlockDecision: ReturnType<typeof requestSharedEbikeUnlock> | null = null
+    let nextSessionSeq = sharedRideSessionId
+    let unlockSessionKey = ''
+    let unlockBikeId = ''
+    let wasAlreadyUnlocked = false
+    if (preRideKind === 'bike' && preOwnership === 'shared') {
+      wasAlreadyUnlocked = isTargetSharedUnlocked(target)
+      unlockBikeId = (target.userData.spawnCoordKey as string | undefined) ?? prevKey
+      if (wasAlreadyUnlocked && activeUnlockedShared) {
+        unlockSessionKey = activeUnlockedShared.sessionKey
+      } else {
+        nextSessionSeq = sharedRideSessionId + 1
+        unlockSessionKey = `shared_unlock_${sharedUnlockBootNonce}_${nextSessionSeq}_${unlockBikeId}`
+      }
+      unlockDecision = requestSharedEbikeUnlock(
+        {
+          bikeId: unlockBikeId,
+          sessionKey: unlockSessionKey,
+          soloEnabled: isSoloActive(),
+          alreadyUnlocked: wasAlreadyUnlocked,
+        },
+        soloServices()?.commerce.unlockSharedEbike,
+      )
+      if (!unlockDecision.ok) {
+        if (unlockDecision.message) {
+          window.dispatchEvent(new CustomEvent('walk:toast', {detail: {text: unlockDecision.message, ms: 2600}}))
+        }
+        return false
+      }
+    } else {
+      clearUnlockedSharedSession()
+    }
+
     const targetMesh = takeRecord(target)
     targetMesh.position.set(safePos.x, safePos.bikeY, safePos.z)
     const rideKind: RideKind = targetMesh.name === 'bicycle' ? 'bicycle' : 'bike'
@@ -738,10 +836,12 @@ export async function vehicles(
     const ownership: VehicleOwnership = (targetMesh.userData.ownership as VehicleOwnership | undefined) ?? saved?.ownership ?? 'shared'
     const instanceId = (targetMesh.userData.instanceId as string | undefined) ?? saved?.instanceId
     const liveOwned = ownership === 'personal' && instanceId ? getState().garage.vehicles[instanceId] : undefined
-    const vehicleType: EbikeVehicleType =
-      ownership === 'personal' || ownership === 'test_ride'
-        ? 'normal'
-        : (saved?.vehicleType ?? resolveEbikeKind((targetMesh.userData.paint as number | undefined) ?? 0, targetMesh.userData.vehicleType ?? targetMesh.userData.ebikeTier))
+    const vehicleType = resolveEffectiveRoadsideType(
+      (targetMesh.userData.paint as number | undefined) ?? 0,
+      ownership,
+      saved?.vehicleType,
+      targetMesh.userData.vehicleType ?? targetMesh.userData.ebikeTier,
+    )
     const modelId = liveOwned?.modelId ?? saved?.modelId ?? (targetMesh.userData.modelId as PersonalEbikeModelId | undefined)
     const spawnCoordKey = (targetMesh.userData.spawnCoordKey as string | undefined) ?? prevKey
     targetMesh.userData.spawnCoordKey = spawnCoordKey
@@ -764,9 +864,22 @@ export async function vehicles(
       mods,
       envHour: skyEnv.hour,
     })
-    sharedRideElapsedSec = 0
-    sharedRideBilled = false
-    sharedRideSessionId += 1
+    if (rideKind === 'bike' && ownership === 'shared') {
+      if (!wasAlreadyUnlocked) {
+        clearUnlockedSharedSession()
+        sharedRideSessionId = nextSessionSeq
+      }
+      bike.userData.sharedUnlockSession = unlockSessionKey
+      activeUnlockedShared = {
+        sessionKey: unlockSessionKey,
+        bikeId: unlockBikeId,
+        mesh: bike,
+        decorId: bike.userData.decorId as string | undefined,
+      }
+      if (unlockDecision?.charged && unlockDecision.charged > 0 && unlockDecision.message) {
+        window.dispatchEvent(new CustomEvent('walk:toast', {detail: {text: unlockDecision.message, ms: 2400}}))
+      }
+    }
     saveBikeInstanceState(bike, {parkLocked: bikeCtrl.parkLocked, kickstandDown: bikeCtrl.kickstandDown})
     syncHud()
     return true
@@ -801,19 +914,25 @@ export async function vehicles(
       mesh.userData.decorId = candidate.id
       mesh.userData.paint = 1
       mesh.userData.shared = true
+      mesh.userData.vehicleType = 'shared'
+      mesh.userData.ebikeTier = 'shared'
       mesh.userData.ownership = 'shared' as VehicleOwnership
       const spawnKey = bikeCoordKey(candidate.x, candidate.z)
       mesh.userData.coordKey = spawnKey
       mesh.userData.spawnCoordKey = spawnKey
       const restored = persistedBatteries.get(spawnKey)
       if (restored !== undefined) mesh.userData.battery = restored
-      if (!mountBikeMesh(mesh)) env.stream.batches.returnBike(candidate.id)
-      nearDecor = null
+      if (!mountBikeMesh(mesh)) {
+        env.stream.batches.returnBike(candidate.id)
+      } else {
+        nearDecor = null
+      }
     } else if (nearBike?.name === 'car') {
       const safePos = board
         ? board(nearBike.position.x, nearBike.position.y, nearBike.position.z, 'car')
         : {x: nearBike.position.x, y: nearBike.position.y, z: nearBike.position.z, bikeY: nearBike.position.y}
       if (!safePos) return
+      clearUnlockedSharedSession()
       car = lastCar = takeRecord(nearBike)
       car.position.set(safePos.x, safePos.bikeY, safePos.z)
       group.add(car)
@@ -825,9 +944,11 @@ export async function vehicles(
     } else if (nearBike) {
       mountBikeMesh(nearBike)
     } else if (nearFree.slot && (nearRoute < 0 || nearFree.distance + 1 < nearRouteDist)) {
+      clearUnlockedSharedSession()
       freeBoats!.mount(nearFree.slot, nearFree.atBank)
       syncHud()
     } else if (nearRoute >= 0) {
+      clearUnlockedSharedSession()
       route = nearRoute
       segment = 1
       disembark = false
@@ -850,12 +971,28 @@ export async function vehicles(
     const toVehicleSnap = (mesh: T.Object3D | null, distance: number): VehicleCandidateSnapshot | null => {
       if (!mesh) return null
       const kind: VehicleCandidateSnapshot['kind'] = mesh.name === 'car' ? 'car' : mesh.name === 'bicycle' ? 'bicycle' : 'bike'
+      const ownership =
+        kind === 'bike'
+          ? ((mesh.userData.ownership as VehicleCandidateSnapshot['ownership'] | undefined) ?? 'shared')
+          : (mesh.userData.ownership as VehicleCandidateSnapshot['ownership'] | undefined)
       const tier =
         kind === 'bike'
-          ? ((mesh.userData.vehicleType as EbikeVehicleType | undefined) ?? resolveEbikeKind((mesh.userData.paint as number | undefined) ?? 0))
+          ? resolveEffectiveRoadsideType(
+              (mesh.userData.paint as number | undefined) ?? 0,
+              ownership ?? 'shared',
+              mesh.userData.vehicleType as EbikeVehicleType | undefined,
+              mesh.userData.ebikeTier,
+            )
           : undefined
-      const ownership = (mesh.userData.ownership as VehicleCandidateSnapshot['ownership'] | undefined) ?? (tier === 'shared' ? 'shared' : undefined)
-      return {kind, downed: !!mesh.userData.downed, distance, ...(tier ? {ebikeTier: tier} : {}), ...(ownership ? {ownership} : {})}
+      const alreadyUnlocked = kind === 'bike' && ownership === 'shared' ? isTargetSharedUnlocked(mesh) : undefined
+      return {
+        kind,
+        downed: !!mesh.userData.downed,
+        distance,
+        ...(tier ? {ebikeTier: tier} : {}),
+        ...(ownership ? {ownership} : {}),
+        ...(alreadyUnlocked !== undefined ? {alreadyUnlocked} : {}),
+      }
     }
     const preferFree = !!nearFree.slot && (nearRoute < 0 || nearFree.distance + 1 < nearRouteDist)
     const nearBoat: BoatCandidateSnapshot | null =
@@ -868,12 +1005,20 @@ export async function vehicles(
       aboardKind,
       tourDisembarkQueued: disembark,
       nearDownedVehicle: toVehicleSnap(nearDownedBike, nearDownedDist),
-      nearVehicle: nearDecor ? {kind:'bike',downed:false,distance:decorDistance,ownership:'shared'} : toVehicleSnap(nearBike, nearBikeDist),
+      nearVehicle: nearDecor
+        ? {kind: 'bike', downed: false, distance: decorDistance, ownership: 'shared', ebikeTier: 'shared', alreadyUnlocked: false}
+        : toVehicleSnap(nearBike, nearBikeDist),
       nearBoat,
     }
   }
 
   function nearby(x: number, z: number, footY?: number) {
+    if (!bike && activeUnlockedShared?.mesh) {
+      const distToUnlocked = Math.hypot(activeUnlockedShared.mesh.position.x - x, activeUnlockedShared.mesh.position.z - z)
+      if (!Number.isFinite(distToUnlocked) || distToUnlocked > 14) {
+        clearUnlockedSharedSession()
+      }
+    }
     const now = performance.now()
     nearBike = null
     nearBikeDist = Infinity
@@ -1112,12 +1257,16 @@ export async function vehicles(
     if (!spot) return false
     let closest: T.Object3D | undefined, best = Infinity
     for (const cell of visibleCells) for (const record of cell.children) {
-      if (record.name !== 'bike' || !record.userData.shared || !record.userData.parkedModel || record.userData.downed || record.userData.ownership !== 'shared') continue
+      if (record.name !== 'bike' || (!isSoloActive() && !record.userData.shared) || !record.userData.parkedModel || record.userData.downed || record.userData.ownership !== 'shared') continue
       const distance = Math.hypot(record.position.x-playerPos.x,record.position.z-playerPos.z)
       if (distance<best) { best=distance; closest=record }
     }
     if (!closest) return false
     const unit=takeRecord(closest)
+    const nextType = resolveEffectiveRoadsideType((unit.userData.paint as number | undefined) ?? 0, 'shared', undefined, unit.userData.vehicleType)
+    unit.userData.vehicleType = nextType
+    unit.userData.ebikeTier = nextType
+    unit.userData.shared = nextType === 'shared'
     relocateParkedBike(unit,spot.x,spot.y,spot.z,playerYaw)
     nearby(playerPos.x,playerPos.z,playerPos.y)
     return true
@@ -1291,6 +1440,10 @@ export async function vehicles(
     nearby,
     advance,
     interact,
+    dismount() {
+      reset()
+      syncHud()
+    },
     getInteractSnapshot,
     actionButton: button,
     setExternalArbiter(on: boolean) {
@@ -1428,18 +1581,6 @@ export async function vehicles(
         } else if (ownership === 'shared') {
           const spawnKey = (bike.userData.spawnCoordKey as string | undefined) ?? (bike.userData.coordKey as string | undefined)
           persistRoadsideBattery(spawnKey, bikeCtrl.batteryPct, bikeCtrl.batteryPct <= 0)
-          if (soloServices() && bikeCtrl.vehicleType === 'shared' && Math.abs(spd) > 0.4 && !isVerifyMode()) {
-            sharedRideElapsedSec += dt
-            if (!sharedRideBilled && sharedRideElapsedSec >= soloServices()!.commerce.SHARED_EBIKE_FREE_SECONDS) {
-              sharedRideBilled = true
-              const fee = soloServices()!.commerce.chargeSharedRideFee(`shared_ride_${sharedRideSessionId}_${Date.now()}`)
-              if (fee.fallbackFree) {
-                window.dispatchEvent(new CustomEvent('walk:toast', {detail: {text: '余额不足 ¥3，可改骑免费人力单车或步行接单赚钱', ms: 2600}}))
-              } else if (fee.charged > 0) {
-                window.dispatchEvent(new CustomEvent('walk:toast', {detail: {text: `共享电车试骑满 120s，已扣费 ¥${fee.charged}`, ms: 2400}}))
-              }
-            }
-          }
         }
       }
       return spd
@@ -1469,7 +1610,7 @@ export async function vehicles(
         for (const {kind, row, shared, spawnKey} of cell.pending) {
           if (kind !== 'bike') continue
           const [x, y, z, , paint] = row
-          const vehicleType = resolveEbikeKind(paint, shared ? 'shared' : undefined)
+          const vehicleType = resolveEffectiveRoadsideType(paint, 'shared', undefined, shared ? 'shared' : undefined)
           out.push({x, y, z, paint, vehicleType, tier: vehicleType, ownership: 'shared',
             batteryPct: persistedBatteries.get(spawnKey ?? bikeCoordKey(x, z)) ?? 100})
         }
@@ -1477,7 +1618,8 @@ export async function vehicles(
           if (child.name !== 'bike') continue
           const paint = (child.userData.paint as number | undefined) ?? 0
           const saved = bikeStates.get(child) ?? bikeCoordStates.get(bikeCoordKey(child.position.x, child.position.z))
-          const vehicleType = saved?.vehicleType ?? resolveEbikeKind(paint, child.userData.vehicleType ?? child.userData.ebikeTier)
+          const ownership = saved?.ownership ?? ((child.userData.ownership as VehicleOwnership | undefined) ?? 'shared')
+          const vehicleType = resolveEffectiveRoadsideType(paint, ownership, saved?.vehicleType, child.userData.vehicleType ?? child.userData.ebikeTier)
           out.push({
             x: child.position.x,
             y: child.position.y,
@@ -1486,7 +1628,7 @@ export async function vehicles(
             vehicleType,
             tier: vehicleType,
             batteryPct: saved?.batteryPct ?? 100,
-            ownership: saved?.ownership ?? 'shared',
+            ownership,
           })
         }
       }

@@ -533,24 +533,24 @@ try {
   assert.equal(spillCheck.beaconAfterFail, false, 'Failed mission must hide 3D beacon')
   assert.equal(spillCheck.hudHiddenAfterFail, true, 'Failed mission must hide mission HUD')
 
-  // Cleanly re-accept & complete noodle-01 (+¥300 -> ¥760)
+  // Cleanly re-accept & complete noodle-01 (note L490 paid ¥2 shared unlock: 460 - 2 + 300 -> ¥758)
   const noodle1Done = await completeMissionByWalkingSteps(page, 'noodle-01')
-  assert.equal(noodle1Done.money, 760, 'noodle-01 full-soup first clear must pay ¥300 (total ¥760)')
+  assert.equal(noodle1Done.money, 758, 'noodle-01 full-soup first clear must pay ¥300 after ¥2 shared unlock (total ¥758)')
 
-  // Scenic spot first checkin (+¥120 -> ¥880) + idempotent repeat check (0 extra)
+  // Scenic spot first checkin (+¥120 -> ¥878) + idempotent repeat check (0 extra)
   await page.evaluate(async () => {
     const lanesSpot = window.viewer.tour.spots.find(s => s.id === 'lanes')
     await window.viewer.walkTo(lanesSpot.x,lanesSpot.z,0,'e2e-walk-to-stamp')
   })
-  await page.waitForFunction(() => window.viewer.game.getState().money === 880, null, {timeout: 15000})
-  // Close spot card & trigger same spot bounty again -> must stay ¥880
+  await page.waitForFunction(() => window.viewer.game.getState().money === 878, null, {timeout: 15000})
+  // Close spot card & trigger same spot bounty again -> must stay ¥878
   const spotIdempotent = await page.evaluate(() => {
     document.querySelector('.spot-card .card-close')?.click()
     const repeat = window.viewer.game.commerce.claimSpotBounty('lanes')
     return {repeat, money: window.viewer.game.getState().money}
   })
   assert.equal(spotIdempotent.repeat.credited, 0, 'Duplicate spot bounty must credit ¥0')
-  assert.equal(spotIdempotent.money, 880, 'Balance must remain ¥880 after duplicate spot claim')
+  assert.equal(spotIdempotent.money, 878, 'Balance must remain ¥878 after duplicate spot claim')
   assert.ok(spotIdempotent.money >= 480, 'Player must reach >= ¥480 within 2-3 runs + 1 spot')
 
   report.stageB = {
@@ -647,13 +647,13 @@ try {
   assert.equal(guardInShop.competingHidden, true, 'Competing HUD must hide when shop is open')
   assert.ok(Math.hypot(guardInShop.pos.x - posAtNiko.x, guardInShop.pos.z - posAtNiko.z) < 0.05, 'WASD inside shop must not move player')
 
-  // 3. Preview T3 outfit (¥1,680 > ¥880 balance -> insufficient funds warning) + 360° orbit drag + Esc rollback
+  // 3. Preview T3 outfit (¥1,680 > ¥876 balance after ¥2 shared bike mount -> insufficient funds warning) + 360° orbit drag + Esc rollback
   await page.click('.shop-card[data-item-key="outfit_preset:outfit_guochao_pankou"]')
   await settleFrames(page, 8)
   const t3InsufficientText = await page.locator('.shop-act-primary').textContent()
-  assert.ok(t3InsufficientText?.includes('余额不足'), `Expected insufficient funds button for T3 ¥1,680 with ¥880, got: ${t3InsufficientText}`)
+  assert.ok(t3InsufficientText?.includes('余额不足'), `Expected insufficient funds button for T3 ¥1,680 with ¥876, got: ${t3InsufficientText}`)
   await page.click('.shop-act-primary')
-  assert.equal(await page.evaluate(() => window.viewer.game.getState().money), 880, 'Insufficient purchase must not debit money')
+  assert.equal(await page.evaluate(() => window.viewer.game.getState().money), 876, 'Insufficient purchase must not debit money')
 
   // 360° drag preview on stage
   const stageBox = await page.locator('.shop-stage').boundingBox()
@@ -677,12 +677,12 @@ try {
     equipped: window.viewer.game.getState().wardrobe.equipped,
     snap: window.viewer.walk.outfit.getSnapshot(),
   }))
-  assert.equal(afterEscRollback.money, 880, 'Esc exit must not deduct money')
+  assert.equal(afterEscRollback.money, 876, 'Esc exit must not deduct money')
   assert.equal(afterEscRollback.equipped.top, 'top_default_tee', 'Esc exit must keep original outfit')
   assert.equal(afterEscRollback.snap.preview, null, 'Esc exit must clear 3D preview')
   assert.equal(afterEscRollback.snap.applied.top, 'top_default_tee', '3D figure must roll back to default top')
 
-  // 4. Re-enter shop -> rapid triple-click buy T1 hoodie (¥480) -> charged ONCE (¥880 -> ¥400)
+  // 4. Re-enter shop -> rapid triple-click buy T1 hoodie (¥480) -> charged ONCE (¥876 -> ¥396)
   await page.keyboard.press('KeyF')
   await page.waitForFunction(() => window.viewer.game.getState().activeShop?.shopId === 'shop_nikoniko_apparel', null, {timeout: 8000})
   await settleFrames(page, 8)
@@ -704,13 +704,13 @@ try {
     equipped: window.viewer.game.getState().wardrobe.equipped,
     snap: window.viewer.walk.outfit.getSnapshot(),
   }))
-  assert.equal(afterBuyT1.money, 400, `Triple-click buy ¥480 must deduct once (¥880 -> ¥400, got ¥${afterBuyT1.money})`)
+  assert.equal(afterBuyT1.money, 396, `Triple-click buy ¥480 must deduct once (¥876 -> ¥396, got ¥${afterBuyT1.money})`)
   assert.equal(afterBuyT1.equipped.top, 'top_guilin_hoodie')
   assert.equal(afterBuyT1.snap.applied.top, 'top_guilin_hoodie')
   assert.equal(afterBuyT1.snap.attachedHat, 'hat_guilin_cap')
   assert.ok(afterBuyT1.snap.drawCallDelta <= 2, `Outfit drawCallDelta must be <= +2, got ${afterBuyT1.snap.drawCallDelta}`)
 
-  // Also buy a bag item (`bag_linen_tote` ¥80 -> ¥320) to verify BUILTIN_PACK hiding (0 Z-fighting)
+  // Also buy a bag item (`bag_linen_tote` ¥80 -> ¥316) to verify BUILTIN_PACK hiding (0 Z-fighting)
   await page.click('.shop-tab[data-tab="bag"]')
   await settleFrames(page, 4)
   await page.click('.shop-card[data-item-key="outfit_item:bag_linen_tote"]')
@@ -721,7 +721,7 @@ try {
     money: window.viewer.game.getState().money,
     snap: window.viewer.walk.outfit.getSnapshot(),
   }))
-  assert.equal(afterBuyBag.money, 320, 'Buying ¥80 bag_linen_tote must bring money to ¥320')
+  assert.equal(afterBuyBag.money, 316, 'Buying ¥80 bag_linen_tote must bring money to ¥316')
   assert.equal(afterBuyBag.snap.attachedBag, 'bag_linen_tote')
   assert.equal(afterBuyBag.snap.builtinPackVisible, false, 'Equipping custom bag must hide BUILTIN_PACK to prevent Z-fighting')
   assert.ok(afterBuyBag.snap.drawCallDelta <= 2, `Hat+Bag drawCallDelta must stay <= +2, got ${afterBuyBag.snap.drawCallDelta}`)
@@ -755,11 +755,11 @@ try {
   // --------------------------------------------------------------------------
   console.log('[Stage D] Earning remaining yuan naturally (errand-02 + noodle-02 + noodle-03 + 3 spots) & testing 十字街车行...')
 
-  // Complete errand-02 (+220 -> 540), noodle-02 (+400 -> 940), noodle-03 (+520 + crossing spot ring at -881,-165 auto +120 -> 1580)
+  // Complete errand-02 (+220 -> 536), noodle-02 (+400 -> 936), noodle-03 (+520 + crossing spot ring at -881,-165 auto +120 -> 1576)
   const afterErrand2 = await completeMissionByWalkingSteps(page, 'errand-02')
-  assert.equal(afterErrand2.money, 540)
+  assert.equal(afterErrand2.money, 536)
   const afterNoodle2 = await completeMissionByWalkingSteps(page, 'noodle-02')
-  assert.equal(afterNoodle2.money, 940)
+  assert.equal(afterNoodle2.money, 936)
   const afterNoodle3 = await completeMissionByWalkingSteps(page, 'noodle-03')
   // Close auto-triggered crossing spot card if opened on noodle-03 pickup at (-881,-165)
   const crossingAutoAwarded = await page.evaluate(() => {
@@ -768,16 +768,16 @@ try {
   })
   assert.equal(
     afterNoodle3.money,
-    crossingAutoAwarded ? 1580 : 1460,
-    `Expected ¥${crossingAutoAwarded ? 1580 : 1460} after noodle-03, got ¥${afterNoodle3.money}`,
+    crossingAutoAwarded ? 1576 : 1456,
+    `Expected ¥${crossingAutoAwarded ? 1576 : 1456} after noodle-03, got ¥${afterNoodle3.money}`,
   )
 
-  // Claim crossing (idempotent if auto-awarded) + pagodas + bridge -> total ¥1,820 (>= ¥1,800 within 5-8 runs!)
+  // Claim crossing (idempotent if auto-awarded) + pagodas + bridge -> total ¥1,816 (>= ¥1,800 within 5-8 runs even after ¥4 shared bike rent!)
   for (const sid of ['crossing', 'pagodas', 'bridge']) {
     await page.evaluate(id => window.viewer.game.commerce.claimSpotBounty(id), sid)
   }
   const moneyBeforeCarShop = await page.evaluate(() => window.viewer.game.getState().money)
-  assert.equal(moneyBeforeCarShop, 1820, 'Natural 5-mission + 4-spot progression must reach ¥1,820 (>= ¥1,800 for first e-bike)')
+  assert.equal(moneyBeforeCarShop, 1816, 'Natural 5-mission + 4-spot progression must reach ¥1,816 (>= ¥1,800 for first e-bike)')
 
   // Walk to 十字街「漓行电驴行 · 十字街总店」
   await page.evaluate(async () => {
@@ -865,7 +865,7 @@ try {
   assert.equal(testRideCrashRecover.activeTestRide, null)
   assert.equal(testRideCrashRecover.leakedTestRideInSave, false)
 
-  // Walk back to shop doorway & buy 1st tier「漓江小轻骑」(`lijiang_light` ¥1,800 -> ¥20 left)
+  // Walk back to shop doorway & buy 1st tier「漓江小轻骑」(`lijiang_light` ¥1,800 -> ¥16 left)
   await page.evaluate(async () => {
     await window.viewer.walkTo(-780.05, -160.08, -0.2317, 'szj-buy-ebike')
     for (let i = 0; i < 6; i++) window.viewer.walk.tick(1 / 60)
@@ -887,7 +887,7 @@ try {
       vehicle: vid ? s.garage.vehicles[vid] : null,
     }
   })
-  assert.equal(afterBuyBike.money, 20, `Buying lijiang_light ¥1,800 from ¥1,820 must leave ¥20, got ¥${afterBuyBike.money}`)
+  assert.equal(afterBuyBike.money, 16, `Buying lijiang_light ¥1,800 from ¥1,816 must leave ¥16, got ¥${afterBuyBike.money}`)
   assert.equal(afterBuyBike.vehicle?.modelId, 'lijiang_light')
 
   // Credit additional spot bounties (remaining 6 spots × ¥120 = +¥720) + repeat delivery (+¥1,000 test fund via reward) to install neon (¥380) + topbox_commuter (¥450) + motor:1 (¥600)
@@ -990,7 +990,7 @@ try {
   assert.equal(mountPersonal.outfitSavedHat, 'hat_guilin_cap', 'autoHelmetOnRide must NOT mutate saved equipped.hat')
   assert.equal(mountPersonal.qStaysP, true, 'Q in P-gear must stay locked')
   assert.equal(mountPersonal.eToD2, true, 'E from P-gear after S-gear must recover safely to D2')
-  assert.equal(mountPersonal.moneyAfterMods, 20 + 1600 - 150 - 320 - 450 - 600)
+  assert.equal(mountPersonal.moneyAfterMods, 16 + 1600 - 150 - 320 - 450 - 600)
 
   // Night riding wearing new outfit on customized personal e-bike: switch time=20.8, headlight L, lean, crash & recover
   await setHour(page, 20.8)
