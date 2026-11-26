@@ -300,10 +300,16 @@ def shard_in_sector(gx: int, gz: int, sector: str) -> bool:
         return True
     if sector == "west":
         return gx <= -6
+    if sector == "north":
+        return gx >= -5 and gz <= -6
+    if sector == "east":
+        return gx >= 3 and gz >= -5
     if sector == "ne":
         return gx >= 3 or (gx >= -5 and gz <= -6)
     if sector == "south":
         return -5 <= gx <= 2 and gz >= 7
+    if sector == "es":
+        return (gx >= 3 and gz >= -5) or (-5 <= gx <= 2 and gz >= 7)
     if sector == "edge":
         return -5 <= gx <= 2 and -5 <= gz <= 6
     raise ValueError(f"Unknown sector: {sector}")
@@ -730,6 +736,15 @@ def load_osm_full(osm_path: Path, x0: float, x1: float, z0: float, z1: float):
                     if am in ("school", "hospital"):
                         compounds.append((tags.get("name", am), am, poly))
 
+            if (
+                tags.get("railway") in ("station", "platform")
+                or tags.get("building") == "train_station"
+                or tags.get("public_transport") == "station"
+            ) and len(pts) >= 4 and pts[0] == pts[-1]:
+                rpoly = make_valid(Polygon(pts))
+                if not rpoly.is_empty and rpoly.area > 120:
+                    quiet_zones.append(rpoly)
+
             lu = tags.get("landuse")
             if lu == "residential" and len(pts) >= 4:
                 poly = make_valid(Polygon(pts))
@@ -760,6 +775,14 @@ def load_osm_full(osm_path: Path, x0: float, x1: float, z0: float, z1: float):
                     quiet_zones.append(poly)
                     if tags.get("amenity") in ("school", "hospital"):
                         compounds.append((tags.get("name", tags["amenity"]), tags["amenity"], poly))
+            elif (
+                tags.get("railway") in ("station", "platform")
+                or tags.get("building") == "train_station"
+                or tags.get("public_transport") == "station"
+            ):
+                poly = osm_element_area(el)
+                if not poly.is_empty and poly.area > 120 and poly.intersects(query_box):
+                    quiet_zones.append(poly)
 
     return {
         "osm_by_key": osm_by_key,
@@ -1112,7 +1135,7 @@ def main():
     t0 = time.time()
     ap = argparse.ArgumentParser(description="Build full-city Guilin v1+ 512m spatial upgrade shards.")
     ap.add_argument("--ring", choices=("r1", "r2", "r3", "r4", "all"), default="all", help="Target ring(s) to generate")
-    ap.add_argument("--sector", choices=("west", "ne", "south", "edge", "all"), default="all", help="Target spatial sector")
+    ap.add_argument("--sector", choices=("west", "north", "east", "ne", "south", "es", "edge", "all"), default="all", help="Target spatial sector")
     ap.add_argument("--world-dir", type=Path, default=None)
     ap.add_argument("--cmab", type=Path, default=None)
     ap.add_argument("--osm", type=Path, default=None)
