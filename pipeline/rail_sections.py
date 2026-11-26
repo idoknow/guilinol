@@ -218,6 +218,12 @@ def road_profiles(section, ways, widths):
                 substring(line, a, b) for a, b in ((0, start), (stop, line.length)) if b - a > .001
             ],
         )
+        if "pavedChords" in road:
+            native = set(zip(local["nodes"], local["nodes"][1:]))
+            widths_by_chord = {(a, b): width for a, b, width in road["pavedChords"]}
+            if not widths_by_chord.keys() <= native or any(width <= 0 for width in widths_by_chord.values()):
+                raise ValueError(f"Invalid finished carriageway on {wid}")
+            local["pavedChords"] = widths_by_chord
         if "nativeTies" in road:
             local["nativeTies"] = road["nativeTies"]
         if "railSideWall" in road:

@@ -145,7 +145,10 @@ def finish_paving(directory, manifest, profiles, elements):
             near = distance <= shoulder + step * math.sqrt(2) + 6
             target[near] = np.minimum(target[near], bed[near])
             if section["openCut"]:
-                axes.add(key(a - [x, z], b - [x, z]))
+                # The finished slab supplies the surface on selected chords.
+                # Keep its native-asphalt cut, including sub-decimetre edge slivers.
+                if not section.get("fittedCarriageway"):
+                    axes.add(key(a - [x, z], b - [x, z]))
         for wid, width in {(s["way"], s["halfWidth"]) for s, _, _ in local}:
             for line, levels, wide in by_way[wid]:
                 pts = [
