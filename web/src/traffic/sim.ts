@@ -1074,16 +1074,10 @@ export class Traffic {
         }
       }
     }
-    if(track.floor){
-      const pose=contactPose(track,dist,undefined,undefined,undefined,actor.dodge+(actor.wrongWay?WRONG_WAY_LATERAL_OFFSET:0))
-      actor.y=pose.y
-      actor.pitch=actor.wrongWay?-pose.pitch:pose.pitch
-      actor.roll=actor.wrongWay?-pose.roll:pose.roll
-      actor.yaw=actor.wrongWay?Math.atan2(-track.dx,-track.dz):track.yaw
-      return
-    }
-    actor.pitch=actor.roll=0
-    const reference=trackHeight(track,dist)
+    const pose=track.floor?contactPose(track,dist,undefined,undefined,undefined,actor.dodge+(actor.wrongWay?WRONG_WAY_LATERAL_OFFSET:0)):undefined
+    actor.pitch=pose?(actor.wrongWay?-pose.pitch:pose.pitch):0
+    actor.roll=pose?(actor.wrongWay?-pose.roll:pose.roll):0
+    const reference=pose?.y??trackHeight(track,dist)
     const car=actor.kind==='car'
     actor.y=this.sampleGround?.(actor.x,actor.z,reference,car)??reference
     if(actor.y!==reference&&this.sampleGround){

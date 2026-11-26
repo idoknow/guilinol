@@ -80,6 +80,7 @@
     "verify:creator": "tsx scripts/verify-creator.mjs",
     "test:emote": "node --experimental-strip-types --test scripts/emote-test.mjs",
     "test:rt-aoi": "node scripts/rt-aoi-check.mjs",
+    "test:rt-moderation": "node rt/protocol-test.mjs && node rt/anti-cheat-autoban-test.mjs && node rt/review-test.mjs && node rt/anti-cheat-test.mjs && node rt/roster-sub-test.mjs",
     "chat:words:import": "node scripts/chat-words-import.mjs",
     "test:chat": "node --test scripts/chat-test.mjs scripts/chat-lexicon-test.mjs scripts/chat-corpus-test.mjs",
     "bench:chat": "node scripts/chat-bench.mjs",
@@ -97,6 +98,7 @@
     "pg": "^8.23.1",
     "postprocessing": "6.39.6",
     "qrcode-generator": "2.0.4",
+    "sharp": "0.35.2",
     "three": "0.180.0",
     "three-good-godrays": "0.12.2",
     "tsx": "^4.23.15"

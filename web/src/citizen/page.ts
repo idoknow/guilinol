@@ -1,4 +1,7 @@
 import './citizen.css'
+import {markSurface,markSession} from '../session-mark'
+markSurface(document.body)
+void fetch('/api/me',{cache:'no-store'}).then(async response=>{if(response.ok) markSession((await response.json()).uid)}).catch(()=>{})
 import qrCode from 'qrcode-generator'
 import {cardUrl} from './items'
 

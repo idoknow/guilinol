@@ -7,6 +7,7 @@ import {feedbackContributors} from '../../lib/contributors'
 import {bindEmail,isSocialType,socialCallback,socialConfig,socialConfirm,socialPending,socialRegister,socialStates,startSocial,userSocialIdentities} from '../../lib/social'
 import {unsubscribe} from '../../lib/feedback-mail'
 import {cloudSave} from '../../lib/cloud-save'
+import {weakPassword} from '../../lib/weak-password'
 type User = SessionAccount & {salt:string;digest:string;locked_until:number}
 const profile=(user:SessionAccount)=>({id:user.id,uid:user.uid,email:user.email,nickname:user.nickname,verified:!!user.verified,role:user.role,notify_email:!!user.notify_email,email_placeholder:!!user.email_placeholder})
 const json=(data:unknown,status=200,session?:string)=>Response.json(data,{status,headers:{'Cache-Control':'no-store',...(session?{'Set-Cookie':session}:{})}})
@@ -18,6 +19,11 @@ function password(value:unknown) {
   if(typeof value!=='string'||value.length<8||value.length>256) invalid()
   return value
 }
+function newPassword(value:unknown) {
+  const pass=password(value)
+  if(weakPassword(pass)) throw new Problem(400,'weak_password','密码过于常见或容易猜测，请换一个更长的独特密码')
+  return pass
+}
 const methods:Record<string,string[]>={'rt/ticket':['POST'],health:['GET'],'auth/me':['GET'],'me/avatar':['GET','PUT'],me:['GET','PATCH'],...Object.fromEntries(['register','resend','verify','reset','login','logout','social/start'].map(name=>[`auth/${name}`,['POST']])),'auth/social/callback':['GET'],'auth/social/pending':['GET'],'auth/social/confirm':['POST'],'auth/social/config':['GET'],'auth/social/register':['POST'],'auth/email/bind':['POST']}
 
 async function handle(request:Request,env:Env) {
@@ -25,6 +31,11 @@ async function handle(request:Request,env:Env) {
   const stmt=(sql:string,...args:(string|number)[])=>db.prepare(sql).bind(...args)
   if(method==='GET'&&path==='unsubscribe')return unsubscribe(env,url)
   if(method==='GET'&&path==='contributors')return feedbackContributors(env)
+  if(path==='trace/tile' && env.traceTile){
+    if(method!=='GET')throw new Problem(405,'method','需要 GET')
+    const account=await sessionAccount(db,await sessionHash(request));if(!account?.verified)unauthorized()
+    return env.traceTile(Number(account.uid))
+  }
   if(env.updateCards && /^(?:admin\/)?updates(?:\/|$)/.test(path)) return env.updateCards(request,path)
   if(/^(feedback|bridge|admin)(\/|$)/.test(path)) return feedback(request,env,path)
   if(path==='me/save')return cloudSave(request,env)
@@ -143,7 +154,7 @@ async function handle(request:Request,env:Env) {
     // 发码/登录仍走后续逻辑（占位账号由 lib/auth 的 reserveMail 返回 no_email，登录保持可用）
     if(register&&/@social\.invalid$/i.test(email)) invalid()
     if(purpose!=='verify'&&purpose!=='reset') invalid()
-    const name=register?nickname(body.nickname):'', pass=register?password(body.password):''
+    const name=register?nickname(body.nickname):'', pass=register?newPassword(body.password):''
     await reserveMail(db,email,ip)
     const user=await getUser()
     if((purpose==='verify'&&user?.verified)||(purpose==='reset'&&!user?.verified)||(!register&&!user)) return json({ok:true})
@@ -181,7 +192,7 @@ async function handle(request:Request,env:Env) {
     if(!session.meta.changes) { checkBan(await getUser()); unauthorized() }
     return json(profile(user),200,cookie(token))
   }
-  const purpose=reset?'reset':'verify', pass=reset?password(body.password):''
+  const purpose=reset?'reset':'verify', pass=reset?newPassword(body.password):''
   if(typeof body.code!=='string'||!/^\d{6}$/.test(body.code)) invalid()
   const bad=()=>new Problem(400,'invalid_code','验证码无效或已过期')
   const record=await stmt(`UPDATE email_codes SET attempts=attempts+1 WHERE email=? AND purpose=? AND expires>? AND attempts<5 RETURNING digest`,email,purpose,now()).first<{digest:string}>()

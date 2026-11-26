@@ -15,6 +15,7 @@ import {gfxState} from './look/gfx-state'
 import {installAtmosphere, outerGround, sky} from './look/atmosphere'
 import {startPeaks} from './peaks'
 import {presets,setPreset,pickSpawn,spawnPool} from './presets'
+import {allowLanding} from './mp-travel'
 import {plazaSpawn} from './helicopter/site'
 import {helicopter} from './helicopter/runtime'
 import {isDeepLink} from './deeplink'
@@ -144,7 +145,8 @@ async function start(loader:FullLoader,creatorSpawn=false) {
   if(params.has('debug'))Object.assign(window,{gfx})
   // tapFrame：录像在这里、present 之前拷帧（IDOK-383，主画布没开 preserveDrawingBuffer）。
   let cabinCruise=false
-  function drawMain(){if(post)stats.shadowCasters=post.render(walker?.active?walker.position:camera.position,cabinCruise);else renderer.render(scene,camera);tapFrame(renderer.domElement)}
+  const drawMark=sessionMarkPass(renderer)
+  function drawMain(){if(post)stats.shadowCasters=post.render(walker?.active?walker.position:camera.position,cabinCruise);else renderer.render(scene,camera);drawMark();tapFrame(renderer.domElement)}
   renderer.info.autoReset=false
   const hemi = new THREE.HemisphereLight(look.hemiSky,look.hemiGround,look.hemiPower); scene.add(hemi)
   const arrivalReady=import('./arrival-programs').then(module=>warmPrograms(module.arrivalPrograms()))
@@ -318,6 +320,7 @@ async function start(loader:FullLoader,creatorSpawn=false) {
     landmarksPromise ??= import('./landmarks').then(module=>{
       cullLandmarks=module.landmarkCulling(stream)
       stream.updateLandmarks=module.landmarkStream(scene,renderer,manifest.landmarks!,stream.landmarks,{
+        collisionLandmarks:stream.collisionLandmarks,
         camera,
         onMount:group=>cullLandmarks?.warm(group),
         getMetrics:()=>stream.metrics,
@@ -378,6 +381,7 @@ async function start(loader:FullLoader,creatorSpawn=false) {
       if(name&&!parent&&!matchMedia('(prefers-reduced-motion: reduce)').matches)await new Promise(resolve=>setTimeout(resolve,450))
       if(signal.aborted)return false
       cover.progress(.3,'步行模块已就绪')
+      if(!await allowLanding(reason,x,z))return false
       completed=await player.enter(x,z,yaw,reason,false,signal,cover.progress)
       if(completed&&request){stream.tick(player.position);stream.updateLandmarks?.(player.position);cover.progress(1);return true}
       signal.throwIfAborted()
@@ -1100,3 +1104,4 @@ async function start(loader:FullLoader,creatorSpawn=false) {
   else if(params.get('mode')==='walk'||params.has('spawn')){await toggle(true);showMode()}
 }
 export const boot=start
+import {sessionMarkPass} from './session-mark-pass'

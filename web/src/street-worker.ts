@@ -1,6 +1,7 @@
 import {platformShift, type PlatformGrade} from './platform-grade'
 import {panelCut} from './crossing-panels'
 import {stationShoulders,type GradePlane,type ShoulderPlane} from './station-shoulders'
+import {clearTerrain} from './roadbed-clearance'
 import style from '../../pipeline/railway-style.json'
 import {inRing} from './polygon'
 import {stationPaving,type StationPavingCut} from './station-paving'
@@ -78,6 +79,14 @@ export function streetGeometry([paths,lamps,banks,signals=[],stops=[],roadCtrl,s
   const cutPanels=panels?.length ? panelCut(panels) : undefined
   let platformPath=false
   let lowerPath=false
+  let bedDepth=0
+  let boundaryEdges:THREE.Line3[]=[]
+  const skirtSegments=new Map<string,[THREE.Vector3,THREE.Vector3][]>()
+  function cellsAlong(startX:number,startZ:number,endX:number,endZ:number){
+    const count=Math.max(1,Math.ceil(Math.hypot(endX-startX,endZ-startZ)/4)),keys=new Set<string>()
+    for(let at=0;at<=count;at++)keys.add(`${Math.floor((startX+(endX-startX)*at/count)/8)},${Math.floor((startZ+(endZ-startZ)*at/count)/8)}`)
+    return keys
+  }
   function vector(pt:THREE.Vector2,offset:number){
     if(offset===.195 && curbSegments.length){
       testPoint.set(pt.x,0,pt.y)
@@ -132,7 +141,12 @@ export function streetGeometry([paths,lamps,banks,signals=[],stops=[],roadCtrl,s
       for(const poly of polys)for(let k=1;k+1<poly.length;k++)emitFace(poly[0],poly[k],poly[k+1],kind,u1,u2,u3,vertical)
     }else emitFace(first,second,third,kind,u1,u2,u3,vertical)
   }
-  function emitFace(first:THREE.Vector3,second:THREE.Vector3,third:THREE.Vector3,kind:number,u1:number,u2:number,u3:number,vertical:boolean){
+  function emitFace(first:THREE.Vector3,second:THREE.Vector3,third:THREE.Vector3,kind:number,u1:number,u2:number,u3:number,vertical:boolean,cleared=false){
+    if(!cleared&&bedDepth===ROAD_LIFT&&!lowerPath&&(kind===0||kind===5)&&stationLevel){
+      for(const polygon of clearTerrain([first,second,third],railGround,4,ROAD_LIFT))for(let index=2;index<polygon.length;index++)
+        emitFace(polygon[0],polygon[index-1],polygon[index],kind,u1,u2,u3,vertical,true)
+      return
+    }
     let p1=first,p2=second,p3=third,a1=u1,a2=u2,a3=u3
     if(kind!==3&&!vertical){
       const x1=Math.fround(p1.x),y1=Math.fround(p1.y),z1=Math.fround(p1.z)
@@ -149,6 +163,30 @@ export function streetGeometry([paths,lamps,banks,signals=[],stops=[],roadCtrl,s
     const textureChannel=platformTop?9:stone?10:kind===6?6:channel
     const c=platformTop?platformBrick:stone?plazaStone:colors[kind]
     const pts=[p1,p2,p3]
+    if(bedDepth && channel===0 && !vertical){
+      const bottom=(point:THREE.Vector3)=>new THREE.Vector3(point.x,point.y-bedDepth,point.z)
+      if(bedDepth>.1||pts.some(point=>point.y-railGround(point.x,point.z)>.15))
+        emitFace(bottom(p1),bottom(p3),bottom(p2),3,0,0,0,false)
+      for(let side=0;side<3;side++){
+        const start=pts[side],end=pts[(side+1)%3]
+        if((start.x===end.x&&(start.x===0||start.x===256))||(start.z===end.z&&(start.z===0||start.z===256)))continue
+        const onEdge=boundaryEdges.some(edge=>{
+          const dx=edge.end.x-edge.start.x,dz=edge.end.z-edge.start.z,len=Math.hypot(dx,dz)
+          return [start,end].every(point=>{
+            const east=point.x-edge.start.x,south=point.z-edge.start.z,along=(east*dx+south*dz)/len
+            return along>=-.0001&&along<=len+.0001&&Math.abs(east*dz-south*dx)<=.0001*len
+          })
+        })
+        if(!onEdge)continue
+        for(const key of cellsAlong(start.x,start.z,end.x,end.z)){
+          if(!skirtSegments.has(key))skirtSegments.set(key,[])
+          skirtSegments.get(key)!.push([start,end])
+        }
+        const low=bottom(start),foot=bottom(end)
+        if(bedDepth<=.1){low.y=Math.min(low.y,railGround(low.x,low.z)-.04);foot.y=Math.min(foot.y,railGround(foot.x,foot.z)-.04)}
+        emitFace(start,end,foot,3,0,0,0,true);emitFace(start,foot,low,3,0,0,0,true)
+      }
+    }
     if(!vertical && (channel===0 || channel===1)){
       const collision=channel===0?road:sidewalk
       for(const p of pts)collision.push(p.x,p.y,p.z)
@@ -183,14 +221,22 @@ export function streetGeometry([paths,lamps,banks,signals=[],stops=[],roadCtrl,s
     const tris=THREE.ShapeUtils.triangulateShape(loops[0],loops.slice(1)),points=loops.flat()
     const protectedDeck=roadbeds.has(-index-1)
     const lifted=roadbeds.has(index)||protectedDeck
-    const roadbed=lifted&&(kind===0||kind===5)
+    const roadbed=(lifted&&(kind===0||kind===5))||(index>=paths.length&&kind===5)
+    const clippedBed=roadbed&&!!(shoulders||stationLevel||remaining)
+    skirtSegments.clear()
+    bedDepth=clippedBed?(protectedDeck?.18:ROAD_LIFT):0
+    const edgeKey=(first:number,last:number)=>Math.min(first,last)*points.length+Math.max(first,last)
+    const boundary=new Set<number>()
+    if(clippedBed)for(const tri of tris)for(let side=0;side<3;side++){
+      const key=edgeKey(tri[side],tri[(side+1)%3]);if(!boundary.delete(key))boundary.add(key)
+    }
     const height=[.045,.195,.065,0,.195,.06,.195][kind]+(lifted?ROAD_LIFT:0)
     function tessellate(a:THREE.Vector2,b:THREE.Vector2,c:THREE.Vector2){
       const ab=a.distanceToSquared(b),bc=b.distanceToSquared(c),ca=c.distanceToSquared(a)
       if(Math.max(ab,bc,ca)<=16){
         const first=vector(a,height),second=vector(c,height),third=vector(b,height)
         triangle(first,second,third,kind)
-        if(roadbed&&(protectedDeck||[first,second,third].some(point=>point.y-railGround(point.x,point.z)>.15))){
+        if(roadbed&&!clippedBed&&(protectedDeck||[first,second,third].some(point=>point.y-railGround(point.x,point.z)>.15))){
           for(const point of [first,second,third])point.y-=protectedDeck?.18:ROAD_LIFT
           triangle(first,third,second,3)
         }
@@ -199,15 +245,39 @@ export function streetGeometry([paths,lamps,banks,signals=[],stops=[],roadCtrl,s
       if(bc>ab&&bc>=ca){tessellate(b,c,a);return}if(ca>ab){tessellate(c,a,b);return}
       const mid=a.clone().lerp(b,.5);tessellate(a,mid,c);tessellate(mid,b,c)
     }
-    for(const [a,b,c] of tris)tessellate(points[a],points[b],points[c])
+    for(const [a,b,c] of tris){
+      if(clippedBed){
+        const corners=[a,b,c];boundaryEdges=[]
+        for(let side=0;side<3;side++){
+          const start=corners[side],end=corners[(side+1)%3]
+          if(boundary.has(edgeKey(start,end)))boundaryEdges.push(new THREE.Line3(new THREE.Vector3(points[start].x,0,points[start].y),new THREE.Vector3(points[end].x,0,points[end].y)))
+        }
+      }
+      tessellate(points[a],points[b],points[c])
+    }
+    bedDepth=0
     if(roadbed)for(const loop of loops)for(let index=0;index<loop.length;index++){
       const start=loop[index],end=loop[(index+1)%loop.length]
       if((start.x===end.x&&(start.x===0||start.x===256))||(start.y===end.y&&(start.y===0||start.y===256)))continue
-      const segments=2**Math.ceil(Math.log2(Math.max(1,start.distanceTo(end)/4)))
+      const dx=end.x-start.x,dz=end.y-start.y,length=start.distanceTo(end)
+      if(!length)continue
+      const covered:[number,number][]=[]
+      if(clippedBed)for(const key of cellsAlong(start.x,start.y,end.x,end.y))for(const pair of skirtSegments.get(key)??[]){
+        if(pair.some(point=>Math.abs((point.x-start.x)*dz-(point.z-start.y)*dx)>.0001*length))continue
+        const [left,right]=pair.map(point=>((point.x-start.x)*dx+(point.z-start.y)*dz)/(length*length)).sort((a,b)=>a-b)
+        if(right>0&&left<1)covered.push([Math.max(0,left),Math.min(1,right)])
+      }
+      let cursor=0
+      const gaps:[number,number][]=[]
+      for(const [left,right] of covered.sort((a,b)=>a[0]-b[0])){if(left>cursor+1e-7)gaps.push([cursor,left]);cursor=Math.max(cursor,right)}
+      if(cursor<1-1e-7)gaps.push([cursor,1])
+      for(const [left,right] of gaps){
+      const segments=2**Math.ceil(Math.log2(Math.max(1,(right-left)*length/4)))
       for(let segment=0;segment<segments;segment++){
-        const first=vector(start.clone().lerp(end,segment/segments),height),second=vector(start.clone().lerp(end,(segment+1)/segments),height)
+        const first=vector(start.clone().lerp(end,left+(right-left)*segment/segments),height),second=vector(start.clone().lerp(end,left+(right-left)*(segment+1)/segments),height)
         const low=first.clone(),next=second.clone();low.y=protectedDeck?first.y-.18:railGround(low.x,low.z)-.04;next.y=protectedDeck?second.y-.18:railGround(next.x,next.z)-.04
         triangle(first,second,next,3);triangle(first,next,low,3)
+      }
       }
     }
     if(kind===1)for(const loop of loops)for(let i=0;i<loop.length;i++){
