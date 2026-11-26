@@ -13,6 +13,7 @@ import {chunkWater, farWater} from './look/water'
 import type {TileBatchInput} from './batch'
 import type {Peaks} from './peaks'
 import {joinPortalRoads,tunnelGeometry,type Tunnel} from './tunnels'
+import {repairBridgeDeck,setBridgeRepairKeepouts} from './ground-repair'
 import {freezeStatic} from './static-freeze'
 
 interface Asset {file:string; bytes:number}
@@ -200,6 +201,7 @@ export function startOverview(manifest:Manifest) {
   const {underlay,packedUnderlay,texture,step,waterMask} = manifest.overview
   const [left,top,width,depth] = manifest.extent
   if(manifest.region)setupCountryside(manifest.region,manifest.extent,step,manifest.chunkSize)
+  setBridgeRepairKeepouts(manifest.landmarks)
   const elevations = packedUnderlay
     ? fetchAsset(packedUnderlay.file).then(data=>new Response(new Blob([data]).stream().pipeThrough(new DecompressionStream('gzip'))).arrayBuffer())
     : fetchAsset(underlay.file)
@@ -423,7 +425,14 @@ export async function detail(tile:Tile, signal:AbortSignal, parseSlot?:()=>Promi
   const activeRings = hasUpgradeShard ? rings.map(b => [...b] as Building) : rings
   const walls = vertices ? buildingGeometry(positions,normals,indices,activeRings,tile.x,tile.z) : null
   for(const [,topLevel] of activeRings) if(topLevel/10+8>maxY) maxY = topLevel/10+8
-  const bridge = deck.length ? bridgeGeometry(deck,thin,asphalt) : null
+  const repairedDeck = deck.length ? repairBridgeDeck(deck,thin,tile.x,tile.z,water,(lx,lz)=>{
+    const col=Math.min(segments-1,Math.max(0,Math.floor(lx/step))),row=Math.min(segments-1,Math.max(0,Math.floor(lz/step))),at=row*stride+col
+    const u=lx/step-col,v=lz/step-row,a=heights.getY(at),b=heights.getY(at+1),c=heights.getY(at+stride),d=heights.getY(at+stride+1)
+    return u+v<=1?a+(b-a)*u+(c-a)*v:d+(c-d)*(1-u)+(b-d)*(1-v)
+  },paths[0],paths[5]) : null
+  const activeDeck = repairedDeck ? repairedDeck.deck : deck
+  const activeThin = repairedDeck ? repairedDeck.thin : thin
+  const bridge = activeDeck.length ? bridgeGeometry(activeDeck,activeThin,asphalt) : null
   const batch:TileBatchInput = {
     tile, minY, maxY, midY:heights.getY(segments/2*(stride+1)),
     walls, pond:pond?.positions ?? null, bridge,
@@ -439,7 +448,7 @@ export async function detail(tile:Tile, signal:AbortSignal, parseSlot?:()=>Promi
   }
   const surfaceAt = buildSurfaceLookup(tile, paths)
   return {
-    group,groundMesh,terrain,underlay,water,rings:physicalBuildingRings(tile,activeRings),deck,thin,streets,batch,tunnel,surfaceAt,cityUpgradeRaw,railCutVertices:new Set(railCuts.map(([index])=>index)),
+    group,groundMesh,terrain,underlay,water,rings:physicalBuildingRings(tile,activeRings),deck:activeDeck,thin:activeThin,streets,batch,tunnel,surfaceAt,cityUpgradeRaw,railCutVertices:new Set(railCuts.map(([index])=>index)),
     dispose(){
       if(tunnel){
         for(const mesh of Object.values(tunnel))if(mesh){
