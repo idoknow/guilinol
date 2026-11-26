@@ -2,6 +2,7 @@
 // 点一行 = 在地图上找到他。只读 mp-roster，不碰 three。
 import './mp-roster-panel.css'
 import {bearing, locatePlayer, onRoster, roster, type Roster, type RosterPlayer} from '../mp-roster'
+import {requestRoster} from '../net'
 
 let panel: HTMLElement | undefined
 let list: HTMLOListElement
@@ -73,12 +74,14 @@ export function openRoster() {
   delete list.dataset.signature
   requestAnimationFrame(() => panel!.classList.add('show'))
   unsubscribe ??= onRoster(paint)
+  requestRoster(true)
   paint(roster())
 }
 export function closeRoster() {
   if (!panel || panel.hidden) return
   panel.classList.remove('show')
   unsubscribe?.(); unsubscribe = undefined
+  requestRoster(false)
   setTimeout(() => { if (panel && !panel.classList.contains('show')) panel.hidden = true }, 180)
 }
 export function toggleRoster() { if (!panel || panel.hidden) openRoster(); else closeRoster() }
