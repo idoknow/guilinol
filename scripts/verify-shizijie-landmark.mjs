@@ -12,6 +12,7 @@ import {join, resolve} from 'node:path'
 import {chromium} from 'playwright'
 import {preview} from 'vite'
 import {browserOptions} from './qa-browser.mjs'
+import {SHIZIJIE_NO_PED_CORE_POLY} from '../web/src/shizijie-zone.ts'
 
 const ROOT = resolve(import.meta.dirname, '..')
 const OUT_DIR = process.env.SZJ_CAPTURE_DIR || '/tmp/szj-verify'
@@ -155,28 +156,76 @@ try {
     assert.ok(sceneMeta.materials.includes(reqMat), `Missing required material ${reqMat} in ${JSON.stringify(sceneMeta.materials)}`)
   }
 
-  // 2. Physical barrier collision verification across 4 corner sidewalks
+  // 2. Physical barrier collision verification across 4 corner sidewalks (sprint in world-space toward carriageway)
+  // First run an unobstructed control walk with identical sprint ticks to prove the threshold genuinely rejects missing barriers.
+  const SPRINT_TICKS = 150
+  const MAX_BLOCKED_DIST = 8.0
+  const controlWalk = await page.evaluate(
+    async ({ox, oz, ticks}) => {
+      const {walk, walkTo} = window.viewer
+      const ok = await walkTo(ox, oz, Math.atan2(0.97, 0.24), 'control-unobstructed')
+      if (!ok) return {ok: false, walked: 0}
+      const p0 = {x: walk.position.x, z: walk.position.z}
+      const len = Math.hypot(-0.97, -0.24)
+      walk.drive(-0.97 / len, -0.24 / len, true)
+      for (let i = 0; i < ticks; i++) walk.tick(1 / 60)
+      walk.drive(0, 0, false)
+      const p1 = {x: walk.position.x, z: walk.position.z}
+      return {ok: true, walked: +Math.hypot(p1.x - p0.x, p1.z - p0.z).toFixed(2)}
+    },
+    {ox: origin.x, oz: origin.z, ticks: SPRINT_TICKS},
+  )
+  assert.equal(controlWalk.ok, true, 'Unobstructed control walk spawn failed')
+  assert.ok(
+    controlWalk.walked > MAX_BLOCKED_DIST + 4.0,
+    `Control walk must clear barrier threshold (${MAX_BLOCKED_DIST}m), got ${controlWalk.walked}m`,
+  )
+
   const barrierChecks = []
   const tests = [
-    {name: 'NW_corner_blocked', sx: -22.0, sz: -30.0, tx: -14.0, tz: -16.0, expectBlockedBeforeDist: 10.5},
-    {name: 'NE_corner_blocked', sx: 38.0, sz: -24.0, tx: 22.0, tz: -10.0, expectBlockedBeforeDist: 16.0},
-    {name: 'SE_corner_blocked', sx: 36.0, sz: 38.0, tx: 20.0, tz: 24.0, expectBlockedBeforeDist: 16.0},
-    {name: 'SW_weixiaotang_blocked', sx: -43.0, sz: 28.0, tx: -28.0, tz: 14.0, expectBlockedBeforeDist: 14.0},
+    {name: 'NW_corner_blocked', sx: -22.0, sz: -26.5, tx: -10.0, tz: -6.0, expectBlockedBeforeDist: 6.5},
+    {name: 'NE_corner_blocked', sx: 46.0, sz: -2.5, tx: 40.0, tz: 18.0, expectBlockedBeforeDist: 6.5},
+    {name: 'SE_corner_blocked', sx: 35.0, sz: 33.0, tx: 30.0, tz: 12.0, expectBlockedBeforeDist: 6.5},
+    {name: 'SW_weixiaotang_blocked', sx: -43.0, sz: 28.0, tx: -28.0, tz: 14.0, expectBlockedBeforeDist: 8.0},
   ]
   for (const t of tests) {
     const res = await page.evaluate(
-      async ({ox, oz, t}) => {
+      async ({ox, oz, t, ticks, noPedPoly}) => {
+        const inPoly = (wx, wz) => {
+          const rx = wx - ox
+          const rz = wz - oz
+          if (rx < -105 || rx > 88 || rz < -88 || rz > 84) return false
+          let inside = false
+          for (let i = 0, j = noPedPoly.length - 1; i < noPedPoly.length; j = i++) {
+            const xi = noPedPoly[i][0], zi = noPedPoly[i][1], xj = noPedPoly[j][0], zj = noPedPoly[j][1]
+            if ((zi > rz) !== (zj > rz) && rx < ((xj - xi) * (rz - zi)) / (zj - zi) + xi) inside = !inside
+          }
+          return inside
+        }
         const {walk, walkTo} = window.viewer
         const sx = ox + t.sx
         const sz = oz + t.sz
         const tx = ox + t.tx
         const tz = oz + t.tz
-        const ok = await walkTo(sx, sz, Math.atan2(sx - tx, sz - tz), `barrier-${t.name}`)
+        const dx = tx - sx
+        const dz = tz - sz
+        const dlen = Math.hypot(dx, dz)
+        const ux = dx / dlen
+        const uz = dz / dlen
+        const yaw = Math.atan2(-ux, -uz)
+        const ok = await walkTo(sx, sz, yaw, `barrier-${t.name}`)
         if (!ok) return {ok: false, name: t.name}
         const p0 = {x: walk.position.x, z: walk.position.z}
-        walk.face(Math.atan2(sx - tx, sz - tz), 0)
-        walk.drive(1, 0, false)
-        for (let i = 0; i < 210; i++) walk.tick(1 / 60)
+        walk.face(yaw, 0)
+        let hitBarrier = false
+        let enteredRoadZone = false
+        walk.drive(ux, uz, true)
+        for (let i = 0; i < ticks; i++) {
+          walk.tick(1 / 60)
+          const p = walk.probe()
+          if (p.hits?.some(h => h === 'rail' || h === 'landmark')) hitBarrier = true
+          if (inPoly(p.x, p.z)) enteredRoadZone = true
+        }
         walk.drive(0, 0, false)
         const p1 = {x: walk.position.x, z: walk.position.z}
         const walked = Math.hypot(p1.x - p0.x, p1.z - p0.z)
@@ -186,29 +235,57 @@ try {
           name: t.name,
           walked: +walked.toFixed(2),
           distToTarget: +distToTarget.toFixed(2),
-          blocked: walked < t.expectBlockedBeforeDist,
+          hitBarrier,
+          enteredRoadZone,
+          blocked: walked < t.expectBlockedBeforeDist && hitBarrier && !enteredRoadZone,
         }
       },
-      {ox: origin.x, oz: origin.z, t},
+      {ox: origin.x, oz: origin.z, t, ticks: SPRINT_TICKS, noPedPoly: SHIZIJIE_NO_PED_CORE_POLY},
     )
     assert.equal(res.ok, true, `Failed to spawn for ${t.name}`)
-    assert.equal(res.blocked, true, `Guardrail failed to stop pedestrian at ${t.name}: walked ${res.walked}m (res=${JSON.stringify(res)})`)
+    assert.equal(res.enteredRoadZone, false, `Pedestrian crossed into Shizijie roadway at ${t.name}: ${JSON.stringify(res)}`)
+    assert.equal(res.blocked, true, `Guardrail failed to stop pedestrian at ${t.name}: ${JSON.stringify(res)}`)
     barrierChecks.push(res)
   }
 
-  // Verify e-bike flagship deliveryBay -> testRideSpawn path remains open (unblocked by barriers)
+  // Verify e-bike flagship deliveryBay -> testRideSpawn path arrives within tolerance (unblocked by any barrier)
   const ebikePath = await page.evaluate(async () => {
     const {walk, walkTo} = window.viewer
-    const startOk = await walkTo(-779.14, -157.40, Math.atan2(-779.14 - (-782.25), -157.40 - (-150.73)), 'ebike-path')
-    walk.drive(1, 0, true)
-    for (let i = 0; i < 120; i++) walk.tick(1 / 60)
+    const sx = -779.14, sz = -157.40
+    const tx = -782.25, tz = -150.73
+    const yaw = Math.atan2(-(tx - sx), -(tz - sz))
+    const startOk = await walkTo(sx, sz, yaw, 'ebike-path')
+    if (!startOk) return {startOk: false, reached: false, distToTarget: Infinity, distWalked: 0, endPos: [sx, sz]}
+    let reached = false
+    for (let i = 0; i < 240; i++) {
+      const dx = tx - walk.position.x
+      const dz = tz - walk.position.z
+      const rem = Math.hypot(dx, dz)
+      if (rem <= 0.75) {
+        reached = true
+        break
+      }
+      walk.drive(dx / rem, dz / rem, true)
+      walk.tick(1 / 60)
+    }
     walk.drive(0, 0, false)
     const p = walk.position
-    const distWalked = Math.hypot(p.x - (-779.14), p.z - (-157.40))
-    return {startOk, distWalked: +distWalked.toFixed(2), endPos: [+p.x.toFixed(2), +p.z.toFixed(2)]}
+    const distWalked = Math.hypot(p.x - sx, p.z - sz)
+    const distToTarget = Math.hypot(p.x - tx, p.z - tz)
+    return {
+      startOk,
+      reached: reached || distToTarget <= 1.0,
+      distWalked: +distWalked.toFixed(2),
+      distToTarget: +distToTarget.toFixed(2),
+      endPos: [+p.x.toFixed(2), +p.z.toFixed(2)],
+    }
   })
   assert.equal(ebikePath.startOk, true, 'e-bike deliveryBay spawn failed')
-  assert.ok(ebikePath.distWalked >= 5.0, `e-bike deliveryBay path to road blocked! only walked ${ebikePath.distWalked}m`)
+  assert.equal(
+    ebikePath.reached,
+    true,
+    `e-bike deliveryBay -> testRideSpawn blocked! distToTarget=${ebikePath.distToTarget}m (${JSON.stringify(ebikePath)})`,
+  )
 
   // 3. Multi-angle Daytime Screenshots (13:30)
   await flyLook(page, L(6, 98, 32), L(12, 0, 2))
@@ -257,8 +334,9 @@ try {
   await flyLook(page, L(18.0, 4.2, -16.0), L(-30.0, 3.2, 14.0))
   await page.screenshot({path: join(OUT_DIR, '11-night-center-SW.png')})
 
-  assert.deepEqual(errors, [], `Runtime console/page errors: ${errors.join('; ')} | HTTP >=400: ${badUrls.join(', ')}`)
-  const report = {ok: true, sceneMeta, barrierChecks, ebikePath, outDir: OUT_DIR}
+  assert.deepEqual(errors, [], `Runtime console/page errors: ${errors.join('; ')}`)
+  assert.deepEqual(badUrls, [], `Unexpected HTTP >=400 responses: ${badUrls.join(', ')}`)
+  const report = {ok: true, sceneMeta, controlWalk, barrierChecks, ebikePath, outDir: OUT_DIR}
   await writeFile(join(OUT_DIR, 'report.json'), JSON.stringify(report, null, 2))
   console.log('SHIZIJIE VERIFY PASS:', JSON.stringify(report))
 } finally {

@@ -21,6 +21,7 @@ import math
 from pathlib import Path
 import sys
 
+import mapbox_earcut
 import numpy as np
 from PIL import Image, ImageDraw
 import trimesh
@@ -510,7 +511,50 @@ class ShizijieBuilder(Builder):
         ], dtype=np.int64)
         self.mesh(verts, faces, mat, collide=False)
 
-    def shop_sign_quad(self, x, y0, z, w, h, sign_key, double_sided=False):
+    def prism_polygon(self, poly, y0, h, mat, collide=False, cap_mat=None):
+        """Extrude a Shapely Polygon (preserving any interior exclusion rings) from y0 to y0 + h."""
+        if not poly.interiors:
+            return self.prism(list(poly.exterior.coords), y0, h, mat, collide=collide, cap_mat=cap_mat)
+
+        def _ring_pts(ring, ccw: bool):
+            pts = np.asarray(list(ring.coords), dtype=float)
+            if len(pts) > 1 and np.allclose(pts[0], pts[-1]):
+                pts = pts[:-1]
+            if len(pts) < 3:
+                return None
+            signed_area = 0.5 * np.sum(pts[:, 0] * np.roll(pts[:, 1], -1) - np.roll(pts[:, 0], -1) * pts[:, 1])
+            if (signed_area < 0) == ccw:
+                pts = pts[::-1]
+            return pts
+
+        ext = _ring_pts(poly.exterior, ccw=True)
+        if ext is None:
+            return
+        rings = [ext]
+        for interior in poly.interiors:
+            hole = _ring_pts(interior, ccw=False)
+            if hole is not None:
+                rings.append(hole)
+        all_pts = np.vstack(rings)
+        ring_ends = np.cumsum([len(r) for r in rings], dtype=np.uint32)
+        tris_2d = mapbox_earcut.triangulate_float64(all_pts, ring_ends).reshape(-1, 3)
+        top_verts = np.column_stack([all_pts[:, 0], np.full(len(all_pts), y0 + h), all_pts[:, 1]])
+        self.mesh(top_verts, tris_2d[:, ::-1], cap_mat or mat, collide)
+        for ring in rings:
+            n = len(ring)
+            for i in range(n):
+                j = (i + 1) % n
+                x0, z0 = ring[i]
+                x1, z1 = ring[j]
+                quad_v = [
+                    (x0, y0, z0),
+                    (x1, y0, z1),
+                    (x1, y0 + h, z1),
+                    (x0, y0 + h, z0),
+                ]
+                self.mesh(quad_v, [[0, 2, 1], [0, 3, 2]], mat, collide)
+
+    def shop_sign_quad(self, x, y0, z, w, h, sign_key, double_sided=False, back_offset=0.04):
         rx, ry, rw, rh = SHOP_SIGN_RECTS[sign_key]
         u0 = (rx + 1.5) / SHOP_SIGN_ATLAS
         u1 = (rx + rw - 1.5) / SHOP_SIGN_ATLAS
@@ -528,11 +572,12 @@ class ShizijieBuilder(Builder):
         self.shop_sign_tris.append(quad[idx])
         self.shop_sign_uv.append(uvs[idx])
         if double_sided:
+            zb = z - back_offset
             back = self._transform([
-                (x + hw, y0, z - 0.04),
-                (x - hw, y0, z - 0.04),
-                (x - hw, y0 + h, z - 0.04),
-                (x + hw, y0 + h, z - 0.04),
+                (x + hw, y0, zb),
+                (x - hw, y0, zb),
+                (x - hw, y0 + h, zb),
+                (x + hw, y0 + h, zb),
             ])
             self.shop_sign_tris.append(back[idx])
             self.shop_sign_uv.append(uvs[idx])
@@ -691,7 +736,7 @@ def _build_ebike_flagship(m: ShizijieBuilder):
         m.box(bay_w + 0.10, 3.60, 1.10, 0.14, 0.86, 1.10, 'dark')
         # Projecting side banner facing east/west along street (rotate 90 deg around local Y)
         m.pose = (c_wx + (bay_w + 0.18) * ux + 1.15 * nx, 0.0, c_wz + (bay_w + 0.18) * uz + 1.15 * nz, yaw + math.pi / 2.0)
-        m.shop_sign_quad(0.0, 3.64, 0.02, 1.04, 0.78, 'ebike_banner_side', double_sided=True)
+        m.shop_sign_quad(0.0, 3.64, 0.02, 1.04, 0.78, 'ebike_banner_side', double_sided=True, back_offset=0.19)
 
     m.pose = (0.0, 0.0, 0.0, 0.0)
 
@@ -842,7 +887,7 @@ def _street_name_plate(m: ShizijieBuilder, x: float, z: float, yaw: float, sign_
     m.box(0.0, -0.08, 0.0, 0.24, 0.14, 0.24, 'rail_base', collide=True)
     m.cylinder_y(0.0, 0.02, 2.60, 0.0, 0.052, 'rail_silver', sections=7 if m.detail else 5, collide=True)
     m.box(0.0, 2.18, 0.0, 1.32, 0.42, 0.04, 'rail_silver')
-    m.shop_sign_quad(0.0, 2.20, 0.028, 1.28, 0.38, sign_key, double_sided=True)
+    m.shop_sign_quad(0.0, 2.20, 0.028, 1.28, 0.38, sign_key, double_sided=True, back_offset=0.056)
     m.pose = (0.0, 0.0, 0.0, 0.0)
 
 
@@ -852,7 +897,7 @@ def _underpass_guide_sign(m: ShizijieBuilder, x: float, z: float, yaw: float):
     m.box(0.0, -0.08, 0.0, 0.26, 0.16, 0.26, 'rail_base', collide=True)
     m.cylinder_y(0.0, 0.02, 2.94, 0.0, 0.06, 'rail_silver', sections=7 if m.detail else 5, collide=True)
     m.box(0.0, 2.22, 0.0, 1.62, 0.56, 0.05, 'rail_silver')
-    m.shop_sign_quad(0.0, 2.24, 0.032, 1.56, 0.52, 'sign_underpass', double_sided=True)
+    m.shop_sign_quad(0.0, 2.24, 0.032, 1.56, 0.52, 'sign_underpass', double_sided=True, back_offset=0.064)
     m.pose = (0.0, 0.0, 0.0, 0.0)
 
 
@@ -869,7 +914,7 @@ def _guardrail_run(
     """See-through municipal guardrail segmented along terrain slope with crisp LOD0 detail and light LOD1."""
     dx, dz = p1[0] - p0[0], p1[1] - p0[1]
     length = math.hypot(dx, dz)
-    if length < 0.7:
+    if length < 1e-3:
         return
     yaw = math.atan2(dx, dz)
 
@@ -880,25 +925,35 @@ def _guardrail_run(
     else:
         h, mat = 0.94, 'rail_silver'
 
+    if length < 0.02:
+        if m.detail and collide:
+            m.pose = ((p0[0] + p1[0]) * 0.5, base_y, (p0[1] + p1[1]) * 0.5, yaw)
+            m.coll_box(0.0, -0.08, 0.0, coll_w, h + 0.12, length + 0.04)
+            m.pose = (0.0, 0.0, 0.0, 0.0)
+        return
+
     # LOD1: lightweight long-span rail + sparse posts (cuts far-field tris by >8x)
     if not m.detail:
         segs = max(1, round(length / 4.8))
         seg_len = length / segs
+        bar_len = max(0.02, seg_len - 0.02)
         for s_idx in range(segs):
             mx = p0[0] + dx * (s_idx + 0.5) / segs
             mz = p0[1] + dz * (s_idx + 0.5) / segs
             m.pose = (mx, base_y, mz, yaw)
-            m.v_bar(0.0, 0.08, 0.048, 0.0, 0.044, seg_len - 0.02, mat)
-            m.v_bar(0.0, h - 0.055, 0.052, 0.0, 0.046, seg_len - 0.02, mat)
-            m.v_bar(0.0, -0.02, h + 0.04, -seg_len * 0.5, 0.068, 0.068, mat)
-            if s_idx == segs - 1:
-                m.v_bar(0.0, -0.02, h + 0.04, seg_len * 0.5, 0.068, 0.068, mat)
+            m.box(0.0, 0.08, 0.0, 0.044, 0.048, bar_len, mat)
+            m.box(0.0, h - 0.055, 0.0, 0.046, 0.052, bar_len, mat)
+            if seg_len >= 0.15:
+                m.v_bar(0.0, -0.02, h + 0.04, -seg_len * 0.5, 0.068, 0.068, mat)
+                if s_idx == segs - 1:
+                    m.v_bar(0.0, -0.02, h + 0.04, seg_len * 0.5, 0.068, 0.068, mat)
         m.pose = (0.0, 0.0, 0.0, 0.0)
         return
 
     # LOD0: finely segmented see-through posts, plinths, rails & pickets / open Guilin medallions
     segs = max(1, round(length / 2.25))
     seg_len = length / segs
+    bar_len = max(0.02, seg_len - 0.02)
     for s_idx in range(segs):
         mx = p0[0] + dx * (s_idx + 0.5) / segs
         mz = p0[1] + dz * (s_idx + 0.5) / segs
@@ -907,30 +962,31 @@ def _guardrail_run(
         if collide:
             m.coll_box(0.0, -0.08, 0.0, coll_w, h + 0.12, seg_len + 0.04)
 
-        m.v_bar(0.0, 0.08, 0.048, 0.0, 0.045, seg_len - 0.02, mat)
-        m.v_bar(0.0, h - 0.055, 0.055, 0.0, 0.048, seg_len - 0.02, mat)
+        m.box(0.0, 0.08, 0.0, 0.045, 0.048, bar_len, mat)
+        m.box(0.0, h - 0.055, 0.0, 0.048, 0.055, bar_len, mat)
 
-        post_zs = (-seg_len * 0.5, seg_len * 0.5) if s_idx == segs - 1 else (-seg_len * 0.5,)
-        for lz in post_zs:
-            m.box(0.0, -0.06, lz, 0.16, 0.13, 0.22, 'rail_base')
-            m.v_bar(0.0, -0.02, h + 0.04, lz, 0.068, 0.068, mat)
+        if seg_len >= 0.15:
+            post_zs = (-seg_len * 0.5, seg_len * 0.5) if s_idx == segs - 1 else (-seg_len * 0.5,)
+            for lz in post_zs:
+                m.box(0.0, -0.06, lz, 0.16, 0.13, 0.22, 'rail_base')
+                m.v_bar(0.0, -0.02, h + 0.04, lz, 0.068, 0.068, mat)
 
         if style == 'ped_white':
-            n_pickets = 5
+            n_pickets = 5 if seg_len >= 1.2 else max(0, min(4, round(seg_len / 0.38) - 1))
             for pi in range(1, n_pickets + 1):
                 pz = -seg_len * 0.5 + (pi / (n_pickets + 1)) * seg_len
                 m.v_bar(0.0, 0.085, h - 0.135, pz, 0.024, 0.024, mat)
             if s_idx in banner_spans and seg_len >= 1.4:
                 m.box(0.0, 0.54, 0.0, 0.04, 0.44, min(1.30, seg_len - 0.3), 'rail_white')
                 m.pose = (mx + math.cos(yaw) * 0.028, base_y, mz - math.sin(yaw) * 0.028, yaw + math.pi * 0.5)
-                m.shop_sign_quad(0.0, 0.56, 0.005, min(1.24, seg_len - 0.36), 0.40, 'sign_rail_banner', double_sided=True)
+                m.shop_sign_quad(0.0, 0.56, 0.005, min(1.24, seg_len - 0.36), 0.40, 'sign_rail_banner', double_sided=True, back_offset=0.066)
                 m.pose = (mx, base_y, mz, yaw)
         elif style == 'planter_green':
-            n_pickets = 4
+            n_pickets = 4 if seg_len >= 1.2 else max(0, min(3, round(seg_len / 0.45) - 1))
             for pi in range(1, n_pickets + 1):
                 pz = -seg_len * 0.5 + (pi / (n_pickets + 1)) * seg_len
                 m.v_bar(0.0, 0.085, h - 0.135, pz, 0.022, 0.022, mat)
-        else:
+        elif seg_len >= 0.70:
             # Open Guilin medallion center diamond/circle frame welded to top rail (floor=-0.06 -> 0 floating risk)
             mid_y = 0.715
             top_y = h - 0.055
@@ -1029,7 +1085,7 @@ def _populate_planter_shrubs(m: ShizijieBuilder, curb_poly, y_base: float, flowe
             pt = Point(jx, jz)
             if not curb_poly.contains(pt):
                 continue
-            d_edge = curb_poly.exterior.distance(pt)
+            d_edge = curb_poly.boundary.distance(pt)
             if d_edge < 0.20:
                 continue
             max_r = (d_edge - 0.04) / 1.22
@@ -1046,7 +1102,7 @@ def _populate_planter_shrubs(m: ShizijieBuilder, curb_poly, y_base: float, flowe
             idx += 1
     if idx == 0:
         rp = curb_poly.representative_point()
-        d_rp = curb_poly.exterior.distance(rp)
+        d_rp = curb_poly.boundary.distance(rp)
         if d_rp >= 0.18:
             r = min(0.56, (d_rp - 0.04) / 1.22)
             _shrub_mound(m, rp.x, y_base, rp.y, r, 0.32, r, 'foliage_dark')
@@ -1065,11 +1121,12 @@ def _build_island_landscaping(m: ShizijieBuilder, u_road0, u_sw):
             curb = max(get_parts(curb), key=lambda g: g.area) if not curb.is_empty else part
             if curb.area < 1.5:
                 continue
-            coords = list(curb.simplify(0.22 if m.detail else 0.55).exterior.coords)
-            m.prism(coords, -0.06, 0.40, 'granite_curb', collide=True, cap_mat='soil_mulch')
+            curb_poly = curb.simplify(0.22 if m.detail else 0.55, preserve_topology=True)
+            if curb_poly.is_empty or curb_poly.geom_type != 'Polygon':
+                continue
+            m.prism_polygon(curb_poly, -0.06, 0.40, 'granite_curb', collide=True, cap_mat='soil_mulch')
             if not m.detail:
                 continue
-            curb_poly = Polygon(coords)
             flower_mat = 'flower_red' if corner in (0, 2) else 'flower_boug'
             _populate_planter_shrubs(m, curb_poly, 0.30, flower_mat, step=1.18 if curb_poly.area > 16.0 else 0.90)
 
@@ -1098,10 +1155,11 @@ def _build_median_planter_strip(m: ShizijieBuilder, zone_poly, rail_style: str, 
     if not zone_poly.is_empty and zone_poly.area >= 2.2:
         best = max(get_parts(zone_poly), key=lambda g: g.area)
         if best.area >= 2.2:
-            coords = list(best.simplify(0.25 if m.detail else 0.55).exterior.coords)
-            m.prism(coords, -0.06, 0.40, 'granite_curb', collide=True, cap_mat='soil_mulch')
-            if m.detail:
-                _populate_planter_shrubs(m, Polygon(coords), 0.30, 'flower_boug', step=0.95)
+            med_poly = best.simplify(0.25 if m.detail else 0.55, preserve_topology=True)
+            if not med_poly.is_empty and med_poly.geom_type == 'Polygon':
+                m.prism_polygon(med_poly, -0.06, 0.40, 'granite_curb', collide=True, cap_mat='soil_mulch')
+                if m.detail:
+                    _populate_planter_shrubs(m, med_poly, 0.30, 'flower_boug', step=0.95)
     _guardrail_polyline(m, rail_pts, safe_zone=zone_poly, style=rail_style, collide=True, coll_w=0.014)
 
 
@@ -1111,10 +1169,13 @@ def _deploy_sidewalk_and_median_guardrails(m: ShizijieBuilder, u_road0, u_sw, u_
     divider_box = box(-62.0, -58.0, 68.0, 54.0)
     corner_r0_box = box(-44.0, -32.0, 44.0, 40.0)
     ebike_open_box = box(88.5, -4.0, 108.0, 26.0)
+    culture_alley_box = box(85.5, 36.0, 103.5, 52.0)
     nikoniko_zone = box(-140.0, 10.0, -61.5, 95.0)
-    roadside_excl = unary_union([ebike_open_box, nikoniko_zone])
+    roadside_excl = unary_union([ebike_open_box, culture_alley_box, nikoniko_zone])
     # Strictly inside cycle lane and >=12cm away from sw & >=9cm away from road0 -> 0.00 m2 audit overlap
     safe_cycle = u_cycle.difference(u_sw.buffer(0.12)).difference(u_road0.buffer(0.09))
+    safe_curb_outer = core_box.difference(u_sw.buffer(0.02)).difference(u_road0.buffer(0.04))
+    street_union = unary_union([u_road0, u_cycle])
 
     for sw_poly in get_parts(u_sw.intersection(core_box)):
         if sw_poly.area < 36.0:
@@ -1130,6 +1191,7 @@ def _deploy_sidewalk_and_median_guardrails(m: ShizijieBuilder, u_road0, u_sw, u_
             .intersection(corner_r0_box)
         )
 
+        sw_emitted = []
         for is_cycle_side, geom in ((True, b_cy), (False, b_r0)):
             if not is_cycle_side and is_divider_island:
                 continue
@@ -1174,6 +1236,66 @@ def _deploy_sidewalk_and_median_guardrails(m: ShizijieBuilder, u_road0, u_sw, u_
                     coll_w=0.014 if is_cycle_side else 0.008,
                     banner_spans=banners,
                 )
+                line_geom = LineString(shifted)
+                clipped_rec = line_geom.intersection(safe_cycle) if is_cycle_side else line_geom
+                for rec_part in get_parts(clipped_rec):
+                    if rec_part.geom_type in ('LineString', 'LinearRing') and rec_part.length >= 1.1:
+                        sw_emitted.append(rec_part)
+
+        # Seal remaining outer-sidewalk verge/transition curb gaps cleanly (0 road0/sw overlap, continuous enclosure)
+        if not is_divider_island and sw_poly.area >= 48.0:
+            curb_all = sw_poly.boundary.intersection(street_union.buffer(0.45)).difference(roadside_excl)
+            curb_gaps = curb_all.difference(unary_union(sw_emitted).buffer(0.18)) if sw_emitted else curb_all
+            raw_gaps = [g for g in get_parts(curb_gaps) if g.geom_type in ('LineString', 'LinearRing') and g.length > 0.35]
+            if raw_gaps:
+                for ls in get_parts(linemerge(raw_gaps)):
+                    if ls.length < 0.6:
+                        continue
+                    coords = list(ls.simplify(0.20 if m.detail else 0.50, preserve_topology=False).coords)
+                    shifted = []
+                    for idx, (cx, cz) in enumerate(coords):
+                        p_prev = coords[max(0, idx - 1)]
+                        p_next = coords[min(len(coords) - 1, idx + 1)]
+                        tx, tz = p_next[0] - p_prev[0], p_next[1] - p_prev[1]
+                        tlen = math.hypot(tx, tz) or 1.0
+                        nx, nz = -tz / tlen, tx / tlen
+                        chosen = None
+                        for off in (0.10, 0.06, 0.03):
+                            c_pos = Point(cx + nx * off, cz + nz * off)
+                            c_neg = Point(cx - nx * off, cz - nz * off)
+                            if safe_curb_outer.contains(c_pos):
+                                chosen = (c_pos.x, c_pos.y)
+                                break
+                            if safe_curb_outer.contains(c_neg):
+                                chosen = (c_neg.x, c_neg.y)
+                                break
+                        if chosen is None:
+                            c_pos = Point(cx + nx * 0.04, cz + nz * 0.04)
+                            c_neg = Point(cx - nx * 0.04, cz - nz * 0.04)
+                            chosen = (c_pos.x, c_pos.y) if not u_sw.contains(c_pos) else (c_neg.x, c_neg.y)
+                        shifted.append(chosen)
+                    if len(shifted) >= 2:
+                        a0, a1 = shifted[0], shifted[1]
+                        la = math.hypot(a1[0] - a0[0], a1[1] - a0[1]) or 1.0
+                        ext0 = (a0[0] - (a1[0] - a0[0]) / la * 0.16, a0[1] - (a1[1] - a0[1]) / la * 0.16)
+                        if safe_curb_outer.contains(Point(ext0)):
+                            shifted[0] = ext0
+                        b0, b1 = shifted[-2], shifted[-1]
+                        lb = math.hypot(b1[0] - b0[0], b1[1] - b0[1]) or 1.0
+                        ext1 = (b1[0] + (b1[0] - b0[0]) / lb * 0.16, b1[1] + (b1[1] - b0[1]) / lb * 0.16)
+                        if safe_curb_outer.contains(Point(ext1)):
+                            shifted[-1] = ext1
+                    sealed = LineString(shifted).intersection(safe_curb_outer)
+                    for part in get_parts(sealed):
+                        if part.geom_type in ('LineString', 'LinearRing') and part.length >= 0.45:
+                            _guardrail_polyline(
+                                m,
+                                list(part.coords),
+                                safe_zone=None,
+                                style='ped_white',
+                                collide=True,
+                                coll_w=0.014,
+                            )
 
     forbidden = unary_union([u_road0, u_sw])
     north_med_zone = box(4.0, -56.0, 18.0, -17.0).difference(forbidden.buffer(0.18))
