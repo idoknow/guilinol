@@ -9,10 +9,10 @@ from PIL import Image, ImageDraw, ImageFont
 from pack_landmarks import read_glb, write_glb
 
 ROOT = Path(__file__).resolve().parents[1]
-MODELS = ROOT / 'web/public/models'
+MODELS = ROOT / 'public/models'
 PALETTE = dict(paint='f2f1e9', jade='6c9c97', ink='243d40', rubber='252b30',
-               alloy='88969b', leather='495f62', piping='b1b9a8', glass='6a9da9',
-               blur='788687', red='ff3430', green='3cff80', white='fff4cc', gold='ecc15b')
+               alloy='88969b', leather='495f62', piping='b1b9a8', glass='81b6c6',
+               glazing_edge='388b8f', webbing='36444d', blur='788687', red='ff3430', green='3cff80', white='fff4cc', gold='ecc15b')
 
 
 class Aircraft:
@@ -28,7 +28,7 @@ class Aircraft:
         for name, color in PALETTE.items():
             srgb = np.frombuffer(bytes.fromhex(color), dtype=np.uint8) / 255
             linear = np.where(srgb <= .04045, srgb / 12.92, ((srgb + .055) / 1.055)**2.4)
-            alpha = {'glass': .30 if lod == 0 else 1, 'blur': .16}.get(name, 1)
+            alpha = {'glass': .18 if lod == 0 else 1, 'blur': .16}.get(name, 1)
             pbr = dict(baseColorFactor=[*linear, alpha], metallicFactor=.55 if name == 'alloy' else .06,
                        roughnessFactor=.21 if name == 'glass' else .65)
             mat = dict(name=name, doubleSided=True, pbrMetallicRoughness=pbr)
@@ -61,8 +61,8 @@ class Aircraft:
         sides = sides or (12, 6, 3)[self.lod]
         self.add(trimesh.creation.cylinder(radius, sections=sides, segment=[a, b]), mat, frame)
 
-    def oval(self, center, radii, mat, frame='airframe'):
-        mesh = trimesh.creation.uv_sphere(count=[20, 24] if not self.lod else [6, 8])
+    def oval(self, center, radii, mat, frame='airframe', count=None):
+        mesh = trimesh.creation.uv_sphere(count=count or ([20, 24] if not self.lod else [6, 8]))
         self.add(mesh.apply_scale(radii).apply_translation(center), mat, frame)
 
     def surface(self, vertices, faces, mat, frame='airframe'):

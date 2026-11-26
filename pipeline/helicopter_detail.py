@@ -22,28 +22,39 @@ def blade_mesh(h, parent, index, theta, radius, tail):
     basis = np.array([orient(1,0,0),orient(0,-1 if tail else 1,0),orient(0,0,1)]).T
     nodes[h.frames[name]]['rotation'] = Rotation.from_matrix(basis).as_quat().tolist()
     stations = [.11,.15,.21,.65,.84,.92,.96,.985,1]
-    samples = (13,6,3)[h.lod]
+    if not h.lod and not tail:
+        stations=np.unique(np.r_[np.linspace(.11,1,49),stations])
+    samples = (27 if not tail else 13,6,3)[h.lod]
     chordwise = (1-np.cos(np.linspace(0,math.pi,samples)))/2
     section = [(u,1) for u in chordwise]+[(u,-1) for u in chordwise[-2:0:-1]]
     rings = []
     for span in stations:
         chord = radius*np.interp(span,[.11,.21,.84,.985,1],[.031,.061,.057,.042,.024])*(1.8 if tail else 1)
-        twist = math.radians(13-10*span)
+        twist = math.radians(23-21*span)
         ring = []
         for u,sign in section:
             # Closed trailing edge, symmetric four-digit airfoil thickness distribution.
             thickness = sign*.65*(.2969*math.sqrt(u)-.126*u-.3516*u*u+.2843*u**3-.1036*u**4)
             z = (.25-u)*chord
             y = thickness*chord
-            ring.append((radius*span-root,y*math.cos(twist)+z*math.sin(twist),
-                         z*math.cos(twist)-y*math.sin(twist)-radius*.20*max(0,span-.84)))
+            ring.append((radius*span-root,y*math.cos(twist)+z*math.sin(twist)-radius*.56*max(0,span-.87)**1.45,
+                         z*math.cos(twist)-y*math.sin(twist)-radius*2.9*max(0,span-.79)**2))
         rings.append(ring)
     n=len(section)
-    faces=[(j,(j+1)%n,n+j) for j in range(n)]+[((j+1)%n,n+(j+1)%n,n+j) for j in range(n)]
-    for i,(a,b) in enumerate(zip(rings,rings[1:])):
-        h.surface(a+b,faces,'gold' if i==6 else 'rubber',name)
-    for ring in (rings[0],rings[-1]):
-        h.surface(ring,[(0,i,i+1) for i in range(1,n-1)],'rubber',name)
+    vertices=np.asarray(rings).reshape(-1,3)
+    by_material={}
+    for i,span in enumerate(stations[:-1]):
+        for j,(u,sign) in enumerate(section):
+            mat='gold' if span>=.96 else ('alloy' if u<=.10 else 'rubber')
+            a=i*n+j
+            b=i*n+(j+1)%n
+            by_material.setdefault(mat,[]).extend([(a,b,b+n),(a,b+n,a+n)])
+    for mat,faces in by_material.items():
+        # Reindex each strip so unused vertices do not inflate the lower LODs.
+        used,indices=np.unique(faces,return_inverse=True)
+        h.surface(vertices[used],indices.reshape(-1,3),mat,name)
+    for ring,mat in [(rings[0],'rubber'),(rings[-1],'gold')]:
+        h.surface(ring,[(0,i,i+1) for i in range(1,n-1)],mat,name)
 
 
 def blur_material(h,suffix,blades):
@@ -55,12 +66,12 @@ def blur_material(h,suffix,blades):
     MODELS.mkdir(parents=True,exist_ok=True)
     for speed in ('medium','high'):
         phase=(np.cos(blades*(theta-.18*r))*.5+.5)**(4 if speed=='medium' else 1.5)
-        alpha=(.055+(.52 if speed=='medium' else .19)*phase)*np.clip((r-.10)*8,0,1)
+        alpha=(.055+(.52 if speed=='medium' else .32)*phase)*np.clip((r-.10)*8,0,1)
         tip=np.exp(-((r-.973)/.012)**2)
         rgba=np.empty((*r.shape,4),dtype='uint8')
-        for i,(base,highlight) in enumerate(zip((56,69,71),(222,185,97))):
+        for i,(base,highlight) in enumerate(zip((95,113,122),(234,199,119))):
             rgba[:,:,i]=base+(highlight-base)*tip
-        rgba[:,:,3]=255*np.clip(alpha+.21*tip,0,1)*np.clip((1-r)*90,0,1)
+        rgba[:,:,3]=255*np.clip(alpha+.32*tip,0,1)*np.clip((1-r)*90,0,1)
         out=io.BytesIO()
         Image.fromarray(rgba).save(out,'PNG')
         data=out.getvalue()
@@ -85,7 +96,7 @@ def trim(h,skin,side,frame,pivot,z0,z1):
         profile=[point(z,a,.012) for a in np.linspace(-22,62,17)]
         for p,q in zip(profile,profile[1:]):
             h.rod(p,q,.017,'rubber',frame,10)
-    for a in (0,61):
+    for a in (63,):
         rail=[point(z,a,.010) for z in np.linspace(z0,z1,12)]
         for p,q in zip(rail,rail[1:]):
             h.rod(p,q,.021,'paint',frame,10)
@@ -97,16 +108,16 @@ def trim(h,skin,side,frame,pivot,z0,z1):
         path=np.linspace(a,b,10)
         for start,end in zip(path,path[1:]):
             p,q=point(*start),point(*end)
-            inner=np.array([-side*.024,0,0])
-            h.surface([p,q,q+inner,p+inner],[(0,1,2),(0,2,3)],'glass',frame)
-            h.rod(p,q,.023,'ink',frame,10)
-            h.rod(p+inner,q+inner,.014,'rubber',frame,8)
+            inner=np.array([-side*.038,0,0])
+            h.surface([p,q,q+inner,p+inner],[(0,1,2),(0,2,3)],'glazing_edge',frame)
+            h.rod(p,q,.029,'paint',frame,10)
+            h.rod(p+inner,q+inner,.015,'rubber',frame,8)
     # Follow the curved pane on the cabin side to give the acrylic a physical inner face.
     sections=np.linspace(z0,z1,7)
     angles=np.linspace(0,62,9)
     for za,zb in zip(sections,sections[1:]):
         for low,high in zip(angles,angles[1:]):
-            corners=[point(t,a,-.024) for t,a in [(za,low),(za,high),(zb,high),(zb,low)]]
+            corners=[point(t,a,-.038) for t,a in [(za,low),(za,high),(zb,high),(zb,low)]]
             h.surface(corners,[(2,1,0),(3,2,0)],'glass',frame)
     handle=point(z0+.18,-6,.025)
     for length in (0,.18):
@@ -118,7 +129,7 @@ def trim(h,skin,side,frame,pivot,z0,z1):
             p=point(z,a,.003)
             # Low domed flush fasteners along the painted skin, outside glass.
             if a==65:
-                p=skin(z,60,side)-pivot
+                p=point(z,63,.025)
             h.rod(p,p+[side*.012,.004,0],.011,'alloy',frame,10)
     z=(z0+z1)/2
     p=point(z,-9,-.028)
@@ -131,23 +142,7 @@ def trim(h,skin,side,frame,pivot,z0,z1):
     h.rod(p+[-side*.07,.045,-.09],p+[-side*.07,.045,.09],.023,'ink',frame)
 
 
-def upholstery(h,seats):
-    for x,y,z in seats.values():
-        # Piped upholstery flutes follow the actual front contour of the backrest.
-        for offset in (-.20,-.10,0,.10,.20):
-            seam=[]
-            for height in np.linspace(-.25,.28,11):
-                depth=.105*math.sqrt(max(0,1-(offset/.34)**2-(height/.44)**2))
-                seam.append((x+offset,y+.24+height,z-.25+depth+.002))
-            for p,q in zip(seam,seam[1:]):
-                h.rod(p,q,.004,'piping',sides=6)
-        for side in (-1,1):
-            path=np.array([(x+side*.24,y+.56,z-.167),(x+side*.22,y+.29,z-.13),
-                           (x+side*.14,y+.06,z-.13),(x+side*.07,y+.005,z+.09)])
-            for p,q in zip(path,path[1:]):
-                w=np.array([.026,0,0])
-                h.surface([p-w,p+w,q+w,q-w],[(0,1,2),(0,2,3)],'rubber')
-            h.box(path[-1],(.081,.022,.07),'alloy')
+def upholstery(h):
     for z in np.arange(-1.46,1.63,.10):
         for x in [-.77,0,.77]:
             h.rod((x-.06,.936,z-.019),(x+.06,.936,z+.019),.006,'ink',sides=6)

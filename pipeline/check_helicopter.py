@@ -66,6 +66,18 @@ def check(lod):
         assert count <= (15000 if lod==1 else 2000)
         assert 'skins' not in g and 'pilot_rig' not in nodes
     else:
+        def triangles_under(node,material=None):
+            triangles=0
+            if 'mesh' in node:
+                for primitive in g['meshes'][node['mesh']]['primitives']:
+                    if material is None or g['materials'][primitive['material']]['name']==material:
+                        triangles+=g['accessors'][primitive['indices']]['count']//3
+            return triangles+sum(triangles_under(g['nodes'][i],material) for i in node.get('children',[]))
+        skin=triangles_under(nodes['fuselage_skin'],'paint')
+        blades=[triangles_under(nodes[f'rotor_main_blade_{i}']) for i in range(1,5)]
+        lights=[triangles_under(nodes[f'nav_{key}']) for key in ('left','right','tail','beacon')]
+        assert skin>=40000 and min(blades)>=2000 and max(lights)<=300,(skin,blades,lights)
+        print(f'Fixed painted fuselage: {skin:,}; main blades: {blades}; complete lights: {lights}')
         assert count >= 100000
         assert (MODELS/'helicopter_tour.glb').stat().st_size <= 6_000_000
         assert any('meshopt_compression' in ext for ext in g['extensionsUsed'])

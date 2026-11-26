@@ -1,12 +1,12 @@
 # 观光直升机资产接口
 
-机头沿本地 +Z，+Y 朝上，+X 为驾驶员左侧，单位为米。三个 GLB 共用原点及挂点。IDOK-441 的资产产物位于 `web/public/models/`。以下 URL 是运行时约定的地址；当前 Vite 的公共目录为仓库根目录的 `public/`，接入时须同步这些文件。
+机头沿本地 +Z，+Y 朝上，+X 为驾驶员左侧，单位为米。三个 GLB 共用原点及挂点。Vite 从仓库根目录的 `public/models/` 提供下列资产。
 
 | 距离 | 模型 URL | 三角面 |
 | --- | --- | ---: |
-| 0–60 m，含蒙皮驾驶员和内饰 | `/models/helicopter_tour.glb` | 138,280 |
-| 60–250 m，外观 | `/models/helicopter_tour_lod1.glb` | 2,560 |
-| 250 m 以外，轮廓 | `/models/helicopter_tour_lod2.glb` | 752 |
+| 0–60 m，含蒙皮驾驶员和内饰 | `/models/helicopter_tour.glb` | 233,572 |
+| 60–250 m，外观 | `/models/helicopter_tour_lod1.glb` | 6,484 |
+| 250 m 以外，轮廓 | `/models/helicopter_tour_lod2.glb` | 1,280 |
 
 ## 运行时挂点
 
@@ -52,4 +52,4 @@ uv run --locked python pipeline/helicopter_tour.py
 uv run --locked python pipeline/check_helicopter.py
 ```
 
-在已安装 Chrome 的环境执行 `npm ci` 后运行 `node pipeline/helicopter_preview.mjs`，五个真实 GLB 视图输出到 `pipeline/helicopter_views/`。
+在已安装 Chrome 的环境执行 `npm ci` 后运行 `node pipeline/helicopter_preview.mjs`，七个真实 GLB 视图（含桨尖近景和深色背景双旋翼高速档）输出到 `pipeline/helicopter_views/`。
