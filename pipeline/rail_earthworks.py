@@ -92,6 +92,8 @@ def bake(world, manifest):
         )
         tile["bytes"] = f.stat().st_size
 
+    from rail_terrain_cleanup import cut_high_terrain
+    cut_high_terrain(world, manifest)
     bake_crossing_panels(world, manifest)
 
 

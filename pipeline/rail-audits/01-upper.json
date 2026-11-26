@@ -1,4 +1,5 @@
 {
+  "cutHighTerrain": true,
   "maximumGrade": 0.012,
   "railTies": {
     "375923389": [
