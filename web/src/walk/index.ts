@@ -2483,11 +2483,25 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
       wasLandmarkHit=touchedLandmark
       const nextTile=sim.tileAt(next.x,next.z)
       if(nextTile&&!stream.loaded.has(nextTile)){next.x=pos.x;next.z=pos.z;vx=vz=0;rides?.stop();bikeSpeed=0}
-      const inBore=tunnelFloor(manifest.tunnels,next.x,next.z,next.y-cfg.height/2)!==undefined
+      const nextFoot=next.y-cfg.height/2
+      const boreFloor=tunnelFloor(manifest.tunnels,next.x,next.z,nextFoot)
+      const inBore=boreFloor!==undefined
       // The shared bridge landing clips its duplicate road collider. The
       // deck under the player's feet also supports travel across this seam.
-      const ground=(inBore?sim.surface(next.x,next.z,'road',next.y+1,5):sim.surface(next.x,next.z,'ground'))
-        ?? sim.surface(next.x,next.z,'deck',next.y-cfg.height/2+.45,1.25)
+      let ground=(inBore?sim.surface(next.x,next.z,'road',next.y+1,5):sim.surface(next.x,next.z,'ground'))
+        ?? sim.surface(next.x,next.z,'deck',nextFoot+.45,1.25)
+      // A vertical ray can miss both adjoining road triangles on their seam.
+      // Require real road support on opposite sides, at the baked bore elevation.
+      if(!ground&&boreFloor!==undefined&&Math.abs(nextFoot-boreFloor)<.18){
+        for(const [dx,dz] of [[.02,0],[0,.02]]){
+          const left=sim.surface(next.x-dx,next.z-dz,'road',next.y+1,5)
+          const right=sim.surface(next.x+dx,next.z+dz,'road',next.y+1,5)
+          if(left&&right&&Math.max(Math.abs(left.y-boreFloor),Math.abs(right.y-boreFloor))<=.05){
+            ground=left
+            break
+          }
+        }
+      }
       if(!ground||next.y-cfg.height/2<ground.y-3){if(place(safe.x,safe.z,'rescue'))resets++;break}
       if(sim.wet(next.x,next.z)){
         const foot=next.y-cfg.height/2,deck=sim.surface(next.x,next.z,'deck')
