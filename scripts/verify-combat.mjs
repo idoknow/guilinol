@@ -90,7 +90,10 @@ export async function verifyCombat(rt, ticket) {
       console.log('Mouse fishing and F shop interaction passed')
       return
     }
+    // 软件渲染（无 GPU 的 Linux）下 A 全速渲染会饿死 B 的加载，B 进场期间先冻结 A
+    await a.evaluate(() => window.viewer.freeze?.())
     const b = await join(100002, -0.31, Math.PI)
+    await a.evaluate(() => window.viewer.resume?.())
     await a.waitForFunction(() => window.viewer.walk.net.probe().some((p) => p.ready))
     const pos = (p) => p.evaluate(() => window.viewer.walk.position).then(({ x, z }) => [x, z])
     async function move(page, ms) {
@@ -116,7 +119,7 @@ export async function verifyCombat(rt, ticket) {
           await b.waitForFunction(
             () => parseInt(document.querySelector('.cb-hp-text').textContent) < 100,
             null,
-            { timeout: 3500 },
+            { timeout: Number(process.env.COMBAT_WAIT_MS ?? 3500) },
           )
           await Promise.all([shot(a, 'strike'), shot(b, 'stagger')])
         }
@@ -133,6 +136,8 @@ export async function verifyCombat(rt, ticket) {
     await a.keyboard.press('Enter')
     await a.locator('.chat-input').waitFor({ state: 'visible' })
     await a.locator('.chat-input').focus()
+    // openChat 在下一帧才聚焦；低帧率下这一帧可能晚于 Escape 把焦点抢回输入框，先等它落地
+    await a.evaluate(() => new Promise((done) => requestAnimationFrame(() => done())))
     await a.keyboard.press('e')
     await a.keyboard.press('f')
     await a.keyboard.press('Escape')
