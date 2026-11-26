@@ -8,61 +8,34 @@ import json
 from pathlib import Path
 
 import numpy as np
-from shapely import LineString, Point, STRtree, box, union_all
+from shapely import LineString, Point, Polygon, STRtree, box, polygons, union_all
 
-from check_rail_platforms import pavement, rail_chords
+from check_rail_platforms import pavement, pavement_triangles, rail_chords
 from common import load_osm
 from features import area
+from island_transects import transects
 
 
-def transects(polygon, axes):
-    corners = np.asarray(polygon.minimum_rotated_rectangle.exterior.coords)
-    edges = np.diff(corners, axis=0)
-    axis = edges[np.argmax(np.linalg.norm(edges, axis=1))]
-    axis = axis / np.linalg.norm(axis)
-    normal = np.array([-axis[1], axis[0]])
-    origin = np.asarray(polygon.centroid.coords[0])
-    outline = np.asarray(polygon.exterior.coords) - origin
-    lower, upper = np.min(outline @ axis), np.max(outline @ axis)
-    reach = np.max(abs(outline @ normal)) + 16
-    tree = STRtree(axes)
-    # On each straight track chord the railhead varies linearly. Include the
-    # projected chord ends along with the half-metre survey and polygon corners.
-    stations = list(np.arange(lower + .25, upper, .5)) + list(outline @ axis)
-    for i in tree.query(polygon.buffer(16), predicate='intersects'):
-        stations.extend((np.asarray(axes[i].coords) - origin) @ axis)
-    for station in np.unique(np.round(stations, 6)):
-        if not lower < station < upper:
-            continue
-        center = origin + station * axis
-        cut = LineString([center - normal * reach, center + normal * reach])
-        span = polygon.intersection(cut)
-        if span.geom_type != 'LineString' or span.length < .5:
-            continue
-        ends = np.sort((np.asarray(span.coords) - center) @ normal)[[0, -1]]
-        sides = [[], []]
-        for i in tree.query(cut, predicate='intersects'):
-            line = axes[i]
-            direction = np.diff(line.coords, axis=0)[0]
-            if abs(direction @ axis) < .9 * line.length:
-                continue
-            pt = cut.intersection(line)
-            if not isinstance(pt, Point):
-                continue
-            across = (np.array(pt.coords[0]) - center) @ normal
-            side = int(across > ends.mean())
-            gap = (across - ends[side]) * (1 if side else -1)
-            # A boarding edge must face its adjacent rail, not another track
-            # beyond a siding or across a neighbouring platform.
-            if -.1 <= gap <= 16:
-                sides[side].append((abs(gap), i, line.project(pt, normalized=True)))
-        if not all(sides):
-            yield None
-            continue
-        left, right = (min(side)[1:] for side in sides)
-        start, stop = ends + [.08, -.08]
-        probes = center + np.linspace(start, stop, int(np.ceil((stop-start)/.25))+1)[:, None]*normal
-        yield probes, left, right
+def rail_head_clearance(world, polygon, material, envelope):
+    # The baked sidewalk rings are quantized to centimetres. Include their
+    # rounded perimeter when identifying paving on the mapped platform.
+    outline = polygon.buffer(.008, join_style="mitre")
+    chords = rail_chords(world, outline.buffer(envelope), include_structures=True)
+    bands = [LineString([key[:2], key[2:]]).buffer(envelope, cap_style="flat")
+             for key in chords]
+    zone = outline.intersection(union_all(bands))
+    if zone.is_empty or zone.area == 0:
+        return dict(overlapM2=0., conflicts=[])
+    triangles = pavement_triangles(world, [zone.bounds], material)
+    footprints = polygons(triangles[:, :, [0, 2]])
+    indices = STRtree(footprints).query(zone, predicate="intersects")
+    overlap = union_all(footprints[indices]).intersection(zone)
+    conflicts = []
+    for key, band in zip(chords, bands):
+        patch = band.intersection(overlap)
+        if patch.area > 1e-8:
+            conflicts.append(dict(chordXZ=key, overlapM2=patch.area))
+    return dict(overlapM2=overlap.area, conflicts=conflicts)
 
 
 def inspect(base, world, polygon, material, boarding_step=None):
@@ -138,8 +111,11 @@ if __name__ == '__main__':
     parser.add_argument('world', type=Path)
     args = parser.parse_args()
     manifest = json.loads((args.base / 'manifest.json').read_bytes())
+    outlines = json.loads((args.world / "manifest.json").read_bytes()).get("platformOutlines", {})
     size = manifest['chunkSize']
     domain = union_all([box(t['x'], t['z'], t['x']+size, t['z']+size) for t in manifest['chunks']])
+    style = json.loads(Path(__file__).with_name("railway-style.json").read_bytes())
+    envelope = style["gauge"]/2 + style["headWidth"] + .10
     report = {}
     for way in load_osm():
         tags = way.get('tags', {})
@@ -158,7 +134,12 @@ if __name__ == '__main__':
             passenger_islands = {375922212, 375922214, 375922215, 375922217, 375922218,
                                   375922219, 375922220, 376029419, 376029420}
             step = 1.2500030517578125 if way['id'] in passenger_islands else None
-            result = inspect(args.base.resolve(), args.world.resolve(), polygon, material, step)
+            ring = outlines.get(str(way["id"]))
+            finished_outline = Polygon(ring) if ring else polygon
+            result = inspect(args.base.resolve(), args.world.resolve(), finished_outline, material, step)
+            clearance = rail_head_clearance(args.world.resolve(), polygon.union(finished_outline), material, envelope)
+            result["railHeadClearance"] = clearance
+            result.setdefault("violations", {})["railHeadEnvelope"] = len(clearance["conflicts"])
         report[way['id']] = result
     print(json.dumps(report, indent=2, allow_nan=False))
     raise SystemExit(any(any(row.get('violations', {}).values()) for row in report.values()))

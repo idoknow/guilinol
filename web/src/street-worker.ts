@@ -95,7 +95,8 @@ export function streetGeometry([paths,lamps,banks,signals=[],stops=[],roadCtrl,s
   function triangle(first:THREE.Vector3,second:THREE.Vector3,third:THREE.Vector3,kind:number,u1=0,u2=0,u3=0,vertical=false){
     if(kind===1 && paving?.platformGrades) {
       const grades=paving.platformGrades
-      const shift=(p:THREE.Vector3)=>platformShift(grades,p.x,p.z)
+      const shift=(p:THREE.Vector3)=>platformShift(grades,p.x,p.z,vertical ? baseLevel(p.x,p.z)+.195 : p.y)
+      const tolerance=grades.some(g=>g.along) ? .0008 : .006
       const heights=[shift(first),shift(second),shift(third)]
       const vertices=[first,second,third]
       // Preserve the original pavement plane when adding a vertex at a change of grade.
@@ -103,7 +104,7 @@ export function streetGeometry([paths,lamps,banks,signals=[],stops=[],roadCtrl,s
       if(mids.some((mid,i)=>{
         const j=(i+1)%3
         return Math.hypot(vertices[i].x-vertices[j].x,vertices[i].z-vertices[j].z)>.25
-          && Math.abs(shift(mid)-(heights[i]+heights[j])/2)>.006
+          && Math.abs(shift(mid)-(heights[i]+heights[j])/2)>tolerance
       })){
         const [ab,bc,ca]=mids
         const uab=(u1+u2)/2, ubc=(u2+u3)/2, uca=(u3+u1)/2
@@ -136,7 +137,7 @@ export function streetGeometry([paths,lamps,banks,signals=[],stops=[],roadCtrl,s
       const x2=Math.fround(p2.x),y2=Math.fround(p2.y),z2=Math.fround(p2.z)
       const x3=Math.fround(p3.x),y3=Math.fround(p3.y),z3=Math.fround(p3.z)
       const ny=(z2-z1)*(x3-x1)-(x2-x1)*(z3-z1)
-      if(Math.abs(ny)<1e-4)return
+      if(Math.abs(ny)<(kind===1 && paving?.platformGrades?.some(g=>g.along) ? 1e-9 : 1e-4))return
       if(ny<0){const tmp=p2;p2=p3;p3=tmp;const tu=a2;a2=a3;a3=tu}
       void y1;void y2;void y3
     }

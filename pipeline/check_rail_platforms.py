@@ -14,30 +14,34 @@ from features import area
 ROOT = Path(__file__).resolve().parents[1]
 
 
-def rail_chords(world, region):
+def rail_chords(world, region, *, include_structures=False):
     chords = {}
     for tile in json.loads((world / "manifest.json").read_bytes())["chunks"]:
         x, z = tile["x"], tile["z"]
         if not box(x, z, x + 256, z + 256).intersects(region):
             continue
         for ax, az, ah, bx, bz, bh, _, flags, *_ in tile_rails(world, tile):
-            if flags & 3:
+            if not include_structures and flags & 3:
                 continue
             key = (x + ax / 100, z + az / 100, x + bx / 100, z + bz / 100)
             chords[key] = [ah / 100, bh / 100]
     return chords
 
 
-def pavement(world, bounds, xy, role="paving-1"):
+def pavement_triangles(world, bounds, role):
     command = [ROOT / "node_modules/.bin/tsx", ROOT / "scripts/approach-faces.ts", world]
     if role == "paving-9":
         command.append("--platform-bricks")
     output = subprocess.check_output(command,
                                      cwd=ROOT, input=json.dumps(bounds).encode())
     faces = [tri for material, tri in map(json.loads, output.splitlines()) if material == role]
-    if not faces:
+    return np.asarray(faces).reshape(-1, 3, 3)
+
+
+def pavement(world, bounds, xy, role="paving-1"):
+    triangles = pavement_triangles(world, bounds, role)
+    if not len(triangles):
         return np.full(len(xy), -np.inf)
-    triangles = np.array(faces)
     footprint = triangles[:, :, [0, 2]]
     basis = footprint[:, 1:] - footprint[:, :1]
     valid = abs(np.linalg.det(basis)) > 1e-7

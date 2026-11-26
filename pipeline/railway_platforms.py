@@ -15,14 +15,22 @@ from service_streets import rings
 from station_site import platform_walking_area
 
 
-def bake(output, chunks, region):
+def bake(output, manifest, region):
+    chunks = manifest["chunks"]
     ways = load_osm()
     crossings = json.loads((Path(__file__).resolve().parents[1]/'docs/railway-crossings.json').read_bytes())
     road_ids = {row['road'] for row in crossings if row['status']!='construction_unverified'}
     roads = [LineString(points(way)).buffer(max(4.5,road_radius(way['tags'])+1.5))
              for way in ways if way['type']=='way' and way['id'] in road_ids]
     corridors = STRtree(roads)
-    platforms = union_all([platform_walking_area(way) for way in ways
+    outlines = json.loads(Path(__file__).with_name('platform-outlines.json').read_bytes())
+    manifest['platformOutlines'] = {wid: row['ring'] for wid, row in outlines.items()}
+    def walking_area(way):
+        shape = platform_walking_area(way)
+        correction = outlines.get(str(way['id']))
+        return shape.intersection(Polygon(correction['ring'])) if correction else shape
+
+    platforms = union_all([walking_area(way) for way in ways
                            if way['type'] == 'way' and way.get('tags', {}).get('railway') == 'platform'
                            and way['tags'].get('monorail') != 'yes']).intersection(region)
     station = union_all([area(w) for w in ways if w['type']=='way' and w['id'] in (376029417,376029418,376029419,376029420)])
