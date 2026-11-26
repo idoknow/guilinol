@@ -593,6 +593,14 @@ def run_audit(world_dir: Path, root: Path) -> dict:
     # class width here would put the outer probe on an adjacent access ramp.
     paired_widths = {s['way']: s['pairedWidth'] for s in station_sections if s.get('pairedWidth')}
 
+    # A fitted approach can cover only part of a highway way. Use the baked
+    # carriageway width on that part, including single-carriageway ramps.
+    approach_widths = defaultdict(list)
+    for section in station_sections:
+        if section.get('gradedLanding') and section.get('footprint'):
+            footprint = union_all([Polygon(ring) for ring in section['footprint']])
+            approach_widths[section['way']].append((footprint, 2 * section['halfWidth']))
+
     def road_surface_y(x: float, z: float, is_bridge: bool, way_id: int) -> float:
         station_level = station_surface(way_id,x,z)
         if station_level is not None:
@@ -631,7 +639,7 @@ def run_audit(world_dir: Path, root: Path) -> dict:
         hs = np.zeros(n_pts, dtype=np.float64)
         xs = np.zeros(n_pts, dtype=np.float64)
         zs = np.zeros(n_pts, dtype=np.float64)
-        half_span = max(1.0, 0.45 * paired_widths.get(way_id, width_m))
+        default_width = paired_widths.get(way_id, width_m)
 
         for i, s in enumerate(dists):
             pt = seg.interpolate(s)
@@ -644,6 +652,9 @@ def run_audit(world_dir: Path, root: Path) -> dict:
             tx_d, tz_d = p_next.x - p_prev.x, p_next.y - p_prev.y
             t_len = math.hypot(tx_d, tz_d)
             if t_len > 1e-4 and not is_bridge:
+                width = next((w for footprint, w in approach_widths.get(way_id, ())
+                              if footprint.covers(pt)), default_width)
+                half_span = max(1.0, 0.45 * width)
                 nx_d, nz_d = -tz_d / t_len, tx_d / t_len
                 lx, lz = pt.x - nx_d * half_span, pt.y - nz_d * half_span
                 rx, rz = pt.x + nx_d * half_span, pt.y + nz_d * half_span
