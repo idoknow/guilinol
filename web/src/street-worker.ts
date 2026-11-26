@@ -1,3 +1,4 @@
+import {platformShift, type PlatformGrade} from './platform-grade'
 import {panelCut} from './crossing-panels'
 import {stationShoulders,type ShoulderPlane} from './station-shoulders'
 import style from '../../pipeline/railway-style.json'
@@ -10,7 +11,7 @@ import {isShizijieCrosswalkRing,isShizijieDecorSuppressed,isShizijieSignalSuppre
 import * as THREE from 'three'
 import {look} from './look/config'
 type Pair=[number,number]
-export interface StationPavingStyle {plaza?:Pair[]; platformEdges?:[Pair,Pair][]}
+export interface StationPavingStyle {plaza?:Pair[]; platformEdges?:[Pair,Pair][]; platformGrades?:PlatformGrade[]}
 type Path=[number,...Pair[][]]
 type RoadCtrl=[number,number[]]
 type Lower=[number,Pair[],[number,number,number,number][]]
@@ -92,6 +93,29 @@ export function streetGeometry([paths,lamps,banks,signals=[],stops=[],roadCtrl,s
   const surfaceKinds:number[]=[],alongVals:number[]=[]
   const fenceXyz:number[]=[],fenceRgb:number[]=[],fenceAlong:number[]=[]
   function triangle(first:THREE.Vector3,second:THREE.Vector3,third:THREE.Vector3,kind:number,u1=0,u2=0,u3=0,vertical=false){
+    if(kind===1 && paving?.platformGrades) {
+      const grades=paving.platformGrades
+      const shift=(p:THREE.Vector3)=>platformShift(grades,p.x,p.z)
+      const heights=[shift(first),shift(second),shift(third)]
+      const vertices=[first,second,third]
+      // Preserve the original pavement plane when adding a vertex at a change of grade.
+      const mids=vertices.map((v,i)=>v.clone().lerp(vertices[(i+1)%3],.5))
+      if(mids.some((mid,i)=>{
+        const j=(i+1)%3
+        return Math.hypot(vertices[i].x-vertices[j].x,vertices[i].z-vertices[j].z)>.25
+          && Math.abs(shift(mid)-(heights[i]+heights[j])/2)>.006
+      })){
+        const [ab,bc,ca]=mids
+        const uab=(u1+u2)/2, ubc=(u2+u3)/2, uca=(u3+u1)/2
+        triangle(first,ab,ca,kind,u1,uab,uca,vertical)
+        triangle(ab,second,bc,kind,uab,u2,ubc,vertical)
+        triangle(ca,bc,third,kind,uca,ubc,u3,vertical)
+        triangle(ab,bc,ca,kind,uab,ubc,uca,vertical)
+        return
+      }
+      first=first.clone();second=second.clone();third=third.clone()
+      first.y+=heights[0];second.y+=heights[1];third.y+=heights[2]
+    }
     if(remaining && (kind===0||kind===5) && !vertical){
       for(const poly of remaining(first,second,third))
         for(let k=1;k<poly.length-1;k++)emit(poly[0],poly[k],poly[k+1],kind,u1,u2,u3,false)
