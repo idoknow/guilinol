@@ -16,7 +16,6 @@ import {
   indoorToWorld,
   portalLanding,
   rotateLocal,
-  shouldEnterPortal,
   validateXxgLayout,
   worldToIndoor,
   worldToPortalLocal,
@@ -51,7 +50,6 @@ export {
   indoorToWorld,
   portalLanding,
   rotateLocal,
-  shouldEnterPortal,
   validateXxgLayout,
   worldToIndoor,
   worldToPortalLocal,
@@ -91,8 +89,6 @@ export interface CreateXxgIndoorSceneOptions {
   readonly layout?: XxgLayout
   /** Override veilFadeInMs in unit tests; defaults to XXG_TIMING.veilFadeInMs (280ms). */
   readonly veilFadeInMs?: number
-  /** Override reenterCooldownMs in unit tests; defaults to XXG_TIMING.reenterCooldownMs (1500ms). */
-  readonly reenterCooldownMs?: number
   readonly now?: () => number
   /** 室内限流人群上限；0 关闭人群，缺省 XXG_CROWD_MAX（18）。 */
   readonly crowdMaxAgents?: number
@@ -107,11 +103,14 @@ export interface XxgPlayerSnapshot {
   readonly eyeY: number
   readonly yaw: number
   readonly pitch: number
+  /** Indoor camera FOV: the street FOV on a well landing, XXG_PLAYER.fovDeg in the mall. */
+  readonly fovDeg: number
   readonly ceilingClearanceM: number
   readonly activePortalId: XxgPortalId | null
   readonly activeShopId: string | null
   readonly collisionContacts: number
-  readonly descending: boolean
+  /** Eased opening (0 shut, 1 open) of each well's B1 glass door, in XXG_PORTAL_IDS order. */
+  readonly doorsOpen: readonly number[]
 }
 
 export interface XxgExtendedIndoorScene extends XxgIndoorScene {

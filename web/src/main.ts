@@ -62,6 +62,7 @@ import {mountStats} from './ui/stats'
 import {mountHotkeys} from './ui/hotkeys'
 import {mountLazyTianyuanMifen} from './mifen/entry'
 import {mountLazyXiaoxianggang} from './xiaoxianggang/entry'
+import {xxgGroundStairwells} from './xiaoxianggang/frame'
 import {mountLazyShizijie} from './shizijie/entry'
 import {shouldMountDrinksShop} from './drinks/site'
 import {
@@ -85,6 +86,10 @@ import {isDown as isKnockdownDown, knockdown, triggerKnockdown} from './walk/kno
 import {mountChat} from './ui/chat'
 import {mountGuide} from './ui/guide'
 import {touchUi} from './ui/input-mode'
+import {registerGroundStairwells} from './tunnels'
+
+// 小香港四个真楼梯井：地形开洞 + 隐形坡道碰撞必须在首批区块生成前登记。
+registerGroundStairwells('xxg',xxgGroundStairwells())
 
 export let spawnCreatedCharacter:()=>Promise<void>=async()=>{}
 let titleTransition:{signal:AbortSignal;cancel:()=>void;view?:Veil}|undefined
@@ -767,7 +772,7 @@ async function start(loader:FullLoader,creatorSpawn=false) {
         const p = walker.position
         const vel = xxgPrevPos ? { x: p.x - xxgPrevPos.x, z: p.z - xxgPrevPos.z } : { x: 0, z: 0 }
         xxgPrevPos = { x: p.x, z: p.z }
-        return { position: { x: p.x, y: p.y, z: p.z }, velocity: vel }
+        return { position: { x: p.x, y: p.y - walkConfig.height * 0.5, z: p.z }, velocity: vel, yaw: walker.yaw, pitch: walker.pitch }
       },
       openVeil: () => {
         const el = document.createElement('div')
@@ -782,10 +787,12 @@ async function start(loader:FullLoader,creatorSpawn=false) {
       resumeWorldAt: async pt => {
         xxgPrevPos = { x: pt.x, z: pt.z }
         if (!walker) return false
+        if (pt.footY !== undefined && walker.resumeAt(pt.x, pt.footY, pt.z, pt.yaw, pt.pitch)) return true
         walker.hold(false)
         walker.showFigure(true)
         return walker.enter(pt.x, pt.z, pt.yaw, 'xxg-exit', false)
       },
+      setWorldViewBlend: blend => walker?.setViewBlend(blend),
     },
     { eager: params.has('xxg'), veilFadeInMs: 80 },
   )

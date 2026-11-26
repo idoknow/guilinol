@@ -11,6 +11,18 @@ import driveCamera from '../drive/camera.json' with {type:'json'}
 type Physics = Awaited<ReturnType<typeof createPhysics>>
 const identity = {x:0,y:0,z:0,w:1}
 
+const eyeFocus = new THREE.Vector3(), eyeDir = new THREE.Vector3()
+/** First-person eye pose (IDOK-178): on the eyes, looking level at pitch = cfg.pitch. */
+export function placeFirstPersonCamera(camera:THREE.Camera, figurePos:THREE.Vector3, yaw:number, pitch:number, lowerFocus=0) {
+  eyeFocus.set(figurePos.x,figurePos.y+1.62-lowerFocus,figurePos.z)
+  // 第三人称默认俯视 cfg.pitch；第一人称把它减掉，默认平视，仰视余量也够看山顶。
+  const eyePitch=pitch-cfg.pitch
+  eyeDir.set(Math.sin(yaw)*Math.cos(eyePitch),Math.sin(eyePitch),Math.cos(yaw)*Math.cos(eyePitch))
+  // eyeDir 指向身后（第三人称相机在 focus+dir·dist、看向 focus），所以第一人称要朝 -dir 看。
+  camera.position.copy(eyeFocus).addScaledVector(eyeDir,-.08)
+  camera.lookAt(eyeFocus.x-eyeDir.x,eyeFocus.y-eyeDir.y,eyeFocus.z-eyeDir.z)
+}
+
 export function createCameraRig(sim:Physics, tunnels:Tunnel[] = []) {
   const roofs=tunnels.filter(section=>!section.openCut)
   const ball = new R.Ball(cfg.camRadius), ray = new R.Ray({x:0,y:0,z:0},{x:0,y:1,z:0})
@@ -42,13 +54,8 @@ export function createCameraRig(sim:Physics, tunnels:Tunnel[] = []) {
     // IDOK-178 第一人称：相机直接落在眼睛上，不做第三人称那一整套防穿透/天花板收束（那条路径会
     // 把相机顶到 0.12m 的最小安全距离上，玩家会看到自己后脑勺）。
     if(first){
-      focus.set(figurePos.x,figurePos.y+1.62-lowerFocus,figurePos.z)
-      // 第三人称默认俯视 cfg.pitch；第一人称把它减掉，默认平视，仰视余量也够看山顶。
-      const eyePitch=pitch-cfg.pitch
-      dir.set(Math.sin(yaw)*Math.cos(eyePitch),Math.sin(eyePitch),Math.cos(yaw)*Math.cos(eyePitch))
-      // dir 指向身后（第三人称相机在 focus+dir·dist、看向 focus），所以第一人称要朝 -dir 看。
-      camera.position.copy(focus).addScaledVector(dir,-.08)
-      camera.lookAt(focus.x-dir.x,focus.y-dir.y,focus.z-dir.z)
+      placeFirstPersonCamera(camera,figurePos,yaw,pitch,lowerFocus)
+      focus.copy(eyeFocus)
       currentDist=0;lastClipped=false;lastBlocked=false;lastCeiling=Infinity;initialized=false
       return
     }

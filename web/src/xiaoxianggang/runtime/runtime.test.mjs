@@ -21,7 +21,6 @@ import {
   mountLazyXiaoxianggang,
   portalLanding,
   rotateLocal,
-  shouldEnterPortal,
   validateXxgLayout,
   worldToIndoor,
   worldToPortalLocal,
@@ -34,10 +33,13 @@ import {
   createIndoorGreyboxScene,
   createXxgIndoorScene,
   createXxgRuntimeStateMachine,
-  findTriggeredExit,
+  doorLeafRects,
+  locateInWell,
   resolveIndoorMovement,
+  xxgIndoorWells,
 } from './index.ts'
-import { resolveXxgExitStair } from './exit-stairs.ts'
+import { toIndoor } from './stairwell.ts'
+import { XXG_STAIRWELL, stairwellFloorY, yawFacing } from '../frame.ts'
 import { normalizeAngleRad } from './types.ts'
 import { XIAOXIANGGANG_B1_LAYOUT } from '../layout/index.ts'
 
@@ -233,8 +235,8 @@ test('Stage 1 greybox layout & coordinate frame strictly conform to contract.ts 
   assert.throws(() => assertValidXxgLayout({ ...STAGE1_GREYBOX_LAYOUT, ceilingHeight: 1.8 }), /ceilingHeight/)
 })
 
-test('runtime state machine enforces XXG_TRANSITIONS, portal walk-in trigger, and exit cooldown hysteresis', () => {
-  const sm = createXxgRuntimeStateMachine(XXG_PORTALS, 1500)
+test('runtime state machine enforces XXG_TRANSITIONS and tracks the active portal', () => {
+  const sm = createXxgRuntimeStateMachine()
   assert.equal(sm.getState(), 'unmounted')
 
   // Illegal transitions from unmounted must fail cleanly without throwing
@@ -243,28 +245,13 @@ test('runtime state machine enforces XXG_TRANSITIONS, portal walk-in trigger, an
   assert.equal(sm.transitionTo('exiting'), false)
 
   assert.equal(sm.transitionTo('idle'), true)
-  assert.equal(sm.getState(), 'idle')
-
-  for (const portal of XXG_PORTALS) {
-    // Stationary player on stairs (vel = 0) must NOT auto-trigger entry
-    const stepPos = {
-      x: portal.world.x + rotateLocal({ x: 0, z: 2.2 }, portal.yaw).x,
-      y: portal.groundY + 0.875,
-      z: portal.world.z + rotateLocal({ x: 0, z: 2.2 }, portal.yaw).z,
-    }
-    assert.equal(shouldEnterPortal(portal, stepPos, { x: 0, z: 0 }), false)
-    assert.equal(sm.detectSurfaceEntry(stepPos, { x: 0, z: 0 }, 1000).triggeredPortal, null)
-
-    // Walking inward across thresholdZ <= 3.0 triggers entry
-    const inwardVel = { x: portal.inward.x * 1.5, z: portal.inward.z * 1.5 }
-    const trig = sm.detectSurfaceEntry(stepPos, inwardVel, 1000)
-    assert.equal(trig.triggeredPortal?.id, portal.id)
-
-    // Cooldown suppresses immediate bounce re-entry, then re-arms after cooldown expires
-    sm.markPortalExitCooldown(portal.id, 2000, 1500)
-    assert.equal(sm.detectSurfaceEntry(stepPos, inwardVel, 2800).triggeredPortal, null)
-    assert.equal(sm.detectSurfaceEntry(stepPos, inwardVel, 3600).triggeredPortal?.id, portal.id)
-  }
+  assert.equal(sm.transitionTo('entering'), true)
+  sm.setActivePortalId('W2')
+  assert.equal(sm.getActivePortalId(), 'W2')
+  assert.equal(sm.transitionTo('inside'), true)
+  assert.equal(sm.transitionTo('entering'), false)
+  assert.equal(sm.transitionTo('exiting'), true)
+  assert.equal(sm.transitionTo('idle'), true)
 
   // Verify transition table parity with contract.ts
   for (const [from, allowed] of Object.entries(XXG_TRANSITIONS)) {
@@ -310,14 +297,27 @@ test('indoor collision blocks walls (zero tunneling), slides smoothly, enters bo
   assert.equal(hitBay2Back.hitWall, true)
   assert.ok(Math.abs(hitBay2Back.x - expectedRear2) < 1e-4)
 
-  // 5. Stairwell solid obstacle push-out & exit trigger directionality
-  const e2Exit = STAGE1_GREYBOX_LAYOUT.exits.find(e => e.portalId === 'E2')
-  assert.equal(findTriggeredExit(STAGE1_GREYBOX_LAYOUT, e2Exit.foot.x, e2Exit.foot.z, 0, 1.5), null, 'walking inward must not exit')
-  assert.equal(
-    findTriggeredExit(STAGE1_GREYBOX_LAYOUT, e2Exit.foot.x, e2Exit.foot.z, 0, -1.5)?.portalId,
-    'E2',
-    'walking toward E2 stair must trigger exit',
-  )
+  // 5. Stairwells: vestibule -> doorway -> landing is walkable, a closed door blocks it, the flight is solid.
+  for (const w of xxgIndoorWells()) {
+    const up = { x: toIndoor(w, 0, 1).x - w.cx, z: toIndoor(w, 0, 1).z - w.cz }
+    const walkUp = (obstacles, metres) => {
+      const start = toIndoor(w, 0, -5.8)
+      let x = start.x
+      let z = start.z
+      for (let i = 0; i < Math.round(metres / 0.1); i++) {
+        const r = resolveIndoorMovement(world, STAGE1_GREYBOX_LAYOUT, x, z, up.x * 0.1, up.z * 0.1, obstacles)
+        x = r.x
+        z = r.z
+      }
+      return locateInWell(x, z)
+    }
+    const open = walkUp([], 4)
+    assert.equal(open?.well.portalId, w.portalId)
+    assert.ok(open.lz >= XXG_STAIRWELL.exitZ, `${w.portalId} open door reaches the landing, lz=${open.lz}`)
+    assert.ok(open.lz <= XXG_STAIRWELL.zBottom + 1e-3, `${w.portalId} flight above the landing stays solid, lz=${open.lz}`)
+    const closed = walkUp(doorLeafRects(w, 0), 4)
+    assert.ok(closed.lz < XXG_STAIRWELL.zBack - 0.2, `${w.portalId} closed door blocks the doorway, lz=${closed.lz}`)
+  }
 
   assert.equal(clampIndoorPitch(world, 3.0), world.maxPitchRad)
   assert.equal(clampIndoorPitch(world, -3.0), world.minPitchRad)
@@ -334,9 +334,13 @@ test('greybox scene stays well under 40 draw calls and disposes every geometry, 
   let disposedGeoms = 0
   let disposedMats = 0
   let disposedTexs = 0
+  // Meshes may share a material (the stairwell door stiles reuse the skylight frame metal): count each once.
+  const seenMats = new Set()
   handle.scene.traverse(obj => {
     if (obj instanceof THREE.Mesh) {
       obj.geometry.addEventListener('dispose', () => disposedGeoms++)
+      if (seenMats.has(obj.material)) return
+      seenMats.add(obj.material)
       obj.material.addEventListener('dispose', () => disposedMats++)
       if (obj.material.map) {
         obj.material.map.addEventListener('dispose', () => disposedTexs++)
@@ -390,7 +394,7 @@ test('repeated enter/exit cycles across all 4 portals leave zero DOM/scene resid
       },
     }
 
-    const indoor = createXxgIndoorScene({ layout: STAGE1_GREYBOX_LAYOUT, veilFadeInMs: 0, reenterCooldownMs: 50 })
+    const indoor = createXxgIndoorScene({ layout: STAGE1_GREYBOX_LAYOUT, veilFadeInMs: 0 })
     assert.equal(indoor.state, 'unmounted')
     assert.equal(await indoor.enter('E1'), false)
     assert.equal(await indoor.exit(), false)
@@ -411,18 +415,10 @@ test('repeated enter/exit cycles across all 4 portals leave zero DOM/scene resid
       assert.equal(env.body.dataset.xxgActive, '1')
       // worldCamera is never mutated (first-person uses indoor.camera)
       assert.deepEqual(worldCamera.position.toArray(), initialWorldCamPos)
-      assert.equal(indoor.getPlayerSnapshot().descending, true)
-      assert.ok(indoor.camera.position.y > XXG_PLAYER.eyeHeight, '首帧应位于楼梯顶上方')
+      assert.ok(Math.abs(indoor.camera.position.y - XXG_PLAYER.eyeHeight) < 0.02)
 
       // Reject concurrent enter while already inside
       assert.equal(await indoor.enter('W2'), false)
-
-      // 跑完脚本下楼后再验证正常移动与碰墙
-      for (let f = 0; f < 240 && indoor.getPlayerSnapshot().descending; f++) {
-        indoor.step(0.05)
-      }
-      assert.equal(indoor.getPlayerSnapshot().descending, false)
-      assert.ok(Math.abs(indoor.camera.position.y - XXG_PLAYER.eyeHeight) < 0.02)
 
       // Move & collide against side wall
       env.mockWindow.dispatchKey('keydown', 'KeyW')
@@ -464,7 +460,7 @@ test('default createXxgIndoorScene loads full 53-shop B1 layout with PBR materia
   await withMockGlobals(env, async () => {
     const renderer = createCountingRenderer()
     const worldCamera = new THREE.PerspectiveCamera(55, 16 / 9, 1, 2000)
-    const indoor = createXxgIndoorScene({ veilFadeInMs: 0, reenterCooldownMs: 50 })
+    const indoor = createXxgIndoorScene({ veilFadeInMs: 0 })
     await indoor.mount({
       renderer,
       worldCamera,
@@ -481,10 +477,6 @@ test('default createXxgIndoorScene loads full 53-shop B1 layout with PBR materia
       const metrics = indoor.getMetrics()
       assert.ok(metrics.drawCalls >= 10 && metrics.drawCalls <= XXG_BUDGET.indoorDrawCallsMax, `drawCalls=${metrics.drawCalls}`)
       assert.ok(metrics.textureBytes <= XXG_BUDGET.indoorTextureBytesMax)
-      for (let f = 0; f < 240 && indoor.getPlayerSnapshot().descending; f++) {
-        indoor.step(0.05)
-      }
-      assert.equal(indoor.getPlayerSnapshot().descending, false, `${pid} descent must complete`)
       const contactsBefore = indoor.getPlayerSnapshot().collisionContacts
       const collideKey = pid === 'W2' ? 'KeyA' : 'KeyD'
       env.mockWindow.dispatchKey('keydown', collideKey)
@@ -497,133 +489,118 @@ test('default createXxgIndoorScene loads full 53-shop B1 layout with PBR materia
   })
 })
 
-test('出口楼梯：进场脚本下楼锁输入、落脚点交还控制、下段侧移后退不离开、上段触发离开且每帧 ΔeyeY ≤ 0.08', async () => {
+test('楼梯井无缝换场：街面楼梯视角渐变、井底平台同帧进场位姿连续、开门走进 B1、倒走回平台同帧交还街面且不回弹', async () => {
   const env = createMockDomEnvironment()
   const hadNode = 'Node' in globalThis
   if (!hadNode) globalThis.Node = class {}
   try {
     await withMockGlobals(env, async () => {
       let t = 0
-      const indoor = createXxgIndoorScene({ veilFadeInMs: 0, reenterCooldownMs: 0, crowdMaxAgents: 0, now: () => t })
+      const portal = getPortal('E1')
+      const local = (lx, lz) => {
+        const o = rotateLocal({ x: lx, z: lz }, portal.yaw)
+        return { x: portal.world.x + o.x, z: portal.world.z + o.z }
+      }
+      const downYaw = yawFacing(portal.inward)
+      const walker = { position: { x: 0, y: 0, z: 0 }, velocity: { x: 0, z: 0 }, yaw: downYaw, pitch: 0.3 }
+      const placeWalker = lz => {
+        const p = local(0, lz)
+        walker.position = { x: p.x, y: portal.groundY + stairwellFloorY(lz), z: p.z }
+      }
+      const blends = []
+      const landings = []
+      let suspended = 0
+      const indoor = createXxgIndoorScene({ veilFadeInMs: 0, crowdMaxAgents: 0, now: () => t })
       await indoor.mount({
         renderer: createCountingRenderer(),
         worldCamera: new THREE.PerspectiveCamera(55, 16 / 9, 1, 2000),
         bodyFlag: 'xxgActive',
-        getWalker: () => null,
+        getWalker: () => walker,
         openVeil: () => ({ done: async () => {} }),
-        suspendWorld() {},
-        resumeWorldAt: async () => true,
+        suspendWorld() {
+          suspended++
+        },
+        resumeWorldAt: async point => {
+          landings.push(point)
+          return true
+        },
+        setWorldViewBlend: b => blends.push(b),
       })
-      const settle = () => new Promise(r => setTimeout(r, 5))
 
-      const e1 = indoor.getLayout().exits.find(e => e.portalId === 'E1')
-      const e1Stair = resolveXxgExitStair(e1)
-      const progressOf = snap =>
-        (snap.x - e1Stair.startCenter.x) * e1Stair.up.x + (snap.z - e1Stair.startCenter.z) * e1Stair.up.z
-
-      // ① 进场后 descending=true，采集无按键基准轨迹（10 帧）
-      assert.equal(await indoor.enter('E1'), true)
-      const startSnap = indoor.getPlayerSnapshot()
-      assert.equal(startSnap.descending, true)
-      assert.ok(Math.abs(startSnap.y - e1Stair.topY) < 1e-3, '起点脚底高度应为 topY')
-      assert.ok(startSnap.pitch < -0.25, '起点俯角应朝下约 -18°')
-      for (let f = 0; f < 10; f++) {
-        t += 50
-        indoor.step(0.05)
-      }
-      const refSnap10 = indoor.getPlayerSnapshot()
-      assert.equal(refSnap10.descending, true)
-      assert.equal(await indoor.exit(), true)
-
-      // 重新进场：下楼期间按 W/D/E + 拖拽视角不产生任何额外移动或偏航
-      assert.equal(await indoor.enter('E1'), true)
-      let prevEyeY = indoor.getPlayerSnapshot().eyeY
-      let maxDeltaEyeY = 0
-      const stepTracked = (dt = 0.05) => {
-        t += dt * 1000
-        indoor.step(dt)
-        const curEyeY = indoor.getPlayerSnapshot().eyeY
-        maxDeltaEyeY = Math.max(maxDeltaEyeY, Math.abs(curEyeY - prevEyeY))
-        prevEyeY = curEyeY
-      }
-
-      env.mockWindow.dispatchKey('keydown', 'KeyW')
-      env.mockWindow.dispatchKey('keydown', 'KeyD')
-      env.mockWindow.dispatchKey('keydown', 'KeyE')
-      env.mockWindow.dispatchKey('pointerdown', '', { button: 0, clientX: 0, clientY: 0 })
-      env.mockWindow.dispatchKey('pointermove', '', { clientX: 200, clientY: -120 })
-      env.mockWindow.dispatchKey('pointerup', '')
-      for (let f = 0; f < 10; f++) stepTracked(0.05)
-      env.mockWindow.dispatchKey('keyup', 'KeyW')
-      env.mockWindow.dispatchKey('keyup', 'KeyD')
-      env.mockWindow.dispatchKey('keyup', 'KeyE')
-
-      const lockedSnap10 = indoor.getPlayerSnapshot()
-      assert.equal(indoor.state, 'inside', '下楼期间按 E 不能触发离开')
-      assert.equal(lockedSnap10.descending, true)
-      assert.equal(lockedSnap10.x, refSnap10.x, '下楼期间按 W/D 不得偏离脚本 X')
-      assert.equal(lockedSnap10.z, refSnap10.z, '下楼期间按 W/D 不得偏离脚本 Z')
-      assert.equal(lockedSnap10.yaw, refSnap10.yaw, '下楼期间拖拽不得改变 yaw')
-      assert.equal(lockedSnap10.pitch, refSnap10.pitch, '下楼期间拖拽不得改变 pitch')
-
-      // ② 下楼完成后落在 exit.foot 附近、yaw ≈ exit.yaw、eyeY ≈ 1.6
-      for (let f = 0; f < 240 && indoor.getPlayerSnapshot().descending; f++) {
-        stepTracked(0.05)
-      }
-      const landed = indoor.getPlayerSnapshot()
-      assert.equal(landed.descending, false)
-      assert.ok(Math.hypot(landed.x - e1.foot.x, landed.z - e1.foot.z) < 0.05, `落点偏离 foot: ${landed.x},${landed.z}`)
-      assert.ok(Math.abs(landed.y) < 1e-3, `落点脚底高应为 0，实际 ${landed.y}`)
-      assert.ok(Math.abs(landed.eyeY - XXG_PLAYER.eyeHeight) < 0.02, `落点 eyeY=${landed.eyeY}`)
-      assert.ok(Math.abs(normalizeAngleRad(landed.yaw - e1.yaw)) < 0.02, `落点 yaw=${landed.yaw}`)
-      assert.ok(Math.abs(landed.pitch) < 0.02, `落点 pitch=${landed.pitch}`)
-
-      // 转身面朝 E1 楼梯上行方向
-      const deltaYaw = normalizeAngleRad(e1Stair.upYaw - landed.yaw)
-      env.mockWindow.dispatchKey('pointerdown', '', { button: 0, clientX: 0, clientY: 0 })
-      env.mockWindow.dispatchKey('pointermove', '', { clientX: -deltaYaw / 0.0026, clientY: 0 })
-      env.mockWindow.dispatchKey('pointerup', '')
-
-      // ④ 走上楼梯下段后侧移/后退不触发离开
-      env.mockWindow.dispatchKey('keydown', 'KeyW')
-      for (let f = 0; f < 60 && indoor.state === 'inside'; f++) {
-        stepTracked(0.05)
-        const s = progressOf(indoor.getPlayerSnapshot())
-        if (s >= Math.min(0.6, e1Stair.runLen * 0.25)) break
-      }
-      env.mockWindow.dispatchKey('keyup', 'KeyW')
-      assert.equal(indoor.state, 'inside')
-      assert.ok(indoor.getPlayerSnapshot().y > 0.02, '应已踏上楼梯下段')
-
-      for (const code of ['KeyA', 'KeyD', 'KeyS']) {
-        env.mockWindow.dispatchKey('keydown', code)
-        for (let f = 0; f < 6 && indoor.state === 'inside'; f++) stepTracked(0.05)
-        env.mockWindow.dispatchKey('keyup', code)
-        assert.equal(indoor.state, 'inside', `楼梯下段按 ${code} 不应触发离开`)
-      }
-
-      // ③ 面朝楼梯按住 W 走上去，在楼梯上段触发 exiting，触发瞬间 eyeY < 2.9 + 0.3 且 progress < 楼梯长度
-      env.mockWindow.dispatchKey('keydown', 'KeyW')
-      for (let f = 0; f < 120 && indoor.state === 'inside'; f++) {
-        stepTracked(0.05)
-      }
-      env.mockWindow.dispatchKey('keyup', 'KeyW')
-      assert.equal(indoor.state, 'exiting', '沿楼梯上行应在楼梯上段触发离开')
-
-      const exitSnap = indoor.getPlayerSnapshot()
-      const exitProgress = progressOf(exitSnap)
-      assert.ok(
-        exitSnap.eyeY < indoor.getLayout().ceilingHeight + 0.3,
-        `触发离开时 eyeY=${exitSnap.eyeY} 必须 < ${indoor.getLayout().ceilingHeight + 0.3}`,
-      )
-      assert.ok(exitProgress > 0 && exitProgress < e1Stair.runLen, `触发点 progress=${exitProgress} 应 < ${e1Stair.runLen}`)
-
-      // ⑤ 全程每帧 eyeY 变化 ≤ 0.08m
-      assert.ok(maxDeltaEyeY <= 0.08 + 1e-9, `单帧最大 eyeY 变化 ${maxDeltaEyeY} 超过 0.08m`)
-
-      await settle()
+      // ① Street side: no blend on the apron, a partial blend mid-flight, no swap anywhere above the landing.
+      placeWalker(5)
+      indoor.step(0.016)
+      assert.equal(blends.at(-1) ?? null, null)
+      placeWalker(0)
+      indoor.step(0.016)
       assert.equal(indoor.state, 'idle')
+      assert.ok(blends.at(-1) > 0.05 && blends.at(-1) < 0.95, `mid-flight blend ${blends.at(-1)}`)
+      placeWalker(-3.3)
+      indoor.step(0.016)
+      assert.equal(indoor.state, 'idle', 'landing edge inside the hysteresis band must not swap')
+
+      // ② Past enterZ on the landing: same-frame swap, foot / yaw / look direction carried over.
+      placeWalker(-3.6)
+      t = 100
+      indoor.step(0.016)
+      assert.equal(indoor.state, 'inside')
+      assert.equal(suspended, 1)
+      assert.equal(env.body.dataset.xxgActive, '1')
+      const inSnap = indoor.getPlayerSnapshot()
+      const expectIndoor = worldToIndoor(walker.position)
+      assert.ok(Math.hypot(inSnap.x - expectIndoor.x, inSnap.z - expectIndoor.z) < 1e-3, 'indoor foot = walker foot')
+      assert.ok(Math.abs(indoor.camera.position.y - XXG_PLAYER.eyeHeight) < 1e-3, `eye ${indoor.camera.position.y}`)
+      const look = new THREE.Vector3()
+      indoor.camera.getWorldDirection(look)
+      const lookWorld = (() => {
+        const a = indoorToWorld({ x: 0, z: 0 })
+        const b = indoorToWorld({ x: look.x, z: look.z })
+        return { x: b.x - a.x, z: b.z - a.z }
+      })()
+      const wantLook = { x: -Math.sin(downYaw), z: -Math.cos(downYaw) }
+      const lookLen = Math.hypot(lookWorld.x, lookWorld.z)
+      assert.ok(Math.hypot(lookWorld.x / lookLen - wantLook.x, lookWorld.z / lookLen - wantLook.z) < 1e-3, 'look direction carried over')
+      assert.ok(Math.abs(look.y) < 1e-3, 'level walker pitch stays level indoors')
+      assert.equal(indoor.renderFrame(), true)
+      assert.ok(indoor.getMetrics().lastSwapMs <= XXG_BUDGET.swapMsMax)
+      assert.equal(indoor.getMetrics().lastBlackFrames, 0)
+      assert.equal(inSnap.doorsOpen[0], 0, 'doors start closed and slide open on approach')
+
+      // ③ Doors open within their travel time; walking on passes the doorway into the B1 vestibule.
+      for (let f = 0; f < 12; f++) indoor.step(0.05)
+      assert.ok(indoor.getPlayerSnapshot().doorsOpen[0] > 0.99)
+      env.mockWindow.dispatchKey('keydown', 'KeyW')
+      for (let f = 0; f < 40; f++) indoor.step(0.05)
+      env.mockWindow.dispatchKey('keyup', 'KeyW')
+      const inB1 = indoor.getPlayerSnapshot()
+      assert.equal(indoor.state, 'inside')
+      const poseB1 = locateInWell(inB1.x, inB1.z)
+      assert.ok(!poseB1 || poseB1.lz < XXG_STAIRWELL.zBack - 0.4, `walked through the door, lz=${poseB1?.lz}`)
+
+      // ④ Backing up onto the landing hands the exact pose back to the street in the same step.
+      env.mockWindow.dispatchKey('keydown', 'KeyS')
+      for (let f = 0; f < 120 && indoor.state === 'inside'; f++) indoor.step(0.05)
+      env.mockWindow.dispatchKey('keyup', 'KeyS')
+      assert.equal(indoor.state, 'idle')
+      assert.equal(env.body.dataset.xxgActive, undefined)
+      const back = landings.at(-1)
+      assert.ok(back, 'resumeWorldAt called')
+      assert.ok(Math.abs(back.footY - (portal.groundY - XXG_STAIRWELL.depth)) < 1e-6)
+      assert.ok(Math.abs(normalizeAngleRad(back.yaw - downYaw)) < 1e-3, `yaw ${back.yaw} vs ${downYaw}`)
+      assert.ok(Math.abs(back.pitch - 0.3) < 1e-3)
+      const backLocal = worldToPortalLocal(portal, back)
+      assert.ok(backLocal.z >= XXG_STAIRWELL.exitZ && backLocal.z < XXG_STAIRWELL.zBottom, `exit lz=${backLocal.z}`)
+      assert.equal(blends.at(-1), 1, 'street resumes in first person')
+
+      // ⑤ Standing where the street resumed must not bounce straight back in; stepping down again re-enters.
+      walker.position = { x: back.x, y: back.footY, z: back.z }
+      for (let f = 0; f < 10; f++) indoor.step(0.016)
+      assert.equal(indoor.state, 'idle')
+      placeWalker(-3.6)
+      indoor.step(0.016)
+      assert.equal(indoor.state, 'inside')
       indoor.dispose()
+      assert.equal(blends.at(-1), null)
     })
   } finally {
     if (!hadNode) delete globalThis.Node

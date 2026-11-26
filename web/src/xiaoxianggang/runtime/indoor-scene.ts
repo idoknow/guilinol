@@ -7,8 +7,7 @@ import {
   resolveShopLook,
   type SignAtlasSlot,
 } from '../look/index.ts'
-import { corridorToAabb, rectToAabb, type Aabb2D } from './collision.ts'
-import { XXG_STAIR_NOSING_COLOR, buildExitStairGeometry, resolveXxgExitStair, xxgStairCurbM } from './exit-stairs.ts'
+import { corridorToAabb, isColumnSkipped, rectToAabb, type Aabb2D } from './collision.ts'
 import { buildMergedBoxesGeometry, carveBoxXZ, mergeGeometries, type BoxSpec, type RectXZ } from './scene-boxes.ts'
 import {
   classifyXxgShop,
@@ -18,7 +17,8 @@ import {
   type FitoutBuckets,
   type ShopFrame,
 } from './shop-fitout.ts'
-import { XXG_STAIR_GLOBES, XXG_WELL_GLOBES, buildSkyCapGeometry, buildSkylightPyramid } from './skylight-pyramid.ts'
+import { XXG_WELL_GLOBES, buildSkyCapGeometry, buildSkylightPyramid } from './skylight-pyramid.ts'
+import { buildIndoorWellGeometry, createWellDoors, wellVestibule, xxgIndoorWells, type XxgWellDoors } from './stairwell.ts'
 
 export interface IndoorGreyboxSceneHandle {
   readonly scene: THREE.Scene
@@ -29,8 +29,10 @@ export interface IndoorGreyboxSceneHandle {
   readonly materialCount: number
   /** 实际渲染的柱子中心（人群避让用）。 */
   readonly columnCenters: readonly { readonly x: number; readonly z: number }[]
-  /** 吊顶开洞（采光井 + 出口楼梯井），金字塔底面与之重合。 */
+  /** Ceiling holes: the two skylight pyramids, then the four stairwell footprints. */
   readonly skylightOpenings: readonly RectXZ[]
+  /** Sliding glass doors of the four stairwells. */
+  readonly wellDoors: XxgWellDoors
   isDisposed(): boolean
   dispose(): void
 }
@@ -289,53 +291,6 @@ function rectContains(r: RectXZ, x: number, z: number, margin = 0): boolean {
   return x > r.minX - margin && x < r.maxX + margin && z > r.minZ - margin && z < r.maxZ + margin
 }
 
-/** 出口楼梯口：走廊边线打通到楼梯；吊顶从楼梯口平台（落脚点外侧）一直开到楼梯尽头，金字塔罩住平台和整段楼梯。 */
-interface ExitWell {
-  readonly stair: Aabb2D
-  readonly alongZ: boolean
-  readonly sign: 1 | -1
-  /** 楼梯这一侧的走廊边线（楼梯口起点）。 */
-  readonly corrEdge: number
-  /** 第一级台阶起步线。 */
-  readonly startEdge: number
-  /** 井口靠走廊一侧的边线（楼梯口平台外沿），安全出口牌挂在这里。 */
-  readonly landingEdge: number
-  readonly opening: RectXZ
-}
-
-function resolveExitWell(ex: XxgLayout['exits'][number], corridorBoxes: readonly Aabb2D[]): ExitWell {
-  const st = ex.stair
-  const stair = rectToAabb(`stair-${ex.portalId}`, st)
-  const dirX = st.x - ex.foot.x
-  const dirZ = st.z - ex.foot.z
-  const alongZ = Math.abs(dirZ) >= Math.abs(dirX)
-  const sign: 1 | -1 = alongZ ? (dirZ >= 0 ? 1 : -1) : dirX >= 0 ? 1 : -1
-  const startEdge = alongZ ? (sign > 0 ? stair.minZ : stair.maxZ) : sign > 0 ? stair.minX : stair.maxX
-  const endEdge = alongZ ? (sign > 0 ? stair.maxZ : stair.minZ) : sign > 0 ? stair.maxX : stair.minX
-  let corrEdge = alongZ ? ex.foot.z : ex.foot.x
-  for (const b of corridorBoxes) {
-    if (!rectContains(b, ex.foot.x, ex.foot.z, 0.01)) continue
-    const edge = alongZ ? (sign > 0 ? b.maxZ : b.minZ) : sign > 0 ? b.maxX : b.minX
-    if ((edge - corrEdge) * sign > 0) corrEdge = edge
-  }
-  if ((corrEdge - startEdge) * sign > 0) corrEdge = startEdge
-  // 平台向走廊里让出「落脚点到边线 + 0.6m」，最多 2.6m，且不越过落脚点所在走廊的对侧边线。
-  const footA = alongZ ? ex.foot.z : ex.foot.x
-  let landingEdge = corrEdge - sign * Math.min(2.6, Math.abs(corrEdge - footA) + 0.6)
-  for (const b of corridorBoxes) {
-    if (!rectContains(b, ex.foot.x, ex.foot.z, 0.01)) continue
-    const opposite = alongZ ? (sign > 0 ? b.minZ : b.maxZ) : sign > 0 ? b.minX : b.maxX
-    if ((opposite + sign * 0.3 - landingEdge) * sign > 0) landingEdge = opposite + sign * 0.3
-  }
-  const far = endEdge + sign * 0.12
-  const a0 = Math.min(landingEdge, far)
-  const a1 = Math.max(landingEdge, far)
-  const opening: RectXZ = alongZ
-    ? { minX: stair.minX, maxX: stair.maxX, minZ: a0, maxZ: a1 }
-    : { minX: a0, maxX: a1, minZ: stair.minZ, maxZ: stair.maxZ }
-  return { stair, alongZ, sign, corrEdge, startEdge, landingEdge, opening }
-}
-
 /**
  * Builds the standalone B1 indoor THREE.Scene from any validated XxgLayout.
  * Strictly <= 40 draw calls (~16 batched PBR meshes), <= 150k triangles, zero dependency on world.ts or terrain.
@@ -412,7 +367,8 @@ export function createIndoorGreyboxScene(layout: XxgLayout): IndoorGreyboxSceneH
 
   const corridorBoxes = layout.corridors.map(corridorToAabb)
   const corridorsById = new Map(layout.corridors.map(c => [c.id, corridorToAabb(c)]))
-  const stairBoxes = layout.exits.map(e => rectToAabb(`stair-${e.portalId}`, e.stair))
+  const wells = xxgIndoorWells()
+  const vestibules = wells.map(w => wellVestibule(w, corridorBoxes))
 
   const namedShops = layout.shops.filter(s => Boolean(s.name && s.name.trim().length > 0))
   const shopGeoms = layout.shops.map(shop => {
@@ -421,7 +377,6 @@ export function createIndoorGreyboxScene(layout: XxgLayout): IndoorGreyboxSceneH
     return { shop, sb, front, geom: resolveShopFrontageGeometry(shop, sb, front) }
   })
 
-  const exitWells = layout.exits.map(ex => resolveExitWell(ex, corridorBoxes))
   const wellOpenings: RectXZ[] = []
   const skyCorr = namedShops.length > 4 ? corridorsById.get('corr-skylight-ns') : undefined
   if (skyCorr) {
@@ -432,10 +387,15 @@ export function createIndoorGreyboxScene(layout: XxgLayout): IndoorGreyboxSceneH
       wellOpenings.push({ minX: wx - half, maxX: wx + half, minZ: wz - half, maxZ: wz + half })
     }
   }
-  const ceilingHoles: RectXZ[] = [...wellOpenings, ...exitWells.map(w => w.opening)]
+  const ceilingHoles: RectXZ[] = [...wellOpenings, ...wells.map(w => w.footprint)]
 
-  const openFootprints: Aabb2D[] = [...corridorBoxes, ...stairBoxes]
-  for (const w of exitWells) openFootprints.push({ id: `${w.stair.id}-well`, ...w.opening })
+  // Stairwell walls and the vestibules replace the corridor walls they cross.
+  const openFootprints: Aabb2D[] = [...corridorBoxes]
+  wells.forEach((w, i) => {
+    openFootprints.push({ id: `well-${w.portalId}`, ...w.footprint })
+    const v = vestibules[i]
+    if (v) openFootprints.push({ id: `well-${w.portalId}-vestibule`, ...v })
+  })
   for (const { geom } of shopGeoms) {
     openFootprints.push(geom.openApron)
   }
@@ -456,7 +416,7 @@ export function createIndoorGreyboxScene(layout: XxgLayout): IndoorGreyboxSceneH
   const woodCamelSpecs: BoxSpec[] = []
   const stairSpecs: BoxSpec[] = []
   const stairNosingSpecs: BoxSpec[] = []
-  const stairDwarfWallGeos: THREE.BufferGeometry[] = []
+  const wellLitGeos: THREE.BufferGeometry[] = []
   const skylightGlassSpecs: BoxSpec[] = []
   const goodsSpecs: BoxSpec[] = []
   const globeSpecs: THREE.BufferGeometry[] = []
@@ -495,6 +455,26 @@ export function createIndoorGreyboxScene(layout: XxgLayout): IndoorGreyboxSceneH
     })
   }
 
+  // B1 vestibule in front of a stairwell door no corridor reaches: floored, ceiled and walled like a short corridor.
+  for (const v of vestibules) {
+    if (!v) continue
+    const cx = (v.minX + v.maxX) * 0.5
+    const cz = (v.minZ + v.maxZ) * 0.5
+    floorTerrazzoSpecs.push({ cx, cy: -0.06, cz, sx: v.maxX - v.minX + 0.2, sy: 0.12, sz: v.maxZ - v.minZ + 0.2 })
+    ceilingSpecs.push({ cx, cy: ceilH + 0.06, cz, sx: v.maxX - v.minX + 0.4, sy: 0.12, sz: v.maxZ - v.minZ + 0.4 })
+    emitEdgeWallSegments(wallCorridorSpecs, rackMetalSpecs, v.minZ, v.minX, v.maxX, 'x', -1, wallT, ceilH, openFootprints)
+    emitEdgeWallSegments(wallCorridorSpecs, rackMetalSpecs, v.maxZ, v.minX, v.maxX, 'x', 1, wallT, ceilH, openFootprints)
+    emitEdgeWallSegments(wallCorridorSpecs, rackMetalSpecs, v.minX, v.minZ, v.maxZ, 'z', -1, wallT, ceilH, openFootprints)
+    emitEdgeWallSegments(wallCorridorSpecs, rackMetalSpecs, v.maxX, v.minZ, v.maxZ, 'z', 1, wallT, ceilH, openFootprints)
+  }
+  // The stairwell landing and walls are the floor inside each footprint.
+  for (const bucket of [floorTerrazzoSpecs, floorRenovatedSpecs]) {
+    let carved: BoxSpec[] = bucket
+    for (const w of wells) carved = carved.flatMap(b => carveBoxXZ(b, w.footprint))
+    bucket.length = 0
+    bucket.push(...carved)
+  }
+
   for (const opening of wellOpenings) {
     const pyramid = buildSkylightPyramid({ opening, ceilH, heightM: 3.0, globes: XXG_WELL_GLOBES })
     wallCorridorSpecs.push(...pyramid.curbWalls)
@@ -508,8 +488,7 @@ export function createIndoorGreyboxScene(layout: XxgLayout): IndoorGreyboxSceneH
   for (const cx of layout.columns.xs) {
     for (const cz of layout.columns.zs) {
       if (!pointInsideAnyAabb(cx, cz, corridorBoxes, -0.3)) continue
-      const nearExit = layout.exits.some(e => Math.hypot(e.foot.x - cx, e.foot.z - cz) < 1.6)
-      if (nearExit) continue
+      if (isColumnSkipped(layout, wells, cx, cz)) continue
       if (ceilingHoles.some(h => rectContains(h, cx, cz, colSize * 0.5 + 0.3))) continue
       wallCorridorSpecs.push({ cx, cy: ceilH * 0.5, cz, sx: colSize, sy: ceilH, sz: colSize })
       rackMetalSpecs.push({ cx, cy: 0.08, cz, sx: colSize + 0.05, sy: 0.16, sz: colSize + 0.05 })
@@ -765,69 +744,27 @@ export function createIndoorGreyboxScene(layout: XxgLayout): IndoorGreyboxSceneH
     }
   }
 
-  // 出口楼梯：花岗岩踏步 + 每级前缘黄色 L 形防滑条 + 两侧坡面花岗岩矮墙 + 白色扶手（两侧与中间）；
-  // 保留两侧到吊顶的走廊墙、长条金字塔采光顶、楼梯顶玻璃门（底边对齐新 topY）与安全出口牌。
-  const graniteUvScale = uvScaleFrom(matPack.stairGranite)
-  for (let wi = 0; wi < exitWells.length; wi++) {
-    const ex = layout.exits[wi]!
-    const well = exitWells[wi]!
-    const { alongZ, sign, corrEdge, startEdge, landingEdge, opening } = well
-    const stair = resolveXxgExitStair(ex, well)
-    const { runLen, acrossLen, acrossC, topY } = stair
-    const box = (a: number, y: number, c: number, sa: number, sy: number, sc: number): BoxSpec =>
-      alongZ ? { cx: c, cy: y, cz: a, sx: sc, sy, sz: sa } : { cx: a, cy: y, cz: c, sx: sa, sy, sz: sc }
-
-    const built = buildExitStairGeometry(stair, graniteUvScale)
-    stairSpecs.push(...built.stepBoxes)
-    if (built.topLandingBox) stairSpecs.push(built.topLandingBox)
-    stairDwarfWallGeos.push(...built.dwarfWallGeos)
-    stairNosingSpecs.push(...built.nosingBoxes)
-    skylightFrameGeos.push(...built.handrailGeos)
-
-    const gap = (startEdge - corrEdge) * sign
-    if (gap > 0.01) floorTerrazzoSpecs.push(box((corrEdge + startEdge) * 0.5, -0.06, acrossC, gap + 0.1, 0.12, acrossLen))
-
-    const farEdge = startEdge + sign * (runLen + 0.2)
-    const wallLen = Math.abs(farEdge - corrEdge)
-    for (const side of [-1, 1] as const) {
-      const c = acrossC + side * (acrossLen + wallT) * 0.5
-      wallCorridorSpecs.push(box((corrEdge + farEdge) * 0.5, ceilH * 0.5, c, wallLen, ceilH, wallT))
-      rackMetalSpecs.push(box((corrEdge + startEdge) * 0.5, 0.06, acrossC + side * (acrossLen * 0.5 - 0.015), Math.max(0.05, gap), 0.12, 0.03))
-    }
-
-    const pyramid = buildSkylightPyramid({ opening, ceilH, heightM: 3.0, curbM: xxgStairCurbM(stair, ceilH), globes: XXG_STAIR_GLOBES })
-    wallCorridorSpecs.push(...pyramid.curbWalls)
-    pyramidGlassGeos.push(pyramid.glass)
-    skylightFrameGeos.push(...pyramid.frame)
-    globeSpecs.push(...pyramid.globes)
-
-    const backA = startEdge + sign * (runLen + 0.08)
-    const doorH = Math.max(0.25, pyramid.baseY - topY)
-    skylightGlassSpecs.push(box(backA, topY + doorH * 0.5, acrossC, 0.08, doorH, acrossLen))
-    for (const m of [-0.5, -0.25, 0, 0.25, 0.5]) {
-      rackMetalSpecs.push(box(backA - sign * 0.05, topY + doorH * 0.5, acrossC + m * (acrossLen - 0.06), 0.06, doorH, 0.05))
-    }
-    if (doorH > 0.5) {
-      rackMetalSpecs.push(box(backA - sign * 0.05, topY + Math.min(2.0, doorH - 0.15), acrossC, 0.06, 0.05, acrossLen))
-    }
-    rackMetalSpecs.push(box(backA - sign * 0.05, topY + 0.03, acrossC, 0.06, 0.06, acrossLen))
-
-    const signA = landingEdge - sign * 0.11
-    rackMetalSpecs.push(
-      box(signA, ceilH - 0.24, acrossC - 0.32, 0.025, 0.48, 0.025),
-      box(signA, ceilH - 0.24, acrossC + 0.32, 0.025, 0.48, 0.025),
-      box(signA + sign * 0.02, ceilH - 0.52, acrossC, 0.04, 0.32, 0.94),
-    )
-    const pg = new THREE.PlaneGeometry(0.88, 0.28)
-    if (alongZ) {
-      if (sign > 0) pg.rotateY(Math.PI)
-      pg.translate(acrossC, ceilH - 0.52, signA - sign * 0.008)
-    } else {
-      pg.rotateY(sign > 0 ? -Math.PI / 2 : Math.PI / 2)
-      pg.translate(signA - sign * 0.008, ceilH - 0.52, acrossC)
-    }
-    exitSignGeos.push(pg)
+  // Four stairwells, built like the street-side model: granite flight and walls, bronze nosings,
+  // aluminium door frame and handrails, warm strip under the rails, a safety exit sign over the B1 door.
+  const wellBuckets = {
+    stone: stairSpecs,
+    nosing: stairNosingSpecs,
+    frame: skylightFrameGeos,
+    dark: rackMetalSpecs,
+    lit: wellLitGeos,
+    exitSigns: exitSignGeos,
   }
+  wells.forEach((w, i) => {
+    buildIndoorWellGeometry(w, wellBuckets)
+    const v = vestibules[i]
+    if (!v) return
+    const lx = snapCell((v.minX + v.maxX) * 0.5)
+    const lz = snapCell((v.minZ + v.maxZ) * 0.5)
+    if (!lampCenters.some(p => Math.abs(p.x - lx) < 1.5 && Math.abs(p.z - lz) < 1.5)) {
+      lampCenters.push({ x: lx, z: lz })
+      lightCoolSpecs.push({ cx: lx, cy: ceilH - 0.004, cz: lz, sx: XXG_LAMP_SIZE_M, sy: 0.01, sz: XXG_LAMP_SIZE_M })
+    }
+  })
 
   // 采光井开洞：吊顶板按井口挖空，井口里的吊顶灯片一并去掉。
   let carvedCeiling: BoxSpec[] = ceilingSpecs
@@ -849,7 +786,9 @@ export function createIndoorGreyboxScene(layout: XxgLayout): IndoorGreyboxSceneH
   addBatchBoxes('xxg_storefront_glass', storefrontGlassSpecs, matPack.storefrontGlass)
   addBatchBoxes('xxg_ceiling_grid', ceilingSpecs, matPack.ceilingGrid)
   addBatchBoxes('xxg_light_cool', lightCoolSpecs, matPack.lightStripCool)
-  addBatchBoxes('xxg_light_warm', lightWarmSpecs, matPack.lightStripWarm)
+  const warmParts = [...wellLitGeos]
+  if (lightWarmSpecs.length > 0) warmParts.unshift(buildMergedBoxesGeometry(lightWarmSpecs, uvScaleFrom(matPack.lightStripWarm)).geom)
+  addMergedGeos('xxg_light_warm', warmParts, matPack.lightStripWarm, true)
   addBatchBoxes('xxg_rack_metal', rackMetalSpecs, matPack.rackMetal)
   if (garmentWineSpecs.length > 0) {
     addBatchBoxes(
@@ -875,43 +814,34 @@ export function createIndoorGreyboxScene(layout: XxgLayout): IndoorGreyboxSceneH
       false,
     )
   }
-  // 花岗岩踏步 + 顶部平台 + 两侧坡面矮墙合批为单次 draw call
-  const stairGraniteParts: THREE.BufferGeometry[] = []
-  if (stairSpecs.length > 0) {
-    stairGraniteParts.push(buildMergedBoxesGeometry(stairSpecs, uvScaleFrom(matPack.stairGranite)).geom)
-  }
-  stairGraniteParts.push(...stairDwarfWallGeos)
-  addMergedGeos('xxg_stair_granite', stairGraniteParts, matPack.stairGranite, true)
-  if (stairNosingSpecs.length > 0) {
-    addBatchBoxes(
-      'xxg_stair_nosing_yellow',
-      stairNosingSpecs,
-      new THREE.MeshStandardMaterial({
-        name: 'xxg_stair_nosing_yellow',
-        color: XXG_STAIR_NOSING_COLOR,
-        emissive: XXG_STAIR_NOSING_COLOR,
-        emissiveIntensity: 0.34,
-        roughness: 0.44,
-        metalness: 0.08,
-      }),
-      false,
-    )
-  }
-  // 金字塔玻璃与楼梯尽头玻璃门同材质，合成一个 mesh（一次 draw call）。
+  addBatchBoxes('xxg_stair_granite', stairSpecs, matPack.stairGranite)
+  addBatchBoxes(
+    'xxg_stair_nosing_bronze',
+    stairNosingSpecs,
+    new THREE.MeshStandardMaterial({ name: 'xxg_stair_nosing_bronze', color: '#52584f', roughness: 0.42, metalness: 0.55 }),
+    false,
+  )
+  // Pyramid glass and any fixed glazing share one draw call; the door leaves are their own two dynamic meshes.
   const skylightGlassParts = [...pyramidGlassGeos]
   if (skylightGlassSpecs.length > 0) {
     skylightGlassParts.push(buildMergedBoxesGeometry(skylightGlassSpecs, uvScaleFrom(matPack.skylightGlass)).geom)
   }
   addMergedGeos('xxg_skylight_glass', skylightGlassParts, matPack.skylightGlass, true)
   addMergedGeos('xxg_globe_lamps', globeSpecs, matPack.globeLamp, true)
-  if (skylightFrameGeos.length > 0) {
-    addMergedGeos(
-      'xxg_skylight_frame',
-      skylightFrameGeos,
-      new THREE.MeshStandardMaterial({ name: 'xxg_skylight_frame', color: '#e3e7ea', emissive: '#4a4f54', roughness: 0.38, metalness: 0.42 }),
-      false,
-    )
-  }
+  const frameMat = new THREE.MeshStandardMaterial({
+    name: 'xxg_skylight_frame',
+    color: '#e3e7ea',
+    emissive: '#4a4f54',
+    roughness: 0.38,
+    metalness: 0.42,
+  })
+  if (!addMergedGeos('xxg_skylight_frame', skylightFrameGeos, frameMat, false)) extraMaterials.push(frameMat)
+  const wellDoors = createWellDoors(wells, matPack.skylightGlass, frameMat)
+  usedPackMats.add(matPack.skylightGlass)
+  scene.add(wellDoors.glass, wellDoors.frame)
+  meshes.push(wellDoors.glass, wellDoors.frame)
+  geometries.push(wellDoors.glass.geometry, wellDoors.frame.geometry)
+  triangleCount += wellDoors.triangles
   if (goodsSpecs.length > 0) {
     addBatchBoxes(
       'xxg_shop_goods',
@@ -993,6 +923,7 @@ export function createIndoorGreyboxScene(layout: XxgLayout): IndoorGreyboxSceneH
     materialCount: usedPackMats.size + extraMaterials.length,
     columnCenters,
     skylightOpenings: ceilingHoles,
+    wellDoors,
     isDisposed: () => disposed,
     dispose() {
       if (disposed) return

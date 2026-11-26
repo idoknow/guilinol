@@ -7,29 +7,27 @@ import {
   getPortal,
   portalLanding,
   validateXxgLayout,
-  type XxgExit,
+  worldToPortalLocal,
   type XxgHostContext,
   type XxgIndoorMetrics,
+  type XxgPortal,
   type XxgPortalId,
   type XxgState,
 } from '../contract.ts'
-import {
-  buildIndoorCollisionWorld,
-  clampIndoorPitch,
-  resolveIndoorMovement,
-} from './collision.ts'
-import {
-  XXG_STAIR_MAX_DELTA_Y,
-  createXxgStairEyeSmoother,
-  descentPath,
-  sampleAllExitStairsFootY,
-  shouldClimbOut,
-  type XxgStairDescent,
-} from './exit-stairs.ts'
+import { XXG_FRAME, XXG_STAIRWELL, indoorToWorld, stairwellViewBlend, worldToIndoor } from '../frame.ts'
+import { buildIndoorCollisionWorld, clampIndoorPitch, resolveIndoorMovement, type Aabb2D } from './collision.ts'
 import { XIAOXIANGGANG_B1_LAYOUT } from '../layout/index.ts'
 import { createIndoorGreyboxScene, type IndoorGreyboxSceneHandle } from './indoor-scene.ts'
 import { XXG_CROWD_MAX, createXxgCrowd, type XxgCrowd } from './crowd.ts'
 import { createXxgRuntimeStateMachine } from './state-machine.ts'
+import {
+  XXG_WELL_DOOR,
+  distanceToNearestLanding,
+  doorLeafRects,
+  doorOpenFraction,
+  locateInWell,
+  type XxgIndoorWell,
+} from './stairwell.ts'
 import {
   normalizeAngleRad,
   type CreateXxgIndoorSceneOptions,
@@ -41,10 +39,27 @@ const LOOK_SENSITIVITY_RAD_PER_PX = 0.0026
 const KEY_TURN_RAD_PER_SEC = 1.85
 const INDOOR_CAMERA_NEAR = 0.08
 const INDOOR_CAMERA_FAR = 140
+/** walk/config cfg.pitch: the walker pitch that means "looking level" in first person. */
+const WALKER_LEVEL_PITCH = 0.3
+/** walk/camera placeFirstPersonCamera puts the lens this far in front of the eye point. */
+const EYE_FORWARD_M = 0.08
+/** Indoor yaw = world yaw + this (the plaza axis E sits this far clockwise from world +x). */
+const FRAME_YAW = Math.atan2(XXG_FRAME.axisE.z, XXG_FRAME.axisE.x)
+const B1_WORLD_Y = XXG_FRAME.surfaceY - XXG_STAIRWELL.depth
+/** Near a landing the indoor view and run speed match the street walker; they settle to indoor values by this distance. */
+const LANDING_MATCH_NEAR_M = 2.4
+const LANDING_MATCH_FAR_M = 7
+/** The well footprint as seen from the street: a little past the top nosing so the blend releases cleanly. */
+const SURFACE_WELL_MARGIN_M = 0.6
 
 function sleepMs(ms: number): Promise<void> {
   if (ms <= 0) return Promise.resolve()
   return new Promise(resolve => setTimeout(resolve, ms))
+}
+
+function smoothstep(edge0: number, edge1: number, x: number): number {
+  const t = Math.min(1, Math.max(0, (x - edge0) / (edge1 - edge0)))
+  return t * t * (3 - 2 * t)
 }
 
 function isEditableTarget(target: EventTarget | null): boolean {
@@ -67,10 +82,24 @@ function isValidPortalId(id: unknown): id is XxgPortalId {
   return typeof id === 'string' && (XXG_PORTAL_IDS as readonly string[]).includes(id)
 }
 
+/** Street walker inside one of the four wells (portal-local lx, lz), or null. */
+function locateSurfaceWell(pos: { x: number; z: number }): { portal: XxgPortal; lx: number; lz: number } | null {
+  const w = XXG_STAIRWELL
+  for (const portal of XXG_PORTALS) {
+    const l = worldToPortalLocal(portal, pos)
+    if (Math.abs(l.x) <= w.halfWidth + 0.05 && l.z >= w.zBack - 0.05 && l.z <= w.zTop + SURFACE_WELL_MARGIN_M) {
+      return { portal, lx: l.x, lz: l.z }
+    }
+  }
+  return null
+}
+
 /**
- * Implements contract.ts XxgIndoorScene strictly:
- * - Standalone THREE.Scene + standalone first-person PerspectiveCamera (never mutating worldCamera or walk/view-mode)
- * - Full state machine ('unmounted' | 'idle' | 'entering' | 'inside' | 'exiting' | 'disposed')
+ * Implements contract.ts XxgIndoorScene:
+ * - Standalone THREE.Scene + first-person PerspectiveCamera (never mutating worldCamera or walk/view-mode)
+ * - Walk-in stairwells: the street walker goes down the real flight; on the landing the scene swaps in the same
+ *   frame with the same position, eye height, yaw, pitch and FOV, and walking back up swaps out the same way.
+ * - [E]-free; enter()/exit() keep the veiled teleport for programmatic entry (map, tests).
  * - Zero residue across repeated enter/exit cycles, zero leaks on dispose()
  */
 export function createXxgIndoorScene(opts: CreateXxgIndoorSceneOptions = {}): XxgExtendedIndoorScene {
@@ -82,10 +111,10 @@ export function createXxgIndoorScene(opts: CreateXxgIndoorSceneOptions = {}): Xx
 
   const nowFn = opts.now ?? (() => performance.now())
   const veilFadeInMs = Math.max(0, opts.veilFadeInMs ?? XXG_TIMING.veilFadeInMs)
-  const reenterCooldownMs = Math.max(0, opts.reenterCooldownMs ?? XXG_TIMING.reenterCooldownMs)
 
   const collisionWorld = buildIndoorCollisionWorld(layout, XXG_PLAYER.radius, XXG_PLAYER.eyeHeight)
-  const machine = createXxgRuntimeStateMachine(XXG_PORTALS, reenterCooldownMs)
+  const wells = collisionWorld.wells
+  const machine = createXxgRuntimeStateMachine()
 
   const scene = new THREE.Scene()
   scene.name = 'xxg-indoor-root'
@@ -104,32 +133,36 @@ export function createXxgIndoorScene(opts: CreateXxgIndoorSceneOptions = {}): Xx
   let playerX = layout.exits[0]?.foot.x ?? 0
   let playerZ = layout.exits[0]?.foot.z ?? 0
   let playerFootY = 0
-  let playerEyeY: number = XXG_PLAYER.eyeHeight
+  const standingEyeY = Math.min(XXG_PLAYER.eyeHeight, layout.ceilingHeight - 0.45)
+  /** Street foot height minus the B1 floor at the swap; eased out so the eye never steps. */
+  let eyeOffset = 0
+  let playerEyeY = standingEyeY
   let playerYaw = layout.exits[0]?.yaw ?? 0
   let playerPitch = 0
-  let ceilingClearanceM = layout.ceilingHeight - XXG_PLAYER.eyeHeight
+  let ceilingClearanceM = layout.ceilingHeight - standingEyeY
   let activeShopId: string | null = null
   let collisionContacts = 0
-  /** 进场后在 inside 状态内部执行的脚本下楼控制器；非空期间锁输入与视角。 */
-  let activeDescent: XxgStairDescent | null = null
-  const eyeSmoother = createXxgStairEyeSmoother({
-    eyeOffset: XXG_PLAYER.eyeHeight,
-    maxDeltaYPerFrame: XXG_STAIR_MAX_DELTA_Y,
-  })
+
+  // B1 glass doors: linear travel progress per well; leaves are obstacles where they stand.
+  const doorProgress = wells.map(() => 0)
+  let doorObstacles: Aabb2D[] = []
+
+  /** Last value handed to host.setWorldViewBlend (undefined = never sent). */
+  let viewBlendSent: number | null | undefined
 
   // Contract metrics (XxgIndoorMetrics)
   let lastDrawCalls = 0
   let lastSwapMs = 0
   let lastBlackFrames = 0
+  let swapStartedAt: number | null = null
 
-  // Input & single-container DOM (0 extra body children across enter/exit cycles)
+  // Input & DOM
   const pressedKeys = new Set<string>()
   let draggingLook = false
   let lastPointerX = 0
   let lastPointerY = 0
   let styleLinkEl: HTMLLinkElement | null = null
-  let rootEl: HTMLDivElement | null = null
-  let promptBtn: HTMLButtonElement | null = null
+  let listening = false
 
   function setBodyFlags(active: boolean): void {
     if (typeof document === 'undefined' || !document.body?.dataset) return
@@ -143,77 +176,71 @@ export function createXxgIndoorScene(opts: CreateXxgIndoorSceneOptions = {}): Xx
     }
   }
 
-  function nearestExit(x: number, z: number): { exit: XxgExit; dist: number } | null {
-    let best: XxgExit | null = null
-    let bestDist = Infinity
-    for (const ex of layout.exits) {
-      const d = Math.hypot(x - ex.foot.x, z - ex.foot.z)
-      if (d < bestDist) {
-        bestDist = d
-        best = ex
-      }
-    }
-    return best ? { exit: best, dist: bestDist } : null
+  function sendViewBlend(blend: number | null): void {
+    if (blend === viewBlendSent) return
+    viewBlendSent = blend
+    hostCtx?.setWorldViewBlend?.(blend)
   }
 
-  /** 返回当前允许 [E] 离开的出口（站在楼梯上或 foot 4m 内）。 */
-  function findInteractiveExit(x: number, z: number): XxgExit | null {
-    const onStair = sampleAllExitStairsFootY(collisionWorld.exitStairs, x, z)
-    if (onStair) {
-      return layout.exits.find(e => e.portalId === onStair.stair.portalId) ?? null
-    }
-    const near = nearestExit(x, z)
-    return near && near.dist <= 4.0 ? near.exit : null
+  function rebuildDoorObstacles(): void {
+    const out: Aabb2D[] = []
+    for (const w of wells) out.push(...doorLeafRects(w, doorOpenFraction(doorProgress[w.index])))
+    doorObstacles = out
   }
 
-  function syncPromptDom(): void {
-    if (!promptBtn) return
-    const st = machine.getState()
-    if (st === 'disposed' || st === 'unmounted' || st === 'entering' || st === 'exiting' || isOverlayBlockingHud()) {
-      promptBtn.hidden = true
-      return
+  function resetDoors(): void {
+    for (const w of wells) {
+      doorProgress[w.index] = 0
+      greyboxHandle?.wellDoors?.setOpen(w.index, 0)
     }
-    if (st === 'idle') {
-      const nearId = machine.getNearbyPortalId()
-      if (!nearId) {
-        promptBtn.hidden = true
-        return
-      }
-      const p = getPortal(nearId)
-      promptBtn.dataset.xxgAction = 'enter'
-      promptBtn.dataset.portalId = p.id
-      promptBtn.textContent = '[E] 进入'
-      promptBtn.setAttribute('aria-label', `进入${p.label}`)
-      promptBtn.hidden = false
-      return
+    rebuildDoorObstacles()
+  }
+
+  /** Doors slide open while the player is near; the leaves keep blocking until they are out of the way. */
+  function stepDoors(dt: number): void {
+    const d = XXG_WELL_DOOR
+    let changed = false
+    for (const w of wells) {
+      const near = Math.hypot(playerX - w.door.x, playerZ - w.door.z) <= d.triggerM
+      const prev = doorProgress[w.index]
+      const next = near ? Math.min(1, prev + dt / d.travelS) : Math.max(0, prev - dt / d.travelS)
+      if (next === prev) continue
+      doorProgress[w.index] = next
+      greyboxHandle?.wellDoors?.setOpen(w.index, doorOpenFraction(next))
+      changed = true
     }
-    if (st === 'inside') {
-      if (activeDescent !== null) {
-        promptBtn.hidden = true
-        return
-      }
-      const targetExit = findInteractiveExit(playerX, playerZ)
-      if (targetExit) {
-        promptBtn.dataset.xxgAction = 'exit'
-        promptBtn.dataset.portalId = targetExit.portalId
-        promptBtn.textContent = '[E] 离开'
-        promptBtn.setAttribute('aria-label', `离开至${getPortal(targetExit.portalId).label}`)
-        promptBtn.hidden = false
-        return
-      }
-    }
-    promptBtn.hidden = true
+    if (changed) rebuildDoorObstacles()
+  }
+
+  /** 1 on a landing (match the street walker), 0 in the mall proper. */
+  function landingMatch(): number {
+    return 1 - smoothstep(LANDING_MATCH_NEAR_M, LANDING_MATCH_FAR_M, distanceToNearestLanding(playerX, playerZ, wells))
   }
 
   function syncIndoorCamera(): void {
-    const worldAspect = hostCtx?.worldCamera?.aspect
+    const worldCam = hostCtx?.worldCamera
+    const worldAspect = worldCam?.aspect
+    let projectionDirty = false
     if (worldAspect && Number.isFinite(worldAspect) && Math.abs(camera.aspect - worldAspect) > 1e-4) {
       camera.aspect = worldAspect
-      camera.updateProjectionMatrix()
+      projectionDirty = true
     }
+    const streetFov = worldCam && Number.isFinite(worldCam.fov) ? worldCam.fov : XXG_PLAYER.fovDeg
+    const fov = XXG_PLAYER.fovDeg + (streetFov - XXG_PLAYER.fovDeg) * landingMatch()
+    if (Math.abs(camera.fov - fov) > 1e-3) {
+      camera.fov = fov
+      projectionDirty = true
+    }
+    if (projectionDirty) camera.updateProjectionMatrix()
+    // Same lens placement as walk/camera placeFirstPersonCamera: a few cm in front of the eye along the view.
+    const cp = Math.cos(playerPitch)
     camera.rotation.order = 'YXZ'
-    camera.position.set(playerX, playerEyeY, playerZ)
     camera.rotation.set(playerPitch, playerYaw, 0, 'YXZ')
+    camera.position.set(
+      playerX - Math.sin(playerYaw) * cp * EYE_FORWARD_M,
+      playerEyeY + Math.sin(playerPitch) * EYE_FORWARD_M,
+      playerZ - Math.cos(playerYaw) * cp * EYE_FORWARD_M,
+    )
     camera.updateMatrixWorld(true)
   }
 
@@ -228,6 +255,10 @@ export function createXxgIndoorScene(opts: CreateXxgIndoorSceneOptions = {}): Xx
     } else {
       lastDrawCalls = greyboxHandle.meshCount + (crowd?.getMetrics().drawCalls ?? 0)
     }
+    if (swapStartedAt !== null) {
+      lastSwapMs = Math.max(0, Math.round((nowFn() - swapStartedAt) * 100) / 100)
+      swapStartedAt = null
+    }
     return true
   }
 
@@ -236,25 +267,8 @@ export function createXxgIndoorScene(opts: CreateXxgIndoorSceneOptions = {}): Xx
     if (st === 'disposed' || st === 'unmounted') return
     if (e.metaKey || e.ctrlKey || e.altKey) return
     if (isEditableTarget(e.target) || isOverlayBlockingHud()) return
-
-    // 脚本下楼期间锁所有移动与交互输入
-    if (st === 'inside' && activeDescent !== null) return
-
+    // Tracked on the street too, so a key held down the stairs keeps walking after the swap.
     pressedKeys.add(e.code)
-
-    if (!e.repeat && e.code === 'KeyE') {
-      if (st === 'idle' && machine.getNearbyPortalId()) {
-        e.preventDefault()
-        void enter(machine.getNearbyPortalId()!)
-      } else if (st === 'inside') {
-        const targetExit = findInteractiveExit(playerX, playerZ)
-        if (targetExit) {
-          e.preventDefault()
-          pendingExitPortalId = targetExit.portalId
-          void exit()
-        }
-      }
-    }
   }
 
   function onKeyUp(e: KeyboardEvent): void {
@@ -267,9 +281,8 @@ export function createXxgIndoorScene(opts: CreateXxgIndoorSceneOptions = {}): Xx
   }
 
   function onPointerDown(e: PointerEvent): void {
-    if (machine.getState() !== 'inside' || activeDescent !== null) return
+    if (machine.getState() !== 'inside') return
     if (e.button !== 0) return
-    if (promptBtn && e.target instanceof Node && promptBtn.contains(e.target)) return
     draggingLook = true
     lastPointerX = e.clientX
     lastPointerY = e.clientY
@@ -277,7 +290,7 @@ export function createXxgIndoorScene(opts: CreateXxgIndoorSceneOptions = {}): Xx
   }
 
   function onPointerMove(e: PointerEvent): void {
-    if (machine.getState() !== 'inside' || activeDescent !== null) return
+    if (machine.getState() !== 'inside') return
     const pointerLocked = typeof document !== 'undefined' && Boolean(document.pointerLockElement)
     if (!draggingLook && !pointerLocked) return
     const dx = pointerLocked ? e.movementX : e.clientX - lastPointerX
@@ -308,29 +321,6 @@ export function createXxgIndoorScene(opts: CreateXxgIndoorSceneOptions = {}): Xx
       }
     }
 
-    rootEl = document.createElement('div')
-    rootEl.className = 'xxg-root'
-    rootEl.dataset.xxgRoot = '1'
-
-    promptBtn = document.createElement('button')
-    promptBtn.type = 'button'
-    promptBtn.className = 'xxg-prompt'
-    promptBtn.hidden = true
-    promptBtn.addEventListener('click', () => {
-      const action = promptBtn?.dataset.xxgAction
-      const pid = promptBtn?.dataset.portalId
-      if (action === 'enter' && isValidPortalId(pid)) {
-        void enter(pid)
-      } else if (action === 'exit') {
-        if (activeDescent !== null) return
-        if (isValidPortalId(pid)) pendingExitPortalId = pid
-        void exit()
-      }
-    })
-
-    rootEl.append(promptBtn)
-    document.body.append(rootEl)
-
     window.addEventListener('keydown', onKeyDown)
     window.addEventListener('keyup', onKeyUp)
     window.addEventListener('blur', onWindowBlur)
@@ -338,10 +328,11 @@ export function createXxgIndoorScene(opts: CreateXxgIndoorSceneOptions = {}): Xx
     window.addEventListener('pointermove', onPointerMove, true)
     window.addEventListener('pointerup', onPointerUp, true)
     window.addEventListener('pointercancel', onPointerUp, true)
+    listening = true
   }
 
   function unmountDomAndListeners(): void {
-    if (typeof window !== 'undefined') {
+    if (listening && typeof window !== 'undefined') {
       window.removeEventListener('keydown', onKeyDown)
       window.removeEventListener('keyup', onKeyUp)
       window.removeEventListener('blur', onWindowBlur)
@@ -350,11 +341,8 @@ export function createXxgIndoorScene(opts: CreateXxgIndoorSceneOptions = {}): Xx
       window.removeEventListener('pointerup', onPointerUp, true)
       window.removeEventListener('pointercancel', onPointerUp, true)
     }
-    promptBtn?.remove()
-    rootEl?.remove()
+    listening = false
     styleLinkEl?.remove()
-    promptBtn = null
-    rootEl = null
     styleLinkEl = null
     pressedKeys.clear()
     draggingLook = false
@@ -368,12 +356,14 @@ export function createXxgIndoorScene(opts: CreateXxgIndoorSceneOptions = {}): Xx
     scene.background = greyboxHandle.scene.background
     scene.fog = greyboxHandle.scene.fog
     scene.add(greyboxHandle.scene)
+    resetDoors()
     if (crowdMaxAgents > 0) {
       crowd = createXxgCrowd({
         layout,
         maxAgents: crowdMaxAgents,
         seed: opts.crowdSeed,
         columns: greyboxHandle.columnCenters,
+        blocked: wells.map(w => w.footprint),
       })
       scene.add(crowd.group)
     }
@@ -382,7 +372,7 @@ export function createXxgIndoorScene(opts: CreateXxgIndoorSceneOptions = {}): Xx
     await prewarmGpu(ctx.renderer)
   }
 
-  /** 挂载时（入口懒加载、还在地面上）就编译着色器、上传纹理，转场里只剩一帧渲染。 */
+  /** 挂载时（入口懒加载、还在地面上）就编译着色器、上传纹理，换场那一帧只剩渲染。 */
   async function prewarmGpu(renderer: THREE.WebGLRenderer): Promise<void> {
     try {
       const textures = new Set<THREE.Texture>()
@@ -400,6 +390,80 @@ export function createXxgIndoorScene(opts: CreateXxgIndoorSceneOptions = {}): Xx
     }
   }
 
+  function settleEye(dt: number): void {
+    eyeOffset = Math.abs(eyeOffset) < 1e-4 ? 0 : eyeOffset * Math.exp(-dt * 12)
+    playerEyeY = standingEyeY + eyeOffset
+    ceilingClearanceM = Math.round((layout.ceilingHeight - playerEyeY) * 1000) / 1000
+  }
+
+  /** Street walker reached the landing of a well: swap in this frame with the walker's own pose. */
+  function enterFromStairs(
+    portalId: XxgPortalId,
+    walker: { position: { x: number; y: number; z: number }; yaw?: number; pitch?: number },
+  ): boolean {
+    if (!hostCtx || !greyboxHandle) return false
+    if (!machine.transitionTo('entering')) return false
+    swapStartedAt = nowFn()
+
+    resetDoors()
+    const indoor = worldToIndoor(walker.position)
+    const settled = resolveIndoorMovement(collisionWorld, layout, indoor.x, indoor.z, 0, 0, doorObstacles)
+    playerX = settled.x
+    playerZ = settled.z
+    playerFootY = settled.y
+    activeShopId = settled.activeShopId
+    eyeOffset = Math.max(-0.4, Math.min(0.4, walker.position.y - B1_WORLD_Y))
+    settleEye(0)
+    playerYaw = normalizeAngleRad((walker.yaw ?? 0) + FRAME_YAW)
+    playerPitch = clampIndoorPitch(collisionWorld, WALKER_LEVEL_PITCH - (walker.pitch ?? WALKER_LEVEL_PITCH))
+    draggingLook = false
+    const foot = layout.exits.find(e => e.portalId === portalId)
+    crowd?.reset(foot ? { x: foot.foot.x, z: foot.foot.z, yaw: foot.yaw } : { x: playerX, z: playerZ, yaw: playerYaw })
+
+    machine.setActivePortalId(portalId)
+    pendingExitPortalId = portalId
+    setBodyFlags(true)
+    hostCtx.suspendWorld()
+    syncIndoorCamera()
+    if (!machine.transitionTo('inside')) {
+      setBodyFlags(false)
+      machine.setActivePortalId(null)
+      swapStartedAt = null
+      return false
+    }
+    lastBlackFrames = 0
+    return true
+  }
+
+  /** Player walked back onto a landing: hand the exact pose to the street walker, first person, same frame. */
+  function exitToStairs(well: XxgIndoorWell): void {
+    const host = hostCtx
+    if (!host) return
+    if (!machine.transitionTo('exiting')) return
+    const swapStart = nowFn()
+    const portal = getPortal(well.portalId)
+    const world = indoorToWorld({ x: playerX, z: playerZ })
+    draggingLook = false
+    setBodyFlags(false)
+    sendViewBlend(1)
+    void host
+      .resumeWorldAt({
+        x: world.x,
+        z: world.z,
+        footY: portal.groundY - XXG_STAIRWELL.depth,
+        yaw: normalizeAngleRad(playerYaw - FRAME_YAW),
+        pitch: WALKER_LEVEL_PITCH - playerPitch,
+      })
+      .catch(() => false)
+    machine.setActivePortalId(null)
+    pendingExitPortalId = null
+    playerFootY = 0
+    activeShopId = null
+    machine.transitionTo('idle')
+    lastSwapMs = Math.max(0, Math.round((nowFn() - swapStart) * 100) / 100)
+    lastBlackFrames = 0
+  }
+
   async function enter(portalId: XxgPortalId): Promise<boolean> {
     if (!isValidPortalId(portalId) || !hostCtx || !greyboxHandle) return false
     if (!machine.transitionTo('entering')) return false
@@ -410,7 +474,6 @@ export function createXxgIndoorScene(opts: CreateXxgIndoorSceneOptions = {}): Xx
       return false
     }
 
-    syncPromptDom()
     const veilHandle = hostCtx.openVeil('小香港商业城')
     try {
       await sleepMs(veilFadeInMs)
@@ -419,49 +482,36 @@ export function createXxgIndoorScene(opts: CreateXxgIndoorSceneOptions = {}): Xx
         return false
       }
 
-      const swapStart = nowFn()
+      swapStartedAt = nowFn()
       machine.setActivePortalId(portalId)
       pendingExitPortalId = portalId
       setBodyFlags(true)
       hostCtx.suspendWorld()
 
-      const exitStair = collisionWorld.exitStairs.find(s => s.portalId === portalId)
-      if (!exitStair) {
-        setBodyFlags(false)
-        machine.setActivePortalId(null)
-        machine.transitionTo('idle')
-        void veilHandle.done()
-        return false
-      }
-
-      // 首帧相机直接放在楼梯顶部下楼脚本起点（离玻璃门 0.45m、俯角 -18°）
-      activeDescent = descentPath(exitStair, exitSpec)
-      const startFrame = activeDescent.start
-      playerX = startFrame.x
-      playerZ = startFrame.z
-      playerFootY = startFrame.footY
-      playerEyeY = eyeSmoother.reset(playerFootY)
-      ceilingClearanceM = Math.round((layout.ceilingHeight - playerEyeY) * 1000) / 1000
-      activeShopId = null
-      playerYaw = startFrame.yaw
-      playerPitch = startFrame.pitch
+      resetDoors()
+      const settled = resolveIndoorMovement(collisionWorld, layout, exitSpec.foot.x, exitSpec.foot.z, 0, 0, doorObstacles)
+      playerX = settled.x
+      playerZ = settled.z
+      playerFootY = settled.y
+      activeShopId = settled.activeShopId
+      eyeOffset = 0
+      settleEye(0)
+      playerYaw = exitSpec.yaw
+      playerPitch = 0
       pressedKeys.clear()
       draggingLook = false
-      // 人群预置避让以楼梯底落脚点为中心，避免行人挡在下楼口
       crowd?.reset({ x: exitSpec.foot.x, z: exitSpec.foot.z, yaw: exitSpec.yaw })
 
       syncIndoorCamera()
       if (!machine.transitionTo('inside')) {
-        activeDescent = null
         setBodyFlags(false)
+        swapStartedAt = null
         void veilHandle.done()
         return false
       }
 
       renderFrame()
-      lastSwapMs = Math.max(0, Math.round((nowFn() - swapStart) * 100) / 100)
       lastBlackFrames = 0
-      syncPromptDom()
 
       await veilHandle.done()
       return true
@@ -471,6 +521,7 @@ export function createXxgIndoorScene(opts: CreateXxgIndoorSceneOptions = {}): Xx
         machine.setActivePortalId(null)
         machine.transitionTo('idle')
       }
+      swapStartedAt = null
       await veilHandle.done().catch(() => {})
       return false
     }
@@ -482,9 +533,7 @@ export function createXxgIndoorScene(opts: CreateXxgIndoorSceneOptions = {}): Xx
 
     const targetPortalId: XxgPortalId = pendingExitPortalId ?? machine.getActivePortalId() ?? 'E1'
     const portalDef = getPortal(targetPortalId)
-    activeDescent = null
     draggingLook = false
-    syncPromptDom()
 
     const veilHandle = hostCtx.openVeil(portalDef.label)
     try {
@@ -498,6 +547,7 @@ export function createXxgIndoorScene(opts: CreateXxgIndoorSceneOptions = {}): Xx
       const landing = portalLanding(portalDef)
       setBodyFlags(false)
       pressedKeys.clear()
+      sendViewBlend(null)
       await hostCtx.resumeWorldAt(landing)
 
       if (machine.getState() !== 'exiting') {
@@ -505,17 +555,14 @@ export function createXxgIndoorScene(opts: CreateXxgIndoorSceneOptions = {}): Xx
         return false
       }
 
-      machine.markPortalExitCooldown(targetPortalId, nowFn(), reenterCooldownMs)
       machine.setActivePortalId(null)
       pendingExitPortalId = null
-      activeDescent = null
       playerFootY = 0
       activeShopId = null
       lastSwapMs = Math.max(0, Math.round((nowFn() - swapStart) * 100) / 100)
       lastBlackFrames = 0
 
       machine.transitionTo('idle')
-      syncPromptDom()
       await veilHandle.done()
       return true
     } catch {
@@ -528,117 +575,89 @@ export function createXxgIndoorScene(opts: CreateXxgIndoorSceneOptions = {}): Xx
     }
   }
 
+  function stepSurface(): void {
+    const walker = hostCtx?.getWalker() ?? null
+    const hit = walker ? locateSurfaceWell(walker.position) : null
+    if (!walker || !hit) {
+      sendViewBlend(null)
+      return
+    }
+    const w = XXG_STAIRWELL
+    const depth = hit.portal.groundY - walker.position.y
+    sendViewBlend(stairwellViewBlend(depth))
+    if (hit.lz <= w.enterZ && Math.abs(hit.lx) <= w.halfWidth && depth >= w.depth - 0.6) {
+      enterFromStairs(hit.portal.id, walker)
+    }
+  }
+
   function step(dtSeconds: number): void {
     const st = machine.getState()
     if (st === 'disposed' || st === 'unmounted' || !hostCtx) return
     const dt = Math.max(0, Math.min(0.1, Number.isFinite(dtSeconds) ? dtSeconds : 0))
-    const nowMs = nowFn()
 
     if (st === 'idle') {
-      const walker = hostCtx.getWalker()
-      if (walker) {
-        const res = machine.detectSurfaceEntry(walker.position, walker.velocity, nowMs)
-        syncPromptDom()
-        if (res.triggeredPortal) {
-          void enter(res.triggeredPortal.id)
-        }
-      } else {
-        syncPromptDom()
-      }
+      stepSurface()
       return
     }
+    if (st !== 'inside') return
 
-    if (st === 'inside') {
-      // 脚本自动下楼阶段：忽略全部玩家输入，视线高度平滑且每帧 Δy ≤ 0.08m
-      if (activeDescent !== null) {
-        const frame = activeDescent.step(dt)
-        playerX = frame.x
-        playerZ = frame.z
-        playerFootY = frame.footY
-        playerEyeY = eyeSmoother.step(playerFootY, dt)
-        playerYaw = frame.yaw
-        playerPitch = frame.pitch
-        ceilingClearanceM = Math.round((layout.ceilingHeight - playerEyeY) * 1000) / 1000
-        activeShopId = null
-
-        if (frame.done) {
-          const settled = resolveIndoorMovement(collisionWorld, layout, playerX, playerZ, 0, 0)
-          playerX = settled.x
-          playerZ = settled.z
-          playerFootY = settled.y
-          activeShopId = settled.activeShopId
-          activeDescent = null
-          pressedKeys.clear()
-          draggingLook = false
-        }
-
-        crowd?.step(dt, { x: playerX, z: playerZ, yaw: playerYaw })
-        syncIndoorCamera()
-        syncPromptDom()
-        return
-      }
-
-      let turnInput = 0
-      if (pressedKeys.has('KeyQ')) turnInput += 1
-      if (turnInput !== 0 && dt > 0) {
-        playerYaw = normalizeAngleRad(playerYaw + turnInput * KEY_TURN_RAD_PER_SEC * dt)
-      }
-      let pitchInput = 0
-      if (pressedKeys.has('PageUp')) pitchInput += 1
-      if (pressedKeys.has('PageDown')) pitchInput -= 1
-      if (pitchInput !== 0 && dt > 0) {
-        playerPitch = clampIndoorPitch(collisionWorld, playerPitch + pitchInput * 1.45 * dt)
-      }
-
-      let forwardInput = 0
-      let rightInput = 0
-      if (pressedKeys.has('KeyW') || pressedKeys.has('ArrowUp')) forwardInput += 1
-      if (pressedKeys.has('KeyS') || pressedKeys.has('ArrowDown')) forwardInput -= 1
-      if (pressedKeys.has('KeyD') || pressedKeys.has('ArrowRight')) rightInput += 1
-      if (pressedKeys.has('KeyA') || pressedKeys.has('ArrowLeft')) rightInput -= 1
-
-      let vx = 0
-      let vz = 0
-      if ((forwardInput !== 0 || rightInput !== 0) && dt > 0) {
-        let wishX = rightInput * Math.cos(playerYaw) - forwardInput * Math.sin(playerYaw)
-        let wishZ = -forwardInput * Math.cos(playerYaw) - rightInput * Math.sin(playerYaw)
-        const len = Math.hypot(wishX, wishZ)
-        if (len > 1e-6) {
-          wishX /= len
-          wishZ /= len
-        }
-        const speed =
-          pressedKeys.has('ShiftLeft') || pressedKeys.has('ShiftRight')
-            ? XXG_PLAYER.runSpeed
-            : XXG_PLAYER.walkSpeed
-        vx = wishX * speed
-        vz = wishZ * speed
-
-        const moveRes = resolveIndoorMovement(collisionWorld, layout, playerX, playerZ, vx * dt, vz * dt)
-        playerX = moveRes.x
-        playerZ = moveRes.z
-        playerFootY = moveRes.y
-        activeShopId = moveRes.activeShopId
-        if (moveRes.hitWall) collisionContacts++
-      }
-
-      // 无论走上台阶还是回到平地，视线高度始终平滑过渡（每帧 Δy ≤ 0.08m）
-      playerEyeY = eyeSmoother.step(playerFootY, dt)
-      ceilingClearanceM = Math.round((layout.ceilingHeight - playerEyeY) * 1000) / 1000
-
-      crowd?.step(dt, { x: playerX, z: playerZ, yaw: playerYaw })
-      syncIndoorCamera()
-      syncPromptDom()
-
-      // 玩家自己走上任一出口楼梯上段并继续朝上行方向移动时触发离开
-      if (vx !== 0 || vz !== 0) {
-        const stairHit = sampleAllExitStairsFootY(collisionWorld.exitStairs, playerX, playerZ)
-        if (stairHit && shouldClimbOut(stairHit.stair, playerX, playerZ, stairHit.footY, vx, vz)) {
-          pendingExitPortalId = stairHit.stair.portalId
-          void exit()
-        }
-      }
+    let turnInput = 0
+    if (pressedKeys.has('KeyQ')) turnInput += 1
+    if (turnInput !== 0 && dt > 0) {
+      playerYaw = normalizeAngleRad(playerYaw + turnInput * KEY_TURN_RAD_PER_SEC * dt)
     }
+    let pitchInput = 0
+    if (pressedKeys.has('PageUp')) pitchInput += 1
+    if (pressedKeys.has('PageDown')) pitchInput -= 1
+    if (pitchInput !== 0 && dt > 0) {
+      playerPitch = clampIndoorPitch(collisionWorld, playerPitch + pitchInput * 1.45 * dt)
+    }
+
+    let forwardInput = 0
+    let rightInput = 0
+    if (pressedKeys.has('KeyW') || pressedKeys.has('ArrowUp')) forwardInput += 1
+    if (pressedKeys.has('KeyS') || pressedKeys.has('ArrowDown')) forwardInput -= 1
+    if (pressedKeys.has('KeyD') || pressedKeys.has('ArrowRight')) rightInput += 1
+    if (pressedKeys.has('KeyA') || pressedKeys.has('ArrowLeft')) rightInput -= 1
+
+    if ((forwardInput !== 0 || rightInput !== 0) && dt > 0) {
+      let wishX = rightInput * Math.cos(playerYaw) - forwardInput * Math.sin(playerYaw)
+      let wishZ = -forwardInput * Math.cos(playerYaw) - rightInput * Math.sin(playerYaw)
+      const len = Math.hypot(wishX, wishZ)
+      if (len > 1e-6) {
+        wishX /= len
+        wishZ /= len
+      }
+      const running = pressedKeys.has('ShiftLeft') || pressedKeys.has('ShiftRight')
+      // Running keeps the street pace on the landing so the swap does not brake the walker.
+      const speed = running
+        ? XXG_PLAYER.runSpeed + (XXG_PLAYER.streetRunSpeed - XXG_PLAYER.runSpeed) * landingMatch()
+        : XXG_PLAYER.walkSpeed
+
+      const moveRes = resolveIndoorMovement(
+        collisionWorld,
+        layout,
+        playerX,
+        playerZ,
+        wishX * speed * dt,
+        wishZ * speed * dt,
+        doorObstacles,
+      )
+      playerX = moveRes.x
+      playerZ = moveRes.z
+      playerFootY = moveRes.y
+      activeShopId = moveRes.activeShopId
+      if (moveRes.hitWall) collisionContacts++
+    }
+
+    stepDoors(dt)
+    settleEye(dt)
+    crowd?.step(dt, { x: playerX, z: playerZ, yaw: playerYaw })
+    syncIndoorCamera()
+
+    const w = XXG_STAIRWELL
+    const pose = locateInWell(playerX, playerZ, wells)
+    if (pose && pose.lz >= w.exitZ && Math.abs(pose.lx) <= w.halfWidth) exitToStairs(pose.well)
   }
 
   function getMetrics(): XxgIndoorMetrics {
@@ -659,18 +678,19 @@ export function createXxgIndoorScene(opts: CreateXxgIndoorSceneOptions = {}): Xx
       eyeY: playerEyeY,
       yaw: Math.round(playerYaw * 10000) / 10000,
       pitch: Math.round(playerPitch * 10000) / 10000,
+      fovDeg: Math.round(camera.fov * 1000) / 1000,
       ceilingClearanceM,
       activePortalId: machine.getActivePortalId(),
       activeShopId,
       collisionContacts,
-      descending: activeDescent !== null,
+      doorsOpen: doorProgress.map(p => Math.round(doorOpenFraction(p) * 1000) / 1000),
     }
   }
 
   function dispose(): void {
     if (machine.getState() === 'disposed') return
+    sendViewBlend(null)
     machine.dispose()
-    activeDescent = null
     playerFootY = 0
     setBodyFlags(false)
     unmountDomAndListeners()
@@ -688,6 +708,7 @@ export function createXxgIndoorScene(opts: CreateXxgIndoorSceneOptions = {}): Xx
     pendingExitPortalId = null
     activeShopId = null
     lastDrawCalls = 0
+    swapStartedAt = null
   }
 
   return {

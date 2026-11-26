@@ -56,15 +56,6 @@ export const XXG_WELL_GLOBES: readonly SkylightGlobe[] = Object.freeze([
   { fx: -0.62, fz: -0.62, dy: -0.15 },
 ])
 
-/** 出口楼梯上方的长条金字塔：沿楼梯方向一排吊灯。 */
-export const XXG_STAIR_GLOBES: readonly SkylightGlobe[] = Object.freeze([
-  { fx: 0, fz: 0, dy: -0.35, radius: 0.2 },
-  { fx: 0.48, fz: 0, dy: 0.2 },
-  { fx: -0.48, fz: 0, dy: 0.2 },
-  { fx: 0.3, fz: 0.45, dy: 0.45 },
-  { fx: -0.3, fz: -0.45, dy: 0.45 },
-])
-
 /** 玻璃贴图 128px、每 64px 一道竖梃：uv 0.27 落在透明格内。 */
 const CLEAR_PANE_UV = 0.27
 

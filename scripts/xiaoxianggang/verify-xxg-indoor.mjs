@@ -4,11 +4,12 @@
  * 1) 直接解析冻结版 contract.ts 中的 XXG_FRAME、XXG_PORTAL_TRIGGER 与 portal('E1'..'W2', ...) 调用，
  *    按与 contract.ts 完全一致的坐标公式算出 E1/E2/W1/W2 世界坐标、inward、approachYaw 与出来落点 landing；
  * 2) 不传 --url 时自启 `vite preview web --config web/vite.config.ts --outDir <dist>`（自动分配空闲端口，绝不碰 4190）；
- * 3) 地面步行到达指定下沉入口，核验地面铺装标高稳定在 153.868m±0.35m；
- * 4) 按真实下行方向（inward）踏过入口触发阈线进入独立 indoorScene（body.dataset.xxgActive === '1'）：
+ * 3) 地面步行到达指定楼梯井口前，核验地面铺装标高稳定在 153.868m±0.35m；
+ * 4) 按住 W 沿真楼梯走下井底平台，同一帧换进独立 indoorScene（body.dataset.xxgActive === '1'）：
  *    - 优先读取 contract.md §4 规定的只读 window.viewer.xxg.getMetrics()（drawCalls/lastSwapMs/lastBlackFrames）；
  *    - 核验换场耗时 <= 300ms、无纯色黑屏帧、室内 draw calls <= 40、墙壁碰撞不穿墙不坠落；
- * 5) 走回室内出口淡出回到 portalLanding(portal) 对应地面落点并保持宿主原视角；
+ *    - 逐帧录制换场前后脚位、视点与朝向，跳变不得超过相邻两帧步长（无缝）；
+ * 5) 转身走回井底平台，同一帧换回世界楼梯井底（B1 标高），同样核验出场无跳变并保持宿主原视角；
  * 6) 连续执行多轮 enter -> exit（默认 2 轮），核验场景节点/DOM 残留为 0、控制台 error = 0、生产无作弊探针；
  * 7) 严格在 finally 中关闭 browser 与自启 vite preview 服务，绝不触碰 4190 端口。
  */
@@ -41,7 +42,18 @@ export const DEFAULT_FRAME = {
   axisS: { x: -0.346, z: 0.938 },
   surfaceY: SURFACE_PLAZA_Y,
   landingZ: 5.8,
+  /** XXG_STAIRWELL.depth / exitZ in web/src/xiaoxianggang/frame.ts. */
+  stairDepth: 4.2,
+  exitZ: -3.25,
 }
+
+/** Seam tolerance: the swap frame may move as far as two ordinary frames plus this slack. */
+export const SEAM_SLACK_FOOT_M = 0.12
+export const SEAM_SLACK_EYE_M = 0.2
+export const MAX_SEAM_FOOT_DY_M = 0.15
+export const MAX_SEAM_YAW_RAD = 0.15
+export const MAX_EXIT_FLOOR_DY_M = 0.35
+const EYE_FORWARD_M = 0.08
 
 const DEFAULT_AXIS_YAW = Math.atan2(-DEFAULT_FRAME.axisE.x, -DEFAULT_FRAME.axisE.z)
 
@@ -78,6 +90,7 @@ function buildPortalEntry({ id, label, along, across, yaw, frame }) {
   const world = indoorToWorld(indoor, frame)
   const inward = rotateLocal({ x: 0, z: -1 }, yaw)
   const landingOff = rotateLocal({ x: 0, z: frame.landingZ }, yaw)
+  const bottomOff = rotateLocal({ x: 0, z: frame.exitZ ?? DEFAULT_FRAME.exitZ }, yaw)
   const outward = { x: -inward.x, z: -inward.z }
   const landing = {
     x: round3(world.x + landingOff.x),
@@ -97,6 +110,12 @@ function buildPortalEntry({ id, label, along, across, yaw, frame }) {
     inward: { x: round4(inward.x), z: round4(inward.z) },
     approachYaw: round4(yawFacing(inward)),
     landing,
+    /** Where the walk-up exit hands the walker back to the world: the well's bottom landing, B1 grade. */
+    wellBottom: {
+      x: round3(world.x + bottomOff.x),
+      z: round3(world.z + bottomOff.z),
+      y: round3(frame.surfaceY - (frame.stairDepth ?? DEFAULT_FRAME.stairDepth)),
+    },
   }
 }
 
@@ -142,6 +161,8 @@ function parseFrameFromContract(src) {
     axisS: { ...DEFAULT_FRAME.axisS },
     surfaceY: DEFAULT_FRAME.surfaceY,
     landingZ: DEFAULT_FRAME.landingZ,
+    stairDepth: DEFAULT_FRAME.stairDepth,
+    exitZ: DEFAULT_FRAME.exitZ,
   }
   const readPair = name => {
     const m = src.match(new RegExp(`${name}\\s*:\\s*\\{\\s*x\\s*:\\s*(-?\\d+(?:\\.\\d+)?)\\s*,\\s*z\\s*:\\s*(-?\\d+(?:\\.\\d+)?)\\s*\\}`))
@@ -154,6 +175,13 @@ function parseFrameFromContract(src) {
   if (sy) frame.surfaceY = Number(sy[1])
   const lz = src.match(/\blandingZ\s*:\s*(-?\d+(?:\.\d+)?)/)
   if (lz) frame.landingZ = Number(lz[1])
+  const well = src.match(/XXG_STAIRWELL\s*=\s*\{([\s\S]*?)\}\s*as const/)
+  if (well) {
+    const d = well[1].match(/\bdepth\s*:\s*(\d+(?:\.\d+)?)/)
+    const ez = well[1].match(/\bexitZ\s*:\s*(-?\d+(?:\.\d+)?)/)
+    if (d) frame.stairDepth = Number(d[1])
+    if (ez) frame.exitZ = Number(ez[1])
+  }
   const axisM = src.match(/AXIS_YAW\s*=\s*Math\.atan2\(\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)\s*\)/)
   const axisYaw = axisM ? Math.atan2(Number(axisM[1]), Number(axisM[2])) : Math.atan2(-frame.axisE.x, -frame.axisE.z)
   return { frame, axisYaw }
@@ -178,7 +206,9 @@ export function loadPortalCatalog(repoRoot = REPO_ROOT) {
     return { source: 'stage0-default', portals: DEFAULT_PORTALS.map(p => ({ ...p })) }
   }
   try {
-    const src = readFileSync(contractPath, 'utf8')
+    // Portal specs and the frame live in frame.ts (shared with the host main chunk); contract.ts re-exports them.
+    const framePath = join(repoRoot, 'web/src/xiaoxianggang/frame.ts')
+    const src = readFileSync(contractPath, 'utf8') + (existsSync(framePath) ? `\n${readFileSync(framePath, 'utf8')}` : '')
     const { frame, axisYaw } = parseFrameFromContract(src)
 
     const callPortals = []
@@ -191,8 +221,14 @@ export function loadPortalCatalog(repoRoot = REPO_ROOT) {
       const yaw = evalYawExpr(m[5], axisYaw)
       callPortals.push(buildPortalEntry({ id, label, along, across, yaw, frame }))
     }
+    const specRe = /\{\s*id\s*:\s*['"`]([^'"`]+)['"`]\s*,\s*label\s*:\s*['"`]([^'"`]+)['"`]\s*,\s*along\s*:\s*(-?\d+(?:\.\d+)?)\s*,\s*across\s*:\s*(-?\d+(?:\.\d+)?)\s*,\s*yaw\s*:\s*([^}]+?)\s*\}/g
+    for (const m of src.matchAll(specRe)) {
+      if (callPortals.some(p => p.id === m[1])) continue
+      const yaw = evalYawExpr(m[5], axisYaw)
+      callPortals.push(buildPortalEntry({ id: m[1], label: m[2], along: Number(m[3]), across: Number(m[4]), yaw, frame }))
+    }
     if (callPortals.length >= 4) {
-      return { source: 'contract.ts', portals: callPortals }
+      return { source: 'contract.ts', frame, portals: callPortals }
     }
 
     const objPortals = []
@@ -227,7 +263,7 @@ export function loadPortalCatalog(repoRoot = REPO_ROOT) {
       })
     }
     if (objPortals.length >= 4) {
-      return { source: 'contract.ts', portals: objPortals }
+      return { source: 'contract.ts', frame, portals: objPortals }
     }
   } catch {
     // 解析失败回退默认坐标
@@ -325,6 +361,74 @@ export function auditXxgProdProbe(snapshot) {
 /**
  * 纯断言汇总：覆盖 Stage 1 全部性能、转场、碰撞、视角与零泄漏指标。
  */
+/** Seam check for one swap frame; returns a short reason or null. */
+export function seamFailure(seam) {
+  if (!seam || typeof seam !== 'object') return null
+  const step = Math.max(0, seam.stepM ?? 0)
+  if (seam.footM > 2 * step + SEAM_SLACK_FOOT_M) return `foot ${seam.footM.toFixed(2)}m>step ${step.toFixed(2)}m`
+  if (seam.footDy > MAX_SEAM_FOOT_DY_M) return `footY ${seam.footDy.toFixed(2)}m`
+  if (typeof seam.eyeM === 'number' && seam.eyeM > 2 * step + SEAM_SLACK_EYE_M) return `eye ${seam.eyeM.toFixed(2)}m`
+  if (typeof seam.yawRad === 'number' && seam.yawRad > MAX_SEAM_YAW_RAD) return `yaw ${seam.yawRad.toFixed(3)}rad`
+  return null
+}
+
+/**
+ * Turns a per-frame recording (see installSeamRecorder) into the swap-frame jump. Poses are world space:
+ * indoor frames map the indoor player through the frame axes onto the B1 grade below the street.
+ */
+export function measureSeam(frames, toIndoor, frame = DEFAULT_FRAME) {
+  if (!Array.isArray(frames)) return null
+  const b1 = frame.surfaceY - (frame.stairDepth ?? DEFAULT_FRAME.stairDepth)
+  const pose = f => {
+    if (f.indoor) {
+      if (!f.p) return null
+      const w = indoorToWorld({ x: f.p.x, z: f.p.z }, frame)
+      const d = { x: -Math.sin(f.p.yaw), z: -Math.cos(f.p.yaw) }
+      const dir = { x: d.x * frame.axisE.x + d.z * frame.axisS.x, z: d.x * frame.axisE.z + d.z * frame.axisS.z }
+      // Both cameras sit EYE_FORWARD_M ahead of the eye along the look ray (walk/camera.ts placeFirstPersonCamera).
+      const pitch = f.p.pitch ?? 0
+      const fwd = EYE_FORWARD_M * Math.cos(pitch)
+      return {
+        x: w.x, z: w.z, y: b1 + (f.p.y ?? 0),
+        eye: { x: w.x + dir.x * fwd, y: b1 + f.p.eyeY + EYE_FORWARD_M * Math.sin(pitch), z: w.z + dir.z * fwd },
+        dir,
+      }
+    }
+    if (!f.w) return null
+    return { x: f.w.x, z: f.w.z, y: f.foot ?? f.w.y, eye: f.cam, dir: f.cam ? { x: f.cam.fx, z: f.cam.fz } : null }
+  }
+  const k = frames.findIndex((f, i) => i > 0 && frames[i - 1].indoor === !toIndoor && f.indoor === toIndoor)
+  if (k < 1) return null
+  const a = pose(frames[k - 1])
+  const b = pose(frames[k])
+  if (!a || !b) return null
+  const steps = []
+  for (let i = Math.max(1, k - 4); i < Math.min(frames.length, k + 5); i++) {
+    if (i === k || frames[i].indoor !== frames[i - 1].indoor) continue
+    const p = pose(frames[i - 1])
+    const q = pose(frames[i])
+    if (p && q) steps.push(Math.hypot(q.x - p.x, q.z - p.z))
+  }
+  steps.sort((m, n) => m - n)
+  const r3 = v => Math.round(v * 1000) / 1000
+  const ang = (u, v) => {
+    if (!u || !v) return null
+    const lu = Math.hypot(u.x, u.z)
+    const lv = Math.hypot(v.x, v.z)
+    if (lu < 1e-6 || lv < 1e-6) return null
+    return Math.acos(Math.max(-1, Math.min(1, (u.x * v.x + u.z * v.z) / (lu * lv))))
+  }
+  const yaw = ang(a.dir, b.dir)
+  return {
+    frame: k,
+    stepM: r3(steps.length ? steps[steps.length >> 1] : 0),
+    footM: r3(Math.hypot(b.x - a.x, b.z - a.z)),
+    footDy: r3(Math.abs(b.y - a.y)),
+    eyeM: a.eye && b.eye ? r3(Math.hypot(b.eye.x - a.eye.x, b.eye.y - a.eye.y, b.eye.z - a.eye.z)) : null,
+    yawRad: yaw === null ? null : r3(yaw),
+  }
+}
+
 export function evaluateXxgChecks(metrics) {
   const failures = []
   if (!metrics || typeof metrics !== 'object') {
@@ -371,6 +475,15 @@ export function evaluateXxgChecks(metrics) {
   }
   if (typeof exit?.climbPeakEyeY === 'number' && exit.climbPeakEyeY >= MAX_CLIMB_EYE_Y_M) {
     failures.push(`EXIT_VIEW_ABOVE_CEILING(${exit.climbPeakEyeY.toFixed(2)}m>=${MAX_CLIMB_EYE_Y_M}m)`)
+  }
+  for (const [phase, seam] of [['ENTER', metrics.enter?.seam], ['EXIT', exit?.seam]]) {
+    if (seam === null) failures.push(`${phase}_SEAM_NOT_RECORDED`)
+    const fail = seamFailure(seam)
+    if (fail) failures.push(`${phase}_SEAM_JUMP(${fail})`)
+  }
+  if (typeof exit?.returnY === 'number' && typeof exit?.expectedY === 'number' &&
+      Math.abs(exit.returnY - exit.expectedY) > MAX_EXIT_FLOOR_DY_M) {
+    failures.push(`EXIT_FLOOR_MISMATCH(${exit.returnY.toFixed(3)}m vs ${exit.expectedY.toFixed(3)}m)`)
   }
   if (typeof exit?.returnDistM === 'number' && exit.returnDistM > MAX_EXIT_RETURN_DIST_M) {
     failures.push(`EXIT_PORTAL_DRIFT(${exit.returnDistM.toFixed(2)}m>${MAX_EXIT_RETURN_DIST_M}m)`)
@@ -459,6 +572,7 @@ export async function runVerify(opts) {
   const catalog = loadPortalCatalog()
   const targetId = normalizePortalId(opts.portal)
   const portal = catalog.portals.find(p => p.id === targetId) ?? catalog.portals[0]
+  const catalogFrame = catalog.frame ?? DEFAULT_FRAME
   if (opts.dryRun) {
     return {
       ok: true,
@@ -566,35 +680,66 @@ export async function runVerify(opts) {
       }
     }, portal.worldY)
 
-    async function walkIntoPortal() {
+    /** Records every rendered frame (indoor player, walker foot, world camera) so the swap frame can be measured. */
+    const startSeamRecorder = () => page.evaluate(() => {
+      const rec = { frames: [], raf: 0 }
+      const tick = () => {
+        const v = window.viewer
+        const st = v?.xxg?.getState?.()
+        const indoor = document.body.dataset.xxgActive === '1' || Boolean(st?.isIndoor)
+        const pl = st?.player
+        const pos = v?.walk?.position
+        const probe = typeof v?.walk?.probe === 'function' ? v.walk.probe() : null
+        const e = v?.camera?.matrixWorld?.elements
+        rec.frames.push({
+          indoor,
+          p: indoor && pl ? { x: pl.x, y: pl.y ?? 0, z: pl.z, eyeY: pl.eyeY, yaw: pl.yaw, pitch: pl.pitch } : null,
+          w: pos ? { x: pos.x, y: pos.y, z: pos.z } : null,
+          foot: typeof probe?.foot === 'number' ? probe.foot : null,
+          cam: e ? { x: e[12], y: e[13], z: e[14], fx: -e[8], fz: -e[10] } : null,
+        })
+        if (rec.frames.length > 4000) rec.frames.splice(0, 1000)
+        rec.raf = requestAnimationFrame(tick)
+      }
+      rec.raf = requestAnimationFrame(tick)
+      window.__xxgSeamRec = rec
+    })
+    const stopSeamRecorder = () => page.evaluate(() => {
+      const rec = window.__xxgSeamRec
+      if (!rec) return []
+      cancelAnimationFrame(rec.raf)
+      delete window.__xxgSeamRec
+      return rec.frames
+    })
+
+    /** Holds W from the street apron down the real stairs; the swap happens on the bottom landing. */
+    async function walkIntoPortal(shotPath) {
       const t0 = Date.now()
+      await startSeamRecorder()
       await page.keyboard.down('KeyW')
       let entered = false
-      const deadline = Date.now() + 5000
+      let shotTaken = !shotPath
+      const deadline = Date.now() + 12000
       while (Date.now() < deadline) {
         entered = await isIndoorFlag()
         if (entered) break
-        await page.waitForTimeout(60)
+        if (!shotTaken) {
+          const foot = await page.evaluate(() => window.viewer.walk?.probe?.()?.foot ?? window.viewer.walk?.position?.y ?? null)
+          if (typeof foot === 'number' && foot < portal.worldY - 2) {
+            await page.screenshot({ path: shotPath })
+            shotTaken = true
+          }
+        }
+        await page.waitForTimeout(40)
       }
       await page.keyboard.up('KeyW')
-      if (!entered) {
-        await page.keyboard.press('KeyE')
-        await page.waitForTimeout(450)
-        entered = await isIndoorFlag()
-      }
-      const wallElapsedMs = Date.now() - t0
-      // 进场是脚本下楼（锁输入），等走到楼梯底交还控制再继续
-      let descended = !entered
-      if (entered) {
-        descended = await page
-          .waitForFunction(() => window.viewer?.xxg?.getState?.()?.player?.descending === false, null, { timeout: 8000 })
-          .then(() => true, () => false)
-      }
       await page.waitForTimeout(350)
-      return { entered, descended, wallElapsedMs }
+      const seam = entered ? measureSeam(await stopSeamRecorder(), true, catalogFrame) : (await stopSeamRecorder(), undefined)
+      const wallElapsedMs = Date.now() - t0
+      return { entered, descended: entered, wallElapsedMs, seam }
     }
 
-    /** 转身面朝当前出口楼梯，按住 W 自己走上台阶离开；记录离开前最高视线，走不出去才用 [E] 兜底。 */
+    /** 转身面朝楼梯，按住 W 走回井底平台，同一帧换回世界；记录离开前最高视线，走不出去才用 [E] 兜底。 */
     async function walkOutOfPortal() {
       const snap = await page.evaluate(() => window.viewer?.xxg?.getState?.() ?? null)
       const pid = snap?.activePortalId ?? snap?.player?.activePortalId ?? portal.id
@@ -612,6 +757,7 @@ export async function runVerify(opts) {
           await page.waitForTimeout(16)
         }
         await page.keyboard.up('KeyQ')
+        await startSeamRecorder()
         await page.keyboard.down('KeyW')
         const climbDeadline = Date.now() + 6000
         while (Date.now() < climbDeadline) {
@@ -628,6 +774,9 @@ export async function runVerify(opts) {
         }
         await page.keyboard.up('KeyW')
       }
+      await page.waitForTimeout(200)
+      const frames = await stopSeamRecorder()
+      const seam = climbedOut ? measureSeam(frames, false, catalogFrame) : undefined
       let returned = !(await isIndoorFlag())
       if (!returned) {
         await page.keyboard.press('KeyE')
@@ -638,12 +787,13 @@ export async function runVerify(opts) {
       return {
         returned,
         climbedOut,
+        seam,
         climbPeakEyeY: climbPeakEyeY === null ? null : Math.round(climbPeakEyeY * 1000) / 1000,
       }
     }
 
     // 2. 第 1 轮真实步入独立 indoorScene
-    const enterRun = await walkIntoPortal()
+    const enterRun = await walkIntoPortal(join(opts.out, '01b-stair-descent.png'))
     const enteredIndoor = enterRun.entered
     const canvasBlack = await sampleCanvasIsBlack(page)
     const xxgEnterMetrics = await page.evaluate(() => window.viewer?.xxg?.getMetrics?.() ?? null)
@@ -686,7 +836,7 @@ export async function runVerify(opts) {
     const collisionShot = join(opts.out, '03-indoor-collision.png')
     await page.screenshot({ path: collisionShot })
 
-    // 4. 走回出口返回地面 portalLanding(portal)，核验落点与宿主原视角保持
+    // 4. 走回井底平台换回世界（落在楼梯井底 B1 标高），核验无跳变与宿主原视角保持
     await page.keyboard.down('KeyD')
     await page.waitForTimeout(1400)
     await page.keyboard.up('KeyD')
@@ -694,7 +844,7 @@ export async function runVerify(opts) {
     const exitShot = join(opts.out, '04-exit-restored.png')
     await page.screenshot({ path: exitShot })
 
-    const exit = await page.evaluate(({ landingPt, viewBefore }) => {
+    const exit = await page.evaluate(({ landingPt, viewBefore, expectedY }) => {
       const pos = window.viewer.walk?.position
       const probe = typeof window.viewer.walk?.probe === 'function' ? window.viewer.walk.probe() : null
       const footY = typeof probe?.foot === 'number'
@@ -713,10 +863,15 @@ export async function runVerify(opts) {
         returnedToSurface: returned,
         returnDistM,
         returnY: footY !== null ? Math.round(footY * 1000) / 1000 : null,
+        expectedY,
         viewRestored: (prefs.view ?? 'third') === viewBefore,
         domCountAfter: document.body.children.length,
       }
-    }, { landingPt: portal.landing ?? { x: portal.worldX, z: portal.worldZ }, viewBefore: surface.viewBefore })
+    }, {
+      landingPt: portal.wellBottom ?? portal.landing ?? { x: portal.worldX, z: portal.worldZ },
+      viewBefore: surface.viewBefore,
+      expectedY: portal.wellBottom?.y ?? null,
+    })
 
     // 5. 若需要多轮重复进出（默认 cycles=2），等待再触发冷却后执行剩余轮次以核验零泄漏
     let completedCycles = enteredIndoor && exit.returnedToSurface ? 1 : 0
@@ -741,15 +896,15 @@ export async function runVerify(opts) {
       portal,
       prodProbeAudit,
       surface,
-      enter: { enteredIndoor, descended: enterRun.descended, transitionMs, blackFrameDetected, xxgMetrics: xxgEnterMetrics },
+      enter: { enteredIndoor, descended: enterRun.descended, transitionMs, blackFrameDetected, seam: enterRun.seam, xxgMetrics: xxgEnterMetrics },
       indoor,
-      exit: { ...exit, climbedOut: outRun.climbedOut, climbPeakEyeY: outRun.climbPeakEyeY },
+      exit: { ...exit, climbedOut: outRun.climbedOut, climbPeakEyeY: outRun.climbPeakEyeY, seam: outRun.seam },
       repeatCycles: {
         completed: completedCycles,
         residualNodes: 0,
         residualDom: Math.max(0, domCountFinal - (surface.domCountBefore ?? 0)),
       },
-      screenshots: [surfaceShot, indoorShot, collisionShot, exitShot],
+      screenshots: [surfaceShot, join(opts.out, '01b-stair-descent.png'), indoorShot, collisionShot, exitShot],
       errors,
     }
     const verdict = evaluateXxgChecks(metrics)

@@ -1,6 +1,7 @@
 import * as THREE from 'three'
 import type { XxgLayout } from '../contract.ts'
 import { corridorToAabb, type Aabb2D } from './collision.ts'
+import type { RectXZ } from './scene-boxes.ts'
 
 /**
  * 小香港地下街限流人群（自研，不依赖十字街 crowd 模块）。
@@ -20,6 +21,8 @@ export interface XxgCrowdOptions {
   readonly seed?: number
   /** 实际渲染的柱子中心；缺省按 layout 柱网中落在走廊里的柱子。 */
   readonly columns?: readonly { readonly x: number; readonly z: number }[]
+  /** Floor areas walkers must keep out of (the exit stairwells): links through them are dropped, lanes beside them narrowed. */
+  readonly blocked?: readonly RectXZ[]
 }
 
 export interface XxgCrowdPlayer {
@@ -97,8 +100,59 @@ function mulberry32(seed: number): () => number {
 const inside = (b: Aabb2D, x: number, z: number, m = 0) =>
   x >= b.minX - m && x <= b.maxX + m && z >= b.minZ - m && z <= b.maxZ + m
 
-/** 由走廊中心线、交叉点、端点投影和出口落脚点组成的行走图。 */
-export function buildXxgCrowdGraph(layout: XxgLayout): NavNode[] {
+/** Body radius plus the narrowest lane offset (laneFor): a link closer than this to a blocked area is dropped. */
+const BLOCKED_CLEAR_M = 0.55
+
+function pointRectDistance(x: number, z: number, r: RectXZ): number {
+  const dx = Math.max(r.minX - x, 0, x - r.maxX)
+  const dz = Math.max(r.minZ - z, 0, z - r.maxZ)
+  return Math.hypot(dx, dz)
+}
+
+function pointSegmentDistance(px: number, pz: number, ax: number, az: number, bx: number, bz: number): number {
+  const vx = bx - ax
+  const vz = bz - az
+  const len2 = vx * vx + vz * vz
+  const t = len2 > 1e-12 ? Math.min(1, Math.max(0, ((px - ax) * vx + (pz - az) * vz) / len2)) : 0
+  return Math.hypot(px - ax - vx * t, pz - az - vz * t)
+}
+
+/** Exact distance between segment AB and an axis-aligned rect (0 when they touch). */
+export function segmentRectClearance(ax: number, az: number, bx: number, bz: number, r: RectXZ): number {
+  // Slab clip: does any part of the segment lie inside the rect?
+  let t0 = 0
+  let t1 = 1
+  const dx = bx - ax
+  const dz = bz - az
+  for (const [p, d, lo, hi] of [
+    [ax, dx, r.minX, r.maxX],
+    [az, dz, r.minZ, r.maxZ],
+  ] as const) {
+    if (Math.abs(d) < 1e-12) {
+      if (p < lo || p > hi) {
+        t0 = 1
+        t1 = 0
+      }
+      continue
+    }
+    const u0 = (lo - p) / d
+    const u1 = (hi - p) / d
+    t0 = Math.max(t0, Math.min(u0, u1))
+    t1 = Math.min(t1, Math.max(u0, u1))
+  }
+  if (t0 <= t1) return 0
+  return Math.min(
+    pointRectDistance(ax, az, r),
+    pointRectDistance(bx, bz, r),
+    pointSegmentDistance(r.minX, r.minZ, ax, az, bx, bz),
+    pointSegmentDistance(r.maxX, r.minZ, ax, az, bx, bz),
+    pointSegmentDistance(r.minX, r.maxZ, ax, az, bx, bz),
+    pointSegmentDistance(r.maxX, r.maxZ, ax, az, bx, bz),
+  )
+}
+
+/** 由走廊中心线、交叉点、端点投影和出口落脚点组成的行走图；blocked 区域（楼梯井）不穿越。 */
+export function buildXxgCrowdGraph(layout: XxgLayout, blocked: readonly RectXZ[] = []): NavNode[] {
   const nodes: NavNode[] = []
   const keyOf = (x: number, z: number) => `${Math.round(x * 20)},${Math.round(z * 20)}`
   const index = new Map<string, number>()
@@ -113,9 +167,17 @@ export function buildXxgCrowdGraph(layout: XxgLayout): NavNode[] {
   const link = (a: number, b: number, halfWidth: number) => {
     if (a === b) return
     const na = nodes[a]!
+    const nb = nodes[b]!
     if (na.links.some(l => l.node === b)) return
-    na.links.push({ node: b, halfWidth })
-    nodes[b]!.links.push({ node: a, halfWidth })
+    let hw = halfWidth
+    for (const r of blocked) {
+      const clear = segmentRectClearance(na.x, na.z, nb.x, nb.z, r)
+      if (clear < BLOCKED_CLEAR_M) return
+      // laneFor keeps lanes within halfWidth - 0.7; keep a body radius (0.3) off the blocked edge.
+      hw = Math.min(hw, clear + 0.4)
+    }
+    na.links.push({ node: b, halfWidth: hw })
+    nb.links.push({ node: a, halfWidth: hw })
   }
 
   const corridors = layout.corridors.map(c => {
@@ -220,7 +282,7 @@ export function createXxgCrowd(opts: XxgCrowdOptions): XxgCrowd {
   const maxAgents = Math.max(1, Math.floor(opts.maxAgents ?? XXG_CROWD_MAX))
   const spawnIntervalS = Math.max(0.1, opts.spawnIntervalS ?? 0.9)
   const rand = mulberry32(opts.seed ?? 0x5a17)
-  const nodes = buildXxgCrowdGraph(opts.layout)
+  const nodes = buildXxgCrowdGraph(opts.layout, opts.blocked)
   const walkable = nodes.map((n, i) => (n.links.length > 0 ? i : -1)).filter(i => i >= 0)
   const columns: { x: number; z: number }[] = opts.columns ? opts.columns.map(c => ({ x: c.x, z: c.z })) : []
   if (!opts.columns) {

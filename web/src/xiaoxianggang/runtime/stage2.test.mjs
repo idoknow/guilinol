@@ -4,16 +4,10 @@ import * as THREE from 'three'
 
 import { XXG_BUDGET, XXG_PLAYER } from '../contract.ts'
 import { XIAOXIANGGANG_B1_LAYOUT as layout } from '../layout/index.ts'
-import { buildIndoorCollisionWorld, resolveIndoorMovement } from './collision.ts'
+import { buildIndoorCollisionWorld, corridorToAabb, resolveIndoorMovement } from './collision.ts'
 import { XXG_CROWD_MAX, XXG_CROWD_MIN_CAP, buildXxgCrowdGraph, createXxgCrowd } from './crowd.ts'
-import {
-  buildExitStairGeometry,
-  resolveXxgExitStair,
-  sampleAllExitStairsFootY,
-  sampleExitStairFootY,
-  shouldClimbOut,
-  xxgStairCurbM,
-} from './exit-stairs.ts'
+import { toIndoor, toWellLocal, wellVestibule, xxgIndoorWells } from './stairwell.ts'
+import { XXG_STAIRWELL } from '../frame.ts'
 import { XXG_LAMP_SIZE_M, createIndoorGreyboxScene } from './indoor-scene.ts'
 import { createXxgIndoorScene } from './controller.ts'
 import { XXG_FIRST_SHOPS, classifyXxgShop, resolveAlcoveDepth } from './shop-fitout.ts'
@@ -70,8 +64,8 @@ test('B1 室内场景：预算内、吊顶在采光井与楼梯井处开洞、�
     assert.ok(h.triangleCount + XXG_CROWD_MAX * 140 <= XXG_BUDGET.indoorTrianglesMax, `tris=${h.triangleCount}`)
     assert.ok(h.textureBytes <= XXG_BUDGET.indoorTextureBytesMax, `tex=${h.textureBytes}`)
 
-    // 2 个中庭采光井 + 4 个出口楼梯井
-    assert.equal(h.skylightOpenings.length, 2 + layout.exits.length)
+    // 2 个中庭采光井 + 4 个楼梯井
+    assert.equal(h.skylightOpenings.length, 2 + xxgIndoorWells().length)
     const ceiling = meshByName(h.scene, 'xxg_ceiling_grid')
     for (const o of h.skylightOpenings) {
       const cx = (o.minX + o.maxX) / 2
@@ -100,132 +94,99 @@ test('B1 室内场景：预算内、吊顶在采光井与楼梯井处开洞、�
   }
 })
 
-test('出口楼梯井敞开：从落脚点朝楼梯看过去没有走廊墙挡住', () => {
+test('楼梯井敞开：门直通 B1 走廊不留死胡同，井底平台抬头看得到整段楼梯直到街面，没有走廊墙或吊顶挡住', () => {
   const h = createIndoorGreyboxScene(layout)
   try {
     const wall = meshByName(h.scene, 'xxg_wall_corridor')
-    for (const ex of layout.exits) {
-      const from = new THREE.Vector3(ex.foot.x, 1.0, ex.foot.z)
-      const to = new THREE.Vector3(ex.stair.x, 1.0, ex.stair.z)
-      const dir = to.clone().sub(from)
-      assert.equal(rayHits(wall, from, dir, dir.length()).length, 0, `${ex.portalId} 楼梯被墙封住`)
+    const ceiling = meshByName(h.scene, 'xxg_ceiling_grid')
+    const W = XXG_STAIRWELL
+    for (const w of xxgIndoorWells()) {
+      const front = toIndoor(w, 0, W.zBack - 1.6)
+      const from = new THREE.Vector3(front.x, 1.0, front.z)
+      const door = new THREE.Vector3(w.door.x, 1.0, w.door.z)
+      const dir = door.clone().sub(from)
+      assert.equal(rayHits(wall, from, dir, dir.length()).length, 0, `${w.portalId} 门前到门被墙封住`)
+      // 四个门都开在走廊里，不补门厅；出门沿走廊至少一侧 8m 内没墙，不是三面墙的凹槽。
+      assert.equal(wellVestibule(w, layout.corridors.map(corridorToAabb)), null, `${w.portalId} 门外补了门厅`)
+      const side = toIndoor(w, 1, W.zBack - 1.6)
+      const along = new THREE.Vector3(side.x - front.x, 0, side.z - front.z)
+      const clear = [along, along.clone().negate(), dir.clone().negate().setY(0).normalize()].map(d => {
+        const hit = rayHits(wall, from, d, 8)
+        return hit.length ? hit[0].distance : 8
+      })
+      assert.ok(Math.max(...clear) >= 8, `${w.portalId} 出门三面都是墙 ${clear.map(c => c.toFixed(1)).join('/')}`)
+
+      const landing = toIndoor(w, 0, -3.55)
+      const top = toIndoor(w, 0, W.zTop)
+      const eye = new THREE.Vector3(landing.x, XXG_PLAYER.eyeHeight, landing.z)
+      const street = new THREE.Vector3(top.x, W.depth + XXG_PLAYER.eyeHeight, top.z)
+      const up = street.clone().sub(eye)
+      for (const m of [wall, ceiling]) {
+        assert.equal(rayHits(m, eye, up, up.length()).length, 0, `${w.portalId} 平台看楼梯被 ${m.name} 挡住`)
+      }
     }
   } finally {
     h.dispose()
   }
 })
 
-test('出口楼梯：黄色 L 防滑条数量=级数、踏步顶面严格递增、topY 采样一致、draw call 符合预算', () => {
+test('楼梯井几何：每井 25 条铜色防滑条、两扇玻璃门各一次 draw call、静态 draw call 给人群留余量', () => {
   const h = createIndoorGreyboxScene(layout)
   try {
-    // 新增 draw call ≤ 2（仅增 xxg_stair_nosing_yellow 1 个 batch），总静态 meshCount ≤ 40 - 3
     assert.ok(h.meshCount <= XXG_BUDGET.indoorDrawCallsMax - 3, `meshCount=${h.meshCount} > 37`)
-    assert.ok(h.meshCount <= 28, `meshCount=${h.meshCount}，相对 26 新增超过 2 个 draw call`)
-
-    const nosingMesh = meshByName(h.scene, 'xxg_stair_nosing_yellow')
-    assert.equal(nosingMesh.material.map, null, '黄色防滑条材质不得新增纹理')
-    const allNosingBoxes = boxesOf(nosingMesh)
-    const size = new THREE.Vector3()
-    const center = new THREE.Vector3()
-
-    for (const ex of layout.exits) {
-      const stair = resolveXxgExitStair(ex)
-      assert.ok(stair.stepCount >= 8, `${ex.portalId} 级数 ${stair.stepCount} < 8`)
-      assert.ok(stair.tread >= 0.27 - 1e-6 && stair.tread <= 0.32 + 1e-6, `${ex.portalId} tread=${stair.tread}`)
-
-      const built = buildExitStairGeometry(stair)
-      assert.equal(built.stepBoxes.length, stair.stepCount)
-      assert.equal(built.nosingTopBoxes.length, stair.stepCount)
-      assert.equal(built.nosingFrontBoxes.length, stair.stepCount)
-
-      // 踏步顶面高度单调递增且末级对齐 topY
-      let prevTop = 0
-      for (const sb of built.stepBoxes) {
-        const top = sb.cy + sb.sy * 0.5
-        assert.ok(top > prevTop, `${ex.portalId} 踏步顶面高度未递增: ${top} <= ${prevTop}`)
-        prevTop = top
-      }
-      assert.ok(Math.abs(prevTop - stair.topY) < 1e-6, `${ex.portalId} 末级顶面 ${prevTop} != topY ${stair.topY}`)
-
-      // 场景中该出口区域的黄色 L 形防滑条：顶面窄条与前立面窄条各等于级数
-      const minX = ex.stair.x - ex.stair.w * 0.5 - 0.05
-      const maxX = ex.stair.x + ex.stair.w * 0.5 + 0.05
-      const minZ = ex.stair.z - ex.stair.d * 0.5 - 0.05
-      const maxZ = ex.stair.z + ex.stair.d * 0.5 + 0.05
-      let topStripCount = 0
-      let frontStripCount = 0
-      for (const b of allNosingBoxes) {
-        b.getCenter(center)
-        if (center.x < minX || center.x > maxX || center.z < minZ || center.z > maxZ) continue
-        b.getSize(size)
-        if (size.y < 0.02) topStripCount++
-        else frontStripCount++
-      }
-      assert.equal(topStripCount, stair.stepCount, `${ex.portalId} 顶面防滑条数 ${topStripCount} != ${stair.stepCount}`)
-      assert.equal(frontStripCount, stair.stepCount, `${ex.portalId} 立面防滑条数 ${frontStripCount} != ${stair.stepCount}`)
-
-      // sampleExitStairFootY 在楼梯顶平台处与 topY 一致，在落脚点返回 null
-      const topPt = stair.alongZ
-        ? { x: stair.acrossC, z: stair.endEdge - stair.sign * 0.1 }
-        : { x: stair.endEdge - stair.sign * 0.1, z: stair.acrossC }
-      const sampledTop = sampleExitStairFootY(stair, topPt.x, topPt.z)
-      assert.ok(sampledTop !== null && Math.abs(sampledTop - stair.topY) < 1e-6, `${ex.portalId} topY=${stair.topY}, sampled=${sampledTop}`)
-      assert.equal(sampleExitStairFootY(stair, ex.foot.x, ex.foot.z), null, `${ex.portalId} foot 处不应在楼梯上`)
-
-      // 清理临时几何防止测试期显存告警
-      for (const g of built.dwarfWallGeos) g.dispose()
-      for (const g of built.handrailGeos) g.dispose()
+    const nosingMesh = meshByName(h.scene, 'xxg_stair_nosing_bronze')
+    assert.equal(nosingMesh.material.map, null, '防滑条不得新增纹理')
+    const nosings = boxesOf(nosingMesh)
+    const c = new THREE.Vector3()
+    for (const w of xxgIndoorWells()) {
+      const inWell = nosings.filter(b => {
+        b.getCenter(c)
+        const l = toWellLocal(w, c.x, c.z)
+        return Math.abs(l.x) < 0.1 && l.z > XXG_STAIRWELL.zBottom - 0.2 && l.z < XXG_STAIRWELL.zTop + 0.2
+      })
+      assert.equal(inWell.length, XXG_STAIRWELL.risers, `${w.portalId} 防滑条 ${inWell.length}`)
+      // Nosing tops climb one riser per tread from the landing up to the street grade.
+      const tops = inWell.map(b => b.max.y).sort((a, b) => a - b)
+      for (let i = 1; i < tops.length; i++) assert.ok(Math.abs(tops[i] - tops[i - 1] - XXG_STAIRWELL.riser) < 1e-3)
+      assert.ok(Math.abs(tops.at(-1) - XXG_STAIRWELL.depth - 0.004) < 1e-3, `${w.portalId} 顶级防滑条 ${tops.at(-1)}`)
     }
+    for (const name of ['xxg_well_door_glass', 'xxg_well_door_frame', 'xxg_stair_granite', 'xxg_exit_signs']) meshByName(h.scene, name)
+    h.wellDoors.setOpen(0, 1)
+    h.wellDoors.setOpen(0, 0)
   } finally {
     h.dispose()
   }
 })
 
-test('出口楼梯：贴横向慢挪也会在上段离开，碰撞走不上顶部平台，拱座挡住吊顶背面', () => {
+test('楼梯井碰撞：B1 里乱走进不了楼梯段和侧墙，最多踩到末级踏步前沿', () => {
   const world = buildIndoorCollisionWorld(layout)
-  const maxEyeY = layout.ceilingHeight + 0.3
-  const dt = 1 / 60
-  for (const ex of layout.exits) {
-    const stair = world.exitStairs.find(s => s.portalId === ex.portalId)
-    assert.ok(stair, `${ex.portalId} 缺楼梯`)
-
-    // 站上第一级后几乎垂直于楼梯在两侧矮墙间来回走：沿上行方向每秒只挪 0.04m
-    let x = stair.startCenter.x + stair.up.x * 0.3
-    let z = stair.startCenter.z + stair.up.z * 0.3
-    let side = 1
-    let triggeredEyeY = null
-    for (let i = 0; i < 60 * 120 && triggeredEyeY === null; i++) {
-      const upSpeed = 0.04
-      const latSpeed = Math.sqrt(XXG_PLAYER.walkSpeed ** 2 - upSpeed ** 2)
-      const vx = stair.up.x * upSpeed + stair.right.x * latSpeed * side
-      const vz = stair.up.z * upSpeed + stair.right.z * latSpeed * side
-      const res = resolveIndoorMovement(world, layout, x, z, vx * dt, vz * dt)
-      if (Math.hypot(res.x - x, res.z - z) < latSpeed * dt * 0.5) side = -side
+  const r = XXG_PLAYER.radius
+  const W = XXG_STAIRWELL
+  let seed = 7
+  const rand = () => ((seed = (seed * 1103515245 + 12345) % 2147483648) / 2147483648)
+  for (const w of xxgIndoorWells()) {
+    const front = toIndoor(w, 0, W.zBack - 1.6)
+    let x = front.x
+    let z = front.z
+    let yaw = rand() * Math.PI * 2
+    let reachedLanding = false
+    for (let i = 0; i < 4000; i++) {
+      if (rand() < 0.08) yaw = rand() * Math.PI * 2
+      // Bias toward the door so the walk keeps testing the well, not the far corridors.
+      const toDoor = Math.atan2(w.door.x - x, w.door.z - z)
+      const heading = rand() < 0.35 ? toDoor : yaw
+      const res = resolveIndoorMovement(world, layout, x, z, Math.sin(heading) * 0.12, Math.cos(heading) * 0.12)
       x = res.x
       z = res.z
-      const hit = sampleAllExitStairsFootY(world.exitStairs, x, z)
-      assert.ok(res.y + XXG_PLAYER.eyeHeight < maxEyeY, `${ex.portalId} 斜走视线 ${res.y + XXG_PLAYER.eyeHeight} 超过 ${maxEyeY}`)
-      if (hit && shouldClimbOut(hit.stair, x, z, hit.footY, vx, vz)) triggeredEyeY = hit.footY + XXG_PLAYER.eyeHeight
+      const l = toWellLocal(w, x, z)
+      const inFootprint = x > w.footprint.minX && x < w.footprint.maxX && z > w.footprint.minZ && z < w.footprint.maxZ
+      if (!inFootprint) continue
+      assert.ok(Math.abs(l.x) <= W.halfWidth - r + 1e-3, `${w.portalId} 进了侧墙 lx=${l.x}`)
+      // The flight solid starts one tread above the last nosing; the controller hands over to the street at exitZ long before.
+      assert.ok(l.z <= W.zBottom + W.tread / 2 + 1e-3, `${w.portalId} 上了楼梯段 lz=${l.z}`)
+      if (l.z >= W.exitZ) reachedLanding = true
     }
-    assert.ok(triggeredEyeY !== null, `${ex.portalId} 斜走 120s 没触发离开`)
-    assert.ok(triggeredEyeY < maxEyeY, `${ex.portalId} 触发时视线 ${triggeredEyeY}`)
-
-    // 不看离开判定，正对楼梯一直往上走：碰撞把玩家挡在顶部平台之前
-    x = ex.foot.x
-    z = ex.foot.z
-    let peakFootY = 0
-    for (let i = 0; i < 60 * 10; i++) {
-      const res = resolveIndoorMovement(world, layout, x, z, stair.up.x * XXG_PLAYER.walkSpeed * dt, stair.up.z * XXG_PLAYER.walkSpeed * dt)
-      x = res.x
-      z = res.z
-      peakFootY = Math.max(peakFootY, res.y)
-    }
-    assert.ok(peakFootY < stair.topY - 0.3, `${ex.portalId} 走到 footY=${peakFootY}，太靠近顶部 ${stair.topY}`)
-    assert.ok(peakFootY + XXG_PLAYER.eyeHeight < maxEyeY, `${ex.portalId} 视线 ${peakFootY + XXG_PLAYER.eyeHeight}`)
-
-    // 下楼起点视线 topY + 1.6 低于拱座顶
-    const curbTop = layout.ceilingHeight + xxgStairCurbM(stair, layout.ceilingHeight)
-    assert.ok(curbTop >= stair.topY + XXG_PLAYER.eyeHeight + 0.1, `${ex.portalId} 拱座顶 ${curbTop} 不够高`)
+    assert.ok(reachedLanding, `${w.portalId} 随机走没到过井底平台`)
   }
 })
 
