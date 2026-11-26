@@ -22,6 +22,7 @@ export interface Landmark {
 export type LoadedLandmarks = Map<Landmark,THREE.Group>
 
 export interface LandmarkStreamOptions {
+  collisionLandmarks?:LoadedLandmarks
   camera?: THREE.Camera
   onMount?: (root: THREE.Group) => void
   onPendingChange?:()=>void
@@ -260,7 +261,8 @@ export function landmarkStream(
     })
   }
 
-  function disposeGroup(root:THREE.Group, state?:LandmarkState){
+  function disposeGroup(entry:Landmark,root:THREE.Group, state?:LandmarkState){
+    options?.collisionLandmarks?.delete(entry)
     const assets=new Set<THREE.BufferGeometry|THREE.Material|THREE.Texture>()
     const resolvedState=state??states.get(root)
     if(resolvedState){
@@ -320,6 +322,11 @@ export function landmarkStream(
       loader.parse(buffer,'./',gltf=>resolve(gltf.scene),reject)
     })).then(group=>{
       parsing=false
+      group.position.fromArray(entry.position);group.rotation.y=THREE.MathUtils.degToRad(entry.rotation)
+      if(entry.collision!=='none'){
+        group.updateMatrixWorld(true)
+        options?.collisionLandmarks?.set(entry,group)
+      }
       decodedQueue.push({entry,group,isPriority})
       schedulePump()
     }).catch(error=>{
@@ -409,11 +416,10 @@ export function landmarkStream(
     const nearCollision=entry.collision!=='none'&&distance<=guardDist
     const {fadeCutoff,unload}=entryCutoffs(entry,metrics,guardDist)
     if(!isPriority&&!nearCollision&&distance>unload){
-      disposeGroup(group)
+      disposeGroup(entry,group)
       finishPending(entry)
       return
     }
-    group.position.fromArray(entry.position);group.rotation.y=THREE.MathUtils.degToRad(entry.rotation)
     const surfaces:Record<string,string>=(seamConfig.surfaces as Record<string,Record<string,string>>)[entry.id]??{}
     const exceptions=seamConfig.exceptions.filter((item:{kind?:string})=>!item.kind||item.kind==='material')
     type AtlasRule={material:string,role:string,box:number[]}
@@ -531,7 +537,7 @@ export function landmarkStream(
       const nearCollision=ready.entry.collision!=='none'&&distance<=guardDist
       const {fadeCutoff,unload}=entryCutoffs(ready.entry,metrics,guardDist)
       if(!ready.isPriority&&!nearCollision&&distance>unload){
-        disposeGroup(ready.group,ready.state)
+        disposeGroup(ready.entry,ready.group,ready.state)
         finishPending(ready.entry)
         continue
       }
@@ -590,7 +596,7 @@ export function landmarkStream(
       const nearCollision=entry.collision!=='none'&&distance<=guardDist
       const {load,fadeCutoff,unload}=entryCutoffs(entry,metrics,guardDist)
       if(root){
-        if(distance>unload){loaded.delete(entry);disposeGroup(root);continue}
+        if(distance>unload){loaded.delete(entry);disposeGroup(entry,root);continue}
         updateVisibility(entry,root,distance,fadeCutoff,metrics,aerial)
       }else if((distance<=load||nearCollision)&&!pending.has(entry)&&now>=(retry.get(entry)??0)){
         candidates.push({entry,distance,nearCollision})

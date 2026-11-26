@@ -37,6 +37,7 @@ export class Stream {
   private attachSlot = frameSlots(streamBudget.attachMs)
   overviewMesh(){return this.base.mesh}
   landmarks:import('./landmarks').LoadedLandmarks=new Map()
+  collisionLandmarks:import('./landmarks').LoadedLandmarks=new Map()
   updateLandmarks?:ReturnType<typeof import('./landmarks').landmarkStream>
   loaded = new Map<Tile,Awaited<ReturnType<typeof detail>>>()
   pending = new Map<Tile,AbortController>()

@@ -218,6 +218,7 @@ try {
   await applyCpuThrottle(page)
   page.on('pageerror', err => errors.push(`pageerror: ${err.message}`))
   page.on('console', msg => {
+    if (msg.text().startsWith('walk:enter-failed')) console.log(msg.text())
     if (msg.type() === 'error') errors.push(`console.error: ${msg.text()} (${msg.location().url})`)
   })
   await page.route('**/favicon.ico', r => r.fulfill({status: 204}))
@@ -274,28 +275,40 @@ try {
     return s.mission?.id === 'errand-01' && window.viewer.game.missions.beaconVisible() === true
   })
 
-  await page.evaluate(async () => {
+  const arrivedAtPickup = await page.evaluate(async () => {
     const target1 = window.viewer.game.getState().mission.target
-    await window.viewer.walkTo(target1[0], target1[1], 0, 'e2e-errand1-step1')
+    return window.viewer.walkTo(target1[0], target1[1], 0, 'e2e-errand1-step1')
   })
+  assert.equal(arrivedAtPickup, true, 'errand pickup landing failed')
   await page.waitForFunction(() => window.viewer.game.getState().mission?.stepIndex === 1, null, {timeout: 15000})
 
-  await page.evaluate(async () => {
-    const target2 = window.viewer.game.getState().mission.target
-    await window.viewer.walkTo(target2[0], target2[1], 0, 'e2e-errand1-step2')
+  const arrivedAtDelivery = await page.evaluate(async () => {
+    const game = window.viewer.game
+    const target2 = game.getState().mission.target
+    const off = game.onEvent(event => {
+      if (event.type === 'mission:done' && event.id === 'errand-01') {
+        window.errandCompletionMode = game.getState().mode
+        off()
+      }
+    })
+    return window.viewer.walkTo(target2[0], target2[1], 0, 'e2e-errand1-step2')
   })
+  assert.equal(arrivedAtDelivery, true, 'errand delivery landing failed')
   await page.waitForFunction(() => window.viewer.game.getState().mission === null, null, {timeout: 15000})
 
   const afterErrand = await page.evaluate(() => ({
+    completionMode: window.errandCompletionMode,
     mode: window.viewer.game.getState().mode,
     money: window.viewer.game.getState().money,
     missionsDone: window.viewer.game.getState().missionsDone,
     beacon: window.viewer.game.missions.beaconVisible(),
   }))
   assert.equal(afterErrand.mode, 'foot')
+  assert.equal(afterErrand.completionMode, 'foot', 'errand completion observed a stale travel mode')
   assert.equal(afterErrand.money, 380)
   assert.ok(afterErrand.missionsDone.includes('errand-01'))
   assert.equal(afterErrand.beacon, false, 'beacon must hide after mission completion')
+  console.log('PASS errand-01', JSON.stringify({arrivedAtPickup, arrivedAtDelivery, ...afterErrand}))
 
   // 4. Reload persistence check
   await page.reload()
