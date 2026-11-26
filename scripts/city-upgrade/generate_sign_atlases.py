@@ -53,18 +53,24 @@ LED_TICKERS_SERVICE = (
     "品质优选 · 贴心服务 · 欢迎进店体验",
     "邻里口碑好店 · 每日正常营业",
 )
-FOOD_ICON_TYPES = frozenset({"noodle", "food", "bakery", "dessert", "tea", "coffee", "fruit"})
+FOOD_ICON_TYPES = frozenset({"noodle", "food", "bakery", "dimsum", "dessert", "tea", "coffee", "fruit"})
 
 LUXURY_ANCHORS: dict[str, tuple[str, str, str]] = {
-    "coffee":     ("COFFEE",  "08:30-22:00", "手冲精品"),
-    "flower":     ("FLORAL",  "GUILIN",      "花艺美学"),
-    "salon":      ("SALON",   "STUDIO",      "形象定制"),
-    "fashion":    ("ATELIER", "GUILIN",      "质感裁剪"),
-    "bakery":     ("BAKERY",  "FRESH",       "手作烘焙"),
-    "books":      ("BOOKS",   "09:00-22:00", "静心阅读"),
-    "hotel_home": ("HOTEL",   "24H",         "江畔雅居"),
-    "food":       ("CRAFT",   "18:00-02:00", "晚间小酌"),
-    "digital":    ("PHOTO",   "GUILIN",      "山水纪实"),
+    "coffee":     ("ROASTERY", "08:30-22:00", "慢品时光"),
+    "flower":     ("FLORAL",   "GUILIN",      "花艺美学"),
+    "salon":      ("STYLING",  "10:00-22:00", "形象定制"),
+    "fashion":    ("FASHION",  "10:00-22:00", "质感剪裁"),
+    "bakery":     ("BAKERY",   "FRESH",       "手作烘焙"),
+    "books":      ("READING",  "09:00-22:00", "静心书屋"),
+    "hotel_home": ("STAY",     "24H CHECK-IN","江畔雅居"),
+    "food":       ("TAPROOM",  "18:00-02:00", "晚间小酌"),
+    "digital":    ("CAMERA",   "09:00-20:00", "旅拍纪实"),
+    "wellness":   ("WELLNESS", "08:00-21:30", "身心平衡"),
+}
+
+LUXURY_ANCHOR_OVERRIDES: dict[str, tuple[str, str, str]] = {
+    "suxin_culture": ("DESIGN", "09:30-21:30", "手作印记"),
+    "fendai_nails":  ("BEAUTY", "10:00-21:30", "精致护理"),
 }
 
 
@@ -542,7 +548,9 @@ def render_single_fascia(idx: int, spec, cw: int = 1280, ch: int = 320) -> tuple
         da.line([(anchor_x, 62), (anchor_x, ch - 62)], fill=decor, width=2)
         de.line([(anchor_x, 62), (anchor_x, ch - 62)], fill=decor + (145,), width=2)
         r_cx = (anchor_x + cw - 44) // 2
-        anc_top, anc_mid, anc_bot = LUXURY_ANCHORS.get(icon_type, ("GUILIN", "0773", "品质严选"))
+        anc_top, anc_mid, anc_bot = LUXURY_ANCHOR_OVERRIDES.get(
+            _key, LUXURY_ANCHORS.get(icon_type, ("GUILIN", "0773", "品质严选"))
+        )
         f_meta_top = load_font(22, "latin")
         f_meta_mid = fit_font(da, anc_mid, 176, 26, "latin", min_size=18)
         f_meta_bot = load_font(20, "sans_med")

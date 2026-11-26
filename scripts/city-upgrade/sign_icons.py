@@ -1191,6 +1191,122 @@ def _icon_glasses(vc: VectorCanvas):
     vc.sparkle(0.0, -0.40, 0.095, gold)
 
 
+def _icon_wellness(vc: VectorCanvas):
+    """21. 普拉提/瑜伽/身心馆: 叠层舒展莲花 + 极简冥想平衡弧 + 水波纹."""
+    ink = rgba(tone("#2A1E38", 0.10))
+    petal_outer = rgba(tone("#7E5A9B", 0.14))
+    petal_mid = rgba(tone("#B488C8", 0.14))
+    petal_core = rgba(tone("#E8D4EE", 0.10))
+    gold = rgba(tone("#DEA83E", 0.14))
+    ripple = rgba(tone("#6496A4", 0.14))
+
+    # Serene balance halo arc crowning the lotus
+    halo = arc_pts(0.0, 0.02, 0.50, 0.48, 212, 328, steps=20)
+    vc.stroke_polyline(halo, width=0.056, color=ink)
+    vc.stroke_polyline(halo, width=0.028, color=gold)
+    vc.circle(0.0, -0.49, 0.064, fill=gold, outline=ink, width=0.024)
+    vc.circle(-0.34, -0.34, 0.036, fill=gold, outline=ink, width=0.016)
+    vc.circle(0.34, -0.34, 0.036, fill=gold, outline=ink, width=0.016)
+
+    # Outer splayed lotus petals (left & right wings)
+    vc.polygon(leaf_pts((-0.06, 0.28), (-0.56, 0.06), bulge=0.34), fill=petal_outer, outline=ink, width=0.030)
+    vc.polygon(leaf_pts((0.06, 0.28), (0.56, 0.06), bulge=-0.34), fill=petal_outer, outline=ink, width=0.030)
+
+    # Mid upturned lotus petals
+    vc.polygon(leaf_pts((-0.04, 0.30), (-0.36, -0.22), bulge=0.34), fill=petal_mid, outline=ink, width=0.030)
+    vc.polygon(leaf_pts((0.04, 0.30), (0.36, -0.22), bulge=-0.34), fill=petal_mid, outline=ink, width=0.030)
+
+    # Central tall lotus crown petal + luminous core highlight
+    vc.polygon(leaf_pts((0.0, 0.32), (0.0, -0.32), bulge=0.34), fill=petal_core, outline=ink, width=0.032)
+    vc.polygon(leaf_pts((0.0, 0.26), (0.0, -0.14), bulge=0.26), fill=rgba(tone("#D2A4D8", 0.12)))
+
+    # Calm horizontal zen water ripples below lotus base
+    vc.stroke_quad((-0.44, 0.42), (0.0, 0.48), (0.44, 0.42), width=0.042, color=ripple)
+    vc.stroke_quad((-0.26, 0.54), (0.0, 0.58), (0.26, 0.54), width=0.032, color=ripple)
+
+
+def _icon_pet(vc: VectorCanvas):
+    """22. 宠物洗护/美容: 温暖饱满萌宠爪印 + 爱心肉垫高光 + 洁净护理泡泡."""
+    ink = rgba(tone("#2E1D16", 0.10))
+    paw_main = rgba(tone("#C86A3A", 0.14))
+    paw_hi = rgba(tone("#E89A64", 0.14))
+    heart_c = rgba(tone("#E8C4A8", 0.10))
+    bubble = rgba(tone("#5CA6CE", 0.14))
+    spark = rgba(tone("#E4AE3C", 0.12))
+
+    # Four plump arched toe beans safely inside upper-mid safe zone
+    toes = [
+        (-0.40, -0.10, 0.135, 0.175, -24),
+        (-0.15, -0.34, 0.135, 0.185, -8),
+        (0.15, -0.34, 0.135, 0.185, 8),
+        (0.40, -0.10, 0.135, 0.175, 24),
+    ]
+    for tx, ty, rx, ry, ang in toes:
+        vc.ellipse(tx, ty, rx, ry, fill=paw_main, outline=ink, width=0.034, angle_deg=ang)
+        vc.circle(tx - 0.03, ty - 0.04, 0.038, fill=paw_hi)
+
+    # Plump scalloped central metacarpal pad (classic dog/cat paw contour)
+    pad: list[Pt] = [(0.0, -0.08)]
+    pad += cubic_bezier((0.0, -0.08), (0.28, -0.08), (0.44, 0.24), (0.34, 0.44), steps=16)[1:]
+    pad += quad_bezier((0.34, 0.44), (0.16, 0.54), (0.0, 0.44), steps=10)[1:]
+    pad += quad_bezier((0.0, 0.44), (-0.16, 0.54), (-0.34, 0.44), steps=10)[1:]
+    pad += cubic_bezier((-0.34, 0.44), (-0.44, 0.24), (-0.28, -0.08), (0.0, -0.08), steps=16)[1:-1]
+    vc.polygon(pad, fill=paw_main, outline=ink, width=0.038)
+
+    # Warm little care heart nestled on the main pad + glossy highlight
+    hc: list[Pt] = [(0.0, 0.16)]
+    hc += cubic_bezier((0.0, 0.16), (0.14, 0.04), (0.22, 0.22), (0.0, 0.34), steps=12)[1:]
+    hc += cubic_bezier((0.0, 0.34), (-0.22, 0.22), (-0.14, 0.04), (0.0, 0.16), steps=12)[1:-1]
+    vc.polygon(hc, fill=heart_c, outline=ink, width=0.022)
+    vc.stroke_quad((-0.24, 0.12), (-0.26, 0.24), (-0.20, 0.34), width=0.032, color=paw_hi)
+
+    # Clean grooming soap bubbles & sparkle in upper corners
+    vc.circle(0.46, -0.40, 0.072, fill=rgba((240, 250, 255)), outline=bubble, width=0.026)
+    vc.circle(-0.46, -0.38, 0.052, fill=rgba((240, 250, 255)), outline=bubble, width=0.022)
+    vc.sparkle(0.0, -0.56, 0.085, spark)
+
+
+def _icon_dimsum(vc: VectorCanvas):
+    """23. 中式面点/小笼包/早点: 竹编蒸笼 + 三枚褶皱鲜肉小笼包 + 袅袅热气."""
+    ink = rgba(tone("#2E2016", 0.10))
+    bamboo = rgba(tone("#C69448", 0.14))
+    bamboo_dark = rgba(tone("#9A6A2C", 0.14))
+    bamboo_hi = rgba(tone("#E2BC72", 0.14))
+    bun = rgba((250, 246, 236))
+    bun_sh = rgba((228, 218, 200))
+    steam = rgba(tone("#C48446", 0.14), 220)
+
+    # Three rising warm steam curls neatly inside top safe zone
+    for sx, top_y in ((-0.26, -0.52), (0.0, -0.60), (0.26, -0.52)):
+        vc.stroke_cubic((sx, -0.22), (sx - 0.07, -0.34), (sx + 0.08, -0.43), (sx - 0.01, top_y), width=0.044, color=steam)
+
+    # Back rim of bamboo steamer basket
+    vc.ellipse(0.0, 0.10, 0.54, 0.16, fill=bamboo_dark, outline=ink, width=0.034)
+
+    # Three plump pleated Chinese steamed buns (小笼包/大肉包) nestled inside basket
+    for bx, by, rx, ry in ((-0.23, 0.02, 0.21, 0.18), (0.23, 0.02, 0.21, 0.18), (0.0, -0.05, 0.23, 0.20)):
+        vc.ellipse(bx, by, rx, ry, fill=bun, outline=ink, width=0.034)
+        # Subtle bottom fold shadow
+        vc.stroke_quad((bx - rx * 0.55, by + ry * 0.45), (bx, by + ry * 0.65), (bx + rx * 0.55, by + ry * 0.45), width=0.024, color=bun_sh)
+        # Classic pinched top pleats radiating from bun crown
+        vc.circle(bx, by - ry * 0.56, 0.045, fill=bun_sh, outline=ink, width=0.020)
+        for dx in (-0.07, 0.0, 0.07):
+            vc.stroke_line((bx + dx * 0.5, by - ry * 0.46), (bx + dx * 1.4, by - ry * 0.06), width=0.020, color=rgba(tone("#968872", 0.12)))
+
+    # Bamboo steamer cylinder body (front wall wrapping over buns)
+    basket = [(-0.54, 0.12), (0.54, 0.12), (0.50, 0.44)]
+    basket += quad_bezier((0.50, 0.44), (0.0, 0.60), (-0.50, 0.44), steps=18)[1:]
+    vc.polygon(basket, fill=bamboo, outline=ink, width=0.038)
+
+    # Bamboo horizontal weave bands & top lip highlight
+    vc.stroke_quad((-0.54, 0.12), (0.0, 0.26), (0.54, 0.12), width=0.052, color=bamboo_hi)
+    vc.stroke_quad((-0.54, 0.12), (0.0, 0.26), (0.54, 0.12), width=0.022, color=ink)
+    vc.stroke_quad((-0.52, 0.30), (0.0, 0.44), (0.52, 0.30), width=0.034, color=bamboo_dark)
+    # Vertical bamboo stitching ticks
+    for vx in (-0.34, -0.17, 0.0, 0.17, 0.34):
+        vc.stroke_line((vx, 0.24), (vx, 0.44), width=0.020, color=bamboo_dark)
+
+
 ICON_REGISTRY: dict[str, Callable[[VectorCanvas], None]] = {
     "noodle": _icon_noodle,
     "pharmacy": _icon_pharmacy,
@@ -1212,6 +1328,9 @@ ICON_REGISTRY: dict[str, Callable[[VectorCanvas], None]] = {
     "hotel_home": _icon_hotel_home,
     "jewelry_opt": _icon_jewelry_opt,
     "glasses": _icon_glasses,
+    "wellness": _icon_wellness,
+    "pet": _icon_pet,
+    "dimsum": _icon_dimsum,
 }
 
 # Preferred medallion geometry per industry (shield strictly reserved for pharmacy!)
@@ -1236,6 +1355,9 @@ DEFAULT_BADGE_SHAPE: dict[str, str] = {
     "hotel_home": "squircle",
     "jewelry_opt": "octagon",
     "glasses": "squircle",
+    "wellness": "circle",
+    "pet": "squircle",
+    "dimsum": "circle",
 }
 
 ICON_NAMES: tuple[str, ...] = tuple(ICON_REGISTRY.keys())

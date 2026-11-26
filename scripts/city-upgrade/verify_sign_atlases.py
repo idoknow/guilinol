@@ -59,16 +59,30 @@ SHOWCASE_8: list[tuple[str, str, str]] = [
     ("fruit",    "鲜果直供", "siji_fruit"),
 ]
 
+# Targeted close-up review collage covering all shops refined in Round 2 review
+PATCH_REVIEW_8: list[tuple[str, str, str]] = [
+    ("wellness", "普拉提馆", "zijing_yoga"),
+    ("pet",      "宠物洗护", "nuanyang_pet"),
+    ("dimsum",   "手工面点", "zaoan_baozi"),
+    ("dimsum",   "手工小笼", "aming_bao"),
+    ("salon",    "型格美发", "ziteng_hair"),
+    ("salon",    "剪裁造型", "qinghe_salon"),
+    ("food",     "精酿酒馆", "lian_craftbeer"),
+    ("books",    "山水文创", "suxin_culture"),
+]
 
-def export_showcase_8(
+
+def export_showcase_collage(
     alb: Image.Image,
     cols: int,
     cw: int,
     ch: int,
     out_path: Path,
     contrast_map: dict[int, tuple[float, float]],
+    entries: list[tuple[str, str, str]],
+    header_text: str,
 ):
-    """Export 8 flagship industries at EXACT 1:1 native 640x160 resolution (2 cols x 4 rows)."""
+    """Export 8 selected shops at EXACT 1:1 native 640x160 resolution (2 cols x 4 rows)."""
     key_to_idx = {spec[0]: i for i, spec in enumerate(FASCIA_SPECS)}
     pad = 24
     hdr_h = 34
@@ -83,15 +97,9 @@ def export_showcase_8(
     draw = ImageDraw.Draw(canvas)
     f_hdr = load_font(24, "sans")
     f_lbl = load_font(15, "sans_med")
-    draw.text(
-        (pad, title_bar // 2),
-        "IDOK-472 · 8 典型业态原寸 640×160 (4:1, 2× SSAA) 放大验收拼图",
-        fill=(244, 240, 232),
-        font=f_hdr,
-        anchor="lm",
-    )
+    draw.text((pad, title_bar // 2), header_text, fill=(244, 240, 232), font=f_hdr, anchor="lm")
 
-    for slot, (ind_key, ind_zh, shop_key) in enumerate(SHOWCASE_8):
+    for slot, (ind_key, ind_zh, shop_key) in enumerate(entries):
         idx = key_to_idx[shop_key]
         spec = FASCIA_SPECS[idx]
         sc, sr = idx % cols, idx // cols
@@ -102,7 +110,7 @@ def export_showcase_8(
         dy = title_bar + pad + gr * (cell_h + pad)
 
         t_cr, s_cr = contrast_map[idx]
-        label = f"#{idx:02d} [{ind_zh}] {spec[6]}  ·  {spec[8]}  ·  WCAG {t_cr:.1f}/{s_cr:.1f}:1"
+        label = f"#{idx:02d} [{ind_zh} · {spec[13]}] {spec[6]}  ·  {spec[8]}  ·  WCAG {t_cr:.1f}/{s_cr:.1f}:1"
         lbl_font = f_lbl
         tb = draw.textbbox((0, 0), label, font=lbl_font)
         if tb[2] - tb[0] > cw - 4:
@@ -113,6 +121,20 @@ def export_showcase_8(
 
     out_path.parent.mkdir(parents=True, exist_ok=True)
     canvas.save(out_path, quality=96)
+
+
+def export_showcase_8(
+    alb: Image.Image,
+    cols: int,
+    cw: int,
+    ch: int,
+    out_path: Path,
+    contrast_map: dict[int, tuple[float, float]],
+):
+    export_showcase_collage(
+        alb, cols, cw, ch, out_path, contrast_map, SHOWCASE_8,
+        "IDOK-472 · 8 典型业态原寸 640×160 (4:1, 2× SSAA) 放大验收拼图",
+    )
 
 
 def export_icon_gallery(out_path: Path, prim_counts: dict[str, int]):
@@ -320,12 +342,17 @@ def main():
     sheet_path = preview_dir / "fascias-96-overview.jpg"
     emit_sheet_path = preview_dir / "fascias-96-emit-overview.jpg"
     showcase_path = preview_dir / "showcase-8-industries-640x160.png"
-    icons_path = preview_dir / "icons-20-gallery.png"
+    patch_review_path = preview_dir / "patch-review-8-640x160.png"
+    icons_path = preview_dir / f"icons-{len(ICON_NAMES)}-gallery.png"
     blades_path = preview_dir / "blades-16-overview.png"
 
     alb.resize((1920, 1280), Image.Resampling.LANCZOS).save(sheet_path, quality=92)
     emit.resize((1920, 1280), Image.Resampling.LANCZOS).save(emit_sheet_path, quality=90)
     export_showcase_8(alb, cols, cw, ch, showcase_path, contrast_map)
+    export_showcase_collage(
+        alb, cols, cw, ch, patch_review_path, contrast_map, PATCH_REVIEW_8,
+        "IDOK-472 · 严审返修 8 格原寸 640×160 (wellness / pet / dimsum / luxury 去重) 复检拼图",
+    )
     export_icon_gallery(icons_path, prim_counts)
     blades.save(blades_path)
 
@@ -361,7 +388,8 @@ def main():
             "overview96": str(sheet_path),
             "emitOverview96": str(emit_sheet_path),
             "showcase8Native": str(showcase_path),
-            "icons20Gallery": str(icons_path),
+            "patchReview8Native": str(patch_review_path),
+            "iconsGallery": str(icons_path),
             "blades16": str(blades_path),
         },
         "errors": errors,
@@ -370,12 +398,12 @@ def main():
     print("=== IDOK-472 Signboard Atlas Hard Verification Report ===")
     for fname, st in asset_stats.items():
         print(f"  {fname:24s}: {st['size'][0]}x{st['size'][1]} {st['mode']} ({st['sizeKB']:.1f} KB)")
-    print(f"  Registered vector icons : {len(ICON_NAMES)} industries (used {len(icon_usage)}/20 across 96 fascias; prims {min(prim_counts.values())}-{max(prim_counts.values())})")
+    print(f"  Registered vector icons : {len(ICON_NAMES)} industries (used {len(icon_usage)}/{len(ICON_NAMES)} across 96 fascias; prims {min(prim_counts.values())}-{max(prim_counts.values())})")
     print(f"  Icon pixel richness     : min std={min_icon_std:.1f} ({min_icon_std_shop}), avg std={np.mean(icon_stds):.1f}, avg grad={np.mean(icon_grad_means):.1f} | blades min std={min(blade_icon_stds):.1f}")
     print(f"  Layout distribution     : {dict(sorted(mode_usage.items()))}")
     print(f"  WCAG 2.1 contrast (96)  : title min={min(title_crs):.2f}:1 (avg {np.mean(title_crs):.2f}:1) | sub min={min(sub_crs):.2f}:1 (avg {np.mean(sub_crs):.2f}:1) | blades min={min(blade_crs):.2f}:1")
     print(f"  Trademark compliance    : {len(tm_violations)} violations")
-    print(f"  Exported previews       :\n    - {showcase_path}\n    - {sheet_path}\n    - {icons_path}\n    - {blades_path}")
+    print(f"  Exported previews       :\n    - {showcase_path}\n    - {patch_review_path}\n    - {sheet_path}\n    - {icons_path}\n    - {blades_path}")
 
     if args.json_report:
         args.json_report.parent.mkdir(parents=True, exist_ok=True)
