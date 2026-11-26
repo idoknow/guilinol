@@ -230,7 +230,7 @@ async function start(loader:FullLoader,creatorSpawn=false) {
   const clock = skyClock(params)
   if(!soloStart)setPreset(camera,params.get('cam')??params.get('spawn'),bounds.bbox)
   let previous=0, first=0, frame=0, sum=0, samples=0
-  const flightStreamFocus=new THREE.Vector3()
+  const flightAhead=new THREE.Vector3()
   const stats = {firstMs:0,readyMs:0,openingRingMs:0,firstWorldBytes:0,ms:0,calls:0,shadowCasters:0,frame:0,loaded:0,pending:0,visited:0,failures:0,
     geometries:0,textures:0,dpr:currentDpr}
   function markFirstFrame(){
@@ -1010,10 +1010,10 @@ async function start(loader:FullLoader,creatorSpawn=false) {
       }
       trafficTick?.(elapsed/1000,walker?.active&&walker.vehicle!=='foot'?walker.position:undefined,
         walker?.active?walker.position:undefined,getPlayMode()==='solo',showTraffic)
-      const target=heli.lookAhead??walker?.destination??(walker?.active?walker.position:
-        flightFocus(camera,stream.groundAt(camera.position.x,camera.position.z),stream.metrics.radius,flightStreamFocus))
+      const target=heli.lookAhead??walker?.destination??(walker?.active?walker.position:camera.position)
+      const ahead=target===camera.position?flightFocus(camera,stream.groundAt(camera.position.x,camera.position.z),stream.radius,flightAhead):undefined
       const streamStart=profiling?performance.now():0
-      stream.tick(target,heli.phase==='cruise')
+      stream.tick(target,heli.phase==='cruise',ahead)
       if(frame>=2) syncCityUpgradeProps()
       stream.updateLandmarks?.(target,undefined,heli.phase==='cruise')
       if(!walkModPromise && !stream.pending.size && camera.position.y<260) void prefetchWalk()
