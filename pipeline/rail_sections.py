@@ -220,16 +220,18 @@ def road_profiles(section, ways, widths):
         )
         if "pavedChords" in road:
             native = set(zip(local["nodes"], local["nodes"][1:]))
-            widths_by_chord = {(a, b): width for a, b, width in road["pavedChords"]}
-            if not widths_by_chord.keys() <= native or any(width <= 0 for width in widths_by_chord.values()):
+            paved = {tuple(pair) for pair in road["pavedChords"]}
+            if not paved <= native:
                 raise ValueError(f"Invalid finished carriageway on {wid}")
-            local["pavedChords"] = widths_by_chord
+            local["pavedChords"] = paved
         if "nativeTies" in road:
             local["nativeTies"] = road["nativeTies"]
         if "railSideWall" in road:
             wall = road["railSideWall"]
             top = np.asarray(wall["top"])
             local["railSideWall"] = (wall["side"], top[:, 0] - start, top[:, 1])
+        if "trafficOffsets" in road:
+            local["trafficOffsets"] = {tuple(sorted((a,b))):offset for a,b,offset in road["trafficOffsets"]}
         if "maxTrafficOffset" in road:
             local["maxTrafficOffset"] = road["maxTrafficOffset"]
         if road.get("stackedRoad"):

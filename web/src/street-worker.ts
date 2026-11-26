@@ -1,6 +1,6 @@
 import {platformShift, type PlatformGrade} from './platform-grade'
 import {panelCut} from './crossing-panels'
-import {stationShoulders,type ShoulderPlane} from './station-shoulders'
+import {stationShoulders,type GradePlane,type ShoulderPlane} from './station-shoulders'
 import style from '../../pipeline/railway-style.json'
 import {inRing} from './polygon'
 import {stationPaving,type StationPavingCut} from './station-paving'
@@ -16,7 +16,7 @@ type Path=[number,...Pair[][]]
 type RoadCtrl=[number,number[]]
 type Lower=[number,Pair[],[number,number,number,number][]]
 type CrossingPanel=import('./railways').CrossingPanel
-type LayeredRoad = [...ShoulderPlane, number]
+type LayeredRoad = [...GradePlane, number]
 export type Streets=[Path[],Pair[],number[][],Pair[]?,Pair[]?,(RoadCtrl|null)?,number[][]?,number[][]?,number[][]?,number[][]?,Pair[][]?,(Lower|null)?,([number,number,number]|null)?,unknown?,StationRoadSegment[]?,StationPavingCut[]?,ShoulderPlane[]?,LayeredRoad[]?,CrossingPanel[]?]
 const colors=look.streets.surfaces.map(v=>new THREE.Color(v)),tone=Object.fromEntries((['railing','lampPole','lampHead'] as const).map(k=>[k,new THREE.Color(look.streets[k])]))
 const stoneLight=new THREE.Color(0xa6a39a),stoneMid=new THREE.Color(0x8c8981),stoneBase=new THREE.Color(0x74726b)
@@ -127,7 +127,7 @@ export function streetGeometry([paths,lamps,banks,signals=[],stops=[],roadCtrl,s
   }
   function emit(first:THREE.Vector3,second:THREE.Vector3,third:THREE.Vector3,kind:number,u1:number,u2:number,u3:number,vertical:boolean){
     if(shoulders){
-      const polys=shoulders(first,second,third)
+      const polys=shoulders(first,second,third,kind===0)
       for(const poly of polys)for(let k=1;k+1<poly.length;k++)emitFace(poly[0],poly[k],poly[k+1],kind,u1,u2,u3,vertical)
     }else emitFace(first,second,third,kind,u1,u2,u3,vertical)
   }

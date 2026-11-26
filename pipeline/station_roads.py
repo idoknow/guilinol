@@ -79,8 +79,7 @@ def tunnel_sections(profiles):
             portals = [[*p[:1], float(y), p[1]] for p,y in zip(coords[i:i+2], levels[[0,-1]])]
             mouths = [False, False] if way.get('surfaceApproach') else [i==0, i==len(chain)-2]
             chord = tuple(way['nodes'][i:i+2])
-            fitted_width = way.get('pavedChords', {}).get(chord)
-            width = fitted_width / 2 if fitted_width is not None else half_width(way)
+            width = half_width(way)
             if opposite.get(way['id']):
                 segment = LineString(coords[i:i+2])
                 if segment.distance(Point(-2395, 1935)) < 160:
@@ -88,7 +87,7 @@ def tunnel_sections(profiles):
             bores.append(dict(way=way['id'], nodes=way['nodes'][i:i+2], portals=portals,
                               length=end-start, halfWidth=width, clearance=4.5,
                               approach=0, openCut=not covered, openEnds=[0,0] if covered else [end-start,0], mouths=mouths,
-                              **({'fittedCarriageway': True} if fitted_width is not None else {}),
+                              **({'fittedCarriageway': True} if chord in way.get('pavedChords', ()) else {}),
                               pairedWidth=way.get('stationWidth'),
                               stations=np.column_stack((distances-start, levels)).tolist()))
             if "railSideWall" in way:

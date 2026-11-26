@@ -108,6 +108,11 @@ def finish_paving(directory, manifest, profiles, elements):
         if len(streets) < 16:
             continue
         planes = grade_planes(local, fitted_shoulders, x, z)
+        # Keep native asphalt at the finished slab edge where the road turns
+        # beside a lowered railway. GL04 street vertices are rounded to 0.1 m.
+        supported = {(s["way"], *s["nodes"]) for s, _, _ in local if s.get("fittedCarriageway")}
+        for plane in grade_planes(local, supported, x, z, width_pad=.10, lift=.012):
+            planes.append([*plane, True])
         if planes:
             if len(streets) == 16:
                 streets.append([])
