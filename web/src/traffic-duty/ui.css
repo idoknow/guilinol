@@ -690,6 +690,13 @@ dialog.td-panel::backdrop {
     top: calc(212px + env(safe-area-inset-top));
   }
 
+  /* 饮品店叫号面板占左侧（drinks/ui/order-panel.css：left 124、宽不超过 300）：交警入口挪到面板右边，不叠在叫号上（IDOK-468） */
+  body:has(.drinks-pickup-hud:not([hidden])) .td-entry {
+    left: calc(436px + env(safe-area-inset-left));
+    transform: none;
+    max-width: calc(100vw - 584px - env(safe-area-inset-left) - env(safe-area-inset-right));
+  }
+
   body:has(.gl-mission-hud:not([hidden])) .td-bounds-banner {
     top: calc(250px + env(safe-area-inset-top));
   }

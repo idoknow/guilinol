@@ -231,6 +231,15 @@ body[data-home] :is(.ride-hud,.vehicle-action,.walk-ui){display:none!important}
   /* 载入街区的小角标原本在左上第五行，左手模式下动作键会顶到那里；横屏挪到时辰条下方正中。 */
   :root .ld-corner{left:50%;right:auto;bottom:auto;top:calc(100px + env(safe-area-inset-top));transform:translateX(-50%)}
 }
+/* 手里捧着饮品时，[F] 提示叠在饮品条上方，不被压住（IDOK-468）。饮品条贴底 80 / 横屏 74、高 46–50（drinks/hold/drink-action.css），
+   提示站到 134 以上；手机竖屏饮品条抬到 226，提示站到 284 以上，同时不低于摇杆列。 */
+:root body:has(.drinks-hold-hud:not([hidden])) .vehicle-action{bottom:calc(134px + env(safe-area-inset-bottom))}
+@media (pointer:coarse) and (not (any-pointer:fine)) and (min-height:501px){
+  :root body:has(.drinks-hold-hud:not([hidden])) .vehicle-action{bottom:max(calc(var(--stick-top) + 110px),calc(134px + env(safe-area-inset-bottom)))}
+}
+@media (pointer:coarse) and (not (any-pointer:fine)) and (max-width:640px) and (min-height:501px){
+  :root body:has(.drinks-hold-hud:not([hidden])) .vehicle-action{bottom:max(calc(var(--stick-top) + 110px),calc(284px + env(safe-area-inset-bottom)))}
+}
 
 .walk-ui .btn-smoke{position:fixed;right:calc(196px + var(--sr));bottom:calc(108px + var(--sb));min-width:54px;height:46px;padding:0 14px;border-radius:23px;touch-action:manipulation;
   font:600 15px/1 var(--ui-serif);letter-spacing:.12em;color:var(--ui-paper);background:rgba(169,80,60,.78);border:1px solid var(--ui-seal-light);box-shadow:var(--ui-shadow-1)}

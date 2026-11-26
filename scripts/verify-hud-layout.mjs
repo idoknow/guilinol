@@ -12,6 +12,7 @@ const {values: args} = parseArgs({
     label: {type: 'string', default: 'run'},
     duty: {type: 'boolean', default: false},
     menu: {type: 'boolean', default: false},
+    drinks: {type: 'boolean', default: false},
     strict: {type: 'boolean', default: false},
   },
   strict: false,
@@ -23,7 +24,9 @@ const label = typeof args.label === 'string' && args.label ? args.label : 'run'
 const duty = Boolean(args.duty)
 // --menu：量之前展开右上「工具」册页，检查展开态不出屏、不压其他 HUD。
 const menu = Boolean(args.menu)
-const suffix = `${duty ? '-duty' : ''}${menu ? '-menu' : ''}`
+// --drinks：开饮品店（?drinks），站到店门口、手里捧一杯，量叫号面板、饮品条和 [F] 进店是否互相压住。
+const drinks = Boolean(args.drinks)
+const suffix = `${duty ? '-duty' : ''}${menu ? '-menu' : ''}${drinks ? '-drinks' : ''}`
 const strict = Boolean(args.strict)
 
 const VIEWPORTS = [
@@ -329,7 +332,7 @@ try {
       )
 
       // `verify` publishes window.viewer; it also turns on the dev overlay, which we switch back off before measuring.
-      await page.goto(`${base}/?play&verify&mode=walk&flow=0`, {waitUntil: 'domcontentloaded', timeout: 120000})
+      await page.goto(`${base}/?play&verify&mode=walk&flow=0${drinks ? '&drinks' : ''}`, {waitUntil: 'domcontentloaded', timeout: 120000})
       await page
         .waitForFunction(() => Boolean(window.viewer?.walk?.active), null, {timeout: 180000})
         .catch(async (err) => {
@@ -392,6 +395,28 @@ try {
         }
       }
 
+      let drinksError = null
+      if (drinks) {
+        try {
+          await page.waitForFunction(() => Boolean(window.viewer?.drinks), null, {timeout: 30000})
+          await page.evaluate(() => window.viewer.drinks.teleportToShop())
+          await page.waitForFunction(() => !document.querySelector('.ld-veil'), null, {timeout: 20000}).catch(() => {})
+          const held = await page.evaluate(() => {
+            const probe = window.viewer.drinks
+            probe.sim.placePlayerOrder({menuItemId: 'ice_lemon_water', orderKey: `hud-layout-${Date.now()}`})
+            probe.fastForward(90)
+            probe.collectReady()
+            return probe.getState().hold?.state
+          })
+          if (held !== 'holding') throw new Error(`drink not in hand: ${held}`)
+          await page.waitForSelector('.drinks-hold-hud:not([hidden])', {timeout: 5000})
+          await page.waitForSelector('.vehicle-action:not([hidden])', {timeout: 8000})
+          await page.waitForTimeout(1500)
+        } catch (err) {
+          drinksError = err?.message || String(err)
+        }
+      }
+
       if (menu) {
         await page.locator('.dock-more').click({timeout: 10000})
         await page.waitForSelector('#dock-menu:not([hidden])', {timeout: 5000})
@@ -406,7 +431,9 @@ try {
         name: vp.name,
         duty,
         menu,
+        drinks,
         dutyError,
+        drinksError,
         ...metrics,
         consoleErrors,
         failedRequests,
@@ -425,6 +452,9 @@ try {
     )
     if (r.dutyError) {
       console.log(`  dutyError: ${r.dutyError}`)
+    }
+    if (r.drinksError) {
+      console.log(`  drinksError: ${r.drinksError}`)
     }
     for (const ov of r.overlaps.slice(0, 20)) {
       console.log(`  overlap (${ov.area}px²): ${ov.a} <-> ${ov.b}`)
