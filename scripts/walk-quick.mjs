@@ -38,6 +38,7 @@ try {
   page.on('console',message=>{if(message.type()==='error')errors.push(message.location().url+': '+message.text())})
   await page.goto(walkUrl,{waitUntil:'domcontentloaded',timeout:120000})
   await page.waitForFunction(()=>window.viewer?.walk?.active && ![1,2].includes(window.__loading?.level),null,{timeout:90000})
+  console.log('Walk startup (ms)',await page.evaluate(()=>({firstFrame:window.viewer.stats.firstMs,walkReady:performance.now()})))
 
   async function fixture(origin,direction,seconds,target){
     progress(target)
