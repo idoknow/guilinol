@@ -1,5 +1,6 @@
 import {readFile} from 'node:fs/promises'
 import {guardAdmin} from './web-guard-admin.mjs'
+import {enrichBans,searchBanUsers} from './ban-identities.mjs'
 import {activities,gameplay,history,record,regions} from './mp-store.mjs'
 
 const json=(value,status=200)=>Response.json(value,{status,headers:{'cache-control':'no-store'}})
@@ -120,6 +121,10 @@ export function multiplayer(pool,env,{cache}={}){
   async function route(path,request,actor){
     if(path.startsWith('admin/bans/'))return guardAdmin(pool,env,path,request,actor)
     const params=new URL(request.url).searchParams
+    if(path==='admin/user-search'){
+      if(request.method!=='GET')return json({error:'method not allowed'},405)
+      return json(await searchBanUsers(pool,(params.get('q')??'').trim().slice(0,128)))
+    }
     // 联机封禁：列表 / 手动封禁 / 人工解封（转发到 rt，由 rt 的 RT_ADMIN_TOKEN 鉴权）
     if(path==='admin/bans'||path==='admin/ban'||path==='admin/unban'){
       if(!env.RT_ADMIN_TOKEN)return json({error:'disabled'},503)
@@ -128,7 +133,9 @@ export function multiplayer(pool,env,{cache}={}){
         const init={method:request.method,redirect:'error',signal:AbortSignal.timeout(6000),headers:{'X-Admin-Token':env.RT_ADMIN_TOKEN,'content-type':'application/json'}}
         if(request.method!=='GET')init.body=JSON.stringify({...(await request.json().catch(()=>({}))),actor})
         const response=await fetch(target,init)
-        return json(await response.json().catch(()=>({})),response.status)
+        const body=await response.json().catch(()=>({}))
+        if(response.ok&&path==='admin/bans'&&Array.isArray(body.bans))body.bans=await enrichBans(pool,body.bans)
+        return json(body,response.status)
       }catch{return json({error:'rt unavailable'},503)}
     }
     if(path.startsWith('admin/chat/')){

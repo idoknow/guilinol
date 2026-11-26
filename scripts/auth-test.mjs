@@ -33,7 +33,8 @@ try {
     const match=Array.from(logs.matchAll(new RegExp(`DEV_EMAIL ${email} ${purpose} (\\d{6})`,'g')))[index];if(match)return match[1];await delay(100)
   }throw Error('Missing local email')}
   if(ui) {
-    browser=await chromium.launch({executablePath:process.env.CHROMIUM,args:['--use-angle=swiftshader','--enable-unsafe-swiftshader']})
+    const gpuArgs=process.platform==='darwin'?['--use-gl=angle','--use-angle=metal']:['--use-angle=swiftshader','--enable-unsafe-swiftshader']
+    browser=await chromium.launch({executablePath:process.env.CHROMIUM,args:gpuArgs})
     await mkdir('captures/auth',{recursive:true})
     const context=await browser.newContext({viewport:{width:feedbackUI?960:1100,height:feedbackUI?620:740}}),page=await context.newPage()
     if(adminUI){

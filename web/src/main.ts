@@ -145,7 +145,8 @@ async function start(loader:FullLoader,creatorSpawn=false) {
   if(params.has('debug'))Object.assign(window,{gfx})
   // tapFrame：录像在这里、present 之前拷帧（IDOK-383，主画布没开 preserveDrawingBuffer）。
   let cabinCruise=false
-  function drawMain(){if(post)stats.shadowCasters=post.render(walker?.active?walker.position:camera.position,cabinCruise);else renderer.render(scene,camera);tapFrame(renderer.domElement)}
+  const drawMark=sessionMarkPass(renderer)
+  function drawMain(){if(post)stats.shadowCasters=post.render(walker?.active?walker.position:camera.position,cabinCruise);else renderer.render(scene,camera);drawMark();tapFrame(renderer.domElement)}
   renderer.info.autoReset=false
   const hemi = new THREE.HemisphereLight(look.hemiSky,look.hemiGround,look.hemiPower); scene.add(hemi)
   const arrivalReady=import('./arrival-programs').then(module=>warmPrograms(module.arrivalPrograms()))
@@ -1103,3 +1104,4 @@ async function start(loader:FullLoader,creatorSpawn=false) {
   else if(params.get('mode')==='walk'||params.has('spawn')){await toggle(true);showMode()}
 }
 export const boot=start
+import {sessionMarkPass} from './session-mark-pass'
