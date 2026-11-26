@@ -8,7 +8,8 @@ import {
   type SignAtlasSlot,
 } from '../look/index.ts'
 import { corridorToAabb, rectToAabb, type Aabb2D } from './collision.ts'
-import { buildMergedBoxesGeometry, carveBoxXZ, mergeGeometries, orientedBar, type BoxSpec, type RectXZ } from './scene-boxes.ts'
+import { XXG_STAIR_NOSING_COLOR, buildExitStairGeometry, resolveXxgExitStair, xxgStairCurbM } from './exit-stairs.ts'
+import { buildMergedBoxesGeometry, carveBoxXZ, mergeGeometries, type BoxSpec, type RectXZ } from './scene-boxes.ts'
 import {
   classifyXxgShop,
   emitShopFitout,
@@ -454,6 +455,8 @@ export function createIndoorGreyboxScene(layout: XxgLayout): IndoorGreyboxSceneH
   const garmentNavySpecs: BoxSpec[] = []
   const woodCamelSpecs: BoxSpec[] = []
   const stairSpecs: BoxSpec[] = []
+  const stairNosingSpecs: BoxSpec[] = []
+  const stairDwarfWallGeos: THREE.BufferGeometry[] = []
   const skylightGlassSpecs: BoxSpec[] = []
   const goodsSpecs: BoxSpec[] = []
   const globeSpecs: THREE.BufferGeometry[] = []
@@ -762,23 +765,24 @@ export function createIndoorGreyboxScene(layout: XxgLayout): IndoorGreyboxSceneH
     }
   }
 
-  // 出口楼梯：楼梯口从走廊边线打通，台阶实心落地，两侧墙到吊顶，楼梯上方整体开洞做长条金字塔采光顶；
-  // 尽头玻璃门，安全出口牌吊在楼梯口井沿下方朝向走廊。
-  for (const well of exitWells) {
-    const { stair: sb, alongZ, sign, corrEdge, startEdge, landingEdge, opening } = well
-    const runLen = alongZ ? sb.maxZ - sb.minZ : sb.maxX - sb.minX
-    const acrossLen = alongZ ? sb.maxX - sb.minX : sb.maxZ - sb.minZ
-    const acrossC = alongZ ? (sb.minX + sb.maxX) * 0.5 : (sb.minZ + sb.maxZ) * 0.5
+  // 出口楼梯：花岗岩踏步 + 每级前缘黄色 L 形防滑条 + 两侧坡面花岗岩矮墙 + 白色扶手（两侧与中间）；
+  // 保留两侧到吊顶的走廊墙、长条金字塔采光顶、楼梯顶玻璃门（底边对齐新 topY）与安全出口牌。
+  const graniteUvScale = uvScaleFrom(matPack.stairGranite)
+  for (let wi = 0; wi < exitWells.length; wi++) {
+    const ex = layout.exits[wi]!
+    const well = exitWells[wi]!
+    const { alongZ, sign, corrEdge, startEdge, landingEdge, opening } = well
+    const stair = resolveXxgExitStair(ex, well)
+    const { runLen, acrossLen, acrossC, topY } = stair
     const box = (a: number, y: number, c: number, sa: number, sy: number, sc: number): BoxSpec =>
       alongZ ? { cx: c, cy: y, cz: a, sx: sc, sy, sz: sa } : { cx: a, cy: y, cz: c, sx: sa, sy, sz: sc }
-    const stepCount = 9
-    const rise = 0.18
-    const topY = stepCount * rise
-    const stepDepth = runLen / stepCount
-    for (let i = 0; i < stepCount; i++) {
-      const h = (i + 1) * rise
-      stairSpecs.push(box(startEdge + sign * (i + 0.5) * stepDepth, h * 0.5, acrossC, stepDepth + 0.02, h, acrossLen))
-    }
+
+    const built = buildExitStairGeometry(stair, graniteUvScale)
+    stairSpecs.push(...built.stepBoxes)
+    if (built.topLandingBox) stairSpecs.push(built.topLandingBox)
+    stairDwarfWallGeos.push(...built.dwarfWallGeos)
+    stairNosingSpecs.push(...built.nosingBoxes)
+    skylightFrameGeos.push(...built.handrailGeos)
 
     const gap = (startEdge - corrEdge) * sign
     if (gap > 0.01) floorTerrazzoSpecs.push(box((corrEdge + startEdge) * 0.5, -0.06, acrossC, gap + 0.1, 0.12, acrossLen))
@@ -791,34 +795,22 @@ export function createIndoorGreyboxScene(layout: XxgLayout): IndoorGreyboxSceneH
       rackMetalSpecs.push(box((corrEdge + startEdge) * 0.5, 0.06, acrossC + side * (acrossLen * 0.5 - 0.015), Math.max(0.05, gap), 0.12, 0.03))
     }
 
-    // 不锈钢扶手：中间一道、两侧靠墙各一道，立杆落在台阶上。
-    const railFrom = (c: number) => (alongZ ? { x: c, y: 0.95, z: startEdge } : { x: startEdge, y: 0.95, z: c })
-    const railTo = (c: number) =>
-      alongZ ? { x: c, y: topY + 0.95, z: startEdge + sign * runLen } : { x: startEdge + sign * runLen, y: topY + 0.95, z: c }
-    for (const c of [acrossC, acrossC - acrossLen * 0.5 + 0.08, acrossC + acrossLen * 0.5 - 0.08]) {
-      skylightFrameGeos.push(orientedBar(railFrom(c), railTo(c), 0.05))
-    }
-    for (const frac of [0.12, 0.5, 0.88]) {
-      const stepY = Math.ceil(frac * stepCount) * rise
-      rackMetalSpecs.push(box(startEdge + sign * runLen * frac, stepY + (0.95 + frac * topY - stepY) * 0.5, acrossC, 0.045, 0.95 + frac * topY - stepY, 0.045))
-    }
-
-    const pyramid = buildSkylightPyramid({ opening, ceilH, heightM: 3.0, globes: XXG_STAIR_GLOBES })
+    const pyramid = buildSkylightPyramid({ opening, ceilH, heightM: 3.0, curbM: xxgStairCurbM(stair, ceilH), globes: XXG_STAIR_GLOBES })
     wallCorridorSpecs.push(...pyramid.curbWalls)
     pyramidGlassGeos.push(pyramid.glass)
     skylightFrameGeos.push(...pyramid.frame)
     globeSpecs.push(...pyramid.globes)
 
     const backA = startEdge + sign * (runLen + 0.08)
-    const doorH = pyramid.baseY - topY
+    const doorH = Math.max(0.25, pyramid.baseY - topY)
     skylightGlassSpecs.push(box(backA, topY + doorH * 0.5, acrossC, 0.08, doorH, acrossLen))
     for (const m of [-0.5, -0.25, 0, 0.25, 0.5]) {
       rackMetalSpecs.push(box(backA - sign * 0.05, topY + doorH * 0.5, acrossC + m * (acrossLen - 0.06), 0.06, doorH, 0.05))
     }
-    rackMetalSpecs.push(
-      box(backA - sign * 0.05, topY + 2.0, acrossC, 0.06, 0.05, acrossLen),
-      box(backA - sign * 0.05, topY + 0.03, acrossC, 0.06, 0.06, acrossLen),
-    )
+    if (doorH > 0.5) {
+      rackMetalSpecs.push(box(backA - sign * 0.05, topY + Math.min(2.0, doorH - 0.15), acrossC, 0.06, 0.05, acrossLen))
+    }
+    rackMetalSpecs.push(box(backA - sign * 0.05, topY + 0.03, acrossC, 0.06, 0.06, acrossLen))
 
     const signA = landingEdge - sign * 0.11
     rackMetalSpecs.push(
@@ -883,7 +875,28 @@ export function createIndoorGreyboxScene(layout: XxgLayout): IndoorGreyboxSceneH
       false,
     )
   }
-  addBatchBoxes('xxg_stair_granite', stairSpecs, matPack.stairGranite)
+  // 花岗岩踏步 + 顶部平台 + 两侧坡面矮墙合批为单次 draw call
+  const stairGraniteParts: THREE.BufferGeometry[] = []
+  if (stairSpecs.length > 0) {
+    stairGraniteParts.push(buildMergedBoxesGeometry(stairSpecs, uvScaleFrom(matPack.stairGranite)).geom)
+  }
+  stairGraniteParts.push(...stairDwarfWallGeos)
+  addMergedGeos('xxg_stair_granite', stairGraniteParts, matPack.stairGranite, true)
+  if (stairNosingSpecs.length > 0) {
+    addBatchBoxes(
+      'xxg_stair_nosing_yellow',
+      stairNosingSpecs,
+      new THREE.MeshStandardMaterial({
+        name: 'xxg_stair_nosing_yellow',
+        color: XXG_STAIR_NOSING_COLOR,
+        emissive: XXG_STAIR_NOSING_COLOR,
+        emissiveIntensity: 0.34,
+        roughness: 0.44,
+        metalness: 0.08,
+      }),
+      false,
+    )
+  }
   // 金字塔玻璃与楼梯尽头玻璃门同材质，合成一个 mesh（一次 draw call）。
   const skylightGlassParts = [...pyramidGlassGeos]
   if (skylightGlassSpecs.length > 0) {

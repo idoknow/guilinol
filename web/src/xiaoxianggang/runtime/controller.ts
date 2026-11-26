@@ -16,9 +16,16 @@ import {
 import {
   buildIndoorCollisionWorld,
   clampIndoorPitch,
-  findTriggeredExit,
   resolveIndoorMovement,
 } from './collision.ts'
+import {
+  XXG_STAIR_MAX_DELTA_Y,
+  createXxgStairEyeSmoother,
+  descentPath,
+  sampleAllExitStairsFootY,
+  shouldClimbOut,
+  type XxgStairDescent,
+} from './exit-stairs.ts'
 import { XIAOXIANGGANG_B1_LAYOUT } from '../layout/index.ts'
 import { createIndoorGreyboxScene, type IndoorGreyboxSceneHandle } from './indoor-scene.ts'
 import { XXG_CROWD_MAX, createXxgCrowd, type XxgCrowd } from './crowd.ts'
@@ -96,16 +103,19 @@ export function createXxgIndoorScene(opts: CreateXxgIndoorSceneOptions = {}): Xx
   // Indoor first-person kinematic state
   let playerX = layout.exits[0]?.foot.x ?? 0
   let playerZ = layout.exits[0]?.foot.z ?? 0
+  let playerFootY = 0
   let playerEyeY: number = XXG_PLAYER.eyeHeight
   let playerYaw = layout.exits[0]?.yaw ?? 0
   let playerPitch = 0
   let ceilingClearanceM = layout.ceilingHeight - XXG_PLAYER.eyeHeight
   let activeShopId: string | null = null
   let collisionContacts = 0
-  let indoorEnteredAtMs = 0
-  /** 刚走下来的那个出口：离开触发圈之前，只有面朝楼梯走才会离开（侧移、后退不把人弹回地面）。 */
-  let landingExit: XxgExit | null = null
-  let landingExitArmed = false
+  /** 进场后在 inside 状态内部执行的脚本下楼控制器；非空期间锁输入与视角。 */
+  let activeDescent: XxgStairDescent | null = null
+  const eyeSmoother = createXxgStairEyeSmoother({
+    eyeOffset: XXG_PLAYER.eyeHeight,
+    maxDeltaYPerFrame: XXG_STAIR_MAX_DELTA_Y,
+  })
 
   // Contract metrics (XxgIndoorMetrics)
   let lastDrawCalls = 0
@@ -146,6 +156,16 @@ export function createXxgIndoorScene(opts: CreateXxgIndoorSceneOptions = {}): Xx
     return best ? { exit: best, dist: bestDist } : null
   }
 
+  /** 返回当前允许 [E] 离开的出口（站在楼梯上或 foot 4m 内）。 */
+  function findInteractiveExit(x: number, z: number): XxgExit | null {
+    const onStair = sampleAllExitStairsFootY(collisionWorld.exitStairs, x, z)
+    if (onStair) {
+      return layout.exits.find(e => e.portalId === onStair.stair.portalId) ?? null
+    }
+    const near = nearestExit(x, z)
+    return near && near.dist <= 4.0 ? near.exit : null
+  }
+
   function syncPromptDom(): void {
     if (!promptBtn) return
     const st = machine.getState()
@@ -168,12 +188,16 @@ export function createXxgIndoorScene(opts: CreateXxgIndoorSceneOptions = {}): Xx
       return
     }
     if (st === 'inside') {
-      const near = nearestExit(playerX, playerZ)
-      if (near && near.dist <= 4.0) {
+      if (activeDescent !== null) {
+        promptBtn.hidden = true
+        return
+      }
+      const targetExit = findInteractiveExit(playerX, playerZ)
+      if (targetExit) {
         promptBtn.dataset.xxgAction = 'exit'
-        promptBtn.dataset.portalId = near.exit.portalId
+        promptBtn.dataset.portalId = targetExit.portalId
         promptBtn.textContent = '[E] 离开'
-        promptBtn.setAttribute('aria-label', `离开至${getPortal(near.exit.portalId).label}`)
+        promptBtn.setAttribute('aria-label', `离开至${getPortal(targetExit.portalId).label}`)
         promptBtn.hidden = false
         return
       }
@@ -213,6 +237,9 @@ export function createXxgIndoorScene(opts: CreateXxgIndoorSceneOptions = {}): Xx
     if (e.metaKey || e.ctrlKey || e.altKey) return
     if (isEditableTarget(e.target) || isOverlayBlockingHud()) return
 
+    // 脚本下楼期间锁所有移动与交互输入
+    if (st === 'inside' && activeDescent !== null) return
+
     pressedKeys.add(e.code)
 
     if (!e.repeat && e.code === 'KeyE') {
@@ -220,10 +247,10 @@ export function createXxgIndoorScene(opts: CreateXxgIndoorSceneOptions = {}): Xx
         e.preventDefault()
         void enter(machine.getNearbyPortalId()!)
       } else if (st === 'inside') {
-        const near = nearestExit(playerX, playerZ)
-        if (near && near.dist <= 4.0) {
+        const targetExit = findInteractiveExit(playerX, playerZ)
+        if (targetExit) {
           e.preventDefault()
-          pendingExitPortalId = near.exit.portalId
+          pendingExitPortalId = targetExit.portalId
           void exit()
         }
       }
@@ -240,7 +267,7 @@ export function createXxgIndoorScene(opts: CreateXxgIndoorSceneOptions = {}): Xx
   }
 
   function onPointerDown(e: PointerEvent): void {
-    if (machine.getState() !== 'inside') return
+    if (machine.getState() !== 'inside' || activeDescent !== null) return
     if (e.button !== 0) return
     if (promptBtn && e.target instanceof Node && promptBtn.contains(e.target)) return
     draggingLook = true
@@ -250,7 +277,7 @@ export function createXxgIndoorScene(opts: CreateXxgIndoorSceneOptions = {}): Xx
   }
 
   function onPointerMove(e: PointerEvent): void {
-    if (machine.getState() !== 'inside') return
+    if (machine.getState() !== 'inside' || activeDescent !== null) return
     const pointerLocked = typeof document !== 'undefined' && Boolean(document.pointerLockElement)
     if (!draggingLook && !pointerLocked) return
     const dx = pointerLocked ? e.movementX : e.clientX - lastPointerX
@@ -295,6 +322,7 @@ export function createXxgIndoorScene(opts: CreateXxgIndoorSceneOptions = {}): Xx
       if (action === 'enter' && isValidPortalId(pid)) {
         void enter(pid)
       } else if (action === 'exit') {
+        if (activeDescent !== null) return
         if (isValidPortalId(pid)) pendingExitPortalId = pid
         void exit()
       }
@@ -397,26 +425,38 @@ export function createXxgIndoorScene(opts: CreateXxgIndoorSceneOptions = {}): Xx
       setBodyFlags(true)
       hostCtx.suspendWorld()
 
-      const settled = resolveIndoorMovement(collisionWorld, layout, exitSpec.foot.x, exitSpec.foot.z, 0, 0)
-      playerX = settled.x
-      playerZ = settled.z
-      playerEyeY = settled.eyeY
-      ceilingClearanceM = settled.ceilingClearanceM
-      activeShopId = settled.activeShopId
-      playerYaw = exitSpec.yaw
-      playerPitch = 0
+      const exitStair = collisionWorld.exitStairs.find(s => s.portalId === portalId)
+      if (!exitStair) {
+        setBodyFlags(false)
+        machine.setActivePortalId(null)
+        machine.transitionTo('idle')
+        void veilHandle.done()
+        return false
+      }
+
+      // 首帧相机直接放在楼梯顶部下楼脚本起点（离玻璃门 0.45m、俯角 -18°）
+      activeDescent = descentPath(exitStair, exitSpec)
+      const startFrame = activeDescent.start
+      playerX = startFrame.x
+      playerZ = startFrame.z
+      playerFootY = startFrame.footY
+      playerEyeY = eyeSmoother.reset(playerFootY)
+      ceilingClearanceM = Math.round((layout.ceilingHeight - playerEyeY) * 1000) / 1000
+      activeShopId = null
+      playerYaw = startFrame.yaw
+      playerPitch = startFrame.pitch
       pressedKeys.clear()
-      crowd?.reset({ x: playerX, z: playerZ, yaw: playerYaw })
+      draggingLook = false
+      // 人群预置避让以楼梯底落脚点为中心，避免行人挡在下楼口
+      crowd?.reset({ x: exitSpec.foot.x, z: exitSpec.foot.z, yaw: exitSpec.yaw })
 
       syncIndoorCamera()
       if (!machine.transitionTo('inside')) {
+        activeDescent = null
         setBodyFlags(false)
         void veilHandle.done()
         return false
       }
-      indoorEnteredAtMs = nowFn()
-      landingExit = exitSpec
-      landingExitArmed = false
 
       renderFrame()
       lastSwapMs = Math.max(0, Math.round((nowFn() - swapStart) * 100) / 100)
@@ -442,6 +482,8 @@ export function createXxgIndoorScene(opts: CreateXxgIndoorSceneOptions = {}): Xx
 
     const targetPortalId: XxgPortalId = pendingExitPortalId ?? machine.getActivePortalId() ?? 'E1'
     const portalDef = getPortal(targetPortalId)
+    activeDescent = null
+    draggingLook = false
     syncPromptDom()
 
     const veilHandle = hostCtx.openVeil(portalDef.label)
@@ -466,7 +508,8 @@ export function createXxgIndoorScene(opts: CreateXxgIndoorSceneOptions = {}): Xx
       machine.markPortalExitCooldown(targetPortalId, nowFn(), reenterCooldownMs)
       machine.setActivePortalId(null)
       pendingExitPortalId = null
-      landingExit = null
+      activeDescent = null
+      playerFootY = 0
       activeShopId = null
       lastSwapMs = Math.max(0, Math.round((nowFn() - swapStart) * 100) / 100)
       lastBlackFrames = 0
@@ -483,13 +526,6 @@ export function createXxgIndoorScene(opts: CreateXxgIndoorSceneOptions = {}): Xx
       await veilHandle.done().catch(() => {})
       return false
     }
-  }
-
-  function facesStair(ex: XxgExit): boolean {
-    const tx = ex.stair.x - ex.foot.x
-    const tz = ex.stair.z - ex.foot.z
-    const len = Math.hypot(tx, tz) || 1
-    return (-Math.sin(playerYaw) * tx - Math.cos(playerYaw) * tz) / len > 0.5
   }
 
   function step(dtSeconds: number): void {
@@ -513,6 +549,35 @@ export function createXxgIndoorScene(opts: CreateXxgIndoorSceneOptions = {}): Xx
     }
 
     if (st === 'inside') {
+      // 脚本自动下楼阶段：忽略全部玩家输入，视线高度平滑且每帧 Δy ≤ 0.08m
+      if (activeDescent !== null) {
+        const frame = activeDescent.step(dt)
+        playerX = frame.x
+        playerZ = frame.z
+        playerFootY = frame.footY
+        playerEyeY = eyeSmoother.step(playerFootY, dt)
+        playerYaw = frame.yaw
+        playerPitch = frame.pitch
+        ceilingClearanceM = Math.round((layout.ceilingHeight - playerEyeY) * 1000) / 1000
+        activeShopId = null
+
+        if (frame.done) {
+          const settled = resolveIndoorMovement(collisionWorld, layout, playerX, playerZ, 0, 0)
+          playerX = settled.x
+          playerZ = settled.z
+          playerFootY = settled.y
+          activeShopId = settled.activeShopId
+          activeDescent = null
+          pressedKeys.clear()
+          draggingLook = false
+        }
+
+        crowd?.step(dt, { x: playerX, z: playerZ, yaw: playerYaw })
+        syncIndoorCamera()
+        syncPromptDom()
+        return
+      }
+
       let turnInput = 0
       if (pressedKeys.has('KeyQ')) turnInput += 1
       if (turnInput !== 0 && dt > 0) {
@@ -552,29 +617,24 @@ export function createXxgIndoorScene(opts: CreateXxgIndoorSceneOptions = {}): Xx
         const moveRes = resolveIndoorMovement(collisionWorld, layout, playerX, playerZ, vx * dt, vz * dt)
         playerX = moveRes.x
         playerZ = moveRes.z
-        playerEyeY = moveRes.eyeY
-        ceilingClearanceM = moveRes.ceilingClearanceM
+        playerFootY = moveRes.y
         activeShopId = moveRes.activeShopId
         if (moveRes.hitWall) collisionContacts++
-      } else {
-        syncIndoorCamera()
       }
+
+      // 无论走上台阶还是回到平地，视线高度始终平滑过渡（每帧 Δy ≤ 0.08m）
+      playerEyeY = eyeSmoother.step(playerFootY, dt)
+      ceilingClearanceM = Math.round((layout.ceilingHeight - playerEyeY) * 1000) / 1000
 
       crowd?.step(dt, { x: playerX, z: playerZ, yaw: playerYaw })
       syncIndoorCamera()
       syncPromptDom()
 
-      if (
-        landingExit &&
-        !landingExitArmed &&
-        Math.hypot(playerX - landingExit.foot.x, playerZ - landingExit.foot.z) > XXG_PLAYER.exitTriggerRadius
-      ) {
-        landingExitArmed = true
-      }
-      if (nowMs - indoorEnteredAtMs >= 200 && (vx !== 0 || vz !== 0)) {
-        const triggeredExit = findTriggeredExit(layout, playerX, playerZ, vx, vz, XXG_PLAYER.exitTriggerRadius)
-        if (triggeredExit && (triggeredExit !== landingExit || landingExitArmed || facesStair(triggeredExit))) {
-          pendingExitPortalId = triggeredExit.portalId
+      // 玩家自己走上任一出口楼梯上段并继续朝上行方向移动时触发离开
+      if (vx !== 0 || vz !== 0) {
+        const stairHit = sampleAllExitStairsFootY(collisionWorld.exitStairs, playerX, playerZ)
+        if (stairHit && shouldClimbOut(stairHit.stair, playerX, playerZ, stairHit.footY, vx, vz)) {
+          pendingExitPortalId = stairHit.stair.portalId
           void exit()
         }
       }
@@ -594,7 +654,7 @@ export function createXxgIndoorScene(opts: CreateXxgIndoorSceneOptions = {}): Xx
   function getPlayerSnapshot(): XxgPlayerSnapshot {
     return {
       x: Math.round(playerX * 1000) / 1000,
-      y: 0,
+      y: Math.round(playerFootY * 1000) / 1000,
       z: Math.round(playerZ * 1000) / 1000,
       eyeY: playerEyeY,
       yaw: Math.round(playerYaw * 10000) / 10000,
@@ -603,12 +663,15 @@ export function createXxgIndoorScene(opts: CreateXxgIndoorSceneOptions = {}): Xx
       activePortalId: machine.getActivePortalId(),
       activeShopId,
       collisionContacts,
+      descending: activeDescent !== null,
     }
   }
 
   function dispose(): void {
     if (machine.getState() === 'disposed') return
     machine.dispose()
+    activeDescent = null
+    playerFootY = 0
     setBodyFlags(false)
     unmountDomAndListeners()
     if (crowd) {

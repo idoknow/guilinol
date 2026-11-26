@@ -111,6 +111,7 @@ export interface XxgPlayerSnapshot {
   readonly activePortalId: XxgPortalId | null
   readonly activeShopId: string | null
   readonly collisionContacts: number
+  readonly descending: boolean
 }
 
 export interface XxgExtendedIndoorScene extends XxgIndoorScene {

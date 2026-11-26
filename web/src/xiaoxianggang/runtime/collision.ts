@@ -6,6 +6,13 @@ import {
   type XxgRect,
   type XxgShop,
 } from '../contract.ts'
+import {
+  XXG_STAIR_DWARF_WALL_THICKNESS,
+  resolveXxgExitStair,
+  sampleAllExitStairsFootY,
+  xxgStairWalkLimitProgress,
+  type XxgExitStairSpec,
+} from './exit-stairs.ts'
 
 export interface Aabb2D {
   readonly id: string
@@ -16,7 +23,7 @@ export interface Aabb2D {
 }
 
 export interface WalkableRegion2D extends Aabb2D {
-  readonly kind: 'corridor' | 'empty-shop'
+  readonly kind: 'corridor' | 'empty-shop' | 'stair'
 }
 
 export interface IndoorCollisionWorld {
@@ -28,6 +35,7 @@ export interface IndoorCollisionWorld {
   readonly walkableRegions: readonly WalkableRegion2D[]
   readonly shrunkWalkableRegions: readonly WalkableRegion2D[]
   readonly solidObstacles: readonly Aabb2D[]
+  readonly exitStairs: readonly XxgExitStairSpec[]
 }
 
 export interface IndoorMoveResult {
@@ -147,17 +155,85 @@ export function buildIndoorCollisionWorld(
     }
   }
 
-  // Exit stairs are solid non-walkable AABBs per contract.ts:308
-  for (const ex of layout.exits) {
-    solidObstacles.push(rectToAabb(`stair-${ex.portalId}`, ex.stair))
+  // 出口楼梯可步行上行：向 foot 一侧延伸衔接可走区，两侧矮墙与远端玻璃门作为实心挡板
+  const exitStairs: XxgExitStairSpec[] = layout.exits.map(ex => resolveXxgExitStair(ex))
+  for (let i = 0; i < layout.exits.length; i++) {
+    const ex = layout.exits[i]!
+    const stair = exitStairs[i]!
+    const wallT = XXG_STAIR_DWARF_WALL_THICKNESS
+    const halfAcross = stair.acrossLen * 0.5
+    const clearMin = stair.acrossC - halfAcross + wallT
+    const clearMax = stair.acrossC + halfAcross - wallT
+    const footAlong = stair.alongZ ? ex.foot.z : ex.foot.x
+    // 入口侧延伸至 foot 之后 radiusM + 0.2m，保证收缩 radiusM 后与走廊/exit-pad 无缝重叠
+    const entryExtend = footAlong - stair.sign * (radiusM + 0.2)
+    // 远端只开到离开阈值以上两级，玩家走不上顶部平台
+    const walkEnd = stair.startEdge + stair.sign * (xxgStairWalkLimitProgress(stair) + radiusM)
+    const aMin = Math.min(entryExtend, walkEnd)
+    const aMax = Math.max(entryExtend, walkEnd)
+    walkableRegions.push(
+      stair.alongZ
+        ? { id: `stair-walk-${ex.portalId}`, kind: 'stair', minX: clearMin, maxX: clearMax, minZ: aMin, maxZ: aMax }
+        : { id: `stair-walk-${ex.portalId}`, kind: 'stair', minX: aMin, maxX: aMax, minZ: clearMin, maxZ: clearMax },
+    )
+
+    // 两侧花岗岩矮墙挡板（放在 stair 矩形内侧）
+    const stairMinA = Math.min(stair.startEdge, stair.endEdge)
+    const stairMaxA = Math.max(stair.startEdge, stair.endEdge)
+    for (const side of [-1, 1] as const) {
+      const wMin = side < 0 ? stair.acrossC - halfAcross : stair.acrossC + halfAcross - wallT
+      const wMax = wMin + wallT
+      solidObstacles.push(
+        stair.alongZ
+          ? {
+              id: `stair-wall-${ex.portalId}-${side < 0 ? 'l' : 'r'}`,
+              minX: wMin,
+              maxX: wMax,
+              minZ: stairMinA,
+              maxZ: stairMaxA,
+            }
+          : {
+              id: `stair-wall-${ex.portalId}-${side < 0 ? 'l' : 'r'}`,
+              minX: stairMinA,
+              maxX: stairMaxA,
+              minZ: wMin,
+              maxZ: wMax,
+            },
+      )
+    }
+
+    // 楼梯顶远端玻璃门实心挡板
+    const doorMinA = Math.min(stair.endEdge, stair.endEdge + stair.sign * 0.16)
+    const doorMaxA = Math.max(stair.endEdge, stair.endEdge + stair.sign * 0.16)
+    solidObstacles.push(
+      stair.alongZ
+        ? {
+            id: `stair-door-${ex.portalId}`,
+            minX: stair.acrossC - halfAcross,
+            maxX: stair.acrossC + halfAcross,
+            minZ: doorMinA,
+            maxZ: doorMaxA,
+          }
+        : {
+            id: `stair-door-${ex.portalId}`,
+            minX: doorMinA,
+            maxX: doorMaxA,
+            minZ: stair.acrossC - halfAcross,
+            maxZ: stair.acrossC + halfAcross,
+          },
+    )
   }
 
   // Structural column grid AABBs (only those overlapping walkable space matter, keep all for completeness)
   const halfCol = layout.columns.size * 0.5
   for (const cx of layout.columns.xs) {
     for (const cz of layout.columns.zs) {
-      // Skip columns that would overlap within 1.2m of an exit foot
-      const nearExit = layout.exits.some(e => Math.hypot(e.foot.x - cx, e.foot.z - cz) < 1.2 + halfCol)
+      // Skip columns that would overlap within 1.2m of an exit foot or inside any stair footprint
+      const nearExit = layout.exits.some(e => {
+        if (Math.hypot(e.foot.x - cx, e.foot.z - cz) < 1.2 + halfCol) return true
+        const sb = rectToAabb(e.portalId, e.stair)
+        return cx >= sb.minX - halfCol && cx <= sb.maxX + halfCol && cz >= sb.minZ - halfCol && cz <= sb.maxZ + halfCol
+      })
       if (nearExit) continue
       solidObstacles.push({
         id: `col-${cx}-${cz}`,
@@ -188,6 +264,7 @@ export function buildIndoorCollisionWorld(
     walkableRegions: Object.freeze(walkableRegions),
     shrunkWalkableRegions: Object.freeze(shrunkWalkableRegions),
     solidObstacles: Object.freeze(solidObstacles),
+    exitStairs: Object.freeze(exitStairs),
   })
 }
 
@@ -316,10 +393,13 @@ export function resolveIndoorMovement(
     }
   }
 
-  const eyeY = Math.min(world.eyeHeightM, world.ceilingHeightM - 0.45)
+  const stairHit = sampleAllExitStairsFootY(world.exitStairs, x, z)
+  const footY = stairHit ? stairHit.footY : 0
+  // 楼梯井上方吊顶已开洞（玻璃金字塔采光顶），上楼时 eyeY 随台阶升高；平地仍受吊顶净高约束
+  const eyeY = stairHit ? footY + world.eyeHeightM : Math.min(world.eyeHeightM, world.ceilingHeightM - 0.45)
   return {
     x,
-    y: 0,
+    y: footY,
     z,
     eyeY,
     ceilingClearanceM: Math.round((world.ceilingHeightM - eyeY) * 1000) / 1000,

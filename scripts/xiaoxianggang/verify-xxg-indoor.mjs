@@ -21,6 +21,12 @@ import { fileURLToPath } from 'node:url'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const REPO_ROOT = resolve(__dirname, '../..')
+/** B1 出口（落脚点 + 楼梯矩形），用来让验收脚本转身面朝楼梯走上去。 */
+const XXG_B1_EXITS = JSON.parse(
+  readFileSync(join(REPO_ROOT, 'web/src/xiaoxianggang/layout/xiaoxianggang-b1.layout.json'), 'utf8'),
+).exits
+/** 上楼离开前视线不得高过吊顶 + 0.3m（否则会看见楼梯顶外的空白）。 */
+const MAX_CLIMB_EYE_Y_M = 2.9 + 0.3
 
 export const SURFACE_PLAZA_Y = 153.868
 export const MAX_INDOOR_DRAW_CALLS = 40
@@ -357,6 +363,15 @@ export function evaluateXxgChecks(metrics) {
   if (!exit?.returnedToSurface) {
     failures.push('EXIT_NOT_RETURNED_TO_SURFACE')
   }
+  if (metrics.enter?.descended === false) {
+    failures.push('ENTRY_DESCENT_NOT_FINISHED')
+  }
+  if (exit?.climbedOut === false) {
+    failures.push('EXIT_STAIR_NOT_CLIMBABLE')
+  }
+  if (typeof exit?.climbPeakEyeY === 'number' && exit.climbPeakEyeY >= MAX_CLIMB_EYE_Y_M) {
+    failures.push(`EXIT_VIEW_ABOVE_CEILING(${exit.climbPeakEyeY.toFixed(2)}m>=${MAX_CLIMB_EYE_Y_M}m)`)
+  }
   if (typeof exit?.returnDistM === 'number' && exit.returnDistM > MAX_EXIT_RETURN_DIST_M) {
     failures.push(`EXIT_PORTAL_DRIFT(${exit.returnDistM.toFixed(2)}m>${MAX_EXIT_RETURN_DIST_M}m)`)
   }
@@ -568,27 +583,63 @@ export async function runVerify(opts) {
         entered = await isIndoorFlag()
       }
       const wallElapsedMs = Date.now() - t0
+      // 进场是脚本下楼（锁输入），等走到楼梯底交还控制再继续
+      let descended = !entered
+      if (entered) {
+        descended = await page
+          .waitForFunction(() => window.viewer?.xxg?.getState?.()?.player?.descending === false, null, { timeout: 8000 })
+          .then(() => true, () => false)
+      }
       await page.waitForTimeout(350)
-      return { entered, wallElapsedMs }
+      return { entered, descended, wallElapsedMs }
     }
 
+    /** 转身面朝当前出口楼梯，按住 W 自己走上台阶离开；记录离开前最高视线，走不出去才用 [E] 兜底。 */
     async function walkOutOfPortal() {
-      await page.keyboard.down('KeyS')
-      let returned = false
-      const deadline = Date.now() + 5000
-      while (Date.now() < deadline) {
-        returned = !(await isIndoorFlag())
-        if (returned) break
-        await page.waitForTimeout(60)
+      const snap = await page.evaluate(() => window.viewer?.xxg?.getState?.() ?? null)
+      const pid = snap?.activePortalId ?? snap?.player?.activePortalId ?? portal.id
+      const ex = XXG_B1_EXITS.find(e => e.portalId === pid)
+      let climbedOut = false
+      let climbPeakEyeY = null
+      if (ex && snap?.player) {
+        const targetYaw = Math.atan2(-(ex.stair.x - snap.player.x), -(ex.stair.z - snap.player.z))
+        const yawErr = yaw => Math.abs(Math.atan2(Math.sin(yaw - targetYaw), Math.cos(yaw - targetYaw)))
+        await page.keyboard.down('KeyQ')
+        const turnDeadline = Date.now() + 6000
+        while (Date.now() < turnDeadline) {
+          const yaw = await page.evaluate(() => window.viewer?.xxg?.getState?.()?.player?.yaw ?? null)
+          if (typeof yaw !== 'number' || yawErr(yaw) < 0.06) break
+          await page.waitForTimeout(16)
+        }
+        await page.keyboard.up('KeyQ')
+        await page.keyboard.down('KeyW')
+        const climbDeadline = Date.now() + 6000
+        while (Date.now() < climbDeadline) {
+          const probe = await page.evaluate(() => ({
+            indoor: document.body.dataset.xxgActive === '1' || Boolean(window.viewer?.xxg?.getState?.().isIndoor),
+            eyeY: window.viewer?.xxg?.getState?.()?.player?.eyeY ?? null,
+          }))
+          if (!probe.indoor) {
+            climbedOut = true
+            break
+          }
+          if (typeof probe.eyeY === 'number') climbPeakEyeY = Math.max(climbPeakEyeY ?? 0, probe.eyeY)
+          await page.waitForTimeout(30)
+        }
+        await page.keyboard.up('KeyW')
       }
-      await page.keyboard.up('KeyS')
+      let returned = !(await isIndoorFlag())
       if (!returned) {
         await page.keyboard.press('KeyE')
         await page.waitForTimeout(500)
         returned = !(await isIndoorFlag())
       }
       await page.waitForTimeout(450)
-      return returned
+      return {
+        returned,
+        climbedOut,
+        climbPeakEyeY: climbPeakEyeY === null ? null : Math.round(climbPeakEyeY * 1000) / 1000,
+      }
     }
 
     // 2. 第 1 轮真实步入独立 indoorScene
@@ -639,7 +690,7 @@ export async function runVerify(opts) {
     await page.keyboard.down('KeyD')
     await page.waitForTimeout(1400)
     await page.keyboard.up('KeyD')
-    const returnedToSurface = await walkOutOfPortal()
+    const outRun = await walkOutOfPortal()
     const exitShot = join(opts.out, '04-exit-restored.png')
     await page.screenshot({ path: exitShot })
 
@@ -678,7 +729,7 @@ export async function runVerify(opts) {
       const repeatIn = await walkIntoPortal()
       if (!repeatIn.entered) break
       const repeatOut = await walkOutOfPortal()
-      if (!repeatOut) break
+      if (!repeatOut.returned) break
       completedCycles = c
     }
 
@@ -690,9 +741,9 @@ export async function runVerify(opts) {
       portal,
       prodProbeAudit,
       surface,
-      enter: { enteredIndoor, transitionMs, blackFrameDetected, xxgMetrics: xxgEnterMetrics },
+      enter: { enteredIndoor, descended: enterRun.descended, transitionMs, blackFrameDetected, xxgMetrics: xxgEnterMetrics },
       indoor,
-      exit,
+      exit: { ...exit, climbedOut: outRun.climbedOut, climbPeakEyeY: outRun.climbPeakEyeY },
       repeatCycles: {
         completed: completedCycles,
         residualNodes: 0,

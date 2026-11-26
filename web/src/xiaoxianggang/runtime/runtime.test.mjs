@@ -37,6 +37,8 @@ import {
   findTriggeredExit,
   resolveIndoorMovement,
 } from './index.ts'
+import { resolveXxgExitStair } from './exit-stairs.ts'
+import { normalizeAngleRad } from './types.ts'
 import { XIAOXIANGGANG_B1_LAYOUT } from '../layout/index.ts'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
@@ -409,10 +411,18 @@ test('repeated enter/exit cycles across all 4 portals leave zero DOM/scene resid
       assert.equal(env.body.dataset.xxgActive, '1')
       // worldCamera is never mutated (first-person uses indoor.camera)
       assert.deepEqual(worldCamera.position.toArray(), initialWorldCamPos)
-      assert.equal(indoor.camera.position.y, XXG_PLAYER.eyeHeight)
+      assert.equal(indoor.getPlayerSnapshot().descending, true)
+      assert.ok(indoor.camera.position.y > XXG_PLAYER.eyeHeight, '首帧应位于楼梯顶上方')
 
       // Reject concurrent enter while already inside
       assert.equal(await indoor.enter('W2'), false)
+
+      // 跑完脚本下楼后再验证正常移动与碰墙
+      for (let f = 0; f < 240 && indoor.getPlayerSnapshot().descending; f++) {
+        indoor.step(0.05)
+      }
+      assert.equal(indoor.getPlayerSnapshot().descending, false)
+      assert.ok(Math.abs(indoor.camera.position.y - XXG_PLAYER.eyeHeight) < 0.02)
 
       // Move & collide against side wall
       env.mockWindow.dispatchKey('keydown', 'KeyW')
@@ -471,18 +481,23 @@ test('default createXxgIndoorScene loads full 53-shop B1 layout with PBR materia
       const metrics = indoor.getMetrics()
       assert.ok(metrics.drawCalls >= 10 && metrics.drawCalls <= XXG_BUDGET.indoorDrawCallsMax, `drawCalls=${metrics.drawCalls}`)
       assert.ok(metrics.textureBytes <= XXG_BUDGET.indoorTextureBytesMax)
+      for (let f = 0; f < 240 && indoor.getPlayerSnapshot().descending; f++) {
+        indoor.step(0.05)
+      }
+      assert.equal(indoor.getPlayerSnapshot().descending, false, `${pid} descent must complete`)
+      const contactsBefore = indoor.getPlayerSnapshot().collisionContacts
       const collideKey = pid === 'W2' ? 'KeyA' : 'KeyD'
       env.mockWindow.dispatchKey('keydown', collideKey)
       for (let f = 0; f < 40; f++) indoor.step(0.05)
       env.mockWindow.dispatchKey('keyup', collideKey)
-      assert.ok(indoor.getPlayerSnapshot().collisionContacts > 0, `${pid} wall collision must engage`)
+      assert.ok(indoor.getPlayerSnapshot().collisionContacts > contactsBefore, `${pid} wall collision must engage`)
       assert.equal(await indoor.exit(), true)
     }
     indoor.dispose()
   })
 })
 
-test('落地出口：侧移靠向楼梯不弹回地面；离开触发圈或面朝楼梯走才离开', async () => {
+test('出口楼梯：进场脚本下楼锁输入、落脚点交还控制、下段侧移后退不离开、上段触发离开且每帧 ΔeyeY ≤ 0.08', async () => {
   const env = createMockDomEnvironment()
   const hadNode = 'Node' in globalThis
   if (!hadNode) globalThis.Node = class {}
@@ -499,36 +514,115 @@ test('落地出口：侧移靠向楼梯不弹回地面；离开触发圈或面�
         suspendWorld() {},
         resumeWorldAt: async () => true,
       })
-      const hold = (code, frames) => {
-        env.mockWindow.dispatchKey('keydown', code)
-        for (let f = 0; f < frames && indoor.state === 'inside'; f++) {
-          t += 50
-          indoor.step(0.05)
-        }
-        env.mockWindow.dispatchKey('keyup', code)
-      }
       const settle = () => new Promise(r => setTimeout(r, 5))
 
-      // B1 的 E1：落脚点朝北看走廊，楼梯在左手边。
       const e1 = indoor.getLayout().exits.find(e => e.portalId === 'E1')
-      assert.ok(e1.stair.x < e1.foot.x && Math.abs(e1.yaw) < 1e-9)
+      const e1Stair = resolveXxgExitStair(e1)
+      const progressOf = snap =>
+        (snap.x - e1Stair.startCenter.x) * e1Stair.up.x + (snap.z - e1Stair.startCenter.z) * e1Stair.up.z
 
+      // ① 进场后 descending=true，采集无按键基准轨迹（10 帧）
       assert.equal(await indoor.enter('E1'), true)
-      hold('KeyA', 28)
-      assert.equal(indoor.state, 'inside', '刚落地侧移靠向楼梯不能把人弹回地面')
-      hold('KeyD', 28)
-      hold('KeyA', 10)
-      assert.equal(indoor.state, 'exiting', '离开过触发圈后，回到楼梯口朝楼梯移动照常离开')
+      const startSnap = indoor.getPlayerSnapshot()
+      assert.equal(startSnap.descending, true)
+      assert.ok(Math.abs(startSnap.y - e1Stair.topY) < 1e-3, '起点脚底高度应为 topY')
+      assert.ok(startSnap.pitch < -0.25, '起点俯角应朝下约 -18°')
+      for (let f = 0; f < 10; f++) {
+        t += 50
+        indoor.step(0.05)
+      }
+      const refSnap10 = indoor.getPlayerSnapshot()
+      assert.equal(refSnap10.descending, true)
+      assert.equal(await indoor.exit(), true)
+
+      // 重新进场：下楼期间按 W/D/E + 拖拽视角不产生任何额外移动或偏航
+      assert.equal(await indoor.enter('E1'), true)
+      let prevEyeY = indoor.getPlayerSnapshot().eyeY
+      let maxDeltaEyeY = 0
+      const stepTracked = (dt = 0.05) => {
+        t += dt * 1000
+        indoor.step(dt)
+        const curEyeY = indoor.getPlayerSnapshot().eyeY
+        maxDeltaEyeY = Math.max(maxDeltaEyeY, Math.abs(curEyeY - prevEyeY))
+        prevEyeY = curEyeY
+      }
+
+      env.mockWindow.dispatchKey('keydown', 'KeyW')
+      env.mockWindow.dispatchKey('keydown', 'KeyD')
+      env.mockWindow.dispatchKey('keydown', 'KeyE')
+      env.mockWindow.dispatchKey('pointerdown', '', { button: 0, clientX: 0, clientY: 0 })
+      env.mockWindow.dispatchKey('pointermove', '', { clientX: 200, clientY: -120 })
+      env.mockWindow.dispatchKey('pointerup', '')
+      for (let f = 0; f < 10; f++) stepTracked(0.05)
+      env.mockWindow.dispatchKey('keyup', 'KeyW')
+      env.mockWindow.dispatchKey('keyup', 'KeyD')
+      env.mockWindow.dispatchKey('keyup', 'KeyE')
+
+      const lockedSnap10 = indoor.getPlayerSnapshot()
+      assert.equal(indoor.state, 'inside', '下楼期间按 E 不能触发离开')
+      assert.equal(lockedSnap10.descending, true)
+      assert.equal(lockedSnap10.x, refSnap10.x, '下楼期间按 W/D 不得偏离脚本 X')
+      assert.equal(lockedSnap10.z, refSnap10.z, '下楼期间按 W/D 不得偏离脚本 Z')
+      assert.equal(lockedSnap10.yaw, refSnap10.yaw, '下楼期间拖拽不得改变 yaw')
+      assert.equal(lockedSnap10.pitch, refSnap10.pitch, '下楼期间拖拽不得改变 pitch')
+
+      // ② 下楼完成后落在 exit.foot 附近、yaw ≈ exit.yaw、eyeY ≈ 1.6
+      for (let f = 0; f < 240 && indoor.getPlayerSnapshot().descending; f++) {
+        stepTracked(0.05)
+      }
+      const landed = indoor.getPlayerSnapshot()
+      assert.equal(landed.descending, false)
+      assert.ok(Math.hypot(landed.x - e1.foot.x, landed.z - e1.foot.z) < 0.05, `落点偏离 foot: ${landed.x},${landed.z}`)
+      assert.ok(Math.abs(landed.y) < 1e-3, `落点脚底高应为 0，实际 ${landed.y}`)
+      assert.ok(Math.abs(landed.eyeY - XXG_PLAYER.eyeHeight) < 0.02, `落点 eyeY=${landed.eyeY}`)
+      assert.ok(Math.abs(normalizeAngleRad(landed.yaw - e1.yaw)) < 0.02, `落点 yaw=${landed.yaw}`)
+      assert.ok(Math.abs(landed.pitch) < 0.02, `落点 pitch=${landed.pitch}`)
+
+      // 转身面朝 E1 楼梯上行方向
+      const deltaYaw = normalizeAngleRad(e1Stair.upYaw - landed.yaw)
+      env.mockWindow.dispatchKey('pointerdown', '', { button: 0, clientX: 0, clientY: 0 })
+      env.mockWindow.dispatchKey('pointermove', '', { clientX: -deltaYaw / 0.0026, clientY: 0 })
+      env.mockWindow.dispatchKey('pointerup', '')
+
+      // ④ 走上楼梯下段后侧移/后退不触发离开
+      env.mockWindow.dispatchKey('keydown', 'KeyW')
+      for (let f = 0; f < 60 && indoor.state === 'inside'; f++) {
+        stepTracked(0.05)
+        const s = progressOf(indoor.getPlayerSnapshot())
+        if (s >= Math.min(0.6, e1Stair.runLen * 0.25)) break
+      }
+      env.mockWindow.dispatchKey('keyup', 'KeyW')
+      assert.equal(indoor.state, 'inside')
+      assert.ok(indoor.getPlayerSnapshot().y > 0.02, '应已踏上楼梯下段')
+
+      for (const code of ['KeyA', 'KeyD', 'KeyS']) {
+        env.mockWindow.dispatchKey('keydown', code)
+        for (let f = 0; f < 6 && indoor.state === 'inside'; f++) stepTracked(0.05)
+        env.mockWindow.dispatchKey('keyup', code)
+        assert.equal(indoor.state, 'inside', `楼梯下段按 ${code} 不应触发离开`)
+      }
+
+      // ③ 面朝楼梯按住 W 走上去，在楼梯上段触发 exiting，触发瞬间 eyeY < 2.9 + 0.3 且 progress < 楼梯长度
+      env.mockWindow.dispatchKey('keydown', 'KeyW')
+      for (let f = 0; f < 120 && indoor.state === 'inside'; f++) {
+        stepTracked(0.05)
+      }
+      env.mockWindow.dispatchKey('keyup', 'KeyW')
+      assert.equal(indoor.state, 'exiting', '沿楼梯上行应在楼梯上段触发离开')
+
+      const exitSnap = indoor.getPlayerSnapshot()
+      const exitProgress = progressOf(exitSnap)
+      assert.ok(
+        exitSnap.eyeY < indoor.getLayout().ceilingHeight + 0.3,
+        `触发离开时 eyeY=${exitSnap.eyeY} 必须 < ${indoor.getLayout().ceilingHeight + 0.3}`,
+      )
+      assert.ok(exitProgress > 0 && exitProgress < e1Stair.runLen, `触发点 progress=${exitProgress} 应 < ${e1Stair.runLen}`)
+
+      // ⑤ 全程每帧 eyeY 变化 ≤ 0.08m
+      assert.ok(maxDeltaEyeY <= 0.08 + 1e-9, `单帧最大 eyeY 变化 ${maxDeltaEyeY} 超过 0.08m`)
+
       await settle()
       assert.equal(indoor.state, 'idle')
-
-      assert.equal(await indoor.enter('E1'), true)
-      env.mockWindow.dispatchKey('pointerdown', '', { button: 0, clientX: 0, clientY: 0 })
-      env.mockWindow.dispatchKey('pointermove', '', { clientX: -Math.PI / 2 / 0.0026, clientY: 0 })
-      env.mockWindow.dispatchKey('pointerup', '')
-      hold('KeyW', 10)
-      assert.equal(indoor.state, 'exiting', '刚落地转身面朝楼梯走，直接离开')
-      await settle()
       indoor.dispose()
     })
   } finally {
