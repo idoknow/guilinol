@@ -1,0 +1,15 @@
+[
+  {
+    "platform": 375922219,
+    "rail": 617221277,
+    "steelOverlapM2": 3.2978773180963623,
+    "centerlineInsideM": 9.96496650243989,
+    "chainageM": [
+      676.4290225317222,
+      727.4022569615479
+    ],
+    "maxInwardM": 0.95703856786713,
+    "headFragments": 5,
+    "withExistingPaving": 5
+  }
+]
