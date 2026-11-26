@@ -12,7 +12,7 @@ import pg from 'pg'
 export const LIMITS = Object.freeze({
   walk: 9,          // m/s 跑步
   bike: 7,          // m/s 助力车
-  car: 30,          // m/s 汽车运动挡（108 km/h）
+  car: 45,          // m/s 汽车（150 km/h ≈ 41.7，留 8% 余量）
   stepM: 1.2,       // 单帧容忍
   upMax: 12,        // 向上速度上限 m/s
   bankMs: 2000,     // 额度最长累积
@@ -24,6 +24,10 @@ export const LIMITS = Object.freeze({
   walkGateMs: 1000, // 出拳要求过去 1 秒是走路速度
   tolerance: 1.6,   // 瞬时速度容忍倍数（掉帧/网络排队）
 })
+
+/** 空中/载具：不限制向上速度，按载具上限放行（直升机刚上线，乘客的 foot 会被置 false） */
+const airborne = (p) => p.foot === false || Boolean(p.bike) || p.activity === 'drone'
+const AUTOBAN = process.env.RT_AC_AUTOBAN === '1'
 
 /** 当前允许的速度（m/s）。客户端上报的 v 永不参与判定。 */
 export function speedCap(p, at) {
@@ -43,7 +47,7 @@ export function checkMove(p, nx, ny, nz, at) {
   const flat = Math.hypot(nx - p.x, nz - p.z)
   const rise = ny - p.y
 
-  if (rise > LIMITS.upMax * dt + 0.5) return { ok: false, kind: 'fly', overflow: rise, reject: true }
+  if (!airborne(p) && rise > LIMITS.upMax * dt + 0.5) return { ok: false, kind: 'fly', overflow: rise, reject: true }
 
   if (flat > LIMITS.jumpM) {
     const inCombat = at - (p.lastCombat ?? 0) < LIMITS.combatLockMs
@@ -56,7 +60,7 @@ export function checkMove(p, nx, ny, nz, at) {
 
   // 容忍 1.6 倍瞬时速度 + 固定抖动余量：手机掉帧/网络排队会集中到一个包里，
   // 但持续作弊（20Hz 下 40 m/s）会稳定超限，会被拒。
-  const cap = speedCap(p, at) * dt * LIMITS.tolerance + LIMITS.stepM
+  const cap = (airborne(p) ? LIMITS.car : speedCap(p, at)) * dt * LIMITS.tolerance + LIMITS.stepM
   if (flat > cap) return { ok: false, kind: 'speed', overflow: flat - cap, reject: true }
   return { ok: true }
 }
@@ -206,7 +210,7 @@ export function createBanStore(env = process.env, log = () => {}) {
         [uid, fp, Date.now(), ua],
       ).catch(() => {})
     }
-    if (uid == null) return null
+    if (uid == null || !AUTOBAN) return null   // 首版只记录不自动封（默认关），用真实数据调参后再开
     const hits = (recent.count.get(uid) ?? 0) + 1
     recent.count.set(uid, hits)
     const now = Date.now()
