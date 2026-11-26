@@ -134,11 +134,21 @@ def bake(directory, manifest, paired_widths):
             key = (wid, section["name"], road["boundaryNodes"][0]) if wid in profiles else wid
             profiles[key] = profile
             joint.append(profile)
-    bake_profiles(directory, manifest, profiles, elements, bridge_ways.values(), landings)
+    joint_bridges = []
+    for section in sections:
+        if not section.get("firstSectionRoadDecks"):
+            continue
+        from rail_section_bridges import grade_decks
+        bridges, abutments = grade_decks(directory, manifest, section["firstSectionRoadDecks"], ways, profiles)
+        if abutments.keys() & landings.keys():
+            raise ValueError("Shared bridge landing requires one joint design")
+        joint_bridges.extend(bridges)
+        landings.update(abutments)
+    bake_profiles(directory, manifest, profiles, elements, [*bridge_ways.values(), *joint_bridges], landings)
     from dingjiang_paving import finish_paving
     corrected = {int(wid) for section in sections for wid in section.get("priorRoadProfiles", {}).get("01", {})}
     finish_paving(directory, manifest, [profiles[wid] for wid in sorted(set(ROAD_IDS) | corrected)] + joint, elements)
-    final_traffic_ways = [way for way, _, _ in joint]
+    final_traffic_ways = [way for way, _, _ in joint] + joint_bridges
     final_traffic_ways.extend(profiles[wid][0] for wid in sorted(corrected))
     # A new bore can share a portal with an earlier graded approach. Generate
     # their profiles under their own design rules, then stitch them in one pass.

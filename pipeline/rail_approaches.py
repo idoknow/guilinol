@@ -35,7 +35,7 @@ def crossings(sections):
     return pairs
 
 
-def measure(world, sections, *, exclude=()):
+def measure(world, sections, *, exclude=(), surface_roles=None):
     manifest = json.loads((world / 'manifest.json').read_bytes())
     rules = json.loads((ROOT / 'pipeline/streets.json').read_bytes())
     probes = []
@@ -65,6 +65,8 @@ def measure(world, sections, *, exclude=()):
     out = subprocess.check_output([ROOT/'node_modules/.bin/tsx', ROOT/'scripts/approach-faces.ts', world],
                                   input=json.dumps([list(p[4].buffer(2.06).bounds) for p in probes]).encode())
     faces = [json.loads(l) for l in out.splitlines()]
+    if surface_roles is not None:
+        faces = [face for face in faces if face[0] in surface_roles]
     polygons = [Polygon([(x,z) for x,_,z in v]) for _,v in faces]
     tree = STRtree(polygons)
     results = []

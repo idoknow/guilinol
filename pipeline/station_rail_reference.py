@@ -11,9 +11,33 @@ def reference_tiles():
     return tiles
 
 
+def section_reference(tiles):
+    """Apply only the five surveyed railhead corrections at the Tiexi siding bridge."""
+    file = Path(__file__).with_name("rail-sections") / "12-guilin-station.json"
+    changes = {(r["x"], r["z"]): r for r in json.loads(file.read_bytes())["approvedCorridorVertices"]}
+    if len(changes) != 5:
+        raise ValueError("Incomplete Tiexi siding vertex list")
+    seen = set()
+    for (x, z), rows in tiles.items():
+        for i, chord in enumerate(rows):
+            row = list(chord)
+            for j in (0, 3):
+                xy = (round(x + row[j] / 100, 6), round(z + row[j + 1] / 100, 6))
+                if xy in changes:
+                    change = changes[xy]
+                    if abs(row[j + 2] - 100 * change["referenceM"]) > .0001:
+                        raise ValueError(f"Unexpected #300 height at {xy}")
+                    row[j + 2] = round(100 * change["railheadM"], 4)
+                    seen.add(xy)
+            rows[i] = row
+    if seen != changes.keys():
+        raise ValueError("Tiexi correction outside reference corridor")
+    return tiles
+
+
 def locked_heights():
     heights = {}
-    for (x, z), rows in reference_tiles().items():
+    for (x, z), rows in section_reference(reference_tiles()).items():
         for row in rows:
             for dx, dz, height in (row[:3], row[3:6]):
                 key = (round(x + dx / 100, 6), round(z + dz / 100, 6))
@@ -42,6 +66,6 @@ def differences(reference, actual):
 
 
 def verify_tiles(tiles):
-    for key, rows in reference_tiles().items():
+    for key, rows in section_reference(reference_tiles()).items():
         if differences(rows, tiles.get(key, [])):
             raise ValueError(f"Station corridor differs from #300 in tile {key}")
