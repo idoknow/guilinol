@@ -12,10 +12,10 @@ let logs=''; srv.stdout.on('data',d=>logs+=d); srv.stderr.on('data',d=>logs+='ER
 await sleep(2000)
 let fail=0
 const ok=(c,m)=>{console.log((c?'  PASS ':'  FAIL ')+m); if(!c)fail++}
-function client(uid,name,x,z){
+function client(uid,name,x,z,caps=['roster3']){
   const ws=new WebSocket(URL); const seen=[]
   ws.on('message',m=>seen.push(JSON.parse(m.toString())))
-  ws.on('open',()=>ws.send(JSON.stringify({t:'join',ticket:mint(uid,name),name,caps:['roster3'],x,y:3,z,yaw:0})))
+  ws.on('open',()=>ws.send(JSON.stringify({t:'join',ticket:mint(uid,name),name,...(caps?{caps}:{}),x,y:3,z,yaw:0})))
   return {ws,seen,send:o=>ws.send(JSON.stringify(o))}
 }
 const A=client(920001,'A',110.29,25.27)
@@ -26,9 +26,12 @@ const aId=A.seen.find(m=>m.t==='welcome')?.me.id
 const bId=B.seen.find(m=>m.t==='welcome')?.me.id
 const fId=F.seen.find(m=>m.t==='welcome')?.me.id
 
-console.log('\n[1] 未订阅：不应该收到 roster3')
+console.log('\n[1] 未订阅：不应该收到 roster3；roster3 客户端也不预发全量')
+const L=client(920004,'L',110.30,25.30,null)   // 老客户端（无 caps）
+await sleep(1200)
 ok(!A.seen.some(m=>m.t==='roster3'), 'A 未订阅时没有 roster3')
-ok(A.seen.some(m=>m.t==='roster'), 'A 仍收到低频全量 roster（老客户端兼容）')
+ok(!A.seen.some(m=>m.t==='roster'), 'A（roster3）进服不再预发全量')
+ok(L.seen.some(m=>m.t==='roster'), '老客户端 L 仍收到全量 roster（兼容）')
 
 console.log('\n[2] 订阅：立即收到附近快照 + 随后全量')
 A.seen.length=0
@@ -40,11 +43,11 @@ if(near){
   const ids=near.near.map(e=>e[0])
   ok(ids.includes(bId), `near 含附近玩家 B(${bId})`)
   ok(!ids.includes(fId), `near 不含 3km 外的 F(${fId})`)
-  ok(near.total===3, `near.total=3（实际 ${near.total}）`)
+  ok(near.total===4, `near.total=4（实际 ${near.total}）`)
 }
 await sleep(900)
 const full=A.seen.find(m=>m.t==='roster3'&&m.full)
-ok(!!full&&full.full.length===3, `随后收到全量快照（${full?full.full.length:0} 人）`)
+ok(!!full&&full.full.length===4, `随后收到全量快照（${full?full.full.length:0} 人）`)
 
 console.log('\n[3] 增量：有人移动 → up')
 A.seen.length=0
