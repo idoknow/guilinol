@@ -218,6 +218,7 @@ try {
   await applyCpuThrottle(page)
   page.on('pageerror', err => errors.push(`pageerror: ${err.message}`))
   page.on('console', msg => {
+    if (msg.text().startsWith('walk:enter-failed')) console.log(msg.text())
     if (msg.type() === 'error') errors.push(`console.error: ${msg.text()} (${msg.location().url})`)
   })
   await page.route('**/favicon.ico', r => r.fulfill({status: 204}))
@@ -307,6 +308,7 @@ try {
   assert.equal(afterErrand.money, 380)
   assert.ok(afterErrand.missionsDone.includes('errand-01'))
   assert.equal(afterErrand.beacon, false, 'beacon must hide after mission completion')
+  console.log('PASS errand-01', JSON.stringify({arrivedAtPickup, arrivedAtDelivery, ...afterErrand}))
 
   // 4. Reload persistence check
   await page.reload()
