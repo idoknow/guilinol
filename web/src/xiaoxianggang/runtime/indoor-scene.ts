@@ -786,8 +786,10 @@ export function createIndoorGreyboxScene(layout: XxgLayout): IndoorGreyboxSceneH
         woodCamelSpecs.push(
           { cx: doorX + rackLen * 0.09, cy: 1.05, cz: rackCoord, sx: rackLen * 0.16, sy: 0.84, sz: 0.28 },
           { cx: shop.rect.x, cy: 0.24, cz: shelfCoord, sx: shelfLen, sy: 0.48, sz: 0.28 },
-          { cx: shop.rect.x, cy: 1.1, cz: shelfCoord, sx: shelfLen, sy: 0.045, sz: 0.26 },
-          { cx: shop.rect.x, cy: 1.6, cz: shelfCoord, sx: shelfLen, sy: 0.045, sz: 0.26 },
+          { cx: shop.rect.x - shelfLen * 0.42, cy: 1.02, cz: shelfCoord, sx: 0.09, sy: 2.04, sz: 0.28 },
+          { cx: shop.rect.x + shelfLen * 0.42, cy: 1.02, cz: shelfCoord, sx: 0.09, sy: 2.04, sz: 0.28 },
+          { cx: shop.rect.x, cy: 1.1, cz: shelfCoord, sx: shelfLen, sy: 0.05, sz: 0.26 },
+          { cx: shop.rect.x, cy: 1.6, cz: shelfCoord, sx: shelfLen, sy: 0.05, sz: 0.26 },
           { cx: shop.rect.x, cy: 1.22, cz: shelfCoord, sx: shelfLen * 0.16, sy: 0.18, sz: 0.22 },
         )
         rackMetalSpecs.push(
@@ -803,8 +805,6 @@ export function createIndoorGreyboxScene(layout: XxgLayout): IndoorGreyboxSceneH
           { cx: doorX + rackLen * 0.48, cy: 0.74, cz: rackCoord, sx: 0.045, sy: 1.48, sz: 0.045 },
           { cx: doorX, cy: 0.06, cz: rackCoord, sx: rackLen, sy: 0.045, sz: 0.24 },
           { cx: doorX, cy: 1.47, cz: rackCoord, sx: rackLen, sy: 0.045, sz: 0.045 },
-          { cx: shop.rect.x - shelfLen * 0.48, cy: 1.02, cz: shelfCoord, sx: 0.05, sy: 2.04, sz: 0.26 },
-          { cx: shop.rect.x + shelfLen * 0.48, cy: 1.02, cz: shelfCoord, sx: 0.05, sy: 2.04, sz: 0.26 },
           { cx: shop.rect.x, cy: 1.72, cz: shelfCoord, sx: shelfLen * 0.16, sy: 0.22, sz: 0.22 },
         )
       } else {
@@ -846,8 +846,10 @@ export function createIndoorGreyboxScene(layout: XxgLayout): IndoorGreyboxSceneH
         woodCamelSpecs.push(
           { cx: rackCoord, cy: 1.05, cz: doorZ + rackLen * 0.09, sx: 0.28, sy: 0.84, sz: rackLen * 0.16 },
           { cx: shelfCoord, cy: 0.24, cz: shop.rect.z, sx: 0.28, sy: 0.48, sz: shelfLen },
-          { cx: shelfCoord, cy: 1.1, cz: shop.rect.z, sx: 0.26, sy: 0.045, sz: shelfLen },
-          { cx: shelfCoord, cy: 1.6, cz: shop.rect.z, sx: 0.26, sy: 0.045, sz: shelfLen },
+          { cx: shelfCoord, cy: 1.02, cz: shop.rect.z - shelfLen * 0.42, sx: 0.28, sy: 2.04, sz: 0.09 },
+          { cx: shelfCoord, cy: 1.02, cz: shop.rect.z + shelfLen * 0.42, sx: 0.28, sy: 2.04, sz: 0.09 },
+          { cx: shelfCoord, cy: 1.1, cz: shop.rect.z, sx: 0.26, sy: 0.05, sz: shelfLen },
+          { cx: shelfCoord, cy: 1.6, cz: shop.rect.z, sx: 0.26, sy: 0.05, sz: shelfLen },
           { cx: shelfCoord, cy: 1.22, cz: shop.rect.z, sx: 0.22, sy: 0.18, sz: shelfLen * 0.16 },
         )
         rackMetalSpecs.push(
@@ -863,8 +865,6 @@ export function createIndoorGreyboxScene(layout: XxgLayout): IndoorGreyboxSceneH
           { cx: rackCoord, cy: 0.74, cz: doorZ + rackLen * 0.48, sx: 0.045, sy: 1.48, sz: 0.045 },
           { cx: rackCoord, cy: 0.06, cz: doorZ, sx: 0.24, sy: 0.045, sz: rackLen },
           { cx: rackCoord, cy: 1.47, cz: doorZ, sx: 0.045, sy: 0.045, sz: rackLen },
-          { cx: shelfCoord, cy: 1.02, cz: shop.rect.z - shelfLen * 0.48, sx: 0.26, sy: 2.04, sz: 0.05 },
-          { cx: shelfCoord, cy: 1.02, cz: shop.rect.z + shelfLen * 0.48, sx: 0.26, sy: 2.04, sz: 0.05 },
           { cx: shelfCoord, cy: 1.72, cz: shop.rect.z, sx: 0.22, sy: 0.22, sz: shelfLen * 0.16 },
         )
       }
