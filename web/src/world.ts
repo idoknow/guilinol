@@ -18,7 +18,7 @@ import {freezeStatic} from './static-freeze'
 
 interface Asset {file:string; bytes:number}
 import {refinePlatformTerrain,type RefinedTerrainFace} from './platform-access'
-export interface Tile extends Asset {buildingColliderRings?:Record<number,Building[2]>; platformAccess?:RefinedTerrainFace[]; x:number; z:number; stationPaving?:StationPavingStyle; roadbeds?:number[]}
+export interface Tile extends Asset {grass?:string; buildingColliderRings?:Record<number,Building[2]>; platformAccess?:RefinedTerrainFace[]; x:number; z:number; stationPaving?:StationPavingStyle; roadbeds?:number[]}
 export function physicalBuildingRings(tile:Tile, rendered:Building[]):Building[]{
   if(!tile.buildingColliderRings)return rendered
   return rendered.map((building,i)=>{

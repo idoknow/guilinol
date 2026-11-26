@@ -664,6 +664,8 @@ def build(bbox, output, palette, workers=4):
         final_manifest = json.loads((output/'manifest.json').read_bytes())
         grade_traffic(output, final_manifest, [], ferry_contacts=True)
         fit_shore_banks(output)
+    from idok279_patch import patch as patch_streetscape
+    patch_streetscape(output, output.parent / (output.name + '-checks'))
     print(f'{len(chunks)} chunks, {len(footprints)} footprints, {sum(c["bytes"] for c in chunks):,} chunk bytes')
 
 

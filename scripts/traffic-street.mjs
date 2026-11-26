@@ -65,6 +65,7 @@ try{
   const cdp=await page.context().newCDPSession(page)
   const capture=async path=>writeFile(path,Buffer.from((await cdp.send('Page.captureScreenshot',{format:'jpeg'})).data,'base64'))
   await page.waitForFunction(()=>window.viewer?.stats.firstMs>0)
+  console.log('Traffic startup (ms)',await page.evaluate(()=>({firstFrame:window.viewer.stats.firstMs,viewerReady:performance.now()})))
   const shots=[...['residential','tertiary'].map(cls=>{
     const [x,y,z,yaw]=rows.filter(row=>row[5]===cls).sort((a,b)=>Math.hypot(a[0],a[2])-Math.hypot(b[0],b[2]))[0]
     return {name:cls,x:x-14*Math.sin(yaw)-3*Math.cos(yaw),y:y+4,z:z-14*Math.cos(yaw)+3*Math.sin(yaw),yaw}
