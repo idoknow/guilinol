@@ -76,7 +76,9 @@ function manifestPlaces(manifest: any): Place[] {
   ].filter((p) => p.name && !/^auto-/.test(p.name) && Number.isFinite(p.x) && Number.isFinite(p.z))
 }
 async function api<T = any>(path: string, data?: unknown, method='POST'): Promise<T> {
-  if (!data) {
+  // 无 body 默认是读（GET）；显式传 DELETE 等方法时照发，且不合并、不重试
+  const read = !data && method === 'POST'
+  if (read) {
     const existing = inflightGet.get(path)
     if (existing) return existing as Promise<T>
   }
@@ -87,14 +89,16 @@ async function api<T = any>(path: string, data?: unknown, method='POST'): Promis
       try {
         response = await fetch(
           `/api/${path}`,
-          data
-            ? { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) }
-            : { cache: 'no-store' },
+          read
+            ? { cache: 'no-store' }
+            : data
+              ? { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) }
+              : { method },
         )
       } catch {
         throw new ApiError(0, 'network', '网络连接失败，请检查网络后重试')
       }
-      if (attempt === 0 && !data && response.status >= 500 && !path.startsWith('admin/security-search?')) {
+      if (attempt === 0 && read && response.status >= 500 && !path.startsWith('admin/security-search?')) {
         await new Promise((resolve) => setTimeout(resolve, 800))
         continue
       }
@@ -113,7 +117,7 @@ async function api<T = any>(path: string, data?: unknown, method='POST'): Promis
     }
     return result as T
   })()
-  if (!data) {
+  if (read) {
     inflightGet.set(path, job)
     job.finally(() => { if (inflightGet.get(path) === job) inflightGet.delete(path) })
   }
@@ -1762,77 +1766,13 @@ const pages: Record<string, (view: View) => void> = {
     }).catch(error=>slot.replaceChildren(errorState(error,()=>render())))
   },
   security() {
-    const banSlot = h('div')
-    const banUidIn = h('input', { type: 'search', name: 'banuid', placeholder: '例如 102276', 'aria-label': '封禁 UID' }) as HTMLInputElement
-    const banFpIn = h('input', { type: 'search', name: 'banfp', placeholder: '例如 6f771cf0012fec6b', 'aria-label': '封禁设备指纹' }) as HTMLInputElement
-    const banMinSel = h('select', { name: 'banmin', class: 'adm-select', 'aria-label': '封禁时长' },
-      h('option', { value: '0' }, '永久'),
-      h('option', { value: '10' }, '10 分钟'),
-      h('option', { value: '60' }, '1 小时'),
-      h('option', { value: '1440' }, '24 小时'),
-      h('option', { value: '10080' }, '7 天')) as HTMLSelectElement
-    const banReasonIn = h('input', { type: 'search', name: 'banreason', placeholder: '可留空', 'aria-label': '封禁原因' }) as HTMLInputElement
-    type Account = { uid: string | number; nickname: string | null; lastLogin: string | number | null }
-    type Device = { fp: string; model: string; browser: string; screen: string; ip24: string; isp: string; city: string; first: number; last: number; accounts?: Account[] }
-    const sub = (text: string) => h('div', {class:'adm-sub'}, text)
-    const summary = (device: Device) => [device.model, device.browser, device.isp, device.city].map(v=>v || '—').join(' · ')
-    const accountText = (account: Account) => `UID ${account.uid} · ${account.nickname || '—'} · 最近登录 ${when(unix(account.lastLogin))}`
-    const nick = h('input', {type:'search',placeholder:'搜索玩家昵称'})
-    const results = h('div', {'aria-live':'polite'})
-    let generation = 0, timer = 0
-    const clearSearch = () => { generation++; clearTimeout(timer); results.replaceChildren() }
-    banUidIn.oninput = () => { clearSearch(); nick.value = '' }
-    nick.oninput = () => {
-      clearSearch(); banUidIn.value = ''
-      const query = nick.value.trim(), current = generation
-      if (!query) return
-      timer = window.setTimeout(async () => {
-        try {
-          const candidates = await api<(Account & {devices:Device[]})[]>(`admin/user-search?q=${encodeURIComponent(query)}`, undefined, 'GET')
-          if (current !== generation) return
-          results.replaceChildren(...(candidates.length ? candidates.map(account=>h('button', {type:'button', class:'adm-btn', onclick:()=>{
-            clearSearch(); nick.value = account.nickname || ''; banUidIn.value = String(account.uid)
-            results.replaceChildren(...(account.devices.length ? account.devices.map(device=>sub(summary(device))) : [sub('暂无设备记录')]))
-          }}, `${account.nickname || '—'} · UID ${account.uid} · 最近登录 ${when(unix(account.lastLogin))}`)) : [sub('没有匹配的昵称')]))
-        } catch (error) { if (current === generation) results.replaceChildren(sub((error as Error).message)) }
-      }, 250)
-    }
-    const banForms = h('form', { class: 'adm-mp-filters', role: 'search' },
-      h('label', null, '昵称', nick), results,
-      h('label', null, 'UID', banUidIn),
-      h('label', null, '设备指纹', banFpIn),
-      h('label', null, '时长', banMinSel),
-      h('label', null, '原因', banReasonIn),
-      h('button', { type: 'submit', class: 'adm-btn adm-btn--sm' }, '封禁'))
-    const accountsView = (accounts: Account[]) => h('details', null, h('summary', null, `关联账号 (${accounts.length})`),
-      accounts.length ? accounts.map(account=>sub(accountText(account))) : sub('暂无账号记录'))
-    const deviceView = (device: Device) => h('details', null, h('summary', null, `${device.fp.slice(0,8)} · ${summary(device)}`),
-      sub(`屏幕 ${device.screen || '—'} · 网段 ${device.ip24 || '—'}`),
-      sub(`首次出现 ${when(device.first ? new Date(Number(device.first)) : null)} · 最近出现 ${when(device.last ? new Date(Number(device.last)) : null)}`),
-      device.accounts && accountsView(device.accounts))
-    const banKind = (row: any) => row.actor === 'protocol' ? ['攻击', 'is-bad'] : row.actor === 'auto' ? ['外挂', 'adm-ban-auto'] : ['人工', '']
-    const banRow = (row: any) => {
-      const [label, tone] = banKind(row)
-      return h('tr', null,
-        h('td', null, h('span', { class: `adm-pill ${tone}` }, label)),
-        h('td', null, row.kind === 'uid' ? `${row.nickname || '—'} · UID ${row.value}` : [
-          `设备 ${String(row.value).slice(0,8)} `, h('button', {type:'button',class:'adm-btn',onclick:async()=>{
-            try { await navigator.clipboard.writeText(String(row.value)); toast('已复制指纹') } catch { toast('复制失败','error') }
-          }}, '复制'), accountsView(row.accounts ?? [])],
-          row.devices?.length ? row.devices.map(deviceView) : sub('暂无设备记录')),
-        h('td', null, row.reason || '—', row.recordId && h('div', { class: 'adm-sub adm-ban-record' }, `记录 ${String(row.recordId).slice(0, 8)}`)),
-        h('td', { class: 'adm-nowrap' }, row.until ? when(new Date(row.until)) : h('span', { class: 'adm-pill is-bad' }, '永久')),
-        h('td', { class: 'adm-right' }, h('button', {
-          type: 'button', class: 'adm-btn adm-btn--sm adm-btn--ghost',
-          onclick: async () => {
-            if (!confirm(`解除${row.kind === 'uid' ? ` UID ${row.value}` : '该设备'}的联机封禁？`)) return
-            try {
-              await api('admin/unban', { uid: row.kind === 'uid' ? Number(row.value) : undefined, fp: row.kind === 'fp' ? row.value : undefined })
-              void loadBans()
-            } catch (error) { alert(String((error as Error)?.message ?? error)) }
-          },
-        }, '解封')))
-    }
+    let bans: any[] = [], reviews: any[] = [], bansError: unknown = null
+    let guard: { rules: any[]; bans: any[] } | null = null, guardError: unknown = null
+    // 后端还没有 admin/bans/protection（网站防护未上线）时隐藏防护卡和网站 IP 页签
+    let guardMissing = false
+    let tab = 'all'
+
+    /* ── 待复核：页面的视觉中心。每条两行：谁命中了什么 / 怎么处理 ── */
     const kindLabel: Record<string, string> = {
       speed: '超速移动', teleport: '违规瞬移', head_overlap: '贴在他人头顶跟随', altitude_unverified: '异常升空 / 滞空（仅记录）', ground_unverified: '疑似钻地（仅记录）',
       mount_player: '请求骑乘他人', foreign_position: '改写他人位置', oversize: '超大消息', invalid_packet: '非法消息', packet_rate: '刷包超频',
@@ -1840,284 +1780,449 @@ const pages: Record<string, (view: View) => void> = {
     const detailLabel: Record<string, string> = { overflow: '超出 (m)', to: '落点', peer: '对象玩家', target: '对象玩家', size: '大小', rate: '频率', speed: '速度 (m/s)', flatSpeed: '水平速度 (m/s)', vspeed: '垂直速度 (m/s)', reportedSpeed: '客户端速度 (m/s)' }
     const attack = new Set(['mount_player', 'foreign_position', 'oversize', 'invalid_packet', 'packet_rate'])
     const coord = (value: unknown) => Array.isArray(value) ? value.map((n) => Math.round(Number(n))).join(', ') : ''
-    const clock = (at: number) => { const d = new Date(at); return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}:${String(d.getSeconds()).padStart(2, '0')}` }
-    type CheatCaptureItem = {
-      id: string
-      uid: number
-      nickname: string
-      accountId: string | null
-      fp: string
-      kind: string
-      capturedAt: number
-      uploadedAt: number
-      stateLabel: string
-      serverState: string
-      speedMs: number
-      clientSpeedMs: number | null
-      pos: [number, number, number]
-      attemptPos: [number, number, number] | null
-      landmark: string
-      landmarkDist: number | null
-      imageBytes: number
-      width: number | null
-      height: number | null
-      imageUrl: string
-      meta?: Record<string, any>
-    }
-    let latestCaptures: CheatCaptureItem[] = []
-    let latestCaptureTotal = 0
-    const formatSpeed = (speedMs: number, clientSpeedMs?: number | null) => {
-      const kmh = (speedMs * 3.6).toFixed(1)
-      const base = `${speedMs.toFixed(1)} m/s（${kmh} km/h）`
-      return clientSpeedMs != null && Math.abs(clientSpeedMs - speedMs) >= 1.5
-        ? `${base} · 客户端 ${clientSpeedMs.toFixed(1)} m/s`
-        : base
-    }
-    const formatCapturePos = (item: CheatCaptureItem) => {
-      const place = item.landmark ? `${item.landmark}${item.landmarkDist != null ? ` 约 ${item.landmarkDist}m` : ''} · ` : ''
-      const base = `${place}(${Math.round(item.pos[0])}, ${Math.round(item.pos[1])}, ${Math.round(item.pos[2])})`
-      if (item.attemptPos) {
-        return `${base} → 落点 (${Math.round(item.attemptPos[0])}, ${Math.round(item.attemptPos[1])}, ${Math.round(item.attemptPos[2])})`
+    const clock = (at: number) => new Date(at).toLocaleTimeString('zh-CN', { hour12: false })
+    const reviewCount = h('em', { class: 'adm-sec-count' })
+    const reviewSlot = h('div', { class: 'adm-reviews' }, skeleton(2))
+    const reviewCard = (review: any) => {
+      const events = (Array.isArray(review.evidence) ? review.evidence : []) as any[]
+      const counts = new Map<string, number>()
+      for (const event of events) counts.set(event.kind, (counts.get(event.kind) ?? 0) + 1)
+      const who = `UID ${review.uid}`
+      const reasonIn = h('input', { type: 'text', class: 'adm-input', maxlength: 200, placeholder: '处罚原因（玩家可见）', 'aria-label': `${who} 的处罚原因`,
+        value: [...counts.keys()].map((k) => kindLabel[k] ?? k).join('、') }) as HTMLInputElement
+      const minutesSel = h('select', { class: 'adm-select', 'aria-label': `${who} 的处罚时长` },
+        ...[['60', '1 小时'], ['1440', '24 小时'], ['10080', '7 天'], ['0', '永久']].map(([v, t]) => h('option', { value: v }, t))) as HTMLSelectElement
+      minutesSel.value = '1440'
+      const confirmBtn = h('button', { type: 'button', class: 'adm-btn adm-btn--sm adm-btn--seal', 'aria-label': `封禁 ${who}` }, '封禁') as HTMLButtonElement
+      const submit = () => {
+        const reason = reasonIn.value.trim()
+        if (!reason) { reasonIn.focus(); toast('请先填写处罚原因', 'error'); return }
+        void act(confirmBtn, async () => {
+          await api('admin/ban', { uid: review.uid, reviewId: review.id, minutes: Number(minutesSel.value), reason })
+          toast(`已封禁 ${who}`)
+          await loadBans()
+        })
       }
-      return base
+      confirmBtn.onclick = submit
+      reasonIn.addEventListener('keydown', (event) => { if (event.key === 'Enter' && !event.isComposing) submit() })
+      const dismissBtn = h('button', { type: 'button', class: 'adm-btn adm-btn--sm adm-btn--ghost', 'aria-label': `不处罚 ${who}` }, '不处罚') as HTMLButtonElement
+      dismissBtn.onclick = async () => {
+        const ok = await confirmDialog({ title: '结束复核', body: h('p', null, `${who} 不做处罚，这条复核会关闭。`), confirm: '不处罚', tone: 'jade' })
+        if (ok === null) return
+        void act(dismissBtn, async () => {
+          await api('admin/unban', { uid: review.uid, reviewId: review.id, dismiss: true })
+          toast(`已结束 ${who} 的复核`)
+          await loadBans()
+        })
+      }
+      const evidence = h('div', { class: 'adm-table-wrap adm-review-evidence' }, h('table', { class: 'adm-table adm-table--dense' },
+        h('thead', null, h('tr', null, ...['时间', '类型', '起点', '详情'].map((t) => h('th', null, t)))),
+        h('tbody', null, ...events.map((event) => {
+          const { from, ...rest } = event.detail ?? {}
+          const extra = Object.entries(rest).map(([k, v]) => `${detailLabel[k] ?? k}：${Array.isArray(v) ? coord(v) : typeof v === 'object' ? JSON.stringify(v) : v}`).join(' · ')
+          return h('tr', null, h('td', { class: 'adm-nowrap' }, clock(Number(event.at))), h('td', null, kindLabel[event.kind] ?? event.kind),
+            h('td', { class: 'adm-nowrap' }, coord(from) || dash), h('td', { class: 'adm-sub' }, extra || dash))
+        }))))
+      evidence.hidden = true
+      const evidenceBtn = h('button', { type: 'button', class: 'adm-review-more', 'aria-expanded': 'false', 'aria-label': `${who} 的 ${events.length} 条证据` }, `${events.length} 条证据`) as HTMLButtonElement
+      evidenceBtn.onclick = () => {
+        evidence.hidden = !evidence.hidden
+        evidenceBtn.setAttribute('aria-expanded', String(!evidence.hidden))
+      }
+      const opened = new Date(Number(review.opened_ms))
+      return h('article', { class: 'adm-review', 'data-uid': String(review.uid) },
+        h('header', { class: 'adm-review-head' },
+          h('b', null, who),
+          h('span', { class: 'adm-review-kinds' }, ...[...counts].map(([k, n]) =>
+            h('span', { class: `adm-pill ${attack.has(k) ? 'is-bad' : 'adm-ban-auto'}` }, `${kindLabel[k] ?? k} ×${n}`))),
+          events.length ? evidenceBtn : null,
+          h('time', { class: 'adm-review-ago', datetime: opened.toISOString(), title: `${when(opened)} 进入复核` }, ago(opened))),
+        events.length ? evidence : null,
+        h('div', { class: 'adm-review-shots', 'data-uid': String(review.uid), hidden: true }),
+        h('div', { class: 'adm-review-actions' }, reasonIn, minutesSel, confirmBtn, dismissBtn))
     }
-    const prefillBanFromCapture = (item: CheatCaptureItem) => {
-      clearSearch()
-      nick.value = item.nickname || ''
-      banUidIn.value = String(item.uid)
-      banFpIn.value = item.fp || ''
-      banMinSel.value = '1440'
-      banReasonIn.value = `${kindLabel[item.kind] ?? item.kind}（自动抓拍取证 ${item.id.slice(0, 8)}）`
-      banForms.scrollIntoView({ behavior: 'smooth', block: 'center' })
-      banReasonIn.focus()
+    const paintReviews = () => {
+      reviewCount.textContent = bansError ? '' : reviews.length ? String(reviews.length) : '暂无'
+      reviewCount.classList.toggle('is-zero', !reviews.length)
+      reviewWrap.classList.toggle('is-clear', !bansError && !reviews.length)
+      if (bansError) return reviewSlot.replaceChildren(errorState(bansError, () => void loadBans()))
+      reviewSlot.replaceChildren(...reviews.map(reviewCard))
+      paintShots()
     }
-    const openCaptureLightbox = (item: CheatCaptureItem) => {
-      document.querySelectorAll('dialog.adm-capture-lightbox').forEach((d) => d.remove())
-      const closeBtn = h('button', { type: 'button', class: 'adm-btn adm-btn--sm adm-btn--ghost' }, '关闭')
-      const banBtn = h('button', { type: 'button', class: 'adm-btn adm-btn--sm adm-btn--danger' }, '去封禁此账号')
-      const delBtn = h('button', { type: 'button', class: 'adm-btn adm-btn--sm adm-btn--ghost' }, '删除抓拍') as HTMLButtonElement
-      const playerEl = item.accountId
-        ? navLink(`${item.nickname || '未命名'} · UID ${item.uid}`, { view: 'users', id: item.accountId }, { class: 'adm-link' })
-        : h('b', null, `${item.nickname || '未命名'} · UID ${item.uid}`)
-      const dialog = h('dialog', { class: 'ui-panel adm-dialog adm-capture-lightbox' },
+
+    /* ── 自动抓拍：服务端判定外挂时玩家端自动截图，附当时状态、速度、位置 ── */
+    type Capture = { id: string; uid: number; nickname: string; accountId: string | null; fp: string; kind: string; capturedAt: number
+      stateLabel: string; serverState: string; speedMs: number; clientSpeedMs: number | null; pos: number[] | null; attemptPos: number[] | null
+      landmark: string; landmarkDist: number | null; imageBytes: number; width: number | null; height: number | null; imageUrl: string }
+    let captures: Capture[] = [], recentCaptures: Capture[] = [], captureTotal = 0, captureError: unknown = null, captureMissing = false
+    let captureSeq = 0, captureTimer = 0
+    const kindPill = (kind: string) => h('span', { class: `adm-pill ${attack.has(kind) ? 'is-bad' : 'adm-ban-auto'}` }, kindLabel[kind] ?? kind)
+    const playerName = (item: Capture) => `${item.nickname || '未命名'} · UID ${item.uid}`
+    const speedText = (item: Capture) => {
+      const speed = Number(item.speedMs) || 0, client = item.clientSpeedMs == null ? null : Number(item.clientSpeedMs)
+      return `${speed.toFixed(1)} m/s${client != null && Math.abs(client - speed) >= 1.5 ? `（客户端 ${client.toFixed(1)}）` : ''}`
+    }
+    const placeText = (item: Capture) => {
+      const at = (p: number[] | null) => Array.isArray(p) ? `(${p.map((n) => Math.round(Number(n))).join(', ')})` : ''
+      return [item.landmark && `${item.landmark}${item.landmarkDist != null ? ` 约 ${item.landmarkDist}m` : ''}`, at(item.pos), item.attemptPos && `→ 落点 ${at(item.attemptPos)}`].filter(Boolean).join(' ') || dash
+    }
+    // 抓拍转人工封禁：展开人工封禁表单并填好，管理员核对后再提交
+    const fillBan = (uid: string, fp: string, reason = '') => {
+      if (manualForm.hidden) manualToggle.click()
+      manualUid.value = uid; manualFp.value = fp; manualReason.value = reason
+      manualPick.replaceChildren(); manualHint.textContent = ''
+      manualForm.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      manualReason.focus()
+    }
+    const prefillBan = (item: Capture) => {
+      manualMin.value = '1440'
+      fillBan(String(item.uid), item.fp || '', `${kindLabel[item.kind] ?? item.kind}（抓拍 ${item.id.slice(0, 8)}）`)
+    }
+    const openCapture = (item: Capture) => {
+      document.querySelectorAll('dialog.adm-capture-lightbox').forEach((node) => node.remove())
+      const closeBtn = h('button', { type: 'button', class: 'adm-btn adm-btn--sm adm-btn--ghost' }, '关闭') as HTMLButtonElement
+      const banBtn = h('button', { type: 'button', class: 'adm-btn adm-btn--sm adm-btn--seal' }, '填表封禁') as HTMLButtonElement
+      const deleteBtn = h('button', { type: 'button', class: 'adm-btn adm-btn--sm adm-btn--ghost' }, '删除') as HTMLButtonElement
+      const who = item.accountId ? navLink(playerName(item), { view: 'users', id: item.accountId }, { class: 'adm-link' }) : h('b', null, playerName(item))
+      const facts: [string, string][] = [
+        ['状态', `${item.stateLabel || item.serverState || dash}${item.serverState && item.stateLabel && item.serverState !== item.stateLabel ? `（服务端 ${item.serverState}）` : ''}`],
+        ['速度', `${speedText(item)} · ${((Number(item.speedMs) || 0) * 3.6).toFixed(0)} km/h`],
+        ['位置', placeText(item)],
+        ['图像', `${item.width ?? '?'}×${item.height ?? '?'} · ${fmt.bytes(Number(item.imageBytes) || 0)} · 记录 ${item.id.slice(0, 8)}`],
+      ]
+      if (item.fp) facts.push(['设备', item.fp])
+      const dialog = h('dialog', { class: 'ui-panel adm-dialog adm-capture-lightbox', 'aria-label': `${playerName(item)} 的抓拍` },
         h('header', { class: 'adm-capture-lb-head' },
-          h('div', null,
-            playerEl,
-            ' ',
-            h('span', { class: `adm-pill ${attack.has(item.kind) ? 'is-bad' : 'adm-ban-auto'}` }, kindLabel[item.kind] ?? item.kind),
-            h('span', { class: 'adm-sub' }, ` · ${when(new Date(item.capturedAt), true)}`)),
+          h('div', { class: 'adm-capture-lb-who' }, who, kindPill(item.kind), h('time', { class: 'adm-sub' }, when(new Date(item.capturedAt)))),
           h('div', { class: 'adm-capture-lb-actions' },
-            h('a', { href: item.imageUrl, target: '_blank', rel: 'noopener noreferrer', class: 'adm-btn adm-btn--sm adm-btn--ghost' }, '原图 ↗'),
-            banBtn,
-            delBtn,
-            closeBtn)),
+            h('a', { href: item.imageUrl, target: '_blank', rel: 'noopener noreferrer', class: 'adm-link' }, '原图'), banBtn, deleteBtn, closeBtn)),
         h('div', { class: 'adm-capture-lb-body' },
-          h('img', { src: item.imageUrl, alt: `UID ${item.uid} 反外挂取证截图`, class: 'adm-capture-lb-img' }),
-          h('dl', { class: 'adm-facts adm-capture-lb-facts' },
-            h('dt', null, '当前状态'), h('dd', null, item.stateLabel + (item.serverState && item.serverState !== item.stateLabel ? `（服务端：${item.serverState}）` : '')),
-            h('dt', null, '当前速度'), h('dd', null, formatSpeed(item.speedMs, item.clientSpeedMs)),
-            h('dt', null, '当前位置'), h('dd', null, formatCapturePos(item)),
-            h('dt', null, '图像信息'), h('dd', null, `${item.width ?? '?'}×${item.height ?? '?'} · ${fmt.bytes(item.imageBytes)} · 记录 ${item.id.slice(0, 8)}`),
-            item.fp && h('dt', null, '设备指纹'), item.fp && h('dd', null, h('code', null, item.fp))))) as HTMLDialogElement
+          h('img', { src: item.imageUrl, alt: `${playerName(item)} ${kindLabel[item.kind] ?? item.kind} 抓拍`, class: 'adm-capture-lb-img' }),
+          h('dl', { class: 'adm-facts adm-capture-lb-facts' }, ...facts.flatMap(([k, v]) => [h('dt', null, k), h('dd', null, v)])))) as HTMLDialogElement
       closeBtn.onclick = () => dialog.close()
-      banBtn.onclick = () => { dialog.close(); prefillBanFromCapture(item) }
-      delBtn.onclick = async () => {
-        if (!confirm(`确认删除 UID ${item.uid} 的这条取证截图？删除后无法恢复。`)) return
-        delBtn.disabled = true
-        try {
+      banBtn.onclick = () => { dialog.close(); prefillBan(item) }
+      deleteBtn.onclick = async () => {
+        if (await confirmDialog({ title: '删除抓拍', body: h('p', null, `${playerName(item)} 的这张抓拍会永久删除。`), confirm: '删除', tone: 'seal' }) === null) return
+        void act(deleteBtn, async () => {
           await api(`admin/mp/cheat-captures/${encodeURIComponent(item.id)}`, undefined, 'DELETE')
-          toast('已删除抓拍记录')
+          toast('已删除抓拍')
           dialog.close()
-          void loadBans()
-        } catch (error) {
-          delBtn.disabled = false
-          alert(String((error as Error)?.message ?? error))
-        }
+          await loadCaptures()
+        })
       }
       dialog.addEventListener('click', (event) => { if (event.target === dialog) dialog.close() })
       dialog.addEventListener('close', () => dialog.remove())
       document.body.append(dialog)
       dialog.showModal()
+      closeBtn.focus()
     }
-    const captureCard = (item: CheatCaptureItem) => {
-      const thumb = h('button', { type: 'button', class: 'adm-capture-thumb', 'aria-label': `查看 UID ${item.uid} 的取证大图` },
-        h('img', { src: item.imageUrl, loading: 'lazy', alt: `UID ${item.uid} ${kindLabel[item.kind] ?? item.kind} 自动截图` }),
-        h('span', { class: `adm-pill adm-capture-badge ${attack.has(item.kind) ? 'is-bad' : 'adm-ban-auto'}` }, kindLabel[item.kind] ?? item.kind))
-      thumb.onclick = () => openCaptureLightbox(item)
-      const who = item.accountId
-        ? navLink(`${item.nickname || '未命名'} · UID ${item.uid}`, { view: 'users', id: item.accountId }, { class: 'adm-link' })
-        : h('b', null, `${item.nickname || '未命名'} · UID ${item.uid}`)
-      const inspectBtn = h('button', { type: 'button', class: 'adm-btn adm-btn--sm adm-btn--ghost' }, '查看大图')
-      inspectBtn.onclick = () => openCaptureLightbox(item)
-      const quickBanBtn = h('button', { type: 'button', class: 'adm-btn adm-btn--sm adm-btn--danger' }, '填表封禁')
-      quickBanBtn.onclick = () => prefillBanFromCapture(item)
-      return h('article', { class: 'adm-capture-card' },
-        thumb,
-        h('div', { class: 'adm-capture-body' },
-          h('div', { class: 'adm-capture-head' },
-            who,
-            h('span', { class: 'adm-sub adm-nowrap' }, when(new Date(item.capturedAt)))),
-          h('dl', { class: 'adm-capture-facts' },
-            h('dt', null, '状态'), h('dd', null, item.stateLabel || item.serverState || '—'),
-            h('dt', null, '速度'), h('dd', null, formatSpeed(item.speedMs, item.clientSpeedMs)),
-            h('dt', null, '位置'), h('dd', null, formatCapturePos(item))),
-          h('div', { class: 'adm-capture-actions' }, inspectBtn, quickBanBtn)))
-    }
-    const reviewCard = (review: any) => {
-      const events = (Array.isArray(review.evidence) ? review.evidence : []) as any[]
-      const counts = new Map<string, number>()
-      for (const event of events) counts.set(event.kind, (counts.get(event.kind) ?? 0) + 1)
-      const reasonIn = h('input', { type: 'text', class: 'adm-input', placeholder: '处罚原因（玩家会看到）', 'aria-label': '处罚原因',
-        value: [...counts.keys()].map((k) => kindLabel[k] ?? k).join('、') }) as HTMLInputElement
-      const minutesSel = h('select', { class: 'adm-select', 'aria-label': '处罚时长' },
-        ...[['60', '1 小时'], ['1440', '24 小时'], ['10080', '7 天'], ['0', '永久']].map(([v, t]) => h('option', { value: v }, t))) as HTMLSelectElement
-      minutesSel.value = '1440'
-      const act = async (button: HTMLButtonElement, run: () => Promise<unknown>) => {
-        button.disabled = true
-        try { await run(); await loadBans() } catch (error) { button.disabled = false; alert(String((error as Error)?.message ?? error)) }
-      }
-      const confirmBtn = h('button', { type: 'button', class: 'adm-btn adm-btn--sm adm-btn--danger' }, '确认违规并封禁') as HTMLButtonElement
-      confirmBtn.onclick = () => {
-        const reason = reasonIn.value.trim()
-        if (!reason) { reasonIn.focus(); return }
-        void act(confirmBtn, () => api('admin/ban', { uid: review.uid, reviewId: review.id, minutes: Number(minutesSel.value), reason }))
-      }
-      const dismissBtn = h('button', { type: 'button', class: 'adm-btn adm-btn--sm adm-btn--ghost' }, '不处罚') as HTMLButtonElement
-      dismissBtn.onclick = () => { if (confirm(`结束 UID ${review.uid} 的复核，不处罚？`)) void act(dismissBtn, () => api('admin/unban', { uid: review.uid, reviewId: review.id, dismiss: true })) }
-      const matchingShots = latestCaptures.filter((shot) => Number(shot.uid) === Number(review.uid)).slice(0, 3)
-      const shotsStrip = matchingShots.length
-        ? h('div', { class: 'adm-review-shots' },
-            h('span', { class: 'adm-sub' }, `关联自动抓拍（${matchingShots.length}）：`),
-            h('div', { class: 'adm-review-shot-list' }, ...matchingShots.map((shot) => {
-              const btn = h('button', { type: 'button', class: 'adm-review-shot-btn', title: `${kindLabel[shot.kind] ?? shot.kind} · ${formatSpeed(shot.speedMs)}` },
-                h('img', { src: shot.imageUrl, loading: 'lazy', alt: `UID ${shot.uid} 抓拍缩略图` }),
-                h('span', null, `${kindLabel[shot.kind] ?? shot.kind} · ${shot.speedMs.toFixed(1)}m/s`))
-              btn.onclick = () => openCaptureLightbox(shot)
-              return btn
-            })))
-        : null
-      return h('article', { class: 'adm-review' },
-        h('header', { class: 'adm-review-head' },
-          h('div', null,
-            h('b', null, `UID ${review.uid}`),
-            h('span', { class: 'adm-sub' }, ` · ${when(new Date(Number(review.opened_ms)))} 进入复核 · ${events.length} 条证据`)),
-          h('div', { class: 'adm-chips' }, ...[...counts].map(([k, n]) =>
-            h('span', { class: `adm-pill ${attack.has(k) ? 'is-bad' : 'adm-ban-auto'}` }, `${kindLabel[k] ?? k} ×${n}`)))),
-        shotsStrip,
-        h('details', { class: 'adm-review-evidence' },
-          h('summary', null, '证据时间线'),
-          h('div', { class: 'adm-table-wrap' }, h('table', { class: 'adm-table adm-table--dense' },
-            h('thead', null, h('tr', null, ...['时间', '类型', '起点', '详情'].map((t) => h('th', null, t)))),
-            h('tbody', null, ...events.map((event) => {
-              const { from, ...rest } = event.detail ?? {}
-              const extra = Object.entries(rest).map(([k, v]) => `${detailLabel[k] ?? k}：${Array.isArray(v) ? coord(v) : typeof v === 'object' ? JSON.stringify(v) : v}`).join(' · ')
-              return h('tr', null, h('td', { class: 'adm-nowrap' }, clock(Number(event.at))), h('td', null, kindLabel[event.kind] ?? event.kind),
-                h('td', { class: 'adm-nowrap' }, coord(from) || '—'), h('td', { class: 'adm-sub' }, extra || '—'))
-            }))))),
-        h('div', { class: 'adm-review-actions' }, reasonIn, minutesSel, confirmBtn, dismissBtn))
-    }
-    const banStats = h('div', { class: 'adm-kpis adm-kpis--small adm-kpis--6' })
-    const reviewSlot = h('div', { class: 'adm-reviews' })
-    const captureSlot = h('div')
-    const captureUidIn = h('input', { type: 'search', name: 'capuid', placeholder: '按 UID 筛选', 'aria-label': '按 UID 筛选抓拍' }) as HTMLInputElement
-    const captureFpIn = h('input',{type:'search',placeholder:'按指纹筛选','aria-label':'按指纹筛选抓拍'})
-    const captureKindSel = h('select', { name: 'capkind', class: 'adm-select', 'aria-label': '按违规类型筛选抓拍' },
-      h('option', { value: '' }, '全部违规类型'),
-      ...Object.entries(kindLabel).map(([k, label]) => h('option', { value: k }, label))) as HTMLSelectElement
-    const captureRefreshBtn = h('button', { type: 'button', class: 'adm-btn adm-btn--sm adm-btn--ghost' }, '刷新')
-    const captureFilterForm = h('form', { class: 'adm-mp-filters adm-capture-filters', role: 'search' },
-      h('label', null, 'UID', captureUidIn),
-      h('label', null, '设备', captureFpIn),
-      h('label', null, '类型', captureKindSel),
-      h('button', { type: 'submit', class: 'adm-btn adm-btn--sm' }, '筛选'),
-      captureRefreshBtn)
-    const loadCaptures = async () => {
-      const q = new URLSearchParams({ limit: '24' })
-      const uidFilter = captureUidIn.value.trim()
-      if (/^\d+$/.test(uidFilter)) q.set('uid', uidFilter)
-      if(captureFpIn.value.trim())q.set('fp',captureFpIn.value.trim())
-      if (captureKindSel.value) q.set('kind', captureKindSel.value)
-      try {
-        const result = await api<{ captures?: CheatCaptureItem[]; total?: number }>(`admin/mp/cheat-captures?${q}`, undefined, 'GET')
-        latestCaptures = Array.isArray(result?.captures) ? result.captures : []
-        latestCaptureTotal = Number(result?.total ?? latestCaptures.length)
-        captureSlot.replaceChildren(latestCaptures.length
-          ? h('div', { class: 'adm-capture-grid' }, ...latestCaptures.map(captureCard))
-          : emptyState('暂无外挂自动抓拍', '联机服务端监测到玩家疑似超速、瞬移、升空或协议攻击时，会自动抓拍玩家画面并附带状态、速度与位置信息上传到此。'))
-      } catch (error) {
-        captureSlot.replaceChildren(errorState(error as Error, () => void loadCaptures()))
+    // 复核卡里的抓拍缩略图：原地更新，不重绘复核卡，免得冲掉正在填的原因
+    const paintShots = () => {
+      for (const slot of Array.from(reviewSlot.querySelectorAll<HTMLElement>('.adm-review-shots'))) {
+        const shots = recentCaptures.filter((shot) => String(shot.uid) === slot.dataset.uid).slice(0, 4)
+        const ids = shots.map((shot) => shot.id).join()
+        if (slot.dataset.ids === ids) continue
+        slot.dataset.ids = ids
+        slot.hidden = !shots.length
+        slot.replaceChildren(...shots.map((shot) => h('button', {
+          type: 'button', class: 'adm-review-shot', onclick: () => openCapture(shot),
+          title: `${kindLabel[shot.kind] ?? shot.kind} · ${speedText(shot)} · ${when(new Date(shot.capturedAt))}`,
+          'aria-label': `查看抓拍：${kindLabel[shot.kind] ?? shot.kind}，${speedText(shot)}`,
+        }, h('img', { src: shot.imageUrl, loading: 'lazy', alt: '' }))))
       }
     }
-    captureFilterForm.addEventListener('submit', (event) => {
-      event.preventDefault()
-      void loadCaptures()
-    })
-    captureKindSel.addEventListener('change', () => void loadCaptures())
-    captureRefreshBtn.onclick = () => void loadCaptures()
-    const loadBans = async () => {
-      const [bansRes] = await Promise.allSettled([
-        api<any>('admin/bans', undefined, 'GET'),
-        loadCaptures(),
-      ])
-      if (bansRes.status === 'fulfilled') {
-        const data = bansRes.value
-        const rows = (data?.bans ?? []) as any[]
-        const reviews = (data?.reviews ?? []) as any[]
-        const count = (actor: string) => rows.filter((row) => row.actor === actor).length
-        banStats.replaceChildren(
-          serverStat('生效封禁', String(rows.length), `${when(new Date())} 刷新`),
-          serverStat('待复核', String(reviews.length), reviews.length ? '多类违规，等待人工确认' : '没有待处理'),
-          serverStat('自动抓拍', String(latestCaptureTotal), latestCaptureTotal ? '已留存画面与遥测' : '暂无抓拍'),
-          serverStat('外挂自动短封', String(count('auto'))),
-          serverStat('攻击自动短封', String(count('protocol'))),
-          serverStat('人工封禁', String(rows.length - count('auto') - count('protocol'))))
-        reviewSlot.replaceChildren(...(reviews.length ? reviews.map(reviewCard) : [emptyState('没有待复核的记录', '同一账号命中多类移动违规时会出现在这里，不会自动长封')]))
-        banSlot.replaceChildren(rows.length
-          ? h('div', { class: 'adm-table-wrap' }, h('table', { class: 'adm-table' },
-            h('thead', null, h('tr', null, ['分类', '对象', '原因', '到期', ''].map((t) => h('th', null, t)))),
-            h('tbody', null, ...rows.map(banRow))))
-          : sub('当前没有生效中的封禁'))
+    const captureRow = (item: Capture) => h('li', null, h('button', {
+      type: 'button', class: 'adm-cap-row', onclick: () => openCapture(item), 'aria-label': `查看 ${playerName(item)} 的抓拍`,
+    },
+      h('img', { src: item.imageUrl, loading: 'lazy', alt: '' }),
+      h('span', { class: 'adm-cap-line' },
+        h('b', null, `UID ${item.uid}`), h('span', { class: 'adm-cap-nick' }, item.nickname || ''),
+        h('time', { class: 'adm-cap-ago', title: when(new Date(item.capturedAt)) }, ago(new Date(item.capturedAt)))),
+      h('span', { class: 'adm-cap-line' }, kindPill(item.kind), h('span', { class: 'adm-cap-speed' }, speedText(item)), h('span', { class: 'adm-cap-place' }, item.landmark || ''))))
+    const captureCount = h('em', { class: 'adm-sec-count' })
+    const captureSlot = h('div', null, skeleton(3))
+    const captureKind = h('select', { name: 'capkind', class: 'adm-select', 'aria-label': '按类型筛选抓拍' },
+      h('option', { value: '' }, '全部类型'), ...Object.entries(kindLabel).map(([k, t]) => h('option', { value: k }, t))) as HTMLSelectElement
+    const captureUid = h('input', { type: 'search', name: 'capuid', inputmode: 'numeric', placeholder: 'UID', 'aria-label': '按 UID 筛选抓拍' }) as HTMLInputElement
+    const captureFp = h('input', { type: 'search', name: 'capfp', placeholder: '设备指纹', spellcheck: 'false', autocomplete: 'off', 'aria-label': '按设备指纹筛选抓拍' }) as HTMLInputElement
+    const captureFilter = h('form', { class: 'adm-cap-filter', role: 'search', 'aria-label': '筛选抓拍' }, captureKind, captureUid, captureFp)
+    captureFilter.addEventListener('submit', (event) => { event.preventDefault(); void loadCaptures() })
+    captureKind.addEventListener('change', () => void loadCaptures())
+    for (const input of [captureUid, captureFp]) input.addEventListener('input', () => { clearTimeout(captureTimer); captureTimer = window.setTimeout(() => void loadCaptures(), 350) })
+    const paintCaptures = () => {
+      captureWrap.hidden = captureMissing
+      captureCount.textContent = captureError ? '' : captureTotal ? fmt.int(captureTotal) : '暂无'
+      captureCount.classList.toggle('is-zero', !captureTotal)
+      captureWrap.classList.toggle('is-clear', !captureError && !captureTotal)
+      if (captureError) return captureSlot.replaceChildren(errorState(captureError, () => void loadCaptures()))
+      captureSlot.replaceChildren(captures.length ? h('ul', { class: 'adm-cap-list' }, ...captures.map(captureRow)) : emptyState('没有匹配的抓拍'))
+    }
+
+    /* ── 生效中的封禁：每条一行，细节放进悬停提示 ── */
+    const left = (at: number) => {
+      const seconds = (at - Date.now()) / 1000
+      if (seconds < 3600) return `${Math.max(1, Math.ceil(seconds / 60))} 分钟`
+      if (seconds < 86400) return `${Math.round(seconds / 3600)} 小时`
+      return `${Math.round(seconds / 86400)} 天`
+    }
+    const untilCell = (at: number | null) => at
+      ? h('td', { class: 'adm-ban-left', title: `${when(new Date(at))} 解除` }, left(at))
+      : h('td', { class: 'adm-ban-left is-forever' }, '永久')
+    const unbanButton = (target: string, effect: string, run: () => Promise<void>) => {
+      const button = h('button', { type: 'button', class: 'adm-btn adm-btn--sm adm-btn--ghost', 'aria-label': `解封 ${target}` }, '解封') as HTMLButtonElement
+      button.onclick = async () => {
+        if (await confirmDialog({ title: `解封 ${target}`, body: h('p', null, effect), confirm: '解封', tone: 'jade' }) === null) return
+        void act(button, async () => { await run(); toast(`已解封 ${target}`) })
+      }
+      return button
+    }
+    const deviceText = (device: any) => [device?.model, device?.browser, device?.isp, device?.city].filter(Boolean).join(' · ')
+    const kindOf = (row: any) => row.actor === 'auto' || row.actor === 'protocol' ? row.actor : 'admin'
+    const kindTag: Record<string, [string, string]> = { auto: ['外挂', 'adm-ban-auto'], protocol: ['攻击', 'is-bad'], admin: ['人工', ''] }
+    const copyFp = (fp: string) => h('button', {
+      type: 'button', class: 'adm-ban-fp', title: `${fp}（点击复制）`, 'aria-label': `复制设备指纹 ${fp.slice(0, 8)}`,
+      onclick: async () => { try { await navigator.clipboard.writeText(fp); toast('已复制设备指纹') } catch { toast('复制失败', 'error') } },
+    }, fp.slice(0, 8))
+    const account = (row: any) => `UID ${row.uid}${row.nickname ? ` ${row.nickname}` : ''}`
+    const seen = (stamp: unknown) => stamp ? when(new Date(Number(stamp))) : dash
+    // 展开行：UID 封禁列它用过的设备和同设备的其他账号；设备封禁列登录过它的账号
+    const banFacts = (row: any) => {
+      const devices = (row.devices ?? []) as any[]
+      if (row.kind === 'fp') {
+        const accounts = (row.accounts ?? []) as any[]
+        return [
+          devices[0] && h('li', null, h('span', null, deviceText(devices[0]) || '设备'), h('span', { class: 'adm-sub' }, `网段 ${devices[0].ip24 || dash} · 最近 ${seen(devices[0].last)}`)),
+          ...accounts.map((row) => h('li', null, h('b', null, account(row)), h('span', { class: 'adm-sub' }, `最近登录 ${when(unix(row.lastLogin))}`))),
+        ].filter(Boolean) as Node[]
+      }
+      return devices.map((device) => {
+        const others = ((device.accounts ?? []) as any[]).filter((row) => String(row.uid) !== String(device.uid))
+        const peers = others.length ? `同设备 ${others.map(account).join('、')}` : ''
+        const net = `网段 ${device.ip24 || dash} · 最近 ${seen(device.last)}`
+        return h('li', null, copyFp(String(device.fp)), h('span', null, deviceText(device) || '设备'),
+          h('span', { class: 'adm-sub', title: net }, net),
+          peers ? h('span', { class: 'adm-ban-peers', title: peers }, peers) : null)
+      })
+    }
+    const banRow = (row: any) => {
+      const [label, tone] = kindTag[kindOf(row)]
+      const fp = row.kind === 'fp' ? String(row.value) : ''
+      const target = fp ? `设备 ${fp.slice(0, 8)}` : `UID ${row.value}`
+      const devices = (row.devices ?? []) as any[], accounts = new Set(((row.accounts ?? []) as any[]).map((row) => String(row.uid))).size
+      const reasonTip = [row.reason, row.recordId && `记录 ${String(row.recordId).slice(0, 8)}`].filter(Boolean).join(' · ') || null
+      const facts = banFacts(row)
+      const brief = fp ? (accounts ? `${accounts} 个账号` : devices[0]?.model || '') : row.nickname || devices[0]?.model || ''
+      const detail = h('tr', { class: 'adm-ban-detail', hidden: true }, h('td', { colspan: 4 }, h('ul', { class: 'adm-ban-facts' }, ...facts)))
+      const more = facts.length ? h('button', { type: 'button', class: 'adm-ban-more', 'aria-expanded': 'false', 'aria-label': `${target} 的设备与账号` }, brief || '详情') as HTMLButtonElement : null
+      if (more) more.onclick = () => { detail.hidden = !detail.hidden; more.setAttribute('aria-expanded', String(!detail.hidden)) }
+      return [h('tr', null,
+        h('td', { class: 'adm-ban-who' },
+          h('span', { class: 'adm-ban-target' }, fp ? '设备' : 'UID', fp ? copyFp(fp) : h('code', null, String(row.value))),
+          more ?? (brief ? h('span', { class: 'adm-ban-dev' }, brief) : null)),
+        h('td', { class: 'adm-ban-why', title: reasonTip }, h('span', { class: `adm-pill ${tone}` }, label), row.reason || dash),
+        untilCell(row.until ? Number(row.until) : null),
+        h('td', { class: 'adm-right' }, unbanButton(target, `${target} 可以立即重新联机。`, async () => {
+          await api('admin/unban', { uid: fp ? undefined : Number(row.value), fp: fp || undefined })
+          await loadBans()
+        }))), facts.length ? detail : null].filter(Boolean) as Node[]
+    }
+    const ipRow = (ban: any) => h('tr', null,
+      h('td', { class: 'adm-ban-who' }, h('code', { class: 'adm-ip' }, ban.ip)),
+      h('td', { class: 'adm-ban-why', title: ban.reason || null }, ban.reason || dash),
+      untilCell(Date.parse(ban.expires)),
+      h('td', { class: 'adm-right' }, unbanButton(ban.ip, `${ban.ip} 恢复访问网站，登录失败计数一并清空。`, async () => {
+        await api('admin/bans/ip/unban', { ip: ban.ip })
+        await loadGuard()
+      })))
+    const table = (heads: string[], rows: Node[]) => h('div', { class: 'adm-table-wrap' }, h('table', { class: 'adm-table adm-sec-table' },
+      h('thead', null, h('tr', null, ...heads.map((t) => h('th', null, t)))), h('tbody', null, ...rows)))
+    const tabs: [string, string][] = [['all', '全部'], ['auto', '外挂'], ['protocol', '攻击'], ['admin', '人工'], ['ip', '网站 IP']]
+    const tabBar = h('div', { class: 'adm-tabs', role: 'group', 'aria-label': '封禁分类' })
+    const banSlot = h('div', null, skeleton(4))
+    const paintBans = () => {
+      const counts: Record<string, number> = { all: bans.length, auto: 0, protocol: 0, admin: 0, ip: guard?.bans.length ?? 0 }
+      for (const row of bans) counts[kindOf(row)]++
+      const focused = (document.activeElement as HTMLElement | null)?.dataset?.tab
+      if (guardMissing && tab === 'ip') tab = 'all'
+      tabBar.replaceChildren(...tabs.filter(([key]) => !(guardMissing && key === 'ip')).map(([key, text]) => h('button', {
+        type: 'button', class: `adm-tab${tab === key ? ' is-on' : ''}`, 'aria-pressed': String(tab === key), 'data-tab': key,
+        onclick: () => { tab = key; paintBans() },
+      }, text, h('em', null, (key === 'ip' ? guard : !bansError) ? String(counts[key]) : dash))))
+      if (focused) tabBar.querySelector<HTMLElement>(`[data-tab="${focused}"]`)?.focus()
+      if (tab === 'ip') {
+        if (!guard) return banSlot.replaceChildren(guardError ? errorState(guardError, () => void loadGuard()) : skeleton(3))
+        banSlot.replaceChildren(guard.bans.length ? table(['IP', '原因', '剩余', ''], guard.bans.map(ipRow)) : emptyState('没有生效中的网站 IP 封禁'))
       } else {
-        banSlot.replaceChildren(errorState(bansRes.reason as Error, () => void loadBans()))
+        if (bansError) return banSlot.replaceChildren(errorState(bansError, () => void loadBans()))
+        const rows = tab === 'all' ? bans : bans.filter((row) => kindOf(row) === tab)
+        banSlot.replaceChildren(rows.length ? table(['对象', '原因', '剩余', ''], rows.flatMap(banRow))
+          : emptyState(tab === 'all' ? '当前没有生效中的封禁' : `没有${tabs.find(([key]) => key === tab)![1]}封禁`))
       }
+      labelTables(banSlot)
     }
-    banForms.addEventListener('submit', async (event) => {
+
+    /* 人工封禁：一行表单，收在封禁卡里按需展开 */
+    const manualUid = h('input', { type: 'search', name: 'banuid', placeholder: 'UID 或昵称', autocomplete: 'off', 'aria-label': '封禁 UID 或昵称' }) as HTMLInputElement
+    const manualFp = h('input', { type: 'search', name: 'banfp', placeholder: '设备指纹', 'aria-label': '封禁设备指纹' }) as HTMLInputElement
+    const manualMin = h('select', { name: 'banmin', class: 'adm-select', 'aria-label': '封禁时长' },
+      ...[['0', '永久'], ['10', '10 分钟'], ['60', '1 小时'], ['1440', '24 小时'], ['10080', '7 天']].map(([v, t]) => h('option', { value: v }, t))) as HTMLSelectElement
+    const manualReason = h('input', { type: 'text', name: 'banreason', maxlength: 200, placeholder: '原因（可空）', 'aria-label': '封禁原因' }) as HTMLInputElement
+    const manualHint = h('p', { class: 'adm-sec-hint', 'aria-live': 'polite' })
+    const manualPick = h('div', { class: 'adm-sec-pick', role: 'group', 'aria-label': '匹配的玩家', 'aria-live': 'polite' })
+    const manualSubmit = h('button', { type: 'submit', class: 'adm-btn adm-btn--sm adm-btn--danger' }, '封禁') as HTMLButtonElement
+    const manualForm = h('form', { class: 'adm-sec-manual', 'aria-label': '人工封禁' },
+      manualUid, manualFp, manualMin, manualReason, manualSubmit, manualPick, manualHint)
+    manualForm.hidden = true
+    const manualToggle = h('button', { type: 'button', class: 'adm-btn adm-btn--sm adm-btn--ghost', 'aria-expanded': 'false' }, '人工封禁') as HTMLButtonElement
+    manualToggle.onclick = () => {
+      manualForm.hidden = !manualForm.hidden
+      manualToggle.setAttribute('aria-expanded', String(!manualForm.hidden))
+      if (!manualForm.hidden) manualUid.focus()
+    }
+    manualForm.addEventListener('keydown', (event) => { if (event.key === 'Escape') manualToggle.click() })
+    manualForm.addEventListener('input', () => { manualHint.textContent = '' })
+    // 输入非数字即按昵称搜，点选候选把 UID 填回来
+    let pickSeq = 0, pickTimer = 0
+    manualUid.addEventListener('input', () => {
+      const query = manualUid.value.trim(), seq = ++pickSeq
+      clearTimeout(pickTimer)
+      manualPick.replaceChildren()
+      if (!query || /^\d+$/.test(query)) return
+      pickTimer = window.setTimeout(async () => {
+        try {
+          const found = await api<any[]>(`admin/user-search?q=${encodeURIComponent(query)}`, undefined, 'GET')
+          if (seq !== pickSeq) return
+          manualPick.replaceChildren(...(found.length ? found.map((row) => h('button', {
+            type: 'button', class: 'adm-sec-pick-item', title: ((row.devices ?? []) as any[]).map(deviceText).filter(Boolean).join('\n') || null,
+            onclick: () => { ++pickSeq; manualUid.value = String(row.uid); manualPick.replaceChildren(); manualReason.focus() },
+          }, h('b', null, row.nickname || '未命名'), h('span', null, `UID ${row.uid}`))) : [h('span', { class: 'adm-sub' }, '没有匹配的昵称')]))
+        } catch (error) {
+          if (seq === pickSeq) manualPick.replaceChildren(h('span', { class: 'adm-sub' }, error instanceof Error ? error.message : '搜索失败'))
+        }
+      }, 250)
+    })
+    manualForm.addEventListener('submit', (event) => {
       event.preventDefault()
-      const uidValue = banUidIn.value.trim(), fpValue = banFpIn.value.trim()
-      if (!uidValue && !fpValue) { alert('UID 和设备指纹至少填一个'); return }
-      try {
-        await api('admin/ban', {
-          uid: uidValue ? Number(uidValue) : undefined,
-          fp: fpValue || undefined,
-          minutes: Number(banMinSel.value),
-          reason: banReasonIn.value.trim() || undefined,
-        })
-        clearSearch(); nick.value = ''; banUidIn.value = ''; banFpIn.value = ''; banReasonIn.value = ''
-        void loadBans()
-      } catch (error) { alert(String((error as Error)?.message ?? error)) }
-    })
-    const banCard = card('生效中的封禁', [banSlot], {
-      sub: '账号与设备指纹任一命中即拦；解封后玩家马上可以重连。',
-      actions: [navLink('操作记录 →', { view: 'audit', target_type: 'mp' }, { class: 'adm-link' }), navLink('封禁申诉 →', { view: 'feedback', status: '', kind: '封禁申诉' }, { class: 'adm-link' })],
-    })
-    const manualCard = card('人工封禁', banForms, { sub: '立即生效，在线玩家会被断开并看到原因与申诉入口。' })
-    const reviewCardWrap = card('待复核', reviewSlot, { sub: '多类违规只进复核，由管理员看过证据后决定是否处罚。' })
-    const captureCardWrap = card('外挂自动抓拍取证', [captureFilterForm, captureSlot], {
-      sub: '监测到玩家疑似开挂或协议攻击时自动截图并上传，画面内置当前状态、当前速度与当前位置；点击图片可查看原图。',
+      const uid = manualUid.value.trim(), fp = manualFp.value.trim()
+      if (!uid && !fp) { manualHint.textContent = 'UID 和设备指纹至少填一个'; manualUid.focus(); return }
+      if (uid && !/^\d+$/.test(uid)) { manualHint.textContent = '从候选里点选玩家，或直接填 UID'; manualUid.focus(); return }
+      manualHint.textContent = ''
+      void act(manualSubmit, async () => {
+        await api('admin/ban', { uid: uid ? Number(uid) : undefined, fp: fp || undefined, minutes: Number(manualMin.value), reason: manualReason.value.trim() || undefined })
+        manualForm.reset(); manualPick.replaceChildren()
+        toast(`已封禁${uid ? ` UID ${uid}` : '该设备'}`)
+        await loadBans()
+      })
     })
 
-    paintTop(views.find((v) => v.key === 'security')!, [h('span', { class: 'adm-live-dot', 'aria-hidden': 'true' }), h('span', { class: 'adm-sub adm-live-stamp' }, '每 10 秒刷新'),
-      navLink('联机概况 →', { view: 'mp' }, { class: 'adm-link' })])
-    const searchCard=securitySearchCard((uid,fp)=>{
-      clearSearch();nick.value='';banUidIn.value=uid;banFpIn.value=fp;banReasonIn.value=''
-      banForms.scrollIntoView({block:'center'});banReasonIn.focus()
-    },(uid,fp)=>{
-      captureUidIn.value=uid;captureFpIn.value=fp;captureKindSel.value='';captureFilterForm.scrollIntoView({block:'center'});void loadCaptures()
+    /* ── 防护状态：开启的每条一行（命中数靠右），未开启的并成一行 ── */
+    const guardSlot = h('div', null, skeleton(5))
+    const guardMeta = h('span', { class: 'adm-guard-meta' })
+    const guardItem = (name: string, note: string, tail: Child, tone: 'is-on' | 'is-part') =>
+      h('li', { class: `adm-guard-item ${tone}`, title: note || null },
+        h('span', { class: 'adm-guard-dot', 'aria-hidden': 'true' }), h('b', null, name), h('span', { class: 'adm-guard-note' }, note), tail)
+    const guardOff = (title: string, rules: [string, string][]) => rules.length ? h('p', { class: 'adm-guard-off' },
+      h('span', null, `${title} ${rules.length}`), ...rules.map(([name, note]) => h('span', { class: 'adm-guard-chip', title: note || null }, name))) : null
+    const paintGuard = () => {
+      guardCard.hidden = guardMissing
+      if (guardMissing) return
+      if (!guard) {
+        guardMeta.textContent = ''
+        if (guardError) guardSlot.replaceChildren(errorState(guardError, () => void loadGuard()))
+        return
+      }
+      const on = guard.rules.filter((rule) => rule.enabled), off = guard.rules.filter((rule) => !rule.enabled)
+      const note = (rule: any) => [rule.threshold, Number(rule.count) > 1 ? `${fmt.int(Number(rule.count))} 条规则` : ''].filter(Boolean).join(' · ')
+      const total = on.reduce((sum, rule) => sum + (Number(rule.hits) || 0), 0)
+      guardMeta.textContent = `24 小时命中 ${fmt.int(total)}`
+      guardSlot.replaceChildren(h('div', { class: 'adm-guard' },
+        on.length ? h('ul', null, ...on.map((rule) => {
+          const hits = Number(rule.hits) || 0
+          return guardItem(rule.name, note(rule),
+            h('span', { class: `adm-guard-hits${hits ? ' is-hot' : ''}`, 'aria-label': `近 24 小时命中 ${hits} 次` }, fmt.int(hits)), 'is-on')
+        })) : null,
+        guardOff('未开启', off.map((rule) => [rule.name, note(rule)]))))
+    }
+
+    /* ── 数据加载 ── */
+    const loadBans = async () => {
+      try {
+        const data = await api<any>('admin/bans', undefined, 'GET')
+        bans = (data?.bans ?? []) as any[]
+        reviews = (data?.reviews ?? []) as any[]
+        bansError = null
+      } catch (error) { bansError = error }
+      paintReviews(); paintBans()
+    }
+    const loadCaptures = async () => {
+      const seq = ++captureSeq
+      const query = (filter: Record<string, string>) =>
+        api<{ captures?: Capture[]; total?: number }>(`admin/mp/cheat-captures?${new URLSearchParams({ limit: '24', ...filter })}`, undefined, 'GET')
+      const filter: Record<string, string> = {}
+      if (captureKind.value) filter.kind = captureKind.value
+      const uidText = captureUid.value.trim(), fpText = captureFp.value.trim().toLowerCase()
+      // 格式不对的筛选不发给服务端（会 400），输入框标红
+      captureUid.setAttribute('aria-invalid', String(!!uidText && !/^\d+$/.test(uidText)))
+      captureFp.setAttribute('aria-invalid', String(!!fpText && !/^[a-f\d]{16,64}$/.test(fpText)))
+      if (/^\d+$/.test(uidText)) filter.uid = uidText
+      if (/^[a-f\d]{16,64}$/.test(fpText)) filter.fp = fpText
+      try {
+        // 不带筛选的最新一批供复核卡配图；有筛选时另取一份给列表
+        const [recent, list] = await Promise.all([query({}), Object.keys(filter).length ? query(filter) : null])
+        if (seq !== captureSeq) return
+        recentCaptures = Array.isArray(recent?.captures) ? recent.captures : []
+        captureTotal = Number(recent?.total ?? recentCaptures.length)
+        captures = list ? (Array.isArray(list.captures) ? list.captures : []) : recentCaptures
+        captureError = null
+      } catch (error) {
+        if (seq !== captureSeq) return
+        captureMissing = error instanceof ApiError && error.status === 404
+        captureError = captureMissing ? null : error
+      }
+      paintCaptures(); paintShots()
+    }
+    const loadGuard = async () => {
+      try {
+        const data = await api<any>('admin/bans/protection', undefined, 'GET')
+        guard = { rules: Array.isArray(data?.rules) ? data.rules : [], bans: Array.isArray(data?.bans) ? data.bans : [] }
+        guardError = null
+      } catch (error) {
+        guard = null
+        guardMissing = error instanceof ApiError && error.status === 404
+        guardError = guardMissing ? null : error
+      }
+      paintGuard(); paintBans()
+    }
+
+    const reviewWrap = card(h('span', { class: 'adm-sec-title' }, '待复核', reviewCount), reviewSlot, { className: 'adm-sec-review' })
+    const banCard = card('生效中的封禁', [manualForm, tabBar, banSlot], {
+      className: 'adm-sec-bans',
+      actions: [manualToggle, navLink('操作记录', { view: 'audit', target_type: 'mp' }, { class: 'adm-link' }), navLink('封禁申诉', { view: 'feedback', status: '', kind: '封禁申诉' }, { class: 'adm-link' })],
     })
-    main.append(h('div', { class: 'adm-stack' }, searchCard, card('封禁管理', [banStats, reviewCardWrap, banCard, manualCard]), captureCardWrap, screenshotTrace(loadBans)))
+    const captureWrap = card(h('span', { class: 'adm-sec-title' }, '自动抓拍', captureCount), captureSlot, { actions: captureFilter, className: 'adm-sec-cap' })
+    const guardCard = card('防护状态', guardSlot, { actions: guardMeta, className: 'adm-sec-guard' })
+    paintTop(views.find((v) => v.key === 'security')!, [
+      h('span', { class: 'adm-live-dot', role: 'img', 'aria-label': '每 10 秒自动刷新', title: '每 10 秒自动刷新' }),
+      navLink('联机概况', { view: 'mp' }, { class: 'adm-link' })])
+    // 全局搜索（IP / 设备 / UID / 昵称）：结果里的「封禁」填进人工封禁表单，「查看取证」筛出对应抓拍
+    const searchCard = securitySearchCard((uid, fp) => fillBan(uid, fp), (uid, fp) => {
+      captureUid.value = uid; captureFp.value = fp; captureKind.value = ''
+      captureWrap.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      void loadCaptures()
+    })
+    main.append(h('div', { class: 'adm-stack' }, searchCard, h('div', { class: 'adm-sec' },
+      h('div', { class: 'adm-sec-col' }, reviewWrap, banCard),
+      h('div', { class: 'adm-sec-col' }, screenshotTrace(loadBans), captureWrap, guardCard))))
     void loadBans()
+    void loadCaptures()
+    void loadGuard()
     refreshTimer = window.setInterval(() => {
-      if (document.visibilityState === 'visible' && !document.querySelector('dialog.adm-dialog') && ![reviewSlot, banSlot, captureFilterForm, captureSlot].some(slot => slot.querySelector('details[open]') || slot.contains(document.activeElement))) void loadBans()
+      if (document.visibilityState !== 'visible' || document.querySelector('dialog[open]')) return
+      // 正在输入、展开证据或操作时不重绘，免得打断；页签焦点在重绘后恢复
+      const busy = (node: Element) => node.contains(document.activeElement) || !!node.querySelector('[aria-expanded="true"], details[open]')
+      if (!busy(reviewSlot) && !busy(manualForm) && !busy(banSlot)) void loadBans()
+      if (!captureMissing && !busy(captureWrap)) void loadCaptures()
+      if (!guardMissing && !busy(banSlot)) void loadGuard()
     }, 10000)
   },
   mp() {
@@ -3664,51 +3769,136 @@ async function boot() {
 }
 boot()
 
-function screenshotTrace(refresh:()=>Promise<void>) {
-  const file=h('input',{type:'file',accept:'image/png,image/jpeg',required:true})
-  const upload=h('button',{class:'adm-btn adm-btn--sm',type:'submit'},'识别截图')
-  const form=h('form',{class:'adm-mp-filters'},h('label',null,'PNG / JPEG（最多 12 MiB）',file),upload)
-  const result=h('div',{'aria-live':'polite',class:'adm-sub'},'尚未上传截图')
-  file.onchange=()=>result.replaceChildren('尚未识别')
-  form.onsubmit=async event=>{
-    event.preventDefault()
-    const image=file.files?.[0]
-    if(!image || image.size>12*1024*1024){result.replaceChildren('请选择不超过 12 MiB 的截图');return}
-    file.disabled=upload.disabled=true; result.replaceChildren('识别中…')
-    try {
-      const response=await fetch('/api/admin/trace',{method:'POST',body:image})
-      const data=await response.json()
-      if(!response.ok) throw Error(`识别失败：${data.error ?? response.status}`)
-      if(!data.ok){result.replaceChildren('未识别到有效的截图来源');return}
-      const reason=h('input',{type:'text',maxlength:200,required:true})
-      const minutes=h('select',null,...[[0,'永久'],[10,'10 分钟'],[60,'1 小时'],[1440,'24 小时']].map(([value,label])=>h('option',{value},label)))
-      const actions=h('div',{class:'adm-mp-filters'},h('label',null,'时长',minutes),h('label',null,'原因',reason))
-      const notice=h('p',{class:'adm-sub'})
-      for(const [scope,label] of [['mp','只封联机'],['account','封禁账户'],['both','两者都封']]){
-        const button=h('button',{class:'adm-btn adm-btn--sm',type:'button'},label)
-        actions.append(button)
-        button.onclick=async()=>{
-          if(!reason.value.trim()){reason.focus();notice.textContent='请填写封禁原因';return}
-          if(scope!=='mp' && Number(minutes.value)!==0){notice.textContent='账户封禁仅支持永久时长';return}
-          if(!confirm(`确认对 UID ${data.uid} 执行「${label}」（${minutes.selectedOptions[0].text}）？`))return
-          const buttons=Array.from(actions.querySelectorAll('button'))
-          buttons.forEach(control=>control.disabled=true)
-          try {
-            const reply=await fetch('/api/admin/trace/action',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({uid:data.uid,scope,minutes:Number(minutes.value),reason:reason.value.trim()})})
-            const state=await reply.json()
-            if(!reply.ok || !state.ok) throw Error(state.accountApplied?'账户已封禁，联机封禁失败':`操作失败：${state.error ?? reply.status}`)
-            notice.textContent=`已执行：${label}`; await refresh()
-          } catch(error){notice.textContent=String(error);buttons.forEach(control=>control.disabled=false)}
-        }
-      }
-      result.replaceChildren(h('p',null,`UID ${data.uid} · ${data.account?.nickname ?? '账号资料缺失'}`),
-        h('p',null,`时间区间：${when(new Date(data.from*1000),true)} — ${when(new Date(data.to*1000),true)}`),
-        ...((data.devices?.length ? data.devices : [null]).map((device:any)=>h('p',null,`设备：${device && [device.model,device.browser,device.isp,device.city].filter(Boolean).join(' · ') || '暂无设备画像'}`))),
-        h('p',null,`同设备其他账号：${data.sameDeviceUids?.join('、') || '无'}`),actions,notice)
-    } catch(error){result.replaceChildren(String(error))}
-    finally{file.disabled=upload.disabled=false}
+/* ───────────── 截图溯源：上传带来源标记的截图 → 找到截图账号 → 处置 ───────────── */
+const traceErrors: Record<string, string> = {
+  too_large: '截图超过 12 MiB', expected_png_or_jpeg: '只支持 PNG 或 JPEG', invalid_image: '图片无法解码',
+  decode_unavailable: '识别服务暂不可用，请稍后再试', disabled: '截图溯源未开启',
+  invalid_action: '参数不完整', not_found: '账号不存在', protected_account: '不能处置管理员或你自己',
+  account_ban_requires_permanent_duration: '账户封禁只支持永久', mp_ban_failed: '联机封禁失败',
+}
+async function traceFetch(path: string, init: RequestInit) {
+  const response = await fetch(`/api/${path}`, init)
+  const data = await response.json().catch(() => ({}))
+  if (response.status === 401) { denied(401); throw new Error('登录已过期') }
+  return { response, data }
+}
+function screenshotTrace(refresh: () => Promise<void>) {
+  const maxBytes = 12 * 1024 * 1024, idleTitle = '拖入、粘贴或点击选择截图'
+  const file = h('input', { type: 'file', accept: 'image/png,image/jpeg', class: 'adm-drop-input', 'aria-label': '选择截图', title: 'PNG / JPEG，不超过 12 MiB' }) as HTMLInputElement
+  const thumb = h('img', { class: 'adm-drop-thumb', alt: '' }) as HTMLImageElement
+  const icon = h('span', { class: 'adm-drop-icon', 'aria-hidden': 'true' }, '⇡')
+  const title = h('b', null, idleTitle), meta = h('span', null)
+  const zone = h('label', { class: 'adm-drop' }, file, icon, thumb, h('span', { class: 'adm-drop-text' }, title, meta))
+  const upload = h('button', { class: 'adm-btn adm-btn--sm adm-btn--jade', type: 'submit', disabled: true }, '识别截图') as HTMLButtonElement
+  const form = h('form', { class: 'adm-trace-form' }, zone, upload)
+  const result = h('div', { class: 'adm-trace-result', 'aria-live': 'polite' })
+  thumb.hidden = true; upload.hidden = true
+  let picked: File | null = null, preview = ''
+  const note = (heading: string, text: string, alert = false) =>
+    h('div', { class: 'adm-trace-note', role: alert ? 'alert' : null }, h('b', null, heading), h('span', null, text))
+  // 选中即识别：拖入、粘贴、点选后不用再点按钮；按钮留作重新识别
+  const pick = (next: File | null | undefined) => {
+    if (preview) URL.revokeObjectURL(preview)
+    picked = next ?? null; preview = ''
+    result.replaceChildren()
+    thumb.hidden = !picked; icon.hidden = !!picked; upload.hidden = !picked
+    if (!picked) { title.textContent = idleTitle; meta.textContent = ''; upload.disabled = true; return }
+    preview = URL.createObjectURL(picked); thumb.src = preview
+    title.textContent = picked.name || '粘贴的截图'
+    meta.textContent = fmt.bytes(picked.size)
+    const problem = !/^image\/(png|jpeg)$/.test(picked.type) ? '只支持 PNG 或 JPEG' : picked.size > maxBytes ? '截图超过 12 MiB' : ''
+    upload.disabled = !!problem
+    if (problem) result.replaceChildren(note('换一张截图', problem, true))
+    else form.requestSubmit()
   }
-  return card('截图溯源',[form,result])
+  file.addEventListener('change', () => pick(file.files?.[0]))
+  zone.addEventListener('dragover', (event) => { event.preventDefault(); zone.classList.add('is-over') })
+  zone.addEventListener('dragleave', () => zone.classList.remove('is-over'))
+  zone.addEventListener('drop', (event) => { event.preventDefault(); zone.classList.remove('is-over'); pick(event.dataTransfer?.files[0]) })
+  form.addEventListener('paste', (event) => {
+    const pasted = event.clipboardData?.files[0]
+    if (pasted) { event.preventDefault(); pick(pasted) }
+  })
+  form.addEventListener('submit', async (event) => {
+    event.preventDefault()
+    if (!picked || upload.disabled || upload.classList.contains('is-busy')) return
+    upload.disabled = true; upload.classList.add('is-busy')
+    result.replaceChildren(h('p', { class: 'adm-sub' }, '识别中…'))
+    try {
+      const { response, data } = await traceFetch('admin/trace', { method: 'POST', body: picked })
+      if (!response.ok) throw new Error(traceErrors[data.error] ?? `识别失败（${response.status}）`)
+      result.replaceChildren(data.ok ? traceHit(data, refresh) : note('没有识别到来源', '只有登录状态下的画面带来源标记；过度裁切或压缩也会读不出。'))
+    } catch (error) {
+      result.replaceChildren(note('识别失败', error instanceof Error ? error.message : String(error), true))
+    } finally {
+      upload.disabled = !picked; upload.classList.remove('is-busy')
+    }
+  })
+  return card('截图溯源', [form, result], { className: 'adm-trace' })
+}
+function traceHit(data: any, refresh: () => Promise<void>) {
+  const devices = (data.devices ?? []) as any[]
+  const others = (data.sameDeviceUids ?? []) as number[]
+  const deviceText = (device: any) => [device?.model, device?.browser, device?.isp, device?.city].filter(Boolean).join(' · ')
+  const from = when(new Date(data.from * 1000)), to = when(new Date(data.to * 1000))
+  const [fromDay, fromTime] = from.split(' '), [toDay, toTime] = to.split(' ')
+  const span = fromDay === toDay && fromTime && toTime ? `${fromDay} ${fromTime}–${toTime}` : `${from} – ${to}`
+  const minutes = h('select', { class: 'adm-select', 'aria-label': '封禁时长' },
+    ...[['0', '永久'], ['10', '10 分钟'], ['60', '1 小时'], ['1440', '24 小时']].map(([v, t]) => h('option', { value: v }, t))) as HTMLSelectElement
+  const reason = h('input', { type: 'text', class: 'adm-input', maxlength: 200, required: true, placeholder: '封禁原因（玩家可见）', 'aria-label': '封禁原因' }) as HTMLInputElement
+  const notice = h('p', { class: 'adm-sec-hint', 'aria-live': 'polite' })
+  const scopes: [string, string][] = [['mp', '只封联机'], ['account', '封禁账户'], ['both', '两者都封']]
+  let finished = false
+  const buttons = scopes.map(([scope, label]) => {
+    const button = h('button', { type: 'button', class: `adm-btn adm-btn--sm ${scope === 'mp' ? 'adm-btn--ghost' : 'adm-btn--danger'}` }, label) as HTMLButtonElement
+    button.onclick = async () => {
+      const text = reason.value.trim()
+      if (!text) { notice.textContent = '先填写封禁原因'; reason.focus(); return }
+      const ok = await confirmDialog({
+        title: label, tone: 'seal', confirm: label,
+        body: h('p', null, `UID ${data.uid}${data.account?.nickname ? `（${data.account.nickname}）` : ''} · ${minutes.selectedOptions[0].text}`, h('br'), `原因：${text}`),
+      })
+      if (ok === null) return
+      await act(button, async () => {
+        const { response, data: state } = await traceFetch('admin/trace/action', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ uid: data.uid, scope, minutes: Number(minutes.value), reason: text }),
+        })
+        if (!response.ok || !state.ok) throw new Error(state.accountApplied ? '账户已封禁，但联机封禁失败' : traceErrors[state.error] ?? `操作失败（${response.status}）`)
+        finished = true
+        notice.textContent = `已执行「${label}」`
+        toast(`UID ${data.uid} 已${label}`)
+        await refresh()
+      })
+      sync()
+    }
+    return button
+  })
+  // 账户封禁只支持永久：选了限时就直接锁住账户相关按钮，而不是点了再报错
+  const sync = () => {
+    const permanent = minutes.value === '0'
+    for (const [index, button] of buttons.entries()) {
+      button.disabled = finished || (index > 0 && !permanent)
+      button.title = !finished && index > 0 && !permanent ? '账户封禁只支持永久' : ''
+    }
+    if (!finished) notice.textContent = permanent ? '' : '账户封禁只支持永久'
+  }
+  reason.addEventListener('input', () => { if (notice.textContent === '先填写封禁原因') sync() })
+  minutes.addEventListener('change', sync)
+  sync()
+  return h('article', { class: 'adm-trace-hit' },
+    h('header', { class: 'adm-trace-head' },
+      h('b', null, `UID ${data.uid}`), h('span', null, data.account?.nickname ?? '账号资料缺失'),
+      h('time', { class: 'adm-trace-when', title: '截图时段' }, span)),
+    h('ul', { class: 'adm-trace-devs', 'aria-label': '截图设备' }, ...(devices.length
+      ? [...devices.slice(0, 3).map((device) => h('li', { title: deviceText(device) || null }, deviceText(device) || '未知设备')),
+        devices.length > 3 ? h('li', { class: 'adm-sub' }, `另有 ${devices.length - 3} 台`) : null]
+      : [h('li', { class: 'adm-sub' }, '暂无设备画像')])),
+    others.length ? h('p', { class: 'adm-trace-peers' }, h('span', null, '同设备'), ...others.map((uid) => h('code', { class: 'adm-pill' }, String(uid)))) : null,
+    h('div', { class: 'adm-trace-act' },
+      h('div', { class: 'adm-trace-fields' }, minutes, reason),
+      h('div', { class: 'adm-trace-btns' }, ...buttons),
+      notice))
 }
 
 function securityCard(user: { id: string; email: string }) {
