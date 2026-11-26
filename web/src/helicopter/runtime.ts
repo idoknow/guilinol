@@ -1,4 +1,5 @@
 import * as THREE from 'three'
+import './helicopter.css'
 import {soloServices,getPlayMode} from '../game/play-mode'
 import {hits} from '../input/keymap'
 import {isGlobalHotkeyBlocked} from '../walk/input-guard'
@@ -21,13 +22,18 @@ export function helicopter(scene:THREE.Scene,camera:THREE.PerspectiveCamera,walk
   const point=(name:string,out:THREE.Vector3)=>model.anchor(name).getWorldPosition(out)
   const hint=document.createElement('button'),notice=document.createElement('span'),panel=document.createElement('dialog')
   hint.className='heli-prompt';notice.className='heli-mode-notice';notice.textContent='进入单人或联机模式后可乘坐观光直升机';panel.className='heli-panel'
-  for(const element of [notice,hint]){element.hidden=true;Object.assign(element.style,{position:'fixed',top:'36%',left:'50%',transform:'translateX(-50%)',zIndex:'12'})}
-  panel.innerHTML=`<form method="dialog"><button aria-label="关闭">关闭</button></form><h2>直升机观光</h2><svg class="heli-map" viewBox="-1550 -1550 1650 2870" width="120" height="180"></svg><ol>${spots.map(spot=>`<li>${spot.name}</li>`).join('')}</ol><select aria-label="观光模式">${Object.entries(modes).map(([id,mode])=>`<option value="${id}">${mode.label}：${mode.description}</option>`).join('')}</select><p class="heli-price"></p><button class="heli-confirm">确认旅行</button><p role="status"></p>`
+  for(const element of [notice,hint])element.hidden=true
+  const altitude:Record<TourMode,string>={low:'楼顶上方 40–70 m',high:'离地 250 m 以上',dynamic:'55–260 m 起伏'}
+  panel.innerHTML=`<header class="heli-head"><div><small>滨江路 · 小香港停机坪</small><h2>直升机观光</h2></div><form method="dialog"><button class="heli-close" aria-label="关闭">×</button></form></header>`+
+    `<div class="heli-scroll"><div class="heli-body"><figure class="heli-route"><svg class="heli-map" viewBox="-1550 -1550 1650 2870" aria-label="观光环线"></svg><figcaption>环线 · 依次途经景册十景</figcaption></figure>`+
+    `<ol class="heli-spots">${spots.map(spot=>`<li>${spot.name}</li>`).join('')}</ol></div>`+
+    `<fieldset class="heli-modes"><legend>观光模式</legend>${Object.entries(modes).map(([id,item],index)=>`<label><input type="radio" name="heli-mode" value="${id}"${index?'':' checked'}><b>${item.label}</b><span>${item.description}</span><em>${altitude[id as TourMode]} · 约 ${Math.round(item.seconds/60)} 分钟</em></label>`).join('')}</fieldset></div>`+
+    `<div class="heli-foot"><div class="heli-meta"><p class="heli-price"></p></div><div class="heli-actions"><button class="heli-confirm">确认旅行</button></div><p role="status"></p></div>`
   document.body.append(hint,notice,panel)
   let phase:Phase='idle',clock=0,mode:TourMode='low',route:ReturnType<typeof tourRoute>|undefined,first=false,near=false,fare=0,heading=0
   const replica=flightReplica()
   let queue:QueueState|undefined,lastPoll=-Infinity,busy=false,sessionFlight:QueueState['flight']=null
-  const status=document.createElement('p'),leave=document.createElement('button'),alert=document.createElement('output');status.className='heli-queue-status';leave.className='heli-queue-leave';leave.textContent='退出排队';alert.className='heli-queue-notice';document.body.append(alert);panel.append(status,leave)
+  const status=document.createElement('p'),leave=document.createElement('button'),alert=document.createElement('output');status.className='heli-queue-status';leave.className='heli-queue-leave';leave.textContent='退出排队';alert.className='heli-queue-notice';document.body.append(alert);panel.querySelector('.heli-meta')!.append(status);panel.querySelector('.heli-actions')!.prepend(leave)
   const confirm=panel.querySelector<HTMLButtonElement>('.heli-confirm')!
   function accept(state:QueueState,start:number){
     if(state.mine?.offered&&!state.flight&&!queue?.mine?.offered)alert.textContent='轮到你了，请在 60 秒内回到停机坪确认登机'
@@ -35,7 +41,7 @@ export function helicopter(scene:THREE.Scene,camera:THREE.PerspectiveCamera,walk
     if(state.code==='INSUFFICIENT_FUNDS')alert.textContent='余额不足，已跳过本班，请充值后重新排队'
     if(state.code==='SAVE_NOT_READY')alert.textContent='账号存档未同步，请同步后重新排队'
     queue=state;replica.sync(start,Date.now(),state.now)
-    status.textContent=`${({idle:'空闲',boarding:'登机中',flying:'执飞中',landing:'降落中',unloading:'下机中'} as Record<string,string>)[state.state]} · 前面 ${state.ahead} 人 · 预计等待 ${state.eta} 秒`
+    status.textContent=`${({idle:'空闲',boarding:'登机中',flying:'执飞中',landing:'降落中',unloading:'下机中'} as Record<string,string>)[state.state]} · 前面 ${state.ahead} 人 · 预计等待 ${state.eta>=60?`${Math.floor(state.eta/60)} 分 ${state.eta%60} 秒`:`${state.eta} 秒`}`
     leave.hidden=!state.mine||!!state.flight&&state.mine.offered;confirm.disabled=!!state.mine&&!state.mine.offered;confirm.textContent=state.mine?.offered?'确认登机':state.mine?'排队中':'加入队列'
   }
   let pending:Promise<QueueState|undefined>|undefined
@@ -55,9 +61,9 @@ export function helicopter(scene:THREE.Scene,camera:THREE.PerspectiveCamera,walk
   const setPhase=(next:Phase)=>{phase=next;clock=0;if(next==='idle')delete document.body.dataset.helicopter;else document.body.dataset.helicopter=next}
   const newRoute=routeFor
   function show(){if(phase!=='idle'||!near&&!queue?.mine||!soloServices())return;const commerce=soloServices()!.commerce;fare=commerce.quotePurchasePrice('helicopter_tour','ticket')!;panel.querySelector('.heli-price')!.textContent=fare?`本次 ¥${fare}`:'首次免费';panel.querySelector('[role=status]')!.textContent='';panel.showModal();void command('ping')}
-  const select=panel.querySelector('select')!
-  function map(){mode=select.value as TourMode;route=newRoute(mode);const points=[];for(let time=0;time<=route.duration;time++) {const pos=route.pose(time);points.push(`${pos.x},${pos.z}`)}panel.querySelector('svg')!.innerHTML=`<polyline points="${points.join(' ')}" fill="none" stroke="currentColor" stroke-width="12"/>${spots.map((spot,index)=>`<text x="${spot.x}" y="${spot.z}" font-size="100">${index+1}</text>`).join('')}`}
-  select.onchange=map;panel.addEventListener('close',()=>{hint.blur()})
+  const selectedMode=()=>(panel.querySelector<HTMLInputElement>('input[name=heli-mode]:checked')?.value??'low') as TourMode
+  function map(){mode=selectedMode();route=newRoute(mode);const points=[];for(let time=0;time<=route.duration;time++) {const pos=route.pose(time);points.push(`${pos.x},${pos.z}`)}const xs=[...points.map(text=>+text.split(',')[0]),...spots.map(spot=>spot.x)],zs=[...points.map(text=>+text.split(',')[1]),...spots.map(spot=>spot.z)],pad=140,minX=Math.min(...xs)-pad,minZ=Math.min(...zs)-pad;panel.querySelector('svg')!.setAttribute('viewBox',`${minX} ${minZ} ${Math.max(...xs)+pad-minX} ${Math.max(...zs)+pad-minZ}`);panel.querySelector('svg')!.innerHTML=`<polyline class="heli-path" points="${points.join(' ')}"/><circle class="heli-pad-dot" cx="${helipad.x}" cy="${helipad.z}" r="60"/>${spots.map((spot,index)=>`<g class="heli-spot"><circle cx="${spot.x}" cy="${spot.z}" r="70"/><text x="${spot.x}" y="${spot.z}">${index+1}</text></g>`).join('')}`}
+  panel.querySelector('.heli-modes')!.addEventListener('change',map);panel.addEventListener('close',()=>{hint.blur()})
   confirm.onclick=async()=>{
     const player=walker(),services=soloServices();if(!panel.open||!player||!services||phase!=='idle'||!player.heli.available())return
     if(!queue?.mine){await command('join',{mode});return}if(!near||!queue.mine.offered)return

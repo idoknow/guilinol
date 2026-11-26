@@ -10,7 +10,7 @@ export async function handoff({page,other,url,api,output}){
   console.log('Both accounts at the pad')
   await wait(page,()=>!document.querySelector('.heli-prompt').hidden);await show(page);await choose(page,'加入队列');await choose(page,'确认登机');await wait(page,()=>window.viewer.heli.queue()?.flight)
   api.advance(24000);await wait(page,()=>window.viewer.heli.phase==='cruise');await other.evaluate(()=>window.viewer.resume());await wait(other,()=>window.viewer.heli.queue()?.state==='flying');await show(other);await choose(other,'加入队列');await wait(other,()=>window.viewer.heli.queue()?.mine?.offered===false)
-  assert.match(await other.locator('.heli-queue-status').innerText(),/前面 0 人 · 预计等待 [1-9]\d* 秒/)
+  assert.match(await other.locator('.heli-queue-status').innerText(),/前面 0 人 · 预计等待 (?:[1-9]\d* 分 \d+ 秒|[1-9]\d* 秒)/)
   const stamp=await other.evaluate(()=>window.viewer.heli.queue().now),[first,second]=await Promise.all([page,other].map(client=>client.evaluate(time=>window.viewer.heli.positionAt(time),stamp)))
   const error=Math.hypot(first.x-second.x,first.y-second.y,first.z-second.z);assert.ok(error<=.5);console.log('Simultaneous airborne error (m)',error)
   await other.screenshot({path:`${output}/10-observer-queue.jpg`,timeout:120000});await other.locator('.heli-panel').evaluate(panel=>panel.close())

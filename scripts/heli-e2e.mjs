@@ -69,7 +69,7 @@ try{
   await shot('02-pad');await page.locator('.heli-prompt').click();await shot('03-panel')
   const modes=['low','high','dynamic']
   for(const mode of modes){
-    await page.locator('.heli-panel select').selectOption(mode);await page.getByRole('button',{name:'加入队列'}).click();await page.getByRole('button',{name:'确认登机'}).click();await phase('board');if(mode==='low')await shot('04-board');await phase('ascend');if(mode==='low')await shot('05-ascent');await phase('cruise')
+    await page.locator(`.heli-panel input[value=${mode}]`).check({force:true});await page.getByRole('button',{name:'加入队列'}).click();await page.getByRole('button',{name:'确认登机'}).click();await phase('board');if(mode==='low')await shot('04-board');await phase('ascend');if(mode==='low')await shot('05-ascent');await phase('cruise')
     await page.keyboard.press('KeyF');assert.equal(await page.evaluate(()=>window.viewer.heli.phase),'cruise');if(mode==='low')await shot('06-third')
     const flightFps=await fps(mode);await page.keyboard.press('KeyT');assert.ok(await page.evaluate(()=>window.viewer.heli.first));if(mode==='low')await shot('07-first');await page.keyboard.press('KeyT');
     const flight=await page.evaluate(()=>window.viewer.heli.queue().flight)

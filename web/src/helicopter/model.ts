@@ -1,6 +1,8 @@
 import * as THREE from 'three'
 import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js'
 
+const cabinTone=new THREE.Color(0x46504b),cabinLift:Record<string,number>={ink:.55,leather:.5,alloy:.3,piping:.25}
+
 export function helicopterModel(){
   const root=new THREE.Group(),loader=new GLTFLoader(),levels=[0,1,2].map(()=>new THREE.Group()),loading=new Set<number>(),ready=new Set<number>()
   const anchors=new Map<string,THREE.Object3D>(),actions=new Map<string,THREE.AnimationAction>()
@@ -14,6 +16,10 @@ export function helicopterModel(){
       levels[index].add(asset.scene);ready.add(index)
       if(index===0)asset.scene.traverse(node=>{
         if(node instanceof THREE.Mesh&&['leather','piping'].includes(node.material.name))upholstery.push(node)
+        // 座舱处在机身阴影里，深色框架/座椅会糊成死黑：给舱内材质一点自发光托底（设计定稿：IDOK-427）
+        if(node instanceof THREE.Mesh&&node.material instanceof THREE.MeshStandardMaterial&&cabinLift[node.material.name]!==undefined&&!node.material.userData.cabinLift){
+          const material=node.material;material.userData.cabinLift=true;material.emissive.copy(material.color).lerp(cabinTone,.5);material.emissiveIntensity=cabinLift[material.name]
+        }
       })
       asset.scene.traverse(node=>{if(node.name){nodes[index].set(node.name,node);if(index===0)anchors.set(node.name,node)}if(node.name.startsWith('rotor_blur'))node.visible=false})
       if(index===0){mixer=new THREE.AnimationMixer(asset.scene);for(const clip of asset.animations)actions.set(clip.name,mixer.clipAction(clip))}
