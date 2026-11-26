@@ -701,7 +701,7 @@ async function start(loader:FullLoader,creatorSpawn=false) {
       trafficTick?.(elapsed/1000,walker?.active&&walker.vehicle!=='foot'?walker.position:undefined,
         walker?.active?walker.position:undefined,getPlayMode()==='solo',showTraffic)
       const target=heli.lookAhead??walker?.destination??(walker?.active?walker.position:camera.position)
-      stream.tick(target)
+      stream.tick(target,heli.phase==='cruise')
       if(frame>=2) syncCityUpgradeProps()
       stream.updateLandmarks?.(target)
       if(!walkModPromise && !stream.pending.size && camera.position.y<260) void prefetchWalk()

@@ -43,7 +43,7 @@ export function setCloudAccount(owner:string|null) {
       if(!valid())return
       flushThrottledSave()
       const original=localStorage.getItem(SAVE_STORAGE_KEY)
-      const local=original?JSON.parse(original):null
+      const local=original?JSON.parse(original):!remote.save&&document.body.dataset.mode==='walk'?loadLocalSave(undefined,Date.now(),false).save:null
       if(local && (!remote.save || local.updatedAt>remote.save.updatedAt)){
         const put=await fetch('/api/me/save',{method:'PUT',headers:{...headers,'Content-Type':'application/json','If-Match':`"${remote.revision}"`},body:JSON.stringify(sanitizeSave(local).save),signal})
         if(!put.ok){if(put.status===409)pending=true;return}

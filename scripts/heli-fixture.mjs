@@ -13,9 +13,9 @@ export async function fixture(pool){
   const tokens={}
   for(const user of ['A','B']){tokens[user]=randomBytes(32).toString('hex');await pool.query('INSERT INTO sessions VALUES($1,$2,$3)',[createHash('sha256').update(tokens[user]).digest('hex'),user,Math.floor(Date.now()/1000)+7200])}
   let offset=0
-  const env={DB:database(pool),helicopter:helicopterStore(pool,()=>Date.now()+offset)}
-  return {tokens,advance(ms){offset+=ms},plugin:{name:'local-queue-api',configurePreviewServer(server){server.middlewares.use(async(req,res,next)=>{
-    if(!/^\/api\/(helicopter|me\/save|me\/avatar|auth\/me|me)(\?|$)/.test(req.url))return next()
+  const env={DB:database(pool),RT_JOIN_SECRET:randomBytes(32).toString('hex'),helicopter:helicopterStore(pool,()=>Date.now()+offset)}
+  return {tokens,secret:env.RT_JOIN_SECRET,advance(ms){offset+=ms},plugin:{name:'local-queue-api',configurePreviewServer(server){server.middlewares.use(async(req,res,next)=>{
+    if(!/^\/api\/(rt\/ticket|helicopter|me\/save|me\/avatar|auth\/me|me)(\?|$)/.test(req.url))return next()
     try{const bytes=[];for await(const part of req)bytes.push(part)
       const response=await onRequest({env,request:new Request('http://'+req.headers.host+req.url,{method:req.method,headers:req.headers,body:bytes.length?Buffer.concat(bytes):undefined})})
       res.writeHead(response.status,Object.fromEntries(response.headers));res.end(await response.text())
