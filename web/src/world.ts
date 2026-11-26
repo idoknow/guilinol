@@ -8,6 +8,7 @@ import {bridgeGeometry} from './look/bridge'
 import {look} from './look/config'
 import {nightGround} from './look/night'
 import {countryside,setupCountryside,touchesCountryside} from './look/countryside'
+import {urbanGround} from './look/urban-ground'
 import {chunkWater, farWater} from './look/water'
 import type {TileBatchInput} from './batch'
 import type {Peaks} from './peaks'
@@ -217,6 +218,7 @@ export function startOverview(manifest:Manifest) {
     mesh.position.set(left,0,top)
     const material = bitmapMaterial(flipped)
     countryside(material)
+    urbanGround(material)
     const size=manifest.chunkSize, side=size/step, stride=cols+1
     const terrain=new THREE.BufferGeometry()
     const positions=new Float32Array(samples.length*3), normals=new Float32Array(samples.length*3)
@@ -390,6 +392,7 @@ export async function detail(tile:Tile, signal:AbortSignal, parseSlot?:()=>Promi
   signal.throwIfAborted()
   const material = await surfaceMaterial(buffer.slice(offset,end))
   if(touchesCountryside(tile.x,tile.z))countryside(material)
+  urbanGround(material)
   if(parseSlot)await parseSlot()
   const group = new THREE.Group()
   group.position.set(tile.x,0,tile.z)
