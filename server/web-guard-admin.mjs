@@ -3,7 +3,8 @@ import {weakFormCount} from '../lib/weak-password.ts'
 const json=(value,status=200)=>Response.json(value,{status,headers:{'cache-control':'private, no-store'}})
 export async function guardAdmin(pool,env,path,request,actor){
   if(path==='admin/bans/ip/unban'&&request.method==='POST'){
-    const {ip}=await request.json();if(typeof ip!=='string'||!isIP(ip))return json({error:'invalid ip'},400)
+    const body=await request.json().catch(()=>null);const ip=body?.ip
+    if(typeof ip!=='string'||!isIP(ip))return json({error:'invalid ip'},400)
     const result=await pool.query(`with removed as (delete from web_ip_bans where ip=$1 and expires>now() returning ip,reason),
       cleared as (delete from web_guard_events where ip in (select ip from removed)),
       windows as (delete from web_guard_windows where ip in (select ip from removed)),

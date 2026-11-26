@@ -1803,7 +1803,20 @@ const pages: Record<string, (view: View) => void> = {
             }))))),
         h('div', { class: 'adm-review-actions' }, reasonIn, minutesSel, confirmBtn, dismissBtn))
     }
-    const banStats = h('div', { class: 'adm-kpis adm-kpis--small' })
+    const ipReasonMeta: Record<string, [string, string]> = {
+      honeypot: ['蜜罐命中', 'is-bad'],
+      scanner: ['扫描器拦截', 'is-bad'],
+      waf: ['WAF 累计', 'adm-ban-auto'],
+      rate: ['入口限流', 'adm-ban-auto'],
+      'login-failed': ['登录爆破', 'is-bad'],
+      'login-attempt': ['撞库枚举', 'adm-ban-auto'],
+    }
+    const attackRuleIds = new Set(['waf', 'scanner', 'honeypot', 'rate', 'auto-ban', 'login-ip-lock', 'login-failed', 'login-attempt'])
+    const ipStatVal = h('b', null, dash)
+    const ipStatHint = h('span', { class: 'adm-delta' }, '入口 / 登录防护')
+    const ipStatCard = h('div', { class: 'adm-kpi adm-kpi--static', title: '当前生效中的入口与登录 IP 封禁数' },
+      h('span', { class: 'adm-kpi-label' }, '生效 IP 封禁'), ipStatVal, ipStatHint)
+    const banStats = h('div', { class: 'adm-kpis adm-kpis--small' }, ipStatCard)
     const reviewSlot = h('div', { class: 'adm-reviews' })
     const loadBans = async () => {
       try {
@@ -1816,13 +1829,15 @@ const pages: Record<string, (view: View) => void> = {
           serverStat('待复核', String(reviews.length), reviews.length ? '多类违规，等待人工确认' : '没有待处理'),
           serverStat('外挂自动短封', String(count('auto'))),
           serverStat('攻击自动短封', String(count('protocol'))),
-          serverStat('人工封禁', String(rows.length - count('auto') - count('protocol'))))
+          serverStat('人工封禁', String(rows.length - count('auto') - count('protocol'))),
+          ipStatCard)
         reviewSlot.replaceChildren(...(reviews.length ? reviews.map(reviewCard) : [emptyState('没有待复核的记录', '同一账号命中多类移动违规时会出现在这里，不会自动长封')]))
         banSlot.replaceChildren(rows.length
           ? h('div', { class: 'adm-table-wrap' }, h('table', { class: 'adm-table' },
             h('thead', null, h('tr', null, ['分类', '对象', '原因', '到期', ''].map((t) => h('th', null, t)))),
             h('tbody', null, ...rows.map(banRow))))
           : emptyState('当前没有生效中的封禁'))
+        labelTables(banSlot)
       } catch (error) { banSlot.replaceChildren(errorState(error as Error, () => void loadBans())) }
     }
     banForms.addEventListener('submit', async (event) => {
@@ -1847,24 +1862,90 @@ const pages: Record<string, (view: View) => void> = {
     const manualCard = card('人工封禁', banForms, { sub: '立即生效，在线玩家会被断开并看到原因与申诉入口。' })
     const reviewCardWrap = card('待复核', reviewSlot, { sub: '多类违规只进复核，由管理员看过证据后决定是否处罚。' })
 
-    const protectionTable=h('div',null)
-    const loadProtection=async()=>{
-      try {
-        const data=await api('admin/bans/protection',undefined,'GET')
-        const cells=(values:unknown[])=>values.map(value=>h('td',null,String(value)))
-        const table=h('table',{class:'adm-table'},h('thead',null,h('tr',null,...['防护项','状态','阈值','规则数','近 24 小时命中'].map(label=>h('th',null,label)))),h('tbody',null,...data.rules.map((rule:any)=>h('tr',null,...cells([rule.name,rule.enabled?'开启':'关闭',rule.threshold,rule.count,rule.hits])))))
-        protectionTable.replaceChildren(table,h('h3',null,'生效中的 IP 封禁'),...data.bans.map((ban:any)=>h('p',null,`${ban.ip} · ${ban.reason} · 至 ${when(new Date(ban.expires))} `,h('button',{type:'button',onclick:async()=>{if(!confirm(`解除 ${ban.ip} 的封禁？`))return;try{await api('admin/bans/ip/unban',{ip:ban.ip});await loadProtection()}catch(error){alert(String(error))}}},'解封'))))
-      }catch(error){protectionTable.replaceChildren(errorState(error as Error,()=>void loadProtection()))}
+    const ipBanSlot = h('div', null, skeleton(3))
+    const protectionSlot = h('div', null, skeleton(5))
+    const ipBanRow = (ban: any) => {
+      const [labelText, tone] = ipReasonMeta[ban.reason] ?? [ban.reason || '自动拦截', '']
+      const unbanBtn = h('button', { type: 'button', class: 'adm-btn adm-btn--sm adm-btn--ghost' }, '解封') as HTMLButtonElement
+      unbanBtn.onclick = async () => {
+        const ok = await confirmDialog({
+          title: '解除 IP 封禁',
+          tone: 'jade',
+          confirm: '确认解封',
+          body: h('p', null, '确认解除 IP ', h('code', null, String(ban.ip)), ' 的封禁（', labelText, '）？解除后该 IP 可立即恢复访问，并记入操作记录。'),
+        })
+        if (ok === null) return
+        await act(unbanBtn, async () => {
+          await api('admin/bans/ip/unban', { ip: ban.ip })
+          toast(`已解除 ${ban.ip} 的封禁`)
+          await loadProtection()
+        })
+      }
+      return h('tr', null,
+        h('td', { class: 'adm-nowrap' }, h('span', { class: `adm-pill ${tone}` }, labelText)),
+        h('td', { class: 'adm-nowrap' }, h('span', { class: 'adm-ban-target' }, h('code', null, String(ban.ip)))),
+        h('td', { class: 'adm-nowrap' }, when(new Date(ban.expires))),
+        h('td', { class: 'adm-right' }, unbanBtn))
     }
+    const protectionStatusPill = (rule: any) => rule.enabled
+      ? h('span', { class: 'adm-pill is-good' }, '已开启')
+      : rule.id === 'reputation'
+        ? h('span', { class: 'adm-pill' }, '未启用')
+        : h('span', { class: 'adm-pill adm-ban-auto' }, '未开启')
+    const loadProtection = async () => {
+      try {
+        const data = await api<{ rules: any[]; bans: any[] }>('admin/bans/protection', undefined, 'GET')
+        const rules = data.rules ?? []
+        const ipBans = data.bans ?? []
+        ipStatVal.textContent = String(ipBans.length)
+        ipStatHint.textContent = `${when(new Date())} 刷新`
+        const table = h('table', { class: 'adm-table adm-protect' },
+          h('thead', null, h('tr', null,
+            h('th', null, '防护项'),
+            h('th', null, '状态'),
+            h('th', null, '阈值 / 策略'),
+            h('th', { class: 'num' }, '规则数'),
+            h('th', { class: 'num' }, '近 24 小时命中'))),
+          h('tbody', null, ...rules.map((rule) => {
+            const hitCount = Number(rule.hits ?? 0)
+            const warnHits = hitCount > 0 && attackRuleIds.has(rule.id)
+            return h('tr', null,
+              h('td', { class: 'adm-nowrap' }, h('b', null, String(rule.name))),
+              h('td', { class: 'adm-nowrap' }, protectionStatusPill(rule)),
+              h('td', { class: 'adm-sub' }, String(rule.threshold ?? dash)),
+              h('td', { class: 'num' }, fmt.int(Number(rule.count ?? 0))),
+              h('td', { class: `num${warnHits ? ' is-bad' : ''}` }, fmt.int(hitCount)))
+          })))
+        protectionSlot.replaceChildren(h('div', { class: 'adm-table-wrap' }, table))
+        labelTables(protectionSlot)
+        ipBanSlot.replaceChildren(ipBans.length
+          ? h('div', { class: 'adm-table-wrap' }, h('table', { class: 'adm-table' },
+            h('thead', null, h('tr', null, ['分类', 'IP 地址', '到期', ''].map((t) => h('th', null, t)))),
+            h('tbody', null, ...ipBans.map(ipBanRow))))
+          : emptyState('当前没有生效中的 IP 封禁', '开启来源校验与入口处罚后，触发蜜罐、扫描器或高频攻击的可信来源 IP 会列在这里'))
+        labelTables(ipBanSlot)
+      } catch (error) {
+        const node = errorState(error as Error, () => void loadProtection())
+        protectionSlot.replaceChildren(node)
+        ipBanSlot.replaceChildren(errorState(error as Error, () => void loadProtection()))
+      }
+    }
+    const ipBanCard = card('生效中的 IP 封禁', [ipBanSlot], {
+      sub: '仅对通过回源校验的可信客户端 IP 生效；人工解封后会同步清除该 IP 的近期拦截计数。',
+      actions: [navLink('IP 审计记录 →', { view: 'audit', target_type: 'ip' }, { class: 'adm-link' })],
+    })
+    const protectionCard = card('当前防护项', [protectionSlot], {
+      sub: '按当前服务运行开关、规则库规模与最近 24 小时拦截记录实时展示。',
+    })
     void loadProtection()
     paintTop(views.find((v) => v.key === 'bans')!, [h('span', { class: 'adm-live-dot', 'aria-hidden': 'true' }), h('span', { class: 'adm-sub adm-live-stamp' }, '每 10 秒刷新'),
       navLink('联机概况 →', { view: 'mp' }, { class: 'adm-link' })])
-    main.append(h('div', { class: 'adm-stack' }, banStats, reviewCardWrap, banCard, manualCard,
-      card('当前防护项', protectionTable, { sub: '按运行配置与最近 24 小时记录展示。' })))
+    main.append(h('div', { class: 'adm-stack' }, banStats, reviewCardWrap, banCard, manualCard, ipBanCard, protectionCard))
     void loadBans()
     refreshTimer = window.setInterval(() => {
-      if (document.visibilityState === 'visible' && !reviewSlot.querySelector('details[open]') && !reviewSlot.contains(document.activeElement)) void loadBans()
-      if(document.visibilityState==='visible'&&!protectionTable.contains(document.activeElement))void loadProtection()
+      if (document.visibilityState !== 'visible' || document.querySelector('dialog.adm-dialog')) return
+      if (!reviewSlot.querySelector('details[open]') && !reviewSlot.contains(document.activeElement)) void loadBans()
+      if (!protectionSlot.contains(document.activeElement) && !ipBanSlot.contains(document.activeElement)) void loadProtection()
     }, 10000)
   },
   mp() {
@@ -2181,12 +2262,16 @@ const pages: Record<string, (view: View) => void> = {
     const type = params.get('target_type') ?? ''
     const slot = h('div')
     main.append(
-      h('div', { class: 'adm-toolbar' }, segmented(type, [['', '全部'], ['user', '身份变更'], ['feedback', '反馈处理'], ['chat', '聊天管理']], (value) => go({ target_type: value || null }, true), '对象类型')),
+      h('div', { class: 'adm-toolbar' }, segmented(type, [['', '全部'], ['user', '身份变更'], ['feedback', '反馈处理'], ['chat', '聊天管理'], ['mp', '联机封禁'], ['ip', 'IP 封禁']], (value) => go({ target_type: value || null }, true), '对象类型')),
       card(null, slot, { className: 'adm-card--flush' }))
     const actions: Record<string, string> = {
       role: '调整身份', status: '变更状态', start_ai: '发起 AI 制作', reply: '回复提交人',
       ban: '封禁账号', unban: '解除封禁', merge_users: '合并账号', reset_password: '重置密码', change_email: '修改邮箱', 'mp.kick': '踢出联机','mp.ban':'联机封禁','mp.unban':'联机解封','mp.dismiss':'复核不处罚',
+      'web.ip.ban': 'IP 自动封禁', 'web.ip.unban': 'IP 人工解封',
       'chat.mute': '聊天禁言', 'chat.unmute': '解除禁言', 'chat.delete': '删除消息', 'chat.approve': '放行消息', 'chat.block': '拦截消息', 'chat.notice': '发布公告', 'chat.settings': '修改聊天规则', 'chat.words': '编辑敏感词', 'chat.words/delete': '删除敏感词', 'chat.lexicon_policy': '词库升级',
+    }
+    const ipReasonLabel: Record<string, string> = {
+      honeypot: '蜜罐命中', scanner: '扫描器拦截', waf: 'WAF 累计', rate: '入口限流', 'login-failed': '登录爆破', 'login-attempt': '撞库枚举',
     }
     const body = h('tbody'),
       more = h('div', { class: 'adm-more' })
@@ -2197,6 +2282,7 @@ const pages: Record<string, (view: View) => void> = {
       return api<{ items: any[]; next_cursor: string | null }>('admin/audit?' + q)
     }
     const who = (id: string, info?: { nickname?: string; email?: string; placeholder?: number }, link = false) => {
+      if (!link && id === 'web-guard') return h('span', { class: 'adm-who' }, h('b', null, '网站入口防护'), h('small', null, '自动规则'))
       const name = info?.nickname || (info?.email && !info?.placeholder ? info.email : `用户 ${String(id).slice(0, 8)}`)
       return h('span', { class: 'adm-who' },
         h('b', null, link ? navLink(name, { view: 'users', id }, { class: 'adm-link' }) : name),
@@ -2213,6 +2299,7 @@ const pages: Record<string, (view: View) => void> = {
         : item.action === 'reset_password' ? (detail.generated ? '生成了新密码' : '设置了新密码')
         : item.action === 'chat.mute' ? `${detail.until === -1 ? '永久' : detail.until ? `至 ${when(new Date(Number(detail.until)))}` : ''} · ${detail.source === 'auto' ? '自动' : ''}${detail.reason || ''}`
         : item.action === 'chat.words' ? `「${detail.word?.word ?? ''}」→ ${chatAction[detail.word?.action] ?? ''}${detail.word?.enabled === false ? '（停用）' : ''}`
+        : item.action.startsWith('web.ip.') ? [ipReasonLabel[detail.reason] ?? detail.reason, detail.expires ? `至 ${when(new Date(detail.expires))}` : null].filter(Boolean).join(' · ')
         : item.action.startsWith('mp.') ? [detail.reason,detail.recordId,detail.reviewId].filter(Boolean).join(' · ')
         : item.action.startsWith('chat.') ? detail.reason || ''
         : ''

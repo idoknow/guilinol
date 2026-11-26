@@ -102,6 +102,7 @@ try {
     await sql(`UPDATE users SET role='admin' WHERE id='${me.id}'`)
     const guard=await api('admin/bans/protection');assert(guard.bans.some(ban=>ban.ip==='192.0.2.241'));assert.equal(guard.rules.find(rule=>rule.id==='reputation').enabled,false)
     await api('admin/bans/ip/unban',{ip:'192.0.2.241'},403,'origin',{headers:{Origin:'https://example.test'}})
+    const badUnban=await fetch(origin+'/api/admin/bans/ip/unban',{method:'POST',headers:{Origin:origin,Cookie:cookie,'Content-Type':'application/json'},body:'{bad'});assert.equal(badUnban.status,400)
     await api('admin/bans/ip/unban',{ip:'192.0.2.241'})
     assert.equal((await sql("select id from admin_audit where action='web.ip.unban' and target_id='192.0.2.241'"))[0].results.length,1)
     await sql(`UPDATE users SET role='user' WHERE id='${me.id}'`)
