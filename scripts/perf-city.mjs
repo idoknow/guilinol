@@ -40,6 +40,8 @@ const SPOTS = [
 function parseArgs(argv) {
   let profile = null
   let compare = null
+  let runs = null
+  let hot = false
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i]
     if (arg === '--profile') {
@@ -52,11 +54,18 @@ function parseArgs(argv) {
       if (!compare) throw new Error('--compare requires a perf-city.json path')
     } else if (arg.startsWith('--compare=')) {
       compare = arg.slice('--compare='.length)
+    } else if (arg === '--runs') {
+      runs = Number(argv[++i])
+    } else if (arg.startsWith('--runs=')) {
+      runs = Number(arg.slice('--runs='.length))
+    } else if (arg === '--hot') {
+      hot = true
     } else {
       throw new Error(`Unknown argument: ${arg}`)
     }
   }
-  return {profile, compare}
+  if (runs !== null && !(Number.isInteger(runs) && runs >= 1)) throw new Error('--runs requires a positive integer')
+  return {profile, compare, runs, hot}
 }
 
 function envNumber(name, fallback) {
@@ -97,6 +106,88 @@ function fmtCompare(prev, next) {
 
 function escapeCell(text) {
   return String(text).replace(/[\r\n|]+/g, ' ').trim().slice(0, 120)
+}
+
+function median(values) {
+  const sorted = values.filter(v => typeof v === 'number' && Number.isFinite(v)).sort((a, b) => a - b)
+  if (!sorted.length) return null
+  const mid = sorted.length >> 1
+  return sorted.length % 2 ? sorted[mid] : round((sorted[mid - 1] + sorted[mid]) / 2, 3)
+}
+
+/** One result per spot from several runs: the median of every numeric metric, every error kept. */
+function mergeRuns(results) {
+  const good = results.filter(result => !result.error)
+  if (results.length === 1) return results[0]
+  if (!good.length) return {...results[results.length - 1], failedRuns: results.map(result => result.error)}
+  const merged = {...good[good.length - 1]}
+  for (const [key, value] of Object.entries(merged)) {
+    if (typeof value === 'number') merged[key] = median(good.map(result => result[key]))
+  }
+  if (merged.trafficStepPartsP95) {
+    merged.trafficStepPartsP95 = Object.fromEntries(
+      Object.keys(merged.trafficStepPartsP95).map(key => [key, median(good.map(result => result.trafficStepPartsP95?.[key]))]),
+    )
+  }
+  for (const key of ['consoleErrors', 'pageErrors', 'failedRequests']) merged[key] = results.flatMap(result => result[key] ?? [])
+  // A spot with at least one good run keeps its medians; the runs that failed are listed beside them.
+  const failed = results.filter(result => result.error).map(result => result.error)
+  if (failed.length) merged.failedRuns = failed
+  merged.runs = results.map(result => ({
+    fps: result.fps ?? null,
+    mainThreadMsPerFrame: result.mainThreadMsPerFrame ?? null,
+    drawCallsAvg: result.drawCallsAvg ?? null,
+    allocMBps: result.allocMBps ?? null,
+  }))
+  return merged
+}
+
+function shortUrl(url) {
+  return url ? url.replace(/^.*\//, '').replace(/\?.*$/, '') : '(native)'
+}
+
+/** file:line:column, so functions that share a line in a minified chunk stay apart. */
+function frameKey(frame) {
+  return `${frame.functionName || '(anonymous)'} ${shortUrl(frame.url)}:${frame.lineNumber + 1}:${frame.columnNumber + 1}`
+}
+
+/** Self time per function from a CDP CPU profile, heaviest first; shares are of busy (non-idle) time. */
+function hotCpu(profile, limit = 25) {
+  const self = new Map()
+  const byId = new Map(profile.nodes.map(node => [node.id, node]))
+  let total = 0
+  profile.samples.forEach((id, index) => {
+    const dt = profile.timeDeltas[index] ?? 0
+    const frame = byId.get(id)?.callFrame
+    // Shares are of the time the main thread was busy; waiting for the next frame is not a hot spot.
+    if (!frame || frame.functionName === '(idle)') return
+    total += dt
+    const key = frameKey(frame)
+    self.set(key, (self.get(key) ?? 0) + dt)
+  })
+  return [...self]
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, limit)
+    .map(([where, micros]) => ({where, ms: round(micros / 1000), pct: total ? round((micros / total) * 100, 1) : 0}))
+}
+
+/** Bytes allocated per function from a CDP sampling heap profile, heaviest first. */
+function hotAlloc(profile, limit = 25) {
+  const self = new Map()
+  let total = 0
+  const walk = node => {
+    const key = frameKey(node.callFrame)
+    if (node.selfSize) {
+      self.set(key, (self.get(key) ?? 0) + node.selfSize)
+      total += node.selfSize
+    }
+    node.children?.forEach(walk)
+  }
+  walk(profile.head)
+  return [...self]
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, limit)
+    .map(([where, bytes]) => ({where, mb: round(bytes / MB), pct: total ? round((bytes / total) * 100, 1) : 0}))
 }
 
 async function readCdpMetrics(cdp) {
@@ -216,6 +307,23 @@ async function measureSpot(browser, baseUrl, profileName, profile, spot, settleM
       .catch(() => consoleErrors.push('perf-city: traffic cell did not load within 60 s'))
     if (settleMs > 0) await page.waitForTimeout(settleMs)
 
+    if (HOT) {
+      await cdp.send('Profiler.enable')
+      await cdp.send('Profiler.setSamplingInterval', {interval: 200})
+      await cdp.send('HeapProfiler.enable')
+      // Report everything allocated in the window, including what a GC already collected.
+      await cdp.send('HeapProfiler.startSampling', {samplingInterval: 8192, includeObjectsCollectedByMajorGC: true, includeObjectsCollectedByMinorGC: true})
+      // Whole-document selector queries are a classic per-frame cost; count them over the window.
+      await page.evaluate(() => {
+        const original = Document.prototype.querySelector
+        window.__perfDocQueries = 0
+        Document.prototype.querySelector = function (selector) {
+          window.__perfDocQueries++
+          return original.call(this, selector)
+        }
+      })
+      await cdp.send('Profiler.start')
+    }
     const cdpBefore = await readCdpMetrics(cdp)
     const sample = await page.evaluate(async durationMs => {
       const nextRaf = () => new Promise(r => requestAnimationFrame(r))
@@ -311,6 +419,14 @@ async function measureSpot(browser, baseUrl, profileName, profile, spot, settleM
       }
     }, sampleMs)
     const cdpAfter = await readCdpMetrics(cdp)
+    let hot = null
+    if (HOT) {
+      const cpu = (await cdp.send('Profiler.stop')).profile
+      const heap = (await cdp.send('HeapProfiler.stopSampling')).profile
+      await writeFile(join(outDir, `${profileName}-${spot.id}.cpuprofile`), JSON.stringify(cpu))
+      const docQueries = await page.evaluate(() => window.__perfDocQueries)
+      hot = {docQueriesPerFrame: round(docQueries / Math.max(1, sample.dts.length)), cpu: hotCpu(cpu), alloc: hotAlloc(heap)}
+    }
 
     await page.screenshot({
       path: join(outDir, `${profileName}-${spot.id}.jpg`),
@@ -357,6 +473,7 @@ async function measureSpot(browser, baseUrl, profileName, profile, spot, settleM
       trafficStepPartsP95: sample.stepParts
         ? Object.fromEntries(Object.entries(sample.stepParts).map(([k, v]) => [k, p95(v)]))
         : null,
+      ...(hot ? {hot} : {}),
       consoleErrors,
       pageErrors,
       failedRequests,
@@ -394,7 +511,7 @@ function buildMarkdown(report, profileNames, spots, comparePath, oldReport) {
     `- Browser: \`${report.browser}\``,
     `- Renderer: \`${report.renderer}\``,
     `- Build: \`${buildText}\``,
-    `- Settle: \`${report.settleMs}ms\` | Sample: \`${report.sampleMs}ms\``,
+    `- Settle: \`${report.settleMs}ms\` | Sample: \`${report.sampleMs}ms\`${report.runs > 1 ? ` | Runs: \`${report.runs}\`（表内为各轮中位数）` : ''}${report.hot ? ' | 带剖析采样，FPS 偏低，不用于前后对比' : ''}`,
     ...(report.worldOverlay ? [`- Road cells overlay: \`${report.worldOverlay}\``] : []),
     '',
   ]
@@ -422,6 +539,9 @@ function buildMarkdown(report, profileNames, spots, comparePath, oldReport) {
           `| ${spot.label} (${spot.id}) | ${fmt(m.fps)} | ${frameTriple} | ${fmt(m.mainThreadMsPerFrame)} | ${fmt(m.scriptMsPerFrame)} | ${fmt(m.drawCallsAvg)} | ${trisWan} | ${fmt(m.motorsAvg)} | ${fmt(m.pedestriansAvg)} | ${fmt(m.allocMBps)} | ${m.gcDrops ?? '-'} | ${fmt(m.trafficStepP95)} |`,
         )
       }
+      if (m?.failedRuns?.length) {
+        notes.push(`- ${spot.id}: ${m.failedRuns.length}/${m.runs?.length ?? report.runs} 轮失败（中位数只算成功的轮）：${m.failedRuns.map(escapeCell).join('；')}`)
+      }
       if (m && !m.error && !m.trafficState?.allMotors && !m.motorsAvg && !m.pedestriansAvg) {
         notes.push(`- ${spot.id}: 交通为空（sim 没有生成任何车辆和行人）。本地路网 cell 缺 \`street\` 字段时会这样，用 PERF_WORLD 指向带线上路网的目录重采。`)
       }
@@ -438,6 +558,17 @@ function buildMarkdown(report, profileNames, spots, comparePath, oldReport) {
     }
     if (notes.length) lines.push('', ...notes)
     lines.push('')
+    for (const spot of spots) {
+      const hot = report.profiles[profileName]?.[spot.id]?.hot
+      if (!hot) continue
+      lines.push(`### ${profileName} / ${spot.id}：主线程自耗时最多的函数`, '')
+      if (hot.docQueriesPerFrame != null) lines.push(`整页选择器查询 \`document.querySelector\`：${fmt(hot.docQueriesPerFrame)} 次/帧。占比按主线程忙碌时间算，不含空闲。`, '')
+      lines.push('| 函数 文件:行:列 | ms | 占比 % |', '| --- | ---: | ---: |')
+      for (const row of hot.cpu) lines.push(`| ${escapeCell(row.where)} | ${fmt(row.ms)} | ${fmt(row.pct, 1)} |`)
+      lines.push('', `### ${profileName} / ${spot.id}：分配最多的函数`, '', '| 函数 文件:行:列 | MB | 占比 % |', '| --- | ---: | ---: |')
+      for (const row of hot.alloc) lines.push(`| ${escapeCell(row.where)} | ${fmt(row.mb)} | ${fmt(row.pct, 1)} |`)
+      lines.push('')
+    }
   }
 
   if (oldReport) {
@@ -484,6 +615,11 @@ if (!spots.length) throw new Error(`No matching spots for PERF_SPOTS="${process.
 
 const SETTLE_MS = envNumber('PERF_SETTLE', 15000)
 const SAMPLE_MS = envNumber('PERF_MS', 10000)
+const RUNS = args.runs ?? envNumber('PERF_RUNS', 1)
+if (!(Number.isInteger(RUNS) && RUNS >= 1)) throw new Error(`Invalid PERF_RUNS: ${process.env.PERF_RUNS} (positive integer)`)
+const HOT = args.hot
+// A hot-spot table and its .cpuprofile describe one sampling window; medians across runs do not apply to them.
+if (HOT && RUNS > 1) throw new Error('--hot profiles a single run; drop --runs / PERF_RUNS')
 const OUT = process.env.PERF_OUT ?? 'captures/perf-city'
 const oldReport = args.compare ? JSON.parse(await readFile(args.compare, 'utf8')) : null
 
@@ -528,6 +664,8 @@ try {
     worldOverlay: WORLD_OVERLAY,
     settleMs: SETTLE_MS,
     sampleMs: SAMPLE_MS,
+    runs: RUNS,
+    hot: HOT,
     profiles: {},
   }
   const saveJson = () => writeFile(join(OUT, 'perf-city.json'), JSON.stringify(report, null, 2) + '\n')
@@ -536,30 +674,25 @@ try {
   for (const profileName of profileNames) {
     const profile = PROFILES[profileName]
     report.profiles[profileName] = {}
-    for (const spot of spots) {
-      console.error(`[perf-city] ${profileName}/${spot.id} (${spot.label}) ...`)
-      const result = await measureSpot(
-        browser,
-        baseUrl,
-        profileName,
-        profile,
-        spot,
-        SETTLE_MS,
-        SAMPLE_MS,
-        OUT,
-      )
-      report.profiles[profileName][spot.id] = result
-      if (result.error || result.pageErrors?.length) {
-        hasFailure = true
-        console.error(
-          `[perf-city] ${profileName}/${spot.id} FAILED: ${result.error ?? result.pageErrors.join('; ')}`,
-        )
-      } else {
-        console.error(
-          `[perf-city] ${profileName}/${spot.id} done: ${fmt(result.fps)} fps, main ${fmt(result.mainThreadMsPerFrame)} ms, calls ${fmt(result.drawCallsAvg)}`,
-        )
+    const perSpot = new Map(spots.map(spot => [spot.id, []]))
+    // Runs go round the spots in turn, so machine-load drift spreads across spots instead of hitting one.
+    for (let run = 1; run <= RUNS; run++) {
+      for (const spot of spots) {
+        const tag = `${profileName}/${spot.id}${RUNS > 1 ? ` run ${run}/${RUNS}` : ''}`
+        console.error(`[perf-city] ${tag} (${spot.label}) ...`)
+        const result = await measureSpot(browser, baseUrl, profileName, profile, spot, SETTLE_MS, SAMPLE_MS, OUT)
+        perSpot.get(spot.id).push(result)
+        report.profiles[profileName][spot.id] = mergeRuns(perSpot.get(spot.id))
+        if (result.error || result.pageErrors?.length) {
+          hasFailure = true
+          console.error(`[perf-city] ${tag} FAILED: ${result.error ?? result.pageErrors.join('; ')}`)
+        } else {
+          console.error(
+            `[perf-city] ${tag} done: ${fmt(result.fps)} fps, main ${fmt(result.mainThreadMsPerFrame)} ms, calls ${fmt(result.drawCallsAvg)}`,
+          )
+        }
+        await saveJson()
       }
-      await saveJson()
     }
   }
 

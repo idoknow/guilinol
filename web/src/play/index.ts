@@ -17,6 +17,7 @@ import {hotbarSlot,mountHotbar,riding,showHotbar} from '../ui/hotbar'
 import {setCameraShown} from '../gear/hand'
 import {droneMode} from '../drone'
 import {navigation} from './nav'
+import {namedChild} from '../scene-named'
 
 const KEY = 'glol.stamps', ARRIVE = 12, REARM = 40, MARK_LAYER = 2
 const ease = (t:number)=>t<.5?4*t*t*t:1-Math.pow(-2*t+2,3)/2
@@ -312,13 +313,14 @@ export function play(host:Host) {
 
   // --- Per-frame: marker placement/fade, arrival, summit pill.
   // Indoor & shop-building occlusion keeps distant scenic stamps (秀/街/巷/楼) from floating through walls.
-  let shopObj:THREE.Object3D|null = null
-  let drinksShopObj:THREE.Object3D|null = null
+  // Both shops are added straight under the scene by their own modules, and only once the player is near.
+  const mifenShop = namedChild(host.scene,'tianyuan_mifen_shop'), drinksShop = namedChild(host.scene,'wangcheng_drinks_shop')
   const tmpLocalA = new THREE.Vector3(), tmpLocalB = new THREE.Vector3(), tmpMarkWorld = new THREE.Vector3()
+  const shopObjs:{mifen:THREE.Object3D|null, drinks:THREE.Object3D|null} = {mifen: null, drinks: null}
   function resolveShopObjs() {
-    if(!shopObj?.parent) shopObj = host.scene.getObjectByName('tianyuan_mifen_shop') ?? null
-    if(!drinksShopObj?.parent) drinksShopObj = host.scene.getObjectByName('wangcheng_drinks_shop') ?? null
-    return {mifen: shopObj, drinks: drinksShopObj}
+    shopObjs.mifen = mifenShop()
+    shopObjs.drinks = drinksShop()
+    return shopObjs
   }
   function pointInsideMifenShop(pos:THREE.Vector3, shop:THREE.Object3D) {
     shop.worldToLocal(tmpLocalA.copy(pos))

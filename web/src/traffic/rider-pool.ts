@@ -269,6 +269,7 @@ function setPose(
 ): void {
   const j = rig.joints
   const flare = wideLegs ? 0.24 : 0.02
+  rig.batch?.(true)
   if (pose === 'ebike_driver') {
     j.Hips?.rotation.set(0, 0, 0)
     j.Torso?.rotation.set(-0.09, 0, 0)
@@ -349,7 +350,8 @@ function setPose(
     j.ShinL?.rotation.set(-1.18, 0, 0)
     j.ShinR?.rotation.set(-1.18, 0, 0)
   }
-  rig.syncPose()
+  if (rig.batch) rig.batch(false)
+  else rig.syncPose()
 
   if (figure) {
     if (pose === 'ebike_driver' && frame) {
@@ -763,6 +765,8 @@ export function riderPool(
         for (const unit of view.units) {
           if (unit.pose !== 'ebike_driver' && unit.pose !== 'bicycle_driver') continue
           const baseLean = unit.pose === 'bicycle_driver' ? -0.24 : -0.09
+          // One skeleton solve per rider per frame: hold the rig while the joints below are written.
+          unit.rig.batch?.(true)
           const targetLean = fleeing ? baseLean - 0.22 : halted ? baseLean + 0.12 : baseLean
           if (unit.rig.joints.Torso) {
             unit.rig.joints.Torso.rotation.x += (targetLean - unit.rig.joints.Torso.rotation.x) * blend
@@ -791,7 +795,8 @@ export function riderPool(
             armJoint.rotation.y += (targetArmY - armJoint.rotation.y) * Math.min(1, dt * 12)
             foreJoint.rotation.x += (targetForeX - foreJoint.rotation.x) * Math.min(1, dt * 12)
           }
-          unit.rig.syncPose()
+          if (unit.rig.batch) unit.rig.batch(false)
+          else unit.rig.syncPose()
           if (receiveAnim || actor.ticketReceived || actor.holdingReceipt) {
             curlHandFingers(unit.root, holdSide === 'left' ? 'l' : 'r', 1.0)
           }
