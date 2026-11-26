@@ -114,7 +114,7 @@ def run(world, faces):
         track = LineString(points(ways[rail]))
         for road in roads:
             for band, graded in crossing_parts[road]:
-                if not graded and floors[road]:
+                if floors[road]:
                     # The same road may run parallel to this rail further away.
                     # Use only the connected track interval containing the level crossing.
                     crossing = track.intersection(lines_by_id[road])
