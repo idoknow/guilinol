@@ -66,7 +66,9 @@ if (vRoof < .5) {
     float layer = clamp(isGroundShop ? shopLayer : upperLayer, 0.0, 11.0);
     float bayW = isGroundShop ? 6.4 : 6.0;
     vec2 contUv = vec2(vFacade / bayW, -vFloor);
-    vec2 baseUv = vec2(vFacade / bayW, 1.0 - fract(max(0.0, vFloor)));
+    vec2 uvDx = dFdx(contUv);
+    vec2 uvDy = dFdy(contUv);
+    vec2 baseUv = vec2(vFacade / bayW, clamp(1.0 - fract(max(0.0, vFloor)), 0.006, 0.994));
     spUvDeriv = contUv;
 
     // Near-field subtle single-step relief parallax using continuous UV derivatives (zero floor-seam spikes!)
@@ -75,25 +77,25 @@ if (vRoof < .5) {
     float camDist = distance(vFogWorld, cameraPosition);
     float nearFade = 1.0 - smoothstep(45.0, 115.0, camDist);
     if (nearFade > 0.01) {
-      float h0 = texture(uFacadeNormH, vec3(baseUv, layer)).b;
+      float h0 = textureGrad(uFacadeNormH, vec3(baseUv, layer), uvDx, uvDy).b;
       vec3 dpx = dFdx(-vViewPosition), dpy = dFdy(-vViewPosition);
-      vec2 duvx = dFdx(contUv), duvy = dFdy(contUv);
-      float det = duvx.x * duvy.y - duvx.y * duvy.x;
+      float det = uvDx.x * uvDy.y - uvDx.y * uvDy.x;
       if (abs(det) > 1e-6) {
-        vec3 T = normalize((dpx * duvy.y - dpy * duvx.y) / det);
-        vec3 B = normalize((-dpx * duvy.x + dpy * duvx.x) / det);
+        vec3 T = normalize((dpx * uvDy.y - dpy * uvDx.y) / det);
+        vec3 B = normalize((-dpx * uvDy.x + dpy * uvDx.x) / det);
         vec3 V = normalize(-vViewPosition);
         vec2 pDir = vec2(dot(V, T), dot(V, B));
         float pScale = (0.72 - h0) * 0.022 * nearFade;
         sampleUv = baseUv - clamp(pDir * pScale, vec2(-0.022), vec2(0.022));
+        sampleUv.y = clamp(sampleUv.y, 0.006, 0.994);
       }
     }
     #endif
 
-    // All 3 strips are 100% opaque RGB (A=255) so Canvas 2D never premultiplies any channel.
-    vec4 albTex = texture(uFacadeAlbedo, vec3(sampleUv, layer));
-    vec4 normH = texture(uFacadeNormH, vec3(sampleUv, layer));
-    vec4 props = texture(uFacadeProps, vec3(sampleUv, layer));
+    // Explicit continuous-derivative textureGrad eliminates mipmap floor-seam bleeding (no dashed white eave leaks)
+    vec4 albTex = textureGrad(uFacadeAlbedo, vec3(sampleUv, layer), uvDx, uvDy);
+    vec4 normH = textureGrad(uFacadeNormH, vec3(sampleUv, layer), uvDx, uvDy);
+    vec4 props = textureGrad(uFacadeProps, vec3(sampleUv, layer), uvDx, uvDy);
     // Decode sRGB -> linear explicitly because DataArrayTexture uses RGBA8 for WebGL2 mipmap safety
     vec3 albLin = pow(max(albTex.rgb, vec3(0.0)), vec3(2.2));
     vec2 nxy = normH.rg * 2.0 - 1.0;
@@ -114,7 +116,7 @@ if (vRoof < .5) {
     if (signMask > 0.35) {
       vec3 signRgb = col * (0.94 + 0.16 * unitHash);
       col = signRgb;
-      spExtraEmissive += signRgb * signMask * uWindowLight * 1.28;
+      spExtraEmissive += signRgb * signMask * uWindowLight * 0.78;
     }
 
     // World-space macro anti-tiling weathering + ground-contact AO
@@ -137,23 +139,26 @@ if (vRoof < .5) {
     }
 
     // Night per-window randomized warm amber (70%) / cool TV-office (30%) interior glow
-    // + varied ground-shop showcase warmth & brightness (avoids uniform bright-white strips)
-    float shopOpen = step(0.18, fract(unitHash * 13.7 + bldgHash * 3.1));
+    // + varied ground-shop showcase warmth, closed dark bays (32%), and restrained HDR power (avoids ACES white-out)
+    float shopBayHash = facadeHash(vec3(bayIdx * 1.7 + 3.1, vCell.x * 23.0 + 7.0, vCell.y * 59.0 + 13.0));
+    float shopOpen = step(0.32, shopBayHash);
     float litProb = isGroundShop ? 1.0 : (0.46 + 0.32 * bldgHash);
-    float isLit = isGroundShop ? mix(0.20, 1.0, shopOpen) : step(1.0 - litProb, unitHash);
-    float shopTone = fract(unitHash * 19.3 + bldgHash * 5.7);
-    vec3 shopWarmAmber = vec3(1.0, 0.77, 0.45);
-    vec3 shopWarmIvory = vec3(1.0, 0.89, 0.69);
-    vec3 shopCoolStore = vec3(0.84, 0.93, 1.0);
-    vec3 shopTint = shopTone < 0.42
-      ? mix(shopWarmAmber, shopWarmIvory, shopTone / 0.42)
-      : (shopTone < 0.78 ? shopWarmIvory : shopCoolStore);
+    float isLit = isGroundShop ? mix(0.06, 1.0, shopOpen) : step(1.0 - litProb, unitHash);
+    float shopTone = fract(shopBayHash * 29.7 + bldgHash * 7.3);
+    vec3 shopWarmAmber = vec3(1.0, 0.54, 0.16);
+    vec3 shopWarmIvory = vec3(1.0, 0.84, 0.52);
+    vec3 shopCoolStore = vec3(0.60, 0.86, 1.0);
+    vec3 shopTint = shopTone < 0.40
+      ? shopWarmAmber
+      : (shopTone < 0.72 ? shopWarmIvory : shopCoolStore);
     vec3 roomTint = isGroundShop
       ? shopTint
-      : mix(vec3(1.0, 0.76, 0.42), vec3(0.68, 0.86, 1.0), step(0.70, fract(unitHash * 17.3)));
-    float shopPower = mix(1.18, 2.02, fract(unitHash * 7.9 + bldgHash * 2.3));
-    float roomPower = isGroundShop ? shopPower : (1.55 + 0.95 * fract(unitHash * 7.1));
-    spExtraEmissive += roomTint * props.g * isLit * roomPower * uWindowLight;
+      : mix(vec3(1.0, 0.74, 0.38), vec3(0.64, 0.85, 1.0), step(0.70, fract(unitHash * 17.3)));
+    float shopPower = mix(0.58, 1.32, fract(shopBayHash * 11.3 + bldgHash * 4.7));
+    float roomPower = isGroundShop ? shopPower : (1.35 + 0.85 * fract(unitHash * 7.1));
+    // Guard against thin floor-seam bleeding on ground-shop upper border
+    float seamMask = isGroundShop ? smoothstep(0.015, 0.055, baseUv.y) * smoothstep(0.015, 0.055, 1.0 - baseUv.y) : 1.0;
+    spExtraEmissive += roomTint * props.g * isLit * roomPower * seamMask * uWindowLight;
 
     diffuseColor.rgb = col;
   } else {
