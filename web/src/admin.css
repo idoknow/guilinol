@@ -66,6 +66,8 @@
 .adm-btn--ghost:hover{background:var(--ui-paper-hi);border-color:var(--ui-jade-500)}
 .adm-btn--danger{background:transparent;color:var(--ui-bad);border-color:rgba(176,71,47,.35)}
 .adm-btn--danger:hover{background:var(--ui-seal-wash);border-color:var(--ui-bad)}
+.adm-btn--seal{background:var(--ui-seal);border-color:var(--ui-seal)}
+.adm-btn--seal:hover{background:#8e3f2e;border-color:#8e3f2e}
 .adm-btn:disabled{opacity:.45;cursor:not-allowed}
 .adm-btn.is-busy,.ui-btn.is-busy{cursor:progress;opacity:.7}
 .adm-btn:focus-visible,.adm-tab:focus-visible,.adm-seg button:focus-visible,.adm-kpi:focus-visible,.adm-nav-item:focus-visible{outline:2px solid var(--ui-jade-500);outline-offset:2px}
@@ -757,49 +759,206 @@ a.adm-kpi:hover{border-color:var(--ui-jade-500);box-shadow:var(--ui-shadow-1);tr
 .adm-ban-target code{font:12.5px var(--num);color:var(--ui-ink)}
 .adm-ban-record{font-family:var(--num)}
 .adm-right{text-align:right}
-.adm-protect td{vertical-align:top}
+/* 安全中心：左列处理（复核、封禁），右列工具与状态（截图溯源、防护） */
+/* 安全中心：待复核是视觉中心；其余信息每条一行，细节进悬停提示 */
+.adm-sec{display:grid;grid-template-columns:minmax(0,1.65fr) minmax(300px,1fr);gap:18px;align-items:start}
+.adm-sec-col{display:grid;gap:18px;min-width:0}
+.adm-sec-col>*{min-width:0}
+.adm-sec .adm-empty{padding:18px 12px}
+.adm-sec-hint{margin:0;font-size:12.5px;color:var(--ui-bad)}
+.adm-sec-hint:empty{display:none}
+/* 待复核 */
+.adm-sec-title{display:inline-flex;align-items:center;gap:10px}
+.adm-sec-count{display:inline-grid;place-items:center;min-width:22px;height:22px;padding:0 7px;border-radius:var(--ui-r-pill);background:var(--ui-seal);color:#fff;font:600 12.5px/1 var(--num);font-style:normal;letter-spacing:0}
+.adm-sec-count:empty{display:none}
+.adm-sec-count.is-zero{min-width:0;height:auto;padding:0;background:none;color:var(--ui-ink-soft);font:400 13px/1 var(--sans);letter-spacing:.06em}
+.adm-sec-review:not(.is-clear){background:linear-gradient(var(--ui-seal-wash),var(--ui-seal-wash)),var(--ui-paper-hi);border-color:rgba(169,80,60,.24)}
+.adm-sec-review.is-clear .adm-card-head{padding-bottom:14px}
+.adm-sec-review.is-clear .adm-card-body{display:none}
+.adm-sec .adm-review{gap:10px;padding:12px 14px;box-shadow:0 1px 2px rgba(60,60,50,.06)}
+.adm-sec .adm-review-head{flex-wrap:nowrap;justify-content:flex-start;gap:10px;min-width:0}
+.adm-review-head>b{flex:none}
+.adm-review-kinds{display:flex;flex-wrap:wrap;gap:5px;flex:1;min-width:0}
+.adm-review-more{flex:none;padding:2px 0;border:0;background:none;font:13px/1.3 var(--sans);color:var(--ui-jade-700);letter-spacing:.02em;cursor:pointer}
+.adm-review-more::after{content:'';display:inline-block;width:5px;height:5px;margin-left:6px;border-right:1.5px solid currentColor;border-bottom:1.5px solid currentColor;transform:translateY(-3px) rotate(45deg);transition:transform var(--ui-fast) var(--ui-ease)}
+.adm-review-more[aria-expanded=true]::after{transform:translateY(0) rotate(-135deg)}
+.adm-review-more:hover{color:var(--ui-jade-500)}
+.adm-review-more:focus-visible{outline:2px solid var(--ui-jade-500);outline-offset:2px;border-radius:4px}
+.adm-review-ago{flex:none;font:12.5px var(--num);color:var(--ui-ink-soft);white-space:nowrap}
+.adm-review-evidence{max-height:280px;overflow:auto;border:1px solid var(--ui-paper-line);border-radius:var(--ui-r-sm)}
+.adm-sec .adm-review-actions{flex-wrap:nowrap}
+.adm-sec .adm-review-actions .adm-input{flex:1 1 auto}
+.adm-sec .adm-review-actions .adm-btn{flex:none}
+/* 生效中的封禁 */
+.adm-sec-bans .adm-card-actions{display:flex;flex-wrap:wrap;align-items:center;gap:8px 16px}
+.adm-sec-bans .adm-card-actions .adm-link+.adm-link{margin-left:0}
+.adm-sec-bans .adm-card-actions .adm-btn[aria-expanded="true"]{background:var(--ui-paper-3);border-color:var(--ui-jade-500);color:var(--ui-jade-700)}
+.adm-sec-bans .adm-tab{cursor:pointer;font-family:var(--ui-serif)}
+.adm-sec-manual{display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:10px;border-radius:var(--ui-r-sm);background:var(--ui-paper-3);border:1px solid var(--ui-paper-line)}
+.adm-sec-manual input{min-width:0;padding:5px 9px;font:13px/1.4 var(--sans);color:var(--ui-ink);background:var(--ui-paper-hi);border:1px solid var(--ui-paper-line);border-radius:var(--ui-r-sm)}
+.adm-sec-manual input:focus{outline:none;border-color:var(--ui-jade-500);box-shadow:0 0 0 3px rgba(79,127,122,.18)}
+.adm-sec-manual [name=banuid]{flex:0 1 104px}
+.adm-sec-manual [name=banfp]{flex:1 1 140px}
+.adm-sec-manual [name=banreason]{flex:1.4 1 140px}
+.adm-sec-manual .adm-select{flex:none;padding:5px 24px 5px 8px;font-size:13px}
+.adm-sec-manual .adm-btn{flex:none}
+.adm-sec-manual .adm-sec-hint{flex-basis:100%}
+.adm-sec-table{table-layout:fixed}
+.adm-sec-table th:nth-child(1){width:36%}
+.adm-sec-table th:nth-child(3){width:76px}
+.adm-sec-table th:nth-child(4){width:68px}
+.adm-sec-table td{padding-top:9px;padding-bottom:9px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.adm-ban-target{display:inline-flex;align-items:baseline;gap:5px;font-size:12px;color:var(--ui-ink-soft);letter-spacing:.04em}
+.adm-sec .adm-ban-target code{font:600 13px var(--num);color:var(--ui-ink);letter-spacing:0}
+.adm-ban-dev{margin-left:10px;font-size:12.5px;color:var(--ui-ink-soft)}
+.adm-ban-why .adm-pill{margin-right:8px;padding:0 8px;font-size:11.5px;vertical-align:1px}
+.adm-ban-left{font:13px var(--num);color:var(--ui-ink);font-variant-numeric:tabular-nums}
+.adm-ban-left.is-forever{color:var(--ui-seal);font:500 13px var(--sans)}
+.adm-ip{font:600 13px var(--num);color:var(--ui-ink)}
+/* 截图溯源 */
+.adm-trace-form{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:10px}
+.adm-drop{position:relative;display:flex;align-items:center;gap:10px;min-height:50px;padding:8px 12px;border:1.5px dashed rgba(47,74,69,.3);border-radius:var(--ui-r-md);
+  background:var(--ui-paper-3);cursor:pointer;transition:border-color var(--ui-fast) var(--ui-ease),background var(--ui-fast) var(--ui-ease)}
+.adm-drop:hover,.adm-drop.is-over{border-color:var(--ui-jade-500);background:rgba(143,193,181,.16)}
+.adm-drop:focus-within{outline:2px solid var(--ui-jade-500);outline-offset:2px}
+.adm-drop-input{position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer}
+.adm-drop-icon{display:grid;place-items:center;flex:none;width:28px;height:28px;border-radius:50%;background:var(--ui-paper-hi);border:1px solid var(--ui-paper-line);color:var(--ui-jade-700);font:400 15px/1 var(--ui-serif)}
+.adm-drop-thumb{flex:none;width:32px;height:32px;object-fit:cover;border-radius:6px;border:1px solid var(--ui-paper-line);background:var(--ui-paper-hi)}
+.adm-drop-text{display:flex;align-items:baseline;gap:8px;min-width:0}
+.adm-drop-text b{min-width:0;font:500 13.5px/1.35 var(--ui-serif);letter-spacing:.04em;color:var(--ui-ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.adm-drop-text span{flex:none;font:12px var(--num);color:var(--ui-ink-soft)}
+.adm-drop-text span:empty{display:none}
+.adm-trace-result:empty{display:none}
+.adm-trace-note{display:grid;gap:3px;padding:10px 12px;border-radius:var(--ui-r-md);background:var(--ui-paper-3);font-size:13px;color:var(--ui-ink-soft)}
+.adm-trace-note b{font:500 14px/1.3 var(--ui-serif);color:var(--ui-ink)}
+.adm-trace-note[role=alert]{box-shadow:inset 3px 0 0 var(--ui-bad)}
+.adm-trace-hit{display:grid;gap:8px;padding:12px 14px;border-radius:var(--ui-r-md);background:var(--ui-paper-hi);border:1px solid var(--ui-paper-line);border-left:3px solid var(--ui-seal);box-shadow:0 1px 2px rgba(60,60,50,.06)}
+.adm-trace-head{display:flex;align-items:baseline;gap:10px;min-width:0}
+.adm-trace-head b{flex:none;font:600 15px/1.3 var(--num);color:var(--ui-ink);font-variant-numeric:tabular-nums}
+.adm-trace-head span{min-width:0;font-size:13.5px;color:var(--ui-ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.adm-trace-when{flex:none;margin-left:auto;font:12.5px var(--num);color:var(--ui-ink-soft);white-space:nowrap}
+.adm-trace-devs{display:grid;gap:2px;margin:0;padding:0;list-style:none;font-size:12.5px;color:var(--ui-ink-soft)}
+.adm-trace-devs li{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.adm-trace-peers{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin:0;font-size:12.5px;color:var(--ui-ink-soft)}
+.adm-trace-peers .adm-pill{font-family:var(--num);color:var(--ui-ink)}
+.adm-trace-act{display:grid;gap:8px;margin-top:2px;padding-top:10px;border-top:1px solid var(--ui-paper-line)}
+.adm-trace-fields{display:flex;gap:8px;min-width:0}
+.adm-trace-fields .adm-select{flex:none;padding:5px 24px 5px 8px;font-size:13px}
+.adm-trace-btns{display:flex;gap:8px}
+.adm-trace-btns .adm-btn{flex:1 1 0;white-space:nowrap}
+/* 防护状态 */
+.adm-guard{display:grid;gap:10px}
+.adm-guard-meta{font:12.5px var(--num);color:var(--ui-ink-soft);white-space:nowrap}
+.adm-guard ul{display:grid;margin:0;padding:0;list-style:none;border:1px solid var(--ui-paper-line);border-radius:var(--ui-r-sm);overflow:hidden}
+.adm-guard-item{display:grid;grid-template-columns:8px auto minmax(0,1fr) auto;align-items:center;gap:10px;padding:8px 12px;background:var(--ui-paper-hi)}
+.adm-guard-item+.adm-guard-item{border-top:1px solid var(--ui-paper-line)}
+.adm-guard-item b{font-weight:500;font-size:13.5px;color:var(--ui-ink);white-space:nowrap}
+.adm-guard-note{min-width:0;font-size:12px;color:var(--ui-ink-soft);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.adm-guard-dot{width:8px;height:8px;border-radius:50%;background:var(--ui-good);box-shadow:0 0 0 3px rgba(63,122,108,.15)}
+.adm-guard-item.is-part .adm-guard-dot{background:var(--ui-ochre);box-shadow:0 0 0 3px var(--ui-ochre-wash)}
+.adm-guard-hits{min-width:2ch;text-align:right;font:600 14px/1 var(--num);font-variant-numeric:tabular-nums;color:var(--ui-ink-soft)}
+.adm-guard-hits.is-hot{color:var(--ui-seal)}
+.adm-guard-state{font-size:12px;color:var(--ui-ink-soft);white-space:nowrap}
+.adm-guard-off{display:flex;flex-wrap:wrap;align-items:center;gap:4px;margin:0;font-size:12px;color:var(--ui-ink-soft)}
+.adm-guard-off>span:first-child{margin-right:2px;letter-spacing:.04em}
+.adm-guard-chip{padding:0 7px;border-radius:var(--ui-r-pill);border:1px dashed rgba(93,101,95,.35);cursor:default}
+@media (max-width:1100px){.adm-sec{grid-template-columns:minmax(0,1fr)}}
+@media (max-width:820px){
+  .adm-table.adm-sec-table tr{grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"who left" "why act";gap:4px 12px;align-items:center}
+  .adm-table.adm-sec-table td{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .adm-table.adm-sec-table td::before{content:none}
+  .adm-table.adm-sec-table td.adm-ban-who{grid-area:who;grid-column:auto}
+  .adm-table.adm-sec-table td.adm-ban-why{grid-area:why}
+  .adm-table.adm-sec-table td.adm-ban-left{grid-area:left;justify-self:end}
+  .adm-table.adm-sec-table td.adm-right{grid-area:act;justify-self:end}
+  .adm-table.adm-sec-table td code{white-space:nowrap;word-break:normal}
+}
+@media (max-width:640px){
+  .adm-sec .adm-review-head{flex-wrap:wrap;row-gap:6px}
+  .adm-review-kinds{order:3;flex-basis:100%}
+  .adm-review-ago{margin-left:auto}
+  .adm-sec .adm-review-actions{flex-wrap:wrap}
+  .adm-sec .adm-review-actions .adm-input{flex-basis:100%}
+  .adm-sec .adm-review-actions .adm-select,.adm-sec .adm-review-actions .adm-btn{flex:1}
+  .adm-sec-manual input{flex:1 1 40%!important}
+  .adm-sec-manual .adm-select{flex:1}
+  .adm-trace-form{grid-template-columns:minmax(0,1fr)}
+}
 @media (max-width:640px){.adm-review-actions .adm-btn{flex:1}.adm-review-actions .adm-select{flex:1;max-width:none}}
 .adm-card-actions .adm-link+.adm-link{margin-left:14px}
 
-/* 外挂自动抓拍取证（IDOK-458） */
-.adm-kpis--6{grid-template-columns:repeat(6,minmax(0,1fr))}
-@media (max-width:1120px){.adm-kpis--6{grid-template-columns:repeat(3,minmax(0,1fr))}}
-@media (max-width:640px){.adm-kpis--6{grid-template-columns:repeat(2,minmax(0,1fr))}}
-.adm-capture-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(310px,1fr));gap:14px;margin-top:12px}
-.adm-capture-card{display:flex;flex-direction:column;overflow:hidden;border-radius:var(--ui-r-md);background:var(--ui-paper-hi);border:1px solid var(--ui-paper-line);box-shadow:0 1px 2px rgba(20,24,28,.04)}
-.adm-capture-thumb{position:relative;display:block;width:100%;aspect-ratio:16/9;padding:0;border:0;background:#0e1319;cursor:pointer;overflow:hidden}
-.adm-capture-thumb img{display:block;width:100%;height:100%;object-fit:cover;transition:transform .2s ease}
-.adm-capture-thumb:hover img{transform:scale(1.02)}
-.adm-capture-badge{position:absolute;top:8px;right:8px;left:auto;background:rgba(20,33,30,.88);color:#f8fafc;border:1px solid rgba(255,255,255,.22);box-shadow:0 2px 6px rgba(0,0,0,.35)}
-.adm-capture-badge.is-bad{background:rgba(185,28,28,.94);color:#fff}
-.adm-capture-badge.adm-ban-auto{background:rgba(180,83,9,.94);color:#fff}
-.adm-capture-body{display:grid;gap:8px;padding:12px 14px;flex:1}
-.adm-capture-head{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap}
-.adm-capture-head b,.adm-capture-head a{font:600 14px/1.3 var(--num);color:var(--ui-ink)}
-.adm-capture-facts{display:grid;grid-template-columns:36px 1fr;gap:4px 8px;margin:0;font-size:12.5px;line-height:1.45}
-.adm-capture-facts dt{color:var(--ui-ink-soft);font-weight:500}
-.adm-capture-facts dd{margin:0;color:var(--ui-ink);font-family:var(--num);word-break:break-word}
-.adm-capture-actions{display:flex;gap:8px;margin-top:auto;padding-top:4px}
-.adm-review-shots{display:grid;gap:6px}
-.adm-review-shot-list{display:flex;flex-wrap:wrap;gap:8px}
-.adm-review-shot-btn{display:flex;align-items:center;gap:8px;padding:4px 8px 4px 4px;border:1px solid var(--ui-paper-line);border-radius:var(--ui-r-sm);background:var(--ui-paper);cursor:pointer;font-size:12px;color:var(--ui-ink)}
-.adm-review-shot-btn:hover{border-color:var(--ui-jade-500)}
-.adm-review-shot-btn img{width:64px;height:36px;object-fit:cover;border-radius:3px;background:#0e1319;display:block}
+/* 安全中心 · 自动抓拍（IDOK-458）：右栏紧凑列表，点开看大图 */
+.adm-sec-cap .adm-card-actions{display:flex;align-items:center;gap:6px}
+.adm-sec-cap.is-clear .adm-card-head{padding-bottom:14px}
+.adm-sec-cap.is-clear .adm-card-body,.adm-sec-cap.is-clear .adm-cap-filter{display:none}
+.adm-cap-filter{display:flex;align-items:center;gap:6px}
+.adm-cap-filter .adm-select{width:auto;max-width:118px;padding:4px 22px 4px 8px;font-size:12.5px}
+.adm-cap-filter input{width:76px;min-width:0;padding:4px 8px;font:12.5px/1.4 var(--num);color:var(--ui-ink);background:var(--ui-paper-hi);border:1px solid var(--ui-paper-line);border-radius:var(--ui-r-sm)}
+.adm-cap-filter input:focus{outline:none;border-color:var(--ui-jade-500);box-shadow:0 0 0 3px rgba(79,127,122,.18)}
+.adm-cap-list{display:grid;gap:2px;max-height:296px;margin:0;padding:0;overflow:auto;list-style:none}
+.adm-cap-row{display:grid;grid-template-columns:72px minmax(0,1fr);grid-template-rows:auto auto;column-gap:12px;row-gap:3px;align-items:center;width:100%;padding:6px;border:0;border-radius:var(--ui-r-sm);background:none;text-align:left;color:inherit;cursor:pointer}
+.adm-cap-row:hover{background:var(--ui-paper-3)}
+.adm-cap-row:focus-visible{outline:2px solid var(--ui-jade-500);outline-offset:-2px}
+.adm-cap-row img{grid-row:1/3;width:72px;height:40px;object-fit:cover;border-radius:4px;background:#0e1319}
+.adm-cap-line{display:flex;align-items:center;gap:8px;min-width:0;white-space:nowrap}
+.adm-cap-line b{font:600 13px/1.3 var(--num);color:var(--ui-ink)}
+.adm-cap-nick,.adm-cap-place{min-width:0;overflow:hidden;text-overflow:ellipsis;font-size:12.5px;color:var(--ui-ink-soft)}
+.adm-cap-ago{margin-left:auto;flex:none;font:12px var(--num);color:var(--ui-ink-soft)}
+.adm-cap-speed{flex:none;font:12.5px var(--num);color:var(--ui-ink)}
+.adm-cap-line .adm-pill{flex:none;max-width:9em;overflow:hidden;text-overflow:ellipsis}
+/* 复核卡里的抓拍缩略图 */
+.adm-review-shots{display:flex;gap:6px}
+.adm-review-shot{flex:none;width:72px;height:40px;padding:0;overflow:hidden;border:1px solid var(--ui-paper-line);border-radius:4px;background:#0e1319;cursor:zoom-in}
+.adm-review-shot img{display:block;width:100%;height:100%;object-fit:cover}
+.adm-review-shot:hover{border-color:var(--ui-seal)}
+.adm-review-shot:focus-visible{outline:2px solid var(--ui-jade-500);outline-offset:2px}
+/* 封禁行：指纹点即复制；设备 / 账号收在展开行 */
+.adm-ban-fp{padding:0;border:0;background:none;font:600 13px var(--num);color:var(--ui-ink);letter-spacing:0;cursor:copy}
+.adm-ban-fp:hover{color:var(--ui-jade-700);text-decoration:underline dotted;text-underline-offset:3px}
+.adm-ban-fp:focus-visible{outline:2px solid var(--ui-jade-500);outline-offset:2px;border-radius:3px}
+.adm-ban-more{margin-left:10px;padding:0;border:0;background:none;font:12.5px var(--sans);color:var(--ui-ink-soft);cursor:pointer}
+.adm-ban-more::after{content:'';display:inline-block;width:5px;height:5px;margin-left:6px;border-right:1.5px solid currentColor;border-bottom:1.5px solid currentColor;transform:translateY(-3px) rotate(45deg);transition:transform var(--ui-fast) var(--ui-ease)}
+.adm-ban-more[aria-expanded=true]{color:var(--ui-jade-700)}
+.adm-ban-more[aria-expanded=true]::after{transform:translateY(1px) rotate(-135deg)}
+.adm-ban-more:hover{color:var(--ui-jade-700)}
+.adm-ban-more:focus-visible{outline:2px solid var(--ui-jade-500);outline-offset:2px;border-radius:3px}
+.adm-sec-table tr.adm-ban-detail td{padding:4px 14px 10px;background:var(--ui-paper-3);white-space:normal}
+.adm-ban-facts{display:grid;gap:4px;margin:0;padding:0;list-style:none;font-size:12.5px}
+.adm-ban-facts li{display:flex;align-items:baseline;gap:10px;min-width:0;white-space:nowrap}
+.adm-ban-facts li>*{flex:none}
+/* 空间不够时先省略网段/时间，同设备账号始终可见 */
+.adm-ban-facts li>.adm-sub{flex:0 1000 auto;min-width:0;overflow:hidden;text-overflow:ellipsis}
+.adm-ban-facts b{font:500 12.5px var(--num);color:var(--ui-ink)}
+.adm-ban-peers{flex:0 1 auto!important;min-width:0;margin-left:auto;overflow:hidden;text-overflow:ellipsis;color:var(--ui-seal)}
+/* 人工封禁：昵称候选 */
+.adm-sec-pick{display:flex;flex-wrap:wrap;gap:6px;flex-basis:100%}
+.adm-sec-pick:empty{display:none}
+.adm-sec-pick-item{display:inline-flex;align-items:baseline;gap:6px;padding:3px 10px;border:1px solid var(--ui-paper-line);border-radius:var(--ui-r-pill);background:var(--ui-paper-hi);font-size:12.5px;color:var(--ui-ink-soft);cursor:pointer}
+.adm-sec-pick-item b{font-weight:500;color:var(--ui-ink)}
+.adm-sec-pick-item:hover{border-color:var(--ui-jade-500);color:var(--ui-jade-700)}
+/* 抓拍大图 */
 .adm-capture-lightbox{width:min(96vw,1040px);max-width:none;padding:0;overflow:hidden;background:var(--ui-paper-hi);color:var(--ui-ink);border:1px solid var(--ui-paper-line)}
-.adm-capture-lb-head{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px;padding:12px 16px;border-bottom:1px solid var(--ui-paper-line);background:var(--ui-paper-hi);color:var(--ui-ink)}
-.adm-capture-lb-actions{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
-.adm-capture-lb-actions a.adm-btn--ghost{color:var(--ui-jade-700);text-decoration:none}
-.adm-capture-lb-actions a.adm-btn--ghost:hover{color:var(--ui-ink)}
-.adm-capture-lb-body{display:grid;gap:12px;padding:14px 16px;max-height:82vh;overflow:auto;background:var(--ui-paper-hi);color:var(--ui-ink)}
-.adm-capture-lb-img{display:block;width:100%;max-height:62vh;object-fit:contain;border-radius:var(--ui-r-sm);background:#0c1117;border:1px solid var(--ui-paper-line)}
+.adm-capture-lb-head{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px;padding:12px 16px;border-bottom:1px solid var(--ui-paper-line)}
+.adm-capture-lb-who{display:flex;align-items:center;gap:10px;min-width:0;white-space:nowrap}
+.adm-capture-lb-who b,.adm-capture-lb-who a{font:600 14px/1.3 var(--num)}
+.adm-capture-lb-actions{display:flex;align-items:center;gap:8px}
+.adm-capture-lb-actions .adm-link{margin-right:6px}
+.adm-capture-lb-body{display:grid;gap:12px;padding:14px 16px;max-height:82vh;overflow:auto}
+.adm-capture-lb-img{display:block;width:100%;max-height:62vh;object-fit:contain;border-radius:var(--ui-r-sm);background:#0c1117}
 .adm-capture-lb-facts{margin:0}
-.adm-capture-lb-facts dt{color:var(--ui-ink-soft)}
-.adm-capture-lb-facts dd{color:var(--ui-ink)}
+.adm-capture-lb-facts dd{font-family:var(--num);word-break:break-all}
+@media (max-width:820px){
+  .adm-table.adm-sec-table tr.adm-ban-detail{display:block}
+  .adm-table.adm-sec-table tr.adm-ban-detail[hidden]{display:none}
+  .adm-table.adm-sec-table tr.adm-ban-detail td{padding:8px 10px;border-radius:var(--ui-r-sm)}
+  .adm-ban-facts li{flex-wrap:wrap;white-space:normal;row-gap:0}
+}
 @media (max-width:640px){
-  .adm-capture-filters label{flex:1 1 100%}
-  .adm-capture-filters .adm-select,.adm-capture-filters input[type=search]{flex:1;width:100%;max-width:none}
-  .adm-capture-grid{grid-template-columns:1fr}
-  .adm-capture-actions .adm-btn{flex:1}
+  .adm-sec-cap .adm-card-head{flex-wrap:wrap}
+  .adm-cap-filter{flex:1 1 100%}
+  .adm-cap-filter .adm-select{flex:1;max-width:none}
+  .adm-cap-filter input{flex:1}
+  .adm-capture-lb-who{flex-wrap:wrap;white-space:normal}
   .adm-capture-lb-actions{width:100%}
-  .adm-capture-lb-actions .adm-btn,.adm-capture-lb-actions a{flex:1;text-align:center}
+  .adm-capture-lb-actions .adm-btn{flex:1}
 }
