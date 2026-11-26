@@ -282,25 +282,28 @@ try {
   await page.waitForFunction(() => window.viewer.game.getState().mission?.stepIndex === 1, null, {timeout: 15000})
 
   const arrivedAtDelivery = await page.evaluate(async () => {
-    const target2 = window.viewer.game.getState().mission.target
+    const game = window.viewer.game
+    const target2 = game.getState().mission.target
+    const off = game.onEvent(event => {
+      if (event.type === 'mission:done' && event.id === 'errand-01') {
+        window.errandCompletionMode = game.getState().mode
+        off()
+      }
+    })
     return window.viewer.walkTo(target2[0], target2[1], 0, 'e2e-errand1-step2')
   })
   assert.equal(arrivedAtDelivery, true, 'errand delivery landing failed')
   await page.waitForFunction(() => window.viewer.game.getState().mission === null, null, {timeout: 15000})
-  await page.waitForFunction(async () => {
-    const onFoot = () => window.viewer.walk.active && window.viewer.game.getState().mode === 'foot'
-    if (!onFoot()) return false
-    await new Promise(requestAnimationFrame)
-    return onFoot()
-  }, null, {timeout: 15000})
 
   const afterErrand = await page.evaluate(() => ({
+    completionMode: window.errandCompletionMode,
     mode: window.viewer.game.getState().mode,
     money: window.viewer.game.getState().money,
     missionsDone: window.viewer.game.getState().missionsDone,
     beacon: window.viewer.game.missions.beaconVisible(),
   }))
   assert.equal(afterErrand.mode, 'foot')
+  assert.equal(afterErrand.completionMode, 'foot', 'errand completion observed a stale travel mode')
   assert.equal(afterErrand.money, 380)
   assert.ok(afterErrand.missionsDone.includes('errand-01'))
   assert.equal(afterErrand.beacon, false, 'beacon must hide after mission completion')

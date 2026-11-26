@@ -1460,6 +1460,7 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
     active=true;rides?.show(true);requestAnimationFrame(()=>requestAnimationFrame(loadRides));figure.visible=true;firstPersonHidden=false
     yaw=heading;facing=yaw+avatar.yaw;figure.rotation.y=facing;input.show(true);accumulator=0;rig.reset(arm)
     restoreFootLocomotion(avatar.clips.idle)
+    syncGameTravelState()
     camera.near=.08;camera.updateProjectionMatrix();follow(0,true)
     if(takeCigaretteIntent(sessionStorage)&&smokeEnabled()){
       chooseSmoke()
