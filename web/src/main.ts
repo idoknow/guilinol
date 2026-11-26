@@ -295,6 +295,7 @@ async function start(loader:FullLoader,creatorSpawn=false) {
   })
   entrySignal?.throwIfAborted()
   scene.add(base.mesh,peaks)
+  const grassTick=lawnGrass(scene,manifest.chunks)
   const stream = openingStream??new Stream(scene,manifest,base,rangeStore,camera)
   const heli=helicopter(scene,camera,()=>walker,params.has('verify'))
   if(!openingStream){
@@ -982,6 +983,7 @@ async function start(loader:FullLoader,creatorSpawn=false) {
     const elapsed = previous?now-previous:0;previous=now
     gfx.frame(elapsed)
     const anyIndoor=xxg.isIndoor()||szj.isIndoor()
+    grassTick(walker?.active?walker.position:camera.position,now/1000,!anyIndoor && gfx.quality!=='low')
     if(!switching&&!anyIndoor){if(walker?.active&&!heli.active)walker.tick(elapsed/1000);else if(!walker?.active){controls(elapsed/1000);clampOpening()}heli.tick(elapsed/1000)}
     cabinCruise=heli.first&&heli.phase==='cruise'
     if(frame===1) {
@@ -1101,3 +1103,4 @@ async function start(loader:FullLoader,creatorSpawn=false) {
   else if(params.get('mode')==='walk'||params.has('spawn')){await toggle(true);showMode()}
 }
 export const boot=start
+import {lawnGrass} from './lawn-grass'

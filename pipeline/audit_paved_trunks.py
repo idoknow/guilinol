@@ -19,6 +19,8 @@ def trunk_hits(streets, records):
     faces = streets[0]
     if len(streets) > 11 and streets[11]:
         faces = faces[:streets[11][0]]
+    if len(streets) > 19:
+        faces = [*faces, *streets[19]]
     kinds = {0: 'road', 1: 'walk', 2: 'marking', 4: 'verge', 5: 'cycle', 6: 'walk'}
     hits = {}
     for kind, label in kinds.items():
@@ -41,6 +43,8 @@ def trunk_hits(streets, records):
 def at_grade_blockers(collision, ground, records, projected):
     streets = collision[1]
     faces = streets[0][:streets[11][0]] if len(streets) > 11 and streets[11] else streets[0]
+    if len(streets) > 19:
+        faces = [*faces, *streets[19]]
     walk = union_all([make_valid(Polygon(shell, holes)) for kind, shell, *holes in faces if kind in (1, 6)])
     buildings = STRtree([Polygon(row[2][0], row[2][1:]) for row in collision[0] if row[2]])
     ids = list(projected)

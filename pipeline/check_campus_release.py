@@ -30,8 +30,6 @@ def check_paving_delta(before, after, patches):
     start = 24 + 16900 + 9 * vertices + 4 * indices
     collision = json.loads(raw[start:start+size])
     streets = collision[1]
-    lower = streets[11] if len(streets) > 11 else None
-    insert = lower[0] if lower else len(streets[0])
     added = []
     for patch in patches:
         material, shell, *holes = patch['face']
@@ -41,9 +39,9 @@ def check_paving_delta(before, after, patches):
                 or face.area == 0 or not box(0, 0, 25600, 25600).covers(gap) or not gap.covers(face)):
             return False
         added.append(patch['face'])
-    streets[0][insert:insert] = added
-    if lower:
-        lower[0] += len(added)
+    while len(streets) < 20:
+        streets.append(None if len(streets) in (5, 11, 12, 13) else [])
+    streets[19] = [*(streets[19] or []), *added]
     encoded = json.dumps(collision, separators=(',', ':')).encode()
     expected = raw[:12] + struct.pack('<I', len(encoded)) + raw[16:start] + encoded + raw[start+size:]
     return gzip.decompress(after) == expected

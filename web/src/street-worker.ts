@@ -19,7 +19,7 @@ type RoadCtrl=[number,number[]]
 type Lower=[number,Pair[],[number,number,number,number][]]
 type CrossingPanel=import('./railways').CrossingPanel
 type LayeredRoad = [...GradePlane, number]
-export type Streets=[Path[],Pair[],number[][],Pair[]?,Pair[]?,(RoadCtrl|null)?,number[][]?,number[][]?,number[][]?,number[][]?,Pair[][]?,(Lower|null)?,([number,number,number]|null)?,unknown?,StationRoadSegment[]?,StationPavingCut[]?,ShoulderPlane[]?,LayeredRoad[]?,CrossingPanel[]?]
+export type Streets=[Path[],Pair[],number[][],Pair[]?,Pair[]?,(RoadCtrl|null)?,number[][]?,number[][]?,number[][]?,number[][]?,Pair[][]?,(Lower|null)?,([number,number,number]|null)?,unknown?,StationRoadSegment[]?,StationPavingCut[]?,ShoulderPlane[]?,LayeredRoad[]?,CrossingPanel[]?,Path[]?]
 const colors=look.streets.surfaces.map(v=>new THREE.Color(v)),tone=Object.fromEntries((['railing','lampPole','lampHead'] as const).map(k=>[k,new THREE.Color(look.streets[k])]))
 const stoneLight=new THREE.Color(0xa6a39a),stoneMid=new THREE.Color(0x8c8981),stoneBase=new THREE.Color(0x74726b)
 const platformBrick=new THREE.Color(style.station.platformBrick)
@@ -55,7 +55,7 @@ function lowerHeight(x:number,z:number,base:number,terrain:number,[,corners,prof
 }
 
 const ROAD_LIFT=.03
-export function streetGeometry([paths,lamps,banks,signals=[],stops=[],roadCtrl,stoneRails=[],beds=[],shops=[],decor=[],curbCuts=[],lower,platform,,stationRoads,stationCuts,shoulderPlanes,layeredRoads,panels]:Streets,ground:(x:number,z:number)=>number,rails:RailSection[]=[],signs:CrossingSign[]=[],railGround:(x:number,z:number)=>number=ground,paving?:StationPavingStyle,roadbeds=new Set<number>(),origin?:readonly [number,number], inspectSlope?:(a:THREE.Vector3,b:THREE.Vector3,c:THREE.Vector3)=>void){
+export function streetGeometry([paths,lamps,banks,signals=[],stops=[],roadCtrl,stoneRails=[],beds=[],shops=[],decor=[],curbCuts=[],lower,platform,,stationRoads,stationCuts,shoulderPlanes,layeredRoads,panels,patches]:Streets,ground:(x:number,z:number)=>number,rails:RailSection[]=[],signs:CrossingSign[]=[],railGround:(x:number,z:number)=>number=ground,paving?:StationPavingStyle,roadbeds=new Set<number>(),origin?:readonly [number,number], inspectSlope?:(a:THREE.Vector3,b:THREE.Vector3,c:THREE.Vector3)=>void){
   const xyz:number[]=[],rgb:number[]=[],sidewalk:number[]=[],road:number[]=[],mats:number[]=[],cols:number[]=[]
   const stationLevel=stationRoads?stationRoadSurface(stationRoads):null
   const shoulders=shoulderPlanes && stationShoulders(shoulderPlanes)
@@ -211,7 +211,7 @@ export function streetGeometry([paths,lamps,banks,signals=[],stops=[],roadCtrl,s
   }
   const checkShizijie=origin?touchesShizijieTile(origin[0],origin[1]):false
   const repaired=repairStreetPaths(paths)
-  const activePaths=repaired.paths
+  const activePaths=patches?.length ? [...repaired.paths,...patches] : repaired.paths
   const skipCurbEdges=repaired.skipCurbEdges
   for(const [index,[kind,...rings]] of activePaths.entries()){
     platformPath=!!platform && index>=platform[0] && index<platform[1]
