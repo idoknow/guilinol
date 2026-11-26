@@ -19,7 +19,9 @@ def crossings(sections):
     ways = {w['id']: w for w in load_osm() if w['type'] == 'way' and w.get('geometry')}
     pairs = {}
     for name, design in sections.items():
-        for key, limits in design['railTies'].items():
+        # Some crossings sit on unchanged chords beyond the active rail profile.
+        ties = {**design['railTies'], **design.get('approachRailTies', {})}
+        for key, limits in ties.items():
             rail = int(key)
             line = LineString(points(ways[rail]))
             part = substring(line, *sorted(limits))
