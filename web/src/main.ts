@@ -786,6 +786,14 @@ async function start(loader:FullLoader,creatorSpawn=false) {
         walker.showFigure(true)
         return walker.enter(pt.x, pt.z, pt.yaw, 'xxg-exit', false)
       },
+      teleportToPlaza: async () => {
+        const { getPortal, yawFacing } = await import('./xiaoxianggang/contract')
+        const portal = getPortal('E1')
+        // Land 3.9m outward from E1 portal center (clear of the glass pyramid behind camera, immediately showing [E] 进入)
+        const px = portal.world.x - portal.inward.x * 3.9
+        const pz = portal.world.z - portal.inward.z * 3.9
+        return walkTo(px, pz, yawFacing(portal.inward), 'xiaoxianggang', '小香港商业城')
+      },
     },
     { eager: params.has('xxg'), veilFadeInMs: 80 },
   )

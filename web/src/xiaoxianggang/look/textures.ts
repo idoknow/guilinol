@@ -432,7 +432,7 @@ export function buildRenovatedTileMaps(cache: TextureUploadCache): {
         const m = tileNoise(x, y, NS, 16, 77)
         height[y * NS + x] = isGrout ? 0.25 : 0.9 + (m - 0.5) * 0.04
         const i = (y * NS + x) * 4
-        const rv = isGrout ? 210 : clampByte(92 + (m - 0.5) * 26)
+        const rv = isGrout ? 215 : clampByte(172 + (m - 0.5) * 26)
         rough[i] = rough[i + 1] = rough[i + 2] = rv
         rough[i + 3] = 255
       }
@@ -1193,7 +1193,15 @@ export function buildSignAtlasMaps(cache: TextureUploadCache): {
   const AH = 512
   const EW = 512
   const EH = 256
-  const hasDom = typeof document !== 'undefined'
+  let hasCanvas2D = false
+  try {
+    hasCanvas2D =
+      typeof document !== 'undefined' &&
+      typeof document.createElement === 'function' &&
+      Boolean(document.createElement('canvas')?.getContext?.('2d'))
+  } catch {
+    hasCanvas2D = false
+  }
 
   return {
     map: cache.acquire({
@@ -1201,14 +1209,14 @@ export function buildSignAtlasMaps(cache: TextureUploadCache): {
       width: AW,
       height: AH,
       kind: 'albedo',
-      build: () => (hasDom ? drawSignAtlasCanvas(AW, AH, false) : drawSignAtlasNodeData(AW, AH, false)),
+      build: () => (hasCanvas2D ? drawSignAtlasCanvas(AW, AH, false) : drawSignAtlasNodeData(AW, AH, false)),
     }),
     emissiveMap: cache.acquire({
       key: 'xxg:sign-atlas:emissive',
       width: EW,
       height: EH,
       kind: 'emissive',
-      build: () => (hasDom ? drawSignAtlasCanvas(EW, EH, true) : drawSignAtlasNodeData(EW, EH, true)),
+      build: () => (hasCanvas2D ? drawSignAtlasCanvas(EW, EH, true) : drawSignAtlasNodeData(EW, EH, true)),
     }),
   }
 }

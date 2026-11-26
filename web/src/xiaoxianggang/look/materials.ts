@@ -145,14 +145,14 @@ export function createXiaoxianggangMaterials(opts: CreateMaterialsOptions = {}):
       name: 'xxg_floor_renovated',
       map: renovated.map,
       normalMap: renovated.normalMap,
-      normalScale: new THREE.Vector2(0.55, 0.55),
+      normalScale: new THREE.Vector2(0.45, 0.45),
       roughnessMap: renovated.roughnessMap,
       roughness: 1,
-      metalness: 0.06,
-      emissive: '#f9f5eb',
+      metalness: 0,
+      emissive: '#dfd8cc',
     }),
-    0.06,
-    0.08,
+    0.01,
+    0.02,
   )
   floorRenovated.userData = { tiled: true, periodM: [1.6, 1.6] }
 
@@ -197,11 +197,11 @@ export function createXiaoxianggangMaterials(opts: CreateMaterialsOptions = {}):
       emissiveMap: ceiling.emissiveMap,
       roughnessMap: ceiling.roughnessMap,
       roughness: 1,
-      metalness: 0.08,
-      emissive: '#ffffff',
+      metalness: 0.06,
+      emissive: '#fff4e2',
     }),
-    1.15,
-    0.55,
+    0.62,
+    0.30,
   )
   ceilingGrid.userData = { tiled: true, periodM: [1.2, 1.2] }
 
@@ -213,11 +213,11 @@ export function createXiaoxianggangMaterials(opts: CreateMaterialsOptions = {}):
       map: stripTex,
       emissiveMap: stripTex,
       emissive: '#e6f1ff',
-      roughness: 0.22,
-      metalness: 0.05,
+      roughness: 0.24,
+      metalness: 0.04,
     }),
-    1.15,
-    0.55,
+    0.68,
+    0.32,
   )
 
   const lightStripWarm = track(
@@ -267,14 +267,14 @@ export function createXiaoxianggangMaterials(opts: CreateMaterialsOptions = {}):
       name: 'xxg_storefront_glass',
       color: XXG_PALETTE.storefrontGlassTint.hex,
       transparent: true,
-      opacity: 0.22,
+      opacity: 0.34,
       roughness: 0.08,
-      metalness: 0.12,
+      metalness: 0.16,
       depthWrite: false,
-      emissive: '#d8eef8',
+      emissive: '#cfe7f3',
     }),
-    0.04,
     0.06,
+    0.08,
   )
 
   const stairGranite = track(
@@ -345,12 +345,12 @@ export function createXiaoxianggangMaterials(opts: CreateMaterialsOptions = {}):
       name: 'xxg_sign_atlas',
       map: atlas.map,
       emissiveMap: atlas.emissiveMap,
-      emissive: '#ffffff',
-      roughness: 0.34,
-      metalness: 0.08,
+      emissive: '#e8e2d6',
+      roughness: 0.72,
+      metalness: 0.0,
     }),
-    0.28,
-    0.35,
+    0.14,
+    0.18,
   )
 
   const snapshot = cache.getSnapshot()

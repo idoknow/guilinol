@@ -19,10 +19,10 @@ import {
   findTriggeredExit,
   resolveIndoorMovement,
 } from './collision.ts'
+import { XIAOXIANGGANG_B1_LAYOUT } from '../layout/index.ts'
 import { createIndoorGreyboxScene, type IndoorGreyboxSceneHandle } from './indoor-scene.ts'
 import { createXxgRuntimeStateMachine } from './state-machine.ts'
 import {
-  STAGE1_GREYBOX_LAYOUT,
   normalizeAngleRad,
   type CreateXxgIndoorSceneOptions,
   type XxgExtendedIndoorScene,
@@ -66,7 +66,7 @@ function isValidPortalId(id: unknown): id is XxgPortalId {
  * - Zero residue across repeated enter/exit cycles, zero leaks on dispose()
  */
 export function createXxgIndoorScene(opts: CreateXxgIndoorSceneOptions = {}): XxgExtendedIndoorScene {
-  const layout = opts.layout ?? STAGE1_GREYBOX_LAYOUT
+  const layout = opts.layout ?? XIAOXIANGGANG_B1_LAYOUT
   const layoutErrors = validateXxgLayout(layout)
   if (layoutErrors.length > 0) {
     throw new Error(`Invalid XxgLayout passed to createXxgIndoorScene: ${layoutErrors.join('; ')}`)
@@ -81,7 +81,7 @@ export function createXxgIndoorScene(opts: CreateXxgIndoorSceneOptions = {}): Xx
 
   const scene = new THREE.Scene()
   scene.name = 'xxg-indoor-root'
-  scene.background = new THREE.Color('#c8d2d8')
+  scene.background = new THREE.Color('#d6dde3')
 
   const camera = new THREE.PerspectiveCamera(XXG_PLAYER.fovDeg, 16 / 9, INDOOR_CAMERA_NEAR, INDOOR_CAMERA_FAR)
   camera.rotation.order = 'YXZ'

@@ -388,7 +388,7 @@ test('repeated enter/exit cycles across all 4 portals leave zero DOM/scene resid
       },
     }
 
-    const indoor = createXxgIndoorScene({ veilFadeInMs: 0, reenterCooldownMs: 50 })
+    const indoor = createXxgIndoorScene({ layout: STAGE1_GREYBOX_LAYOUT, veilFadeInMs: 0, reenterCooldownMs: 50 })
     assert.equal(indoor.state, 'unmounted')
     assert.equal(await indoor.enter('E1'), false)
     assert.equal(await indoor.exit(), false)
@@ -445,6 +445,39 @@ test('repeated enter/exit cycles across all 4 portals leave zero DOM/scene resid
 
     assert.equal(veilOpens, 16)
     assert.equal(veilDones, 16)
+    indoor.dispose()
+  })
+})
+
+test('default createXxgIndoorScene loads full 53-shop B1 layout with PBR materials and teleport pill', async () => {
+  const env = createMockDomEnvironment()
+  await withMockGlobals(env, async () => {
+    const renderer = createCountingRenderer()
+    const worldCamera = new THREE.PerspectiveCamera(55, 16 / 9, 1, 2000)
+    const indoor = createXxgIndoorScene({ veilFadeInMs: 0, reenterCooldownMs: 50 })
+    await indoor.mount({
+      renderer,
+      worldCamera,
+      bodyFlag: 'xxgActive',
+      getWalker: () => null,
+      openVeil: () => ({ done: async () => {} }),
+      suspendWorld() {},
+      resumeWorldAt: async () => true,
+    })
+    assert.equal(indoor.getLayout().shops.length, 53)
+    for (const pid of XXG_PORTAL_IDS) {
+      assert.equal(await indoor.enter(pid), true)
+      assert.equal(indoor.renderFrame(), true)
+      const metrics = indoor.getMetrics()
+      assert.ok(metrics.drawCalls >= 10 && metrics.drawCalls <= XXG_BUDGET.indoorDrawCallsMax, `drawCalls=${metrics.drawCalls}`)
+      assert.ok(metrics.textureBytes <= XXG_BUDGET.indoorTextureBytesMax)
+      const collideKey = pid === 'W2' ? 'KeyA' : 'KeyD'
+      env.mockWindow.dispatchKey('keydown', collideKey)
+      for (let f = 0; f < 40; f++) indoor.step(0.05)
+      env.mockWindow.dispatchKey('keyup', collideKey)
+      assert.ok(indoor.getPlayerSnapshot().collisionContacts > 0, `${pid} wall collision must engage`)
+      assert.equal(await indoor.exit(), true)
+    }
     indoor.dispose()
   })
 })
