@@ -122,7 +122,8 @@ async function start(loader:FullLoader,creatorSpawn=false) {
   let post:ReturnType<typeof import('./look/post').mainPass>|undefined
   if(params.has('debug'))Object.assign(window,{gfx})
   // tapFrame：录像在这里、present 之前拷帧（IDOK-383，主画布没开 preserveDrawingBuffer）。
-  function drawMain(){if(post)stats.shadowCasters=post.render(walker?.active?walker.position:camera.position);else renderer.render(scene,camera);tapFrame(renderer.domElement)}
+  let cabinCruise=false
+  function drawMain(){if(post)stats.shadowCasters=post.render(walker?.active?walker.position:camera.position,cabinCruise);else renderer.render(scene,camera);tapFrame(renderer.domElement)}
   renderer.info.autoReset=false
   const hemi = new THREE.HemisphereLight(look.hemiSky,look.hemiGround,look.hemiPower); scene.add(hemi)
   const arrivalReady=import('./arrival-programs').then(module=>warmPrograms(module.arrivalPrograms()))
@@ -679,6 +680,7 @@ async function start(loader:FullLoader,creatorSpawn=false) {
     const elapsed = previous?now-previous:0;previous=now
     gfx.frame(elapsed)
     if(!switching){if(walker?.active&&!heli.active)walker.tick(elapsed/1000);else if(!walker?.active){controls(elapsed/1000);clampOpening()}heli.tick(elapsed/1000)}
+    cabinCruise=heli.first&&heli.phase==='cruise'
     if(frame===1) {
       if(!first)markFirstFrame()
       void import('./play').then(mod=>{tour=mod.play(host)})

@@ -38,7 +38,15 @@ export function helicopter(scene:THREE.Scene,camera:THREE.PerspectiveCamera,walk
     status.textContent=`${({idle:'空闲',boarding:'登机中',flying:'执飞中',landing:'降落中',unloading:'下机中'} as Record<string,string>)[state.state]} · 前面 ${state.ahead} 人 · 预计等待 ${state.eta} 秒`
     leave.hidden=!state.mine||!!state.flight&&state.mine.offered;confirm.disabled=!!state.mine&&!state.mine.offered;confirm.textContent=state.mine?.offered?'确认登机':state.mine?'排队中':'加入队列'
   }
-  async function command(action:string,fields:Record<string,string>={}){if(busy||!soloServices())return;busy=true;const start=Date.now();try{const state=action==='confirm'?await soloServices()!.commerce.confirmHelicopterTicket(fields.ticket):await queueCommand(action,fields);accept(state,start);return state}catch(error){status.textContent=(error as Error).message}finally{busy=false}}
+  let pending:Promise<QueueState|undefined>|undefined
+  async function command(action:string,fields:Record<string,string>={}):Promise<QueueState|undefined>{
+    if(pending){if(action==='ping')return pending;await pending;return command(action,fields)}
+    const services=soloServices();if(!services)return
+    const start=Date.now();busy=true
+    pending=(action==='confirm'?services.commerce.confirmHelicopterTicket(fields.ticket):queueCommand(action,fields))
+      .then(state=>{accept(state,start);return state}).catch(error=>{status.textContent=error.message;return undefined}).finally(()=>{busy=false;pending=undefined})
+    return pending
+  }
   leave.onclick=()=>{if(queue?.mine)void command('leave',{ticket:queue.mine.ticket})}
   const from=new THREE.Vector3(),ground=new THREE.Vector3(),seat=new THREE.Vector3(),step=new THREE.Vector3(),actor=new THREE.Vector3(),eye=new THREE.Vector3(),target=new THREE.Vector3(),ahead=new THREE.Vector3()
   const previousPosition=craft.position.clone();let measuredSpeed=0,rotorPower=0
