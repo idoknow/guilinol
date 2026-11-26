@@ -1,0 +1,1 @@
+ALTER TABLE helicopter_queue ADD COLUMN IF NOT EXISTS seat smallint NOT NULL DEFAULT 1 CHECK (seat BETWEEN 1 AND 3);

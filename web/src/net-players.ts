@@ -56,7 +56,7 @@ function visual(player:Player) {
   const root=new THREE.Group(), name=label(player.name), bike=vehicleModel('bike')
   registerNameplate(name)
   root.position.set(player.x,player.y,player.z); root.add(name); bike.visible=false
-  return {root,name,bike,rig:undefined as AvatarRig|undefined,posed:false,over:undefined as HTMLElement|undefined,played:-1,emote:undefined as ReturnType<typeof emotePlayback>|undefined,smoke:new RemoteSmoke(),kit:undefined as ReturnType<typeof smokeVisual>|undefined,mixer:undefined as THREE.AnimationMixer|undefined,action:undefined as THREE.AnimationAction|undefined,key:''}
+  return {root,name,bike,rig:undefined as AvatarRig|undefined,posed:false,wasSeated:false,over:undefined as HTMLElement|undefined,played:-1,emote:undefined as ReturnType<typeof emotePlayback>|undefined,smoke:new RemoteSmoke(),kit:undefined as ReturnType<typeof smokeVisual>|undefined,mixer:undefined as THREE.AnimationMixer|undefined,action:undefined as THREE.AnimationAction|undefined,key:''}
 }
 
 export function players(scene:THREE.Scene,clips:THREE.AnimationClip[],camera:THREE.Camera) {
@@ -106,7 +106,9 @@ export function players(scene:THREE.Scene,clips:THREE.AnimationClip[],camera:THR
       pos.x+=(player.x-pos.x)*alpha;pos.y+=(player.y-pos.y)*alpha;pos.z+=(player.z-pos.z)*alpha
       const angle=player.yaw-view.root.rotation.y;view.root.rotation.y+=Math.atan2(Math.sin(angle),Math.cos(angle))*alpha
       const seated=!!remoteSeat.uid&&player.uid===remoteSeat.uid
-      if(seated){pos.set(remoteSeat.x,remoteSeat.y,remoteSeat.z);view.root.rotation.y=remoteSeat.yaw}
+      if(seated){pos.set(remoteSeat.x,remoteSeat.y,remoteSeat.z);view.root.quaternion.copy(remoteSeat.orientation)}
+      else if(view.wasSeated)view.root.rotation.set(0,player.yaw,0)
+      view.wasSeated=seated
       view.bike.visible=!!player.bike
       if(player.bike){view.bike.position.set(pos.x+player.bx-player.x,pos.y,pos.z+player.bz-player.z);view.bike.rotation.y=player.byaw}
       const away=Math.hypot(pos.x-camera.position.x,pos.z-camera.position.z,pos.y+NAME_Y-camera.position.y)

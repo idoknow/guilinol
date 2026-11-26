@@ -50,8 +50,8 @@ import {RECENT_ACTION_LIMIT} from '../fishing/limits'
 import {queueCommand} from '../helicopter/queue'
 import {fareForTour} from '../../../lib/helicopter-clock'
 
-export async function confirmHelicopterTicket(ticket:string){
-  const state=await queueCommand('confirm',{ticket});if(state.code==='OK')window.dispatchEvent(new Event('glol:save-written'));return state
+export async function confirmHelicopterTicket(ticket:string,seat="1"){
+  const state=await queueCommand('confirm',{ticket,seat});if(state.code==='OK')window.dispatchEvent(new Event('glol:save-written'));return state
 }
 
 export type CatalogItemType =

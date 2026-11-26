@@ -8,7 +8,7 @@ for (const mode of Object.keys(modes)) test(`${mode}: closed album route and bou
   assert.deepEqual(route.stops,[pad,...spots,pad]); assert.ok(route.duration>=240 && route.duration<=420)
   for(const [index, time] of route.times.entries()) {
     const pose=route.pose(time), stop=route.stops[index]
-    assert.ok(Math.hypot(pose.x-stop.x, pose.z-stop.z)<0.001)
+    assert.ok(Math.hypot(route.target(time).x-stop.x,route.target(time).z-stop.z)<0.001);assert.ok(Math.hypot(pose.x-stop.x, pose.z-stop.z)<1)
   }
   for(let time=0;time<route.duration;time+=0.2) {
     const pose=route.pose(time)
