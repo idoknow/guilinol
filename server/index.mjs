@@ -134,7 +134,8 @@ const server=serve({port:Number(process.env.PORT || 3000),fetch: async (request,
   try {
     const remoteAddr=serverEnv?.incoming?.socket?.remoteAddress??''
     const resolved=resolveClientIp(request.headers,remoteAddr)
-    const reqEnv={...env,clientIp:resolved.clientIp}
+    const acceptsVerifiedIp=process.env.VERIFIED_LOGIN_IP==='1' && ['127.0.0.1','::1','::ffff:127.0.0.1'].includes(remoteAddr)
+    const reqEnv={...env,clientIp:resolved.clientIp,acceptsVerifiedIp}
     const response=url.pathname==='/api/t'?await receive(request,connections,origin,{remoteAddr}):await onRequest({env:reqEnv,request:new Request(origin+url.pathname+url.search,request)})
     status=response.status
     if(request.method!=='GET'&&status<400&&/^\/api\/(?:admin|feedback|bridge|auth\/(?:register|verify))/.test(url.pathname)){

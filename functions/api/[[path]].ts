@@ -160,7 +160,7 @@ async function handle(request:Request,env:Env) {
     return json({ok:true})
   }
   const login=path==='auth/login', reset=path==='auth/reset'
-  const loginIp=login?trustedLoginIp(request):null
+  const loginIp=login && env.acceptsVerifiedIp===true ? trustedLoginIp(request):null
   if(!login) await limit(db,`code:${ip}`,60,900)
   else if(loginIp) {
     await limit(db,`login:${loginIp}`,60,900)

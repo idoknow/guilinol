@@ -9,6 +9,7 @@ export interface Env {
   RT_JOIN_SECRET?: string
   perfQuery?:(path:string,params:URLSearchParams,runner?:(path:string,params:URLSearchParams)=>Promise<Response>)=>Promise<Response>
   clientIp?: string
+  acceptsVerifiedIp?: boolean
   DB: D1Database; FEEDBACK:R2Bucket; BRIDGE_TOKEN?:string; EMAIL_DEV_LOG?: string; RESEND_API_KEY?: string
   /** 聚合登录：全部来自 Pages 环境变量/secret，不进 D1、后台不暴露 */
   SOCIAL_APPID?: string
