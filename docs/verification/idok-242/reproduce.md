@@ -24,6 +24,8 @@ npm run audit -- --strict --no-shots --out captures/final/strict
 npm run audit:grounding
 ```
 
+独立候选烘焙完成后，用 `python3 scripts/compare-rail-products.py "$MAIN_DIST/world" dist/world` 检查全部 GL04 铁路段、标志和切削层，差异必须为空。分别对两侧运行 `uv run --locked python pipeline/check_dingjiang_rail_clearance.py WORLD` 和同命令加 `--roads`，两份配对报告应相同。需要留存铁路入口时，将 `RAIL_BAKE_INPUTS` 设为工作树外未使用的绝对目录，再运行 `npm run world`。
+
 定江四条道路按 IDOK-247 的交接边界保留原始底图。用同一个候选审计器运行 `npm run audit:vehicles -- "$MAIN_DIST/world" captures/final/main-wheels`。比较两份 `wheels/audit.json`（基线位于 `main-wheels`）中 `lanes` 的逐 way 结果：对 `1030049241`、`727929887`、`459580311`、`815078158` 分别求 `over` 总和及最大的 `maximum`，两项都须小于或等于基线。原始审计保留超限及缺底板记录，因此应检查 JSON。名单外的超限须为零。
 
 定江两个入口无需为本单生成底板。其接线采用原生车道剖面；同一条 `1030049241` 远端连接的另一个洞口 `9495420412` 仍按该洞口原有接线实跑，纳入名单外检查。

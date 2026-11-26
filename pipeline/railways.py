@@ -5,7 +5,9 @@ import gzip
 import heapq
 import json
 import math
+import os
 from pathlib import Path
+import shutil
 from itertools import product
 import struct
 import subprocess
@@ -448,6 +450,9 @@ def bake(world_dir, manifest, inventory, samples):
 
 
 def bake_world(directory,manifest):
+    snapshot = os.environ.get('RAIL_BAKE_INPUTS')
+    if snapshot:
+        shutil.copytree(directory, Path(snapshot)/'world')
     inventory_file=ROOT/'docs/railway-crossings.json'
     inventory=json.loads(inventory_file.read_bytes())
     branch=next(w for w in load_osm() if w['type']=='way' and w['id']==BRANCH)
@@ -462,6 +467,8 @@ def bake_world(directory,manifest):
             probes.append([f'branch:{at}:{offset}',*(point+offset*normal)])
     raw=json.loads(subprocess.check_output([ROOT/'node_modules/.bin/tsx',ROOT/'scripts/railway-road-heights.mjs',
                                             directory,inventory_file,'--branch-deck'],input=json.dumps(probes).encode()))
+    if snapshot:
+        (Path(snapshot)/'road-samples.json').write_text(json.dumps(raw))
     samples={}
     for k,v in raw.items():
         if '/' in k:

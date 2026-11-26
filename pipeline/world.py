@@ -575,6 +575,10 @@ def build(bbox, output, palette, workers=4):
     from service_streets import bake_walks
     bake_walks(output, manifest, palette, [layout.exclude, *layout.school_grounds, *layers['water']])
     write_city_lods(output, manifest)
+    if play_region:
+        from railways import bake_world as bake_railways
+        (output/'manifest.json').write_text(json.dumps(manifest,separators=(',',':'))+'\n')
+        report = bake_railways(output,manifest)
     from traffic import bake as bake_traffic
     bake_traffic(output, manifest, roads)
     from npc_network import install as install_npc
@@ -582,8 +586,6 @@ def build(bbox, output, palette, workers=4):
     install_npc(output, audit_npc(output, manifest))
     (output/'manifest.json').write_text(json.dumps(manifest,separators=(',',':'))+'\n')
     if play_region:
-        from railways import bake_world as bake_railways
-        report = bake_railways(output,manifest)
         from station_roads import bake as bake_station_roads
         bake_station_roads(output,manifest,{road.way:road.width for road in roads if road.source=='paired'})
         (output/'manifest.json').write_text(json.dumps(manifest,separators=(',',':'))+'\n')
