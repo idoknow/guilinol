@@ -221,7 +221,7 @@ export function streetGeometry([paths,lamps,banks,signals=[],stops=[],roadCtrl,s
     const tris=THREE.ShapeUtils.triangulateShape(loops[0],loops.slice(1)),points=loops.flat()
     const protectedDeck=roadbeds.has(-index-1)
     const lifted=roadbeds.has(index)||protectedDeck
-    const roadbed=lifted&&(kind===0||kind===5)
+    const roadbed=(lifted&&(kind===0||kind===5))||(index>=paths.length&&kind===5)
     const clippedBed=roadbed&&!!(shoulders||stationLevel||remaining)
     skirtSegments.clear()
     bedDepth=clippedBed?(protectedDeck?.18:ROAD_LIFT):0
