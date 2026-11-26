@@ -96,7 +96,13 @@ export function shootFeedbackPhoto(): Promise<CameraShot | null> {
       })
       .catch(() => {})
 
-    const stop = () => stream?.getTracks().forEach((track) => track.stop())
+    let startupTimer: number | undefined
+    const previewError = () => Error('摄像头没有可用画面，请检查摄像头或选择已有照片。反馈游戏场景可用「重新取景」。')
+    const stop = () => {
+      window.clearTimeout(startupTimer)
+      stream?.getTracks().forEach((track) => track.stop())
+      video.srcObject = null
+    }
     const finish = (value: CameraShot | null, error?: unknown) => {
       if (done) return
       done = true
@@ -122,6 +128,9 @@ export function shootFeedbackPhoto(): Promise<CameraShot | null> {
     async function open() {
       stop()
       shutter.disabled = true
+      flip.hidden = true
+      status.textContent = '正在打开设备摄像头，请允许浏览器使用相机…'
+      startupTimer = window.setTimeout(() => finish(null, previewError()), 15000)
       try {
         stream = await navigator.mediaDevices.getUserMedia({
           audio: false,
@@ -141,11 +150,19 @@ export function shootFeedbackPhoto(): Promise<CameraShot | null> {
       }
       if (done) return stop()
       video.srcObject = stream
-      await video.play().catch(() => {})
+      try {
+        await video.play()
+      } catch {
+        return finish(null, previewError())
+      }
+      if (done) return
+      if (!video.videoWidth || !video.videoHeight || video.readyState < video.HAVE_CURRENT_DATA)
+        return finish(null, previewError())
+      window.clearTimeout(startupTimer)
       root.classList.toggle('fb-cam--mirror', facing === 'user')
       status.textContent = ''
       shutter.disabled = false
-      const cams = (await navigator.mediaDevices.enumerateDevices()).filter((d) => d.kind === 'videoinput')
+      const cams = (await navigator.mediaDevices.enumerateDevices().catch(() => [])).filter((d) => d.kind === 'videoinput')
       flip.hidden = cams.length < 2
     }
     cancel.onclick = () => finish(null)
