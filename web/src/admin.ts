@@ -1758,22 +1758,33 @@ const pages: Record<string, (view: View) => void> = {
     })
     activityCard.id = 'adm-mp-activities'
 
-    // 联机封禁（反外挂 P0）：账号 / 设备指纹封禁 + 人工解封，立即生效
+    // 联机封禁（反外挂）：与上面的筛选条同一套视觉
     const banSlot = h('div')
-    const banUidIn = h('input', { type: 'text', class: 'adm-input', placeholder: 'UID（与指纹至少填一个）', 'aria-label': '封禁 UID' }) as HTMLInputElement
-    const banFpIn = h('input', { type: 'text', class: 'adm-input', placeholder: '设备指纹（换号也能封）', 'aria-label': '封禁设备指纹' }) as HTMLInputElement
-    const banMinSel = h('select', { class: 'adm-input', 'aria-label': '封禁时长' },
+    const banUidIn = h('input', { type: 'search', name: 'banuid', placeholder: '例如 102276', 'aria-label': '封禁 UID' }) as HTMLInputElement
+    const banFpIn = h('input', { type: 'search', name: 'banfp', placeholder: '例如 6f771cf0012fec6b', 'aria-label': '封禁设备指纹' }) as HTMLInputElement
+    const banMinSel = h('select', { name: 'banmin', class: 'adm-select', 'aria-label': '封禁时长' },
       h('option', { value: '0' }, '永久'),
       h('option', { value: '10' }, '10 分钟'),
       h('option', { value: '60' }, '1 小时'),
       h('option', { value: '1440' }, '24 小时'),
       h('option', { value: '10080' }, '7 天')) as HTMLSelectElement
-    const banReasonIn = h('input', { type: 'text', class: 'adm-input', placeholder: '原因（可留空）' }) as HTMLInputElement
-    const banForms = h('form', { class: 'adm-mp-filters' }, banUidIn, banFpIn, banMinSel, banReasonIn,
+    const banReasonIn = h('input', { type: 'search', name: 'banreason', placeholder: '可留空', 'aria-label': '封禁原因' }) as HTMLInputElement
+    const banForms = h('form', { class: 'adm-mp-filters', role: 'search' },
+      h('label', null, 'UID', banUidIn),
+      h('label', null, '设备指纹', banFpIn),
+      h('label', null, '时长', banMinSel),
+      h('label', null, '原因', banReasonIn),
       h('button', { type: 'submit', class: 'adm-btn adm-btn--sm' }, '封禁'))
+    const deviceLine = (row: any) => {
+      const list = (row.devices ?? []) as any[]
+      if (!list.length) return null
+      const one = list[0]
+      const who = [one.model, one.browser, one.isp, one.city].filter(Boolean).join(' · ')
+      return h('div', { class: 'adm-sub' }, `${who || '设备'}${list.length > 1 ? ` · 关联 ${list.length} 个账号` : ''}`)
+    }
     const banRow = (row: any) => h('tr', null,
       h('td', null, row.kind === 'uid' ? '账号' : '设备'),
-      h('td', null, String(row.value)),
+      h('td', null, String(row.value), deviceLine(row)),
       h('td', null, row.until ? when(new Date(row.until)) : '永久'),
       h('td', null, row.reason || '—'),
       h('td', null, h('button', {

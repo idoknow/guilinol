@@ -1045,6 +1045,9 @@ wss.on('connection', (ws, req) => {
         // 移动合法性由服务端判定：超速 / 飞天 / 非法瞬移一律拒包，客户端收 setback 拉回
         const stepDt = Math.max((at - (me.posAt ?? at)) / 1000, 0.02)
         const stepLen = Math.hypot(nx - me.x, nz - me.z)
+        // 先落「是否在空中/载具」，否则第一帧会被当成飞天（直升机会被误拉回）
+        me.foot = msg.foot !== false
+        me.bike = clampStr(msg.bike, 32)
         const verdict = checkMove(me, nx, ny, nz, at)
         if (verdict.reject) {
           send(ws, {t: 'setback', x: me.x, y: me.y, z: me.z, kind: verdict.kind})
