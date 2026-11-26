@@ -4,6 +4,8 @@ const c = config
 const foot = new Set(['walk', 'idle', 'mission', 'photo', 'smoke', 'fishing'])
 const standing = (p) =>
   p && p.ws?.readyState === 1 && p.foot !== false && !p.dn && !p.bike && p.gr && foot.has(p.activity)
+// 冷却按包到达时间算，客户端按点击时间算；留 cooldownSlackMs 吸收网络抖动和掉帧，否则满速连按会被静默吞拳
+const gap = (kind) => Math.max(200, c.punchCooldownMs[kind] - (c.cooldownSlackMs ?? 0))
 const distance = (a, b) => Math.hypot(a.x - b.x, a.y - b.y, a.z - b.z)
 export function snapshot(p, at) {
   return {
@@ -88,7 +90,7 @@ export function combat(players, broadcast) {
     }
     if (msg.t === 'windup') {
       if (at < (p.nextPunch ?? 0) || at < (p.nextWindup ?? 0)) return
-      p.nextWindup = at + Math.max(200, c.punchCooldownMs.jab)
+      p.nextWindup = at + gap('jab')
       changed(p, at, { windup: msg.kind === 'hook' ? 'hook' : 'jab', side: msg.s % 2 === 1 ? 'l' : 'r' })
       return
     }
@@ -102,7 +104,7 @@ export function combat(players, broadcast) {
     p.combo = at - (p.lastPunch ?? -Infinity) <= c.comboWindowMs ? (p.combo + 1) % 3 : 0
     const kind = p.combo === 2 ? 'hook' : 'jab'
     p.lastPunch = p.lastCombat = at
-    p.nextPunch = at + Math.max(200, c.punchCooldownMs[kind])
+    p.nextPunch = at + gap(kind)
     changed(p, at, { swing: kind, side: msg.s % 2 === 1 ? 'l' : 'r' })
     if (!standing(target) || p === target || distance(p, target) > c.reachM + c.networkMarginM) return
     const dmg = Math.round(c.damage[kind] * c.zone[msg.zone])
