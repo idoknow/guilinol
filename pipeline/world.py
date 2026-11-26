@@ -649,7 +649,7 @@ def build(bbox, output, palette, workers=4):
     if play_region and bridge_traffic:
         # Wheel samples at bridge ends straddle the slab and the final arterial roadbed.
         from station_roads import grade_traffic
-        grade_traffic(output, manifest, bridge_traffic)
+        grade_traffic(output, manifest, bridge_traffic, ferry_contacts=True)
     (output/'manifest.json').write_text(json.dumps(manifest,separators=(',',':'))+'\n')
     if play_region:
         from rail_earthworks import bake as bake_rail_earthworks
@@ -658,6 +658,9 @@ def build(bbox, output, palette, workers=4):
     manifest['damPassageVersion'] = 1
     (output/'manifest.json').write_text(json.dumps(manifest,separators=(',',':'))+'\n')
     subprocess.run(['node',Path(__file__).resolve().parents[1]/'scripts/bake-dams.mjs',output],check=True)
+    if play_region:
+        from dam_passages import fit_shore_banks
+        fit_shore_banks(output)
     print(f'{len(chunks)} chunks, {len(footprints)} footprints, {sum(c["bytes"] for c in chunks):,} chunk bytes')
 
 

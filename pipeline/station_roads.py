@@ -449,7 +449,39 @@ def stitch(ends,joints):
 
 
 
-def grade_traffic(directory, manifest, ways):
+def ferry_contact_profiles(graph):
+    # Ferry clearances also change the nearby street spline. Ground the selected
+    # native lanes on their finished mesh without moving their lateral paths.
+    rules = json.loads(Path(__file__).with_name("ferry-road-contacts.json").read_bytes())
+    contacts = {tuple(edge): int(wid) for wid, edges in rules["surfaceProfiles"].items() for edge in edges}
+    native = {tuple(row["lane"]): row for row in rules["nativeLandings"]}
+    selected_ways = set(contacts.values())
+    road_ways = {way["id"]: way for way in load_osm() if way["type"] == "way" and way["id"] in selected_ways}
+    nodes = {node["id"]: node for node in graph["nodes"]}
+    lanes = []
+    landings = {}
+    for lane in graph["lanes"]:
+        key = (lane["from"], lane["to"], lane["offset"])
+        if key in contacts:
+            wid = contacts[key]
+            tags = road_ways[wid]["tags"]
+            structure = next((s for s in ("bridge", "tunnel") if tags.get(s) == "yes"), "surface")
+            lanes.append(dict(lane, way=wid, structure=structure))
+        if key in native:
+            # These two service edges have a sharp lateral step. Keep their native
+            # level pose and blend the surveyed landing lift into its vertical profile.
+            rule = native[key]
+            a, b = nodes[lane["from"]], nodes[lane["to"]]
+            length = np.hypot(b["x"]-a["x"], b["z"]-a["z"])
+            at, taper = rule["chainageM"], rule["taperM"]
+            knots = np.array(lane["heights"]).reshape(-1, 2)
+            positions = np.unique(np.r_[knots[:, 0], np.clip([at-taper,at,at+taper],0,length)/length])
+            levels = np.interp(positions, *knots.T) + rule["liftM"] * np.maximum(0, 1-abs(positions*length-at)/taper)
+            landings[str(lane["id"])] = {"heights": np.column_stack((positions, levels)).ravel().tolist()}
+    return lanes, landings
+
+
+def grade_traffic(directory, manifest, ways, *, ferry_contacts=False):
     import gzip
     import subprocess
     from tempfile import NamedTemporaryFile
@@ -475,6 +507,10 @@ def grade_traffic(directory, manifest, ways):
             edge = tuple(sorted((lane['from'],lane['to'])))
             offset = way.get('trafficOffsets', {}).get(edge, way.get('maxTrafficOffset'))
             lanes.append(dict(lane, way=way['id'],halfWidth=half_width(way),maxTrafficOffset=offset,structure=next((s for s in ('bridge','tunnel') if way['tags'].get(s)=='yes'),'surface')))
+    landings = {}
+    if ferry_contacts:
+        ferry_lanes, landings = ferry_contact_profiles(graph)
+        lanes.extend(ferry_lanes)
     root=Path(__file__).resolve().parents[1]
     with NamedTemporaryFile(dir=directory,mode='w+') as payload:
         json.dump(dict(manifest=manifest,nodes=graph['nodes'],lanes=lanes),payload)
@@ -483,6 +519,7 @@ def grade_traffic(directory, manifest, ways):
                         directory.resolve(),Path(payload.name).resolve()],cwd=root,check=True)
         payload.seek(0)
         changes=json.load(payload)
+    changes.update(landings)
     for path in [graph_path,*sorted((directory/'roads').glob('*_*.json.gz'))]:
         content=graph if path==graph_path else json.loads(gzip.decompress(path.read_bytes()))
         changed=False
