@@ -49,6 +49,7 @@ import {rules} from '../smoke/data'
 import {RECENT_ACTION_LIMIT} from '../fishing/limits'
 
 export type CatalogItemType =
+  | 'helicopter_tour'
   | 'cigarette_pack'
   | 'outfit_item'
   | 'outfit_preset'
@@ -190,6 +191,7 @@ export function quotePurchasePrice(
   save: Readonly<LocalSaveV1> = getActiveSaveSnapshot(),
 ): number | null {
   switch (itemType) {
+    case 'helicopter_tour': return itemId === 'ticket' ? (save.economy.helicopterTours ? 88 : 0) : null
     case 'cigarette_pack': return rules.brands.find(b => b.id === itemId)?.price ?? null
     case 'outfit_item':
       return OUTFIT_ITEMS_BY_ID[itemId]?.price ?? null
@@ -249,7 +251,10 @@ export function executePurchase(req: PurchaseRequest): PurchaseResult {
     let createdVehicleId: string | undefined
     let postCommitEvents: (() => void)[] = []
 
-    if (req.itemType === 'cigarette_pack') {
+    if (req.itemType === 'helicopter_tour') {
+      realPrice = quotePurchasePrice(req.itemType, req.itemId, undefined, baseSave)
+      nextSave.economy.helicopterTours++
+    } else if (req.itemType === 'cigarette_pack') {
       realPrice = quotePurchasePrice(req.itemType, req.itemId)
       if (nextSave.packs.length >= 3) return {ok:false,code:'ALREADY_FULL',charged:0,balanceAfter:baseSave.money}
       nextSave.packs.push({brand:req.itemId, remaining:20, opened:false})
