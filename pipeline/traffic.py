@@ -180,15 +180,10 @@ def native_dingjiang_lanes(graph_path, elements):
 def bake_after_roads(output, manifest, rendered_roads, station_ways):
     import copy
     import shutil
-    from features import points
-    from shapely.geometry import box
     ways = [way for way in station_ways if way['id'] in DINGJIANG_NATIVE]
-    corridor = unary_union([LineString(points(way)) for way in ways]).buffer(32)
     with tempfile.TemporaryDirectory() as tmp:
         directory = Path(tmp)
         native = copy.deepcopy(manifest)
-        native['chunks'] = [tile for tile in native['chunks'] if corridor.intersects(
-            box(tile['x'],tile['z'],tile['x']+256,tile['z']+256))]
         for tile in native['chunks']:
             shutil.copyfile(output/tile['file'],directory/tile['file'])
         bake(output, manifest, rendered_roads, native_surface=(directory, native, ways))
