@@ -95,6 +95,15 @@ def bake(world, manifest):
     from rail_terrain_cleanup import cut_high_terrain
     cut_high_terrain(world, manifest)
     bake_crossing_panels(world, manifest)
+    from platform_access import bake_access
+    bake_access(world, manifest)
+    from check_platform_building import fit_collider
+    from pathlib import Path
+    outlines = json.loads(Path(__file__).with_name("platform-outlines.json").read_bytes())
+    style = json.loads(Path(__file__).with_name("railway-style.json").read_bytes())
+    for design in outlines.values():
+        if building := design.get("retainedBuilding"):
+            fit_collider(world, manifest, building, style["gauge"]/2 + style["headWidth"] + .10)
 
 
 def bake_crossing_panels(world, manifest):

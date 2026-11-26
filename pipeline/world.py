@@ -624,7 +624,7 @@ def build(bbox, output, palette, workers=4):
         from yulong_passage import open_passage
         open_passage(output, chunks)
         from railway_platforms import bake as bake_platforms
-        bake_platforms(output, chunks, play_region.geometry)
+        bake_platforms(output, manifest, play_region.geometry)
     from shizijie_underpass import apply_world as apply_shizijie_underpass
     apply_shizijie_underpass(output, roads, bake_roads=False)
     from service_streets import bake_walks

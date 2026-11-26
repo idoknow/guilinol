@@ -11,14 +11,16 @@ function publish(detail:MpStatus){window.dispatchEvent(new CustomEvent('glol:mp-
 
 type State='connecting'|'online'|'offline'|'replaced'
 export type ActivityReport={act:string;detail?:string}
-let rosterRequester:((on:boolean)=>void)|null=null
-/** 地图 / 玩家列表调用：on=true 开始收远距离名册，false 停止。引用计数，两个面板同时开也安全。 */
-export function requestRoster(on:boolean){rosterRequester?.(on)}
+let rosterRequester:(()=>void)|null=null
+let subCount=0
+/** 地图 / 玩家列表调用：on=true 开始收远距离名册，false 停止。引用计数，两个面板同时开也安全。
+ *  计数放在模块级：地图可能比 socket 先打开，联网后要补发订阅。 */
+export function requestRoster(on:boolean){subCount=Math.max(0,subCount+(on?1:-1));rosterRequester?.()}
 
 export function attachNet(scene:Scene,clips:AnimationClip[],getPose:()=>Pose,getAvatar:()=>Avatar,camera:Camera,getActivity?:()=>ActivityReport,onCombat?:(p:CombatPacket,self:string)=>void) {
   const peers=players(scene,clips,camera)
   let socket:WebSocket|undefined,attempt=0,generation=0,timer=0,lastSent=-Infinity,lastRoster=-Infinity,lastActCheck=-Infinity,disposed=false
-  let lastRosterV=0,rosterPaused=false,subCount=0,subTimer=0
+  let lastRosterV=0,rosterPaused=false,subTimer=0
   let lastActKey=''
   let state:State='offline',online=0
   // AOI 之后 peers 只有身边 ~150m 的人；整座城的人来自服务端每 5s 一次的 roster（只有位置，没有朝向）
@@ -48,7 +50,8 @@ export function attachNet(scene:Scene,clips:AnimationClip[],getPose:()=>Pose,get
       send({t:'roster_unsub'});far.clear()
     }
   }
-  rosterRequester=on=>{subCount=Math.max(0,subCount+(on?1:-1));applySub()}
+  rosterRequester=applySub
+  if(subCount>0)applySub()   // 地图先开了、后联网：连上即补订阅
   // 不能像以前那样 6 次之后永久放弃：满员、同一出口 IP 挤爆、切后台被断，都是暂时的。
   // 一旦放弃，玩家只能刷新页面，表现出来就是「联机时好时坏」。
   function retry(fixed?:number,quiet=false){

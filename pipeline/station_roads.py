@@ -169,6 +169,8 @@ def bake(directory, manifest, paired_widths):
         if bridges or section.get("retainRoadNodeLevels"):
             final_traffic_ways.extend(way for way, _, _ in parts.values())
             final_traffic_ways.extend(bridges)
+    from platform_grades import mark_platform_grades
+    mark_platform_grades(directory, manifest, ways, sections)
     return final_traffic_ways
 
 

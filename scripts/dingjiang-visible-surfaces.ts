@@ -1,3 +1,4 @@
+import {refinePlatformTerrain} from '../web/src/platform-access'
 // Compare each polygon to the piecewise-linear grade over their actual overlap.
 // Checking only mesh vertices misses triangles that cross the entire carriageway.
 import fs from 'node:fs'
@@ -99,6 +100,7 @@ export function tileFaces(world: string, tile: any, tunnels: Tunnel[], visit: (p
   }
   for (const [k, y] of railCuts) positions.setY(k, y / 100)
   const originalGround = includeRailBed || trackAudit ? g.clone() : undefined
+  if(tile.platformAccess?.length)refinePlatformTerrain(g,tile.platformAccess)
   const tunnel = tunnelGeometry(tile, g, tunnels,paths[18])
   function mesh(geometry: THREE.BufferGeometry, role: string, owner?: number, indexCount?: number) {
     const p = geometry.getAttribute('position'),
@@ -178,7 +180,8 @@ function underDeck(points: Vertex[], deck: Vertex[], depth: number) {
   return least
 }
 
-export function visibleSurfaces(world: string, ids: Set<number>, closure: Set<number>, reference?: Tunnel[], coveredRoads = false) {
+type RoadOverpass = {way:number; halfWidthM:number; lower:number[]; minimumM:number}
+export function visibleSurfaces(world: string, ids: Set<number>, closure: Set<number>, reference?: Tunnel[], coveredRoads = false, overpasses: RoadOverpass[] = []) {
   const manifest = JSON.parse(fs.readFileSync(path.join(world, 'manifest.json'), 'utf8'))
   const strips = (reference ?? (manifest.tunnels as Tunnel[]))
     .filter((t) => ids.has(t.way))
@@ -203,21 +206,21 @@ export function visibleSurfaces(world: string, ids: Set<number>, closure: Set<nu
   // Only named OSM bridge alignments can account for an upper deck. An
   // unassigned deck is subject to the same 5 cm test as ground-level paving.
   const bridges = JSON.parse(fs.readFileSync('raw/osm-2026-11.json', 'utf8'))
-    .elements.filter((w: any) => w.type === 'way' && w.tags?.bridge === 'yes' && w.tags?.ref === 'S2201')
+    .elements.filter((w: any) => w.type === 'way' && w.tags?.bridge === 'yes' && (w.tags?.ref === 'S2201' || overpasses.some(b=>b.way===w.id)))
     .map((w: any) => ({ way: w.id, points: w.geometry.map((p: any) => ll2xz(p.lat, p.lon)) }))
   function deckOwner(points: Vertex[]): number | undefined {
-    const covers = (p: Vertex, a: { x: number; z: number }, b: { x: number; z: number }) => {
+    const covers = (p: Vertex, a: { x: number; z: number }, b: { x: number; z: number }, halfWidth: number) => {
       const dx = b.x - a.x,
         dz = b.z - a.z,
         length = Math.hypot(dx, dz),
         x = p[0] - a.x,
         z = p[2] - a.z
       const at = (x * dx + z * dz) / length
-      return at >= -2.52 && at <= length + 2.52 && Math.abs(x * dz - z * dx) / length <= 5.02
+      return at >= -2.52 && at <= length + 2.52 && Math.abs(x * dz - z * dx) / length <= halfWidth+.02
     }
     return bridges.find((bridge: any) =>
       points.every((p) =>
-        bridge.points.some((a: any, i: number, pts: any[]) => i + 1 < pts.length && covers(p, a, pts[i + 1])),
+        bridge.points.some((a: any, i: number, pts: any[]) => i + 1 < pts.length && covers(p, a, pts[i + 1], overpasses.find(b=>b.way===bridge.way)?.halfWidthM ?? 5)),
       ),
     )?.way
   }
@@ -313,7 +316,8 @@ export function visibleSurfaces(world: string, ids: Set<number>, closure: Set<nu
         const lo = Math.min(...poly.map((v) => v[0])),
           hi = Math.max(...poly.map((v) => v[0]))
         const report = reports.get(s.t.way)!
-        const targetM = s.t.way === 459580311 ? 5 : 4.5
+        const overhead = overpasses.filter(b=>b.lower.includes(s.t.way))
+        const targetM = overhead[0]?.minimumM ?? (s.t.way === 459580311 ? 5 : 4.5)
         const entry = (id: number) =>
           (report.roadBridges[id] ??= {
             minClearanceM: Infinity,
@@ -329,7 +333,7 @@ export function visibleSurfaces(world: string, ids: Set<number>, closure: Set<nu
             (p) => s.t.length - p[0],
           ).map(([d, y, w]): Vertex => [s.x + d * s.dx - w * s.dz, y, s.z + d * s.dz + w * s.dx])
           for (const deck of decks) {
-            if (![983781246, 983781248, 983781250, 983781252].includes(deck.owner!)) continue
+            if (![983781246, 983781248, 983781250, 983781252].includes(deck.owner!) && !overhead.some(b=>b.way===deck.owner)) continue
             if (
               inStrip.every((p) => deck.points.every((q) => p[0] < q[0])) ||
               inStrip.every((p) => deck.points.every((q) => p[0] > q[0])) ||
@@ -430,7 +434,9 @@ export function visibleSurfaces(world: string, ids: Set<number>, closure: Set<nu
           upper.maxSeparationM = Math.max(upper.maxSeparationM, worst)
           if ([983781246, 983781248, 983781250, 983781252].includes(bridgeWay) && lowest < targetM)
             entry(bridgeWay).belowTargetFaces++
-          if (!closure.has(bridgeWay) && worst > 0.05001) report.externalBridgeViolations++
+          if (overhead.some(b=>b.way===bridgeWay)) {
+            if (lowest < targetM-1e-5) entry(bridgeWay).belowTargetFaces++
+          } else if (!closure.has(bridgeWay) && worst > 0.05001) report.externalBridgeViolations++
           continue
         }
         report.checked++

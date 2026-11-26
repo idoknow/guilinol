@@ -14,7 +14,7 @@ import {
   type RenderRangeListener,
   type RenderRangeMetrics,
 } from './render-range'
-import {detail, type Manifest, type Tile} from './world'
+import {physicalBuildingRings,detail, type Manifest, type Tile} from './world'
 import {buildingGeometry, type Building} from './buildings'
 import {ensureShardForTile, hasShardForTile, releaseUnusedShards, shardKeyForTile} from './city-upgrade/state'
 import {registerTunnels, loadShizijieUnderground} from './tunnels'
@@ -306,7 +306,7 @@ export class Stream {
       const nextWalls=buildingGeometry(raw.positions,raw.normals,raw.indices,nextRings,tile.x,tile.z)
       let nextMaxY=item.batch.maxY
       for(const [,topLevel] of nextRings)if(topLevel/10+8>nextMaxY)nextMaxY=topLevel/10+8
-      item.rings=nextRings
+      item.rings=physicalBuildingRings(tile,nextRings)
       this.batches.replaceWalls(tile,nextWalls,nextMaxY)
       changed++
     }

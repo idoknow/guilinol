@@ -23,9 +23,15 @@ def section_strips(world, *, terrain_only=False, design_flag=None):
         design = json.loads(path.read_bytes())
         if design_flag and not design.get(design_flag):
             continue
+        survey = root / "rail-audits" / path.name
+        if not design_flag and survey != path and survey.exists():
+            design = json.loads(survey.read_bytes())
         ties.extend(
             (path.stem, int(w), sorted(s)) for w, s in design["railTies"].items()
         )
+        if design_flag == "cutHighTerrain":
+            # Previously accepted track vertices can move on a shared approach beyond the new rail fit.
+            ties.extend((path.stem, int(w), sorted(s)) for w, s in design.get("terrainRailTies", {}).items())
     ways = load_tracks({w for _, w, _ in ties})
     axes = [substring(LineString(points(ways[w])), *limits) for _, w, limits in ties]
     lookup = STRtree(axes)

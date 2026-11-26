@@ -199,8 +199,13 @@ for (const { way: id, controls, boundaryNodes, maximumGrade = 0.05, direction = 
     regressions,
   })
 }
-const reverse = visibleSurfaces(candidate, ids, ids, sections, !!design.railProfiles)
+const reverse = visibleSurfaces(candidate, ids, ids, sections, !!design.railProfiles, design.roadOverpasses)
 console.log(JSON.stringify({ grades, deckChecks, reverse }, null, 2))
+for(const bridge of design.roadOverpasses ?? []) for(const way of bridge.lower) {
+  const clearance=reverse.find(r=>r.way===way)?.roadBridges[bridge.way]
+  assert(clearance?.intersections && clearance.minClearanceM >= bridge.minimumM-1e-5 &&
+    clearance.belowTargetFaces===0, `Insufficient full-width clearance at ${bridge.way}/${way}`)
+}
 assert(
   deckChecks.length === (design.expectedRoadRailCrossings ?? 0) &&
     deckChecks.every((r) => r.clearanceM >= 4.5 - 0.001),

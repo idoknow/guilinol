@@ -460,8 +460,8 @@ export async function createPhysics(manifest:Manifest,stream:Stream,peaks:PeaksG
       const spacing=manifest.overview.step,stride=width/spacing+1,start=(tile.z-top)/spacing*stride+(tile.x-left)/spacing
       const colliders:R.Collider[]=[]
       let barrierColliders:R.Collider[]=[]
-      if(data?.tunnel){
-        for(const [mesh,kind] of [[data.groundMesh,'ground'],[data.tunnel.fringe,'ground'],[data.tunnel.floor,'road'],[data.tunnel.portal,'rail'],[data.tunnel.interior,'rail']] as const){
+      if(data && (data.tunnel || tile.platformAccess?.length)){
+        for(const [mesh,kind] of [[data.groundMesh,'ground'],[data.tunnel?.fringe,'ground'],[data.tunnel?.floor,'road'],[data.tunnel?.portal,'rail'],[data.tunnel?.interior,'rail']] as const){
           if(!mesh)continue
           const geometry=mesh.geometry,positions=geometry.getAttribute('position');if(!positions.count)continue
           const indices=geometry.index?Array.from(geometry.index.array):Array.from({length:positions.count},(_,index)=>index)

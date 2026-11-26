@@ -105,6 +105,12 @@ if __name__ == "__main__":
             *sorted((pipeline / "rail-sections").glob("*.json")),
         ]
         designs = {path.stem: json.loads(path.read_text()) for path in paths}
+        # A station yard survey includes unchanged tracks between the fitted alignments.
+        # Baking checks the construction profiles; report the full specified domain here.
+        for name in designs:
+            survey = first_section / (name + ".json")
+            if survey.is_file():
+                designs[name] = json.loads(survey.read_text())
         ways = load_tracks({int(wid) for design in designs.values() for wid in design["railTies"]})
         reports = {}
         for name, design in designs.items():

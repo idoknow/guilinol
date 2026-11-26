@@ -15,7 +15,18 @@ import {getRegisteredShizijieUnderground,joinPortalRoads,tunnelGeometry,type Gro
 import {freezeStatic} from './static-freeze'
 
 interface Asset {file:string; bytes:number}
-export interface Tile extends Asset {x:number; z:number; stationPaving?:StationPavingStyle; roadbeds?:number[]}
+import {refinePlatformTerrain,type RefinedTerrainFace} from './platform-access'
+export interface Tile extends Asset {buildingColliderRings?:Record<number,Building[2]>; platformAccess?:RefinedTerrainFace[]; x:number; z:number; stationPaving?:StationPavingStyle; roadbeds?:number[]}
+export function physicalBuildingRings(tile:Tile, rendered:Building[]):Building[]{
+  if(!tile.buildingColliderRings)return rendered
+  return rendered.map((building,i)=>{
+    const loops=tile.buildingColliderRings?.[i]
+    if(!loops)return building
+    const physical:Building=[...building]
+    physical[2]=loops
+    return physical
+  })
+}
 export interface Manifest {
   region?:import('../../lib/play-region').Region
   tunnels?:Tunnel[]
@@ -387,6 +398,7 @@ export async function detail(tile:Tile, signal:AbortSignal, parseSlot?:()=>Promi
   // Cut after street construction to preserve the original carriageway grade.
   for(const [index,cm] of railCuts)heights.setY(index,cm/100)
   if(railCuts.length){geometry.computeVertexNormals();geometry.computeBoundingSphere()}
+  if(tile.platformAccess?.length)refinePlatformTerrain(geometry,tile.platformAccess)
   const groundMesh = new THREE.Mesh(geometry,material)
   group.add(groundMesh)
   const tunnel=(tunnels?.length||groundCutouts?.length||underpass||getRegisteredShizijieUnderground())
@@ -426,7 +438,7 @@ export async function detail(tile:Tile, signal:AbortSignal, parseSlot?:()=>Promi
   }
   const surfaceAt = buildSurfaceLookup(tile, paths)
   return {
-    group,groundMesh,terrain,underlay,water,rings:activeRings,deck,thin,streets,batch,tunnel,surfaceAt,cityUpgradeRaw,railCutVertices:new Set(railCuts.map(([index])=>index)),
+    group,groundMesh,terrain,underlay,water,rings:physicalBuildingRings(tile,activeRings),deck,thin,streets,batch,tunnel,surfaceAt,cityUpgradeRaw,railCutVertices:new Set(railCuts.map(([index])=>index)),
     dispose(){
       if(tunnel){
         for(const mesh of Object.values(tunnel))if(mesh){

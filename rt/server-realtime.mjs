@@ -448,9 +448,9 @@ function rosterPayload() {
   return { t: 'roster', players: list }
 }
 
-// ── 名册增量（roster2）──────────────────────────────────────────────
+// ── 名册：按需订阅（roster3）+ 低频全量兜底 ─────────────────────────
 // 全量名册的带宽是 O(n²)：每人每 5 秒收一次全城名单，1000 人时约 76 Mbps。
-// 支持 caps:['roster2'] 的客户端改为收增量（只发新增/离开/移动≥2m 的人），
+// 支持 caps:['roster3'] 的客户端只在开地图/玩家列表时订阅，收增量，
 // 每 RT_ROSTER_FULL_MS 强制一次全量对账，防止长期漂移。
 // 老客户端仍然收全量 roster，行为完全不变。
 const ROSTER_FULL_MS = Number(process.env.RT_ROSTER_FULL_MS || 30000)   // 未订阅者：低频全量
@@ -752,8 +752,6 @@ wss.on('connection', (ws, req) => {
         }
         // 顺手清掉过期封禁，不起 setInterval（避免泄漏）
         sweepBans()
-        // 客户端能力位：支持增量名册的客户端才收 roster2，老客户端继续收全量
-        ws.roster2 = Array.isArray(msg.caps) && msg.caps.includes('roster2')
         ws.caps3 = Array.isArray(msg.caps) && msg.caps.includes('roster3')
         const claims = identity(msg.ticket)
         if (!claims) { obs.reject('ticket');ws.rejected = true; ws.close(4003, 'ticket rejected'); return }
