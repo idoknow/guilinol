@@ -105,14 +105,14 @@ const VIEWS = [
   {
     id: '03_cruiser_closeup',
     label: '警车近景 · 院内制式警车侧面涂装（警察 POLICE / 桂C·1108警）',
-    pos: [AX - 6.2, AY + 2.8, AZ + 8.6],
-    look: [AX - 12.2, AY + 2.2, AZ + 4.8],
+    pos: [AX - 7.0, AY + 1.85, AZ + 8.5],
+    look: [AX - 10.4, AY + 1.15, AZ + 4.5],
   },
   {
     id: '04_moto_kiosk_closeup',
-    label: '铁骑与岗亭近景 · 桂林交警铁骑涂装与漓滨执勤岗',
-    pos: [AX + 28.2, AY + 3.2, AZ + 22.2],
-    look: [AX + 30.2, AY + 2.3, AZ + 12.2],
+    label: '铁骑与岗亭近景 · 桂林交警铁骑正侧面涂装与漓滨路零断差街缘',
+    pos: [AX + 32.8, AY + 1.95, AZ + 17.6],
+    look: [AX + 27.6, AY + 1.25, AZ + 14.8],
   },
   {
     id: '05_equip_locker',
@@ -129,14 +129,28 @@ const VIEWS = [
   {
     id: '07_oblique_overview',
     label: '斜视总览 · 榕城派出所+交警中区执勤中队大院全景',
-    pos: [AX + 15.5, AY + 20.5, AZ + 34.5],
-    look: [AX - 3.5, AY + 6.5, AZ - 2.0],
+    pos: [AX + 8.5, AY + 22.0, AZ + 25.5],
+    look: [AX - 9.5, AY + 5.5, AZ + 1.0],
   },
   {
     id: '08_b2_ne_corner',
-    label: '东北路口与退让 · 交警中队立面窗灯与依仁路骑楼退让车行道',
-    pos: [AX + 38.5, AY + 7.2, AZ - 16.5],
-    look: [AX + 16.0, AY + 6.2, AZ - 5.5],
+    label: '东北路口与交警中队 · 依仁路×漓滨路口交警中队 5F 立面窗灯与退界',
+    pos: [AX + 40.5, AY + 8.5, AZ - 15.5],
+    look: [AX + 22.5, AY + 7.5, AZ + 2.5],
+  },
+  {
+    id: '09_front_unobstructed',
+    label: '正门头与骑楼退界（去旧底商遮挡）· 验证 B1 牌匾/110灯箱/服务窗与骑楼柱踩人行道',
+    pos: [AX - 8.5, AY + 4.0, AZ - 23.5],
+    look: [AX - 22.5, AY + 5.2, AZ - 13.0],
+    hideLegacyWalls: true,
+  },
+  {
+    id: '10_ceiling_unobstructed',
+    label: '骑楼封底无遮挡抽检 · 临时摘除未重烘旧底商验证 B1 2F 向下天花板封底',
+    pos: [AX - 16.8, AY + 2.05, AZ - 14.2],
+    look: [AX - 23.5, AY + 4.95, AZ - 12.2],
+    hideLegacyWalls: true,
   },
 ]
 
@@ -238,8 +252,54 @@ try {
 
       await page.waitForTimeout(1000)
 
-      const afterInfo = await page.evaluate(async () => {
+      const afterInfo = await page.evaluate(async ({ hideLegacy }) => {
         const v = window.viewer
+        // Hide HUD overlay chrome cleanly during verification capture without touching web/src/**
+        for (const el of document.body.children) {
+          if (el.tagName !== 'CANVAS' && !el.querySelector?.('canvas')) {
+            el.style.opacity = '0'
+          }
+        }
+        const detachedLegacy = []
+        let prevCu = false
+        if (hideLegacy) {
+          prevCu = Boolean(v.cityUpgrade?.getStats?.()?.enabled)
+          if (prevCu) v.cityUpgrade.setEnabled(false)
+          // Collect landmark roots so we NEVER detach zhongqu_police or other landmarks
+          const lmRoots = new Set()
+          for (const [, root] of v.stream.landmarks) lmRoots.add(root)
+          const isInsideLandmark = obj => {
+            let cur = obj
+            while (cur) {
+              if (lmRoots.has(cur)) return true
+              cur = cur.parent
+            }
+            return false
+          }
+          // Walk up from an actual mounted landmark root (`v.camera.parent` is null in Three.js!) to reach `THREE.Scene`
+          let sceneRoot = null
+          for (const [, root] of v.stream.landmarks) {
+            if (root?.parent) {
+              sceneRoot = root
+              while (sceneRoot.parent) sceneRoot = sceneRoot.parent
+              break
+            }
+          }
+          const toDetach = []
+          if (sceneRoot) {
+            sceneRoot.traverse(n => {
+              if (!n.isMesh || !n.parent || isInsideLandmark(n)) return
+              if (n.geometry?.getAttribute?.('aFacade') || (n.isInstancedMesh && n.geometry?.attributes?.instanceColor)) {
+                toDetach.push(n)
+              }
+            })
+          }
+          for (const n of toDetach) {
+            detachedLegacy.push([n, n.parent])
+            n.parent.remove(n)
+          }
+        }
+        window.__detachedLegacy = { pairs: detachedLegacy, prevCu }
         const calls = []
         for (let i = 0; i < 10; i++) {
           await new Promise(r => requestAnimationFrame(r))
@@ -259,7 +319,7 @@ try {
         }
         await v.freeze()
         return { calls: calls.length ? Math.min(...calls) : -1, lod0Vis, dynLights }
-      })
+      }, { hideLegacy: Boolean(view.hideLegacyWalls) })
       frozen = true
       assert.ok(afterInfo.lod0Vis, `zhongqu_police lod0 not visible at ${view.id} (${mode.key})`)
       assert.equal(afterInfo.dynLights, 0, `Dynamic lights forbidden in zhongqu_police: ${afterInfo.dynLights}`)
@@ -298,6 +358,13 @@ try {
           parent.add(root)
         }
         window.__savedZhongquRoots = []
+        if (window.__detachedLegacy) {
+          for (const [n, parent] of window.__detachedLegacy.pairs || []) {
+            if (parent) parent.add(n)
+          }
+          if (window.__detachedLegacy.prevCu) v.cityUpgrade.setEnabled(true)
+          window.__detachedLegacy = null
+        }
       })
       frozen = false
 

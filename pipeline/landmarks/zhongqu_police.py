@@ -92,17 +92,19 @@ B5_PAVILION_PTS = [
     (-4.98, 23.35), (-8.21, 18.96), (-13.45, 22.82), (-10.22, 27.19),
 ]
 
-# Outer courtyard + Yiren Rd colonnade sidewalk + Libin Rd dispatch lane & Iron-Cavalry apron (local XZ)
-# Strictly inside street edges & flush with B3 NE corner `(7.16, 36.89)` so zero orphan slivers or cantilevered acute corners occur.
+# Outer courtyard + Yiren Rd colonnade sidewalk + Libin Rd dispatch lane, Iron-Cavalry apron & B3 frontage (local XZ).
+# Street-facing edges extend 3.5-5.5 m INTO `streets_mask` so `site_world.difference(streets_mask)` clips flush
+# along Yiren Rd & Libin Rd (`d_street == 0.000 m`), while rear edges hug B1/B3/B4 building footprints cleanly.
 SITE_PAVING_RING = [
-    (-53.4, -19.2), (7.6, -8.1), (22.6, -5.6), (37.4, 5.2),
-    (16.8, 31.8), (6.9, 36.7), (-3.9, 26.0), (-21.8, 24.2),
-    (-45.5, 15.9), (-43.6, 7.1), (-53.5, -8.7),
+    (-50.75, -22.60), (9.50, -13.50), (27.50, -10.50), (43.50, 6.50),
+    (1.50, 54.50), (-4.26, 49.54), (-10.25, 41.78), (-5.74, 37.07),
+    (-9.14, 33.15), (-3.84, 25.88), (-21.80, 24.20),
+    (-45.50, 15.90), (-43.60, 7.10), (-53.35, -8.77),
 ]
-# Vehicular asphalt zone (courtyard core + SE dispatch channel meeting Libin Rd)
+# Vehicular asphalt zone (courtyard core + SE dispatch channel extending into `streets_mask` for `d_street == 0.000 m`)
 ROAD_ZONE_RING = [
-    (-22.5, -2.0), (7.5, 2.5), (19.5, 4.8), (8.0, 17.5),
-    (17.2, 31.2), (9.8, 35.4), (-3.5, 24.5), (-22.0, 19.5),
+    (-22.50, -2.00), (7.50, 2.50), (19.50, 4.80), (8.00, 17.50),
+    (21.50, 34.50), (12.00, 41.50), (7.10, 36.80), (-3.50, 24.50), (-22.00, 19.50),
 ]
 
 
@@ -298,7 +300,7 @@ def _draw_shield_emblem(dr: ImageDraw.ImageDraw, cx: int, cy: int, r: int):
         (cx, cy + int(r * 0.76)),
         (cx - int(r * 0.67), cy + int(r * 0.04)),
     ]
-    dr.polygon(pts_outer, fill=_desat_rgb(232, 194, 78), outline=(40, 42, 42))
+    dr.polygon(pts_outer, fill=_desat_rgb(232, 194, 78), outline=(48, 42, 30))
     dr.polygon(pts_inner, fill=_desat_rgb(102, 146, 198, mix_luma=0.16))
     # 5-point gold star at center
     star = []
@@ -311,7 +313,7 @@ def _draw_shield_emblem(dr: ImageDraw.ImageDraw, cx: int, cy: int, r: int):
 
 def _shadow_text(dr: ImageDraw.ImageDraw, xy, text: str, font, fill, anchor='mm'):
     x, y = xy
-    dr.text((x + 2, y + 2), text, font=font, fill=(22, 26, 30), anchor=anchor)
+    dr.text((x + 2, y + 2), text, font=font, fill=(38, 34, 26), anchor=anchor)
     dr.text((x, y), text, font=font, fill=fill, anchor=anchor)
 
 
@@ -324,13 +326,14 @@ def make_zhongqu_police_atlas() -> tuple[Image.Image, dict]:
     # PSB Cobalt Blue on `_atlas` surfaces: linear min_lum >= 0.21 (> 0.17) -> ZERO false-positive night window glow!
     c_psb_blue_raw = (102, 146, 198)
     c_psb_blue = _desat_rgb(*c_psb_blue_raw, mix_luma=0.16)
-    # Neutral dark slate for text on `_atlas` panels (`b - r <= 2` -> ZERO night window glow!)
-    c_slate_txt = (36, 40, 42)
+    # Warm-biased dark umber (`R=78, G=56, B=30`, `R - B = +48`) so neither AA blending nor KTX2 4x4 block quantization
+    # can EVER cross `lum < 0.17 && b > r + 0.03` (`0` warm-yellow night noise pixels!)
+    c_slate_txt = (78, 56, 30)
     c_deep_sign = _desat_rgb(24, 62, 116)  # Used only on `_lit` sign_quads (not `landmarkNight`)
-    c_white_txt = (242, 244, 246)
+    c_white_txt = (248, 248, 246)
     c_gold_txt = _desat_rgb(236, 196, 78)
     c_lime = _desat_rgb(188, 206, 58)
-    c_frame = (56, 60, 62)
+    c_frame = (62, 58, 48)
 
     # 1. Main Rongcheng Police Station fascia (0, 0, 640, 128) — `_lit` material
     r = (0, 0, 640, 128)
@@ -473,41 +476,47 @@ def make_zhongqu_police_atlas() -> tuple[Image.Image, dict]:
     _paint_weathered_panel(im, rects['courtyard_wall'], (208, 198, 186), mode='acp', seed=216, rain_strength=0.12)
 
     # 8. Vehicle Full-Side Liveries (clamped 0..1 UVs!), Hall Interiors & Metals (y = 736 .. 864)
-    # 8a. Standard Chinese Police Cruiser Side Livery (`警察 POLICE / 桂 C · 1108 警`) (0, 736, 320, 128)
+    # 8a. Standard Chinese Police Cruiser Side Livery (`警察 POLICE / 桂C·1108警` constrained to door zone x in [84..236]!)
     r = (0, 736, 320, 128)
     rects['police_car_side'] = r
-    _paint_weathered_panel(im, r, (240, 242, 244), mode='acp', seed=217, rain_strength=0.02, noise_amp=2.0)
-    dr.rectangle((0, 804, 319, 863), fill=c_psb_blue)
-    dr.rectangle((0, 796, 319, 803), fill=_desat_rgb(192, 46, 42))
-    _draw_shield_emblem(dr, 52, 766, 20)
-    dr.text((178, 766), '警 察  POLICE', font=_cjk_font(25, bold=True), fill=c_slate_txt, anchor='mm')
-    dr.text((160, 833), '桂 C · 1108 警   |   公安巡逻', font=_cjk_font(18, bold=True), fill=c_white_txt, anchor='mm')
+    _paint_weathered_panel(im, r, (242, 244, 242), mode='acp', seed=217, rain_strength=0.02, noise_amp=1.8)
+    dr.rectangle((0, 802, 319, 863), fill=c_psb_blue)
+    dr.rectangle((0, 794, 319, 801), fill=_desat_rgb(192, 46, 42))
+    # Painted recessed wheel-arch cutouts at u~0.16 and u~0.84 (warm umber `R=86 >> B=32` so AA with blue band never has `b > r`!)
+    for wcx in (50, 270):
+        dr.pieslice((wcx - 26, 837, wcx + 26, 889), start=180, end=360, fill=(84, 62, 34), outline=(124, 108, 86), width=2)
+    # Door emblem & lettering strictly inside [84..236] px (`u in [0.26, 0.74]`) with KTX2-safe high-contrast white/plate styling!
+    _draw_shield_emblem(dr, 98, 765, 16)
+    dr.text((176, 765), '警察 POLICE', font=_cjk_font(20, bold=True), fill=c_slate_txt, anchor='mm')
+    # White rounded door plate backing (`[90..230]`, `lum ~0.90 >> 0.17`) + bold dark-umber `桂 C · 1108 警` (>10:1 WCAG contrast & 0 blue-dark AA!)
+    dr.rounded_rectangle((88, 813, 232, 849), radius=5, fill=(248, 248, 244), outline=(218, 192, 96), width=2)
+    dr.text((160, 831), '桂 C · 1108 警', font=_cjk_font(18, bold=True), fill=c_slate_txt, anchor='mm')
 
-    # 8b. Traffic Police Iron-Cavalry Moto Side Livery (`桂林交警铁骑`) (320, 736, 256, 128)
+    # 8b. Traffic Police Iron-Cavalry Moto Side Livery (`桂林交警铁骑` crisp anti-bloom + KTX2-safe warm umber!)
     r = (320, 736, 256, 128)
     rects['moto_cavalry_side'] = r
-    _paint_weathered_panel(im, r, (238, 240, 242), mode='acp', seed=218, rain_strength=0.02, noise_amp=2.0)
-    dr.rectangle((320, 806, 575, 863), fill=c_psb_blue)
-    dr.rectangle((320, 786, 575, 805), fill=c_lime)
-    dr.text((448, 758), '桂 林 交 警 铁 骑', font=_cjk_font(23, bold=True), fill=c_slate_txt, anchor='mm')
-    dr.text((448, 834), 'TRAFFIC POLICE', font=_cjk_font(17, bold=True), fill=c_white_txt, anchor='mm')
+    _paint_weathered_panel(im, r, (228, 230, 226), mode='acp', seed=218, rain_strength=0.02, desat=0.0, noise_amp=1.5)
+    dr.rectangle((320, 804, 575, 863), fill=c_psb_blue)
+    dr.rectangle((320, 784, 575, 803), fill=_desat_rgb(198, 218, 54, mix_luma=0.08))
+    dr.text((448, 758), '桂林交警铁骑', font=_cjk_font(26, bold=True), fill=c_slate_txt, anchor='mm')
+    dr.text((448, 833), 'TRAFFIC POLICE', font=_cjk_font(19, bold=True), fill=(252, 252, 248), anchor='mm')
 
     # 8c. Warm-lit Reception Hall / Duty Interior Window (576, 736, 256, 128) — `_lit`
     r = (576, 736, 256, 128)
     rects['hall_interior'] = r
     _paint_weathered_panel(im, r, (220, 206, 178), mode='acp', seed=219, rain_strength=0.0)
-    dr.rectangle((584, 744, 823, 855), fill=_desat_rgb(230, 216, 186), outline=(84, 88, 92), width=4)
+    dr.rectangle((584, 744, 823, 855), fill=_desat_rgb(230, 216, 186), outline=(88, 84, 76), width=4)
     dr.rectangle((598, 758, 810, 790), fill=c_deep_sign)
     dr.text((704, 774), '人民公安为人民 · 综合服务窗口', font=_cjk_font(14, bold=True), fill=c_white_txt, anchor='mm')
     dr.rectangle((604, 810, 804, 850), fill=_desat_rgb(138, 146, 152))
 
-    # 8d. Roof Grey Concrete, Neutral Dark Metal & Tire Black (`b == r` so `step(r+0.03, b) == 0`!)
+    # 8d. Roof Grey Concrete, Warm-Neutral Dark Metal & Tire Black (`R > B + 8` KTX2-safe!)
     rects['roof_conc'] = (832, 736, 96, 128)
-    _paint_weathered_panel(im, rects['roof_conc'], (134, 136, 136), mode='noise', seed=220, rain_strength=0.08, desat=0.0)
+    _paint_weathered_panel(im, rects['roof_conc'], (136, 136, 132), mode='noise', seed=220, rain_strength=0.08, desat=0.0)
     rects['dark_metal'] = (928, 736, 96, 64)
-    _paint_weathered_panel(im, rects['dark_metal'], (52, 54, 54), mode='noise', seed=221, rain_strength=0.0, desat=0.0, noise_amp=2.0)
+    _paint_weathered_panel(im, rects['dark_metal'], (58, 54, 46), mode='noise', seed=221, rain_strength=0.0, desat=0.0, noise_amp=2.0)
     rects['tire_black'] = (928, 800, 96, 64)
-    _paint_weathered_panel(im, rects['tire_black'], (34, 35, 35), mode='noise', seed=222, rain_strength=0.0, desat=0.0, noise_amp=2.0)
+    _paint_weathered_panel(im, rects['tire_black'], (40, 37, 30), mode='noise', seed=222, rain_strength=0.0, desat=0.0, noise_amp=2.0)
 
     # 9. Bottom Strip (y = 864 .. 1024): Strobe lights, foliage, bark, markings, cone, vest, emblem medallion
     rects['red_lit'] = (0, 864, 96, 80)
@@ -806,9 +815,11 @@ def _add_police_cruiser(b: SceneBuilder, grader: SiteGrader, cx: float, cz: floa
         for sx in (-W * 0.33, W * 0.33):
             b.box(sx, 0.54, L * 0.5 + 0.02, 0.34, 0.16, 0.08, 'warm_lit', lit=True, bottom=True)
             b.box(sx, 0.56, -L * 0.5 - 0.02, 0.34, 0.16, 0.08, 'red_lit', lit=True, bottom=True)
-        for sx in (-W * 0.48, W * 0.48):
+        # Tuck all 4 wheels strictly inside body width (`x_out = W*0.5 - 0.02 < xo = W*0.5 + 0.016`) so zero livery clipping occurs!
+        wheel_x = W * 0.5 - 0.12
+        for sx in (-wheel_x, wheel_x):
             for sz in (-L * 0.31, L * 0.31):
-                b.box(sx, 0.004, sz, 0.22, wheel_r * 1.90, wheel_r * 1.90, 'tire_black', bottom=True)
+                b.box(sx, 0.004, sz, 0.20, wheel_r * 1.82, wheel_r * 1.82, 'tire_black', bottom=True)
 
     b.restore_frame(pf)
 
@@ -822,20 +833,21 @@ def _add_iron_cavalry_moto(b: SceneBuilder, grader: SiteGrader, cx: float, cz: f
     b.box(0.0, 0.004, 0.66, 0.18, 0.58, 0.58, 'tire_black', bottom=True)
     b.box(0.0, 0.004, -0.66, 0.20, 0.58, 0.58, 'tire_black', bottom=True)
 
-    # Main white fairing + explicit clamped side livery panels (`桂林交警铁骑`)
-    b.box(0.0, 0.34, 0.08, 0.54, 0.54, 1.36, 'white_clean', cap_region='white_clean', bottom=True)
-    _add_side_livery_panels(b, 0.27, 0.36, 0.86, -0.56, 0.72, 'moto_cavalry_side')
+    # Main fairing + explicit clamped side livery panels (`桂林交警铁骑`, unobstructed along z in [-0.52, 0.72])
+    b.box(0.0, 0.34, 0.08, 0.54, 0.54, 1.32, 'white_clean', cap_region='police_blue', bottom=True)
+    _add_side_livery_panels(b, 0.27, 0.35, 0.87, -0.52, 0.72, 'moto_cavalry_side')
 
-    # Front cowl + windshield + headlight
-    b.box(0.0, 0.60, 0.62, 0.50, 0.42, 0.38, 'police_blue', cap_region='white_clean', bottom=True)
+    # Front cowl + windshield + non-blooming daytime/night lens (`white_clean` avoids rainy-night bloom washout)
+    b.box(0.0, 0.60, 0.62, 0.48, 0.40, 0.36, 'police_blue', cap_region='police_blue', bottom=True)
     if b.detail:
-        b.box(0.0, 0.96, 0.58, 0.42, 0.36, 0.08, 'cabin_glass', bottom=True)
-        b.box(0.0, 0.76, 0.82, 0.24, 0.14, 0.08, 'warm_lit', lit=True, bottom=True)
-        for sx in (-0.34, 0.34):
-            b.box(sx, 0.48, -0.54, 0.18, 0.34, 0.48, 'white_clean', bottom=True)
-        b.box(0.0, 0.80, -0.68, 0.42, 0.28, 0.38, 'white_clean', cap_region='police_blue', bottom=True)
-        b.cylinder_y(0.18, 0.80, 0.68, -0.78, 0.025, 'dark_metal', sections=5)
-        b.cylinder_y(0.18, 1.46, 0.14, -0.78, 0.065, 'blue_lit', sections=6, lit=True)
+        b.box(0.0, 0.95, 0.58, 0.40, 0.34, 0.08, 'cabin_glass', bottom=True)
+        b.box(0.0, 0.75, 0.81, 0.18, 0.10, 0.06, 'white_clean', bottom=True)
+        # Rear panniers set aft (`z = -0.74`, `z in [-0.90, -0.58]`) so they NEVER overlap or occlude `moto_cavalry_side`!
+        for sx in (-0.28, 0.28):
+            b.box(sx, 0.48, -0.74, 0.16, 0.30, 0.32, 'police_blue', cap_region='white_clean', bottom=True)
+        b.box(0.0, 0.80, -0.74, 0.38, 0.26, 0.34, 'police_blue', cap_region='white_clean', bottom=True)
+        b.cylinder_y(0.16, 0.80, 0.64, -0.84, 0.025, 'dark_metal', sections=5)
+        b.cylinder_y(0.16, 1.42, 0.12, -0.84, 0.055, 'blue_lit', sections=6, lit=True)
 
     b.restore_frame(pf)
 
@@ -1004,8 +1016,8 @@ def build_zhongqu_police(b: SceneBuilder):
     f_b4e = b.set_frame(origin=(eq_mx, 0.0, eq_mz), front_xz=(8.62, 2.94))
     y_eq = grader.local_y(eq_mx, eq_mz)
     b.box(0.0, y_eq + 3.02, 0.95, 7.8, 0.34, 2.15, 'police_blue', cap_region='dark_metal', bottom=True)
-    # Raised +0.40 m (`y_eq + 4.22`) so lime-green subtitle bar clears canopy cleanly!
-    _mounted_sign(b, 0.0, y_eq + 4.22, 0.0, 7.4, 1.02, 'sign_equip_hall', protrude=0.18, embed=0.18, lit=True)
+    # Positioned cleanly in spandrel band (`y_eq + 3.94`, h=0.90 -> 3.49..4.39): +13cm above canopy top (3.36) and below 2F window sill!
+    _mounted_sign(b, 0.0, y_eq + 3.94, 0.0, 7.4, 0.90, 'sign_equip_hall', protrude=0.18, embed=0.18, lit=True)
     yb_eq = grader.footing_y(eq_mx, eq_mz, 0.08)
     b.box(0.0, yb_eq, 0.06, 6.4, y_eq + 2.90 - yb_eq, 0.32, 'dark_metal', bottom=True)
     _mounted_sign(b, 0.0, y_eq + 1.46, 0.22, 6.0, 2.64, 'hall_interior', protrude=0.05, embed=0.22, lit=True)
