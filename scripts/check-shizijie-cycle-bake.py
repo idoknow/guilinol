@@ -45,4 +45,24 @@ for pocket in void.geoms:
     if pocket.boundary.intersection(cycle.buffer(1)).length<50:
         continue
     assert any(pocket.covers(seed) for seed in island_seeds), pocket.representative_point()
-print('PASS: both former bare pockets paved, incident cycle lane joined, ±100 m corridor checked')
+if '--ride-route' in sys.argv:
+    rectangle = list(owner.minimum_rotated_rectangle.exterior.coords)
+    edges = [(end[0]-start[0],end[1]-start[1]) for start,end in zip(rectangle,rectangle[1:])]
+    east,south = max(edges,key=lambda edge:edge[0]**2+edge[1]**2)
+    length = (east**2+south**2)**.5 * (1 if east>0 else -1)
+    east,south = east/length,south/length
+    target = (-832.326,-142.627)
+    def waypoint(along, across):
+        return [target[0]+along*east-across*south,target[1]+along*south+across*east]
+    route = [waypoint(along,across) for along,across in
+             [(-10,-.5),(-4,-.5),(0,-.35),(3,-2.3),(7,-3.4),(11,-3.4)]]
+    def world_line(ring):
+        return [(east_cm/100-1024,south_cm/100-256) for east_cm,south_cm in ring.coords]
+    curbs = [world_line(ring) for kind,poly in layers if kind in (1,4,6)
+             and poly.distance(Point(19167,11337))<2200 for ring in [poly.exterior,*poly.interiors]]
+    for x,z in (route[0],route[-1]):
+        endpoint = Point((x+1024)*100,(z+256)*100)
+        assert any(poly.contains(endpoint) for kind,poly in layers if kind==0)
+    print(json.dumps(dict(route=route, target=target, curbs=curbs)))
+else:
+    print('PASS: both former bare pockets paved, incident cycle lane joined, ±100 m corridor checked')
