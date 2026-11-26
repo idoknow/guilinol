@@ -2,6 +2,7 @@ import * as THREE from 'three'
 import {mainDetail} from '../look/mirror-layer'
 import {getActiveDutyTraffic} from '../traffic/duty-traffic.ts'
 import {getLatestTraffic, type Traffic} from '../traffic/sim.ts'
+import {SIGNAL_DRIVER_RANK, SignalPlan, citySignalClock, citySignals, type SignalColor, type SignalState} from '../traffic/signals.ts'
 
 /**
  * Pure-frontend dynamic traffic-signal lens overlay for Shizijie's 4 cantilevered gantries
@@ -11,12 +12,12 @@ import {getLatestTraffic, type Traffic} from '../traffic/sim.ts'
  *  - Zero landmark rebaking (`public/landmarks/shizijie.glb` untouched)
  *  - Zero dynamic `PointLight` / `SpotLight` (uses unlit `MeshBasicMaterial` LED discs only)
  *  - Opaque dark housing shroud (`#16191d`) cleanly masks the static baked lenses on both faces
- *  - Driven directly by live `sim.getSignalPhase()` on signal group `626322720` (with deterministic
- *    cycle fallback `offset=22s, EW 18g+3y / NS 18g+3y` before traffic cell streams in)
+ *  - Driven directly by live `sim.getSignalPhase()` on signal group `626322720`; before a traffic cell
+ *    streams in it reads the same programme from `traffic/signals.ts` on the one `citySignalClock`
  *  - Updates `.color.setHex()` only on actual phase transitions + distance-culled to `<= 220 m`
  */
 
-export type SignalColor = 'green' | 'yellow' | 'red'
+export type {SignalColor}
 export type SignalAxis = 'ew' | 'ns'
 
 export const SHIZIJIE_ORIGIN = Object.freeze({
@@ -30,8 +31,11 @@ export const SHIZIJIE_SIGNAL_OFFSET_SEC = 22
 export const SHIZIJIE_SIGNAL_GREEN_SEC = 18
 export const SHIZIJIE_SIGNAL_YELLOW_SEC = 3
 export const SHIZIJIE_SIGNAL_CYCLE_SEC = (SHIZIJIE_SIGNAL_GREEN_SEC + SHIZIJIE_SIGNAL_YELLOW_SEC) * 2
-export const SHIZIJIE_EW_LANE_ID = 9712
-export const SHIZIJIE_NS_LANE_ID = 610
+/**
+ * Phase order of the Shizijie programme in the world data: 解放路 (east–west) first, 中山路 (north–south) second.
+ * Lights are resolved by phase, never by lane id — lane ids are renumbered whenever the road network is rebuilt.
+ */
+export const SHIZIJIE_AXIS_PHASE = Object.freeze({ew: 0, ns: 1} as const)
 
 export interface ShizijieGantrySpec {
   readonly id: string
@@ -43,7 +47,6 @@ export interface ShizijieGantrySpec {
   readonly yaw: number
   readonly span: number
   readonly axis: SignalAxis
-  readonly repLaneId: number
   readonly signalNodeId: number
 }
 
@@ -66,7 +69,6 @@ function makeGantry(
     yaw,
     span,
     axis,
-    repLaneId: axis === 'ns' ? SHIZIJIE_NS_LANE_ID : SHIZIJIE_EW_LANE_ID,
     signalNodeId: SHIZIJIE_SIGNAL_NODE_ID,
   })
 }
@@ -92,30 +94,44 @@ const LENS_HEX = {
   green: {lit: 0x25e07d, off: 0x10261b},
 } as const
 
+/** Programme used until a road cell carrying the Shizijie signal has loaded; mirrors `graph.json.gz`. */
+const SHIZIJIE_FALLBACK_PLAN = new SignalPlan([{
+  node: SHIZIJIE_SIGNAL_NODE_ID,
+  group: SHIZIJIE_SIGNAL_NODE_ID,
+  offset: SHIZIJIE_SIGNAL_OFFSET_SEC,
+  phases: [
+    {lanes: [], green: SHIZIJIE_SIGNAL_GREEN_SEC, yellow: SHIZIJIE_SIGNAL_YELLOW_SEC},
+    {lanes: [], green: SHIZIJIE_SIGNAL_GREEN_SEC, yellow: SHIZIJIE_SIGNAL_YELLOW_SEC},
+  ],
+}])
+
 export interface ShizijiePhaseSnapshot {
   ew: SignalColor
   ns: SignalColor
   source: 'sim' | 'fallback'
 }
 
+const phaseScratch: SignalState = {phase: 0, color: 'green', remaining: 0, cycle: 0}
+
+function axisColors(state: SignalState | null, source: ShizijiePhaseSnapshot['source']): ShizijiePhaseSnapshot {
+  return {
+    ew: state?.phase === SHIZIJIE_AXIS_PHASE.ew ? state.color : 'red',
+    ns: state?.phase === SHIZIJIE_AXIS_PHASE.ns ? state.color : 'red',
+    source,
+  }
+}
+
 /**
  * Resolves live EW/NS signal colors for Shizijie (`node=626322720`).
- * Uses `sim.getSignalPhase()` when Shizijie's traffic cell is active, falling back
- * to the exact `graph.json.gz` fixed-time cycle (`offset=22s, 18g+3y / 18g+3y`).
+ * Reads the sim's programme when Shizijie's traffic cell is active, otherwise the city plan
+ * (or, before any road cell has loaded, the same fixed-time cycle: `offset=22s, 18g+3y / 18g+3y`).
  */
 export function resolveShizijieSignalPhase(sim?: Traffic, fallbackTimeSec = 0): ShizijiePhaseSnapshot {
   if (sim?.hasSignal(SHIZIJIE_SIGNAL_NODE_ID)) {
-    const ew = sim.getSignalPhase(SHIZIJIE_EW_LANE_ID, SHIZIJIE_SIGNAL_NODE_ID) ?? 'red'
-    const ns = sim.getSignalPhase(SHIZIJIE_NS_LANE_ID, SHIZIJIE_SIGNAL_NODE_ID) ?? 'red'
-    return {ew, ns, source: 'sim'}
+    return axisColors(sim.getSignalState(SHIZIJIE_SIGNAL_NODE_ID, undefined, phaseScratch), 'sim')
   }
-  const cycle = SHIZIJIE_SIGNAL_CYCLE_SEC
-  const half = SHIZIJIE_SIGNAL_GREEN_SEC + SHIZIJIE_SIGNAL_YELLOW_SEC
-  const local = (((fallbackTimeSec + SHIZIJIE_SIGNAL_OFFSET_SEC) % cycle) + cycle) % cycle
-  if (local < SHIZIJIE_SIGNAL_GREEN_SEC) return {ew: 'green', ns: 'red', source: 'fallback'}
-  if (local < half) return {ew: 'yellow', ns: 'red', source: 'fallback'}
-  if (local < half + SHIZIJIE_SIGNAL_GREEN_SEC) return {ew: 'red', ns: 'green', source: 'fallback'}
-  return {ew: 'red', ns: 'yellow', source: 'fallback'}
+  const plan = citySignals.has(SHIZIJIE_SIGNAL_NODE_ID) ? citySignals : SHIZIJIE_FALLBACK_PLAN
+  return axisColors(plan.state(SHIZIJIE_SIGNAL_NODE_ID, fallbackTimeSec, phaseScratch), 'fallback')
 }
 
 export interface ShizijieSignalsOverlayOptions {
@@ -207,7 +223,7 @@ export function mountShizijieSignalsOverlay(
   let lastEw: SignalColor | null = null
   let lastNs: SignalColor | null = null
   let lastSnapshot: ShizijiePhaseSnapshot = {ew: 'red', ns: 'red', source: 'fallback'}
-  let fallbackClock = 0
+  const signalDriver = citySignalClock.driver(SIGNAL_DRIVER_RANK.visual)
   let groundTimer = 0
   let enabled = true
   let disposed = false
@@ -235,7 +251,7 @@ export function mountShizijieSignalsOverlay(
     }
   }
 
-  syncColors(resolveShizijieSignalPhase(resolveSim(), 0))
+  syncColors(resolveShizijieSignalPhase(resolveSim(), citySignalClock.now))
 
   return {
     group,
@@ -246,7 +262,8 @@ export function mountShizijieSignalsOverlay(
         return {ew: lastSnapshot.ew, ns: lastSnapshot.ns, visible: false}
       }
       const safeDt = Number.isFinite(dt) && dt > 0 ? Math.min(0.25, dt) : 0
-      fallbackClock += safeDt
+      // Keeps the city clock running while no sim is stepping; yields as soon as one does.
+      signalDriver.advance(safeDt)
 
       const dx = cameraPos.x - SHIZIJIE_ORIGIN.x
       const dz = cameraPos.z - SHIZIJIE_ORIGIN.z
@@ -254,7 +271,7 @@ export function mountShizijieSignalsOverlay(
       if (group.visible !== visible) group.visible = visible
 
       const sim = resolveSim()
-      const snap = resolveShizijieSignalPhase(sim, fallbackClock)
+      const snap = resolveShizijieSignalPhase(sim, citySignalClock.now)
       if (visible) {
         syncColors(snap)
         groundTimer -= safeDt

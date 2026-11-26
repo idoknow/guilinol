@@ -113,6 +113,7 @@ await build({
         SHIZIJIE_GANTRIES,
         SHIZIJIE_ORIGIN,
         SHIZIJIE_SIGNAL_NODE_ID,
+        SHIZIJIE_AXIS_PHASE,
       } from './web/src/traffic-duty/traffic-signals-overlay.ts'
     `,
     resolveDir: process.cwd(),
@@ -210,6 +211,7 @@ const {
   SHIZIJIE_GANTRIES,
   SHIZIJIE_ORIGIN,
   SHIZIJIE_SIGNAL_NODE_ID,
+  SHIZIJIE_AXIS_PHASE,
 } = await import(pathToFileURL(bundleFile).href)
 
 const cachedGraph = JSON.parse(gunzipSync(readFileSync('public/world/roads/graph.json.gz')).toString('utf8'))
@@ -475,6 +477,29 @@ test('Shizijie 4-gantry dynamic signal overlay & dual NPC officers: synced with 
     assert.equal(live.ns, fallback.ns, `NS phase mismatch at t=${t}`)
     assert.notEqual(live.ew === 'green' && live.ns === 'green', true, 'EW and NS must never both be green')
   }
+
+  // The overlay reads lights by phase index, so the world data must keep 解放路 (east–west) as phase 0
+  // and 中山路 (north–south) as phase 1. Lane ids are not stable across road-network rebuilds; geometry is.
+  const nodeById = new Map(cachedGraph.nodes.map(node => [node.id, node]))
+  const laneById = new Map(cachedGraph.lanes.map(lane => [lane.id, lane]))
+  const shizijie = cachedGraph.signals.find(signal => signal.node === SHIZIJIE_SIGNAL_NODE_ID)
+  assert.equal(shizijie.phases.length, 2)
+  const phaseRun = phase => phase.lanes.reduce((run, id) => {
+    const lane = laneById.get(id), from = nodeById.get(lane.from), to = nodeById.get(lane.to)
+    return {x: run.x + Math.abs(to.x - from.x), z: run.z + Math.abs(to.z - from.z)}
+  }, {x: 0, z: 0})
+  const ewRun = phaseRun(shizijie.phases[SHIZIJIE_AXIS_PHASE.ew]), nsRun = phaseRun(shizijie.phases[SHIZIJIE_AXIS_PHASE.ns])
+  assert.ok(ewRun.x > ewRun.z * 2, `phase ${SHIZIJIE_AXIS_PHASE.ew} must be the east–west approaches: ${JSON.stringify(ewRun)}`)
+  assert.ok(nsRun.z > nsRun.x * 2, `phase ${SHIZIJIE_AXIS_PHASE.ns} must be the north–south approaches: ${JSON.stringify(nsRun)}`)
+  let ewGreen = 0, nsGreen = 0
+  for (let t = 0; t < 42; t++) {
+    sim.time = t
+    const live = resolveShizijieSignalPhase(sim, t)
+    if (live.ew === 'green') ewGreen++
+    if (live.ns === 'green') nsGreen++
+  }
+  assert.equal(ewGreen, 18, 'east–west heads show 18s of green per 42s cycle')
+  assert.equal(nsGreen, 18, 'north–south heads show 18s of green per 42s cycle')
 
   const scene = new THREE.Scene()
   const overlay = mountShizijieSignalsOverlay(scene, {getTraffic: () => sim})
