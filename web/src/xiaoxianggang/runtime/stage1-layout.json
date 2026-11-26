@@ -1,0 +1,83 @@
+{
+  "version": 1,
+  "units": "m",
+  "ceilingHeight": 3.1,
+  "bounds": {
+    "minX": -84,
+    "maxX": -14,
+    "minZ": -33,
+    "maxZ": 33
+  },
+  "corridors": [
+    {
+      "id": "corr-main-ew",
+      "kind": "main",
+      "from": { "x": -80.4, "z": 0 },
+      "to": { "x": -19.4, "z": 0 },
+      "width": 5.6
+    },
+    {
+      "id": "corr-east-ns",
+      "kind": "main",
+      "from": { "x": -22, "z": -27.5 },
+      "to": { "x": -22, "z": 27.5 },
+      "width": 5.2
+    },
+    {
+      "id": "corr-west-ns",
+      "kind": "alley",
+      "from": { "x": -78, "z": -20.5 },
+      "to": { "x": -78, "z": 20.5 },
+      "width": 4.8
+    }
+  ],
+  "shops": [
+    {
+      "id": "shop-s1-east-01",
+      "no": "A-01",
+      "rect": { "x": -17.3, "z": -12.5, "w": 4.2, "d": 5.8 },
+      "frontage": "corr-east-ns"
+    },
+    {
+      "id": "shop-s1-west-02",
+      "no": "B-01",
+      "rect": { "x": -73.5, "z": 8.5, "w": 4.2, "d": 5.8 },
+      "frontage": "corr-west-ns"
+    }
+  ],
+  "columns": {
+    "xs": [-64, -50, -36],
+    "zs": [-2.45, 2.45],
+    "size": 0.44
+  },
+  "exits": [
+    {
+      "portalId": "E1",
+      "foot": { "x": -22, "z": 24.8 },
+      "yaw": 0,
+      "stair": { "x": -22, "z": 29.0, "w": 3.8, "d": 3.6 }
+    },
+    {
+      "portalId": "E2",
+      "foot": { "x": -22, "z": -24.8 },
+      "yaw": 3.141592653589793,
+      "stair": { "x": -22, "z": -29.0, "w": 3.8, "d": 3.6 }
+    },
+    {
+      "portalId": "W1",
+      "foot": { "x": -78, "z": 17.8 },
+      "yaw": 0,
+      "stair": { "x": -78, "z": 22.0, "w": 3.8, "d": 3.6 }
+    },
+    {
+      "portalId": "W2",
+      "foot": { "x": -78, "z": -17.8 },
+      "yaw": 3.141592653589793,
+      "stair": { "x": -78, "z": -22.0, "w": 3.8, "d": 3.6 }
+    }
+  ],
+  "sources": [
+    "pipeline/landmarks/central_square.py (_ax_pt & _underground_portal exact coordinates)",
+    "docs/xiaoxianggang/contract.md (Stage 1 greybox skeleton: corridors + 2 empty shop bays)"
+  ]
+}

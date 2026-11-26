@@ -66,7 +66,11 @@ body[data-photo="on"] .gl-mission-hud,
 body[data-shop-open] .gl-mission-entry,
 body[data-shop-open] .gl-mission-hud,
 body[data-hud="street"] .gl-mission-entry,
-body[data-hud="street"] .gl-mission-hud {
+body[data-hud="street"] .gl-mission-hud,
+body[data-szj-active="1"] .gl-mission-entry,
+body[data-szj-active="1"] .gl-mission-hud,
+body[data-szj-indoor="1"] .gl-mission-entry,
+body[data-szj-indoor="1"] .gl-mission-hud {
   display: none !important;
 }
 

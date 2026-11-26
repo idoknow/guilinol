@@ -2,7 +2,7 @@
 
 :root {
   --mf-font: var(--ui-serif, "Noto Serif SC", "Source Han Serif SC", "Songti SC", serif);
-  --mf-surface: var(--ui-glass-solid, rgba(22, 36, 33, 0.9));
+  --mf-surface: var(--ui-glass-solid, rgba(22, 36, 33, 0.92));
   --mf-line: rgba(244, 239, 226, 0.14);
   --mf-fill: rgba(244, 239, 226, 0.08);
   --mf-fill-2: rgba(244, 239, 226, 0.16);
@@ -12,10 +12,10 @@
   --mf-ink: var(--ui-ink-900, #14211e);
   --mf-accent: var(--ui-seal, #a9503c);
   --mf-accent-hi: var(--ui-seal-hi, #bd5e48);
-  --mf-accent-text: #e57f61;
+  --mf-accent-text: #f8b49c;
   --mf-radius: var(--ui-r-md, 12px);
   --mf-h: 32px;
-  --mf-blur: var(--ui-blur, blur(8px) saturate(1.15));
+  --mf-blur: var(--ui-blur, none);
   --mf-ease: var(--ui-ease, cubic-bezier(0.2, 0.8, 0.2, 1));
   --mf-fast: var(--ui-fast, 0.15s);
 }
@@ -55,8 +55,8 @@
   display: none !important;
 }
 
-body[data-mifen-cooking="1"] :is(.hint, .vehicle-action, .walk-ui, .ride-hud),
-body[data-mifen-drawer="1"] :is(.hint, .vehicle-action, .walk-ui, .ride-hud) {
+body[data-mifen-cooking="1"] :is(.hint, .vehicle-action, .walk-ui, .ride-hud, .hotbar, .smoke-hint, .hud-stats, .gl-mission-entry, .gl-mission-hud, .beta-note, .drinks-hold-hud, output, footer),
+body[data-mifen-drawer="1"] :is(.hint, .vehicle-action, .walk-ui, .ride-hud, .hotbar, .smoke-hint, .hud-stats, .gl-mission-entry, .gl-mission-hud, .beta-note, .drinks-hold-hud, output, footer) {
   display: none !important;
 }
 
@@ -111,8 +111,6 @@ body[data-mifen-drawer="1"] :is(.hint, .vehicle-action, .walk-ui, .ride-hud) {
   pointer-events: auto;
   background: var(--mf-surface);
   box-shadow: inset 0 0 0 1px var(--mf-line);
-  backdrop-filter: var(--mf-blur);
-  -webkit-backdrop-filter: var(--mf-blur);
 }
 
 /* ---------- 按钮 ---------- */
@@ -275,6 +273,7 @@ body[data-mifen-drawer="1"] :is(.hint, .vehicle-action, .walk-ui, .ride-hud) {
 
 .mifen-ticket.is-urgent .mifen-ticket-state {
   color: var(--mf-accent-text);
+  font-weight: 600;
 }
 
 .mifen-ticket-patience {
@@ -326,6 +325,12 @@ body[data-mifen-drawer="1"] :is(.hint, .vehicle-action, .walk-ui, .ride-hud) {
   height: 36px;
   padding: 0 16px 0 8px;
   border-radius: 999px;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  body[data-hotbar="on"] .mifen-prompt {
+    bottom: calc(154px + env(safe-area-inset-bottom));
+  }
 }
 
 /* ---------- 反馈 ---------- */
@@ -675,6 +680,7 @@ body[data-mifen-drawer="1"] :is(.hint, .vehicle-action, .walk-ui, .ride-hud) {
 }
 
 :is(.mifen-upgrade-drawer, .mifen-drawer) :is(.mifen-panel-head, .mifen-drawer-head) {
+  flex: none;
   padding: 12px 12px 8px 16px;
 }
 
@@ -684,7 +690,15 @@ body[data-mifen-drawer="1"] :is(.hint, .vehicle-action, .walk-ui, .ride-hud) {
   overflow-y: auto;
   overscroll-behavior: contain;
   scrollbar-width: thin;
-  padding: 0 12px 8px;
+  padding: 0 12px 12px;
+}
+
+:is(.mifen-upgrade-drawer, .mifen-drawer) .mifen-row {
+  min-width: 0;
+}
+
+:is(.mifen-upgrade-drawer, .mifen-drawer) .mifen-row-main {
+  overflow-wrap: anywhere;
 }
 
 :is(.mifen-upgrade-drawer, .mifen-drawer) .mifen-btn:is(.mifen-btn--primary, .mifen-btn--gold) {
@@ -773,20 +787,22 @@ body[data-mifen-drawer="1"] :is(.hint, .vehicle-action, .walk-ui, .ride-hud) {
     overflow-x: visible;
     width: min(max-content, calc(100vw - 20px));
     max-width: calc(100vw - 20px);
-    gap: 4px;
-    padding: 5px 8px;
+    gap: 3px;
+    padding: 4px 6px;
     border-radius: var(--mf-radius);
   }
 
   .mifen-bar .mifen-stat {
-    margin-right: 4px;
-    font-size: 13px;
+    margin-right: 3px;
+    font-size: 12.5px;
   }
 
   .mifen-bar .mifen-btn {
     flex: 0 0 auto;
-    padding: 0 9px;
-    font-size: 13px;
+    min-height: 34px;
+    height: 34px;
+    padding: 0 7px;
+    font-size: 12px;
   }
 
   .mifen-tickets {
@@ -802,7 +818,7 @@ body[data-mifen-drawer="1"] :is(.hint, .vehicle-action, .walk-ui, .ride-hud) {
     right: calc(10px + env(safe-area-inset-right));
     top: calc(var(--mf-bar-bottom, 58px) + 8px);
     width: auto;
-    max-height: calc(100dvh - var(--mf-bar-bottom, 58px) - 48px - env(safe-area-inset-bottom));
+    max-height: calc(100dvh - var(--mf-bar-bottom, 58px) - 24px - env(safe-area-inset-bottom));
   }
 
   .mifen-cook-panel {
@@ -814,6 +830,12 @@ body[data-mifen-drawer="1"] :is(.hint, .vehicle-action, .walk-ui, .ride-hud) {
   }
 }
 
+@media (pointer: coarse) and (not (any-pointer: fine)) and (max-width: 520px) {
+  .mifen-pill {
+    top: calc(104px + env(safe-area-inset-top));
+  }
+}
+
 @media (max-width: 768px), (max-height: 640px) {
   body[data-mifen-cooking="1"] .mifen-tickets,
   body[data-mifen-drawer="1"] .mifen-tickets {
@@ -822,22 +844,24 @@ body[data-mifen-drawer="1"] :is(.hint, .vehicle-action, .walk-ui, .ride-hud) {
 }
 
 @media (max-width: 768px), (max-height: 480px) {
-  body[data-mifen-drawer="1"] :is(.hud-me, .sky-ui, .dock, .minimap, .walk-ui, .vehicle-action, .ride-hud, .hint, .hud-stats, .gl-mission-entry, .gl-mission-hud),
-  body[data-mifen-cooking="1"] :is(.hud-me, .sky-ui, .dock, .minimap, .hint, .hud-stats, .gl-mission-entry, .gl-mission-hud) {
+  body[data-mifen-indoor="1"] :is(.hud-me, .sky-ui, .dock, .minimap, .hotbar, .smoke-hint, .hint, .hud-stats, .gl-mission-entry, .gl-mission-hud, .beta-note, .drinks-hold-hud, .drinks-pickup-hud, output, footer),
+  body:has(.mifen-bar:not([hidden])) :is(.hud-me, .sky-ui, .dock, .minimap, .hotbar, .smoke-hint, .hint, .hud-stats, .gl-mission-entry, .gl-mission-hud, .beta-note, .drinks-hold-hud, .drinks-pickup-hud, output, footer),
+  body[data-mifen-drawer="1"] :is(.hud-me, .sky-ui, .dock, .minimap, .walk-ui, .vehicle-action, .ride-hud, .hotbar, .smoke-hint, .hint, .hud-stats, .gl-mission-entry, .gl-mission-hud, .beta-note, .drinks-hold-hud, .drinks-pickup-hud, output, footer),
+  body[data-mifen-cooking="1"] :is(.hud-me, .sky-ui, .dock, .minimap, .hotbar, .smoke-hint, .hint, .hud-stats, .gl-mission-entry, .gl-mission-hud, .beta-note, .drinks-hold-hud, .drinks-pickup-hud, output, footer) {
     display: none !important;
   }
 }
 
 @media (max-height: 480px) and (min-width: 640px) {
   .mifen-bar {
-    left: calc(192px + env(safe-area-inset-left));
-    right: auto;
-    margin-inline: 0;
+    left: 0;
+    right: 0;
+    margin-inline: auto;
     flex-wrap: wrap;
-    justify-content: flex-start;
+    justify-content: center;
     overflow-x: visible;
     width: max-content;
-    max-width: calc(100vw - 344px);
+    max-width: calc(100vw - 24px);
     gap: 3px;
     padding: 3px 6px 3px 8px;
   }
@@ -857,8 +881,11 @@ body[data-mifen-drawer="1"] :is(.hint, .vehicle-action, .walk-ui, .ride-hud) {
 
 @media (pointer: coarse) and (max-height: 480px) and (min-width: 640px) {
   .mifen-bar {
-    left: calc(148px + env(safe-area-inset-left));
-    max-width: calc(100vw - 566px);
+    left: 0;
+    right: 0;
+    margin-inline: auto;
+    justify-content: center;
+    max-width: calc(100vw - 24px);
   }
 }
 
@@ -895,7 +922,7 @@ body[data-mifen-drawer="1"] :is(.hint, .vehicle-action, .walk-ui, .ride-hud) {
     right: calc(10px + env(safe-area-inset-right));
     width: auto;
     top: calc(var(--mf-bar-bottom, 48px) + 6px);
-    max-height: calc(100dvh - var(--mf-bar-bottom, 48px) - 40px - env(safe-area-inset-bottom));
+    max-height: calc(100dvh - var(--mf-bar-bottom, 48px) - 20px - env(safe-area-inset-bottom));
   }
 
   :is(.mifen-upgrade-drawer, .mifen-drawer) :is(.mifen-panel-body, .mifen-drawer-body) {
@@ -904,7 +931,7 @@ body[data-mifen-drawer="1"] :is(.hint, .vehicle-action, .walk-ui, .ride-hud) {
     column-gap: 12px;
     row-gap: 4px;
     align-content: start;
-    padding: 0 12px 6px;
+    padding: 0 12px 12px;
   }
 
   :is(.mifen-upgrade-drawer, .mifen-drawer) :is(.mifen-panel-head, .mifen-drawer-head) {

@@ -1,7 +1,14 @@
 import './ui.css'
 import {
+  ACTIVE_VIOLATIONS,
+  DEFAULT_OFFICER_TALK_RANGE_M,
+  formatViolationFormula,
   VIOLATION_LABELS,
   type DutyFineTable,
+  type DutySignalKind,
+  type DutyZoneId,
+  type FineTerminalRequest,
+  type FineTerminalResult,
   type LeaderboardSummary,
   type TrafficDutyInteractCandidate,
   type TrafficDutySnapshot,
@@ -11,11 +18,14 @@ export interface TrafficDutyUiOptions {
   container: HTMLElement
   arbiterWired: boolean
   alwaysShowEntry: boolean
-  onStart: () => void
+  onTalkOfficer: () => void
+  onReportOffDuty?: () => void
   onAbandon: () => void
   onFinish: () => void
-  onWhistle: () => void
+  onInteract: () => void
+  onSignal: (kind: DutySignalKind) => void
   onGoBridge?: () => void
+  onGoZone?: (zoneId: DutyZoneId) => void
   getFineTable: () => DutyFineTable
 }
 
@@ -24,6 +34,7 @@ export interface TrafficDutyUiHandle {
   openPanel(tab?: 'duty' | 'rank'): void
   closePanel(): void
   isPanelOpen(): boolean
+  openFallbackFineTerminal?(req: FineTerminalRequest): Promise<FineTerminalResult>
   dispose(): void
 }
 
@@ -47,34 +58,114 @@ export function mountTrafficDutyUi(opts: TrafficDutyUiOptions): TrafficDutyUiHan
   root.className = 'td-hud-root'
   opts.container.append(root)
 
+  // Idle guidance pill: opens duty info / leaderboard / teleport to officer — NEVER directly starts duty
   const entry = document.createElement('button')
   entry.type = 'button'
   entry.className = 'td-entry'
   entry.dataset.tdEntry = '1'
-  entry.setAttribute('aria-label', '打开解放桥交通劝导执勤面板')
-  entry.innerHTML = '<span>解放桥劝导</span><span class="td-entry-best" hidden></span>'
+  entry.setAttribute('aria-label', '查看解放桥交警执勤站与榜单')
+  const entryLabelEl = document.createElement('span')
+  entryLabelEl.className = 'td-entry-label'
+  entryLabelEl.textContent = '解放桥交警'
+  const entryBestEl = document.createElement('span')
+  entryBestEl.className = 'td-entry-best'
+  entryBestEl.hidden = true
+  entry.append(entryLabelEl, entryBestEl)
   stopPointerLeak(entry)
   root.append(entry)
 
+  // Screen-space overhead badge pinned to the Jiefang Bridge officer so players spot him immediately
+  const officerMarker = document.createElement('button')
+  officerMarker.type = 'button'
+  officerMarker.className = 'td-officer-marker'
+  officerMarker.dataset.tdOfficerMarker = '1'
+  officerMarker.hidden = true
+  officerMarker.setAttribute('aria-label', '解放桥交警执勤位置')
+  stopPointerLeak(officerMarker)
+  root.append(officerMarker)
+
+  // Active duty status strip: real-time count, total fines, 10% pending commission & prominent off-duty check-in button
   const bar = document.createElement('section')
   bar.className = 'td-bar'
   bar.dataset.tdBar = '1'
   bar.hidden = true
-  bar.setAttribute('aria-label', '交通劝导执勤状态')
-  bar.innerHTML = `
-    <span class="td-stat td-stat--timer" data-td-stat="timer">10:00</span>
-    <span class="td-stat" data-td-stat="fine">¥0</span>
-    <span class="td-stat td-stat--muted" data-td-stat="count">0 起</span>
-    <button type="button" class="td-btn" data-td-action="rank">排行</button>
-    <button type="button" class="td-btn" data-td-action="abandon">结束</button>
-  `
+  bar.setAttribute('aria-label', '解放桥交通劝导执勤状态')
+  const timerEl = document.createElement('span')
+  timerEl.className = 'td-stat td-stat--timer'
+  timerEl.dataset.tdStat = 'timer'
+  timerEl.textContent = '10:00'
+  const countEl = document.createElement('span')
+  countEl.className = 'td-stat td-stat--muted'
+  countEl.dataset.tdStat = 'count'
+  countEl.textContent = '开单 0 单'
+  const fineEl = document.createElement('span')
+  fineEl.className = 'td-stat'
+  fineEl.dataset.tdStat = 'fine'
+  fineEl.textContent = '罚款 ¥0'
+  const earningsEl = document.createElement('span')
+  earningsEl.className = 'td-stat td-stat--earnings'
+  earningsEl.dataset.tdStat = 'earnings'
+  earningsEl.textContent = '待领10% ¥0'
+  const offDutyBarBtn = document.createElement('button')
+  offDutyBarBtn.type = 'button'
+  offDutyBarBtn.className = 'td-btn td-btn--primary'
+  offDutyBarBtn.dataset.tdAction = 'report-off-duty'
+  offDutyBarBtn.textContent = '下岗交差'
+  const rankBarBtn = document.createElement('button')
+  rankBarBtn.type = 'button'
+  rankBarBtn.className = 'td-btn'
+  rankBarBtn.dataset.tdAction = 'rank'
+  rankBarBtn.textContent = '排行'
+  const abandonBarBtn = document.createElement('button')
+  abandonBarBtn.type = 'button'
+  abandonBarBtn.className = 'td-btn'
+  abandonBarBtn.dataset.tdAction = 'abandon'
+  abandonBarBtn.textContent = '放弃'
+  bar.append(timerEl, countEl, fineEl, earningsEl, offDutyBarBtn, rankBarBtn, abandonBarBtn)
   stopPointerLeak(bar)
   root.append(bar)
 
+  // Out-of-bounds warning banner while on duty
+  const boundsBanner = document.createElement('div')
+  boundsBanner.className = 'td-bounds-banner'
+  boundsBanner.dataset.tdBoundsBanner = '1'
+  boundsBanner.setAttribute('role', 'status')
+  boundsBanner.hidden = true
+  root.append(boundsBanner)
+
+  // Active duty whistle, command-flag & ticket 3-key action dock (desktop keycaps + touch buttons)
+  const signalDock = document.createElement('div')
+  signalDock.className = 'td-signal-dock'
+  signalDock.dataset.tdSignalDock = '1'
+  signalDock.hidden = true
+  signalDock.setAttribute('aria-label', '执勤哨、指挥旗与开单操作')
+  const makeSignalBtn = (sig: string, keyCap: string, label: string, primary = false) => {
+    const btn = document.createElement('button')
+    btn.type = 'button'
+    btn.className = primary ? 'td-btn td-btn--primary' : 'td-btn'
+    btn.dataset.tdSignal = sig
+    const kbd = document.createElement('kbd')
+    kbd.className = 'td-kbd'
+    kbd.textContent = keyCap
+    const span = document.createElement('span')
+    span.textContent = label
+    if (sig === 'ticket') span.dataset.tdTicketLabel = '1'
+    btn.append(kbd, span)
+    return {btn, span}
+  }
+  const whistleSig = makeSignalBtn('whistle', 'Q', '吹哨', true)
+  const stopSig = makeSignalBtn('flag_stop', 'E', '挥旗拦停')
+  const goSig = makeSignalBtn('flag_go', '长按E', '放行')
+  const ticketSig = makeSignalBtn('ticket', 'F', '开单')
+  signalDock.append(whistleSig.btn, stopSig.btn, goSig.btn, ticketSig.btn)
+  stopPointerLeak(signalDock)
+  root.append(signalDock)
+
+  // Standalone fallback interact button (only shown when walk/interact-arbiter is not wired)
   const whistleBtn = document.createElement('button')
   whistleBtn.type = 'button'
   whistleBtn.className = 'td-whistle-btn'
-  whistleBtn.dataset.tdAction = 'whistle'
+  whistleBtn.dataset.tdAction = 'interact'
   whistleBtn.hidden = true
   stopPointerLeak(whistleBtn)
   root.append(whistleBtn)
@@ -88,28 +179,54 @@ export function mountTrafficDutyUi(opts: TrafficDutyUiOptions): TrafficDutyUiHan
   dialog.className = 'td-panel'
   dialog.dataset.tdPanel = '1'
   dialog.setAttribute('aria-label', '解放桥交通劝导')
-  dialog.innerHTML = `
-    <header class="td-panel-head">
-      <h2>解放桥交通劝导</h2>
-      <div class="td-panel-actions">
-        <div class="td-tabs" role="tablist">
-          <button type="button" class="td-tab" role="tab" data-td-tab="duty" aria-selected="true">执勤</button>
-          <button type="button" class="td-tab" role="tab" data-td-tab="rank" aria-selected="false">榜单</button>
-        </div>
-        <button type="button" class="td-close" data-td-action="close" aria-label="关闭">×</button>
-      </div>
-    </header>
-    <div class="td-panel-body"></div>
-  `
+  const panelHead = document.createElement('header')
+  panelHead.className = 'td-panel-head'
+  const headingEl = document.createElement('h2')
+  headingEl.dataset.tdHeading = '1'
+  headingEl.textContent = '解放桥交通劝导'
+  const panelActions = document.createElement('div')
+  panelActions.className = 'td-panel-actions'
+  const tabsWrap = document.createElement('div')
+  tabsWrap.className = 'td-tabs'
+  tabsWrap.setAttribute('role', 'tablist')
+  const dutyTabBtn = document.createElement('button')
+  dutyTabBtn.type = 'button'
+  dutyTabBtn.className = 'td-tab'
+  dutyTabBtn.setAttribute('role', 'tab')
+  dutyTabBtn.dataset.tdTab = 'duty'
+  dutyTabBtn.setAttribute('aria-selected', 'true')
+  dutyTabBtn.textContent = '执勤'
+  const rankTabBtn = document.createElement('button')
+  rankTabBtn.type = 'button'
+  rankTabBtn.className = 'td-tab'
+  rankTabBtn.setAttribute('role', 'tab')
+  rankTabBtn.dataset.tdTab = 'rank'
+  rankTabBtn.setAttribute('aria-selected', 'false')
+  rankTabBtn.textContent = '榜单'
+  tabsWrap.append(dutyTabBtn, rankTabBtn)
+  const closeDialogBtn = document.createElement('button')
+  closeDialogBtn.type = 'button'
+  closeDialogBtn.className = 'td-close'
+  closeDialogBtn.dataset.tdAction = 'close'
+  closeDialogBtn.setAttribute('aria-label', '关闭')
+  closeDialogBtn.textContent = '×'
+  panelActions.append(tabsWrap, closeDialogBtn)
+  panelHead.append(headingEl, panelActions)
+  const bodyEl = document.createElement('div')
+  bodyEl.className = 'td-panel-body'
+  dialog.append(panelHead, bodyEl)
   stopPointerLeak(dialog)
   root.append(dialog)
 
-  const entryBestEl = entry.querySelector<HTMLElement>('.td-entry-best')!
-  const timerEl = bar.querySelector<HTMLElement>('[data-td-stat="timer"]')!
-  const fineEl = bar.querySelector<HTMLElement>('[data-td-stat="fine"]')!
-  const countEl = bar.querySelector<HTMLElement>('[data-td-stat="count"]')!
-  const bodyEl = dialog.querySelector<HTMLElement>('.td-panel-body')!
-  const tabBtns = Array.from(dialog.querySelectorAll<HTMLButtonElement>('[data-td-tab]'))
+  // Fallback fine confirmation dialog (used only when external fineTerminal bridge is not wired)
+  const fallbackFineDialog = document.createElement('dialog')
+  fallbackFineDialog.className = 'td-panel td-fine-fallback'
+  fallbackFineDialog.dataset.tdFineFallback = '1'
+  fallbackFineDialog.setAttribute('aria-label', '电子罚单确认')
+  stopPointerLeak(fallbackFineDialog)
+  root.append(fallbackFineDialog)
+
+  const tabBtns = [dutyTabBtn, rankTabBtn]
 
   let activeTab: 'duty' | 'rank' = 'duty'
   let lastSnapshot: TrafficDutySnapshot | null = null
@@ -118,13 +235,18 @@ export function mountTrafficDutyUi(opts: TrafficDutyUiOptions): TrafficDutyUiHan
   let panelFineEl: HTMLElement | null = null
   let panelMetaEl: HTMLElement | null = null
   let renderedEntryShow = false
+  let renderedEntryLabel = ''
   let renderedBestFine = -1
   let renderedBarVisible = false
+  let renderedDockVisible = false
+  let renderedBoundsText = ''
   let renderedClock = ''
   let renderedUrgent = false
   let renderedFine = ''
+  let renderedEarnings = ''
   let renderedCount = ''
   let renderedWhistleText = ''
+  let pendingFallbackResolve: ((res: FineTerminalResult) => void) | null = null
 
   function renderViolationGrid(items: readonly {label: string; value: string}[]): string {
     return `<div class="td-rules-grid">${items
@@ -143,9 +265,13 @@ export function mountTrafficDutyUi(opts: TrafficDutyUiOptions): TrafficDutyUiHan
     const btn = (e.target as HTMLElement | null)?.closest<HTMLButtonElement>('[data-td-action]')
     if (!btn) return
     const action = btn.dataset.tdAction
-    if (action === 'start') {
+    if (action === 'talk-officer') {
       dialog.close()
-      opts.onStart()
+      opts.onTalkOfficer()
+    } else if (action === 'report-off-duty') {
+      dialog.close()
+      if (opts.onReportOffDuty) opts.onReportOffDuty()
+      else opts.onTalkOfficer()
     } else if (action === 'abandon') {
       opts.onAbandon()
     } else if (action === 'rank') {
@@ -153,9 +279,23 @@ export function mountTrafficDutyUi(opts: TrafficDutyUiOptions): TrafficDutyUiHan
       renderPanel()
     } else if (action === 'go-bridge') {
       dialog.close()
-      opts.onGoBridge?.()
+      if (opts.onGoZone) opts.onGoZone('jiefang')
+      else opts.onGoBridge?.()
     } else if (action === 'close') {
       dialog.close()
+    }
+  })
+
+  signalDock.addEventListener('click', e => {
+    const btn = (e.target as HTMLElement | null)?.closest<HTMLButtonElement>('[data-td-signal]')
+    if (!btn) return
+    const kind = btn.dataset.tdSignal
+    if (kind === 'ticket') {
+      opts.onInteract()
+      return
+    }
+    if (kind === 'whistle' || kind === 'flag_stop' || kind === 'flag_go') {
+      opts.onSignal(kind)
     }
   })
 
@@ -166,16 +306,22 @@ export function mountTrafficDutyUi(opts: TrafficDutyUiOptions): TrafficDutyUiHan
     for (const btn of tabBtns) {
       btn.setAttribute('aria-selected', String(btn.dataset.tdTab === activeTab))
     }
+    const headingText = '解放桥交通劝导'
+    if (headingEl.textContent !== headingText) headingEl.textContent = headingText
 
+    const nearOfficer = snap?.officerDistanceM !== null && snap?.officerDistanceM !== undefined && snap.officerDistanceM <= DEFAULT_OFFICER_TALK_RANGE_M + 0.5
+    const fineSig = ACTIVE_VIOLATIONS.map(k => fines[k]).join(',')
     let nextSig = ''
     if (activeTab === 'rank') {
-      nextSig = `rank|${snap?.phase !== 'active' ? 1 : 0}|${leaderboardSig(lb)}`
+      nextSig = `rank|${snap?.phase !== 'active' ? 1 : 0}|${nearOfficer ? 1 : 0}|${leaderboardSig(lb)}`
     } else if (snap?.phase === 'summary') {
-      nextSig = `summary|${snap.totalFineYuan}|${snap.citedCount}|${snap.lastRecordRank ?? ''}|${snap.breakdown.no_helmet}|${snap.breakdown.bike_double}|${snap.breakdown.ebike_overload}`
+      const bdSig = ACTIVE_VIOLATIONS.map(k => snap.breakdown[k]).join(',')
+      nextSig = `summary|${snap.totalFineYuan}|${snap.settledEarningsYuan}|${snap.pendingEarningsYuan}|${snap.citedCount}|${snap.lastRecordRank ?? ''}|${snap.reportTitle ?? ''}|${nearOfficer ? 1 : 0}|${bdSig}`
     } else if (snap?.phase === 'active') {
-      nextSig = `active|${fines.no_helmet}|${fines.bike_double}|${fines.ebike_overload}`
+      nextSig = `active|${nearOfficer ? 1 : 0}|${fineSig}`
     } else {
-      nextSig = `idle|${!snap?.inDutyZone && opts.onGoBridge ? 1 : 0}|${fines.no_helmet}|${fines.bike_double}|${fines.ebike_overload}`
+      const distBucket = snap?.officerDistanceM != null ? Math.round(snap.officerDistanceM) : -1
+      nextSig = `idle|${nearOfficer ? 1 : 0}|${distBucket}|${opts.onGoZone || opts.onGoBridge ? 1 : 0}|${fineSig}`
     }
 
     if (nextSig !== renderedPanelSig) {
@@ -198,28 +344,44 @@ export function mountTrafficDutyUi(opts: TrafficDutyUiOptions): TrafficDutyUiHan
               )
               .join('')}</ol>`
           : `<p class="td-empty">暂无执勤记录</p>`
+        const cta =
+          snap?.phase === 'active'
+            ? ''
+            : nearOfficer
+              ? `<button type="button" class="td-btn td-btn--primary" data-td-action="talk-officer">与交警对话上岗</button>`
+              : opts.onGoZone || opts.onGoBridge
+                ? `<button type="button" class="td-btn td-btn--primary" data-td-action="go-bridge">前往解放桥交警</button>`
+                : ''
         bodyEl.innerHTML = `
           ${listHtml}
-          <div class="td-panel-foot">
-            ${snap?.phase !== 'active' ? `<button type="button" class="td-btn td-btn--primary" data-td-action="start">开始执勤</button>` : ''}
-          </div>
+          <div class="td-panel-foot">${cta}</div>
         `
         return
       }
 
-      const rulesHtml = renderViolationGrid([
-        {label: VIOLATION_LABELS.no_helmet, value: `¥${fines.no_helmet}`},
-        {label: VIOLATION_LABELS.bike_double, value: `¥${fines.bike_double}`},
-        {label: VIOLATION_LABELS.ebike_overload, value: `¥${fines.ebike_overload}`},
-      ])
+      const rulesHtml = renderViolationGrid(
+        ACTIVE_VIOLATIONS.map(k => ({label: VIOLATION_LABELS[k], value: `¥${fines[k]}`})),
+      )
 
       if (snap?.phase === 'summary') {
         const titleText = snap.reportTitle ?? ''
-        const countsHtml = renderViolationGrid([
-          {label: VIOLATION_LABELS.no_helmet, value: `${snap.breakdown.no_helmet} 起`},
-          {label: VIOLATION_LABELS.bike_double, value: `${snap.breakdown.bike_double} 起`},
-          {label: VIOLATION_LABELS.ebike_overload, value: `${snap.breakdown.ebike_overload} 起`},
-        ])
+        const countsHtml = renderViolationGrid(
+          ACTIVE_VIOLATIONS.map(k => ({label: VIOLATION_LABELS[k], value: `${snap.breakdown[k]} 起`})),
+        )
+        const earningsLine =
+          snap.settledEarningsYuan > 0
+            ? `已向交警交差下岗，10% 执勤分成 ¥${snap.settledEarningsYuan} 已入账。`
+            : snap.pendingEarningsYuan > 0
+              ? `尚有待领 10% 执勤分成 ¥${snap.pendingEarningsYuan}，请找解放桥交警交差领取。`
+              : snap.totalFineYuan > 0
+                ? '本次未向交警交差下岗，执勤分成未发放。'
+                : '本次无开单记录，随时可找解放桥交警再接一班。'
+        const nextShiftBtn =
+          snap.pendingEarningsYuan > 0
+            ? `<button type="button" class="td-btn td-btn--primary" data-td-action="report-off-duty">${nearOfficer ? '向交警交差领分成' : '去交警岗交差领分成'}</button>`
+            : nearOfficer
+              ? `<button type="button" class="td-btn td-btn--primary" data-td-action="talk-officer">找交警再接一班</button>`
+              : `<button type="button" class="td-btn td-btn--primary" data-td-action="go-bridge">回解放桥交警岗</button>`
         bodyEl.innerHTML = `
           <section class="td-summary-card" aria-label="执勤战报">
             <div class="td-report-title" data-td-report-title="1">${escapeHtml(titleText)}</div>
@@ -227,28 +389,32 @@ export function mountTrafficDutyUi(opts: TrafficDutyUiOptions): TrafficDutyUiHan
               <b>¥${snap.totalFineYuan}</b>
               <span>劝导 ${snap.citedCount} 起${snap.lastRecordRank ? ` · 本榜第 ${snap.lastRecordRank} 名` : ''}</span>
             </div>
+            <p class="td-guide-note">${escapeHtml(earningsLine)}</p>
             ${countsHtml}
           </section>
           <div class="td-panel-foot">
             <button type="button" class="td-btn" data-td-action="rank">榜单</button>
-            <button type="button" class="td-btn td-btn--primary" data-td-action="start">再执一班</button>
+            ${nextShiftBtn}
           </div>
         `
         return
       }
 
       if (snap?.phase === 'active') {
+        const offDutyBtn = `<button type="button" class="td-btn td-btn--primary" data-td-action="report-off-duty">${nearOfficer ? '下岗交差' : '回交警岗下岗交差'}</button>`
         bodyEl.innerHTML = `
           <section class="td-summary-card">
             <div class="td-summary-metrics">
-              <b data-td-panel-fine="1">¥${snap.totalFineYuan}</b>
-              <span data-td-panel-meta="1">剩余 ${formatClock(snap.remainingSec)} · 劝导 ${snap.citedCount} 起</span>
+              <b data-td-panel-fine="1">罚款 ¥${snap.totalFineYuan}</b>
+              <span data-td-panel-meta="1">剩余 ${formatClock(snap.remainingSec)} · 开单 ${snap.citedCount} 单 · 待领10% ¥${snap.pendingEarningsYuan}</span>
             </div>
+            <p class="td-guide-note">执勤范围限定在解放桥桥面内；多项违法按「数罪并罚」叠加开单，10% 分成待向交警下岗交差后一次性入账。</p>
           </section>
           ${rulesHtml}
           <div class="td-panel-foot">
-            <button type="button" class="td-btn" data-td-action="abandon">结束</button>
-            <button type="button" class="td-btn td-btn--primary" data-td-action="close">继续执勤</button>
+            <button type="button" class="td-btn" data-td-action="abandon">直接放弃</button>
+            ${offDutyBtn}
+            <button type="button" class="td-btn" data-td-action="close">继续执勤</button>
           </div>
         `
         panelFineEl = bodyEl.querySelector<HTMLElement>('[data-td-panel-fine]')
@@ -256,24 +422,36 @@ export function mountTrafficDutyUi(opts: TrafficDutyUiOptions): TrafficDutyUiHan
         return
       }
 
-      const goBtn = !snap?.inDutyZone && opts.onGoBridge
-        ? `<button type="button" class="td-btn" data-td-action="go-bridge">前往解放桥</button>`
-        : ''
+      const distLine =
+        snap?.officerDistanceM != null
+          ? nearOfficer
+            ? '已抵达解放桥交警身旁，按 F 对话领取哨子与指挥旗即可原地开始执勤。'
+            : `解放桥西桥头交警距当前位置约 ${Math.round(snap.officerDistanceM)} 米，需先找交警对话领装后上岗。`
+          : '请前往解放桥西桥头与交警对话，领取执勤哨与指挥旗后在桥面原地开始执勤。'
+
+      const actionBtn = nearOfficer
+        ? `<button type="button" class="td-btn td-btn--primary" data-td-action="talk-officer">与交警对话领任务</button>`
+        : opts.onGoZone || opts.onGoBridge
+          ? `<button type="button" class="td-btn td-btn--primary" data-td-action="go-bridge">前往解放桥交警</button>`
+          : `<button type="button" class="td-btn" data-td-action="close">知道了</button>`
 
       bodyEl.innerHTML = `
+        <section class="td-summary-card">
+          <div class="td-report-title">解放桥桥面定点执勤</div>
+          <p class="td-guide-note">${escapeHtml(distLine)}</p>
+        </section>
         ${rulesHtml}
         <div class="td-panel-foot">
-          ${goBtn}
           <button type="button" class="td-btn" data-td-action="rank">榜单</button>
-          <button type="button" class="td-btn td-btn--primary" data-td-action="start">开始执勤</button>
+          ${actionBtn}
         </div>
       `
       return
     }
 
     if (activeTab === 'duty' && snap?.phase === 'active' && panelFineEl && panelMetaEl) {
-      const fineText = `¥${snap.totalFineYuan}`
-      const metaText = `剩余 ${formatClock(snap.remainingSec)} · 劝导 ${snap.citedCount} 起`
+      const fineText = `罚款 ¥${snap.totalFineYuan}`
+      const metaText = `剩余 ${formatClock(snap.remainingSec)} · 开单 ${snap.citedCount} 单 · 待领10% ¥${snap.pendingEarningsYuan}`
       if (panelFineEl.textContent !== fineText) panelFineEl.textContent = fineText
       if (panelMetaEl.textContent !== metaText) panelMetaEl.textContent = metaText
     }
@@ -287,11 +465,26 @@ export function mountTrafficDutyUi(opts: TrafficDutyUiOptions): TrafficDutyUiHan
     lastSnapshot = snapshot
     lastLeaderboard = leaderboard
 
-    const showEntry = snapshot.phase !== 'active' && (opts.alwaysShowEntry || snapshot.inDutyZone)
+    const showEntry =
+      snapshot.phase !== 'active' &&
+      !snapshot.storyActive &&
+      (opts.alwaysShowEntry || snapshot.inDutyZone || (snapshot.officerDistanceM !== null && snapshot.officerDistanceM <= 260))
     if (showEntry !== renderedEntryShow) {
       renderedEntryShow = showEntry
       entry.hidden = !showEntry
     }
+
+    const nextEntryLabel =
+      snapshot.officerDistanceM !== null
+        ? snapshot.officerDistanceM <= DEFAULT_OFFICER_TALK_RANGE_M
+          ? '解放桥交警 · 按 F 对话'
+          : `解放桥交警 · ${Math.round(snapshot.officerDistanceM)}m`
+        : '解放桥交警'
+    if (nextEntryLabel !== renderedEntryLabel) {
+      renderedEntryLabel = nextEntryLabel
+      entryLabelEl.textContent = nextEntryLabel
+    }
+
     if (leaderboard.bestFineYuan !== renderedBestFine) {
       renderedBestFine = leaderboard.bestFineYuan
       if (leaderboard.bestFineYuan > 0) {
@@ -302,7 +495,34 @@ export function mountTrafficDutyUi(opts: TrafficDutyUiOptions): TrafficDutyUiHan
       }
     }
 
-    const barVisible = snapshot.phase === 'active'
+    // Overhead screen-space officer marker (idle: briefing entry; active: prominent off-duty check-in guide)
+    const showMarker =
+      !snapshot.storyActive &&
+      !snapshot.terminalOpen &&
+      !snapshot.knockdownActive &&
+      Boolean(snapshot.officerScreen?.visible) &&
+      snapshot.officerDistanceM !== null &&
+      snapshot.officerDistanceM <= 180
+    officerMarker.hidden = !showMarker
+    if (showMarker && snapshot.officerScreen && snapshot.officerDistanceM !== null) {
+      const near = snapshot.officerDistanceM <= DEFAULT_OFFICER_TALK_RANGE_M
+      const isOffDuty = snapshot.phase === 'active' || (snapshot.phase === 'summary' && snapshot.pendingEarningsYuan > 0)
+      const label = isOffDuty
+        ? near
+          ? snapshot.pendingEarningsYuan > 0
+            ? `解放桥交警 · [F] 下岗交差（待领 ¥${snapshot.pendingEarningsYuan}）`
+            : '解放桥交警 · [F] 下岗交差'
+          : `解放桥交警 · 下岗交差 ${Math.round(snapshot.officerDistanceM)}m`
+        : near
+          ? '解放桥交警 · [F] 领任务'
+          : `解放桥交警 · ${Math.round(snapshot.officerDistanceM)}m`
+      if (officerMarker.textContent !== label) officerMarker.textContent = label
+      officerMarker.classList.toggle('is-near', near)
+      officerMarker.style.left = `${snapshot.officerScreen.x.toFixed(1)}px`
+      officerMarker.style.top = `${snapshot.officerScreen.y.toFixed(1)}px`
+    }
+
+    const barVisible = snapshot.phase === 'active' && !snapshot.storyActive
     if (barVisible !== renderedBarVisible) {
       renderedBarVisible = barVisible
       bar.hidden = !barVisible
@@ -318,19 +538,56 @@ export function mountTrafficDutyUi(opts: TrafficDutyUiOptions): TrafficDutyUiHan
         renderedUrgent = urgent
         timerEl.classList.toggle('is-urgent', urgent)
       }
-      const fineText = `¥${snapshot.totalFineYuan}`
-      if (fineText !== renderedFine) {
-        renderedFine = fineText
-        fineEl.textContent = fineText
-      }
-      const countText = `${snapshot.citedCount} 起`
+      const countText = `开单 ${snapshot.citedCount} 单`
       if (countText !== renderedCount) {
         renderedCount = countText
         countEl.textContent = countText
       }
+      const fineText = `罚款 ¥${snapshot.totalFineYuan}`
+      if (fineText !== renderedFine) {
+        renderedFine = fineText
+        fineEl.textContent = fineText
+      }
+      const earningsText = `待领10% ¥${snapshot.pendingEarningsYuan}`
+      if (earningsText !== renderedEarnings) {
+        renderedEarnings = earningsText
+        earningsEl.textContent = earningsText
+        earningsEl.classList.toggle('is-nonzero', snapshot.pendingEarningsYuan > 0)
+      }
     }
 
-    const nextWhistle = !opts.arbiterWired && snapshot.phase === 'active' && candidate ? `[F] ${candidate.label}` : ''
+    const dockVisible =
+      snapshot.phase === 'active' &&
+      !snapshot.storyActive &&
+      !snapshot.terminalOpen &&
+      !snapshot.knockdownActive &&
+      (snapshot.gear.hasWhistle || snapshot.gear.hasFlag)
+    if (dockVisible !== renderedDockVisible) {
+      renderedDockVisible = dockVisible
+      signalDock.hidden = !dockVisible
+    }
+    if (dockVisible) {
+      whistleSig.btn.disabled = false
+      stopSig.btn.disabled = snapshot.hasPendingCitation || snapshot.terminalOpen
+      goSig.btn.disabled = snapshot.terminalOpen
+      const nextTicketLbl = snapshot.handoverPending ? '递交罚单' : '开单'
+      if (ticketSig.span.textContent !== nextTicketLbl) ticketSig.span.textContent = nextTicketLbl
+    }
+    if ((snapshot.storyActive || snapshot.terminalOpen || snapshot.knockdownActive) && dialog.open) {
+      dialog.close()
+    }
+
+    const boundsText = snapshot.phase === 'active' && snapshot.outOfBoundsWarning ? snapshot.outOfBoundsWarning : ''
+    if (boundsText !== renderedBoundsText) {
+      renderedBoundsText = boundsText
+      boundsBanner.hidden = !boundsText
+      if (boundsText) boundsBanner.textContent = boundsText
+    }
+
+    const nextWhistle =
+      !opts.arbiterWired && !snapshot.storyActive && !snapshot.terminalOpen && candidate
+        ? `[F] ${candidate.label}`
+        : ''
     if (nextWhistle !== renderedWhistleText) {
       renderedWhistleText = nextWhistle
       if (nextWhistle && candidate) {
@@ -371,25 +628,107 @@ export function mountTrafficDutyUi(opts: TrafficDutyUiOptions): TrafficDutyUiHan
     if (dialog.open) renderPanel()
   }
 
+  function openFallbackFineTerminal(req: FineTerminalRequest): Promise<FineTerminalResult> {
+    if (pendingFallbackResolve) {
+      pendingFallbackResolve({issued: false, cancelled: true})
+      pendingFallbackResolve = null
+    }
+    const fines = opts.getFineTable()
+    const viols = req.violations && req.violations.length > 0 ? req.violations : [req.violation]
+    const isStacked = viols.length > 1
+    const stackedFormula = isStacked ? formatViolationFormula(viols, fines) : ''
+    const itemsHtml = isStacked
+      ? renderViolationGrid(viols.map(v => ({label: VIOLATION_LABELS[v], value: `¥${fines[v]}`})))
+      : ''
+    fallbackFineDialog.innerHTML = `
+      <header class="td-panel-head">
+        <h2>${isStacked ? '电子罚单终端 · 数罪并罚' : '电子罚单终端'}</h2>
+        <button type="button" class="td-close" data-td-fine="cancel" aria-label="取消">×</button>
+      </header>
+      <div class="td-panel-body">
+        <section class="td-summary-card">
+          <div class="td-report-title">${escapeHtml(req.zoneName)} · ${isStacked ? `数罪并罚（${escapeHtml(stackedFormula)}）` : escapeHtml(req.violationLabel)}</div>
+          <div class="td-summary-metrics">
+            <b>¥${req.fineYuan}</b>
+            <span>车型：${req.vehicleSubtype === 'bicycle' ? '单车' : '两轮电动车'}</span>
+          </div>
+          ${itemsHtml}
+          <p class="td-guide-note">确认核对无误后签发模拟电子罚单；取消将不计入本班劝导成绩。</p>
+        </section>
+        <div class="td-panel-foot">
+          <button type="button" class="td-btn" data-td-fine="cancel">取消</button>
+          <button type="button" class="td-btn td-btn--primary" data-td-fine="issue">签发并交付</button>
+        </div>
+      </div>
+    `
+    return new Promise<FineTerminalResult>(resolve => {
+      pendingFallbackResolve = resolve
+      const finish = (issued: boolean) => {
+        if (!pendingFallbackResolve) return
+        const done = pendingFallbackResolve
+        pendingFallbackResolve = null
+        if (fallbackFineDialog.open) fallbackFineDialog.close()
+        done(
+          issued
+            ? {
+                issued: true,
+                fineYuan: req.fineYuan,
+                violations: req.violations,
+                ticketId: `GL-${Date.now().toString(36).toUpperCase()}`,
+              }
+            : {issued: false, cancelled: true},
+        )
+      }
+      fallbackFineDialog.onclick = e => {
+        if (e.target === fallbackFineDialog) {
+          finish(false)
+          return
+        }
+        const btn = (e.target as HTMLElement | null)?.closest<HTMLButtonElement>('[data-td-fine]')
+        if (!btn) return
+        finish(btn.dataset.tdFine === 'issue')
+      }
+      fallbackFineDialog.oncancel = e => {
+        e.preventDefault()
+        finish(false)
+      }
+      if (!fallbackFineDialog.open) fallbackFineDialog.showModal()
+    })
+  }
+
   entry.onclick = () => {
     activeTab = 'duty'
     renderPanel()
     if (!dialog.open) dialog.showModal()
   }
 
-  bar.querySelector<HTMLButtonElement>('[data-td-action="rank"]')!.onclick = () => {
+  officerMarker.onclick = () => {
+    if (lastSnapshot?.phase === 'active' || (lastSnapshot?.phase === 'summary' && lastSnapshot.pendingEarningsYuan > 0)) {
+      if (opts.onReportOffDuty) opts.onReportOffDuty()
+      else opts.onTalkOfficer()
+    } else {
+      opts.onTalkOfficer()
+    }
+  }
+
+  offDutyBarBtn.onclick = () => {
+    if (opts.onReportOffDuty) opts.onReportOffDuty()
+    else opts.onTalkOfficer()
+  }
+
+  rankBarBtn.onclick = () => {
     activeTab = 'rank'
     renderPanel()
     if (!dialog.open) dialog.showModal()
   }
 
-  bar.querySelector<HTMLButtonElement>('[data-td-action="abandon"]')!.onclick = () => {
+  abandonBarBtn.onclick = () => {
     opts.onAbandon()
   }
 
-  whistleBtn.onclick = () => opts.onWhistle()
+  whistleBtn.onclick = () => opts.onInteract()
 
-  dialog.querySelector<HTMLButtonElement>('[data-td-action="close"]')!.onclick = () => {
+  closeDialogBtn.onclick = () => {
     if (dialog.open) dialog.close()
   }
   for (const btn of tabBtns) {
@@ -412,8 +751,14 @@ export function mountTrafficDutyUi(opts: TrafficDutyUiOptions): TrafficDutyUiHan
     closePanel() {
       if (dialog.open) dialog.close()
     },
-    isPanelOpen: () => dialog.open,
+    isPanelOpen: () => dialog.open || fallbackFineDialog.open,
+    openFallbackFineTerminal,
     dispose() {
+      if (pendingFallbackResolve) {
+        pendingFallbackResolve({issued: false, cancelled: true})
+        pendingFallbackResolve = null
+      }
+      if (fallbackFineDialog.open) fallbackFineDialog.close()
       if (dialog.open) dialog.close()
       root.remove()
     },

@@ -1,3 +1,10 @@
+import {
+  JIEFANG_RAILING_VOLUME_ID,
+  buildJiefangRailingObstacleVolume,
+} from '../traffic-duty/jiefang-railings.ts'
+
+export {JIEFANG_RAILING_VOLUME_ID, buildJiefangRailingObstacleVolume}
+
 export interface ObstacleBox {
   minX: number
   maxX: number
@@ -5,6 +12,8 @@ export interface ObstacleBox {
   maxZ: number
   minY?: number
   maxY?: number
+  /** True when players may jump onto and walk/stand cleanly across the top face (`maxY`). */
+  standOnTop?: boolean
   label?: string
 }
 
@@ -116,6 +125,7 @@ const PART_MAX_Y = 3.4
 const FIXTURE_MAX_Y = 3.2
 const TABLE_MAX_Y = 2.4
 const PROP_MAX_Y = 2.0
+const STAND_ON_TOP_TOLERANCE = 0.045
 
 export function worldToVolumeLocal(
   wx: number,
@@ -693,7 +703,8 @@ function resolveSingleVolumeStep(
       for (const box of volume.boxes) {
         const minY = box.minY ?? WALL_MIN_Y
         const maxY = box.maxY ?? FIXTURE_MAX_Y
-        if (localHeadY <= minY || localFootY >= maxY) continue
+        const topTol = box.standOnTop ? STAND_ON_TOP_TOLERANCE : 0
+        if (localHeadY <= minY || localFootY >= maxY - topTol) continue
         const res = pushCircleOutOfBox(candX, candZ, clearance, box)
         if (res.hit) {
           candX = res.x
@@ -882,4 +893,23 @@ export function clampCameraToObstacleVolumes(
     clamped = true
   }
   return clamped
+}
+
+/** 创建随城市静态地标默认启用的障碍碰撞体积列表（含解放桥全桥机非与中央护栏）。 */
+export function createDefaultCityObstacleVolumes(): ObstacleVolumeSpec[] {
+  return [buildJiefangRailingObstacleVolume()]
+}
+
+/** 将默认城市固定障碍体合并进现有障碍集合，不重复注入同 `id` 体积。 */
+export function withDefaultCityObstacleVolumes(volumes: Iterable<ObstacleVolumeSpec>): ObstacleVolumeSpec[] {
+  const out: ObstacleVolumeSpec[] = []
+  let hasJiefang = false
+  for (const vol of volumes) {
+    out.push(vol)
+    if (vol.id === JIEFANG_RAILING_VOLUME_ID) hasJiefang = true
+  }
+  if (!hasJiefang) {
+    out.push(buildJiefangRailingObstacleVolume())
+  }
+  return out
 }

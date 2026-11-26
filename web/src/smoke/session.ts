@@ -1,5 +1,10 @@
 import {BRANDS, rules, type BrandId} from './data.ts'
 
+export const DUTY_NO_SMOKING_TOAST = '执勤中禁止吸烟'
+export function isSmokeBlockedByDuty(): boolean {
+  return typeof document !== 'undefined' && (document.body?.dataset?.duty === 'active' || document.body?.dataset?.tdDutyActive === '1')
+}
+
 // Keep the original wire codes for idle, ignition and burning.
 const phases = ['idle','light','smoking','draw','sealed','tear','open','take','ready','drawOpened'] as const
 export type SmokePhase = typeof phases[number]
@@ -39,7 +44,7 @@ export class SmokeSession {
   get inMouth(){return this.phase==='light'||this.phase==='ready'||this.lit}
   get prompt(){return this.puffTime===0 && this.phase in prompts ? prompts[this.phase as keyof typeof prompts] : ''}
   start(brand:string|undefined,remaining=20,opened=false){
-    if(!brand||this.active)return false
+    if(isSmokeBlockedByDuty()||!brand||this.active)return false
     this.remaining=remaining
     this.brand=brand
     this.phase=opened || remaining<20?'drawOpened':'draw'
@@ -52,6 +57,7 @@ export class SmokeSession {
   }
   stop(){this.phase='idle';this.elapsed=this.puffTime=this.burn=0}
   act(take:()=>boolean,unseal:()=>boolean=()=>true){
+    if(isSmokeBlockedByDuty()){this.stop();return false}
     if(!this.prompt)return false
     if(this.phase==='sealed'){
       if(!unseal())return false

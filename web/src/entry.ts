@@ -104,7 +104,16 @@ function hud(main: typeof import('./main')) {
     })
   }).finally(done)}
   addEventListener('keydown', event => {
-    if (event.code !== 'Escape' || title.shown || document.querySelector('dialog[open],.about-mask:not([hidden]),.atlas:not([hidden]),.book:not([hidden]),.spot-card:not([hidden]),.photo-bar:not([hidden]),.render-pop:not([hidden]),.shop-overlay.show,.wardrobe-overlay.show,.garage-overlay.show')) return
+    if (
+      event.code !== 'Escape' ||
+      event.defaultPrevented ||
+      title.shown ||
+      document.body.dataset.drinksUiOpen === '1' ||
+      document.body.dataset.mifenCooking === '1' ||
+      document.body.dataset.mifenDrawer === '1' ||
+      document.body.dataset.mifenStoryActive === '1' ||
+      document.querySelector('dialog[open],.about-mask:not([hidden]),.atlas:not([hidden]),.book:not([hidden]),.spot-card:not([hidden]),.photo-bar:not([hidden]),.render-pop:not([hidden]),.shop-overlay.show,.wardrobe-overlay.show,.garage-overlay.show,.drinks-order-panel:not([hidden]),.mifen-cook-panel:not([hidden]),.mifen-upgrade-drawer:not([hidden]),.mifen-econ-panel:not([hidden]),.mifen-story-dialog:not([hidden]),[data-story-dialog="1"]:not([hidden])')
+    ) return
     menu.click()
   })
 }

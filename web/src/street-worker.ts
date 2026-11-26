@@ -8,6 +8,7 @@ import {stationRoadSurface,type StationRoadSegment} from './station-road-surface
 import {railwayGeometry,type RailSection,type RailFace,type CrossingSign} from './railways'
 import {buildRoadBarriers} from './road-barriers'
 import {isShizijieCrosswalkRing,isShizijieDecorSuppressed,isShizijieSignalSuppressed,touchesShizijieTile} from './shizijie-zone.ts'
+import {curbEdgeKeyCm,repairStreetPaths} from './ground-repair'
 import * as THREE from 'three'
 import {look} from './look/config'
 type Pair=[number,number]
@@ -171,9 +172,12 @@ export function streetGeometry([paths,lamps,banks,signals=[],stops=[],roadCtrl,s
     for(const pt of pts){xyz.push(pt.x,pt.y,pt.z);rgb.push(c.r,c.g,c.b)}
   }
   const checkShizijie=origin?touchesShizijieTile(origin[0],origin[1]):false
-  for(const [index,[kind,...rings]] of paths.entries()){
+  const repaired=repairStreetPaths(paths)
+  const activePaths=repaired.paths
+  const skipCurbEdges=repaired.skipCurbEdges
+  for(const [index,[kind,...rings]] of activePaths.entries()){
     platformPath=!!platform && index>=platform[0] && index<platform[1]
-    lowerPath=!!lower && index>=lower[0]
+    lowerPath=!!lower && index>=lower[0] && index<paths.length
     const loops=rings.map(ring=>ring.map(([x,z])=>new THREE.Vector2(x/100,z/100)))
     if(kind===2&&checkShizijie&&origin&&rings[0]?.length>=4&&isShizijieCrosswalkRing(loops[0].map(v=>[v.x,v.y] as const),origin[0],origin[1]))continue
     const tris=THREE.ShapeUtils.triangulateShape(loops[0],loops.slice(1)),points=loops.flat()
@@ -209,6 +213,7 @@ export function streetGeometry([paths,lamps,banks,signals=[],stops=[],roadCtrl,s
     if(kind===1)for(const loop of loops)for(let i=0;i<loop.length;i++){
       const a=loop[i],b=loop[(i+1)%loop.length],steps=Math.ceil(a.distanceTo(b)/4)
       if((a.x===b.x&&(a.x===0||a.x===256))||(a.y===b.y&&(a.y===0||a.y===256)))continue
+      if(skipCurbEdges.size&&skipCurbEdges.has(curbEdgeKeyCm(a.x*100,a.y*100,b.x*100,b.y*100)))continue
       for(let j=0;j<steps;j++){
         const p=a.clone().lerp(b,j/steps),q=a.clone().lerp(b,(j+1)/steps)
         const grade=passengerGrades.find(row=>inRing(p.x,p.y,row.ring)&&inRing(q.x,q.y,row.ring)&&inRing((p.x+q.x)/2,(p.y+q.y)/2,row.ring))
@@ -224,10 +229,24 @@ export function streetGeometry([paths,lamps,banks,signals=[],stops=[],roadCtrl,s
           emit(low,upper,end,1,0,0,0,true)
           emit(low,end,next,1,0,0,0,true)
         }else{
-          triangle(vector(p,.045),vector(p,height),vector(q,height),1,0,0,0,true)
-          triangle(vector(p,.045),vector(q,height),vector(q,.045),1,0,0,0,true)
+          const topP=vector(p,height),topQ=vector(q,height),botP=vector(p,.045),botQ=vector(q,.045)
+          if(!platformPath&&!lowerPath){
+            botP.y=Math.max(botP.y-.6,Math.min(botP.y,ground(p.x,p.y)-.02))
+            botQ.y=Math.max(botQ.y-.6,Math.min(botQ.y,ground(q.x,q.y)-.02))
+          }
+          triangle(botP,topP,topQ,1,0,0,0,true)
+          triangle(botP,topQ,botQ,1,0,0,0,true)
         }
       }
+    }
+  }
+  // Emit flush pedestrian crossing aprons across wide arterial verges without raised vertical curbs.
+  platformPath=false;lowerPath=false
+  for(const [kind,...rings] of repaired.flushPaths){
+    const loops=rings.map(ring=>ring.map(([x,z])=>new THREE.Vector2(x/100,z/100)))
+    const tris=THREE.ShapeUtils.triangulateShape(loops[0],loops.slice(1)),points=loops.flat()
+    for(const [a,b,c] of tris){
+      triangle(vector(points[a],.065),vector(points[c],.065),vector(points[b],.065),kind)
     }
   }
   platformPath=false

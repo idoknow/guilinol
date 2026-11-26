@@ -63,6 +63,11 @@ const TIANYUAN_ROT = 2.83616 - Math.PI
 const TIANYUAN_COS = Math.cos(TIANYUAN_ROT)
 const TIANYUAN_SIN = Math.sin(TIANYUAN_ROT)
 
+const DRINKS_CENTER_X = -595.459
+const DRINKS_CENTER_Z = -70.778
+const DRINKS_COS = Math.cos(2.921681)
+const DRINKS_SIN = Math.sin(2.921681)
+
 export function isTianyuanExcludedParkedBike(wx:number, wz:number):boolean {
   const dx = wx - TIANYUAN_CENTER_X, dz = wz - TIANYUAN_CENTER_Z
   if(dx*dx + dz*dz > 225) return false
@@ -71,14 +76,22 @@ export function isTianyuanExcludedParkedBike(wx:number, wz:number):boolean {
   return lx>=-5.6 && lx<=4.6 && lz>=-8.5 && lz<=13.0
 }
 
+export function isWangchengDrinksExcludedParkedBike(wx:number, wz:number):boolean {
+  const dx = wx - DRINKS_CENTER_X, dz = wz - DRINKS_CENTER_Z
+  if(dx*dx + dz*dz > 144) return false
+  const lx = dx*DRINKS_COS - dz*DRINKS_SIN
+  const lz = dx*DRINKS_SIN + dz*DRINKS_COS
+  return lx>=-6.8 && lx<=6.8 && lz>=-5.6 && lz<=6.8
+}
+
 function filterExcludedParkedBikes(parked:Float32Array):Float32Array {
   let drop = 0
-  for(let i=0;i<parked.length;i+=16) if(isTianyuanExcludedParkedBike(parked[i+12],parked[i+14])) drop++
+  for(let i=0;i<parked.length;i+=16) if(isTianyuanExcludedParkedBike(parked[i+12],parked[i+14])||isWangchengDrinksExcludedParkedBike(parked[i+12],parked[i+14])) drop++
   if(!drop) return parked
   const kept = new Float32Array(parked.length - drop*16)
   let out = 0
   for(let i=0;i<parked.length;i+=16) {
-    if(isTianyuanExcludedParkedBike(parked[i+12],parked[i+14])) continue
+    if(isTianyuanExcludedParkedBike(parked[i+12],parked[i+14])||isWangchengDrinksExcludedParkedBike(parked[i+12],parked[i+14])) continue
     kept.set(parked.subarray(i,i+16),out)
     out += 16
   }
@@ -339,7 +352,7 @@ export class ChunkBatcher {
         const distance=(east-x)**2+(south-z)**2
         if(distance>=best||footY!==undefined&&Math.abs(footY-height)>1.5)continue
         const id=`${tile.x}:${tile.z}:${offset/16}`
-        if(this.takenBikes.has(id)||vehicleForbiddenAt(east,south)||isTianyuanExcludedParkedBike(east,south))continue
+        if(this.takenBikes.has(id)||vehicleForbiddenAt(east,south)||isTianyuanExcludedParkedBike(east,south)||isWangchengDrinksExcludedParkedBike(east,south))continue
         nearest={id,x:east,y:height,z:south,yaw:Math.atan2(parked[offset+8],parked[offset+10])};best=distance
       }
     }
@@ -352,7 +365,7 @@ export class ChunkBatcher {
     if(!Number.isInteger(index)||index<0||id!==`${east}:${south}:${index}`)return false
     for(const {tile,parked} of this.items.values()){
       if(tile.x!==east||tile.z!==south||index>=parked.length/16)continue
-      if(vehicleForbiddenAt(parked[16*index+12],parked[16*index+14])||isTianyuanExcludedParkedBike(parked[16*index+12],parked[16*index+14]))return false
+      if(vehicleForbiddenAt(parked[16*index+12],parked[16*index+14])||isTianyuanExcludedParkedBike(parked[16*index+12],parked[16*index+14])||isWangchengDrinksExcludedParkedBike(parked[16*index+12],parked[16*index+14]))return false
       this.takenBikes.add(id);this.furnitureStale=true;return true
     }
     return false

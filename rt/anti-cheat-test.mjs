@@ -60,8 +60,14 @@ const driver = client(900103, 'drive')
 await driver.ready; driver.join(); await sleep(400)
 let dx = 0
 for (let i = 0; i < 34; i++) { dx += 0.3; driver.pos(dx, 3, 0, {bike: 'bike'}); await sleep(50) }  // 先 6 m/s 热车 1.7s
-for (let i = 0; i < 30; i++) { dx += 1.5; driver.pos(dx, 3, 0, {bike: 'bike'}); await sleep(50) }  // 30 m/s
-ok(driver.setbacks() === 0, '开车 30 m/s：无误报')
+for (let i = 0; i < 30; i++) { dx += 2.08; driver.pos(dx, 3, 0, {bike: 'bike'}); await sleep(50) }  // 41.7 m/s = 150 km/h
+ok(driver.setbacks() === 0, '开车 150 km/h：无误报')
+
+// 直升机/载具：foot=false 时向上速度不受限（飞行是合法玩法）
+const flyerOk = client(900150, 'heli')
+await flyerOk.ready; flyerOk.join(); await sleep(400)
+for (let i = 1; i <= 40; i++) { flyerOk.pos(0, 3 + i * 2, 0, {foot: false, bike: 'heli'}); await sleep(50) }  // 40 m/s 爬升
+ok(flyerOk.setbacks() === 0, '直升机爬升 40 m/s：无误报')
 
 // ── 2. 作弊必须被拦
 console.log('\n[2] 作弊必须被拦')

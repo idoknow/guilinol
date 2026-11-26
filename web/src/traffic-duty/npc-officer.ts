@@ -1,9 +1,29 @@
 import * as THREE from 'three'
+import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js'
 import type {Avatar} from '../../../lib/avatar'
+import {OFFICER_UNIFORM_OUTFIT, type EquippedOutfit} from '../game/catalog'
 import {avatar as figureConfig} from '../look/avatar'
+import {mainDetail} from '../look/mirror-layer'
 import {ensureAvatarRig, type AvatarRig} from '../walk/avatar-rig'
-import {characterModel, styleCharacter} from '../walk/character'
-import {OUTFIT_ZONE, partitionCityWalkerGeometry} from '../walk/outfits'
+import {characterModel, disposeCharacterParts, styleCharacter} from '../walk/character'
+import {setCreatorExpression} from '../walk/creator-face'
+import {addOutline, streetShading} from '../walk/creator-ink'
+import type {AvatarOutfitController} from '../walk/outfits'
+import {
+  applyOfficerLook,
+  type OfficerLookHandle,
+} from './officer-look/index.ts'
+
+let sharedIdleClipPromise: Promise<THREE.AnimationClip | null> | null = null
+function loadSharedPlayerIdleClip(): Promise<THREE.AnimationClip | null> {
+  if (!sharedIdleClipPromise) {
+    sharedIdleClipPromise = new GLTFLoader()
+      .loadAsync(figureConfig.path)
+      .then(gltf => gltf.animations.find(c => c.name === figureConfig.clips.idle) ?? null)
+      .catch(() => null)
+  }
+  return sharedIdleClipPromise
+}
 
 /**
  * High-detail original Jiefang Bridge Traffic Officer NPC + compliant persuasion sign post
@@ -24,6 +44,22 @@ export const JIEFANG_OFFICER_SPOT = {
   yaw: 0.80,
 } as const
 
+/**
+ * Shizijie NE refuge island police-kiosk apron (`KIOSK_CENTER = (27.2, -2.4)` in shizijie local space).
+ * Verified via `shizijie_layout.islands()`: officer stands 0.80 m in front of kiosk glass,
+ * 0.87 m clear of hedge, and 1.25 m inside NE island curb (`>= 0.4 m` margin); sign sits beside at 0.73 m curb margin.
+ */
+export const SHIZIJIE_OFFICER_SPOT = {
+  x: -854.38,
+  y: 151.45,
+  z: -170.57,
+  /** -Z forward faces WSW squarely into Shizijie intersection approaches. */
+  yaw: 2.15,
+  signX: -853.02,
+  signZ: -169.73,
+  signYaw: 2.59,
+} as const
+
 export type GroundSampler = (x: number, z: number, reference?: number, car?: boolean) => number | undefined
 
 export interface JiefangOfficerOptions {
@@ -31,17 +67,65 @@ export interface JiefangOfficerOptions {
   y?: number
   z?: number
   yaw?: number
+  signX?: number
+  signZ?: number
+  signYaw?: number
+  stationTitle?: string
+  groupName?: string
   /** Skip async GLB load (useful in pure Node/unit environments without fetch). */
   proceduralOnly?: boolean
+}
+
+export type OfficerVisualState = 'available' | 'talking' | 'handoff' | 'active'
+
+export type OfficerExpressionId = 'serious' | 'smile' | 'remind' | 'thumbs_up'
+
+export const OFFICER_EXPRESSION_IDS: readonly OfficerExpressionId[] = Object.freeze([
+  'serious',
+  'smile',
+  'remind',
+  'thumbs_up',
+])
+
+export function normalizeOfficerExpression(raw?: string | null): OfficerExpressionId {
+  if (raw === 'smile' || raw === 'remind' || raw === 'thumbs_up' || raw === 'serious') return raw
+  if (raw === 'handoff') return 'thumbs_up'
+  if (raw === 'curious') return 'remind'
+  return 'serious'
+}
+
+/**
+ * Clamps sampled ground elevation to the bridge/sidewalk deck band `[fallbackY - 1.0, fallbackY + 2.5]`.
+ * Prevents lower Binjiang Road / riverbank raycasts (~146m) from burying the Jiefang Bridge officer under the deck.
+ */
+export function resolveDeckGroundY(sampled: number | undefined, fallbackY: number): number {
+  if (sampled === undefined || !Number.isFinite(sampled)) return fallbackY
+  if (sampled < fallbackY - 1.0 || sampled > fallbackY + 2.5) return fallbackY
+  return sampled
 }
 
 export interface JiefangOfficerHandle {
   readonly group: THREE.Group
   readonly officerRoot: THREE.Group
   readonly signGroup: THREE.Group
+  readonly beaconGroup: THREE.Group
   readonly position: Readonly<{x: number; y: number; z: number}>
   readonly signPosition: Readonly<{x: number; y: number; z: number}>
   readonly phase: () => 'go' | 'stop' | 'guide' | 'watch'
+  setDutyState(state: OfficerVisualState): void
+  setExpression(expr: OfficerExpressionId | string): void
+  setLookTarget(pos: {x: number; y?: number; z: number} | null): void
+  headWorld(out?: THREE.Vector3): THREE.Vector3
+  update(dt: number, elapsedSec?: number): void
+  dispose(): void
+}
+
+export interface AllDutyOfficersHandle {
+  readonly officers: Readonly<{
+    jiefang: JiefangOfficerHandle
+    shizijie: JiefangOfficerHandle
+  }>
+  setJiefangState(state: OfficerVisualState): void
   update(dt: number, elapsedSec?: number): void
   dispose(): void
 }
@@ -111,126 +195,37 @@ function mergeColoredMesh(
   return mesh
 }
 
-/** Original traffic director white-top cap with abstract Guilin diamond badge (no real police emblem/ID). */
-function buildOfficerCap(): THREE.Mesh {
-  const crown = new THREE.CylinderGeometry(0.132, 0.114, 0.068, 18)
-  crown.scale(1, 1, 1.08)
-  crown.translate(0, 0.172, 0.008)
-
-  const band = new THREE.CylinderGeometry(0.116, 0.118, 0.044, 18)
-  band.scale(1, 1, 1.12)
-  band.translate(0, 0.122, 0.012)
-
-  const piping = new THREE.CylinderGeometry(0.120, 0.120, 0.012, 18)
-  piping.scale(1, 1, 1.12)
-  piping.translate(0, 0.146, 0.012)
-
-  const brim = new THREE.CylinderGeometry(0.118, 0.132, 0.012, 16, 1, false, Math.PI * 0.65, Math.PI * 0.70)
-  brim.rotateX(0.16)
-  brim.translate(0, 0.104, -0.025)
-
-  const strap = new THREE.BoxGeometry(0.228, 0.012, 0.014)
-  strap.translate(0, 0.112, -0.112)
-
-  // Original Guilin bridge diamond geometric ornament (not a police shield)
-  const badge = new THREE.OctahedronGeometry(0.019, 0)
-  badge.scale(0.85, 1.15, 0.4)
-  badge.translate(0, 0.156, -0.122)
-
-  // Undercut dark nape/sideburn hair rim tucked naturally under peaked cap edge
-  const napeHair = new THREE.CylinderGeometry(0.109, 0.100, 0.056, 16, 1, false, -Math.PI * 0.65, Math.PI * 1.30)
-  napeHair.scale(1, 1, 1.12)
-  napeHair.translate(0, 0.072, 0.015)
-
-  return mergeColoredMesh(
-    [
-      {geom: crown, hex: '#f4f6f2'},
-      {geom: band, hex: '#162233'},
-      {geom: piping, hex: '#d8ee1e'},
-      {geom: brim, hex: '#111822'},
-      {geom: strap, hex: '#d4b46a'},
-      {geom: badge, hex: '#209c8e'},
-      {geom: napeHair, hex: '#1d1917'},
-    ],
-    'officer_traffic_cap',
-    {roughness: 0.55},
-  )
-}
-
-/** Original high-vis waist belt, Sam Browne diagonal sash, shoulder straps & radio mic (no badge/ID). */
-function buildOfficerDutyGear(): THREE.Mesh {
-  const parts: ColoredPart[] = []
-
-  // Waist duty belt
-  const belt = new THREE.CylinderGeometry(0.168, 0.172, 0.048, 16)
-  belt.scale(1.06, 1, 0.78)
-  belt.translate(0, -0.135, 0.004)
-  parts.push({geom: belt, hex: '#eef2ee'})
-
-  // Brushed alloy belt buckle
-  const buckle = new THREE.BoxGeometry(0.056, 0.052, 0.016)
-  buckle.translate(0, -0.135, -0.132)
-  parts.push({geom: buckle, hex: '#cfd6dc'})
-
-  // Sleek flush epaulets seated right at measured attach_torso shoulder seam (y=0.330..0.342, z=+0.016) so bottom embeds 1cm cleanly into shoulder mesh
-  for (const s of [-1, 1]) {
-    const ep = new THREE.BoxGeometry(0.088, 0.016, 0.044)
-    ep.rotateZ(-s * 0.16)
-    ep.translate(s * 0.152, 0.330, 0.016)
-    parts.push({geom: ep, hex: '#142030'})
-    const bar = new THREE.BoxGeometry(0.068, 0.009, 0.022)
-    bar.rotateZ(-s * 0.16)
-    bar.translate(s * 0.158, 0.339, 0.016)
-    parts.push({geom: bar, hex: '#d8ee1e'})
-    const btn = new THREE.CylinderGeometry(0.010, 0.010, 0.008, 8)
-    btn.rotateZ(-s * 0.16)
-    btn.translate(s * 0.114, 0.344, 0.016)
-    parts.push({geom: btn, hex: '#eef3f8'})
-  }
-
-  // Left-shoulder communication mic (cleanly clears diagonal chest sash)
-  const mic = new THREE.BoxGeometry(0.036, 0.058, 0.028)
-  mic.translate(-0.11, 0.18, -0.11)
-  parts.push({geom: mic, hex: '#20262e'})
-
-  return mergeColoredMesh(parts, 'officer_duty_gear', {roughness: 0.55})
-}
-
-/** Handheld traffic command LED wand: matte black handle/collar separated from emissive red rod. */
+/** Handheld traffic command LED wand merged into 1 single cel-shaded Mesh (`+1` draw call total). */
 function buildTrafficWand(): THREE.Group {
   const grp = new THREE.Group()
   grp.name = 'officer_traffic_wand'
 
-  // Matte black grip & high collar (collar sits at +0.098 cleanly above closed index/thumb knuckles)
   const handle = new THREE.CylinderGeometry(0.014, 0.014, 0.114, 10)
   handle.translate(0, 0.031, 0)
   const pommel = new THREE.SphereGeometry(0.015, 8, 6)
   pommel.translate(0, -0.028, 0)
   const collar = new THREE.CylinderGeometry(0.021, 0.018, 0.022, 10)
   collar.translate(0, 0.098, 0)
-  const gripMesh = mergeColoredMesh(
+  const glowRod = new THREE.CylinderGeometry(0.016, 0.016, 0.255, 10)
+  glowRod.translate(0, 0.236, 0)
+
+  const wandMesh = mergeColoredMesh(
     [
       {geom: handle, hex: '#14171d'},
       {geom: pommel, hex: '#14171d'},
       {geom: collar, hex: '#eef3f7'},
+      {geom: glowRod, hex: '#f23a24'},
     ],
-    'officer_traffic_wand_grip',
+    'officer_traffic_wand_mesh',
     {roughness: 0.45},
   )
-
-  const glowRod = new THREE.CylinderGeometry(0.016, 0.016, 0.255, 10)
-  glowRod.translate(0, 0.236, 0)
-  const rodMesh = mergeColoredMesh(
-    [{geom: glowRod, hex: '#f03522'}],
-    'officer_traffic_wand_rod',
-    {emissiveHex: '#ff3814', emissiveIntensity: 0.45, roughness: 0.4},
-  )
-
-  grp.add(gripMesh, rodMesh)
+  streetShading(wandMesh.material as THREE.MeshStandardMaterial)
+  addOutline(wandMesh, 0.0035)
+  grp.add(wandMesh)
   return grp
 }
 
-const OFFICER_AVATAR: Avatar = {
+export const OFFICER_AVATAR: Avatar = {
   v: 1,
   body: 'm',
   skin: 2,
@@ -318,178 +313,171 @@ function buildOfficerRightGrip(figure: THREE.Object3D): FingerPoseTarget[] {
   return entries
 }
 
-function buildOfficerLeftCurl(figure: THREE.Object3D): FingerPoseTarget[] {
-  const entries: FingerPoseTarget[] = []
-  const bindPos = new Map<string, THREE.Vector3>()
-  const bindRot = new Map<string, THREE.Quaternion>()
-  figure.traverse(node => {
-    if (bindRot.size || !(node instanceof THREE.SkinnedMesh)) return
-    node.skeleton.bones.forEach((b, i) => {
-      const m = new THREE.Matrix4().copy(node.skeleton.boneInverses[i]).invert()
-      bindPos.set(b.name, new THREE.Vector3().setFromMatrixPosition(m))
-      bindRot.set(b.name, new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().extractRotation(m)))
-    })
+/**
+ * Styles an already-loaded `characterModel(OFFICER_AVATAR)` scene through the unified player pipeline:
+ * `ensureAvatarRig(figure)` -> `styleCharacter(figure, rig, OFFICER_AVATAR)` -> `applyEquipped(OFFICER_UNIFORM_OUTFIT)` -> `applyOfficerLook(...)`.
+ */
+function mountOfficerWithLook(
+  figure: THREE.Group,
+  expression: OfficerExpressionId,
+  includeWand: boolean,
+): {
+  look: OfficerLookHandle
+  outfitController: AvatarOutfitController
+  uniformOutfit: EquippedOutfit
+  rightGrips: FingerPoseTarget[]
+} {
+  const rig = ensureAvatarRig(figure)
+  const outfitController = styleCharacter(figure, rig, OFFICER_AVATAR)
+  const uniformOutfit: EquippedOutfit = {...OFFICER_UNIFORM_OUTFIT}
+  outfitController.applyEquipped(uniformOutfit, {ridingEbike: false, autoHelmetOnRide: false})
+  setCreatorExpression(figure, expression)
+
+  const look = applyOfficerLook(figure, {
+    avatar: OFFICER_AVATAR,
+    outfitController,
+    uniformOutfit,
+    expression,
+    scale: 1.03,
+    poseHands: true,
   })
-  if (!bindRot.size) return entries
-  const identity = new THREE.Quaternion()
-  const axisZ = new THREE.Vector3(0, 0, 1)
-  const addJoint = (name: string, parentName: string, delta: THREE.Quaternion, parentDelta: THREE.Quaternion) => {
-    const bone = figure.getObjectByName(name)
-    const childB = bindRot.get(name)
-    const parentB = bindRot.get(parentName)
-    if (!bone || !childB || !parentB) return
-    const local = parentB.clone().invert().multiply(parentDelta.clone().invert()).multiply(delta).multiply(childB)
-    entries.push({bone, target: local})
-  }
-  for (const finger of ['index', 'middle', 'ring', 'pinky'] as const) {
-    let parentDelta = identity.clone()
-    let parentName = 'hand_l'
-    for (let i = 1; i <= 3; i++) {
-      const name = `${finger}_0${i}_l`
-      const turn = new THREE.Quaternion().setFromAxisAngle(axisZ, i === 1 ? -0.45 : -0.58)
-      const delta = parentDelta.clone().multiply(turn)
-      addJoint(name, parentName, delta, parentDelta)
-      parentDelta = delta
-      parentName = name
+
+  // Enable BOTH Layer 0 and MAIN_DETAIL_LAYER (3) on every node
+  figure.traverse(n => {
+    n.layers.enable(0)
+    n.layers.enable(3)
+  })
+
+  const rightGrips: FingerPoseTarget[] = []
+  if (includeWand) {
+    look.setHandGesture('grip', 'right')
+    // Mount baton inside character-aligned `hand_r` palm pocket (`spec.md` §5.2: avoid camera-tilted `attach_hand_r`)
+    const rightHandMount = look.anchors.handR
+    if (rightHandMount && !rightHandMount.getObjectByName('officer_traffic_wand')) {
+      const wand = buildTrafficWand()
+      // Exact measured center of curled 4-finger grip channel in `officer_mount_hand_r`:
+      // (x = +0.086, y = -0.028), channel axis runs from pinky (+Z) to index (-Z) out the front of the fist!
+      wand.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), new THREE.Vector3(-0.06, 0.14, -0.988).normalize())
+      wand.position.set(0.086, -0.028, 0.012)
+      wand.traverse(n => {
+        n.layers.enable(0)
+        n.layers.enable(3)
+      })
+      rightHandMount.add(wand)
     }
   }
-  const t1 = bindPos.get('thumb_01_l')
-  const t2 = bindPos.get('thumb_02_l')
-  const t3 = bindPos.get('thumb_03_l')
-  const t4 = bindPos.get('thumb_04_leaf_l')
-  if (t1 && t2 && t3 && t4) {
-    // Align relaxed left thumb downward alongside palm/index (+0.85 along hand axis -> straight down beside leg when lowered)
-    const seg1 = t2.clone().sub(t1).normalize()
-    const d1 = new THREE.Quaternion().setFromUnitVectors(seg1, new THREE.Vector3(0.85, -0.12, 0.50).normalize())
-    addJoint('thumb_01_l', 'hand_l', d1, identity)
-
-    const seg2 = t3.clone().sub(t2).applyQuaternion(d1).normalize()
-    const d2 = new THREE.Quaternion().setFromUnitVectors(seg2, new THREE.Vector3(0.80, -0.18, 0.57).normalize()).multiply(d1)
-    addJoint('thumb_02_l', 'thumb_01_l', d2, d1)
-
-    const seg3 = t4.clone().sub(t3).applyQuaternion(d2).normalize()
-    const d3 = new THREE.Quaternion().setFromUnitVectors(seg3, new THREE.Vector3(0.72, -0.24, 0.65).normalize()).multiply(d2)
-    addJoint('thumb_03_l', 'thumb_02_l', d3, d2)
-  }
-  return entries
+  return {look, outfitController, uniformOutfit, rightGrips}
 }
 
-/** Razor-sharp per-pixel GLSL uniform shader so vest, reflective strips, navy pants, boots & white gloves have zero vertex blur. */
-function installOfficerClothShader(mat: THREE.Material): void {
-  const std = mat as THREE.MeshStandardMaterial
-  if (!std.userData?.clothing || std.userData.officerUniformHooked) return
-  std.userData.officerUniformHooked = true
-  const prevCompile = std.onBeforeCompile
-  std.customProgramCacheKey = () => 'creator-cloth-officer'
-  std.onBeforeCompile = (shader, renderer) => {
-    prevCompile.call(std, shader, renderer)
-    if (!shader.fragmentShader.includes('vec3 keyDir =')) return
-    shader.fragmentShader = shader.fragmentShader.replace(
-      'vec3 keyDir =',
-      `{
-        float ax = abs(rest.x);
-        bool vFront = rest.z > 0.0;
-        vec3 oNavy  = vec3(0.008, 0.016, 0.036);
-        vec3 oVest  = vec3(0.690, 0.855, 0.014);
-        vec3 oSilv  = vec3(0.860, 0.905, 0.945);
-        vec3 oGlove = vec3(0.895, 0.912, 0.875);
-        vec3 oBoot  = vec3(0.007, 0.009, 0.014);
-        if (rest.y < 0.138 && ax < 0.25) {
-          diffuseColor.rgb = oBoot;
-        } else if (zone < 0.5 && ax > 0.720 && rest.y > 1.32 && rest.y < 1.54) {
-          diffuseColor.rgb = oGlove;
-        } else if (zone > 0.5 && zone < 1.5) {
-          if (rest.y > 1.385 && ax > 0.090 && ax < 0.225 && rest.z > -0.095 && rest.z < 0.035) {
-            if (ax > 0.098 && ax < 0.132 && rest.z > -0.055 && rest.z < 0.015) diffuseColor.rgb = oSilv;
-            else if (ax >= 0.138 && ax < 0.214 && rest.z > -0.055 && rest.z < 0.012) diffuseColor.rgb = oVest;
-            else diffuseColor.rgb = oNavy;
-          } else if (ax > 0.184) {
-            if (ax > 0.720) diffuseColor.rgb = oGlove;
-            else if (ax > 0.696) diffuseColor.rgb = oSilv;
-            else diffuseColor.rgb = oNavy;
-          } else if (rest.y < 1.032) {
-            diffuseColor.rgb = oNavy;
-          } else if ((vFront && rest.y > 1.375 + 0.08 * min(1.0, ax / 0.075)) || (!vFront && ax < 0.088 && rest.y > 1.430)) {
-            diffuseColor.rgb = oNavy;
-          } else if (vFront && ax < 0.007 && rest.y >= 1.032) {
-            diffuseColor.rgb = vec3(0.50, 0.55, 0.60);
-          } else if ((rest.y >= 1.088 && rest.y <= 1.128) || (rest.y >= 1.248 && rest.y <= 1.288) || (ax > 0.086 && ax < 0.122 && rest.y > 1.288 && rest.y < 1.485)) {
-            diffuseColor.rgb = oSilv;
-          } else {
-            diffuseColor.rgb = oVest;
-          }
-        } else if (zone > 1.5 && zone < 2.5) {
-          if (rest.y > 0.945 && rest.y < 0.992) {
-            diffuseColor.rgb = (vFront && ax < 0.030) ? vec3(0.68, 0.72, 0.76) : oGlove;
-          } else if (ax > 0.152 && abs(rest.z + 0.014) < 0.012) {
-            diffuseColor.rgb = vec3(0.032, 0.056, 0.095);
-          } else {
-            diffuseColor.rgb = oNavy;
-          }
-        } else if (zone > 2.5) {
-          diffuseColor.rgb = oBoot;
-        }
+export interface OfficerPortraitModelHandle {
+  readonly group: THREE.Group
+  setExpression(expr: OfficerExpressionId | string): void
+  headWorld(out?: THREE.Vector3): THREE.Vector3
+  dispose(): void
+}
+
+/**
+ * Builds an isolated rigged traffic officer model via the unified player character pipeline
+ * (`characterModel` -> `ensureAvatarRig` -> `styleCharacter` -> `applyEquipped(OFFICER_UNIFORM_OUTFIT)` -> `applyOfficerLook`)
+ * for offscreen bust/expression portrait rendering.
+ */
+export async function buildOfficerPortraitModel(): Promise<OfficerPortraitModelHandle> {
+  const root = new THREE.Group()
+  root.name = 'officer_portrait_root'
+  let riggedModel: THREE.Group | null = null
+  let rigged: AvatarRig | null = null
+  let lookHandle: OfficerLookHandle | null = null
+  let outfitCtrl: AvatarOutfitController | null = null
+  let thumbsUpPosed = false
+
+  const loaded = await characterModel(OFFICER_AVATAR)
+  if (loaded?.scene) {
+    const modelScene = loaded.scene
+    modelScene.name = 'officer_portrait_rig'
+    const applied = mountOfficerWithLook(modelScene, 'serious', false)
+    lookHandle = applied.look
+    outfitCtrl = applied.outfitController
+    rigged = applied.look.rig
+    riggedModel = modelScene
+    root.add(modelScene)
+  }
+
+  function applyExpr(rawExpr: OfficerExpressionId | string): void {
+    const isNeutral = typeof rawExpr === 'string' && rawExpr.trim().toLowerCase() === 'neutral'
+    const expr = normalizeOfficerExpression(rawExpr)
+    if (!rigged || !riggedModel || !lookHandle) return
+    const wantThumbs = !isNeutral && expr === 'thumbs_up'
+    if (thumbsUpPosed && !wantThumbs) {
+      lookHandle.poseThumbsUp(false, 'left')
+      thumbsUpPosed = false
+    }
+    const j = rigged.joints
+    j.Hips?.rotation.set(0, 0, 0)
+    j.ThighL?.rotation.set(0, 0, -0.02)
+    j.ThighR?.rotation.set(0, 0, 0.02)
+    j.ShinL?.rotation.set(0, 0, 0)
+    j.ShinR?.rotation.set(0, 0, 0)
+    j.ArmR?.rotation.set(0.14, 0, 0.14)
+    j.ForearmR?.rotation.set(0.32, 0, 0)
+    if (wantThumbs) {
+      j.Torso?.rotation.set(0.03, -0.05, 0)
+      j.Head?.rotation.set(0.03, -0.04, 0.03)
+      j.ArmL?.rotation.set(0.12, 0, -0.14)
+      j.ForearmL?.rotation.set(0.24, 0, 0)
+    } else if (!isNeutral && expr === 'remind') {
+      j.Torso?.rotation.set(0.03, 0.04, 0)
+      j.Head?.rotation.set(0.04, -0.05, -0.03)
+      j.ArmL?.rotation.set(0.14, -0.06, -0.15)
+      j.ForearmL?.rotation.set(0.38, 0.04, 0)
+    } else if (!isNeutral && expr === 'smile') {
+      j.Torso?.rotation.set(0.02, -0.04, 0)
+      j.Head?.rotation.set(0.03, 0.04, 0.03)
+      j.ArmL?.rotation.set(0.08, 0, -0.14)
+      j.ForearmL?.rotation.set(0.24, 0, 0)
+    } else {
+      j.Torso?.rotation.set(0, 0, 0)
+      j.Head?.rotation.set(-0.02, 0.02, 0)
+      j.ArmL?.rotation.set(0.06, 0, -0.14)
+      j.ForearmL?.rotation.set(0.20, 0, 0)
+    }
+    lookHandle.setExpression(isNeutral ? 'neutral' : expr)
+    if (wantThumbs) {
+      lookHandle.poseThumbsUp(true, 'left')
+      thumbsUpPosed = true
+    } else {
+      rigged.syncPose()
+    }
+    root.updateMatrixWorld(true)
+  }
+
+  applyExpr('serious')
+
+  return {
+    group: root,
+    setExpression: applyExpr,
+    headWorld(out = new THREE.Vector3()) {
+      const head = lookHandle?.anchors.head ?? rigged?.attachments.head
+      if (head) {
+        head.getWorldPosition(out)
+        out.y += 0.05
+        return out
       }
-      vec3 keyDir =`,
-    )
+      return out.set(0, 1.62, 0)
+    },
+    dispose() {
+      lookHandle?.dispose()
+      lookHandle = null
+      outfitCtrl?.dispose()
+      outfitCtrl = null
+      root.removeFromParent()
+      if (riggedModel) {
+        disposeCharacterParts(riggedModel)
+        riggedModel.traverse(node => {
+          if (node instanceof THREE.SkinnedMesh) node.skeleton.dispose()
+        })
+      }
+    },
   }
-  std.needsUpdate = true
-}
-
-/** Applies compliant traffic officer uniform colors, cap, cropped hair, gear & hand-gripped baton. */
-function applyOfficerUniformColors(figure: THREE.Group, rig: AvatarRig): FingerPoseTarget[] {
-  const skinned = rig.skinnedMesh
-  if (!skinned) return []
-  const part = partitionCityWalkerGeometry(skinned)
-  if (part) skinned.geometry.setDrawRange(0, part.bodyIndexCount)
-
-  const uniforms = (skinned.material as THREE.Material).userData?.clothing
-  if (uniforms && part) {
-    if (!skinned.geometry.hasAttribute('clothZone')) {
-      const ids = Float32Array.from(part.zones, z =>
-        z === OUTFIT_ZONE.TOP_PRIMARY || z === OUTFIT_ZONE.TOP_SLEEVE || z === OUTFIT_ZONE.TOP_TRIM || z === OUTFIT_ZONE.TOP_INNER
-          ? 1
-          : z === OUTFIT_ZONE.BOTTOM_MAIN || z === OUTFIT_ZONE.BOTTOM_BELT
-            ? 2
-            : z === OUTFIT_ZONE.SHOES_UPPER || z === OUTFIT_ZONE.SHOES_ACCENT || z === OUTFIT_ZONE.SHOES_SOLE
-              ? 3
-              : 0,
-      )
-      skinned.geometry.setAttribute('clothZone', new THREE.BufferAttribute(ids, 1))
-    }
-    uniforms.schoolTop.value = 0
-    uniforms.skinTone.value.set('#dfb08a')
-    uniforms.sleeve.value = 1
-    uniforms.shortHem.value = 0
-    uniforms.sandal.value = 0
-    uniforms.pattern.value = 0
-    uniforms.legStripe.value = 0
-    installOfficerClothShader(skinned.material as THREE.Material)
-  }
-
-  const head = rig.attachments.head
-  if (head) {
-    const hair = head.getObjectByName('creator-hair')
-    if (hair) {
-      hair.visible = true
-      hair.scale.set(0.94, 0.80, 0.94)
-      hair.position.set(0, -0.015, 0.010)
-    }
-    head.add(buildOfficerCap())
-  }
-  const torso = rig.attachments.torso
-  if (torso) torso.add(buildOfficerDutyGear())
-
-  const rightHand = rig.attachmentAt?.('hand_r')
-  if (rightHand) {
-    const wand = buildTrafficWand()
-    // Coaxial with IDOK-281 palm grip pocket pinky->index axis in attach_hand_r local space
-    wand.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), new THREE.Vector3(0.151, 0.974, 0.171).normalize())
-    wand.position.set(-0.006, 0, -0.012)
-    rightHand.add(wand)
-  }
-  figure.scale.setScalar(figureConfig.scale * 1.03)
-  return [...buildOfficerRightGrip(figure), ...buildOfficerLeftCurl(figure)]
 }
 
 /** Immediate rounded procedural articulated officer shown before figure_m.glb finishes loading (or in headless Node). */
@@ -515,8 +503,17 @@ function buildFallbackOfficer(): {root: THREE.Group; armL: THREE.Group; armR: TH
 
   const head = new THREE.Group()
   head.position.set(0, 1.50, 0)
-  head.add(mergeColoredMesh([{geom: new THREE.IcosahedronGeometry(0.12, 1).translate(0, 0.05, 0), hex: '#dfb08a'}], 'officer_fallback_head'))
-  head.add(buildOfficerCap())
+  head.add(
+    mergeColoredMesh(
+      [
+        {geom: new THREE.IcosahedronGeometry(0.12, 1).translate(0, 0.05, 0), hex: '#dfb08a'},
+        {geom: new THREE.CylinderGeometry(0.132, 0.112, 0.068, 16).translate(0, 0.172, 0.008), hex: '#f8faf6'},
+        {geom: new THREE.CylinderGeometry(0.116, 0.118, 0.044, 16).translate(0, 0.122, 0.012), hex: '#162233'},
+        {geom: new THREE.CylinderGeometry(0.145, 0.145, 0.010, 12, 1, false, Math.PI * 0.64, Math.PI * 0.72).translate(0, 0.104, -0.010), hex: '#111822'},
+      ],
+      'officer_fallback_head',
+    ),
+  )
   root.add(head)
 
   const makeArm = (s: -1 | 1, withWand: boolean) => {
@@ -541,7 +538,7 @@ function buildFallbackOfficer(): {root: THREE.Group; armL: THREE.Group; armR: TH
 }
 
 /** Creates high-resolution compliant persuasion sign texture on canvas when DOM exists. */
-function buildPersuasionSignTexture(): THREE.CanvasTexture | null {
+function buildPersuasionSignTexture(stationTitle = '解放桥文明交通劝导站'): THREE.CanvasTexture | null {
   if (typeof document === 'undefined') return null
   const canvas = document.createElement('canvas')
   canvas.width = 512
@@ -565,7 +562,7 @@ function buildPersuasionSignTexture(): THREE.CanvasTexture | null {
   ctx.fillStyle = '#152220'
   ctx.textAlign = 'center'
   ctx.font = 'bold 40px "Noto Serif SC", "PingFang SC", serif'
-  ctx.fillText('解放桥文明交通劝导站', 256, 76)
+  ctx.fillText(stationTitle, 256, 76)
   ctx.font = 'bold 22px "Noto Serif SC", "PingFang SC", sans-serif'
   ctx.fillText('GUILIN TRAFFIC PERSUASION POST', 256, 114)
 
@@ -642,14 +639,14 @@ function makeSignPlinth(): THREE.ExtrudeGeometry {
   return g
 }
 
-/** Builds the Jiefang Bridge persuasion stand sign + safety cone + side-mounted triangular guidance flag. */
-function buildPersuasionPost(): {
+/** Builds the persuasion stand sign + safety cone + side-mounted triangular guidance flag. */
+function buildPersuasionPost(stationTitle = '解放桥文明交通劝导站'): {
   signGroup: THREE.Group
   flagPivot: THREE.Group
   disposables: {dispose(): void}[]
 } {
   const signGroup = new THREE.Group()
-  signGroup.name = 'jiefang_persuasion_sign'
+  signGroup.name = 'traffic_persuasion_sign'
   const disposables: {dispose(): void}[] = []
 
   // Wide unified rounded plinth enclosing both uprights at x = ±0.28 + upright posts + cone
@@ -672,7 +669,7 @@ function buildPersuasionPost(): {
   // Sign board (front & back face)
   const boardGeom = new THREE.BoxGeometry(0.54, 0.68, 0.028)
   boardGeom.translate(0, 1.19, 0)
-  const tex = buildPersuasionSignTexture()
+  const tex = buildPersuasionSignTexture(stationTitle)
   const faceMat = new THREE.MeshStandardMaterial({
     color: tex ? 0xffffff : 0x182825,
     ...(tex ? {map: tex} : {}),
@@ -714,6 +711,48 @@ function buildPersuasionPost(): {
   return {signGroup, flagPivot, disposables}
 }
 
+/** High-contrast 3D overhead locator beacon above the officer's cap (zero dynamic Three.js lights). */
+function buildOfficerBeacon(): {beaconGroup: THREE.Group; disposables: {dispose(): void}[]} {
+  const beaconGroup = new THREE.Group()
+  beaconGroup.name = 'officer_overhead_beacon'
+  beaconGroup.position.set(0, 2.22, 0)
+
+  const diamond = new THREE.OctahedronGeometry(0.16, 0)
+  diamond.scale(0.85, 1.35, 0.85)
+  diamond.translate(0, 0.12, 0)
+  const chevron = new THREE.ConeGeometry(0.11, 0.22, 4)
+  chevron.rotateX(Math.PI)
+  chevron.translate(0, -0.14, 0)
+  const beaconCore = mergeColoredMesh(
+    [
+      {geom: diamond, hex: '#e2f524'},
+      {geom: chevron, hex: '#f4efe2'},
+    ],
+    'officer_overhead_beacon_core',
+    {emissiveHex: '#cde61c', emissiveIntensity: 0.45, roughness: 0.4},
+  )
+
+  const halo = new THREE.TorusGeometry(0.24, 0.022, 6, 20)
+  halo.rotateX(Math.PI / 2)
+  halo.translate(0, 0.02, 0)
+  const haloMesh = mergeColoredMesh(
+    [{geom: halo, hex: '#a9503c'}],
+    'officer_overhead_beacon_halo',
+    {emissiveHex: '#a9503c', emissiveIntensity: 0.35, roughness: 0.45},
+  )
+
+  beaconGroup.add(beaconCore, haloMesh)
+  return {
+    beaconGroup,
+    disposables: [
+      beaconCore.geometry,
+      beaconCore.material as THREE.Material,
+      haloMesh.geometry,
+      haloMesh.material as THREE.Material,
+    ],
+  }
+}
+
 export function mountJiefangOfficer(
   scene: THREE.Scene,
   groundAt?: GroundSampler,
@@ -730,15 +769,16 @@ export function mountJiefangOfficer(
   const fallbackY = opts?.y ?? JIEFANG_OFFICER_SPOT.y
 
   // Sign & safety cone sit cleanly side-by-side along bridge sidewalk east (+tx) on level pave@151.85
-  const sx = ox + tx * 1.25
-  const sz = oz + tz * 1.25
+  const sx = opts?.signX ?? ox + tx * 1.25
+  const sz = opts?.signZ ?? oz + tz * 1.25
+  const signYaw = opts?.signYaw ?? -0.18
 
   const group = new THREE.Group()
-  group.name = 'jiefang_traffic_officer_post'
+  group.name = opts?.groupName ?? 'jiefang_traffic_officer_post'
 
   const officerRoot = new THREE.Group()
-  officerRoot.name = 'jiefang_traffic_officer'
-  const initY = groundAt?.(ox, oz, fallbackY, false) ?? fallbackY
+  officerRoot.name = `${group.name}_officer`
+  const initY = resolveDeckGroundY(groundAt?.(ox, oz, fallbackY, false), fallbackY)
   officerRoot.position.set(ox, initY, oz)
   officerRoot.rotation.set(0, yaw, 0)
   group.add(officerRoot)
@@ -746,39 +786,66 @@ export function mountJiefangOfficer(
   const fallback = buildFallbackOfficer()
   officerRoot.add(fallback.root)
 
-  const {signGroup, flagPivot, disposables} = buildPersuasionPost()
-  const initSignY = groundAt?.(sx, sz, initY, false) ?? initY
+  const beacon = buildOfficerBeacon()
+  officerRoot.add(beacon.beaconGroup)
+
+  const {signGroup, flagPivot, disposables} = buildPersuasionPost(opts?.stationTitle ?? '解放桥文明交通劝导站')
+  disposables.push(...beacon.disposables)
+  const initSignY = resolveDeckGroundY(groundAt?.(sx, sz, initY, false), initY)
   signGroup.position.set(sx, initSignY, sz)
-  signGroup.rotation.set(0, -0.18, 0)
+  signGroup.rotation.set(0, signYaw, 0)
   group.add(signGroup)
 
   scene.add(group)
+  mainDetail(group)
 
   let riggedModel: THREE.Group | null = null
   let rigged: AvatarRig | null = null
-  let fingerGrips: FingerPoseTarget[] = []
+  let lookHandle: OfficerLookHandle | null = null
+  let outfitCtrl: AvatarOutfitController | null = null
+  let idleMixer: THREE.AnimationMixer | null = null
+  let rightGrips: FingerPoseTarget[] = []
+  let thumbsUpPosed = false
   let disposed = false
   let clock = 0
   let groundTimer = 0
   let curPhase: 'go' | 'stop' | 'guide' | 'watch' = 'go'
+  let visualState: OfficerVisualState = 'available'
+  let curExpression: OfficerExpressionId = 'serious'
+  let lookTarget: {x: number; y?: number; z: number} | null = null
+  let currentYaw = yaw
 
   if (!opts?.proceduralOnly && typeof fetch === 'function') {
-    void characterModel(OFFICER_AVATAR)
-      .then(loaded => {
-        if (disposed || !loaded) return
+    void Promise.all([characterModel(OFFICER_AVATAR), loadSharedPlayerIdleClip()])
+      .then(([loaded, idleClip]) => {
+        if (disposed || !loaded?.scene) return
         const modelScene = loaded.scene
+        let hasRenderableMesh = false
+        modelScene.traverse(node => {
+          if (node instanceof THREE.Mesh && node.geometry?.attributes?.position?.count > 0) {
+            hasRenderableMesh = true
+          }
+        })
+        if (!hasRenderableMesh) return
         modelScene.name = 'rigged-traffic-officer'
-        const avatarRig = ensureAvatarRig(modelScene)
-        styleCharacter(modelScene, avatarRig, OFFICER_AVATAR)
-        fingerGrips = applyOfficerUniformColors(modelScene, avatarRig)
+        const applied = mountOfficerWithLook(modelScene, curExpression, true)
+        lookHandle = applied.look
+        outfitCtrl = applied.outfitController
+        rightGrips = applied.rightGrips
+        if (idleClip) {
+          idleMixer = new THREE.AnimationMixer(modelScene)
+          idleMixer.clipAction(idleClip).play()
+          idleMixer.update(1.2)
+        }
         fallback.root.visible = false
         officerRoot.add(modelScene)
         riggedModel = modelScene
-        rigged = avatarRig
+        rigged = applied.look.rig
         applyGesturePose(clock)
       })
       .catch(() => {
-        // Keep procedural articulated fallback in environments without asset server
+        // Keep procedural articulated fallback clearly visible if GLB cannot load
+        fallback.root.visible = true
       })
   }
 
@@ -791,8 +858,37 @@ export function mountJiefangOfficer(
     let foreR: [number, number, number] = [0.18, 0, 0]
     let torso: [number, number, number] = [0, 0, 0]
     let head: [number, number, number] = [0, 0, 0]
+    let useThumbsUp = false
 
-    if (t < 2.2) {
+    if (visualState === 'handoff' || ((visualState === 'talking') && curExpression === 'thumbs_up')) {
+      curPhase = 'guide'
+      useThumbsUp = true
+      const pulse = Math.sin(tCycle * 3.0) * 0.05
+      armL = [0.10, 0, -0.14]
+      foreL = [0.22, 0, 0]
+      armR = [0.76 + pulse, -0.08, 0.16]
+      foreR = [0.35, 0, 0]
+      torso = [0.03, 0, 0]
+      head = [0.03, 0, 0]
+    } else if (visualState === 'talking') {
+      curPhase = 'watch'
+      const nod = Math.sin(tCycle * 3.4) * 0.06
+      const gesture = Math.sin(tCycle * 2.4) * 0.14
+      if (curExpression === 'remind') {
+        armL = [0.48 + gesture, -0.10, -0.20]
+        foreL = [1.05, 0.10, 0.06]
+        armR = [0.24, 0, 0.15]
+        foreR = [0.38, 0, 0]
+        head = [0.07 + nod, Math.sin(tCycle * 1.1) * 0.05, 0]
+      } else {
+        armL = [0.22 + gesture * 0.6, 0.08, -0.18]
+        foreL = [0.46, 0, 0]
+        armR = [0.22, 0, 0.15]
+        foreR = [0.38, 0, 0]
+        head = [nod, Math.sin(tCycle * 1.2) * 0.06, 0]
+      }
+      torso = [0.02, 0, 0]
+    } else if (t < 2.2) {
       curPhase = 'go'
       const u = Math.sin((t / 2.2) * Math.PI)
       const sweep = Math.sin(t * 4.5) * 0.36
@@ -834,20 +930,55 @@ export function mountJiefangOfficer(
     }
 
     if (rigged && riggedModel) {
-      const j = rigged.joints
-      j.Hips?.rotation.set(0, 0, 0)
-      j.Torso?.rotation.set(...torso)
-      j.Head?.rotation.set(...head)
-      j.ArmL?.rotation.set(...armL)
-      j.ForearmL?.rotation.set(...foreL)
-      j.ArmR?.rotation.set(...armR)
-      j.ForearmR?.rotation.set(...foreR)
-      j.ThighL?.rotation.set(0, 0, -0.03)
-      j.ThighR?.rotation.set(0, 0, 0.03)
-      j.ShinL?.rotation.set(0, 0, 0)
-      j.ShinR?.rotation.set(0, 0, 0)
-      rigged.syncPose()
-      for (const fg of fingerGrips) fg.bone.quaternion.copy(fg.target)
+      if (lookHandle && !useThumbsUp && thumbsUpPosed) {
+        lookHandle.poseThumbsUp(false, 'left')
+        thumbsUpPosed = false
+      }
+      // `r10-officer-guide.md` Red Line 4: When `available` (waiting at bridge head) or `watch`,
+      // play the genuine player `idle` clip so left arm & shoulders hang naturally (~5° by trouser seam, never stiff 35° A-pose!)
+      // and bend right forearm slightly for relaxed baton carry.
+      if (idleMixer && !useThumbsUp && (visualState === 'available' || (visualState === 'active' && curPhase === 'watch'))) {
+        curPhase = 'watch'
+        // Reset pose first so per-frame forearm delta never accumulates across frames, then sample player `idle` clip!
+        rigged.clearPose()
+        idleMixer.setTime(0)
+        idleMixer.update(1.2 + (tCycle % 4.0))
+        const upperR = riggedModel.getObjectByName('upperarm_r')
+        const lowerR = riggedModel.getObjectByName('lowerarm_r')
+        if (upperR) {
+          upperR.quaternion.multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), -0.08))
+        }
+        if (lowerR) {
+          // +X bends right forearm cleanly forward-upward (handR -> [0.24, 0.89, -0.08], well clear of right thigh!)
+          lowerR.quaternion.multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), 0.38))
+        }
+        lookHandle?.setHandGesture('relaxed', 'left')
+        lookHandle?.setHandGesture('grip', 'right')
+      } else {
+        const j = rigged.joints
+        j.Hips?.rotation.set(0, 0, 0)
+        j.Torso?.rotation.set(...torso)
+        j.Head?.rotation.set(...head)
+        j.ArmL?.rotation.set(armL[0], armL[1], Math.max(armL[2], curPhase === 'go' || curPhase === 'guide' ? armL[2] : -0.05))
+        j.ForearmL?.rotation.set(...foreL)
+        j.ArmR?.rotation.set(armR[0], armR[1], Math.min(armR[2], 0.08))
+        j.ForearmR?.rotation.set(Math.max(0.28, foreR[0]), foreR[1], foreR[2])
+        j.ThighL?.rotation.set(0, 0, -0.02)
+        j.ThighR?.rotation.set(0, 0, 0.02)
+        j.ShinL?.rotation.set(0, 0, 0)
+        j.ShinR?.rotation.set(0, 0, 0)
+        if (lookHandle && useThumbsUp) {
+          if (!thumbsUpPosed) {
+            lookHandle.poseThumbsUp(true, 'left')
+            thumbsUpPosed = true
+          } else {
+            rigged.syncPose()
+          }
+        } else {
+          rigged.syncPose()
+        }
+        lookHandle?.setHandGesture('grip', 'right')
+      }
     } else {
       fallback.armL.rotation.set(armL[0], armL[1], armL[2])
       fallback.armR.rotation.set(armR[0], armR[1], armR[2])
@@ -855,12 +986,41 @@ export function mountJiefangOfficer(
     }
   }
 
+  function syncBeacon(tSec: number): void {
+    const show = visualState === 'available'
+    beacon.beaconGroup.visible = show
+    if (show) {
+      beacon.beaconGroup.position.y = 2.22 + Math.sin(tSec * 3.2) * 0.08
+      beacon.beaconGroup.rotation.y = tSec * 1.35
+    }
+  }
+
+  function stepLookYaw(dt: number): void {
+    let targetYaw = yaw
+    if (lookTarget && (visualState === 'talking' || visualState === 'handoff')) {
+      const dx = lookTarget.x - officerRoot.position.x
+      const dz = lookTarget.z - officerRoot.position.z
+      if (dx * dx + dz * dz > 0.09) {
+        // Local -Z faces forward -> yaw = atan2(-dx, -dz)
+        targetYaw = Math.atan2(-dx, -dz)
+      }
+    }
+    let delta = targetYaw - currentYaw
+    while (delta > Math.PI) delta -= Math.PI * 2
+    while (delta < -Math.PI) delta += Math.PI * 2
+    const k = dt > 0 ? Math.min(1, 1 - Math.exp(-9 * dt)) : 1
+    currentYaw += delta * k
+    officerRoot.rotation.y = currentYaw
+  }
+
   applyGesturePose(0)
+  syncBeacon(0)
 
   return {
     group,
     officerRoot,
     signGroup,
+    beaconGroup: beacon.beaconGroup,
     get position() {
       return {x: officerRoot.position.x, y: officerRoot.position.y, z: officerRoot.position.z}
     },
@@ -868,25 +1028,61 @@ export function mountJiefangOfficer(
       return {x: signGroup.position.x, y: signGroup.position.y, z: signGroup.position.z}
     },
     phase: () => curPhase,
+    setDutyState(state: OfficerVisualState) {
+      visualState = state
+      if (state === 'handoff') curExpression = 'thumbs_up'
+      else if (state === 'available' || state === 'active') curExpression = 'serious'
+      lookHandle?.setExpression(curExpression)
+      syncBeacon(clock)
+      applyGesturePose(clock)
+    },
+    setExpression(rawExpr: OfficerExpressionId | string) {
+      curExpression = normalizeOfficerExpression(rawExpr)
+      lookHandle?.setExpression(curExpression)
+      applyGesturePose(clock)
+    },
+    setLookTarget(pos: {x: number; y?: number; z: number} | null) {
+      lookTarget = pos ? {x: pos.x, y: pos.y, z: pos.z} : null
+      stepLookYaw(0)
+    },
+    headWorld(out = new THREE.Vector3()) {
+      officerRoot.updateMatrixWorld(true)
+      const headBone = lookHandle?.anchors.head ?? rigged?.attachments.head ?? fallback.head
+      if (headBone) {
+        headBone.getWorldPosition(out)
+        out.y += 0.05
+        return out
+      }
+      return out.set(officerRoot.position.x, officerRoot.position.y + 1.62, officerRoot.position.z)
+    },
     update(dt: number, elapsedSec?: number) {
       if (disposed) return
-      clock = elapsedSec ?? clock + Math.max(0, dt)
+      const stepDt = Math.max(0, dt)
+      clock = elapsedSec ?? clock + stepDt
+      stepLookYaw(stepDt)
       applyGesturePose(clock)
+      syncBeacon(clock)
       flagPivot.rotation.z = Math.sin(clock * 2.8) * 0.06
       flagPivot.rotation.y = Math.cos(clock * 1.9) * 0.08
 
-      groundTimer -= Math.max(0, dt)
+      groundTimer -= stepDt
       if (groundAt && groundTimer <= 0) {
         groundTimer = 0.25
-        const oy = groundAt(ox, oz, fallbackY, false)
-        if (oy !== undefined && Number.isFinite(oy)) officerRoot.position.y = oy
-        const sy = groundAt(sx, sz, oy ?? fallbackY, false)
-        if (sy !== undefined && Number.isFinite(sy)) signGroup.position.y = sy
+        const oy = resolveDeckGroundY(groundAt(ox, oz, fallbackY, false), fallbackY)
+        officerRoot.position.y = oy
+        const sy = resolveDeckGroundY(groundAt(sx, sz, oy, false), oy)
+        signGroup.position.y = sy
       }
     },
     dispose() {
       if (disposed) return
       disposed = true
+      idleMixer?.stopAllAction()
+      idleMixer = null
+      lookHandle?.dispose()
+      lookHandle = null
+      outfitCtrl?.dispose()
+      outfitCtrl = null
       group.removeFromParent()
       for (const d of disposables) d.dispose()
       fallback.root.traverse(node => {
@@ -895,13 +1091,62 @@ export function mountJiefangOfficer(
           for (const m of Array.isArray(node.material) ? node.material : [node.material]) m.dispose()
         }
       })
-      riggedModel?.traverse(node => {
-        if (node instanceof THREE.SkinnedMesh) node.skeleton.dispose()
-        if (node instanceof THREE.Mesh) {
-          node.geometry.dispose()
-          for (const m of Array.isArray(node.material) ? node.material : [node.material]) m.dispose()
-        }
-      })
+      if (riggedModel) {
+        disposeCharacterParts(riggedModel)
+        riggedModel.traverse(node => {
+          if (node instanceof THREE.SkinnedMesh) node.skeleton.dispose()
+        })
+      }
+    },
+  }
+}
+
+export function mountDutyOfficer(
+  scene: THREE.Scene,
+  zoneId: 'jiefang' | 'shizijie',
+  groundAt?: GroundSampler,
+  opts?: JiefangOfficerOptions,
+): JiefangOfficerHandle {
+  if (zoneId === 'shizijie') {
+    return mountJiefangOfficer(scene, groundAt, {
+      x: SHIZIJIE_OFFICER_SPOT.x,
+      y: SHIZIJIE_OFFICER_SPOT.y,
+      z: SHIZIJIE_OFFICER_SPOT.z,
+      yaw: SHIZIJIE_OFFICER_SPOT.yaw,
+      signX: SHIZIJIE_OFFICER_SPOT.signX,
+      signZ: SHIZIJIE_OFFICER_SPOT.signZ,
+      signYaw: SHIZIJIE_OFFICER_SPOT.signYaw,
+      stationTitle: '十字街文明交通劝导站',
+      groupName: 'shizijie_traffic_officer_post',
+      ...opts,
+    })
+  }
+  return mountJiefangOfficer(scene, groundAt, {
+    stationTitle: '解放桥文明交通劝导站',
+    groupName: 'jiefang_traffic_officer_post',
+    ...opts,
+  })
+}
+
+export function mountAllDutyOfficers(
+  scene: THREE.Scene,
+  groundAt?: GroundSampler,
+  opts?: Pick<JiefangOfficerOptions, 'proceduralOnly'>,
+): AllDutyOfficersHandle {
+  const jiefang = mountDutyOfficer(scene, 'jiefang', groundAt, opts)
+  const shizijie = mountDutyOfficer(scene, 'shizijie', groundAt, opts)
+  return {
+    officers: Object.freeze({jiefang, shizijie}),
+    setJiefangState(state: OfficerVisualState) {
+      jiefang.setDutyState(state)
+    },
+    update(dt: number, elapsedSec?: number) {
+      jiefang.update(dt, elapsedSec)
+      shizijie.update(dt, elapsedSec !== undefined ? elapsedSec + 2.5 : undefined)
+    },
+    dispose() {
+      jiefang.dispose()
+      shizijie.dispose()
     },
   }
 }

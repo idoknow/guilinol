@@ -103,10 +103,12 @@ def chunks(roads,banks,bounds,water,sample,exclude,ped_areas=(),replace_exclude=
     lane_stripes = []
     lamp_candidates = []
 
+    from shizijie_underpass import in_shizijie_clear_zone
     def emit_crosswalk(line, width, left_w, right_w, dist, sign_away, with_stop, search=0, approach=None):
         if not 0 <= dist <= line.length:
             return
         mid = np.array(line.interpolate(dist).coords[0])
+        suppress_crosswalk = in_shizijie_clear_zone(float(mid[0]), float(mid[1]))
         delta = np.subtract(line.interpolate(min(line.length, dist + .25)).coords[0], line.interpolate(max(0, dist - .25)).coords[0])
         tangent = sign_away * delta / max(.001, np.linalg.norm(delta))
         normal = np.array([-tangent[1], tangent[0]])
@@ -121,7 +123,7 @@ def chunks(roads,banks,bounds,water,sample,exclude,ped_areas=(),replace_exclude=
             low = -width/2 - (extension if sign_away < 0 else 0)
             high = width/2 + (extension if sign_away > 0 else 0)
             spans = np.linspace(low+half_bar,high-half_bar,max(2,round((high-low)/1.15)))
-        if not no_zebra:
+        if not (suppress_crosswalk or no_zebra):
             for span in spans:
                 center = mid + normal * span
                 bars.append(LineString([center - tangent * 1.9, center + tangent * 1.9]).buffer(half_bar, cap_style='flat'))
@@ -135,13 +137,13 @@ def chunks(roads,banks,bounds,water,sample,exclude,ped_areas=(),replace_exclude=
             if search < 24:
                 emit_crosswalk(line, width, left_w, right_w, dist + sign_away * 2, sign_away, with_stop, search + 2, approach)
             return
-        if any(Point(mid).distance(c) < 8 for c in crossing_centres):
+        if not suppress_crosswalk and any(Point(mid).distance(c) < 8 for c in crossing_centres):
             return
         if any(group.intersects(other) for other in crosswalk_groups):
             return
-        crossing_centres.append(Point(mid))
         crosswalk_groups.append(group)
-        if not no_zebra:
+        if not (suppress_crosswalk or no_zebra):
+            crossing_centres.append(Point(mid))
             gaps.append(LineString([mid - normal * (width / 2 + left_w + 1), mid + normal * (width / 2 + right_w + 1)]).buffer(2.05, cap_style='flat'))
 
     for road in roads:
@@ -231,9 +233,20 @@ def chunks(roads,banks,bounds,water,sample,exclude,ped_areas=(),replace_exclude=
                          for lane in lane_stripes])
     stripes = [*polygons(lanes), *crosswalk_groups]
     lengths['markingOverlap'] = list(violations(stripes, cores, bounds))
-    bridge_ways = [LineString(points(el)) for el in load_osm() if el['type']=='way' and
-                   el.get('tags',{}).get('bridge','no')!='no' and 'highway' in el.get('tags',{}) and len(points(el))>1]
+    bridge_elems = [el for el in load_osm() if el['type']=='way' and
+                    el.get('tags',{}).get('bridge','no')!='no' and 'highway' in el.get('tags',{}) and len(points(el))>1]
+    bridge_ways = [LineString(points(el)) for el in bridge_elems]
     bridge = STRtree([bw.buffer(11) for bw in bridge_ways])
+    # IDOK-431: use actual per-class bridge half-widths with flat endcaps for sidewalk/cycle paving
+    # masks so a narrow footbridge never erases sidewalks 11m away on intersecting approach streets.
+    bridge_half_widths = {
+        'footway': 1.8, 'path': 1.8, 'steps': 1.8, 'cycleway': 1.8, 'service': 3.5,
+        'residential': 5.0, 'tertiary': 5.5, 'secondary': 6.5, 'primary': 7.5, 'trunk': 9.5,
+    }
+    bridge_paving_masks = [
+        bw.buffer(bridge_half_widths.get(el['tags']['highway'], 5.5), cap_style='flat')
+        for el, bw in zip(bridge_elems, bridge_ways)
+    ]
     carriageway_union = unary_union([*surfaces, *bands[2].geometries, *(bw.buffer(10, quad_segs=2) for bw in bridge_ways)])
     carriageway_avoid = carriageway_union.buffer(0.35) if not carriageway_union.is_empty else Polygon()
     curb_shell = carriageway_union.buffer(0.85) if not carriageway_union.is_empty else Polygon()
@@ -356,7 +369,7 @@ def chunks(roads,banks,bounds,water,sample,exclude,ped_areas=(),replace_exclude=
                                 pos_s += 3.1
 
     layers=[STRtree(values) for values in (surfaces,sidewalks,stripes,medians,gaps)]
-    fixed_obstacles = [*footprints, *water, *bridge.geometries, *polygons(rep_excl), *clear.geometries]
+    fixed_obstacles = [*footprints, *water, *bridge_paving_masks, *polygons(rep_excl), *clear.geometries]
     obstacles = STRtree([*fixed_obstacles, *polygons(exclude)])
     paving_obstacles = (STRtree([*fixed_obstacles, *polygons(exclude.difference(station_open))])
                         if not station_open.is_empty else obstacles)
@@ -482,16 +495,29 @@ def chunks(roads,banks,bounds,water,sample,exclude,ped_areas=(),replace_exclude=
         gate_plaza = area_only(gate_plaza)
     def encode(tile,origin):
         shapes = [clipped(layer,tile) for layer in layers]
-        shapes[1]=shapes[1].difference(shapes[0]).union(shapes[3]).difference(shapes[4])
+        # IDOK-431: only punch crosswalk gaps (shapes[4]) through central medians (shapes[3]),
+        # never carve rectangular cutouts out of roadside sidewalks or non-motorized bike lanes.
+        shapes[1]=shapes[1].difference(shapes[0]).union(shapes[3].difference(shapes[4]))
         if bldg_tree is not None:
             shapes[1] = shapes[1].difference(clipped(bldg_tree,tile))
         shapes[2]=shapes[2].difference(shapes[3])
         if modeled_paving is not None and tile.intersects(modeled_paving):
             shapes[:3]=[shape.difference(modeled_paving) for shape in shapes[:3]]
-        blocked = unary_union([shapes[0], shapes[4], clipped(paving_obstacles, tile)])
+        blocked = unary_union([shapes[0], clipped(paving_obstacles, tile)])
         if modeled_paving is not None:
             blocked = blocked.union(clip_area(modeled_paving,tile))
-        walk, verge, cycle, tactile = [clipped(layer, tile).difference(blocked) for layer in bands]
+        walk, verge_raw, cycle, tactile = [clipped(layer, tile).difference(blocked) for layer in bands]
+        verge = verge_raw.difference(shapes[4])
+        # Replace crosswalk openings in roadside verges with flush paving so zero bare-earth pits remain.
+        verge_gap = verge_raw.intersection(shapes[4])
+        if not verge_gap.is_empty:
+            for vg in polygons(verge_gap):
+                if vg.area < .005:
+                    continue
+                if vg.area / max(vg.length * .5, .1) < .55:
+                    cycle = cycle.union(vg)
+                else:
+                    walk = walk.union(vg)
         if parking_walk.intersects(tile):
             bay = clip_area(parking_walk,tile).difference(shapes[0]).difference(shapes[4]).difference(rep_excl)
             for mask in (bldg_tree,water_tree):

@@ -1,7 +1,7 @@
 import { Vector3, type Camera, type Group } from 'three'
 import type { AvatarRig } from '../walk/avatar-rig'
 import type { Player } from '../net-players'
-import { hits } from '../input/keymap'
+import { hits, isDutyScopeActive } from '../input/keymap'
 import { isGlobalHotkeyBlocked } from '../walk/input-guard'
 import { Fighter } from './state'
 import { config, type CombatPacket } from './net'
@@ -21,7 +21,8 @@ interface Host {
   onDown: () => void
   align: (p: Player) => boolean
 }
-const touch = matchMedia('(pointer:coarse) and (not (any-pointer:fine))').matches
+const touch = typeof matchMedia === 'function' && matchMedia('(pointer:coarse) and (not (any-pointer:fine))').matches
+export const isPunchBlockedByDuty = isDutyScopeActive
 export function combatController(h: Host) {
   const f = new Fighter(),
     ui = hud(),
@@ -38,6 +39,7 @@ export function combatController(h: Host) {
     return h.allowed() && !f.down && !isGlobalHotkeyBlocked(document.activeElement)
   }
   function punch() {
+    if (isDutyScopeActive()) return
     const now = performance.now()
     if (
       !free() ||
@@ -57,7 +59,7 @@ export function combatController(h: Host) {
   }
   let press: { x: number; y: number; t: number; id: number } | undefined
   h.canvas.addEventListener('pointerdown', (e) => {
-    if (e.button === 0 && e.pointerType === 'mouse' && free())
+    if (e.button === 0 && e.pointerType === 'mouse' && free() && !isDutyScopeActive())
       press = { x: e.clientX, y: e.clientY, t: e.timeStamp, id: e.pointerId }
   })
   h.canvas.addEventListener('pointermove', (e) => {
@@ -69,6 +71,7 @@ export function combatController(h: Host) {
       e.pointerId === press.id &&
       e.target === h.canvas &&
       e.timeStamp - press.t < 200 &&
+      !isDutyScopeActive() &&
       hits('Mouse0', 'punch')
     )
       punch()
@@ -78,7 +81,7 @@ export function combatController(h: Host) {
     press = undefined
   })
   window.addEventListener('keydown', (e) => {
-    if (!e.repeat && hits(e.code, 'punch') && !isGlobalHotkeyBlocked(e.target)) punch()
+    if (!e.repeat && !isDutyScopeActive() && hits(e.code, 'punch') && !isGlobalHotkeyBlocked(e.target)) punch()
   })
   function nearest(closerThan = Infinity) {
     let best: Player | undefined,
@@ -171,8 +174,9 @@ export function combatController(h: Host) {
   function tick(moving: boolean) {
     const now = performance.now(),
       phase = f.phase(now, moving)
+    if (isDutyScopeActive()) pending = false
     if (pending && now - last >= 100) {
-      if (free()) {
+      if (free() && !isDutyScopeActive()) {
         pose(h.rig, f, 'strike', f.punched + 120, h.figure.rotation.y)
         posed = true
         const hand =
@@ -202,7 +206,7 @@ export function combatController(h: Host) {
       ui.tip.style.top = ((1 - screen.y) * innerHeight) / 2 + 'px'
     }
     ui.update(f, phase, now, prompt, f.down ? f.progress : (p?.progress ?? 0))
-    ui.punch.hidden ||= !h.allowed()
+    ui.punch.hidden ||= !h.allowed() || isDutyScopeActive()
   }
   function hide() {
     stop()

@@ -1,0 +1,589 @@
+{
+  "version": 2,
+  "target": "shizijie-b1-underground",
+  "atlasSheetsMax": 2,
+  "atlasSheetsCount": 2,
+  "budgetBytesLimit": 8388608,
+  "totalPublicDiskBytes": 1927774,
+  "totalGpuRawBytes": 6250496,
+  "totalGpuMipmappedBytes": 8334007,
+  "realBrandLogosIncluded": false,
+  "assets": [
+    {
+      "id": "atlas-signs-albedo",
+      "file": "textures/atlas-signs-albedo.png",
+      "kind": "atlas-albedo",
+      "atlasSheetIndex": 1,
+      "width": 1024,
+      "height": 512,
+      "diskBytes": 292959,
+      "gpuRawBytes": 2097152,
+      "gpuMipmappedBytes": 2796203,
+      "license": "CC0-1.0",
+      "sourceUrl": "https://github.com/idoknow/guilinol/blob/main/docs/style.md",
+      "derivedFrom": [
+        "baidu_se_wenhua_W",
+        "BV1GuW9zJEQT_13:20",
+        "wikimedia_cc0_wangcheng_plaza"
+      ],
+      "slotCount": 30,
+      "description": "十字街地下街 30 槽位高反差降饱和 1:1 原创店招/出口/防滑合批图集（含逃生人像与安全防渗边距）"
+    },
+    {
+      "id": "atlas-wayfinding-albedo",
+      "file": "textures/atlas-wayfinding-albedo.png",
+      "kind": "atlas-wayfinding",
+      "atlasSheetIndex": 2,
+      "width": 1024,
+      "height": 512,
+      "diskBytes": 95101,
+      "gpuRawBytes": 2097152,
+      "gpuMipmappedBytes": 2796203,
+      "license": "CC0-1.0",
+      "sourceUrl": "https://github.com/idoknow/guilinol/blob/main/docs/shizijie/wayfinding.md",
+      "derivedFrom": [
+        "BV1b8411r7EP_sheet_1_R3",
+        "web/src/shizijie/wayfinding/index.ts"
+      ],
+      "slotCount": 63,
+      "description": "数据驱动天花板悬挂多栏灯箱图集（1024×512：248×96防溢700黑体中文+120×76圆角深红[NW/NE/SE/SW]+84×104厚重箭头+85×54零压窄开腔距离）"
+    },
+    {
+      "id": "tile-terrazzo-albedo",
+      "file": "textures/tile-terrazzo-albedo.png",
+      "kind": "albedo",
+      "width": 256,
+      "height": 256,
+      "diskBytes": 104247,
+      "gpuRawBytes": 262144,
+      "gpuMipmappedBytes": 349526,
+      "license": "CC0-1.0",
+      "sourceUrl": "https://github.com/idoknow/guilinol/blob/main/docs/style.md",
+      "derivedFrom": [
+        "BV1b8411r7EP_sheet_1_R3",
+        "bilibili_BV1GuW9zJEQT_03:52"
+      ],
+      "description": "老区环廊抛光紧实柔边盐椒花水磨石地砖（含 1px 骨料间细矿物点噪）"
+    },
+    {
+      "id": "tile-terrazzo-normal",
+      "file": "textures/tile-terrazzo-normal.png",
+      "kind": "normal",
+      "width": 128,
+      "height": 128,
+      "diskBytes": 8666,
+      "gpuRawBytes": 65536,
+      "gpuMipmappedBytes": 87382,
+      "license": "CC0-1.0",
+      "sourceUrl": "https://github.com/idoknow/guilinol/blob/main/docs/style.md",
+      "derivedFrom": [
+        "BV1b8411r7EP_sheet_1_R3"
+      ],
+      "description": "水磨石深砖缝、板块微倾阶跃与骨料法线"
+    },
+    {
+      "id": "tile-terrazzo-roughness",
+      "file": "textures/tile-terrazzo-roughness.png",
+      "kind": "roughness",
+      "width": 64,
+      "height": 64,
+      "diskBytes": 3645,
+      "gpuRawBytes": 16384,
+      "gpuMipmappedBytes": 21846,
+      "license": "CC0-1.0",
+      "sourceUrl": "https://github.com/idoknow/guilinol/blob/main/docs/style.md",
+      "derivedFrom": [
+        "BV1b8411r7EP_sheet_1_R3"
+      ],
+      "description": "半抛光地面低粗糙度贴图（0.11..0.19 砖面 vs 0.78 砖缝）"
+    },
+    {
+      "id": "tile-corridor-albedo",
+      "file": "textures/tile-corridor-albedo.png",
+      "kind": "albedo",
+      "width": 256,
+      "height": 256,
+      "diskBytes": 89279,
+      "gpuRawBytes": 262144,
+      "gpuMipmappedBytes": 349526,
+      "license": "CC0-1.0",
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:Xiufeng,_Guilin,_Guangxi,_China_-_panoramio_(4).jpg",
+      "derivedFrom": [
+        "BV1b8411r7EP_sheet_1_R3",
+        "wikimedia_Xiufeng_panoramio_4"
+      ],
+      "description": "主通道抛光芝麻灰盐椒花岗岩方砖（细灰拼缝+高对比斑晶）"
+    },
+    {
+      "id": "tile-corridor-normal",
+      "file": "textures/tile-corridor-normal.png",
+      "kind": "normal",
+      "width": 128,
+      "height": 128,
+      "diskBytes": 4533,
+      "gpuRawBytes": 65536,
+      "gpuMipmappedBytes": 87382,
+      "license": "CC0-1.0",
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:Xiufeng,_Guilin,_Guangxi,_China_-_panoramio_(4).jpg",
+      "derivedFrom": [
+        "BV1b8411r7EP_sheet_1_R3"
+      ],
+      "description": "走廊花岗岩板块微倾与沟缝法线贴图"
+    },
+    {
+      "id": "tile-corridor-roughness",
+      "file": "textures/tile-corridor-roughness.png",
+      "kind": "roughness",
+      "width": 64,
+      "height": 64,
+      "diskBytes": 2891,
+      "gpuRawBytes": 16384,
+      "gpuMipmappedBytes": 21846,
+      "license": "CC0-1.0",
+      "sourceUrl": "https://github.com/idoknow/guilinol/blob/main/docs/style.md",
+      "derivedFrom": [
+        "BV1b8411r7EP_sheet_1_R3"
+      ],
+      "description": "走廊抛光石砖低粗糙度反射贴图（0.10..0.17）"
+    },
+    {
+      "id": "ceiling-grid-albedo",
+      "file": "textures/ceiling-grid-albedo.png",
+      "kind": "albedo",
+      "width": 256,
+      "height": 128,
+      "diskBytes": 4733,
+      "gpuRawBytes": 131072,
+      "gpuMipmappedBytes": 174763,
+      "license": "CC0-1.0",
+      "sourceUrl": "https://github.com/idoknow/guilinol/blob/main/docs/style.md",
+      "derivedFrom": [
+        "BV1b8411r7EP_sheet_1_R3",
+        "BV1GuW9zJEQT_sheet_1_R7"
+      ],
+      "description": "银白拉丝铝合金吊顶主板与纤细稀疏条形嵌灯（占比约 10.6%，去除黑框方块感）"
+    },
+    {
+      "id": "ceiling-grid-emissive",
+      "file": "textures/ceiling-grid-emissive.png",
+      "kind": "emissive",
+      "width": 256,
+      "height": 128,
+      "diskBytes": 293,
+      "gpuRawBytes": 131072,
+      "gpuMipmappedBytes": 174763,
+      "license": "CC0-1.0",
+      "sourceUrl": "https://github.com/idoknow/guilinol/blob/main/docs/style.md",
+      "derivedFrom": [
+        "BV1b8411r7EP_sheet_1_R3"
+      ],
+      "description": "纤细条形嵌灯柔和自发光遮罩（占比约 10.6%）"
+    },
+    {
+      "id": "ceiling-grid-roughness",
+      "file": "textures/ceiling-grid-roughness.png",
+      "kind": "roughness",
+      "width": 64,
+      "height": 64,
+      "diskBytes": 3316,
+      "gpuRawBytes": 16384,
+      "gpuMipmappedBytes": 21846,
+      "license": "CC0-1.0",
+      "sourceUrl": "https://github.com/idoknow/guilinol/blob/main/docs/style.md",
+      "derivedFrom": [
+        "BV1b8411r7EP_sheet_1_R3"
+      ],
+      "description": "铝扣板半哑光与灯框压条粗糙度贴图"
+    },
+    {
+      "id": "light-strip",
+      "file": "textures/light-strip.png",
+      "kind": "albedo",
+      "width": 64,
+      "height": 32,
+      "diskBytes": 227,
+      "gpuRawBytes": 8192,
+      "gpuMipmappedBytes": 10923,
+      "license": "CC0-1.0",
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:%E6%A1%82%E6%9E%97%E7%8E%8E%E5%9F%8E%E5%95%86%E5%8E%A6_01.jpg",
+      "derivedFrom": [
+        "BV1b8411r7EP_sheet_1_R3",
+        "wikimedia_cc0_wangcheng_plaza"
+      ],
+      "description": "门楣灯槽柔和自发光灯带渐变贴图"
+    },
+    {
+      "id": "shutter-silver-albedo",
+      "file": "textures/shutter-silver-albedo.png",
+      "kind": "albedo",
+      "width": 128,
+      "height": 256,
+      "diskBytes": 8578,
+      "gpuRawBytes": 131072,
+      "gpuMipmappedBytes": 174763,
+      "license": "CC0-1.0",
+      "sourceUrl": "https://github.com/idoknow/guilinol/blob/main/docs/style.md",
+      "derivedFrom": [
+        "BV1b8411r7EP_sheet_1_R3",
+        "baidu_jiefang_west"
+      ],
+      "description": "镀锌银灰波纹卷帘门（底部含橡胶封条与锁盒）"
+    },
+    {
+      "id": "shutter-cream-albedo",
+      "file": "textures/shutter-cream-albedo.png",
+      "kind": "albedo",
+      "width": 128,
+      "height": 256,
+      "diskBytes": 8781,
+      "gpuRawBytes": 131072,
+      "gpuMipmappedBytes": 174763,
+      "license": "CC0-1.0",
+      "sourceUrl": "https://github.com/idoknow/guilinol/blob/main/docs/style.md",
+      "derivedFrom": [
+        "baidu_jiefang_east"
+      ],
+      "description": "暖米灰烤漆波纹卷帘门（底部含封条与锁盒）"
+    },
+    {
+      "id": "shutter-normal",
+      "file": "textures/shutter-normal.png",
+      "kind": "normal",
+      "width": 64,
+      "height": 128,
+      "diskBytes": 503,
+      "gpuRawBytes": 32768,
+      "gpuMipmappedBytes": 43691,
+      "license": "CC0-1.0",
+      "sourceUrl": "https://github.com/idoknow/guilinol/blob/main/docs/style.md",
+      "derivedFrom": [
+        "BV1b8411r7EP_sheet_1_R3"
+      ],
+      "description": "卷帘门弧形波纹法线贴图（0 重复上传）"
+    },
+    {
+      "id": "shutter-roughness",
+      "file": "textures/shutter-roughness.png",
+      "kind": "roughness",
+      "width": 64,
+      "height": 128,
+      "diskBytes": 225,
+      "gpuRawBytes": 32768,
+      "gpuMipmappedBytes": 43691,
+      "license": "CC0-1.0",
+      "sourceUrl": "https://github.com/idoknow/guilinol/blob/main/docs/style.md",
+      "derivedFrom": [
+        "BV1b8411r7EP_sheet_1_R3"
+      ],
+      "description": "卷帘门金属拉丝粗糙度（0 重复上传）"
+    },
+    {
+      "id": "stair-granite-albedo",
+      "file": "textures/stair-granite-albedo.png",
+      "kind": "albedo",
+      "width": 256,
+      "height": 256,
+      "diskBytes": 35664,
+      "gpuRawBytes": 262144,
+      "gpuMipmappedBytes": 349526,
+      "license": "CC0-1.0",
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:Xiufeng,_Guilin,_Guangxi,_China_-_panoramio_(4).jpg",
+      "derivedFrom": [
+        "baidu_se_wenhua_N",
+        "baidu_ne_zhengyang"
+      ],
+      "description": "梯井侧墙与下部 1.04m 廊道深青灰纹路花岗岩护墙裙"
+    },
+    {
+      "id": "stair-granite-roughness",
+      "file": "textures/stair-granite-roughness.png",
+      "kind": "roughness",
+      "width": 64,
+      "height": 64,
+      "diskBytes": 4876,
+      "gpuRawBytes": 16384,
+      "gpuMipmappedBytes": 21846,
+      "license": "CC0-1.0",
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:Xiufeng,_Guilin,_Guangxi,_China_-_panoramio_(4).jpg",
+      "derivedFrom": [
+        "baidu_se_wenhua_N"
+      ],
+      "description": "半抛光深花岗岩墙裙与梯壁粗糙度贴图"
+    },
+    {
+      "id": "stair-tread-albedo",
+      "file": "textures/stair-tread-albedo.png",
+      "kind": "albedo",
+      "width": 128,
+      "height": 256,
+      "diskBytes": 14608,
+      "gpuRawBytes": 131072,
+      "gpuMipmappedBytes": 174763,
+      "license": "CC0-1.0",
+      "sourceUrl": "https://github.com/idoknow/guilinol/blob/main/docs/style.md",
+      "derivedFrom": [
+        "baidu_jiefang_east_E"
+      ],
+      "description": "28级踏步花岗岩与降饱和防滑警示前缘"
+    },
+    {
+      "id": "stair-tread-normal",
+      "file": "textures/stair-tread-normal.png",
+      "kind": "normal",
+      "width": 64,
+      "height": 128,
+      "diskBytes": 12563,
+      "gpuRawBytes": 32768,
+      "gpuMipmappedBytes": 43691,
+      "license": "CC0-1.0",
+      "sourceUrl": "https://github.com/idoknow/guilinol/blob/main/docs/style.md",
+      "derivedFrom": [
+        "baidu_jiefang_east_E"
+      ],
+      "description": "楼梯防滑沟槽法线贴图"
+    },
+    {
+      "id": "wall-corridor-albedo",
+      "file": "textures/wall-corridor-albedo.png",
+      "kind": "albedo",
+      "width": 256,
+      "height": 256,
+      "diskBytes": 13677,
+      "gpuRawBytes": 262144,
+      "gpuMipmappedBytes": 349526,
+      "license": "CC0-1.0",
+      "sourceUrl": "https://github.com/idoknow/guilinol/blob/main/docs/style.md",
+      "derivedFrom": [
+        "BV1b8411r7EP_sheet_1_R3",
+        "docs/style.md"
+      ],
+      "description": "地下上半墙暖白无机矿物质饰面与 1.4m 竖向勾缝（直接搭配 1.04m 深石材 dadoSpecs 使用）"
+    },
+    {
+      "id": "wall-corridor-normal",
+      "file": "textures/wall-corridor-normal.png",
+      "kind": "normal",
+      "width": 64,
+      "height": 64,
+      "diskBytes": 8781,
+      "gpuRawBytes": 16384,
+      "gpuMipmappedBytes": 21846,
+      "license": "CC0-1.0",
+      "sourceUrl": "https://github.com/idoknow/guilinol/blob/main/docs/style.md",
+      "derivedFrom": [
+        "BV1b8411r7EP_sheet_1_R3"
+      ],
+      "description": "墙面矿物质细腻灰泥、竖缝与不锈钢腰线凹凸法线"
+    },
+    {
+      "id": "wall-corridor-roughness",
+      "file": "textures/wall-corridor-roughness.png",
+      "kind": "roughness",
+      "width": 64,
+      "height": 64,
+      "diskBytes": 2732,
+      "gpuRawBytes": 16384,
+      "gpuMipmappedBytes": 21846,
+      "license": "CC0-1.0",
+      "sourceUrl": "https://github.com/idoknow/guilinol/blob/main/docs/style.md",
+      "derivedFrom": [
+        "BV1b8411r7EP_sheet_1_R3"
+      ],
+      "description": "墙体哑光无机漆与拉丝不锈钢腰线粗糙度"
+    },
+    {
+      "id": "canopy-glass-albedo",
+      "file": "textures/canopy-glass-albedo.png",
+      "kind": "albedo",
+      "width": 64,
+      "height": 64,
+      "diskBytes": 2467,
+      "gpuRawBytes": 16384,
+      "gpuMipmappedBytes": 21846,
+      "license": "CC0-1.0",
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:%E6%A1%82%E6%9E%97%E5%8D%97%E6%96%B9%E5%A4%A7%E5%8E%A6.jpg",
+      "derivedFrom": [
+        "baidu_shizijie_center_S",
+        "baidu_ne_zhengyang"
+      ],
+      "description": "四角梯井斜坡雨棚灰蓝夹胶玻璃纯不透明RGB基准色"
+    },
+    {
+      "id": "wikimedia_cc0_nanfang_plaza",
+      "title": "File:桂林南方大厦.jpg",
+      "license": "CC0",
+      "sourceUrl": "https://upload.wikimedia.org/wikipedia/commons/9/9b/%E6%A1%82%E6%9E%97%E5%8D%97%E6%96%B9%E5%A4%A7%E5%8E%A6.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+      "commonsPageUrl": "https://commons.wikimedia.org/wiki/File:%E6%A1%82%E6%9E%97%E5%8D%97%E6%96%B9%E5%A4%A7%E5%8E%A6.jpg",
+      "gps": [
+        25.281678,
+        110.291777
+      ],
+      "description": "十字街北侧弧形蓝绿玻璃幕墙与米灰石材网格立面（CC0 公共领域实拍，仅配色与体量校准参考）",
+      "file": "refs/wikimedia-cc0-nanfang-plaza.jpg",
+      "kind": "cc0-reference-photo",
+      "width": 1280,
+      "height": 720,
+      "diskBytes": 219245,
+      "usage": "palette-and-proportion-reference-only"
+    },
+    {
+      "id": "wikimedia_cc0_weixiaotang_plaza",
+      "title": "File:大商集团桂林微笑堂商厦.jpg",
+      "license": "CC0",
+      "sourceUrl": "https://upload.wikimedia.org/wikipedia/commons/8/8d/%E5%A4%A7%E5%95%86%E9%9B%86%E5%9B%A2%E6%A1%82%E6%9E%97%E5%BE%AE%E7%AC%91%E5%A0%82%E5%95%86%E5%8E%A6.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+      "commonsPageUrl": "https://commons.wikimedia.org/wiki/File:%E5%A4%A7%E5%95%86%E9%9B%86%E5%9B%A2%E6%A1%82%E6%9E%97%E5%BE%AE%E7%AC%91%E5%A0%82%E5%95%86%E5%8E%A6.jpg",
+      "gps": [
+        25.281649,
+        110.29177
+      ],
+      "description": "十字街西南角青蓝反光幕墙、银灰铝塑板与红黑LED条屏参考（CC0，禁取原商标）",
+      "file": "refs/wikimedia-cc0-weixiaotang-plaza.jpg",
+      "kind": "cc0-reference-photo",
+      "width": 1280,
+      "height": 720,
+      "diskBytes": 180060,
+      "usage": "palette-and-proportion-reference-only"
+    },
+    {
+      "id": "wikimedia_cc0_wangcheng_plaza",
+      "title": "File:桂林王城商厦 01.jpg",
+      "license": "CC0",
+      "sourceUrl": "https://upload.wikimedia.org/wikipedia/commons/4/4c/%E6%A1%82%E6%9E%97%E7%8E%8B%E5%9F%8E%E5%95%86%E5%8E%A6_01.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+      "commonsPageUrl": "https://commons.wikimedia.org/wiki/File:%E6%A1%82%E6%9E%97%E7%8E%8B%E5%9F%8E%E5%95%86%E5%8E%A6_01.jpg",
+      "gps": [
+        25.280833,
+        110.293056
+      ],
+      "description": "十字街东南夜间门头暖白/冷白高亮灯箱对比参考（CC0，禁取原商标）",
+      "file": "refs/wikimedia-cc0-wangcheng-plaza.jpg",
+      "kind": "cc0-reference-photo",
+      "width": 1280,
+      "height": 960,
+      "diskBytes": 292349,
+      "usage": "palette-and-proportion-reference-only"
+    },
+    {
+      "id": "wikimedia_cc0_dongxi_alley_09",
+      "title": "File:桂林东西巷 09.jpg",
+      "license": "CC0",
+      "sourceUrl": "https://upload.wikimedia.org/wikipedia/commons/a/af/%E6%A1%82%E6%9E%97%E4%B8%9C%E8%A5%BF%E5%B7%B7_09.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+      "commonsPageUrl": "https://commons.wikimedia.org/wiki/File:桂林东西巷_09.jpg",
+      "gps": [
+        25.281111,
+        110.293611
+      ],
+      "description": "正阳—东西巷步行街毗邻片区 CC0 实拍参考（File:桂林东西巷 09.jpg）",
+      "file": "refs/wikimedia-cc0-dongxi-alley-09.jpg",
+      "kind": "cc0-reference-photo",
+      "width": 1280,
+      "height": 960,
+      "diskBytes": 292247,
+      "usage": "palette-and-proportion-reference-only"
+    },
+    {
+      "id": "wikimedia_cc0_dongxi_alley_10",
+      "title": "File:桂林东西巷 10.jpg",
+      "license": "CC0",
+      "sourceUrl": "https://upload.wikimedia.org/wikipedia/commons/6/69/%E6%A1%82%E6%9E%97%E4%B8%9C%E8%A5%BF%E5%B7%B7_10.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+      "commonsPageUrl": "https://commons.wikimedia.org/wiki/File:桂林东西巷_10.jpg",
+      "gps": [
+        25.281111,
+        110.293611
+      ],
+      "description": "正阳—东西巷步行街毗邻片区 CC0 实拍参考（File:桂林东西巷 10.jpg）",
+      "file": "refs/wikimedia-cc0-dongxi-alley-10.jpg",
+      "kind": "cc0-reference-photo",
+      "width": 1280,
+      "height": 960,
+      "diskBytes": 188075,
+      "usage": "palette-and-proportion-reference-only"
+    }
+  ],
+  "externalReferences": [
+    {
+      "id": "baidu_shizijie_center_S",
+      "channel": "baidu_panorama",
+      "license": "Proprietary (Baidu Map Street View; visual reference only, NOT redistributed)",
+      "sourceUrl": "https://map.baidu.com/?panoid=0900680012230602155105882AV",
+      "captureDate": "2023-06-02",
+      "description": "shizijie-ref-pack 十字街中心南/西侧下沉通道蓝灰玻璃雨棚、灰色石材矮墙与彩色非机动车道"
+    },
+    {
+      "id": "baidu_jiefang_west",
+      "channel": "baidu_panorama",
+      "license": "Proprietary (Baidu Map Street View; visual reference only, NOT redistributed)",
+      "sourceUrl": "https://map.baidu.com/?panoid=0900680012230602170749135AV",
+      "captureDate": "2023-06-02",
+      "description": "shizijie-ref-pack 解放西路沿街铺面横幅灯箱、绿篱铁栏与银灰卷帘尺度参考"
+    },
+    {
+      "id": "baidu_jiefang_east_E",
+      "channel": "baidu_panorama",
+      "license": "Proprietary (Baidu Map Street View; visual reference only, NOT redistributed)",
+      "sourceUrl": "https://map.baidu.com/?panoid=09006800121806201057502578A",
+      "captureDate": "2018-06-20",
+      "description": "shizijie-ref-pack 解放东路花岗岩台阶、不锈钢扶手与底商深棕金字招牌参考"
+    },
+    {
+      "id": "baidu_nw_nanfang",
+      "channel": "baidu_panorama_gap_fill",
+      "license": "Proprietary (Baidu Map Street View; visual reference only, NOT redistributed)",
+      "sourceUrl": "https://map.baidu.com/?panoid=0900680012230602170738643AV",
+      "captureDate": "2023-06-02",
+      "description": "fetch_city_ref.py 补空：NW 角梯井深灰钢构雨棚、暗灰蓝玻璃顶及红色通道提示牌"
+    },
+    {
+      "id": "baidu_ne_zhengyang",
+      "channel": "baidu_panorama_gap_fill",
+      "license": "Proprietary (Baidu Map Street View; visual reference only, NOT redistributed)",
+      "sourceUrl": "https://map.baidu.com/?panoid=0900680012230603085845305AV",
+      "captureDate": "2023-06-03",
+      "description": "fetch_city_ref.py 补空：NE 角梯井花岗岩矮墙、白色方管护栏与红白警示立柱"
+    },
+    {
+      "id": "baidu_se_wenhua_W",
+      "channel": "baidu_panorama_gap_fill",
+      "license": "Proprietary (Baidu Map Street View; visual reference only, NOT redistributed)",
+      "sourceUrl": "https://map.baidu.com/?panoid=09006800121806051002338908A",
+      "captureDate": "2018-06-05",
+      "description": "fetch_city_ref.py 补空：SE/SW 梯井黑框红顶“地下通道 TUNNEL ↓”导视灯箱及深灰勾缝广场地砖"
+    },
+    {
+      "id": "baidu_sw_weixiaotang",
+      "channel": "baidu_panorama_gap_fill",
+      "license": "Proprietary (Baidu Map Street View; visual reference only, NOT redistributed)",
+      "sourceUrl": "https://map.baidu.com/?panoid=0900680012230602170113610AV",
+      "captureDate": "2023-06-02",
+      "description": "fetch_city_ref.py 补空：SW 角梯井衔接处非机动车停放带及街角石材铺装"
+    },
+    {
+      "id": "baidu_zhengyang_north",
+      "channel": "baidu_panorama_gap_fill",
+      "license": "Proprietary (Baidu Map Street View; visual reference only, NOT redistributed)",
+      "sourceUrl": "https://map.baidu.com/?panoid=09006800121806201054135408A",
+      "captureDate": "2018-06-20",
+      "description": "fetch_city_ref.py 补空：解放东路—正阳街北段口商业门楣与人行道缘石过渡"
+    },
+    {
+      "id": "bilibili_BV1GuW9zJEQT_03:52",
+      "channel": "bilibili_videoshot",
+      "license": "Reference-Only (Bilibili User Video Videoshot; visual proportion reference only, NOT redistributed)",
+      "sourceUrl": "https://www.bilibili.com/video/BV1GuW9zJEQT",
+      "description": "shizijie-ref-pack B站街拍 03:52/07:04/13:20：地下通道扶手、冷白嵌灯、抛光砖与高亮店招配色"
+    },
+    {
+      "id": "wikimedia_Xiufeng_panoramio_4",
+      "channel": "wikimedia_commons",
+      "license": "CC BY 3.0",
+      "sourceUrl": "https://upload.wikimedia.org/wikipedia/commons/c/c2/Xiufeng%2C_Guilin%2C_Guangxi%2C_China_-_panoramio_%284%29.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+      "description": "shizijie-ref-pack 秀峰区下穿桥梁通道浅青灰条形花岗岩砖与台阶石材护壁配色参考（未直接嵌入）"
+    },
+    {
+      "id": "wikimedia_East_West_Alley_49041010817",
+      "channel": "wikimedia_commons",
+      "license": "CC BY 2.0",
+      "sourceUrl": "https://upload.wikimedia.org/wikipedia/commons/9/93/East-West_Alley_89748-Guilin_%2849041010817%29.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+      "description": "shizijie-ref-pack 东西巷青灰石板砖及挑出式竖向灯箱比例参考（未直接嵌入）"
+    }
+  ]
+}
