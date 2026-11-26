@@ -1,15 +1,17 @@
 """Audit packed at-grade network corridors against final GL04 street faces."""
 from collections import defaultdict
 import gzip
+import io
 import json
 import math
 import struct
 
 import numpy as np
-from shapely import Polygon, STRtree, box, make_valid, set_precision, union_all
-from shapely.affinity import translate
+from PIL import Image
+from shapely import LineString, Polygon, STRtree, box, make_valid, set_precision, union_all
+from shapely.affinity import scale, translate
 
-from features import polygons
+from features import area, points, polygons
 from common import load_osm
 
 
@@ -17,21 +19,51 @@ def network_masks(world):
     graph = json.loads(gzip.decompress((world/'roads/graph.json.gz').read_bytes()))
     nodes = {node['id']: (node['x'], node['z']) for node in graph['nodes']}
     masks = [[], []]
-    skip, surface = set(), set()
+    skip, surface, keepouts = set(), set(), []
+    tagged_widths = {}
     for way in load_osm():
         tags = way.get('tags', {})
-        if way['type'] != 'way' or not tags.get('highway'):
+        if way['type'] == 'node':
             continue
         separated = tags.get('layer', '0') != '0' or any(tags.get(key, 'no') != 'no' for key in ('bridge', 'tunnel', 'indoor'))
+        if (separated or any(key in tags for key in ('railway','water','waterway','area:highway')) or
+            tags.get('natural') in ('grassland','water','wetland','scrub','wood') or tags.get('landuse') in ('grass','meadow','village_green','railway') or
+            tags.get('leisure') in ('park','garden') or (tags.get('highway') and tags.get('area') == 'yes')):
+            footprint = area(way)
+            if not footprint.is_empty:
+                keepouts.append(footprint)
+            elif way['type'] == 'way' and len(coords := points(way)) > 1:
+                try:
+                    width = float(tags.get('width', 0))
+                except ValueError:
+                    width = 0
+                keepouts.append(LineString(coords).buffer(max(24, width/2+2)))
+        if way['type'] != 'way' or not tags.get('highway'):
+            continue
         unpaved = tags.get('surface') in ('unpaved', 'dirt', 'ground', 'earth', 'grass', 'sand', 'gravel', 'fine_gravel')
         edges = skip if separated or unpaved else surface
         refs = way.get('nodes', [])
-        edges.update((min(head, tail), max(head, tail)) for head, tail in zip(refs, refs[1:]))
-    skip -= surface
+        pairs = [(min(head, tail), max(head, tail)) for head, tail in zip(refs, refs[1:])]
+        edges.update(pairs)
+        try:
+            width = float(tags['width']) if 'width' in tags else int(tags['lanes'])*3
+        except (KeyError, ValueError):
+            continue
+        for pair in pairs:
+            tagged_widths[pair] = min(width, tagged_widths.get(pair,width))
 
     def add(kind, head, tail, offset, width):
-        if (min(head, tail), max(head, tail)) in skip:
+        pair = min(head, tail), max(head, tail)
+        if pair in skip or pair not in surface:
             return
+        if kind == 0:
+            if pair not in tagged_widths:
+                return
+            half = tagged_widths[pair]/2
+            left, right = max(offset-width/2,-half), min(offset+width/2,half)
+            if left >= right:
+                return
+            offset, width = (left+right)/2, right-left
         start, end = nodes[head], nodes[tail]
         east, south = end[0]-start[0], end[1]-start[1]
         length = math.hypot(east, south)
@@ -48,7 +80,7 @@ def network_masks(world):
     for head, tail, offset, _, *profile in graph['walks']:
         if profile:
             add(1, head, tail, offset, 2)
-    return [STRtree(group) for group in masks]
+    return [STRtree(group) for group in masks], STRtree([scale(shape,100,100,origin=(0,0)) for shape in keepouts])
 
 
 def loops(part):
@@ -56,7 +88,8 @@ def loops(part):
             for ring in (part.exterior, *part.interiors)]
 
 
-def patches_for(tile, raw, masks):
+def patches_for(tile, raw, indexes):
+    masks, keepouts = indexes
     west, north = 100*tile['x'], 100*tile['z']
     boundary = box(west, north, west+25600, north+25600)
     selected = [index.query(boundary, predicate='intersects') for index in masks]
@@ -70,6 +103,18 @@ def patches_for(tile, raw, masks):
     occupied.extend(make_valid(Polygon(row[2][0],row[2][1:])) for row in collision[0] if row[2])
     deck_faces = np.frombuffer(raw, '<i2', decks*9, start+size+png).reshape(-1,3,3)
     occupied.extend(Polygon(face[:,[0,2]]) for face in deck_faces)
+    for idx in keepouts.query(boundary,predicate='intersects'):
+        occupied.append(translate(keepouts.geometries[idx].intersection(boundary),-west,-north))
+    pixels = np.asarray(Image.open(io.BytesIO(raw[start+size:start+size+png])).convert('RGB'))
+    bare = (pixels == [179,177,156]).all(axis=2)
+    if not bare.any():
+        return [], raw
+    wet = np.frombuffer(raw,'<i2',65**2,24+8450).reshape(65,65) != -32768
+    wet_cells = wet[:-1,:-1] | wet[1:,:-1] | wet[:-1,1:] | wet[1:,1:]
+    bare &= ~wet_cells.repeat(4,axis=0).repeat(4,axis=1)
+    for north_px,row in enumerate(bare):
+        changes = np.flatnonzero(np.diff(np.r_[False,~row,False]))
+        occupied.extend(box(left*100,north_px*100,right*100,(north_px+1)*100) for left,right in changes.reshape(-1,2))
     obstacle = union_all([part for shape in occupied for part in polygons(shape) if part.area], grid_size=1).buffer(0)
     patches = []
     for kind, group in enumerate(selected):
