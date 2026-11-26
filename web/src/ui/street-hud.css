@@ -11,7 +11,7 @@
   --st-shadow:0 2px 0 rgba(0,0,0,.55),0 0 10px rgba(0,0,0,.45);
 }
 body[data-hud=street]{font-family:var(--st-sans)}
-body[data-hud=street] :is(.sky-ui,.dock-buttons,.btn-mode,.hint,output){display:none!important}
+body[data-hud=street] :is(.sky-ui,.dock-bar,.dock-buttons,.btn-mode,.hint,output){display:none!important}
 body[data-hud=street] footer{font:10px/1.4 var(--st-sans);background:none;opacity:.5;text-shadow:var(--st-shadow);left:auto;right:12px;bottom:6px}
 .st-hud{position:fixed;inset:0;overflow:hidden;pointer-events:none;z-index:6;color:var(--st-white);font-family:var(--st-sans);user-select:none;-webkit-user-select:none}
 .st-hud button{pointer-events:auto;font-family:inherit}

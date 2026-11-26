@@ -435,7 +435,11 @@ try {
   const rotateEntry=await mobile.evaluate(()=>{
     const btn=document.querySelector('.dock-buttons>.dock-rotate')
     if(!btn)return {missing:true}
-    const st=getComputedStyle(btn), r=btn.getBoundingClientRect(), host=document.querySelector('.dock-buttons').getBoundingClientRect()
+    // 横屏入口收在「工具」册页里（IDOK-468）：先展开再量，量完收起。
+    const more=document.querySelector('.dock-more'), menu=document.querySelector('.dock-buttons'), wasHidden=menu.hidden
+    if(wasHidden)more.click()
+    const st=getComputedStyle(btn), r=btn.getBoundingClientRect(), host=menu.getBoundingClientRect()
+    if(wasHidden)more.click()
     return {missing:false,visible:st.display!=='none'&&!btn.hidden,text:btn.textContent.trim(),label:btn.getAttribute('aria-label'),
       inside:r.left>=-.5&&r.top>=-.5&&r.right<=390.5&&r.bottom<=844.5,
       aligned:Math.abs(host.right-r.right)<=1.5&&r.height>=30,
@@ -601,13 +605,15 @@ try {
       chip:st.backgroundColor,chev:chev.borderRightWidth,foldW:+fr.width.toFixed(1),foldH:+fr.height.toFixed(1),
       hittable:hit===fold||fold.contains(hit)}
   })
-  const skyOpen=await skyFold()
-  assert.equal(skyOpen.folded,false,'sky panel starts unfolded')
-  assert.equal(skyOpen.groups,'flex,flex')
-  assert.equal(skyOpen.hittable,true,'fold button must be hittable in landscape')
-  assert.notEqual(skyOpen.chip,'rgba(0, 0, 0, 0)','fold control needs a visible chip, or it reads as decoration')
-  assert.equal(skyOpen.chev,'2px','fold control draws a chevron')
-  assert(skyOpen.foldW>=24&&skyOpen.foldH>=24,`fold control tap target too small: ${skyOpen.foldW}x${skyOpen.foldH}`)
+  // IDOK-468: the panel starts folded down to the clock; only an explicit 展开 is remembered.
+  const skyStart=await skyFold()
+  assert.equal(skyStart.folded,true,'sky panel starts folded')
+  assert.equal(skyStart.groups,'none,none','folded panel hides both groups')
+  assert.equal(skyStart.expanded,'false')
+  assert.equal(skyStart.hittable,true,'fold button must be hittable in landscape')
+  assert.notEqual(skyStart.chip,'rgba(0, 0, 0, 0)','fold control needs a visible chip, or it reads as decoration')
+  assert.equal(skyStart.chev,'2px','fold control draws a chevron')
+  assert(skyStart.foldW>=24&&skyStart.foldH>=24,`fold control tap target too small: ${skyStart.foldW}x${skyStart.foldH}`)
   // A timed-out tap may still have been delivered, so only retry when the panel did not toggle.
   const skyTap=async()=>{const before=(await skyFold()).folded
     try{await mobile.locator('.sky-ui .sky-fold').tap({timeout:10000})}catch{/* the click may still have landed */}
@@ -615,18 +621,18 @@ try {
     if((await skyFold()).folded===before){await mobile.evaluate(()=>document.querySelector('.sky-ui .sky-fold').click())
       await mobile.evaluate(async()=>{for(let i=0;i<3;i++)await new Promise(requestAnimationFrame)})}}
   await skyTap()
-  const skyFolded=await skyFold()
-  assert.equal(skyFolded.folded,true,'tap folds the sky panel')
-  assert.equal(skyFolded.groups,'none,none','folded panel hides both groups')
-  assert.equal(skyFolded.expanded,'false')
-  assert(skyFolded.width<skyOpen.width*0.6,`folded sky panel must shrink: ${skyFolded.width} vs ${skyOpen.width}`)
-  assert(skyFolded.right<=skyOpen.right,'folded panel must not grow rightwards')
+  const skyOpen=await skyFold()
+  assert.equal(skyOpen.folded,false,'tap unfolds the sky panel')
+  assert.equal(skyOpen.groups,'flex,flex')
+  assert.equal(skyOpen.expanded,'true')
+  assert(skyStart.width<skyOpen.width*0.6,`folded sky panel must be compact: ${skyStart.width} vs ${skyOpen.width}`)
+  assert(skyStart.right<=skyOpen.right,'folded panel must not reach further right than the open one')
   // A full reload would re-stream the whole world, so check the persisted flag instead: the panel reads
   // it back on boot.
-  assert.equal(await mobile.evaluate(()=>localStorage.getItem('glol.skyFolded')),'1','folded sky panel is persisted')
+  assert.equal(await mobile.evaluate(()=>localStorage.getItem('glol.sky.open')),'1','unfolded sky panel is persisted')
   await skyTap()
-  assert.equal((await skyFold()).folded,false,'tapping again unfolds it')
-  assert.equal(await mobile.evaluate(()=>localStorage.getItem('glol.skyFolded')),'0','unfolding clears the flag')
+  assert.equal((await skyFold()).folded,true,'tapping again folds it')
+  assert.equal(await mobile.evaluate(()=>localStorage.getItem('glol.sky.open')),'0','folding clears the flag')
 
   // IDOK-256: 设置 → 手机按键 writes glol.prefs and drives body hooks; then every preset × size × hand at 320 / 375 / 812 wide
   // keeps all thumb controls, the dock pieces, readouts and hud-me apart, inside the screen and off the character.

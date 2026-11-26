@@ -298,13 +298,6 @@ export function mountTianyuanMifen(ctx: MifenMountContext): MifenController {
   hudRoot.className = 'mifen-hud-root'
   document.body.append(hudRoot)
 
-  const tpBtn = document.createElement('button')
-  tpBtn.type = 'button'
-  tpBtn.className = 'mifen-pill'
-  tpBtn.setAttribute('aria-label', '前往田源米粉，快捷键 N')
-  tpBtn.innerHTML = '<span>田源米粉</span><kbd>N</kbd>'
-  hudRoot.append(tpBtn)
-
   const statusBarEl = document.createElement('header')
   statusBarEl.className = 'mifen-bar'
   statusBarEl.hidden = true
@@ -1144,7 +1137,6 @@ export function mountTianyuanMifen(ctx: MifenMountContext): MifenController {
     const upgradeOpen = upgrade.isOpen()
     const showBar = earning && !storyActive
     const tickets = showBar ? getRailTickets() : []
-    tpBtn.hidden = nearShop || storyActive || isOverlayOpen()
     statusBarEl.hidden = !showBar
     ticketRailEl.hidden = !showBar || tickets.length === 0
     if (!showBar) {
@@ -1207,10 +1199,6 @@ export function mountTianyuanMifen(ctx: MifenMountContext): MifenController {
     }
   }
 
-  tpBtn.addEventListener('click', () => {
-    void teleportToShop()
-  })
-
   statusBarEl.addEventListener('click', e => {
     const action = (e.target as Element).closest<HTMLElement>('[data-hud-action]')?.dataset.hudAction
     if (action === 'cook-next') cookNext()
@@ -1261,12 +1249,6 @@ export function mountTianyuanMifen(ctx: MifenMountContext): MifenController {
     if (isInputFocused(e.target)) return
     if (document.body.hasAttribute('data-home')) return
     if (director.isActive()) return
-
-    if (e.code === 'KeyN' && !isOverlayOpen()) {
-      e.preventDefault()
-      void teleportToShop()
-      return
-    }
 
     if (e.code === 'KeyE' && !isOverlayOpen()) {
       if (nearUncle && director.canTalk()) {

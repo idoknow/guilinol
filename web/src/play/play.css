@@ -2,12 +2,32 @@
    rice paper for things you read, vermilion seal for the one thing that matters. Glass button material lives in hud.css. */
 
 /* Dock: top-right column — mode, 景册, 拍照 (the map joins it once the atlas lands). */
-.dock{position:fixed;right:calc(12px + env(safe-area-inset-right));top:calc(12px + env(safe-area-inset-top));display:flex;flex-direction:column;align-items:flex-end;gap:8px;z-index:5}
-.dock-mini{display:flex;flex-direction:column;align-items:center;gap:6px}
-.dock-buttons{display:flex;flex-direction:column;align-items:flex-end;gap:8px}
-.dock-buttons>button{box-sizing:border-box;height:var(--ui-h);border-radius:var(--ui-r-pill);padding:0 16px;font-size:14px;letter-spacing:var(--ui-track);display:flex;align-items:center;gap:6px}
-.dock small{font:600 11px/1 var(--ui-serif);letter-spacing:0;background:var(--seal);border-radius:var(--ui-r-pill);padding:3px 7px}
-.dock .btn-mode{position:static;height:var(--ui-h);padding:0 16px}
+/* 右上 dock（IDOK-468）：小地图 + 一行「工具」。景册、拍照、反馈、视角、设置、相机、无人机都收在工具册页里，点开才出现；
+   起飞（游览模式）留在工具旁。材质同左上：墨青纸面、方角印框，朱砂只给计数和按下。 */
+.dock{position:fixed;right:calc(12px + env(safe-area-inset-right));top:calc(12px + env(safe-area-inset-top));z-index:5;
+  display:grid;grid-template-areas:"mini" "bar";justify-items:end;align-items:start;gap:8px}
+.dock.open{z-index:6}
+.dock-mini{grid-area:mini;display:flex;flex-direction:column;align-items:center;gap:6px}
+.dock-bar{grid-area:bar;display:flex;gap:6px;position:relative}
+.dock-bar>button{box-sizing:border-box;height:var(--ui-h);padding:0 14px;border-radius:var(--ui-r-paper);font-size:14px;letter-spacing:var(--ui-track);display:inline-flex;align-items:center;gap:8px}
+.dock .btn-mode{position:static}
+/* 工具图标：田字四方印，和左上「菜单」的三道横线区分开 */
+.dock-more::before{content:"";width:4px;height:4px;margin:0 6px 6px 0;background:currentColor;box-shadow:6px 0 currentColor,0 6px currentColor,6px 6px currentColor;opacity:.9}
+.dock-more[aria-expanded=true]{background:var(--ui-paper);color:var(--ui-ink-900);border-color:var(--ui-paper)}
+.dock-more[aria-expanded=true]:hover{background:var(--ui-paper-3)}
+/* 工具册页：一张墨青纸，内衬一道纸色细线（印框），条目是纸面上的字，不再各自是一颗胶囊。
+   挂在工具条里、贴「工具」按钮正下方右对齐弹出，不参与 dock 排版，展开时 dock 不变宽、不盖左边的 HUD。 */
+.dock-buttons{position:absolute;top:calc(100% + 8px);right:0;width:max-content;display:grid;grid-template-columns:repeat(2,auto);gap:2px;padding:7px;box-sizing:border-box;
+  background:var(--ui-ink-900);border:1px solid var(--ui-glass-line);border-radius:var(--ui-r-paper);
+  box-shadow:inset 0 0 0 3px var(--ui-ink-900),inset 0 0 0 4px var(--ui-glass-line-soft),var(--ui-shadow-1)}
+.dock-buttons[hidden]{display:none}
+/* 册页条目只在这里定样式（不吃 hud.css 的玻璃胶囊材质），不靠 CSS 加载顺序 */
+.dock-buttons>button{box-sizing:border-box;min-width:6.5em;height:38px;padding:0 12px;border:0;border-radius:4px;background:transparent;
+  font-family:var(--ui-serif);font-size:14px;letter-spacing:.14em;color:var(--ui-paper);display:flex;align-items:center;justify-content:space-between;gap:8px;
+  cursor:pointer;touch-action:none;user-select:none;-webkit-user-select:none;-webkit-tap-highlight-color:transparent;transition:background var(--ui-fast)}
+.dock-buttons>button:hover{background:rgba(244,239,226,.1)}
+.dock-buttons>button:active{background:rgba(169,80,60,.7)}
+.dock small{font:600 11px/1 var(--ui-serif);letter-spacing:0;color:var(--ui-paper);background:var(--ui-seal);border-radius:3px;padding:3px 5px}
 body[data-photo=on] :is(output,.hint,footer,.sky-ui,.walk-ui,.dock,.toast,.spot-card,.book,.summit-pill,.minimap,.road-name,.hud-me,.emote-toggle,.emote-overlay){display:none!important}
 
 /* Minimap: a paper disc with a thin jade rim; north tick on top. */
@@ -132,9 +152,7 @@ body[data-photo=on] :is(output,.hint,footer,.sky-ui,.walk-ui,.dock,.toast,.spot-
 
 /* Phones */
 @media (pointer:coarse) and (not (any-pointer:fine)){
-  .dock{gap:6px}.dock-mini{display:flex;flex-direction:column;align-items:center;gap:6px}
-.dock-buttons{display:flex;flex-direction:column;align-items:flex-end;gap:8px}
-.dock-buttons>button{padding:6px 12px;font-size:13px}
+  .dock{gap:6px}
   .spot-card{left:50%;right:auto;top:auto;bottom:calc(10px + env(safe-area-inset-bottom));width:min(420px,calc(100vw - 20px));padding:16px 18px 14px;
     transform:translate(-50%,24px)}
   .spot-card.show{transform:translate(-50%,0)}
@@ -146,8 +164,10 @@ body[data-photo=on] :is(output,.hint,footer,.sky-ui,.walk-ui,.dock,.toast,.spot-
   .summit-pill{top:auto;bottom:calc(24px + env(safe-area-inset-bottom))}
 }
 @media (pointer:coarse) and (not (any-pointer:fine)) and (max-height:500px){
-  .dock{flex-direction:row-reverse;align-items:flex-start}.minimap{width:96px;height:96px}
-  .dock-buttons{gap:5px}.dock-buttons>button,.dock .btn-mode{height:32px;padding:0 12px;font-size:12.5px}
+  /* 横屏：工具条在小地图左侧，册页从工具条下方展开，三列更矮，不伸进右侧拇指区 */
+  .dock{grid-template-areas:"bar mini";gap:6px 8px}.minimap{width:96px;height:96px}
+  .dock-bar>button{height:34px;padding:0 12px;font-size:13px}
+  .dock-buttons{grid-template-columns:repeat(3,auto)}.dock-buttons>button{height:34px;min-width:5.5em;font-size:13px}
   .atlas-legend{display:none}
   .spot-card{max-height:calc(100vh - 20px);overflow:auto;width:min(560px,calc(100vw - 260px))}
   .card-intro{font-size:12.5px;line-height:1.6}
@@ -160,25 +180,19 @@ body[data-photo=on] :is(output,.hint,footer,.sky-ui,.walk-ui,.dock,.toast,.spot-
    a right-aligned grid and dropped the duplicate 地图 button (the minimap is the only map entry now). */
 @media (pointer:coarse) and (not (any-pointer:fine)) and (orientation:portrait) and (max-width:600px){
   .dock{gap:5px}
-  .dock-buttons{margin-top:16px}
   .dock .minimap{width:96px;height:96px}
 }
-/* IDOK-256 竖屏手机：dock 按钮从一根长竖列（排到屏幕中下、压住跃/远近）改成右对齐的两三列小网格，地图入口只剩小圆图。 */
+/* 竖屏手机：工具条与册页仍在小地图下方，按钮略矮 */
 @media (pointer:coarse) and (not (any-pointer:fine)) and (min-height:501px){
-  .dock-buttons{flex-direction:row;flex-wrap:wrap;justify-content:flex-end;align-content:flex-start;gap:6px;max-width:min(196px,54vw)}
-  .dock-buttons>button,.dock .btn-mode{height:36px;padding:0 12px;font-size:13px}
+  .dock-bar>button,.dock-buttons>button{height:36px;font-size:13px}
 }
 @media (max-width:520px){.book ol{grid-template-columns:1fr}.spot-card{width:calc(100vw - 20px)}}
 /* Short landscape phones (IDOK-146: 770x265 with browser bars, 844x390 iPhone): a column of five dock buttons
    ran into the thumb cluster (跃/远近/跑). Lay the buttons out as one row along the top edge, shrink the minimap so it
    ends above 跃/远近, and float the road name over the map's lower rim. */
 @media (pointer:coarse) and (not (any-pointer:fine)) and (max-height:430px){
-  .dock{flex-direction:row-reverse;align-items:flex-start;gap:8px}
-  .dock-buttons{flex-direction:row;align-items:center;gap:6px}
-  .dock-buttons>button,.dock .btn-mode{height:32px;padding:0 11px;font-size:12.5px}
-  /* IDOK-178: 读数/设置/视角三个入口进来以后，顶行在 844×390 上一行放不下、会压到左上时辰条，
-     所以允许右侧按钮折成两行（仍然右对齐，不挡住底下拇指区）。 */
-  .dock-buttons{flex-wrap:wrap;justify-content:flex-end;max-width:min(52vw,320px);row-gap:4px}
+  .dock-bar>button{height:32px;padding:0 11px;font-size:12.5px}
+  .dock-buttons>button{height:32px;font-size:12.5px}
   body:not([data-hud=street]) .dock-mini{position:relative}
   body:not([data-hud=street]) .dock .minimap{width:72px;height:72px;border-width:2px}
   body:not([data-hud=street]) .dock .road-name{position:absolute;left:50%;top:58px;transform:translateX(-50%);max-width:96px;padding:3px 7px;font-size:10.5px;letter-spacing:.06em}
@@ -225,7 +239,5 @@ body[data-photo=on] :is(output,.hint,footer,.sky-ui,.walk-ui,.dock,.toast,.spot-
   .hud-me{gap:4px}
   .dock{right:calc(6px + env(safe-area-inset-right))}
   :root .dock .minimap{width:68px;height:68px}
-  .dock-buttons{max-width:min(196px,50vw);margin-top:8px}
-  /* 时辰条让出小地图以后只要两行，dock 按钮从它下面开始排 */
   :root .sky-ui{max-width:calc(100vw - 104px);padding:4px 6px}
 }

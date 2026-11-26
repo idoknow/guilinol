@@ -5,6 +5,7 @@ import {onOnline, startLive} from './live'
 import {onUser, openAccount} from './account'
 import type {MpStatus} from './mp-pref'
 import {toggleRoster} from './mp-roster-panel'
+import {debugHud} from '../deeplink'
 
 const FPS_WINDOW = 500
 const NET_WINDOW = 1000
@@ -45,12 +46,13 @@ export function mountStats() {
   let online: number | null = null
   let mp: MpStatus = {state: 'off', online: 0}
   let signedIn = false
+  let shownDev = debugHud()
 
   function syncVisibility() {
-    const current = prefs().stats
-    fpsTile.hidden = !current.fps
-    netTile.hidden = !current.net
-    onlineTile.hidden = !current.online || online === null || mp.state !== 'off'
+    const current = prefs().stats, dev = shownDev = debugHud()
+    fpsTile.hidden = !dev || !current.fps
+    netTile.hidden = !dev || !current.net
+    onlineTile.hidden = !dev || !current.online || online === null || mp.state !== 'off'
     mpTile.hidden = mp.state === 'off'
     chip.hidden = fpsTile.hidden && netTile.hidden && onlineTile.hidden && mpTile.hidden
     chip.classList.toggle('hud-stats--mp', !mpTile.hidden)
@@ -73,6 +75,8 @@ export function mountStats() {
       frames = 0
       frameAt = now
       paintFps()
+      // 调试开关可在运行中切（控制台改 body[data-debug]、量测脚本还原玩家视角），半秒内跟上。
+      if (shownDev !== debugHud()) { syncVisibility(); paintMp() }
     }
     requestAnimationFrame(loop)
   }
@@ -108,11 +112,14 @@ export function mountStats() {
   function paintMp() {
     mpTile.dataset.state = mp.state === 'offline' && !signedIn ? 'login' : mp.state
     mpTile.disabled = mp.state === 'connecting'
-    mpTile.textContent = mp.state === 'online' ? `同城 ${mp.online} 人`
+    // 在线人数不常驻（IDOK-468）：按钮只写「同城」，人数留在无障碍名称和名单里。
+    mpTile.textContent = mp.state === 'online' ? (debugHud() ? `同城 ${mp.online} 人` : '同城')
       : mp.state === 'connecting' ? '联机连接中'
       : mp.state === 'replaced' ? '已在其他设备联机 · 重连'
       : signedIn ? '联机已断开 · 重连' : '登录后联机'
     mpTile.title = mp.state === 'online' ? '查看同城在线玩家和他们的位置' : ''
+    if (mp.state === 'online') mpTile.setAttribute('aria-label', `同城在线 ${mp.online} 人`)
+    else mpTile.removeAttribute('aria-label')
     syncVisibility()
   }
   mpTile.onclick = () => {
