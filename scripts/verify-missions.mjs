@@ -274,17 +274,25 @@ try {
     return s.mission?.id === 'errand-01' && window.viewer.game.missions.beaconVisible() === true
   })
 
-  await page.evaluate(async () => {
+  const arrivedAtPickup = await page.evaluate(async () => {
     const target1 = window.viewer.game.getState().mission.target
-    await window.viewer.walkTo(target1[0], target1[1], 0, 'e2e-errand1-step1')
+    return window.viewer.walkTo(target1[0], target1[1], 0, 'e2e-errand1-step1')
   })
+  assert.equal(arrivedAtPickup, true, 'errand pickup landing failed')
   await page.waitForFunction(() => window.viewer.game.getState().mission?.stepIndex === 1, null, {timeout: 15000})
 
-  await page.evaluate(async () => {
+  const arrivedAtDelivery = await page.evaluate(async () => {
     const target2 = window.viewer.game.getState().mission.target
-    await window.viewer.walkTo(target2[0], target2[1], 0, 'e2e-errand1-step2')
+    return window.viewer.walkTo(target2[0], target2[1], 0, 'e2e-errand1-step2')
   })
+  assert.equal(arrivedAtDelivery, true, 'errand delivery landing failed')
   await page.waitForFunction(() => window.viewer.game.getState().mission === null, null, {timeout: 15000})
+  await page.waitForFunction(async () => {
+    const onFoot = () => window.viewer.walk.active && window.viewer.game.getState().mode === 'foot'
+    if (!onFoot()) return false
+    await new Promise(requestAnimationFrame)
+    return onFoot()
+  }, null, {timeout: 15000})
 
   const afterErrand = await page.evaluate(() => ({
     mode: window.viewer.game.getState().mode,
