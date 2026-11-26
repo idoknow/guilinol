@@ -11,6 +11,17 @@ import {Traffic, WALK_OFFSET} from '../web/src/traffic/sim.ts'
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..')
 
+test('a loaded support layer overrides a stale baked lane elevation',()=>{
+  const sim=new Traffic({nodes:[],lanes:[],signals:[],walks:[]})
+  const track={start:{x:0,z:0},dx:0,dz:1,length:10,yaw:0,offset:0,floor:'test',knots:Int32Array.of(0,14665,0,1500,14665,0)}
+  const actor={track,dist:5,dodge:0,kind:'scooter'}
+  sim.position(actor)
+  assert.equal(actor.y,146.65)
+  sim.sampleGround=()=>153.51
+  sim.position(actor)
+  assert.equal(actor.y,153.51)
+})
+
 test('IDOK-377: a station walker continues across overlapping fragments, then idles at the destination', () => {
   const walks = [[0, 0, -.4315, -5.586], [-.2842, -2.1689, -.829, -21.6159]]
   const lane = {id: 4, from: 1, to: 2, offset: 0, kind: 'motor', width: 3, cls: 'primary', speedKmh: 30, street: 'station', npcWalks: walks}
