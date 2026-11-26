@@ -6,7 +6,7 @@ const mint=(uid,name)=>{const p=Buffer.from(JSON.stringify({uid,name,exp:Math.fl
 const PORT=8896, URL=`ws://127.0.0.1:${PORT}/ws`
 const sleep=ms=>new Promise(r=>setTimeout(r,ms))
 const srv=spawn('node',['rt/server-realtime.mjs'],{env:{...process.env,RT_JOIN_SECRET:SECRET,PORT:String(PORT),
-  RT_ROSTER_SUB_MS:'400',RT_ROSTER_FULL_MS:'800',RT_ROSTER_SUB_TTL_MS:'6000',RT_ROSTER_FULL_QPS:'50',
+  RT_ROSTER_SUB_MS:'400',RT_ROSTER_MOVE_M:'1',RT_ROSTER_FULL_MS:'800',RT_ROSTER_SUB_TTL_MS:'6000',RT_ROSTER_FULL_QPS:'50',
   RT_ROSTER_SUB_RADIUS:'500',RT_RESUME_MS:'600',MAX_PLAYERS:'50'},stdio:['ignore','pipe','pipe']})
 let logs=''; srv.stdout.on('data',d=>logs+=d); srv.stderr.on('data',d=>logs+='ERR '+d)
 await sleep(2000)
@@ -51,7 +51,8 @@ ok(!!full&&full.full.length===4, `随后收到全量快照（${full?full.full.le
 
 console.log('\n[3] 增量：有人移动 → up')
 A.seen.length=0
-B.send({t:'pos',x:110.35+20,y:3,z:25.31,yaw:0})
+A.send({t:'roster_ping'})
+for(let i=1;i<=30;i++){B.send({t:'pos',x:110.35+i*0.4,y:3,z:25.31,yaw:0});await sleep(50)}
 await sleep(900)
 const ups=A.seen.filter(m=>m.t==='roster3').flatMap(m=>m.up||[])
 ok(ups.some(u=>u[0]===bId), `收到 B 的 up 增量`)

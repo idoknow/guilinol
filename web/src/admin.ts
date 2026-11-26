@@ -1758,8 +1758,67 @@ const pages: Record<string, (view: View) => void> = {
     })
     activityCard.id = 'adm-mp-activities'
 
+    // 联机封禁（反外挂 P0）：账号 / 设备指纹封禁 + 人工解封，立即生效
+    const banSlot = h('div')
+    const banUidIn = h('input', { type: 'text', class: 'adm-input', placeholder: 'UID（与指纹至少填一个）', 'aria-label': '封禁 UID' }) as HTMLInputElement
+    const banFpIn = h('input', { type: 'text', class: 'adm-input', placeholder: '设备指纹（换号也能封）', 'aria-label': '封禁设备指纹' }) as HTMLInputElement
+    const banMinSel = h('select', { class: 'adm-input', 'aria-label': '封禁时长' },
+      h('option', { value: '0' }, '永久'),
+      h('option', { value: '10' }, '10 分钟'),
+      h('option', { value: '60' }, '1 小时'),
+      h('option', { value: '1440' }, '24 小时'),
+      h('option', { value: '10080' }, '7 天')) as HTMLSelectElement
+    const banReasonIn = h('input', { type: 'text', class: 'adm-input', placeholder: '原因（可留空）' }) as HTMLInputElement
+    const banForms = h('form', { class: 'adm-mp-filters' }, banUidIn, banFpIn, banMinSel, banReasonIn,
+      h('button', { type: 'submit', class: 'adm-btn adm-btn--sm' }, '封禁'))
+    const banRow = (row: any) => h('tr', null,
+      h('td', null, row.kind === 'uid' ? '账号' : '设备'),
+      h('td', null, String(row.value)),
+      h('td', null, row.until ? when(new Date(row.until)) : '永久'),
+      h('td', null, row.reason || '—'),
+      h('td', null, h('button', {
+        type: 'button', class: 'adm-btn adm-btn--sm adm-btn--ghost',
+        onclick: async () => {
+          try {
+            await api('admin/unban', { uid: row.kind === 'uid' ? Number(row.value) : undefined, fp: row.kind === 'fp' ? row.value : undefined })
+            void loadBans()
+          } catch (error) { alert(String((error as Error)?.message ?? error)) }
+        },
+      }, '解封')))
+    const loadBans = async () => {
+      try {
+        const data = await api<any>('admin/bans', undefined, 'GET')
+        const rows = (data?.bans ?? []) as any[]
+        if (!rows.length) { banSlot.replaceChildren(h('p', { class: 'adm-sub' }, '当前没有生效中的封禁')); return }
+        const table = h('table', { class: 'adm-table' },
+          h('thead', null, h('tr', null, ['类型', '对象', '到期', '原因', ''].map((t) => h('th', null, t)))),
+          h('tbody', null, ...rows.map(banRow)))
+        banSlot.replaceChildren(h('div', { class: 'adm-table-wrap' }, table))
+      } catch (error) { banSlot.replaceChildren(errorState(error as Error, () => void loadBans())) }
+    }
+    banForms.addEventListener('submit', async (event) => {
+      event.preventDefault()
+      const uidValue = banUidIn.value.trim(), fpValue = banFpIn.value.trim()
+      if (!uidValue && !fpValue) { alert('UID 和设备指纹至少填一个'); return }
+      try {
+        await api('admin/ban', {
+          uid: uidValue ? Number(uidValue) : undefined,
+          fp: fpValue || undefined,
+          minutes: Number(banMinSel.value),
+          reason: banReasonIn.value.trim() || undefined,
+        })
+        banUidIn.value = ''; banFpIn.value = ''; banReasonIn.value = ''
+        void loadBans()
+      } catch (error) { alert(String((error as Error)?.message ?? error)) }
+    })
+    void loadBans()
+    const banCard = card('联机封禁（账号 / 设备指纹）', [banForms, banSlot], {
+      sub: '封了立即生效（在线会掉线）；账号与设备指纹任一命中即拦。人工解封后马上可重连。',
+    })
+
     main.append(h('div', { class: 'adm-stack' },
       liveSlot,
+      banCard,
       card('玩法占用玩家时间对比', gpSlot, {
         sub: '统计每个玩法在所选时间段内占用的总玩家时长、占比、独立参与人数与趋势，方便对比哪种玩法最吸引玩家',
         actions: segmented(gpRange, [['24h', '24 小时'], ['7d', '7 天'], ['30d', '30 天'], ['90d', '90 天']], (key) => go({ gprange: key }, true, true), '玩法分析范围'),

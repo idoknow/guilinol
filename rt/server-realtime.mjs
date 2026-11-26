@@ -59,6 +59,7 @@ import {createHmac,timingSafeEqual} from 'node:crypto'
 import {WebSocketServer} from 'ws'
 import * as obs from './observability.mjs'
 import {createChat} from './chat.mjs'
+import {checkMove, canAct, cleanFp, createBanStore, LIMITS} from './anti-cheat.mjs'
 import {resolveClientIp} from './client-ip.mjs'
 
 const PORT = Number(process.env.PORT || 8790)
@@ -113,8 +114,10 @@ const players = new Map()
 const sockets = new Set()
 /** 每个 IP 的当前连接数，防止一个客户端开几百条把房间挤满 */
 const ipCounts = new Map()
-/** uid → {until, reason}，被 /kick 踢过的 uid 在 until 之前不许重新 join */
+/** uid → {until, reason}，被 /kick 踢过的 uid 在 until 之前不许重新 join（进程内快速路径） */
 const bans = new Map()
+/** 持久封禁：uid + 设备指纹，重启不丢；人工解封走 /admin/unban */
+const banStore = createBanStore(process.env, (...args) => console.warn('[anti-cheat]', ...args))
 let nextId = 1
 
 const now = () => Date.now()
@@ -144,6 +147,25 @@ function identity(ticket) {
         normalizeUid(claims.uid) !== null && typeof claims.name === 'string') return {...claims,uid:normalizeUid(claims.uid)}
   } catch {}
   return null
+}
+
+/** UA → {browser, model}：只取粗粒度，够运营识别"同一台手机换个号" */
+function parseDev(dev, ua) {
+  const out = { model: '', browser: '' }
+  if (dev) {
+    const [model, browser] = String(dev).split('|')
+    out.model = clampStr(model, 60)
+    out.browser = clampStr(browser, 40)
+  }
+  if (!out.browser) {
+    const m = /(Edg|OPR|Chrome|Firefox|Safari)\/(\d+)/.exec(ua || '')
+    if (m) out.browser = `${m[1] === 'OPR' ? 'Opera' : m[1] === 'Edg' ? 'Edge' : m[1]} ${m[2]}`
+  }
+  if (!out.model) {
+    const m = /Android[^;]*;\s*([^;)]+?)(?:\s+Build|\s+MIUI|\s+HM|\s+Redmi|;|\))/.exec(ua || '')
+    out.model = m ? clampStr(m[1], 60) : ''
+  }
+  return out
 }
 
 /** 昵称去控制字符 + 限长；空则给默认名，避免别人客户端里被塞换行 / 伪造昵称 */
@@ -537,6 +559,76 @@ const server = createServer(async(req, res) => {
       sweepBans();res.writeHead(200,{'content-type':'application/json','cache-control':'no-store'})
       res.end(JSON.stringify(obs.state(players,sockets,bans,PROTO,MAX_PLAYERS)));return
     }
+    // 联机封禁管理（运营后台）：列表 / 手动封禁 / 人工解封
+    const ADMIN = process.env.RT_ADMIN_TOKEN
+    const adminAuthorized = Boolean(ADMIN) && req.headers['x-admin-token'] === ADMIN
+    const readJson = () => new Promise((resolve) => {
+      let raw = ''
+      req.on('data', (chunk) => { raw += chunk; if (raw.length > 8192) req.destroy() })
+      req.on('end', () => { try { resolve(JSON.parse(raw || '{}')) } catch { resolve(null) } })
+      req.on('error', () => resolve(null))
+    })
+    if (req.url === '/admin/bans' && req.method === 'GET') {
+      if (!adminAuthorized) { res.writeHead(403); res.end(); return }
+      void banStore.refresh()
+      res.writeHead(200, {'content-type': 'application/json', 'cache-control': 'no-store'})
+      const bans = banStore.list()
+      // 指纹封禁带上设备画像（型号/浏览器/屏幕/运营商/关联账号），运营才好判断是不是误封
+      const enriched = await Promise.all(bans.map(async (row) => {
+        if (row.kind !== 'fp') return row
+        const devices = await banStore.deviceAccounts(row.value)
+        return { ...row, devices }
+      }))
+      res.end(JSON.stringify({
+        bans: enriched,
+        live: [...players.values()].filter((p) => p.ws).map((p) => ({ uid: p.uid, name: p.name, id: p.id })),
+      }))
+      return
+    }
+    if ((req.url === '/admin/ban' || req.url === '/admin/unban') && req.method === 'POST') {
+      if (!adminAuthorized) { res.writeHead(403); res.end(); return }
+      const body = await readJson()
+      if (!body || typeof body !== 'object' || Array.isArray(body)) {
+        res.writeHead(400, {'content-type': 'application/json'})
+        res.end('{"ok":false,"error":"bad json"}')
+        return
+      }
+      const uid = body.uid === undefined || body.uid === null || body.uid === '' ? null : normalizeUid(body.uid)
+      const fp = cleanFp(body.fp)
+      if (uid == null && !fp) {
+        res.writeHead(400, {'content-type': 'application/json'})
+        res.end('{"ok":false,"error":"uid or fp required"}')
+        return
+      }
+      try {
+        if (req.url === '/admin/unban') {
+          const result = await banStore.unban({uid, fp, actor: clampStr(body.actor, 64)})
+          bans.delete(uid)   // 同步清掉进程内快速封禁
+          res.writeHead(200, {'content-type': 'application/json'})
+          res.end(JSON.stringify({ok: true, ...result}))
+          return
+        }
+        const minutes = body.minutes === undefined ? 0 : Number(body.minutes)
+        if (!Number.isFinite(minutes) || minutes < 0 || minutes > 525600) {
+          res.writeHead(400, {'content-type': 'application/json'})
+          res.end('{"ok":false,"error":"bad minutes"}')
+          return
+        }
+        const reason = clampStr(body.reason, 200).trim() || '违反联机规则'
+        const result = await banStore.ban({uid, fp, minutes, reason, actor: clampStr(body.actor, 64), level: Number(body.level) || 0})
+        // 立即踢掉在线命中者（封了还挂着就没意义）
+        for (const p of [...players.values()]) {
+          const hit = (uid != null && p.uid === uid) || (fp && (p.fp === fp || p.ws?.fp === fp))
+          if (hit) { try { p.ws?.close(4003, 'banned') } catch { /* 忽略 */ } }
+        }
+        res.writeHead(200, {'content-type': 'application/json'})
+        res.end(JSON.stringify({ok: true, ...result}))
+      } catch (error) {
+        res.writeHead(500, {'content-type': 'application/json'})
+        res.end(JSON.stringify({ok: false, error: String(error && error.message || error)}))
+      }
+      return
+    }
     if (req.url === '/health') {
       res.writeHead(200, {'content-type': 'application/json'})
       // 保留 ok / online / proto 三个老字段（探针和监控在用），后面只是补容量信息
@@ -756,6 +848,25 @@ wss.on('connection', (ws, req) => {
         const claims = identity(msg.ticket)
         if (!claims) { obs.reject('ticket');ws.rejected = true; ws.close(4003, 'ticket rejected'); return }
         const uid = claims.uid
+        // 设备指纹：客户端算好发过来（只存，不参与身份判定），用于「换号但设备不变」的封禁
+        const fp = cleanFp(msg.fp)
+        const ua = clampStr(req.headers['user-agent'], 200)
+        if (fp) {
+          ws.fp = fp
+          ws.dev = clampStr(msg.dev, 160)   // 客户端给的型号/浏览器/屏幕摘要（只展示，不参与身份判定）
+          const [ip24] = (ip ?? '').split('.').length === 4 ? [`${(ip ?? '').split('.').slice(0, 3).join('.')}.0/24`] : ['']
+          const dev = parseDev(ws.dev, ua)
+          void banStore.noteDevice(uid, {fp, ua, ip, ip24, ...dev})
+        }
+        void banStore.refresh()
+        const persistent = banStore.check(uid, fp)
+        if (persistent) {
+          obs.reject('banned', {uid, name: cleanName(claims.name)})
+          ws.rejected = true
+          send(ws, {t: 'banned', reason: persistent.reason || '账号已被封禁'})
+          setTimeout(() => { try { ws.close(4003, 'banned') } catch { /* 忽略 */ } }, 60)
+          return
+        }
         const ban = bans.get(uid)
         if (ban && ban.until > now()) {
           obs.reject('banned',{uid,name:cleanName(claims.name)})
@@ -872,6 +983,7 @@ wss.on('connection', (ws, req) => {
         ws.joined = true
         clearTimeout(ws.joinTimer)
         unpend()
+        player.fp = ws.fp ?? ''
         players.set(id, player)
         void chat.joined(player)
         gridAdd(player)
@@ -927,13 +1039,37 @@ wss.on('connection', (ws, req) => {
         if (at - me.lastPos < MIN_POS_GAP_MS) return
         me.lastPos = at
         obs.position(me,at)
-        me.x = clampNum(msg.x, -1e5, 1e5)
-        me.y = clampNum(msg.y, -1000, 8000)
-        me.z = clampNum(msg.z, -1e5, 1e5)
+        const nx = clampNum(msg.x, -1e5, 1e5)
+        const ny = clampNum(msg.y, -1000, 8000)
+        const nz = clampNum(msg.z, -1e5, 1e5)
+        // 移动合法性由服务端判定：超速 / 飞天 / 非法瞬移一律拒包，客户端收 setback 拉回
+        const stepDt = Math.max((at - (me.posAt ?? at)) / 1000, 0.02)
+        const stepLen = Math.hypot(nx - me.x, nz - me.z)
+        const verdict = checkMove(me, nx, ny, nz, at)
+        if (verdict.reject) {
+          send(ws, {t: 'setback', x: me.x, y: me.y, z: me.z, kind: verdict.kind})
+          if (at - (me.cheatAt ?? 0) > 2000) {
+            me.cheatAt = at
+            void banStore.violation({
+              uid: me.uid, fp: ws.fp ?? '', kind: verdict.kind,
+              detail: {overflow: Math.round(verdict.overflow ?? 0), x: Math.round(nx), z: Math.round(nz)},
+              ua: me.ua ?? '',
+            })
+          }
+          return
+        }
+        // 过去 1 秒跑过步（超过走路上限）→ 短暂禁止出拳/扶人（防"切车瞬移贴脸出拳"）
+        if (stepLen / stepDt > LIMITS.walk) me.fastAt = at
+        me.posAt = at
+        me.x = nx
+        me.y = ny
+        me.z = nz
         me.yaw = clampNum(msg.yaw, -10, 10)
         me.v = clampNum(msg.v, 0, 120)
         me.foot = msg.foot!==false
         me.bike = clampStr(msg.bike, 32)
+        if (me.bike && !me.bikeAt) me.bikeAt = at
+        else if (!me.bike) me.bikeAt = 0
         me.bx = clampNum(msg.bx, -1e5, 1e5)
         me.bz = clampNum(msg.bz, -1e5, 1e5)
         me.byaw = clampNum(msg.byaw, -20, 20)
@@ -944,6 +1080,9 @@ wss.on('connection', (ws, req) => {
         me.hb = clampNum(msg.hb, 0, 1)
         me.hx = clampNum(msg.hx, -1e5, 1e5)
         me.hz = clampNum(msg.hz, -1e5, 1e5)
+        // 手部/载具坐标只允许在玩家附近（防止用远端坐标做伪装的"隔空打"视觉）
+        if (!me.hb || Math.hypot(me.hx - me.x, me.hz - me.z) > 3) { me.hx = me.x; me.hz = me.z }
+        if (me.bike && Math.hypot(me.bx - me.x, me.bz - me.z) > 12) { me.bx = me.x; me.bz = me.z }
         me.hyaw = clampNum(msg.hyaw, -20, 20)
         me.cr = clampNum(msg.cr, 0, 1)
         me.gr = clampNum(msg.gr, 0, 1, 1)
