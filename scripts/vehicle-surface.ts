@@ -120,7 +120,7 @@ export function vehicleSurface(world,m){
       for(const t of local){
         if(!t.nodes)continue
         const onLanding=t.nodes.some((node,end)=>{
-          if(!t.mouths?.[end]||!(node===lane.from||node===lane.to||lane.nodes?.has(node)))return false
+          if(!(t.mouths?.[end]||t.gradedLanding)||!(node===lane.from||node===lane.to||lane.nodes?.has(node)))return false
           const [px,,pz]=t.portals[end]
           return Math.hypot(x-px,z-pz)<=4*t.halfWidth
         })

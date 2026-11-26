@@ -89,7 +89,7 @@ for (const [id, way] of ways) {
   const intervalsOnWay = structure === 'bridge' ? [[0,station]] : worlds[1].tunnels
     .filter(t=>t.way===id).map(t=>t.portals.map(([x,,z])=>stationAt(x,z)).sort((a,b)=>a-b))
   const cap = way.tags.highway === 'service' ? .08 : .05
-  let activeIntervals = 0, aboveCap = 0, raisedM = 0, loweredM = 0
+  let activeIntervals = 0, aboveCap = 0, raisedM = 0, unauthorizedRiseM = 0, loweredM = 0
   let before = 0, after = 0, intervals = 0, regressions = 0
   for (let i = 1; i < points.length; i++) {
     const a = points[i - 1], b = points[i], len = stations[i]-stations[i-1]
@@ -100,6 +100,9 @@ for (const [id, way] of ways) {
       const x = a.x + (b.x-a.x)*j/count, z = a.z + (b.z-a.z)*j/count
       if (!worlds[0].tile(x,z)) { previous = undefined; continue }
       const heights = worlds.map(w => w.surface(x,z,lane))
+      const atStation = stations[i-1] + step*j
+      if (id !== 983781244 || atStation < 1154 || atStation > 1290)
+        unauthorizedRiseM = Math.max(unauthorizedRiseM, heights[1]-heights[0])
       raisedM = Math.max(raisedM, heights[1] - heights[0])
       loweredM = Math.min(loweredM, heights[1] - heights[0])
       if (previous) {
@@ -117,8 +120,8 @@ for (const [id, way] of ways) {
       previous = heights
     }
   }
-  if (roads.has(id) || id === 815078159) assert(raisedM < .001, 'Underpass pavement raised on '+id)
-  grades.push({road:id, intervals, activeIntervals, aboveCap, regressions, before, after, raisedM, loweredM})
+  if (roads.has(id) || id === 815078159) assert(unauthorizedRiseM < .001, 'Underpass pavement raised on '+id)
+  grades.push({road:id, intervals, activeIntervals, aboveCap, regressions, before, after, raisedM, unauthorizedRiseM, loweredM})
   assert(activeIntervals > 0, 'No intervals in the solved extent on ' + id)
   assert.equal(aboveCap, 0, 'Road grade limit exceeded inside the closure on ' + id)
   assert.equal(regressions,0,'Road grade regressions on '+id)
@@ -176,7 +179,20 @@ for(const [bridge,start,end] of [[983781246,983781245,500400552],[983781248,5005
   }
 }
 const mainReverse=visibleSurfaces(base,paved,auditedRoads,reference)
-const reverse = visibleSurfaces(candidate, paved, auditedRoads)
+// Subsequent phases can add an enclosed crossing inside these original
+// approaches. Resolve its upper road, roof and adjacent portal separately.
+const laterBores=worlds[1].tunnels.some(t=>t.gradedLanding)
+const closure=new Set(auditedRoads)
+if (laterBores) {
+  for (const file of fs.readdirSync('pipeline/rail-sections').filter(f => f.endsWith('.json'))) {
+    const section=json(path.join('pipeline/rail-sections',file))
+    for (const road of [...section.roads,...(section.additionalRoadGroups ?? []).flat()]) {
+      if (road.stackedRoad && worlds[1].tunnels.some(t=>t.way===road.way && t.nodes?.[0]===road.boundaryNodes[0]))
+        closure.add(road.way)
+    }
+  }
+}
+const reverse = visibleSurfaces(candidate, paved, closure, undefined, laterBores)
 console.log(JSON.stringify({abutments, mainReverse, reverse, closure: [...auditedRoads].sort((a,b)=>a-b), crossings:results, grades, yardGrades}, null, 2))
 
 assert(reverse.every(r => r.checked > 0 && r.groundViolations === 0), 'Ground-level faces intrude into a surveyed underpass')

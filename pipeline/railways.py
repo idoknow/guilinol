@@ -339,7 +339,11 @@ def bake(world_dir, manifest, inventory, samples):
     from dingjiang import fit_rail
     fit_rail(coords,pieces,height,ways)
     from rail_sections import designs, fit_tracks, split_profile_tiles
+    short_profiles = defaultdict(list)
     for section in designs():
+        if section.get("retainShortSpans"):
+            for wid, interval in section["railTies"].items():
+                short_profiles[int(wid)].append(interval)
         if "railProfiles" in section:
             coords,pieces,height = split_profile_tiles(section,coords,pieces,height,ways)
         fit_tracks(section, coords, pieces, height, ways)
@@ -356,7 +360,12 @@ def bake(world_dir, manifest, inventory, samples):
         cuts=sorted(cuts)
         length=float(np.linalg.norm(delta))
         for s,t in zip(cuts,cuts[1:]):
-            if (t-s)*length<.005: continue
+            if (t-s)*length < .005:
+                mid_station = station + (s+t)*length/2
+                if not any(lo <= mid_station <= hi for lo, hi in short_profiles.get(way_id, ())):
+                    continue
+                if (t-s)*length < .000002:
+                    continue  # Both ends must remain distinct at GL04 coordinate precision.
             center=a+delta*((s+t)/2)
             origin=np.floor(center/CHUNK)*CHUNK
             key=tuple(map(int,origin))

@@ -88,6 +88,14 @@ def tunnel_sections(profiles):
                               approach=0, openCut=not covered, openEnds=[0,0] if covered else [end-start,0], mouths=mouths,
                               pairedWidth=way.get('stationWidth'),
                               stations=np.column_stack((distances-start, levels)).tolist()))
+            if "railSideWall" in way:
+                side, at, top = way["railSideWall"]
+                bores[-1]["wallSide"] = side
+                bores[-1]["wallTop"] = np.interp(distances, at, top).tolist()
+    joined = {way["id"] for way, _, _ in profiles.values() if way.get("flatNativeTie")}
+    for t in bores:
+        if t["way"] in joined and t["openCut"]:
+            t["gradedLanding"] = True
     ends = defaultdict(list)
     for t in bores:
         for idx,node in enumerate(t["nodes"]):
@@ -105,17 +113,29 @@ def bake(directory, manifest, paired_widths):
     profiles.update(road_profiles(elements, paired_widths))
     import dingjiang_structures
     profiles.update(dingjiang_structures.road_profiles(elements, paired_widths))
-    from rail_sections import adjust_prior_roads, designs, road_profiles as section_roads
+    from rail_sections import adjust_prior_roads, designs, road_phases, road_profiles as section_roads
     sections = designs()
     adjust_prior_roads("01", profiles, sections)
     bridge_ways, landings = dingjiang_structures.raise_decks(directory, manifest, elements, profiles)
     from dingjiang import ROAD_IDS
+    ways = {way['id']: way for way in elements if way['type'] == 'way'}
+    joint = []
+    for section in sections:
+        for road in section["roads"]:
+            if not road.get("withFirstSection"):
+                continue
+            wid = road["way"]
+            profile = section_roads(dict(section, roads=[road]), ways, paired_widths)[wid]
+            key = (wid, section["name"], road["boundaryNodes"][0]) if wid in profiles else wid
+            profiles[key] = profile
+            joint.append(profile)
     bake_profiles(directory, manifest, profiles, elements, bridge_ways.values(), landings)
     from dingjiang_paving import finish_paving
-    finish_paving(directory, manifest, [profiles[wid] for wid in ROAD_IDS], elements)
-    ways = {way['id']: way for way in elements if way['type']=='way'}
-    final_traffic_ways = []
-    for section in sections:
+    corrected = {int(wid) for section in sections for wid in section.get("priorRoadProfiles", {}).get("01", {})}
+    finish_paving(directory, manifest, [profiles[wid] for wid in sorted(set(ROAD_IDS) | corrected)] + joint, elements)
+    final_traffic_ways = [way for way, _, _ in joint]
+    final_traffic_ways.extend(profiles[wid][0] for wid in sorted(corrected))
+    for section in road_phases(sections):
         parts = section_roads(section, ways, paired_widths)
         adjust_prior_roads(section["name"], parts, sections)
         if not parts:
@@ -129,7 +149,7 @@ def bake(directory, manifest, paired_widths):
         bake_profiles(directory, manifest, parts, elements, bridges, joints, additional=True,
                       sample_traffic=not bridges)
         finish_paving(directory, manifest, list(parts.values()), elements)
-        if bridges:
+        if bridges or section.get("retainRoadNodeLevels"):
             final_traffic_ways.extend(way for way, _, _ in parts.values())
             final_traffic_ways.extend(bridges)
     return final_traffic_ways
@@ -166,6 +186,10 @@ def bake_profiles(directory, manifest, profiles, elements, bridge_ways=(), landi
     active = set(tiles)
     near = STRtree(open_lines)
     fixed_pavement=[]
+    parts_by_way = defaultdict(list)
+    for profile in profiles.values():
+        parts_by_way[profile[0]['id']].append(profile)
+
     for way in elements:
         tags = way.get('tags',{})
         if way['type']!='way' or 'highway' not in tags or tags.get('railway')=='platform':
@@ -174,7 +198,23 @@ def bake_profiles(directory, manifest, profiles, elements, bridge_ways=(), landi
         if len(coords)<2 or not len(near.query(LineString(coords),predicate='dwithin',distance=40)):
             continue
         profiled = profiles.get(way['id'])
-        if profiled and 'nativeRemainders' in profiled[0]:
+        parts = parts_by_way[way['id']]
+        if len(parts) > 1:
+            from shapely.ops import substring
+            axis = LineString(coords)
+            spans = sorted(sorted(axis.project(Point(line.coords[i])) for i in (0, -1))
+                           for _, line, _ in parts)
+            fixed = []
+            previous = 0.
+            for start, end in spans:
+                if start < previous - .001:
+                    raise ValueError(f"Overlapping road profiles on {way['id']}")
+                if start > previous + .001:
+                    fixed.append(substring(axis, previous, start))
+                previous = end
+            if previous < axis.length - .001:
+                fixed.append(substring(axis, previous, axis.length))
+        elif profiled and 'nativeRemainders' in profiled[0]:
             fixed = profiled[0]['nativeRemainders']
         elif profiled and 'nativeRemainder' in profiled[0]:
             fixed = [LineString(profiled[0]['nativeRemainder'])]
@@ -191,7 +231,11 @@ def bake_profiles(directory, manifest, profiles, elements, bridge_ways=(), landi
             fixed = [LineString(coords)]
         for line in fixed:
             if tags.get('bridge','no')=='no' and tags.get('tunnel','no')=='no':
-                fixed_pavement.append(line.buffer(half_width(way)+.1,cap_style='round'))
+                paving = line.buffer(half_width(way)+.1, cap_style='round')
+                for part, graded, _ in parts:
+                    if part.get("flatNativeTie"):
+                        paving = paving.difference(graded.buffer(half_width(part)+.1, cap_style="flat"))
+                fixed_pavement.append(paving)
             for a,b in zip(line.coords,line.coords[1:]):
                 add(np.asarray(a),np.asarray(b),half_width(way),None,None)
     from shapely import Polygon, constrained_delaunay_triangles, union_all
@@ -202,6 +246,7 @@ def bake_profiles(directory, manifest, profiles, elements, bridge_ways=(), landi
         for end,node in enumerate(bore['nodes']):
             if landings and node in landings:
                 bore.setdefault('joints',[None,None])[end] = landings[node]
+    install_native_ties(bores, profiles)
     cuts = defaultdict(list)
     for t in bores:
         a,b=t['portals']
@@ -334,6 +379,37 @@ def bake_profiles(directory, manifest, profiles, elements, bridge_ways=(), landi
         grade_traffic(directory, manifest, [*(way for way, _, _ in profiles.values()), *bridge_ways])
 
 
+def install_native_ties(bores, profiles):
+    """Blend the surveyed native crossfall into a flat graded approach."""
+    ties = {(way["id"], int(node)): rows for way, _, _ in profiles.values()
+            for node, rows in way.get("nativeTies", {}).items()}
+    if not ties:
+        return
+    for bore in bores:
+        start, end = np.asarray(bore["portals"])[:, [0, 2]]
+        tangent = (end - start) / bore["length"]
+        normal = np.array([-tangent[1], tangent[0]])
+        for index, node in enumerate(bore["nodes"]):
+            rows = ties.get((bore["way"], node))
+            if not rows:
+                continue
+            joints = bore.setdefault("joints", [None, None])
+            if joints[index] or rows[-1][0] >= bore["length"]:
+                raise ValueError(f"Native tie overlaps a junction on {bore['way']} at {node}")
+            mesh = []
+            for distance, levels in rows:
+                axis = end - distance*tangent if index else start + distance*tangent
+                offsets = np.linspace(-bore["halfWidth"], bore["halfWidth"], len(levels))
+                mesh.append([[float(x), height, float(z)] for (x,z),height in
+                             zip(axis + offsets[:, None]*normal, levels)])
+            faces = []
+            for a,b in zip(mesh, mesh[1:]):
+                for j in range(len(a)-1):
+                    faces.extend(([a[j], b[j], b[j+1]], [a[j], b[j+1], a[j+1]]))
+            ring = [row[::2] for row in (mesh[0][0],mesh[0][-1],mesh[-1][-1],mesh[-1][0])]
+            joints[index] = dict(ring=ring, faces=faces, wedges=[], draw=True)
+
+
 def trim_joint_floors(tunnels):
     """Fill only the uncovered wedge between graded rectangular road strips."""
     from shapely import LineString, Polygon, union_all
@@ -396,7 +472,9 @@ def grade_traffic(directory, manifest, ways):
     for lane in graph['lanes']:
         way = owners.get((lane['from'],lane['to']))
         if way is not None:
-            lanes.append(dict(lane, way=way['id'],halfWidth=half_width(way),maxTrafficOffset=way.get('maxTrafficOffset'),structure=next((s for s in ('bridge','tunnel') if way['tags'].get(s)=='yes'),'surface')))
+            edge = tuple(sorted((lane['from'],lane['to'])))
+            offset = way.get('trafficOffsets', {}).get(edge, way.get('maxTrafficOffset'))
+            lanes.append(dict(lane, way=way['id'],halfWidth=half_width(way),maxTrafficOffset=offset,structure=next((s for s in ('bridge','tunnel') if way['tags'].get(s)=='yes'),'surface')))
     root=Path(__file__).resolve().parents[1]
     with NamedTemporaryFile(dir=directory,mode='w+') as payload:
         json.dump(dict(manifest=manifest,nodes=graph['nodes'],lanes=lanes),payload)

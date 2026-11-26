@@ -387,7 +387,7 @@ export async function detail(tile:Tile, signal:AbortSignal, parseSlot?:()=>Promi
   if(railCuts.length){geometry.computeVertexNormals();geometry.computeBoundingSphere()}
   const groundMesh = new THREE.Mesh(geometry,material)
   group.add(groundMesh)
-  const tunnel=tunnels?tunnelGeometry(tile,geometry,tunnels):null
+  const tunnel=tunnels?tunnelGeometry(tile,geometry,tunnels,paths[18]):null
   if(tunnel){
     if(tunnel.fringe){tunnel.fringe.material.dispose();tunnel.fringe.material=material}
     if('lining' in tunnel)group.add(tunnel.floor,tunnel.portal,tunnel.interior)
