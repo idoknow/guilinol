@@ -151,9 +151,26 @@ def bake(directory, manifest, paired_widths):
                   bridge_approaches=bridge_approaches)
     from dingjiang_paving import finish_paving
     corrected = {int(wid) for section in sections for wid in section.get("priorRoadProfiles", {}).get("01", {})}
-    finish_paving(directory, manifest, [profiles[wid] for wid in sorted(set(ROAD_IDS) | corrected)] + joint, elements)
+    paving = {wid: profiles[wid] for wid in sorted(set(ROAD_IDS) | corrected)}
+    for section in sections:
+        for key, segment in section.get("priorRoadProfiles", {}).get("01", {}).items():
+            if "pavingNodes" not in segment:
+                continue
+            wid = int(key)
+            way, line, heights = profiles[wid]
+            start_node, end_node = segment["pavingNodes"]
+            first, last = (way["nodes"].index(node) for node in (start_node, end_node))
+            chain = np.r_[0., np.cumsum(np.linalg.norm(np.diff(line.coords, axis=0), axis=1))]
+            start, stop = chain[[first, last]]
+            limits = np.asarray(segment["controls"])[[0, -1], 0]
+            if first >= last or np.max(abs(limits - [start, stop])) > .001:
+                raise ValueError(f"Pavement ties differ from the approved profile on {wid}")
+            at = np.r_[start, heights[(heights[:,0] > start+.00001) & (heights[:,0] < stop-.00001), 0], stop]
+            part = dict(way, nodes=way["nodes"][first:last+1], geometry=way["geometry"][first:last+1])
+            paving[wid] = part, LineString(points(part)), np.column_stack((at-start, np.interp(at, *heights.T)))
+    finish_paving(directory, manifest, list(paving.values()) + joint, elements)
     final_traffic_ways = [way for way, _, _ in joint] + joint_bridges
-    final_traffic_ways.extend(profiles[wid][0] for wid in sorted(corrected))
+    final_traffic_ways.extend(paving[wid][0] for wid in sorted(corrected))
     # A new bore can share a portal with an earlier graded approach. Generate
     # their profiles under their own design rules, then stitch them in one pass.
     phases = []

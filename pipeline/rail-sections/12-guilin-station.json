@@ -3,6 +3,7 @@
   "priorRoadProfiles": {
     "01": {
       "169505553": {
+        "pavingNodes": [4138779624, 2457187867],
         "followNativeCeiling": true,
         "startNode": 4138779624,
         "controls": [
@@ -132,6 +133,7 @@
         ]
       },
       "265411063": {
+        "pavingNodes": [6372238737, 6372238738],
         "followNativeCeiling": true,
         "startNode": 3744313684,
         "controls": [
@@ -188,6 +190,7 @@
         ]
       },
       "412456329": {
+        "pavingNodes": [4138779624, 6484104243],
         "followNativeCeiling": true,
         "startNode": 4138779624,
         "controls": [
@@ -211,6 +214,7 @@
         ]
       },
       "1017595561": {
+        "pavingNodes": [9385960964, 9385960966],
         "followNativeCeiling": true,
         "startNode": 9385960959,
         "controls": [
@@ -286,6 +290,7 @@
         ]
       },
       "690703974": {
+        "pavingNodes": [6480631919, 6480631921],
         "followNativeCeiling": true,
         "startNode": 6480631919,
         "controls": [
