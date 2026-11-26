@@ -4,6 +4,7 @@ import {applyTreeVariant, setTreeFar, sharedProxyAssets, TREE_SPECIES_COUNT, tre
 import {look} from './look/config'
 import {fetchAsset,type Tile} from './world'
 import {treeBlocked} from './tunnels'
+import {isOuterOsmanthus} from './outer-osmanthus'
 import {onOldSouthSlope,slopeStart,slopeRatio,yueyaShoulderHeight} from './yueya-slope'
 import {freezeStatic} from './static-freeze'
 import treeSpecs from '../../pipeline/tree-specs.json'
@@ -73,6 +74,7 @@ export async function readTrees(tile:Tile,signal:AbortSignal){
       z=start+distance*slopeRatio(distance)
     }
     if(treeBlocked(x,y,z))continue
+    if(isOuterOsmanthus(x,z,data.getUint8(i+6),data.getUint8(i+7)))continue
     // Clear Sanduo Rd Tianyuan Mifen storefront, Lv3 expansion lot, and front viewing corridor
     if(x>=-1154&&x<=-1135&&z>=-65&&z<=-36)continue
     // Clear Wangcheng Mall Mixue-Lincheng drinks storefront & patio apron (wangcheng_drinks_shop)
