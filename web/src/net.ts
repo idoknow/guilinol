@@ -11,9 +11,14 @@ function publish(detail:MpStatus){window.dispatchEvent(new CustomEvent('glol:mp-
 
 type State='connecting'|'online'|'offline'|'replaced'
 export type ActivityReport={act:string;detail?:string}
+let rosterRequester:((on:boolean)=>void)|null=null
+/** 地图 / 玩家列表调用：on=true 开始收远距离名册，false 停止。引用计数，两个面板同时开也安全。 */
+export function requestRoster(on:boolean){rosterRequester?.(on)}
+
 export function attachNet(scene:Scene,clips:AnimationClip[],getPose:()=>Pose,getAvatar:()=>Avatar,camera:Camera,getActivity?:()=>ActivityReport,onCombat?:(p:CombatPacket,self:string)=>void) {
   const peers=players(scene,clips,camera)
   let socket:WebSocket|undefined,attempt=0,generation=0,timer=0,lastSent=-Infinity,lastRoster=-Infinity,lastActCheck=-Infinity,disposed=false
+  let lastRosterV=0,rosterPaused=false,subCount=0,subTimer=0
   let lastActKey=''
   let state:State='offline',online=0
   // AOI 之后 peers 只有身边 ~150m 的人；整座城的人来自服务端每 5s 一次的 roster（只有位置，没有朝向）
@@ -33,6 +38,17 @@ export function attachNet(scene:Scene,clips:AnimationClip[],getPose:()=>Pose,get
   function status(){return {state,online}}
   function update(next:State,count=0){state=next;online=count;bindChat(next==='online'?send:undefined);if(next!=='online'){far.clear();clearRoster();onCombat?.({id:myId,hp:combatConfig.hpMax,dn:0,remaining:0,progress:0,helper:''},myId)}if(badge)badge.textContent=`${state} · ${online}`;publish({state,online})}
   function send(packet:object){if(socket?.readyState===WebSocket.OPEN)socket.send(JSON.stringify(packet))}
+  // 远距离名册订阅：只在打开大地图/玩家列表时开，关闭即退订；45s 续订防止被服务端按超时清理
+  function applySub(){
+    if(subCount>0){
+      send({t:'roster_sub',since:lastRosterV})
+      if(!subTimer)subTimer=window.setInterval(()=>{if(subCount>0)send({t:'roster_ping'})},45000)
+    }else{
+      if(subTimer){clearInterval(subTimer);subTimer=0}
+      send({t:'roster_unsub'});far.clear()
+    }
+  }
+  rosterRequester=on=>{subCount=Math.max(0,subCount+(on?1:-1));applySub()}
   // 不能像以前那样 6 次之后永久放弃：满员、同一出口 IP 挤爆、切后台被断，都是暂时的。
   // 一旦放弃，玩家只能刷新页面，表现出来就是「联机时好时坏」。
   function retry(fixed?:number,quiet=false){
@@ -58,7 +74,7 @@ export function attachNet(scene:Scene,clips:AnimationClip[],getPose:()=>Pose,get
       const previous=socket
       if(previous){previous.onopen=previous.onmessage=previous.onclose=previous.onerror=null;try{previous.close(1000,'replace')}catch{}}
       const ws=new WebSocket(endpoint);socket=ws
-      ws.onopen=()=>{if(version===generation){const initial=getActivity?.();lastActKey=initial?`${initial.act}|${initial.detail??''}`:'';send({t:'join',ticket,avatar:getAvatar(),caps:['roster2'],...(initial?{act:initial.act,actDetail:initial.detail}:{}),...getPose()})}}
+      ws.onopen=()=>{if(version===generation){const initial=getActivity?.();lastActKey=initial?`${initial.act}|${initial.detail??''}`:'';send({t:'join',ticket,avatar:getAvatar(),caps:['roster3'],...(initial?{act:initial.act,actDetail:initial.detail}:{}),...getPose()})}}
       ws.onmessage=event=>{
         if(version!==generation)return
         const msg=JSON.parse(event.data)
@@ -71,7 +87,7 @@ export function attachNet(scene:Scene,clips:AnimationClip[],getPose:()=>Pose,get
             if(msg.id===myId&&msg.by)peers.reveal(msg.by)
             peers.combat(msg);onCombat?.(msg,myId);break
           }
-          case 'welcome': sent=0;sentTimes=[];myId=String(msg.me?.id??'');setChatSelf(Number(msg.me?.uid)||0);onCombat?.(msg.me,myId)
+          case 'welcome': sent=0;sentTimes=[];myId=String(msg.me?.id??'');setChatSelf(Number(msg.me?.uid)||0);onCombat?.(msg.me,myId);if(subCount>0)send({t:'roster_sub',since:lastRosterV})
             // 续连（CDN 掐断后原地接管）：对账而不是清空重建，否则每 44 秒所有人的模型都会销毁再克隆一遍
             if(msg.me?.resumed){const keep=new Set((msg.players as {id:string}[]).map(p=>p.id))
               for(const p of peers.list())if(!keep.has(p.id))peers.remove(p.id)
@@ -83,6 +99,22 @@ export function attachNet(scene:Scene,clips:AnimationClip[],getPose:()=>Pose,get
             attempt=0;update('online',msg.online);break
           case 'online':update('online',msg.online);break
           case 'roster':far=new Map();for(const [id,name,x,z,joinedAt] of msg.players as [string,string,number,number,number][])if(id!==myId)far.set(id,{id,name,x,z,yaw:0,v:0,bike:false,joinedAt,far:true});lastRoster=-Infinity;break
+          // 按需名册：只在打开大地图/玩家列表时订阅；near 是附近快照，full 是全量，其余是增量
+          case 'roster3':{
+            if(msg.paused){rosterPaused=true;lastRosterV=msg.v??lastRosterV;break}
+            rosterPaused=false
+            if(typeof msg.v==='number')lastRosterV=msg.v
+            if(msg.full||msg.near){
+              far=new Map()
+              const list=(msg.full??msg.near??[]) as [string,string,number,number][]
+              for(const [id,name,x,z] of list)if(id!==myId)far.set(id,{id,name,x,z,yaw:0,v:0,bike:false,far:true})
+            }else{
+              for(const id of (msg.del??[]) as string[])far.delete(id)
+              for(const [id,name,x,z] of (msg.add??[]) as [string,string,number,number][])if(id!==myId)far.set(id,{id,name,x,z,yaw:0,v:0,bike:false,far:true})
+              for(const [id,x,z] of (msg.up??[]) as [string,number,number][]){const q=far.get(id);if(q){q.x=x;q.z=z}}
+            }
+            if(typeof msg.total==='number')online=msg.total
+            lastRoster=-Infinity;break}
           // 增量名册：只发新增/离开/移动≥2m 的人，每 30s 一次全量对账（服务端保证）
           case 'roster2':{
             if(msg.full){far=new Map();for(const [id,name,x,z,joinedAt] of msg.full as [string,string,number,number,number][])if(id!==myId)far.set(id,{id,name,x,z,yaw:0,v:0,bike:false,joinedAt,far:true})}
