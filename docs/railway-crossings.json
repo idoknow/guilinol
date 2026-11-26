@@ -1042,18 +1042,14 @@
     "lon": 110.2872192,
     "sharedNode": 459904752,
     "geometry": "Point",
-    "type": "level",
+    "type": "rail_over",
     "status": "active",
-    "evidence": "无标签，按共享节点推定",
+    "evidence": "层级（铁路 1，道路 -1）",
     "nodeEvidence": {
       "version": 3,
       "railway": null
     },
-    "measuredClearance": null,
-    "railY": 158.8626,
-    "roadY": 158.8626,
-    "designClearanceM": null,
-    "surfaceSource": "painted_terrain"
+    "measuredClearance": null
   },
   {
     "rail": 259082248,
