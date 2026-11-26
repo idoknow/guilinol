@@ -1,5 +1,5 @@
 import {defineConfig, type Plugin} from 'vite'
-import {existsSync, readFileSync} from 'node:fs'
+import {existsSync, readFileSync, readdirSync} from 'node:fs'
 import {execFileSync} from 'node:child_process'
 import {dirname, join} from 'node:path'
 import {fileURLToPath} from 'node:url'
@@ -49,6 +49,12 @@ export default defineConfig({
   }, generateBundle(){
     const sha = buildSha()
     this.emitFile({type:'asset',fileName:'version.json',source:JSON.stringify({sha})})
+  }}, {name:'error-pages',generateBundle(){
+    // IDOK-420: self-contained error pages, copied byte-for-byte (no Vite HTML transform) to dist/errors/.
+    // Edit via scripts/build-error-pages.mjs; the CDN copy is pushed from the ops repo.
+    const dir=join(root,'web/errors')
+    for(const file of readdirSync(dir).filter(name=>name.endsWith('.html')))
+      this.emitFile({type:'asset',fileName:'errors/'+file,source:readFileSync(join(dir,file),'utf8')})
   }}],
   optimizeDeps: {exclude: ['@dimforge/rapier3d-compat']},
   build: {outDir: '../dist', emptyOutDir: true, rollupOptions: {input: {

@@ -26,7 +26,7 @@ function clip(poly: Vertex[], side: Cut) {
   return result
 }
 
-export function tileFaces(world: string, tile: any, tunnels: Tunnel[], visit: (p: Vertex[], role: string) => void, includeRailBed = false) {
+export function tileFaces(world: string, tile: any, tunnels: Tunnel[], visit: (p: Vertex[], role: string, floorOwner?: number) => void, includeRailBed = false, trackAudit = false) {
   const raw = gunzipSync(fs.readFileSync(path.join(world, tile.file)))
   const [v, i, n, image, deck] = [4, 8, 12, 16, 20].map((k) => raw.readUInt32LE(k))
   const off = 16924 + 9 * v + 4 * i,
@@ -69,6 +69,24 @@ export function tileFaces(world: string, tile: any, tunnels: Tunnel[], visit: (p
   }
   const street = streetGeometry(paths, sample(false), includeRailBed ? rails : [], [], sample(true), tile.stationPaving, new Set(tile.roadbeds))
   joinPortalRoads(tile, tunnels, [street.positions])
+  if (trackAudit) {
+    const coords = (p: THREE.Vector3): Vertex => [tile.x+p.x,p.y,tile.z+p.z]
+    streetGeometry(paths,sample(false),rails,[],sample(true),tile.stationPaving,new Set(tile.roadbeds),
+      [tile.x,tile.z],(a,b,c)=>visit([a,b,c].map(coords),'rail-slope'))
+    // Replay just the barrier furniture using the same pavement heights and transforms.
+    const barriers = [...paths]
+    for (const slot of [1,3,4,7,8]) barriers[slot]=[]
+    barriers[9]=(paths[9]??[]).filter(([kind])=>[1,2,5,6,8].includes(kind))
+    const furniture = streetGeometry(barriers as typeof paths,sample(false),[],[],sample(true),tile.stationPaving,new Set(tile.roadbeds),[tile.x,tile.z])
+    const cube = new THREE.BoxGeometry(1,1,1)
+    const verts=cube.getAttribute('position'), indices=cube.index!, matrix=new THREE.Matrix4()
+    for(let k=0;k<furniture.furnitureMatrices.length;k+=16) {
+      matrix.fromArray(furniture.furnitureMatrices,k)
+      for(let j=0;j<indices.count;j+=3) visit([0,1,2].map(n=>coords(new THREE.Vector3()
+        .fromBufferAttribute(verts,indices.getX(j+n)).applyMatrix4(matrix))), 'road-barrier')
+    }
+    cube.dispose()
+  }
   for (let t = 0; t < street.positions.length; t += 9) {
     visit(
       [0, 3, 6].map((off) => [
@@ -80,24 +98,46 @@ export function tileFaces(world: string, tile: any, tunnels: Tunnel[], visit: (p
     )
   }
   for (const [k, y] of railCuts) positions.setY(k, y / 100)
-  const tunnel = tunnelGeometry(tile, g, tunnels)
-  function mesh(geometry: THREE.BufferGeometry, role: string) {
+  const originalGround = includeRailBed || trackAudit ? g.clone() : undefined
+  const tunnel = tunnelGeometry(tile, g, tunnels,paths[18])
+  function mesh(geometry: THREE.BufferGeometry, role: string, owner?: number, indexCount?: number) {
     const p = geometry.getAttribute('position'),
       ix = geometry.index
-    for (let j = 0; j < (ix?.count ?? p.count); j += 3)
+    for (let j = 0; j < (indexCount ?? ix?.count ?? p.count); j += 3)
       visit(
         [0, 1, 2].map((offset) => {
           const k = ix ? ix.getX(j + offset) : j + offset
           return [tile.x + p.getX(k), p.getY(k), tile.z + p.getZ(k)]
         }),
-        role,
+        role, owner,
       )
   }
   mesh(g, 'terrain')
   if (tunnel && 'lining' in tunnel) {
-    mesh(tunnel.floor.geometry, 'graded-floor')
-    mesh(tunnel.lining.geometry, 'tunnel-lining')
-    mesh(tunnel.lights.geometry, 'tunnel-lights')
+    function inspect(parts: typeof tunnel, owner?: number) {
+      if (!parts || !('lining' in parts)) return
+      mesh(parts.floor.geometry, 'graded-floor', owner)
+      if(trackAudit){
+        mesh(parts.lining.geometry, 'visible-carriageway', owner, parts.lining.userData.floorIndexCount)
+        mesh(parts.portal.geometry,'retaining-wall',owner)
+        mesh(parts.interior.geometry,'tunnel-interior',owner)
+      } else mesh(parts.lining.geometry, 'tunnel-lining', owner)
+      mesh(parts.lights.geometry, 'tunnel-lights', owner)
+    }
+    if (!originalGround) inspect(tunnel)
+    else {
+      // Isolate the signed way on identical triangles. Junction faces and
+      // mesh trimming are already attached to the owning manifest chord.
+      const byWay = new Map<number, Tunnel[]>()
+      for (const t of tunnels) {
+        const [a,b] = t.portals, pad = t.halfWidth + 1
+        if (Math.max(a[0],b[0])+pad < tile.x || Math.min(a[0],b[0])-pad > tile.x+256 ||
+            Math.max(a[2],b[2])+pad < tile.z || Math.min(a[2],b[2])-pad > tile.z+256) continue
+        if (!byWay.has(t.way)) byWay.set(t.way, [])
+        byWay.get(t.way)!.push(t)
+      }
+      for (const [way, group] of byWay) inspect(tunnelGeometry(tile, originalGround.clone(), group,paths[18]), way)
+    }
   } else if (tunnel) {
     for (const [kind, item] of Object.entries(tunnel)) if (item) mesh(item.geometry, kind)
   }
@@ -201,6 +241,7 @@ export function visibleSurfaces(world: string, ids: Set<number>, closure: Set<nu
         >,
         upperDecks: {} as Record<number, { faces: number; minSeparationM: number; maxSeparationM: number }>,
         minimumRailBedClearanceM: null as number | null,
+        lowestRailFace: null as Vertex[] | null,
         railBedIntrusions: 0,
         maxGroundExcessM: 0,
         worst: null as any,
@@ -213,9 +254,9 @@ export function visibleSurfaces(world: string, ids: Set<number>, closure: Set<nu
       (s) => s.left <= tile.x + 256 && s.right >= tile.x && s.top <= tile.z + 256 && s.bottom >= tile.z,
     )
     if (!local.length) continue
-    const faces: { points: Vertex[]; role: string; owner?: number }[] = []
-    tileFaces(world, tile, manifest.tunnels, (points, role) =>
-      faces.push({ points, role, owner: role === 'deck' ? deckOwner(points) : undefined }),
+    const faces: { points: Vertex[]; role: string; owner?: number; floorOwner?: number }[] = []
+    tileFaces(world, tile, manifest.tunnels, (points, role, floorOwner) =>
+      faces.push({ points, role, floorOwner, owner: role === 'deck' ? deckOwner(points) : undefined }),
       coveredRoads,
     )
     const nearTunnels = (manifest.tunnels as Tunnel[]).filter(t => {
@@ -232,12 +273,14 @@ export function visibleSurfaces(world: string, ids: Set<number>, closure: Set<nu
             (f.points[1][2] - f.points[0][2]) * (f.points[2][0] - f.points[0][0]),
         ) > 0.000001,
     )
-    for (const { points, role, owner: bridgeWay } of faces) {
-      if (allLiningOwned && (role === 'tunnel-lining' || role === 'tunnel-lights')) continue
+    for (const { points, role, owner: bridgeWay, floorOwner } of faces) {
+      if ((allLiningOwned || (floorOwner !== undefined && closure.has(floorOwner))) && (role === 'tunnel-lining' || role === 'tunnel-lights')) continue
       // The terrain generator emits a separate polygon above each enclosed
       // bore. Only classify faces wholly on that roof, including its edges.
-      if (coveredRoads && role === 'terrain' && local.some(({t,x,z,dx,dz}) => !t.openCut &&
+      const roof = coveredRoads && role === 'terrain' && nearTunnels.some(t => !t.openCut &&
         points.every(([px,py,pz]) => {
+          const [first,last]=t.portals
+          const x=first[0],z=first[2],dx=(last[0]-x)/t.length,dz=(last[2]-z)/t.length
           const d=(px-x)*dx+(pz-z)*dz, across=Math.abs((pz-z)*dx-(px-x)*dz)
           if(d < -.001 || d > t.length+.001 || across > t.halfWidth+.001)return false
           const at=Math.max(0, Math.min(t.length,d))
@@ -245,7 +288,7 @@ export function visibleSurfaces(world: string, ids: Set<number>, closure: Set<nu
           if(i<0)return false
           const [a,ay]=t.stations[Math.max(0,i-1)], [b,by]=t.stations[i]
           return py>=ay+(by-ay)*(at-a)/(b-a||1)+t.clearance-.001
-        }))) continue
+        }))
       for (const s of local) {
         if (
           points.every((p) => p[0] < s.left) ||
@@ -318,7 +361,7 @@ export function visibleSurfaces(world: string, ids: Set<number>, closure: Set<nu
               z = s.z + v[0] * s.dz + v[2] * s.dx
             for (const other of local) {
               if (!s.t.nodes?.some((n) => other.t.nodes?.includes(n))) continue
-              const surface = floorLevel(other.t, x, z)
+              const surface = floorLevel(other.t, x, z, 0.0005)
               if (surface !== undefined) grade = Math.max(grade, surface)
               const at = (x - other.x) * other.dx + (z - other.z) * other.dz
               const lateral = Math.abs((z - other.z) * other.dx - (x - other.x) * other.dz)
@@ -358,7 +401,20 @@ export function visibleSurfaces(world: string, ids: Set<number>, closure: Set<nu
           }
         }
         if (!where) continue
+        if (role === 'graded-floor' && floorOwner !== undefined && floorOwner !== s.t.way && closure.has(floorOwner)) {
+          // The upper road belongs above a covered bore. Confirm clearance
+          // over the entire clipped triangle before classifying it as overhead.
+          if (!s.t.openCut && lowest >= s.t.clearance - 1e-5) continue
+          // Opposing carriageways can meet the 2 m survey margin. Keep
+          // testing every part that actually enters the driving surface.
+          const inner = clip(clip(clip(poly, p => s.t.halfWidth-p[2]), p => s.t.halfWidth+p[2]), p => p[0])
+          if (inner.every(p => p[0] > s.t.length) || !inner.length) continue
+        }
+        // A roof is overhead for the lower road only. Its exposed upper
+        // face must still be tested against any pavement carried above it.
+        if (roof && lowest >= s.t.clearance - .001) continue
         if (role === 'rail-bed') {
+          if (lowest < (report.minimumRailBedClearanceM ?? Infinity)) report.lowestRailFace = points
           report.minimumRailBedClearanceM = Math.min(report.minimumRailBedClearanceM ?? Infinity, lowest)
           if (lowest < s.t.clearance - 1e-5) report.railBedIntrusions++
           continue

@@ -1,3 +1,5 @@
+import type {CrossingPanel} from './railways'
+import {panelCut} from './crossing-panels'
 import {mergeVertices} from 'three/addons/utils/BufferGeometryUtils.js'
 import * as THREE from 'three'
 import type {Tile} from './world'
@@ -7,7 +9,7 @@ export const tunnelLiningMaterial=new THREE.MeshStandardMaterial({side:THREE.Dou
 export const tunnelLightMaterial=new THREE.MeshBasicMaterial({side:THREE.DoubleSide,vertexColors:true})
 
 type Point=[number,number,number]
-export type Tunnel={way:number,nodes?:[number,number],portals:[Point,Point],length:number,halfWidth:number,clearance:number,approach:number,approachEnds?:[number,number],mouths?:[boolean,boolean],openEnds?:[number,number],nativePaving?:boolean,openCut?:boolean,footprint?:[number,number][][],joints?:({ring:[number,number][],wedges?:[number,number][][],faces?:Point[][],draw:boolean}|null)[],stations:[number,number][]}
+export type Tunnel={way:number,nodes?:[number,number],portals:[Point,Point],length:number,halfWidth:number,clearance:number,approach:number,approachEnds?:[number,number],mouths?:[boolean,boolean],openEnds?:[number,number],nativePaving?:boolean,wallSide?:number,wallTop?:number[],openCut?:boolean,footprint?:[number,number][][],joints?:({ring:[number,number][],wedges?:[number,number][][],faces?:Point[][],draw:boolean}|null)[],stations:[number,number][]}
 
 function frame(tunnel:Tunnel){
   const [start,end]=tunnel.portals, ux=(end[0]-start[0])/tunnel.length,uz=(end[2]-start[2])/tunnel.length
@@ -46,7 +48,7 @@ function footprintPlanes(ring:[number,number][]){
   })
 }
 
-export function floorLevel(tunnel:Tunnel,x:number,z:number){
+export function floorLevel(tunnel:Tunnel,x:number,z:number,edgeToleranceM=0){
   for(const [end,joint] of (tunnel.joints??[]).entries()){
     const p=tunnel.portals[end]
     if(Math.abs(p[0]-x)>32 || Math.abs(p[2]-z)>32)continue
@@ -55,7 +57,11 @@ export function floorLevel(tunnel:Tunnel,x:number,z:number){
       const det=ux*vz-uz*vx
       if(Math.abs(det)<1e-9)continue
       const u=(dx*vz-dz*vx)/det,v=(ux*dz-uz*dx)/det
-      if(u>=-1e-7 && v>=-1e-7 && u+v<=1.0000001)return a[1]+u*(b[1]-a[1])+v*(c[1]-a[1])
+      // Rendered vertices are Float32. Compare signed edge distances in metres
+      // so even narrow triangles at native pavement ties include their rim.
+      const tolerance=edgeToleranceM/Math.abs(det)
+      if(u>=-1e-7-tolerance*Math.hypot(vx,vz) && v>=-1e-7-tolerance*Math.hypot(ux,uz) &&
+        1-u-v>=-1e-7-tolerance*Math.hypot(ux-vx,uz-vz))return a[1]+u*(b[1]-a[1])+v*(c[1]-a[1])
     }
   }
   if(tunnel.footprint&&!tunnel.footprint.some(tri=>footprintPlanes(tri).every(plane=>plane(x,z)>=-.000001)))return
@@ -114,8 +120,8 @@ function clip(poly:Point[],plane:Plane){
 }
 function fan(poly:Point[],out:number[]){for(let at=2;at<poly.length;at++)out.push(...poly[0],...poly[at-1],...poly[at])}
 
-export function tunnelGeometry(tile:Tile,ground:THREE.PlaneGeometry,tunnels:Tunnel[]){
-  const parts={floor:[] as number[],interior:[] as number[],portal:[] as number[],band:[] as number[],lamp:[] as number[],lane:[] as number[],ceiling:[] as number[]}
+export function tunnelGeometry(tile:Tile,ground:THREE.PlaneGeometry,tunnels:Tunnel[],panels:CrossingPanel[]=[]){
+  const parts={floor:[] as number[],panelBase:[] as number[],interior:[] as number[],portal:[] as number[],band:[] as number[],lamp:[] as number[],lane:[] as number[],ceiling:[] as number[]}
   const cuts:{planes:Plane[],roof?:(point:Point)=>number}[]=[]
   const limits:Plane[]=[p=>p[0],p=>256-p[0],p=>p[2],p=>256-p[2]]
   const heights=ground.getAttribute('position'), cells=ground.parameters.widthSegments
@@ -214,7 +220,19 @@ export function tunnelGeometry(tile:Tile,ground:THREE.PlaneGeometry,tunnels:Tunn
       const al=local(a,-width,ay),ar=local(a,width,ay),bl=local(b,-width,by),br=local(b,width,by)
       quad([al,ar,br,bl],'floor')
       const top=(p:Point):Point=>[p[0],open?Math.max(p[1],groundY(p)):p[1]+head,p[2]]
-      quad([al,bl,top(bl),top(al)],open?'portal':'interior');quad([br,ar,top(ar),top(br)],open?'portal':'interior')
+      const leftA=top(al),leftB=top(bl),rightA=top(ar),rightB=top(br)
+      if(open && tunnel.wallTop && tunnel.wallSide){
+        const side=tunnel.wallSide, ends=side>0?[rightA,rightB]:[leftA,leftB]
+        ends[0][1]=Math.max(ends[0][1],tunnel.wallTop[i-1])
+        ends[1][1]=Math.max(ends[1][1],tunnel.wallTop[i])
+        if(tunnel.wallTop[i-1]>ay+.02 || tunnel.wallTop[i]>by+.02){
+          const edge=side*(width+.18)
+          const oa=local(a,edge,ends[0][1]), ob=local(b,edge,ends[1][1])
+          quad([ends[0],ends[1],ob,oa],'portal')
+          quad([oa,ob,local(b,edge,by),local(a,edge,ay)],'portal')
+        }
+      }
+      quad([al,bl,leftB,leftA],open?'portal':'interior');quad([br,ar,rightA,rightB],open?'portal':'interior')
       if(!open)quad([top(al),top(bl),top(br),top(ar)],'ceiling')
       if(!open){
         // 青绿 glazed-tile dado, warm lamp strips and a dashed centre line (IDOK-165 visual pass)
@@ -296,7 +314,7 @@ export function tunnelGeometry(tile:Tile,ground:THREE.PlaneGeometry,tunnels:Tunn
     result.visible=false
     return result
   }
-  const palette={floor:0x3b3e42,interior:0xcfc8b8,portal:0xa39d90,band:0x4d7466,
+  const palette={floor:0x3b3e42,panelBase:0x575650,interior:0xcfc8b8,portal:0xa39d90,band:0x4d7466,
     lane:0xeae3cf,ceiling:0x9c968a,lamp:0xffd9a6}
   function batch(keys:(keyof typeof parts)[],material:THREE.Material,kind:string){
     const positions:number[]=[],colors:number[]=[]
@@ -314,8 +332,22 @@ export function tunnelGeometry(tile:Tile,ground:THREE.PlaneGeometry,tunnels:Tunn
     triangles.dispose()
     return result
   }
-  const lining=batch(['floor','interior','portal','band','lane'],
+  const drivingFloor=parts.floor
+  if(panels.length){
+    const cut=panelCut(panels)
+    parts.floor=[]
+    for(let i=0;i<drivingFloor.length;i+=9){
+      const triangle=[0,3,6].map(k=>drivingFloor.slice(i+k,i+k+3) as Point)
+      // A continuous recessed slab supports the flangeways and the
+      // mitres between GL04 chords, including the cut at each tile seam.
+      const pavement=cut(triangle, panel=>fan(panel.map(([x,y,z]):Point=>[x,y-.045,z]),parts.panelBase))
+      for(const polygon of pavement)fan(polygon,parts.floor)
+    }
+  }
+  const lining=batch(['floor','panelBase','interior','portal','band','lane'],
     tunnelLiningMaterial,'lining')
+  // The pavement is first in the indexed lining batch.
+  lining.userData.floorIndexCount=parts.floor.length/3
   const lights=batch(['ceiling','lamp'],tunnelLightMaterial,'lighting')
-  return {lining,lights,floor:collider(parts.floor,'road'),interior:collider(parts.interior,'interior'),portal:collider(parts.portal,'portal')}
+  return {lining,lights,floor:collider(drivingFloor,'road'),interior:collider(parts.interior,'interior'),portal:collider(parts.portal,'portal')}
 }

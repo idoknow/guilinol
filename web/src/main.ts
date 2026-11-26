@@ -1,7 +1,8 @@
 import {prepareCityAudioDuringLoad} from './city-audio'
 import {onPrefs} from './ui/prefs'
 import {bindingLabel, hits} from './input/keymap'
-import {nearestPlayable} from '../../lib/play-region'
+import {inRegion,nearestPlayable} from '../../lib/play-region'
+import {installGeolocation} from './geolocation'
 import {identifyWorld,instrument,operation,record} from './telemetry'
 import * as THREE from 'three'
 import {landingWarmBudget,warmShaders,type WarmBudget} from './shader-warmup'
@@ -26,7 +27,17 @@ import {skyClock} from './ui/sky'
 import type {Host} from './play/host'
 import {streamIndicator,veil,type FullLoader,type Veil} from './ui/loading'
 import {loadTiles} from './look/tiles'
+import {
+  getCityUpgradeStats,
+  isCityUpgradeEnabled,
+  loadCityUpgradeTextures,
+  preloadCityUpgradeIndex,
+  setCityUpgradeEnabled,
+  syncCityUpgradeQuality,
+} from './city-upgrade/state'
+import {mountCityUpgradeProps} from './city-upgrade/props'
 import {flags} from './debug'
+import {tapFrame} from './gear/frame-tap'
 import {deriveRangeMetrics, loadRenderConfig, RenderRangeStore, type RenderRangeConfig} from './render-range'
 import {renderRangeControl} from './ui/render-range'
 import type {FeedbackView} from '../../lib/feedback-contract'
@@ -105,9 +116,11 @@ async function start(loader:FullLoader,creatorSpawn=false) {
   const light = new THREE.DirectionalLight(look.sunColor,look.sunPower)
   light.position.set(...look.sunDirection); scene.add(light)
   const gfx=gfxState(params)
+  syncCityUpgradeQuality(gfx.quality)
   let post:ReturnType<typeof import('./look/post').mainPass>|undefined
   if(params.has('debug'))Object.assign(window,{gfx})
-  function drawMain(){if(post)stats.shadowCasters=post.render(walker?.active?walker.position:camera.position);else renderer.render(scene,camera)}
+  // tapFrame：录像在这里、present 之前拷帧（IDOK-383，主画布没开 preserveDrawingBuffer）。
+  function drawMain(){if(post)stats.shadowCasters=post.render(walker?.active?walker.position:camera.position);else renderer.render(scene,camera);tapFrame(renderer.domElement)}
   renderer.info.autoReset=false
   const hemi = new THREE.HemisphereLight(look.hemiSky,look.hemiGround,look.hemiPower); scene.add(hemi)
   const arrivalReady=import('./arrival-programs').then(module=>warmPrograms(module.arrivalPrograms()))
@@ -231,7 +244,10 @@ async function start(loader:FullLoader,creatorSpawn=false) {
   }
   if(terrain){scene.add(terrain.mesh);await presentOpening()}
   async function loadFullScene(){
-    const manifest=previousWorld??await readManifest()
+    const [manifest]=await Promise.all([
+      previousWorld?Promise.resolve(previousWorld):readManifest(),
+      isCityUpgradeEnabled()?preloadCityUpgradeIndex():Promise.resolve(null),
+    ])
     playBounds=manifest
     clampOpening()
     entrySignal?.throwIfAborted()
@@ -310,17 +326,17 @@ async function start(loader:FullLoader,creatorSpawn=false) {
   function loadWalker():Promise<Walker>{return loadingWalker??=prefetchWalk().then(module=>module.walk(scene,camera,renderer.domElement,manifest,stream,peaks,params.has('verify'))).then(player=>walker=player).catch(error=>{loadingWalker=undefined;throw error})}
   let checkedCards=false
   let landingQueue=Promise.resolve()
-  function walkTo(x:number,z:number,yaw:number,reason:string,name?:string){
+  function walkTo(x:number,z:number,yaw:number,reason:string,name?:string,request?:AbortSignal){
     const parent=titleTransition
-    const result=landingQueue.then(()=>land(x,z,yaw,reason,name,parent))
+    const result=landingQueue.then(()=>request?.aborted?false:land(x,z,yaw,reason,name,parent,request))
     landingQueue=result.then(()=>{},()=>{})
     return result
   }
-  async function land(x:number,z:number,yaw:number,reason:string,name:string|undefined,transition:typeof titleTransition){
+  async function land(x:number,z:number,yaw:number,reason:string,name:string|undefined,transition:typeof titleTransition,request?:AbortSignal){
     switching=true
     const start=performance.now()
     let completed=false
-    const controller=new AbortController(),signal=transition?AbortSignal.any([transition.signal,controller.signal]):controller.signal
+    const controller=new AbortController(),signal=AbortSignal.any([controller.signal,...(transition?[transition.signal]:[]),...(request?[request]:[])])
     let stage='stream'
     const deadline=window.setTimeout(()=>controller.abort(new Error(`Landing timed out (${reason}, ${x},${z}, ${stage})`)),90000)
     const interrupted=new Promise<never>((_,reject)=>signal.addEventListener('abort',()=>reject(signal.reason),{once:true}))
@@ -335,6 +351,7 @@ async function start(loader:FullLoader,creatorSpawn=false) {
       if(signal.aborted)return false
       cover.progress(.3,'步行模块已就绪')
       completed=await player.enter(x,z,yaw,reason,false,signal,cover.progress)
+      if(completed&&request){stream.tick(player.position);stream.updateLandmarks?.(player.position);cover.progress(1);return true}
       signal.throwIfAborted()
       if(completed){
         stage='landing content'
@@ -540,9 +557,33 @@ async function start(loader:FullLoader,creatorSpawn=false) {
     }
   }
   mountChat()
+  const cityUpgradeProps = mountCityUpgradeProps(scene)
+  const syncCityUpgradeProps = (force = false) => {
+    const activeShards = stream.pruneCityUpgradeShards()
+    cityUpgradeProps.update(camera, activeShards, stream.metrics.streetRadius, force)
+  }
+  const applyCityUpgradeState = () => {
+    if (isCityUpgradeEnabled()) {
+      void loadCityUpgradeTextures(renderer).catch(error => console.warn('City upgrade textures unavailable', error))
+      void stream.ensureCityUpgradeForLoaded().then(() => {
+        stream.rebuildCityUpgradeTiles()
+        syncCityUpgradeProps(true)
+      })
+    } else {
+      stream.rebuildCityUpgradeTiles()
+      syncCityUpgradeProps(true)
+    }
+  }
+  gfx.subscribe(tier => {
+    if (syncCityUpgradeQuality(tier)) applyCityUpgradeState()
+  })
   const tourProbe = {getState, missions: {start: () => ({ok:false, code:'SOLO_MODE_REQUIRED'})}}
   let staticAudit:ReturnType<typeof import('./verify-static').staticVerifier>|undefined
   const publishViewer=()=>Object.assign(window,{viewer:{camera,stream,manifest,stats,walkTo,staticAudit,get game(){return solo?.probe ?? tourProbe},get mifen(){return mifen.getProbe()},
+    cityUpgrade: {
+      getStats: () => ({ ...getCityUpgradeStats(), mountedPropGroups: cityUpgradeProps.mountedCount() }),
+      setEnabled: (on: boolean) => { if (setCityUpgradeEnabled(on)) applyCityUpgradeState() },
+    },
     get trafficCount(){return (scene.getObjectByName('G2 traffic') as THREE.InstancedMesh|undefined)?.count??0},
     get trafficProbe(){return scene.getObjectByName('G2 traffic')?.userData},
     async trafficPixels(){return (await import('./traffic/visibility-probe')).pixelVisible(renderer,scene,camera)},
@@ -618,10 +659,17 @@ async function start(loader:FullLoader,creatorSpawn=false) {
     return {mode,x:position.x,z:position.z,chunks:stream.loaded.size}
   })
   let playable=false
+  const geoTick=installGeolocation({
+    ready:()=>!!walker?.active&&!walker.geoHeld&&walker.vehicle==='foot'&&!walker.shop.isOpen()&&!switching&&!cinema&&!paused&&!tour?.map?.active,
+    inside:point=>inRegion(manifest,point.x,point.z),position:()=>walker!.position,
+    land:(point,yaw,signal)=>walkTo(point.x,point.z,yaw??walker!.yaw,'geolocation','我的位置',signal),
+    drive:(x,z)=>walker!.drive(x,z,false),release:()=>walker?.releaseDrive(),face:yaw=>walker?.face(yaw),
+  })
   let trafficTick:Awaited<ReturnType<typeof import('./traffic').traffic>>|undefined
   let trafficRequested=false
   const trafficOverride=params.get('traffic')
   function animate(now:number){
+    geoTick()
     if(getPlayMode()==='solo'&&!walker?.active)return
     if((paused||tour?.map?.active)&&frame>2){previous=0;return}
     const elapsed = previous?now-previous:0;previous=now
@@ -635,6 +683,10 @@ async function start(loader:FullLoader,creatorSpawn=false) {
     if(frame===2){
       peaks.loadModels(renderer)
       void loadTiles(renderer).catch(error=>console.warn('City textures unavailable',error))
+      if(isCityUpgradeEnabled()){
+        void loadCityUpgradeTextures(renderer).catch(error=>console.warn('City upgrade textures unavailable',error))
+        syncCityUpgradeProps(true)
+      }
     }
     if(frame>0&&!switching) {
       const showTraffic=trafficEnabled(getPlayMode(),trafficOverride)
@@ -646,6 +698,7 @@ async function start(loader:FullLoader,creatorSpawn=false) {
         walker?.active?walker.position:undefined,getPlayMode()==='solo',showTraffic)
       const target=walker?.destination??(walker?.active?walker.position:camera.position)
       stream.tick(target)
+      if(frame>=2) syncCityUpgradeProps()
       stream.updateLandmarks?.(target)
       if(!walkModPromise && !stream.pending.size && camera.position.y<260) void prefetchWalk()
     }

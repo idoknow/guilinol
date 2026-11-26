@@ -1,16 +1,28 @@
 import {axleHeight,contactPose} from './lane-surface.ts'
 import {nearStatic,resolveContact,staticSolids,pickups,type Solid} from './contact.ts'
 import {CAR_SCALE} from '../drive/scale.ts'
-type Node = {id:number,x:number,y:number,z:number}
-type Lane = {id:number,from:number,to:number,offset:number,width?:number,kind:'motor'|'bus'|'nonmotor',speedKmh:number,cls?:string,street?:string,npcWalks?:number[][],heights?:number[],floor?:string}
+import {clampOutsideShizijieNoPedZone,isInShizijieNoPedZone,isNearShizijiePrecinct,segmentHitsShizijieNoPedZone} from '../shizijie-zone.ts'
+export type Node = {id:number,x:number,y:number,z:number}
+export type Lane = {id:number,from:number,to:number,offset:number,width?:number,kind:'motor'|'bus'|'nonmotor',speedKmh:number,cls?:string,street?:string,npcWalks?:number[][],heights?:number[],floor?:string,gradeSeparated?:string,oneway?:boolean}
 type Phase = {lanes:number[],green:number,yellow:number}
 type Signal={node:number,group:number,offset:number,phases:Phase[]}
 export type Graph = {nodes:Node[],lanes:Lane[],walks:[number,number,number,number?,number[]?][],signals:Signal[]}
 export type SurfaceLookup = (x:number,z:number)=>readonly number[]|undefined
 export type Track = Lane & {
   start:Node,end:Node,dx:number,dz:number,yaw:number,length:number,walk:boolean,
+  virtual?:boolean,sourceLaneId?:number,
   outwardSign?:1|-1,dodgeMin?:number,dodgeMax?:number,tightEdge?:boolean,
   surfaceState?:'pending'|'ok'|'rejected',suspectVerge?:boolean,pairTrack?:Track,
+}
+export type TrafficViolation = 'none' | 'no_helmet' | 'ebike_overload' | 'bike_double'
+export type VehicleSubtype = 'ebike' | 'bicycle'
+export type DutyViolationWeights = Partial<Record<TrafficViolation, number>>
+export type DutyTrafficConfig = {
+  active:boolean
+  center?:{x:number,z:number}
+  radius?:number
+  weights?:DutyViolationWeights
+  twoWheelShare?:number
 }
 type MotorSeg = {id:number,cls?:string,street?:string,ax:number,az:number,bx:number,bz:number,dx:number,dz:number,len:number,halfW:number}
 const MOTOR_CLEARANCE=.45
@@ -29,15 +41,64 @@ function trackHeight(track:Track,dist:number){
   return heights[index+1]+(heights[index+3]-heights[index+1])*(fraction-heights[index])/(heights[index+2]-heights[index])
 }
 export const WALK_OFFSET=.32
-type Actor = {pitch?:number,roll?:number,track:Track,dist:number,speed:number,pace?:number,arrived?:boolean,kind:'car'|'scooter'|'person',down:number,dodge:number,x:number,y:number,z:number,yaw:number,scale:number,leaving:boolean,halfWidth:number,halfLength:number,height:number,holdUntil?:number,waitingFor?:Actor,waitingSince?:number}
-type Position = {x:number,z:number,y:number}
+export type Actor = {
+  pitch?:number,roll?:number,arrived?:boolean,
+  track:Track,dist:number,speed:number,pace?:number,kind:'car'|'scooter'|'person',down:number,dodge:number,
+  x:number,y:number,z:number,yaw:number,scale:number,leaving:boolean,halfWidth:number,halfLength:number,height:number,
+  holdUntil?:number,waitingFor?:Actor,waitingSince?:number,
+  violation?:TrafficViolation,vehicleSubtype?:VehicleSubtype,stoppedUntil?:number,cited?:boolean,
+  spawnStreet?:string,
+}
+export type Position = {x:number,z:number,y:number}
 export const MAX_ACTORS=100
 export const MOBILE_ACTORS=80
 // IDOK-160: motor actors never appear inside the view frustum closer than this,
 // except right after a cold start or teleport when the street is still empty.
 export const VISIBLE_SPAWN_MIN=130
 const WARMUP_S=1.2,TELEPORT=60
+const DEFAULT_DUTY_CENTER={x:-168,z:40}
+const DEFAULT_DUTY_RADIUS=240
+const DEFAULT_AMBIENT_WEIGHTS:Record<TrafficViolation,number>={none:72,no_helmet:12,ebike_overload:8,bike_double:8}
+const DEFAULT_DUTY_WEIGHTS:Record<TrafficViolation,number>={none:18,no_helmet:34,ebike_overload:26,bike_double:22}
 const distanceSq=(left:Position,right:Position)=>(left.x-right.x)**2+(left.y-right.y)**2+(left.z-right.z)**2
+
+const actorOwners=new WeakMap<Actor,Traffic>()
+let latestTrafficRef:WeakRef<Traffic>|undefined
+
+export function getLatestTraffic():Traffic|undefined{
+  return latestTrafficRef?.deref()
+}
+
+export function stopActor(actor:Actor,durationSec=4,traffic?:Traffic):boolean{
+  const owner=traffic??actorOwners.get(actor)
+  if(owner)return owner.stopActor(actor,durationSec)
+  if(!actor||!Number.isFinite(durationSec)||durationSec<0)return false
+  actor.holdUntil=Math.max(actor.holdUntil??0,performance.now()+durationSec*1000)
+  actor.speed=0
+  return true
+}
+
+function pointToSegmentDistSq(px:number,pz:number,ax:number,az:number,bx:number,bz:number){
+  const dx=bx-ax,dz=bz-az,lenSq=dx*dx+dz*dz
+  if(lenSq<1e-6)return (px-ax)**2+(pz-az)**2
+  const t=Math.max(0,Math.min(1,((px-ax)*dx+(pz-az)*dz)/lenSq))
+  return (px-ax-dx*t)**2+(pz-az-dz*t)**2
+}
+
+function pickTwoWheelProfile(random:()=>number,weights?:DutyViolationWeights,dutyActive=false):{vehicleSubtype:VehicleSubtype,violation:TrafficViolation}{
+  const base=dutyActive?DEFAULT_DUTY_WEIGHTS:DEFAULT_AMBIENT_WEIGHTS
+  const wNone=Math.max(0,weights?.none??base.none)
+  const wHelmet=Math.max(0,weights?.no_helmet??base.no_helmet)
+  const wOverload=Math.max(0,weights?.ebike_overload??base.ebike_overload)
+  const wDouble=Math.max(0,weights?.bike_double??base.bike_double)
+  const total=wNone+wHelmet+wOverload+wDouble
+  if(total<=0)return {vehicleSubtype:random()<.72?'ebike':'bicycle',violation:'none'}
+  let roll=random()*total
+  if((roll-=wHelmet)<0)return {vehicleSubtype:'ebike',violation:'no_helmet'}
+  if((roll-=wOverload)<0)return {vehicleSubtype:'ebike',violation:'ebike_overload'}
+  if((roll-=wDouble)<0)return {vehicleSubtype:'bicycle',violation:'bike_double'}
+  return {vehicleSubtype:random()<.72?'ebike':'bicycle',violation:'none'}
+}
 
 export class Traffic {
   sampleGround?:(x:number,z:number,reference:number,car:boolean)=>number|undefined
@@ -104,13 +165,25 @@ export class Traffic {
       const nx=-track.dz,nz=track.dx
       const sampleOk=(shift:number)=>{
         for(const t of [.2,.5,.8]){
-          const ks=this.surfaceAt!(track.start.x+track.dx*track.length*t+nx*shift,track.start.z+track.dz*track.length*t+nz*shift)
+          const px=track.start.x+track.dx*track.length*t+nx*shift,pz=track.start.z+track.dz*track.length*t+nz*shift
+          if(isInShizijieNoPedZone(px,pz))return false
+          const ks=this.surfaceAt!(px,pz)
           if(ks&&!isSafeWalkSurface(ks))return false
         }
         return true
       }
       if(maxD>0&&!sampleOk(maxD))maxD=sampleOk(maxD*.5)?maxD*.5:0
       if(minD<0&&!sampleOk(minD))minD=sampleOk(minD*.5)?minD*.5:0
+    }else{
+      const nx=-track.dz,nz=track.dx
+      const shizijieOk=(shift:number)=>{
+        for(const t of [.2,.5,.8]){
+          if(isInShizijieNoPedZone(track.start.x+track.dx*track.length*t+nx*shift,track.start.z+track.dz*track.length*t+nz*shift))return false
+        }
+        return true
+      }
+      if(maxD>0&&!shizijieOk(maxD))maxD=shizijieOk(maxD*.5)?maxD*.5:0
+      if(minD<0&&!shizijieOk(minD))minD=shizijieOk(minD*.5)?minD*.5:0
     }
     track.dodgeMin=minD;track.dodgeMax=maxD
     const cls=(track.cls??'').replace(/_link$/,'')
@@ -165,7 +238,7 @@ export class Traffic {
       }
       return true
     }
-    if(checkAllSafe(track.start.x,track.start.z,track.end.x,track.end.z)){
+    if(!segmentHitsShizijieNoPedZone(track.start.x,track.start.z,track.end.x,track.end.z)&&checkAllSafe(track.start.x,track.start.z,track.end.x,track.end.z)){
       this.computeWalkSafety(track)
       if(track.pairTrack)this.computeWalkSafety(track.pairTrack)
       return mark('ok')
@@ -173,6 +246,7 @@ export class Traffic {
     const wdx=track.dx,wdz=track.dz,nx=-wdz,nz=wdx
     const outSign=track.outwardSign??1
     const safePt=(px:number,pz:number)=>{
+      if(isInShizijieNoPedZone(px,pz))return false
       const ks=lookup(px,pz)
       return !!ks&&isSafeWalkSurface(ks)&&!this.hitsMotorLane(px,pz,MOTOR_CLEARANCE)&&!this.sideClearances(px,pz,wdx,wdz).betweenMotors
     }
@@ -199,7 +273,7 @@ export class Traffic {
         if(l>bestLen){bestLen=l;bestSeg=seg}
       }
     }
-    if(!bestSeg||!this.updateTrackGeometry(track,bestSeg[0],bestSeg[1],bestSeg[2],bestSeg[3]))return mark('rejected')
+    if(!bestSeg||segmentHitsShizijieNoPedZone(bestSeg[0],bestSeg[1],bestSeg[2],bestSeg[3])||!this.updateTrackGeometry(track,bestSeg[0],bestSeg[1],bestSeg[2],bestSeg[3]))return mark('rejected')
     for(const actor of this.actors){
       if(actor.track===track||actor.track===track.pairTrack){
         actor.dist=Math.min(actor.dist,Math.max(0,actor.track.length-.1))
@@ -244,7 +318,7 @@ export class Traffic {
     for(let step=0;step<=steps;step++){const along=track.length*step/steps;pickups.near(track.start.x+track.dx*along-track.dz*track.offset,track.start.z+track.dz*along+track.dx*track.offset,inspect)}
     hits.sort((a,b)=>a.dist-b.dist);cache.set(track,{revision:pickups.revision,hits});return hits
   }
-  private adjacent(track:Track){return (this.exits.get(track.from)??[]).filter(next=>next!==track&&!next.walk&&next.to===track.to&&next.street===track.street&&Math.abs(next.offset-track.offset)<=(next.width??3)/2+(track.width??3)/2+.1&&!this.parkingHits(next).length)}
+  private adjacent(track:Track){return (this.exits.get(track.from)??[]).filter(next=>next!==track&&!next.walk&&next.kind===track.kind&&next.to===track.to&&next.street===track.street&&Math.abs(next.offset-track.offset)<=(next.width??3)/2+(track.width??3)/2+.1&&!this.parkingHits(next).length)}
   private usable(track:Track){return track.walk?this.resolveWalkSurface(track):!this.parkingHits(track).length||!!this.adjacent(track).length}
   private cells=new Map<string,Track[]>()
   private obstacles=new Map<number,(Position|Actor)[]>()
@@ -259,19 +333,41 @@ export class Traffic {
   private checkWaitsAt=0
   private warmUntil=-1
   private lastCamera?:Position
-  private streets=new Map<string,{walk:Track[],motor:Track[]}>()
+  private streets=new Map<string,{walk:Track[],motor:Track[],virtualNonmotor:Track[]}>()
+  private nearbyRealNonmotor:Track[]=[]
   private cellKey=''
+  private dutyConfig:DutyTrafficConfig={active:false}
+  private dutyTracksCache?:{cx:number,cz:number,r:number,tracks:Track[]}
+  setDutyConfig(config:Partial<DutyTrafficConfig>){
+    const next={...this.dutyConfig,...config}
+    if(next.center?.x!==this.dutyConfig.center?.x||next.center?.z!==this.dutyConfig.center?.z||next.radius!==this.dutyConfig.radius){
+      this.dutyTracksCache=undefined
+    }
+    this.dutyConfig=next
+  }
+  getDutyConfig():Readonly<DutyTrafficConfig>{return this.dutyConfig}
+  stopActor(actor:Actor,durationSec=4):boolean{
+    if(!actor||!Number.isFinite(durationSec)||durationSec<0)return false
+    actor.stoppedUntil=this.time+durationSec
+    actor.speed=0
+    actorOwners.set(actor,this)
+    return true
+  }
   private sites(camera:Position){
     const col=Math.floor(camera.x/128),row=Math.floor(camera.z/128),key=`${col},${row}`
     if(key===this.cellKey)return this.streets
-    this.cellKey=key;this.streets.clear()
+    this.cellKey=key;this.streets.clear();this.nearbyRealNonmotor.length=0
     const seen=new Set<Track>()
     for(let east=col-2;east<=col+2;east++)for(let south=row-2;south<=row+2;south++)for(const track of this.cells.get(`${east},${south}`)??[]){
-      if(seen.has(track)||!track.street)continue
+      if(seen.has(track))continue
       seen.add(track)
+      if(!track.walk&&track.kind==='nonmotor'&&!track.virtual)this.nearbyRealNonmotor.push(track)
+      if(!track.street)continue
       let group=this.streets.get(track.street)
-      if(!group){group={walk:[],motor:[]};this.streets.set(track.street,group)}
-      group[track.walk?'walk':'motor'].push(track)
+      if(!group){group={walk:[],motor:[],virtualNonmotor:[]};this.streets.set(track.street,group)}
+      if(track.walk)group.walk.push(track)
+      else if(track.kind==='nonmotor'){if(track.virtual)group.virtualNonmotor.push(track)}
+      else group.motor.push(track)
     }
     return this.streets
   }
@@ -298,28 +394,45 @@ export class Traffic {
         const k=gx*65536+gz,arr=this.motorGrid.get(k)??[];arr.push(seg);this.motorGrid.set(k,arr)
       }
     }
-    const add=(lane:Lane,walk:boolean):Track|undefined=>{
-      const start=nodes.get(lane.from)!,end=nodes.get(lane.to)!
+    const add=(lane:Lane,walk:boolean,virtual=false,sourceLaneId?:number):Track|undefined=>{
+      const start=nodes.get(lane.from),end=nodes.get(lane.to)
+      if(!start||!end)return undefined
       const length=Math.hypot(end.x-start.x,end.z-start.z)
       if(length<.5)return undefined
-      const track:Track={...lane,start,end,length,dx:(end.x-start.x)/length,dz:(end.z-start.z)/length,yaw:Math.atan2(end.x-start.x,end.z-start.z),walk,surfaceState:walk?'pending':'ok'}
+      const track:Track={...lane,start,end,length,dx:(end.x-start.x)/length,dz:(end.z-start.z)/length,yaw:Math.atan2(end.x-start.x,end.z-start.z),walk,virtual,sourceLaneId,surfaceState:walk?'pending':'ok'}
       if(walk)this.computeWalkSafety(track)
       const exits=this.exits.get(start.id)??[];exits.push(track);this.exits.set(start.id,exits)
       this.registerTrackCells(track)
       return track
     }
     const arms=new Map<number,Set<number>>()
+    const realNonmotorCells=new Map<string,Track[]>()
+    const rightmostMotor=new Map<string,Lane>()
     let synthNodeId=-1
     for(const lane of graph.lanes){
+      if(lane.kind==='nonmotor'){
+        const track=add(lane,false,false)
+        if(track){
+          const ax=track.start.x-track.dz*track.offset,az=track.start.z+track.dx*track.offset
+          const bx=track.end.x-track.dz*track.offset,bz=track.end.z+track.dx*track.offset
+          for(let c=Math.floor(Math.min(ax,bx)/64);c<=Math.floor(Math.max(ax,bx)/64);c++)
+            for(let r=Math.floor(Math.min(az,bz)/64);r<=Math.floor(Math.max(az,bz)/64);r++){
+              const k=`${c},${r}`,bucket=realNonmotorCells.get(k)??[];bucket.push(track);realNonmotorCells.set(k,bucket)
+            }
+        }
+        continue
+      }
       if(!rules.classes.includes((lane.cls??'').replace(/_link$/,''))||lane.kind!=='motor')continue
-      add(lane,false)
+      add(lane,false,false)
+      const edgeKey=`${lane.from}:${lane.to}`,existingBest=rightmostMotor.get(edgeKey)
+      if(!existingBest||lane.offset>existingBest.offset)rightmostMotor.set(edgeKey,lane)
       const head=nodes.get(lane.from)!,tail=nodes.get(lane.to)!
       const yAt=(px:number,pz:number)=>{const dx=tail.x-head.x,dz=tail.z-head.z,d2=dx*dx+dz*dz||1;return head.y+(tail.y-head.y)*Math.max(0,Math.min(1,((px-head.x)*dx+(pz-head.z)*dz)/d2))}
       for(const [x,z,east,south] of lane.npcWalks??[]){
         const wLen=Math.hypot(east-x,south-z)
         if(wLen<WALK_MIN_LEN)continue
         const wdx=(east-x)/wLen,wdz=(south-z)/wLen
-        let segs=this.extractSafeSegments(x,z,east,south,(px,pz)=>!this.hitsMotorLane(px,pz,MOTOR_CLEARANCE)&&!this.sideClearances(px,pz,wdx,wdz).betweenMotors)
+        let segs=this.extractSafeSegments(x,z,east,south,(px,pz)=>!isInShizijieNoPedZone(px,pz)&&!this.hitsMotorLane(px,pz,MOTOR_CLEARANCE)&&!this.sideClearances(px,pz,wdx,wdz).betweenMotors)
         // Fallback ONLY for roads where a stale walk centerline falls directly inside the carriageway
         // (never push divided-road median tracks blindly into off-sidewalk ground).
         if(!segs.length){
@@ -330,7 +443,7 @@ export class Traffic {
             for(const sign of [1,-1] as const){
               const sx=sign*nx*shift,sz=sign*nz*shift
               const shifted=this.extractSafeSegments(x+sx,z+sz,east+sx,south+sz,(px,pz)=>{
-                if(this.hitsMotorLane(px,pz,MOTOR_CLEARANCE)||this.sideClearances(px,pz,wdx,wdz).betweenMotors)return false
+                if(isInShizijieNoPedZone(px,pz)||this.hitsMotorLane(px,pz,MOTOR_CLEARANCE)||this.sideClearances(px,pz,wdx,wdz).betweenMotors)return false
                 if(this.surfaceAt){const ks=this.surfaceAt(px,pz);if(ks&&!isSafeWalkSurface(ks))return false}
                 return true
               })
@@ -339,15 +452,44 @@ export class Traffic {
           }
         }
         for(const [sx,sz,ex,ez] of segs){
+          if(segmentHitsShizijieNoPedZone(sx,sz,ex,ez))continue
           const from=synthNodeId--,to=synthNodeId--
           nodes.set(from,{id:from,x:sx,z:sz,y:yAt(sx,sz)});nodes.set(to,{id:to,x:ex,z:ez,y:yAt(ex,ez)})
-          const fwd=add({from,to,id:from,offset:0,cls:lane.cls,street:lane.street,kind:'nonmotor',speedKmh:5},true)
-          const rev=add({from:to,to:from,id:to,offset:0,cls:lane.cls,street:lane.street,kind:'nonmotor',speedKmh:5},true)
+          const fwd=add({from,to,id:from,offset:0,cls:lane.cls,street:lane.street,kind:'nonmotor',speedKmh:5},true,false)
+          const rev=add({from:to,to:from,id:to,offset:0,cls:lane.cls,street:lane.street,kind:'nonmotor',speedKmh:5},true,false)
           if(fwd&&rev){fwd.pairTrack=rev;rev.pairTrack=fwd}
         }
       }
       for(const [node,other] of [[lane.from,lane.to],[lane.to,lane.from]]){
         const neighbors=arms.get(node)??new Set<number>();neighbors.add(other);arms.set(node,neighbors)
+      }
+    }
+    // Phase 1 fallback: synthesize a virtual right-edge nonmotor track on major motor roads lacking an adjacent cycleway.
+    if(realNonmotorCells.size||rightmostMotor.size){
+      for(const best of rightmostMotor.values()){
+        if(best.gradeSeparated==='jiefang')continue
+        const head=nodes.get(best.from),tail=nodes.get(best.to)
+        if(!head||!tail)continue
+        const len=Math.hypot(tail.x-head.x,tail.z-head.z)
+        if(len<.5)continue
+        const dx=(tail.x-head.x)/len,dz=(tail.z-head.z)/len
+        const mx=(head.x+tail.x)/2-dz*best.offset,mz=(head.z+tail.z)/2+dx*best.offset,my=(head.y+tail.y)/2
+        let covered=false
+        const cc=Math.floor(mx/64),cr=Math.floor(mz/64)
+        outer:for(let dc=-1;dc<=1;dc++)for(let dr=-1;dr<=1;dr++){
+          for(const nm of realNonmotorCells.get(`${cc+dc},${cr+dr}`)??[]){
+            if(dx*nm.dx+dz*nm.dz<.65)continue
+            const nmAx=nm.start.x-nm.dz*nm.offset,nmAz=nm.start.z+nm.dx*nm.offset
+            const nmBx=nm.end.x-nm.dz*nm.offset,nmBz=nm.end.z+nm.dx*nm.offset
+            if(pointToSegmentDistSq(mx,mz,nmAx,nmAz,nmBx,nmBz)<=20**2&&Math.abs(my-(nm.start.y+nm.end.y)/2)<=2.5){
+              covered=true;break outer
+            }
+          }
+        }
+        if(covered)continue
+        const laneW=best.width??3
+        const virtualOffset=Math.round((best.offset+Math.min(1.45,laneW*.45))*100)/100
+        add({...best,kind:'nonmotor',offset:virtualOffset,width:1.6,speedKmh:Math.min(best.speedKmh,25)},false,true,best.id)
       }
     }
     for(const [node,neighbors] of arms)if(neighbors.size>=3)this.junctions.add(node)
@@ -364,7 +506,9 @@ export class Traffic {
           const dist=Math.max(0,Math.min(next.length,(x-next.start.x)*next.dx+(z-next.start.z)*next.dz))
           const remaining=next.length-dist
           if(remaining<WALK_MIN_LEN||(best&&remaining<=best.remaining))continue
-          if(Math.hypot(next.start.x+dist*next.dx-x,next.start.z+dist*next.dz-z)>tolerance)continue
+          const nxPt=next.start.x+dist*next.dx,nzPt=next.start.z+dist*next.dz
+          if(Math.hypot(nxPt-x,nzPt-z)>tolerance)continue
+          if(segmentHitsShizijieNoPedZone(next.start.x,next.start.z,next.end.x,next.end.z)||segmentHitsShizijieNoPedZone(x,z,nxPt,nzPt))continue
           if(Math.abs(trackHeight(next,dist)-trackHeight(track,track.length))>tolerance)continue
           best={track:next,dist,remaining}
         }
@@ -372,13 +516,46 @@ export class Traffic {
     }
     return best
   }
+  private shizijieTurnOrReverse(track:Track){
+    const {x,z}=track.end
+    if(!isNearShizijiePrecinct(x,z,12))return undefined
+    const tolerance=4.5
+    let best:{track:Track,dist:number,gap:number}|undefined
+    for(let col=Math.floor((x-tolerance)/128);col<=Math.floor((x+tolerance)/128);col++){
+      for(let row=Math.floor((z-tolerance)/128);row<=Math.floor((z+tolerance)/128);row++){
+        for(const next of this.cells.get(`${col},${row}`)??[]){
+          if(!next.walk||next===track||next===track.pairTrack||next.dx*track.dx+next.dz*track.dz<-.75)continue
+          if(!this.usable(next))continue
+          const dist=Math.max(0,Math.min(next.length,(x-next.start.x)*next.dx+(z-next.start.z)*next.dz))
+          if(next.length-dist<WALK_MIN_LEN)continue
+          const nxPt=next.start.x+dist*next.dx,nzPt=next.start.z+dist*next.dz
+          const gap=Math.hypot(nxPt-x,nzPt-z)
+          if(gap>tolerance||(best&&gap>=best.gap))continue
+          if(segmentHitsShizijieNoPedZone(next.start.x,next.start.z,next.end.x,next.end.z)||segmentHitsShizijieNoPedZone(x,z,nxPt,nzPt))continue
+          if(gap>.5&&this.surfaceAt){
+            const midKs=this.surfaceAt((x+nxPt)*.5,(z+nzPt)*.5)
+            if(midKs&&!isSafeWalkSurface(midKs))continue
+          }
+          if(Math.abs(trackHeight(next,dist)-trackHeight(track,track.length))>.6)continue
+          best={track:next,dist,gap}
+        }
+      }
+    }
+    if(best)return best
+    const rev=track.pairTrack
+    if(rev&&this.usable(rev)&&!segmentHitsShizijieNoPedZone(rev.start.x,rev.start.z,rev.end.x,rev.end.z)){
+      return {track:rev,dist:0}
+    }
+    return undefined
+  }
   isJunction(node:number){return this.junctions.has(node)||this.signal.has(node)}
   inherit(previous:Traffic){
     this.time=previous.time
     this.warmUntil=previous.warmUntil;this.lastCamera=previous.lastCamera
+    this.dutyConfig={...previous.dutyConfig};this.dutyTracksCache=undefined
     for(const actor of previous.actors){
-      const track=this.exits.get(actor.track.from)?.find(candidate=>candidate.id===actor.track.id)
-      if(track){actor.track=track;this.actors.push(actor)}
+      const track=this.exits.get(actor.track.from)?.find(candidate=>candidate.id===actor.track.id&&candidate.kind===actor.track.kind&&!!candidate.virtual===!!actor.track.virtual)
+      if(track){actor.track=track;this.actors.push(actor);actorOwners.set(actor,this)}
     }
     for(const [node,queue] of previous.queues)if(this.junctions.has(node))this.queues.set(node,queue.filter(actor=>this.actors.includes(actor)))
   }
@@ -390,12 +567,16 @@ export class Traffic {
     }
     actor.x=track.start.x+track.dx*dist-track.dz*(track.offset+actor.dodge)
     actor.z=track.start.z+track.dz*dist+track.dx*(track.offset+actor.dodge)
-    if(actor.kind==='person'&&actor.dodge!==0&&(track.tightEdge||this.surfaceAt)){
+    if(actor.kind==='person'&&(actor.dodge!==0&&(track.tightEdge||this.surfaceAt)||isInShizijieNoPedZone(actor.x,actor.z))){
       const ks=this.surfaceAt?.(actor.x,actor.z)
-      if((track.tightEdge&&this.hitsMotorLane(actor.x,actor.z,.35))||(ks&&!isSafeWalkSurface(ks))){
+      if((track.tightEdge&&this.hitsMotorLane(actor.x,actor.z,.35))||(ks&&!isSafeWalkSurface(ks))||isInShizijieNoPedZone(actor.x,actor.z)){
         actor.dodge=0
         actor.x=track.start.x+track.dx*dist-track.dz*track.offset
         actor.z=track.start.z+track.dz*dist+track.dx*track.offset
+        if(isInShizijieNoPedZone(actor.x,actor.z)){
+          const [cx,cz]=clampOutsideShizijieNoPedZone(actor.x,actor.z,.3)
+          actor.x=cx;actor.z=cz
+        }
       }
     }
     if(track.floor){
@@ -431,7 +612,108 @@ export class Traffic {
   green(track:Lane,time=this.time){
     return this.phase(track,time)==='green'
   }
+  private collectCandidates(tracks:readonly Track[],camera:Position){
+    const candidates:{track:Track,min:number,max:number,end:number}[]=[]
+    let availableLength=0
+    for(const track of tracks){
+      if(!this.usable(track))continue
+      const dx=camera.x-track.start.x+track.dz*track.offset,dz=camera.z-track.start.z-track.dx*track.offset
+      const center=dx*track.dx+dz*track.dz,span=Math.sqrt(200**2-(dx*track.dz-dz*track.dx)**2)
+      const min=Math.max(0,center-span),max=Math.min(track.length,center+span)
+      if(max>min){availableLength+=max-min;candidates.push({track,min,max,end:availableLength})}
+    }
+    return {candidates,availableLength}
+  }
+  private trySpawnFromPool(
+    pool:{candidates:{track:Track,min:number,max:number,end:number}[],availableLength:number},
+    kind:Actor['kind'],
+    camera:Position,
+    hiddenCheck:(point:Position)=>boolean,
+    spawnStreet?:string,
+    dutyWeighted=false,
+  ):Actor|null{
+    const {candidates,availableLength}=pool
+    if(!candidates.length||availableLength<=0)return null
+    const walk=kind==='person',scooter=kind==='scooter'
+    const metre=this.random()*availableLength
+    const {track,min,max}=candidates.find(candidate=>candidate.end>metre)??candidates[candidates.length-1]
+    const profile=scooter?pickTwoWheelProfile(this.random,this.dutyConfig.weights,dutyWeighted||this.dutyConfig.active):undefined
+    const actor:Actor={
+      track,
+      dist:min+this.random()*(max-min),
+      speed:0,
+      kind,
+      down:0,
+      dodge:0,
+      x:0,
+      y:0,
+      z:0,
+      yaw:0,
+      scale:0,
+      leaving:false,
+      halfWidth:walk||scooter?.3:.9*CAR_SCALE,
+      halfLength:walk?.3:scooter?.85:2.1*CAR_SCALE,
+      height:1.5,
+      ...(profile?{violation:profile.violation,vehicleSubtype:profile.vehicleSubtype,cited:false}:{}),
+      ...(spawnStreet?{spawnStreet}:{}),
+    }
+    this.position(actor)
+    if(!hiddenCheck(actor)||this.actors.some(other=>distanceSq(other,actor)<(walk?.5:5)**2))return null
+    if(!walk&&nearStatic(actor.x,actor.z)&&resolveContact(actor,actor.y,actor.yaw,actor.halfWidth,actor.halfLength,staticSolids))return null
+    actorOwners.set(actor,this)
+    this.actors.push(actor)
+    return actor
+  }
+  private getDutyTracks(cx:number,cz:number,radius:number):Track[]{
+    const cached=this.dutyTracksCache
+    if(cached&&cached.cx===cx&&cached.cz===cz&&cached.r===radius)return cached.tracks
+    const rSq=radius**2
+    const realNm:Track[]=[],virtNm:Track[]=[],motorFallback:Track[]=[]
+    for(const list of this.exits.values())for(const t of list){
+      if(t.walk)continue
+      const mx=(t.start.x+t.end.x)*.5,mz=(t.start.z+t.end.z)*.5
+      if((mx-cx)**2+(mz-cz)**2>rSq)continue
+      if(t.kind==='nonmotor'){
+        if(!t.virtual)realNm.push(t)
+        else virtNm.push(t)
+      }else{
+        motorFallback.push(t)
+      }
+    }
+    const tracks=realNm.length?[...realNm,...virtNm]:virtNm.length?virtNm:motorFallback
+    this.dutyTracksCache={cx,cz,r:radius,tracks}
+    return tracks
+  }
+  private stepDutySpawns(camera:Position,visible:((point:Position)=>boolean)|undefined,budget:number,warm=false):number{
+    if(!this.dutyConfig.active||budget<=0||this.actors.length>=this.actorLimit)return budget
+    const center=this.dutyConfig.center??DEFAULT_DUTY_CENTER
+    const radius=this.dutyConfig.radius??DEFAULT_DUTY_RADIUS
+    if(Math.hypot(camera.x-center.x,camera.z-center.z)>radius+160)return budget
+    const dutyTracks=this.getDutyTracks(center.x,center.z,radius)
+    if(!dutyTracks.length)return budget
+    const rSq=radius**2
+    let existingDuty=0
+    for(const actor of this.actors){
+      if(actor.kind==='scooter'&&!actor.leaving&&(actor.x-center.x)**2+(actor.z-center.z)**2<=rSq)existingDuty++
+    }
+    const desiredDuty=Math.min(10,Math.max(4,Math.floor(this.actorLimit*.1)))
+    if(existingDuty>=desiredDuty)return budget
+    const pool=this.collectCandidates(dutyTracks,camera)
+    if(!pool.candidates.length)return budget
+    const dutyHidden=(point:Position)=>{
+      if(warm||!visible)return true
+      const radial=(point.x-camera.x)**2+(point.z-camera.z)**2
+      return radial>VISIBLE_SPAWN_MIN**2||(radial>18**2&&!visible(point))
+    }
+    for(let attempt=0;attempt<24&&existingDuty<desiredDuty&&budget>0&&this.actors.length<this.actorLimit;attempt++){
+      if(this.trySpawnFromPool(pool,'scooter',camera,dutyHidden,undefined,true)){
+        existingDuty++;budget--
+      }
+    }
+    return budget
+  }
   step(dt:number,camera:Position,vehicle?:Position,visible?:(point:Position)=>boolean,profile?:(spawn:number,grid:number,motion:number)=>void){
+    latestTrafficRef=new WeakRef(this)
     const start=profile?performance.now():0
     this.time+=dt
     if(!this.lastCamera||Math.hypot(camera.x-this.lastCamera.x,camera.z-this.lastCamera.z)>TELEPORT)this.warmUntil=this.time+WARMUP_S
@@ -445,39 +727,44 @@ export class Traffic {
     }
     this.actors=this.actors.filter(actor=>(!actor.leaving||actor.scale>0)&&(actor.x-camera.x)**2+(actor.z-camera.z)**2<=200**2)
     const counts=new Map<string,number>()
-    for(const actor of this.actors){const key=actor.track.street+':'+actor.track.walk;counts.set(key,(counts.get(key)??0)+1)}
+    for(const actor of this.actors){const key=(actor.spawnStreet??actor.track.street)+':'+actor.track.walk;counts.set(key,(counts.get(key)??0)+1)}
     let budget=warm?48:8
+    const scooterShare=this.dutyConfig.active?(this.dutyConfig.twoWheelShare??.52):.36
     for(const [street,group] of this.sites(camera))for(const walk of [false,true]){
       const key=street+':'+walk,existing=counts.get(key)??0
       const low=walk?this.rules.personMin:this.rules.carMin,high=walk?this.rules.personMax:this.rules.carMax
       const desired=this.actorLimit===MOBILE_ACTORS?low:Math.ceil((low+high)/2)
       if(existing>=desired||budget<=0)continue
-      const candidates:{track:Track,min:number,max:number,end:number}[]=[]
-      let availableLength=0
-      for(const track of group[walk?'walk':'motor']){
-        if(!this.usable(track))continue
-        const dx=camera.x-track.start.x+track.dz*track.offset,dz=camera.z-track.start.z-track.dx*track.offset
-        const center=dx*track.dx+dz*track.dz,span=Math.sqrt(200**2-(dx*track.dz-dz*track.dx)**2)
-        const min=Math.max(0,center-span),max=Math.min(track.length,center+span)
-        if(max>min){availableLength+=max-min;candidates.push({track,min,max,end:availableLength})}
-      }
-      const otherMotor=!walk&&this.actors.find(actor=>!actor.track.walk&&!actor.leaving&&actor.track.street===street)
-      for(let count=existing,attempt=0;candidates.length&&count<desired&&attempt<24&&budget>0&&this.actors.length<this.actorLimit;attempt++){
-        const metre=this.random()*availableLength
-        const {track,min,max}=candidates.find(candidate=>candidate.end>metre)??candidates[candidates.length-1]
-        const scooter=!walk&&this.actors.filter(other=>other.kind==='scooter').length<Math.round((1+this.actors.filter(other=>other.kind!=='person').length)*.36)
-        const actor:Actor={track,dist:min+this.random()*(max-min),speed:0,kind:walk?'person':scooter?'scooter':'car',down:0,dodge:0,x:0,y:0,z:0,yaw:0,scale:0,leaving:false,halfWidth:walk||scooter?.3:.9*CAR_SCALE,halfLength:walk?.3:scooter?.85:2.1*CAR_SCALE,height:1.5}
-        this.position(actor)
-        if(!walk&&attempt<18){
-          const approach=(camera.x-actor.x)*track.dx+(camera.z-actor.z)*track.dz
-          if(approach<10||approach>150)continue
-          if(attempt<10&&otherMotor&&track.dx*otherMotor.track.dx+track.dz*otherMotor.track.dz>.5)continue
+      if(walk){
+        if(!group.walk.length)continue
+        const walkPool=this.collectCandidates(group.walk,camera)
+        for(let count=existing,attempt=0;walkPool.candidates.length&&count<desired&&attempt<24&&budget>0&&this.actors.length<this.actorLimit;attempt++){
+          if(this.trySpawnFromPool(walkPool,'person',camera,hiddenSpawn)){count++;budget--}
         }
-        if(!hiddenSpawn(actor)||this.actors.some(other=>distanceSq(other,actor)<(walk?.5:5)**2))continue
-        if(!walk&&nearStatic(actor.x,actor.z)&&resolveContact(actor,actor.y,actor.yaw,actor.halfWidth,actor.halfLength,staticSolids))continue
-        this.actors.push(actor);count++;budget--
+        continue
+      }
+      if(!group.motor.length)continue
+      const motorPool=this.collectCandidates(group.motor,camera)
+      if(!motorPool.candidates.length)continue
+      let virtualPool:ReturnType<Traffic['collectCandidates']>|undefined
+      let realNmPool:ReturnType<Traffic['collectCandidates']>|undefined
+      for(let count=existing,attempt=0;count<desired&&attempt<24&&budget>0&&this.actors.length<this.actorLimit;attempt++){
+        const scooter=this.actors.filter(other=>other.kind==='scooter').length<Math.round((1+this.actors.filter(other=>other.kind!=='person').length)*scooterShare)
+        if(!scooter){
+          if(this.trySpawnFromPool(motorPool,'car',camera,hiddenSpawn)){count++;budget--}
+          continue
+        }
+        if(realNmPool===undefined&&this.nearbyRealNonmotor.length){
+          const localNm=this.nearbyRealNonmotor.filter(t=>pointToSegmentDistSq(camera.x,camera.z,t.start.x,t.start.z,t.end.x,t.end.z)<=180**2)
+          realNmPool=this.collectCandidates(localNm,camera)
+        }
+        if(realNmPool?.candidates.length&&this.trySpawnFromPool(realNmPool,'scooter',camera,hiddenSpawn,street)){count++;budget--;continue}
+        if(virtualPool===undefined)virtualPool=this.collectCandidates(group.virtualNonmotor,camera)
+        if(virtualPool.candidates.length&&this.trySpawnFromPool(virtualPool,'scooter',camera,hiddenSpawn,street)){count++;budget--;continue}
+        if(this.trySpawnFromPool(motorPool,'scooter',camera,hiddenSpawn,street)){count++;budget--}
       }
     }
+    if(this.dutyConfig.active)budget=this.stepDutySpawns(camera,visible,budget,warm)
     const spawned=profile?performance.now():0
     for(const [node,queue] of this.queues){
       const retained=queue.filter(actor=>this.actors.includes(actor)&&!actor.leaving&&(actor.track.to===node||actor.track.from===node&&actor.dist<6))
@@ -531,7 +818,8 @@ export class Traffic {
         else if(!options.length&&!visible?.(actor)){actor.leaving=true;return}
       }
       actor.scale=Math.min(1,actor.scale+dt/.4)
-      if(actor.holdUntil&&actor.holdUntil>performance.now()){actor.speed=0;return}
+      if((actor.holdUntil&&actor.holdUntil>performance.now())||(actor.stoppedUntil!==undefined&&actor.stoppedUntil>this.time)){actor.speed=0;return}
+      if(actor.stoppedUntil!==undefined&&actor.stoppedUntil<=this.time)actor.stoppedUntil=undefined
       const maxSpeed=(person?(actor.pace??=1.1+.6*this.random()):Math.min(track.speedKmh/3.6,actor.kind==='car'?12:7))
       let advance=Math.min(maxSpeed,actor.speed+dt*2)*dt
       if(actor.down>0){actor.down-=dt;actor.waitingFor=previousBlocker;return}
@@ -578,7 +866,16 @@ export class Traffic {
           if(distanceSq<16){
             advance=0;if('kind' in other)actor.waitingFor=other;break nearby
           }
-        }else if(ahead>0&&lateral<1.8){advance=Math.min(advance,Math.max(0,ahead-5));if(advance<1e-6&&'kind' in other)actor.waitingFor=other;if(!advance)break nearby}
+        }else{
+          const otherIsCar='kind' in other&&other.kind==='car'
+          const minLat=(actor.kind==='scooter'||('kind' in other&&other.kind==='scooter'))?(actor.kind==='car'||otherIsCar?1.25:.95):1.8
+          if(ahead>0&&lateral<minLat){
+            const stopGap=actor.kind==='scooter'&&!otherIsCar?2.8:5
+            advance=Math.min(advance,Math.max(0,ahead-stopGap))
+            if(advance<1e-6&&'kind' in other)actor.waitingFor=other
+            if(!advance)break nearby
+          }
+        }
         }
       }
       if(person){
@@ -619,13 +916,26 @@ export class Traffic {
         if(resolveContact(next,next.y,track.yaw,actor.halfWidth,actor.halfLength,staticSolids)){actor.speed=0;actor.dist-=advance;return}
       }
       if(person&&actor.dist>=track.length){
-        const onward=this.onwardWalk(track)
+        const onward=this.onwardWalk(track)??this.shizijieTurnOrReverse(track)
         if(onward){actor.track=onward.track;actor.dist=onward.dist;this.transitions++}
         else{actor.dist=track.length;actor.speed=0;actor.arrived=true}
       }else if(actor.dist>=track.length){
-        const exits=(this.exits.get(track.to)??[]).filter(next=>!next.walk&&next.to!==track.from&&(next.kind==='motor'||(actor.kind==='scooter'&&next.kind==='nonmotor'))&&this.usable(next)&&!this.parkingHits(next).some(hit=>hit.dist<12))
-        const sameStreet=exits.filter(next=>next.street===track.street)
-        const choices=sameStreet.length?sameStreet:exits
+        const exits=this.exits.get(track.to)??[]
+        let choices:Track[]
+        if(actor.kind==='car'){
+          const legal=exits.filter(next=>this.usable(next)&&!this.parkingHits(next).some(hit=>hit.dist<12)&&!next.walk&&next.to!==track.from&&next.kind!=='nonmotor')
+          const sameStreet=legal.filter(next=>next.street===track.street)
+          choices=sameStreet.length?sameStreet:legal
+        }else{
+          const legal=exits.filter(next=>this.usable(next)&&!this.parkingHits(next).some(hit=>hit.dist<12)&&!next.walk&&next.to!==track.from&&
+            (next.kind==='nonmotor'?(!next.virtual||!track.street||next.street===track.street||exits.every(e=>e.street!==track.street)):(!track.street||next.street===track.street||track.kind==='nonmotor')))
+          const realNm=legal.filter(next=>next.kind==='nonmotor'&&!next.virtual)
+          const virtNm=legal.filter(next=>next.kind==='nonmotor'&&next.virtual)
+          choices=realNm.length?realNm:virtNm.length?virtNm:legal
+          if(!choices.length){
+            choices=exits.filter(next=>this.usable(next)&&!this.parkingHits(next).some(hit=>hit.dist<12)&&!next.walk&&next.to!==track.from)
+          }
+        }
         if(!choices.length){actor.dist=track.length;actor.speed=0;this.position(actor);actor.leaving=!visible?.(actor);return}
         if(this.signal.has(track.to)){this.crossed++;this.onCross?.(track,this.time)}
         const pool=choices

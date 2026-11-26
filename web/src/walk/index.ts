@@ -1435,10 +1435,15 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
     if(signal?.aborted)return fail('aborted')
     const missingTiles=needed.filter(tile=>!stream.loaded.has(tile)).map(tile=>tile.file),missingLandmarks=supports.filter(entry=>!stream.landmarks.has(entry)).map(entry=>entry.id)
     if(missingTiles.length||missingLandmarks.length)return fail('collision-load-timeout',{missingTiles,missingLandmarks})
+    let gpsSpot:ReturnType<typeof sim.findWalkableSpawn>|undefined
+    if(reason==='geolocation'){
+      syncSceneObstacleVolumes();sim.sync(x,z);gpsSpot=sim.findWalkableSpawn(x,z,false,true)
+      if(!gpsSpot){const current=sim.body.translation();sim.sync(current.x,current.z);return false}
+    }
     if(active)resetWalk()
     syncSceneObstacleVolumes()
     const rejected:Record<string,{count:number,x:number,z:number,hitY:number|null,slope?:number}>={}
-    sim.sync(x,z);if(!place(x,z,reason,override,undefined,(why,cx,cz,hitY,slope)=>{
+    sim.sync(x,z);if(!place(x,z,reason,override,gpsSpot,(why,cx,cz,hitY,slope)=>{
       const sample=rejected[why]??={count:0,x:cx,z:cz,hitY:hitY??null,slope};sample.count++
     })){disconnect();window.dispatchEvent(new CustomEvent('walk:spawn-failed',{detail:{x,z,reason:'no-walkable-support'}}));return fail('no-walkable-support',{rejected})}
     active=true;rides?.show(true);requestAnimationFrame(()=>requestAnimationFrame(loadRides));figure.visible=true;firstPersonHidden=false
@@ -2939,6 +2944,7 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
       cycleLight(){carHeadlight=nextHeadlightMode(carHeadlight);carHeadlightManual=true;return carHeadlight},
       setHeadlight(mode:TwoWheelHeadlightMode){carHeadlight=mode;carHeadlightManual=true;return carHeadlight},
     },
+    get geoHeld(){return held},releaseDrive(){external=null},
     shop:{
       open:(shopId:string,tab?:string)=>shopOverlay?.openShop(shopId,tab),
       openService:(shopId:string)=>shopOverlay?.openServiceBay(shopId),

@@ -102,14 +102,53 @@ def check(world, design):
             target = design["groundRailToRoad"]
         if bottom not in roads:
             floor = track_pieces(world, manifest, lines[bottom], area)
-            if not floor or not all(piece[3] & ELECTRIC for piece in floor):
-                raise ValueError(f"Expected an electrified lower track on {bottom}")
+            electrified = bottom not in design.get("unelectrifiedGroundRails", ())
+            if not floor or any(bool(piece[3] & ELECTRIC) != electrified for piece in floor):
+                raise ValueError(f"Missing track or unexpected electrification on lower track {bottom}")
+            # At a bend, GL04 renders square-ended girders on each chord.
+            # Check both spines for missing chords before measuring their girder edges.
+            upper_spine = union_all([piece[0] for piece in ceiling])
+            lower_spine = union_all([piece[0] for piece in floor])
+            upper_crossing = lines[top].intersection(lines[bottom].buffer(width))
+            if (not upper_spine.buffer(.002).covers(upper_crossing)
+                    or not lower_spine.buffer(.002).covers(expected)):
+                raise ValueError(f"Incomplete rail alignment at {top}/{bottom}")
+            girders = union_all([piece[0].buffer(width, cap_style="flat") for piece in ceiling])
+            expected = girders.intersection(lines[bottom])
         measured = separation(ceiling, floor, width, floor_width, deduction, expected)
         row = dict(upper=top, lower=bottom, minimumM=measured, targetM=target)
         if bottom not in roads:
-            row["wireMarginM"] = measured - design["wireHeight"]
+            row["wireMarginM"] = measured - design["wireHeight"] if electrified else None
         result.append(row)
     return result
+
+
+def check_bores(world, designs):
+    """Require a finished covered floor at every individually registered rail crossing."""
+    manifest = json.loads((world / "manifest.json").read_bytes())
+    ids = {wid for design in designs for wid in [design["road"], *design["rails"]]}
+    lines = {w["id"]: LineString(points(w)) for w in load_osm() if w["type"] == "way" and w["id"] in ids}
+    results = []
+    for design in designs:
+        road = design["road"]
+        half_width = design["railHalfWidth"]
+        for rail in design["rails"]:
+            crossing = lines[road].intersection(lines[rail])
+            if crossing.geom_type != "Point":
+                raise ValueError(f"Expected one crossing for {rail} over tunnel {road}")
+            floor, width = tunnel_floor(manifest, road, crossing)
+            road_band = lines[road].buffer(width, cap_style="flat")
+            area = lines[rail].buffer(half_width, cap_style="flat").intersection(road_band)
+            track = track_pieces(world, manifest, lines[rail], area.buffer(half_width + .001))
+            spine = union_all([piece[0] for piece in track])
+            if not spine.buffer(.002).covers(lines[rail].intersection(road_band)):
+                raise ValueError(f"Incomplete encoded track over tunnel {road} on {rail}")
+            # GL04 girders end square at each chord; bends have no rounded outer face.
+            girders = union_all([piece[0].buffer(half_width, cap_style="flat") for piece in track])
+            minimum = separation(track, floor, half_width, width, 0, girders.intersection(road_band))
+            results.append(dict(upper=rail, lower=road, halfWidthM=width,
+                                minimumM=minimum, targetM=design["minimumRailToRoad"]))
+    return results
 
 
 if __name__ == "__main__":
@@ -130,6 +169,14 @@ if __name__ == "__main__":
         paths = sorted((pipeline / "rail-audits").glob("01-*.json")) + sorted((pipeline / "rail-sections").glob("*.json"))
         sections = {p.stem: json.loads(p.read_bytes()) for p in paths
                     if args.through is None or int(p.stem.split("-")[0]) <= args.through}
-        rows.extend(measure(args.world, sections))
+        registered = []
+        for path in sorted((pipeline / "rail-audits").glob("*-bores.json")):
+            if args.through is None or int(path.stem.split("-")[0]) <= args.through:
+                registered.extend(check_bores(args.world, json.loads(path.read_bytes())))
+        # The registered covered bores have their own floor below the surface
+        # crossings. Use that specific floor even after the inventory becomes active.
+        registered_pairs = {(r["upper"], r["lower"]) for r in registered}
+        rows.extend(measure(args.world, sections, exclude=registered_pairs))
+        rows.extend(registered)
     print(json.dumps(rows, indent=2))
     raise SystemExit(0 if all(r["minimumM"] + 1e-6 >= r["targetM"] for r in rows) else 1)
