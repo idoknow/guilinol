@@ -12,7 +12,7 @@ import {urbanGround} from './look/urban-ground'
 import {chunkWater, farWater} from './look/water'
 import type {TileBatchInput} from './batch'
 import type {Peaks} from './peaks'
-import {joinPortalRoads,tunnelGeometry,type Tunnel} from './tunnels'
+import {getRegisteredShizijieUnderground,joinPortalRoads,tunnelGeometry,type GroundCutout,type ShizijieUnderpass,type Tunnel} from './tunnels'
 import {repairBridgeDeck,setBridgeRepairKeepouts} from './ground-repair'
 import {freezeStatic} from './static-freeze'
 
@@ -32,6 +32,8 @@ export function physicalBuildingRings(tile:Tile, rendered:Building[]):Building[]
 export interface Manifest {
   region?:import('../../lib/play-region').Region
   tunnels?:Tunnel[]
+  groundCutouts?:GroundCutout[]
+  shizijieUnderpass?:ShizijieUnderpass
   builtArea?:{type:'Polygon';coordinates:[number,number][][]}
   distantBuildings?:Asset
   landmarks?:import('./landmarks').Landmark[]
@@ -349,7 +351,7 @@ function buildSurfaceLookup(tile:Tile,paths:Streets){
   }
 }
 
-export async function detail(tile:Tile, signal:AbortSignal, parseSlot?:()=>Promise<void>, tunnels?:Tunnel[]) {
+export async function detail(tile:Tile, signal:AbortSignal, parseSlot?:()=>Promise<void>, tunnels?:Tunnel[], groundCutouts?:GroundCutout[], underpass?:ShizijieUnderpass) {
   const shardReady = ensureShardForTile(tile.x,tile.z)
   const compressed = await fetchAsset(tile.file,signal)
   const buffer = await new Response(new Blob([compressed]).stream().pipeThrough(new DecompressionStream('gzip'))).arrayBuffer()
@@ -406,11 +408,13 @@ export async function detail(tile:Tile, signal:AbortSignal, parseSlot?:()=>Promi
   if(tile.platformAccess?.length)refinePlatformTerrain(geometry,tile.platformAccess)
   const groundMesh = new THREE.Mesh(geometry,material)
   group.add(groundMesh)
-  const tunnel=tunnels?tunnelGeometry(tile,geometry,tunnels,paths[18]):null
+  const tunnel=(tunnels?.length||groundCutouts?.length||underpass||getRegisteredShizijieUnderground())
+    ?tunnelGeometry(tile,geometry,tunnels??[],paths[18],groundCutouts,underpass)
+    :null
   if(tunnel){
     if(tunnel.fringe){tunnel.fringe.material.dispose();tunnel.fringe.material=material}
     if('lining' in tunnel)group.add(tunnel.floor,tunnel.portal,tunnel.interior)
-    else group.add(...Object.values(tunnel))
+    else group.add(...Object.values(tunnel).filter((m):m is THREE.Mesh<THREE.BufferGeometry,THREE.Material>=>Boolean(m)))
   }
   const pond = chunkWater(water,underlay,tile.x,tile.z)
   await shardReady

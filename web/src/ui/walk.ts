@@ -4,11 +4,36 @@ import type {CarDynamicTelemetry} from '../walk/car'
 import type {EbikeRideControlInput, EbikeTelemetrySnapshot} from '../walk/ebike-fx'
 import {isGlobalHotkeyBlocked, isModalOrOverlayOpen, isTouchInControlZone} from '../walk/input-guard'
 import {hits, type Action} from '../input/keymap'
+import {shouldSuppressRideGearKey} from '../traffic-duty/duty-keys'
 import {rideSoundMuted, setRideSoundMuted} from '../walk/ride-sound-pref'
 import {touchUi} from './input-mode'
 import {mountThumbLayout} from './thumb-layout'
 
 const MOD_LABELS = {stock: '素车', ghostfire: '鬼火', neon: '霓虹'} as const
+
+export interface WalkGearKeyContext {
+  dutyActive: boolean
+  ridingTwoWheel: boolean
+  drivingCar: boolean
+  aboard: boolean
+  repeat?: boolean
+}
+
+/**
+ * Resolves Q/E gear-shift delta for riding/driving.
+ * When on traffic duty and walking on foot, Q (whistle) and E (flag) MUST NOT shift gears.
+ */
+export function resolveWalkGearKeyDelta(code: string, ctx: WalkGearKeyContext): -1 | 0 | 1 {
+  if (ctx.repeat) return 0
+  if (ctx.dutyActive && !ctx.aboard) {
+    if (shouldSuppressRideGearKey(code, true) || code === 'KeyQ' || code === 'KeyE' || hits(code, 'dutyWhistle') || hits(code, 'dutyFlag')) return 0
+    return 0
+  }
+  if (!ctx.aboard || (!ctx.ridingTwoWheel && !ctx.drivingCar)) return 0
+  if (code === 'KeyE') return 1
+  if (code === 'KeyQ') return -1
+  return 0
+}
 
 function safeCapture(el:Element, pointerId:number) {
   try { el.setPointerCapture(pointerId) } catch {}
@@ -241,10 +266,15 @@ const held=(action:Action)=>{let on=false;keys.forEach(code=>{if(!on&&hits(code,
     if(!event.repeat&&event.code==='KeyC')view()
     if(!event.repeat&&hits(event.code,'crouch')&&!aboard){crouch=!crouch;syncCrouch()}
     if(!event.repeat&&hits(event.code,'run')&&!aboard&&crouch){crouch=false;syncCrouch()}
-    if((ridingTwoWheel||drivingCar)&&!event.repeat){
-      if(event.code==='KeyE')gearDelta+=1
-      else if(event.code==='KeyQ')gearDelta-=1
-      else if(event.code==='KeyG'&&document.body.dataset.ride==='bike')cycleModPulse=true
+    const dutyActive=document.body.dataset.duty==='active'||document.body.dataset.tdDutyActive==='1'
+    if(!shouldSuppressRideGearKey(event.code,dutyActive&&!aboard)){
+      const gearStep=resolveWalkGearKeyDelta(event.code,{dutyActive,ridingTwoWheel,drivingCar,aboard,repeat:event.repeat})
+      if(gearStep!==0){
+        gearDelta+=gearStep
+      }
+    }
+    if(aboard&&(ridingTwoWheel||drivingCar)&&!event.repeat&&!(dutyActive&&!aboard)){
+      if(event.code==='KeyG'&&document.body.dataset.ride==='bike')cycleModPulse=true
       else if(event.code==='KeyP'&&document.body.dataset.ride==='bike'&&!crashed&&!event.shiftKey&&!event.altKey&&!event.ctrlKey&&!event.metaKey){
         parkTogglePulse=true
         event.preventDefault()

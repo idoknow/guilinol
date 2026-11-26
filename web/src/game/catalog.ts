@@ -55,6 +55,8 @@ export interface OutfitItemDef {
   readonly accentHex?: string
   readonly description: string
   readonly defaultOwned?: boolean
+  /** Marks NPC-exclusive uniform pieces that must never appear in shops, player default wardrobe, or save migration. */
+  readonly npcOnly?: boolean
 }
 
 export interface OutfitPresetDef {
@@ -172,11 +174,11 @@ export const OUTFIT_ITEMS: readonly OutfitItemDef[] = [
   {id: 'shoes_night_moto', slot: 'shoes', name: '碳纹疾风骑行靴', tier: 3, price: 480, colorHex: '#171a1f', accentHex: '#ffc53d', description: '加硬脚踝保护疾风骑行靴'},
   {id: 'hat_night_visor', slot: 'hat', name: '夜航全覆光镜盔', tier: 3, price: 320, colorHex: '#151920', accentHex: '#20d6c1', description: '流线型防风全盔配青色镜片'},
 
-  // Traffic volunteer / persuasion duty kit (compliant public-web design: no real police emblem/ID)
-  {id: 'top_traffic_volunteer', slot: 'top', name: '文明劝导反光背心', tier: 0, price: 0, colorHex: '#e2f524', accentHex: '#eef4f8', description: '荧光黄高反光交通劝导背心，含双银反光条与志愿袖标（无真实警徽警号）', defaultOwned: true},
+  // Traffic volunteer / persuasion duty kit (compliant public-web civic guidance design)
+  {id: 'top_traffic_volunteer', slot: 'top', name: '文明劝导反光背心', tier: 0, price: 0, colorHex: '#e2f524', accentHex: '#eef4f8', description: '荧光黄高反光交通劝导背心，含双银反光条与志愿袖标（原创合规志愿样式）', defaultOwned: true},
   {id: 'bottom_traffic_duty', slot: 'bottom', name: '深蓝执勤长裤', tier: 0, price: 0, colorHex: '#1b2330', accentHex: '#dce6ee', description: '深蓝修身志愿劝导长裤，配简洁反光滚边', defaultOwned: true},
   {id: 'shoes_traffic_duty', slot: 'shoes', name: '黑色防滑执勤鞋', tier: 0, price: 0, colorHex: '#16191e', accentHex: '#2f3844', description: '轻量防滑全黑劝导执勤鞋', defaultOwned: true},
-  {id: 'hat_traffic_cap', slot: 'hat', name: '桂林志愿劝导帽', tier: 0, price: 0, colorHex: '#1b2636', accentHex: '#e2f524', description: '深蓝荧光黄滚边交通劝导帽（无真实警徽警号）', defaultOwned: true},
+  {id: 'hat_traffic_cap', slot: 'hat', name: '桂林志愿劝导帽', tier: 0, price: 0, colorHex: '#1b2636', accentHex: '#e2f524', description: '深蓝荧光黄滚边交通劝导帽（原创合规志愿样式）', defaultOwned: true},
   {id: 'bag_traffic_flag', slot: 'bag', name: '劝导小黄旗腰包', tier: 0, price: 0, colorHex: '#1d2735', accentHex: '#f5d226', description: '志愿反光腰包与随身劝导小黄旗', defaultOwned: true},
 ] as const
 
@@ -186,6 +188,65 @@ export const DEFAULT_EQUIPPED_OUTFIT: Readonly<EquippedOutfit> = starterOutfit('
 export const DEFAULT_OWNED_OUTFIT_ITEMS: readonly string[] = OUTFIT_ITEMS
   .filter(item => item.defaultOwned)
   .map(item => item.id)
+
+/**
+ * NPC-only traffic police officer uniform items (r10).
+ * Strictly isolated from `OUTFIT_ITEMS`, `OUTFIT_ITEMS_BY_ID`, `OUTFIT_PRESETS`, `DEFAULT_EQUIPPED_OUTFIT`,
+ * and save migration so players can never buy, equip, or migrate them in shops/wardrobe.
+ */
+export const NPC_ONLY_OUTFIT_ITEMS: readonly OutfitItemDef[] = [
+  {
+    id: 'top_traffic_police_shirt',
+    slot: 'top',
+    name: '交警浅蓝执勤衬衫',
+    tier: 0,
+    price: 0,
+    colorHex: '#7ab8e6',
+    accentHex: '#18253c',
+    description: 'NPC 专用：浅蓝短袖执勤衬衫，配肩章、藏青领口与荧光黄绿 #ccee1c 反光背心（背后印「桂林交警」，不上架商店）',
+    npcOnly: true,
+  },
+  {
+    id: 'bottom_police_trousers',
+    slot: 'bottom',
+    name: '交警藏青执勤长裤',
+    tier: 0,
+    price: 0,
+    colorHex: '#1a263a',
+    accentHex: '#1b2028',
+    description: 'NPC 专用：藏青长裤配黑色执勤腰带与银扣（不上架商店）',
+    npcOnly: true,
+  },
+  {
+    id: 'hat_traffic_police_cap',
+    slot: 'hat',
+    name: '交警白顶大檐帽',
+    tier: 0,
+    price: 0,
+    colorHex: '#f6f7f9',
+    accentHex: '#18253c',
+    description: 'NPC 专用：白顶大檐帽、藏青帽墙、黑色漆皮帽檐与内置短发兜（不上架商店）',
+    npcOnly: true,
+  },
+] as const
+
+export const NPC_ONLY_OUTFIT_ITEMS_BY_ID: Readonly<Record<string, OutfitItemDef>> = Object.fromEntries(
+  NPC_ONLY_OUTFIT_ITEMS.map(item => [item.id, item]),
+)
+
+/** Resolves any outfit item definition for rendering, including NPC-exclusive items kept out of shops/saves. */
+export function resolveOutfitItemDef(id: string): OutfitItemDef | undefined {
+  return OUTFIT_ITEMS_BY_ID[id] ?? NPC_ONLY_OUTFIT_ITEMS_BY_ID[id]
+}
+
+/** NPC-exclusive Jiefang Bridge traffic police uniform outfit preset (used by `applyEquipped(OFFICER_UNIFORM_OUTFIT)`). */
+export const OFFICER_UNIFORM_OUTFIT: Readonly<EquippedOutfit> = Object.freeze({
+  top: 'top_traffic_police_shirt',
+  bottom: 'bottom_police_trousers',
+  shoes: 'shoes_traffic_duty',
+  hat: 'hat_traffic_police_cap',
+  bag: 'bag_none',
+})
 
 export const OUTFIT_PRESETS: readonly OutfitPresetDef[] = [
   ...looks.slice(1).map((look,i)=>({id:'starter_'+look,name:lookNames[i+1],tier:0 as const,price:0,
@@ -295,7 +356,7 @@ export const OUTFIT_PRESETS: readonly OutfitPresetDef[] = [
     name: '交通文明劝导志愿套',
     tier: 0,
     price: 0,
-    summary: '荧光黄反光劝导背心配深蓝长袖与袖标（+0 Draw Call，无真实警徽警号）。',
+    summary: '荧光黄反光劝导背心配深蓝长袖与袖标（+0 Draw Call，原创合规志愿样式）。',
     tag: '志愿 · 劝导',
     items: {
       top: 'top_traffic_volunteer',

@@ -7,8 +7,8 @@ import {dirname, join} from 'node:path'
 import {fileURLToPath} from 'node:url'
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..')
-const out = process.env.OG_OUT ?? join(root, 'public/og.jpg')
 const distOut = join(root, 'dist/og.jpg')
+const out = process.env.OG_OUT ?? (process.argv.includes('--update-public') ? join(root, 'public/og.jpg') : distOut)
 
 // 分享图只是装饰：构建机偶尔很慢（页面 load 事件 30 s 内等不到），不能因此让整个网页镜像构建失败。
 // 等 DOMContentLoaded 而不是 load，最多试 3 次；都失败就沿用仓库里已有的 og.jpg 并只打警告。
@@ -47,5 +47,5 @@ for (let attempt = 1; attempt <= 3 && !done; attempt++) {
   try { await capture(); done = true } catch (error) { console.warn(`og.jpg capture attempt ${attempt} failed: ${error?.message?.split('\n')[0]}`) }
 }
 const fallback = join(root, 'public/og.jpg')
-try { await copyFile(done ? out : fallback, distOut) } catch {}
+if (!done || out !== distOut) { try { await copyFile(done ? out : fallback, distOut) } catch {} }
 console.log(done ? `og.jpg ${out}` : `og.jpg capture failed — kept existing ${fallback}`)

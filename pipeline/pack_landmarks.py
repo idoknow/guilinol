@@ -462,6 +462,9 @@ def main():
                     f"Landmark {entry['id']} exceeded texture budget: "
                     f"non_ktx2={audit['non_ktx2']}, ktx2VRAM={audit['gpu_vram_mb']:.2f}MB > {SINGLE_LANDMARK_VRAM_BUDGET_MB:.1f}MB"
                 )
+            meta_file = Path(temp) / f"{entry['id']}.meta.json"
+            if meta_file.exists():
+                info.update(json.loads(meta_file.read_text()))
             target.with_suffix('.json').write_text(json.dumps(info) + '\n')
 
 

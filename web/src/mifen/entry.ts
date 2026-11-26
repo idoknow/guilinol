@@ -53,10 +53,25 @@ export function mountLazyTianyuanMifen(ctx: MifenMountContext, opts: LazyMifenOp
     whiteSpace: 'nowrap',
     cursor: 'pointer',
   })
+  const syncStubPlacement = (): void => {
+    const coarsePortrait =
+      typeof window.matchMedia === 'function' &&
+      window.matchMedia('(pointer: coarse) and (not (any-pointer: fine)) and (max-width: 520px)').matches
+    const shortLandscape =
+      typeof window.matchMedia === 'function' && window.matchMedia('(max-height: 480px)').matches
+    stubBtn.style.top = shortLandscape
+      ? 'calc(50px + env(safe-area-inset-top))'
+      : coarsePortrait
+        ? 'calc(104px + env(safe-area-inset-top))'
+        : 'calc(58px + env(safe-area-inset-top))'
+  }
+  syncStubPlacement()
+  window.addEventListener('resize', syncStubPlacement)
   document.body.append(stubBtn)
 
   function teardownStub(): void {
     window.removeEventListener('keydown', onLazyKeyDown)
+    window.removeEventListener('resize', syncStubPlacement)
     stubBtn.remove()
   }
 

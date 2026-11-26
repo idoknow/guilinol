@@ -46,7 +46,7 @@ import type {FeedbackView} from '../../lib/feedback-contract'
 import {getPlayMode, onPlayMode, soloServices, trafficEnabled} from './game/play-mode'
 import {getState} from './game/state'
 import {loadLocalSave} from './game/save'
-import {isGlobalHotkeyBlocked} from './walk/input-guard'
+import {isGlobalHotkeyBlocked,isModalOrOverlayOpen} from './walk/input-guard'
 import {freezeStatic} from './static-freeze'
 
 installAtmosphere()
@@ -60,6 +60,27 @@ import {armOrientationGate} from './ui/orientation'
 import {mountStats} from './ui/stats'
 import {mountHotkeys} from './ui/hotkeys'
 import {mountLazyTianyuanMifen} from './mifen/entry'
+import {mountLazyXiaoxianggang} from './xiaoxianggang/entry'
+import {mountLazyShizijie} from './shizijie/entry'
+import {shouldMountDrinksShop} from './drinks/site'
+import {
+  createJiefangRailingsVisual,
+  createTrafficDuty,
+  DUTY_ZONES,
+  getActiveFineTerminalSession,
+  isOnJiefangBridgeDeck,
+  JIEFANG_DUTY_ZONE,
+  jiefangDeckWorldY,
+  mountAllDutyOfficers,
+  mountShizijieSignalsOverlay,
+  openFineTerminal,
+  resolveDutyTeleportDeckY,
+  sharedCitationLedger,
+  type DutyTrafficBridge,
+  type TrafficDutyController,
+} from './traffic-duty'
+import {createDutyTraffic} from './traffic/duty-traffic'
+import {isDown as isKnockdownDown, knockdown, triggerKnockdown} from './walk/knockdown'
 import {mountChat} from './ui/chat'
 import {mountGuide} from './ui/guide'
 import {touchUi} from './ui/input-mode'
@@ -101,7 +122,7 @@ async function start(loader:FullLoader,creatorSpawn=false) {
   await loader.showBeforeBlockingWork()
   await prepareCityAudioDuringLoad()
   const bounds=terrain??previousWorld!
-  const renderer = new THREE.WebGLRenderer({antialias:false,powerPreference:'high-performance'})
+  const renderer = new THREE.WebGLRenderer({antialias:false,powerPreference:'high-performance',preserveDrawingBuffer:params.has('verify')})
   renderer.debug.checkShaderErrors = import.meta.env.DEV || params.has('debug')
   const warmPrograms=async(root:THREE.Object3D,budget?:WarmBudget)=>{
     try{await warmShaders(renderer,root,camera,scene,budget)}catch(error){console.warn('Shader warmup unavailable',error)}
@@ -147,6 +168,8 @@ async function start(loader:FullLoader,creatorSpawn=false) {
   const framing = hasDowntown ? [-2304,-2560,3584,5888] : bounds.extent
   const [viewX,viewZ,viewWidth,viewDepth] = framing
   let walker:Awaited<ReturnType<typeof import('./walk').walk>>|undefined, switching=false
+  let drinks:Awaited<ReturnType<typeof import('./drinks').mountDrinksShop>>|undefined
+  let trafficDuty:TrafficDutyController|undefined
   let cinema=false
   let walkModPromise:Promise<typeof import('./walk')>|undefined
   const prefetchWalk = ()=>{
@@ -327,17 +350,17 @@ async function start(loader:FullLoader,creatorSpawn=false) {
   }
   type Walker=Awaited<ReturnType<typeof import('./walk').walk>>
   let loadingWalker:Promise<Walker>|undefined
-  function loadWalker():Promise<Walker>{return loadingWalker??=prefetchWalk().then(module=>module.walk(scene,camera,renderer.domElement,manifest,stream,peaks,params.has('verify'))).then(player=>walker=player).catch(error=>{loadingWalker=undefined;throw error})}
+  function loadWalker():Promise<Walker>{return loadingWalker??=prefetchWalk().then(module=>module.walk(scene,camera,renderer.domElement,manifest,stream,peaks,params.has('verify'))).then(player=>{walker=player;player.setDrinksBridge?.(drinks?{getCandidate:()=>drinks!.getInteractCandidate(),interact:()=>drinks!.interact()}:null);player.setTrafficDuty?.(trafficDuty??null);return player}).catch(error=>{loadingWalker=undefined;throw error})}
   let checkedCards=false
   let landingQueue=Promise.resolve()
-  function walkTo(x:number,z:number,yaw:number,reason:string,name?:string,request?:AbortSignal){
+  function walkTo(x:number,z:number,yaw:number,reason:string,name?:string,request?:AbortSignal,targetY?:number){
     if(heli.active)return Promise.resolve(false)
     const parent=titleTransition
-    const result=landingQueue.then(()=>request?.aborted?false:land(x,z,yaw,reason,name,parent,request))
+    const result=landingQueue.then(()=>request?.aborted?false:land(x,z,yaw,reason,name,parent,request,targetY))
     landingQueue=result.then(()=>{},()=>{})
     return result
   }
-  async function land(x:number,z:number,yaw:number,reason:string,name:string|undefined,transition:typeof titleTransition,request?:AbortSignal){
+  async function land(x:number,z:number,yaw:number,reason:string,name:string|undefined,transition:typeof titleTransition,request?:AbortSignal,targetY?:number){
     switching=true
     const start=performance.now()
     let completed=false
@@ -379,6 +402,22 @@ async function start(loader:FullLoader,creatorSpawn=false) {
         }finally{budget.dispose()}
       }
       if(completed){
+        const desiredY=typeof targetY==='number'&&Number.isFinite(targetY)
+          ? targetY
+          : (reason==='traffic-duty'||name==='解放桥')&&isOnJiefangBridgeDeck({x,z})
+            ? jiefangDeckWorldY(x,z)
+            : undefined
+        if(desiredY!==undefined){
+          const curFootY=player.position.y-walkConfig.height/2
+          const curPlanarErr=Math.hypot(player.position.x-x,player.position.z-z)
+          if(Math.abs(curFootY-desiredY)>0.5||curPlanarErr>0.8){
+            const sampledY=player.carSupportAt(x,z,desiredY)?.y
+            const deckY=resolveDutyTeleportDeckY(sampledY,desiredY)
+            player.clampPosition({x,y:deckY+0.055,z})
+            player.face(yaw,0.08)
+            trafficDuty?.step(0)
+          }
+        }
         cover.progress(1)
         if(!checkedCards){checkedCards=true; void import('./ui/update-cards').then(module=>module.startCards(params.has('verify'))).catch(()=>{})}
       }
@@ -437,13 +476,15 @@ async function start(loader:FullLoader,creatorSpawn=false) {
       hint.textContent='WASD 骑行 · 1-3/Q·E 换挡 · Space 翘头/起身 · Shift 压弯 · K 边撑 · H 铃铛 · F 下车 · V 起飞'
     }else if(walking&&document.body.hasAttribute('data-aboard')&&ride==='boat'){
       hint.textContent='WASD 划船 · F 靠岸下船 · 拖动转视角 · 滚轮远近 · V 起飞'
+    }else if(walking&&!document.body.hasAttribute('data-aboard')&&document.body.dataset.tdDutyActive==='1'){
+      hint.textContent=`WASD 走 · ${bindingLabel('dutyWhistle')} 吹哨 · ${bindingLabel('dutyFlag')} 短按挥旗拦停 / 长按放行 · ${bindingLabel('dutyTicket')} 开单与1.5m递交 · 空格 跳 · C 视距`
     }else{
       hint.textContent=walking?`WASD 走 · Shift 跑 · X 蹲 · 空格 跳 · ${bindingLabel('emote')} 表情 · C 视距 · 滚轮远近 · V 起飞 · M 地图 · J 景册 · P 拍照`:'WASD 飞 · Q/E 升降 · Shift 加速 · V 落地步行 · M 地图 · J 景册 · P 拍照 · Esc 菜单'
     }
     if(getPlayMode()==='solo')hint.textContent=hint.textContent?.replace(/ · V (起飞|飞)/g,'') ?? ''
   }
   onPrefs(showMode)
-  new MutationObserver(()=>showMode()).observe(document.body,{attributes:true,attributeFilter:['data-aboard','data-ride']})
+  new MutationObserver(()=>showMode()).observe(document.body,{attributes:true,attributeFilter:['data-aboard','data-ride','data-td-duty-active']})
   let toastTimer=0
   const showToast=(text:string,ms=3200)=>{toast.textContent=text;toast.classList.add('show')
     clearTimeout(toastTimer);toastTimer=window.setTimeout(()=>toast.classList.remove('show'),ms)}
@@ -554,6 +595,253 @@ async function start(loader:FullLoader,creatorSpawn=false) {
     },
     { eagerVerify: params.has('mifen') },
   )
+  if (shouldMountDrinksShop({ isDev: import.meta.env.DEV, search: location.search })) {
+    void Promise.all([import('./drinks'), import('./drinks/hold/payment')]).then(([mod, pay]) => {
+      const mounted = mod.mountDrinksShop({
+        scene,
+        camera,
+        getPlayerPos: () => (walker?.active ? walker.position : null),
+        getWalker: () => walker,
+        getHour: () => clock.hour,
+        getNightFactor: () => env.night,
+        sampleGroundY: sampleMissionGroundY,
+        walkTo,
+        wallet: pay.mainGameDrinkWallet,
+      })
+      drinks = mounted
+      walker?.setDrinksBridge?.({
+        getCandidate: () => mounted.getInteractCandidate(),
+        interact: () => mounted.interact(),
+      })
+    }).catch(error => console.warn('Drinks shop unavailable', error))
+  }
+  const dutyGroundAt = (x: number, z: number, y?: number, car = false) => {
+    const refY = y ?? 200
+    const v = walker?.active ? (car ? walker.carSupportAt(x, z, refY) : walker.supportAt(x, z, refY))?.y : sampleMissionGroundY(x, z)
+    return typeof v === 'number' && Number.isFinite(v) ? v : undefined
+  }
+  const dutyOfficers = mountAllDutyOfficers(scene, dutyGroundAt)
+  const jiefangRailings = createJiefangRailingsVisual()
+  scene.add(jiefangRailings.group)
+  const dutyTraffic = createDutyTraffic({ scene, camera, sampleGround: dutyGroundAt })
+  const dutyTrafficBridge: DutyTrafficBridge = {
+    start: () => dutyTraffic.start(),
+    stop: () => dutyTraffic.stop(),
+    getTraffic: () => dutyTraffic.getTraffic(),
+    getActors: () => dutyTraffic.getActors(),
+    onPlayerHit: cb => dutyTraffic.onPlayerHit(cb),
+    onPlayerHorn: cb => dutyTraffic.onPlayerHorn(cb),
+    notifyViolatorCited: actor => dutyTraffic.notifyViolatorCited(actor),
+    commandHalt: (origin, opts) => dutyTraffic.commandHalt(origin, opts),
+    onViolatorPulledOver: (actor, durationSec) => dutyTraffic.onViolatorPulledOver(actor, durationSec),
+    onTicketReceived: (actor, receipt) => dutyTraffic.onTicketReceived(actor, receipt),
+    getActorHandBone: (actor, side) => dutyTraffic.getActorHandBone(actor, side),
+    releaseViolator: actor => dutyTraffic.releaseViolator(actor),
+  }
+  const shizijieSignals = mountShizijieSignalsOverlay(scene, { groundAt: dutyGroundAt })
+  const dutyProjVec = new THREE.Vector3()
+  let activeFineTargetActor: import('./traffic/sim').Actor | null = null
+  trafficDuty = createTrafficDuty({
+    getPlayerPos: () => (walker?.active ? walker.position : null),
+    getPlayerYaw: () => walker?.yaw ?? 0,
+    getPlayerObject: () => walker?.figure ?? null,
+    isWalking: () => !!walker?.active,
+    isPaused: () => paused || !!tour?.map?.active,
+    isUiBlocked: () => {
+      const ft = getActiveFineTerminalSession()
+      return isModalOrOverlayOpen() || document.body.dataset.photo === 'on' || (Boolean(ft) && ft?.getPhase() !== 'deliver')
+    },
+    getOfficerPos: () => dutyOfficers.officers.jiefang.position,
+    getOfficerYaw: () => JIEFANG_DUTY_ZONE.spot.yaw,
+    getOfficerObject: () => dutyOfficers.officers.jiefang.officerRoot,
+    officerNpc: dutyOfficers.officers.jiefang,
+    camera,
+    renderer,
+    scene,
+    projectToScreen: worldPos => {
+      dutyProjVec.set(worldPos.x, worldPos.y, worldPos.z).project(camera)
+      return {
+        x: (1 + dutyProjVec.x) * 0.5 * window.innerWidth,
+        y: (1 - dutyProjVec.y) * 0.5 * window.innerHeight,
+        visible: dutyProjVec.z >= -1 && dutyProjVec.z <= 1 && Math.abs(dutyProjVec.x) <= 1 && Math.abs(dutyProjVec.y) <= 1,
+      }
+    },
+    onOfficerStateChange: state => dutyOfficers.setJiefangState(state),
+    onOfficerExpression: expr => dutyOfficers.officers.jiefang.setExpression(expr),
+    onOfficerLookTarget: pos => dutyOfficers.officers.jiefang.setLookTarget(pos),
+    onDutyStateChange: active => {
+      walker?.setTrafficVolunteerMode?.(active)
+      if (!active) walker?.setDutyGear?.({ hasWhistle: false, hasFlag: false })
+    },
+    trafficBridge: dutyTrafficBridge,
+    fineTerminal: {
+      openFineTerminal: req => {
+        activeFineTargetActor = req.actor
+        if (!camera.parent) scene.add(camera)
+        const opened = openFineTerminal({
+          actor: req.actor,
+          violation: req.violation,
+          violations: req.violations,
+          fineYuan: req.fineYuan,
+          plateNo: req.plateNo ?? req.plate,
+          zoneName: req.zoneName,
+          vehicleSubtype: req.vehicleSubtype,
+          getPlayerPos: req.getPlayerPos ?? (() => (walker?.active ? walker.position : null)),
+          ledger: sharedCitationLedger,
+          enforceDuplicateCheck: true,
+          printerMountMode: 'hand',
+          handAnchor: walker?.handAnchor?.() ?? null,
+          firstPersonCamera: camera,
+          dutyProps: req.dutyProps ?? walker?.getDutyPropsHandle?.() ?? walker?.dutyPropsHandle ?? null,
+          violatorObject3D: req.violatorObject3D ?? null,
+          getActorHandBone: (actor, side) => dutyTrafficBridge.getActorHandBone?.(actor, side) ?? null,
+          resolveViolatorHandBone: (actor, side) =>
+            dutyTrafficBridge.getActorHandBone?.(actor, side ?? 'right') ?? null,
+          closeupCamera: req.closeupCamera ?? camera,
+          onToast: msg => showToast(msg, 2400),
+          onPhaseChange: (phase, snap) => {
+            if (typeof document !== 'undefined' && document.body) {
+              document.body.dataset.tdTerminalPhase = phase
+            }
+            req.onPhaseChange?.(phase, snap)
+          },
+        })
+        void opened.finally(() => {
+          if (activeFineTargetActor === req.actor) activeFineTargetActor = null
+          if (typeof document !== 'undefined' && document.body) {
+            delete document.body.dataset.tdTerminalPhase
+          }
+        })
+        return opened
+      },
+      isOpen: () => Boolean(getActiveFineTerminalSession()),
+      isDelivering: () => getActiveFineTerminalSession()?.getPhase() === 'deliver',
+      isHandingOver: () => Boolean(getActiveFineTerminalSession()?.getSnapshot().isHandingOver),
+      confirmDeliver: () => Boolean(getActiveFineTerminalSession()?.confirmDeliver()),
+      getTargetActor: () => activeFineTargetActor,
+      close: () => {
+        activeFineTargetActor = null
+        if (typeof document !== 'undefined' && document.body) {
+          delete document.body.dataset.tdTerminalPhase
+        }
+        getActiveFineTerminalSession()?.cancel('disposed')
+      },
+    },
+    propsBridge: {
+      grantGear: g => walker?.setDutyGear?.(g),
+      clearGear: () => walker?.setDutyGear?.({ hasWhistle: false, hasFlag: false }),
+      playGesture: kind => walker?.playDutyGesture?.(kind),
+      setWhistleAlwaysAtMouth: on => walker?.setWhistleAlwaysAtMouth?.(on),
+      getHandle: () => walker?.getDutyPropsHandle?.() ?? walker?.dutyPropsHandle ?? null,
+    },
+    knockdownBridge: {
+      triggerKnockdown: (kind, dir, severity) => {
+        if (trafficDuty && !trafficDuty.canStartKnockdown()) return
+        triggerKnockdown(kind === 'ebike_fall' ? 'bike_crash' : kind, dir, severity, { yaw: walker?.yaw ?? 0 })
+      },
+      isDown: () => isKnockdownDown(),
+    },
+    onDutyBoundaryClamp: clamped => walker?.clampPosition?.(clamped),
+    onToast: (text, ms) => showToast(text, ms),
+    onTeleportToZone: zoneId => {
+      const z = DUTY_ZONES.find(item => item.id === zoneId) ?? DUTY_ZONES[0]
+      return walkTo(z.teleport.x, z.teleport.z, z.teleport.yaw, 'traffic-duty', z.name, undefined, z.teleport.y)
+    },
+    arbiterWired: true,
+  })
+  walker?.setTrafficDuty?.(trafficDuty)
+  let xxgPrevPos: { x: number; z: number } | null = null
+  const xxg = mountLazyXiaoxianggang(
+    {
+      renderer,
+      worldCamera: camera,
+      bodyFlag: 'xxgActive',
+      getWalker: () => {
+        if (!walker?.active || walker.vehicle !== 'foot') {
+          xxgPrevPos = null
+          return null
+        }
+        const p = walker.position
+        const vel = xxgPrevPos ? { x: p.x - xxgPrevPos.x, z: p.z - xxgPrevPos.z } : { x: 0, z: 0 }
+        xxgPrevPos = { x: p.x, z: p.z }
+        return { position: { x: p.x, y: p.y, z: p.z }, velocity: vel }
+      },
+      openVeil: () => {
+        const el = document.createElement('div')
+        el.className = 'xxg-veil is-active'
+        document.body.append(el)
+        return { async done() { el.remove() } }
+      },
+      suspendWorld: () => {
+        walker?.hold(true)
+        walker?.showFigure(false)
+      },
+      resumeWorldAt: async pt => {
+        xxgPrevPos = { x: pt.x, z: pt.z }
+        if (!walker) return false
+        walker.hold(false)
+        walker.showFigure(true)
+        return walker.enter(pt.x, pt.z, pt.yaw, 'xxg-exit', false)
+      },
+    },
+    { eager: params.has('xxg'), veilFadeInMs: 80 },
+  )
+  let szjPrevPos: { x: number; z: number } | null = null
+  let szjHoodsLoading: Promise<void> | null = null
+  const ensureSzjHoods = () => {
+    if (szjHoodsLoading) return
+    szjHoodsLoading = import('./shizijie/look/index')
+      .then(mod => {
+        const pack = mod.createShizijieMaterials()
+        const hoods = mod.createSurfaceStairwellHoods(pack, { worldSpace: true })
+        for (const child of hoods.children) {
+          const gy = sampleMissionGroundY(child.position.x, child.position.z)
+          if (Number.isFinite(gy)) child.position.y = gy
+        }
+        scene.add(hoods)
+      })
+      .catch(error => {
+        szjHoodsLoading = null
+        console.warn('Shizijie surface canopies unavailable', error)
+      })
+  }
+  if (params.has('szj')) ensureSzjHoods()
+  const szj = mountLazyShizijie(
+    {
+      renderer,
+      worldCamera: camera,
+      bodyFlag: 'szjActive',
+      getWalker: () => {
+        if (!walker?.active || walker.vehicle !== 'foot') {
+          szjPrevPos = null
+          return null
+        }
+        const p = walker.position
+        if (Math.hypot(p.x + 879.75, p.z + 169.63) < 160) ensureSzjHoods()
+        const vel = szjPrevPos ? { x: p.x - szjPrevPos.x, z: p.z - szjPrevPos.z } : { x: 0, z: 0 }
+        szjPrevPos = { x: p.x, z: p.z }
+        return { position: { x: p.x, y: p.y - walkConfig.height * 0.5, z: p.z }, velocity: vel }
+      },
+      openVeil: () => {
+        const el = document.createElement('div')
+        el.className = 'szj-veil is-active'
+        document.body.append(el)
+        return { async done() { el.remove() } }
+      },
+      suspendWorld: () => {
+        walker?.hold(true)
+        walker?.showFigure(false)
+      },
+      resumeWorldAt: async pt => {
+        szjPrevPos = { x: pt.x, z: pt.z }
+        if (!walker) return false
+        walker.hold(false)
+        walker.showFigure(true)
+        return walker.enter(pt.x, pt.z, pt.yaw, 'szj-exit', false)
+      },
+    },
+    { eager: params.has('szj'), veilFadeInMs: 80 },
+  )
   prepareLandingContent=async()=>{
     mifen.step(0)
     const probe=mifen.getProbe() as ReturnType<typeof mifen.getProbe>&{ensureLoaded?:()=>Promise<unknown>}
@@ -584,11 +872,12 @@ async function start(loader:FullLoader,creatorSpawn=false) {
   })
   const tourProbe = {getState, missions: {start: () => ({ok:false, code:'SOLO_MODE_REQUIRED'})}}
   let staticAudit:ReturnType<typeof import('./verify-static').staticVerifier>|undefined
-  const publishViewer=()=>Object.assign(window,{viewer:{camera,stream,manifest,stats,walkTo,staticAudit,get game(){return solo?.probe ?? tourProbe},get mifen(){return mifen.getProbe()},
+  const publishViewer=()=>Object.assign(window,{viewer:{camera,stream,manifest,stats,walkTo,staticAudit,get game(){return solo?.probe ?? tourProbe},get mifen(){return mifen.getProbe()},get xxg(){return xxg.getProbe()},get szj(){return szj.getProbe()},
     cityUpgrade: {
       getStats: () => ({ ...getCityUpgradeStats(), mountedPropGroups: cityUpgradeProps.mountedCount() }),
       setEnabled: (on: boolean) => { if (setCityUpgradeEnabled(on)) applyCityUpgradeState() },
     },
+    get drinks(){return drinks?.getProbe()??null},trafficDuty,dutyTraffic,jiefangRailings,dutyOfficers,shizijieSignals,knockdown,openFineTerminal,getActiveFineTerminalSession,
     get trafficCount(){return (scene.getObjectByName('G2 traffic') as THREE.InstancedMesh|undefined)?.count??0},
     get trafficProbe(){return scene.getObjectByName('G2 traffic')?.userData},
     async trafficPixels(){return (await import('./traffic/visibility-probe')).pixelVisible(renderer,scene,camera)},
@@ -639,6 +928,7 @@ async function start(loader:FullLoader,creatorSpawn=false) {
     readLastViewNow:()=>readLastView(),
     applyLastViewNow:(view:FeedbackView)=>getPlayMode()==='solo'?{ok:false,code:'FLIGHT_DISABLED_IN_SOLO'}:restoreOpening(view)}})
   function draw(){
+    if(xxg.render()||szj.render())return
     renderer.info.reset()
     base.update(camera,heli.phase==='cruise')
     const metrics=stream.metrics
@@ -690,7 +980,8 @@ async function start(loader:FullLoader,creatorSpawn=false) {
     if((paused||tour?.map?.active)&&frame>2){previous=0;return}
     const elapsed = previous?now-previous:0;previous=now
     gfx.frame(elapsed)
-    if(!switching){if(walker?.active&&!heli.active)walker.tick(elapsed/1000);else if(!walker?.active){controls(elapsed/1000);clampOpening()}heli.tick(elapsed/1000)}
+    const anyIndoor=xxg.isIndoor()||szj.isIndoor()
+    if(!switching&&!anyIndoor){if(walker?.active&&!heli.active)walker.tick(elapsed/1000);else if(!walker?.active){controls(elapsed/1000);clampOpening()}heli.tick(elapsed/1000)}
     cabinCruise=heli.first&&heli.phase==='cruise'
     if(frame===1) {
       if(!first)markFirstFrame()
@@ -705,7 +996,7 @@ async function start(loader:FullLoader,creatorSpawn=false) {
         syncCityUpgradeProps(true)
       }
     }
-    if(frame>0&&!switching) {
+    if(frame>0&&!switching&&!anyIndoor) {
       const showTraffic=trafficEnabled(getPlayMode(),trafficOverride)
       if(showTraffic&&!trafficRequested && camera.position.y<250 && !stream.pending.size){
         trafficRequested=true
@@ -722,9 +1013,24 @@ async function start(loader:FullLoader,creatorSpawn=false) {
       if(profiling)streamMs=performance.now()-streamStart
     }
     updateAtmosphere(now,elapsed)
-    tour?.tick(elapsed/1000)
-    solo?.step(Math.min(0.1, elapsed/1000))
-    mifen.step(Math.min(0.1, elapsed/1000))
+    const stepDt = Math.min(0.1, elapsed/1000)
+    if(!anyIndoor){
+      tour?.tick(elapsed/1000)
+      solo?.step(stepDt)
+      mifen.step(stepDt)
+      drinks?.step(stepDt)
+      dutyTraffic.step(stepDt, walker?.active ? walker.position : null, {
+        officerActive: trafficDuty?.getSnapshot().phase === 'active',
+        officerYaw: walker?.yaw ?? 0,
+        officerRunning: Boolean(walker?.active && walker.vehicle === 'foot' && (walker.footSpeed ?? 0) > 4.6),
+        vehiclePos: walker?.active && walker.vehicle !== 'foot' ? walker.position : undefined,
+      })
+      trafficDuty?.step(stepDt)
+      dutyOfficers.update(stepDt)
+      shizijieSignals.update(walker?.active ? walker.position : camera.position, stepDt)
+    }
+    if(!szj.isIndoor())xxg.step(stepDt)
+    if(!xxg.isIndoor())szj.step(stepDt)
     persistView?.()
     const renderStart=profiling?performance.now():0
     draw()

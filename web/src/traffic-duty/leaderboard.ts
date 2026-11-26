@@ -54,6 +54,9 @@ function sanitizeBreakdown(raw: unknown): ViolationBreakdown {
     no_helmet: clampInt(src.no_helmet, 0, 10000),
     bike_double: clampInt(src.bike_double, 0, 10000),
     ebike_overload: clampInt(src.ebike_overload, 0, 10000),
+    illegal_mod: clampInt(src.illegal_mod, 0, 10000),
+    wrong_way: clampInt(src.wrong_way, 0, 10000),
+    red_light_run: clampInt(src.red_light_run, 0, 10000),
   }
 }
 

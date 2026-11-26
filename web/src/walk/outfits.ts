@@ -14,10 +14,22 @@
 import * as THREE from 'three'
 import {
   DEFAULT_EQUIPPED_OUTFIT,
+  NPC_ONLY_OUTFIT_ITEMS,
+  NPC_ONLY_OUTFIT_ITEMS_BY_ID,
+  OFFICER_UNIFORM_OUTFIT,
   OUTFIT_ITEMS_BY_ID,
+  resolveOutfitItemDef,
   type EquippedOutfit,
 } from '../game/catalog'
 import type {AvatarRig} from './avatar-rig'
+import {streetShading} from './creator-ink'
+
+export {
+  NPC_ONLY_OUTFIT_ITEMS,
+  NPC_ONLY_OUTFIT_ITEMS_BY_ID,
+  OFFICER_UNIFORM_OUTFIT,
+  resolveOutfitItemDef,
+}
 
 export const OUTFIT_ZONE = {
   LOCKED_SKIN: 0,
@@ -43,9 +55,13 @@ export function isSafetyHelmet(hatId: string): boolean {
   return SAFETY_HELMET_IDS.has(hatId)
 }
 
+export type ReflectiveVestMode = 'auto' | 'none' | 'volunteer' | 'officer'
+
 export interface VisualOutfitOptions {
   ridingEbike: boolean
   autoHelmetOnRide: boolean
+  /** Optional GLSL reflective vest overlay mode (`'auto'` activates `'officer'` on `top_traffic_police_shirt` and `'volunteer'` on `top_traffic_volunteer`). */
+  vestMode?: ReflectiveVestMode
 }
 
 /**
@@ -92,6 +108,7 @@ const TOP_RECIPES: Record<string, TopRecipe> = {
   top_guochao_pankou: {primary: '#1c242b', sleeve: '#1c242b', trim: '#d8b46a', inner: '#c84b3c'},
   top_night_moto: {primary: '#161b22', sleeve: '#1f2630', trim: '#20d6c1', inner: '#2b3440'},
   top_traffic_volunteer: {primary: '#d8ee1e', sleeve: '#192332', trim: '#d8ee1e', inner: '#192332'},
+  top_traffic_police_shirt: {primary: '#7ab8e6', sleeve: '#7ab8e6', trim: '#18253c', inner: '#18253c'},
 }
 
 const BOTTOM_RECIPES: Record<string, BottomRecipe> = {
@@ -103,6 +120,7 @@ const BOTTOM_RECIPES: Record<string, BottomRecipe> = {
   bottom_guochao_drape: {main: '#1c2026', belt: '#b89658'},
   bottom_night_moto: {main: '#181c22', belt: '#20d6c1'},
   bottom_traffic_duty: {main: '#1b2330', belt: '#dce6ee'},
+  bottom_police_trousers: {main: '#1a263a', belt: '#1b2028'},
 }
 
 const SHOES_RECIPES: Record<string, ShoesRecipe> = {
@@ -135,7 +153,7 @@ function resolveTopRecipe(topId: string): TopRecipe {
   }
   const known = TOP_RECIPES[topId]
   if (known) return known
-  const item = OUTFIT_ITEMS_BY_ID[topId]
+  const item = resolveOutfitItemDef(topId)
   const primary = item?.colorHex ?? '#f09a4a'
   const accent = item?.accentHex ?? '#f2efe8'
   return {primary, sleeve: primary, trim: accent, inner: accent}
@@ -144,7 +162,7 @@ function resolveTopRecipe(topId: string): TopRecipe {
 function resolveBottomRecipe(bottomId: string): BottomRecipe {
   const known = BOTTOM_RECIPES[bottomId]
   if (known) return known
-  const item = OUTFIT_ITEMS_BY_ID[bottomId]
+  const item = resolveOutfitItemDef(bottomId)
   return {main: item?.colorHex ?? '#55708f', belt: item?.accentHex ?? '#262b30'}
 }
 
@@ -152,7 +170,7 @@ function resolveShoesRecipe(shoesId: string): ShoesRecipe {
   if(shoesId==='shoes_starter_chinese')return SHOES_RECIPES.shoes_default_sneaker
   const known = SHOES_RECIPES[shoesId]
   if (known) return known
-  const item = OUTFIT_ITEMS_BY_ID[shoesId]
+  const item = resolveOutfitItemDef(shoesId)
   return {upper: item?.colorHex ?? '#eeeae2', accent: item?.accentHex ?? '#343b40', sole: '#6b5742'}
 }
 
@@ -605,6 +623,211 @@ function buildHatMesh(hatId: string): THREE.Mesh | null {
     )
   }
 
+  if (hatId === 'hat_traffic_police_cap') {
+    // Head-fitted Chinese traffic police peaked cap (白顶大檐帽 + 藏青帽墙 + 黑色漆皮帽檐 + 素面金盾徽 + 防光头短发兜):
+    // Aligned with `docs/research/officer-r10/spec.md` & measured against `figure_m.glb` in `attach_head`
+    // (-Z forward, head center z=+0.020, eyebrows y=0.082..0.090, forehead z=-0.095, occiput z=+0.132).
+    // Because `creator-hair` is hidden whenever a hat is worn (0 hair poke-through on every hairstyle),
+    // charcoal `#1b1a1a` nape + sideburn hair is built neatly under the navy wall so the officer never looks bald.
+    const segs = 24
+    const centerZ = 0.020
+    const buildRingLoft = (
+      rings: readonly {y: number; rx: number; rz: number; frontLift: number}[],
+      closeTopY?: number,
+    ): THREE.BufferGeometry => {
+      const positions: number[] = []
+      const indices: number[] = []
+      const ringSize = segs + 1
+      for (const r of rings) {
+        for (let i = 0; i <= segs; i++) {
+          const ang = (i / segs) * Math.PI * 2
+          // ang = 0 -> -Z (front center), ang = PI -> +Z (back center)
+          const sinA = Math.sin(ang)
+          const cosA = Math.cos(ang)
+          const frontFactor = Math.max(0, cosA) ** 1.6
+          const x = sinA * r.rx
+          const z = centerZ - cosA * r.rz
+          const y = r.y + r.frontLift * frontFactor
+          positions.push(x, y, z)
+        }
+      }
+      for (let ri = 0; ri + 1 < rings.length; ri++) {
+        const a0 = ri * ringSize
+        const b0 = (ri + 1) * ringSize
+        for (let i = 0; i < segs; i++) {
+          // Outward normals (T_ring x T_ang points outward: -Z at front, +X at right, +Z at back)
+          indices.push(a0 + i, b0 + i, a0 + i + 1)
+          indices.push(a0 + i + 1, b0 + i, b0 + i + 1)
+        }
+      }
+      if (closeTopY !== undefined) {
+        const topStart = (rings.length - 1) * ringSize
+        const apexIdx = positions.length / 3
+        positions.push(0, closeTopY, centerZ - 0.006)
+        for (let i = 0; i < segs; i++) {
+          // Upward (+Y) crown top normals
+          indices.push(topStart + i, apexIdx, topStart + i + 1)
+        }
+      }
+      const g = new THREE.BufferGeometry()
+      g.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3))
+      g.setIndex(indices)
+      g.computeVertexNormals()
+      return g
+    }
+
+    // 0. Built-in charcoal-black `#1b1a1a` nape + temple short hair tucked cleanly under the navy cap wall
+    const buildNapeHair = (): THREE.BufferGeometry => {
+      const nSegs = 14
+      const startAng = Math.PI * 0.42
+      const endAng = Math.PI * 1.58
+      const rings = [
+        {y: 0.048, rx: 0.088, rz: 0.106},
+        {y: 0.078, rx: 0.101, rz: 0.121},
+        {y: 0.104, rx: 0.102, rz: 0.121},
+      ]
+      const pos: number[] = []
+      const idx: number[] = []
+      const rowSize = nSegs + 1
+      for (const r of rings) {
+        for (let i = 0; i <= nSegs; i++) {
+          const ang = startAng + (i / nSegs) * (endAng - startAng)
+          const sinA = Math.sin(ang)
+          const cosA = Math.cos(ang)
+          pos.push(sinA * r.rx, r.y, centerZ - cosA * r.rz)
+        }
+      }
+      for (let ri = 0; ri + 1 < rings.length; ri++) {
+        const a0 = ri * rowSize
+        const b0 = (ri + 1) * rowSize
+        for (let i = 0; i < nSegs; i++) {
+          idx.push(a0 + i, b0 + i, a0 + i + 1)
+          idx.push(a0 + i + 1, b0 + i, b0 + i + 1)
+        }
+      }
+      const g = new THREE.BufferGeometry()
+      g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3))
+      g.setIndex(idx)
+      g.computeVertexNormals()
+      return g
+    }
+    const napeHair = buildNapeHair()
+    const sideHairL = new THREE.BoxGeometry(0.013, 0.034, 0.032)
+    sideHairL.translate(-0.094, 0.085, -0.022)
+    const sideHairR = new THREE.BoxGeometry(0.013, 0.034, 0.032)
+    sideHairR.translate(0.094, 0.085, -0.022)
+
+    // 1. Deep navy cap wall / band hugging head circumference snugly above eyebrows
+    const navyWall = buildRingLoft([
+      {y: 0.098, rx: 0.106, rz: 0.124, frontLift: 0.005},
+      {y: 0.124, rx: 0.108, rz: 0.126, frontLift: 0.005},
+      {y: 0.149, rx: 0.111, rz: 0.129, frontLift: 0.006},
+    ])
+
+    // 2. White flared flat-saucer peaked crown (classic crisp front peak lift, flat smooth top)
+    const whiteSide = buildRingLoft([
+      {y: 0.147, rx: 0.110, rz: 0.128, frontLift: 0.006},
+      {y: 0.172, rx: 0.124, rz: 0.142, frontLift: 0.014},
+      {y: 0.194, rx: 0.135, rz: 0.153, frontLift: 0.021},
+    ])
+    const whiteTop = buildRingLoft(
+      [
+        {y: 0.194, rx: 0.135, rz: 0.153, frontLift: 0.021},
+        {y: 0.200, rx: 0.096, rz: 0.111, frontLift: 0.012},
+      ],
+      0.205,
+    )
+
+    // 3. Navy piping trim along outer crown ridge
+    const crownPiping = buildRingLoft([
+      {y: 0.191, rx: 0.1365, rz: 0.1545, frontLift: 0.021},
+      {y: 0.196, rx: 0.1365, rz: 0.1545, frontLift: 0.021},
+    ])
+
+    // 4. Curved black patent-leather visor / brim (-68°..+68° around front -Z, sloping cleanly above brows)
+    const buildCurvedVisor = (): THREE.BufferGeometry => {
+      const vSegs = 16
+      const maxAng = 1.18
+      const pos: number[] = []
+      const idx: number[] = []
+      const pushRow = (rScaleX: number, rScaleZ: number, yBase: number, yFrontDrop: number) => {
+        const start = pos.length / 3
+        for (let i = 0; i <= vSegs; i++) {
+          const u = (i / vSegs) * 2 - 1 // -1..+1
+          const ang = u * maxAng
+          const sinA = Math.sin(ang)
+          const cosA = Math.cos(ang)
+          const tip = Math.max(0, Math.cos(u * Math.PI * 0.5)) ** 1.15
+          const x = sinA * rScaleX
+          const z = centerZ - cosA * rScaleZ - tip * (rScaleZ - 0.123) * 0.34
+          const y = yBase - tip * yFrontDrop
+          pos.push(x, y, z)
+        }
+        return start
+      }
+      const inTop = pushRow(0.105, 0.123, 0.105, 0.0)
+      const outTop = pushRow(0.119, 0.168, 0.100, 0.017)
+      const outBot = pushRow(0.118, 0.167, 0.094, 0.017)
+      const inBot = pushRow(0.104, 0.122, 0.100, 0.0)
+      const stitch = (r0: number, r1: number) => {
+        for (let i = 0; i < vSegs; i++) {
+          // Outward/upward normals on visor top, front edge, and underside
+          idx.push(r0 + i, r0 + i + 1, r1 + i)
+          idx.push(r0 + i + 1, r1 + i + 1, r1 + i)
+        }
+      }
+      stitch(inTop, outTop)
+      stitch(outTop, outBot)
+      stitch(outBot, inBot)
+      const g = new THREE.BufferGeometry()
+      g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3))
+      g.setIndex(idx)
+      g.computeVertexNormals()
+      return g
+    }
+    const visor = buildCurvedVisor()
+
+    // 5. Silver-white cap wind strap across front base of navy wall + dual silver side buttons
+    const strap = buildRingLoft([
+      {y: 0.105, rx: 0.1095, rz: 0.1285, frontLift: 0.005},
+      {y: 0.112, rx: 0.1095, rz: 0.1285, frontLift: 0.005},
+    ])
+    const btnL = new THREE.SphereGeometry(0.0072, 8, 6)
+    btnL.translate(0.107, 0.110, -0.010)
+    const btnR = new THREE.SphereGeometry(0.0072, 8, 6)
+    btnR.translate(-0.107, 0.110, -0.010)
+
+    // 6. Compliant simplified plain gold shield emblem (pure geometric block, zero real insignia or text)
+    const badgeShield = new THREE.CylinderGeometry(0.016, 0.011, 0.006, 6)
+    badgeShield.rotateX(Math.PI * 0.44)
+    badgeShield.translate(0, 0.162, -0.118)
+
+    const mesh = mergeColoredParts(
+      [
+        {geom: napeHair, hex: '#1b1a1a'},
+        {geom: sideHairL, hex: '#1b1a1a'},
+        {geom: sideHairR, hex: '#1b1a1a'},
+        {geom: navyWall, hex: '#18253c'},
+        {geom: whiteSide, hex: '#e8edf3'},
+        {geom: whiteTop, hex: '#f6f7f9'},
+        {geom: crownPiping, hex: '#18253c'},
+        {geom: visor, hex: '#141920'},
+        {geom: strap, hex: '#dde5ee'},
+        {geom: btnL, hex: '#cfd8e3'},
+        {geom: btnR, hex: '#cfd8e3'},
+        {geom: badgeShield, hex: '#dfb64c'},
+      ],
+      'outfit_hat_traffic_police_cap',
+      true,
+    )
+    // Match player's streetShading 3-band sunlit toon lighting so cap & character share one visual style
+    const mat = mesh.material as THREE.MeshStandardMaterial
+    mat.roughness = 0.72
+    mat.metalness = 0.08
+    streetShading(mat, false)
+    return mesh
+  }
+
   return null
 }
 
@@ -780,6 +1003,7 @@ export interface AvatarOutfitController {
   applyEquipped(equipped: Readonly<EquippedOutfit>, opts?: Partial<VisualOutfitOptions>): void
   setRidingEbike(riding: boolean): void
   setAutoHelmet(enabled: boolean): void
+  setVestMode?(mode: ReflectiveVestMode): void
   setPreview(preview: Readonly<EquippedOutfit> | null): void
   clearPreview(): void
   getSnapshot(): OutfitControllerSnapshot
@@ -788,40 +1012,144 @@ export interface AvatarOutfitController {
 
 const _tmpColor = new THREE.Color()
 
+let cachedOfficerBackTexture: THREE.Texture | null = null
+
+/**
+ * Builds a compact RGBA texture of bold 「桂林交警」 for the back reflective placard of the
+ * officer vest GLSL overlay (+0 Draw Calls, works identically in browser Canvas and headless Node).
+ */
+function getOfficerBackTextTexture(): THREE.Texture {
+  if (cachedOfficerBackTexture) return cachedOfficerBackTexture
+  if (typeof document !== 'undefined' && typeof document.createElement === 'function') {
+    const canvas = document.createElement('canvas')
+    canvas.width = 512
+    canvas.height = 192
+    const ctx = canvas.getContext('2d')
+    if (ctx) {
+      ctx.clearRect(0, 0, canvas.width, canvas.height)
+      ctx.textAlign = 'center'
+      ctx.textBaseline = 'middle'
+      ctx.font = '900 106px "PingFang SC", "Noto Sans SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif'
+      ctx.lineJoin = 'round'
+      ctx.lineWidth = 4
+      ctx.strokeStyle = '#0c1626'
+      ctx.fillStyle = '#101d32'
+      const chars = ['桂', '林', '交', '警'] as const
+      const xs = [78, 196, 314, 434] as const
+      for (let i = 0; i < chars.length; i++) {
+        ctx.strokeText(chars[i], xs[i], 99)
+        ctx.fillText(chars[i], xs[i], 99)
+      }
+      const tex = new THREE.CanvasTexture(canvas)
+      tex.colorSpace = THREE.SRGBColorSpace
+      tex.wrapS = THREE.ClampToEdgeWrapping
+      tex.wrapT = THREE.ClampToEdgeWrapping
+      tex.minFilter = THREE.LinearFilter
+      tex.magFilter = THREE.LinearFilter
+      tex.generateMipmaps = false
+      tex.needsUpdate = true
+      cachedOfficerBackTexture = tex
+      return tex
+    }
+  }
+  // Headless Node fallback: crisp 128x48 procedural RGBA DataTexture with 4 non-zero 「桂林交警」 glyph columns
+  const w = 128
+  const h = 48
+  const data = new Uint8Array(w * h * 4)
+  const fillRect = (x0: number, y0: number, x1: number, y1: number) => {
+    for (let y = Math.max(0, y0); y <= Math.min(h - 1, y1); y++) {
+      for (let x = Math.max(0, x0); x <= Math.min(w - 1, x1); x++) {
+        const idx = (y * w + x) * 4
+        data[idx] = 16
+        data[idx + 1] = 29
+        data[idx + 2] = 50
+        data[idx + 3] = 255
+      }
+    }
+  }
+  // 「桂」 (x=8..28)
+  fillRect(11, 8, 14, 39)
+  fillRect(8, 28, 17, 31)
+  fillRect(18, 30, 27, 33)
+  fillRect(21, 22, 24, 39)
+  fillRect(17, 21, 28, 24)
+  fillRect(18, 12, 27, 15)
+  fillRect(21, 8, 24, 21)
+  fillRect(16, 8, 28, 11)
+  // 「林」 (x=38..58)
+  fillRect(42, 8, 45, 39)
+  fillRect(38, 28, 47, 31)
+  fillRect(52, 8, 55, 39)
+  fillRect(48, 28, 58, 31)
+  // 「交」 (x=68..88)
+  fillRect(76, 36, 80, 40)
+  fillRect(69, 31, 87, 34)
+  fillRect(70, 21, 75, 28)
+  fillRect(81, 21, 86, 28)
+  fillRect(72, 9, 84, 20)
+  // 「警」 (x=98..120)
+  fillRect(99, 34, 119, 38)
+  fillRect(101, 24, 117, 31)
+  fillRect(100, 18, 118, 21)
+  fillRect(102, 8, 116, 15)
+  const tex = new THREE.DataTexture(data, w, h, THREE.RGBAFormat)
+  tex.colorSpace = THREE.SRGBColorSpace
+  tex.wrapS = THREE.ClampToEdgeWrapping
+  tex.wrapT = THREE.ClampToEdgeWrapping
+  tex.minFilter = THREE.LinearFilter
+  tex.magFilter = THREE.LinearFilter
+  tex.generateMipmaps = false
+  tex.needsUpdate = true
+  cachedOfficerBackTexture = tex
+  return tex
+}
+
 /**
  * Installs a razor-sharp per-pixel GLSL overlay on `streetShading(..., true)` materials so
- * reflective vest stripes, navy cuffs/hem, and left-arm red volunteer armbands never blur
- * across sparse SkinnedMesh torso triangles (+0 Draw Calls).
+ * volunteer & traffic-officer reflective vests, police short-sleeve shirt details (epaulettes,
+ * navy collar), back 「桂林交警」 placard, and duty trousers + black duty belt never blur across
+ * sparse SkinnedMesh triangles (+0 Draw Calls).
  *
- * Strictly scopes `uVolunteerVest` to upper-body garment zone (zone == 1) so mixing the vest
- * with shorts, skirts, jeans, or shoes preserves the wearer's bottom/skin/shoe choices intact,
- * while `uDutyBottom` applies exclusively when equipping `bottom_traffic_duty` (zone == 2).
+ * Early-returns without touching `onBeforeCompile` or `customProgramCacheKey` when no duty/officer
+ * overlay is active, keeping player `DEFAULT_EQUIPPED_OUTFIT` rendering 100% bit-for-bit identical.
  */
-function syncVolunteerClothShader(mat: THREE.Material, vestActive: boolean, dutyBottomActive: boolean): void {
+function syncVolunteerClothShader(
+  mat: THREE.Material,
+  vestMode: 'none' | 'volunteer' | 'officer',
+  dutyBottomMode: 'none' | 'volunteer' | 'officer',
+  officerShirtActive: boolean,
+): void {
   const std = mat as THREE.MeshStandardMaterial
   if (!std.userData?.clothing) return
-  if (!vestActive && !dutyBottomActive && !std.userData.volunteerUniforms) return
+  const vestValue = vestMode === 'officer' ? 2.0 : vestMode === 'volunteer' ? 1.0 : 0.0
+  const bottomValue = dutyBottomMode === 'officer' ? 2.0 : dutyBottomMode === 'volunteer' ? 1.0 : 0.0
+  const shirtValue = officerShirtActive ? 1.0 : 0.0
+  if (vestValue === 0 && bottomValue === 0 && shirtValue === 0 && !std.userData.volunteerUniforms) return
   if (!std.userData.volunteerUniforms) {
     const uniforms = {
-      uVolunteerVest: {value: vestActive ? 1.0 : 0.0},
-      uDutyBottom: {value: dutyBottomActive ? 1.0 : 0.0},
+      uVolunteerVest: {value: vestValue},
+      uDutyBottom: {value: bottomValue},
+      uOfficerShirt: {value: shirtValue},
+      uOfficerBackMap: {value: getOfficerBackTextTexture()},
     }
     std.userData.volunteerUniforms = uniforms
     const prevCompile = std.onBeforeCompile
     const prevKey = std.customProgramCacheKey
-    std.customProgramCacheKey = () => (prevKey ? prevKey.call(std) : 'creator-cloth') + '-volunteer'
+    std.customProgramCacheKey = () => (prevKey ? prevKey.call(std) : 'creator-cloth') + '-volunteer-r10'
     std.onBeforeCompile = (shader, renderer) => {
       prevCompile.call(std, shader, renderer)
       shader.uniforms.uVolunteerVest = uniforms.uVolunteerVest
       shader.uniforms.uDutyBottom = uniforms.uDutyBottom
+      shader.uniforms.uOfficerShirt = uniforms.uOfficerShirt
+      shader.uniforms.uOfficerBackMap = uniforms.uOfficerBackMap
       if (!shader.fragmentShader.includes('vec3 keyDir =')) return
       shader.fragmentShader =
-        'uniform float uVolunteerVest;\nuniform float uDutyBottom;\n' +
+        'uniform float uVolunteerVest;\nuniform float uDutyBottom;\nuniform float uOfficerShirt;\nuniform sampler2D uOfficerBackMap;\n' +
         shader.fragmentShader.replace(
           'vec3 keyDir =',
           `float _vax = abs(rest.x);
           bool _vFront = rest.z > 0.0;
-          if (uVolunteerVest > 0.5 && zone > 0.5 && zone < 1.5) {
+          if (uVolunteerVest > 0.5 && uVolunteerVest < 1.5 && zone > 0.5 && zone < 1.5) {
             vec3 vNavy = vec3(0.010, 0.017, 0.033);
             vec3 vVest = vec3(0.690, 0.855, 0.014);
             vec3 vSilv = vec3(0.855, 0.905, 0.940);
@@ -844,10 +1172,107 @@ function syncVolunteerClothShader(mat: THREE.Material, vestActive: boolean, duty
               diffuseColor.rgb = vVest;
             }
           }
-          if (uDutyBottom > 0.5 && zone > 1.5 && zone < 2.5 && rest.y > 0.125) {
+          if (uOfficerShirt > 0.5 && zone > 0.5 && zone < 1.5 && _vax <= sleeve + 0.002) {
+            vec3 pShirt = vec3(0.195, 0.479, 0.791);
+            vec3 pNavy  = vec3(0.009, 0.019, 0.045);
+            vec3 pSilv  = vec3(0.807, 0.855, 0.913);
+            vec3 pBelt  = vec3(0.011, 0.014, 0.021);
+            vec3 pBuck  = vec3(0.716, 0.776, 0.855);
+            vec3 pPants = vec3(0.010, 0.020, 0.042);
+            diffuseColor.rgb = pShirt;
+            // Subtle dark-navy cuff hem at short-sleeve edge
+            if (_vax > 0.340 && _vax <= 0.362) {
+              diffuseColor.rgb = pNavy;
+            }
+            // Minimal dark-navy shield outline on anatomical left outer sleeve (+X in rest coords)
+            if (rest.x > 0.232 && rest.x < 0.298 && rest.z < -0.025 && rest.y > 1.405 && rest.y < 1.472) {
+              diffuseColor.rgb = pNavy;
+            }
+            // Navy shoulder epaulettes with dual geometric silver rank bars (zero real numbers)
+            if (_vax >= 0.095 && _vax <= 0.214 && rest.y >= 1.445 && abs(rest.z + 0.052) <= 0.036) {
+              bool pip = (abs(_vax - 0.138) < 0.009 || abs(_vax - 0.170) < 0.009) && abs(rest.z + 0.052) < 0.018;
+              diffuseColor.rgb = pip ? pSilv : pNavy;
+            }
+            // Navy shirt collar & center tie/placket
+            if ((rest.y >= 1.425 && _vax < 0.104) || (_vFront && rest.y >= 1.365 + 0.092 * min(1.0, _vax / 0.078) && _vax < 0.094)) {
+              diffuseColor.rgb = pNavy;
+            } else if (_vFront && _vax < 0.014 && rest.y >= 1.22 && rest.y < 1.43) {
+              diffuseColor.rgb = pNavy;
+            }
+            // Black duty belt + matte silver buckle on visible outer waist hem (figure_m TOP_PRIMARY spans y=0.927..1.485)
+            if (_vax <= 0.175 && rest.y < 0.985) {
+              if (rest.y < 0.935) {
+                diffuseColor.rgb = pPants;
+              } else if (_vFront && _vax < 0.030 && rest.y >= 0.940 && rest.y <= 0.980) {
+                bool inner = _vax < 0.016 && rest.y >= 0.948 && rest.y <= 0.972;
+                diffuseColor.rgb = inner ? pBelt : pBuck;
+              } else {
+                diffuseColor.rgb = pBelt;
+              }
+            }
+          }
+          if (uVolunteerVest > 1.5 && zone > 0.5 && zone < 1.5 && _vax <= 0.172 && rest.y >= 0.985) {
+            bool onEpaulette = _vax >= 0.095 && rest.y >= 1.445 && abs(rest.z + 0.052) <= 0.036;
+            bool inFrontVNeck = _vFront && rest.y > 1.335 + 0.105 * min(1.0, _vax / 0.086);
+            bool inBackCollar = !_vFront && rest.y >= 1.435 && _vax < 0.096;
+            if (!onEpaulette && !inFrontVNeck && !inBackCollar) {
+              vec3 oNavy = vec3(0.009, 0.019, 0.045);
+              vec3 oVest = vec3(0.604, 0.855, 0.012);
+              vec3 oSilv = vec3(0.807, 0.855, 0.913);
+              vec3 oZip  = vec3(0.074, 0.095, 0.122);
+              vec3 oBadgeNavy = vec3(0.008, 0.020, 0.061);
+              vec3 oBlankPlate = vec3(0.624, 0.694, 0.776);
+              if (rest.y < 1.003) {
+                // Dark-navy vest bottom binding resting flush on top of black duty belt
+                diffuseColor.rgb = oNavy;
+              } else if (_vFront && _vax < 0.007) {
+                diffuseColor.rgb = oZip;
+              } else if (!_vFront && _vax <= 0.128 && rest.y >= 1.264 && rest.y <= 1.366) {
+                // Back silver reflective placard printed with bold non-mirrored 「桂林交警」
+                bool border = _vax > 0.123 || rest.y < 1.270 || rest.y > 1.360;
+                if (border) {
+                  diffuseColor.rgb = oNavy;
+                } else {
+                  vec2 _buv = vec2((0.122 - rest.x) / 0.244, (rest.y - 1.270) / 0.090);
+                  if (_buv.x >= 0.0 && _buv.x <= 1.0 && _buv.y >= 0.0 && _buv.y <= 1.0) {
+                    vec4 _bt = texture2D(uOfficerBackMap, _buv);
+                    diffuseColor.rgb = mix(oSilv, _bt.rgb, _bt.a);
+                  } else {
+                    diffuseColor.rgb = oSilv;
+                  }
+                }
+              } else if (_vFront && rest.x >= 0.030 && rest.x <= 0.080 && rest.y >= 1.285 && rest.y <= 1.318) {
+                // Anatomical left chest (+X in rest coords): dark navy officer tab
+                diffuseColor.rgb = (rest.y > 1.298 && rest.y < 1.306 && rest.x > 0.036 && rest.x < 0.074) ? oSilv : oBadgeNavy;
+              } else if (_vFront && rest.x <= -0.032 && rest.x >= -0.080 && rest.y >= 1.287 && rest.y <= 1.316) {
+                // Anatomical right chest (-X in rest coords): blank silver-blue placeholder (zero real IDs)
+                bool rBorder = rest.x > -0.036 || rest.x < -0.076 || rest.y < 1.291 || rest.y > 1.312;
+                diffuseColor.rgb = rBorder ? oNavy : oBlankPlate;
+              } else if ((rest.y >= 1.055 && rest.y <= 1.125) || (_vax >= 0.086 && _vax <= 0.116 && rest.y > 1.125 && rest.y <= 1.448)) {
+                // Lengthened spec layout: dual vertical shoulder reflective bands + wide 360° waist reflective band
+                diffuseColor.rgb = oSilv;
+              } else {
+                diffuseColor.rgb = oVest;
+              }
+            }
+          }
+          if (uDutyBottom > 0.5 && uDutyBottom < 1.5 && zone > 1.5 && zone < 2.5 && rest.y > 0.125) {
             diffuseColor.rgb = vec3(0.010, 0.017, 0.033);
             if (rest.y > 0.945 && rest.y < 0.985) {
               diffuseColor.rgb = (_vFront && _vax < 0.028) ? vec3(0.68, 0.72, 0.76) : vec3(0.008, 0.011, 0.018);
+            }
+          }
+          if (uDutyBottom > 1.5 && zone > 1.5 && zone < 2.5 && rest.y > 0.125) {
+            // Police dark-navy trousers + matte-black duty belt (#1b2028) with silver buckle (#dce4ee)
+            vec3 tNavy = vec3(0.010, 0.020, 0.042);
+            vec3 tBelt = vec3(0.011, 0.014, 0.021);
+            diffuseColor.rgb = (_vax > 0.148 && abs(rest.z + 0.015) < 0.011) ? vec3(0.019, 0.045, 0.112) : tNavy;
+            if (rest.y >= 0.940 && rest.y <= 0.996) {
+              if (_vFront && _vax < 0.028) {
+                diffuseColor.rgb = (_vax < 0.014 && rest.y > 0.950 && rest.y < 0.984) ? tBelt : vec3(0.716, 0.776, 0.855);
+              } else {
+                diffuseColor.rgb = tBelt;
+              }
             }
           }
           vec3 keyDir =`,
@@ -858,9 +1283,12 @@ function syncVolunteerClothShader(mat: THREE.Material, vestActive: boolean, duty
     const uniforms = std.userData.volunteerUniforms as {
       uVolunteerVest: {value: number}
       uDutyBottom: {value: number}
+      uOfficerShirt: {value: number}
+      uOfficerBackMap: {value: THREE.Texture}
     }
-    uniforms.uVolunteerVest.value = vestActive ? 1.0 : 0.0
-    uniforms.uDutyBottom.value = dutyBottomActive ? 1.0 : 0.0
+    uniforms.uVolunteerVest.value = vestValue
+    uniforms.uDutyBottom.value = bottomValue
+    uniforms.uOfficerShirt.value = shirtValue
   }
 }
 
@@ -891,6 +1319,7 @@ export function createAvatarOutfitController(figure: THREE.Group, rig: AvatarRig
   let appliedOutfit: EquippedOutfit = {...DEFAULT_EQUIPPED_OUTFIT}
   let ridingEbike = false
   let autoHelmetOnRide = true
+  let vestModeOverride: ReflectiveVestMode = 'auto'
   let currentHatId: string | null = null
   let currentBagId: string | null = null
   let builtinPackVisible = false
@@ -903,6 +1332,13 @@ export function createAvatarOutfitController(figure: THREE.Group, rig: AvatarRig
   function getOrBuildBag(bagId: string): THREE.Mesh | null {
     if (!bagCache.has(bagId)) bagCache.set(bagId, buildBagMesh(bagId))
     return bagCache.get(bagId) ?? null
+  }
+
+  function resolveEffectiveVestMode(topId: string): 'none' | 'volunteer' | 'officer' {
+    if (vestModeOverride !== 'auto') return vestModeOverride
+    if (topId === 'top_traffic_police_shirt') return 'officer'
+    if (topId === 'top_traffic_volunteer') return 'volunteer'
+    return 'none'
   }
 
   function applyColorZones(outfit: Readonly<EquippedOutfit>): void {
@@ -936,16 +1372,28 @@ export function createAvatarOutfitController(figure: THREE.Group, rig: AvatarRig
     if (female && outfit.top === 'top_starter_office') cPrimary.set('#e4e1d6')
     // Stored starter IDs predate the street wardrobe. Preserve them for existing saves.
     const summerTop = outfit.top === 'top_starter_sport'
-    const shortSleeve = summerTop || outfit.top === 'top_starter_outdoor' || (!female && outfit.top === 'top_starter_office')
+    const shortSleeve =
+      summerTop ||
+      outfit.top === 'top_starter_outdoor' ||
+      (!female && outfit.top === 'top_starter_office') ||
+      outfit.top === 'top_traffic_police_shirt'
     const shorts = outfit.bottom === 'bottom_starter_sport' || outfit.bottom === 'bottom_starter_outdoor' || (female && outfit.bottom === 'bottom_starter_knit')
     const wideLeg = female && outfit.bottom === 'bottom_starter_chinese'
     const starterTop = outfit.top.startsWith('top_starter_') || outfit.top === 'top_default_tee'
     const starterBottom = outfit.bottom.startsWith('bottom_starter_') || outfit.bottom === 'bottom_default_pants'
     const uniforms = (skinned.material as THREE.Material).userData?.clothing
+    const effectiveVest = resolveEffectiveVestMode(outfit.top)
+    const dutyBottomMode: 'none' | 'volunteer' | 'officer' =
+      outfit.bottom === 'bottom_police_trousers'
+        ? 'officer'
+        : outfit.bottom === 'bottom_traffic_duty'
+          ? 'volunteer'
+          : 'none'
     syncVolunteerClothShader(
       skinned.material as THREE.Material,
-      outfit.top === 'top_traffic_volunteer',
-      outfit.bottom === 'bottom_traffic_duty',
+      effectiveVest,
+      dutyBottomMode,
+      outfit.top === 'top_traffic_police_shirt',
     )
     if (uniforms && skin) {
       if (!skinned.geometry.hasAttribute('clothZone')) {
@@ -961,7 +1409,7 @@ export function createAvatarOutfitController(figure: THREE.Group, rig: AvatarRig
       // IDOK-229 present-day starter looks: printed detail in the clothing shader (no extra geometry/draws).
       const pattern = STARTER_PATTERNS[outfit.top] ?? 0
       uniforms.pattern.value = pattern
-      const accent = OUTFIT_ITEMS_BY_ID[outfit.top]?.accentHex ?? '#efece4'
+      const accent = resolveOutfitItemDef(outfit.top)?.accentHex ?? '#efece4'
       uniforms.patA.value.set(pattern === 2 ? '#ebe8e0' : accent)
       uniforms.patB.value.set(accent)
       uniforms.legStripe.value = Number(outfit.bottom === 'bottom_starter_track')
@@ -1011,6 +1459,22 @@ export function createAvatarOutfitController(figure: THREE.Group, rig: AvatarRig
           else _tmpColor.set('#d8ee1e')
         } else if (z === OUTFIT_ZONE.TOP_SLEEVE && vx > 0.22 && vx < 0.36) {
           _tmpColor.set('#d6362c')
+        }
+      } else if (outfit.top === 'top_traffic_police_shirt') {
+        const vx = position.getX(i)
+        const vy = position.getY(i)
+        if (z === OUTFIT_ZONE.TOP_PRIMARY || z === OUTFIT_ZONE.TOP_TRIM || z === OUTFIT_ZONE.TOP_INNER) {
+          if (vy < 0.935) _tmpColor.set('#1a263a')
+          else if (vy < 0.985) _tmpColor.set('#1b2028')
+          else if (vy >= 1.44 && Math.abs(vx) >= 0.095) _tmpColor.set('#18253c')
+          else if (vy > 1.37 && Math.abs(vx) < 0.085) _tmpColor.set('#18253c')
+          else if (effectiveVest === 'officer' && vy >= 0.985 && vy <= 1.43 && Math.abs(vx) <= 0.172) {
+            if (vy < 1.003) _tmpColor.set('#18253c')
+            else if (vy >= 1.055 && vy <= 1.125) _tmpColor.set('#e8eef5')
+            else _tmpColor.set('#ccee1c')
+          } else {
+            _tmpColor.set('#7ab8e6')
+          }
         }
       }
       colAttr.setXYZ(i, _tmpColor.r, _tmpColor.g, _tmpColor.b)
@@ -1089,6 +1553,7 @@ export function createAvatarOutfitController(figure: THREE.Group, rig: AvatarRig
       savedEquipped = {...equipped}
       if (opts?.ridingEbike !== undefined) ridingEbike = opts.ridingEbike
       if (opts?.autoHelmetOnRide !== undefined) autoHelmetOnRide = opts.autoHelmetOnRide
+      if (opts?.vestMode !== undefined) vestModeOverride = opts.vestMode
       render()
     },
     setRidingEbike(riding) {
@@ -1100,6 +1565,11 @@ export function createAvatarOutfitController(figure: THREE.Group, rig: AvatarRig
       if (autoHelmetOnRide === enabled) return
       autoHelmetOnRide = enabled
       if (!previewOutfit) render()
+    },
+    setVestMode(mode) {
+      if (vestModeOverride === mode) return
+      vestModeOverride = mode
+      render()
     },
     setPreview(preview) {
       previewOutfit = preview ? {...preview} : null

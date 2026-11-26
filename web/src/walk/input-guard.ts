@@ -8,15 +8,28 @@
  */
 
 const TEXT_INPUT_SELECTOR = 'input,textarea,select,[contenteditable]'
-const MODAL_OVERLAY_SELECTOR = 'dialog[open],.about-mask:not([hidden]),.atlas.show,.book.show,.shop-overlay.show,.wardrobe-overlay.show,.garage-overlay.show,.mifen-story-dialog:not([hidden]),[data-story-dialog="1"]:not([hidden])'
-const TOUCH_UI_SELECTOR = '.hotbar,.smoke-hint,.walk-ui,.ride-hud,.vehicle-action,.dock,.sky-ui,.render-entry,.hud-me,.shop-overlay,.wardrobe-overlay,.garage-overlay,.mission-hud,.gl-mission-entry,.gl-mission-hud,.mission-board,.st-phone,.st-phone-btn,.mp-roster,.hud-stats,.mifen-story-dialog,.mifen-story-skip,.chat-dock'
+const BASE_MODAL_OVERLAY_SELECTOR = 'dialog[open],.about-mask:not([hidden]),.atlas.show,.book.show,.shop-overlay.show,.wardrobe-overlay.show,.garage-overlay.show,.fx-drawer:not([hidden]),.mifen-story-dialog:not([hidden]),[data-story-dialog="1"]:not([hidden]),.td-story-dialog:not([hidden]),.drinks-order-panel:not([hidden])'
+const MODAL_OVERLAY_SELECTOR = `${BASE_MODAL_OVERLAY_SELECTOR},.td-fine-terminal:not([hidden])`
+const TOUCH_UI_SELECTOR = '.hotbar,.smoke-hint,.walk-ui,.ride-hud,.vehicle-action,.dock,.sky-ui,.render-entry,.hud-me,.shop-overlay,.wardrobe-overlay,.garage-overlay,.fishing-ui,.fx-drawer,.nav-card,.mission-hud,.gl-mission-entry,.gl-mission-hud,.mission-board,.st-phone,.st-phone-btn,.mp-roster,.hud-stats,.mifen-story-dialog,.mifen-story-skip,.chat-dock,.drinks-panel,.drinks-hold-hud,.drinks-pickup-hud,.td-entry,.td-bar,.td-officer-marker,.td-signal-dock,.td-bounds-banner,.td-story-dialog,.td-story-letterbox,.td-fine-terminal,.td-fine-fallback,.td-duty-keys-dock,.td-duty-key-btn,.td-whistle-btn,.td-panel,.knockdown-hud'
 
 export function isShopOverlayOpen(doc: Document = document): boolean {
   return doc.body.dataset.shopOpen === '1' || !!doc.querySelector('.shop-overlay.show,.wardrobe-overlay.show,.garage-overlay.show')
 }
 
 export function isStoryDialogueOpen(doc: Document = document): boolean {
-  return doc.body.dataset.mifenStoryActive === '1' || !!doc.querySelector('.mifen-story-dialog:not([hidden]),[data-story-dialog="1"]:not([hidden])')
+  return (
+    doc.body.dataset.mifenStoryActive === '1' ||
+    doc.body.dataset.tdStoryActive === '1' ||
+    !!doc.querySelector('.mifen-story-dialog:not([hidden]),[data-story-dialog="1"]:not([hidden]),.td-story-dialog:not([hidden])')
+  )
+}
+
+export function isKnockdownActive(doc: Document = document): boolean {
+  return doc.body.dataset.tdKnockdown === '1' || !!doc.querySelector('.knockdown-hud:not([hidden])')
+}
+
+export function isFineTerminalDelivering(doc: Document = document): boolean {
+  return doc.body.dataset.tdTerminalPhase === 'deliver' || doc.body.dataset.tdHandoverDeliver === '1'
 }
 
 export function isTextInputTarget(target: EventTarget | null): boolean {
@@ -27,8 +40,15 @@ export function isTextInputTarget(target: EventTarget | null): boolean {
 export function isModalOrOverlayOpen(doc: Document = document): boolean {
   if (doc.body.hasAttribute('data-home')) return true
   if (doc.body.dataset.shopOpen === '1') return true
+  if (doc.body.dataset.fishMenu === '1') return true
   if (doc.body.dataset.mifenStoryActive === '1') return true
-  return !!doc.querySelector(MODAL_OVERLAY_SELECTOR)
+  if (doc.body.dataset.xxgActive === '1') return true
+  if (doc.body.dataset.szjActive === '1') return true
+  if (doc.body.dataset.tdStoryActive === '1') return true
+  if (doc.body.dataset.drinksUiOpen === '1') return true
+  const delivering = isFineTerminalDelivering(doc)
+  if (doc.body.dataset.tdTerminalOpen === '1' && !delivering) return true
+  return !!doc.querySelector(delivering ? BASE_MODAL_OVERLAY_SELECTOR : MODAL_OVERLAY_SELECTOR)
 }
 
 export function isGlobalHotkeyBlocked(

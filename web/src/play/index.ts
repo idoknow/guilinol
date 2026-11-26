@@ -293,18 +293,24 @@ export function play(host:Host) {
   // --- Per-frame: marker placement/fade, arrival, summit pill.
   // Indoor & shop-building occlusion keeps distant scenic stamps (秀/街/巷/楼) from floating through walls.
   let shopObj:THREE.Object3D|null = null
+  let drinksShopObj:THREE.Object3D|null = null
   const tmpLocalA = new THREE.Vector3(), tmpLocalB = new THREE.Vector3(), tmpMarkWorld = new THREE.Vector3()
-  function resolveShopObj() {
+  function resolveShopObjs() {
     if(!shopObj?.parent) shopObj = host.scene.getObjectByName('tianyuan_mifen_shop') ?? null
-    return shopObj
+    if(!drinksShopObj?.parent) drinksShopObj = host.scene.getObjectByName('wangcheng_drinks_shop') ?? null
+    return {mifen: shopObj, drinks: drinksShopObj}
   }
-  function pointInsideShop(pos:THREE.Vector3, shop:THREE.Object3D) {
+  function pointInsideMifenShop(pos:THREE.Vector3, shop:THREE.Object3D) {
     shop.worldToLocal(tmpLocalA.copy(pos))
     if(Math.abs(tmpLocalA.x)>3.55||tmpLocalA.z<-7.3||tmpLocalA.z>7.15||tmpLocalA.y<-0.6||tmpLocalA.y>3.6) return false
     if(tmpLocalA.x<-1.4&&tmpLocalA.z>5.0&&Math.hypot(tmpLocalA.x+1.4,tmpLocalA.z-5.0)>2.2) return false
     return true
   }
-  function segmentHitsShopBuilding(camPos:THREE.Vector3, targetPos:THREE.Vector3, shop:THREE.Object3D) {
+  function pointInsideDrinksShop(pos:THREE.Vector3, shop:THREE.Object3D) {
+    shop.worldToLocal(tmpLocalA.copy(pos))
+    return Math.abs(tmpLocalA.x)<=6.0&&tmpLocalA.z>=-4.8&&tmpLocalA.z<=3.2&&tmpLocalA.y>=-0.5&&tmpLocalA.y<=4.6
+  }
+  function segmentHitsBox(camPos:THREE.Vector3, targetPos:THREE.Vector3, shop:THREE.Object3D, hx:number, yMin:number, yMax:number, zMin:number, zMax:number) {
     shop.worldToLocal(tmpLocalA.copy(camPos))
     shop.worldToLocal(tmpLocalB.copy(targetPos))
     const dx = tmpLocalB.x-tmpLocalA.x, dy = tmpLocalB.y-tmpLocalA.y, dz = tmpLocalB.z-tmpLocalA.z
@@ -317,7 +323,7 @@ export function play(host:Host) {
       if(t2<tmax) tmax = t2
       return tmin<=tmax
     }
-    return clipAxis(tmpLocalA.x,dx,-3.55,3.55)&&clipAxis(tmpLocalA.y,dy,-0.5,10.6)&&clipAxis(tmpLocalA.z,dz,-7.3,7.15)&&tmax>0&&tmin<1
+    return clipAxis(tmpLocalA.x,dx,-hx,hx)&&clipAxis(tmpLocalA.y,dy,yMin,yMax)&&clipAxis(tmpLocalA.z,dz,zMin,zMax)&&tmax>0&&tmin<1
   }
   let pulse = 0
   function tick(dt:number) {
@@ -329,15 +335,22 @@ export function play(host:Host) {
     const onFoot = walking && !photo.active && !isRackOpen() && !riding()
     showHotbar(onFoot)
     setCameraShown(onFoot && hotbarSlot() === 'camera', walker)
-    const shop = resolveShopObj()
-    const indoors = document.body.dataset.mifenIndoor==='1' || (!!shop&&(pointInsideShop(host.camera.position,shop)||pointInsideShop(p,shop)))
-    const nearShop = !!shop&&host.camera.position.distanceTo(shop.position)<55
+    const shops = resolveShopObjs()
+    const indoors = document.body.dataset.mifenIndoor==='1'
+      || (!!shops.mifen&&(pointInsideMifenShop(host.camera.position,shops.mifen)||pointInsideMifenShop(p,shops.mifen)))
+      || (!!shops.drinks&&(pointInsideDrinksShop(host.camera.position,shops.drinks)||pointInsideDrinksShop(p,shops.drinks)))
+    const nearMifen = !!shops.mifen&&host.camera.position.distanceTo(shops.mifen.position)<55
+    const nearDrinks = !!shops.drinks&&host.camera.position.distanceTo(shops.drinks.position)<55
+    const nearShop = nearMifen || nearDrinks
     for(const m of marks) {
       const d = Math.hypot(m.spot.x-p.x,m.spot.z-p.z)
       if(Number.isNaN(m.ground)&&d<600) m.ground = groundAt(m.spot.x,m.spot.z)
       const baseShow = !indoors&&d<1400&&!photo.active&&!drone.active&&!Number.isNaN(m.ground)&&!(summit&&d>0)
       const spriteY = m.ground+9+Math.sin(pulse*1.6)*.35
-      const occluded = baseShow&&nearShop&&!!shop&&segmentHitsShopBuilding(host.camera.position,tmpMarkWorld.set(m.spot.x,spriteY,m.spot.z),shop)
+      const occluded = baseShow&&(
+        (nearMifen&&!!shops.mifen&&segmentHitsBox(host.camera.position,tmpMarkWorld.set(m.spot.x,spriteY,m.spot.z),shops.mifen,3.55,-0.5,10.6,-7.3,7.15))
+        || (nearDrinks&&!!shops.drinks&&segmentHitsBox(host.camera.position,tmpMarkWorld.set(m.spot.x,spriteY,m.spot.z),shops.drinks,6.0,-0.5,5.0,-4.8,3.2))
+      )
       const show = baseShow&&!occluded
       m.group.visible = show
       if(show) {

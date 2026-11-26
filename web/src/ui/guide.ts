@@ -5,13 +5,19 @@
 //  · 新手引导 .coach —— 第一次进城时按真实 HUD 位置点亮 4–6 步（找不到的按钮自动跳过），只出现一次，可在指南里重看。
 // 键名一律走 keymap 的 bindingLabel，玩家改键后这里跟着变。
 import './guide.css'
-import {bindingLabel, type Action} from '../input/keymap'
+import {
+  bindingLabel,
+  getDutyCardRows,
+  getDutyGuideFeature,
+  getDutyGuideKeyGroup,
+  type Action,
+} from '../input/keymap'
 import {onPrefs} from './prefs'
 import {getPlayMode} from '../game/play-mode'
 import {isGlobalHotkeyBlocked} from '../walk/input-guard'
 import {touchUi} from './input-mode'
 
-type Ctx = 'walk' | 'fly' | 'bike' | 'bicycle' | 'car' | 'boat'
+type Ctx = 'walk' | 'duty' | 'fly' | 'bike' | 'bicycle' | 'car' | 'boat'
 type Row = {keys: string[]; label: string; solo?: boolean; free?: boolean; id?: string}
 
 const touch = touchUi
@@ -19,7 +25,7 @@ const solo = () => getPlayMode() === 'solo'
 const k = (action: Action) => bindingLabel(action).split(' / ')[0]
 const move = () => [k('forward'), k('left'), k('back'), k('right')]
 
-const CTX_NAME: Record<Ctx, string> = {walk: '步行', fly: '飞行', bike: '骑电驴', bicycle: '骑单车', car: '开车', boat: '划船'}
+const CTX_NAME: Record<Ctx, string> = {walk: '步行', duty: '执勤', fly: '飞行', bike: '骑电驴', bicycle: '骑单车', car: '开车', boat: '划船'}
 
 // 每个场景最多 10 格（两列五行），按「最常用」排序。free = 只在可以飞的模式（游览 / 联机）里出现。
 function rows(ctx: Ctx): Row[] {
@@ -32,6 +38,7 @@ function rows(ctx: Ctx): Row[] {
       {keys: [k('view')], label: '第一 / 第三人称'}, {keys: ['V'], label: '起飞', free: true},
       {keys: ['1', '2'], label: '空手 / 相机'}, {keys: ['M'], label: '地图'}, {keys: ['P'], label: '拍照'},
     ]
+    case 'duty': return getDutyCardRows()
     case 'fly': return [
       {keys: move(), label: '飞'}, {keys: ['Q', 'E'], label: '降 / 升'},
       {keys: ['Shift'], label: '加速'}, {keys: ['V'], label: '落地步行'},
@@ -72,6 +79,7 @@ function current(): Ctx {
     const ride = body.ride
     if (ride === 'bike' || ride === 'bicycle' || ride === 'car' || ride === 'boat') return ride
   }
+  if (body.duty === 'active' || body.tdDutyActive === '1') return 'duty'
   return 'walk'
 }
 
@@ -110,7 +118,7 @@ function renderCard() {
   card.querySelector('.keys-list')!.innerHTML = rows(ctx).filter(visible)
     .map(row => `<li${row.id ? ` data-id="${row.id}"` : ''}><span class="keys-caps">${caps(row.keys)}</span><span>${row.label}</span></li>`).join('')
   // 第一次上某种车：卡片自动展开并闪一下，告诉玩家「这辆车的键在这儿」。
-  if (lastCtx && ctx !== lastCtx && ctx !== 'walk' && ctx !== 'fly') {
+  if (lastCtx && ctx !== lastCtx && ctx !== 'walk' && ctx !== 'fly' && ctx !== 'duty') {
     const seen = `glol.keys.seen.${ctx}`
     if (!localStorage.getItem(seen)) {
       localStorage.setItem(seen, '1')
@@ -158,6 +166,7 @@ const FEATURES = (): Feature[] => [
   {seal: '时', title: '时辰与天气', only: 'free',
     pc: '左上角的时辰条可以切晨、午、昏、夜和晴、雾、雨，点 ▶ 让时间自己走。',
     phone: '左上角的时辰条可以切晨、午、昏、夜和晴、雾、雨。'},
+  getDutyGuideFeature(),
   {seal: '设', title: '设置与改键',
     pc: `按 <kbd>${k('settings')}</kbd> 或点「设置」：改键、开关读数（<kbd>${k('stats')}</kbd>）、表情显示。左上「视野」调远处画多少，电脑卡就调小一点。`,
     phone: '点「设置」开关读数和表情显示。左上「视野」调远处画多少，手机发烫就调小一点。'},
@@ -170,6 +179,7 @@ const KEY_GROUPS = (): {title: string; rows: Row[]}[] => [
   {title: '单车', rows: rows('bicycle')},
   {title: '汽车', rows: rows('car').concat([{keys: ['1', '2', '3'], label: '直接选模式'}])},
   {title: '船', rows: rows('boat')},
+  getDutyGuideKeyGroup(),
   {title: '界面', rows: [
     {keys: ['M'], label: '地图'}, {keys: ['J'], label: '景册'}, {keys: ['P'], label: '拍照'},
     {keys: [k('settings')], label: '设置'}, {keys: [k('stats')], label: '读数'}, {keys: ['Tab'], label: '手机（街头界面）'},
@@ -365,7 +375,7 @@ export function mountGuide(opts: {autoTour: boolean}) {
   })
 
   renderCard()
-  new MutationObserver(renderCard).observe(document.body, {attributes: true, attributeFilter: ['data-mode', 'data-aboard', 'data-ride']})
+  new MutationObserver(renderCard).observe(document.body, {attributes: true, attributeFilter: ['data-mode', 'data-aboard', 'data-ride', 'data-duty', 'data-td-duty-active']})
   onPrefs(renderCard)
 
   if (!opts.autoTour || localStorage.getItem(TOUR_KEY)) return

@@ -18,7 +18,7 @@ import {
 import {physicalBuildingRings,detail, type Manifest, type Tile} from './world'
 import {buildingGeometry, type Building} from './buildings'
 import {ensureShardForTile, hasShardForTile, releaseUnusedShards, shardKeyForTile} from './city-upgrade/state'
-import {registerTunnels} from './tunnels'
+import {registerTunnels, loadShizijieUnderground} from './tunnels'
 import {freezeStatic} from './static-freeze'
 
 import {TileGrid, streamBudget, frameSlots, tileEdgeDistance} from './tile-grid'
@@ -67,6 +67,8 @@ export class Stream {
     if(manifest.distantBuildings)this.distant=new DistantBuildings(scene,manifest.distantBuildings.file,manifest.chunks)
     this.forest = new Forest(scene,this.grid,camera,initialMetrics)
     this.batches = new ChunkBatcher(scene)
+    registerTunnels(manifest.tunnels,manifest.groundCutouts,manifest.shizijieUnderpass)
+    void loadShizijieUnderground()
     this.syncMetrics(initialMetrics)
     this.rangeStore.subscribe((_cfg, metrics)=>{
       this.syncMetrics(metrics)
@@ -188,8 +190,8 @@ export class Stream {
     // attachment continuations run as data arrives, even on multi-second frames.
     const urgent=()=>inner || tileCenterDistance(tile,this.priorityTarget??this.lastPosition)<=streamBudget.priorityRadius
     const parseSlot=()=>urgent()?Promise.resolve():this.parseSlot()
-    registerTunnels(this.manifest.tunnels)
-    return detail(tile,controller.signal,parseSlot,this.manifest.tunnels).then(async item=>{
+    registerTunnels(this.manifest.tunnels,this.manifest.groundCutouts,this.manifest.shizijieUnderpass)
+    return detail(tile,controller.signal,parseSlot,this.manifest.tunnels,this.manifest.groundCutouts,this.manifest.shizijieUnderpass).then(async item=>{
       if(!urgent())await this.attachSlot()
       if(controller.signal.aborted){item.dispose();return}
       this.scene.add(freezeStatic(item.group));this.batches.add(item.batch);this.base.toggle(tile,false)

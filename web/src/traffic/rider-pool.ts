@@ -3,13 +3,20 @@ import {clone} from 'three/addons/utils/SkeletonUtils.js'
 import {browNames, eyeNames, faceNames, hairStyles, looks, type Avatar} from '../../../lib/avatar'
 import {starterOutfit} from '../game/catalog'
 import {touchUi} from '../ui/input-mode'
+import {mainDetail} from '../look/mirror-layer'
 import {avatar as figureConfig} from '../look/avatar'
 import {ensureAvatarRig, type AvatarRig} from '../walk/avatar-rig'
 import {characterModel, styleCharacter} from '../walk/character'
 import {createEbikeGripPose} from '../walk/ebike-grip'
 import {steeringZ} from '../walk/ebike-mounts'
+import {
+  attachReceiptToViolator,
+  getViolatorHeldReceipt,
+  isViolatorHoldingReceipt,
+} from '../traffic-duty/handover/receipt-model.ts'
 import type {TrafficViolation, TwoWheelActorLike, TwoWheelSubtype} from './models'
 import {resolveTwoWheelSpec} from './models'
+import type {Actor} from './sim.ts'
 
 /**
  * Near-camera articulated two-wheel rider pool (`web/src/traffic/rider-pool.ts`).
@@ -51,6 +58,12 @@ type RiderView = {
   units: RiderUnit[]
   placed: boolean
   pedalPhase: number
+  handMountR: THREE.Object3D
+  handMountL: THREE.Object3D
+  blinkerGroup: THREE.Group
+  blinkerCoreMat: THREE.MeshBasicMaterial
+  blinkerHaloMat: THREE.MeshBasicMaterial
+  blinkerClock: number
 }
 
 const RIDER_LOOKS: readonly (typeof looks)[number][] = [
@@ -58,6 +71,59 @@ const RIDER_LOOKS: readonly (typeof looks)[number][] = [
 ]
 const KID_LOOKS: readonly (typeof looks)[number][] = ['campus', 'track', 'sport', 'hoodie']
 const MAX_RIDER_DIST_SQ = 60 ** 2
+
+export const DESKTOP_RIDER_LIMIT = 8
+export const MOBILE_RIDER_LIMIT = 4
+export const DESKTOP_MAX_SKELETONS = 16
+export const MOBILE_MAX_SKELETONS = 8
+
+export function riderSkeletonCost(violation: TrafficViolation, fourOnOverload = false): number {
+  if (violation === 'ebike_overload') return fourOnOverload ? 4 : 3
+  if (violation === 'bike_double') return 2
+  return 1
+}
+
+/**
+ * Pure skeleton-budget selector enforcing vehicle limit (8 desktop / 4 mobile)
+ * and total rigged skeleton cap (<= 16 desktop / <= 8 mobile).
+ */
+export function selectWithinSkeletonBudget<T extends TwoWheelActorLike>(
+  actors: readonly T[],
+  cameraPos: {x: number; z: number},
+  mobile: boolean,
+  isFourOnOverload: (actor: T) => boolean = () => false,
+): {selected: T[]; usedSkeletons: number; limit: number; maxSkeletons: number} {
+  const limit = mobile ? MOBILE_RIDER_LIMIT : DESKTOP_RIDER_LIMIT
+  const maxSkeletons = mobile ? MOBILE_MAX_SKELETONS : DESKTOP_MAX_SKELETONS
+  const cx = cameraPos.x, cz = cameraPos.z
+  const priorityOf = (a: T): number =>
+    a.dutyState === 'pulled_over' ||
+    a.dutyState === 'pulling_over' ||
+    a.dutyState === 'halted' ||
+    a.haltedByDuty ||
+    a.ticketReceived ||
+    a.holdingReceipt
+      ? 0
+      : 1
+  const candidates = actors
+    .filter(a => a.kind === 'scooter' && !a.down && (a.x - cx) ** 2 + (a.z - cz) ** 2 < MAX_RIDER_DIST_SQ)
+    .sort((a, b) => {
+      const pDiff = priorityOf(a) - priorityOf(b)
+      if (pDiff !== 0) return pDiff
+      return (a.x - cx) ** 2 + (a.z - cz) ** 2 - ((b.x - cx) ** 2 + (b.z - cz) ** 2)
+    })
+  const selected: T[] = []
+  let usedSkeletons = 0
+  for (const a of candidates) {
+    if (selected.length >= limit) break
+    const {violation} = resolveTwoWheelSpec(a)
+    const cost = riderSkeletonCost(violation, isFourOnOverload(a))
+    if (usedSkeletons + cost > maxSkeletons) continue
+    selected.push(a)
+    usedSkeletons += cost
+  }
+  return {selected, usedSkeletons, limit, maxSkeletons}
+}
 
 const _qTmp = new THREE.Quaternion()
 const _qOrient = new THREE.Quaternion()
@@ -311,8 +377,8 @@ export function riderPool(
   groundAt?: (x: number, z: number, y: number, car: boolean) => number | undefined,
 ) {
   const mobile = touchUi()
-  const LIMIT = mobile ? 4 : 8
-  const MAX_SKELETONS = mobile ? 8 : 16
+  const LIMIT = mobile ? MOBILE_RIDER_LIMIT : DESKTOP_RIDER_LIMIT
+  const MAX_SKELETONS = mobile ? MOBILE_MAX_SKELETONS : DESKTOP_MAX_SKELETONS
   const POOL = 12
   const templates: (Promise<RiderTemplate> | undefined)[] = new Array(POOL)
   const ready: (RiderTemplate | undefined)[] = new Array(POOL)
@@ -449,13 +515,15 @@ export function riderPool(
       return [{templateIdx: driverTpl, scale: figureConfig.scale * 0.96, x: 0, y: 0.046, z: 0.23, ry: 0, pose: 'bicycle_driver'}]
     }
 
+    const {noHelmet} = resolveTwoWheelSpec(actor)
+
     // E-bike variants (distinct template index per rider so outfits/hairstyles never clone-twin)
     if (violation === 'ebike_overload') {
       const used = new Set<number>()
       const frontChildTpl = pickTemplateIndex(false, true, used)
       if (frontChildTpl === undefined) return undefined
       used.add(frontChildTpl)
-      const driverTpl = pickTemplateIndex(false, false, used)
+      const driverTpl = pickTemplateIndex(!noHelmet, false, used)
       if (driverTpl === undefined) return undefined
       used.add(driverTpl)
       const rearTpl = pickTemplateIndex(false, false, used)
@@ -478,7 +546,7 @@ export function riderPool(
       ]
     }
 
-    const wantHelmet = violation !== 'no_helmet'
+    const wantHelmet = !noHelmet
     const preferred = ready[meta.driverIdx]
     const driverTpl = preferred && preferred.hasHelmet === wantHelmet ? meta.driverIdx : pickTemplateIndex(wantHelmet)
     if (driverTpl === undefined) return undefined
@@ -488,9 +556,35 @@ export function riderPool(
   function release(actor: TwoWheelActorLike, view: RiderView): void {
     active.delete(actor)
     view.root.removeFromParent()
+    view.blinkerGroup.traverse(node => {
+      if (node instanceof THREE.Mesh) node.geometry.dispose()
+    })
+    view.blinkerCoreMat.dispose()
+    view.blinkerHaloMat.dispose()
     view.root.traverse(node => {
       if (node instanceof THREE.SkinnedMesh) node.skeleton.dispose()
     })
+  }
+
+  function ensureHandMount(driverUnit: RiderUnit | undefined, fallbackFrame: THREE.Group, side: 'right' | 'left'): THREE.Object3D {
+    const suffix = side === 'right' ? 'r' : 'l'
+    const mountName = `attach_hand_${suffix}`
+    const boneParent: THREE.Object3D =
+      driverUnit?.root.getObjectByName(`hand_${suffix}`) ??
+      driverUnit?.root.getObjectByName(`lowerarm_${suffix}`) ??
+      driverUnit?.slot ??
+      fallbackFrame
+    const existing = boneParent.getObjectByName(mountName)
+    if (existing) return existing
+    const mount = new THREE.Group()
+    mount.name = mountName
+    mount.userData.boneName = `hand_${suffix}`
+    mount.userData.side = side
+    if (boneParent === fallbackFrame) {
+      mount.position.set(side === 'right' ? 0.28 : -0.28, 1.05, -0.25)
+    }
+    boneParent.add(mount)
+    return mount
   }
 
   function build(actor: TwoWheelActorLike, subtype: TwoWheelSubtype, violation: TrafficViolation): RiderView | undefined {
@@ -524,14 +618,57 @@ export function riderPool(
       setPose(rig, s.pose, initialPedal, actor.speed > 0.15, s.scale, frame, inst, violation === 'ebike_overload')
       units.push({slot, root: inst, rig, pose: s.pose, baseY: s.y, scale: s.scale})
     }
+    const driverUnit = units.find(u => u.pose === 'ebike_driver' || u.pose === 'bicycle_driver') ?? units[0]
+    const handMountR = ensureHandMount(driverUnit, frame, 'right')
+    const handMountL = ensureHandMount(driverUnit, frame, 'left')
+    if (isViolatorHoldingReceipt(actor as Actor)) {
+      const held = getViolatorHeldReceipt(actor as Actor)
+      const useLeft = held?.anchorBoneName === 'hand_l' || actor.heldTicketHandSide === 'left'
+      const targetMount = useLeft ? handMountL : handMountR
+      if (held && held.mountedNode !== targetMount) {
+        attachReceiptToViolator(actor as Actor, held.record, {handBone: targetMount})
+      }
+    }
+
+    // Zero-dynamic-light front-right + rear-right emissive amber turn-signal lamps + glow halos (visible from officer & chase angles)
+    const blinkerGroup = new THREE.Group()
+    blinkerGroup.name = 'violator_turn_blinker'
+    const blinkerCoreMat = new THREE.MeshBasicMaterial({color: 0xffd020})
+    const blinkerHaloMat = new THREE.MeshBasicMaterial({
+      color: 0xff9e00,
+      transparent: true,
+      opacity: 0.56,
+      depthWrite: false,
+    })
+    for (const [bx, by, bz] of [
+      [0.26, 0.92, -0.52], // front-right handlebar / fairing turn lamp
+      [0.24, 0.74, 0.78], // rear-right tail turn lamp
+    ] as const) {
+      const lamp = new THREE.Mesh(new THREE.BoxGeometry(0.11, 0.08, 0.11), blinkerCoreMat)
+      lamp.position.set(bx, by, bz)
+      const halo = new THREE.Mesh(new THREE.SphereGeometry(0.115, 10, 8), blinkerHaloMat)
+      halo.position.set(bx, by, bz)
+      blinkerGroup.add(lamp, halo)
+    }
+    blinkerGroup.visible = false
+    frame.add(blinkerGroup)
+
     scene.add(root)
+    mainDetail(root)
+    const {noHelmet} = resolveTwoWheelSpec(actor)
     const view: RiderView = {
       root,
       frame,
-      signature: `${subtype}:${violation}`,
+      signature: `${subtype}:${violation}:${noHelmet ? 'nh' : 'h'}`,
       units,
       placed: false,
       pedalPhase: initialPedal,
+      handMountR,
+      handMountL,
+      blinkerGroup,
+      blinkerCoreMat,
+      blinkerHaloMat,
+      blinkerClock: 0,
     }
     active.set(actor, view)
     return view
@@ -543,28 +680,20 @@ export function riderPool(
      * and total rigged skeleton budget (<= 16 desktop / <= 8 mobile); overflow cleanly stays on BatchedMesh stand-ins.
      */
     select(actors: readonly TwoWheelActorLike[]) {
-      const cx = camera.position.x, cz = camera.position.z
-      const candidates = actors
-        .filter(a => a.kind === 'scooter' && !a.down && (a.x - cx) ** 2 + (a.z - cz) ** 2 < MAX_RIDER_DIST_SQ)
-        .sort((a, b) => (a.x - cx) ** 2 + (a.z - cz) ** 2 - ((b.x - cx) ** 2 + (b.z - cz) ** 2))
-      const near: TwoWheelActorLike[] = []
-      let usedSkeletons = 0
-      for (const a of candidates) {
-        if (near.length >= LIMIT) break
-        const {violation} = resolveTwoWheelSpec(a)
-        const cost = violation === 'ebike_overload' ? (getActorMeta(a).fourOnOverload ? 4 : 3) : violation === 'bike_double' ? 2 : 1
-        if (usedSkeletons + cost > MAX_SKELETONS) continue
-        near.push(a)
-        usedSkeletons += cost
-      }
+      const {selected: near} = selectWithinSkeletonBudget(
+        actors,
+        camera.position,
+        mobile,
+        a => getActorMeta(a).fourOnOverload,
+      )
       const keep = new Set<TwoWheelActorLike>(near)
       for (const [actor, view] of active) {
         if (!keep.has(actor)) release(actor, view)
       }
       const shown = new Set<object>()
       for (const actor of near) {
-        const {subtype, violation} = resolveTwoWheelSpec(actor)
-        const sig = `${subtype}:${violation}`
+        const {subtype, violation, noHelmet} = resolveTwoWheelSpec(actor)
+        const sig = `${subtype}:${violation}:${noHelmet ? 'nh' : 'h'}`
         const existing = active.get(actor)
         if (existing && existing.signature !== sig) release(actor, existing)
         if (active.has(actor) || build(actor, subtype, violation)) shown.add(actor)
@@ -575,6 +704,7 @@ export function riderPool(
       dt: number,
       lag: number,
       onSync?: (actor: TwoWheelActorLike, x: number, y: number, z: number, yaw: number, scale: number) => void,
+      officerPos?: {x: number; y: number; z: number} | null,
     ) {
       for (const [actor, view] of active) {
         const px = actor.x + Math.sin(actor.yaw) * actor.speed * lag
@@ -585,9 +715,105 @@ export function riderPool(
         view.root.rotation.y = actor.yaw
         view.root.scale.setScalar(scale)
         view.placed = true
+
+        // High-duty pulsing amber turn signal (front-right + rear-right) while pulling over / pulled over
+        const blinking = actor.blinker === 'right' || actor.blinker === 'hazard'
+        if (blinking) {
+          view.blinkerClock += dt
+          const phase = (view.blinkerClock * 2.5) % 1
+          const bright = phase < 0.72
+          view.blinkerGroup.visible = true
+          view.blinkerCoreMat.color.setHex(bright ? 0xffd020 : 0xc46200)
+          view.blinkerHaloMat.opacity = bright ? 0.62 : 0.18
+          const pulseScale = bright ? 1.16 : 0.9
+          for (const child of view.blinkerGroup.children) {
+            if (child instanceof THREE.Mesh && child.material === view.blinkerHaloMat) {
+              child.scale.setScalar(pulseScale)
+            }
+          }
+        } else {
+          view.blinkerClock = 0
+          view.blinkerGroup.visible = false
+        }
+
+        // Expressive rider posture feedback for fleeing, pulled-over look-at-officer, and reach-to-receive ticket
+        const fleeing = actor.dutyState === 'fleeing' || actor.dutyState === 'evading'
+        const pulledOver = actor.dutyState === 'pulled_over' || actor.dutyState === 'halted' || Boolean(actor.lookAtOfficer)
+        const halted = pulledOver || actor.haltedByDuty || actor.speed < 0.15
+        const receiveAnim = Boolean(actor.ticketReceiveAnimActive)
+        const receiveT = receiveAnim
+          ? Math.min(1, Math.max(0, (actor.ticketReceiveAnimElapsed ?? 0) / Math.max(0.1, actor.ticketReceiveAnimDuration ?? 1.15)))
+          : 0
+        const reachWeight = receiveAnim
+          ? receiveT < 0.45
+            ? receiveT / 0.45
+            : Math.max(0, 1 - (receiveT - 0.45) / 0.55)
+          : 0
+
+        let lookYaw = fleeing ? 0.42 : 0
+        if (pulledOver && officerPos) {
+          const worldAngle = Math.atan2(officerPos.x - px, officerPos.z - pz)
+          let rel = worldAngle - actor.yaw
+          while (rel > Math.PI) rel -= Math.PI * 2
+          while (rel < -Math.PI) rel += Math.PI * 2
+          lookYaw = THREE.MathUtils.clamp(rel, -1.05, 1.05)
+        }
+
+        const blend = Math.min(1, dt * 8)
+        for (const unit of view.units) {
+          if (unit.pose !== 'ebike_driver' && unit.pose !== 'bicycle_driver') continue
+          const baseLean = unit.pose === 'bicycle_driver' ? -0.24 : -0.09
+          const targetLean = fleeing ? baseLean - 0.22 : halted ? baseLean + 0.12 : baseLean
+          if (unit.rig.joints.Torso) {
+            unit.rig.joints.Torso.rotation.x += (targetLean - unit.rig.joints.Torso.rotation.x) * blend
+          }
+          if (unit.rig.joints.Head) {
+            unit.rig.joints.Head.rotation.y += (lookYaw - unit.rig.joints.Head.rotation.y) * blend
+          }
+          // Straddle stance while stopped on curb (left foot lowered toward pavement)
+          if (unit.pose === 'ebike_driver' && unit.rig.joints.ThighL && unit.rig.joints.ShinL) {
+            const targetThighL = pulledOver ? 0.68 : 1.22
+            const targetShinL = pulledOver ? -0.72 : -1.42
+            unit.rig.joints.ThighL.rotation.x += (targetThighL - unit.rig.joints.ThighL.rotation.x) * blend
+            unit.rig.joints.ShinL.rotation.x += (targetShinL - unit.rig.joints.ShinL.rotation.x) * blend
+          }
+          // Arm reach-out & grasp animation on receiving ticket (supports nearest left or right hand)
+          const holdSide: 'left' | 'right' = actor.heldTicketHandSide === 'left' ? 'left' : 'right'
+          const armJoint = holdSide === 'left' ? unit.rig.joints.ArmL : unit.rig.joints.ArmR
+          const foreJoint = holdSide === 'left' ? unit.rig.joints.ForearmL : unit.rig.joints.ForearmR
+          if (armJoint && foreJoint) {
+            const baseArmX = unit.pose === 'bicycle_driver' ? 0.84 : 0.92
+            const baseForeX = unit.pose === 'bicycle_driver' ? 0.42 : 0.36
+            const targetArmX = baseArmX + reachWeight * 0.48
+            const targetArmY = reachWeight * (holdSide === 'left' ? 0.42 : -0.42)
+            const targetForeX = baseForeX - reachWeight * 0.14
+            armJoint.rotation.x += (targetArmX - armJoint.rotation.x) * Math.min(1, dt * 12)
+            armJoint.rotation.y += (targetArmY - armJoint.rotation.y) * Math.min(1, dt * 12)
+            foreJoint.rotation.x += (targetForeX - foreJoint.rotation.x) * Math.min(1, dt * 12)
+          }
+          unit.rig.syncPose()
+          if (receiveAnim || actor.ticketReceived || actor.holdingReceipt) {
+            curlHandFingers(unit.root, holdSide === 'left' ? 'l' : 'r', 1.0)
+          }
+        }
         onSync?.(actor, px, py, pz, actor.yaw, scale)
-        // Lock bicycle legs onto static BatchedMesh crank phase 0 so shoes always rest cleanly on physical pedals
       }
+    },
+    getActorHandBone(actorOrId: TwoWheelActorLike | string | number, side: 'right' | 'left' = 'right'): THREE.Object3D | null {
+      let view: RiderView | undefined
+      if (typeof actorOrId === 'object' && actorOrId !== null) {
+        view = active.get(actorOrId)
+      } else {
+        const key = String(actorOrId)
+        for (const [a, v] of active) {
+          if (a.id !== undefined && String(a.id) === key) {
+            view = v
+            break
+          }
+        }
+      }
+      if (!view) return null
+      return side === 'right' ? view.handMountR : view.handMountL
     },
     clear() {
       for (const [actor, view] of active) release(actor, view)
