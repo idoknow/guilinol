@@ -135,6 +135,7 @@ def bake(directory, manifest, paired_widths):
             profiles[key] = profile
             joint.append(profile)
     joint_bridges = []
+    bridge_approaches = set()
     for section in sections:
         if not section.get("firstSectionRoadDecks"):
             continue
@@ -142,9 +143,12 @@ def bake(directory, manifest, paired_widths):
         bridges, abutments = grade_decks(directory, manifest, section["firstSectionRoadDecks"], ways, profiles)
         if abutments.keys() & landings.keys():
             raise ValueError("Shared bridge landing requires one joint design")
+        bridge_approaches.update(access["approachWay"] for deck in section["firstSectionRoadDecks"]
+                                 for access in deck["access"])
         joint_bridges.extend(bridges)
         landings.update(abutments)
-    bake_profiles(directory, manifest, profiles, elements, [*bridge_ways.values(), *joint_bridges], landings)
+    bake_profiles(directory, manifest, profiles, elements, [*bridge_ways.values(), *joint_bridges], landings,
+                  bridge_approaches=bridge_approaches)
     from dingjiang_paving import finish_paving
     corrected = {int(wid) for section in sections for wid in section.get("priorRoadProfiles", {}).get("01", {})}
     finish_paving(directory, manifest, [profiles[wid] for wid in sorted(set(ROAD_IDS) | corrected)] + joint, elements)
@@ -190,7 +194,7 @@ def bake(directory, manifest, paired_widths):
 
 
 def bake_profiles(directory, manifest, profiles, elements, bridge_ways=(), landings=None, *,
-                  additional=False, sample_traffic=True):
+                  additional=False, sample_traffic=True, bridge_approaches=()):
     import gzip
     import struct
     from collections import defaultdict
@@ -220,6 +224,7 @@ def bake_profiles(directory, manifest, profiles, elements, bridge_ways=(), landi
     active = set(tiles)
     near = STRtree(open_lines)
     fixed_pavement=[]
+    original_pavement = []
     parts_by_way = defaultdict(list)
     for profile in profiles.values():
         parts_by_way[profile[0]['id']].append(profile)
@@ -231,6 +236,7 @@ def bake_profiles(directory, manifest, profiles, elements, bridge_ways=(), landi
         coords = points(way)
         if len(coords)<2 or not len(near.query(LineString(coords),predicate='dwithin',distance=40)):
             continue
+        first_guard = len(fixed_pavement)
         profiled = profiles.get(way['id'])
         parts = parts_by_way[way['id']]
         if len(parts) > 1:
@@ -272,10 +278,22 @@ def bake_profiles(directory, manifest, profiles, elements, bridge_ways=(), landi
                 fixed_pavement.append(paving)
             for a,b in zip(line.coords,line.coords[1:]):
                 add(np.asarray(a),np.asarray(b),half_width(way),None,None)
+        if bridge_approaches:
+            if way['id'] in bridge_approaches:
+                original_pavement.append(LineString(coords).buffer(half_width(way)+.1, cap_style='round'))
+            else:
+                original_pavement.extend(fixed_pavement[first_guard:])
     from shapely import Polygon, constrained_delaunay_triangles, union_all
     protected_paving = STRtree(fixed_pavement)
     from station_junctions import build as build_junctions
-    build_junctions(bores,protected_paving)
+    if bridge_approaches:
+        original_guards = STRtree(original_pavement)
+        # Existing station streets retain the cuts made for the native approaches.
+        build_junctions([b for b in bores if b['way'] not in bridge_approaches], original_guards)
+        build_junctions([b for b in bores if b['way'] in bridge_approaches], protected_paving)
+    else:
+        original_guards = protected_paving
+        build_junctions(bores, protected_paving)
     for bore in bores:
         for end,node in enumerate(bore['nodes']):
             if landings and node in landings:
@@ -283,6 +301,7 @@ def bake_profiles(directory, manifest, profiles, elements, bridge_ways=(), landi
     install_native_ties(bores, profiles)
     cuts = defaultdict(list)
     for t in bores:
+        guards = protected_paving if t['way'] in bridge_approaches else original_guards
         a,b=t['portals']
         width=t['halfWidth']
         if not t['openCut'] and profiles[t['way']][0].get('gradeShoulders'):
@@ -290,9 +309,9 @@ def bake_profiles(directory, manifest, profiles, elements, bridge_ways=(), landi
             width += .01
         if t['openCut']:
             strip=LineString([(a[0],a[2]),(b[0],b[2])]).buffer(width,cap_style='flat')
-            nearby=protected_paving.query(strip,predicate='intersects')
+            nearby=guards.query(strip,predicate='intersects')
             if len(nearby):
-                outside=strip.difference(union_all([fixed_pavement[i] for i in nearby]))
+                outside=strip.difference(union_all(guards.geometries[nearby]))
                 t['footprint']=[list(tri.exterior.coords)[:-1] for tri in
                                 constrained_delaunay_triangles(outside).geoms if tri.area>1.e-8]
         low=np.floor((np.minimum(a,b)[[0,2]]-width)/256).astype(int)
@@ -314,9 +333,9 @@ def bake_profiles(directory, manifest, profiles, elements, bridge_ways=(), landi
                 continue
             for wedge in joint.get('wedges', ()):
                 area = Polygon(wedge)
-                nearby = protected_paving.query(area, predicate='intersects')
+                nearby = guards.query(area, predicate='intersects')
                 if len(nearby):
-                    area = area.difference(union_all(protected_paving.geometries[nearby]))
+                    area = area.difference(union_all(guards.geometries[nearby]))
                 for face in constrained_delaunay_triangles(area).geoms:
                     left, top, right, bottom = face.bounds
                     if face.area < 1.e-8:
