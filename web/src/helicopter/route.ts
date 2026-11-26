@@ -1,4 +1,5 @@
 import {spots} from '../play/spots'
+import {flightTable} from './dynamics'
 import {cruiseSeconds} from '../../../lib/helicopter-clock'
 
 export const modes = {
@@ -27,28 +28,30 @@ export function tourRoute(pad:Point, mode:TourMode, ceiling:(x:number,z:number,s
     const from=stops[leg], to=stops[leg+1], reverse=1-fraction
     const slope=(u:number)=>u*(1-u)**3*(1+3*u)
     const axis=(key:'x'|'z')=>from[key]+(to[key]-from[key])*blend(fraction)+span*(tangent(leg,key)*slope(fraction)-tangent(leg+1,key)*slope(reverse))
-    return {x:axis('x'), z:axis('z'), fraction}
+    return {x:axis('x'), z:axis('z'), fraction,span}
   }
   const step=0.25, heights:number[]=[]
   for(let tick=0;tick<=duration/step;tick++) {
-    const {x,z,fraction}=horizontal(tick*step)
+    const {x,z,fraction,span}=horizontal(tick*step)
     const surface=ceiling(x,z,tick*step)
     if(!Number.isFinite(surface)) throw new Error('Missing tour clearance data')
-    heights.push(surface+(mode==='high'?260:mode==='low'?55:55+135*Math.sin(Math.PI*fraction)**4))
+    const open=mode==='dynamic'&&span>30?Math.min(44,(span-24)*2)*blend(1-Math.abs(2*fraction-1)):0
+    heights.push(surface+(mode==='high'?260:55)+open)
   }
+  const smooth=heights.map((height,index)=>{
+    const window=mode==='dynamic'?124:24
+    let sum=0,weight=0
+    for(let delta=-window;delta<=window;delta++){const w=window+1-Math.abs(delta);sum+=w*heights[Math.max(0,Math.min(heights.length-1,index+delta))];weight+=w}
+    const edge=Math.min(index,heights.length-1-index)*step
+    const end=index<heights.length/2?heights[0]:heights[heights.length-1]
+    return end+(sum/weight-end+(mode==='high'?3:0))*blend(Math.min(1,Math.max(0,(edge-2)/(mode==='dynamic'?42:10))))
+  })
   function position(time:number) {
     const bounded=Math.min(duration,Math.max(0,time)), index=Math.min(heights.length-2,Math.floor(bounded/step))
     const {x,z}=horizontal(bounded)
-    return {x,z,y:heights[index]+(heights[index+1]-heights[index])*blend(bounded/step-index)}
+    return {x,z,y:smooth[index]+(smooth[index+1]-smooth[index])*(bounded/step-index)}
   }
-  function pose(time:number) {
-    const delta=0.1, before=position(time-delta), center=position(time), after=position(time+delta)
-    const vx=(after.x-before.x)/(2*delta), vz=(after.z-before.z)/(2*delta), speed=Math.hypot(vx,vz)
-    const ax=(after.x+before.x-2*center.x)/delta**2, az=(after.z+before.z-2*center.z)/delta**2
-    return {...center, speed, yaw:Math.atan2(vx,vz), roll:limit(Math.atan2(vz*ax-vx*az,Math.max(0.01,speed)*9.81),25*Math.PI/180),
-      pitch:limit(Math.atan2(after.y-before.y,Math.max(1,speed)*2*delta)-Math.atan((vx*ax+vz*az)/(9.81*Math.max(1,speed))),Math.PI/18)}
-  }
-  return {stops, times, duration, pose}
+  return {stops,times,duration,pose:flightTable(duration,position,ceiling(pad.x,pad.z,0)),target:position}
 }
 
 export function canDisembark(phase:string, contact:boolean, idleRotor:boolean, speed:number) {

@@ -13,7 +13,7 @@ export async function withQueueDatabase(run){
     pool=new pg.Pool({connectionString:`postgres://postgres:${password}@${addr}/postgres`})
     for(let attempt=0;;attempt++){try{await pool.query('SELECT 1');break}catch(error){if(attempt>300){execFileSync('docker',['logs','--tail','10',container],{stdio:'inherit'});throw error}await new Promise(resolve=>setTimeout(resolve,200))}}
     await pool.query('CREATE TABLE users(id text PRIMARY KEY,uid integer);INSERT INTO users VALUES (\'A\',100001),(\'B\',100002),(\'C\',100003)')
-    for(const migration of ['003-player-saves','022-helicopter'])await pool.query(await readFile(`deploy/postgres/${migration}.sql`,'utf8'))
+    for(const migration of ['003-player-saves','022-helicopter','023-helicopter-seat'])await pool.query(await readFile(`deploy/postgres/${migration}.sql`,'utf8'))
     for(const user of ['A','B','C'])await pool.query('INSERT INTO player_saves(user_id,payload_json,client_updated_at,updated_at) VALUES($1,$2,0,0)',[user,JSON.stringify({schemaVersion:2,money:user==='C'?2:100,updatedAt:1,economy:{helicopterTours:user==='C'?1:0}})])
     return await run(pool)
   }finally{await pool?.end();execFileSync('docker',['stop','-t','1',container])}

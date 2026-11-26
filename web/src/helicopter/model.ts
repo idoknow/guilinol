@@ -32,12 +32,12 @@ export function helicopterModel(){
       }
     }).catch(error=>console.warn('Helicopter LOD unavailable',index,error))
   }
-  return {root,get loaded(){return ready.has(0)},anchor:(name:string)=>anchors.get(name)??root,
-    animate(dt:number,rpm:number,opening:number,distance:number,pilot:string,exteriorCruise=false){
+  return {root,get loaded(){return ready.has(0)},has:(name:string)=>anchors.has(name),anchor:(name:string)=>anchors.get(name)??root,
+    animate(dt:number,rpm:number,opening:number,distance:number,pilot:string,exteriorCruise=false,doorName='door_L'){
       const wanted=distance>250?2:distance>60?1:0;load(wanted)
       let visible=wanted;if(!ready.has(visible))visible=[...ready].sort((left,right)=>Math.abs(left-wanted)-Math.abs(right-wanted))[0]??wanted
       levels.forEach((level,index)=>{level.visible=index===visible});if(!ready.has(visible))return
-      const parts=nodes[visible],door=parts.get('door_L');if(door)door.rotation.y=-1.38*opening
+      const parts=nodes[visible];for(const name of ['door_front_L','door_L','door_R']){const door=parts.get(name);if(door)door.rotation.y=name===doorName?(name.endsWith('_L')?-1:1)*1.38*opening:0}
       if(visible===0)for(const mesh of upholstery)mesh.visible=!exteriorCruise
       angle=(angle+dt*(2+rpm*38))%(4*Math.PI)
       for(const update of rotors[visible])update(angle,rpm)
