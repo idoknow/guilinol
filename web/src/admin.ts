@@ -315,6 +315,7 @@ const views: View[] = [
   { key: 'feedback', label: '反馈处理', icon: '✉', domain: 'biz', group: '用户与社区' },
   { key: 'chat', label: '聊天管理', icon: '❝', domain: 'biz', group: '用户与社区' },
   { key: 'users', label: '用户与权限', icon: '☺', domain: 'biz', group: '用户与社区' },
+  { key: 'bans', label: '封禁管理', icon: '⊘', domain: 'biz', group: '用户与社区' },
   { key: 'audit', label: '操作记录', icon: '☰', domain: 'biz', group: '用户与社区' },
   { key: 'npc', label: '路人与车流', icon: '⇄', domain: 'biz', group: '内容与玩法' },
   { key: 'smoke', label: '香烟', icon: '▥', domain: 'biz', group: '内容与玩法' },
@@ -1711,54 +1712,7 @@ const pages: Record<string, (view: View) => void> = {
       }
     }).catch(error=>slot.replaceChildren(errorState(error,()=>render())))
   },
-  mp() {
-    const stamp = h('span', { class: 'adm-sub adm-live-stamp' })
-    paintTop(views.find((v) => v.key === 'mp')!, [
-      h('span', { class: 'adm-live-dot', 'aria-hidden': 'true' }),
-      stamp,
-      navLink('运维侧 · 联机引擎 →', { view: 'rt' }, { class: 'adm-link' }),
-    ])
-    const range = ['24h', '7d', '30d', '90d'].includes(params.get('mprange') ?? '') ? params.get('mprange')! : '24h'
-    const gpRange = ['24h', '7d', '30d', '90d'].includes(params.get('gprange') ?? '') ? params.get('gprange')! : '7d'
-    const actRange = ['24h', '7d', '30d'].includes(params.get('actrange') ?? '') ? params.get('actrange')! : '7d'
-    const uid = /^\d+$/.test(params.get('uid') ?? '') ? params.get('uid') : null
-    const actFilter = params.get('act') ?? ''
-    const kindFilter = params.get('actkind') ?? ''
-    const actQ = params.get('actq') ?? ''
-
-    const liveSlot = h('div')
-    const gpSlot = h('div')
-    const actSlot = h('div')
-    const histSlot = h('div')
-    const sessSlot = h('div')
-
-    const actSearchIn = h('input', { type: 'search', name: 'actq', value: actQ, placeholder: '搜昵称 / UID / 地标 / 内容', 'aria-label': '搜索活动记录' }) as HTMLInputElement
-    const actForm = h('form', { class: 'adm-mp-filters', role: 'search' },
-      h('label', null, '玩法',
-        select('act', actFilter, [['', '全部玩法'], ...Object.entries(mpActivityMeta).map(([k, v]) => [k, v.label] as [string, string])],
-          (value) => go({ act: value || null }, true, true), '按玩法筛选')),
-      h('label', null, '事件',
-        select('actkind', kindFilter, [
-          ['', '全部事件'], ['activity', '开始玩法'], ['activity_end', '结束玩法'], ['join', '进入联机'],
-          ['leave', '离开联机'], ['chat', '发言聊天'], ['emote', '使用表情'], ['avatar', '更换造型'],
-        ], (value) => go({ actkind: value || null }, true, true), '按事件类型筛选')),
-      actSearchIn,
-      h('button', { type: 'submit', class: 'adm-btn adm-btn--sm' }, '筛选'),
-      (uid || actFilter || kindFilter || actQ)
-        ? navLink('清除筛选', { uid: null, act: null, actkind: null, actq: null }, { class: 'adm-btn adm-btn--sm adm-btn--ghost' }, true)
-        : null)
-    actForm.addEventListener('submit', (event) => {
-      event.preventDefault()
-      go({ actq: actSearchIn.value.trim() || null }, true, true)
-    })
-
-    const activityCard = card(uid ? `账户最近活动记录 · UID ${uid}` : '账户最近活动记录（每个账户最近在做什么）', [actForm, actSlot], {
-      sub: '点击任意账户芯片或在线玩家可聚焦该账户的玩法与行为时间线，实时合并持久化流水与当前在线事件',
-      actions: segmented(actRange, [['24h', '24 小时'], ['7d', '7 天'], ['30d', '30 天']], (key) => go({ actrange: key }, true, true), '活动时间范围'),
-    })
-    activityCard.id = 'adm-mp-activities'
-
-    // 联机封禁（反外挂）：与上面的筛选条同一套视觉
+  bans() {
     const banSlot = h('div')
     const banUidIn = h('input', { type: 'search', name: 'banuid', placeholder: '例如 102276', 'aria-label': '封禁 UID' }) as HTMLInputElement
     const banFpIn = h('input', { type: 'search', name: 'banfp', placeholder: '例如 6f771cf0012fec6b', 'aria-label': '封禁设备指纹' }) as HTMLInputElement
@@ -1837,9 +1791,61 @@ const pages: Record<string, (view: View) => void> = {
       sub: '封了立即生效（在线会掉线）；账号与设备指纹任一命中即拦。人工解封后马上可重连。',
     })
 
+    main.append(banCard)
+    refreshTimer = window.setInterval(() => {
+      if (document.visibilityState === 'visible' && !banSlot.querySelector('details[open]')) void loadBans()
+    }, 10000)
+  },
+  mp() {
+    const stamp = h('span', { class: 'adm-sub adm-live-stamp' })
+    paintTop(views.find((v) => v.key === 'mp')!, [
+      h('span', { class: 'adm-live-dot', 'aria-hidden': 'true' }),
+      stamp,
+      navLink('封禁管理 →', { view: 'bans' }, { class: 'adm-link' }),
+      navLink('运维侧 · 联机引擎 →', { view: 'rt' }, { class: 'adm-link' }),
+    ])
+    const range = ['24h', '7d', '30d', '90d'].includes(params.get('mprange') ?? '') ? params.get('mprange')! : '24h'
+    const gpRange = ['24h', '7d', '30d', '90d'].includes(params.get('gprange') ?? '') ? params.get('gprange')! : '7d'
+    const actRange = ['24h', '7d', '30d'].includes(params.get('actrange') ?? '') ? params.get('actrange')! : '7d'
+    const uid = /^\d+$/.test(params.get('uid') ?? '') ? params.get('uid') : null
+    const actFilter = params.get('act') ?? ''
+    const kindFilter = params.get('actkind') ?? ''
+    const actQ = params.get('actq') ?? ''
+
+    const liveSlot = h('div')
+    const gpSlot = h('div')
+    const actSlot = h('div')
+    const histSlot = h('div')
+    const sessSlot = h('div')
+
+    const actSearchIn = h('input', { type: 'search', name: 'actq', value: actQ, placeholder: '搜昵称 / UID / 地标 / 内容', 'aria-label': '搜索活动记录' }) as HTMLInputElement
+    const actForm = h('form', { class: 'adm-mp-filters', role: 'search' },
+      h('label', null, '玩法',
+        select('act', actFilter, [['', '全部玩法'], ...Object.entries(mpActivityMeta).map(([k, v]) => [k, v.label] as [string, string])],
+          (value) => go({ act: value || null }, true, true), '按玩法筛选')),
+      h('label', null, '事件',
+        select('actkind', kindFilter, [
+          ['', '全部事件'], ['activity', '开始玩法'], ['activity_end', '结束玩法'], ['join', '进入联机'],
+          ['leave', '离开联机'], ['chat', '发言聊天'], ['emote', '使用表情'], ['avatar', '更换造型'],
+        ], (value) => go({ actkind: value || null }, true, true), '按事件类型筛选')),
+      actSearchIn,
+      h('button', { type: 'submit', class: 'adm-btn adm-btn--sm' }, '筛选'),
+      (uid || actFilter || kindFilter || actQ)
+        ? navLink('清除筛选', { uid: null, act: null, actkind: null, actq: null }, { class: 'adm-btn adm-btn--sm adm-btn--ghost' }, true)
+        : null)
+    actForm.addEventListener('submit', (event) => {
+      event.preventDefault()
+      go({ actq: actSearchIn.value.trim() || null }, true, true)
+    })
+
+    const activityCard = card(uid ? `账户最近活动记录 · UID ${uid}` : '账户最近活动记录（每个账户最近在做什么）', [actForm, actSlot], {
+      sub: '点击任意账户芯片或在线玩家可聚焦该账户的玩法与行为时间线，实时合并持久化流水与当前在线事件',
+      actions: segmented(actRange, [['24h', '24 小时'], ['7d', '7 天'], ['30d', '30 天']], (key) => go({ actrange: key }, true, true), '活动时间范围'),
+    })
+    activityCard.id = 'adm-mp-activities'
+
     main.append(h('div', { class: 'adm-stack' },
       liveSlot,
-      banCard,
       card('玩法占用玩家时间对比', gpSlot, {
         sub: '统计每个玩法在所选时间段内占用的总玩家时长、占比、独立参与人数与趋势，方便对比哪种玩法最吸引玩家',
         actions: segmented(gpRange, [['24h', '24 小时'], ['7d', '7 天'], ['30d', '30 天'], ['90d', '90 天']], (key) => go({ gprange: key }, true, true), '玩法分析范围'),
@@ -1873,7 +1879,7 @@ const pages: Record<string, (view: View) => void> = {
       })
     liveSlot.append(skeleton(6))
     load(true)
-    refreshTimer = window.setInterval(() => {if(document.visibilityState==='visible'&&!document.querySelector('dialog.adm-dialog')){void load(false);if(!banSlot.querySelector('details[open]'))void loadBans()}}, 10000)
+    refreshTimer = window.setInterval(() => {if(document.visibilityState==='visible'&&!document.querySelector('dialog.adm-dialog'))void load(false)}, 10000)
 
     const actParams = new URLSearchParams({ range: actRange, limit: '100' })
     if (uid) actParams.set('uid', uid)
