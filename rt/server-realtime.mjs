@@ -306,6 +306,75 @@ function notifyBan(ws, ban) {
   send(ws,{t:'banned',recordId:ban.recordId,reason:ban.reason,until:Number.isFinite(ban.until)?ban.until:null})
 }
 
+const CAPTURE_COOLDOWN_MS = process.env.RT_AC_CAPTURE_COOLDOWN_MS !== undefined && Number.isFinite(Number(process.env.RT_AC_CAPTURE_COOLDOWN_MS))
+  ? Math.max(0, Number(process.env.RT_AC_CAPTURE_COOLDOWN_MS))
+  : 15000
+const ACTIVITY_STATE_LABELS = {
+  walk: '步行', idle: '原地待机', ebike: '骑电车', bicycle: '骑单车', car: '开车',
+  boat: '划船', fishing: '钓鱼', mifen: '米粉店', drone: '航拍', photo: '摄影',
+  shop: '逛店', mission: '任务中', smoke: '抽烟',
+}
+function describePlayerState(player) {
+  const base = player.activityDetail || ACTIVITY_STATE_LABELS[player.activity] || player.activity || '步行'
+  const parts = [base]
+  if (player.dn > 0) parts.push('倒地')
+  if (player.bike && !/电车|单车|开车|划船/.test(base)) parts.push('载具')
+  if (player.foot === false && !player.bike && player.activity !== 'drone') parts.push('离地/空中')
+  else if (player.gr === 0 && !player.bike) parts.push('空中')
+  return parts.join(' · ')
+}
+function emitCheatCapture(player, kind, detail = {}, { force = false } = {}) {
+  const secret = process.env.RT_JOIN_SECRET
+  if (!secret || !player?.ws || player.ws.readyState !== 1 || player.uid == null) return false
+  const at = now()
+  const minGap = force ? Math.min(CAPTURE_COOLDOWN_MS, 2000) : CAPTURE_COOLDOWN_MS
+  if (player.lastCaptureAt && at - player.lastCaptureAt < minGap) return false
+  player.lastCaptureAt = at
+  const id = randomUUID()
+  const pos = [+(Number(player.x) || 0).toFixed(2), +(Number(player.y) || 0).toFixed(2), +(Number(player.z) || 0).toFixed(2)]
+  const attemptPos = Array.isArray(detail.to) && detail.to.length >= 3 && detail.to.every(Number.isFinite)
+    ? [+Number(detail.to[0]).toFixed(2), +Number(detail.to[1]).toFixed(2), +Number(detail.to[2]).toFixed(2)]
+    : null
+  const speed = Number.isFinite(detail.speed) ? +Number(detail.speed).toFixed(2) : +(Number(player.v) || 0).toFixed(2)
+  const flatSpeed = Number.isFinite(detail.flatSpeed) ? +Number(detail.flatSpeed).toFixed(2) : null
+  const vspeed = Number.isFinite(detail.vspeed) ? +Number(detail.vspeed).toFixed(2) : null
+  const reportedSpeed = Number.isFinite(detail.reportedSpeed) ? +Number(detail.reportedSpeed).toFixed(2) : +(Number(player.v) || 0).toFixed(2)
+  const overflow = Number.isFinite(detail.overflow) ? +Number(detail.overflow).toFixed(2) : null
+  const state = describePlayerState(player)
+  const claims = {
+    id,
+    uid: player.uid,
+    name: player.name || '',
+    fp: player.fp || player.ws?.fp || '',
+    kind,
+    at,
+    exp: Math.floor(at / 1000) + 120,
+    state,
+    activity: player.activity || 'walk',
+    activityDetail: player.activityDetail || '',
+    foot: player.foot !== false,
+    bike: player.bike || '',
+    speed,
+    flatSpeed,
+    vspeed,
+    reportedSpeed,
+    overflow,
+    pos,
+    attemptPos,
+  }
+  const body = Buffer.from(JSON.stringify(claims)).toString('base64url')
+  const sig = createHmac('sha256', secret).update('cheat-capture:v1.' + body).digest('base64url')
+  send(player.ws, {
+    t: 'cheat_capture',
+    token: `${body}.${sig}`,
+    id, uid: claims.uid, name: claims.name, kind, at,
+    state, activity: claims.activity, activityDetail: claims.activityDetail,
+    foot: claims.foot, bike: claims.bike,
+    speed, flatSpeed, vspeed, reportedSpeed, overflow, pos, attemptPos,
+  })
+  return true
+}
+
 /**
  * 广播专用发送：先看发送缓冲，堆积超过 1 MB 说明对面跟不上（或故意不收），
  * 这一条直接跳过；连续跳过 60 次基本就是死连接，close(1013) 交给 close 回调回收。
@@ -844,11 +913,12 @@ wss.on('connection', (ws, req) => {
   function recordAttack(kind){
     const player=players.get(ws.playerId??id)
     if(!player || player.ws!==ws || queuedAttacks>=3 || ws.disciplined)return
+    emitCheatCapture(player,kind,{speed:player.v||0})
     queuedAttacks++
     attackQueue=attackQueue.then(async()=>{
       if(ws.disciplined)return
       const ban=await banStore.violation({uid:player.uid,fp:ws.fp??'',kind,detail:{from:[player.x,player.y,player.z]}})
-      if(ban){ws.disciplined=true;const current=[...players.values()].find(other=>other.uid===player.uid);if(current?.ws){notifyBan(current.ws,ban);current.ws.close(4003,'banned')}}
+      if(ban){ws.disciplined=true;const current=[...players.values()].find(other=>other.uid===player.uid);if(current?.ws){emitCheatCapture(current,kind,{speed:current.v||0},{force:true});notifyBan(current.ws,ban);current.ws.close(4003,'banned')}}
     }).catch(error=>console.warn('[protocol]',error.message)).finally(()=>queuedAttacks--)
   }
   ws.on('message', async (raw,binary) => {
@@ -1057,8 +1127,9 @@ wss.on('connection', (ws, req) => {
         me.cheatTimes ??= new Map()
         if (now()-(me.cheatTimes.get(kind)??0)<2000) return
         me.cheatTimes.set(kind,now())
+        emitCheatCapture(me,kind,detail)
         void banStore.violation({uid:me.uid,fp:ws.fp??'',kind,detail:{from:[me.x,me.y,me.z],...detail},ua:me.ua??''}).then(ban=>{
-          if (ban) { notifyBan(ws,ban); ws.close(4003,'banned') }
+          if (ban) { emitCheatCapture(me,kind,detail,{force:true}); notifyBan(ws,ban); ws.close(4003,'banned') }
         }).catch(error=>console.warn('[anti-cheat]',error.message))
       }
       if (msg.t==='mount_player' && me.visible.has(msg.target) && players.has(msg.target) && msg.target!==me.id) {
@@ -1093,30 +1164,34 @@ wss.on('connection', (ws, req) => {
         const nx = clampNum(msg.x, -1e5, 1e5)
         const ny = clampNum(msg.y, -1000, 8000)
         const nz = clampNum(msg.z, -1e5, 1e5)
+        const stepDt = Math.max((at - (me.posAt ?? at)) / 1000, 0.02)
+        const stepLen = Math.hypot(nx - me.x, nz - me.z)
+        const flatSpeed = +(stepLen / stepDt).toFixed(2)
+        const vspeed = +((ny - me.y) / stepDt).toFixed(2)
+        const speed3d = +(Math.hypot(nx - me.x, ny - me.y, nz - me.z) / stepDt).toFixed(2)
+        const reportedSpeed = +clampNum(msg.v, 0, 999).toFixed(2)
         if(me.headTrack || Math.abs(ny-me.y)>0.5){
           const peer=me.headTrack ? players.get(me.headTrack.id) : [...me.visible].map(id=>players.get(id)).find(other=>other && Math.hypot(nx-other.x,nz-other.z)<0.35 && ny-other.y>1.4 && ny-other.y<2.2)
           if(peer && Math.hypot(nx-peer.x,nz-peer.z)<0.35 && ny-peer.y>1.4 && ny-peer.y<2.2){
             me.headTrack??={id:peer.id,at,x:peer.x,z:peer.z}
             if(at-me.headTrack.at>1000 && Math.hypot(peer.x-me.headTrack.x,peer.z-me.headTrack.z)>2){
-              recordMove('head_overlap',{to:[nx,ny,nz],peer:peer.id});send(ws,{t:'setback',kind:'head_overlap',x:me.x,y:me.y,z:me.z});return
+              recordMove('head_overlap',{to:[nx,ny,nz],peer:peer.id,speed:speed3d,flatSpeed,vspeed,reportedSpeed});send(ws,{t:'setback',kind:'head_overlap',x:me.x,y:me.y,z:me.z});return
             }
           }else me.headTrack=null
         }
         // 移动合法性由服务端判定：超速 / 飞天 / 非法瞬移一律拒包，客户端收 setback 拉回
-        const stepDt = Math.max((at - (me.posAt ?? at)) / 1000, 0.02)
-        const stepLen = Math.hypot(nx - me.x, nz - me.z)
         // 先落「是否在空中/载具」，否则第一帧会被当成飞天（直升机会被误拉回）
         me.foot = msg.foot !== false
         me.bike = clampStr(msg.bike, 32)
         const verdict = checkMove(me, nx, ny, nz, at)
         if (verdict.reject) {
+          recordMove(verdict.kind,{to:[nx,ny,nz],overflow:verdict.overflow,speed:speed3d,flatSpeed,vspeed,reportedSpeed})
           send(ws, {t: 'setback', x: me.x, y: me.y, z: me.z, kind: verdict.kind})
-          recordMove(verdict.kind,{to:[nx,ny,nz],overflow:verdict.overflow})
           return
         }
         // 过去 1 秒跑过步（超过走路上限）→ 短暂禁止出拳/扶人（防"切车瞬移贴脸出拳"）
         if (stepLen / stepDt > LIMITS.walk) me.fastAt = at
-        if (verdict.observation) recordMove(verdict.observation,{to:[nx,ny,nz]})
+        if (verdict.observation) recordMove(verdict.observation,{to:[nx,ny,nz],speed:speed3d,flatSpeed,vspeed,reportedSpeed})
         me.posAt = at
         me.x = nx
         me.y = ny
