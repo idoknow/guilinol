@@ -2,8 +2,9 @@ import { ll2xz } from './projection'
 
 // 游戏 bug（IDOK-219）：功能故障、卡住、显示错误等，不需要实景照片，截图可选。
 export const BUG = '游戏 bug'
-export const kinds = ['缺失建筑', '位置或朝向不对', '外观不像', '道路水系', BUG, '其他']
-export const photosOptional = (kind?: string | null) => kind === BUG
+export const APPEAL = '封禁申诉'
+export const kinds = ['缺失建筑', '位置或朝向不对', '外观不像', '道路水系', BUG, APPEAL, '其他']
+export const photosOptional = (kind?: string | null) => kind === BUG || kind === APPEAL
 export const views = ['正面', '左侧', '右侧', '背面', '远景', '细节', '内部']
 export const labels: Record<string, string> = {
   draft: '草稿',

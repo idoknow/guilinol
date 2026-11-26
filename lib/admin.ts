@@ -161,6 +161,7 @@ export async function adminList(db: D1Database, path: string, params: URLSearchP
       filters.push('f.status=?')
       args.push(status)
     }
+    if(params.get('kind')==='封禁申诉'){filters.push('f.kind=?');args.push('封禁申诉')}
     if (user) {
       filters.push('f.user_id=?')
       args.push(user)
