@@ -1,0 +1,42 @@
+{
+  "rail": 221882704,
+  "road": 648183014,
+  "lat": 25.272184,
+  "lon": 110.2764096,
+  "railProbeXZ": [
+    -2387.1421,
+    758.9512
+  ],
+  "before": {
+    "roadM": 155.3145760763533,
+    "gradeEnvelopeM": 159.74424878566109,
+    "unconstrainedM": 152.44017923462485,
+    "afterStationFitM": 159.74424878566109,
+    "tieDistances": {
+      "north": {
+        "fromPadEndM": 571,
+        "ties": 2
+      },
+      "south": {
+        "fromPadEndM": 502,
+        "ties": 4
+      }
+    }
+  },
+  "after": {
+    "roadM": 155.31296814042358,
+    "gradeEnvelopeM": 159.74264084973137,
+    "unconstrainedM": 152.44017923462485,
+    "afterStationFitM": 159.74264084973137,
+    "tieDistances": {
+      "north": {
+        "fromPadEndM": 571,
+        "ties": 2
+      },
+      "south": {
+        "fromPadEndM": 502,
+        "ties": 4
+      }
+    }
+  }
+}
