@@ -12,6 +12,7 @@ import {ll2xz} from '../../../lib/projection'
 import {getState} from '../game/state'
 import {listShops, type ShopTriggerDef} from '../game/shops'
 import {roster, bearing, type RosterPlayer} from '../mp-roster'
+import {requestRoster} from '../net'
 import {touchUi} from '../ui/input-mode'
 
 // 地图 (M4): one canvas painter shared by the minimap and the full map. North up, world z grows south.
@@ -331,10 +332,10 @@ export function mapView(host:Host, atlas:Atlas, ui:{slot:HTMLElement; buttons:HT
     const start=performance.now()
     requestMap('overview.bin')
     const p = here(); view.x = p.x; view.z = p.z; view.scale = innerWidth<700?.45:.6
-    sheet.hidden = false; requestAnimationFrame(()=>{sheet.classList.add('show'); redraw();operation('mapOpen',start)})
+    sheet.hidden = false; requestRoster(true); requestAnimationFrame(()=>{sheet.classList.add('show'); redraw();operation('mapOpen',start)})
     if(!touchUi()) input.focus()
   }
-  function close(){sheet.classList.remove('show'); setPin(null); input.value = ''; results.innerHTML = ''; input.blur()
+  function close(){sheet.classList.remove('show'); setPin(null); requestRoster(false); input.value = ''; results.innerHTML = ''; input.blur()
     setTimeout(()=>{if(!sheet.classList.contains('show')) sheet.hidden = true},240)}
   function setPin(next:typeof pin) {
     pin = next; pop.hidden = !pin

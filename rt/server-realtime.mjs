@@ -453,9 +453,18 @@ function rosterPayload() {
 // 支持 caps:['roster2'] 的客户端改为收增量（只发新增/离开/移动≥2m 的人），
 // 每 RT_ROSTER_FULL_MS 强制一次全量对账，防止长期漂移。
 // 老客户端仍然收全量 roster，行为完全不变。
-const ROSTER_FULL_MS = Number(process.env.RT_ROSTER_FULL_MS || 30000)
+const ROSTER_FULL_MS = Number(process.env.RT_ROSTER_FULL_MS || 30000)   // 未订阅者：低频全量
+const ROSTER_SUB_MS = Number(process.env.RT_ROSTER_SUB_MS || 5000)      // 订阅者：增量间隔
+const ROSTER_MOVE_M = Number(process.env.RT_ROSTER_MOVE_M || 8)         // 增量阈值（缩略图上 <2px）
+const ROSTER_SUB_RADIUS = Number(process.env.RT_ROSTER_SUB_RADIUS || 500)
+const ROSTER_SUB_TTL_MS = Number(process.env.RT_ROSTER_SUB_TTL_MS || 90000)
+const ROSTER_FULL_QPS = Number(process.env.RT_ROSTER_FULL_QPS || 15)    // 全量快照全服限速
+const ROSTER_HIST_MS = 60000
+
 let rosterSnap = new Map()   // id -> {x, z, name}
-let rosterFullAt = Date.now()
+let rosterV = 0
+let rosterHist = []          // [{v, at, add, up, del, total}]，保留 60s 供 since 补发
+const fullQueue = []         // 等全量快照的 socket（全局限速）
 
 function rosterDelta() {
   const add = [], up = [], del = []
@@ -465,11 +474,38 @@ function rosterDelta() {
     const prev = rosterSnap.get(p.id)
     next.set(p.id, { x, z, name: p.name })
     if (!prev || prev.name !== p.name) add.push([p.id, p.name, x, z])
-    else if (Math.abs(prev.x - x) + Math.abs(prev.z - z) >= 2) up.push([p.id, x, z])
+    else if (Math.abs(prev.x - x) + Math.abs(prev.z - z) >= ROSTER_MOVE_M) up.push([p.id, x, z])
   }
   for (const id of rosterSnap.keys()) if (!next.has(id)) del.push(id)
   rosterSnap = next
-  return { t: 'roster2', total: next.size, add, up, del }
+  return { add, up, del, total: next.size }
+}
+
+function pushHist(entry) {
+  rosterHist.push(entry)
+  const cut = Date.now() - ROSTER_HIST_MS
+  while (rosterHist.length && rosterHist[0].at < cut) rosterHist.shift()
+}
+
+/** 订阅者立刻能用的快照：附近 ROSTER_SUB_RADIUS 内的人 + 总人数 */
+function nearPayload(me) {
+  const near = []
+  for (const p of players.values()) {
+    if (me && p.id === me.id) continue
+    if (me && flatDistance(p, me) > ROSTER_SUB_RADIUS) continue
+    near.push([p.id, p.name, Math.round(p.x), Math.round(p.z)])
+  }
+  return { t: 'roster3', v: rosterV, near, total: players.size, radius: ROSTER_SUB_RADIUS }
+}
+
+/** since 命中历史就补发增量，避免重开地图/断线续连时重拉 50KB 全量 */
+function replaySince(ws, since) {
+  const idx = rosterHist.findIndex(e => e.v === since)
+  if (idx < 0) return false
+  const add = [], up = [], del = []
+  for (const e of rosterHist.slice(idx + 1)) { add.push(...e.add); up.push(...e.up); del.push(...e.del) }
+  send(ws, { t: 'roster3', v: rosterV, add, up, del, total: players.size })
+  return true
 }
 
 function publicOf(p,viewer=p) {
@@ -965,6 +1001,15 @@ wss.on('connection', (ws, req) => {
         return
       }
 
+      if (msg.t === 'roster_sub') {
+        ws.rosterSub = { at: now() }
+        send(ws, nearPayload(me))
+        if (typeof msg.since === 'number' && replaySince(ws, msg.since)) return
+        fullQueue.push(ws)
+        return
+      }
+      if (msg.t === 'roster_unsub') { ws.rosterSub = null; return }
+      if (msg.t === 'roster_ping') { if (ws.rosterSub) ws.rosterSub.at = now(); return }
       if (msg.t === 'who') {
         // 全服名单走 roster 通道；这里只回视野内的人，否则客户端会把视野外的人画进场景并永远停在原地
         send(ws, {
@@ -987,28 +1032,64 @@ wss.on('connection', (ws, req) => {
   ws.on('error', () => { try { ws.close() } catch { /* 忽略 */ } })
 })
 
-// 在线人数心跳
+// 在线人数：人数变了才广播，10s 兜底一次（原来是每秒无条件全服广播）
+let onlineSent = -1, onlineAt = 0
 setInterval(() => {
-  broadcast({t: 'online', online: players.size})
+  const n = players.size
+  const at = Date.now()
+  if (n === onlineSent && at - onlineAt < 10000) return
+  onlineSent = n; onlineAt = at
+  broadcast({t: 'online', online: n})
 }, TICK_MS)
 
-// 全服低频名册：老客户端收全量（行为不变），支持 roster2 的客户端收增量
+// 订阅者增量：只有打开大地图/玩家列表的客户端在收（近距离位姿走 AOI，不受影响）
 setInterval(() => {
   if (!players.size) return
-  const full = rosterPayload()
-  const fullText = JSON.stringify(full)
-  const fullSize = Buffer.byteLength(fullText)
-  const wantsFull = Date.now() - rosterFullAt >= ROSTER_FULL_MS
-  const delta = rosterDelta()
-  const payload = wantsFull ? { t: 'roster2', total: delta.total, full: full.players } : delta
-  const deltaText = JSON.stringify(payload)
-  const deltaSize = Buffer.byteLength(deltaText)
-  if (wantsFull) rosterFullAt = Date.now()
+  rosterV++
+  const d = rosterDelta()
+  pushHist({ v: rosterV, at: Date.now(), ...d })
+  let text = null, size = 0
   for (const p of players.values()) {
-    if (p.ws && p.ws.roster2) sendSlowAware(p.ws, deltaText, 'roster', deltaSize)
-    else sendSlowAware(p.ws, fullText, 'roster', fullSize)
+    const ws = p.ws
+    if (!ws || !ws.rosterSub) continue
+    if (Date.now() - ws.rosterSub.at > ROSTER_SUB_TTL_MS) {
+      ws.rosterSub = null
+      send(ws, { t: 'roster3', v: rosterV, paused: true, total: players.size })
+      continue
+    }
+    if (!text) { text = JSON.stringify({ t: 'roster3', v: rosterV, ...d }); size = Buffer.byteLength(text) }
+    sendSlowAware(ws, text, 'roster', size)
+    if (ws.slowSkips > 0) {
+      ws.rosterSub = null
+      send(ws, { t: 'roster3', v: rosterV, paused: true, total: players.size })
+    }
   }
-}, ROSTER_MS)
+}, ROSTER_SUB_MS)
+
+// 未订阅者：低频全量（老客户端从 5s 降到 30s，行为仍兼容，只是刷新慢）
+setInterval(() => {
+  if (!players.size) return
+  const text = JSON.stringify(rosterPayload())
+  const size = Buffer.byteLength(text)
+  for (const p of players.values()) {
+    const ws = p.ws
+    if (!ws || ws.rosterSub) continue
+    sendSlowAware(ws, text, 'roster', size)
+  }
+}, ROSTER_FULL_MS)
+
+// 全量快照限速泵：全服共享 15 份/秒，避免 1000 人同时开图把端口打满
+setInterval(() => {
+  if (!fullQueue.length) return
+  if (!players.size) { fullQueue.length = 0; return }
+  const text = JSON.stringify({ t: 'roster3', v: rosterV, full: rosterPayload().players, total: players.size })
+  const size = Buffer.byteLength(text)
+  for (let i = 0; i < ROSTER_FULL_QPS && fullQueue.length; i++) {
+    const ws = fullQueue.shift()
+    if (!ws) continue
+    sendSlowAware(ws, text, 'roster', size)
+  }
+}, 1000)
 
 // 每 30s 一条 rt-stats：线上判断「单核是否顶满」看 loopP99Ms，> 50ms 玩家就能感到卡
 const STATS_MS = Number(process.env.RT_STATS_MS || 30000)
