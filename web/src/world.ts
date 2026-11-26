@@ -350,7 +350,7 @@ export async function detail(tile:Tile, signal:AbortSignal, parseSlot?:()=>Promi
   const normals = new Int8Array(buffer,offset,vertices*3); offset+=vertices*3
   const indices = new Uint32Array(buffer.slice(offset,offset+count*4)); offset+=count*4
   const [rings,paths,thinIndices=[],asphalt=[],legacy=[],signs=[],railCuts=[],savedBed]:[Building[],Streets,number[]?,number[]?,(RoadBed|import('./railways').RailSection[])?,import('./railways').CrossingSign[]?,[number,number][]?,RoadBed?]=JSON.parse(new TextDecoder().decode(new Uint8Array(buffer,offset,collision))); offset+=collision
-  const bed=savedBed??(legacy&&!Array.isArray(legacy)?legacy:undefined)
+  const bed=paths[17]??savedBed??(legacy&&!Array.isArray(legacy)?legacy:undefined)
   const rails=Array.isArray(legacy)?legacy:[]
   const thin=new Set(thinIndices)
   const end = offset+imageBytes, tail = end+triangles*18, extra = buffer.byteLength-tail

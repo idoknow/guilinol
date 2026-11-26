@@ -130,10 +130,19 @@ def rongyin_sidewalk():
                     [(-8, 0), (8, 0), (8, 10), (-8, 10)]])
 
 
+GRAIN_YARD_SITE = '56f66428-e070-4340-a894-4f7d04c1d044'
+
+
+def grain_yard_site():
+    with (Path(RAW)/'overture_buildings.csv').open() as source:
+        row = next(row for row in csv.DictReader(source, delimiter='\t') if row['id'] == GRAIN_YARD_SITE)
+    return affine_transform(from_wkt(row['wkt']), [MLON, 0, 0, -MLAT, -LON0*MLON, LAT0*MLAT])
+
+
 def overture_geometry(row):
     # This OSM-derived warehouse-company record is the industrial site.
     # The traffic bake restores its individual current OSM warehouses.
-    if row['id']=='56f66428-e070-4340-a894-4f7d04c1d044':
+    if row['id']==GRAIN_YARD_SITE:
         return Polygon()
     shape = affine_transform(from_wkt(row['wkt']), [MLON, 0, 0, -MLAT, -LON0*MLON, LAT0*MLAT])
     if row['id'] == '94d505df-4dd6-4bdf-b242-be218cce7937':

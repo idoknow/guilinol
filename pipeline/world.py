@@ -579,22 +579,25 @@ def build(bbox, output, palette, workers=4):
         from railways import bake_world as bake_railways
         (output/'manifest.json').write_text(json.dumps(manifest,separators=(',',':'))+'\n')
         report = bake_railways(output,manifest)
-    from traffic import bake as bake_traffic
-    bake_traffic(output, manifest, roads)
+        from station_roads import bake as bake_station_roads
+        station_ways = bake_station_roads(output,manifest,{road.way:road.width for road in roads if road.source=='paired'},defer_lanes=True)
+    from major_roadbeds import bake as bake_major_roadbeds
+    bake_major_roadbeds(output,manifest)
+    (output/'manifest.json').write_text(json.dumps(manifest,separators=(',',':'))+'\n')
+    from traffic import bake as bake_traffic, bake_after_roads
+    if play_region:
+        bake_after_roads(output, manifest, roads, station_ways)
+    else:
+        bake_traffic(output, manifest, roads)
     from npc_network import install as install_npc
     from npc_sidewalks import audit as audit_npc
     install_npc(output, audit_npc(output, manifest))
     (output/'manifest.json').write_text(json.dumps(manifest,separators=(',',':'))+'\n')
     if play_region:
-        from station_roads import bake as bake_station_roads
-        bake_station_roads(output,manifest,{road.way:road.width for road in roads if road.source=='paired'})
-        (output/'manifest.json').write_text(json.dumps(manifest,separators=(',',':'))+'\n')
         from check_dingjiang_rail_clearance import checked_road_pairs
         verified = checked_road_pairs(output)
         remaining = [r for r in report['clearanceConflicts'] if (r['rail'],r['road']) not in verified]
         print('Railway tiles:',report['tiles'],'clearance conflicts:',len(remaining))
-    from major_roadbeds import bake as bake_major_roadbeds
-    bake_major_roadbeds(output,manifest)
     (output/'manifest.json').write_text(json.dumps(manifest,separators=(',',':'))+'\n')
     print(f'{len(chunks)} chunks, {len(footprints)} footprints, {sum(c["bytes"] for c in chunks):,} chunk bytes')
 

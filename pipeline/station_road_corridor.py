@@ -14,6 +14,7 @@ from shapely.geometry.polygon import orient
 from common import ll2xz
 from road_grading import eval_bspline_grid
 from service_streets import patch_tile, width
+from vehicle_roadbed import set_roadbed
 
 
 def bake(output, chunks, ways):
@@ -66,10 +67,7 @@ def bake(output, chunks, ways):
                             end=(s,bed(s,t),t);rim=(s,old(s,t),t)
                             emit((lo,hi,end,end,hi,rim))
         # GL04 slots 4–6 belong to rails, crossing signs and fence cuts.
-        while len(collision)<8:collision.append([])
-        if isinstance(collision[4],dict) and 'drop' in collision[4]:
-            collision[4]=[]  # Migrate previews written before the railway extension.
-        collision[7]=dict(drop=drop,vertices=vertices)
+        set_roadbed(collision,dict(drop=drop,vertices=vertices))
         data=json.dumps(collision,separators=(',',':')).encode()
         file.write_bytes(gzip.compress(raw[:12]+struct.pack('<I',len(data))+raw[16:offset]+data+raw[offset+size:],mtime=0))
         tile['bytes']=file.stat().st_size

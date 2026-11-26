@@ -5,6 +5,7 @@ import {join} from 'node:path'
 import {gunzipSync, gzipSync} from 'node:zlib'
 import {tunnelClearanceClipper} from '../web/src/tunnels'
 import {tileSurface} from './vehicle-surface'
+import {encodeRoadEdits} from './roadbed-json.mjs'
 
 const [world, request]=process.argv.slice(2)
 const {tile,bore,upper}=JSON.parse(readFileSync(request,'utf8'))
@@ -30,7 +31,7 @@ for(const part of ['packed','skirt','sidewalk']){
 const road=decode(upper,.001)
 const wet=Array.from({length:4225},(_,i)=>raw.readInt16LE(8474+2*i)).some(v=>v!==-32768)
 const step=wet?4:8, cells=256/step
-const bed=data[7]??{drop:[],packed:''}, old=new Set<number>(bed.drop), needed=new Set<number>()
+const bed=data[1][17]??data[7]??{drop:[],packed:''}, old=new Set<number>(bed.drop), needed=new Set<number>()
 const cell=(p:number)=>Math.max(0,Math.min(cells-1,Math.floor(p/step)))
 for(let i=0;i<road.length;i+=9){
   const x=[road[i],road[i+3],road[i+6]],z=[road[i+2],road[i+5],road[i+8]]
@@ -56,6 +57,6 @@ bed.drop=[...old,...needed].sort((a,b)=>a-b)
 const existing=bed.packed?Buffer.from(bed.packed,'base64'):encode((bed.vertices??[]).flat(),10000)
 bed.packed=Buffer.concat([existing,encode(kept,10000),encode(road,10000)]).toString('base64')
 delete bed.vertices
-data[7]=bed
-const payload=Buffer.from(JSON.stringify(data));raw.writeUInt32LE(payload.length,12)
+if(data.length>=7)data[7]=bed;else data[1][17]=bed
+const payload=Buffer.from(encodeRoadEdits(raw.toString('utf8',start,start+size),data));raw.writeUInt32LE(payload.length,12)
 writeFileSync(file,gzipSync(Buffer.concat([raw.subarray(0,start),payload,raw.subarray(start+size)])))

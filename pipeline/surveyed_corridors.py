@@ -21,6 +21,7 @@ from common import ll2xz
 from features import polygons
 from road_grading import eval_bspline_grid
 from service_streets import rings, width
+from vehicle_roadbed import roadbed, set_roadbed
 
 
 def read_chunk(file):
@@ -60,7 +61,7 @@ def restore(output,chunks):
                 paths.append(None if len(paths) in (5,11,12,13) else [])
             paths[12] = original.get('platform')
             paths[13] = anchors
-        collision[7]=original['bed']
+        set_roadbed(collision,original['bed'])
         write_chunk(file,raw,start,size,collision)
         tile['bytes']=file.stat().st_size
 
@@ -170,7 +171,7 @@ def patch(file, area, approaches=(), foot=(), seam=None, crossings=(), fixed=(),
         original=json.loads(zlib.decompress(base64.b64decode(previous)))
     else:
         original=dict(paths=paths[0],lower=paths[11][0] if len(paths)>11 and paths[11] else None,
-                      platform=old if isinstance(old,list) else None,length=len(paths),bed=collision[7] if len(collision)>7 else None)
+                      platform=old if isinstance(old,list) else None,length=len(paths),bed=roadbed(collision))
         if tile and 'roadbeds' in tile:
             original['roadbeds']=tile['roadbeds']
         previous=base64.b64encode(zlib.compress(json.dumps(original,separators=(',',':')).encode())).decode()
@@ -418,10 +419,6 @@ def patch(file, area, approaches=(), foot=(), seam=None, crossings=(), fixed=(),
     for name,points in [('sidewalk',sidewalks),('skirt',skirts)]:
         if points:
             paths[12][name]=base64.b64encode(np.asarray(points,dtype='<i4').tobytes()).decode()
-    while len(collision)<8:
-        collision.append([])
-    if isinstance(collision[4],dict) and 'drop' in collision[4]:
-        collision[4] = []
     if old_bed:
         old_vertices=(np.frombuffer(base64.b64decode(old_bed['packed']),'<i4').reshape(-1,3)/10000
                       if old_bed.get('packed') else np.asarray(old_bed['vertices']))
@@ -459,6 +456,6 @@ def patch(file, area, approaches=(), foot=(), seam=None, crossings=(), fixed=(),
             vertices.extend(old_vertices.tolist())
         drop=sorted(old_faces.union(drop))
     positions=np.rint(np.asarray(vertices)*10000).astype("<i4")
-    collision[7] = dict(drop=drop,packed=base64.b64encode(positions.tobytes()).decode())
+    set_roadbed(collision, dict(drop=drop,packed=base64.b64encode(positions.tobytes()).decode()))
     write_chunk(file,raw,start,size,collision)
     return True

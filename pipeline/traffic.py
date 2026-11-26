@@ -177,7 +177,24 @@ def native_dingjiang_lanes(graph_path, elements):
             for lane in graph['lanes'] if (lane['from'],lane['to']) in pairs or (lane['to'],lane['from']) in pairs}
 
 
-def bake(output, manifest, rendered_roads=None):
+def bake_after_roads(output, manifest, rendered_roads, station_ways):
+    import copy
+    import shutil
+    from features import points
+    from shapely.geometry import box
+    ways = [way for way in station_ways if way['id'] in DINGJIANG_NATIVE]
+    corridor = unary_union([LineString(points(way)) for way in ways]).buffer(32)
+    with tempfile.TemporaryDirectory() as tmp:
+        directory = Path(tmp)
+        native = copy.deepcopy(manifest)
+        native['chunks'] = [tile for tile in native['chunks'] if corridor.intersects(
+            box(tile['x'],tile['z'],tile['x']+256,tile['z']+256))]
+        for tile in native['chunks']:
+            shutil.copyfile(output/tile['file'],directory/tile['file'])
+        bake(output, manifest, rendered_roads, native_surface=(directory, native, ways))
+
+
+def bake(output, manifest, rendered_roads=None, *, native_surface=None):
     from shapely.geometry import box
     left, top, width, depth = manifest['extent']
     native_world = rendered_roads is not None
@@ -460,6 +477,14 @@ def bake(output, manifest, rendered_roads=None):
     align_airport_lane(nodes, lanes, node_height, profile)
     result = dict(nodes=[node for node in nodes.values() if node['y'] is not None],lanes=lanes,signals=signals,quiet=quiet,walks=walks)
     dest.parent.mkdir(exist_ok=True)
+    if native_surface is not None:
+        from station_roads import sample_lane_profiles
+        directory, native_manifest, ways = native_surface
+        originals = [lane for lane in lanes if lane['way'] in DINGJIANG_NATIVE]
+        changes = sample_lane_profiles(directory, native_manifest, ways, dict(nodes=result['nodes'], lanes=originals))
+        for lane in originals:
+            if str(lane['id']) in changes:
+                native_lanes[lane['from'],lane['to']] = {**{k:lane[k] for k in ('offset','heights') if k in lane}, **changes[str(lane['id'])]}
     with tempfile.TemporaryDirectory() as tmp:
         request = Path(tmp)/'request.json'
         original_tunnels = [t for t in manifest.get('tunnels',[]) if not t.get('generated')]

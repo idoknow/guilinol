@@ -13,6 +13,7 @@ from vehicle_tunnels import grade_limit
 from service_streets import width
 
 from surveyed_corridors import read_chunk, write_chunk
+from vehicle_roadbed import roadbed
 
 
 def bake(output, manifest, tunnels, elements):
@@ -166,8 +167,9 @@ def refit(output, chunks, mouths, ribbons, *, landing, cut_only=False):
             return base64.b64encode(xyz.tobytes()).decode()
         for part in ('packed','sidewalk','skirt'):
             if survey.get(part):survey[part]=blend(survey[part],1000,0)
-        if len(c)>7 and c[7] and c[7].get('packed'):
-            c[7]['packed']=blend(c[7]['packed'],10000,-.051)
+        bed=roadbed(c)
+        if bed and bed.get('packed'):
+            bed['packed']=blend(bed['packed'],10000,-.051)
         if changed:
             write_chunk(file,raw,start,size,c)
             tile['bytes']=file.stat().st_size

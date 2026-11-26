@@ -12,7 +12,7 @@ export interface StationPavingStyle {plaza?:Pair[]; platformEdges?:[Pair,Pair][]
 type Path=[number,...Pair[][]]
 type RoadCtrl=[number,number[]]
 type Lower=[number,Pair[],[number,number,number,number][]]
-export type Streets=[Path[],Pair[],number[][],Pair[]?,Pair[]?,(RoadCtrl|null)?,number[][]?,number[][]?,number[][]?,number[][]?,Pair[][]?,(Lower|null)?,([number,number,number]|{start:number,end:number,vertices?:[number,number,number][],packed?:string,bank?:string,sidewalk?:string,skirt?:string}|null)?,Record<string,number>?,StationRoadSegment[]?,StationPavingCut[]?,[number,number,number]?]
+export type Streets=[Path[],Pair[],number[][],Pair[]?,Pair[]?,(RoadCtrl|null)?,number[][]?,number[][]?,number[][]?,number[][]?,Pair[][]?,(Lower|null)?,([number,number,number]|{start:number,end:number,vertices?:[number,number,number][],packed?:string,bank?:string,sidewalk?:string,skirt?:string}|null)?,Record<string,number>?,StationRoadSegment[]?,StationPavingCut[]?,[number,number,number]?,import('./roadbed').RoadBed?]
 const colors=look.streets.surfaces.map(v=>new THREE.Color(v)),tone=Object.fromEntries((['railing','lampPole','lampHead'] as const).map(k=>[k,new THREE.Color(look.streets[k])]))
 const stoneLight=new THREE.Color(0xa6a39a),stoneMid=new THREE.Color(0x8c8981),stoneBase=new THREE.Color(0x74726b)
 const platformBrick=new THREE.Color(style.station.platformBrick)

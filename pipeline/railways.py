@@ -16,7 +16,7 @@ import numpy as np
 from shapely import LineString, Point, STRtree, box, points as point_array
 
 from common import CHUNK, load_osm, ll2xz
-from features import points
+from features import grain_yard_site, points
 from landmarks.world_surface import Surface
 from play_region import PlayRegion
 from railway_layout import lines
@@ -98,6 +98,7 @@ def bake(world_dir, manifest, inventory, samples):
             if tags.get('bridge','no')=='no':
                 surface_roads.append(zone)
     protected = STRtree(road_zones)
+    yard = grain_yard_site()
     nodes, coords, ground, graph = {}, [], [], []
     def vertex(p):
         key = tuple(round(v, 4) for v in p.coords[0])
@@ -205,7 +206,7 @@ def bake(world_dir, manifest, inventory, samples):
                                 continue
                             if rail_corridors.query(Point(xy),predicate='dwithin',distance=2.4).size: continue
                             if any(np.linalg.norm(xy-other)<1.3 for other in used_sites): continue
-                            if world.roof(*xy) is not None: continue
+                            if yard.covers(Point(xy)) or world.roof(*xy) is not None: continue
                             used_sites.append(xy)
                             origin=np.floor(xy/CHUNK)*CHUNK
                             sign_sites[tuple(map(int,origin))].append([*np.round((xy-origin)*100).astype(int).tolist(),

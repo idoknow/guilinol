@@ -97,7 +97,7 @@ def tunnel_sections(profiles):
     return bores
 
 
-def bake(directory, manifest, paired_widths):
+def bake(directory, manifest, paired_widths, *, defer_lanes=False):
     """Install profiles after the native rail tie-ins have been evaluated."""
     from dingjiang import road_profiles
     elements = load_osm()
@@ -108,7 +108,7 @@ def bake(directory, manifest, paired_widths):
     bridge_ways, landings = dingjiang_structures.raise_decks(directory, manifest, elements, profiles)
     from rail_sections import designs, road_profiles as section_roads
     from dingjiang import ROAD_IDS
-    bake_profiles(directory, manifest, profiles, elements, bridge_ways.values(), landings)
+    lane_ways = bake_profiles(directory, manifest, profiles, elements, bridge_ways.values(), landings, defer_lanes=defer_lanes)
     from dingjiang_paving import finish_paving
     finish_paving(directory, manifest, [profiles[wid] for wid in ROAD_IDS], elements)
     ways = {way['id']: way for way in elements if way['type']=='way'}
@@ -116,11 +116,12 @@ def bake(directory, manifest, paired_widths):
         parts = section_roads(section, ways, paired_widths)
         if not parts:
             continue
-        bake_profiles(directory, manifest, parts, elements, additional=True)
+        lane_ways.extend(bake_profiles(directory, manifest, parts, elements, additional=True, defer_lanes=defer_lanes))
         finish_paving(directory, manifest, list(parts.values()), elements)
+    return lane_ways
 
 
-def bake_profiles(directory, manifest, profiles, elements, bridge_ways=(), landings=None, *, additional=False):
+def bake_profiles(directory, manifest, profiles, elements, bridge_ways=(), landings=None, *, additional=False, defer_lanes=False):
     import gzip
     import struct
     from collections import defaultdict
@@ -311,7 +312,10 @@ def bake_profiles(directory, manifest, profiles, elements, bridge_ways=(), landi
             if np.any(moved):
                 stems[moved,2]=(stems[moved,2].view('<i2')+np.rint(10*(new_y[moved]-native_y[moved]))).astype('<i2')
                 treefile.write_bytes(gzip.compress(stems.tobytes(),mtime=0))
-    grade_traffic(directory, manifest, [*(way for way, _, _ in profiles.values()), *bridge_ways])
+    lane_ways = [*(way for way, _, _ in profiles.values()), *bridge_ways]
+    if not defer_lanes:
+        grade_traffic(directory, manifest, lane_ways)
+    return lane_ways
 
 
 def trim_joint_floors(tunnels):
@@ -353,13 +357,10 @@ def stitch(ends,joints):
 
 
 
-def grade_traffic(directory, manifest, ways):
-    import gzip
+def sample_lane_profiles(directory, manifest, ways, graph):
     import subprocess
     from tempfile import NamedTemporaryFile
 
-    graph_path = directory/'roads'/'graph.json.gz'
-    graph = json.loads(gzip.decompress(graph_path.read_bytes()))
     owners = {}
     roads = list(ways)
     # The north access road skirts the replaced station building. Its traffic
@@ -384,7 +385,14 @@ def grade_traffic(directory, manifest, ways):
         subprocess.run([root/'node_modules/.bin/tsx',root/'scripts/railway-lane-heights.ts',
                         directory.resolve(),Path(payload.name).resolve()],cwd=root,check=True)
         payload.seek(0)
-        changes=json.load(payload)
+        return json.load(payload)
+
+
+def grade_traffic(directory, manifest, ways):
+    import gzip
+    graph_path = directory/'roads'/'graph.json.gz'
+    graph = json.loads(gzip.decompress(graph_path.read_bytes()))
+    changes = sample_lane_profiles(directory, manifest, ways, graph)
     for path in [graph_path,*sorted((directory/'roads').glob('*_*.json.gz'))]:
         content=graph if path==graph_path else json.loads(gzip.decompress(path.read_bytes()))
         changed=False

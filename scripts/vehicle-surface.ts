@@ -38,7 +38,7 @@ export function tileSurface(world,entry,tunnels, collect?:(kind:string,faces:Flo
   const [verts,indices,jsonSize,imageBytes,triangles]=[4,8,12,16,20].map(i=>data.readUInt32LE(i))
   const jsonStart=24+16900+9*verts+4*indices
   const [,paths,,,legacy,signs=[],railCuts=[],savedBed]=JSON.parse(data.toString('utf8',jsonStart,jsonStart+jsonSize))
-  const bed=savedBed??(legacy&&!Array.isArray(legacy)?legacy:undefined)
+  const bed=paths[17]??savedBed??(legacy&&!Array.isArray(legacy)?legacy:undefined)
   const deckStart=jsonStart+jsonSize+imageBytes,tail=deckStart+18*triangles
   const groundStart=data.length===tail?24:tail
   const grid=new Float32Array(4225),wet=new Uint8Array(4225)

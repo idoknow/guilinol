@@ -4,6 +4,7 @@ import {readFileSync,writeFileSync} from 'node:fs'
 import {join} from 'node:path'
 import {gunzipSync,gzipSync} from 'node:zlib'
 import {MeshoptSimplifier} from 'meshoptimizer'
+import {encodeRoadEdits} from './roadbed-json.mjs'
 
 // Terrain is sampled vertically. A small 3D simplifier cost at a steep rim
 // does not bound the height of a wheel. Keep those faces and certify the
@@ -116,7 +117,7 @@ for(const file of JSON.parse(readFileSync(list,'utf8'))){
   const path=join(world,file),raw=gunzipSync(readFileSync(path))
   const offset=24+16900+9*raw.readUInt32LE(4)+4*raw.readUInt32LE(8)
   const length=raw.readUInt32LE(12),collision=JSON.parse(raw.toString('utf8',offset,offset+length))
-  const bed=collision[7]
+  const bed=collision[1][17]??collision[7]
   if(!bed?.packed)continue
   const survey=collision[1][12]
   let changed=false
@@ -126,7 +127,7 @@ for(const file of JSON.parse(readFileSync(list,'utf8'))){
     if(reduced!==mesh[key]){mesh[key]=reduced;changed=true}
   }
   if(!changed)continue
-  const json=Buffer.from(JSON.stringify(collision))
+  const json=Buffer.from(encodeRoadEdits(raw.toString('utf8',offset,offset+length),collision))
   raw.writeUInt32LE(json.length,12)
   const result=gzipSync(Buffer.concat([raw.subarray(0,offset),json,raw.subarray(offset+length)]),{level:5})
   writeFileSync(path,result)
