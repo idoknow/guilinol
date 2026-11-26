@@ -2,7 +2,7 @@ import {spawn} from 'node:child_process'
 import WebSocket from 'ws'
 import {createHmac} from 'node:crypto'
 const SECRET='test-secret'
-const mint=(uid,name)=>{const p=Buffer.from(JSON.stringify({uid,name,exp:Math.floor(Date.now()/1000)+50})).toString('base64url');return p+'.'+createHmac('sha256',SECRET).update(p).digest('base64url')}
+const mint=(uid,name,x,z)=>{const p=Buffer.from(JSON.stringify({uid,name,exp:Math.floor(Date.now()/1000)+50})).toString('base64url');return p+'.'+createHmac('sha256',SECRET).update(p).digest('base64url')}
 const PORT=8896, URL=`ws://127.0.0.1:${PORT}/ws`
 const sleep=ms=>new Promise(r=>setTimeout(r,ms))
 const srv=spawn('node',['rt/server-realtime.mjs'],{env:{...process.env,RT_JOIN_SECRET:SECRET,PORT:String(PORT),
@@ -15,11 +15,11 @@ const ok=(c,m)=>{console.log((c?'  PASS ':'  FAIL ')+m); if(!c)fail++}
 function client(uid,name,x,z,caps=['roster3']){
   const ws=new WebSocket(URL); const seen=[]
   ws.on('message',m=>seen.push(JSON.parse(m.toString())))
-  ws.on('open',()=>ws.send(JSON.stringify({t:'join',ticket:mint(uid,name),name,...(caps?{caps}:{}),x,y:3,z,yaw:0})))
+  ws.on('open',()=>ws.send(JSON.stringify({t:'join',ticket:mint(uid,name,x,z),name,...(caps?{caps}:{}),x,y:3,z,yaw:0})))
   return {ws,seen,send:o=>ws.send(JSON.stringify(o))}
 }
 const A=client(920001,'A',110.29,25.27)
-const B=client(920002,'B',110.35,25.31)          // 附近
+const B=client(920002,'B',190,25.31)
 const F=client(920003,'F',110.29+3000,25.27) // 3km 外（世界坐标单位是米）
 await sleep(1200)
 const aId=A.seen.find(m=>m.t==='welcome')?.me.id
@@ -52,7 +52,7 @@ ok(!!full&&full.full.length===4, `随后收到全量快照（${full?full.full.le
 console.log('\n[3] 增量：有人移动 → up')
 A.seen.length=0
 A.send({t:'roster_ping'})
-for(let i=1;i<=30;i++){B.send({t:'pos',x:110.35+i*0.4,y:3,z:25.31,yaw:0});await sleep(50)}
+for(let i=1;i<=30;i++){B.send({t:'pos',x:190+i*0.4,y:3,z:25.31,yaw:0});await sleep(50)}
 await sleep(900)
 const ups=A.seen.filter(m=>m.t==='roster3').flatMap(m=>m.up||[])
 ok(ups.some(u=>u[0]===bId), `收到 B 的 up 增量`)

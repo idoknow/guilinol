@@ -7,6 +7,7 @@ import {onUser} from './ui/account'
 import type {MpStatus} from './ui/mp-pref'
 import {setRoster,clearRoster,type RosterPlayer} from './mp-roster'
 import {fingerprint,deviceSummary} from './fingerprint'
+import {bindTravel,travelTarget} from './mp-travel'
 
 function publish(detail:MpStatus){window.dispatchEvent(new CustomEvent('glol:mp-status',{detail}))}
 
@@ -20,6 +21,15 @@ export function requestRoster(on:boolean){subCount=Math.max(0,subCount+(on?1:-1)
 
 export function attachNet(scene:Scene,clips:AnimationClip[],getPose:()=>Pose,getAvatar:()=>Avatar,camera:Camera,getActivity?:()=>ActivityReport,onCombat?:(p:CombatPacket,self:string)=>void,onSetback?:(x:number,y:number,z:number)=>void) {
   const peers=players(scene,clips,camera)
+  let travelReply:((ok:boolean)=>void)|undefined
+  let travelSequence=0
+  bindTravel(async(reason,x,z)=>{
+    if(state!=='online'||Math.hypot(getPose().x-x,getPose().z-z)<=200)return true
+    const target=travelTarget(reason,x,z);if(!target||travelReply)return false
+    return new Promise(resolve=>{const timeout=setTimeout(()=>travelReply?.(false),4000)
+      travelReply=ok=>{clearTimeout(timeout);travelReply=undefined;resolve(ok)}
+      send({t:'travel',seq:++travelSequence,reason:reason.split(':')[0],target})})
+  })
   let socket:WebSocket|undefined,attempt=0,generation=0,timer=0,lastSent=-Infinity,lastRoster=-Infinity,lastActCheck=-Infinity,disposed=false
   let lastRosterV=0,rosterPaused=false,subTimer=0
   let lastActKey=''
@@ -83,6 +93,8 @@ export function attachNet(scene:Scene,clips:AnimationClip[],getPose:()=>Pose,get
         if(version!==generation)return
         const msg=JSON.parse(event.data)
         switch(msg.t){
+          case 'travel_result':if(msg.seq===travelSequence)travelReply?.(msg.ok===true);break
+          case 'banned':window.dispatchEvent(new CustomEvent('glol:mp-ban',{detail:msg}));break
           case 'chat':case 'chat_hist':case 'chat_del':case 'chat_mute':case 'chat_ack':receiveChat(msg);break
           case 'combat': {
             const old=peers.list().find(p=>p.id===msg.id)?.helper
@@ -190,6 +202,7 @@ export function attachNet(scene:Scene,clips:AnimationClip[],getPose:()=>Pose,get
   window.addEventListener('glol:mp-reconnect',manual)
   return {list:peers.list,send,emote,status,tick,who:()=>send({t:'who'}),probe:peers.probe,reconnect:manual,
     dispose(){disposed=true;unsubscribe();stop();clearTimeout(timer)
+      bindTravel();travelReply?.(false)
       if(socket){const ws=socket;socket=undefined;ws.onopen=ws.onmessage=ws.onclose=ws.onerror=null;try{ws.close(1000,'dispose')}catch{}}
       badge?.remove();window.removeEventListener('glol:avatar-change',avatarChanged);window.removeEventListener('glol:mp-reconnect',manual)
       window.removeEventListener('pagehide',pageHide);window.removeEventListener('pageshow',pageShow);publish({state:'off',online:0})}}

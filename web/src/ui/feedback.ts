@@ -2,7 +2,7 @@ import {getPlayMode} from '../game/play-mode'
 import {record} from '../telemetry'
 import type { Host } from '../play/host'
 import type { mapView } from '../play/map'
-import { kinds, labels, photosOptional, type FeedbackView } from '../../../lib/feedback-contract'
+import { APPEAL,kinds, labels, photosOptional, type FeedbackView } from '../../../lib/feedback-contract'
 import { ll2xz, xz2ll } from '../../../lib/projection'
 import { photoPicker } from './feedback-photo'
 import { cameraSupported, shootFeedbackPhoto } from './feedback-camera'
@@ -213,7 +213,7 @@ function locationPicker(
   }
 }
 
-export async function openFeedback(host: Host, ensureMap: () => Promise<MapApi | undefined>,initialId?:string) {
+export async function openFeedback(host: Host, ensureMap: () => Promise<MapApi | undefined>,initialId?:string,banId?:string) {
   record('funnel',{step:'feedbackOpen'})
   if (document.querySelector('.fb-panel,.fb-aim-bar')) return
   const dialog = el('dialog', '', 'about-panel fb-panel')
@@ -231,7 +231,7 @@ export async function openFeedback(host: Host, ensureMap: () => Promise<MapApi |
   document.body.append(dialog)
   let captured: Awaited<ReturnType<Host['captureView']>> | undefined
   try {
-    if(!initialId)captured = await host.captureView()
+    if(!initialId&&!banId)captured = await host.captureView()
   } catch (error) {
     note.textContent = String(error)
   }
@@ -532,6 +532,7 @@ export async function openFeedback(host: Host, ensureMap: () => Promise<MapApi |
     if (item) preview(section('', '游戏视角'))
     if (!item) {
       const where = section('1', '在哪里')
+      where.hidden=!!banId
       preview(where)
       const rule = el('div', '', 'fb-rule')
       rule.innerHTML =
@@ -604,7 +605,7 @@ export async function openFeedback(host: Host, ensureMap: () => Promise<MapApi |
         radio.type = 'radio'
         radio.name = 'fb-kind'
         radio.value = value
-        radio.checked = i === 0
+        radio.checked = banId ? value===APPEAL : i === 0
         radio.onchange = () => applyKind()
         chip.append(radio, el('span', value))
         kind.append(chip)
@@ -616,6 +617,7 @@ export async function openFeedback(host: Host, ensureMap: () => Promise<MapApi |
       field(what, '标题', name)
       description.maxLength = 1400
       description.rows = 3
+      if (banId) {name.value=APPEAL;description.value=`封禁记录 ID：${banId}\n申诉说明：`}
       description.placeholder = '哪里和现实不一样？现实中是什么样子？'
       describeField = field(what, '描述（可选）', description)
     } else if (supplement) {
@@ -648,6 +650,12 @@ export async function openFeedback(host: Host, ensureMap: () => Promise<MapApi |
     }
     applyKind = () => {
       const bug = photosOptional(chosenKind())
+      if(chosenKind()===APPEAL) {
+        shotsHint.textContent='可选：附上封禁通知截图。请勿填写密码或验证码。'
+        description.placeholder='请输入封禁记录 ID，说明希望复核的情况。'
+        description.required=true
+        setCount(photoCount);return
+      }
       shotsTitle.lastChild!.textContent = bug ? '截图（可选）' : '照片'
       shotsHint.textContent = bug
         ? '上面已经自动附上了你看到的游戏画面。出错提示、卡住的界面等可以再截图补充，没有也可以直接提交。'
@@ -712,13 +720,14 @@ export async function openFeedback(host: Host, ensureMap: () => Promise<MapApi |
         send.textContent = '正在上传…'
         try {
           if (!id) {
-            if (!selection) throw Error('请先截取游戏画面')
+            const appeal=chosenKind()===APPEAL
+            if (!selection&&!appeal) throw Error('请先截取游戏画面')
             id = (
               await api<{ id: string }>('feedback', {
-                ...location,
-                view: selection.view,
-                heading: selection.view.heading,
-                landmark_id: selection.view.landmark_id,
+                ...(appeal?xz2ll(0,0):location),
+                view: appeal?null:selection?.view,
+                heading: appeal?null:selection?.view.heading,
+                landmark_id: appeal?null:selection?.view.landmark_id,
                 kind: chosenKind(),
                 title: name.value.trim(),
                 body: text,
@@ -727,7 +736,7 @@ export async function openFeedback(host: Host, ensureMap: () => Promise<MapApi |
             for (const box of Array.from(form.querySelectorAll<HTMLElement>('.fb-step')))
               box.inert = box !== shots
           }
-          if (selection) {
+          if (selection && chosenKind()!==APPEAL) {
             const response = await fetch(`/api/feedback/${id}/view-shot`, {
               method: 'PUT',
               headers: { 'Content-Type': 'image/jpeg', 'X-Feedback-View': JSON.stringify(selection.view).replace(/[^\x20-\x7e]/g,char=>'\\u'+char.charCodeAt(0).toString(16).padStart(4,'0')) },

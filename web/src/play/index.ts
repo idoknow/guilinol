@@ -145,6 +145,10 @@ export function play(host:Host) {
   const loadMap = ()=>void ensureMap(true)
   let mapRequested = !(host.manifest as {atlas?:unknown}).atlas
   const feedbackEntry=button('反馈','反馈','dock-feedback');buttons.append(feedbackEntry)
+  window.addEventListener('glol:mp-ban',event=>{
+    const detail=(event as CustomEvent).detail
+    void import('../ui/mp-ban').then(module=>module.showMpBan(detail,recordId=>void import('../ui/feedback').then(feedback=>feedback.openFeedback(host,()=>{mapRequested=true;return ensureMap()},undefined,recordId))))
+  })
   feedbackEntry.onclick=()=>void import('../ui/feedback').then(module=>module.openFeedback(host,()=>{mapRequested = true; return ensureMap()}))
   const feedbackId=new URLSearchParams(location.search).get('feedback');if(feedbackId&&/^[\w-]{1,128}$/.test(feedbackId))void import('../ui/feedback').then(module=>module.openFeedback(host,()=>{mapRequested=true;return ensureMap()},feedbackId))
   // IDOK-144: portrait phones can tap back into landscape after dismissing the gate (see ui/orientation.ts).

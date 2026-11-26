@@ -8,6 +8,7 @@
 //   · 瞬移按合法处理需同时满足：不在战斗（5s）、距上次瞬移 ≥3s；瞬移后 3s 不能出拳
 //   · 溢出 ≤2m 的抖动直接接受（只记数），超过才拒包并拉回，避免手机网络抖动被拉回
 import pg from 'pg'
+import { randomUUID } from 'node:crypto'
 
 export const LIMITS = Object.freeze({
   walk: 9,          // m/s 跑步
@@ -27,7 +28,7 @@ export const LIMITS = Object.freeze({
 
 /** 空中/载具：不限制向上速度，按载具上限放行（直升机刚上线，乘客的 foot 会被置 false） */
 const airborne = (p) => p.foot === false || Boolean(p.bike) || p.activity === 'drone'
-const AUTOBAN = process.env.RT_AC_AUTOBAN === '1'
+const attackKinds=new Set(['mount_player','foreign_position','oversize','invalid_packet','packet_rate'])
 // 阈值按"合法玩家 0~5 次/10 分钟、脚本 150+ 次"的实测分布取，宁可漏也不误封：
 // 40 次 → 3 分钟（强制下线冷静一下）；150 次 → 1 小时；300 次 → 24 小时
 const num = (value, fallback) => (Number.isFinite(Number(value)) && Number(value) > 0 ? Number(value) : fallback)
@@ -59,12 +60,12 @@ export function checkMove(p, nx, ny, nz, at) {
   const flat = Math.hypot(nx - p.x, nz - p.z)
   const rise = ny - p.y
 
-  if (!airborne(p) && rise > LIMITS.upMax * dt + 0.5) return { ok: false, kind: 'fly', overflow: rise, reject: true }
-
   if (flat > LIMITS.jumpM) {
     const inCombat = at - (p.lastCombat ?? 0) < LIMITS.combatLockMs
     const tooSoon = at - (p.tpAt ?? -Infinity) < LIMITS.tpGapMs
-    if (inCombat || tooSoon) return { ok: false, kind: 'teleport', overflow: flat, reject: true }
+    const permit=p.travel
+    p.travel=null
+    if (!permit || permit.until<at || Math.hypot(nx-permit.x,nz-permit.z)>8 || inCombat || tooSoon) return { ok: false, kind: 'teleport', overflow: flat, reject: true }
     p.tpAt = at
     p.punchLockUntil = at + LIMITS.tpLockMs
     return { ok: true, teleport: true }
@@ -74,11 +75,15 @@ export function checkMove(p, nx, ny, nz, at) {
   // 但持续作弊（20Hz 下 40 m/s）会稳定超限，会被拒。
   const cap = (airborne(p) ? LIMITS.car : speedCap(p, at)) * dt * LIMITS.tolerance + LIMITS.stepM
   if (flat > cap) return { ok: false, kind: 'speed', overflow: flat - cap, reject: true }
-  return { ok: true }
+  const baseline=p.altitudeBaseline??={y:p.y,at}
+  if (ny<baseline.y+1) { baseline.y=ny; baseline.at=at }
+  const observation= !airborne(p) && (rise>LIMITS.upMax*dt+0.5 || (ny-baseline.y>4 && at-baseline.at>8000)) ? 'altitude_unverified' : ny < -10 ? 'ground_unverified' : null
+  return { ok: true, observation }
 }
 
 /** 出拳/扶人前调用：过去 1 秒必须是走路速度，且不在瞬移后锁定里 */
 export function canAct(p, at) {
+  if (airborne(p)) return false
   if (at < (p.punchLockUntil ?? 0)) return false
   return at - (p.fastAt ?? -Infinity) > LIMITS.walkGateMs
 }
@@ -103,25 +108,27 @@ export function createBanStore(env = process.env, log = () => {}) {
   const put = (row) => {
     const until = row.until_ms == null ? Infinity : Number(row.until_ms)
     if (until <= Date.now()) { cells.delete(keyOf(row.kind, row.value)); return }
-    cells.set(keyOf(row.kind, row.value), { kind: row.kind, value: String(row.value), until, reason: row.reason ?? '', actor: row.actor ?? '', level: Number(row.level ?? 0) })
+    cells.set(keyOf(row.kind, row.value), { kind: row.kind, value: String(row.value), recordId: row.record_id, until, reason: row.reason ?? '', actor: row.actor ?? '', level: Number(row.level ?? 0) })
   }
 
   async function hydrate() {
     if (!pool) return
     try {
-      const { rows } = await pool.query('select kind,value,until_ms,reason,actor,level from mp_bans')
+      const { rows } = await pool.query("select kind,value,until_ms,reason,actor,level,coalesce(record_id,'legacy-'||id) as record_id from mp_bans")
       const now = Date.now()
       cells.clear()
       for (const row of rows) { if (row.until_ms == null || Number(row.until_ms) > now) put(row) }
       hydratedAt = now
-    } catch (error) { log('ban hydrate failed', error.message) }
+    } catch (error) { log('ban hydrate failed', error.message); if (!hydratedAt) throw error }
   }
 
   /** 每次 join 前调用；15 秒一次真查库，其余走缓存 */
+  let refreshing
   async function refresh() {
     if (!pool) return
     if (Date.now() - hydratedAt < 15000) return
-    await hydrate()
+    refreshing ??= hydrate().finally(()=>{refreshing=null})
+    await refreshing
   }
 
   /** 返回命中的封禁（uid 或指纹任一命中） */
@@ -134,43 +141,67 @@ export function createBanStore(env = process.env, log = () => {}) {
     return null
   }
 
-  async function ban({ uid, fp, minutes = 0, reason = '', actor = '', level = 0 }) {
+  async function transaction(work) {
+    if (!pool) return
+    const db = await pool.connect()
+    try { await db.query('BEGIN'); await work(db); await db.query('COMMIT') }
+    catch (error) { await db.query('ROLLBACK'); throw error } finally { db.release() }
+  }
+  const audit = (db,actor,action,target,detail) => db.query('insert into admin_audit(actor_id,action,target_type,target_id,detail) values($1,$2,$3,$4,$5)',[actor,action,'mp',String(target),detail])
+  async function ban({ uid, fp, minutes = 0, reason = '', actor = '', level = 0, reviewId }) {
+    const recordId = randomUUID()
     const until = minutes > 0 ? Date.now() + minutes * 60000 : null
     const entries = []
     if (uid != null) entries.push({ kind: 'uid', value: String(uid) })
     if (fp) entries.push({ kind: 'fp', value: fp })
     if (!entries.length) throw Error('uid or fp required')
-    for (const entry of entries) {
-      put({ ...entry, until_ms: until, reason, actor, level })
-      if (pool) {
-        await pool.query(
-          `insert into mp_bans(kind,value,until_ms,reason,actor,level,created_at) values($1,$2,$3,$4,$5,$6,$7)
-           on conflict (kind,value) do update set until_ms=excluded.until_ms, reason=excluded.reason, actor=excluded.actor, level=excluded.level, created_at=excluded.created_at`,
-          [entry.kind, entry.value, until, reason, actor, level, Date.now()],
+    if (!pool && reviewId && memoryReviews.get(uid)?.id !== reviewId) throw Error('待复核记录不匹配')
+    await transaction(async db => {
+      if (reviewId) {
+        const result = await db.query('update mp_reviews set resolved_ms=$3,ban_id=$4 where id=$1 and uid=$2 and resolved_ms is null',[reviewId,uid,Date.now(),recordId])
+        if (!result.rowCount) throw Error('待复核记录不匹配')
+      }
+      for (const entry of entries) {
+        await db.query(
+          `insert into mp_bans(kind,value,until_ms,reason,actor,level,created_at,record_id) values($1,$2,$3,$4,$5,$6,$7,$8)
+           on conflict (kind,value) do update set until_ms=excluded.until_ms, reason=excluded.reason, actor=excluded.actor, level=excluded.level, created_at=excluded.created_at,record_id=excluded.record_id`,
+          [entry.kind, entry.value, until, reason, actor, level, Date.now(),recordId],
         )
       }
-    }
-    return { uid: uid ?? null, fp: fp ?? null, until, minutes }
+      await audit(db,actor,'mp.ban',uid ?? fp,{uid,fp,reason,until,recordId,reviewId})
+    })
+    for (const entry of entries) put({...entry,until_ms:until,reason,actor,level,record_id:recordId})
+    if (reviewId) memoryReviews.delete(uid)
+    return { uid: uid ?? null, fp: fp ?? null, until, minutes, recordId, reason }
   }
 
   async function unban({ uid, fp, actor = '' }) {
     let removed = 0
-    if (uid != null) { cells.delete(keyOf('uid', String(uid))); removed++ }
-    if (fp) { cells.delete(keyOf('fp', fp)); removed++ }
-    if (pool) {
-      if (uid != null) await pool.query("delete from mp_bans where kind='uid' and value=$1", [String(uid)])
-      if (fp) await pool.query("delete from mp_bans where kind='fp' and value=$1", [fp])
-      if (actor) await pool.query('insert into admin_audit(actor_id,action,target,detail,created_at) values($1,$2,$3,$4,$5)', [actor, 'mp.unban', String(uid ?? fp ?? ''), JSON.stringify({ uid: uid ?? null, fp: fp ?? null }), Date.now()]).catch(() => {})
-    }
+    await transaction(async db => {
+      const result = await db.query("delete from mp_bans where (kind='uid' and value=$1) or (kind='fp' and value=$2) returning record_id",[uid == null ? null : String(uid),fp || null])
+      await audit(db,actor,'mp.unban',uid ?? fp,{uid,fp,records:result.rows})
+    })
+    if (uid != null && cells.delete(keyOf('uid', String(uid)))) removed++
+    if (fp && cells.delete(keyOf('fp', fp))) removed++
     await hydrate()
     return { removed }
+  }
+  async function dismiss(uid,reviewId,actor) {
+    if (!pool && memoryReviews.get(uid)?.id!==reviewId) throw Error('待复核记录不匹配')
+    await transaction(async db=>{
+      const result=await db.query('update mp_reviews set resolved_ms=$3 where id=$1 and uid=$2 and resolved_ms is null',[reviewId,uid,Date.now()])
+      if(!result.rowCount) throw Error('待复核记录不匹配')
+      await audit(db,actor,'mp.dismiss',uid,{reviewId})
+    })
+    memoryReviews.delete(uid);recent.delete(uid)
+    return {dismissed:true}
   }
 
   function list() {
     const now = Date.now()
     return [...cells.values()].filter((row) => row.until > now).map((row) => ({
       kind: row.kind, value: row.value, until: Number.isFinite(row.until) ? row.until : null,
-      reason: row.reason, actor: row.actor, level: row.level,
+      reason: row.reason, actor: row.actor, level: row.level, recordId:row.recordId,
     }))
   }
 
@@ -212,7 +243,6 @@ export function createBanStore(env = process.env, log = () => {}) {
     } catch { return [] }
   }
 
-  /** 记录一次违规；同一 uid 10 分钟内 ≥8 次自动封 10 分钟，≥20 次封 24 小时 */
   async function violation({ uid, fp, kind, detail = {}, ua = '' }) {
     if (pool) {
       await pool.query('insert into mp_cheat_events(uid,fp,kind,detail,at) values($1,$2,$3,$4,$5)', [uid, fp || null, kind, detail, Date.now()]).catch(() => {})
@@ -222,28 +252,32 @@ export function createBanStore(env = process.env, log = () => {}) {
         [uid, fp, Date.now(), ua],
       ).catch(() => {})
     }
-    if (uid == null || !AUTOBAN) return null   // 首版只记录不自动封（默认关），用真实数据调参后再开
-    // 滑动窗口（10 分钟）：只统计最近 10 分钟的违规次数
-    const at = Date.now()
-    const list = (recent.get(uid) ?? []).filter((t) => at - t < BAN.windowMs)
-    list.push(at)
-    recent.set(uid, list)
-    if (recent.size > 500) for (const [id, times] of recent) if (!times.length || at - times[times.length - 1] > BAN.windowMs) recent.delete(id)
-
-    if (check(uid, fp)) return null                  // 已经在封禁里，不重复封
-    const hits = list.length
-    const level = hits >= BAN.l3 ? 3 : hits >= BAN.l2 ? 2 : hits >= BAN.l1 ? 1 : 0
+    if (uid == null || !attackKinds.has(kind) && !['speed','teleport'].includes(kind)) return null
+    const now = Date.now()
+    for (const [id, events] of recent) if (events.at(-1).at <= now-600000) recent.delete(id)
+    const window = (recent.get(uid) || []).filter(event=>event.at>now-600000)
+    const tail = window.slice(-Math.max(300,BAN.l3))
+    const latestByKind = new Map(window.map(event=>[event.kind,event]))
+    const events = [...latestByKind.values()].filter(event=>!tail.includes(event)).concat(tail)
+    events.push({at:now,kind,fp,detail}); recent.set(uid,events)
+    if (new Set(events.map(event=>event.kind)).size > 1) {
+      latestByKind.set(kind,events.at(-1))
+      const evidence = [...new Set([...latestByKind.values(),...events.slice(-32)])].sort((left,right)=>left.at-right.at)
+      const review = {id:randomUUID(),uid,opened_ms:now,evidence}
+      if (pool) await pool.query('insert into mp_reviews(id,uid,opened_ms,evidence) values($1,$2,$3,$4) on conflict (uid) where resolved_ms is null do nothing',[review.id,uid,now,JSON.stringify(review.evidence)])
+      else if (!memoryReviews.has(uid)) memoryReviews.set(uid,review)
+    }
+    if (check(uid,fp)) return null
+    if (attackKinds.has(kind) && (kind==='mount_player' || events.filter(event=>attackKinds.has(event.kind)).length>=3)) return ban({uid,minutes:10,reason:kind==='mount_player'?'试图骑乘其他在线玩家':'重复发送非法或越权的联机消息',actor:'protocol'})
+    if (new Set(events.map(event=>event.kind)).size>1 || attackKinds.has(kind)) return null
+    if (env.RT_AC_AUTOBAN !== '1') return null
+    const hits=events.length, level=hits>=BAN.l3?3:hits>=BAN.l2?2:hits>=BAN.l1?1:0
     if (!level) return null
-    const minutes = level === 3 ? BAN.l3Min : level === 2 ? BAN.l2Min : BAN.l1Min
-    const reason = `异常移动 ${hits} 次/10 分钟（自动·${level} 级）`
-    // 轻罚只封号（可以申诉、换设备也认账）；2 级以上才连设备一起封
-    await ban({ uid, fp: level >= 2 ? fp : '', minutes, reason, actor: 'auto', level })
-    return { banned: minutes * 60, level, hits }
+    return ban({uid,fp:level>=2?fp:'',minutes:[0,BAN.l1Min,BAN.l2Min,BAN.l3Min][level],reason:`异常移动 ${hits} 次/10 分钟（自动·${level} 级）`,actor:'auto',level})
   }
 
-  /** uid → 最近 10 分钟内的违规时间戳 */
-  const recent = new Map()
+  const recent = new Map(), memoryReviews = new Map()
+  const reviews = async () => pool ? (await pool.query('select id,uid,opened_ms,evidence from mp_reviews where resolved_ms is null order by opened_ms desc limit 100')).rows : [...memoryReviews.values()]
 
-  if (pool) void hydrate()
-  return { pool, refresh, hydrate, check, ban, unban, list, violation, noteDevice, deviceAccounts }
+  return { pool, refresh, hydrate, check, ban, unban, dismiss,list, reviews, violation, noteDevice, deviceAccounts }
 }
