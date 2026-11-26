@@ -25,6 +25,11 @@ function streetWorker(){
 }
 
 export async function loadStreetGeometry(paths:Streets,step:number,heights:THREE.BufferAttribute|THREE.InterleavedBufferAttribute,rails?:StreetRequest['rails'],signs?:StreetRequest['signs'],railCuts?:StreetRequest['railCuts'],paving?:StreetRequest['paving'],roadbeds?:number[],origin?:readonly [number,number]){
+  if(origin?.[0]===-1024 && origin[1]===-256){
+    const {closeCycleGap}=await import('./shizijie-cycle-gap')
+    const [surfaces,...rest]=paths
+    paths=[closeCycleGap(surfaces),...rest]
+  }
   const elevations=Float32Array.from({length:heights.count},(_,i)=>heights.getY(i))
   const target=streetWorker(), id=nextId++
   const data=await new Promise<StreetData>((resolve,reject)=>{
