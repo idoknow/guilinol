@@ -4,7 +4,7 @@ import {createServer} from 'vite'
 import {chromium} from 'playwright'
 import {browserOptions} from './qa-browser.mjs'
 
-test('production GLB: cruise disc pixels retain at least 60% material alpha, while blade and disc overlap at mid RPM',async()=>{
+test('production GLB: cruise disc pixels stay at least 30% opaque (light translucent film, design floor), while blade and disc overlap at mid RPM',async()=>{
   const server=await createServer({root:'web',configFile:'web/vite.config.ts',server:{host:'127.0.0.1',port:0}});await server.listen()
   const browser=await chromium.launch(browserOptions())
   try{
@@ -37,6 +37,6 @@ test('production GLB: cruise disc pixels retain at least 60% material alpha, whi
       }
       renderer.dispose();target.dispose();return results
     },"/@fs/"+process.cwd()+"/node_modules/three/build/three.module.js")
-    for(const sample of results){console.log(sample);assert.ok(sample.minAlpha>=sample.original*.60,JSON.stringify(sample))}
+    for(const sample of results){console.log(sample);assert.ok(sample.minAlpha>=sample.original*.30&&sample.minAlpha<=.75,JSON.stringify(sample))}
   }finally{await browser.close();await server.close()}
 })

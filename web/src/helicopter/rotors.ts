@@ -8,8 +8,10 @@ function layer(node:Object3D,isDisc=false){
       const material=new MeshBasicMaterial({name:original.name,color:original.color,map:original.map,opacity:original.opacity,transparent:true,depthWrite:false,side:DoubleSide,forceSinglePass:true})
       material.onBeforeCompile=shader=>{shader.fragmentShader=shader.fragmentShader.replace('#include <map_fragment>',`#ifdef USE_MAP
         vec4 texel=texture2D(map,vMapUv);
-        diffuseColor.rgb*=texel.rgb;
-        diffuseColor.a*=smoothstep(0.0,0.04,texel.a)*(0.60+0.38*texel.a);
+        // 定稿（sg claude，IDOK-442）：桨盘是“半透明的浅灰气膜”，不是实心黑盘——提亮到天光灰，
+        // 透明度 0.26 起、随贴图条纹上浮，保留 4 道桨影和桨尖黄环
+        diffuseColor.rgb*=mix(texel.rgb,vec3(0.80,0.84,0.86),0.5);
+        diffuseColor.a*=smoothstep(0.0,0.04,texel.a)*(0.26+0.9*texel.a);
         #endif`)}
       return material
     }

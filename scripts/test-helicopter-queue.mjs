@@ -11,7 +11,9 @@ export async function withQueueDatabase(run){
   let pool
   try{
     const addr=execFileSync('docker',['port',container,'5432/tcp'],{encoding:'utf8'}).trim()
-    pool=new pg.Pool({connectionString:`postgres://postgres:${password}@${addr}/postgres`})
+    pool=new pg.Pool({connectionString:`postgres://postgres:${password}@${addr}/postgres`});pool.on('error',()=>{})
+    // postgres 镜像先起一个临时 init 服务器再重启：等 init 完成，否则高负载下会连到即将关闭的实例
+    for(let wait=0;wait<600&&!execFileSync('docker',['logs',container],{encoding:'utf8',stdio:['ignore','pipe','pipe']}).includes('init process complete');wait++)await new Promise(resolve=>setTimeout(resolve,500))
     for(let attempt=0;;attempt++){try{await pool.query('SELECT 1');break}catch(error){if(attempt>300){execFileSync('docker',['logs','--tail','10',container],{stdio:'inherit'});throw error}await new Promise(resolve=>setTimeout(resolve,200))}}
     await pool.query('CREATE TABLE users(id text PRIMARY KEY,uid integer);INSERT INTO users VALUES (\'A\',100001),(\'B\',100002),(\'C\',100003)')
     for(const migration of ['003-player-saves','022-helicopter','023-helicopter-seat'])await pool.query(await readFile(`deploy/postgres/${migration}.sql`,'utf8'))
