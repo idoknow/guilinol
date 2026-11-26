@@ -2965,9 +2965,9 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
     heli:{figure,arms:passengerArms(figure),available:()=>active&&!rides?.car&&!rides?.bike&&!rides?.boat&&!shopOverlay?.isOpen()&&!cigarette.active&&!crashSession&&!standUpSession&&!document.body.matches('[data-fishing=on],[data-drone=rc],[data-photo=on]'),
       begin(){emote.stop();cancelSmoke();selectSlot('hand');actionButton.hidden=true;resetMotion();stopLocomotionActions();yaw=0;pitch=.23},
       view:()=>({yaw,pitch,arm}),
-      pose(point:THREE.Vector3,angle:number,clip:string,dt:number,hidden:boolean){
+      pose(point:THREE.Vector3,angle:number,clip:string,dt:number,hidden:boolean,orientation?:THREE.Quaternion){
         steles?.aerialView(point)
-        figure.position.copy(point);figure.rotation.set(0,angle,0);figure.visible=!hidden;const next=actions.get(clip)
+        figure.position.copy(point);if(orientation)figure.quaternion.copy(orientation);else figure.rotation.set(0,angle,0);figure.visible=!hidden;const next=actions.get(clip)
         if(next&&action!==next)forceLocomotionClip(next);mixer.update(dt);avatarRig.syncPose()
         const body={x:point.x,y:point.y+cfg.height/2,z:point.z};sim.body.setTranslation(body,true);sim.body.setNextKinematicTranslation(body)
         net?.tick(dt)
