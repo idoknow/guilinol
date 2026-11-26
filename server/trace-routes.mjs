@@ -1,9 +1,21 @@
 import sharp from 'sharp'
 import {setBan} from '../lib/admin.ts'
-import {decodeGray,encodeTile} from './trace-qim.mjs'
+import {encodeTile} from './trace-qim.mjs'
+import {Worker} from 'node:worker_threads'
 
 const json=(data,status=200)=>Response.json(data,{status,headers:{'cache-control':'private, no-store'}})
 const reject=(error,status)=>json({ok:false,error},status)
+
+function decodeOffThread(pixels,key){
+  const gray=Uint8Array.from(pixels.data)
+  const worker=new Worker(new URL('./trace-worker.mjs',import.meta.url),{workerData:{gray,width:pixels.info.width,height:pixels.info.height,key},transferList:[gray.buffer]})
+  return new Promise((resolve,reject)=>{
+    const timer=setTimeout(()=>{reject(Error('decode deadline'));void worker.terminate()},12000)
+    worker.once('message',resolve)
+    worker.once('error',reject)
+    worker.once('exit',()=>{clearTimeout(timer);reject(Error('decoder exited'))})
+  })
+}
 
 async function readBounded(request,maximum) {
   if(Number(request.headers.get('content-length'))>maximum) return null
@@ -40,7 +52,7 @@ export function traceRoutes(pool,env){
     if(!bytes.subarray(0,8).equals(Buffer.from('89504e470d0a1a0a','hex')) && !bytes.subarray(0,3).equals(Buffer.from('ffd8ff','hex')))return reject('expected_png_or_jpeg',415)
     let pixels
     try{pixels=await sharp(bytes,{limitInputPixels:4096**2}).removeAlpha().greyscale().raw().toBuffer({resolveWithObject:true})}catch{return reject('invalid_image',400)}
-    const result=decodeGray(pixels.data,pixels.info.width,pixels.info.height,key)
+    let result;try{result=await decodeOffThread(pixels,key)}catch{return reject('decode_unavailable',503)}
     if(!result)return json({ok:false,confidence:'none',account:null,devices:[],sameDeviceUids:[]})
     const {rows:[account]}=await pool.query(`select uid,nickname,signup_method as "signupMethod",(select max(last_login_at) from social_identities where user_id=users.id) as "lastLogin" from users where uid=$1`,[result.uid])
     const {rows:devices}=await pool.query('select model,browser,screen,ip24,isp,city,first,last from mp_devices where uid=$1 order by last desc nulls last limit 50',[result.uid])
