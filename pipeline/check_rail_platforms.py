@@ -28,10 +28,15 @@ def rail_chords(world, region):
     return chords
 
 
-def pavement(world, bounds, xy):
-    output = subprocess.check_output([ROOT / "node_modules/.bin/tsx", ROOT / "scripts/approach-faces.ts", world],
+def pavement(world, bounds, xy, role="paving-1"):
+    command = [ROOT / "node_modules/.bin/tsx", ROOT / "scripts/approach-faces.ts", world]
+    if role == "paving-9":
+        command.append("--platform-bricks")
+    output = subprocess.check_output(command,
                                      cwd=ROOT, input=json.dumps(bounds).encode())
-    faces = [tri for role, tri in map(json.loads, output.splitlines()) if role == "paving-1"]
+    faces = [tri for material, tri in map(json.loads, output.splitlines()) if material == role]
+    if not faces:
+        return np.full(len(xy), -np.inf)
     triangles = np.array(faces)
     footprint = triangles[:, :, [0, 2]]
     basis = footprint[:, 1:] - footprint[:, :1]
