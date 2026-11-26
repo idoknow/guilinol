@@ -305,6 +305,7 @@ export function mapView(host:Host, atlas:Atlas, ui:{slot:HTMLElement; buttons:HT
     <button class="atlas-close" aria-label="关闭地图">×</button><button class="atlas-here" aria-label="回到我的位置">◎</button>
     <div class="atlas-pop" hidden></div><p class="atlas-legend">朱印＝观景点 · 霓标＝商圈商铺 · <span class="atlas-travel-legend">已开放区域可传送 · </span> © OpenStreetMap contributors</p>`
   document.body.append(sheet)
+  markSurface(sheet)
   const canvas = sheet.querySelector('canvas')!, input = sheet.querySelector('input')!, results = sheet.querySelector('ol')!, pop = sheet.querySelector<HTMLElement>('.atlas-pop')!
   for(const b of Array.from(sheet.querySelectorAll<HTMLButtonElement>('.atlas-docks button[data-shop]'))) b.onclick = ()=>{const sh = listShops().find(x=>x.shopId===b.dataset.shop); if(sh){close(); if(ui.goShop) ui.goShop(sh); else ui.goPoint(sh.triggerPos[0],sh.triggerPos[2],sh.displayName)}}
   for(const b of Array.from(sheet.querySelectorAll<HTMLButtonElement>('.atlas-docks button[data-dock]'))) b.onclick = ()=>{const d = waterDocks.find(x=>x.id===b.dataset.dock); if(d){close(); ui.goDock(d)}}
@@ -429,3 +430,4 @@ export function mapView(host:Host, atlas:Atlas, ui:{slot:HTMLElement; buttons:HT
   return {paint, contains:built.contains, extent:atlas.extent, roadAt:atlas.roadAt.bind(atlas), open, close, get active(){return !sheet.hidden}, get navTarget(){return navTarget}, setNavTarget:(next:typeof navTarget,notify=true)=>{navTarget=next;if(notify)ui.onNav?.(navTarget);drawMini();redraw()}, roadName:()=>lastRoad, search:(q:string)=>{input.value = q; input.oninput?.(new Event('input'))},
     tick(dt:number){clock += dt; if(clock<.2) return; clock = 0; if(pin?.peer){const live = roster().players.find(p=>p.id===pin!.peer!.id); if(live){pin.x = live.x; pin.z = live.z}} if(document.body.dataset.photo!=='on') drawMini(); if(!sheet.hidden&&!pointers.size) redraw()}}
 }
+import {markSurface} from '../session-mark'
