@@ -2,7 +2,7 @@ import math
 from collections import defaultdict
 
 import numpy as np
-from shapely import STRtree
+from shapely import STRtree, make_valid
 from shapely.geometry import LineString, Point, Polygon
 from shapely.ops import nearest_points, unary_union, substring
 
@@ -11,7 +11,7 @@ from markings import junction_cores, violations
 from common import CHUNK, ll2xz, load_osm
 from features import points, polygons, rongyin_photo, rongyin_sidewalk
 from scatter import CONFIG, walk_line
-from sections import section_layers, clipped, speed_paint, yiwu_frontage, RULES
+from sections import section_layers, speed_paint, yiwu_frontage, RULES
 from dongxi_streets import street_surface
 
 # Shizijie surface crossings are replaced by the IDOK-301 underground pedestrian underpass.
@@ -25,6 +25,24 @@ SHIZIJIE_NO_CROSSWALK_ZONE = Polygon([
         (30, 105), (-65, 105), (-65, 45), (-120, 45),
     ]
 ])
+
+
+def area_only(shape):
+    if not shape.is_valid:
+        shape = make_valid(shape)
+    if shape.geom_type in ('Polygon', 'MultiPolygon'):
+        return shape
+    parts = list(polygons(shape))
+    return unary_union(parts) if parts else Polygon()
+
+
+def clip_area(shape, tile):
+    return area_only(area_only(shape).intersection(tile))
+
+
+def clipped(tree, tile):
+    return area_only(unary_union([clip_area(tree.geometries[index], tile)
+                                 for index in sorted(tree.query(tile))]))
 
 
 def chunks(roads,banks,bounds,water,sample,exclude,ped_areas=(),replace_exclude=None,road_ctrl=None,world_origin=None,ground_mesh_fn=None,footprints=(),bands=None,modeled_paving=None,gate_plaza=None,walkable_by_way=None,deck_mask=None):
@@ -457,8 +475,13 @@ def chunks(roads,banks,bounds,water,sample,exclude,ped_areas=(),replace_exclude=
                 segment = LineString([first,last])
                 if segment.length>.15 and not any(mask.query(segment,predicate='intersects').size for mask in (layers[0],layers[4])):
                     anchor(segment.centroid,math.atan2(last.y-first.y,last.x-first.x),kind,segment.length)
+    rep_excl = area_only(rep_excl)
+    if modeled_paving is not None:
+        modeled_paving = area_only(modeled_paving)
+    if gate_plaza is not None:
+        gate_plaza = area_only(gate_plaza)
     def encode(tile,origin):
-        shapes = [unary_union([layer.geometries[idx].intersection(tile) for idx in sorted(layer.query(tile))]) for layer in layers]
+        shapes = [clipped(layer,tile) for layer in layers]
         shapes[1]=shapes[1].difference(shapes[0]).union(shapes[3]).difference(shapes[4])
         if bldg_tree is not None:
             shapes[1] = shapes[1].difference(clipped(bldg_tree,tile))
@@ -467,30 +490,30 @@ def chunks(roads,banks,bounds,water,sample,exclude,ped_areas=(),replace_exclude=
             shapes[:3]=[shape.difference(modeled_paving) for shape in shapes[:3]]
         blocked = unary_union([shapes[0], shapes[4], clipped(paving_obstacles, tile)])
         if modeled_paving is not None:
-            blocked = blocked.union(modeled_paving.intersection(tile))
+            blocked = blocked.union(clip_area(modeled_paving,tile))
         walk, verge, cycle, tactile = [clipped(layer, tile).difference(blocked) for layer in bands]
         if parking_walk.intersects(tile):
-            bay = parking_walk.intersection(tile).difference(shapes[0]).difference(shapes[4]).difference(rep_excl)
+            bay = clip_area(parking_walk,tile).difference(shapes[0]).difference(shapes[4]).difference(rep_excl)
             for mask in (bldg_tree,water_tree):
                 if mask is not None:
                     bay = bay.difference(clipped(mask,tile))
             walk = walk.union(bay)
         if frontage and frontage[0].intersects(tile):
-            free = frontage[0].intersection(tile).difference(shapes[0]).difference(shapes[4])
+            free = clip_area(frontage[0],tile).difference(shapes[0]).difference(shapes[4])
             for mask in (bldg_tree,water_tree):
                 if mask is not None:
                     free = free.difference(clipped(mask,tile))
             free = free.difference(rep_excl)
-            tactile = tactile.difference(free).union(frontage[1].intersection(free))
+            tactile = tactile.difference(free).union(clip_area(frontage[1],free))
             walk = walk.union(free)
         walk = walk.difference(cycle).difference(verge)
-        tactile = tactile.intersection(walk)
+        tactile = clip_area(tactile,walk)
         shapes[1] = shapes[1].union(walk.difference(tactile))
         # The gate square shares the surrounding stone sidewalk mesh, height
         # field and 2 m paver texture. Union before triangulation to remove seams.
         curb_cuts = []
         if gate_plaza is not None and tile.intersects(gate_plaza):
-            shapes[1] = shapes[1].union(tile.intersection(gate_plaza))
+            shapes[1] = shapes[1].union(clip_area(gate_plaza,tile))
             # Lower the approach at the motor and cycle pavement edges.
             for adjacent in (shapes[0],cycle):
                 contact = gate_plaza.boundary.intersection(adjacent.buffer(.01))
@@ -499,7 +522,7 @@ def chunks(roads,banks,bounds,water,sample,exclude,ped_areas=(),replace_exclude=
                         curb_cuts.append(np.rint((np.asarray(line.coords)-origin)*100).astype(int).tolist())
         items=[]
         surfaces_here = [*enumerate(shapes[:3]), (4,verge), (5,cycle.difference(verge)), (6,tactile)]
-        under = {kind:shape.intersection(tile) for kind,shape in lower.items() if shape.intersects(tile)}
+        under = {kind:clip_area(shape,tile) for kind,shape in lower.items() if shape.intersects(tile)}
         def append(kind,shape):
             for poly in polygons(shape):
                 if poly.area<.005:

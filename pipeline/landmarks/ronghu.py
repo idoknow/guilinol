@@ -491,39 +491,53 @@ def steel_bridge(b):
     """North-south footbridge, 44.5 m, the length of way/155148522."""
     steel, wall = b.parts['steel'], b.parts['atlas']
     x, y, z = -604.1, 0.0, 87.2
-    starts = [(m,len(m.pos)) for m in [*b.parts.values(), b.hit]]
     length, width = 44.5, 3.3
+    z0, z1 = z-length/2, z+length/2
+    near, far = ground(x,z0)-.19, ground(x,z1)-.19
+    crossing = 96.25  # local z at the intersection with ferry way/674893651
+    south = crossing+6  # three 4 m water cells centred on the ferry
+    def grade(station):
+        base = near+(far-near)*(station-z0)/length
+        fraction = min(1., max(0., min((station-z0)/(crossing-6-z0), (z1-station)/(z1-south))))
+        return base + 2.15*fraction**2*(3-2*fraction)
+
+    bays = 14
+    stations = [z0+length*i/(2*bays) for i in range(2*bays+1)]
+    def beam(mesh, center, bottom, breadth, height, top_mesh=None):
+        rings = [[(center+dx, grade(station)+bottom+dy, station) for dx,dy in
+                  ((-breadth/2,0),(breadth/2,0),(breadth/2,height),(-breadth/2,height))]
+                 for station in stations]
+        for first,last in zip(rings,rings[1:]):
+            for edge,normal in enumerate(((0,-1,0),(1,0,0),(0,1,0),(-1,0,0))):
+                other = (edge+1)%4
+                target = top_mesh if edge==2 and top_mesh is not None else mesh
+                target.face([first[edge],first[other],last[other],last[edge]],normal,'steel',2)
+        mesh.face(rings[0],(0,0,-1),'steel'); mesh.face(rings[-1],(0,0,1),'steel')
     # Keep the fascia, underside and trusses metallic. Only the wearing surface
     # belongs to the municipal sidewalk material.
-    box(steel, (x, y + .12, z), (width, .24, length), 'steel', 2, top_mesh=b.parts['sidewalk'])
-    bays = 14 if b.detail else 4
+    beam(steel,x,0,width,.24,b.parts['sidewalk'])
     for side in (-width / 2, width / 2):
-        z0, z1 = z - length / 2, z + length / 2
-        tube(steel, (x + side, y + 0.3, z0), (x + side, y + 0.3, z1), 0.08, 'steel', 5)
-        tube(steel, (x + side, y + 2.15, z0), (x + side, y + 2.15, z1), 0.07, 'steel', 5)
-        for i in range(bays + 1):
-            zz = z0 + length * i / bays
-            tube(steel, (x + side, y + 0.3, zz), (x + side, y + 2.15, zz), 0.05, 'steel', 4)
+        for za,zb in zip(stations,stations[1:]):
+            for offset,radius in ((.3,.08),(2.15,.07)):
+                tube(steel,(x+side,grade(za)+offset,za),(x+side,grade(zb)+offset,zb),radius,'steel',5)
+        for zz in stations[::2 if b.detail else 7]:
+            tube(steel,(x+side,grade(zz)+.3,zz),(x+side,grade(zz)+2.15,zz),.05,'steel',4)
         if b.detail:
             for i in range(bays):
                 za = z0 + length * i / bays
                 zb = za + length / bays
-                tube(steel, (x + side, y + 0.3, za), (x + side, y + 2.15, zb), 0.04, 'steel', 4)
+                tube(steel, (x + side, grade(za) + 0.3, za), (x + side, grade(zb) + 2.15, zb), 0.04, 'steel', 4)
     if b.detail:
         for side in (-1,1):
-            box(steel,(x+side*(width/2-.15),y+.365,z),(.22,.27,length),'steel')
-        railing(wall, (x - width / 2 + 0.15, z - length / 2 + .22), (x - width / 2 + 0.15, z + length / 2 - .22), y + 0.25, 1.05, 'steel', 1.6)
-        railing(wall, (x + width / 2 - 0.15, z - length / 2 + .22), (x + width / 2 - 0.15, z + length / 2 - .22), y + 0.25, 1.05, 'steel', 1.6)
+            rail = x+side*(width/2-.15)
+            beam(steel,rail,.23,.22,.27)
+            beam(wall,rail,.49,.08,.08); beam(wall,rail,1.19,.1,.1)
+            for zz in stations:
+                box(wall,(rail,grade(zz)+.72,zz),(.12,.945,.12),'steel')
     if b.collide:
-        solid(b.hit, (x, y + 0.12, z), (width - 0.3, 0.24, length), 'steel')
-        solid(b.hit, (x - width / 2, y + 0.7, z), (0.16, 1.1, length), 'steel')
-        solid(b.hit, (x + width / 2, y + 0.7, z), (0.16, 1.1, length), 'steel')
-
-    z0, z1 = z-length/2, z+length/2
-    near, far = ground(x,z0), ground(x,z1)
-    for mesh, start in starts:
-        mesh.pos[start:] = [(px, py+near+(far-near)*(pz-z0)/length-.19, pz)
-                            for px,py,pz in mesh.pos[start:]]
+        beam(b.hit,x,0,width-.3,.24)
+        for side in (-width/2,width/2):
+            beam(b.hit,x+side,.15,.16,1.1)
 
 
 def glass_bridge(builder):

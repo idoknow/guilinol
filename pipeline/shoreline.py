@@ -76,7 +76,7 @@ def contour_ronghu(surface, terrain, original, bounds):
                 field[patch]=np.where(water==-32768,np.minimum(field[patch],np.rint(limit)),field[patch])
 
 
-def correct_water(surface, terrain, original, bounds, stencil):
+def correct_water(surface, terrain, original, bounds, stencil, reference=None):
     dry = surface == -32768
     sentinel = np.iinfo(terrain.dtype).max
     bank_ground = np.minimum(original,terrain)
@@ -162,9 +162,18 @@ def correct_water(surface, terrain, original, bounds, stencil):
         for other in graph[segment]:
             if index[other]>index[segment]: levels[other]=min(levels[segment],levels[other])
     surface[~dry]=levels[components[~dry]]
-    for segment,shore in shores.items():
-        terrain[shore] = np.maximum(terrain[shore],levels[segment]+3)
-        original[shore] = np.maximum(original[shore],levels[segment]+3)
+    if reference is None:
+        for segment,shore in shores.items():
+            terrain[shore] = np.maximum(terrain[shore],levels[segment]+3)
+            original[shore] = np.maximum(original[shore],levels[segment]+3)
+    else:
+        window,source = reference
+        patch = surface[window]
+        np.copyto(patch,source,where=(patch!=-32768)&(source!=-32768))
+        adjacent = maximum_filter(surface,footprint=cross,mode='constant',cval=-32768)
+        shore = dry & (adjacent!=-32768)
+        for field in (terrain,original):
+            field[shore] = np.maximum(field[shore],adjacent[shore]+3)
     corrected = np.minimum(original,terrain)
     lift = corrected-bank_ground
     final_bank = minimum_filter(np.where(dry,corrected,sentinel),footprint=[[0,1,0],[1,0,1],[0,1,0]],mode='constant',cval=sentinel)

@@ -9,7 +9,9 @@ import io
 import json
 import math
 import struct
+import subprocess
 from pathlib import Path
+from tempfile import TemporaryDirectory
 from overview_water import water_mask
 from sections import section_layers, shopfronts, RULES
 
@@ -38,6 +40,7 @@ from clearance import landmark_triangles
 from landmarks.rong_ground import GATE_PLAZA, grade_landings
 from landmarks import xiaoyao_access
 from shoreline import correct_water, contour_ronghu
+from dam_passages import apply_dams
 from landmark_layout import Layout
 from landmark_solids import load_landmark_meshes, structural_footprint, slice_tris_at_y
 from landmarks.world_surface import PeakSurface
@@ -93,30 +96,20 @@ def write_chunk(output, name, payload, trees, origin):
     return dict(x=origin[0], z=origin[1], file=name, bytes=len(compressed))
 
 
-def build(bbox, output, palette, workers=4):
-    if workers < 1:
-        raise ValueError('workers must be positive')
-    play_region = PlayRegion() if bbox is None else None
-    if play_region:
-        bbox = play_region.bbox
+def grid_extent(bbox):
     south, west, north, east = bbox
     if not (south < north and west < east):
         raise ValueError('Expected bbox: south west north east')
     start = np.floor(np.array(ll2xz(north, west))/CHUNK).astype(int)*CHUNK
     end = np.ceil(np.array(ll2xz(south, east))/CHUNK).astype(int)*CHUNK
-    west0,north0,w0,h0 = DOWNTOWN
-    downtown = Downtown() if (start[0]<west0 and start[1]<north0 and end[0]>west0+w0 and end[1]>north0+h0) else None
+    return start,end
+
+
+def prepare_banks(bbox,bounds,layout,layers,output,mountain_trees,playable):
+    start,end = grid_extent(bbox)
     left, top = map(int,start)
     width, depth = map(int,end-start)
     terrain = np.rint(load_dem(np.arange(left,left+width+1,GRID),np.arange(top,top+depth+1,GRID))*10).astype('<i2')
-    raster_bounds = box(*start,*end)
-    bounds = play_region.geometry if play_region else raster_bounds
-    def elevation(east,south):
-        row = np.clip(round((south-top)/GRID),0,depth//GRID)
-        col = np.clip(round((east-left)/GRID),0,width//GRID)
-        return original[row,col]/10
-    layout = Layout()
-    layers = ground_features(bounds,layout.school_grounds)
     surface = np.full_like(terrain, DRY)
     for poly in layers['water']:
         mask, (col,row) = stencil(poly,left,top,GRID)
@@ -129,8 +122,7 @@ def build(bbox, output, palette, workers=4):
     previous_bed = np.where(wet,np.minimum(terrain,surface-20),terrain)
     output.mkdir(parents=True, exist_ok=True)
     original = previous_bed.copy()
-    mountain_trees = []
-    peaks, peak_shapes = generate(original,terrain,left,top,bbox,output,wet,mountain_trees,CONFIG['peakAreaPerTree'],play_region.geometry if play_region else None)
+    peaks, peak_shapes = generate(original,terrain,left,top,bbox,output,wet,mountain_trees,CONFIG['peakAreaPerTree'],playable)
     for region,level in layout.flatten:
         for part in polygons(region.intersection(bounds)):
             col, row = math.floor((part.bounds[0]-left)/GRID), math.floor((part.bounds[1]-top)/GRID)
@@ -139,7 +131,50 @@ def build(bbox, output, palette, workers=4):
             window = np.s_[row:end_row+1, col:end_col+1]
             mask = terrain_stencil(part, left, top, col, row, terrain[window].shape)
             terrain[window][mask] = original[window][mask] = round(level*10)
-    correct_water(surface, terrain, original, raster_bounds, stencil)
+    return terrain,original,surface,previous_bed,peaks,peak_shapes
+
+
+def city_water_window(region, layout, start, end):
+    """Solve connected basins on the city's source domain before selecting the output window."""
+    city_start,city_end = grid_extent(region.bbox)
+    low,high = np.maximum(start,city_start),np.minimum(end,city_end)
+    if np.any(low>high) or not region.geometry.intersects(box(*start,*end)):
+        return None
+    layers = ground_features(region.geometry,layout.school_grounds)
+    with TemporaryDirectory() as directory:
+        terrain,original,water,*_ = prepare_banks(region.bbox,region.geometry,layout,layers,Path(directory),None,region.geometry)
+    correct_water(water,terrain,original,box(*city_start,*city_end),stencil)
+    def window(origin):
+        west,north = (low-origin)//GRID
+        east,south = (high-origin)//GRID
+        return np.s_[north:south+1,west:east+1]
+    return window(start),water[window(city_start)].copy()
+
+
+def build(bbox, output, palette, workers=4):
+    if workers < 1:
+        raise ValueError('workers must be positive')
+    city = PlayRegion()
+    play_region = city if bbox is None else None
+    if play_region:
+        bbox = play_region.bbox
+    start,end = grid_extent(bbox)
+    west0,north0,w0,h0 = DOWNTOWN
+    downtown = Downtown() if (start[0]<=west0 and start[1]<=north0 and end[0]>=west0+w0 and end[1]>=north0+h0) else None
+    left,top = map(int,start)
+    width,depth = map(int,end-start)
+    raster_bounds = box(*start,*end)
+    bounds = play_region.geometry if play_region else raster_bounds
+    layout = Layout()
+    reference = None if play_region else city_water_window(city,layout,start,end)
+    layers = ground_features(bounds,layout.school_grounds)
+    mountain_trees = []
+    terrain,original,surface,previous_bed,peaks,peak_shapes = prepare_banks(bbox,bounds,layout,layers,output,mountain_trees,play_region.geometry if play_region else None)
+    def elevation(east,south):
+        row = np.clip(round((south-top)/GRID),0,depth//GRID)
+        col = np.clip(round((east-left)/GRID),0,width//GRID)
+        return original[row,col]/10
+    correct_water(surface, terrain, original, raster_bounds, stencil, reference=reference)
     wet = surface != DRY
     terrain[wet] = original[wet] = np.minimum(terrain[wet], surface[wet] - 20)
 
@@ -222,7 +257,10 @@ def build(bbox, output, palette, workers=4):
 
     peak_tree = STRtree(peak_shapes)
     init_footprints, _ = buildings(bounds, elevation, peak_tree, layout, carriageway_mask, sidewalk_mask, airport_buildings)
-    candidate_routes = plan_vehicles(bounds, surface, layers['road'], init_footprints, sample, grid_origin=(left,top), routes_only=True)['routes']
+    routing_surface = surface.copy()
+    apply_dams(routing_surface, left, top)
+    candidate_routes = plan_vehicles(bounds, routing_surface, layers['road'], init_footprints, sample, grid_origin=(left,top), routes_only=True)['routes']
+    del routing_surface
 
     road_ctrl, bridge_plans, finalize_bridges = solve_road_and_bridge_elevations(
         original, terrain, surface, left, top, width, depth,
@@ -277,8 +315,9 @@ def build(bbox, output, palette, workers=4):
         fubo = fubo_site(spec['eastLimit'])
     if downtown:
         downtown.blend(terrain,surface,original,road_ctrl,left,top,fubo)
-        wet[:] = surface != DRY
         downtown.peaks(output,peaks)
+    apply_dams(surface,left,top)
+    wet[:] = surface != DRY
     if fubo is not None:
         fubo.grade_bank(terrain,original,surface,left,top)
         fubo.native_grade(terrain,original,surface,left,top)
@@ -616,6 +655,9 @@ def build(bbox, output, palette, workers=4):
         from rail_earthworks import bake as bake_rail_earthworks
         bake_rail_earthworks(output, manifest)
         (output/'manifest.json').write_text(json.dumps(manifest,separators=(',',':'))+'\n')
+    manifest['damPassageVersion'] = 1
+    (output/'manifest.json').write_text(json.dumps(manifest,separators=(',',':'))+'\n')
+    subprocess.run(['node',Path(__file__).resolve().parents[1]/'scripts/bake-dams.mjs',output],check=True)
     print(f'{len(chunks)} chunks, {len(footprints)} footprints, {sum(c["bytes"] for c in chunks):,} chunk bytes')
 
 
