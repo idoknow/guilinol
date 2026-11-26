@@ -2,11 +2,13 @@
 // 判定一律走 hits(code, action)：它只认「这个动作现在绑的键」，所以改键之后旧键立刻失效。
 import {prefs, setPrefs} from '../ui/prefs'
 
-export type Action = 'forward' | 'back' | 'left' | 'right' | 'run' | 'crouch' | 'jump' | 'interact' | 'view' | 'stats' | 'settings' | 'useItem' | 'emote' | 'unstuck'
+export type Action = 'punch' | 'rescue' | 'forward' | 'back' | 'left' | 'right' | 'run' | 'crouch' | 'jump' | 'interact' | 'view' | 'stats' | 'settings' | 'useItem' | 'emote' | 'unstuck'
 
 type Definition = {id: Action; label: string; codes: string[]}
 
 export const ACTIONS: Definition[] = [
+  {id:'punch',label:'出拳',codes:['Mouse0']},
+  {id:'rescue',label:'长按救援',codes:['KeyE']},
   {id: 'forward', label: '前进', codes: ['KeyW', 'ArrowUp']},
   {id: 'back', label: '后退', codes: ['KeyS', 'ArrowDown']},
   {id: 'left', label: '左移', codes: ['KeyA', 'ArrowLeft']},
@@ -26,7 +28,7 @@ export const ACTIONS: Definition[] = [
 const BY_ID = new Map(ACTIONS.map(entry => [entry.id, entry]))
 
 const NAMES: Record<string, string> = {
-  Space: '空格', ShiftLeft: 'Shift', ShiftRight: 'Shift', ControlLeft: 'Ctrl', ControlRight: 'Ctrl',
+  Mouse0:'鼠标左键', Space: '空格', ShiftLeft: 'Shift', ShiftRight: 'Shift', ControlLeft: 'Ctrl', ControlRight: 'Ctrl',
   ArrowUp: '↑', ArrowDown: '↓', ArrowLeft: '←', ArrowRight: '→', Enter: '回车', Tab: 'Tab',
   Backquote: '`', Minus: '-', Equal: '=', BracketLeft: '[', BracketRight: ']', Backslash: '\\',
   Semicolon: ';', Quote: "'", Comma: ',', Period: '.', Slash: '/',

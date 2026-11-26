@@ -35,13 +35,13 @@ export function createCameraRig(sim:Physics, tunnels:Tunnel[] = []) {
   }
 
   let priorFov:number|undefined
-  function update(camera:THREE.PerspectiveCamera, figurePos:THREE.Vector3, yaw:number, pitch:number, desiredDist:number, dt:number, snap=false,driving=false,first=false) {
+  function update(camera:THREE.PerspectiveCamera, figurePos:THREE.Vector3, yaw:number, pitch:number, desiredDist:number, dt:number, snap=false,driving=false,first=false,lowerFocus=0) {
     if(driving && priorFov===undefined){priorFov=camera.fov;camera.fov=driveCamera.fov;camera.updateProjectionMatrix()}
     else if(!driving && priorFov!==undefined){camera.fov=priorFov;priorFov=undefined;camera.updateProjectionMatrix()}
     // IDOK-178 第一人称：相机直接落在眼睛上，不做第三人称那一整套防穿透/天花板收束（那条路径会
     // 把相机顶到 0.12m 的最小安全距离上，玩家会看到自己后脑勺）。
     if(first){
-      focus.set(figurePos.x,figurePos.y+1.62,figurePos.z)
+      focus.set(figurePos.x,figurePos.y+1.62-lowerFocus,figurePos.z)
       // 第三人称默认俯视 cfg.pitch；第一人称把它减掉，默认平视，仰视余量也够看山顶。
       const eyePitch=pitch-cfg.pitch
       dir.set(Math.sin(yaw)*Math.cos(eyePitch),Math.sin(eyePitch),Math.cos(yaw)*Math.cos(eyePitch))
@@ -52,7 +52,7 @@ export function createCameraRig(sim:Physics, tunnels:Tunnel[] = []) {
       return
     }
     const footY = figurePos.y
-    let focusY = footY+(driving?driveCamera.height:1.4)
+    let focusY = footY+(driving?driveCamera.height:1.4)-lowerFocus
     const hasStartDeck = sim.hasDeck(figurePos.x,figurePos.z)
     const headCeil = ceilingAt(figurePos.x,figurePos.z,footY)
     if(Number.isFinite(headCeil)) focusY = Math.max(footY+.85,Math.min(focusY,headCeil-.04))

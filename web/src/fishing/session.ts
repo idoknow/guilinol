@@ -301,5 +301,11 @@ export function createFishing(host:Host,verify:boolean){
   const teleportToSpot=async(id:string,index=0)=>{const bank=waters.find(row=>row.id===id)?.banks[index];return !!bank&&await host.teleport(bank.x,bank.z,bank.yaw)}
   Object.assign(window,{fishing:{waters,journal,profile:certification,inspect,state:()=>({stage:engine.stage,phase:chargeStart!==null?'charge':engine.stage,distance:engine.distance,stamina:engine.stamina,direction:engine.direction,tension:engine.tension,method,spot:spot()?.id,inventory:structuredClone(inventory())}),
     ...(verify?{teleportToSpot,waterAt:host.waterAt,onLand:host.onLand,charge:(power:number)=>cast(power),forceApproach:()=>engine.approach(true),forceHit:()=>{engine.approach(true);engine.hit()},setSeed:(seed:number)=>engine.setSeed(seed),openMenu:(name?:string)=>{if(name)tab=name;openDrawer()}}:{})}})
-  return {toggle,tick,teleportToSpot}
+  function interruptCast(){
+    if(hotbarSlot()!=='fishing')return
+    if(receipt&&!terminal.includes(engine.stage))refundFullCast(receipt.baitId,receipt.key,'down')
+    receipt=undefined
+    selectSlot('hand')
+  }
+  return {toggle,tick,teleportToSpot,interruptCast}
 }

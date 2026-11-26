@@ -254,6 +254,7 @@ export function play(host:Host) {
       }
     }
   })
+  window.addEventListener('combat:down',()=>{if(photo.active)photo.close()})
   shutter.onclick = ()=>photo.open()
   // IDOK-215: 无人机 —— 机库/放置/起飞都在这个入口，遥控时整条 dock 让位给遥控器界面。
   const drone = droneMode(host,{
