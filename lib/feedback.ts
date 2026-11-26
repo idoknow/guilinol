@@ -1,6 +1,6 @@
 import { type Env, Problem, equal, hash, invalid, limited, now, sessionAccount, sessionHash, unauthorized } from './auth'
 import { ll2xz } from './projection'
-import { BUG, edges, kinds, labels, views, validView } from './feedback-contract'
+import { APPEAL,BUG, edges, kinds, labels, views, validView } from './feedback-contract'
 import { adminList, adminMergeUsers, adminSetEmail, adminSetPassword, adminUserDetail, audit, setBan, setRole } from './admin'
 import {flushMail} from './feedback-mail'
 
@@ -148,7 +148,7 @@ export async function feedback(request: Request, env: Env, path: string) {
       Math.abs(point.x) > 3072.000001 ||
       Math.abs(point.z) > 3328.000001 ||
       !kinds.includes(String(data.kind)) ||
-      !validView(data.view)
+      !(data.kind===APPEAL && data.view==null) && !validView(data.view)
     )
       invalid()
     const id = crypto.randomUUID()
@@ -164,7 +164,7 @@ export async function feedback(request: Request, env: Env, path: string) {
       lon,
       data.heading == null ? null : number(data.heading, 0, 360),
       text(data.landmark_id, 120),
-      JSON.stringify(data.view),
+      data.view==null?null:JSON.stringify(data.view),
       user,
     ).run()
     if (!created.meta.changes) throw new Problem(429, 'draft_limit', '最多保留 3 条草稿，请先提交或删除草稿')
@@ -443,7 +443,7 @@ export async function feedback(request: Request, env: Env, path: string) {
     if (row.status !== 'draft') conflict()
     target = 'submitted'
     message = '已提交，等待处理'
-    guard = ` AND view_json IS NOT NULL AND shot_state=1 AND (kind='${BUG}' OR EXISTS(SELECT 1 FROM feedback_photos WHERE feedback_id=feedback.id AND ready=1)) AND (SELECT count(*) FROM feedback f WHERE f.user_id=feedback.user_id AND f.submitted_at>unixepoch()-86400)<5`
+    guard = ` AND (kind='${APPEAL}' OR (view_json IS NOT NULL AND shot_state=1 AND (kind='${BUG}' OR EXISTS(SELECT 1 FROM feedback_photos WHERE feedback_id=feedback.id AND ready=1)))) AND (SELECT count(*) FROM feedback f WHERE f.user_id=feedback.user_id AND f.submitted_at>unixepoch()-86400)<5`
   } else if (action === 'supplement') {
     if (row.status !== 'need_info') conflict()
     target = 'submitted'

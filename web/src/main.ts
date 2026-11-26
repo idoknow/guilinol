@@ -15,6 +15,7 @@ import {gfxState} from './look/gfx-state'
 import {installAtmosphere, outerGround, sky} from './look/atmosphere'
 import {startPeaks} from './peaks'
 import {presets,setPreset,pickSpawn,spawnPool} from './presets'
+import {allowLanding} from './mp-travel'
 import {plazaSpawn} from './helicopter/site'
 import {helicopter} from './helicopter/runtime'
 import {isDeepLink} from './deeplink'
@@ -379,6 +380,7 @@ async function start(loader:FullLoader,creatorSpawn=false) {
       if(name&&!parent&&!matchMedia('(prefers-reduced-motion: reduce)').matches)await new Promise(resolve=>setTimeout(resolve,450))
       if(signal.aborted)return false
       cover.progress(.3,'步行模块已就绪')
+      if(!await allowLanding(reason,x,z))return false
       completed=await player.enter(x,z,yaw,reason,false,signal,cover.progress)
       if(completed&&request){stream.tick(player.position);stream.updateLandmarks?.(player.position);cover.progress(1);return true}
       signal.throwIfAborted()

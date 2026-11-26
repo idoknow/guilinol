@@ -126,7 +126,7 @@ export function multiplayer(pool,env,{cache}={}){
         const init={method:request.method,redirect:'error',signal:AbortSignal.timeout(6000),headers:{'X-Admin-Token':env.RT_ADMIN_TOKEN,'content-type':'application/json'}}
         if(request.method!=='GET')init.body=JSON.stringify({...(await request.json().catch(()=>({}))),actor})
         const response=await fetch(target,init)
-        return json(await response.json().catch(()=>({})))
+        return json(await response.json().catch(()=>({})),response.status)
       }catch{return json({error:'rt unavailable'},503)}
     }
     if(path.startsWith('admin/chat/')){
