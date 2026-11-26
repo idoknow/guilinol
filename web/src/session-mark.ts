@@ -48,7 +48,9 @@ export function markSession(next: number | null) {
 export function markSurface(parent: HTMLElement) {
   const layer = document.createElement('div')
   layer.setAttribute('aria-hidden','true')
-  layer.style.cssText='position:fixed;inset:0;pointer-events:none;z-index:2147483647;opacity:.12;image-rendering:pixelated'
+  // 0.04：实测 0.035 在 JPEG q70/q60 下仍可解，0.025 在 q60 开始失败；
+  // 0.12 会像纸纹，0.04 基本只剩极细颗粒
+  layer.style.cssText='position:fixed;inset:0;pointer-events:none;z-index:2147483647;opacity:.04;background-repeat:repeat'
   onTile(image => {
     if (!image) { layer.remove(); return }
     layer.style.backgroundImage=`url("${image.src}")`
