@@ -448,6 +448,30 @@ function rosterPayload() {
   return { t: 'roster', players: list }
 }
 
+// ── 名册增量（roster2）──────────────────────────────────────────────
+// 全量名册的带宽是 O(n²)：每人每 5 秒收一次全城名单，1000 人时约 76 Mbps。
+// 支持 caps:['roster2'] 的客户端改为收增量（只发新增/离开/移动≥2m 的人），
+// 每 RT_ROSTER_FULL_MS 强制一次全量对账，防止长期漂移。
+// 老客户端仍然收全量 roster，行为完全不变。
+const ROSTER_FULL_MS = Number(process.env.RT_ROSTER_FULL_MS || 30000)
+let rosterSnap = new Map()   // id -> {x, z, name}
+let rosterFullAt = Date.now()
+
+function rosterDelta() {
+  const add = [], up = [], del = []
+  const next = new Map()
+  for (const p of players.values()) {
+    const x = Math.round(p.x), z = Math.round(p.z)
+    const prev = rosterSnap.get(p.id)
+    next.set(p.id, { x, z, name: p.name })
+    if (!prev || prev.name !== p.name) add.push([p.id, p.name, x, z])
+    else if (Math.abs(prev.x - x) + Math.abs(prev.z - z) >= 2) up.push([p.id, x, z])
+  }
+  for (const id of rosterSnap.keys()) if (!next.has(id)) del.push(id)
+  rosterSnap = next
+  return { t: 'roster2', total: next.size, add, up, del }
+}
+
 function publicOf(p,viewer=p) {
   return {
     id: p.id, uid: p.uid, name: p.name, avatar: p.avatar, jt:p.joinedAt,
@@ -685,6 +709,8 @@ wss.on('connection', (ws, req) => {
         }
         // 顺手清掉过期封禁，不起 setInterval（避免泄漏）
         sweepBans()
+        // 客户端能力位：支持增量名册的客户端才收 roster2，老客户端继续收全量
+        ws.roster2 = Array.isArray(msg.caps) && msg.caps.includes('roster2')
         const claims = identity(msg.ticket)
         if (!claims) { obs.reject('ticket');ws.rejected = true; ws.close(4003, 'ticket rejected'); return }
         const uid = claims.uid
@@ -966,12 +992,22 @@ setInterval(() => {
   broadcast({t: 'online', online: players.size})
 }, TICK_MS)
 
-// 全服低频名册（地图 / 同城名册用）：只 stringify 一次，同一个字符串发给所有人
+// 全服低频名册：老客户端收全量（行为不变），支持 roster2 的客户端收增量
 setInterval(() => {
   if (!players.size) return
-  const text = JSON.stringify(rosterPayload())
-  const size = Buffer.byteLength(text)
-  for (const p of players.values()) sendSlowAware(p.ws, text, 'roster', size)
+  const full = rosterPayload()
+  const fullText = JSON.stringify(full)
+  const fullSize = Buffer.byteLength(fullText)
+  const wantsFull = Date.now() - rosterFullAt >= ROSTER_FULL_MS
+  const delta = rosterDelta()
+  const payload = wantsFull ? { t: 'roster2', total: delta.total, full: full.players } : delta
+  const deltaText = JSON.stringify(payload)
+  const deltaSize = Buffer.byteLength(deltaText)
+  if (wantsFull) rosterFullAt = Date.now()
+  for (const p of players.values()) {
+    if (p.ws && p.ws.roster2) sendSlowAware(p.ws, deltaText, 'roster', deltaSize)
+    else sendSlowAware(p.ws, fullText, 'roster', fullSize)
+  }
 }, ROSTER_MS)
 
 // 每 30s 一条 rt-stats：线上判断「单核是否顶满」看 loopP99Ms，> 50ms 玩家就能感到卡
