@@ -1,4 +1,5 @@
 """Render the old-city school basemaps from the same geometry as the GLBs."""
+from ops_evidence import require_evidence
 import importlib
 import sys
 from pathlib import Path
@@ -12,7 +13,7 @@ from features import polygons
 
 SCHOOLS = ('kuiguang_school', 'guilin_middle', 'libin_middle', 'ronghu_primary',
            'minzhu_primary', 'zhonghua_primary')
-OUTPUT = ROOT / 'docs/layout/schools'
+OUTPUT = require_evidence('layout/schools')
 SPORTS = {'basketball': '篮球场', 'volleyball': '排球场', 'soccer': '足球场',
           'running': '跑步场地', 'athletics': '跑道'}
 

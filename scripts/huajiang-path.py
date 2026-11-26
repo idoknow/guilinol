@@ -52,4 +52,7 @@ def path(world, osm):
 
 
 if __name__ == '__main__':
+    if isinstance(json.loads(Path('dist/world/manifest.json').read_text()).get('dev_bbox'), list):
+        print('SKIP: 开发世界不含花江高校扩区。', file=sys.stderr)
+        sys.exit(0)
     print(json.dumps(path(Path('dist/world'),Path('raw/osm-2026-11.json'))))

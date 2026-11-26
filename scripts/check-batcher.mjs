@@ -130,6 +130,21 @@ batcher.add({...tile(-768,-256),parked:Float32Array.from(new THREE.Matrix4().mak
 check('decor in pedestrian district has no boarding candidate',batcher.nearestBike(-588,-212,150,2),null)
 check('decor in pedestrian district cannot be checked out by id',batcher.takeBike('-768:-256:0'),false)
 
+// Wire fences live on a dedicated lazy batch so non-fence buckets emit 0 extra meshes/discard shaders.
+const fenceGeom = new THREE.BufferGeometry()
+fenceGeom.setAttribute('position', new THREE.Float32BufferAttribute([0, 150, 0, 1, 150, 0, 0, 151.4, 0], 3))
+fenceGeom.setAttribute('normal', new THREE.Float32BufferAttribute([0, 0, 1, 0, 0, 1, 0, 0, 1], 3))
+fenceGeom.setAttribute('color', new THREE.Float32BufferAttribute([0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5], 3))
+fenceGeom.setAttribute('aAlong', new THREE.Float32BufferAttribute([0, 1, 0], 1))
+const tFence = {...tile(1536, 0), streetFence: fenceGeom}
+const sceneBeforeFence = scene.children.length
+batcher.add(tFence)
+batcher.update(new THREE.Vector3(1600, 150, 100), camera)
+check('fence bucket attached 5 meshes (including lazy wire-fence layer)', scene.children.length, sceneBeforeFence + 5)
+check('fence bucket has wire-fence mesh', Boolean(batcher.buckets.get('2:0')?.fences?.mesh), true)
+batcher.remove(tFence.tile)
+check('fence bucket removal cleaned all 5 meshes', scene.children.length, sceneBeforeFence)
+
 await rm(dir, {recursive: true, force: true})
 
 if (failures.length) {

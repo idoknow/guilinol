@@ -8,6 +8,8 @@ const manifestFile=join(directory,'manifest.json')
 if(!existsSync(manifestFile)){console.log('No world supplied; skipping dam assembly');process.exit(0)}
 const dams=JSON.parse(readFileSync(new URL('../pipeline/dam-cells.json',import.meta.url)))
 const manifest=JSON.parse(readFileSync(manifestFile))
+const passages=manifest.damPassageVersion===1
+  ? JSON.parse(readFileSync(new URL('../pipeline/dam-passages.json',import.meta.url))) : {}
 const origins=new Map(manifest.chunks.map(tile=>[[tile.x,tile.z].join(),tile]))
 const cache=new Map(),dry=-32768
 function samples(col,row) {
@@ -30,6 +32,7 @@ function samples(col,row) {
 for(const [id,runs] of Object.entries(dams)){
   const cells=runs.flatMap(([row,start,end])=>Array.from({length:end-start+1},(_,index)=>[start+index,row]))
   const inside=new Set(cells.map(pair=>pair.join())),bank=[]
+  const openings=new Set((passages[id]?.cells??[]).map(pair=>pair.join()))
   for(const [col,row] of cells)for(const [dx,dz] of [[0,1],[0,-1],[1,0],[-1,0]]){
     if(!inside.has([col+dx,row+dz].join()))for(const {water} of samples(col+dx,row+dz))if(water!==dry)bank.push(water)
   }
@@ -37,6 +40,7 @@ for(const [id,runs] of Object.entries(dams)){
   const crest=Math.max(...bank)+3
   let changed=0
   for(const [col,row] of cells)for(const {chunk,offset,water} of samples(col,row)){
+    if(openings.has([col,row].join()))continue
     if(water===dry)continue
     chunk.data.writeInt16LE(dry,8474+offset)
     for(const base of new Set([24,chunk.underlay]))chunk.data.writeInt16LE(Math.max(crest,chunk.data.readInt16LE(base+offset)),base+offset)

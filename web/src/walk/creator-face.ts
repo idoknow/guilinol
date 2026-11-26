@@ -49,6 +49,10 @@ export function facialFeatures(geometry: T.BufferGeometry, a: Avatar) {
   const group = new T.Group(),
     front = frontOfFace(geometry)
   group.name = 'creator-face'
+  const mouth=new T.Object3D()
+  mouth.name='smoke-lips'
+  mouth.position.set(.004,.002,front(.004,.002)-.0018)
+  group.add(mouth)
   const positions: number[] = [],
     colors: number[] = [],
     indices: number[] = []

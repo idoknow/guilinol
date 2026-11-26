@@ -1,3 +1,4 @@
+import {audioCtor, existingCityAudio, resumeCityAudio} from '../../city-audio.ts'
 import type { CookingVisualState } from '../cooking.ts'
 import { SOUND_CATALOG, SOUND_IDS, type MifenSoundId, type SoundSpec } from './catalog.ts'
 import { createPinkNoiseBuffer, createSafeMasterChain, scheduleSoundVoice } from './synth.ts'
@@ -55,14 +56,6 @@ export interface MifenAudioController {
   dispose: () => void
 }
 
-function getAudioContextCtor(): typeof AudioContext | null {
-  if (typeof window === 'undefined') return null
-  const w = window as unknown as {
-    AudioContext?: typeof AudioContext
-    webkitAudioContext?: typeof AudioContext
-  }
-  return w.AudioContext ?? w.webkitAudioContext ?? null
-}
 
 /**
  * 田源米粉 · Web Audio 全链路音效引擎
@@ -125,10 +118,9 @@ export function createMifenAudio(opts?: { muted?: boolean; volume?: number }): M
   function ensureContext(): AudioContext | null {
     if (disposed || muted) return null
     if (!ctx) {
-      const Ctor = getAudioContextCtor()
-      if (!Ctor) return null
+      ctx = existingCityAudio()
+      if (!ctx) return null
       try {
-        ctx = new Ctor()
         const chain = createSafeMasterChain(ctx, volume)
         masterInput = chain.input
         masterGain = chain.master
@@ -143,7 +135,7 @@ export function createMifenAudio(opts?: { muted?: boolean; volume?: number }): M
     }
     if (ctx.state === 'suspended') {
       try {
-        void ctx.resume()
+        void resumeCityAudio(ctx)
       } catch {
         // 自动播放策略未激活，等待用户交互手势
       }
@@ -424,7 +416,7 @@ export function createMifenAudio(opts?: { muted?: boolean; volume?: number }): M
     },
     getCatalog: () => SOUND_CATALOG,
     getStats: (): MifenAudioStats => ({
-      supported: getAudioContextCtor() !== null,
+      supported: audioCtor() !== null,
       unlocked,
       muted,
       volume,
@@ -449,13 +441,14 @@ export function createMifenAudio(opts?: { muted?: boolean; volume?: number }): M
         document.removeEventListener('visibilitychange', onVisibilityChange)
       }
       if (ctx) {
-        const closing = ctx
+        distanceGainNode?.disconnect()
+        masterInput?.disconnect()
+        masterGain?.disconnect()
         ctx = null
         distanceGainNode = null
         masterInput = null
         masterGain = null
         noiseBuf = null
-        void closing.close().catch(() => {})
       }
     },
   }

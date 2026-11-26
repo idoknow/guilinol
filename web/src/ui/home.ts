@@ -1,6 +1,6 @@
 import {getPlayMode, lastPlayMode, type PlayMode} from '../game/play-mode'
 import {openGuide} from './guide'
-import {mpEnabled, setMpEnabled} from './mp-pref'
+import {mpEnabled, mpExplicitlyDisabled, setMpEnabled} from './mp-pref'
 import {onMpOnline, startLive} from './live'
 import './home.css'
 import {spots} from '../play/spots'
@@ -32,19 +32,14 @@ export function home(play:(mode:PlayMode)=>void):Home {
     <div class="home-title">
       <span class="home-seal" aria-hidden="true"><img src="./brand/emblem.webp" width="371" height="144" alt=""></span>
       <h1>网上桂林</h1>
-      <p class="home-tag">一座按真实地图搭起来的 3D 桂林。<br>穿街走巷接单赚钱，也能飞上天看山水。</p>
-      <p class="home-meta"><span>登录就能玩</span><span>电脑 · 手机都行</span><span>不用下载</span></p>
+      <p class="home-tag">一座按真实地图搭起来的 3D 桂林。<br>同城联机逛街骑车赚钱，也能飞上天看山水。</p>
+      <p class="home-meta"><span>同城实时联机</span><span>登录就能玩</span><span>电脑 · 手机都行</span></p>
     </div>
     <div class="home-modes" role="list">
-      <button type="button" class="home-mode home-mode--solo" role="listitem" data-umami-event="home-solo">
-        <span class="home-mode-seal" aria-hidden="true">街</span>
-        <span class="home-mode-text"><b>单人模式</b><span>骑电驴、开车穿街走巷，接单送米粉、拉客、跑夜赛，赚了钱换车换装。</span>
-          <small class="home-wallet"></small></span>
-        <span class="home-go home-go--solo">开始</span>
-      </button>
       <button type="button" class="home-mode home-mode--mp" role="listitem" data-umami-event="home-mp">
         <span class="home-mode-seal" aria-hidden="true">联</span>
-        <span class="home-mode-text"><b>联机模式<i class="home-mp-live" hidden></i></b><span>和其他玩家同城逛街骑车，看得到彼此的样子和昵称。</span></span>
+        <span class="home-mode-text"><b>联机模式<em class="home-mp-badge">推荐</em><i class="home-mp-live" hidden></i></b><span>同城玩家一起逛街骑车、接单送米粉、钓鱼换装，实时看到彼此外形和昵称。</span>
+          <small class="home-wallet"></small></span>
         <span class="home-go home-go--mp">进入联机</span>
       </button>
       <button type="button" class="home-mode home-mode--tour" role="listitem" data-umami-event="home-tour">
@@ -58,6 +53,11 @@ export function home(play:(mode:PlayMode)=>void):Home {
           <i aria-hidden="true"></i><span>回到上次离开的地方</span><small class="home-resume-ago"></small>
         </button>
       </div>
+      <button type="button" class="home-mode home-mode--solo" role="listitem" data-umami-event="home-solo">
+        <span class="home-mode-seal" aria-hidden="true">街</span>
+        <span class="home-mode-text"><b>单人模式</b><span>离线独自逛街接单，保留完整进度与存档。</span></span>
+        <span class="home-go home-go--solo">进入</span>
+      </button>
     </div>
     <nav class="home-links">
       <button type="button" class="ui-btn ui-btn--ghost" data-act="guide" data-umami-event="home-guide">玩法说明</button>
@@ -70,11 +70,12 @@ export function home(play:(mode:PlayMode)=>void):Home {
     <img class="home-douyin-code" src="./icons/douyin-code.webp" width="560" height="560" decoding="async" loading="lazy" alt="">
     <span class="home-douyin-text"><img class="home-douyin-mark" src="./icons/douyin-mark.webp" width="284" height="120" alt=""><b>${DOUYIN_NAME}</b><small>官方号 · 扫码关注</small></span>
   </button>
-  <div class="home-foot"><span class="home-caption" aria-live="off"></span><span class="home-credit">受 <a href="https://nanningol.com" target="_blank" rel="noopener" data-umami-event="home-thanks-nanning">网上南宁</a> 启发 · 地图数据 © OpenStreetMap 贡献者 · v${__APP_VERSION__}</span></div>`
+  <div class="home-foot"><span class="home-caption" aria-live="off"></span><span class="home-credit">受 <a href="https://nanningol.com" target="_blank" rel="noopener" data-umami-event="home-thanks-nanning">网上南宁</a> 启发 · 地图数据 © OpenStreetMap 贡献者 <span class="home-ver">· v${__APP_VERSION__}</span></span></div>`
   const progress = root.querySelector('.home-progress')!
   progress.textContent = stamps ? `已集 ${Math.min(stamps,spots.length)} / ${spots.length} 枚印章` : ''
   const go = root.querySelector<HTMLElement>('.home-go--tour')!, tour = root.querySelector<HTMLButtonElement>('.home-mode--tour')!
-  const solo = root.querySelector<HTMLButtonElement>('[data-umami-event=home-solo]')!, wallet = root.querySelector('.home-wallet')!
+  const solo = root.querySelector<HTMLButtonElement>('[data-umami-event=home-solo]')!, soloGo = root.querySelector<HTMLElement>('.home-go--solo')!
+  const wallet = root.querySelector('.home-wallet')!
   // IDOK-216: entering waits on the network (login check, cloud save, avatar) before the loader can show,
   // so the pressed card answers at once: spinner in its pill, other cards held until entry.ts calls idle().
   let busyCard:HTMLElement|undefined, busyLabel = ''
@@ -95,7 +96,7 @@ export function home(play:(mode:PlayMode)=>void):Home {
     const timer = setTimeout(()=>button.setAttribute('aria-busy','true'),120)
     void task().finally(()=>{clearTimeout(timer); button.removeAttribute('aria-busy')})
   }
-  solo.onclick = ()=>press(solo,'正在进入',()=>{setMpEnabled(false); play('solo')})
+  solo.onclick = ()=>press(solo,'正在进入',()=>{setMpEnabled(false,true); play('solo')})
   tour.onclick = ()=>press(tour,'正在进入',()=>{setMpEnabled(false); play('tour')})
   // IDOK-105: a slim strip under the tour card, shown only when a usable last view is stored.
   // 开始游览 still opens on a random frame; this is the opt-in way back.
@@ -127,32 +128,41 @@ export function home(play:(mode:PlayMode)=>void):Home {
     images[index].classList.remove('on'); images[next].classList.add('on'); index = next; caption.textContent = slides[index][1]}
   const reduce = matchMedia('(prefers-reduced-motion:reduce)').matches
 
-  let shown = false
+  let shown = false, currentResume = false
+  const focusTarget = (resume:boolean) => {
+    const mode = resume ? getPlayMode() : lastPlayMode()
+    if (mode === 'tour') return tour
+    if (resume) return mpEnabled() ? mp : solo
+    return mpExplicitlyDisabled() ? solo : mp
+  }
   // Keys must not reach the paused game underneath (V/J/P/M toggle things).
   addEventListener('keydown',event=>{if(shown&&!(event.target as Element)?.closest?.('dialog,.about-mask')) {event.stopImmediatePropagation()
-    if(event.code==='Enter'&&document.activeElement===document.body){event.preventDefault(); const mode = lastPlayMode(); press(mode==='solo'?(mpEnabled()?mp:solo):tour,'正在进入',()=>play(mode))}
+    if(event.code==='Enter'&&document.activeElement===document.body){event.preventDefault(); focusTarget(currentResume).click()}
     else if(event.code==='Escape'&&!event.repeat&&root.classList.contains('resume')) play(getPlayMode())}},{capture:true})
   document.body.append(root)
-  let playedSolo = false
   const api:Home = {
     get shown(){return shown},
     idle,
     open(resume){
       idle()
-      shown = true; root.hidden = false; root.classList.toggle('resume',resume)
-      playedSolo ||= resume && getPlayMode() === 'solo'
+      shown = true; currentResume = resume; root.hidden = false; root.classList.toggle('resume',resume)
       let hasProgress = false, money:number|null = null
       try { const raw = localStorage.getItem('glol.save.v1'); hasProgress = raw !== null
         const value = raw ? (JSON.parse(raw) as {money?:unknown}).money : null; if(typeof value==='number'&&Number.isFinite(value)) money = Math.round(value) } catch {}
-      const inMp = resume && mpEnabled()
-      solo.querySelector('.home-go')!.textContent = !inMp && (playedSolo || hasProgress) ? '继续' : '开始'
+      const inMp = resume && getPlayMode() === 'solo' && mpEnabled()
+      const inSolo = resume && getPlayMode() === 'solo' && !mpEnabled()
+      const inTour = resume && getPlayMode() === 'tour'
+      mp.classList.toggle('is-current', inMp)
+      solo.classList.toggle('is-current', inSolo)
+      tour.classList.toggle('is-current', inTour)
       mpGo.textContent = inMp ? '继续联机' : '进入联机'
+      soloGo.textContent = inSolo ? '继续单人' : '进入'
       wallet.textContent = hasProgress && money!==null ? `钱包 ¥${money.toLocaleString('zh-CN')}` : ''
-      go.textContent = resume?'继续游览':'开始游览'
+      go.textContent = inTour ? '继续游览' : '开始游览'
       // IDOK-105: only on a fresh entry (not the mid-game 继续游览 menu) and only with a usable record.
       const saved = resume ? null : lastViewSavedAt()
       resumeRow.hidden = saved===null; if(saved!==null) resumeAgo.textContent = ago(saved)
-      requestAnimationFrame(()=>{root.classList.add('show'); ((resume?getPlayMode():lastPlayMode())==='solo'?(resume&&mpEnabled()?mp:solo):tour).focus({preventScroll:true})})
+      requestAnimationFrame(()=>{root.classList.add('show'); focusTarget(resume).focus({preventScroll:true})})
       if(!reduce&&!timer) timer = window.setInterval(step,SLIDE_MS)
       document.body.dataset.home = ''
     },

@@ -1,4 +1,4 @@
-import {Matrix4, Object3D, Quaternion, Vector3} from 'three'
+import {Matrix4, Object3D, Quaternion, SkinnedMesh, Vector3} from 'three'
 import {steeringZ} from './ebike-mounts'
 
 const shoulder = new Vector3(), elbow = new Vector3(), palm = new Vector3()
@@ -7,7 +7,26 @@ const from = new Vector3(), to = new Vector3(), delta = new Quaternion(), parent
 const collar = new Vector3(), reach = new Vector3()
 const wristRotation = new Quaternion()
 
-function fingerPose(figure: Object3D, side: string, sign: number) {
+function bindLocalQuaternions(figure: Object3D) {
+  const world = new Map<string, Quaternion>()
+  figure.traverse(node => {
+    if (world.size || !(node instanceof SkinnedMesh || (node as SkinnedMesh).isSkinnedMesh)) return
+    const mesh = node as SkinnedMesh
+    const inv = new Matrix4(), rot = new Matrix4()
+    mesh.skeleton.bones.forEach((bone, i) => {
+      inv.copy(mesh.skeleton.boneInverses[i]).invert()
+      world.set(bone.name, new Quaternion().setFromRotationMatrix(rot.extractRotation(inv)).normalize())
+    })
+  })
+  return (joint: Object3D) => {
+    const child = world.get(joint.name)
+    const parent = joint.parent ? world.get(joint.parent.name) : undefined
+    return (child && parent ? parent.clone().invert().multiply(child) : joint.quaternion.clone()).normalize()
+  }
+}
+
+export function fingerPose(figure: Object3D, side: string, sign: number) {
+  const bindLocal = bindLocalQuaternions(figure)
   const joints = []
   for (const digit of ['index','middle','ring','pinky','thumb']) {
     const directions = digit === 'thumb'
@@ -18,7 +37,7 @@ function fingerPose(figure: Object3D, side: string, sign: number) {
       const joint = figure.getObjectByName(`${digit}_0${index+1}_${side}`)
       if (!joint) break
       const [down,forward,inward] = directions[index]
-      const orientation = parentInHand.clone().multiply(joint.quaternion)
+      const orientation = parentInHand.clone().multiply(bindLocal(joint))
       const direction = new Vector3(0,1,0).applyQuaternion(orientation)
       const goal = new Vector3(-sign*down,forward,inward).normalize()
       orientation.premultiply(new Quaternion().setFromUnitVectors(direction,goal))

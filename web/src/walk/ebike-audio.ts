@@ -10,6 +10,7 @@
  */
 
 import {rideSoundMuted,masterVolume,VOLUME_EVENT} from './ride-sound-pref'
+import {audioCtor,existingCityAudio,resumeCityAudio} from '../city-audio'
 
 export type RideSoundKind = 'bike' | 'bicycle'
 export type HeadlightSoundMode = 'off' | 'low' | 'high'
@@ -43,6 +44,7 @@ export interface EbikeAudioSnapshot {
 export interface EbikeAudioEngine {
   readonly unlocked: boolean
   readonly muted: boolean
+  prepare: () => Promise<void>
   unlock: () => boolean
   setMuted: (muted: boolean) => void
   setHorn: (active: boolean, kind?: RideSoundKind) => void
@@ -76,15 +78,6 @@ export interface EbikeAudioEngine {
  */
 const MASTER_LEVEL = 0.45
 const BUS_HIGHPASS_HZ = 120
-
-function getAudioContextCtor(): typeof AudioContext | null {
-  if (typeof window === 'undefined') return null
-  const w = window as unknown as {
-    AudioContext?: typeof AudioContext
-    webkitAudioContext?: typeof AudioContext
-  }
-  return w.AudioContext ?? w.webkitAudioContext ?? null
-}
 
 function createNoiseBuffer(ctx: AudioContext, seconds = 1.2): AudioBuffer {
   const len = Math.max(1, Math.floor(ctx.sampleRate * seconds))
@@ -149,13 +142,12 @@ export function createEbikeAudioEngine(): EbikeAudioEngine {
     shopBuy: 0,
   }
 
-  function ensureContext(): AudioContext | null {
+  function ensureContext(resume=true): AudioContext | null {
     if (isDisposed || muted) return null
     if (!ctx) {
-      const Ctor = getAudioContextCtor()
-      if (!Ctor) return null
+      ctx=existingCityAudio()
+      if(!ctx)return null
       try {
-        ctx = new Ctor()
         compressor = ctx.createDynamicsCompressor()
         compressor.threshold.value = -16
         compressor.knee.value = 18
@@ -179,9 +171,9 @@ export function createEbikeAudioEngine(): EbikeAudioEngine {
         return null
       }
     }
-    if (ctx.state === 'suspended') {
+    if (resume && ctx.state === 'suspended') {
       try {
-        void ctx.resume()
+        void resumeCityAudio(ctx)
       } catch {
         // Autoplay gated until gesture
       }
@@ -391,7 +383,7 @@ export function createEbikeAudioEngine(): EbikeAudioEngine {
       master.gain.setTargetAtTime(muted ? 0 : MASTER_LEVEL*masterVolume(), ctx.currentTime, 0.02)
     }
     // Unmuting from the HUD is a user gesture: open the context now so sound resumes mid-ride.
-    if (!muted) ensureContext()
+    if (!muted) unlock()
   }
 
   function setHorn(active: boolean, kind: RideSoundKind = 'bike') {
@@ -414,6 +406,15 @@ export function createEbikeAudioEngine(): EbikeAudioEngine {
 
   function playPowerOn(kind: RideSoundKind = 'bike') {
     counts.powerOn++
+    if(muted||isDisposed)return
+    if(!ensureContext()){
+      if(ctx)void resumeCityAudio(ctx).then(running=>{if(running&&!muted&&!isDisposed)powerOnChime(kind)})
+      return
+    }
+    powerOnChime(kind)
+  }
+
+  function powerOnChime(kind:RideSoundKind){
     if (kind === 'bicycle') {
       // Soft metallic frame creak + saddle tap
       noiseBurst(900, 2.0, 0.03, 0.05)
@@ -604,7 +605,7 @@ export function createEbikeAudioEngine(): EbikeAudioEngine {
   function probe(): EbikeAudioSnapshot {
     return {
       unlocked: ctx?.state === 'running',
-      supported: !!getAudioContextCtor(),
+      supported: !!audioCtor(),
       muted,
       hornActive,
       motorHumHz: +currentMotorHz.toFixed(1),
@@ -622,7 +623,7 @@ export function createEbikeAudioEngine(): EbikeAudioEngine {
     isDisposed = true
     stopContinuous()
     try { motorOscMain?.stop(); motorOscHarm?.stop(); scrubSrc?.stop() } catch {}
-    try { void ctx?.close() } catch {}
+    master?.disconnect();bus?.disconnect();compressor?.disconnect()
     ctx = null
     compressor = null
     bus = null
@@ -636,6 +637,7 @@ export function createEbikeAudioEngine(): EbikeAudioEngine {
   return {
     get unlocked() { return ctx?.state === 'running' },
     get muted() { return muted },
+    prepare:async()=>{if(!muted&&!isDisposed){ensureContext(false)}},
     unlock,
     setMuted,
     setHorn,

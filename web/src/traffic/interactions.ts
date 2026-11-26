@@ -1,7 +1,9 @@
 import {Raycaster,Vector3,type Camera,type Scene} from 'three'
-import {npcDefaults} from '../../../lib/npc'
+import {MAIN_DETAIL_LAYER} from '../look/mirror-layer'
+import {NPC_VOICE_PAUSED,npcDefaults} from '../../../lib/npc'
 import {rideSoundMuted,RIDE_SOUND_EVENT,masterVolume,VOLUME_EVENT} from '../walk/ride-sound-pref'
 import type {Traffic} from './sim'
+import {existingCityAudio,resumeCityAudio} from '../city-audio'
 import './interactions.css'
 
 type Actor=Traffic['actors'][number]
@@ -10,10 +12,13 @@ export function interactions(scene:Scene,camera:Camera,rules:typeof npcDefaults)
   let audio:AudioContext|undefined,activeHorns=0,sequence=0,previous:Vector3|undefined,said:SpeechSynthesisUtterance|undefined
   const states=new WeakMap<Actor,State>(),bubbles=new Map<Actor,{element:HTMLElement,until:number,checkAt:number,occluded:boolean}>()
   const hotspot=new Vector3(),direction=new Vector3(),ray=new Raycaster()
+  ray.camera=camera
+  ray.layers.enable(MAIN_DETAIL_LAYER)
   const interval=(walk:boolean)=>walk?15+Math.random()*30:10+Math.random()*20
   const pick=(lines:string[])=>lines[Math.floor(Math.random()*lines.length)]
   let output:GainNode|undefined,level=masterVolume(),muted=rideSoundMuted()
-  function unlock(){if(!muted&&level>0){audio??=new AudioContext();if(!output){output=audio.createGain();output.gain.value=level;output.connect(audio.destination)}void audio.resume().catch(()=>{})}}
+  function connect(context:AudioContext|null){if(!context||muted||level<=0)return;audio=context;if(!output){output=audio.createGain();output.gain.value=level;output.connect(audio.destination)}void resumeCityAudio(audio)}
+  function unlock(){if(!muted&&level>0){const current=existingCityAudio();connect(current)}}
   window.addEventListener('pointerdown',unlock,{passive:true});window.addEventListener('keydown',unlock)
   function sync(){level=masterVolume();muted=rideSoundMuted();if(output)output.gain.value=muted?0:level;if(said)window.speechSynthesis?.cancel();if(!muted&&level>0&&audio?.state==='suspended')void audio.resume().catch(()=>{})}
   window.addEventListener(RIDE_SOUND_EVENT,sync);window.addEventListener(VOLUME_EVENT,sync)
@@ -47,11 +52,13 @@ export function interactions(scene:Scene,camera:Camera,rules:typeof npcDefaults)
       if(time>=state.next){
         state.next=time+interval(walk)
         if(audible&&!walk&&rules.horn&&distance<120)horn(actor,geometry(actor))
-        const speech=window.speechSynthesis
-        if(audible&&walk&&rules.mutter&&distance<25&&speech&&!speech.speaking&&!speech.pending&&!said){
-          const voice=speech.getVoices().find(item=>/^zh(?:[-_]|$)/i.test(item.lang))
-          if(voice){const line=new SpeechSynthesisUtterance(pick(rules.mutterLines));line.lang='zh-CN';line.voice=voice;line.volume=level*rules.volume*(1-distance/25);said=line
-            line.onend=line.onerror=()=>{if(said===line)said=undefined};speech.speak(line);setTimeout(()=>{if(said===line){speech.cancel();said=undefined}},3000)}
+        if(!NPC_VOICE_PAUSED&&audible&&walk&&rules.mutter&&distance<25){
+          const speech=window.speechSynthesis
+          if(speech&&!speech.speaking&&!speech.pending&&!said){
+            const voice=speech.getVoices().find(item=>/^zh(?:[-_]|$)/i.test(item.lang))
+            if(voice){const line=new SpeechSynthesisUtterance(pick(rules.mutterLines));line.lang='zh-CN';line.voice=voice;line.volume=level*rules.volume*(1-distance/25);said=line
+              line.onend=line.onerror=()=>{if(said===line)said=undefined};speech.speak(line);setTimeout(()=>{if(said===line){speech.cancel();said=undefined}},3000)}
+          }
         }
       }
       if(walk&&rules.bubble&&player&&previous&&time-state.lastBump>=6&&Math.abs(player.y-actor.y)<2.5&&Math.hypot(player.x-actor.x,player.z-actor.z)<(vehicle?1.4:.65)&&Math.hypot(dx-actor.speed*actor.track.dx,dz-actor.speed*actor.track.dz)>=rules.bumpSpeed){

@@ -127,7 +127,7 @@ type Feature = {seal: string; title: string; pc: string; phone: string; only?: '
 const FEATURES = (): Feature[] => [
   {seal: '行', title: '走路与视角',
     pc: `${caps(move())} 走，<kbd>${k('run')}</kbd> 跑，<kbd>${k('jump')}</kbd> 跳，<kbd>${k('crouch')}</kbd> 蹲。按住鼠标拖动转视角，滚轮拉远拉近，<kbd>${k('view')}</kbd> 切第一 / 第三人称。`,
-    phone: '左下摇杆走路，推到底就是跑；右半边屏幕滑动转视角，双指捏合拉远拉近。右下「跃」「蹲」「远近」分别是跳、蹲、换视距。'},
+    phone: '左下摇杆走路，推到底就是跑；右半边屏幕滑动转视角，双指捏合拉远拉近。右下「跃」「蹲」是跳、蹲；按住「远近」上下拖动调视距，轻点切近 / 远。按键位置在「设置 → 手机按键」里改。'},
   {seal: '情', title: '表情动作',
     pc: `<b>长按</b> <kbd>${k('emote')}</kbd> 打开动作盘，鼠标移到想做的动作上松手；<b>短按</b> <kbd>${k('emote')}</kbd> 重播上一个。联机时别人也能看到。`,
     phone: '点右边「表情」打开动作盘，再点一个动作。联机时别人也能看到。'},
@@ -144,8 +144,8 @@ const FEATURES = (): Feature[] => [
     pc: `按 <kbd>V</kbd> 起飞，${caps(move())} 飞，<kbd>Q</kbd> / <kbd>E</kbd> 降 / 升，<kbd>Shift</kbd> 加速；再按 <kbd>V</kbd> 落地步行。`,
     phone: '点右上「起飞」。一根手指拖动转方向，两根手指拖着走；点「落地步行」回到地面。'},
   {seal: '图', title: '地图与传送',
-    pc: `按 <kbd>M</kbd> 或点右上「地图」。可以搜地名，点地图上任意一处就直接过去；右上角小圆图随时告诉你在哪条路。卡进墙里或掉进水里，点左上「复位」或按 <kbd>${k('unstuck')}</kbd>，回到最近的平地。`,
-    phone: '点右上「地图」，搜地名或点地图上任意一处，直接传送过去。卡进墙里或掉进水里，点左上的复位按钮回到最近的平地。'},
+    pc: `按 <kbd>M</kbd> 或点右上角小圆图。可以搜地名，点地图上任意一处就直接过去；右上角小圆图随时告诉你在哪条路。卡进墙里或掉进水里，点左上「复位」或按 <kbd>${k('unstuck')}</kbd>，回到最近的平地。`,
+    phone: '点右上角小圆图打开大地图，搜地名或点地图上任意一处，直接传送过去。卡进墙里或掉进水里，点左上的复位按钮回到最近的平地。'},
   {seal: '印', title: '景册集印章',
     pc: '名胜附近地上有朱红色圆圈，走进去就盖一枚印章。按 <kbd>J</kbd> 翻景册，看还差哪几处，也能从景册直接去。',
     phone: '名胜附近地上有朱红色圆圈，走进去就盖一枚印章。点「景册」看还差哪几处，也能从景册直接去。'},
@@ -153,8 +153,8 @@ const FEATURES = (): Feature[] => [
     pc: '按 <kbd>P</kbd> 或点「拍照」进入拍照模式，可以换时辰、天气和滤镜，拍完直接存图。点「相机」挑一台相机戴上，拍出来就是那台相机的画质，还能录像。',
     phone: '点「拍照」进入拍照模式，可以换时辰、天气和滤镜。点「相机」挑一台相机戴上，还能录像。'},
   {seal: '物', title: '背包里的东西',
-    pc: `点左上账号 → 我的背包，点物品旁的「使用」，回到城里它就在手上；按 <kbd>${k('useItem')}</kbd> 用它，<kbd>Esc</kbd> 收起。`,
-    phone: '点左上账号 → 我的背包，点物品旁的「使用」，回到城里它就在手上。'},
+    pc: `按 <kbd>3</kbd> 或从背包选中香烟，用 <kbd>${k('interact')}</kbd> 跟随提示操作，再按 <kbd>3</kbd> 丢弃。`,
+    phone: '点物品栏第 3 格选择香烟，跟随按钮操作。叼烟时再次点格子可以丢弃。'},
   {seal: '时', title: '时辰与天气', only: 'free',
     pc: '左上角的时辰条可以切晨、午、昏、夜和晴、雾、雨，点 ▶ 让时间自己走。',
     phone: '左上角的时辰条可以切晨、午、昏、夜和晴、雾、雨。'},
@@ -179,8 +179,8 @@ const KEY_GROUPS = (): {title: string; rows: Row[]}[] => [
 
 const TOUCH_ROWS: [string, string][] = [
   ['左下摇杆', '走路；推到底是跑'], ['右半屏滑动', '转视角'], ['双指捏合', '拉远拉近'],
-  ['跃 / 蹲 / 远近', '跳、蹲、换视距'], ['叫车', '叫一辆共享电驴到身边'], ['上车 / 下车', '车旁边出现，点一下'],
-  ['表情', '打开动作盘'], ['右上一排', '起飞、景册、拍照、相机、地图、设置'], ['左上「视野」', '画面远近与流畅度'],
+  ['跃 / 蹲', '跳、蹲'], ['按住「远近」上下拖', '调视距；轻点切近 / 远'], ['叫车', '叫一辆共享电驴到身边'], ['上车 / 下车', '车旁边出现，点一下'],
+  ['表情', '打开动作盘'], ['右上小地图', '点开大地图，搜地名、传送'], ['右上一排', '起飞、景册、拍照、相机、设置（含手机按键布局）'], ['左上「视野」', '画面远近与流畅度'],
 ]
 
 let sheet: HTMLDivElement | undefined
@@ -259,7 +259,7 @@ function steps(): Step[] {
     {target: () => touch() ? shown(document.querySelector('.emote-toggle')) : shown(document.querySelector('.keys-card:not(.folded) [data-id=emote]')) ?? shown(document.querySelector('.keys-card')), title: '做个表情',
       pc: `<b>长按</b> <kbd>${k('emote')}</kbd> 打开动作盘：点赞、奶蛙笑……移到想做的动作上松手。联机时别人也能看到。`,
       phone: '点这里打开动作盘：点赞、奶蛙笑……联机时别人也能看到。'},
-    {target: q('.dock-map'), title: '地图',
+    {target: q('.minimap'), title: '地图',
       pc: '搜地名，或者点地图上任意一处，直接传送过去。快捷键 <kbd>M</kbd>。', phone: '搜地名，或者点地图上任意一处，直接传送过去。'},
     {target: q('.dock-book'), title: '景册',
       pc: '名胜附近地上有朱红色圆圈，走进去就盖一枚印章，集齐全城名胜。快捷键 <kbd>J</kbd>。',
@@ -370,12 +370,12 @@ export function mountGuide(opts: {autoTour: boolean}) {
 
   if (!opts.autoTour || localStorage.getItem(TOUR_KEY)) return
   // 等加载卡、传送遮罩、首页都退场，画面稳定 1.2 s 后再开始。
-  // 右侧按钮（地图 / 景册 / 拍照）是懒加载的，等它们挂上再开始，最多等 20 s。
+  // 右侧小地图和按钮（景册 / 拍照）是懒加载的，等它们挂上再开始，最多等 20 s。
   let calm = 0
   const since = performance.now()
   const timer = setInterval(() => {
     const busy = document.querySelector('#boot,.ld-veil,.about-mask:not([hidden]),dialog[open]') || document.body.hasAttribute('data-home') || !document.body.dataset.mode
-      || (!document.querySelector('.dock-map') && performance.now() - since < 20000)
+      || (!document.querySelector('.minimap') && performance.now() - since < 20000)
     calm = busy ? 0 : calm + 1
     if (calm >= 3) { clearInterval(timer); void startTour() }
   }, 400)

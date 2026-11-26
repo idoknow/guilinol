@@ -1,6 +1,6 @@
 """宝贤中学 (`way/669065609`) — OSM-level campus (IDOK-80, 口径 A).
 
-Evidence and inferred attributes: docs/layout/schools/baoxian_school.md.
+Evidence and inferred attributes: ops 仓库 docs/layout/schools/baoxian_school.md.
 Footprints, sports surfaces and the campus outline are OSM/Overture geometry only;
 floors, roofs and colours are inferred. One generalized street-side gate, always closed.
 """

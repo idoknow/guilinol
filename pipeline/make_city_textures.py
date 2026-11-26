@@ -29,6 +29,28 @@ def tileable_noise(size: int, freq: int, rng: np.random.Generator) -> np.ndarray
     return (c00 * (1 - fx) + c10 * fx) * (1 - fy) + (c01 * (1 - fx) + c11 * fx) * fy
 
 
+CC0_DETAIL = {
+    # channel: (file in pipeline/textures-cc0, contrast of the normalised detail, mean multiplier)
+    'road': ('road-Asphalt031.png', 0.10, 0.985),
+    'wall': ('wall-Plaster001.png', 0.035, 0.99),
+}
+
+
+def cc0_channel_image(name: str) -> Image.Image | None:
+    """Luminance-neutral detail from a CC0 photo source (IDOK-291), or None to fall back to noise."""
+    spec = CC0_DETAIL.get(name)
+    if not spec:
+        return None
+    path = Path(__file__).resolve().parent / 'textures-cc0' / spec[0]
+    if not path.exists():
+        return None
+    a = np.asarray(Image.open(path).convert('L'), dtype=np.float64)
+    z = (a - a.mean()) / max(a.std(), 1e-6)
+    lum = spec[2] + spec[1] * np.clip(z, -3.0, 3.0) / 3.0
+    rgb = np.clip(np.rint(lum * 255.0), 180, 255).astype(np.uint8)
+    return Image.fromarray(np.stack([rgb, rgb, rgb], axis=-1), mode='RGB')
+
+
 def make_channel_image(name: str, size: int = 256) -> Image.Image:
     rng = np.random.default_rng({'road': 101, 'sidewalk': 202, 'bank': 303, 'wall': 404, 'roof': 505}[name])
     coarse = tileable_noise(size, 8, rng)
@@ -72,7 +94,7 @@ def make_channel_image(name: str, size: int = 256) -> Image.Image:
     return Image.fromarray(arr, mode='RGB')
 
 
-def png_to_ktx2(img: Image.Image, out_path: Path, gltfpack: str):
+def png_to_ktx2(img: Image.Image, out_path: Path, gltfpack: str, limit: int = 256):
     with tempfile.TemporaryDirectory() as tmp:
         in_glb = Path(tmp) / 'in.glb'
         out_glb = Path(tmp) / 'out.glb'
@@ -85,7 +107,7 @@ def png_to_ktx2(img: Image.Image, out_path: Path, gltfpack: str):
         sc = trimesh.Scene()
         sc.add_geometry(mesh)
         sc.export(in_glb)
-        subprocess.run([gltfpack, '-i', str(in_glb), '-o', str(out_glb), '-tc', '-tl', '256'],
+        subprocess.run([gltfpack, '-i', str(in_glb), '-o', str(out_glb), '-tc', '-tl', str(limit)],
                        check=True, capture_output=True)
         blob = out_glb.read_bytes()
         j_len, j_type = struct.unpack_from('<II', blob, 12)
@@ -111,12 +133,12 @@ def main():
     gltfpack = os.getenv('GLTFPACK') or 'gltfpack'
     total = 0
     for ch in ('wall', 'roof', 'road', 'sidewalk', 'bank'):
-        img = make_channel_image(ch, 256)
+        img = cc0_channel_image(ch) or make_channel_image(ch, 256)
         target = tex_dir / f'{ch}.ktx2'
-        png_to_ktx2(img, target, gltfpack)
+        png_to_ktx2(img, target, gltfpack, img.width)
         sz = target.stat().st_size
         total += sz
-        print(f'Generated {target.name}: 256x256, {sz:,} B')
+        print(f'Generated {target.name}: {img.width}x{img.height}, {sz:,} B')
     print(f'Total KTX2 bytes: {total:,} B (budget <= 1,500,000 B)')
 
 

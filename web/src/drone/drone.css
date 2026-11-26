@@ -1,9 +1,9 @@
 /* IDOK-215/IDOK-256: remote-controller overlay. Two skins: 傻瓜式 for the Mini 5 Pro, professional
    (DJI Fly style: top status bar, side rails, bottom telemetry + shutter) for the rest. */
 .rc{position:fixed;inset:0;z-index:70;pointer-events:none;font:12px/1.35 ui-monospace,SFMono-Regular,Menlo,monospace;
-  color:#f4efe2;text-shadow:0 1px 2px rgba(0,0,0,.55);--rc-glass:rgba(18,26,25,.42);--rc-line:rgba(244,239,226,.22)}
+  color:#f4efe2;text-shadow:0 1px 2px rgba(0,0,0,.55);--rc-glass:rgba(18,26,25,.62);--rc-line:rgba(244,239,226,.22)}
 .rc button{pointer-events:auto;font:inherit;color:inherit;background:var(--rc-glass);border:1px solid var(--rc-line);
-  border-radius:999px;padding:7px 13px;backdrop-filter:blur(6px);cursor:pointer;transition:background .15s,color .15s}
+  border-radius:999px;padding:7px 13px;cursor:pointer;transition:background .15s,color .15s}
 .rc button:hover{background:rgba(40,54,52,.62)}
 
 /* ---------- 专业遥控：DJI Fly 顶栏（飞行模式 / 遥控与图传信号 / GNSS / 电量与剩余时间） ---------- */
@@ -56,7 +56,7 @@
   pointer-events:none}
 .rc .rc-bottom>*{pointer-events:auto}
 .rc .rc-tele{font-size:11px;letter-spacing:.03em;white-space:nowrap;padding:5px 10px;border-radius:7px;
-  background:rgba(0,0,0,.42);border:1px solid rgba(244,239,226,.14);backdrop-filter:blur(4px);
+  background:rgba(10,14,13,.6);border:1px solid rgba(244,239,226,.16);
   font-variant-numeric:tabular-nums}
 .rc .rc-bottom-mid{position:absolute;left:50%;bottom:calc(12px + env(safe-area-inset-bottom));
   transform:translateX(-50%);display:flex;flex-direction:column;align-items:center;gap:7px}
@@ -104,7 +104,7 @@
 .rc.rc-simple .rc-time{display:none}
 .rc .rc-readout{position:absolute;left:50%;bottom:calc(150px + env(safe-area-inset-bottom));transform:translateX(-50%);
   font-size:11px;white-space:nowrap;padding:5px 12px;border-radius:999px;background:var(--rc-glass);
-  border:1px solid var(--rc-line);backdrop-filter:blur(6px);font-variant-numeric:tabular-nums}
+  border:1px solid var(--rc-line);font-variant-numeric:tabular-nums}
 .rc.rc-simple .rc-readout{font-size:12.5px;bottom:calc(118px + env(safe-area-inset-bottom))}
 .rc.rc-simple .rc-sticks{bottom:calc(150px + env(safe-area-inset-bottom))}
 .rc.rc-simple .rc-stick{width:132px;height:132px}
@@ -133,6 +133,8 @@
   .rc .rc-shutter[data-live="1"] i{width:22px;height:22px}
   .rc .rc-modes button{padding:2px 8px;font-size:10px}
   .rc .rc-gimbal{display:none}
+  /* 横屏手机底部的摇杆会顶到居中的侧栏，把侧栏收到摇杆上方（IDOK-255） */
+  .rc .rc-rail{top:auto;bottom:calc(184px + env(safe-area-inset-bottom));transform:none}
   .rc .rc-big,.rc .rc-takeoff{padding:7px 14px;font-size:11.5px}
   .rc .rc-actions{bottom:calc(8px + env(safe-area-inset-bottom));gap:6px}
   .rc .rc-actions button{padding:5px 10px;font-size:11px}
@@ -163,7 +165,7 @@ body[data-home] .drone-hint{display:none}
 /* 遥控时让出 HUD：与 photo 模式同一份清单，取景框里只留 RC 自己的仪表 */
 body[data-drone="rc"] :is(output,.hint,footer,.sky-ui,.walk-ui,.dock,.toast,.spot-card,.book,.summit-pill,
   .minimap,.road-name,.hud-me,.emote-toggle,.emote-overlay,.render-entry,.hud-stats,.drone-hint,.vehicle-action,
-  .ride-hud,.photo-hint,.ld-corner,.hotbar,.keys-card,.beta-note){display:none!important}
+  .ride-hud,.photo-hint,.ld-corner,.hotbar,.keys-card){display:none!important}
 /* 机库面板：五张机型卡，复用 about 弹层语言 */
 .drone-mask[hidden]{display:none}
 .drone-mask.show{opacity:1}

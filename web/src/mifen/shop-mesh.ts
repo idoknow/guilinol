@@ -150,37 +150,68 @@ interface DecorMats {
   dispose(): void
 }
 
-function createDecorMats(): DecorMats {
+function createDecorMats(M: Pack): DecorMats {
   const created: THREE.MeshStandardMaterial[] = []
-  const reg = (mat: THREE.MeshStandardMaterial, mapEmissive = false) => {
-    if (mapEmissive && mat.map && !mat.emissiveMap) mat.emissiveMap = mat.map
-    created.push(mat)
-    return mat
+  const bm = M.batchMasters
+  const tag = (
+    name: string,
+    colorHex: number,
+    target: THREE.MeshStandardMaterial | undefined,
+    extra: THREE.MeshStandardMaterialParameters = {},
+  ) => {
+    const m = new THREE.MeshStandardMaterial({
+      color: colorHex,
+      roughness: 0.72,
+      metalness: 0.04,
+      emissive: colorHex,
+      emissiveIntensity: 0.14,
+      ...extra,
+    })
+    m.name = name
+    if (target) {
+      m.userData.batchTarget = target
+      m.userData.batchColor = colorHex
+    }
+    created.push(m)
+    return m
   }
-  const cedarLit = reg(createWoodMaterial('cedar', {emissive: 0xffb764, emissiveIntensity: 0, name: 'tianyuan_facade_cedar_warm'}), true)
-  const graniteLit = reg(createConcreteMaterial('granite', {emissive: 0xffc682, emissiveIntensity: 0, name: 'tianyuan_granite_warm'}), true)
-  const wainscotTile = reg(createTileMaterial('hall_wall', {color: 0xdccdb3, periodM: [1.8, 1.8], emissive: 0xffe4be, emissiveIntensity: 0, name: 'tianyuan_wainscot_tile'}), true)
-  const groutSeam = reg(createTileMaterial('pavers', {color: 0x9b9284, roughness: 0.92, emissive: 0xffe4bc, emissiveIntensity: 0, name: 'tianyuan_floor_grout'}), true)
-  const chromeTrim = reg(createStainlessMaterial('aluminium', {color: 0xebeef2, metalness: 0.28, roughness: 0.24, emissive: 0xfff0da, emissiveIntensity: 0, name: 'tianyuan_chrome_trim'}), true)
-  const brassGold = reg(createStainlessMaterial('aluminium', {color: 0xe7c14e, metalness: 0.28, roughness: 0.3, emissive: 0xffcd48, emissiveIntensity: 0.15, name: 'tianyuan_brass_gold_signs'}), true)
-  const warmLed = reg(createConcreteMaterial('plaster', {color: 0xfff7e2, emissive: 0xffcc70, emissiveIntensity: 0.72, roughness: 0.28, name: 'tianyuan_warm_led_signs'}))
-  const awningCanopy = reg(createCurtainMaterial('guilin_blue', {color: 0x3b444d, roughness: 0.78, emissive: 0xffc88a, emissiveIntensity: 0, side: THREE.DoubleSide, name: 'tianyuan_awning_canopy'}), true)
-  const pvcCurtain = reg(createCurtainMaterial('stripe_vinyl', {color: 0xe3f2ef, transparent: true, opacity: 0.46, emissive: 0xffecd0, emissiveIntensity: 0, side: THREE.DoubleSide, name: 'tianyuan_pvc_curtain'}), true)
-  const linenValance = reg(createCurtainMaterial('kitchen_linen', {color: 0xb2362a, roughness: 0.85, emissive: 0xffcfa0, emissiveIntensity: 0, side: THREE.DoubleSide, name: 'tianyuan_linen_valance'}), true)
-  const ceramicJar = reg(createConcreteMaterial('plaster', {color: 0x7e371f, roughness: 0.42, emissive: 0xffdcb0, emissiveIntensity: 0, name: 'tianyuan_ceramic_jar'}), true)
-  const nightSpill = reg(createConcreteMaterial('plaster', {color: 0xffdf9e, transparent: true, opacity: 0, roughness: 1, emissive: 0xffc46b, emissiveIntensity: 1.0, name: 'tianyuan_night_spill_signs'}))
-  nightSpill.depthWrite = false
-  const porkFat = reg(createConcreteMaterial('plaster', {color: 0xf4e3c6, roughness: 0.45, emissive: 0xfff0d8, emissiveIntensity: 0.18, name: 'tianyuan_pork_fat'}), true)
-  const meatLean = reg(createConcreteMaterial('plaster', {color: 0x7f3622, roughness: 0.52, emissive: 0x8f402a, emissiveIntensity: 0.14, name: 'tianyuan_meat_lean'}), true)
-  const eggWhite = reg(createConcreteMaterial('plaster', {color: 0xfbf4e4, roughness: 0.28, emissive: 0xfff5dc, emissiveIntensity: 0.16, name: 'tianyuan_egg_white'}), true)
-  const eggYolk = reg(createIngredientMaterial('yolk', {emissive: 0xffba44, emissiveIntensity: 0.16, name: 'tianyuan_egg_yolk'}), true)
-  const peanutSkin = reg(createIngredientMaterial('peanut', {emissive: 0xc96b34, emissiveIntensity: 0.16, name: 'tianyuan_peanut_skin'}), true)
-  const garlicMat = reg(createConcreteMaterial('plaster', {color: 0xfcf6e3, roughness: 0.34, emissive: 0xfff7e2, emissiveIntensity: 0.16, name: 'tianyuan_garlic_clove'}), true)
-  const sourSoupMat = reg(createIngredientMaterial('sour_soup', {emissive: 0xffb080, emissiveIntensity: 0.15, name: 'tianyuan_sour_soup'}), true)
-  const chiliOilSurface = reg(createCondimentMaterial('chili_oil', {emissive: 0xd83620, emissiveIntensity: 0.22, name: 'tianyuan_chili_oil_surface'}), true)
-  chiliOilSurface.roughness = 0.14
-  chiliOilSurface.metalness = 0.04
-  const waterDrop = reg(createConcreteMaterial('plaster', {color: 0xdcf2f7, transparent: true, opacity: 0.72, roughness: 0.12, emissive: 0xffffff, emissiveIntensity: 0.2, name: 'tianyuan_water_drop'}))
+  const cedarLit = tag('tianyuan_facade_cedar_warm', 0xffffff, M.facadeWood, {emissive: 0xffb764, emissiveIntensity: 0})
+  cedarLit.userData.tiled = true
+  cedarLit.userData.keepOwnTarget = M.facadeWood
+  const graniteLit = tag('tianyuan_granite_warm', 0xc8baa4, bm?.vcStone ?? M.granite, {emissive: 0xffc682, emissiveIntensity: 0})
+  graniteLit.userData.tiled = true
+  graniteLit.userData.surfTex = 'granite'
+  graniteLit.userData.glow = [0, 0.16]
+  const wainscotTile = tag('tianyuan_wainscot_tile', 0xdccdb3, M.wallTileHall, {emissive: 0xffe4be, emissiveIntensity: 0})
+  wainscotTile.userData.tiled = true
+  const groutSeam = tag('tianyuan_floor_grout', 0x9b9284, M.floorHall, {roughness: 0.92, emissive: 0xffe4bc, emissiveIntensity: 0})
+  groutSeam.userData.tiled = true
+  const chromeTrim = tag('tianyuan_chrome_trim', 0xebeef2, bm?.vcMetal ?? M.aluminium, {metalness: 0.28, roughness: 0.24})
+  const brassGold = tag('tianyuan_brass_gold_signs', 0xe7c14e, bm?.vcMetal ?? M.aluminium, {metalness: 0.28, roughness: 0.3, emissive: 0xffcd48, emissiveIntensity: 0.15})
+  const warmLed = tag('tianyuan_warm_led_signs', 0xfff7e2, bm?.vcEmissive ?? M.ceilingLamp, {emissive: 0xffcc70, emissiveIntensity: 0.72, roughness: 0.28})
+  warmLed.userData.glow = [0.72, 1.6]
+  brassGold.userData.glow = [0.15, 1.0]
+  const awningCanopy = tag('tianyuan_awning_canopy', 0x3b444d, bm?.vcExterior ?? M.doorCurtain, {roughness: 0.78, side: THREE.DoubleSide})
+  const pvcCurtain = tag('tianyuan_pvc_curtain', 0xe3f2ef, bm?.vcGlass ?? M.thermalCurtain, {transparent: true, opacity: 0.46, side: THREE.DoubleSide})
+  const linenValance = tag('tianyuan_linen_valance', 0xb2362a, bm?.vcPlastic ?? M.doorCurtain, {roughness: 0.85, side: THREE.DoubleSide})
+  const ceramicJar = tag('tianyuan_ceramic_jar', 0x7e371f, bm?.vcPlastic ?? M.whitePlastic, {roughness: 0.42})
+  const nightSpill = tag('tianyuan_night_spill_signs', 0xffdf9e, undefined, {
+    transparent: true,
+    opacity: 0,
+    depthWrite: false,
+    roughness: 1,
+    emissive: 0xffc46b,
+    emissiveIntensity: 1.0,
+  })
+  const porkFat = tag('tianyuan_pork_fat', 0xf4e3c6, bm?.vcFood ?? M.noodle, {roughness: 0.45})
+  const meatLean = tag('tianyuan_meat_lean', 0x7f3622, bm?.vcFood ?? M.beef, {roughness: 0.52})
+  const eggWhite = tag('tianyuan_egg_white', 0xfbf4e4, bm?.vcFood ?? M.noodle, {roughness: 0.28})
+  const eggYolk = tag('tianyuan_egg_yolk', 0xf0a522, bm?.vcFood ?? M.braisedEgg, {roughness: 0.42})
+  const peanutSkin = tag('tianyuan_peanut_skin', 0xc97336, bm?.vcFood ?? M.youtiao, {roughness: 0.55})
+  const garlicMat = tag('tianyuan_garlic_clove', 0xfcf6e3, bm?.vcFood ?? M.noodle, {roughness: 0.34})
+  const sourSoupMat = tag('tianyuan_sour_soup', 0xd6502c, bm?.vcFood ?? M.brine, {roughness: 0.22})
+  const chiliOilSurface = tag('tianyuan_chili_oil_surface', 0xc83022, bm?.vcFood ?? M.brine, {roughness: 0.18})
+  const waterDrop = tag('tianyuan_water_drop', 0xdcf2f7, undefined, {transparent: true, opacity: 0.72, roughness: 0.12, emissive: 0xffffff, emissiveIntensity: 0.2})
   return {
     cedarLit,
     graniteLit,
@@ -257,7 +288,8 @@ class Mesher {
 }
 
 const isTiled = (mat: THREE.Material) => mat.userData.tiled === true
-const KEEP_ATTRS = new Set(['position', 'normal', 'uv'])
+const KEEP_ATTRS = new Set(['position', 'normal', 'uv', 'color', 'aSurf'])
+const BATCH_TMP_COLOR = new THREE.Color()
 
 function scaleUv(g: THREE.BufferGeometry, su: number, sv: number) {
   const uv = g.getAttribute('uv') as THREE.BufferAttribute
@@ -285,7 +317,7 @@ function boxGeo(w: number, h: number, d: number, tiled: boolean): THREE.BufferGe
   return g
 }
 
-/** 按材质合并静态几何，整店几十个 draw call */
+/** 按主材质 + 顶点色/图集 UV 重映射合并静态几何，整店压缩至 <= 25 draw calls */
 class Batch {
   private readonly buckets = new Map<THREE.Material, THREE.BufferGeometry[]>()
   private readonly m4 = new THREE.Matrix4()
@@ -293,6 +325,13 @@ class Batch {
   private readonly e = new THREE.Euler()
   private readonly p = new THREE.Vector3()
   private readonly one = new THREE.Vector3(1, 1, 1)
+  private readonly overrideTarget: THREE.Material | null
+  private readonly atlasTarget: THREE.Material | null
+
+  constructor(overrideTarget: THREE.Material | null = null, atlasTarget: THREE.Material | null = null) {
+    this.overrideTarget = overrideTarget
+    this.atlasTarget = atlasTarget
+  }
 
   add(mat: THREE.Material, geo: THREE.BufferGeometry, x = 0, y = 0, z = 0, ry = 0, rx = 0, rz = 0): void {
     let g = geo
@@ -303,15 +342,76 @@ class Batch {
     }
     for (const name of Object.keys(g.attributes)) if (!KEEP_ATTRS.has(name)) g.deleteAttribute(name)
     if (!g.getAttribute('normal')) g.computeVertexNormals()
-    if (!g.getAttribute('uv')) g.setAttribute('uv', new THREE.Float32BufferAttribute(new Float32Array(g.getAttribute('position').count * 2), 2))
+    const vCount = g.getAttribute('position').count
+    let uv = g.getAttribute('uv') as THREE.BufferAttribute | undefined
+    if (!uv) {
+      uv = new THREE.Float32BufferAttribute(new Float32Array(vCount * 2), 2)
+      g.setAttribute('uv', uv)
+    }
+
+    const atlasRect = mat.userData.atlasRect as [number, number, number, number] | undefined
+    if (atlasRect) {
+      const [u0, v0, u1, v1] = atlasRect
+      const du = u1 - u0
+      const dv = v1 - v0
+      for (let i = 0; i < uv.count; i++) {
+        uv.setXY(i, u0 + THREE.MathUtils.clamp(uv.getX(i), 0, 1) * du, v0 + THREE.MathUtils.clamp(uv.getY(i), 0, 1) * dv)
+      }
+    }
+
+    const ownTarget: THREE.Material = (mat.userData.batchTarget as THREE.Material | undefined) ?? mat
+    let target: THREE.Material = ownTarget
+    if (atlasRect && this.atlasTarget) {
+      target = this.atlasTarget
+    } else if (
+      this.overrideTarget &&
+      target !== mat &&
+      !atlasRect &&
+      !(target as THREE.MeshStandardMaterial).transparent &&
+      target !== (mat.userData.keepOwnTarget as THREE.Material | undefined)
+    ) {
+      target = this.overrideTarget
+    }
+
+    if ((target as THREE.MeshStandardMaterial).vertexColors) {
+      const rawTint = mat.userData.batchColor as number | undefined
+      if (rawTint !== undefined) BATCH_TMP_COLOR.setHex(rawTint)
+      else if ((mat as THREE.MeshStandardMaterial).color) BATCH_TMP_COLOR.copy((mat as THREE.MeshStandardMaterial).color)
+      else BATCH_TMP_COLOR.setRGB(1, 1, 1)
+      const cols = new Float32Array(vCount * 3)
+      for (let i = 0; i < vCount; i++) {
+        cols[i * 3] = BATCH_TMP_COLOR.r
+        cols[i * 3 + 1] = BATCH_TMP_COLOR.g
+        cols[i * 3 + 2] = BATCH_TMP_COLOR.b
+      }
+      g.setAttribute('color', new THREE.BufferAttribute(cols, 3))
+    } else if (g.getAttribute('color')) {
+      g.deleteAttribute('color')
+    }
+
+    // IDOK-305：surface master 按顶点记录贴图层与自发光（见 materials.ts bindSurfaceMaster）
+    const surfLayers = target.userData.surfLayers as Record<string, number> | undefined
+    if (surfLayers) {
+      const key = (mat.userData.surfTex ?? ownTarget.userData.surfTex) as string | undefined
+      const layer = key === 'none' ? 3 : key && surfLayers[key] ? surfLayers[key] : 0
+      const glow = (mat.userData.glow ?? ownTarget.userData.glow ?? target.userData.glow ?? [0, 0]) as [number, number]
+      const surf = new Float32Array(vCount * 3)
+      for (let i = 0; i < vCount; i++) {
+        surf[i * 3] = layer
+        surf[i * 3 + 1] = glow[0]
+        surf[i * 3 + 2] = glow[1]
+      }
+      g.setAttribute('aSurf', new THREE.BufferAttribute(surf, 3))
+    }
+
     g.clearGroups()
     if (x || y || z || ry || rx || rz) {
       this.e.set(rx, ry, rz, 'YXZ')
       this.m4.compose(this.p.set(x, y, z), this.q.setFromEuler(this.e), this.one)
       g.applyMatrix4(this.m4)
     }
-    let list = this.buckets.get(mat)
-    if (!list) this.buckets.set(mat, (list = []))
+    let list = this.buckets.get(target)
+    if (!list) this.buckets.set(target, (list = []))
     list.push(g)
   }
 
@@ -1204,7 +1304,7 @@ function buildHall(I: Batch, M: Pack, D: DecorMats, lv: ShopLevel, col: AddColli
   I.box(D.warmLed, IN_X - 0.03, 3.0, 3.5, 0.04, 0.035, 2.46)
   I.sign(M.menuPosters, IN_X - 0.038, 2.66, 3.5, 2.4, 0.6, -Math.PI / 2)
   I.add(M.wallClock, new THREE.CircleGeometry(0.16, 18), IN_X - 0.02, 2.62, 6.45, -Math.PI / 2)
-  I.box(M.acUnit, IN_X - 0.11, 2.52, 5.45, 0.22, 0.3, 0.92)
+  I.box(M.whitePlastic, IN_X - 0.11, 2.52, 5.45, 0.22, 0.3, 0.92)
   I.box(M.blackMetal, IN_X - 0.225, 2.56, 5.45, 0.01, 0.03, 0.8)
   wallFan(I, M, D, -IN_X + 0.02, 2.38, 2.15, 1)
   wallFan(I, M, D, IN_X - 0.02, 2.36, 4.6, -1)
@@ -1696,10 +1796,52 @@ function named<T extends THREE.Object3D>(obj: T, name: string): T {
   return obj
 }
 
+// Static Batch.flush meshes have identity transforms and non-indexed triangles
+// in shop-local space. Two sections can share a draw even when either section
+// can be hidden: both visible ranges and either individual range are contiguous.
+function batchShopSections(root: THREE.Group, sections: THREE.Group[]) {
+  const byMaterial = new Map<THREE.Material, THREE.Mesh[]>()
+  for (const section of sections) {
+    for (const mesh of section.children) {
+      if (!(mesh instanceof THREE.Mesh) || Array.isArray(mesh.material) || mesh.material.transparent) continue
+      const list = byMaterial.get(mesh.material) ?? []
+      list.push(mesh)
+      byMaterial.set(mesh.material, list)
+    }
+  }
+  const updates: (() => void)[] = []
+  for (const [material, meshes] of byMaterial) {
+    if (meshes.length !== 2) continue
+    const [first, second] = meshes
+    const a = first.parent!, b = second.parent!
+    const geometry = mergeGeometries([first.geometry, second.geometry], false)
+    if (!geometry) continue
+    const split = first.geometry.getAttribute('position').count
+    const total = geometry.getAttribute('position').count
+    const mesh = new THREE.Mesh(geometry, material)
+    mesh.name = 'tianyuan.shared:' + material.name
+    mesh.matrixAutoUpdate = false
+    root.add(mesh)
+    for (const source of meshes) {
+      source.removeFromParent()
+      source.geometry.dispose()
+    }
+    updates.push(() => {
+      const start = a.visible ? 0 : split
+      const end = b.visible ? total : split
+      mesh.visible = end > start
+      geometry.setDrawRange(start, end - start)
+    })
+  }
+  const sync = () => { for (const update of updates) update() }
+  sync()
+  return sync
+}
+
 export function buildTianyuanShopMesh(level: ShopLevel = 1): TianyuanShopBuildResult {
   const lv: ShopLevel = level === 3 ? 3 : level === 2 ? 2 : 1
   const M = acquireTianyuanMaterials()
-  const D = createDecorMats()
+  const D = createDecorMats(M)
   const group = named(new THREE.Group(), 'tianyuan_mifen_shop')
   const exterior = named(new THREE.Group(), 'tianyuan.exterior')
   const ceilingGroup = named(new THREE.Group(), 'tianyuan.ceiling')
@@ -1717,22 +1859,20 @@ export function buildTianyuanShopMesh(level: ShopLevel = 1): TianyuanShopBuildRe
   col(-IN_X, KDOOR_X0, PART_Z0, PART_Z1, 'wall:pass-west')
   col(KDOOR_X1, IN_X, PART_Z0, PART_Z1, 'wall:pass-east')
 
-  const E = new Batch()
-  const C = new Batch()
-  const I = new Batch()
-  const S = new Batch()
-  const W = new Batch()
-  buildShell(E, M, D)
-  buildStorefront(S, M, D, col)
-  buildCeiling(C, M, D)
-  const seats = [...buildHall(I, M, D, lv, col), ...buildSidewalk(W, M, D, lv, col)]
-  const kitchen = buildKitchen(I, M, D, lv, col)
-  E.flush(exterior, 'tianyuan.exterior')
-  C.flush(ceilingGroup, 'tianyuan.ceiling')
-  I.flush(interior, 'tianyuan.interior')
-  S.flush(storefront, 'tianyuan.storefront')
-  W.flush(sidewalk, 'tianyuan.sidewalk')
-  for (const grp of [storefront, interior, sidewalk]) {
+  // 外立面与吊顶统一进 EC（剖切时同步隐藏）；门面独立进 SF（35~165m 中距和剖切态均常显，仅 4 draws）；前厅/后厨/外摆进 IW（<=35m 显示）
+  const EC = new Batch(M.batchMasters?.vcExterior ?? null)
+  const SF = new Batch(M.batchMasters?.vcExterior ?? null, M.batchMasters?.signAtlasLit ?? null)
+  const IW = new Batch()
+  buildShell(EC, M, D)
+  buildCeiling(EC, M, D)
+  buildStorefront(SF, M, D, col)
+  const seats = [...buildHall(IW, M, D, lv, col), ...buildSidewalk(IW, M, D, lv, col)]
+  const kitchen = buildKitchen(IW, M, D, lv, col)
+  EC.flush(exterior, 'tianyuan.exterior')
+  SF.flush(storefront, 'tianyuan.storefront')
+  IW.flush(interior, 'tianyuan.interior')
+  const syncSectionBatches = batchShopSections(group, [exterior, storefront, interior])
+  for (const grp of [storefront, interior]) {
     grp.traverse(o => {
       const mesh = o as THREE.Mesh
       if (mesh.isMesh && (mesh.material as THREE.Material).transparent) mesh.renderOrder = 2
@@ -1754,36 +1894,32 @@ export function buildTianyuanShopMesh(level: ShopLevel = 1): TianyuanShopBuildRe
     })
     return g
   }
+  const dynVc = M.batchMasters?.vcPlastic ?? M.whitePlastic
   const buildMiniBowl = (targetName: string) => {
-    const bb = new Batch()
+    const bb = new Batch(dynVc)
     const prof: V2[] = [[0, 0.002], [0.04, 0.002], [0.05, 0.014], [0.095, 0.075], [0.098, 0.078], [0.088, 0.074], [0.044, 0.018], [0, 0.016]]
     bb.add(M.whitePlastic, new THREE.LatheGeometry(prof.map(([x, y]) => new THREE.Vector2(x, y)), 14))
     bb.torus(D.chromeTrim, 0, 0.077, 0, 0.096, 0.003, 14)
     return batchToGroup(bb, targetName)
   }
   const buildNoodleBundle = (targetName: string, r = 0.06, tube = 0.0045, strands = 5) => {
-    const bb = new Batch()
+    const bb = new Batch(M.batchMasters?.vcFood ?? M.noodle)
     addNoodleCoil(bb, M.noodle, 0, 0, 0, r, tube, strands, 7, 0.018, 43)
     return batchToGroup(bb, targetName)
   }
 
   const waterGeo = own(new THREE.CircleGeometry(POT_R - 0.012, 16).rotateX(-Math.PI / 2))
   const flameGeo = own(new THREE.TorusGeometry(POT_R + 0.02, 0.016, 6, 18).rotateX(Math.PI / 2))
-  const basketGeo = own(new THREE.CylinderGeometry(0.085, 0.07, 0.1, 10, 1, true))
-  // 鹅颈高升笊篱手柄（垂直立杆避开 1.18m 锅沿 + 外伸木握把，永不穿模锅壁）
-  const strainerStemGeo = own(new THREE.CylinderGeometry(0.0085, 0.0085, 0.216, 6).rotateZ(0.32).translate(-0.116, 0.148, 0))
-  const strainerGripGeo = own(new THREE.CylinderGeometry(0.012, 0.011, 0.25, 6).rotateZ(1.326).translate(-0.27, 0.28, 0))
   const potFx = kitchen.pots.map((p, i) => {
     const water = new THREE.Mesh(waterGeo, M.boilingWater)
     water.position.set(p.x, RANGE_TOP + 0.31, p.z)
     const flame = new THREE.Mesh(flameGeo, M.gasFlame)
     flame.position.set(p.x, RANGE_TOP + 0.005, p.z)
-    const basket = named(new THREE.Group(), `tianyuan.strainer-${i + 1}`)
-    basket.add(
-      new THREE.Mesh(basketGeo, M.stainlessDark),
-      new THREE.Mesh(strainerStemGeo, M.stainlessDark),
-      new THREE.Mesh(strainerGripGeo, M.darkWood),
-    )
+    const sb = new Batch(dynVc)
+    sb.add(M.stainlessDark, new THREE.CylinderGeometry(0.085, 0.07, 0.1, 10, 1, true))
+    sb.add(M.stainlessDark, new THREE.CylinderGeometry(0.0085, 0.0085, 0.216, 6).rotateZ(0.32).translate(-0.116, 0.148, 0))
+    sb.add(M.darkWood, new THREE.CylinderGeometry(0.012, 0.011, 0.25, 6).rotateZ(1.326).translate(-0.27, 0.28, 0))
+    const basket = batchToGroup(sb, `tianyuan.strainer-${i + 1}`)
     const potNoodles = buildNoodleBundle(`tianyuan.strainer-noodles-${i + 1}`, 0.064, 0.005, 6)
     potNoodles.position.set(0, 0.018, 0)
     basket.add(potNoodles)
@@ -1792,7 +1928,7 @@ export function buildTianyuanShopMesh(level: ShopLevel = 1): TianyuanShopBuildRe
     return {pot: p, water, flame, basket, potNoodles, phase: i * 1.7}
   })
 
-  // 1) 煮锅台等待出锅的沥水碗 + 6 颗下落水珠（配合 potFx[0] 演绎涮粉-松散-沥水-入碗）
+  // 1) 煮锅台等待出锅的沥水碗 + 6 颗下落水珠
   const dropGeo = own(new THREE.SphereGeometry(0.011, 5, 4).scale(0.85, 1.5, 0.85))
   const boilDrops = Array.from({length: 6}, () => {
     const d = new THREE.Mesh(dropGeo, D.waterDrop)
@@ -1808,147 +1944,118 @@ export function buildTianyuanShopMesh(level: ShopLevel = 1): TianyuanShopBuildRe
   boilWaitBowl.add(boilBowlNoodles)
   dynamic.add(boilWaitBowl)
 
-  // 共享具象肉码组构建器：按碗周 5 方位无遮挡排布，各自一眼可辨且严格随 bowl.meats 显隐
+  // 共享具象肉码组构建器：每类肉码合批为 1 个顶点色 mesh（29 draws -> 5 draws）
+  const foodVc = M.batchMasters?.vcFood ?? M.guoshao
   const buildBowlMeatClusters = (targetName: string): {root: THREE.Group; pieces: THREE.Group[]} => {
     const root = named(new THREE.Group(), targetName)
     const pieces: THREE.Group[] = []
-    const makeKey = (key: ToppingKey) => {
-      const g = named(new THREE.Group(), `${targetName}.${key}`)
+    const buildCluster = (key: ToppingKey, fill: (b: Batch) => void) => {
+      const b = new Batch(foodVc)
+      fill(b)
+      const g = batchToGroup(b, `${targetName}.${key}`)
       g.userData.meatKey = key
+      g.visible = false
       root.add(g)
       pieces.push(g)
-      return g
     }
 
-    // 1) guoshao（10点钟）：三层叠加五花锅烧厚片（瘦肉底+白花肥膘+金黄起泡脆皮）
-    const gGuoshao = makeKey('guoshao')
-    const gsLeanG = own(new THREE.BoxGeometry(0.044, 0.008, 0.026))
-    const gsFatG = own(new THREE.BoxGeometry(0.044, 0.005, 0.026))
-    const gsSkinG = own(new THREE.BoxGeometry(0.044, 0.005, 0.026))
-    for (let k = 0; k < 3; k++) {
-      const sg = new THREE.Group()
-      sg.add(
-        new THREE.Mesh(gsLeanG, D.meatLean),
-        (() => { const m = new THREE.Mesh(gsFatG, D.porkFat); m.position.y = 0.0065; return m })(),
-        (() => { const m = new THREE.Mesh(gsSkinG, M.guoshao); m.position.y = 0.0115; return m })(),
-      )
-      sg.position.set(-0.046 + k * 0.01, 0.062 + k * 0.0025, -0.028 + k * 0.013)
-      sg.rotation.set(0.22, 0.42 + k * 0.18, -0.1)
-      gGuoshao.add(sg)
-    }
-
-    // 2) beef（4-5点钟）：高位扇形叠码 4 片深酱红卤牛肉圆片（独立空位，绝不被压挡）
-    const gBeef = makeKey('beef')
-    const beefSliceG = own(new THREE.CylinderGeometry(0.023, 0.023, 0.005, 8).scale(1.24, 1, 0.84))
-    for (let k = 0; k < 4; k++) {
-      const bm = new THREE.Mesh(beefSliceG, M.beef)
-      bm.position.set(0.032 + (k % 2) * 0.018, 0.067 + k * 0.0025, 0.02 + k * 0.009)
-      bm.rotation.set(0.22, 0.25 + k * 0.35, 0.08)
-      gBeef.add(bm)
-    }
-
-    // 3) charsiu（2点钟）：蜜汁焦红叉烧条块 + 微亮白膘缘
-    const gCharsiu = makeKey('charsiu')
-    const csG = own(new THREE.BoxGeometry(0.042, 0.009, 0.022))
-    const csEdgeG = own(new THREE.BoxGeometry(0.04, 0.004, 0.005))
-    for (let k = 0; k < 3; k++) {
-      const cg = new THREE.Group()
-      const main = new THREE.Mesh(csG, M.charsiu)
-      const edge = new THREE.Mesh(csEdgeG, D.porkFat)
-      edge.position.set(0, 0.002, 0.01)
-      cg.add(main, edge)
-      cg.position.set(0.038 + k * 0.007, 0.063 + k * 0.0025, -0.034 + k * 0.012)
-      cg.rotation.set(0.24, -0.3 + k * 0.22, 0.06)
-      gCharsiu.add(cg)
-    }
-
-    // 4) egg（7-8点钟）：切半虎皮卤蛋（褐壳+奶白蛋白切面+金黄圆蛋黄芯）
-    const gEgg = makeKey('egg')
-    const shellG = own(new THREE.SphereGeometry(0.019, 8, 6, 0, Math.PI * 2, Math.PI * 0.45, Math.PI * 0.55).scale(1, 0.78, 1.28))
-    const whiteG = own(new THREE.CylinderGeometry(0.017, 0.017, 0.0035, 10).scale(1, 1, 1.24))
-    const yolkG = own(new THREE.SphereGeometry(0.01, 8, 5).scale(1, 0.58, 1))
-    for (let h = 0; h < 2; h++) {
-      const eg = new THREE.Group()
-      eg.add(
-        new THREE.Mesh(shellG, M.braisedEgg),
-        (() => { const m = new THREE.Mesh(whiteG, D.eggWhite); m.position.y = 0.002; return m })(),
-        (() => { const m = new THREE.Mesh(yolkG, D.eggYolk); m.position.y = 0.005; return m })(),
-      )
-      eg.position.set(-0.044 + h * 0.024, 0.067, 0.032 - h * 0.013)
-      eg.rotation.set(-0.22, h * 0.55, 0.12)
-      gEgg.add(eg)
-    }
-
-    // 5) youtiao（12点钟后缘）：双股金黄炸油条斜搭后侧碗缘，完全让开中前排卤蛋与牛肉
-    const gYoutiao = makeKey('youtiao')
-    const ytRodG = own(new THREE.CylinderGeometry(0.0072, 0.0072, 0.056, 6).rotateZ(Math.PI / 2))
-    const ytPinchG = own(new THREE.BoxGeometry(0.01, 0.01, 0.022))
-    for (let p = 0; p < 2; p++) {
-      const yg = new THREE.Group()
-      const a = new THREE.Mesh(ytRodG, M.youtiao)
-      a.position.z = -0.007
-      const b = new THREE.Mesh(ytRodG, M.youtiao)
-      b.position.z = 0.007
-      const tie = new THREE.Mesh(ytPinchG, M.youtiao)
-      yg.add(a, b, tie)
-      yg.position.set(-0.008 + p * 0.018, 0.076 + p * 0.007, -0.056 + p * 0.008)
-      yg.rotation.set(0.32, 0.12 - p * 0.18, -0.14)
-      gYoutiao.add(yg)
-    }
+    buildCluster('guoshao', b => {
+      for (let k = 0; k < 3; k++) {
+        const px = -0.046 + k * 0.01
+        const py = 0.062 + k * 0.0025
+        const pz = -0.028 + k * 0.013
+        const ry = 0.42 + k * 0.18
+        b.add(D.meatLean, new THREE.BoxGeometry(0.044, 0.008, 0.026), px, py, pz, ry, 0.22, -0.1)
+        b.add(D.porkFat, new THREE.BoxGeometry(0.044, 0.005, 0.026).translate(0, 0.0065, 0), px, py, pz, ry, 0.22, -0.1)
+        b.add(M.guoshao, new THREE.BoxGeometry(0.044, 0.005, 0.026).translate(0, 0.0115, 0), px, py, pz, ry, 0.22, -0.1)
+      }
+    })
+    buildCluster('beef', b => {
+      for (let k = 0; k < 4; k++) {
+        b.add(
+          M.beef,
+          new THREE.CylinderGeometry(0.023, 0.023, 0.005, 8).scale(1.24, 1, 0.84),
+          0.032 + (k % 2) * 0.018,
+          0.067 + k * 0.0025,
+          0.02 + k * 0.009,
+          0.25 + k * 0.35,
+          0.22,
+          0.08,
+        )
+      }
+    })
+    buildCluster('charsiu', b => {
+      for (let k = 0; k < 3; k++) {
+        const px = 0.038 + k * 0.007
+        const py = 0.063 + k * 0.0025
+        const pz = -0.034 + k * 0.012
+        const ry = -0.3 + k * 0.22
+        b.add(M.charsiu, new THREE.BoxGeometry(0.042, 0.009, 0.022), px, py, pz, ry, 0.24, 0.06)
+        b.add(D.porkFat, new THREE.BoxGeometry(0.04, 0.004, 0.005).translate(0, 0.002, 0.01), px, py, pz, ry, 0.24, 0.06)
+      }
+    })
+    buildCluster('egg', b => {
+      for (let h = 0; h < 2; h++) {
+        const px = -0.044 + h * 0.024
+        const py = 0.067
+        const pz = 0.032 - h * 0.013
+        const ry = h * 0.55
+        b.add(M.braisedEgg, new THREE.SphereGeometry(0.019, 8, 6, 0, Math.PI * 2, Math.PI * 0.45, Math.PI * 0.55).scale(1, 0.78, 1.28), px, py, pz, ry, -0.22, 0.12)
+        b.add(D.eggWhite, new THREE.CylinderGeometry(0.017, 0.017, 0.0035, 10).scale(1, 1, 1.24).translate(0, 0.002, 0), px, py, pz, ry, -0.22, 0.12)
+        b.add(D.eggYolk, new THREE.SphereGeometry(0.01, 8, 5).scale(1, 0.58, 1).translate(0, 0.005, 0), px, py, pz, ry, -0.22, 0.12)
+      }
+    })
+    buildCluster('youtiao', b => {
+      for (let p = 0; p < 2; p++) {
+        const px = -0.008 + p * 0.018
+        const py = 0.076 + p * 0.007
+        const pz = -0.056 + p * 0.008
+        const ry = 0.12 - p * 0.18
+        b.add(M.youtiao, new THREE.CylinderGeometry(0.0072, 0.0072, 0.056, 6).rotateZ(Math.PI / 2).translate(0, 0, -0.007), px, py, pz, ry, 0.32, -0.14)
+        b.add(M.youtiao, new THREE.CylinderGeometry(0.0072, 0.0072, 0.056, 6).rotateZ(Math.PI / 2).translate(0, 0, 0.007), px, py, pz, ry, 0.32, -0.14)
+        b.add(M.youtiao, new THREE.BoxGeometry(0.01, 0.01, 0.022), px, py, pz, ry, 0.32, -0.14)
+      }
+    })
 
     return {root, pieces}
   }
 
-  // 2) 肉台动画：木砧板菜刀起落剁切 + 五大肉码动态砧板段 + 对应飞入肉片 + 待装盘粉碗
-  const cleaverPivot = named(new THREE.Group(), 'tianyuan.cleaver-pivot')
-  const bladeMesh = new THREE.Mesh(own(new THREE.BoxGeometry(0.18, 0.082, 0.004).translate(-0.14, 0.038, 0)), M.stainless)
-  const knifeGrip = new THREE.Mesh(own(new THREE.CylinderGeometry(0.015, 0.014, 0.11, 8).rotateZ(Math.PI / 2).translate(0.01, 0.068, 0)), M.darkWood)
-  cleaverPivot.add(bladeMesh, knifeGrip)
+  // 2) 肉台动画：菜刀 / 砧板肉块 / 飞肉片 / 待装盘粉碗（全部合批）
+  const cleaverB = new Batch(dynVc)
+  cleaverB.add(M.stainless, new THREE.BoxGeometry(0.18, 0.082, 0.004).translate(-0.14, 0.038, 0))
+  cleaverB.add(M.darkWood, new THREE.CylinderGeometry(0.015, 0.014, 0.11, 8).rotateZ(Math.PI / 2).translate(0.01, 0.068, 0))
+  const cleaverPivot = batchToGroup(cleaverB, 'tianyuan.cleaver-pivot')
   cleaverPivot.position.set(-2.72, 0.992, -2.66)
 
   const cutSlab = named(new THREE.Group(), 'tianyuan.cut-slab')
   cutSlab.position.set(-2.88, 0.986, -2.8)
+  const makeSlab = (key: string, fill: (b: Batch) => void) => {
+    const b = new Batch(foodVc)
+    fill(b)
+    return batchToGroup(b, `tianyuan.slab-${key}`)
+  }
   const cutSlabByMeat: Record<ToppingKey, THREE.Group> = {
-    guoshao: (() => {
-      const g = new THREE.Group()
-      g.add(
-        new THREE.Mesh(own(new THREE.BoxGeometry(0.15, 0.02, 0.095)), D.meatLean),
-        new THREE.Mesh(own(new THREE.BoxGeometry(0.15, 0.012, 0.095).translate(0, 0.016, 0)), D.porkFat),
-        new THREE.Mesh(own(new THREE.BoxGeometry(0.15, 0.012, 0.095).translate(0, 0.028, 0)), M.guoshao),
-      )
-      return g
-    })(),
-    beef: (() => {
-      const g = new THREE.Group()
-      const m = new THREE.Mesh(own(new THREE.SphereGeometry(0.072, 10, 6).scale(1.25, 0.48, 0.88).translate(0, 0.022, 0)), M.beef)
-      g.add(m)
-      return g
-    })(),
-    charsiu: (() => {
-      const g = new THREE.Group()
-      const body = new THREE.Mesh(own(new THREE.BoxGeometry(0.17, 0.04, 0.072).translate(0, 0.018, 0)), M.charsiu)
-      const rim = new THREE.Mesh(own(new THREE.BoxGeometry(0.16, 0.01, 0.008).translate(0, 0.022, 0.036)), D.porkFat)
-      g.add(body, rim)
-      return g
-    })(),
-    egg: (() => {
-      const g = new THREE.Group()
-      const whole = new THREE.Mesh(own(new THREE.SphereGeometry(0.028, 8, 6).scale(1, 1.2, 1).translate(-0.04, 0.028, 0)), M.braisedEgg)
-      const half = new THREE.Mesh(own(new THREE.SphereGeometry(0.028, 8, 6, 0, Math.PI * 2, Math.PI * 0.45, Math.PI * 0.55).scale(1, 0.75, 1.25).translate(0.035, 0.012, 0)), M.braisedEgg)
-      const yolk = new THREE.Mesh(own(new THREE.SphereGeometry(0.013, 8, 5).scale(1, 0.6, 1).translate(0.035, 0.017, 0)), D.eggYolk)
-      g.add(whole, half, yolk)
-      return g
-    })(),
-    youtiao: (() => {
-      const g = new THREE.Group()
-      const stick = own(new THREE.CylinderGeometry(0.013, 0.013, 0.19, 6).rotateZ(Math.PI / 2))
-      const a = new THREE.Mesh(stick, M.youtiao)
-      a.position.set(0, 0.014, -0.012)
-      const b = new THREE.Mesh(stick, M.youtiao)
-      b.position.set(0, 0.014, 0.012)
-      g.add(a, b)
-      return g
-    })(),
+    guoshao: makeSlab('guoshao', b => {
+      b.add(D.meatLean, new THREE.BoxGeometry(0.15, 0.02, 0.095))
+      b.add(D.porkFat, new THREE.BoxGeometry(0.15, 0.012, 0.095).translate(0, 0.016, 0))
+      b.add(M.guoshao, new THREE.BoxGeometry(0.15, 0.012, 0.095).translate(0, 0.028, 0))
+    }),
+    beef: makeSlab('beef', b => {
+      b.add(M.beef, new THREE.SphereGeometry(0.072, 10, 6).scale(1.25, 0.48, 0.88).translate(0, 0.022, 0))
+    }),
+    charsiu: makeSlab('charsiu', b => {
+      b.add(M.charsiu, new THREE.BoxGeometry(0.17, 0.04, 0.072).translate(0, 0.018, 0))
+      b.add(D.porkFat, new THREE.BoxGeometry(0.16, 0.01, 0.008).translate(0, 0.022, 0.036))
+    }),
+    egg: makeSlab('egg', b => {
+      b.add(M.braisedEgg, new THREE.SphereGeometry(0.028, 8, 6).scale(1, 1.2, 1).translate(-0.04, 0.028, 0))
+      b.add(M.braisedEgg, new THREE.SphereGeometry(0.028, 8, 6, 0, Math.PI * 2, Math.PI * 0.45, Math.PI * 0.55).scale(1, 0.75, 1.25).translate(0.035, 0.012, 0))
+      b.add(D.eggYolk, new THREE.SphereGeometry(0.013, 8, 5).scale(1, 0.6, 1).translate(0.035, 0.017, 0))
+    }),
+    youtiao: makeSlab('youtiao', b => {
+      b.add(M.youtiao, new THREE.CylinderGeometry(0.013, 0.013, 0.19, 6).rotateZ(Math.PI / 2), 0, 0.014, -0.012)
+      b.add(M.youtiao, new THREE.CylinderGeometry(0.013, 0.013, 0.19, 6).rotateZ(Math.PI / 2), 0, 0.014, 0.012)
+    }),
   }
   for (const k of ['guoshao', 'beef', 'charsiu', 'egg', 'youtiao'] as const) {
     cutSlabByMeat[k].visible = k === 'guoshao'
@@ -1978,16 +2085,19 @@ export function buildTianyuanShopMesh(level: ShopLevel = 1): TianyuanShopBuildRe
   const meatBowlClusters = buildBowlMeatClusters('tianyuan.meat-bowl-slices')
   const meatBowlSlices = meatBowlClusters.root
   const meatPieces = meatBowlClusters.pieces
+  meatBowlSlices.visible = false
   meatWaitBowl.add(meatBowlNoodles, meatBowlSlices)
   dynamic.add(cleaverPivot, cutSlab, flyingMeat, meatWaitBowl)
 
-  // 3) 前台明档动画：老卤长勺舀卤 + 淋卤液柱（适配卤水/骨汤/酸辣汤材质）+ 出餐成品碗（具象肉码+花生葱花+可选红油辣椒）
-  const ladlePivot = named(new THREE.Group(), 'tianyuan.brine-ladle-pivot')
-  const ladleCup = new THREE.Mesh(own(new THREE.CylinderGeometry(0.036, 0.026, 0.032, 10, 1, false).translate(0, -0.016, 0)), M.stainless)
+  // 3) 前台明档动画：老卤长勺合批 + 淋卤液柱 + 出餐成品碗（配菜/红油各合批为 1 mesh）
+  const ladleB = new Batch(dynVc)
+  ladleB.add(M.stainless, new THREE.CylinderGeometry(0.036, 0.026, 0.032, 10, 1, false).translate(0, -0.016, 0))
+  ladleB.add(M.stainlessDark, new THREE.CylinderGeometry(0.0065, 0.0065, 0.24, 6).rotateZ(-0.24).translate(0.035, 0.11, 0))
+  ladleB.add(M.darkWood, new THREE.CylinderGeometry(0.0095, 0.0095, 0.1, 6).rotateZ(-0.24).translate(0.072, 0.26, 0))
+  const ladlePivot = batchToGroup(ladleB, 'tianyuan.brine-ladle-pivot')
   const ladleLiquid = new THREE.Mesh(own(new THREE.CircleGeometry(0.033, 10).rotateX(-Math.PI / 2).translate(0, -0.002, 0)), M.brine)
-  const ladleStem = new THREE.Mesh(own(new THREE.CylinderGeometry(0.0065, 0.0065, 0.24, 6).rotateZ(-0.24).translate(0.035, 0.11, 0)), M.stainlessDark)
-  const ladleHandle = new THREE.Mesh(own(new THREE.CylinderGeometry(0.0095, 0.0095, 0.1, 6).rotateZ(-0.24).translate(0.072, 0.26, 0)), M.darkWood)
-  ladlePivot.add(ladleCup, ladleLiquid, ladleStem, ladleHandle)
+  ladleLiquid.visible = false
+  ladlePivot.add(ladleLiquid)
   ladlePivot.position.set(2.0, COUNTER_Y + 0.22, 1.48)
 
   const streamCurve = new THREE.CatmullRomCurve3([
@@ -2002,6 +2112,7 @@ export function buildTianyuanShopMesh(level: ShopLevel = 1): TianyuanShopBuildRe
 
   const counterServeBowl = buildMiniBowl('tianyuan.counter-serve-bowl')
   counterServeBowl.position.set(1.66, COUNTER_Y + 0.05, 1.5)
+  counterServeBowl.visible = false
   const counterBowlNoodles = buildNoodleBundle('tianyuan.counter-bowl-noodles', 0.064, 0.0048, 9)
   counterBowlNoodles.position.set(0, 0.038, 0)
   const counterBrinePool = new THREE.Mesh(own(new THREE.CircleGeometry(0.08, 18).rotateX(-Math.PI / 2)), M.brine)
@@ -2010,34 +2121,24 @@ export function buildTianyuanShopMesh(level: ShopLevel = 1): TianyuanShopBuildRe
   const counterMeatSlices = counterMeatClusters.root
   const counterMeatPieces = counterMeatClusters.pieces
 
-  const counterGarnish = named(new THREE.Group(), 'tianyuan.counter-garnish')
-  const garGeo = own(new THREE.TorusGeometry(0.0075, 0.0026, 3, 6))
+  const garnB = new Batch(foodVc)
   for (let k = 0; k < 8; k++) {
     const a = (k / 8) * Math.PI * 2
-    const gm = new THREE.Mesh(garGeo, M.condiments[0] ?? D.peanutSkin)
-    gm.position.set(Math.cos(a) * 0.024, 0.075, Math.sin(a) * 0.024)
-    gm.rotation.set(Math.PI / 2 + 0.25, a, 0)
-    counterGarnish.add(gm)
+    garnB.add(M.condiments[0] ?? D.peanutSkin, new THREE.TorusGeometry(0.0075, 0.0026, 3, 6), Math.cos(a) * 0.024, 0.075, Math.sin(a) * 0.024, a, Math.PI / 2 + 0.25)
   }
-  const nutGeo = own(new THREE.SphereGeometry(0.0078, 5, 4).scale(1, 0.78, 1.42))
   for (const [nx, nz] of [[-0.01, 0.016], [0.014, 0.008], [-0.016, -0.012], [0.008, -0.02], [0.0, 0.0]] as const) {
-    const nm = new THREE.Mesh(nutGeo, D.peanutSkin)
-    nm.position.set(nx, 0.077, nz)
-    nm.rotation.y = nx * 18
-    counterGarnish.add(nm)
+    garnB.add(D.peanutSkin, new THREE.SphereGeometry(0.0078, 5, 4).scale(1, 0.78, 1.42), nx, 0.077, nz, nx * 18)
   }
+  const counterGarnish = batchToGroup(garnB, 'tianyuan.counter-garnish')
 
-  const counterChiliLayer = named(new THREE.Group(), 'tianyuan.counter-chili-oil')
-  const chiliDotGeo = own(new THREE.SphereGeometry(0.009, 6, 4).scale(1.3, 0.35, 1.05))
-  const chiliFlakeGeo = own(new THREE.BoxGeometry(0.011, 0.0035, 0.008))
+  const chiliB = new Batch(foodVc)
   for (let k = 0; k < 10; k++) {
     const a = (k / 10) * Math.PI * 2 + 0.35
     const r = 0.012 + (k % 3) * 0.014
-    const dm = new THREE.Mesh(k % 2 ? chiliDotGeo : chiliFlakeGeo, D.chiliOilSurface)
-    dm.position.set(Math.cos(a) * r, 0.076, Math.sin(a) * r)
-    dm.rotation.y = a
-    counterChiliLayer.add(dm)
+    const g = k % 2 ? new THREE.SphereGeometry(0.009, 6, 4).scale(1.3, 0.35, 1.05) : new THREE.BoxGeometry(0.011, 0.0035, 0.008)
+    chiliB.add(D.chiliOilSurface, g, Math.cos(a) * r, 0.076, Math.sin(a) * r, a)
   }
+  const counterChiliLayer = batchToGroup(chiliB, 'tianyuan.counter-chili-oil')
   counterChiliLayer.visible = false
 
   counterServeBowl.add(counterBowlNoodles, counterBrinePool, counterMeatSlices, counterGarnish, counterChiliLayer)
@@ -2052,74 +2153,44 @@ export function buildTianyuanShopMesh(level: ShopLevel = 1): TianyuanShopBuildRe
 
   let fan: THREE.Group | null = null
   if (lv >= 2) {
-    fan = named(new THREE.Group(), 'tianyuan.ceiling-fan')
-    const rod = new THREE.Mesh(own(new THREE.CylinderGeometry(0.015, 0.015, 0.4, 6).translate(0, -0.2, 0)), M.blackMetal)
-    const hub = new THREE.Mesh(own(new THREE.CylinderGeometry(0.09, 0.07, 0.08, 10).translate(0, -0.44, 0)), M.whitePlastic)
-    fan.add(rod, hub)
-    const bladeGeo = own(new THREE.BoxGeometry(0.62, 0.012, 0.12).translate(0.38, -0.44, 0))
+    const fb = new Batch(dynVc)
+    fb.add(M.blackMetal, new THREE.CylinderGeometry(0.015, 0.015, 0.4, 6).translate(0, -0.2, 0))
+    fb.add(M.whitePlastic, new THREE.CylinderGeometry(0.09, 0.07, 0.08, 10).translate(0, -0.44, 0))
     for (let k = 0; k < 3; k++) {
-      const blade = new THREE.Mesh(bladeGeo, M.whitePlastic)
-      blade.rotation.y = (k / 3) * Math.PI * 2
-      fan.add(blade)
+      fb.add(M.whitePlastic, new THREE.BoxGeometry(0.62, 0.012, 0.12).translate(0.38, -0.44, 0), 0, 0, 0, (k / 3) * Math.PI * 2)
     }
+    fan = batchToGroup(fb, 'tianyuan.ceiling-fan')
     fan.position.set(0.4, CEIL_Y, 4.4)
-    ceilingGroup.add(fan)
+    exterior.add(fan)
   }
 
   const lanterns: THREE.Group[] = []
   if (lv >= 3) {
-    const bodyGeo = own(new THREE.SphereGeometry(0.17, 10, 8).scale(1, 0.86, 1))
-    const capGeo = own(new THREE.CylinderGeometry(0.08, 0.08, 0.04, 10))
-    const tasselGeo = own(new THREE.CylinderGeometry(0.012, 0.03, 0.16, 6))
-    const cordGeo = own(new THREE.CylinderGeometry(0.004, 0.004, 0.3, 4))
     for (const x of [-0.3, 2.45]) {
-      const l = named(new THREE.Group(), 'tianyuan.lantern')
-      const body = new THREE.Mesh(bodyGeo, M.lanternRed)
-      body.position.y = -0.47
-      const capTop = new THREE.Mesh(capGeo, M.darkWood)
-      capTop.position.y = -0.31
-      const capBottom = new THREE.Mesh(capGeo, M.darkWood)
-      capBottom.position.y = -0.62
-      const tassel = new THREE.Mesh(tasselGeo, M.lanternRed)
-      tassel.position.y = -0.72
-      const cord = new THREE.Mesh(cordGeo, M.blackMetal)
-      cord.position.y = -0.15
-      l.add(body, capTop, capBottom, tassel, cord)
+      const lb = new Batch(dynVc)
+      lb.add(M.lanternRed, new THREE.SphereGeometry(0.17, 10, 8).scale(1, 0.86, 1), 0, -0.47, 0)
+      lb.add(M.darkWood, new THREE.CylinderGeometry(0.08, 0.08, 0.04, 10), 0, -0.31, 0)
+      lb.add(M.darkWood, new THREE.CylinderGeometry(0.08, 0.08, 0.04, 10), 0, -0.62, 0)
+      lb.add(M.lanternRed, new THREE.CylinderGeometry(0.012, 0.03, 0.16, 6), 0, -0.72, 0)
+      lb.add(M.blackMetal, new THREE.CylinderGeometry(0.004, 0.004, 0.3, 4), 0, -0.15, 0)
+      const l = batchToGroup(lb, 'tianyuan.lantern')
       l.position.set(x, FASCIA_Y0, GLASS_Z + 0.5)
       dynamic.add(l)
       lanterns.push(l)
     }
   }
 
-  // 相机探针：借 materials.ts 工厂材质，不在此文件新建原生材质
-  const probeGeo = own(new THREE.BufferGeometry())
-  probeGeo.setAttribute('position', new THREE.Float32BufferAttribute([0, 0, 0, 0, 0, 0, 0, 0, 0], 3))
-  const probeMat = createConcreteMaterial('plaster', {transparent: true, opacity: 0, name: 'tianyuan_camera_probe'})
-  probeMat.colorWrite = false
-  probeMat.depthWrite = false
-  probeMat.depthTest = false
-  const probe = new THREE.Mesh(probeGeo, probeMat)
-  probe.name = 'tianyuan.camera-probe'
-  probe.frustumCulled = false
-  const camWorld = new THREE.Vector3()
+  // 室外远近只依赖传入 cameraPos（零额外 probe Mesh draw call）
   const camLocal = new THREE.Vector3()
-  let camSeen = false
-  probe.onBeforeRender = (_r, _s, camera) => {
-    camWorld.setFromMatrixPosition(camera.matrixWorld)
-    camSeen = true
-  }
-  group.add(probe)
-
   let cutMode: ShopCutawayMode = 'auto'
   let cut = false
   const inFootprint = (p: THREE.Vector3) =>
     Math.abs(p.x) < HX && p.z > -HZ && p.z < GLASS_Z + 0.05 && !(p.x < ARC_CX && p.z > ARC_CZ && Math.hypot(p.x - ARC_CX, p.z - ARC_CZ) > ARC_R)
 
-  function evalCutaway(indoor: boolean): boolean {
+  function evalCutaway(indoor: boolean, camWorldPos?: THREE.Vector3): boolean {
     if (cutMode !== 'auto') return cutMode
-    if (!camSeen) return false
-    group.updateMatrixWorld()
-    group.worldToLocal(camLocal.copy(camWorld))
+    if (!camWorldPos) return false
+    group.worldToLocal(camLocal.copy(camWorldPos))
     const overhead = inFootprint(camLocal) && camLocal.y >= CEIL_Y - 0.05 && camLocal.y < ROOF_Y + 0.8
     const inRoom = Math.abs(camLocal.x) < IN_X && camLocal.z > BACK_IN_Z && camLocal.z < GLASS_Z && camLocal.y < CEIL_Y - 0.05 && inFootprint(camLocal)
     return overhead || (indoor && !inRoom)
@@ -2130,6 +2201,7 @@ export function buildTianyuanShopMesh(level: ShopLevel = 1): TianyuanShopBuildRe
     cut = next
     exterior.visible = !cut
     ceilingGroup.visible = !cut
+    syncSectionBatches()
     group.userData.cutaway = cut
   }
 
@@ -2559,7 +2631,20 @@ export function buildTianyuanShopMesh(level: ShopLevel = 1): TianyuanShopBuildRe
       if (fan) fan.rotation.y += dt * 4.2
       lanterns.forEach((l, i) => (l.rotation.z = Math.sin(time * 1.3 + i) * 0.05))
       const indoor = ctx.indoor ?? (typeof document !== 'undefined' && document.body?.dataset.mifenIndoor === '1')
-      applyCut(evalCutaway(indoor))
+      applyCut(evalCutaway(indoor, ctx.cameraPos))
+      // 后厨动态厨具（煮锅水/火/笊篱/菜刀/砧板肉/淋卤勺）仅进店或距店 <10m 或正在做粉时渲染，街面外省 ~12 draws
+      const kitchenActive = indoor || Boolean(ctx.boiling) || Boolean(activeCooking && activeCooking.stage !== 'idle')
+      const showKitchenDyn = kitchenActive || (ctx.cameraPos ? ctx.cameraPos.distanceTo(group.position) < 10 : true)
+      for (const p of potFx) {
+        p.water.visible = showKitchenDyn
+        p.flame.visible = showKitchenDyn && p.flame.visible
+        p.basket.visible = showKitchenDyn
+      }
+      boilWaitBowl.visible = showKitchenDyn
+      cleaverPivot.visible = showKitchenDyn
+      cutSlab.visible = showKitchenDyn
+      meatWaitBowl.visible = showKitchenDyn
+      ladlePivot.visible = showKitchenDyn
     },
 
     setCutaway(mode: ShopCutawayMode) {
@@ -2568,6 +2653,22 @@ export function buildTianyuanShopMesh(level: ShopLevel = 1): TianyuanShopBuildRe
     },
 
     isCutaway: () => cut,
+
+    setDetailVisible(visible: boolean) {
+      dynamic.visible = visible
+      if (interior.visible !== visible) {
+        interior.visible = visible
+        syncSectionBatches()
+      }
+      if (fan) fan.visible = visible
+    },
+
+    updateNight(night: number, time = 0) {
+      if (disposed) return
+      const n = THREE.MathUtils.clamp(night, 0, 1)
+      M.updateNight(n, false, time)
+      D.nightSpill.opacity = n * 0.2
+    },
 
     dispose() {
       if (disposed) return
@@ -2580,7 +2681,6 @@ export function buildTianyuanShopMesh(level: ShopLevel = 1): TianyuanShopBuildRe
         if (mesh.isMesh && mesh.geometry && !owned.has(mesh.geometry)) mesh.geometry.dispose()
       })
       for (const g of ownGeos) g.dispose()
-      disposeMifenMaterial(probeMat)
       D.dispose()
       group.clear()
       releaseTianyuanMaterials()

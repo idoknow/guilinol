@@ -1,3 +1,5 @@
+import {smokeDefaults,validRules} from '../lib/smoke.ts'
+import {gfxDefaults,validGfx} from '../lib/gfx.ts'
 import {serve} from '@hono/node-server'
 import {timingSafeEqual} from 'node:crypto'
 import pg from 'pg'
@@ -7,10 +9,14 @@ import {receive,queryPerf} from './telemetry.mjs'
 import {onRequest} from '../functions/api/[[path]].ts'
 import {database, measuredConnections} from './postgres.mjs'
 import {bucket} from './bucket.mjs'
+import {cardRoutes} from './update-cards.mjs'
 import {createReadiness} from './readiness.mjs'
 import {presence, mpPresence} from './live.mjs'
 import {multiplayer} from './mp-admin.mjs'
 import {npcDefaults,validNpc} from '../lib/npc.ts'
+import {resolveClientIp} from './client-ip.mjs'
+import {createPerfCache} from './perf-cache.mjs'
+import {fishingStore} from './fishing.mjs'
 
 crypto.subtle.timingSafeEqual = (left,right) => left.byteLength===right.byteLength && timingSafeEqual(left,right)
 // 连接/查询都有上限：卡住的查询不能长期占着 5 连接的池子
@@ -22,52 +28,30 @@ const pool=new pg.Pool({connectionString:process.env.DATABASE_URL,max:Number(pro
 // 空闲连接被服务端断开（postgres 重启/维护）时 pg.Pool 会 emit 'error'，不监听就整个进程崩溃
 pool.on('error',error=>console.error('postgres idle client error',error.code??error.message))
 const readiness=createReadiness({query:sql=>pool.query(sql)})
-const metrics=monitor(pool)
+let warmAdminCache=()=>{}
+const metrics=monitor(pool,{onHourlyReady:()=>warmAdminCache()})
 const connections=measuredConnections(pool,metrics)
-// 后台聚合查询的短期缓存：一次首屏并发十几条聚合，数据本身按分钟更新，30 秒内重复跑同一份 SQL 没意义
-// （单条网格查询 24 小时要 933ms）。只缓存只读分析类路径，admin/live 与写操作直通。
-const ADMIN_CACHE_TTL = Number(process.env.ADMIN_CACHE_TTL ?? 120000)
-// 过期后的这段时间里仍然先把旧结果发出去、后台再刷新：24h 总览要 12-20s，
-// 让管理员干等一个必然超时的查询，不如先给他上一次的图，同时在后台算新的。
-const ADMIN_CACHE_STALE = Number(process.env.ADMIN_CACHE_STALE ?? 900000)
-const ADMIN_CACHE_MAX = 200
-const adminCache = new Map()
-const adminPending = new Map()
-const cacheableAdminPath = path => /^admin\/(perf(\/grid|\/server)?|overview|timeseries|breakdown|funnel|errors)$/.test(path)
-function rememberAdminCache(key, response) {
-  adminCache.set(key, {response: response.clone(), expires: Date.now() + ADMIN_CACHE_TTL})
-  if (adminCache.size > ADMIN_CACHE_MAX) adminCache.delete(adminCache.keys().next().value)
-}
-function withAdminCache(key, run) {
-  const now = Date.now()
-  const hit = adminCache.get(key)
-  if (hit && hit.expires > now) return Promise.resolve(hit.response.clone())
-  // 同一个 key 的并发请求只打一次库：后台首屏会同时发好几个卡片、前端还每 15s 轮询一次，
-  // 不去重就是同样一条 20s 的聚合被并行跑 N 遍，把连接池占满。
-  const pending = adminPending.get(key)
-  if (pending) return pending.then(response => response.clone())
-  // 有旧结果就立即返回，刷新在后台进行（成功后才覆盖缓存）
-  const stale = hit && hit.expires + ADMIN_CACHE_STALE > now ? hit.response.clone() : null
-  const job = run().then(response => {
-    if (response.ok) rememberAdminCache(key, response)
-    return response
-  })
-  adminPending.set(key, job)
-  job.then(() => adminPending.delete(key), () => adminPending.delete(key))
-  return stale ? Promise.resolve(stale) : job.then(response => response.clone())
-}
 const runPerfQuery = (path, params) => (path.startsWith('admin/perf') ? queryPerf : analytics)(connections, path, params)
-const cachedPerfQuery = (path, params) => {
-  const started = Date.now()
-  const done = response => {
-    const ms = Date.now() - started
-    if (ms > 300) console.log(JSON.stringify({scope: 'admin-query', path, ms, query: String(params).slice(0, 120)}))
-    return response
-  }
-  if (!cacheableAdminPath(path)) return runPerfQuery(path, params).then(done)
-  return withAdminCache(`${path}?${params}`, () => runPerfQuery(path, params)).then(done)
+const cachedPerfQuery = createPerfCache({ runPerfQuery })
+const mp=multiplayer(pool,process.env,{cache:cachedPerfQuery})
+let warming=false
+warmAdminCache=()=>{
+  if(warming||process.env.ADMIN_WARMUP==='0')return
+  warming=true
+  const snap=300000
+  const toMs=Math.ceil(Date.now()/snap)*snap
+  const from=new Date(toMs-86400e3).toISOString(),to=new Date(toMs).toISOString()
+  // 后台首屏 24h 常用查询提前预热进内存缓存，管理员首开页面直接命中
+  Promise.allSettled([
+    cachedPerfQuery('admin/live',new URLSearchParams()),
+    cachedPerfQuery('admin/overview',new URLSearchParams({from,to})),
+    cachedPerfQuery('admin/timeseries',new URLSearchParams({from,to,metric:'visitors',bucket:'1h'})),
+    cachedPerfQuery('admin/timeseries',new URLSearchParams({from,to,metric:'sessions',bucket:'1h'})),
+    cachedPerfQuery('admin/funnel',new URLSearchParams({from,to})),
+  ]).finally(()=>{warming=false})
 }
-const mp=multiplayer(pool,process.env)
+const warmTimer=setInterval(()=>warmAdminCache(),120000)
+warmTimer.unref()
 const readNpc=async()=> (await pool.query('select settings from npc_settings where singleton')).rows[0]?.settings??npcDefaults
 async function npcAdmin(request){
   if(request.method==='GET')return json(await readNpc())
@@ -77,16 +61,48 @@ async function npcAdmin(request){
   await pool.query('insert into npc_settings(singleton,settings) values(true,$1) on conflict(singleton) do update set settings=excluded.settings',[rules])
   return json({ok:true})
 }
-const env = {...process.env, npcAdmin,mpAdmin:mp.route, perfQuery:cachedPerfQuery, DB:database(connections), FEEDBACK:bucket(process.env.S3_ENDPOINT)}
+async function readSmoke(){
+  const {rows}=await pool.query("SELECT detail FROM admin_audit WHERE target_type='smoke' AND target_id='settings' AND action='smoke.settings' ORDER BY id DESC LIMIT 1")
+  const stored=rows[0]?.detail
+  if(!stored)return smokeDefaults
+  if(stored.catalogVersion===2)return stored
+  // Pre-expansion settings could only contain the original six brands.
+  return {...stored,brands:[...stored.brands,...smokeDefaults.brands.slice(6)]}
+}
+async function smokeAdmin(request,user){
+  if(request.method==='GET')return json(await readSmoke())
+  if(request.method!=='POST')return json({error:'method'},405)
+  const rules=await request.json().catch(()=>null)
+  if(!validRules(rules))return json({error:'invalid smoke settings'},400)
+  await pool.query("INSERT INTO admin_audit(actor_id,action,target_type,target_id,detail) VALUES($1,'smoke.settings','smoke','settings',$2)",[user,{...rules,catalogVersion:2}])
+  return json({ok:true})
+}
+async function readGfx(){
+  const {rows}=await pool.query("SELECT detail FROM admin_audit WHERE target_type='gfx' AND target_id='settings' AND action='gfx.settings' ORDER BY id DESC LIMIT 1")
+  return validGfx(rows[0]?.detail)?rows[0].detail:gfxDefaults
+}
+async function gfxAdmin(request,user){
+  if(request.method==='GET')return json(await readGfx())
+  if(request.method!=='PUT')return json({error:'method'},405)
+  const config=await request.json().catch(()=>null)
+  if(!validGfx(config))return json({error:'invalid gfx settings'},400)
+  await pool.query("INSERT INTO admin_audit(actor_id,action,target_type,target_id,detail) VALUES($1,'gfx.settings','gfx','settings',$2)",[user,config])
+  return json({ok:true})
+}
+const env = {...process.env, gfxAdmin,smokeAdmin,npcAdmin,mpAdmin:mp.route, perfQuery:cachedPerfQuery, DB:database(connections), FEEDBACK:bucket(process.env.S3_ENDPOINT)}
 const origin = new URL(process.env.PUBLIC_ORIGIN).origin
+env.updateCards=cardRoutes(pool,env)
+env.fishing=fishingStore(connections)
 const online = presence(pool)
 const mpOnline = mpPresence()
 
 const json=(body,status=200)=>new Response(JSON.stringify(body),{status,headers:{'content-type':'application/json','cache-control':'no-store'}})
 
-const server=serve({port:Number(process.env.PORT || 3000),fetch: async request => {
+const server=serve({port:Number(process.env.PORT || 3000),fetch: async (request,serverEnv) => {
   const url = new URL(request.url)
   if (!url.pathname.startsWith('/api/')) return new Response(null,{status:404})
+  if(url.pathname==='/api/smoke')return request.method==='GET'?json(await readSmoke()):json({error:'method'},405)
+  if(url.pathname==='/api/gfx')return request.method==='GET'?json(await readGfx()):json({error:'method'},405)
   if(url.pathname==='/api/npc'){
     if(request.method!=='GET')return json({error:'method'},405)
     const body=JSON.stringify(await readNpc()),etag='"'+Buffer.from(await crypto.subtle.digest('SHA-256',Buffer.from(body))).toString('hex')+'"'
@@ -114,8 +130,15 @@ const server=serve({port:Number(process.env.PORT || 3000),fetch: async request =
   const start=performance.now()
   let status=500
   try {
-    const response=url.pathname==='/api/t'?await receive(request,connections,origin):await onRequest({env,request:new Request(origin+url.pathname+url.search,request)})
+    const remoteAddr=serverEnv?.incoming?.socket?.remoteAddress??''
+    const resolved=resolveClientIp(request.headers,remoteAddr)
+    const reqEnv={...env,clientIp:resolved.clientIp}
+    const response=url.pathname==='/api/t'?await receive(request,connections,origin,{remoteAddr}):await onRequest({env:reqEnv,request:new Request(origin+url.pathname+url.search,request)})
     status=response.status
+    if(request.method!=='GET'&&status<400&&/^\/api\/(?:admin|feedback|bridge|auth\/(?:register|verify))/.test(url.pathname)){
+      cachedPerfQuery.invalidate('admin/stats?')
+      cachedPerfQuery.invalidate('admin/signups?')
+    }
     return response
   }finally{if(!request.headers.get('user-agent')?.startsWith('kube-probe/'))metrics.request(url.pathname,status,performance.now()-start)}
 }})

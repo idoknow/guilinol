@@ -6,7 +6,7 @@ import {buildDroneAsync, disposeDrone, spinProps, type DroneMesh} from './models
 import {createFlight, landNow, lensPose, liftOff, requestHome, stepFlight, telemetry, type Flight, type Sticks} from './flight'
 import {PilotInput, type DroneAction} from './input'
 import {createRc, type RcView} from './rc-ui'
-import {startRecording, saveRecording, type Recording} from '../gear/video'
+import {recordingProblem, startRecording, saveRecording, type Recording} from '../gear/video'
 
 // IDOK-215: 机库 → 放置 → 起飞 → 遥控画面。The dock entry opens the hangar; once a drone is out,
 // the same entry becomes 起飞, and the RC overlay takes over the camera until 退出.
@@ -474,7 +474,9 @@ export function droneMode(host:Host, deps:{groundAt:(x:number,z:number)=>number;
     const result = await current.rec.stop()
     const saved = saveRecording(result,'航拍')
     if (!saved) {
-      rc.toast('这台机器录不出画面（浏览器编码器没有输出）')
+      const problem = recordingProblem(result) ?? '录像保存失败'
+      window.lastDroneClipProblem = problem
+      rc.toast(problem)
       return
     }
     window.lastDroneClip = {name:saved,container:result.container,mime:result.mime,seconds:result.seconds,width:result.width,height:result.height,fps:result.fps}
@@ -601,5 +603,6 @@ declare global {
     droneChase?:(view:{distance:number; height:number; side:number}|null) => void
     lastDronePhoto?:{name:string;bytes:number;width:number;height:number;drone:string|null}
     lastDroneClip?:{name:string;container:string;mime:string;seconds:number;width:number;height:number;fps:number}
+    lastDroneClipProblem?:string
   }
 }

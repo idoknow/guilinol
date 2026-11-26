@@ -160,6 +160,7 @@ class SceneBuilder:
         self.detail = (lod == 0)
         self.collide = collide
         self.atlas = MeshBucket(rects, atlas_size)
+        self.glass = MeshBucket(rects, atlas_size)
         self.street_parts = {role:MeshBucket(rects,atlas_size) for role in ("road","curb","sidewalk")}
         self.lit = MeshBucket(rects, atlas_size)
         self.hit = MeshBucket(rects, atlas_size)
@@ -505,11 +506,15 @@ def export_landmark_glb(
     atlas_metallic=0.05,
     atlas_roughness=0.84,
     double_sided=False,
+    surface=None,
+    masked_atlas=False,
+    glass_opacity=.43,
+    atlas_emissive=(0.0, 0.0, 0.0),
 ):
     atlas_size = image.width
     hi = SceneBuilder(rects, atlas_size=atlas_size, lod=0, collide=True)
     lo = SceneBuilder(rects, atlas_size=atlas_size, lod=1, collide=False)
-    hi.surface=lo.surface=landmark_surface(out_glb.stem)
+    hi.surface=lo.surface=surface or landmark_surface(out_glb.stem)
     build_fn(hi)
     build_fn(lo)
 
@@ -518,10 +523,17 @@ def export_landmark_glb(
     for lod_name, b in (('lod0', hi), ('lod1', lo)):
         scene.graph.update(frame_from=base, frame_to=lod_name)
         m_atlas = bucket_to_trimesh(
-            b.atlas, image, f'{mat_prefix}_atlas', (0, 0, 0), atlas_metallic, atlas_roughness, double_sided=double_sided
+            b.atlas, image, f'{mat_prefix}_atlas', atlas_emissive, atlas_metallic, atlas_roughness, double_sided=double_sided
         )
         if m_atlas is not None:
+            if masked_atlas:
+                m_atlas.visual.material.alphaMode = 'MASK'
             scene.add_geometry(m_atlas, node_name=f'{lod_name}_atlas', parent_node_name=lod_name)
+        glass = bucket_to_trimesh(b.glass, image, f'{mat_prefix}_glass', roughness=.32, double_sided=True)
+        if glass is not None:
+            glass.visual.material.alphaMode = 'BLEND'
+            glass.visual.material.baseColorFactor = [255, 255, 255, round(255 * glass_opacity)]
+            scene.add_geometry(glass, node_name=f'{lod_name}_glass', parent_node_name=lod_name)
         for role, part in b.street_parts.items():
             mesh=bucket_to_trimesh(part,None,role,roughness=1,double_sided=True)
             if mesh is not None:
@@ -541,7 +553,7 @@ def export_landmark_glb(
 
     image.save(out_glb.parent / f'{mat_prefix}_atlas.png')
     scene.export(out_glb)
-    n0 = len(hi.atlas) + len(hi.lit) + sum(map(len,hi.street_parts.values()))
-    n1 = len(lo.atlas) + len(lo.lit) + sum(map(len,lo.street_parts.values()))
+    n0 = len(hi.atlas) + len(hi.glass) + len(hi.lit) + sum(map(len,hi.street_parts.values()))
+    n1 = len(lo.atlas) + len(lo.glass) + len(lo.lit) + sum(map(len,lo.street_parts.values()))
     print(f'{out_glb.stem}: lod0={n0} tris, lod1={n1} tris, collision={len(hi.hit)} tris')
     return n0, n1, len(hi.hit)
