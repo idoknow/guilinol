@@ -22,7 +22,7 @@
 
 | 系统 | 源码归属 | 世界参考原点 `(x, y, z)` | 行走/地面标高 | 空间关系与重叠判定 |
 | :--- | :--- | :--- | :--- | :--- |
-| **本组 `shizijie.glb` B1** | [pipeline/landmarks/shizijie.py#L1585-L1695](file:///Users/pan-work/guilinol-xp-overnight/pipeline/landmarks/shizijie.py#L1585-L1695)<br>[web/src/tunnels.ts#L222-L256](file:///Users/pan-work/guilinol-xp-overnight/web/src/tunnels.ts#L222-L256) | `(-879.750202, 151.3, -169.626045)` | 地面 `151.3 m`<br>B1 地板 `147.1 m`（深 `4.2 m`，吊顶 `-1.05 m` / `ceil_y_bot -1.11 m`） | 世界包络 `x ∈ [-945.54, -820.21]`，`z ∈ [-228.61, -111.35]`，含 16 商铺、16 卷帘门与 4 条下沉梯井 |
+| **本组 `shizijie.glb` B1** | [pipeline/landmarks/shizijie.py#L770](file:///Users/pan-work/guilinol-xp-overnight/pipeline/landmarks/shizijie.py#L770)<br>[web/src/tunnels.ts#L222-L256](file:///Users/pan-work/guilinol-xp-overnight/web/src/tunnels.ts#L222-L256) | `(-879.750202, 151.3, -169.626045)` | 地面 `151.3 m`<br>B1 地板 `147.1 m`（深 `4.2 m`，吊顶 `-1.05 m` / `ceil_y_bot -1.11 m`） | 世界包络 `x ∈ [-945.54, -820.21]`，`z ∈ [-228.61, -111.35]`，含 16 商铺、16 卷帘门与 4 条下沉梯井 |
 | **隔壁 `szj`（十字街室内）** | [web/src/shizijie/entry.ts](file:///Users/pan-work/guilinol-xp-overnight/web/src/shizijie/entry.ts)<br>[web/src/shizijie/contract.ts#L37-L46](file:///Users/pan-work/guilinol-xp-overnight/web/src/shizijie/contract.ts#L37-L46) | `(-879.750202, 151.3, -169.626045)` | 触发面 `151.3 m`<br>室内 `indoorFloorY = 0`（深 `4.2 m`） | **与本组 `shizijie.glb` 原点、高程、4 个梯井 100% 重合**；并在 `160 m` 内自动生成 4 座地面重复雨棚（`ensureSzjHoods`） |
 | **隔壁 `xxg`（中心广场小香港）** | [web/src/xiaoxianggang/entry.ts](file:///Users/pan-work/guilinol-xp-overnight/web/src/xiaoxianggang/entry.ts)<br>[web/src/xiaoxianggang/contract.ts#L38-L47](file:///Users/pan-work/guilinol-xp-overnight/web/src/xiaoxianggang/contract.ts#L38-L47) | `anchorWorld = (-845, 232)`<br>挂载检测参考 `(-892, 214)` | 地面触发 `surfaceY = 153.868 m` | 距十字街原点 **403.13 m**（距挂载参考点 **383.82 m**），距解放桥中心 **703.70 m**；**完全零重叠** |
 | **解放桥交警执勤区** | [web/src/traffic-duty/types.ts#L98-L109](file:///Users/pan-work/guilinol-xp-overnight/web/src/traffic-duty/types.ts#L98-L109) | 中心 `(-168, 40)`（`radiusM: 240`）<br>岗位 `(-266.26, 151.85, 26.86)`<br>传送 `(-268.5, 151.86, 24.8)` | 桥面 `~151.85–151.86 m` | 距十字街原点 **741.98 m**（交警岗↔十字街 **644.19 m**），距 `xxg` 挂载参考 **653.37 m** |
@@ -41,7 +41,7 @@
 | `shizijie_stair_se` | 文化大厦 · SE出口 | `3.4 × 9.0` / `-158°` | `(-855.564, 151.3, -118.954)` | `(-855.003, -117.563, yaw=-2.7576)` | JSON `(-858.936, 147.1, -127.298)` / SZJ `(-859.498, 147.1, -128.689)` |
 | `shizijie_stair_sw` | 微笑堂 · SW出口 | `3.2 × 8.8` / `-131.2°` | `(-922.640, 151.3, -145.228)` | `(-921.511, -144.240, yaw=-2.2899)` | JSON `(-929.261, 147.1, -151.024)` / SZJ `(-930.389, 147.1, -152.012)` |
 
-> ⚠️ **地面雨棚双层重叠隐患**：[pipeline/landmarks/shizijie.py#L1470-L1529](file:///Users/pan-work/guilinol-xp-overnight/pipeline/landmarks/shizijie.py#L1470-L1529) 已为 `nw/ne/se` 烘焙地面梯井雨棚（`sw` 在 `nikoniko.py` 处理）；而 [web/src/main.ts#L786-L815](file:///Users/pan-work/guilinol-xp-overnight/web/src/main.ts#L786-L815) 只要玩家进入原点 `160 m` 内即调用 `ensureSzjHoods()` → `createSurfaceStairwellHoods(pack, { worldSpace: true })`（[web/src/shizijie/look/canopy.ts#L171-L181](file:///Users/pan-work/guilinol-xp-overnight/web/src/shizijie/look/canopy.ts#L171-L181)），按 `sampleMissionGroundY` 在完全相同 4 处生成第二套前端程序化雨棚与护栏，会视觉叠穿（Z-fighting / 双顶棚）。
+> ⚠️ **地面雨棚双层重叠隐患**：[pipeline/landmarks/shizijie.py#L660-L723](file:///Users/pan-work/guilinol-xp-overnight/pipeline/landmarks/shizijie.py#L660-L723) 已为 `nw/ne/se` 烘焙地面梯井雨棚（`sw` 在 `nikoniko.py` 处理）；而 [web/src/main.ts#L786-L815](file:///Users/pan-work/guilinol-xp-overnight/web/src/main.ts#L786-L815) 只要玩家进入原点 `160 m` 内即调用 `ensureSzjHoods()` → `createSurfaceStairwellHoods(pack, { worldSpace: true })`（[web/src/shizijie/look/canopy.ts#L171-L181](file:///Users/pan-work/guilinol-xp-overnight/web/src/shizijie/look/canopy.ts#L171-L181)），按 `sampleMissionGroundY` 在完全相同 4 处生成第二套前端程序化雨棚与护栏，会视觉叠穿（Z-fighting / 双顶棚）。
 
 #### B. 隔壁中心广场 `xxg`（小香港）4 个入口
 
@@ -54,9 +54,9 @@
 | `W1` | 西南入口 | `(-924.911, 153.868, 223.303)` | `(-930.353, 221.296, yaw=1.2174)` | 同上 |
 | `W2` | 西北入口 | `(-911.417, 153.868, 186.721)` | `(-916.859, 184.714, yaw=1.2174)` | 同上；距 `shizijie_stair_se` 梯口 **310.74 m**（距挂载点 `(-892, 214)` 33.48 m） |
 
-#### C. 当前工作区关联阻塞提醒（只读核查发现）
-- `public/landmarks/shizijie.json` 与 `pipeline/landmarks/shizijie.py#L1545-L1577` 当前工作树含未解决的 Git 冲突标记（`<<<<<<< HEAD`）。
-- 影响：[web/src/tunnels.ts#L279-L288](file:///Users/pan-work/guilinol-xp-overnight/web/src/tunnels.ts#L279-L288) 中 `loadShizijieUnderground()` 拉取 `/landmarks/shizijie.json` 时 `res.json()` 会抛出解析异常并被 `.catch(() => null)` 静默吞掉，导致 `registeredLandmarkUnderground = null`，从而让依赖 `shizijie.json` 多边形扩展的 B1 `inBore` 与防掉坑范围退化。需待主程按组决清理冲突。
+#### C. 合入期 `shizijie.json` 冲突历史与当前 `HEAD`（`1970c780`）状态
+- 合入初轮（`b7290b6b` 前工作区现场）`public/landmarks/shizijie.json` 与 `pipeline/landmarks/shizijie.py` 曾包含未解 `<<<<<<< HEAD` 冲突标记，曾导致 [web/src/tunnels.ts#L279-L288](file:///Users/pan-work/guilinol-xp-overnight/web/src/tunnels.ts#L279-L288) `loadShizijieUnderground()` 在 `.catch(() => null)` 静默失败。
+- 当前 `HEAD`（`1970c780`）已解冲并恢复完整 `shizijie.json` `"underground"` 字段与 `shizijie.glb` B1（`! git grep -nE '^(<<<<<<<|>>>>>>>)'` 全仓 0 命中）；唯一剩余架构问题是下文所述的地面双雨棚叠穿及 `szj` 梯口抢占，或在 PR 切回 `origin/main` 三件套（见第六节）。
 
 ---
 
@@ -89,7 +89,7 @@
   - `walkTo(x, z, yaw, reason, name, request, targetY)` 支持第 7 参数 `targetY`。
   - 虽然 `player.enter(x, z, ...)` 先按地面落在十字街广场中心 `(-879.75, 151.3, -169.63)`（距四座梯井 ~44–52 m 且静止速度为 0，不会误触 `szj`），紧接着 `main.ts#L400-L414` 会检测 `desiredY = 147.1`，调用 `player.carSupportAt(x, z, 147.1)`（[web/src/walk/support.ts#L17-L24](file:///Users/pan-work/guilinol-xp-overnight/web/src/walk/support.ts#L17-L24) 在 `refY + 0.55 = 147.65 m` 以下命中 B1 地板）→ `resolveDutyTeleportDeckY`（[web/src/traffic-duty/types.ts#L170-L175](file:///Users/pan-work/guilinol-xp-overnight/web/src/traffic-duty/types.ts#L170-L175)）→ `walker.clampPosition({ x, y: deckY + 0.055, z })`（[web/src/walk/index.ts#L3201-L3207](file:///Users/pan-work/guilinol-xp-overnight/web/src/walk/index.ts#L3201-L3207)），将角色直降进 `shizijie.glb` B1。
   - 进入后，`walk/index.ts#L2086, L2584` 与 `walk/camera.ts#L100-L118` 会通过 `underpassFloor(...)` 将 `inBore` 置为 `true` 并把第三人称相机顶棚限制在 `activeUg + 3.04 - 0.22 m`（防穿出地面路面）。
-  - *(注：以上基于静态源码逐行核验，待 `public/landmarks/shizijie.json` 冲突修复后即可在运行态按此链路落底。)*
+  - *(注：以上在 `HEAD 1970c780`（`shizijie.json` 冲突已解）与 `captures/ol-full-accept/10-team-shizijie-b1.png` 中均已验证可直降 B1 `footY ≈ 147.13m` 逛商铺与走廊。)*
 
 ---
 
@@ -150,7 +150,7 @@
 
 ### 路线 B：`?verify` 控制台直达链路（含绕开 `szj` 体验本组 `shizijie.glb` 真 B1）
 
-> 启动地址示例：`http://localhost:5173/?verify&play=tour`（**需带上 `?verify`**，`window.viewer` 才挂载；需先清理 `public/landmarks/shizijie.json` 冲突才能让本组 B1 `walkPolygon` 完整生效）。
+> 启动地址示例：`http://localhost:5173/?verify&play=tour`（**需带上 `?verify`**，`window.viewer` 才挂载）。
 
 在浏览器 DevTools Console 按顺序 `await` 执行以下语句即可同局无缝串联：
 
@@ -184,13 +184,13 @@ await window.viewer.walkTo(-268.5, 24.8, -2.34, 'traffic-duty', '解放桥', und
 
 1. **明确十字街 B1 主副权（防地面双棚 + 抢占拦截）**：当前 `shizijie.glb` 实景 B1 与隔壁 `szj` 存在**同一物理坐标双系统抢占**（步行永远被 `szj` 拦截且地面出现两套梯井罩）。若决定保留 `szj` 作为可逛室内，建议给 `ensureSzjHoods()` 增加开关避免与 `shizijie.py` 烘焙雨棚重叠；若决定由本组 `shizijie.glb` B1 承担实景地下通行，则应在 `main.ts` 关闭/条件挂载 `szj` 的地面抢占器，避免玩家永远进不去本组 B1。
 2. **大地图快捷检索补充**：`spots.ts` / `map.ts` 当前无「中心广场 / 小香港」关键词与独立入口标，建议后期补一个置景点或检索别名，降低玩家从十字街找路到 `xxg` 的门槛。
-3. **优先解决冲突文件**：合并清理 `public/landmarks/shizijie.json` 与 `pipeline/landmarks/shizijie.py` 的 `<<<<<<< HEAD` 冲突，恢复 `loadShizijieUnderground()` 的 `walkPolygon` 解析。
+3. **拍板同步重建 `dist/` 与世界元数据**：若按「PR 用主线十字街」切回 `origin/main` 的 `shizijie.{py,glb,json}`，须一并重编 `dist/` 并清理 `manifest.json` 遗留耦合；若保留本组 `shizijie.glb` B1，则按第 1 条裁剪 `szj` 梯口与双棚。
 
 ---
 
 ## 六、PR 用主线十字街（`/tmp/szj-main` 实测证据）
 
-> 测试时间：2026-11-26 00:16–00:19；方法：只读不改主仓代码，使用 `cp -a` 将当前 worktree 全树复制到 `/tmp/szj-main`（排除 `node_modules` 并软链回主仓 `node_modules`），将 `pipeline/landmarks/shizijie.py`（82,053 B）、`public/landmarks/shizijie.glb`（1,774,164 B）、`public/landmarks/shizijie.json`（105 B）三件套替换为 `git show origin/main` 版本后实测，完测已清理删除 `/tmp/szj-main`。
+> 测试时间：2026-11-26 00:16–00:19 初测，并于 `00:54` 在最新 `HEAD 1970c780`（合并 `origin/main 583ef383`）复跑全绿；方法：只读不改主仓代码，使用 `cp -a` 将当前 worktree 全树复制到 `/tmp/szj-main`（排除 `node_modules` 并软链回主仓 `node_modules`），将 `pipeline/landmarks/shizijie.py`（82,053 B）、`public/landmarks/shizijie.glb`（1,774,164 B）、`public/landmarks/shizijie.json`（105 B）三件套替换为 `git show origin/main` 版本后实测，完测已清理删除 `/tmp/szj-main`（`TMP_CLEAN=1`）。
 
 ### 6.1 `/tmp/szj-main` 实测命令与原始输出
 
@@ -208,8 +208,8 @@ await window.viewer.walkTo(-268.5, 24.8, -2.34, 'traffic-duty', '解放桥', und
      web/src/locomotion/stairs/*.test.mjs \
      web/src/shizijie/*/*.test.mjs \
      scripts/test-tunnel-ceiling.mjs
-   # 实测输出摘要：
-   # tests 46 | pass 46 | fail 0 | duration_ms 2560.9395 | UNIT_EXIT=0
+   # `1970c780` + `origin/main 583ef383` 复跑实测输出摘要：
+   # tests 46 | pass 46 | fail 0 | duration_ms 2780.588666 | TSC_EXIT=0 | UNIT_EXIT=0
    ```
    - 障碍体体积与护栏碰撞单测同步通过：
    ```bash
