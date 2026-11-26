@@ -4,9 +4,13 @@ import { MAIN_DETAIL_LAYER } from '../look/mirror-layer'
 import { atmo } from '../look/time'
 import { freezeStatic } from '../static-freeze'
 import {
+  getCityUpgradeAnisotropy,
   getCityUpgradeIndex,
+  getCityUpgradeQuality,
   getLoadedShard,
   isCityUpgradeEnabled,
+  onCityUpgradeAnisotropy,
+  onCityUpgradeQuality,
   onCityUpgradeToggle,
   type CityUpgradeShard,
   type StreetSignDef,
@@ -96,10 +100,25 @@ function makeUvGeom(pos: number[], nor: number[], uv: number[], idx: number[]): 
   return g
 }
 
-function loadSrgbTex(url: string): THREE.Texture {
-  const tex = new THREE.TextureLoader().load(url)
+function readTexPixelSize(tex: THREE.Texture): [number, number] | null {
+  const img = tex.image as { naturalWidth?: number; naturalHeight?: number; width?: number; height?: number } | undefined
+  const w = img?.naturalWidth || img?.width || 0
+  const h = img?.naturalHeight || img?.height || 0
+  return w > 0 && h > 0 ? [w, h] : null
+}
+
+function loadSrgbTex(url: string, onLoad?: (tex: THREE.Texture) => void): THREE.Texture {
+  const tex = new THREE.TextureLoader().load(url, loaded => {
+    loaded.needsUpdate = true
+    onLoad?.(loaded)
+  })
   tex.colorSpace = THREE.SRGBColorSpace
-  tex.anisotropy = 4
+  tex.generateMipmaps = true
+  tex.minFilter = THREE.LinearMipmapLinearFilter
+  tex.magFilter = THREE.LinearFilter
+  tex.wrapS = THREE.ClampToEdgeWrapping
+  tex.wrapT = THREE.ClampToEdgeWrapping
+  tex.anisotropy = getCityUpgradeAnisotropy()
   return tex
 }
 
@@ -113,10 +132,16 @@ interface SharedResources {
   fasciaMat: THREE.MeshStandardMaterial
   bladeMap: THREE.Texture
   bladeMat: THREE.MeshStandardMaterial
+  fasciaTexSize: [number, number] | null
+  bladeTexSize: [number, number] | null
+  setAnisotropy(aniso: number): void
   dispose(): void
 }
 
-function createSharedResources(): SharedResources {
+function createSharedResources(
+  onFasciaTexLoad?: (size: [number, number]) => void,
+  onBladeTexLoad?: (size: [number, number]) => void,
+): SharedResources {
   const eavesWallsMat = new THREE.MeshStandardMaterial({
     vertexColors: true,
     roughness: 0.80,
@@ -142,55 +167,216 @@ function createSharedResources(): SharedResources {
   acMat.onBeforeCompile = shader => shareAtmosphere(shader)
   acMat.customProgramCacheKey = () => 'city-upgrade-ac-v1'
 
-  const fasciaMap = loadSrgbTex(`${BASE_URL}/shop-fascias.webp`)
-  const fasciaEmitMap = loadSrgbTex(`${BASE_URL}/shop-fascias-emit.webp`)
-  const fasciaMat = new THREE.MeshStandardMaterial({
-    map: fasciaMap,
+  const res: SharedResources = {
+    eavesWallsMat,
+    acGeom,
+    acTex,
+    acMat,
+    fasciaMap: null as unknown as THREE.Texture,
+    fasciaEmitMap: null as unknown as THREE.Texture,
+    fasciaMat: null as unknown as THREE.MeshStandardMaterial,
+    bladeMap: null as unknown as THREE.Texture,
+    bladeMat: null as unknown as THREE.MeshStandardMaterial,
+    fasciaTexSize: null,
+    bladeTexSize: null,
+    setAnisotropy(aniso: number) {
+      for (const tex of [res.fasciaMap, res.fasciaEmitMap, res.bladeMap]) {
+        if (tex && tex.anisotropy !== aniso) {
+          tex.anisotropy = aniso
+          tex.needsUpdate = true
+        }
+      }
+    },
+    dispose() {
+      eavesWallsMat.dispose()
+      acGeom.dispose(); acTex.dispose(); acMat.dispose()
+      res.fasciaMap.dispose(); res.fasciaEmitMap.dispose(); res.fasciaMat.dispose()
+      res.bladeMap.dispose(); res.bladeMat.dispose()
+    },
+  }
+
+  res.fasciaMap = loadSrgbTex(`${BASE_URL}/shop-fascias.webp`, tex => {
+    const sz = readTexPixelSize(tex)
+    if (sz) {
+      res.fasciaTexSize = sz
+      onFasciaTexLoad?.(sz)
+    }
+  })
+  res.fasciaEmitMap = loadSrgbTex(`${BASE_URL}/shop-fascias-emit.webp`)
+  res.fasciaMat = new THREE.MeshStandardMaterial({
+    map: res.fasciaMap,
     emissive: new THREE.Color(0xffffff),
-    emissiveMap: fasciaEmitMap,
+    emissiveMap: res.fasciaEmitMap,
     emissiveIntensity: 1.0,
     roughness: 0.50,
     metalness: 0.10,
   })
-  fasciaMat.onBeforeCompile = shader => {
+  res.fasciaMat.onBeforeCompile = shader => {
     shareAtmosphere(shader)
     shader.uniforms.uNight = atmo.uNight
+    shader.uniforms.uSun = atmo.uSun
+    shader.vertexShader = shader.vertexShader
+      .replace('#include <common>', '#include <common>\nvarying vec3 vSignWorldNormal;')
+      .replace(
+        '#include <beginnormal_vertex>',
+        '#include <beginnormal_vertex>\nvSignWorldNormal = normalize(mat3(modelMatrix) * objectNormal);',
+      )
     shader.fragmentShader = shader.fragmentShader
-      .replace('#include <common>', '#include <common>\nuniform float uNight;')
+      .replace('#include <common>', '#include <common>\nuniform float uNight;\nuniform vec3 uSun;\nvarying vec3 vSignWorldNormal;')
       .replace('#include <color_fragment>', `#include <color_fragment>
 #ifdef USE_FOG
 float spW = sin(vFogWorld.x * 0.11 + vFogWorld.z * 0.08) * cos(vFogWorld.z * 0.13 - vFogWorld.y * 0.22);
 diffuseColor.rgb *= 1.0 + spW * 0.045;
 #endif`)
-      .replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\ntotalEmissiveRadiance *= (uNight * 0.98);\ntotalEmissiveRadiance += diffuseColor.rgb * (0.095 * (1.0 - uNight));')
+      .replace(
+        '#include <emissivemap_fragment>',
+        `#include <emissivemap_fragment>
+float signSunFacing = clamp(dot(normalize(vSignWorldNormal), normalize(uSun)), 0.0, 1.0);
+float signDayFill = mix(0.175, 0.075, smoothstep(0.05, 0.65, signSunFacing)) * (1.0 - uNight);
+totalEmissiveRadiance *= (uNight * 0.96);
+totalEmissiveRadiance += diffuseColor.rgb * signDayFill;`,
+      )
   }
-  fasciaMat.customProgramCacheKey = () => 'city-upgrade-fascias-v1'
+  res.fasciaMat.customProgramCacheKey = () => 'city-upgrade-fascias-v2'
 
-  const bladeMap = loadSrgbTex(`${BASE_URL}/shop-blades.webp`)
-  const bladeMat = new THREE.MeshStandardMaterial({ map: bladeMap, roughness: 0.46, metalness: 0.08 })
-  bladeMat.onBeforeCompile = shader => {
+  res.bladeMap = loadSrgbTex(`${BASE_URL}/shop-blades.webp`, tex => {
+    const sz = readTexPixelSize(tex)
+    if (sz) {
+      res.bladeTexSize = sz
+      onBladeTexLoad?.(sz)
+    }
+  })
+  res.bladeMat = new THREE.MeshStandardMaterial({ map: res.bladeMap, roughness: 0.46, metalness: 0.08 })
+  res.bladeMat.onBeforeCompile = shader => {
     shareAtmosphere(shader)
     shader.uniforms.uNight = atmo.uNight
+    shader.uniforms.uSun = atmo.uSun
+    shader.vertexShader = shader.vertexShader
+      .replace('#include <common>', '#include <common>\nvarying vec3 vSignWorldNormal;')
+      .replace(
+        '#include <beginnormal_vertex>',
+        '#include <beginnormal_vertex>\nvSignWorldNormal = normalize(mat3(modelMatrix) * objectNormal);',
+      )
     shader.fragmentShader = shader.fragmentShader
-      .replace('#include <common>', '#include <common>\nuniform float uNight;')
-      .replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\ntotalEmissiveRadiance += diffuseColor.rgb * uNight * 0.90;')
+      .replace('#include <common>', '#include <common>\nuniform float uNight;\nuniform vec3 uSun;\nvarying vec3 vSignWorldNormal;')
+      .replace(
+        '#include <emissivemap_fragment>',
+        `#include <emissivemap_fragment>
+float bladeSunFacing = clamp(dot(normalize(vSignWorldNormal), normalize(uSun)), 0.0, 1.0);
+float bladeDayFill = mix(0.15, 0.065, smoothstep(0.05, 0.65, bladeSunFacing)) * (1.0 - uNight);
+totalEmissiveRadiance += diffuseColor.rgb * (uNight * 0.88 + bladeDayFill);`,
+      )
   }
-  bladeMat.customProgramCacheKey = () => 'city-upgrade-blades-v1'
+  res.bladeMat.customProgramCacheKey = () => 'city-upgrade-blades-v2'
 
-  return {
-    eavesWallsMat, acGeom, acTex, acMat, fasciaMap, fasciaEmitMap, fasciaMat, bladeMap, bladeMat,
-    dispose() {
-      eavesWallsMat.dispose()
-      acGeom.dispose(); acTex.dispose(); acMat.dispose()
-      fasciaMap.dispose(); fasciaEmitMap.dispose(); fasciaMat.dispose()
-      bladeMap.dispose(); bladeMat.dispose()
-    },
+  return res
+}
+
+type FasciaTuple = NonNullable<CityUpgradeShard['fascias']>[number]
+type EaveTuple = NonNullable<CityUpgradeShard['eaves']>[number]
+
+interface ResolvedEave {
+  x1: number
+  z1: number
+  x2: number
+  z2: number
+  y: number
+  nx: number
+  nz: number
+  kind: number
+  reach: number
+  drop: number
+  thick: number
+}
+
+// Resolve spatial & sightline clearance between 3D eaves/awnings and shopfront fascias:
+// - kind === 0 (2F grey-tile eave): tighten overhang above shopfronts and lift lip cleanly above
+//   both eye-level and 25-degree downward third-person camera sightlines to fascia top.
+// - kind === 1 (alley rain awning): press below fascia bottom with compact reach so awning never
+//   slices through fascia geometry or blocks eye-level / third-person view of sign letters & icons.
+function resolveEaveClearance(eave: EaveTuple, fascias: FasciaTuple[]): ResolvedEave | null {
+  const [x1, z1, x2, z2, ey, enx, enz, kind] = eave
+  const dx = x2 - x1, dz = z2 - z1
+  const elen = Math.hypot(dx, dz)
+  if (elen < 0.05) return null
+
+  const ex = dx / elen, ez = dz / elen
+  let reach = kind === 0 ? 0.96 : 0.88
+  let drop = kind === 0 ? 0.40 : 0.28
+  let thick = kind === 0 ? 0.09 : 0.05
+
+  let minFBot = Infinity
+  let maxFTop = -Infinity
+  let maxFd = 0
+  let hasOverlap = false
+
+  for (let i = 0; i < fascias.length; i++) {
+    const [fx, fy, fz, fyaw, fw, fh, fd] = fascias[i]
+    const fBot = fy - fh * 0.5
+    const fTop = fy + fh * 0.5
+    if (fTop < ey - 1.65 || fBot > ey + 1.65) continue
+
+    const fnx = Math.sin(fyaw), fnz = Math.cos(fyaw)
+    const dot = fnx * enx + fnz * enz
+    const s = (fx - x1) * ex + (fz - z1) * ez
+    let matched = false
+
+    if (dot >= 0.55) {
+      const perp = (fx - x1) * enx + (fz - z1) * enz
+      if (perp >= -0.45 && perp <= reach + 0.35 && s + fw * 0.5 + 0.35 >= 0 && s - fw * 0.5 - 0.35 <= elen) {
+        matched = true
+      }
+    } else {
+      const t = Math.max(0, Math.min(1, s / elen))
+      const px = x1 + dx * t, pz = z1 + dz * t
+      const qx = px + enx * reach, qz = pz + enz * reach
+      const d0 = Math.hypot(px - fx, pz - fz)
+      const d1 = Math.hypot(qx - fx, qz - fz)
+      if (Math.min(d0, d1) <= fw * 0.5 + 0.55) {
+        const pf0 = (px - fx) * fnx + (pz - fz) * fnz
+        const pf1 = (qx - fx) * fnx + (qz - fz) * fnz
+        if (Math.max(pf0, pf1) >= -0.05 && Math.min(pf0, pf1) <= 1.5) {
+          matched = true
+        }
+      }
+    }
+
+    if (matched) {
+      hasOverlap = true
+      if (fBot < minFBot) minFBot = fBot
+      if (fTop > maxFTop) maxFTop = fTop
+      if (fd > maxFd) maxFd = fd
+    }
   }
+
+  if (!hasOverlap) {
+    return { x1, z1, x2, z2, y: ey, nx: enx, nz: enz, kind, reach, drop, thick }
+  }
+
+  if (kind === 0) {
+    reach = 0.72
+    drop = 0.26
+    thick = 0.08
+    // Keep outer lip bottom above 25-deg downward sightline to fascia top (+0.08m clearance)
+    const needLipBot = maxFTop + Math.max(0.10, (reach - maxFd) * 0.47 + 0.08)
+    const yAdj = Math.max(ey, needLipBot + drop + thick)
+    if (yAdj - ey > 1.45) return null
+    return { x1, z1, x2, z2, y: yAdj, nx: enx, nz: enz, kind, reach, drop, thick }
+  }
+
+  reach = 0.50
+  drop = 0.14
+  thick = 0.04
+  // Press alley awning cleanly below fascia bottom (0.10m physical gap + unobstructed eye-level ray)
+  const yAdj = Math.min(ey, minFBot - 0.10)
+  if (ey - yAdj > 1.35) return null
+  return { x1, z1, x2, z2, y: yAdj, nx: enx, nz: enz, kind, reach, drop, thick }
 }
 
 // Combined 2F grey-tile eaves + sun-faded alley awnings + subtle compound walls + street sign poles (1 DrawCall per shard!)
 function buildEavesAndWalls(shard: CityUpgradeShard, mat: THREE.MeshStandardMaterial): { mesh: THREE.Mesh; box: THREE.Box3 } | null {
   const eaves = shard.eaves ?? []
+  const fascias = shard.fascias ?? []
   const walls = shard.walls ?? []
   const signs = shard.streetSigns ?? []
   if (!eaves.length && !walls.length && !signs.length) return null
@@ -204,10 +390,9 @@ function buildEavesAndWalls(shard: CityUpgradeShard, mat: THREE.MeshStandardMate
   const awningColors = [hexRgb(0x535e69), hexRgb(0x525e57), hexRgb(0x6b5350), hexRgb(0x5c6063)]
 
   for (let i = 0; i < eaves.length; i++) {
-    const [x1, z1, x2, z2, y, nx, nz, kind] = eaves[i]
-    const reach = kind === 0 ? 0.96 : 0.88
-    const drop = kind === 0 ? 0.40 : 0.28
-    const thick = kind === 0 ? 0.09 : 0.05
+    const resolved = resolveEaveClearance(eaves[i], fascias)
+    if (!resolved) continue
+    const { x1, z1, x2, z2, y, nx, nz, kind, reach, drop, thick } = resolved
 
     const aTop: V3 = [x1, y, z1], bTop: V3 = [x2, y, z2]
     const cTop: V3 = [x2 + nx * reach, y - drop, z2 + nz * reach]
@@ -299,19 +484,26 @@ function buildAcUnits(shard: CityUpgradeShard, shared: SharedResources): { mesh:
   return { mesh: freezeStatic(inst), box }
 }
 
+function fallbackFasciaTexSize(cols: number, rows: number): [number, number] {
+  if (cols === 6 && rows === 16) return [3840, 2560]
+  return [cols * 384, rows * 192]
+}
+
 function buildShopFascias(
   shard: CityUpgradeShard,
   mat: THREE.MeshStandardMaterial,
   grid: [number, number],
-): { mesh: THREE.Mesh; box: THREE.Box3 } | null {
+  texSize: [number, number] | null,
+): { mesh: THREE.Mesh; box: THREE.Box3; texSize: [number, number] } | null {
   const list = shard.fascias ?? []
   if (!list.length) return null
   const pos: number[] = [], nor: number[] = [], uv: number[] = [], idx: number[] = []
-  const cols = Math.max(1, grid[0] || 8)
-  const rows = Math.max(1, grid[1] || 6)
+  const cols = Math.max(1, grid[0] || 6)
+  const rows = Math.max(1, grid[1] || 16)
   const total = cols * rows
-  const du = 1 / (512 * cols)
-  const dv = 1 / (256 * rows)
+  const usedSize = texSize ?? fallbackFasciaTexSize(cols, rows)
+  const du = 1 / Math.max(1, usedSize[0])
+  const dv = 1 / Math.max(1, usedSize[1])
 
   for (const [x, y, z, yaw, fw, fh, fd, aidx] of list) {
     const cell = ((aidx % total) + total) % total
@@ -319,15 +511,18 @@ function buildShopFascias(
     const row = Math.floor(cell / cols)
     const u0 = col / cols, u1 = (col + 1) / cols
     const v1 = 1 - row / rows, v0 = 1 - (row + 1) / rows
-    const bu0 = u0 + du, bu1 = u0 + du * 3
-    const bv1 = v1 - dv, bv0 = v1 - dv * 3
+    // 1-texel inset on front face prevents mipmap/bilinear neighbor-cell bleeding across atlas seams
+    const fu0 = u0 + du, fu1 = u1 - du
+    const fv0 = v0 + dv, fv1 = v1 - dv
+    const bu0 = u0 + du * 2, bu1 = u0 + du * 4
+    const bv1 = v1 - dv * 2, bv0 = v1 - dv * 4
 
     const hx = fw * 0.5, hy = fh * 0.5
     const pt = localPt(x, y, z, yaw)
     const fBL = pt(-hx, -hy, fd), fBR = pt(hx, -hy, fd), fTR = pt(hx, hy, fd), fTL = pt(-hx, hy, fd)
     const bBL = pt(-hx, -hy, -0.02), bBR = pt(hx, -hy, -0.02), bTR = pt(hx, hy, -0.02), bTL = pt(-hx, hy, -0.02)
 
-    pushUvQuad(pos, nor, uv, idx, fBL, fBR, fTR, fTL, u0, v0, u1, v1)
+    pushUvQuad(pos, nor, uv, idx, fBL, fBR, fTR, fTL, fu0, fv0, fu1, fv1)
     pushUvQuad(pos, nor, uv, idx, fTL, fTR, bTR, bTL, bu0, bv0, bu1, bv1)
     pushUvQuad(pos, nor, uv, idx, bBL, bBR, fBR, fBL, bu0, bv0, bu1, bv1)
     pushUvQuad(pos, nor, uv, idx, fBR, bBR, bTR, fTR, bu0, bv0, bu1, bv1)
@@ -339,22 +534,24 @@ function buildShopFascias(
   mesh.name = 'city-upgrade-shop-fascias'
   mesh.layers.set(MAIN_DETAIL_LAYER)
   mesh.userData.noShadowCast = true
-  return { mesh: freezeStatic(mesh), box: geom.boundingBox!.clone() }
+  return { mesh: freezeStatic(mesh), box: geom.boundingBox!.clone(), texSize: usedSize }
 }
 
 function buildShopBlades(
   shard: CityUpgradeShard,
   mat: THREE.MeshStandardMaterial,
   grid: [number, number],
-): { mesh: THREE.Mesh; box: THREE.Box3 } | null {
+  texSize: [number, number] | null,
+): { mesh: THREE.Mesh; box: THREE.Box3; texSize: [number, number] } | null {
   const list = shard.blades ?? []
   if (!list.length) return null
   const pos: number[] = [], nor: number[] = [], uv: number[] = [], idx: number[] = []
   const cols = Math.max(1, grid[0] || 8)
   const rows = Math.max(1, grid[1] || 2)
   const total = cols * rows
-  const du = 1 / (128 * cols)
-  const dv = 1 / (512 * rows)
+  const usedSize: [number, number] = texSize ?? [cols * 128, rows * 512]
+  const du = 1 / Math.max(1, usedSize[0])
+  const dv = 1 / Math.max(1, usedSize[1])
   const w = 0.52, h = 1.42, d = 0.11
 
   for (const [x, y, z, yaw, bi] of list) {
@@ -362,12 +559,14 @@ function buildShopBlades(
     const col = li % cols, row = Math.floor(li / cols)
     const u0 = col / cols, u1 = (col + 1) / cols
     const v1 = 1 - row / rows, v0 = 1 - (row + 1) / rows
-    const bu0 = u0 + du, bu1 = u0 + du * 3
-    const bv1 = v1 - dv, bv0 = v1 - dv * 3
+    const fu0 = u0 + du, fu1 = u1 - du
+    const fv0 = v0 + dv, fv1 = v1 - dv
+    const bu0 = u0 + du * 2, bu1 = u0 + du * 4
+    const bv1 = v1 - dv * 2, bv0 = v1 - dv * 4
     const pt = localPt(x, y, z, yaw)
     const hx = d * 0.5, hy = h * 0.5
-    pushUvQuad(pos, nor, uv, idx, pt(hx, -hy, 0), pt(hx, -hy, w), pt(hx, hy, w), pt(hx, hy, 0), u0, v0, u1, v1)
-    pushUvQuad(pos, nor, uv, idx, pt(-hx, -hy, w), pt(-hx, -hy, 0), pt(-hx, hy, 0), pt(-hx, hy, w), u0, v0, u1, v1)
+    pushUvQuad(pos, nor, uv, idx, pt(hx, -hy, 0), pt(hx, -hy, w), pt(hx, hy, w), pt(hx, hy, 0), fu0, fv0, fu1, fv1)
+    pushUvQuad(pos, nor, uv, idx, pt(-hx, -hy, w), pt(-hx, -hy, 0), pt(-hx, hy, 0), pt(-hx, hy, w), fu0, fv0, fu1, fv1)
     pushUvQuad(pos, nor, uv, idx, pt(-hx, -hy, w), pt(hx, -hy, w), pt(hx, hy, w), pt(-hx, hy, w), bu0, bv0, bu1, bv1)
     pushUvQuad(pos, nor, uv, idx, pt(-hx, hy, 0), pt(hx, hy, 0), pt(hx, hy, w), pt(-hx, hy, w), bu0, bv0, bu1, bv1)
     pushUvQuad(pos, nor, uv, idx, pt(-hx, -hy, w), pt(hx, -hy, w), pt(hx, -hy, 0), pt(-hx, -hy, 0), bu0, bv0, bu1, bv1)
@@ -378,7 +577,7 @@ function buildShopBlades(
   mesh.name = 'city-upgrade-shop-blades'
   mesh.layers.set(MAIN_DETAIL_LAYER)
   mesh.userData.noShadowCast = true
-  return { mesh: freezeStatic(mesh), box: geom.boundingBox!.clone() }
+  return { mesh: freezeStatic(mesh), box: geom.boundingBox!.clone(), texSize: usedSize }
 }
 
 interface StreetSignBuild {
@@ -411,7 +610,11 @@ function buildStreetSignPlates(list: StreetSignDef[]): StreetSignBuild | null {
     ctx.fillText(s.en, cx + pw * 0.5, cy + 79, pw - 18)
   }
   const plateTex = new THREE.CanvasTexture(canvas)
-  plateTex.colorSpace = THREE.SRGBColorSpace; plateTex.anisotropy = 4
+  plateTex.colorSpace = THREE.SRGBColorSpace
+  plateTex.generateMipmaps = true
+  plateTex.minFilter = THREE.LinearMipmapLinearFilter
+  plateTex.magFilter = THREE.LinearFilter
+  plateTex.anisotropy = getCityUpgradeAnisotropy()
 
   const bPos: number[] = [], bNor: number[] = [], bUv: number[] = [], bIdx: number[] = []
   const plateW = 1.56, plateH = 0.58, plateD = 0.07
@@ -443,10 +646,11 @@ function buildStreetSignPlates(list: StreetSignDef[]): StreetSignBuild | null {
 
 interface MountedShard {
   key: string
+  shard: CityUpgradeShard
   group: THREE.Group
-  fascias: { mesh: THREE.Mesh; box: THREE.Box3 } | null
+  fascias: { mesh: THREE.Mesh; box: THREE.Box3; texSize: [number, number] } | null
   eavesWalls: { mesh: THREE.Mesh; box: THREE.Box3 } | null
-  blades: { mesh: THREE.Mesh; box: THREE.Box3 } | null
+  blades: { mesh: THREE.Mesh; box: THREE.Box3; texSize: [number, number] } | null
   acUnits: { mesh: THREE.InstancedMesh; box: THREE.Box3 } | null
   streetSigns: StreetSignBuild | null
   dispose(): void
@@ -466,23 +670,61 @@ export function mountCityUpgradeProps(scene: THREE.Scene) {
   const projScreen = new THREE.Matrix4()
   let lastRadius = -1
 
+  function rebuildMountedFascias(actualSize: [number, number]): void {
+    if (!shared || !mounted.size) return
+    const index = getCityUpgradeIndex()
+    const fasciaGrid: [number, number] = index?.fasciaGrid ?? [6, 16]
+    for (const entry of mounted.values()) {
+      if (!entry.fascias) continue
+      if (entry.fascias.texSize[0] === actualSize[0] && entry.fascias.texSize[1] === actualSize[1]) continue
+      const wasVisible = entry.fascias.mesh.visible
+      entry.group.remove(entry.fascias.mesh)
+      entry.fascias.mesh.geometry.dispose()
+      const next = buildShopFascias(entry.shard, shared.fasciaMat, fasciaGrid, actualSize)
+      entry.fascias = next
+      if (next) {
+        next.mesh.visible = wasVisible
+        entry.group.add(next.mesh)
+      }
+    }
+  }
+
+  function rebuildMountedBlades(actualSize: [number, number]): void {
+    if (!shared || !mounted.size) return
+    const index = getCityUpgradeIndex()
+    const bladeGrid: [number, number] = index?.bladeGrid ?? [8, 2]
+    for (const entry of mounted.values()) {
+      if (!entry.blades) continue
+      if (entry.blades.texSize[0] === actualSize[0] && entry.blades.texSize[1] === actualSize[1]) continue
+      const wasVisible = entry.blades.mesh.visible
+      entry.group.remove(entry.blades.mesh)
+      entry.blades.mesh.geometry.dispose()
+      const next = buildShopBlades(entry.shard, shared.bladeMat, bladeGrid, actualSize)
+      entry.blades = next
+      if (next) {
+        next.mesh.visible = wasVisible
+        entry.group.add(next.mesh)
+      }
+    }
+  }
+
   function ensureShared(): SharedResources {
-    return (shared ??= createSharedResources())
+    return (shared ??= createSharedResources(rebuildMountedFascias, rebuildMountedBlades))
   }
 
   function mountShard(key: string, shard: CityUpgradeShard): void {
     if (mounted.has(key)) return
     const res = ensureShared()
     const index = getCityUpgradeIndex()
-    const fasciaGrid: [number, number] = index?.fasciaGrid ?? [8, 6]
+    const fasciaGrid: [number, number] = index?.fasciaGrid ?? [6, 16]
     const bladeGrid: [number, number] = index?.bladeGrid ?? [8, 2]
 
     const group = new THREE.Group()
     group.name = `city-upgrade-shard:${key}`
 
-    const fascias = buildShopFascias(shard, res.fasciaMat, fasciaGrid)
+    const fascias = buildShopFascias(shard, res.fasciaMat, fasciaGrid, res.fasciaTexSize)
     const eavesWalls = buildEavesAndWalls(shard, res.eavesWallsMat)
-    const blades = buildShopBlades(shard, res.bladeMat, bladeGrid)
+    const blades = buildShopBlades(shard, res.bladeMat, bladeGrid, res.bladeTexSize)
     const acUnits = buildAcUnits(shard, res)
     const streetSigns = buildStreetSignPlates(shard.streetSigns ?? [])
 
@@ -493,8 +735,9 @@ export function mountCityUpgradeProps(scene: THREE.Scene) {
     if (streetSigns) group.add(streetSigns.mesh)
 
     root.add(group)
-    mounted.set(key, {
+    const entry: MountedShard = {
       key,
+      shard,
       group,
       fascias,
       eavesWalls,
@@ -502,18 +745,19 @@ export function mountCityUpgradeProps(scene: THREE.Scene) {
       acUnits,
       streetSigns,
       dispose() {
-        fascias?.mesh.geometry.dispose()
-        eavesWalls?.mesh.geometry.dispose()
-        blades?.mesh.geometry.dispose()
-        acUnits?.mesh.dispose()
-        if (streetSigns) {
-          streetSigns.plateGeom.dispose()
-          streetSigns.plateTex.dispose()
-          streetSigns.plateMat.dispose()
+        entry.fascias?.mesh.geometry.dispose()
+        entry.eavesWalls?.mesh.geometry.dispose()
+        entry.blades?.mesh.geometry.dispose()
+        entry.acUnits?.mesh.dispose()
+        if (entry.streetSigns) {
+          entry.streetSigns.plateGeom.dispose()
+          entry.streetSigns.plateTex.dispose()
+          entry.streetSigns.plateMat.dispose()
         }
         group.removeFromParent()
       },
-    })
+    }
+    mounted.set(key, entry)
     lastCam.set(Infinity, Infinity, Infinity)
   }
 
@@ -560,11 +804,12 @@ export function mountCityUpgradeProps(scene: THREE.Scene) {
 
     const cam = camera.position
     const isAerial = cam.y > 230
-    const fasciaDist = isAerial ? 220 : Math.min(streetRadius, 195)
-    const eavesDist = isAerial ? 180 : Math.min(streetRadius, 145)
-    const bladeDist = isAerial ? 0 : Math.min(streetRadius, 110)
-    const acDist = isAerial ? 0 : Math.min(streetRadius, 75)
-    const signDist = isAerial ? 0 : Math.min(streetRadius, 85)
+    const isLow = getCityUpgradeQuality() === 'low'
+    const fasciaDist = isAerial ? (isLow ? 140 : 220) : Math.min(streetRadius, isLow ? 120 : 195)
+    const eavesDist = isAerial ? (isLow ? 110 : 180) : Math.min(streetRadius, isLow ? 95 : 145)
+    const bladeDist = isAerial ? 0 : Math.min(streetRadius, isLow ? 60 : 110)
+    const acDist = isAerial || isLow ? 0 : Math.min(streetRadius, 75)
+    const signDist = isAerial ? 0 : Math.min(streetRadius, isLow ? 65 : 85)
 
     for (const entry of mounted.values()) {
       let anyVis = false
@@ -597,9 +842,21 @@ export function mountCityUpgradeProps(scene: THREE.Scene) {
     }
   }
 
-  const off = onCityUpgradeToggle(on => {
+  const offToggle = onCityUpgradeToggle(on => {
     root.visible = on
     if (on) lastCam.set(Infinity, Infinity, Infinity)
+  })
+  const offQuality = onCityUpgradeQuality(() => {
+    lastCam.set(Infinity, Infinity, Infinity)
+  })
+  const offAniso = onCityUpgradeAnisotropy(aniso => {
+    shared?.setAnisotropy(aniso)
+    for (const entry of mounted.values()) {
+      if (entry.streetSigns && entry.streetSigns.plateTex.anisotropy !== aniso) {
+        entry.streetSigns.plateTex.anisotropy = aniso
+        entry.streetSigns.plateTex.needsUpdate = true
+      }
+    }
   })
 
   return {
@@ -607,7 +864,9 @@ export function mountCityUpgradeProps(scene: THREE.Scene) {
     update,
     mountedCount: () => mounted.size,
     dispose() {
-      off()
+      offToggle()
+      offQuality()
+      offAniso()
       for (const key of Array.from(mounted.keys())) unmountShard(key)
       shared?.dispose()
       shared = null

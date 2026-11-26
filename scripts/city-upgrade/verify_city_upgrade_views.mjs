@@ -308,8 +308,8 @@ const assertions = []
 if (!verifiedStats || verifiedStats.indexedShards !== 952) {
   assertions.push(`Expected indexedShards=952, got ${verifiedStats?.indexedShards}`)
 }
-if (!verifiedStats || verifiedStats.fasciaGrid?.[0] !== 8 || verifiedStats.fasciaGrid?.[1] !== 12) {
-  assertions.push(`Expected fasciaGrid=[8,12], got ${JSON.stringify(verifiedStats?.fasciaGrid)}`)
+if (!verifiedStats || verifiedStats.fasciaGrid?.[0] !== 6 || verifiedStats.fasciaGrid?.[1] !== 16) {
+  assertions.push(`Expected fasciaGrid=[6,16], got ${JSON.stringify(verifiedStats?.fasciaGrid)}`)
 }
 for (const m of metrics) {
   if (m.dcDelta !== null && m.dcDelta > 10) {

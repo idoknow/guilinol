@@ -1143,7 +1143,7 @@ def main():
     ap.add_argument("--overture", type=Path, default=None)
     ap.add_argument("--landmarks-glb-dir", type=Path, default=None)
     ap.add_argument("--out-dir", type=Path, default=REPO_ROOT / "public/city-upgrade")
-    ap.add_argument("--fascia-grid", choices=("8x8", "8x12"), default="8x12")
+    ap.add_argument("--fascia-grid", choices=("8x8", "8x12", "6x16"), default="6x16")
     ap.add_argument("--merge-existing", action="store_true", help="Preserve existing shards outside selected --ring/--sector")
     ap.add_argument("--no-index", action="store_true", help="Write shard JSONs only; do not touch index.json")
     ap.add_argument("--allow-dev-world", action="store_true", help="Allow running against 325-chunk dev_bbox world")

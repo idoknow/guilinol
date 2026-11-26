@@ -10,20 +10,32 @@ import {look} from './look/config'
 import {flags} from './debug'
 import {tunnelLiningMaterial,tunnelLightMaterial} from './station-tunnels'
 import {freezeStatic} from './static-freeze'
-import {isCityUpgradeEnabled,isCoordInUpgradedTile} from './city-upgrade/state'
+import {
+  hasShardForTile,
+  isCityUpgradeEnabled,
+  isCoordInUpgradedTile,
+  onCityUpgradeShard,
+  onCityUpgradeToggle,
+} from './city-upgrade/state'
 
-function isCityUpgradeExcludedShopBox(matrices:Float32Array, index:number):boolean {
+function isProceduralShopBox(matrices:Float32Array, index:number):boolean {
   const o = index * 16
-  if (!isCoordInUpgradedTile(matrices[o + 12], matrices[o + 14])) return false
   const sy = matrices[o + 5]
   const sz = Math.hypot(matrices[o + 8], matrices[o + 10])
-  // Hide procedural plastic awnings & grey rolling shutters (street-worker.ts:225-226) in city-upgrade tiles
+  // Match procedural plastic awnings, blank fascia strips & grey rolling shutters (street-worker.ts:384-389)
   return (
     (Math.abs(sy - 0.12) < 0.015 && Math.abs(sz - 1.1) < 0.08) ||
     (Math.abs(sy - 0.53) < 0.02 && Math.abs(sz - 0.12) < 0.02) ||
     (Math.abs(sy - 2.32) < 0.05 && Math.abs(sz - 0.06) < 0.015) ||
     (Math.abs(sy - 0.035) < 0.008 && Math.abs(sz - 0.03) < 0.008)
   )
+}
+
+function isCityUpgradeExcludedShopBox(matrices:Float32Array, index:number, tileUpgraded = false):boolean {
+  if (!isProceduralShopBox(matrices, index)) return false
+  if (tileUpgraded) return true
+  const o = index * 16
+  return isCoordInUpgradedTile(matrices[o + 12], matrices[o + 14])
 }
 
 export interface TileBatchInput {
@@ -386,6 +398,8 @@ export class ChunkBatcher {
 
   constructor(private scene:THREE.Scene) {
     scene.add(this.tunnelLining.mesh,this.tunnelLights.mesh)
+    onCityUpgradeShard(() => this.invalidateFurniture())
+    onCityUpgradeToggle(() => this.invalidateFurniture())
   }
 
   add(input:TileBatchInput) {
@@ -535,18 +549,22 @@ export class ChunkBatcher {
         const offset=index*16,position=camera.position
         return (matrices[offset+12]-position.x)**2+(matrices[offset+13]-position.y)**2+(matrices[offset+14]-position.z)**2<=radius**2
       }
+      const hideOldShops = isCityUpgradeEnabled()
       const selections=Array.from(visibleStreets,tile=>{
         const item=this.items.get(tile)!, bikes:number[]=[],boxes:number[]=[]
         const position=camera.position
         const tileDistance=Math.max(tile.x-position.x,position.x-tile.x-256,tile.z-position.z,position.z-tile.z-256)
+        const tileUpgraded=hideOldShops && hasShardForTile(tile.x,tile.z)
         if(tileDistance<=122){
-          for(let index=0;index<item.railLodCount;index++)if(near(item.furnitureMatrices,index,120))boxes.push(index)
+          for(let index=0;index<item.railLodCount;index++){
+            if(hideOldShops && isCityUpgradeExcludedShopBox(item.furnitureMatrices,index,tileUpgraded))continue
+            if(near(item.furnitureMatrices,index,120))boxes.push(index)
+          }
         }
         if(tileDistance<=32){
-          const hideOldShops = isCityUpgradeEnabled()
           for(let index=0;index<item.parked.length/16;index++)if(near(item.parked,index)&&(!this.takenBikes.size||!this.takenBikes.has(`${tile.x}:${tile.z}:${index}`)))bikes.push(index)
           for(let index=item.railLodCount;index<item.detailCount;index++){
-            if(hideOldShops && isCityUpgradeExcludedShopBox(item.furnitureMatrices,index))continue
+            if(hideOldShops && isCityUpgradeExcludedShopBox(item.furnitureMatrices,index,tileUpgraded))continue
             if(near(item.furnitureMatrices,index))boxes.push(index)
           }
         }
