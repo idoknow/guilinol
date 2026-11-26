@@ -239,8 +239,10 @@ if (carriagewayReverse) {
     assert(Object.keys(r.byRole).every(role => /^paving-[01236]$/.test(role)),
       'Non-pavement intrusion in road margin on ' + r.way)
   }
-  execFileSync(process.execPath, [path.resolve('node_modules/tsx/dist/cli.mjs'),
-    'scripts/check-station-curb-returns.ts', base, candidate])
+  for (const flags of [[], ['--aprons']]) {
+    execFileSync(process.execPath, [path.resolve('node_modules/tsx/dist/cli.mjs'),
+      'scripts/check-station-curb-returns.ts', base, candidate, ...flags])
+  }
 } else {
   assert(reverse.every(r => r.checked && !r.violations))
 }

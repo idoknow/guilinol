@@ -8,6 +8,7 @@ export interface CurbReturn {
   along: number[]
   lateral: number[]
   lanes: number[][][]
+  aprons: NativeFace[]
   faces: NativeFace[]
   displacement: number[][]
 }
@@ -169,10 +170,12 @@ export function fitCurbReturns(
       buffer.length = 0
       for (const v of kept) buffer.push(v)
     }
-    for (const [kind, ...tri] of patch.faces) {
+    for (const [index, face] of [...patch.faces, ...patch.aprons].entries()) {
+      const [kind, ...tri] = face
       const pts = tri.map(([s, h, n]) => {
         const px = x + s * dx - n * dz,
           pz = z + s * dz + n * dx
+        if (index >= patch.faces.length) return [px, h, pz, ...color(kind), 0]
         const shifts = patch.displacement
         const i = shifts.findIndex(([at]) => at >= s)
         const [a, da] = shifts[Math.max(0, i - 1)],

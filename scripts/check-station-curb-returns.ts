@@ -6,6 +6,10 @@ import { tileFaces } from './dingjiang-visible-surfaces'
 type Vertex = [number, number, number]
 type Face = Vertex[]
 const [reference, candidate] = process.argv.slice(2)
+const checkAprons = process.argv.includes('--aprons')
+const checkpoints = checkAprons
+  ? Array.from({ length: 69 }, (_, i) => -3 + i / 4)
+  : [-0.02, 0.02, 0.25, 0.5, 1, 1.5, 2, 2.5, 3, 3.5, 4]
 const worlds = [reference, candidate]
 const manifests = worlds.map((w) => JSON.parse(fs.readFileSync(path.join(w, 'manifest.json'), 'utf8')))
 const design = JSON.parse(fs.readFileSync('pipeline/rail-sections/12-guilin-station.json', 'utf8'))
@@ -54,7 +58,7 @@ for (const [key, profile] of Object.entries(design.priorRoadProfiles['01']) as [
     const dx = (other[0] - x) / chords[0].length,
       dz = (other[2] - z) / chords[0].length
     const width = chords[0].halfWidth,
-      reach = width + 8
+      reach = width + (checkAprons ? 20 : 8)
     const meshes = worlds.map((world, i) => {
       const faces: Face[] = []
       for (const tile of manifests[i].chunks) {
@@ -91,7 +95,7 @@ for (const [key, profile] of Object.entries(design.priorRoadProfiles['01']) as [
         maxGrade = 0,
         maxInheritedGrade = 0
       let worstGrade = null
-      for (const along of [-0.02, 0.02, 0.25, 0.5, 1, 1.5, 2, 2.5, 3, 3.5, 4]) {
+      for (const along of checkpoints) {
         const px = x + along * dx,
           pz = z + along * dz
         const centers = chords.map((chord) => roadHeight(chord, index ? chord.length - along : along))
@@ -145,10 +149,10 @@ console.log(JSON.stringify(results, null, 2))
 if (
   results.some(
     (r) =>
-      (r.samples === 0) !== bareSides.has(r.node + '/' + r.side) ||
+      (!checkAprons && (r.samples === 0) !== bareSides.has(r.node + '/' + r.side)) ||
       r.gradeViolations ||
       r.missing ||
-      r.maxRevealError > 0.020001,
+      (!checkAprons && r.maxRevealError > 0.020001),
   )
 )
   process.exitCode = 1
