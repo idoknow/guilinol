@@ -152,6 +152,7 @@ def run(world, faces):
     cache = {}
     summary = defaultdict(dict)
     registered = defaultdict(set)
+    pavement_ranges = {}
     b_count = defaultdict(int)
     from rail_sections import designs
     panel_roads = {wid for design in designs() for wid in design.get("panelRoads", [])}
@@ -275,6 +276,9 @@ def run(world, faces):
                 # The signed finished floor is continuous across the road width.
                 # Still test all protruding native paving against the upper limit.
                 owns_grade = owner == road or not graded
+                if owns_grade:
+                    low, high_gap = pavement_ranges.get(road, (float("inf"), -float("inf")))
+                    pavement_ranges[road] = min(low, float(gap.min())), max(high_gap, float(gap.max()))
                 error = (
                     np.maximum(gap - 0.05, -0.02 - gap) if owns_grade else gap - 0.05
                 )
@@ -377,6 +381,7 @@ def run(world, faces):
         },
         verifiedOverheadFaces=dict(b_count),
         crossings=levels,
+        pavementMinusRailM=pavement_ranges,
         railHeadsChecked={road: 2*len(levels[road]["rails"]) for road in sorted(panel_roads)},
         coveredRailHeads={road: list(covered_heads[road].values()) for road in sorted(panel_roads)},
     )
