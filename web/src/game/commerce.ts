@@ -46,6 +46,7 @@ import {
 import {EBIKE_UPGRADE_MAX_KMH} from '../walk/tuning'
 
 import {rules} from '../smoke/data'
+import {RECENT_ACTION_LIMIT} from '../fishing/limits'
 
 export type CatalogItemType =
   | 'cigarette_pack'
@@ -120,6 +121,24 @@ export interface FineResult {
 }
 
 const inFlightLocks = new Set<string>()
+export function fishingTransaction(key:string,ref:string,change:(block:LocalSaveV1['fishing'])=>number|string){
+  const lock='fishing', base=getActiveSaveSnapshot()
+  if(inFlightLocks.has(lock))return {ok:false,code:'IN_FLIGHT'}
+  if(!key||base.fishing.recentActions.includes(key)||findIdempotentTx(base,key))return {ok:false,code:'IDEMPOTENT_REPLAY'}
+  inFlightLocks.add(lock)
+  try{
+    const next=cloneSave(base),delta=change(next.fishing)
+    if(typeof delta==='string')return {ok:false,code:delta}
+    if(!Number.isSafeInteger(delta)||base.money+delta>MAX_SAFE_MONEY)return {ok:false,code:'INVALID_AMOUNT'}
+    if(base.money+delta<0)return {ok:false,code:'INSUFFICIENT_FUNDS'}
+    next.money+=delta;const at=Date.now(),txId=nextTxId(at);next.updatedAt=at
+    if(delta!==0)appendTx(next,{txId,at,idempotencyKey:key,kind:delta>0?'reward':'purchase',refId:`fishing:${ref}`,delta,balanceAfter:next.money})
+    else next.fishing.recentActions=[...next.fishing.recentActions,key].slice(-RECENT_ACTION_LIMIT)
+    if(!persistSaveSync(next))return {ok:false,code:'PERSIST_FAILED'}
+    if(delta){_commitPersistedSlice({money:next.money,bumpWalletSeq:true});emit({type:'money:change',delta,balance:next.money,reason:'fishing',txId})}
+    return {ok:true,code:'OK',delta}
+  }finally{inFlightLocks.delete(lock)}
+}
 let txCounter = 0
 
 function nextTxId(nowMs: number): string {
@@ -233,7 +252,7 @@ export function executePurchase(req: PurchaseRequest): PurchaseResult {
     if (req.itemType === 'cigarette_pack') {
       realPrice = quotePurchasePrice(req.itemType, req.itemId)
       if (nextSave.packs.length >= 3) return {ok:false,code:'ALREADY_FULL',charged:0,balanceAfter:baseSave.money}
-      nextSave.packs.push({brand:req.itemId, remaining:20})
+      nextSave.packs.push({brand:req.itemId, remaining:20, opened:false})
     } else if (req.itemType === 'outfit_item') {
       const def = OUTFIT_ITEMS_BY_ID[req.itemId]
       if (!def) return {ok: false, code: 'INVALID_ITEM', charged: 0, balanceAfter: baseSave.money}

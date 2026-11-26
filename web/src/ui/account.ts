@@ -118,10 +118,11 @@ const setUser=(value:User|null)=>{
   for(const listen of listeners)listen(user)
 }
 let sessionUnknown=false
-const refresh=()=>api('me').then(r=>{sessionUnknown=false;setUser(r&&typeof r.nickname==='string'?r:null)}).catch(error=>{
+let checking:Promise<void>|undefined
+const refresh=()=>checking??=api('me').then(r=>{sessionUnknown=false;setUser(r&&typeof r.nickname==='string'?r:null)}).catch(error=>{
   sessionUnknown=error.code!=='unauthorized'
   if(!sessionUnknown)setUser(null)
-})
+}).finally(()=>{checking=undefined})
 const ready=refresh()
 // IDOK-216: warm what the first click needs while the player reads the title screen — the login dialog's
 // social buttons for guests, the avatar module + record for signed-in players — so entering is one wait, not four.
@@ -139,11 +140,14 @@ const socialConfigSoon=()=>Promise.race([loadSocialOptions(),new Promise(resolve
 let dialog:HTMLDialogElement|undefined,render:((screen:Screen,note?:string,pass?:string)=>void)|undefined
 let gate:((user:User|null)=>void)|undefined
 export async function openAccount(){
-  build();await Promise.all([ready,socialConfigSoon()]);render!(user?'profile':'login');dialog!.showModal();if(!user)record('funnel',{step:'loginOpen'})
+  const openingLogin=!user
+  await refresh()
+  if(openingLogin && user && !sessionUnknown)return
+  build();await socialConfigSoon();render!(user && !sessionUnknown?'profile':'login');dialog!.showModal();if(!user)record('funnel',{step:'loginOpen'})
 }
 /** Resolve with the signed-in user, opening the login dialog first if needed; null if the player closes it without signing in. */
 async function signIn():Promise<User|null>{
-  await ready;if(user)return user
+  await refresh();if(user && !sessionUnknown)return user
   build();gate?.(null);await socialConfigSoon()
   return new Promise(resolve=>{gate=resolve;render!('login');dialog!.showModal();if(!user)record('funnel',{step:'loginOpen'})})
 }
@@ -171,6 +175,14 @@ export function accountEntry(parent:HTMLElement){
 }
 
 
+function resumeSocialLogin(){
+  settlePendingLogin(!!user && !sessionUnknown)
+  if(!user || sessionUnknown)return false
+  if(dialog?.open)dialog.close()
+  window.dispatchEvent(new Event('glol:registered'))
+  return true
+}
+
 /* 从第三方回调回来（?social=...）：直接在账号面板里把结果展示出来。 */
 const bootSocial=new URLSearchParams(location.search).get('social')
 if(bootSocial){
@@ -179,6 +191,8 @@ if(bootSocial){
   history.replaceState(null,'',clean.pathname+clean.search+clean.hash)
   void (async()=>{
     await ready
+    const returningLogin=bootSocial==='login'||bootSocial==='registered'
+    if(returningLogin && resumeSocialLogin())return
     build()
     dialog!.showModal()
     if(bootSocial==='confirm'){
@@ -186,9 +200,8 @@ if(bootSocial){
       catch(error){render!('login',error instanceof Error?error.message:'授权已过期，请重新发起')}
       return
     }
-    if(bootSocial==='login'||bootSocial==='registered')settlePendingLogin(true)
-    else if(bootSocial!=='bound')settlePendingLogin(false)
-    if(bootSocial==='login'){try{setUser(await api('me') as User)}catch{}}
+    if(returningLogin){render!('login','请重新登录');return}
+    if(bootSocial!=='bound')settlePendingLogin(false)
     const notice=socialNotes[bootSocial]
     render!(notice?.screen??'login',notice?.text??'第三方登录未完成，请重新发起')
     record('funnel',{step:'loginOpen'})
@@ -398,9 +411,8 @@ function build(){
       }
       const result=await api('auth/social/confirm','POST',{}) as {intent?:string}
       if(result.intent==='login'){
-        settlePendingLogin(true)
-        setUser(await api('me') as User)
-        render!('profile','已通过第三方账号登录')
+        await refresh()
+        if(!resumeSocialLogin())render!('login','请重新登录')
         return
       }
       setUser(await api('me') as User)
@@ -434,7 +446,7 @@ function build(){
   })}
   d.querySelector('header button')!.addEventListener('click',()=>d.close())
   d.querySelector('.acc-join')!.addEventListener('click',()=>{if(!busy)render!('register')})
-  d.addEventListener('close',()=>{verificationPassword='';form.reset();const resolve=gate;gate=undefined;resolve?.(user)})
+  d.addEventListener('close',()=>{verificationPassword='';form.reset();const resolve=gate;gate=undefined;resolve?.(sessionUnknown?null:user)})
   d.addEventListener('click',event=>{if(event.target===d)d.close()})
   for(const type of ['keydown','keyup'])d.addEventListener(type,event=>event.stopPropagation())
   document.body.append(d)

@@ -1,4 +1,5 @@
 """Report symmetric roof disagreement within the replacement polygon on the Esri grid."""
+from ops_evidence import require_evidence
 import argparse
 import json
 import math
@@ -12,7 +13,7 @@ parser.add_argument('capture', type=Path)
 parser.add_argument('--rgb', type=Path, help='optional Esri mosaic on the reference grid')
 args = parser.parse_args()
 root = Path(__file__).resolve().parents[1]
-folder = root / 'docs/layout'
+folder = require_evidence('layout')
 grid = json.loads((folder / 'dongxi-esri-grid.json').read_text())
 reference = np.asarray(Image.open(folder / 'dongxi-esri-mask.png').convert('1'))
 render = np.asarray(Image.open(args.capture / 'roof-mask.png').convert('L')) >= 128

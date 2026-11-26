@@ -3,6 +3,7 @@
   border-radius:var(--ui-r-md);background:var(--ui-glass-solid);border:1px solid var(--ui-glass-line-soft);
   box-shadow:var(--ui-shadow-1);user-select:none;-webkit-user-select:none;touch-action:manipulation}
 .hotbar[hidden]{display:none}
+.hotbar-slot[hidden]{display:none}
 .hotbar-slot{position:relative;width:54px;height:50px;box-sizing:border-box;padding:6px 0 4px;margin:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;
   border-radius:var(--ui-r-sm);border:1px solid transparent;background:rgba(244,239,226,.06);color:var(--ui-paper-dim);font:11px/1 var(--ui-serif);letter-spacing:.08em;cursor:pointer;
   transition:background var(--ui-fast) var(--ui-ease),border-color var(--ui-fast) var(--ui-ease),color var(--ui-fast) var(--ui-ease)}
@@ -12,9 +13,8 @@
 .hotbar-slot.on{background:rgba(169,80,60,.22);border-color:var(--ui-seal-light);color:var(--ui-paper)}
 .hotbar-slot.on kbd{color:var(--ui-paper-dim)}
 .hotbar-slot:focus-visible{outline:2px solid var(--ui-jade-300);outline-offset:1px}
-/* 物品栏在时，把原本贴底的提示条和测试版说明往上让 */
+/* 物品栏在时，把原本贴底的提示条往上让 */
 body[data-hotbar=on] .hint{bottom:calc(76px + env(safe-area-inset-bottom))}
-body[data-hotbar=on] .beta-note{bottom:calc(72px + env(safe-area-inset-bottom))}
 /* 抬起只对鼠标/触控板生效：触屏上 .vehicle-action 已由 walk.css 的 coarse 规则抬到摇杆之上
    （230px），这里再压到 104px 会压住左摇杆和跑键（IDOK-255 回归）。 */
 @media (hover:hover) and (pointer:fine){
@@ -54,5 +54,4 @@ body[data-hotbar=on] .beta-note{bottom:calc(72px + env(safe-area-inset-bottom))}
 body[data-shop-open="1"] .hotbar{display:none}
 @media(pointer:coarse) and (max-height:500px){
   body[data-hotbar=on] .hud-stats{left:calc(126px + env(safe-area-inset-left));bottom:calc(6px + env(safe-area-inset-bottom));transform:none;max-width:calc(50vw - 248px)}
-  body:has(.smoke-hint:not([hidden])) .beta-note{visibility:hidden}
 }

@@ -44,7 +44,7 @@ Rock 第八批 `IMG_1373–1375` 校正临街门楼：平白门楣和红字下�
 
 ## 桂林市第十三中学
 
-IDOK-80（2026-11-21）按口径 A 做成 OSM 级概化校园：楼栋只用 OSM/Overture 已有轮廓，运动场地只做 OSM 已标注的，一处临街概化校门常闭，不做门卫、闸机、监控，不标楼栋用途，不做室内。逐项来源和推断说明见 [layout/schools/guilin_thirteen.md](layout/schools/guilin_thirteen.md)。
+IDOK-80（2026-11-21）按口径 A 做成 OSM 级概化校园：楼栋只用 OSM/Overture 已有轮廓，运动场地只做 OSM 已标注的，一处临街概化校门常闭，不做门卫、闸机、监控，不标楼栋用途，不做室内。逐项来源和推断说明见 `私有资料：layout/schools/guilin_thirteen.md`。
 
 地标包：`guilin_thirteen.glb`（OSM `way/669069474`，含楼栋、围墙、校门、运动场地和绿化）。
 
@@ -52,7 +52,7 @@ IDOK-80（2026-11-21）按口径 A 做成 OSM 级概化校园：楼栋只用 OSM
 
 ## 乐群小学
 
-IDOK-80（2026-11-21）按口径 A 做成 OSM 级概化校园：楼栋只用 OSM/Overture 已有轮廓，运动场地只做 OSM 已标注的，一处临街概化校门常闭，不做门卫、闸机、监控，不标楼栋用途，不做室内。逐项来源和推断说明见 [layout/schools/lequn_primary.md](layout/schools/lequn_primary.md)。
+IDOK-80（2026-11-21）按口径 A 做成 OSM 级概化校园：楼栋只用 OSM/Overture 已有轮廓，运动场地只做 OSM 已标注的，一处临街概化校门常闭，不做门卫、闸机、监控，不标楼栋用途，不做室内。逐项来源和推断说明见 `私有资料：layout/schools/lequn_primary.md`。
 
 地标包：`lequn_primary.glb`（OSM `way/684946203`，含楼栋、围墙、校门、运动场地和绿化）。
 
@@ -60,7 +60,7 @@ IDOK-80（2026-11-21）按口径 A 做成 OSM 级概化校园：楼栋只用 OSM
 
 ## 宝贤中学
 
-IDOK-80（2026-11-21）按口径 A 做成 OSM 级概化校园：楼栋只用 OSM/Overture 已有轮廓，运动场地只做 OSM 已标注的，一处临街概化校门常闭，不做门卫、闸机、监控，不标楼栋用途，不做室内。逐项来源和推断说明见 [layout/schools/baoxian_school.md](layout/schools/baoxian_school.md)。
+IDOK-80（2026-11-21）按口径 A 做成 OSM 级概化校园：楼栋只用 OSM/Overture 已有轮廓，运动场地只做 OSM 已标注的，一处临街概化校门常闭，不做门卫、闸机、监控，不标楼栋用途，不做室内。逐项来源和推断说明见 `私有资料：layout/schools/baoxian_school.md`。
 
 地标包：`baoxian_school.glb`（OSM `way/669065609`，含楼栋、围墙、校门、运动场地和绿化）。
 
@@ -80,7 +80,7 @@ IDOK-80（2026-11-21）按口径 A 做成 OSM 级概化校园：楼栋只用 OSM
 
 ## 桂林市第五中学
 
-IDOK-80（2026-11-21）按口径 A 做成 OSM 级概化校园：楼栋只用 OSM/Overture 已有轮廓，运动场地只做 OSM 已标注的，一处临街概化校门常闭，不做门卫、闸机、监控，不标楼栋用途，不做室内。逐项来源和推断说明见 [layout/schools/guilin_fifth.md](layout/schools/guilin_fifth.md)。
+IDOK-80（2026-11-21）按口径 A 做成 OSM 级概化校园：楼栋只用 OSM/Overture 已有轮廓，运动场地只做 OSM 已标注的，一处临街概化校门常闭，不做门卫、闸机、监控，不标楼栋用途，不做室内。逐项来源和推断说明见 `私有资料：layout/schools/guilin_fifth.md`。
 
 地标包：`guilin_fifth.glb`（OSM `way/683286832`，含楼栋、围墙、校门、运动场地和绿化）。
 
@@ -88,7 +88,7 @@ IDOK-80（2026-11-21）按口径 A 做成 OSM 级概化校园：楼栋只用 OSM
 
 ## 桂林医科大学（乐群校区）
 
-IDOK-80（2026-11-21）按口径 A 做成 OSM 级概化校园：楼栋只用 OSM/Overture 已有轮廓，运动场地只做 OSM 已标注的，一处临街概化校门常闭，不做门卫、闸机、监控，不标楼栋用途，不做室内。逐项来源和推断说明见 [layout/schools/lequn_medical.md](layout/schools/lequn_medical.md)。
+IDOK-80（2026-11-21）按口径 A 做成 OSM 级概化校园：楼栋只用 OSM/Overture 已有轮廓，运动场地只做 OSM 已标注的，一处临街概化校门常闭，不做门卫、闸机、监控，不标楼栋用途，不做室内。逐项来源和推断说明见 `私有资料：layout/schools/lequn_medical.md`。
 
 地标包：`lequn_medical.glb`（OSM `way/627527309`，含楼栋、围墙、校门、运动场地和绿化）。
 
@@ -120,7 +120,7 @@ IDOK-80（2026-11-21）按口径 A 做成 OSM 级概化校园：楼栋只用 OSM
 
 据中文维基百科「桂林市中山中学」（OSM `way/675588260` 的 `wikipedia` 标签），学校又名桂林市第九中学。游戏将「桂林市第九中学」「桂林九中」「九中」归入同一个搜索结果，落点设在漓滨路校门正前方的公共街道上。
 
-按 Rock 实拍（`docs/refs/rock/walk-dongxi-xiaoyao-jiefang/51–55`）与 OSM 底图重做（M2.6-16）：
+按 Rock 实拍（`ops 仓库 docs/refs/rock/walk-dongxi-xiaoyao-jiefang/51–55`）与 OSM 底图重做（M2.6-16）：
 - **临街校门**：位于东侧漓滨路（`way/675174045`）西侧红线、紧邻 `node/9214622462`，正立面法线朝向 `115.6°`（正对漓滨路）。左为 9.4 m 浅米黄石材方塔柱（深褐红圆饰盘），右为 11.8 m 纪念高塔柱（深青绿通高竖槽与圆盘、古铜金竖排「桂林市中山中学」题字及壮文拼音、党牌与旗杆列），中央挑檐横梁嵌红色发光 LED 横幅与门廊筒灯，横梁上方立弧曲收腰高台牌楼（「公為下天」与「孫文」落款），门洞设关闭状态铁艺栅栏门（不建岗亭、闸机、监控），门前设绿篱花坛、灰白石狮与花岗岩圆柱隔离石墩；左侧紧接桂林图书市场与 7 层滨江大厦，右侧紧接 8 层环球国际酒店（`way/675919397`）。
 - **校园主体**：严格贴合 OSM 真实轮廓建模——北侧五层 L 形教学主楼（`way/683033662`，IoU `0.9996`、偏移 `0.00 m`、朝向差 `0.00°`）、中部四层教学楼（`way/683033663`，IoU `0.9995`、偏移 `0.00 m`、朝向差 `0.00°`）、南侧塑胶跑道田径场（`relation/9475535`）与三片篮球场（`way/683033665–683033667`）。
 - **资源指标**：LOD0 / LOD1：`2,054 / 1,078` 三角形，可见 draw call `2`（`atlas` + `lit`）；压缩 GLB `128,868 B`。

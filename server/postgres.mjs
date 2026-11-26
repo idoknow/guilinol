@@ -31,8 +31,30 @@ export function measuredConnections(pool,metrics) {
   }}
 }
 
+export function isReadOnlySql(sql) {
+  const head = sql.trimStart()
+  if (!/^(?:SELECT|WITH)\b/i.test(head)) return false
+  // 去掉单引号字符串再检查是否含 DML/DDL、行锁或序列写，防止 WITH ... UPDATE/DELETE/INSERT 或 FOR UPDATE 被误判只读
+  const stripped = head.replace(/'(?:''|[^'])*'/g, "''")
+  if (/\b(?:INSERT|UPDATE|DELETE|ALTER|DROP|CREATE|TRUNCATE|MERGE)\b/i.test(stripped)) return false
+  if (/\bFOR\s+(?:NO\s+KEY\s+UPDATE|UPDATE|KEY\s+SHARE|SHARE)\b/i.test(stripped)) return false
+  if (/\b(?:nextval|setval)\s*\(/i.test(stripped)) return false
+  return true
+}
+
 export function database(pool) {
+  async function runSingleRead({sql, args}) {
+    const result = await pool.query(compile(sql, 0), args)
+    for (const row of result.rows) delete row.rowid
+    return {results: result.rows, meta: {changes: result.rowCount}}
+  }
   async function batch(statements) {
+    // 纯只读语句绝不抢全局排他锁 907071，也不必额外发 BEGIN/COMMIT 往返；
+    // 含任何写语句的批次继续走串行事务锁，保持与 D1 原子批次完全一致的语义。
+    if (statements.length && statements.every(stmt => isReadOnlySql(stmt.sql))) {
+      if (statements.length === 1) return [await runSingleRead(statements[0])]
+      return Promise.all(statements.map(runSingleRead))
+    }
     const client=await pool.connect()
     try {
       await client.query('BEGIN')

@@ -10,6 +10,7 @@ import {previewCharacter} from './walk/character'
 import {vehicleModel} from './walk/vehicle-model'
 import {avatar as figure} from './look/avatar'
 import {touchUi} from './ui/input-mode'
+import {registerNameplate,removeNameplate} from './look/nameplates'
 
 export interface Pose {x:number;y:number;z:number;yaw:number;v:number;gr:number;bike:string;bx:number;bz:number;byaw:number;sc:number;sb:number;sp:number;br:number;sd?:number;ss?:number;sr?:number}
 export interface Player extends Pose {em?:number;es?:number;expires?:number;id:string;uid?:number;jt?:number;name:string;avatar:Avatar}
@@ -48,6 +49,7 @@ type Template={model:ReturnType<typeof template>;refs:number}
 type Visual=ReturnType<typeof visual>
 function visual(player:Player) {
   const root=new THREE.Group(), name=label(player.name), bike=vehicleModel('bike')
+  registerNameplate(name)
   root.position.set(player.x,player.y,player.z); root.add(name); bike.visible=false
   return {root,name,bike,played:-1,emote:undefined as ReturnType<typeof emotePlayback>|undefined,smoke:new RemoteSmoke(),kit:undefined as ReturnType<typeof smokeVisual>|undefined,mixer:undefined as THREE.AnimationMixer|undefined,action:undefined as THREE.AnimationAction|undefined,key:''}
 }
@@ -61,7 +63,7 @@ export function players(scene:THREE.Scene,clips:THREE.AnimationClip[],camera:THR
   function hide(id:string) {
     const view=visible.get(id); if(!view)return
     view.kit?.dispose();visible.delete(id); view.root.removeFromParent(); view.bike.removeFromParent()
-    view.name.material.map?.dispose(); view.name.material.dispose(); view.mixer?.stopAllAction()
+    removeNameplate(view.name);view.name.material.map?.dispose(); view.name.material.dispose(); view.mixer?.stopAllAction()
     view.root.traverse(node=>{if(node instanceof THREE.SkinnedMesh)node.skeleton.dispose()})
     const entry=templates.get(view.key)
     if(entry&&!--entry.refs){templates.delete(view.key); void entry.model.then(root=>{
@@ -77,6 +79,8 @@ export function players(scene:THREE.Scene,clips:THREE.AnimationClip[],camera:THR
     entry.refs++
     void entry.model.then(model=>{if(visible.get(player.id)!==view)return
       const instance=clone(model); view.root.add(instance);view.mixer=new THREE.AnimationMixer(instance);view.emote=emotePlayback(instance,undefined,view.mixer)
+      const idleClip=clips.find(item=>item.name===figure.clips.idle)
+      if(idleClip){const idleAct=view.mixer.clipAction(idleClip);idleAct.reset().setEffectiveWeight(1).play();view.action=idleAct;view.mixer.update(0)}
     }).catch(error=>console.warn('remote character unavailable',error))
   }
   function tick(dt:number,local:Pose) {
@@ -103,6 +107,8 @@ export function players(scene:THREE.Scene,clips:THREE.AnimationClip[],camera:THR
         view.name.scale.set(height*view.name.userData.aspect,height,1);view.name.position.y=NAME_Y+height/2-NAME_H/2
         view.name.material.opacity=Math.min(1,(NAME_FAR-away)/(NAME_FAR-NAME_NEAR))
       }
+      // Reverse LIFO reset: apply order below is emote.tick() -> kit.tick().
+      view.kit?.resetPose()
       view.emote?.reset()
       const inRange=Math.hypot(player.x-local.x,player.z-local.z)<80
       bounds.center.set(player.x,player.y+.9,player.z)
@@ -111,10 +117,16 @@ export function players(scene:THREE.Scene,clips:THREE.AnimationClip[],camera:THR
         if(eligible&&player.em&&view.played!==player.es){view.emote.play(player.em,Math.max(0,(emoteById(player.em)?.duration??0)-((player.expires??0)-performance.now())/1000));view.played=player.es??0}
         if(!eligible||!player.em){view.emote.stop();view.played=-1}
       }
-      view.kit?.resetPose()
       const name=player.bike?'sit':!player.gr?'jump':player.v>3?'run':player.v>.12?'walk':'idle'
-      const clip=clips.find(item=>item.name===figure.clips[name]);if(clip&&view.mixer){const action=view.mixer.clipAction(clip)
-        if(action!==view.action){view.action?.fadeOut(.12);action.reset().fadeIn(.12).play();view.action=action} view.mixer.update(dt)}
+      const clip=clips.find(item=>item.name===figure.clips[name])??clips.find(item=>item.name===figure.clips.idle)
+      if(clip&&view.mixer){const action=view.mixer.clipAction(clip)
+        if(!view.action||!view.action.isRunning()||!view.action.enabled){
+          view.mixer.stopAllAction()
+          action.reset().setEffectiveWeight(1).play();view.action=action
+        }else if(action!==view.action){
+          view.action.fadeOut(.12);action.reset().setEffectiveWeight(1).fadeIn(.12).play();view.action=action
+        }
+        view.mixer.update(dt)}
       view.emote?.tick(dt,player.v>.12)
       if(enableSmoke&&view.mixer){
         if(player.sc&&!view.kit)view.kit=smokeVisual(scene,view.root)

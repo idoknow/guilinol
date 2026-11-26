@@ -27,7 +27,7 @@ try {
     await page.goto('http://127.0.0.1:' + server.httpServer.address().port + '/?verify')
     await page.waitForFunction(() => window.viewer?.tour)
     await recordFrames(page)
-    await page.locator('.dock-map').click()
+    await page.locator('.minimap').click()
     await page.getByRole('searchbox').fill('象鼻山')
     await page.locator('.atlas-search li').filter({ hasText: '观景点' }).first().click()
     await page.locator('.atlas-pop button[data-act=go]').click()

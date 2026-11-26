@@ -178,8 +178,10 @@ function createDecorMats(M: Pack): DecorMats {
   const cedarLit = tag('tianyuan_facade_cedar_warm', 0xffffff, M.facadeWood, {emissive: 0xffb764, emissiveIntensity: 0})
   cedarLit.userData.tiled = true
   cedarLit.userData.keepOwnTarget = M.facadeWood
-  const graniteLit = tag('tianyuan_granite_warm', 0xc8baa4, bm?.vcExterior ?? M.granite, {emissive: 0xffc682, emissiveIntensity: 0})
+  const graniteLit = tag('tianyuan_granite_warm', 0xc8baa4, bm?.vcStone ?? M.granite, {emissive: 0xffc682, emissiveIntensity: 0})
   graniteLit.userData.tiled = true
+  graniteLit.userData.surfTex = 'granite'
+  graniteLit.userData.glow = [0, 0.16]
   const wainscotTile = tag('tianyuan_wainscot_tile', 0xdccdb3, M.wallTileHall, {emissive: 0xffe4be, emissiveIntensity: 0})
   wainscotTile.userData.tiled = true
   const groutSeam = tag('tianyuan_floor_grout', 0x9b9284, M.floorHall, {roughness: 0.92, emissive: 0xffe4bc, emissiveIntensity: 0})
@@ -187,6 +189,8 @@ function createDecorMats(M: Pack): DecorMats {
   const chromeTrim = tag('tianyuan_chrome_trim', 0xebeef2, bm?.vcMetal ?? M.aluminium, {metalness: 0.28, roughness: 0.24})
   const brassGold = tag('tianyuan_brass_gold_signs', 0xe7c14e, bm?.vcMetal ?? M.aluminium, {metalness: 0.28, roughness: 0.3, emissive: 0xffcd48, emissiveIntensity: 0.15})
   const warmLed = tag('tianyuan_warm_led_signs', 0xfff7e2, bm?.vcEmissive ?? M.ceilingLamp, {emissive: 0xffcc70, emissiveIntensity: 0.72, roughness: 0.28})
+  warmLed.userData.glow = [0.72, 1.6]
+  brassGold.userData.glow = [0.15, 1.0]
   const awningCanopy = tag('tianyuan_awning_canopy', 0x3b444d, bm?.vcExterior ?? M.doorCurtain, {roughness: 0.78, side: THREE.DoubleSide})
   const pvcCurtain = tag('tianyuan_pvc_curtain', 0xe3f2ef, bm?.vcGlass ?? M.thermalCurtain, {transparent: true, opacity: 0.46, side: THREE.DoubleSide})
   const linenValance = tag('tianyuan_linen_valance', 0xb2362a, bm?.vcPlastic ?? M.doorCurtain, {roughness: 0.85, side: THREE.DoubleSide})
@@ -284,7 +288,7 @@ class Mesher {
 }
 
 const isTiled = (mat: THREE.Material) => mat.userData.tiled === true
-const KEEP_ATTRS = new Set(['position', 'normal', 'uv', 'color'])
+const KEEP_ATTRS = new Set(['position', 'normal', 'uv', 'color', 'aSurf'])
 const BATCH_TMP_COLOR = new THREE.Color()
 
 function scaleUv(g: THREE.BufferGeometry, su: number, sv: number) {
@@ -322,9 +326,11 @@ class Batch {
   private readonly p = new THREE.Vector3()
   private readonly one = new THREE.Vector3(1, 1, 1)
   private readonly overrideTarget: THREE.Material | null
+  private readonly atlasTarget: THREE.Material | null
 
-  constructor(overrideTarget: THREE.Material | null = null) {
+  constructor(overrideTarget: THREE.Material | null = null, atlasTarget: THREE.Material | null = null) {
     this.overrideTarget = overrideTarget
+    this.atlasTarget = atlasTarget
   }
 
   add(mat: THREE.Material, geo: THREE.BufferGeometry, x = 0, y = 0, z = 0, ry = 0, rx = 0, rz = 0): void {
@@ -353,8 +359,11 @@ class Batch {
       }
     }
 
-    let target: THREE.Material = (mat.userData.batchTarget as THREE.Material | undefined) ?? mat
-    if (
+    const ownTarget: THREE.Material = (mat.userData.batchTarget as THREE.Material | undefined) ?? mat
+    let target: THREE.Material = ownTarget
+    if (atlasRect && this.atlasTarget) {
+      target = this.atlasTarget
+    } else if (
       this.overrideTarget &&
       target !== mat &&
       !atlasRect &&
@@ -378,6 +387,21 @@ class Batch {
       g.setAttribute('color', new THREE.BufferAttribute(cols, 3))
     } else if (g.getAttribute('color')) {
       g.deleteAttribute('color')
+    }
+
+    // IDOK-305：surface master 按顶点记录贴图层与自发光（见 materials.ts bindSurfaceMaster）
+    const surfLayers = target.userData.surfLayers as Record<string, number> | undefined
+    if (surfLayers) {
+      const key = (mat.userData.surfTex ?? ownTarget.userData.surfTex) as string | undefined
+      const layer = key === 'none' ? 3 : key && surfLayers[key] ? surfLayers[key] : 0
+      const glow = (mat.userData.glow ?? ownTarget.userData.glow ?? target.userData.glow ?? [0, 0]) as [number, number]
+      const surf = new Float32Array(vCount * 3)
+      for (let i = 0; i < vCount; i++) {
+        surf[i * 3] = layer
+        surf[i * 3 + 1] = glow[0]
+        surf[i * 3 + 2] = glow[1]
+      }
+      g.setAttribute('aSurf', new THREE.BufferAttribute(surf, 3))
     }
 
     g.clearGroups()
@@ -1280,7 +1304,7 @@ function buildHall(I: Batch, M: Pack, D: DecorMats, lv: ShopLevel, col: AddColli
   I.box(D.warmLed, IN_X - 0.03, 3.0, 3.5, 0.04, 0.035, 2.46)
   I.sign(M.menuPosters, IN_X - 0.038, 2.66, 3.5, 2.4, 0.6, -Math.PI / 2)
   I.add(M.wallClock, new THREE.CircleGeometry(0.16, 18), IN_X - 0.02, 2.62, 6.45, -Math.PI / 2)
-  I.box(M.acUnit, IN_X - 0.11, 2.52, 5.45, 0.22, 0.3, 0.92)
+  I.box(M.whitePlastic, IN_X - 0.11, 2.52, 5.45, 0.22, 0.3, 0.92)
   I.box(M.blackMetal, IN_X - 0.225, 2.56, 5.45, 0.01, 0.03, 0.8)
   wallFan(I, M, D, -IN_X + 0.02, 2.38, 2.15, 1)
   wallFan(I, M, D, IN_X - 0.02, 2.36, 4.6, -1)
@@ -1772,6 +1796,48 @@ function named<T extends THREE.Object3D>(obj: T, name: string): T {
   return obj
 }
 
+// Static Batch.flush meshes have identity transforms and non-indexed triangles
+// in shop-local space. Two sections can share a draw even when either section
+// can be hidden: both visible ranges and either individual range are contiguous.
+function batchShopSections(root: THREE.Group, sections: THREE.Group[]) {
+  const byMaterial = new Map<THREE.Material, THREE.Mesh[]>()
+  for (const section of sections) {
+    for (const mesh of section.children) {
+      if (!(mesh instanceof THREE.Mesh) || Array.isArray(mesh.material) || mesh.material.transparent) continue
+      const list = byMaterial.get(mesh.material) ?? []
+      list.push(mesh)
+      byMaterial.set(mesh.material, list)
+    }
+  }
+  const updates: (() => void)[] = []
+  for (const [material, meshes] of byMaterial) {
+    if (meshes.length !== 2) continue
+    const [first, second] = meshes
+    const a = first.parent!, b = second.parent!
+    const geometry = mergeGeometries([first.geometry, second.geometry], false)
+    if (!geometry) continue
+    const split = first.geometry.getAttribute('position').count
+    const total = geometry.getAttribute('position').count
+    const mesh = new THREE.Mesh(geometry, material)
+    mesh.name = 'tianyuan.shared:' + material.name
+    mesh.matrixAutoUpdate = false
+    root.add(mesh)
+    for (const source of meshes) {
+      source.removeFromParent()
+      source.geometry.dispose()
+    }
+    updates.push(() => {
+      const start = a.visible ? 0 : split
+      const end = b.visible ? total : split
+      mesh.visible = end > start
+      geometry.setDrawRange(start, end - start)
+    })
+  }
+  const sync = () => { for (const update of updates) update() }
+  sync()
+  return sync
+}
+
 export function buildTianyuanShopMesh(level: ShopLevel = 1): TianyuanShopBuildResult {
   const lv: ShopLevel = level === 3 ? 3 : level === 2 ? 2 : 1
   const M = acquireTianyuanMaterials()
@@ -1793,20 +1859,25 @@ export function buildTianyuanShopMesh(level: ShopLevel = 1): TianyuanShopBuildRe
   col(-IN_X, KDOOR_X0, PART_Z0, PART_Z1, 'wall:pass-west')
   col(KDOOR_X1, IN_X, PART_Z0, PART_Z1, 'wall:pass-east')
 
-  // 外立面与吊顶统一进 EC（剖切时同步隐藏），前厅/后厨/门面/外摆统一进 ISW（消除跨组重复材质桶）
+  // 外立面与吊顶统一进 EC（剖切时同步隐藏）；门面独立进 SF（35~165m 中距和剖切态均常显，仅 4 draws）；前厅/后厨/外摆进 IW（<=35m 显示）
   const EC = new Batch(M.batchMasters?.vcExterior ?? null)
-  const ISW = new Batch()
+  const SF = new Batch(M.batchMasters?.vcExterior ?? null, M.batchMasters?.signAtlasLit ?? null)
+  const IW = new Batch()
   buildShell(EC, M, D)
   buildCeiling(EC, M, D)
-  buildStorefront(ISW, M, D, col)
-  const seats = [...buildHall(ISW, M, D, lv, col), ...buildSidewalk(ISW, M, D, lv, col)]
-  const kitchen = buildKitchen(ISW, M, D, lv, col)
+  buildStorefront(SF, M, D, col)
+  const seats = [...buildHall(IW, M, D, lv, col), ...buildSidewalk(IW, M, D, lv, col)]
+  const kitchen = buildKitchen(IW, M, D, lv, col)
   EC.flush(exterior, 'tianyuan.exterior')
-  ISW.flush(interior, 'tianyuan.interior')
-  interior.traverse(o => {
-    const mesh = o as THREE.Mesh
-    if (mesh.isMesh && (mesh.material as THREE.Material).transparent) mesh.renderOrder = 2
-  })
+  SF.flush(storefront, 'tianyuan.storefront')
+  IW.flush(interior, 'tianyuan.interior')
+  const syncSectionBatches = batchShopSections(group, [exterior, storefront, interior])
+  for (const grp of [storefront, interior]) {
+    grp.traverse(o => {
+      const mesh = o as THREE.Mesh
+      if (mesh.isMesh && (mesh.material as THREE.Material).transparent) mesh.renderOrder = 2
+    })
+  }
 
   // 动态件与三工位精细动画模型
   const ownGeos: THREE.BufferGeometry[] = []
@@ -2130,6 +2201,7 @@ export function buildTianyuanShopMesh(level: ShopLevel = 1): TianyuanShopBuildRe
     cut = next
     exterior.visible = !cut
     ceilingGroup.visible = !cut
+    syncSectionBatches()
     group.userData.cutaway = cut
   }
 
@@ -2584,7 +2656,18 @@ export function buildTianyuanShopMesh(level: ShopLevel = 1): TianyuanShopBuildRe
 
     setDetailVisible(visible: boolean) {
       dynamic.visible = visible
-      interior.visible = visible
+      if (interior.visible !== visible) {
+        interior.visible = visible
+        syncSectionBatches()
+      }
+      if (fan) fan.visible = visible
+    },
+
+    updateNight(night: number, time = 0) {
+      if (disposed) return
+      const n = THREE.MathUtils.clamp(night, 0, 1)
+      M.updateNight(n, false, time)
+      D.nightSpill.opacity = n * 0.2
     },
 
     dispose() {

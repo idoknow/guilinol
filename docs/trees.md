@@ -7,7 +7,7 @@
 ## 一、调研综述：桂林城市树木格局
 
 1. **基调与市树双核心**：桂林属中亚热带湿润季风气候，市林业和园林局长期遵循“乡土常绿为主、乔灌相宜、突出桂花文化与山水季相”原则。城区道路多度与频度最高的基调大乔木为**香樟**与**小叶榕/黄葛榕**（桂林古称“榕城”），最具辨识度的文化符号为市树/市花**桂花**（1984 年确立，形成中山路、龙隐路、漓江路等“桂花长廊”）。
-2. **断面与冠层尺度**（核对 Rock 2026-11-19 实拍 `docs/refs/rock/`）：
+2. **断面与冠层尺度**（核对 Rock 2026-11-19 实拍 `ops 仓库 docs/refs/rock/`）：
    - **主干路（`trunk` / `primary`，如解放西路 `IMG_1380–1386`、解放东路 `01_IMG_1390–05_IMG_1394`）**：机动车道与 3 m 独立沥青非机动车道之间的 2.2 m 绿化分隔带种植高大乔木（**小叶榕、黄葛榕、香樟**，株距 6.5–7.5 m），树冠在非机动车道上方合拢成廊；部分商业段（解放东路十字街至王城商厦北侧 `01_IMG_1390`、中山中路）在人行道外沿方形抬高树池内增植一列小乔木**桂花**，形成“内高樟榕、外低丹桂”复层街景。
    - **老城林荫次干路/支路（如翊武路 `IMG_1345–1347`、榕荫路 `IMG_1299–1302`、信义路 `IMG_1359–1360`）**：窄双车道两侧于平齐石缘树池（翊武路、榕荫路）或方形抬高花岗岩树池配防撞石墩（信义路）内栽植行道树，株距 6–8 m。榕荫路为气根垂拂的**小叶榕**隧道；翊武路为树高 12–16 m、主干向路心倾 8–15°、树冠在双车道上方合拢遮蔽天空 ≥60% 的**秋枫/复羽叶栾树/香樟**混交林荫；信义路为树池内 1.1–1.5 m 低分枝、冠高占树高约 78% 的圆卵冠**桂花**。
    - **历史轴线与色叶景观路**：靖江王城正阳路主轴两侧成排栽植**银杏**（11 月呈黄绿至金黄叶色，见 `walk-shizijie-wangcheng/25_IMG_1414.jpg`）；穿山路以高大**黄葛榕**绿色隧道闻名；七星路、西凤路以基调**香樟**配植秋冬暖色叶乔木（枫香/秋枫）；现代干道（环城北一路等）配植直立卵柱形团簇冠、零星挂红叶的阔叶树**杜英**。
@@ -45,7 +45,7 @@
 |---:|---|---|---|
 | 1 | 整株主体照（对比卡左图） | 澳大利亚 Golden Valley 树木园独立宽圆穹冠大香樟 | [File:Cinnamomum camphora in Golden Valley Tree Park, May 2022 01.jpg](https://commons.wikimedia.org/wiki/File:Cinnamomum_camphora_in_Golden_Valley_Tree_Park,_May_2022_01.jpg) |
 | 2 | 整株（夏季开展穹冠） | 日本佐贺宗眼寺独立大香樟 | [File:Camphor tree of Sogan-ji in Hasuikemachi, Saga.jpg](https://commons.wikimedia.org/wiki/File:Camphor_tree_of_Sogan-ji_in_Hasuikemachi,_Saga.jpg) |
-| 3 | 桂林沿湖步道成排大香樟 | 桂林榕湖北路溪流步道两侧大香樟林荫（11 月） | 项目内实拍 `docs/refs/rock/IMG_1334.jpg` |
+| 3 | 桂林沿湖步道成排大香樟 | 桂林榕湖北路溪流步道两侧大香樟林荫（11 月） | 项目内实拍 `ops 仓库 docs/refs/rock/IMG_1334.jpg` |
 | 4 | 树干与斜展主枝 | 熊本健军神社香樟粗干与斜展主枝 | [File:Kengun-jinja (Higashi-ku, Kumamoto) VLux5 hdsr ok02.jpg](https://commons.wikimedia.org/wiki/File:Kengun-jinja_(Higashi-ku,_Kumamoto)_VLux5_hdsr_ok02.jpg) |
 | 5 | 树干细部（纵裂纹） | 香樟成熟树皮纵裂特写 | [File:Bark of Cinnamomum camphora 2.jpg](https://commons.wikimedia.org/wiki/File:Bark_of_Cinnamomum_camphora_2.jpg) |
 | 6 | 秋冬季相（常绿） | 千叶神崎神社冬季常绿大香樟 | [File:Kōzaki-jinja (Kōzaki, Chiba) 10.jpg](https://commons.wikimedia.org/wiki/File:K%C5%8Dzaki-jinja_(K%C5%8Dzaki,_Chiba)_10.jpg) |
@@ -53,9 +53,9 @@
 ### 2. 小叶榕 / 高山榕 (*Ficus microcarpa* / *Ficus altissima*) — `banyan`
 | # | 部位/季相 | 拍摄地点 / 场景 | 参考链接 / 仓库实拍 |
 |---:|---|---|---|
-| 1 | 整株与支柱根成林（对比卡左图） | 桂林古南门外榕湖北路千年古榕粗干与落地副干支柱根 | 项目内实拍 `docs/refs/rock/IMG_1310.jpg` |
-| 2 | 图书馆前多股合干古榕 | 桂林榕湖北路广西省立图书馆门前大古榕（11 月） | 项目内实拍 `docs/refs/rock/IMG_1339.jpg` |
-| 3 | 行道树整列与气根 | 桂林榕荫路成排行道小叶榕与榕荫路×三多路巨榕 | 项目内实拍 `docs/refs/rock/IMG_1299.jpg`、`IMG_1301.jpg` |
+| 1 | 整株与支柱根成林（对比卡左图） | 桂林古南门外榕湖北路千年古榕粗干与落地副干支柱根 | 项目内实拍 `ops 仓库 docs/refs/rock/IMG_1310.jpg` |
+| 2 | 图书馆前多股合干古榕 | 桂林榕湖北路广西省立图书馆门前大古榕（11 月） | 项目内实拍 `ops 仓库 docs/refs/rock/IMG_1339.jpg` |
+| 3 | 行道树整列与气根 | 桂林榕荫路成排行道小叶榕与榕荫路×三多路巨榕 | 项目内实拍 `ops 仓库 docs/refs/rock/IMG_1299.jpg`、`IMG_1301.jpg` |
 | 4 | 宽扁穹冠整株（外景） | 拉戈梅拉岛成年小叶榕宽冠整株（冠宽 ≈ 1.5×冠高） | [File:Ficus microcarpa - La Gomera 01.jpg](https://commons.wikimedia.org/wiki/File:Ficus_microcarpa_-_La_Gomera_01.jpg) |
 | 5 | 成束气生根帘细节 | 小叶榕主枝下垂挂成束长短不一气根帘 | [File:Ficus microcarpa - La Gomera 02.jpg](https://commons.wikimedia.org/wiki/File:Ficus_microcarpa_-_La_Gomera_02.jpg) |
 | 6 | 秋冬季相（11 月滨水） | 桂林榕湖 11 月大榕树常绿浓荫 | [File:Ronghu Lake Guilin November 2017 HDR.jpg](https://commons.wikimedia.org/wiki/File:Ronghu_Lake_Guilin_November_2017_HDR.jpg) |
@@ -63,9 +63,9 @@
 ### 3. 桂花 (*Osmanthus fragrans*，市树) — `osmanthus`
 | # | 部位/季相 | 拍摄地点 / 场景 | 参考链接 / 仓库实拍 |
 |---:|---|---|---|
-| 1 | 桂林行道整株（对比卡左图） | 桂林信义路方形花岗岩树池内低分枝圆卵冠桂花（11 月） | 项目内实拍 `docs/refs/rock/IMG_1359.jpg` |
-| 2 | 成列树冠与低分枝 | 桂林信义路桂花树列与 1.2 m 多主干分枝 | 项目内实拍 `docs/refs/rock/IMG_1360.jpg` |
-| 3 | 主干道外侧双排桂花 | 桂林解放东路北侧人行道外沿方形树池桂花列 | 项目内实拍 `docs/refs/rock/walk-shizijie-wangcheng/01_IMG_1390.jpg` |
+| 1 | 桂林行道整株（对比卡左图） | 桂林信义路方形花岗岩树池内低分枝圆卵冠桂花（11 月） | 项目内实拍 `ops 仓库 docs/refs/rock/IMG_1359.jpg` |
+| 2 | 成列树冠与低分枝 | 桂林信义路桂花树列与 1.2 m 多主干分枝 | 项目内实拍 `ops 仓库 docs/refs/rock/IMG_1360.jpg` |
+| 3 | 主干道外侧双排桂花 | 桂林解放东路北侧人行道外沿方形树池桂花列 | 项目内实拍 `ops 仓库 docs/refs/rock/walk-shizijie-wangcheng/01_IMG_1390.jpg` |
 | 4 | 整株园林形态 | 中国南方成年桂花树紧实圆卵树冠 | [File:Osmanthus fragrans in China.jpg](https://commons.wikimedia.org/wiki/File:Osmanthus_fragrans_in_China.jpg) |
 | 5 | 枝叶与秋花季相 | 金秋盛花期桂花对生革质叶与花簇 | [File:Osmanthus fragrans in full bloom.jpg](https://commons.wikimedia.org/wiki/File:Osmanthus_fragrans_in_full_bloom.jpg) |
 | 6 | 丹桂秋冬花叶特写 | 橙红色丹桂秋冬季花叶形态 | [File:Osmanthus fragrans (orange flowers).jpg](https://commons.wikimedia.org/wiki/File:Osmanthus_fragrans_(orange_flowers).jpg) |
@@ -73,7 +73,7 @@
 ### 4. 蒲葵 / 大王椰 (*Livistona chinensis* / *Roystonea regia*) — `palm`
 | # | 部位/季相 | 拍摄地点 / 场景 | 参考链接 / 仓库实拍 |
 |---:|---|---|---|
-| 1 | 桂林街景整株群（对比卡左图） | 桂林翊武路石柱铁栏围墙内高大蒲葵圆扇冠与垂尖（11 月） | 项目内实拍 `docs/refs/rock/IMG_1347.jpg` |
+| 1 | 桂林街景整株群（对比卡左图） | 桂林翊武路石柱铁栏围墙内高大蒲葵圆扇冠与垂尖（11 月） | 项目内实拍 `ops 仓库 docs/refs/rock/IMG_1347.jpg` |
 | 2 | 桂林滨水道路列植 | 桂林湖滨道路两侧大王椰/棕榈列植 | [File:Guilin in 2026 1.jpg](https://commons.wikimedia.org/wiki/File:Guilin_in_2026_1.jpg) |
 | 3 | 蒲葵整株与垂叶裂片 | 福冈西公园冬季蒲葵圆润叶冠与下垂叶尖 | [File:Livistona Chinensis in Nishi Park Nishi-kōen Chūō-ku Fukuoka City 20221209.jpg](https://commons.wikimedia.org/wiki/File:Livistona_Chinensis_in_Nishi_Park_Nishi-k%C5%8Den_Ch%C5%AB%C5%8D-ku_Fukuoka_City_20221209.jpg) |
 | 4 | 蒲葵树干与叶柄细节 | 马拉加冬季蒲葵单干与放射叶柄 | [File:Livistona chinensis Liwistona chińska 2024-01-20 Malaga 01.jpg](https://commons.wikimedia.org/wiki/File:Livistona_chinensis_Liwistona_chi%C5%84ska_2024-01-20_Malaga_01.jpg) |
@@ -91,7 +91,7 @@
 ### 6. 黄葛榕 / 大叶榕 (*Ficus virens*) — `virens`
 | # | 部位/季相 | 拍摄地点 / 场景 | 参考链接 / 仓库实拍 |
 |---:|---|---|---|
-| 1 | 桂林主干道整株（对比卡左图） | 桂林解放西路分车绿带高分枝陡 V 形主枝黄葛榕（11 月） | 项目内实拍 `docs/refs/rock/IMG_1381.jpg` |
+| 1 | 桂林主干道整株（对比卡左图） | 桂林解放西路分车绿带高分枝陡 V 形主枝黄葛榕（11 月） | 项目内实拍 `ops 仓库 docs/refs/rock/IMG_1381.jpg` |
 | 2 | 整株宽顶大冠 | 香港成年大叶榕（黄葛树）开阔高顶冠 | [File:DaaiJipJung.jpg](https://commons.wikimedia.org/wiki/File:DaaiJipJung.jpg) |
 | 3 | 高分枝 V 形主枝结构 | 德里国家动物园黄葛树高耸斜上主枝架 | [File:Ficus virens at National Zoological Park Delhi - Visit during WCI 2016 (1).jpg](https://commons.wikimedia.org/wiki/File:Ficus_virens_at_National_Zoological_Park_Delhi_-_Visit_during_WCI_2016_(1).jpg) |
 | 4 | 树干与板根基部 | 黄葛树浅灰褐树皮与板根基部 | [File:Ficus virens 239303854.jpg](https://commons.wikimedia.org/wiki/File:Ficus_virens_239303854.jpg) |
@@ -100,8 +100,8 @@
 ### 7. 秋枫 / 复羽叶栾树 (*Bischofia javanica* / *Koelreuteria bipinnata*) — `bischofia`
 | # | 部位/季相 | 拍摄地点 / 场景 | 参考链接 / 仓库实拍 |
 |---:|---|---|---|
-| 1 | 桂林老街拱冠与蒴果（对比卡左图） | 桂林翊武路倾干合拢林荫及冠表零散粉褐栾树蒴果团 | 项目内实拍 `docs/refs/rock/IMG_1345.jpg` |
-| 2 | 桂林树池倾干与复叶冠 | 桂林翊武路平齐树池与向路心倾伸主干 | 项目内实拍 `docs/refs/rock/IMG_1346.jpg` |
+| 1 | 桂林老街拱冠与蒴果（对比卡左图） | 桂林翊武路倾干合拢林荫及冠表零散粉褐栾树蒴果团 | 项目内实拍 `ops 仓库 docs/refs/rock/IMG_1345.jpg` |
+| 2 | 桂林树池倾干与复叶冠 | 桂林翊武路平齐树池与向路心倾伸主干 | 项目内实拍 `ops 仓库 docs/refs/rock/IMG_1346.jpg` |
 | 3 | 秋枫整株自然冠形 | 亚热带成年秋枫不规则团簇圆冠 | [File:Bischofia javanica.jpg](https://commons.wikimedia.org/wiki/File:Bischofia_javanica.jpg) |
 | 4 | 秋枫树干与分枝 | 成年秋枫暗灰褐粗糙树干与主枝分叉 | [File:Bischofia-javanica-SF24233-02.jpg](https://commons.wikimedia.org/wiki/File:Bischofia-javanica-SF24233-02.jpg) |
 | 5 | 复羽叶栾树粉褐蒴果团 | 莫里斯树木园秋末栾树冠表粉褐蒴果簇 | [File:Koelreuteria bipinnata--IMG 20161030 083948.jpg](https://commons.wikimedia.org/wiki/File:Koelreuteria_bipinnata--IMG_20161030_083948.jpg) |
@@ -118,7 +118,7 @@
 ### 9. 银杏 (*Ginkgo biloba*) — `ginkgo`
 | # | 部位/季相 | 拍摄地点 / 场景 | 参考链接 / 仓库实拍 |
 |---:|---|---|---|
-| 1 | 桂林王城主轴实拍（对比卡左图） | 桂林靖江王城正阳路主轴两侧黄绿金黄银杏列（11 月） | 项目内实拍 `docs/refs/rock/walk-shizijie-wangcheng/25_IMG_1414.jpg` |
+| 1 | 桂林王城主轴实拍（对比卡左图） | 桂林靖江王城正阳路主轴两侧黄绿金黄银杏列（11 月） | 项目内实拍 `ops 仓库 docs/refs/rock/walk-shizijie-wangcheng/25_IMG_1414.jpg` |
 | 2 | 行道成列卵圆锥冠 | 银杏夹道列植直立卵圆锥树冠 | [File:Ginkgo biloba. filare.jpg](https://commons.wikimedia.org/wiki/File:Ginkgo_biloba._filare.jpg) |
 | 3 | 整株金秋盛景 | 成年银杏金黄色秋季整株冠形 | [File:GINKGOBAUM-2.jpg](https://commons.wikimedia.org/wiki/File:GINKGOBAUM-2.jpg) |
 | 4 | 树干与斜上主枝 | 弗雷德里克街边银杏浅灰褐纵裂干与斜上分枝 | [File:Ginkgo biloba Frederick MD1.jpg](https://commons.wikimedia.org/wiki/File:Ginkgo_biloba_Frederick_MD1.jpg) |

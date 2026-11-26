@@ -9,6 +9,7 @@ import {loadingTips} from './loading-tips'
 
 export type Stage = {id:string;label:string;weight:number}
 export interface FullLoader {
+  showBeforeBlockingWork():Promise<void>
   stage(id:string,done:number,total:number,detail?:string):void
   fail(reason:string,retry:()=>void):void
   finish():Promise<void>
@@ -65,6 +66,11 @@ export function fullLoader(stages:Stage[]):FullLoader {
     }
   }
   return {
+    async showBeforeBlockingWork(){
+      if(skip || !root.hidden)return
+      root.hidden=false
+      await new Promise<void>(resolve=>requestAnimationFrame(()=>requestAnimationFrame(()=>resolve())))
+    },
     stage(id,done,total,text=''){
       if(closed)return
       const stage=stages.find(item=>item.id===id)

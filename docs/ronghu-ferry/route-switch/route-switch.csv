@@ -1,0 +1,72 @@
+tile,x_m,z_m,overlay_vs_pr,overlay_vs_switched,switched_vs_pr,max_ground_change_dm,max_underlay_change_dm
+89_40.glc,-4096,256,streets,,streets,0,0
+89_41.glc,-4096,512,ground streets,,ground streets,1,0
+90_39.glc,-3840,0,streets,,streets,0,0
+90_40.glc,-3840,256,streets,,streets,0,0
+90_41.glc,-3840,512,ground streets underlay,,ground streets underlay,1,1
+90_42.glc,-3840,768,streets,,streets,0,0
+91_31.glc,-3584,-2048,streets,,streets,0,0
+91_32.glc,-3584,-1792,streets,,streets,0,0
+91_36.glc,-3584,-768,streets,,streets,0,0
+91_37.glc,-3584,-512,ground streets,,ground streets,1,0
+91_38.glc,-3584,-256,ground streets,,ground streets,1,0
+91_39.glc,-3584,0,ground streets underlay,,ground streets underlay,1,1
+91_40.glc,-3584,256,ground streets underlay,,ground streets underlay,1,1
+91_41.glc,-3584,512,ground streets underlay,,ground streets underlay,1,1
+91_42.glc,-3584,768,streets,,streets,0,0
+92_27.glc,-3328,-3072,streets,,streets,0,0
+92_28.glc,-3328,-2816,streets,,streets,0,0
+92_29.glc,-3328,-2560,ground streets decks,,ground streets decks,16,0
+92_30.glc,-3328,-2304,ground streets decks,,ground streets decks,16,0
+92_31.glc,-3328,-2048,ground streets underlay,,ground streets underlay,1,1
+92_32.glc,-3328,-1792,streets,,streets,0,0
+92_37.glc,-3328,-512,streets,,streets,0,0
+92_38.glc,-3328,-256,ground streets decks,,ground streets decks,4,0
+92_39.glc,-3328,0,ground streets underlay,,ground streets underlay,2,2
+92_40.glc,-3328,256,ground streets underlay,,ground streets underlay,1,1
+92_41.glc,-3328,512,streets,,streets,0,0
+92_42.glc,-3328,768,streets,,streets,0,0
+93_27.glc,-3072,-3072,ground streets,,ground streets,1,0
+93_28.glc,-3072,-2816,ground streets decks underlay,,ground streets decks underlay,1,1
+93_29.glc,-3072,-2560,ground streets decks underlay,,ground streets decks underlay,16,16
+93_30.glc,-3072,-2304,ground mesh buildings streets decks,,ground mesh buildings streets decks,16,0
+93_31.glc,-3072,-2048,ground streets underlay,,ground streets underlay,1,1
+93_38.glc,-3072,-256,ground mesh buildings streets underlay,,ground mesh buildings streets underlay,1,1
+93_39.glc,-3072,0,streets,,streets,0,0
+93_40.glc,-3072,256,ground streets,,ground streets,1,0
+93_41.glc,-3072,512,streets,,streets,0,0
+94_26.glc,-2816,-3328,streets,,streets,0,0
+94_27.glc,-2816,-3072,streets,,streets,0,0
+94_28.glc,-2816,-2816,ground streets underlay,,ground streets underlay,1,1
+94_29.glc,-2816,-2560,ground streets underlay,,ground streets underlay,1,1
+94_30.glc,-2816,-2304,ground streets,,ground streets,1,0
+94_37.glc,-2816,-512,streets,,streets,0,0
+94_38.glc,-2816,-256,ground streets underlay,,ground streets underlay,1,1
+94_39.glc,-2816,0,ground mesh buildings streets underlay,,ground mesh buildings streets underlay,1,1
+94_40.glc,-2816,256,ground streets underlay,,ground streets underlay,1,1
+94_42.glc,-2816,768,streets,,streets,0,0
+94_43.glc,-2816,1024,streets,,streets,0,0
+95_28.glc,-2560,-2816,ground streets underlay,,ground streets underlay,1,1
+95_31.glc,-2560,-2048,ground decks,,ground decks,2,0
+95_37.glc,-2560,-512,streets,,streets,0,0
+95_38.glc,-2560,-256,ground streets other underlay,,ground streets other underlay,1,1
+95_39.glc,-2560,0,ground mesh buildings streets other underlay,,ground mesh buildings streets other underlay,1,1
+95_40.glc,-2560,256,ground mesh buildings streets other decks underlay,,ground mesh buildings streets other decks underlay,3,3
+95_41.glc,-2560,512,ground mesh buildings streets other,,ground mesh buildings streets other,3,0
+95_42.glc,-2560,768,ground streets other underlay,,ground streets other underlay,1,1
+95_43.glc,-2560,1024,ground streets other underlay,,ground streets other underlay,1,1
+95_44.glc,-2560,1280,streets,,streets,0,0
+96_28.glc,-2304,-2816,streets,,streets,0,0
+96_37.glc,-2304,-512,streets,,streets,0,0
+96_38.glc,-2304,-256,ground streets underlay,,ground streets underlay,1,1
+96_39.glc,-2304,0,ground water mesh buildings streets decks underlay,ground water streets underlay,ground mesh buildings streets decks underlay,1,1
+96_40.glc,-2304,256,ground streets,,ground streets,2,0
+96_41.glc,-2304,512,ground streets,,ground streets,2,0
+96_42.glc,-2304,768,ground streets underlay,,ground streets underlay,1,1
+96_43.glc,-2304,1024,streets,,streets,0,0
+96_44.glc,-2304,1280,streets,,streets,0,0
+98_29.glc,-1792,-2560,streets,,streets,0,0
+99_28.glc,-1536,-2816,streets,,streets,0,0
+99_29.glc,-1536,-2560,streets,,streets,0,0
+99_39.glc,-1536,0,streets,streets,,0,0
+104_32.glc,-256,-1792,ground water underlay,ground water underlay,,0,0

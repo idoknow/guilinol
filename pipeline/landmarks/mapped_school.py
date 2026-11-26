@@ -14,17 +14,21 @@ from features import area, overture_geometry, polygons
 
 
 @cache
-def sources():
-    osm = {f"{e['type']}/{e['id']}": e for e in load_osm()}
-    with (Path(RAW) / 'overture_buildings.csv').open() as source:
-        overture = {row['id']: row for row in csv.DictReader(source, delimiter='\t')}
+def sources(model):
+    osm = {f"{e['type']}/{e['id']}": e for e in load_osm(model)}
+    if Path(RAW).exists():
+        with (Path(RAW) / 'overture_buildings.csv').open() as source:
+            overture = {row['id']: row for row in csv.DictReader(source, delimiter='\t')}
+    else:
+        path = Path(__file__).resolve().parents[1]/'data/landmarks'/f'{model}.json'
+        overture = {row['id']: row for row in json.loads(path.read_bytes())['overture']}
     entries = json.loads(Path(__file__).resolve().parents[1].joinpath('landmarks.json').read_text())
     return osm, overture, {e['id']: e for e in entries}
 
 
 @cache
 def layout(module):
-    osm, overture, entries = sources()
+    osm, overture, entries = sources(module.SCHOOL)
     origin = area(osm[entries[module.SCHOOL]['anchor']]).centroid
 
     def local(shape):

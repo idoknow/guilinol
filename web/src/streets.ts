@@ -1,6 +1,6 @@
 import * as THREE from 'three'
 import {nightStreets} from './look/night'
-import {tileMaterial} from './look/tiles'
+import {tileMaterial,wireFenceMaterial} from './look/tiles'
 import {look} from './look/config'
 
 export function bindStreetSurface(geometry:THREE.BufferGeometry,role:string){
@@ -15,6 +15,9 @@ export function bindStreetSurface(geometry:THREE.BufferGeometry,role:string){
 }
 
 export const streetSurfaceMat=new THREE.MeshStandardMaterial({
+  vertexColors:true,side:THREE.DoubleSide,polygonOffset:true,polygonOffsetFactor:-2,polygonOffsetUnits:-4,
+})
+export const streetFenceMat=new THREE.MeshStandardMaterial({
   vertexColors:true,side:THREE.DoubleSide,polygonOffset:true,polygonOffsetFactor:-2,polygonOffsetUnits:-4,
 })
 export const streetFurnitureGeo=new THREE.BoxGeometry()
@@ -45,3 +48,4 @@ streetFurnitureMat.onBeforeCompile=function(shader,renderer){
 streetFurnitureMat.customProgramCacheKey=()=>'street-furniture-night-slogan'
 
 tileMaterial(streetSurfaceMat,false)
+wireFenceMaterial(streetFenceMat)

@@ -9,9 +9,11 @@ import {setRoster,clearRoster,type RosterPlayer} from './mp-roster'
 function publish(detail:MpStatus){window.dispatchEvent(new CustomEvent('glol:mp-status',{detail}))}
 
 type State='connecting'|'online'|'offline'|'replaced'
-export function attachNet(scene:Scene,clips:AnimationClip[],getPose:()=>Pose,getAvatar:()=>Avatar,camera:Camera) {
+export type ActivityReport={act:string;detail?:string}
+export function attachNet(scene:Scene,clips:AnimationClip[],getPose:()=>Pose,getAvatar:()=>Avatar,camera:Camera,getActivity?:()=>ActivityReport) {
   const peers=players(scene,clips,camera)
-  let socket:WebSocket|undefined,attempt=0,generation=0,timer=0,lastSent=-Infinity,lastRoster=-Infinity,disposed=false
+  let socket:WebSocket|undefined,attempt=0,generation=0,timer=0,lastSent=-Infinity,lastRoster=-Infinity,lastActCheck=-Infinity,disposed=false
+  let lastActKey=''
   let state:State='offline',online=0
   // AOI 之后 peers 只有身边 ~150m 的人；整座城的人来自服务端每 5s 一次的 roster（只有位置，没有朝向）
   let myId='',far=new Map<string,RosterPlayer>()
@@ -55,7 +57,7 @@ export function attachNet(scene:Scene,clips:AnimationClip[],getPose:()=>Pose,get
       const previous=socket
       if(previous){previous.onopen=previous.onmessage=previous.onclose=previous.onerror=null;try{previous.close(1000,'replace')}catch{}}
       const ws=new WebSocket(endpoint);socket=ws
-      ws.onopen=()=>{if(version===generation)send({t:'join',ticket,avatar:getAvatar(),...getPose()})}
+      ws.onopen=()=>{if(version===generation){const initial=getActivity?.();lastActKey=initial?`${initial.act}|${initial.detail??''}`:'';send({t:'join',ticket,avatar:getAvatar(),caps:['roster2'],...(initial?{act:initial.act,actDetail:initial.detail}:{}),...getPose()})}}
       ws.onmessage=event=>{
         if(version!==generation)return
         const msg=JSON.parse(event.data)
@@ -73,6 +75,15 @@ export function attachNet(scene:Scene,clips:AnimationClip[],getPose:()=>Pose,get
             attempt=0;update('online',msg.online);break
           case 'online':update('online',msg.online);break
           case 'roster':far=new Map();for(const [id,name,x,z,joinedAt] of msg.players as [string,string,number,number,number][])if(id!==myId)far.set(id,{id,name,x,z,yaw:0,v:0,bike:false,joinedAt,far:true});lastRoster=-Infinity;break
+          // 增量名册：只发新增/离开/移动≥2m 的人，每 30s 一次全量对账（服务端保证）
+          case 'roster2':{
+            if(msg.full){far=new Map();for(const [id,name,x,z,joinedAt] of msg.full as [string,string,number,number,number][])if(id!==myId)far.set(id,{id,name,x,z,yaw:0,v:0,bike:false,joinedAt,far:true})}
+            else{
+              for(const id of (msg.del??[]) as string[])far.delete(id)
+              for(const [id,name,x,z] of (msg.add??[]) as [string,string,number,number][])if(id!==myId)far.set(id,{id,name,x,z,yaw:0,v:0,bike:false,far:true})
+              for(const [id,x,z] of (msg.up??[]) as [string,number,number][]){const p=far.get(id);if(p){p.x=x;p.z=z}}
+            }
+            lastRoster=-Infinity;break}
           case 'join':peers.add(msg.player);break
           case 'leave':peers.remove(msg.id);break
           case 'pos':peers.move(msg.id,msg);break
@@ -101,7 +112,14 @@ export function attachNet(scene:Scene,clips:AnimationClip[],getPose:()=>Pose,get
   function stop(){generation++;clearTimeout(timer);socket?.close(1000,'stop');socket=undefined;peers.clear();update('offline')}
   function avatarChanged(){if(state==='online')send({t:'avatar',avatar:getAvatar()})}
   function tick(dt:number){if(state!=='online')return
-    flushEmote();const pose=getPose(),now=performance.now();if(now-lastSent>=50){lastSent=now;send({t:'pos',...pose})}peers.tick(dt,pose)
+    flushEmote();const pose=getPose(),now=performance.now();if(now-lastSent>=50){lastSent=now;send({t:'pos',...pose})}
+    if(getActivity&&now-lastActCheck>=500){
+      lastActCheck=now
+      const next=getActivity()
+      const key=`${next.act}|${next.detail??''}`
+      if(key!==lastActKey){lastActKey=key;send({t:'act',act:next.act,detail:next.detail??''})}
+    }
+    peers.tick(dt,pose)
     if(now-lastRoster>=300){lastRoster=now;setRoster({me:{x:pose.x,z:pose.z,yaw:pose.yaw},at:now,players:mergeRoster()})}}
   function mergeRoster(){const live=peers.list().map(p=>({id:p.id,uid:p.uid,name:p.name,x:p.x,z:p.z,yaw:p.yaw,v:p.v,bike:!!p.bike,joinedAt:p.jt}))
     const seen=new Set(live.map(p=>p.id));return [...live,...[...far.values()].filter(p=>!seen.has(p.id))]}

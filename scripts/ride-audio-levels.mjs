@@ -7,7 +7,7 @@ import {chromium} from 'playwright'
 import {browserOptions} from './qa-browser.mjs'
 
 const entry=process.argv.slice(2).find(arg=>!arg.startsWith('--'))??'web/src/walk/ebike-audio.ts'
-const bundle=await build({entryPoints:[entry],bundle:true,write:false,format:'iife',globalName:'RideAudio',target:'es2020'})
+const bundle=await build({stdin:{contents:`export * from ${JSON.stringify('./'+entry)};export {prepareCityAudioDuringLoad} from './web/src/city-audio'`,resolveDir:process.cwd()},bundle:true,write:false,format:'iife',globalName:'RideAudio',target:'es2020'})
 const code=bundle.outputFiles[0].text+';window.RideAudio=RideAudio'
 
 const SR=48000
@@ -35,13 +35,16 @@ try{
       class Fake extends OfflineAudioContext{
         constructor(){super(1,Math.round(SR*seconds),SR);ctx=this}
         get state(){return 'running'}
+        suspend(){return Promise.resolve()}
         resume(){return Promise.resolve()}
         close(){return Promise.resolve()}
       }
       window.AudioContext=Fake
       new Function(code)()
+      await window.RideAudio.prepareCityAudioDuringLoad()
       const engine=window.RideAudio.createEbikeAudioEngine()
       if(engine.muted)engine.setMuted(false)
+      await engine.prepare()
       engine.unlock()
       const base={active:true,rideKind:'bike',braking:false,parked:false,leanRisk:0,dt:1/60}
       if(run==='cruise')engine.updateContinuous({...base,speed:25/3.6,throttle:.5})

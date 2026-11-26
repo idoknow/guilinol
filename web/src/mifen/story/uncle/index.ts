@@ -1,4 +1,6 @@
 import * as THREE from 'three'
+import {mainDetail} from '../../../look/mirror-layer'
+import {shareAtmosphere} from '../../../look/atmosphere'
 import {
   getUnclePortraitUrl,
   PLAYER_PORTRAIT,
@@ -228,6 +230,14 @@ export function createUncleNpc(opts: UncleNpcOptions = {}): UncleNpcController {
       side: THREE.DoubleSide,
     }),
   )
+  bodyMasterMat.onBeforeCompile = shader => {
+    shareAtmosphere(shader)
+    shader.fragmentShader = shader.fragmentShader.replace(
+      '#include <emissivemap_fragment>',
+      '#include <emissivemap_fragment>\n#ifdef USE_COLOR\ntotalEmissiveRadiance *= vColor.rgb;\n#endif',
+    )
+  }
+  bodyMasterMat.customProgramCacheKey = () => 'guilinol-mifen-vc-emissive'
   const litMats: Array<{mat: THREE.MeshStandardMaterial; base: number; nightBoost: number}> = [
     {mat: bodyMasterMat, base: 0.02, nightBoost: 0.2},
   ]
@@ -287,8 +297,6 @@ export function createUncleNpc(opts: UncleNpcOptions = {}): UncleNpcController {
 
   const group = new THREE.Group()
   group.name = 'tianyuan.uncle-npc'
-  const camWorld = new THREE.Vector3()
-  const camSeen = false
 
   // 身体根节点（呼吸律动）
   const bodyPivot = new THREE.Group()
@@ -667,6 +675,7 @@ export function createUncleNpc(opts: UncleNpcOptions = {}): UncleNpcController {
   group.add(markerPivot)
 
   if (opts.scene) opts.scene.add(group)
+  mainDetail(group)
 
   // 运行时状态
   let markerMode: UncleMarkerMode = 'new'
@@ -785,9 +794,6 @@ export function createUncleNpc(opts: UncleNpcOptions = {}): UncleNpcController {
       let hasLookTarget = false
       if (playerPos) {
         tmpWorldPos.set(playerPos.x, playerPos.y ?? group.position.y + 1.56, playerPos.z)
-        hasLookTarget = true
-      } else if (camSeen) {
-        tmpWorldPos.copy(camWorld)
         hasLookTarget = true
       }
       if (hasLookTarget) {

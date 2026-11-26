@@ -3,6 +3,7 @@ import './mifen-ui.css'
 import rawRecipes from './recipes.json'
 import type { MifenRecipesData, ShopLevel, StationKey, TianyuanShopBuildResult } from './types'
 import { buildTianyuanShopMesh, TIANYUAN_SITE } from './shop-mesh'
+import {mainDetail} from '../look/mirror-layer'
 import { computeShopBonuses, createMifenStore, formatMoney, formatRecipeTitle, type MifenSaveState } from './state'
 import {
   COOKING_STATION_LABELS,
@@ -219,6 +220,7 @@ export function mountTianyuanMifen(ctx: MifenMountContext): MifenController {
   let hudRefreshTimer = 0
   let nearShop = false
   let nearUncle = false
+  let detailVisible = false
   let lastPlayerDistance = Infinity
   let nearestStation: StationKey | null = null
   let lastCookReason: string | null = null
@@ -279,6 +281,7 @@ export function mountTianyuanMifen(ctx: MifenMountContext): MifenController {
   shop = buildTianyuanShopMesh(store.getState().shopLevel)
   placeShopGroup(shop)
   ctx.scene.add(shop.group)
+  mainDetail(shop.group)
   let coords = makeCoordAdapter(shop)
 
   const uncle = createUncleNpc({ scene: ctx.scene })
@@ -502,7 +505,9 @@ export function mountTianyuanMifen(ctx: MifenMountContext): MifenController {
 
     shop = buildTianyuanShopMesh(nextLevel)
     placeShopGroup(shop)
+    shop.setDetailVisible?.(detailVisible)
     ctx.scene.add(shop.group)
+    mainDetail(shop.group)
     coords = makeCoordAdapter(shop)
     placeUncleNpc()
     customers.onShopChanged(shop, coords)
@@ -568,10 +573,15 @@ export function mountTianyuanMifen(ctx: MifenMountContext): MifenController {
 
   let indoorAutoFirstPerson = false
   let lastPlayerZone: 'outside' | 'front' | 'kitchen' = 'outside'
+  let lastIndoorFlag = ''
 
   function syncIndoorCameraMode(zone: 'outside' | 'front' | 'kitchen'): void {
     const inside = zone === 'front' || zone === 'kitchen'
-    document.body.dataset.mifenIndoor = inside ? '1' : '0'
+    const nextFlag = inside ? '1' : '0'
+    if (lastIndoorFlag !== nextFlag) {
+      lastIndoorFlag = nextFlag
+      document.body.dataset.mifenIndoor = nextFlag
+    }
     if (inside && lastPlayerZone === 'outside') {
       if (!isFirstPerson()) {
         indoorAutoFirstPerson = true
@@ -1304,12 +1314,14 @@ export function mountTianyuanMifen(ctx: MifenMountContext): MifenController {
       const shopCenter = shop.group.position
       lastPlayerDistance = Math.hypot(refPos.x - shopCenter.x, refPos.z - shopCenter.z)
 
-      // 距离门控 LOD：>165m 整店隐藏跳过步进；38~165m 只留建筑外观、藏室内动态件与表叔；<=38m 全量渲染
+      // 距离门控 LOD：>165m 整店隐藏跳过步进；35~165m 只留建筑外立面与门面、藏室内道具/表叔/顾客；<=35m（38m 滞回）全量渲染
       const showShell = lastPlayerDistance <= 165
-      const showDetail = lastPlayerDistance <= 38 || director.isActive()
+      const showDetail = director.isActive() || (detailVisible ? lastPlayerDistance <= 38 : lastPlayerDistance <= 35)
+      detailVisible = showDetail
       if (shop.group.visible !== showShell) shop.group.visible = showShell
       shop.setDetailVisible?.(showDetail)
       if (uncle.group.visible !== showDetail) uncle.group.visible = showDetail
+      customers.setVisible(showDetail)
       if (!showShell) {
         if (nearShop || nearUncle || nearestStation !== null) {
           nearShop = false
@@ -1394,6 +1406,8 @@ export function mountTianyuanMifen(ctx: MifenMountContext): MifenController {
         uncle.step(safeDt, elapsedTime, night, playerPos)
         economyHud.step(safeDt, cooking.getActiveOrder()?.ticketId ?? null)
         customers.step(safeDt, nearShop, ctx.camera.position)
+      } else {
+        shop.updateNight?.(night, elapsedTime)
       }
 
       hudRefreshTimer += safeDt

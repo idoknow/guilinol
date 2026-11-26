@@ -55,10 +55,10 @@
 import {flatDistance,inEmoteRange,acceptEmote} from './emote.mjs'
 import {createServer} from 'node:http'
 import {createHmac,timingSafeEqual} from 'node:crypto'
-import {isIP} from 'node:net'
 import {WebSocketServer} from 'ws'
 import * as obs from './observability.mjs'
 import {createChat} from './chat.mjs'
+import {resolveClientIp} from './client-ip.mjs'
 
 const PORT = Number(process.env.PORT || 8790)
 // 单进程 Node 只能用 1 核：AOI 压测 300 人密集场景已接近 1 核，先按 300 封顶（IDOK-224）
@@ -158,42 +158,62 @@ function cleanName(value) {
   return cleaned || '游客'
 }
 
-/** 反代场景取 x-forwarded-for 第一跳，但只接受合法 IP 字面量；客户端乱写头就退回 socket 地址 */
+const VALID_ACTIVITIES = new Set(['walk', 'idle', 'ebike', 'bicycle', 'car', 'boat', 'fishing', 'mifen', 'drone', 'photo', 'shop', 'mission', 'smoke'])
+const TRACKED_GAMEPLAY = new Set(['ebike', 'bicycle', 'car', 'boat', 'fishing', 'mifen', 'drone', 'photo', 'shop', 'mission', 'smoke'])
+function cleanDetail(value) {
+  return typeof value === 'string'
+    ? value.replace(/[\u0000-\u001f\u007f-\u009f\u200b-\u200f\u2028\u2029]/g, '').trim().slice(0, 48)
+    : ''
+}
+function setActivity(p, nextAct, nextDetail = '', at = now()) {
+  if (!VALID_ACTIVITIES.has(nextAct)) return
+  const detail = cleanDetail(nextDetail)
+  const prevAct = p.activity || 'walk'
+  const prevDetail = p.activityDetail || ''
+  if (prevAct === nextAct && prevDetail === detail) return
+  const durSec = Math.max(0, Math.round((at - (p.activitySince || p.joinedAt || at)) / 1000))
+  if (prevAct && durSec > 0) {
+    p.activityTotals[prevAct] = (p.activityTotals[prevAct] ?? 0) + durSec
+  }
+  p.activity = nextAct
+  p.activityDetail = detail
+  p.activitySince = at
+  if (prevAct !== nextAct) {
+    // 结束一个专项玩法（且持续 >= 5 秒）时落一条带时长的结束记录，方便回看该账号刚玩了多久
+    if (TRACKED_GAMEPLAY.has(prevAct) && durSec >= 5) {
+      obs.activity(p, { kind: 'activity_end', activity: prevAct, detail: prevDetail, durationSec: durSec, ts: at })
+    }
+    // 跳过 walk <-> idle 频繁抖动，仅在切到专项玩法或显著变化时记入开始记录
+    const quietBounce = (prevAct === 'walk' && nextAct === 'idle') || (prevAct === 'idle' && nextAct === 'walk')
+    if (!quietBounce) {
+      obs.activity(p, { kind: 'activity', activity: nextAct, detail, ts: at })
+    }
+  } else if (TRACKED_GAMEPLAY.has(nextAct) && detail && detail !== prevDetail) {
+    obs.activity(p, { kind: 'activity', activity: nextAct, detail, ts: at })
+  }
+}
+
 /**
- * 取真实客户端 IP。
+ * 取真实客户端 IP 与 CDN 节点 IP。
  *
- * 线上拓扑是 CDN 节点 → Traefik → rt，而 Traefik 不信任上游的 X-Forwarded-For，
- * 会用「直连对端地址」（也就是 CDN 节点 IP）覆盖它。所以不能只信 XFF 第一个值：
- * 优先级按「离客户端最近、且中间层不会伪改」的顺序来，再退回 socket 地址。
- *
- * 注意：这些头只在 CDN 能覆盖写入时才可信。有人绕过 CDN 直连源站时能伪造成本很低的值，
- * 因此这里的结果只用于限流 / 统计 / 日志，不能当鉴权依据。
+ * 线上拓扑是 CDN 节点 → Traefik/nginx → rt，只有直连对端属于可信代理（内网/回环或 TRUSTED_PROXIES）
+ * 时才采信转发头，且头里的值必须通过合法 IP 字面量校验，不合法则回退到 socket 地址。
  */
-function clientIp(req) {
-  const header = (name) => {
-    const value = req.headers[name]
-    return typeof value === 'string' ? value.split(',')[0].trim() : ''
-  }
-  for (const name of ['cf-connecting-ip', 'x-real-ip', 'x-client-ip', 'true-client-ip']) {
-    const value = header(name)
-    if (isIP(value)) return value
-  }
-  const forwarded = header('x-forwarded-for')
-  if (isIP(forwarded)) return forwarded
-  return req.socket.remoteAddress || 'unknown'
+function clientIpInfo(req) {
+  return resolveClientIp(req.headers, req.socket.remoteAddress || '')
 }
 
 // 排障用：一段时间打一条「这次连接命中了哪个头」，确认 CDN 到底传了什么
 let ipDebugAt = 0
-function ipDebug(req, ip) {
-  if (!process.env.RT_IP_DEBUG) return
+function ipDebug(req, info) {
+  if (process.env.RT_IP_DEBUG !== '1') return
   const at = now()
   if (at - ipDebugAt < 5000) return
   ipDebugAt = at
   const names = ['cf-connecting-ip', 'x-real-ip', 'x-client-ip', 'true-client-ip', 'x-forwarded-for', 'forwarded']
   const seen = {}
   for (const name of names) if (req.headers[name] !== undefined) seen[name] = String(req.headers[name]).slice(0, 120)
-  console.log(JSON.stringify({ scope: 'rt-ip', ip, socket: req.socket.remoteAddress, headers: seen }))
+  console.log(JSON.stringify({ scope: 'rt-ip', ip: info.clientIp, nodeIp: info.nodeIp, trusted: info.trusted, socket: req.socket.remoteAddress, headers: seen }))
 }
 
 /** 每次 join 顺手清掉过期封禁，不起 setInterval（避免泄漏） */
@@ -398,6 +418,10 @@ function aoiSend(p, payload) {
  */
 function removePlayer(p, extra = {}) {
   if (!p || !players.has(p.id)) return false
+  const at = now()
+  const finalTotals = obs.liveTotals(p, at)
+  p.activityTotals = finalTotals
+  p.activitySince = at
   gridDel(p)
   for (const peerId of [...p.visible]) {
     const peer = players.get(peerId)
@@ -406,7 +430,14 @@ function removePlayer(p, extra = {}) {
   p.visible.clear()
   p.farSent.clear()
   players.delete(p.id)
-  obs.event('leave', p, extra)
+  obs.event('leave', p, { ...extra, activityTotals: finalTotals })
+  obs.activity(p, {
+    kind: 'leave',
+    activity: p.activity ?? null,
+    detail: extra?.reason ? String(extra.reason) : '',
+    durationSec: p.joinedAt ? Math.floor((at - p.joinedAt) / 1000) : null,
+    ts: at,
+  })
   broadcast({ t: 'online', online: players.size })
   return true
 }
@@ -415,6 +446,30 @@ function rosterPayload() {
   const list = []
   for (const p of players.values()) list.push([p.id, p.name, Math.round(p.x), Math.round(p.z), p.joinedAt])
   return { t: 'roster', players: list }
+}
+
+// ── 名册增量（roster2）──────────────────────────────────────────────
+// 全量名册的带宽是 O(n²)：每人每 5 秒收一次全城名单，1000 人时约 76 Mbps。
+// 支持 caps:['roster2'] 的客户端改为收增量（只发新增/离开/移动≥2m 的人），
+// 每 RT_ROSTER_FULL_MS 强制一次全量对账，防止长期漂移。
+// 老客户端仍然收全量 roster，行为完全不变。
+const ROSTER_FULL_MS = Number(process.env.RT_ROSTER_FULL_MS || 30000)
+let rosterSnap = new Map()   // id -> {x, z, name}
+let rosterFullAt = Date.now()
+
+function rosterDelta() {
+  const add = [], up = [], del = []
+  const next = new Map()
+  for (const p of players.values()) {
+    const x = Math.round(p.x), z = Math.round(p.z)
+    const prev = rosterSnap.get(p.id)
+    next.set(p.id, { x, z, name: p.name })
+    if (!prev || prev.name !== p.name) add.push([p.id, p.name, x, z])
+    else if (Math.abs(prev.x - x) + Math.abs(prev.z - z) >= 2) up.push([p.id, x, z])
+  }
+  for (const id of rosterSnap.keys()) if (!next.has(id)) del.push(id)
+  rosterSnap = next
+  return { t: 'roster2', total: next.size, add, up, del }
 }
 
 function publicOf(p,viewer=p) {
@@ -501,7 +556,7 @@ const server = createServer(async(req, res) => {
           if(minutes!==undefined&&(!Number.isInteger(minutes)||minutes<1||minutes>10080)){res.writeHead(400);res.end('{}');return}
           bans.set(uid, {until: now() + (minutes===undefined?KICK_BAN_SECONDS:minutes*60) * 1000, reason})
           const target=[...players.values()].find(p=>p.uid===uid)
-          obs.event('kick',target??{uid},{reason});if(target)target.kickReason=reason
+          obs.event('kick',target??{uid},{reason});obs.activity(target??{uid,name:''},{kind:'kick',detail:reason});if(target)target.kickReason=reason
           let kicked = 0
           for (const p of players.values()) {
             if (p.uid !== uid) continue
@@ -538,9 +593,12 @@ const wss = new WebSocketServer({server, path: '/ws', maxPayload: 4096})
 
 wss.on('connection', (ws, req) => {
   let ip = 'unknown'
+  let nodeIp = null
   try {
-    ip = clientIp(req)
-    ipDebug(req, ip)
+    const ipInfo = clientIpInfo(req)
+    ip = ipInfo.clientIp
+    nodeIp = ipInfo.nodeIp
+    ipDebug(req, ipInfo)
     // 容量按「所有连接」算：只数 players 的话，握完手不 join 就能无限占连接
     if (sockets.size >= MAX_PLAYERS) {
       console.warn(JSON.stringify({scope:'rt-reject',reason:'full',ip,players:players.size,sockets:sockets.size}))
@@ -610,7 +668,7 @@ wss.on('connection', (ws, req) => {
       else ipCounts.delete(ip)
     }
     // 关闭原因必须留痕：线上「联机不稳定」时，没有这行就只能靠猜是超时、满员还是顶号
-    if (joined) console.log(JSON.stringify({scope:'rt-close',code:code??null,reason:String(reason??''),ip,uid:players.get(pid)?.uid??null,players:players.size}))
+    if (joined) console.log(JSON.stringify({scope:'rt-close',code:code??null,reason:String(reason??''),ip,nodeIp,uid:players.get(pid)?.uid??null,players:players.size}))
     if (joined) {
       const player=players.get(pid)
       // 竞态：旧 socket 的 close 晚到（新 socket 已经续连上了）——绝不能把活着的会话判死
@@ -651,6 +709,8 @@ wss.on('connection', (ws, req) => {
         }
         // 顺手清掉过期封禁，不起 setInterval（避免泄漏）
         sweepBans()
+        // 客户端能力位：支持增量名册的客户端才收 roster2，老客户端继续收全量
+        ws.roster2 = Array.isArray(msg.caps) && msg.caps.includes('roster2')
         const claims = identity(msg.ticket)
         if (!claims) { obs.reject('ticket');ws.rejected = true; ws.close(4003, 'ticket rejected'); return }
         const uid = claims.uid
@@ -678,6 +738,7 @@ wss.on('connection', (ws, req) => {
             delete p.dead
             delete p.deadAt
             p.ip = ip
+            p.nodeIp = nodeIp
             p.ua = clampStr(req.headers['user-agent'], 200)
             p.lastPos = 0            // 新连接的第一条 pos 不能被 MIN_POS_GAP_MS 挡掉
             ws.joined = true
@@ -721,8 +782,13 @@ wss.on('connection', (ws, req) => {
           try { previous.ws.close(4001, 'replaced') } catch { /* 忽略 */ }
           console.log(JSON.stringify({scope: 'rt-replace', uid, oldId: previous.id, newId: id}))
         }
+        const initAct = VALID_ACTIVITIES.has(msg.act) ? msg.act : 'walk'
+        const initDetail = cleanDetail(msg.actDetail)
+        const joinedAt = now()
         const player = {
-          joinedAt:now(),ip,ua:clampStr(req.headers['user-agent'],200),positions:[],chats:0,
+          joinedAt,ip,nodeIp,ua:clampStr(req.headers['user-agent'],200),positions:[],chats:0,
+          activity: initAct, activityDetail: initDetail, activitySince: joinedAt, activityTotals: {},
+          activityExplicit: VALID_ACTIVITIES.has(msg.act), lastMoveAt: joinedAt, lastActAt: 0,
           id,
           ws,
           uid,
@@ -798,8 +864,19 @@ wss.on('connection', (ws, req) => {
 
       if (msg.t === 'emote') {
         if (!acceptEmote(me,msg,now())) return
+        obs.activity(me,{kind:'emote',activity:me.activity,detail:`表情 #${me.em}`})
         const packet=JSON.stringify({t:'emote',from:me.id,id:me.em,s:me.es})
         for(const peerId of me.visible){const peer=players.get(peerId);if(peer&&inEmoteRange(peer,me))sendSlowAware(peer.ws,packet,'emote')}
+        return
+      }
+
+      if (msg.t === 'act') {
+        const at = now()
+        if (!VALID_ACTIVITIES.has(msg.act)) return
+        if (at - (me.lastActAt || 0) < 200) return
+        me.lastActAt = at
+        me.activityExplicit = true
+        setActivity(me, msg.act, msg.detail, at)
         return
       }
 
@@ -829,13 +906,18 @@ wss.on('connection', (ws, req) => {
         me.gr = clampNum(msg.gr, 0, 1, 1)
         // 血量：出手方靠它看到自己打掉了多少，被打的人也靠它对齐屏幕上的血条
         me.hp = clampInt(msg.hp, 0, 100, 100)
-        me.sc = clampInt(msg.sc, 0, 8)
+        me.sc = clampInt(msg.sc, 0, 9)
         me.sb = clampInt(msg.sb, 0, 1800)
         me.sp = clampInt(msg.sp, 0, 999)
         me.sr = clampInt(msg.sr, 0, 20, 20)
         me.sd = clampInt(msg.sd, 0, 999)
         me.ss = clampInt(msg.ss, 1, 2, 1)
-        me.br = clampInt(msg.br, 0, 5)
+        me.br = clampInt(msg.br, 0, 11)
+        if (me.v > 0.12) me.lastMoveAt = at
+        if (!me.activityExplicit) {
+          const inferred = me.bike || me.hb ? 'ebike' : me.sc > 0 ? 'smoke' : me.v > 0.12 ? 'walk' : (at - (me.lastMoveAt || me.joinedAt) > 15000 ? 'idle' : me.activity)
+          setActivity(me, inferred, '', at)
+        }
         aoiMove(me)
         aoiSend(me, {
           t: 'pos', id: me.id,
@@ -878,6 +960,7 @@ wss.on('connection', (ws, req) => {
         const avatar = sanitizeAvatar(msg.avatar)
         if (!avatar) return
         me.avatar = avatar
+        obs.activity(me,{kind:'avatar',activity:me.activity,detail:avatar.look})
         for (const peerId of me.visible) { const peer = players.get(peerId); if (peer) sendSlowAware(peer.ws, JSON.stringify({t:'avatar',id:me.id,avatar}), 'avatar') }
         return
       }
@@ -909,12 +992,22 @@ setInterval(() => {
   broadcast({t: 'online', online: players.size})
 }, TICK_MS)
 
-// 全服低频名册（地图 / 同城名册用）：只 stringify 一次，同一个字符串发给所有人
+// 全服低频名册：老客户端收全量（行为不变），支持 roster2 的客户端收增量
 setInterval(() => {
   if (!players.size) return
-  const text = JSON.stringify(rosterPayload())
-  const size = Buffer.byteLength(text)
-  for (const p of players.values()) sendSlowAware(p.ws, text, 'roster', size)
+  const full = rosterPayload()
+  const fullText = JSON.stringify(full)
+  const fullSize = Buffer.byteLength(fullText)
+  const wantsFull = Date.now() - rosterFullAt >= ROSTER_FULL_MS
+  const delta = rosterDelta()
+  const payload = wantsFull ? { t: 'roster2', total: delta.total, full: full.players } : delta
+  const deltaText = JSON.stringify(payload)
+  const deltaSize = Buffer.byteLength(deltaText)
+  if (wantsFull) rosterFullAt = Date.now()
+  for (const p of players.values()) {
+    if (p.ws && p.ws.roster2) sendSlowAware(p.ws, deltaText, 'roster', deltaSize)
+    else sendSlowAware(p.ws, fullText, 'roster', fullSize)
+  }
 }, ROSTER_MS)
 
 // 每 30s 一条 rt-stats：线上判断「单核是否顶满」看 loopP99Ms，> 50ms 玩家就能感到卡

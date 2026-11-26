@@ -16,7 +16,7 @@ from common import ll2xz,load_osm
 
 def mall(model):
     model.surface = landmark_surface('wangcheng_mall')
-    way = next(item for item in load_osm() if item['type']=='way' and item['id']==264901525)
+    way = next(item for item in load_osm('wangcheng_mall') if item['type']=='way' and item['id']==264901525)
     footprint = np.array([ll2xz(v['lat'],v['lon']) for v in way['geometry'][:-1]])
     origin = np.array(Polygon(footprint).centroid.coords[0])
     footprint -= origin

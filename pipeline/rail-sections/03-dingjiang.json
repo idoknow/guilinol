@@ -1,0 +1,17 @@
+{
+  "cutHighTerrain": true,
+  "referenceRail": 375923389,
+  "railTies": {
+    "375923389": [2935.21260, 3499.21260],
+    "375923385": [1236.0, 672.0]
+  },
+  "maximumGrade": 0.012,
+  "railControls": [
+    [2960, 163.05],
+    [3380, 158.04],
+    [3455, 157.16],
+    [3476, 157.16]
+  ],
+  "expectedRoadRailCrossings": 0,
+  "roads": []
+}

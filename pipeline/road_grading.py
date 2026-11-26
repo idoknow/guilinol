@@ -11,12 +11,12 @@ from statistics import median
 import numpy as np
 from scipy.spatial import cKDTree
 from scipy.ndimage import distance_transform_edt, gaussian_filter, maximum_filter
-from scipy.sparse import coo_matrix, csr_matrix
+from scipy.sparse import csr_matrix
 from scipy.sparse.linalg import spsolve
 from concurrent.futures import ThreadPoolExecutor
 import hashlib
 import tempfile
-from shapely import STRtree, intersects_xy
+from shapely import STRtree, get_x, get_y, intersects_xy
 from shapely.geometry import LineString, Point, Polygon
 from shapely.ops import unary_union
 
@@ -58,71 +58,77 @@ def eval_bspline_grid(ctrl: np.ndarray, left: float, top: float, xs: np.ndarray,
     return out
 
 
-def _add_eval_rows(rows_l, cols_l, vals_l, rhs_l, row_cursor: int,
-                   gw: int, gh: int, left: float, top: float,
-                   xs: np.ndarray, zs: np.ndarray, targets: np.ndarray, weights: np.ndarray) -> int:
-    n = len(xs)
-    if not n:
-        return row_cursor
-    u = (xs - left) / STEP + 1.0
-    v = (zs - top) / STEP + 1.0
-    ic = np.clip(np.floor(u).astype(np.int32), 1, gw - 3)
-    ir = np.clip(np.floor(v).astype(np.int32), 1, gh - 3)
-    tu = np.clip(u - ic, 0.0, 1.0)
-    tv = np.clip(v - ir, 0.0, 1.0)
-    wu = bspline_weights_1d(tu)
-    wv = bspline_weights_1d(tv)
-    r_ids = np.arange(row_cursor, row_cursor + n, dtype=np.int32)
-    for dr in range(4):
-        r_idx = ir - 1 + dr
-        for dc in range(4):
-            c_idx = ic - 1 + dc
-            w = weights * wv[dr] * wu[dc]
-            rows_l.append(r_ids)
-            cols_l.append(r_idx * gw + c_idx)
-            vals_l.append(w)
-    rhs_l.append(weights * targets)
-    return row_cursor + n
+class RoadConstraints:
+    """Exact-size COO storage; each reservation is a consecutive group of equations."""
+
+    def __init__(self, row_count, entries):
+        if max(row_count, entries) > np.iinfo(np.int32).max:
+            raise ValueError('Road survey exceeds 32-bit sparse index capacity')
+        self.rows = np.empty(entries, np.int32)
+        self.cols = np.empty(entries, np.int32)
+        self.vals = np.empty(entries, np.float64)
+        self.rhs = np.zeros(row_count, np.float64)
+        self.row = self.entry = 0
+
+    def reserve(self, count, width):
+        rows = slice(self.row, self.row + count)
+        entries = slice(self.entry, self.entry + count * width)
+        self.row = rows.stop
+        self.entry = entries.stop
+        self.rows[entries].reshape(count, width)[:] = np.arange(rows.start, rows.stop, dtype=np.int32)[:, None]
+        return (self.cols[entries].reshape(count, width),
+                self.vals[entries].reshape(count, width), self.rhs[rows])
+
+    def finish(self, nodes):
+        if self.row != len(self.rhs) or self.entry != len(self.vals):
+            raise ValueError('Road survey count changed during assembly')
+        matrix = csr_matrix((self.vals, (self.rows, self.cols)), shape=(self.row, nodes))
+        del self.rows, self.cols, self.vals
+        return matrix
 
 
-def _add_diff_rows(rows_l, cols_l, vals_l, rhs_l, row_cursor: int,
-                   gw: int, gh: int, left: float, top: float,
-                   x1: np.ndarray, z1: np.ndarray, x2: np.ndarray, z2: np.ndarray,
-                   diff_targets: np.ndarray, weights: np.ndarray) -> int:
-    """Add weighted equations: S(x1, z1) - S(x2, z2) = diff_targets."""
-    n = len(x1)
-    if not n:
-        return row_cursor
-    r_ids = np.arange(row_cursor, row_cursor + n, dtype=np.int32)
-    for sign, xs, zs in ((1.0, x1, z1), (-1.0, x2, z2)):
+def _survey_rows(system, gw, gh, left, top, samples, targets, weights):
+    count = len(samples[0][0])
+    cols, vals, rhs = system.reserve(count, 16 * len(samples))
+    rhs[:] = weights * targets
+    for side, (xs, zs) in enumerate(samples):
         u = (xs - left) / STEP + 1.0
         v = (zs - top) / STEP + 1.0
         ic = np.clip(np.floor(u).astype(np.int32), 1, gw - 3)
         ir = np.clip(np.floor(v).astype(np.int32), 1, gh - 3)
-        tu = np.clip(u - ic, 0.0, 1.0)
-        tv = np.clip(v - ir, 0.0, 1.0)
-        wu = bspline_weights_1d(tu)
-        wv = bspline_weights_1d(tv)
+        wu = bspline_weights_1d(np.clip(u - ic, 0.0, 1.0))
+        wv = bspline_weights_1d(np.clip(v - ir, 0.0, 1.0))
         for dr in range(4):
-            r_idx = ir - 1 + dr
             for dc in range(4):
-                c_idx = ic - 1 + dc
-                rows_l.append(r_ids)
-                cols_l.append(r_idx * gw + c_idx)
-                vals_l.append(sign * weights * wv[dr] * wu[dc])
-    rhs_l.append(weights * diff_targets)
-    return row_cursor + n
+                slot = 16 * side + 4 * dr + dc
+                cols[:, slot] = (ir - 1 + dr) * np.int32(gw) + (ic - 1 + dc)
+                vals[:, slot] = (-weights if side else weights) * wv[dr] * wu[dc]
 
 
-def solve_city_spline(A, rhs, initial):
+def _grid_stencil(system, mask, active, gw, offsets, high, low, start=0):
+    """Write in original scanline order without allocating city-sized index grids."""
+    height, width = mask.shape
+    for first in range(0, height, 32):
+        band = mask[first:first + 32]
+        idx = (np.flatnonzero(band).astype(np.int32) if active
+               else np.arange(band.size, dtype=np.int32))
+        base = (first + idx // width) * np.int32(gw) + idx % width + start
+        weights = high if active else np.where(band.ravel(), high, low)
+        cols, vals, _ = system.reserve(len(idx), len(offsets))
+        for slot, (offset, coeff) in enumerate(offsets):
+            cols[:, slot] = base + offset
+            vals[:, slot] = weights * coeff
+
+
+def solve_city_spline(transposed, rhs, initial):
     """Overlapping Dirichlet subdomains on the same survey least-squares system."""
     height,width = initial.shape
     side,halo = 96,20   # 768 m core and 160 m of surrounding survey constraints
     tiles = [(r,c) for r in range(0,height,side) for c in range(0,width,side)]
-    transposed = A.T.tocsr()
+    design_view = transposed.T
     ctrl = initial.copy()
     for _ in range(4):
-        residual = rhs-A@ctrl.ravel()
+        residual = rhs-design_view@ctrl.ravel()
         correction = np.zeros_like(ctrl)
         def patch(tile):
             r,c = tile
@@ -155,7 +161,7 @@ def solve_road_spline(A, b_rhs, initial):
     # otherwise propagate through thousands of Lanczos iterations.
     A.sort_indices()
     x0 = np.round(initial.ravel(), 8)
-    A.data = np.round(A.data, 8)
+    np.round(A.data, 8, out=A.data)
     A.eliminate_zeros()
     if initial.size>1_000_000:
         directory = Path(__file__).resolve().parents[1]/'.world-cache'
@@ -163,10 +169,13 @@ def solve_road_spline(A, b_rhs, initial):
         digest = hashlib.sha256(Path(__file__).read_bytes())
         for array in (A.indptr,A.indices,A.data,b_rhs,initial):
             digest.update(np.ascontiguousarray(array).view(np.uint8))
+        del array
         path = directory/('spline-'+digest.hexdigest()+'.npy')
         if path.exists():
             return np.load(path,allow_pickle=False)
-        result = solve_city_spline(A,np.round(b_rhs,8),x0.reshape(initial.shape))
+        transposed = A.T.tocsr()
+        del A
+        result = solve_city_spline(transposed,np.round(b_rhs,8),x0.reshape(initial.shape))
         with tempfile.NamedTemporaryFile(dir=directory,delete=False) as out:
             np.save(out,result)
         Path(out.name).replace(path)
@@ -262,12 +271,15 @@ def solve_road_and_bridge_elevations(original_dm: np.ndarray, terrain_dm: np.nda
     shore_floor_dm = np.where((~wet) & (adj_water_dm != -32768), adj_water_dm + 3, -32768).astype('<i2')
 
     # Fill wet cells with smoothed dry terrain strictly for initial background DEM reference (never modifies wet!)
+    del adj_water_dm
     dry_m = original_dm.astype(np.float64) / 10.0
     if wet.any() and (~wet).any():
-        _, nearest_idx = distance_transform_edt(wet, return_indices=True)
+        nearest_idx = distance_transform_edt(wet, return_distances=False, return_indices=True)
         dry_filled = dry_m[nearest_idx[0], nearest_idx[1]]
+        del nearest_idx
     else:
-        dry_filled = dry_m.copy()
+        dry_filled = dry_m
+    del dry_m
     dem_smooth = gaussian_filter(dry_filled, sigma=2.5)
 
     def dem_at(x: float, z: float) -> float:
@@ -740,6 +752,7 @@ def solve_road_and_bridge_elevations(original_dm: np.ndarray, terrain_dm: np.nda
     r4_idx = np.clip(np.rint((gz_coords - top) / GRID).astype(int), 0, gh4 - 1)
     c4_idx = np.clip(np.rint((gx_coords - left) / GRID).astype(int), 0, gw4 - 1)
     bg_ctrl = dry_filled[np.ix_(r4_idx, c4_idx)]
+    del dry_filled
     smooth_bg_ctrl = dem_smooth[np.ix_(r4_idx, c4_idx)]
 
     rep_excl = getattr(layout, 'compound_polygons', getattr(layout, 'replace_exclude', layout.exclude))
@@ -758,7 +771,7 @@ def solve_road_and_bridge_elevations(original_dm: np.ndarray, terrain_dm: np.nda
             road_polys.append(cpa)
     u_roads = unary_union(road_polys) if road_polys else Polygon()
     corridor_24m = u_roads.buffer(24.0) if not u_roads.is_empty else Polygon()
-    GX, GZ = np.meshgrid(gx_coords, gz_coords)
+    GX, GZ = np.broadcast_arrays(gx_coords[None, :], gz_coords[:, None])
     in_corridor = intersects_xy(corridor_24m, GX, GZ) if not corridor_24m.is_empty else np.zeros((gh, gw), dtype=bool)
 
     flatten_ctrl_mask = np.zeros((gh, gw), dtype=bool)
@@ -768,83 +781,7 @@ def solve_road_and_bridge_elevations(original_dm: np.ndarray, terrain_dm: np.nda
         flatten_ctrl_mask |= m
         flatten_ctrl_val[m] = level
 
-    rows_l, cols_l, vals_l, rhs_l = [], [], [], []
-    cursor = 0
-
-    # Term 1: Control-grid background / DEM anchor
-    all_nodes = np.arange(gh * gw, dtype=np.int32)
-    node_w = np.where(in_corridor.ravel(), 0.16, 2.5)
-    node_target = np.where(in_corridor.ravel(), smooth_bg_ctrl.ravel(), bg_ctrl.ravel())
-    flat_flat = flatten_ctrl_mask.ravel()
-    node_w = np.where(flat_flat, 14.0, node_w)
-    node_target = np.where(flat_flat, flatten_ctrl_val.ravel(), node_target)
-    rows_l.append(np.arange(cursor, cursor + gh * gw, dtype=np.int32))
-    cols_l.append(all_nodes)
-    vals_l.append(node_w)
-    rhs_l.append(node_w * node_target)
-    cursor += gh * gw
-
-    # Term 2: Strong biharmonic (2nd-difference) smoothness on C (guarantees gradeJump == 0 & localBump == 0)
-    rr, cc = np.meshgrid(np.arange(gh), np.arange(1, gw - 1), indexing='ij')
-    w_xx = np.where(in_corridor[:, 1:-1], 92.0, 6.0).ravel()
-    n_xx = rr.size
-    r_ids = np.arange(cursor, cursor + n_xx, dtype=np.int32)
-    for dc, coeff in ((-1, 1.0), (0, -2.0), (1, 1.0)):
-        rows_l.append(r_ids)
-        cols_l.append((rr * gw + (cc + dc)).ravel())
-        vals_l.append(coeff * w_xx)
-    rhs_l.append(np.zeros(n_xx))
-    cursor += n_xx
-
-    rr, cc = np.meshgrid(np.arange(1, gh - 1), np.arange(gw), indexing='ij')
-    w_zz = np.where(in_corridor[1:-1, :], 92.0, 6.0).ravel()
-    n_zz = rr.size
-    r_ids = np.arange(cursor, cursor + n_zz, dtype=np.int32)
-    for dr, coeff in ((-1, 1.0), (0, -2.0), (1, 1.0)):
-        rows_l.append(r_ids)
-        cols_l.append(((rr + dr) * gw + cc).ravel())
-        vals_l.append(coeff * w_zz)
-    rhs_l.append(np.zeros(n_zz))
-    cursor += n_zz
-
-    rr, cc = np.meshgrid(np.arange(gh - 1), np.arange(gw - 1), indexing='ij')
-    w_xz = np.where(in_corridor[:-1, :-1] | in_corridor[1:, 1:], 115.0, 6.0).ravel()
-    n_xz = rr.size
-    r_ids = np.arange(cursor, cursor + n_xz, dtype=np.int32)
-    for dr, dc, coeff in ((0, 0, 1.0), (0, 1, -1.0), (1, 0, -1.0), (1, 1, 1.0)):
-        rows_l.append(r_ids)
-        cols_l.append(((rr + dr) * gw + (cc + dc)).ravel())
-        vals_l.append(coeff * w_xz)
-    rhs_l.append(np.zeros(n_xz))
-    cursor += n_xz
-
-    rr, cc = np.meshgrid(np.arange(gh), np.arange(gw - 1), indexing='ij')
-    m_gx = (in_corridor[:, :-1] | in_corridor[:, 1:]).ravel()
-    rr_m, cc_m = rr.ravel()[m_gx], cc.ravel()[m_gx]
-    n_gx = len(rr_m)
-    if n_gx:
-        r_ids = np.arange(cursor, cursor + n_gx, dtype=np.int32)
-        rows_l.extend([r_ids, r_ids])
-        cols_l.extend([rr_m * gw + cc_m, rr_m * gw + cc_m + 1])
-        vals_l.extend([np.full(n_gx, 2.2), np.full(n_gx, -2.2)])
-        rhs_l.append(np.zeros(n_gx))
-        cursor += n_gx
-
-    rr, cc = np.meshgrid(np.arange(gh - 1), np.arange(gw), indexing='ij')
-    m_gz = (in_corridor[:-1, :] | in_corridor[1:, :]).ravel()
-    rr_m, cc_m = rr.ravel()[m_gz], cc.ravel()[m_gz]
-    n_gz = len(rr_m)
-    if n_gz:
-        r_ids = np.arange(cursor, cursor + n_gz, dtype=np.int32)
-        rows_l.extend([r_ids, r_ids])
-        cols_l.extend([rr_m * gw + cc_m, (rr_m + 1) * gw + cc_m])
-        vals_l.extend([np.full(n_gz, 2.2), np.full(n_gz, -2.2)])
-        rhs_l.append(np.zeros(n_gz))
-        cursor += n_gz
-
-    # Term 3: Zero cross-slope across EVERY road cross-section (including raw un-paired OSM width spans!)
-    lx_a, lz_a, rx_a, rz_a = [], [], [], []
-    lx_b, lz_b, rx_b, rz_b = [], [], [], []
+    sections = []
     for road in roads:
         clipped = road.line.intersection(bounds_poly.buffer(-1.5))
         if road.kind == 'pedestrian' and not rep_excl.is_empty:
@@ -856,44 +793,15 @@ def solve_road_and_bridge_elevations(original_dm: np.ndarray, terrain_dm: np.nda
             n_st = max(2, int(math.ceil(seg.length / 2.5)) + 1)
             half_in = max(1.2, 0.45 * max(road.width, raw_def_w))
             half_out = max(4.0, 0.5 * max(road.width, raw_def_w) + max(road.left, road.right) + 2.0)
-            for s_val in np.linspace(0.0, seg.length, n_st):
-                pt = seg.interpolate(s_val)
-                p0 = seg.interpolate(max(0.0, s_val - 0.5))
-                p1 = seg.interpolate(min(seg.length, s_val + 0.5))
-                tdx, tdy = p1.x - p0.x, p1.y - p0.y
-                tl = math.hypot(tdx, tdy)
-                if tl < 1e-4:
-                    continue
-                nx_d, nz_d = -tdy / tl, tdx / tl
-                lx_a.append(pt.x - nx_d * half_in)
-                lz_a.append(pt.y - nz_d * half_in)
-                rx_a.append(pt.x + nx_d * half_in)
-                rz_a.append(pt.y + nz_d * half_in)
-                lx_b.append(pt.x - nx_d * half_out)
-                lz_b.append(pt.y - nz_d * half_out)
-                rx_b.append(pt.x + nx_d * half_out)
-                rz_b.append(pt.y + nz_d * half_out)
-
-    if lx_a:
-        lx_a_arr, lz_a_arr = np.asarray(lx_a), np.asarray(lz_a)
-        rx_a_arr, rz_a_arr = np.asarray(rx_a), np.asarray(rz_a)
-        cursor = _add_diff_rows(rows_l, cols_l, vals_l, rhs_l, cursor, gw, gh, left, top,
-                                lx_a_arr, lz_a_arr, rx_a_arr, rz_a_arr,
-                                np.zeros(len(lx_a_arr)), np.full(len(lx_a_arr), 520.0))
-        lx_b_arr, lz_b_arr = np.asarray(lx_b), np.asarray(lz_b)
-        rx_b_arr, rz_b_arr = np.asarray(rx_b), np.asarray(rz_b)
-        cursor = _add_diff_rows(rows_l, cols_l, vals_l, rhs_l, cursor, gw, gh, left, top,
-                                lx_b_arr, lz_b_arr, rx_b_arr, rz_b_arr,
-                                np.zeros(len(lx_b_arr)), np.full(len(lx_b_arr), 240.0))
-
-    # Term 4: Bridge approach elevation guidance
-    if bridge_targets:
-        bx = np.array([b[0] for b in bridge_targets], dtype=np.float64)
-        bz = np.array([b[1] for b in bridge_targets], dtype=np.float64)
-        by = np.array([b[2] for b in bridge_targets], dtype=np.float64)
-        bw = np.array([b[3] for b in bridge_targets], dtype=np.float64)
-        cursor = _add_eval_rows(rows_l, cols_l, vals_l, rhs_l, cursor, gw, gh, left, top,
-                                bx, bz, by, bw)
+            stations = np.linspace(0.0, seg.length, n_st)
+            center = seg.interpolate(stations)
+            before = seg.interpolate(np.maximum(0.0, stations - 0.5))
+            after = seg.interpolate(np.minimum(seg.length, stations + 0.5))
+            dx, dz = get_x(after) - get_x(before), get_y(after) - get_y(before)
+            lengths = np.fromiter(map(math.hypot, dx, dz), np.float64, n_st)
+            valid = lengths >= 1e-4
+            sections.append((get_x(center)[valid], get_y(center)[valid],
+                             -dz[valid] / lengths[valid], dx[valid] / lengths[valid], half_in, half_out))
 
     # Keep lakeside roads/walkways above perched adjacent water so wet bank cells never poke through
     lake_x, lake_z, lake_y = [], [], []
@@ -913,19 +821,47 @@ def solve_road_and_bridge_elevations(original_dm: np.ndarray, terrain_dm: np.nda
                         lake_x.append(pt.x)
                         lake_z.append(pt.y)
                         lake_y.append(wy + 0.38)
+    grad_x = in_corridor[:, :-1] | in_corridor[:, 1:]
+    grad_z = in_corridor[:-1, :] | in_corridor[1:, :]
+    nodes = gw * gh
+    second = gh * (gw - 2) + (gh - 2) * gw
+    mixed = (gh - 1) * (gw - 1)
+    gradient = int(grad_x.sum() + grad_z.sum())
+    cross = 2 * sum(len(section[0]) for section in sections)
+    anchors = len(bridge_targets) + len(lake_x)
+    system = RoadConstraints(nodes + second + mixed + gradient + cross + anchors,
+                             nodes + 3 * second + 4 * mixed + 2 * gradient + 32 * cross + 16 * anchors)
+    for first in range(0, gh, 32):
+        band = slice(first, min(first + 32, gh))
+        size = in_corridor[band].size
+        cols, vals, rhs = system.reserve(size, 1)
+        cols[:, 0] = np.arange(first * gw, first * gw + size, dtype=np.int32)
+        weights = np.where(flatten_ctrl_mask[band], 14.0, np.where(in_corridor[band], 0.16, 2.5))
+        targets = np.where(flatten_ctrl_mask[band], flatten_ctrl_val[band],
+                           np.where(in_corridor[band], smooth_bg_ctrl[band], bg_ctrl[band]))
+        vals[:, 0] = weights.ravel()
+        rhs[:] = (weights * targets).ravel()
+    del cols, vals, rhs, bg_ctrl, flatten_ctrl_val, flatten_ctrl_mask
+    _grid_stencil(system, in_corridor[:, 1:-1], False, gw, ((-1, 1), (0, -2), (1, 1)), 92., 6., 1)
+    _grid_stencil(system, in_corridor[1:-1], False, gw, ((-gw, 1), (0, -2), (gw, 1)), 92., 6., gw)
+    _grid_stencil(system, in_corridor[:-1, :-1] | in_corridor[1:, 1:], False, gw,
+                  ((0, 1), (1, -1), (gw, -1), (gw + 1, 1)), 115., 6.)
+    _grid_stencil(system, grad_x, True, gw, ((0, 1), (1, -1)), 2.2, 0.)
+    _grid_stencil(system, grad_z, True, gw, ((0, 1), (gw, -1)), 2.2, 0.)
+    del grad_x, grad_z, in_corridor
+    for outer, weight in ((False, 520.), (True, 240.)):
+        for xs, zs, nx, nz, inner_width, outer_width in sections:
+            half = outer_width if outer else inner_width
+            _survey_rows(system, gw, gh, left, top, ((xs - nx * half, zs - nz * half),
+                         (xs + nx * half, zs + nz * half)), 0., weight)
+    del sections
+    if bridge_targets:
+        bx, bz, by, bw = np.asarray(bridge_targets, dtype=np.float64).T
+        _survey_rows(system, gw, gh, left, top, ((bx, bz),), by, bw)
     if lake_x:
-        cursor = _add_eval_rows(rows_l, cols_l, vals_l, rhs_l, cursor, gw, gh, left, top,
-                                np.asarray(lake_x), np.asarray(lake_z), np.asarray(lake_y),
-                                np.full(len(lake_x), 45.0))
-
-    A = coo_matrix(
-        (np.concatenate(vals_l), (np.concatenate(rows_l), np.concatenate(cols_l))),
-        shape=(cursor, gh * gw),
-    ).tocsr()
-    b_rhs = np.concatenate(rhs_l)
-    del rows_l,cols_l,vals_l,rhs_l
-    ctrl = solve_road_spline(A, b_rhs, smooth_bg_ctrl)
-    del A,b_rhs
+        _survey_rows(system, gw, gh, left, top, ((np.asarray(lake_x), np.asarray(lake_z)),), np.asarray(lake_y), 45.)
+    ctrl = solve_road_spline(system.finish(nodes), system.rhs, smooth_bg_ctrl)
+    del system, smooth_bg_ctrl
 
     # Imprint S(x, z) onto DRY cells of original_dm & terrain_dm:
     # - Inside actual road footprint (excluding landmark bounds): lift or press smoothly to road bed.
