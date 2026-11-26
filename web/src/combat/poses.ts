@@ -25,7 +25,7 @@ export function pose(rig: AvatarRig, f: Fighter, phase: Phase, t: number, yaw: n
     if (phase === 'stagger') {
       const u = (t - f.struck) / (f.heavy ? 410 : 280)
       // 受击：轻击 0.45 rad、重击 0.75 rad 的后仰/侧晃，头再多甩一点，看得出挨了一下
-      const recoil = Math.sin(Math.PI * Math.sqrt(Math.min(1, u))) * (f.heavy ? 0.75 : 0.45)
+      const recoil = Math.sin(Math.PI * Math.sqrt(Math.min(1, u))) * (f.heavy ? -0.75 : -0.45)
       set('Torso', recoil * Math.cos(f.dir - yaw), 0, -recoil * Math.sin(f.dir - yaw))
       set('Head', 0.5 * recoil * Math.cos(f.dir - yaw), 0, -0.5 * recoil * Math.sin(f.dir - yaw))
     } else if (['windup', 'strike', 'recover'].includes(phase)) {
@@ -34,9 +34,8 @@ export function pose(rig: AvatarRig, f: Fighter, phase: Phase, t: number, yaw: n
         sign = left ? 1 : -1
       const extend = age < 100 ? (age / 100) * 0.35 : age < 160 ? 1 : Math.max(0, 1 - (age - 160) / 180)
       set('Torso', -0.09 * extend, sign * 0.28 * extend)
-      // 出拳：此骨架大臂 x 为负 = 向前抬（正值是往后上方甩，看起来像举手）。命中帧抬到肩高（-1.45），
-      // 前摇时大臂先抬一半，小臂保持伸直（肘部弯向未在 GPU 上核对前不加屈肘）
-      set(left ? 'ArmL' : 'ArmR', -1.45 * extend, sign * (f.kind === 'hook' ? 0.55 : 0.12) * extend)
+      // 角色局部前方为 -Z，大臂绕 X 正向转动将手腕送到肩前。
+      set(left ? 'ArmL' : 'ArmR', 1.45 * extend, sign * (f.kind === 'hook' ? 0.55 : 0.12) * extend)
       set(left ? 'ForearmL' : 'ForearmR', 0)
     } else if (phase === 'reviving') {
       const lift = Math.min(1, (1 - f.assistProgress) * 4)
