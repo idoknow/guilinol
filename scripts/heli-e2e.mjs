@@ -7,11 +7,11 @@ const output=process.env.HELI_CAPTURE_DIR??'captures/helicopter',server=await pr
 let browser
 try{
   await mkdir(output,{recursive:true});browser=await chromium.launch(browserOptions(true))
-  const page=await browser.newPage({viewport:{width:800,height:500}}),origin=`http://127.0.0.1:${server.httpServer.address().port}`
+  const quick=process.env.HELI_QUICK==='1',page=await browser.newPage({viewport:quick?{width:480,height:300}:{width:800,height:500}}),origin=`http://127.0.0.1:${server.httpServer.address().port}`
   const shot=async name=>{await page.screenshot({path:`${output}/${name}.jpg`,type:'jpeg',quality:80});console.log('captured',name)}
   const phase=async name=>page.waitForFunction(state=>window.viewer.heli.phase===state,name,{timeout:180000})
   const rate=async value=>page.evaluate(speed=>window.viewer.heli.rate(speed),value)
-  const fps=async()=>page.evaluate(async()=>{const start=performance.now();for(let frame=0;frame<24;frame++)await new Promise(requestAnimationFrame);return 24000/(performance.now()-start)})
+  const fps=async()=>page.evaluate(async count=>{const start=performance.now();for(let frame=0;frame<count;frame++)await new Promise(requestAnimationFrame);return 1000*count/(performance.now()-start)},quick?8:24)
   await page.goto(`${origin}/?verify&solo=1&flow=0&radius=480`,{waitUntil:'domcontentloaded'})
   await page.waitForFunction(()=>window.viewer?.walk?.active,null,{timeout:120000})
   assert.ok(await page.evaluate(()=>window.viewer.walkTo(-844,208,-2.51,'plaza-e2e')))
@@ -19,7 +19,7 @@ try{
   const approach=await page.evaluate(()=>{
     const player=window.viewer.walk
     for(let frame=0;frame<1000;frame++){
-      const current=player.position,dx=-810-current.x,dz=258-current.z,distance=Math.hypot(dx,dz)
+      const current=player.position,dx=-805.8-current.x,dz=257.6-current.z,distance=Math.hypot(dx,dz)
       if(distance<2){player.drive(0,0);return true}player.drive(dx/distance,dz/distance);player.tick(1/30)
     }
     return player.position.toArray()
