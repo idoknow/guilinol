@@ -33,6 +33,10 @@ function ticket(uid,exp=Math.floor(Date.now()/1000)+60){const body=Buffer.from(J
 async function socket(host,options){const client=new WebSocket(`ws://${host}/ws`,options);sockets.push(client);await once(client,'open');return client}
 async function reject(host,value){const client=await socket(host),closed=once(client,'close',{signal:AbortSignal.timeout(3000)});client.send(JSON.stringify({t:'join',ticket:value}));assert.equal((await closed)[0],4003)}
 async function verify(){
+  if(process.argv.includes('--combat')){
+    const rt=await service('rt/server-realtime.mjs',{RT_JOIN_SECRET:secret},'/health',200)
+    return (await import('./verify-combat.mjs')).verifyCombat(rt,ticket)
+  }
   if(process.argv.includes('--emote')){
     const rt=await service('rt/server-realtime.mjs',{RT_JOIN_SECRET:secret},'/health',200)
     return (await import('./verify-emote-mp.mjs')).verifyEmotes(rt,ticket)

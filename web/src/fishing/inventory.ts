@@ -22,7 +22,7 @@ function fullBag(){if(typeof window!=='undefined')window.dispatchEvent(new Custo
 export function consume(id:string,key=crypto.randomUUID()){return fishingTransaction(key,'cast',save=>{
   if(save.bag.length>=BAG_CAPACITY)return fullBag()
   if(!(save.bait[id]>0))return 'NO_BAIT';save.bait[id]--;return 0})}
-export function refundFullCast(baitId:string,castKey:string){return fishingTransaction(`refund:${castKey}`,'full-bag',save=>{
+export function refundFullCast(baitId:string,castKey:string,reason='full-bag'){return fishingTransaction(`refund:${castKey}`,reason,save=>{
   if(!save.recentActions.includes(castKey))return 'NO_LOCAL_DEBIT'
   save.bait[baitId]=(save.bait[baitId]??0)+1;return 0})}
 export function collect(item:Catch){return fishingTransaction(item.id,'catch',save=>{

@@ -1,3 +1,4 @@
+import {config as combatConfig,type CombatPacket} from './combat/net'
 import type {AnimationClip,Scene,Camera} from 'three'
 import type {Avatar} from '../../lib/avatar'
 import {bindChat,receiveChat,setChatSelf} from './chat-store'
@@ -10,7 +11,7 @@ function publish(detail:MpStatus){window.dispatchEvent(new CustomEvent('glol:mp-
 
 type State='connecting'|'online'|'offline'|'replaced'
 export type ActivityReport={act:string;detail?:string}
-export function attachNet(scene:Scene,clips:AnimationClip[],getPose:()=>Pose,getAvatar:()=>Avatar,camera:Camera,getActivity?:()=>ActivityReport) {
+export function attachNet(scene:Scene,clips:AnimationClip[],getPose:()=>Pose,getAvatar:()=>Avatar,camera:Camera,getActivity?:()=>ActivityReport,onCombat?:(p:CombatPacket,self:string)=>void) {
   const peers=players(scene,clips,camera)
   let socket:WebSocket|undefined,attempt=0,generation=0,timer=0,lastSent=-Infinity,lastRoster=-Infinity,lastActCheck=-Infinity,disposed=false
   let lastActKey=''
@@ -30,7 +31,7 @@ export function attachNet(scene:Scene,clips:AnimationClip[],getPose:()=>Pose,get
   }
   function emote(id:number){if(id===desired&&id)sent=-1;desired=id;flushEmote()}
   function status(){return {state,online}}
-  function update(next:State,count=0){state=next;online=count;bindChat(next==='online'?send:undefined);if(next!=='online'){far.clear();clearRoster()}if(badge)badge.textContent=`${state} · ${online}`;publish({state,online})}
+  function update(next:State,count=0){state=next;online=count;bindChat(next==='online'?send:undefined);if(next!=='online'){far.clear();clearRoster();onCombat?.({id:myId,hp:combatConfig.hpMax,dn:0,remaining:0,progress:0,helper:''},myId)}if(badge)badge.textContent=`${state} · ${online}`;publish({state,online})}
   function send(packet:object){if(socket?.readyState===WebSocket.OPEN)socket.send(JSON.stringify(packet))}
   // 不能像以前那样 6 次之后永久放弃：满员、同一出口 IP 挤爆、切后台被断，都是暂时的。
   // 一旦放弃，玩家只能刷新页面，表现出来就是「联机时好时坏」。
@@ -63,12 +64,19 @@ export function attachNet(scene:Scene,clips:AnimationClip[],getPose:()=>Pose,get
         const msg=JSON.parse(event.data)
         switch(msg.t){
           case 'chat':case 'chat_hist':case 'chat_del':case 'chat_mute':case 'chat_ack':receiveChat(msg);break
-          case 'welcome': sent=0;sentTimes=[];myId=String(msg.me?.id??'');setChatSelf(Number(msg.me?.uid)||0)
+          case 'combat': {
+            const old=peers.list().find(p=>p.id===msg.id)?.helper
+            if(old)peers.helping(old,'')
+            if(msg.helper)peers.helping(msg.helper,msg.id,msg.progress)
+            if(msg.id===myId&&msg.by)peers.reveal(msg.by)
+            peers.combat(msg);onCombat?.(msg,myId);break
+          }
+          case 'welcome': sent=0;sentTimes=[];myId=String(msg.me?.id??'');setChatSelf(Number(msg.me?.uid)||0);onCombat?.(msg.me,myId)
             // 续连（CDN 掐断后原地接管）：对账而不是清空重建，否则每 44 秒所有人的模型都会销毁再克隆一遍
             if(msg.me?.resumed){const keep=new Set((msg.players as {id:string}[]).map(p=>p.id))
               for(const p of peers.list())if(!keep.has(p.id))peers.remove(p.id)
               const have=new Set(peers.list().map(p=>p.id))
-              for(const player of msg.players)if(have.has(player.id))peers.move(player.id,player);else peers.add(player)
+              for(const player of msg.players)if(have.has(player.id)){peers.move(player.id,player);peers.reconcile(player)}else peers.add(player)
               attempt=0;update('online',msg.online);break}
           case 'players':
             peers.clear();for(const player of msg.players)peers.add(player)
@@ -140,7 +148,7 @@ export function attachNet(scene:Scene,clips:AnimationClip[],getPose:()=>Pose,get
   window.addEventListener('pageshow',pageShow)
   const manual=()=>{if(!disposed){stop();attempt=0;void connect()}}
   window.addEventListener('glol:mp-reconnect',manual)
-  return {emote,status,tick,who:()=>send({t:'who'}),probe:peers.probe,reconnect:manual,
+  return {list:peers.list,send,emote,status,tick,who:()=>send({t:'who'}),probe:peers.probe,reconnect:manual,
     dispose(){disposed=true;unsubscribe();stop();clearTimeout(timer)
       if(socket){const ws=socket;socket=undefined;ws.onopen=ws.onmessage=ws.onclose=ws.onerror=null;try{ws.close(1000,'dispose')}catch{}}
       badge?.remove();window.removeEventListener('glol:avatar-change',avatarChanged);window.removeEventListener('glol:mp-reconnect',manual)

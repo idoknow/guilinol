@@ -4,9 +4,9 @@
  * 协议（JSON over WebSocket，路径 /ws）
  *   客户端 → 服务端
  *     {t:'join', ticket, avatar, x,y,z,yaw}
- *     {t:'pos', x,y,z, yaw, v, bike, bx,bz,byaw, hb,hx,hz,hyaw, mv,cr,gr,dn,pn,hp, sc,sb,sp,br}
- *     {t:'hit', id, dmg}            出拳打到 id 这个人
- *     {t:'revive', id}              扶起倒地的 id
+ *     {t:'pos', x,y,z, yaw, v, bike, bx,bz,byaw, hb,hx,hz,hyaw, mv,cr,gr,pn, sc,sb,sp,br}
+ *     {t:'punch', id?, kind, zone, s} 命中帧（空拳省略 id）
+ *     {t:'rescue-start', id} / {t:'rescue-stop'}
  *     {t:'avatar', avatar}
  *     {t:'who'}
  *     {t:'chat', ch, text, cid} / {t:'chat_hist', ch} (docs/chat.md)
@@ -14,7 +14,7 @@
  *     {t:'welcome', me, online, players:[...]}
  *     {t:'join', player} / {t:'leave', id}
  *     {t:'pos', id, x,y,z,yaw,v,bike,bx,bz,byaw, hb,hx,hz,hyaw, mv,cr,gr,dn,pn,hp, sc,sb,sp,br}
- *     {t:'hit', dmg, by, byId} / {t:'revive', by}
+ *     {t:'combat', id, hp, dn, remaining, helper, progress, ...event}
  *     {t:'avatar', id, avatar}
  *     chat / chat_ack / chat_hist / chat_del / chat_mute (docs/chat.md)
  *     {t:'online', online}
@@ -52,6 +52,7 @@
  * 启动：PORT=8790 node server-realtime.mjs
  * 依赖：npm i ws
  */
+import {combat, config as combatConfig, snapshot as combatSnapshot} from './combat.mjs'
 import {flatDistance,inEmoteRange,acceptEmote} from './emote.mjs'
 import {createServer} from 'node:http'
 import {createHmac,timingSafeEqual} from 'node:crypto'
@@ -80,9 +81,6 @@ const MAX_PENDING_PER_IP = Number(process.env.RT_MAX_PENDING_PER_IP ?? 8)
 const pendingIp = new Map()
 /** 昵称长度上限（字符） */
 const MAX_NAME = 16
-/** 服务端裁决 hit / revive 的水平距离（米） */
-const HIT_RANGE = 3.5
-const REVIVE_RANGE = 3
 /** 广播前允许的发送缓冲；超了就跳过，连续跳过 60 次直接断开，别让慢客户端拖垮内存 */
 const MAX_BUFFERED = 1024 * 1024
 const MAX_SLOW_SKIPS = 60
@@ -262,7 +260,7 @@ function sanitizeAvatar(value) {
 }
 
 function send(ws, payload, type=payload.t, size) {
-  if (ws.readyState === 1) {
+  if (ws?.readyState === 1) {
     try {
       if (ws.readyState !== 1) return   // 已断开（续连宽限期内被标记 dead）的连接不再写
       const text=typeof payload === 'string' ? payload : JSON.stringify(payload)
@@ -419,6 +417,8 @@ function aoiSend(p, payload) {
 function removePlayer(p, extra = {}) {
   if (!p || !players.has(p.id)) return false
   const at = now()
+  if(p.helping)fight.cancel(p,at)
+  if(p.helper){const helper=players.get(p.helper);if(helper)fight.cancel(helper,at)}
   const finalTotals = obs.liveTotals(p, at)
   p.activityTotals = finalTotals
   p.activitySince = at
@@ -476,13 +476,18 @@ function publicOf(p,viewer=p) {
   return {
     id: p.id, uid: p.uid, name: p.name, avatar: p.avatar, jt:p.joinedAt,
     x: p.x, y: p.y, z: p.z, yaw: p.yaw, v: p.v,
-    bike: p.bike, bx: p.bx, bz: p.bz, byaw: p.byaw,
-    hb: p.hb, hx: p.hx, hz: p.hz, hyaw: p.hyaw, mv: p.mv, dn: p.dn, pn: p.pn, wl: p.wl, cr: p.cr, gr: p.gr,
-    hp: p.hp, em:inEmoteRange(p,viewer)&&now()<p.emoteUntil?p.em:0, es:p.es,
+    foot:p.foot, bike: p.bike, bx: p.bx, bz: p.bz, byaw: p.byaw,
+    hb: p.hb, hx: p.hx, hz: p.hz, hyaw: p.hyaw, mv: p.mv, pn: p.pn, wl: p.wl, cr: p.cr, gr: p.gr,
+    ...combatSnapshot(p,now()), em:inEmoteRange(p,viewer)&&now()<p.emoteUntil?p.em:0, es:p.es,
     sc: p.sc, sb: p.sb, sp: p.sp, br: p.br, ss:p.ss, sd:p.sd, sr:p.sr,
   }
 }
 
+const fight=combat(players,(p,packet)=>{
+  send(p.ws,packet)
+  for(const id of p.visible)send(players.get(id)?.ws,packet)
+})
+setInterval(()=>fight.tick(now()),100).unref()
 const chat=createChat({players,send,observed:obs.chatted})
 const server = createServer(async(req, res) => {
   try {
@@ -676,6 +681,8 @@ wss.on('connection', (ws, req) => {
         console.log(JSON.stringify({scope:'rt-stale-close',uid:player.uid,pid,code:code??null}))
         return
       }
+      if(player?.helping)fight.cancel(player,now())
+      if(player?.helper){const helper=players.get(player.helper);if(helper)fight.cancel(helper,now())}
       // 异常断开（CDN 掐连接、切网络、手机息屏）先保留会话，等同 uid 回来续连；
       // 主动关闭（pagehide/dispose）、被踢被封、顶号都不保留，避免留下假在线。
       if (player && RESUMABLE(code) && !player.kickReason && !player.replaced) {
@@ -760,7 +767,7 @@ wss.on('connection', (ws, req) => {
             }
             send(ws, {
               t: 'welcome',
-              me: { id: p.id, uid: p.uid, name: p.name, avatar: p.avatar, x: p.x, z: p.z, resumed: true },
+              me: { id: p.id, uid: p.uid, name: p.name, avatar: p.avatar, x: p.x, z: p.z, ...combatSnapshot(p,now()), resumed: true },
               online: players.size,
               players: visible.map(peerId => players.get(peerId)).filter(Boolean).map(q => publicOf(q, p)),
             })
@@ -812,10 +819,10 @@ wss.on('connection', (ws, req) => {
           dn: 0,
           pn: 0,
           wl: 0,
-          lastHit: 0,
           cr: 0,
           gr: 1,
-          hp: 100,
+          foot: msg.foot!==false,
+          hp: combatConfig.hpMax,
           sc: 0,
           sb: 0,
           sp: 0,
@@ -850,7 +857,7 @@ wss.on('connection', (ws, req) => {
         obs.joined(player,players.size)
         send(ws, {
           t: 'welcome',
-          me: {id, uid: player.uid, name: player.name, avatar: player.avatar},
+          me: {...combatSnapshot(player,now()), id, uid: player.uid, name: player.name, avatar: player.avatar},
           online: players.size,
           players: visible.map(peerId => players.get(peerId)).filter(Boolean).map(p=>publicOf(p,player)),
         })
@@ -890,12 +897,13 @@ wss.on('connection', (ws, req) => {
         me.z = clampNum(msg.z, -1e5, 1e5)
         me.yaw = clampNum(msg.yaw, -10, 10)
         me.v = clampNum(msg.v, 0, 120)
+        me.foot = msg.foot!==false
         me.bike = clampStr(msg.bike, 32)
         me.bx = clampNum(msg.bx, -1e5, 1e5)
         me.bz = clampNum(msg.bz, -1e5, 1e5)
         me.byaw = clampNum(msg.byaw, -20, 20)
         me.mv = clampNum(msg.mv, 0, 1)
-        me.dn = clampNum(msg.dn, 0, 1)
+
         me.pn = clampNum(msg.pn, 0, 1)
         me.wl = clampNum(msg.wl, 0, 1)
         me.hb = clampNum(msg.hb, 0, 1)
@@ -904,8 +912,6 @@ wss.on('connection', (ws, req) => {
         me.hyaw = clampNum(msg.hyaw, -20, 20)
         me.cr = clampNum(msg.cr, 0, 1)
         me.gr = clampNum(msg.gr, 0, 1, 1)
-        // 血量：出手方靠它看到自己打掉了多少，被打的人也靠它对齐屏幕上的血条
-        me.hp = clampInt(msg.hp, 0, 100, 100)
         me.sc = clampInt(msg.sc, 0, 9)
         me.sb = clampInt(msg.sb, 0, 1800)
         me.sp = clampInt(msg.sp, 0, 999)
@@ -922,7 +928,7 @@ wss.on('connection', (ws, req) => {
         aoiSend(me, {
           t: 'pos', id: me.id,
           x: me.x, y: me.y, z: me.z, yaw: me.yaw, v: me.v,
-          bike: me.bike, bx: me.bx, bz: me.bz, byaw: me.byaw,
+          foot:me.foot, bike: me.bike, bx: me.bx, bz: me.bz, byaw: me.byaw,
           hb: me.hb, hx: me.hx, hz: me.hz, hyaw: me.hyaw, mv: me.mv, cr: me.cr, gr: me.gr, dn: me.dn, pn: me.pn, wl: me.wl,
           hp: me.hp,
           sc: me.sc, sb: me.sb, sp: me.sp, br: me.br, ss:me.ss, sd:me.sd, sr:me.sr,
@@ -930,29 +936,8 @@ wss.on('connection', (ws, req) => {
         return
       }
 
-      if (msg.t === 'hit') {
-        // 出拳：限频 5 次/秒，只转给被打的那个人，伤害由出手方算（夹到 1..35）
-        const at = now()
-        if (at - me.lastHit < 200) return
-        me.lastHit = at
-        const target = players.get(clampStr(msg.id, 64))
-        if (!target || target === me) return
-        // 目标已经倒地就别再打；距离用双方最近一次 pos 裁决，挡「隔空打人」
-        if (target.dn) return
-        if (flatDistance(me, target) > HIT_RANGE) return
-        const dmg = Math.max(1, Math.min(35, clampInt(msg.dmg, 1, 35, 9)))
-        // byId 让被打的一方算出「从哪个方向挨的这一下」；by 只用来显示
-        send(target.ws, {t: 'hit', dmg, by: me.name, byId: me.id})
-        return
-      }
-
-      if (msg.t === 'revive') {
-        const target = players.get(clampStr(msg.id, 64))
-        if (!target || target === me) return
-        // 只有对方倒地时才允许扶，且得站在 3 m 内
-        if (!target.dn) return
-        if (flatDistance(me, target) > REVIVE_RANGE) return
-        send(target.ws, {t: 'revive', by: me.name})
+      if (['windup','punch','rescue-start','rescue-stop'].includes(msg.t)) {
+        fight.input(me,msg,now())
         return
       }
 
