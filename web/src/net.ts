@@ -57,7 +57,7 @@ export function attachNet(scene:Scene,clips:AnimationClip[],getPose:()=>Pose,get
       const previous=socket
       if(previous){previous.onopen=previous.onmessage=previous.onclose=previous.onerror=null;try{previous.close(1000,'replace')}catch{}}
       const ws=new WebSocket(endpoint);socket=ws
-      ws.onopen=()=>{if(version===generation){const initial=getActivity?.();lastActKey=initial?`${initial.act}|${initial.detail??''}`:'';send({t:'join',ticket,avatar:getAvatar(),...(initial?{act:initial.act,actDetail:initial.detail}:{}),...getPose()})}}
+      ws.onopen=()=>{if(version===generation){const initial=getActivity?.();lastActKey=initial?`${initial.act}|${initial.detail??''}`:'';send({t:'join',ticket,avatar:getAvatar(),caps:['roster2'],...(initial?{act:initial.act,actDetail:initial.detail}:{}),...getPose()})}}
       ws.onmessage=event=>{
         if(version!==generation)return
         const msg=JSON.parse(event.data)
@@ -75,6 +75,15 @@ export function attachNet(scene:Scene,clips:AnimationClip[],getPose:()=>Pose,get
             attempt=0;update('online',msg.online);break
           case 'online':update('online',msg.online);break
           case 'roster':far=new Map();for(const [id,name,x,z,joinedAt] of msg.players as [string,string,number,number,number][])if(id!==myId)far.set(id,{id,name,x,z,yaw:0,v:0,bike:false,joinedAt,far:true});lastRoster=-Infinity;break
+          // 增量名册：只发新增/离开/移动≥2m 的人，每 30s 一次全量对账（服务端保证）
+          case 'roster2':{
+            if(msg.full){far=new Map();for(const [id,name,x,z,joinedAt] of msg.full as [string,string,number,number,number][])if(id!==myId)far.set(id,{id,name,x,z,yaw:0,v:0,bike:false,joinedAt,far:true})}
+            else{
+              for(const id of (msg.del??[]) as string[])far.delete(id)
+              for(const [id,name,x,z] of (msg.add??[]) as [string,string,number,number][])if(id!==myId)far.set(id,{id,name,x,z,yaw:0,v:0,bike:false,far:true})
+              for(const [id,x,z] of (msg.up??[]) as [string,number,number][]){const p=far.get(id);if(p){p.x=x;p.z=z}}
+            }
+            lastRoster=-Infinity;break}
           case 'join':peers.add(msg.player);break
           case 'leave':peers.remove(msg.id);break
           case 'pos':peers.move(msg.id,msg);break

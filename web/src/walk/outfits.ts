@@ -91,6 +91,7 @@ const TOP_RECIPES: Record<string, TopRecipe> = {
   top_lijiang_shell: {primary: '#1e9d91', sleeve: '#1a7d74', trim: '#14191e', inner: '#28343b'},
   top_guochao_pankou: {primary: '#1c242b', sleeve: '#1c242b', trim: '#d8b46a', inner: '#c84b3c'},
   top_night_moto: {primary: '#161b22', sleeve: '#1f2630', trim: '#20d6c1', inner: '#2b3440'},
+  top_traffic_volunteer: {primary: '#d8ee1e', sleeve: '#192332', trim: '#d8ee1e', inner: '#192332'},
 }
 
 const BOTTOM_RECIPES: Record<string, BottomRecipe> = {
@@ -101,6 +102,7 @@ const BOTTOM_RECIPES: Record<string, BottomRecipe> = {
   bottom_lijiang_tech: {main: '#353d44', belt: '#20d6c1'},
   bottom_guochao_drape: {main: '#1c2026', belt: '#b89658'},
   bottom_night_moto: {main: '#181c22', belt: '#20d6c1'},
+  bottom_traffic_duty: {main: '#1b2330', belt: '#dce6ee'},
 }
 
 const SHOES_RECIPES: Record<string, ShoesRecipe> = {
@@ -111,6 +113,7 @@ const SHOES_RECIPES: Record<string, ShoesRecipe> = {
   shoes_lijiang_trail: {upper: '#2e3839', accent: '#20d6c1', sole: '#1a1f22'},
   shoes_guochao_sneaker: {upper: '#2a2d31', accent: '#d8b46a', sole: '#4a3121'},
   shoes_night_moto: {upper: '#171a1f', accent: '#20d6c1', sole: '#ffc53d'},
+  shoes_traffic_duty: {upper: '#16191e', accent: '#2f3844', sole: '#111418'},
 }
 
 const STARTER_PATTERNS: Record<string, number> = {
@@ -561,6 +564,47 @@ function buildHatMesh(hatId: string): THREE.Mesh | null {
     )
   }
 
+  if (hatId === 'hat_traffic_cap') {
+    // Compliant traffic persuasion volunteer cap + dark short undercut hair fringe/nape beneath cap brim
+    const crown = new THREE.SphereGeometry(1, 16, 10, 0, Math.PI * 2, 0, Math.PI * 0.56)
+    crown.scale(0.119, 0.110, 0.138)
+    crown.translate(0, 0.112, 0.014)
+
+    const band = new THREE.CylinderGeometry(0.121, 0.122, 0.024, 16)
+    band.scale(1, 1, 1.15)
+    band.translate(0, 0.112, 0.014)
+
+    const brim = new THREE.BoxGeometry(0.160, 0.011, 0.095)
+    brim.rotateX(-0.08)
+    brim.translate(0, 0.104, -0.145)
+
+    const badgeStripe = new THREE.BoxGeometry(0.056, 0.016, 0.012)
+    badgeStripe.translate(0, 0.132, -0.132)
+
+    // Sideburn/nape hair band sitting cleanly beneath cap rim so wearer never looks bald
+    const napeHair = new THREE.CylinderGeometry(0.112, 0.102, 0.068, 16, 1, false, -Math.PI * 0.65, Math.PI * 1.30)
+    napeHair.scale(1, 1, 1.13)
+    napeHair.translate(0, 0.072, 0.016)
+
+    const sideHairL = new THREE.CapsuleGeometry(0.018, 0.036, 2, 5)
+    sideHairL.translate(0.102, 0.080, -0.028)
+    const sideHairR = new THREE.CapsuleGeometry(0.018, 0.036, 2, 5)
+    sideHairR.translate(-0.102, 0.080, -0.028)
+
+    return mergeColoredParts(
+      [
+        {geom: crown, hex: '#1b2636'},
+        {geom: band, hex: '#d8ee1e'},
+        {geom: brim, hex: '#141c28'},
+        {geom: badgeStripe, hex: '#eef4f8'},
+        {geom: napeHair, hex: '#231c18'},
+        {geom: sideHairL, hex: '#231c18'},
+        {geom: sideHairR, hex: '#231c18'},
+      ],
+      'outfit_hat_traffic_cap',
+    )
+  }
+
   return null
 }
 
@@ -668,6 +712,54 @@ function buildBagMesh(bagId: string): THREE.Mesh | null {
     )
   }
 
+  if (bagId === 'bag_traffic_flag') {
+    // Rounded volunteer crossbody flag quiver + diagonal sash + full yellow pennant streaming backward-outward behind back
+    // Strictly obeys check-outfits bounds: minZ >= 0.13, width <= 0.34, local maxY <= 0.24
+    const quiver = new THREE.CapsuleGeometry(0.030, 0.16, 3, 7)
+    quiver.rotateZ(-0.42)
+    quiver.translate(-0.025, -0.02, 0.172)
+
+    const cuff = new THREE.CylinderGeometry(0.035, 0.033, 0.022, 8)
+    cuff.rotateZ(-0.42)
+    cuff.translate(0.008, 0.055, 0.175)
+
+    const strap = new THREE.CapsuleGeometry(0.015, 0.28, 2, 5)
+    strap.rotateZ(-0.56)
+    strap.translate(-0.01, 0.06, 0.150)
+
+    const pole = new THREE.CylinderGeometry(0.007, 0.007, 0.26, 6)
+    pole.rotateZ(-0.34)
+    pole.rotateX(0.32)
+    pole.translate(0.065, 0.125, 0.225)
+
+    // Flag billows backward (+Z) and slightly outward (+X) in open air well clear of the vest back
+    const flagShape = new THREE.Shape([
+      [0.000, 0.115],
+      [0.000, 0.225],
+      [0.145, 0.180],
+    ].map(([zOff, y]) => new THREE.Vector2(zOff, y)))
+    const pennant = new THREE.ExtrudeGeometry(flagShape, {
+      depth: 0.008,
+      steps: 1,
+      bevelEnabled: false,
+      curveSegments: 1,
+    })
+    pennant.rotateY(-Math.PI / 2 + 0.38)
+    pennant.translate(0.095, 0, 0.255)
+
+    return mergeColoredParts(
+      [
+        {geom: quiver, hex: '#1c2634'},
+        {geom: cuff, hex: '#eef4f8'},
+        {geom: strap, hex: '#1c2634'},
+        {geom: pole, hex: '#dce2e8'},
+        {geom: pennant, hex: '#f5d226'},
+      ],
+      'outfit_bag_traffic_flag',
+      true,
+    )
+  }
+
   return null
 }
 
@@ -695,6 +787,82 @@ export interface AvatarOutfitController {
 }
 
 const _tmpColor = new THREE.Color()
+
+/**
+ * Installs a razor-sharp per-pixel GLSL overlay on `streetShading(..., true)` materials so
+ * reflective vest stripes, navy cuffs/hem, and left-arm red volunteer armbands never blur
+ * across sparse SkinnedMesh torso triangles (+0 Draw Calls).
+ *
+ * Strictly scopes `uVolunteerVest` to upper-body garment zone (zone == 1) so mixing the vest
+ * with shorts, skirts, jeans, or shoes preserves the wearer's bottom/skin/shoe choices intact,
+ * while `uDutyBottom` applies exclusively when equipping `bottom_traffic_duty` (zone == 2).
+ */
+function syncVolunteerClothShader(mat: THREE.Material, vestActive: boolean, dutyBottomActive: boolean): void {
+  const std = mat as THREE.MeshStandardMaterial
+  if (!std.userData?.clothing) return
+  if (!vestActive && !dutyBottomActive && !std.userData.volunteerUniforms) return
+  if (!std.userData.volunteerUniforms) {
+    const uniforms = {
+      uVolunteerVest: {value: vestActive ? 1.0 : 0.0},
+      uDutyBottom: {value: dutyBottomActive ? 1.0 : 0.0},
+    }
+    std.userData.volunteerUniforms = uniforms
+    const prevCompile = std.onBeforeCompile
+    const prevKey = std.customProgramCacheKey
+    std.customProgramCacheKey = () => (prevKey ? prevKey.call(std) : 'creator-cloth') + '-volunteer'
+    std.onBeforeCompile = (shader, renderer) => {
+      prevCompile.call(std, shader, renderer)
+      shader.uniforms.uVolunteerVest = uniforms.uVolunteerVest
+      shader.uniforms.uDutyBottom = uniforms.uDutyBottom
+      if (!shader.fragmentShader.includes('vec3 keyDir =')) return
+      shader.fragmentShader =
+        'uniform float uVolunteerVest;\nuniform float uDutyBottom;\n' +
+        shader.fragmentShader.replace(
+          'vec3 keyDir =',
+          `float _vax = abs(rest.x);
+          bool _vFront = rest.z > 0.0;
+          if (uVolunteerVest > 0.5 && zone > 0.5 && zone < 1.5) {
+            vec3 vNavy = vec3(0.010, 0.017, 0.033);
+            vec3 vVest = vec3(0.690, 0.855, 0.014);
+            vec3 vSilv = vec3(0.855, 0.905, 0.940);
+            vec3 vRed  = vec3(0.675, 0.038, 0.026);
+            if (_vax > 0.166) {
+              if (rest.x > 0.220 && rest.x < 0.355) {
+                diffuseColor.rgb = (abs(rest.x - 0.288) < 0.014 && rest.y > 1.425) ? vSilv : vRed;
+              } else {
+                diffuseColor.rgb = vNavy;
+              }
+            } else if (rest.y < 1.032) {
+              diffuseColor.rgb = vNavy;
+            } else if (_vFront && rest.y > 1.375 + 0.08 * min(1.0, _vax / 0.075)) {
+              diffuseColor.rgb = vNavy;
+            } else if (_vFront && _vax < 0.007 && rest.y >= 1.032) {
+              diffuseColor.rgb = vec3(0.45, 0.49, 0.53);
+            } else if ((rest.y >= 1.088 && rest.y <= 1.128) || (rest.y >= 1.248 && rest.y <= 1.288) || (_vax > 0.086 && _vax < 0.122 && rest.y > 1.288 && rest.y < 1.485)) {
+              diffuseColor.rgb = vSilv;
+            } else {
+              diffuseColor.rgb = vVest;
+            }
+          }
+          if (uDutyBottom > 0.5 && zone > 1.5 && zone < 2.5 && rest.y > 0.125) {
+            diffuseColor.rgb = vec3(0.010, 0.017, 0.033);
+            if (rest.y > 0.945 && rest.y < 0.985) {
+              diffuseColor.rgb = (_vFront && _vax < 0.028) ? vec3(0.68, 0.72, 0.76) : vec3(0.008, 0.011, 0.018);
+            }
+          }
+          vec3 keyDir =`,
+        )
+    }
+    std.needsUpdate = true
+  } else {
+    const uniforms = std.userData.volunteerUniforms as {
+      uVolunteerVest: {value: number}
+      uDutyBottom: {value: number}
+    }
+    uniforms.uVolunteerVest.value = vestActive ? 1.0 : 0.0
+    uniforms.uDutyBottom.value = dutyBottomActive ? 1.0 : 0.0
+  }
+}
 
 /**
  * Runtime avatar wardrobe applier attached to `figure` + `AvatarRig`.
@@ -774,6 +942,11 @@ export function createAvatarOutfitController(figure: THREE.Group, rig: AvatarRig
     const starterTop = outfit.top.startsWith('top_starter_') || outfit.top === 'top_default_tee'
     const starterBottom = outfit.bottom.startsWith('bottom_starter_') || outfit.bottom === 'bottom_default_pants'
     const uniforms = (skinned.material as THREE.Material).userData?.clothing
+    syncVolunteerClothShader(
+      skinned.material as THREE.Material,
+      outfit.top === 'top_traffic_volunteer',
+      outfit.bottom === 'bottom_traffic_duty',
+    )
     if (uniforms && skin) {
       if (!skinned.geometry.hasAttribute('clothZone')) {
         const ids = Float32Array.from(zones, z => [OUTFIT_ZONE.TOP_PRIMARY,OUTFIT_ZONE.TOP_SLEEVE,OUTFIT_ZONE.TOP_TRIM,OUTFIT_ZONE.TOP_INNER].some(v=>v===z) ? 1 :
@@ -827,6 +1000,18 @@ export function createAvatarOutfitController(figure: THREE.Group, rig: AvatarRig
         const shirt = z === OUTFIT_ZONE.TOP_PRIMARY || z === OUTFIT_ZONE.TOP_SLEEVE || z === OUTFIT_ZONE.TOP_TRIM || z === OUTFIT_ZONE.TOP_INNER
         if (shirt && starterTop) _tmpColor.copy(cPrimary)
         if (z === OUTFIT_ZONE.BOTTOM_BELT && starterBottom) _tmpColor.copy(cBottom)
+      }
+      if (outfit.top === 'top_traffic_volunteer') {
+        const vx = position.getX(i)
+        const vy = position.getY(i)
+        if (z === OUTFIT_ZONE.TOP_PRIMARY || z === OUTFIT_ZONE.TOP_TRIM || z === OUTFIT_ZONE.TOP_INNER) {
+          // Fallback vertex assignment for legacy unshaded figure.glb (live figure_m/f use razor-sharp GLSL overlay)
+          if (vy < 1.03 || (vy > 1.38 && Math.abs(vx) < 0.075)) _tmpColor.set('#192332')
+          else if (vy >= 1.25 && vy <= 1.33) _tmpColor.set('#eef4f8')
+          else _tmpColor.set('#d8ee1e')
+        } else if (z === OUTFIT_ZONE.TOP_SLEEVE && vx > 0.22 && vx < 0.36) {
+          _tmpColor.set('#d6362c')
+        }
       }
       colAttr.setXYZ(i, _tmpColor.r, _tmpColor.g, _tmpColor.b)
     }
