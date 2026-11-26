@@ -21,6 +21,7 @@ interface Host {
   onDown: () => void
   align: (p: Player) => boolean
 }
+const touch = matchMedia('(pointer:coarse) and (not (any-pointer:fine))').matches
 export function combatController(h: Host) {
   const f = new Fighter(),
     ui = hud(),
@@ -57,7 +58,7 @@ export function combatController(h: Host) {
   let press: { x: number; y: number; t: number; id: number } | undefined
   h.canvas.addEventListener('pointerdown', (e) => {
     if (e.button === 0 && e.pointerType === 'mouse' && free())
-      press = { x: e.clientX, y: e.clientY, t: performance.now(), id: e.pointerId }
+      press = { x: e.clientX, y: e.clientY, t: e.timeStamp, id: e.pointerId }
   })
   h.canvas.addEventListener('pointermove', (e) => {
     if (press && Math.hypot(e.clientX - press.x, e.clientY - press.y) >= 6) press = undefined
@@ -67,7 +68,7 @@ export function combatController(h: Host) {
       press &&
       e.pointerId === press.id &&
       e.target === h.canvas &&
-      performance.now() - press.t < 200 &&
+      e.timeStamp - press.t < 200 &&
       hits('Mouse0', 'punch')
     )
       punch()
@@ -194,7 +195,7 @@ export function combatController(h: Host) {
     }
     const p = nearest(),
       prompt =
-        f.down || !p || !h.allowed() ? '' : p.helper && p.helper !== selfId ? '正在被救援' : '长按 E 救援'
+        f.down || !p || !h.allowed() ? '' : p.helper && p.helper !== selfId ? '正在被救援' : touch ? '按住「扶」救援' : '长按 E 救援'
     if (prompt && p) {
       screen.set(p.x, p.y + 1.6, p.z).project(h.camera)
       ui.tip.style.left = ((1 + screen.x) * innerWidth) / 2 + 'px'

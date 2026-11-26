@@ -1,4 +1,4 @@
-import {SHIZIJIE_CURB_BARRIER_POLYLINES, SHIZIJIE_ORIGIN, touchesShizijieTile} from './shizijie-zone.ts'
+import {isShizijieDecorSuppressed, SHIZIJIE_CURB_BARRIER_POLYLINES, SHIZIJIE_ORIGIN, touchesShizijieTile} from './shizijie-zone.ts'
 
 export const ROAD_BARRIER_STRIDE = 7
 
@@ -88,6 +88,7 @@ export function buildRoadBarriers(
   const raw: RawBarrier[] = []
   for (const item of decor) {
     const kind = item[0], east = item[1], south = item[2], heading = item[3], span = item[4] ?? 0
+    if (addShizijieCurbs && origin && isShizijieDecorSuppressed(origin[0] + east / 10, origin[1] + south / 10, kind)) continue
     const spec = barrierSpec(kind)
     if (!spec) continue
     const length = span / 10 + spec.padX * 2

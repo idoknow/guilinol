@@ -112,3 +112,16 @@ test('one helper, release and movement decay, hit interruption and revive HP', (
   assert.equal(b.dn, 0)
   assert(!other.helping)
 })
+test('cooldown tolerates packet jitter at max click rate', () => {
+  const { b, punch, tick } = fixture()
+  punch()
+  assert.equal(b.hp, 92)
+  // 客户端按 350 ms 点击，包到达间隔被抖动压到 300 ms，仍应结算
+  tick(300)
+  punch()
+  assert.equal(b.hp, 84)
+  // 但低于 200 ms 下限的连发仍拒绝
+  tick(150)
+  punch()
+  assert.equal(b.hp, 84)
+})

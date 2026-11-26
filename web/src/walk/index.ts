@@ -1496,13 +1496,21 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
     peers:()=>net?.list()??[],send:p=>net?.send(p),
     onDown(){fishing?.interruptCast();emote.stop();wheel.close();cancelSmoke();selectSlot('hand');window.dispatchEvent(new Event('combat:down'));jumpTimer=0;vx=vz=0},
     align(p){
-      const x=p.x-.6*Math.sin(p.yaw),z=p.z-.6*Math.cos(p.yaw),pos=sim.body.translation()
-      const support=supportAt(x,z,pos.y-cfg.height/2)
-      if(!support||Math.abs(support.y-pos.y+cfg.height/2)>.35||sim.wet(x,z)||sim.pathBlocked(pos.x,pos.z,x,z,pos.y,pos.y))return false
-      const dest={x,y:support.y+cfg.height/2+.02,z}
-      sim.body.setTranslation(dest,true);sim.body.setNextKinematicTranslation(dest)
-      facing=Math.atan2(x-p.x,z-p.z);figure.rotation.y=facing
-      vx=vz=0;return true
+      // IDOK-423：站到倒地者肩侧（与 rt/combat.mjs 的候选位一致），先挑离自己近的一侧，挡住再换另一侧，最后才正前方
+      const pos=sim.body.translation(),fx=-Math.sin(p.yaw),fz=-Math.cos(p.yaw)
+      const spot=(f:number,s:number)=>({x:p.x+fx*f+fz*s,z:p.z+fz*f-fx*s})
+      const sides=[spot(.35,.55),spot(.35,-.55)].sort((a,b)=>Math.hypot(a.x-pos.x,a.z-pos.z)-Math.hypot(b.x-pos.x,b.z-pos.z))
+      for(const {x,z} of [...sides,spot(.6,0)]){
+        const support=supportAt(x,z,pos.y-cfg.height/2)
+        if(!support||Math.abs(support.y-pos.y+cfg.height/2)>.35||sim.wet(x,z)||sim.pathBlocked(pos.x,pos.z,x,z,pos.y,pos.y))continue
+        const dest={x,y:support.y+cfg.height/2+.02,z}
+        sim.body.setTranslation(dest,true);sim.body.setNextKinematicTranslation(dest)
+        // 面朝倒地者的肩（身体前方 0.35 m 处）
+        const sx=p.x+fx*.35,sz=p.z+fz*.35
+        facing=Math.atan2(x-sx,z-sz);figure.rotation.y=facing
+        vx=vz=0;return true
+      }
+      return false
     },
   })
   function attachMp(){
@@ -2924,7 +2932,7 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
   function findUnstuck(from?:{x:number,z:number}){if(!active)return null;const p=from??rides?.boat?.position??sim.body.translation();sim.sync(p.x,p.z);const spot=sim.findFlatGround(p.x,p.z)
     if(verify)spawns.push({reason:'unstuck-probe',from:[p.x,p.z],to:spot?[spot.x,spot.z]:null,distance:spot?Math.hypot(spot.x-p.x,spot.z-p.z):null,rule:spot?.rule??'none'})
     return spot&&{x:spot.x,z:spot.z,distance:Math.hypot(spot.x-p.x,spot.z-p.z),rule:spot.rule}}
-  return {supportAt,carSupportAt,emote,get net(){return net},photoSupport,enter,leave,tick,findUnstuck,get destination(){return destination},spawns,probe,boatClearance,parked(kind?:import('./ride').RideKind|'car'){return rides?.parked(kind)??[]},get freeMoorings(){return rides?.freeMoorings()??[]},get boatKind(){return rides?.freeKind??null},get obstacle(){return bikeObstacle},get vehicle(){return rides?.car?'car':rides?.bike?(rides.rideKind==='bicycle'?'bicycle':'bike'):rides?.boat?'boat':'foot'},get heading(){return rides?.heading??0},get speed(){return rides?.speed??0},get active(){return active},drive(x:number,z:number,run=true){external={x,z,run}},
+  return {supportAt,carSupportAt,emote,get net(){return net},combat,photoSupport,enter,leave,tick,findUnstuck,get destination(){return destination},spawns,probe,boatClearance,parked(kind?:import('./ride').RideKind|'car'){return rides?.parked(kind)??[]},get freeMoorings(){return rides?.freeMoorings()??[]},get boatKind(){return rides?.freeKind??null},get obstacle(){return bikeObstacle},get vehicle(){return rides?.car?'car':rides?.bike?(rides.rideKind==='bicycle'?'bicycle':'bike'):rides?.boat?'boat':'foot'},get heading(){return rides?.heading??0},get speed(){return rides?.speed??0},get active(){return active},drive(x:number,z:number,run=true){external={x,z,run}},
     ebike:{
       get state(){return ebikeState},
       triggerCrash(reason:Exclude<EbikeCrashReason,''>='lowside',side:-1|1=1){if(rides?.bike)triggerTwoWheelCrash(reason,side)},

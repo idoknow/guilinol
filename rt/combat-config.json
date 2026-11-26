@@ -4,6 +4,7 @@
   "zone": {"head": 1.5, "body": 1},
   "comboWindowMs": 850,
   "punchCooldownMs": {"jab": 350, "hook": 650},
+  "cooldownSlackMs": 120,
   "reachM": 0.9,
   "networkMarginM": 0.4,
   "downSeconds": 15,

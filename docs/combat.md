@@ -35,6 +35,7 @@ stateDiagram-v2
 | hpMax | 满血 100 |
 | damage、zone | 直拳 8、摆拳 15，头部 ×1.5、身体 ×1，伤害四舍五入 |
 | comboWindowMs、punchCooldownMs | 850 ms 内承接上一拳，直拳冷却 350 ms、摆拳 650 ms。服务端另有 200 ms 最小间隔 |
+| cooldownSlackMs | 120 ms。服务端按包到达时间计冷却，允许比客户端冷却早到这么多，吸收网络抖动与掉帧；不低于 200 ms 下限 |
 | reachM、networkMarginM | 客户端近身距离 0.9 m，rt 以双方最新三维位置另容许 0.4 m 同步误差 |
 | downSeconds、selfRiseHpRatio | 15 秒自行起身，恢复 30% |
 | crawlSpeed | 爬行速度上限 0.6 m/s，实际另受步速 30% 限制 |
