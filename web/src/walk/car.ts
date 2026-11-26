@@ -347,7 +347,8 @@ export function createCarControl() {
 
       const uFwd = deadzone(T.MathUtils.clamp(forward, -1, 1), ccfg.stickDeadFwd)
       const uTurn = deadzone(T.MathUtils.clamp(right, -1, 1), ccfg.stickDeadTurn)
-      steerInput = T.MathUtils.damp(steerInput, uTurn, ccfg.steerDamp, cdt)
+      const steerAttack = Math.abs(uTurn) > Math.abs(steerInput)
+      steerInput = T.MathUtils.damp(steerInput, uTurn, steerAttack ? ccfg.steerDamp : Math.max(ccfg.steerDamp * 1.4, 8.5), cdt)
       handbrake = !!control?.handbrake
 
       const fx = -Math.sin(heading), fz = -Math.cos(heading)
@@ -419,7 +420,9 @@ export function createCarControl() {
         const spdRatio = Math.min(1, Math.abs(vLong) / Math.max(11.11, capMs))
         const steerScale = gtaPhysics ? ccfg.speedSteer : 2.2
         const effSteer = ccfg.maxSteerAngle / (1 + steerScale * spdRatio * spdRatio)
-        const ackermannOmega = (vLong / ccfg.wheelbase) * Math.tan(steerInput * effSteer)
+        const steerMag = Math.abs(steerInput)
+        const shapedSteer = Math.sign(steerInput) * Math.pow(steerMag, 1.2)
+        const ackermannOmega = (vLong / ccfg.wheelbase) * Math.tan(shapedSteer * effSteer)
 
         if (!gtaPhysics || (Math.abs(vLong) < 4.5 && !handbrake)) {
           // Crisp low-speed Ackermann steering: exact turning radius [4.6, 6.2]m & reverse sign.
@@ -430,7 +433,7 @@ export function createCarControl() {
           // GTA planar yaw + rear tire slip & handbrake powerslide dynamics.
           const speedGate = T.MathUtils.clamp((Math.abs(vLong) - 3.5) / 9.5, 0, 1)
           const hbOversteer = handbrake && vLong > 2.2
-            ? steerInput * ccfg.driftYawBoost * spec.driftSlipGain * Math.min(1, vLong / 10.5)
+            ? shapedSteer * ccfg.driftYawBoost * spec.driftSlipGain * Math.min(1, vLong / 10.5)
             : 0
           const counterRestore = !handbrake && Math.abs(vLat) > .45
             ? T.MathUtils.clamp((vLat / Math.max(4, Math.abs(vLong))) * ccfg.driftCounterAssist, -1.2, 1.2)
