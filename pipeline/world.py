@@ -624,7 +624,7 @@ def build(bbox, output, palette, workers=4):
         from yulong_passage import open_passage
         open_passage(output, chunks)
         from railway_platforms import bake as bake_platforms
-        bake_platforms(output, chunks, play_region.geometry)
+        bake_platforms(output, manifest, play_region.geometry)
     from service_streets import bake_walks
     bake_walks(output, manifest, palette, [layout.exclude, *layout.school_grounds, *layers['water']])
     write_city_lods(output, manifest)

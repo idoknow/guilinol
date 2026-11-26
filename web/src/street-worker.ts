@@ -1,3 +1,4 @@
+import {platformShift, type PlatformGrade} from './platform-grade'
 import {panelCut} from './crossing-panels'
 import {stationShoulders,type ShoulderPlane} from './station-shoulders'
 import style from '../../pipeline/railway-style.json'
@@ -10,7 +11,7 @@ import {isShizijieCrosswalkRing,isShizijieDecorSuppressed,isShizijieSignalSuppre
 import * as THREE from 'three'
 import {look} from './look/config'
 type Pair=[number,number]
-export interface StationPavingStyle {plaza?:Pair[]; platformEdges?:[Pair,Pair][]}
+export interface StationPavingStyle {plaza?:Pair[]; platformEdges?:[Pair,Pair][]; platformGrades?:PlatformGrade[]}
 type Path=[number,...Pair[][]]
 type RoadCtrl=[number,number[]]
 type Lower=[number,Pair[],[number,number,number,number][]]
@@ -72,6 +73,7 @@ export function streetGeometry([paths,lamps,banks,signals=[],stops=[],roadCtrl,s
     }
     return distance
   }
+  const passengerGrades=paving?.platformGrades?.filter(grade=>grade.along) ?? []
   const cutPanels=panels?.length ? panelCut(panels) : undefined
   let platformPath=false
   let lowerPath=false
@@ -92,6 +94,30 @@ export function streetGeometry([paths,lamps,banks,signals=[],stops=[],roadCtrl,s
   const surfaceKinds:number[]=[],alongVals:number[]=[]
   const fenceXyz:number[]=[],fenceRgb:number[]=[],fenceAlong:number[]=[]
   function triangle(first:THREE.Vector3,second:THREE.Vector3,third:THREE.Vector3,kind:number,u1=0,u2=0,u3=0,vertical=false){
+    if(kind===1 && paving?.platformGrades) {
+      const grades=paving.platformGrades
+      const shift=(p:THREE.Vector3)=>platformShift(grades,p.x,p.z,vertical ? baseLevel(p.x,p.z)+.195 : p.y)
+      const tolerance=grades.some(g=>g.along) ? .0008 : .006
+      const heights=[shift(first),shift(second),shift(third)]
+      const vertices=[first,second,third]
+      // Preserve the original pavement plane when adding a vertex at a change of grade.
+      const mids=vertices.map((v,i)=>v.clone().lerp(vertices[(i+1)%3],.5))
+      if(mids.some((mid,i)=>{
+        const j=(i+1)%3
+        return Math.hypot(vertices[i].x-vertices[j].x,vertices[i].z-vertices[j].z)>.25
+          && Math.abs(shift(mid)-(heights[i]+heights[j])/2)>tolerance
+      })){
+        const [ab,bc,ca]=mids
+        const uab=(u1+u2)/2, ubc=(u2+u3)/2, uca=(u3+u1)/2
+        triangle(first,ab,ca,kind,u1,uab,uca,vertical)
+        triangle(ab,second,bc,kind,uab,u2,ubc,vertical)
+        triangle(ca,bc,third,kind,uca,ubc,u3,vertical)
+        triangle(ab,bc,ca,kind,uab,ubc,uca,vertical)
+        return
+      }
+      first=first.clone();second=second.clone();third=third.clone()
+      first.y+=heights[0];second.y+=heights[1];third.y+=heights[2]
+    }
     if(remaining && (kind===0||kind===5) && !vertical){
       for(const poly of remaining(first,second,third))
         for(let k=1;k<poly.length-1;k++)emit(poly[0],poly[k],poly[k+1],kind,u1,u2,u3,false)
@@ -112,7 +138,7 @@ export function streetGeometry([paths,lamps,banks,signals=[],stops=[],roadCtrl,s
       const x2=Math.fround(p2.x),y2=Math.fround(p2.y),z2=Math.fround(p2.z)
       const x3=Math.fround(p3.x),y3=Math.fround(p3.y),z3=Math.fround(p3.z)
       const ny=(z2-z1)*(x3-x1)-(x2-x1)*(z3-z1)
-      if(Math.abs(ny)<1e-4)return
+      if(Math.abs(ny)<(kind===1 && paving?.platformGrades?.some(g=>g.along) ? 1e-9 : 1e-4))return
       if(ny<0){const tmp=p2;p2=p3;p3=tmp;const tu=a2;a2=a3;a3=tu}
       void y1;void y2;void y3
     }
@@ -185,7 +211,22 @@ export function streetGeometry([paths,lamps,banks,signals=[],stops=[],roadCtrl,s
       if((a.x===b.x&&(a.x===0||a.x===256))||(a.y===b.y&&(a.y===0||a.y===256)))continue
       for(let j=0;j<steps;j++){
         const p=a.clone().lerp(b,j/steps),q=a.clone().lerp(b,(j+1)/steps)
-        triangle(vector(p,.045),vector(p,height),vector(q,height),1,0,0,0,true);triangle(vector(p,.045),vector(q,height),vector(q,.045),1,0,0,0,true)
+        const grade=passengerGrades.find(row=>inRing(p.x,p.y,row.ring)&&inRing(q.x,q.y,row.ring)&&inRing((p.x+q.x)/2,(p.y+q.y)/2,row.ring))
+        if(grade){
+          const top=(v:THREE.Vector2)=>new THREE.Vector3(v.x,platformShift([grade],v.x,v.y,0),v.y)
+          const upper=top(p),end=top(q)
+          // Bound the entire face by the lowest terrain corner on both the 4 m and 8 m grids.
+          let foot=Math.min(upper.y,end.y)-.15
+          for(let x=Math.floor(Math.min(p.x,q.x)/8)*8;x<=Math.ceil(Math.max(p.x,q.x)/8)*8;x+=4)
+            for(let z=Math.floor(Math.min(p.y,q.y)/8)*8;z<=Math.ceil(Math.max(p.y,q.y)/8)*8;z+=4)
+              foot=Math.min(foot,railGround(x,z)-.04)
+          const low=new THREE.Vector3(p.x,foot,p.y),next=new THREE.Vector3(q.x,foot,q.y)
+          emit(low,upper,end,1,0,0,0,true)
+          emit(low,end,next,1,0,0,0,true)
+        }else{
+          triangle(vector(p,.045),vector(p,height),vector(q,height),1,0,0,0,true)
+          triangle(vector(p,.045),vector(q,height),vector(q,.045),1,0,0,0,true)
+        }
       }
     }
   }
