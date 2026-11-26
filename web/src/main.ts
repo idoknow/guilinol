@@ -15,6 +15,8 @@ import {gfxState} from './look/gfx-state'
 import {installAtmosphere, outerGround, sky} from './look/atmosphere'
 import {startPeaks} from './peaks'
 import {presets,setPreset,pickSpawn,spawnPool} from './presets'
+import {plazaSpawn} from './helicopter/site'
+import {helicopter} from './helicopter/runtime'
 import {isDeepLink} from './deeplink'
 import {readLastView, saveLastView, consumeRestore, applyLastView} from './lastview'
 import {walkConfig} from './walk/config'
@@ -270,6 +272,7 @@ async function start(loader:FullLoader,creatorSpawn=false) {
   entrySignal?.throwIfAborted()
   scene.add(base.mesh,peaks)
   const stream = openingStream??new Stream(scene,manifest,base,rangeStore,camera)
+  const heli=helicopter(scene,camera,()=>walker,params.has('verify'))
   if(!openingStream){
     openingStream=stream
     try{
@@ -327,6 +330,7 @@ async function start(loader:FullLoader,creatorSpawn=false) {
   let checkedCards=false
   let landingQueue=Promise.resolve()
   function walkTo(x:number,z:number,yaw:number,reason:string,name?:string,request?:AbortSignal){
+    if(heli.active)return Promise.resolve(false)
     const parent=titleTransition
     const result=landingQueue.then(()=>request?.aborted?false:land(x,z,yaw,reason,name,parent,request))
     landingQueue=result.then(()=>{},()=>{})
@@ -384,14 +388,14 @@ async function start(loader:FullLoader,creatorSpawn=false) {
   async function landSolo(initial:boolean) {
     if(walker?.active)return
     const gate = walkConfig.gate
-    const point = initial && !opening ? gate : {x:camera.position.x,z:camera.position.z,yaw:camera.rotation.y}
+    const point = initial && !isDeepLink(openParams) ? plazaSpawn : initial && !opening ? gate : {x:camera.position.x,z:camera.position.z,yaw:camera.rotation.y}
     if(await walkTo(point.x,point.z,point.yaw,'solo'))return
     titleTransition?.signal.throwIfAborted()
     if(await walkTo(gate.x,gate.z,gate.yaw,'solo-fallback'))return
     throw Error('单人模式未找到可落脚的位置')
   }
   function takeFlight() {
-    if(getPlayMode()==='solo')return {ok:false,code:'FLIGHT_DISABLED_IN_SOLO'} as const
+    if(getPlayMode()==='solo'||heli.active)return {ok:false,code:'FLIGHT_DISABLED_IN_SOLO'} as const
     walker?.leave()
     showMode()
     return {ok:true} as const
@@ -595,7 +599,7 @@ async function start(loader:FullLoader,creatorSpawn=false) {
     deriveRangeMetrics,
     setView:(view:unknown)=>host.setView(view),
     async photoSupport(x:number,z:number,bridgeRadius?:number){return (await loadWalker()).photoSupport(x,z,bridgeRadius)},
-    peaksStats:peaks.stats,clock,env,get tour(){return tour},get walk(){return walker},
+    peaksStats:peaks.stats,clock,env,get tour(){return tour},get walk(){return walker},...(params.has('verify')?{heli}:{}),
     flight: takeFlight,
     setPreset(name:string){if(getPlayMode()==='solo')return {ok:false,code:'FLIGHT_DISABLED_IN_SOLO'}
       setPreset(camera,name,manifest.bbox);camera.updateMatrixWorld();return stats.frame},
@@ -674,7 +678,7 @@ async function start(loader:FullLoader,creatorSpawn=false) {
     if((paused||tour?.map?.active)&&frame>2){previous=0;return}
     const elapsed = previous?now-previous:0;previous=now
     gfx.frame(elapsed)
-    if(!switching){if(walker?.active)walker.tick(elapsed/1000);else {controls(elapsed/1000);clampOpening()}}
+    if(!switching){if(walker?.active&&!heli.active)walker.tick(elapsed/1000);else if(!walker?.active){controls(elapsed/1000);clampOpening()}heli.tick(elapsed/1000)}
     if(frame===1) {
       if(!first)markFirstFrame()
       void import('./play').then(mod=>{tour=mod.play(host)})
@@ -696,7 +700,7 @@ async function start(loader:FullLoader,creatorSpawn=false) {
       }
       trafficTick?.(elapsed/1000,walker?.active&&walker.vehicle!=='foot'?walker.position:undefined,
         walker?.active?walker.position:undefined,getPlayMode()==='solo',showTraffic)
-      const target=walker?.destination??(walker?.active?walker.position:camera.position)
+      const target=heli.lookAhead??walker?.destination??(walker?.active?walker.position:camera.position)
       stream.tick(target)
       if(frame>=2) syncCityUpgradeProps()
       stream.updateLandmarks?.(target)
@@ -738,7 +742,7 @@ async function start(loader:FullLoader,creatorSpawn=false) {
       sum=0;samples=0
     }
   }
-  spawnCreatedCharacter=async()=>{const gate=walkConfig.gate
+  spawnCreatedCharacter=async()=>{const gate=getPlayMode()==='solo'&&!isDeepLink(openParams)?plazaSpawn:walkConfig.gate
     if(!await walkTo(gate.x,gate.z,gate.yaw,'creator'))throw Error('出生点暂时无法进入')
     showMode()}
   if(creatorSpawn)await spawnCreatedCharacter()

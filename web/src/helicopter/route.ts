@@ -10,7 +10,7 @@ interface Point {x:number; z:number}
 const limit = (value:number, max:number) => Math.min(max, Math.max(-max, value))
 const blend = (fraction:number) => fraction ** 3 * (10 + fraction * (-15 + 6 * fraction))
 
-export function tourRoute(pad:Point, mode:TourMode, ceiling:(x:number,z:number)=>number) {
+export function tourRoute(pad:Point, mode:TourMode, ceiling:(x:number,z:number,seconds:number)=>number) {
   const stops = [pad, ...spots, pad]
   const lengths = stops.slice(1).map((stop,index)=>Math.hypot(stop.x-stops[index].x, stop.z-stops[index].z))
   const total = lengths.reduce((sum,length)=>sum + length, 0)
@@ -31,7 +31,7 @@ export function tourRoute(pad:Point, mode:TourMode, ceiling:(x:number,z:number)=
   const step=0.25, heights:number[]=[]
   for(let tick=0;tick<=duration/step;tick++) {
     const {x,z,fraction}=horizontal(tick*step)
-    const surface=ceiling(x,z)
+    const surface=ceiling(x,z,tick*step)
     if(!Number.isFinite(surface)) throw new Error('Missing tour clearance data')
     heights.push(surface+(mode==='high'?260:mode==='low'?55:55+135*Math.sin(Math.PI*fraction)**4))
   }

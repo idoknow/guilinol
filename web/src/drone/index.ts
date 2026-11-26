@@ -178,6 +178,7 @@ export function droneMode(host:Host, deps:{groundAt:(x:number,z:number)=>number;
   }
 
   async function place(id:DroneId) {
+    if(document.body.dataset.helicopter)return
     recall()
     placed = id
     const built = await buildDroneAsync(id)
@@ -350,6 +351,7 @@ export function droneMode(host:Host, deps:{groundAt:(x:number,z:number)=>number;
   let savedCamera:{pos:THREE.Vector3; quat:THREE.Quaternion; fov:number}|null = null
 
   function enterRc() {
+    if(document.body.dataset.helicopter)return
     if (!flight || rcActive) return
     if (flight.phase !== 'landed') return
     const cap = flight.spec.payloadG ?? 0
