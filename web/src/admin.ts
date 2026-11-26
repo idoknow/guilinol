@@ -1791,7 +1791,25 @@ const pages: Record<string, (view: View) => void> = {
       sub: '封了立即生效（在线会掉线）；账号与设备指纹任一命中即拦。人工解封后马上可重连。',
     })
 
-    main.append(banCard)
+    const protections = [
+      ['WAF 特征拦截','待接入','SQL 注入、XSS、命令注入、路径遍历、SSRF'],
+      ['蜜罐路径','待接入','命中后按可信来源 IP 封禁'],
+      ['扫描器识别','待接入','扫描器 UA 匹配'],
+      ['全局限流','未核实','目标：每 IP 120 次 / 60 秒'],
+      ['登录防爆破','部分实现','当前：每 IP 登录 60 次 / 15 分钟；单账号连续失败 5 次锁 15 分钟。目标：每 IP 5 次锁 15 分钟、单账号 8 次锁 30 分钟、20 次封 IP 24 小时'],
+      ['安全响应头','部分实现','反馈附件响应有 CSP；未核实全站 CSP、HSTS、X-Frame-Options'],
+      ['自动封禁','仅联机规则','Web 目标：10 分钟内 20 次事件封 IP；联机短封不等于网站 IP 封禁'],
+      ['特征库规模','未取得规则源','期望基线：89 条正则（65 高 / 23 中 / 1 低）、58 个 UA、102 条蜜罐路径；非当前已加载数量'],
+      ['拦截级别','待接入','目标：默认拦截严重度 2 级及以上'],
+      ['扫描器行为识别','待接入','目标：综合 UA、请求头、方法、路径及 5 分钟内行为，达到 5 分判定'],
+      ['撞库 / 学号枚举','待接入','目标：30 分钟内同 IP 尝试 15 个账号封 2 小时；同学号段 5 个封 1 小时。本站邮箱登录，未核实学号字段'],
+      ['弱密码库','注册 / 重设已接入',`${weakFormCount} 个去重弱口令形式，另检测键盘序、重复、纯数字和日期格式；不改变旧账号登录`],
+      ['IP 信誉查询','未接入','未接入 360 或 AbuseIPDB；请勿在此填写密钥'],
+    ]
+    const protectionTable=h('table',{class:'adm-table'},
+      h('thead',null,h('tr',null,...['防护项','状态','说明'].map(label=>h('th',null,label)))),
+      h('tbody',null,...protections.map(row=>h('tr',null,...row.map(value=>h('td',null,value))))))
+    main.append(banCard,card('当前防护项',protectionTable,{sub:'按本版本代码核对，不代表线上 CDN 或 WAF 实时状态。'}))
     refreshTimer = window.setInterval(() => {
       if (document.visibilityState === 'visible' && !banSlot.querySelector('details[open]')) void loadBans()
     }, 10000)
@@ -3372,3 +3390,4 @@ function securityCard(user: { id: string; email: string }) {
     h('div', { class: 'adm-merge-row' }, emailInput, emailButton),
     output)
 }
+import { weakFormCount } from '../../lib/weak-password'
