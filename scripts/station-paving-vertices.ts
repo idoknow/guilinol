@@ -22,7 +22,9 @@ for (const file of new Set([...tiles[0].keys(), ...tiles[1].keys()])) {
   const pair = tiles.map(lookup => lookup.get(file))
   if (pair.some(t => !t)) throw new Error('Missing tile ' + file)
   const bytes = worlds.map(world => fs.readFileSync(path.join(world, file)))
-  if ((!referenceSource || !scope?.has(file)) && bytes[0].equals(bytes[1]) && JSON.stringify(pair[0]) === JSON.stringify(pair[1])
+  const inScope = !scope || scope.has(file)
+  if (!inScope && bytes[0].equals(bytes[1])) continue
+  if (!referenceSource && bytes[0].equals(bytes[1]) && JSON.stringify(pair[0]) === JSON.stringify(pair[1])
       && JSON.stringify(nearbyTunnels(manifests[0].tunnels, pair[0].x, pair[0].z)) ===
          JSON.stringify(nearbyTunnels(manifests[1].tunnels, pair[1].x, pair[1].z))) continue
   const buildings = bytes.map(raw => {
@@ -30,7 +32,7 @@ for (const file of new Set([...tiles[0].keys(), ...tiles[1].keys()])) {
     return b.subarray(16924, 16924 + 9 * b.readUInt32LE(4) + 4 * b.readUInt32LE(8))
   })
   if (!buildings[0].equals(buildings[1])) buildingChanges.push(file)
-  if (scope && !scope.has(file)) continue
+  if (!inScope) continue
   const sets = worlds.map((world, i) => {
     const keys = new Set<string>()
     const render = i === 0 ? openingFaces : tileFaces

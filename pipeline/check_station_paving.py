@@ -37,14 +37,13 @@ def compare(reference, candidate, reference_source=None):
                   for k, (way, line, _) in road_design(widths).items() if k not in TIEXI})
     command = [ROOT / "node_modules/.bin/tsx", ROOT / "scripts/station-paving-vertices.ts", *worlds]
     with tempfile.TemporaryDirectory() as temp:
-        if reference_source:
-            size = manifests[0]["chunkSize"]
-            tiles = [t["file"] for t in manifests[0]["chunks"]
-                     if any(mask.intersects(shapely.box(t["x"], t["z"], t["x"] + size, t["z"] + size))
-                            for mask in areas.values())]
-            scope = Path(temp) / "station-tiles.json"
-            scope.write_text(json.dumps(tiles))
-            command.extend([reference_source.resolve(), scope])
+        size = manifests[0]["chunkSize"]
+        tiles = [t["file"] for t in manifests[0]["chunks"]
+                 if any(mask.intersects(shapely.box(t["x"], t["z"], t["x"] + size, t["z"] + size))
+                        for mask in areas.values())]
+        scope = Path(temp) / "station-tiles.json"
+        scope.write_text(json.dumps(tiles))
+        command.extend([reference_source.resolve() if reference_source else "", scope])
         result = json.loads(subprocess.check_output(command, cwd=ROOT))
     # A separately rendered elevated slab can cross a fixed road in plan.
     # Its own bridge/approach audit checks it. Native unowned pavement is
