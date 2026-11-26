@@ -44,7 +44,24 @@ import {mountStats} from './ui/stats'
 import {mountHotkeys} from './ui/hotkeys'
 import {mountLazyTianyuanMifen} from './mifen/entry'
 import {shouldMountDrinksShop} from './drinks/site'
-import {createTrafficDuty, DUTY_ZONES, mountAllDutyOfficers, mountShizijieSignalsOverlay, type TrafficDutyController} from './traffic-duty'
+import {
+  createJiefangRailingsVisual,
+  createTrafficDuty,
+  DUTY_ZONES,
+  getActiveFineTerminalSession,
+  isOnJiefangBridgeDeck,
+  JIEFANG_DUTY_ZONE,
+  jiefangDeckWorldY,
+  mountAllDutyOfficers,
+  mountShizijieSignalsOverlay,
+  openFineTerminal,
+  resolveDutyTeleportDeckY,
+  sharedCitationLedger,
+  type DutyTrafficBridge,
+  type TrafficDutyController,
+} from './traffic-duty'
+import {createDutyTraffic} from './traffic/duty-traffic'
+import {isDown as isKnockdownDown, knockdown, triggerKnockdown} from './walk/knockdown'
 import {mountChat} from './ui/chat'
 import {mountGuide} from './ui/guide'
 import {touchUi} from './ui/input-mode'
@@ -295,7 +312,7 @@ async function start(loader:FullLoader,creatorSpawn=false) {
   type Walker=Awaited<ReturnType<typeof import('./walk').walk>>
   let loadingWalker:Promise<Walker>|undefined
   function loadWalker():Promise<Walker>{return loadingWalker??=prefetchWalk().then(module=>module.walk(scene,camera,renderer.domElement,manifest,stream,peaks,params.has('verify'))).then(player=>{walker=player;player.setDrinksBridge?.(drinks?{getCandidate:()=>drinks!.getInteractCandidate(),interact:()=>drinks!.interact()}:null);player.setTrafficDuty?.(trafficDuty??null);return player}).catch(error=>{loadingWalker=undefined;throw error})}
-  async function walkTo(x:number,z:number,yaw:number,reason:string,name?:string){
+  async function walkTo(x:number,z:number,yaw:number,reason:string,name?:string,targetY?:number){
     if(switching)return false
     switching=true
     const start=performance.now()
@@ -311,7 +328,25 @@ async function start(loader:FullLoader,creatorSpawn=false) {
       if(signal.aborted)return false
       cover.progress(.3,'步行模块已就绪')
       completed=await player.enter(x,z,yaw,reason,false,signal,cover.progress)
-      if(completed)cover.progress(1)
+      if(completed){
+        const desiredY=typeof targetY==='number'&&Number.isFinite(targetY)
+          ? targetY
+          : (reason==='traffic-duty'||name==='解放桥')&&isOnJiefangBridgeDeck({x,z})
+            ? jiefangDeckWorldY(x,z)
+            : undefined
+        if(desiredY!==undefined){
+          const curFootY=player.position.y-walkConfig.height/2
+          const curPlanarErr=Math.hypot(player.position.x-x,player.position.z-z)
+          if(Math.abs(curFootY-desiredY)>0.5||curPlanarErr>0.8){
+            const sampledY=player.carSupportAt(x,z,desiredY)?.y
+            const deckY=resolveDutyTeleportDeckY(sampledY,desiredY)
+            player.clampPosition({x,y:deckY+0.055,z})
+            player.face(yaw,0.08)
+            trafficDuty?.step(0)
+          }
+        }
+        cover.progress(1)
+      }
       return completed
     }finally{controller.abort();operation('teleport',start,completed);switching=false;showMode();if(!parent)await cover.done()}
   }
@@ -366,13 +401,15 @@ async function start(loader:FullLoader,creatorSpawn=false) {
       hint.textContent='WASD 骑行 · 1-3/Q·E 换挡 · Space 翘头/起身 · Shift 压弯 · K 边撑 · H 铃铛 · F 下车 · V 起飞'
     }else if(walking&&document.body.hasAttribute('data-aboard')&&ride==='boat'){
       hint.textContent='WASD 划船 · F 靠岸下船 · 拖动转视角 · 滚轮远近 · V 起飞'
+    }else if(walking&&!document.body.hasAttribute('data-aboard')&&document.body.dataset.tdDutyActive==='1'){
+      hint.textContent=`WASD 走 · ${bindingLabel('dutyWhistle')} 吹哨 · ${bindingLabel('dutyFlag')} 短按挥旗拦停 / 长按放行 · ${bindingLabel('dutyTicket')} 开单与1.5m递交 · 空格 跳 · C 视距`
     }else{
       hint.textContent=walking?`WASD 走 · Shift 跑 · X 蹲 · 空格 跳 · ${bindingLabel('emote')} 表情 · C 视距 · 滚轮远近 · V 起飞 · M 地图 · J 景册 · P 拍照`:'WASD 飞 · Q/E 升降 · Shift 加速 · V 落地步行 · M 地图 · J 景册 · P 拍照 · Esc 菜单'
     }
     if(getPlayMode()==='solo')hint.textContent=hint.textContent?.replace(/ · V (起飞|飞)/g,'') ?? ''
   }
   onPrefs(showMode)
-  new MutationObserver(()=>showMode()).observe(document.body,{attributes:true,attributeFilter:['data-aboard','data-ride']})
+  new MutationObserver(()=>showMode()).observe(document.body,{attributes:true,attributeFilter:['data-aboard','data-ride','data-td-duty-active']})
   let toastTimer=0
   const showToast=(text:string,ms=3200)=>{toast.textContent=text;toast.classList.add('show')
     clearTimeout(toastTimer);toastTimer=window.setTimeout(()=>toast.classList.remove('show'),ms)}
@@ -507,13 +544,43 @@ async function start(loader:FullLoader,creatorSpawn=false) {
     return typeof v === 'number' && Number.isFinite(v) ? v : undefined
   }
   const dutyOfficers = mountAllDutyOfficers(scene, dutyGroundAt)
+  const jiefangRailings = createJiefangRailingsVisual()
+  scene.add(jiefangRailings.group)
+  const dutyTraffic = createDutyTraffic({ scene, camera, sampleGround: dutyGroundAt })
+  const dutyTrafficBridge: DutyTrafficBridge = {
+    start: () => dutyTraffic.start(),
+    stop: () => dutyTraffic.stop(),
+    getTraffic: () => dutyTraffic.getTraffic(),
+    getActors: () => dutyTraffic.getActors(),
+    onPlayerHit: cb => dutyTraffic.onPlayerHit(cb),
+    onPlayerHorn: cb => dutyTraffic.onPlayerHorn(cb),
+    notifyViolatorCited: actor => dutyTraffic.notifyViolatorCited(actor),
+    commandHalt: (origin, opts) => dutyTraffic.commandHalt(origin, opts),
+    onViolatorPulledOver: (actor, durationSec) => dutyTraffic.onViolatorPulledOver(actor, durationSec),
+    onTicketReceived: (actor, receipt) => dutyTraffic.onTicketReceived(actor, receipt),
+    getActorHandBone: (actor, side) => dutyTraffic.getActorHandBone(actor, side),
+    releaseViolator: actor => dutyTraffic.releaseViolator(actor),
+  }
   const shizijieSignals = mountShizijieSignalsOverlay(scene, { groundAt: dutyGroundAt })
   const dutyProjVec = new THREE.Vector3()
+  let activeFineTargetActor: import('./traffic/sim').Actor | null = null
   trafficDuty = createTrafficDuty({
     getPlayerPos: () => (walker?.active ? walker.position : null),
+    getPlayerYaw: () => walker?.yaw ?? 0,
+    getPlayerObject: () => walker?.figure ?? null,
     isWalking: () => !!walker?.active,
     isPaused: () => paused || !!tour?.map?.active,
-    isUiBlocked: () => isModalOrOverlayOpen() || document.body.dataset.photo === 'on',
+    isUiBlocked: () => {
+      const ft = getActiveFineTerminalSession()
+      return isModalOrOverlayOpen() || document.body.dataset.photo === 'on' || (Boolean(ft) && ft?.getPhase() !== 'deliver')
+    },
+    getOfficerPos: () => dutyOfficers.officers.jiefang.position,
+    getOfficerYaw: () => JIEFANG_DUTY_ZONE.spot.yaw,
+    getOfficerObject: () => dutyOfficers.officers.jiefang.officerRoot,
+    officerNpc: dutyOfficers.officers.jiefang,
+    camera,
+    renderer,
+    scene,
     projectToScreen: worldPos => {
       dutyProjVec.set(worldPos.x, worldPos.y, worldPos.z).project(camera)
       return {
@@ -522,11 +589,86 @@ async function start(loader:FullLoader,creatorSpawn=false) {
         visible: dutyProjVec.z >= -1 && dutyProjVec.z <= 1 && Math.abs(dutyProjVec.x) <= 1 && Math.abs(dutyProjVec.y) <= 1,
       }
     },
-    onDutyStateChange: active => walker?.setTrafficVolunteerMode?.(active),
+    onOfficerStateChange: state => dutyOfficers.setJiefangState(state),
+    onOfficerExpression: expr => dutyOfficers.officers.jiefang.setExpression(expr),
+    onOfficerLookTarget: pos => dutyOfficers.officers.jiefang.setLookTarget(pos),
+    onDutyStateChange: active => {
+      walker?.setTrafficVolunteerMode?.(active)
+      if (!active) walker?.setDutyGear?.({ hasWhistle: false, hasFlag: false })
+    },
+    trafficBridge: dutyTrafficBridge,
+    fineTerminal: {
+      openFineTerminal: req => {
+        activeFineTargetActor = req.actor
+        if (!camera.parent) scene.add(camera)
+        const opened = openFineTerminal({
+          actor: req.actor,
+          violation: req.violation,
+          violations: req.violations,
+          fineYuan: req.fineYuan,
+          plateNo: req.plateNo ?? req.plate,
+          zoneName: req.zoneName,
+          vehicleSubtype: req.vehicleSubtype,
+          getPlayerPos: req.getPlayerPos ?? (() => (walker?.active ? walker.position : null)),
+          ledger: sharedCitationLedger,
+          enforceDuplicateCheck: true,
+          printerMountMode: 'hand',
+          handAnchor: walker?.handAnchor?.() ?? null,
+          firstPersonCamera: camera,
+          dutyProps: req.dutyProps ?? walker?.getDutyPropsHandle?.() ?? walker?.dutyPropsHandle ?? null,
+          violatorObject3D: req.violatorObject3D ?? null,
+          getActorHandBone: (actor, side) => dutyTrafficBridge.getActorHandBone?.(actor, side) ?? null,
+          resolveViolatorHandBone: (actor, side) =>
+            dutyTrafficBridge.getActorHandBone?.(actor, side ?? 'right') ?? null,
+          closeupCamera: req.closeupCamera ?? camera,
+          onToast: msg => showToast(msg, 2400),
+          onPhaseChange: (phase, snap) => {
+            if (typeof document !== 'undefined' && document.body) {
+              document.body.dataset.tdTerminalPhase = phase
+            }
+            req.onPhaseChange?.(phase, snap)
+          },
+        })
+        void opened.finally(() => {
+          if (activeFineTargetActor === req.actor) activeFineTargetActor = null
+          if (typeof document !== 'undefined' && document.body) {
+            delete document.body.dataset.tdTerminalPhase
+          }
+        })
+        return opened
+      },
+      isOpen: () => Boolean(getActiveFineTerminalSession()),
+      isDelivering: () => getActiveFineTerminalSession()?.getPhase() === 'deliver',
+      isHandingOver: () => Boolean(getActiveFineTerminalSession()?.getSnapshot().isHandingOver),
+      confirmDeliver: () => Boolean(getActiveFineTerminalSession()?.confirmDeliver()),
+      getTargetActor: () => activeFineTargetActor,
+      close: () => {
+        activeFineTargetActor = null
+        if (typeof document !== 'undefined' && document.body) {
+          delete document.body.dataset.tdTerminalPhase
+        }
+        getActiveFineTerminalSession()?.cancel('disposed')
+      },
+    },
+    propsBridge: {
+      grantGear: g => walker?.setDutyGear?.(g),
+      clearGear: () => walker?.setDutyGear?.({ hasWhistle: false, hasFlag: false }),
+      playGesture: kind => walker?.playDutyGesture?.(kind),
+      setWhistleAlwaysAtMouth: on => walker?.setWhistleAlwaysAtMouth?.(on),
+      getHandle: () => walker?.getDutyPropsHandle?.() ?? walker?.dutyPropsHandle ?? null,
+    },
+    knockdownBridge: {
+      triggerKnockdown: (kind, dir, severity) => {
+        if (trafficDuty && !trafficDuty.canStartKnockdown()) return
+        triggerKnockdown(kind === 'ebike_fall' ? 'bike_crash' : kind, dir, severity, { yaw: walker?.yaw ?? 0 })
+      },
+      isDown: () => isKnockdownDown(),
+    },
+    onDutyBoundaryClamp: clamped => walker?.clampPosition?.(clamped),
     onToast: (text, ms) => showToast(text, ms),
     onTeleportToZone: zoneId => {
       const z = DUTY_ZONES.find(item => item.id === zoneId) ?? DUTY_ZONES[0]
-      return walkTo(z.teleport.x, z.teleport.z, z.teleport.yaw, 'traffic-duty', z.name)
+      return walkTo(z.teleport.x, z.teleport.z, z.teleport.yaw, 'traffic-duty', z.name, z.teleport.y)
     },
     arbiterWired: true,
   })
@@ -534,7 +676,7 @@ async function start(loader:FullLoader,creatorSpawn=false) {
   mountChat()
   const tourProbe = {getState, missions: {start: () => ({ok:false, code:'SOLO_MODE_REQUIRED'})}}
   let staticAudit:ReturnType<typeof import('./verify-static').staticVerifier>|undefined
-  const publishViewer=()=>Object.assign(window,{viewer:{camera,stream,manifest,stats,walkTo,staticAudit,get game(){return solo?.probe ?? tourProbe},get mifen(){return mifen.getProbe()},get drinks(){return drinks?.getProbe()??null},trafficDuty,dutyOfficers,shizijieSignals,
+  const publishViewer=()=>Object.assign(window,{viewer:{camera,stream,manifest,stats,walkTo,staticAudit,get game(){return solo?.probe ?? tourProbe},get mifen(){return mifen.getProbe()},get drinks(){return drinks?.getProbe()??null},trafficDuty,dutyTraffic,jiefangRailings,dutyOfficers,shizijieSignals,knockdown,openFineTerminal,getActiveFineTerminalSession,
     get trafficCount(){return (scene.getObjectByName('G2 traffic') as THREE.InstancedMesh|undefined)?.count??0},
     get trafficProbe(){return scene.getObjectByName('G2 traffic')?.userData},
     async trafficPixels(){return (await import('./traffic/visibility-probe')).pixelVisible(renderer,scene,camera)},
@@ -644,6 +786,12 @@ async function start(loader:FullLoader,creatorSpawn=false) {
     solo?.step(stepDt)
     mifen.step(stepDt)
     drinks?.step(stepDt)
+    dutyTraffic.step(stepDt, walker?.active ? walker.position : null, {
+      officerActive: trafficDuty?.getSnapshot().phase === 'active',
+      officerYaw: walker?.yaw ?? 0,
+      officerRunning: Boolean(walker?.active && walker.vehicle === 'foot' && (walker.footSpeed ?? 0) > 4.6),
+      vehiclePos: walker?.active && walker.vehicle !== 'foot' ? walker.position : undefined,
+    })
     trafficDuty?.step(stepDt)
     dutyOfficers.update(stepDt)
     shizijieSignals.update(walker?.active ? walker.position : camera.position, stepDt)

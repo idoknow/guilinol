@@ -2,14 +2,25 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 
 import {
+  JIEFANG_RAILING_VOLUME_ID,
+  buildJiefangRailingObstacleVolume,
   buildTianyuanObstacleVolume,
   clampCameraToObstacleVolumes,
+  createDefaultCityObstacleVolumes,
   expandVolumeToCuboids,
   isInsideShell,
   resolveObstacleVolumesStep,
   volumeLocalToWorld,
+  withDefaultCityObstacleVolumes,
   worldToVolumeLocal,
 } from './obstacle-volumes.ts'
+import R from '@dimforge/rapier3d-compat'
+import {
+  JIEFANG_BRIDGE_ORIGIN,
+  JIEFANG_BRIDGE_ROTATION_Y,
+  JIEFANG_RAILING_TRACKS,
+  jiefangDeckRoadLocalY,
+} from '../traffic-duty/jiefang-railings.ts'
 
 const SITE_ORIGIN = [-1139.2, 156.1, -55.5]
 const SITE_ROT = 2.83616 - Math.PI
@@ -275,4 +286,208 @@ test('indoor camera clamp prevents camera from poking outside exterior walls, cu
   const [ocx, ocz] = volumeLocalToWorld(1.1, 14.0, SITE_ORIGIN, SITE_ROT)
   const outCam = { x: ocx, y: SITE_ORIGIN[1] + 3.0, z: ocz }
   assert.equal(clampCameraToObstacleVolumes({ x: opx, y: SITE_ORIGIN[1], z: opz }, outCam, 0.22, [vol]), false)
+})
+
+function makeBridgePos(lx, lz, aboveRoadY = 0.0) {
+  const [wx, wz] = volumeLocalToWorld(lx, lz, JIEFANG_BRIDGE_ORIGIN, JIEFANG_BRIDGE_ROTATION_Y)
+  const roadLocalY = jiefangDeckRoadLocalY(lx)
+  return {
+    x: wx,
+    y: JIEFANG_BRIDGE_ORIGIN[1] + roadLocalY + aboveRoadY + FOOT_HEIGHT * 0.5,
+    z: wz,
+  }
+}
+
+test('Jiefang bridge railings volume continuously blocks walk/vehicles across full span while lowered ~1.1m top is jumpable & standable', async () => {
+  const defaults = createDefaultCityObstacleVolumes()
+  assert.equal(defaults.length, 1)
+  assert.equal(defaults[0].id, JIEFANG_RAILING_VOLUME_ID)
+  const merged = withDefaultCityObstacleVolumes([])
+  assert.equal(merged.length, 1)
+  assert.equal(withDefaultCityObstacleVolumes(merged).length, 1)
+
+  const vol = buildJiefangRailingObstacleVolume()
+  assert.equal(vol.shell, undefined)
+  assert.ok(vol.boxes.length >= 40)
+
+  const foot = { radius: FOOT_RADIUS, height: FOOT_HEIGHT }
+
+  // Continuous closed railings across full [-140.5, +140.5] span (including former gaps -98, 0, 125) block walking and low hops
+  for (const testX of [-138, -115, -98, -50, 0, 60, 125, 138]) {
+    for (const track of JIEFANG_RAILING_TRACKS) {
+      const railZ = track.z
+      assert.ok(track.colliderHeight >= 1.0 && track.colliderHeight <= 1.2)
+      let pos = makeBridgePos(testX, railZ - 1.2)
+      let hits = 0
+      for (let s = 0; s < 25; s++) {
+        const [clx, clz] = worldToVolumeLocal(pos.x, pos.z, JIEFANG_BRIDGE_ORIGIN, JIEFANG_BRIDGE_ROTATION_Y)
+        const next = makeBridgePos(clx, clz + 0.12)
+        const res = resolveObstacleVolumesStep(pos, next, foot, [vol])
+        if (res.blocked) hits++
+        pos = next
+      }
+      const [, endLz] = worldToVolumeLocal(pos.x, pos.z, JIEFANG_BRIDGE_ORIGIN, JIEFANG_BRIDGE_ROTATION_Y)
+      assert.ok(hits > 0, `railZ=${railZ} at lx=${testX} did not block walker`)
+      assert.ok(endLz < railZ, `walker crossed continuous barrier railZ=${railZ} at lx=${testX}: endLz=${endLz}`)
+
+      // Low hop (+0.55m) still blocks crossing
+      const lowHop0 = makeBridgePos(testX, railZ - 0.9, 0.55)
+      const lowHop1 = makeBridgePos(testX, railZ + 0.9, 0.55)
+      assert.equal(resolveObstacleVolumesStep(lowHop0, lowHop1, foot, [vol]).blocked, true)
+
+      // Full jump reaching top surface (>= colliderHeight) allows stepping onto and over the railing top
+      const topY = track.colliderHeight
+      const topStep0 = makeBridgePos(testX, railZ - 0.5, topY)
+      const topStep1 = makeBridgePos(testX, railZ, topY)
+      const topStep2 = makeBridgePos(testX, railZ + 0.5, topY)
+      assert.equal(resolveObstacleVolumesStep(topStep0, topStep1, foot, [vol]).blocked, false, `failed stepping onto top of ${track.id} at lx=${testX}`)
+      assert.equal(resolveObstacleVolumesStep(topStep1, topStep2, foot, [vol]).blocked, false, `failed stepping across top of ${track.id} at lx=${testX}`)
+    }
+  }
+
+  // Real Rapier CharacterController + obstacle-volumes simulation: jump onto railing top, stand steadily, then cross to opposite lane
+  await R.init()
+  const world = new R.World({ x: 0, y: -20, z: 0 })
+  const controller = world.createCharacterController(0.025)
+  controller.setMaxSlopeClimbAngle((52 * Math.PI) / 180)
+  controller.setMinSlopeSlideAngle((52 * Math.PI) / 180)
+  controller.enableAutostep(0.62, 0.08, false)
+  controller.enableSnapToGround(0.65)
+  const shape = new R.Capsule(FOOT_HEIGHT / 2 - 0.29, 0.29)
+  const body = world.createRigidBody(R.RigidBodyDesc.kinematicPositionBased().setTranslation(0, 0, 0))
+  const capsule = world.createCollider(new R.ColliderDesc(shape), body)
+
+  // Mount bridge road slab (top at roadY) + expanded railing cuboids matching physics.ts
+  for (let x0 = -140; x0 < 140; x0 += 2) {
+    const x1 = x0 + 2
+    const ry = (jiefangDeckRoadLocalY(x0) + jiefangDeckRoadLocalY(x1)) * 0.5
+    const [wx, wz] = volumeLocalToWorld((x0 + x1) * 0.5, 0, JIEFANG_BRIDGE_ORIGIN, JIEFANG_BRIDGE_ROTATION_Y)
+    const hy = 0.25
+    const halfYaw = JIEFANG_BRIDGE_ROTATION_Y * 0.5
+    world.createCollider(
+      R.ColliderDesc.cuboid(1.05, hy, 21.5)
+        .setTranslation(wx, JIEFANG_BRIDGE_ORIGIN[1] + ry - hy, wz)
+        .setRotation({ x: 0, y: Math.sin(halfYaw), z: 0, w: Math.cos(halfYaw) }),
+    )
+  }
+  for (const c of expandVolumeToCuboids(vol)) {
+    const halfYaw = c.yaw * 0.5
+    world.createCollider(
+      R.ColliderDesc.cuboid(c.hx, c.hy, c.hz)
+        .setTranslation(c.x, c.y, c.z)
+        .setRotation({ x: 0, y: Math.sin(halfYaw), z: 0, w: Math.cos(halfYaw) }),
+    )
+  }
+  world.step()
+
+  const stepDt = 1 / 60
+  const jumpV0 = Math.sqrt(2 * 20 * 1.2) // walkConfig: gravity=-20, jump=1.2
+  const runJumpDemo = (startLx, track) => {
+    const roadY0 = JIEFANG_BRIDGE_ORIGIN[1] + jiefangDeckRoadLocalY(startLx)
+    const [sx, sz] = volumeLocalToWorld(startLx, track.z - 0.85, JIEFANG_BRIDGE_ORIGIN, JIEFANG_BRIDGE_ROTATION_Y)
+    let pos = { x: sx, y: roadY0 + FOOT_HEIGHT * 0.5 + 0.025, z: sz }
+    body.setTranslation(pos, true)
+    body.setNextKinematicTranslation(pos)
+    world.step()
+
+    // Phase 1: grounded walk forward hits railing (blocked before crossing track.z)
+    for (let f = 0; f < 40; f++) {
+      const fx = Math.sin(JIEFANG_BRIDGE_ROTATION_Y) * 1.65 * stepDt
+      const fz = Math.cos(JIEFANG_BRIDGE_ROTATION_Y) * 1.65 * stepDt
+      controller.computeColliderMovement(capsule, { x: fx, y: -28 * stepDt, z: fz })
+      const m = controller.computedMovement()
+      const next = { x: pos.x + m.x, y: pos.y + m.y, z: pos.z + m.z }
+      resolveObstacleVolumesStep(pos, next, { radius: 0.315, height: FOOT_HEIGHT }, [vol])
+      pos = next
+      body.setNextKinematicTranslation(pos)
+      world.step()
+    }
+    const [, blockedLz] = worldToVolumeLocal(pos.x, pos.z, JIEFANG_BRIDGE_ORIGIN, JIEFANG_BRIDGE_ROTATION_Y)
+    assert.ok(blockedLz < track.z, `grounded walk crossed ${track.id} at lx=${startLx}: ${blockedLz}`)
+
+    // Phase 2: jump up onto railing top and release input on arrival -> lands & stands stably on top!
+    let vy = jumpV0
+    let stoodFrames = 0
+    for (let f = 0; f < 90; f++) {
+      vy += (vy > 0 ? -20 : -28) * stepDt
+      const [, curLz] = worldToVolumeLocal(pos.x, pos.z, JIEFANG_BRIDGE_ORIGIN, JIEFANG_BRIDGE_ROTATION_Y)
+      const speedZ = curLz < track.z ? 1.65 : 0
+      const desired = {
+        x: Math.sin(JIEFANG_BRIDGE_ROTATION_Y) * speedZ * stepDt,
+        y: vy * stepDt,
+        z: Math.cos(JIEFANG_BRIDGE_ROTATION_Y) * speedZ * stepDt,
+      }
+      controller.computeColliderMovement(capsule, desired)
+      const m = controller.computedMovement()
+      const next = { x: pos.x + m.x, y: pos.y + m.y, z: pos.z + m.z }
+      resolveObstacleVolumesStep(pos, next, { radius: 0.315, height: FOOT_HEIGHT }, [vol])
+      if (vy <= 0 && controller.computedGrounded()) vy = 0
+      pos = next
+      body.setNextKinematicTranslation(pos)
+      world.step()
+      const [lxNow, lzNow] = worldToVolumeLocal(pos.x, pos.z, JIEFANG_BRIDGE_ORIGIN, JIEFANG_BRIDGE_ROTATION_Y)
+      const footAboveDeck = pos.y - FOOT_HEIGHT * 0.5 - (JIEFANG_BRIDGE_ORIGIN[1] + jiefangDeckRoadLocalY(lxNow))
+      if (controller.computedGrounded() && Math.abs(lzNow - track.z) <= 0.35 && footAboveDeck >= track.colliderHeight - 0.06) {
+        stoodFrames++
+      }
+    }
+    assert.ok(stoodFrames >= 10, `player failed to stand stably on top of ${track.id} at lx=${startLx}: stoodFrames=${stoodFrames}`)
+
+    // Phase 3: continue walking off railing top onto opposite lane
+    for (let f = 0; f < 50; f++) {
+      vy = controller.computedGrounded() ? 0 : vy - 28 * stepDt
+      const desired = {
+        x: Math.sin(JIEFANG_BRIDGE_ROTATION_Y) * 1.65 * stepDt,
+        y: (vy - 2) * stepDt,
+        z: Math.cos(JIEFANG_BRIDGE_ROTATION_Y) * 1.65 * stepDt,
+      }
+      controller.computeColliderMovement(capsule, desired)
+      const m = controller.computedMovement()
+      const next = { x: pos.x + m.x, y: pos.y + m.y, z: pos.z + m.z }
+      resolveObstacleVolumesStep(pos, next, { radius: 0.315, height: FOOT_HEIGHT }, [vol])
+      pos = next
+      body.setNextKinematicTranslation(pos)
+      world.step()
+    }
+    const [, afterCrossLz] = worldToVolumeLocal(pos.x, pos.z, JIEFANG_BRIDGE_ORIGIN, JIEFANG_BRIDGE_ROTATION_Y)
+    assert.ok(afterCrossLz > track.z + 0.45, `failed crossing over ${track.id} at lx=${startLx}: afterCrossLz=${afterCrossLz}`)
+  }
+
+  // Verify on flat deck (-50, -98) AND steepest east ramp (+80) across side & center median railings!
+  for (const testX of [-98, -50, 80]) {
+    for (const track of JIEFANG_RAILING_TRACKS) {
+      runJumpDemo(testX, track)
+    }
+  }
+  world.free()
+
+  // Vehicles (ebike / car) cannot cross solid railing; continuous span blocks everywhere
+  const scooter = { radius: 0.34, height: 1.55, halfWidth: 0.34, halfLength: 0.92, heading: 0 }
+  for (const vx of [-98, -40, 60]) {
+    const s0 = makeBridgePos(vx, 13.4, 0)
+    const s1 = makeBridgePos(vx, 10.2, 0)
+    const sRes = resolveObstacleVolumesStep(s0, s1, scooter, [vol])
+    assert.equal(sRes.blocked, true, `scooter crossed gapless railing at lx=${vx}`)
+    const [, sEndZ] = worldToVolumeLocal(s1.x, s1.z, JIEFANG_BRIDGE_ORIGIN, JIEFANG_BRIDGE_ROTATION_Y)
+    assert.ok(sEndZ > 12.0, `scooter crossed south motor/nonmotor barrier at lx=${vx}: ${sEndZ}`)
+  }
+
+  // Under-bridge ground walker (well below deckY) must NOT be blocked by upper bridge deck railings
+  const [ux, uz] = volumeLocalToWorld(-40, -12.6, JIEFANG_BRIDGE_ORIGIN, JIEFANG_BRIDGE_ROTATION_Y)
+  const [tx, tz] = volumeLocalToWorld(-40, -11.4, JIEFANG_BRIDGE_ORIGIN, JIEFANG_BRIDGE_ROTATION_Y)
+  const underRes = resolveObstacleVolumesStep(
+    { x: ux, y: 147.2, z: uz },
+    { x: tx, y: 147.2, z: tz },
+    foot,
+    [vol],
+  )
+  assert.equal(underRes.blocked, false)
+
+  // Expanded Rapier cuboids keep zero overlaps with JIEFANG_OFFICER_SPOT (-266.2, 151.85, 26.2)
+  const cuboids = expandVolumeToCuboids(vol)
+  assert.equal(cuboids.length, vol.boxes.length)
+  for (const c of cuboids) {
+    const dCenter = Math.hypot(c.x - -266.2, c.z - 26.2)
+    assert.ok(dCenter > 4.0, `cuboid ${c.label} too close to JIEFANG_OFFICER_SPOT (${dCenter}m)`)
+  }
 })

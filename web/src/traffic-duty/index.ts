@@ -59,6 +59,40 @@ export * from './arbiter.ts'
 export * from './whistle.ts'
 export * from './npc-officer.ts'
 export * from './traffic-signals-overlay.ts'
+export * from './story/index.ts'
+export * from './jiefang-railings.ts'
+export * from './duty-keys.ts'
+export * from './handover/index.ts'
+export {
+  clampFineYuan,
+  createFineTerminalModel,
+  createFineTerminalSession,
+  deriveSimulatedPlateNo,
+  generateSimulatedReceiptNo,
+  getActiveFineTerminalSession,
+  isFineTerminalBusy,
+  mountFineTerminalOverlay,
+  openFineTerminal,
+  playTerminalCancelSound,
+  playTerminalDeliverSound,
+  playTerminalKeySound,
+  playTerminalPrintPulseSound,
+  playTerminalPrintReadySound,
+  playTerminalTakeOutSound,
+  playTerminalTearPaperSound,
+  TERMINAL_OVERLAY_CSS,
+  type FineTerminalCancelReason,
+  type FineTerminalCancelledResult,
+  type FineTerminalIssuedResult,
+  type FineTerminalMountHandle,
+  type FineTerminalOpenOptions,
+  type FineTerminalPhase,
+  type FineTerminalPromise,
+  type FineTerminalResult as FineTerminalModalResult,
+  type FineTerminalSession,
+  type FineTerminalSnapshot,
+  type FineTerminalVisualModel,
+} from './fine-terminal/index.ts'
 export {createTrafficDutyController} from './controller.ts'
 
 export function createTrafficDuty(host: TrafficDutyHost): TrafficDutyController {

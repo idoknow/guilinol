@@ -15,7 +15,7 @@ import {
   type RenderRangeMetrics,
 } from './render-range'
 import {detail, type Manifest, type Tile} from './world'
-import {registerTunnels} from './tunnels'
+import {registerTunnels, loadShizijieUnderground} from './tunnels'
 import {freezeStatic} from './static-freeze'
 
 import {TileGrid, streamBudget, frameSlots, tileEdgeDistance} from './tile-grid'
@@ -63,6 +63,7 @@ export class Stream {
     this.forest = new Forest(scene,this.grid,camera,initialMetrics)
     this.batches = new ChunkBatcher(scene)
     registerTunnels(manifest.tunnels,manifest.groundCutouts,manifest.shizijieUnderpass)
+    void loadShizijieUnderground()
     this.syncMetrics(initialMetrics)
     this.rangeStore.subscribe((_cfg, metrics)=>{
       this.syncMetrics(metrics)

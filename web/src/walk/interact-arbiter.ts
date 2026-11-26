@@ -20,9 +20,11 @@ export type InteractionActionKind =
   | 'pickup_busy'
   | 'dismount'
   | 'pickup_downed'
+  | 'handover_ticket'
+  | 'whistle_cite'
+  | 'talk_officer'
   | 'open_shop'
   | 'open_service'
-  | 'whistle_cite'
   | 'mount_vehicle'
   | 'board_boat'
 
@@ -53,6 +55,17 @@ export interface ServiceBayCandidateSnapshot {
   distance: number
 }
 
+export interface TrafficDutyHandoverSnapshot {
+  label: string
+  distance?: number
+  canDeliverNow?: boolean
+}
+
+export interface TrafficDutyOfficerSnapshot {
+  label: string
+  distance?: number
+}
+
 export interface InteractionContext {
   soloEnabled: boolean
   active: boolean
@@ -66,7 +79,9 @@ export interface InteractionContext {
   nearDownedVehicle: VehicleCandidateSnapshot | null
   nearShop: ShopCandidateSnapshot | null
   nearServiceBay: ServiceBayCandidateSnapshot | null
-  nearTrafficViolator?: {label: string; violation: string; fineYuan: number} | null
+  nearTicketHandover?: TrafficDutyHandoverSnapshot | null
+  nearTrafficViolator?: {label: string; violation: string; fineYuan: number; action?: 'handover_ticket' | 'talk_officer' | 'whistle_cite'} | null
+  nearDutyOfficer?: TrafficDutyOfficerSnapshot | null
   nearVehicle: VehicleCandidateSnapshot | null
   nearBoat: BoatCandidateSnapshot | null
 }
@@ -135,7 +150,48 @@ export function resolveInteraction(ctx: InteractionContext): InteractionDecision
     }
   }
 
-  // Priority 4: On foot in shop trigger or service bay (outside quiet zone) -> suppresses vehicle mount within 4.2m
+  // Priority 4: Strict duty priority on foot: handover > fine ticket > talk officer > shop/service > vehicle/boat
+  if (ctx.nearTicketHandover) {
+    return {
+      priority: 4,
+      action: 'handover_ticket',
+      label: ctx.nearTicketHandover.label,
+      disabled: false,
+    }
+  }
+  if (ctx.nearTrafficViolator?.action === 'handover_ticket') {
+    return {
+      priority: 4,
+      action: 'handover_ticket',
+      label: ctx.nearTrafficViolator.label,
+      disabled: false,
+    }
+  }
+  if (ctx.nearTrafficViolator && ctx.nearTrafficViolator.action !== 'talk_officer') {
+    return {
+      priority: 4,
+      action: 'whistle_cite',
+      label: ctx.nearTrafficViolator.label,
+      disabled: false,
+    }
+  }
+  if (ctx.nearDutyOfficer) {
+    return {
+      priority: 4,
+      action: 'talk_officer',
+      label: ctx.nearDutyOfficer.label,
+      disabled: false,
+    }
+  }
+  if (ctx.nearTrafficViolator?.action === 'talk_officer') {
+    return {
+      priority: 4,
+      action: 'talk_officer',
+      label: ctx.nearTrafficViolator.label,
+      disabled: false,
+    }
+  }
+
   if ((ctx.soloEnabled || ctx.nearShop?.shopId === 'wangcheng_drinks_shop') && !ctx.inQuietZone && ctx.nearShop) {
     const label = ctx.nearShop.displayName.startsWith('取杯')
       ? ctx.nearShop.displayName
@@ -155,14 +211,6 @@ export function resolveInteraction(ctx: InteractionContext): InteractionDecision
       label: '充电/保养',
       disabled: false,
       shopId: ctx.nearServiceBay.shopId,
-    }
-  }
-  if (ctx.nearTrafficViolator) {
-    return {
-      priority: 4,
-      action: 'whistle_cite',
-      label: ctx.nearTrafficViolator.label,
-      disabled: false,
     }
   }
 
@@ -207,6 +255,8 @@ export interface InteractArbiterCallbacks {
   getContext: () => InteractionContext
   onOpenShop: (shopId: string) => void
   onOpenService: (shopId: string) => void
+  onHandoverTicket?: () => void
+  onTalkOfficer?: () => void
   onWhistleCite?: () => void
   onVehicleOrBoatInteract: () => void
   onSoftHint?: (text: string) => void
@@ -279,6 +329,16 @@ export function createInteractArbiter(callbacks: InteractArbiterCallbacks): Inte
       callbacks.onOpenService(decision.shopId)
       return decision
     }
+    if (decision.action === 'handover_ticket') {
+      if (callbacks.onHandoverTicket) callbacks.onHandoverTicket()
+      else callbacks.onWhistleCite?.()
+      return decision
+    }
+    if (decision.action === 'talk_officer') {
+      if (callbacks.onTalkOfficer) callbacks.onTalkOfficer()
+      else callbacks.onWhistleCite?.()
+      return decision
+    }
     if (decision.action === 'whistle_cite') {
       callbacks.onWhistleCite?.()
       return decision
@@ -296,14 +356,18 @@ export function createInteractArbiter(callbacks: InteractArbiterCallbacks): Inte
     }
   }
 
-  window.addEventListener('keydown', onKeyDown)
+  if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') {
+    window.addEventListener('keydown', onKeyDown)
+  }
 
   return {
     sync,
     trigger,
     getLastDecision: () => lastDecision,
     dispose: () => {
-      window.removeEventListener('keydown', onKeyDown)
+      if (typeof window !== 'undefined' && typeof window.removeEventListener === 'function') {
+        window.removeEventListener('keydown', onKeyDown)
+      }
     },
   }
 }

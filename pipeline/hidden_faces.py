@@ -97,9 +97,11 @@ def prune(path, key, ground):
     doc = json.loads(raw[20:20+length])
     binary = bytearray(raw[28+length:])
     uses = {}
-    def visit(idx, parent, collision):
+    def visit(idx, parent, collision, underground):
         node = doc['nodes'][idx]
-        collision |= node.get('name', '').lower().startswith('collision')
+        name_l = node.get('name', '').lower()
+        collision |= name_l.startswith('collision')
+        underground |= 'underground' in name_l
         if 'matrix' in node:
             local = np.array(node['matrix']).reshape(4,4).T
         else:
@@ -108,12 +110,12 @@ def prune(path, key, ground):
             local[:3,3] = node.get('translation',(0,0,0))
         transform = parent @ local
         if 'mesh' in node:
-            uses.setdefault(node['mesh'], []).append((collision,transform))
+            uses.setdefault(node['mesh'], []).append((collision,underground,transform))
         for child in node.get('children', []):
-            visit(child, transform, collision)
+            visit(child, transform, collision, underground)
     for scene in doc['scenes']:
         for idx in scene['nodes']:
-            visit(idx, np.eye(4), False)
+            visit(idx, np.eye(4), False, False)
 
     def read(idx, components):
         acc = doc['accessors'][idx]
@@ -126,8 +128,9 @@ def prune(path, key, ground):
     before = removed = 0
     for idx, mesh in enumerate(doc['meshes']):
         nodes = uses.get(idx, [])
-        if not nodes or any(is_collision for is_collision,_ in nodes):
+        if not nodes or any(is_collision for is_collision, _, _ in nodes):
             continue
+        is_underground = any(is_ug for _, is_ug, _ in nodes)
         for primitive in mesh['primitives']:
             if primitive.get('mode',4)!=4:
                 continue
@@ -144,8 +147,8 @@ def prune(path, key, ground):
             mates = pairs[ordered[pairs[:,0],1]==ordered[pairs[:,1],2]]
             hidden = np.zeros(len(faces),bool)
             hidden[internal_contacts(ids, faces, pos, mates).ravel()] = True
-            if len(nodes)==1:
-                matrix = nodes[0][1]
+            if len(nodes)==1 and not is_underground:
+                matrix = nodes[0][2]
                 points = pos @ matrix[:3,:3].T + matrix[:3,3]
                 floor = ground.local_floor(key,points,faces)
                 tris = points[faces]

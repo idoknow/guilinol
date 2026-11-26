@@ -1,10 +1,41 @@
-// 键位映射（IDOK-178）：所有可改键的动作集中在这里，默认值就是旧手感。
+// 键位映射（IDOK-178 + 辅警执勤三键）：所有可改键的动作集中在这里，默认值就是旧手感。
 // 判定一律走 hits(code, action)：它只认「这个动作现在绑的键」，所以改键之后旧键立刻失效。
-import {prefs, setPrefs} from '../ui/prefs'
+import {prefs, setPrefs} from '../ui/prefs.ts'
 
-export type Action = 'forward' | 'back' | 'left' | 'right' | 'run' | 'crouch' | 'jump' | 'interact' | 'view' | 'stats' | 'settings' | 'useItem' | 'emote' | 'unstuck'
+export type DutyAction = 'dutyWhistle' | 'dutyFlag' | 'dutyTicket'
 
-type Definition = {id: Action; label: string; codes: string[]}
+export type Action =
+  | 'forward'
+  | 'back'
+  | 'left'
+  | 'right'
+  | 'run'
+  | 'crouch'
+  | 'jump'
+  | 'interact'
+  | 'view'
+  | 'stats'
+  | 'settings'
+  | 'useItem'
+  | 'emote'
+  | 'unstuck'
+  | DutyAction
+
+export type ActionScope = 'common' | 'duty'
+
+export type Definition = {
+  id: Action
+  label: string
+  codes: string[]
+  scope?: ActionScope
+  hint?: string
+}
+
+export const DUTY_ACTION_IDS: readonly DutyAction[] = Object.freeze([
+  'dutyWhistle',
+  'dutyFlag',
+  'dutyTicket',
+])
 
 export const ACTIONS: Definition[] = [
   {id: 'forward', label: '前进', codes: ['KeyW', 'ArrowUp']},
@@ -17,10 +48,31 @@ export const ACTIONS: Definition[] = [
   {id: 'interact', label: '交互 / 上下车', codes: ['KeyF']},
   {id: 'view', label: '第一 / 第三人称', codes: ['KeyT']},
   {id: 'stats', label: '显示 / 隐藏读数', codes: ['F3']},
-  {id:'emote',label:'表情动作（长按选择，短按重播）',codes:['KeyG']},
+  {id: 'emote', label: '表情动作（长按选择，短按重播）', codes: ['KeyG']},
   {id: 'useItem', label: '使用手中物品', codes: ['KeyY']},
   {id: 'unstuck', label: '复位（卡住 / 落水时回到最近的平地）', codes: ['KeyR']},
   {id: 'settings', label: '设置', codes: ['KeyN']},
+  {
+    id: 'dutyWhistle',
+    label: '执勤吹哨（12m 违规减速 / 震慑停下）',
+    codes: ['KeyQ'],
+    scope: 'duty',
+    hint: '口哨常驻嘴边，按一下吹一声；12m 内违规车减速、逃逸车概率停下，正常车不受影响',
+  },
+  {
+    id: 'dutyFlag',
+    label: '执勤挥旗（短按靠边停 / 长按 0.6s 放行）',
+    codes: ['KeyE'],
+    scope: 'duty',
+    hint: '短按示意前方 8m 内违规车靠边停；长按 0.6 秒放行刚拦下的车',
+  },
+  {
+    id: 'dutyTicket',
+    label: '执勤罚单（靠近开票 / 1.5m 内递交）',
+    codes: ['KeyF'],
+    scope: 'duty',
+    hint: '靠近已停下的违规车按 F 开始开票；撕下凭条后走到 1.5m 内再按 F 递交',
+  },
 ]
 
 const BY_ID = new Map(ACTIONS.map(entry => [entry.id, entry]))
@@ -32,7 +84,11 @@ const NAMES: Record<string, string> = {
   Semicolon: ';', Quote: "'", Comma: ',', Period: '.', Slash: '/',
 }
 
-/** 这个动作当前绑的第一个键（自定义优先，其次默认）。 */
+export function isDutyAction(action: Action): action is DutyAction {
+  return BY_ID.get(action)?.scope === 'duty'
+}
+
+/** 这个动作当前绑的键列表（自定义优先，其次默认）。 */
 export function binding(action: Action): string[] {
   const custom = prefs().keys[action]
   return custom?.length ? [...custom] : [...BY_ID.get(action)!.codes]
@@ -40,7 +96,14 @@ export function binding(action: Action): string[] {
 
 /** 物理按键 → 该动作的默认 code。没被任何动作占用就原样返回。 */
 export function canonical(code: string): string {
-  for (const action of ACTIONS) if (binding(action.id).includes(code)) return action.codes[0]
+  for (const action of ACTIONS) {
+    if (action.scope === 'duty') continue
+    if (binding(action.id).includes(code)) return action.codes[0]
+  }
+  for (const action of ACTIONS) {
+    if (action.scope !== 'duty') continue
+    if (binding(action.id).includes(code)) return action.codes[0]
+  }
   return code
 }
 
@@ -56,22 +119,30 @@ const RESERVED: Record<string, string> = {
   Digit0: '骑行', Digit1: '骑行', Digit2: '骑行', Digit3: '骑行', Digit4: '骑行',
 }
 
-/** 这个键被固定功能占用时返回该功能名，可以绑就返回 undefined。 */
-export function reservedFor(code: string): string | undefined {
+/** 这个键被固定功能占用时返回该功能名，可以绑就返回 undefined。执勤专属动作允许绑回 Q / E。 */
+export function reservedFor(code: string, forAction?: Action): string | undefined {
+  if (forAction && isDutyAction(forAction) && (code === 'KeyQ' || code === 'KeyE' || code === 'KeyF')) {
+    return undefined
+  }
   return RESERVED[code]
 }
 
-/** 改键；把同一物理键从别的动作上摘下来，避免一键两用。 */
+/** 改键；在同一作用域（普通 vs 执勤）内把同一物理键从别的动作上摘下来，避免同场景一键两用。 */
 export function setBinding(action: Action, code: string) {
-  const defaults = BY_ID.get(action)!.codes
+  const targetDef = BY_ID.get(action)!
+  const targetScope: ActionScope = targetDef.scope ?? 'common'
+  const defaults = targetDef.codes
   setPrefs(value => {
     const keys: Record<string, string[]> = {...value.keys}
     for (const [id, codes] of Object.entries(keys)) {
+      const otherScope: ActionScope = BY_ID.get(id as Action)?.scope ?? 'common'
+      if (otherScope !== targetScope) continue
       const kept = codes.filter(entry => entry !== code)
       if (kept.length) keys[id] = kept
       else delete keys[id]
     }
     if (!defaults.includes(code)) keys[action] = [code]
+    else delete keys[action]
     return {...value, keys}
   })
 }
@@ -96,4 +167,51 @@ export function keyLabel(code: string): string {
 
 export function bindingLabel(action: Action): string {
   return [...new Set(binding(action).map(keyLabel))].join(' / ')
+}
+
+export interface GuideKeyRow {
+  keys: string[]
+  label: string
+  id?: string
+}
+
+/** 供左下角「按键」面板（.keys-card）在辅警执勤态展示的精简按键行。 */
+export function getDutyCardRows(): GuideKeyRow[] {
+  const firstKey = (action: Action) => bindingLabel(action).split(' / ')[0]
+  return [
+    {keys: [firstKey('forward'), firstKey('left'), firstKey('back'), firstKey('right')], label: '走路'},
+    {keys: [firstKey('run')], label: '跑'},
+    {keys: [firstKey('jump')], label: '跳越栏杆'},
+    {keys: [firstKey('dutyWhistle')], label: '吹哨减速', id: 'dutyWhistle'},
+    {keys: [firstKey('dutyFlag')], label: '挥旗拦停 / 长按放行', id: 'dutyFlag'},
+    {keys: [firstKey('dutyTicket')], label: '开票 / 近身递交', id: 'dutyTicket'},
+    {keys: [firstKey('view')], label: '第一 / 第三人称'},
+    {keys: ['F1'], label: '执勤指南'},
+  ]
+}
+
+/** 供 F1 玩法指南「全部按键」（KEY_GROUPS）展示的辅警执勤三键完整说明。 */
+export function getDutyGuideKeyGroup(): {title: string; rows: GuideKeyRow[]} {
+  const firstKey = (action: Action) => bindingLabel(action).split(' / ')[0]
+  return {
+    title: '辅警执勤',
+    rows: [
+      {keys: [firstKey('dutyWhistle')], label: '吹哨（12m 内违规车减速、逃逸停下）', id: 'dutyWhistle'},
+      {keys: [firstKey('dutyFlag')], label: '挥旗（短按 8m 内靠边停 / 长按 0.6s 放行）', id: 'dutyFlag'},
+      {keys: [firstKey('dutyTicket')], label: '罚单（靠近停稳车开票 / 1.5m 内递交）', id: 'dutyTicket'},
+    ],
+  }
+}
+
+/** 供 F1 玩法指南「玩法」页展示的辅警执勤词条。 */
+export function getDutyGuideFeature(): {seal: string; title: string; pc: string; phone: string} {
+  const qKey = bindingLabel('dutyWhistle').split(' / ')[0]
+  const eKey = bindingLabel('dutyFlag').split(' / ')[0]
+  const fKey = bindingLabel('dutyTicket').split(' / ')[0]
+  return {
+    seal: '执',
+    title: '解放桥辅警执勤',
+    pc: `找桥头交警领装上岗后，口哨常驻嘴边：按 <kbd>${qKey}</kbd> 吹哨令 12m 内违规车减速；短按 <kbd>${eKey}</kbd> 示意前方 8m 违规车靠边停、长按 0.6 秒放行；靠近停稳违规车按 <kbd>${fKey}</kbd> 取出打印机打单撕纸，走到 1.5m 内再按 <kbd>${fKey}</kbd> 递交对方手里。`,
+    phone: `上岗后点击底部「吹哨（<kbd>${qKey}</kbd>）」「挥旗（<kbd>${eKey}</kbd> 长按放行）」「罚单（<kbd>${fKey}</kbd>）」三个按钮完成拦停、打印撕纸与近身 1.5m 递交。`,
+  }
 }

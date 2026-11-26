@@ -154,6 +154,7 @@ def build_surface_stairwell(
     glass_mat: str = 'glass',
     bollard_mat: str = 'red',
     roof_mat: str = 'alum',
+    header_sign_key: str | None = None,
 ):
     """Add an above-ground open-front blue-glass canopy, 3-sided parapet, and 3 bollards.
 
@@ -214,6 +215,11 @@ def build_surface_stairwell(
             m.beam([-hw_roof, yr, zr], [hw_roof, yr, zr], 0.045, frame_mat, sections=4)
     # Entrance header accent band ("十字街地下通道 · 小香港") at -Z portal (high clearance y=2.62..3.18m)
     m.box(0.0, yf - 0.52, zf + 0.12, over_w, 0.50, 0.22, roof_mat)
+    if header_sign_key:
+        if header_sign_key == 'xiaoxianggang' and hasattr(m, 'sign_quad'):
+            m.sign_quad(0.0, yf - 0.49, zf + 0.02, over_w - 0.26, 0.42, header_sign_key, double_sided=True)
+        elif hasattr(m, 'shop_sign_quad'):
+            m.shop_sign_quad(0.0, yf - 0.49, zf + 0.02, over_w - 0.26, 0.42, header_sign_key, double_sided=True)
 
     # 3 anti-ebike/car stainless/red bollards across open -Z entrance mouth
     # Clear gap between outer edge and bollards is ~0.82m (walkers pass freely; motorbikes blocked)
@@ -370,6 +376,143 @@ def build_manifest_data(surface_sampler=None) -> tuple[list[dict], dict]:
         'shops': shops,
     }
     return cutouts, underpass
+
+
+def _compass_label(dx: float, dz: float) -> str:
+    """Map directional XZ vector (local stair mouth -> street facing) to cardinal/intercardinal tag."""
+    ang = (math.degrees(math.atan2(dx, -dz)) + 360.0) % 360.0
+    dirs = ('N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW')
+    return dirs[int((ang + 22.5) // 45.0) % 8]
+
+
+def build_underground_landmark_metadata(surface_sampler=None) -> dict:
+    """Build landmark-local B1 metadata for `public/landmarks/shizijie.json['underground']`
+    aligned 1:1 with STAIRWELLS cutouts, OSM 15-way ring concourse, shop booths & lightboxes."""
+    _, ug = build_manifest_data(surface_sampler)
+    ox, oz = SHIZIJIE_ORIGIN
+    surf_y = round(float(surface_sampler(ox, oz) if surface_sampler is not None else SHIZIJIE_SURFACE_Y), 2)
+    world_floor_y = ug['floorY']
+    local_floor_y = round(world_floor_y - surf_y, 2)
+    ceiling_h = round(ug['ceilingHeight'], 2)
+    local_ceil_y = round(local_floor_y + ceiling_h, 2)
+
+    ring_local = [[round(px - ox, 3), round(pz - oz, 3)] for px, pz in ug['ringPolygon']]
+    corridors_local = []
+    poly_parts = [Polygon(ring_local).buffer(ug.get('ringHalfWidth', 2.8))]
+    for c in ug['corridors']:
+        pts_l = [[round(px - ox, 3), round(pz - oz, 3)] for px, pz in c['points']]
+        corridors_local.append({'way': c['way'], 'points': pts_l, 'halfWidth': c['halfWidth']})
+        if len(pts_l) >= 2:
+            poly_parts.append(LineString(pts_l).buffer(c['halfWidth']))
+
+    connectors_local = []
+    for conn in ug['connectors']:
+        pts_l = [[round(px - ox, 3), round(pz - oz, 3)] for px, pz in conn['points']]
+        connectors_local.append({'id': conn['id'], 'points': pts_l, 'halfWidth': conn['halfWidth']})
+        if len(pts_l) >= 2:
+            poly_parts.append(LineString(pts_l).buffer(conn['halfWidth']))
+
+    entrances = []
+    stairs_local = []
+    for st in ug['stairs']:
+        cx_l = round(st['center'][0] - ox, 3)
+        cz_l = round(st['center'][2] - oz, 3)
+        mx_l = round(st['mouth'][0] - ox, 3)
+        mz_l = round(st['mouth'][2] - oz, 3)
+        dx_l = round(st['deep'][0] - ox, 3)
+        dz_l = round(st['deep'][2] - oz, 3)
+        hole_local = [[round(px - ox, 3), round(pz - oz, 3)] for px, pz in st['polygon']]
+        if len(hole_local) >= 3:
+            poly_parts.append(Polygon(hole_local))
+        orient = _compass_label(mx_l - dx_l, mz_l - dz_l)
+        top_local_y = round(st['topY'] - surf_y, 3)
+        ent = {
+            'id': st['id'],
+            'corner': st['corner'],
+            'label': st['label'],
+            'orientation': orient,
+            'yawDeg': round(math.degrees(st['yaw']), 2),
+            'yawRad': st['yaw'],
+            'center': [cx_l, top_local_y, cz_l],
+            'mouth': [mx_l, top_local_y, mz_l],
+            'deep': [dx_l, local_floor_y, dz_l],
+            'worldMouth': st['mouth'],
+            'worldDeep': st['deep'],
+            'width': st['width'],
+            'length': st['length'],
+            'cutoutPolygon': hole_local,
+        }
+        entrances.append(ent)
+        stairs_local.append(ent)
+
+    walk_union = unary_union(poly_parts).buffer(0)
+    if walk_union.geom_type == 'MultiPolygon':
+        walk_dom = max(walk_union.geoms, key=lambda g: g.area)
+    else:
+        walk_dom = walk_union
+    walk_simplified = walk_dom.simplify(0.12, preserve_topology=True)
+    walk_poly = [[round(float(x), 3), round(float(z), 3)] for x, z in list(walk_simplified.exterior.coords)[:-1]]
+
+    shops_local = [
+        {**sp, 'x': round(sp['x'] - ox, 3), 'z': round(sp['z'] - oz, 3), 'depth': 2.4}
+        for sp in ug['shops']
+    ]
+    shutters_local = [
+        {**sh, 'x': round(sh['x'] - ox, 3), 'z': round(sh['z'] - oz, 3), 'depth': 2.4}
+        for sh in ug['shutters']
+    ]
+    booths = [
+        {'id': f'shop-{sp["index"] + 1:02d}', 'kind': 'lit_shop', **sp}
+        for sp in shops_local
+    ] + [
+        {'id': f'shutter-{sh["code"].lower()}', 'kind': 'reserved_shutter', **sh}
+        for sh in shutters_local
+    ]
+
+    lightboxes = []
+    for st in entrances:
+        lightboxes.append({
+            'id': f"portal-lb-{st['corner']}",
+            'kind': 'stair_portal',
+            'text': st['label'],
+            'position': [st['deep'][0], round(local_floor_y + 2.68, 2), st['deep'][2]],
+            'yaw': st['yawRad'],
+        })
+    for idx, (lx, lz, yaw, text) in enumerate((
+        (0.0, -14.8, 0.0, '小香港地下商业街 · 北通道'),
+        (15.2, 1.0, math.pi * 0.5, '↑ 出口 · 解放东路 / 正阳步行街'),
+        (0.8, 17.5, math.pi, '中心环岛 · 南通道'),
+        (-15.5, 2.2, -math.pi * 0.5, '↑ 出口 · 中山中路 / 解放西路'),
+    )):
+        lightboxes.append({
+            'id': f'atrium-dir-{idx}',
+            'kind': 'hanging_wayfinding',
+            'text': text,
+            'position': [lx, round(local_floor_y + 2.72, 2), lz],
+            'yaw': round(yaw, 4),
+        })
+
+    return {
+        'id': ug['id'],
+        'name': '十字街小香港地下商业街',
+        'coordinateSpace': 'landmark-local',
+        'originWorld': [round(ox, 6), surf_y, round(oz, 6)],
+        'nodeName': 'underground',
+        'floorY': local_floor_y,
+        'worldFloorY': world_floor_y,
+        'ceilingY': local_ceil_y,
+        'ceilingHeight': ceiling_h,
+        'entrances': entrances,
+        'walkPolygon': walk_poly,
+        'ringPolygon': ring_local,
+        'corridors': corridors_local,
+        'connectors': connectors_local,
+        'stairs': stairs_local,
+        'shops': shops_local,
+        'shutters': shutters_local,
+        'booths': booths,
+        'lightboxes': lightboxes,
+    }
 
 
 def _is_zebra_bar_near_shizijie(ring_world: np.ndarray) -> bool:

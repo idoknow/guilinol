@@ -1,12 +1,17 @@
-import type {Actor, Position} from '../traffic/sim.ts'
+import type {Actor, Position, TrafficViolation} from '../traffic/sim.ts'
 import type {InteractionContext, InteractionDecision} from '../walk/interact-arbiter.ts'
 import {
-  computeFineYuan,
+  computeFineYuanStack,
   DEFAULT_FINE_YUAN,
+  DEFAULT_OFFICER_TALK_RANGE_M,
   DEFAULT_WHISTLE_RANGE_M,
-  VIOLATION_LABELS,
+  formatViolationBreakdownFormula,
+  formatViolationStackLabel,
+  JIEFANG_DUTY_ZONE,
+  resolveActorViolations,
   type ActiveViolation,
   type DutyFineTable,
+  type TrafficDutyInteractAction,
   type TrafficDutyInteractCandidate,
 } from './types.ts'
 
@@ -26,28 +31,59 @@ export type MergedTrafficDutyDecision =
   | InteractionDecision
   | {
       priority: 4
-      action: 'whistle_cite'
+      action: TrafficDutyInteractAction
       label: string
       disabled: false
-      violation: ActiveViolation
+      violation: ActiveViolation | 'officer_briefing'
       fineYuan: number
     }
 
 const MAX_VERTICAL_DELTA_M = 2.5
 
-export function isCitableViolator(actor: Actor): actor is Actor & {violation: ActiveViolation} {
+function isWalkLocked(walkLocks: WalkLockState | undefined): boolean {
+  if (!walkLocks) return false
+  if (walkLocks.active === false || walkLocks.modalOrOverlayBlocked) return true
+  if (walkLocks.crashed || walkLocks.standingUp || walkLocks.pickingUpKind) return true
+  if (walkLocks.aboardKind) return true
+  if (walkLocks.nearDownedVehicle || walkLocks.nearShop || walkLocks.nearServiceBay) return true
+  return false
+}
+
+export function isCitableViolator(actor: Actor): boolean {
   if (actor.kind !== 'scooter') return false
   if (actor.leaving || actor.scale < 0.5) return false
   if (actor.cited) return false
-  const v = actor.violation
-  if (v === 'red_light_run') return actor.redLightActive !== false
-  return (
-    v === 'no_helmet' ||
-    v === 'bike_double' ||
-    v === 'ebike_overload' ||
-    v === 'illegal_mod' ||
-    v === 'wrong_way'
-  )
+  return resolveActorViolations(actor as Actor & {violations?: readonly TrafficViolation[]}).length > 0
+}
+
+export function findOfficerInteractCandidate(
+  playerPos: Position | null,
+  officerPos: {x: number; y: number; z: number} = JIEFANG_DUTY_ZONE.spot,
+  maxRangeM = DEFAULT_OFFICER_TALK_RANGE_M,
+  briefingDone = false,
+  isOffDutyReport = false,
+  pendingEarningsYuan = 0,
+): TrafficDutyInteractCandidate | null {
+  if (!playerPos) return null
+  if (Math.abs(officerPos.y - playerPos.y) > MAX_VERTICAL_DELTA_M) return null
+  const distance = Math.hypot(officerPos.x - playerPos.x, officerPos.z - playerPos.z)
+  if (distance > maxRangeM) return null
+  const pendingInt = Math.max(0, Math.round(pendingEarningsYuan))
+  return {
+    action: 'talk_officer',
+    officerId: 'jiefang',
+    distance,
+    violation: 'officer_briefing',
+    fineYuan: 0,
+    ...(isOffDutyReport ? {isOffDutyReport: true} : {}),
+    label: isOffDutyReport
+      ? pendingInt > 0
+        ? `下岗交差 · 向解放桥交警领10%分成 ¥${pendingInt}`
+        : '下岗交差 · 向解放桥交警交差'
+      : briefingDone
+        ? '与解放桥交警对话 · 再接一班'
+        : '与解放桥交警对话 · 领取执勤任务',
+  }
 }
 
 export function findNearestCitableViolator(
@@ -64,13 +100,21 @@ export function findNearestCitableViolator(
     const distance = Math.hypot(actor.x - playerPos.x, actor.z - playerPos.z)
     if (distance > maxRangeM) continue
     if (!best || distance < best.distance) {
-      const fineYuan = computeFineYuan(actor.violation, fineTable)
+      const violations = resolveActorViolations(actor as Actor & {violations?: readonly TrafficViolation[]})
+      if (violations.length === 0) continue
+      const primary = violations[0]
+      const fineYuan = computeFineYuanStack(violations, fineTable)
+      const label =
+        violations.length > 1
+          ? `拦截开单 · 数罪并罚 ${formatViolationBreakdownFormula(violations, fineTable)}`
+          : `拦截开单 · ${formatViolationStackLabel(violations)} ¥${fineYuan}`
       best = {
         actor,
-        violation: actor.violation,
+        violation: primary,
+        violations,
         distance,
         fineYuan,
-        label: `吹哨劝导 · ${VIOLATION_LABELS[actor.violation]} ¥${fineYuan}`,
+        label,
         action: 'whistle_cite',
       }
     }
@@ -90,21 +134,59 @@ export function resolveTrafficDutyCandidate(
   playerPos: Position | null,
   maxRangeM = DEFAULT_WHISTLE_RANGE_M,
   fineTable: Readonly<DutyFineTable> = DEFAULT_FINE_YUAN,
+  officerOpts?: {
+    canTalkOfficer?: boolean
+    canReportOffDuty?: boolean
+    pendingEarningsYuan?: number
+    officerPos?: {x: number; y: number; z: number}
+    officerRangeM?: number
+    briefingDone?: boolean
+  },
 ): TrafficDutyInteractCandidate | null {
-  if (!dutyActive) return null
-  if (walkLocks) {
-    if (walkLocks.active === false || walkLocks.modalOrOverlayBlocked) return null
-    if (walkLocks.crashed || walkLocks.standingUp || walkLocks.pickingUpKind) return null
-    if (walkLocks.aboardKind) return null
-    if (walkLocks.nearDownedVehicle || walkLocks.nearShop || walkLocks.nearServiceBay) return null
+  if (isWalkLocked(walkLocks)) return null
+  if (!dutyActive) {
+    if (officerOpts?.canReportOffDuty) {
+      return findOfficerInteractCandidate(
+        playerPos,
+        officerOpts.officerPos ?? JIEFANG_DUTY_ZONE.spot,
+        officerOpts.officerRangeM ?? DEFAULT_OFFICER_TALK_RANGE_M,
+        true,
+        true,
+        officerOpts.pendingEarningsYuan ?? 0,
+      )
+    }
+    if (officerOpts?.canTalkOfficer) {
+      return findOfficerInteractCandidate(
+        playerPos,
+        officerOpts.officerPos ?? JIEFANG_DUTY_ZONE.spot,
+        officerOpts.officerRangeM ?? DEFAULT_OFFICER_TALK_RANGE_M,
+        Boolean(officerOpts.briefingDone),
+        false,
+        0,
+      )
+    }
+    return null
   }
-  return findNearestCitableViolator(actors, playerPos, maxRangeM, fineTable)
+  // Priority 2: violator intercept strictly precedes officer off-duty check-in
+  const violator = findNearestCitableViolator(actors, playerPos, maxRangeM, fineTable)
+  if (violator) return violator
+  if (officerOpts?.canReportOffDuty) {
+    return findOfficerInteractCandidate(
+      playerPos,
+      officerOpts.officerPos ?? JIEFANG_DUTY_ZONE.spot,
+      officerOpts.officerRangeM ?? DEFAULT_OFFICER_TALK_RANGE_M,
+      true,
+      true,
+      officerOpts.pendingEarningsYuan ?? 0,
+    )
+  }
+  return null
 }
 
 /**
- * Pure bridge for `py Neon` when integrating `traffic-duty` into `walk/index.ts` + `interact-arbiter.ts`:
+ * Pure bridge for integrating `traffic-duty` into `walk/index.ts` + `interact-arbiter.ts`:
  *  - Priorities 0..4 (`none`/blocked, lock, `dismount`, `pickup_downed`, `open_shop`, `open_service`) always take precedence.
- *  - Priorities 5..7 (`mount_vehicle`, `board_boat`, `none`) yield to `whistle_cite` when a violator is in `[F]` range.
+ *  - Priorities 5..7 (`mount_vehicle`, `board_boat`, `none`) yield to `talk_officer` or `whistle_cite`.
  */
 export function mergeTrafficDutyDecision(
   baseDecision: InteractionDecision,
@@ -114,7 +196,7 @@ export function mergeTrafficDutyDecision(
   if (baseDecision.priority <= 4) return baseDecision
   return {
     priority: 4,
-    action: 'whistle_cite',
+    action: candidate.action,
     label: candidate.label,
     disabled: false,
     violation: candidate.violation,
@@ -122,6 +204,8 @@ export function mergeTrafficDutyDecision(
   }
 }
 
-export function isContextBlockedForDuty(ctx: Pick<InteractionContext, 'active' | 'modalOrOverlayBlocked' | 'crashed' | 'standingUp' | 'pickingUpKind' | 'aboardKind'>): boolean {
+export function isContextBlockedForDuty(
+  ctx: Pick<InteractionContext, 'active' | 'modalOrOverlayBlocked' | 'crashed' | 'standingUp' | 'pickingUpKind' | 'aboardKind'>,
+): boolean {
   return !ctx.active || ctx.modalOrOverlayBlocked || ctx.crashed || ctx.standingUp || !!ctx.pickingUpKind || !!ctx.aboardKind
 }

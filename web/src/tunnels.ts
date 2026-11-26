@@ -17,6 +17,31 @@ export type ShizijieUnderpass={
   stairs:(GroundCutout&{label?:string,mouth:Point,deep:Point})[],
   shutters:ShizijieShutter[],shops:ShizijieShop[]
 }
+export type ShizijieLandmarkEntrance={
+  id?:string,corner?:string,label?:string,
+  center?:Point,mouth?:Point,deep?:Point,
+  worldMouth?:Point,worldDeep?:Point,
+  surface?:Point|[number,number]|{x:number,y?:number,z:number},
+  underground?:Point|[number,number]|{x:number,y?:number,z:number},
+  position?:Point|[number,number]|{x:number,y?:number,z:number},
+  yaw?:number,yawRad?:number,width?:number,length?:number,topY?:number,floorY?:number,
+  polygon?:[number,number][],cutoutPolygon?:[number,number][],
+}
+export type ShizijieLandmarkUnderground={
+  id?:string,origin?:Point,originWorld?:Point,center?:Point,
+  floorY:number,worldFloorY?:number,ceilingHeight?:number,
+  entrances:ShizijieLandmarkEntrance[],
+  walkPolygon:[number,number][],
+  ringPolygon?:[number,number][],ringHalfWidth?:number,
+  corridors?:ShizijieCorridor[],connectors?:ShizijieCorridor[],
+  shutters?:ShizijieShutter[],shops?:ShizijieShop[],
+}
+export type ShizijieUndergroundZone={
+  cutouts:GroundCutout[],
+  underpass:ShizijieUnderpass,
+  walkPolygon:[number,number][],
+}
+export const SHIZIJIE_LANDMARK_ORIGIN:Point=[-879.7502,151.3,-169.626]
 
 function frame(tunnel:Tunnel){
   const [start,end]=tunnel.portals, ux=(end[0]-start[0])/tunnel.length,uz=(end[2]-start[2])/tunnel.length
@@ -54,26 +79,177 @@ function distToSegments(x:number,z:number,pts:[number,number][]){
   return best
 }
 
-/** Query pedestrian underpass floor elevation (Shizijie 4 stairwells + 15-way ring concourse). Excludes motor-vehicle tunnels. */
-export function underpassFloor(cutouts:GroundCutout[]|undefined,underpass:ShizijieUnderpass|undefined,x:number,z:number,foot:number){
-  const list=cutouts??registeredCutouts
-  const ug=underpass??registeredUnderpass
-  for(const c of list){
+function toWorldXZ(pt:readonly [number,number],origin:Point):[number,number]{
+  return Math.hypot(pt[0],pt[1])<250?[pt[0]+origin[0],pt[1]+origin[2]]:[pt[0],pt[1]]
+}
+function toWorldY(y:number,originY:number){
+  return Math.abs(y)<50?originY+y:y
+}
+function parsePoint3(raw:unknown,origin:Point,defaultY:number):Point|null{
+  if(Array.isArray(raw)&&raw.length>=2&&Number.isFinite(raw[0])&&Number.isFinite(raw[1])){
+    if(raw.length>=3&&Number.isFinite(raw[2])){
+      const [wx,wz]=toWorldXZ([raw[0],raw[2]],origin)
+      return [wx,toWorldY(raw[1],origin[1]),wz]
+    }
+    const [wx,wz]=toWorldXZ([raw[0],raw[1]],origin)
+    return [wx,defaultY,wz]
+  }
+  if(raw&&typeof raw==='object'&&'x' in raw&&'z' in raw){
+    const obj=raw as {x:number,y?:number,z:number}
+    if(!Number.isFinite(obj.x)||!Number.isFinite(obj.z))return null
+    const [wx,wz]=toWorldXZ([obj.x,obj.z],origin)
+    const wy=typeof obj.y==='number'&&Number.isFinite(obj.y)?toWorldY(obj.y,origin[1]):defaultY
+    return [wx,wy,wz]
+  }
+  return null
+}
+function nearestPolygonPoint(x:number,z:number,poly:[number,number][]):[number,number]{
+  let best:[number,number]=poly[0],bestD=Infinity
+  for(let i=0;i<poly.length;i++){
+    const [ax,az]=poly[i],[bx,bz]=poly[(i+1)%poly.length],dx=bx-ax,dz=bz-az,len2=dx*dx+dz*dz||1
+    const t=Math.max(0,Math.min(1,((x-ax)*dx+(z-az)*dz)/len2))
+    const px=ax+t*dx,pz=az+t*dz,d=Math.hypot(x-px,z-pz)
+    if(d<bestD){bestD=d;best=[px,pz]}
+  }
+  return best
+}
+
+/** Parse and normalize `public/landmarks/shizijie.json` `underground` metadata into world-space cutouts + walkable zone. */
+export function parseShizijieLandmarkUnderground(raw:unknown):ShizijieUndergroundZone|null{
+  if(!raw||typeof raw!=='object')return null
+  const container=raw as {underground?:unknown}
+  const src=(container.underground&&typeof container.underground==='object'?container.underground:raw) as Partial<ShizijieLandmarkUnderground>
+  if(typeof src.floorY!=='number'||!Number.isFinite(src.floorY))return null
+  if(!Array.isArray(src.entrances)||src.entrances.length<2)return null
+  const rawPoly=Array.isArray(src.walkPolygon)&&src.walkPolygon.length>=3?src.walkPolygon:src.ringPolygon
+  if(!Array.isArray(rawPoly)||rawPoly.length<3)return null
+  const rawOrigin=Array.isArray(src.originWorld)&&src.originWorld.length>=3
+    ?src.originWorld
+    :Array.isArray(src.origin)&&src.origin.length>=3?src.origin:null
+  const origin:Point=rawOrigin
+    ?[rawOrigin[0],rawOrigin[1],rawOrigin[2]]
+    :SHIZIJIE_LANDMARK_ORIGIN
+  const floorY=typeof src.worldFloorY==='number'&&Number.isFinite(src.worldFloorY)
+    ?src.worldFloorY
+    :toWorldY(src.floorY,origin[1])
+  const ceilingHeight=typeof src.ceilingHeight==='number'&&Number.isFinite(src.ceilingHeight)?src.ceilingHeight:3.15
+  const walkPolygon:[number,number][]=rawPoly.map(p=>toWorldXZ(p,origin))
+  const ringPolygon:[number,number][]=Array.isArray(src.ringPolygon)&&src.ringPolygon.length>=3
+    ?src.ringPolygon.map(p=>toWorldXZ(p,origin))
+    :walkPolygon
+  const center=parsePoint3(src.center,origin,origin[1])??[
+    walkPolygon.reduce((s,p)=>s+p[0],0)/walkPolygon.length,
+    origin[1],
+    walkPolygon.reduce((s,p)=>s+p[1],0)/walkPolygon.length,
+  ]
+  const stairs:(GroundCutout&{label?:string,mouth:Point,deep:Point})[]=[]
+  const cutouts:GroundCutout[]=[]
+  for(let i=0;i<src.entrances.length;i++){
+    const e=src.entrances[i]
+    if(!e||typeof e!=='object')continue
+    const topY=typeof e.topY==='number'&&Number.isFinite(e.topY)?toWorldY(e.topY,origin[1]):origin[1]
+    const eFloorY=typeof e.floorY==='number'&&Number.isFinite(e.floorY)?toWorldY(e.floorY,origin[1]):floorY
+    const mouth=parsePoint3(e.worldMouth??e.mouth??e.surface,origin,topY)
+    const deep=parsePoint3(e.worldDeep??e.deep??e.underground,origin,eFloorY)
+    const width=typeof e.width==='number'&&Number.isFinite(e.width)?e.width:3.4
+    const givenYaw=typeof e.yawRad==='number'&&Number.isFinite(e.yawRad)?e.yawRad:e.yaw
+    let centerPt:Point,yaw:number,length:number,resolvedMouth:Point,resolvedDeep:Point
+    if(mouth&&deep){
+      const dx=deep[0]-mouth[0],dz=deep[2]-mouth[2]
+      length=typeof e.length==='number'&&Number.isFinite(e.length)?e.length:Math.max(6,Math.hypot(dx,dz))
+      yaw=typeof givenYaw==='number'&&Number.isFinite(givenYaw)?givenYaw:Math.atan2(dx,dz)
+      centerPt=[(mouth[0]+deep[0])*.5,mouth[1],(mouth[2]+deep[2])*.5]
+      resolvedMouth=[mouth[0],mouth[1],mouth[2]]
+      resolvedDeep=[deep[0],eFloorY,deep[2]]
+    }else{
+      const base=parsePoint3(e.center??e.position,origin,topY)
+      if(!base)continue
+      length=typeof e.length==='number'&&Number.isFinite(e.length)?e.length:9.0
+      const toward=nearestPolygonPoint(base[0],base[2],walkPolygon)
+      yaw=typeof givenYaw==='number'&&Number.isFinite(givenYaw)?givenYaw:Math.atan2(toward[0]-base[0],toward[1]-base[2])
+      const hl=length*.5,s=Math.sin(yaw),c=Math.cos(yaw)
+      centerPt=[base[0],topY,base[2]]
+      resolvedMouth=[base[0]-hl*s,topY,base[2]-hl*c]
+      resolvedDeep=[base[0]+hl*s,eFloorY,base[2]+hl*c]
+    }
+    const hw=width*.5,hl=length*.5,c=Math.cos(yaw),s=Math.sin(yaw)
+    const toXZ=(lx:number,lz:number):[number,number]=>[centerPt[0]+lx*c+lz*s,centerPt[2]-lx*s+lz*c]
+    const rawCutPoly=Array.isArray(e.cutoutPolygon)&&e.cutoutPolygon.length>=3?e.cutoutPolygon:e.polygon
+    const polygon:[number,number][]=Array.isArray(rawCutPoly)&&rawCutPoly.length>=3
+      ?rawCutPoly.map(p=>toWorldXZ(p,origin))
+      :[toXZ(-hw,-hl),toXZ(hw,-hl),toXZ(hw,hl),toXZ(-hw,hl)]
+    const cutout:GroundCutout={
+      id:e.id??`shizijie_ug_entrance_${i}`,
+      corner:e.corner,
+      kind:'shizijie-stair',
+      center:centerPt,
+      yaw,width,length,
+      topY:resolvedMouth[1],
+      floorY:resolvedDeep[1],
+      polygon,
+    }
+    cutouts.push(cutout)
+    stairs.push({...cutout,label:e.label,mouth:resolvedMouth,deep:resolvedDeep})
+  }
+  if(stairs.length<2)return null
+  const corridors:ShizijieCorridor[]=(src.corridors??[]).map(seg=>({...seg,points:seg.points.map(p=>toWorldXZ(p,origin))}))
+  const connectors:ShizijieCorridor[]=src.connectors?.length
+    ?src.connectors.map(seg=>({...seg,points:seg.points.map(p=>toWorldXZ(p,origin))}))
+    :stairs.map(st=>{
+      const target=nearestPolygonPoint(st.deep[0],st.deep[2],walkPolygon)
+      return {id:st.id,halfWidth:Math.max(2.0,st.width*.55),points:[[st.deep[0],st.deep[2]],target]}
+    })
+  const underpass:ShizijieUnderpass={
+    id:src.id??'shizijie_landmark_underground',
+    center,floorY,ceilingHeight,
+    ringPolygon,
+    ringHalfWidth:typeof src.ringHalfWidth==='number'&&Number.isFinite(src.ringHalfWidth)?src.ringHalfWidth:2.8,
+    corridors,connectors,stairs,
+    shutters:(src.shutters??[]).map(sh=>Math.abs(sh.x)<200&&Math.abs(sh.z)<200?{...sh,x:sh.x+origin[0],z:sh.z+origin[2]}:sh),
+    shops:(src.shops??[]).map(sp=>Math.abs(sp.x)<200&&Math.abs(sp.z)<200?{...sp,x:sp.x+origin[0],z:sp.z+origin[2]}:sp),
+  }
+  return {cutouts,underpass,walkPolygon}
+}
+
+function queryUnderpassFloor(cutouts:GroundCutout[],ug:ShizijieUnderpass|undefined,walkPoly:[number,number][]|undefined,x:number,z:number,foot:number){
+  // Strict inclusion invariant: cuts ⊂ underpassFloor ⊂ parts.floor ('road' collider)
+  for(const c of cutouts){
     const dx=x-c.center[0],dz=z-c.center[2],cos=Math.cos(c.yaw),sin=Math.sin(c.yaw)
     const lx=dx*cos-dz*sin,lz=dx*sin+dz*cos
-    if(Math.abs(lx)<=c.width*.5+.25&&Math.abs(lz)<=c.length*.5+.35){
+    if(Math.abs(lx)<=c.width*.5+.06&&lz>=-c.length*.5-.25&&lz<=c.length*.5+.55){
       const t=THREE.MathUtils.clamp((lz+c.length*.5)/(c.length||1),0,1)
       const floor=c.topY+(c.floorY-c.topY)*t
       if(foot>=floor-.95&&foot<=c.topY+.8)return floor
     }
   }
   if(ug&&foot>=ug.floorY-.95&&foot<=ug.floorY+ug.ceilingHeight+.4){
-    if(pointInPolygon(x,z,ug.ringPolygon)||distToSegments(x,z,ug.ringPolygon)<=ug.ringHalfWidth+.35)return ug.floorY
+    if(pointInPolygon(x,z,ug.ringPolygon)||distToSegments(x,z,ug.ringPolygon)<=ug.ringHalfWidth)return ug.floorY
+    if(walkPoly&&walkPoly!==ug.ringPolygon&&pointInPolygon(x,z,walkPoly))return ug.floorY
     for(const seg of [...ug.corridors,...ug.connectors]){
-      if(distToSegments(x,z,seg.points)<=seg.halfWidth+.35)return ug.floorY
+      if(distToSegments(x,z,seg.points)<=seg.halfWidth+.08)return ug.floorY
     }
   }
   return undefined
+}
+
+/** Query pedestrian underpass floor elevation (Shizijie 4 stairwells + 15-way ring concourse + shizijie.json underground). Excludes motor-vehicle tunnels. */
+export function underpassFloor(cutouts:GroundCutout[]|undefined,underpass:ShizijieUnderpass|undefined,x:number,z:number,foot:number){
+  const primary=queryUnderpassFloor(cutouts??registeredCutouts,underpass??registeredUnderpass,undefined,x,z,foot)
+  if(primary!==undefined)return primary
+  if(registeredLandmarkUnderground){
+    return queryUnderpassFloor(
+      registeredLandmarkUnderground.cutouts,
+      registeredLandmarkUnderground.underpass,
+      registeredLandmarkUnderground.walkPolygon,
+      x,z,foot,
+    )
+  }
+  return undefined
+}
+
+/** Check whether `(x, z, foot)` lies inside any walkable Shizijie underground zone or stairwell. */
+export function isWalkableUnderground(x:number,z:number,foot:number){
+  return underpassFloor(undefined,undefined,x,z,foot)!==undefined
 }
 
 // Trees from the base map can stand in a portal cutting or inside the bore; the
@@ -81,10 +257,34 @@ export function underpassFloor(cutouts:GroundCutout[]|undefined,underpass:Shizij
 let registered:Tunnel[]=[]
 let registeredCutouts:GroundCutout[]=[]
 let registeredUnderpass:ShizijieUnderpass|undefined
+let registeredLandmarkUnderground:ShizijieUndergroundZone|null=null
+let landmarkUndergroundPromise:Promise<ShizijieUndergroundZone|null>|null=null
+
+export function registerShizijieUnderground(raw:unknown):ShizijieUndergroundZone|null{
+  const parsed=parseShizijieLandmarkUnderground(raw)
+  registeredLandmarkUnderground=parsed
+  return parsed
+}
+export function getRegisteredShizijieUnderground(){
+  return registeredLandmarkUnderground
+}
+export function loadShizijieUnderground(url='/landmarks/shizijie.json'):Promise<ShizijieUndergroundZone|null>{
+  if(registeredLandmarkUnderground)return Promise.resolve(registeredLandmarkUnderground)
+  if(landmarkUndergroundPromise)return landmarkUndergroundPromise
+  if(typeof fetch!=='function')return Promise.resolve(null)
+  landmarkUndergroundPromise=fetch(url)
+    .then(res=>res.ok?res.json():null)
+    .then(data=>data?registerShizijieUnderground(data):null)
+    .catch(()=>null)
+  return landmarkUndergroundPromise
+}
 export function registerTunnels(list:Tunnel[]|undefined,cutouts?:GroundCutout[],underpass?:ShizijieUnderpass){
   registered=list??[]
   if(cutouts!==undefined)registeredCutouts=cutouts
   if(underpass!==undefined)registeredUnderpass=underpass
+  if(typeof window!=='undefined'&&typeof fetch==='function'&&/^https?:/.test(window.location?.protocol??'')){
+    void loadShizijieUnderground()
+  }
 }
 export function treeBlocked(x:number,y:number,z:number){
   for(const tunnel of registered){
@@ -94,7 +294,10 @@ export function treeBlocked(x:number,y:number,z:number){
     const index=Math.max(0,tunnel.stations.findIndex(([s])=>s>=at)),floor=tunnel.stations[Math.min(index,tunnel.stations.length-1)][1]
     if(open||y<floor+tunnel.clearance+.6)return true
   }
-  for(const c of registeredCutouts){
+  const allCutouts=registeredLandmarkUnderground
+    ?[...registeredCutouts,...registeredLandmarkUnderground.cutouts]
+    :registeredCutouts
+  for(const c of allCutouts){
     const dx=x-c.center[0],dz=z-c.center[2],cos=Math.cos(c.yaw),sin=Math.sin(c.yaw)
     const lx=dx*cos-dz*sin,lz=dx*sin+dz*cos
     if(Math.abs(lx)<=c.width*.5+1.8&&Math.abs(lz)<=c.length*.5+2.0)return true
@@ -200,8 +403,13 @@ export function tunnelGeometry(
   tile:Tile,ground:THREE.PlaneGeometry,tunnels:Tunnel[],
   groundCutouts?:GroundCutout[],underpass?:ShizijieUnderpass,
 ){
-  const cutouts=groundCutouts??registeredCutouts
-  const ug=underpass??registeredUnderpass
+  const baseCutouts=groundCutouts??registeredCutouts
+  const extraCutouts=(registeredLandmarkUnderground?.cutouts??[]).filter(
+    ec=>!baseCutouts.some(bc=>Math.hypot(bc.center[0]-ec.center[0],bc.center[2]-ec.center[2])<3.0),
+  )
+  const cutouts=extraCutouts.length?[...baseCutouts,...extraCutouts]:baseCutouts
+  const ug=underpass??registeredUnderpass??registeredLandmarkUnderground?.underpass
+  const extraWalkPoly=underpass||registeredUnderpass?registeredLandmarkUnderground?.walkPolygon:undefined
   const parts={floor:[] as number[],interior:[] as number[],portal:[] as number[],band:[] as number[],lamp:[] as number[],lane:[] as number[],ceiling:[] as number[]}
   const shopPos:number[]=[],shopUv:number[]=[]
   const cuts:Plane[][]=[]
@@ -256,14 +464,17 @@ export function tunnelGeometry(
 
     // Build smooth walkable underground staircase ramp & shaft walls inside the cutout
     const toTile=(x:number,y:number,z:number):Point=>[cx+x*cos+z*sin,y,cz-x*sin+z*cos]
-    const w=c.width,hwr=w*.5,hlr=c.length*.5,head=3.1
+    const w=c.width,hwr=w*.5,fwr=hwr+.12,hlr=c.length*.5,head=3.1
+    // Flush mouth & deep landing aprons keep 'road' collider strictly wider than underpassFloor() bounds
+    quad([toTile(-fwr,c.topY-.015,-hlr-.65),toTile(fwr,c.topY-.015,-hlr-.65),toTile(fwr,c.topY,-hlr),toTile(-fwr,c.topY,-hlr)],'floor')
+    quad([toTile(-fwr,c.floorY,hlr),toTile(fwr,c.floorY,hlr),toTile(fwr,c.floorY,hlr+.9),toTile(-fwr,c.floorY,hlr+.9)],'floor')
     const nSegs=12
     for(let i=0;i<nSegs;i++){
       const t0=i/nSegs,t1=(i+1)/nSegs
       const z0=-hlr+c.length*t0,z1=-hlr+c.length*t1
       const y0=c.topY+(c.floorY-c.topY)*t0,y1=c.topY+(c.floorY-c.topY)*t1
       // Walkable ramp floor (Rapier 'road')
-      quad([toTile(-hwr,y0,z0),toTile(hwr,y0,z0),toTile(hwr,y1,z1),toTile(-hwr,y1,z1)],'floor')
+      quad([toTile(-fwr,y0,z0),toTile(fwr,y0,z0),toTile(fwr,y1,z1),toTile(-fwr,y1,z1)],'floor')
       // Side retaining walls up to street grade or +3.1m
       const wt0=Math.max(y0+head,c.topY+.05),wt1=Math.max(y1+head,c.topY+.05)
       quad([toTile(-hwr,y0,z0),toTile(-hwr,y1,z1),toTile(-hwr,wt1,z1),toTile(-hwr,wt0,z0)],'interior')
@@ -305,51 +516,76 @@ export function tunnelGeometry(
 
     // Helper: check if a wall midpoint is inside the ring atrium OR another walkable corridor/connector
     const allPassages=[...ug.corridors,...ug.connectors]
+    const inCutout=(wx:number,wz:number,pad=0)=>{
+      for(const st of ug.stairs){
+        const dx=wx-st.center[0],dz=wz-st.center[2],cos=Math.cos(st.yaw),sin=Math.sin(st.yaw)
+        if(Math.abs(dx*cos-dz*sin)<=st.width*.5+pad&&Math.abs(dx*sin+dz*cos)<=st.length*.5+pad)return true
+      }
+      return false
+    }
+    const nearBooth=(wx:number,wz:number)=>
+      ug.shops.some(sp=>Math.hypot(wx-sp.x,wz-sp.z)<2.2)||ug.shutters.some(sh=>Math.hypot(wx-sh.x,wz-sh.z)<2.2)
     const wallOpenAt=(wx:number,wz:number,skipIndex:number)=>{
       if(pointInPolygon(wx,wz,ringWorld))return true
+      if(nearBooth(wx,wz))return true
       for(let i=0;i<allPassages.length;i++){
         if(i===skipIndex)continue
         if(distToSegments(wx,wz,allPassages[i].points)<allPassages[i].halfWidth+.2)return true
       }
-      for(const st of ug.stairs){
-        const dx=wx-st.center[0],dz=wz-st.center[2],cos=Math.cos(st.yaw),sin=Math.sin(st.yaw)
-        if(Math.abs(dx*cos-dz*sin)<=st.width*.5+.4&&Math.abs(dx*sin+dz*cos)<=st.length*.5+.4)return true
-      }
-      return false
+      return inCutout(wx,wz,.4)
     }
 
-    // Extrude corridors + stair connectors (floor, ceiling, dado, warm LEDs, skip interior intersections!)
+    // Extrude corridors + stair connectors (floor, ceiling, dado, warm LEDs, subdivided wall checks so junctions never seal!)
+    const emitDisk=(cxW:number,czW:number,r:number)=>{
+      const fPts:Point[]=[],cPts:Point[]=[]
+      for(let s=0;s<8;s++){
+        const a=s*Math.PI/4
+        const px=cxW+Math.cos(a)*r-tile.x,pz=czW+Math.sin(a)*r-tile.z
+        fPts.push([px,fy,pz])
+        cPts.push([px,cy,pz])
+      }
+      fan(limits.reduce((poly,plane)=>clip(poly,plane),fPts),parts.floor)
+      if(!inCutout(cxW,czW,.2))fan(limits.reduce((poly,plane)=>clip(poly,plane),cPts.reverse()),parts.ceiling)
+    }
     allPassages.forEach((seg,pIdx)=>{
-      const hw=seg.halfWidth
+      const hw=seg.halfWidth,fhw=hw+.18
+      for(const [vx,vz] of seg.points)emitDisk(vx,vz,fhw)
       for(let i=1;i<seg.points.length;i++){
         const [ax,az]=seg.points[i-1],[bx,bz]=seg.points[i],dx=bx-ax,dz=bz-az,len=Math.hypot(dx,dz)
         if(len<.2)continue
         const tx=dx/len,tz=dz/len,nx=-tz,nz=tx
         const pt=(x:number,z:number,y:number):Point=>[x-tile.x,y,z-tile.z]
-        const al=pt(ax-nx*hw,az-nz*hw,fy),ar=pt(ax+nx*hw,az+nz*hw,fy)
-        const bl=pt(bx-nx*hw,bz-nz*hw,fy),br=pt(bx+nx*hw,bz+nz*hw,fy)
+        const al=pt(ax-nx*fhw,az-nz*fhw,fy),ar=pt(ax+nx*fhw,az+nz*fhw,fy)
+        const bl=pt(bx-nx*fhw,bz-nz*fhw,fy),br=pt(bx+nx*fhw,bz+nz*fhw,fy)
         quad([al,ar,br,bl],'floor')
-        quad([pt(ax-nx*hw,az-nz*hw,cy),pt(bx-nx*hw,bz-nz*hw,cy),pt(bx+nx*hw,bz+nz*hw,cy),pt(ax+nx*hw,az+nz*hw,cy)],'ceiling')
-        // Center warm ceiling LED light strip
-        quad([pt(ax-nx*.22,az-nz*.22,cy-.03),pt(ax+nx*.22,az+nz*.22,cy-.03),pt(bx+nx*.22,bz+nz*.22,cy-.03),pt(bx-nx*.22,bz-nz*.22,cy-.03)],'lamp')
-        const mx=(ax+bx)*.5,mz=(az+bz)*.5
-        for(const sgn of [-1,1]){
-          const wx=mx+sgn*nx*(hw+.1),wz=mz+sgn*nz*(hw+.1)
-          if(wallOpenAt(wx,wz,pIdx))continue
-          const wl0=pt(ax+sgn*nx*hw,az+sgn*nz*hw,fy),wl1=pt(bx+sgn*nx*hw,bz+sgn*nz*hw,fy)
-          const wh0:Point=[wl0[0],cy,wl0[2]],wh1:Point=[wl1[0],cy,wl1[2]]
-          if(sgn<0){
-            quad([wl0,wl1,wh1,wh0],'interior')
-            quad([pt(ax+sgn*nx*(hw-.03),az+sgn*nz*(hw-.03),fy),pt(bx+sgn*nx*(hw-.03),bz+sgn*nz*(hw-.03),fy),pt(bx+sgn*nx*(hw-.03),bz+sgn*nz*(hw-.03),fy+1.2),pt(ax+sgn*nx*(hw-.03),az+sgn*nz*(hw-.03),fy+1.2)],'band')
-          }else{
-            quad([wl1,wl0,wh0,wh1],'interior')
-            quad([pt(bx+sgn*nx*(hw-.03),bz+sgn*nz*(hw-.03),fy),pt(ax+sgn*nx*(hw-.03),az+sgn*nz*(hw-.03),fy),pt(ax+sgn*nx*(hw-.03),az+sgn*nz*(hw-.03),fy+1.2),pt(bx+sgn*nx*(hw-.03),bz+sgn*nz*(hw-.03),fy+1.2)],'band')
+        const panels=Math.max(1,Math.ceil(len/3.0))
+        for(let p=0;p<panels;p++){
+          const f0=p/panels,f1=(p+1)/panels
+          const sax=ax+dx*f0,saz=az+dz*f0,sbx=ax+dx*f1,sbz=az+dz*f1
+          const pmx=(sax+sbx)*.5,pmz=(saz+sbz)*.5
+          if(!inCutout(pmx,pmz,0)){
+            quad([pt(sax-nx*fhw,saz-nz*fhw,cy),pt(sbx-nx*fhw,sbz-nz*fhw,cy),pt(sbx+nx*fhw,sbz+nz*fhw,cy),pt(sax+nx*fhw,saz+nz*fhw,cy)],'ceiling')
+            // Center warm ceiling LED light strip
+            quad([pt(sax-nx*.22,saz-nz*.22,cy-.03),pt(sax+nx*.22,saz+nz*.22,cy-.03),pt(sbx+nx*.22,sbz+nz*.22,cy-.03),pt(sbx-nx*.22,sbz-nz*.22,cy-.03)],'lamp')
+          }
+          for(const sgn of [-1,1]){
+            const off=sgn*(hw+.1)
+            if(wallOpenAt(pmx+nx*off,pmz+nz*off,pIdx)||wallOpenAt(sax+nx*off,saz+nz*off,pIdx)||wallOpenAt(sbx+nx*off,sbz+nz*off,pIdx))continue
+            const wl0=pt(sax+sgn*nx*hw,saz+sgn*nz*hw,fy),wl1=pt(sbx+sgn*nx*hw,sbz+sgn*nz*hw,fy)
+            const wh0:Point=[wl0[0],cy,wl0[2]],wh1:Point=[wl1[0],cy,wl1[2]]
+            if(sgn<0){
+              quad([wl0,wl1,wh1,wh0],'interior')
+              quad([pt(sax+sgn*nx*(hw-.03),saz+sgn*nz*(hw-.03),fy),pt(sbx+sgn*nx*(hw-.03),sbz+sgn*nz*(hw-.03),fy),pt(sbx+sgn*nx*(hw-.03),sbz+sgn*nz*(hw-.03),fy+1.2),pt(sax+sgn*nx*(hw-.03),saz+sgn*nz*(hw-.03),fy+1.2)],'band')
+            }else{
+              quad([wl1,wl0,wh0,wh1],'interior')
+              quad([pt(sbx+sgn*nx*(hw-.03),sbz+sgn*nz*(hw-.03),fy),pt(sax+sgn*nx*(hw-.03),saz+sgn*nz*(hw-.03),fy),pt(sax+sgn*nx*(hw-.03),saz+sgn*nz*(hw-.03),fy+1.2),pt(sbx+sgn*nx*(hw-.03),sbz+sgn*nz*(hw-.03),fy+1.2)],'band')
+            }
           }
         }
       }
     })
 
-    // Ring perimeter wall (skipped where stair/corridor passages enter) + central octagonal support pier
+    // Ring perimeter wall (skipped where stair/corridor passages enter) + continuous floor/ceiling apron
     for(let i=0;i<ringWorld.length;i++){
       const [ax,az]=ringWorld[i],[bx,bz]=ringWorld[(i+1)%ringWorld.length]
       const dx=bx-ax,dz=bz-az,len=Math.hypot(dx,dz)
@@ -358,23 +594,34 @@ export function tunnelGeometry(
       // Outward vector away from ug center
       const sign=(mx-ug.center[0])*nx+(mz-ug.center[2])*nz>=0?1:-1
       const ox=nx*sign,oz=nz*sign
-      if(allPassages.some(seg=>distToSegments(mx+ox*2.0,mz+oz*2.0,seg.points)<seg.halfWidth+1.1))continue
       const p=(x:number,y:number,z:number):Point=>[x-tile.x,y,z-tile.z]
+      // Always emit outer floor & ceiling apron out to +3.2m so ring-to-corridor seams never drop
+      quad([p(ax,fy,az),p(bx,fy,bz),p(bx+ox*3.2,fy,bz+oz*3.2),p(ax+ox*3.2,fy,az+oz*3.2)],'floor')
+      quad([p(ax,cy,az),p(ax+ox*3.2,cy,az+oz*3.2),p(bx+ox*3.2,cy,bz+oz*3.2),p(bx,cy,bz)],'ceiling')
+      if(allPassages.some(seg=>distToSegments(mx+ox*2.0,mz+oz*2.0,seg.points)<seg.halfWidth+1.1))continue
       quad([p(ax+ox*3.1,fy,az+oz*3.1),p(bx+ox*3.1,fy,bz+oz*3.1),p(bx+ox*3.1,cy,bz+oz*3.1),p(ax+ox*3.1,cy,az+oz*3.1)],'interior')
-      // Outer ceiling extension & floor apron out to shopfront ring
-      quad([p(ax,fy,az),p(bx,fy,bz),p(bx+ox*3.1,fy,bz+oz*3.1),p(ax+ox*3.1,fy,az+oz*3.1)],'floor')
-      quad([p(ax,cy,az),p(ax+ox*3.1,cy,az+oz*3.1),p(bx+ox*3.1,cy,bz+oz*3.1),p(bx,cy,bz)],'ceiling')
       quad([p(ax+ox*1.6,cy-.04,az+oz*1.6),p(bx+ox*1.6,cy-.04,bz+oz*1.6),p(bx+ox*1.9,cy-.04,bz+oz*1.9),p(ax+ox*1.9,cy-.04,az+oz*1.9)],'lamp')
+    }
+
+    if(extraWalkPoly&&extraWalkPoly.length>=3){
+      const ewVec=extraWalkPoly.map(([x,z])=>new THREE.Vector2(x,z))
+      for(const [a,b,c] of THREE.ShapeUtils.triangulateShape(ewVec,[])){
+        const pa:Point=[extraWalkPoly[a][0]-tile.x,fy,extraWalkPoly[a][1]-tile.z]
+        const pb:Point=[extraWalkPoly[b][0]-tile.x,fy,extraWalkPoly[b][1]-tile.z]
+        const pc:Point=[extraWalkPoly[c][0]-tile.x,fy,extraWalkPoly[c][1]-tile.z]
+        fan(limits.reduce((poly,plane)=>clip(poly,plane),[pa,pb,pc]),parts.floor)
+      }
     }
 
     // 4 structural octagonal terrazzo columns in atrium hall around central core
     for(const [ox,oz] of [[-7.2,-6.8],[7.2,-6.8],[7.2,6.8],[-7.2,6.8]]){
-      const ccx=ug.center[0]+ox-tile.x,ccz=ug.center[2]+oz-tile.z,r=.68
+      const ccx=ug.center[0]+ox-tile.x,ccz=ug.center[2]+oz-tile.z,r=.68,rb=r+.015
       for(let s=0;s<8;s++){
         const a0=s*Math.PI/4,a1=(s+1)*Math.PI/4
         const p0:Point=[ccx+Math.cos(a0)*r,fy,ccz+Math.sin(a0)*r],p1:Point=[ccx+Math.cos(a1)*r,fy,ccz+Math.sin(a1)*r]
+        const b0:Point=[ccx+Math.cos(a0)*rb,fy,ccz+Math.sin(a0)*rb],b1:Point=[ccx+Math.cos(a1)*rb,fy,ccz+Math.sin(a1)*rb]
         quad([p0,p1,[p1[0],cy,p1[2]],[p0[0],cy,p0[2]]],'interior')
-        quad([p0,p1,[p1[0],fy+1.2,p1[2]],[p0[0],fy+1.2,p0[2]]],'band')
+        quad([b0,b1,[b1[0],fy+1.2,b1[2]],[b0[0],fy+1.2,b0[2]]],'band')
       }
     }
 

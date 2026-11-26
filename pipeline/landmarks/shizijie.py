@@ -17,10 +17,12 @@ modeled in nikoniko.py):
   plinths, dual-gun fast charger, and dedicated self-illuminated night signage
   (`shizijie_shop_signs`, zero dynamic Three.js lights, zero real-world trademarks).
 """
+import json
 import math
 from pathlib import Path
 import sys
 
+import mapbox_earcut
 import numpy as np
 from PIL import Image, ImageDraw
 import trimesh
@@ -30,7 +32,8 @@ from nikoniko import Builder, _draw_centered, _font
 from shizijie_layout import KIOSK_CENTER, islands
 from plaza_seam import civic_plaza
 from shapely.affinity import scale
-from shapely.geometry import box
+from shapely.geometry import Polygon, box
+from shapely.ops import unary_union
 
 
 SHOP_SIGN_ATLAS = 1024
@@ -57,6 +60,17 @@ SHOP_SIGN_RECTS = {
     'szj_shop_5': (256, 704, 256, 80),
     'szj_shop_6': (512, 704, 256, 80),
     'szj_shop_7': (768, 704, 256, 80),
+    # B1 "小香港" underground concourse lightboxes, 4 unique corner exit portals & 16 unique shops (y=784..1024)
+    'ug_portal_main': (0, 784, 512, 36),
+    'ug_exit_nw': (512, 784, 256, 36),
+    'ug_exit_ne': (768, 784, 256, 36),
+    'ug_exit_se': (0, 820, 256, 36),
+    'ug_exit_sw': (256, 820, 256, 36),
+    'ug_dir_atrium': (512, 820, 512, 36),
+    **{f'ug_shop_{i}': ((i % 4) * 256, 856 + (i // 4) * 31, 256, 31) for i in range(16)},
+    'ug_booth_win_a': (0, 980, 256, 44),
+    'ug_booth_win_b': (256, 980, 256, 44),
+    'ug_shutter_band': (512, 980, 256, 44),
 }
 
 NW_NANFANG = [
@@ -206,6 +220,63 @@ def _build_shizijie_shop_signs_sheet() -> Image.Image:
         _draw_centered(draw, (rx + 10, ry + 6, rw - 20, int(rh * 0.58)), zh, _font(28, bold=True), fg, stroke_w=1)
         _draw_centered(draw, (rx + 10, ry + int(rh * 0.62), rw - 20, int(rh * 0.30)), en, _font(13, bold=True, sans=True), fg)
 
+    # 8. B1 "小香港" underground commercial complex lightboxes & showcases (unused bottom band y=784..1024; 0 extra VRAM!)
+    def paint_ug_box(rect_key, bg, fg, rim, title_zh, sub_text, title_sz=20, sub_sz=10):
+        rx, ry, rw, rh = SHOP_SIGN_RECTS[rect_key]
+        draw.rectangle((rx, ry, rx + rw - 1, ry + rh - 1), fill=bg)
+        draw.rectangle((rx + 2, ry + 2, rx + rw - 3, ry + rh - 3), outline=rim, width=2)
+        zh_h = max(14, int(rh * 0.56))
+        _draw_centered(draw, (rx + 12, ry + 2, rw - 24, zh_h), title_zh, _font(title_sz, bold=True, sans=True), fg, stroke_w=1)
+        _draw_centered(draw, (rx + 12, ry + zh_h + 2, rw - 24, max(10, rh - zh_h - 4)), sub_text, _font(sub_sz, bold=True, sans=True), rim)
+
+    paint_ug_box('ug_portal_main', (16, 46, 38), (252, 232, 162), (96, 224, 192), '十 字 街 地 下 商 业 街  ·  小 香 港 B1', 'XIAO XIANG GANG UNDERGROUND MARKET · 4 EXITS', 18, 9)
+    paint_ug_box('ug_exit_nw', (14, 52, 42), (242, 252, 248), (156, 236, 212), '↑ NW 出口 · 南方大厦 / 解放西路', 'EXIT NW · NANFANG / JIEFANG W.', 13, 8)
+    paint_ug_box('ug_exit_ne', (14, 52, 42), (242, 252, 248), (252, 220, 124), '↑ NE 出口 · 解放东路 / 东巷口', 'EXIT NE · JIEFANG E. / EAST ALLEY', 13, 8)
+    paint_ug_box('ug_exit_se', (14, 52, 42), (242, 252, 248), (252, 220, 124), '↑ SE 出口 · 文化大厦 / 正阳步行街', 'EXIT SE · WENHUA / ZHENGYANG ST.', 13, 8)
+    paint_ug_box('ug_exit_sw', (14, 52, 42), (242, 252, 248), (156, 236, 212), '↑ SW 出口 · 微笑堂 / 中山中路', 'EXIT SW · WEIXIAOTANG / ZHONGSHAN RD.', 13, 8)
+
+    ug_shops = (
+        ('ug_shop_0', (148, 54, 24), (255, 238, 176), (250, 184, 96), '小香港 · 漓江米粉', 'RICE NOODLES · B1-01'),
+        ('ug_shop_1', (138, 28, 34), (255, 234, 152), (246, 206, 116), '桂林三宝手信坊', 'LOCAL GIFTS · B1-02'),
+        ('ug_shop_2', (16, 86, 76), (246, 252, 248), (144, 236, 214), '阳朔鲜果茶饮', 'FRUIT TEA · B1-03'),
+        ('ug_shop_3', (78, 32, 118), (252, 238, 255), (220, 170, 250), '正阳潮玩盲盒社', 'COLLECTIBLES · B1-04'),
+        ('ug_shop_4', (22, 74, 126), (242, 248, 255), (156, 212, 252), '潮流数码配件站', 'DIGITAL GEAR · B1-05'),
+        ('ug_shop_5', (142, 30, 74), (254, 240, 246), (250, 184, 214), '港式冰室甜品屋', 'DESSERT CAFE · B1-06'),
+        ('ug_shop_6', (44, 56, 66), (246, 248, 252), (232, 200, 132), '复古黑胶与明信片', 'VINYL & CARDS · B1-07'),
+        ('ug_shop_7', (66, 42, 34), (254, 238, 188), (232, 188, 118), '手作银饰工坊', 'SILVER STUDIO · B1-08'),
+        ('ug_shop_8', (36, 52, 124), (240, 246, 255), (168, 206, 254), '二次元谷子集市', 'ANIME HOBBY · B1-09'),
+        ('ug_shop_9', (152, 28, 86), (255, 240, 248), (252, 184, 220), '精品美妆集合店', 'BEAUTY PICK · B1-10'),
+        ('ug_shop_10', (34, 42, 46), (244, 254, 236), (144, 238, 118), '街头运动潮鞋馆', 'STREET KICKS · B1-11'),
+        ('ug_shop_11', (18, 98, 112), (246, 252, 254), (156, 234, 244), '象山文创纪念馆', 'CULTURAL ART · B1-12'),
+        ('ug_shop_12', (158, 92, 18), (255, 246, 214), (252, 224, 136), '手工鲜奶麻薯铺', 'MOCHI BAKERY · B1-13'),
+        ('ug_shop_13', (16, 88, 128), (242, 250, 255), (162, 224, 252), '眼镜快配工坊', 'OPTICAL LAB · B1-14'),
+        ('ug_shop_14', (72, 28, 108), (252, 238, 255), (218, 174, 248), '港风复古穿搭馆', 'VINTAGE WEAR · B1-15'),
+        ('ug_shop_15', (28, 96, 46), (244, 254, 246), (158, 232, 168), '24H地下便利店', '24H MART · B1-16'),
+    )
+    for k, bg, fg, rim, zh, en in ug_shops:
+        paint_ug_box(k, bg, fg, rim, zh, en, 12, 7)
+
+    # Illuminated storefront showcase display textures (display counter, hanger shelves & lightbox backdrop)
+    for key, wall_c, warm_c in (('ug_booth_win_a', (48, 40, 34), (248, 230, 186)), ('ug_booth_win_b', (28, 46, 52), (186, 236, 226))):
+        rx, ry, rw, rh = SHOP_SIGN_RECTS[key]
+        draw.rectangle((rx, ry, rx + rw - 1, ry + rh - 1), fill=wall_c)
+        draw.rectangle((rx + 8, ry + 4, rx + rw - 9, ry + 10), fill=warm_c)
+        draw.rectangle((rx + 12, ry + 20, rx + rw - 13, ry + 24), fill=(214, 206, 192))
+        for kx in range(rx + 24, rx + rw - 20, 42):
+            draw.rectangle((kx, ry + 26, kx + 26, ry + rh - 5), fill=(192, 178, 158))
+        draw.rectangle((rx + 3, ry + 3, rx + rw - 4, ry + rh - 4), outline=warm_c, width=2)
+
+    # Corrugated galvanized roller shutter texture (256x44 aspect-safe) with crisp yellow XH rental plate
+    rx, ry, rw, rh = SHOP_SIGN_RECTS['ug_shutter_band']
+    draw.rectangle((rx, ry, rx + rw - 1, ry + rh - 1), fill=(92, 98, 108))
+    for sy in range(ry + 18, ry + rh - 3, 5):
+        draw.line((rx + 4, sy, rx + rw - 5, sy), fill=(128, 134, 144), width=2)
+        draw.line((rx + 4, sy + 2, rx + rw - 5, sy + 2), fill=(58, 62, 70), width=1)
+    draw.rectangle((rx + 12, ry + 2, rx + rw - 13, ry + 18), fill=(24, 30, 40), outline=(248, 210, 88), width=1)
+    _draw_centered(draw, (rx + 14, ry + 2, rw - 28, 16), '预留 · XH 招租', _font(12, bold=True, sans=True), (252, 218, 96))
+
+    paint_ug_box('ug_dir_atrium', (24, 34, 42), (248, 228, 152), (222, 184, 104), '中心环岛中庭 · A / B / C / D 区', 'CENTRAL ATRIUM · FOUR-WAY CONCOURSE', 14, 9)
+
     return sheet
 
 
@@ -243,6 +314,17 @@ class ShizijieBuilder(Builder):
             ])
             self.shop_sign_tris.append(back[idx])
             self.shop_sign_uv.append(uvs[idx])
+
+    def soffit_quad(self, x, y0, z, w, d, mat):
+        """Emit a horizontal DoubleSide soffit quad with +Y normal so hidden_faces.py never strips B1 ceilings."""
+        hw, hd = w * 0.5, d * 0.5
+        verts = np.array([
+            (x - hw, y0, z - hd),
+            (x - hw, y0, z + hd),
+            (x + hw, y0, z + hd),
+            (x + hw, y0, z - hd),
+        ], dtype=float)
+        self.mesh(verts, [[0, 1, 2], [0, 2, 3]], mat)
 
 
 def _pave_surface_y(m: Builder, lx: float, lz: float) -> float:
@@ -558,11 +640,11 @@ def build_shizijie(m: ShizijieBuilder):
     # Roadside large municipal blue direction sign on south approach east sidewalk (bing_10.jpg right)
     _roadside_direction_sign(m, 4.7, 46.5, yaw=math.atan2(-17.3, 46.5), sign_key='road_szj_ns')
 
-    # NE Corner '桂林交警' blue-and-white police kiosk
+    # NE Corner '桂林交警' blue-and-white police kiosk (base seated -0.04 m into island curb for clean grounding)
     m.pose = (KIOSK_CENTER[0], 0.15, KIOSK_CENTER[1], -0.55)
-    m.box(0, 0.0, 0, 3.4, 2.85, 2.8, 'white', collide=True)
+    m.box(0, -0.04, 0, 3.4, 2.89, 2.8, 'white', collide=True)
     m.box(0, 0.95, 1.42, 2.6, 1.25, 0.08, 'glass')
-    m.box(0, 0.0, 1.41, 2.8, 0.88, 0.08, 'red')
+    m.box(0, -0.04, 1.41, 2.8, 0.92, 0.08, 'red')
     m.box(0, 2.45, 0, 3.7, 0.52, 3.1, 'blue')
     m.box(0, 2.97, 0, 3.9, 0.16, 3.3, 'alum')
     m.sign_quad(0, 2.46, 1.58, 3.45, 0.50, 'police_sign')
@@ -587,9 +669,11 @@ def build_shizijie(m: ShizijieBuilder):
     build_surface_stairwell(
         m, _stairs_by_corner['nw'], SHIZIJIE_ORIGIN,
         frame_mat='alum', parapet_mat='dark', glass_mat='glass', bollard_mat='red', roof_mat='blue',
+        header_sign_key='ug_portal_main',
     )
     m.prism(NW_NANFANG, -2.0, 6.8, 'dark', collide=True, cap_mat='alum', footing=True)
     m.prism(NW_NANFANG, 4.8, 20.4, 'white', collide=True, cap_mat='roof')
+    m.cylinder_y(-24.5, 4.78, 0.14, -46.0, 9.56, 'white', sections=16 if m.detail else 8)
     m.cylinder_y(-24.5, 4.8, 22.4, -46.0, 9.6, 'glass', sections=16 if m.detail else 8, collide=True)
     m.cylinder_y(-24.5, 27.2, 2.2, -46.0, 8.8, 'white', sections=16 if m.detail else 8)
     m.pose = (-24.5, 27.5, -46.0, math.atan2(1.0, 1.1))
@@ -610,6 +694,7 @@ def build_shizijie(m: ShizijieBuilder):
     build_surface_stairwell(
         m, _stairs_by_corner['se'], SHIZIJIE_ORIGIN,
         frame_mat='alum', parapet_mat='dark', glass_mat='glass', bollard_mat='red', roof_mat='blue',
+        header_sign_key='ug_portal_main',
     )
     m.prism(SE_WENHUA, -2.0, 6.6, 'dark', collide=True, cap_mat='beige', footing=True)
     m.prism(SE_WENHUA, 4.6, 18.0, 'beige', collide=True, cap_mat='roof')
@@ -638,6 +723,7 @@ def build_shizijie(m: ShizijieBuilder):
     build_surface_stairwell(
         m, _stairs_by_corner['ne'], SHIZIJIE_ORIGIN,
         frame_mat='alum', parapet_mat='dark', glass_mat='glass', bollard_mat='red', roof_mat='blue',
+        header_sign_key='ug_portal_main',
     )
     m.prism(NE_CORNER, -2.0, 6.4, 'dark', collide=True, cap_mat='alum', footing=True)
     m.prism(NE_CORNER, 4.4, 17.0, 'white', collide=True, cap_mat='roof')
@@ -666,7 +752,7 @@ def build_shizijie(m: ShizijieBuilder):
         (50.5, -18.0, 8.2, 3.3),
         (88.0, 6.5, 8.2, 3.3),
         (108.0, 11.2, 8.2, 3.3),
-        (24.0, 56.5, 8.2, 3.3),
+        (14.0, 59.5, 8.2, 3.3),
         (4.5, 74.0, 8.2, 3.3),
     ):
         m.street_tree(tx, 0.08, tz, height=th, spread=tsp, kind='camphor', lanterns=(tx > -55), collide=True)
@@ -679,6 +765,267 @@ def build_shizijie(m: ShizijieBuilder):
             sz = 26.5 - 1.5 * t
             m.cylinder_y(sx, 0.10, 0.72, sz, 0.85, 'hedge', sections=7)
             m.cylinder_y(sx, 0.82, 0.55, sz, 0.72, 'red', sections=7)
+
+
+def build_shizijie_underground(m: ShizijieBuilder):
+    """Build B1 "小香港" underground commercial street & concourse geometry inside node `underground`.
+
+    Aligns 1:1 with `pipeline/shizijie_underpass.py` STAIRWELLS cutouts & 15-way OSM network:
+    - Floor slabs & terrazzo walkway inlays at `-4.20 m` (offset from procedural `tunnels.ts` to avoid Z-fighting)
+    - Coffered suspended aluminum baffle ceiling + warm cove strips (`-1.22..-1.09 m`, >= 2.98 m headroom)
+    - 4 stair shafts with brushed steel side handrails, tactile nosings & deep B1 directional portal lightboxes
+    - 16 illuminated 3D shop cubicles + projecting blade lightboxes + 16 corrugated shutter bays (`XH-01..16`)
+    - Central octagonal atrium columns with wrap seating & suspended wayfinding lightboxes
+    """
+    from shizijie_underpass import build_underground_landmark_metadata
+
+    ug = build_underground_landmark_metadata()
+    floor_y = ug['floorY']
+    ceil_y = ug['ceilingY']
+    m.follow_grade = False
+
+    # 1. Subterranean floor plate, watertight perimeter walls, and ceiling deck with exact 4 stairwell cutouts
+    walk_poly = ug['walkPolygon']
+    if len(walk_poly) >= 3:
+        m.prism(walk_poly, floor_y - 0.036, 0.016, 'beige', cap_mat='pave')
+
+    ring_closed = list(ug['ringPolygon']) + [ug['ringPolygon'][0]]
+    m.poly_wall_strip(ring_closed, floor_y + 0.010, 0.008, 0.24, 'dark', cap_mat='red_pave')
+    m.poly_wall_strip(ring_closed, floor_y + 0.011, 0.007, 0.08, 'yellow_pave', cap_mat='yellow_pave')
+
+    def _pose_rect(cx_p, cz_p, yaw_p, x0, x1, z0, z1):
+        c_p, s_p = math.cos(yaw_p), math.sin(yaw_p)
+        return Polygon([
+            (cx_p + lx * c_p + lz * s_p, cz_p - lx * s_p + lz * c_p)
+            for lx, lz in ((x0, z0), (x1, z0), (x1, z1), (x0, z1))
+        ])
+
+    envelope_parts = [Polygon(walk_poly).buffer(0.26, join_style=2)]
+    for b_spec in [*ug['shops'], *ug['shutters']]:
+        hw_b = b_spec['width'] * 0.5 + 0.14
+        bd_b = b_spec.get('depth', 2.4)
+        envelope_parts.append(_pose_rect(b_spec['x'], b_spec['z'], b_spec['yaw'], -hw_b, hw_b, -bd_b - 0.16, 0.34))
+    stair_holes = []
+    for st in ug['entrances']:
+        cx_s, _, cz_s = st['center']
+        yaw_s = st['yawRad']
+        hw_s, hl_s = st['width'] * 0.5, st['length'] * 0.5
+        envelope_parts.append(_pose_rect(cx_s, cz_s, yaw_s, -hw_s - 1.2, hw_s + 1.2, hl_s - 0.6, hl_s + 3.2))
+        stair_holes.append(_pose_rect(cx_s, cz_s, yaw_s, -hw_s + 0.02, hw_s - 0.02, -hl_s - 0.04, hl_s - 0.25))
+
+    outer_b1 = unary_union(envelope_parts).buffer(0)
+    if outer_b1.geom_type == 'MultiPolygon':
+        outer_b1 = max(outer_b1.geoms, key=lambda g: g.area)
+
+    ceil_y_bot = ceil_y - 0.06  # -1.11m: 1cm cleanly below procedural tunnels.ts (-1.10m), masking overlap slivers
+    ceil_shape = outer_b1.buffer(0.24, join_style=2).difference(unary_union(stair_holes))
+    ceil_comps = list(getattr(ceil_shape, 'geoms', [ceil_shape]))
+    for comp in ceil_comps:
+        if comp.is_empty or comp.area < 1.0:
+            continue
+        ext_pts = np.asarray(comp.exterior.coords[:-1], dtype=float)
+        if len(ext_pts) < 3:
+            continue
+        rings_list = [ext_pts]
+        for hole_ring in comp.interiors:
+            h_pts = np.asarray(hole_ring.coords[:-1], dtype=float)
+            if len(h_pts) >= 3:
+                rings_list.append(h_pts)
+        verts_2d = np.vstack(rings_list)
+        ring_ends = np.cumsum([len(r) for r in rings_list], dtype=np.uint32)
+        tris_2d = mapbox_earcut.triangulate_float64(verts_2d, ring_ends).reshape(-1, 3)
+        if len(tris_2d):
+            verts_3d = np.column_stack([verts_2d[:, 0], np.full(len(verts_2d), ceil_y_bot), verts_2d[:, 1]])
+            v0, v1, v2 = verts_3d[tris_2d[:, 0]], verts_3d[tris_2d[:, 1]], verts_3d[tris_2d[:, 2]]
+            # Keep +Y normal so hidden_faces.py never strips underground ceiling triangles (material is doubleSided=True)
+            if float(np.mean(np.cross(v1 - v0, v2 - v0)[:, 1])) < 0.0:
+                tris_2d = tris_2d[:, ::-1]
+            m.mesh(verts_3d, tris_2d, 'white')
+
+    # Watertight outer enclosure perimeter wall (`floor_y - 0.05 .. ceil_y_bot + 0.08`) around outer_b1
+    wall_shell = outer_b1.buffer(0.18, join_style=2).simplify(0.22, preserve_topology=True)
+    wall_coords = list(wall_shell.exterior.coords)
+    if len(wall_coords) >= 4:
+        m.poly_wall_strip(wall_coords, floor_y - 0.05, (ceil_y_bot + 0.08) - (floor_y - 0.05), 0.28, 'beige', cap_mat='beige')
+        m.poly_wall_strip(wall_coords, floor_y - 0.04, 1.16, 0.32, 'dark', cap_mat='beige')
+        m.poly_wall_strip(wall_coords, ceil_y_bot - 0.08, 0.06, 0.34, 'white_lit')
+
+    # Connected coffered ceiling beams, continuous longitudinal runners & warm coves anchored into -1.11m deck
+    for seg in [*ug['corridors'], *ug['connectors']]:
+        pts = seg['points']
+        hw = seg['halfWidth']
+        for i in range(1, len(pts)):
+            ax, az = pts[i - 1]
+            bx, bz = pts[i]
+            dx, dz = bx - ax, bz - az
+            seg_len = math.hypot(dx, dz)
+            if seg_len < 1.2:
+                continue
+            yaw = math.atan2(dx, dz)
+            m.pose = ((ax + bx) * 0.5, 0.0, (az + bz) * 0.5, yaw)
+            for rx in (-hw * 0.68, hw * 0.68):
+                m.box(rx, ceil_y_bot - 0.05, 0.0, 0.10, 0.10, seg_len + 0.16, 'alum')
+            n_baffles = max(1, int(seg_len // 3.4))
+            for k in range(n_baffles):
+                u = (k + 0.5) / n_baffles - 0.5
+                pz_l = u * seg_len
+                m.box(0.0, ceil_y - 0.14, pz_l, hw * 1.92, 0.12, 0.14, 'alum')
+                m.box(0.0, ceil_y - 0.17, pz_l, hw * 1.60, 0.035, 0.08, 'white_lit')
+                m.soffit_quad(0.0, ceil_y - 0.174, pz_l, hw * 1.60, 0.09, 'white_lit')
+            m.pose = (0.0, 0.0, 0.0, 0.0)
+
+    # 2. 4 Corner stair shafts aligned 1:1 with STAIRWELLS cutouts + full under-stair & portal bulkhead sealing
+    for st in ug['entrances']:
+        cx, _, cz = st['center']
+        yaw = st['yawRad']
+        w, length = st['width'], st['length']
+        hw, hl = w * 0.5, length * 0.5
+        top_y = st['mouth'][1]
+        bot_y = st['deep'][1]
+        exit_key = f"ug_exit_{st['corner']}"
+
+        m.pose = (cx, 0.0, cz, yaw)
+        # Tactile caution strips at top mouth and bottom B1 lobby
+        m.box(0.0, top_y + 0.008, -hl + 0.18, w - 0.24, 0.012, 0.28, 'yellow_pave')
+        m.box(0.0, bot_y + 0.010, hl + 0.18, w - 0.16, 0.012, 0.30, 'yellow_pave')
+
+        # Side brushed-aluminum handrails, vertical stanchions & warm LED stair strips
+        for sx in (-hw + 0.10, hw - 0.10):
+            m.beam([sx, top_y + 0.88, -hl + 0.15], [sx, bot_y + 0.88, hl - 0.15], 0.028, 'alum', sections=6)
+            m.beam([sx - math.copysign(0.02, sx), top_y + 0.98, -hl + 0.20], [sx - math.copysign(0.02, sx), bot_y + 0.98, hl - 0.12], 0.024, 'white_lit', sections=5)
+            for t_post in (0.08, 0.36, 0.64, 0.92):
+                py = top_y + (bot_y - top_y) * t_post
+                pz = -hl + length * t_post
+                m.box(sx, py, pz, 0.045, 0.88, 0.045, 'alum')
+
+        # Enclose stair cheek walls + under-stair structural core strictly within cutout width `w` (no rear see-through!)
+        n_encl = 12
+        seg_l = length / n_encl
+        for e_idx in range(n_encl):
+            t0 = e_idx / n_encl
+            t1 = (e_idx + 1) / n_encl
+            zc = -hl + length * (t0 + t1) * 0.5
+            y_mid = top_y + (bot_y - top_y) * ((t0 + t1) * 0.5)
+            side_top = min(-0.08, max(ceil_y + 0.06, y_mid + 3.15))
+            if side_top > floor_y + 0.2:
+                for sx_w in (-hw - 0.07, hw + 0.07):
+                    m.box(sx_w, floor_y - 0.04, zc, 0.14, side_top - (floor_y - 0.04), seg_l + 0.02, 'beige')
+            under_top = min(-0.14, y_mid - 0.18)
+            if under_top > floor_y + 0.25:
+                m.box(0.0, floor_y - 0.04, zc, w, under_top - (floor_y - 0.04), seg_l + 0.02, 'dark')
+
+        # Illuminated stair nosing bars synchronized with 24 steps
+        for s_idx in range(24):
+            t_s = (s_idx + 1) / 24.0
+            sy = top_y + (bot_y - top_y) * t_s
+            sz = -hl + length * ((s_idx + 0.05) / 24.0)
+            m.box(0.0, sy + 0.008, sz, w - 0.26, 0.012, 0.045, 'beige')
+
+        # Underground B1 stair portal arch, recessed ceiling hood (seals tunnels.ts overhangs) & exit lightbox
+        portal_top = ceil_y + 0.12
+        lintel_y0 = bot_y + 2.30
+        for px in (-hw - 0.18, hw + 0.18):
+            m.box(px, bot_y - 0.04, hl, 0.38, portal_top - (bot_y - 0.04), 0.34, 'dark')
+        m.box(0.0, lintel_y0, hl, w + 2.20, portal_top - lintel_y0, 0.36, 'dark')
+        m.soffit_quad(0.0, lintel_y0 - 0.002, hl, w + 2.20, 0.36, 'dark')
+        m.box(0.0, ceil_y_bot - 0.14, hl - 0.65, w + 0.44, 0.24, 1.44, 'dark')
+        m.soffit_quad(0.0, ceil_y_bot - 0.144, hl - 0.65, w + 0.44, 1.44, 'dark')
+        m.box(0.0, lintel_y0 - 0.03, hl + 0.14, w - 0.10, 0.04, 0.10, 'white_lit')
+        m.soffit_quad(0.0, lintel_y0 - 0.034, hl + 0.14, w - 0.10, 0.10, 'white_lit')
+        m.shop_sign_quad(0.0, bot_y + 2.34, hl + 0.20, w - 0.12, 0.50, exit_key, double_sided=True)
+        m.pose = (0.0, 0.0, 0.0, 0.0)
+
+    # 3. 16 lit boutique cubicles (+ projecting Hong Kong blade lightboxes) & 16 reserved shutter bays (XH-01..16)
+    for sp in ug['shops']:
+        idx = sp['index']
+        bw, bh, bd = sp['width'], sp['height'], sp.get('depth', 2.4)
+        hw = bw * 0.5
+        m.pose = (sp['x'], floor_y, sp['z'], sp['yaw'])
+        # Recessed cubicle back shell (z in [-bd, -0.04]) for full 3D booth compartments
+        m.box(0.0, -0.032, -bd * 0.5 - 0.02, bw, 0.016, bd, 'pave')
+        m.box(0.0, bh + 0.02, -bd * 0.5 - 0.02, bw, 0.14, bd, 'dark')
+        m.soffit_quad(0.0, bh - 0.005, -bd * 0.5 - 0.02, bw - 0.10, bd, 'white')
+        m.box(0.0, 0.0, -bd - 0.02, bw, bh, 0.10, 'beige')
+        for sx in (-hw + 0.06, hw - 0.06):
+            m.box(sx, 0.0, -bd * 0.5, 0.10, bh, bd, 'white')
+        m.box(0.0, bh - 0.18, -bd * 0.45, bw - 0.24, 0.07, 0.48, 'white_lit')
+        m.soffit_quad(0.0, bh - 0.185, -bd * 0.45, bw - 0.24, 0.48, 'white_lit')
+
+        # Corridor-facing 3D booth pilasters, showcase counter & overhead luminous shop lightbox (`z > 0`)
+        for sx in (-hw + 0.07, hw - 0.07):
+            m.box(sx, 0.0, 0.16, 0.13, bh + 0.12, 0.26, 'dark')
+            m.box(sx, 0.0, 0.29, 0.05, bh, 0.04, 'alum')
+        m.box(0.0, 0.0, 0.18, bw - 0.26, 0.82, 0.26, 'dark')
+        m.box(0.0, 0.82, 0.19, bw - 0.20, 0.05, 0.30, 'alum')
+        win_key = 'ug_booth_win_a' if idx % 2 == 0 else 'ug_booth_win_b'
+        m.shop_sign_quad(0.0, 0.87, 0.09, bw - 0.32, 1.32, win_key)
+        # Upper shop header fascia lightbox box + quad + under-fascia cove glow
+        m.box(0.0, 2.22, 0.20, bw - 0.12, 0.60, 0.26, 'dark')
+        m.soffit_quad(0.0, 2.216, 0.20, bw - 0.12, 0.26, 'dark')
+        m.box(0.0, 2.18, 0.24, bw - 0.26, 0.04, 0.12, 'white_lit')
+        m.soffit_quad(0.0, 2.176, 0.24, bw - 0.26, 0.12, 'white_lit')
+        m.shop_sign_quad(0.0, 2.25, 0.34, bw - 0.24, 0.52, f'ug_shop_{idx}')
+
+        # Projecting perpendicular double-sided blade lightbox every other booth (clear height 2.16 m!)
+        if idx % 2 == 0:
+            m.box(hw - 0.06, 2.18, 0.46, 0.08, 0.54, 0.62, 'dark')
+            c, s = math.cos(sp['yaw']), math.sin(sp['yaw'])
+            bx_w = sp['x'] + (hw - 0.06) * c + 0.48 * s
+            bz_w = sp['z'] - (hw - 0.06) * s + 0.48 * c
+            m.pose = (bx_w, floor_y, bz_w, sp['yaw'] + math.pi * 0.5)
+            m.shop_sign_quad(0.0, 2.21, 0.02, 0.54, 0.48, f'ug_shop_{idx}', double_sided=True)
+        m.pose = (0.0, 0.0, 0.0, 0.0)
+
+    for sh in ug['shutters']:
+        bw, bh, bd = sh['width'], sh['height'], sh.get('depth', 2.4)
+        hw = bw * 0.5
+        m.pose = (sh['x'], floor_y, sh['z'], sh['yaw'])
+        m.box(0.0, -0.032, -bd * 0.5 - 0.02, bw, 0.016, bd, 'dark')
+        m.box(0.0, 0.0, -bd - 0.02, bw, bh + 0.14, 0.10, 'dark')
+        for sx in (-hw + 0.07, hw - 0.07):
+            m.box(sx, 0.0, 0.14, 0.13, bh, 0.22, 'alum')
+        m.box(0.0, 2.38, 0.14, bw - 0.14, 0.44, 0.22, 'dark')
+        m.soffit_quad(0.0, 2.376, 0.14, bw - 0.14, 0.22, 'dark')
+        m.shop_sign_quad(0.0, 0.04, 0.12, bw - 0.28, 2.32, 'ug_shutter_band')
+        m.pose = (0.0, 0.0, 0.0, 0.0)
+
+    # 4. Atrium octagonal columns Z-fighting clad sleeves + wrap benches + hanging wayfinding ceiling lightboxes
+    for ox, oz in ((-7.2, -6.8), (7.2, -6.8), (7.2, 6.8), (-7.2, 6.8)):
+        m.cylinder_y(ox, floor_y + 0.012, 1.32, oz, 0.72, 'dark', sections=8)
+        m.cylinder_y(ox, floor_y + 1.33, 0.06, oz, 0.75, 'beige', sections=8)
+        m.cylinder_y(ox, floor_y + 0.012, 0.42, oz, 0.94, 'dark', sections=8)
+        m.cylinder_y(ox, floor_y + 0.43, 0.05, oz, 0.98, 'beige', sections=8)
+        m.cylinder_y(ox, floor_y + 2.28, 0.34, oz, 0.74, 'white_lit', sections=8)
+
+    for lb in [*ug['lightboxes'], {'kind': 'hanging_wayfinding', 'text': 'SW微笑堂', 'position': [-47.5, -1.54, 15.2], 'yaw': 0.52}]:
+        if lb['kind'] != 'hanging_wayfinding':
+            continue
+        lx, ly, lz = lb['position']
+        yaw = lb['yaw']
+        key = 'ug_portal_main' if '小香港' in lb['text'] else 'ug_exit_ne' if '解放东路' in lb['text'] else 'ug_exit_sw' if 'SW' in lb['text'] else 'ug_exit_nw' if '解放西路' in lb['text'] else 'ug_dir_atrium'
+        m.pose = (lx, ly, lz, yaw)
+        rod_h = max(0.20, ceil_y_bot + 0.04 - (ly + 0.46))
+        for rx in (-1.05, 1.05):
+            m.box(rx, 0.46, 0.0, 0.045, rod_h, 0.045, 'alum')
+        m.box(0.0, 0.0, 0.0, 2.66, 0.50, 0.16, 'dark')
+        m.soffit_quad(0.0, -0.004, 0.0, 2.66, 0.16, 'dark')
+        m.shop_sign_quad(0.0, 0.03, 0.10, 2.54, 0.44, key, double_sided=True)
+        m.pose = (0.0, 0.0, 0.0, 0.0)
+
+
+def build_underground_sidecar() -> dict:
+    from shizijie_underpass import build_underground_landmark_metadata
+    return build_underground_landmark_metadata()
+
+
+def sync_shizijie_json(json_path: Path) -> dict:
+    """Merge canonical `underground` metadata into `public/landmarks/shizijie.json` while preserving sphere/lods."""
+    existing = {}
+    if json_path.exists():
+        existing = json.loads(json_path.read_text())
+    existing['underground'] = build_underground_sidecar()
+    json_path.write_text(json.dumps(existing, ensure_ascii=False) + '\n')
+    return existing
 
 
 def _export_shizijie():
@@ -699,11 +1046,23 @@ def _export_shizijie():
     )
     mat_shop_signs = trimesh.visual.material.PBRMaterial(
         name='shizijie_shop_signs', baseColorTexture=shop_signs_img,
+        emissiveTexture=shop_signs_img, emissiveFactor=[0.65, 0.65, 0.65],
         roughnessFactor=0.22, metallicFactor=0.18, doubleSided=True,
     )
     mat_lit = trimesh.visual.material.PBRMaterial(
         name='B_surfaces_lit', baseColorTexture=textures['surfaces'],
         emissiveFactor=[0.18, 0.16, 0.12], roughnessFactor=0.65, metallicFactor=0.05, doubleSided=True,
+    )
+    # Daytime-visible subterranean interior bounce + continuous cove lighting (names skip night.ts *_lit multiplier)
+    mat_ug_shell = trimesh.visual.material.PBRMaterial(
+        name='ug_interior', baseColorTexture=textures['surfaces'],
+        emissiveTexture=textures['surfaces'], emissiveFactor=[0.28, 0.27, 0.25],
+        roughnessFactor=0.88, metallicFactor=0.04, doubleSided=True,
+    )
+    mat_ug_lit = trimesh.visual.material.PBRMaterial(
+        name='ug_lamp_cove', baseColorTexture=textures['surfaces'],
+        emissiveTexture=textures['surfaces'], emissiveFactor=[0.90, 0.85, 0.72],
+        roughnessFactor=0.35, metallicFactor=0.05, doubleSided=True,
     )
     tiled_mats = {
         'glass': trimesh.visual.material.PBRMaterial(
@@ -721,16 +1080,13 @@ def _export_shizijie():
         faces = np.arange(len(verts), dtype=np.int64).reshape(-1, 3)
         return trimesh.Trimesh(vertices=verts, faces=faces, process=False)
 
-    for lod in (0, 1):
-        builder = ShizijieBuilder(detail=(lod == 0))
-        build_shizijie(builder)
-        layer = f'lod{lod}'
+    def append_layer(layer: str, builder: ShizijieBuilder, emit_collision: bool = False):
         scene.graph.update(frame_to=layer)
-
+        is_ug = (layer == 'underground')
         if builder.visible:
             mesh = pack_tris(builder.visible)
             uv = np.concatenate(builder.uv, axis=0).reshape(-1, 2)
-            mesh.visual = trimesh.visual.TextureVisuals(uv=uv, material=mat_surfaces)
+            mesh.visual = trimesh.visual.TextureVisuals(uv=uv, material=mat_ug_shell if is_ug else mat_surfaces)
             scene.add_geometry(mesh, node_name=f'{layer}_joinery', parent_node_name=layer)
 
         for key, parts in builder.tiled.items():
@@ -756,17 +1112,30 @@ def _export_shizijie():
         if builder.lit_tris:
             mesh = pack_tris(builder.lit_tris)
             uv = np.concatenate(builder.lit_uv, axis=0).reshape(-1, 2)
-            mesh.visual = trimesh.visual.TextureVisuals(uv=uv, material=mat_lit)
+            mesh.visual = trimesh.visual.TextureVisuals(uv=uv, material=mat_ug_lit if is_ug else mat_lit)
             scene.add_geometry(mesh, node_name=f'{layer}_lit', parent_node_name=layer)
 
-        if lod == 0 and builder.solid:
+        if emit_collision and builder.solid:
             coll = pack_tris(builder.solid)
             scene.add_geometry(coll, node_name='collision_surface')
+
+    for lod in (0, 1):
+        builder = ShizijieBuilder(detail=(lod == 0))
+        build_shizijie(builder)
+        append_layer(f'lod{lod}', builder, emit_collision=(lod == 0))
+
+    ug_builder = ShizijieBuilder(detail=True)
+    build_shizijie_underground(ug_builder)
+    append_layer('underground', ug_builder, emit_collision=False)
 
     out_dir = Path(sys.argv[1])
     out_dir.mkdir(parents=True, exist_ok=True)
     scene.export(out_dir / 'shizijie.glb')
+    (out_dir / 'shizijie.meta.json').write_text(json.dumps({'underground': build_underground_sidecar()}, ensure_ascii=False) + '\n')
 
 
 if __name__ == '__main__':
-    _export_shizijie()
+    if len(sys.argv) >= 3 and sys.argv[1] == '--sync-json':
+        sync_shizijie_json(Path(sys.argv[2]))
+    else:
+        _export_shizijie()

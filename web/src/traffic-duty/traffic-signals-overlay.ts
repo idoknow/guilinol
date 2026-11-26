@@ -1,5 +1,6 @@
 import * as THREE from 'three'
 import {mainDetail} from '../look/mirror-layer'
+import {getActiveDutyTraffic} from '../traffic/duty-traffic.ts'
 import {getLatestTraffic, type Traffic} from '../traffic/sim.ts'
 
 /**
@@ -128,6 +129,8 @@ export interface ShizijieSignalsOverlayHandle {
   readonly gantryGroups: readonly THREE.Group[]
   update(cameraPos: {x: number; z: number}, dt?: number): {ew: SignalColor; ns: SignalColor; visible: boolean}
   getPhaseSnapshot(): ShizijiePhaseSnapshot
+  setEnabled(enabled: boolean): void
+  isIndependentClockActive(): boolean
   dispose(): void
 }
 
@@ -206,7 +209,12 @@ export function mountShizijieSignalsOverlay(
   let lastSnapshot: ShizijiePhaseSnapshot = {ew: 'red', ns: 'red', source: 'fallback'}
   let fallbackClock = 0
   let groundTimer = 0
+  let enabled = true
   let disposed = false
+
+  function resolveSim(): Traffic | undefined {
+    return opts?.getTraffic?.() ?? getActiveDutyTraffic() ?? getLatestTraffic()
+  }
 
   function applyAxisColor(axis: SignalAxis, activeColor: SignalColor): void {
     const mats = axisMats[axis]
@@ -227,13 +235,16 @@ export function mountShizijieSignalsOverlay(
     }
   }
 
-  syncColors(resolveShizijieSignalPhase(opts?.getTraffic?.() ?? getLatestTraffic(), 0))
+  syncColors(resolveShizijieSignalPhase(resolveSim(), 0))
 
   return {
     group,
     gantryGroups,
     update(cameraPos: {x: number; z: number}, dt = 0) {
-      if (disposed) return {ew: lastSnapshot.ew, ns: lastSnapshot.ns, visible: false}
+      if (disposed || !enabled) {
+        if (group.visible) group.visible = false
+        return {ew: lastSnapshot.ew, ns: lastSnapshot.ns, visible: false}
+      }
       const safeDt = Number.isFinite(dt) && dt > 0 ? Math.min(0.25, dt) : 0
       fallbackClock += safeDt
 
@@ -242,7 +253,7 @@ export function mountShizijieSignalsOverlay(
       const visible = dx * dx + dz * dz <= maxDistSq
       if (group.visible !== visible) group.visible = visible
 
-      const sim = opts?.getTraffic?.() ?? getLatestTraffic()
+      const sim = resolveSim()
       const snap = resolveShizijieSignalPhase(sim, fallbackClock)
       if (visible) {
         syncColors(snap)
@@ -262,6 +273,13 @@ export function mountShizijieSignalsOverlay(
     },
     getPhaseSnapshot() {
       return {...lastSnapshot}
+    },
+    setEnabled(next: boolean) {
+      enabled = Boolean(next)
+      if (!enabled) group.visible = false
+    },
+    isIndependentClockActive() {
+      return lastSnapshot.source === 'fallback'
     },
     dispose() {
       if (disposed) return

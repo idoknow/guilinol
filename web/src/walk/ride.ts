@@ -4,6 +4,12 @@ import type {Stream} from '../stream'
 import type {Tile} from '../world'
 import {clearAvatarPose, getAvatarJoints} from './avatar-rig'
 import {
+  applyKnockdownPose,
+  createKnockdownState,
+  type KnockdownController,
+  type KnockdownSnapshot,
+} from './knockdown'
+import {
   BICYCLE_DEFAULT_GEAR,
   EBIKE_COMPLIANT_CAP_KMH,
   EBIKE_DEFAULT_GEAR,
@@ -79,6 +85,8 @@ export interface TwoWheelCrashInput {
   recover?: boolean
   moveHeld?: boolean
   autoStand?: boolean
+  mashRecover?: boolean
+  requireKnockdownMash?: boolean
 }
 
 export interface TwoWheelPickupResult {
@@ -113,6 +121,7 @@ export interface TwoWheelCrashSnapshot {
   canStandUp: boolean
   canPickup: boolean
   justRecoveredToRide: boolean
+  knockdown: KnockdownSnapshot
 }
 
 export interface EbikeDynamicTelemetry {
@@ -597,6 +606,14 @@ export function createBikeControl() {
     emitToast(text, 2600)
   }
 
+  const knockdown: KnockdownController = createKnockdownState({
+    mashRequired: 5,
+    mashWindowSec: 2.4,
+    fallDurationSec: twoWheelCrashFlowConfig.minSlideSec,
+    stunDurationSec: 0.65,
+    riseDurationSec: twoWheelCrashFlowConfig.riderRiseSec,
+  })
+
   function clearCrashState() {
     crashPhase = 'none'
     crashReason = ''
@@ -611,6 +628,7 @@ export function createBikeControl() {
     crashRisk = 0
     leanRateNow = 0
     brakeInLeanHold = 0
+    knockdown.reset()
   }
 
   function reset() {
@@ -950,12 +968,24 @@ export function createBikeControl() {
     hazard = kind === 'bike'
     blinkOn = hazard
 
+    const severity = T.MathUtils.clamp((entrySpd - 2.4) / 8.5, 0.32, 1.0)
+    const impactDir = reason === 'loopout'
+      ? {x: Math.sin(bikeYaw), z: Math.cos(bikeYaw)}
+      : reason === 'lowside'
+        ? {x: Math.cos(bikeYaw) * resolvedSide, z: -Math.sin(bikeYaw) * resolvedSide}
+        : {x: Math.sin(bikeYaw), z: Math.cos(bikeYaw)}
+    knockdown.triggerKnockdown('bike_crash', impactDir, severity, {
+      yaw: bikeYaw,
+      side: resolvedSide,
+      reason,
+    })
+
     const vehicleName = kind === 'bicycle' ? '单车' : '电车'
     const msg = reason === 'lowside'
       ? `压弯过低打滑摔车！人将先爬起，再走近扶起${vehicleName}`
       : reason === 'loopout'
         ? `翘头过度后翻！人将先爬起，再走近扶起${vehicleName}`
-        : `撞击倒地！人将先爬起，再走近扶起${vehicleName}`
+        : `撞击倒地！连按空格（或点击起身）5次站起，再扶起${vehicleName}`
     if (!isVerifySilentMode()) emitToast(msg, 2800)
     return crashSnapshot()
   }
@@ -963,10 +993,29 @@ export function createBikeControl() {
   /** Step 1 of recovery: only the thrown rider gets back up onto their feet; vehicle remains lying on its side. */
   function standUp(): boolean {
     if (crashPhase !== 'downed') return false
+    knockdown.forceRise(false)
     crashPhase = 'rider_rising'
     phaseElapsed = 0
     riderStandProgress = 0
     return true
+  }
+
+  function mashCrashRecover(): boolean {
+    if (crashPhase !== 'downed' && crashPhase !== 'sliding') return false
+    const triggered = knockdown.recordRecoverMash()
+    if (triggered && crashPhase === 'downed') {
+      return standUp()
+    }
+    return triggered
+  }
+
+  function handleCrashKeyDown(code: string, repeat = false): boolean {
+    if (crashPhase !== 'downed' && crashPhase !== 'sliding') return false
+    const triggered = knockdown.handleKeyDown(code, repeat)
+    if (triggered && crashPhase === 'downed') {
+      return standUp()
+    }
+    return triggered
   }
 
   /** Step 2 of recovery: standing rider approaches within pickupRadius and lifts the downed two-wheeler upright. */
@@ -1001,6 +1050,7 @@ export function createBikeControl() {
     const cdt = Math.min(.1, Math.max(0, dt))
     crashElapsed += cdt
     phaseElapsed += cdt
+    knockdown.step(cdt)
 
     if (hazard || turnSignal !== 'off') {
       blinkPhase = (blinkPhase + cdt * ebikeRealFeaturesConfig.blinkFreqHz) % 1
@@ -1055,7 +1105,13 @@ export function createBikeControl() {
       }
     } else if (crashPhase === 'downed') {
       bikeRoll = layRoll
-      if (input?.standUp || input?.recover || input?.moveHeld || (input?.autoStand !== false && phaseElapsed >= twoWheelCrashFlowConfig.autoRiseDelaySec)) {
+      if (input?.mashRecover) {
+        knockdown.recordRecoverMash()
+      }
+      const mashGate = input?.requireKnockdownMash ?? (crashReason === 'impact')
+      if (knockdown.phase === 'rising' || input?.standUp || input?.recover) {
+        standUp()
+      } else if (!mashGate && (input?.moveHeld || (input?.autoStand !== false && phaseElapsed >= twoWheelCrashFlowConfig.autoRiseDelaySec))) {
         standUp()
       }
     } else if (crashPhase === 'rider_rising') {
@@ -1127,6 +1183,7 @@ export function createBikeControl() {
       canStandUp: crashPhase === 'downed',
       canPickup: crashPhase === 'bike_down' && dist <= twoWheelCrashFlowConfig.pickupRadius,
       justRecoveredToRide,
+      knockdown: knockdown.getSnapshot(),
     }
   }
 
@@ -1310,6 +1367,9 @@ export function createBikeControl() {
     startPickup,
     recover,
     stepCrash,
+    knockdown,
+    mashCrashRecover,
+    handleCrashKeyDown,
     stop() { speed = 0; drainPerSec = 0; wheelieVel = 0; cruiseControl = false },
     reset,
     dampSpeed(step: number) {
@@ -1926,6 +1986,19 @@ export function createRiderPose(figure: T.Group) {
       if (snap.phase === 'none' || snap.phase === 'bike_down') {
         figure.rotation.x = figure.rotation.z = 0
         clearJoints()
+        return
+      }
+      if (
+        snap.knockdown?.isDown &&
+        snap.knockdown.variant &&
+        (snap.phase === 'sliding' || snap.phase === 'downed' || snap.phase === 'rider_rising')
+      ) {
+        figure.rotation.y = snap.riderYaw
+        const effectiveSnap: KnockdownSnapshot =
+          snap.phase === 'rider_rising'
+            ? {...snap.knockdown, phase: 'rising', riseProgress: snap.riderStandProgress, isRecovering: true}
+            : snap.knockdown
+        applyKnockdownPose(figure, joints, effectiveSnap, snap.riderPos)
         return
       }
       if (snap.phase === 'sliding' || snap.phase === 'downed') {

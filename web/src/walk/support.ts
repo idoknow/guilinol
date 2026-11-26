@@ -5,7 +5,10 @@ export function playerSupport(sim:Awaited<ReturnType<typeof createPhysics>>){
   function supportAt(x:number,z:number,refY:number){
     const deck=sim.surface(x,z,'deck',refY+.35,1.4)
     const validDeck=deck&&deck.y<=refY+.35?deck:null
-    return validDeck??sim.surface(x,z,'sidewalk')??sim.surface(x,z,'road')??sim.surface(x,z,'ground')
+    const lm=sim.surface(x,z,'landmark',refY+.35,1.4)
+    const validLm=lm&&lm.y<=refY+.35&&lm.slope<=cfg.slope?lm:null
+    const elevated=validDeck&&validLm?(validLm.y>validDeck.y?validLm:validDeck):(validDeck??validLm)
+    return elevated??sim.surface(x,z,'sidewalk')??sim.surface(x,z,'road')??sim.surface(x,z,'ground')
   }
   function carSupportAt(x:number,z:number,refY:number){
     const deck=sim.surface(x,z,'deck',refY+.55,1.8)

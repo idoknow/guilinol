@@ -3,6 +3,7 @@ import {MAX_ACTORS,MOBILE_ACTORS,Traffic,type Graph} from './sim'
 import {curbside,staticSolids,useTrafficSolids,type Solid,contactSamples,sampleContacts} from './contact'
 import {trafficModels,trafficMaterial,loadCarMeshes,resolveTwoWheelSpec,type TrafficViolation,type TwoWheelSubtype,type Variant} from './models'
 import {crowd} from './crowd'
+import {getActiveDutyTraffic, getDutyTrafficExclusionZone} from './duty-traffic'
 import {riderPool} from './rider-pool'
 import {interactions} from './interactions'
 import {touchUi} from '../ui/input-mode'
@@ -47,7 +48,7 @@ export async function traffic(scene:THREE.Scene,camera:THREE.Camera,verify:boole
   const geometryIds=models.geometries.map(g=>batch.addGeometry(g))
   const slotGeometry=new Int16Array(SLOTS).fill(-1),slotPaint:(THREE.Color|undefined)[]=[],slotShown=new Uint8Array(SLOTS)
   for(let slot=0;slot<SLOTS;slot++){batch.addInstance(geometryIds[0]);batch.setVisibleAt(slot,false)}
-  const variants=new WeakMap<object,{full:Variant,bare?:Variant,subtype?:TwoWheelSubtype,violation?:TrafficViolation,u:number,v:number}>()
+  const variants=new WeakMap<object,{full:Variant,bare?:Variant,subtype?:TwoWheelSubtype,violation?:TrafficViolation,noHelmet?:boolean,u:number,v:number}>()
   const pose=new THREE.Object3D();pose.rotation.order='YXZ'
   const transforms=new Float64Array(SLOTS*6).fill(NaN)
   const FAR=75**2 // IDOK-253: detailed car meshes only near the camera, light stand-ins beyond 75 m
@@ -93,7 +94,7 @@ export async function traffic(scene:THREE.Scene,camera:THREE.Camera,verify:boole
       hide(STATIC+count,STATIC+parkCount);parkCount=count;mesh.userData.parked=count
     }).catch(error=>{if(target===parkKey){parkKey='';cache.clear()}console.warn('Parking cell unavailable',error)})
   }
-  const near=(x:number,z:number,visit:(solid:Solid)=>void)=>{sim?.nearSolids(x,z,visit);staticSolids(x,z,visit)}
+  const near=(x:number,z:number,visit:(solid:Solid)=>void)=>{sim?.nearSolids(x,z,visit);getActiveDutyTraffic()?.nearSolids(x,z,visit);staticSolids(x,z,visit)}
   let accumulator=0
   const probeIds=new WeakMap<object,number>();let nextProbeId=0
   const people=crowd(scene,camera,sampleGround);mesh.userData.crowd=people
@@ -105,7 +106,9 @@ export async function traffic(scene:THREE.Scene,camera:THREE.Camera,verify:boole
     show(item.slot,item.variant,x,y,z,yaw,scale,false)
   }
   return (dt:number,vehicle?:THREE.Vector3,player?:THREE.Vector3,_solo=false,enabled=true)=>{
-    useTrafficSolids(enabled?near:undefined)
+    const dutyActive=Boolean(getActiveDutyTraffic())
+    if(enabled)useTrafficSolids(near)
+    else if(!dutyActive)useTrafficSolids(undefined)
     if(!enabled){effects.clear();people.clear();riders.clear();walking.clear();ridden.clear();riddenSlots.clear();mesh.count=0;hide(0,SLOTS);parkKey='';parkCount=0;curbside.clear();return}
     updateParking(camera.position.x,camera.position.z)
     parkLodAt-=dt;if(parkLodAt<=0){parkLodAt=.5;for(const [slot,variant,x,y,z,yaw] of parkedRows)show(slot,variant,x,y,z,yaw,1)}
@@ -127,6 +130,7 @@ export async function traffic(scene:THREE.Scene,camera:THREE.Camera,verify:boole
     if(accumulator<.05){people.animate(dt,accumulator);riders.animate(dt,accumulator,syncRiddenVehicle);return}
     camera.updateMatrixWorld()
     frustum.setFromProjectionMatrix(projection.multiplyMatrices(camera.projectionMatrix,camera.matrixWorldInverse))
+    sim.setExternalExclusion(getDutyTrafficExclusionZone())
     const elapsed=accumulator
     while(accumulator>=.05){
       const start=verify?performance.now():0;sim.step(.05,center,vehicle,visible,profile);accumulator-=.05
@@ -153,11 +157,11 @@ export async function traffic(scene:THREE.Scene,camera:THREE.Camera,verify:boole
       }
       let entry=variants.get(actor)
       const spec=actor.kind==='scooter'?resolveTwoWheelSpec(actor):undefined
-      if(!entry||(spec&&(entry.subtype!==spec.subtype||entry.violation!==spec.violation))){
+      if(!entry||(spec&&(entry.subtype!==spec.subtype||entry.violation!==spec.violation||entry.noHelmet!==spec.noHelmet))){
         const u=entry?.u??Math.random(),v=entry?.v??Math.random()
         if(spec){
-          const pair=models.twoWheelVariant(spec.subtype,spec.violation,u,v)
-          entry={full:pair.full,bare:pair.bare,subtype:spec.subtype,violation:spec.violation,u,v}
+          const pair=models.twoWheelVariant(spec.subtype,spec.violation,u,v,spec.noHelmet)
+          entry={full:pair.full,bare:pair.bare,subtype:spec.subtype,violation:spec.violation,noHelmet:spec.noHelmet,u,v}
         }else{
           entry={full:models.variant(actor.kind,u,v),u,v}
         }

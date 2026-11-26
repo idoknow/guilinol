@@ -5,7 +5,7 @@ import {CAR_SCALE} from '../drive/scale'
 import {bikeGeometry} from '../walk/ebike-geometry'
 import {accessories} from '../walk/ebike-mounts'
 import {vehicleModel} from '../walk/vehicle-model'
-import type {TrafficViolation} from './sim'
+import type {ActiveTrafficViolation, DutyBehaviorState, TrafficViolation} from './sim'
 
 // IDOK-149 / IDOK-283 / 辅警 2.0 交通车模: low-poly, flat-shaded street traffic in one BatchedMesh draw.
 // Every model faces +z (actor yaw = atan2(dx,dz)), stands on y = 0 and carries two vertex
@@ -13,10 +13,11 @@ import type {TrafficViolation} from './sim'
 // `aMask` = (paint, lamp, flash). Lamps glow a little by day and properly at night (uNight);
 // flash = +1 red / -1 blue police lightbar, alternating on uTime.
 
-export type {TrafficViolation}
+export type {ActiveTrafficViolation, TrafficViolation}
 export type TwoWheelSubtype = 'ebike' | 'bicycle'
 
 export interface TwoWheelActorLike {
+  id?: string
   kind: 'car' | 'scooter' | 'person'
   x: number
   y: number
@@ -28,14 +29,42 @@ export interface TwoWheelActorLike {
   down?: number
   vehicleSubtype?: TwoWheelSubtype
   violation?: TrafficViolation
+  violations?: ActiveTrafficViolation[]
   stoppedUntil?: number
   cited?: boolean
+  dutyState?: DutyBehaviorState
+  brakingForOfficer?: boolean
+  haltedByDuty?: boolean
+  blinker?: 'none' | 'right' | 'hazard'
+  lookAtOfficer?: boolean
+  ticketReceived?: boolean
+  holdingReceipt?: boolean
+  heldTicketId?: string
+  heldTicketHandSide?: 'right' | 'left'
+  ticketReceiveAnimActive?: boolean
+  ticketReceiveAnimElapsed?: number
+  ticketReceiveAnimDuration?: number
 }
 
-export function resolveTwoWheelSpec(actor: TwoWheelActorLike): {subtype: TwoWheelSubtype; violation: TrafficViolation} {
-  const violation: TrafficViolation = actor.violation ?? 'none'
+export function resolveTwoWheelSpec(actor: TwoWheelActorLike): {
+  subtype: TwoWheelSubtype
+  violation: TrafficViolation
+  violations: ActiveTrafficViolation[]
+  noHelmet: boolean
+} {
+  const violations: ActiveTrafficViolation[] = []
+  if (Array.isArray(actor.violations)) {
+    for (const v of actor.violations) {
+      if (v && (v as string) !== 'none' && !violations.includes(v)) violations.push(v)
+    }
+  }
+  const violation: TrafficViolation = actor.violation ?? violations[0] ?? 'none'
+  if (violation !== 'none' && !violations.includes(violation)) {
+    violations.unshift(violation)
+  }
   const subtype: TwoWheelSubtype = actor.vehicleSubtype ?? (violation === 'bike_double' ? 'bicycle' : 'ebike')
-  return {subtype, violation}
+  const noHelmet = violations.includes('no_helmet')
+  return {subtype, violation, violations, noHelmet}
 }
 
 type Mask = readonly [number,number,number]
@@ -429,7 +458,7 @@ function scooter(opts:ScooterStandinOpts){
   }
   if(opts.violation==='ebike_overload'){
     addRoundedStandinRider(k,{x:0,y:.27,z:.19,scale:.66,jacket:0xe9c46a,pants:0x2d3340,pose:'child_front'},far)
-    addRoundedStandinRider(k,{x:0,y:.02,z:-.16,scale:.94,jacket:opts.jacket,pants:opts.pants,hairStyle:opts.hairStyle,pose:'ebike'},far)
+    addRoundedStandinRider(k,{x:0,y:.02,z:-.16,scale:.94,jacket:opts.jacket,pants:opts.pants,helmet:opts.helmet,hairStyle:opts.hairStyle,pose:'ebike'},far)
     addRoundedStandinRider(k,{x:0,y:.02,z:-.52,scale:.90,jacket:0x8fb4c4,pants:0x262b33,hairStyle:'pony',pose:'rear_passenger'},far)
   }else{
     addRoundedStandinRider(k,{
@@ -572,12 +601,14 @@ export function trafficModels(cars:CarMesh[]=[]){
   const ebikeNoHelmA=add(scooter({subtype:'ebike',violation:'no_helmet',jacket:0x728795,pants:0x2a2c30,hairStyle:'short'}))
   const ebikeNoHelmB=add(scooter({subtype:'ebike',violation:'no_helmet',jacket:0x9a3f35,pants:0x28344a,hairStyle:'long'}))
   const ebikeOverload=add(scooter({subtype:'ebike',violation:'ebike_overload',jacket:0x5b6c7a,pants:0x2d3340,hairStyle:'short'}))
+  const ebikeOverloadHelm=add(scooter({subtype:'ebike',violation:'ebike_overload',jacket:0x5b6c7a,pants:0x2d3340,helmet:0xf0f0ea,hairStyle:'short'}))
   const ebikeModFull=add(scooter({subtype:'ebike',violation:'illegal_mod',jacket:0x202733,pants:0x1b1e24,helmet:0x222831}))
 
   const ebikeFarHelm=add(scooter({subtype:'ebike',violation:'none',jacket:0x465460,pants:0x2d3340,helmet:0xf0f0ea,far:true}))
   const ebikeFarHelmBox=add(scooter({subtype:'ebike',violation:'none',jacket:0xd98a2b,pants:0x252a30,helmet:0xe6b235,box:0x29343b,far:true}))
   const ebikeFarNoHelm=add(scooter({subtype:'ebike',violation:'no_helmet',jacket:0x728795,pants:0x2a2c30,hairStyle:'short',far:true}))
   const ebikeFarOverload=add(scooter({subtype:'ebike',violation:'ebike_overload',jacket:0x5b6c7a,pants:0x2d3340,hairStyle:'short',far:true}))
+  const ebikeFarOverloadHelm=add(scooter({subtype:'ebike',violation:'ebike_overload',jacket:0x5b6c7a,pants:0x2d3340,helmet:0xf0f0ea,hairStyle:'short',far:true}))
   const ebikeModFarFull=add(scooter({subtype:'ebike',violation:'illegal_mod',jacket:0x202733,pants:0x1b1e24,helmet:0x222831,far:true}))
 
   const bikeSoloA=add(scooter({subtype:'bicycle',violation:'none',jacket:0xe9e7e1,pants:0x2d3340,hairStyle:'short'}))
@@ -590,7 +621,7 @@ export function trafficModels(cars:CarMesh[]=[]){
   Object.assign(far,{
     [ebikeBare]:ebikeFarBare,[ebikeDeliveryBare]:ebikeDeliveryFarBare,[ebikeModBare]:ebikeModFarBare,[bicycleBare]:bicycleFarBare,[bicycleDoubleBare]:bicycleDoubleFarBare,
     [ebikeHelmA]:ebikeFarHelm,[ebikeHelmB]:ebikeFarHelm,[ebikeHelmBox]:ebikeFarHelmBox,
-    [ebikeNoHelmA]:ebikeFarNoHelm,[ebikeNoHelmB]:ebikeFarNoHelm,[ebikeOverload]:ebikeFarOverload,[ebikeModFull]:ebikeModFarFull,
+    [ebikeNoHelmA]:ebikeFarNoHelm,[ebikeNoHelmB]:ebikeFarNoHelm,[ebikeOverload]:ebikeFarOverload,[ebikeOverloadHelm]:ebikeFarOverloadHelm,[ebikeModFull]:ebikeModFarFull,
     [bikeSoloA]:bikeFarSolo,[bikeSoloB]:bikeFarSolo,[bikeDouble]:bikeFarDouble,
   })
 
@@ -619,7 +650,7 @@ export function trafficModels(cars:CarMesh[]=[]){
     return {geometry,paint:geometry===cab||geometry===patrol?plain:new T.Color(pick(pool.paints,v).hex)}
   }
   const modPaints=[0x1f2530,0x209c8e,0x9b2a26,0x28344a].map(hex=>({hex,w:1}))
-  const twoWheelVariant=(subtype:TwoWheelSubtype,violation:TrafficViolation,u:number,v:number):TwoWheelVariantPair=>{
+  const twoWheelVariant=(subtype:TwoWheelSubtype,violation:TrafficViolation,u:number,v:number,noHelmet=violation==='no_helmet'):TwoWheelVariantPair=>{
     if(subtype==='bicycle'){
       const paint=new T.Color(pick(bicyclePaints,v).hex)
       const dbl=violation==='bike_double'
@@ -631,8 +662,10 @@ export function trafficModels(cars:CarMesh[]=[]){
       return {full:{geometry:ebikeModFull,paint},bare:{geometry:ebikeModBare,paint}}
     }
     const paint=new T.Color(pick(ebikePaints,v).hex)
-    if(violation==='ebike_overload')return {full:{geometry:ebikeOverload,paint},bare:{geometry:ebikeBare,paint}}
-    if(violation==='no_helmet')return {full:{geometry:u<.5?ebikeNoHelmA:ebikeNoHelmB,paint},bare:{geometry:ebikeBare,paint}}
+    if(violation==='ebike_overload'){
+      return {full:{geometry:noHelmet?ebikeOverload:ebikeOverloadHelm,paint},bare:{geometry:ebikeBare,paint}}
+    }
+    if(violation==='no_helmet'||noHelmet)return {full:{geometry:u<.5?ebikeNoHelmA:ebikeNoHelmB,paint},bare:{geometry:ebikeBare,paint}}
     const hasBox=u>.7&&violation==='none'
     return {full:{geometry:hasBox?ebikeHelmBox:(u<.35?ebikeHelmA:ebikeHelmB),paint},bare:{geometry:hasBox?ebikeDeliveryBare:ebikeBare,paint}}
   }

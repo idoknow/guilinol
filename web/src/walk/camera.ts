@@ -2,6 +2,7 @@ import {getPlayMode} from '../game/play-mode'
 import R from '@dimforge/rapier3d-compat'
 import * as THREE from 'three'
 import {look} from '../look/config'
+import {underpassFloor} from '../tunnels'
 import {walkConfig as cfg} from './config'
 import type {createPhysics} from './physics'
 import driveCamera from '../drive/camera.json' with {type:'json'}
@@ -93,16 +94,37 @@ export function createCameraRig(sim:Physics) {
       currentDist = THREE.MathUtils.damp(currentDist,safeDist,cfg.camRecover,Math.min(.1,Math.max(0,dt)))
     }
 
+    function undergroundAt(x:number, z:number, footY:number) {
+      return underpassFloor(undefined, undefined, x, z, footY)
+    }
+
+    const activeUg = footY < 149.8 ? undergroundAt(figurePos.x, figurePos.z, footY) : undefined
+    const ugCeilLimit = activeUg !== undefined && footY < 148.6 ? activeUg + 3.04 - cfg.camRadius : Infinity
+
+    function resolveCamBounds(cx:number, cz:number, baseCeil:number) {
+      const camDeck = anyDeck ? sim.surface(cx, cz, 'deck', footY + 18, 20) : null
+      const underDeck = !!camDeck && footY < camDeck.y - .55
+      const ceilCap = Math.min(baseCeil, ceilingAt(cx, cz, footY), ugCeilLimit)
+      let floor: {y:number} | null = null
+      if (!underDeck && camDeck) {
+        floor = camDeck
+      } else if (activeUg !== undefined) {
+        floor = sim.surface(cx, cz, 'road', footY + 1.8, 8)
+          ?? sim.surface(cx, cz, 'sidewalk', footY + 1.8, 8)
+          ?? {y: undergroundAt(cx, cz, footY) ?? activeUg}
+      } else {
+        floor = sim.surface(cx, cz, 'sidewalk') ?? sim.surface(cx, cz, 'road') ?? sim.surface(cx, cz, 'ground')
+      }
+      return {ceilCap, floor}
+    }
+
     camera.position.copy(focus).addScaledVector(dir,currentDist)
     let clampedY = false
-    const endCeil = anyDeck?Math.min(activeCeil,ceilingAt(camera.position.x,camera.position.z,footY)):Infinity
+    const startBounds = resolveCamBounds(camera.position.x, camera.position.z, activeCeil)
+    const endCeil = startBounds.ceilCap
     if(Number.isFinite(endCeil) && camera.position.y>endCeil) { camera.position.y = endCeil; clampedY = true }
-
-    const camDeck = anyDeck?sim.surface(camera.position.x,camera.position.z,'deck',footY+18,20):null
-    const underDeck = !!camDeck && footY<camDeck.y-.55
-    const floor = (!underDeck?camDeck:null)??sim.surface(camera.position.x,camera.position.z,'sidewalk')??sim.surface(camera.position.x,camera.position.z,'road')??sim.surface(camera.position.x,camera.position.z,'ground')
-    if(floor) {
-      const minY = floor.y+cfg.camRadius
+    if(startBounds.floor) {
+      const minY = startBounds.floor.y+cfg.camRadius
       if(camera.position.y<minY) { camera.position.y = Number.isFinite(endCeil)?Math.min(minY,endCeil):minY; clampedY = true }
     }
 
@@ -114,14 +136,11 @@ export function createCameraRig(sim:Physics) {
         const rechecked = castClear(check,len)
         if(rechecked<len) {
           camera.position.copy(focus).addScaledVector(check,rechecked)
-          const reCeil = anyDeck?Math.min(activeCeil,ceilingAt(camera.position.x,camera.position.z,footY)):Infinity
-          if(Number.isFinite(reCeil) && camera.position.y>reCeil) camera.position.y = reCeil
-          const reDeck = anyDeck?sim.surface(camera.position.x,camera.position.z,'deck',footY+18,20):null
-          const reUnder = !!reDeck && footY<reDeck.y-.55
-          const reFloor = (!reUnder?reDeck:null)??sim.surface(camera.position.x,camera.position.z,'sidewalk')??sim.surface(camera.position.x,camera.position.z,'road')??sim.surface(camera.position.x,camera.position.z,'ground')
-          if(reFloor) {
-            const reMinY = reFloor.y+cfg.camRadius
-            if(camera.position.y<reMinY) camera.position.y = Number.isFinite(reCeil)?Math.min(reMinY,reCeil):reMinY
+          const reBounds = resolveCamBounds(camera.position.x, camera.position.z, activeCeil)
+          if(Number.isFinite(reBounds.ceilCap) && camera.position.y>reBounds.ceilCap) camera.position.y = reBounds.ceilCap
+          if(reBounds.floor) {
+            const reMinY = reBounds.floor.y+cfg.camRadius
+            if(camera.position.y<reMinY) camera.position.y = Number.isFinite(reBounds.ceilCap)?Math.min(reMinY,reBounds.ceilCap):reMinY
           }
         }
       }
