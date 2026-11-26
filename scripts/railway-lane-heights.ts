@@ -53,7 +53,7 @@ const profiles={}
 for(const lane of lanes){
   const {start,dx,dz,length}=lane
   // The grounding audit reserves 1.005 m on either side of the lane centre.
-  const maxOffset=Math.max(0,lane.halfWidth-1.005)
+  const maxOffset=lane.halfWidth == null ? Infinity : Math.max(0,lane.halfWidth-1.005)
   const offset=Math.sign(lane.offset)*Math.min(Math.abs(lane.offset),maxOffset,lane.maxTrafficOffset??Infinity)
   const sample=(along:number,right:number,diagnostic?)=>surface(start.x+dx*along+dz*(right-offset),
     start.z+dz*along-dx*(right-offset),lane,diagnostic)
