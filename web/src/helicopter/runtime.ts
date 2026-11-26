@@ -96,7 +96,7 @@ export function helicopter(scene:THREE.Scene,camera:THREE.PerspectiveCamera,walk
     }
     measuredSpeed=craft.position.distanceTo(previousPosition)/Math.max(.001,dt);previousPosition.copy(craft.position);rotorPower=rpm
     craft.rotation.z=phase==='cruise'?-route.pose(clock).roll:0;craft.rotation.z+=.0016*rpm*Math.sin(clock*8)
-    model.animate(dt,rpm,door,camera.position.distanceTo(craft.position),phase==='start'?'startup':phase==='cruise'||phase==='ascend'?'cruise':phase==='descend'||phase==='stop'?'landing':'idle');player.heli.pose(actor,heading,clip,dt,first&&orbit)
+    model.animate(dt,rpm,door,camera.position.distanceTo(craft.position),phase==='start'?'startup':phase==='cruise'||phase==='ascend'?'cruise':phase==='descend'||phase==='stop'?'landing':'idle',phase==='cruise'&&!first);player.heli.pose(actor,heading,clip,dt,first&&orbit)
     if(clip==='sit'){player.heli.arms.left(point('hand_rest_pax_1_L',target));player.heli.arms.right(point('hand_rest_pax_1_R',target))}
     else if(door>.05){point('door_L',target);target.y+=.66;player.heli.arms.right(target)}
     if(document.body.dataset.photo!=='on'){

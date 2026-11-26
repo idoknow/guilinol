@@ -2952,11 +2952,12 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
       begin(){emote.stop();cancelSmoke();selectSlot('hand');actionButton.hidden=true;resetMotion();stopLocomotionActions();yaw=0;pitch=.23},
       view:()=>({yaw,pitch,arm}),
       pose(point:THREE.Vector3,angle:number,clip:string,dt:number,hidden:boolean){
+        steles?.aerialView(point)
         figure.position.copy(point);figure.rotation.set(0,angle,0);figure.visible=!hidden;const next=actions.get(clip)
         if(next&&action!==next)forceLocomotionClip(next);mixer.update(dt);avatarRig.syncPose()
         const body={x:point.x,y:point.y+cfg.height/2,z:point.z};sim.body.setTranslation(body,true);sim.body.setNextKinematicTranslation(body)
         net?.tick(dt)
-      },end(point:THREE.Vector3){figure.visible=true;sim.sync(point.x,point.z);place(point.x,point.z,'heli-exit');resetMotion();restoreFootLocomotion(avatar.clips.idle);follow(0,true)}},
+      },end(point:THREE.Vector3){steles?.aerialView();figure.visible=true;sim.sync(point.x,point.z);place(point.x,point.z,'heli-exit');resetMotion();restoreFootLocomotion(avatar.clips.idle);follow(0,true)}},
     ebike:{
       get state(){return ebikeState},
       triggerCrash(reason:Exclude<EbikeCrashReason,''>='lowside',side:-1|1=1){if(rides?.bike)triggerTwoWheelCrash(reason,side)},

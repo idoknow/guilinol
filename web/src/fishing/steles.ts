@@ -65,10 +65,10 @@ export function createSteles(scene:THREE.Scene,addCollider?:(spec:ObstacleVolume
       const texture=new THREE.CanvasTexture(canvas);texture.colorSpace=THREE.SRGBColorSpace
       const mesh=steleModel(texture);mesh.name=`stele-${zone.id}-${kind}`;mesh.position.set(x,y,z);mesh.rotation.y=yaw;scene.add(mesh)
       addCollider?.({id:mesh.name,origin:[x,y,z],rotationY:yaw,boxes:[{minX:-.6,maxX:.6,minZ:-.2,maxZ:.2,minY:0,maxY:2.2}]})
-      const update=(boards?:Boards)=>{drawBoard(canvas,title,boards?.[kind as keyof Boards]);texture.needsUpdate=true};update();return {x,z,update}
+      const update=(boards?:Boards)=>{drawBoard(canvas,title,boards?.[kind as keyof Boards]);texture.needsUpdate=true};update();return {x,z,mesh,update}
     });return {zone:zone.id,signs,next:0}
   })
-  return {tick(x:number,z:number){const now=performance.now();for(const group of groups){
+  return {aerialView(eye?:THREE.Vector3){for(const group of groups)for(const sign of group.signs)sign.mesh.visible=!eye||sign.mesh.position.distanceToSquared(eye)<160**2},tick(x:number,z:number){const now=performance.now();for(const group of groups){
     if(now<group.next||!group.signs.some(sign=>(sign.x-x)**2+(sign.z-z)**2<=3600))continue
     group.next=now+300000;void fetch(`/api/fishing/boards?zone=${group.zone}`).then(async response=>{
       if(response.ok){const boards=await response.json();group.signs.forEach(sign=>sign.update(boards))}

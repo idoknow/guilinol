@@ -30,7 +30,7 @@ try{
     intervals.sort((left,right)=>left-right);const percentile=value=>intervals[Math.ceil(count*value)-1]
     return {frames:count,fps:1000*count/intervals.reduce((sum,value)=>sum+value,0),p50:percentile(.5),p95:percentile(.95),p99:percentile(.99)}
   },quick?8:120).then(sample=>{console.log('FRAME_SAMPLE',JSON.stringify({label,...sample}));return sample.fps})
-  const url=`${origin}/?verify&solo=1&mp=1&flow=0&radius=480`
+  const url=`${origin}/?verify&solo=1&mp=1&flow=0&radius=480${process.env.HELI_PROFILE?'&frameProfile':''}`
   if(process.env.HELI_B_ONLY){
     const started=Date.now(),path=request=>new URL(request.url()).pathname
     other.on('console',message=>console.log('B console',message.type(),message.text().slice(0,240)))
@@ -44,6 +44,7 @@ try{
   await page.waitForFunction(()=>window.viewer?.walk?.active,null,{timeout:120000})
   if(process.env.HELI_HANDOFF_ONLY){const {handoff}=await import('./heli-handoff.mjs');await handoff({page,other,url,api,output});return}
   assert.ok(await page.evaluate(()=>window.viewer.walkTo(-844,208,-2.51,'plaza-e2e')))
+  if(process.env.HELI_PROFILE){await (await import('./heli-profile.mjs')).profile(page,api,pool);return}
   const baseline=await fps('walk')
   if(process.env.HELI_PERF_ONLY){
     await page.evaluate(()=>window.viewer.walkTo(-805.8,257.6,-1.57,'benchmark'))

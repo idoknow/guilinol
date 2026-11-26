@@ -640,7 +640,7 @@ async function start(loader:FullLoader,creatorSpawn=false) {
     applyLastViewNow:(view:FeedbackView)=>getPlayMode()==='solo'?{ok:false,code:'FLIGHT_DISABLED_IN_SOLO'}:restoreOpening(view)}})
   function draw(){
     renderer.info.reset()
-    base.update(camera)
+    base.update(camera,heli.phase==='cruise')
     const metrics=stream.metrics
     const ground=!!walker?.active && !cinema
     const mirror=prepareMirror(camera,flags.noMirror||frame<2,ground?walker?.waterSightBlocked:undefined)
@@ -672,8 +672,19 @@ async function start(loader:FullLoader,creatorSpawn=false) {
   })
   let trafficTick:Awaited<ReturnType<typeof import('./traffic').traffic>>|undefined
   let trafficRequested=false
+  const profiling=params.has('verify')&&params.has('frameProfile')
+  let uploads=0
+  if(profiling){
+    const memory=renderer.info.memory
+    let resident=memory.geometries
+    Object.defineProperty(memory,'geometries',{get:()=>resident,set:(count:number)=>{
+      uploads+=Math.max(0,count-resident);resident=count
+    }})
+  }
   const trafficOverride=params.get('traffic')
   function animate(now:number){
+    const start=profiling?performance.now():0
+    let streamMs=0
     geoTick()
     if(getPlayMode()==='solo'&&!walker?.active)return
     if((paused||tour?.map?.active)&&frame>2){previous=0;return}
@@ -703,17 +714,21 @@ async function start(loader:FullLoader,creatorSpawn=false) {
       trafficTick?.(elapsed/1000,walker?.active&&walker.vehicle!=='foot'?walker.position:undefined,
         walker?.active?walker.position:undefined,getPlayMode()==='solo',showTraffic)
       const target=heli.lookAhead??walker?.destination??(walker?.active?walker.position:camera.position)
+      const streamStart=profiling?performance.now():0
       stream.tick(target,heli.phase==='cruise')
       if(frame>=2) syncCityUpgradeProps()
-      stream.updateLandmarks?.(target)
+      stream.updateLandmarks?.(target,undefined,heli.phase==='cruise')
       if(!walkModPromise && !stream.pending.size && camera.position.y<260) void prefetchWalk()
+      if(profiling)streamMs=performance.now()-streamStart
     }
     updateAtmosphere(now,elapsed)
     tour?.tick(elapsed/1000)
     solo?.step(Math.min(0.1, elapsed/1000))
     mifen.step(Math.min(0.1, elapsed/1000))
     persistView?.()
+    const renderStart=profiling?performance.now():0
     draw()
+    const renderMs=profiling?performance.now()-renderStart:0
     if(staticAudit && frame%30===0)staticAudit.check()
     sampleFrame(elapsed)
     if(!frame)record('firstFrame',{ms:first||performance.now()})
@@ -742,6 +757,11 @@ async function start(loader:FullLoader,creatorSpawn=false) {
       output.value=`${Math.round(samples*1000/(sum||16.7))} FPS · ${stats.calls} calls · ${stats.loaded} 块 · ${bytes.toLocaleString()} B`
       renderUi.refreshStats()
       sum=0;samples=0
+    }
+    if(profiling){
+      const mainMs=performance.now()-start
+      Object.assign(stats,{mainMs,renderMs,streamMs,simulationMs:renderStart-start-streamMs,uploads,triangles:renderer.info.render.triangles})
+      uploads=0
     }
   }
   spawnCreatedCharacter=async()=>{const gate=getPlayMode()==='solo'&&!isDeepLink(openParams)?plazaSpawn:walkConfig.gate
