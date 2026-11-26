@@ -9,15 +9,15 @@ import numpy as np
 from shapely.geometry import Point, Polygon
 from shapely.ops import unary_union
 
-KIOSK_CENTER = (27.2, -2.4)
+KIOSK_CENTER = (27.45, -1.65)
 
 
 @lru_cache(maxsize=1)
-def surfaces(landmark='shizijie', radius=150):
+def _load_street_layers(landmark='shizijie', radius=150):
     world = Path(__file__).resolve().parents[2] / 'public/world'
     manifest = json.loads((world / 'manifest.json').read_text())
     origin_x, _, origin_z = next(entry['position'] for entry in manifest['landmarks'] if entry['id'] == landmark)
-    layers = [[], []]
+    layers = {k: [] for k in (0, 1, 4, 5, 6)}
     for chunk in manifest['chunks']:
         dx, dz = chunk['x'] - origin_x, chunk['z'] - origin_z
         if dx > radius or dz > radius or dx + 256 < -radius or dz + 256 < -radius:
@@ -26,10 +26,25 @@ def surfaces(landmark='shizijie', radius=150):
         vertices, indices, length = struct.unpack_from('<3I', data, 4)
         start = 24 + 65 * 65 * 4 + vertices * 9 + indices * 4
         for kind, *loops in json.loads(data[start:start + length])[1][0]:
-            if kind in (0, 1):
+            if kind in layers:
                 rings = [np.array(loop) / 100 + [dx, dz] for loop in loops]
-                layers[kind].append(Polygon(rings[0], rings[1:]).buffer(0))
-    return tuple(unary_union(parts) for parts in layers)
+                poly = Polygon(rings[0], rings[1:]).buffer(0)
+                if not poly.is_empty:
+                    layers[kind].append(poly)
+    return {k: unary_union(parts) for k, parts in layers.items()}
+
+
+@lru_cache(maxsize=1)
+def surfaces(landmark='shizijie', radius=150):
+    layers = _load_street_layers(landmark, radius)
+    return layers[0], layers[1]
+
+
+@lru_cache(maxsize=1)
+def street_masks(landmark='shizijie', radius=150):
+    """Return `(road0, all_sidewalk_1_4_6, cycle_5)` unions around Shizijie."""
+    layers = _load_street_layers(landmark, radius)
+    return layers[0], unary_union([layers[1], layers[4], layers[6]]), layers[5]
 
 
 @lru_cache(maxsize=1)

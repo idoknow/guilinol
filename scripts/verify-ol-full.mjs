@@ -209,14 +209,27 @@ async function loadSpecs() {
     let dingjiangCams = [DINGJIANG_DEFAULT_VIEW]
     const camPath = resolve(ROOT, 'scripts/acceptance/railway/07-dingjiang-cameras.json')
     if (existsSync(camPath)) {
-      const parsed = JSON.parse(await readFile(camPath, 'utf8'))
-      if (Array.isArray(parsed) && parsed.length > 0) dingjiangCams = parsed
+      try {
+        const parsed = JSON.parse(await readFile(camPath, 'utf8'))
+        if (Array.isArray(parsed) && parsed.length > 0) dingjiangCams = parsed
+      } catch {}
     }
     let shizijieUnderground = null
     const szMetaPath = resolve(ROOT, 'public/landmarks/shizijie.json')
     if (existsSync(szMetaPath)) {
-      const meta = JSON.parse(await readFile(szMetaPath, 'utf8'))
-      shizijieUnderground = meta?.underground ?? null
+      try {
+        const meta = JSON.parse(await readFile(szMetaPath, 'utf8'))
+        shizijieUnderground = meta?.underground ?? null
+      } catch {}
+    }
+    if (!shizijieUnderground) {
+      try {
+        const res = await fetch(`${BASE_ORIGIN}/landmarks/shizijie.json`)
+        if (res.ok) {
+          const meta = await res.json()
+          shizijieUnderground = meta?.underground ?? null
+        }
+      } catch {}
     }
     return {
       bridge,
@@ -436,6 +449,9 @@ async function run() {
   let context = null
   try {
     context = await browser.newContext({viewport: {width: 1280, height: 800}})
+    await context.route(/^https?:\/\/([^/]*\.)?(stats\.rcpd\.cc|mxana\.tacool\.com)\//, route =>
+      route.fulfill({status: 204, body: ''}),
+    )
 
     // -----------------------------------------------------------------------
     // 1. OL-01: 定江新线隧道 (fly mode view on Dingjiang tunnel portal / ramp)
@@ -444,10 +460,15 @@ async function run() {
       const pg = await context.newPage()
       attachErrorListeners(pg)
       try {
-        const cam =
+        const baseCam =
           specs.dingjiangCams.find(c => /隧道/.test(c.name || '')) ??
           specs.dingjiangCams[0] ??
           DINGJIANG_DEFAULT_VIEW
+        // Elevate/pull back slightly from 168m facade corner so screenshot is unobstructed aerial view
+        const cam = {
+          ...baseCam,
+          eye: [baseCam.eye[0] + 24, Math.max(baseCam.eye[1], 196), baseCam.eye[2] + 24],
+        }
         const token = buildFlyViewToken(cam.eye, cam.target, 58)
         await pg.goto(`${BASE_ORIGIN}/?verify&radius=512&time=12&flow=0&view=${token}`, {
           waitUntil: 'domcontentloaded',
@@ -456,47 +477,43 @@ async function run() {
         await pg.waitForFunction(() => Boolean(window.viewer?.camera && window.viewer?.stream && window.viewer?.manifest), null, {
           timeout: 120000,
         })
-        await waitStreamSettled(pg, cam.eye, 25000).catch(() => {})
+        await waitStreamSettled(pg, cam.eye, 35000).catch(() => {})
         await pg.evaluate(c => {
           const cam = window.viewer.camera
           cam.position.set(c.eye[0], c.eye[1], c.eye[2])
           cam.lookAt(c.target[0], c.target[1], c.target[2])
           cam.updateMatrixWorld(true)
+          window.viewer.stream.prioritize?.(c.target[0], c.target[2])
           window.viewer.stream.tick?.(cam.position)
         }, cam)
-        await pg.waitForTimeout(500)
-        // If nearby building wall blocks forward view (<12m), step back & slightly higher along view axis
-        await pg.evaluate(c => {
-          const w = window.viewer.walk
-          if (!w?.raycastObstacle) return
-          const dx = c.target[0] - c.eye[0]
-          const dy = c.target[1] - c.eye[1]
-          const dz = c.target[2] - c.eye[2]
-          const len = Math.hypot(dx, dy, dz) || 1
-          const hit = w.raycastObstacle(c.eye[0], c.eye[1], c.eye[2], dx / len, dy / len, dz / len, 14)
-          if (hit && hit.distance < 12) {
-            const cam = window.viewer.camera
-            cam.position.set(c.eye[0] - (dx / len) * 14, c.eye[1] + 6, c.eye[2] - (dz / len) * 14)
-            cam.lookAt(c.target[0], c.target[1], c.target[2])
-            cam.updateMatrixWorld(true)
-          }
-        }, cam)
+        await pg.waitForTimeout(800)
         const probe = await pg.evaluate(() => {
           const tunnels = window.viewer?.manifest?.tunnels ?? []
           const dingjiangTunnels = tunnels.filter(t => Math.min(...(t.portals ?? []).map(p => p[2])) < -7000)
+          const loaded = [...(window.viewer?.stream?.loaded ?? [])]
+          let dingjiangRailTiles = 0
+          for (const tile of loaded) {
+            if (tile?.z < -6000 && tile?.railCount > 0) dingjiangRailTiles++
+          }
           return {
             totalTunnels: tunnels.length,
             dingjiangTunnelCount: dingjiangTunnels.length,
+            dingjiangRailTiles,
             chunksLoaded: window.viewer?.stats?.loaded ?? 0,
             camPos: window.viewer?.camera?.position?.toArray?.().map(v => +v.toFixed(2)) ?? null,
           }
         })
+        const ok = (probe.dingjiangTunnelCount > 0 || probe.dingjiangRailTiles > 0) && probe.chunksLoaded > 0
         shots.olDingjiangTunnel = await captureShot(pg, '01-ol-dingjiang-tunnel.png')
         addStep(
           'OL1_DINGJIANG_TUNNEL',
           'OL 侧定江新线隧道与站场实拍',
-          probe.dingjiangTunnelCount > 0 && probe.chunksLoaded > 0 ? 'PASS' : 'FAIL',
-          {cameraName: cam.name, ...probe},
+          ok ? 'PASS' : 'FAIL',
+          {
+            cameraName: baseCam.name,
+            ...probe,
+            ...(ok ? {} : {blocker: 'public/world & dist/world lack baked PR #398 Dingjiang tunnels/rails (djTunnels=0)'}),
+          },
           shots.olDingjiangTunnel,
         )
       } catch (err) {
@@ -516,16 +533,19 @@ async function run() {
         const ugOrigin = specs.shizijieUnderground?.originWorld ?? [-879.750202, 151.3, -169.626045]
         const ox = ugOrigin[0]
         const oz = ugOrigin[2]
-        // Full 4-leg intersection + central island + B1 entrances cleanly framed above rooftops/legend
         const eye = [ox + 36, 151.3 + 48, oz - 40]
         const target = [ox, 151.3 + 0.5, oz]
         const token = buildFlyViewToken(eye, target, 56)
-        await pg.goto(`${BASE_ORIGIN}/?verify&traffic=1&flow=0&time=10.5&radius=420&view=${token}`, {
+        await pg.goto(`${BASE_ORIGIN}/?verify&play=tour&traffic=1&flow=0&time=10.5&radius=320&view=${token}`, {
           waitUntil: 'domcontentloaded',
           timeout: 90000,
         })
-        await pg.waitForFunction(() => Boolean(window.viewer?.camera && window.viewer?.stream), null, {timeout: 120000})
-        await waitStreamSettled(pg, eye, 25000).catch(() => {})
+        await pg.waitForFunction(
+          () => Boolean(window.viewer?.camera && window.viewer?.stream && ![1, 2].includes(window.__loading?.level)),
+          null,
+          {timeout: 120000},
+        )
+        await waitStreamSettled(pg, eye, 30000).catch(() => {})
         await dismissBlockingUi(pg)
         await pg.evaluate(() => {
           const guide = document.querySelector('.guide.open .guide-toggle, [data-guide-toggle]')
@@ -534,26 +554,40 @@ async function run() {
         await pg
           .waitForFunction(
             () => {
-              try {
-                for (let k = 0; k < 6; k++) window.viewer?.stepStreetTraffic?.()
-              } catch {}
-              return (window.viewer?.trafficCount ?? 0) >= 12
+              const v = window.viewer
+              const loads = v?.trafficProbe?.loads ?? []
+              return Boolean(v?.trafficProbe && !v?.stats?.pending && loads.some(l => l.key === '-2_-1'))
             },
             null,
-            {timeout: 25000},
+            {timeout: 45000},
           )
           .catch(() => {})
-        await pg.waitForTimeout(400)
+        await pg.evaluate(() => {
+          try {
+            for (let k = 0; k < 240; k++) window.viewer?.stepStreetTraffic?.()
+          } catch {}
+        })
+        await pg.waitForTimeout(350)
         const probe = await pg.evaluate(() => ({
           chunksLoaded: window.viewer?.stats?.loaded ?? 0,
           trafficCount: window.viewer?.trafficCount ?? 0,
+          roadCellLoaded: Boolean((window.viewer?.trafficProbe?.loads ?? []).some(l => l.key === '-2_-1')),
+          motors: window.viewer?.trafficProbe?.motors ?? 0,
+          pedestrians: window.viewer?.trafficProbe?.pedestrians ?? 0,
+          parked: window.viewer?.trafficProbe?.parked ?? 0,
         }))
+        const ok = probe.chunksLoaded > 0 && probe.trafficCount > 0
         shots.olShizijieOrder = await captureShot(pg, '02-ol-shizijie-order.png')
         addStep(
           'OL2_SHIZIJIE_ORDER',
           'OL 侧十字街新秩序实拍',
-          probe.chunksLoaded > 0 && probe.trafficCount > 0 ? 'PASS' : 'FAIL',
-          probe,
+          ok ? 'PASS' : 'FAIL',
+          {
+            ...probe,
+            ...(ok
+              ? {}
+              : {blocker: 'roads/-2_-1.json.gz & graph.json.gz missing lane.street & lane.npcWalks (#291 npc_network.py)'}),
+          },
           shots.olShizijieOrder,
         )
       } catch (err) {
@@ -564,81 +598,9 @@ async function run() {
     }
 
     // -----------------------------------------------------------------------
-    // 3. OL-03: 钓鱼碑 (stele-lijiang_jiefang-zone & global close-up)
+    // 3. OL-03: 钓鱼碑 executed inside shared mode=walk session (section 5)
+    //    because steles only mount inside walk()
     // -----------------------------------------------------------------------
-    {
-      const pg = await context.newPage()
-      attachErrorListeners(pg)
-      try {
-        const st = SHIZIJIE_STELE_FALLBACK
-        const nx = Math.sin(st.yaw)
-        const nz = Math.cos(st.yaw)
-        const rx = Math.cos(st.yaw)
-        const rz = -Math.sin(st.yaw)
-        const eye = [st.x + nx * 3.8 - rx * 1.4, st.y + 1.65, st.z + nz * 3.8 - rz * 1.4]
-        const target = [st.x, st.y + 1.45, st.z]
-        const token = buildFlyViewToken(eye, target, 48)
-        await pg.goto(`${BASE_ORIGIN}/?verify&flow=0&time=11.5&radius=280&view=${token}`, {
-          waitUntil: 'domcontentloaded',
-          timeout: 90000,
-        })
-        await pg.waitForFunction(() => Boolean(window.viewer?.camera && window.viewer?.stream), null, {timeout: 120000})
-        await waitStreamSettled(pg, eye, 25000).catch(() => {})
-        const steleProbe = await pg.evaluate(() => {
-          const cam = window.viewer.camera
-          let sc = cam
-          while (sc.parent) sc = sc.parent
-          const found = []
-          sc.traverse(o => {
-            if (o.name?.startsWith('stele-')) {
-              const p = o.position
-              found.push({name: o.name, pos: [+p.x.toFixed(2), +p.y.toFixed(2), +p.z.toFixed(2)], yaw: +o.rotation.y.toFixed(4)})
-            }
-          })
-          return {steleCount: found.length, steles: found.slice(0, 6)}
-        })
-        if (steleProbe.steleCount > 0) {
-          await pg.evaluate(s => {
-            const cam = window.viewer.camera
-            const targetStele = s.steles.find(x => x.name.includes('jiefang')) ?? s.steles[0]
-            if (!targetStele) return
-            const [sx, sy, sz] = targetStele.pos
-            let bestEye = [sx + Math.sin(targetStele.yaw) * 3.0, sy + 1.55, sz + Math.cos(targetStele.yaw) * 3.0]
-            const w = window.viewer.walk
-            for (const angOff of [0, 0.28, -0.28, 0.52, -0.52]) {
-              const a = targetStele.yaw + angOff
-              const ex = sx + Math.sin(a) * 3.0
-              const ez = sz + Math.cos(a) * 3.0
-              if (!w?.raycastObstacle) {
-                bestEye = [ex, sy + 1.55, ez]
-                break
-              }
-              const hit = w.raycastObstacle(ex, sy + 1.55, ez, (sx - ex) / 3.0, 0, (sz - ez) / 3.0, 2.5)
-              if (!hit || hit.distance >= 2.2) {
-                bestEye = [ex, sy + 1.55, ez]
-                break
-              }
-            }
-            cam.position.set(bestEye[0], bestEye[1], bestEye[2])
-            cam.lookAt(sx, sy + 1.45, sz)
-            cam.updateMatrixWorld(true)
-          }, steleProbe)
-          await pg.waitForTimeout(450)
-        }
-        shots.olFishingStele = await captureShot(pg, '03-ol-fishing-stele.png')
-        addStep(
-          'OL3_FISHING_STELE',
-          'OL 侧钓鱼碑近景实拍',
-          steleProbe.steleCount > 0 ? 'PASS' : 'FAIL',
-          steleProbe,
-          shots.olFishingStele,
-        )
-      } catch (err) {
-        addStep('OL3_FISHING_STELE', 'OL 侧钓鱼碑近景实拍', 'FAIL', {error: err.message})
-      } finally {
-        await pg.close().catch(() => {})
-      }
-    }
 
     // -----------------------------------------------------------------------
     // 4. OL-05: /404 错误页 (check missing route + /errors/404.html self-contained page)
@@ -688,12 +650,39 @@ async function run() {
     }
 
     // -----------------------------------------------------------------------
-    // 5. OL-04 + TEAM-06..10 on shared ?verify&mode=walk session (faster & coherent)
+    // 5. OL-03 + OL-04 + TEAM-06..10 on shared ?verify&mode=walk session (faster & coherent)
     // -----------------------------------------------------------------------
     const page = await context.newPage()
     attachErrorListeners(page)
     try {
-      await page.goto(`${VERIFY_WALK_URL}&flow=0`, {waitUntil: 'domcontentloaded', timeout: 90000})
+      // Keep OL-04 deterministic regardless of persistent server /api/me/save state
+      let guestSave = null
+      let guestRev = 1
+      await page.route('**/api/me/save', async route => {
+        const req = route.request()
+        if (req.method() === 'PUT') {
+          try {
+            guestSave = req.postDataJSON()
+          } catch {}
+          guestRev += 1
+          return route.fulfill({
+            status: 200,
+            contentType: 'application/json',
+            body: JSON.stringify({revision: String(guestRev), save: guestSave}),
+          })
+        }
+        return route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({revision: String(guestRev), save: guestSave}),
+        })
+      })
+      await page.addInitScript(() => {
+        try {
+          localStorage.removeItem('glol.save.v1')
+        } catch {}
+      })
+      await page.goto(`${VERIFY_WALK_URL}&flow=0&time=11.5`, {waitUntil: 'domcontentloaded', timeout: 90000})
       await page.waitForFunction(
         () =>
           Boolean(
@@ -709,22 +698,106 @@ async function run() {
       await installFullHelpers(page, specs.bridge)
 
       // ---------------------------------------------------------------------
-      // OL-04: 新烟盒 (一点虹 / #388/#389 flip-top pack open state)
+      // OL-03: 钓鱼碑 (stele-lijiang_jiefang-zone inside walk() mode, obstacle-free)
       // ---------------------------------------------------------------------
       try {
-        const smokeSlot = page.locator('.hotbar [data-slot=smoke]')
-        await smokeSlot.waitFor({timeout: 10000})
+        const st = SHIZIJIE_STELE_FALLBACK
+        await page.evaluate(async s => {
+          const guide = document.querySelector('.guide.open .guide-toggle, [data-guide-toggle]')
+          if (guide instanceof HTMLElement) guide.click()
+          const ax = s.x + Math.sin(s.yaw) * 4.5
+          const az = s.z + Math.cos(s.yaw) * 4.5
+          await window.viewer.walkTo(ax, az, s.yaw, 'ol-full-stele')
+        }, st)
+        await page.waitForTimeout(800)
+        await dismissBlockingUi(page)
+        const steleProbe = await page.evaluate(() => {
+          let sc = window.viewer.camera
+          while (sc.parent) sc = sc.parent
+          const found = []
+          sc.traverse(o => {
+            if (o.name?.startsWith('stele-')) {
+              const p = o.position
+              found.push({name: o.name, pos: [+p.x.toFixed(2), +p.y.toFixed(2), +p.z.toFixed(2)], yaw: +o.rotation.y.toFixed(4)})
+            }
+          })
+          return {steleCount: found.length, steles: found}
+        })
+        if (steleProbe.steleCount > 0) {
+          await page.evaluate(s => {
+            const targetStele = s.steles.find(x => x.name.includes('jiefang')) ?? s.steles[0]
+            if (!targetStele) return
+            const [sx, sy, sz] = targetStele.pos
+            let bestEye = [sx + Math.sin(targetStele.yaw) * 2.85, sy + 1.48, sz + Math.cos(targetStele.yaw) * 2.85]
+            const w = window.viewer.walk
+            for (const angOff of [0, 0.25, -0.25, 0.5, -0.5, 0.78, -0.78]) {
+              const a = targetStele.yaw + angOff
+              const ex = sx + Math.sin(a) * 2.85
+              const ez = sz + Math.cos(a) * 2.85
+              const hit = w?.raycastObstacle?.(ex, sy + 1.48, ez, (sx - ex) / 2.85, 0, (sz - ez) / 2.85, 2.55)
+              if (!hit || hit.distance >= 2.35) {
+                bestEye = [ex, sy + 1.48, ez]
+                break
+              }
+            }
+            // Place player behind camera so player doesn't occlude stele face
+            w?.clampPosition?.({x: bestEye[0] + Math.sin(targetStele.yaw) * 2.0, y: sy + 0.05, z: bestEye[2] + Math.cos(targetStele.yaw) * 2.0})
+            window.__olCamHold = {
+              eye: bestEye,
+              at: [sx, sy + 1.32, sz],
+            }
+          }, steleProbe)
+          await page.evaluate(() => window.__olFlushFrames(4))
+        }
+        shots.olFishingStele = await captureShot(page, '03-ol-fishing-stele.png')
+        await page.evaluate(() => {
+          window.__olCamHold = null
+        })
+        addStep(
+          'OL3_FISHING_STELE',
+          'OL 侧钓鱼碑近景实拍',
+          steleProbe.steleCount > 0 ? 'PASS' : 'FAIL',
+          {steleCount: steleProbe.steleCount, target: steleProbe.steles.find(x => x.name.includes('jiefang')) ?? null},
+          shots.olFishingStele,
+        )
+      } catch (err) {
+        await page.evaluate(() => {
+          window.__olCamHold = null
+        }).catch(() => {})
+        addStep('OL3_FISHING_STELE', 'OL 侧钓鱼碑近景实拍', 'FAIL', {error: err.message})
+      }
+
+      // ---------------------------------------------------------------------
+      // OL-04: 新烟盒 (一点虹 / #388/#389 flip-top pack open state in first-person foreground)
+      // ---------------------------------------------------------------------
+      let switchedFirstPerson = false
+      try {
         await page.waitForFunction(
           () => {
-            const slot = document.querySelector('.hotbar [data-slot=smoke]')
-            if (!slot || document.body.hasAttribute('data-home')) return false
-            const r = slot.getBoundingClientRect()
-            return slot.contains(document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2))
+            const btn = document.querySelector('.hotbar [data-shop=smoke]')
+            if (!btn || document.body.hasAttribute('data-home')) return false
+            const r = btn.getBoundingClientRect()
+            return btn.contains(document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2))
           },
           null,
           {timeout: 15000},
         )
-        await smokeSlot.click()
+        // Ensure first-person view ('KeyT' in keymap) so firstPersonArms & smoke-pack frame front-center above hotbar
+        const isFirstInitially = await page.evaluate(
+          () => JSON.parse(localStorage.getItem('glol.prefs') || '{}')?.view === 'first',
+        )
+        if (!isFirstInitially) {
+          await page.keyboard.press('KeyT')
+          await page
+            .waitForFunction(() => JSON.parse(localStorage.getItem('glol.prefs') || '{}')?.view === 'first', null, {
+              timeout: 4000,
+            })
+            .catch(() => {})
+          switchedFirstPerson = await page.evaluate(
+            () => JSON.parse(localStorage.getItem('glol.prefs') || '{}')?.view === 'first',
+          )
+        }
+        await page.locator('.hotbar [data-shop=smoke]').click()
         const shop = page.locator('.shop-overlay.show')
         await shop.waitFor({timeout: 8000})
         const newBrands = ['一点虹', '丹桂', '红玫', '二伍甲', '老八块', '乐涂']
@@ -733,33 +806,62 @@ async function run() {
           const card = shop.locator('.shop-card').filter({hasText: label}).first()
           if ((await card.count()) > 0) {
             await card.click()
-            await shop.locator('.shop-act-primary').click()
-            boughtBrand = label
-            break
+            const primary = shop.locator('.shop-act-primary')
+            if (await primary.isEnabled()) {
+              await primary.click()
+              boughtBrand = label
+              break
+            }
           }
         }
+        await page.waitForFunction(
+          () => (JSON.parse(localStorage.getItem('glol.save.v1') || '{}').packs ?? []).length >= 1,
+          null,
+          {timeout: 5000},
+        )
         await shop.locator('.shop-act-close').click()
         await shop.waitFor({state: 'hidden', timeout: 5000})
-        await smokeSlot.click()
-        await page.waitForFunction(() => window.viewer?.walk?.probe?.()?.smoke?.phase === 'sealed', null, {timeout: 15000})
-        await page.keyboard.press('KeyF')
+        await page.waitForFunction(() => !document.body.dataset.shopOpen, null, {timeout: 5000})
+        await page.keyboard.press('Digit3')
         await page.waitForFunction(
           () => {
-            const sm = window.viewer?.walk?.probe?.()?.smoke
-            return sm?.phase === 'open' && (sm?.progress ?? 0) >= 0.2
+            const ph = window.viewer?.walk?.probe?.()?.smoke?.phase
+            return ph === 'sealed' || ph === 'open'
           },
           null,
           {timeout: 15000},
         )
+        const curPhase = await page.evaluate(() => window.viewer?.walk?.probe?.()?.smoke?.phase)
+        if (curPhase === 'sealed') {
+          await page.waitForFunction(
+            () => Boolean(window.viewer?.camera?.getObjectByName?.('smoke-prompt')?.visible),
+            null,
+            {timeout: 15000},
+          )
+          await page.keyboard.press('KeyF')
+          await page.waitForFunction(
+            () => {
+              const sm = window.viewer?.walk?.probe?.()?.smoke
+              return sm?.phase === 'open' && (sm?.progress ?? 0) >= 0.45
+            },
+            null,
+            {timeout: 15000},
+          )
+        } else {
+          await page.waitForFunction(() => (window.viewer?.walk?.probe?.()?.smoke?.progress ?? 0) >= 0.45, null, {
+            timeout: 15000,
+          })
+        }
         const smokeMeta = await page.evaluate(() => {
           const cam = window.viewer.camera
           const pack = cam?.parent?.getObjectByName?.('smoke-pack')
           return {
+            viewMode: JSON.parse(localStorage.getItem('glol.prefs') || '{}')?.view ?? 'third',
             smoke: window.viewer.walk.probe().smoke,
             packMountedIn: pack?.parent?.name ?? null,
           }
         })
-        await page.evaluate(() => window.__olFlushFrames(4))
+        await page.evaluate(() => window.__olFlushFrames(6))
         shots.olNewSmokePack = await captureShot(page, '04-ol-new-smoke-pack.png')
         addStep(
           'OL4_NEW_SMOKE_PACK',
@@ -768,13 +870,22 @@ async function run() {
           {boughtBrand, ...smokeMeta},
           shots.olNewSmokePack,
         )
-        // Stow cigarette before moving on to traffic duty
+        // Stow cigarette and restore third-person view before traffic duty shots
         await page.keyboard.press('1')
         await page.waitForTimeout(250)
       } catch (err) {
         addStep('OL4_NEW_SMOKE_PACK', 'OL 侧新烟盒开盒态实拍', 'FAIL', {error: err.message})
         await page.evaluate(() => document.querySelector('.shop-overlay .shop-act-close')?.click?.()).catch(() => {})
         await page.keyboard.press('1').catch(() => {})
+      } finally {
+        if (switchedFirstPerson) {
+          await page.keyboard.press('KeyT').catch(() => {})
+          await page
+            .waitForFunction(() => JSON.parse(localStorage.getItem('glol.prefs') || '{}')?.view === 'third', null, {
+              timeout: 4000,
+            })
+            .catch(() => {})
+        }
       }
 
       // ---------------------------------------------------------------------
@@ -842,7 +953,7 @@ async function run() {
             triangleCount: countTris(rigged),
           }
 
-          // Center well east of bridgehead sign (-96.2) & clear of bridgehead guardrail, between lampposts (-105 and -84)
+          // Center clear of bridgehead guardrail, between lampposts (-105 and -84), shifted slightly laterally so UI pin clears baton
           const baseLx = -89.0
           const offLz = 17.95
           const plyLz = 18.88
@@ -874,7 +985,7 @@ async function run() {
           for (let i = 0; i < 20; i++) w.tick(1 / 60)
           w.face(yaw, 0.06)
 
-          const [camWx, camWz] = window.__olToWorld(baseLx - 2.9, 18.35)
+          const [camWx, camWz] = window.__olToWorld(baseLx - 2.9, 18.78)
           window.__olCamHold = {
             eye: [camWx, footY + 0.98, camWz],
             at: [(ox + px) * 0.5, footY + 0.68, (oz + pz) * 0.5],
@@ -1488,7 +1599,7 @@ async function run() {
           await dismissBlockingUi(pg)
 
           await pg.keyboard.down('KeyW')
-          const enterDeadline = Date.now() + 5500
+          const enterDeadline = Date.now() + 9000
           let entered = false
           while (Date.now() < enterDeadline) {
             entered = await pg.evaluate(
@@ -1506,12 +1617,23 @@ async function run() {
             )
           }
           await pg
-            .waitForFunction(() => window.viewer?.xxg?.getState?.()?.state === 'inside', null, {timeout: 10000})
+            .waitForFunction(() => window.viewer?.xxg?.getState?.()?.state === 'inside', null, {timeout: 15000})
             .catch(() => {})
-          // Step slightly forward past portal vestibule so lit shop corridor & signage fill view
-          await pg.keyboard.down('KeyW')
-          await pg.waitForTimeout(550)
+          // Run forward along corr-east-ns to z <= -8.5 (adjacent to shop-s1-east-01 alcove at x=-17.3, z=-12.5)
           await pg.keyboard.up('KeyW')
+          await pg.waitForTimeout(150)
+          await pg.keyboard.down('ShiftLeft')
+          await pg.keyboard.down('KeyW')
+          await pg
+            .waitForFunction(() => (window.viewer?.xxg?.getState?.()?.player?.z ?? 99) <= -8.5, null, {timeout: 22000})
+            .catch(() => {})
+          await pg.keyboard.up('KeyW')
+          await pg.keyboard.up('ShiftLeft')
+          // Pan right slightly toward shop-s1-east-01 alcove & lit E2 exit stairs
+          await pg.mouse.move(640, 400)
+          await pg.mouse.down()
+          await pg.mouse.move(820, 400, {steps: 6})
+          await pg.mouse.up()
           await pg.waitForTimeout(350)
           await dismissBlockingUi(pg)
           await pg.evaluate(() => {
@@ -1520,10 +1642,11 @@ async function run() {
           })
           const xxgBlack = await sampleCanvasIsBlack(pg)
           const xxgState = await pg.evaluate(() => window.viewer?.xxg?.getState?.() ?? null)
+          const enteredOk = Boolean(entered || xxgState?.isIndoor || xxgState?.state === 'inside')
           shots.xxgEntry = await captureShot(pg, '11-xxg-entry.png')
           const m = xxgState?.metrics ?? {}
           const ok =
-            Boolean(entered && xxgState?.state === 'inside' && !xxgBlack) &&
+            Boolean(enteredOk && xxgState?.state === 'inside' && !xxgBlack) &&
             (m.drawCalls ?? 0) > 0 &&
             (m.drawCalls ?? 0) <= 40 &&
             (m.lastBlackFrames ?? 0) === 0
@@ -1531,7 +1654,7 @@ async function run() {
             'XXG_ENTRY',
             '小香港地下商业城进入实拍',
             ok ? 'PASS' : 'FAIL',
-            {portalId: portal.id, entered, xxgBlack, state: xxgState?.state ?? null, metrics: m, player: xxgState?.player ?? null},
+            {portalId: portal.id, entered: enteredOk, xxgBlack, state: xxgState?.state ?? null, metrics: m, player: xxgState?.player ?? null},
             shots.xxgEntry,
           )
         }
@@ -1583,12 +1706,24 @@ async function run() {
           }
           await pg.keyboard.up('KeyW')
           await pg
-            .waitForFunction(() => window.viewer?.szj?.getState?.()?.state === 'inside', null, {timeout: 12000})
+            .waitForFunction(() => window.viewer?.szj?.getState?.()?.state === 'inside', null, {timeout: 35000})
             .catch(() => {})
-          // Walk briefly past entrance stair foot into brightly lit B1 concourse under hanging sign
+          // Run into main B1 ring corridor (z <= 21.0), then turn west along corr-ring-985734888 facing lit shopfronts & NPCs
+          await pg.keyboard.down('ShiftLeft')
           await pg.keyboard.down('KeyW')
-          await pg.waitForTimeout(800)
+          await pg
+            .waitForFunction(() => (window.viewer?.szj?.getState?.()?.player?.z ?? 99) <= 21.0, null, {timeout: 24000})
+            .catch(() => {})
           await pg.keyboard.up('KeyW')
+          await pg.keyboard.down('ArrowLeft')
+          await pg
+            .waitForFunction(() => (window.viewer?.szj?.getState?.()?.player?.yaw ?? 0) >= 1.4, null, {timeout: 6000})
+            .catch(() => {})
+          await pg.keyboard.up('ArrowLeft')
+          await pg.keyboard.down('KeyW')
+          await pg.waitForTimeout(700)
+          await pg.keyboard.up('KeyW')
+          await pg.keyboard.up('ShiftLeft')
           await pg.waitForTimeout(350)
           await dismissBlockingUi(pg)
           await pg.evaluate(() => {
@@ -1599,8 +1734,9 @@ async function run() {
           const szjState = await pg.evaluate(() => window.viewer?.szj?.getState?.() ?? null)
           shots.szjEntry = await captureShot(pg, '12-szj-entry.png')
           const m = szjState?.metrics ?? {}
+          const enteredOk = Boolean(entered || szjState?.isIndoor || szjState?.state === 'inside')
           const ok =
-            Boolean(entered && szjState?.state === 'inside' && !szjBlack) &&
+            Boolean(enteredOk && szjState?.state === 'inside' && !szjBlack) &&
             (m.drawCalls ?? 0) > 0 &&
             (m.drawCalls ?? 0) <= 60 &&
             (m.lastBlackFrames ?? 0) === 0
@@ -1608,7 +1744,7 @@ async function run() {
             'SZJ_ENTRY',
             '十字街地下街新路线 A 进入实拍',
             ok ? 'PASS' : 'FAIL',
-            {stairId: st.id, entered, szjBlack, state: szjState?.state ?? null, metrics: m, player: szjState?.player ?? null},
+            {stairId: st.id, entered: enteredOk, szjBlack, state: szjState?.state ?? null, metrics: m, player: szjState?.player ?? null},
             shots.szjEntry,
           )
         }

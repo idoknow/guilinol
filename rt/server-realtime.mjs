@@ -4,9 +4,9 @@
  * 协议（JSON over WebSocket，路径 /ws）
  *   客户端 → 服务端
  *     {t:'join', ticket, avatar, x,y,z,yaw}
- *     {t:'pos', x,y,z, yaw, v, bike, bx,bz,byaw, hb,hx,hz,hyaw, mv,cr,gr,dn,pn,hp, sc,sb,sp,br}
- *     {t:'hit', id, dmg}            出拳打到 id 这个人
- *     {t:'revive', id}              扶起倒地的 id
+ *     {t:'pos', x,y,z, yaw, v, bike, bx,bz,byaw, hb,hx,hz,hyaw, mv,cr,gr,pn, sc,sb,sp,br}
+ *     {t:'punch', id?, kind, zone, s} 命中帧（空拳省略 id）
+ *     {t:'rescue-start', id} / {t:'rescue-stop'}
  *     {t:'avatar', avatar}
  *     {t:'who'}
  *     {t:'chat', ch, text, cid} / {t:'chat_hist', ch} (docs/chat.md)
@@ -14,7 +14,7 @@
  *     {t:'welcome', me, online, players:[...]}
  *     {t:'join', player} / {t:'leave', id}
  *     {t:'pos', id, x,y,z,yaw,v,bike,bx,bz,byaw, hb,hx,hz,hyaw, mv,cr,gr,dn,pn,hp, sc,sb,sp,br}
- *     {t:'hit', dmg, by, byId} / {t:'revive', by}
+ *     {t:'combat', id, hp, dn, remaining, helper, progress, ...event}
  *     {t:'avatar', id, avatar}
  *     chat / chat_ack / chat_hist / chat_del / chat_mute (docs/chat.md)
  *     {t:'online', online}
@@ -52,6 +52,7 @@
  * 启动：PORT=8790 node server-realtime.mjs
  * 依赖：npm i ws
  */
+import {combat, config as combatConfig, snapshot as combatSnapshot} from './combat.mjs'
 import {flatDistance,inEmoteRange,acceptEmote} from './emote.mjs'
 import {createServer} from 'node:http'
 import {createHmac,timingSafeEqual} from 'node:crypto'
@@ -80,9 +81,6 @@ const MAX_PENDING_PER_IP = Number(process.env.RT_MAX_PENDING_PER_IP ?? 8)
 const pendingIp = new Map()
 /** 昵称长度上限（字符） */
 const MAX_NAME = 16
-/** 服务端裁决 hit / revive 的水平距离（米） */
-const HIT_RANGE = 3.5
-const REVIVE_RANGE = 3
 /** 广播前允许的发送缓冲；超了就跳过，连续跳过 60 次直接断开，别让慢客户端拖垮内存 */
 const MAX_BUFFERED = 1024 * 1024
 const MAX_SLOW_SKIPS = 60
@@ -262,7 +260,7 @@ function sanitizeAvatar(value) {
 }
 
 function send(ws, payload, type=payload.t, size) {
-  if (ws.readyState === 1) {
+  if (ws?.readyState === 1) {
     try {
       if (ws.readyState !== 1) return   // 已断开（续连宽限期内被标记 dead）的连接不再写
       const text=typeof payload === 'string' ? payload : JSON.stringify(payload)
@@ -419,6 +417,8 @@ function aoiSend(p, payload) {
 function removePlayer(p, extra = {}) {
   if (!p || !players.has(p.id)) return false
   const at = now()
+  if(p.helping)fight.cancel(p,at)
+  if(p.helper){const helper=players.get(p.helper);if(helper)fight.cancel(helper,at)}
   const finalTotals = obs.liveTotals(p, at)
   p.activityTotals = finalTotals
   p.activitySince = at
@@ -448,17 +448,82 @@ function rosterPayload() {
   return { t: 'roster', players: list }
 }
 
+// ── 名册增量（roster2）──────────────────────────────────────────────
+// 全量名册的带宽是 O(n²)：每人每 5 秒收一次全城名单，1000 人时约 76 Mbps。
+// 支持 caps:['roster2'] 的客户端改为收增量（只发新增/离开/移动≥2m 的人），
+// 每 RT_ROSTER_FULL_MS 强制一次全量对账，防止长期漂移。
+// 老客户端仍然收全量 roster，行为完全不变。
+const ROSTER_FULL_MS = Number(process.env.RT_ROSTER_FULL_MS || 30000)   // 未订阅者：低频全量
+const ROSTER_SUB_MS = Number(process.env.RT_ROSTER_SUB_MS || 5000)      // 订阅者：增量间隔
+const ROSTER_MOVE_M = Number(process.env.RT_ROSTER_MOVE_M || 8)         // 增量阈值（缩略图上 <2px）
+const ROSTER_SUB_RADIUS = Number(process.env.RT_ROSTER_SUB_RADIUS || 500)
+const ROSTER_SUB_TTL_MS = Number(process.env.RT_ROSTER_SUB_TTL_MS || 90000)
+const ROSTER_FULL_QPS = Number(process.env.RT_ROSTER_FULL_QPS || 15)    // 全量快照全服限速
+const ROSTER_HIST_MS = 60000
+
+let rosterSnap = new Map()   // id -> {x, z, name}
+let rosterV = 0
+let rosterHist = []          // [{v, at, add, up, del, total}]，保留 60s 供 since 补发
+const fullQueue = []         // 等全量快照的 socket（全局限速）
+
+function rosterDelta() {
+  const add = [], up = [], del = []
+  const next = new Map()
+  for (const p of players.values()) {
+    const x = Math.round(p.x), z = Math.round(p.z)
+    const prev = rosterSnap.get(p.id)
+    next.set(p.id, { x, z, name: p.name })
+    if (!prev || prev.name !== p.name) add.push([p.id, p.name, x, z])
+    else if (Math.abs(prev.x - x) + Math.abs(prev.z - z) >= ROSTER_MOVE_M) up.push([p.id, x, z])
+  }
+  for (const id of rosterSnap.keys()) if (!next.has(id)) del.push(id)
+  rosterSnap = next
+  return { add, up, del, total: next.size }
+}
+
+function pushHist(entry) {
+  rosterHist.push(entry)
+  const cut = Date.now() - ROSTER_HIST_MS
+  while (rosterHist.length && rosterHist[0].at < cut) rosterHist.shift()
+}
+
+/** 订阅者立刻能用的快照：附近 ROSTER_SUB_RADIUS 内的人 + 总人数 */
+function nearPayload(me) {
+  const near = []
+  for (const p of players.values()) {
+    if (me && p.id === me.id) continue
+    if (me && flatDistance(p, me) > ROSTER_SUB_RADIUS) continue
+    near.push([p.id, p.name, Math.round(p.x), Math.round(p.z)])
+  }
+  return { t: 'roster3', v: rosterV, near, total: players.size, radius: ROSTER_SUB_RADIUS }
+}
+
+/** since 命中历史就补发增量，避免重开地图/断线续连时重拉 50KB 全量 */
+function replaySince(ws, since) {
+  const idx = rosterHist.findIndex(e => e.v === since)
+  if (idx < 0) return false
+  const add = [], up = [], del = []
+  for (const e of rosterHist.slice(idx + 1)) { add.push(...e.add); up.push(...e.up); del.push(...e.del) }
+  send(ws, { t: 'roster3', v: rosterV, add, up, del, total: players.size })
+  return true
+}
+
 function publicOf(p,viewer=p) {
   return {
     id: p.id, uid: p.uid, name: p.name, avatar: p.avatar, jt:p.joinedAt,
     x: p.x, y: p.y, z: p.z, yaw: p.yaw, v: p.v,
-    bike: p.bike, bx: p.bx, bz: p.bz, byaw: p.byaw,
-    hb: p.hb, hx: p.hx, hz: p.hz, hyaw: p.hyaw, mv: p.mv, dn: p.dn, pn: p.pn, wl: p.wl, cr: p.cr, gr: p.gr,
-    hp: p.hp, em:inEmoteRange(p,viewer)&&now()<p.emoteUntil?p.em:0, es:p.es,
+    foot:p.foot, bike: p.bike, bx: p.bx, bz: p.bz, byaw: p.byaw,
+    hb: p.hb, hx: p.hx, hz: p.hz, hyaw: p.hyaw, mv: p.mv, pn: p.pn, wl: p.wl, cr: p.cr, gr: p.gr,
+    ...combatSnapshot(p,now()), em:inEmoteRange(p,viewer)&&now()<p.emoteUntil?p.em:0, es:p.es,
     sc: p.sc, sb: p.sb, sp: p.sp, br: p.br, ss:p.ss, sd:p.sd, sr:p.sr,
   }
 }
 
+const fight=combat(players,(p,packet)=>{
+  send(p.ws,packet)
+  for(const id of p.visible)send(players.get(id)?.ws,packet)
+})
+setInterval(()=>fight.tick(now()),100).unref()
 const chat=createChat({players,send,observed:obs.chatted})
 const server = createServer(async(req, res) => {
   try {
@@ -652,6 +717,8 @@ wss.on('connection', (ws, req) => {
         console.log(JSON.stringify({scope:'rt-stale-close',uid:player.uid,pid,code:code??null}))
         return
       }
+      if(player?.helping)fight.cancel(player,now())
+      if(player?.helper){const helper=players.get(player.helper);if(helper)fight.cancel(helper,now())}
       // 异常断开（CDN 掐连接、切网络、手机息屏）先保留会话，等同 uid 回来续连；
       // 主动关闭（pagehide/dispose）、被踢被封、顶号都不保留，避免留下假在线。
       if (player && RESUMABLE(code) && !player.kickReason && !player.replaced) {
@@ -685,6 +752,9 @@ wss.on('connection', (ws, req) => {
         }
         // 顺手清掉过期封禁，不起 setInterval（避免泄漏）
         sweepBans()
+        // 客户端能力位：支持增量名册的客户端才收 roster2，老客户端继续收全量
+        ws.roster2 = Array.isArray(msg.caps) && msg.caps.includes('roster2')
+        ws.caps3 = Array.isArray(msg.caps) && msg.caps.includes('roster3')
         const claims = identity(msg.ticket)
         if (!claims) { obs.reject('ticket');ws.rejected = true; ws.close(4003, 'ticket rejected'); return }
         const uid = claims.uid
@@ -734,7 +804,7 @@ wss.on('connection', (ws, req) => {
             }
             send(ws, {
               t: 'welcome',
-              me: { id: p.id, uid: p.uid, name: p.name, avatar: p.avatar, x: p.x, z: p.z, resumed: true },
+              me: { id: p.id, uid: p.uid, name: p.name, avatar: p.avatar, x: p.x, z: p.z, ...combatSnapshot(p,now()), resumed: true },
               online: players.size,
               players: visible.map(peerId => players.get(peerId)).filter(Boolean).map(q => publicOf(q, p)),
             })
@@ -786,10 +856,10 @@ wss.on('connection', (ws, req) => {
           dn: 0,
           pn: 0,
           wl: 0,
-          lastHit: 0,
           cr: 0,
           gr: 1,
-          hp: 100,
+          foot: msg.foot!==false,
+          hp: combatConfig.hpMax,
           sc: 0,
           sb: 0,
           sp: 0,
@@ -824,12 +894,12 @@ wss.on('connection', (ws, req) => {
         obs.joined(player,players.size)
         send(ws, {
           t: 'welcome',
-          me: {id, uid: player.uid, name: player.name, avatar: player.avatar},
+          me: {...combatSnapshot(player,now()), id, uid: player.uid, name: player.name, avatar: player.avatar},
           online: players.size,
           players: visible.map(peerId => players.get(peerId)).filter(Boolean).map(p=>publicOf(p,player)),
         })
-        // 全服名册立刻给一份，不用等下一个 5s 周期
-        send(ws, rosterPayload())
+        // 全服名册立刻给一份（仅老客户端；roster3 客户端按需订阅，不预发 50KB）
+        if (!ws.caps3) send(ws, rosterPayload())
         broadcast({t: 'online', online: players.size})
         return
       }
@@ -864,12 +934,13 @@ wss.on('connection', (ws, req) => {
         me.z = clampNum(msg.z, -1e5, 1e5)
         me.yaw = clampNum(msg.yaw, -10, 10)
         me.v = clampNum(msg.v, 0, 120)
+        me.foot = msg.foot!==false
         me.bike = clampStr(msg.bike, 32)
         me.bx = clampNum(msg.bx, -1e5, 1e5)
         me.bz = clampNum(msg.bz, -1e5, 1e5)
         me.byaw = clampNum(msg.byaw, -20, 20)
         me.mv = clampNum(msg.mv, 0, 1)
-        me.dn = clampNum(msg.dn, 0, 1)
+
         me.pn = clampNum(msg.pn, 0, 1)
         me.wl = clampNum(msg.wl, 0, 1)
         me.hb = clampNum(msg.hb, 0, 1)
@@ -878,8 +949,6 @@ wss.on('connection', (ws, req) => {
         me.hyaw = clampNum(msg.hyaw, -20, 20)
         me.cr = clampNum(msg.cr, 0, 1)
         me.gr = clampNum(msg.gr, 0, 1, 1)
-        // 血量：出手方靠它看到自己打掉了多少，被打的人也靠它对齐屏幕上的血条
-        me.hp = clampInt(msg.hp, 0, 100, 100)
         me.sc = clampInt(msg.sc, 0, 9)
         me.sb = clampInt(msg.sb, 0, 1800)
         me.sp = clampInt(msg.sp, 0, 999)
@@ -896,7 +965,7 @@ wss.on('connection', (ws, req) => {
         aoiSend(me, {
           t: 'pos', id: me.id,
           x: me.x, y: me.y, z: me.z, yaw: me.yaw, v: me.v,
-          bike: me.bike, bx: me.bx, bz: me.bz, byaw: me.byaw,
+          foot:me.foot, bike: me.bike, bx: me.bx, bz: me.bz, byaw: me.byaw,
           hb: me.hb, hx: me.hx, hz: me.hz, hyaw: me.hyaw, mv: me.mv, cr: me.cr, gr: me.gr, dn: me.dn, pn: me.pn, wl: me.wl,
           hp: me.hp,
           sc: me.sc, sb: me.sb, sp: me.sp, br: me.br, ss:me.ss, sd:me.sd, sr:me.sr,
@@ -904,29 +973,8 @@ wss.on('connection', (ws, req) => {
         return
       }
 
-      if (msg.t === 'hit') {
-        // 出拳：限频 5 次/秒，只转给被打的那个人，伤害由出手方算（夹到 1..35）
-        const at = now()
-        if (at - me.lastHit < 200) return
-        me.lastHit = at
-        const target = players.get(clampStr(msg.id, 64))
-        if (!target || target === me) return
-        // 目标已经倒地就别再打；距离用双方最近一次 pos 裁决，挡「隔空打人」
-        if (target.dn) return
-        if (flatDistance(me, target) > HIT_RANGE) return
-        const dmg = Math.max(1, Math.min(35, clampInt(msg.dmg, 1, 35, 9)))
-        // byId 让被打的一方算出「从哪个方向挨的这一下」；by 只用来显示
-        send(target.ws, {t: 'hit', dmg, by: me.name, byId: me.id})
-        return
-      }
-
-      if (msg.t === 'revive') {
-        const target = players.get(clampStr(msg.id, 64))
-        if (!target || target === me) return
-        // 只有对方倒地时才允许扶，且得站在 3 m 内
-        if (!target.dn) return
-        if (flatDistance(me, target) > REVIVE_RANGE) return
-        send(target.ws, {t: 'revive', by: me.name})
+      if (['windup','punch','rescue-start','rescue-stop'].includes(msg.t)) {
+        fight.input(me,msg,now())
         return
       }
 
@@ -939,6 +987,15 @@ wss.on('connection', (ws, req) => {
         return
       }
 
+      if (msg.t === 'roster_sub') {
+        ws.rosterSub = { at: now() }
+        send(ws, nearPayload(me))
+        if (typeof msg.since === 'number' && replaySince(ws, msg.since)) return
+        fullQueue.push(ws)
+        return
+      }
+      if (msg.t === 'roster_unsub') { ws.rosterSub = null; return }
+      if (msg.t === 'roster_ping') { if (ws.rosterSub) ws.rosterSub.at = now(); return }
       if (msg.t === 'who') {
         // 全服名单走 roster 通道；这里只回视野内的人，否则客户端会把视野外的人画进场景并永远停在原地
         send(ws, {
@@ -961,18 +1018,64 @@ wss.on('connection', (ws, req) => {
   ws.on('error', () => { try { ws.close() } catch { /* 忽略 */ } })
 })
 
-// 在线人数心跳
+// 在线人数：人数变了才广播，10s 兜底一次（原来是每秒无条件全服广播）
+let onlineSent = -1, onlineAt = 0
 setInterval(() => {
-  broadcast({t: 'online', online: players.size})
+  const n = players.size
+  const at = Date.now()
+  if (n === onlineSent && at - onlineAt < 10000) return
+  onlineSent = n; onlineAt = at
+  broadcast({t: 'online', online: n})
 }, TICK_MS)
 
-// 全服低频名册（地图 / 同城名册用）：只 stringify 一次，同一个字符串发给所有人
+// 订阅者增量：只有打开大地图/玩家列表的客户端在收（近距离位姿走 AOI，不受影响）
+setInterval(() => {
+  if (!players.size) return
+  rosterV++
+  const d = rosterDelta()
+  pushHist({ v: rosterV, at: Date.now(), ...d })
+  let text = null, size = 0
+  for (const p of players.values()) {
+    const ws = p.ws
+    if (!ws || !ws.rosterSub) continue
+    if (Date.now() - ws.rosterSub.at > ROSTER_SUB_TTL_MS) {
+      ws.rosterSub = null
+      send(ws, { t: 'roster3', v: rosterV, paused: true, total: players.size })
+      continue
+    }
+    if (!text) { text = JSON.stringify({ t: 'roster3', v: rosterV, ...d }); size = Buffer.byteLength(text) }
+    sendSlowAware(ws, text, 'roster', size)
+    if (ws.slowSkips > 0) {
+      ws.rosterSub = null
+      send(ws, { t: 'roster3', v: rosterV, paused: true, total: players.size })
+    }
+  }
+}, ROSTER_SUB_MS)
+
+// 未订阅者：低频全量（老客户端从 5s 降到 30s，行为仍兼容，只是刷新慢）
 setInterval(() => {
   if (!players.size) return
   const text = JSON.stringify(rosterPayload())
   const size = Buffer.byteLength(text)
-  for (const p of players.values()) sendSlowAware(p.ws, text, 'roster', size)
-}, ROSTER_MS)
+  for (const p of players.values()) {
+    const ws = p.ws
+    if (!ws || ws.rosterSub || ws.caps3) continue   // roster3 客户端只在订阅期间收
+    sendSlowAware(ws, text, 'roster', size)
+  }
+}, ROSTER_FULL_MS)
+
+// 全量快照限速泵：全服共享 15 份/秒，避免 1000 人同时开图把端口打满
+setInterval(() => {
+  if (!fullQueue.length) return
+  if (!players.size) { fullQueue.length = 0; return }
+  const text = JSON.stringify({ t: 'roster3', v: rosterV, full: rosterPayload().players, total: players.size })
+  const size = Buffer.byteLength(text)
+  for (let i = 0; i < ROSTER_FULL_QPS && fullQueue.length; i++) {
+    const ws = fullQueue.shift()
+    if (!ws) continue
+    sendSlowAware(ws, text, 'roster', size)
+  }
+}, 1000)
 
 // 每 30s 一条 rt-stats：线上判断「单核是否顶满」看 loopP99Ms，> 50ms 玩家就能感到卡
 const STATS_MS = Number(process.env.RT_STATS_MS || 30000)

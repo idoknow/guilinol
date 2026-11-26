@@ -9,6 +9,7 @@ import shapely
 import numpy as np
 from shapely import LineString, Polygon, STRtree
 from shapely.affinity import translate
+from shapely.ops import substring
 
 from common import load_osm
 from features import points, polygons
@@ -18,7 +19,20 @@ from road_profile import RULES, profile
 def bake(directory, manifest):
     eligible, elevated, positive_bridges = [], [], []
     empty = STRtree([])
-    for element in load_osm():
+    from rail_sections import designs
+    elements = load_osm()
+    cuts = [cut for section in designs() for cut in section.get("bridgeApproachRailCuts", [])]
+    ids = {cut[key] for cut in cuts for key in ("bridge", "rail")}
+    axes_by_way = {w["id"]: LineString(points(w)) for w in elements if w["type"] == "way" and w["id"] in ids}
+    rail_width = json.loads(Path(__file__).with_name("railway-style.json").read_bytes())["ballastHalfWidth"]
+    # Keep the native approach corner outside the rail envelope. GL04 stores
+    # polygon corners in centimetres, so reserve two centimetres when clipping.
+    rail_cuts = STRtree([
+        substring(axes_by_way[cut["bridge"]], *cut["chainage"]).buffer(cut["width"] / 2)
+        .intersection(axes_by_way[cut["rail"]].buffer(rail_width + 2.02))
+        for cut in cuts
+    ])
+    for element in elements:
         tags = element.get('tags', {})
         kind = tags.get('highway', '')
         if element['type'] != 'way' or not kind:
@@ -58,6 +72,9 @@ def bake(directory, manifest):
         upper_hits = upper.query(bounds,predicate='intersects')
         axes = local_cm(shapely.union_all(upper.geometries.take(upper_hits)))
         owned = shapely.union_all([part for part in polygons(deck_cm) if part.intersects(axes)])
+        hits = rail_cuts.query(bounds, predicate="intersects")
+        if len(hits):
+            owned = owned.union(local_cm(shapely.union_all(rail_cuts.geometries.take(hits))), grid_size=1)
         transition = local_cm(shapely.union_all(bridges.geometries.take(separated))).union(deck_cm.buffer(60),grid_size=1)
         corridor = local_cm(mask)
         cutoff = streets[11][0] if len(streets)>11 and streets[11] else len(streets[0])

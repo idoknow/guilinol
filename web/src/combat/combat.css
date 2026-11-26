@@ -1,0 +1,158 @@
+/* IDOK-423 拳击 HUD「气血签」——青玉玻璃同一块材质（theme.css token），克制、小号、不抢画面。
+   位置：桌面左下、聊天气泡正上方；手机摇杆一侧竖列（摇杆 → 物品栏 → 读数 → 气血）。
+   满血且没打架时降到 .5 透明度；颜色只在 青玉 → 赭黄 → 朱砂 三档之间过渡，濒危才轻微呼吸。 */
+.cb-ui { pointer-events: none; color: var(--ui-paper, #f4efe2); }
+.cb-ui [hidden], .cb-ui[hidden] { display: none !important; }
+
+/* --- 自身气血（左下） ------------------------------------------------------------------- */
+.cb-hp {
+  --hp: 1; --down: 0;
+  --hp-a: #5f9688; --hp-b: var(--ui-jade-300, #8fc1b5);
+  position: fixed; z-index: 5;
+  left: calc(12px + env(safe-area-inset-left));
+  bottom: calc(90px + env(safe-area-inset-bottom));
+  display: flex; align-items: center; gap: 7px;
+  height: 22px; box-sizing: border-box; padding: 0 9px 0 8px;
+  border-radius: var(--ui-r-pill, 999px);
+  background: rgba(22, 37, 34, .5);
+  border: 1px solid var(--ui-glass-line-soft, rgba(244, 239, 226, .16));
+  box-shadow: 0 2px 8px rgba(12, 20, 20, .16);
+  font: 10.5px/1 var(--ui-serif, serif);
+  letter-spacing: .08em;
+  user-select: none; -webkit-user-select: none;
+  transition: opacity .6s var(--ui-ease, ease), background .3s;
+}
+.cb-hp.is-calm { opacity: .5; }
+.cb-hp.is-mid { --hp-a: #a9853f; --hp-b: var(--ui-warn, #e2b878); }
+.cb-hp.is-low { --hp-a: var(--ui-seal, #a9503c); --hp-b: var(--ui-seal-light, #d0694c); }
+.cb-hp-label { color: var(--ui-paper-dim, rgba(244, 239, 226, .7)); }
+.cb-hp-track {
+  position: relative; width: 96px; height: 4px; overflow: hidden;
+  border-radius: 2px; background: rgba(244, 239, 226, .13);
+  box-shadow: inset 0 0 0 .5px rgba(12, 20, 20, .35);
+}
+.cb-hp-fill, .cb-hp-lag {
+  position: absolute; inset: 0; border-radius: inherit;
+  transform-origin: left center; transform: scaleX(var(--hp));
+}
+.cb-hp-fill {
+  background: linear-gradient(90deg, var(--hp-a), var(--hp-b));
+  transition: transform .22s var(--ui-ease, ease), background .3s;
+}
+/* 掉血时先留一截淡纸色「余痕」，0.25 s 后再追上，掉血过程看得清又不跳变 */
+.cb-hp-lag { background: rgba(244, 239, 226, .42); transition: transform .55s .25s ease-out; }
+.cb-hp-text {
+  min-width: 3ch; text-align: right;
+  font: 10.5px/1 ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing: 0;
+  font-variant-numeric: tabular-nums; color: rgba(244, 239, 226, .62);
+}
+.cb-hp.is-low .cb-hp-fill { animation: cb-breathe 1.2s ease-in-out infinite; }
+.cb-hp.is-low .cb-hp-text { color: var(--ui-error, #f0b9a6); }
+@keyframes cb-breathe { 50% { opacity: .55; } }
+
+/* 倒地：槽改成倒计时（纸色细条从满缩到空），数字换成「待救援 12s」 */
+.cb-hp.is-down { background: rgba(60, 28, 22, .55); border-color: rgba(208, 105, 76, .35); }
+.cb-hp.is-down .cb-hp-label { color: var(--ui-seal-light, #d0694c); }
+.cb-hp.is-down .cb-hp-fill { transform: scaleX(var(--down)); background: rgba(244, 239, 226, .55); transition: transform .1s linear; }
+.cb-hp.is-down .cb-hp-lag, .cb-hp.is-down .cb-hp-text { display: none; }
+.cb-down-ring {
+  font: 10.5px/1 var(--ui-serif, serif); letter-spacing: .06em;
+  color: rgba(244, 239, 226, .78); font-variant-numeric: tabular-nums; white-space: nowrap;
+}
+
+/* --- 救援提示（倒地者头顶，纯文字无底板） ------------------------------------------------- */
+.cb-tip {
+  position: fixed; z-index: 5; transform: translate(-50%, -100%);
+  font: 12.5px/1 var(--ui-serif, serif); letter-spacing: .12em; white-space: nowrap;
+  color: var(--ui-paper, #f4efe2);
+  text-shadow: 0 1px 2px rgba(12, 20, 20, .85), 0 0 8px rgba(12, 20, 20, .5);
+}
+.cb-tip.is-busy { color: var(--ui-paper-dim, rgba(244, 239, 226, .7)); font-size: 11.5px; }
+
+/* --- 救援读条（屏幕中下，施救者与被救者都看得到） ------------------------------------------ */
+.cb-revive-bar {
+  --p: 0;
+  position: fixed; z-index: 5; left: 50%; bottom: 28%; transform: translateX(-50%);
+  display: grid; justify-items: center; gap: 6px;
+  font: 11px/1 var(--ui-serif, serif); letter-spacing: .2em;
+  color: rgba(244, 239, 226, .82); text-shadow: 0 1px 2px rgba(12, 20, 20, .8);
+}
+.cb-revive-bar i {
+  display: block; width: 132px; height: 3px; border-radius: 2px;
+  background: linear-gradient(90deg, var(--ui-jade-300, #8fc1b5) calc(var(--p) * 100%), rgba(244, 239, 226, .18) 0);
+  box-shadow: 0 0 0 .5px rgba(12, 20, 20, .4);
+}
+
+/* --- 他人头顶临时血条（net-players.ts 定位，left 已减去半宽 21px） ------------------------- */
+.cb-over {
+  --p: 1;
+  position: fixed; z-index: 4; width: 42px; height: 3px; border-radius: 2px; pointer-events: none;
+  background: linear-gradient(90deg, var(--ui-jade-300, #8fc1b5) calc(var(--p) * 100%), rgba(20, 30, 28, .55) 0);
+  box-shadow: 0 0 0 1px rgba(12, 20, 20, .45);
+  transition: opacity .2s;
+}
+.cb-over[hidden] { display: none; }
+
+/* --- 自己挨打：四角很淡的朱砂晕 ------------------------------------------------------------ */
+.cb-vignette {
+  position: fixed; inset: 0; z-index: 3; opacity: 0; pointer-events: none;
+  background: radial-gradient(ellipse at center, transparent 58%, rgba(169, 80, 60, .38) 100%);
+}
+
+/* --- 手机：拳 / 扶 键（同一个位置，二选一显示）。
+   竖屏：「表情」左边、「跃」上方的空位；横屏：「叫车」同一行、它的左边（物品栏右侧）。 --- */
+.cb-controls { display: none; }
+@media (pointer: coarse) and (not (any-pointer: fine)) {
+  .cb-controls { display: block; }
+  .cb-controls button {
+    --cb-x: 70px; --cb-y: 224px; --cb-d: 48px;
+    position: fixed; z-index: 6; pointer-events: auto; touch-action: none;
+    right: calc(env(safe-area-inset-right) + var(--cb-x) * var(--k, 1));
+    bottom: calc(env(safe-area-inset-bottom) + var(--cb-y) * var(--k, 1));
+    width: calc(var(--cb-d) * var(--k, 1)); height: calc(var(--cb-d) * var(--k, 1));
+    display: grid; place-items: center; padding: 0; box-sizing: border-box;
+    border-radius: 50%;
+    background: rgba(22, 37, 34, .55); border: 1px solid rgba(244, 239, 226, .42);
+    color: var(--ui-paper, #f4efe2); font: 600 calc(16px * var(--k, 1))/1 var(--ui-serif, serif);
+    -webkit-tap-highlight-color: transparent; user-select: none; -webkit-user-select: none;
+    transition: transform var(--ui-fast, .15s), background var(--ui-fast, .15s);
+  }
+  .cb-controls button:active { transform: scale(.92); background: rgba(169, 80, 60, .62); }
+  .cb-controls .cb-btn-revive { border-color: rgba(143, 193, 181, .75); background: rgba(47, 74, 69, .7); }
+  .cb-controls .cb-btn-revive:active { background: rgba(79, 127, 122, .8); }
+  body[data-thumb-hand=left] .cb-controls button {
+    right: auto; left: calc(env(safe-area-inset-left) + var(--cb-x) * var(--k, 1));
+  }
+  /* 气血签跟着摇杆那一侧的竖列：摇杆 → 物品栏 → 读数 → 气血 */
+  .cb-hp {
+    left: calc(env(safe-area-inset-left) + var(--j-x, 18px) * var(--k, 1) - 8px);
+    bottom: calc(var(--stick-top, 140px) + 40px);
+  }
+  body[data-thumb-hand=left] .cb-hp {
+    left: auto; right: calc(env(safe-area-inset-right) + var(--j-x, 18px) * var(--k, 1) - 8px);
+  }
+}
+@media (pointer: coarse) and (not (any-pointer: fine)) and (min-height: 501px) {
+  body[data-hotbar=on] .cb-hp { bottom: calc(var(--stick-top, 140px) + 106px); }
+}
+@media (pointer: coarse) and (not (any-pointer: fine)) and (max-height: 500px) {
+  .cb-controls button { --cb-x: calc(var(--b-x, 142px) + var(--b-d, 54px) + 16px); --cb-y: var(--b-y, 98px); }
+}
+
+/* 新手「按键」卡片展开时（268px 宽、从 44px 往上），气血挪到卡片右侧同一底线 */
+@media (pointer: fine) {
+  body:has(.keys-card:not(.folded)) .cb-hp { left: calc(12px + 268px + 10px + env(safe-area-inset-left)); bottom: calc(44px + env(safe-area-inset-bottom)); }
+}
+/* 窄桌面窗口：聊天气泡被抬到 84px，气血跟着抬 */
+@media (pointer: fine) and (max-width: 1100px) {
+  .cb-hp { bottom: calc(126px + env(safe-area-inset-bottom)); }
+}
+/* 街头 HUD：左下是 192px 大号小地图，气血站到小地图上方 */
+@media (pointer: fine) { body[data-hud=street] .cb-hp { bottom: calc(226px + env(safe-area-inset-bottom)); } }
+
+/* 和其他全屏界面让位 */
+body[data-home] .cb-ui, body[data-photo="on"] .cb-ui, body[data-shop-open="1"] .cb-ui { display: none !important; }
+@media (prefers-reduced-motion: reduce) {
+  .cb-hp, .cb-hp-fill, .cb-hp-lag { transition: none; }
+  .cb-hp.is-low .cb-hp-fill { animation: none; }
+}

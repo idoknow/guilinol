@@ -660,6 +660,12 @@ def build(bbox, output, palette, workers=4):
     manifest['damPassageVersion'] = 1
     (output/'manifest.json').write_text(json.dumps(manifest,separators=(',',':'))+'\n')
     subprocess.run(['node',Path(__file__).resolve().parents[1]/'scripts/bake-dams.mjs',output],check=True)
+    if play_region:
+        from dam_passages import fit_shore_banks
+        from station_roads import grade_traffic
+        final_manifest = json.loads((output/'manifest.json').read_bytes())
+        grade_traffic(output, final_manifest, [], ferry_contacts=True)
+        fit_shore_banks(output)
     print(f'{len(chunks)} chunks, {len(footprints)} footprints, {sum(c["bytes"] for c in chunks):,} chunk bytes')
 
 

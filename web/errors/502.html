@@ -27,7 +27,38 @@ background:#c8553d;color:#f4efe2;font:inherit;font-size:14px;font-weight:500;let
 .btn.ghost{background:transparent;border-color:rgba(159,199,182,.4);color:#dfe9e4}.btn.ghost:hover{border-color:#dfe9e4;background:rgba(223,233,228,.06)}
 .auto{margin:10px 0 0;color:#9fc7b6;font-size:12px;text-align:center;min-height:1.2em}
 footer{margin-top:18px;color:#9fc7b6;font-size:12px;letter-spacing:.12em;opacity:.7;text-align:center}
-@media (max-width:360px){.top{padding:22px 18px 0}.body{padding:16px 18px 20px}}</style></head><body>
+@media (max-width:360px){.top{padding:22px 18px 0}.body{padding:16px 18px 20px}}
+/* 横向手机 / 矮窗口：压缩密度，操作按钮吸附在卡片底部，任何高度都能直接点到 */
+@media (max-height:720px){
+body{padding:10px;justify-content:flex-start}
+main{max-height:calc(100dvh - 20px);display:flex;flex-direction:column}
+.top{padding:16px 18px 0}
+.brand{margin:0 0 10px;font-size:11px}
+.seal{width:22px;height:22px;font-size:13px}
+.code{font-size:clamp(40px,9vh,60px)}
+h1{margin:6px 0 4px;font-size:clamp(16px,4.4vw,19px);letter-spacing:.1em}
+.lead{font-size:13px}
+.hills{height:34px;margin-top:10px}
+.body{padding:10px 18px 14px;overflow-y:auto;overscroll-behavior:contain}
+h2{margin:0 0 4px;font-size:11px}
+ul{margin:0 0 8px}li{margin:0;font-size:12.5px;line-height:1.55}
+.note{margin:0 0 8px;padding:5px 9px;font-size:12px}
+.path{font-size:11px;margin:2px 0 0}
+.act{position:sticky;bottom:0;padding-top:8px;background:#1a312c;gap:8px}
+.btn{height:38px;font-size:13px}
+.auto{margin:6px 0 0}
+footer{margin-top:8px;font-size:11px}
+}
+/* 极矮（横屏小手机）：进一步瘦身 */
+@media (max-height:470px){
+.hills{display:none}
+.brand{margin:0 0 6px}
+.code{font-size:clamp(32px,7.5vh,44px)}
+h1{font-size:16px}
+li:nth-of-type(n+3){display:none}
+.note{display:none}
+footer{margin-top:6px}
+}</style></head><body>
 <main><div class="top"><p class="brand"><span class="seal" aria-hidden="true">桂</span>网上桂林</p>
 <p class="code">502</p><h1>服务暂时没接上</h1><p class="lead">游戏服务暂时不可用，多半是正在发布新版本。</p></div><svg class="hills" viewBox="0 0 400 90" preserveAspectRatio="none" aria-hidden="true"><path fill="#223b35" d="M0 90L0 58 18 44 30 20 42 16 52 40 70 50 88 30 98 8 110 6 120 34 140 46 162 38 176 14 188 12 198 42 222 52 246 34 258 18 270 20 282 44 306 50 326 26 336 10 348 12 360 40 380 48 400 36L400 90Z"/><path fill="#2f5a4d" d="M0 90L0 74 24 64 40 46 52 44 62 66 92 72 118 58 130 40 142 42 152 64 184 70 214 60 228 44 240 46 250 66 284 72 310 62 322 48 334 50 344 68 372 72 400 62L400 90Z"/><path fill="#1a312c" d="M0 82h400v8H0z"/><path stroke="#9fc7b6" stroke-opacity=".18" d="M40 86h60M180 85h44M300 87h52"/></svg>
 <div class="body"><h2>可能的原因</h2><ul><li>新版本正在上线，服务在重启</li><li>服务器短暂繁忙</li></ul><h2>可以这样做</h2><ul><li>稍等几秒再点「重试」</li><li>页面会自动重试，留在这里就好</li></ul>

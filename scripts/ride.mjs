@@ -404,7 +404,7 @@ try{
       await rideToSlopeBase(bcSpot[2])
       const bicycleUphill=await measureUphillRun([592,1300])
       await interact('下车')
-      const ebSpot=await fixtureNear(585,1200,'bike');await waitSlopeChunks();await interact('骑电动车')
+      const ebSpot=await fixtureNear(585,1196.9,'bike');await waitSlopeChunks();await interact('骑电动车')
       await rideToSlopeBase(ebSpot[2])
       const ebikeUphill=await measureUphillRun([592,1300])
       await interact('下车')

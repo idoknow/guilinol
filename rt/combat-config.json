@@ -1,0 +1,21 @@
+{
+  "hpMax": 100,
+  "damage": {"jab": 8, "hook": 15},
+  "zone": {"head": 1.5, "body": 1},
+  "comboWindowMs": 850,
+  "punchCooldownMs": {"jab": 350, "hook": 650},
+  "cooldownSlackMs": 120,
+  "reachM": 0.9,
+  "networkMarginM": 0.4,
+  "downSeconds": 15,
+  "reviveHoldSeconds": 3,
+  "reviveDecayPerSec": 0.5,
+  "reviveHpRatio": 0.4,
+  "selfRiseHpRatio": 0.3,
+  "regenDelaySeconds": 8,
+  "regenPerSec": 3,
+  "crawlSpeed": 0.6,
+  "reviveRangeM": 1.6,
+  "reviveMoveM": 0.3,
+  "overheadBarHideSeconds": 5
+}

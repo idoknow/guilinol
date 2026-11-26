@@ -116,8 +116,8 @@ console.log('[OK] 2. Save migration, legacy stamps idempotency, corrupt backup &
 // ---------------------------------------------------------------------------
 assert.equal(catalog.DEFAULT_START_MONEY, 200)
 assert.equal(commerce.SPOT_BOUNTY_YUAN, 120)
-assert.equal(commerce.SHARED_EBIKE_FEE_YUAN, 3)
-assert.equal(commerce.SHARED_EBIKE_FREE_SECONDS, 120)
+assert.equal(commerce.SHARED_EBIKE_FEE_YUAN, 2)
+assert.equal(commerce.SHARED_EBIKE_FREE_SECONDS, 0)
 assert.equal(catalog.OUTFIT_PRESETS_BY_ID.outfit_guilin_hoodie.price, 480)
 assert.equal(catalog.OUTFIT_PRESETS_BY_ID.outfit_rider_vest.price, 960)
 assert.equal(catalog.OUTFIT_PRESETS_BY_ID.outfit_guochao_pankou.price, 1680)
@@ -362,12 +362,21 @@ for (let i = 0; i < 10; i++) {
 mRunner.step({dt: 0.1, x: -588, z: -212, mode: 'ebike', speedMs: 1, braking: true, parkLocked: false, crashPhase: 'none'})
 assert.equal(mRunner.getSnapshot().soup, 0.925, 'city_range delivery box reduces 10% spill by 25% -> 7.5%')
 
-// Shared ride fee when < ¥3 triggers free fallback instead of negative balance
-saveMod.resetSaveForTesting(2)
-const feeRes = commerce.chargeSharedRideFee('test_session_1')
-assert.equal(feeRes.fallbackFree, true)
+// Shared ride unlock strictly refuses < ¥2 (never free/negative) and charges ¥2 atomically when >= ¥2
+saveMod.resetSaveForTesting(1)
+const blockedUnlock = commerce.unlockSharedEbike({sessionKey: 'test_session_low'})
+assert.equal(blockedUnlock.ok, false)
+assert.equal(blockedUnlock.code, 'INSUFFICIENT_FUNDS')
+assert.equal(stateMod.getState().money, 1)
+const feeRes = commerce.chargeSharedRideFee('test_session_low_2')
+assert.equal(feeRes.fallbackFree, false)
 assert.equal(feeRes.charged, 0)
-assert.equal(stateMod.getState().money, 2)
+assert.equal(stateMod.getState().money, 1)
+saveMod.resetSaveForTesting(5)
+const paidUnlock = commerce.unlockSharedEbike({sessionKey: 'test_session_ok'})
+assert.equal(paidUnlock.ok, true)
+assert.equal(paidUnlock.charged, 2)
+assert.equal(stateMod.getState().money, 3)
 
 console.log('[OK] 4. MissionRunnerEngine state machine, soup protection, timer freeze & cleanup')
 // Exercise the full catalog through the production runner and wallet.

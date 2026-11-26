@@ -123,7 +123,11 @@ try {
   const brakeUnlockClampedD2 = ctrl.parkLocked === false && ctrl.gear === 2 && ctrl.telemetry().gearLabel === 'D2'
 
   ctrl.setVehicleType('shared')
-  const sharedResetsModel = ctrl.vehicleType === 'shared' && ctrl.profile.allowUpgrades === false && ctrl.profile.tierMaxKmh <= 40
+  const sharedResetsModel =
+    ctrl.vehicleType === 'shared' &&
+    ctrl.profile.allowUpgrades === false &&
+    ctrl.profile.allowWheelie === false &&
+    ctrl.profile.tierMaxKmh <= 18
 
   check(
     'P-gear unlock deterministic: Q stays P; E & brake clamp D3/S->D2 & preserve D1; Digit4->S; shared isolates model',
@@ -223,12 +227,24 @@ try {
     `svcPrice=¥${svcPrice}`,
   )
 
-  // Shared ride fee non-negative fallback
-  save.resetSaveForTesting(2, mem)
-  const lowFee = commerce.chargeSharedRideFee('s1c_low_bal')
+  // Shared ride unlock v1 atomic fee: strictly reject < ¥2 (never negative, never free), deduct ¥2 once when >= ¥2
+  save.resetSaveForTesting(1, mem)
+  const deniedUnlock = commerce.unlockSharedEbike({sessionKey: 's1c_low_bal'})
+  const lowFee = commerce.chargeSharedRideFee('s1c_low_bal_legacy')
+  save.resetSaveForTesting(5, mem)
+  const paidUnlock = commerce.unlockSharedEbike({sessionKey: 's1c_paid_bal'})
+  const paidReplay = commerce.unlockSharedEbike({sessionKey: 's1c_paid_bal'})
   check(
-    'shared ride fee falls back free when balance < ¥3 (non-negative)',
-    lowFee.fallbackFree === true && lowFee.charged === 0 && state.getState().money === 2,
+    'shared ride v1 blocks < ¥2 strictly, atomically deducts ¥2 once when >= ¥2, and preserves idempotency',
+    !deniedUnlock.ok &&
+      deniedUnlock.code === 'INSUFFICIENT_FUNDS' &&
+      lowFee.fallbackFree === false &&
+      lowFee.charged === 0 &&
+      paidUnlock.ok &&
+      paidUnlock.charged === 2 &&
+      paidReplay.code === 'IDEMPOTENT_REPLAY' &&
+      paidReplay.charged === 0 &&
+      state.getState().money === 3,
   )
 
   // 4. Static redline & hygiene checks

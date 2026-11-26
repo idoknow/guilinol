@@ -224,6 +224,7 @@ function readJsonBody(req: IncomingMessage): Promise<Record<string, unknown>> {
 
 function cacheHeaderFor(relPath: string): string {
   if (relPath.startsWith('assets/')) return 'public, max-age=31536000, immutable'
+  if (relPath === 'version.json' || relPath.endsWith('.html')) return 'no-store'
   return 'no-cache'
 }
 
@@ -374,6 +375,23 @@ export async function startPreviewServer(opts: PreviewServerOptions = {}): Promi
         }
         if (pathname === '/api/feedback' && method === 'GET') {
           return sendJson(res, 200, {items: []})
+        }
+        if (pathname === '/api/gfx' && method === 'GET') {
+          return sendJson(res, 200, null)
+        }
+        if (pathname === '/api/updates/unseen' && method === 'GET') {
+          return sendJson(res, 200, [])
+        }
+        if (pathname.startsWith('/api/updates/') && pathname.endsWith('/seen') && method === 'POST') {
+          req.resume()
+          return sendJson(res, 200, {ok: true})
+        }
+        if (pathname === '/api/fishing/boards' && method === 'GET') {
+          return sendJson(res, 200, {zone: [], global: []})
+        }
+        if (pathname === '/api/fishing/catch' && method === 'POST') {
+          req.resume()
+          return sendJson(res, 200, {status: 'recorded'})
         }
         if (pathname === '/api/rt/ticket' && method === 'POST') {
           req.resume()

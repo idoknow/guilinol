@@ -204,18 +204,18 @@ export interface DrinksMountPolicyInput {
 }
 
 /**
- * Default-enabled in both Vite DEV and production builds so bare URLs mount 「蜜雪林城」 directly.
- * Pass `?drinks=0` (or `false` / `off` / `no`) to disable explicitly; `?drinks=1` / `?drinks=true` remain compatible.
+ * Opt-in gate: kept dormant by default in both Vite DEV and production builds unless `?drinks`
+ * is explicitly present in the URL query string (`?drinks`, `?drinks=1`, `?drinks=true`, etc.).
+ * Passing `?drinks=0` / `false` / `off` / `no` explicitly disables mounting.
  */
-export function shouldMountDrinksShop(input: DrinksMountPolicyInput): boolean {
-  const rawSearch = input.search ?? ''
+export function shouldMountDrinksShop(input: DrinksMountPolicyInput = {}): boolean {
+  const rawSearch = input?.search ?? ''
   const query = rawSearch.startsWith('?') ? rawSearch.slice(1) : rawSearch
   const params = new URLSearchParams(query)
   const flag = params.get('drinks')
-  if (flag !== null) {
-    const norm = flag.trim().toLowerCase()
-    if (norm === '0' || norm === 'false' || norm === 'off' || norm === 'no') return false
-    if (norm === '' || norm === '1' || norm === 'true' || norm === 'on' || norm === 'yes') return true
-  }
+  if (flag === null) return false
+  const norm = flag.trim().toLowerCase()
+  if (norm === '0' || norm === 'false' || norm === 'off' || norm === 'no') return false
+  if (norm === '' || norm === '1' || norm === 'true' || norm === 'on' || norm === 'yes') return true
   return true
 }

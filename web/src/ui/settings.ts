@@ -41,7 +41,7 @@ function build() {
         <p class="set-note" role="status" data-geo-status></p>
       </section>
       <section class="set-block"><h3>声音</h3>
-        <label class="set-row set-row--range"><span class="set-what"><b>总音量</b><small>骑车、鸣笛和路人念叨</small></span><input data-volume type="range" min="0" max="1" step="0.01"><span class="set-val" data-volume-out></span></label>
+        <label class="set-row set-row--range"><span class="set-what"><b>总音量</b><small>骑车和鸣笛</small></span><input data-volume type="range" min="0" max="1" step="0.01"><span class="set-val" data-volume-out></span></label>
         <label class="set-row"><span class="set-what"><b>静音</b><small>关闭全部游戏音效</small></span><input data-mute type="checkbox"></label>
       </section>
       <section class="set-block">

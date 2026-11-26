@@ -42,6 +42,7 @@ export interface AvatarRig {
   soleOffset: number
   footProbes: FootProbe[]
   clearPose(): void
+  batch?(hold:boolean): void
   syncPose(): void
 }
 
@@ -395,6 +396,7 @@ export function ensureAvatarRig(root: THREE.Group, tintHex: string | null = null
     }
   }
 
+  let batching=false
   function makeJointHandle(name: AvatarJointName): AvatarJointHandle {
     const arr = state[name]
     const rotation: AvatarJointRotation = {
@@ -407,7 +409,7 @@ export function ensureAvatarRig(root: THREE.Group, tintHex: string | null = null
       set(x: number, y: number, z: number) {
         arr[0] = x; arr[1] = y; arr[2] = z
         proceduralActive = true
-        applyBones()
+        if(!batching)applyBones()
       },
     }
     return {rotation}
@@ -458,6 +460,7 @@ export function ensureAvatarRig(root: THREE.Group, tintHex: string | null = null
     soleOffset,
     footProbes,
     clearPose: restoreRestPose,
+    batch(hold){batching=hold;if(!hold)applyBones()},
     syncPose: applyBones,
   }
   root.userData.avatarRig = rig

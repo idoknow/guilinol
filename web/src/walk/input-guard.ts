@@ -42,6 +42,8 @@ export function isModalOrOverlayOpen(doc: Document = document): boolean {
   if (doc.body.dataset.shopOpen === '1') return true
   if (doc.body.dataset.fishMenu === '1') return true
   if (doc.body.dataset.mifenStoryActive === '1') return true
+  if (doc.body.dataset.xxgActive === '1') return true
+  if (doc.body.dataset.szjActive === '1') return true
   if (doc.body.dataset.tdStoryActive === '1') return true
   if (doc.body.dataset.drinksUiOpen === '1') return true
   const delivering = isFineTerminalDelivering(doc)

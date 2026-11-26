@@ -5,6 +5,8 @@ import {prefs, setPrefs} from '../ui/prefs.ts'
 export type DutyAction = 'dutyWhistle' | 'dutyFlag' | 'dutyTicket'
 
 export type Action =
+  | 'punch'
+  | 'rescue'
   | 'forward'
   | 'back'
   | 'left'
@@ -38,6 +40,20 @@ export const DUTY_ACTION_IDS: readonly DutyAction[] = Object.freeze([
 ])
 
 export const ACTIONS: Definition[] = [
+  {
+    id: 'punch',
+    label: '出拳',
+    codes: ['Mouse0'],
+    scope: 'common',
+    hint: '步行时点击鼠标左键出拳；与执勤 Q / E / F 三键不冲突',
+  },
+  {
+    id: 'rescue',
+    label: '长按救援',
+    codes: ['KeyE'],
+    scope: 'common',
+    hint: '非执勤走路时按住 E 救援倒地同伴；执勤时 E 键归执勤挥旗（短按拦停 / 长按放行）使用',
+  },
   {id: 'forward', label: '前进', codes: ['KeyW', 'ArrowUp']},
   {id: 'back', label: '后退', codes: ['KeyS', 'ArrowDown']},
   {id: 'left', label: '左移', codes: ['KeyA', 'ArrowLeft']},
@@ -78,14 +94,29 @@ export const ACTIONS: Definition[] = [
 const BY_ID = new Map(ACTIONS.map(entry => [entry.id, entry]))
 
 const NAMES: Record<string, string> = {
-  Space: '空格', ShiftLeft: 'Shift', ShiftRight: 'Shift', ControlLeft: 'Ctrl', ControlRight: 'Ctrl',
+  Mouse0:'鼠标左键', Space: '空格', ShiftLeft: 'Shift', ShiftRight: 'Shift', ControlLeft: 'Ctrl', ControlRight: 'Ctrl',
   ArrowUp: '↑', ArrowDown: '↓', ArrowLeft: '←', ArrowRight: '→', Enter: '回车', Tab: 'Tab',
   Backquote: '`', Minus: '-', Equal: '=', BracketLeft: '[', BracketRight: ']', Backslash: '\\',
   Semicolon: ';', Quote: "'", Comma: ',', Period: '.', Slash: '/',
 }
 
+export function actionScope(action: Action): ActionScope {
+  return BY_ID.get(action)?.scope ?? 'common'
+}
+
 export function isDutyAction(action: Action): action is DutyAction {
-  return BY_ID.get(action)?.scope === 'duty'
+  return actionScope(action) === 'duty'
+}
+
+/** 当前是否处于辅警执勤作用域（由 `controller.ts` / `walk/index.ts` 同步到 `document.body.dataset`）。 */
+export function isDutyScopeActive(): boolean {
+  if (typeof document === 'undefined') return false
+  const ds = document.body?.dataset
+  return ds?.duty === 'active' || ds?.tdDutyActive === '1'
+}
+
+export function activeActionScope(): ActionScope {
+  return isDutyScopeActive() ? 'duty' : 'common'
 }
 
 /** 这个动作当前绑的键列表（自定义优先，其次默认）。 */
@@ -94,21 +125,53 @@ export function binding(action: Action): string[] {
   return custom?.length ? [...custom] : [...BY_ID.get(action)!.codes]
 }
 
-/** 物理按键 → 该动作的默认 code。没被任何动作占用就原样返回。 */
-export function canonical(code: string): string {
+/** 物理按键 → 该动作的默认 code（按当前作用域优先）。没被任何动作占用就原样返回。 */
+export function canonical(code: string, scope?: ActionScope): string {
+  const active = scope ?? activeActionScope()
+  const primaryDuty = active === 'duty'
   for (const action of ACTIONS) {
-    if (action.scope === 'duty') continue
+    if ((action.scope === 'duty') !== primaryDuty) continue
     if (binding(action.id).includes(code)) return action.codes[0]
   }
   for (const action of ACTIONS) {
-    if (action.scope !== 'duty') continue
+    if ((action.scope === 'duty') === primaryDuty) continue
     if (binding(action.id).includes(code)) return action.codes[0]
   }
   return code
 }
 
-/** 这一下按键是不是在做某个动作（含改键后）。只认当前绑定，旧键不会误触发。 */
-export function hits(code: string, action: Action): boolean {
+/** 检测指定作用域内是否存在同一物理键绑定到多个动作的冲突。 */
+export function findScopeKeyConflicts(scope: ActionScope): Array<{code: string; actions: Action[]}> {
+  const byCode = new Map<string, Action[]>()
+  for (const def of ACTIONS) {
+    if ((def.scope ?? 'common') !== scope) continue
+    for (const code of binding(def.id)) {
+      const list = byCode.get(code)
+      if (list) list.push(def.id)
+      else byCode.set(code, [def.id])
+    }
+  }
+  const conflicts: Array<{code: string; actions: Action[]}> = []
+  for (const [code, actions] of byCode.entries()) {
+    if (actions.length > 1) conflicts.push({code, actions})
+  }
+  return conflicts
+}
+
+/**
+ * 这一下按键是不是在做某个动作（含改键后与作用域隔离）。只认当前绑定，旧键不会误触发。
+ * - `scope === 'duty'`（或执勤态激活）时，`dutyWhistle` / `dutyFlag` 绑定的物理键（默认 Q / E）优先归执勤独占，
+ *   阻止 `rescue` 等普通动作吞掉执勤挥旗/吹哨；`interact`（默认 F）与 `dutyTicket` 共用统一交互仲裁器保持可用。
+ * - `scope === 'common'`（非执勤走路态）时，`rescue`（长按 E）、`punch`（Mouse0）与 `interact`（F）照常可用。
+ */
+export function hits(code: string, action: Action, scope?: ActionScope): boolean {
+  if (scope === 'common' && isDutyAction(action)) return false
+  const resolvedScope = scope ?? (isDutyScopeActive() ? 'duty' : undefined)
+  if (resolvedScope === 'duty' && !isDutyAction(action) && action !== 'interact') {
+    if (binding('dutyWhistle').includes(code) || binding('dutyFlag').includes(code)) {
+      return false
+    }
+  }
   return binding(action).includes(code)
 }
 
@@ -119,11 +182,13 @@ const RESERVED: Record<string, string> = {
   Digit0: '骑行', Digit1: '骑行', Digit2: '骑行', Digit3: '骑行', Digit4: '骑行',
 }
 
-/** 这个键被固定功能占用时返回该功能名，可以绑就返回 undefined。执勤专属动作允许绑回 Q / E。 */
+/** 这个键被固定功能占用时返回该功能名，可以绑就返回 undefined。执勤动作允许 Q/E/F，救援/表情允许绑回默认键。 */
 export function reservedFor(code: string, forAction?: Action): string | undefined {
   if (forAction && isDutyAction(forAction) && (code === 'KeyQ' || code === 'KeyE' || code === 'KeyF')) {
     return undefined
   }
+  if (forAction === 'rescue' && code === 'KeyE') return undefined
+  if (forAction === 'emote' && code === 'KeyG') return undefined
   return RESERVED[code]
 }
 

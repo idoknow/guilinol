@@ -575,7 +575,7 @@ try {
     assert.equal(p4Quiet.priority, 5)
     assert.equal(p4Quiet.action, 'mount_vehicle')
 
-    // Priority 5: Personal bike displays '骑我的电摩', roadside bike keeps legacy '骑电动车'
+    // Priority 5: Personal bike displays '骑我的电摩'; Solo shared bike shows unlock fee '解锁共享电动车（¥2）' (or '继续骑共享电车' once unlocked); Tour mode keeps '骑电动车'
     const p5Personal = arbiter.resolveInteraction({
       ...base,
       nearShop: null,
@@ -584,9 +584,20 @@ try {
     assert.equal(p5Personal.priority, 5)
     assert.equal(p5Personal.label, '骑我的电摩')
 
-    const p5Shared = arbiter.resolveInteraction({...base, nearShop: null})
-    assert.equal(p5Shared.priority, 5)
-    assert.equal(p5Shared.label, '骑电动车')
+    const p5SharedSolo = arbiter.resolveInteraction({...base, nearShop: null})
+    assert.equal(p5SharedSolo.priority, 5)
+    assert.equal(p5SharedSolo.label, '解锁共享电动车（¥2）')
+
+    const p5SharedUnlocked = arbiter.resolveInteraction({
+      ...base,
+      nearShop: null,
+      nearVehicle: {kind: 'bike', downed: false, distance: 2.0, ownership: 'shared', ebikeTier: 'shared', alreadyUnlocked: true},
+    })
+    assert.equal(p5SharedUnlocked.label, '继续骑共享电车')
+
+    const p5SharedTour = arbiter.resolveInteraction({...base, soloEnabled: false, nearShop: null})
+    assert.equal(p5SharedTour.priority, 5)
+    assert.equal(p5SharedTour.label, '骑电动车')
 
     // Priority 6: Water dock fallback
     const p6 = arbiter.resolveInteraction({...base, nearShop: null, nearVehicle: null})

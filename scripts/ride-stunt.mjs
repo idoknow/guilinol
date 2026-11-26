@@ -67,15 +67,21 @@ async function waitWalkReady(page, extraCheck = null) {
   if (extraCheck) await page.waitForFunction(extraCheck, null, {timeout: 90000})
 }
 
-async function walkNearBike(page, tx, tz, reason = 'stunt-bike') {
-  const picked = await page.evaluate(async ([x, z, r]) => {
+async function walkNearBike(page, tx, tz, reason = 'stunt-bike', normalOnly = false) {
+  const picked = await page.evaluate(async ([x, z, r, onlyNormal]) => {
     const {walk} = window.viewer
-    const target = walk.parked('bike').slice().sort((a, b) => Math.hypot(a[0] - x, a[2] - z) - Math.hypot(b[0] - x, b[2] - z))[0]
-    if (!target) return null
-    await window.viewer.walkTo(target[0], target[2], 0, r)
-    for (let i = 0; i < 6; i++) walk.tick(1 / 60)
-    return target
-  }, [tx, tz, reason])
+    const candidates = walk.parked('bike').slice().sort((a, b) => Math.hypot(a[0] - x, a[2] - z) - Math.hypot(b[0] - x, b[2] - z))
+    const limit = onlyNormal ? Math.min(6, candidates.length) : Math.min(1, candidates.length)
+    for (let i = 0; i < limit; i++) {
+      const target = candidates[i]
+      await window.viewer.walkTo(target[0], target[2], 0, r)
+      for (let t = 0; t < 6; t++) walk.tick(1 / 60)
+      if (!onlyNormal || walk.shop?.getInteractDecision?.()?.ebikeTier === 'normal') {
+        return target
+      }
+    }
+    return candidates[0] ?? null
+  }, [tx, tz, reason, normalOnly])
   assert(picked, `no parked bike found near ${tx},${tz}`)
   return picked
 }
@@ -319,10 +325,10 @@ try {
     await interactF(page, '下车')
     await page.waitForFunction(() => window.viewer.walk.vehicle === 'foot')
 
-    // 2B. Shared e-bike at (-389.6, -49.4) (paint=1 -> shared): modsLocked, S <= 40 km/h
+    // 2B. Shared e-bike at (-389.6, -49.4) (snaps onto sidewalk z=-53.4; paint=1 -> shared): modsLocked, wheelieDisabled, S <= 18 km/h
     const sharedBikeCoord = await page.evaluate(async () => {
       const {walk} = window.viewer
-      const shared = walk.parked('bike').find(b => Math.hypot(b[0] + 389.6, b[2] + 49.4) < 3)
+      const shared = walk.parked('bike').find(b => Math.abs(b[0] + 389.6) < 0.8 && Math.hypot(b[0] + 389.6, b[2] + 49.4) < 6)
       if (!shared) return null
       await window.viewer.walkTo(shared[0], shared[2], 0, 'stunt-shared')
       for (let i = 0; i < 6; i++) walk.tick(1 / 60)
@@ -346,35 +352,40 @@ try {
     assert.equal(sharedMount.typeText, '共享')
     assert.equal(sharedMount.modDisplay, 'none')
     assert.equal(sharedMount.eb.modPreset, 'stock', 'shared bike must reject G mod change')
-    assert(sharedMount.eb.maxKmh <= 25, 'shared bike must mount at <= 25 km/h')
+    assert(sharedMount.eb.maxKmh <= 18, 'shared bike must mount at <= 18 km/h')
     await unlockAndShift(page, 4)
     const sharedPeak = await page.evaluate(() => {
       const {walk} = window.viewer
       const target = [-463, -54]
       window.dispatchEvent(new KeyboardEvent('keydown', {code: 'KeyW'}))
+      window.dispatchEvent(new KeyboardEvent('keydown', {code: 'Space'}))
       let peak = 0
-      for (let i = 0; i < 160; i++) {
+      let peakWheelie = 0
+      for (let i = 0; i < 380; i++) {
         const dx = target[0] - walk.position.x, dz = target[1] - walk.position.z
         const err = Math.atan2(Math.sin(Math.atan2(-dx, -dz) - walk.heading), Math.cos(Math.atan2(-dx, -dz) - walk.heading))
         window.dispatchEvent(new KeyboardEvent(err > .04 ? 'keydown' : 'keyup', {code: 'KeyA'}))
         window.dispatchEvent(new KeyboardEvent(err < -.04 ? 'keydown' : 'keyup', {code: 'KeyD'}))
         walk.tick(1 / 60)
         peak = Math.max(peak, walk.speed * 3.6)
+        peakWheelie = Math.max(peakWheelie, Math.abs(walk.probe().ebike?.wheelie ?? 0))
       }
+      window.dispatchEvent(new KeyboardEvent('keyup', {code: 'Space'}))
       window.dispatchEvent(new KeyboardEvent('keyup', {code: 'KeyA'}))
       window.dispatchEvent(new KeyboardEvent('keyup', {code: 'KeyD'}))
       window.dispatchEvent(new KeyboardEvent('keyup', {code: 'KeyW'}))
       for (let i = 0; i < 30; i++) walk.tick(1 / 60)
-      return {peak, maxKmh: walk.probe().ebike.maxKmh}
+      return {peak, peakWheelie, maxKmh: walk.probe().ebike.maxKmh}
     })
-    assert.equal(sharedPeak.maxKmh, 40)
-    assert(sharedPeak.peak >= 36 && sharedPeak.peak <= 40.2, `shared peak unexpected: ${JSON.stringify(sharedPeak)}`)
+    assert.equal(sharedPeak.maxKmh, 18)
+    assert(sharedPeak.peak >= 14 && sharedPeak.peak <= 18.2, `shared peak unexpected: ${JSON.stringify(sharedPeak)}`)
+    assert.equal(sharedPeak.peakWheelie, 0, `shared bike must prohibit wheelies: ${JSON.stringify(sharedPeak)}`)
     metrics.sharedPeakKmh = +sharedPeak.peak.toFixed(1)
     await interactF(page, '下车')
     await page.waitForFunction(() => window.viewer.walk.vehicle === 'foot')
 
     // 2C. Straight wheelie hold + smooth landing + wheelie tip-over + normal turn + lowside + slow curb + Path 2 reset
-    await walkNearBike(page, -874.2, -134.4, 'stunt-zhongshan')
+    await walkNearBike(page, -874.2, -134.4, 'stunt-zhongshan', true)
     await interactF(page, '骑电动车')
     await page.waitForFunction(() => window.viewer.walk.vehicle === 'bike')
     await unlockAndShift(page, 3)
@@ -924,7 +935,7 @@ try {
     // Dismiss rotate-screen gate on portrait mobile if rendered
     await mp.evaluate(() => document.querySelector('.portrait-gate button')?.click())
 
-    await walkNearBike(mp, -393.6, -50.7, `stunt-mob-${label}`)
+    await walkNearBike(mp, -393.6, -50.7, `stunt-mob-${label}`, true)
     await closeCard(mp)
     await mp.waitForFunction(() => document.querySelector('.vehicle-action:not([hidden])')?.textContent?.includes('骑电动车'))
 

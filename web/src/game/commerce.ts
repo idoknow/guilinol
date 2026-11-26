@@ -743,8 +743,8 @@ export function recordSpotFound(spotId: string): boolean {
 // ---- Stage 1B mission payout, spot bounty & shared e-bike fare helpers (IDOK-123) ----
 
 export const SPOT_BOUNTY_YUAN = 120
-export const SHARED_EBIKE_FEE_YUAN = 3
-export const SHARED_EBIKE_FREE_SECONDS = 120
+export const SHARED_EBIKE_FEE_YUAN = 2
+export const SHARED_EBIKE_FREE_SECONDS = 0
 
 export interface MissionPayoutShape {
   id: string
@@ -823,20 +823,99 @@ export function settleMissionReward(params: {
   return {...res, isFirstClear}
 }
 
-export function chargeSharedRideFee(sessionKey: string): {charged: number; balanceAfter: number; fallbackFree: boolean} {
+const sharedUnlockInFlight = new Set<string>()
+
+export interface SharedEbikeUnlockResult {
+  ok: boolean
+  code: 'OK' | 'IDEMPOTENT_REPLAY' | 'INSUFFICIENT_FUNDS' | 'FAILED'
+  charged: number
+  balanceAfter: number
+  feeYuan: number
+  deficitYuan: number
+  message: string
+}
+
+/**
+ * Atomically deducts the shared e-bike unlock fee (default ¥2) before boarding.
+ * Strictly blocks riding when wallet balance is insufficient (never free, never negative).
+ */
+export function unlockSharedEbike(req: {sessionKey: string; feeYuan?: number}): SharedEbikeUnlockResult {
+  const rawFee = typeof req.feeYuan === 'number' && Number.isFinite(req.feeYuan) ? req.feeYuan : SHARED_EBIKE_FEE_YUAN
+  const feeYuan = Math.max(1, Math.round(rawFee))
+  const key = `shared_ride:${req.sessionKey}`
   const snap = getActiveSaveSnapshot()
-  const key = `shared_ride:${sessionKey}`
   if (findIdempotentTx(snap, key)) {
-    return {charged: 0, balanceAfter: snap.money, fallbackFree: false}
+    return {
+      ok: true,
+      code: 'IDEMPOTENT_REPLAY',
+      charged: 0,
+      balanceAfter: snap.money,
+      feeYuan,
+      deficitYuan: 0,
+      message: '',
+    }
   }
-  if (snap.money < SHARED_EBIKE_FEE_YUAN) {
-    return {charged: 0, balanceAfter: snap.money, fallbackFree: true}
+  if (sharedUnlockInFlight.has(key)) {
+    return {
+      ok: false,
+      code: 'FAILED',
+      charged: 0,
+      balanceAfter: snap.money,
+      feeYuan,
+      deficitYuan: 0,
+      message: '正在解锁共享电动车，请稍候',
+    }
   }
-  const res = applyFine({amount: SHARED_EBIKE_FEE_YUAN, reason: 'shared_ebike_ride', idempotencyKey: key})
-  if (!res.ok) {
-    return {charged: 0, balanceAfter: snap.money, fallbackFree: true}
+  if (snap.money < feeYuan) {
+    return {
+      ok: false,
+      code: 'INSUFFICIENT_FUNDS',
+      charged: 0,
+      balanceAfter: snap.money,
+      feeYuan,
+      deficitYuan: feeYuan - snap.money,
+      message: `余额不足（需 ¥${feeYuan}），去送米粉/跑腿赚钱或步行吧`,
+    }
   }
-  return {charged: res.charged, balanceAfter: res.balanceAfter, fallbackFree: false}
+
+  sharedUnlockInFlight.add(key)
+  try {
+    const res = applyFine({amount: feeYuan, reason: 'shared_ebike_ride', idempotencyKey: key})
+    if (!res.ok || res.charged < feeYuan) {
+      const insufficient = res.balanceAfter < feeYuan
+      return {
+        ok: false,
+        code: insufficient ? 'INSUFFICIENT_FUNDS' : 'FAILED',
+        charged: 0,
+        balanceAfter: res.balanceAfter,
+        feeYuan,
+        deficitYuan: Math.max(0, feeYuan - res.balanceAfter),
+        message: insufficient
+          ? `余额不足（需 ¥${feeYuan}），去送米粉/跑腿赚钱或步行吧`
+          : '共享电动车解锁失败，请稍后重试',
+      }
+    }
+    return {
+      ok: true,
+      code: 'OK',
+      charged: res.charged,
+      balanceAfter: res.balanceAfter,
+      feeYuan,
+      deficitYuan: 0,
+      message: '',
+    }
+  } finally {
+    sharedUnlockInFlight.delete(key)
+  }
+}
+
+export function chargeSharedRideFee(sessionKey: string): {charged: number; balanceAfter: number; fallbackFree: boolean} {
+  const res = unlockSharedEbike({sessionKey, feeYuan: SHARED_EBIKE_FEE_YUAN})
+  return {
+    charged: res.charged,
+    balanceAfter: res.balanceAfter,
+    fallbackFree: false,
+  }
 }
 
 export function getActiveDeliverySoupSpillMultiplier(): number {
