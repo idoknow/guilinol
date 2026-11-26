@@ -1427,9 +1427,14 @@ export function createBikeControl() {
       steerInput = T.MathUtils.damp(steerInput, uTurn, s.steerDamp, cdt)
       tucking = !!control?.tuck && Math.abs(speed) > 1.8
 
-      const reqWheelie = typeof control?.wheelie === 'number'
-        ? T.MathUtils.clamp(control.wheelie, 0, 1)
-        : control?.wheelie ? 1 : 0
+      const canWheelie = kind === 'bicycle' || (profile.vehicleType !== 'shared' && profile.allowWheelie !== false)
+      const reqWheelie = canWheelie
+        ? typeof control?.wheelie === 'number'
+          ? T.MathUtils.clamp(control.wheelie, 0, 1)
+          : control?.wheelie
+            ? 1
+            : 0
+        : 0
       wheelieLoad = reqWheelie
 
       const uphillSin = Math.sin(pitch)
@@ -1506,7 +1511,10 @@ export function createBikeControl() {
             : -(9.8 * downhillFactor * .35)
           const drag = s.rollDrag + s.aeroDrag * speed * speed + gravityDelta
           speed = Math.max(0, speed - drag * cdt)
-          const coastCap = kind === 'bike' && isVerifySilentMode() && gSpec.maxKmh <= EBIKE_COMPLIANT_CAP_KMH ? effMax : effMax * 1.12
+          const coastCap =
+            kind === 'bike' && ((isVerifySilentMode() && gSpec.maxKmh <= EBIKE_COMPLIANT_CAP_KMH) || profile.vehicleType === 'shared')
+              ? effMax
+              : effMax * 1.12
           if (downhillFactor > 0 && speed > coastCap) speed = coastCap
         } else if (speed < 0) {
           speed = Math.min(0, speed + (s.rollDrag * 2.2 + s.aeroDrag * speed * speed) * cdt)
@@ -1519,7 +1527,6 @@ export function createBikeControl() {
 
       // Active wheelie pitch physics driven by throttle torque + gear wheelie gain.
       // Shared commuter e-bikes prohibit wheelies regardless of speed or throttle input.
-      const canWheelie = kind === 'bicycle' || (profile.vehicleType !== 'shared' && profile.allowWheelie !== false)
       const torqueBias = canWheelie ? gSpec.wheelieGain * (kind === 'bike' ? profile.wheelieTorqueMul : 1) : 0
       if (canWheelie && wheelieLoad > .05 && speed >= s.crash.wheelieMinSpeedMs && !braking) {
         const speedEase = T.MathUtils.clamp(speed / 3.8, .48, 1.25)

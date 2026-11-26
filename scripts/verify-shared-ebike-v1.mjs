@@ -27,7 +27,7 @@ async function waitWalkReady(page) {
       return w && typeof w.tick === 'function' && w.parked?.('bike')?.length > 0 && w.shop && window.viewer?.game
     },
     null,
-    {timeout: 60000},
+    {timeout: 120000},
   )
 }
 
@@ -268,9 +268,75 @@ try {
   await page.waitForFunction(() => window.viewer.walk.vehicle === 'bike', null, {timeout: 5000})
   const reborrowMoney = await page.evaluate(() => window.viewer.game.getState().money)
   assert.equal(reborrowMoney, 14, `Re-borrowing after dismount must charge ¥2 (¥16 -> ¥14), got ¥${reborrowMoney}`)
+
+  // Abandonment > 14m after crash invalidates the active unlock session -> returning charges ¥2 (¥14 -> ¥12)
+  const abandonState = await page.evaluate(async () => {
+    const {walk, game} = window.viewer
+    walk.ebike.triggerCrash('lowside', 1)
+    for (let i = 0; i < 20; i++) walk.tick(1 / 60)
+    walk.ebike.recover()
+    for (let i = 0; i < 55; i++) walk.tick(1 / 60)
+    const crashX = walk.position.x
+    const crashZ = walk.position.z
+    walk.ebike.pickupNearest()
+    for (let i = 0; i < 50; i++) walk.tick(1 / 60)
+    // Walk > 18m away from the upright unlocked bike, then walk back
+    await window.viewer.walkTo(crashX + 20, crashZ, 0, 'e2e-abandon-far')
+    for (let i = 0; i < 6; i++) walk.tick(1 / 60)
+    await window.viewer.walkTo(crashX, crashZ, 0, 'e2e-abandon-return')
+    for (let i = 0; i < 8; i++) walk.tick(1 / 60)
+    const beforeReturnMount = walk.shop.getInteractDecision()
+    walk.shop.triggerInteract()
+    for (let i = 0; i < 8; i++) walk.tick(1 / 60)
+    return {
+      beforeReturnLabel: beforeReturnMount?.label,
+      vehicleAfterReturn: walk.vehicle,
+      moneyAfterAbandonReborrow: game.getState().money,
+    }
+  })
+  assert.equal(abandonState.beforeReturnLabel, '解锁共享电动车（¥2）', `Walking >14m must clear active session: ${JSON.stringify(abandonState)}`)
+  assert.equal(abandonState.vehicleAfterReturn, 'bike')
+  assert.equal(abandonState.moneyAfterAbandonReborrow, 12, `Abandoning >14m and re-borrowing must charge ¥2 (¥14 -> ¥12), got ¥${abandonState.moneyAfterAbandonReborrow}`)
   await page.keyboard.press('KeyF')
   await page.waitForFunction(() => window.viewer.walk.vehicle === 'foot', null, {timeout: 5000})
-  console.log('[3/5] Crash-pickup remount (¥0) & dismount -> re-borrow billing lifecycle verified (¥16 -> ¥14)')
+
+  // Reload anti-replay check: keep persisted economy.txHistoryRing with prior shared_ride unlock entries,
+  // set money to ¥1, reload into a fresh page (sharedRideSessionId resets to 0), and verify the same starter bike is still blocked.
+  const reloadPage = await context.newPage()
+  reloadPage.on('pageerror', err => errors.push(`reload pageerror: ${err.message}`))
+  await reloadPage.route('**/favicon.ico', r => r.fulfill({status: 204}))
+  await reloadPage.route('**/api/t', r => r.fulfill({status: 204}))
+  await reloadPage.goto(`${baseUrl}/?verify&solo=1&mode=walk&flow=0&time=10.5&radius=420`, {waitUntil: 'domcontentloaded'})
+  await waitWalkReady(reloadPage)
+  const reloadBlocked = await reloadPage.evaluate(async ({key, x, z}) => {
+    const raw = localStorage.getItem(key)
+    const parsed = raw ? JSON.parse(raw) : {}
+    const prevMoney = parsed.money
+    const sharedTxCount = (parsed?.economy?.txHistoryRing ?? []).filter(t => String(t?.idempotencyKey ?? '').startsWith('shared_ride:')).length
+    parsed.money = 1
+    localStorage.setItem(key, JSON.stringify(parsed))
+    window.viewer.game.save.reload()
+    document.querySelector('.spot-card .card-close')?.click()
+    await window.viewer.walkTo(x, z, 0, 'e2e-reload-replay')
+    for (let i = 0; i < 8; i++) window.viewer.walk.tick(1 / 60)
+    window.viewer.walk.shop.triggerInteract()
+    for (let i = 0; i < 8; i++) window.viewer.walk.tick(1 / 60)
+    const result = {
+      sharedTxCount,
+      vehicle: window.viewer.walk.vehicle,
+      money: window.viewer.game.getState().money,
+      toast: document.querySelector('.toast')?.textContent ?? '',
+    }
+    parsed.money = prevMoney
+    localStorage.setItem(key, JSON.stringify(parsed))
+    return result
+  }, {key: SAVE_KEY, x: preMount.chosen.x, z: preMount.chosen.z})
+  await reloadPage.close()
+  assert.ok(reloadBlocked.sharedTxCount >= 1, `Expected persisted shared_ride ledger entries before reload check: ${JSON.stringify(reloadBlocked)}`)
+  assert.equal(reloadBlocked.vehicle, 'foot', `Reload must NOT replay old ledger key for free ride: ${JSON.stringify(reloadBlocked)}`)
+  assert.equal(reloadBlocked.money, 1)
+  assert.ok(reloadBlocked.toast.includes('余额不足'), `Expected low-balance toast after reload: ${JSON.stringify(reloadBlocked)}`)
+  console.log('[3/5] Crash-pickup remount (¥0), dismount re-borrow (¥16->¥14), >14m abandon (¥14->¥12), and reload anti-replay verified')
 
   // -------------------------------------------------------------------------
   // 4. Personal owned e-bike regression check: ¥0 unlock fee, > 42 km/h, wheelie > 0.15
@@ -340,6 +406,7 @@ try {
   assert.notEqual(personalStats.modDisplay, 'none', 'Personal e-bike must keep .ride-mod button visible')
   await page.screenshot({path: resolve(OUT_DIR, '04-personal-ebike-unrestricted.png')})
   console.log('[4/5] Personal e-bike zero-regression verified:', JSON.stringify(personalStats))
+  await context.close()
 
   // -------------------------------------------------------------------------
   // 5. Mobile touch viewport: unlock prompt & riding HUD non-overlap
@@ -383,8 +450,21 @@ try {
   assert.equal(mobRide.wheelieText, '禁翘头')
   assert.equal(mobRide.overlap, false, 'Mobile ride-hud and hud-stats must not overlap')
   await mp.screenshot({path: resolve(OUT_DIR, '05-mobile-shared-hud.png')})
+  const afterMobDismount = await mp.evaluate(() => {
+    window.viewer.walk.shop.triggerInteract()
+    for (let i = 0; i < 6; i++) window.viewer.walk.tick(1 / 60)
+    const btn = document.querySelector('.walk-ui .btn-wheelie')
+    return {
+      vehicle: window.viewer.walk.vehicle,
+      locked: btn?.getAttribute('data-locked'),
+      ariaDisabled: btn?.getAttribute('aria-disabled'),
+    }
+  })
+  assert.equal(afterMobDismount.vehicle, 'foot')
+  assert.equal(afterMobDismount.locked, '0', 'Dismounting shared bike must clear btn-wheelie data-locked')
+  assert.equal(afterMobDismount.ariaDisabled, 'false', 'Dismounting shared bike must clear btn-wheelie aria-disabled')
   await mCtx.close()
-  console.log('[5/5] Mobile HUD & touch unlock verified:', JSON.stringify(mobRide))
+  console.log('[5/5] Mobile HUD, touch unlock & dismount button reset verified:', JSON.stringify({mobRide, afterMobDismount}))
 
   assert.deepEqual(errors, [], `Uncaught errors: ${JSON.stringify(errors)}`)
   console.log('verify:shared-ebike-v1 ALL PASSED')

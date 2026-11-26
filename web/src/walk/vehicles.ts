@@ -217,6 +217,7 @@ export async function vehicles(
   let activePersonalMesh: T.Mesh | null = null
   let activeTestRideMesh: T.Mesh | null = null
   let sharedRideSessionId = 0
+  const sharedUnlockBootNonce = `${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`
   type UnlockedSharedSession = {
     sessionKey: string
     bikeId: string
@@ -807,7 +808,7 @@ export async function vehicles(
         unlockSessionKey = activeUnlockedShared.sessionKey
       } else {
         nextSessionSeq = sharedRideSessionId + 1
-        unlockSessionKey = `shared_unlock_${nextSessionSeq}_${unlockBikeId}`
+        unlockSessionKey = `shared_unlock_${sharedUnlockBootNonce}_${nextSessionSeq}_${unlockBikeId}`
       }
       unlockDecision = requestSharedEbikeUnlock(
         {
@@ -864,7 +865,10 @@ export async function vehicles(
       envHour: skyEnv.hour,
     })
     if (rideKind === 'bike' && ownership === 'shared') {
-      if (!wasAlreadyUnlocked) sharedRideSessionId = nextSessionSeq
+      if (!wasAlreadyUnlocked) {
+        clearUnlockedSharedSession()
+        sharedRideSessionId = nextSessionSeq
+      }
       bike.userData.sharedUnlockSession = unlockSessionKey
       activeUnlockedShared = {
         sessionKey: unlockSessionKey,
@@ -1436,6 +1440,10 @@ export async function vehicles(
     nearby,
     advance,
     interact,
+    dismount() {
+      reset()
+      syncHud()
+    },
     getInteractSnapshot,
     actionButton: button,
     setExternalArbiter(on: boolean) {

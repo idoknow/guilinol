@@ -136,6 +136,36 @@ check(
   `launch2s shared=${sharedLaunch2s.toFixed(1)} gt=${gtLaunch2s.toFixed(1)} uphill=${sharedUphillKmh.toFixed(1)} gtPeak=${gtPeak.toFixed(1)} gtWheelie=${gtWheeliePeak.toFixed(2)}`,
 )
 
+// Downhill coasting clamp & zero extra battery drain for disabled wheelie input on shared e-bikes
+const sharedCoast = createBikeControl()
+sharedCoast.mount(0, 0, 'bike', {vehicleType: 'shared', drainEnabled: false, parkStart: false, autoCrash: false})
+unlockP(sharedCoast)
+sharedCoast.setGear(4)
+for (let i = 0; i < 120; i++) sharedCoast.steer(1, 0, 0.05, true)
+let sharedDownhillPeak = 0
+for (let i = 0; i < 120; i++) {
+  sharedCoast.setPitch(0, 0.35, 0.05)
+  sharedCoast.steer(0, 0, 0.05, true)
+  sharedDownhillPeak = Math.max(sharedDownhillPeak, sharedCoast.speed * 3.6)
+}
+const sharedDrainBase = createBikeControl()
+sharedDrainBase.mount(0, 0, 'bike', {vehicleType: 'shared', drainEnabled: true, parkStart: false, autoCrash: false})
+unlockP(sharedDrainBase)
+sharedDrainBase.setGear(3)
+const sharedDrainWheelie = createBikeControl()
+sharedDrainWheelie.mount(0, 0, 'bike', {vehicleType: 'shared', drainEnabled: true, parkStart: false, autoCrash: false})
+unlockP(sharedDrainWheelie)
+sharedDrainWheelie.setGear(3)
+for (let i = 0; i < 80; i++) {
+  sharedDrainBase.steer(1, 0, 0.05, true, {wheelie: 0})
+  sharedDrainWheelie.steer(1, 0, 0.05, true, {wheelie: 1})
+}
+check(
+  'shared bike clamps downhill coasting <= 18.2 km/h & holding wheelie adds 0 battery drain',
+  sharedDownhillPeak <= 18.2 && Math.abs(sharedDrainBase.batteryPct - sharedDrainWheelie.batteryPct) < 1e-6,
+  `downhillPeak=${sharedDownhillPeak.toFixed(2)} batBase=${sharedDrainBase.batteryPct.toFixed(3)} batWheelie=${sharedDrainWheelie.batteryPct.toFixed(3)}`,
+)
+
 // ---------------------------------------------------------------------------
 // 3. Atomic ¥2 unlock, strict < ¥2 blocking, anti-double-charge & v2 hooks
 // ---------------------------------------------------------------------------

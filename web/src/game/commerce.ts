@@ -840,7 +840,8 @@ export interface SharedEbikeUnlockResult {
  * Strictly blocks riding when wallet balance is insufficient (never free, never negative).
  */
 export function unlockSharedEbike(req: {sessionKey: string; feeYuan?: number}): SharedEbikeUnlockResult {
-  const feeYuan = Math.max(1, Math.round(req.feeYuan ?? SHARED_EBIKE_FEE_YUAN))
+  const rawFee = typeof req.feeYuan === 'number' && Number.isFinite(req.feeYuan) ? req.feeYuan : SHARED_EBIKE_FEE_YUAN
+  const feeYuan = Math.max(1, Math.round(rawFee))
   const key = `shared_ride:${req.sessionKey}`
   const snap = getActiveSaveSnapshot()
   if (findIdempotentTx(snap, key)) {
@@ -881,19 +882,22 @@ export function unlockSharedEbike(req: {sessionKey: string; feeYuan?: number}): 
   try {
     const res = applyFine({amount: feeYuan, reason: 'shared_ebike_ride', idempotencyKey: key})
     if (!res.ok || res.charged < feeYuan) {
+      const insufficient = res.balanceAfter < feeYuan
       return {
         ok: false,
-        code: res.balanceAfter < feeYuan ? 'INSUFFICIENT_FUNDS' : 'FAILED',
+        code: insufficient ? 'INSUFFICIENT_FUNDS' : 'FAILED',
         charged: 0,
         balanceAfter: res.balanceAfter,
         feeYuan,
         deficitYuan: Math.max(0, feeYuan - res.balanceAfter),
-        message: `余额不足（需 ¥${feeYuan}），去送米粉/跑腿赚钱或步行吧`,
+        message: insufficient
+          ? `余额不足（需 ¥${feeYuan}），去送米粉/跑腿赚钱或步行吧`
+          : '共享电动车解锁失败，请稍后重试',
       }
     }
     return {
       ok: true,
-      code: res.charged === 0 ? 'IDEMPOTENT_REPLAY' : 'OK',
+      code: 'OK',
       charged: res.charged,
       balanceAfter: res.balanceAfter,
       feeYuan,

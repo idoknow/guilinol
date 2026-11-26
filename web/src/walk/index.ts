@@ -912,6 +912,10 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
     if(mode==='tour'){
       shopHintGroup.visible=false
       if(getGameState().garage.activeTestRide) finishActiveTestRide('mode_switch')
+    }else if(mode==='solo'&&rides?.bike&&rides.rideKind==='bike'&&rides.bikeOwnership==='shared'){
+      // Dismount any unpaid tour-mode roadside e-bike so switching Tour -> Solo cannot bypass ¥2 unlock & 18 km/h cap.
+      rides.interact()
+      if(rides.bike)rides.dismount()
     }
     syncShopOverlay()
   })

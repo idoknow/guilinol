@@ -412,6 +412,8 @@ const held=(action:Action)=>{let on=false;keys.forEach(code=>{if(!on&&hits(code,
       if(!state||(rideKind!=='bike'&&rideKind!=='bicycle')){
         stateEl.hidden=true
         delete document.body.dataset.rideCrash
+        btnWheelie.dataset.locked='0'
+        btnWheelie.setAttribute('aria-disabled','false')
         return
       }
       const bikeGearLabels=['D1','D2','D3','S']
@@ -554,6 +556,8 @@ const held=(action:Action)=>{let on=false;keys.forEach(code=>{if(!on&&hits(code,
       batFillEl.style.width=`${rpmPct}%`
       batPctEl.textContent=`${(state.rpm/1000).toFixed(1)}k`
       keysEl.textContent='Space手刹漂移 · 1-3/Q·E切模式'
+      btnWheelie.dataset.locked='0'
+      btnWheelie.setAttribute('aria-disabled','false')
       btnWheelie.textContent='手刹'
       btnWheelie.classList.toggle('on',state.handbrake)
       const slipDeg=Math.round(Math.abs(state.slipAngle)*180/Math.PI)
