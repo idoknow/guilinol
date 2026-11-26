@@ -15,10 +15,7 @@ cat dist/version.json
 ```sh
 npm ci
 uv sync --locked
-mkdir -p public/world
-cp -R "$MAIN_DIST/world/." public/world/
-uv run --locked python pipeline/traffic.py
-uv run --locked python pipeline/npc_network.py public/world
+npm run world
 npm run build
 cat dist/version.json
 mkdir -p captures/final

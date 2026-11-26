@@ -20,6 +20,7 @@ from play_region import PlayRegion
 from railway_layout import lines
 from road_profile import RULES
 from service_streets import width
+from vehicle_tunnels import profile_stations
 
 ROOT = Path(__file__).resolve().parents[1]
 BRANCH=678370321
@@ -178,7 +179,7 @@ def bake(world_dir, manifest, inventory, samples):
                     along=offset@direction
                     if 0<=along<=tunnel['length'] and abs(offset@[-direction[1],direction[0]])<=tunnel['halfWidth']:
                         surface_source='tunnel_profile'
-                        road=float(np.interp(along,*np.asarray(tunnel['stations']).T))
+                        road=float(np.interp(along,*np.asarray(profile_stations(tunnel)).T))
                 if road is None and row['roadTags']['highway'] in ('footway','cycleway','path','steps','pedestrian') and hit['sidewalk'] is not None:
                     road=hit['sidewalk']
                     surface_source='sidewalk'

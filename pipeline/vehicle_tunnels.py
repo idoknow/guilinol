@@ -18,6 +18,18 @@ def pack_stations(stations):
     return base64.b64encode(struct.pack(f'<{len(levels)}i', *levels)).decode('ascii')
 
 
+def profile_stations(tunnel):
+    if 'stations' in tunnel:
+        return tunnel['stations']
+    levels = [value for value, in struct.iter_unpack('<i', base64.b64decode(tunnel['knotHeights'], validate=True))]
+    step = tunnel['length'] / (len(levels)-1)
+    samples = [[math.floor(step*(index+phase)*1e5+.5)/1e5,
+                math.floor(start+(end-start)*blend+.5)/1e5]
+               for index, (start, end) in enumerate(zip(levels, levels[1:]))
+               for phase, blend in ((0, 0), (.06, .03/.94), (.94, .91/.94))]
+    return samples + [[tunnel['length'], tunnel['portals'][1][1]]]
+
+
 def mark_underpasses(elements):
     """Identify grade-separated crossings without treating adjoining bridges as roofs."""
     bridges = []
@@ -403,6 +415,7 @@ def solve(network, nodes, samples):
                               portals=[[start['x'],levels[0],start['z']],
                                        [end['x'],levels[-1],end['z']]],
                               mouths=[a in mouths,b in mouths],approach=0,openEnds=approach,knotHeights=pack_stations(stations[::3])))
+        generated[-1]['stations'] = profile_stations(generated[-1])
     # Fill the wedge between the two end sections on the outside of a bend.
     # All incident strips share the node elevation. Only one draws the patch.
     incident=defaultdict(list)
