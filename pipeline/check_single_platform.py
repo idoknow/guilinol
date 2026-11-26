@@ -7,6 +7,7 @@ import numpy as np
 from shapely import LineString, Point, STRtree, polygons, union_all
 
 from check_rail_platforms import pavement, pavement_triangles, rail_chords
+from check_platform_building import building_parts, check as building_clearance
 from common import load_osm
 from features import area, points
 
@@ -55,10 +56,39 @@ def inspect(base, world, platform, track, design, gauge):
     rise = pavement(world, bounds, np.array(probes)) - rail
     error = rise-design["passengerRiseM"]
     heights_bad = ~np.isfinite(error) | (abs(error) > .02)
-    return dict(rail=design["track"], chords=len(keys), changedChords=changed,
+    lower, upper = design["nonBoardingObstructionM"]
+    obstruction = (stations >= lower) & (stations <= upper)
+    transition = stations >= design["nonBoardingTransitionM"]
+    boarding = ~(transition | obstruction)
+    bad = (boarding & bad) | (transition & (~np.isfinite(gaps) | (gaps < design["innerRailClearanceM"])))
+    heights_bad &= boarding
+    style = json.loads(Path(__file__).with_name("railway-style.json").read_bytes())
+    building = building_clearance(world, design["retainedBuilding"], gauge/2+style["headWidth"]+.10)
+    # The rear strip remains walkable around the retained building. Check the full
+    # free slab on each side of both boundaries, not a probe inside the building.
+    manifest = json.loads((world/'manifest.json').read_bytes())
+    occupied = union_all([part for _, _, part in building_parts(world, manifest, design["retainedBuilding"])])
+    from shapely import Polygon
+    free = Polygon(design["ring"]).difference(occupied.buffer(.035))
+    joints = []
+    for station in (lower, upper):
+        a, b = [np.array(track.interpolate(station+ds).coords[0]) for ds in (-.125,.125)]
+        normal = (b-a)[::-1]*[1,-1]/np.linalg.norm(b-a)
+        if np.dot(normal,np.subtract(platform.centroid.coords[0],a)) < 0:
+            normal *= -1
+        band = Polygon([a,a+span*normal,b+span*normal,b])
+        missing = free.intersection(band).difference(surface.buffer(.015)).area
+        offsets = np.arange(.1,span,.1)
+        pairs = np.stack((a+offsets[:,None]*normal,b+offsets[:,None]*normal),axis=1)
+        probes = [pair for pair in pairs if free.covers(LineString(pair))]
+        heights = pavement(world,bounds,np.asarray(probes).reshape(-1,2)).reshape(-1,2)
+        jump = float(np.max(abs(heights[:,0]-heights[:,1]))) if len(heights) and np.isfinite(heights).all() else None
+        joints.append(dict(stationM=station,missingM2=missing,heightJumpM=jump,samples=len(probes)))
+    joins_ok = all(j["missingM2"] < .0001 and j["heightJumpM"] is not None and j["heightJumpM"] <= .02 for j in joints)
+    return dict(obstructionEnds=joints,retainedBuilding=building, rail=design["track"], chords=len(keys), changedChords=changed,
                 samples=len(stations), edgeGapM=[float(np.nanmin(gaps)),float(np.nanmax(gaps))],
                 gapViolations=intervals(stations,bad), boardingViolations=intervals(stations,heights_bad),
-                passed=not(changed or bad.any() or heights_bad.any()))
+                passed=joins_ok and not(building["conflicts"] or changed or bad.any() or heights_bad.any()))
 
 
 if __name__ == "__main__":

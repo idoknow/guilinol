@@ -20,8 +20,16 @@ def bake(output, manifest, region):
     ways = load_osm()
     crossings = json.loads((Path(__file__).resolve().parents[1]/'docs/railway-crossings.json').read_bytes())
     road_ids = {row['road'] for row in crossings if row['status']!='construction_unverified'}
+    road_ways = [way for way in ways if way['type']=='way' and way['id'] in road_ids]
     roads = [LineString(points(way)).buffer(max(4.5,road_radius(way['tags'])+1.5))
-             for way in ways if way['type']=='way' and way['id'] in road_ids]
+             for way in road_ways]
+    # Two elevated passenger bridges cross above the Guilinbei islands.
+    # Keep their grounded approaches excluded everywhere outside the island slabs.
+    section = json.loads((Path(__file__).with_name('rail-sections')/'09-guilinbei-yard.json').read_bytes())
+    islands = union_all([area(way) for way in ways if way['type']=='way' and way['id'] in section['islandPlatforms']])
+    for i, way in enumerate(road_ways):
+        if way['id'] in (617221278,617221279):
+            roads[i] = roads[i].difference(islands)
     corridors = STRtree(roads)
     outlines = json.loads(Path(__file__).with_name('platform-outlines.json').read_bytes())
     manifest['platformOutlines'] = {wid: row['ring'] for wid, row in outlines.items()}

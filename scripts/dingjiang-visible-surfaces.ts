@@ -1,3 +1,4 @@
+import {refinePlatformTerrain} from '../web/src/platform-access'
 // Compare each polygon to the piecewise-linear grade over their actual overlap.
 // Checking only mesh vertices misses triangles that cross the entire carriageway.
 import fs from 'node:fs'
@@ -99,6 +100,7 @@ export function tileFaces(world: string, tile: any, tunnels: Tunnel[], visit: (p
   }
   for (const [k, y] of railCuts) positions.setY(k, y / 100)
   const originalGround = includeRailBed || trackAudit ? g.clone() : undefined
+  if(tile.platformAccess?.length)refinePlatformTerrain(g,tile.platformAccess)
   const tunnel = tunnelGeometry(tile, g, tunnels,paths[18])
   function mesh(geometry: THREE.BufferGeometry, role: string, owner?: number, indexCount?: number) {
     const p = geometry.getAttribute('position'),

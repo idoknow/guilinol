@@ -163,6 +163,12 @@
         -612.98,
         -3874.06
       ]
-    ]
+    ],
+    "nonBoardingObstructionM": [
+      357.75,
+      392.5
+    ],
+    "nonBoardingTransitionM": 579.66630354,
+    "retainedBuilding": "cb559ac4-70e7-4560-8c65-da3e7b123bc8"
   }
 }
