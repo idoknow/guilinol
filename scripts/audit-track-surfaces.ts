@@ -160,7 +160,7 @@ for (const tile of manifest.chunks) {
         if (
           output !== undefined &&
           (peak ||
-            ['paving-0', 'graded-floor', 'retaining-wall'].includes(role))
+            ['paving-0', 'graded-floor', 'visible-carriageway', 'retaining-wall'].includes(role))
         ) {
           const vertices = polygon.map(([s, y, u]) => [
             x + s * dx - u * dz,

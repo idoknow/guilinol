@@ -99,11 +99,11 @@ export function tileFaces(world: string, tile: any, tunnels: Tunnel[], visit: (p
   }
   for (const [k, y] of railCuts) positions.setY(k, y / 100)
   const originalGround = includeRailBed || trackAudit ? g.clone() : undefined
-  const tunnel = tunnelGeometry(tile, g, tunnels)
-  function mesh(geometry: THREE.BufferGeometry, role: string, owner?: number) {
+  const tunnel = tunnelGeometry(tile, g, tunnels,paths[18])
+  function mesh(geometry: THREE.BufferGeometry, role: string, owner?: number, indexCount?: number) {
     const p = geometry.getAttribute('position'),
       ix = geometry.index
-    for (let j = 0; j < (ix?.count ?? p.count); j += 3)
+    for (let j = 0; j < (indexCount ?? ix?.count ?? p.count); j += 3)
       visit(
         [0, 1, 2].map((offset) => {
           const k = ix ? ix.getX(j + offset) : j + offset
@@ -118,6 +118,7 @@ export function tileFaces(world: string, tile: any, tunnels: Tunnel[], visit: (p
       if (!parts || !('lining' in parts)) return
       mesh(parts.floor.geometry, 'graded-floor', owner)
       if(trackAudit){
+        mesh(parts.lining.geometry, 'visible-carriageway', owner, parts.lining.userData.floorIndexCount)
         mesh(parts.portal.geometry,'retaining-wall',owner)
         mesh(parts.interior.geometry,'tunnel-interior',owner)
       } else mesh(parts.lining.geometry, 'tunnel-lining', owner)
@@ -135,7 +136,7 @@ export function tileFaces(world: string, tile: any, tunnels: Tunnel[], visit: (p
         if (!byWay.has(t.way)) byWay.set(t.way, [])
         byWay.get(t.way)!.push(t)
       }
-      for (const [way, group] of byWay) inspect(tunnelGeometry(tile, originalGround.clone(), group), way)
+      for (const [way, group] of byWay) inspect(tunnelGeometry(tile, originalGround.clone(), group,paths[18]), way)
     }
   } else if (tunnel) {
     for (const [kind, item] of Object.entries(tunnel)) if (item) mesh(item.geometry, kind)

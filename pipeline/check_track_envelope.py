@@ -130,6 +130,11 @@ def run(world, faces):
     summary = defaultdict(dict)
     registered = defaultdict(set)
     b_count = defaultdict(int)
+    from rail_sections import designs
+    panel_roads = {wid for design in designs() for wid in design.get("panelRoads", [])}
+    style = json.loads((ROOT / "pipeline/railway-style.json").read_bytes())
+    steel_bands = {}
+    covered_heads = defaultdict(dict)
 
     def add(section, category, i, row, error, role, pos, road=None):
         entry = summary[section].setdefault(category, {})
@@ -147,6 +152,34 @@ def run(world, faces):
     for line in faces:
         sec, i, row, role, owner, vertices, gradient = json.loads(line)
         w, x, z, h, bx, bz, bh, _ = row
+        if role in ("visible-carriageway", "paving-0") and max(v[3] for v in vertices) >= -.02:
+            roads = panel_roads.intersection(cross.get(w, []))
+            if roads:
+                key = (sec, i)
+                if key not in steel_bands:
+                    axis = LineString([(x,z),(bx,bz)])
+                    heads = []
+                    for sign in (-1,1):
+                        offset = sign * (style["gauge"] + style["headWidth"]) / 2
+                        head = axis.offset_curve(offset).buffer(style["headWidth"]/2, cap_style="flat")
+                        for road in roads:
+                            footprint = head.intersection(c_bands[road])
+                            if not footprint.is_empty:
+                                heads.append((road,sign,footprint))
+                    steel_bands[key] = heads
+                # Include coplanar asphalt and surfaces within the crossing's
+                # 2 cm fit tolerance, as well as faces projecting above the head.
+                if steel_bands[key]:
+                    near_top = excess_polygon(vertices, -.02)
+                    for road,side,head in steel_bands[key]:
+                        hit = head.intersection(near_top)
+                        if hit.area > 1e-7:
+                            key = (w,side)
+                            if key not in covered_heads[road] or hit.area > covered_heads[road][key]["area"]:
+                                pos = hit.representative_point()
+                                covered_heads[road][key] = dict(rail=w,side=side,role=role,owner=owner,area=hit.area,x=pos.x,z=pos.y)
+        if role == "visible-carriageway":
+            continue
         if i not in cache:
             axis = LineString([(x, z), (bx, bz)])
             band = axis.buffer(3.7, cap_style="flat")
@@ -320,6 +353,8 @@ def run(world, faces):
         },
         verifiedOverheadFaces=dict(b_count),
         crossings=levels,
+        railHeadsChecked={road: 2*len(levels[road]["rails"]) for road in sorted(panel_roads)},
+        coveredRailHeads={road: list(covered_heads[road].values()) for road in sorted(panel_roads)},
     )
 
 
@@ -344,7 +379,7 @@ if __name__ == "__main__":
     print(json.dumps(report, indent=2))
     raise SystemExit(
         int(
-            bool(report["chords"])
+            bool(report["chords"]) or any(report["coveredRailHeads"].values())
             or any(q["spreadM"] > 0.05 for q in report["crossings"].values())
         )
     )

@@ -91,3 +91,46 @@ def bake(world, manifest):
             )
         )
         tile["bytes"] = f.stat().st_size
+
+    bake_crossing_panels(world, manifest)
+
+
+def bake_crossing_panels(world, manifest):
+    """Attach the finished crossing pavement level to each GL04 panel chord."""
+    from rail_sections import designs
+
+    ids = {wid for design in designs() for wid in design.get("panelRoads", [])}
+    roads = [r for r in manifest["tunnels"] if r["way"] in ids]
+    axes = [LineString([(x, z) for x, _, z in r["portals"]]) for r in roads]
+    tree = STRtree(axes)
+    for tile in manifest["chunks"]:
+        x, z = tile["x"], tile["z"]
+        if not tree.query(box(x-20, z-20, x+276, z+276)).size:
+            continue
+        file = world / tile["file"]
+        data = gzip.decompress(file.read_bytes())
+        v, i, size = struct.unpack_from("<3I", data, 4)
+        off = 16924 + 9*v + 4*i
+        collision = json.loads(data[off:off+size])
+        panels = []
+        for ax, az, _, bx, bz, _, _, flags, *_ in collision[4]:
+            if not flags & 16:
+                continue
+            chord = LineString([(x+ax/100, z+az/100), (x+bx/100, z+bz/100)])
+            mid = chord.interpolate(0.5, normalized=True)
+            k = tree.nearest(mid)
+            if axes[k].distance(mid) > roads[k]["halfWidth"] + 1.75:
+                continue
+            at = axes[k].project(mid)
+            level = np.interp(at, *np.asarray(roads[k]["stations"]).T)
+            panels.append([ax, az, bx, bz, float(level)])
+        if not panels:
+            continue
+        paths = collision[1]
+        while len(paths) <= 18:
+            paths.append([])
+        paths[18] = panels
+        encoded = json.dumps(collision, separators=(",", ":")).encode()
+        file.write_bytes(gzip.compress(data[:12] + struct.pack("<I",len(encoded))
+                         + data[16:off] + encoded + data[off+size:], mtime=0))
+        tile["bytes"] = file.stat().st_size

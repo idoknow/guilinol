@@ -1,3 +1,5 @@
+import type {CrossingPanel} from './railways'
+import {panelCut} from './crossing-panels'
 import {mergeVertices} from 'three/addons/utils/BufferGeometryUtils.js'
 import * as THREE from 'three'
 import type {Tile} from './world'
@@ -118,8 +120,8 @@ function clip(poly:Point[],plane:Plane){
 }
 function fan(poly:Point[],out:number[]){for(let at=2;at<poly.length;at++)out.push(...poly[0],...poly[at-1],...poly[at])}
 
-export function tunnelGeometry(tile:Tile,ground:THREE.PlaneGeometry,tunnels:Tunnel[]){
-  const parts={floor:[] as number[],interior:[] as number[],portal:[] as number[],band:[] as number[],lamp:[] as number[],lane:[] as number[],ceiling:[] as number[]}
+export function tunnelGeometry(tile:Tile,ground:THREE.PlaneGeometry,tunnels:Tunnel[],panels:CrossingPanel[]=[]){
+  const parts={floor:[] as number[],panelBase:[] as number[],interior:[] as number[],portal:[] as number[],band:[] as number[],lamp:[] as number[],lane:[] as number[],ceiling:[] as number[]}
   const cuts:{planes:Plane[],roof?:(point:Point)=>number}[]=[]
   const limits:Plane[]=[p=>p[0],p=>256-p[0],p=>p[2],p=>256-p[2]]
   const heights=ground.getAttribute('position'), cells=ground.parameters.widthSegments
@@ -312,7 +314,7 @@ export function tunnelGeometry(tile:Tile,ground:THREE.PlaneGeometry,tunnels:Tunn
     result.visible=false
     return result
   }
-  const palette={floor:0x3b3e42,interior:0xcfc8b8,portal:0xa39d90,band:0x4d7466,
+  const palette={floor:0x3b3e42,panelBase:0x575650,interior:0xcfc8b8,portal:0xa39d90,band:0x4d7466,
     lane:0xeae3cf,ceiling:0x9c968a,lamp:0xffd9a6}
   function batch(keys:(keyof typeof parts)[],material:THREE.Material,kind:string){
     const positions:number[]=[],colors:number[]=[]
@@ -330,8 +332,22 @@ export function tunnelGeometry(tile:Tile,ground:THREE.PlaneGeometry,tunnels:Tunn
     triangles.dispose()
     return result
   }
-  const lining=batch(['floor','interior','portal','band','lane'],
+  const drivingFloor=parts.floor
+  if(panels.length){
+    const cut=panelCut(panels)
+    parts.floor=[]
+    for(let i=0;i<drivingFloor.length;i+=9){
+      const triangle=[0,3,6].map(k=>drivingFloor.slice(i+k,i+k+3) as Point)
+      // A continuous recessed slab supports the flangeways and the
+      // mitres between GL04 chords, including the cut at each tile seam.
+      const pavement=cut(triangle, panel=>fan(panel.map(([x,y,z]):Point=>[x,y-.045,z]),parts.panelBase))
+      for(const polygon of pavement)fan(polygon,parts.floor)
+    }
+  }
+  const lining=batch(['floor','panelBase','interior','portal','band','lane'],
     tunnelLiningMaterial,'lining')
+  // The pavement is first in the indexed lining batch.
+  lining.userData.floorIndexCount=parts.floor.length/3
   const lights=batch(['ceiling','lamp'],tunnelLightMaterial,'lighting')
-  return {lining,lights,floor:collider(parts.floor,'road'),interior:collider(parts.interior,'interior'),portal:collider(parts.portal,'portal')}
+  return {lining,lights,floor:collider(drivingFloor,'road'),interior:collider(parts.interior,'interior'),portal:collider(parts.portal,'portal')}
 }
