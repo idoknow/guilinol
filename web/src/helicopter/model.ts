@@ -24,7 +24,7 @@ export function helicopterModel(){
           const material=node.material;material.userData.cabinLift=true;material.emissive.copy(material.color).lerp(cabinTone,.5);material.emissiveIntensity=cabinLift[material.name]
         }
       })
-      asset.scene.traverse(node=>{if(node.name){nodes[index].set(node.name,node);if(index===0)anchors.set(node.name,node)}if(node.name.startsWith('rotor_blur'))node.visible=false})
+      asset.scene.traverse(node=>{if(node.name){nodes[index].set(node.name,node);if(index===0)anchors.set(node.name,node)}if(/^rotor_blur_(main|tail)$/.test(node.name))node.visible=false})
       if(index===0){mixer=new THREE.AnimationMixer(asset.scene);for(const clip of asset.animations)actions.set(clip.name,mixer.clipAction(clip))}
       for(const kind of ['main','tail']){
         const solid=nodes[index].get('rotor_'+kind),blur=nodes[index].get('rotor_blur_'+kind)

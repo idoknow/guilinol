@@ -12,6 +12,7 @@ import {aircraftPose,flightReplica,routeFor} from './flight'
 import {mpEnabled} from '../ui/mp-pref'
 import {passengerOrientation} from './seat-frame'
 import {padDownwash} from './downwash'
+import {cabinCamera} from './cabin-camera'
 import {cabins,closestCabin} from './doors'
 import {rotorSound} from './sound'
 import {services as schedules} from '../../../lib/helicopter-clock'
@@ -37,7 +38,7 @@ export function helicopter(scene:THREE.Scene,camera:THREE.PerspectiveCamera,walk
     `<div class="heli-foot"><div class="heli-meta"><p class="heli-price"></p></div><div class="heli-actions"><button class="heli-confirm">确认旅行</button></div><p role="status"></p></div>`
   document.body.append(hint,notice,panel)
   let phase:Phase='idle',clock=0,mode:TourMode='low',route:ReturnType<typeof tourRoute>|undefined,first=false,near=false,fare=0,heading=0
-  const replica=flightReplica();let verificationClock:number|undefined,verificationAzimuth:number|undefined
+  const replica=flightReplica();let verificationClock:number|undefined,verificationAzimuth:number|undefined,verificationPitch:number|undefined,savedNear:number|undefined
   let queue:QueueState|undefined,lastPoll=-Infinity,busy=false,sessionFlight:QueueState['flight']=null
   const status=document.createElement('p'),leave=document.createElement('button'),alert=document.createElement('output');status.className='heli-queue-status';leave.className='heli-queue-leave';leave.textContent='退出排队';alert.className='heli-queue-notice';document.body.append(alert);panel.querySelector('.heli-meta')!.append(status);panel.querySelector('.heli-actions')!.prepend(leave)
   const confirm=panel.querySelector<HTMLButtonElement>('.heli-confirm')!
@@ -119,10 +120,13 @@ export function helicopter(scene:THREE.Scene,camera:THREE.PerspectiveCamera,walk
     if(clip==='sit'){player.heli.arms.left(point(`hand_rest_pax_${cabin.number}_L`,target));player.heli.arms.right(point(`hand_rest_pax_${cabin.number}_R`,target))}
     else if(door>.05){point(cabin.door,target);target.y+=.66;player.heli.arms.right(target)}
     if(document.body.dataset.photo!=='on'){
-      const view=player.heli.view(),{pitch,arm}=view,yaw=(!first?verificationAzimuth:undefined)??view.yaw;if(first&&orbit){camera.position.set(0,.72,.06);model.anchor(cabin.seat).localToWorld(camera.position);camera.rotation.set(-pitch,yaw+Math.PI,0,'YXZ');camera.quaternion.premultiply(craft.quaternion)}
+      const view=player.heli.view(),pitch=verificationPitch??(first?view.pitch-.38+8*Math.PI/180:view.pitch),arm=view.arm,yaw=verificationAzimuth??view.yaw
+      if(first&&orbit&&savedNear===undefined){savedNear=camera.near;camera.near=Math.min(camera.near,.035);camera.updateProjectionMatrix()}
+      else if(!(first&&orbit)&&savedNear!==undefined){camera.near=savedNear;savedNear=undefined;camera.updateProjectionMatrix()}
+      if(first&&orbit)cabinCamera(camera,model.anchor(cabin.seat),cabin.number,yaw,pitch,craft.quaternion)
       else{target.copy(orbit?craft.position:actor);target.y+=1;const radius=orbit?9+arm:4;eye.set(Math.sin(yaw)*Math.cos(pitch),Math.sin(pitch),Math.cos(yaw)*Math.cos(pitch)).multiplyScalar(radius);camera.position.copy(target).add(eye);camera.lookAt(target)}
     }
     if(phase==='exit'&&clock>=duration){if(queue?.mine?.offered&&queue.flight?.t0===sessionFlight?.t0){if(!busy)void command('unload',{ticket:queue.mine.ticket});return}player.heli.end(ground);first=false;sessionFlight=null;setPhase('idle')}
   }
-  return {tick,get active(){return phase!=='idle'},get lookAhead(){return phase==='cruise'?ahead:null},get phase(){return phase},get mode(){return mode},get first(){return first},...(verify?{seek:(seconds:number,azimuth?:number)=>{verificationAzimuth=azimuth;if(sessionFlight)verificationClock=sessionFlight.t0+seconds*1000},queue:()=>queue,positionAt:(time:number)=>queue?.flight&&aircraftPose(time,queue.flight.t0,queue.flight.mode),visible:()=>craft.visible}: {})}
+  return {tick,get active(){return phase!=='idle'},get lookAhead(){return phase==='cruise'?ahead:null},get phase(){return phase},get mode(){return mode},get first(){return first},...(verify?{seek:(seconds:number,azimuth?:number,pitch?:number)=>{verificationAzimuth=azimuth;verificationPitch=pitch;if(sessionFlight)verificationClock=sessionFlight.t0+seconds*1000},queue:()=>queue,positionAt:(time:number)=>queue?.flight&&aircraftPose(time,queue.flight.t0,queue.flight.mode),visible:()=>craft.visible}: {})}
 }
