@@ -73,7 +73,7 @@ export async function fixture({postgresOnly=false}={}) {
     }
     const migrate=async name=>pool.query(await readFile('deploy/postgres/'+name+'.sql','utf8'))
     const replay=async()=>{
-      for(const migration of ['002-telemetry','003-admin','003-player-saves','004-social','005-social-pending','006-social-register','007-social-only','008-social-states-register','009-feedback-credit','010-perf-admin-indexes','010-user-moderation','011-player-uid','012-citizen-photo','013-perf-hour','014-mp','015-chat','016-chat-lexicon','017-npc','019-update-cards','020-social-direct-revert','020-perf-event-ips','021-admin-perf-and-mp-activity','024-mp-anti-cheat','025-mp-reviews'])await migrate(migration)
+      for(const migration of ['002-telemetry','003-admin','003-player-saves','004-social','005-social-pending','006-social-register','007-social-only','008-social-states-register','009-feedback-credit','010-perf-admin-indexes','010-user-moderation','011-player-uid','012-citizen-photo','013-perf-hour','014-mp','015-chat','016-chat-lexicon','017-npc','019-update-cards','020-social-direct-revert','020-perf-event-ips','021-admin-perf-and-mp-activity','024-mp-anti-cheat','025-mp-reviews','026-web-guard'])await migrate(migration)
     }
     await migrate('001-schema');await replay()
     if(!postgresOnly){

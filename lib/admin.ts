@@ -1,4 +1,5 @@
 import { invalid, passwordHash, Problem, random } from './auth'
+import {weakPassword} from './weak-password'
 import { labels } from './feedback-contract'
 import { isSocialType, userSocialIdentities } from './social'
 
@@ -349,6 +350,7 @@ export async function adminSetPassword(db: D1Database, actor: string, id: string
   if (provided && (provided.length < 8 || provided.length > 256))
     return json({ error: { code: 'invalid_input', message: '密码长度需 8–256 位' } }, 400)
   const password = provided || random(6) + random(2).toUpperCase()
+  if(provided&&weakPassword(provided))throw new Problem(400,'weak_password','密码容易猜测，请换一个更长的独特密码')
   const salt = random(16)
   await db.batch([
     db

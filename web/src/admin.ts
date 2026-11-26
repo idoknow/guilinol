@@ -1847,33 +1847,24 @@ const pages: Record<string, (view: View) => void> = {
     const manualCard = card('人工封禁', banForms, { sub: '立即生效，在线玩家会被断开并看到原因与申诉入口。' })
     const reviewCardWrap = card('待复核', reviewSlot, { sub: '多类违规只进复核，由管理员看过证据后决定是否处罚。' })
 
-    const protections = [
-      ['WAF 特征拦截','待接入','SQL 注入、XSS、命令注入、路径遍历、SSRF'],
-      ['蜜罐路径','待接入','命中后按可信来源 IP 封禁'],
-      ['扫描器识别','待接入','扫描器 UA 匹配'],
-      ['全局限流','未核实','目标：每 IP 120 次 / 60 秒'],
-      ['登录防爆破','部分实现','当前：每 IP 登录 60 次 / 15 分钟；单账号连续失败 5 次锁 15 分钟。目标：每 IP 5 次锁 15 分钟、单账号 8 次锁 30 分钟、20 次封 IP 24 小时'],
-      ['安全响应头','部分实现','反馈附件响应有 CSP；未核实全站 CSP、HSTS、X-Frame-Options'],
-      ['自动封禁','仅联机规则','Web 目标：10 分钟内 20 次事件封 IP；联机短封不等于网站 IP 封禁'],
-      ['特征库规模','未取得规则源','期望基线：89 条正则（65 高 / 23 中 / 1 低）、58 个 UA、102 条蜜罐路径；非当前已加载数量'],
-      ['拦截级别','待接入','目标：默认拦截严重度 2 级及以上'],
-      ['扫描器行为识别','待接入','目标：综合 UA、请求头、方法、路径及 5 分钟内行为，达到 5 分判定'],
-      ['撞库 / 学号枚举','待接入','目标：30 分钟内同 IP 尝试 15 个账号封 2 小时；同学号段 5 个封 1 小时。本站邮箱登录，未核实学号字段'],
-      ['弱密码库','注册 / 重设已接入',`${weakFormCount} 个去重弱口令形式，另检测键盘序、重复、纯数字和日期格式；不改变旧账号登录`],
-      ['IP 信誉查询','未接入','未接入 360 或 AbuseIPDB；请勿在此填写密钥'],
-    ]
-    const tone = (status: string) => /已接入|仅联机/.test(status) ? 'is-good' : /部分/.test(status) ? 'adm-ban-auto' : ''
-    const protectionTable = h('div', { class: 'adm-table-wrap' }, h('table', { class: 'adm-table adm-protect' },
-      h('thead', null, h('tr', null, ...['防护项', '状态', '说明'].map((label) => h('th', null, label)))),
-      h('tbody', null, ...protections.map(([name, status, note]) => h('tr', null,
-        h('td', { class: 'adm-nowrap' }, h('b', null, name)), h('td', { class: 'adm-nowrap' }, h('span', { class: `adm-pill ${tone(status)}` }, status)), h('td', { class: 'adm-sub' }, note))))))
+    const protectionTable=h('div',null)
+    const loadProtection=async()=>{
+      try {
+        const data=await api('admin/bans/protection',undefined,'GET')
+        const cells=(values:unknown[])=>values.map(value=>h('td',null,String(value)))
+        const table=h('table',{class:'adm-table'},h('thead',null,h('tr',null,...['防护项','状态','阈值','规则数','近 24 小时命中'].map(label=>h('th',null,label)))),h('tbody',null,...data.rules.map((rule:any)=>h('tr',null,...cells([rule.name,rule.enabled?'开启':'关闭',rule.threshold,rule.count,rule.hits])))))
+        protectionTable.replaceChildren(table,h('h3',null,'生效中的 IP 封禁'),...data.bans.map((ban:any)=>h('p',null,`${ban.ip} · ${ban.reason} · 至 ${when(new Date(ban.expires))} `,h('button',{type:'button',onclick:async()=>{if(!confirm(`解除 ${ban.ip} 的封禁？`))return;try{await api('admin/bans/ip/unban',{ip:ban.ip});await loadProtection()}catch(error){alert(String(error))}}},'解封'))))
+      }catch(error){protectionTable.replaceChildren(errorState(error as Error,()=>void loadProtection()))}
+    }
+    void loadProtection()
     paintTop(views.find((v) => v.key === 'bans')!, [h('span', { class: 'adm-live-dot', 'aria-hidden': 'true' }), h('span', { class: 'adm-sub adm-live-stamp' }, '每 10 秒刷新'),
       navLink('联机概况 →', { view: 'mp' }, { class: 'adm-link' })])
     main.append(h('div', { class: 'adm-stack' }, banStats, reviewCardWrap, banCard, manualCard,
-      card('当前防护项', protectionTable, { sub: '按本版本代码核对，不代表线上 CDN 或 WAF 实时状态；网站入口防护见 IDOK-462。' })))
+      card('当前防护项', protectionTable, { sub: '按运行配置与最近 24 小时记录展示。' })))
     void loadBans()
     refreshTimer = window.setInterval(() => {
       if (document.visibilityState === 'visible' && !reviewSlot.querySelector('details[open]') && !reviewSlot.contains(document.activeElement)) void loadBans()
+      if(document.visibilityState==='visible'&&!protectionTable.contains(document.activeElement))void loadProtection()
     }, 10000)
   },
   mp() {
@@ -3453,4 +3444,3 @@ function securityCard(user: { id: string; email: string }) {
     h('div', { class: 'adm-merge-row' }, emailInput, emailButton),
     output)
 }
-import { weakFormCount } from '../../lib/weak-password'

@@ -1,4 +1,5 @@
 import {readFile} from 'node:fs/promises'
+import {guardAdmin} from './web-guard-admin.mjs'
 import {activities,gameplay,history,record,regions} from './mp-store.mjs'
 
 const json=(value,status=200)=>Response.json(value,{status,headers:{'cache-control':'no-store'}})
@@ -117,6 +118,7 @@ export function multiplayer(pool,env,{cache}={}){
     return name?{name,dist:Math.round(Math.sqrt(best))}:null
   }
   async function route(path,request,actor){
+    if(path.startsWith('admin/bans/'))return guardAdmin(pool,env,path,request,actor)
     const params=new URL(request.url).searchParams
     // 联机封禁：列表 / 手动封禁 / 人工解封（转发到 rt，由 rt 的 RT_ADMIN_TOKEN 鉴权）
     if(path==='admin/bans'||path==='admin/ban'||path==='admin/unban'){

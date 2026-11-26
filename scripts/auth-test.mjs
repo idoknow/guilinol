@@ -85,6 +85,27 @@ try {
     for(let index=0;index<12;index++)await api('auth/resend',{email:`shared${index}@example.test`,purpose:'reset'},200,null,untrusted)
     await api('auth/resend',{email:'shared0@example.test',purpose:'reset'},429,'rate_limited',untrusted)
     assert.equal((await sql("SELECT key FROM rate_limits WHERE key LIKE '%192.0.2.222'"))[0].results.length,0)
+    const attempt={headers:{'CF-Connecting-IP':'192.0.2.241'}}, badLogin={email:'absent@example.test',password:'not-a-real-password'}
+    for(let failure=1;failure<=20;failure++){
+      if(failure>1&&failure%5===1)await sql("UPDATE rate_limits SET until=0 WHERE key='login-failed:192.0.2.241'")
+      await api('auth/login',badLogin,failure%5===0?429:401,failure%5===0?'rate_limited':'credentials',attempt)
+    }
+    const durable=(await sql("select expires-now() between interval '23 hours 59 minutes' and interval '24 hours' valid from web_ip_bans where ip='192.0.2.241'"))[0].results
+    assert.equal(durable[0]?.valid,true)
+    for(let index=1;index<=15;index++)await api('auth/login',{...badLogin,email:`fixture-${index}@example.test`},index<5?401:429,index<5?'credentials':'rate_limited',{headers:{'CF-Connecting-IP':'192.0.2.242'}})
+    assert.equal((await sql("select expires-now() between interval '119 minutes' and interval '120 minutes' valid from web_ip_bans where ip='192.0.2.242'"))[0].results[0]?.valid,true)
+    for(let index=0;index<21;index++)await api('auth/login',{...badLogin,email:`guest-${index}@example.test`},401,'credentials',untrusted)
+    assert.equal((await sql("select ip from web_ip_bans where ip='192.0.2.222'"))[0].results.length,0)
+    assert.equal((await sql("select id from admin_audit where action='web.ip.ban' and target_id='192.0.2.241'"))[0].results.length,1)
+    await api('auth/register',{...register,email:'weak@example.test',password:'password123'},400,'weak_password')
+    await api('admin/bans/protection',null,403,'forbidden')
+    await sql(`UPDATE users SET role='admin' WHERE id='${me.id}'`)
+    const guard=await api('admin/bans/protection');assert(guard.bans.some(ban=>ban.ip==='192.0.2.241'));assert.equal(guard.rules.find(rule=>rule.id==='reputation').enabled,false)
+    await api('admin/bans/ip/unban',{ip:'192.0.2.241'},403,'origin',{headers:{Origin:'https://example.test'}})
+    await api('admin/bans/ip/unban',{ip:'192.0.2.241'})
+    assert.equal((await sql("select id from admin_audit where action='web.ip.unban' and target_id='192.0.2.241'"))[0].results.length,1)
+    await sql(`UPDATE users SET role='user' WHERE id='${me.id}'`)
+    console.log('Verified 5/8/15/20 boundaries, unverified shared-IP exemption, expiry and audit passed')
     await Promise.all(['first','second'].map(label=>api('auth/register',{...register,email:`${label}@race.test`},200,null,{headers:{'CF-Connecting-IP':'192.0.2.83'}})))
     const race=(await sql("SELECT uid FROM users WHERE email LIKE '%@race.test' ORDER BY uid"))[0].results.map(row=>Number(row.uid));assert.equal(race.length,2);assert.equal(race[1],race[0]+1)
   }

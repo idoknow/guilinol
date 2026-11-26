@@ -169,6 +169,7 @@ async function handle(request:Request,env:Env) {
   const loginIp=login?ip:null
   if(!login && ip) await limit(db,`code:${ip}`,60,900)
   else if(loginIp) {
+    if(await env.loginEvent?.(loginIp,'login-attempt',await hash(email))) throw new Problem(429,'rate_limited','请求过于频繁，请稍后再试')
     await limit(db,`login:${loginIp}`,60,900)
     await checkLoginIp(db,loginIp)
   }
@@ -181,8 +182,11 @@ async function handle(request:Request,env:Env) {
     if(!valid||!user) {
       const result=user && await stmt(`UPDATE users SET failures=CASE WHEN failures>=7 THEN 0 ELSE failures+1 END,
         locked_until=CASE WHEN failures>=7 THEN ? ELSE 0 END WHERE id=? AND locked_until<=? AND digest=? RETURNING locked_until`,now()+1800,user.id,now(),user.digest).first<{locked_until:number}>()
-      if(loginIp) await failedLoginIp(db,loginIp)
-      if(result?.locked_until) throw locked()
+      if(loginIp) {
+        if(await env.loginEvent?.(loginIp,'login-failed',null)) throw new Problem(429,'rate_limited','请求过于频繁，请稍后再试')
+        try{await failedLoginIp(db,loginIp)}catch(error){if(error instanceof Problem)await env.countProtection?.('login-ip-lock');throw error}
+      }
+      if(result?.locked_until){await env.countProtection?.('account-lock');throw locked()}
       throw new Problem(401,'credentials','邮箱或密码不正确')
     }
     checkBan(user)
@@ -220,6 +224,7 @@ export const onRequest:PagesFunction<Env>=async ({request,env})=>{
   try { return await handle(request,env) } catch(error) {
     if(!(error instanceof Problem)) console.error(error)
     const problem=error instanceof Problem?error:new Problem(500,'internal','服务暂时不可用')
+    if(problem.code==='weak_password')await env.countProtection?.('weak')
     return json({error:{code:problem.code,message:problem.message}},problem.status)
   }
 }

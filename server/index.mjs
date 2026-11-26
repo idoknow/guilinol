@@ -91,6 +91,8 @@ async function gfxAdmin(request,user){
   return json({ok:true})
 }
 const env = {...process.env, gfxAdmin,smokeAdmin,npcAdmin,mpAdmin:mp.route, perfQuery:cachedPerfQuery, DB:database(connections), FEEDBACK:bucket(process.env.S3_ENDPOINT)}
+env.loginEvent=async(ip,kind,subject)=>(await pool.query('select web_guard_event($1,$2,$3) banned',[ip,kind,subject])).rows[0].banned
+env.countProtection=category=>pool.query('select web_guard_hit($1)',[category])
 const origin = new URL(process.env.PUBLIC_ORIGIN).origin
 env.updateCards=cardRoutes(pool,env)
 env.fishing=fishingStore(connections)

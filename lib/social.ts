@@ -651,6 +651,7 @@ export async function socialRegister(env: Env, db: D1Database, request: Request,
   if (existing?.verified) throw new Problem(409, 'email_taken', '该邮箱已注册，请直接登录后在账号设置里绑定')
 
   if (typeof body.code !== 'string' || !/^\d{6}$/.test(body.code)) {
+    if(weakPassword(password))throw new Problem(400,'weak_password','密码容易猜测，请换一个更长的独特密码')
     await reserveMail(db, email, ip)
     const salt = random(16)
     await db
@@ -776,6 +777,7 @@ export async function bindEmail(
 
   const password = typeof body.password === 'string' ? body.password : ''
   if (password && (password.length < 8 || password.length > 256)) invalid()
+  if(password&&weakPassword(password))throw new Problem(400,'weak_password','密码容易猜测，请换一个更长的独特密码')
 
   const writes = [
     db.prepare('UPDATE users SET email=?,email_placeholder=0,verified=1 WHERE id=?').bind(email, account.id),
@@ -789,3 +791,4 @@ export async function bindEmail(
   logSocial({ action: 'bind_email', password: !!password })
   return Response.json({ ok: true, email, password_set: !!password }, { headers })
 }
+import {weakPassword} from './weak-password'
