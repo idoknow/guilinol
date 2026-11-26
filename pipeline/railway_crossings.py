@@ -62,11 +62,12 @@ def inventory(elements, region, node_evidence):
                 r, h = level(rt), level(ht)
                 evidence = node_evidence.get(str(shared))
                 kind = None
-                if shared:
+                tag = (evidence or {}).get('railway')
+                separated = None not in (r, h) and r != h
+                if shared and (tag in ('crossing', 'level_crossing') or not separated):
                     kind = 'level'
-                    tag = (evidence or {}).get('railway')
                     reason = f'railway={tag}' if tag else '无标签，按共享节点推定'
-                elif None not in (r, h) and r != h:
+                elif separated:
                     kind = 'rail_over' if r > h else 'road_over'
                     reason = f'层级（铁路 {r}，道路 {h}）'
                 elif ht.get('tunnel') == 'yes' and rt.get('tunnel', 'no') == 'no':

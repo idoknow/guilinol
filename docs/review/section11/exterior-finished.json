@@ -1,0 +1,133 @@
+[
+  {
+    "x": -2394.3068,
+    "z": 699.3806,
+    "heightM": 159.024068,
+    "movementMM": 0.206,
+    "ways": [
+      221882705,
+      991385691
+    ],
+    "maxChordGradePermille": 11.999959115762508
+  },
+  {
+    "x": -2392.8739,
+    "z": 711.2947,
+    "heightM": 159.168067,
+    "movementMM": 0.45,
+    "ways": [
+      221882705
+    ],
+    "maxChordGradePermille": 11.999959115762508
+  },
+  {
+    "x": -2391.4409,
+    "z": 723.2088,
+    "heightM": 159.312066,
+    "movementMM": 0.693,
+    "ways": [
+      221882705
+    ],
+    "maxChordGradePermille": 11.99994717448814
+  },
+  {
+    "x": -2390.008,
+    "z": 735.123,
+    "heightM": 159.456066,
+    "movementMM": 0.936,
+    "ways": [
+      221882705
+    ],
+    "maxChordGradePermille": 11.999959115764138
+  },
+  {
+    "x": -2388.5751,
+    "z": 747.0371,
+    "heightM": 159.600065,
+    "movementMM": 1.18,
+    "ways": [
+      221882705
+    ],
+    "maxChordGradePermille": 11.999959115764138
+  },
+  {
+    "x": -2387.1421,
+    "z": 758.9512,
+    "heightM": 159.744064,
+    "movementMM": 1.423,
+    "ways": [
+      221882705
+    ],
+    "maxChordGradePermille": 11.999989502588557
+  },
+  {
+    "x": -2393.8541,
+    "z": 757.212,
+    "heightM": 159.709527,
+    "movementMM": 1.413,
+    "ways": [
+      259082290
+    ],
+    "maxChordGradePermille": 11.999957688140144
+  },
+  {
+    "x": -2395.2634,
+    "z": 745.295,
+    "heightM": 159.565527,
+    "movementMM": 1.17,
+    "ways": [
+      259082290
+    ],
+    "maxChordGradePermille": 11.999957688140205
+  },
+  {
+    "x": -2396.6727,
+    "z": 733.378,
+    "heightM": 159.421527,
+    "movementMM": 0.926,
+    "ways": [
+      259082290
+    ],
+    "maxChordGradePermille": 11.99998540636351
+  },
+  {
+    "x": -2398.0819,
+    "z": 721.4611,
+    "heightM": 159.277528,
+    "movementMM": 0.683,
+    "ways": [
+      259082290
+    ],
+    "maxChordGradePermille": 11.99998540636351
+  },
+  {
+    "x": -2399.4912,
+    "z": 709.5441,
+    "heightM": 159.133528,
+    "movementMM": 0.439,
+    "ways": [
+      259082290
+    ],
+    "maxChordGradePermille": 11.999973662510575
+  },
+  {
+    "x": -2400.9005,
+    "z": 697.6272,
+    "heightM": 158.989529,
+    "movementMM": 0.195,
+    "ways": [
+      259082290
+    ],
+    "maxChordGradePermille": 11.999973662510575
+  },
+  {
+    "x": -2395.1423,
+    "z": 692.0053,
+    "heightM": 158.934999,
+    "movementMM": 0.054,
+    "ways": [
+      991385691
+    ],
+    "maxChordGradePermille": 11.999908391129757
+  }
+]

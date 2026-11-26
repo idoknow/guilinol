@@ -97,6 +97,10 @@ if __name__ == "__main__":
     inputs.add_argument("--all", action="store_true", help="Include every section and both first-section alignments")
     args = parser.parse_args()
     if args.all:
+        from check_station_corridor_vertices import compare
+        corridor = compare(args.world)
+        if corridor["referenceSegments"] != 1139 or corridor["changedChunks"]:
+            parser.exit(1, f"Station corridor differs from #300: {corridor['changedChunks']}\n")
         pipeline = Path(__file__).resolve().parent
         first_section = pipeline / "rail-audits"
         paths = [
