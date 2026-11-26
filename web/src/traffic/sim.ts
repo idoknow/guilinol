@@ -1,7 +1,7 @@
 import {axleHeight,contactPose} from './lane-surface.ts'
 import {nearStatic,resolveContact,staticSolids,pickups,type Solid} from './contact.ts'
 import {CAR_SCALE} from '../drive/scale.ts'
-import {clearance,passage,type Corridor,type Profile} from './narrow.ts'
+import {canRoute,clearance,passage,type Corridor,type Profile} from './narrow.ts'
 import {clampOutsideShizijieNoPedZone,isInShizijieNoPedZone,isNearShizijiePrecinct,segmentHitsShizijieNoPedZone} from '../shizijie-zone.ts'
 export type Node = {id:number,x:number,y:number,z:number}
 type Crossing={osm:[string,number],bars:number,points:[number,number][],width:number}
@@ -197,7 +197,7 @@ export type Actor = {
   pitch?:number,roll?:number,arrived?:boolean,
   track:Track,dist:number,speed:number,pace?:number,kind:'car'|'scooter'|'person',down:number,dodge:number,
   x:number,y:number,z:number,yaw:number,scale:number,leaving:boolean,halfWidth:number,halfLength:number,height:number,
-  holdUntil?:number,waitingFor?:Actor,waitingSince?:number,waitingAtGate?:boolean,squeeze?:number,
+  holdUntil?:number,waitingFor?:Actor,waitingSince?:number,waitingAtGate?:boolean,squeeze?:number,backing?:boolean,
   violation?:TrafficViolation,violations?:ActiveTrafficViolation[],vehicleSubtype?:VehicleSubtype,stoppedUntil?:number,cited?:boolean,
   wrongWay?:boolean,redLightActive?:boolean,redLightTrailDist?:number,
   dutyState?:DutyBehaviorState,fleeUntil?:number,haltedByDuty?:boolean,brakingForOfficer?:boolean,lastPlayerHitAt?:number,
@@ -1305,6 +1305,7 @@ export class Traffic {
       }:{}),
       ...(spawnStreet?{spawnStreet}:{}),
     }
+    if(walk&&!canRoute(track.corridor,actor.dist,this.actors))return null
     this.position(actor)
     if(!walk&&!hl&&approachPref&&approachPref.attempt<18){
       const approach=(camera.x-actor.x)*track.dx+(camera.z-actor.z)*track.dz
@@ -1861,10 +1862,11 @@ export class Traffic {
       const narrow=person&&track.corridor?.profile[1].length?passage(actor,this.actors):undefined
       if(person)actor.waitingAtGate=Boolean(narrow&&narrow.limit<=.01)
       if(narrow)advance=Math.min(advance,narrow.limit)
+      if(person)actor.backing=Boolean(narrow?.back&&narrow.back>1e-6)
       const squeeze=narrow?.squeeze??0
       if(person)actor.squeeze=squeeze
       if(squeeze)advance=Math.min(advance,.5*dt)
-      const room=narrow&&track.corridor?clearance(track.corridor,actor.dist+advance,.25-.049*squeeze):undefined
+      const room=narrow&&track.corridor?clearance(track.corridor,actor.dist+advance,.25-.049*squeeze,narrow.atBay):undefined
       const safeMinDodge=person?Math.max(track.dodgeMin??-WALK_OFFSET,room?.[0]??-Infinity):-WALK_OFFSET
       const safeMaxDodge=person?Math.min(squeeze?2*WALK_OFFSET:track.dodgeMax??WALK_OFFSET,room?.[1]??Infinity):WALK_OFFSET
       let minDodge=safeMinDodge,maxDodge=safeMaxDodge
@@ -1982,7 +1984,8 @@ export class Traffic {
       }
       if(advance>=dt*.05)actor.waitingSince=undefined
       else actor.waitingSince??=this.time
-      actor.speed=advance/dt
+      if(actor.backing&&narrow?.back)advance=-Math.min(.6*dt,narrow.back)
+      actor.speed=Math.abs(advance)/dt
       if(reverse)actor.dist-=advance
       else actor.dist+=advance
       if(!person&&advance>0&&nearStatic(actor.x+dirX*advance,actor.z+dirZ*advance)){
@@ -1997,7 +2000,8 @@ export class Traffic {
       }
       if(person&&actor.dist>=track.length){
         const onward=this.onwardWalk(track)??this.shizijieTurnOrReverse(track)
-        if(onward){actor.track=onward.track;actor.dist=onward.dist;this.transitions++}
+        if(onward&&!canRoute(onward.track.corridor,onward.dist,this.actors.filter(other=>other!==actor))){actor.dist=track.length;actor.speed=0;actor.waitingAtGate=true}
+        else if(onward){actor.track=onward.track;actor.dist=onward.dist;this.transitions++}
         else{actor.dist=track.length;actor.speed=0;actor.arrived=true}
       }else if(reverse&&actor.dist<=0){
         const incoming=(this.entries.get(track.from)??[]).filter(prev=>
@@ -2070,7 +2074,7 @@ export class Traffic {
         actor.dist=0;this.transitions++
       }
       this.position(actor)
-      if(person&&actor.track===track&&Math.hypot(actor.x-previousX,actor.z-previousZ)>1e-5)actor.yaw=Math.atan2(actor.x-previousX,actor.z-previousZ)
+      if(person&&!actor.backing&&actor.track===track&&Math.hypot(actor.x-previousX,actor.z-previousZ)>1e-5)actor.yaw=Math.atan2(actor.x-previousX,actor.z-previousZ)
       // Player collision check: sidewalk & nonmotor lane are 100% car-hit-free; walking calmly rarely gets hit;
       // motor-lane impacts only occur when running or ignoring horn, with impact speed strictly capped <= 25 km/h.
       if(actor.kind==='car'&&officer&&!officerInSafeZone&&this.onPlayerHit&&!actor.leaving&&actor.scale>=.5&&actor.speed>1.2){
