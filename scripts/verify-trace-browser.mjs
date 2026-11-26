@@ -30,7 +30,7 @@ try{
   }
   await page.goto(origin+'/backpack.html');await page.getByText('请先登录后查看背包').waitFor();await capture('guest',false);assert.equal(tiles,0)
   authenticated=true;await page.reload();await page.locator('div[style*="blob:"]').waitFor();await capture('dom',true)
-  await page.goto(origin+'/?verify');await page.waitForFunction(()=>window.viewer?.stats.firstMs>0,null,{timeout:120000});await page.locator('div[style*="blob:"]').waitFor()
+  await page.goto(origin+'/?verify');await page.waitForFunction(()=>window.viewer?.stats.firstMs>0,null,{timeout:120000});await page.evaluate(async()=>{const {onTile}=await import('/src/session-mark.ts');await new Promise(resolve=>onTile(image=>{if(image)resolve(true)}))})
   await page.evaluate(()=>{for(const layer of document.querySelectorAll('div[style*="blob:"]'))layer.remove();window.viewer.setPreset('lijiang')})
   await page.waitForFunction(()=>window.viewer.stats.frame>6);console.log('buffers',await page.locator('canvas').evaluateAll(nodes=>nodes.map(node=>[node.width,node.height,node.clientWidth,node.clientHeight])));assert.equal(await page.locator('div[style*="blob:"]').count(),0);await capture('webgl',true)
 }finally{await browser?.close();await server.close()}
