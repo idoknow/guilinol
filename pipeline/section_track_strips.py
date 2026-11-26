@@ -29,6 +29,9 @@ def section_strips(world, *, terrain_only=False, design_flag=None):
         ties.extend(
             (path.stem, int(w), sorted(s)) for w, s in design["railTies"].items()
         )
+        if design_flag == "cutHighTerrain":
+            # Previously accepted track vertices can move on a shared approach beyond the new rail fit.
+            ties.extend((path.stem, int(w), sorted(s)) for w, s in design.get("terrainRailTies", {}).items())
     ways = load_tracks({w for _, w, _ in ties})
     axes = [substring(LineString(points(ways[w])), *limits) for _, w, limits in ties]
     lookup = STRtree(axes)

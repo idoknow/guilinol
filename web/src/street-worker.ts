@@ -215,10 +215,10 @@ export function streetGeometry([paths,lamps,banks,signals=[],stops=[],roadCtrl,s
         if(grade){
           const top=(v:THREE.Vector2)=>new THREE.Vector3(v.x,platformShift([grade],v.x,v.y,0),v.y)
           const upper=top(p),end=top(q)
-          // Bound the entire face by the lowest corner of each 4 m terrain cell it touches.
+          // Bound the entire face by the lowest terrain corner on both the 4 m and 8 m grids.
           let foot=Math.min(upper.y,end.y)-.15
-          for(let x=Math.floor(Math.min(p.x,q.x)/4)*4;x<=Math.ceil(Math.max(p.x,q.x)/4)*4;x+=4)
-            for(let z=Math.floor(Math.min(p.y,q.y)/4)*4;z<=Math.ceil(Math.max(p.y,q.y)/4)*4;z+=4)
+          for(let x=Math.floor(Math.min(p.x,q.x)/8)*8;x<=Math.ceil(Math.max(p.x,q.x)/8)*8;x+=4)
+            for(let z=Math.floor(Math.min(p.y,q.y)/8)*8;z<=Math.ceil(Math.max(p.y,q.y)/8)*8;z+=4)
               foot=Math.min(foot,railGround(x,z)-.04)
           const low=new THREE.Vector3(p.x,foot,p.y),next=new THREE.Vector3(q.x,foot,q.y)
           emit(low,upper,end,1,0,0,0,true)
