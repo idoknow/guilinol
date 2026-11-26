@@ -71,7 +71,9 @@ export function photoMode(host: Host, place: () => string, onCapture?: () => voi
   let active = false
   let saved = {fov: 55, flowing: true}
   let recording: Recording | null = null
-  let capturing = false
+  // 连按快门会叠多次出片：计数到全部出完才恢复「动作」键。
+  let shots = 0
+  let poseFocus = false
   let shotUrl = ''
 
   const body = (): CameraBody => camera(state.body)
@@ -189,12 +191,12 @@ export function photoMode(host: Host, place: () => string, onCapture?: () => voi
   }
 
   async function capture() {
-    capturing = true
+    shots++
     syncPose()
     try {
       await shoot()
     } finally {
-      capturing = false
+      shots--
       syncPose()
     }
   }
@@ -317,8 +319,14 @@ export function photoMode(host: Host, place: () => string, onCapture?: () => voi
   let poseKey = ''
   function syncPose() {
     const wheel = host.walker()?.emotes
-    const view = poseView({figure: state.toggle.figure, capturing, recording: !!recording, ready: !!wheel?.ready})
+    const view = poseView({figure: state.toggle.figure, capturing: shots > 0, recording: !!recording, ready: !!wheel?.ready})
+    if (!active) return view
     if (!view.wheel && wheel?.shown) wheel.close()
+    // 键盘开的轮盘关掉后焦点回到「动作」键，别丢在已隐藏的槽位上。
+    if (poseFocus && !wheel?.shown) {
+      poseFocus = false
+      if (view.button && view.enabled) poseButton.focus()
+    }
     const key = `${view.busy}|${view.enabled}`
     if (key === poseKey) return view
     poseKey = key
@@ -352,7 +360,10 @@ export function photoMode(host: Host, place: () => string, onCapture?: () => voi
           refreshCamera(host.walker())
         })
       } else if (value === 'pose') {
-        if (syncPose().wheel) host.walker()?.emotes?.open()
+        if (syncPose().wheel) {
+          poseFocus = event.detail === 0
+          host.walker()?.emotes?.open(poseFocus)
+        }
       } else {
         const key = value as ToggleKey
         state.toggle[key] = !state.toggle[key]
@@ -379,6 +390,9 @@ export function photoMode(host: Host, place: () => string, onCapture?: () => voi
     setCameraShown(false, host.walker())
     host.walker()?.emotes?.close()
     poseKey = ''
+    poseFocus = false
+    // 上次退出时 close() 已把人物显示回来，开关跟着复位，免得「动作」键误灰。
+    state.toggle.figure = true
     document.body.dataset.photo = 'on'
     bar.hidden = exit.hidden = false
     refresh()
@@ -427,6 +441,13 @@ export function photoMode(host: Host, place: () => string, onCapture?: () => voi
     close,
     capture: () => void capture(),
     record: () => void toggleRecording(),
+    /** Esc 先收轮盘：收了返回 true，没开着返回 false（再交给 close）。 */
+    dismissPose() {
+      const wheel = host.walker()?.emotes
+      if (!active || !wheel?.shown) return false
+      wheel.close()
+      return true
+    },
     get active() {
       return active
     },

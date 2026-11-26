@@ -277,7 +277,7 @@ export function play(host:Host) {
   window.addEventListener('keydown',event=>{
     if(event.repeat) return
     if(drone.active) return
-    if(event.code==='Escape') {if(photo.active) photo.close(); else if(!map?.active) closeAll(); return}
+    if(event.code==='Escape') {if(photo.active) {if(!photo.dismissPose()) photo.close()} else if(!map?.active) closeAll(); return}
     if(isGlobalHotkeyBlocked(event.target,{allowPhoto:photo.active})) return
     if(event.code==='KeyJ'&&!photo.active) sheet.hidden?openBook():closeBook()
     if(event.code==='KeyP'){

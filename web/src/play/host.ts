@@ -14,7 +14,7 @@ export interface Walker {
   /** Raise/relax the right arm while a camera is equipped (IDOK-188). */
   setCameraHold?(on:boolean,pose?:{aim?:{forward?:number;up?:number;side?:number}}):void
   /** The walk-mode emote wheel, reused by the photo mode 「动作」 key (IDOK-226). */
-  emotes?:{open():void; close():void; readonly shown:boolean; readonly ready:boolean}
+  emotes?:{open(focus?:boolean):void; close():void; readonly shown:boolean; readonly ready:boolean}
 }
 export interface Clock {hour:number; weather:Weather; flowing:boolean; goal:number|null; set(hour:number,weather?:Weather):void}
 export interface Host {

@@ -33,6 +33,7 @@ export function emoteWheel(allowed: () => boolean, play: (id: number) => void) {
     button.setAttribute('aria-label', entry?.label ?? '空位')
     if (entry) button.innerHTML = '<svg viewBox="0 0 24 24"><path d="' + icons[i] + '"/></svg>'
     button.onclick = () => choose(i)
+    button.onfocus = () => select(i)
     disc.append(button)
     return button
   })
@@ -62,11 +63,12 @@ export function emoteWheel(allowed: () => boolean, play: (id: number) => void) {
     }
     close()
   }
-  function open() {
+  function open(focus = false) {
     if (!allowed() || !emotesEnabled()) return
     overlay.hidden = false
     dx = dy = 0
     select(-1)
+    if (focus) slots.find((slot) => !slot.disabled)?.focus()
   }
   function angle(x: number, y: number) {
     return Math.hypot(x, y) < 18 ? -1 : (Math.round((Math.atan2(x, -y) * 4) / Math.PI) + 8) % 8
@@ -94,12 +96,12 @@ export function emoteWheel(allowed: () => boolean, play: (id: number) => void) {
     pointer(event)
     choose(selected)
   }
-  toggle.onclick = open
+  toggle.onclick = () => open()
   window.addEventListener('keydown', (event) => {
     if (!allowed() || !emotesEnabled() || isGlobalHotkeyBlocked(event.target) || !hits(event.code, 'emote'))
       return
     event.preventDefault()
-    if (!timer && !event.repeat) timer = window.setTimeout(open, 200)
+    if (!timer && !event.repeat) timer = window.setTimeout(() => open(), 200)
   })
   window.addEventListener('keyup', (event) => {
     if (!hits(event.code, 'emote') || !timer) return

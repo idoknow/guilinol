@@ -3,7 +3,7 @@ import {mkdir, writeFile} from 'node:fs/promises'
 import {chromium} from 'playwright'
 import {createServer} from 'vite'
 
-// IDOK-226 拍照「动作」键验收：进拍照 → 开轮盘 → 选奶蛙笑 → 快门 → 录像，
+// IDOK-226 拍照「动作」键验收：进拍照 → 开轮盘 → 选奶蛙笑 → 快门 → 录像 → 键盘开轮盘/Esc → 关人物重进，
 // 断言快门/录像期间「动作」键与轮盘收起、人物动作照常播；电脑 + 手机横屏各一组，控制台 0 报错。
 // BASE=已起的服务地址（可省，省了自己起 vite dev）；OUT=截图/成片目录；
 // GL_ARGS=Chromium GL 参数（默认 swiftshader；软渲染每帧 >1s 时动作 2~4 帧就播完，mac 上用
@@ -151,7 +151,32 @@ async function run(profile) {
     if (clipSaved) clip.file = await clipSaved.catch(() => null)
   }
 
-  // 6) 退出拍照
+  // 6) 键盘开轮盘：焦点进第一个槽；Esc 先收轮盘不退拍照，焦点回到「动作」键
+  if (await page.evaluate(() => document.querySelector('.photo-shot .shot-close'))) await tap('.photo-shot .shot-close')
+  await page.focus(POSE)
+  await page.keyboard.press('Enter')
+  await page.waitForFunction(() => !document.querySelector('.emote-overlay').hidden, null, {timeout: 10000})
+  const keyboard = {slotFocused: await page.evaluate(() => !!document.activeElement?.matches('.emote-overlay .emote-slot:not(:disabled)'))}
+  assert.equal(keyboard.slotFocused, true, '键盘开轮盘焦点进槽位')
+  await page.keyboard.press('Escape')
+  await page.waitForFunction(sel => document.querySelector('.emote-overlay').hidden && document.activeElement === document.querySelector(sel), POSE, {timeout: 10000})
+  keyboard.stillPhoto = await page.evaluate(() => document.body.dataset.photo === 'on')
+  assert.equal(keyboard.stillPhoto, true, 'Esc 先收轮盘、不退拍照')
+
+  // 7) 关「人物」后退出再进：人物开关复位，「动作」键可点
+  await tap('.photo-bar [data-v="figure"]')
+  assert.equal((await state()).poseDisabled, true, '关人物后动作键置灰')
+  await page.keyboard.press('Escape')
+  await page.waitForFunction(() => document.body.dataset.photo !== 'on', null, {timeout: 10000})
+  await page.keyboard.press('KeyP')
+  await page.waitForFunction(() => document.body.dataset.photo === 'on', null, {timeout: 1500}).catch(() => tap('.dock-photo'))
+  await page.waitForFunction(() => document.body.dataset.photo === 'on', null, {timeout: 15000})
+  const reopened = await state()
+  keyboard.figureReset = await page.evaluate(() => document.querySelector('.photo-bar [data-v="figure"]').classList.contains('on'))
+  assert.equal(keyboard.figureReset, true, '再进拍照人物开关复位')
+  assert.equal(reopened.poseDisabled, false, '再进拍照动作键可点')
+
+  // 8) 退出拍照
   await page.keyboard.press('Escape')
   await page.waitForFunction(() => document.body.dataset.photo !== 'on', null, {timeout: 10000})
   const exited = await state()
@@ -159,7 +184,7 @@ async function run(profile) {
   assert.equal(exited.wheel, false)
   await context.close()
   assert.deepEqual(errors, [], `${profile.name} 控制台报错`)
-  return {profile: profile.name, opened, posed, atShutter, photo: {file: photoFile, width: photo.width, height: photo.height}, recording, clip, errors}
+  return {profile: profile.name, opened, posed, atShutter, photo: {file: photoFile, width: photo.width, height: photo.height}, recording, clip, keyboard, errors}
 }
 
 try {
