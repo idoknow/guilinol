@@ -140,7 +140,8 @@ def bake(directory, manifest, paired_widths):
         if not section.get("firstSectionRoadDecks"):
             continue
         from rail_section_bridges import grade_decks
-        bridges, abutments = grade_decks(directory, manifest, section["firstSectionRoadDecks"], ways, profiles)
+        bridges, abutments = grade_decks(directory, manifest, section["firstSectionRoadDecks"],
+                                         ways, profiles, preserve_paving=True)
         if abutments.keys() & landings.keys():
             raise ValueError("Shared bridge landing requires one joint design")
         bridge_approaches.update(access["approachWay"] for deck in section["firstSectionRoadDecks"]

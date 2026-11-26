@@ -66,6 +66,13 @@ def bake(directory, manifest):
         payload = json.loads(data[offset:offset+size]); streets = payload[1]
         image_bytes, deck_count = struct.unpack_from('<2I',data,16)
         deck = np.frombuffer(data, '<i2', deck_count*9, offset+size+image_bytes).reshape((-1,3,3))
+        if tile.get("elevatedAbutments"):
+            native = np.ones(deck_count, dtype=bool)
+            for first, length in tile["elevatedAbutments"]:
+                if first < 0 or length <= 0 or first + length > deck_count:
+                    raise ValueError(f"Invalid elevated abutment range in {tile['file']}")
+                native[first:first + length] = False
+            deck = deck[native]
         deck_cm = shapely.union_all([Polygon(triangle[:,[0,2]]) for triangle in deck if Polygon(triangle[:,[0,2]]).area])
         def local_cm(geometry):
             return shapely.set_precision(shapely.affinity.scale(translate(geometry,-origin[0],-origin[1]),xfact=100,yfact=100,origin=(0,0)),1)
