@@ -13,7 +13,9 @@ const INTERNAL_CIDRS = [
   'fe80::/10',
 ]
 
-const FORWARD_HEADERS = ['cf-connecting-ip', 'x-real-ip', 'x-client-ip', 'true-client-ip']
+// x-real-ip 会被链路代理改写成本节点地址（CDNFly/Traefik 都会覆盖），所以排在最后；
+// CDN 用自定义头 X-Client-IP 传真实客户端 IP，必须优先于它。
+const FORWARD_HEADERS = ['cf-connecting-ip', 'true-client-ip', 'x-client-ip', 'x-real-ip']
 
 /** 校验并规范化 IP 字面量（剥掉 ::ffff: IPv4-mapped 前缀）；不合法返回空串。 */
 export function normalizeIp(raw) {

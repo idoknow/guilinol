@@ -117,6 +117,16 @@ test('client-ip resolver priority, trusted proxy CIDRs, and rt parity',()=>{
       resolve({'cf-connecting-ip':'202.103.225.68','x-real-ip':'10.42.10.1','x-forwarded-for':'10.42.10.1'},'127.0.0.1'),
       {clientIp:'202.103.225.68',nodeIp:'127.0.0.1',trusted:true},
     )
+    // CDNFly 链路：x-real-ip 被改写成本节点地址，真实客户端 IP 走自定义头 X-Client-IP，必须优先采信
+    assert.deepEqual(
+      resolve({'x-client-ip':'202.103.225.68','x-real-ip':'103.45.143.210','x-forwarded-for':'103.45.143.210'},'127.0.0.1'),
+      {clientIp:'202.103.225.68',nodeIp:'103.45.143.210',trusted:true},
+    )
+    // 没有自定义头时退回 x-real-ip（Cloudflare/直连场景保持原行为）
+    assert.deepEqual(
+      resolve({'x-real-ip':'202.103.225.68','x-forwarded-for':'111.223.13.41'},'127.0.0.1'),
+      {clientIp:'202.103.225.68',nodeIp:'111.223.13.41',trusted:true},
+    )
   }
 })
 test('perf cache deduplicates concurrent queries, canonicalizes param order, and serves hits/stale within ms',async()=>{
