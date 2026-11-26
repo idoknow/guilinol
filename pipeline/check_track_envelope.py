@@ -92,15 +92,38 @@ def run(world, faces):
         if r["type"] == "level":
             cross[r["rail"]].append(r["road"])
     levelroads = {w for roads in cross.values() for w in roads}
-    c_bands = {}
+    crossing_parts = {}
     lines_by_id = {}
     for w in levelroads:
         axis = lines_by_id[w] = LineString(points(ways[w]))
-        c_bands[w] = (
-            union_all([a.buffer(b + 1, cap_style="flat") for a, b in floors[w]])
-            if floors[w]
-            else axis.buffer(half_width(ways[w]) + 1)
-        )
+        native_width = half_width(ways[w]) + 1
+        if floors[w]:
+            # A way may have a graded approach kilometres from its level crossing.
+            # Retain the native pavement on every ungraded part of that same way.
+            profiles = union_all([a for a, _ in floors[w]])
+            native = axis.difference(profiles.buffer(XY_TOLERANCE, cap_style="flat"))
+            graded_band = union_all([a.buffer(b + 1, cap_style="flat") for a, b in floors[w]])
+            native_band = native.buffer(native_width, cap_style="flat").difference(graded_band)
+            crossing_parts[w] = [(graded_band, True), (native_band, False)]
+        else:
+            crossing_parts[w] = [(axis.buffer(native_width), False)]
+    style = json.loads((ROOT / "pipeline/railway-style.json").read_bytes())
+    strip_width = style["ballastHalfWidth"] + 2
+    parts_by_rail = defaultdict(list)
+    for rail, roads in cross.items():
+        track = LineString(points(ways[rail]))
+        for road in roads:
+            for band, graded in crossing_parts[road]:
+                if not graded and floors[road]:
+                    # The same road may run parallel to this rail further away.
+                    # Use only the connected track interval containing the level crossing.
+                    crossing = track.intersection(lines_by_id[road])
+                    clipped = track.intersection(band)
+                    connected = [part for part in getattr(clipped, "geoms", [clipped])
+                                 if not part.is_empty and part.distance(crossing) < XY_TOLERANCE]
+                    band = band.intersection(union_all(connected).buffer(strip_width, cap_style="square"))
+                if not band.is_empty:
+                    parts_by_rail[rail].append((road, band, graded))
     axes = []
     road_ids = []
     widths = []
@@ -132,7 +155,6 @@ def run(world, faces):
     b_count = defaultdict(int)
     from rail_sections import designs
     panel_roads = {wid for design in designs() for wid in design.get("panelRoads", [])}
-    style = json.loads((ROOT / "pipeline/railway-style.json").read_bytes())
     steel_bands = {}
     covered_heads = defaultdict(dict)
 
@@ -162,8 +184,10 @@ def run(world, faces):
                     for sign in (-1,1):
                         offset = sign * (style["gauge"] + style["headWidth"]) / 2
                         head = axis.offset_curve(offset).buffer(style["headWidth"]/2, cap_style="flat")
-                        for road in roads:
-                            footprint = head.intersection(c_bands[road])
+                        for road, band, _ in parts_by_rail[w]:
+                            if road not in roads:
+                                continue
+                            footprint = head.intersection(band)
                             if not footprint.is_empty:
                                 heads.append((road,sign,footprint))
                     steel_bands[key] = heads
@@ -239,10 +263,10 @@ def run(world, faces):
                 return loc, signed
 
             remaining = footprint
-            for road in cross.get(w, []):
+            for road, band, graded in parts_by_rail.get(w, ()):
                 if owner not in (None, road):
                     continue
-                part = remaining.intersection(c_bands[road])
+                part = remaining.intersection(band)
                 if part.is_empty:
                     continue
                 registered[sec].add(road)
@@ -250,7 +274,7 @@ def run(world, faces):
                 # At stacked roads a lower sheet is not the crossing surface.
                 # The signed finished floor is continuous across the road width.
                 # Still test all protruding native paving against the upper limit.
-                owns_grade = owner == road or not floors.get(road)
+                owns_grade = owner == road or not graded
                 error = (
                     np.maximum(gap - 0.05, -0.02 - gap) if owns_grade else gap - 0.05
                 )
@@ -285,7 +309,7 @@ def run(world, faces):
                                 loc[0].tolist(),
                                 road,
                             )
-                remaining = remaining.difference(c_bands[road])
+                remaining = remaining.difference(band)
                 if remaining.is_empty:
                     break
             for road, area in cache[i]:
