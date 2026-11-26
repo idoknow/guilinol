@@ -118,6 +118,17 @@ export function multiplayer(pool,env,{cache}={}){
   }
   async function route(path,request,actor){
     const params=new URL(request.url).searchParams
+    // 联机封禁：列表 / 手动封禁 / 人工解封（转发到 rt，由 rt 的 RT_ADMIN_TOKEN 鉴权）
+    if(path==='admin/bans'||path==='admin/ban'||path==='admin/unban'){
+      if(!env.RT_ADMIN_TOKEN)return json({error:'disabled'},503)
+      const target=base+'/'+path
+      try{
+        const init={method:request.method,redirect:'error',signal:AbortSignal.timeout(6000),headers:{'X-Admin-Token':env.RT_ADMIN_TOKEN,'content-type':'application/json'}}
+        if(request.method!=='GET')init.body=JSON.stringify({...(await request.json().catch(()=>({}))),actor})
+        const response=await fetch(target,init)
+        return json(await response.json().catch(()=>({})))
+      }catch{return json({error:'rt unavailable'},503)}
+    }
     if(path.startsWith('admin/chat/')){
       if(!env.RT_ADMIN_TOKEN)return json({error:'chat unavailable'},503)
       try{return await fetch(base+'/admin/chat',{method:'POST',redirect:'error',signal:AbortSignal.timeout(8000),headers:{'X-Admin-Token':env.RT_ADMIN_TOKEN,'content-type':'application/json'},body:JSON.stringify({path:path.slice(11),actor,method:request.method,params:Object.fromEntries(params),body:request.method==='GET'?{}:await request.json()})})}catch{return json({error:'chat unavailable'},503)}

@@ -1,4 +1,5 @@
 import { readFileSync } from 'node:fs'
+import { canAct } from './anti-cheat.mjs'
 export const config = JSON.parse(readFileSync(new URL('./combat-config.json', import.meta.url)))
 const c = config
 const foot = new Set(['walk', 'idle', 'mission', 'photo', 'smoke', 'fishing'])
@@ -62,6 +63,8 @@ export function combat(players, broadcast) {
     if (!standing(p) || p.helping || !['walk', 'idle', 'mission'].includes(p.activity)) return
     const target = players.get(msg.id)
     if (msg.t === 'rescue-start') {
+      // 刚瞬移 / 刚高速移动过不能扶人（否则可以瞬移到倒地者身边瞬间扶起）
+      if (!canAct(p, at)) return
       if (
         !target?.dn ||
         target === p ||
@@ -96,6 +99,7 @@ export function combat(players, broadcast) {
     }
     if (
       msg.t !== 'punch' ||
+      !canAct(p, at) ||
       !Object.hasOwn(c.damage, msg.kind) ||
       !Object.hasOwn(c.zone, msg.zone) ||
       at < (p.nextPunch ?? 0)

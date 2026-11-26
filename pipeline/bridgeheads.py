@@ -1,13 +1,72 @@
 import numpy as np
 from shapely.geometry import LineString, box
 
-from bridges import bridge_tiles
 from clearance import audit_routes
 from common import CHUNK, GRID, load_osm
 from features import points
 
 
+def extend_to_dry_bank(coords, sample, max_extend=20.0, step=2.0, end_heights=None):
+    """Extend bridge endpoints that terminate over water or a steep riverbank drop onto dry bank.
+
+    Returns (extended_coords, start_ext_m, end_ext_m) while preserving original vertices in-between.
+    """
+    if len(coords) < 2:
+        return list(coords), 0.0, 0.0
+    out = [tuple(pt) for pt in coords]
+    exts = [0.0, 0.0]
+    for end_idx, (ep_i, near_i) in enumerate(((0, 1), (-1, -2))):
+        ep = np.asarray(out[ep_i], dtype=float)
+        near = np.asarray(out[near_i], dtype=float)
+        vec = ep - near
+        vlen = float(np.linalg.norm(vec))
+        if vlen < 1e-4:
+            continue
+        direction = vec / vlen
+        g0, w0 = sample(float(ep[0]), float(ep[1]))
+        h_ref = float(end_heights[end_idx]) if end_heights is not None else g0
+        # Only extend if endpoint sits directly on water, hovers >0.45m above a wet-adjacent bank,
+        # or sits down in a wet-adjacent riverbank depression (>0.8m below the dry bank plateau ahead).
+        near_wet = (w0 != -32768) or any(
+            sample(float(ep[0] + ox), float(ep[1] + oz))[1] != -32768
+            for ox, oz in ((-6, 0), (6, 0), (0, -6), (0, 6), (-4, -4), (4, 4))
+        )
+        needs_extend = (w0 != -32768)
+        if not needs_extend and near_wet:
+            if end_heights is not None and (h_ref - g0) > 0.45:
+                needs_extend = True
+            else:
+                plateau_g = g0
+                for probe_d in np.arange(step, min(14.0, max_extend) + 0.01, step):
+                    gp, wp = sample(float(ep[0] + direction[0] * probe_d), float(ep[1] + direction[1] * probe_d))
+                    if wp == -32768 and gp > plateau_g:
+                        plateau_g = gp
+                if plateau_g >= g0 + 0.8:
+                    needs_extend = True
+                    h_ref = max(h_ref, plateau_g)
+        if not needs_extend:
+            continue
+        landed = None
+        for dist in np.arange(step, max_extend + 0.01, step):
+            cand = ep + direction * float(dist)
+            gc, wc = sample(float(cand[0]), float(cand[1]))
+            if wc != -32768:
+                continue
+            if (h_ref - gc) <= 0.20:
+                landed = (float(cand[0]), float(cand[1])), float(dist)
+                break
+        if landed is not None:
+            pt_land, dist_land = landed
+            if end_idx == 0:
+                out.insert(0, pt_land)
+            else:
+                out.append(pt_land)
+            exts[end_idx] = dist_land
+    return out, exts[0], exts[1]
+
+
 def raise_approaches(bounds, routes, sample, terrain, original, wet):
+    from bridges import bridge_tiles
     encode, triangles = bridge_tiles(bounds, sample, routes)
     west, north, east, south = map(int, bounds.bounds)
     for row in range(north,south,CHUNK):

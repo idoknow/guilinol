@@ -6,6 +6,7 @@ import {players,type Pose} from './net-players'
 import {onUser} from './ui/account'
 import type {MpStatus} from './ui/mp-pref'
 import {setRoster,clearRoster,type RosterPlayer} from './mp-roster'
+import {fingerprint,deviceSummary} from './fingerprint'
 
 function publish(detail:MpStatus){window.dispatchEvent(new CustomEvent('glol:mp-status',{detail}))}
 
@@ -17,7 +18,7 @@ let subCount=0
  *  计数放在模块级：地图可能比 socket 先打开，联网后要补发订阅。 */
 export function requestRoster(on:boolean){subCount=Math.max(0,subCount+(on?1:-1));rosterRequester?.()}
 
-export function attachNet(scene:Scene,clips:AnimationClip[],getPose:()=>Pose,getAvatar:()=>Avatar,camera:Camera,getActivity?:()=>ActivityReport,onCombat?:(p:CombatPacket,self:string)=>void) {
+export function attachNet(scene:Scene,clips:AnimationClip[],getPose:()=>Pose,getAvatar:()=>Avatar,camera:Camera,getActivity?:()=>ActivityReport,onCombat?:(p:CombatPacket,self:string)=>void,onSetback?:(x:number,y:number,z:number)=>void) {
   const peers=players(scene,clips,camera)
   let socket:WebSocket|undefined,attempt=0,generation=0,timer=0,lastSent=-Infinity,lastRoster=-Infinity,lastActCheck=-Infinity,disposed=false
   let lastRosterV=0,rosterPaused=false,subTimer=0
@@ -77,7 +78,7 @@ export function attachNet(scene:Scene,clips:AnimationClip[],getPose:()=>Pose,get
       const previous=socket
       if(previous){previous.onopen=previous.onmessage=previous.onclose=previous.onerror=null;try{previous.close(1000,'replace')}catch{}}
       const ws=new WebSocket(endpoint);socket=ws
-      ws.onopen=()=>{if(version===generation){const initial=getActivity?.();lastActKey=initial?`${initial.act}|${initial.detail??''}`:'';send({t:'join',ticket,avatar:getAvatar(),caps:['roster3'],...(initial?{act:initial.act,actDetail:initial.detail}:{}),...getPose()})}}
+      ws.onopen=()=>{if(version===generation){const initial=getActivity?.();lastActKey=initial?`${initial.act}|${initial.detail??''}`:'';send({t:'join',ticket,fp:fingerprint(),dev:deviceSummary(),avatar:getAvatar(),caps:['roster3'],...(initial?{act:initial.act,actDetail:initial.detail}:{}),...getPose()})}}
       ws.onmessage=event=>{
         if(version!==generation)return
         const msg=JSON.parse(event.data)
@@ -102,6 +103,10 @@ export function attachNet(scene:Scene,clips:AnimationClip[],getPose:()=>Pose,get
             attempt=0;update('online',msg.online);break
           case 'online':update('online',msg.online);break
           case 'roster':far=new Map();for(const [id,name,x,z,joinedAt] of msg.players as [string,string,number,number,number][])if(id!==myId)far.set(id,{id,name,x,z,yaw:0,v:0,bike:false,joinedAt,far:true});lastRoster=-Infinity;break
+          // 服务端判定这次移动不合法（超速/飞天/非法瞬移）：把自己拉回服务端认可的位置
+          case 'setback':{
+            if(typeof msg.x==='number'&&typeof msg.z==='number')onSetback?.(msg.x,typeof msg.y==='number'?msg.y:0,msg.z)
+            break}
           // 按需名册：只在打开大地图/玩家列表时订阅；near 是附近快照，full 是全量，其余是增量
           case 'roster3':{
             if(msg.paused){rosterPaused=true;lastRosterV=msg.v??lastRosterV;break}

@@ -1,9 +1,9 @@
-import {cruiseSeconds,fareForTour,flightClock,routeVersion} from '../lib/helicopter-clock.ts'
+import {cruiseSeconds,fareForTour,flightClock,routeVersion,queueETA,services} from '../lib/helicopter-clock.ts'
 
 function phaseOf(row,now){
   if(!row)return 'idle'
   if(row.t0==null)return 'boarding'
-  const {phase}=flightClock(now,Number(row.t0),row.mode)
+  const {phase}=flightClock(now,Number(row.t0),row.mode,row.route_version)
   if(phase==='landed')return 'unloading'
   if(phase==='descend'||phase==='stop')return 'landing'
   if(phase==='start'||phase==='board')return 'boarding'
@@ -39,7 +39,7 @@ export function helicopterStore(pool,clock=Date.now){
         if(!active||active.passenger!==user||String(active.ticket)!==String(body?.ticket))code='NOT_YOUR_TURN'
         else if(action==='unload'){
           if(phaseOf(active,now)==='unloading')await remove(active.ticket);else code='IN_FLIGHT'
-        }else if(active.t0===null)await client.query('UPDATE helicopter_queue SET t0=$2 WHERE ticket=$1',[active.ticket,now+7000])
+        }else if(active.t0===null)await client.query('UPDATE helicopter_queue SET t0=$2,seat=$3,route_version=$4 WHERE ticket=$1',[active.ticket,now+7000,[1,2,3].includes(Number(body.seat))?Number(body.seat):1,routeVersion])
       }
       async function bill(active){
           const user=active.passenger
@@ -62,8 +62,8 @@ export function helicopterStore(pool,clock=Date.now){
       active=await advance();const mine=await one('SELECT ticket,offered_at,mode FROM helicopter_queue WHERE passenger=$1',[user])
       const notice=await one('DELETE FROM helicopter_notice WHERE passenger=$1 RETURNING code',[user]);if(notice)code=notice.code
       const ahead=mine?await one('SELECT count(*) AS count, array_agg(mode) AS modes FROM helicopter_queue WHERE offered_at IS NULL AND ticket<$1',[mine.ticket]):null
-      const remaining=!active||active.passenger===user?0:Math.max(0,((active.t0===null?Number(active.offered_at)+67000:Number(active.t0))+(cruiseSeconds[active.mode]+26)*1000-now)/1000)
-      const result={code,now,state:phaseOf(active,now),mine:mine?{ticket:String(mine.ticket),offered:mine.offered_at!==null,mode:mine.mode}:null,ahead:Number(ahead?.count??0),eta:Math.ceil(remaining+(ahead?.modes??[]).reduce((sum,mode)=>sum+93+cruiseSeconds[mode],0)),flight:active?.t0!=null?{mode:active.mode,t0:Number(active.t0),version:active.route_version}:null}
+      const eta=!active||active.passenger===user?0:queueETA(active.mode,now,active.t0===null?now:Number(active.t0)-services[active.mode].start*1000,ahead?.modes??[])
+      const result={code,now,state:phaseOf(active,now),mine:mine?{ticket:String(mine.ticket),offered:mine.offered_at!==null,mode:mine.mode}:null,ahead:Number(ahead?.count??0),eta,flight:active?.t0!=null?{mode:active.mode,t0:Number(active.t0),version:active.route_version,seat:active.seat}:null}
       if(result.flight)result.flight.passengerUid=Number((await one('SELECT uid FROM users WHERE id=$1',[active.passenger])).uid)
       await client.query('COMMIT');return result
     }catch(error){await client.query('ROLLBACK');throw error}finally{client.release()}

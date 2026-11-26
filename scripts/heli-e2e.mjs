@@ -7,7 +7,7 @@ import {register} from 'tsx/esm/api'
 import {spawn} from 'node:child_process'
 import {once} from 'node:events'
 register()
-const {withQueueDatabase}=await import('./test-helicopter-queue.mjs'),{fixture}=await import('./heli-fixture.mjs')
+const {services}=await import('../lib/helicopter-clock.ts');const {withQueueDatabase}=await import('./test-helicopter-queue.mjs'),{fixture}=await import('./heli-fixture.mjs')
 await withQueueDatabase(async pool=>{
 const api=await fixture(pool)
 const output=process.env.HELI_CAPTURE_DIR??'captures/helicopter',server=await preview({root:'web',configFile:'web/vite.config.ts',plugins:[api.plugin],...(process.env.HELI_COMPARE_DIST?{build:{outDir:process.env.HELI_COMPARE_DIST}}:{}),preview:{host:'127.0.0.1',port:0}})
@@ -42,6 +42,7 @@ try{
   }
   await page.goto(url,{waitUntil:'domcontentloaded'})
   await page.waitForFunction(()=>window.viewer?.walk?.active,null,{timeout:120000})
+  if(process.env.HELI_REWORK_CAPTURE){const {captureFlight}=await import('./heli-capture-flight.mjs');await captureFlight(page,output);return}
   if(process.env.HELI_HANDOFF_ONLY){const {handoff}=await import('./heli-handoff.mjs');await handoff({page,other,url,api,output});return}
   assert.ok(await page.evaluate(()=>window.viewer.walkTo(-844,208,-2.51,'plaza-e2e')))
   if(process.env.HELI_PROFILE){await (await import('./heli-profile.mjs')).profile(page,api,pool);return}
@@ -52,8 +53,8 @@ try{
     for(const mode of ['low','high','dynamic']){
       const join=await cmd('join',{mode});assert.ok(join.mine?.offered,JSON.stringify(join))
       const {flight}=await cmd('confirm',{ticket:join.mine.ticket});assert.ok(flight)
-      api.advance(30000);await phase('cruise');const sampled=await fps(mode);console.log('CRUISE_RATIO',mode,sampled/baseline)
-      api.advance(({low:360,high:280,dynamic:330}[mode]+100)*1000);await phase('idle')
+      api.advance((services[mode].ascend+15)*1000);await phase('cruise');const sampled=await fps(mode);console.log('CRUISE_RATIO',mode,sampled/baseline)
+      api.advance((services[mode].total+65)*1000);await phase('idle')
     }
     return
   }
@@ -73,7 +74,7 @@ try{
     await page.keyboard.press('KeyF');assert.equal(await page.evaluate(()=>window.viewer.heli.phase),'cruise');if(mode==='low')await shot('06-third')
     const flightFps=await fps(mode);await page.keyboard.press('KeyT');assert.ok(await page.evaluate(()=>window.viewer.heli.first));if(mode==='low')await shot('07-first');await page.keyboard.press('KeyT');
     const flight=await page.evaluate(()=>window.viewer.heli.queue().flight)
-    const left=await page.evaluate(()=>window.viewer.heli.queue().now);api.advance(Math.max(0,flight.t0+({low:360,high:280,dynamic:330}[mode]-20)*1000-left))
+    const left=await page.evaluate(()=>window.viewer.heli.queue().now);api.advance(Math.max(0,flight.t0+(services[mode].total-15)*1000-left))
     await phase('landed');if(mode==='low')await shot('08-landed');await page.locator('.heli-prompt').filter({hasText:'按 F 键下机'}).waitFor();await page.keyboard.press('KeyF');await phase('idle');if(mode==='low')await shot('09-exit');console.log({mode,baseline,flightFps,ratio:flightFps/baseline})
     if(mode!=='dynamic')await page.locator('.heli-prompt').click()
   }

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import {cruiseSeconds,routeVersion} from '../lib/helicopter-clock.ts'
+import {cruiseSeconds,routeVersion,services} from '../lib/helicopter-clock.ts'
 import {flightReplica} from '../web/src/helicopter/flight.ts'
 
 const epoch=1800000000000
@@ -20,7 +20,7 @@ for(const mode of Object.keys(cruiseSeconds))test(`independent replicas: ${mode}
   const flight={t0:epoch,mode,version:routeVersion};let distance=0,angle=0
   for(const firstSkew of [0,-200,200])for(const secondSkew of [0,-200,200]){
     const first=client(firstSkew,0),second=client(secondSkew,731)
-    for(let time=-7000;time<=(cruiseSeconds[mode]+86)*1000;time+=50){
+    for(let time=-7000;time<=(services[mode].total+60)*1000;time+=50){
       const left=first(time,flight),right=second(time,{...flight})
       distance=Math.max(distance,Math.hypot(left.x-right.x,left.y-right.y,left.z-right.z))
       for(const key of ['yaw','pitch','roll']){const delta=left[key]-right[key];angle=Math.max(angle,Math.abs(Math.atan2(Math.sin(delta),Math.cos(delta))))}
