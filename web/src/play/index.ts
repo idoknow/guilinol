@@ -146,13 +146,8 @@ export function play(host:Host) {
   let mapRequested = !(host.manifest as {atlas?:unknown}).atlas
   const feedbackEntry=button('反馈','反馈','dock-feedback');buttons.append(feedbackEntry)
   window.addEventListener('glol:mp-ban',event=>{
-    const {reason,until,recordId}=(event as CustomEvent).detail
-    document.getElementById('mp-ban-notice')?.remove()
-    const notice=document.createElement('dialog'),appeal=document.createElement('button'),close=document.createElement('button')
-    notice.id='mp-ban-notice';notice.textContent=`联机已封禁：${reason}。截止：${until==null?'永久':new Date(until).toLocaleString()}。记录 ID：${recordId}。`
-    appeal.textContent='申诉';close.textContent='关闭';close.onclick=()=>notice.close();notice.onclose=()=>notice.remove()
-    appeal.onclick=()=>{notice.close();void import('../ui/feedback').then(module=>module.openFeedback(host,()=>ensureMap(),undefined,recordId))}
-    notice.append(appeal,close);document.body.append(notice);notice.showModal()
+    const detail=(event as CustomEvent).detail
+    void import('../ui/mp-ban').then(module=>module.showMpBan(detail,recordId=>void import('../ui/feedback').then(feedback=>feedback.openFeedback(host,()=>{mapRequested=true;return ensureMap()},undefined,recordId))))
   })
   feedbackEntry.onclick=()=>void import('../ui/feedback').then(module=>module.openFeedback(host,()=>{mapRequested = true; return ensureMap()}))
   const feedbackId=new URLSearchParams(location.search).get('feedback');if(feedbackId&&/^[\w-]{1,128}$/.test(feedbackId))void import('../ui/feedback').then(module=>module.openFeedback(host,()=>{mapRequested=true;return ensureMap()},feedbackId))

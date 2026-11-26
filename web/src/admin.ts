@@ -1736,39 +1736,93 @@ const pages: Record<string, (view: View) => void> = {
       const who = [one.model, one.browser, one.isp, one.city].filter(Boolean).join(' · ')
       return h('div', { class: 'adm-sub' }, `${who || '设备'}${list.length > 1 ? ` · 关联 ${list.length} 个账号` : ''}`)
     }
-    const banRow = (row: any) => h('tr', null,
-      h('td', null, row.kind === 'uid' ? '账号' : '设备'),
-      h('td', null, String(row.value), deviceLine(row)),
-      h('td', null, row.until ? when(new Date(row.until)) : '永久'),
-      h('td', null, row.actor==='protocol'?'攻击':row.actor==='auto'?'外挂':'人工'),h('td', null, row.reason || '—'),
-      h('td', null, h('button', {
-        type: 'button', class: 'adm-btn adm-btn--sm adm-btn--ghost',
-        onclick: async () => {
-          try {
-            await api('admin/unban', { uid: row.kind === 'uid' ? Number(row.value) : undefined, fp: row.kind === 'fp' ? row.value : undefined })
-            void loadBans()
-          } catch (error) { alert(String((error as Error)?.message ?? error)) }
-        },
-      }, '解封')))
+    const banKind = (row: any) => row.actor === 'protocol' ? ['攻击', 'is-bad'] : row.actor === 'auto' ? ['外挂', 'adm-ban-auto'] : ['人工', '']
+    const banRow = (row: any) => {
+      const [label, tone] = banKind(row)
+      return h('tr', null,
+        h('td', null, h('span', { class: `adm-pill ${tone}` }, label)),
+        h('td', null, h('span', { class: 'adm-ban-target' }, row.kind === 'uid' ? 'UID ' : '设备 ', h('code', null, String(row.value))), deviceLine(row)),
+        h('td', null, row.reason || '—', row.recordId && h('div', { class: 'adm-sub adm-ban-record' }, `记录 ${String(row.recordId).slice(0, 8)}`)),
+        h('td', { class: 'adm-nowrap' }, row.until ? when(new Date(row.until)) : h('span', { class: 'adm-pill is-bad' }, '永久')),
+        h('td', { class: 'adm-right' }, h('button', {
+          type: 'button', class: 'adm-btn adm-btn--sm adm-btn--ghost',
+          onclick: async () => {
+            if (!confirm(`解除${row.kind === 'uid' ? ` UID ${row.value}` : '该设备'}的联机封禁？`)) return
+            try {
+              await api('admin/unban', { uid: row.kind === 'uid' ? Number(row.value) : undefined, fp: row.kind === 'fp' ? row.value : undefined })
+              void loadBans()
+            } catch (error) { alert(String((error as Error)?.message ?? error)) }
+          },
+        }, '解封')))
+    }
+    const kindLabel: Record<string, string> = {
+      speed: '超速移动', teleport: '违规瞬移', head_overlap: '贴在他人头顶跟随', altitude_unverified: '异常升空 / 滞空（仅记录）', ground_unverified: '疑似钻地（仅记录）',
+      mount_player: '请求骑乘他人', foreign_position: '改写他人位置', oversize: '超大消息', invalid_packet: '非法消息', packet_rate: '刷包超频',
+    }
+    const detailLabel: Record<string, string> = { overflow: '超出 (m)', to: '落点', peer: '对象玩家', target: '对象玩家', size: '大小', rate: '频率' }
+    const attack = new Set(['mount_player', 'foreign_position', 'oversize', 'invalid_packet', 'packet_rate'])
+    const coord = (value: unknown) => Array.isArray(value) ? value.map((n) => Math.round(Number(n))).join(', ') : ''
+    const clock = (at: number) => { const d = new Date(at); return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}:${String(d.getSeconds()).padStart(2, '0')}` }
+    const reviewCard = (review: any) => {
+      const events = (Array.isArray(review.evidence) ? review.evidence : []) as any[]
+      const counts = new Map<string, number>()
+      for (const event of events) counts.set(event.kind, (counts.get(event.kind) ?? 0) + 1)
+      const reasonIn = h('input', { type: 'text', class: 'adm-input', placeholder: '处罚原因（玩家会看到）', 'aria-label': '处罚原因',
+        value: [...counts.keys()].map((k) => kindLabel[k] ?? k).join('、') }) as HTMLInputElement
+      const minutesSel = h('select', { class: 'adm-select', 'aria-label': '处罚时长' },
+        ...[['60', '1 小时'], ['1440', '24 小时'], ['10080', '7 天'], ['0', '永久']].map(([v, t]) => h('option', { value: v }, t))) as HTMLSelectElement
+      minutesSel.value = '1440'
+      const act = async (button: HTMLButtonElement, run: () => Promise<unknown>) => {
+        button.disabled = true
+        try { await run(); await loadBans() } catch (error) { button.disabled = false; alert(String((error as Error)?.message ?? error)) }
+      }
+      const confirmBtn = h('button', { type: 'button', class: 'adm-btn adm-btn--sm adm-btn--danger' }, '确认违规并封禁') as HTMLButtonElement
+      confirmBtn.onclick = () => {
+        const reason = reasonIn.value.trim()
+        if (!reason) { reasonIn.focus(); return }
+        void act(confirmBtn, () => api('admin/ban', { uid: review.uid, reviewId: review.id, minutes: Number(minutesSel.value), reason }))
+      }
+      const dismissBtn = h('button', { type: 'button', class: 'adm-btn adm-btn--sm adm-btn--ghost' }, '不处罚') as HTMLButtonElement
+      dismissBtn.onclick = () => { if (confirm(`结束 UID ${review.uid} 的复核，不处罚？`)) void act(dismissBtn, () => api('admin/unban', { uid: review.uid, reviewId: review.id, dismiss: true })) }
+      return h('article', { class: 'adm-review' },
+        h('header', { class: 'adm-review-head' },
+          h('div', null,
+            h('b', null, `UID ${review.uid}`),
+            h('span', { class: 'adm-sub' }, ` · ${when(new Date(Number(review.opened_ms)))} 进入复核 · ${events.length} 条证据`)),
+          h('div', { class: 'adm-chips' }, ...[...counts].map(([k, n]) =>
+            h('span', { class: `adm-pill ${attack.has(k) ? 'is-bad' : 'adm-ban-auto'}` }, `${kindLabel[k] ?? k} ×${n}`)))),
+        h('details', { class: 'adm-review-evidence' },
+          h('summary', null, '证据时间线'),
+          h('div', { class: 'adm-table-wrap' }, h('table', { class: 'adm-table adm-table--dense' },
+            h('thead', null, h('tr', null, ...['时间', '类型', '起点', '详情'].map((t) => h('th', null, t)))),
+            h('tbody', null, ...events.map((event) => {
+              const { from, ...rest } = event.detail ?? {}
+              const extra = Object.entries(rest).map(([k, v]) => `${detailLabel[k] ?? k}：${Array.isArray(v) ? coord(v) : typeof v === 'object' ? JSON.stringify(v) : v}`).join(' · ')
+              return h('tr', null, h('td', { class: 'adm-nowrap' }, clock(Number(event.at))), h('td', null, kindLabel[event.kind] ?? event.kind),
+                h('td', { class: 'adm-nowrap' }, coord(from) || '—'), h('td', { class: 'adm-sub' }, extra || '—'))
+            }))))),
+        h('div', { class: 'adm-review-actions' }, reasonIn, minutesSel, confirmBtn, dismissBtn))
+    }
+    const banStats = h('div', { class: 'adm-kpis adm-kpis--small' })
+    const reviewSlot = h('div', { class: 'adm-reviews' })
     const loadBans = async () => {
       try {
         const data = await api<any>('admin/bans', undefined, 'GET')
         const rows = (data?.bans ?? []) as any[]
-        const reviews=(data.reviews??[]).map((review:any)=>h('details',null,
-          h('summary',null,`UID ${review.uid} · ${when(new Date(Number(review.opened_ms)))} · 查看证据`),
-          h('pre',null,JSON.stringify(review.evidence,null,2)),
-          h('button',{type:'button',onclick:async()=>{
-            const reason=window.prompt(`确认违规并按上方所选时长「${banMinSel.selectedOptions[0]?.text}」封禁 UID ${review.uid}？请输入原因`)
-            if(!reason?.trim())return
-            try {await api('admin/ban',{uid:review.uid,reviewId:review.id,minutes:Number(banMinSel.value),reason});await loadBans()} catch(error){alert(String(error))}
-          }},'确认违规'),h('button',{type:'button',onclick:async()=>{
-            if(!confirm('结束复核，不处罚且不改变已有封禁？'))return
-            try {await api('admin/unban',{uid:review.uid,reviewId:review.id,dismiss:true});await loadBans()} catch(error){alert(String(error))}
-          }},'不处罚')))
-        const table = h('table', { class: 'adm-table' },
-          h('thead', null, h('tr', null, ['类型', '对象', '到期','分类', '原因', ''].map((t) => h('th', null, t)))),
-          h('tbody', null, ...rows.map(banRow)))
-        banSlot.replaceChildren(h('p',null,`生效封禁 ${rows.length} · ${when(new Date())} 刷新`),table,h('h3',null,`待复核 ${reviews.length}`),...reviews,navLink('全部封禁管理记录',{view:'audit',target_type:'mp'},{class:'adm-link'}),navLink('封禁申诉列表',{view:'feedback',status:'',kind:'封禁申诉'},{class:'adm-link'}))
+        const reviews = (data?.reviews ?? []) as any[]
+        const count = (actor: string) => rows.filter((row) => row.actor === actor).length
+        banStats.replaceChildren(
+          serverStat('生效封禁', String(rows.length), `${when(new Date())} 刷新`),
+          serverStat('待复核', String(reviews.length), reviews.length ? '多类违规，等待人工确认' : '没有待处理'),
+          serverStat('外挂自动短封', String(count('auto'))),
+          serverStat('攻击自动短封', String(count('protocol'))),
+          serverStat('人工封禁', String(rows.length - count('auto') - count('protocol'))))
+        reviewSlot.replaceChildren(...(reviews.length ? reviews.map(reviewCard) : [emptyState('没有待复核的记录', '同一账号命中多类移动违规时会出现在这里，不会自动长封')]))
+        banSlot.replaceChildren(rows.length
+          ? h('div', { class: 'adm-table-wrap' }, h('table', { class: 'adm-table' },
+            h('thead', null, h('tr', null, ['分类', '对象', '原因', '到期', ''].map((t) => h('th', null, t)))),
+            h('tbody', null, ...rows.map(banRow))))
+          : emptyState('当前没有生效中的封禁'))
       } catch (error) { banSlot.replaceChildren(errorState(error as Error, () => void loadBans())) }
     }
     banForms.addEventListener('submit', async (event) => {
@@ -1786,10 +1840,12 @@ const pages: Record<string, (view: View) => void> = {
         void loadBans()
       } catch (error) { alert(String((error as Error)?.message ?? error)) }
     })
-    void loadBans()
-    const banCard = card('联机封禁（账号 / 设备指纹）', [banForms, banSlot], {
-      sub: '封了立即生效（在线会掉线）；账号与设备指纹任一命中即拦。人工解封后马上可重连。',
+    const banCard = card('生效中的封禁', [banSlot], {
+      sub: '账号与设备指纹任一命中即拦；解封后玩家马上可以重连。',
+      actions: [navLink('操作记录 →', { view: 'audit', target_type: 'mp' }, { class: 'adm-link' }), navLink('封禁申诉 →', { view: 'feedback', status: '', kind: '封禁申诉' }, { class: 'adm-link' })],
     })
+    const manualCard = card('人工封禁', banForms, { sub: '立即生效，在线玩家会被断开并看到原因与申诉入口。' })
+    const reviewCardWrap = card('待复核', reviewSlot, { sub: '多类违规只进复核，由管理员看过证据后决定是否处罚。' })
 
     const protections = [
       ['WAF 特征拦截','待接入','SQL 注入、XSS、命令注入、路径遍历、SSRF'],
@@ -1806,12 +1862,18 @@ const pages: Record<string, (view: View) => void> = {
       ['弱密码库','注册 / 重设已接入',`${weakFormCount} 个去重弱口令形式，另检测键盘序、重复、纯数字和日期格式；不改变旧账号登录`],
       ['IP 信誉查询','未接入','未接入 360 或 AbuseIPDB；请勿在此填写密钥'],
     ]
-    const protectionTable=h('table',{class:'adm-table'},
-      h('thead',null,h('tr',null,...['防护项','状态','说明'].map(label=>h('th',null,label)))),
-      h('tbody',null,...protections.map(row=>h('tr',null,...row.map(value=>h('td',null,value))))))
-    main.append(banCard,card('当前防护项',protectionTable,{sub:'按本版本代码核对，不代表线上 CDN 或 WAF 实时状态。'}))
+    const tone = (status: string) => /已接入|仅联机/.test(status) ? 'is-good' : /部分/.test(status) ? 'adm-ban-auto' : ''
+    const protectionTable = h('div', { class: 'adm-table-wrap' }, h('table', { class: 'adm-table adm-protect' },
+      h('thead', null, h('tr', null, ...['防护项', '状态', '说明'].map((label) => h('th', null, label)))),
+      h('tbody', null, ...protections.map(([name, status, note]) => h('tr', null,
+        h('td', { class: 'adm-nowrap' }, h('b', null, name)), h('td', { class: 'adm-nowrap' }, h('span', { class: `adm-pill ${tone(status)}` }, status)), h('td', { class: 'adm-sub' }, note))))))
+    paintTop(views.find((v) => v.key === 'bans')!, [h('span', { class: 'adm-live-dot', 'aria-hidden': 'true' }), h('span', { class: 'adm-sub adm-live-stamp' }, '每 10 秒刷新'),
+      navLink('联机概况 →', { view: 'mp' }, { class: 'adm-link' })])
+    main.append(h('div', { class: 'adm-stack' }, banStats, reviewCardWrap, banCard, manualCard,
+      card('当前防护项', protectionTable, { sub: '按本版本代码核对，不代表线上 CDN 或 WAF 实时状态；网站入口防护见 IDOK-462。' })))
+    void loadBans()
     refreshTimer = window.setInterval(() => {
-      if (document.visibilityState === 'visible' && !banSlot.querySelector('details[open]')) void loadBans()
+      if (document.visibilityState === 'visible' && !reviewSlot.querySelector('details[open]') && !reviewSlot.contains(document.activeElement)) void loadBans()
     }, 10000)
   },
   mp() {
