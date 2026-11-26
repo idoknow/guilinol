@@ -258,16 +258,18 @@ export function startOverview(manifest:Manifest) {
     const box = new THREE.Box3()
     const frustum=new THREE.Frustum(), projection=new THREE.Matrix4(), lastView=new THREE.Matrix4()
     let dirty=true
-    function update(camera:THREE.PerspectiveCamera){
+    let lastFineRadius=0
+    function update(camera:THREE.PerspectiveCamera,aerial=false){
       lake.update(camera)
       const {position,far}=camera
       const ax=Math.floor(position.x/size), az=Math.floor(position.z/size)
       projection.multiplyMatrices(camera.projectionMatrix,camera.matrixWorldInverse)
-      if(!dirty && lastView.equals(projection))return
+      const fineRadius=aerial?2:7
+      if(!dirty && lastView.equals(projection)&&lastFineRadius===fineRadius)return
+      lastFineRadius=fineRadius
       lastView.copy(projection);dirty=false
       frustum.setFromProjectionMatrix(projection)
       // The entire fine-detail streaming radius fits inside this square.
-      const fineRadius=7
       const high=(x:number,z:number)=>Math.max(Math.abs(x-ax),Math.abs(z-az))<=fineRadius
       let cursor=0
       const radius = Math.ceil(far/size)+2

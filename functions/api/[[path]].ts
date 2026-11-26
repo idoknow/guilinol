@@ -28,6 +28,17 @@ async function handle(request:Request,env:Env) {
   if(env.updateCards && /^(?:admin\/)?updates(?:\/|$)/.test(path)) return env.updateCards(request,path)
   if(/^(feedback|bridge|admin)(\/|$)/.test(path)) return feedback(request,env,path)
   if(path==='me/save')return cloudSave(request,env)
+  if(path==='helicopter'&&env.helicopter){
+    if(method!=='POST')throw new Problem(405,'method','需要 POST')
+    if(request.headers.get('Origin')!==url.origin)throw new Problem(403,'origin','请求来源不符')
+    const account=await sessionAccount(db,await sessionHash(request));if(!account?.verified)unauthorized()
+    const input=await request.json().catch(()=>null)
+    if(!input||typeof input!=='object'||Array.isArray(input))invalid()
+    const data=input as Record<string,unknown>
+    if(typeof data.action!=='string'||!['join','ping','leave','confirm','unload'].includes(data.action))invalid()
+    if(['confirm','leave','unload'].includes(data.action)&&!/^\d{1,18}$/.test(String(data.ticket)))invalid()
+    return json(await env.helicopter(account.id,data.action,data))
+  }
   if(env.fishing && path==='fishing/boards' && method==='GET'){
     const boards=await env.fishing.boards(url.searchParams.get('zone'));if(!boards)invalid();return json(boards)
   }

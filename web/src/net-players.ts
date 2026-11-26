@@ -1,3 +1,4 @@
+import {remoteSeat} from './helicopter/remote-seat'
 import {ensureAvatarRig,type AvatarRig} from './walk/avatar-rig'
 import {Fighter} from './combat/state'
 import {pose as combatPose} from './combat/poses'
@@ -104,6 +105,8 @@ export function players(scene:THREE.Scene,clips:THREE.AnimationClip[],camera:THR
     for(const [id,view] of visible){const player=records.get(id)!,pos=view.root.position
       pos.x+=(player.x-pos.x)*alpha;pos.y+=(player.y-pos.y)*alpha;pos.z+=(player.z-pos.z)*alpha
       const angle=player.yaw-view.root.rotation.y;view.root.rotation.y+=Math.atan2(Math.sin(angle),Math.cos(angle))*alpha
+      const seated=!!remoteSeat.uid&&player.uid===remoteSeat.uid
+      if(seated){pos.set(remoteSeat.x,remoteSeat.y,remoteSeat.z);view.root.rotation.y=remoteSeat.yaw}
       view.bike.visible=!!player.bike
       if(player.bike){view.bike.position.set(pos.x+player.bx-player.x,pos.y,pos.z+player.bz-player.z);view.bike.rotation.y=player.byaw}
       const away=Math.hypot(pos.x-camera.position.x,pos.z-camera.position.z,pos.y+NAME_Y-camera.position.y)
@@ -125,7 +128,7 @@ export function players(scene:THREE.Scene,clips:THREE.AnimationClip[],camera:THR
         if(eligible&&player.em&&view.played!==player.es){view.emote.play(player.em,Math.max(0,(emoteById(player.em)?.duration??0)-((player.expires??0)-performance.now())/1000));view.played=player.es??0}
         if(!eligible||!player.em){view.emote.stop();view.played=-1}
       }
-      const name=player.bike?'sit':!player.gr?'jump':player.v>3?'run':player.v>.12?'walk':'idle'
+      const name=seated||player.bike?'sit':!player.gr?'jump':player.v>3?'run':player.v>.12?'walk':'idle'
       const clip=clips.find(item=>item.name===figure.clips[name])??clips.find(item=>item.name===figure.clips.idle)
       if(clip&&view.mixer){const action=view.mixer.clipAction(clip)
         if(!view.action||!view.action.isRunning()||!view.action.enabled){

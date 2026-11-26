@@ -47,8 +47,15 @@ import {EBIKE_UPGRADE_MAX_KMH} from '../walk/tuning'
 
 import {rules} from '../smoke/data'
 import {RECENT_ACTION_LIMIT} from '../fishing/limits'
+import {queueCommand} from '../helicopter/queue'
+import {fareForTour} from '../../../lib/helicopter-clock'
+
+export async function confirmHelicopterTicket(ticket:string){
+  const state=await queueCommand('confirm',{ticket});if(state.code==='OK')window.dispatchEvent(new Event('glol:save-written'));return state
+}
 
 export type CatalogItemType =
+  | 'helicopter_tour'
   | 'cigarette_pack'
   | 'outfit_item'
   | 'outfit_preset'
@@ -190,6 +197,7 @@ export function quotePurchasePrice(
   save: Readonly<LocalSaveV1> = getActiveSaveSnapshot(),
 ): number | null {
   switch (itemType) {
+    case 'helicopter_tour': return itemId === 'ticket' ? fareForTour(save.economy.helicopterTours) : null
     case 'cigarette_pack': return rules.brands.find(b => b.id === itemId)?.price ?? null
     case 'outfit_item':
       return OUTFIT_ITEMS_BY_ID[itemId]?.price ?? null
@@ -249,7 +257,9 @@ export function executePurchase(req: PurchaseRequest): PurchaseResult {
     let createdVehicleId: string | undefined
     let postCommitEvents: (() => void)[] = []
 
-    if (req.itemType === 'cigarette_pack') {
+    if (req.itemType === 'helicopter_tour') {
+      return {ok:false,code:'INVALID_ITEM',charged:0,balanceAfter:currentBalance}
+    } else if (req.itemType === 'cigarette_pack') {
       realPrice = quotePurchasePrice(req.itemType, req.itemId)
       if (nextSave.packs.length >= 3) return {ok:false,code:'ALREADY_FULL',charged:0,balanceAfter:baseSave.money}
       nextSave.packs.push({brand:req.itemId, remaining:20, opened:false})

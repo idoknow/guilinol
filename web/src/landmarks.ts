@@ -386,14 +386,15 @@ export function landmarkStream(
     if(wantFading)state.coverage.value=nextCoverage
   }
 
-  function updateVisibility(entry:Landmark,root:THREE.Group,distance:number,fadeCutoff:number,metrics:RenderRangeMetrics){
+  function updateVisibility(entry:Landmark,root:THREE.Group,distance:number,fadeCutoff:number,metrics:RenderRangeMetrics,aerial=false){
     const visible=distance<fadeCutoff
     root.visible=visible
     if(!visible)return
     const state=states.get(root)
     if(state)applyCoverage(state,distance,fadeCutoff)
     if(entry.lods.length){
-      const level=distance>metrics.landmarkLod1?'lod2':distance>metrics.landmarkLod0?'lod1':'lod0'
+      const lodDistance=aerial?distance*2:distance
+      const level=lodDistance>metrics.landmarkLod1&&entry.lods.includes('lod2')?'lod2':lodDistance>metrics.landmarkLod0&&entry.lods.includes('lod1')?'lod1':'lod0'
       const lods=getLodNodes(root)
       for(const name of entry.lods){
         const node=lods[name as keyof typeof lods]??root.getObjectByName(name)
@@ -562,7 +563,7 @@ export function landmarkStream(
     if(didWork)lastDrainAt=frameStart
   }
 
-  const tick = (eye:THREE.Vector3, priority?:Landmark)=>{
+  const tick = (eye:THREE.Vector3, priority?:Landmark,aerial=false)=>{
     lastEye.copy(eye)
     const metrics=options?.getMetrics?.()??fallbackMetrics
     const guardDist=metrics.spawnRingEdge+48
@@ -590,7 +591,7 @@ export function landmarkStream(
       const {load,fadeCutoff,unload}=entryCutoffs(entry,metrics,guardDist)
       if(root){
         if(distance>unload){loaded.delete(entry);disposeGroup(root);continue}
-        updateVisibility(entry,root,distance,fadeCutoff,metrics)
+        updateVisibility(entry,root,distance,fadeCutoff,metrics,aerial)
       }else if((distance<=load||nearCollision)&&!pending.has(entry)&&now>=(retry.get(entry)??0)){
         candidates.push({entry,distance,nearCollision})
       }

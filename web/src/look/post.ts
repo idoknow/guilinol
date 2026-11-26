@@ -47,7 +47,7 @@ export function mainPass(renderer:THREE.WebGLRenderer,scene:THREE.Scene,camera:T
     composer.addPass(high.rays,composer.passes.indexOf(glow));composer.addPass(high.focus,composer.passes.indexOf(aa))
   }
   let lastTier:Tier|undefined, width=0,height=0,config=state.config,hour=NaN,options=sample(config,env.hour),density=-1
-  return {render(focus:THREE.Vector3){
+  return {render(focus:THREE.Vector3,cabin=false){
     const canvas=renderer.domElement
     if(canvas.width!==width||canvas.height!==height){width=canvas.width;height=canvas.height;const ratio=renderer.getPixelRatio();composer.setSize(width/ratio,height/ratio,false)}
     if(config!==state.config||Math.abs(hour-env.hour)>.01||!Number.isFinite(hour)){config=state.config;hour=env.hour;options=sample(config,hour)}
@@ -69,7 +69,7 @@ export function mainPass(renderer:THREE.WebGLRenderer,scene:THREE.Scene,camera:T
     scenePass.mapping=nativeTone[options.toneMapping]
     saturation.saturation=options.saturation-1;contrast.contrast=options.contrast-1
     renderer.toneMappingExposure=env.exposure*options.exposure
-    const casters=shadows(quality,options.shadow,focus)
+    const casters=shadows(quality,options.shadow,focus,cabin)
     if(high){
       high.rays.enabled=quality==='high'&&light.castShadow&&options.godrays.enabled&&env.sunUp>0
       const next=Math.round(options.godrays.intensity*env.sunUp*1000)/1000

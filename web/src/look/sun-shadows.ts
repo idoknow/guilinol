@@ -28,13 +28,15 @@ export function sunShadows(renderer:THREE.WebGLRenderer,scene:THREE.Scene,camera
   shadow.normalBias=.18;shadow.bias=-.00035
   const high={value:false},strength={value:0.5},patched=new WeakSet<THREE.Material>()
   let frames=Infinity,extent=0,casters=0
-  return (tier:Tier,settings:Options['shadow'],focus:THREE.Vector3)=>{
+  return (tier:Tier,settings:Options['shadow'],focus:THREE.Vector3,cabin=false)=>{
     const active=tier!=='low'&&settings.enabled&&env.sunDir.y>0&&env.night<.99
     light.castShadow=renderer.shadowMap.enabled=active
     if(!active){frames=Infinity;return 0}
     high.value=tier==='high';strength.value=shadow.intensity=settings.strength;shadow.radius=settings.softness
     if(shadow.mapSize.x!==settings.mapSize){shadow.map?.dispose();shadow.map=null;shadow.mapSize.setScalar(settings.mapSize)}
-    if(++frames<(tier==='high'?1:settings.updateEvery)&&anchor.position.distanceTo(focus)<settings.moveThreshold&&extent===settings.distance&&shadow.map)return casters
+    const interval=cabin?Math.max(4,settings.updateEvery):tier==='high'?1:settings.updateEvery
+    const threshold=cabin?Math.max(settings.moveThreshold,settings.distance*.15):settings.moveThreshold
+    if(++frames<interval&&anchor.position.distanceTo(focus)<threshold&&extent===settings.distance&&shadow.map)return casters
     frames=0;renderer.shadowMap.needsUpdate=true
     extent=settings.distance;anchor.position.copy(focus);light.position.copy(anchor.position).addScaledVector(env.sunDir,extent)
     Object.assign(shadow.camera,{left:-extent/2,right:extent/2,top:extent/2,bottom:-extent/2,far:extent*2});shadow.camera.updateProjectionMatrix()
