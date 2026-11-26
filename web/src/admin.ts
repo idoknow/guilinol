@@ -1740,7 +1740,7 @@ const pages: Record<string, (view: View) => void> = {
       h('td', null, row.kind === 'uid' ? '账号' : '设备'),
       h('td', null, String(row.value), deviceLine(row)),
       h('td', null, row.until ? when(new Date(row.until)) : '永久'),
-      h('td', null, row.reason || '—'),
+      h('td', null, row.actor==='protocol'?'攻击':row.actor==='auto'?'外挂':'人工'),h('td', null, row.reason || '—'),
       h('td', null, h('button', {
         type: 'button', class: 'adm-btn adm-btn--sm adm-btn--ghost',
         onclick: async () => {
@@ -1766,9 +1766,9 @@ const pages: Record<string, (view: View) => void> = {
             try {await api('admin/unban',{uid:review.uid,reviewId:review.id,dismiss:true});await loadBans()} catch(error){alert(String(error))}
           }},'不处罚')))
         const table = h('table', { class: 'adm-table' },
-          h('thead', null, h('tr', null, ['类型', '对象', '到期', '原因', ''].map((t) => h('th', null, t)))),
+          h('thead', null, h('tr', null, ['类型', '对象', '到期','分类', '原因', ''].map((t) => h('th', null, t)))),
           h('tbody', null, ...rows.map(banRow)))
-        banSlot.replaceChildren(h('p',null,`生效封禁 ${rows.length} · ${when(new Date())} 刷新`),table,h('h3',null,`待复核 ${reviews.length}`),...reviews,navLink('全部封禁管理记录',{view:'audit',target_type:'mp'},{class:'adm-link'}))
+        banSlot.replaceChildren(h('p',null,`生效封禁 ${rows.length} · ${when(new Date())} 刷新`),table,h('h3',null,`待复核 ${reviews.length}`),...reviews,navLink('全部封禁管理记录',{view:'audit',target_type:'mp'},{class:'adm-link'}),navLink('封禁申诉列表',{view:'feedback',status:'',kind:'封禁申诉'},{class:'adm-link'}))
       } catch (error) { banSlot.replaceChildren(errorState(error as Error, () => void loadBans())) }
     }
     banForms.addEventListener('submit', async (event) => {
@@ -1937,7 +1937,7 @@ const pages: Record<string, (view: View) => void> = {
         ...Object.entries(labels).filter(([k]) => k !== 'draft').map(([k, l]) => [k, l, stats ? num(counts[k]) ?? 0 : null] as [string, string, number | null]),
       ]
       tabs.replaceChildren(...entries.map(([key, text, n]) =>
-        navLink([text, n != null ? h('em', null, n) : null], { view: 'feedback', status: key, q: query || null, user }, {
+        navLink([text, n != null ? h('em', null, n) : null], { view: 'feedback', status: key, q: query || null, user, kind: params.get('kind') }, {
           class: `adm-tab ${status === key ? 'is-on' : ''} ${key === 'pending' && n ? 'is-alert' : ''}`, role: 'tab', 'aria-selected': String(status === key),
         })))
     }
@@ -1968,6 +1968,7 @@ const pages: Record<string, (view: View) => void> = {
       if (status) q.set('status', status)
       if (query) q.set('q', query)
       if (user) q.set('user', user)
+      if(params.get('kind')==='封禁申诉')q.set('kind','封禁申诉')
       if (cursor) q.set('cursor', cursor)
       return api<{ items: any[]; next_cursor: string | null }>('admin/feedback?' + q)
     }

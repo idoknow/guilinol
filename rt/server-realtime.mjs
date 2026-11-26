@@ -121,7 +121,8 @@ const banStore = createBanStore(process.env, (...args) => console.warn('[anti-ch
 let nextId = 1
 
 const now = () => Date.now()
-const systemGate = {x:-588,z:-212}
+import {grantTravel} from './travel.mjs'
+import {ipGate,tooFast} from './protocol-guard.mjs'
 const rosterCoordinate = value => Math.round(value/128)*128
 function rosterPoint(player,at=now()) {
   if(!player.mapPoint || at-player.mapPoint.at>=ROSTER_SUB_MS) {
@@ -736,7 +737,8 @@ const server = createServer(async(req, res) => {
   }
 })
 
-const wss = new WebSocketServer({server, path: '/ws', maxPayload: 4096})
+const acceptIp=ipGate()
+const wss = new WebSocketServer({server,path:'/ws',maxPayload:4096,verifyClient:({req},done)=>done(acceptIp(clientIpInfo(req).clientIp,'connection'),429,'Too many connections')})
 
 wss.on('connection', (ws, req) => {
   let ip = 'unknown'
@@ -838,12 +840,27 @@ wss.on('connection', (ws, req) => {
     }
   }
 
-  ws.on('message', async raw => {
+  let queuedAttacks=0, attackQueue=Promise.resolve()
+  function recordAttack(kind){
+    const player=players.get(ws.playerId??id)
+    if(!player || player.ws!==ws || queuedAttacks>=3 || ws.disciplined)return
+    queuedAttacks++
+    attackQueue=attackQueue.then(async()=>{
+      if(ws.disciplined)return
+      const ban=await banStore.violation({uid:player.uid,fp:ws.fp??'',kind,detail:{from:[player.x,player.y,player.z]}})
+      if(ban){ws.disciplined=true;const current=[...players.values()].find(other=>other.uid===player.uid);if(current?.ws){notifyBan(current.ws,ban);current.ws.close(4003,'banned')}}
+    }).catch(error=>console.warn('[protocol]',error.message)).finally(()=>queuedAttacks--)
+  }
+  ws.on('message', async (raw,binary) => {
     try {
-      const msg = JSON.parse(String(raw))
+      if(ws.disciplined)return
+      if(tooFast(ws,now())){recordAttack('packet_rate');return}
+      if(binary){recordAttack('invalid_packet');return}
+      let msg
+      try{msg=JSON.parse(String(raw))}catch{recordAttack('invalid_packet');return}
       obs.packet(ws,'in',msg?.t,raw.length)
       // null / 数组 / 标量都不是合法消息，直接忽略（否则读 msg.t 会抛）
-      if (!msg || typeof msg !== 'object' || Array.isArray(msg)) return
+      if (!msg || typeof msg.t !== 'string' || Array.isArray(msg)){recordAttack('invalid_packet');return}
       const me = players.get(ws.playerId??id)
 
       if (msg.t === 'join' && !me) {
@@ -860,7 +877,7 @@ wss.on('connection', (ws, req) => {
         sweepBans()
         ws.caps3 = Array.isArray(msg.caps) && msg.caps.includes('roster3')
         const claims = identity(msg.ticket)
-        if (!claims) { obs.reject('ticket');ws.rejected = true; ws.close(4003, 'ticket rejected'); return }
+        if (!claims) { acceptIp(ip,'ticket');obs.reject('ticket');ws.rejected = true; ws.close(4003, 'ticket rejected'); return }
         const uid = claims.uid
         // 设备指纹：客户端算好发过来（只存，不参与身份判定），用于「换号但设备不变」的封禁
         const fp = cleanFp(msg.fp)
@@ -952,8 +969,7 @@ wss.on('connection', (ws, req) => {
           try { previous.ws.close(4001, 'replaced') } catch { /* 忽略 */ }
           console.log(JSON.stringify({scope: 'rt-replace', uid, oldId: previous.id, newId: id}))
         }
-        const start = previous ?? claims.spawn ?? systemGate
-        const destination = claims.destination
+        const start = msg
         const initAct = VALID_ACTIVITIES.has(msg.act) ? msg.act : 'walk'
         const initDetail = cleanDetail(msg.actDetail)
         const joinedAt = now()
@@ -970,7 +986,7 @@ wss.on('connection', (ws, req) => {
           x: clampNum(start.x, -1e5, 1e5),
           y: clampNum(msg.y, -1000, 8000),
           z: clampNum(start.z, -1e5, 1e5),
-          travel:destination ? {x:destination.x,z:destination.z,until:claims.exp*1000} : null,
+          travel:null,
           yaw: clampNum(msg.yaw, -10, 10),
           v: 0,
           bike: '',
@@ -1030,12 +1046,13 @@ wss.on('connection', (ws, req) => {
         })
         // 全服名册立刻给一份（仅老客户端；roster3 客户端按需订阅，不预发 50KB）
         if (!ws.caps3) send(ws, rosterPayload())
-        if(Math.hypot(msg.x-player.x,msg.z-player.z)>2)send(ws,{t:'setback',kind:'system_spawn',x:player.x,y:player.y,z:player.z})
         broadcast({t: 'online', online: players.size})
         return
       }
 
       if (!me || me.ws!==ws) return
+      if ((msg.uid!=null && String(msg.uid)!==String(me.uid)) || ['pull_player','teleport_player'].includes(msg.t) || (msg.t==='pos' && [msg.id,msg.target,msg.playerId].some(value=>value!=null && value!==me.id))){recordAttack('foreign_position');return}
+      if(msg.t==='travel'){send(ws,{t:'travel_result',seq:Number.isSafeInteger(msg.seq)?msg.seq:undefined,ok:grantTravel(me,msg.reason,msg.target,now())});return}
       const recordMove = (kind,detail) => {
         me.cheatTimes ??= new Map()
         if (now()-(me.cheatTimes.get(kind)??0)<2000) return
@@ -1045,7 +1062,7 @@ wss.on('connection', (ws, req) => {
         }).catch(error=>console.warn('[anti-cheat]',error.message))
       }
       if (msg.t==='mount_player' && me.visible.has(msg.target) && players.has(msg.target) && msg.target!==me.id) {
-        if(!me.mountPending){me.mountPending=true;void banStore.violation({uid:me.uid,fp:ws.fp??'',kind:'mount_player',detail:{target:msg.target,from:[me.x,me.y,me.z]}}).then(ban=>{if(ban){notifyBan(ws,ban);ws.close(4003,'banned')}}).catch(error=>console.warn('[anti-cheat]',error.message)).finally(()=>{me.mountPending=false})}
+        recordAttack('mount_player')
         return
       }
 
@@ -1072,10 +1089,7 @@ wss.on('connection', (ws, req) => {
         if (at - me.lastPos < MIN_POS_GAP_MS) return
         me.lastPos = at
         obs.position(me,at)
-        if ([msg.id,msg.target,msg.playerId].some(value=>value!=null && value!==me.id) || (msg.uid!=null && String(msg.uid)!==String(me.uid))) {
-          recordMove('foreign_position',{}); return
-        }
-        if (![msg.x,msg.y,msg.z].every(Number.isFinite)) return
+        if (![msg.x,msg.y,msg.z].every(Number.isFinite)){recordAttack('invalid_packet');return}
         const nx = clampNum(msg.x, -1e5, 1e5)
         const ny = clampNum(msg.y, -1000, 8000)
         const nz = clampNum(msg.z, -1e5, 1e5)
@@ -1200,7 +1214,7 @@ wss.on('connection', (ws, req) => {
   })
 
   ws.on('close', (code, reason) => release(code, reason))
-  ws.on('error', () => { try { ws.close() } catch { /* 忽略 */ } })
+  ws.on('error', error => {if(error.code==='WS_ERR_UNSUPPORTED_MESSAGE_LENGTH')recordAttack('oversize'); try { ws.close() } catch { /* 忽略 */ } })
 })
 
 // 在线人数：人数变了才广播，10s 兜底一次（原来是每秒无条件全服广播）

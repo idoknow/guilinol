@@ -2,7 +2,7 @@ import {spawn} from 'node:child_process'
 import WebSocket from 'ws'
 import {createHmac} from 'node:crypto'
 const SECRET='test-secret'
-const mint=(uid,name,x,z)=>{const p=Buffer.from(JSON.stringify({uid,name,spawn:{x,z},exp:Math.floor(Date.now()/1000)+50})).toString('base64url');return p+'.'+createHmac('sha256',SECRET).update(p).digest('base64url')}
+const mint=(uid,name,x,z)=>{const p=Buffer.from(JSON.stringify({uid,name,exp:Math.floor(Date.now()/1000)+50})).toString('base64url');return p+'.'+createHmac('sha256',SECRET).update(p).digest('base64url')}
 const PORT=8896, URL=`ws://127.0.0.1:${PORT}/ws`
 const sleep=ms=>new Promise(r=>setTimeout(r,ms))
 const srv=spawn('node',['rt/server-realtime.mjs'],{env:{...process.env,RT_JOIN_SECRET:SECRET,PORT:String(PORT),

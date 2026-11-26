@@ -243,7 +243,6 @@ export function createBanStore(env = process.env, log = () => {}) {
     } catch { return [] }
   }
 
-  /** 记录一次违规；同一 uid 10 分钟内 ≥8 次自动封 10 分钟，≥20 次封 24 小时 */
   async function violation({ uid, fp, kind, detail = {}, ua = '' }) {
     if (pool) {
       await pool.query('insert into mp_cheat_events(uid,fp,kind,detail,at) values($1,$2,$3,$4,$5)', [uid, fp || null, kind, detail, Date.now()]).catch(() => {})
@@ -256,10 +255,15 @@ export function createBanStore(env = process.env, log = () => {}) {
     if (uid == null || !attackKinds.has(kind) && !['speed','teleport'].includes(kind)) return null
     const now = Date.now()
     for (const [id, events] of recent) if (events.at(-1).at <= now-600000) recent.delete(id)
-    const events = (recent.get(uid) || []).filter(event=>event.at>now-600000).slice(-Math.max(300,BAN.l3))
+    const window = (recent.get(uid) || []).filter(event=>event.at>now-600000)
+    const tail = window.slice(-Math.max(300,BAN.l3))
+    const latestByKind = new Map(window.map(event=>[event.kind,event]))
+    const events = [...latestByKind.values()].filter(event=>!tail.includes(event)).concat(tail)
     events.push({at:now,kind,fp,detail}); recent.set(uid,events)
     if (new Set(events.map(event=>event.kind)).size > 1) {
-      const review = {id:randomUUID(),uid,opened_ms:now,evidence:events.slice(-32)}
+      latestByKind.set(kind,events.at(-1))
+      const evidence = [...new Set([...latestByKind.values(),...events.slice(-32)])].sort((left,right)=>left.at-right.at)
+      const review = {id:randomUUID(),uid,opened_ms:now,evidence}
       if (pool) await pool.query('insert into mp_reviews(id,uid,opened_ms,evidence) values($1,$2,$3,$4) on conflict (uid) where resolved_ms is null do nothing',[review.id,uid,now,JSON.stringify(review.evidence)])
       else if (!memoryReviews.has(uid)) memoryReviews.set(uid,review)
     }

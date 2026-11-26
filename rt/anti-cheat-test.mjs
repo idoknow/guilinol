@@ -8,7 +8,7 @@ const ADMIN = 'admin-token'
 const PORT = 8897
 const URL = `ws://127.0.0.1:${PORT}/ws`
 const mint = (uid, name) => {
-  const p = Buffer.from(JSON.stringify({uid,name,spawn:{x:0,z:0},destination:{x:600,z:600},exp:Math.floor(Date.now()/1000)+50})).toString('base64url')
+  const p = Buffer.from(JSON.stringify({uid,name,exp:Math.floor(Date.now()/1000)+50})).toString('base64url')
   return `${p}.${createHmac('sha256', SECRET).update(p).digest('base64url')}`
 }
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
@@ -94,20 +94,27 @@ ok(speeder.setbacks() >= 1, '徒步 40 m/s 加速：被拉回')
 
 // ── 3. 合法瞬移放行一次，但 3 秒内不能出拳
 console.log('\n[3] 合法瞬移与出拳锁')
-const jumper = client(900301, 'jump')
+const jumper = client(900301, 'jump',1000,1000)
 await jumper.ready; jumper.join(); await sleep(400)
 const before = jumper.setbacks()
-jumper.pos(600, 3, 600)
+ok(before===0,'现网票据 join (1000,1000) 不拉回')
+jumper.ws.send(JSON.stringify({t:'travel',reason:'map',target:{x:1500,z:1500}}));await sleep(100)
+ok(jumper.got.filter(m=>m.t==='travel_result').at(-1)?.ok===false,'客户端任意坐标未获许可')
+jumper.ws.send(JSON.stringify({t:'travel',reason:'map',target:'spot:pagodas'}));await sleep(100)
+ok(jumper.got.filter(m=>m.t==='travel_result').at(-1)?.ok===true,'地标 ID 获得许可');jumper.pos(-905,3,520)
 await sleep(300)
-ok(jumper.setbacks() === before, '静止状态：允许系统票据指定的目的地')
-const target = client(900302, 'target')
+ok(jumper.setbacks() === before, '静止状态：允许系统许可指定的目的地')
+const target = client(900302, 'target',-904,520)
 await target.ready; target.join(undefined); await sleep(200)
-target.pos(601, 3, 600); await sleep(120)
-jumper.pos(600.9, 3, 600); await sleep(120)
-jumper.ws.send(JSON.stringify({t: 'punch', id: target.got.find((m) => m.t === 'welcome')?.me?.id, kind: 'jab', zone: 'torso', s: 1}))
+target.pos(-904,3,520); await sleep(120)
+jumper.pos(-904.1,3,520); await sleep(120)
+jumper.ws.send(JSON.stringify({t: 'punch', id: target.got.find((m) => m.t === 'welcome')?.me?.id, kind: 'jab', zone: 'body', s: 1}))
 await sleep(300)
 const tHp = target.got.filter((m) => m.t === 'combat').map((m) => m.hp)
 ok(!tHp.length || tHp.every((hp) => hp === tHp[0]), '瞬移后 3 秒内出拳：不生效')
+target.ws.send(JSON.stringify({t:'punch',id:jumper.got.find(m=>m.t==='welcome')?.me.id,kind:'jab',zone:'body',s:1}))
+target.ws.send(JSON.stringify({t:'travel',reason:'map',target:'spot:bridge'}));await sleep(150)
+ok(target.got.filter(m=>m.t==='travel_result').at(-1)?.ok===false,'未传送过的玩家在战斗中不能取得许可')
 
 // ── 4. 封禁与人工解封
 console.log('\n[4] 封禁 / 人工解封')
