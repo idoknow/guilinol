@@ -103,6 +103,9 @@ export function createXxgIndoorScene(opts: CreateXxgIndoorSceneOptions = {}): Xx
   let activeShopId: string | null = null
   let collisionContacts = 0
   let indoorEnteredAtMs = 0
+  /** 刚走下来的那个出口：离开触发圈之前，只有面朝楼梯走才会离开（侧移、后退不把人弹回地面）。 */
+  let landingExit: XxgExit | null = null
+  let landingExitArmed = false
 
   // Contract metrics (XxgIndoorMetrics)
   let lastDrawCalls = 0
@@ -348,6 +351,25 @@ export function createXxgIndoorScene(opts: CreateXxgIndoorSceneOptions = {}): Xx
     }
     mountDomAndListeners()
     machine.transitionTo('idle')
+    await prewarmGpu(ctx.renderer)
+  }
+
+  /** 挂载时（入口懒加载、还在地面上）就编译着色器、上传纹理，转场里只剩一帧渲染。 */
+  async function prewarmGpu(renderer: THREE.WebGLRenderer): Promise<void> {
+    try {
+      const textures = new Set<THREE.Texture>()
+      scene.traverse(obj => {
+        const mat = (obj as THREE.Mesh).material
+        for (const m of Array.isArray(mat) ? mat : mat ? [mat] : []) {
+          for (const v of Object.values(m)) if ((v as THREE.Texture | null)?.isTexture) textures.add(v as THREE.Texture)
+        }
+      })
+      if (typeof renderer.initTexture === 'function') for (const t of textures) renderer.initTexture(t)
+      if (typeof renderer.compileAsync === 'function') await renderer.compileAsync(scene, camera)
+      else if (typeof renderer.compile === 'function') renderer.compile(scene, camera)
+    } catch {
+      // 预热失败不影响进入：首帧照常编译。
+    }
   }
 
   async function enter(portalId: XxgPortalId): Promise<boolean> {
@@ -393,6 +415,8 @@ export function createXxgIndoorScene(opts: CreateXxgIndoorSceneOptions = {}): Xx
         return false
       }
       indoorEnteredAtMs = nowFn()
+      landingExit = exitSpec
+      landingExitArmed = false
 
       renderFrame()
       lastSwapMs = Math.max(0, Math.round((nowFn() - swapStart) * 100) / 100)
@@ -442,6 +466,7 @@ export function createXxgIndoorScene(opts: CreateXxgIndoorSceneOptions = {}): Xx
       machine.markPortalExitCooldown(targetPortalId, nowFn(), reenterCooldownMs)
       machine.setActivePortalId(null)
       pendingExitPortalId = null
+      landingExit = null
       activeShopId = null
       lastSwapMs = Math.max(0, Math.round((nowFn() - swapStart) * 100) / 100)
       lastBlackFrames = 0
@@ -458,6 +483,13 @@ export function createXxgIndoorScene(opts: CreateXxgIndoorSceneOptions = {}): Xx
       await veilHandle.done().catch(() => {})
       return false
     }
+  }
+
+  function facesStair(ex: XxgExit): boolean {
+    const tx = ex.stair.x - ex.foot.x
+    const tz = ex.stair.z - ex.foot.z
+    const len = Math.hypot(tx, tz) || 1
+    return (-Math.sin(playerYaw) * tx - Math.cos(playerYaw) * tz) / len > 0.5
   }
 
   function step(dtSeconds: number): void {
@@ -532,9 +564,16 @@ export function createXxgIndoorScene(opts: CreateXxgIndoorSceneOptions = {}): Xx
       syncIndoorCamera()
       syncPromptDom()
 
+      if (
+        landingExit &&
+        !landingExitArmed &&
+        Math.hypot(playerX - landingExit.foot.x, playerZ - landingExit.foot.z) > XXG_PLAYER.exitTriggerRadius
+      ) {
+        landingExitArmed = true
+      }
       if (nowMs - indoorEnteredAtMs >= 200 && (vx !== 0 || vz !== 0)) {
         const triggeredExit = findTriggeredExit(layout, playerX, playerZ, vx, vz, XXG_PLAYER.exitTriggerRadius)
-        if (triggeredExit) {
+        if (triggeredExit && (triggeredExit !== landingExit || landingExitArmed || facesStair(triggeredExit))) {
           pendingExitPortalId = triggeredExit.portalId
           void exit()
         }

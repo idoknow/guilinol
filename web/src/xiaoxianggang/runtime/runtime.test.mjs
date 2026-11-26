@@ -482,6 +482,60 @@ test('default createXxgIndoorScene loads full 53-shop B1 layout with PBR materia
   })
 })
 
+test('落地出口：侧移靠向楼梯不弹回地面；离开触发圈或面朝楼梯走才离开', async () => {
+  const env = createMockDomEnvironment()
+  const hadNode = 'Node' in globalThis
+  if (!hadNode) globalThis.Node = class {}
+  try {
+    await withMockGlobals(env, async () => {
+      let t = 0
+      const indoor = createXxgIndoorScene({ veilFadeInMs: 0, reenterCooldownMs: 0, crowdMaxAgents: 0, now: () => t })
+      await indoor.mount({
+        renderer: createCountingRenderer(),
+        worldCamera: new THREE.PerspectiveCamera(55, 16 / 9, 1, 2000),
+        bodyFlag: 'xxgActive',
+        getWalker: () => null,
+        openVeil: () => ({ done: async () => {} }),
+        suspendWorld() {},
+        resumeWorldAt: async () => true,
+      })
+      const hold = (code, frames) => {
+        env.mockWindow.dispatchKey('keydown', code)
+        for (let f = 0; f < frames && indoor.state === 'inside'; f++) {
+          t += 50
+          indoor.step(0.05)
+        }
+        env.mockWindow.dispatchKey('keyup', code)
+      }
+      const settle = () => new Promise(r => setTimeout(r, 5))
+
+      // B1 的 E1：落脚点朝北看走廊，楼梯在左手边。
+      const e1 = indoor.getLayout().exits.find(e => e.portalId === 'E1')
+      assert.ok(e1.stair.x < e1.foot.x && Math.abs(e1.yaw) < 1e-9)
+
+      assert.equal(await indoor.enter('E1'), true)
+      hold('KeyA', 28)
+      assert.equal(indoor.state, 'inside', '刚落地侧移靠向楼梯不能把人弹回地面')
+      hold('KeyD', 28)
+      hold('KeyA', 10)
+      assert.equal(indoor.state, 'exiting', '离开过触发圈后，回到楼梯口朝楼梯移动照常离开')
+      await settle()
+      assert.equal(indoor.state, 'idle')
+
+      assert.equal(await indoor.enter('E1'), true)
+      env.mockWindow.dispatchKey('pointerdown', '', { button: 0, clientX: 0, clientY: 0 })
+      env.mockWindow.dispatchKey('pointermove', '', { clientX: -Math.PI / 2 / 0.0026, clientY: 0 })
+      env.mockWindow.dispatchKey('pointerup', '')
+      hold('KeyW', 10)
+      assert.equal(indoor.state, 'exiting', '刚落地转身面朝楼梯走，直接离开')
+      await settle()
+      indoor.dispose()
+    })
+  } finally {
+    if (!hadNode) delete globalThis.Node
+  }
+})
+
 test('dispose from any state (including mid-inside) releases GPU resources, DOM, and window listeners with zero leaks', async () => {
   const env = createMockDomEnvironment()
   await withMockGlobals(env, async () => {
