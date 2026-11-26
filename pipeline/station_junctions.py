@@ -11,9 +11,10 @@ def build(sections, protected):
     for road in sections:
         for end, node in enumerate(road['nodes']):
             ends[node].append((road, end))
-    for arms in ends.values():
+    for node, arms in ends.items():
         if len(arms) < 2:
             continue
+        turning_apron = any(node in road.get("turningAprons", ()) for road, _ in arms)
         boundary = []
         controls = {}
         x, y, z = arms[0][0]['portals'][arms[0][1]]
@@ -26,7 +27,8 @@ def build(sections, protected):
             side = road['halfWidth']*np.array([-direction[1], direction[0]])
             run = min(2.,length/3)
             stations, levels = np.array(road['stations']).T
-            for along in (0.,run):
+            # An axle can remain on the incoming tangent as the car enters the bend.
+            for along in ((-1.5, 0., run) if turning_apron else (0., run)):
                 pos = center+along*direction
                 level = np.interp(length-along if end else along, stations, levels)
                 for offset in (-1,0,1):
@@ -44,7 +46,7 @@ def build(sections, protected):
                   if road.get('joints') and road['joints'][end]]
         if pivots:
             original.append(MultiPoint(pivots[0]).convex_hull)
-        footprint = hull.intersection(union_all(original))
+        footprint = hull if turning_apron else hull.intersection(union_all(original))
         if any(road['openCut'] for road,_ in arms):
             fixed = protected.query(footprint,predicate='intersects')
             if len(fixed):
@@ -98,5 +100,8 @@ def build(sections, protected):
                     faces.append(vertices)
         for i,(road,end) in enumerate(arms):
             joint = road.setdefault('joints',[None,None])[end] or {}
+            if turning_apron:
+                joint["wedges"] = [list(p.exterior.coords)[:-1] for p in
+                                   getattr(footprint, "geoms", [footprint]) if p.area > 0]
             joint.update(ring=ring,faces=faces,draw=i==0)
             road['joints'][end]=joint

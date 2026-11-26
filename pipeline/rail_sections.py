@@ -218,6 +218,7 @@ def road_profiles(section, ways, widths):
                 substring(line, a, b) for a, b in ((0, start), (stop, line.length)) if b - a > .001
             ],
         )
+        local["turningAprons"] = road.get("turningAprons", [])
         if "pavedChords" in road:
             native = set(zip(local["nodes"], local["nodes"][1:]))
             paved = {tuple(pair) for pair in road["pavedChords"]}
