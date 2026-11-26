@@ -11,15 +11,17 @@ from check_rail_section_tracks import load_tracks, tile_rails
 from features import points
 
 
-def section_strips(world, *, terrain_only=False):
+def section_strips(world, *, terrain_only=False, design_flag=None):
     root = Path(__file__).resolve().parent
     designs = sorted((root / "rail-audits").glob("01-*.json")) + sorted(
         (root / "rail-sections").glob("*.json")
     )
+    if terrain_only:
+        design_flag = "gradeTrackTerrain"
     ties = []
     for path in designs:
         design = json.loads(path.read_bytes())
-        if terrain_only and not design.get("gradeTrackTerrain"):
+        if design_flag and not design.get(design_flag):
             continue
         ties.extend(
             (path.stem, int(w), sorted(s)) for w, s in design["railTies"].items()
