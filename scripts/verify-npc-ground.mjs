@@ -3,7 +3,11 @@ import {createServer} from 'vite'
 import {chromium} from 'playwright'
 import {browserOptions} from './qa-browser.mjs'
 
-const server=await createServer({root:'web',configFile:'web/vite.config.ts',server:{host:'127.0.0.1',port:0}})
+const fixture='/ground-fixture.js'
+const server=await createServer({root:'web',configFile:'web/vite.config.ts',server:{host:'127.0.0.1',port:0},plugins:[{
+  name:'ground-fixture',resolveId:id=>id===fixture?id:null,
+  load:id=>id===fixture?`export {Scene,Vector3,WebGLRenderer} from 'three';export {landmarkStream} from '/src/landmarks.ts'`:null,
+}]})
 let browser
 try{
   await server.listen()
@@ -22,7 +26,18 @@ try{
     const stream=new Blob([bytes]).stream()
     const graph=await new Response(new Uint8Array(bytes)[0]===31?stream.pipeThrough(new DecompressionStream('gzip')):stream).json()
     const traffic=new Traffic(graph), loaded=new Map(), tiles=new Map(manifest.chunks.map(tile=>[`${tile.x},${tile.z}`,tile]))
-    const physics=await createPhysics(manifest,{loaded,radius:256,landmarks:new Map(),forest:{loaded:new Map()},grid:{near:()=>loaded.keys()}},{colliders:[],modelPeaks:[]}).catch(e=>{throw Error(`physics: ${e.stack}`)})
+    const {Scene,Vector3,WebGLRenderer,landmarkStream}=await import('/ground-fixture.js')
+    const landmarks=new Map(),collisionLandmarks=new Map(),entries=manifest.landmarks??[]
+    const tick=landmarkStream(new Scene(),new WebGLRenderer(),entries,landmarks,{collisionLandmarks})
+    for(const entry of entries.filter(entry=>entry.collision!=='none')){
+      tick(new Vector3().fromArray(entry.position),entry)
+      const deadline=performance.now()+30000
+      while(!landmarks.has(entry)){
+        if(!tick.pendingCount()||performance.now()>deadline)throw Error(`Landmark fixture failed: ${entry.file}`)
+        await new Promise(requestAnimationFrame)
+      }
+    }
+    const physics=await createPhysics(manifest,{loaded,radius:256,landmarks,collisionLandmarks,forest:{loaded:new Map()},grid:{near:()=>loaded.keys()}},{colliders:[],modelPeaks:[]}).catch(e=>{throw Error(`physics: ${e.stack}`)})
     const {supportAt,carSupportAt}=playerSupport(physics)
     traffic.sampleGround=(x,z,y,car)=>(car?carSupportAt:supportAt)(x,z,y)?.y
     const batches=new Map(),models=trafficModels(),bottoms={}
@@ -65,7 +80,7 @@ try{
       }
       physics.clear();loaded.clear();data?.dispose()
     }
-    return {tiles:batches.size,samples,failed,missing,worst,pullOver}
+    return {collisionLandmarks:collisionLandmarks.size,tiles:batches.size,samples,failed,missing,worst,pullOver}
   },process.argv.includes('--pull-over'))
   console.log(JSON.stringify(report,null,2));assert.ok(report.samples>0&&report.failed===0)
   if(process.argv.includes('--pull-over')){
