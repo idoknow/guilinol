@@ -76,6 +76,7 @@ export interface MissionHistoryEntry {
 }
 
 export interface SaveEconomyBlock {
+  helicopterTours: number
   claimedSpotBounties: string[]
   claimedMissionFirstClear: string[]
   completedMissionCounts: Record<string, number>
@@ -314,6 +315,7 @@ export function createDefaultSave(nowMs = Date.now()): LocalSaveV1 {
       vehicles: {},
     },
     economy: {
+      helicopterTours: 0,
       claimedSpotBounties: [],
       claimedMissionFirstClear: [],
       completedMissionCounts: {},
@@ -358,6 +360,7 @@ export function cloneSave(save: LocalSaveV1): LocalSaveV1 {
       vehicles,
     },
     economy: {
+      helicopterTours: save.economy.helicopterTours,
       claimedSpotBounties: [...save.economy.claimedSpotBounties],
       claimedMissionFirstClear: [...save.economy.claimedMissionFirstClear],
       completedMissionCounts: {...save.economy.completedMissionCounts},
@@ -497,6 +500,7 @@ export function sanitizeSave(raw: unknown, nowMs = Date.now()): {save: LocalSave
     wardrobe,
     garage: {activeVehicleId, vehicles},
     economy: {
+      helicopterTours: typeof rawEco?.helicopterTours === 'number' && Number.isSafeInteger(rawEco.helicopterTours) ? Math.max(0, rawEco.helicopterTours) : 0,
       claimedSpotBounties,
       claimedMissionFirstClear,
       completedMissionCounts,
@@ -861,6 +865,7 @@ export function mergeCloudAndLocalSave(localRaw: LocalSaveV1, cloudRaw: LocalSav
     },
     garage: {activeVehicleId, vehicles},
     economy: {
+      helicopterTours: Math.max(local.economy.helicopterTours, cloud.economy.helicopterTours),
       claimedSpotBounties,
       claimedMissionFirstClear,
       completedMissionCounts,

@@ -1101,8 +1101,8 @@ setInterval(() => {
   }
 }, 10000)
 
-server.listen(PORT, () => {
-  console.log(`网上桂林 · 联机服务已启动  ws://127.0.0.1:${PORT}/ws`)
+server.listen(PORT, process.env.RT_BIND_HOST, () => {
+  console.log(`网上桂林 · 联机服务已启动  ws://127.0.0.1:${server.address().port}/ws`)
   console.log(`  健康检查：http://127.0.0.1:${PORT}/health`)
 })
 

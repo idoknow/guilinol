@@ -6,10 +6,12 @@ from pathlib import Path
 from section_track_strips import section_strips
 
 
-def vertices(world, section):
+def vertices(world, section, graded=False):
     chords = []
     heights = {}
-    for way, ax, az, ah, bx, bz, bh, flags in section_strips(world)[section]:
+    for way, ax, az, ah, bx, bz, bh, flags in section_strips(
+        world, design_flag="gradeTrackTerrain" if graded else None
+    )[section]:
         ends = [(way, ax, az), (way, bx, bz)]
         chords.append((*ends, flags))
         for point, height in zip(ends, (ah, bh)):
@@ -20,9 +22,9 @@ def vertices(world, section):
     return sorted(chords), heights
 
 
-def check(base, candidate, section, allowed):
-    old_chords, old = vertices(base, section)
-    new_chords, new = vertices(candidate, section)
+def check(base, candidate, section, allowed, graded=False):
+    old_chords, old = vertices(base, section, graded)
+    new_chords, new = vertices(candidate, section, graded)
     if old_chords != new_chords:
         raise ValueError(f"Changed geometry or flags in {section}")
     changes = []
@@ -49,6 +51,7 @@ if __name__ == "__main__":
     parser.add_argument("candidate", type=Path)
     parser.add_argument("section")
     parser.add_argument("allowlist", type=Path)
+    parser.add_argument("--graded", action="store_true", help="Include fitted approach tracks outside the audit boundary")
     args = parser.parse_args()
     limits = {(r["way"], r["x"], r["z"]): r["deltaM"] for r in json.loads(args.allowlist.read_bytes())}
-    print(json.dumps(check(args.base, args.candidate, args.section, limits), indent=2))
+    print(json.dumps(check(args.base, args.candidate, args.section, limits, args.graded), indent=2))

@@ -218,12 +218,20 @@ def road_profiles(section, ways, widths):
                 substring(line, a, b) for a, b in ((0, start), (stop, line.length)) if b - a > .001
             ],
         )
+        if "pavedChords" in road:
+            native = set(zip(local["nodes"], local["nodes"][1:]))
+            paved = {tuple(pair) for pair in road["pavedChords"]}
+            if not paved <= native:
+                raise ValueError(f"Invalid finished carriageway on {wid}")
+            local["pavedChords"] = paved
         if "nativeTies" in road:
             local["nativeTies"] = road["nativeTies"]
         if "railSideWall" in road:
             wall = road["railSideWall"]
             top = np.asarray(wall["top"])
             local["railSideWall"] = (wall["side"], top[:, 0] - start, top[:, 1])
+        if "trafficOffsets" in road:
+            local["trafficOffsets"] = {tuple(sorted((a,b))):offset for a,b,offset in road["trafficOffsets"]}
         if "maxTrafficOffset" in road:
             local["maxTrafficOffset"] = road["maxTrafficOffset"]
         if road.get("stackedRoad"):

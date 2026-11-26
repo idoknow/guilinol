@@ -21,14 +21,20 @@ export const look = {
   // IDOK-200 区外郊野 (look/countryside.ts): field patchwork + wood clumps outside the play region.
   countryside: {paddy: 0x7d9150, paddyYoung: 0x93a35e, fallow: 0xa39d78, vegetable: 0x86915a,
     wood: 0x4a6638, woodDark: 0x2f4a2b},
+  // IDOK-432 城区地面/退界铺装/草坡/驳岸色板 (calibrated for gradeDay saturation 1.22, contrast 1.12).
+  urbanGround: {
+    bareA: 0x9b9b96, bareB: 0xa7a49a,
+    grassA: 0x5c6d50, grassB: 0x6f7e5b, soil: 0x6e6958,
+    rockA: 0x6d6b62, rockB: 0x827f73,
+  },
   sunColor: 0xfff0d4, sunPower: 2.7,
   hemiSky: 0xc9dcea, hemiGround: 0x6f6a5e, hemiPower: 1.2,
   exposure: 1.0,
   // Phase 2 colour grade, applied in every fogged material before fog (look/atmosphere.ts):
   // saturation, contrast around mid-grey; per time of day in time.ts (day / night values here).
   gradeDay: [1.22, 1.12] as const, gradeNight: [1.12, 1.1] as const,
-  // 石桥 decks (GL03): warm limestone top, shaded fascia hanging bridgeDepth metres below the deck.
-  bridgeTop: 0xc4bca8, bridgeSide: 0x938d7e, bridgeDepth: vesselBounds.bridgeDepth,
+  // 石桥 decks (GL03): weathered concrete/tarmac bridge deck, cast-concrete fascia hanging bridgeDepth metres below.
+  bridgeTop: 0x7d7f81, bridgeSide: 0x92918a, bridgeDepth: vesselBounds.bridgeDepth,
   // M3 water: jade body under the mirror; night lights.
   waterBody: 0x4f8580, waterBaked: 0x6c9c97, waterBank: 0x8a876f, windowLight: 0xffc27a, roadLight: 0xffe2bc, bridgeLamp: 0xffd08a,
   peakUplightWarm: 0xffd9a0, peakUplightJade: 0x9fd8c0,
@@ -65,8 +71,8 @@ export const look = {
     directionSign: 0x3279a7,
     sharedBike: 0x5e7680,
     awnings: [0x2f8a4a,0x2766b0,0xc23b33,0x8b8e90], shutter:0x8d9391,
-    // Phase 2: dark asphalt so markings, neon and wet reflections read; cool grey sidewalk.
-    surfaces: [0x4a4d50, 0x8e8d89, 0xf1eee4, 0x8f897b, 0x737962, 0x4a4c4f, 0xa18b55],
+    // Phase 2 + IDOK-432: lifted dark urban asphalt (avoid low-angle charcoal crush), cool granite sidewalk, calmer markings & turf.
+    surfaces: [0x55595e, 0x908f8b, 0xebe7dc, 0x8c877c, 0x637155, 0x50555a, 0x9b895f],
     wetDarken: .55,
     railing: 0xd9d5ca, lampPole: 0x3e4743, lampHead: 0xe7dcbc,
   },

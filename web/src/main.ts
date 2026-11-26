@@ -15,6 +15,8 @@ import {gfxState} from './look/gfx-state'
 import {installAtmosphere, outerGround, sky} from './look/atmosphere'
 import {startPeaks} from './peaks'
 import {presets,setPreset,pickSpawn,spawnPool} from './presets'
+import {plazaSpawn} from './helicopter/site'
+import {helicopter} from './helicopter/runtime'
 import {isDeepLink} from './deeplink'
 import {readLastView, saveLastView, consumeRestore, applyLastView} from './lastview'
 import {walkConfig} from './walk/config'
@@ -141,7 +143,8 @@ async function start(loader:FullLoader,creatorSpawn=false) {
   let post:ReturnType<typeof import('./look/post').mainPass>|undefined
   if(params.has('debug'))Object.assign(window,{gfx})
   // tapFrame：录像在这里、present 之前拷帧（IDOK-383，主画布没开 preserveDrawingBuffer）。
-  function drawMain(){if(post)stats.shadowCasters=post.render(walker?.active?walker.position:camera.position);else renderer.render(scene,camera);tapFrame(renderer.domElement)}
+  let cabinCruise=false
+  function drawMain(){if(post)stats.shadowCasters=post.render(walker?.active?walker.position:camera.position,cabinCruise);else renderer.render(scene,camera);tapFrame(renderer.domElement)}
   renderer.info.autoReset=false
   const hemi = new THREE.HemisphereLight(look.hemiSky,look.hemiGround,look.hemiPower); scene.add(hemi)
   const arrivalReady=import('./arrival-programs').then(module=>warmPrograms(module.arrivalPrograms()))
@@ -293,6 +296,7 @@ async function start(loader:FullLoader,creatorSpawn=false) {
   entrySignal?.throwIfAborted()
   scene.add(base.mesh,peaks)
   const stream = openingStream??new Stream(scene,manifest,base,rangeStore,camera)
+  const heli=helicopter(scene,camera,()=>walker,params.has('verify'))
   if(!openingStream){
     openingStream=stream
     try{
@@ -350,6 +354,7 @@ async function start(loader:FullLoader,creatorSpawn=false) {
   let checkedCards=false
   let landingQueue=Promise.resolve()
   function walkTo(x:number,z:number,yaw:number,reason:string,name?:string,request?:AbortSignal,targetY?:number){
+    if(heli.active)return Promise.resolve(false)
     const parent=titleTransition
     const result=landingQueue.then(()=>request?.aborted?false:land(x,z,yaw,reason,name,parent,request,targetY))
     landingQueue=result.then(()=>{},()=>{})
@@ -423,14 +428,14 @@ async function start(loader:FullLoader,creatorSpawn=false) {
   async function landSolo(initial:boolean) {
     if(walker?.active)return
     const gate = walkConfig.gate
-    const point = initial && !opening ? gate : {x:camera.position.x,z:camera.position.z,yaw:camera.rotation.y}
+    const point = initial && !isDeepLink(openParams) ? plazaSpawn : initial && !opening ? gate : {x:camera.position.x,z:camera.position.z,yaw:camera.rotation.y}
     if(await walkTo(point.x,point.z,point.yaw,'solo'))return
     titleTransition?.signal.throwIfAborted()
     if(await walkTo(gate.x,gate.z,gate.yaw,'solo-fallback'))return
     throw Error('单人模式未找到可落脚的位置')
   }
   function takeFlight() {
-    if(getPlayMode()==='solo')return {ok:false,code:'FLIGHT_DISABLED_IN_SOLO'} as const
+    if(getPlayMode()==='solo'||heli.active)return {ok:false,code:'FLIGHT_DISABLED_IN_SOLO'} as const
     walker?.leave()
     showMode()
     return {ok:true} as const
@@ -884,7 +889,7 @@ async function start(loader:FullLoader,creatorSpawn=false) {
     deriveRangeMetrics,
     setView:(view:unknown)=>host.setView(view),
     async photoSupport(x:number,z:number,bridgeRadius?:number){return (await loadWalker()).photoSupport(x,z,bridgeRadius)},
-    peaksStats:peaks.stats,clock,env,get tour(){return tour},get walk(){return walker},
+    peaksStats:peaks.stats,clock,env,get tour(){return tour},get walk(){return walker},...(params.has('verify')?{heli}:{}),
     flight: takeFlight,
     setPreset(name:string){if(getPlayMode()==='solo')return {ok:false,code:'FLIGHT_DISABLED_IN_SOLO'}
       setPreset(camera,name,manifest.bbox);camera.updateMatrixWorld();return stats.frame},
@@ -925,7 +930,7 @@ async function start(loader:FullLoader,creatorSpawn=false) {
   function draw(){
     if(xxg.render()||szj.render())return
     renderer.info.reset()
-    base.update(camera)
+    base.update(camera,heli.phase==='cruise')
     const metrics=stream.metrics
     const ground=!!walker?.active && !cinema
     const mirror=prepareMirror(camera,flags.noMirror||frame<2,ground?walker?.waterSightBlocked:undefined)
@@ -957,15 +962,27 @@ async function start(loader:FullLoader,creatorSpawn=false) {
   })
   let trafficTick:Awaited<ReturnType<typeof import('./traffic').traffic>>|undefined
   let trafficRequested=false
+  const profiling=params.has('verify')&&params.has('frameProfile')
+  let uploads=0
+  if(profiling){
+    const memory=renderer.info.memory
+    let resident=memory.geometries
+    Object.defineProperty(memory,'geometries',{get:()=>resident,set:(count:number)=>{
+      uploads+=Math.max(0,count-resident);resident=count
+    }})
+  }
   const trafficOverride=params.get('traffic')
   function animate(now:number){
+    const start=profiling?performance.now():0
+    let streamMs=0
     geoTick()
     if(getPlayMode()==='solo'&&!walker?.active)return
     if((paused||tour?.map?.active)&&frame>2){previous=0;return}
     const elapsed = previous?now-previous:0;previous=now
     gfx.frame(elapsed)
     const anyIndoor=xxg.isIndoor()||szj.isIndoor()
-    if(!switching&&!anyIndoor){if(walker?.active)walker.tick(elapsed/1000);else {controls(elapsed/1000);clampOpening()}}
+    if(!switching&&!anyIndoor){if(walker?.active&&!heli.active)walker.tick(elapsed/1000);else if(!walker?.active){controls(elapsed/1000);clampOpening()}heli.tick(elapsed/1000)}
+    cabinCruise=heli.first&&heli.phase==='cruise'
     if(frame===1) {
       if(!first)markFirstFrame()
       void import('./play').then(mod=>{tour=mod.play(host)})
@@ -987,11 +1004,13 @@ async function start(loader:FullLoader,creatorSpawn=false) {
       }
       trafficTick?.(elapsed/1000,walker?.active&&walker.vehicle!=='foot'?walker.position:undefined,
         walker?.active?walker.position:undefined,getPlayMode()==='solo',showTraffic)
-      const target=walker?.destination??(walker?.active?walker.position:camera.position)
-      stream.tick(target)
+      const target=heli.lookAhead??walker?.destination??(walker?.active?walker.position:camera.position)
+      const streamStart=profiling?performance.now():0
+      stream.tick(target,heli.phase==='cruise')
       if(frame>=2) syncCityUpgradeProps()
-      stream.updateLandmarks?.(target)
+      stream.updateLandmarks?.(target,undefined,heli.phase==='cruise')
       if(!walkModPromise && !stream.pending.size && camera.position.y<260) void prefetchWalk()
+      if(profiling)streamMs=performance.now()-streamStart
     }
     updateAtmosphere(now,elapsed)
     const stepDt = Math.min(0.1, elapsed/1000)
@@ -1013,7 +1032,9 @@ async function start(loader:FullLoader,creatorSpawn=false) {
     if(!szj.isIndoor())xxg.step(stepDt)
     if(!xxg.isIndoor())szj.step(stepDt)
     persistView?.()
+    const renderStart=profiling?performance.now():0
     draw()
+    const renderMs=profiling?performance.now()-renderStart:0
     if(staticAudit && frame%30===0)staticAudit.check()
     sampleFrame(elapsed)
     if(!frame)record('firstFrame',{ms:first||performance.now()})
@@ -1043,8 +1064,13 @@ async function start(loader:FullLoader,creatorSpawn=false) {
       renderUi.refreshStats()
       sum=0;samples=0
     }
+    if(profiling){
+      const mainMs=performance.now()-start
+      Object.assign(stats,{mainMs,renderMs,streamMs,simulationMs:renderStart-start-streamMs,uploads,triangles:renderer.info.render.triangles})
+      uploads=0
+    }
   }
-  spawnCreatedCharacter=async()=>{const gate=walkConfig.gate
+  spawnCreatedCharacter=async()=>{const gate=getPlayMode()==='solo'&&!isDeepLink(openParams)?plazaSpawn:walkConfig.gate
     if(!await walkTo(gate.x,gate.z,gate.yaw,'creator'))throw Error('出生点暂时无法进入')
     showMode()}
   if(creatorSpawn)await spawnCreatedCharacter()

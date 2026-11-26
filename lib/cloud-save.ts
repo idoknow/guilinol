@@ -32,6 +32,11 @@ export async function cloudSave(request:Request,env:Env) {
      !Array.isArray(next.wardrobe?.ownedItemIds) || !Array.isArray(next.wardrobe?.ownedPresetIds) ||
      !Number.isSafeInteger(next.updatedAt) || next.updatedAt<=0 || next.updatedAt>Date.now()+300000)invalid()
   if(save && save.updatedAt>=next.updatedAt)return reply({save,revision:row!.revision})
+  const confirmed=save?.economy?.helicopterTours??0
+  if((next.economy?.helicopterTours??0)!==confirmed){
+    if(save)return reply({save,revision:row!.revision})
+    invalid()
+  }
   delete next[AVATAR_KEY]
   if(existing?.[AVATAR_KEY])next[AVATAR_KEY]=existing[AVATAR_KEY]
   const payload=JSON.stringify(next)

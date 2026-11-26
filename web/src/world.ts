@@ -8,6 +8,7 @@ import {bridgeGeometry} from './look/bridge'
 import {look} from './look/config'
 import {nightGround} from './look/night'
 import {countryside,setupCountryside,touchesCountryside} from './look/countryside'
+import {urbanGround} from './look/urban-ground'
 import {chunkWater, farWater} from './look/water'
 import type {TileBatchInput} from './batch'
 import type {Peaks} from './peaks'
@@ -219,6 +220,7 @@ export function startOverview(manifest:Manifest) {
     mesh.position.set(left,0,top)
     const material = bitmapMaterial(flipped)
     countryside(material)
+    urbanGround(material)
     const size=manifest.chunkSize, side=size/step, stride=cols+1
     const terrain=new THREE.BufferGeometry()
     const positions=new Float32Array(samples.length*3), normals=new Float32Array(samples.length*3)
@@ -258,16 +260,18 @@ export function startOverview(manifest:Manifest) {
     const box = new THREE.Box3()
     const frustum=new THREE.Frustum(), projection=new THREE.Matrix4(), lastView=new THREE.Matrix4()
     let dirty=true
-    function update(camera:THREE.PerspectiveCamera){
+    let lastFineRadius=0
+    function update(camera:THREE.PerspectiveCamera,aerial=false){
       lake.update(camera)
       const {position,far}=camera
       const ax=Math.floor(position.x/size), az=Math.floor(position.z/size)
       projection.multiplyMatrices(camera.projectionMatrix,camera.matrixWorldInverse)
-      if(!dirty && lastView.equals(projection))return
+      const fineRadius=aerial?2:7
+      if(!dirty && lastView.equals(projection)&&lastFineRadius===fineRadius)return
+      lastFineRadius=fineRadius
       lastView.copy(projection);dirty=false
       frustum.setFromProjectionMatrix(projection)
       // The entire fine-detail streaming radius fits inside this square.
-      const fineRadius=7
       const high=(x:number,z:number)=>Math.max(Math.abs(x-ax),Math.abs(z-az))<=fineRadius
       let cursor=0
       const radius = Math.ceil(far/size)+2
@@ -392,6 +396,7 @@ export async function detail(tile:Tile, signal:AbortSignal, parseSlot?:()=>Promi
   signal.throwIfAborted()
   const material = await surfaceMaterial(buffer.slice(offset,end))
   if(touchesCountryside(tile.x,tile.z))countryside(material)
+  urbanGround(material)
   if(parseSlot)await parseSlot()
   const group = new THREE.Group()
   group.position.set(tile.x,0,tile.z)
