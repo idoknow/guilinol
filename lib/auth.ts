@@ -20,6 +20,21 @@ export interface Env {
 export function requestIp(request:Request, env?:Pick<Env,'clientIp'>):string {
   return env?.clientIp || request.headers.get('CF-Connecting-IP') || 'local'
 }
+export function trustedLoginIp(request:Request):string|null {
+  return request.headers.get('X-Glol-Ip-Trusted')==='1' ? request.headers.get('CF-Connecting-IP') : null
+}
+export async function checkLoginIp(db:D1Database,ip:string) {
+  const row=await db.prepare('SELECT hits,until FROM rate_limits WHERE key=?').bind(`login-failed:${ip}`).first<{hits:number;until:number}>()
+  if(row && row.hits>=5 && row.until>now()) limited()
+}
+export async function failedLoginIp(db:D1Database,ip:string) {
+  const time=now()
+  const row=await db.prepare(`INSERT INTO rate_limits(key,until,hits) VALUES(?,?,1) ON CONFLICT(key) DO UPDATE SET
+    hits=CASE WHEN rate_limits.until<=? THEN 1 ELSE rate_limits.hits+1 END,
+    until=CASE WHEN rate_limits.until<=? OR rate_limits.hits=4 THEN excluded.until ELSE rate_limits.until END
+    WHERE rate_limits.until<=? OR rate_limits.hits<5 RETURNING hits`).bind(`login-failed:${ip}`,time+900,time,time,time).first<{hits:number}>()
+  if(!row || row.hits>=5) limited()
+}
 export const lifetime = 30 * 86400
 export const now = () => Math.floor(Date.now()/1000)
 export class Problem extends Error {

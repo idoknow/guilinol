@@ -1,4 +1,5 @@
 import {type SessionAccount,type Env,checkBan,sessionAccount,Problem,cookie,deliver,equal,hash,invalid,lifetime,limit,newCode,now,passwordHash,random,requestIp,reserveMail,sessionHash,unauthorized} from '../../lib/auth'
+import {trustedLoginIp,checkLoginIp,failedLoginIp} from '../../lib/auth'
 
 import {AVATAR_KEY, looks, sanitizeAvatar, starterOutfit} from '../../lib/avatar'
 import {feedback} from '../../lib/feedback'
@@ -159,19 +160,23 @@ async function handle(request:Request,env:Env) {
     return json({ok:true})
   }
   const login=path==='auth/login', reset=path==='auth/reset'
-  await limit(db,`${login?'login':'code'}:${ip}`,60,900)
+  const loginIp=login?trustedLoginIp(request):null
+  if(!login) await limit(db,`code:${ip}`,60,900)
+  else if(loginIp) {
+    await limit(db,`login:${loginIp}`,60,900)
+    await checkLoginIp(db,loginIp)
+  }
   const user=await getUser(), token=random(32), sessionDigest=await hash(token)
   if(login) {
     const pass=password(body.password)
-    const locked=()=>new Problem(429,'locked','密码错误次数过多，请在 15 分钟后重试')
+    const locked=()=>new Problem(429,'locked','密码错误次数过多，请在 30 分钟后重试')
     if(user&&user.locked_until>now()) throw locked()
     const valid=equal(await passwordHash(pass,user?.salt??'00'.repeat(16)),user?.digest??'00'.repeat(32))
     if(!valid||!user) {
-      if(user) {
-        const result=await stmt(`UPDATE users SET failures=CASE WHEN failures>=4 THEN 0 ELSE failures+1 END,
-          locked_until=CASE WHEN failures>=4 THEN ? ELSE 0 END WHERE id=? AND locked_until<=? AND digest=? RETURNING locked_until`,now()+900,user.id,now(),user.digest).first<{locked_until:number}>()
-        if(result?.locked_until) throw locked()
-      }
+      const result=user && await stmt(`UPDATE users SET failures=CASE WHEN failures>=7 THEN 0 ELSE failures+1 END,
+        locked_until=CASE WHEN failures>=7 THEN ? ELSE 0 END WHERE id=? AND locked_until<=? AND digest=? RETURNING locked_until`,now()+1800,user.id,now(),user.digest).first<{locked_until:number}>()
+      if(loginIp) await failedLoginIp(db,loginIp)
+      if(result?.locked_until) throw locked()
       throw new Problem(401,'credentials','邮箱或密码不正确')
     }
     checkBan(user)
