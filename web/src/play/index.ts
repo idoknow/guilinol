@@ -134,7 +134,7 @@ export function play(host:Host) {
   let atlas:import('../map/atlas').Atlas|undefined, map:ReturnType<typeof mapView>|undefined
   // Atlas loads only after the scene has been running a couple of seconds, never inside the first-frame budget.
   let mapLoading:Promise<ReturnType<typeof mapView>|undefined>|undefined
-  const ensureMap = ()=>{if(mapLoading)return mapLoading;const done=inlineBusy(slot,'载入地图');return mapLoading = import('../map/atlas').then(m=>m.loadAtlas(host.manifest)).then(loaded=>{
+  const ensureMap = (background=false)=>{if(mapLoading)return mapLoading;const done=inlineBusy(slot,'载入地图',{quiet:background});return mapLoading = import('../map/atlas').then(m=>m.loadAtlas(host.manifest)).then(loaded=>{
     atlas = loaded; return map = mapView(host,loaded,{slot,buttons,stamps,goPoint:(x,z,n)=>void goPoint(x,z,n),goSpot:s=>void goTo(s),goDock:d=>void goDock(d),goShop:sh=>void goShop(sh),
       onNav:target=>nav.set(target),navPath:()=>nav.path()})
   }).catch(error=>{console.warn('atlas',error); mapLoading = undefined
@@ -142,7 +142,7 @@ export function play(host:Host) {
     // ask whether the site was redeployed under us (old chunks 404 after a release) so the player can refresh.
     mapRetryAt = pulse+Math.min(60,10*2**mapFailures++); mapRequested = false; checkForUpdate(true); return undefined}).finally(done)}
   let mapFailures = 0, mapRetryAt = 2.5
-  const loadMap = ()=>void ensureMap()
+  const loadMap = ()=>void ensureMap(true)
   let mapRequested = !(host.manifest as {atlas?:unknown}).atlas
   const feedbackEntry=button('反馈','反馈','dock-feedback');buttons.append(feedbackEntry)
   feedbackEntry.onclick=()=>void import('../ui/feedback').then(module=>module.openFeedback(host,()=>{mapRequested = true; return ensureMap()}))

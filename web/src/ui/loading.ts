@@ -202,7 +202,9 @@ export function inline(el:HTMLElement,{label,progress}:{label:string;progress?:n
   }
 }
 
-export function inlineBusy(el:HTMLElement,label='正在加载'){
+// quiet: background prefetches (e.g. the minimap atlas a few seconds after entry) only mark `el` busy; the centred
+// skeleton is for loads the player asked for, otherwise it floats over the character for no visible reason (IDOK-429).
+export function inlineBusy(el:HTMLElement,label='正在加载',{quiet=false}:{quiet?:boolean}={}){
   const key=Symbol(), skeleton=document.createElement('div')
   skeleton.className='ld-skeleton'
   skeleton.innerHTML='<i></i><i></i><i></i>'
@@ -211,7 +213,7 @@ export function inlineBusy(el:HTMLElement,label='正在加载'){
   const timer=setTimeout(()=>{
     el.setAttribute('aria-busy','true')
     el.classList.add('ld-inline')
-    document.body.append(skeleton)
+    if(!quiet)document.body.append(skeleton)
     publish(key,{level:3,stage:label,fraction:0})
   },200)
   return ()=>{
