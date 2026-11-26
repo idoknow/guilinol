@@ -135,9 +135,26 @@ def bake(directory, manifest, paired_widths):
     finish_paving(directory, manifest, [profiles[wid] for wid in sorted(set(ROAD_IDS) | corrected)] + joint, elements)
     final_traffic_ways = [way for way, _, _ in joint]
     final_traffic_ways.extend(profiles[wid][0] for wid in sorted(corrected))
+    # A new bore can share a portal with an earlier graded approach. Generate
+    # their profiles under their own design rules, then stitch them in one pass.
+    phases = []
+    batches = {}
     for section in road_phases(sections):
         parts = section_roads(section, ways, paired_widths)
         adjust_prior_roads(section["name"], parts, sections)
+        target = section.get("joinRoadSection")
+        if target:
+            existing = batches[target]
+            if existing.keys() & parts.keys() or section.get("roadDecks"):
+                raise ValueError(f"Conflicting road profiles in joint section {target}")
+            existing.update(parts)
+            final_traffic_ways.extend(way for way, _, _ in parts.values())
+            corrected = section.get("priorRoadProfiles", {}).get(target, {})
+            final_traffic_ways.extend(existing[int(wid)][0] for wid in corrected)
+        else:
+            batches.setdefault(section["name"], parts)
+            phases.append((section, parts))
+    for section, parts in phases:
         if not parts:
             continue
         bridges, joints = [], {}
