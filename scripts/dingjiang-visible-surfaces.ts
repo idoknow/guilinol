@@ -6,6 +6,7 @@ import path from 'node:path'
 import { gunzipSync } from 'node:zlib'
 import * as THREE from 'three'
 import { ll2xz } from '../lib/projection'
+import { stationRoofDepth } from '../web/src/station-tunnels'
 import vesselBounds from '../pipeline/vessel-bounds.json'
 import streetRules from '../pipeline/streets.json'
 import { bridgeGeometry } from '../web/src/look/bridge'
@@ -238,6 +239,7 @@ export function visibleSurfaces(world: string, ids: Set<number>, closure: Set<nu
             minClearanceM: number
             intersections: number
             targetM: number
+            minimumStructureGapM?: number
             belowTargetFaces: number
             groundHits: number
           }
@@ -292,6 +294,21 @@ export function visibleSurfaces(world: string, ids: Set<number>, closure: Set<nu
           const [a,ay]=t.stations[Math.max(0,i-1)], [b,by]=t.stations[i]
           return py>=ay+(by-ay)*(at-a)/(b-a||1)+t.clearance-.001
         }))
+      // A covered bend also has a roof above the wedge between the two
+      // rectangular strips. Check its actual floor triangles and roof height.
+      const jointRoof = !roof && coveredRoads && role === 'terrain' && nearTunnels.some(t =>
+        !t.openCut && t.joints?.some((joint, end) =>
+          joint?.draw && !t.mouths?.[end] && t.openEnds?.[end] === 0 &&
+          (joint.wedges ?? [joint.ring]).some(ring => {
+            const corners = ring.map(([x,z], i) => [x,z,...ring[(i+1)%ring.length]])
+            return points.every(([x,y,z]) => {
+              const sides = corners.map(([a,b,c,d]) =>
+                ((c-a)*(z-b)-(d-b)*(x-a)) / (Math.hypot(c-a,d-b) || 1))
+              const inside = sides.every(v => v >= -.001) || sides.every(v => v <= .001)
+              const top = t.portals[end][1] + t.clearance + stationRoofDepth - .35
+              return inside && Math.abs(y-top) < .001
+            })
+          })))
       for (const s of local) {
         if (
           points.every((p) => p[0] < s.left) ||
@@ -346,7 +363,13 @@ export function visibleSurfaces(world: string, ids: Set<number>, closure: Set<nu
             const row = entry(deck.owner!)
             overlaps.add(deck.owner!)
             row.intersections++
-            row.minClearanceM = Math.min(row.minClearanceM, gap)
+            // Intermediate roofs and ballast need physical separation from
+            // the bridge. Vehicle headroom is measured from the lower road.
+            if (overhead.some(b => b.way === deck.owner) && !s.t.openCut &&
+                (roof || jointRoof || role === 'rail-bed')) {
+              row.minimumStructureGapM = Math.min(row.minimumStructureGapM ?? Infinity, gap)
+              if (gap < 0) row.belowTargetFaces++
+            } else row.minClearanceM = Math.min(row.minClearanceM, gap)
           }
         }
         let lowest = Infinity,
@@ -416,7 +439,7 @@ export function visibleSurfaces(world: string, ids: Set<number>, closure: Set<nu
         }
         // A roof is overhead for the lower road only. Its exposed upper
         // face must still be tested against any pavement carried above it.
-        if (roof && lowest >= s.t.clearance - .001) continue
+        if ((roof || jointRoof) && lowest >= s.t.clearance - .001) continue
         if (role === 'rail-bed') {
           if (lowest < (report.minimumRailBedClearanceM ?? Infinity)) report.lowestRailFace = points
           report.minimumRailBedClearanceM = Math.min(report.minimumRailBedClearanceM ?? Infinity, lowest)

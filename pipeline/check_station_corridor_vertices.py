@@ -1,6 +1,7 @@
 """Compare finished rail endpoints in all chunks within 600 m of Guilin station."""
 import argparse
 import json
+from collections import Counter
 from pathlib import Path
 
 from shapely.geometry import box
@@ -28,6 +29,15 @@ if __name__ == "__main__":
     pad = station_pad({w["id"]: w for w in load_osm() if w["type"] == "way"})
     before, after = (corridor(world, pad) for world in (args.reference, args.candidate))
     changed = sorted(k for k in before.keys() | after.keys() if before.get(k) != after.get(k))
+    differences = []
+    for key in changed:
+        reference = Counter(before.get(key, []))
+        candidate = Counter(after.get(key, []))
+        differences.append({
+            "chunk": key,
+            "referenceOnly": list((reference - candidate).elements()),
+            "candidateOnly": list((candidate - reference).elements()),
+        })
     segments = sum(map(len, before.values()))
-    print(json.dumps(dict(referenceSegments=segments, changedChunks=changed), indent=2))
+    print(json.dumps(dict(referenceSegments=segments, changedChunks=changed, differences=differences), indent=2))
     raise SystemExit(int(not segments or bool(changed)))

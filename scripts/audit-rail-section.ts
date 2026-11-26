@@ -203,7 +203,7 @@ const reverse = visibleSurfaces(candidate, ids, ids, sections, !!design.railProf
 console.log(JSON.stringify({ grades, deckChecks, reverse }, null, 2))
 for(const bridge of design.roadOverpasses ?? []) for(const way of bridge.lower) {
   const clearance=reverse.find(r=>r.way===way)?.roadBridges[bridge.way]
-  assert(clearance?.intersections && clearance.minClearanceM >= bridge.minimumM-1e-5 &&
+  assert(clearance?.intersections && Number.isFinite(clearance.minClearanceM) && clearance.minClearanceM >= bridge.minimumM-1e-5 &&
     clearance.belowTargetFaces===0, `Insufficient full-width clearance at ${bridge.way}/${way}`)
 }
 assert(
