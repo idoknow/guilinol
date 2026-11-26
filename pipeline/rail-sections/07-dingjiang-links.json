@@ -1627,7 +1627,8 @@
         [1004.0, 151.0271069576],
         [1004.7416488, 150.97]
       ],
-      "maximumGrade": 0.08
+      "maximumGrade": 0.08,
+      "maxTrafficOffset": 0.85
     },
     {
       "way": 1030049246,
@@ -1659,6 +1660,7 @@
         [45.674938, 150.97]
       ],
       "maximumGrade": 0.08,
+      "maxTrafficOffset": 0.85,
       "stackedRoad": true
     },
     {
@@ -1746,7 +1748,8 @@
         [154.0, 155.8757042619425],
         [154.746827, 155.88369856236986]
       ],
-      "maximumGrade": 0.08
+      "maximumGrade": 0.08,
+      "maxTrafficOffset": 0.85
     }
   ],
   "panelRoads": [983781244, 983846312]
