@@ -1,4 +1,5 @@
 import rawStage1Layout from './stage1-layout.json' with { type: 'json' }
+import type { XxgCrowdMetrics } from './crowd.ts'
 import {
   XXG_BUDGET,
   XXG_CONTRACT_VERSION,
@@ -93,6 +94,10 @@ export interface CreateXxgIndoorSceneOptions {
   /** Override reenterCooldownMs in unit tests; defaults to XXG_TIMING.reenterCooldownMs (1500ms). */
   readonly reenterCooldownMs?: number
   readonly now?: () => number
+  /** 室内限流人群上限；0 关闭人群，缺省 XXG_CROWD_MAX（18）。 */
+  readonly crowdMaxAgents?: number
+  /** 人群随机种子（测试与对照截图固定画面用）。 */
+  readonly crowdSeed?: number
 }
 
 export interface XxgPlayerSnapshot {
@@ -113,4 +118,6 @@ export interface XxgExtendedIndoorScene extends XxgIndoorScene {
   renderFrame(): boolean
   getPlayerSnapshot(): XxgPlayerSnapshot
   getLayout(): XxgLayout
+  /** 人群上限、在场人数、生成/消失计数与开销；人群关闭时为 null。 */
+  getCrowdMetrics(): XxgCrowdMetrics | null
 }

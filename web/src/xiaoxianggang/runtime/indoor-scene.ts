@@ -8,15 +8,16 @@ import {
   type SignAtlasSlot,
 } from '../look/index.ts'
 import { corridorToAabb, rectToAabb, type Aabb2D } from './collision.ts'
-
-interface BoxSpec {
-  readonly cx: number
-  readonly cy: number
-  readonly cz: number
-  readonly sx: number
-  readonly sy: number
-  readonly sz: number
-}
+import { buildMergedBoxesGeometry, carveBoxXZ, mergeGeometries, orientedBar, type BoxSpec, type RectXZ } from './scene-boxes.ts'
+import {
+  classifyXxgShop,
+  emitShopFitout,
+  getXxgFirstShop,
+  resolveAlcoveDepth,
+  type FitoutBuckets,
+  type ShopFrame,
+} from './shop-fitout.ts'
+import { XXG_STAIR_GLOBES, XXG_WELL_GLOBES, buildSkyCapGeometry, buildSkylightPyramid } from './skylight-pyramid.ts'
 
 export interface IndoorGreyboxSceneHandle {
   readonly scene: THREE.Scene
@@ -25,99 +26,12 @@ export interface IndoorGreyboxSceneHandle {
   readonly textureBytes: number
   readonly geometryCount: number
   readonly materialCount: number
+  /** 实际渲染的柱子中心（人群避让用）。 */
+  readonly columnCenters: readonly { readonly x: number; readonly z: number }[]
+  /** 吊顶开洞（采光井 + 出口楼梯井），金字塔底面与之重合。 */
+  readonly skylightOpenings: readonly RectXZ[]
   isDisposed(): boolean
   dispose(): void
-}
-
-function buildMergedBoxesGeometry(
-  specs: readonly BoxSpec[],
-  uvScale: readonly [number, number] = [1, 1],
-): { geom: THREE.BufferGeometry; triangles: number } {
-  const positions: number[] = []
-  const normals: number[] = []
-  const uvs: number[] = []
-  const indices: number[] = []
-  let vertexOffset = 0
-  const [su, sv] = uvScale
-
-  for (const b of specs) {
-    if (b.sx <= 0 || b.sy <= 0 || b.sz <= 0) continue
-    const box = new THREE.BoxGeometry(b.sx, b.sy, b.sz)
-    box.translate(b.cx, b.cy, b.cz)
-    const pos = box.getAttribute('position')
-    const norm = box.getAttribute('normal')
-    const idx = box.getIndex()
-
-    for (let i = 0; i < pos.count; i++) {
-      const px = pos.getX(i)
-      const py = pos.getY(i)
-      const pz = pos.getZ(i)
-      const nx = norm.getX(i)
-      const ny = norm.getY(i)
-      positions.push(px, py, pz)
-      normals.push(nx, ny, norm.getZ(i))
-      if (Math.abs(ny) > 0.5) {
-        uvs.push(px * su, pz * sv)
-      } else if (Math.abs(nx) > 0.5) {
-        uvs.push(pz * su, py * sv)
-      } else {
-        uvs.push(px * su, py * sv)
-      }
-    }
-    if (idx) {
-      for (let i = 0; i < idx.count; i++) indices.push(vertexOffset + idx.getX(i))
-    } else {
-      for (let i = 0; i < pos.count; i++) indices.push(vertexOffset + i)
-    }
-    vertexOffset += pos.count
-    box.dispose()
-  }
-
-  const merged = new THREE.BufferGeometry()
-  merged.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3))
-  merged.setAttribute('normal', new THREE.Float32BufferAttribute(normals, 3))
-  merged.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2))
-  merged.setIndex(indices)
-  merged.computeBoundingSphere()
-  return { geom: merged, triangles: Math.floor(indices.length / 3) }
-}
-
-function mergeGeometries(parts: readonly THREE.BufferGeometry[]): {
-  geom: THREE.BufferGeometry
-  triangles: number
-} {
-  const positions: number[] = []
-  const normals: number[] = []
-  const uvs: number[] = []
-  const indices: number[] = []
-  let vertexOffset = 0
-
-  for (const part of parts) {
-    const pos = part.getAttribute('position')
-    const norm = part.getAttribute('normal')
-    const uv = part.getAttribute('uv')
-    const idx = part.getIndex()
-    for (let i = 0; i < pos.count; i++) {
-      positions.push(pos.getX(i), pos.getY(i), pos.getZ(i))
-      normals.push(norm ? norm.getX(i) : 0, norm ? norm.getY(i) : 1, norm ? norm.getZ(i) : 0)
-      uvs.push(uv ? uv.getX(i) : 0, uv ? uv.getY(i) : 0)
-    }
-    if (idx) {
-      for (let i = 0; i < idx.count; i++) indices.push(vertexOffset + idx.getX(i))
-    } else {
-      for (let i = 0; i < pos.count; i++) indices.push(vertexOffset + i)
-    }
-    vertexOffset += pos.count
-    part.dispose()
-  }
-
-  const merged = new THREE.BufferGeometry()
-  merged.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3))
-  merged.setAttribute('normal', new THREE.Float32BufferAttribute(normals, 3))
-  merged.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2))
-  merged.setIndex(indices)
-  merged.computeBoundingSphere()
-  return { geom: merged, triangles: Math.floor(indices.length / 3) }
 }
 
 function createSafetyExitSignTexture(): { texture: THREE.DataTexture; bytes: number } {
@@ -366,6 +280,61 @@ function resolveShopFrontageGeometry(shop: XxgShop, sb: Aabb2D, front: Aabb2D | 
   }
 }
 
+/** 吊顶方灯：600mm 格内嵌 560mm 灯片，沿走廊每 4 格一排。 */
+export const XXG_LAMP_SIZE_M = 0.56
+export const XXG_LAMP_PITCH_M = 2.4
+
+function rectContains(r: RectXZ, x: number, z: number, margin = 0): boolean {
+  return x > r.minX - margin && x < r.maxX + margin && z > r.minZ - margin && z < r.maxZ + margin
+}
+
+/** 出口楼梯口：走廊边线打通到楼梯；吊顶从楼梯口平台（落脚点外侧）一直开到楼梯尽头，金字塔罩住平台和整段楼梯。 */
+interface ExitWell {
+  readonly stair: Aabb2D
+  readonly alongZ: boolean
+  readonly sign: 1 | -1
+  /** 楼梯这一侧的走廊边线（楼梯口起点）。 */
+  readonly corrEdge: number
+  /** 第一级台阶起步线。 */
+  readonly startEdge: number
+  /** 井口靠走廊一侧的边线（楼梯口平台外沿），安全出口牌挂在这里。 */
+  readonly landingEdge: number
+  readonly opening: RectXZ
+}
+
+function resolveExitWell(ex: XxgLayout['exits'][number], corridorBoxes: readonly Aabb2D[]): ExitWell {
+  const st = ex.stair
+  const stair = rectToAabb(`stair-${ex.portalId}`, st)
+  const dirX = st.x - ex.foot.x
+  const dirZ = st.z - ex.foot.z
+  const alongZ = Math.abs(dirZ) >= Math.abs(dirX)
+  const sign: 1 | -1 = alongZ ? (dirZ >= 0 ? 1 : -1) : dirX >= 0 ? 1 : -1
+  const startEdge = alongZ ? (sign > 0 ? stair.minZ : stair.maxZ) : sign > 0 ? stair.minX : stair.maxX
+  const endEdge = alongZ ? (sign > 0 ? stair.maxZ : stair.minZ) : sign > 0 ? stair.maxX : stair.minX
+  let corrEdge = alongZ ? ex.foot.z : ex.foot.x
+  for (const b of corridorBoxes) {
+    if (!rectContains(b, ex.foot.x, ex.foot.z, 0.01)) continue
+    const edge = alongZ ? (sign > 0 ? b.maxZ : b.minZ) : sign > 0 ? b.maxX : b.minX
+    if ((edge - corrEdge) * sign > 0) corrEdge = edge
+  }
+  if ((corrEdge - startEdge) * sign > 0) corrEdge = startEdge
+  // 平台向走廊里让出「落脚点到边线 + 0.6m」，最多 2.6m，且不越过落脚点所在走廊的对侧边线。
+  const footA = alongZ ? ex.foot.z : ex.foot.x
+  let landingEdge = corrEdge - sign * Math.min(2.6, Math.abs(corrEdge - footA) + 0.6)
+  for (const b of corridorBoxes) {
+    if (!rectContains(b, ex.foot.x, ex.foot.z, 0.01)) continue
+    const opposite = alongZ ? (sign > 0 ? b.minZ : b.maxZ) : sign > 0 ? b.minX : b.maxX
+    if ((opposite + sign * 0.3 - landingEdge) * sign > 0) landingEdge = opposite + sign * 0.3
+  }
+  const far = endEdge + sign * 0.12
+  const a0 = Math.min(landingEdge, far)
+  const a1 = Math.max(landingEdge, far)
+  const opening: RectXZ = alongZ
+    ? { minX: stair.minX, maxX: stair.maxX, minZ: a0, maxZ: a1 }
+    : { minX: a0, maxX: a1, minZ: stair.minZ, maxZ: stair.maxZ }
+  return { stair, alongZ, sign, corrEdge, startEdge, landingEdge, opening }
+}
+
 /**
  * Builds the standalone B1 indoor THREE.Scene from any validated XxgLayout.
  * Strictly <= 40 draw calls (~16 batched PBR meshes), <= 150k triangles, zero dependency on world.ts or terrain.
@@ -442,7 +411,6 @@ export function createIndoorGreyboxScene(layout: XxgLayout): IndoorGreyboxSceneH
 
   const corridorBoxes = layout.corridors.map(corridorToAabb)
   const corridorsById = new Map(layout.corridors.map(c => [c.id, corridorToAabb(c)]))
-  const corridorKindsById = new Map(layout.corridors.map(c => [c.id, c.kind]))
   const stairBoxes = layout.exits.map(e => rectToAabb(`stair-${e.portalId}`, e.stair))
 
   const namedShops = layout.shops.filter(s => Boolean(s.name && s.name.trim().length > 0))
@@ -452,7 +420,21 @@ export function createIndoorGreyboxScene(layout: XxgLayout): IndoorGreyboxSceneH
     return { shop, sb, front, geom: resolveShopFrontageGeometry(shop, sb, front) }
   })
 
+  const exitWells = layout.exits.map(ex => resolveExitWell(ex, corridorBoxes))
+  const wellOpenings: RectXZ[] = []
+  const skyCorr = namedShops.length > 4 ? corridorsById.get('corr-skylight-ns') : undefined
+  if (skyCorr) {
+    const wx = (skyCorr.minX + skyCorr.maxX) * 0.5
+    const half = Math.min(2.2, (skyCorr.maxX - skyCorr.minX) * 0.5 - 0.08)
+    for (const zc of [-25.5, 25.5]) {
+      const wz = Math.min(skyCorr.maxZ - half - 0.4, Math.max(skyCorr.minZ + half + 0.4, zc))
+      wellOpenings.push({ minX: wx - half, maxX: wx + half, minZ: wz - half, maxZ: wz + half })
+    }
+  }
+  const ceilingHoles: RectXZ[] = [...wellOpenings, ...exitWells.map(w => w.opening)]
+
   const openFootprints: Aabb2D[] = [...corridorBoxes, ...stairBoxes]
+  for (const w of exitWells) openFootprints.push({ id: `${w.stair.id}-well`, ...w.opening })
   for (const { geom } of shopGeoms) {
     openFootprints.push(geom.openApron)
   }
@@ -473,25 +455,22 @@ export function createIndoorGreyboxScene(layout: XxgLayout): IndoorGreyboxSceneH
   const woodCamelSpecs: BoxSpec[] = []
   const stairSpecs: BoxSpec[] = []
   const skylightGlassSpecs: BoxSpec[] = []
+  const goodsSpecs: BoxSpec[] = []
   const globeSpecs: THREE.BufferGeometry[] = []
+  const skylightFrameGeos: THREE.BufferGeometry[] = []
+  const pyramidGlassGeos: THREE.BufferGeometry[] = []
   const shopSignGeos: THREE.BufferGeometry[] = []
   const exitSignGeos: THREE.BufferGeometry[] = []
-
-  const skylightZones = namedShops.length > 4
-    ? [
-        { cx: -36.0, cz: -25.5, r: 3.1 },
-        { cx: -36.0, cz: 25.5, r: 3.1 },
-      ]
-    : []
 
   for (let ci = 0; ci < layout.corridors.length; ci++) {
     const c = layout.corridors[ci]!
     const b = corridorBoxes[ci]!
-    const isRenovated = c.kind === 'main'
+    // 中庭翻新区铺抛光砖，其余主街与支巷都是水磨石；翻新砖高 4mm 压住重叠处的水磨石，避免 z-fighting。
+    const isRenovated = c.id.startsWith('corr-atrium')
     const floorTarget = isRenovated ? floorRenovatedSpecs : floorTerrazzoSpecs
     floorTarget.push({
       cx: (b.minX + b.maxX) * 0.5,
-      cy: -0.06,
+      cy: isRenovated ? -0.056 : -0.06,
       cz: (b.minZ + b.maxZ) * 0.5,
       sx: b.maxX - b.minX + 0.2,
       sy: 0.12,
@@ -503,92 +482,83 @@ export function createIndoorGreyboxScene(layout: XxgLayout): IndoorGreyboxSceneH
     emitEdgeWallSegments(wallCorridorSpecs, rackMetalSpecs, b.minX, b.minZ, b.maxZ, 'z', -1, wallT, ceilH, openFootprints)
     emitEdgeWallSegments(wallCorridorSpecs, rackMetalSpecs, b.maxX, b.minZ, b.maxZ, 'z', 1, wallT, ceilH, openFootprints)
 
-    const w = b.maxX - b.minX
-    const d = b.maxZ - b.minZ
-    const skipFullCeiling = c.id === 'corr-skylight-ns' && skylightZones.length > 0
-    if (skipFullCeiling) {
-      ceilingSpecs.push({
-        cx: (b.minX + b.maxX) * 0.5,
-        cy: ceilH + 0.06,
-        cz: 0,
-        sx: w + 0.4,
-        sy: 0.12,
-        sz: 42.0,
-      })
-    } else {
-      ceilingSpecs.push({
-        cx: (b.minX + b.maxX) * 0.5,
-        cy: ceilH + 0.06,
-        cz: (b.minZ + b.maxZ) * 0.5,
-        sx: w + 0.4,
-        sy: 0.12,
-        sz: d + 0.4,
-      })
-    }
-
-    const lampBucket = isRenovated ? lightCoolSpecs : lightWarmSpecs
-    if (w >= d) {
-      const midZ = (b.minZ + b.maxZ) * 0.5
-      const rowOff = Math.min(1.35, d * 0.26)
-      for (let lx = b.minX + 2.4; lx <= b.maxX - 2.0; lx += 5.4) {
-        lampBucket.push(
-          { cx: lx, cy: ceilH - 0.015, cz: midZ - rowOff, sx: 0.58, sy: 0.025, sz: 0.58 },
-          { cx: lx, cy: ceilH - 0.015, cz: midZ + rowOff, sx: 0.58, sy: 0.025, sz: 0.58 },
-        )
-      }
-      if (isRenovated) {
-        lightWarmSpecs.push({
-          cx: (b.minX + b.maxX) * 0.5,
-          cy: ceilH - 0.014,
-          cz: midZ,
-          sx: Math.max(1, w - 3.0),
-          sy: 0.02,
-          sz: 0.08,
-        })
-      }
-    } else {
-      const midX = (b.minX + b.maxX) * 0.5
-      const colOff = Math.min(1.2, w * 0.25)
-      for (let lz = b.minZ + 2.4; lz <= b.maxZ - 2.0; lz += 5.4) {
-        if (skipFullCeiling && skylightZones.some(z => Math.abs(lz - z.cz) < 3.6)) continue
-        lampBucket.push(
-          { cx: midX - colOff, cy: ceilH - 0.015, cz: lz, sx: 0.58, sy: 0.025, sz: 0.58 },
-          { cx: midX + colOff, cy: ceilH - 0.015, cz: lz, sx: 0.58, sy: 0.025, sz: 0.58 },
-        )
-      }
-    }
+    ceilingSpecs.push({
+      cx: (b.minX + b.maxX) * 0.5,
+      cy: ceilH + 0.06,
+      cz: (b.minZ + b.maxZ) * 0.5,
+      sx: b.maxX - b.minX + 0.4,
+      sy: 0.12,
+      sz: b.maxZ - b.minZ + 0.4,
+    })
   }
 
-  for (const sky of skylightZones) {
-    const wellHalf = 2.6
-    const wellTop = ceilH + 1.9
-    wallCorridorSpecs.push(
-      { cx: sky.cx, cy: (ceilH + wellTop) * 0.5, cz: sky.cz - wellHalf, sx: wellHalf * 2, sy: wellTop - ceilH, sz: 0.22 },
-      { cx: sky.cx, cy: (ceilH + wellTop) * 0.5, cz: sky.cz + wellHalf, sx: wellHalf * 2, sy: wellTop - ceilH, sz: 0.22 },
-      { cx: sky.cx - wellHalf, cy: (ceilH + wellTop) * 0.5, cz: sky.cz, sx: 0.22, sy: wellTop - ceilH, sz: wellHalf * 2 },
-      { cx: sky.cx + wellHalf, cy: (ceilH + wellTop) * 0.5, cz: sky.cz, sx: 0.22, sy: wellTop - ceilH, sz: wellHalf * 2 },
-    )
-    skylightGlassSpecs.push({ cx: sky.cx, cy: wellTop, cz: sky.cz, sx: wellHalf * 2, sy: 0.06, sz: wellHalf * 2 })
-    for (const gx of [-1.0, 1.0]) {
-      for (const gz of [-1.0, 1.0]) {
-        const dropY = ceilH - 0.15
-        rackMetalSpecs.push({ cx: sky.cx + gx, cy: (wellTop + dropY) * 0.5, cz: sky.cz + gz, sx: 0.03, sy: wellTop - dropY, sz: 0.03 })
-        const g = new THREE.IcosahedronGeometry(0.16, 1)
-        g.translate(sky.cx + gx, dropY, sky.cz + gz)
-        globeSpecs.push(g)
-      }
-    }
+  for (const opening of wellOpenings) {
+    const pyramid = buildSkylightPyramid({ opening, ceilH, heightM: 3.0, globes: XXG_WELL_GLOBES })
+    wallCorridorSpecs.push(...pyramid.curbWalls)
+    pyramidGlassGeos.push(pyramid.glass)
+    skylightFrameGeos.push(...pyramid.frame)
+    globeSpecs.push(...pyramid.globes)
   }
 
   const colSize = layout.columns.size
+  const columnCenters: { x: number; z: number }[] = []
   for (const cx of layout.columns.xs) {
     for (const cz of layout.columns.zs) {
       if (!pointInsideAnyAabb(cx, cz, corridorBoxes, -0.3)) continue
       const nearExit = layout.exits.some(e => Math.hypot(e.foot.x - cx, e.foot.z - cz) < 1.6)
       if (nearExit) continue
+      if (ceilingHoles.some(h => rectContains(h, cx, cz, colSize * 0.5 + 0.3))) continue
       wallCorridorSpecs.push({ cx, cy: ceilH * 0.5, cz, sx: colSize, sy: ceilH, sz: colSize })
       rackMetalSpecs.push({ cx, cy: 0.08, cz, sx: colSize + 0.05, sy: 0.16, sz: colSize + 0.05 })
+      columnCenters.push({ x: cx, z: cz })
     }
+  }
+
+  // 嵌入式方灯矩阵：600mm 吊顶格里整格嵌灯，沿走廊每 2.4m（4 格）一排、横向每 1.8m（3 格）一列；
+  // 主街先排，支巷与主街交叉处不重复布灯，采光井和柱头周围空出。
+  const lampCenters: { x: number; z: number }[] = []
+  const snapCell = (v: number) => 0.3 + Math.round((v - 0.3) / 0.6) * 0.6
+  const lampOrder = corridorBoxes
+    .map((b, i) => ({ b, main: layout.corridors[i]!.kind === 'main' ? 1 : 0 }))
+    .sort((p, q) => q.main - p.main)
+  for (const { b } of lampOrder) {
+    const w = b.maxX - b.minX
+    const d = b.maxZ - b.minZ
+    const alongX = w >= d
+    const len = alongX ? w : d
+    const across = alongX ? d : w
+    const a0 = alongX ? b.minX : b.minZ
+    const c0 = alongX ? b.minZ : b.minX
+    const rows = across < 3.6 ? 1 : across < 5.4 ? 2 : across < 7.8 ? 3 : 4
+    const count = Math.max(1, Math.floor((len - 1.2) / XXG_LAMP_PITCH_M) + 1)
+    const firstAlong = snapCell(a0 + (len - (count - 1) * XXG_LAMP_PITCH_M) * 0.5)
+    const firstRow = snapCell(c0 + across * 0.5 - (rows - 1) * 0.9)
+    for (let i = 0; i < count; i++) {
+      for (let r = 0; r < rows; r++) {
+        const av = firstAlong + i * XXG_LAMP_PITCH_M
+        const cv = firstRow + r * 1.8
+        const x = alongX ? av : cv
+        const z = alongX ? cv : av
+        if (!rectContains(b, x, z, -0.55)) continue
+        if (ceilingHoles.some(h => rectContains(h, x, z, 0.45))) continue
+        if (lampCenters.some(p => Math.abs(p.x - x) < 1.5 && Math.abs(p.z - z) < 1.5)) continue
+        if (columnCenters.some(p => Math.abs(p.x - x) < colSize * 0.5 + 0.4 && Math.abs(p.z - z) < colSize * 0.5 + 0.4)) continue
+        lampCenters.push({ x, z })
+        lightCoolSpecs.push({ cx: x, cy: ceilH - 0.004, cz: z, sx: XXG_LAMP_SIZE_M, sy: 0.01, sz: XXG_LAMP_SIZE_M })
+      }
+    }
+  }
+
+  const fitoutBuckets: FitoutBuckets = {
+    wall: wallCorridorSpecs,
+    glass: storefrontGlassSpecs,
+    cream: shutterCreamSpecs,
+    wine: garmentWineSpecs,
+    navy: garmentNavySpecs,
+    camel: woodCamelSpecs,
+    metal: rackMetalSpecs,
+    warmLight: lightWarmSpecs,
+    goods: goodsSpecs,
   }
 
   for (let si = 0; si < shopGeoms.length; si++) {
@@ -670,15 +640,17 @@ export function createIndoorGreyboxScene(layout: XxgLayout): IndoorGreyboxSceneH
     }
 
     const resolved = resolveShopLook(matPack, shop.lookKey)
+    const firstShop = getXxgFirstShop(shop)
     const isPink = shop.lookKey === 'wallBoutiquePink' || shop.lookKey === 'boutiqueB181' || shop.lookKey === 'boutiqueYuyu'
-    const isShutterSilver = shop.lookKey === 'rollerShutterSilver'
-    const isShutterCream = shop.lookKey === 'rollerShutterCream'
+    // 首批三家强制营业（不落卷帘），其余按 lookKey 决定是否卷帘。
+    const isShutterSilver = !firstShop && shop.lookKey === 'rollerShutterSilver'
+    const isShutterCream = !firstShop && shop.lookKey === 'rollerShutterCream'
     const isShuttered = isShutterSilver || isShutterCream
 
-    const alcoveDepth = gapM + (isShuttered ? 0.22 : Math.min(0.65, frontDepth * 0.32))
+    const alcoveDepth = resolveAlcoveDepth(gapM, frontDepth, isShuttered, firstShop !== null)
     const sideWallTarget = isPink ? wallPinkSpecs : wallCorridorSpecs
     const backPlaneCoord = facadeCoord - outwardSign * alcoveDepth
-    const shopFloorBucket = corridorKindsById.get(shop.frontage) === 'main' ? floorRenovatedSpecs : floorTerrazzoSpecs
+    const shopFloorBucket = shop.frontage.startsWith('corr-atrium') ? floorRenovatedSpecs : floorTerrazzoSpecs
 
     if (facingZ) {
       sideWallTarget.push({
@@ -736,144 +708,23 @@ export function createIndoorGreyboxScene(layout: XxgLayout): IndoorGreyboxSceneH
         rackMetalSpecs.push({ cx: facadeCoord - outwardSign * 0.02, cy: lintelBottomM - 0.04, cz: shop.rect.z, sx: 0.12, sy: 0.09, sz: frontSpan - 0.18 })
       }
     } else {
-      const glassPaneCoord = facadeCoord - outwardSign * 0.06
-      const windowRecessCoord = facadeCoord - outwardSign * Math.min(alcoveDepth * 0.48, gapM + 0.22)
-      const rackCoord = facadeCoord - outwardSign * Math.min(alcoveDepth * 0.56, gapM + 0.16)
-      const shelfCoord = backPlaneCoord + outwardSign * 0.16
-      const trimCoord = facadeCoord - outwardSign * 0.02
-      const winCenterOff = -frontSpan * 0.26
-      const doorCenterOff = frontSpan * 0.11
-      const winSpan = Math.max(0.56, frontSpan * 0.4)
-      const rackLen = Math.max(0.84, frontSpan * 0.4)
-      const shelfLen = Math.max(1.1, frontSpan - 0.56)
-
-      if (facingZ) {
-        const winX = shop.rect.x + winCenterOff
-        const doorX = shop.rect.x + doorCenterOff
-        lightWarmSpecs.push(
-          { cx: shop.rect.x, cy: lintelBottomM - 0.03, cz: facadeCoord - outwardSign * 0.26, sx: Math.max(0.8, frontSpan - 0.48), sy: 0.04, sz: 0.18 },
-          { cx: shop.rect.x, cy: lintelBottomM - 0.18, cz: backPlaneCoord + outwardSign * 0.08, sx: Math.max(0.8, frontSpan - 0.56), sy: 0.045, sz: 0.07 },
-          { cx: shop.rect.x, cy: 1.56, cz: shelfCoord, sx: shelfLen - 0.08, sy: 0.025, sz: 0.04 },
-        )
-        wallCorridorSpecs.push({ cx: winX, cy: 0.2, cz: trimCoord - outwardSign * 0.04, sx: winSpan, sy: 0.4, sz: 0.12 })
-        storefrontGlassSpecs.push({
-          cx: winX,
-          cy: (0.4 + lintelBottomM - 0.06) * 0.5,
-          cz: glassPaneCoord,
-          sx: winSpan - 0.06,
-          sy: lintelBottomM - 0.48,
-          sz: 0.03,
-        })
-        shutterCreamSpecs.push(
-          { cx: winX, cy: 0.51, cz: windowRecessCoord, sx: Math.min(0.72, winSpan * 0.62), sy: 0.06, sz: 0.44 },
-          { cx: winX, cy: 1.24, cz: windowRecessCoord, sx: 0.13, sy: 0.16, sz: 0.13 },
-          { cx: doorX - rackLen * 0.22, cy: 1.07, cz: rackCoord, sx: rackLen * 0.15, sy: 0.78, sz: 0.26 },
-        )
-        garmentWineSpecs.push(
-          { cx: winX, cy: 0.72, cz: windowRecessCoord, sx: 0.34, sy: 0.34, sz: 0.26 },
-          { cx: doorX - rackLen * 0.36, cy: 1.05, cz: rackCoord, sx: rackLen * 0.16, sy: 0.84, sz: 0.28 },
-          { cx: doorX + rackLen * 0.24, cy: 1.07, cz: rackCoord, sx: rackLen * 0.15, sy: 0.78, sz: 0.28 },
-          { cx: shop.rect.x - shelfLen * 0.26, cy: 1.72, cz: shelfCoord, sx: shelfLen * 0.22, sy: 0.2, sz: 0.22 },
-          { cx: shop.rect.x + shelfLen * 0.22, cy: 1.22, cz: shelfCoord, sx: shelfLen * 0.22, sy: 0.2, sz: 0.22 },
-        )
-        garmentNavySpecs.push(
-          { cx: winX, cy: 1.02, cz: windowRecessCoord, sx: 0.24, sy: 0.28, sz: 0.18 },
-          { cx: doorX - rackLen * 0.06, cy: 1.06, cz: rackCoord, sx: rackLen * 0.16, sy: 0.82, sz: 0.28 },
-          { cx: doorX + rackLen * 0.37, cy: 1.09, cz: rackCoord, sx: rackLen * 0.14, sy: 0.74, sz: 0.26 },
-          { cx: shop.rect.x + shelfLen * 0.22, cy: 1.72, cz: shelfCoord, sx: shelfLen * 0.22, sy: 0.2, sz: 0.22 },
-          { cx: shop.rect.x - shelfLen * 0.2, cy: 1.22, cz: shelfCoord, sx: shelfLen * 0.22, sy: 0.18, sz: 0.22 },
-        )
-        woodCamelSpecs.push(
-          { cx: doorX + rackLen * 0.09, cy: 1.05, cz: rackCoord, sx: rackLen * 0.16, sy: 0.84, sz: 0.28 },
-          { cx: shop.rect.x, cy: 0.24, cz: shelfCoord, sx: shelfLen, sy: 0.48, sz: 0.28 },
-          { cx: shop.rect.x - shelfLen * 0.42, cy: 1.02, cz: shelfCoord, sx: 0.09, sy: 2.04, sz: 0.28 },
-          { cx: shop.rect.x + shelfLen * 0.42, cy: 1.02, cz: shelfCoord, sx: 0.09, sy: 2.04, sz: 0.28 },
-          { cx: shop.rect.x, cy: 1.1, cz: shelfCoord, sx: shelfLen, sy: 0.05, sz: 0.26 },
-          { cx: shop.rect.x, cy: 1.6, cz: shelfCoord, sx: shelfLen, sy: 0.05, sz: 0.26 },
-          { cx: shop.rect.x, cy: 1.22, cz: shelfCoord, sx: shelfLen * 0.16, sy: 0.18, sz: 0.22 },
-        )
-        rackMetalSpecs.push(
-          { cx: sb.minX + 0.21, cy: lintelBottomM * 0.5, cz: trimCoord, sx: 0.07, sy: lintelBottomM, sz: 0.09 },
-          { cx: sb.maxX - 0.21, cy: lintelBottomM * 0.5, cz: trimCoord, sx: 0.07, sy: lintelBottomM, sz: 0.09 },
-          { cx: winX + winSpan * 0.5, cy: lintelBottomM * 0.5, cz: trimCoord, sx: 0.06, sy: lintelBottomM, sz: 0.08 },
-          { cx: winX, cy: 0.41, cz: trimCoord, sx: winSpan, sy: 0.05, sz: 0.1 },
-          { cx: shop.rect.x, cy: lintelBottomM - 0.03, cz: trimCoord, sx: frontSpan - 0.26, sy: 0.07, sz: 0.11 },
-          { cx: winX - 0.24, cy: 0.24, cz: windowRecessCoord, sx: 0.04, sy: 0.48, sz: 0.34 },
-          { cx: winX + 0.24, cy: 0.24, cz: windowRecessCoord, sx: 0.04, sy: 0.48, sz: 0.34 },
-          { cx: winX + 0.22, cy: 0.65, cz: windowRecessCoord, sx: 0.14, sy: 0.22, sz: 0.1 },
-          { cx: doorX - rackLen * 0.48, cy: 0.74, cz: rackCoord, sx: 0.045, sy: 1.48, sz: 0.045 },
-          { cx: doorX + rackLen * 0.48, cy: 0.74, cz: rackCoord, sx: 0.045, sy: 1.48, sz: 0.045 },
-          { cx: doorX, cy: 0.06, cz: rackCoord, sx: rackLen, sy: 0.045, sz: 0.24 },
-          { cx: doorX, cy: 1.47, cz: rackCoord, sx: rackLen, sy: 0.045, sz: 0.045 },
-          { cx: shop.rect.x, cy: 1.72, cz: shelfCoord, sx: shelfLen * 0.16, sy: 0.22, sz: 0.22 },
-        )
-      } else {
-        const winZ = shop.rect.z + winCenterOff
-        const doorZ = shop.rect.z + doorCenterOff
-        lightWarmSpecs.push(
-          { cx: facadeCoord - outwardSign * 0.26, cy: lintelBottomM - 0.03, cz: shop.rect.z, sx: 0.18, sy: 0.04, sz: Math.max(0.8, frontSpan - 0.48) },
-          { cx: backPlaneCoord + outwardSign * 0.08, cy: lintelBottomM - 0.18, cz: shop.rect.z, sx: 0.07, sy: 0.045, sz: Math.max(0.8, frontSpan - 0.56) },
-          { cx: shelfCoord, cy: 1.56, cz: shop.rect.z, sx: 0.04, sy: 0.025, sz: shelfLen - 0.08 },
-        )
-        wallCorridorSpecs.push({ cx: trimCoord - outwardSign * 0.04, cy: 0.2, cz: winZ, sx: 0.12, sy: 0.4, sz: winSpan })
-        storefrontGlassSpecs.push({
-          cx: glassPaneCoord,
-          cy: (0.4 + lintelBottomM - 0.06) * 0.5,
-          cz: winZ,
-          sx: 0.03,
-          sy: lintelBottomM - 0.48,
-          sz: winSpan - 0.06,
-        })
-        shutterCreamSpecs.push(
-          { cx: windowRecessCoord, cy: 0.51, cz: winZ, sx: 0.44, sy: 0.06, sz: Math.min(0.72, winSpan * 0.62) },
-          { cx: windowRecessCoord, cy: 1.24, cz: winZ, sx: 0.13, sy: 0.16, sz: 0.13 },
-          { cx: rackCoord, cy: 1.07, cz: doorZ - rackLen * 0.22, sx: 0.26, sy: 0.78, sz: rackLen * 0.15 },
-        )
-        garmentWineSpecs.push(
-          { cx: windowRecessCoord, cy: 0.72, cz: winZ, sx: 0.26, sy: 0.34, sz: 0.34 },
-          { cx: rackCoord, cy: 1.05, cz: doorZ - rackLen * 0.36, sx: 0.28, sy: 0.84, sz: rackLen * 0.16 },
-          { cx: rackCoord, cy: 1.07, cz: doorZ + rackLen * 0.24, sx: 0.28, sy: 0.78, sz: rackLen * 0.15 },
-          { cx: shelfCoord, cy: 1.72, cz: shop.rect.z - shelfLen * 0.26, sx: 0.22, sy: 0.2, sz: shelfLen * 0.22 },
-          { cx: shelfCoord, cy: 1.22, cz: shop.rect.z + shelfLen * 0.22, sx: 0.22, sy: 0.2, sz: shelfLen * 0.22 },
-        )
-        garmentNavySpecs.push(
-          { cx: windowRecessCoord, cy: 1.02, cz: winZ, sx: 0.18, sy: 0.28, sz: 0.24 },
-          { cx: rackCoord, cy: 1.06, cz: doorZ - rackLen * 0.06, sx: 0.28, sy: 0.82, sz: rackLen * 0.16 },
-          { cx: rackCoord, cy: 1.09, cz: doorZ + rackLen * 0.37, sx: 0.26, sy: 0.74, sz: rackLen * 0.14 },
-          { cx: shelfCoord, cy: 1.72, cz: shop.rect.z + shelfLen * 0.22, sx: 0.22, sy: 0.2, sz: shelfLen * 0.22 },
-          { cx: shelfCoord, cy: 1.22, cz: shop.rect.z - shelfLen * 0.2, sx: 0.22, sy: 0.18, sz: shelfLen * 0.22 },
-        )
-        woodCamelSpecs.push(
-          { cx: rackCoord, cy: 1.05, cz: doorZ + rackLen * 0.09, sx: 0.28, sy: 0.84, sz: rackLen * 0.16 },
-          { cx: shelfCoord, cy: 0.24, cz: shop.rect.z, sx: 0.28, sy: 0.48, sz: shelfLen },
-          { cx: shelfCoord, cy: 1.02, cz: shop.rect.z - shelfLen * 0.42, sx: 0.28, sy: 2.04, sz: 0.09 },
-          { cx: shelfCoord, cy: 1.02, cz: shop.rect.z + shelfLen * 0.42, sx: 0.28, sy: 2.04, sz: 0.09 },
-          { cx: shelfCoord, cy: 1.1, cz: shop.rect.z, sx: 0.26, sy: 0.05, sz: shelfLen },
-          { cx: shelfCoord, cy: 1.6, cz: shop.rect.z, sx: 0.26, sy: 0.05, sz: shelfLen },
-          { cx: shelfCoord, cy: 1.22, cz: shop.rect.z, sx: 0.22, sy: 0.18, sz: shelfLen * 0.16 },
-        )
-        rackMetalSpecs.push(
-          { cx: trimCoord, cy: lintelBottomM * 0.5, cz: sb.minZ + 0.21, sx: 0.09, sy: lintelBottomM, sz: 0.07 },
-          { cx: trimCoord, cy: lintelBottomM * 0.5, cz: sb.maxZ - 0.21, sx: 0.09, sy: lintelBottomM, sz: 0.07 },
-          { cx: trimCoord, cy: lintelBottomM * 0.5, cz: winZ + winSpan * 0.5, sx: 0.08, sy: lintelBottomM, sz: 0.06 },
-          { cx: trimCoord, cy: 0.41, cz: winZ, sx: 0.1, sy: 0.05, sz: winSpan },
-          { cx: trimCoord, cy: lintelBottomM - 0.03, cz: shop.rect.z, sx: 0.11, sy: 0.07, sz: frontSpan - 0.26 },
-          { cx: windowRecessCoord, cy: 0.24, cz: winZ - 0.24, sx: 0.34, sy: 0.48, sz: 0.04 },
-          { cx: windowRecessCoord, cy: 0.24, cz: winZ + 0.24, sx: 0.34, sy: 0.48, sz: 0.04 },
-          { cx: windowRecessCoord, cy: 0.65, cz: winZ + 0.22, sx: 0.1, sy: 0.22, sz: 0.14 },
-          { cx: rackCoord, cy: 0.74, cz: doorZ - rackLen * 0.48, sx: 0.045, sy: 1.48, sz: 0.045 },
-          { cx: rackCoord, cy: 0.74, cz: doorZ + rackLen * 0.48, sx: 0.045, sy: 1.48, sz: 0.045 },
-          { cx: rackCoord, cy: 0.06, cz: doorZ, sx: 0.24, sy: 0.045, sz: rackLen },
-          { cx: rackCoord, cy: 1.47, cz: doorZ, sx: 0.045, sy: 0.045, sz: rackLen },
-          { cx: shelfCoord, cy: 1.72, cz: shop.rect.z, sx: 0.22, sy: 0.22, sz: shelfLen * 0.16 },
-        )
+      const frame: ShopFrame = {
+        facingZ,
+        cu: facingZ ? shop.rect.x : shop.rect.z,
+        facade: facadeCoord,
+        outwardSign,
+        frontSpan,
+        alcoveDepth,
+        gapM,
+        lintelBottomM,
       }
+      emitShopFitout(classifyXxgShop(shop), frame, fitoutBuckets, { hero: firstShop !== null })
     }
 
     const signW = Math.min(2.55, Math.max(1.25, frontSpan * 0.78))
     const signH = Math.min(0.46, lintelH * 0.84)
     const signY = lintelBottomM + signH * 0.54
-    const signSlot = pickStoreSignSlot(resolved, shop.frontage, si)
+    const signSlot = firstShop ? firstShop.sign : pickStoreSignSlot(resolved, shop.frontage, si)
     const faceOffset = 0.04
 
     if (facingZ) {
@@ -909,90 +760,92 @@ export function createIndoorGreyboxScene(layout: XxgLayout): IndoorGreyboxSceneH
         { cx: -15.9, cy: 2.28, cz: pz, sx: 0.04, sy: 0.04, sz: 2.4 },
       )
     }
-    lightCoolSpecs.push({ cx: -18.0, cy: ceilH - 0.014, cz: 12.5, sx: 0.14, sy: 0.022, sz: 25.0 })
   }
 
-  for (const ex of layout.exits) {
-    const st = ex.stair
-    const sb = rectToAabb(`stair-${ex.portalId}`, st)
-    const dirX = st.x - ex.foot.x
-    const dirZ = st.z - ex.foot.z
-    const alongZ = Math.abs(dirZ) >= Math.abs(dirX)
-    const sign = alongZ ? (dirZ >= 0 ? 1 : -1) : dirX >= 0 ? 1 : -1
+  // 出口楼梯：楼梯口从走廊边线打通，台阶实心落地，两侧墙到吊顶，楼梯上方整体开洞做长条金字塔采光顶；
+  // 尽头玻璃门，安全出口牌吊在楼梯口井沿下方朝向走廊。
+  for (const well of exitWells) {
+    const { stair: sb, alongZ, sign, corrEdge, startEdge, landingEdge, opening } = well
+    const runLen = alongZ ? sb.maxZ - sb.minZ : sb.maxX - sb.minX
+    const acrossLen = alongZ ? sb.maxX - sb.minX : sb.maxZ - sb.minZ
+    const acrossC = alongZ ? (sb.minX + sb.maxX) * 0.5 : (sb.minZ + sb.maxZ) * 0.5
+    const box = (a: number, y: number, c: number, sa: number, sy: number, sc: number): BoxSpec =>
+      alongZ ? { cx: c, cy: y, cz: a, sx: sc, sy, sz: sa } : { cx: a, cy: y, cz: c, sx: sa, sy, sz: sc }
     const stepCount = 9
-
-    ceilingSpecs.push({ cx: st.x, cy: ceilH + 0.85, cz: st.z, sx: st.w + 0.8, sy: 0.16, sz: st.d + 0.8 })
-
-    if (alongZ) {
-      const startZ = sign > 0 ? sb.minZ : sb.maxZ
-      const stepDepth = st.d / stepCount
-      for (let i = 0; i < stepCount; i++) {
-        stairSpecs.push({
-          cx: st.x,
-          cy: (i + 0.5) * 0.18,
-          cz: startZ + sign * (i + 0.5) * stepDepth,
-          sx: st.w,
-          sy: 0.18,
-          sz: stepDepth + 0.02,
-        })
-      }
-      wallCorridorSpecs.push(
-        { cx: sb.minX - wallT * 0.5, cy: (ceilH + 0.8) * 0.5, cz: st.z, sx: wallT, sy: ceilH + 0.8, sz: st.d + 0.4 },
-        { cx: sb.maxX + wallT * 0.5, cy: (ceilH + 0.8) * 0.5, cz: st.z, sx: wallT, sy: ceilH + 0.8, sz: st.d + 0.4 },
-        { cx: st.x, cy: ceilH - 0.22, cz: startZ - sign * 0.12, sx: st.w + wallT * 2, sy: 0.44, sz: wallT },
-      )
-      for (const frac of [0.18, 0.52, 0.86]) {
-        rackMetalSpecs.push({ cx: st.x, cy: frac * 1.6 + 0.42, cz: startZ + sign * st.d * frac, sx: 0.045, sy: 0.84, sz: 0.045 })
-      }
-      rackMetalSpecs.push(
-        { cx: st.x, cy: 1.05, cz: startZ + sign * st.d * 0.35, sx: 0.05, sy: 0.06, sz: st.d * 0.36 },
-        { cx: st.x, cy: 1.62, cz: startZ + sign * st.d * 0.69, sx: 0.05, sy: 0.06, sz: st.d * 0.36 },
-      )
-      const backZ = startZ + sign * (st.d + 0.08)
-      skylightGlassSpecs.push({ cx: st.x, cy: 2.65, cz: backZ, sx: st.w, sy: 1.75, sz: 0.08 })
-      for (const mx of [-st.w * 0.28, 0, st.w * 0.28]) {
-        rackMetalSpecs.push({ cx: st.x + mx, cy: 2.65, cz: backZ - sign * 0.05, sx: 0.05, sy: 1.75, sz: 0.06 })
-      }
-      const signZ = startZ - sign * 0.28
-      rackMetalSpecs.push(
-        { cx: st.x - 0.32, cy: ceilH - 0.24, cz: signZ, sx: 0.025, sy: 0.48, sz: 0.025 },
-        { cx: st.x + 0.32, cy: ceilH - 0.24, cz: signZ, sx: 0.025, sy: 0.48, sz: 0.025 },
-        { cx: st.x, cy: ceilH - 0.52, cz: signZ + sign * 0.02, sx: 0.94, sy: 0.32, sz: 0.04 },
-      )
-      const pg = new THREE.PlaneGeometry(0.88, 0.28)
-      if (sign > 0) pg.rotateY(Math.PI)
-      pg.translate(st.x, ceilH - 0.52, signZ - sign * 0.008)
-      exitSignGeos.push(pg)
-    } else {
-      const startX = sign > 0 ? sb.minX : sb.maxX
-      const stepDepth = st.w / stepCount
-      for (let i = 0; i < stepCount; i++) {
-        stairSpecs.push({
-          cx: startX + sign * (i + 0.5) * stepDepth,
-          cy: (i + 0.5) * 0.18,
-          cz: st.z,
-          sx: stepDepth + 0.02,
-          sy: 0.18,
-          sz: st.d,
-        })
-      }
-      wallCorridorSpecs.push(
-        { cx: st.x, cy: (ceilH + 0.8) * 0.5, cz: sb.minZ - wallT * 0.5, sx: st.w + 0.4, sy: ceilH + 0.8, sz: wallT },
-        { cx: st.x, cy: (ceilH + 0.8) * 0.5, cz: sb.maxZ + wallT * 0.5, sx: st.w + 0.4, sy: ceilH + 0.8, sz: wallT },
-      )
-      const backX = startX + sign * (st.w + 0.08)
-      skylightGlassSpecs.push({ cx: backX, cy: 2.65, cz: st.z, sx: 0.08, sy: 1.75, sz: st.d })
-      const signX = startX - sign * 0.28
-      rackMetalSpecs.push(
-        { cx: signX, cy: ceilH - 0.24, cz: st.z - 0.32, sx: 0.025, sy: 0.48, sz: 0.025 },
-        { cx: signX, cy: ceilH - 0.24, cz: st.z + 0.32, sx: 0.025, sy: 0.48, sz: 0.025 },
-        { cx: signX + sign * 0.02, cy: ceilH - 0.52, cz: st.z, sx: 0.04, sy: 0.32, sz: 0.94 },
-      )
-      const pg = new THREE.PlaneGeometry(0.88, 0.28)
-      pg.rotateY(sign > 0 ? -Math.PI / 2 : Math.PI / 2)
-      pg.translate(signX - sign * 0.008, ceilH - 0.52, st.z)
-      exitSignGeos.push(pg)
+    const rise = 0.18
+    const topY = stepCount * rise
+    const stepDepth = runLen / stepCount
+    for (let i = 0; i < stepCount; i++) {
+      const h = (i + 1) * rise
+      stairSpecs.push(box(startEdge + sign * (i + 0.5) * stepDepth, h * 0.5, acrossC, stepDepth + 0.02, h, acrossLen))
     }
+
+    const gap = (startEdge - corrEdge) * sign
+    if (gap > 0.01) floorTerrazzoSpecs.push(box((corrEdge + startEdge) * 0.5, -0.06, acrossC, gap + 0.1, 0.12, acrossLen))
+
+    const farEdge = startEdge + sign * (runLen + 0.2)
+    const wallLen = Math.abs(farEdge - corrEdge)
+    for (const side of [-1, 1] as const) {
+      const c = acrossC + side * (acrossLen + wallT) * 0.5
+      wallCorridorSpecs.push(box((corrEdge + farEdge) * 0.5, ceilH * 0.5, c, wallLen, ceilH, wallT))
+      rackMetalSpecs.push(box((corrEdge + startEdge) * 0.5, 0.06, acrossC + side * (acrossLen * 0.5 - 0.015), Math.max(0.05, gap), 0.12, 0.03))
+    }
+
+    // 不锈钢扶手：中间一道、两侧靠墙各一道，立杆落在台阶上。
+    const railFrom = (c: number) => (alongZ ? { x: c, y: 0.95, z: startEdge } : { x: startEdge, y: 0.95, z: c })
+    const railTo = (c: number) =>
+      alongZ ? { x: c, y: topY + 0.95, z: startEdge + sign * runLen } : { x: startEdge + sign * runLen, y: topY + 0.95, z: c }
+    for (const c of [acrossC, acrossC - acrossLen * 0.5 + 0.08, acrossC + acrossLen * 0.5 - 0.08]) {
+      skylightFrameGeos.push(orientedBar(railFrom(c), railTo(c), 0.05))
+    }
+    for (const frac of [0.12, 0.5, 0.88]) {
+      const stepY = Math.ceil(frac * stepCount) * rise
+      rackMetalSpecs.push(box(startEdge + sign * runLen * frac, stepY + (0.95 + frac * topY - stepY) * 0.5, acrossC, 0.045, 0.95 + frac * topY - stepY, 0.045))
+    }
+
+    const pyramid = buildSkylightPyramid({ opening, ceilH, heightM: 3.0, globes: XXG_STAIR_GLOBES })
+    wallCorridorSpecs.push(...pyramid.curbWalls)
+    pyramidGlassGeos.push(pyramid.glass)
+    skylightFrameGeos.push(...pyramid.frame)
+    globeSpecs.push(...pyramid.globes)
+
+    const backA = startEdge + sign * (runLen + 0.08)
+    const doorH = pyramid.baseY - topY
+    skylightGlassSpecs.push(box(backA, topY + doorH * 0.5, acrossC, 0.08, doorH, acrossLen))
+    for (const m of [-0.5, -0.25, 0, 0.25, 0.5]) {
+      rackMetalSpecs.push(box(backA - sign * 0.05, topY + doorH * 0.5, acrossC + m * (acrossLen - 0.06), 0.06, doorH, 0.05))
+    }
+    rackMetalSpecs.push(
+      box(backA - sign * 0.05, topY + 2.0, acrossC, 0.06, 0.05, acrossLen),
+      box(backA - sign * 0.05, topY + 0.03, acrossC, 0.06, 0.06, acrossLen),
+    )
+
+    const signA = landingEdge - sign * 0.11
+    rackMetalSpecs.push(
+      box(signA, ceilH - 0.24, acrossC - 0.32, 0.025, 0.48, 0.025),
+      box(signA, ceilH - 0.24, acrossC + 0.32, 0.025, 0.48, 0.025),
+      box(signA + sign * 0.02, ceilH - 0.52, acrossC, 0.04, 0.32, 0.94),
+    )
+    const pg = new THREE.PlaneGeometry(0.88, 0.28)
+    if (alongZ) {
+      if (sign > 0) pg.rotateY(Math.PI)
+      pg.translate(acrossC, ceilH - 0.52, signA - sign * 0.008)
+    } else {
+      pg.rotateY(sign > 0 ? -Math.PI / 2 : Math.PI / 2)
+      pg.translate(signA - sign * 0.008, ceilH - 0.52, acrossC)
+    }
+    exitSignGeos.push(pg)
+  }
+
+  // 采光井开洞：吊顶板按井口挖空，井口里的吊顶灯片一并去掉。
+  let carvedCeiling: BoxSpec[] = ceilingSpecs
+  for (const hole of ceilingHoles) carvedCeiling = carvedCeiling.flatMap(b => carveBoxXZ(b, hole))
+  ceilingSpecs.length = 0
+  ceilingSpecs.push(...carvedCeiling)
+  for (const bucket of [lightCoolSpecs, lightWarmSpecs]) {
+    const kept = bucket.filter(b => b.cy < ceilH - 0.1 || !ceilingHoles.some(h => rectContains(h, b.cx, b.cz)))
+    bucket.length = 0
+    bucket.push(...kept)
   }
 
   addBatchBoxes('xxg_floor_renovated', floorRenovatedSpecs, matPack.floorRenovated)
@@ -1031,8 +884,48 @@ export function createIndoorGreyboxScene(layout: XxgLayout): IndoorGreyboxSceneH
     )
   }
   addBatchBoxes('xxg_stair_granite', stairSpecs, matPack.stairGranite)
-  addBatchBoxes('xxg_skylight_glass', skylightGlassSpecs, matPack.skylightGlass)
+  // 金字塔玻璃与楼梯尽头玻璃门同材质，合成一个 mesh（一次 draw call）。
+  const skylightGlassParts = [...pyramidGlassGeos]
+  if (skylightGlassSpecs.length > 0) {
+    skylightGlassParts.push(buildMergedBoxesGeometry(skylightGlassSpecs, uvScaleFrom(matPack.skylightGlass)).geom)
+  }
+  addMergedGeos('xxg_skylight_glass', skylightGlassParts, matPack.skylightGlass, true)
   addMergedGeos('xxg_globe_lamps', globeSpecs, matPack.globeLamp, true)
+  if (skylightFrameGeos.length > 0) {
+    addMergedGeos(
+      'xxg_skylight_frame',
+      skylightFrameGeos,
+      new THREE.MeshStandardMaterial({ name: 'xxg_skylight_frame', color: '#e3e7ea', emissive: '#4a4f54', roughness: 0.38, metalness: 0.42 }),
+      false,
+    )
+  }
+  if (goodsSpecs.length > 0) {
+    addBatchBoxes(
+      'xxg_shop_goods',
+      goodsSpecs,
+      new THREE.MeshStandardMaterial({ name: 'xxg_shop_goods', vertexColors: true, roughness: 0.62, metalness: 0.04 }),
+      false,
+    )
+  }
+  if (ceilingHoles.length > 0) {
+    let minX = Infinity
+    let maxX = -Infinity
+    let minZ = Infinity
+    let maxZ = -Infinity
+    for (const h of ceilingHoles) {
+      minX = Math.min(minX, h.minX)
+      maxX = Math.max(maxX, h.maxX)
+      minZ = Math.min(minZ, h.minZ)
+      maxZ = Math.max(maxZ, h.maxZ)
+    }
+    const skyGeo = buildSkyCapGeometry({ minX: minX - 30, maxX: maxX + 30, minZ: minZ - 30, maxZ: maxZ + 30 }, ceilH + 7.5)
+    addMergedGeos(
+      'xxg_sky_cap',
+      [skyGeo],
+      new THREE.MeshBasicMaterial({ name: 'xxg_sky_cap', vertexColors: true, fog: false, side: THREE.DoubleSide }),
+      false,
+    )
+  }
   addMergedGeos('xxg_shop_signs', shopSignGeos, matPack.signAtlasMat, true)
 
   if (exitSignGeos.length > 0) {
@@ -1085,6 +978,8 @@ export function createIndoorGreyboxScene(layout: XxgLayout): IndoorGreyboxSceneH
     textureBytes,
     geometryCount: geometries.length,
     materialCount: usedPackMats.size + extraMaterials.length,
+    columnCenters,
+    skylightOpenings: ceilingHoles,
     isDisposed: () => disposed,
     dispose() {
       if (disposed) return

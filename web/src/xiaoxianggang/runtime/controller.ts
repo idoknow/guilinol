@@ -21,6 +21,7 @@ import {
 } from './collision.ts'
 import { XIAOXIANGGANG_B1_LAYOUT } from '../layout/index.ts'
 import { createIndoorGreyboxScene, type IndoorGreyboxSceneHandle } from './indoor-scene.ts'
+import { XXG_CROWD_MAX, createXxgCrowd, type XxgCrowd } from './crowd.ts'
 import { createXxgRuntimeStateMachine } from './state-machine.ts'
 import {
   normalizeAngleRad,
@@ -88,6 +89,8 @@ export function createXxgIndoorScene(opts: CreateXxgIndoorSceneOptions = {}): Xx
 
   let hostCtx: XxgHostContext | null = null
   let greyboxHandle: IndoorGreyboxSceneHandle | null = null
+  let crowd: XxgCrowd | null = null
+  const crowdMaxAgents = Math.max(0, Math.floor(opts.crowdMaxAgents ?? XXG_CROWD_MAX))
   let pendingExitPortalId: XxgPortalId | null = null
 
   // Indoor first-person kinematic state
@@ -196,7 +199,7 @@ export function createXxgIndoorScene(opts: CreateXxgIndoorSceneOptions = {}): Xx
       hostCtx.renderer.render(scene, camera)
       lastDrawCalls = hostCtx.renderer.info.render.calls
     } else {
-      lastDrawCalls = greyboxHandle.meshCount
+      lastDrawCalls = greyboxHandle.meshCount + (crowd?.getMetrics().drawCalls ?? 0)
     }
     return true
   }
@@ -334,6 +337,15 @@ export function createXxgIndoorScene(opts: CreateXxgIndoorSceneOptions = {}): Xx
     scene.background = greyboxHandle.scene.background
     scene.fog = greyboxHandle.scene.fog
     scene.add(greyboxHandle.scene)
+    if (crowdMaxAgents > 0) {
+      crowd = createXxgCrowd({
+        layout,
+        maxAgents: crowdMaxAgents,
+        seed: opts.crowdSeed,
+        columns: greyboxHandle.columnCenters,
+      })
+      scene.add(crowd.group)
+    }
     mountDomAndListeners()
     machine.transitionTo('idle')
   }
@@ -372,6 +384,7 @@ export function createXxgIndoorScene(opts: CreateXxgIndoorSceneOptions = {}): Xx
       playerYaw = exitSpec.yaw
       playerPitch = 0
       pressedKeys.clear()
+      crowd?.reset({ x: playerX, z: playerZ, yaw: playerYaw })
 
       syncIndoorCamera()
       if (!machine.transitionTo('inside')) {
@@ -515,6 +528,7 @@ export function createXxgIndoorScene(opts: CreateXxgIndoorSceneOptions = {}): Xx
         syncIndoorCamera()
       }
 
+      crowd?.step(dt, { x: playerX, z: playerZ, yaw: playerYaw })
       syncIndoorCamera()
       syncPromptDom()
 
@@ -531,7 +545,7 @@ export function createXxgIndoorScene(opts: CreateXxgIndoorSceneOptions = {}): Xx
   function getMetrics(): XxgIndoorMetrics {
     return {
       drawCalls: lastDrawCalls,
-      triangles: greyboxHandle?.triangleCount ?? 0,
+      triangles: (greyboxHandle?.triangleCount ?? 0) + (crowd?.getMetrics().triangles ?? 0),
       textureBytes: greyboxHandle?.textureBytes ?? 0,
       lastSwapMs,
       lastBlackFrames,
@@ -558,6 +572,10 @@ export function createXxgIndoorScene(opts: CreateXxgIndoorSceneOptions = {}): Xx
     machine.dispose()
     setBodyFlags(false)
     unmountDomAndListeners()
+    if (crowd) {
+      crowd.dispose()
+      crowd = null
+    }
     if (greyboxHandle) {
       scene.remove(greyboxHandle.scene)
       greyboxHandle.dispose()
@@ -585,5 +603,6 @@ export function createXxgIndoorScene(opts: CreateXxgIndoorSceneOptions = {}): Xx
     renderFrame,
     getPlayerSnapshot,
     getLayout: () => layout,
+    getCrowdMetrics: () => crowd?.getMetrics() ?? null,
   }
 }

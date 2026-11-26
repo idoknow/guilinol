@@ -218,8 +218,6 @@ export interface XxgHostContext {
   resumeWorldAt(point: { x: number; z: number; yaw: number }): Promise<boolean>
   /** 室内期间宿主键盘、触屏处理要让路：runtime 设 document.body.dataset.xxgActive = '1'。 */
   readonly bodyFlag: 'xxgActive'
-  /** 可选：将步行玩家传送至中心广场小香港下沉口外（面向入口楼梯）。 */
-  teleportToPlaza?: () => Promise<boolean>
 }
 
 export interface XxgIndoorMetrics {

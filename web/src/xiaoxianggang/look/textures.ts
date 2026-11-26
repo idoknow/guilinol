@@ -471,6 +471,9 @@ export function buildRenovatedTileMaps(cache: TextureUploadCache): {
   }
 }
 
+/** 吊顶矿棉板自发光底值（0..255）：让朝下的板面在半球光下不发灰，龙骨保持 0。 */
+export const CEILING_BOARD_GLOW = 188
+
 export function buildCeilingGridMaps(cache: TextureUploadCache): {
   map: THREE.Texture
   emissiveMap: THREE.Texture
@@ -480,7 +483,6 @@ export function buildCeilingGridMaps(cache: TextureUploadCache): {
   const RS = 128
   const [br, bg, bb] = XXG_PALETTE.ceilingBoard.rgb
   const [rr, rg, rb] = XXG_PALETTE.ceilingGridRail.rgb
-  const [lr, lg, lb] = XXG_PALETTE.ceilingLampCool.rgb
 
   let cached: { albedo: Uint8Array; emissive: Uint8Array; rough: Uint8Array } | null = null
   const ensure = () => {
@@ -496,10 +498,10 @@ export function buildCeilingGridMaps(cache: TextureUploadCache): {
         const tx = Math.floor(x / 128)
         const lx = x % 128
         const isRail = lx < 3 || ly < 3 || lx > 124 || ly > 124
-        // 对角格嵌入 600×600 方灯面板（匹配 #11/#13 方灯矩阵）
-        const isLampCell = (tx + ty) % 2 === 0
-        const inLampDiffuser = isLampCell && lx >= 10 && lx <= 117 && ly >= 10 && ly <= 117
+        // 方灯改由场景几何按 600mm 格对齐嵌入（runtime/indoor-scene.ts 方灯矩阵），贴图只留矿棉板与龙骨。
+        // 板面带一层柔和自发光，模拟地下廊道灯光在浅色吊顶上的漫反射；龙骨不发光，保留深灰分格线。
         const grain = (tileNoise(x, y, S, 4, 91) - 0.5) * 9
+        const fissure = tileNoise(x, y, S, 2, 37 + tx * 3 + ty * 5) > 0.84 ? -10 : 0
         const i = (y * S + x) * 4
         if (isRail) {
           albedo[i] = rr
@@ -508,21 +510,15 @@ export function buildCeilingGridMaps(cache: TextureUploadCache): {
           albedo[i + 3] = 255
           emissive[i] = emissive[i + 1] = emissive[i + 2] = 0
           emissive[i + 3] = 255
-        } else if (inLampDiffuser) {
-          albedo[i] = lr
-          albedo[i + 1] = lg
-          albedo[i + 2] = lb
-          albedo[i + 3] = 255
-          emissive[i] = lr
-          emissive[i + 1] = lg
-          emissive[i + 2] = lb
-          emissive[i + 3] = 255
         } else {
-          albedo[i] = clampByte(br + grain)
-          albedo[i + 1] = clampByte(bg + grain)
-          albedo[i + 2] = clampByte(bb + grain)
+          albedo[i] = clampByte(br + grain + fissure)
+          albedo[i + 1] = clampByte(bg + grain + fissure)
+          albedo[i + 2] = clampByte(bb + grain + fissure)
           albedo[i + 3] = 255
-          emissive[i] = emissive[i + 1] = emissive[i + 2] = 0
+          const glow = clampByte(CEILING_BOARD_GLOW + grain * 0.6 + fissure)
+          emissive[i] = glow
+          emissive[i + 1] = glow
+          emissive[i + 2] = clampByte(glow - 4)
           emissive[i + 3] = 255
         }
       }
@@ -535,9 +531,8 @@ export function buildCeilingGridMaps(cache: TextureUploadCache): {
         const tx = Math.floor(x / 64)
         const lx = x % 64
         const isRail = lx < 2 || ly < 2 || lx > 61 || ly > 61
-        const isLamp = (tx + ty) % 2 === 0 && lx >= 5 && lx <= 58 && ly >= 5 && ly <= 58
         const i = (y * RS + x) * 4
-        const rv = isLamp ? 48 : isRail ? 120 : 216
+        const rv = isRail ? 120 : 216 - ((tx + ty) % 2) * 8
         rough[i] = rough[i + 1] = rough[i + 2] = rv
         rough[i + 3] = 255
       }
@@ -886,6 +881,42 @@ const SIGN_BLOCKS: readonly SignBlockSpec[] = [
     en: 'Xiao Xiang Gang Commercial Market',
     badge: '17号 出入口',
     badgeStyle: 'box',
+    fontKind: 'sans',
+  },
+  {
+    rect: SIGN_ATLAS_RECTS.firstApparelSweet,
+    bg: [244, 216, 220],
+    border: [252, 246, 246],
+    ink: [46, 24, 32],
+    subInk: [96, 58, 68],
+    backlitPanel: true,
+    glow: [246, 214, 220],
+    cn: 'Sweet 甜心轻奢',
+    en: 'M-109',
+    fontKind: 'serif',
+  },
+  {
+    rect: SIGN_ATLAS_RECTS.firstAccessorySilver,
+    bg: [30, 32, 38],
+    border: [196, 200, 208],
+    ink: [232, 234, 238],
+    subInk: [176, 180, 188],
+    backlitPanel: false,
+    glow: [236, 240, 248],
+    cn: '正阳手作银饰',
+    en: 'SILVER CRAFT M-111',
+    fontKind: 'serif',
+  },
+  {
+    rect: SIGN_ATLAS_RECTS.firstSnackGuilin,
+    bg: [172, 40, 32],
+    border: [250, 226, 176],
+    ink: [255, 246, 220],
+    subInk: [252, 222, 160],
+    backlitPanel: false,
+    glow: [255, 214, 150],
+    cn: '桂林风味小吃',
+    en: '关东煮 糖水 M-114',
     fontKind: 'sans',
   },
   {

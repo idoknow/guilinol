@@ -108,7 +108,7 @@ test('zero duplicate GPU texture uploads across variants and shared cache re-mou
   }
 })
 
-test('material pixel synthesis encodes real terrazzo chips, ceiling light cutouts, and corrugated shutter normals', () => {
+test('material pixel synthesis encodes real terrazzo chips, ceiling boards with T-rails, and corrugated shutter normals', () => {
   const pack = createXiaoxianggangMaterials()
   try {
     // 1. 水磨石地砖：底色与分格缝及骨料碎点有真实方差
@@ -122,15 +122,18 @@ test('material pixel synthesis encodes real terrazzo chips, ceiling light cutout
     }
     assert.ok(maxLum - minLum > 90, `terrazzo contrast should exceed 90, got ${maxLum - minLum}`)
 
-    // 2. 吊顶矩阵方灯：emissiveMap 既有灭格 (0) 又有亮灯方格 (>200)
+    // 2. 吊顶：方灯改由场景几何嵌入，贴图只剩龙骨 (0) 与带柔光的矿棉板；不再烘焙亮灯格
     const ceilEm = pack.ceilingGrid.emissiveMap.image.data
-    let darkPx = 0
-    let litPx = 0
+    let railPx = 0
+    let boardPx = 0
+    let bakedLampPx = 0
     for (let i = 0; i < ceilEm.length; i += 4) {
-      if (ceilEm[i] === 0 && ceilEm[i + 1] === 0) darkPx++
-      else if (ceilEm[i] > 200) litPx++
+      if (ceilEm[i] === 0 && ceilEm[i + 1] === 0) railPx++
+      else if (ceilEm[i] >= 150 && ceilEm[i] <= 220) boardPx++
+      if (ceilEm[i] > 230) bakedLampPx++
     }
-    assert.ok(darkPx > 1000 && litPx > 1000, `ceiling must contain both dark acoustic boards (${darkPx}) and lit LED panels (${litPx})`)
+    assert.ok(railPx > 1000 && boardPx > 20000, `ceiling must contain dark T-rails (${railPx}) and softly lit boards (${boardPx})`)
+    assert.equal(bakedLampPx, 0, 'lamp panels belong to the geometry lamp matrix, not the ceiling texture')
 
     // 3. 金属波纹卷帘门法线：垂直 Y 分量应因水平波纹反复正负起伏
     const shNorm = pack.rollerShutterSilver.normalMap.image.data

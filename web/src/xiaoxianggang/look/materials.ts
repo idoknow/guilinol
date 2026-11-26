@@ -284,7 +284,7 @@ export function createXiaoxianggangMaterials(opts: CreateMaterialsOptions = {}):
       roughnessMap: wallAndStone.graniteRoughness,
       roughness: 1,
       metalness: 0.05,
-      emissive: '#8f8e8b',
+      emissive: '#a39a8d',
     }),
     0.02,
     0.04,

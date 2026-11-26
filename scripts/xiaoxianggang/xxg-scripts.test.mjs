@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { execFileSync } from 'node:child_process'
-import { mkdirSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import test from 'node:test'
@@ -19,6 +19,7 @@ import {
   parseVerifyArgs,
   SURFACE_PLAZA_Y,
 } from './verify-xxg-indoor.mjs'
+import { XXG_FIRST_SHOP_SHOTS, XXG_REF_SHOTS, parseShootArgs } from './shoot-xxg-refs.mjs'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 
@@ -193,4 +194,22 @@ test('verify-xxg-indoor 与 stage-gate CLI --dry-run 命中 contract.ts(E1..W2) 
     blockedCode = err.status
   }
   assert.equal(blockedCode, 2)
+})
+
+test('shoot-xxg-refs 机位覆盖 refs/ 里全部室内实拍（04–20），首批三店各有一张，参数解析带默认值', () => {
+  const refsDir = join(__dirname, '../../docs/xiaoxianggang/refs')
+  const indoorRefs = readdirSync(refsDir).filter(f => /^(0[4-9]|1\d|20)-.+\.jpg$/.test(f)).sort()
+  assert.equal(indoorRefs.length, 17)
+  assert.deepEqual(XXG_REF_SHOTS.map(s => s.ref).sort(), indoorRefs)
+  for (const s of XXG_REF_SHOTS) {
+    assert.ok(existsSync(join(refsDir, s.ref)))
+    assert.ok(Number.isFinite(s.x) && Number.isFinite(s.z) && Number.isFinite(s.yaw))
+  }
+  const ids = new Set(XXG_FIRST_SHOP_SHOTS.map(s => s.id))
+  for (const id of ['shop-apparel', 'shop-accessory', 'shop-snack']) assert.ok(ids.has(id), id)
+  assert.deepEqual(parseShootArgs([]), { out: '/tmp/xxg-ref-shots', only: null, width: 540, warmup: 40 })
+  const o = parseShootArgs(['--only', '04, 05', '--width', '100', '--warmup', '0'])
+  assert.deepEqual(o.only, ['04', '05'])
+  assert.equal(o.width, 180)
+  assert.equal(o.warmup, 0)
 })

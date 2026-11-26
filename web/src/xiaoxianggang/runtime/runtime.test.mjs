@@ -449,7 +449,7 @@ test('repeated enter/exit cycles across all 4 portals leave zero DOM/scene resid
   })
 })
 
-test('default createXxgIndoorScene loads full 53-shop B1 layout with PBR materials and teleport pill', async () => {
+test('default createXxgIndoorScene loads full 53-shop B1 layout with PBR materials within budget', async () => {
   const env = createMockDomEnvironment()
   await withMockGlobals(env, async () => {
     const renderer = createCountingRenderer()

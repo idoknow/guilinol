@@ -46,7 +46,7 @@ export const XXG_PALETTE = Object.freeze({
   storefrontGlassTint: swatch('#dcebf2', '15-shop-boutique-b181-queenshan.jpg', '女装橱窗通透微青钢化玻璃'),
   wallCorridorPlaster: swatch('#eceae4', '14-atrium-renovated-rest-area.jpg', '地下中庭及通道浅暖白墙柱'),
   wallBoutiquePink: swatch('#e8cccf', '15-shop-boutique-b181-queenshan.jpg', 'B181 精品女装柔粉灰墙框'),
-  stairGranite: swatch('#8c8b88', '06-portal-18-market-sign-steps.jpg', '出入口花岗岩防滑石阶与矮墙'),
+  stairGranite: swatch('#bcb1a2', '04-skylight-pyramid-interior-stairs.jpg', '采光顶楼梯间米色花岗岩防滑石阶与矮墙'),
   rollerShutterSilver: swatch('#9ca5af', '08-portal-10-glass-gallery-entry.jpg', '商业街标准银灰镀锌波纹卷帘门'),
   rollerShutterCream: swatch('#c6bfb2', '19-alley-retro-discount-racks.jpg', '老区暖灰烤漆波纹卷帘门'),
   portal18Navy: swatch('#1b3554', '06-portal-18-market-sign-steps.jpg', '18号出入口深海军蓝金属底牌'),
@@ -89,8 +89,11 @@ export const XXG_UI_TOKENS = Object.freeze({
  * 各子区长宽比尽量对齐现实牌匾比例，贴图阶段配合 applySignAtlasRect 防文字变形。
  */
 export const SIGN_ATLAS_RECTS = Object.freeze({
-  portal18Navy: [0.0, 0.0, 0.5, 0.34] as AtlasRect,
-  portal17Gold: [0.5, 0.0, 1.0, 0.34] as AtlasRect,
+  portal18Navy: [0.0, 0.0, 0.5, 0.24] as AtlasRect,
+  portal17Gold: [0.5, 0.0, 1.0, 0.24] as AtlasRect,
+  firstApparelSweet: [0.0, 0.24, 0.3333, 0.34] as AtlasRect,
+  firstAccessorySilver: [0.3333, 0.24, 0.6667, 0.34] as AtlasRect,
+  firstSnackGuilin: [0.6667, 0.24, 1.0, 0.34] as AtlasRect,
   portal10Glass: [0.0, 0.34, 0.34, 0.67] as AtlasRect,
   safetyExit: [0.34, 0.34, 0.52, 0.51] as AtlasRect,
   store1987: [0.34, 0.51, 0.52, 0.67] as AtlasRect,

@@ -29,13 +29,7 @@ body[data-xxg-indoor="1"] .hint {
 body[data-xxg-active="1"] .mifen-pill,
 body[data-xxg-active="1"] .mifen-pill--lazy,
 body[data-xxg-indoor="1"] .mifen-pill,
-body[data-xxg-indoor="1"] .mifen-pill--lazy,
-body[data-xxg-active="1"] .xxg-pill,
-body[data-xxg-active="1"] .xxg-pill--lazy,
-body[data-xxg-indoor="1"] .xxg-pill,
-body[data-xxg-indoor="1"] .xxg-pill--lazy,
-body[data-mifen-cooking="1"] .xxg-pill,
-body[data-mifen-drawer="1"] .xxg-pill {
+body[data-xxg-indoor="1"] .mifen-pill--lazy {
   visibility: hidden;
   opacity: 0;
   pointer-events: none;
