@@ -37,10 +37,37 @@ def grade_planes(local, ways, x, z, *, width_pad=2.08, lift=.029, mark_layer=Fal
     return planes
 
 
+def curb_return_planes(section, a, b, origin, nodes):
+    """Preserve the carriageway cap and release the outer curb at native ties."""
+    axis = (b - a) / section["length"]
+    length = section["length"]
+    ends = [index for index, node in enumerate(section["nodes"]) if node in nodes]
+    run = min(4., length / len(ends))
+    base = np.asarray(section["stations"])
+    cuts = np.unique(np.r_[base[:, 0], [run if i == 0 else length - run for i in ends]])
+    cuts = np.clip(cuts, 0., length)
+    levels = np.interp(cuts, *base.T)
+    distance = np.minimum.reduce([cuts if i == 0 else length - cuts for i in ends])
+    # The relaxed outer ceiling leaves the native vertical curb profile intact.
+    # It never raises a face. Its permitted reveal changes by at most 1:12.
+    release = np.maximum(0., run - distance) * min(.18 / run, 1 / 12)
+    planes = []
+    for i in range(len(cuts) - 1):
+        if cuts[i + 1] <= cuts[i]:
+            continue
+        coords = [*(a - origin + cuts[i] * axis), *(a - origin + cuts[i + 1] * axis)]
+        lo, hi = levels[i:i + 2] + .029
+        planes.append([*coords, section["halfWidth"] + 2.08, lo + release[i], hi + release[i + 1]])
+        if max(release[i:i + 2]) > 0:
+            planes.append([*coords, section["halfWidth"], lo, hi])
+    return planes
+
+
 def finish_paving(directory, manifest, profiles, elements):
     by_way = {}
     for way, line, heights in profiles:
         by_way.setdefault(way["id"], []).append((line, heights, way.get("gradeShoulders")))
+    curb_returns = {way["id"]: set(way["curbReturns"]) for way, _, _ in profiles if way.get("curbReturns")}
     fitted_shoulders = {
         (way["id"], u, v)
         for way, _, _ in profiles if way.get("gradeShoulders") or way.get("fitShoulderPlanes")
@@ -107,7 +134,15 @@ def finish_paving(directory, manifest, profiles, elements):
         streets = collision[1]
         if len(streets) < 16:
             continue
-        planes = grade_planes(local, fitted_shoulders, x, z)
+        regular = []
+        planes = []
+        for section, a, b in local:
+            nodes = curb_returns.get(section["way"], set())
+            if nodes.intersection(section["nodes"]) and (section["way"], *section["nodes"]) in fitted_shoulders:
+                planes.extend(curb_return_planes(section, a, b, np.array([x, z]), nodes))
+            else:
+                regular.append((section, a, b))
+        planes.extend(grade_planes(regular, fitted_shoulders, x, z))
         # Keep native asphalt at the finished slab edge where the road turns
         # beside a lowered railway. GL04 street vertices are rounded to 0.1 m.
         supported = {(s["way"], *s["nodes"]) for s, _, _ in local if s.get("fittedCarriageway")}

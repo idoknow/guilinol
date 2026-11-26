@@ -167,7 +167,8 @@ def bake(directory, manifest, paired_widths):
             if first >= last or np.max(abs(limits - [start, stop])) > .001:
                 raise ValueError(f"Pavement ties differ from the approved profile on {wid}")
             at = np.r_[start, heights[(heights[:,0] > start+.00001) & (heights[:,0] < stop-.00001), 0], stop]
-            part = dict(way, nodes=way["nodes"][first:last+1], geometry=way["geometry"][first:last+1])
+            part = dict(way, nodes=way["nodes"][first:last+1], geometry=way["geometry"][first:last+1],
+                        curbReturns=segment.get("curbReturns", ()))
             paving[wid] = part, LineString(points(part)), np.column_stack((at-start, np.interp(at, *heights.T)))
     surface_profiles = [profile for profile in joint if profile[0]["id"] not in bridge_approaches]
     finish_paving(directory, manifest, list(paving.values()) + surface_profiles, elements)
@@ -219,7 +220,14 @@ def bake_profiles(directory, manifest, profiles, elements, bridge_ways=(), landi
     from collections import defaultdict
     from shapely import STRtree
 
-    bores = tunnel_sections(profiles)
+    # Raised approaches overlap the ends of existing ground-level streets.
+    # Stitch each level independently, including the preliminary joint rings.
+    if bridge_approaches:
+        ground = {k: p for k, p in profiles.items() if p[0]["id"] not in bridge_approaches}
+        raised = {k: p for k, p in profiles.items() if p[0]["id"] in bridge_approaches}
+        bores = tunnel_sections(ground) + tunnel_sections(raised)
+    else:
+        bores = tunnel_sections(profiles)
     replaced = set() if additional else {t['way'] for t in bores}
     manifest['tunnels'] = [t for t in manifest.get('tunnels', []) if t['way'] not in replaced] + bores
     tiles = defaultdict(list)
