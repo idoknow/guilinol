@@ -73,6 +73,7 @@ export function streetGeometry([paths,lamps,banks,signals=[],stops=[],roadCtrl,s
     }
     return distance
   }
+  const passengerGrades=paving?.platformGrades?.filter(grade=>grade.along) ?? []
   const cutPanels=panels?.length ? panelCut(panels) : undefined
   let platformPath=false
   let lowerPath=false
@@ -210,7 +211,22 @@ export function streetGeometry([paths,lamps,banks,signals=[],stops=[],roadCtrl,s
       if((a.x===b.x&&(a.x===0||a.x===256))||(a.y===b.y&&(a.y===0||a.y===256)))continue
       for(let j=0;j<steps;j++){
         const p=a.clone().lerp(b,j/steps),q=a.clone().lerp(b,(j+1)/steps)
-        triangle(vector(p,.045),vector(p,height),vector(q,height),1,0,0,0,true);triangle(vector(p,.045),vector(q,height),vector(q,.045),1,0,0,0,true)
+        const grade=passengerGrades.find(row=>inRing(p.x,p.y,row.ring)&&inRing(q.x,q.y,row.ring)&&inRing((p.x+q.x)/2,(p.y+q.y)/2,row.ring))
+        if(grade){
+          const top=(v:THREE.Vector2)=>new THREE.Vector3(v.x,platformShift([grade],v.x,v.y,0),v.y)
+          const upper=top(p),end=top(q)
+          // Bound the entire face by the lowest corner of each 4 m terrain cell it touches.
+          let foot=Math.min(upper.y,end.y)-.15
+          for(let x=Math.floor(Math.min(p.x,q.x)/4)*4;x<=Math.ceil(Math.max(p.x,q.x)/4)*4;x+=4)
+            for(let z=Math.floor(Math.min(p.y,q.y)/4)*4;z<=Math.ceil(Math.max(p.y,q.y)/4)*4;z+=4)
+              foot=Math.min(foot,railGround(x,z)-.04)
+          const low=new THREE.Vector3(p.x,foot,p.y),next=new THREE.Vector3(q.x,foot,q.y)
+          emit(low,upper,end,1,0,0,0,true)
+          emit(low,end,next,1,0,0,0,true)
+        }else{
+          triangle(vector(p,.045),vector(p,height),vector(q,height),1,0,0,0,true)
+          triangle(vector(p,.045),vector(q,height),vector(q,.045),1,0,0,0,true)
+        }
       }
     }
   }

@@ -32,6 +32,27 @@ def passenger_profiles(directory, polygon, rise):
     return along, across, rows
 
 
+def single_platform_profile(directory, platform, track, rise):
+    """Interpolate railhead height longitudinally across a single passenger slab."""
+    from check_rail_platforms import rail_chords
+
+    along = np.subtract(track.coords[-1], track.coords[0])
+    along /= np.linalg.norm(along)
+    across = along[::-1] * [-1, 1]
+    rows = {}
+    for key, heights in rail_chords(directory, platform.buffer(16)).items():
+        ends = np.reshape(key, (2, 2))
+        if any(track.distance(Point(point)) > .001 for point in ends):
+            continue
+        for point, height in zip(ends, heights):
+            rows[tuple(point)] = height + rise
+    if not rows:
+        raise ValueError("Single passenger platform has no finished boarding track")
+    samples = [(np.array(point), np.array(point)+across, (height, height))
+               for point, height in sorted(rows.items(), key=lambda item: np.dot(item[0], along))]
+    return along, across, samples
+
+
 def mark_platform_grades(directory, manifest, ways, sections):
     for section in sections:
         ids = section.get("fitPlatforms", [])
@@ -61,8 +82,13 @@ def mark_platform_grades(directory, manifest, ways, sections):
             return np.interp(tracks[wid].project(point), *offsets[wid], left=0, right=0)
 
         for wid, platform in zip(ids, platforms):
-            if wid in section.get("islandPlatforms", []):
-                along, across, samples = passenger_profiles(directory, platform, section["islandBoardingHeightM"])
+            single = section.get("singleBoardingTracks", {}).get(str(wid))
+            if single or wid in section.get("islandPlatforms", []):
+                rise = section["islandBoardingHeightM"]
+                if single:
+                    along, across, samples = single_platform_profile(directory, platform, tracks[single], rise)
+                else:
+                    along, across, samples = passenger_profiles(directory, platform, rise)
                 for tile in manifest["chunks"]:
                     origin = np.array([tile["x"], tile["z"]])
                     cell = box(*origin, *(origin + 256))
