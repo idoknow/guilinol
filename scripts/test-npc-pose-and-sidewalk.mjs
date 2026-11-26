@@ -11,6 +11,25 @@ import {Traffic, WALK_OFFSET} from '../web/src/traffic/sim.ts'
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..')
 
+test('IDOK-377: a station walker continues across overlapping fragments, then idles at the destination', () => {
+  const walks = [[0, 0, -.4315, -5.586], [-.2842, -2.1689, -.829, -21.6159]]
+  const lane = {id: 4, from: 1, to: 2, offset: 0, kind: 'motor', width: 3, cls: 'primary', speedKmh: 30, street: 'station', npcWalks: walks}
+  const graph = {nodes: [{id: 1, x: 12, y: 0, z: 0}, {id: 2, x: 12, y: 0, z: -30}], lanes: [lane], signals: [], walks: []}
+  const sim = new Traffic(graph, () => .5, 0)
+  const track = [...sim.allTracks()].find(track => track.walk && track.start.z === 0)
+  const actor = {track, dist: 0, speed: 1.4, pace: 1.4, kind: 'person', down: 0, dodge: 0, x: 0, y: 0, z: 0, yaw: track.yaw, scale: 1, leaving: false, halfWidth: .3, halfLength: .3, height: 1.5}
+  sim.actors = [actor]
+  const camera = {x: 0, y: 1, z: 1}
+  for (let tick = 0; tick < 600; tick++) {
+    const lastZ = actor.z
+    sim.step(.05, camera, undefined, () => true)
+    assert.ok(actor.z <= lastZ + .01, `walker reversed at ${lastZ.toFixed(2)} m`)
+  }
+  assert.ok(actor.z < -21 && actor.speed === 0 && !actor.leaving)
+  for (let tick = 0; tick < 20; tick++) sim.step(.05, camera, undefined, () => false)
+  assert.equal(sim.actors.length, 0)
+})
+
 async function loadFigure(file) {
   const avatarDir = join(root, 'public/avatar')
   const origLoad = THREE.FileLoader.prototype.load

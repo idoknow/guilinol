@@ -56,6 +56,13 @@ export async function verifyZones(page){
       return false
     },id),`${id}: no castable bank`)
     console.log('bank ready',id)
+    const probes=await page.evaluate(id=>{
+      const zone=window.fishing.waters.find(row=>row.id===id),walk=window.viewer.walk
+      return zone.steles.map(({x,y,z,yaw,kind})=>{
+        const dx=Math.sin(yaw),dz=Math.cos(yaw),hit=walk.raycastObstacle(x+dx,y+1,z+dz,-dx,0,-dz,2)
+        return window.fishing.onLand(x,z)&&walk.getObstacleVolumeIds().includes(`stele-${id}-${kind}`)&&hit?.kind==='building'&&Math.abs(hit.distance-.8)<.02
+      })
+    },id);assert.deepEqual(probes,[true,true],`${id}: both stele faces block on dry ground`)
     if(index<3){
       await page.keyboard.press('4');await page.waitForFunction(()=>window.fishing.state().phase==='equip')
       const actual=await page.evaluate(()=>{

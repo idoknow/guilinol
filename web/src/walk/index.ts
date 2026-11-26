@@ -7,7 +7,9 @@ import {selectSlot,hotbarSlot,showSmokeDiscard,showFishingSlot} from '../ui/hotb
 import {nearestFishingShore} from '../fishing/zones'
 import {openWater} from '../fishing/surface'
 import {fishingMarks} from '../fishing/marks'
-import {getActiveSaveSnapshot,takeFromPack} from '../game/save'
+import '../fishing/report'
+import {createSteles} from '../fishing/steles'
+import {getActiveSaveSnapshot,openPack,takeFromPack} from '../game/save'
 import {rules,validRules} from '../smoke/data'
 import {createSmokePrompt} from '../smoke/prompt'
 import {SmokeSession,brandIndex} from '../smoke/session'
@@ -374,7 +376,7 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
     }
     if(cigarette.active)return
     const pack=getActiveSaveSnapshot().packs[0]
-    if(!cigarette.start(pack?.brand,pack?.remaining)){
+    if(!cigarette.start(pack?.brand,pack?.remaining,pack?.opened)){
       void openSmokeShop('没有香烟了，去旁边的香烟铺买')
       return
     }
@@ -383,7 +385,7 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
   function smokeAction(){
     if(!usable()||!cigarette.prompt)return
     const puffs=cigarette.puffs
-    cigarette.act(()=>takeFromPack(cigarette.brand))
+    cigarette.act(()=>takeFromPack(cigarette.brand),()=>openPack(cigarette.brand))
     if(cigarette.puffs!==puffs)puffSeq=(puffSeq+1)%1000
     smokeHint.hidden=true
     updateSmokePrompt('')
@@ -1158,6 +1160,7 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
   // 钓点可发现（IDOK-336 线上反馈）：40 m 内就亮出鱼竿格；切竿不移动玩家。
   const FISH_NEAR=40
   const fishMarks=fishingOn?fishingMarks(scene):undefined
+  const steles=fishingOn?createSteles(scene,sim.syncObstacleVolume):undefined
   window.addEventListener('fishing:slot',()=>{if(!fishingOn)return
     void loadFishing().then(session=>session.toggle())})
   if(verify)Object.assign(window,{fishing:{teleportToSpot:async(id:string)=>(await loadFishing()).teleportToSpot(id)}})
@@ -1366,7 +1369,7 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
   const boatBoardFrom=new THREE.Vector3(), boatLandFrom=new THREE.Vector3()
   let boatBoardElapsed=BOAT_BOARD_DUR, boatBoardYaw=0, boatLandElapsed=BOAT_LAND_DUR, boatLandYaw=0
   let wasBoat=false,wasBike=false,wasCar=false,bikeObstacle=''
-  function place(x:number,z:number,reason:string,override=false,prefound?:ReturnType<typeof sim.findWalkableSpawn>){const found=prefound??sim.findWalkableSpawn(x,z,override)
+  function place(x:number,z:number,reason:string,override=false,prefound?:ReturnType<typeof sim.findWalkableSpawn>,reject?:Parameters<typeof sim.findWalkableSpawn>[5]){const found=prefound??sim.findWalkableSpawn(x,z,override,false,undefined,reject)
     if(verify)spawns.push({reason,from:[x,z],to:found?[found.x,found.z]:null,distance:found?Math.hypot(found.x-x,found.z-z):null,rule:found?.rule??'none'})
     if(!found)return false
     sim.body.setTranslation(found,true);sim.body.setNextKinematicTranslation(found);sim.world.step();safe.set(found.x,found.y,found.z);resetMotion();return true}
@@ -1391,8 +1394,13 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
     return ready
   }
   async function enter(x:number,z:number,heading:number,reason:string,override=false,signal?:AbortSignal,progress?:(fraction:number,detail:string)=>void){
+    const started=performance.now()
+    function fail(cause:string,detail:object={}){
+      console.warn('walk:enter-failed',JSON.stringify({reason,x,z,cause,elapsedMs:Math.round(performance.now()-started),loaded:stream.loaded.size,queued:stream.queuedTiles,pending:stream.pending.size,...detail}))
+      return false
+    }
     if(!sim.withinBounds(x,z)){
-      if(!manifest.region)return false
+      if(!manifest.region)return fail('outside-bounds')
       const point=nearestPlayable(manifest,x,z)
       x=point.x;z=point.z
     }
@@ -1412,8 +1420,8 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
     const deadline=performance.now()+(signal?60000:15000)
     let reported=''
     while((needed.some(tile=>!stream.loaded.has(tile))||supports.some(entry=>!stream.landmarks.has(entry)))&&performance.now()<deadline){
-      if(signal?.aborted){if(destination===target)destination=null;return false}
-      if(destination!==target)return false
+      if(signal?.aborted){if(destination===target)destination=null;return fail('aborted')}
+      if(destination!==target)return fail('superseded')
       if(progress){const tiles=needed.filter(tile=>stream.loaded.has(tile)).length,landmarks=supports.filter(entry=>stream.landmarks.has(entry)).length
         const key=`${tiles}:${landmarks}`;if(key!==reported){reported=key;progress(.3+.6*tiles/Math.max(1,needed.length)+.1*landmarks/Math.max(1,supports.length),`街区 ${tiles} / ${needed.length}`)}}
       target.y=0;stream.tick(target)
@@ -1422,13 +1430,22 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
       }
       await new Promise(resolve=>setTimeout(resolve,12))
     }
-    if(destination!==target)return false
+    if(destination!==target)return fail('superseded')
     destination=null
-    if(signal?.aborted)return false
-    if(needed.some(tile=>!stream.loaded.has(tile))||supports.some(entry=>!stream.landmarks.has(entry)))return false
+    if(signal?.aborted)return fail('aborted')
+    const missingTiles=needed.filter(tile=>!stream.loaded.has(tile)).map(tile=>tile.file),missingLandmarks=supports.filter(entry=>!stream.landmarks.has(entry)).map(entry=>entry.id)
+    if(missingTiles.length||missingLandmarks.length)return fail('collision-load-timeout',{missingTiles,missingLandmarks})
+    let gpsSpot:ReturnType<typeof sim.findWalkableSpawn>|undefined
+    if(reason==='geolocation'){
+      syncSceneObstacleVolumes();sim.sync(x,z);gpsSpot=sim.findWalkableSpawn(x,z,false,true)
+      if(!gpsSpot){const current=sim.body.translation();sim.sync(current.x,current.z);return false}
+    }
     if(active)resetWalk()
     syncSceneObstacleVolumes()
-    sim.sync(x,z);if(!place(x,z,reason,override)){disconnect();window.dispatchEvent(new CustomEvent('walk:spawn-failed',{detail:{x,z,reason:'no-walkable-support'}}));return false}
+    const rejected:Record<string,{count:number,x:number,z:number,hitY:number|null,slope?:number}>={}
+    sim.sync(x,z);if(!place(x,z,reason,override,gpsSpot,(why,cx,cz,hitY,slope)=>{
+      const sample=rejected[why]??={count:0,x:cx,z:cz,hitY:hitY??null,slope};sample.count++
+    })){disconnect();window.dispatchEvent(new CustomEvent('walk:spawn-failed',{detail:{x,z,reason:'no-walkable-support'}}));return fail('no-walkable-support',{rejected})}
     active=true;rides?.show(true);requestAnimationFrame(()=>requestAnimationFrame(loadRides));figure.visible=true;firstPersonHidden=false
     yaw=heading;facing=yaw+avatar.yaw;figure.rotation.y=facing;input.show(true);accumulator=0;rig.reset(arm)
     restoreFootLocomotion(avatar.clips.idle)
@@ -1440,6 +1457,35 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
     return true
   }
   // 同城联机：首页开关随时生效（IDOK-192）。预载过就同步连上，没预载就先拉模块，回来时还在步行才连。
+  let lastMoveTs=performance.now()
+  function currentActivity(){
+    const speed=rides?.bike?Math.abs(rides.speed):Math.hypot(vx,vz)
+    if(speed>0.12)lastMoveTs=performance.now()
+    const ds=document.body.dataset
+    if(ds.drone==='rc')return {act:'drone',detail:'遥控航拍'}
+    if(ds.photo==='on')return {act:'photo',detail:'摄影模式'}
+    if(ds.fishing==='on')return {act:'fishing',detail:ds.fishMenu==='1'?'渔利背包':'岸边垂钓'}
+    if(ds.mifenCooking==='1'||ds.mifenStoryActive==='1'||ds.mifenIndoor==='1'){
+      return {act:'mifen',detail:ds.mifenCooking==='1'?'煮粉出餐':ds.mifenStoryActive==='1'?'米粉剧情':'田源米粉店'}
+    }
+    const gState=getGameState()
+    if(shopOverlay?.isOpen()||ds.shopOpen==='1'){
+      const kind=gState.activeShop?.kind
+      return {act:'shop',detail:kind==='ebike'?'电车店/改装':kind==='clothing'?'服装/换装':'逛店'}
+    }
+    if(rides?.boat){
+      const kind=rides.getInteractSnapshot?.().aboardKind
+      return {act:'boat',detail:kind==='tour_boat'?'画舫游船':'自由划船'}
+    }
+    if(rides?.car)return {act:'car',detail:'开车兜风'}
+    if(rides?.bike&&rides.rideKind==='bicycle')return {act:'bicycle',detail:'骑单车'}
+    if(rides?.bike)return {act:'ebike',detail:rides.bikeOwnership==='test_ride'?'试驾电车':rides.bikeOwnership==='personal'?'个人电车':'共享电车'}
+    if(cigarette.wire>0)return {act:'smoke',detail:'抽烟'}
+    if(gState.mission&&gState.mission.status!=='completed'&&gState.mission.status!=='failed'&&gState.mission.status!=='abandoned'){
+      return {act:'mission',detail:gState.mission.title?.slice(0,32)??'进行中'}
+    }
+    return performance.now()-lastMoveTs>15000?{act:'idle',detail:''}:{act:'walk',detail:''}
+  }
   function attachMp(){
     if(!mpEnabled()||!active||net)return
     if(!netModule){void import('../net').then(module=>{netModule=module;attachMp()}).catch(error=>console.warn('multiplayer unavailable',error));return}
@@ -1447,7 +1493,7 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
         net=netModule.attachNet(scene,model.animations,()=>({x:figure.position.x,y:figure.position.y,z:figure.position.z,
           yaw:figure.rotation.y,v:rides?.bike?Math.abs(rides.speed):Math.hypot(vx,vz),gr:Number(grounded),
           sc:cigarette.wire,sb:Math.round(cigarette.length*1800),sp:puffSeq,br:brandIndex(cigarette.brand),sd:dropSeq,ss:cigarette.strength,sr:cigarette.remaining,
-          bike:rides?.bike?'bike':'',bx:rides?.bike?.position.x??0,bz:rides?.bike?.position.z??0,byaw:rides?.heading??0}),()=>currentAvatar()??profile,camera)
+          bike:rides?.bike?'bike':'',bx:rides?.bike?.position.x??0,bz:rides?.bike?.position.z??0,byaw:rides?.heading??0}),()=>currentAvatar()??profile,camera,currentActivity)
         net.emote(emote.id);net.tick(0)
     }
   }
@@ -1998,6 +2044,7 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
     const before=performance.now(),start=rides?.boat?.position??sim.body.translation();syncSceneObstacleVolumes();sim.sync(start.x,start.z,true);const footYNow=rides?.boat?start.y:start.y-cfg.height/2;rides?.nearby(start.x,start.z,footYNow);interactArbiter.sync(actionButton);syncGameTravelState();updateShopHintRings(start.x,start.z,footYNow)
     showFishingSlot(fishingOn&&!rides?.bike&&!rides?.boat&&!rides?.car&&(hotbarSlot()==='fishing'||nearestFishingShore(start.x,start.z).distance<=FISH_NEAR))
     fishMarks?.tick(start.x,start.z,dt,hotbarSlot()==='fishing',start.y)
+    steles?.tick(start.x,start.z)
     if(cigarette.active && (rides?.bike||rides?.boat||rides?.car)){
       cancelSmoke()
       smoking?.tick(dt,cigarette.view(),false)
@@ -2057,7 +2104,8 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
     if((rides?.car||rides?.bike)&&!vehicleCollisionReady(start.x,start.y,start.z)){
       rides.stop();vx=vz=accumulator=0;bikeObstacle='streaming';return
     }
-    const fishingOnFoot=hotbarSlot()==='fishing'&&!rides?.bike&&!rides?.boat&&!rides?.car
+    // 拿着鱼竿也能走动（需求方：不要把人固定在原地）；抛出去后走开会自动收线
+    const fishingOnFoot=false
     const read=input.read(dt),keys=held||fishingOnFoot?still:read
     const rideCtrl=held?ZERO_RIDE_INPUT:input.readRideControls()
     const busyFootAnim=!!(standUpSession||pickupSession)
@@ -2790,7 +2838,7 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
       showSmokeDiscard(cigarette.inMouth)
       const label=cigarette.prompt
       smokeHint.hidden=!label||!usable()
-      const hint=touchUi()?label:({'':'',撕开:'请按 F 键撕开烟盒封条',拿取:'请按 F 键拿取香烟',点燃:'请按 F 键点燃香烟',吸一口:'F 键吸一口'}[label]).replace('F',bindingLabel('interact'))
+      const hint=touchUi()?label:({'':'',撕开:'请按 F 键撕开封条',拿取:'请按 F 键拿取香烟',点燃:'请按 F 键点燃香烟',吸一口:'F 键吸一口'}[label]).replace('F',bindingLabel('interact'))
       updateSmokePrompt(smokeHint.hidden||touchUi()?'':hint)
       if(smokeHint.textContent!==hint)smokeHint.textContent=hint
       if(cigarette.advance(dt))smoking.drop()
@@ -2896,6 +2944,7 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
       cycleLight(){carHeadlight=nextHeadlightMode(carHeadlight);carHeadlightManual=true;return carHeadlight},
       setHeadlight(mode:TwoWheelHeadlightMode){carHeadlight=mode;carHeadlightManual=true;return carHeadlight},
     },
+    get geoHeld(){return held},releaseDrive(){external=null},
     shop:{
       open:(shopId:string,tab?:string)=>shopOverlay?.openShop(shopId,tab),
       openService:(shopId:string)=>shopOverlay?.openServiceBay(shopId),

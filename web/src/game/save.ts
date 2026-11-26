@@ -876,6 +876,15 @@ export function mergeCloudAndLocalSave(localRaw: LocalSaveV1, cloudRaw: LocalSav
   return sanitizeSave(merged, nowMs).save
 }
 
+export function openPack(brand: string): boolean {
+  const next = cloneSave(getActiveSaveSnapshot())
+  const pack = next.packs[0]
+  if (!pack || pack.brand !== brand) return false
+  pack.opened = true
+  next.updatedAt = Date.now()
+  return persistSaveSync(next)
+}
+
 export function takeFromPack(brand: string): boolean {
   const next = cloneSave(getActiveSaveSnapshot())
   const pack = next.packs[0]

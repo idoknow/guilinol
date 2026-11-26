@@ -76,10 +76,10 @@ function clip(poly:Point[],plane:Plane){
 }
 function fan(poly:Point[],out:number[]){for(let at=2;at<poly.length;at++)out.push(...poly[0],...poly[at-1],...poly[at])}
 
-export function tunnelGeometry(tile:Tile,ground:THREE.PlaneGeometry,tunnels:Tunnel[]){
+export function tunnelGeometry(tile:Tile,ground:THREE.PlaneGeometry,tunnels:Tunnel[],panels:import('./railways').CrossingPanel[]=[]){
   const local=station.nearbyTunnels(tunnels,tile.x,tile.z)
   if(local.some(t=>t.nodes)){
-    const mesh=station.tunnelGeometry(tile,ground,local)
+    const mesh=station.tunnelGeometry(tile,ground,local,panels)
     if(mesh)return {...mesh,fringe:undefined}
   }
   tunnels=local.filter(t=>!t.nodes)

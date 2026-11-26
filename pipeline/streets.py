@@ -14,6 +14,18 @@ from scatter import CONFIG, walk_line
 from sections import section_layers, speed_paint, yiwu_frontage, RULES
 from dongxi_streets import street_surface
 
+# Shizijie surface crossings are replaced by the IDOK-301 underground pedestrian underpass.
+# Keep stop lines, omit zebra crosswalk bars and median/curb crosswalk gaps.
+SHIZIJIE_ORIGIN = (-879.7502021582604, -169.62604470000713)
+SHIZIJIE_NO_CROSSWALK_ZONE = Polygon([
+    (SHIZIJIE_ORIGIN[0] + x, SHIZIJIE_ORIGIN[1] + z)
+    for x, z in [
+        (-120, -50), (-52, -50), (-30, -110), (55, -110),
+        (55, -40), (125, -30), (125, 55), (40, 55),
+        (30, 105), (-65, 105), (-65, 45), (-120, 45),
+    ]
+])
+
 
 def area_only(shape):
     if not shape.is_valid:
@@ -98,6 +110,8 @@ def chunks(roads,banks,bounds,water,sample,exclude,ped_areas=(),replace_exclude=
         delta = np.subtract(line.interpolate(min(line.length, dist + .25)).coords[0], line.interpolate(max(0, dist - .25)).coords[0])
         tangent = sign_away * delta / max(.001, np.linalg.norm(delta))
         normal = np.array([-tangent[1], tangent[0]])
+        # Suppress surface zebra bars & curb gaps inside Shizijie (IDOK-301 underpass), while keeping stop lines.
+        no_zebra = SHIZIJIE_NO_CROSSWALK_ZONE.contains(Point(float(mid[0]), float(mid[1])))
         bars = []
         corner = Point(mid).distance(Point(-1331.2,-103.5)) < 28
         half_bar = .34 if corner else .24
@@ -107,12 +121,15 @@ def chunks(roads,banks,bounds,water,sample,exclude,ped_areas=(),replace_exclude=
             low = -width/2 - (extension if sign_away < 0 else 0)
             high = width/2 + (extension if sign_away > 0 else 0)
             spans = np.linspace(low+half_bar,high-half_bar,max(2,round((high-low)/1.15)))
-        for span in spans:
-            center = mid + normal * span
-            bars.append(LineString([center - tangent * 1.9, center + tangent * 1.9]).buffer(half_bar, cap_style='flat'))
+        if not no_zebra:
+            for span in spans:
+                center = mid + normal * span
+                bars.append(LineString([center - tangent * 1.9, center + tangent * 1.9]).buffer(half_bar, cap_style='flat'))
         if with_stop:
             stop = mid + tangent * 2.5
             bars.append(LineString([stop, stop + normal * width / 2]).buffer(.22, cap_style='flat'))
+        if not bars:
+            return
         group = unary_union(bars)
         if cores.query(group, predicate='intersects').size:
             if search < 24:
@@ -124,7 +141,8 @@ def chunks(roads,banks,bounds,water,sample,exclude,ped_areas=(),replace_exclude=
             return
         crossing_centres.append(Point(mid))
         crosswalk_groups.append(group)
-        gaps.append(LineString([mid - normal * (width / 2 + left_w + 1), mid + normal * (width / 2 + right_w + 1)]).buffer(2.05, cap_style='flat'))
+        if not no_zebra:
+            gaps.append(LineString([mid - normal * (width / 2 + left_w + 1), mid + normal * (width / 2 + right_w + 1)]).buffer(2.05, cap_style='flat'))
 
     for road in roads:
         line,width,kind = road.line,road.width,road.kind

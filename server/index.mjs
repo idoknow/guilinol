@@ -16,6 +16,7 @@ import {multiplayer} from './mp-admin.mjs'
 import {npcDefaults,validNpc} from '../lib/npc.ts'
 import {resolveClientIp} from './client-ip.mjs'
 import {createPerfCache} from './perf-cache.mjs'
+import {fishingStore} from './fishing.mjs'
 
 crypto.subtle.timingSafeEqual = (left,right) => left.byteLength===right.byteLength && timingSafeEqual(left,right)
 // 连接/查询都有上限：卡住的查询不能长期占着 5 连接的池子
@@ -27,11 +28,30 @@ const pool=new pg.Pool({connectionString:process.env.DATABASE_URL,max:Number(pro
 // 空闲连接被服务端断开（postgres 重启/维护）时 pg.Pool 会 emit 'error'，不监听就整个进程崩溃
 pool.on('error',error=>console.error('postgres idle client error',error.code??error.message))
 const readiness=createReadiness({query:sql=>pool.query(sql)})
-const metrics=monitor(pool)
+let warmAdminCache=()=>{}
+const metrics=monitor(pool,{onHourlyReady:()=>warmAdminCache()})
 const connections=measuredConnections(pool,metrics)
 const runPerfQuery = (path, params) => (path.startsWith('admin/perf') ? queryPerf : analytics)(connections, path, params)
 const cachedPerfQuery = createPerfCache({ runPerfQuery })
-const mp=multiplayer(pool,process.env)
+const mp=multiplayer(pool,process.env,{cache:cachedPerfQuery})
+let warming=false
+warmAdminCache=()=>{
+  if(warming||process.env.ADMIN_WARMUP==='0')return
+  warming=true
+  const snap=300000
+  const toMs=Math.ceil(Date.now()/snap)*snap
+  const from=new Date(toMs-86400e3).toISOString(),to=new Date(toMs).toISOString()
+  // 后台首屏 24h 常用查询提前预热进内存缓存，管理员首开页面直接命中
+  Promise.allSettled([
+    cachedPerfQuery('admin/live',new URLSearchParams()),
+    cachedPerfQuery('admin/overview',new URLSearchParams({from,to})),
+    cachedPerfQuery('admin/timeseries',new URLSearchParams({from,to,metric:'visitors',bucket:'1h'})),
+    cachedPerfQuery('admin/timeseries',new URLSearchParams({from,to,metric:'sessions',bucket:'1h'})),
+    cachedPerfQuery('admin/funnel',new URLSearchParams({from,to})),
+  ]).finally(()=>{warming=false})
+}
+const warmTimer=setInterval(()=>warmAdminCache(),120000)
+warmTimer.unref()
 const readNpc=async()=> (await pool.query('select settings from npc_settings where singleton')).rows[0]?.settings??npcDefaults
 async function npcAdmin(request){
   if(request.method==='GET')return json(await readNpc())
@@ -43,14 +63,18 @@ async function npcAdmin(request){
 }
 async function readSmoke(){
   const {rows}=await pool.query("SELECT detail FROM admin_audit WHERE target_type='smoke' AND target_id='settings' AND action='smoke.settings' ORDER BY id DESC LIMIT 1")
-  return rows[0]?.detail??smokeDefaults
+  const stored=rows[0]?.detail
+  if(!stored)return smokeDefaults
+  if(stored.catalogVersion===2)return stored
+  // Pre-expansion settings could only contain the original six brands.
+  return {...stored,brands:[...stored.brands,...smokeDefaults.brands.slice(6)]}
 }
 async function smokeAdmin(request,user){
   if(request.method==='GET')return json(await readSmoke())
   if(request.method!=='POST')return json({error:'method'},405)
   const rules=await request.json().catch(()=>null)
   if(!validRules(rules))return json({error:'invalid smoke settings'},400)
-  await pool.query("INSERT INTO admin_audit(actor_id,action,target_type,target_id,detail) VALUES($1,'smoke.settings','smoke','settings',$2)",[user,rules])
+  await pool.query("INSERT INTO admin_audit(actor_id,action,target_type,target_id,detail) VALUES($1,'smoke.settings','smoke','settings',$2)",[user,{...rules,catalogVersion:2}])
   return json({ok:true})
 }
 async function readGfx(){
@@ -68,6 +92,7 @@ async function gfxAdmin(request,user){
 const env = {...process.env, gfxAdmin,smokeAdmin,npcAdmin,mpAdmin:mp.route, perfQuery:cachedPerfQuery, DB:database(connections), FEEDBACK:bucket(process.env.S3_ENDPOINT)}
 const origin = new URL(process.env.PUBLIC_ORIGIN).origin
 env.updateCards=cardRoutes(pool,env)
+env.fishing=fishingStore(connections)
 const online = presence(pool)
 const mpOnline = mpPresence()
 
@@ -110,6 +135,10 @@ const server=serve({port:Number(process.env.PORT || 3000),fetch: async (request,
     const reqEnv={...env,clientIp:resolved.clientIp}
     const response=url.pathname==='/api/t'?await receive(request,connections,origin,{remoteAddr}):await onRequest({env:reqEnv,request:new Request(origin+url.pathname+url.search,request)})
     status=response.status
+    if(request.method!=='GET'&&status<400&&/^\/api\/(?:admin|feedback|bridge|auth\/(?:register|verify))/.test(url.pathname)){
+      cachedPerfQuery.invalidate('admin/stats?')
+      cachedPerfQuery.invalidate('admin/signups?')
+    }
     return response
   }finally{if(!request.headers.get('user-agent')?.startsWith('kube-probe/'))metrics.request(url.pathname,status,performance.now()-start)}
 }})

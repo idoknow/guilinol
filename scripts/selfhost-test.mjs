@@ -17,7 +17,7 @@ async function localPort() {
   return port
 }
 
-export async function fixture({postgresOnly=false,beforeSocialDirect=false}={}) {
+export async function fixture({postgresOnly=false}={}) {
   const ids=[],secret=randomUUID(),credentials={accessKeyId:'gloltest',secretAccessKey:secret}
   const docker=args=>execFileSync('docker',args,{encoding:'utf8'}).trim()
   function service(port,args) {
@@ -71,13 +71,16 @@ export async function fixture({postgresOnly=false,beforeSocialDirect=false}={}) 
       if(attempt>=100||minio?.exitCode!=null)throw Error('Test services not ready')
       await delay(300)
     }
-    for(const migration of ['001-schema','002-telemetry','003-admin','003-player-saves','004-social','005-social-pending','006-social-register','007-social-only','008-social-states-register','009-feedback-credit','010-user-moderation','011-player-uid','012-citizen-photo','013-perf-hour','014-mp','015-chat','016-chat-lexicon','017-npc',...(beforeSocialDirect?[]:['018-social-direct']),'020-perf-event-ips'])
-      await pool.query(await readFile('deploy/postgres/'+migration+'.sql','utf8'))
+    const migrate=async name=>pool.query(await readFile('deploy/postgres/'+name+'.sql','utf8'))
+    const replay=async()=>{
+      for(const migration of ['002-telemetry','003-admin','003-player-saves','004-social','005-social-pending','006-social-register','007-social-only','008-social-states-register','009-feedback-credit','010-perf-admin-indexes','010-user-moderation','011-player-uid','012-citizen-photo','013-perf-hour','014-mp','015-chat','016-chat-lexicon','017-npc','019-update-cards','020-social-direct-revert','020-perf-event-ips','021-admin-perf-and-mp-activity'])await migrate(migration)
+    }
+    await migrate('001-schema');await replay()
     if(!postgresOnly){
       const s3=new S3Client({endpoint:S3_ENDPOINT,region:'us-east-1',forcePathStyle:true,credentials})
       try{await s3.send(new CreateBucketCommand({Bucket:'glol-feedback'}))}finally{s3.destroy()}
     }
-    return {env:{DATABASE_URL,S3_ENDPOINT:S3_ENDPOINT??'http://127.0.0.1:0',AWS_ACCESS_KEY_ID:credentials.accessKeyId,AWS_SECRET_ACCESS_KEY:secret},close,
+    return {env:{DATABASE_URL,S3_ENDPOINT:S3_ENDPOINT??'http://127.0.0.1:0',AWS_ACCESS_KEY_ID:credentials.accessKeyId,AWS_SECRET_ACCESS_KEY:secret},close,replay,
       async sql(text,args){return [].concat(await pool.query(text,args)).map(row=>({results:row.rows}))}}
   }catch(error){await close();throw error}
 }

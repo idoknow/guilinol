@@ -160,6 +160,7 @@ body[data-photo=on] :is(output,.hint,footer,.sky-ui,.walk-ui,.dock,.toast,.spot-
    a right-aligned grid and dropped the duplicate 地图 button (the minimap is the only map entry now). */
 @media (pointer:coarse) and (not (any-pointer:fine)) and (orientation:portrait) and (max-width:600px){
   .dock{gap:5px}
+  .dock-buttons{margin-top:16px}
   .dock .minimap{width:96px;height:96px}
 }
 /* IDOK-256 竖屏手机：dock 按钮从一根长竖列（排到屏幕中下、压住跃/远近）改成右对齐的两三列小网格，地图入口只剩小圆图。 */

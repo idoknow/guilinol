@@ -6,6 +6,7 @@ import {Histogram,route} from '../server/perf-monitor.mjs'
 import {resolveClientIp} from '../server/client-ip.mjs'
 import {resolveClientIp as resolveRtClientIp} from '../rt/client-ip.mjs'
 import {createPerfCache} from '../server/perf-cache.mjs'
+import {database,isReadOnlySql} from '../server/postgres.mjs'
 const batch=()=>({sid:randomUUID(),context:{device:'desktop'},rows:[{kind:'window',fps:60,grid:'-3,2',mode:'fly'}]})
 test('bounded minute histogram',()=>{
   const h=new Histogram()
@@ -18,6 +19,11 @@ test('bounded minute histogram',()=>{
 test('bounded routes omit player supplied identifiers',()=>{
   assert.equal(route('/api/feedback/example/photos/5'),'/api/feedback/:id/photos/:n')
   assert.equal(route('/api/me'),'/api/me')
+  assert.equal(route('/api/admin/mp/gameplay'),'/api/admin/mp/gameplay')
+  assert.equal(route('/api/admin/mp/activities'),'/api/admin/mp/activities')
+  assert.equal(route('/api/admin/chat/settings'),'/api/admin/chat/settings')
+  assert.equal(route('/api/admin/users/abc-123/role'),'/api/admin/users/:id/role')
+  assert.equal(route('/api/admin/signups'),'/api/admin/signups')
   assert.equal(route('/api/secret'),'/api/other')
 })
 test('payload validation excludes identity, URLs and unsupported coordinates',()=>{
@@ -117,6 +123,16 @@ test('client-ip resolver priority, trusted proxy CIDRs, and rt parity',()=>{
       resolve({'cf-connecting-ip':'202.103.225.68','x-real-ip':'10.42.10.1','x-forwarded-for':'10.42.10.1'},'127.0.0.1'),
       {clientIp:'202.103.225.68',nodeIp:'127.0.0.1',trusted:true},
     )
+    // CDNFly 链路：x-real-ip 被改写成本节点地址，真实客户端 IP 走自定义头 X-Client-IP，必须优先采信
+    assert.deepEqual(
+      resolve({'x-client-ip':'202.103.225.68','x-real-ip':'103.45.143.210','x-forwarded-for':'103.45.143.210'},'127.0.0.1'),
+      {clientIp:'202.103.225.68',nodeIp:'103.45.143.210',trusted:true},
+    )
+    // 没有自定义头时退回 x-real-ip（Cloudflare/直连场景保持原行为）
+    assert.deepEqual(
+      resolve({'x-real-ip':'202.103.225.68','x-forwarded-for':'111.223.13.41'},'127.0.0.1'),
+      {clientIp:'202.103.225.68',nodeIp:'111.223.13.41',trusted:true},
+    )
   }
 })
 test('perf cache deduplicates concurrent queries, canonicalizes param order, and serves hits/stale within ms',async()=>{
@@ -166,4 +182,79 @@ test('anonymous session context and event schemas',()=>{
   for(const playMode of ['tour','solo']) assert.ok(validate({...batch(),context,rows:[{kind:'session',total:42,playMode}]}))
   for(const row of [{kind:'session',total:42,playMode:'other'},{kind:'error',count:1,signature:'main.js:42'},{kind:'funnel',step:'admin@example.test'}])
     assert.equal(validate({...batch(),context,rows:[row]}),false)
+})
+test('postgres read-only queries skip BEGIN and global advisory lock while writes stay serialized',async()=>{
+  assert.equal(isReadOnlySql('SELECT id FROM users WHERE id=?'),true)
+  assert.equal(isReadOnlySql("  WITH t AS (SELECT 'UPDATE' AS label) SELECT * FROM t"),true)
+  assert.equal(isReadOnlySql('UPDATE users SET role=? WHERE id=?'),false)
+  assert.equal(isReadOnlySql('WITH x AS (UPDATE users SET role=? RETURNING id) SELECT * FROM x'),false)
+  assert.equal(isReadOnlySql('SELECT * FROM users FOR UPDATE'),false)
+  assert.equal(isReadOnlySql("SELECT nextval('users_uid_seq')"),false)
+
+  const poolQueries=[],clientQueries=[]
+  const fakePool={
+    async query(sql,args){poolQueries.push({sql,args});return {rows:[{id:'u1',rowid:1}],rowCount:1,command:'SELECT'}},
+    async connect(){
+      return {
+        async query(sql,args){clientQueries.push({sql,args});return {rows:[],rowCount:1,command:sql.startsWith('SELECT')?'SELECT':'UPDATE'}},
+        release(){},
+      }
+    },
+  }
+  const db=database(fakePool)
+  const [r1,r2]=await db.batch([db.prepare('SELECT id FROM users WHERE id=?').bind('u1'),db.prepare('SELECT count(*) n FROM users')])
+  assert.equal(r1.results[0].id,'u1')
+  assert.equal('rowid' in r1.results[0],false)
+  assert.equal(r2.results.length,1)
+  assert.equal(poolQueries.length,2)
+  assert.equal(clientQueries.length,0)
+
+  await db.batch([db.prepare('UPDATE users SET nickname=? WHERE id=?').bind('新名字','u1')])
+  assert.equal(clientQueries[0].sql,'BEGIN')
+  assert.ok(clientQueries[1].sql.includes('pg_advisory_xact_lock(907071)'))
+  assert.equal(clientQueries.at(-1).sql,'COMMIT')
+})
+test('perf cache deduplicates breakdown p50/p95 keys, caches live/stats/mp, and supports invalidate',async()=>{
+  let calls=0
+  const cache=createPerfCache({
+    ttlMs:60000,
+    staleMs:120000,
+    runPerfQuery:async(path,params)=>{calls++;return Response.json({path,metric:params.get('metric'),calls})},
+  })
+  const b1=await cache('admin/breakdown',new URLSearchParams({dim:'device',metric:'chunk.p50'}))
+  const b2=await cache('admin/breakdown',new URLSearchParams({dim:'device',metric:'chunk.p95'}))
+  assert.equal(calls,1)
+  assert.deepEqual(await b1.json(),await b2.json())
+
+  let statCalls=0
+  const runStats=async()=>{statCalls++;return Response.json({n:statCalls})}
+  assert.equal((await (await cache('admin/stats',new URLSearchParams(),runStats)).json()).n,1)
+  assert.equal((await (await cache('admin/stats',new URLSearchParams(),runStats)).json()).n,1)
+  cache.invalidate('admin/stats?')
+  assert.equal((await (await cache('admin/stats',new URLSearchParams(),runStats)).json()).n,2)
+})
+test('admin/perf/server summary=1 downsamples series and aggregates routes while default keeps raw items',async()=>{
+  const {queryPerf}=await import('../server/telemetry.mjs')
+  const t0=new Date('2026-11-24T00:00:00Z'),t1=new Date('2026-11-24T00:05:00Z'),t2=new Date('2026-11-24T01:00:00Z')
+  const fakePool={
+    async query(){
+      return {rows:[
+        {minute:t0,sample:{cpuCores:0.2,rss:100,loopP99:5,pgP95:10,routes:[{route:'/api/me',count:10,errors:0,p95:8,p99:12}]}},
+        {minute:t1,sample:{cpuCores:0.6,rss:120,loopP99:15,pgP95:25,routes:[{route:'/api/me',count:5,errors:1,p95:18,p99:30}]}},
+        {minute:t2,sample:{cpuCores:0.4,rss:110,loopP99:8,pgP95:12,routes:[{route:'/api/admin/mp',count:20,errors:0,p95:40,p99:55}]}},
+      ]}
+    },
+  }
+  const base='from=2026-11-24T00:00:00Z&to=2026-11-25T00:00:00Z'
+  const raw=await (await queryPerf(fakePool,'admin/perf/server',new URLSearchParams(base))).json()
+  assert.equal(raw.items.length,3)
+
+  const sum=await (await queryPerf(fakePool,'admin/perf/server',new URLSearchParams(base+'&summary=1'))).json()
+  assert.equal(sum.summary,true)
+  assert.equal(sum.count,3)
+  assert.equal('items' in sum,false)
+  assert.equal(sum.series.cpuCores.length,2)
+  assert.equal(sum.series.cpuCores[0].v,0.6)
+  assert.equal(sum.routes[0].route,'/api/admin/mp')
+  assert.deepEqual(sum.routes[1],{route:'/api/me',count:15,errors:1,p95:18,p99:30})
 })

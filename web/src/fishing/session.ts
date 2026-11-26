@@ -1,11 +1,13 @@
 import * as THREE from 'three'
 import {hotbarSlot,selectSlot} from '../ui/hotbar'
+import {prefs} from '../ui/prefs'
 import {getActiveSaveSnapshot} from '../game/save'
 import {FishingEngine,type Catch} from './engine'
 import {chargePower,resolveCast,type Point,nearestFishingShore,nearby,species,tabs,waters,xpThresholds,type Method} from './config'
 import {buy,certification,collect,consume,inventory,journal,refundFullCast,removeCatch,shop} from './inventory'
 import {bait} from './bait'
 import {fishThumb} from './fish-model'
+import {reportCatch} from './report'
 import {createRod,createWaterFx} from './fx'
 import './fishing.css'
 
@@ -15,6 +17,7 @@ const textFocus=()=>document.activeElement?.matches('input,textarea,select,[cont
 const terminal=['equip','land','snap','escape','miss','junk','empty-hook']
 const gradeClass=(grade:string)=>grade==='legendary'?'g-l':grade==='high'?'g-r':grade==='junk'?'g-j':'g-c'
 const zoneName={red:'红区 · 传说出没',blue:'蓝区 · 高级鱼',green:'绿区 · 常见鱼'} as Record<string,string>
+const coarse=()=>matchMedia('(pointer:coarse) and (not (any-pointer:fine))').matches
 const esc=(text:string)=>text.replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'})[c]!)
 const BAG_ICON='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12c3-4.5 8.5-6 13-3l4-3v12l-4-3c-4.5 3-10 1.5-13-3z"/><circle cx="7.5" cy="11.2" r=".9"/></svg>'
 
@@ -65,8 +68,10 @@ export function createFishing(host:Host,verify:boolean){
   const tipLocal=new THREE.Vector3(0,2.1,0)
   const rodKit=createRod(tipLocal),rod=rodKit.root,tip=rodKit.tip,reel=rodKit.reel;rod.name='fishing-grip'
   const fx=createWaterFx(host.scene),targetVec=new THREE.Vector3(),endVec=new THREE.Vector3()
-  let flying=false,fightSurge=false
-  const rodDir=new THREE.Vector3(),UP=new THREE.Vector3(0,1,0),camGoal=new THREE.Vector3()
+  let flying=false,fightSurge=false,castFrom:{x:number,z:number}|undefined
+  const rodDir=new THREE.Vector3(),UP=new THREE.Vector3(0,1,0),camGoal=new THREE.Vector3(),camLook=new THREE.Vector3(),camFwd=new THREE.Vector3()
+  let camBlend=0
+  const firstPerson=()=>prefs().view==='first'
   function visual(name:string,detail:unknown){
     const d=(detail??{}) as {side?:number,size?:string,surge?:boolean}
     if(name==='fight'){const was=fightSurge;fightSurge=!!d.surge;if(fightSurge&&!was&&target)fx.surge(endVec)}
@@ -116,11 +121,13 @@ export function createFishing(host:Host,verify:boolean){
   function stageChanged(stage:string){
     ui.dataset.stage=stage
     const lure=method==='路亚'
-    action.textContent=terminal.includes(stage)?'按住蓄力':stage==='fight'?'按住收线':stage==='hit'?'提竿！':lure?'收线':'提竿'
+    const k=coarse()?'':'空格 · '
+    action.textContent=terminal.includes(stage)?k+'按住蓄力':stage==='fight'?k+'按住收线':stage==='hit'?k+'提竿！':lure?k+'收线':k+'提竿'
     cue.hidden=!['hit','nibble','approach'].includes(stage);cue.className='fx-cue'+(stage==='hit'?' bite':'')
     cue.textContent=stage==='hit'?'咬钩了 · 快提竿！':stage==='nibble'?'有鱼在试探 · 别动':'鱼游过来了…'
     fightBox.hidden=stage!=='fight'
-    hint.textContent=terminal.includes(stage)?'按住蓄力，松开抛竿':stage==='fight'?'按住收线，松开放线':stage==='hit'?'咬钩了！马上按一下提竿':stage==='nibble'?'鱼在试探，先别动':stage==='approach'?'有鱼靠近了，稳住':lure?'按住收线引鱼，咬钩后松开再按一下提竿':'盯住浮标，猛地一沉再提竿'
+    const sp=coarse()?'':'空格'
+    hint.textContent=terminal.includes(stage)?`按住${sp||'按钮'}蓄力，松开抛竿`:stage==='fight'?`按住${sp||'按钮'}收线，松开放线`:stage==='hit'?`咬钩了！马上按一下${sp||'提竿'}`:stage==='nibble'?'鱼在试探，先别动':stage==='approach'?'有鱼靠近了，稳住':lure?`等鱼来咬（按住${sp||'按钮'}收线能引鱼更快），咬钩后按一下提竿`:'盯住浮标，猛地一沉再提竿'
     if(stage==='empty-hook')toast('空钩 · 这一竿没上鱼','dim')
     else if(stage==='escape')toast(lure?'鱼脱钩了':'没等到咬口','dim')
     else if(stage==='miss')toast('提竿慢了，鱼溜了','dim')
@@ -129,6 +136,7 @@ export function createFishing(host:Host,verify:boolean){
   let cardTimer=0
   function toast(text:string,tone:'bad'|'dim'){card.hidden=false;card.className=`fx-catch fx-toast ${tone}`;card.innerHTML=`<p>${esc(text)}</p>`;clearTimeout(cardTimer);cardTimer=window.setTimeout(()=>{card.hidden=true},2600)}
   function showCatch(item:Catch){
+    reportCatch(item)
     const row=species.find(s=>s.id===item.speciesId),fresh=row&&inventory().bag.filter(b=>b.speciesId===row.id).length===1
     card.hidden=false;card.className=`fx-catch ${gradeClass(item.grade)}`
     card.innerHTML=row?`<img alt="" src="${fishThumb(row.id)}"><div><p class="fc-no">${row.number}${fresh?' · <b>新图鉴</b>':''}</p><h3>${esc(row.name)}</h3>
@@ -145,7 +153,7 @@ export function createFishing(host:Host,verify:boolean){
     const id=baitSelect.value,key=crypto.randomUUID(),debit=consume(id,key);if(!debit.ok){toast(debit.code==='BAG_FULL'?'渔利背包已满 · 先去出售或丢弃':debit.code==='NO_BAIT'?'这款饵用完了 · 去渔利补货':debit.code,'dim');return false}
     receipt={key,baitId:id}
     const save=inventory(),tier=(prefix:string)=>Math.max(...save.owned.filter(value=>value.startsWith(prefix)).map(value=>Number(value.slice(prefix.length))))
-    target=landing.to;origin=water;card.hidden=true;signal('cast',landing)
+    target=landing.to;origin=water;card.hidden=true;signal('cast',landing);castFrom={x:pos.x,z:pos.z}
     tip.getWorldPosition(tipWorld);flying=true;fx.cast(tipWorld,new THREE.Vector3(target.x,target.y,target.z),()=>{flying=false});signal('camera',{target:[target.x,target.y,target.z],zoom:method==='台钓'})
     const result=engine.cast({distance:landing.distance,water,method,bait:id,line:tier('line'),rod:tier(method==='台钓'?'pole':'lure'),float:save.owned.includes('float'),drag:save.owned.includes('drag')});options();return result}
   const inspect=(id:string)=>import('./inspect').then(module=>module.inspect(id))
@@ -250,11 +258,11 @@ export function createFishing(host:Host,verify:boolean){
     rodKit.set(st==='fight'?.35+.65*engine.tension:st==='hit'?.35:st==='nibble'?.12:chargeStart!==null?-.25:.04,st==='fight'?engine.direction:0,st==='hit'?1:st==='nibble'?.4:st==='fight'&&engine.tension>.8?.6:0)
     rodKit.tick(dt)
     // 鱼竿挂在右手位置，朝人物前方斜向上（角力时压低指向鱼线）
-    const hand=host.hand();if(hand){hand.getWorldPosition(rod.position)}
+    const hand=host.hand();if(hand){hand.updateWorldMatrix(true,false);hand.getWorldPosition(rod.position)}
     const a=host.heading(),fwd=rodDir.set(Math.sin(a),0,Math.cos(a)),lift=st==='fight'?.45:chargeStart!==null?1.6:.85
     fwd.y=lift;fwd.normalize();rod.quaternion.setFromUnitVectors(UP,fwd)
     clock+=dt;engine.tick(dt);line.visible=!!origin&&!terminal.includes(engine.stage);float.visible=line.visible&&method==='台钓'
-    reel.rotation.y+=engine.reel?dt*14:0
+    if(engine.reel)rodKit.spin(dt)
     if(line.visible&&origin&&target){
       tip.getWorldPosition(tipWorld);const fight=engine.stage==='fight',pos=host.position()
       const fl=flying?fx.flying():undefined
@@ -262,6 +270,7 @@ export function createFishing(host:Host,verify:boolean){
       else{endVec.set(target.x,target.y,target.z);if(fight){const dx=target.x-pos.x,dz=target.z-pos.z,len=Math.hypot(dx,dz)||1,k=Math.min(1,Math.max(.08,engine.distance/len))
         endVec.set(pos.x+dx*k+engine.direction*.6*(fightSurge?1:0),target.y,pos.z+dz*k);fx.follow(endVec)}}
       const {x,y,z}=endVec
+      fx.bait(method==='路亚'&&!flying?endVec:undefined)
       // 鱼线：竿梢到入水点的下垂弧，角力时绷直、随拉力抖动
       const sag=fight?.05*(1-engine.tension):.45,shake=fight?Math.sin(clock*40)*.03*engine.tension:0
       const end=endVec
@@ -274,12 +283,20 @@ export function createFishing(host:Host,verify:boolean){
       if(!flying&&['wait','retrieve','approach','nibble','hit','fight'].includes(st)){
         const p=host.position(),k=method==='台钓'?.55:.5
         camGoal.set(p.x+(x-p.x)*k,y+5.5,p.z+(z-p.z)*k)
-        host.camera.position.lerp(camGoal,Math.min(1,dt*3));host.camera.lookAt(x,y,z)}}
+        // 行走相机每帧都会把镜头放回角色身后，所以这里按自己的混合度在「跟随位」和「看水位」之间插值，
+        // 不能拿上一帧的镜头去 lerp（那会每帧来回跳，看起来像人在抽搐）；第一人称不接管镜头。
+        if(!firstPerson()){camBlend=Math.min(1,camBlend+dt*1.6);const e=camBlend*camBlend*(3-2*camBlend)
+          camLook.copy(host.camera.position).addScaledVector(camFwd.set(0,0,-1).applyQuaternion(host.camera.quaternion),10)
+          host.camera.position.lerp(camGoal,e);camLook.lerp(endVec,e);host.camera.lookAt(camLook)}}
+      else camBlend=Math.max(0,camBlend-dt*2)}
+      else camBlend=0
+    // 抛竿后走开超过 1.5 m：自动收线（不把人钉在原地）
+    if(castFrom&&!terminal.includes(engine.stage)){const p=host.position();if(Math.hypot(p.x-castFrom.x,p.z-castFrom.z)>1.5){const lost=engine.stage==='fight';castFrom=undefined;fx.clear();flying=false;line.visible=float.visible=false;origin=undefined;engine.cancel();engine.equip();toast(lost?'走开了 · 鱼跑了':'走动了 · 已收线','dim')}}
     if(engine.stage==='fight'){
       ffFill.style.transform=`scaleX(${engine.tension.toFixed(3)})`;ffMark.style.left=`${(engine.tension*100).toFixed(1)}%`
       fightBox.classList.toggle('red',engine.tension>=.85);fightBox.classList.toggle('slack',engine.tension<=.1);fightBox.classList.toggle('surge',fightSurge)
       ffDist.textContent=`距岸 ${Math.max(0,engine.distance).toFixed(1)} m`;ffStam.textContent=`鱼体力 ${Math.round(engine.stamina*100)}%`
-      hint.textContent=fightSurge?'鱼在冲，松开放线':engine.tension>=.85?'拉力太大，快松线':engine.tension<=.1?'线太松，按住收线':'按住收线，松开放线'}
+      hint.textContent=fightSurge?'鱼在冲，松开放线':engine.tension>=.85?'拉力太大，快松线':engine.tension<=.1?`线太松，按住${coarse()?'':'空格'}收线`:`按住${coarse()?'':'空格'}收线，松开放线`}
   }
   const teleportToSpot=async(id:string,index=0)=>{const bank=waters.find(row=>row.id===id)?.banks[index];return !!bank&&await host.teleport(bank.x,bank.z,bank.yaw)}
   Object.assign(window,{fishing:{waters,journal,profile:certification,inspect,state:()=>({stage:engine.stage,phase:chargeStart!==null?'charge':engine.stage,distance:engine.distance,stamina:engine.stamina,direction:engine.direction,tension:engine.tension,method,spot:spot()?.id,inventory:structuredClone(inventory())}),

@@ -1,6 +1,8 @@
 import type {CameraBody, VideoPreset} from './cameras'
 import {MP4_MIMES} from './cameras'
 import {download, stamp} from './capture'
+import {addFrameTap} from './frame-tap'
+import {withWebmDuration} from './webm-duration'
 
 // 录像（IDOK-182 / IDOK-211）：canvas.captureStream + MediaRecorder，容器固定 MP4。
 // 浏览器真能编 MP4（探针为准）就落 .mp4，否则退回 WebM，并在返回值里说明真实容器。
@@ -14,6 +16,8 @@ export interface RecordingResult {
   height: number
   fps: number
   preset: string
+  /** 真正从渲染循环拷进来的帧数；0 说明整段都没渲染（后台标签页 / 渲染停摆），片子只能是黑的。 */
+  frames: number
 }
 
 export interface Recording {
@@ -46,20 +50,15 @@ export function canRecord(canvas: HTMLCanvasElement): boolean {
  * 注意别用 64×36 这类小画布试：小尺寸下编码器经常什么都不出，会把能出 MP4 的机器误判掉；
  * 反过来 320×180 能出、1280×720 一个字节也不出（软渲染现场复现），尺寸必须贴近真实出片。
  */
-let mp4Capable: boolean | null = null
-async function probeMp4(): Promise<boolean> {
-  if (mp4Capable !== null) return mp4Capable
-  const mime = pickMime(MP4_MIMES)
-  if (!mime) {
-    mp4Capable = false
-    return false
-  }
+let mp4Mime: string | null | undefined
+async function probeOne(mime: string): Promise<boolean> {
   const canvas = document.createElement('canvas')
   canvas.width = 1280
   canvas.height = 720
   const context = canvas.getContext('2d')!
   const stream = canvas.captureStream(30)
   const chunks: Blob[] = []
+  let ok = false
   try {
     const recorder = new MediaRecorder(stream, {mimeType: mime, videoBitsPerSecond: 4000000})
     recorder.ondataavailable = event => {
@@ -84,12 +83,27 @@ async function probeMp4(): Promise<boolean> {
         recorder.stop()
       })
     }
-    mp4Capable = chunks.length > 0
+    ok = chunks.length > 0
   } catch {
-    mp4Capable = false
+    ok = false
   }
   stream.getTracks().forEach(track => track.stop())
-  return mp4Capable
+  return ok
+}
+
+/** 按顺序试每个 MP4 候选，第一个真吐数据的就是本机的 MP4 mime；都不行返回 null（走 WebM）。结果缓存。 */
+async function probeMp4(): Promise<string | null> {
+  if (mp4Mime !== undefined) return mp4Mime
+  mp4Mime = null
+  if (typeof MediaRecorder === 'undefined') return null
+  for (const mime of MP4_MIMES) {
+    if (!MediaRecorder.isTypeSupported(mime)) continue
+    if (await probeOne(mime)) {
+      mp4Mime = mime
+      break
+    }
+  }
+  return mp4Mime
 }
 
 /**
@@ -99,10 +113,10 @@ async function probeMp4(): Promise<boolean> {
  */
 export async function startRecording(source: HTMLCanvasElement, body: CameraBody, preset: VideoPreset): Promise<Recording | null> {
   if (!canRecord(source)) return null
-  const mp4Mime = (await probeMp4()) ? pickMime(MP4_MIMES) : null
-  const mime = mp4Mime ?? pickMime(WEBM_FALLBACK)
+  const mp4 = await probeMp4()
+  const mime = mp4 ?? pickMime(WEBM_FALLBACK)
   if (!mime) return null
-  const actual: 'mp4' | 'webm' = mp4Mime ? 'mp4' : 'webm'
+  const actual: 'mp4' | 'webm' = mp4 ? 'mp4' : 'webm'
 
   // 保持源画面比例（手机横屏是 2.16:1，硬拉成 16:9 会变形），长边取 min(档位长边, 源长边)。
   const scale = Math.min(1, Math.max(preset.width, preset.height) / Math.max(source.width, source.height, 1))
@@ -126,18 +140,31 @@ export async function startRecording(source: HTMLCanvasElement, body: CameraBody
     if (event.data.size > 0) chunks.push(event.data)
   }
 
-  // 出帧走 setInterval 而不是 requestAnimationFrame：rAF 在后台标签页、软渲染（swiftshader）
-  // 或主线程被长任务占住时会停摆，中间画布一帧都拿不到，MediaRecorder 最后吐出 0 字节。
-  // 定时器按录制帧率跑，最差情况只是重复同一帧，至少不会空录。
-  const draw = () => {
-    try {
-      scratch.drawImage(source, 0, 0, width, height)
-    } catch {
-      // 源 canvas 尺寸为 0 的瞬间（切场景/重建）跳过这一帧
-    }
-  }
-  draw()
-  const timer = setInterval(draw, 1000 / Math.max(1, fps))
+  // 抓帧（IDOK-383 全黑的根因）：主渲染器没开 preserveDrawingBuffer，WebGL 画布 present 之后
+  // drawing buffer 就被清掉，原来在 setInterval 里 drawImage 抓到的全是空 buffer → 整段黑。
+  // 现在由渲染循环在 renderer.render 刚结束、同一个任务里回调（frame-tap.ts），这时 buffer 一定有画面。
+  // 照相模式的滤镜是画布上的 CSS filter，屏幕上看得到，录像也要带上：同一串 filter 交给 2D context。
+  // 高刷屏（120/144 Hz）上渲染比录制帧率快，多拷的帧 captureStream 也会丢掉：按录制帧率节流（留 2 ms 抖动余量）。
+  const frameMs = 1000 / Math.max(1, fps)
+  let frames = 0, lastTap = 0
+  const untap = addFrameTap(canvas => {
+    if (canvas !== source || !canvas.width || !canvas.height) return
+    if (frames && performance.now() - lastTap < frameMs - 2) return
+    const filter = source.style.filter || 'none'
+    if (scratch.filter !== filter) scratch.filter = filter
+    scratch.drawImage(source, 0, 0, width, height)
+    frames++
+    lastTap = performance.now()
+  })
+
+  // 保底：rAF 停摆（后台标签页、软渲染长帧、主线程被占）时 captureStream 收不到新帧，
+  // 编码器可能一段都不吐（IDOK-215 的 0 字节）。这时把中间画布自己再画一遍（重复上一帧），
+  // 绝不在循环外读 WebGL 画布。自绘前关掉 filter，不然滤镜会叠一层又一层。
+  const timer = setInterval(() => {
+    if (!frames || performance.now() - lastTap < frameMs * 1.5) return
+    scratch.filter = 'none'
+    scratch.drawImage(stage, 0, 0)
+  }, frameMs)
 
   const started = performance.now()
   recorder.start(500)
@@ -157,6 +184,7 @@ export async function startRecording(source: HTMLCanvasElement, body: CameraBody
       if (!settled) {
         settled = true
         clearInterval(timer)
+        untap()
         // 有些编码器（headless swiftshader、低码率小画面）收尾时不会自己再触发一次
         // dataavailable，直接 stop 会拿到 0 字节的 blob。先 requestData 把尾包挤出来。
         try {
@@ -176,8 +204,9 @@ export async function startRecording(source: HTMLCanvasElement, body: CameraBody
         stream.getTracks().forEach(track => track.stop())
       }
       const type = recorder.mimeType || mime
+      const raw = new Blob(chunks, {type})
       return {
-        blob: new Blob(chunks, {type}),
+        blob: actual === 'webm' && frames ? await withWebmDuration(raw, seconds * 1000) : raw,
         mime: type,
         container: actual,
         seconds,
@@ -185,17 +214,29 @@ export async function startRecording(source: HTMLCanvasElement, body: CameraBody
         height,
         fps,
         preset: preset.label,
+        frames,
       }
     },
   }
 }
 
+/** 短于这个时长的片子当失败处理：多半是刚点开就停，或者编码器只吐了个文件头。 */
+export const MIN_CLIP_SECONDS = 0.5
+
 /**
- * 存盘。编码器一帧都没吐（0 字节 blob）时返回 null —— 别把空文件写进用户下载目录，
- * 调用方应该提示"这台机器录不出来"。
+ * 这段录像能不能用。返回给用户看的失败原因，能用返回 null。
+ * 空 blob、过短、整段没抓到一帧（片子只会是黑的）都算失败 —— 别把坏文件写进用户下载目录。
  */
+export function recordingProblem(result: RecordingResult): string | null {
+  if (!result.frames) return '录像没抓到画面（页面在后台或画面停住了），回到游戏画面再录'
+  if (!result.blob.size) return '这台机器录不出画面（浏览器编码器没有输出），换个浏览器再试'
+  if (result.seconds < MIN_CLIP_SECONDS) return '录像太短，没有保存（至少录 1 秒）'
+  return null
+}
+
+/** 存盘。`recordingProblem` 不为空时返回 null，不落盘。 */
 export function saveRecording(result: RecordingResult, prefix = 'glol-clip'): string | null {
-  if (!result.blob.size) return null
+  if (recordingProblem(result)) return null
   const name = `${prefix}-${stamp()}.${result.container}`
   download(result.blob, name)
   return name

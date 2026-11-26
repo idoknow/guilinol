@@ -15,6 +15,8 @@ import {
   type RenderRangeMetrics,
 } from './render-range'
 import {detail, type Manifest, type Tile} from './world'
+import {buildingGeometry, type Building} from './buildings'
+import {ensureShardForTile, hasShardForTile, releaseUnusedShards, shardKeyForTile} from './city-upgrade/state'
 import {registerTunnels} from './tunnels'
 import {freezeStatic} from './static-freeze'
 
@@ -47,6 +49,7 @@ export class Stream {
   private priorityUntil = 0
   private lastPosition = new THREE.Vector3(Infinity,0,0)
   private queue:Tile[]=[]
+  get queuedTiles(){return this.queue.length}
   private queueIsInner=false
   private innerPending = new Set<Tile>()
 
@@ -266,5 +269,50 @@ export class Stream {
       buildingFarLod:metrics.buildingFarLod,
       streetRadius:metrics.streetRadius,
     })
+  }
+
+  activeCityUpgradeShardKeys():Set<string>{
+    const keys=new Set<string>()
+    for(const tile of this.loaded.keys()){
+      if(hasShardForTile(tile.x,tile.z))keys.add(shardKeyForTile(tile.x,tile.z))
+    }
+    return keys
+  }
+
+  pruneCityUpgradeShards():Set<string>{
+    const active=this.activeCityUpgradeShardKeys()
+    const keep=new Set(active)
+    for(const tile of this.pending.keys()){
+      if(hasShardForTile(tile.x,tile.z))keep.add(shardKeyForTile(tile.x,tile.z))
+    }
+    releaseUnusedShards(keep)
+    return active
+  }
+
+  async ensureCityUpgradeForLoaded():Promise<void>{
+    const keys=this.activeCityUpgradeShardKeys()
+    if(!keys.size)return
+    await Promise.all(Array.from(this.loaded.keys()).map(tile=>ensureShardForTile(tile.x,tile.z)))
+  }
+
+  rebuildCityUpgradeTiles():number{
+    let changed=0
+    for(const [tile,item] of this.loaded){
+      const raw=item.cityUpgradeRaw
+      if(!raw)continue
+      const nextRings=raw.origRings.map(b=>[...b] as Building)
+      const nextWalls=buildingGeometry(raw.positions,raw.normals,raw.indices,nextRings,tile.x,tile.z)
+      let nextMaxY=item.batch.maxY
+      for(const [,topLevel] of nextRings)if(topLevel/10+8>nextMaxY)nextMaxY=topLevel/10+8
+      item.rings=nextRings
+      this.batches.replaceWalls(tile,nextWalls,nextMaxY)
+      changed++
+    }
+    this.batches.invalidateFurniture()
+    if(changed){
+      this.revision++
+    }
+    if(Number.isFinite(this.lastPosition.x))this.updateBatches(this.lastPosition)
+    return changed
   }
 }

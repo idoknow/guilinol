@@ -1,5 +1,3 @@
-import {oauthStart,oauthCallback,directDecision} from '../../lib/oauth'
-import {migration,allowLegacy,providers,schedule} from '../../lib/social-policy'
 import {type SessionAccount,type Env,checkBan,sessionAccount,Problem,cookie,deliver,equal,hash,invalid,lifetime,limit,newCode,now,passwordHash,random,requestIp,reserveMail,sessionHash,unauthorized} from '../../lib/auth'
 
 import {AVATAR_KEY, looks, sanitizeAvatar, starterOutfit} from '../../lib/avatar'
@@ -20,7 +18,7 @@ function password(value:unknown) {
   if(typeof value!=='string'||value.length<8||value.length>256) invalid()
   return value
 }
-const methods:Record<string,string[]>={'rt/ticket':['POST'],health:['GET'],'auth/me':['GET'],'me/avatar':['GET','PUT'],me:['GET','PATCH'],...Object.fromEntries(['register','resend','verify','reset','login','logout','social/start'].map(name=>[`auth/${name}`,['POST']])),'auth/oauth/start':['POST'],'auth/oauth/qq/callback':['GET'],'auth/oauth/wx/callback':['GET'],'auth/social/callback':['GET'],'auth/social/pending':['GET'],'auth/social/confirm':['POST'],'auth/social/config':['GET'],'auth/social/register':['POST'],'auth/email/bind':['POST']}
+const methods:Record<string,string[]>={'rt/ticket':['POST'],health:['GET'],'auth/me':['GET'],'me/avatar':['GET','PUT'],me:['GET','PATCH'],...Object.fromEntries(['register','resend','verify','reset','login','logout','social/start'].map(name=>[`auth/${name}`,['POST']])),'auth/social/callback':['GET'],'auth/social/pending':['GET'],'auth/social/confirm':['POST'],'auth/social/config':['GET'],'auth/social/register':['POST'],'auth/email/bind':['POST']}
 
 async function handle(request:Request,env:Env) {
   const url=new URL(request.url), path=url.pathname.slice(5), method=request.method, db=env.DB
@@ -30,6 +28,15 @@ async function handle(request:Request,env:Env) {
   if(env.updateCards && /^(?:admin\/)?updates(?:\/|$)/.test(path)) return env.updateCards(request,path)
   if(/^(feedback|bridge|admin)(\/|$)/.test(path)) return feedback(request,env,path)
   if(path==='me/save')return cloudSave(request,env)
+  if(env.fishing && path==='fishing/boards' && method==='GET'){
+    const boards=await env.fishing.boards(url.searchParams.get('zone'));if(!boards)invalid();return json(boards)
+  }
+  if(env.fishing && path==='fishing/catch' && method==='POST'){
+    if(request.headers.get('Origin')!==url.origin)throw new Problem(403,'origin','请求来源不符')
+    const account=await sessionAccount(db,await sessionHash(request));if(!account)unauthorized()
+    if(request.headers.get('X-Fishing-Owner') && request.headers.get('X-Fishing-Owner')!==account.id)unauthorized()
+    return json(await env.fishing.record(account.id,await request.json().catch(()=>null)))
+  }
   if(path.startsWith('citizen/'))return citizen(request,env,path)
   if(!Object.hasOwn(methods,path)) throw new Problem(404,'not_found','接口不存在')
   if(!methods[path].includes(method)) throw new Problem(405,'method','不支持的请求方式')
@@ -40,19 +47,16 @@ async function handle(request:Request,env:Env) {
     try { body=await request.json() } catch { invalid() }
     if(!body||typeof body!=='object'||Array.isArray(body)) invalid()
   }
-  if(path==='auth/oauth/start') return oauthStart(env,db,request,body)
-  if(path==='auth/oauth/qq/callback'||path==='auth/oauth/wx/callback') return oauthCallback(env,db,request,path==='auth/oauth/qq/callback'?'qq':'wx')
   if(path==='auth/social/callback') return socialCallback(env,db,request)
   if(path==='auth/social/config') return socialConfig(env)
   if(path==='auth/social/pending') return socialPending(env,db,request)
   if(path==='auth/social/register') return socialRegister(env,db,request,body)
-  if(path==='auth/social/confirm') return (await directDecision(env,db,request,body)) ?? socialConfirm(env,db,request)
+  if(path==='auth/social/confirm') return socialConfirm(env,db,request)
   if(path==='auth/email/bind') return bindEmail(env,db,request,body)
   if(path==='auth/social/start') {
     const type=body.type
     if(!isSocialType(type)) invalid()
     const intent=body.intent==='bind'?'bind':body.intent==='register'?'register':'login'
-    allowLegacy(env,intent)
     let userId:string|undefined
     if(intent==='bind') {
       const account=await sessionAccount(db,await sessionHash(request))
@@ -115,8 +119,8 @@ async function handle(request:Request,env:Env) {
     }
     if(!(await db.batch(writes))[0].meta.changes) unauthorized()
     // 带上已绑定的第三方平台，账号面板据此显示「已绑定」而不是还让用户去绑
-    const social=await userSocialIdentities(db,user.id,providers(env).length>0||schedule(env).phase!=='before')
-    return json({...profile(user),social,migration:migration(env,user,social)},200,cookie(request.headers.get('Cookie')!.match(/(?:^|;\s*)glol_session=([a-f0-9]{64})(?:;|$)/)![1]))
+    const social=await userSocialIdentities(db,user.id)
+    return json({...profile(user),social},200,cookie(request.headers.get('Cookie')!.match(/(?:^|;\s*)glol_session=([a-f0-9]{64})(?:;|$)/)![1]))
   }
   const email=typeof body.email==='string'?body.email.trim().toLowerCase():''
   if(email.length>254||!/^\S+@[^\s@]+\.[^\s@]+$/.test(email)||email.split('@').length!==2) invalid()

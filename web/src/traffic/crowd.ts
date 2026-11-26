@@ -1,5 +1,6 @@
 import {touchUi} from '../ui/input-mode'
 import {mainDetail} from '../look/mirror-layer'
+import {clampOutsideShizijieNoPedZone} from '../shizijie-zone.ts'
 import * as THREE from 'three'
 import {clone} from 'three/addons/utils/SkeletonUtils.js'
 import {browNames, eyeNames, faceNames, hairStyles, looks, type Avatar} from '../../../lib/avatar'
@@ -141,7 +142,11 @@ export function crowd(scene:THREE.Scene,camera:THREE.Camera,groundAt?:(x:number,
       proj.multiplyMatrices(camera.projectionMatrix,camera.matrixWorldInverse)
       frustum.setFromProjectionMatrix(proj)
       for(const [walker,view] of active){
-        const tx=walker.x+Math.sin(walker.yaw)*walker.speed*lag,tz=walker.z+Math.cos(walker.yaw)*walker.speed*lag
+        const [tx,tz]=clampOutsideShizijieNoPedZone(
+          walker.x+Math.sin(walker.yaw)*walker.speed*lag,
+          walker.z+Math.cos(walker.yaw)*walker.speed*lag,
+          .25,
+        )
         const pos=view.root.position
         if(!view.placed){pos.set(tx,walker.y,tz);view.root.rotation.y=walker.yaw+Math.PI;view.placed=true}
         else{
