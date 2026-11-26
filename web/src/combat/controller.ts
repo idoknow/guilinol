@@ -21,6 +21,7 @@ interface Host {
   onDown: () => void
   align: (p: Player) => boolean
 }
+const touch = matchMedia('(pointer:coarse) and (not (any-pointer:fine))').matches
 export function combatController(h: Host) {
   const f = new Fighter(),
     ui = hud(),
@@ -194,7 +195,7 @@ export function combatController(h: Host) {
     }
     const p = nearest(),
       prompt =
-        f.down || !p || !h.allowed() ? '' : p.helper && p.helper !== selfId ? '正在被救援' : '长按 E 救援'
+        f.down || !p || !h.allowed() ? '' : p.helper && p.helper !== selfId ? '正在被救援' : touch ? '按住「扶」救援' : '长按 E 救援'
     if (prompt && p) {
       screen.set(p.x, p.y + 1.6, p.z).project(h.camera)
       ui.tip.style.left = ((1 + screen.x) * innerWidth) / 2 + 'px'

@@ -76,12 +76,12 @@ export function combat(players, broadcast) {
       target.helper = p.id
       target.updated = at
       p.helping = target.id
-      p.alignment = {
-        x: target.x - 0.6 * Math.sin(target.yaw ?? 0),
-        y: p.y,
-        z: target.z - 0.6 * Math.cos(target.yaw ?? 0),
-        until: at + 250,
-      }
+      // 施救者站位：倒地者肩侧（前 0.35 m、侧 0.55 m，左右两侧任选），其次正前 0.6 m；客户端挑一个能站的
+      const yaw = target.yaw ?? 0,
+        fx = -Math.sin(yaw),
+        fz = -Math.cos(yaw),
+        spot = (f, s) => ({ x: target.x + fx * f + fz * s, y: p.y, z: target.z + fz * f - fx * s })
+      p.alignment = { spots: [spot(0.35, 0.55), spot(0.35, -0.55), spot(0.6, 0)], until: at + 250 }
       p.origin = { x: p.x, y: p.y, z: p.z }
       changed(target, at)
       return
@@ -139,7 +139,11 @@ export function combat(players, broadcast) {
           continue
         }
         const helper = players.get(p.helper)
-        if (helper?.alignment && at <= helper.alignment.until && distance(helper, helper.alignment) < 0.2) {
+        if (
+          helper?.alignment &&
+          at <= helper.alignment.until &&
+          helper.alignment.spots.some((spot) => distance(helper, spot) < 0.2)
+        ) {
           helper.origin = { x: helper.x, y: helper.y, z: helper.z }
           helper.alignment = null
         }
