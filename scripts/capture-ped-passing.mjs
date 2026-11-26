@@ -15,6 +15,7 @@ try{
   await page.evaluate(async trace=>{
     const THREE=await import('/@id/three'),{crowd}=await import('/src/traffic/crowd.ts')
     const scene=new THREE.Scene(),camera=new THREE.PerspectiveCamera(37,1.5,.05,50),renderer=new THREE.WebGLRenderer({antialias:true,preserveDrawingBuffer:true})
+    camera.layers.enableAll()
     renderer.setSize(720,480);document.body.append(renderer.domElement);scene.background=new THREE.Color(0xc9d5db)
     const [first,last]=trace[0],midX=(first.x+last.x)/2,midZ=(first.z+last.z)/2
     const angle=Math.atan2(last.x-first.x,last.z-first.z)
