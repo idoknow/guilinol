@@ -136,13 +136,23 @@ if (vRoof < .5) {
       col = mix(col, skyRefl, spGlass * dayRefl);
     }
 
-    // Night per-window randomized warm amber (70%) / cool TV-office (30%) interior glow + bright ground shops
-    float litProb = isGroundShop ? 0.92 : (0.46 + 0.32 * bldgHash);
-    float isLit = step(1.0 - litProb, unitHash);
+    // Night per-window randomized warm amber (70%) / cool TV-office (30%) interior glow
+    // + varied ground-shop showcase warmth & brightness (avoids uniform bright-white strips)
+    float shopOpen = step(0.18, fract(unitHash * 13.7 + bldgHash * 3.1));
+    float litProb = isGroundShop ? 1.0 : (0.46 + 0.32 * bldgHash);
+    float isLit = isGroundShop ? mix(0.20, 1.0, shopOpen) : step(1.0 - litProb, unitHash);
+    float shopTone = fract(unitHash * 19.3 + bldgHash * 5.7);
+    vec3 shopWarmAmber = vec3(1.0, 0.77, 0.45);
+    vec3 shopWarmIvory = vec3(1.0, 0.89, 0.69);
+    vec3 shopCoolStore = vec3(0.84, 0.93, 1.0);
+    vec3 shopTint = shopTone < 0.42
+      ? mix(shopWarmAmber, shopWarmIvory, shopTone / 0.42)
+      : (shopTone < 0.78 ? shopWarmIvory : shopCoolStore);
     vec3 roomTint = isGroundShop
-      ? vec3(1.0, 0.87, 0.64)
+      ? shopTint
       : mix(vec3(1.0, 0.76, 0.42), vec3(0.68, 0.86, 1.0), step(0.70, fract(unitHash * 17.3)));
-    float roomPower = isGroundShop ? 2.25 : (1.55 + 0.95 * fract(unitHash * 7.1));
+    float shopPower = mix(1.18, 2.02, fract(unitHash * 7.9 + bldgHash * 2.3));
+    float roomPower = isGroundShop ? shopPower : (1.55 + 0.95 * fract(unitHash * 7.1));
     spExtraEmissive += roomTint * props.g * isLit * roomPower * uWindowLight;
 
     diffuseColor.rgb = col;
