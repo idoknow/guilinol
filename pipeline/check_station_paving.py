@@ -19,7 +19,7 @@ from station_site import footprints
 ROOT = Path(__file__).resolve().parents[1]
 
 
-def compare(reference, candidate, reference_source=None):
+def compare(reference, candidate, reference_source=None, renderer_source=None):
     worlds = [reference.resolve(), candidate.resolve()]
     manifests = [json.loads((w / "manifest.json").read_bytes()) for w in worlds]
     halls = [next(l for l in m["landmarks"] if l["id"] == "guilin_station") for m in manifests]
@@ -43,7 +43,9 @@ def compare(reference, candidate, reference_source=None):
                         for mask in areas.values())]
         scope = Path(temp) / "station-tiles.json"
         scope.write_text(json.dumps(tiles))
-        command.extend([reference_source.resolve() if reference_source else "", scope])
+        first = reference_source or renderer_source
+        command.extend([first.resolve() if first else "", scope,
+                        renderer_source.resolve() if renderer_source else ""])
         result = json.loads(subprocess.check_output(command, cwd=ROOT))
     # A separately rendered elevated slab can cross a fixed road in plan.
     # Its own bridge/approach audit checks it. Native unowned pavement is
@@ -69,7 +71,8 @@ if __name__ == "__main__":
     parser.add_argument("reference", type=Path)
     parser.add_argument("candidate", type=Path)
     parser.add_argument("--reference-source", type=Path, help="Checkout with the renderer that shipped the reference world")
+    parser.add_argument("--renderer-source", type=Path, help="Use this renderer checkout for both packages")
     args = parser.parse_args()
-    report = compare(args.reference, args.candidate, args.reference_source)
+    report = compare(args.reference, args.candidate, args.reference_source, args.renderer_source)
     print(json.dumps(report, indent=2))
     raise SystemExit(bool(report["stationHallChanged"] or report["buildingMeshChanges"] or report["pavementChanges"]))

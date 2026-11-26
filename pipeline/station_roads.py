@@ -210,6 +210,8 @@ def bake(directory, manifest, paired_widths):
             final_traffic_ways.extend(bridges)
     from platform_grades import mark_platform_grades
     mark_platform_grades(directory, manifest, ways, sections)
+    from curb_returns import apply as fit_curb_returns
+    fit_curb_returns(manifest, sections)
     return final_traffic_ways
 
 

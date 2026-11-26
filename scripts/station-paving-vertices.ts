@@ -7,9 +7,12 @@ import {tileFaces} from './dingjiang-visible-surfaces'
 
 import {nearbyTunnels} from '../web/src/station-tunnels'
 
-const [reference, candidate, referenceSource, scopeFile] = process.argv.slice(2)
+const [reference, candidate, referenceSource, scopeFile, candidateSource] = process.argv.slice(2)
 const openingFaces: typeof tileFaces = referenceSource
   ? (await import(pathToFileURL(path.resolve(referenceSource, 'scripts/dingjiang-visible-surfaces.ts')).href)).tileFaces
+  : tileFaces
+const candidateFaces: typeof tileFaces = candidateSource
+  ? (await import(pathToFileURL(path.resolve(candidateSource, 'scripts/dingjiang-visible-surfaces.ts')).href)).tileFaces
   : tileFaces
 const scope = scopeFile ? new Set<string>(JSON.parse(fs.readFileSync(scopeFile, 'utf8'))) : undefined
 const worlds = [reference, candidate]
@@ -35,7 +38,7 @@ for (const file of new Set([...tiles[0].keys(), ...tiles[1].keys()])) {
   if (!inScope) continue
   const sets = worlds.map((world, i) => {
     const keys = new Set<string>()
-    const render = i === 0 ? openingFaces : tileFaces
+    const render = i === 0 ? openingFaces : candidateFaces
     render(world, pair[i], manifests[i].tunnels, (face, role, owner) => {
       if (!role.startsWith('paving-') && role !== 'graded-floor') return
       for (const vertex of face) keys.add(JSON.stringify([role, owner ?? 0, ...vertex]))

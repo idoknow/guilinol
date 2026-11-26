@@ -2,6 +2,7 @@
 // Run from the repo root: tsx scripts/audit-rail-section.ts BASE WORLD DESIGN.json
 import assert from 'node:assert/strict'
 import fs from 'node:fs'
+import { execFileSync } from 'node:child_process'
 import path from 'node:path'
 import { ll2xz } from '../lib/projection'
 import { visibleSurfaces } from './dingjiang-visible-surfaces'
@@ -21,7 +22,16 @@ for (const group of Object.values(design.priorRoadProfiles ?? {})) {
     const axis = way.geometry.map(p => ll2xz(p.lat, p.lon))
     let offset = 0
     for (let i = 1; i <= origin; i++) offset += Math.hypot(axis[i].x-axis[i-1].x, axis[i].z-axis[i-1].z)
-    roads.push({way: Number(key), controls: segment.controls.map(([s,h]) => [s+offset,h])})
+    const controls = segment.controls.map(([s,h]) => [s+offset,h])
+    if (segment.pavingNodes) {
+      for (const [index,node] of segment.pavingNodes.entries()) {
+        const n=way.nodes.indexOf(node)
+        assert(n>=0, 'Missing paving boundary node '+node)
+        const chain=axis.slice(1,n+1).reduce((a,p,i)=>a+Math.hypot(p.x-axis[i].x,p.z-axis[i].z),0)
+        assert(Math.abs(chain-controls[index?controls.length-1:0][0])<.0001, 'Paving boundary differs from profile')
+      }
+    }
+    roads.push({way:Number(key), controls, boundaryNodes:segment.pavingNodes})
   }
 }
 const ids = new Set<number>(roads.map((r) => r.way))
@@ -220,7 +230,20 @@ assert(
     (r) => r.samples && !r.directionErrors && r.maximumGrade <= r.limit + 1e-6 && !r.regressions,
   ),
 )
-assert(reverse.every((r) => r.checked && !r.violations))
+if (carriagewayReverse) {
+  assert(carriagewayReverse.every(r => r.checked && !r.violations), 'Intrusion inside carriageway')
+  for (const r of reverse) {
+    // Outside the driving strip the native pavement carries its own curb
+    // reveal. Keep the wider survey for terrain, ballast and bridge clearance.
+    assert(r.checked && !r.externalBridgeViolations && !r.railBedIntrusions)
+    assert(Object.keys(r.byRole).every(role => /^paving-[01236]$/.test(role)),
+      'Non-pavement intrusion in road margin on ' + r.way)
+  }
+  execFileSync(process.execPath, [path.resolve('node_modules/tsx/dist/cli.mjs'),
+    'scripts/check-station-curb-returns.ts', base, candidate])
+} else {
+  assert(reverse.every(r => r.checked && !r.violations))
+}
 for (const way of coveredCrossings) {
   assert(reverse.find(r => r.way === way)?.minimumRailBedClearanceM != null, 'Missing rail bed above bore ' + way)
 }

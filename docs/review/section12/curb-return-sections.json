@@ -1,0 +1,1319 @@
+[
+  {
+    "way": 169505553,
+    "node": 2457187867,
+    "side": -1,
+    "samples": 400,
+    "missing": 0,
+    "maxRevealError": 0.007718062691310479,
+    "maxGrade": 0.023699453198446463,
+    "maxInheritedGrade": 0.017475797363999845,
+    "gradeViolations": 0,
+    "worstGrade": null,
+    "sections": [
+      {
+        "along": -0.02,
+        "worst": {
+          "offset": -6.1,
+          "reference": 0.0006481551791353013,
+          "candidate": -0.0028978193407454,
+          "error": 0.0035459745198807013
+        }
+      },
+      {
+        "along": 0.02,
+        "worst": {
+          "offset": -6.15,
+          "reference": 0.0006061845425904266,
+          "candidate": -0.002953035473211685,
+          "error": 0.0035592200158021114
+        }
+      },
+      {
+        "along": 0.25,
+        "worst": {
+          "offset": -6.15,
+          "reference": 0.0004596989709000354,
+          "candidate": -0.0029846077133299787,
+          "error": 0.003444306684230014
+        }
+      },
+      {
+        "along": 0.5,
+        "worst": {
+          "offset": -6.2,
+          "reference": 0.0004901904231644494,
+          "candidate": -0.002640626916814881,
+          "error": 0.0031308173399793304
+        }
+      },
+      {
+        "along": 1,
+        "worst": {
+          "offset": -6.3,
+          "reference": 0.0006327200325983995,
+          "candidate": -0.0012512877398762612,
+          "error": 0.0018840077724746607
+        }
+      },
+      {
+        "along": 1.5,
+        "worst": {
+          "offset": -5.05,
+          "reference": 0.0007330367087092782,
+          "candidate": 0.002886937363399511,
+          "error": 0.002153900654690233
+        }
+      },
+      {
+        "along": 2,
+        "worst": {
+          "offset": -5.05,
+          "reference": 0.0011174725522096196,
+          "candidate": 0.00558238193661964,
+          "error": 0.004464909384410021
+        }
+      },
+      {
+        "along": 2.5,
+        "worst": {
+          "offset": -5.05,
+          "reference": 0.008667820911597346,
+          "candidate": 0.009370309157191059,
+          "error": 0.0007024882455937131
+        }
+      },
+      {
+        "along": 3,
+        "worst": {
+          "offset": -6.4,
+          "reference": 0.016222694253116288,
+          "candidate": 0.018324648605869243,
+          "error": 0.002101954352752955
+        }
+      },
+      {
+        "along": 3.5,
+        "worst": {
+          "offset": -6.3,
+          "reference": 0.023699400139037152,
+          "candidate": 0.02877585004472394,
+          "error": 0.005076449905686786
+        }
+      },
+      {
+        "along": 4,
+        "worst": {
+          "offset": -6.2,
+          "reference": 0.03240954003089769,
+          "candidate": 0.04012760272220817,
+          "error": 0.007718062691310479
+        }
+      }
+    ]
+  },
+  {
+    "way": 169505553,
+    "node": 2457187867,
+    "side": 1,
+    "samples": 357,
+    "missing": 0,
+    "maxRevealError": 0.007344772862865057,
+    "maxGrade": 0.02065117047993681,
+    "maxInheritedGrade": 0.01750371677877638,
+    "gradeViolations": 0,
+    "worstGrade": null,
+    "sections": [
+      {
+        "along": -0.02,
+        "worst": {
+          "offset": 6.9,
+          "reference": -0.0016725755492075223,
+          "candidate": -0.006326083435027385,
+          "error": 0.004653507885819863
+        }
+      },
+      {
+        "along": 0.02,
+        "worst": {
+          "offset": 6.9,
+          "reference": -0.001715243175993919,
+          "candidate": -0.0063826381325498005,
+          "error": 0.0046673949565558814
+        }
+      },
+      {
+        "along": 0.25,
+        "worst": {
+          "offset": 6.8,
+          "reference": -0.001826905521312483,
+          "candidate": -0.005797130090684277,
+          "error": 0.003970224569371794
+        }
+      },
+      {
+        "along": 0.5,
+        "worst": {
+          "offset": 6.7,
+          "reference": -0.0017630136454727108,
+          "candidate": -0.004894598965620389,
+          "error": 0.0031315853201476784
+        }
+      },
+      {
+        "along": 1,
+        "worst": {
+          "offset": 6.55,
+          "reference": -0.0015679617133628199,
+          "candidate": -0.0024626147697119904,
+          "error": 0.0008946530563491706
+        }
+      },
+      {
+        "along": 1.5,
+        "worst": {
+          "offset": 6.4,
+          "reference": -0.001418811554003696,
+          "candidate": 0.001274937828640077,
+          "error": 0.002693749382643773
+        }
+      },
+      {
+        "along": 2,
+        "worst": {
+          "offset": 6.25,
+          "reference": -0.0010259407494288553,
+          "candidate": 0.006318832113436201,
+          "error": 0.007344772862865057
+        }
+      },
+      {
+        "along": 2.5,
+        "worst": {
+          "offset": 6.1,
+          "reference": 0.006532842571090214,
+          "candidate": 0.012455209045583615,
+          "error": 0.005922366474493401
+        }
+      },
+      {
+        "along": 3,
+        "worst": {
+          "offset": 6,
+          "reference": 0.014076601623514762,
+          "candidate": 0.019564301602230216,
+          "error": 0.0054876999787154546
+        }
+      },
+      {
+        "along": 3.5,
+        "worst": {
+          "offset": 5.85,
+          "reference": 0.021634927802637094,
+          "candidate": 0.027754187610952386,
+          "error": 0.006119259808315292
+        }
+      },
+      {
+        "along": 4,
+        "worst": {
+          "offset": 5.7,
+          "reference": 0.03042686298300623,
+          "candidate": 0.0367911746764662,
+          "error": 0.0063643116934599675
+        }
+      }
+    ]
+  },
+  {
+    "way": 265411063,
+    "node": 6372238737,
+    "side": -1,
+    "samples": 0,
+    "missing": 0,
+    "maxRevealError": 0,
+    "maxGrade": 0,
+    "maxInheritedGrade": 0,
+    "gradeViolations": 0,
+    "worstGrade": null,
+    "sections": [
+      {
+        "along": -0.02,
+        "worst": null
+      },
+      {
+        "along": 0.02,
+        "worst": null
+      },
+      {
+        "along": 0.25,
+        "worst": null
+      },
+      {
+        "along": 0.5,
+        "worst": null
+      },
+      {
+        "along": 1,
+        "worst": null
+      },
+      {
+        "along": 1.5,
+        "worst": null
+      },
+      {
+        "along": 2,
+        "worst": null
+      },
+      {
+        "along": 2.5,
+        "worst": null
+      },
+      {
+        "along": 3,
+        "worst": null
+      },
+      {
+        "along": 3.5,
+        "worst": null
+      },
+      {
+        "along": 4,
+        "worst": null
+      }
+    ]
+  },
+  {
+    "way": 265411063,
+    "node": 6372238737,
+    "side": 1,
+    "samples": 440,
+    "missing": 0,
+    "maxRevealError": 0.0024858402838390248,
+    "maxGrade": 0.005381125717519808,
+    "maxInheritedGrade": 0.002079418499079111,
+    "gradeViolations": 0,
+    "worstGrade": null,
+    "sections": [
+      {
+        "along": -0.02,
+        "worst": {
+          "offset": 4.42701574610006,
+          "reference": 0.1771885649648084,
+          "candidate": 0.17705028262747646,
+          "error": 0.00013828233733192974
+        }
+      },
+      {
+        "along": 0.02,
+        "worst": {
+          "offset": 4.42701574610006,
+          "reference": 0.177111501147607,
+          "candidate": 0.17711150133240494,
+          "error": 1.8479795471648686e-10
+        }
+      },
+      {
+        "along": 0.25,
+        "worst": {
+          "offset": 4.42701574610006,
+          "reference": 0.17676750607878944,
+          "candidate": 0.17676750624195847,
+          "error": 1.631690338399494e-10
+        }
+      },
+      {
+        "along": 0.5,
+        "worst": {
+          "offset": 4.42701574610006,
+          "reference": 0.17639047534103725,
+          "candidate": 0.17639047548070153,
+          "error": 1.396642801410053e-10
+        }
+      },
+      {
+        "along": 1,
+        "worst": {
+          "offset": 4.42701574610006,
+          "reference": 0.17567156774083514,
+          "candidate": 0.17567156783351834,
+          "error": 9.268319445254747e-11
+        }
+      },
+      {
+        "along": 1.5,
+        "worst": {
+          "offset": 4.42701574610006,
+          "reference": 0.1749674378069983,
+          "candidate": 0.174967437852672,
+          "error": 4.567368705465924e-11
+        }
+      },
+      {
+        "along": 2,
+        "worst": {
+          "offset": 4.42701574610006,
+          "reference": 0.1742636252631371,
+          "candidate": 0.17426362526558137,
+          "error": 2.4442670110147446e-12
+        }
+      },
+      {
+        "along": 2.5,
+        "worst": {
+          "offset": 4.42701574610006,
+          "reference": 0.17415817447366067,
+          "candidate": 0.17415817447366067,
+          "error": 0
+        }
+      },
+      {
+        "along": 3,
+        "worst": {
+          "offset": 4.42701574610006,
+          "reference": 0.17394555140620582,
+          "candidate": 0.17394555140620582,
+          "error": 0
+        }
+      },
+      {
+        "along": 3.5,
+        "worst": {
+          "offset": 4.62701574610006,
+          "reference": 0.17377875131148812,
+          "candidate": 0.1735823663401277,
+          "error": 0.00019638497136043043
+        }
+      },
+      {
+        "along": 4,
+        "worst": {
+          "offset": 4.67701574610006,
+          "reference": 0.1734772648133287,
+          "candidate": 0.17099142452948968,
+          "error": 0.0024858402838390248
+        }
+      }
+    ]
+  },
+  {
+    "way": 265411063,
+    "node": 6372238738,
+    "side": -1,
+    "samples": 440,
+    "missing": 0,
+    "maxRevealError": 0.0003176283325103668,
+    "maxGrade": 0.005033171064638964,
+    "maxInheritedGrade": 0.004926029144769473,
+    "gradeViolations": 0,
+    "worstGrade": null,
+    "sections": [
+      {
+        "along": -0.02,
+        "worst": {
+          "offset": -5.32701574610006,
+          "reference": 0.11479906864099121,
+          "candidate": 0.11463412657903405,
+          "error": 0.00016494206195716288
+        }
+      },
+      {
+        "along": 0.02,
+        "worst": {
+          "offset": -5.32701574610006,
+          "reference": 0.11460202747520043,
+          "candidate": 0.11443279973644849,
+          "error": 0.00016922773875194252
+        }
+      },
+      {
+        "along": 0.25,
+        "worst": {
+          "offset": -5.32701574610006,
+          "reference": 0.11405780658824938,
+          "candidate": 0.11386471889139216,
+          "error": 0.00019308769685721927
+        }
+      },
+      {
+        "along": 0.5,
+        "worst": {
+          "offset": -5.32701574610006,
+          "reference": 0.11346626214586308,
+          "candidate": 0.11324723971196704,
+          "error": 0.00021902243389604337
+        }
+      },
+      {
+        "along": 1,
+        "worst": {
+          "offset": -5.32701574610006,
+          "reference": 0.11228317326114734,
+          "candidate": 0.11205898453042096,
+          "error": 0.00022418873072638235
+        }
+      },
+      {
+        "along": 1.5,
+        "worst": {
+          "offset": -4.42701574610006,
+          "reference": 0.11095258240993644,
+          "candidate": 0.1110754366299318,
+          "error": 0.00012285421999536084
+        }
+      },
+      {
+        "along": 2,
+        "worst": {
+          "offset": -4.42701574610006,
+          "reference": 0.1099567837190989,
+          "candidate": 0.11027441205160926,
+          "error": 0.0003176283325103668
+        }
+      },
+      {
+        "along": 2.5,
+        "worst": {
+          "offset": -5.32701574610006,
+          "reference": 0.11150639738025347,
+          "candidate": 0.11135056680299726,
+          "error": 0.00015583057725621074
+        }
+      },
+      {
+        "along": 3,
+        "worst": {
+          "offset": -5.32701574610006,
+          "reference": 0.11286870110421887,
+          "candidate": 0.11263536042795863,
+          "error": 0.0002333406762602408
+        }
+      },
+      {
+        "along": 3.5,
+        "worst": {
+          "offset": -5.32701574610006,
+          "reference": 0.11423100482812742,
+          "candidate": 0.11400298899562245,
+          "error": 0.0002280158325049797
+        }
+      },
+      {
+        "along": 4,
+        "worst": {
+          "offset": -5.32701574610006,
+          "reference": 0.11559330855209282,
+          "candidate": 0.11541879053035586,
+          "error": 0.00017451802173695796
+        }
+      }
+    ]
+  },
+  {
+    "way": 265411063,
+    "node": 6372238738,
+    "side": 1,
+    "samples": 0,
+    "missing": 0,
+    "maxRevealError": 0,
+    "maxGrade": 0,
+    "maxInheritedGrade": 0,
+    "gradeViolations": 0,
+    "worstGrade": null,
+    "sections": [
+      {
+        "along": -0.02,
+        "worst": null
+      },
+      {
+        "along": 0.02,
+        "worst": null
+      },
+      {
+        "along": 0.25,
+        "worst": null
+      },
+      {
+        "along": 0.5,
+        "worst": null
+      },
+      {
+        "along": 1,
+        "worst": null
+      },
+      {
+        "along": 1.5,
+        "worst": null
+      },
+      {
+        "along": 2,
+        "worst": null
+      },
+      {
+        "along": 2.5,
+        "worst": null
+      },
+      {
+        "along": 3,
+        "worst": null
+      },
+      {
+        "along": 3.5,
+        "worst": null
+      },
+      {
+        "along": 4,
+        "worst": null
+      }
+    ]
+  },
+  {
+    "way": 412456329,
+    "node": 6484104243,
+    "side": -1,
+    "samples": 438,
+    "missing": 0,
+    "maxRevealError": 0.0008714146980537407,
+    "maxGrade": 0.005958197378902241,
+    "maxInheritedGrade": 0.0054223593392066505,
+    "gradeViolations": 0,
+    "worstGrade": null,
+    "sections": [
+      {
+        "along": -0.02,
+        "worst": {
+          "offset": -5.05,
+          "reference": 0.03090613098603967,
+          "candidate": 0.03090262327611981,
+          "error": 0.0000035077099198588257
+        }
+      },
+      {
+        "along": 0.02,
+        "worst": {
+          "offset": -5.1,
+          "reference": 0.030935531563386576,
+          "candidate": 0.030935244832249964,
+          "error": 2.8673113661170646e-7
+        }
+      },
+      {
+        "along": 0.25,
+        "worst": {
+          "offset": -5.55,
+          "reference": 0.03151514661200849,
+          "candidate": 0.031209948537053833,
+          "error": 0.0003051980749546601
+        }
+      },
+      {
+        "along": 0.5,
+        "worst": {
+          "offset": -5.5,
+          "reference": 0.032020172973489025,
+          "candidate": 0.031934326378888045,
+          "error": 0.0000858465946009801
+        }
+      },
+      {
+        "along": 1,
+        "worst": {
+          "offset": -5.5,
+          "reference": 0.03306775453239652,
+          "candidate": 0.032892273063140465,
+          "error": 0.0001754814692560558
+        }
+      },
+      {
+        "along": 1.5,
+        "worst": {
+          "offset": -5.55,
+          "reference": 0.03405044577471017,
+          "candidate": 0.034294973140816865,
+          "error": 0.0002445273661066949
+        }
+      },
+      {
+        "along": 2,
+        "worst": {
+          "offset": -5.5,
+          "reference": 0.03518069655774525,
+          "candidate": 0.035718587007124825,
+          "error": 0.0005378904493795744
+        }
+      },
+      {
+        "along": 2.5,
+        "worst": {
+          "offset": -5.45,
+          "reference": 0.03784060709159576,
+          "candidate": 0.0375385921941529,
+          "error": 0.00030201489744285936
+        }
+      },
+      {
+        "along": 3,
+        "worst": {
+          "offset": -5.4,
+          "reference": 0.04044480253398319,
+          "candidate": 0.04021558754541843,
+          "error": 0.0002292149885647632
+        }
+      },
+      {
+        "along": 3.5,
+        "worst": {
+          "offset": -5.45,
+          "reference": 0.0431491585964352,
+          "candidate": 0.042731100841422176,
+          "error": 0.0004180577550130238
+        }
+      },
+      {
+        "along": 4,
+        "worst": {
+          "offset": -5.45,
+          "reference": 0.0457400309898901,
+          "candidate": 0.04486861629183636,
+          "error": 0.0008714146980537407
+        }
+      }
+    ]
+  },
+  {
+    "way": 412456329,
+    "node": 6484104243,
+    "side": 1,
+    "samples": 434,
+    "missing": 0,
+    "maxRevealError": 0.0009420664224251141,
+    "maxGrade": 0.30445897484275974,
+    "maxInheritedGrade": 0.30530360064210527,
+    "gradeViolations": 0,
+    "worstGrade": null,
+    "sections": [
+      {
+        "along": -0.02,
+        "worst": {
+          "offset": 5.75,
+          "reference": 0.03091004366871175,
+          "candidate": 0.03084364595150646,
+          "error": 0.00006639771720529097
+        }
+      },
+      {
+        "along": 0.02,
+        "worst": {
+          "offset": 5.75,
+          "reference": 0.030929873248680906,
+          "candidate": 0.03085980653287379,
+          "error": 0.00007006671580711554
+        }
+      },
+      {
+        "along": 0.25,
+        "worst": {
+          "offset": 5.75,
+          "reference": 0.03141498192144354,
+          "candidate": 0.031323818134325165,
+          "error": 0.0000911637871183757
+        }
+      },
+      {
+        "along": 0.5,
+        "worst": {
+          "offset": 6.55,
+          "reference": 0.002330740761749439,
+          "candidate": 0.0021867935477644096,
+          "error": 0.00014394721398502952
+        }
+      },
+      {
+        "along": 1,
+        "worst": {
+          "offset": 6.55,
+          "reference": 0.003371577487570221,
+          "candidate": 0.0031471560626812334,
+          "error": 0.00022442142488898753
+        }
+      },
+      {
+        "along": 1.5,
+        "worst": {
+          "offset": 6.35,
+          "reference": 0.034255267218895824,
+          "candidate": 0.03449979458500252,
+          "error": 0.0002445273661066949
+        }
+      },
+      {
+        "along": 2,
+        "worst": {
+          "offset": 6.3,
+          "reference": 0.03539473785590985,
+          "candidate": 0.03593262830528943,
+          "error": 0.0005378904493795744
+        }
+      },
+      {
+        "along": 2.5,
+        "worst": {
+          "offset": 7,
+          "reference": 0.05352160462635425,
+          "candidate": 0.05257953820392913,
+          "error": 0.0009420664224251141
+        }
+      },
+      {
+        "along": 3,
+        "worst": {
+          "offset": 7,
+          "reference": 0.056173229869500574,
+          "candidate": 0.05554279457524558,
+          "error": 0.000630435294254994
+        }
+      },
+      {
+        "along": 3.5,
+        "worst": {
+          "offset": 7,
+          "reference": 0.0588248551126469,
+          "candidate": 0.05852456892390023,
+          "error": 0.0003002861887466679
+        }
+      },
+      {
+        "along": 4,
+        "worst": {
+          "offset": 6.35,
+          "reference": 0.04609981778455108,
+          "candidate": 0.04558595991321113,
+          "error": 0.0005138578713399511
+        }
+      }
+    ]
+  },
+  {
+    "way": 690703974,
+    "node": 6480631921,
+    "side": -1,
+    "samples": 280,
+    "missing": 0,
+    "maxRevealError": 0.000006359479982620542,
+    "maxGrade": 0.0029412383149154107,
+    "maxInheritedGrade": 0.0029750465458895947,
+    "gradeViolations": 0,
+    "worstGrade": null,
+    "sections": [
+      {
+        "along": -0.02,
+        "worst": {
+          "offset": -2.05,
+          "reference": -0.009236045973722184,
+          "candidate": -0.00924201440901129,
+          "error": 0.0000059684352891054004
+        }
+      },
+      {
+        "along": 0.02,
+        "worst": {
+          "offset": -2.05,
+          "reference": -0.009328349797669944,
+          "candidate": -0.009333732305066178,
+          "error": 0.0000053825073962343595
+        }
+      },
+      {
+        "along": 0.25,
+        "worst": {
+          "offset": -3.6,
+          "reference": -0.016698933298442853,
+          "candidate": -0.0167022922076967,
+          "error": 0.0000033589092538477416
+        }
+      },
+      {
+        "along": 0.5,
+        "worst": {
+          "offset": -3.4,
+          "reference": -0.016438003146362234,
+          "candidate": -0.01644195301742002,
+          "error": 0.000003949871057784549
+        }
+      },
+      {
+        "along": 1,
+        "worst": {
+          "offset": -2.9,
+          "reference": -0.015477803528057166,
+          "candidate": -0.015482949371914856,
+          "error": 0.000005145843857690124
+        }
+      },
+      {
+        "along": 1.5,
+        "worst": {
+          "offset": -2.45,
+          "reference": -0.01473575574684105,
+          "candidate": -0.014742115226823671,
+          "error": 0.000006359479982620542
+        }
+      },
+      {
+        "along": 2,
+        "worst": {
+          "offset": -2.05,
+          "reference": -0.014320679426077731,
+          "candidate": -0.014322328424356101,
+          "error": 0.0000016489982783696178
+        }
+      },
+      {
+        "along": 2.5,
+        "worst": null
+      },
+      {
+        "along": 3,
+        "worst": null
+      },
+      {
+        "along": 3.5,
+        "worst": null
+      },
+      {
+        "along": 4,
+        "worst": null
+      }
+    ]
+  },
+  {
+    "way": 690703974,
+    "node": 6480631921,
+    "side": 1,
+    "samples": 240,
+    "missing": 0,
+    "maxRevealError": 0.000003238511254721743,
+    "maxGrade": 0.0023367017532742148,
+    "maxInheritedGrade": 0.002337622812398837,
+    "gradeViolations": 0,
+    "worstGrade": null,
+    "sections": [
+      {
+        "along": -0.02,
+        "worst": {
+          "offset": 2.05,
+          "reference": 0.009024045150169968,
+          "candidate": 0.009020806638915246,
+          "error": 0.000003238511254721743
+        }
+      },
+      {
+        "along": 0.02,
+        "worst": {
+          "offset": 2.05,
+          "reference": 0.008956256043916255,
+          "candidate": 0.008954552668399174,
+          "error": 0.0000017033755170814402
+        }
+      },
+      {
+        "along": 0.25,
+        "worst": {
+          "offset": 2.05,
+          "reference": 0.008418602797064523,
+          "candidate": 0.008417111265146104,
+          "error": 0.0000014915319184183318
+        }
+      },
+      {
+        "along": 0.5,
+        "worst": {
+          "offset": 2.05,
+          "reference": 0.007834197094013007,
+          "candidate": 0.007832936247098132,
+          "error": 0.0000012608469148744916
+        }
+      },
+      {
+        "along": 1,
+        "worst": {
+          "offset": 2.05,
+          "reference": 0.006665385687938397,
+          "candidate": 0.006664586201793554,
+          "error": 7.994861448423762e-7
+        }
+      },
+      {
+        "along": 1.5,
+        "worst": {
+          "offset": 2.05,
+          "reference": 0.005496574281806943,
+          "candidate": 0.005496235985845033,
+          "error": 3.382959619102621e-7
+        }
+      },
+      {
+        "along": 2,
+        "worst": null
+      },
+      {
+        "along": 2.5,
+        "worst": null
+      },
+      {
+        "along": 3,
+        "worst": null
+      },
+      {
+        "along": 3.5,
+        "worst": null
+      },
+      {
+        "along": 4,
+        "worst": null
+      }
+    ]
+  },
+  {
+    "way": 1017595561,
+    "node": 9385960964,
+    "side": -1,
+    "samples": 0,
+    "missing": 0,
+    "maxRevealError": 0,
+    "maxGrade": 0,
+    "maxInheritedGrade": 0,
+    "gradeViolations": 0,
+    "worstGrade": null,
+    "sections": [
+      {
+        "along": -0.02,
+        "worst": null
+      },
+      {
+        "along": 0.02,
+        "worst": null
+      },
+      {
+        "along": 0.25,
+        "worst": null
+      },
+      {
+        "along": 0.5,
+        "worst": null
+      },
+      {
+        "along": 1,
+        "worst": null
+      },
+      {
+        "along": 1.5,
+        "worst": null
+      },
+      {
+        "along": 2,
+        "worst": null
+      },
+      {
+        "along": 2.5,
+        "worst": null
+      },
+      {
+        "along": 3,
+        "worst": null
+      },
+      {
+        "along": 3.5,
+        "worst": null
+      },
+      {
+        "along": 4,
+        "worst": null
+      }
+    ]
+  },
+  {
+    "way": 1017595561,
+    "node": 9385960964,
+    "side": 1,
+    "samples": 440,
+    "missing": 0,
+    "maxRevealError": 0.007294281169691885,
+    "maxGrade": 0.03011934660969473,
+    "maxInheritedGrade": 0.029980254915358273,
+    "gradeViolations": 0,
+    "worstGrade": null,
+    "sections": [
+      {
+        "along": -0.02,
+        "worst": {
+          "offset": 5.620152927363364,
+          "reference": 0.1739672708845319,
+          "candidate": 0.1717002463632582,
+          "error": 0.0022670245212736972
+        }
+      },
+      {
+        "along": 0.02,
+        "worst": {
+          "offset": 5.620152927363364,
+          "reference": 0.17410788993657889,
+          "candidate": 0.1721853982971595,
+          "error": 0.001922491639419377
+        }
+      },
+      {
+        "along": 0.25,
+        "worst": {
+          "offset": 4.720152927363364,
+          "reference": 0.17694034578659057,
+          "candidate": 0.176230072446117,
+          "error": 0.0007102733404735773
+        }
+      },
+      {
+        "along": 0.5,
+        "worst": {
+          "offset": 6.370152927363364,
+          "reference": 0.17978853683518992,
+          "candidate": 0.18076740204028852,
+          "error": 0.0009788652050986002
+        }
+      },
+      {
+        "along": 1,
+        "worst": {
+          "offset": 6.370152927363364,
+          "reference": 0.18580168049882673,
+          "candidate": 0.18830738984178197,
+          "error": 0.0025057093429552424
+        }
+      },
+      {
+        "along": 1.5,
+        "worst": {
+          "offset": 6.370152927363364,
+          "reference": 0.19181482416246354,
+          "candidate": 0.1970949536451485,
+          "error": 0.00528012948268497
+        }
+      },
+      {
+        "along": 2,
+        "worst": {
+          "offset": 5.620152927363364,
+          "reference": 0.19919724486382506,
+          "candidate": 0.20649152603351695,
+          "error": 0.007294281169691885
+        }
+      },
+      {
+        "along": 2.5,
+        "worst": {
+          "offset": 5.620152927363364,
+          "reference": 0.21387746170361766,
+          "candidate": 0.21781752009198385,
+          "error": 0.003940058388366197
+        }
+      },
+      {
+        "along": 3,
+        "worst": {
+          "offset": 4.870152927363364,
+          "reference": 0.22865444441907812,
+          "candidate": 0.22589564436711385,
+          "error": 0.002758800051964272
+        }
+      },
+      {
+        "along": 3.5,
+        "worst": {
+          "offset": 4.920152927363364,
+          "reference": 0.24355757878052486,
+          "candidate": 0.2394255016618274,
+          "error": 0.0041320771186974525
+        }
+      },
+      {
+        "along": 4,
+        "worst": {
+          "offset": 6.070152927363364,
+          "reference": 0.25838519250496006,
+          "candidate": 0.2523045621009885,
+          "error": 0.006080630403971554
+        }
+      }
+    ]
+  },
+  {
+    "way": 1017595561,
+    "node": 9385960966,
+    "side": -1,
+    "samples": 440,
+    "missing": 0,
+    "maxRevealError": 0.0033564371304919405,
+    "maxGrade": 0.004186530913386832,
+    "maxInheritedGrade": 0.004294183399906615,
+    "gradeViolations": 0,
+    "worstGrade": null,
+    "sections": [
+      {
+        "along": -0.02,
+        "worst": {
+          "offset": -5.520152927363364,
+          "reference": 0.1646426474669056,
+          "candidate": 0.16424582815830036,
+          "error": 0.00039681930860524517
+        }
+      },
+      {
+        "along": 0.02,
+        "worst": {
+          "offset": -5.520152927363364,
+          "reference": 0.16461363808497254,
+          "candidate": 0.16422264596499758,
+          "error": 0.0003909921199749533
+        }
+      },
+      {
+        "along": 0.25,
+        "worst": {
+          "offset": -5.520152927363364,
+          "reference": 0.16479009883892104,
+          "candidate": 0.16443261307477997,
+          "error": 0.00035748576414107447
+        }
+      },
+      {
+        "along": 0.5,
+        "worst": {
+          "offset": -5.520152927363364,
+          "reference": 0.16498190400633916,
+          "candidate": 0.16466083819418031,
+          "error": 0.00032106581215884944
+        }
+      },
+      {
+        "along": 1,
+        "worst": {
+          "offset": -5.520152927363364,
+          "reference": 0.16536494630415177,
+          "candidate": 0.16511882896270436,
+          "error": 0.00024611734144741604
+        }
+      },
+      {
+        "along": 1.5,
+        "worst": {
+          "offset": -5.520152927363364,
+          "reference": 0.16574651879005842,
+          "candidate": 0.1656079340287704,
+          "error": 0.00013858476128802977
+        }
+      },
+      {
+        "along": 2,
+        "worst": {
+          "offset": -5.820152927363364,
+          "reference": 0.1660778323720251,
+          "candidate": 0.1663092679964393,
+          "error": 0.00023143562441418908
+        }
+      },
+      {
+        "along": 2.5,
+        "worst": {
+          "offset": -5.470152927363364,
+          "reference": 0.1681056542187207,
+          "candidate": 0.16812706849643178,
+          "error": 0.000021414277711073737
+        }
+      },
+      {
+        "along": 3,
+        "worst": {
+          "offset": -5.520152927363364,
+          "reference": 0.1701620418058667,
+          "candidate": 0.1694994792945863,
+          "error": 0.0006625625112803846
+        }
+      },
+      {
+        "along": 3.5,
+        "worst": {
+          "offset": -5.570152927363364,
+          "reference": 0.17228126753798279,
+          "candidate": 0.1703188580047481,
+          "error": 0.001962409533234677
+        }
+      },
+      {
+        "along": 4,
+        "worst": {
+          "offset": -5.570152927363364,
+          "reference": 0.17441480490779782,
+          "candidate": 0.17105836777730588,
+          "error": 0.0033564371304919405
+        }
+      }
+    ]
+  },
+  {
+    "way": 1017595561,
+    "node": 9385960966,
+    "side": 1,
+    "samples": 0,
+    "missing": 0,
+    "maxRevealError": 0,
+    "maxGrade": 0,
+    "maxInheritedGrade": 0,
+    "gradeViolations": 0,
+    "worstGrade": null,
+    "sections": [
+      {
+        "along": -0.02,
+        "worst": null
+      },
+      {
+        "along": 0.02,
+        "worst": null
+      },
+      {
+        "along": 0.25,
+        "worst": null
+      },
+      {
+        "along": 0.5,
+        "worst": null
+      },
+      {
+        "along": 1,
+        "worst": null
+      },
+      {
+        "along": 1.5,
+        "worst": null
+      },
+      {
+        "along": 2,
+        "worst": null
+      },
+      {
+        "along": 2.5,
+        "worst": null
+      },
+      {
+        "along": 3,
+        "worst": null
+      },
+      {
+        "along": 3.5,
+        "worst": null
+      },
+      {
+        "along": 4,
+        "worst": null
+      }
+    ]
+  }
+]

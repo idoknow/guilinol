@@ -1,3 +1,4 @@
+import {fitCurbReturns,type CurbReturn} from './curb-returns'
 import {platformShift, type PlatformGrade} from './platform-grade'
 import {panelCut} from './crossing-panels'
 import {stationShoulders,type GradePlane,type ShoulderPlane} from './station-shoulders'
@@ -13,7 +14,7 @@ import {curbEdgeKeyCm,repairStreetPaths} from './ground-repair'
 import * as THREE from 'three'
 import {look} from './look/config'
 type Pair=[number,number]
-export interface StationPavingStyle {plaza?:Pair[]; platformEdges?:[Pair,Pair][]; platformGrades?:PlatformGrade[]}
+export interface StationPavingStyle {curbReturns?:CurbReturn[]; plaza?:Pair[]; platformEdges?:[Pair,Pair][]; platformGrades?:PlatformGrade[]}
 type Path=[number,...Pair[][]]
 type RoadCtrl=[number,number[]]
 type Lower=[number,Pair[],[number,number,number,number][]]
@@ -575,6 +576,7 @@ export function streetGeometry([paths,lamps,banks,signals=[],stops=[],roadCtrl,s
       box(mx,ym+.15,mz,Math.max(.1,span-.36),.07,.18,angle,stoneBase)
     }
   }
+  if(paving?.curbReturns)fitCurbReturns(paving.curbReturns,xyz,rgb,surfaceKinds,alongVals,road,sidewalk,k=>colors[k].toArray())
   const positions=new Float32Array(xyz)
   const surface=new THREE.BufferGeometry()
   surface.setAttribute('position',new THREE.BufferAttribute(positions,3))
