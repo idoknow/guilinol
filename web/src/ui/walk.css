@@ -183,7 +183,7 @@ body[data-home] :is(.ride-hud,.vehicle-action,.walk-ui){display:none!important}
   .ride-bat-bar{width:22px;height:7px}
   .ride-bat-pct{font-size:9.5px}
   .ride-lean-bar{width:20px;height:5px}
-  footer{box-sizing:border-box;left:calc(50% - 52px);max-width:calc(100vw - 364px - env(safe-area-inset-left) - env(safe-area-inset-right));font-size:8px;overflow:hidden;text-overflow:ellipsis}
+  /* 署名在顶边题签里（hud.css），不再和快捷栏、载具条抢底边 */
   .ride-gear-btn,.ride-park,.ride-light,.ride-turn-left,.ride-turn-right,.ride-hazard,.ride-horn,.ride-cruise,.ride-sound{padding:1.5px 4px;font-size:9px}
   output{top:calc(142px + env(safe-area-inset-top));bottom:auto;left:calc(12px + env(safe-area-inset-left));max-width:124px}
 }

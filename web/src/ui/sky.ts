@@ -36,16 +36,20 @@ export function skyClock(params:URLSearchParams) {
   // back and forth doesn't undo it (stored per device, ignored when storage is blocked).
   // The chevron is drawn in CSS (hud.css .sky-fold::before) rather than set as a ‹/› glyph: at 20px and
   // 55% opacity that glyph read as decoration and people never found the control.
-  const FOLD_KEY = 'glol.skyFolded'
-  let folded = false
-  function setFolded(on:boolean) {
+  // IDOK-468: folded by default everywhere; only an explicit 展开 is remembered (new key, so the old
+  // per-device '0' written on every first load no longer pins the panel open).
+  const OPEN_KEY = 'glol.sky.open'
+  let folded = true
+  function setFolded(on:boolean, remember = true) {
     folded = on; panel.classList.toggle('folded', on)
     fold.setAttribute('aria-expanded', String(!on))
     fold.setAttribute('aria-label', on?'展开时辰天气':'收起时辰天气'); fold.title = on?'展开时辰天气':'收起时辰天气'
-    try { localStorage.setItem(FOLD_KEY, on?'1':'0') } catch {}
+    if (remember) try { localStorage.setItem(OPEN_KEY, on?'0':'1') } catch {}
   }
   fold.onclick = ()=>setFolded(!folded)
-  try { setFolded(localStorage.getItem(FOLD_KEY)==='1') } catch { setFolded(false) }
+  let open = false
+  try { open = localStorage.getItem(OPEN_KEY)==='1' } catch {}
+  setFolded(!open, false)
   // Next weather: mostly clear, morning mist, the odd shower; never the same weather twice in a row.
   function nextWeather(hour:number):Weather {
     const w:[Weather,number][] = [['clear',.62],['mist',hour>=4.5&&hour<9.5?.45:.12],['rain',.22]]

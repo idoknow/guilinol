@@ -36,6 +36,7 @@ try {
     await page.waitForFunction(() => window.lastPhoto?.bytes > 5000)
     assert(await page.evaluate(() => window.viewer.tour.stamps.has('elephant')))
     await page.getByRole('button', { name: '退出拍照' }).click()
+    await page.locator('.dock-more').click() // 景册收在「工具」里（IDOK-468）
     await page.locator('.dock-book').click()
     assert(await page.locator('.book li.done [data-id="elephant"]').isVisible())
     assert.deepEqual(errors, [])

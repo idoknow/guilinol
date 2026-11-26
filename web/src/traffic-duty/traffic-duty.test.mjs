@@ -2289,6 +2289,11 @@ test('k77 (r9): HUD实时显示开单数/罚款合计/待领10%（50+100+20+70=2
   const {doc, body} = createMockBrowserDom()
   const prevDoc = globalThis.document
   globalThis.document = doc
+  // The global [F] prompt (walk/vehicles.ts) as the interact arbiter leaves it when it picks the officer.
+  const fPrompt = doc.createElement('button')
+  fPrompt.className = 'vehicle-action'
+  fPrompt.dataset.interactAction = 'talk_officer'
+  body.append(fPrompt)
 
   const sim = new Traffic(cachedGraph, makeSeededRng(2029))
   const track = [...sim.allTracks()].find(t => t.kind === 'nonmotor')
@@ -2444,12 +2449,20 @@ test('k77 (r9): HUD实时显示开单数/罚款合计/待领10%（50+100+20+70=2
     const earnEl = barEl.querySelector('[data-td-stat="earnings"]')
     assert.equal(earnEl?.textContent, '待领10% ¥24')
     assert.equal(earnEl?.classList.contains('is-nonzero'), true)
-    assert.equal(barEl.querySelector('[data-td-action="report-off-duty"]')?.textContent, '下岗交差')
+    // IDOK-468: next to the officer the [F] prompt is the only 下岗交差 — bar button and overhead marker step aside.
+    const reportBarBtn = barEl.querySelector('[data-td-action="report-off-duty"]')
+    assert.equal(reportBarBtn?.textContent, '下岗交差')
+    assert.equal(reportBarBtn?.hidden, true, 'bar 下岗交差 yields to the [F] prompt within talking range')
+    // When the arbiter gives [F] to something else (下车 / 上车), the bar button is the only 下岗交差 left, so it stays.
+    fPrompt.dataset.interactAction = 'dismount'
+    duty.step(0.016)
+    assert.equal(reportBarBtn?.hidden, false, 'bar 下岗交差 stays while [F] shows another action')
+    fPrompt.dataset.interactAction = 'talk_officer'
+    duty.step(0.016)
+    assert.equal(reportBarBtn?.hidden, true)
 
     const markerEl = body.querySelector('[data-td-officer-marker="1"]')
-    assert.ok(markerEl && !markerEl.hidden, 'overhead officer marker must guide off-duty check-in during active duty')
-    assert.equal(markerEl.textContent.includes('下岗交差'), true)
-    assert.equal(markerEl.textContent.includes('¥24'), true)
+    assert.ok(markerEl && markerEl.hidden, 'overhead officer marker yields to the [F] prompt within talking range')
 
     // Walk to officer -> [F] shows 「下岗交差」 -> real Hy1 openOffDuty -> settles ONCE (+24) and zeros pending
     const offCand = duty.getInteractCandidate()
@@ -2457,7 +2470,7 @@ test('k77 (r9): HUD实时显示开单数/罚款合计/待领10%（50+100+20+70=2
     assert.equal(offCand.action, 'talk_officer')
     assert.equal(offCand.isOffDutyReport, true)
     assert.equal(offCand.label.includes('下岗交差'), true)
-    assert.equal(offCand.label.includes('¥24'), true)
+    assert.equal(offCand.label, '下岗交差 ¥24')
 
     const openOff = await duty.interact()
     assert.equal(openOff.ok, true)

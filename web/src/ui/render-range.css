@@ -1,4 +1,6 @@
 /* 渲染范围轻量化配置入口与实时预览面板 · 青绿山水玻璃语言 */
+/* 常驻入口只给开发看（?debug / ?verify）；玩家从「设置 · 画面 · 视野与画质」打开同一面板（IDOK-468）。 */
+body:not([data-debug]) .render-entry { display: none; }
 .render-entry {
   position: fixed;
   left: calc(10px + env(safe-area-inset-left));

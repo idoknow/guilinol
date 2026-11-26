@@ -583,6 +583,7 @@ async function start(loader:FullLoader,creatorSpawn=false) {
     },
   })
   rangeStore.subscribe(nextCfg=>{renderUi.setConfig(nextCfg)})
+  window.addEventListener('glol:open-render-range',()=>renderUi.open())
   // IDOK-178：帧率/网速/在线人数读数与设置热键（都靠 localStorage 记住上次选择）。
   mountStats()
   mountHotkeys()

@@ -74,6 +74,7 @@
     "verify:home": "node scripts/verify-home-mp.mjs",
     "verify:qq": "node scripts/verify-qq-entry.mjs",
     "verify:hud": "node scripts/verify-hud-extras.mjs",
+    "verify:hud-layout": "npm run build && node scripts/verify-hud-layout.mjs && node scripts/verify-hud-layout.mjs --duty && node scripts/verify-hud-layout.mjs --menu",
     "verify:camera": "node --experimental-strip-types --test scripts/camera-hold-test.mjs && node scripts/verify-camera.mjs",
     "verify:drone": "node scripts/verify-drone.mjs",
     "verify:recording": "node scripts/verify-recording.mjs",
