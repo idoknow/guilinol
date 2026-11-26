@@ -625,8 +625,6 @@ def build(bbox, output, palette, workers=4):
         open_passage(output, chunks)
         from railway_platforms import bake as bake_platforms
         bake_platforms(output, manifest, play_region.geometry)
-    from shizijie_underpass import apply_world as apply_shizijie_underpass
-    apply_shizijie_underpass(output, roads, bake_roads=False)
     from service_streets import bake_walks
     bake_walks(output, manifest, palette, [layout.exclude, *layout.school_grounds, *layers['water']])
     write_city_lods(output, manifest)
