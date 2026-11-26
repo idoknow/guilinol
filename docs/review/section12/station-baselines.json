@@ -1,0 +1,90 @@
+{
+  "reference": "440af6ea",
+  "officialPackage": "world-16193c0c4e5d",
+  "cuizhuEndpoints": [
+    {
+      "way": 265411001,
+      "chainageM": 0.0,
+      "reference300M": 155.746592,
+      "section11M": 155.746592,
+      "deltaM": 0.0
+    },
+    {
+      "way": 265411001,
+      "chainageM": 1051.767,
+      "reference300M": 153.506988,
+      "section11M": 147.7,
+      "deltaM": -5.806988
+    },
+    {
+      "way": 265411005,
+      "chainageM": 0.0,
+      "reference300M": 151.506353,
+      "section11M": 147.5,
+      "deltaM": -4.006353
+    },
+    {
+      "way": 265411005,
+      "chainageM": 81.40233,
+      "reference300M": 153.404575,
+      "section11M": 147.69999993357695,
+      "deltaM": -5.704575
+    },
+    {
+      "way": 815082645,
+      "chainageM": 0.0,
+      "reference300M": 148.882269,
+      "section11M": 148.882269,
+      "deltaM": 0.0
+    },
+    {
+      "way": 815082645,
+      "chainageM": 54.48169,
+      "reference300M": 151.506353,
+      "section11M": 147.5000000279786,
+      "deltaM": -4.006353
+    },
+    {
+      "way": 815082646,
+      "chainageM": 0.0,
+      "reference300M": 151.396217,
+      "section11M": 147.5,
+      "deltaM": -3.896217
+    },
+    {
+      "way": 815082646,
+      "chainageM": 52.40045,
+      "reference300M": 148.876194,
+      "section11M": 148.876194,
+      "deltaM": 0.0
+    },
+    {
+      "way": 815082648,
+      "chainageM": 0.0,
+      "reference300M": 153.404575,
+      "section11M": 147.7,
+      "deltaM": -5.704575
+    },
+    {
+      "way": 815082648,
+      "chainageM": 1041.39096,
+      "reference300M": 155.747655,
+      "section11M": 155.7476549998648,
+      "deltaM": -0.0
+    },
+    {
+      "way": 815082649,
+      "chainageM": 0.0,
+      "reference300M": 153.506988,
+      "section11M": 147.7,
+      "deltaM": -5.806988
+    },
+    {
+      "way": 815082649,
+      "chainageM": 85.04708,
+      "reference300M": 151.396217,
+      "section11M": 147.5,
+      "deltaM": -3.896217
+    }
+  ]
+}

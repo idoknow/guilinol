@@ -168,7 +168,8 @@ def bake(directory, manifest, paired_widths):
             at = np.r_[start, heights[(heights[:,0] > start+.00001) & (heights[:,0] < stop-.00001), 0], stop]
             part = dict(way, nodes=way["nodes"][first:last+1], geometry=way["geometry"][first:last+1])
             paving[wid] = part, LineString(points(part)), np.column_stack((at-start, np.interp(at, *heights.T)))
-    finish_paving(directory, manifest, list(paving.values()) + joint, elements)
+    surface_profiles = [profile for profile in joint if profile[0]["id"] not in bridge_approaches]
+    finish_paving(directory, manifest, list(paving.values()) + surface_profiles, elements)
     final_traffic_ways = [way for way, _, _ in joint] + joint_bridges
     final_traffic_ways.extend(paving[wid][0] for wid in sorted(corrected))
     # A new bore can share a portal with an earlier graded approach. Generate
@@ -231,6 +232,10 @@ def bake_profiles(directory, manifest, profiles, elements, bridge_ways=(), landi
                                    round(b[1]-z,4),round(width,3),y0,y1])
     open_lines = []
     for way, line, heights in profiles.values():
+        # Raised bridge approaches own their slabs, while the ground-level
+        # station roads below and beside them retain their native pavement.
+        if way['id'] in bridge_approaches:
+            continue
         if way['tags'].get('tunnel')=='yes' and not way.get('gradeShoulders'):
             continue
         open_lines.append(line)
@@ -253,6 +258,11 @@ def bake_profiles(directory, manifest, profiles, elements, bridge_ways=(), landi
         coords = points(way)
         if len(coords)<2 or not len(near.query(LineString(coords),predicate='dwithin',distance=40)):
             continue
+        elevated = way['id'] in bridge_approaches
+        if elevated:
+            for a, b in zip(coords, coords[1:]):
+                add(np.asarray(a), np.asarray(b), half_width(way), None, None)
+            original_pavement.append(LineString(coords).buffer(half_width(way)+.1, cap_style='round'))
         first_guard = len(fixed_pavement)
         profiled = profiles.get(way['id'])
         parts = parts_by_way[way['id']]
@@ -293,13 +303,11 @@ def bake_profiles(directory, manifest, profiles, elements, bridge_ways=(), landi
                     if part.get("flatNativeTie"):
                         paving = paving.difference(graded.buffer(half_width(part)+.1, cap_style="flat"))
                 fixed_pavement.append(paving)
-            for a,b in zip(line.coords,line.coords[1:]):
-                add(np.asarray(a),np.asarray(b),half_width(way),None,None)
-        if bridge_approaches:
-            if way['id'] in bridge_approaches:
-                original_pavement.append(LineString(coords).buffer(half_width(way)+.1, cap_style='round'))
-            else:
-                original_pavement.extend(fixed_pavement[first_guard:])
+            if not elevated:
+                for a,b in zip(line.coords,line.coords[1:]):
+                    add(np.asarray(a),np.asarray(b),half_width(way),None,None)
+        if bridge_approaches and not elevated:
+            original_pavement.extend(fixed_pavement[first_guard:])
     from shapely import Polygon, constrained_delaunay_triangles, union_all
     protected_paving = STRtree(fixed_pavement)
     from station_junctions import build as build_junctions
@@ -331,6 +339,8 @@ def bake_profiles(directory, manifest, profiles, elements, bridge_ways=(), landi
                 outside=strip.difference(union_all(guards.geometries[nearby]))
                 t['footprint']=[list(tri.exterior.coords)[:-1] for tri in
                                 constrained_delaunay_triangles(outside).geoms if tri.area>1.e-8]
+        if t['way'] in bridge_approaches:
+            continue
         low=np.floor((np.minimum(a,b)[[0,2]]-width)/256).astype(int)
         high=np.floor((np.maximum(a,b)[[0,2]]+width)/256).astype(int)
         for col in range(low[0],high[0]+1):
