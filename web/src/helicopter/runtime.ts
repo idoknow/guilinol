@@ -7,8 +7,7 @@ import {modes,tourRoute,canDisembark,type TourMode} from './route'
 import {helipad} from './site'
 import {helicopterModel} from './model'
 import {queueCommand,type QueueState} from './queue'
-import {aircraftPose,routeFor} from './flight'
-import {routeVersion} from '../../../lib/helicopter-clock'
+import {aircraftPose,flightReplica,routeFor} from './flight'
 import {mpEnabled} from '../ui/mp-pref'
 import {remoteSeat} from './remote-seat'
 
@@ -26,7 +25,8 @@ export function helicopter(scene:THREE.Scene,camera:THREE.PerspectiveCamera,walk
   panel.innerHTML=`<form method="dialog"><button aria-label="关闭">关闭</button></form><h2>直升机观光</h2><svg class="heli-map" viewBox="-1550 -1550 1650 2870" width="120" height="180"></svg><ol>${spots.map(spot=>`<li>${spot.name}</li>`).join('')}</ol><select aria-label="观光模式">${Object.entries(modes).map(([id,mode])=>`<option value="${id}">${mode.label}：${mode.description}</option>`).join('')}</select><p class="heli-price"></p><button class="heli-confirm">确认旅行</button><p role="status"></p>`
   document.body.append(hint,notice,panel)
   let phase:Phase='idle',clock=0,mode:TourMode='low',route:ReturnType<typeof tourRoute>|undefined,first=false,near=false,fare=0,heading=0
-  let queue:QueueState|undefined,offset=0,lastPoll=-Infinity,busy=false,sessionFlight:QueueState['flight']=null
+  const replica=flightReplica()
+  let queue:QueueState|undefined,lastPoll=-Infinity,busy=false,sessionFlight:QueueState['flight']=null
   const status=document.createElement('p'),leave=document.createElement('button'),alert=document.createElement('output');status.className='heli-queue-status';leave.className='heli-queue-leave';leave.textContent='退出排队';alert.className='heli-queue-notice';document.body.append(alert);panel.append(status,leave)
   const confirm=panel.querySelector<HTMLButtonElement>('.heli-confirm')!
   function accept(state:QueueState,start:number){
@@ -34,7 +34,7 @@ export function helicopter(scene:THREE.Scene,camera:THREE.PerspectiveCamera,walk
     if(!state.mine||state.flight&&state.mine.offered)alert.textContent=''
     if(state.code==='INSUFFICIENT_FUNDS')alert.textContent='余额不足，已跳过本班，请充值后重新排队'
     if(state.code==='SAVE_NOT_READY')alert.textContent='账号存档未同步，请同步后重新排队'
-    queue=state;offset=state.now-(start+Date.now())/2
+    queue=state;replica.sync(start,Date.now(),state.now)
     status.textContent=`${({idle:'空闲',boarding:'登机中',flying:'执飞中',landing:'降落中',unloading:'下机中'} as Record<string,string>)[state.state]} · 前面 ${state.ahead} 人 · 预计等待 ${state.eta} 秒`
     leave.hidden=!state.mine||!!state.flight&&state.mine.offered;confirm.disabled=!!state.mine&&!state.mine.offered;confirm.textContent=state.mine?.offered?'确认登机':state.mine?'排队中':'加入队列'
   }
@@ -75,7 +75,7 @@ export function helicopter(scene:THREE.Scene,camera:THREE.PerspectiveCamera,walk
   const padDoor=new THREE.Vector3(helipad.x+1.19,helipad.y+.56,helipad.z-.4)
   alert.onclick=()=>{if(queue?.mine&&!panel.open)show()}
   function tick(dt:number){const player=walker();if(soloServices()&&performance.now()-lastPoll>2500&&!busy){lastPoll=performance.now();void command('ping')}
-    const flight=sessionFlight??(soloServices()?queue?.flight:null),pose=flight?.version===routeVersion?aircraftPose(Date.now()+offset,flight.t0,flight.mode):null
+    const flight=sessionFlight??(soloServices()?queue?.flight:null),pose=replica.pose(Date.now(),flight)
     craft.position.set(pose?.x??helipad.x,pose?.y??helipad.y,pose?.z??helipad.z);craft.rotation.set(pose?.pitch??0,pose?.yaw??0,-(pose?.roll??0),'YXZ');craft.visible=!flight||!!sessionFlight||mpEnabled()
     remoteSeat.uid=pose&&flight&&model.loaded&&mpEnabled()?flight.passengerUid:0
     if(remoteSeat.uid){point('seat_pax_1',seat);Object.assign(remoteSeat,{x:seat.x,y:seat.y-.65,z:seat.z,yaw:craft.rotation.y})}

@@ -31,6 +31,15 @@ try{
     return {frames:count,fps:1000*count/intervals.reduce((sum,value)=>sum+value,0),p50:percentile(.5),p95:percentile(.95),p99:percentile(.99)}
   },quick?8:120).then(sample=>{console.log('FRAME_SAMPLE',JSON.stringify({label,...sample}));return sample.fps})
   const url=`${origin}/?verify&solo=1&mp=1&flow=0&radius=480`
+  if(process.env.HELI_B_ONLY){
+    const started=Date.now(),path=request=>new URL(request.url()).pathname
+    other.on('console',message=>console.log('B console',message.type(),message.text().slice(0,240)))
+    other.on('requestfailed',request=>console.log('B failed',path(request),request.failure()?.errorText))
+    other.on('response',response=>{if(response.status()>=400||['/api/auth/me','/api/me/save','/api/helicopter','/api/rt/ticket'].includes(path(response)))console.log('B HTTP',response.status(),path(response))})
+    await other.goto(url,{waitUntil:'domcontentloaded'});await other.waitForFunction(()=>window.viewer?.walk?.active,null,{timeout:180000})
+    const details=await other.evaluate(async()=>({account:(await (await fetch('/api/auth/me')).json()).id,walk:window.viewer.walk.active,position:window.viewer.walk.position.toArray(),queue:await (await fetch('/api/helicopter',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'ping'})})).json()}))
+    assert.equal(details.account,'B');assert.ok(details.walk);assert.equal(details.queue.code,'OK');console.log('B standalone landed',Date.now()-started,details);return
+  }
   await page.goto(url,{waitUntil:'domcontentloaded'})
   await page.waitForFunction(()=>window.viewer?.walk?.active,null,{timeout:120000})
   if(process.env.HELI_HANDOFF_ONLY){const {handoff}=await import('./heli-handoff.mjs');await handoff({page,other,url,api,output});return}

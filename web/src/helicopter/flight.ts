@@ -1,4 +1,4 @@
-import {flightClock,type FlightMode} from '../../../lib/helicopter-clock'
+import {flightClock,routeVersion,type FlightMode} from '../../../lib/helicopter-clock'
 import {helipad} from './site'
 import {tourRoute} from './route'
 import profiles from './clearance.json'
@@ -13,4 +13,22 @@ export function aircraftPose(now:number,t0:number,mode:FlightMode){
   const fraction=Math.min(1,clock/duration),smooth=fraction**3*(10-15*fraction+6*fraction*fraction),ascent=phase==='ascend',descent=phase==='descend',lift=ascent?smooth:descent?1-smooth:0
   const end=route.pose(descent?route.duration:0),bearing=route.pose(descent?route.duration-.1:.1).yaw
   return {x:helipad.x,z:helipad.z,y:helipad.y+(end.y-helipad.y)*lift,yaw:bearing*lift,roll:0,pitch:(ascent?1:descent?-1:0)*.06*Math.sin(Math.PI*fraction)**2,speed:0,phase,clock,rpm:ascent||descent?1:phase==='start'?smooth:phase==='stop'?1-smooth:0}
+}
+
+export function flightReplica(){
+  const bounds:{low:number;high:number}[]=[]
+  let offset=0
+  return {
+    sync(sent:number,received:number,server:number){
+      if(received<sent)return
+      const sample={low:server-received,high:server-sent}
+      bounds.push(sample);if(bounds.length>8)bounds.shift()
+      let low=Math.max(...bounds.map(value=>value.low)),high=Math.min(...bounds.map(value=>value.high))
+      if(low>high){bounds.splice(0,bounds.length-1);({low,high}=sample)}
+      offset=(low+high)/2
+    },
+    pose(local:number,flight:{t0:number;mode:FlightMode;version:string}|null|undefined){
+      return flight?.version===routeVersion?aircraftPose(local+offset,flight.t0,flight.mode):null
+    },
+  }
 }
