@@ -180,6 +180,15 @@ export class Stream {
     return this.loaded.get(tile)?.surfaceAt(x,z)
   }
 
+  // Fine-terrain height in metres, or undefined until that tile has streamed in.
+  groundAt(x:number,z:number){
+    const tile=this.grid.at(x,z), underlay=tile&&this.loaded.get(tile)?.underlay
+    if(!tile||!underlay)return undefined
+    const u=Math.min(64,Math.max(0,(x-tile.x)/4)), w=Math.min(64,Math.max(0,(z-tile.z)/4))
+    const col=Math.min(63,Math.floor(u)), row=Math.min(63,Math.floor(w)), fu=u-col, fw=w-row, i=row*65+col
+    return ((underlay[i]*(1-fu)+underlay[i+1]*fu)*(1-fw)+(underlay[i+65]*(1-fu)+underlay[i+66]*fu)*fw)/10
+  }
+
   private enqueue(tile:Tile, inner:boolean){
     const controller = new AbortController()
     if(this.failures.has(tile))record('retry',{category:'chunk'})
