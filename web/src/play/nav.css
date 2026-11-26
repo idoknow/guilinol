@@ -28,10 +28,10 @@
 /* photo mode / drone / home screen hide it like the other HUD */
 body[data-photo=on] .nav-card,body[data-home] .nav-card{display:none}
 
-/* 手机（窄屏触屏）：右侧 dock 整列是保留区；左上依次是菜单、商铺/时辰条、视野按钮、载入街区提示，卡片排在它们下面、dock 左侧 */
-@media (max-width:560px), ((pointer:coarse) and (not (any-pointer:fine)) and (max-width:768px)){
+/* 触屏（手机/平板，与 input-mode.ts 的 TOUCH_UI_QUERY 一致）：右侧 dock 整列是保留区；左上依次是菜单、商铺/时辰条、视野按钮、载入街区提示，卡片排在它们下面、dock 左侧 */
+@media (pointer:coarse) and (not (any-pointer:fine)),(max-width:560px){
   .nav-card{left:calc(10px + env(safe-area-inset-left));top:calc(234px + env(safe-area-inset-top));transform:none;animation:none;
-    min-width:0;width:max-content;max-width:min(380px,calc(100vw - 136px - env(safe-area-inset-left) - env(safe-area-inset-right)));
+    min-width:0;width:max-content;max-width:min(420px,calc(100vw - 136px - env(safe-area-inset-left) - env(safe-area-inset-right)));
     column-gap:8px;padding:6px;border-radius:12px}
   .nav-glyph{width:42px;height:42px;border-radius:8px}
   .nav-glyph svg{width:27px;height:27px}
@@ -43,9 +43,9 @@ body[data-photo=on] .nav-card,body[data-home] .nav-card{display:none}
   .nav-stop{width:26px;font-size:19px;padding-left:4px}
 }
 /* street HUD on phones: minimap sits under the cash on the left, so the card takes the top row instead */
-@media (max-width:560px), ((pointer:coarse) and (not (any-pointer:fine)) and (max-width:768px)){
-  body[data-hud=street] .nav-card{top:calc(12px + env(safe-area-inset-top));width:max-content;max-width:min(380px,calc(100vw - 150px - env(safe-area-inset-left) - env(safe-area-inset-right)))}
+@media (pointer:coarse) and (not (any-pointer:fine)),(max-width:560px){
+  body[data-hud=street] .nav-card{top:calc(12px + env(safe-area-inset-top));width:max-content;max-width:min(420px,calc(100vw - 150px - env(safe-area-inset-left) - env(safe-area-inset-right)))}
 }
 /* desktop street HUD: keep clear of the 安静区 tag line */
-body[data-hud=street] .nav-card{top:calc(48px + env(safe-area-inset-top))}
-@media (max-width:560px), ((pointer:coarse) and (not (any-pointer:fine)) and (max-width:768px)){body[data-hud=street] .nav-card{top:calc(12px + env(safe-area-inset-top))}}
+body[data-hud=street] .nav-card{top:calc(18px + env(safe-area-inset-top))}
+@media (pointer:coarse) and (not (any-pointer:fine)),(max-width:560px){body[data-hud=street] .nav-card{top:calc(12px + env(safe-area-inset-top))}}
