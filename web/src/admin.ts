@@ -2049,13 +2049,15 @@ const pages: Record<string, (view: View) => void> = {
       const devices = (row.devices ?? []) as any[], accounts = new Set(((row.accounts ?? []) as any[]).map((row) => String(row.uid))).size
       const reasonTip = [row.reason, row.recordId && `记录 ${String(row.recordId).slice(0, 8)}`].filter(Boolean).join(' · ') || null
       const facts = banFacts(row)
-      const brief = fp ? (accounts ? `${accounts} 个账号` : devices[0]?.model || '') : row.nickname || devices[0]?.model || ''
+      const brief = fp ? (accounts ? `${accounts} 个账号` : devices[0]?.model || '') : devices[0]?.model || ''
       const detail = h('tr', { class: 'adm-ban-detail', hidden: true }, h('td', { colspan: 4 }, h('ul', { class: 'adm-ban-facts' }, ...facts)))
       const more = facts.length ? h('button', { type: 'button', class: 'adm-ban-more', 'aria-expanded': 'false', 'aria-label': `${target} 的设备与账号` }, brief || '详情') as HTMLButtonElement : null
       if (more) more.onclick = () => { detail.hidden = !detail.hidden; more.setAttribute('aria-expanded', String(!detail.hidden)) }
       return [h('tr', null,
         h('td', { class: 'adm-ban-who' },
-          h('span', { class: 'adm-ban-target' }, fp ? '设备' : 'UID', fp ? copyFp(fp) : h('code', null, String(row.value))),
+          !fp && row.account?.id
+            ? navLink([row.account.nickname || '未设置昵称', ' · UID ', h('code', null, String(row.value))], { view: 'users', id: row.account.id }, { class: 'adm-ban-target adm-link' })
+            : h('span', { class: 'adm-ban-target' }, fp ? '设备' : 'UID', fp ? copyFp(fp) : h('code', null, String(row.value))),
           more ?? (brief ? h('span', { class: 'adm-ban-dev' }, brief) : null)),
         h('td', { class: 'adm-ban-why', title: reasonTip }, h('span', { class: `adm-pill ${tone}` }, label), row.reason || dash),
         untilCell(row.until ? Number(row.until) : null),
