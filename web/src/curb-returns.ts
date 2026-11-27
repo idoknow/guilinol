@@ -4,6 +4,8 @@ import {Vector3} from 'three'
 type Point = number[]
 type NativeFace = [number, Point, Point, Point]
 export interface CurbReturn {
+  roadOnly?: boolean
+  abutmentDropM?: number
   sidewalkOnly?: boolean
   origin: number[]
   axis: number[]
@@ -127,6 +129,20 @@ export function fitCurbReturns(
         if (b.length >= 3) remnants.push(b)
         inner = a
       }
+      // Keep the original render and collision triangles through a bridge
+      // landing. Translate curb and street together so their reveal is preserved.
+      const drop = patch.abutmentDropM
+      if (drop !== undefined) {
+        for (const strip of split(inner, along)) {
+          if (strip.length < 3) continue
+          remnants.push(strip.map(p => {
+            const q = p.slice()
+            q[1] -= drop * (1 - Math.max(0, along(p)) / end)
+            return q
+          }))
+        }
+        return remnants
+      }
       outsideLanes(inner, remnants)
       return remnants
     }
@@ -154,7 +170,7 @@ export function fitCurbReturns(
         rgb[3 * j + 2],
         uv[j],
       ])
-      const outside = (patch.sidewalkOnly ? [1, 2, 6] : [0, 1, 2, 3, 6]).includes(kind) ? cut(points) : undefined
+      const outside = (patch.roadOnly ? [0] : patch.sidewalkOnly ? [1, 2, 6] : [0, 1, 2, 3, 6]).includes(kind) ? cut(points) : undefined
       if (!outside) {
         write(points, kind)
         continue
@@ -162,7 +178,7 @@ export function fitCurbReturns(
       original.push({ points, kind })
       for (const poly of outside) write(poly, kind)
     }
-    for (const buffer of patch.sidewalkOnly ? [sidewalk] : [road, sidewalk]) {
+    for (const buffer of patch.roadOnly ? [road] : patch.sidewalkOnly ? [sidewalk] : [road, sidewalk]) {
       const kept: number[] = []
       for (let i = 0; i < buffer.length; i += 9) {
         const face = [0, 3, 6].map((j) => buffer.slice(i + j, i + j + 3))
