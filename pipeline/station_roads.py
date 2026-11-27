@@ -208,6 +208,12 @@ def bake(directory, manifest, paired_widths):
         if bridges or section.get("retainRoadNodeLevels"):
             final_traffic_ways.extend(way for way, _, _ in parts.values())
             final_traffic_ways.extend(bridges)
+    interior = [span for section in sections for span in section.get("raisedBridgeSpans", ())]
+    if interior:
+        from rail_section_bridges import raise_interior_spans
+        raise_interior_spans(directory, manifest, interior, ways)
+        final_traffic_ways.extend(dict(ways[span["way"]], tags=dict(ways[span["way"]]["tags"], bridge="yes"),
+                                       profileWidth=2*span["halfWidthM"]) for span in interior)
     from platform_grades import mark_platform_grades
     mark_platform_grades(directory, manifest, ways, sections)
     from curb_returns import apply as fit_curb_returns

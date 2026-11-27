@@ -58,6 +58,53 @@ def clipped_faces(face, tile):
                         for x, z in (ring[0], a, b)])
 
 
+def raise_interior_spans(directory, manifest, designs, ways):
+    """Keep native bridge ends and widen the vertical transition toward each approved span."""
+    active = []
+    for design in designs:
+        line = LineString(points(ways[design["way"]]))
+        active.append((design, line, line.buffer(design["halfWidthM"] + .02)))
+    for tile in manifest["chunks"]:
+        x, z = tile["x"], tile["z"]
+        size = manifest["chunkSize"]
+        bounds = box(x, z, x + size, z + size)
+        local = [(d, l, strip) for d, l, strip in active if strip.intersects(bounds)]
+        if not local:
+            continue
+        path = directory / tile["file"]
+        raw = bytearray(gzip.decompress(path.read_bytes()))
+        vertices, indices, metadata, image, count = struct.unpack_from("<5I", raw, 4)
+        offset = 16924 + 9 * vertices + 4 * indices + metadata + image
+        faces = np.frombuffer(raw, "<i2", count * 9, offset).reshape(-1, 3, 3)
+        changed = False
+        for face in faces:
+            corners = [Point(x + px / 100, z + pz / 100) for px, _, pz in face]
+            for design, axis, strip in local:
+                if not all(strip.covers(pt) for pt in corners):
+                    continue
+                stations = np.array([axis.project(pt) for pt in corners])
+                lo, hi = design["crossingRange"]
+                distance = np.maximum(0., np.maximum(lo - stations, stations - hi))
+                radius = design["transitionM"]
+                ramp = np.where(distance < radius, distance**2 / (2 * radius), distance - radius / 2)
+                old = face[:, 1] / 100.
+                gap = design["deckM"] - design["approachGrade"] * ramp - old
+                blend = .05
+                lift = np.maximum(0., gap)
+                joint = abs(gap) < blend
+                lift[joint] = (gap[joint] + blend)**2 / (4 * blend)
+                if np.any((lift > .005) & ((stations < .015) | (stations > axis.length - .015))):
+                    raise ValueError(f"Bridge approach reaches the end of {design['way']}")
+                new = np.rint(100 * (old + lift)).astype("<i2")
+                if np.any(new != face[:, 1]):
+                    face[:, 1] = new
+                    changed = True
+                break
+        if changed:
+            path.write_bytes(gzip.compress(raw, mtime=0))
+            tile["bytes"] = path.stat().st_size
+
+
 def grade_decks(directory, manifest, designs, ways, profiles, passage=None, *, preserve_paving=False):
     axes = {d["way"]: LineString(points(ways[d["way"]])) for d in designs}
     patches = {}
