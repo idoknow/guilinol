@@ -13,6 +13,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from airport import airfield
 from features import polygons
 from shop_lettering import letters
+from liangjiang_grade import Grade
 
 
 COLORS = {'airport_roof_metal':'#e0e3e2', 'airport_glass_lit':'#6994a4',
@@ -53,10 +54,10 @@ class Batch:
         self.parts[material].append(trimesh.creation.cylinder(radius=radius, sections=sides,
                                                               segment=[start,end]))
 
-    def finish(self, scene, group):
+    def finish(self, scene, group, grade):
         scene.graph.update(frame_to=group)
         for material, parts in self.parts.items():
-            mesh = trimesh.util.concatenate(parts)
+            mesh = grade.fit(trimesh.util.concatenate(parts))
             color = bytes.fromhex(COLORS[material][1:])
             mesh.visual = trimesh.visual.TextureVisuals(material=trimesh.visual.material.PBRMaterial(
                 name=material,baseColorFactor=[*color,255],roughnessFactor=.65,metallicFactor=.12,
@@ -112,11 +113,18 @@ def terminal(batch, footprint, solid, t2):
             for station in np.arange(0,ring.length,step):
                 point = ring.interpolate(station)
                 batch.beam((point.x,7,point.y),(point.x,sill+1.9,point.y),.18,'airport_structure',4)
-        front_x=footprint.intersection(LineString([(west-1,0),(east+1,0)])).bounds[2]
+        def front_x(south_coord):
+            return footprint.intersection(LineString([(west-1,south_coord),(east+1,south_coord)])).bounds[2]
+        if not t2:
+            for station in np.linspace(-6,6,7):
+                boundary=front_x(station)-.03
+                batch.beam((boundary,sill,station),(boundary,sill+5.45,station),.15,'airport_structure')
+            for low,high in zip(np.linspace(-6,6,7)[:-1],np.linspace(-6,6,7)[1:]):
+                batch.mesh([(front_x(z),y,z) for z,y in [(low,sill+2),(high,sill+2),(high,sill+5.45),(low,sill+5.45)]],[(0,1,2),(0,2,3)],'airport_structure')
         class FrontSign:
             detail = batch.detail
             def mesh(self, vertices, faces, material):
-                batch.mesh([(front_x+depth,height,-along) for along,height,depth in vertices],faces,material)
+                batch.mesh([(front_x(-along)+.012+depth,height,-along) for along,height,depth in vertices],faces,material)
         letters(FrontSign(),'桂林两江国际机场' if t2 else '桂林',(0,sill+2,0),34 if t2 else 12,3.4,'airport_red')
 
 
@@ -156,12 +164,15 @@ def warehouse(batch, footprint, hangar):
         if np.dot(normal,(np.array(first)+last)/2) < 0: normal *= -1
         count = 8 if hangar else max(1,int(length//9))
         for idx in range(count):
-            start = first+delta*(.08+.84*idx/count)+normal*.12
-            end = first+delta*(.08+.84*(idx+1)/count)-tangent*(.2 if hangar else 2)+normal*.12
+            start = first+delta*(.08+.84*idx/count)+normal*.012
+            end = first+delta*(.08+.84*(idx+1)/count)-tangent*(.2 if hangar else 2)+normal*.012
             top = height-1 if hangar else 4.7
             batch.mesh([(start[0],.8,start[1]),(end[0],.8,end[1]),(end[0],top,end[1]),(start[0],top,start[1])],
                        [(0,1,2),(0,2,3)],'airport_door')
             if not hangar:
+                for point in [start,end]:
+                    post=point+normal*2.35
+                    batch.beam((post[0],-.06,post[1]),(post[0],top+.2,post[1]),.13,'airport_structure')
                 for level,depth in [(1,2.5),(top+.2,3.5)]:
                     outer = normal*depth
                     batch.mesh([(point[0],level,point[1]) for point in (start,end,end+outer,start+outer)],
@@ -175,6 +186,7 @@ def warehouse(batch, footprint, hangar):
 def generate(name, way):
     _,foot,solid = next(row for row in airfield()[1] if row[0]['id']==way)
     center = foot.centroid
+    grade=Grade(name,center)
     foot,solid = (translate(poly,-center.x,-center.y) for poly in (foot,solid))
     scene = trimesh.Scene()
     for level in range(3):
@@ -182,9 +194,9 @@ def generate(name, way):
         if name in ('t1','t2'): terminal(batch,foot,solid,name=='t2')
         elif name=='tower': tower(batch,foot)
         else: warehouse(batch,foot,name=='hangar')
-        batch.finish(scene,f'lod{level}')
+        batch.finish(scene,f'lod{level}',grade)
     collision = Batch(2)
     collision.slab(solid,-.3,7 if name in ('t1','t2') else {'tower':23,'hangar':13,'cargo':6}[name], 'airport_concrete')
     if name in ('t1','t2'): collision.slab(foot,7,9,'airport_concrete')
-    scene.add_geometry(trimesh.util.concatenate(collision.parts['airport_concrete']),node_name='collision_surface')
+    scene.add_geometry(grade.fit(trimesh.util.concatenate(collision.parts['airport_concrete'])),node_name='collision_surface')
     scene.export(Path(sys.argv[1])/f'liangjiang_{name}.glb')

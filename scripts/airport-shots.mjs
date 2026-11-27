@@ -1,6 +1,7 @@
 import { mkdir, writeFile } from 'node:fs/promises'
 import { dirname } from 'node:path'
 import { chromium } from 'playwright'
+import { preview } from 'vite'
 import { browserOptions } from './qa-browser.mjs'
 
 const views = [
@@ -16,10 +17,12 @@ const views = [
 ]
 const prefix = process.argv[2] ?? 'captures/airport/before'
 await mkdir(dirname(prefix), {recursive:true})
-const browser = await chromium.launch(browserOptions())
+const server = process.env.BASE ? null : await preview({root:'web',configFile:'web/vite.config.ts',preview:{host:'127.0.0.1',port:0}})
+let browser
 try {
+  browser = await chromium.launch(browserOptions())
   const page = await browser.newPage({viewport:{width:1280,height:800}})
-  const base = process.env.BASE ?? 'http://localhost:5714'
+  const base = process.env.BASE ?? `http://127.0.0.1:${server.httpServer.address().port}`
   await page.goto(new URL('/?verify&flow=0&time=11', base).href, {waitUntil:'commit'})
   await page.waitForFunction(() => window.viewer?.camera, null, {timeout:180000})
   const metrics = {}
@@ -48,8 +51,10 @@ try {
       return {peakCalls:Math.max(...samples), samples}
     })
     await page.screenshot({path:`${prefix}-${name}.jpg`, quality:85})
+    console.log(name, metrics[name].peakCalls)
   }
   await writeFile(`${prefix}-metrics.json`, JSON.stringify(metrics, null, 2) + '\n')
 } finally {
-  await browser.close()
+  await browser?.close()
+  await server?.close()
 }
