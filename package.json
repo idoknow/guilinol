@@ -63,6 +63,7 @@
     "verify:street-furniture:city": "node --import tsx scripts/verify-street-furniture.mjs",
     "verify:bus-stops": "node --import tsx --test scripts/test-bus-stops.mjs",
     "verify:bus-stops:city": "node --import tsx scripts/verify-bus-stops.mjs",
+    "verify:sim-order": "node --import tsx --test scripts/test-sim-order.mjs",
     "verify:boat": "node scripts/boat.mjs",
     "verify:jiefang-landing": "node scripts/boat.mjs --jiefang-landing",
     "perf": "node scripts/perf.mjs",

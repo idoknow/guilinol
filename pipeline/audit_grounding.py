@@ -167,6 +167,15 @@ def measurements(model, surface, sample_region=None, wall_corners=None):
     terrain = np.array([g for g, _ in samples])
     levels = np.array([np.nan if w is None else w for _, w in samples])
     support = terrain.copy()
+    if surface.name == 'zhongshan_road':
+        from landmarks.yangqiao import deck_faces
+        for face in deck_faces():
+            local = np.asarray(face) - [surface.x, surface.y, surface.z]
+            inside = shapely.intersects_xy(shapely.Polygon(local[:, ::2]), pts[:, 0], pts[:, 2])
+            normal = np.cross(local[1] - local[0], local[2] - local[0])
+            height = local[0, 1] - ((pts[:, ::2] - local[0, ::2]) @ normal[::2]) / normal[1]
+            valid = inside & (height <= pts[:, 1] + SINK)
+            support[valid] = np.maximum(support[valid], height[valid])
     if surface.name == 'wangcheng_teaching':
         for i, (x, y, z) in enumerate(pts):
             roof = surface.roof(x, z)

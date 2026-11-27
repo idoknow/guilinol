@@ -317,3 +317,20 @@ npm run perf:city -- --hot                          # 附「谁最耗主线程 /
 - 站名画布 1024² 整张上传，已节流到每 0.5 秒一次，手机上首次进入密集站区可能有一次小卡顿。
 - 数据跟世界指纹走：世界重烘后不重跑 `pipeline/bus_stops.py`，站点可能偏离人行道、候车亭可能撞上新种的行道树。
 - 候车亭 58 个（5b 时 26 个）：电动车改由运行时让开后，剩下挡亭的是行道树、花坛、指路牌和护栏。
+
+# 车流仿真热点与秩序（IDOK-399 阶段 6）
+
+集中在 `web/src/traffic/sim.ts`、`web/src/traffic/narrow.ts` 与 `web/src/walk/physics.ts`，不改玩法数值与对外接口。
+
+## 热点与分配清理
+- **每 tick 零冗余对象**：`latestTrafficRef` 仅在变更时重建 `WeakRef`；`lastCamera` / `prevOfficerPos` 原地覆写坐标（`inherit()` 同步 `hasLastCamera` 防重建图时误触发瞬移冷启动）；`this.actors` 两处裁剪改为双指针原地压缩；`spawnCounts`、`waitVisited`、`waitChain`、`exitChoices`、`exitStraight`、`defaultDutyZone` 及 `hiddenSpawn`/`dutyHidden` 方法全部复用。
+- **补车与空间哈希**：补车循环外维护 `scooterCount`/`motorCount`，去除内层双 `actors.filter`；`nearbyRealNonmotor` 按 tick 仅筛建一次候选池；16 m `obstacles` 桶数组池化复用，不再展开 `[...this.actors, vehicle]`；`queues` 靠复用的 `liveActors` Set 原地压缩，`occupiedJunctions` Map 单趟建表，消除路口内 `actors.find`；`parkingHits` 区间查询改无闭包循环；`canRoute` 支持 `exclude` 参数避免行人换轨时拷贝 `actors`；`physics.ts` 的 `surface()` / `coveredWater()` 碰撞体过滤函数按 `kind` 缓存复用。
+
+## 车流秩序与缺陷修复
+- **`fleeUntil` 复位**：到期与退出复位逻辑移出 `officer` 守卫并删除不可达 `else if`，辅警下岗、开单或拦截后不再永久滞留 `fleeing`/`evading`。
+- **饿死批量解救**：1 Hz 巡检由 `actors.find`（每秒只救 1 辆）改为遍历解救全部绿灯下阻塞 ≥ 18 秒的车辆。
+- **平顺减速**：红/黄灯停车线前 22 m 内按舒适减速度（`3.5 m/s²`）平顺降速并稳停在停止线前（保持 `red === 0` 约束）；机动车/两轮车跟车前瞻扩至 14 m，按前车同向速度与安全余量平顺降速，消除 12 m/s 撞墙式瞬停。
+
+## 验证
+- `npm run verify:sim-order`（`scripts/test-sim-order.mjs`）：覆盖 `fleeUntil` 复位、多车同时饿死解救、红灯平顺制动、跟车平顺减速、池化障碍/队列清理、6 级两轮出口选路、`canRoute(exclude)` 与 `inherit()`。
+- 回归全套：`verify:signals`、`traffic-duty.test.mjs`、`test-npc-pose-and-sidewalk.mjs`、`test-traffic-wall.ts`、`verify-traffic-recovery.mjs`、`verify-traffic.mjs`、`verify-traffic-popin.mjs`、`traffic-city-stalls.mjs`、`verify:hot-paths`。

@@ -20,8 +20,8 @@ Yangqiao Commons series (00..11-2024.jpg) and 2018–2025 street views:
   planter dividers placed on each carriageway's outermost lane line
   (width * ((lanes - 1) / lanes - 0.5)) so the outer lane next to the sidewalk
   is a clean bike lane with no motor-lane markings outside the planters
-  (89188-Guilin.jpg), sidewalk camphor street trees, 4 bus shelters (十字街 /
-  阳桥), and Yangqiao municipal blue road sign gantry.
+  (89188-Guilin.jpg), sidewalk camphor street trees, Shizijie bus shelters,
+  and Yangqiao municipal blue road sign gantry.
 """
 from collections import defaultdict
 import json
@@ -44,6 +44,7 @@ from road_profile import RULES, pair_carriageways, profile  # noqa: E402
 from c_kit import landmark_surface
 from shizijie_layout import surfaces
 from nikoniko import Builder, export_landmark  # noqa: E402
+from yangqiao import pedestrian_wings
 
 
 AX, AZ = ll2xz(25.2790956, 110.2903834)
@@ -334,6 +335,7 @@ def _planter_divider_curve(m: Builder, world_line: LineString):
 
 def build_zhongshan_road(m: Builder):
     m.surface = landmark_surface('zhongshan_road')
+    pedestrian_wings(m, (AX, AZ))
     # ------------------------------------------------------------------
     # 1. West Frontage 1: Commercial Complex way/675593163 (6F / 20.6 m)
     # ------------------------------------------------------------------
@@ -377,7 +379,7 @@ def build_zhongshan_road(m: Builder):
     m.box(-2.0, 5.0, 0.85, 3.8, 23.2, 0.85, 'dark')
     m.sign_quad(-2.0, 12.6, 1.32, 3.4, 14.4, 'jinma_vert')
     m.box(-18.0, 17.6, 0.78, 14.6, 1.85, 0.28, 'dark')
-    m.sign_quad(-18.0, 17.66, 0.96, 14.3, 1.72, 'hexie_sign')
+    m.sign_quad(-18.0, 17.66, 0.925, 14.3, 1.72, 'hexie_sign')
     m.pose = (0.0, 0.0, 0.0, 0.0)
 
     # ------------------------------------------------------------------
@@ -418,19 +420,22 @@ def build_zhongshan_road(m: Builder):
     east_road = by_way[258911170]
     west_roads = [by_way[259016852], by_way[259020518]]
 
-    # Place 4 bus shelters directly on the paired carriageways' 2.5 m sidewalks
+    # Yangqiao platforms 2642197676 / 2643390973 are already emitted by streets.py south of the bridge.
     bus_specs = [
         # (road, fraction_along, station_key)
         (east_road, 0.78, 'bus_shizijie'),
         (west_roads[0], 0.16, 'bus_shizijie'),
-        (east_road, 0.31, 'bus_yangqiao'),
-        (west_roads[1], 0.42, 'bus_yangqiao'),
+        (east_road, 0.31, None),
+        (west_roads[1], 0.42, None),
     ]
     bus_pullin_zones = []
     for road, frac, station_key in bus_specs:
         sw_line = road.line.offset_curve(road.width / 2.0 + max(road.right, 2.5) * 0.58)
         d = sw_line.length * frac
         pt = sw_line.interpolate(d)
+        bus_pullin_zones.append(pt.buffer(11.5))
+        if station_key is None:
+            continue
         p_a = sw_line.interpolate(max(0.0, d - 1.0))
         p_b = sw_line.interpolate(min(sw_line.length, d + 1.0))
         tx, tz = p_b.x - p_a.x, p_b.y - p_a.y
@@ -445,7 +450,6 @@ def build_zhongshan_road(m: Builder):
         lx, lz = pt.x - AX, pt.y - AZ
         _bus_shelter(m, lx, m.surface.ground(lx,lz), lz, shelter_yaw, station_key=station_key,
                      graded=road is west_roads[0] and station_key == 'bus_shizijie')
-        bus_pullin_zones.append(pt.buffer(11.5))
 
     divider_mask = unary_union([junc_mask, *bus_pullin_zones])
     road_surface, sidewalk = surfaces('zhongshan_road', 260)

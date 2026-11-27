@@ -56,7 +56,7 @@ export function needsAdmission(corridor:Corridor,pinch:Pinch){
   const [left,right]=gates(corridor,pinch),count=Number(left!==null)+Number(right!==null)
   return !count||(right??station(corridor,pinch.last))-(left??station(corridor,pinch.first))>8*count
 }
-export function canRoute(corridor:Corridor|undefined,dist:number,actors:readonly Walker[]){
+export function canRoute(corridor:Corridor|undefined,dist:number,actors:readonly Walker[],exclude?:Walker){
   if(!corridor)return true
   const along=offset(corridor,dist),direction=corridor.direction
   return !pinches(corridor.profile).some(pinch=>{
@@ -64,6 +64,7 @@ export function canRoute(corridor:Corridor|undefined,dist:number,actors:readonly
     const near=station(corridor,direction>0?pinch.first:pinch.last),far=station(corridor,direction>0?pinch.last:pinch.first)
     if((far-along)*direction<0)return false
     return actors.some(other=>{
+      if(other===exclude)return false
       const reverse=other.track.corridor
       return !other.arrived&&!other.leaving&&reverse?.profile===corridor.profile&&reverse.direction!==direction&&(offset(reverse,other.dist)-near)*direction>=0
     })
