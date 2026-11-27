@@ -731,6 +731,7 @@ const ICO_SUB1 = (() => {
 const TREE_SHADE_C0 = new THREE.Color()
 const TREE_SHADE_C1 = new THREE.Color()
 const TREE_SHADE_C2 = new THREE.Color()
+const TREE_SHADE_UNDER = new THREE.Color()
 const TREE_SHADE_OUT = new THREE.Color()
 
 function evalPolyBlob(
@@ -812,21 +813,27 @@ function emitShadedWoodTris(
 function emitShadedCanopyTris(
   tris: readonly [Vec3, Vec3, Vec3][],
   cYmin: number, cSpan: number,
-  darkHex: number, midHex: number, litHex: number,
+  darkHex: number, midHex: number, litHex: number, underLiftHex: number,
   emitTri: SurfaceTriEmitter,
 ) {
   TREE_SHADE_C0.setHex(darkHex); TREE_SHADE_C1.setHex(midHex); TREE_SHADE_C2.setHex(litHex)
+  TREE_SHADE_UNDER.setHex(underLiftHex)
   for (const [a, b, c] of tris) {
     const ym = (a[1] + b[1] + c[1]) / 3
     const abx = b[0] - a[0], aby = b[1] - a[1], abz = b[2] - a[2]
     const acx = c[0] - a[0], acy = c[1] - a[1], acz = c[2] - a[2]
     const nx = aby * acz - abz * acy, ny = abz * acx - abx * acz, nz = abx * acy - aby * acx
     const nl = Math.hypot(nx, ny, nz) || 1
+    const nyNorm = ny / nl
     const hT = Math.max(0, Math.min(1, (ym - cYmin) / cSpan))
-    const nT = (ny / nl) * 0.5 + 0.5
-    const t = Math.max(0, Math.min(1, 0.58 * hT + 0.42 * nT))
+    const nT = nyNorm * 0.5 + 0.5
+    const t = Math.max(0, Math.min(1, 0.65 * hT + 0.35 * nT))
     if (t < 0.5) TREE_SHADE_OUT.copy(TREE_SHADE_C0).lerp(TREE_SHADE_C1, t * 2)
     else TREE_SHADE_OUT.copy(TREE_SHADE_C1).lerp(TREE_SHADE_C2, (t - 0.5) * 2)
+    // Street surface material (aSurface=7) lacks trees.ts treeShadeFloor=0.8; lift downward-facing facet albedo
+    // so HemisphereLight ground bounce + gradeDay contrast lands at natural deep green (matching native trees, 0 dead-black).
+    const underLift = Math.max(0, Math.min(1, (0.20 - nyNorm) / 1.15))
+    if (underLift > 0) TREE_SHADE_OUT.lerp(TREE_SHADE_UNDER, underLift * 0.88)
     emitTri(a[0], a[1], a[2], b[0], b[1], b[2], c[0], c[1], c[2], TREE_SHADE_OUT.r, TREE_SHADE_OUT.g, TREE_SHADE_OUT.b)
   }
 }
@@ -937,10 +944,32 @@ function emitOrnamentalTree(
     cYmax = Math.max(cYmax, a[1], b[1], c[1])
   }
   const cSpan = Math.max(0.5, cYmax - cYmin)
-  emitShadedCanopyTris(greenTris, cYmin, cSpan, 0x17311d, 0x2f5a2d, 0x5a8540, emitTri)
+  emitShadedCanopyTris(greenTris, cYmin, cSpan, 0x285229, 0x366432, 0x5a8540, 0x569447, emitTri)
   if (blossomTris.length) {
-    emitShadedCanopyTris(blossomTris, cYmin, cSpan, 0x6b2f47, 0x9e536f, 0xce8fa5, emitTri)
+    emitShadedCanopyTris(blossomTris, cYmin, cSpan, 0x86445d, 0xa45874, 0xce8fa5, 0xc87a96, emitTri)
   }
+}
+
+/**
+ * Samples raised surface offset (+0.195 vs +0.045) for a chain start/end cap or tile-border end post.
+ * Combines the raw endpoint, the 0.08 m tucked end-cap center, a 0.5 m inward probe, and the adjacent
+ * leg midpoint so 0.1 m quantized endpoints sitting millimetres outside a kind=4/kind=1 polygon never
+ * sink 15 cm below the attached rail/curb.
+ */
+function sampleEndSurfaceOff(
+  chain: DividerChain,
+  isStart: boolean,
+  surfaceAt: (x: number, z: number) => number,
+): number {
+  const sEnd = isStart ? 0 : chain.totalLength
+  const inwardSign = isStart ? 1 : -1
+  const pEnd = sampleChainAt(chain, sEnd)
+  const px = pEnd.x + pEnd.tx * inwardSign * 0.08
+  const pz = pEnd.z + pEnd.tz * inwardSign * 0.08
+  const pIn = sampleChainAt(chain, isStart ? Math.min(chain.totalLength, 0.5) : Math.max(0, chain.totalLength - 0.5))
+  const adjLeg = isStart ? chain.legs[0] : chain.legs[chain.legs.length - 1]
+  const adjMidOff = adjLeg ? surfaceAt((adjLeg.start.x + adjLeg.end.x) * 0.5, (adjLeg.start.z + adjLeg.end.z) * 0.5) : 0.045
+  return Math.max(surfaceAt(pEnd.x, pEnd.z), surfaceAt(px, pz), surfaceAt(pIn.x, pIn.z), adjMidOff)
 }
 
 /** Emits a grounded cast-iron plinth + white rail post with 2 cm vertical overlap (0 air gap, visible atop +0.195). */
@@ -949,10 +978,10 @@ function emitMedianRailPost(
   z: number,
   yaw: number,
   baseLevel: (x: number, z: number) => number,
-  surfaceAt: (x: number, z: number) => number,
+  surfaceOff: number,
   box: BoxEmitter,
 ) {
-  const y0 = baseLevel(x, z) + surfaceAt(x, z)
+  const y0 = baseLevel(x, z) + surfaceOff
   // Plinth [y0-0.03 .. y0+0.13] sits cleanly visible atop either +0.195 raised median or +0.045 asphalt
   box(x, y0 + 0.05, z, 0.16, 0.16, 0.20, yaw, PAL.railBase)
   // Post [y0+0.11 .. y0+0.94] embedded 2 cm into plinth (0 gap) and capped cleanly at top rail (+0.9225)
@@ -967,8 +996,12 @@ function emitMedianMetalRailChain(
   palette: DividerPalette,
 ) {
   const mergedLegs = mergeCollinearChainLegs(chain.legs, baseLevel, 12)
+  const mergedBands: {s0: number; s1: number; off: number}[] = []
+  let sAcc = 0
   for (const leg of mergedLegs) {
     const midOff = surfaceAt((leg.start.x + leg.end.x) * 0.5, (leg.start.z + leg.end.z) * 0.5)
+    mergedBands.push({s0: sAcc, s1: sAcc + leg.length, off: midOff})
+    sAcc += leg.length
     const g = sampleDividerSpanGrade(leg.start.x, leg.start.z, leg.end.x, leg.end.z, baseLevel, midOff)
     if (g.flatLength < 0.05) continue
     // Top white beam [y0+0.8375 .. y0+0.9225] + lower silver beam [y0+0.2475 .. y0+0.3125]
@@ -979,33 +1012,48 @@ function emitMedianMetalRailChain(
       box(g.midX, g.midY + 0.58, g.midZ, Math.min(1.35, g.slopeLength), 0.42, 0.09, g.yaw, palette.bannerRed, g.pitch)
     }
   }
+  const mergedOffAt = (s: number) => {
+    for (let i = 0; i < mergedBands.length; i++) {
+      if (s <= mergedBands[i].s1 + 1e-4) return mergedBands[i].off
+    }
+    return mergedBands.length ? mergedBands[mergedBands.length - 1].off : 0.045
+  }
   // Posts + alternating airy vertical pickets along continuous chainage
   const bayCount = Math.max(1, Math.round(chain.totalLength / 2.2))
   const postStep = chain.totalLength / bayCount
+  const sampleInnerSurf = (p: ReturnType<typeof sampleChainAt>, s: number) => Math.max(
+    surfaceAt(p.x, p.z),
+    surfaceAt(p.x + p.tx * 0.25, p.z + p.tz * 0.25),
+    surfaceAt(p.x - p.tx * 0.25, p.z - p.tz * 0.25),
+    mergedOffAt(s),
+  )
   for (let i = 0; i < bayCount; i++) {
     const midS = (i + 0.5) * postStep
     const pm = sampleChainAt(chain, midS)
-    const ym = baseLevel(pm.x, pm.z) + surfaceAt(pm.x, pm.z)
+    const ym = baseLevel(pm.x, pm.z) + sampleInnerSurf(pm, midS)
     // Picket [ym+0.27 .. ym+0.89] spans cleanly into both lower and upper rails
     box(pm.x, ym + 0.58, pm.z, 0.036, 0.62, 0.036, pm.yaw, PAL.railSilver)
     if (i > 0) {
-      const p = sampleChainAt(chain, i * postStep)
-      emitMedianRailPost(p.x, p.z, p.yaw, baseLevel, surfaceAt, box)
+      const ps = i * postStep
+      const p = sampleChainAt(chain, ps)
+      emitMedianRailPost(p.x, p.z, p.yaw, baseLevel, sampleInnerSurf(p, ps), box)
     }
   }
   // End-cap treatments at real street openings vs grounded plinth posts at tile borders
   const first = sampleChainAt(chain, 0)
   const last = sampleChainAt(chain, chain.totalLength)
+  const startSurfOff = Math.max(sampleEndSurfaceOff(chain, true, surfaceAt), mergedOffAt(0))
+  const endSurfOff = Math.max(sampleEndSurfaceOff(chain, false, surfaceAt), mergedOffAt(chain.totalLength))
   if (chain.startOpen) {
-    emitOpeningEndCap(first.x, first.z, first.tx, first.tz, first.yaw, baseLevel, box, 'rail', 1, surfaceAt(first.x, first.z))
+    emitOpeningEndCap(first.x, first.z, first.tx, first.tz, first.yaw, baseLevel, box, 'rail', 1, startSurfOff)
   } else {
-    emitMedianRailPost(first.x, first.z, first.yaw, baseLevel, surfaceAt, box)
+    emitMedianRailPost(first.x, first.z, first.yaw, baseLevel, startSurfOff, box)
   }
   if (!chain.closed) {
     if (chain.endOpen) {
-      emitOpeningEndCap(last.x, last.z, last.tx, last.tz, last.yaw, baseLevel, box, 'rail', -1, surfaceAt(last.x, last.z))
+      emitOpeningEndCap(last.x, last.z, last.tx, last.tz, last.yaw, baseLevel, box, 'rail', -1, endSurfOff)
     } else {
-      emitMedianRailPost(last.x, last.z, last.yaw, baseLevel, surfaceAt, box)
+      emitMedianRailPost(last.x, last.z, last.yaw, baseLevel, endSurfOff, box)
     }
   }
 }
@@ -1109,13 +1157,17 @@ function emitMedianGreenTreesChain(
     }
   }
 
+  const firstGreenLeg = mergedLegs[0]
+  const lastGreenLeg = mergedLegs[mergedLegs.length - 1]
+  const firstGreenOff = firstGreenLeg ? surfaceAt((firstGreenLeg.start.x + firstGreenLeg.end.x) * 0.5, (firstGreenLeg.start.z + firstGreenLeg.end.z) * 0.5) : 0.045
+  const lastGreenOff = lastGreenLeg ? surfaceAt((lastGreenLeg.start.x + lastGreenLeg.end.x) * 0.5, (lastGreenLeg.start.z + lastGreenLeg.end.z) * 0.5) : 0.045
   if (chain.startOpen) {
     const first = sampleChainAt(chain, 0)
-    emitOpeningEndCap(first.x, first.z, first.tx, first.tz, first.yaw, baseLevel, box, 'green', 1, surfaceAt(first.x, first.z))
+    emitOpeningEndCap(first.x, first.z, first.tx, first.tz, first.yaw, baseLevel, box, 'green', 1, Math.max(sampleEndSurfaceOff(chain, true, surfaceAt), firstGreenOff))
   }
   if (!chain.closed && chain.endOpen) {
     const last = sampleChainAt(chain, chain.totalLength)
-    emitOpeningEndCap(last.x, last.z, last.tx, last.tz, last.yaw, baseLevel, box, 'green', -1, surfaceAt(last.x, last.z))
+    emitOpeningEndCap(last.x, last.z, last.tx, last.tz, last.yaw, baseLevel, box, 'green', -1, Math.max(sampleEndSurfaceOff(chain, false, surfaceAt), lastGreenOff))
   }
 }
 
@@ -1220,11 +1272,13 @@ function emitVergeHedgeCurbChain(
     }
   }
 
-  if (chain.startOpen) {
+  const startHasNativeTree = nativeBeds.some(b => b.s < 1.05)
+  const endHasNativeTree = nativeBeds.some(b => chain.totalLength - b.s < 1.05)
+  if (chain.startOpen && !startHasNativeTree) {
     const first = sampleChainAt(chain, 0)
     emitOpeningEndCap(first.x, first.z, first.tx, first.tz, first.yaw, baseLevel, box, 'verge', 1, 0.195)
   }
-  if (!chain.closed && chain.endOpen) {
+  if (!chain.closed && chain.endOpen && !endHasNativeTree) {
     const last = sampleChainAt(chain, chain.totalLength)
     emitOpeningEndCap(last.x, last.z, last.tx, last.tz, last.yaw, baseLevel, box, 'verge', -1, 0.195)
   }
@@ -1382,11 +1436,13 @@ function emitVergeTreePlanterChain(
     }
   }
 
-  if (chain.startOpen) {
+  const startHasNativeTree = nativeBeds.some(b => b.s < 1.05)
+  const endHasNativeTree = nativeBeds.some(b => chain.totalLength - b.s < 1.05)
+  if (chain.startOpen && !startHasNativeTree) {
     const first = sampleChainAt(chain, 0)
     emitOpeningEndCap(first.x, first.z, first.tx, first.tz, first.yaw, baseLevel, box, 'verge', 1, 0.195)
   }
-  if (!chain.closed && chain.endOpen) {
+  if (!chain.closed && chain.endOpen && !endHasNativeTree) {
     const last = sampleChainAt(chain, chain.totalLength)
     emitOpeningEndCap(last.x, last.z, last.tx, last.tz, last.yaw, baseLevel, box, 'verge', -1, 0.195)
   }

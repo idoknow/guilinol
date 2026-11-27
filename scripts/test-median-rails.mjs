@@ -248,6 +248,78 @@ test('emitMedianMetalRailChain keeps cast-iron plinths visible above +0.195 medi
   }
 })
 
+test('opening end-caps inherit +0.195 surface even when quantized chain endpoints sit 0.05 m outside kind=4 polygon', () => {
+  // Raised kind=4 island spans x=[10.00..22.00], z=[19.40..20.60], while chain endpoints sit 5 cm outside at x=9.95 and x=22.05
+  const raisedMedianPath = [4, [[1000, 1940], [2200, 1940], [2200, 2060], [1000, 2060]]]
+  const decor = [
+    [1, 115, 200, 0, 31], // x=[9.95 .. 13.05]
+    [1, 145, 200, 0, 30], // x=[13.00 .. 16.00]
+    [1, 175, 200, 0, 30], // x=[16.00 .. 19.00]
+    [1, 205, 200, 0, 31], // x=[18.95 .. 22.05]
+  ]
+  const boxes = []
+  const pal = {
+    railing: new THREE.Color(0xd9d5ca),
+    stoneLight: new THREE.Color(0xa6a39a),
+    stoneMid: new THREE.Color(0x8c8981),
+    bannerRed: new THREE.Color(0xc23b33),
+    hedge: new THREE.Color(0x486544),
+    iron: new THREE.Color(0x42624e),
+  }
+  emitRoadDividers(
+    decor,
+    [raisedMedianPath],
+    () => false,
+    () => 150,
+    [-768, -256], // Jiefang East Rd -> median_metal_rail
+    (x, y, z, w, h, d, yaw, tint) => boxes.push({x, y, z, minY: y - h * 0.5, maxY: y + h * 0.5, w, h, d, hex: tint?.getHex?.()}),
+    pal,
+  )
+  const topRails = boxes.filter(b => b.hex === 0xe4e3dd && b.w > 1.0 && b.h < 0.1)
+  const yellowCaps = boxes.filter(b => b.hex === 0xe5b126)
+  const whiteTopCaps = boxes.filter(b => b.hex === 0xe4e3dd && Math.abs(b.w - 0.14) < 0.01)
+  const capPlinths = boxes.filter(b => b.hex === 0x3a4044 && Math.abs(b.w - 0.22) < 0.01)
+  assert.equal(yellowCaps.length, 2, `expected 2 open end-caps, got ${yellowCaps.length}`)
+  assert.equal(whiteTopCaps.length, 2, `expected 2 white top caps, got ${whiteTopCaps.length}`)
+  assert.equal(capPlinths.length, 2, `expected 2 cast-iron end-cap plinths, got ${capPlinths.length}`)
+  const expectedSurfY = 150.195
+  const railTopY = Math.max(...topRails.map(r => r.maxY))
+  for (let i = 0; i < 2; i++) {
+    assert(capPlinths[i].maxY >= expectedSurfY + 0.11, `end-cap ${i} plinth buried: maxY=${capPlinths[i].maxY}`)
+    assert(whiteTopCaps[i].maxY >= railTopY - 0.005, `end-cap ${i} sank below top rail: capMaxY=${whiteTopCaps[i].maxY}, railTopY=${railTopY}`)
+    assert(whiteTopCaps[i].minY <= yellowCaps[i].maxY - 0.01, `gap between yellow shaft and white cap on end-cap ${i}`)
+  }
+})
+
+test('verge opening end-caps are skipped when a native street tree stands within 1.05 m of the chain end', () => {
+  const pal = {
+    railing: new THREE.Color(0xd9d5ca),
+    stoneLight: new THREE.Color(0xa6a39a),
+    stoneMid: new THREE.Color(0x8c8981),
+    bannerRed: new THREE.Color(0xc23b33),
+    hedge: new THREE.Color(0x486544),
+    iron: new THREE.Color(0x42624e),
+  }
+  // Lijiang Rd hedge_curb chain x=[160..176], native bed right at start x=160.3 (s=0.3 < 1.05) and none at end x=176
+  const decor = [
+    [5, 1620, 1047, 0, 40],
+    [5, 1660, 1047, 0, 40],
+    [5, 1700, 1047, 0, 40],
+    [5, 1740, 1047, 0, 40],
+  ]
+  const beds = [[1603, 1047, 0, 1]]
+  const boxes = []
+  emitRoadDividers(
+    decor, [], () => false, () => 150, [256, 1792],
+    (x, y, z, w, h, d, yaw, tint) => boxes.push({x, y, z, w, h, d, hex: tint?.getHex?.()}),
+    pal, beds,
+  )
+  // Verge opening end-cap has yellow warning band 0xe5b126; only the clear end (x~175.9) should emit one, NOT x~160.1
+  const endWarnBands = boxes.filter(b => b.hex === 0xe5b126)
+  assert.equal(endWarnBands.length, 1, `expected exactly 1 verge end-cap (clear end only), got ${endWarnBands.length}`)
+  assert(endWarnBands[0].x > 174, `verge end-cap should only appear at the tree-free end, got x=${endWarnBands[0].x}`)
+})
+
 test('emitSoftDelineatorPost exposes black rubber base above +0.195 collector kind=4 verges with zero base-post gap', () => {
   const boxes = []
   emitSoftDelineatorPost(
