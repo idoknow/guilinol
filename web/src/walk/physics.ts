@@ -552,11 +552,21 @@ export async function createPhysics(manifest:Manifest,stream:Stream,peaks:PeaksG
   const bikeWallFilter=(coll:R.Collider)=>{const k=kinds.get(coll.handle);return k==='landmark'||k==='peak'||k==='rail'||k==='building'||k==='tree'}
   const canTrafficPush=trafficPushGuard(world,capsule,bikeWallFilter,insideHouse)
   const landmarkFilter=(coll:R.Collider)=>kinds.get(coll.handle)==='landmark'
+  const bridgeSurfaceFilter=(coll:R.Collider)=>bridgeSurfaces.has(coll.handle)
+  const coveredWaterFilter=(coll:R.Collider)=>{const kind=kinds.get(coll.handle);return !!kind&&kind!=='ground'&&kind!=='overview'}
+  const kindFilters=new Map<Kind,(coll:R.Collider)=>boolean>()
+  const filterForKind=(kind:Kind|'bridgeSurface')=>{
+    if(kind==='deck')return deckFilter
+    if(kind==='bridgeSurface')return bridgeSurfaceFilter
+    let fn=kindFilters.get(kind)
+    if(!fn){fn=(coll:R.Collider)=>kinds.get(coll.handle)===kind;kindFilters.set(kind,fn)}
+    return fn
+  }
   const walkableFilter=(coll:R.Collider)=>{const k=kinds.get(coll.handle);return k==='deck'||k==='deckThin'||k==='sidewalk'||k==='road'||k==='ground'||k==='overview'||k==='landmark'}
   function surface(east:number,south:number,kind:Kind|'bridgeSurface',origin=4000,reach=6000){
     if(kind==='bridgeSurface'&&!bridgeSurfaces.size)return null
     surfaceRay.origin.x=east;surfaceRay.origin.y=origin;surfaceRay.origin.z=south
-    const hit=world.castRayAndGetNormal(surfaceRay,reach,false,undefined,undefined,capsule,undefined,kind==='deck'?deckFilter:kind==='bridgeSurface'?coll=>bridgeSurfaces.has(coll.handle):coll=>kinds.get(coll.handle)===kind)
+    const hit=world.castRayAndGetNormal(surfaceRay,reach,false,undefined,undefined,capsule,undefined,filterForKind(kind))
     const thin=!!hit&&(thinDecks.has(hit.collider.handle)||kinds.get(hit.collider.handle)==='deckThin')
     return hit?{y:origin-hit.timeOfImpact,slope:Math.acos(Math.min(1,Math.abs(hit.normal.y))),thin}:null
   }
@@ -571,9 +581,7 @@ export async function createPhysics(manifest:Manifest,stream:Stream,peaks:PeaksG
   }
   const fishingColumn=new R.Cuboid(1,150,1)
   function coveredWater(x:number,z:number,height:number){
-    return !!world.intersectionWithShape({x,y:height+150-.02,z},identity,fishingColumn,undefined,undefined,capsule,undefined,coll=>{
-      const kind=kinds.get(coll.handle);return !!kind&&kind!=='ground'&&kind!=='overview'
-    })
+    return !!world.intersectionWithShape({x,y:height+150-.02,z},identity,fishingColumn,undefined,undefined,capsule,undefined,coveredWaterFilter)
   }
   function waterCeiling(east:number,south:number,waterY:number){
     let bottom=Infinity
