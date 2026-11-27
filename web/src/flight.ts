@@ -8,11 +8,13 @@ export function flight(camera:THREE.PerspectiveCamera, canvas:HTMLCanvasElement,
     camera.rotation.y -= dx*.003
     camera.rotation.x = clamp(camera.rotation.x-dy*.003,-1.54,1.54)
   }
-  const forward = new THREE.Vector3(), right = new THREE.Vector3()
-  function move(ahead:number, side:number) {
-    camera.getWorldDirection(forward)
-    right.setFromMatrixColumn(camera.matrixWorld,0)
-    camera.position.addScaledVector(forward,ahead).addScaledVector(right,side)
+  const min = new THREE.Vector3(extent[0],120,extent[1]), max = new THREE.Vector3(extent[0]+extent[2],6000,extent[1]+extent[3])
+  function move(ahead:number, side:number, up=0) {
+    const sin=Math.sin(camera.rotation.y), cos=Math.cos(camera.rotation.y)
+    camera.position.x += side*cos-ahead*sin
+    camera.position.z -= ahead*cos+side*sin
+    camera.position.y += up
+    camera.position.clamp(min,max)
   }
   window.addEventListener('keydown',event=>keys.add(event.code))
   window.addEventListener('keyup',event=>keys.delete(event.code))
@@ -32,7 +34,8 @@ export function flight(camera:THREE.PerspectiveCamera, canvas:HTMLCanvasElement,
     if(!last) return
     const dx=event.clientX-last[0],dy=event.clientY-last[1]
     if(touches.size===1) rotate(dx,dy)
-    else move(-dy*.8,dx*.8)
+    else if(touches.size===2) move(-dy*.8,dx*.8)
+    else move(0,0,-dy*.8/touches.size)
     touches.set(event.pointerId,[event.clientX,event.clientY])
   })
   for(const name of ['pointerup','pointercancel','lostpointercapture'])
@@ -41,8 +44,6 @@ export function flight(camera:THREE.PerspectiveCamera, canvas:HTMLCanvasElement,
     if(!enabled()||!['KeyW','KeyS','KeyA','KeyD','KeyE','KeyQ'].some(key=>keys.has(key)))return
     const speed = (keys.has('ShiftLeft')?380:120)*Math.min(.1,dt)
     const axis = (plus:string,minus:string)=>Number(keys.has(plus))-Number(keys.has(minus))
-    move(axis('KeyW','KeyS')*speed,axis('KeyD','KeyA')*speed)
-    camera.position.y += axis('KeyE','KeyQ')*speed
-    camera.position.clamp(new THREE.Vector3(extent[0],120,extent[1]),new THREE.Vector3(extent[0]+extent[2],6000,extent[1]+extent[3]))
+    move(axis('KeyW','KeyS')*speed,axis('KeyD','KeyA')*speed,axis('KeyE','KeyQ')*speed)
   }
 }

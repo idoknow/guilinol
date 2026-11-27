@@ -1,6 +1,6 @@
 import {cacheResponse} from './telemetry'
 import * as THREE from 'three'
-import {buildingGeometry,type Building} from './buildings'
+import {buildingGeometry,isLegacyKuiguangSliver,type Building} from './buildings'
 import {ensureShardForTile,hasShardForTile} from './city-upgrade/state'
 import {loadStreetGeometry} from './street-loader'
 import type {StationPavingStyle,Streets} from './street-worker'
@@ -21,14 +21,14 @@ interface Asset {file:string; bytes:number}
 import {refinePlatformTerrain,type RefinedTerrainFace} from './platform-access'
 export interface Tile extends Asset {buildingColliderRings?:Record<number,Building[2]>; platformAccess?:RefinedTerrainFace[]; x:number; z:number; stationPaving?:StationPavingStyle; roadbeds?:number[]}
 export function physicalBuildingRings(tile:Tile, rendered:Building[]):Building[]{
-  if(!tile.buildingColliderRings)return rendered
-  return rendered.map((building,i)=>{
+  const rings=!tile.buildingColliderRings?rendered:rendered.map((building,i)=>{
     const loops=tile.buildingColliderRings?.[i]
     if(!loops)return building
     const physical:Building=[...building]
     physical[2]=loops
     return physical
   })
+  return tile.x===-1536 && tile.z===-256 ? rings.filter(part=>!isLegacyKuiguangSliver(tile.x,tile.z,part)) : rings
 }
 export interface Manifest {
   region?:import('../../lib/play-region').Region
