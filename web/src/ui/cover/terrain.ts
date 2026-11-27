@@ -122,7 +122,7 @@ export function createTerrain(ctx: Ctx, view: ViewData, noise: T.Texture) {
         float ridge = smoothstep(1. - px * 2.5, 1., vTop);
         float back = pow(max(dot(-V, uSunDir), 0.), 3.);
         c = applyAir(c, vW, -V, dist);
-        c += uGlow * ridge * (.1 + .9 * back) * .5 * uRim.y;
+        c += uGlow * ridge * (.1 + .9 * back) * .5 * mix(1., uRim.y, smoothstep(-.06, .03, uSunDir.y));
         gl_FragColor = vec4(c, 1.);
         ${GLSL_OUT}
       }`,
