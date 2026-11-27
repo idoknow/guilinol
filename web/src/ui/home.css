@@ -29,13 +29,15 @@ body[data-home] :is(.hud-me,.dock,.sky-ui,.hint,footer,.walk-ui,.vehicle-action,
 .home-main{position:relative;box-sizing:border-box;min-height:calc(100dvh - 40px);display:flex;flex-direction:column;justify-content:center;gap:var(--ui-s-6);
   width:min(560px,100%);padding:calc(48px + env(safe-area-inset-top)) calc(24px + env(safe-area-inset-right)) var(--ui-s-4) calc(clamp(24px,7vw,112px) + env(safe-area-inset-left))}
 
-/* 书名：大字是主视觉（--ui-fs-3xl）；像素 Logo 收成书名上方一枚小宣纸签，像刻本封面角上的签条，只做配角 */
-.home-title{display:grid;justify-items:start;gap:14px}
-.home-seal{display:block;box-sizing:border-box;width:clamp(112px,15vh,144px);padding:6px 8px 5px;background:var(--ui-paper);border-radius:var(--ui-r-xs);
-  outline:1px solid var(--ui-paper-line);outline-offset:-3px}
-.home-seal img{display:block;width:100%;height:auto;mix-blend-mode:multiply}
-.home-title h1{margin:0 0 0 -.04em;font:700 clamp(var(--ui-fs-2xl),7.2vh,var(--ui-fs-3xl))/1.05 var(--ui-serif);letter-spacing:var(--ui-track-display);
+/* 书名（IDOK-468 二改）：一枚字标——「网上」竖排一列，「桂林」两枚大字，像刻本题签的「小字领、大字立」，四字仍按「网上桂林」读。
+   像素徽标去掉白底（emblem-clear.webp），收成「林」字右下角的落款，只陪衬不抢镜。字号走 --h1，徽标跟着字号缩放。 */
+.home-title{--h1:clamp(88px,12.6vh,112px);display:flex;align-items:flex-end;gap:calc(var(--h1) * .14)}
+.home-title h1{display:flex;align-items:stretch;gap:calc(var(--h1) * .1);margin:0 0 0 -.04em;font:700 var(--h1)/1 var(--ui-serif);
   text-shadow:0 2px 24px color-mix(in srgb,var(--ui-ink-950) 55%,transparent)}
+.home-h1-net{writing-mode:vertical-rl;padding:.06em .22em 0 0;border-right:1px solid var(--ui-line-strong);font-size:.4em;font-weight:600;letter-spacing:.2em}
+.home-h1-city{letter-spacing:.04em}
+.home-seal{display:block;flex:none;margin-bottom:calc(var(--h1) * .05)}
+.home-seal img{display:block;width:auto;height:calc(var(--h1) * .36)}
 
 /* 目录：三行，发丝线分隔。行、发丝线、悬停底色、焦点框四者同宽，左右对齐；内容在行内缩进 12px */
 .home-modes{display:grid;margin:0}
@@ -136,18 +138,20 @@ kbd{display:inline-block;min-width:1.5em;padding:1px 5px;margin:0 1px;border-rad
 /* 抖音官方号（IDOK-272）：电脑右下一张小码签；手机收成左上一枚小钮（和右上账号对称） */
 .home-douyin{position:absolute;z-index:1;right:calc(24px + env(safe-area-inset-right));bottom:calc(52px + env(safe-area-inset-bottom));
   display:grid;grid-template-columns:auto auto;align-items:center;gap:12px;padding:8px 16px 8px 8px;cursor:pointer;text-align:left;
-  font:inherit;color:var(--ui-text);background:var(--ui-surface-float);border:1px solid var(--ui-line);border-radius:var(--ui-r-md);
-  -webkit-tap-highlight-color:transparent;transition:background var(--ui-fast),border-color var(--ui-fast),transform var(--ui-fast)}
-.home-douyin:hover{background:var(--ui-surface-2);border-color:var(--ui-line-strong)}
+  font:inherit;color:var(--ui-text);background:var(--ui-surface-float);border:0;border-radius:var(--ui-r-sm);
+  -webkit-tap-highlight-color:transparent;transition:background var(--ui-fast),transform var(--ui-fast)}
+/* 匾（同游戏内左上一块匾）：墨青纸面、无外描边，内衬一道 3px 印框；二维码原样不动 */
+.home-douyin::after{content:"";position:absolute;inset:3px;border:1px solid var(--ui-line-strong);border-radius:var(--ui-r-xs);pointer-events:none;transition:border-color var(--ui-fast)}
+.home-douyin:hover::after{border-color:var(--ui-line-hover)}
 .home-douyin:active{transform:scale(var(--ui-press))}
 .home-douyin:focus-visible{outline:2px solid var(--ui-focus);outline-offset:2px}
 .home-douyin-code{display:block;width:64px;height:64px}
 .home-douyin-text{display:grid;gap:8px;justify-items:start}
 .home-douyin-mark{display:block;width:auto;height:16px}
-.home-douyin-text b{font:500 var(--ui-fs-sm)/1.2 var(--ui-serif);letter-spacing:.02em}
+.home-douyin-text b{font:600 var(--ui-fs-sm)/1.2 var(--ui-serif);letter-spacing:.04em}
 @media (max-width:760px),(max-height:520px) and (orientation:landscape){
   .home-douyin{right:auto;bottom:auto;top:calc(16px + env(safe-area-inset-top));left:calc(20px + env(safe-area-inset-left));
-    min-height:var(--ui-h);padding:4px 12px 4px 4px;gap:8px;border-color:var(--ui-line-strong);border-radius:var(--ui-r-ctl)}
+    min-height:var(--ui-h);padding:6px 13px 6px 6px;gap:9px;border-radius:var(--ui-r-sm)}
   .home-douyin-code{width:30px;height:30px}
   .home-douyin-text{grid-auto-flow:column;align-items:center;gap:7px}.home-douyin-mark{height:13px}.home-douyin-text b{display:none}
   .home-douyin-text::after{content:"官方号";font-size:var(--ui-fs-xs);letter-spacing:.1em;color:var(--ui-text-2)}
@@ -161,9 +165,8 @@ kbd{display:inline-block;min-width:1.5em;padding:1px 5px;margin:0 1px;border-rad
   .home-main{justify-content:flex-start;min-height:calc(100dvh - 56px);width:100%;gap:var(--ui-s-5);
     padding:calc(84px + env(safe-area-inset-top)) calc(20px + env(safe-area-inset-right)) var(--ui-s-2) calc(20px + env(safe-area-inset-left))}
   .home-modes{margin-top:auto}
-  .home-title{gap:10px;margin-bottom:0}
-  .home-seal{width:104px;padding:5px 7px 4px}
-  .home-title h1{font-size:clamp(40px,12.5vw,var(--ui-fs-2xl))}
+  .home-title{margin-bottom:0}
+  .home-title{--h1:clamp(72px,21vw,88px)}
   .home-mode{column-gap:var(--ui-s-3);padding:12px}
   .home-mode-seal{font-size:18px}
   .home-mode-text b{gap:10px;font-size:var(--ui-fs-md);letter-spacing:.16em}
@@ -177,7 +180,7 @@ kbd{display:inline-block;min-width:1.5em;padding:1px 5px;margin:0 1px;border-rad
   .home-top{padding-top:calc(10px + env(safe-area-inset-top))}
   .home-douyin{top:calc(10px + env(safe-area-inset-top))}
   .home-main{min-height:calc(100dvh - 48px);padding-top:calc(64px + env(safe-area-inset-top));gap:var(--ui-s-4)}
-  .home-title{gap:8px}.home-seal{width:88px;padding:4px 6px 3px}.home-title h1{font-size:36px}
+  .home-title{--h1:64px}
   .home-mode{padding:9px 12px}
   .home-mode-text>span{font-size:var(--ui-fs-xs)}
   .home-foot{padding-bottom:calc(8px + env(safe-area-inset-bottom))}
@@ -190,9 +193,8 @@ kbd{display:inline-block;min-width:1.5em;padding:1px 5px;margin:0 1px;border-rad
   .home-main{width:100%;min-height:calc(100dvh - 26px);display:grid;grid-template-columns:minmax(0,1fr) minmax(340px,1.3fr);grid-template-areas:"title modes" "title links";
     align-content:center;column-gap:clamp(24px,5vw,56px);row-gap:var(--ui-s-1);
     padding:calc(58px + env(safe-area-inset-top)) calc(20px + env(safe-area-inset-right)) var(--ui-s-1) calc(clamp(20px,5vw,56px) + env(safe-area-inset-left))}
-  .home-title{grid-area:title;align-self:center;gap:10px;margin-bottom:0}
-  .home-seal{width:clamp(88px,12vw,108px);padding:4px 6px 3px}
-  .home-title h1{font-size:clamp(var(--ui-fs-xl),10.4vh,var(--ui-fs-2xl))}
+  .home-title{grid-area:title;align-self:center;margin-bottom:0}
+  .home-title{--h1:clamp(54px,15vh,68px)}
   .home-modes{grid-area:modes;margin:0}
   .home-links{grid-area:links;margin:0 0 0 2px}
   .home-mode{column-gap:var(--ui-s-3);padding:7px 12px}
