@@ -1,7 +1,12 @@
 import * as T from 'three'
+import {characterLight} from './character-light'
 
-/** Three bands of diffuse colour, using the same world-space key in the studio and on the street. */
-export function streetShading(material: T.MeshStandardMaterial, garment = false) {
+/**
+ * Soft key ramp in world space (same in the studio and on the street), tinted cool on the shadow side and warm
+ * on the lit side, plus a Fresnel rim and — for hair — a smooth-normal sheen. All knobs are the shared
+ * uniforms in character-light.ts, so the player, the crowd and the creator stage stay one look.
+ */
+export function streetShading(material: T.MeshStandardMaterial, garment = false, hair = false) {
   const clothing = {
     sleeve: {value: 1.0},
     shortHem: {value: 0},
@@ -9,14 +14,15 @@ export function streetShading(material: T.MeshStandardMaterial, garment = false)
     schoolTop: {value: 0},
     schoolBlue: {value: new T.Color('#536e90')},
     skinTone: {value: new T.Color()},
-    // IDOK-229 starter patterns: 0 none, 1 open front, 2 plaid open overshirt, 3 track stripes, 4 shell yoke, 5 hoodie
+    // IDOK-229 starter patterns: 0 none, 1 open front, 2 plaid open overshirt, 3 track stripes, 4 shell yoke, 5 hoodie,
+    // 6 IDOK-386 cover crew knit (figure_m only: tonal rib in patB)
     pattern: {value: 0},
     legStripe: {value: 0},
     patA: {value: new T.Color()},
     patB: {value: new T.Color()},
   }
   if (garment) material.userData.clothing = clothing
-  material.customProgramCacheKey = () => (garment ? 'creator-cloth' : 'creator-solid')
+  material.customProgramCacheKey = () => (garment ? 'creator-cloth-v6' : hair ? 'creator-hair-v2' : 'creator-solid-v2')
   // Facet normals keep coincident garment/skin layers identical (smooth normals z-fight). Hard bands on
   // facets read as a patchwork, so the key light is a soft ramp instead.
   material.flatShading = true
@@ -27,13 +33,12 @@ export function streetShading(material: T.MeshStandardMaterial, garment = false)
       // A zone is a per-face ID. Interpolating it can turn e.g. 1 into 0.99999994
       // between vertices and make fragments switch between cloth and skin.
       shader.vertexShader =
-        'attribute float clothZone; flat out float zone; varying vec3 rest;\n' +
-        shader.vertexShader.replace(
-          '#include <begin_vertex>',
-          '#include <begin_vertex>\nzone = clothZone; rest = position;',
-        )
+        'attribute float clothZone; flat out float zone; varying vec3 rest; varying vec3 vSmoothN;\n' +
+        shader.vertexShader
+          .replace('#include <begin_vertex>', '#include <begin_vertex>\nzone = clothZone; rest = position;')
+          .replace('#include <defaultnormal_vertex>', '#include <defaultnormal_vertex>\nvSmoothN = transformedNormal;')
       shader.fragmentShader =
-        'flat in float zone; varying vec3 rest; uniform float sleeve, shortHem, sandal, schoolTop, pattern, legStripe; uniform vec3 skinTone, schoolBlue, patA, patB;\n' +
+        'flat in float zone; varying vec3 rest; varying vec3 vSmoothN; uniform float sleeve, shortHem, sandal, schoolTop, pattern, legStripe; uniform vec3 skinTone, schoolBlue, patA, patB;\n' +
         shader.fragmentShader.replace(
           '#include <color_fragment>',
           `#include <color_fragment>
@@ -58,6 +63,13 @@ export function streetShading(material: T.MeshStandardMaterial, garment = false)
             if (pat == 3 && ((x > 0.2 && rest.y > PAT_ARM_TOP) || (front && x < 0.006))) diffuseColor.rgb = patA;
             if (pat == 4 && ((rest.y > 1.31 && x < 0.34) || (front && x < 0.007))) diffuseColor.rgb = patA;
             if (pat == 5 && front && x < 0.105 && rest.y > 1.0 && rest.y < 1.13) diffuseColor.rgb *= rest.y > 1.118 ? 0.7 : 0.88;
+            if (pat == 6) {
+              // IDOK-386 cover crew knit. Rest pose: torso y 0.93-1.50, arms along x 0.23-0.75 (T-pose top = outer arm).
+              // Tonal rib (patB) at hem / cuffs / collar.
+              bool arm = x > 0.2;
+              float ribs = 0.9 + 0.1 * step(0.5, fract((arm ? rest.y : rest.x) * 150.0));
+              if ((!arm && (rest.y < 0.968 || (x < 0.085 && rest.y > 1.445))) || (arm && x > 0.705)) diffuseColor.rgb = patB * ribs;
+            }
           }
         }
         if (legStripe > 0.5 && zone == 2.0 && x > PAT_LEG_OUT && abs(rest.z - PAT_LEG_Z) < 0.022) diffuseColor.rgb = vec3(0.93, 0.93, 0.9);
@@ -69,15 +81,41 @@ export function streetShading(material: T.MeshStandardMaterial, garment = false)
         }`,
         )
     }
-    shader.fragmentShader = 'uniform float uNight;\n' + shader.fragmentShader.replace(
-      '#include <opaque_fragment>',
-      `
-      vec3 keyDir = normalize(mat3(viewMatrix) * vec3(-0.45, 0.86, -0.36));
-      float facing = dot(normal, keyDir);
-      float band = 0.80 + 0.22 * smoothstep(-0.55, 0.85, facing);
-      outgoingLight = diffuseColor.rgb * band * mix(1.0, 0.38, uNight);
+    Object.assign(shader.uniforms, characterLight)
+    if (hair)
+      shader.vertexShader = 'varying vec3 vSheenNormal;\n' + shader.vertexShader.replace(
+        '#include <defaultnormal_vertex>',
+        '#include <defaultnormal_vertex>\nvSheenNormal = transformedNormal;',
+      )
+    shader.fragmentShader =
+      'uniform float uNight, uRim, uSheen, uContrast, uLevel; uniform vec3 uRimColor, uRimFrom, uShade, uLit, uKeyFrom;\n' +
+      (hair ? 'varying vec3 vSheenNormal;\n' : '') +
+      shader.fragmentShader.replace(
+        '#include <opaque_fragment>',
+        `
+      vec3 keyDir = normalize(mat3(viewMatrix) * uKeyFrom);
+      vec3 shadeN = normal;
+      ${garment
+        ? `// The face is one skin layer (nothing coincident to z-fight), so it may shade smoothly: facet patches
+      // on a close-up face read as blotches.
+      if (zone == 0.0 && rest.y > 1.47) shadeN = normalize(vSmoothN);`
+        : ''}
+      float lit = smoothstep(-0.55, 0.85, dot(shadeN, keyDir));
+      vec3 toEye = isOrthographic ? vec3(0.0, 0.0, 1.0) : normalize(vViewPosition);
+      vec3 tone = mix(uShade, uLit, lit) * (1.02 - uContrast * (1.0 - lit));
+      outgoingLight = diffuseColor.rgb * tone * mix(1.0, 0.38, uNight) * uLevel;
+      float edge = 1.0 - clamp(dot(shadeN, toEye), 0.0, 1.0);
+      float rim = uRim * smoothstep(0.42, 0.95, edge) * smoothstep(-0.25, 0.55, dot(shadeN, normalize(mat3(viewMatrix) * uRimFrom)));
+      outgoingLight += rim * mix(1.0, 0.7, uNight) * uRimColor * mix(vec3(0.55), diffuseColor.rgb * 1.6 + 0.2, 0.45);
+      ${hair
+        ? `vec3 sheenN = normalize(vSheenNormal);
+      // Angel ring: a band where the hair turns from facing up to facing the viewer, brightest toward the eye.
+      float up = dot(sheenN, normalize(mat3(viewMatrix) * vec3(0.0, 1.0, 0.0)));
+      float ring = smoothstep(0.18, 0.42, up) * (1.0 - smoothstep(0.5, 0.74, up)) * smoothstep(0.15, 0.75, dot(sheenN, toEye));
+      outgoingLight += uSheen * uLevel * mix(1.0, 0.45, uNight) * ring * mix(vec3(0.62, 0.64, 0.68), diffuseColor.rgb * 2.2 + 0.1, 0.55);`
+        : ''}
       #include <opaque_fragment>`,
-    )
+      )
   }
 }
 
