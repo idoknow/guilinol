@@ -10,6 +10,8 @@ import {interactions} from './interactions'
 import {SIGNAL_DRIVER_RANK,citySignalClock,citySignalColor,citySignalState,citySignals} from './signals'
 import {signalApproaches} from './signal-approach'
 import {parkingBayLines} from './parking-bays'
+import {manholeCovers} from './manhole-covers'
+import {bollards} from './bollards'
 import {LANDMARK_SIGNAL_GROUPS,signalHeads} from './signal-heads'
 import {touchUi} from '../ui/input-mode'
 import {npcDefaults,validNpc} from '../../../lib/npc'
@@ -28,7 +30,7 @@ async function loadGraph(key:string,rules:typeof npcDefaults,surfaceAt?:Traffic[
   const approaches=signalApproaches(graph,LANDMARK_SIGNAL_GROUPS)
   const sim=new Traffic(graph,Math.random,touchUi()?MOBILE_ACTORS:MAX_ACTORS,rules,surfaceAt)
   const timing=performance.getEntriesByName(response.url).at(-1) as PerformanceResourceTiming|undefined
-  return {sim,approaches,sample:{key,encodedBytes:timing?.encodedBodySize||bytes.byteLength,decodedBytes:decoded.byteLength,downloadMs:downloaded-start,parseAndIndexMs:performance.now()-downloaded}}
+  return {sim,approaches,graph,sample:{key,encodedBytes:timing?.encodedBodySize||bytes.byteLength,decodedBytes:decoded.byteLength,downloadMs:downloaded-start,parseAndIndexMs:performance.now()-downloaded}}
 }
 
 export async function traffic(scene:THREE.Scene,camera:THREE.Camera,verify:boolean,sampleGround?:Traffic['sampleGround'],warm?:(root:THREE.Object3D)=>Promise<void>,surfaceAt?:Traffic['surfaceAt']){
@@ -102,7 +104,7 @@ export async function traffic(scene:THREE.Scene,camera:THREE.Camera,verify:boole
       }
       hide(STATIC+count,STATIC+parkCount);parkCount=count;mesh.userData.parked=count
       // A failure here must not reach the catch below: that one drops the cells and fetches them again.
-      try{bays?.setRows(groups.flat())}catch(error){console.warn('Parking bays unavailable',error)}
+      try{bays?.setRows(groups.flat());covers?.recheck()}catch(error){console.warn('Parking bays unavailable',error)}
     }).catch(error=>{if(target===parkKey){parkKey='';cache.clear()}console.warn('Parking cell unavailable',error)})
   }
   let accumulator=0
@@ -121,7 +123,19 @@ export async function traffic(scene:THREE.Scene,camera:THREE.Camera,verify:boole
     mesh.userData.parkingBayDraws=async(frames?:number)=>(await import('./parking-bay-audit')).parkingBayDraws(bays.mesh,frames)
   }
   if(bays)void warm?.(bays.mesh)
-  const near=(x:number,z:number,visit:(solid:Solid)=>void)=>{sim?.nearSolids(x,z,visit);getActiveDutyTraffic()?.nearSolids(x,z,visit);staticSolids(x,z,visit);heads?.near(x,z,visit)}
+  // IDOK-399: manhole covers and gully grates along the lanes of the loaded road cell. One mesh; they keep off the bay lines above.
+  const covers=sampleGround&&surfaceAt&&manholeCovers(scene,sampleGround,surfaceAt,bays?(x,z,margin)=>bays.blocks(x,z,margin):undefined)
+  if(covers)void warm?.(covers.mesh)
+  // IDOK-399: kerb bollards beside the signal poles. One instanced mesh; they stand where `heads` found a kerb.
+  const posts=heads&&sampleGround&&surfaceAt&&bollards(scene,sampleGround,surfaceAt)
+  if(posts)void warm?.(posts.mesh)
+  if(verify&&covers)mesh.userData.manholeCovers=covers.probe
+  if(verify&&posts)mesh.userData.bollards=posts.probe
+  if(verify&&(covers||posts))mesh.userData.streetFurnitureDraws=async(frames?:number)=>{const {parkingBayDraws}=await import('./parking-bay-audit');return {covers:covers?await parkingBayDraws(covers.mesh,frames):undefined,posts:posts?await parkingBayDraws(posts.mesh,frames):undefined}}
+  // Verify-only: the same view with and without the covers and posts, for before/after screenshots.
+  if(verify&&(covers||posts))mesh.userData.streetFurnitureShown=(shown:boolean)=>{for(const item of [covers?.mesh,posts?.mesh])if(item)(item.material as THREE.Material).visible=shown}
+  if(verify&&(covers||posts))mesh.userData.streetFurnitureAudit=async(focus:{x:number,z:number},radius?:number)=>(await import('./street-furniture-audit')).streetFurnitureAudit(scene,covers?covers.mesh:undefined,covers?covers.probe().covers:[],posts?posts.mesh:undefined,posts?posts.probe().posts:[],focus,radius)
+  const near=(x:number,z:number,visit:(solid:Solid)=>void)=>{sim?.nearSolids(x,z,visit);getActiveDutyTraffic()?.nearSolids(x,z,visit);staticSolids(x,z,visit);heads?.near(x,z,visit);posts?.near(x,z,visit)}
   const probeIds=new WeakMap<object,number>();let nextProbeId=0
   batch.setColorAt(0,new THREE.Color(0xffffff))
   await warm?.(batch)
@@ -137,21 +151,25 @@ export async function traffic(scene:THREE.Scene,camera:THREE.Camera,verify:boole
     const dutyActive=Boolean(getActiveDutyTraffic())
     if(enabled)useTrafficSolids(near)
     else if(!dutyActive)useTrafficSolids(undefined)
-    if(!enabled){effects.clear();people.clear();riders.clear();walking.clear();ridden.clear();riddenSlots.clear();mesh.count=0;hide(0,SLOTS);parkKey='';parkCount=0;curbside.clear();heads?.hide();bays?.hide();return}
+    if(!enabled){effects.clear();people.clear();riders.clear();walking.clear();ridden.clear();riddenSlots.clear();mesh.count=0;hide(0,SLOTS);parkKey='';parkCount=0;curbside.clear();heads?.hide();bays?.hide();covers?.hide();posts?.hide();return}
     updateParking(camera.position.x,camera.position.z)
     parkLodAt-=dt;if(parkLodAt<=0){parkLodAt=.5;for(const [slot,variant,x,y,z,yaw] of parkedRows)show(slot,variant,x,y,z,yaw,1)}
     bays?.update(dt,player??camera.position)
+    covers?.update(dt,player??camera.position)
+    if(posts&&heads){posts.sync(heads);posts.update(dt,player??camera.position)}
     if(verify&&mesh.userData.staticOnly){hide(0,STATIC);mesh.count=0;mesh.userData.allMotors=[];heads?.update(dt,player??camera.position);return}
     const center=player??camera.position
     const target=`${Math.floor(center.x/512)}_${Math.floor(center.z/512)}`
     if(target!==key){
       key=target
-      if(cells.has(key))void loadGraph(key,rules,surfaceAt).then(({sim:next,approaches,sample})=>{
+      if(cells.has(key))void loadGraph(key,rules,surfaceAt).then(({sim:next,approaches,graph,sample})=>{
         if(key!==target)return
         if(verify){mesh.userData.loads.push(sample);if(mesh.userData.loads.length>64)mesh.userData.loads.shift()}
         next.sampleGround=sampleGround
         next.surfaceAt=surfaceAt
         if(sim)next.inherit(sim);sim=next;heads?.setApproaches(approaches)
+        // A failure here must not take the street traffic with it.
+        try{covers?.setGraph(target,graph)}catch(error){console.warn('Manhole covers unavailable',error)}
       }).catch(error=>console.warn('Traffic cell unavailable',error))
       else {sim=undefined;heads?.setApproaches([]);people.clear();riders.clear();walking.clear();ridden.clear();riddenSlots.clear();mesh.count=0;hide(0,STATIC)}
     }

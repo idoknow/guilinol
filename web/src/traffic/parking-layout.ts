@@ -240,3 +240,14 @@ export function insideBay(bay: ParkingBay, x: number, z: number, boxed = false) 
   const along = dx * bay.headingX + dz * bay.headingZ, side = dz * bay.headingX - dx * bay.headingZ
   return along >= -bay.rear && along <= bay.front && side >= -ROAD_SIDE && side <= (boxed ? ROAD_SIDE : BAY_KERB)
 }
+
+/**
+ * True when `x, z` is within `margin` metres of the bay taken at its widest (boxed: `ROAD_SIDE` to
+ * either side of the car), measured square to its sides. Other street furniture painted on the road
+ * asks this to keep clear of the bay lines without knowing whether the bay ended up boxed.
+ */
+export function nearBay(bay: ParkingBay, x: number, z: number, margin: number) {
+  const dx = x - bay.x, dz = z - bay.z
+  const along = dx * bay.headingX + dz * bay.headingZ, side = dz * bay.headingX - dx * bay.headingZ
+  return along >= -bay.rear - margin && along <= bay.front + margin && Math.abs(side) <= ROAD_SIDE + margin
+}

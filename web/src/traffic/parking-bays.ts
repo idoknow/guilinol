@@ -9,7 +9,7 @@ import * as THREE from 'three'
 import {vehicleForbiddenAt} from '../game/car-free'
 import {look} from '../look/config'
 import {mainDetail} from '../look/mirror-layer'
-import {BAY_BOX_CLEARANCE, BAY_MOUTH_REACH, BAY_CORNERS, BAY_INDICES, BAY_VERTICES, bayCorners, parkingBays, writeBay, type ParkingBay, type ParkingRow} from './parking-layout'
+import {BAY_BOX_CLEARANCE, BAY_MOUTH_REACH, BAY_CORNERS, BAY_INDICES, BAY_VERTICES, bayCorners, nearBay, parkingBays, writeBay, type ParkingBay, type ParkingRow} from './parking-layout'
 import type {SurfaceAt} from './signal-approach'
 
 /** Road height under a point, or `undefined` while the ground there has not loaded. `car` asks for the carriageway. */
@@ -93,6 +93,10 @@ export function parkingBayLines(scene: THREE.Scene, groundAt: GroundAt, surfaceA
   let slots = new Map<string, Slot>()
   /** Every bay that has, or may still get, paint. Each is looked at when its `dueAt` comes, if it is near the player. */
   let active: Slot[] = []
+  /** Every slot of the loaded rows, dead or not, as a plain array so `blocks` can walk it without an iterator. */
+  let listed: Slot[] = []
+  /** Goes up with every `setRows`, so street furniture kept clear of the bays knows when to look again. */
+  let revision = 0
   let capacity = 0, drawn = 0, cursor = 0, elapsed = 0, samples = 0
   let position: THREE.BufferAttribute | undefined
   /**
@@ -204,6 +208,8 @@ export function parkingBayLines(scene: THREE.Scene, groundAt: GroundAt, surfaceA
       if (bays.length > capacity) allocate(bays.length)
       slots = new Map()
       active = []
+      listed = []
+      revision++
       drawn = cursor = 0
       for (const bay of bays) {
         const known = before.get(bay.key)
@@ -212,6 +218,7 @@ export function parkingBayLines(scene: THREE.Scene, groundAt: GroundAt, surfaceA
           : {bay, state: 'waiting', at: -1, heights: new Float32Array(BAY_CORNERS), looks: 0, wrong: 0, dead: false, surfaceChecked: false, boxed: false, dueAt: 0}
         slot.bay = bay
         slots.set(bay.key, slot)
+        listed.push(slot)
         if (slot.state === 'drawn') {
           slot.at = drawn++
           writeBay(bay, slot.heights, LIFT, position!.array as Float32Array, slot.at * BAY_VERTICES, slot.boxed)
@@ -235,6 +242,20 @@ export function parkingBayLines(scene: THREE.Scene, groundAt: GroundAt, surfaceA
         else { active[cursor] = active[active.length - 1]; active.pop() }
       }
     },
+    /**
+     * True when `x, z` is within `margin` metres of a bay that has, or may still get, paint — taken at
+     * its widest, boxed or not, since a bay not yet looked at may turn out boxed. Bays found to be off
+     * the carriageway (dead) do not count. A straight walk over the bays: no allocation.
+     */
+    blocks(x: number, z: number, margin: number) {
+      for (let index = 0; index < listed.length; index++) {
+        const slot = listed[index]
+        if (!slot.dead && nearBay(slot.bay, x, z, margin)) return true
+      }
+      return false
+    },
+    /** Bumped by every `setRows`. */
+    get revision() { return revision },
     /** Street traffic is switched off: parked cars go, and so does their paint. The next `update` shows it again. */
     hide() {
       if (mesh.visible) mesh.visible = false
