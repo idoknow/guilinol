@@ -26,8 +26,8 @@ export const LIMITS = Object.freeze({
   tolerance: 1.6,   // 瞬时速度容忍倍数（掉帧/网络排队）
 })
 
-/** 空中/载具：不限制向上速度，按载具上限放行（直升机刚上线，乘客的 foot 会被置 false） */
 const airborne = (p) => p.foot === false || Boolean(p.bike) || p.activity === 'drone'
+const vehicleMotion = (p) => Boolean(p.bike && p.bike!=='heli') || p.activity==='drone' || (p.foot===false && (p.activity==='car' || p.activity==='boat'))
 const attackKinds=new Set(['mount_player','foreign_position','oversize','invalid_packet','packet_rate'])
 // 阈值按"合法玩家 0~5 次/10 分钟、脚本 150+ 次"的实测分布取，宁可漏也不误封：
 // 40 次 → 3 分钟（强制下线冷静一下）；150 次 → 1 小时；300 次 → 24 小时
@@ -73,11 +73,11 @@ export function checkMove(p, nx, ny, nz, at) {
 
   // 容忍 1.6 倍瞬时速度 + 固定抖动余量：手机掉帧/网络排队会集中到一个包里，
   // 但持续作弊（20Hz 下 40 m/s）会稳定超限，会被拒。
-  const cap = (airborne(p) ? LIMITS.car : speedCap(p, at)) * dt * LIMITS.tolerance + LIMITS.stepM
+  const cap = (vehicleMotion(p) ? LIMITS.car : speedCap(p, at)) * dt * LIMITS.tolerance + LIMITS.stepM
   if (flat > cap) return { ok: false, kind: 'speed', overflow: flat - cap, reject: true }
   const baseline=p.altitudeBaseline??={y:p.y,at}
   if (ny<baseline.y+1) { baseline.y=ny; baseline.at=at }
-  const observation= !airborne(p) && (rise>LIMITS.upMax*dt+0.5 || (ny-baseline.y>4 && at-baseline.at>8000)) ? 'altitude_unverified' : ny < -10 ? 'ground_unverified' : null
+  const observation= !vehicleMotion(p) && (rise>LIMITS.upMax*dt+0.5 || (ny-baseline.y>4 && at-baseline.at>8000)) ? 'altitude_unverified' : ny < -10 ? 'ground_unverified' : null
   return { ok: true, observation }
 }
 

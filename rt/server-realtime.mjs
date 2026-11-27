@@ -61,6 +61,7 @@ import * as obs from './observability.mjs'
 import {createChat} from './chat.mjs'
 import {checkMove, canAct, cleanFp, createBanStore, LIMITS} from './anti-cheat.mjs'
 import {resolveClientIp} from './client-ip.mjs'
+import {watchFlight,passengerMove} from './flight-passenger.mjs'
 
 const PORT = Number(process.env.PORT || 8790)
 // 单进程 Node 只能用 1 核：AOI 压测 300 人密集场景已接近 1 核，先按 300 封顶（IDOK-224）
@@ -118,6 +119,7 @@ const ipCounts = new Map()
 const bans = new Map()
 /** 持久封禁：uid + 设备指纹，重启不丢；人工解封走 /admin/unban */
 const banStore = createBanStore(process.env, (...args) => console.warn('[anti-cheat]', ...args))
+const currentFlight=watchFlight(banStore.pool)
 let nextId = 1
 
 const now = () => Date.now()
@@ -1174,7 +1176,8 @@ wss.on('connection', (ws, req) => {
         const vspeed = +((ny - me.y) / stepDt).toFixed(2)
         const speed3d = +(Math.hypot(nx - me.x, ny - me.y, nz - me.z) / stepDt).toFixed(2)
         const reportedSpeed = +clampNum(msg.v, 0, 999).toFixed(2)
-        if(me.headTrack || Math.abs(ny-me.y)>0.5){
+        const flight=currentFlight(at),flightVerdict=passengerMove(flight,me,msg,at)
+        if(!flightVerdict?.ok && (me.headTrack || Math.abs(ny-me.y)>0.5)){
           const peer=me.headTrack ? players.get(me.headTrack.id) : [...me.visible].map(id=>players.get(id)).find(other=>other && Math.hypot(nx-other.x,nz-other.z)<0.35 && ny-other.y>1.4 && ny-other.y<2.2)
           if(peer && Math.hypot(nx-peer.x,nz-peer.z)<0.35 && ny-peer.y>1.4 && ny-peer.y<2.2){
             me.headTrack??={id:peer.id,at,x:peer.x,z:peer.z}
@@ -1187,10 +1190,12 @@ wss.on('connection', (ws, req) => {
         // 先落「是否在空中/载具」，否则第一帧会被当成飞天（直升机会被误拉回）
         me.foot = msg.foot !== false
         me.bike = clampStr(msg.bike, 32)
-        const verdict = checkMove(me, nx, ny, nz, at)
+        const verdict = flightVerdict ?? checkMove(me, nx, ny, nz, at)
+        if(flightVerdict?.ok){me.altitudeBaseline={y:ny,at};me.headTrack=null}
         if (verdict.reject) {
           if(shouldRecordCorrection(me.awaitingCorrection,verdict,stepDt,at)){
-            if(recordMove(verdict.kind,{to:[nx,ny,nz],overflow:verdict.overflow,flatSpeed,vspeed,reportedSpeed}))me.awaitingCorrection={kind:verdict.kind,until:at+2000}
+            const tour=flightVerdict?{claimed:msg.passenger===true || msg.bike==='heli',verifiedSeat:flight?.uid!=null && Number(flight.uid)===me.uid?{ticket:flight.ticket,seat:flight.seat,mode:flight.mode,t0:flight.t0}:null}:undefined
+            if(recordMove(verdict.kind,{to:[nx,ny,nz],overflow:verdict.overflow,flatSpeed,vspeed,reportedSpeed,tour}))me.awaitingCorrection={kind:verdict.kind,until:at+2000}
           }
           send(ws, {t: 'setback', x: me.x, y: me.y, z: me.z, kind: verdict.kind})
           return
