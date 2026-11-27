@@ -184,9 +184,11 @@ try{
         })
       }
       await capturePhase('02-pack','sealed')
+      assert.equal(await page.locator('.smoke-meter').count(),0,'meter must not render while holding pack')
       await press('撕开')
       await capturePhase('03-tear','tear',.25)
       await capturePhase('04-open','open')
+      assert.equal(await page.locator('.smoke-meter').count(),0,'meter must not render before taking a cigarette')
       await press('拿取')
       await capturePhase('05-take','take',.28)
       await capturePhase('06-mouth','ready')
@@ -224,10 +226,22 @@ try{
         return false
       })
       await capturePhase('08-lit','smoking')
+      const litMeter=await page.evaluate(()=>{
+        const meter=document.querySelector('.smoke-meter'),track=document.querySelector('.smoke-meter-track'),fill=document.querySelector('.smoke-meter-fill')
+        if(!meter||!track||!fill)return null
+        const mr=meter.getBoundingClientRect(),tr=track.getBoundingClientRect(),fr=fill.getBoundingClientRect()
+        return {width:mr.width,text:meter.textContent?.trim(),ratio:fr.width/Math.max(1,tr.width)}
+      })
+      assert(litMeter&&litMeter.width<=160.5&&litMeter.text==='剩余 19 / 20'&&litMeter.ratio>0.9,JSON.stringify(litMeter))
       for(const name of ['09-puff','10-puff','11-puff']){
         await press('吸一口')
         await capturePhase(name,'smoking',0,true)
       }
+      const puffMeter=await page.evaluate(()=>{
+        const track=document.querySelector('.smoke-meter-track'),fill=document.querySelector('.smoke-meter-fill')
+        return track&&fill?fill.getBoundingClientRect().width/Math.max(1,track.getBoundingClientRect().width):null
+      })
+      assert(puffMeter!==null&&puffMeter<litMeter.ratio-0.25,JSON.stringify({litMeter,puffMeter}))
       await page.evaluate(()=>{
         window.viewer.walk.drive(0,0,false)
         window.viewer.camera.clearViewOffset()
@@ -242,6 +256,7 @@ try{
       })
       await select()
       await hint.waitFor({state:'hidden'})
+      assert.equal(await page.locator('.smoke-meter').count(),0,'meter must unmount after discard')
       assert.equal(await page.evaluate(()=>JSON.parse(localStorage.getItem('glol.save.v1')).packs[0].remaining),19)
       for(const [name,time] of [['12-discard',300],['13-ground',1500]]){
         await page.waitForFunction(ms=>window.dropSample&&performance.now()-window.dropSample.born>=ms,time)
@@ -282,6 +297,6 @@ try{
   const disabled=await browser.newPage()
   await disabled.goto(base+'/?verify&mode=walk&smoke=0&flow=0',{waitUntil:'domcontentloaded'})
   await disabled.waitForFunction(()=>window.viewer?.walk?.active,null,{timeout:120000})
-  assert.equal(await disabled.locator('[data-slot=smoke],[data-shop=smoke],.smoke-hint').count(),0)
+  assert.equal(await disabled.locator('[data-slot=smoke],[data-shop=smoke],.smoke-hint,.smoke-meter').count(),0)
   await disabled.close()
 }finally{await browser?.close();await new Promise(resolve=>site.httpServer.close(resolve))}

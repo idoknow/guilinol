@@ -1,0 +1,127 @@
+/* 持烟燃烧进度条与剩余根数：山水印青玉玻璃 + 宣纸白，零新增色值，宽 <= 160px。 */
+.smoke-meter{
+  position:fixed;
+  left:50%;
+  bottom:calc(80px + env(safe-area-inset-bottom));
+  transform:translateX(-50%);
+  z-index:4;
+  box-sizing:border-box;
+  min-width:124px;
+  max-width:160px;
+  width:max-content;
+  padding:6px 10px 5px;
+  display:flex;
+  flex-direction:column;
+  align-items:stretch;
+  gap:5px;
+  border-radius:var(--ui-r-md);
+  background:var(--ui-glass-solid);
+  border:1px solid var(--ui-glass-line-soft);
+  box-shadow:var(--ui-shadow-1);
+  pointer-events:none;
+  user-select:none;
+  -webkit-user-select:none;
+}
+.smoke-meter-track{
+  width:100%;
+  height:4px;
+  border-radius:var(--ui-r-pill);
+  background:var(--ui-glass-line-soft);
+  overflow:hidden;
+}
+.smoke-meter-fill{
+  display:block;
+  width:100%;
+  height:100%;
+  border-radius:var(--ui-r-pill);
+  background:var(--ui-jade-300);
+  transition:background-color var(--ui-fast) var(--ui-ease);
+}
+.smoke-meter.is-low .smoke-meter-fill{
+  background:var(--ui-seal-light);
+}
+.smoke-meter-text{
+  font:500 11px/1.2 var(--ui-serif);
+  letter-spacing:.04em;
+  font-variant-numeric:tabular-nums;
+  color:var(--ui-paper);
+  text-align:center;
+  white-space:nowrap;
+}
+
+/* 避开桌面提示条、载具动作条与街头任务条 */
+body[data-smoke-meter=on][data-hotbar=on] .hint{
+  bottom:calc(122px + env(safe-area-inset-bottom));
+}
+@media (hover:hover) and (pointer:fine){
+  body[data-smoke-meter=on][data-hotbar=on] .vehicle-action{
+    bottom:calc(150px + env(safe-area-inset-bottom));
+  }
+}
+body[data-hud=street][data-smoke-meter=on] .st-mission{
+  bottom:calc(124px + env(safe-area-inset-bottom));
+}
+
+/* 手机横屏：贴在物品栏正上方，与右侧 .btn-smoke 错开 */
+@media (pointer:coarse) and (not (any-pointer:fine)) and (max-height:500px){
+  .smoke-meter{
+    bottom:calc(74px + env(safe-area-inset-bottom));
+  }
+  body[data-smoke-meter=on] .vehicle-action,
+  body[data-smoke-meter=on][data-hotbar=on] .vehicle-action{
+    bottom:calc(116px + env(safe-area-inset-bottom));
+  }
+}
+
+/* 手机竖屏：站在摇杆+物品栏+读数柱（及战斗气血签）上方居中，.btn-smoke 置于其上方，避免压到摇杆与右下按键 */
+@media (pointer:coarse) and (not (any-pointer:fine)) and (min-height:501px){
+  .smoke-meter{
+    bottom:calc(var(--stick-top) + 106px);
+  }
+  body:has(.hud-stats[hidden]) .smoke-meter{
+    bottom:calc(var(--stick-top) + 78px);
+  }
+  body .walk-ui .btn-smoke{
+    left:50%;
+    right:auto;
+    transform:translateX(-50%);
+    bottom:calc(var(--stick-top) + 150px);
+  }
+  body:has(.hud-stats[hidden]) .walk-ui .btn-smoke{
+    bottom:calc(var(--stick-top) + 122px);
+  }
+  body .walk-ui .btn-smoke:active{
+    transform:translateX(-50%) scale(.96);
+  }
+  body[data-smoke-meter=on] .vehicle-action,
+  body[data-smoke-meter=on][data-hotbar=on] .vehicle-action{
+    bottom:calc(var(--stick-top) + 148px);
+  }
+  body[data-smoke-meter=on]:has(.smoke-hint:not([hidden])) .vehicle-action{
+    bottom:calc(var(--stick-top) + 204px);
+  }
+  body[data-hud=street][data-smoke-meter=on] .st-mission{
+    bottom:calc(var(--stick-top) + 148px);
+  }
+  body[data-hotbar=on]:has(.cb-ui:not([hidden]) .cb-hp:not([hidden])) .smoke-meter{
+    bottom:calc(var(--stick-top) + 136px);
+  }
+  body[data-hotbar=on]:has(.cb-ui:not([hidden]) .cb-hp:not([hidden])) .walk-ui .btn-smoke{
+    bottom:calc(var(--stick-top) + 180px);
+  }
+  body[data-smoke-meter=on][data-hotbar=on]:has(.cb-ui:not([hidden]) .cb-hp:not([hidden])) .vehicle-action{
+    bottom:calc(var(--stick-top) + 178px);
+  }
+  body[data-smoke-meter=on][data-hotbar=on]:has(.cb-ui:not([hidden]) .cb-hp:not([hidden])):has(.smoke-hint:not([hidden])) .vehicle-action{
+    bottom:calc(var(--stick-top) + 234px);
+  }
+  body[data-hud=street][data-smoke-meter=on][data-hotbar=on]:has(.cb-ui:not([hidden]) .cb-hp:not([hidden])) .st-mission{
+    bottom:calc(var(--stick-top) + 178px);
+  }
+}
+
+body[data-home] .smoke-meter,
+body[data-photo="on"] .smoke-meter,
+body[data-shop-open="1"] .smoke-meter{
+  display:none!important;
+}

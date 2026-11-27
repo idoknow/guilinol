@@ -17,6 +17,7 @@ import {createSteles} from '../fishing/steles'
 import {createSpotSigns} from '../play/spot-signs'
 import {getActiveSaveSnapshot,openPack,takeFromPack} from '../game/save'
 import {rules,validRules} from '../smoke/data'
+import {createSmokeMeter} from '../smoke/meter'
 import {createSmokePrompt} from '../smoke/prompt'
 import {SmokeSession,brandIndex,DUTY_NO_SMOKING_TOAST} from '../smoke/session'
 import {smokeVisual} from '../smoke/visual'
@@ -372,6 +373,7 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
   },true)
   const cigarette=new SmokeSession()
   const updateSmokePrompt=smokeEnabled()?createSmokePrompt(scene,camera):()=>{}
+  const smokeMeter=smokeEnabled()?createSmokeMeter():undefined
   const smokeHint=document.createElement('button')
   smokeHint.type='button'
   smokeHint.className='smoke-hint btn-smoke'
@@ -380,7 +382,7 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
     void fetch('/api/smoke').then(r=>r.json()).then(data=>{if(validRules(data))Object.assign(rules,data)}).catch(()=>{})
   }
   function usable(){return active && !combat.f.down && !rides?.bike && !rides?.car && !rides?.boat && !isModalOrOverlayOpen() && !document.body.dataset.shopOpen && document.body.dataset.photo!=='on'}
-  function cancelSmoke(){showSmokeDiscard(false);cigarette.stop();smokeHint.hidden=true;updateSmokePrompt('')}
+  function cancelSmoke(){showSmokeDiscard(false);cigarette.stop();smokeHint.hidden=true;updateSmokePrompt('');smokeMeter?.hide()}
   function notifyDutyNoSmoking(){window.dispatchEvent(new CustomEvent('walk:toast',{detail:{text:DUTY_NO_SMOKING_TOAST,ms:2200}}))}
   function cancelSmokeForDuty(notify:boolean,dt=0){
     const wasActive=cigarette.active
@@ -406,6 +408,7 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
     }
     smokeHint.hidden=true
     updateSmokePrompt('')
+    smokeMeter?.hide()
     shopOverlay.openSmoke(message)
   }
   function chooseSmoke(){
@@ -2256,7 +2259,7 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
       smoking?.tick(dt,cigarette.view(),false)
       selectSlot('hand')
     }
-    if(shopOverlay?.isOpen()){combat.hide();net?.tick(dt);smoking?.setFirstPerson(false);updateShopShowcaseCamera();return}
+    if(shopOverlay?.isOpen()){combat.hide();net?.tick(dt);smoking?.setFirstPerson(false);smokeMeter?.hide();updateShopShowcaseCamera();return}
     // Test-ride 90s timer & 350m / quiet-zone boundary watchdog (with 1.5s gentle decel when >15 km/h)
     const activeTr=getGameState().garage.activeTestRide
     if(activeTr){
@@ -3094,7 +3097,9 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
       updateSmokePrompt(smokeHint.hidden||touchUi()?'':hint)
       if(smokeHint.textContent!==hint)smokeHint.textContent=hint
       if(cigarette.advance(dt))smoking.drop()
-      smoking.tick(dt,cigarette.view(),isFirstPerson())
+      const smokeView=cigarette.view()
+      smoking.tick(dt,smokeView,isFirstPerson())
+      smokeMeter?.sync(smokeView,getActiveSaveSnapshot().packs.length,active&&!isModalOrOverlayOpen()&&document.body.dataset.photo!=='on'&&!document.body.dataset.shopOpen)
     }
     const emoteMoving=!!(keys.right||keys.forward||external?.x||external?.z)
     if(emote.id&&interrupted(emote.id,emoteMoving,!emotesEnabled()||!canEmote()||keys.jump||!grounded))emote.stop()

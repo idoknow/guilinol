@@ -55,8 +55,8 @@
   display: none !important;
 }
 
-body[data-mifen-cooking="1"] :is(.hint, .vehicle-action, .walk-ui, .cb-controls, .cb-hp, .ride-hud, .hotbar, .smoke-hint, .hud-stats, .gl-mission-entry, .gl-mission-hud, .beta-note, .drinks-hold-hud, output, footer),
-body[data-mifen-drawer="1"] :is(.hint, .vehicle-action, .walk-ui, .cb-controls, .cb-hp, .ride-hud, .hotbar, .smoke-hint, .hud-stats, .gl-mission-entry, .gl-mission-hud, .beta-note, .drinks-hold-hud, output, footer) {
+body[data-mifen-cooking="1"] :is(.hint, .vehicle-action, .walk-ui, .cb-controls, .cb-hp, .ride-hud, .hotbar, .smoke-meter, .smoke-hint, .hud-stats, .gl-mission-entry, .gl-mission-hud, .beta-note, .drinks-hold-hud, output, footer),
+body[data-mifen-drawer="1"] :is(.hint, .vehicle-action, .walk-ui, .cb-controls, .cb-hp, .ride-hud, .hotbar, .smoke-meter, .smoke-hint, .hud-stats, .gl-mission-entry, .gl-mission-hud, .beta-note, .drinks-hold-hud, output, footer) {
   display: none !important;
 }
 
@@ -849,10 +849,10 @@ body[data-mifen-indoor="1"] :is(.render-entry, .render-pop, .keys-card) {
 }
 
 @media (max-width: 768px), (max-height: 480px) {
-  body[data-mifen-indoor="1"] :is(.hud-me, .sky-ui, .dock, .minimap, .hotbar, .smoke-hint, .hint, .hud-stats, .cb-hp, .gl-mission-entry, .gl-mission-hud, .beta-note, .drinks-hold-hud, .drinks-pickup-hud, output, footer),
-  body:has(.mifen-bar:not([hidden])) :is(.hud-me, .sky-ui, .dock, .minimap, .hotbar, .smoke-hint, .hint, .hud-stats, .cb-hp, .gl-mission-entry, .gl-mission-hud, .beta-note, .drinks-hold-hud, .drinks-pickup-hud, output, footer),
-  body[data-mifen-drawer="1"] :is(.hud-me, .sky-ui, .dock, .minimap, .walk-ui, .vehicle-action, .ride-hud, .hotbar, .smoke-hint, .hint, .hud-stats, .gl-mission-entry, .gl-mission-hud, .beta-note, .drinks-hold-hud, .drinks-pickup-hud, output, footer),
-  body[data-mifen-cooking="1"] :is(.hud-me, .sky-ui, .dock, .minimap, .hotbar, .smoke-hint, .hint, .hud-stats, .gl-mission-entry, .gl-mission-hud, .beta-note, .drinks-hold-hud, .drinks-pickup-hud, output, footer) {
+  body[data-mifen-indoor="1"] :is(.hud-me, .sky-ui, .dock, .minimap, .hotbar, .smoke-meter, .smoke-hint, .hint, .hud-stats, .cb-hp, .gl-mission-entry, .gl-mission-hud, .beta-note, .drinks-hold-hud, .drinks-pickup-hud, output, footer),
+  body:has(.mifen-bar:not([hidden])) :is(.hud-me, .sky-ui, .dock, .minimap, .hotbar, .smoke-meter, .smoke-hint, .hint, .hud-stats, .cb-hp, .gl-mission-entry, .gl-mission-hud, .beta-note, .drinks-hold-hud, .drinks-pickup-hud, output, footer),
+  body[data-mifen-drawer="1"] :is(.hud-me, .sky-ui, .dock, .minimap, .walk-ui, .vehicle-action, .ride-hud, .hotbar, .smoke-meter, .smoke-hint, .hint, .hud-stats, .gl-mission-entry, .gl-mission-hud, .beta-note, .drinks-hold-hud, .drinks-pickup-hud, output, footer),
+  body[data-mifen-cooking="1"] :is(.hud-me, .sky-ui, .dock, .minimap, .hotbar, .smoke-meter, .smoke-hint, .hint, .hud-stats, .gl-mission-entry, .gl-mission-hud, .beta-note, .drinks-hold-hud, .drinks-pickup-hud, output, footer) {
     display: none !important;
   }
 }
