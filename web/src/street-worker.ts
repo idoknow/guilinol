@@ -366,6 +366,12 @@ export function streetGeometry([paths,lamps,banks,signals=[],stops=[],roadCtrl,s
   const parked:number[]=[],blue=new THREE.Color(look.streets.directionSign)
   const suppressDecor=(kind:number,x:number,z:number)=>checkShizijie&&!!origin&&isShizijieDecorSuppressed(origin[0]+x,origin[1]+z,kind)
   // 栅栏与多形态机非/中央隔离带（金属护栏、绿篱、树池花箱、中央紫薇树丛、次干道软隔离、石墩铁栏）整段同档：120 m 内一起画。
+  const emitSurfaceTri=(ax:number,ay:number,az:number,bx:number,by:number,bz:number,cx:number,cy:number,cz:number,r:number,g:number,b:number)=>{
+    xyz.push(ax,ay,az,bx,by,bz,cx,cy,cz)
+    rgb.push(r,g,b,r,g,b,r,g,b)
+    surfaceKinds.push(7,7,7)
+    alongVals.push(0,0,0)
+  }
   emitRoadDividers(decor,activePaths,suppressDecor,baseLevel,origin,box,{
     railing:tone.railing,
     stoneLight,
@@ -373,7 +379,7 @@ export function streetGeometry([paths,lamps,banks,signals=[],stops=[],roadCtrl,s
     bannerRed:awnings[2],
     hedge,
     iron,
-  })
+  },beds,emitSurfaceTri)
   const railLodCount=mats.length/16
   for(const [kind,east,south,heading,span] of decor){
     const x=east/10,z=south/10

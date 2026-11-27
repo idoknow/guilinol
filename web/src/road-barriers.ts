@@ -82,13 +82,14 @@ export function resolveRoadBarrierSpec(
     if (profile === 'soft_delineator' || profile === 'marking_only') return null
     const groupBase = kind === 6 ? 6 : 5
     if (profile === 'metal_guardrail') {
-      return {group: groupBase + 10, offZ: 0, hz: .52, padX: .02, topOffset: 1.16, profile}
+      // Covers motor-side white-grey guardrail (-0.86 m) and central tree verge seamlessly
+      return {group: groupBase + 10, offZ: 0, hz: .90, padX: .02, topOffset: 1.16, profile}
     }
     if (profile === 'tree_planter') {
       return {group: groupBase + 20, offZ: 0, hz: .56, padX: .02, topOffset: 1.15, profile}
     }
-    // hedge_curb: granite curb + layered shrub hedge + motor-side garden fence
-    return {group: groupBase, offZ: 0, hz: .61, padX: .02, topOffset: 1.12, profile}
+    // hedge_curb: granite curb + layered shrub hedge + motor-side garden fence (-0.74 m)
+    return {group: groupBase, offZ: 0, hz: .76, padX: .02, topOffset: 1.12, profile}
   }
 
   if (kind === 8) return {group: 8, offZ: 0, hz: .14, padX: 0, topOffset: 1.44, profile: 'stone_fence'}

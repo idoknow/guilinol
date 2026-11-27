@@ -310,9 +310,9 @@ try {
     await shot('showcase-binjiang-soft-collector', 0.22, 0.16)
     assert(results.footBjSoftPass.crossed && results.footBjSoftPass.endSigned > 0.5, `Binjiang collector soft delineator falsely blocked: ${JSON.stringify(results.footBjSoftPass)}`)
 
-    // 9d. Capture Jiefang East Rd junction opening & end-cap view
-    await enterAt(JF_GAP.x - JF_GAP.nx * 5.0, JF_GAP.z - JF_GAP.nz * 5.0, headingToward(JF_GAP.nx, JF_GAP.nz))
-    await shot('showcase-jiefang-opening-endcap', 0.55, 0.22)
+    // 9d. Capture Jiefang East Rd junction opening & close-up yellow/black end-cap view
+    await enterAt(JF_GAP.x - JF_GAP.nx * 3.8 + JF_MEDIAN.tx * 7.5, JF_GAP.z - JF_GAP.nz * 3.8 + JF_MEDIAN.tz * 7.5, headingToward(JF_GAP.nx, JF_GAP.nz))
+    await shot('showcase-jiefang-opening-endcap', 0.48, 0.18)
 
     // 10. Loaded road barrier collider stats around Jiefang East Rd
     await enterAt(JF_MEDIAN.x - JF_MEDIAN.nx * 3.0, JF_MEDIAN.z - JF_MEDIAN.nz * 3.0, 0)

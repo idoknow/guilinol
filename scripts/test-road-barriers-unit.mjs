@@ -117,7 +117,7 @@ test('resolves Guilin road divider profiles per corridor and updates barrier vol
   const jfMedSpec = resolveRoadBarrierSpec(1, -544.3, -83.3, jfHeading)
   const jfVergeSpec = resolveRoadBarrierSpec(5, -544.1, -71.9, jfHeading)
   assert.equal(jfMedSpec?.hz, 0.08)
-  assert.equal(jfVergeSpec?.hz, 0.52)
+  assert.equal(jfVergeSpec?.hz, 0.90)
 
   // Zhongshan Middle Rd north of Shizijie: central crape-myrtle green trees + roadside tree-pit planters
   const zsHeading = Math.atan2(234, -47)
@@ -132,7 +132,7 @@ test('resolves Guilin road divider profiles per corridor and updates barrier vol
   assert.equal(resolveMedianDividerKind(350, 1905, 1, 0), 'median_green_trees')
   assert.equal(resolveVergeDividerKind(350, 1896, 5, 0), 'hedge_curb')
   const ljVergeSpec = resolveRoadBarrierSpec(5, 350, 1896, 0)
-  assert.equal(ljVergeSpec?.hz, 0.61)
+  assert.equal(ljVergeSpec?.hz, 0.76)
 })
 
 test('narrow old-town streets emit zero rigid barrier walls (soft_delineator) and respect tangent alignment at junctions', () => {
@@ -144,7 +144,7 @@ test('narrow old-town streets emit zero rigid barrier walls (soft_delineator) an
   // Adjacent Jiefang West Rd arterial verge (-1000, -208) must NOT be hijacked by narrow-branch rules
   const jfWestHeading = -2.96
   assert.equal(resolveVergeDividerKind(-1000, -208, 5, jfWestHeading), 'metal_guardrail')
-  assert.equal(resolveRoadBarrierSpec(5, -1000, -208, jfWestHeading)?.hz, 0.52)
+  assert.equal(resolveRoadBarrierSpec(5, -1000, -208, jfWestHeading)?.hz, 0.90)
 
   // Forward-compatible explicit decor kinds 12..15
   assert.equal(resolveRoadBarrierSpec(DECOR_KIND_MEDIAN_GREEN_TREES)?.hz, 0.37)

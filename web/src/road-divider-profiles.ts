@@ -137,10 +137,10 @@ export const GUILIN_DIVIDER_CORRIDORS: readonly DividerCorridor[] = [
     priority: 8,
   },
 
-  // ---- 河东片区主干：龙隐路林荫、七星路护栏/绿篱分段、穿山路南北分型 ----
+  // ---- 河东片区主干：龙隐路林荫、七星路东南绿篱护栏段、穿山路南北分型 ----
   {
     id: 'longyin_rd',
-    name: '龙隐路（七星公园林荫道）',
+    name: '龙隐路（穿山桥—七星公园林荫道）',
     polyline: [[40, 724], [95, 735], [664, 939], [705, 957]],
     halfWidth: 30,
     median: 'median_green_trees',
@@ -148,17 +148,8 @@ export const GUILIN_DIVIDER_CORRIDORS: readonly DividerCorridor[] = [
     priority: 10,
   },
   {
-    id: 'qixing_rd_nw',
-    name: '七星路（穿山桥—三里店）',
-    polyline: [[98, 731], [420, 845], [720, 965]],
-    halfWidth: 28,
-    median: 'median_metal_rail',
-    verge: 'metal_guardrail',
-    priority: 8,
-  },
-  {
     id: 'qixing_rd_se',
-    name: '七星路（三里店往东南）',
+    name: '七星路（三里店往东南段）',
     polyline: [[720, 965], [846, 1142], [1207, 1538]],
     halfWidth: 32,
     median: 'median_metal_rail',
@@ -454,6 +445,17 @@ export type BoxEmitter = (
   pitch?: number,
 ) => void
 
+/**
+ * Emits one outward-facing CCW flat-shaded triangle into the shared street `surface` geometry
+ * (`aSurface = 7`: untextured vertex-colored mesh, 0 extra draw calls, 0 road/sidewalk physics impact).
+ */
+export type SurfaceTriEmitter = (
+  ax: number, ay: number, az: number,
+  bx: number, by: number, bz: number,
+  cx: number, cy: number, cz: number,
+  r: number, g: number, b: number,
+) => void
+
 export interface DividerPalette {
   railing: THREE.Color
   stoneLight: THREE.Color
@@ -477,10 +479,12 @@ const PAL = {
   guilinJade: new THREE.Color(0x36796b),
   hedgeDark: new THREE.Color(0x2f532e),
   hedgeMid: new THREE.Color(0x446d3a),
-  hedgeLit: new THREE.Color(0x5c8444),
-  shrubCrimson: new THREE.Color(0x703943),
-  crapeDark: new THREE.Color(0xa93e64),
-  crapeLit: new THREE.Color(0xcf5f87),
+  hedgeLit: new THREE.Color(0x5a8142),
+  shrubCrimson: new THREE.Color(0x6d3a44),
+  // Natural Guilin crape-myrtle blossom palette (restrained saturation calibrated for gradeDay 1.22)
+  crapeDark: new THREE.Color(0x8b445d),
+  crapeLit: new THREE.Color(0xaa627a),
+  crapeSoft: new THREE.Color(0xc08297),
   planterWood: new THREE.Color(0x6f4433),
   planterTrim: new THREE.Color(0x383c40),
   trunkLime: new THREE.Color(0xdcd9cf),
@@ -491,443 +495,17 @@ const PAL = {
   softWhite: new THREE.Color(0xf1f0ea),
 } as const
 
-function hash2d(x: number, z: number): number {
-  const s = Math.sin(x * 12.9898 + z * 78.233) * 43758.5453
-  return s - Math.floor(s)
-}
-
-/** Emits a high-visibility yellow/black bollard + tapered end cap at a real street opening (crosswalk / U-turn / junction). */
-function emitOpeningEndCap(
-  x: number,
-  z: number,
-  tx: number,
-  tz: number,
-  yaw: number,
-  baseLevel: (x: number, z: number) => number,
-  box: BoxEmitter,
-  style: 'rail' | 'green' | 'verge',
-  inwardSign: number,
-) {
-  // Tuck end-cap slightly inward (+inwardSign * 0.08 m) so it never protrudes into crosswalk openings.
-  const px = x + tx * inwardSign * 0.08
-  const pz = z + tz * inwardSign * 0.08
-  const y = baseLevel(px, pz) + 0.045
-  if (style === 'rail') {
-    box(px, y + 0.05, pz, 0.22, 0.16, 0.20, yaw, PAL.railBase)
-    box(px, y + 0.42, pz, 0.11, 0.62, 0.11, yaw, PAL.warnYellow)
-    box(px, y + 0.56, pz, 0.115, 0.14, 0.115, yaw, PAL.warnDark)
-    box(px, y + 0.78, pz, 0.115, 0.12, 0.115, yaw, PAL.warnDark)
-    box(px, y + 0.90, pz, 0.13, 0.08, 0.13, yaw, PAL.railWhite)
-  } else if (style === 'green') {
-    // Granite nose stone + compact reflective warning post
-    box(px, y + 0.08, pz, 0.34, 0.22, 0.78, yaw, PAL.curbLight)
-    box(px, y + 0.36, pz, 0.09, 0.42, 0.09, yaw, PAL.warnYellow)
-    box(px, y + 0.52, pz, 0.095, 0.09, 0.095, yaw, PAL.warnDark)
-  } else {
-    // Verge granite nose block + sleek reflective delineator
-    box(px, y + 0.08, pz, 0.32, 0.22, 1.04, yaw, PAL.curbLight)
-    box(px, y + 0.44, pz, 0.095, 0.56, 0.095, yaw, PAL.railWhite)
-    box(px, y + 0.66, pz, 0.10, 0.10, 0.10, yaw, PAL.warnYellow)
-  }
-}
-
-/** Emits a compact low-poly ornamental crape-myrtle / osmanthus median tree with >= 2.2 m clear trunk height. */
-function emitOrnamentalTree(
-  x: number,
-  z: number,
-  yaw: number,
-  baseLevel: (x: number, z: number) => number,
-  box: BoxEmitter,
-  seed: number,
-  withCrapeBlossom: boolean,
-  crownScale = 1.0,
-) {
-  const y = baseLevel(x, z) + 0.195
-  // Lower whitewashed trunk + upper bark trunk (split heights stay clear of batch.ts shop-shutter detector)
-  box(x, y + 0.52, z, 0.17, 1.12, 0.17, yaw, PAL.trunkLime)
-  box(x, y + 1.62, z, 0.15, 1.16, 0.15, yaw, PAL.trunkBark)
-  // Two-tier stylized low-poly canopy starting well above car/e-bike clearance (y >= 2.20 m), vertically separated to avoid z-fighting
-  const w1 = (1.32 + (seed % 0.22)) * crownScale
-  const h1 = (0.64 + (seed % 0.12)) * crownScale
-  const d1 = (1.14 + ((seed * 3) % 0.18)) * crownScale
-  const rot1 = yaw + (seed - 0.5) * 0.45
-  box(x, y + 2.48, z, w1, h1, d1, rot1, PAL.hedgeDark)
-  const h2 = h1 * 0.78
-  const topBaseY = y + 2.48 + h1 * 0.46
-  box(x, topBaseY + h2 * 0.5, z, w1 * 0.72, h2, d1 * 0.72, rot1 + 0.52, withCrapeBlossom ? PAL.crapeLit : PAL.hedgeLit)
-  if (withCrapeBlossom) {
-    // Nested upper blossom crown tuft seated cleanly atop the green tier (no coplanar overhang artifacts)
-    box(x, topBaseY + h2 + 0.12 * crownScale, z, w1 * 0.44, 0.30 * crownScale, d1 * 0.44, rot1 + 0.25, PAL.crapeDark)
-  }
-}
-
-function emitMedianMetalRailChain(
-  chain: DividerChain,
-  baseLevel: (x: number, z: number) => number,
-  box: BoxEmitter,
-  palette: DividerPalette,
-) {
-  const mergedLegs = mergeCollinearChainLegs(chain.legs, baseLevel, 12)
-  for (const leg of mergedLegs) {
-    const g = sampleDividerSpanGrade(leg.start.x, leg.start.z, leg.end.x, leg.end.z, baseLevel, 0.195)
-    if (g.flatLength < 0.05) continue
-    // Top white beam + lower silver beam (merged across straight spans up to 12 m)
-    box(g.midX, g.midY + 0.88, g.midZ, g.slopeLength, 0.085, 0.075, g.yaw, PAL.railWhite, g.pitch)
-    box(g.midX, g.midY + 0.26, g.midZ, g.slopeLength, 0.065, 0.075, g.yaw, PAL.railSilver, g.pitch)
-    // Preserve exact 1.35 x 0.42 slogan banner geometry for streets.ts uSlogan shader!
-    if (leg.banner && g.flatLength >= 1.2) {
-      box(g.midX, g.midY + 0.58, g.midZ, Math.min(1.35, g.slopeLength), 0.42, 0.09, g.yaw, palette.bannerRed, g.pitch)
-    }
-  }
-  // Posts + alternating airy vertical pickets along continuous chainage (main post every 2.2 m, picket at midpoint)
-  const bayCount = Math.max(1, Math.round(chain.totalLength / 2.2))
-  const postStep = chain.totalLength / bayCount
-  for (let i = 0; i < bayCount; i++) {
-    const midS = (i + 0.5) * postStep
-    const pm = sampleChainAt(chain, midS)
-    const ym = baseLevel(pm.x, pm.z) + 0.195
-    box(pm.x, ym + 0.57, pm.z, 0.036, 0.58, 0.036, pm.yaw, PAL.railSilver)
-    if (i > 0) {
-      const p = sampleChainAt(chain, i * postStep)
-      const y = baseLevel(p.x, p.z) + 0.045
-      box(p.x, y + 0.04, p.z, 0.14, 0.15, 0.16, p.yaw, PAL.railBase)
-      box(p.x, y + 0.62, p.z, 0.062, 0.94, 0.062, p.yaw, PAL.railWhite)
-    }
-  }
-  // End-cap treatments at real street openings vs plain terminal posts at tile borders
-  const first = sampleChainAt(chain, 0)
-  const last = sampleChainAt(chain, chain.totalLength)
-  if (chain.startOpen) {
-    emitOpeningEndCap(first.x, first.z, first.tx, first.tz, first.yaw, baseLevel, box, 'rail', 1)
-  } else {
-    const y = baseLevel(first.x, first.z) + 0.045
-    box(first.x, y + 0.62, first.z, 0.062, 0.94, 0.062, first.yaw, PAL.railWhite)
-  }
-  if (!chain.closed) {
-    if (chain.endOpen) {
-      emitOpeningEndCap(last.x, last.z, last.tx, last.tz, last.yaw, baseLevel, box, 'rail', -1)
-    } else {
-      const y = baseLevel(last.x, last.z) + 0.045
-      box(last.x, y + 0.62, last.z, 0.062, 0.94, 0.062, last.yaw, PAL.railWhite)
-    }
-  }
-}
-
-function emitMedianGreenTreesChain(
-  chain: DividerChain,
-  baseLevel: (x: number, z: number) => number,
-  box: BoxEmitter,
-  origin?: readonly [number, number],
-) {
-  const ox = origin?.[0] ?? 0
-  const oz = origin?.[1] ?? 0
-  // Merge collinear curbs & base evergreen hedge up to 12 m to keep draw instances lean
-  const mergedLegs = mergeCollinearChainLegs(chain.legs, baseLevel, 12)
-  for (const leg of mergedLegs) {
-    const g = sampleDividerSpanGrade(leg.start.x, leg.start.z, leg.end.x, leg.end.z, baseLevel, 0.045)
-    if (g.flatLength < 0.08) continue
-    // Granite planter curb (0.76 m wide, grounded with skirt embedDepth so graded stretches never float)
-    const curbH = 0.24 + g.embedDepth
-    box(g.midX, g.midY + 0.24 - curbH * 0.5, g.midZ, g.slopeLength + 0.04, curbH, 0.76, g.yaw, PAL.curbLight, g.pitch)
-    // Continuous evergreen base hedge inside the granite curb
-    box(g.midX, g.midY + 0.45, g.midZ, g.slopeLength + 0.02, 0.46, 0.58, g.yaw, PAL.hedgeDark, g.pitch)
-  }
-
-  // Layered sculpted shrub / Guilin crape-myrtle blossom crowns every ~3.4 m (pulled back from open ends)
-  const crownCount = Math.max(1, Math.round(chain.totalLength / 3.4))
-  const crownStep = chain.totalLength / crownCount
-  for (let i = 0; i < crownCount; i++) {
-    const s = (i + 0.5) * crownStep
-    if ((chain.startOpen && s < 1.1) || (chain.endOpen && chain.totalLength - s < 1.1)) continue
-    const p = sampleChainAt(chain, s)
-    const hSeed = hash2d(ox + p.x, oz + p.z)
-    const isBlossom = hSeed > 0.44
-    const crownTint = isBlossom ? (hSeed > 0.70 ? PAL.crapeLit : PAL.crapeDark) : PAL.hedgeLit
-    const crownH = isBlossom ? 0.28 + (hSeed % 0.12) : 0.24 + (hSeed % 0.10)
-    const y = baseLevel(p.x, p.z) + 0.045
-    box(
-      p.x,
-      y + 0.68 + crownH * 0.42,
-      p.z,
-      Math.max(0.7, Math.min(2.4, crownStep * 0.68)),
-      crownH,
-      isBlossom ? 0.48 : 0.52,
-      p.yaw + (hSeed - 0.5) * 0.08,
-      crownTint,
-    )
-  }
-
-  // Ornamental crape-myrtle / osmanthus trees spaced every ~14 m, strictly clear (>= 4.5 m) of open ends
-  if (chain.totalLength >= 10.5) {
-    const startMargin = chain.startOpen ? 4.8 : 2.5
-    const endMargin = chain.endOpen ? 4.8 : 2.5
-    const usable = chain.totalLength - startMargin - endMargin
-    if (usable >= 1.5) {
-      const count = Math.max(1, Math.floor(usable / 14) + 1)
-      const step = count > 1 ? usable / (count - 1) : 0
-      for (let i = 0; i < count; i++) {
-        const s = count === 1 ? startMargin + usable * 0.5 : startMargin + i * step
-        const p = sampleChainAt(chain, s)
-        const seed = hash2d(ox + p.x, oz + p.z)
-        emitOrnamentalTree(p.x, p.z, p.yaw, baseLevel, box, seed, true, 0.92)
-      }
-    }
-  }
-
-  if (chain.startOpen) {
-    const first = sampleChainAt(chain, 0)
-    emitOpeningEndCap(first.x, first.z, first.tx, first.tz, first.yaw, baseLevel, box, 'green', 1)
-  }
-  if (!chain.closed && chain.endOpen) {
-    const last = sampleChainAt(chain, chain.totalLength)
-    emitOpeningEndCap(last.x, last.z, last.tx, last.tz, last.yaw, baseLevel, box, 'green', -1)
-  }
-}
-
-function emitVergeHedgeCurbChain(
-  chain: DividerChain,
-  baseLevel: (x: number, z: number) => number,
-  box: BoxEmitter,
-  palette: DividerPalette,
-  origin?: readonly [number, number],
-) {
-  const ox = origin?.[0] ?? 0
-  const oz = origin?.[1] ?? 0
-  // Merge long straight curbs & iron rails up to 12 m while keeping organic 4.5 m shrub variety
-  const mergedLegs = mergeCollinearChainLegs(chain.legs, baseLevel, 12)
-  for (const leg of mergedLegs) {
-    const g = sampleDividerSpanGrade(leg.start.x, leg.start.z, leg.end.x, leg.end.z, baseLevel, 0.045)
-    if (g.flatLength < 0.15) continue
-    const curbH = 0.20 + g.embedDepth
-    box(g.midX, g.midY + 0.20 - curbH * 0.5, g.midZ, g.slopeLength + 0.04, curbH, 1.22, g.yaw, PAL.curbMid, g.pitch)
-    box(g.midX, g.midY + 0.40, g.midZ, g.slopeLength + 0.02, 0.44, 0.98, g.yaw, PAL.hedgeDark, g.pitch)
-    // Low dark-green garden edge fence on motor-lane side (-sideSign * 0.58 m)
-    const nx = Math.sin(g.yaw), nz = Math.cos(g.yaw)
-    const fenceOff = -leg.sideSign * 0.58
-    const fx = g.midX + fenceOff * nx
-    const fz = g.midZ + fenceOff * nz
-    box(fx, g.midY + 0.36, fz, g.slopeLength + 0.03, 0.05, 0.05, g.yaw, palette.iron, g.pitch)
-    box(fx, g.midY + 0.66, fz, g.slopeLength + 0.03, 0.05, 0.05, g.yaw, palette.iron, g.pitch)
-  }
-
-  // Sculpted upper shrub variety (alternating green & crimson Loropetalum mounds every ~4.5 m)
-  const moundCount = Math.max(1, Math.round(chain.totalLength / 4.5))
-  const moundStep = chain.totalLength / moundCount
-  for (let i = 0; i < moundCount; i++) {
-    const s = (i + 0.5) * moundStep
-    if ((chain.startOpen && s < 1.0) || (chain.endOpen && chain.totalLength - s < 1.0)) continue
-    const p = sampleChainAt(chain, s)
-    const hSeed = hash2d(ox + p.x, oz + p.z)
-    const upperTint = hSeed > 0.72 ? PAL.shrubCrimson : hSeed > 0.35 ? PAL.hedgeLit : PAL.hedgeMid
-    const y = baseLevel(p.x, p.z) + 0.045
-    box(p.x, y + 0.70, p.z, Math.min(3.4, moundStep * 0.78), 0.24 + (hSeed % 0.08), 0.72, p.yaw, upperTint)
-  }
-
-  // Fence posts along motor-lane side at 2.6 m chainage
-  const postStep = chain.totalLength / Math.max(1, Math.round(chain.totalLength / 2.6))
-  for (let s = 0; s <= chain.totalLength + 1e-4; s += postStep) {
-    const p = sampleChainAt(chain, Math.min(chain.totalLength, s))
-    const fenceOff = -p.sideSign * 0.58
-    const fx = p.x + fenceOff * p.nx
-    const fz = p.z + fenceOff * p.nz
-    const y = baseLevel(fx, fz) + 0.045
-    box(fx, y + 0.38, fz, 0.052, 0.66, 0.052, p.yaw, palette.iron)
-  }
-
-  if (chain.startOpen) {
-    const first = sampleChainAt(chain, 0)
-    emitOpeningEndCap(first.x, first.z, first.tx, first.tz, first.yaw, baseLevel, box, 'verge', 1)
-  }
-  if (!chain.closed && chain.endOpen) {
-    const last = sampleChainAt(chain, chain.totalLength)
-    emitOpeningEndCap(last.x, last.z, last.tx, last.tz, last.yaw, baseLevel, box, 'verge', -1)
-  }
-}
-
-function emitVergeMetalGuardrailChain(
-  chain: DividerChain,
-  baseLevel: (x: number, z: number) => number,
-  box: BoxEmitter,
-) {
-  const mergedLegs = mergeCollinearChainLegs(chain.legs, baseLevel, 12)
-  for (const leg of mergedLegs) {
-    const g = sampleDividerSpanGrade(leg.start.x, leg.start.z, leg.end.x, leg.end.z, baseLevel, 0.045)
-    if (g.flatLength < 0.15) continue
-    // Clean granite curb plinth strip (1.02 m wide, grounded) matching physical collider envelope
-    const curbH = 0.18 + g.embedDepth
-    box(g.midX, g.midY + 0.18 - curbH * 0.5, g.midZ, g.slopeLength + 0.03, curbH, 1.02, g.yaw, PAL.curbLight, g.pitch)
-
-    // Primary Guilin white-grey steel guardrail with Guilin jade accent rail
-    box(g.midX, g.midY + 1.02, g.midZ, g.slopeLength + 0.02, 0.075, 0.07, g.yaw, PAL.railWhite, g.pitch)
-    box(g.midX, g.midY + 0.36, g.midZ, g.slopeLength + 0.02, 0.06, 0.07, g.yaw, PAL.railSilver, g.pitch)
-    box(g.midX, g.midY + 0.88, g.midZ, g.slopeLength + 0.01, 0.045, 0.055, g.yaw, PAL.guilinJade, g.pitch)
-  }
-
-  // Heavy cast-iron plinths + main white posts every ~2.4 m, plus midpoint vertical pickets
-  const bayCount = Math.max(1, Math.round(chain.totalLength / 2.4))
-  const postStep = chain.totalLength / bayCount
-  for (let i = 0; i < bayCount; i++) {
-    const pm = sampleChainAt(chain, (i + 0.5) * postStep)
-    const ym = baseLevel(pm.x, pm.z) + 0.045
-    box(pm.x, ym + 0.68, pm.z, 0.036, 0.62, 0.036, pm.yaw, PAL.railWhite)
-    if (i > 0) {
-      const p = sampleChainAt(chain, i * postStep)
-      const y = baseLevel(p.x, p.z) + 0.045
-      box(p.x, y + 0.21, p.z, 0.16, 0.14, 0.22, p.yaw, PAL.railBase)
-      box(p.x, y + 0.68, p.z, 0.068, 0.90, 0.068, p.yaw, PAL.railWhite)
-    }
-  }
-
-  const first = sampleChainAt(chain, 0)
-  const last = sampleChainAt(chain, chain.totalLength)
-  if (chain.startOpen) {
-    emitOpeningEndCap(first.x, first.z, first.tx, first.tz, first.yaw, baseLevel, box, 'rail', 1)
-  } else {
-    const y = baseLevel(first.x, first.z) + 0.045
-    box(first.x, y + 0.68, first.z, 0.068, 0.90, 0.068, first.yaw, PAL.railWhite)
-  }
-  if (!chain.closed) {
-    if (chain.endOpen) {
-      emitOpeningEndCap(last.x, last.z, last.tx, last.tz, last.yaw, baseLevel, box, 'rail', -1)
-    } else {
-      const y = baseLevel(last.x, last.z) + 0.045
-      box(last.x, y + 0.68, last.z, 0.068, 0.90, 0.068, last.yaw, PAL.railWhite)
-    }
-  }
-}
-
-function emitVergeTreePlanterChain(
-  chain: DividerChain,
-  baseLevel: (x: number, z: number) => number,
-  box: BoxEmitter,
-  origin?: readonly [number, number],
-) {
-  const ox = origin?.[0] ?? 0
-  const oz = origin?.[1] ?? 0
-
-  // Compute street-tree pit stations first so linked redwood planters cleanly break around every framed tree pit
-  const treeStations: number[] = []
-  if (chain.totalLength >= 8.5) {
-    const startMargin = chain.startOpen ? 4.2 : 2.2
-    const endMargin = chain.endOpen ? 4.2 : 2.2
-    const usable = chain.totalLength - startMargin - endMargin
-    if (usable >= 1.0) {
-      const count = Math.max(1, Math.floor(usable / 12) + 1)
-      const step = count > 1 ? usable / (count - 1) : 0
-      for (let i = 0; i < count; i++) {
-        treeStations.push(count === 1 ? startMargin + usable * 0.5 : startMargin + i * step)
-      }
-    }
-  }
-
-  // Continuous granite verge base strip
-  const mergedLegs = mergeCollinearChainLegs(chain.legs, baseLevel, 12)
-  for (const leg of mergedLegs) {
-    const g = sampleDividerSpanGrade(leg.start.x, leg.start.z, leg.end.x, leg.end.z, baseLevel, 0.045)
-    if (g.flatLength < 0.15) continue
-    const curbH = 0.20 + g.embedDepth
-    box(g.midX, g.midY + 0.20 - curbH * 0.5, g.midZ, g.slopeLength + 0.04, curbH, 1.12, g.yaw, PAL.curbLight, g.pitch)
-  }
-
-  // Emit linked redwood flower planters strictly in the bays BETWEEN framed tree pits (never piercing tree trunks/pits)
-  const pitHalfClearance = 0.88
-  const bays: [number, number][] = []
-  let cursor = chain.startOpen ? 0.28 : 0
-  const limit = chain.endOpen ? Math.max(cursor, chain.totalLength - 0.28) : chain.totalLength
-  for (const ts of treeStations) {
-    const bayEnd = Math.max(cursor, ts - pitHalfClearance)
-    if (bayEnd - cursor >= 0.75) bays.push([cursor, bayEnd])
-    cursor = Math.min(limit, ts + pitHalfClearance)
-  }
-  if (limit - cursor >= 0.75) bays.push([cursor, limit])
-
-  for (const [bStart, bEnd] of bays) {
-    const spanLen = bEnd - bStart
-    const subCount = Math.max(1, Math.ceil(spanLen / 4.2))
-    const subStep = spanLen / subCount
-    for (let k = 0; k < subCount; k++) {
-      const s0 = bStart + k * subStep
-      const s1 = s0 + subStep
-      const p0 = sampleChainAt(chain, s0)
-      const p1 = sampleChainAt(chain, s1)
-      const g = sampleDividerSpanGrade(p0.x, p0.z, p1.x, p1.z, baseLevel, 0.045)
-      if (g.flatLength < 0.35) continue
-      const hSeed = hash2d(ox + g.midX, oz + g.midZ)
-      const floral = hSeed > 0.42
-      box(g.midX, g.midY + 0.42, g.midZ, g.slopeLength, 0.48, 0.74, g.yaw, PAL.planterWood, g.pitch)
-      box(g.midX, g.midY + 0.69, g.midZ, g.slopeLength + 0.04, 0.06, 0.80, g.yaw, PAL.planterTrim, g.pitch)
-      box(
-        g.midX,
-        g.midY + 0.81,
-        g.midZ,
-        Math.max(0.3, g.slopeLength * 0.90),
-        0.22,
-        0.58,
-        g.yaw,
-        floral ? (hSeed > 0.70 ? PAL.crapeLit : PAL.crapeDark) : PAL.hedgeLit,
-        g.pitch,
-      )
-    }
-  }
-
-  // Framed granite street-tree pits + dark iron tree grates + shaded ornamental trees in their dedicated openings
-  for (const s of treeStations) {
-    const p = sampleChainAt(chain, s)
-    const y = baseLevel(p.x, p.z) + 0.045
-    box(p.x, y + 0.14, p.z, 1.48, 0.24, 1.48, p.yaw, PAL.curbMid)
-    box(p.x, y + 0.27, p.z, 1.18, 0.055, 1.18, p.yaw, PAL.planterTrim)
-    const seed = hash2d(ox + p.x, oz + p.z)
-    emitOrnamentalTree(p.x, p.z, p.yaw, baseLevel, box, seed, seed > 0.65, 1.06)
-  }
-
-  if (chain.startOpen) {
-    const first = sampleChainAt(chain, 0)
-    emitOpeningEndCap(first.x, first.z, first.tx, first.tz, first.yaw, baseLevel, box, 'verge', 1)
-  }
-  if (!chain.closed && chain.endOpen) {
-    const last = sampleChainAt(chain, chain.totalLength)
-    emitOpeningEndCap(last.x, last.z, last.tx, last.tz, last.yaw, baseLevel, box, 'verge', -1)
-  }
-}
-
-function emitSoftDelineatorPost(
-  x: number,
-  z: number,
-  yaw: number,
-  baseLevel: (x: number, z: number) => number,
-  box: BoxEmitter,
-) {
-  const y = baseLevel(x, z) + 0.045
-  // Flexible rubber base + orange-red delineator bollard + white reflective collar
-  box(x, y + 0.04, z, 0.18, 0.08, 0.18, yaw, PAL.warnDark)
-  box(x, y + 0.38, z, 0.085, 0.66, 0.085, yaw, PAL.softOrange)
-  box(x, y + 0.56, z, 0.09, 0.11, 0.09, yaw, PAL.softWhite)
-}
-
-function emitSoftDelineatorChain(
-  chain: DividerChain,
-  baseLevel: (x: number, z: number) => number,
-  box: BoxEmitter,
-) {
-  const startMargin = chain.startOpen ? 0.6 : 0.2
-  const endMargin = chain.endOpen ? 0.6 : 0.2
-  const usable = chain.totalLength - startMargin - endMargin
-  if (usable < 0.4) {
-    const mid = sampleChainAt(chain, chain.totalLength * 0.5)
-    emitSoftDelineatorPost(mid.x, mid.z, mid.yaw, baseLevel, box)
-    return
-  }
-  const count = Math.max(1, Math.round(usable / 3.5) + 1)
-  const step = count > 1 ? usable / (count - 1) : 0
-  for (let i = 0; i < count; i++) {
-    const s = count === 1 ? startMargin + usable * 0.5 : startMargin + i * step
-    const p = sampleChainAt(chain, s)
-    emitSoftDelineatorPost(p.x, p.z, p.yaw, baseLevel, box)
-  }
-}
-
 type Pair = [number, number]
 type StreetPath = [number, ...Pair[][]]
+
+interface RaisedSurfacePoly {
+  shell: readonly Pair[]
+  holes: readonly (readonly Pair[])[]
+  minX: number
+  maxX: number
+  minZ: number
+  maxZ: number
+}
 
 function pointInRingM(x: number, z: number, ring: readonly Pair[]): boolean {
   let inside = false
@@ -940,9 +518,930 @@ function pointInRingM(x: number, z: number, ring: readonly Pair[]): boolean {
 }
 
 /**
+ * Indexes raised street surfaces (kind=1 median islands/sidewalks and kind=4 verges, all at baseLevel+0.195 m)
+ * so divider plinths, end-caps, and soft delineator bases always sit cleanly atop the actual rendered surface.
+ */
+function buildRaisedSurfaceLookup(paths: readonly StreetPath[]): (x: number, z: number) => number {
+  const polys: RaisedSurfacePoly[] = []
+  for (const p of paths) {
+    const k = p[0]
+    if (k !== 1 && k !== 4) continue
+    const shell = p[1]
+    if (!shell || shell.length < 3) continue
+    let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity
+    for (const [cx, cz] of shell) {
+      const mx = cx / 100, mz = cz / 100
+      if (mx < minX) minX = mx
+      if (mx > maxX) maxX = mx
+      if (mz < minZ) minZ = mz
+      if (mz > maxZ) maxZ = mz
+    }
+    polys.push({shell, holes: p.slice(2) as Pair[][], minX, maxX, minZ, maxZ})
+  }
+  if (!polys.length) return () => 0.045
+  return (x: number, z: number) => {
+    for (let i = 0; i < polys.length; i++) {
+      const poly = polys[i]
+      if (x < poly.minX || x > poly.maxX || z < poly.minZ || z > poly.maxZ) continue
+      if (!pointInRingM(x, z, poly.shell)) continue
+      if (poly.holes.some(h => pointInRingM(x, z, h))) continue
+      return 0.195
+    }
+    return 0.045
+  }
+}
+
+interface ProjectedBed {
+  s: number
+  lat: number
+  x: number
+  z: number
+}
+
+/**
+ * Projects GL04 native street-tree `beds` (`[eastDm, southDm, heading, arterial]`) onto a traced divider chain.
+ * Returns deduplicated stations along chainage sorted ascending.
+ */
+function projectBedsToChain(
+  chain: DividerChain,
+  beds: readonly (readonly number[])[],
+  maxLateralDist: number,
+): ProjectedBed[] {
+  if (!beds.length || !chain.legs.length) return []
+  let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity
+  for (const leg of chain.legs) {
+    minX = Math.min(minX, leg.start.x, leg.end.x)
+    maxX = Math.max(maxX, leg.start.x, leg.end.x)
+    minZ = Math.min(minZ, leg.start.z, leg.end.z)
+    maxZ = Math.max(maxZ, leg.start.z, leg.end.z)
+  }
+  const pad = maxLateralDist + 1.0
+  minX -= pad; maxX += pad; minZ -= pad; maxZ += pad
+
+  const raw: ProjectedBed[] = []
+  for (const b of beds) {
+    const bx = b[0] / 10, bz = b[1] / 10
+    if (bx < minX || bx > maxX || bz < minZ || bz > maxZ) continue
+    let bestDist = maxLateralDist
+    let bestS = -1
+    let bestLat = 0
+    let acc = 0
+    for (const leg of chain.legs) {
+      const dx = leg.end.x - leg.start.x, dz = leg.end.z - leg.start.z
+      const lenSq = dx * dx + dz * dz
+      if (lenSq < 1e-6) { acc += leg.length; continue }
+      const t = Math.max(0, Math.min(1, ((bx - leg.start.x) * dx + (bz - leg.start.z) * dz) / lenSq))
+      const px = leg.start.x + dx * t, pz = leg.start.z + dz * t
+      const dist = Math.hypot(bx - px, bz - pz)
+      if (dist <= bestDist) {
+        bestDist = dist
+        bestS = acc + t * leg.length
+        const yaw = -Math.atan2(dz, dx)
+        const nx = Math.sin(yaw), nz = Math.cos(yaw)
+        bestLat = (bx - px) * nx + (bz - pz) * nz
+      }
+      acc += leg.length
+    }
+    if (bestS >= 0) raw.push({s: bestS, lat: bestLat, x: bx, z: bz})
+  }
+  if (!raw.length) return []
+  raw.sort((a, b) => a.s - b.s)
+  const deduped: ProjectedBed[] = [raw[0]]
+  for (let i = 1; i < raw.length; i++) {
+    if (raw[i].s - deduped[deduped.length - 1].s >= 0.85) deduped.push(raw[i])
+  }
+  return deduped
+}
+
+/**
+ * Splits `[startMargin, totalLength - endMargin]` into continuous obstacle-free bays around tree stations.
+ */
+function splitChainClearBays(
+  totalLength: number,
+  startMargin: number,
+  endMargin: number,
+  obstacleStations: readonly number[],
+  halfClearance: number,
+  minBayLen = 0.55,
+): [number, number][] {
+  const limit = Math.max(startMargin, totalLength - endMargin)
+  if (limit - startMargin < minBayLen) return []
+  const sorted = [...obstacleStations].sort((a, b) => a - b)
+  const bays: [number, number][] = []
+  let cursor = startMargin
+  for (const s of sorted) {
+    const bayEnd = Math.min(limit, s - halfClearance)
+    if (bayEnd - cursor >= minBayLen) bays.push([cursor, bayEnd])
+    cursor = Math.max(cursor, Math.min(limit, s + halfClearance))
+  }
+  if (limit - cursor >= minBayLen) bays.push([cursor, limit])
+  return bays
+}
+
+function hash2d(x: number, z: number): number {
+  const s = Math.sin(x * 12.9898 + z * 78.233) * 43758.5453
+  return s - Math.floor(s)
+}
+
+/**
+ * Emits a watertight yellow/black reflective bollard + cap at a real street opening (crosswalk / U-turn / junction).
+ * All stacked components overlap vertically by >= 0.01 m (zero air gaps) and seat cleanly on `surfaceOff` (+0.195 or +0.045).
+ */
+export function emitOpeningEndCap(
+  x: number,
+  z: number,
+  tx: number,
+  tz: number,
+  yaw: number,
+  baseLevel: (x: number, z: number) => number,
+  box: BoxEmitter,
+  style: 'rail' | 'green' | 'verge',
+  inwardSign: number,
+  surfaceOff = 0.195,
+) {
+  // Tuck end-cap slightly inward (+inwardSign * 0.08 m) so it never protrudes into crosswalk openings.
+  const px = x + tx * inwardSign * 0.08
+  const pz = z + tz * inwardSign * 0.08
+  const y0 = baseLevel(px, pz) + surfaceOff
+  if (style === 'rail') {
+    // Cast-iron plinth [y0-0.03 .. y0+0.13] sits cleanly atop surfaceOff (13 cm visible)
+    box(px, y0 + 0.05, pz, 0.22, 0.16, 0.20, yaw, PAL.railBase)
+    // Continuous yellow post shaft [y0+0.11 .. y0+0.88] embedded 2 cm into plinth (0 gap)
+    box(px, y0 + 0.495, pz, 0.11, 0.77, 0.11, yaw, PAL.warnYellow)
+    // Two dark warning collar bands wrapping the continuous yellow shaft (no cut gaps)
+    box(px, y0 + 0.40, pz, 0.122, 0.13, 0.122, yaw, PAL.warnDark)
+    box(px, y0 + 0.68, pz, 0.122, 0.13, 0.122, yaw, PAL.warnDark)
+    // Top white cap [y0+0.86 .. y0+0.95] overlaps yellow shaft by 2 cm & aligns flush with top rail (+0.9225)
+    box(px, y0 + 0.905, pz, 0.14, 0.09, 0.14, yaw, PAL.railWhite)
+  } else if (style === 'green') {
+    // Granite nose stone [y0-0.04 .. y0+0.22] + warning post [y0+0.20 .. y0+0.68] + white cap [y0+0.66 .. y0+0.73]
+    box(px, y0 + 0.09, pz, 0.34, 0.26, 0.78, yaw, PAL.curbLight)
+    box(px, y0 + 0.44, pz, 0.095, 0.48, 0.095, yaw, PAL.warnYellow)
+    box(px, y0 + 0.52, pz, 0.106, 0.10, 0.106, yaw, PAL.warnDark)
+    box(px, y0 + 0.695, pz, 0.115, 0.07, 0.115, yaw, PAL.railWhite)
+  } else {
+    // Verge granite nose block [y0-0.04 .. y0+0.16] + sleek reflective delineator [y0+0.14 .. y0+0.74]
+    box(px, y0 + 0.06, pz, 0.32, 0.20, 1.04, yaw, PAL.curbLight)
+    box(px, y0 + 0.44, pz, 0.095, 0.60, 0.095, yaw, PAL.railWhite)
+    box(px, y0 + 0.60, pz, 0.108, 0.12, 0.108, yaw, PAL.warnYellow)
+  }
+}
+
+// Shared 1-level geodesic icosahedron (42 verts, 80 outward-CCW tris) matching web/src/look/trees.ts
+// so procedural boulevard crape-myrtle trees match Guilin Online's native low-poly botanical style (0 extra draw calls).
+type Vec3 = [number, number, number]
+const ICO_PHI = (1 + Math.sqrt(5)) / 2
+const ICO_BASE_VERTS: Vec3[] = [
+  [-1, ICO_PHI, 0], [1, ICO_PHI, 0], [-1, -ICO_PHI, 0], [1, -ICO_PHI, 0],
+  [0, -1, ICO_PHI], [0, 1, ICO_PHI], [0, -1, -ICO_PHI], [0, 1, -ICO_PHI],
+  [ICO_PHI, 0, -1], [ICO_PHI, 0, 1], [-ICO_PHI, 0, -1], [-ICO_PHI, 0, 1],
+].map(([vx, vy, vz]) => {
+  const ln = Math.hypot(vx, vy, vz)
+  return [vx / ln, vy / ln, vz / ln] as Vec3
+})
+const ICO_BASE_FACES: [number, number, number][] = [
+  [0, 11, 5], [0, 5, 1], [0, 1, 7], [0, 7, 10], [0, 10, 11],
+  [1, 5, 9], [5, 11, 4], [11, 10, 2], [10, 7, 6], [7, 1, 8],
+  [3, 9, 4], [3, 4, 2], [3, 2, 6], [3, 6, 8], [3, 8, 9],
+  [4, 9, 5], [2, 4, 11], [6, 2, 10], [8, 6, 7], [9, 8, 1],
+]
+const ICO_SUB1 = (() => {
+  const verts = ICO_BASE_VERTS.slice()
+  const cache = new Map<string, number>()
+  const mid = (i: number, j: number) => {
+    const key = i < j ? `${i}_${j}` : `${j}_${i}`
+    const hit = cache.get(key)
+    if (hit !== undefined) return hit
+    const [ax, ay, az] = verts[i], [bx, by, bz] = verts[j]
+    const mx = (ax + bx) * 0.5, my = (ay + by) * 0.5, mz = (az + bz) * 0.5
+    const ln = Math.hypot(mx, my, mz)
+    const idx = verts.length
+    verts.push([mx / ln, my / ln, mz / ln])
+    cache.set(key, idx)
+    return idx
+  }
+  const faces: [number, number, number][] = []
+  for (const [a, b, c] of ICO_BASE_FACES) {
+    const ab = mid(a, b), bc = mid(b, c), ca = mid(c, a)
+    faces.push([a, ab, ca], [b, bc, ab], [c, ca, bc], [ab, bc, ca])
+  }
+  return {verts, faces}
+})()
+
+const TREE_SHADE_C0 = new THREE.Color()
+const TREE_SHADE_C1 = new THREE.Color()
+const TREE_SHADE_C2 = new THREE.Color()
+const TREE_SHADE_OUT = new THREE.Color()
+
+function evalPolyBlob(
+  ox: number, oy: number, oz: number,
+  rx: number, ry: number, rz: number,
+  yaw: number, seed: number, jitter: number,
+): [Vec3, Vec3, Vec3][] {
+  const cy = Math.cos(yaw), sy = Math.sin(yaw)
+  const pts: Vec3[] = ICO_SUB1.verts.map(([ux, uy, uz]) => {
+    const d1 = Math.sin(seed * 1.73 + ux * 3.17 + uy * 2.63 + uz * 3.53)
+    const d2 = Math.cos(seed * 2.91 - ux * 4.31 + uy * 3.79 - uz * 2.87)
+    const disp = 1 + jitter * (0.62 * d1 + 0.38 * d2)
+    const lx = ux * rx * disp, ly = uy * ry * disp, lz = uz * rz * disp
+    return [lx * cy + lz * sy + ox, ly + oy, -lx * sy + lz * cy + oz]
+  })
+  return ICO_SUB1.faces.map(([a, b, c]) => [pts[a], pts[b], pts[c]])
+}
+
+function evalPolyTube(pts: readonly [number, number, number, number][], sides: number): [Vec3, Vec3, Vec3][] {
+  const rings: Vec3[][] = []
+  const n = pts.length
+  for (let i = 0; i < n; i++) {
+    const [cx, cy, cz, r] = pts[i]
+    const p0 = pts[Math.max(0, i - 1)], p1 = pts[Math.min(n - 1, i + 1)]
+    let tx = p1[0] - p0[0], ty = p1[1] - p0[1], tz = p1[2] - p0[2]
+    const tl = Math.hypot(tx, ty, tz) || 1
+    tx /= tl; ty /= tl; tz /= tl
+    const upX = Math.abs(ty) > 0.92 ? 1 : 0, upY = Math.abs(ty) > 0.92 ? 0 : 1
+    let ux = -tz * upY, uy = tz * upX, uz = tx * upY - ty * upX
+    const ul = Math.hypot(ux, uy, uz) || 1
+    ux /= ul; uy /= ul; uz /= ul
+    const vx = ty * uz - tz * uy, vy = tz * ux - tx * uz, vz = tx * uy - ty * ux
+    const ring: Vec3[] = []
+    for (let s = 0; s < sides; s++) {
+      const ang = (s / sides) * Math.PI * 2
+      const ca = Math.cos(ang), sa = Math.sin(ang)
+      ring.push([cx + r * (ca * ux + sa * vx), cy + r * (ca * uy + sa * vy), cz + r * (ca * uz + sa * vz)])
+    }
+    rings.push(ring)
+  }
+  const tris: [Vec3, Vec3, Vec3][] = []
+  for (let i = 0; i < n - 1; i++) {
+    const r0 = rings[i], r1 = rings[i + 1]
+    for (let s = 0; s < sides; s++) {
+      const sn = (s + 1) % sides
+      tris.push([r0[s], r0[sn], r1[sn]], [r0[s], r1[sn], r1[s]])
+    }
+  }
+  return tris
+}
+
+function emitShadedWoodTris(
+  tris: readonly [Vec3, Vec3, Vec3][],
+  darkHex: number, midHex: number, litHex: number,
+  emitTri: SurfaceTriEmitter,
+) {
+  let wMin = Infinity, wMax = -Infinity
+  for (const [a, b, c] of tris) {
+    const ym = (a[1] + b[1] + c[1]) / 3
+    if (ym < wMin) wMin = ym
+    if (ym > wMax) wMax = ym
+  }
+  const wSpan = Math.max(0.2, wMax - wMin)
+  TREE_SHADE_C0.setHex(darkHex); TREE_SHADE_C1.setHex(midHex); TREE_SHADE_C2.setHex(litHex)
+  for (const [a, b, c] of tris) {
+    const ym = (a[1] + b[1] + c[1]) / 3
+    const abx = b[0] - a[0], aby = b[1] - a[1], abz = b[2] - a[2]
+    const acx = c[0] - a[0], acy = c[1] - a[1], acz = c[2] - a[2]
+    const nx = aby * acz - abz * acy, ny = abz * acx - abx * acz, nz = abx * acy - aby * acx
+    const nl = Math.hypot(nx, ny, nz) || 1
+    const sun = Math.max(0, Math.min(1, (-0.45 * (nx / nl) + 0.35 * (ny / nl) + 0.55 * (nz / nl)) * 0.5 + 0.5))
+    const t = 0.45 * ((ym - wMin) / wSpan) + 0.55 * sun
+    if (t < 0.5) TREE_SHADE_OUT.copy(TREE_SHADE_C0).lerp(TREE_SHADE_C1, t * 2)
+    else TREE_SHADE_OUT.copy(TREE_SHADE_C1).lerp(TREE_SHADE_C2, (t - 0.5) * 2)
+    emitTri(a[0], a[1], a[2], b[0], b[1], b[2], c[0], c[1], c[2], TREE_SHADE_OUT.r, TREE_SHADE_OUT.g, TREE_SHADE_OUT.b)
+  }
+}
+
+function emitShadedCanopyTris(
+  tris: readonly [Vec3, Vec3, Vec3][],
+  cYmin: number, cSpan: number,
+  darkHex: number, midHex: number, litHex: number,
+  emitTri: SurfaceTriEmitter,
+) {
+  TREE_SHADE_C0.setHex(darkHex); TREE_SHADE_C1.setHex(midHex); TREE_SHADE_C2.setHex(litHex)
+  for (const [a, b, c] of tris) {
+    const ym = (a[1] + b[1] + c[1]) / 3
+    const abx = b[0] - a[0], aby = b[1] - a[1], abz = b[2] - a[2]
+    const acx = c[0] - a[0], acy = c[1] - a[1], acz = c[2] - a[2]
+    const nx = aby * acz - abz * acy, ny = abz * acx - abx * acz, nz = abx * acy - aby * acx
+    const nl = Math.hypot(nx, ny, nz) || 1
+    const hT = Math.max(0, Math.min(1, (ym - cYmin) / cSpan))
+    const nT = (ny / nl) * 0.5 + 0.5
+    const t = Math.max(0, Math.min(1, 0.58 * hT + 0.42 * nT))
+    if (t < 0.5) TREE_SHADE_OUT.copy(TREE_SHADE_C0).lerp(TREE_SHADE_C1, t * 2)
+    else TREE_SHADE_OUT.copy(TREE_SHADE_C1).lerp(TREE_SHADE_C2, (t - 0.5) * 2)
+    emitTri(a[0], a[1], a[2], b[0], b[1], b[2], c[0], c[1], c[2], TREE_SHADE_OUT.r, TREE_SHADE_OUT.g, TREE_SHADE_OUT.b)
+  }
+}
+
+/**
+ * Emits a genuine low-poly geodesic polyhedral Guilin crape-myrtle / osmanthus ornamental tree
+ * directly into the shared street `surface` mesh (`aSurface = 7`, 0 extra draw calls, 0 boxy cubes).
+ * Uses the exact subdivided-icosahedron blob + tapered forked trunk + vertical/normal baked shading
+ * language of `web/src/look/trees.ts` so it blends seamlessly alongside native street trees.
+ */
+function emitOrnamentalTree(
+  x: number,
+  z: number,
+  yaw: number,
+  baseLevel: (x: number, z: number) => number,
+  box: BoxEmitter,
+  seed: number,
+  withCrapeBlossom: boolean,
+  crownScale = 1.0,
+  surfaceOff = 0.195,
+  emitTri?: SurfaceTriEmitter,
+) {
+  const y0 = baseLevel(x, z) + surfaceOff
+  if (!emitTri) {
+    // Minimal trunk-only marker for legacy callers without surface triangle callback (never emits boxy cube crowns)
+    box(x, y0 + 0.51, z, 0.15, 1.06, 0.15, yaw, PAL.trunkLime)
+    box(x, y0 + 1.56, z, 0.12, 1.12, 0.12, yaw + 0.2, PAL.trunkBark)
+    return
+  }
+
+  const cs = crownScale
+  const rot0 = yaw + (seed - 0.5) * 1.4
+  const sSeed = 11 + seed * 97
+
+  // Tapered 6-sided lower limewashed trunk [y0-0.06 .. y0+1.04]
+  const limeTris = evalPolyTube([
+    [x, y0 - 0.06, z, 0.105],
+    [x, y0 + 0.48, z, 0.090],
+    [x + 0.01, y0 + 1.04, z, 0.080],
+  ], 6)
+  emitShadedWoodTris(limeTris, 0xb2ae9f, 0xd6d2c6, 0xe8e5db, emitTri)
+
+  // Tapered 6-sided upper smooth crape-myrtle bark [y0+1.00 .. y0+2.12] + 3 splayed ascending boughs
+  const barkTris: [Vec3, Vec3, Vec3][] = [
+    ...evalPolyTube([
+      [x + 0.01, y0 + 1.00, z, 0.078],
+      [x + 0.02, y0 + 1.66, z + 0.01, 0.066],
+      [x + 0.02, y0 + 2.12, z + 0.01, 0.052],
+    ], 6),
+  ]
+  const boughAngles = [rot0, rot0 + 2.12, rot0 + 4.24]
+  for (let i = 0; i < 3; i++) {
+    const ang = boughAngles[i]
+    const bx = Math.cos(ang), bz = Math.sin(ang)
+    const reach = (0.44 + (i % 2) * 0.08) * cs
+    const tipY = y0 + (2.56 + (i === 1 ? 0.10 : i === 2 ? -0.04 : 0.04)) * (0.94 + 0.06 * cs)
+    barkTris.push(...evalPolyTube([
+      [x + 0.02, y0 + 1.94, z + 0.01, 0.046],
+      [x + bx * reach * 0.55, y0 + 2.28, z + bz * reach * 0.55, 0.032],
+      [x + bx * reach, tipY, z + bz * reach, 0.020],
+    ], 4))
+  }
+  emitShadedWoodTris(barkTris, 0x3b3128, 0x5c4d40, 0x766454, emitTri)
+
+  // Organic 4-lobe geodesic broadleaf green umbrella crown (matches pipeline/tree-specs.json osmanthus hues)
+  const greenTris: [Vec3, Vec3, Vec3][] = [
+    ...evalPolyBlob(x + 0.02, y0 + 2.74, z + 0.01, 0.78 * cs, 0.52 * cs, 0.74 * cs, rot0 + 0.4, sSeed + 13, 0.14),
+  ]
+  for (let i = 0; i < 3; i++) {
+    const ang = boughAngles[i] + 0.15
+    const dist = (0.44 + (i % 2) * 0.07) * cs
+    const lx = x + Math.cos(ang) * dist
+    const lz = z + Math.sin(ang) * dist
+    const ly = y0 + 2.54 + (i === 1 ? 0.10 : i === 2 ? 0.03 : -0.02)
+    greenTris.push(...evalPolyBlob(
+      lx, ly, lz,
+      (0.58 - i * 0.02) * cs,
+      0.40 * cs,
+      (0.54 + (i % 2) * 0.03) * cs,
+      ang + 0.7,
+      sSeed + 29 + i * 19,
+      0.14,
+    ))
+  }
+
+  // Natural Guilin crape-myrtle rose-lilac blossom panicle clusters nestled organically atop the green crown
+  const blossomTris: [Vec3, Vec3, Vec3][] = []
+  if (withCrapeBlossom) {
+    const a0 = rot0 + 0.55
+    blossomTris.push(
+      ...evalPolyBlob(x + Math.cos(a0) * 0.14 * cs, y0 + 3.06, z + Math.sin(a0) * 0.14 * cs, 0.54 * cs, 0.37 * cs, 0.50 * cs, a0 + 0.3, sSeed + 71, 0.15),
+      ...evalPolyBlob(x + Math.cos(a0 + 2.05) * 0.46 * cs, y0 + 2.86, z + Math.sin(a0 + 2.05) * 0.46 * cs, 0.44 * cs, 0.31 * cs, 0.42 * cs, a0 + 1.4, sSeed + 89, 0.15),
+      ...evalPolyBlob(x + Math.cos(a0 + 4.15) * 0.42 * cs, y0 + 2.90, z + Math.sin(a0 + 4.15) * 0.42 * cs, 0.40 * cs, 0.29 * cs, 0.38 * cs, a0 + 2.6, sSeed + 107, 0.15),
+    )
+  } else {
+    greenTris.push(
+      ...evalPolyBlob(x - 0.04, y0 + 3.02, z + 0.03, 0.56 * cs, 0.40 * cs, 0.52 * cs, rot0 + 1.2, sSeed + 71, 0.14),
+    )
+  }
+
+  let cYmin = Infinity, cYmax = -Infinity
+  for (const [a, b, c] of greenTris) {
+    cYmin = Math.min(cYmin, a[1], b[1], c[1])
+    cYmax = Math.max(cYmax, a[1], b[1], c[1])
+  }
+  for (const [a, b, c] of blossomTris) {
+    cYmin = Math.min(cYmin, a[1], b[1], c[1])
+    cYmax = Math.max(cYmax, a[1], b[1], c[1])
+  }
+  const cSpan = Math.max(0.5, cYmax - cYmin)
+  emitShadedCanopyTris(greenTris, cYmin, cSpan, 0x17311d, 0x2f5a2d, 0x5a8540, emitTri)
+  if (blossomTris.length) {
+    emitShadedCanopyTris(blossomTris, cYmin, cSpan, 0x6b2f47, 0x9e536f, 0xce8fa5, emitTri)
+  }
+}
+
+/** Emits a grounded cast-iron plinth + white rail post with 2 cm vertical overlap (0 air gap, visible atop +0.195). */
+function emitMedianRailPost(
+  x: number,
+  z: number,
+  yaw: number,
+  baseLevel: (x: number, z: number) => number,
+  surfaceAt: (x: number, z: number) => number,
+  box: BoxEmitter,
+) {
+  const y0 = baseLevel(x, z) + surfaceAt(x, z)
+  // Plinth [y0-0.03 .. y0+0.13] sits cleanly visible atop either +0.195 raised median or +0.045 asphalt
+  box(x, y0 + 0.05, z, 0.16, 0.16, 0.20, yaw, PAL.railBase)
+  // Post [y0+0.11 .. y0+0.94] embedded 2 cm into plinth (0 gap) and capped cleanly at top rail (+0.9225)
+  box(x, y0 + 0.525, z, 0.064, 0.83, 0.064, yaw, PAL.railWhite)
+}
+
+function emitMedianMetalRailChain(
+  chain: DividerChain,
+  baseLevel: (x: number, z: number) => number,
+  surfaceAt: (x: number, z: number) => number,
+  box: BoxEmitter,
+  palette: DividerPalette,
+) {
+  const mergedLegs = mergeCollinearChainLegs(chain.legs, baseLevel, 12)
+  for (const leg of mergedLegs) {
+    const midOff = surfaceAt((leg.start.x + leg.end.x) * 0.5, (leg.start.z + leg.end.z) * 0.5)
+    const g = sampleDividerSpanGrade(leg.start.x, leg.start.z, leg.end.x, leg.end.z, baseLevel, midOff)
+    if (g.flatLength < 0.05) continue
+    // Top white beam [y0+0.8375 .. y0+0.9225] + lower silver beam [y0+0.2475 .. y0+0.3125]
+    box(g.midX, g.midY + 0.88, g.midZ, g.slopeLength, 0.085, 0.075, g.yaw, PAL.railWhite, g.pitch)
+    box(g.midX, g.midY + 0.28, g.midZ, g.slopeLength, 0.065, 0.075, g.yaw, PAL.railSilver, g.pitch)
+    // Preserve exact 1.35 x 0.42 slogan banner geometry for streets.ts uSlogan shader!
+    if (leg.banner && g.flatLength >= 1.2) {
+      box(g.midX, g.midY + 0.58, g.midZ, Math.min(1.35, g.slopeLength), 0.42, 0.09, g.yaw, palette.bannerRed, g.pitch)
+    }
+  }
+  // Posts + alternating airy vertical pickets along continuous chainage
+  const bayCount = Math.max(1, Math.round(chain.totalLength / 2.2))
+  const postStep = chain.totalLength / bayCount
+  for (let i = 0; i < bayCount; i++) {
+    const midS = (i + 0.5) * postStep
+    const pm = sampleChainAt(chain, midS)
+    const ym = baseLevel(pm.x, pm.z) + surfaceAt(pm.x, pm.z)
+    // Picket [ym+0.27 .. ym+0.89] spans cleanly into both lower and upper rails
+    box(pm.x, ym + 0.58, pm.z, 0.036, 0.62, 0.036, pm.yaw, PAL.railSilver)
+    if (i > 0) {
+      const p = sampleChainAt(chain, i * postStep)
+      emitMedianRailPost(p.x, p.z, p.yaw, baseLevel, surfaceAt, box)
+    }
+  }
+  // End-cap treatments at real street openings vs grounded plinth posts at tile borders
+  const first = sampleChainAt(chain, 0)
+  const last = sampleChainAt(chain, chain.totalLength)
+  if (chain.startOpen) {
+    emitOpeningEndCap(first.x, first.z, first.tx, first.tz, first.yaw, baseLevel, box, 'rail', 1, surfaceAt(first.x, first.z))
+  } else {
+    emitMedianRailPost(first.x, first.z, first.yaw, baseLevel, surfaceAt, box)
+  }
+  if (!chain.closed) {
+    if (chain.endOpen) {
+      emitOpeningEndCap(last.x, last.z, last.tx, last.tz, last.yaw, baseLevel, box, 'rail', -1, surfaceAt(last.x, last.z))
+    } else {
+      emitMedianRailPost(last.x, last.z, last.yaw, baseLevel, surfaceAt, box)
+    }
+  }
+}
+
+function emitMedianGreenTreesChain(
+  chain: DividerChain,
+  beds: readonly (readonly number[])[],
+  baseLevel: (x: number, z: number) => number,
+  surfaceAt: (x: number, z: number) => number,
+  box: BoxEmitter,
+  origin?: readonly [number, number],
+  emitTri?: SurfaceTriEmitter,
+) {
+  const ox = origin?.[0] ?? 0
+  const oz = origin?.[1] ?? 0
+
+  // Determine ornamental crape-myrtle tree stations first (prefer native beds if present; otherwise space ~14 m clear of open ends)
+  const nativeBeds = projectBedsToChain(chain, beds, 0.95)
+  const treeStations: {s: number; isNative: boolean}[] = nativeBeds.map(b => ({s: b.s, isNative: true}))
+  if (!treeStations.length && chain.totalLength >= 10.5) {
+    const startMargin = chain.startOpen ? 4.8 : 2.5
+    const endMargin = chain.endOpen ? 4.8 : 2.5
+    const usable = chain.totalLength - startMargin - endMargin
+    if (usable >= 1.5) {
+      const count = Math.max(1, Math.floor(usable / 14) + 1)
+      const step = count > 1 ? usable / (count - 1) : 0
+      for (let i = 0; i < count; i++) {
+        treeStations.push({s: count === 1 ? startMargin + usable * 0.5 : startMargin + i * step, isNative: false})
+      }
+    }
+  }
+
+  // Continuous granite planter kerb enclosure along straight spans up to 12 m
+  const mergedLegs = mergeCollinearChainLegs(chain.legs, baseLevel, 12)
+  for (const leg of mergedLegs) {
+    const midOff = surfaceAt((leg.start.x + leg.end.x) * 0.5, (leg.start.z + leg.end.z) * 0.5)
+    const g = sampleDividerSpanGrade(leg.start.x, leg.start.z, leg.end.x, leg.end.z, baseLevel, midOff)
+    if (g.flatLength < 0.08) continue
+    const curbTop = midOff > 0.12 ? 0.14 : 0.24
+    const curbH = curbTop + g.embedDepth
+    box(g.midX, g.midY + curbTop - curbH * 0.5, g.midZ, g.slopeLength + 0.04, curbH, 0.76, g.yaw, PAL.curbLight, g.pitch)
+  }
+
+  // Emit evergreen base hedge & sculpted blossom crowns STRICTLY in clear bays BETWEEN tree wells (0 trunk-through-hedge)
+  const hedgeBays = splitChainClearBays(
+    chain.totalLength,
+    chain.startOpen ? 0.32 : 0,
+    chain.endOpen ? 0.32 : 0,
+    treeStations.map(t => t.s),
+    0.58,
+    0.50,
+  )
+  for (const [bStart, bEnd] of hedgeBays) {
+    const spanLen = bEnd - bStart
+    const subCount = Math.max(1, Math.ceil(spanLen / 3.6))
+    const subStep = spanLen / subCount
+    for (let k = 0; k < subCount; k++) {
+      const s0 = bStart + k * subStep
+      const s1 = s0 + subStep
+      const p0 = sampleChainAt(chain, s0)
+      const p1 = sampleChainAt(chain, s1)
+      const midOff = surfaceAt((p0.x + p1.x) * 0.5, (p0.z + p1.z) * 0.5)
+      const g = sampleDividerSpanGrade(p0.x, p0.z, p1.x, p1.z, baseLevel, midOff)
+      if (g.flatLength < 0.30) continue
+      const curbTop = midOff > 0.12 ? 0.12 : 0.22
+      // Evergreen base hedge seated cleanly inside granite curb
+      box(g.midX, g.midY + curbTop + 0.21, g.midZ, g.slopeLength, 0.44, 0.58, g.yaw, PAL.hedgeDark, g.pitch)
+      const midS = (s0 + s1) * 0.5
+      if ((!chain.startOpen || midS >= 1.1) && (!chain.endOpen || chain.totalLength - midS >= 1.1) && g.flatLength >= 0.75) {
+        const hSeed = hash2d(ox + g.midX, oz + g.midZ)
+        const isBlossom = hSeed > 0.45
+        const crownTint = isBlossom ? (hSeed > 0.72 ? PAL.crapeLit : PAL.crapeDark) : PAL.hedgeLit
+        const crownH = isBlossom ? 0.24 + (hSeed % 0.10) : 0.22 + (hSeed % 0.08)
+        box(
+          g.midX,
+          g.midY + curbTop + 0.42 + crownH * 0.44,
+          g.midZ,
+          Math.max(0.55, g.slopeLength * 0.72),
+          crownH,
+          isBlossom ? 0.46 : 0.50,
+          g.yaw + (hSeed - 0.5) * 0.08,
+          crownTint,
+          g.pitch,
+        )
+      }
+    }
+  }
+
+  // Emit dedicated soil tree wells + geodesic low-poly crape-myrtle trees (native beds get wells only, zero duplicate fake trees)
+  for (const t of treeStations) {
+    const p = sampleChainAt(chain, t.s)
+    const surfOff = surfaceAt(p.x, p.z)
+    const curbTop = surfOff > 0.12 ? 0.14 : 0.24
+    const yWell = baseLevel(p.x, p.z) + surfOff + curbTop
+    // Compact granite collar + mulch bed inside the hedge cutout so the trunk rises cleanly from soil
+    box(p.x, yWell - 0.02, p.z, 0.96, 0.09, 0.80, p.yaw, PAL.curbMid)
+    box(p.x, yWell + 0.02, p.z, 0.76, 0.05, 0.60, p.yaw, PAL.soil)
+    if (!t.isNative) {
+      const seed = hash2d(ox + p.x, oz + p.z)
+      emitOrnamentalTree(p.x, p.z, p.yaw, baseLevel, box, seed, true, 0.92, surfOff + curbTop, emitTri)
+    }
+  }
+
+  if (chain.startOpen) {
+    const first = sampleChainAt(chain, 0)
+    emitOpeningEndCap(first.x, first.z, first.tx, first.tz, first.yaw, baseLevel, box, 'green', 1, surfaceAt(first.x, first.z))
+  }
+  if (!chain.closed && chain.endOpen) {
+    const last = sampleChainAt(chain, chain.totalLength)
+    emitOpeningEndCap(last.x, last.z, last.tx, last.tz, last.yaw, baseLevel, box, 'green', -1, surfaceAt(last.x, last.z))
+  }
+}
+
+function emitVergeHedgeCurbChain(
+  chain: DividerChain,
+  beds: readonly (readonly number[])[],
+  baseLevel: (x: number, z: number) => number,
+  box: BoxEmitter,
+  palette: DividerPalette,
+  origin?: readonly [number, number],
+) {
+  const ox = origin?.[0] ?? 0
+  const oz = origin?.[1] ?? 0
+  // Project GL04 native street-tree beds along verge centerline so BOTH hedges AND motor-side iron fences
+  // break cleanly around every native trunk (including wide camphor/banyan trunks & buttress flares).
+  const nativeBeds = projectBedsToChain(chain, beds, 1.35)
+  const treeStations = nativeBeds.map(b => b.s)
+
+  // Cut hedge bays cleanly around every native tree (halfClearance = 1.02 m -> 2.04 m spacious tree-pit opening)
+  const hedgeBays = splitChainClearBays(
+    chain.totalLength,
+    chain.startOpen ? 0.30 : 0,
+    chain.endOpen ? 0.30 : 0,
+    treeStations,
+    1.02,
+    0.55,
+  )
+  for (const [bStart, bEnd] of hedgeBays) {
+    const spanLen = bEnd - bStart
+    const subCount = Math.max(1, Math.ceil(spanLen / 4.4))
+    const subStep = spanLen / subCount
+    for (let k = 0; k < subCount; k++) {
+      const s0 = bStart + k * subStep
+      const s1 = s0 + subStep
+      const p0 = sampleChainAt(chain, s0)
+      const p1 = sampleChainAt(chain, s1)
+      const g = sampleDividerSpanGrade(p0.x, p0.z, p1.x, p1.z, baseLevel, 0.195)
+      if (g.flatLength < 0.35) continue
+      const hSeed = hash2d(ox + g.midX, oz + g.midZ)
+      // Low granite inner kerb lip seated directly on +0.195 verge top (h=0.16 stays well clear of batch.ts 0.12 awning matcher)
+      box(g.midX, g.midY + 0.03, g.midZ, g.slopeLength, 0.16, 1.06, g.yaw, PAL.curbMid, g.pitch)
+      // Lower evergreen hedge + sculpted upper shrub crown
+      box(g.midX, g.midY + 0.30, g.midZ, g.slopeLength, 0.42, 0.90, g.yaw, PAL.hedgeDark, g.pitch)
+      const midS = (s0 + s1) * 0.5
+      if ((!chain.startOpen || midS >= 1.0) && (!chain.endOpen || chain.totalLength - midS >= 1.0) && g.flatLength >= 0.85) {
+        const upperTint = hSeed > 0.72 ? PAL.shrubCrimson : hSeed > 0.35 ? PAL.hedgeLit : PAL.hedgeMid
+        box(g.midX, g.midY + 0.58, g.midZ, Math.min(3.4, g.slopeLength * 0.78), 0.22 + (hSeed % 0.07), 0.68, g.yaw, upperTint, g.pitch)
+      }
+    }
+  }
+
+  // Emit crisp 4-sided hollow granite tree-pit curb frames + dark soil bed around every native street tree
+  // (1.66 x 1.66 m outer fits inside 2.20 m verge while comfortably framing wide camphor/banyan trunks)
+  for (const b of nativeBeds) {
+    const p = sampleChainAt(chain, b.s)
+    const y0 = baseLevel(p.x, p.z) + 0.195
+    // Four granite border curbs [y0-0.04 .. y0+0.14] (h=0.18 avoids batch.ts magic awning height)
+    const borderOff = 0.75
+    for (const side of [-1, 1]) {
+      box(p.x + p.nx * side * borderOff, y0 + 0.05, p.z + p.nz * side * borderOff, 1.66, 0.18, 0.16, p.yaw, PAL.curbLight)
+      box(p.x + p.tx * side * borderOff, y0 + 0.05, p.z + p.tz * side * borderOff, 0.16, 0.18, 1.34, p.yaw, PAL.curbLight)
+    }
+    box(p.x, y0 + 0.03, p.z, 1.34, 0.06, 1.34, p.yaw, PAL.soil)
+  }
+
+  // Motor-lane side low garden fence frames strictly each hedge bay (-sideSign * 0.74 m) and terminates cleanly
+  // with end posts on both sides of EVERY native tree pit (halfClearance = 1.00 m -> 0% trunk piercing).
+  const FENCE_OFFSET = 0.74
+  const fenceBays = splitChainClearBays(
+    chain.totalLength,
+    chain.startOpen ? 0.30 : 0,
+    chain.endOpen ? 0.30 : 0,
+    treeStations,
+    1.00,
+    0.55,
+  )
+  for (const [bStart, bEnd] of fenceBays) {
+    const spanLen = bEnd - bStart
+    const subCount = Math.max(1, Math.ceil(spanLen / 10))
+    const subStep = spanLen / subCount
+    for (let k = 0; k < subCount; k++) {
+      const p0 = sampleChainAt(chain, bStart + k * subStep)
+      const p1 = sampleChainAt(chain, bStart + (k + 1) * subStep)
+      const off0 = -p0.sideSign * FENCE_OFFSET, off1 = -p1.sideSign * FENCE_OFFSET
+      const g = sampleDividerSpanGrade(
+        p0.x + off0 * p0.nx, p0.z + off0 * p0.nz,
+        p1.x + off1 * p1.nx, p1.z + off1 * p1.nz,
+        baseLevel, 0.195,
+      )
+      if (g.flatLength < 0.15) continue
+      box(g.midX, g.midY + 0.22, g.midZ, g.slopeLength, 0.05, 0.05, g.yaw, palette.iron, g.pitch)
+      box(g.midX, g.midY + 0.52, g.midZ, g.slopeLength, 0.05, 0.05, g.yaw, palette.iron, g.pitch)
+    }
+    const postCount = Math.max(2, Math.round(spanLen / 2.6) + 1)
+    for (let i = 0; i < postCount; i++) {
+      const s = bStart + (spanLen * i) / (postCount - 1)
+      const p = sampleChainAt(chain, s)
+      const off = -p.sideSign * FENCE_OFFSET
+      const fx = p.x + off * p.nx, fz = p.z + off * p.nz
+      const y0 = baseLevel(fx, fz) + 0.195
+      box(fx, y0 + 0.27, fz, 0.052, 0.60, 0.052, p.yaw, palette.iron)
+    }
+  }
+
+  if (chain.startOpen) {
+    const first = sampleChainAt(chain, 0)
+    emitOpeningEndCap(first.x, first.z, first.tx, first.tz, first.yaw, baseLevel, box, 'verge', 1, 0.195)
+  }
+  if (!chain.closed && chain.endOpen) {
+    const last = sampleChainAt(chain, chain.totalLength)
+    emitOpeningEndCap(last.x, last.z, last.tx, last.tz, last.yaw, baseLevel, box, 'verge', -1, 0.195)
+  }
+}
+
+function emitVergeMetalGuardrailChain(
+  chain: DividerChain,
+  beds: readonly (readonly number[])[],
+  baseLevel: (x: number, z: number) => number,
+  box: BoxEmitter,
+) {
+  // Position the Guilin white-grey guardrail on the motor-lane inner edge of the 2.2 m verge (-sideSign * 0.86 m).
+  // This gives >= 0.86 m lateral clearance from verge-centerline native trees (clearing even 1.2x banyan trunks)
+  // while plinth half-depth 0.10 m stays safely inside the -1.10 m native granite curb (0 curb overflow).
+  const RAIL_OFFSET = 0.86
+  const nativeBeds = projectBedsToChain(chain, beds, 1.45)
+  const railObstacles = nativeBeds
+    .filter(b => {
+      const p = sampleChainAt(chain, b.s)
+      return Math.abs(b.lat - (-p.sideSign * RAIL_OFFSET)) < 0.65
+    })
+    .map(b => b.s)
+  const railBays = splitChainClearBays(chain.totalLength, 0, 0, railObstacles, 0.62, 0.55)
+
+  for (const [bStart, bEnd] of railBays) {
+    const spanLen = bEnd - bStart
+    const subCount = Math.max(1, Math.ceil(spanLen / 10))
+    const subStep = spanLen / subCount
+    for (let k = 0; k < subCount; k++) {
+      const p0 = sampleChainAt(chain, bStart + k * subStep)
+      const p1 = sampleChainAt(chain, bStart + (k + 1) * subStep)
+      const off0 = -p0.sideSign * RAIL_OFFSET, off1 = -p1.sideSign * RAIL_OFFSET
+      const g = sampleDividerSpanGrade(
+        p0.x + off0 * p0.nx, p0.z + off0 * p0.nz,
+        p1.x + off1 * p1.nx, p1.z + off1 * p1.nz,
+        baseLevel, 0.195,
+      )
+      if (g.flatLength < 0.15) continue
+      // Primary Guilin white-grey steel guardrail + Guilin jade accent strip (seated cleanly on +0.195 verge)
+      box(g.midX, g.midY + 0.88, g.midZ, g.slopeLength, 0.075, 0.07, g.yaw, PAL.railWhite, g.pitch)
+      box(g.midX, g.midY + 0.28, g.midZ, g.slopeLength, 0.06, 0.07, g.yaw, PAL.railSilver, g.pitch)
+      box(g.midX, g.midY + 0.74, g.midZ, g.slopeLength, 0.045, 0.055, g.yaw, PAL.guilinJade, g.pitch)
+    }
+
+    // Grounded cast-iron plinths + white main posts (with 2 cm vertical overlap) + midpoint pickets
+    const bayCount = Math.max(1, Math.round(spanLen / 2.4))
+    const postStep = spanLen / bayCount
+    for (let i = 0; i <= bayCount; i++) {
+      const s = Math.min(bEnd, bStart + i * postStep)
+      const isStartCap = i === 0 && bStart <= 0.05 && chain.startOpen
+      const isEndCap = i === bayCount && bEnd >= chain.totalLength - 0.05 && !chain.closed && chain.endOpen
+      const p = sampleChainAt(chain, s)
+      const off = -p.sideSign * RAIL_OFFSET
+      const rx = p.x + off * p.nx, rz = p.z + off * p.nz
+      if (isStartCap) {
+        emitOpeningEndCap(rx, rz, p.tx, p.tz, p.yaw, baseLevel, box, 'rail', 1, 0.195)
+      } else if (isEndCap) {
+        emitOpeningEndCap(rx, rz, p.tx, p.tz, p.yaw, baseLevel, box, 'rail', -1, 0.195)
+      } else {
+        const y0 = baseLevel(rx, rz) + 0.195
+        box(rx, y0 + 0.05, rz, 0.16, 0.16, 0.20, p.yaw, PAL.railBase)
+        box(rx, y0 + 0.525, rz, 0.068, 0.83, 0.068, p.yaw, PAL.railWhite)
+      }
+      if (i < bayCount) {
+        const pm = sampleChainAt(chain, bStart + (i + 0.5) * postStep)
+        const offM = -pm.sideSign * RAIL_OFFSET
+        const mx = pm.x + offM * pm.nx, mz = pm.z + offM * pm.nz
+        const ym = baseLevel(mx, mz) + 0.195
+        box(mx, ym + 0.58, mz, 0.036, 0.62, 0.036, pm.yaw, PAL.railWhite)
+      }
+    }
+  }
+}
+
+function emitVergeTreePlanterChain(
+  chain: DividerChain,
+  beds: readonly (readonly number[])[],
+  baseLevel: (x: number, z: number) => number,
+  box: BoxEmitter,
+  origin?: readonly [number, number],
+  emitTri?: SurfaceTriEmitter,
+) {
+  const ox = origin?.[0] ?? 0
+  const oz = origin?.[1] ?? 0
+
+  // Align tree-pit openings to REAL GL04 native street trees (`beds`) first — never spawn duplicate fake trees
+  // on any corridor chain that already carries native street trees (keep intersection approaches clean planters).
+  const nativeBeds = projectBedsToChain(chain, beds, 1.35)
+  const treeStations: {s: number; isNative: boolean}[] = nativeBeds.map(b => ({s: b.s, isNative: true}))
+
+  // Only plant polyhedral ornamental trees on genuinely treeless long chains (>= 18 m, 0 native beds)
+  const startMargin = chain.startOpen ? 5.2 : 2.5
+  const endMargin = chain.endOpen ? 5.2 : 2.5
+  if (!treeStations.length && chain.totalLength >= 18.0) {
+    const usable = chain.totalLength - startMargin - endMargin
+    if (usable >= 2.0) {
+      const count = Math.max(1, Math.floor(usable / 15) + 1)
+      const step = count > 1 ? usable / (count - 1) : 0
+      for (let i = 0; i < count; i++) {
+        treeStations.push({s: count === 1 ? startMargin + usable * 0.5 : startMargin + i * step, isNative: false})
+      }
+    }
+  }
+
+  // Emit linked redwood flower planters strictly in the bays BETWEEN tree pits (halfClearance = 1.04 m -> 0 trunk/pit piercing)
+  const bays = splitChainClearBays(
+    chain.totalLength,
+    chain.startOpen ? 0.30 : 0,
+    chain.endOpen ? 0.30 : 0,
+    treeStations.map(t => t.s),
+    1.04,
+    0.70,
+  )
+
+  for (const [bStart, bEnd] of bays) {
+    const spanLen = bEnd - bStart
+    const subCount = Math.max(1, Math.ceil(spanLen / 4.2))
+    const subStep = spanLen / subCount
+    for (let k = 0; k < subCount; k++) {
+      const s0 = bStart + k * subStep
+      const s1 = s0 + subStep
+      const p0 = sampleChainAt(chain, s0)
+      const p1 = sampleChainAt(chain, s1)
+      const g = sampleDividerSpanGrade(p0.x, p0.z, p1.x, p1.z, baseLevel, 0.195)
+      if (g.flatLength < 0.35) continue
+      const hSeed = hash2d(ox + g.midX, oz + g.midZ)
+      const floral = hSeed > 0.42
+      // Grounded redwood planter wall seated directly on +0.195 verge top + dark steel trim + lush shrub/blossom crown
+      box(g.midX, g.midY + 0.22, g.midZ, g.slopeLength, 0.48, 0.74, g.yaw, PAL.planterWood, g.pitch)
+      box(g.midX, g.midY + 0.49, g.midZ, g.slopeLength + 0.04, 0.06, 0.80, g.yaw, PAL.planterTrim, g.pitch)
+      box(
+        g.midX,
+        g.midY + 0.61,
+        g.midZ,
+        Math.max(0.3, g.slopeLength * 0.90),
+        0.22,
+        0.58,
+        g.yaw,
+        floral ? (hSeed > 0.70 ? PAL.crapeLit : PAL.crapeDark) : PAL.hedgeLit,
+        g.pitch,
+      )
+    }
+  }
+
+  // Framed granite street-tree pits + dark iron grates around every tree station; only plant fallback tree when treeless
+  for (const t of treeStations) {
+    const p = sampleChainAt(chain, t.s)
+    const y0 = baseLevel(p.x, p.z) + 0.195
+    // Spacious granite tree pit collar [y0-0.04 .. y0+0.12] + iron tree grate [y0+0.10 .. y0+0.145]
+    box(p.x, y0 + 0.04, p.z, 1.66, 0.16, 1.66, p.yaw, PAL.curbLight)
+    box(p.x, y0 + 0.12, p.z, 1.34, 0.05, 1.34, p.yaw, PAL.planterTrim)
+    if (!t.isNative) {
+      const seed = hash2d(ox + p.x, oz + p.z)
+      emitOrnamentalTree(p.x, p.z, p.yaw, baseLevel, box, seed, seed > 0.65, 0.96, 0.195 + 0.10, emitTri)
+    }
+  }
+
+  if (chain.startOpen) {
+    const first = sampleChainAt(chain, 0)
+    emitOpeningEndCap(first.x, first.z, first.tx, first.tz, first.yaw, baseLevel, box, 'verge', 1, 0.195)
+  }
+  if (!chain.closed && chain.endOpen) {
+    const last = sampleChainAt(chain, chain.totalLength)
+    emitOpeningEndCap(last.x, last.z, last.tx, last.tz, last.yaw, baseLevel, box, 'verge', -1, 0.195)
+  }
+}
+
+/**
+ * Emits a flexible orange/white reflective soft-delineator bollard seated cleanly atop `surfaceOff`
+ * (+0.195 m on raised kind=4 collector verges, +0.045 m on flush asphalt).
+ * Rubber base rises 8 cm above the surface and the post embeds 2 cm into the base (0 gap).
+ */
+export function emitSoftDelineatorPost(
+  x: number,
+  z: number,
+  yaw: number,
+  baseLevel: (x: number, z: number) => number,
+  box: BoxEmitter,
+  surfaceOff = 0.195,
+) {
+  const y0 = baseLevel(x, z) + surfaceOff
+  // Black rubber base [y0-0.02 .. y0+0.08] rises 8 cm visibly above surface
+  box(x, y0 + 0.03, z, 0.20, 0.10, 0.20, yaw, PAL.warnDark)
+  // Orange-red flexible post [y0+0.06 .. y0+0.72] embedded 2 cm into rubber base (0 gap)
+  box(x, y0 + 0.39, z, 0.086, 0.66, 0.086, yaw, PAL.softOrange)
+  // Dual white reflective collar bands wrapping the post
+  box(x, y0 + 0.56, z, 0.094, 0.09, 0.094, yaw, PAL.softWhite)
+  box(x, y0 + 0.42, z, 0.094, 0.07, 0.094, yaw, PAL.softWhite)
+}
+
+function emitSoftDelineatorChain(
+  chain: DividerChain,
+  baseLevel: (x: number, z: number) => number,
+  surfaceAt: (x: number, z: number) => number,
+  box: BoxEmitter,
+) {
+  const startMargin = chain.startOpen ? 0.6 : 0.2
+  const endMargin = chain.endOpen ? 0.6 : 0.2
+  const usable = chain.totalLength - startMargin - endMargin
+  if (usable < 0.4) {
+    const mid = sampleChainAt(chain, chain.totalLength * 0.5)
+    emitSoftDelineatorPost(mid.x, mid.z, mid.yaw, baseLevel, box, surfaceAt(mid.x, mid.z))
+    return
+  }
+  const count = Math.max(1, Math.round(usable / 3.5) + 1)
+  const step = count > 1 ? usable / (count - 1) : 0
+  for (let i = 0; i < count; i++) {
+    const s = count === 1 ? startMargin + usable * 0.5 : startMargin + i * step
+    const p = sampleChainAt(chain, s)
+    emitSoftDelineatorPost(p.x, p.z, p.yaw, baseLevel, box, surfaceAt(p.x, p.z))
+  }
+}
+
+/**
  * Extracts gentle reflective soft-delineator bollards along narrow collector three-band verges
  * (path kind=4 with strip width 0.14..0.62 m and length >= 8 m, e.g. Binjiang Rd / Minzhu Rd / Jiangan Rd)
- * where no arterial decor 5/6 exists, visually separating motor and non-motor lanes without hard walls.
+ * where no arterial decor exists, visually separating motor and non-motor lanes without hard walls.
  */
 export function extractCollectorSoftDelineators(
   paths: readonly StreetPath[],
@@ -957,7 +1456,6 @@ export function extractCollectorSoftDelineators(
     if (path[0] !== 4) continue
     const ring = path[1]
     if (!ring || ring.length < 3) continue
-    // Find longest edge to establish strip principal axis
     let maxLenSq = 0
     let ax0 = 0, az0 = 0, tx = 1, tz = 0
     for (let i = 0; i < ring.length; i++) {
@@ -987,7 +1485,6 @@ export function extractCollectorSoftDelineators(
     }
     const stripLen = maxU - minU
     const stripWidth = maxV - minV
-    // Strictly match narrow collector dividers (~0.22 m wide) and skip wide arterial verges (2.2 m)
     if (stripLen < 8.5 || stripWidth < 0.14 || stripWidth > 0.62) continue
 
     const midV = (minV + maxV) * 0.5
@@ -1006,7 +1503,6 @@ export function extractCollectorSoftDelineators(
       if (!pointInRingM(lx, lz, ring)) continue
       const wx = ox + lx, wz = oz + lz
       if (origin && isShizijieDecorSuppressed(wx, wz, 5)) continue
-      // If any point of this narrow strip overlaps an existing arterial median/verge divider, skip the whole strip
       for (let k = 0; k < existingVergePoints.length; k++) {
         const dx = existingVergePoints[k][0] - lx
         const dz = existingVergePoints[k][1] - lz
@@ -1032,12 +1528,15 @@ export function emitRoadDividers(
   origin: readonly [number, number] | undefined,
   box: BoxEmitter,
   palette: DividerPalette,
+  beds: readonly (readonly number[])[] = [],
+  emitTri?: SurfaceTriEmitter,
 ): void {
   const ox = origin?.[0] ?? 0
   const oz = origin?.[1] ?? 0
+  const surfaceAt = buildRaisedSurfaceLookup(paths)
   const medianSegments: DividerSegmentInput[] = []
   const vergeSegments: DividerSegmentInput[] = []
-  const existingVergePoints: [number, number][] = []
+  const existingArterialPoints: [number, number][] = []
 
   for (const item of decor) {
     const kind = item[0]
@@ -1049,7 +1548,7 @@ export function emitRoadDividers(
     const headingRad = heading / 100
 
     if (kind === 1 || kind === 2 || kind === 7 || kind === DECOR_KIND_MEDIAN_GREEN_TREES) {
-      existingVergePoints.push([lx, lz])
+      existingArterialPoints.push([lx, lz])
       if (origin && isZhongshanLandmarkMedianSuppressed(wx, wz, kind)) continue
       const exact = item[8] !== undefined
       const dx = Math.cos(headingRad) * (span / 20)
@@ -1078,7 +1577,7 @@ export function emitRoadDividers(
       kind === DECOR_KIND_VERGE_TREE_PLANTER ||
       kind === DECOR_KIND_VERGE_SOFT_DELINEATOR
     ) {
-      existingVergePoints.push([lx, lz])
+      existingArterialPoints.push([lx, lz])
       const resolved: VergeDividerKind = origin
         ? resolveVergeDividerKind(wx, wz, kind, headingRad)
         : (
@@ -1117,29 +1616,29 @@ export function emitRoadDividers(
 
   for (const chain of traceDividerChains(medianSegments)) {
     if (chain.group === 'median_green_trees') {
-      emitMedianGreenTreesChain(chain, baseLevel, box, origin)
+      emitMedianGreenTreesChain(chain, beds, baseLevel, surfaceAt, box, origin, emitTri)
     } else {
-      emitMedianMetalRailChain(chain, baseLevel, box, palette)
+      emitMedianMetalRailChain(chain, baseLevel, surfaceAt, box, palette)
     }
   }
 
   for (const chain of traceDividerChains(vergeSegments)) {
     const kind = chain.group.split(':')[0] as VergeDividerKind
     if (kind === 'metal_guardrail') {
-      emitVergeMetalGuardrailChain(chain, baseLevel, box)
+      emitVergeMetalGuardrailChain(chain, beds, baseLevel, box)
     } else if (kind === 'tree_planter') {
-      emitVergeTreePlanterChain(chain, baseLevel, box, origin)
+      emitVergeTreePlanterChain(chain, beds, baseLevel, box, origin, emitTri)
     } else if (kind === 'soft_delineator') {
-      emitSoftDelineatorChain(chain, baseLevel, box)
+      emitSoftDelineatorChain(chain, baseLevel, surfaceAt, box)
     } else {
-      emitVergeHedgeCurbChain(chain, baseLevel, box, palette, origin)
+      emitVergeHedgeCurbChain(chain, beds, baseLevel, box, palette, origin)
     }
   }
 
-  // Emit gentle soft-delineator bollards on narrow collector three-band verges (no rigid barrier wall)
+  // Emit gentle soft-delineator bollards seated atop +0.195 narrow collector kind=4 verges (no rigid barrier wall)
   if (paths.length) {
-    for (const post of extractCollectorSoftDelineators(paths, existingVergePoints, origin)) {
-      emitSoftDelineatorPost(post.x, post.z, post.yaw, baseLevel, box)
+    for (const post of extractCollectorSoftDelineators(paths, existingArterialPoints, origin)) {
+      emitSoftDelineatorPost(post.x, post.z, post.yaw, baseLevel, box, 0.195)
     }
   }
 }
