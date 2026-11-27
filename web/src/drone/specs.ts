@@ -1,6 +1,6 @@
 // IDOK-215: the fleet. Figures follow DJI's published spec sheets (S mode, sea level, no wind);
 // where a number depends on battery or region we take the optimistic published one and say so in `notes`.
-export type DroneId = 'mavic4pro' | 'mini5pro' | 'air3s' | 'inspire3' | 'flycart200'
+export type DroneId = 'mavic4pro' | 'mini5pro' | 'air3s' | 'fpv' | 'flycart200'
 export type RcUi = 'simple' | 'pro'
 
 export interface DroneSpec {
@@ -69,16 +69,16 @@ export const DRONES:Record<DroneId,DroneSpec> = {
     battery:{label:'Air 3S 智能飞行电池', wh:77},
     notes:'45 分钟、21 m/s、6000 m、O4 20 km。',
   },
-  inspire3:{
-    id:'inspire3', name:'DJI Inspire 3', short:'Inspire 3', maker:'DJI',
-    tagline:'全画幅 8K 电影机，片场常客', weightG:3995, flightMin:28, speed:26, ascent:8, descent:8,
-    ceiling:5000, wind:12, rangeKm:15, transmitKm:15,
-    gimbal:{tiltMin:-90, tiltMax:30},
-    camera:{sensor:'全画幅 CMOS（X9-8K Air）', mp:4500, lens:'DL 18/24/35/50mm', aperture:'可换镜头', zoom:'光学换镜'},
-    video:{res:'8K', fps:25}, rc:'pro', span:1.4, height:.25, props:4,
-    color:{shell:'#2e3136', accent:'#d1462f', dark:'#1b1d21', metal:'#7d858e'},
-    battery:{label:'TB51', wh:428},
-    notes:'28 分钟（起落架放下）、26 m/s、5000 m 升限、O3 Pro 15 km。',
+  fpv:{
+    id:'fpv', name:'DJI FPV 穿越机', short:'FPV', maker:'DJI',
+    tagline:'140 km/h 穿越机，贴着树梢飞', weightG:795, flightMin:20, speed:39, ascent:12, descent:10,
+    ceiling:6000, wind:13, rangeKm:32, transmitKm:20,
+    gimbal:{tiltMin:-90, tiltMax:45},
+    camera:{sensor:'1/2.3 英寸 CMOS', mp:12, lens:'14mm 等效超广角', aperture:'f/2.8'},
+    video:{res:'4K', fps:60}, rc:'pro', span:.55, height:.12, props:4,
+    color:{shell:'#2a2f36', accent:'#e0553f', dark:'#15181c', metal:'#7f8792'},
+    battery:{label:'FPV 智能飞行电池', wh:44.4},
+    notes:'手动模式 39 m/s（140 km/h）、20 分钟、O3 20 km；四片涵道桨，起飞后默认专业遥控。',
   },
   flycart200:{
     id:'flycart200', name:'DJI FlyCart 200', short:'FlyCart 200', maker:'DJI',
@@ -93,7 +93,7 @@ export const DRONES:Record<DroneId,DroneSpec> = {
   },
 }
 
-export const DRONE_IDS:DroneId[] = ['mavic4pro','mini5pro','air3s','inspire3','flycart200']
+export const DRONE_IDS:DroneId[] = ['mavic4pro','mini5pro','air3s','fpv','flycart200']
 
 export function drone(id:DroneId):DroneSpec { return DRONES[id] ?? DRONES.mavic4pro }
 

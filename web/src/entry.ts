@@ -91,6 +91,7 @@ function hud(main: typeof import('./main')) {
   menu.innerHTML = '<span>菜单</span>'; menu.setAttribute('aria-label', '主菜单'); menu.title = '主菜单（Esc）'
   menu.onclick = () => { main.setPaused(true); title.open(true) }
   box.append(menu); accountEntry(box); document.body.append(box)
+  registerPageUI(box)
   // Phase 2 street HUD (IDOK-109 / IDOK-123): live game state by default, demoSource when ?hudDemo= is passed.
   const street = params.get('hud') === 'street'
   if (street) {const done=inlineBusy(menu,'载入街道界面');void Promise.all([import('./ui/street-hud'), import('./play/map')]).then(([hudModule, map]) => {
@@ -131,3 +132,4 @@ else {
   if ('requestIdleCallback' in window) requestIdleCallback(warm, {timeout: 2500}); else setTimeout(warm, 1200)
 }
 import {markSession} from './session-mark'
+import {registerPageUI} from './capture-page'

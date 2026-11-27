@@ -145,7 +145,7 @@ export function createCity(ctx: Ctx, view: ViewData, avoid: T.Box3[], hills: {at
     }`,
     HEAD +
       /* glsl */ `uniform vec3 uFac[${FACADES.length}]; uniform vec3 uRoof, uWarm, uCool, uStreet; uniform vec4 uWave[${WAVES}];
-    uniform float uNight, uTime;
+    uniform float uNight;
     varying vec3 vW, vN; varying vec3 vL; varying vec2 vFac, vSz; varying float vSeed, vH;
     float h1(float x){ return fract(sin(x * 91.17) * 43758.5453); }
     void main(){

@@ -370,6 +370,7 @@ export function mountGuide(opts: {autoTour: boolean}) {
   help.onclick = () => openGuide()
   const me = document.querySelector('.hud-me')
   if (me) me.append(help); else document.body.append(help)
+  registerPageUI(help,Boolean(me))
 
   addEventListener('keydown', event => {
     if (event.repeat || isGlobalHotkeyBlocked(event.target)) return
@@ -392,4 +393,4 @@ export function mountGuide(opts: {autoTour: boolean}) {
     if (calm >= 3) { clearInterval(timer); void startTour() }
   }, 400)
 }
-
+import {registerPageUI} from '../capture-page'

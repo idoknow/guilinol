@@ -2,12 +2,14 @@
 //
 // Where they stand comes from `bollard-layout.ts`, which follows the signal heads: a few posts either
 // side of every pole, along the same kerb. This file waits for the heads to find their kerbs, stands
-// the posts on the pavement (its height is read from the ground, like the parking paint), draws them
+// the posts on the pavement (its height is read from the collider, like the parking paint, then from
+// the ground as drawn where `drawn-ground.ts` can read it, one reading a frame), draws them
 // as one instanced mesh — one draw call for the whole town — and makes them solid for the player.
 import * as THREE from 'three'
 import {mainDetail} from '../look/mirror-layer'
 import {BOLLARD_HEIGHT, BOLLARD_RADIUS, placeBollards, separateBollards, type Bollard} from './bollard-layout'
 import {SolidGrid, type Solid} from './contact'
+import type {DrawnGroundAt} from './drawn-ground'
 import type {GroundAt} from './parking-bays'
 import type {HeadPlacement, SignalApproach, SurfaceAt} from './signal-approach'
 
@@ -40,11 +42,17 @@ const WRONG_SURFACE_LOOKS = 6
 const WRONG_SURFACE_RETRY = 30
 const SAME_HEIGHT = .004
 /**
- * The post and its collar carry on this far below the pavement. A slope never shows daylight under
- * them, and neither does the hand's width by which the walking collider can ride above the paving
- * that is drawn (the blocks beside a street are draped over coarser ground than they show).
+ * The post and its collar carry on this far below the base, so a slope never shows daylight under
+ * them — nor does the collider, where the base falls back to it (it can ride a hand's width above the
+ * paving that is drawn: the blocks beside a street are draped over coarser ground than they show).
  */
 const BURIED = .3
+/** Drawn-ground readings per frame (`drawn-ground.ts`; a tile's street surface is bucketed a few thousand triangles per reading). */
+const DRAWN_PER_FRAME = 1
+/** A drawn-ground reading is kept until the collider under the post changes, or this long (s). */
+const DRAWN_RECHECK = 30
+/** A post whose drawn ground is still not known after this long (s) stays on the collider until the next recheck. */
+const DRAWN_WAIT = 5
 const SIDES = 10
 const BODY_HEX = 0x4a5057
 const CAP_HEX = 0x5c636b
@@ -52,14 +60,25 @@ const CAP_HEX = 0x5c636b
 const BAND_HEX = 0xe7b62e
 /** A little wider than the post, so a wheel or a shoulder stops just short of it. */
 const SOLID_HALF = BOLLARD_RADIUS + .02
+/** A post that moved less than this is the same post; further and it is settled afresh. */
+const SAME_PLACE = .01
 
 type Slot = {
   post: Bollard
   state: 'waiting' | 'drawn' | 'none'
   /** Instance index while drawn. */
   at: number
-  /** Pavement height under it. */
+  /** Base of the post as drawn: the drawn ground where that is known and near the collider, else the collider. */
   y: number
+  /** Collider height under it (lower of walking and driving ground). */
+  support: number
+  /** Drawn ground under it: `undefined` not read yet, `null` nothing usable there. */
+  drawn?: number | null
+  /** The collider reading and the time the drawn reading was taken for. */
+  drawnFor: number
+  drawnAt: number
+  /** When the post first asked for a drawn reading it has not had yet. */
+  drawnSince: number
   looks: number
   wrong: number
   dueAt: number
@@ -77,7 +96,10 @@ export type BollardProbe = {
   pending: number
   visible: boolean
   drawCalls: number
-  posts: (Bollard & {state: Slot['state'], settled: boolean})[]
+  /** Drawn posts standing on the ground as drawn rather than on the collider. */
+  onDrawn: number
+  /** `y`: base as drawn; `support`: the collider under it (`null` while not stood up). */
+  posts: (Bollard & {state: Slot['state'], settled: boolean, support: number | null})[]
 }
 
 /** One post about its own axis, base at the origin: collar, body, yellow band, domed cap. */
@@ -109,7 +131,11 @@ function postGeometry() {
   return geometry
 }
 
-export function bollards(scene: THREE.Scene, groundAt: GroundAt, surfaceAt: SurfaceAt) {
+/**
+ * `drawnAt` (optional, `drawn-ground.ts`): height of the ground as drawn. Without it, or where it reads
+ * nothing, or more than 0.6 m from the collider, the posts stand on the collider.
+ */
+export function bollards(scene: THREE.Scene, groundAt: GroundAt, surfaceAt: SurfaceAt, drawnAt?: DrawnGroundAt) {
   const mesh = new THREE.InstancedMesh(postGeometry(), new THREE.MeshLambertMaterial({vertexColors: true}), CAPACITY)
   mesh.name = 'G2 bollards'
   mesh.count = 0
@@ -133,12 +159,50 @@ export function bollards(scene: THREE.Scene, groundAt: GroundAt, surfaceAt: Surf
   const solids = new SolidGrid()
   const matrix = new THREE.Matrix4()
 
+  const wanting = new Set<Slot>()
+  let drawnBudget = 0
+
   function stand(slot: Slot) {
     mesh.setMatrixAt(slot.at, matrix.makeTranslation(slot.post.x, slot.y, slot.post.z))
     mesh.instanceMatrix.needsUpdate = true
     slot.release?.()
-    slot.solid = {x: slot.post.x, y: slot.y, z: slot.post.z, yaw: 0, halfWidth: SOLID_HALF, halfLength: SOLID_HALF, height: BOLLARD_HEIGHT}
+    // From the lower of the drawn base and the collider to a post's height above the higher: a player
+    // standing on the collider meets as tall a post as before, wherever the post is drawn.
+    const bottom = Math.min(slot.y, slot.support)
+    slot.solid = {x: slot.post.x, y: bottom, z: slot.post.z, yaw: 0, halfWidth: SOLID_HALF, halfLength: SOLID_HALF, height: BOLLARD_HEIGHT + Math.abs(slot.y - slot.support)}
     slot.release = solids.add(slot.solid)
+  }
+
+  /** The drawn ground when it is known and within 0.6 m of the collider (further is a deck, a pit, something else); else the collider. */
+  function baseOf(slot: Slot) {
+    const drawn = slot.drawn
+    return typeof drawn === 'number' && Math.abs(drawn - slot.support) <= HEIGHT_BAND ? drawn : slot.support
+  }
+
+  function wantsDrawn(slot: Slot) {
+    return slot.drawn === undefined || Math.abs(slot.support - slot.drawnFor) > SAME_HEIGHT || elapsed - slot.drawnAt >= DRAWN_RECHECK
+  }
+
+  /** One drawn-ground reading for the post, if it needs one and the frame has one left. True when a reading was taken. */
+  function readDrawn(slot: Slot) {
+    if (!drawnAt || !wantsDrawn(slot)) { wanting.delete(slot); return false }
+    if (drawnBudget <= 0) { wanting.add(slot); return false }
+    drawnBudget--
+    let value = drawnAt(slot.post.x, slot.post.z, slot.support)
+    if (value === undefined) {
+      if (slot.drawnSince < 0) slot.drawnSince = elapsed
+      // Still being taken in: to the back of the queue, the next frame reads another post.
+      wanting.delete(slot)
+      if (elapsed - slot.drawnSince < DRAWN_WAIT) { wanting.add(slot); return false }
+      // Given up for now: an older reading stands, else the collider.
+      value = slot.drawn === undefined ? null : slot.drawn
+    }
+    wanting.delete(slot)
+    slot.drawnSince = -1
+    slot.drawn = value
+    slot.drawnFor = slot.support
+    slot.drawnAt = elapsed
+    return true
   }
 
   function show() {
@@ -158,8 +222,13 @@ export function bollards(scene: THREE.Scene, groundAt: GroundAt, surfaceAt: Surf
     shown = []
     cursor = 0
     for (const post of posts) {
-      const slot: Slot = before.get(post.key) ?? {post, state: 'waiting', at: -1, y: post.y, looks: 0, wrong: 0, dueAt: 0}
-      before.delete(post.key)
+      // A neighbouring pole can shift a post that keeps its key: such a post starts over where it now stands,
+      // and the old slot stays in `before`, which lets go of its solid below.
+      const kept = before.get(post.key)
+      const moved = kept && (Math.abs(kept.post.x - post.x) > SAME_PLACE || Math.abs(kept.post.z - post.z) > SAME_PLACE)
+      const slot: Slot = kept && !moved ? kept : {post, state: 'waiting', at: -1, y: post.y, support: post.y, drawnFor: NaN, drawnAt: 0, drawnSince: -1, looks: 0, wrong: 0, dueAt: 0}
+      slot.post = post
+      if (!moved) before.delete(post.key)
       slots.set(post.key, slot)
       active.push(slot)
       if (slot.state !== 'drawn') continue
@@ -185,9 +254,14 @@ export function bollards(scene: THREE.Scene, groundAt: GroundAt, surfaceAt: Surf
       return
     }
     slot.wrong = 0
-    if (slot.state !== 'drawn' || Math.abs(y - slot.y) > SAME_HEIGHT) {
+    const moved = slot.state !== 'drawn' || Math.abs(y - slot.support) > SAME_HEIGHT
+    slot.support = y
+    // Where the ground as drawn is known the post stands on it; it is read again only when the collider moves or every 30 s.
+    readDrawn(slot)
+    const base = baseOf(slot)
+    if (moved || Math.abs(base - slot.y) > SAME_HEIGHT) {
       if (slot.state !== 'drawn') { slot.state = 'drawn'; slot.at = shown.length; shown.push(slot); slot.wrong = 0 }
-      slot.y = y
+      slot.y = base
       slot.looks = 1
       stand(slot)
       show()
@@ -225,12 +299,27 @@ export function bollards(scene: THREE.Scene, groundAt: GroundAt, surfaceAt: Surf
       if (dirty) reconcile()
       if (!mesh.visible && shown.length) mesh.visible = true
       let budget = LOOKS_PER_FRAME
+      drawnBudget = DRAWN_PER_FRAME
+      const inReach = (slot: Slot) => (slot.post.x - focus.x) ** 2 + (slot.post.z - focus.z) ** 2 <= DRAPE_RADIUS ** 2
       for (let remaining = Math.min(active.length, SCAN_PER_FRAME); remaining > 0 && budget > 0; remaining--) {
         if (cursor >= active.length) cursor = 0
         const slot = active[cursor++]
-        if (slot.dueAt > elapsed || (slot.post.x - focus.x) ** 2 + (slot.post.z - focus.z) ** 2 > DRAPE_RADIUS ** 2) continue
+        if (slot.dueAt > elapsed || !inReach(slot)) continue
         budget--
         lookAt(slot)
+      }
+      // Posts whose look found no drawn reading left this frame (or one still being taken in): one more, if there is one left.
+      for (const slot of wanting) {
+        if (drawnBudget <= 0) break
+        // Out of the queue: the wait for a reading starts afresh when the post is next looked at.
+        if (slots.get(slot.post.key) !== slot || slot.state !== 'drawn' || !inReach(slot)) { wanting.delete(slot); slot.drawnSince = -1; continue }
+        if (!readDrawn(slot)) continue
+        const base = baseOf(slot)
+        if (Math.abs(base - slot.y) <= SAME_HEIGHT) continue
+        slot.y = base
+        slot.looks = 1
+        slot.dueAt = elapsed + RECHECK
+        stand(slot)
       }
     },
     /** Posts near a point, for contact resolution. Hidden posts do not block anything. */
@@ -248,7 +337,8 @@ export function bollards(scene: THREE.Scene, groundAt: GroundAt, surfaceAt: Surf
         total: all.length, drawn: shown.length, settled: count(slot => slot.state === 'drawn' && slot.looks >= SETTLE_LOOKS),
         waiting: count(slot => slot.state === 'waiting'), none: count(slot => slot.state === 'none'), pending: pending.length,
         visible: mesh.visible, drawCalls: mesh.visible && mesh.parent === scene && shown.length > 0 ? 1 : 0,
-        posts: all.map(slot => ({...slot.post, y: slot.state === 'drawn' ? slot.y : slot.post.y, state: slot.state, settled: slot.looks >= SETTLE_LOOKS})),
+        onDrawn: count(slot => slot.state === 'drawn' && slot.y !== slot.support),
+        posts: all.map(slot => ({...slot.post, y: slot.state === 'drawn' ? slot.y : slot.post.y, state: slot.state, settled: slot.looks >= SETTLE_LOOKS, support: slot.state === 'drawn' ? slot.support : null})),
       }
     },
   }

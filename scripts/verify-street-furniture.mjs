@@ -29,13 +29,13 @@ const MAX_GAP_OFF_RATIO = 0.1
 // A cover whose centre or rim lands on paint is counted; more than this share of them fails.
 const MAX_ON_PAINT_RATIO = 0.12
 const MAX_NONE_RATIO = 0.6
-// A post stands on the walking collider, which beside a street can ride up to a hand's width above the
-// ground that is drawn (the drawn ground mesh is far coarser). The post and its sleeve carry on 0.3 m
-// below their base, so up to there nothing shows; beyond it there would be daylight under the post.
-const POST_GAP_MAX = 0.28
+// A post stands on the ground as drawn (tile ground mesh or street surface, `drawn-ground.ts`), so its
+// base meets what is drawn under it. Only where that is not read (bridges, tunnel fringes, landmark
+// models) does it fall back to the walking collider, which can ride a hand's width above the drawing.
+const POST_GAP_MAX = 0.06
 const POST_SUNK_MAX = 0.06
 // Reported, not failed: posts whose base is this far above the drawn ground (they read a little tall).
-const POST_GAP_SNUG = 0.06
+const POST_GAP_SNUG = 0.02
 const MAX_POST_TOUCHING_RATIO = 0.1
 
 const QUERY = 'verify&solo=1&flow=0&time=17&traffic=1'
@@ -276,7 +276,7 @@ async function verifySpot(browser, baseUrl, profileName, profile, spot, options)
       if (onRoad.length) failures.push(`${tag}: ${onRoad.length} bollard(s) on road, fence or verge: ${onRoad.slice(0, 3).map(item => `${item.key}@${item.surface}`).join(', ')}`)
       const postGaps = inspected.audit.posts.map(item => item.gap)
       const floating = inspected.audit.posts.filter(item => item.gap === null || item.gap > POST_GAP_MAX || item.gap < -POST_SUNK_MAX)
-      if (floating.length) failures.push(`${tag}: ${floating.length} bollard(s) off the ground: ${floating.slice(0, 3).map(item => `${item.key} ${item.gap}`).join(', ')}`)
+      if (floating.length) failures.push(`${tag}: ${floating.length} bollard(s) off the ground (base −${POST_SUNK_MAX}…+${POST_GAP_MAX} m from the drawn ground): ${floating.slice(0, 3).map(item => `${item.key} ${item.gap} on ${item.under}`).join(', ')}`)
       const touching = inspected.audit.posts.filter(item => item.touching.length)
       if (inspected.audit.posts.length && touching.length / inspected.audit.posts.length > MAX_POST_TOUCHING_RATIO) failures.push(`${tag}: ${touching.length}/${inspected.audit.posts.length} bollards stand in something: ${touching.slice(0, 4).map(item => `${item.key}→${item.touching.join('+')}`).join(', ')}`)
 
@@ -347,7 +347,7 @@ try {
   }
   for (const row of results) {
     if (row.error) { console.log(`${row.profile}/${row.spot}: ERROR ${row.error}`); continue }
-    console.log(`${row.profile}/${row.spot}: covers ${row.covers.nearDrawn}/${row.covers.near} drawn (圆/篦/方 ${row.covers.kinds.join('/')}, none ${row.covers.nearNone}, on paint ${row.covers.onPaint}/${row.covers.audited}), gap ${row.covers.gap.min}…${row.covers.gap.median}…${row.covers.gap.max} m; bollards ${row.posts.nearDrawn}/${row.posts.near} drawn (touching ${row.posts.touching}, base >${POST_GAP_SNUG} m above drawn ground ${row.posts.tall}, gap max ${row.posts.gap.max ?? '-'}); draws ${row.draws.covers?.mostPerFrame}/${row.draws.posts?.mostPerFrame}; settle ${row.settleMs} ms`)
+    console.log(`${row.profile}/${row.spot}: covers ${row.covers.nearDrawn}/${row.covers.near} drawn (圆/篦/方 ${row.covers.kinds.join('/')}, none ${row.covers.nearNone}, on paint ${row.covers.onPaint}/${row.covers.audited}), gap ${row.covers.gap.min}…${row.covers.gap.median}…${row.covers.gap.max} m; bollards ${row.posts.nearDrawn}/${row.posts.near} drawn (touching ${row.posts.touching}, on drawn ground ${row.posts.onDrawn ?? '-'}/${row.posts.drawn}, base >${POST_GAP_SNUG} m above drawn ground ${row.posts.tall}, gap ${row.posts.gap.min ?? '-'}…${row.posts.gap.max ?? '-'}); draws ${row.draws.covers?.mostPerFrame}/${row.draws.posts?.mostPerFrame}; settle ${row.settleMs} ms`)
   }
   if (failures.length) {
     console.log(`\nFAIL (${failures.length}):`)

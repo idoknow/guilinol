@@ -12,7 +12,7 @@
  *   6 (Foot·Water)    : on foot near free boat dock or tour pier -> board boat
  */
 
-import {hits} from '../input/keymap'
+import {hits, isDutyScopeActive} from '../input/keymap'
 import {isGlobalHotkeyBlocked} from './input-guard'
 
 export type InteractionActionKind =
@@ -354,7 +354,8 @@ export function createInteractArbiter(callbacks: InteractArbiterCallbacks): Inte
   }
 
   const onKeyDown = (event: KeyboardEvent) => {
-    if (hits(event.code, 'rescue') && !event.repeat && !isGlobalHotkeyBlocked(event.target)) {
+    const dutyBlocksRescueKey = isDutyScopeActive() && (hits(event.code, 'dutyFlag') || hits(event.code, 'dutyWhistle') || event.code === 'KeyE')
+    if (hits(event.code, 'rescue') && !dutyBlocksRescueKey && !event.repeat && !isGlobalHotkeyBlocked(event.target)) {
       let closerThan = Infinity
       if (hits(event.code, 'interact')) {
         const ctx = callbacks.getContext()
@@ -374,7 +375,10 @@ export function createInteractArbiter(callbacks: InteractArbiterCallbacks): Inte
     }
   }
 
-  const release=(e:KeyboardEvent)=>{if(hits(e.code,'rescue'))callbacks.stopRescue?.()}
+  const release=(e:KeyboardEvent)=>{
+    if(isDutyScopeActive()&&(hits(e.code,'dutyFlag')||hits(e.code,'dutyWhistle')||e.code==='KeyE'))return
+    if(hits(e.code,'rescue'))callbacks.stopRescue?.()
+  }
   if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') {
     window.addEventListener('keyup',release)
     window.addEventListener('keydown', onKeyDown)

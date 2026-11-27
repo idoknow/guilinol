@@ -286,6 +286,7 @@ export function mapView(host:Host, atlas:Atlas, ui:{slot:HTMLElement; buttons:HT
   const north = document.createElement('i'); north.textContent = '北'; mini.append(north)
   const road = document.createElement('div'); road.className = 'road-name'
   ui.slot.append(mini,road)
+  registerPageUI(mini); registerPageUI(road)
   // IDOK-256: the minimap disc is the only map entry (the old「地图」dock button opened the same atlas). M still works.
   let lastRoad = ''
   function drawMini() {
@@ -295,7 +296,7 @@ export function mapView(host:Host, atlas:Atlas, ui:{slot:HTMLElement; buttons:HT
     const p = here(), altitude = host.walker()?.active?0:Math.max(0,p.y-200)
     paint(miniCanvas.getContext('2d')!,size,size,dpr,p.x,p.z,altitude>150?.1:altitude>40?.22:.42,true)
     const found = atlas.roadAt(p.x,p.z,host.walker()?.active?18:0)?.name ?? ''
-    if(found!==lastRoad){lastRoad = found; road.textContent = found; road.hidden = !found}
+    if(found!==lastRoad){lastRoad = found; road.textContent = found; registerPageUI(road,true); road.hidden = !found}
   }
 
   // --- Full map
@@ -431,3 +432,4 @@ export function mapView(host:Host, atlas:Atlas, ui:{slot:HTMLElement; buttons:HT
     tick(dt:number){clock += dt; if(clock<.2) return; clock = 0; if(pin?.peer){const live = roster().players.find(p=>p.id===pin!.peer!.id); if(live){pin.x = live.x; pin.z = live.z}} if(document.body.dataset.photo!=='on') drawMini(); if(!sheet.hidden&&!pointers.size) redraw()}}
 }
 import {markSurface} from '../session-mark'
+import {registerPageUI} from '../capture-page'

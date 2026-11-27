@@ -7,7 +7,7 @@ import {onUser} from './ui/account'
 import type {MpStatus} from './ui/mp-pref'
 import {setRoster,clearRoster,type RosterPlayer} from './mp-roster'
 import {fingerprint,deviceSummary} from './fingerprint'
-import {bindTravel,prepareTravel,rejectTravel,type TravelReply} from './mp-travel'
+import {bindTravel,prepareTravel,rejectTravel,travelTarget,type TravelReply} from './mp-travel'
 
 import type {CaptureClientContext, CheatCapturePacket} from './cheat-capture'
 
@@ -27,13 +27,17 @@ export function attachNet(scene:Scene,clips:AnimationClip[],getPose:()=>Pose,get
   let landingPaused=false,rejoinTimer=0
   let travelSequence=0
   bindTravel(async(reason,x,z)=>{
-    if(landingPaused && Math.hypot(getPose().x-x,getPose().z-z)>200)return rejectTravel('cooldown')
-    if(state!=='online'||Math.hypot(getPose().x-x,getPose().z-z)<=200)return true
+    const cur=getPose(),dist=Math.hypot(cur.x-x,cur.z-z)
+    if(landingPaused && dist>24)return rejectTravel('cooldown')
+    const target=travelTarget(reason,x,z)??null
+    if(state!=='online'||dist<=24)return true
+    if(dist<=200 && reason==='mp-teleport')return true
     if(travelReply)return rejectTravel('busy')
-    return prepareTravel(reason,x,z,target=>new Promise(resolve=>{
+    const precheck=target===null || dist<=200
+    return prepareTravel(reason,x,z,()=>new Promise(resolve=>{
       const timeout=setTimeout(()=>travelReply?.({ok:false,code:'timeout'}),4000)
       travelReply=result=>{clearTimeout(timeout);travelReply=undefined;resolve(result)}
-      send({t:'travel',seq:++travelSequence,reason:reason.split(':')[0],target,...(target===null?{precheck:true}:{})})
+      send({t:'travel',seq:++travelSequence,reason:reason.split(':')[0],target:precheck?null:target,...(precheck?{precheck:true}:{})})
     }),delay=>{
       const earliest=performance.now()+delay
       landingPaused=true;stop()
@@ -98,7 +102,7 @@ export function attachNet(scene:Scene,clips:AnimationClip[],getPose:()=>Pose,get
       const endpoint=localStorage.getItem('guiling.ws')||`${location.protocol==='https:'?'wss':'ws'}://${location.host}/ws`
       const previous=socket
       if(previous){previous.onopen=previous.onmessage=previous.onclose=previous.onerror=null;try{previous.close(1000,'replace')}catch{}}
-      const ws=new WebSocket(endpoint);socket=ws
+      const ws=new WebSocket(endpoint);socket=ws;welcomed=false
       ws.onopen=()=>{if(version===generation){const initial=getActivity?.();lastActKey=initial?`${initial.act}|${initial.detail??''}`:'';send({t:'join',ticket,fp:fingerprint(),dev:deviceSummary(),avatar:getAvatar(),caps:['roster3'],...(initial?{act:initial.act,actDetail:initial.detail}:{}),...getPose()})}}
       ws.onmessage=event=>{
         if(version!==generation)return
@@ -137,6 +141,7 @@ export function attachNet(scene:Scene,clips:AnimationClip[],getPose:()=>Pose,get
           }
           case 'welcome': sent=0;sentTimes=[];myId=String(msg.me?.id??'');myUid=Number(msg.me?.uid)||0;myName=String(msg.me?.name??'');setChatSelf(myUid);onCombat?.(msg.me,myId);if(subCount>0)send({t:'roster_sub',since:lastRosterV})
             if(msg.relocated){const {x,y,z,code}=msg.relocated;onSetback?.(x,y,z);rejectTravel(code)}
+            welcomed=true
             // 续连（CDN 掐断后原地接管）：对账而不是清空重建，否则每 44 秒所有人的模型都会销毁再克隆一遍
             if(msg.me?.resumed){const keep=new Set((msg.players as {id:string}[]).map(p=>p.id))
               for(const p of peers.list())if(!keep.has(p.id))peers.remove(p.id)
@@ -202,9 +207,10 @@ export function attachNet(scene:Scene,clips:AnimationClip[],getPose:()=>Pose,get
         else retry()}
     }catch{if(version===generation)retry()}
   }
-  function stop(){generation++;clearTimeout(timer);socket?.close(1000,'stop');socket=undefined;peers.clear();update('offline')}
+  function stop(){generation++;clearTimeout(timer);travelReply?.({ok:false});socket?.close(1000,'stop');socket=undefined;peers.clear();update('offline')}
   function avatarChanged(){if(state==='online')send({t:'avatar',avatar:getAvatar()})}
-  function tick(dt:number){if(state!=='online')return
+  let welcomed=false
+  function tick(dt:number){if(state!=='online'||!welcomed)return
     flushEmote();const pose=getPose(),now=performance.now()
     if(now-lastSent>=50 && socket && socket.bufferedAmount<4096){lastSent=now;send({t:'pos',...pose})}
     if(getActivity&&now-lastActCheck>=500){

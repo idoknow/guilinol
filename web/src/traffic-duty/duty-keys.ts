@@ -657,6 +657,36 @@ export interface BoundDutyKeyboardHandle {
  * 在 capture 阶段绑定执勤热键（Q / E / F）：
  * - 当执勤激活时，Q 与 E 在 capture 阶段即被消费并 `stopImmediatePropagation()`，绝不泄漏触发 `ui/walk.ts` 骑车换挡。
  */
+function isDutyEditableOrModalTarget(target: EventTarget | null): boolean {
+  const doc = typeof document !== 'undefined' ? document : null
+  const checkEl = (node: unknown): boolean => {
+    if (!node || typeof node !== 'object') return false
+    const el = node as {
+      tagName?: string
+      isContentEditable?: boolean
+      closest?: (selector: string) => unknown
+    }
+    const tag = el.tagName?.toUpperCase()
+    if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || el.isContentEditable) return true
+    return Boolean(el.closest?.('input, textarea, select, [contenteditable], .chat-input'))
+  }
+  if (checkEl(target)) return true
+  if (doc) {
+    if (checkEl(doc.activeElement)) return true
+    const ds = doc.body?.dataset
+    if (
+      ds &&
+      ('home' in ds || ds.photo === 'on' || ds.shopOpen === '1' || ds.tdKnockdown === '1' || ds.kdDown === '1' || ds.drinksUiOpen === '1')
+    ) {
+      return true
+    }
+    if (typeof doc.querySelector === 'function' && doc.querySelector('dialog[open], .td-story-dialog:not([hidden]), .shop-overlay:not([hidden]), .about-mask:not([hidden])')) {
+      return true
+    }
+  }
+  return false
+}
+
 export function bindDutyKeyboard(
   target: Pick<Window, 'addEventListener' | 'removeEventListener'>,
   controller: DutyKeysController,
@@ -664,7 +694,7 @@ export function bindDutyKeyboard(
 ): BoundDutyKeyboardHandle {
   const onKeyDown = (ev: Event) => {
     const kev = ev as KeyboardEvent
-    if (!isDutyActive()) return
+    if (!isDutyActive() || isDutyEditableOrModalTarget(kev.target)) return
     if (shouldSuppressRideGearKey(kev.code, true)) {
       kev.preventDefault?.()
       kev.stopImmediatePropagation?.()
@@ -682,6 +712,10 @@ export function bindDutyKeyboard(
 
   const onKeyUp = (ev: Event) => {
     const kev = ev as KeyboardEvent
+    if (isDutyEditableOrModalTarget(kev.target)) {
+      if (hits(kev.code, 'dutyFlag')) controller.handleKeyUp(kev.code)
+      return
+    }
     if (!isDutyActive()) return
     if (shouldSuppressRideGearKey(kev.code, true)) {
       kev.preventDefault?.()

@@ -29,6 +29,45 @@ try{
   await call('bridge/mail','bridge',{});const mail=await db.prepare('SELECT summary,next_at FROM feedback_mail').first();assert.equal(mail.summary,'');assert.ok(mail.next_at>Date.now()/1000+590)
   await call('me','user',{notify_email:false},200,'PATCH');assert.equal((await call('me','user')).notify_email,false);await call('me','user',{notify_email:true},200,'PATCH')
   await call('unsubscribe?user=user&sig=bad',null,null,400);await call('unsubscribe?user=user&sig='+createHmac('sha256','local-test').update('feedback-unsubscribe:user').digest('hex'),null);assert.equal((await call('me','user')).notify_email,false)
+  // 管理员定向路由：bridge/pending 与 bridge detail 带出 submitter_email/submitter_role；xiepy244@gmail.com 管理员直提非申诉自动 approved 且免 5 条限额
+  const bossToken='c'.repeat(64),bossDigest=createHash('sha256').update(bossToken).digest('hex')
+  await db.prepare("INSERT INTO users(id,email,nickname,salt,digest,verified,role) VALUES('boss','xiepy244@gmail.com','py','','',1,'admin')").run()
+  await db.prepare('INSERT INTO sessions VALUES(?,?,unixepoch()+3600)').bind(bossDigest,'boss').run()
+  const callAs=async(path,token,data,expected=200,method=data?'POST':'GET')=>{
+    const headers={Origin:'https://example.test','Content-Type':'application/json',Cookie:'glol_session='+token}
+    const response=await worker.dispatchFetch('https://example.test/api/'+path,{method,headers,body:data?JSON.stringify(data):undefined})
+    const body=await response.text();assert.equal(response.status,expected,`${path}: ${body}`);return body.startsWith('{')||body.startsWith('[')?JSON.parse(body):body
+  }
+  const pendingBefore=JSON.parse(await call('bridge/pending','bridge'))
+  assert.equal(pendingBefore[0].submitter_email,'user@example.test');assert.equal(pendingBefore[0].submitter_role,'user')
+  const bossIds=[]
+  for(let n=0;n<6;n++){
+    const created=await callAs('feedback',bossToken,{view,kind:'游戏 bug',title:`老板直提-${n}`,body:'复现步骤',lat:25.28,lon:110.3})
+    const shotRes=await worker.dispatchFetch(`https://example.test/api/feedback/${created.id}/view-shot`,{method:'PUT',headers:{Origin:'https://example.test',Cookie:'glol_session='+bossToken,'Content-Type':'image/jpeg','Content-Length':String(image.length)},body:image})
+    assert.equal(shotRes.status,200,await shotRes.text())
+    await callAs(`feedback/${created.id}/submit`,bossToken,{})
+    const detail=await callAs(`feedback/${created.id}`,bossToken)
+    assert.equal(detail.status,'approved');assert.equal(detail.submitter_role,undefined)
+    bossIds.push(created.id)
+  }
+  const bossAppeal=await callAs('feedback',bossToken,{view:null,kind:'封禁申诉',title:'封禁申诉',body:'测试',lat:25.28,lon:110.3})
+  await callAs(`feedback/${bossAppeal.id}/submit`,bossToken,{})
+  assert.equal((await callAs(`feedback/${bossAppeal.id}`,bossToken)).status,'submitted')
+  const pendingAfter=JSON.parse(await call('bridge/pending','bridge'))
+  const bossPending=pendingAfter.find(item=>item.id===bossIds[0])
+  assert.equal(bossPending.submitter_email,'xiepy244@gmail.com');assert.equal(bossPending.submitter_role,'admin');assert.equal(bossPending.status,'approved')
+  const bridgeDetail=await call(`feedback/${bossIds[0]}`,'bridge')
+  assert.equal(bridgeDetail.email,'xiepy244@gmail.com');assert.equal(bridgeDetail.submitter_role,'admin')
+  await call(`bridge/feedback/${bossIds[0]}/status`,'bridge',{status:'queued'})
+  await call(`bridge/feedback/${bossIds[0]}/status`,'bridge',{status:'need_info',message:'补充复现步骤'})
+  await callAs(`feedback/${bossIds[0]}/supplement`,bossToken,{body:'已补充'})
+  assert.equal((await callAs(`feedback/${bossIds[0]}`,bossToken)).status,'approved')
+  const byEmail=await call('admin/feedback?email=xiepy244@gmail.com','admin')
+  assert.equal(byEmail.items.length,7);assert.ok(byEmail.items.every(item=>item.email==='xiepy244@gmail.com'&&item.submitter_role==='admin'))
+  const byRole=await call('admin/feedback?role=admin','admin')
+  assert.equal(byRole.items.length,7)
+  const idx=await db.prepare("SELECT name FROM sqlite_master WHERE type='index' AND name='feedback_user_status'").first()
+  assert.equal(idx?.name,'feedback_user_status')
   const blankBug=(await call('feedback','user',{view,kind:'游戏 bug',title:'空描述',body:'   ',lat:25.28,lon:110.3})).id
   await call(`feedback/${blankBug}/submit`,'user',{},409)
   await call(`feedback/${blankBug}`,'user',null,200,'DELETE')
@@ -37,7 +76,7 @@ try{
   const plainNoPhoto=(await call('feedback','user',{view,kind:'其他',title:'无图普通',body:'有文字无图',lat:25.28,lon:110.3})).id
   await call(`feedback/${plainNoPhoto}/submit`,'user',{},409)
   await call(`feedback/${plainNoPhoto}`,'user',null,200,'DELETE')
-  console.log('Isolated Worker: approval gate, user/admin chat, reply deduplication, quota, mail debounce, bug submit guard and unsubscribe passed')
+  console.log('Isolated Worker: approval gate, user/admin chat, reply deduplication, quota, mail debounce, bug submit guard, unsubscribe and priority admin route passed')
   if(process.argv.includes('--ui')){
     await db.prepare("UPDATE users SET email='walker@example.test' WHERE id='user'").run()
     const server=await preview({configFile:false,build:{outDir:'dist'},preview:{host:'127.0.0.1',port:0,proxy:{'/api':{target:(await worker.ready).origin,changeOrigin:true,rewriteWsOrigin:false,configure(proxy){proxy.on('proxyReq',req=>req.setHeader('Origin',(new URL(req.protocol+'//'+req.getHeader('host'))).origin))}}}}})

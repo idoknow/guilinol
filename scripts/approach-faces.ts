@@ -5,6 +5,7 @@ import { tileFaces } from './dingjiang-visible-surfaces'
 
 const world = process.argv[2]
 const roles = new Set(['graded-floor', 'paving-0', 'paving-1', 'paving-2', 'paving-6'])
+if (process.argv.includes('--with-ground')) roles.add('terrain')
 if (process.argv.includes('--platform-bricks')) roles.add('paving-9')
 const boxes: number[][] = JSON.parse(fs.readFileSync(0, 'utf8'))
 const manifest = JSON.parse(fs.readFileSync(path.join(world, 'manifest.json'), 'utf8'))

@@ -16,12 +16,14 @@ export interface Spec {
   sparks: number
   dust: number
   grain: boolean
+  /** 天空丁达尔光束 */
+  rays: boolean
 }
 
 export const SPECS: Record<CoverTier, Spec> = {
-  high: {dpr: 2, refl: 0.5, reflEvery: 1, city: 5200, trees: 2600, lanterns: 48, sparks: 1600, dust: 90, grain: true},
-  mid: {dpr: 1.5, refl: 0.35, reflEvery: 1, city: 3600, trees: 1800, lanterns: 32, sparks: 1000, dust: 60, grain: true},
-  low: {dpr: 1, refl: 0.25, reflEvery: 2, city: 2000, trees: 900, lanterns: 16, sparks: 500, dust: 0, grain: false},
+  high: {dpr: 2, refl: 0.5, reflEvery: 1, city: 5200, trees: 2600, lanterns: 48, sparks: 1600, dust: 90, grain: true, rays: true},
+  mid: {dpr: 1.5, refl: 0.35, reflEvery: 1, city: 3600, trees: 1800, lanterns: 32, sparks: 1000, dust: 60, grain: true, rays: true},
+  low: {dpr: 1, refl: 0.25, reflEvery: 2, city: 2000, trees: 900, lanterns: 16, sparks: 500, dust: 0, grain: false, rays: false},
 }
 
 const ORDER: CoverTier[] = ['low', 'mid', 'high']

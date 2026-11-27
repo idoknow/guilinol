@@ -560,7 +560,7 @@ def _seal_curb_guardrail_gaps(decor: list, tile_origin: tuple[float, float], roa
     keep = []
     near_rails = []
     for item in decor:
-        kind, ex, sz, hdg, span = item
+        kind, ex, sz, hdg, span = item[:5]
         wx, wz = ox + ex / 10.0, oz + sz / 10.0
         pt = Point(wx, wz)
         if cutout_union.buffer(0.6).contains(pt):
