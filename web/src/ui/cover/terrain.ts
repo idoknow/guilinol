@@ -55,7 +55,7 @@ export function createTerrain(ctx: Ctx, view: ViewData, noise: T.Texture) {
       /* glsl */ `attribute vec3 aK; varying vec3 vW, vK;
       void main(){ vec4 w = modelMatrix * vec4(position, 1.); vW = w.xyz; vK = aK; gl_Position = projectionMatrix * viewMatrix * w; }`,
       HEAD +
-        /* glsl */ `uniform sampler2D uNoise; uniform vec3 uVeg, uRock; varying vec3 vW, vK;
+        /* glsl */ `uniform vec3 uVeg, uRock; varying vec3 vW, vK;
       void main(){
         vec3 toC = cameraPosition - vW; float dist = length(toC); vec3 V = toC / dist;
         float t = vK.x, H = vK.y, v = clamp((vW.y - uGround) / H, 0., 1.);
@@ -122,7 +122,7 @@ export function createTerrain(ctx: Ctx, view: ViewData, noise: T.Texture) {
         float ridge = smoothstep(1. - px * 2.5, 1., vTop);
         float back = pow(max(dot(-V, uSunDir), 0.), 3.);
         c = applyAir(c, vW, -V, dist);
-        c += uGlow * ridge * (.1 + .9 * back) * .5;
+        c += uGlow * ridge * (.1 + .9 * back) * .5 * uRim.y;
         gl_FragColor = vec4(c, 1.);
         ${GLSL_OUT}
       }`,
@@ -253,7 +253,7 @@ export function createTerrain(ctx: Ctx, view: ViewData, noise: T.Texture) {
       ctx,
       /* glsl */ `varying vec3 vW; void main(){ vec4 w = modelMatrix * vec4(position, 1.); vW = w.xyz; gl_Position = projectionMatrix * viewMatrix * w; }`,
       HEAD +
-        /* glsl */ `uniform sampler2D uMask, uNoise; uniform vec4 uRect; uniform vec3 uAlb, uTree, uWarm, uCool, uHead, uTail; uniform vec4 uGrid; uniform float uNight, uTime; varying vec3 vW;
+        /* glsl */ `uniform sampler2D uMask; uniform vec4 uRect; uniform vec3 uAlb, uTree, uWarm, uCool, uHead, uTail; uniform vec4 uGrid; uniform float uNight; varying vec3 vW;
       void main(){
         vec2 m = (vW.xz - uRect.xy) * uRect.zw;
         float wet = all(greaterThan(m, vec2(0.))) && all(lessThan(m, vec2(1.))) ? texture2D(uMask, m).r : 0.;
