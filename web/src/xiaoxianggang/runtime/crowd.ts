@@ -1,18 +1,17 @@
-import * as THREE from 'three'
 import type { XxgLayout } from '../contract.ts'
 import { corridorToAabb, type Aabb2D } from './collision.ts'
 import type { RectXZ } from './scene-boxes.ts'
 
 /**
- * 小香港地下街限流人群（自研，不依赖十字街 crowd 模块）。
- * - 上限低：默认 18 人，帧时持续偏高时自动减半（不少于 6）。
+ * 小香港地下街限流人群的走位（自研，不依赖十字街 crowd 模块）；画面由 crowd-figures.ts 用主线同款路人角色呈现。
+ * - 上限低：桌面 7 人、触屏 4 人（每个主线路人约 7 次 draw call），帧时持续偏高时自动减半（不少于 4）。
  * - 限流生成：每 spawnIntervalS 最多补 1 人，只在离玩家 ≥10m 且不在正前方的节点生成；到寿命后在玩家身后或远处消失。
  * - 沿走廊中心线节点图行走，按行进方向靠右走、偶尔驻足看店，遇玩家侧让减速，与柱子和其他行人保持间距。
- * - 渲染 3 个 InstancedMesh（躯干 / 四肢 / 头），每人约 140 三角，固定 3 次 draw call。
+ * - 只算位置、朝向、速度和每人的外观槽位，不建任何网格，可在 node 里测。
  */
-export const XXG_CROWD_MAX = 18
-export const XXG_CROWD_MIN_CAP = 6
-export const XXG_CROWD_TRIS_PER_AGENT = 140
+export const XXG_CROWD_MAX = 7
+export const XXG_CROWD_MAX_TOUCH = 4
+export const XXG_CROWD_MIN_CAP = 4
 
 export interface XxgCrowdOptions {
   readonly layout: XxgLayout
@@ -38,16 +37,28 @@ export interface XxgCrowdMetrics {
   readonly maxAgents: number
   readonly spawned: number
   readonly despawned: number
-  readonly drawCalls: number
-  readonly triangles: number
+}
+
+/** One walker as the figures layer sees it. The object is stable for the walker's whole life. */
+export interface XxgCrowdAgent {
+  readonly id: number
+  readonly x: number
+  readonly z: number
+  /** Heading: walks along (sin yaw, cos yaw). */
+  readonly yaw: number
+  /** Current ground speed, m/s (0 while browsing a shop). */
+  readonly speed: number
+  /** Look slot, any non-negative integer; the figures layer picks the character by it. */
+  readonly look: number
 }
 
 export interface XxgCrowd {
-  readonly group: THREE.Group
   step(dtSeconds: number, player: XxgCrowdPlayer): void
   /** 进场时调用：清空并在离玩家较远处预置约 60% 上限的人。 */
   reset(player: XxgCrowdPlayer): void
   getMetrics(): XxgCrowdMetrics
+  /** 当前行人（顺序即生成顺序）。 */
+  getAgents(): readonly XxgCrowdAgent[]
   /** 当前行人位置（测试与调试用）。 */
   getAgentPositions(): readonly { readonly x: number; readonly z: number }[]
   dispose(): void
@@ -59,11 +70,11 @@ interface NavNode {
   readonly links: { node: number; halfWidth: number }[]
 }
 
-interface Agent {
+interface Agent extends XxgCrowdAgent {
+  id: number
   x: number
   z: number
   yaw: number
-  speed: number
   lanePref: number
   from: number
   to: number
@@ -72,19 +83,11 @@ interface Agent {
   pauseS: number
   ageS: number
   lifeS: number
-  phase: number
-  scale: number
-  shirt: number
-  pants: number
-  sleeveSkin: boolean
-  skinTone: number
+  speed: number
+  /** Preferred walking speed, m/s. */
+  walkSpeed: number
+  look: number
 }
-
-const SHIRTS = [0xf2efe8, 0x2b2b2e, 0xd9c7a8, 0xe8b9c3, 0xa9c4dc, 0x6b7f99, 0x8c3b3b, 0xc9d6c0, 0xe9d36b, 0x4f6b58] as const
-const PANTS = [0x2a2d33, 0x3d4f6b, 0xd8d0c0, 0x1f1f22, 0x6b6257, 0xece8e0, 0x5a6f8f] as const
-const SKIN_TONES = [0xffffff, 0xf3e6dc, 0xe8d6c6, 0xf8ece2] as const
-const SKIN = 0xe2b896
-const HAIR = 0x1d1a18
 
 function mulberry32(seed: number): () => number {
   let a = seed >>> 0
@@ -259,25 +262,6 @@ export function buildXxgCrowdGraph(layout: XxgLayout, blocked: readonly RectXZ[]
   return nodes
 }
 
-function buildHeadGeometry(): THREE.BufferGeometry {
-  const g = new THREE.IcosahedronGeometry(0.115, 1)
-  g.scale(0.92, 1.08, 1)
-  const pos = g.getAttribute('position')
-  const colors = new Float32Array(pos.count * 3)
-  const skin = new THREE.Color(SKIN)
-  const hair = new THREE.Color(HAIR)
-  for (let i = 0; i < pos.count; i++) {
-    // 头顶与后脑是头发（模型朝 +z）
-    const isHair = pos.getY(i) > 0.035 || (pos.getZ(i) < -0.04 && pos.getY(i) > -0.06)
-    const c = isHair ? hair : skin
-    colors[i * 3] = c.r
-    colors[i * 3 + 1] = c.g
-    colors[i * 3 + 2] = c.b
-  }
-  g.setAttribute('color', new THREE.BufferAttribute(colors, 3))
-  return g
-}
-
 export function createXxgCrowd(opts: XxgCrowdOptions): XxgCrowd {
   const maxAgents = Math.max(1, Math.floor(opts.maxAgents ?? XXG_CROWD_MAX))
   const spawnIntervalS = Math.max(0.1, opts.spawnIntervalS ?? 0.9)
@@ -295,30 +279,8 @@ export function createXxgCrowd(opts: XxgCrowdOptions): XxgCrowd {
   }
   const columnClear = opts.layout.columns.size * 0.5 + 0.38
 
-  const group = new THREE.Group()
-  group.name = 'xxg_crowd'
-
-  const torsoGeo = new THREE.BoxGeometry(0.36, 0.6, 0.21)
-  torsoGeo.translate(0, 1.13, 0)
-  const limbGeo = new THREE.BoxGeometry(0.13, 0.86, 0.14)
-  limbGeo.translate(0, -0.43, 0)
-  const headGeo = buildHeadGeometry()
-  const clothMat = new THREE.MeshStandardMaterial({ name: 'xxg_crowd_cloth', roughness: 0.86, metalness: 0, emissive: '#2a2622' })
-  const headMat = new THREE.MeshStandardMaterial({ name: 'xxg_crowd_head', vertexColors: true, roughness: 0.7, metalness: 0, emissive: '#2a2622' })
-  const torsoMesh = new THREE.InstancedMesh(torsoGeo, clothMat, maxAgents)
-  const limbMesh = new THREE.InstancedMesh(limbGeo, clothMat, maxAgents * 4)
-  const headMesh = new THREE.InstancedMesh(headGeo, headMat, maxAgents)
-  torsoMesh.name = 'xxg_crowd_torso'
-  limbMesh.name = 'xxg_crowd_limbs'
-  headMesh.name = 'xxg_crowd_heads'
-  for (const m of [torsoMesh, limbMesh, headMesh]) {
-    m.frustumCulled = false
-    m.count = 0
-    m.instanceMatrix.setUsage(THREE.DynamicDrawUsage)
-    group.add(m)
-  }
-
   const agents: Agent[] = []
+  let nextId = 1
   let cap = maxAgents
   let spawnTimer = 0
   let spawned = 0
@@ -367,11 +329,14 @@ export function createXxgCrowd(opts: XxgCrowdOptions): XxgCrowd {
   }
 
   const makeAgent = (from: number, to: number, t: number): Agent => {
+    const walkSpeed = 0.9 + rand() * 0.45
     const a: Agent = {
+      id: nextId++,
       x: 0,
       z: 0,
       yaw: 0,
-      speed: 0.9 + rand() * 0.45,
+      speed: walkSpeed,
+      walkSpeed,
       lanePref: 0.35 + rand() * 1.3,
       from,
       to,
@@ -380,12 +345,7 @@ export function createXxgCrowd(opts: XxgCrowdOptions): XxgCrowd {
       pauseS: 0,
       ageS: 0,
       lifeS: 40 + rand() * 50,
-      phase: rand() * Math.PI * 2,
-      scale: 0.93 + rand() * 0.12,
-      shirt: pick(SHIRTS),
-      pants: pick(PANTS),
-      sleeveSkin: rand() < 0.45,
-      skinTone: pick(SKIN_TONES),
+      look: Math.floor(rand() * 0x10000),
     }
     assignEdge(a, from, to)
     const p0 = a.waypoints[0]!
@@ -425,67 +385,6 @@ export function createXxgCrowd(opts: XxgCrowdOptions): XxgCrowd {
     if (walkable.length === 0) return
     const target = Math.round(maxAgents * 0.6)
     for (let i = 0; i < target * 3 && agents.length < target; i++) trySpawn(player, 6, false)
-    writeInstances()
-  }
-
-  const tmpM = new THREE.Matrix4()
-  const tmpQ = new THREE.Quaternion()
-  const tmpE = new THREE.Euler(0, 0, 0, 'YXZ')
-  const tmpP = new THREE.Vector3()
-  const tmpS = new THREE.Vector3()
-  const tmpC = new THREE.Color()
-  const local = new THREE.Vector3()
-
-  function writeInstances(): void {
-    const n = agents.length
-    for (let i = 0; i < n; i++) {
-      const a = agents[i]!
-      const s = a.scale
-      const moving = a.pauseS <= 0
-      const swing = moving ? Math.sin(a.phase) * 0.42 : 0
-      const bob = moving ? Math.abs(Math.cos(a.phase)) * 0.025 : 0
-      const cosY = Math.cos(a.yaw)
-      const sinY = Math.sin(a.yaw)
-      const toWorld = (lx: number, ly: number, lz: number) =>
-        local.set(a.x + (lx * cosY + lz * sinY) * s, ly * s + bob, a.z + (-lx * sinY + lz * cosY) * s)
-
-      tmpE.set(0, a.yaw, 0)
-      tmpQ.setFromEuler(tmpE)
-      tmpP.set(a.x, bob, a.z)
-      tmpS.set(s, s, s)
-      tmpM.compose(tmpP, tmpQ, tmpS)
-      torsoMesh.setMatrixAt(i, tmpM)
-      torsoMesh.setColorAt(i, tmpC.setHex(a.shirt))
-
-      tmpP.copy(toWorld(0, 1.6, 0.01))
-      headMesh.setMatrixAt(i, tmpM.compose(tmpP, tmpQ, tmpS))
-      headMesh.setColorAt(i, tmpC.setHex(a.skinTone))
-
-      // 四肢：0/1 腿（裤色），2/3 手臂（袖色或肤色），轴心在髋 / 肩
-      const limbs: [number, number, number, number, number, number][] = [
-        [-0.09, 0.86, 0, swing, 1, 1],
-        [0.09, 0.86, 0, -swing, 1, 1],
-        [-0.235, 1.4, 0, -swing * 0.7, 0.62, 0.68],
-        [0.235, 1.4, 0, swing * 0.7, 0.62, 0.68],
-      ]
-      for (let k = 0; k < 4; k++) {
-        const [lx, ly, lz, rot, sw, sl] = limbs[k]!
-        tmpE.set(rot, a.yaw, 0)
-        tmpQ.setFromEuler(tmpE)
-        tmpP.copy(toWorld(lx, ly, lz))
-        tmpS.set(s * sw, s * sl, s * sw)
-        limbMesh.setMatrixAt(i * 4 + k, tmpM.compose(tmpP, tmpQ, tmpS))
-        const color = k < 2 ? a.pants : a.sleeveSkin ? SKIN : a.shirt
-        limbMesh.setColorAt(i * 4 + k, tmpC.setHex(color))
-      }
-    }
-    torsoMesh.count = n
-    headMesh.count = n
-    limbMesh.count = n * 4
-    for (const m of [torsoMesh, limbMesh, headMesh]) {
-      m.instanceMatrix.needsUpdate = true
-      if (m.instanceColor) m.instanceColor.needsUpdate = true
-    }
   }
 
   const step = (dtSeconds: number, player: XxgCrowdPlayer) => {
@@ -518,6 +417,7 @@ export function createXxgCrowd(opts: XxgCrowdOptions): XxgCrowd {
     for (const a of agents) {
       if (a.pauseS > 0) {
         a.pauseS -= dt
+        a.speed = 0
         continue
       }
       let target = a.waypoints[0]
@@ -536,7 +436,7 @@ export function createXxgCrowd(opts: XxgCrowdOptions): XxgCrowd {
       }
       dx /= dist
       dz /= dist
-      let speed = a.speed
+      let speed = a.walkSpeed
       let sx = 0
       let sz = 0
       const pdx = a.x - player.x
@@ -573,7 +473,7 @@ export function createXxgCrowd(opts: XxgCrowdOptions): XxgCrowd {
       let vx = dx * speed + sx * 0.8
       let vz = dz * speed + sz * 0.8
       const vlen = Math.hypot(vx, vz)
-      const vmax = a.speed * 1.25
+      const vmax = a.walkSpeed * 1.25
       if (vlen > vmax) {
         vx *= vmax / vlen
         vz *= vmax / vlen
@@ -585,9 +485,8 @@ export function createXxgCrowd(opts: XxgCrowdOptions): XxgCrowd {
       while (dy > Math.PI) dy -= Math.PI * 2
       while (dy < -Math.PI) dy += Math.PI * 2
       a.yaw += dy * Math.min(1, dt * 6)
-      a.phase += (Math.hypot(vx, vz) * dt * Math.PI * 2) / 1.25
+      a.speed = Math.hypot(vx, vz)
     }
-    writeInstances()
   }
 
   const getMetrics = (): XxgCrowdMetrics => ({
@@ -596,31 +495,19 @@ export function createXxgCrowd(opts: XxgCrowdOptions): XxgCrowd {
     maxAgents,
     spawned,
     despawned,
-    drawCalls: agents.length > 0 ? 3 : 0,
-    triangles: agents.length * XXG_CROWD_TRIS_PER_AGENT,
   })
 
   const dispose = () => {
     if (disposed) return
     disposed = true
     agents.length = 0
-    group.removeFromParent()
-    for (const m of [torsoMesh, limbMesh, headMesh]) {
-      group.remove(m)
-      m.dispose()
-    }
-    torsoGeo.dispose()
-    limbGeo.dispose()
-    headGeo.dispose()
-    clothMat.dispose()
-    headMat.dispose()
   }
 
   return {
-    group,
     step,
     reset,
     getMetrics,
+    getAgents: () => agents,
     getAgentPositions: () => agents.map(a => ({ x: a.x, z: a.z })),
     dispose,
   }

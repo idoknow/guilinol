@@ -154,7 +154,7 @@ test('auditXxgProdProbe 与 evaluateXxgChecks 精确检出 Stage 1 全部性能/
     errors: ['pageerror: crash'],
     surface: { y: 149.2, expectedY: 153.868 },
     enter: { enteredIndoor: false, transitionMs: 520, blackFrameDetected: true },
-    indoor: { autoFirstPerson: false, drawCalls: 62, collisionHeld: false },
+    indoor: { autoFirstPerson: false, drawCalls: 92, collisionHeld: false },
     exit: { returnedToSurface: false, returnDistM: 9.5, viewRestored: false },
     repeatCycles: { completed: 1, residualNodes: 3, residualDom: 2 },
     prodProbeAudit: { enforce: true, leakedKeys: ['viewer.xxg.forceEnter'] },

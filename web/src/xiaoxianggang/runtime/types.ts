@@ -1,5 +1,6 @@
 import rawStage1Layout from './stage1-layout.json' with { type: 'json' }
 import type { XxgCrowdMetrics } from './crowd.ts'
+import type { XxgCrowdFiguresMetrics } from './crowd-figures.ts'
 import {
   XXG_BUDGET,
   XXG_CONTRACT_VERSION,
@@ -90,7 +91,7 @@ export interface CreateXxgIndoorSceneOptions {
   /** Override veilFadeInMs in unit tests; defaults to XXG_TIMING.veilFadeInMs (280ms). */
   readonly veilFadeInMs?: number
   readonly now?: () => number
-  /** 室内限流人群上限；0 关闭人群，缺省 XXG_CROWD_MAX（18）。 */
+  /** 室内限流人群上限；0 关闭人群，缺省桌面 XXG_CROWD_MAX（7）、触屏 XXG_CROWD_MAX_TOUCH（4）。 */
   readonly crowdMaxAgents?: number
   /** 人群随机种子（测试与对照截图固定画面用）。 */
   readonly crowdSeed?: number
@@ -118,6 +119,6 @@ export interface XxgExtendedIndoorScene extends XxgIndoorScene {
   renderFrame(): boolean
   getPlayerSnapshot(): XxgPlayerSnapshot
   getLayout(): XxgLayout
-  /** 人群上限、在场人数、生成/消失计数与开销；人群关闭时为 null。 */
-  getCrowdMetrics(): XxgCrowdMetrics | null
+  /** 人群上限、在场人数、生成/消失计数，以及路人画面的外观槽位、画出人数与开销；人群关闭或未挂载时为 null。 */
+  getCrowdMetrics(): (XxgCrowdMetrics & XxgCrowdFiguresMetrics) | null
 }

@@ -7,7 +7,7 @@
  * 3) 地面步行到达指定楼梯井口前，核验地面铺装标高稳定在 153.868m±0.35m；
  * 4) 按住 W 沿真楼梯走下井底平台，同一帧换进独立 indoorScene（body.dataset.xxgActive === '1'）：
  *    - 优先读取 contract.md §4 规定的只读 window.viewer.xxg.getMetrics()（drawCalls/lastSwapMs/lastBlackFrames）；
- *    - 核验换场耗时 <= 300ms、无纯色黑屏帧、室内 draw calls <= 40、墙壁碰撞不穿墙不坠落；
+ *    - 核验换场耗时 <= 300ms、无纯色黑屏帧、室内 draw calls <= 80、墙壁碰撞不穿墙不坠落；
  *    - 逐帧录制换场前后脚位、视点与朝向，跳变不得超过相邻两帧步长（无缝）；
  * 5) 转身走回井底平台，同一帧换回世界楼梯井底（B1 标高），同样核验出场无跳变并保持宿主原视角；
  * 6) 连续执行多轮 enter -> exit（默认 2 轮），核验场景节点/DOM 残留为 0、控制台 error = 0、生产无作弊探针；
@@ -30,7 +30,7 @@ const XXG_B1_EXITS = JSON.parse(
 const MAX_CLIMB_EYE_Y_M = 2.9 + 0.3
 
 export const SURFACE_PLAZA_Y = 153.868
-export const MAX_INDOOR_DRAW_CALLS = 40
+export const MAX_INDOOR_DRAW_CALLS = 80
 export const MAX_TRANSITION_MS = 300
 export const MAX_SURFACE_Y_DELTA_M = 0.35
 export const MAX_EXIT_RETURN_DIST_M = 3.0
@@ -804,7 +804,7 @@ export async function runVerify(opts) {
     const indoorShot = join(opts.out, '02-indoor-graybox.png')
     await page.screenshot({ path: indoorShot })
 
-    // 3. 核验室内自带第一人称相机、draw calls <= 40 与墙壁碰撞
+    // 3. 核验室内自带第一人称相机、draw calls <= 80 与墙壁碰撞
     const beforeWall = await page.evaluate(() => {
       const snap = window.viewer?.xxg?.getState?.()?.player
       if (snap) return { x: snap.x, y: snap.y ?? 0, z: snap.z }

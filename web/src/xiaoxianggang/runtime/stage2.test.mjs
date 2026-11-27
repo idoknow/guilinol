@@ -5,7 +5,8 @@ import * as THREE from 'three'
 import { XXG_BUDGET, XXG_PLAYER } from '../contract.ts'
 import { XIAOXIANGGANG_B1_LAYOUT as layout } from '../layout/index.ts'
 import { buildIndoorCollisionWorld, corridorToAabb, resolveIndoorMovement } from './collision.ts'
-import { XXG_CROWD_MAX, XXG_CROWD_MIN_CAP, buildXxgCrowdGraph, createXxgCrowd } from './crowd.ts'
+import { XXG_CROWD_MAX, XXG_CROWD_MAX_TOUCH, XXG_CROWD_MIN_CAP, buildXxgCrowdGraph, createXxgCrowd } from './crowd.ts'
+import { createXxgCrowdFigures } from './crowd-figures.ts'
 import { toIndoor, toWellLocal, wellVestibule, xxgIndoorWells } from './stairwell.ts'
 import { XXG_STAIRWELL } from '../frame.ts'
 import { XXG_LAMP_SIZE_M, createIndoorGreyboxScene } from './indoor-scene.ts'
@@ -60,8 +61,10 @@ test('首批三家店覆盖服装 / 小饰品 / 小吃，且都在 B1 布局主�
 test('B1 室内场景：预算内、吊顶在采光井与楼梯井处开洞、方灯落在 600mm 吊顶格中心', () => {
   const h = createIndoorGreyboxScene(layout)
   try {
-    assert.ok(h.meshCount <= XXG_BUDGET.indoorDrawCallsMax - 3, `meshCount=${h.meshCount}（需给人群留 3 次 draw call）`)
-    assert.ok(h.triangleCount + XXG_CROWD_MAX * 140 <= XXG_BUDGET.indoorTrianglesMax, `tris=${h.triangleCount}`)
+    assert.ok(h.meshCount <= XXG_BUDGET.indoorSceneDrawCallsMax, `meshCount=${h.meshCount}（静态场景上限 ${XXG_BUDGET.indoorSceneDrawCallsMax}）`)
+    // 余量至少放得下桌面上限的路人：每人约 7 次 draw call、约 11.4k 三角面（主线同款带骨骼角色）
+    assert.ok(XXG_BUDGET.indoorDrawCallsMax - h.meshCount >= XXG_CROWD_MAX * 7, `meshCount=${h.meshCount}`)
+    assert.ok(h.triangleCount + XXG_CROWD_MAX * 11_500 <= XXG_BUDGET.indoorTrianglesMax, `tris=${h.triangleCount}`)
     assert.ok(h.textureBytes <= XXG_BUDGET.indoorTextureBytesMax, `tex=${h.textureBytes}`)
 
     // 2 个中庭采光井 + 4 个楼梯井
@@ -133,7 +136,7 @@ test('楼梯井敞开：门直通 B1 走廊不留死胡同，井底平台抬头�
 test('楼梯井几何：每井 25 条铜色防滑条、两扇玻璃门各一次 draw call、静态 draw call 给人群留余量', () => {
   const h = createIndoorGreyboxScene(layout)
   try {
-    assert.ok(h.meshCount <= XXG_BUDGET.indoorDrawCallsMax - 3, `meshCount=${h.meshCount} > 37`)
+    assert.ok(h.meshCount <= XXG_BUDGET.indoorSceneDrawCallsMax, `meshCount=${h.meshCount} > ${XXG_BUDGET.indoorSceneDrawCallsMax}`)
     const nosingMesh = meshByName(h.scene, 'xxg_stair_nosing_bronze')
     assert.equal(nosingMesh.material.map, null, '防滑条不得新增纹理')
     const nosings = boxesOf(nosingMesh)
@@ -213,8 +216,28 @@ test('人群：行走图连通、上限与限流生成、确定性、不出走�
     let inColumn = 0
     let maxActive = 0
     let prevSpawned = c.getMetrics().spawned
+    let walked = 0
+    let browsed = 0
+    let backwards = 0
     for (let i = 0; i < 60 * 90; i++) {
+      const before = new Map(c.getAgents().map(a => [a.id, { x: a.x, z: a.z }]))
       c.step(1 / 60, player)
+      // 画面层按 speed 混合走/站动作、按 yaw 转身：走动的人朝向与位移一致，逛店停下时 speed 为 0
+      for (const a of c.getAgents()) {
+        const b = before.get(a.id)
+        if (!b) continue
+        const d = Math.hypot(a.x - b.x, a.z - b.z)
+        if (a.speed === 0) {
+          browsed++
+          assert.ok(d < 1e-9, `停下的人仍在移动 d=${d}`)
+        } else if (d > 1e-4) {
+          walked++
+          assert.ok(Math.abs(a.speed - d * 60) < 1e-6, `speed=${a.speed} d=${d}`)
+          // 转角和侧让时朝向平滑跟上，允许短暂偏差，但不能倒着走
+          if (((a.x - b.x) * Math.sin(a.yaw) + (a.z - b.z) * Math.cos(a.yaw)) / d < 0) backwards++
+        }
+        assert.ok(Number.isInteger(a.look) && a.look >= 0)
+      }
       const m = c.getMetrics()
       maxActive = Math.max(maxActive, m.active)
       // 0.9s 才放一人：任一帧最多新增 1 人
@@ -227,24 +250,18 @@ test('人群：行走图连通、上限与限流生成、确定性、不出走�
         }
       }
     }
-    assert.ok(maxActive <= XXG_CROWD_MAX && maxActive >= 12, `maxActive=${maxActive}`)
+    assert.ok(maxActive <= XXG_CROWD_MAX && maxActive >= XXG_CROWD_MAX - 1, `maxActive=${maxActive}`)
+    assert.ok(walked > 0 && browsed > 0, `walked=${walked} browsed=${browsed}`)
+    assert.ok(backwards / walked < 0.01, `倒着走 ${backwards}/${walked}`)
     assert.equal(outside, 0, '行人走出走廊')
     assert.equal(inColumn, 0, '行人穿柱')
-    const m = c.getMetrics()
-    assert.equal(m.drawCalls, 3)
-    assert.equal(m.triangles, m.active * 140)
     const snapshot = c.getAgentPositions()
     for (let i = 0; i < 300; i++) c.step(0.06, player)
     const slow = c.getMetrics()
     assert.ok(slow.cap === Math.max(XXG_CROWD_MIN_CAP, Math.floor(XXG_CROWD_MAX / 2)) && slow.active <= XXG_CROWD_MAX, `slow=${JSON.stringify(slow)}`)
-    let disposed = 0
-    c.group.traverse(o => {
-      if (o.isMesh) o.geometry.addEventListener('dispose', () => disposed++)
-    })
     c.dispose()
     c.dispose()
-    assert.equal(disposed, 3)
-    assert.equal(c.group.children.length, 0)
+    assert.equal(c.getAgents().length, 0)
     return snapshot
   }
   try {
@@ -265,4 +282,18 @@ test('控制器：人群随进场生成、可关闭、计入三角面并随 disp
     off.dispose()
   }
   assert.equal(on.getCrowdMetrics(), null)
+  assert.ok(XXG_CROWD_MAX_TOUCH < XXG_CROWD_MAX)
+})
+
+test('路人画面：角色未就绪时不画人、不计开销，dispose 幂等', () => {
+  const f = createXxgCrowdFigures({ slots: 3, seed: 5 })
+  const camera = new THREE.PerspectiveCamera(70, 16 / 9, 0.05, 200)
+  const agents = [{ id: 1, x: 0, z: 5, yaw: 0, speed: 1.1, look: 2 }]
+  f.sync(agents, 1 / 60, camera, { drawCalls: 50, triangles: 90_000 })
+  assert.deepEqual(f.getMetrics(), { looks: 0, shown: 0, drawCalls: 0, triangles: 0 })
+  assert.equal(f.group.children.length, 0)
+  f.dispose()
+  f.dispose()
+  f.sync(agents, 1 / 60, camera, { drawCalls: 50, triangles: 90_000 })
+  assert.equal(f.getMetrics().shown, 0)
 })

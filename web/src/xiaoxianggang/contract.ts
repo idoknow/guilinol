@@ -123,7 +123,10 @@ export const XXG_TIMING = {
 } as const
 
 export const XXG_BUDGET = {
-  indoorDrawCallsMax: 40,
+  /** 室内总 draw calls：静态场景 + 主线同款带骨骼路人（每人约 7 次，视锥外隐藏不计）。 */
+  indoorDrawCallsMax: 80,
+  /** 其中静态场景（灰盒、店铺、楼梯井）自身的上限，余量全部给路人。 */
+  indoorSceneDrawCallsMax: 40,
   indoorTrianglesMax: 150_000,
   /** 室内纹理总字节（GPU 估算），与 Hy2 look 验收一致。 */
   indoorTextureBytesMax: 8 * 1024 * 1024,

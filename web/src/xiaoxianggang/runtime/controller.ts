@@ -1,5 +1,6 @@
 import * as THREE from 'three'
 import {
+  XXG_BUDGET,
   XXG_PLAYER,
   XXG_PORTALS,
   XXG_PORTAL_IDS,
@@ -18,7 +19,8 @@ import { XXG_FRAME, XXG_STAIRWELL, indoorToWorld, stairwellViewBlend, worldToInd
 import { buildIndoorCollisionWorld, clampIndoorPitch, resolveIndoorMovement, type Aabb2D } from './collision.ts'
 import { XIAOXIANGGANG_B1_LAYOUT } from '../layout/index.ts'
 import { createIndoorGreyboxScene, type IndoorGreyboxSceneHandle } from './indoor-scene.ts'
-import { XXG_CROWD_MAX, createXxgCrowd, type XxgCrowd } from './crowd.ts'
+import { XXG_CROWD_MAX, XXG_CROWD_MAX_TOUCH, createXxgCrowd, type XxgCrowd } from './crowd.ts'
+import { createXxgCrowdFigures, type XxgCrowdFigures } from './crowd-figures.ts'
 import { createXxgRuntimeStateMachine } from './state-machine.ts'
 import {
   XXG_WELL_DOOR,
@@ -126,7 +128,8 @@ export function createXxgIndoorScene(opts: CreateXxgIndoorSceneOptions = {}): Xx
   let hostCtx: XxgHostContext | null = null
   let greyboxHandle: IndoorGreyboxSceneHandle | null = null
   let crowd: XxgCrowd | null = null
-  const crowdMaxAgents = Math.max(0, Math.floor(opts.crowdMaxAgents ?? XXG_CROWD_MAX))
+  let figures: XxgCrowdFigures | null = null
+  const crowdOverride = opts.crowdMaxAgents === undefined ? null : Math.max(0, Math.floor(opts.crowdMaxAgents))
   let pendingExitPortalId: XxgPortalId | null = null
 
   // Indoor first-person kinematic state
@@ -253,7 +256,7 @@ export function createXxgIndoorScene(opts: CreateXxgIndoorSceneOptions = {}): Xx
       hostCtx.renderer.render(scene, camera)
       lastDrawCalls = hostCtx.renderer.info.render.calls
     } else {
-      lastDrawCalls = greyboxHandle.meshCount + (crowd?.getMetrics().drawCalls ?? 0)
+      lastDrawCalls = greyboxHandle.meshCount + (figures?.getMetrics().drawCalls ?? 0)
     }
     if (swapStartedAt !== null) {
       lastSwapMs = Math.max(0, Math.round((nowFn() - swapStartedAt) * 100) / 100)
@@ -349,6 +352,10 @@ export function createXxgIndoorScene(opts: CreateXxgIndoorSceneOptions = {}): Xx
   }
 
   async function mount(ctx: XxgHostContext): Promise<void> {
+    // Passers-by need a real WebGL renderer (node tests mount with a counting stub).
+    const browser = typeof document !== 'undefined' && (ctx.renderer as { isWebGLRenderer?: boolean }).isWebGLRenderer === true
+    // Same rule as the street crowd: touch screens get the smaller crowd.
+    const touch = crowdOverride === null && browser && (await import('../../ui/input-mode.ts').then(m => m.touchUi(), () => false))
     if (machine.getState() === 'disposed') return
     if (machine.getState() !== 'unmounted') return
     hostCtx = ctx
@@ -357,19 +364,23 @@ export function createXxgIndoorScene(opts: CreateXxgIndoorSceneOptions = {}): Xx
     scene.fog = greyboxHandle.scene.fog
     scene.add(greyboxHandle.scene)
     resetDoors()
-    if (crowdMaxAgents > 0) {
+    const maxAgents = crowdOverride ?? (touch ? XXG_CROWD_MAX_TOUCH : XXG_CROWD_MAX)
+    if (maxAgents > 0) {
       crowd = createXxgCrowd({
         layout,
-        maxAgents: crowdMaxAgents,
+        maxAgents,
         seed: opts.crowdSeed,
         columns: greyboxHandle.columnCenters,
         blocked: wells.map(w => w.footprint),
       })
-      scene.add(crowd.group)
+      figures = createXxgCrowdFigures({ slots: maxAgents + 1, seed: opts.crowdSeed })
+      scene.add(figures.group)
     }
     mountDomAndListeners()
     machine.transitionTo('idle')
     await prewarmGpu(ctx.renderer)
+    // Builds in the background: the indoor scene is usable at once, passers-by appear once their looks are ready.
+    if (browser && figures) void figures.prepare(ctx.renderer, scene, camera)
   }
 
   /** 挂载时（入口懒加载、还在地面上）就编译着色器、上传纹理，换场那一帧只剩渲染。 */
@@ -654,6 +665,13 @@ export function createXxgIndoorScene(opts: CreateXxgIndoorSceneOptions = {}): Xx
     settleEye(dt)
     crowd?.step(dt, { x: playerX, z: playerZ, yaw: playerYaw })
     syncIndoorCamera()
+    if (crowd && figures && greyboxHandle) {
+      // Passers-by get whatever the contract leaves after the static scene (each mesh at most one draw).
+      figures.sync(crowd.getAgents(), dt, camera, {
+        drawCalls: XXG_BUDGET.indoorDrawCallsMax - greyboxHandle.meshCount,
+        triangles: XXG_BUDGET.indoorTrianglesMax - greyboxHandle.triangleCount,
+      })
+    }
 
     const w = XXG_STAIRWELL
     const pose = locateInWell(playerX, playerZ, wells)
@@ -663,7 +681,7 @@ export function createXxgIndoorScene(opts: CreateXxgIndoorSceneOptions = {}): Xx
   function getMetrics(): XxgIndoorMetrics {
     return {
       drawCalls: lastDrawCalls,
-      triangles: (greyboxHandle?.triangleCount ?? 0) + (crowd?.getMetrics().triangles ?? 0),
+      triangles: (greyboxHandle?.triangleCount ?? 0) + (figures?.getMetrics().triangles ?? 0),
       textureBytes: greyboxHandle?.textureBytes ?? 0,
       lastSwapMs,
       lastBlackFrames,
@@ -694,10 +712,10 @@ export function createXxgIndoorScene(opts: CreateXxgIndoorSceneOptions = {}): Xx
     playerFootY = 0
     setBodyFlags(false)
     unmountDomAndListeners()
-    if (crowd) {
-      crowd.dispose()
-      crowd = null
-    }
+    crowd?.dispose()
+    crowd = null
+    figures?.dispose()
+    figures = null
     if (greyboxHandle) {
       scene.remove(greyboxHandle.scene)
       greyboxHandle.dispose()
@@ -726,6 +744,6 @@ export function createXxgIndoorScene(opts: CreateXxgIndoorSceneOptions = {}): Xx
     renderFrame,
     getPlayerSnapshot,
     getLayout: () => layout,
-    getCrowdMetrics: () => crowd?.getMetrics() ?? null,
+    getCrowdMetrics: () => (crowd && figures ? { ...crowd.getMetrics(), ...figures.getMetrics() } : null),
   }
 }
