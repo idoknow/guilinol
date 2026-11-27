@@ -10,6 +10,10 @@ body[data-home] :is(.hud-me,.dock,.sky-ui,.hint,footer,.walk-ui,.vehicle-action,
 .home-bg{position:fixed;inset:0;overflow:hidden}
 .home-bg img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:0;transform:scale(1.08);transition:opacity 1.6s ease,transform 9s linear}
 .home-bg img.on{opacity:1;transform:scale(1)}
+/* IDOK-386 实时封面：画布叠在海报图上，首帧出来再淡入；场景接管拖拽，竖向滑动仍留给页面滚动 */
+.home-bg canvas{opacity:0;transition:opacity 1.4s ease}
+.home.live .home-bg canvas{opacity:1}
+.home[data-cover=loading],.home[data-cover=live]{touch-action:pan-y}
 /* 可读性压暗：左侧托住书名和目录，上下各一道收边（不是装饰渐变） */
 .home-shade{position:fixed;inset:0;pointer-events:none;
   background:linear-gradient(90deg,color-mix(in srgb,var(--ui-ink-950) 90%,transparent) 0,color-mix(in srgb,var(--ui-ink-950) 74%,transparent) 32%,color-mix(in srgb,var(--ui-ink-950) 18%,transparent) 58%,transparent 76%),

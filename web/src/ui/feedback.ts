@@ -4,6 +4,7 @@ import type { Host } from '../play/host'
 import type { mapView } from '../play/map'
 import { APPEAL,kinds, labels, photosOptional, type FeedbackView } from '../../../lib/feedback-contract'
 import { ll2xz, xz2ll } from '../../../lib/projection'
+import { readJson, jsonError } from '../lib/json'
 import { photoPicker } from './feedback-photo'
 import { cameraSupported, shootFeedbackPhoto } from './feedback-camera'
 import './feedback.css'
@@ -32,8 +33,8 @@ async function api<T>(path: string, data?: object): Promise<T> {
       ? { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) }
       : {},
   )
-  const result = await response.json()
-  if (!response.ok) throw Error(result.error.message)
+  const result = await readJson(response)
+  if (!response.ok) throw Error(result.error?.message ?? `请求失败（${response.status}）`)
   return result
 }
 function el<K extends keyof HTMLElementTagNameMap>(tag: K, text = '', className = '') {
@@ -424,7 +425,7 @@ export async function openFeedback(host: Host, ensureMap: () => Promise<MapApi |
         async () => {
           if (!confirm('确定删除草稿和照片？')) return
           const response = await fetch(`/api/feedback/${id}`, { method: 'DELETE' })
-          if (!response.ok) throw Error((await response.json()).error.message)
+          if (!response.ok) throw Error(await jsonError(response))
           await list()
         },
         'quiet',
@@ -742,7 +743,7 @@ export async function openFeedback(host: Host, ensureMap: () => Promise<MapApi |
               headers: { 'Content-Type': 'image/jpeg', 'X-Feedback-View': JSON.stringify(selection.view).replace(/[^\x20-\x7e]/g,char=>'\\u'+char.charCodeAt(0).toString(16).padStart(4,'0')) },
               body: selection.shot,
             })
-            if (!response.ok) throw Error((await response.json()).error.message)
+            if (!response.ok) throw Error(await jsonError(response))
           }
           await picker.upload(id)
           await api(`feedback/${id}/${supplement ? 'supplement' : 'submit'}`, { body: text });if(!supplement)record('funnel',{step:'feedbackSuccess'})

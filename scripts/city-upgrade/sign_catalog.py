@@ -77,7 +77,7 @@ FASCIA_SPECS: list[FasciaSpec] = [
     ("xianguo_mart",   "yellow",  "gusset",  "#D4AE54", "#241914", "#6E1E18", "漓北鲜果仓",     "应季直采 · 果篮礼盒",        "duotone_banner", "sans",  0.72, 1.12, ("old_downtown", "neighborhood_alley", "station_arterial"), "fruit",       "产地直供"),
     ("jianyu_mens",    "yellow",  "gusset",  "#CCA44C", "#1D1B18", "#483614", "正阳男装服饰",   "商务休闲 · 针织衬衣",        "luxury_frame",   "sans",  0.66, 1.04, ("old_downtown", "station_arterial"),                     "fashion",     "MENSWEAR 0773"),
     ("zhiqu_kids",     "yellow",  "gusset",  "#D8B458", "#641814", "#3E2216", "小象童装店",     "纯棉童装 · 亲子穿搭",        "left_hero",      "sans",  0.72, 1.16, ("old_downtown", "neighborhood_alley"),                   "fashion",     "全棉优选"),
-    ("xiaoshudian",    "yellow",  "acrylic", "#D5B056", "#1C2A3C", "#25486E", "小数点婴童馆",   "新生棉品 · 启蒙玩具",        "split_tag",      "sans",  0.70, 1.14, ("old_downtown", "neighborhood_alley"),                   "fashion",     "母婴好物\n会员优惠"),
+    ("xiaomuma_kids",  "yellow",  "acrylic", "#D5B056", "#1C2A3C", "#25486E", "小木马婴童馆",   "新生棉品 · 启蒙玩具",        "split_tag",      "sans",  0.70, 1.14, ("old_downtown", "neighborhood_alley"),                   "fashion",     "母婴好物\n会员优惠"),
     ("guixiang_bake",  "yellow",  "acp",     "#D2AA52", "#261B12", "#6A2E1A", "桂香现烤面包",   "手工可颂 · 桂花酥饼",        "duotone_banner", "serif", 0.70, 1.10, ("station_arterial", "campus_edge", "old_downtown"),      "bakery",      "BAKERY · 现烤"),
     ("zaoan_baozi",    "yellow",  "acrylic", "#D6B054", "#4E120E", "#5A1812", "林记手工面点",   "鲜肉大包 · 现磨豆浆",        "led_ticker",     "sans",  0.72, 1.16, ("neighborhood_alley", "station_arterial", "campus_edge"),"dimsum",      "06:00 营业"),
     ("jinsui_grain",   "yellow",  "gusset",  "#CEAA52", "#221D14", "#2E4A2C", "金穗粮油干货",   "山货干果 · 生态香米",        "split_tag",      "sans",  0.70, 1.18, ("neighborhood_alley", "station_arterial"),               "specialty",   "平价粮油\n送货上门"),
@@ -115,7 +115,7 @@ FASCIA_SPECS: list[FasciaSpec] = [
 
     # --- 8. green (8) ---
     ("siji_fruit",     "green",   "acrylic", "#2E5238", "#F7F3DF", "#DFBA62", "四季鲜果直供",   "精品鲜果 · 现切果盘",        "duotone_banner", "sans",  0.70, 1.16, ("old_downtown", "station_arterial", "neighborhood_alley"), "fruit",       "每日直达"),
-    ("lvcheng_post",   "green",   "acp",     "#244432", "#F2D264", "#E2C872", "绿城社区驿站",   "快递收发 · 邻里便民",        "left_hero",      "sans",  0.68, 1.12, ("old_downtown", "neighborhood_alley", "station_arterial"), "hotel_home",  "早8晚10"),
+    ("rongyin_post",   "green",   "acp",     "#244432", "#F2D264", "#E2C872", "榕荫社区驿站",   "快递收发 · 邻里便民",        "left_hero",      "sans",  0.68, 1.12, ("old_downtown", "neighborhood_alley", "station_arterial"), "hotel_home",  "早8晚10"),
     ("zelin_hw",       "green",   "acrylic", "#284B37", "#F4F6F2", "#BCE0C8", "泽霖五金水电",   "五金工具 · 灯具开关",        "left_hero",      "sans",  0.70, 1.14, ("neighborhood_alley", "station_arterial", "old_downtown"), "hardware",    "水电建材"),
     ("xiuxin_tailor",  "green",   "gusset",  "#233E32", "#ECD072", "#B4D4BE", "秀新精工改衣",   "量体裁衣 · 换拉链裤脚",      "heritage_seal",  "serif", 0.68, 1.08, ("old_downtown", "neighborhood_alley"),                   "fashion",     "精工细作"),
     ("jimin_pharm",    "green",   "acrylic", "#284D3A", "#F6F4EA", "#842620", "叠彩济民药堂",   "中药饮片 · 家庭常备药",      "split_tag",      "serif", 0.72, 1.20, ("station_arterial", "neighborhood_alley"),               "pharmacy",    "执业药师\n医保刷卡"),
@@ -127,14 +127,14 @@ FASCIA_SPECS: list[FasciaSpec] = [
     ("laozhou_beef",   "teal",    "gusset",  "#264A42", "#F7EBC4", "#DFB864", "老周秘制牛腩粉", "浓汤牛腩 · 萝卜牛杂",        "led_ticker",     "brush", 0.72, 1.22, ("old_downtown", "neighborhood_alley", "station_arterial"), "noodle",      "30年老汤"),
     ("letu_hotel",     "teal",    "acp",     "#203832", "#F2EEE4", "#D4B880", "乐途江景酒店",   "观景客房 · 免费泊车",        "luxury_frame",   "serif", 0.66, 1.08, ("station_arterial", "riverside_scenic"),                 "hotel_home",  "RIVERSIDE HOTEL"),
     ("guiying_coffee", "teal",    "acp",     "#223B34", "#F4EFE6", "#E8D09E", "桂影手冲 CAFE",  "自有烘焙 · 社区精品咖啡",    "luxury_frame",   "serif", 0.64, 1.02, ("old_downtown", "riverside_scenic", "campus_edge"),      "coffee",      "HAND DRIP 0773"),
-    ("lishui_music",   "teal",    "acp",     "#244448", "#F4F4EE", "#B6D4CE", "漓水清音琴行",   "古筝吉他 · 调律培训",        "left_hero",      "serif", 0.64, 1.06, ("campus_edge", "old_downtown"),                          "books",       "MUSIC STUDIO"),
-    ("qingshan_photo", "teal",    "acp",     "#284744", "#F6F2E6", "#DEC07C", "青山山水旅拍",   "漓江跟拍 · 汉服妆造",        "luxury_frame",   "serif", 0.64, 1.04, ("riverside_scenic", "old_downtown"),                     "digital",     "PHOTO STUDIO"),
+    ("lishui_music",   "teal",    "acp",     "#244448", "#F4F4EE", "#B6D4CE", "漓水清音琴行",   "古筝吉他 · 调律培训",        "left_hero",      "serif", 0.64, 1.06, ("campus_edge", "old_downtown"),                          "music",       "MUSIC STUDIO"),
+    ("qingshan_photo", "teal",    "acp",     "#284744", "#F6F2E6", "#DEC07C", "青山山水旅拍",   "漓江跟拍 · 汉服妆造",        "luxury_frame",   "serif", 0.64, 1.04, ("riverside_scenic", "old_downtown"),                     "camera",      "PHOTO STUDIO"),
     ("bishui_teahall", "teal",    "gusset",  "#22403C", "#F6EBC8", "#D8BA74", "碧水六堡茶庄",   "陈年六堡 · 桂林毛尖",        "heritage_seal",  "brush", 0.68, 1.14, ("riverside_scenic", "station_arterial"),                 "tea",         "梧州六堡"),
     ("kangjie_dental", "teal",    "acrylic", "#2B4F54", "#F6F9F9", "#1E3A40", "康洁口腔诊所",   "显微补牙 · 舒适洁牙",        "split_tag",      "sans",  0.70, 1.12, ("station_arterial", "neighborhood_alley"),               "pharmacy",    "医保定点\n预约看诊"),
     ("qingfeng_ac",    "teal",    "acrylic", "#274B50", "#F4F8F8", "#C8E4E8", "清风制冷维修",   "空调移机 · 深度拆洗",        "left_hero",      "sans",  0.68, 1.10, ("neighborhood_alley", "station_arterial"),               "hardware",    "上门快修"),
 
     # --- 10. blue (8) ---
-    ("guixin_consult", "blue",    "gusset",  "#243E5C", "#F4DA84", "#D8BC6C", "桂信工程咨询",   "造价评估 · 招标代理",        "heritage_seal",  "serif", 0.70, 1.14, ("station_arterial", "old_downtown"),                     "hotel_home",  "甲级资质"),
+    ("guixin_consult", "blue",    "gusset",  "#243E5C", "#F4DA84", "#D8BC6C", "桂信工程咨询",   "造价评估 · 招标代理",        "heritage_seal",  "serif", 0.70, 1.14, ("station_arterial", "old_downtown"),                     "engineering", "甲级资质"),
     ("xinkang_tcm",    "blue",    "acp",     "#26323E", "#F2F6FA", "#96C2E4", "信康中医推拿",   "艾灸拔罐 · 颈肩调理",        "left_hero",      "serif", 0.66, 1.10, ("old_downtown", "neighborhood_alley"),                   "tcm",         "古法理疗"),
     ("jisu_digital",   "blue",    "acrylic", "#244262", "#F4F8FC", "#1C324A", "极速手机快修",   "换屏换电 · 钢化贴膜",        "split_tag",      "sans",  0.72, 1.14, ("station_arterial", "campus_edge", "old_downtown"),      "digital",     "立等可取\n原厂配件"),
     ("licheng_home",   "blue",    "gusset",  "#274566", "#F7F5EA", "#E4C068", "漓城房产中介",   "二手租售 · 过户代办",        "duotone_banner", "sans",  0.72, 1.18, ("station_arterial", "neighborhood_alley"),               "hotel_home",  "本地房源"),
@@ -228,7 +228,7 @@ TRADEMARK_DENYLIST = re.compile(
     r"(淘宝|天猫|美团|饿了么|蜜雪|瑞幸|星巴克|肯德基|麦当劳|一心堂|力源|中国邮政|CHINA\s*POST|"
     r"老百姓|益丰|光头佬|万达|屈臣氏|名创优品|海底捞|喜茶|霸王茶姬|绝味|周黑鸭|国泰|皇冠|仁和|晨光|"
     r"全家|罗森|7-?11|沃尔玛|家乐福|华润|华为|小米|苹果|OPPO|VIVO|耐克|阿迪|优衣库|海澜之家|"
-    r"如家|汉庭|全季|维也纳|格林豪泰|美宜佳|链家|贝壳|崇善|椿记|阿甘|日头火|明桂|同仁堂|老东江)",
+    r"如家|汉庭|全季|维也纳|格林豪泰|美宜佳|链家|贝壳|崇善|椿记|阿甘|日头火|明桂|同仁堂|老东江|小数点|绿城)",
     re.IGNORECASE,
 )
 

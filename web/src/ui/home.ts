@@ -7,16 +7,21 @@ import {spots} from '../play/spots'
 import {SOURCE_URL} from './source'
 import {initial, onUser, openAccount} from './account'
 import {lastViewSavedAt, requestRestore} from '../lastview'
+import type {Cover, CoverTier} from './cover'
 
 // 主界面（title screen）. Shown on every plain visit before the 3D city loads; the menu button in game brings it back.
 // It owns no engine state: it calls `play()` and the entry module decides whether that boots or resumes the city.
-// Backdrops are real in-game shots, regenerated with scripts/home-shots.mjs.
+// IDOK-386: a fresh visit gets a live 3D night scene (ui/cover, its own chunk) behind the menu; the first in-game shot
+// is its poster until the first frame. The slideshow stays as the fallback (no WebGL, context lost, ?nocover) and as
+// the backdrop of the in-game menu, which never builds the scene. Backdrops: scripts/home-shots.mjs.
 const slides:[file:string,caption:string][] = [
   ['elephant','象鼻山 · 黄昏'],['pagodas','日月双塔 · 入夜'],['lijiang','漓江 · 清晨'],['duxiu','独秀峰 · 靖江王城'],
 ]
 const SLIDE_MS = 7000
 
-export interface Home {open(resume:boolean):void; close():void; idle():void; readonly shown:boolean}
+export interface Home {open(resume:boolean):void; close():void; idle():void; readonly shown:boolean
+  /** Resolves once the entry dive (started by a mode card) has played far enough for the loader to cover it. */
+  launch():Promise<void>}
 
 export function home(play:(mode:PlayMode)=>void):Home {
   const root = document.createElement('section')
@@ -87,13 +92,19 @@ export function home(play:(mode:PlayMode)=>void):Home {
     if(busyCard) return
     const pill = card.querySelector<HTMLElement>('.home-go'); busyCard = card; busyLabel = pill?.textContent ?? ''
     card.setAttribute('aria-busy','true'); root.dataset.busy = ''
+    // The live cover answers the press: the hero turns to the river and the camera dives past his shoulder (~1.5 s, holds wait),
+    // the login check runs meanwhile and entry.ts awaits launch() before the loader fades in.
+    if(cover && !reduce && root.dataset.cover==='live'){
+      diveAt = performance.now(); cover.dive(); clearTimeout(swoop); swoop = window.setTimeout(()=>{swoop = 0; syncHolds()},1500)
+    }
+    hold('busy',true)
     if(pill) pill.innerHTML = `<i class="home-spin" aria-hidden="true"></i><span>${label}</span>`
     run()
   }
   const idle = ()=>{
     if(!busyCard) return
     const pill = busyCard.querySelector<HTMLElement>('.home-go'); if(pill) pill.textContent = busyLabel
-    busyCard.removeAttribute('aria-busy'); delete root.dataset.busy; busyCard = undefined
+    busyCard.removeAttribute('aria-busy'); delete root.dataset.busy; busyCard = undefined; hold('busy',false)
   }
   const pending = (button:HTMLElement, task:()=>Promise<unknown>)=>{
     if(button.hasAttribute('aria-busy')) return
@@ -136,6 +147,55 @@ export function home(play:(mode:PlayMode)=>void):Home {
   const step = ()=>{const next = (index+1)%images.length; if(!images[next].complete||!images[next].naturalWidth) return
     images[index].classList.remove('on'); images[next].classList.add('on'); index = next; caption.textContent = slides[index][1]}
   const reduce = matchMedia('(prefers-reduced-motion:reduce)').matches
+  const startSlides = ()=>{if(!reduce&&!timer&&!cover) timer = window.setInterval(step,SLIDE_MS)}
+
+  // Live cover. Lifecycle: open(false) loads it, busy / creator pause it, close() pauses at once and frees every GPU
+  // resource and the canvas once the fade-out ends. data-cover on .home tells tests and agents where it is:
+  // loading → live, or off (fallback slideshow).
+  const params = new URLSearchParams(location.search)
+  const bg = root.querySelector<HTMLElement>('.home-bg')!, main = root.querySelector<HTMLElement>('.home-main')!
+  const modes = root.querySelector<HTMLElement>('.home-modes')!
+  const UI = 'button,a,input,select,textarea,label,dialog,[role=dialog],.about-mask,.home-top'
+  const narrow = matchMedia('(max-width:760px)'), short = matchMedia('(max-height:520px) and (orientation:landscape)')
+  let cover:Cover|undefined, coverWanted = false, coverOff = params.has('nocover')
+  const holds = new Set<string>()
+  let swoop = 0, diveAt = -1
+  const syncHolds = ()=>{if(holds.size) cover?.pause(); else cover?.resume()}
+  function hold(reason:string, on:boolean){
+    if(on) holds.add(reason); else holds.delete(reason)
+    if(!swoop) syncHolds()
+  }
+  // The menu covers the left column (desktop), the thumb zone at the bottom (portrait phone) or the right column
+  // (landscape phone); the scene frames the hero and landmarks in the rest.
+  const safe = ()=>narrow.matches
+    ? {left:0, right:0, bottom:Math.max(0, innerHeight - modes.getBoundingClientRect().top + 8)}
+    : short.matches
+      ? {left:0, right:Math.max(0, innerWidth - modes.getBoundingClientRect().left + 8), bottom:0}
+      : {left:Math.max(0, main.getBoundingClientRect().right - 40), right:0, bottom:0}
+  const resafe = ()=>{cover?.setSafeArea(safe())}
+  new ResizeObserver(resafe).observe(main)
+  // Rotating may not resize .home-main, so a media-query flip recomputes too.
+  narrow.addEventListener('change', resafe); short.addEventListener('change', resafe)
+  const dropCover = (off:boolean)=>{
+    cover?.dispose(); cover = undefined; coverOff ||= off
+    root.classList.remove('live'); root.dataset.cover = 'off'; caption.textContent = slides[index][1]
+    if(shown) startSlides()
+  }
+  const loadCover = ()=>{
+    if(cover||coverOff||!coverWanted) return
+    root.dataset.cover = 'loading'
+    import('./cover').then(m=>{
+      if(cover||!coverWanted) return
+      const tier = params.get('covertier') as CoverTier|null
+      cover = m.mountCover(bg,{reduced:reduce, surface:root, ignore:t=>!!t.closest(UI), safe:safe(), tier:tier??undefined,
+        onReady(){root.classList.add('live'); root.dataset.cover = 'live'; clearInterval(timer); timer = 0; caption.textContent = ''},
+        onHover(name){caption.textContent = name ?? ''},
+        onLost(){dropCover(true)}})
+      if(holds.size) cover.pause()
+      if(params.has('coverstats')) (window as Window & {glolCover?:Cover}).glolCover = cover
+    }).catch(()=>dropCover(true))
+  }
+  addEventListener('glol:creator',event=>hold('creator',!!(event as CustomEvent<{open?:boolean}>).detail?.open))
 
   let shown = false, currentResume = false
   const focusTarget = (resume:boolean) => {
@@ -152,6 +212,10 @@ export function home(play:(mode:PlayMode)=>void):Home {
   const api:Home = {
     get shown(){return shown},
     idle,
+    launch(){
+      const wait = diveAt < 0 ? 0 : diveAt + 800 - performance.now(); diveAt = -1
+      return new Promise(done=>setTimeout(done, Math.max(0, wait)))
+    },
     open(resume){
       idle()
       shown = true; currentResume = resume; root.hidden = false; root.classList.toggle('resume',resume)
@@ -172,12 +236,16 @@ export function home(play:(mode:PlayMode)=>void):Home {
       const saved = resume ? null : lastViewSavedAt()
       resumeRow.hidden = saved===null; if(saved!==null) resumeAgo.textContent = ago(saved)
       requestAnimationFrame(()=>{root.classList.add('show'); focusTarget(resume).focus({preventScroll:true})})
-      if(!reduce&&!timer) timer = window.setInterval(step,SLIDE_MS)
+      coverWanted = !resume
+      hold('closed',false)
+      if(resume) dropCover(false); else loadCover()
+      startSlides()
       document.body.dataset.home = ''
     },
     close(){
-      shown = false; root.classList.remove('show'); clearInterval(timer); timer = 0; delete document.body.dataset.home
-      setTimeout(()=>{if(!shown) root.hidden = true},450)
+      shown = false; coverWanted = false; root.classList.remove('show'); clearInterval(timer); timer = 0; delete document.body.dataset.home
+      hold('closed',true)
+      setTimeout(()=>{if(!shown){root.hidden = true; if(cover) dropCover(false)}},450)
     },
   }
   return api

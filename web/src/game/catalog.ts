@@ -228,6 +228,10 @@ export const NPC_ONLY_OUTFIT_ITEMS: readonly OutfitItemDef[] = [
     description: 'NPC 专用：白顶大檐帽、藏青帽墙、黑色漆皮帽檐与内置短发兜（不上架商店）',
     npcOnly: true,
   },
+  // IDOK-386 封面主角专属一套（只在首页封面穿，不上架、不进存档）
+  {id: 'top_cover_dusk', slot: 'top', name: '封面·燕麦针织衫', tier: 0, price: 0, colorHex: '#d3c19f', accentHex: '#bfab86', description: '封面主角专用：燕麦色圆领针织衫，同色罗纹领口袖口下摆（不上架商店）', npcOnly: true},
+  {id: 'bottom_cover_dusk', slot: 'bottom', name: '封面·深靛直筒裤', tier: 0, price: 0, colorHex: '#34405a', accentHex: '#1f232b', description: '封面主角专用：深靛直筒长裤（不上架商店）', npcOnly: true},
+  {id: 'shoes_cover_dusk', slot: 'shoes', name: '封面·米白板鞋', tier: 0, price: 0, colorHex: '#efebe3', accentHex: '#b9a27d', description: '封面主角专用：米白板鞋配燕麦色后跟（不上架商店）', npcOnly: true},
 ] as const
 
 export const NPC_ONLY_OUTFIT_ITEMS_BY_ID: Readonly<Record<string, OutfitItemDef>> = Object.fromEntries(
@@ -245,6 +249,15 @@ export const OFFICER_UNIFORM_OUTFIT: Readonly<EquippedOutfit> = Object.freeze({
   bottom: 'bottom_police_trousers',
   shoes: 'shoes_traffic_duty',
   hat: 'hat_traffic_police_cap',
+  bag: 'bag_none',
+})
+
+/** IDOK-386 首页封面主角的专属穿搭（applyEquipped / previewCharacter 用）。 */
+export const COVER_HERO_OUTFIT: Readonly<EquippedOutfit> = Object.freeze({
+  top: 'top_cover_dusk',
+  bottom: 'bottom_cover_dusk',
+  shoes: 'shoes_cover_dusk',
+  hat: 'hat_none',
   bag: 'bag_none',
 })
 

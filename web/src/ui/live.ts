@@ -1,4 +1,5 @@
 // 在线人数（IDOK-178）：/api/live 只读接口，60 秒一次；拿不到就安静地不显示。
+import { readJson } from '../lib/json'
 const ENDPOINT = '/api/live'
 
 let online: number | null = null
@@ -38,7 +39,7 @@ async function poll() {
   try {
     const response = await fetch(ENDPOINT, {cache: 'no-store', credentials: 'omit'})
     if (!response.ok) throw new Error(String(response.status))
-    const body = (await response.json()) as {online?: unknown; mp?: unknown}
+    const body = await readJson<{online?: unknown; mp?: unknown}>(response)
     publish(count(body.online), count(body.mp))
   } catch {
     publish(null, null)

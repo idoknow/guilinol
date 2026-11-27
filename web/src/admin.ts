@@ -75,9 +75,8 @@ function manifestPlaces(manifest: any): Place[] {
     ...(manifest?.peaks?.entries ?? []).map((p: any) => ({ name: p.name, x: p.center?.[0], z: p.center?.[2] })),
   ].filter((p) => p.name && !/^auto-/.test(p.name) && Number.isFinite(p.x) && Number.isFinite(p.z))
 }
-async function api<T = any>(path: string, data?: unknown, method='POST'): Promise<T> {
-  // 无 body 默认是读（GET）；显式传 DELETE 等方法时照发，且不合并、不重试
-  const read = !data && method === 'POST'
+async function api<T = any>(path: string, data?: unknown, method=data===undefined?'GET':'POST'): Promise<T> {
+  const read = method === 'GET'
   if (read) {
     const existing = inflightGet.get(path)
     if (existing) return existing as Promise<T>
@@ -93,7 +92,7 @@ async function api<T = any>(path: string, data?: unknown, method='POST'): Promis
             ? { cache: 'no-store' }
             : data
               ? { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) }
-              : { method },
+              : { method, cache: 'no-store' },
         )
       } catch {
         throw new ApiError(0, 'network', '网络连接失败，请检查网络后重试')
@@ -2588,6 +2587,7 @@ const pages: Record<string, (view: View) => void> = {
       h('div', { class: 'adm-toolbar' }, segmented(type, [['', '全部'], ['user', '身份变更'], ['feedback', '反馈处理'], ['chat', '聊天管理']], (value) => go({ target_type: value || null }, true), '对象类型')),
       card(null, slot, { className: 'adm-card--flush' }))
     const actions: Record<string, string> = {
+      'mp.cheat_capture.delete':'删除取证截图',
       role: '调整身份', status: '变更状态', start_ai: '发起 AI 制作', reply: '回复提交人',
       ban: '封禁账号', unban: '解除封禁', merge_users: '合并账号', reset_password: '重置密码', change_email: '修改邮箱', 'mp.kick': '踢出联机','mp.ban':'联机封禁','mp.unban':'联机解封','mp.dismiss':'复核不处罚',
       'chat.mute': '聊天禁言', 'chat.unmute': '解除禁言', 'chat.delete': '删除消息', 'chat.approve': '放行消息', 'chat.block': '拦截消息', 'chat.notice': '发布公告', 'chat.settings': '修改聊天规则', 'chat.words': '编辑敏感词', 'chat.words/delete': '删除敏感词', 'chat.lexicon_policy': '词库升级',
@@ -2609,6 +2609,7 @@ const pages: Record<string, (view: View) => void> = {
     const rowsOf = (items: any[]) => items.map((item) => {
       const detail = typeof item.detail === 'string' ? JSON.parse(item.detail || '{}') : item.detail ?? {}
       const what: Child =
+        item.action==='mp.cheat_capture.delete' ? `截图 ${detail.captureId ?? dash}` :
         item.action === 'role' ? (detail.role === 'admin' ? '设为管理员' : '取消管理员')
         : item.action === 'status' || item.action === 'start_ai' ? h('span', { class: 'adm-flow' }, detail.from ? pill(detail.from) : null, '→', detail.to ? pill(detail.to) : null)
         : item.action === 'change_email' ? h('span', { class: 'adm-flow' }, h('span', null, detail.from || '（无）'), '→', h('span', null, detail.to || dash))

@@ -1,5 +1,6 @@
 import {isModalOrOverlayOpen,isTextInputTarget} from '../walk/input-guard'
 import './update-cards.css'
+import { readJson } from '../lib/json'
 
 type Card={id:string;kind?:'gameplay'|'modeling';title:string;summary:string;how_to:string;images:string[]}
 type Hooks={open?:()=>Promise<void>;mock?:(cards:Card[])=>void}
@@ -10,7 +11,7 @@ const el=<K extends keyof HTMLElementTagNameMap>(tag:K,className='',text='')=>{c
 async function unseen():Promise<Card[]>{
   const response=await fetch('/api/updates/unseen',{cache:'no-store'})
   if(!response.ok)throw Error('读取卡片失败')
-  return response.json()
+  return readJson<Card[]>(response)
 }
 export async function startCards(verify:boolean){
   let mock:Card[]|undefined,running=false

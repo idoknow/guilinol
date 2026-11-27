@@ -122,7 +122,7 @@ let nextId = 1
 
 const now = () => Date.now()
 import {grantTravel} from './travel.mjs'
-import {acceptSample,acceptedSpeed} from './movement-sample.mjs'
+import {acceptSample,acceptedSpeed,shouldRecordCorrection} from './movement-sample.mjs'
 import {ipGate,tooFast} from './protocol-guard.mjs'
 const rosterCoordinate = value => Math.round(value/128)*128
 function rosterPoint(player,at=now()) {
@@ -1128,12 +1128,13 @@ wss.on('connection', (ws, req) => {
       if(msg.t==='travel'){send(ws,{t:'travel_result',seq:Number.isSafeInteger(msg.seq)?msg.seq:undefined,ok:grantTravel(me,msg.reason,msg.target,now())});return}
       const recordMove = (kind,detail) => {
         me.cheatTimes ??= new Map()
-        if (now()-(me.cheatTimes.get(kind)??0)<2000) return
+        if (now()-(me.cheatTimes.get(kind)??0)<2000) return false
         me.cheatTimes.set(kind,now())
         emitCheatCapture(me,kind,detail)
         void banStore.violation({uid:me.uid,fp:ws.fp??'',kind,detail:{from:[me.x,me.y,me.z],...detail},ua:me.ua??''}).then(ban=>{
           if (ban) { emitCheatCapture(me,kind,detail,{force:true}); notifyBan(ws,ban); ws.close(4003,'banned') }
         }).catch(error=>console.warn('[anti-cheat]',error.message))
+        return true
       }
       if (msg.t==='mount_player' && me.visible.has(msg.target) && players.has(msg.target) && msg.target!==me.id) {
         recordAttack('mount_player')
@@ -1188,10 +1189,8 @@ wss.on('connection', (ws, req) => {
         me.bike = clampStr(msg.bike, 32)
         const verdict = checkMove(me, nx, ny, nz, at)
         if (verdict.reject) {
-          if(!me.awaitingCorrection){
-            me.awaitingCorrection=true
-            const jitter=verdict.kind==='speed' && stepDt<0.25 && verdict.overflow<=2
-            if(!jitter)recordMove(verdict.kind,{to:[nx,ny,nz],overflow:verdict.overflow,flatSpeed,vspeed,reportedSpeed})
+          if(shouldRecordCorrection(me.awaitingCorrection,verdict,stepDt,at)){
+            if(recordMove(verdict.kind,{to:[nx,ny,nz],overflow:verdict.overflow,flatSpeed,vspeed,reportedSpeed}))me.awaitingCorrection={kind:verdict.kind,until:at+2000}
           }
           send(ws, {t: 'setback', x: me.x, y: me.y, z: me.z, kind: verdict.kind})
           return

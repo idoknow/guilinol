@@ -180,7 +180,7 @@ test('realtime server emits signed cheat_capture on cheats and full API upload +
   const walker = await connectPlayer(100501, '正常步行者', -185, 3, 35)
   for (let i = 1; i <= 8; i++) {
     walker.pos(-185 + i * 0.08, 3, 35)
-    await delay(55)
+    await delay(90)
   }
   assert.equal(walker.messages.filter((m) => m.t === 'cheat_capture').length, 0, 'normal walking must not emit cheat_capture')
 
@@ -190,7 +190,7 @@ test('realtime server emits signed cheat_capture on cheats and full API upload +
   for (let i = 0; i < 8; i++) {
     x += 0.1
     cheater.pos(x, 3, 35)
-    await delay(55)
+    await delay(90)
   }
   cheater.pos(x+30,10,35)
   await delay(150)
@@ -388,6 +388,9 @@ test('realtime server emits signed cheat_capture on cheats and full API upload +
   const page=async(offset)=> (await (await callApi(`admin/mp/cheat-captures?uid=100502&limit=1&offset=${offset}`,{cookie:adminTokenCookie})).json()).captures
   assert.notEqual((await page(0))[0].id,(await page(1))[0].id)
   assert.deepEqual(await page(2),[])
+  const filtered=async(fp,offset)=>(await (await callApi(`admin/mp/cheat-captures?uid=100502&fp=${fp}&limit=1&offset=${offset}`,{cookie:adminTokenCookie})).json())
+  assert.equal((await filtered('a'.repeat(16),0)).total,0)
+  assert.equal((await filtered('b'.repeat(16),1)).captures.length,1)
   await pool.query("insert into admin_audit(actor_id,action,target_type,target_id,detail) values ('adm-1','mp.unban','mp','100502','{}')")
   const audit=await (await callApi('admin/audit?target_type=mp',{cookie:adminTokenCookie})).json()
   const unban=audit.items.find(row=>row.action==='mp.unban' && row.target_id==='100502')
@@ -405,8 +408,39 @@ test('realtime server emits signed cheat_capture on cheats and full API upload +
   assert.deepEqual(fetchedBytes, sampleJpeg)
 
   // Admin can delete capture and audit trail is recorded
-  const delRes = await callApi(`admin/mp/cheat-captures/${speedCapture.id}`, {method: 'DELETE', cookie: adminTokenCookie})
-  assert.equal(delRes.status, 200)
+  if(process.env.CAPTURE_BROWSER==='1'){
+    const {preview}=await import('vite'),{chromium}=await import('playwright'),{browserOptions}=await import('./qa-browser.mjs')
+    const web=await preview({configFile:false,build:{outDir:'dist'},preview:{host:'127.0.0.1',port:0},plugins:[{name:'fixture-api',configurePreviewServer(server){
+      server.middlewares.use('/api',async(req,res,next)=>{try{
+        const url=new URL('/api'+req.url,`http://${req.headers.host}`)
+        const result=await onRequest({env,request:new Request(url,{method:req.method,headers:req.headers})})
+        res.writeHead(result.status,Object.fromEntries(result.headers));res.end(Buffer.from(await result.arrayBuffer()))
+      }catch(error){next(error)}})
+    }}]})
+    try{
+      const browser=await chromium.launch(browserOptions())
+      try{
+        const base=`http://127.0.0.1:${web.httpServer.address().port}`,page=await browser.newPage()
+        await page.context().addCookies([{name:'glol_session',value:adminTokenCookie,url:base}])
+        page.on('dialog',dialog=>dialog.accept());await page.goto(base+'/admin/?view=security')
+        for(const [index,label] of ['删除截图','删除抓拍'].entries()){
+          const card=page.locator('.adm-cap-item').first()
+          if(index)await card.getByRole('button',{name:/^查看/}).click()
+          await (index?page.locator('.adm-capture-lightbox'):card).getByRole('button',{name:/^删除/}).click()
+          const confirm=page.locator('dialog[open]').last().getByRole('button',{name:'删除',exact:true})
+          const [response]=await Promise.all([page.waitForResponse(r=>r.request().method()==='DELETE'&&r.url().includes('/api/admin/mp/cheat-captures/')),confirm.click()])
+          assert.equal(response.status(),200)
+          const id=new URL(response.url()).pathname.split('/').pop()
+          assert.equal((await pool.query("select count(*)::int n from admin_audit where action='mp.cheat_capture.delete' and detail->>'captureId'=$1",[id])).rows[0].n,1)
+          await page.waitForFunction(count=>document.querySelectorAll('.adm-cap-item').length===count,1-index)
+          console.log(`${label}: HTTP DELETE 200, one persisted audit row`)
+        }
+      }finally{await browser.close()}
+    }finally{await web.close()}
+  }else{
+    const delRes = await callApi(`admin/mp/cheat-captures/${speedCapture.id}`, {method: 'DELETE', cookie: adminTokenCookie})
+    assert.equal(delRes.status, 200)
+  }
   assert.equal((await callApi(`admin/mp/cheat-captures/${speedCapture.id}/image`, {cookie: adminTokenCookie})).status, 404)
   const auditRow = (await pool.query("SELECT action, target_id FROM admin_audit WHERE action='mp.cheat_capture.delete'")).rows[0]
   assert.equal(auditRow.target_id, '100502')
