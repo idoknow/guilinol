@@ -2,6 +2,14 @@ import assert from 'node:assert/strict'
 import {createBanStore,checkMove} from './anti-cheat.mjs'
 import {ipGate,tooFast} from './protocol-guard.mjs'
 import {grantTravel} from './travel.mjs'
+import {acceptSample,acceptedSpeed} from './movement-sample.mjs'
+
+const moving={}
+for(let at=0;at<=500;at+=50)acceptSample(moving,at/100,0,at)
+assert.equal(acceptedSpeed(moving,500),10)
+assert.equal(acceptedSpeed(moving,1100),null)
+acceptSample(moving,1400,0,1150,true)
+assert.equal(acceptedSpeed(moving,1150),null)
 
 for(const kind of ['foreign_position','oversize','invalid_packet','packet_rate','mount_player']){
   const store=createBanStore({}),uid=900101, starts=Date.now()

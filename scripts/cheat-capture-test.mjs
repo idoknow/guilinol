@@ -188,22 +188,24 @@ test('realtime server emits signed cheat_capture on cheats and full API upload +
   const cheater = await connectPlayer(100502, '测试开挂者', -185, 3, 35)
   let x = -185
   for (let i = 0; i < 8; i++) {
-    x += 2.5
+    x += 0.1
     cheater.pos(x, 3, 35)
     await delay(55)
   }
+  cheater.pos(x+30,10,35)
   await delay(150)
   const speedIdx = cheater.messages.findIndex((m) => m.t === 'cheat_capture' && m.kind === 'speed')
   const setbackIdx = cheater.messages.findIndex((m) => m.t === 'setback' && m.kind === 'speed')
   assert.ok(speedIdx >= 0, 'speed cheat must emit cheat_capture: ' + rtLogs)
   assert.ok(setbackIdx > speedIdx, 'cheat_capture must arrive before setback so pre-setback state is preserved')
   const speedCapture = cheater.messages[speedIdx]
-  assert.ok(speedCapture.speed >= 20, `server-measured speed should be >= 20 m/s, got ${speedCapture.speed}`)
+  assert.equal(speedCapture.speedBasis,'accepted-horizontal')
+  assert.ok(speedCapture.speed>0 && speedCapture.speed<4,'rejected displacement must not inflate the walking average')
   assert.ok(Array.isArray(speedCapture.pos) && speedCapture.pos.length === 3)
   assert.ok(Array.isArray(speedCapture.attemptPos) && speedCapture.attemptPos.length === 3)
 
   // 3. Teleport cheat emits signed cheat_capture
-  cheater.pos(600, 3, 600)
+  cheater.pos(x,3,35);await delay(100);cheater.pos(600, 3, 600)
   await delay(150)
   const tpCapture = cheater.messages.find((m) => m.t === 'cheat_capture' && m.kind === 'teleport')
   assert.ok(tpCapture, 'illegal teleport must emit cheat_capture')
@@ -381,7 +383,15 @@ test('realtime server emits signed cheat_capture on cheats and full API upload +
   assert.equal(item.nickname, '测试开挂者')
   assert.equal(item.accountId, 'usr-cheat')
   assert.equal(item.stateLabel, '步行 · 地面')
-  assert.ok(item.speedMs >= 20)
+  assert.equal(item.meta.speedBasis,'accepted-horizontal')
+  assert.ok(Math.abs(item.speedMs-speedCapture.speed)<0.001)
+  const page=async(offset)=> (await (await callApi(`admin/mp/cheat-captures?uid=100502&limit=1&offset=${offset}`,{cookie:adminTokenCookie})).json()).captures
+  assert.notEqual((await page(0))[0].id,(await page(1))[0].id)
+  assert.deepEqual(await page(2),[])
+  await pool.query("insert into admin_audit(actor_id,action,target_type,target_id,detail) values ('adm-1','mp.unban','mp','100502','{}')")
+  const audit=await (await callApi('admin/audit?target_type=mp',{cookie:adminTokenCookie})).json()
+  const unban=audit.items.find(row=>row.action==='mp.unban' && row.target_id==='100502')
+  assert.equal(unban.mp_nickname,'测试开挂者');assert.equal(unban.mp_account_id,'usr-cheat')
   assert.equal(item.landmark, '解放桥')
   assert.equal(item.imageUrl, `/api/admin/mp/cheat-captures/${speedCapture.id}/image`)
 

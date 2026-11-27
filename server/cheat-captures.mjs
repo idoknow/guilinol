@@ -108,6 +108,7 @@ export function verifyCheatCaptureToken(token, secret, nowMs = Date.now()) {
       foot: claims.foot !== false,
       bike: clampText(claims.bike, 32),
       speed: finiteNum(claims.speed, 0, 5000) ?? 0,
+      speedBasis: ['accepted-horizontal','insufficient'].includes(claims.speedBasis)?claims.speedBasis:'legacy',
       flatSpeed: finiteNum(claims.flatSpeed, 0, 5000),
       vspeed: finiteNum(claims.vspeed, -5000, 5000),
       reportedSpeed: finiteNum(claims.reportedSpeed, 0, 5000),
@@ -231,6 +232,7 @@ export function createCheatCaptureService(pool, env, {bucket, resolvePlace} = {}
       foot: claims.foot,
       bike: claims.bike,
       flatSpeed: claims.flatSpeed,
+      speedBasis: claims.speedBasis,
       vspeed: claims.vspeed,
       reportedSpeed: claims.reportedSpeed,
       overflow: claims.overflow,
@@ -279,6 +281,8 @@ export function createCheatCaptureService(pool, env, {bucket, resolvePlace} = {}
     const kind = (params.get('kind') ?? '').trim()
     const rawLimit = Number(params.get('limit') ?? 40)
     const rawBefore = params.get('before')
+    const offset=Number(params.get('offset')??0)
+    if(!Number.isSafeInteger(offset)||offset<0)return json({error:'bad offset'},400)
     const limit = Number.isInteger(rawLimit) && rawLimit >= 1 && rawLimit <= 100 ? rawLimit : 40
     if (rawUid && (!/^\d+$/.test(rawUid) || !Number.isSafeInteger(Number(rawUid)))) {
       return json({error: 'bad uid filter'}, 400)
@@ -309,8 +313,8 @@ export function createCheatCaptureService(pool, env, {bucket, resolvePlace} = {}
            AND ($3::bigint IS NULL OR c.captured_at < $3)
            AND ($5::text IS NULL OR c.fp = $5)
          ORDER BY c.captured_at DESC, c.id DESC
-         LIMIT $4`,
-        [uid, kind || null, before, limit, fp],
+         LIMIT $4 OFFSET $6`,
+        [uid, kind || null, before, limit, fp, offset],
       ),
       pool.query(
         `SELECT count(*)::int AS total FROM mp_cheat_captures
