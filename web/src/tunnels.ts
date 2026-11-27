@@ -248,9 +248,10 @@ function queryUnderpassFloor(cutouts:GroundCutout[],ug:ShizijieUnderpass|undefin
 let wells:typeof import('./ground-stairwells')|undefined
 export const groundStairwellsReady=import('./ground-stairwells').then(kit=>{wells=kit},error=>console.error(error))
 
-/** Query pedestrian underpass floor elevation (Shizijie 4 stairwells + 15-way ring concourse + shizijie.json underground). Excludes motor-vehicle tunnels. */
 /** True on a landmark open-stairwell ramp (open to the sky, unlike the covered underpass). */
 export const openWellAt=(x:number,z:number,foot:number)=>wells?.floorAt(x,z,foot)!==undefined
+
+/** Query pedestrian underpass floor elevation (Shizijie 4 stairwells + 15-way ring concourse + shizijie.json underground). Excludes motor-vehicle tunnels. */
 
 export function underpassFloor(cutouts:GroundCutout[]|undefined,underpass:ShizijieUnderpass|undefined,x:number,z:number,foot:number){
   const well=wells?.floorAt(x,z,foot)

@@ -25,7 +25,7 @@ import {mpEnabled} from '../ui/mp-pref'
 import * as THREE from 'three'
 import {passengerTop} from './passenger-height'
 import {passengerArms} from '../helicopter/arms'
-import {tunnelFloor,underpassFloor} from '../tunnels'
+import {openWellAt,tunnelFloor,underpassFloor} from '../tunnels'
 import {getCarFreeAt} from '../game/car-free'
 import {CAR_SCALE} from '../drive/scale'
 import R from '@dimforge/rapier3d-compat'
@@ -1328,6 +1328,8 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
     return best
   }
   function visualFloorAt(x:number,z:number,baseY:number){
+    // Open-well treads are visual only; snapping onto each tread top bobs the figure and the first-person eye per riser.
+    if(openWellAt(x,z,baseY))return baseY
     let best=baseY
     const cellKey=`${Math.floor(x/4)},${Math.floor(z/4)}`
     for(const [entry,root] of stream.landmarks){
@@ -3297,7 +3299,11 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
     resumeAt(x:number,footY:number,z:number,heading:number,tilt=cfg.pitch){
       if(!active)return false
       sim.sync(x,z)
-      const at={x,y:footY+cfg.height/2,z}
+      // The caller's foot is the walk line; settle the capsule down onto it from just above, or on a ramp it starts
+      // embedded (~0.1 m) and pops out mid-stairs a few seconds later.
+      const lift=.3,at={x,y:footY+cfg.height/2+lift,z}
+      sim.body.setTranslation(at,true);sim.body.setNextKinematicTranslation(at);sim.world.step()
+      sim.controller.computeColliderMovement(sim.capsule,{x:0,y:-lift-.05,z:0});at.y+=sim.controller.computedMovement().y
       sim.body.setTranslation(at,true);sim.body.setNextKinematicTranslation(at);sim.world.step();safe.set(at.x,at.y,at.z);resetMotion()
       held=false;external=null;yaw=heading;pitch=tilt;facing=yaw+avatar.yaw;figure.rotation.y=facing
       firstPersonHidden=false;figure.visible=true;restoreFootLocomotion(avatar.clips.idle);follow(0,true)
