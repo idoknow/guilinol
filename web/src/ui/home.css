@@ -173,7 +173,8 @@ kbd{display:inline-block;min-width:1.5em;padding:1px 5px;margin:0 1px;border-rad
 /* --- 竖屏手机：上半屏留给封面场景（IDOK-386 实时夜景按书名上沿算安全区），书名压在目录正上方 ------------- */
 /* 整组落在拇指区，底部链接收进「更多」 */
 @media (max-width:760px){
-  .home-shade{background:linear-gradient(0deg,color-mix(in srgb,var(--ui-ink-950) 94%,transparent) 0,color-mix(in srgb,var(--ui-ink-950) 82%,transparent) 46%,color-mix(in srgb,var(--ui-ink-950) 18%,transparent) 70%,color-mix(in srgb,var(--ui-ink-950) 40%,transparent) 100%)}
+  /* 上半屏是封面场景，只在顶栏留一层薄压暗；书名起点（约 50%）往下逐渐压实托住文字 */
+  .home-shade{background:linear-gradient(0deg,color-mix(in srgb,var(--ui-ink-950) 94%,transparent) 0,color-mix(in srgb,var(--ui-ink-950) 84%,transparent) 40%,color-mix(in srgb,var(--ui-ink-950) 30%,transparent) 56%,color-mix(in srgb,var(--ui-ink-950) 6%,transparent) 74%,color-mix(in srgb,var(--ui-ink-950) 30%,transparent) 100%)}
   .home-top{padding-left:calc(20px + env(safe-area-inset-left));padding-right:calc(20px + env(safe-area-inset-right))}
   .home-main{justify-content:flex-start;min-height:calc(100dvh - 56px);width:100%;gap:var(--ui-s-5);
     padding:calc(84px + env(safe-area-inset-top)) calc(20px + env(safe-area-inset-right)) var(--ui-s-2) calc(20px + env(safe-area-inset-left))}
@@ -200,7 +201,8 @@ kbd{display:inline-block;min-width:1.5em;padding:1px 5px;margin:0 1px;border-rad
 }
 /* --- 横屏手机（844×390、873×403）：书名左、目录右，一屏放下 ---------------------------------------- */
 @media (max-height:520px) and (orientation:landscape){
-  .home-shade{background:linear-gradient(90deg,color-mix(in srgb,var(--ui-ink-950) 86%,transparent) 0,color-mix(in srgb,var(--ui-ink-950) 62%,transparent) 44%,color-mix(in srgb,var(--ui-ink-950) 80%,transparent) 100%)}
+  /* 左半是书名 + 场景人物，中间留亮；目录列（约 48% 起）压实 */
+  .home-shade{background:linear-gradient(90deg,color-mix(in srgb,var(--ui-ink-950) 80%,transparent) 0,color-mix(in srgb,var(--ui-ink-950) 36%,transparent) 28%,color-mix(in srgb,var(--ui-ink-950) 36%,transparent) 42%,color-mix(in srgb,var(--ui-ink-950) 82%,transparent) 54%,color-mix(in srgb,var(--ui-ink-950) 86%,transparent) 100%)}
   .home-top{padding-top:calc(10px + env(safe-area-inset-top))}
   .home-douyin{top:calc(10px + env(safe-area-inset-top))}
   .home-main{width:100%;min-height:calc(100dvh - 26px);display:grid;grid-template-columns:minmax(0,1fr) minmax(340px,1.3fr);grid-template-areas:"title modes" "title links";
