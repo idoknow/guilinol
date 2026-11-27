@@ -9,6 +9,7 @@ const center=[-1062,342]
 const views=[['plan',0,0,0,0],['south',-25,34,18,-26],['north',25,-36,-18,26],
   ['west-walk',-15,-10,-41,-25],['east-walk',16,11,50,24],['ronghu',-63,-12,0,0],
   ['shanhu',56,23,0,0],['water-west',-30,-16,28,16],['water-east',31,20,-28,-16]]
+if(process.argv.includes('--south-only'))views.splice(0,views.length,views[1])
 if(process.argv.includes('--water-survey')){
   views.length=0
   for(const [index,[x,z]] of [[-1170,288],[-1120,315],[-1102,314],[-1092,326],[-1040,371],[-1015,384],[-987,409],[-977,430]].entries()){

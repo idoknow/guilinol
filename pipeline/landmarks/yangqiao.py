@@ -64,7 +64,8 @@ def pedestrian_wings(builder, anchor):
             builder.cylinder_y(x, level + 3.45, .55, z, .24, 'white_lit')
 
     for along, end in zip(profile['stations'], profile['stations'][1:]):
-        along = max(along, profile['stations'][0]+.002)
+        if end <= 0:
+            continue
         end = min(end, profile['stations'][-1]-.002)
         for across in (.377, .44, .565, .628):
             quad([station(along, across-.0016, .027), station(along, across+.0016, .027),
