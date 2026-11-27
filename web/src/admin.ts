@@ -1853,18 +1853,38 @@ const pages: Record<string, (view: View) => void> = {
     /* ── 自动抓拍：服务端判定外挂时玩家端自动截图，附当时状态、速度、位置 ── */
     type Capture = { id: string; uid: number; nickname: string; accountId: string | null; fp: string; kind: string; capturedAt: number
       stateLabel: string; serverState: string; speedMs: number; clientSpeedMs: number | null; pos: number[] | null; attemptPos: number[] | null
-      landmark: string; landmarkDist: number | null; imageBytes: number; width: number | null; height: number | null; imageUrl: string }
+      landmark: string; landmarkDist: number | null; imageBytes: number; width: number | null; height: number | null; imageUrl: string
+      meta?: { speedBasis?: string } | null }
     let captures: Capture[] = [], recentCaptures: Capture[] = [], captureTotal = 0, captureError: unknown = null, captureMissing = false
     let captureSeq = 0, captureTimer = 0
+    // 列表分页：每页 12 条；换筛选回第一页
+    const CAP_PAGE = 12
+    let capPage = 0, capFilterKey = '', listTotal = 0
     const kindPill = (kind: string) => h('span', { class: `adm-pill ${attack.has(kind) ? 'is-bad' : 'adm-ban-auto'}` }, kindLabel[kind] ?? kind)
     const playerName = (item: Capture) => `${item.nickname || '未命名'} · UID ${item.uid}`
-    const speedText = (item: Capture) => {
-      const speed = Number(item.speedMs) || 0, client = item.clientSpeedMs == null ? null : Number(item.clientSpeedMs)
-      return `${speed.toFixed(1)} m/s${client != null && Math.abs(client - speed) >= 1.5 ? `（客户端 ${client.toFixed(1)}）` : ''}`
+    // 速度口径：accepted-horizontal = 服务端已接受轨迹的水平均速；insufficient = 采样不足；其余是旧版单包估算（可能偏高）
+    const speedBasis = (item: Capture) => {
+      const basis = item.meta?.speedBasis
+      return basis === 'accepted-horizontal' || basis === 'insufficient' ? basis : 'legacy'
     }
+    const basisNote: Record<string, string> = { 'accepted-horizontal': '已接受轨迹的水平均速', insufficient: '服务端采样不足，无法估速', legacy: '旧版单包估算，可能偏高' }
+    const speedText = (item: Capture) => {
+      const basis = speedBasis(item), client = item.clientSpeedMs == null ? null : Number(item.clientSpeedMs)
+      if (basis === 'insufficient') return `速度不可用${client != null ? `（客户端 ${client.toFixed(1)}）` : ''}`
+      const speed = Number(item.speedMs) || 0
+      return `${speed.toFixed(1)} m/s${basis === 'legacy' ? ' 旧估算' : ''}${client != null && Math.abs(client - speed) >= 1.5 ? `（客户端 ${client.toFixed(1)}）` : ''}`
+    }
+    const speedCell = (item: Capture) => {
+      const basis = speedBasis(item)
+      if (basis === 'insufficient') return h('span', { class: 'adm-cap-speed is-na', title: basisNote.insufficient }, '速度不可用')
+      return h('span', { class: 'adm-cap-speed', title: basisNote[basis] }, `${(Number(item.speedMs) || 0).toFixed(1)} m/s`,
+        basis === 'legacy' ? h('em', { class: 'adm-cap-basis' }, '旧估算') : null)
+    }
+    // 升空 / 钻地只记录不处罚，不给「填表封禁」
+    const canPrefill = (item: Capture) => !['altitude_unverified', 'ground_unverified'].includes(item.kind)
     const placeText = (item: Capture) => {
       const at = (p: number[] | null) => Array.isArray(p) ? `(${p.map((n) => Math.round(Number(n))).join(', ')})` : ''
-      return [item.landmark && `${item.landmark}${item.landmarkDist != null ? ` 约 ${item.landmarkDist}m` : ''}`, at(item.pos), item.attemptPos && `→ 落点 ${at(item.attemptPos)}`].filter(Boolean).join(' ') || dash
+      return [item.landmark && `${item.landmark}${item.landmarkDist != null ? ` 约 ${item.landmarkDist}m` : ''}`, at(item.pos), item.attemptPos && `→ 上报位置 ${at(item.attemptPos)}`].filter(Boolean).join(' ') || dash
     }
     // 抓拍转人工封禁：展开人工封禁表单并填好，管理员核对后再提交
     const fillBan = (uid: string, fp: string, reason = '') => {
@@ -1878,6 +1898,15 @@ const pages: Record<string, (view: View) => void> = {
       manualMin.value = '1440'
       fillBan(String(item.uid), item.fp || '', `${kindLabel[item.kind] ?? item.kind}（抓拍 ${item.id.slice(0, 8)}）`)
     }
+    const deleteCapture = async (item: Capture, button: HTMLButtonElement, dialog?: HTMLDialogElement) => {
+      if (await confirmDialog({ title: '删除抓拍', body: h('p', null, `${playerName(item)} 的这张抓拍会永久删除。`), confirm: '删除', tone: 'seal' }) === null) return
+      void act(button, async () => {
+        await api(`admin/mp/cheat-captures/${encodeURIComponent(item.id)}`, undefined, 'DELETE')
+        toast('已删除抓拍')
+        dialog?.close()
+        await loadCaptures()
+      })
+    }
     const openCapture = (item: Capture) => {
       document.querySelectorAll('dialog.adm-capture-lightbox').forEach((node) => node.remove())
       const closeBtn = h('button', { type: 'button', class: 'adm-btn adm-btn--sm adm-btn--ghost' }, '关闭') as HTMLButtonElement
@@ -1886,7 +1915,7 @@ const pages: Record<string, (view: View) => void> = {
       const who = item.accountId ? navLink(playerName(item), { view: 'users', id: item.accountId }, { class: 'adm-link' }) : h('b', null, playerName(item))
       const facts: [string, string][] = [
         ['状态', `${item.stateLabel || item.serverState || dash}${item.serverState && item.stateLabel && item.serverState !== item.stateLabel ? `（服务端 ${item.serverState}）` : ''}`],
-        ['速度', `${speedText(item)} · ${((Number(item.speedMs) || 0) * 3.6).toFixed(0)} km/h`],
+        ['速度', speedBasis(item) === 'insufficient' ? speedText(item) : `${speedText(item)} · ${((Number(item.speedMs) || 0) * 3.6).toFixed(0)} km/h · ${basisNote[speedBasis(item)]}`],
         ['位置', placeText(item)],
         ['图像', `${item.width ?? '?'}×${item.height ?? '?'} · ${fmt.bytes(Number(item.imageBytes) || 0)} · 记录 ${item.id.slice(0, 8)}`],
       ]
@@ -1895,21 +1924,13 @@ const pages: Record<string, (view: View) => void> = {
         h('header', { class: 'adm-capture-lb-head' },
           h('div', { class: 'adm-capture-lb-who' }, who, kindPill(item.kind), h('time', { class: 'adm-sub' }, when(new Date(item.capturedAt)))),
           h('div', { class: 'adm-capture-lb-actions' },
-            h('a', { href: item.imageUrl, target: '_blank', rel: 'noopener noreferrer', class: 'adm-link' }, '原图'), banBtn, deleteBtn, closeBtn)),
+            h('a', { href: item.imageUrl, target: '_blank', rel: 'noopener noreferrer', class: 'adm-link' }, '原图'), canPrefill(item) ? banBtn : null, deleteBtn, closeBtn)),
         h('div', { class: 'adm-capture-lb-body' },
           h('img', { src: item.imageUrl, alt: `${playerName(item)} ${kindLabel[item.kind] ?? item.kind} 抓拍`, class: 'adm-capture-lb-img' }),
           h('dl', { class: 'adm-facts adm-capture-lb-facts' }, ...facts.flatMap(([k, v]) => [h('dt', null, k), h('dd', null, v)])))) as HTMLDialogElement
       closeBtn.onclick = () => dialog.close()
       banBtn.onclick = () => { dialog.close(); prefillBan(item) }
-      deleteBtn.onclick = async () => {
-        if (await confirmDialog({ title: '删除抓拍', body: h('p', null, `${playerName(item)} 的这张抓拍会永久删除。`), confirm: '删除', tone: 'seal' }) === null) return
-        void act(deleteBtn, async () => {
-          await api(`admin/mp/cheat-captures/${encodeURIComponent(item.id)}`, undefined, 'DELETE')
-          toast('已删除抓拍')
-          dialog.close()
-          await loadCaptures()
-        })
-      }
+      deleteBtn.onclick = () => void deleteCapture(item, deleteBtn, dialog)
       dialog.addEventListener('click', (event) => { if (event.target === dialog) dialog.close() })
       dialog.addEventListener('close', () => dialog.remove())
       document.body.append(dialog)
@@ -1931,14 +1952,18 @@ const pages: Record<string, (view: View) => void> = {
         }, h('img', { src: shot.imageUrl, loading: 'lazy', alt: '' }))))
       }
     }
-    const captureRow = (item: Capture) => h('li', null, h('button', {
-      type: 'button', class: 'adm-cap-row', onclick: () => openCapture(item), 'aria-label': `查看 ${playerName(item)} 的抓拍`,
-    },
-      h('img', { src: item.imageUrl, loading: 'lazy', alt: '' }),
-      h('span', { class: 'adm-cap-line' },
-        h('b', null, `UID ${item.uid}`), h('span', { class: 'adm-cap-nick' }, item.nickname || ''),
-        h('time', { class: 'adm-cap-ago', title: when(new Date(item.capturedAt)) }, ago(new Date(item.capturedAt)))),
-      h('span', { class: 'adm-cap-line' }, kindPill(item.kind), h('span', { class: 'adm-cap-speed' }, speedText(item)), h('span', { class: 'adm-cap-place' }, item.landmark || ''))))
+    const captureRow = (item: Capture) => {
+      const del = h('button', { type: 'button', class: 'adm-cap-del', 'aria-label': `删除 ${playerName(item)} 的抓拍` }, '删除') as HTMLButtonElement
+      del.onclick = () => void deleteCapture(item, del)
+      return h('li', { class: 'adm-cap-item', 'data-capture-id': item.id }, h('button', {
+        type: 'button', class: 'adm-cap-row', onclick: () => openCapture(item), 'aria-label': `查看 ${playerName(item)} 的抓拍`,
+      },
+        h('img', { src: item.imageUrl, loading: 'lazy', alt: '' }),
+        h('span', { class: 'adm-cap-line' },
+          h('b', null, `UID ${item.uid}`), h('span', { class: 'adm-cap-nick' }, item.nickname || ''),
+          h('time', { class: 'adm-cap-ago', title: when(new Date(item.capturedAt)) }, ago(new Date(item.capturedAt)))),
+        h('span', { class: 'adm-cap-line' }, kindPill(item.kind), speedCell(item), h('span', { class: 'adm-cap-place' }, item.landmark || ''))), del)
+    }
     const captureCount = h('em', { class: 'adm-sec-count' })
     const captureSlot = h('div', null, skeleton(3))
     const captureKind = h('select', { name: 'capkind', class: 'adm-select', 'aria-label': '按类型筛选抓拍' },
@@ -1951,11 +1976,24 @@ const pages: Record<string, (view: View) => void> = {
     for (const input of [captureUid, captureFp]) input.addEventListener('input', () => { clearTimeout(captureTimer); captureTimer = window.setTimeout(() => void loadCaptures(), 350) })
     const paintCaptures = () => {
       captureWrap.hidden = captureMissing
-      captureCount.textContent = captureError ? '' : captureTotal ? fmt.int(captureTotal) : '暂无'
-      captureCount.classList.toggle('is-zero', !captureTotal)
+      // 角标随筛选变；整卡收起只看全站有没有抓拍，免得筛空后连筛选框一起藏掉
+      captureCount.textContent = captureError ? '' : listTotal ? fmt.int(listTotal) : '暂无'
+      captureCount.classList.toggle('is-zero', !listTotal)
       captureWrap.classList.toggle('is-clear', !captureError && !captureTotal)
       if (captureError) return captureSlot.replaceChildren(errorState(captureError, () => void loadCaptures()))
+      const pages = Math.max(1, Math.ceil(listTotal / CAP_PAGE))
+      const focused = (document.activeElement as HTMLElement | null)?.dataset?.capPage
+      const turn = (delta: number) => { capPage = Math.max(0, Math.min(pages - 1, capPage + delta)); void loadCaptures() }
+      const pageBtn = (dir: 'prev' | 'next', text: string, off: boolean) =>
+        h('button', { type: 'button', class: 'adm-btn adm-btn--sm adm-btn--ghost', 'data-cap-page': dir, disabled: off, onclick: () => turn(dir === 'prev' ? -1 : 1) }, text)
       captureSlot.replaceChildren(captures.length ? h('ul', { class: 'adm-cap-list' }, ...captures.map(captureRow)) : emptyState('没有匹配的抓拍'))
+      if (pages > 1) captureSlot.append(h('nav', { class: 'adm-cap-pager', 'aria-label': '抓拍分页' },
+        pageBtn('prev', '上一页', capPage === 0),
+        h('span', { class: 'adm-cap-page', 'aria-live': 'polite', 'aria-label': `第 ${capPage + 1} 页，共 ${pages} 页` }, `${capPage + 1} / ${pages}`),
+        pageBtn('next', '下一页', capPage + 1 >= pages)))
+      // 翻页后焦点留在分页按钮上；到头那侧禁用时落到另一侧
+      if (focused) (captureSlot.querySelector<HTMLButtonElement>(`[data-cap-page="${focused}"]:not(:disabled)`)
+        ?? captureSlot.querySelector<HTMLButtonElement>('[data-cap-page]:not(:disabled)'))?.focus()
     }
 
     /* ── 生效中的封禁：每条一行，细节放进悬停提示 ── */
@@ -2154,10 +2192,10 @@ const pages: Record<string, (view: View) => void> = {
       } catch (error) { bansError = error }
       paintReviews(); paintBans()
     }
-    const loadCaptures = async () => {
+    const loadCaptures = async (): Promise<void> => {
       const seq = ++captureSeq
-      const query = (filter: Record<string, string>) =>
-        api<{ captures?: Capture[]; total?: number }>(`admin/mp/cheat-captures?${new URLSearchParams({ limit: '24', ...filter })}`, undefined, 'GET')
+      const query = (params: Record<string, string>) =>
+        api<{ captures?: Capture[]; total?: number }>(`admin/mp/cheat-captures?${new URLSearchParams(params)}`, undefined, 'GET')
       const filter: Record<string, string> = {}
       if (captureKind.value) filter.kind = captureKind.value
       const uidText = captureUid.value.trim(), fpText = captureFp.value.trim().toLowerCase()
@@ -2166,13 +2204,20 @@ const pages: Record<string, (view: View) => void> = {
       captureFp.setAttribute('aria-invalid', String(!!fpText && !/^[a-f\d]{16,64}$/.test(fpText)))
       if (/^\d+$/.test(uidText)) filter.uid = uidText
       if (/^[a-f\d]{16,64}$/.test(fpText)) filter.fp = fpText
+      const key = new URLSearchParams(filter).toString()
+      if (key !== capFilterKey) { capFilterKey = key; capPage = 0 }
       try {
-        // 不带筛选的最新一批供复核卡配图；有筛选时另取一份给列表
-        const [recent, list] = await Promise.all([query({}), Object.keys(filter).length ? query(filter) : null])
+        // 不带筛选的最新 24 张供复核卡配图；有筛选或翻页时另取一页给列表
+        const [recent, list] = await Promise.all([query({ limit: '24' }),
+          key || capPage ? query({ ...filter, limit: String(CAP_PAGE), offset: String(capPage * CAP_PAGE) }) : null])
         if (seq !== captureSeq) return
         recentCaptures = Array.isArray(recent?.captures) ? recent.captures : []
         captureTotal = Number(recent?.total ?? recentCaptures.length)
-        captures = list ? (Array.isArray(list.captures) ? list.captures : []) : recentCaptures
+        captures = list ? (Array.isArray(list.captures) ? list.captures : []) : recentCaptures.slice(0, CAP_PAGE)
+        listTotal = list ? Number(list.total ?? captures.length) : captureTotal
+        // 删光最后一页或总数变少时退回末页重取
+        const last = Math.max(0, Math.ceil(listTotal / CAP_PAGE) - 1)
+        if (capPage > last) { capPage = last; return loadCaptures() }
         captureError = null
       } catch (error) {
         if (seq !== captureSeq) return
@@ -2577,6 +2622,7 @@ const pages: Record<string, (view: View) => void> = {
       const target = item.target_type === 'feedback'
         ? navLink('查看反馈', { view: 'feedback', id: item.target_id }, { class: 'adm-link' })
         : item.target_type === 'user' ? who(item.target_id, { nickname: item.target_nickname, email: item.target_email, placeholder: item.target_placeholder }, true)
+        : item.mp_account_id ? navLink(`${item.mp_nickname || '未设置昵称'} · UID ${item.target_id}`,{view:'users',id:item.mp_account_id},{class:'adm-link'})
         : item.target_type === 'chat' ? h('code', null, ['chat.mute', 'chat.unmute'].includes(item.action) ? `UID ${item.target_id}` : `#${item.target_id}`)
         : h('code', null, String(item.target_id ?? dash))
       return h('tr', null,

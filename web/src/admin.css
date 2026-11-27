@@ -908,6 +908,15 @@ a.adm-kpi:hover{border-color:var(--ui-jade-500);box-shadow:var(--ui-shadow-1);tr
 .adm-cap-ago{margin-left:auto;flex:none;font:12px var(--num);color:var(--ui-ink-soft)}
 .adm-cap-speed{flex:none;font:12.5px var(--num);color:var(--ui-ink)}
 .adm-cap-line .adm-pill{flex:none;max-width:9em;overflow:hidden;text-overflow:ellipsis}
+.adm-cap-item{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:4px}
+.adm-cap-del{flex:none;padding:4px 8px;border:0;border-radius:var(--ui-r-sm);background:none;font:12.5px var(--sans);color:var(--ui-ink-soft);cursor:pointer}
+.adm-cap-del:hover{background:var(--ui-seal-wash);color:var(--ui-seal)}
+.adm-cap-del:focus-visible{outline:2px solid var(--ui-jade-500);outline-offset:-2px}
+.adm-cap-del:disabled{opacity:.5;cursor:default}
+.adm-cap-speed.is-na{color:var(--ui-ink-soft)}
+.adm-cap-basis{margin-left:6px;padding:0 5px;border:1px solid var(--ui-paper-line-strong);border-radius:var(--ui-r-xs);color:var(--ui-ink-soft);font:500 11px/1.5 var(--sans);font-style:normal}
+.adm-cap-pager{display:flex;align-items:center;justify-content:center;gap:12px;margin-top:8px}
+.adm-cap-page{min-width:5ch;text-align:center;font:12.5px var(--num);color:var(--ui-ink-soft);font-variant-numeric:tabular-nums}
 /* 复核卡里的抓拍缩略图 */
 .adm-review-shots{display:flex;gap:6px}
 .adm-review-shot{flex:none;width:72px;height:40px;padding:0;overflow:hidden;border:1px solid var(--ui-paper-line);border-radius:4px;background:#0e1319;cursor:zoom-in}

@@ -15,6 +15,7 @@ export interface CheatCapturePacket {
   foot?: boolean
   bike?: string
   speed?: number
+  speedBasis?: string
   flatSpeed?: number | null
   vspeed?: number | null
   reportedSpeed?: number | null
@@ -131,10 +132,9 @@ export function buildOverlayCopy(packet: CheatCapturePacket, ctx: CaptureClientC
 
   const serverSpeed = typeof packet.speed === 'number' && Number.isFinite(packet.speed) ? packet.speed : null
   const clientSpeed = Number.isFinite(ctx.speedMs) ? Math.max(0, ctx.speedMs) : 0
-  const displaySpeed = serverSpeed !== null && serverSpeed > clientSpeed ? serverSpeed : clientSpeed
-  const speedPrimary = `${displaySpeed.toFixed(1)} m/s (${(displaySpeed * 3.6).toFixed(1)} km/h)`
+  const speedPrimary = serverSpeed === null ? '采样不足' : `${serverSpeed.toFixed(1)} m/s (${(serverSpeed * 3.6).toFixed(1)} km/h)`
   const speedDetails: string[] = []
-  if (serverSpeed !== null) speedDetails.push(`服务端实测 ${serverSpeed.toFixed(1)} m/s`)
+  if (serverSpeed !== null) speedDetails.push(packet.speedBasis==='accepted-horizontal'?'已接受轨迹 · 水平均速':'旧版单包估算')
   speedDetails.push(`客户端 ${clientSpeed.toFixed(1)} m/s`)
   const vspeed = typeof packet.vspeed === 'number' && Number.isFinite(packet.vspeed)
     ? packet.vspeed
@@ -286,7 +286,7 @@ export function renderEvidenceCanvas(
 
   const blocks: Array<{label: string; value: string; sub: string; accent: string}> = [
     {label: '当前状态', value: copy.statePrimary, sub: copy.stateSub, accent: '#38bdf8'},
-    {label: '当前速度', value: copy.speedPrimary, sub: copy.speedSub, accent: '#fbbf24'},
+    {label: '服务端估速', value: copy.speedPrimary, sub: copy.speedSub, accent: '#fbbf24'},
     {label: '当前位置', value: copy.posPrimary, sub: copy.posSub, accent: '#34d399'},
   ]
 

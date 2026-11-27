@@ -122,6 +122,7 @@ let nextId = 1
 
 const now = () => Date.now()
 import {grantTravel} from './travel.mjs'
+import {acceptSample,acceptedSpeed} from './movement-sample.mjs'
 import {ipGate,tooFast} from './protocol-guard.mjs'
 const rosterCoordinate = value => Math.round(value/128)*128
 function rosterPoint(player,at=now()) {
@@ -335,7 +336,8 @@ function emitCheatCapture(player, kind, detail = {}, { force = false } = {}) {
   const attemptPos = Array.isArray(detail.to) && detail.to.length >= 3 && detail.to.every(Number.isFinite)
     ? [+Number(detail.to[0]).toFixed(2), +Number(detail.to[1]).toFixed(2), +Number(detail.to[2]).toFixed(2)]
     : null
-  const speed = Number.isFinite(detail.speed) ? +Number(detail.speed).toFixed(2) : +(Number(player.v) || 0).toFixed(2)
+  const speed = acceptedSpeed(player,at)
+  const speedBasis = speed===null ? 'insufficient' : 'accepted-horizontal'
   const flatSpeed = Number.isFinite(detail.flatSpeed) ? +Number(detail.flatSpeed).toFixed(2) : null
   const vspeed = Number.isFinite(detail.vspeed) ? +Number(detail.vspeed).toFixed(2) : null
   const reportedSpeed = Number.isFinite(detail.reportedSpeed) ? +Number(detail.reportedSpeed).toFixed(2) : +(Number(player.v) || 0).toFixed(2)
@@ -354,7 +356,7 @@ function emitCheatCapture(player, kind, detail = {}, { force = false } = {}) {
     activityDetail: player.activityDetail || '',
     foot: player.foot !== false,
     bike: player.bike || '',
-    speed,
+    speed,speedBasis,
     flatSpeed,
     vspeed,
     reportedSpeed,
@@ -370,7 +372,7 @@ function emitCheatCapture(player, kind, detail = {}, { force = false } = {}) {
     id, uid: claims.uid, name: claims.name, kind, at,
     state, activity: claims.activity, activityDetail: claims.activityDetail,
     foot: claims.foot, bike: claims.bike,
-    speed, flatSpeed, vspeed, reportedSpeed, overflow, pos, attemptPos,
+    speed,speedBasis, flatSpeed, vspeed, reportedSpeed, overflow, pos, attemptPos,
   })
   return true
 }
@@ -1186,12 +1188,18 @@ wss.on('connection', (ws, req) => {
         me.bike = clampStr(msg.bike, 32)
         const verdict = checkMove(me, nx, ny, nz, at)
         if (verdict.reject) {
-          recordMove(verdict.kind,{to:[nx,ny,nz],overflow:verdict.overflow,speed:speed3d,flatSpeed,vspeed,reportedSpeed})
+          if(!me.awaitingCorrection){
+            me.awaitingCorrection=true
+            const jitter=verdict.kind==='speed' && stepDt<0.25 && verdict.overflow<=2
+            if(!jitter)recordMove(verdict.kind,{to:[nx,ny,nz],overflow:verdict.overflow,flatSpeed,vspeed,reportedSpeed})
+          }
           send(ws, {t: 'setback', x: me.x, y: me.y, z: me.z, kind: verdict.kind})
           return
         }
         // 过去 1 秒跑过步（超过走路上限）→ 短暂禁止出拳/扶人（防"切车瞬移贴脸出拳"）
         if (stepLen / stepDt > LIMITS.walk) me.fastAt = at
+        me.awaitingCorrection=false
+        acceptSample(me,nx,nz,at,verdict.teleport)
         if (verdict.observation) recordMove(verdict.observation,{to:[nx,ny,nz],speed:speed3d,flatSpeed,vspeed,reportedSpeed})
         me.posAt = at
         me.x = nx
