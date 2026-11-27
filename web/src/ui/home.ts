@@ -36,7 +36,7 @@ export function home(play:(mode:PlayMode)=>void):Home {
     <div class="home-modes" role="list" aria-label="选择模式">
       <div class="home-row home-row--mp" role="listitem">
         <button type="button" class="home-mode home-mode--mp" data-umami-event="home-mp">
-          <span class="home-mode-seal ui-seal" aria-hidden="true">联</span>
+          <span class="home-mode-seal ui-seal" aria-hidden="true"></span>
           <span class="home-mode-text"><b>联机模式<i class="home-mp-live ui-num" hidden></i></b><span>同城玩家一起逛街接单</span>
             <small class="home-wallet ui-num"></small></span>
           <span class="home-go home-go--mp">进入联机</span>
@@ -44,7 +44,7 @@ export function home(play:(mode:PlayMode)=>void):Home {
       </div>
       <div class="home-row home-row--tour" role="listitem">
         <button type="button" class="home-mode home-mode--tour" data-umami-event="home-tour">
-          <span class="home-mode-seal ui-seal ui-seal--ink" aria-hidden="true">游</span>
+          <span class="home-mode-seal ui-seal ui-seal--ink" aria-hidden="true"></span>
           <span class="home-mode-text"><b>游览模式</b><span>飞遍 ${spots.length} 处名胜集印章</span>
             <small class="home-progress ui-num"></small></span>
           <span class="home-go home-go--tour">开始游览</span>
@@ -57,18 +57,19 @@ export function home(play:(mode:PlayMode)=>void):Home {
       </div>
       <div class="home-row home-row--solo" role="listitem">
         <button type="button" class="home-mode home-mode--solo" data-umami-event="home-solo">
-          <span class="home-mode-seal ui-seal ui-seal--ink" aria-hidden="true">街</span>
+          <span class="home-mode-seal ui-seal ui-seal--ink" aria-hidden="true"></span>
           <span class="home-mode-text"><b>单人模式</b><span>离线逛街，进度照存</span></span>
           <span class="home-go home-go--solo">进入</span>
         </button>
       </div>
     </div>
-    <nav class="home-links" aria-label="更多">
+    <nav class="home-links" id="home-links" aria-label="更多">
       <button type="button" class="ui-btn ui-btn--ghost" data-act="guide" data-umami-event="home-guide">玩法说明</button>
       <button type="button" class="ui-btn ui-btn--ghost" data-act="about" data-umami-event="home-about">关于游戏</button>
       <button type="button" class="ui-btn ui-btn--ghost" data-act="qq" data-umami-event="home-qq">QQ 群</button>
       <a class="ui-btn ui-btn--ghost" href="${SOURCE_URL}" target="_blank" rel="noopener" data-umami-event="home-source-link">源代码<span aria-hidden="true"> ↗</span></a>
     </nav>
+    <button type="button" class="ui-btn ui-btn--ghost home-more" aria-expanded="false" aria-controls="home-links">更多</button>
   </div>
   <button type="button" class="home-douyin" data-umami-event="home-douyin" aria-label="抖音官方号 ${DOUYIN_NAME}，点开看二维码">
     <img class="home-douyin-code" src="./icons/douyin-code.webp" width="560" height="560" decoding="async" loading="lazy" alt="">
@@ -111,6 +112,11 @@ export function home(play:(mode:PlayMode)=>void):Home {
   about.onclick = ()=>pending(about,()=>import('./about').then(m=>m.openAbout()))
   root.querySelector<HTMLButtonElement>('[data-act=qq]')!.onclick = ()=>qqGroup()
   root.querySelector<HTMLButtonElement>('.home-douyin')!.onclick = ()=>douyin()
+  // 手机收起（IDOK-468）：竖屏 / 横屏手机默认只留模式名和动作，次要说明、底部链接、署名点「更多」才出现。
+  // 状态只有一份：按钮的 aria-expanded，CSS 用 :has() 读它；桌面上按钮不显示、内容始终展开。
+  const more = root.querySelector<HTMLButtonElement>('.home-more')!
+  more.onclick = ()=>{const open = more.getAttribute('aria-expanded')!=='true'
+    more.setAttribute('aria-expanded',String(open)); more.textContent = open?'收起':'更多'}
   // IDOK-192 联机模式：街头玩法 + 同城联机。单人/游览会把联机关掉，walk 那边当场连上或断开。
   const mp = root.querySelector<HTMLButtonElement>('.home-mode--mp')!, mpGo = root.querySelector('.home-go--mp')!
   const mpLive = root.querySelector<HTMLElement>('.home-mp-live')!

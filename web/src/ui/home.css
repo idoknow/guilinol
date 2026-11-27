@@ -30,7 +30,7 @@ body[data-home] :is(.hud-me,.dock,.sky-ui,.hint,footer,.walk-ui,.vehicle-action,
   width:min(560px,100%);padding:calc(48px + env(safe-area-inset-top)) calc(24px + env(safe-area-inset-right)) var(--ui-s-4) calc(clamp(24px,7vw,112px) + env(safe-area-inset-left))}
 
 /* 书名：大字是主视觉（--ui-fs-3xl）；像素 Logo 收成书名上方一枚小宣纸签，像刻本封面角上的签条，只做配角 */
-.home-title{display:grid;justify-items:start;gap:14px;margin-bottom:var(--ui-s-4)}
+.home-title{display:grid;justify-items:start;gap:14px}
 .home-seal{display:block;box-sizing:border-box;width:clamp(112px,15vh,144px);padding:6px 8px 5px;background:var(--ui-paper);border-radius:var(--ui-r-xs);
   outline:1px solid var(--ui-paper-line);outline-offset:-3px}
 .home-seal img{display:block;width:100%;height:auto;mix-blend-mode:multiply}
@@ -39,6 +39,13 @@ body[data-home] :is(.hud-me,.dock,.sky-ui,.hint,footer,.walk-ui,.vehicle-action,
 
 /* 目录：三行，发丝线分隔。行、发丝线、悬停底色、焦点框四者同宽，左右对齐；内容在行内缩进 12px */
 .home-modes{display:grid;margin:0}
+/* 目录上沿 = 一笔桂林山水线（home-skyline.svg：左起象鼻山、背上普贤塔、鼻下水月洞，漓江水面，一簇峰林，最高是独秀峰）。
+   山靠右，左边是一条平水线；底边 y=39.5 就是第一行的上发丝线，所以第一行不再画自己的上线。书名在山上，目录在水里。
+   SVG 只当遮罩，颜色由这里的 --ui-line-hover 决定 */
+.home-modes::before{content:"";display:block;height:40px;background:var(--ui-line-hover);pointer-events:none;
+  -webkit-mask:url("./home-skyline.svg") right bottom/auto 100% no-repeat,linear-gradient(#000 0 0) left bottom/100% 1px no-repeat;
+  mask:url("./home-skyline.svg") right bottom/auto 100% no-repeat,linear-gradient(#000 0 0) left bottom/100% 1px no-repeat}
+.home-row:first-child::before{content:none}
 .home-row{position:relative}
 .home-row::before,.home-row:last-child::after{content:"";position:absolute;left:0;right:0;height:1px;background:var(--ui-line-strong);pointer-events:none}
 .home-row::before{top:0}.home-row:last-child::after{bottom:0}
@@ -47,7 +54,17 @@ body[data-home] :is(.hud-me,.dock,.sky-ui,.hint,footer,.walk-ui,.vehicle-action,
   transition:background var(--ui-fast)}
 .home-mode:hover{background:var(--ui-fill)}
 .home-mode:focus-visible{outline:2px solid var(--ui-focus);outline-offset:-2px;border-radius:var(--ui-r-ctl)}
-.home-mode-seal{font-size:21px}
+/* 三枚肖形印：不再刻「联 / 游 / 街」（模式名就在右边），各刻一处桂林——
+   联机 = 日月双塔（两塔并立杉湖，月牙挂在月塔上）；游览 = 象鼻山（鼻插漓江、水月洞、背上普贤塔，洞影合成一轮圆）；
+   单人 = 漓江竹筏（一人斗笠蓑衣撑篙，身后两座峰）。
+   画面是 home-seal-*.svg 遮罩，颜色取 currentColor：朱印上是纸色，墨印上是 --ui-text-2，悬停上朱，续游当前行变朱印，规则都不用改。
+   外框仍是石刻残边遮罩（home-seal.svg：四角磨圆、三处崩口），三枚各歪一点，不是同一个模子压出来的 */
+.home-mode-seal{position:relative;font-size:23px;-webkit-mask:url("./home-seal.svg") center/100% 100% no-repeat;mask:url("./home-seal.svg") center/100% 100% no-repeat}
+.home-mode-seal::before{content:"";position:absolute;inset:0;background:currentColor}
+.home-mode--mp .home-mode-seal::before{-webkit-mask:url("./home-seal-mp.svg") center/100% 100% no-repeat;mask:url("./home-seal-mp.svg") center/100% 100% no-repeat}
+.home-mode--tour .home-mode-seal::before{-webkit-mask:url("./home-seal-tour.svg") center/100% 100% no-repeat;mask:url("./home-seal-tour.svg") center/100% 100% no-repeat}
+.home-mode--solo .home-mode-seal::before{-webkit-mask:url("./home-seal-solo.svg") center/100% 100% no-repeat;mask:url("./home-seal-solo.svg") center/100% 100% no-repeat}
+.home-mode--tour .home-mode-seal{transform:rotate(1.2deg)}.home-mode--solo .home-mode-seal{transform:rotate(-.8deg)}
 .home-mode-text{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 10px;min-width:0}
 .home-mode-text b{flex:1 0 100%;display:flex;align-items:center;gap:12px;min-width:0;white-space:nowrap;
   font:600 var(--ui-fs-lg)/1.3 var(--ui-serif);letter-spacing:var(--ui-track-title)}
@@ -76,7 +93,7 @@ body[data-home] :is(.hud-me,.dock,.sky-ui,.hint,footer,.walk-ui,.vehicle-action,
 .home.resume .home-mode.is-current .ui-seal--ink{color:var(--ui-paper)}
 
 /* 续游（IDOK-105）：游览行下一行文字链接，左缘对齐模式名；只有存过位置才出现 */
-.home-resume-row{padding:0 12px 10px calc(12px + 40px + var(--ui-s-4));margin-top:-6px}
+.home-resume-row{padding:0 12px 10px calc(12px + 44px + var(--ui-s-4));margin-top:-6px}
 .home-resume{min-height:28px;font-size:var(--ui-fs-sm);letter-spacing:.06em}
 .home-resume i{flex:none;width:14px;height:14px;background:currentColor;
   -webkit-mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%23000' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3 8a5 5 0 1 0 1.6-3.7'/%3E%3Cpath d='M3 2.5V5h2.5'/%3E%3C/svg%3E") center/contain no-repeat;
@@ -187,9 +204,32 @@ kbd{display:inline-block;min-width:1.5em;padding:1px 5px;margin:0 1px;border-rad
   .home-resume-row{padding:0 12px 4px calc(12px + 30px + var(--ui-s-3));margin-top:-4px}
   .home-foot{padding-bottom:calc(6px + env(safe-area-inset-bottom));padding-left:calc(clamp(20px,5vw,56px) + env(safe-area-inset-left))}
 }
+/* --- 手机收起（IDOK-468）：竖屏和横屏手机默认只留「印章 + 模式名 + 动作」，联机那行保留一句说明（主推）。
+   游览 / 单人的说明、底部链接、署名收进「更多」；钱包、印章进度、在线人数、续游是状态，始终显示。
+   唯一状态 = .home-more 的 aria-expanded；桌面不显示按钮，内容始终展开。 ---------------------------------- */
+.home-more{display:none}
+@media (max-width:760px),(max-height:520px) and (orientation:landscape){
+  .home:has(.home-more[aria-expanded=false]) :is(.home-row--tour,.home-row--solo) .home-mode-text>span,
+  .home:has(.home-more[aria-expanded=false]) :is(.home-links,.home-foot){display:none}
+  .home-more{display:inline-flex;align-self:center;min-height:34px;padding:0 10px;font-size:var(--ui-fs-sm);letter-spacing:var(--ui-track)}
+  .home-more::after{content:"";width:6px;height:6px;margin:-3px 0 0 2px;border:solid currentColor;border-width:0 1.5px 1.5px 0;transform:rotate(45deg);transition:transform var(--ui-fast)}
+  .home-more[aria-expanded=true]::after{margin-top:3px;transform:rotate(-135deg)}
+  .home-more:hover{color:var(--ui-text);background:none}
+  /* 展开时链接重新播一次进场动画：去掉首屏错落的 180ms 延迟，点了立刻出来 */
+  .home:has(.home-more[aria-expanded=true]) .home-links{animation-delay:0ms}
+  .home-main:has(.home-more[aria-expanded=false]){min-height:100dvh}
+}
+/* 竖屏：「更多」紧跟目录下方；目录上方的 margin:auto 把整组推到拇指区，展开后链接也跟在目录下面 */
+@media (max-width:760px){
+  .home-links{margin-top:0}
+}
+@media (max-height:520px) and (orientation:landscape){
+  .home-main{grid-template-areas:"title modes" "title links" "title more"}
+  .home-more{grid-area:more;justify-self:start;margin-left:2px}
+}
 /* 触屏：文字链接与续游也要够手指按 */
 @media (pointer:coarse) and (not (any-pointer:fine)){
-  .home-links .ui-btn,.home-resume{min-height:var(--ui-h)}
+  .home-links .ui-btn,.home-more,.home-resume{min-height:var(--ui-h)}
   .home-resume-row{padding-bottom:0}
 }
 

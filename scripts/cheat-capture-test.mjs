@@ -424,14 +424,15 @@ test('realtime server emits signed cheat_capture on cheats and full API upload +
         await page.context().addCookies([{name:'glol_session',value:adminTokenCookie,url:base}])
         page.on('dialog',dialog=>dialog.accept());await page.goto(base+'/admin/?view=security')
         for(const [index,label] of ['删除截图','删除抓拍'].entries()){
-          const card=page.locator('.adm-capture-card').first()
-          if(index)await card.getByText('查看大图').click()
-          const button=(index?page.locator('dialog'):card).getByRole('button',{name:label,exact:true})
-          const [response]=await Promise.all([page.waitForResponse(r=>r.request().method()==='DELETE'&&r.url().includes('/api/admin/mp/cheat-captures/')),button.click()])
+          const card=page.locator('.adm-cap-item').first()
+          if(index)await card.getByRole('button',{name:/^查看/}).click()
+          await (index?page.locator('.adm-capture-lightbox'):card).getByRole('button',{name:/^删除/}).click()
+          const confirm=page.locator('dialog[open]').last().getByRole('button',{name:'删除',exact:true})
+          const [response]=await Promise.all([page.waitForResponse(r=>r.request().method()==='DELETE'&&r.url().includes('/api/admin/mp/cheat-captures/')),confirm.click()])
           assert.equal(response.status(),200)
           const id=new URL(response.url()).pathname.split('/').pop()
           assert.equal((await pool.query("select count(*)::int n from admin_audit where action='mp.cheat_capture.delete' and detail->>'captureId'=$1",[id])).rows[0].n,1)
-          await page.waitForFunction(count=>document.querySelectorAll('.adm-capture-card').length===count,1-index)
+          await page.waitForFunction(count=>document.querySelectorAll('.adm-cap-item').length===count,1-index)
           console.log(`${label}: HTTP DELETE 200, one persisted audit row`)
         }
       }finally{await browser.close()}
