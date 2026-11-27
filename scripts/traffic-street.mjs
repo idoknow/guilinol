@@ -15,6 +15,9 @@ assert.ok(rows.every(row=>!major(row[5])))
 const graph=JSON.parse(gunzipSync(await readFile('public/world/roads/graph.json.gz')))
 const nodes=new Map(graph.nodes.map(node=>[node.id,node]))
 const lanes=graph.lanes.filter(lane=>lane.kind==='motor'&&major(lane.cls)),majorIds=new Set(lanes.map(lane=>lane.id))
+// IDOK-284 realNmPool spawns scooters on real cycleways, so only that pairing may leave the major roads; a probe actor without kind stays illegal.
+const realNonmotorIds=new Set(graph.lanes.filter(lane=>lane.kind==='nonmotor').map(lane=>lane.id))
+const offMajorLane=actor=>!majorIds.has(actor.lane)&&!(actor.kind==='scooter'&&realNonmotorIds.has(actor.lane))
 async function withDeadline(work,label){
   let timer
   try{return await Promise.race([work,new Promise((_,reject)=>{timer=setTimeout(()=>reject(Error(`${label}: 300 s wall timeout; 30 s simulation window not verified`)),300000)})])}
@@ -77,7 +80,7 @@ try{
     await page.waitForFunction(frame=>window.viewer.stats.frame>=frame+15,await page.evaluate(()=>window.viewer.stats.frame),{timeout:120000})
     if(!shot.min){
       const nearby=await page.evaluate(({x,z})=>window.viewer.trafficProbe.motorLanes.filter(actor=>Math.hypot(actor.x-x,actor.z-z)<=200),shot)
-      const illegal=nearby.filter(actor=>!majorIds.has(actor.lane));console.log(shot.name,{nearby:nearby.length,illegal});assert.equal(illegal.length,0)
+      const illegal=nearby.filter(offMajorLane),cyclewayScooters=nearby.filter(actor=>!majorIds.has(actor.lane)&&!offMajorLane(actor)).length;console.log(shot.name,{nearby:nearby.length,cyclewayScooters,illegal});assert.equal(illegal.length,0)
       await page.evaluate(()=>{window.viewer.trafficProbe.staticOnly=true})
       await page.waitForFunction(()=>window.viewer.trafficProbe.allMotors.length===0&&window.viewer.trafficProbe.parked>0)
       console.log('Static-only',shot.name,await page.evaluate(()=>({parked:window.viewer.trafficProbe.parked,moving:window.viewer.trafficProbe.allMotors.length})))
