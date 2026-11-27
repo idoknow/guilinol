@@ -3,6 +3,8 @@ import * as T from 'three'
 import type {Stream} from '../stream'
 import type {Tile} from '../world'
 import {clearAvatarPose, getAvatarJoints} from './avatar-rig'
+// IDOK-502: 夜色（全服时辰 + 天气共同决定）是头灯 / 夜景灯光的唯一开关。
+import {env as skyEnv} from '../look/time'
 import {
   applyKnockdownPose,
   createKnockdownState,
@@ -765,7 +767,12 @@ export function createBikeControl() {
 
   function setEnvironmentHour(hour: number) {
     if (headlightManual || batteryPct <= 0 || crashPhase !== 'none') return
-    const isNight = hour >= 18.5 || hour < 6.0
+    // IDOK-502: 头灯跟随「全服夜色」而不是固定钟点。全服时间统一后，同一个时辰在雾天 / 雨天
+    // 更暗，所以用 env.night（已被全服时辰与天气共同决定）阈值化，头灯亮起的时机与路灯、
+    // 窗户灯箱完全一致，不会再出现「灯亮了但天没黑」。
+    // 只有 env 确实是按这个时辰求值时才信它，否则退回钟点判断（单元测试里 env 可能没跑过）。
+    const live = Math.abs(((skyEnv.hour - hour) % 24 + 24) % 24) < .5
+    const isNight = live ? skyEnv.night >= .55 : hour >= 18.5 || hour < 6.0
     headlight = isNight ? 'low' : 'off'
   }
 

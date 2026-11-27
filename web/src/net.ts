@@ -7,6 +7,7 @@ import {onUser} from './ui/account'
 import type {MpStatus} from './ui/mp-pref'
 import {setRoster,clearRoster,type RosterPlayer} from './mp-roster'
 import {fingerprint,deviceSummary} from './fingerprint'
+import {worldClockClient} from './look/world-clock-client'
 import {bindTravel,prepareTravel,rejectTravel,travelTarget,type TravelReply} from './mp-travel'
 
 import type {CaptureClientContext, CheatCapturePacket} from './cheat-capture'
@@ -140,6 +141,9 @@ export function attachNet(scene:Scene,clips:AnimationClip[],getPose:()=>Pose,get
             peers.combat(msg);onCombat?.(msg,myId);break
           }
           case 'welcome': sent=0;sentTimes=[];myId=String(msg.me?.id??'');myUid=Number(msg.me?.uid)||0;myName=String(msg.me?.name??'');setChatSelf(myUid);onCombat?.(msg.me,myId);if(subCount>0)send({t:'roster_sub',since:lastRosterV})
+            // IDOK-502: the authoritative clock is a pure function of server epoch, so a socket
+            // that just rejoined only needs one fresh sample to land on the same sky as everyone.
+            void worldClockClient().sync(true)
             if(msg.relocated){const {x,y,z,code}=msg.relocated;onSetback?.(x,y,z);rejectTravel(code)}
             welcomed=true
             // 续连（CDN 掐断后原地接管）：对账而不是清空重建，否则每 44 秒所有人的模型都会销毁再克隆一遍

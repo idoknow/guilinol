@@ -9,6 +9,7 @@ import {bindEmail,isSocialType,socialCallback,socialConfig,socialConfirm,socialP
 import {unsubscribe} from '../../lib/feedback-mail'
 import {cloudSave} from '../../lib/cloud-save'
 import {weakPassword} from '../../lib/weak-password'
+import {worldTimePayload} from '../../lib/world-clock'
 type User = SessionAccount & {salt:string;digest:string;locked_until:number}
 const profile=(user:SessionAccount)=>({id:user.id,uid:user.uid,email:user.email,nickname:user.nickname,verified:!!user.verified,role:user.role,notify_email:!!user.notify_email,email_placeholder:!!user.email_placeholder})
 const json=(data:unknown,status=200,session?:string)=>Response.json(data,{status,headers:{'Cache-Control':'no-store',...(session?{'Set-Cookie':session}:{})}})
@@ -25,7 +26,7 @@ function newPassword(value:unknown) {
   if(weakPassword(pass)) throw new Problem(400,'weak_password','密码过于常见或容易猜测，请换一个更长的独特密码')
   return pass
 }
-const methods:Record<string,string[]>={'rt/ticket':['POST'],health:['GET'],'auth/me':['GET'],'me/avatar':['GET','PUT'],me:['GET','PATCH'],...Object.fromEntries(['register','resend','verify','reset','login','logout','social/start'].map(name=>[`auth/${name}`,['POST']])),'auth/social/callback':['GET'],'auth/social/pending':['GET'],'auth/social/confirm':['POST'],'auth/social/config':['GET'],'auth/social/register':['POST'],'auth/email/bind':['POST']}
+const methods:Record<string,string[]>={'time':['GET'],'rt/ticket':['POST'],health:['GET'],'auth/me':['GET'],'me/avatar':['GET','PUT'],me:['GET','PATCH'],...Object.fromEntries(['register','resend','verify','reset','login','logout','social/start'].map(name=>[`auth/${name}`,['POST']])),'auth/social/callback':['GET'],'auth/social/pending':['GET'],'auth/social/confirm':['POST'],'auth/social/config':['GET'],'auth/social/register':['POST'],'auth/email/bind':['POST']}
 
 async function handle(request:Request,env:Env) {
   const url=new URL(request.url), path=url.pathname.slice(5), method=request.method, db=env.DB
@@ -71,6 +72,9 @@ async function handle(request:Request,env:Env) {
   if(!Object.hasOwn(methods,path)) throw new Problem(404,'not_found','接口不存在')
   if(!methods[path].includes(method)) throw new Problem(405,'method','不支持的请求方式')
   if(path==='health')return json({ok:true})
+  // IDOK-502 全服时间：公开只读，未登录也能取（单机 / 未联机同样对齐同一天色）。
+  // 世界时间是 epoch 的纯函数，所以这里只需要把服务端时钟和映射常量交出去，不必存状态。
+  if(path==='time')return json(worldTimePayload(Date.now()))
   if(method!=='GET'&&request.headers.get('Origin')!==url.origin) throw new Problem(403,'origin','请求来源不符')
   let body:Record<string,unknown>={}
   if(method!=='GET'&&path!=='auth/logout'&&path!=='rt/ticket') {

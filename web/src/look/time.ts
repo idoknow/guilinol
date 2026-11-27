@@ -1,5 +1,9 @@
 import * as THREE from 'three'
 import {look} from './config'
+// 天气乘数与种类放在 lib/world-clock.ts：服务端算全服天气、客户端上色，必须是同一张表。
+import {weatherFx, type WeatherMix, type Weather} from '../../../lib/world-clock.ts'
+
+export type {Weather}
 
 // M3 光是情绪: one keyframed "mood" per hour of the day, blended with a weather layer.
 // Every visual that changes with time reads from `env` (CPU side) or `atmo` (shared shader uniforms).
@@ -50,13 +54,8 @@ const keys:[number,Key][] = [
 ]
 keys.push([24,keys[0][1]])
 
-export type Weather = 'clear'|'mist'|'rain'
-// Weather is a multiplier on the hour's mood: mist thickens and greys the air, rain also dims light and adds streaks.
-const weatherFx = {
-  clear:{fog:1,boost:0,grey:0,dim:1,clouds:0,rain:0},
-  mist:{fog:.42,boost:2.2,grey:.45,dim:.72,clouds:.15,rain:0},
-  rain:{fog:.5,boost:1.2,grey:.62,dim:.5,clouds:.55,rain:1},
-}
+// Weather is a multiplier on the hour's mood; the table lives in lib/world-clock.ts so the
+// server and every client share it.
 
 const color = ()=>new THREE.Color()
 // Shared uniforms: patched into every fogged material (atmosphere.ts) plus sky / water / rain.
@@ -86,7 +85,7 @@ function blendColor(target:THREE.Color, from:number, to:number, t:number) {
   a.setHex(from); b.setHex(to); target.copy(a).lerp(b,t)
 }
 // Colours stored as-authored sRGB hex; three converts them to linear in Color.setHex.
-export function evaluate(hour:number, weather:Weather, blend=1) {
+export function evaluate(hour:number, weather:Weather, blend=1, mix?:WeatherMix) {
   hour = ((hour%24)+24)%24
   let i = 0; while(keys[i+1][0]<=hour) i++
   const [h0,k0] = keys[i], [h1,k1] = keys[i+1]
@@ -104,9 +103,14 @@ export function evaluate(hour:number, weather:Weather, blend=1) {
   env.night = lerp(k0.night,k1.night); env.exposure = lerp(k0.exposure,k1.exposure); env.clouds = lerp(k0.clouds,k1.clouds)
   let fogLength = lerp(k0.fogLength,k1.fogLength), fogBoost = lerp(k0.fogBoost,k1.fogBoost)
   const fogFalloff = lerp(k0.fogFalloff,k1.fogFalloff)
-  // Weather: ease the previous weather mix toward the target so switching never pops.
-  const target = weatherFx[weather]
-  for(const key of Object.keys(env.mix) as (keyof typeof env.mix)[]) env.mix[key] += (target[key]-env.mix[key])*blend
+  // Weather: with an explicit `mix` (全服确定性天气) it is used verbatim, so every client lands on
+  // the same multiplier for the same instant; otherwise ease the previous mix toward the target so
+  // switching never pops (hand-picked weather in solo / photo mode).
+  if(mix) for(const key of Object.keys(env.mix) as (keyof typeof env.mix)[]) env.mix[key] = mix[key]
+  else {
+    const target = weatherFx[weather]
+    for(const key of Object.keys(env.mix) as (keyof typeof env.mix)[]) env.mix[key] += (target[key]-env.mix[key])*blend
+  }
   env.weather = weather
   const m = env.mix
   fogLength *= m.fog*fogRangeScale; fogBoost += m.boost
