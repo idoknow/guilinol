@@ -90,7 +90,27 @@ def channel_spans(elements, widths):
                     and len(water.query(axis,predicate='intersects'))])
 
 
-def bake(output, chunks, elements, widths, approaches=(), only_approaches=False, bridge_profiles=(), preferred=(), continuous=()):
+def east_gate_piers(surface, elements):
+    from landmark_solids import load_landmark_meshes, slice_tris_at_y
+    from features import area
+    gate=next((way for way in elements if way['type']=='way' and way['id']==1008248057),None)
+    palace=surface.entries.get('jingjiang')
+    if not palace or gate is None:return Polygon()
+    vicinity=area(gate).buffer(16)
+    if not box(surface.left,surface.top,surface.left+surface.width,surface.top+surface.depth).covers(vicinity):return Polygon()
+    mesh=load_landmark_meshes(Path(__file__).resolve().parents[1],{'landmarks':[palace]})['jingjiang']
+    walls=mesh['coll_tris'][np.abs(mesh['coll_normals'][:,1])<.72].copy()
+    west,north,east,south=vicinity.bounds
+    walls=walls[(walls[:,:,0].max(axis=1)>=west)&(walls[:,:,0].min(axis=1)<=east)&
+                (walls[:,:,2].max(axis=1)>=north)&(walls[:,:,2].min(axis=1)<=south)]
+    if not len(walls):return Polygon()
+    corners,indices=np.unique(walls[:,:,::2].reshape(-1,2),axis=0,return_inverse=True)
+    ground=np.array([surface.sample(*point,include_peaks=False)[0] for point in corners])
+    walls[:,:,1]-=ground[indices].reshape(-1,3)
+    return union_all([slice_tris_at_y(walls,height,grid_size=.001) for height in (.6,1.2)]).intersection(vicinity)
+
+
+def bake(output, chunks, elements, widths, approaches=(), only_approaches=False, bridge_profiles=(), preferred=(), continuous=(), landmark_walls=None):
     from ground_passages import paved_passage
     intervals = json.loads(Path(__file__).with_name('road-corridor-survey.json').read_text())
     shapes, footpaths, passage_roads = [], [], []
@@ -133,6 +153,8 @@ def bake(output, chunks, elements, widths, approaches=(), only_approaches=False,
             continue
         area = union_all([shapes[i].intersection(bounds) for i in hits]+
                          [grades.geometries[i].intersection(bounds) for i in nearby])
+        if landmark_walls is not None and landmark_walls.intersects(area):
+            area=area.difference(landmark_walls)
         protected=channels.query(area,predicate='intersects')
         seam=None
         if len(protected):
@@ -192,11 +214,13 @@ def patch(file, area, approaches=(), foot=(), seam=None, crossings=(), fixed=(),
                 cuts.append(overlap.buffer(half) if warehouse is not None and row[5]==21813141 else corridor)
         obstacles.append(poly.difference(union_all(cuts)) if cuts else poly)
     solids=union_all(obstacles)
+    occupied=None
     if not solids.is_empty and solids.intersects(area):
         existing_roads=union_all([make_valid(Polygon(np.asarray(shell)/100,[np.asarray(h)/100 for h in holes]))
                                   for kind,shell,*holes in original['paths'] if kind in (0,5)])
         # The exposed bed stops short of its retaining edge. Carry the asphalt
         # under the facade lip so it meets the wall at street level.
+        occupied=solids.difference(existing_roads)
         area=set_precision(area.difference(solids.buffer(-.06).difference(existing_roads)),.01)
         area=union_all(list(polygons(area)))
         if area.is_empty:
@@ -225,6 +249,8 @@ def patch(file, area, approaches=(), foot=(), seam=None, crossings=(), fixed=(),
     if seam is not None:
         exterior=exterior.difference(seam)
     top_area=area.difference(exterior.buffer(.04,quad_segs=2))
+    if occupied is not None:
+        top_area=top_area.difference(occupied)
     walk=union_all([*foot, *(line.buffer(half,quad_segs=4) for line,half,*_,kind in approaches if kind==1)])
     motor=union_all([line.buffer(half,quad_segs=4) for line,half,*_,kind in approaches if kind==0])
     walk=union_all(list(polygons(set_precision(walk.difference(motor).intersection(area),.01))))

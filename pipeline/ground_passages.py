@@ -8,13 +8,14 @@ from collections import defaultdict
 import numpy as np
 from shapely.ops import substring
 from shapely.affinity import translate
-from shapely import LineString, Point, Polygon, STRtree, box, make_valid, union_all
+from shapely import LineString, Point, Polygon, STRtree, box, contains_xy, make_valid, union_all
 
 from canal_passages import sample_road_heights
 from features import area, building_mesh, points, polygons
 from common import xz2ll
 from service_streets import rings, width
 from surveyed_corridors import read_chunk
+from major_roadbeds import remap_paths
 
 YARD = 1565322396
 GARAGE = (2937485852, 1493582667)
@@ -314,6 +315,28 @@ def write_parts(file,tile,raw,start,size,collision,parts,origin):
 YARD_ROADS = {453854241,453854242,453854243,453854244,453854245,453854246,453854248,453854249,453854250}
 
 
+def clip_ground_paving(tile, paths, occupied):
+    lower=paths[11] if len(paths)>11 else None
+    limit=lower[0] if lower else len(paths[0])
+    starts=[];rebuilt=[]
+    for index,row in enumerate(paths[0]):
+        starts.append(len(rebuilt))
+        if index<limit and row[0] in (0,1,4,5,6):
+            shell,*holes=[np.asarray(loop)/100 for loop in row[1:]]
+            paved=make_valid(Polygon(shell,holes))
+            if occupied.intersection(paved).area>0:
+                rebuilt.extend(rings(row[0],paved.difference(occupied)))
+                continue
+        rebuilt.append(row)
+    starts.append(len(rebuilt))
+    remap_paths(tile,starts[:-1],starts[1:])
+    if lower:lower[0]=starts[limit]
+    if len(paths)>12 and isinstance(paths[12],list):
+        platform=paths[12]
+        platform[:2]=[starts[index] for index in platform[:2]]
+    paths[0]=rebuilt
+
+
 def yard_bypass(way,axis,crossing,half,site,buildings,shared):
     """Try a smooth lateral shift, keeping mapped junctions and both tie-ins."""
     lo,hi=sorted(axis.project(Point(p)) for p in (crossing.coords[0],crossing.coords[-1]))
@@ -382,6 +405,11 @@ def grain_yard(output,manifest,elements,widths):
     roads=union_all([LineString(points(w)).buffer(widths.get(w['id'],width(w['tags']))/2+.5)
                      for w in elements if w['type']=='way' and w['id'] in YARD_ROADS])
     structures=union_all([p for _,p in mapped])
+    warehouse_walls=None
+    if warehouse is not None:
+        doors=union_all([way['warehousePassages'].buffer(widths.get(way['id'],width(way['tags']))/2+.5)
+                         for way in elements if 'warehousePassages' in way])
+        warehouse_walls=warehouse.difference(doors)
     pavement=site.difference(structures.union(roads).buffer(.02))
     for tile in manifest['chunks']:
         x,z=tile['x'],tile['z'];bounds=box(x,z,x+256,z+256)
@@ -401,7 +429,10 @@ def grain_yard(output,manifest,elements,widths):
             roof=base+floors*3.1
             for p in polygons(poly.intersection(bounds)):
                 if p.area>.01:parts.append((p,(roof-.35 if raised else base,roof,0,floors,way['id'],poly.representative_point(),[],False,raised)))
-        paths=c[1];existing=union_all([make_valid(Polygon(np.asarray(r[1])/100,[np.asarray(h)/100 for h in r[2:]]))
+        paths=c[1]
+        if warehouse_walls is not None and warehouse_walls.intersects(bounds):
+            clip_ground_paving(tile,paths,translate(warehouse_walls,-x,-z))
+        existing=union_all([make_valid(Polygon(np.asarray(r[1])/100,[np.asarray(h)/100 for h in r[2:]]))
                                        for r in paths[0] if len(r[1])>=3])
         fill=translate(pavement.intersection(bounds),-x,-z).difference(existing.buffer(.02))
         for row in rings(4,fill):
@@ -410,6 +441,34 @@ def grain_yard(output,manifest,elements,widths):
             paths[0].insert(at,row)
             if lower:lower[0]+=1
         write_parts(file,tile,raw,start,size,c,parts,origin)
+
+
+def pavement_probes(foot, paths, origin):
+    surfaces=[]
+    for kind,*loops in paths:
+        if kind not in (0,1,4,5,6) or not loops:
+            continue
+        shell,*holes=[np.asarray(loop)/100+origin for loop in loops]
+        paved=Polygon(shell,holes).buffer(0)
+        if paved.intersects(foot):
+            surfaces.append(paved)
+    for patch in polygons(foot.intersection(union_all(surfaces))):
+        yield patch.representative_point().coords[0]
+        for boundary in (patch.exterior,*patch.interiors):
+            yield from boundary.segmentize(.45).coords
+        west,north,east,south=patch.bounds
+        eastings,northings=np.meshgrid(np.arange(west+.225,east,.45),np.arange(north+.225,south,.45))
+        inside=contains_xy(patch,eastings,northings)
+        yield from zip(eastings[inside],northings[inside])
+
+
+def deck_probes(foot, triangles, origin):
+    for triangle in triangles:
+        face=Polygon(triangle[:,[0,2]]/100+origin)
+        if face.area<=1e-4 or not foot.intersects(face):continue
+        for patch in polygons(foot.intersection(face)):
+            yield patch.representative_point().coords[0]
+            yield from patch.exterior.coords
 
 
 def level_soffits(output, manifest, elements, widths):
@@ -421,7 +480,10 @@ def level_soffits(output, manifest, elements, widths):
     for tile in manifest['chunks']:
         x,z=tile['x'],tile['z']
         if not len(axes.query(box(x,z,x+256,z+256))):continue
-        rows=read_chunk(output/tile['file'])[3][0]
+        raw,offset,size,collision=read_chunk(output/tile['file'])
+        image_bytes,deck_count=struct.unpack_from('<2I',raw,16)
+        decks=np.frombuffer(raw,'<i2',deck_count*9,offset+size+image_bytes).reshape(-1,3,3)
+        rows=collision[0]
         origin=np.array([x,z]);updates=[]
         for row in rows:
             if not any(row[9:]) or row[5] in (1551968228%65536,1568418630%65536,1572366586):continue
@@ -441,19 +503,25 @@ def level_soffits(output, manifest, elements, widths):
                         for side in np.linspace(-half,half,2*math.ceil(half/.45)+1):
                             px,pz=pt.x+dz*side/length,pt.y-dx*side/length
                             if poly.covers(Point(px,pz)):samples.append(dict(x=px,z=pz,pavementOnly=True))
-            if len(samples)>start:updates.append((row[5],row[0],row[1],start,len(samples)))
+            if len(samples)>start:
+                samples.extend(dict(x=east,z=north,passageClearance=True)
+                               for east,north in pavement_probes(poly,collision[1][0],origin))
+                samples.extend(dict(x=east,z=north,passageClearance=True)
+                               for east,north in deck_probes(poly,decks,origin))
+                updates.append((row[5],row[0],row[1],start,len(samples)))
         if updates:work.append((tile,updates))
     if not samples:return
     heights=sample_road_heights(output,manifest,samples)
+    lifts={}
     for tile,updates in work:
-        lifts={}
         for seed,old,top,a,b in updates:
             peak=max((y for y in heights[a:b] if y is not None),default=-math.inf)
             if peak==-math.inf or old/10>=peak+3.54:continue
             ceiling=math.ceil((peak+3.54)*10)
             if ceiling>=top:raise ValueError(f'Passage {seed} cannot meet headroom at pavement edge')
             lifts[seed,old]=max(ceiling,lifts.get((seed,old),old))
-        if not lifts:continue
+    for tile,updates in work:
+        if not any((seed,old) in lifts for seed,old,*_ in updates):continue
         file=output/tile['file'];raw,start,size,c=read_chunk(file)
         origin=np.array([tile['x'],tile['z']]);parts=[]
         for row in c[0]:

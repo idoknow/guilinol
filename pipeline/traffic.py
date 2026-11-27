@@ -20,7 +20,7 @@ from portal_routes import permits, routes as portal_routes
 from common import OUT, ll2xz, load_osm
 from road_tunnels import clear_approach_paving
 from station_road_corridor import bake as bake_station_corridor
-from surveyed_corridors import bake as bake_surveyed_corridors, restore as restore_corridors
+from surveyed_corridors import bake as bake_surveyed_corridors, east_gate_piers, restore as restore_corridors
 import narrow_streets
 import ground_passages
 import vehicle_surface_grades
@@ -289,7 +289,8 @@ def bake(output, manifest, rendered_roads=None, *, native_surface=None):
     graded_sections,grade_points=vehicle_surface_grades.stations(elements,sections,box(left,top,left+width,top+depth))
     native_levels=sample_road_heights(output,manifest,grade_points)
     bake_station_corridor(output, manifest['chunks'], elements)
-    bake_surveyed_corridors(output,manifest['chunks'],elements,sections)
+    gate_walls=east_gate_piers(surface,elements)
+    bake_surveyed_corridors(output,manifest['chunks'],elements,sections,landmark_walls=gate_walls)
     from dingjiang_structures import motorway_sections
     from rail_sections import motorway_sections as graded_motorways
     # Append the modeled motorway segments after the existing network so every
@@ -541,7 +542,7 @@ def bake(output, manifest, rendered_roads=None, *, native_surface=None):
             from local_junctions import profiles as connected_profiles
             pedestrian+=connected_profiles(output, manifest, elements, sections, planned+pedestrian)
             pedestrian+=east_canal
-            bake_surveyed_corridors(output,manifest['chunks'],elements,sections,planned+pedestrian,only_approaches=True,bridge_profiles=canal_grades,preferred=pedestrian+cycling,continuous=continuous_canal)
+            bake_surveyed_corridors(output,manifest['chunks'],elements,sections,planned+pedestrian,only_approaches=True,bridge_profiles=canal_grades,preferred=pedestrian+cycling,continuous=continuous_canal,landmark_walls=gate_walls)
             trim_portal_paving(output,manifest['chunks'],generated,elements,sections)
             for tunnel in generated:
                 tunnel['gradedAccess']=True
@@ -554,7 +555,6 @@ def bake(output, manifest, rendered_roads=None, *, native_surface=None):
                             'portal-check',str(output.resolve()),str(request)],check=True,cwd=ROOT)
             (output/'vehicle-tunnel-grades.json').write_bytes(request.read_bytes())
         ground_passages.bake(output,manifest,elements,sections,garage_curbs)
-        ground_passages.level_soffits(output,manifest,elements,sections)
         from verge_crossings import open_verges
         open_verges(output,manifest,elements,sections)
         portal_landings.carriageways(output,manifest,elements,sections)
@@ -574,6 +574,7 @@ def bake(output, manifest, rendered_roads=None, *, native_surface=None):
                 tile['bytes']=sizes[tile['file']]
         from sitang_profile import install as install_sitang
         raised, adjoining = install_sitang(output, manifest, elements)
+        ground_passages.level_soffits(output,manifest,elements,sections)
         if network['edges']:
             route_file=output/'vehicle-portal-routes.json'
             yard_routes=[]
