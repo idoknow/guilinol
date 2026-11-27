@@ -156,7 +156,7 @@ if (uGroundUpgrade > 0.5 && brSkyFill > 0.0) {
 }
 
 const asphaltColor=new THREE.Color(look.streets.surfaces[0])
-export function bridgeGeometry(deck:Float32Array,thin:Set<number>,asphalt:number[],pavedTops?:Set<number>) {
+export function bridgeGeometry(deck:Float32Array,thin:Set<number>,asphalt:number[],pavedTops?:Set<number>,joinedEdge?:(east:number,south:number)=>boolean) {
   top.set(look.bridgeTop); side.set(look.bridgeSide)
   const key = (at:number)=>`${Math.round(deck[at]*20)},${Math.round(deck[at+1]*20)},${Math.round(deck[at+2]*20)}`
   const edges = new Map<string,[number,number,number]>()
@@ -165,7 +165,7 @@ export function bridgeGeometry(deck:Float32Array,thin:Set<number>,asphalt:number
     const id = ka<kb?`${ka}|${kb}`:`${kb}|${ka}`, seen = edges.get(id)
     if(seen) seen[2]++; else edges.set(id,[a,b,1])
   }
-  const open = [...edges.values()].filter(edge=>edge[2]===1)
+  const open = [...edges.values()].filter(([first,second,count])=>count===1&&!(joinedEdge?.(deck[first],deck[first+2])&&joinedEdge(deck[second],deck[second+2])))
   const positions = new Float32Array(deck.length-(pavedTops?.size??0)*9+open.length*18), colors = new Float32Array(positions.length), edge = new Float32Array(positions.length/3)
   const road=new Set(asphalt)
   let out=0
