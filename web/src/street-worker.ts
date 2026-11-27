@@ -1,4 +1,4 @@
-import {fitCurbReturns,type CurbReturn} from './curb-returns'
+import {emitVergeCurbWalls,fitCurbReturns,type CurbReturn} from './curb-returns'
 import {platformShift, type PlatformGrade} from './platform-grade'
 import {panelCut} from './crossing-panels'
 import {stationShoulders,type GradePlane,type ShoulderPlane} from './station-shoulders'
@@ -9,7 +9,7 @@ import {stationPaving,type StationPavingCut} from './station-paving'
 import {stationRoadSurface,type StationRoadSegment} from './station-road-surface'
 import {railwayGeometry,type RailSection,type RailFace,type CrossingSign} from './railways'
 import {buildRoadBarriers} from './road-barriers'
-import {medianRails} from './median-rails'
+import {emitRoadDividers} from './road-divider-profiles'
 import {isShizijieCrosswalkRing,isShizijieDecorSuppressed,isShizijieSignalSuppressed,touchesShizijieTile} from './shizijie-zone.ts'
 import {curbEdgeKeyCm,repairStreetPaths} from './ground-repair'
 import {isOuterOsmanthusBed} from './outer-osmanthus'
@@ -338,6 +338,13 @@ export function streetGeometry([paths,lamps,banks,signals=[],stops=[],roadCtrl,s
         }
       }
     }
+    if(kind===4)emitVergeCurbWalls(
+      loops,
+      (x,z,offset)=>vector(new THREE.Vector2(x,z),offset),
+      ground,
+      (a,b,c,k,vert)=>triangle(a,b,c,k,0,0,0,vert),
+      {topOffset:height,bottomOffset:.045,skipCurbEdges,edgeKeyCm:curbEdgeKeyCm,clampToGround:!platformPath&&!lowerPath},
+    )
   }
   // Emit flush pedestrian crossing aprons across wide arterial verges without raised vertical curbs.
   platformPath=false;lowerPath=false
@@ -358,34 +365,15 @@ export function streetGeometry([paths,lamps,banks,signals=[],stops=[],roadCtrl,s
   const awnings=look.streets.awnings.map(value=>new THREE.Color(value)),shutter=new THREE.Color(look.streets.shutter)
   const parked:number[]=[],blue=new THREE.Color(look.streets.directionSign)
   const suppressDecor=(kind:number,x:number,z:number)=>checkShizijie&&!!origin&&isShizijieDecorSuppressed(origin[0]+x,origin[1]+z,kind)
-  medianRails(decor,suppressDecor,(start,end,banner)=>{
-    const dx=end.x-start.x,dz=end.z-start.z,flat=Math.hypot(dx,dz),yaw=-Math.atan2(dz,dx)
-    const low=baseLevel(start.x,start.z),high=baseLevel(end.x,end.z),pitch=Math.atan2(high-low,flat)
-    const x=(start.x+end.x)/2,z=(start.z+end.z)/2,y=(low+high)/2+.195,span=Math.hypot(flat,high-low)
-    box(x,y+.88,z,span,.085,.07,yaw,stoneLight,pitch)
-    box(x,y+.28,z,span,.065,.07,yaw,tone.railing,pitch)
-    if(banner)box(x,y+.59,z,Math.min(1.35,span),.42,.09,yaw,awnings[2],pitch)
-  },point=>box(point.x,baseLevel(point.x,point.z)+.195+.58,point.z,.05,.6,.05))
-  // 栅栏件（绿篱、机非铁栏、白护栏、石墩铁栏）整段同档：120 m 内一起画，远处不再只剩绿篱或悬空横杆。
-  for(const [kind,east,south,heading,span] of decor){
-    if(kind!==5&&kind!==6&&kind!==7&&kind!==8)continue
-    const x=east/10,z=south/10
-    if(suppressDecor(kind,x,z))continue
-    const angle=-heading/100,y=baseLevel(x,z)+.195,length=span/10
-    if(kind===5||kind===6||kind===7){
-      const height=kind===7?.68+.06*Math.sin(east*.13+south*.07):.44
-      box(x,y+height/2,z,length+.04,height,kind===7?.74:.95,angle,hedge)
-      if(kind===7)continue
-      const offset=kind===5?.58:-.58
-      const fx=x+offset*Math.sin(angle),fz=z+offset*Math.cos(angle)
-      for(const level of [.24,.60])box(fx,y+level,fz,length+.04,.055,.055,angle,iron)
-      for(const shift of [-.4,0,.4])box(fx+shift*length*Math.cos(angle),y+.31,fz-shift*length*Math.sin(angle),.055,.62,.055,angle,iron)
-    }else if(kind===8){
-      box(x-length*.5*Math.cos(angle),y+.62,z+length*.5*Math.sin(angle),.32,1.24,.32,angle,stoneMid)
-      for(const level of [.32,1.05])box(x,y+level,z,length,.06,.07,angle,iron)
-      for(const fraction of [-.32,-.12,.12,.32])box(x+fraction*length*Math.cos(angle),y+.69,z-fraction*length*Math.sin(angle),.04,.78,.04,angle,iron)
-    }
-  }
+  // 栅栏与多形态机非/中央隔离带（金属护栏、绿篱、树池花箱、中央紫薇树丛、次干道软隔离、石墩铁栏）整段同档：120 m 内一起画。
+  emitRoadDividers(decor,activePaths,suppressDecor,baseLevel,origin,box,{
+    railing:tone.railing,
+    stoneLight,
+    stoneMid,
+    bannerRed:awnings[2],
+    hedge,
+    iron,
+  })
   const railLodCount=mats.length/16
   for(const [kind,east,south,heading,span] of decor){
     const x=east/10,z=south/10

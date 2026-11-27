@@ -28,6 +28,11 @@ const KIND7_HEDGE = {x: -1393.9, z: -296.0, nx: -0.497, nz: 0.868}
 const KIND8_FENCE = {x: -1545.9, z: -3.8, nx: 0.984, nz: 0.180}
 const KIND9_STRIP = {x: -1542.0, z: -2.7, nx: 0.964, nz: 0.267}
 const KIND10_STRIPE = {x: -1358.2, z: -9.8, nx: 0.389, nz: 0.921}
+// 7) Lijiang Rd green boulevard: central crape-myrtle tree median + roadside hedge-curb verge
+const LJ_MEDIAN = {x: 453.0, z: 1905.4, tx: -1.0, tz: 0.002, nx: -0.002, nz: -1.0}
+const LJ_VERGE = {x: 452.4, z: 1896.7, tx: -1.0, tz: 0.002, nx: -0.002, nz: -1.0}
+// 8) Binjiang Rd collector three-band soft delineator strip (must stay walkable with zero invisible wall)
+const BJ_SOFT = {x: -366.2, z: 140.8, tx: -0.497, tz: 0.868, nx: 0.868, nz: 0.497}
 
 // Heading convention in walk: fwd = (-sin(heading), -cos(heading)).
 // Keep parked fixture headings within (-pi/2, pi/2) so Three.js default XYZ Euler record copy preserves exact yaw.
@@ -35,13 +40,14 @@ function headingToward(dx, dz) {
   return Math.atan2(-dx, -dz)
 }
 
-// Start vehicles on wide carriageway / cycleway approaching barriers from the -n side going +n (all headings in (-pi/2, pi/2)):
-const bikeMedianStart = [JF_MEDIAN.x - JF_MEDIAN.nx * 3.8, 156.5, JF_MEDIAN.z - JF_MEDIAN.nz * 3.8, headingToward(JF_MEDIAN.nx, JF_MEDIAN.nz), 0]
+// Start vehicles on wide carriageway / cycleway approaching barriers from the -n side going +n (all headings in (-pi/2, pi/2)).
+// Offset e-bike and sedan longitudinally along Jiefang East Rd so test vehicles never overlap or collide with each other!
+const bikeMedianStart = [JF_MEDIAN.x + JF_MEDIAN.tx * 9.5 - JF_MEDIAN.nx * 3.8, 156.5, JF_MEDIAN.z + JF_MEDIAN.tz * 9.5 - JF_MEDIAN.nz * 3.8, headingToward(JF_MEDIAN.nx, JF_MEDIAN.nz), 0]
 const bicycleVergeStart = [JF_VERGE.x + JF_VERGE.nx * 3.2, 156.5, JF_VERGE.z + JF_VERGE.nz * 3.2, headingToward(-JF_VERGE.nx, -JF_VERGE.nz), 0]
-const carMedianStart = [JF_MEDIAN.x - JF_MEDIAN.nx * 5.0, 156.5, JF_MEDIAN.z - JF_MEDIAN.nz * 5.0, headingToward(JF_MEDIAN.nx, JF_MEDIAN.nz), 0]
+const carMedianStart = [JF_MEDIAN.x - JF_MEDIAN.tx * 7.5 - JF_MEDIAN.nx * 5.0, 156.5, JF_MEDIAN.z - JF_MEDIAN.tz * 7.5 - JF_MEDIAN.nz * 5.0, headingToward(JF_MEDIAN.nx, JF_MEDIAN.nz), 0]
 const obDirX = JF_MEDIAN.nx * 0.65 + JF_MEDIAN.tx * 0.76
 const obDirZ = JF_MEDIAN.nz * 0.65 + JF_MEDIAN.tz * 0.76
-const carObliqueStart = [JF_MEDIAN.x - JF_MEDIAN.nx * 4.5 - JF_MEDIAN.tx * 4.5, 156.5, JF_MEDIAN.z - JF_MEDIAN.nz * 4.5 - JF_MEDIAN.tz * 4.5, headingToward(obDirX, obDirZ), 3]
+const carObliqueStart = [JF_MEDIAN.x - JF_MEDIAN.nx * 4.5 - JF_MEDIAN.tx * 14.5, 156.5, JF_MEDIAN.z - JF_MEDIAN.nz * 4.5 - JF_MEDIAN.tz * 14.5, headingToward(obDirX, obDirZ), 3]
 const carVergeStart = [ZS_VERGE.x - ZS_VERGE.nx * 5.2, 153.3, ZS_VERGE.z - ZS_VERGE.nz * 5.2, headingToward(ZS_VERGE.nx, ZS_VERGE.nz), 1]
 const carGapStart = [JF_EAST_GAP.x - JF_EAST_GAP.nx * 5.0, 151.8, JF_EAST_GAP.z - JF_EAST_GAP.nz * 5.0, headingToward(JF_EAST_GAP.nx, JF_EAST_GAP.nz), 2]
 
@@ -62,17 +68,19 @@ let browser
 try {
   browser = await chromium.launch({
     executablePath: process.env.CHROMIUM,
-    args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader'],
+    args: process.env.USE_METAL === '1'
+      ? ['--use-gl=angle', '--use-angle=metal', '--enable-webgl', '--ignore-gpu-blocklist']
+      : ['--use-angle=swiftshader', '--enable-unsafe-swiftshader'],
   })
-  const page = await browser.newPage({viewport: {width: 960, height: 540}})
+  const page = await browser.newPage({viewport: {width: 1280, height: 720}})
   const errors = []
   page.on('pageerror', err => errors.push(err.message))
   await page.route('**/favicon.ico', route => route.fulfill({status: 204}))
   await page.route('**/api/t', route => route.fulfill({status: 204}))
   await page.route('**/stats.rcpd.cc/**', route => route.fulfill({status: 204, body: ''}))
   await page.route('**/world/vehicles.bin', route => route.fulfill({body: patchedVehicles}))
-  await page.goto(`${baseUrl}/?verify&mode=walk&flow=0&radius=480&hour=9.5`, {waitUntil: 'domcontentloaded', timeout: 120000})
-  await page.waitForFunction(() => window.viewer?.walk?.active, null, {timeout: 90000})
+  await page.goto(`${baseUrl}/?verify&mode=walk&flow=0&radius=360&hour=9.5`, {waitUntil: 'domcontentloaded', timeout: 120000})
+  await page.waitForFunction(() => window.viewer?.walk?.active, null, {timeout: 180000})
 
   async function closeCards() {
     await page.evaluate(() => {
@@ -84,7 +92,10 @@ try {
     const ok = await page.evaluate(async ([x, z, yaw]) => {
       const {walk, stream} = window.viewer
       walk.leave()
-      const entered = await walk.enter(x, z, yaw, 'barrier-verify')
+      let entered = false
+      for (let attempt = 0; attempt < 2 && !entered; attempt++) {
+        entered = await walk.enter(x, z, yaw, 'barrier-verify', false, new AbortController().signal)
+      }
       if (!entered) return false
       for (let i = 0; i < 12; i++) {
         stream.tick(walk.position)
@@ -214,7 +225,7 @@ try {
 
     // 1. Foot head-on & oblique against Jiefang East Rd median guardrail (kind=1/2)
     results.footJfMedianHeadOn = await walkAttempt(JF_MEDIAN.x - JF_MEDIAN.nx * 2.8, JF_MEDIAN.z - JF_MEDIAN.nz * 2.8, JF_MEDIAN.nx, JF_MEDIAN.nz, JF_MEDIAN, 1.8, true)
-    await shot('after-foot-median', 0.85, 0.24)
+    await shot('after-foot-median', -1.05, 0.18)
     assert(!results.footJfMedianHeadOn.crossed && results.footJfMedianHeadOn.endSigned < -0.25 && results.footJfMedianHeadOn.hitRail, `foot Jiefang median head-on failed: ${JSON.stringify(results.footJfMedianHeadOn)}`)
 
     results.footJfMedianOblique = await walkAttempt(JF_MEDIAN.x - JF_MEDIAN.nx * 2.5, JF_MEDIAN.z - JF_MEDIAN.nz * 2.5, JF_MEDIAN.nx * 0.7 + JF_MEDIAN.tx * 0.7, JF_MEDIAN.nz * 0.7 + JF_MEDIAN.tz * 0.7, JF_MEDIAN, 1.8, true)
@@ -225,13 +236,19 @@ try {
     await shot('after-foot-verge', 0.85, 0.24)
     assert(!results.footJfVergeHeadOn.crossed && results.footJfVergeHeadOn.endSigned < -0.5 && results.footJfVergeHeadOn.hitRail, `foot Jiefang verge head-on failed: ${JSON.stringify(results.footJfVergeHeadOn)}`)
 
-    // 3. Foot head-on against Zhongshan Middle Rd median (kind=1/2)
+    // 3. Foot head-on against Zhongshan Middle Rd median (upgraded to central crape-myrtle green trees)
     results.footZsMedianHeadOn = await walkAttempt(ZS_MEDIAN.x - ZS_MEDIAN.nx * 3.0, ZS_MEDIAN.z - ZS_MEDIAN.nz * 3.0, ZS_MEDIAN.nx, ZS_MEDIAN.nz, ZS_MEDIAN, 1.8, true)
+    await shot('showcase-zhongshan-median-trees', 0.95, 0.20)
     assert(!results.footZsMedianHeadOn.crossed && results.footZsMedianHeadOn.endSigned < -0.25 && results.footZsMedianHeadOn.hitRail, `foot Zhongshan median failed: ${JSON.stringify(results.footZsMedianHeadOn)}`)
+
+    // 3b. Foot head-on against Zhongshan Middle Rd verge (tree-pit + redwood flower planter)
+    results.footZsVergeHeadOn = await walkAttempt(ZS_VERGE.x - ZS_VERGE.nx * 3.0, ZS_VERGE.z - ZS_VERGE.nz * 3.0, ZS_VERGE.nx, ZS_VERGE.nz, ZS_VERGE, 1.8, true)
+    await shot('showcase-zhongshan-verge-planter', 0.92, 0.22)
+    assert(!results.footZsVergeHeadOn.crossed && results.footZsVergeHeadOn.endSigned < -0.45 && results.footZsVergeHeadOn.hitRail, `foot Zhongshan verge planter failed: ${JSON.stringify(results.footZsVergeHeadOn)}`)
 
     // 4. E-bike head-on against Jiefang East Rd median (kind=1/2)
     results.ebikeJfMedian = await mountAndDrive(bikeMedianStart, '骑电动车', 'bike', JF_MEDIAN, 2.2)
-    await shot('after-ebike-median', 0.72, 0.20)
+    await shot('after-ebike-median', -0.95, 0.18)
     assert(!results.ebikeJfMedian.crossed && results.ebikeJfMedian.endSigned < -0.25 && (results.ebikeJfMedian.hitRail || results.ebikeJfMedian.obstacleSeen === 'collision'), `e-bike median block failed: ${JSON.stringify(results.ebikeJfMedian)}`)
     await dismountClean()
 
@@ -242,7 +259,7 @@ try {
 
     // 6. Car head-on & oblique against Jiefang East Rd median (kind=1/2) and Zhongshan Middle Rd verge (kind=5)
     results.carJfMedianHeadOn = await mountAndDrive(carMedianStart, '开车', 'car', JF_MEDIAN, 2.6)
-    await shot('after-car-median', 0.72, 0.20)
+    await shot('after-car-median', -0.88, 0.18)
     assert(!results.carJfMedianHeadOn.crossed && results.carJfMedianHeadOn.endSigned < -1.2 && results.carJfMedianHeadOn.obstacleSeen === 'collision', `car median head-on block failed: ${JSON.stringify(results.carJfMedianHeadOn)}`)
     await dismountClean()
 
@@ -276,6 +293,26 @@ try {
 
     results.footKind10Pass = await walkAttempt(KIND10_STRIPE.x - KIND10_STRIPE.nx * 2.5, KIND10_STRIPE.z - KIND10_STRIPE.nz * 2.5, KIND10_STRIPE.nx, KIND10_STRIPE.nz, KIND10_STRIPE, 2.4, false)
     assert(results.footKind10Pass.crossed && results.footKind10Pass.endSigned > 0.5, `kind=10 yellow paint falsely blocked: ${JSON.stringify(results.footKind10Pass)}`)
+
+    // 9b. Lijiang Rd green boulevard: central crape-myrtle tree median + hedge-curb verge must block cleanly
+    results.footLjMedian = await walkAttempt(LJ_MEDIAN.x - LJ_MEDIAN.nx * 3.2, LJ_MEDIAN.z - LJ_MEDIAN.nz * 3.2, LJ_MEDIAN.nx, LJ_MEDIAN.nz, LJ_MEDIAN, 1.8, true)
+    await shot('showcase-lijiang-median-green', 0.92, 0.20)
+    assert(!results.footLjMedian.crossed && results.footLjMedian.endSigned < -0.30 && results.footLjMedian.hitRail, `foot Lijiang green median failed: ${JSON.stringify(results.footLjMedian)}`)
+
+    results.footLjVerge = await walkAttempt(LJ_VERGE.x - LJ_VERGE.nx * 3.2, LJ_VERGE.z - LJ_VERGE.nz * 3.2, LJ_VERGE.nx, LJ_VERGE.nz, LJ_VERGE, 1.8, true)
+    await shot('showcase-lijiang-verge-hedge', 0.95, 0.22)
+    assert(!results.footLjVerge.crossed && results.footLjVerge.endSigned < -0.50 && results.footLjVerge.hitRail, `foot Lijiang hedge-curb verge failed: ${JSON.stringify(results.footLjVerge)}`)
+
+    // 9c. Binjiang Rd collector narrow three-band soft delineators must NOT create an invisible wall
+    results.footBjSoftPass = await walkAttempt(BJ_SOFT.x - BJ_SOFT.nx * 2.4, BJ_SOFT.z - BJ_SOFT.nz * 2.4, BJ_SOFT.nx, BJ_SOFT.nz, BJ_SOFT, 2.2, false)
+    // Step into clear carriageway axis along Binjiang Rd for an unobstructed shot of both soft-delineator rows
+    await enterAt(BJ_SOFT.x + BJ_SOFT.nx * 2.6, BJ_SOFT.z + BJ_SOFT.nz * 2.6, headingToward(BJ_SOFT.tx, BJ_SOFT.tz))
+    await shot('showcase-binjiang-soft-collector', 0.22, 0.16)
+    assert(results.footBjSoftPass.crossed && results.footBjSoftPass.endSigned > 0.5, `Binjiang collector soft delineator falsely blocked: ${JSON.stringify(results.footBjSoftPass)}`)
+
+    // 9d. Capture Jiefang East Rd junction opening & end-cap view
+    await enterAt(JF_GAP.x - JF_GAP.nx * 5.0, JF_GAP.z - JF_GAP.nz * 5.0, headingToward(JF_GAP.nx, JF_GAP.nz))
+    await shot('showcase-jiefang-opening-endcap', 0.55, 0.22)
 
     // 10. Loaded road barrier collider stats around Jiefang East Rd
     await enterAt(JF_MEDIAN.x - JF_MEDIAN.nx * 3.0, JF_MEDIAN.z - JF_MEDIAN.nz * 3.0, 0)

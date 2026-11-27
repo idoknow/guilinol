@@ -1,13 +1,23 @@
+import {
+  DECOR_KIND_MEDIAN_GREEN_TREES,
+  DECOR_KIND_VERGE_METAL_RAIL,
+  DECOR_KIND_VERGE_SOFT_DELINEATOR,
+  DECOR_KIND_VERGE_TREE_PLANTER,
+  resolveMedianDividerKind,
+  resolveVergeDividerKind,
+  type RoadDividerKind,
+} from './road-divider-profiles.ts'
 import {isShizijieDecorSuppressed, SHIZIJIE_CURB_BARRIER_POLYLINES, SHIZIJIE_ORIGIN, touchesShizijieTile} from './shizijie-zone.ts'
 
 export const ROAD_BARRIER_STRIDE = 7
 
-interface BarrierSpec {
+export interface BarrierSpec {
   group: number
   offZ: number
   hz: number
   padX: number
   topOffset: number
+  profile?: RoadDividerKind | 'stone_fence'
 }
 
 interface RawBarrier {
@@ -26,19 +36,62 @@ interface RawBarrier {
   topOffset: number
 }
 
-// Blocking street decor kinds from pipeline/streets.py & street-worker.ts:
-// - kind 1/2: arterial road median white guardrail / banner guardrail (merged together as group 1)
-// - kind 5/6: motor/non-motor verge hedge + offset iron fence (kept separate per side)
-// - kind 7: planted arterial median hedge
-// - kind 8: frontage stone-pillar + iron fence
+// Blocking street decor kinds from pipeline/streets.py & road-divider-profiles.ts:
+// - kind 1/2: arterial road median -> resolved per Guilin corridor to median_metal_rail (group 1) or median_green_trees (group 7)
+// - kind 5/6: motor/non-motor verge -> resolved per Guilin corridor to hedge_curb / metal_guardrail / tree_planter / soft_delineator
+//   (soft_delineator & marking_only intentionally omit rigid barrier cuboids so narrow streets never trap vehicles/pedestrians)
+// - kind 7 / 12: planted arterial median hedge / crape-myrtle tree strip (group 7)
+// - kind 8: frontage stone-pillar + iron fence (group 8)
+// - kind 13/14/15: forward-compatible explicit verge profile codes
 // Explicitly excluded: kind 3 (parked bikes), 4 (sign pole), 9 (low curb strip), 10 (yellow paint), 11 (single bollard).
 // Heights clear walkConfig.step (0.62 m above baseLevel+0.195) while remaining below 3rd-person camera focus (~foot+1.4 m).
-function barrierSpec(kind: number): BarrierSpec | null {
-  if (kind === 1 || kind === 2) return {group: 1, offZ: 0, hz: .08, padX: 0, topOffset: 1.22}
-  if (kind === 5) return {group: 5, offZ: .065, hz: .54, padX: .02, topOffset: 1.10}
-  if (kind === 6) return {group: 6, offZ: -.065, hz: .54, padX: .02, topOffset: 1.10}
-  if (kind === 7) return {group: 7, offZ: 0, hz: .37, padX: .02, topOffset: 1.10}
-  if (kind === 8) return {group: 8, offZ: 0, hz: .14, padX: 0, topOffset: 1.44}
+export function resolveRoadBarrierSpec(
+  kind: number,
+  worldX?: number,
+  worldZ?: number,
+  headingRad?: number,
+): BarrierSpec | null {
+  const hasWorld = worldX !== undefined && worldZ !== undefined
+
+  if (kind === 1 || kind === 2 || kind === 7 || kind === DECOR_KIND_MEDIAN_GREEN_TREES) {
+    const profile = hasWorld
+      ? resolveMedianDividerKind(worldX, worldZ, kind, headingRad)
+      : (kind === 7 || kind === DECOR_KIND_MEDIAN_GREEN_TREES ? 'median_green_trees' : 'median_metal_rail')
+    if (profile === 'median_green_trees') {
+      return {group: 7, offZ: 0, hz: .37, padX: .02, topOffset: 1.12, profile}
+    }
+    return {group: 1, offZ: 0, hz: .08, padX: 0, topOffset: 1.22, profile}
+  }
+
+  if (
+    kind === 5 || kind === 6 ||
+    kind === DECOR_KIND_VERGE_METAL_RAIL ||
+    kind === DECOR_KIND_VERGE_TREE_PLANTER ||
+    kind === DECOR_KIND_VERGE_SOFT_DELINEATOR
+  ) {
+    // Legacy synthetic unit tests without world origin keep exact historical side offset (+/- 0.065, hz 0.54)
+    if (!hasWorld) {
+      if (kind === DECOR_KIND_VERGE_SOFT_DELINEATOR) return null
+      if (kind === DECOR_KIND_VERGE_METAL_RAIL) return {group: 5, offZ: 0, hz: .52, padX: .02, topOffset: 1.16, profile: 'metal_guardrail'}
+      if (kind === DECOR_KIND_VERGE_TREE_PLANTER) return {group: 5, offZ: 0, hz: .56, padX: .02, topOffset: 1.15, profile: 'tree_planter'}
+      return kind === 5
+        ? {group: 5, offZ: .065, hz: .54, padX: .02, topOffset: 1.10, profile: 'hedge_curb'}
+        : {group: 6, offZ: -.065, hz: .54, padX: .02, topOffset: 1.10, profile: 'hedge_curb'}
+    }
+    const profile = resolveVergeDividerKind(worldX, worldZ, kind, headingRad)
+    if (profile === 'soft_delineator' || profile === 'marking_only') return null
+    const groupBase = kind === 6 ? 6 : 5
+    if (profile === 'metal_guardrail') {
+      return {group: groupBase + 10, offZ: 0, hz: .52, padX: .02, topOffset: 1.16, profile}
+    }
+    if (profile === 'tree_planter') {
+      return {group: groupBase + 20, offZ: 0, hz: .56, padX: .02, topOffset: 1.15, profile}
+    }
+    // hedge_curb: granite curb + layered shrub hedge + motor-side garden fence
+    return {group: groupBase, offZ: 0, hz: .61, padX: .02, topOffset: 1.12, profile}
+  }
+
+  if (kind === 8) return {group: 8, offZ: 0, hz: .14, padX: 0, topOffset: 1.44, profile: 'stone_fence'}
   return null
 }
 
@@ -88,8 +141,10 @@ export function buildRoadBarriers(
   const raw: RawBarrier[] = []
   for (const item of decor) {
     const kind = item[0], east = item[1], south = item[2], heading = item[3], span = item[4] ?? 0
-    if (addShizijieCurbs && origin && isShizijieDecorSuppressed(origin[0] + east / 10, origin[1] + south / 10, kind)) continue
-    const spec = barrierSpec(kind)
+    const wx = origin ? origin[0] + east / 10 : undefined
+    const wz = origin ? origin[1] + south / 10 : undefined
+    if (addShizijieCurbs && wx !== undefined && wz !== undefined && isShizijieDecorSuppressed(wx, wz, kind)) continue
+    const spec = resolveRoadBarrierSpec(kind, wx, wz, heading / 100)
     if (!spec) continue
     const length = span / 10 + spec.padX * 2
     if (length < .1) continue

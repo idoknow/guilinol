@@ -1,6 +1,15 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import {buildRoadBarriers, ROAD_BARRIER_STRIDE} from '../web/src/road-barriers.ts'
+import {buildRoadBarriers, resolveRoadBarrierSpec, ROAD_BARRIER_STRIDE} from '../web/src/road-barriers.ts'
+import {
+  DECOR_KIND_MEDIAN_GREEN_TREES,
+  DECOR_KIND_VERGE_METAL_RAIL,
+  DECOR_KIND_VERGE_SOFT_DELINEATOR,
+  DECOR_KIND_VERGE_TREE_PLANTER,
+  isZhongshanLandmarkMedianSuppressed,
+  resolveMedianDividerKind,
+  resolveVergeDividerKind,
+} from '../web/src/road-divider-profiles.ts'
 
 const flat = () => 150
 
@@ -98,4 +107,74 @@ test('never merges different barrier groups (e.g. kind 5 vs kind 6) or small rea
   ]
   const boxes = unpack(buildRoadBarriers(decor, flat))
   assert.equal(boxes.length, 2, '0.36m cutout gap must remain unbridged')
+})
+
+test('resolves Guilin road divider profiles per corridor and updates barrier volumes accordingly', () => {
+  // Jiefang East Rd (near Jiefang Bridge): central metal rail + white-grey metal verge guardrail
+  const jfHeading = Math.atan2(75, 290)
+  assert.equal(resolveMedianDividerKind(-544.3, -83.3, 1, jfHeading), 'median_metal_rail')
+  assert.equal(resolveVergeDividerKind(-544.1, -71.9, 5, jfHeading), 'metal_guardrail')
+  const jfMedSpec = resolveRoadBarrierSpec(1, -544.3, -83.3, jfHeading)
+  const jfVergeSpec = resolveRoadBarrierSpec(5, -544.1, -71.9, jfHeading)
+  assert.equal(jfMedSpec?.hz, 0.08)
+  assert.equal(jfVergeSpec?.hz, 0.52)
+
+  // Zhongshan Middle Rd north of Shizijie: central crape-myrtle green trees + roadside tree-pit planters
+  const zsHeading = Math.atan2(234, -47)
+  assert.equal(resolveMedianDividerKind(-838.8, -321.0, 1, zsHeading), 'median_green_trees')
+  assert.equal(resolveVergeDividerKind(-854.3, -320.4, 5, zsHeading), 'tree_planter')
+  const zsMedSpec = resolveRoadBarrierSpec(1, -838.8, -321.0, zsHeading)
+  const zsVergeSpec = resolveRoadBarrierSpec(5, -854.3, -320.4, zsHeading)
+  assert.equal(zsMedSpec?.hz, 0.37)
+  assert.equal(zsVergeSpec?.hz, 0.56)
+
+  // Lijiang Rd & Huancheng North 2nd Rd: central green trees + hedge_curb verge
+  assert.equal(resolveMedianDividerKind(350, 1905, 1, 0), 'median_green_trees')
+  assert.equal(resolveVergeDividerKind(350, 1896, 5, 0), 'hedge_curb')
+  const ljVergeSpec = resolveRoadBarrierSpec(5, 350, 1896, 0)
+  assert.equal(ljVergeSpec?.hz, 0.61)
+})
+
+test('narrow old-town streets emit zero rigid barrier walls (soft_delineator) and respect tangent alignment at junctions', () => {
+  // Narrow old-town branch (Xinyi / Liumashan Rd): soft_delineator -> no rigid wall collider
+  const xyHeading = Math.atan2(60, 35)
+  assert.equal(resolveVergeDividerKind(-1718, -625, 5, xyHeading), 'soft_delineator')
+  assert.equal(resolveRoadBarrierSpec(5, -1718, -625, xyHeading), null)
+
+  // Adjacent Jiefang West Rd arterial verge (-1000, -208) must NOT be hijacked by narrow-branch rules
+  const jfWestHeading = -2.96
+  assert.equal(resolveVergeDividerKind(-1000, -208, 5, jfWestHeading), 'metal_guardrail')
+  assert.equal(resolveRoadBarrierSpec(5, -1000, -208, jfWestHeading)?.hz, 0.52)
+
+  // Forward-compatible explicit decor kinds 12..15
+  assert.equal(resolveRoadBarrierSpec(DECOR_KIND_MEDIAN_GREEN_TREES)?.hz, 0.37)
+  assert.equal(resolveRoadBarrierSpec(DECOR_KIND_VERGE_METAL_RAIL)?.hz, 0.52)
+  assert.equal(resolveRoadBarrierSpec(DECOR_KIND_VERGE_TREE_PLANTER)?.hz, 0.56)
+  assert.equal(resolveRoadBarrierSpec(DECOR_KIND_VERGE_SOFT_DELINEATOR), null)
+
+  // Orthogonal cross street near Zhongshan Rd must not falsely inherit Zhongshan's profile
+  const eastWestHeading = 0 // perpendicular to N-S Zhongshan Rd
+  assert.equal(resolveMedianDividerKind(-838.8, -321.0, 1, eastWestHeading), 'median_metal_rail')
+
+  // Hand-modeled zhongshan_road.glb central median suppression only triggers inside [-74, 296] along centerline
+  assert.equal(isZhongshanLandmarkMedianSuppressed(-955, 76, 1), true)
+  assert.equal(isZhongshanLandmarkMedianSuppressed(-838.8, -321.0, 1), false)
+  assert.equal(isZhongshanLandmarkMedianSuppressed(-955, 76, 5), false)
+})
+
+test('buildRoadBarriers with real chunk origin upgrades Zhongshan median to green-width collider while keeping gaps open', () => {
+  const origin = [-1024, -512]
+  // Local coords inside (-1024, -512) matching Zhongshan Middle Rd north (-838.8, -321.0)
+  const lx = Math.round((-838.8 - origin[0]) * 10)
+  const lz = Math.round((-321.0 - origin[1]) * 10)
+  const h = Math.round(Math.atan2(234, -47) * 100)
+  const decor = [
+    [1, lx, lz, h, 30],
+    [1, lx - 6, lz + 29, h, 30],
+    // 5m crosswalk gap
+    [1, lx - 22, lz + 106, h, 30],
+  ]
+  const boxes = unpack(buildRoadBarriers(decor, flat, origin))
+  assert.equal(boxes.length, 2, 'crosswalk gap on Zhongshan green median must stay open')
+  assert(Math.abs(boxes[0].hz - 0.37) < 1e-4, `expected green median hz=0.37, got ${boxes[0].hz}`)
 })
