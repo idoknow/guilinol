@@ -1,12 +1,25 @@
 import unittest
 from math import cos, sin
-from shapely.geometry import Point
+from shapely.geometry import LineString, Point, box
+from shapely.ops import unary_union
 import numpy as np
 
 from airport_pavement import pavement_sources
-from airport_props import layout
+from airport_props import layout, scenery_fence
 from common import load_osm
 from play_region import PlayRegion
+
+
+class ScenicFenceTest(unittest.TestCase):
+    def test_detour_preserves_ring_except_at_game_route(self):
+        field=box(0,0,100,100)
+        buildings=box(80,30,105,50).union(box(30,30,40,40))
+        ring,=scenery_fence(field,buildings,[],field)
+        self.assertTrue(ring.is_ring)
+        self.assertAlmostEqual(ring.distance(buildings),3,delta=.02)
+        route=LineString([(0,50),(20,50)])
+        cut=unary_union(list(scenery_fence(field,buildings,[route],field)))
+        self.assertTrue(cut.equals(ring.difference(route.buffer(8))))
 
 
 class LiangjiangSnapshot(unittest.TestCase):

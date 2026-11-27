@@ -2,6 +2,7 @@
 from collections import defaultdict
 import json
 import math
+from pathlib import Path
 
 import numpy as np
 from shapely.geometry import LineString, Point, Polygon
@@ -29,6 +30,22 @@ def approach_points(tip, forward, inset):
             point=tip+station*forward+shift*right
             if inset.covers(Point(point)): yield point
 
+def scenery_fence(field, buildings, routes, bounds):
+    footprint = field.buffer(-4).difference(buildings.buffer(3))
+    public_space = unary_union([route.buffer(8) for route in routes])
+    for piece in getattr(footprint, 'geoms', [footprint]):
+        if piece.is_empty or piece.geom_type != 'Polygon': continue
+        visible = piece.exterior.difference(public_space).intersection(bounds)
+        for line in getattr(visible, 'geoms', [visible]):
+            if not line.is_empty and line.geom_type in ('LineString','LinearRing'): yield line
+
+
+def landside_routes():
+    definition = json.loads(Path(__file__).with_name('region.json').read_bytes())
+    return [LineString(route['geometry']['coordinates']) for route in definition['corridors']
+            if route['end'] == '两江机场' and route['mode'] in ('drive','walk')]
+
+
 def layout(elements, bounds, ground):
     field,sources = pavement_sources(elements)
     if field is None or not field.intersects(bounds): return {}
@@ -46,7 +63,7 @@ def layout(elements, bounds, ground):
     def angle(direction): return math.atan2(direction[0],direction[1])
     def path(kind,start,end,lift=0):
         put(kind,(np.array(start)+end)/2,angle(vector(start,end)),(1,1,np.linalg.norm(np.subtract(end,start))),lift)
-    docks=[]; bridges=[]; roads=[]
+    docks=[]; bridges=[]
     for row in elements:
         tags=row.get('tags',{}); coords=points(row)
         if row['type']!='way' or len(coords)<2: continue
@@ -59,8 +76,6 @@ def layout(elements, bounds, ground):
             put('bridgePivot',coords[-2]); put('bridgeDock',coords[-1],angle(vector(coords[-2],coords[-1])))
             docks.append(np.array(coords[-1])); bridges.append(line.buffer(1.5))
         elif tags.get('aeroway')=='navigationaid': put('beacon',line.centroid.coords[0])
-        if tags.get('highway') and tags.get('access') not in ('private','no') and line.crosses(field.boundary):
-            roads.append(line.buffer(8))
     occupied=[]; used=set(); bridge_area=unary_union(bridges)
     for index,(_,line) in enumerate(sorted(sources['parking_position'],key=lambda pair:pair[0]['id'])):
         coords=list(line.coords)
@@ -101,15 +116,13 @@ def layout(elements, bounds, ground):
         for station in np.arange(0,edge.length,120):
             point=edge.interpolate(station)
             if buildings.distance(point)>10 and bridge_area.distance(point)>6: put('mast',point.coords[0])
-    fence=field.buffer(-4).boundary.difference(unary_union([*roads,buildings.buffer(1)]))
-    for segment in getattr(fence,'geoms',[fence]):
+    for segment in scenery_fence(field, buildings, landside_routes(), bounds):
         coords=list(segment.coords)
         for start,end in zip(coords,coords[1:]):
             count=max(1,math.ceil(math.dist(start,end)/5)); delta=np.subtract(end,start)/count
             for idx in range(count):
                 first=start+idx*delta;last=first+delta
                 center=(first+last)/2
-                if not bounds.covers(Point(center)): continue
                 base,tip=ground(*first),ground(*last)
                 rows['fence'].append([round(float(value),4) for value in
                     (center[0],(base+tip)/2,center[1],angle(vector(first,last)),1,1,np.linalg.norm(delta),tip-base)])

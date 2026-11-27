@@ -34,6 +34,8 @@ if (expansion) {
 
 const SAMPLE_FRAMES = Number(process.env.PERF_FRAMES ?? 60)
 const FIRST_RUNS = Number(process.env.PERF_FIRST_RUNS ?? 5)
+const firstTimeoutMs = Number(process.env.PERF_FIRST_TIMEOUT_MS ?? 120000)
+assert.ok(Number.isSafeInteger(firstTimeoutMs) && firstTimeoutMs > 0, 'Invalid PERF_FIRST_TIMEOUT_MS')
 const trafficQuery = process.argv.includes('--traffic') ? '&traffic=1' : ''
 const OUT_FILE = process.env.PERF_OUT ?? 'captures/perf.json'
 
@@ -66,8 +68,8 @@ try {
     try {
       const page = await coldBrowser.newPage({viewport: {width: 960, height: 540}})
       await throttle(page)
-      await page.goto(`${baseUrl}/?verify&slot=N&flow=0${trafficQuery}`)
-      await page.waitForFunction(() => window.viewer?.stats.firstMs > 0, null, {timeout: 30000})
+      await page.goto(`${baseUrl}/?verify&slot=N&flow=0${trafficQuery}`, {waitUntil:'commit', timeout:firstTimeoutMs})
+      await page.waitForFunction(() => window.viewer?.stats.firstMs > 0, null, {timeout:firstTimeoutMs})
       const firstMs = await page.evaluate(() => +window.viewer.stats.firstMs.toFixed(1))
       firstFrameRuns.push(firstMs)
       const requests=await page.evaluate(()=>{
@@ -107,7 +109,7 @@ try {
     const summary = {
       timestamp: new Date().toISOString(),
       viewport: {...viewport, renderer, dpr:mobile?3:1}, build, browser:browser.version(), sampleMs,
-      cpuRate, sampleFrames: SAMPLE_FRAMES,
+      cpuRate, firstTimeoutMs, sampleFrames: SAMPLE_FRAMES,
       firstFrame: {
         runsMs: firstFrameRuns, worldBytes: firstWorldBytes, requests:firstWorldRequests,
         meanMs: count ? round(firstFrameRuns.reduce((a,b)=>a+b,0)/count,1) : null,
