@@ -81,7 +81,7 @@ function build() {
           <input type="range" data-thumb-scale min="${THUMB_SCALE_MIN}" max="${THUMB_SCALE_MAX}" step="0.05"><output data-thumb-scale-out></output>
         </label>
         <label class="set-row">
-          <span class="set-what"><b>左手模式</b><small>摇杆换到右下，跃 / 蹲 / 远近换到左下</small></span>
+          <span class="set-what"><b>左手模式</b><small>摇杆换到右下，跳、蹲、视距键换到左下</small></span>
           <input type="checkbox" data-thumb-mirror>
         </label>
         <p class="set-note">只在手机、平板触屏上生效；改完立刻生效并记住。</p>
