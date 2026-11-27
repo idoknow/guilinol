@@ -5,7 +5,7 @@ import subprocess
 from pathlib import Path
 
 import numpy as np
-from shapely import LineString, Point, Polygon, union_all
+from shapely import LineString, Point, Polygon, STRtree, union_all
 
 from check_rail_overbridges import road_faces
 from check_shanghai_overpasses import height_at
@@ -61,9 +61,46 @@ def measure(world):
     return results
 
 
+def check_carriageway(world):
+    manifest = json.loads((world / "manifest.json").read_bytes())
+    strips = [LineString([p[::2] for p in s["portals"]]).buffer(s["halfWidth"] + 2)
+              for s in manifest["tunnels"] if s.get("retainCutBanks")
+              and s["way"] in (1041976618, 459580369, 459580373, 459580376)]
+    region = union_all(strips)
+    if not strips:
+        raise ValueError("No fitted cut in the world")
+    raw_faces = subprocess.check_output(
+        [ROOT / "node_modules/.bin/tsx", ROOT / "scripts/approach-faces.ts", world, "--with-ground"],
+        input=json.dumps([region.bounds]).encode())
+    floors, outside = [], []
+    for role, xyz in map(json.loads, raw_faces.splitlines()):
+        vertices = np.asarray(xyz)
+        polygon = Polygon(vertices[:, [0, 2]])
+        if polygon.area < 1e-8 or not region.intersects(polygon):
+            continue
+        (floors if role == "graded-floor" else outside).append((polygon, vertices, role))
+    if not floors:
+        raise ValueError("No finished carriageway triangles")
+    index = STRtree([p for p, _, _ in floors])
+    failures, maximum = 0, 0.
+    for polygon, vertices, role in outside:
+        for k in index.query(polygon, predicate="intersects"):
+            deck, slab, _ = floors[k]
+            overlap = polygon.intersection(deck)
+            if overlap.area < 1e-5:
+                continue
+            xy = np.asarray(overlap.exterior.coords)
+            excess = float(np.max(height_at(vertices, xy) - height_at(slab, xy)))
+            maximum = max(maximum, excess)
+            failures += excess > .05
+    return dict(over5cm=failures, maximumM=maximum)
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("world", type=Path)
-    rows = measure(parser.parse_args().world)
-    print(json.dumps(rows, indent=2))
-    raise SystemExit(int(any(row["minimumM"] < row["targetM"] for row in rows)))
+    world = parser.parse_args().world
+    rows = measure(world)
+    reverse = check_carriageway(world)
+    print(json.dumps(dict(crossings=rows, reverse=reverse), indent=2))
+    raise SystemExit(int(bool(reverse["over5cm"]) or any(row["minimumM"] < row["targetM"] for row in rows)))
