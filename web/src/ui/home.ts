@@ -167,11 +167,12 @@ export function home(play:(mode:PlayMode)=>void):Home {
     if(!swoop) syncHolds()
   }
   // The menu covers the left column (desktop), the title + thumb zone at the bottom (portrait phone: the title sits right
-  // above the modes) or the right column (landscape phone); the scene frames the hero and landmarks in the rest.
+  // above the modes) or the left column (landscape phone, same side as desktop); the scene frames the hero and landmarks in
+  // the rest.
   const safe = ()=>narrow.matches
     ? {left:0, right:0, bottom:Math.max(0, innerHeight - title.getBoundingClientRect().top + 8)}
     : short.matches
-      ? {left:0, right:Math.max(0, innerWidth - modes.getBoundingClientRect().left + 8), bottom:0}
+      ? {left:Math.max(0, modes.getBoundingClientRect().right + 8), right:0, bottom:0}
       : {left:Math.max(0, main.getBoundingClientRect().right - 40), right:0, bottom:0}
   const resafe = ()=>{cover?.setSafeArea(safe())}
   new ResizeObserver(resafe).observe(main)

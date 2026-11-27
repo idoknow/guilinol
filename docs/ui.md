@@ -57,7 +57,7 @@ S1（2026-11）重做了「游戏外」界面（主界面、账号、加载、�
 | `--ui-fs-lg` | 20px | 对话框标题、模式名 |
 | `--ui-fs-xl` | 28px | 页标题 |
 | `--ui-fs-2xl` | 44px | 手机上的封面书名、少数大数字 |
-| `--ui-fs-3xl` | 60px | 大标题上限。封面书名是例外的字标（IDOK-468）：「网上」竖排一列 +「桂林」两枚大字，字号走 `.home-title` 的 `--h1`（电脑 88–112px、竖屏手机 72–88px、横屏 54–68px）；Logo 去白底垫在「桂」下方当底座（位置按 brand-wordmark.py 打印的「桂」墨迹框）；竖屏手机书名压在目录正上方，上半屏留给封面场景。「桂林」用马善政体（Ma Shan Zheng，OFL）轮廓做 CSS 遮罩字标（`web/src/ui/home-wordmark.svg`，`scripts/brand-wordmark.py` 生成），「桂」高「林」低错落；h1 文字仍是「网上桂林」；页面不加载书法字体 |
+| `--ui-fs-3xl` | 60px | 大标题上限。封面书名是例外的字标（IDOK-468）：「网上」竖排一列 +「桂林」两枚大字，字号走 `.home-title` 的 `--h1`（电脑 88–112px、竖屏手机 72–88px、横屏 54–68px）；Logo 去白底垫在「桂」下方当底座（位置按 brand-wordmark.py 打印的「桂」墨迹框）；竖屏手机书名压在目录正上方，上半屏留给封面场景；横屏手机目录在左（同电脑），书名在右下、落在人物脚边，夕阳和象鼻山露在中间。「桂林」用马善政体（Ma Shan Zheng，OFL）轮廓做 CSS 遮罩字标（`web/src/ui/home-wordmark.svg`，`scripts/brand-wordmark.py` 生成），「桂」高「林」低错落；h1 文字仍是「网上桂林」；页面不加载书法字体 |
 
 - 字距：正文 `--ui-track-body`（.04em）、按钮 `--ui-track`（.1em）、标题 `--ui-track-title`（.2em）、大标题 `--ui-track-display`（.32em）。行高 `--ui-lh-tight`（1.25）/ `--ui-lh`（1.65）。
 
