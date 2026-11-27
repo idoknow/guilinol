@@ -30,12 +30,18 @@ body[data-home] :is(.hud-me,.dock,.sky-ui,.hint,footer,.walk-ui,.vehicle-action,
   width:min(560px,100%);padding:calc(48px + env(safe-area-inset-top)) calc(24px + env(safe-area-inset-right)) var(--ui-s-4) calc(clamp(24px,7vw,112px) + env(safe-area-inset-left))}
 
 /* 书名（IDOK-468 二改）：一枚字标——「网上」竖排一列，「桂林」两枚大字，像刻本题签的「小字领、大字立」，四字仍按「网上桂林」读。
-   像素徽标去掉白底（emblem-clear.webp），收成「林」字右下角的落款，只陪衬不抢镜。字号走 --h1，徽标跟着字号缩放。 */
-.home-title{--h1:clamp(88px,12.6vh,112px);display:flex;align-items:flex-end;gap:calc(var(--h1) * .14)}
-.home-title h1{display:flex;align-items:stretch;gap:calc(var(--h1) * .1);margin:0 0 0 -.04em;font:700 var(--h1)/1 var(--ui-serif);
-  text-shadow:0 2px 24px color-mix(in srgb,var(--ui-ink-950) 55%,transparent)}
+   像素徽标去掉白底（emblem-clear.webp），收成「林」字右下角的落款，只陪衬不抢镜。字号走 --h1，徽标跟着字号缩放。
+   「桂林」是马善政体轮廓做的遮罩字标（home-wordmark.svg，scripts/brand-wordmark.py 生成），「桂」高「林」低；文字留在视觉隐藏的 span 里。
+   字标是遮罩背景，text-shadow 不生效，阴影放在 h1 的 drop-shadow 上。 */
+.home-title{--h1:clamp(88px,12.6vh,112px);
+  --wm-ratio:1.723; /* 字标宽高比，由 scripts/brand-wordmark.py 打印 */
+  display:flex;align-items:flex-end;gap:calc(var(--h1) * .14);padding-left:calc(var(--h1) * .14)}
+.home-title h1{display:flex;align-items:stretch;gap:calc(var(--h1) * .1);margin:0;font:700 var(--h1)/1 var(--ui-serif);
+  filter:drop-shadow(0 2px 18px color-mix(in srgb,var(--ui-ink-950) 55%,transparent))}
 .home-h1-net{writing-mode:vertical-rl;padding:.06em .22em 0 0;border-right:1px solid var(--ui-line-strong);font-size:.4em;font-weight:600;letter-spacing:.2em}
-.home-h1-city{letter-spacing:.04em}
+.home-h1-city{position:relative;display:block;flex:none;height:calc(var(--h1) * 1.2);aspect-ratio:var(--wm-ratio,1.6);
+  background:currentColor;-webkit-mask:url(./home-wordmark.svg) left bottom/contain no-repeat;mask:url(./home-wordmark.svg) left bottom/contain no-repeat}
+.home-h1-city>span{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
 .home-seal{display:block;flex:none;margin-bottom:calc(var(--h1) * .05)}
 .home-seal img{display:block;width:auto;height:calc(var(--h1) * .36)}
 
