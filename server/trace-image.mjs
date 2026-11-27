@@ -1,10 +1,34 @@
 import sharp from 'sharp'
 import {decodeGray,decodePeriodic} from './trace-qim.mjs'
 
+/** 连续尺度扫描：截图被缩放（聊天软件压缩、HiDPI 截屏）后 8×8 网格会错位，
+ *  这里对中心区域按比例重采样再折叠解码，覆盖 0.5×~2.0× 的任意缩放。 */
+function sweepScales(data,width,height,key){
+  const cropW=Math.min(width,1024), cropH=Math.min(height,768)
+  const left=Math.floor((width-cropW)/2), top=Math.floor((height-cropH)/2)
+  const crop=new Float32Array(cropW*cropH)
+  for(let row=0;row<cropH;row++)for(let col=0;col<cropW;col++)crop[row*cropW+col]=data[(top+row)*width+left+col]
+  for(let s=0.5;s<=2.0001;s+=0.05){
+    const cols=Math.max(128,Math.round(cropW*s)), rows=Math.max(32,Math.round(cropH*s))
+    const out=new Float32Array(cols*rows)
+    for(let row=0;row<rows;row++)for(let col=0;col<cols;col++){
+      const sx=(col+.5)/s-.5, sy=(row+.5)/s-.5
+      const x0=Math.min(cropW-1,Math.max(0,Math.floor(sx))), y0=Math.min(cropH-1,Math.max(0,Math.floor(sy)))
+      const x1=Math.min(cropW-1,x0+1), y1=Math.min(cropH-1,y0+1)
+      const dx=Math.min(1,Math.max(0,sx-x0)), dy=Math.min(1,Math.max(0,sy-y0))
+      out[row*cols+col]=(1-dy)*((1-dx)*crop[y0*cropW+x0]+dx*crop[y0*cropW+x1])+dy*((1-dx)*crop[y1*cropW+x0]+dx*crop[y1*cropW+x1])
+    }
+    const result=decodePeriodic(out,cols,rows,key,true)??decodePeriodic(out,cols,rows,key,false,true)
+    if(result)return result
+  }
+  return null
+}
+
 export async function decodeImage(data,width,height,key){
   const direct=decodeGray(data,width,height,key)
   if(direct)return direct
   const quiet=decodePeriodic(data,width,height,key,true)??decodePeriodic(data,width,height,key,false,true);if(quiet)return quiet
+  const swept=sweepScales(data,width,height,key);if(swept)return swept
   if(width>=256&&height>=256){
     for(const [left,top] of [[0,0],[width-256,0],[0,height-256],[width-256,height-256]]){
       const region=Buffer.alloc(256*256)

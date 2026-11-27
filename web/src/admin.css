@@ -892,6 +892,7 @@ a.adm-kpi:hover{border-color:var(--ui-jade-500);box-shadow:var(--ui-shadow-1);tr
 .adm-sec-cap.is-clear .adm-card-head{padding-bottom:14px}
 .adm-sec-cap.is-clear .adm-card-body,.adm-sec-cap.is-clear .adm-cap-filter{display:none}
 .adm-cap-filter{display:flex;align-items:center;gap:6px}
+.adm-cap-tools{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
 .adm-cap-filter .adm-select{width:auto;max-width:118px;padding:4px 22px 4px 8px;font-size:12.5px}
 .adm-cap-filter input{width:76px;min-width:0;padding:4px 8px;font:12.5px/1.4 var(--num);color:var(--ui-ink);background:var(--ui-paper-hi);border:1px solid var(--ui-paper-line);border-radius:var(--ui-r-sm)}
 .adm-cap-filter input:focus{outline:none;border-color:var(--ui-jade-500);box-shadow:0 0 0 3px rgba(79,127,122,.18)}

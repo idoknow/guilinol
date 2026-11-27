@@ -2246,7 +2246,20 @@ const pages: Record<string, (view: View) => void> = {
       className: 'adm-sec-bans',
       actions: [manualToggle, navLink('操作记录', { view: 'audit', target_type: 'mp' }, { class: 'adm-link' }), navLink('封禁申诉', { view: 'feedback', status: '', kind: '封禁申诉' }, { class: 'adm-link' })],
     })
-    const captureWrap = card(h('span', { class: 'adm-sec-title' }, '自动抓拍', captureCount), captureSlot, { actions: captureFilter, className: 'adm-sec-cap' })
+    const captureClear = h('button', { type: 'button', class: 'adm-btn adm-btn--sm adm-btn--seal', title: '按当前筛选删除抓拍（最多 500 条）' }, '全部删除') as HTMLButtonElement
+    captureClear.onclick = () => void act(captureClear, async () => {
+      const filter: Record<string, string> = {}
+      if (captureKind.value) filter.kind = captureKind.value
+      const uidText = captureUid.value.trim()
+      if (/^\d+$/.test(uidText)) filter.uid = uidText
+      const scope = [filter.uid && `UID ${filter.uid}`, filter.kind && (kindLabel[filter.kind] ?? filter.kind)].filter(Boolean).join(' · ') || '全部抓拍'
+      if (await confirmDialog({ title: '删除抓拍', body: h('p', null, `将永久删除${scope}，一次最多 500 条（含图片）。`), confirm: '全部删除', tone: 'seal' }) === null) return
+      const result = await api<{ deleted?: number }>(`admin/mp/cheat-captures?${new URLSearchParams(filter)}`, undefined, 'DELETE')
+      toast(`已删除 ${Number(result?.deleted ?? 0)} 条抓拍`)
+      capPage = 0
+      await loadCaptures()
+    })
+    const captureWrap = card(h('span', { class: 'adm-sec-title' }, '自动抓拍', captureCount), captureSlot, { actions: h('div', { class: 'adm-cap-tools' }, captureFilter, captureClear), className: 'adm-sec-cap' })
     const guardCard = card('防护状态', guardSlot, { actions: guardMeta, className: 'adm-sec-guard' })
     paintTop(views.find((v) => v.key === 'security')!, [
       h('span', { class: 'adm-live-dot', role: 'img', 'aria-label': '每 10 秒自动刷新', title: '每 10 秒自动刷新' }),
