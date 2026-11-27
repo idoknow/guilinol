@@ -47,8 +47,9 @@ export function yangqiaoDeck(tile:{x:number,z:number},deck:Float32Array,thin:Set
     const faces=[[quad[0],quad[1],quad[2]],[quad[0],quad[2],quad[3]]]
     for(const face of faces)for(const piece of carve(face,tileExterior)??[face]){
       const first=result.length/9;fan(piece,result)
-      if(col!==2)fan(piece,walkPaving)
-      for(let index=first;index<result.length/9;index++){newThin.add(index);if(col===2)newAsphalt.push(index);else pavedTops.add(index)}
+      const band=profile.bands[col]
+      if(band==='walk')fan(piece,walkPaving)
+      for(let index=first;index<result.length/9;index++){newThin.add(index);if(band==='asphalt')newAsphalt.push(index);else if(band==='walk')pavedTops.add(index)}
     }
   }
   if(streets.surface)streets.surface=carvePaving(streets.surface,[planes])
@@ -66,7 +67,8 @@ export function yangqiaoDeck(tile:{x:number,z:number},deck:Float32Array,thin:Set
 export function approachDecor(tile:{x:number,z:number},decor:number[][]){
   if(tile.z!==256||!(tile.x===-1280||tile.x===-1024))return decor
   const end=profile.stations.length-1
-  const lane=[vertex(tile,0,2),vertex(tile,0,3),vertex(tile,end,3),vertex(tile,end,2)]
+  const road=profile.bands.indexOf('asphalt')
+  const lane=[vertex(tile,0,road),vertex(tile,0,road+1),vertex(tile,end,road+1),vertex(tile,end,road)]
   for(const [near,far] of [[0,3],[1,2]]){
     const dx=lane[far][0]-lane[near][0],dz=lane[far][2]-lane[near][2],scale=10/Math.hypot(dx,dz)
     lane[near][0]-=dx*scale;lane[near][2]-=dz*scale;lane[far][0]+=dx*scale;lane[far][2]+=dz*scale

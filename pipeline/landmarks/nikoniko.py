@@ -559,6 +559,7 @@ class Builder:
         self.follow_grade = False
         self.visible = []
         self.named_parts = {}
+        self.named_solids = {}
         self.uv = []
         self.tiled = {k: [] for k in self.TILED_SCALES}
         self.sign_tris = []
@@ -1059,6 +1060,9 @@ def export_landmark(name, build_fn, *, reuse_atlas=False):
         if lod == 0 and builder.solid:
             coll = pack_tris(builder.solid)
             scene.add_geometry(coll, node_name='collision_surface')
+        if lod == 0:
+            for part, triangles in builder.named_solids.items():
+                scene.add_geometry(pack_tris(triangles), node_name=f'collision_{part}')
 
     out_dir = Path(sys.argv[1])
     out_dir.mkdir(parents=True, exist_ok=True)

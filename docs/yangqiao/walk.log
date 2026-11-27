@@ -4,4 +4,5 @@ ronghuBank {"ok":true,"totalTicks":222,"resets":0,"stalls":0}
 shanhuBank {"ok":true,"totalTicks":234,"resets":0,"stalls":0}
 westApproaches {"ok":true,"totalTicks":485,"resets":0,"stalls":0}
 eastApproaches {"ok":true,"totalTicks":475,"resets":0,"stalls":0}
-crossing {"ok":true,"totalTicks":251,"resets":0,"stalls":0,"seams":{"-0.18:0.125":0.003662109375,"-0.18:0.875":0.001953125,"0:0.125":0.00146484375,"0:0.875":0.000732421875,"1:0.125":0,"1:0.875":0.00048828125,"1.18:0.125":0.001953125,"1.18:0.875":0.000244140625,"inner:0.25":0.000244140625,"inner:0.765":0.00048828125}}
+crossing {"ok":true,"totalTicks":259,"resets":0,"stalls":0,"seams":{"-0.18:0.125":0.003662109375,"-0.18:0.875":0.001953125,"0:0.125":0.001953125,"0:0.875":0.0009765625,"1:0.125":0.000244140625,"1:0.875":0.00048828125,"1.18:0.125":0.001953125,"1.18:0.875":0.000244140625,"inner:0.25":0.000244140625,"inner:0.765":0.00048828125}}
+northWestSidewalk {"ok":true,"totalTicks":194,"resets":0,"stalls":0,"start":[-1033.2,253],"finish":[-1022.1614990234375,223.3375701904297],"metres":31.649774817797013}

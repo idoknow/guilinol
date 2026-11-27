@@ -38,6 +38,7 @@ def pedestrian_wings(builder, anchor):
     for side, inward in [(.001, .005), (.999, -.005)]:
         for bay in range(14):
             first = len(builder.visible)
+            solid_start = len(builder.solid)
             start, end = bay / 14, (bay + 1) / 14
             for base, cap in [(0, .19), (.86, 1)]:
                 section = [(side, base), (side, cap), (side + inward, cap), (side + inward, base)]
@@ -49,9 +50,11 @@ def pedestrian_wings(builder, anchor):
                 x, base, z = station(middle, side + inward / 2, .18)
                 builder.cylinder_y(x, base, .70, z, .065, 'white', sections=8, collide=True)
             for along in ([start, end] if bay == 13 else [start]):
-                x, level, z = station(along, side + inward, 0)
+                x, level, z = station(along, side + inward / 2, 0)
                 builder.box(x, level, z, .32, 1.15, .32, 'stone', collide=True)
             bank = 'west' if inward > 0 else 'east'
+            builder.named_solids.setdefault('yangqiao_rail', []).extend(builder.solid[solid_start:])
+            del builder.solid[solid_start:]
             builder.named_parts[f'yangqiao_rail_{bank}_{bay:02d}'] = (builder.visible[first:], 'yangqiao_rail', [211,211,211,255])
             del builder.visible[first:], builder.uv[first:]
         for along in (.025, .32, .68, .975):
