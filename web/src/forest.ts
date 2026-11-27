@@ -2,7 +2,7 @@ import {TileGrid, streamBudget, tileEdgeDistance} from './tile-grid'
 import * as THREE from 'three'
 import {applyTreeVariant, setTreeFar, sharedProxyAssets, TREE_SPECIES_COUNT, treeFar, treeNearAsset} from './look/trees'
 import {look} from './look/config'
-import {fetchAsset,type Tile} from './world'
+import {fetchAsset,treeGroundGrade,type Tile} from './world'
 import {groundStairwellsReady,treeBlocked} from './tunnels'
 import {isOuterOsmanthus} from './outer-osmanthus'
 import {onOldSouthSlope,slopeStart,slopeRatio,yueyaShoulderHeight} from './yueya-slope'
@@ -57,6 +57,7 @@ export async function readTrees(tile:Tile,signal:AbortSignal){
   const data=new DataView(await new Response(new Blob([raw]).stream().pipeThrough(new DecompressionStream('gzip'))).arrayBuffer())
   if(data.byteLength%12)throw Error('Invalid vegetation payload')
   await groundStairwellsReady
+  const grade=await treeGroundGrade(tile,signal)
   const trees:Tree[]=[],up=new THREE.Vector3(0,1,0),nVec=new THREE.Vector3()
   // Two matrices and two RGB triples per tree, packed directly at GPU
   // precision. Physics keeps lightweight tree identities for trunk colliders.
@@ -68,6 +69,7 @@ export async function readTrees(tile:Tile,signal:AbortSignal){
     const x=tile.x+data.getUint16(i,true)/100
     let y=data.getInt16(i+4,true)/10
     let z=tile.z+data.getUint16(i+2,true)/100
+    if(grade)y=grade.rootHeight(x-tile.x,z-tile.z,y)
     const slopeTree=data.getInt8(i+10)||data.getInt8(i+11)
     if(slopeTree)y=yueyaShoulderHeight(x,y,z)
     if(slopeTree&&onOldSouthSlope(x,z)){

@@ -13,7 +13,7 @@ export {blendPasserbyWeights, syncPasserbyActions}
 // and starter looks as players, and actually walk (walk clip, stride matched to their speed). Far
 // pedestrians stay in the traffic BatchedMesh as one-draw stand-ins.
 
-type Walker = {x:number,y:number,z:number,yaw:number,speed:number,scale:number,down:number,kind:string,leaving:boolean,squeeze?:number}
+type Walker = {x:number,y:number,z:number,yaw:number,speed:number,scale:number,down:number,kind:string,leaving:boolean,squeeze?:number,laneCompliant?:boolean,encroachmentKind?:string}
 export type PasserbyTemplate = {scene:THREE.Object3D,clips:THREE.AnimationClip[]}
 type Template = PasserbyTemplate
 /** One cloned passer-by and its walk/idle clips. */
@@ -306,6 +306,8 @@ export function crowd(scene:THREE.Scene,camera:THREE.Camera,groundAt?:(x:number,
         return {
           x:v.root.position.x,y:v.root.position.y,z:v.root.position.z,
           speed:walker.speed,moving:v.moving,walkWeight:v.walkWeight,
+          laneCompliant:walker.laneCompliant!==false,
+          encroachmentKind:walker.encroachmentKind??'none',
           walkEnabled:!!v.walk?.enabled,idleEnabled:!!v.idle?.enabled,
           walkEff:v.walk?.getEffectiveWeight()??0,idleEff:v.idle?.getEffectiveWeight()??0,
           leftArmDownDeg:armDown(v.root,'l'),rightArmDownDeg:armDown(v.root,'r'),

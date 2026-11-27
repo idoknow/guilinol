@@ -34,7 +34,94 @@ export type TrafficViolation =
   | 'wrong_way'
   | 'illegal_mod'
   | 'red_light_run'
+  | 'sidewalk_riding'
 export type ActiveTrafficViolation = Exclude<TrafficViolation, 'none'>
+export const ALL_ACTIVE_TRAFFIC_VIOLATIONS: readonly ActiveTrafficViolation[] = Object.freeze([
+  'no_helmet',
+  'ebike_overload',
+  'bike_double',
+  'wrong_way',
+  'illegal_mod',
+  'red_light_run',
+  'sidewalk_riding',
+])
+export const TRAFFIC_VIOLATION_BITS: Readonly<Record<ActiveTrafficViolation, number>> = Object.freeze({
+  no_helmet: 1 << 0,
+  ebike_overload: 1 << 1,
+  bike_double: 1 << 2,
+  wrong_way: 1 << 3,
+  illegal_mod: 1 << 4,
+  red_light_run: 1 << 5,
+  sidewalk_riding: 1 << 6,
+})
+export type NpcLaneRuleKind = 'sidewalk' | 'nonmotor' | 'motor'
+export type LaneEncroachmentKind =
+  | 'none'
+  | 'scooter_on_sidewalk'
+  | 'scooter_on_motor_lane'
+  | 'pedestrian_jaywalk'
+  | 'car_edge_encroach'
+export type SecondaryTrafficViolation = Exclude<ActiveTrafficViolation, 'no_helmet'>
+export interface TrafficViolationPolicy {
+  /** 全城三道守规基准率（默认 0.95；余下 0.05 为越界/不规范借道）。 */
+  laneComplianceRate?: number
+  /** 全城/区域非机动车总体违规率（默认 0.60；交警剧情模式可动态上调）。 */
+  nonmotorViolationRate?: number
+  /** 违规非机动车中包含未戴头盔（no_helmet）的条件概率（默认 0.80）。 */
+  noHelmetGivenViolatorRate?: number
+  /** 违规非机动车叠加 2 项及以上违章的概率（默认 0.45）。 */
+  multiViolationStackRate?: number
+  /** 是否允许生成 sidewalk_riding（走人行道）违规；常态全城默认 true，解放桥非剧情默认 false。 */
+  allowSidewalkRiding?: boolean
+  /** 在次级违章池中为 sidewalk_riding 额外加权（>0 时在非越界槽也可叠加生成，供剧情模式使用）。 */
+  sidewalkRidingWeight?: number
+  /** 允许逆行（默认 true）。 */
+  allowWrongWay?: boolean
+  /** 允许闯红灯（默认仅在信号灯路口启用）。 */
+  allowRedLightRun?: boolean
+  /** 越界非机动车中走人行道的比例（余下走机动车道；默认 0.60）。 */
+  sidewalkShareInEncroach?: number
+  /** 次级违章相对权重覆写（不含 no_helmet）。 */
+  secondaryWeights?: Partial<Record<SecondaryTrafficViolation, number>>
+}
+export interface DutyStoryOverrideConfig extends TrafficViolationPolicy {
+  /** 是否激活交警剧情覆盖模式（默认 true）。 */
+  active?: boolean
+  /** 区域期望机动车数量覆盖。 */
+  desiredCars?: number
+  /** 区域期望非机动车数量覆盖。 */
+  desiredScooters?: number
+  /** 区域违规车辆占总车流上限覆盖（例如剧情模式设 1.0）。 */
+  maxViolatorRatio?: number
+  /** 区域并发未开单违规车上限覆盖。 */
+  maxConcurrentViolators?: number
+  /** 开单后违规车刷新冷却时间覆盖（秒）。 */
+  violatorCooldownSec?: number
+  /** 兼容旧版权重表覆写。 */
+  weights?: DutyViolationWeights
+}
+export interface ActorViolationSnapshot {
+  actor: Actor
+  actorId: string
+  kind: Actor['kind']
+  vehicleSubtype: VehicleSubtype | undefined
+  violation: TrafficViolation
+  violations: ActiveTrafficViolation[]
+  violationMask: number
+  hasNoHelmet: boolean
+  hasSidewalkRiding: boolean
+  laneCompliant: boolean
+  encroachmentKind: LaneEncroachmentKind
+  cited: boolean
+  dutyState: DutyBehaviorState
+  x: number
+  y: number
+  z: number
+  yaw: number
+  speed: number
+  headingX: number
+  headingZ: number
+}
 export type VehicleSubtype = 'ebike' | 'bicycle'
 export type DutyViolationWeights = Partial<Record<TrafficViolation, number>>
 export type HitSeverity = 'light' | 'medium' | 'heavy'
@@ -182,6 +269,10 @@ export type DutyTrafficConfig = {
   computePullOverTarget?:(actor:Actor)=>{targetDodge:number;targetLocalZ:number}
   /** Optional off-bridge hidden spawn/recycle lifecycle gate (r8-1). */
   hiddenLifecycle?:DutyHiddenLifecycleConfig
+  /** Optional runtime violation & compliance policy overrides. */
+  policy?:TrafficViolationPolicy
+  /** Optional dynamic story-mode override (density, sidewalk_riding, violation rate). */
+  storyOverride?:DutyStoryOverrideConfig|null
 }
 function trackHeight(track:Track,dist:number){
   if(track.floor)return axleHeight(track,dist)
@@ -199,7 +290,8 @@ export type Actor = {
   track:Track,dist:number,speed:number,pace?:number,kind:'car'|'scooter'|'person',down:number,dodge:number,
   x:number,y:number,z:number,yaw:number,scale:number,leaving:boolean,halfWidth:number,halfLength:number,height:number,
   holdUntil?:number,waitingFor?:Actor,waitingSince?:number,waitingAtGate?:boolean,squeeze?:number,backing?:boolean,
-  violation?:TrafficViolation,violations?:ActiveTrafficViolation[],vehicleSubtype?:VehicleSubtype,stoppedUntil?:number,cited?:boolean,
+  violation?:TrafficViolation,violations?:ActiveTrafficViolation[],violationMask?:number,vehicleSubtype?:VehicleSubtype,stoppedUntil?:number,cited?:boolean,
+  laneCompliant?:boolean,encroachmentKind?:LaneEncroachmentKind,encroachOffset?:number,
   wrongWay?:boolean,redLightActive?:boolean,redLightTrailDist?:number,
   dutyState?:DutyBehaviorState,fleeUntil?:number,haltedByDuty?:boolean,brakingForOfficer?:boolean,lastPlayerHitAt?:number,
   honkingForOfficer?:boolean,lastHornAt?:number,hornCount?:number,officerWarningSince?:number,
@@ -218,7 +310,13 @@ export const MAX_ACTORS=100
 export const MOBILE_ACTORS=80
 export const MAX_PLAYER_HIT_SPEED_KMH=25
 export const WHISTLE_FLEE_SURRENDER_PROB=0.4
-export const OVERLOAD_NO_HELMET_STACK_PROB=0.55
+export const CITY_LANE_COMPLIANCE_RATE=0.95
+export const CITY_LANE_ENCROACHMENT_RATE=1-CITY_LANE_COMPLIANCE_RATE
+export const CITY_NONMOTOR_VIOLATION_RATE=0.60
+export const VIOLATOR_NO_HELMET_CONDITIONAL_RATE=0.80
+export const MULTI_VIOLATION_STACK_PROB=0.45
+export const SECONDARY_VIOLATION_STACK_PROB=0.28
+export const OVERLOAD_NO_HELMET_STACK_PROB=VIOLATOR_NO_HELMET_CONDITIONAL_RATE
 export const POST_TICKET_SLOW_DURATION_S=3.0
 export const POST_TICKET_SLOW_MAX_SPEED_MS=2.2
 const MAX_PLAYER_HIT_SPEED_MS=24.5/3.6
@@ -238,11 +336,31 @@ const DEFAULT_DUTY_CENTER={x:-168,z:40}
 const DEFAULT_DUTY_RADIUS=240
 const SHIZIJIE_MOD_SHOP={x:-779.4,z:-162.8}
 const WRONG_WAY_LATERAL_OFFSET=-.55
+const SCOOTER_SIDEWALK_ENCROACH_OFFSET=1.65
+const SCOOTER_MOTOR_ENCROACH_OFFSET=-1.05
+const CAR_EDGE_ENCROACH_OFFSET=.36
+const DEFAULT_SECONDARY_WEIGHTS:Readonly<Record<SecondaryTrafficViolation,number>>=Object.freeze({
+  ebike_overload:26,
+  wrong_way:24,
+  illegal_mod:22,
+  bike_double:18,
+  red_light_run:6,
+  sidewalk_riding:0,
+})
+const PRIMARY_VIOLATION_ORDER:readonly ActiveTrafficViolation[]=Object.freeze([
+  'ebike_overload',
+  'bike_double',
+  'illegal_mod',
+  'sidewalk_riding',
+  'wrong_way',
+  'red_light_run',
+  'no_helmet',
+])
 const DEFAULT_AMBIENT_WEIGHTS:Record<TrafficViolation,number>={
-  none:82,no_helmet:5,ebike_overload:4,bike_double:3,illegal_mod:3,wrong_way:2,red_light_run:1,
+  none:40,no_helmet:20,ebike_overload:12,bike_double:8,illegal_mod:8,wrong_way:8,red_light_run:1,sidewalk_riding:3,
 }
 const DEFAULT_DUTY_WEIGHTS:Record<TrafficViolation,number>={
-  none:72,no_helmet:8,ebike_overload:6,bike_double:5,illegal_mod:5,wrong_way:4,red_light_run:0,
+  none:40,no_helmet:20,ebike_overload:13,bike_double:8,illegal_mod:10,wrong_way:9,red_light_run:0,sidewalk_riding:0,
 }
 const distanceSq=(left:Position,right:Position)=>(left.x-right.x)**2+(left.y-right.y)**2+(left.z-right.z)**2
 
@@ -269,61 +387,387 @@ function pointToSegmentDistSq(px:number,pz:number,ax:number,az:number,bx:number,
   return (px-ax-dx*t)**2+(pz-az-dz*t)**2
 }
 
+export function encodeViolationMask(
+  violations: readonly (TrafficViolation | null | undefined)[] | null | undefined,
+): number {
+  if (!violations) return 0
+  let mask = 0
+  for (const v of violations) {
+    if (!v || v === 'none') continue
+    const bit = TRAFFIC_VIOLATION_BITS[v]
+    if (bit) mask |= bit
+  }
+  return mask
+}
+
+export function decodeViolationMask(mask: number | null | undefined): ActiveTrafficViolation[] {
+  if (!mask || !Number.isFinite(mask)) return []
+  const list: ActiveTrafficViolation[] = []
+  for (const v of PRIMARY_VIOLATION_ORDER) {
+    if ((mask & TRAFFIC_VIOLATION_BITS[v]) !== 0) list.push(v)
+  }
+  return list
+}
+
+export function sortTrafficViolations(
+  violations: readonly (TrafficViolation | null | undefined)[],
+): ActiveTrafficViolation[] {
+  const unique: ActiveTrafficViolation[] = []
+  for (const v of violations) {
+    if (!v || v === 'none' || !(v in TRAFFIC_VIOLATION_BITS) || unique.includes(v)) continue
+    unique.push(v)
+  }
+  unique.sort((a, b) => PRIMARY_VIOLATION_ORDER.indexOf(a) - PRIMARY_VIOLATION_ORDER.indexOf(b))
+  return unique
+}
+
+export function pickPrimaryViolation(
+  violations: readonly (TrafficViolation | null | undefined)[] | null | undefined,
+): TrafficViolation {
+  if (!violations || violations.length === 0) return 'none'
+  const sorted = sortTrafficViolations(violations)
+  return sorted[0] ?? 'none'
+}
+
 export function getActorViolations(
-  actor?: Pick<Actor, 'violation' | 'violations'> | null,
+  actor?: Pick<Actor, 'violation' | 'violations' | 'violationMask'> | null,
 ): ActiveTrafficViolation[] {
   if (!actor) return []
   const list: ActiveTrafficViolation[] = []
   if (Array.isArray(actor.violations)) {
     for (const v of actor.violations) {
-      if (v && (v as string) !== 'none' && !list.includes(v)) list.push(v)
+      if (v && (v as string) !== 'none' && (v in TRAFFIC_VIOLATION_BITS) && !list.includes(v)) list.push(v)
     }
   }
-  if (actor.violation && actor.violation !== 'none' && !list.includes(actor.violation)) {
+  if (typeof actor.violationMask === 'number' && actor.violationMask > 0) {
+    for (const v of decodeViolationMask(actor.violationMask)) {
+      if (!list.includes(v)) list.push(v)
+    }
+  }
+  if (actor.violation && actor.violation !== 'none' && (actor.violation in TRAFFIC_VIOLATION_BITS) && !list.includes(actor.violation)) {
     list.unshift(actor.violation)
   }
   return list
 }
 
-export function actorHasViolation(
-  actor: Pick<Actor, 'violation' | 'violations'> | null | undefined,
-  target: ActiveTrafficViolation,
-): boolean {
-  return getActorViolations(actor).includes(target)
+export function getActorViolationMask(
+  actor?: Pick<Actor, 'violation' | 'violations' | 'violationMask'> | null,
+): number {
+  return encodeViolationMask(getActorViolations(actor))
 }
 
-function pickTwoWheelProfile(
-  random:()=>number,
-  weights?:DutyViolationWeights,
-  dutyActive=false,
-  opts?:{allowWrongWay?:boolean,nearModShop?:boolean,approachingSignal?:boolean},
-):{vehicleSubtype:VehicleSubtype,violation:TrafficViolation,violations:ActiveTrafficViolation[]}{
-  const base=dutyActive?DEFAULT_DUTY_WEIGHTS:DEFAULT_AMBIENT_WEIGHTS
-  const weightOf=(k:TrafficViolation)=>Math.max(0,weights?(weights[k]??0):base[k])
-  const wNone=weightOf('none')
-  const wHelmet=weightOf('no_helmet')
-  const wOverload=weightOf('ebike_overload')
-  const wDouble=weightOf('bike_double')
-  const wIllegalMod=weightOf('illegal_mod')*(opts?.nearModShop&&!weights?1.6:1)
-  const wWrongWay=opts?.allowWrongWay===false?0:weightOf('wrong_way')
-  const wRedLight=weightOf('red_light_run')*(opts?.approachingSignal&&!weights?1.8:1)
-  const total=wNone+wHelmet+wOverload+wDouble+wIllegalMod+wWrongWay+wRedLight
-  if(total<=0)return {vehicleSubtype:random()<.72?'ebike':'bicycle',violation:'none',violations:[]}
-  let roll=random()*total
-  if((roll-=wHelmet)<0)return {vehicleSubtype:'ebike',violation:'no_helmet',violations:['no_helmet']}
-  if((roll-=wOverload)<0){
-    const stackNoHelmet=random()<OVERLOAD_NO_HELMET_STACK_PROB
-    return {
-      vehicleSubtype:'ebike',
-      violation:'ebike_overload',
-      violations:stackNoHelmet?['ebike_overload','no_helmet']:['ebike_overload'],
+export function actorHasViolation(
+  actor: Pick<Actor, 'violation' | 'violations' | 'violationMask'> | null | undefined,
+  target: ActiveTrafficViolation,
+): boolean {
+  if (!actor) return false
+  if (typeof actor.violationMask === 'number') {
+    const bit = TRAFFIC_VIOLATION_BITS[target]
+    if ((actor.violationMask & bit) !== 0) return true
+    if (actor.violation !== target && (!actor.violations || actor.violations.length === 0)) return false
+  }
+  if (actor.violation === target) return true
+  if (Array.isArray(actor.violations)) {
+    for (let i = 0; i < actor.violations.length; i++) {
+      if (actor.violations[i] === target) return true
     }
   }
-  if((roll-=wDouble)<0)return {vehicleSubtype:'bicycle',violation:'bike_double',violations:['bike_double']}
-  if((roll-=wIllegalMod)<0)return {vehicleSubtype:'ebike',violation:'illegal_mod',violations:['illegal_mod']}
-  if((roll-=wWrongWay)<0)return {vehicleSubtype:'ebike',violation:'wrong_way',violations:['wrong_way']}
-  if((roll-=wRedLight)<0)return {vehicleSubtype:'ebike',violation:'red_light_run',violations:['red_light_run']}
-  return {vehicleSubtype:random()<.72?'ebike':'bicycle',violation:'none',violations:[]}
+  return false
+}
+
+export function actorHasAnyViolation(
+  actor: Pick<Actor, 'violation' | 'violations' | 'violationMask'> | null | undefined,
+): boolean {
+  if (!actor) return false
+  if (typeof actor.violationMask === 'number' && actor.violationMask > 0) return true
+  if (actor.violation && actor.violation !== 'none') return true
+  if (Array.isArray(actor.violations)) {
+    for (let i = 0; i < actor.violations.length; i++) {
+      const v = actor.violations[i]
+      if (v && (v as string) !== 'none') return true
+    }
+  }
+  return false
+}
+
+export interface LaneComplianceSample {
+  ruleKind: NpcLaneRuleKind
+  laneCompliant: boolean
+  encroachmentKind: LaneEncroachmentKind
+  encroachOffset: number
+}
+
+export interface TwoWheelProfile {
+  vehicleSubtype: VehicleSubtype
+  violation: TrafficViolation
+  violations: ActiveTrafficViolation[]
+  violationMask: number
+  laneCompliant: boolean
+  encroachmentKind: LaneEncroachmentKind
+  encroachOffset: number
+}
+
+function clamp01(v: number): number {
+  return Number.isFinite(v) ? Math.max(0, Math.min(1, v)) : 0
+}
+
+export function sampleNpcLaneCompliance(
+  kind: 'person' | 'scooter' | 'car',
+  random: () => number,
+  policy?: TrafficViolationPolicy,
+): LaneComplianceSample {
+  const complianceRate = clamp01(policy?.laneComplianceRate ?? CITY_LANE_COMPLIANCE_RATE)
+  const ruleKind: NpcLaneRuleKind = kind === 'person' ? 'sidewalk' : kind === 'scooter' ? 'nonmotor' : 'motor'
+  if (random() < complianceRate) {
+    return {ruleKind, laneCompliant: true, encroachmentKind: 'none', encroachOffset: 0}
+  }
+  if (kind === 'person') {
+    return {ruleKind, laneCompliant: false, encroachmentKind: 'pedestrian_jaywalk', encroachOffset: 0}
+  }
+  if (kind === 'car') {
+    return {ruleKind, laneCompliant: false, encroachmentKind: 'car_edge_encroach', encroachOffset: CAR_EDGE_ENCROACH_OFFSET}
+  }
+  const allowSidewalk = policy?.allowSidewalkRiding !== false
+  const sidewalkShare = clamp01(policy?.sidewalkShareInEncroach ?? 0.6)
+  if (allowSidewalk && random() < sidewalkShare) {
+    return {ruleKind, laneCompliant: false, encroachmentKind: 'scooter_on_sidewalk', encroachOffset: SCOOTER_SIDEWALK_ENCROACH_OFFSET}
+  }
+  return {ruleKind, laneCompliant: false, encroachmentKind: 'scooter_on_motor_lane', encroachOffset: SCOOTER_MOTOR_ENCROACH_OFFSET}
+}
+
+function pickWeightedSecondary(
+  pool: readonly {key: SecondaryTrafficViolation; weight: number}[],
+  random: () => number,
+): SecondaryTrafficViolation | undefined {
+  let total = 0
+  for (const item of pool) if (item.weight > 0) total += item.weight
+  if (total <= 0) return undefined
+  let roll = random() * total
+  for (const item of pool) {
+    if (item.weight <= 0) continue
+    roll -= item.weight
+    if (roll < 0) return item.key
+  }
+  for (let i = pool.length - 1; i >= 0; i--) {
+    if (pool[i].weight > 0) return pool[i].key
+  }
+  return undefined
+}
+
+export function pickTwoWheelProfile(
+  random: () => number,
+  weights?: DutyViolationWeights,
+  dutyActive = false,
+  opts?: {
+    allowWrongWay?: boolean
+    nearModShop?: boolean
+    approachingSignal?: boolean
+    policy?: TrafficViolationPolicy
+    storyOverride?: DutyStoryOverrideConfig | null
+  },
+): TwoWheelProfile {
+  const story = opts?.storyOverride && opts.storyOverride.active !== false ? opts.storyOverride : undefined
+  const policy = opts?.policy
+  const effWeights = story?.weights ?? weights
+  const complianceRate = clamp01(
+    story?.laneComplianceRate ?? policy?.laneComplianceRate ?? CITY_LANE_COMPLIANCE_RATE,
+  )
+  const encroachRate = 1 - complianceRate
+
+  const rateFromWeights = (w: DutyViolationWeights): number | undefined => {
+    const wNone = Math.max(0, w.none ?? 0)
+    let wActive = 0
+    for (const k of ALL_ACTIVE_TRAFFIC_VIOLATIONS) wActive += Math.max(0, w[k] ?? 0)
+    const sum = wNone + wActive
+    return sum > 0 ? clamp01(wActive / sum) : undefined
+  }
+  let violationRate: number
+  if (story?.nonmotorViolationRate !== undefined) {
+    violationRate = clamp01(story.nonmotorViolationRate)
+  } else if (story?.weights) {
+    violationRate = rateFromWeights(story.weights) ?? CITY_NONMOTOR_VIOLATION_RATE
+  } else if (policy?.nonmotorViolationRate !== undefined) {
+    violationRate = clamp01(policy.nonmotorViolationRate)
+  } else if (weights) {
+    violationRate = rateFromWeights(weights) ?? CITY_NONMOTOR_VIOLATION_RATE
+  } else {
+    violationRate = CITY_NONMOTOR_VIOLATION_RATE
+  }
+
+  const noHelmetRate = clamp01(
+    story?.noHelmetGivenViolatorRate ??
+      policy?.noHelmetGivenViolatorRate ??
+      VIOLATOR_NO_HELMET_CONDITIONAL_RATE,
+  )
+  const stackRate = clamp01(
+    story?.multiViolationStackRate ?? policy?.multiViolationStackRate ?? MULTI_VIOLATION_STACK_PROB,
+  )
+  const allowWrongWay =
+    opts?.allowWrongWay !== false &&
+    story?.allowWrongWay !== false &&
+    policy?.allowWrongWay !== false
+  const allowRedLightRun =
+    story?.allowRedLightRun ??
+    policy?.allowRedLightRun ??
+    (effWeights ? (effWeights.red_light_run ?? 0) > 0 : (!dutyActive && Boolean(opts?.approachingSignal)))
+  const storySidewalkW = story?.weights?.sidewalk_riding ?? 0
+  const explicitSidewalkWeight =
+    story?.sidewalkRidingWeight ??
+    (storySidewalkW > 0 ? storySidewalkW : undefined) ??
+    policy?.sidewalkRidingWeight ??
+    (effWeights?.sidewalk_riding !== undefined && effWeights.sidewalk_riding > 0 ? effWeights.sidewalk_riding : 0)
+  const allowSidewalk =
+    story?.allowSidewalkRiding ??
+    (story?.sidewalkRidingWeight !== undefined && story.sidewalkRidingWeight > 0 ? true : undefined) ??
+    (storySidewalkW > 0 ? true : undefined) ??
+    policy?.allowSidewalkRiding ??
+    (explicitSidewalkWeight > 0 ? true : !dutyActive)
+  const sidewalkShareInEncroach = clamp01(
+    story?.sidewalkShareInEncroach ?? policy?.sidewalkShareInEncroach ?? (explicitSidewalkWeight > 0 ? 0.78 : 0.6),
+  )
+
+  const isViolator = random() < violationRate
+  if (!isViolator) {
+    const residualEncroach =
+      violationRate < encroachRate && 1 - violationRate > 1e-9
+        ? (encroachRate - violationRate) / (1 - violationRate)
+        : 0
+    const encroach = residualEncroach > 0 && random() < residualEncroach
+    return {
+      vehicleSubtype: random() < 0.72 ? 'ebike' : 'bicycle',
+      violation: 'none',
+      violations: [],
+      violationMask: 0,
+      laneCompliant: !encroach,
+      encroachmentKind: encroach ? 'scooter_on_motor_lane' : 'none',
+      encroachOffset: encroach ? SCOOTER_MOTOR_ENCROACH_OFFSET : 0,
+    }
+  }
+
+  const picked: ActiveTrafficViolation[] = []
+  let laneCompliant = true
+  let encroachmentKind: LaneEncroachmentKind = 'none'
+  let encroachOffset = 0
+
+  // 1) 精确耦合三道守规率：若 violationRate >= encroachRate，全城 5% 越界全部从违规非机动车中精确按 encroachRate/violationRate 抽取
+  const condEncroachProb = violationRate > 1e-9 ? Math.min(1, encroachRate / violationRate) : 0
+  if (condEncroachProb > 0 && random() < condEncroachProb) {
+    laneCompliant = false
+    if (allowSidewalk && random() < sidewalkShareInEncroach) {
+      encroachmentKind = 'scooter_on_sidewalk'
+      encroachOffset = SCOOTER_SIDEWALK_ENCROACH_OFFSET
+      picked.push('sidewalk_riding')
+    } else {
+      encroachmentKind = 'scooter_on_motor_lane'
+      encroachOffset = SCOOTER_MOTOR_ENCROACH_OFFSET
+    }
+  }
+
+  // 2) 未戴头盔硬指标：所有违规非机动车中严格按 noHelmetRate（默认 80%）包含 no_helmet
+  const hasNoHelmet = random() < noHelmetRate
+  if (hasNoHelmet) picked.push('no_helmet')
+
+  // 3) 构造次级违章权重池（支持多维重叠叠加且保持车型互斥合法）
+  const baseSec = dutyActive ? DEFAULT_DUTY_WEIGHTS : DEFAULT_AMBIENT_WEIGHTS
+  const secOverride = story?.secondaryWeights ?? policy?.secondaryWeights
+  const rawSecWeight = (k: SecondaryTrafficViolation): number => {
+    if (secOverride && secOverride[k] !== undefined) return Math.max(0, secOverride[k]!)
+    if (k === 'sidewalk_riding') {
+      if (!allowSidewalk) return 0
+      if (story?.sidewalkRidingWeight !== undefined) return Math.max(0, story.sidewalkRidingWeight)
+      if (story?.weights && story.weights.sidewalk_riding !== undefined) return Math.max(0, story.weights.sidewalk_riding)
+      if (policy?.sidewalkRidingWeight !== undefined) return Math.max(0, policy.sidewalkRidingWeight)
+      if (effWeights) return Math.max(0, effWeights.sidewalk_riding ?? 0)
+      return 0
+    }
+    if (effWeights) return Math.max(0, effWeights[k] ?? 0)
+    return DEFAULT_SECONDARY_WEIGHTS[k] ?? Math.max(0, baseSec[k] ?? 0)
+  }
+
+  let fixedSubtype: VehicleSubtype | undefined
+  const buildPool = (current: readonly ActiveTrafficViolation[]) => {
+    const has = (k: ActiveTrafficViolation) => current.includes(k)
+    const isBicycleOnly = fixedSubtype === 'bicycle' || has('bike_double')
+    const isEbikeOnly =
+      fixedSubtype === 'ebike' || has('ebike_overload') || has('illegal_mod') || has('red_light_run')
+    const candidates: {key: SecondaryTrafficViolation; weight: number}[] = []
+    if (!isBicycleOnly && !has('ebike_overload')) {
+      candidates.push({key: 'ebike_overload', weight: rawSecWeight('ebike_overload')})
+    }
+    if (!isEbikeOnly && !has('bike_double')) {
+      candidates.push({key: 'bike_double', weight: rawSecWeight('bike_double')})
+    }
+    if (!isBicycleOnly && !has('illegal_mod')) {
+      const modMult = opts?.nearModShop && !effWeights && !secOverride ? 1.5 : 1
+      candidates.push({key: 'illegal_mod', weight: rawSecWeight('illegal_mod') * modMult})
+    }
+    if (allowWrongWay && !has('wrong_way')) {
+      candidates.push({key: 'wrong_way', weight: rawSecWeight('wrong_way')})
+    }
+    if (!isBicycleOnly && allowRedLightRun && !has('red_light_run')) {
+      const sigMult = opts?.approachingSignal ? 1.8 : 1
+      candidates.push({key: 'red_light_run', weight: rawSecWeight('red_light_run') * sigMult})
+    }
+    if (allowSidewalk && !has('sidewalk_riding')) {
+      const swW = rawSecWeight('sidewalk_riding')
+      if (swW > 0) candidates.push({key: 'sidewalk_riding', weight: swW})
+    }
+    return candidates
+  }
+
+  const pushSecondary = (choice: SecondaryTrafficViolation) => {
+    if (!picked.includes(choice)) picked.push(choice)
+    if (choice === 'bike_double') fixedSubtype = 'bicycle'
+    else if (choice === 'ebike_overload' || choice === 'illegal_mod' || choice === 'red_light_run') {
+      fixedSubtype = 'ebike'
+    }
+    if (choice === 'sidewalk_riding') {
+      laneCompliant = false
+      encroachmentKind = 'scooter_on_sidewalk'
+      encroachOffset = SCOOTER_SIDEWALK_ENCROACH_OFFSET
+    }
+  }
+
+  if (picked.length === 0) {
+    // 20% 未含 no_helmet 且未走人行道：必选 1 项次级违章，再按概率叠加第 2 项
+    const first = pickWeightedSecondary(buildPool(picked), random)
+    if (first) {
+      pushSecondary(first)
+    } else {
+      // 极端全 0 权重兜底（绝不添加 no_helmet 破坏 80% 条件概率）
+      pushSecondary(allowWrongWay ? 'wrong_way' : 'ebike_overload')
+    }
+    if (random() < SECONDARY_VIOLATION_STACK_PROB) {
+      const second = pickWeightedSecondary(buildPool(picked), random)
+      if (second) pushSecondary(second)
+    }
+  } else {
+    // 已有 no_helmet 或 sidewalk_riding：按 stackRate 叠加次级违章，支持 2~3 项重叠
+    if (random() < stackRate) {
+      const extra1 = pickWeightedSecondary(buildPool(picked), random)
+      if (extra1) {
+        pushSecondary(extra1)
+        if (random() < SECONDARY_VIOLATION_STACK_PROB) {
+          const extra2 = pickWeightedSecondary(buildPool(picked), random)
+          if (extra2) pushSecondary(extra2)
+        }
+      }
+    }
+  }
+
+  const ordered = sortTrafficViolations(picked)
+  const primary = ordered[0] ?? 'none'
+  const violationMask = encodeViolationMask(ordered)
+  const vehicleSubtype: VehicleSubtype = fixedSubtype ?? (ordered.includes('bike_double') ? 'bicycle' : 'ebike')
+  return {
+    vehicleSubtype,
+    violation: primary,
+    violations: ordered,
+    violationMask,
+    laneCompliant,
+    encroachmentKind,
+    encroachOffset,
+  }
 }
 
 export class Traffic {
@@ -637,6 +1081,59 @@ export class Traffic {
   private lastHitAt=-Infinity
   private lastViolatorCitedAt=-Infinity
   private countedCitedActors=new WeakSet<Actor>()
+  private rulePolicy:TrafficViolationPolicy={}
+  setRulePolicy(policy:Partial<TrafficViolationPolicy>|null|undefined){
+    this.rulePolicy=policy?{...this.rulePolicy,...policy}:{}
+  }
+  getRulePolicy():Readonly<TrafficViolationPolicy>{return this.rulePolicy}
+  setStoryOverride(override:DutyStoryOverrideConfig|null|undefined){
+    this.dutyConfig={...this.dutyConfig,storyOverride:override?{active:true,...override}:null}
+  }
+  clearStoryOverride(){
+    this.dutyConfig={...this.dutyConfig,storyOverride:null}
+  }
+  getStoryOverride():Readonly<DutyStoryOverrideConfig>|null{
+    const ov=this.dutyConfig.storyOverride
+    return ov&&ov.active!==false?ov:null
+  }
+  getActorViolations(actorOrId:string|number|Actor|null|undefined):ActiveTrafficViolation[]{
+    const actor=this.findActor(actorOrId)
+    return getActorViolations(actor)
+  }
+  getViolatorSnapshots(opts?:{includeCited?:boolean}):ActorViolationSnapshot[]{
+    const includeCited=Boolean(opts?.includeCited)
+    const out:ActorViolationSnapshot[]=[]
+    for(const a of this.actors){
+      if(a.leaving||a.pendingRecycle||a.kind!=='scooter')continue
+      if(!includeCited&&a.cited)continue
+      const violations=getActorViolations(a)
+      if(!violations.length)continue
+      const rev=Boolean(a.wrongWay)
+      out.push({
+        actor:a,
+        actorId:ensureActorId(a),
+        kind:a.kind,
+        vehicleSubtype:a.vehicleSubtype,
+        violation:pickPrimaryViolation(violations),
+        violations,
+        violationMask:encodeViolationMask(violations),
+        hasNoHelmet:violations.includes('no_helmet'),
+        hasSidewalkRiding:violations.includes('sidewalk_riding'),
+        laneCompliant:a.laneCompliant!==false,
+        encroachmentKind:a.encroachmentKind??'none',
+        cited:Boolean(a.cited),
+        dutyState:a.dutyState??'normal',
+        x:a.x,
+        y:a.y,
+        z:a.z,
+        yaw:a.yaw,
+        speed:a.speed,
+        headingX:rev?-a.track.dx:a.track.dx,
+        headingZ:rev?-a.track.dz:a.track.dz,
+      })
+    }
+    return out
+  }
   setDutyConfig(config:Partial<DutyTrafficConfig>){
     const prevDutyOnly=Boolean(this.dutyConfig.dutyOnly)
     this.dutyConfig={...this.dutyConfig,...config}
@@ -660,39 +1157,44 @@ export class Traffic {
   }
   syncCitedViolatorCooldown(){
     for(const actor of this.actors){
-      if(actor.cited&&actor.violation&&actor.violation!=='none'&&!this.countedCitedActors.has(actor)){
+      if(actor.cited&&actorHasAnyViolation(actor)&&!this.countedCitedActors.has(actor)){
         this.countedCitedActors.add(actor)
         this.lastViolatorCitedAt=this.time
       }
     }
   }
   getViolatorCooldownRemaining():number{
-    const cd=this.dutyConfig.violatorCooldownSec??0
+    const ov=this.getStoryOverride()
+    const cd=ov?.violatorCooldownSec??this.dutyConfig.violatorCooldownSec??0
     if(cd<=0||!Number.isFinite(this.lastViolatorCitedAt))return 0
     return Math.max(0,cd-(this.time-this.lastViolatorCitedAt))
   }
   private canSpawnViolator():boolean{
     const cfg=this.dutyConfig
-    if(cfg.violatorCooldownSec!==undefined&&cfg.violatorCooldownSec>0&&this.time-this.lastViolatorCitedAt<cfg.violatorCooldownSec){
+    const ov=this.getStoryOverride()
+    const cooldownSec=ov?.violatorCooldownSec??cfg.violatorCooldownSec
+    if(cooldownSec!==undefined&&cooldownSec>0&&this.time-this.lastViolatorCitedAt<cooldownSec){
       return false
     }
     let activeVehicles=0,activeViolators=0
     for(const a of this.actors){
       if(a.leaving||a.pendingRecycle||a.kind==='person')continue
       activeVehicles++
-      if(a.kind==='scooter'&&!a.cited&&a.violation&&a.violation!=='none'){
+      if(a.kind==='scooter'&&!a.cited&&actorHasAnyViolation(a)){
         activeViolators++
       }
     }
-    if(cfg.maxConcurrentViolators!==undefined&&activeViolators>=cfg.maxConcurrentViolators){
+    const maxConcurrent=ov?.maxConcurrentViolators??cfg.maxConcurrentViolators
+    if(maxConcurrent!==undefined&&activeViolators>=maxConcurrent){
       return false
     }
-    if(cfg.maxViolatorRatio!==undefined&&cfg.maxViolatorRatio<1){
+    const maxRatio=ov?.maxViolatorRatio??cfg.maxViolatorRatio
+    if(maxRatio!==undefined&&maxRatio<1){
       // Enforce strict ratio cap with 2-vehicle exit headroom so normal vehicles leaving bridge never spike share > maxViolatorRatio.
       const projectedTotal=activeVehicles+1
       const projectedViolators=activeViolators+1
       const effectiveTotal=Math.max(1,projectedTotal-2)
-      if(projectedViolators/projectedTotal>cfg.maxViolatorRatio||projectedViolators/effectiveTotal>cfg.maxViolatorRatio){
+      if(projectedViolators/projectedTotal>maxRatio||projectedViolators/effectiveTotal>maxRatio){
         return false
       }
     }
@@ -814,7 +1316,7 @@ export class Traffic {
     const fled:Actor[]=[]
     for(const actor of this.actors){
       if(actor.kind!=='scooter'||actor.leaving||actor.cited||actor.ticketReceived||actor.scale<.5)continue
-      if(!actor.violation||actor.violation==='none')continue
+      if(!actorHasAnyViolation(actor))continue
       if(Math.abs(actor.y-origin.y)>3)continue
       const dist=Math.hypot(actor.x-origin.x,actor.z-origin.z)
       if(dist>rangeM)continue
@@ -1178,6 +1680,10 @@ export class Traffic {
     this.warmUntil=previous.warmUntil
     this.hasLastCamera=previous.hasLastCamera
     this.lastCamera.x=previous.lastCamera.x;this.lastCamera.y=previous.lastCamera.y;this.lastCamera.z=previous.lastCamera.z
+    this.rulePolicy={
+      ...previous.rulePolicy,
+      ...(previous.rulePolicy.secondaryWeights?{secondaryWeights:{...previous.rulePolicy.secondaryWeights}}:{}),
+    }
     this.dutyConfig={...previous.dutyConfig};this.dutyTracksCache.clear();this.lastDutyTracks=undefined
     for(const actor of previous.actors){
       const track=this.exits.get(actor.track.from)?.find(candidate=>candidate.id===actor.track.id&&candidate.kind===actor.track.kind&&!!candidate.virtual===!!actor.track.virtual)
@@ -1191,7 +1697,9 @@ export class Traffic {
       const lo=track.dodgeMin??-WALK_OFFSET,hi=track.dodgeMax??WALK_OFFSET
       actor.dodge=Math.max(lo,Math.min(hi,actor.dodge))
     }
-    const totalOffset=track.offset+actor.dodge+(actor.wrongWay?WRONG_WAY_LATERAL_OFFSET:0)
+    const pullingOver=actor.dutyState==='pulling_over'||actor.dutyState==='pulled_over'
+    const encroachLat=actor.kind==='person'||pullingOver?0:(actor.encroachOffset??0)
+    const totalOffset=track.offset+actor.dodge+encroachLat+(actor.wrongWay?WRONG_WAY_LATERAL_OFFSET:0)
     actor.x=track.start.x+track.dx*dist-track.dz*totalOffset
     actor.z=track.start.z+track.dz*dist+track.dx*totalOffset
     if(actor.kind!=='person')this.dutyConfig.constrainActorPosition?.(actor)
@@ -1207,7 +1715,7 @@ export class Traffic {
         }
       }
     }
-    const pose=track.floor?contactPose(track,dist,undefined,undefined,undefined,actor.dodge+(actor.wrongWay?WRONG_WAY_LATERAL_OFFSET:0)):undefined
+    const pose=track.floor?contactPose(track,dist,undefined,undefined,undefined,actor.dodge+encroachLat+(actor.wrongWay?WRONG_WAY_LATERAL_OFFSET:0)):undefined
     actor.pitch=pose?(actor.wrongWay?-pose.pitch:pose.pitch):0
     actor.roll=pose?(actor.wrongWay?-pose.roll:pose.roll):0
     const reference=pose?.y??trackHeight(track,dist)
@@ -1306,13 +1814,29 @@ export class Traffic {
     const mx=(sampleTrackForPick.start.x+sampleTrackForPick.end.x)*.5,mz=(sampleTrackForPick.start.z+sampleTrackForPick.end.z)*.5
     const nearModShop=(mx-SHIZIJIE_MOD_SHOP.x)**2+(mz-SHIZIJIE_MOD_SHOP.z)**2<140**2
     const approachingSignal=this.signal.has(sampleTrackForPick.to)
+    const activePolicy=this.dutyConfig.policy?{...this.rulePolicy,...this.dutyConfig.policy}:this.rulePolicy
+    const activeStory=this.getStoryOverride()
     const rawProfile=scooter
-      ?pickTwoWheelProfile(this.random,overrideWeights??this.dutyConfig.weights,dutyWeighted||this.dutyConfig.active,{allowWrongWay,nearModShop,approachingSignal})
+      ?pickTwoWheelProfile(
+          this.random,
+          overrideWeights??this.dutyConfig.weights,
+          dutyWeighted||this.dutyConfig.active,
+          {allowWrongWay,nearModShop,approachingSignal,policy:activePolicy,storyOverride:activeStory},
+        )
       :undefined
-    const profile=rawProfile&&rawProfile.violation!=='none'&&!this.canSpawnViolator()
-      ?{...rawProfile,violation:'none' as const,violations:[] as ActiveTrafficViolation[]}
+    const profile=rawProfile&&rawProfile.violations.length>0&&!this.canSpawnViolator()
+      ?{
+          ...rawProfile,
+          violation:'none' as const,
+          violations:[] as ActiveTrafficViolation[],
+          violationMask:0,
+          laneCompliant:true,
+          encroachmentKind:'none' as const,
+          encroachOffset:0,
+        }
       :rawProfile
-    const wrongWay=Boolean(profile?.violation==='wrong_way'&&allowWrongWay)
+    const nonScooterCompliance=!scooter?sampleNpcLaneCompliance(walk?'person':'car',this.random,activePolicy):undefined
+    const wrongWay=Boolean(profile&&profile.violations.includes('wrong_way')&&allowWrongWay)
     let picked:{track:Track,min:number,max:number}|undefined
     if(hl?.canSpawnOnTrack){
       const eligible:{track:Track,min:number,max:number,len:number}[]=[]
@@ -1361,6 +1885,23 @@ export class Traffic {
     }
     const {track,min,max}=picked
     const finalWrongWay=Boolean(wrongWay&&!track.walk&&track.kind==='nonmotor')
+    let finalViolations=profile?.violations
+    let finalViolation=profile?.violation
+    let finalViolationMask=profile?.violationMask
+    let finalLaneCompliant=profile?.laneCompliant
+    let finalEncroachmentKind=profile?.encroachmentKind
+    let finalEncroachOffset=profile?.encroachOffset
+    if(profile&&wrongWay&&!finalWrongWay){
+      const stripped=profile.violations.filter(v=>v!=='wrong_way')
+      finalViolations=stripped
+      finalViolation=stripped[0]??'none'
+      finalViolationMask=encodeViolationMask(stripped)
+      if(stripped.length===0){
+        finalLaneCompliant=true
+        finalEncroachmentKind='none'
+        finalEncroachOffset=0
+      }
+    }
     const cruiseSpeed=hl
       ?Math.min(track.speedKmh/3.6,kind==='car'?9.5:6.2)
       :0
@@ -1382,14 +1923,22 @@ export class Traffic {
       halfLength:walk?.3:scooter?.85:2.1*CAR_SCALE,
       height:1.5,
       ...(profile?{
-        violation:profile.violation,
-        violations:[...profile.violations],
+        violation:finalViolation!,
+        violations:[...finalViolations!],
+        violationMask:finalViolationMask!,
         vehicleSubtype:profile.vehicleSubtype,
+        laneCompliant:finalLaneCompliant!,
+        encroachmentKind:finalEncroachmentKind!,
+        encroachOffset:finalEncroachOffset!,
         cited:false,
         dutyState:'normal' as const,
         ...(finalWrongWay?{wrongWay:true}:{}),
-        ...(profile.violation==='red_light_run'?{redLightActive:false}:{}),
-      }:{}),
+        ...(finalViolations!.includes('red_light_run')?{redLightActive:false}:{}),
+      }:{
+        laneCompliant:nonScooterCompliance?.laneCompliant??true,
+        encroachmentKind:nonScooterCompliance?.encroachmentKind??'none',
+        encroachOffset:nonScooterCompliance?.encroachOffset??0,
+      }),
       ...(spawnStreet?{spawnStreet}:{}),
     }
     if(walk&&!canRoute(track.corridor,actor.dist,this.actors))return null
@@ -1500,8 +2049,9 @@ export class Traffic {
         if(actor.kind==='scooter')existingScooters++
         else if(actor.kind==='car')existingCars++
       }
-      const desiredScooters=zone.desiredScooters??this.dutyConfig.desiredScooters??defaultScooters
-      const desiredCars=zone.desiredCars??this.dutyConfig.desiredCars??(dutyOnly?8:0)
+      const ov=this.getStoryOverride()
+      const desiredScooters=ov?.desiredScooters??zone.desiredScooters??this.dutyConfig.desiredScooters??defaultScooters
+      const desiredCars=ov?.desiredCars??zone.desiredCars??this.dutyConfig.desiredCars??(dutyOnly?8:0)
       const spawnCenter=dutyOnly?{x:center.x,y:camera.y,z:center.z}:camera
       const searchR=hl?Math.max(corridorRadius+40,460):dutyOnly?Math.max(240,radius+20):200
       if(desiredCars>0&&existingCars<desiredCars&&motor.length&&budget>0&&this.actors.length<this.actorLimit){
@@ -1643,7 +2193,7 @@ export class Traffic {
             if(sharedRealNmPool?.candidates.length&&this.trySpawnFromPool(sharedRealNmPool,'scooter',camera,hiddenSpawn,street,false,undefined,false,visible,pref)){count++;budget--;motorCount++;scooterCount++;continue}
             if(virtualPool===undefined)virtualPool=this.collectCandidates(group.virtualNonmotor,camera)
             if(virtualPool.candidates.length&&this.trySpawnFromPool(virtualPool,'scooter',camera,hiddenSpawn,street,false,undefined,false,visible,pref)){count++;budget--;motorCount++;scooterCount++;continue}
-            if(this.trySpawnFromPool(motorPool,'scooter',camera,hiddenSpawn,street,false,undefined,false,visible,pref)){count++;budget--;motorCount++;scooterCount++}
+            if(!sharedRealNmPool?.candidates.length&&!virtualPool.candidates.length&&this.trySpawnFromPool(motorPool,'scooter',camera,hiddenSpawn,street,false,undefined,false,visible,pref)){count++;budget--;motorCount++;scooterCount++}
           }
         }
       }
@@ -1849,7 +2399,7 @@ export class Traffic {
       }
       const reverse=Boolean(actor.wrongWay)
       let dirX=reverse?-track.dx:track.dx,dirZ=reverse?-track.dz:track.dz
-      let maxSpeed=(person?(actor.pace??=1.1+.6*this.random()):Math.min(track.speedKmh/3.6,actor.kind==='car'?12:7))
+      let maxSpeed=(person?(actor.pace??=(actor.encroachmentKind==='pedestrian_jaywalk'?1.28:1.1)+.6*this.random()):Math.min(track.speedKmh/3.6,actor.kind==='car'?12:7))
       let accelRate=2
       actor.brakingForOfficer=false
       actor.honkingForOfficer=false
@@ -1862,7 +2412,7 @@ export class Traffic {
       const officerRunning=officerCtx?.running===true||(officerCtx?.running===undefined&&this.officerSpeed>=3.4)
       const officerWalkingCalmly=officerCtx?.running===false||(officerCtx?.running===undefined&&this.officerSpeed>=0.25&&this.officerSpeed<3.4)
       // Violator evasion: when spotting auxiliary police within 8..15m, accelerate to flee or change lane.
-      if(!person&&officer&&actor.kind==='scooter'&&!actor.cited&&!actor.haltedByDuty&&actor.violation&&actor.violation!=='none'){
+      if(!person&&officer&&actor.kind==='scooter'&&!actor.cited&&!actor.haltedByDuty&&actorHasAnyViolation(actor)){
         const odx=officer.x-actor.x,odz=officer.z-actor.z,ody=Math.abs(officer.y-actor.y)
         const odist=Math.hypot(odx,odz)
         const oahead=odx*dirX+odz*dirZ
@@ -2028,6 +2578,7 @@ export class Traffic {
         minZ=(actor.z<endZ?actor.z:endZ)-2.5;maxZ=(actor.z>endZ?actor.z:endZ)+2.5
       }
       const left=Math.floor(minX/16),right=Math.floor(maxX/16),top=Math.floor(minZ/16),bottom=Math.floor(maxZ/16)
+      const hasRedLightViol=!person&&actorHasViolation(actor,'red_light_run')
       let crossTrafficBlocked=false
       nearby:for(let col=left;col<=right;col++)for(let row=top;row<=bottom;row++){
         const bin=obstacles.get(col*65536+row)
@@ -2065,20 +2616,35 @@ export class Traffic {
           }
         }else{
           const otherIsCar='kind' in other&&other.kind==='car'
-          if(actor.violation==='red_light_run'&&otherIsCar&&ahead>0&&ahead<4.2&&lateral<2.5){
+          if(hasRedLightViol&&otherIsCar&&ahead>0&&ahead<4.2&&lateral<2.5){
             crossTrafficBlocked=true
           }
-          const oppositeScooters=actor.kind==='scooter'&&'kind' in other&&other.kind==='scooter'&&Boolean(other.wrongWay)!==reverse
-          const minLat=oppositeScooters?.42:(actor.kind==='scooter'||('kind' in other&&other.kind==='scooter'))?(actor.kind==='car'||otherIsCar?1.25:.95):1.8
-          const ghostActive=actor.ghostPassUntil!==undefined&&this.time<actor.ghostPassUntil
-          const headOnStuck='kind' in other&&Boolean(other.wrongWay)!==reverse&&actor.waitingSince!==undefined&&this.time-actor.waitingSince>=4
-          if(!ghostActive&&!headOnStuck&&ahead>0&&lateral<minLat){
+          const otherIsNpc='kind' in other
+          const oppositeScooters=actor.kind==='scooter'&&otherIsNpc&&other.kind==='scooter'&&Boolean(other.wrongWay)!==reverse
+          const minLat=oppositeScooters?.42:(actor.kind==='scooter'||(otherIsNpc&&other.kind==='scooter'))?(actor.kind==='car'||otherIsCar?1.25:.95):1.8
+          let ghostActive=actor.ghostPassUntil!==undefined&&this.time<actor.ghostPassUntil
+          if(ahead>0&&lateral<minLat&&!ghostActive){
+            const headOn=otherIsNpc&&other.kind!=='person'&&(
+              Boolean(other.wrongWay)!==reverse||
+              ((other.wrongWay?-other.track.dx:other.track.dx)*dirX+(other.wrongWay?-other.track.dz:other.track.dz)*dirZ)<-0.2
+            )
+            const headOnStuck=headOn&&actor.waitingSince!==undefined&&this.time-actor.waitingSince>=2.5
+            const encroachYield=otherIsNpc&&actor.laneCompliant===false&&actor.waitingSince!==undefined&&this.time-actor.waitingSince>=3.0&&
+              (headOn||!this.signal.has(track.to)||this.phase(track)==='green')
+            if(headOnStuck||encroachYield){
+              actor.ghostPassUntil=Math.max(actor.ghostPassUntil??0,this.time+2.4)
+              actor.waitingFor=undefined
+              actor.waitingSince=undefined
+              ghostActive=true
+            }
+          }
+          if(!ghostActive&&ahead>0&&lateral<minLat){
             const stopGap=actor.kind==='scooter'&&!otherIsCar?2.8:5
             const margin=Math.max(0,ahead-stopGap)
             let limit=margin
             if(margin>0&&ahead<=14){
               let leaderSpeed=0
-              if('kind' in other&&other.kind!=='person'){
+              if(otherIsNpc&&other.kind!=='person'){
                 const oDirX=other.wrongWay?-other.track.dx:other.track.dx
                 const oDirZ=other.wrongWay?-other.track.dz:other.track.dz
                 const align=oDirX*dirX+oDirZ*dirZ
@@ -2088,14 +2654,15 @@ export class Traffic {
               if(smoothLimit<limit)limit=smoothLimit
             }
             advance=Math.min(advance,limit)
-            if(advance<1e-6&&'kind' in other)actor.waitingFor=other
+            if(advance<1e-6&&otherIsNpc)actor.waitingFor=other
             if(!advance)break nearby
           }
         }
         }
       }
       if(person){
-        let target=keepRight?WALK_OFFSET:passLeft?-WALK_OFFSET:0
+        const curbBias=actor.encroachmentKind==='pedestrian_jaywalk'&&track.outwardSign?-track.outwardSign*WALK_OFFSET*.65:0
+        let target=keepRight?WALK_OFFSET:passLeft?-WALK_OFFSET:curbBias
         // If dodging toward the carriageway side is clamped out, shift outward onto the safe sidewalk side instead.
         if(room&&target!==0){
           const spacing=Math.min(2*WALK_OFFSET,safeMaxDodge-safeMinDodge)
@@ -2132,7 +2699,8 @@ export class Traffic {
       }
       const sigPhase=!person&&!reverse&&this.signal.has(track.to)?this.phase(track):'green'
       const distToLine=Math.max(0,track.length-actor.dist)
-      const runningRed=actor.kind==='scooter'&&!reverse&&actor.violation==='red_light_run'&&!actor.cited&&this.signal.has(track.to)&&sigPhase==='red'&&!crossTrafficBlocked
+      const hasRedLight=actorHasViolation(actor,'red_light_run')
+      const runningRed=actor.kind==='scooter'&&!reverse&&hasRedLight&&!actor.cited&&this.signal.has(track.to)&&sigPhase==='red'&&!crossTrafficBlocked
       if(!person&&!reverse&&sigPhase!=='green'){
         if(runningRed){
           if(distToLine<=6)actor.redLightActive=true
@@ -2143,7 +2711,7 @@ export class Traffic {
           advance=Math.min(advance,limit)
         }
       }
-      if(actor.violation==='red_light_run'){
+      if(hasRedLight){
         if(actor.cited){
           actor.redLightActive=false
           actor.redLightTrailDist=undefined
@@ -2163,14 +2731,27 @@ export class Traffic {
       actor.speed=Math.abs(advance)/dt
       if(reverse)actor.dist-=advance
       else actor.dist+=advance
-      if(!person&&advance>0&&nearStatic(actor.x+dirX*advance,actor.z+dirZ*advance)){
-        const offset=track.offset+actor.dodge+(reverse?WRONG_WAY_LATERAL_OFFSET:0)
-        const next={x:track.start.x+track.dx*actor.dist-track.dz*offset,y:actor.y,z:track.start.z+track.dz*actor.dist+track.dx*offset}
-        const yaw=reverse?Math.atan2(-track.dx,-track.dz):track.yaw
-        if(resolveContact(next,next.y,yaw,actor.halfWidth,actor.halfLength,staticSolids)){
-          actor.speed=0
-          actor.dist+=reverse?advance:-advance
-          return
+      if(!person&&advance>0){
+        const pullingOver=actor.dutyState==='pulled_over'
+        const encroachLat=pullingOver?0:(actor.encroachOffset??0)
+        const offset=track.offset+actor.dodge+encroachLat+(reverse?WRONG_WAY_LATERAL_OFFSET:0)
+        let nextX=track.start.x+track.dx*actor.dist-track.dz*offset
+        let nextZ=track.start.z+track.dz*actor.dist+track.dx*offset
+        if(this.dutyConfig.constrainActorPosition){
+          const prevX=actor.x,prevZ=actor.z
+          actor.x=nextX;actor.z=nextZ
+          this.dutyConfig.constrainActorPosition(actor)
+          nextX=actor.x;nextZ=actor.z
+          actor.x=prevX;actor.z=prevZ
+        }
+        if(nearStatic(nextX,nextZ)){
+          const next={x:nextX,y:actor.y,z:nextZ}
+          const yaw=reverse?Math.atan2(-track.dx,-track.dz):track.yaw
+          if(resolveContact(next,next.y,yaw,actor.halfWidth,actor.halfLength,staticSolids)){
+            actor.speed=0
+            actor.dist+=reverse?advance:-advance
+            return
+          }
         }
       }
       if(person&&actor.dist>=track.length){
@@ -2246,7 +2827,7 @@ export class Traffic {
         }
         if(this.signal.has(track.to)){
           this.crossed++
-          this.onCross?.(track,this.time)
+          if(!runningRed)this.onCross?.(track,this.time)
           if(runningRed){
             actor.redLightActive=true
             actor.redLightTrailDist=0

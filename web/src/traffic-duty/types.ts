@@ -33,6 +33,11 @@ export const ACTIVE_VIOLATIONS: readonly ActiveViolation[] = Object.freeze([
   'red_light_run',
 ])
 
+export const ALL_ACTIVE_VIOLATIONS: readonly ActiveViolation[] = Object.freeze([
+  ...ACTIVE_VIOLATIONS,
+  'sidewalk_riding',
+])
+
 export interface DutyFineTable {
   no_helmet: number
   bike_double: number
@@ -40,6 +45,7 @@ export interface DutyFineTable {
   illegal_mod: number
   wrong_way: number
   red_light_run: number
+  sidewalk_riding: number
 }
 
 export const DEFAULT_FINE_YUAN: Readonly<DutyFineTable> = Object.freeze({
@@ -49,6 +55,7 @@ export const DEFAULT_FINE_YUAN: Readonly<DutyFineTable> = Object.freeze({
   illegal_mod: 100,
   wrong_way: 50,
   red_light_run: 50,
+  sidewalk_riding: 50,
 })
 
 export const PLAYER_COMMISSION_RATE = 0.1
@@ -66,6 +73,7 @@ export const VIOLATION_LABELS: Readonly<Record<ActiveViolation, string>> = Objec
   illegal_mod: '非法改装',
   wrong_way: '逆向行驶',
   red_light_run: '闯红灯',
+  sidewalk_riding: '走人行道',
 })
 
 export const VIOLATION_BUBBLE_LINES: Readonly<Record<ActiveViolation, readonly string[]>> = Object.freeze({
@@ -75,6 +83,7 @@ export const VIOLATION_BUBBLE_LINES: Readonly<Record<ActiveViolation, readonly s
   illegal_mod: ['这就拆除改装件恢复原厂', '合规上路才安心'],
   wrong_way: ['马上调头顺向骑行', '以后一定按道顺行'],
   red_light_run: ['宁等三分不抢一秒', '下次一定看清信号灯'],
+  sidewalk_riding: ['马上推车下人行道', '下次一定不走人行道'],
 })
 
 export const TRAFFIC_DUTY_DURATION_SEC = 600
@@ -211,7 +220,9 @@ export function isInJiefangZone(pos: Position | null): boolean {
 
 export type DutyPhase = 'idle' | 'active' | 'summary'
 
-export type ViolationBreakdown = Record<ActiveViolation, number>
+export type ViolationBreakdown = Record<Exclude<ActiveViolation, 'sidewalk_riding'>, number> & {
+  sidewalk_riding?: number
+}
 
 export interface DutyGearState {
   readonly hasWhistle: boolean
@@ -623,7 +634,7 @@ export function formatDutyReportTitle(totalFineYuan: number, zoneName?: string |
   return `${prefix} · 10分钟模拟罚单 ¥${Math.max(0, Math.round(totalFineYuan))}`
 }
 
-const ACTIVE_VIOLATION_SET = new Set<string>(ACTIVE_VIOLATIONS)
+const ACTIVE_VIOLATION_SET = new Set<string>(ALL_ACTIVE_VIOLATIONS)
 
 export function isActiveViolation(value: unknown): value is ActiveViolation {
   return typeof value === 'string' && ACTIVE_VIOLATION_SET.has(value)

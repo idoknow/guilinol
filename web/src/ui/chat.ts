@@ -188,12 +188,13 @@ function select(ch: Channel) {
 }
 export function openChat(focus = false) {
   if (!root || !online) return
+  dispatchEvent(new Event('glol:chat-open'))
   open = true
   root.dataset.open = '1'
   unread[channel] = 0
   placePanel(); paintTabs(); paintInput(); paintList(); paintBubble()
   if (online) chatStore.history(channel)
-  if (focus) requestAnimationFrame(() => input.focus({preventScroll: true}))
+  if (focus) requestAnimationFrame(() => { if (open) input.focus({preventScroll: true}) })
 }
 export function closeChat() {
   if (!root || !open) return
@@ -314,6 +315,7 @@ function build() {
 export function mountChat() {
   if (root) return
   build()
+  addEventListener('glol:roster-open', closeChat)
   chatStore.subscribe(event => {
     switch (event.t) {
       case 'chat': {

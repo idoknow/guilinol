@@ -210,6 +210,7 @@ export function createTrafficDutyController(
     illegal_mod: Math.max(1, Math.round(host.fineTable?.illegal_mod ?? DEFAULT_FINE_YUAN.illegal_mod)),
     wrong_way: Math.max(1, Math.round(host.fineTable?.wrong_way ?? DEFAULT_FINE_YUAN.wrong_way)),
     red_light_run: Math.max(1, Math.round(host.fineTable?.red_light_run ?? DEFAULT_FINE_YUAN.red_light_run)),
+    sidewalk_riding: Math.max(1, Math.round(host.fineTable?.sidewalk_riding ?? DEFAULT_FINE_YUAN.sidewalk_riding)),
   }
   const leaderboard = options?.leaderboard ?? createLocalLeaderboardProvider()
   let cachedLeaderboard = leaderboard.load()
@@ -1396,7 +1397,7 @@ export function createTrafficDutyController(
     totalFineYuan += fineYuan
     pendingEarningsYuan = computeCommissionYuan(totalFineYuan)
     for (const v of resolvedViolations) {
-      breakdown[v] += 1
+      breakdown[v] = (breakdown[v] ?? 0) + 1
     }
     if (resolvedViolations.length > 1) {
       stackedCitationCount++

@@ -20,6 +20,16 @@ try {
   if(!checkBoard)await verifyZones(page)
   assert(await page.evaluate(()=>window.fishing.teleportToSpot('lijiang_xiangbi')))
   await page.keyboard.press('4');await page.waitForFunction(()=>window.fishing.state().stage==='equip')
+  const canvasPoint=await page.evaluate(()=>{
+    for(let y=80;y<innerHeight-60;y+=20)for(let x=80;x<innerWidth-80;x+=20)
+      if(document.elementFromPoint(x,y)?.tagName==='CANVAS')return {x,y}
+  });assert(canvasPoint,'unobstructed world canvas')
+  await page.mouse.click(canvasPoint.x,canvasPoint.y)
+  await page.waitForFunction(()=>document.pointerLockElement?.tagName==='CANVAS')
+  assert.equal(await page.evaluate(()=>window.fishing.state().phase),'equip','relocking does not cast')
+  await page.keyboard.press('Alt');await page.waitForFunction(()=>!document.pointerLockElement)
+  await page.mouse.click(canvasPoint.x,canvasPoint.y);await page.waitForFunction(()=>!!document.pointerLockElement)
+  await page.keyboard.press('Alt');await page.waitForFunction(()=>!document.pointerLockElement)
   await page.evaluate(()=>{
     window.fishEvents=[]
     for(const name of ['charge','cast','cast-blocked','approach','nibble','hit','hooked','spooked','missed','fight'])window.addEventListener('fishing:'+name,event=>window.fishEvents.push([name,event.detail]))

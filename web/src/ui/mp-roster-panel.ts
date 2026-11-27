@@ -66,19 +66,24 @@ function build() {
   // 断开联机就收起
   addEventListener('glol:mp-status', event => { if ((event as CustomEvent<{state: string}>).detail.state !== 'online') closeRoster() })
   document.body.append(panel)
+  addEventListener('glol:chat-open', () => {
+    closeRoster()
+    panel!.hidden = true
+  })
 }
 
 export function openRoster() {
   if (!panel) build()
+  dispatchEvent(new Event('glol:roster-open'))
   panel!.hidden = false
   delete list.dataset.signature
-  requestAnimationFrame(() => panel!.classList.add('show'))
+  requestAnimationFrame(() => { if (unsubscribe) panel!.classList.add('show') })
   unsubscribe ??= onRoster(paint)
   requestRoster(true)
   paint(roster())
 }
 export function closeRoster() {
-  if (!panel || panel.hidden) return
+  if (!panel || !unsubscribe) return
   panel.classList.remove('show')
   unsubscribe?.(); unsubscribe = undefined
   requestRoster(false)

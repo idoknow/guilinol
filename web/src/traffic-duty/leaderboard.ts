@@ -50,6 +50,7 @@ function clampInt(value: unknown, min: number, max: number): number {
 
 function sanitizeBreakdown(raw: unknown): ViolationBreakdown {
   const src = raw && typeof raw === 'object' ? (raw as Record<string, unknown>) : {}
+  const sidewalkCount = clampInt(src.sidewalk_riding, 0, 10000)
   return {
     no_helmet: clampInt(src.no_helmet, 0, 10000),
     bike_double: clampInt(src.bike_double, 0, 10000),
@@ -57,6 +58,7 @@ function sanitizeBreakdown(raw: unknown): ViolationBreakdown {
     illegal_mod: clampInt(src.illegal_mod, 0, 10000),
     wrong_way: clampInt(src.wrong_way, 0, 10000),
     red_light_run: clampInt(src.red_light_run, 0, 10000),
+    ...(sidewalkCount > 0 ? {sidewalk_riding: sidewalkCount} : {}),
   }
 }
 

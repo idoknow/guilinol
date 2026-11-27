@@ -1,5 +1,5 @@
 import type {Actor} from '../../traffic/sim.ts'
-import {ACTIVE_VIOLATIONS, VIOLATION_LABELS, type ActiveViolation} from '../types.ts'
+import {isActiveViolation, VIOLATION_LABELS, type ActiveViolation} from '../types.ts'
 import {
   DUPLICATE_CITATION_MESSAGE,
   type CitationNetSyncPayload,
@@ -41,7 +41,7 @@ function normalizeKey(raw: string | undefined | null): string {
 }
 
 function isValidViolation(v: unknown): v is ActiveViolation {
-  return typeof v === 'string' && (ACTIVE_VIOLATIONS as readonly string[]).includes(v)
+  return isActiveViolation(v)
 }
 
 export function createCitationLedger(): CitationLedger {

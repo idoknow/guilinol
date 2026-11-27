@@ -17,10 +17,10 @@ import {
   type TypingProgressSnapshot,
 } from '../handover/types.ts'
 import {
-  ACTIVE_VIOLATIONS,
   DEFAULT_FINE_YUAN,
   VIOLATION_LABELS,
   computeFineYuanStack as computeUpstreamFineYuanStack,
+  isActiveViolation,
   resolveActorViolations,
   type ActiveViolation,
   type DutyFineTable,
@@ -55,13 +55,13 @@ export function normalizeViolationStack(
   const out: ActiveViolation[] = []
   if (Array.isArray(violations)) {
     for (const v of violations) {
-      if (ACTIVE_VIOLATIONS.includes(v) && !out.includes(v)) {
+      if (isActiveViolation(v) && !out.includes(v)) {
         out.push(v)
       }
     }
   }
   if (out.length === 0) {
-    out.push(fallback && ACTIVE_VIOLATIONS.includes(fallback) ? fallback : 'no_helmet')
+    out.push(fallback && isActiveViolation(fallback) ? fallback : 'no_helmet')
   }
   return out
 }
@@ -74,6 +74,7 @@ export function resolveFineTable(custom?: Partial<DutyFineTable>): DutyFineTable
     illegal_mod: Math.max(1, Math.round(custom?.illegal_mod ?? R8_DEFAULT_FINE_YUAN.illegal_mod)),
     wrong_way: Math.max(1, Math.round(custom?.wrong_way ?? R8_DEFAULT_FINE_YUAN.wrong_way)),
     red_light_run: Math.max(1, Math.round(custom?.red_light_run ?? R8_DEFAULT_FINE_YUAN.red_light_run)),
+    sidewalk_riding: Math.max(1, Math.round(custom?.sidewalk_riding ?? R8_DEFAULT_FINE_YUAN.sidewalk_riding)),
   }
 }
 
@@ -156,9 +157,9 @@ export function resolveInitialViolations(opts: FineTerminalOpenOptions): ActiveV
     }
   }
   const single =
-    opts.violation && ACTIVE_VIOLATIONS.includes(opts.violation)
+    opts.violation && isActiveViolation(opts.violation)
       ? opts.violation
-      : opts.actor?.violation && opts.actor.violation !== 'none' && ACTIVE_VIOLATIONS.includes(opts.actor.violation)
+      : opts.actor?.violation && opts.actor.violation !== 'none' && isActiveViolation(opts.actor.violation)
         ? opts.actor.violation
         : 'no_helmet'
   return [single]
@@ -478,7 +479,7 @@ export function createFineTerminalSession(options: FineTerminalOpenOptions = {})
     },
     setViolation(nextViol: ActiveViolation, syncDefaultFine = true): boolean {
       if (phase !== 'input') return false
-      if (!ACTIVE_VIOLATIONS.includes(nextViol)) return false
+      if (!isActiveViolation(nextViol)) return false
       violations = [nextViol]
       syncViolationDerived(syncDefaultFine)
       completeTyping()
@@ -496,7 +497,7 @@ export function createFineTerminalSession(options: FineTerminalOpenOptions = {})
     },
     toggleViolation(targetViol: ActiveViolation, syncDefaultFine = true): boolean {
       if (phase !== 'input') return false
-      if (!ACTIVE_VIOLATIONS.includes(targetViol)) return false
+      if (!isActiveViolation(targetViol)) return false
       const exists = violations.includes(targetViol)
       if (exists && violations.length <= 1) return false
       violations = exists ? violations.filter(v => v !== targetViol) : [...violations, targetViol]
