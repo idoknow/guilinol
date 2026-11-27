@@ -14,6 +14,8 @@ import { createMifenBowlMesh } from './shop-mesh'
 import { getMaxCustomersForLevel, type ShopEquipmentBonuses } from './state'
 import type { CookCompletion } from './cooking'
 import { computeQueuePatienceRate, getTimeAndTrafficModifiers } from './economy/rush'
+import { createFigurePool, driveFigureClips, instantiateFigure, setJoint, solveForearm, type FigureInstance, type FigureTemplate } from './figure-people'
+import type { Age } from '../traffic/crowd'
 
 export type CustomerPhase = 'approaching' | 'entering' | 'queuing' | 'pickup' | 'toppings' | 'seated' | 'leaving'
 export type CustomerRoleKind = 'student' | 'commuter' | 'tourist' | 'gourmet' | 'rider'
@@ -109,7 +111,20 @@ interface CustomerRig {
   lastBubbleKey: string
   skeleton?: THREE.Skeleton
   disposables: { geometries: THREE.BufferGeometry[]; materials: THREE.Material[] }
+  /** 现版本角色（与街上路人同源）；上面的四肢/头/身体只是旧动作代码写入的关节角，由 syncCustomerFigure 换算到骨骼 */
+  figure?: { inst: FigureInstance; mode: 'clip' | 'pose'; walkWeight: number; lastX: number; lastZ: number; holdFore: number; seatFore: number }
 }
+
+/** 顾客身份对应街上路人的年龄段，穿搭与体态跟着走 */
+const ROLE_AGE: Record<CustomerRoleKind, Age> = {
+  student: 'student',
+  commuter: 'young',
+  tourist: 'young',
+  gourmet: 'middle',
+  rider: 'young',
+}
+/** 坐凳时骨盆离地高度（与旧方块人坐姿 0.74 - 0.26 对齐） */
+const SEATED_PELVIS_Y = 0.5
 
 interface CustomerAgent {
   id: string
@@ -663,6 +678,120 @@ function drawGraphicalBubble(
   texture.needsUpdate = true
 }
 
+// Overhead vector Canvas Sprite bubble (high-DPI compact badge; distance-clamped in step)
+function attachBubble(root: THREE.Group, materials: THREE.Material[]) {
+  const bubbleCanvas = document.createElement('canvas')
+  bubbleCanvas.width = 400
+  bubbleCanvas.height = 160
+  const bubbleTexture = new THREE.CanvasTexture(bubbleCanvas)
+  bubbleTexture.colorSpace = THREE.SRGBColorSpace
+  const spriteMat = new THREE.SpriteMaterial({ map: bubbleTexture, transparent: true, opacity: 0.92, depthWrite: false, fog: false })
+  materials.push(spriteMat)
+  const bubbleSprite = new THREE.Sprite(spriteMat)
+  bubbleSprite.position.set(0, 2.04, 0)
+  bubbleSprite.scale.set(BUBBLE_BASE_W * 0.55, BUBBLE_BASE_H * 0.55, 1)
+  root.add(bubbleSprite)
+  return { bubbleSprite, bubbleCanvas, bubbleTexture }
+}
+
+/** 现版本顾客：路人同款角色；四肢/头/身体是空节点，只承接旧动作代码写入的角度 */
+function buildFigureCustomerRig(template: FigureTemplate): CustomerRig {
+  const materials: THREE.Material[] = []
+  const root = new THREE.Group()
+  const bodyPivot = new THREE.Group()
+  const head = new THREE.Group()
+  const leftArm = new THREE.Group()
+  const rightArm = new THREE.Group()
+  const leftLeg = new THREE.Group()
+  const rightLeg = new THREE.Group()
+  const bowlAnchor = new THREE.Group()
+  bowlAnchor.position.set(0, 1.05, 0.36)
+  bodyPivot.add(head, leftArm, rightArm, leftLeg, rightLeg, bowlAnchor)
+  const inst = instantiateFigure(template)
+  root.add(bodyPivot, inst.holder)
+  // 按这个人的肩高和臂长解出小臂角，让手腕托在碗底（站着碗高 1.05，坐下随身体降 0.26 到桌面）
+  const bowlY = bowlAnchor.position.y - 0.02
+  const seatedShoulder = inst.arm.shoulderY + SEATED_PELVIS_Y - inst.pelvisY
+  const holdFore = solveForearm(inst, HOLD_ARM, bowlY)
+  const seatFore = solveForearm(inst, SEAT_ARM, bowlY - 0.26, seatedShoulder)
+  const { bubbleSprite, bubbleCanvas, bubbleTexture } = attachBubble(root, materials)
+  return {
+    root,
+    bodyPivot,
+    head,
+    leftArm,
+    rightArm,
+    leftLeg,
+    rightLeg,
+    bowlAnchor,
+    bubbleSprite,
+    bubbleCanvas,
+    bubbleTexture,
+    lastBubbleKey: '',
+    disposables: { geometries: [], materials },
+    figure: { inst, mode: 'clip', walkWeight: 0, lastX: NaN, lastZ: NaN, holdFore, seatFore },
+  }
+}
+
+/**
+ * 每帧把旧动作代码的关节角落到角色骨骼：空手站立/走路用路人同款 walk/idle 片段；
+ * 端碗、伸手、吃粉、坐凳由程序摆姿势（旧方块人面朝 +z、左块在 −x，对应角色右侧）。
+ */
+function syncCustomerFigure(c: CustomerAgent, dt: number): void {
+  const f = c.rig.figure
+  if (!f) return
+  const rig = c.rig
+  const pos = rig.root.position
+  const speed = dt > 0 && Number.isFinite(f.lastX) ? Math.hypot(pos.x - f.lastX, pos.z - f.lastZ) / dt : 0
+  f.lastX = pos.x
+  f.lastZ = pos.z
+  const seated = rig.bodyPivot.position.y < -0.1
+  const holding = rig.leftArm.rotation.x < -0.5 && rig.rightArm.rotation.x < -0.5
+  if (!seated && !holding) {
+    f.inst.holder.position.y = 0
+    driveFigureClips(f.inst, f, speed, dt)
+    return
+  }
+  f.mode = 'pose'
+  const r = f.inst.rig
+  const j = r.joints
+  // 旧动作以双臂 x = −0.95 为端碗基准；d > 0 为接碗前伸或吃粉抬手（旧 left 在 −x，即角色右手）
+  const dR = -rig.leftArm.rotation.x - 0.95
+  const dL = -rig.rightArm.rotation.x - 0.95
+  const reaching = c.phase === 'pickup'
+  const arm = seated ? SEAT_ARM : HOLD_ARM
+  const fore = (d: number) => (seated ? f.seatFore : f.holdFore) + (reaching ? -d * 1.5 : d * 1.6)
+  r.batch?.(true)
+  // 角色关节约定（walk/knockdown.ts）：Arm x+ 前抬，ArmR y+ / ArmL y− 小臂收向中线，ArmR z− / ArmL z+ 内收，Forearm x+ 屈肘
+  j.ArmR?.rotation.set(arm + dR, HOLD_TWIST, -HOLD_ARM_IN)
+  j.ArmL?.rotation.set(arm + dL, -HOLD_TWIST, HOLD_ARM_IN)
+  j.ForearmR?.rotation.set(fore(dR), 0, 0)
+  j.ForearmL?.rotation.set(fore(dL), 0, 0)
+  setJoint(j.Head, rig.head.rotation.x, 0, 0)
+  j.Torso?.rotation.set(0, 0, 0)
+  if (seated) {
+    setJoint(j.ThighR, rig.leftLeg.rotation.x, 0, 0)
+    setJoint(j.ThighL, rig.rightLeg.rotation.x, 0, 0)
+    setJoint(j.ShinR, -rig.leftLeg.rotation.x, 0, 0)
+    setJoint(j.ShinL, -rig.rightLeg.rotation.x, 0, 0)
+    f.inst.holder.position.y = SEATED_PELVIS_Y - f.inst.pelvisY
+  } else {
+    const swingL = rig.leftLeg.rotation.x
+    const swingR = rig.rightLeg.rotation.x
+    setJoint(j.ThighR, swingL, 0, 0)
+    setJoint(j.ThighL, swingR, 0, 0)
+    setJoint(j.ShinR, Math.max(0, swingL) * 0.6, 0, 0)
+    setJoint(j.ShinL, Math.max(0, swingR) * 0.6, 0, 0)
+    f.inst.holder.position.y = Math.max(0, rig.bodyPivot.position.y)
+  }
+  r.batch?.(false)
+}
+// 端碗：上臂微抬、小臂前伸，两手在胸前托住碗底（小臂角按各人臂长解出）；坐着时上臂多抬一点够到桌面
+const HOLD_ARM = 0.45
+const HOLD_TWIST = 0.3
+const HOLD_ARM_IN = 0.06
+const SEAT_ARM = 0.6
+
 function buildCustomerRig(shirtHex: string, roleKind: CustomerRoleKind): CustomerRig {
   const geometries: THREE.BufferGeometry[] = []
   const materials: THREE.Material[] = []
@@ -875,19 +1004,7 @@ function buildCustomerRig(shirtHex: string, roleKind: CustomerRoleKind): Custome
   bowlAnchor.position.set(0, 1.05, 0.36)
   bodyPivot.add(bowlAnchor)
 
-  // Overhead vector Canvas Sprite bubble (high-DPI compact badge; distance-clamped in step)
-  const bubbleCanvas = document.createElement('canvas')
-  bubbleCanvas.width = 400
-  bubbleCanvas.height = 160
-  const bubbleTexture = new THREE.CanvasTexture(bubbleCanvas)
-  bubbleTexture.colorSpace = THREE.SRGBColorSpace
-  const spriteMat = trackMat(
-    new THREE.SpriteMaterial({ map: bubbleTexture, transparent: true, opacity: 0.92, depthWrite: false, fog: false }),
-  )
-  const bubbleSprite = new THREE.Sprite(spriteMat)
-  bubbleSprite.position.set(0, 2.04, 0)
-  bubbleSprite.scale.set(BUBBLE_BASE_W * 0.55, BUBBLE_BASE_H * 0.55, 1)
-  root.add(bubbleSprite)
+  const { bubbleSprite, bubbleCanvas, bubbleTexture } = attachBubble(root, materials)
 
   return {
     root,
@@ -917,6 +1034,8 @@ export function createCustomerManager(
   const container = new THREE.Group()
   container.name = 'tianyuan-mifen-customers'
   scene.add(container)
+  // 与街上路人同源的角色模板，每个年龄段预热 2 个（手机端 1 个），未就绪时退回旧方块人
+  const figurePool = createFigurePool(matchMedia('(pointer: coarse)').matches ? 1 : 2, 0x7d1a)
 
   let shop = initialShop
   let coords = initialCoords
@@ -1175,6 +1294,7 @@ export function createCustomerManager(
       c.bowlMesh = null
     }
     c.rig.skeleton?.dispose()
+    c.rig.figure?.inst.dispose()
     c.rig.bubbleTexture.dispose()
     for (const g of c.rig.disposables.geometries) g.dispose()
     for (const m of c.rig.disposables.materials) if (!m.userData?.sharedCached) m.dispose()
@@ -1218,7 +1338,8 @@ export function createCustomerManager(
     const id = `cust-${seq++}`
     const titleSuffix = pickRandom(ROLE_TITLES[roleKind], archetype.name)
     const displayName = `${pickRandom(SURNAMES, '陈')}${titleSuffix}·${archetype.name}`
-    const rig = buildCustomerRig(shirt, roleKind)
+    const figureTemplate = figurePool.take(ROLE_AGE[roleKind])
+    const rig = figureTemplate ? buildFigureCustomerRig(figureTemplate) : buildCustomerRig(shirt, roleKind)
 
     const entLocal = getEntranceLocal()
     const side: -1 | 1 = Math.random() < 0.5 ? -1 : 1
@@ -1455,7 +1576,10 @@ export function createCustomerManager(
       const safeDt = Math.min(0.1, Math.max(0, dt))
       const earning = isEarningEnabled()
       if (!earning) {
-        for (const c of customers) updateBubbleTransform(c, cameraPos)
+        for (const c of customers) {
+          syncCustomerFigure(c, safeDt)
+          updateBubbleTransform(c, cameraPos)
+        }
         return
       }
       const level = events.getShopLevel()
@@ -1638,6 +1762,7 @@ export function createCustomerManager(
             continue
           }
         }
+        syncCustomerFigure(c, safeDt)
         updateBubbleTransform(c, cameraPos)
       }
     },
@@ -1748,6 +1873,7 @@ export function createCustomerManager(
       for (let i = customers.length - 1; i >= 0; i--) {
         removeCustomer(i)
       }
+      figurePool.dispose()
       container.removeFromParent()
     },
   }
