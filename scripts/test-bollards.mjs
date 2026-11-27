@@ -782,6 +782,62 @@ test('drawnGround: a street surface layer that joins the scene after the ground 
   assert.ok(near(got, ground + .195, 1e-4), `the pavement once the layer is there: ${got}`)
 })
 
+test('drawnGround: several street surface layers (one per bucket of tiles) are all read, and one that joins later is found', async () => {
+  const {drawnGround} = await import('../web/src/traffic/drawn-ground.ts')
+  const scene = new THREE.Scene(), street = new THREE.MeshStandardMaterial({side: THREE.DoubleSide})
+  const west = groundTile(0, 0, 32, gentle), east = groundTile(768, 0, 32, gentle), south = groundTile(0, 768, 32, gentle)
+  // Two buckets, each with its own merged layer; the scene lists the one of the tile asked about first.
+  scene.add(west.group, east.group, south.group,
+    streetLayer(street, [{tile: {x: 0, z: 0}, triangles: pavement(0, 0, gentle, {x0: 110, x1: 130})}]),
+    streetLayer(street, [{tile: {x: 768, z: 0}, triangles: pavement(768, 0, gentle, {x0: 110, x1: 130})}]))
+  let clock = 0
+  const drawnAt = drawnGround(scene, street, () => clock)
+  const settle = (x, z, at) => { let got, waits = 0; while ((got = drawnAt(x, z, at)) === undefined) assert.ok(++waits < 30, 'bucketing finishes'); return got }
+  for (const [tile, x] of [[west, 120], [east, 888]]) {
+    const ground = rayDown([tile.mesh], x, 102)
+    assert.ok(near(settle(x, 102, ground), ground + .195, 1e-4), `the pavement of the tile at ${tile.group.position.x}, whichever layer holds it`)
+  }
+  // A third bucket whose layer is not there yet: waited for, then the ground, then the pavement once it joins.
+  const ground = rayDown([south.mesh], 120, 870)
+  assert.equal(drawnAt(120, 870, ground), undefined, 'no layer holds this tile yet')
+  clock = 2500
+  assert.ok(near(drawnAt(120, 870, ground), ground, 1e-4), 'still none: the ground')
+  scene.add(streetLayer(street, [{tile: {x: 0, z: 768}, triangles: pavement(0, 768, gentle, {x0: 110, x1: 130})}]))
+  clock = 5000
+  assert.ok(near(settle(120, 870, ground), ground + .195, 1e-4), 'the pavement once its layer joined')
+  // The first two are still read after the scene was looked through again.
+  assert.ok(near(settle(888, 102, rayDown([east.mesh], 888, 102)), rayDown([east.mesh], 888, 102) + .195, 1e-4))
+})
+
+test('drawnGround: an indexed tile in the street surface layer — its indices count from the tile\'s own first vertex', async () => {
+  const {drawnGround} = await import('../web/src/traffic/drawn-ground.ts')
+  const scene = new THREE.Scene(), street = new THREE.MeshStandardMaterial({side: THREE.DoubleSide})
+  const west = groundTile(-256, 0, 32, gentle), east = groundTile(0, 0, 32, gentle)
+  // Merged buffer as `batch.ts` lays it out: the west tile's vertices first (non-indexed), then the east tile's
+  // four corners with six indices that are local to the tile (0…3), not positions in the merged buffer.
+  const first = pavement(-256, 0, gentle, {x0: 10, x1: 20}).flat()
+  const quad = [[100, 100], [100, 104], [140, 104], [140, 100]].map(([x, z]) => [x, gentle(x, z) + .195, z])
+  const geometry = new THREE.BufferGeometry()
+  geometry.setAttribute('position', new THREE.Float32BufferAttribute([...first, ...quad].flat(), 3))
+  const layer = new THREE.Mesh(geometry, street), indices = new Uint16Array([0, 1, 2, 0, 2, 3])
+  layer.userData.tileSlices = () => [
+    {tile: {x: -256, z: 0}, vertexStart: 0, count: first.length, indices: null, farCount: first.length},
+    {tile: {x: 0, z: 0}, vertexStart: first.length, count: indices.length, indices, farCount: indices.length},
+  ]
+  assert.ok(first.length > 4, 'the east tile starts part-way into the buffer')
+  scene.add(west.group, east.group, layer)
+  const drawnAt = drawnGround(scene, street, () => 0)
+  for (const [x, z] of [[101, 101], [120, 102], [139, 103.5], [110, 103.9]]) {
+    const ground = gentle(x, z)
+    let got, waits = 0
+    while ((got = drawnAt(x, z, ground)) === undefined) assert.ok(++waits < 30, 'bucketing finishes')
+    assert.ok(near(got, ground + .195, 1e-3), `pavement at ${x}, ${z}: ${got} vs ${ground + .195}`)
+  }
+  assert.ok(near(drawnAt(120, 110, gentle(120, 110)), gentle(120, 110), 1e-3), 'beside the quad: bare ground')
+  const there = gentle(15, 102)
+  assert.ok(near(drawnAt(-256 + 15, 102, there), there + .195, 1e-3), 'the non-indexed tile before it is still read')
+})
+
 test('drawnGround: bucketing is bounded by bucket entries written too — long triangles take more passes', async () => {
   const {drawnGround, BUCKET_WRITES_PER_CALL} = await import('../web/src/traffic/drawn-ground.ts')
   const scene = new THREE.Scene(), street = new THREE.MeshStandardMaterial({side: THREE.DoubleSide})

@@ -12,9 +12,12 @@
 //   replaced some (`platform-access.ts`), the grid triangles that are left are looked up once per index
 //   buffer. A cell that was cut away or replaced reads nothing.
 // - The street surface layer (`batch.ts` `StaticLayerBatch` with `streetSurfaceMat`: pavements, roads,
-//   paint, draped up to 0.195 m above the ground mesh). One merged mesh for all tiles; its
-//   `userData.tileSlices()` says which triangles belong to which tile. The triangles of a tile are put
-//   into 8 m buckets once, a few thousand per call, so a reading is a handful of triangle tests.
+//   paint, draped up to 0.195 m above the ground mesh; a pavement slab stands about 0.3 m over it).
+//   One merged mesh per bucket of tiles (`batch.ts` `Bucket`: the city is split into squares of a few
+//   tiles, each with its own layer), so there are several in the scene and more join as the walker
+//   moves. A layer's `userData.tileSlices()` says which of its triangles belong to which tile. The
+//   triangles of a tile are put into 8 m buckets once, a few thousand per call, so a reading is a
+//   handful of triangle tests.
 //
 // Anything else (bridges, tunnel fringes, landmark models) is not read: a post there falls back to
 // the collider, as before.
@@ -36,7 +39,7 @@ export const BUCKET_PER_CALL = 2048
 export const BUCKET_WRITES_PER_CALL = 8192
 const BUCKET = 8
 const BUCKETS = TILE / BUCKET
-/** Scene children are looked through again at most this often (ms) when a point has no tile. */
+/** Scene children are looked through again at most this often (ms) when a point has no tile, or its tile no street surface. */
 const REFRESH_MS = 2000
 /** A tile's street surface joins the merged layer a little after its ground; until then a street-less tile is not believed. */
 const STREET_WAIT_MS = 2000
@@ -72,7 +75,10 @@ function heightIn(ax: number, ay: number, az: number, bx: number, by: number, bz
 
 export function drawnGround(scene: THREE.Scene, streetMaterial: THREE.Material, now = () => performance.now()): DrawnGroundAt {
   let grounds: GroundTile[] = []
-  let streets: THREE.Mesh | undefined
+  /** Every street surface layer in the scene: one per bucket of tiles (`batch.ts` `Bucket`). */
+  let layers: THREE.Mesh[] = []
+  /** The layer `sliceOf` found its slice in. */
+  let sliceLayer: THREE.Mesh | undefined
   let refreshedAt = -Infinity
   const buckets = new Map<object, Buckets>()
   /** Per index buffer of a ground mesh that is not in `PlaneGeometry` order: where each grid triangle is, -1 if gone. */
@@ -82,9 +88,9 @@ export function drawnGround(scene: THREE.Scene, streetMaterial: THREE.Material, 
     refreshedAt = now()
     const before = new Map(grounds.map(item => [item.group, item]))
     grounds = []
-    streets = undefined
+    layers = []
     for (const child of scene.children) {
-      if ((child as THREE.Mesh).isMesh && (child as THREE.Mesh).material === streetMaterial && typeof child.userData.tileSlices === 'function') { streets = child as THREE.Mesh; continue }
+      if ((child as THREE.Mesh).isMesh && (child as THREE.Mesh).material === streetMaterial && typeof child.userData.tileSlices === 'function') { layers.push(child as THREE.Mesh); continue }
       const mesh = groundOf(child)
       if (mesh) grounds.push(before.get(child) ?? {x: child.position.x, z: child.position.z, group: child, mesh, seenAt: refreshedAt})
     }
@@ -147,11 +153,16 @@ export function drawnGround(scene: THREE.Scene, streetMaterial: THREE.Material, 
   }
 
   function sliceOf(tile: GroundTile): Slice | undefined {
-    // The merged layer joins the scene with the first tiles; one that was not there at the last look is looked for again.
-    if (streets?.parent !== scene && now() - refreshedAt >= REFRESH_MS) refresh()
-    const slices = (streets?.parent === scene ? streets.userData.tileSlices?.() : undefined) as Slice[] | undefined
-    if (!slices) return
-    for (const slice of slices) if (slice.tile.x === tile.x && slice.tile.z === tile.z) return slice
+    // A layer joins the scene with the first tiles of its bucket: a tile found in none of the layers known
+    // at the last look has the scene looked through again, then is taken to have no street surface (yet).
+    for (let pass = 0; pass < 2; pass++) {
+      for (const layer of layers) {
+        if (layer.parent !== scene) continue
+        for (const slice of layer.userData.tileSlices() as Slice[]) if (slice.tile.x === tile.x && slice.tile.z === tile.z) { sliceLayer = layer; return slice }
+      }
+      if (pass || now() - refreshedAt < REFRESH_MS) return
+      refresh()
+    }
   }
 
   /** Street surface height at a point, `null` if none within reach, `undefined` while the tile's buckets are being filled. */
@@ -161,14 +172,16 @@ export function drawnGround(scene: THREE.Scene, streetMaterial: THREE.Material, 
       for (const key of buckets.keys()) if ((key as Slice['tile']).x === tile.x && (key as Slice['tile']).z === tile.z) buckets.delete(key)
       return now() - tile.seenAt < STREET_WAIT_MS ? undefined : null
     }
-    const position = streets!.geometry.getAttribute('position')
+    const position = sliceLayer!.geometry.getAttribute('position')
     if (!position || (position as THREE.InterleavedBufferAttribute).isInterleavedBufferAttribute) return null
     const p = position.array, base = slice.vertexStart, ids = slice.indices
     const vertex = (corner: number) => (base + (ids ? ids[corner] : corner)) * 3
     let entry = buckets.get(slice.tile)
     if (!entry || entry.indices !== ids || entry.count !== slice.count) {
       // A tile reloaded: start over. Tiles that are gone are dropped as they are found.
-      for (const key of buckets.keys()) if (!(streets!.userData.tileSlices() as Slice[]).some(item => item.tile === key)) buckets.delete(key)
+      const live = new Set<object>()
+      for (const layer of layers) if (layer.parent === scene) for (const item of layer.userData.tileSlices() as Slice[]) live.add(item.tile)
+      for (const key of buckets.keys()) if (!live.has(key)) buckets.delete(key)
       entry = {indices: ids, count: slice.count, done: 0, cells: new Array(BUCKETS * BUCKETS)}
       buckets.set(slice.tile, entry)
     }
