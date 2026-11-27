@@ -136,6 +136,27 @@ def stair_hole_ring(stair: dict, target_origin: tuple[float, float] = (0.0, 0.0)
     return [(float(x), float(z)) for x, z in reversed(pts)]
 
 
+STAIR_RISERS = 28
+STAIR_TREAD = 0.3
+
+
+def stair_opening_ring(stair: dict, target_origin: tuple[float, float] = (0.0, 0.0), margin: float = 0.0) -> list[tuple[float, float]]:
+    """Return CCW corners of the open well only: first nosing to bottom nosing.
+
+    The top landing (mouth to first nosing) stays street paving; the runtime cuts terrain and streets to the
+    same rectangle (web/src/shizijie/frame.ts), and its stairwell geometry covers the walls and the B1 door.
+    """
+    cx, cz, yaw = stair_for_origin(stair, target_origin)
+    hw = stair['width'] * 0.5 + margin
+    hl = stair['length'] * 0.5
+    z0 = -hl + (stair['length'] - STAIR_RISERS * STAIR_TREAD) - margin
+    z1 = hl + margin
+    pts = [stair_local_to_frame(lx, lz, (cx, cz), yaw) for lx, lz in ((-hw, z0), (hw, z0), (hw, z1), (-hw, z1))]
+    if Polygon(pts).exterior.is_ccw:
+        return [(float(x), float(z)) for x, z in pts]
+    return [(float(x), float(z)) for x, z in reversed(pts)]
+
+
 def stair_hole_world_poly(stair: dict, margin: float = 0.0) -> Polygon:
     return Polygon(stair_hole_ring(stair, (0.0, 0.0), margin))
 

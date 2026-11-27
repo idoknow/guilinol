@@ -12,7 +12,7 @@ import {urbanGround} from './look/urban-ground'
 import {chunkWater, farWater} from './look/water'
 import type {TileBatchInput} from './batch'
 import type {Peaks} from './peaks'
-import {getRegisteredShizijieUnderground,joinPortalRoads,tunnelGeometry,type GroundCutout,type ShizijieUnderpass,type Tunnel} from './tunnels'
+import {cutStairwellStreets,getRegisteredShizijieUnderground,groundStairwellsReady,joinPortalRoads,tunnelGeometry,type GroundCutout,type ShizijieUnderpass,type Tunnel} from './tunnels'
 import {repairBridgeDeck,setBridgeRepairKeepouts} from './ground-repair'
 import {freezeStatic} from './static-freeze'
 
@@ -395,6 +395,8 @@ export async function detail(tile:Tile, signal:AbortSignal, parseSlot?:()=>Promi
   const heights = geometry.getAttribute('position')
   const streets = await loadStreetGeometry(paths,step,heights,rails,signs,railCuts,tile.stationPaving,tile.roadbeds,[tile.x,tile.z])
   if(tunnels)joinPortalRoads(tile,tunnels,[streets.road,streets.sidewalk,...(streets.surface?[streets.surface.getAttribute('position').array as Float32Array]:[])])
+  await groundStairwellsReady
+  cutStairwellStreets(tile,streets)
   signal.throwIfAborted()
   const material = await surfaceMaterial(buffer.slice(offset,end))
   if(touchesCountryside(tile.x,tile.z))countryside(material)

@@ -1,6 +1,6 @@
 /**
- * 小香港 frame and open-stairwell geometry: pure numbers only, so the host main chunk can register the
- * terrain holes before tiles stream while the indoor runtime stays lazy.
+ * 小香港 frame and open-stairwell geometry: pure numbers only, so the host's small ground-stairwells chunk can cut
+ * the terrain holes before tiles stream without pulling in the indoor runtime.
  *
  * Mirrors pipeline/landmarks/central_square.py (XXG_STAIR_* / XXG_PORTAL_AXIAL); scripts/xiaoxianggang/xxg-scripts.test.mjs
  * keeps both in step.

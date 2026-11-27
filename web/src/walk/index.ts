@@ -2094,11 +2094,13 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
     const onFoot=!rides?.bike&&!rides?.car&&!rides?.boat,blend=onFoot&&viewBlend!==null?viewBlend:0
     const firstPerson=(isFirstPerson()||blend>=1)&&onFoot
     const camYaw=yaw+shakeYaw,camPitch=pitch+shakePitch+knockdown.cameraPitchBias,lowerFocus=combat.f.down ? .72 : 0
-    rig.update(camera,figure.position,camYaw,camPitch,arm+ridePose.cameraArm(!!rides?.bike,dt,snap)+driverPose.cameraArm(!!rides?.car,dt,snap)+(rides?.car?carSpeedArm:0),dt,snap,!!rides?.car,firstPerson,lowerFocus)
+    // Open-stairwell blend: pull the arm in with the blend so its collision ray never reaches the well lip or the slab over
+    // the landing; a clamp kicking in or letting go mid-blend is a visible camera jump.
+    rig.update(camera,figure.position,camYaw,camPitch,(arm+ridePose.cameraArm(!!rides?.bike,dt,snap)+driverPose.cameraArm(!!rides?.car,dt,snap)+(rides?.car?carSpeedArm:0))*(1-blend)**2,dt,snap,!!rides?.car,firstPerson,lowerFocus)
     if(sim.clampCamera(figure.position,camera.position,firstPerson?.18:cfg.camRadius)&&!firstPerson){
       camera.lookAt(rig.focus)
     }
-    // Stairwell descent (小香港): ease the third-person camera into the eyes by foot depth, no second rig pass.
+    // Open stairwells (小香港, 十字街): ease the third-person camera into the eyes by foot depth, no second rig pass.
     if(!firstPerson&&blend>0){
       blendFrom.copy(camera.position);blendTurn.copy(camera.quaternion)
       placeFirstPersonCamera(camera,figure.position,camYaw,camPitch,lowerFocus);blendEye.copy(camera.quaternion)

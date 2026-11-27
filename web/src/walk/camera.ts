@@ -2,7 +2,7 @@ import {getPlayMode} from '../game/play-mode'
 import R from '@dimforge/rapier3d-compat'
 import * as THREE from 'three'
 import {look} from '../look/config'
-import {underpassFloor} from '../tunnels'
+import {openWellAt,underpassFloor} from '../tunnels'
 import {walkConfig as cfg} from './config'
 import {nearbyTunnels,tunnelCeiling,type Tunnel} from '../station-tunnels'
 import type {createPhysics} from './physics'
@@ -109,7 +109,8 @@ export function createCameraRig(sim:Physics, tunnels:Tunnel[] = []) {
     }
 
     const activeUg = footY < 149.8 ? undergroundAt(figurePos.x, figurePos.z, footY) : undefined
-    const ugCeilLimit = activeUg !== undefined && footY < 148.6 ? activeUg + 3.04 - cfg.camRadius : Infinity
+    // Covered underpass only: an open landmark stairwell has sky over it, so capping there drops the camera mid-flight.
+    const ugCeilLimit = activeUg !== undefined && footY < 148.6 && !openWellAt(figurePos.x, figurePos.z, footY) ? activeUg + 3.04 - cfg.camRadius : Infinity
 
     function resolveCamBounds(cx:number, cz:number, baseCeil:number) {
       const camDeck = anyDeck ? sim.surface(cx, cz, 'deck', footY + 18, 20) : null
