@@ -105,18 +105,18 @@ const held=(action:Action)=>{let on=false;keys.forEach(code=>{if(!on&&hits(code,
   const touches=new Map<number,{x:number,y:number}>()
   let mouseDown=false, lastMouse={x:0,y:0}, pinchDist=0
 
-  function resetRideTouchControls(){
+  function resetRideTouchControls(preserveRecover=false){
     wheelieTouch=false;wheeliePointer=-1;btnWheelie.classList.remove('on')
     tuckTouch=false;tuckPointer=-1;btnTuck.classList.remove('on');btnTuck.setAttribute('aria-pressed','false')
     hornTouch=false;hornPointer=-1;hornPulse=false;hornBtn.classList.remove('on')
-    gearDelta=0;gearSelect=null;recoverPulse=false;cycleModPulse=false
+    gearDelta=0;gearSelect=null;if(!preserveRecover)recoverPulse=false;cycleModPulse=false
     parkTogglePulse=false;kickstandTogglePulse=false;headlightCyclePulse=false
     turnLeftPulse=false;turnRightPulse=false;hazardPulse=false;cruisePulse=false
   }
-  function clearTransientInput(clearKeys=true){
+  function clearTransientInput(clearKeys=true,preserveRecover=false){
     if(clearKeys)keys.clear()
     jump=false;crouch=false;syncCrouch();endView()
-    resetRideTouchControls()
+    resetRideTouchControls(preserveRecover)
     touches.clear();mouseDown=false;pinchDist=0
     resetStick()
   }
@@ -203,8 +203,8 @@ const held=(action:Action)=>{let on=false;keys.forEach(code=>{if(!on&&hits(code,
     const kdActive=document.body.dataset.tdKnockdown==='1'
     const rideCrashed=document.body.dataset.rideCrash==='1'
     if(kdActive||rideCrashed){
-      if(rideCrashed)recoverPulse=true
-      else window.dispatchEvent(new CustomEvent('walk:knockdown-mash'))
+      if(kdActive)window.dispatchEvent(new CustomEvent('walk:knockdown-mash'))
+      else recoverPulse=true
       btnWheelie.classList.add('on')
       wheeliePointer=event.pointerId;safeCapture(btnWheelie,event.pointerId)
       return
@@ -254,8 +254,8 @@ const held=(action:Action)=>{let on=false;keys.forEach(code=>{if(!on&&hits(code,
   stateEl.onpointerdown=event=>{event.stopPropagation()}
   stateEl.onclick=event=>{
     event.stopPropagation()
-    if(document.body.dataset.rideCrash==='1')recoverPulse=true
-    else if(document.body.dataset.tdKnockdown==='1')window.dispatchEvent(new CustomEvent('walk:knockdown-mash'))
+    if(document.body.dataset.tdKnockdown==='1')window.dispatchEvent(new CustomEvent('walk:knockdown-mash'))
+    else if(document.body.dataset.rideCrash==='1')recoverPulse=true
   }
   new MutationObserver(()=>{
     if(document.body.dataset.photo==='on'||document.body.dataset.shopOpen==='1'){clearTransientInput(true);return}
@@ -415,7 +415,8 @@ const held=(action:Action)=>{let on=false;keys.forEach(code=>{if(!on&&hits(code,
     /** Movement intent for this frame. */
     read(dt?:number){
       if(isModalOrOverlayOpen()||document.body.dataset.tdKnockdown==='1'){
-        if(keys.size||jump||crouch||stick.mag>0)clearTransientInput(true)
+        const preserve=document.body.dataset.tdKnockdown==='1'||document.body.dataset.rideCrash==='1'
+        if(keys.size||jump||crouch||stick.mag>0)clearTransientInput(true,preserve)
         return {right:0,forward:0,run:false,crouch:false,jump:false}
       }
       if(document.body.hasAttribute('data-aboard')&&crouch){crouch=false;syncCrouch()}
@@ -535,7 +536,7 @@ const held=(action:Action)=>{let on=false;keys.forEach(code=>{if(!on&&hits(code,
       document.body.dataset.rideCrash=crashed?'1':'0'
       if(crashed){
         stateEl.hidden=false;stateEl.dataset.warn='1'
-        stateEl.textContent='摔车 · 连按空格/点起身'
+        stateEl.textContent='摔车中'
         btnWheelie.textContent='爬起';btnWheelie.classList.add('on')
       }else if(state.crashPhase==='recovering'){
         stateEl.hidden=false;stateEl.dataset.warn='0'

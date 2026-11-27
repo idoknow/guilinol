@@ -275,7 +275,7 @@ export function createEbikeFxController() {
     lowBatteryWarned = battery <= 20
   }
 
-  function triggerCrash(reason: Exclude<EbikeCrashReason, ''>, side: -1 | 1, heading: number, entrySpeed: number) {
+  function triggerCrash(reason: Exclude<EbikeCrashReason, ''>, side: -1 | 1, heading: number, entrySpeed: number, silentToast = false) {
     if (crashPhase !== 'none') return
     crashPhase = 'crashed'
     crashReason = reason
@@ -289,7 +289,7 @@ export function createEbikeFxController() {
     const sideX = Math.cos(heading) * side, sideZ = -Math.sin(heading) * side
     riderEjectX = -sideX * .55
     riderEjectZ = -sideZ * .55
-    if (!isVerifySilent()) {
+    if (!silentToast && !isVerifySilent()) {
       window.dispatchEvent(new CustomEvent('walk:toast', {
         detail: {
           text: reason === 'lowside'

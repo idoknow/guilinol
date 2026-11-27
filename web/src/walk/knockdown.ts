@@ -1432,10 +1432,12 @@ export function createKnockdownState(options?: KnockdownOptions): KnockdownContr
 
 const HUD_STYLE_ID = 'knockdown-hud-style'
 const HUD_CSS = `
-.knockdown-hud{position:fixed;left:50%;bottom:calc(96px + env(safe-area-inset-bottom));transform:translateX(-50%);z-index:88;display:flex;flex-direction:row;align-items:center;gap:12px;padding:6px 16px 6px 6px;border-radius:999px;background:rgba(14,20,24,.5);border:1px solid rgba(255,212,120,.22);box-shadow:0 6px 18px rgba(0,0,0,.28);backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px);max-width:calc(100vw - 24px);box-sizing:border-box;pointer-events:none;user-select:none;-webkit-user-select:none;font:600 14px/1.35 system-ui,-apple-system,"PingFang SC",sans-serif;color:#f6f1e4;text-shadow:0 1px 3px rgba(0,0,0,.55)}
+.knockdown-hud{position:fixed;left:50%;bottom:calc(96px + env(safe-area-inset-bottom));transform:translateX(-50%);z-index:25;display:flex;flex-direction:row;align-items:center;gap:12px;padding:6px 16px 6px 6px;border-radius:999px;background:rgba(14,20,24,.5);border:1px solid rgba(255,212,120,.22);box-shadow:0 6px 18px rgba(0,0,0,.28);backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px);max-width:calc(100vw - 24px);box-sizing:border-box;pointer-events:none;user-select:none;-webkit-user-select:none;font:600 14px/1.35 system-ui,-apple-system,"PingFang SC",sans-serif;color:#f6f1e4;text-shadow:0 1px 3px rgba(0,0,0,.55)}
 .knockdown-hud[hidden]{display:none}
 body:not([data-hotbar=on]) .knockdown-hud{bottom:calc(28px + env(safe-area-inset-bottom))}
 body[data-kd-down]:is([data-aboard],[data-ride-crash="1"]) .knockdown-hud{bottom:calc(184px + env(safe-area-inset-bottom))}
+@media (hover:hover) and (pointer:fine) and (min-width:1180px){body[data-kd-down][data-ride-crash="1"] .ride-hud{left:calc(50% + 56px)}}
+@media (hover:hover) and (pointer:fine) and (max-width:1179px){body[data-kd-down] .ride-hud .ride-state{display:none}}
 .knockdown-hud .kd-info{display:flex;flex-direction:column;align-items:flex-start;gap:5px;min-width:0}
 body[data-kd-down] .td-duty-keys-dock,body[data-kd-down] .beta-note,body[data-kd-down] .hint{opacity:0;visibility:hidden;pointer-events:none;transition:opacity .18s}
 .knockdown-hud .kd-title{font-size:15px;letter-spacing:.04em;white-space:nowrap}
@@ -1464,16 +1466,45 @@ body[data-kd-down] .td-duty-keys-dock,body[data-kd-down] .beta-note,body[data-kd
 @keyframes kd-burst{from{opacity:1;transform:scale(.9)}to{opacity:0;transform:scale(1.25)}}
 @keyframes kd-shake{0%,100%{transform:translateX(-50%)}25%{transform:translateX(calc(-50% - 6px))}75%{transform:translateX(calc(-50% + 6px))}}
 @media (pointer:coarse){
-  .knockdown-hud .kd-ring{width:112px;height:112px}
-  .knockdown-hud .kd-key{min-width:66px;padding:12px 9px;font-size:17px}
+  .knockdown-hud .kd-ring{width:104px;height:104px}
+  .knockdown-hud .kd-key{min-width:62px;padding:10px 9px;font-size:16px}
 }
 @media (pointer:coarse) and (not (any-pointer:fine)) and (min-height:501px){
-  .knockdown-hud,body:not([data-hotbar=on]) .knockdown-hud{bottom:calc(238px + env(safe-area-inset-bottom))}
-  body[data-kd-down]:is([data-aboard],[data-ride-crash="1"]) .knockdown-hud{bottom:calc(352px + env(safe-area-inset-bottom))}
+  .knockdown-hud,
+  body:not([data-hotbar=on]) .knockdown-hud,
+  body[data-kd-down]:is([data-aboard],[data-ride-crash="1"]) .knockdown-hud{
+    top:calc(232px + env(safe-area-inset-top));bottom:auto;padding:5px 14px 5px 5px;gap:10px
+  }
+  .knockdown-hud .kd-ring{width:90px;height:90px}
+  .knockdown-hud .kd-key{min-width:54px;padding:9px 7px;font-size:15px}
+}
+@media (pointer:coarse) and (not (any-pointer:fine)) and (min-height:501px) and (max-height:700px){
+  .knockdown-hud,
+  body:not([data-hotbar=on]) .knockdown-hud,
+  body[data-kd-down]:is([data-aboard],[data-ride-crash="1"]) .knockdown-hud{
+    top:calc(182px + env(safe-area-inset-top));bottom:auto
+  }
 }
 @media (pointer:coarse) and (not (any-pointer:fine)) and (max-height:500px){
-  .knockdown-hud,body:not([data-hotbar=on]) .knockdown-hud{bottom:calc(74px + env(safe-area-inset-bottom))}
-  body[data-kd-down]:is([data-aboard],[data-ride-crash="1"]) .knockdown-hud{bottom:calc(74px + env(safe-area-inset-bottom))}
+  .knockdown-hud,
+  body:not([data-hotbar=on]) .knockdown-hud{
+    left:calc(50% - 24px);bottom:calc(76px + env(safe-area-inset-bottom));top:auto;
+    gap:8px;padding:3px 12px 3px 4px
+  }
+  body[data-kd-down]:is([data-aboard],[data-ride-crash="1"]) .knockdown-hud{
+    left:calc(50% - 24px);bottom:calc(18px + env(safe-area-inset-bottom));top:auto;
+    gap:8px;padding:3px 12px 3px 4px
+  }
+  body[data-kd-down]:is([data-aboard],[data-ride-crash="1"]) .ride-hud{display:none!important}
+  .knockdown-hud .kd-ring{width:46px;height:46px}
+  .knockdown-hud .kd-track,.knockdown-hud .kd-fill{stroke-width:8}
+  .knockdown-hud .kd-key{min-width:34px;padding:4px 4px 5px;border-radius:8px;font-size:11px;box-shadow:0 2px 0 #a8885a,0 4px 8px rgba(0,0,0,.35)}
+  .knockdown-hud .kd-key small{display:none}
+  .knockdown-hud .kd-info{gap:2px}
+  .knockdown-hud .kd-title{font-size:12px;line-height:1.15}
+  .knockdown-hud .kd-segs{gap:3px}
+  .knockdown-hud .kd-seg{padding:1px 6px;font-size:10px;line-height:1.2}
+  .knockdown-hud .kd-sub{font-size:9.5px;line-height:1.15;min-height:0}
 }
 @media (max-width:440px){.knockdown-hud{gap:8px;padding:6px 10px 6px 6px}.knockdown-hud .kd-seg{padding:2px 6px;font-size:11px;white-space:nowrap}.knockdown-hud .kd-title{font-size:13px}.knockdown-hud .kd-sub{font-size:11px}}
 @media (prefers-reduced-motion:reduce){.knockdown-hud .kd-ring.kd-pulse,.knockdown-hud.kd-shake{animation:none}}
@@ -1593,17 +1624,30 @@ function createKnockdownHud(container: HTMLElement | null | undefined, onMash: (
   window.addEventListener('keydown', onKey, true)
 
   const sync = (snap: KnockdownSnapshot) => {
-    const visible = snap.isDown && snap.phase !== 'idle'
+    const portraitRotateGateOpen =
+      typeof window !== 'undefined' &&
+      typeof matchMedia === 'function' &&
+      matchMedia('(orientation:portrait) and (pointer:coarse) and (not (any-pointer:fine)) and (max-width:600px)').matches &&
+      !document.body.hasAttribute('data-home') &&
+      document.body.dataset.drone !== 'rc' &&
+      document.getElementsByClassName('rotate-gate').length > 0
+    const uiBlocked =
+      portraitRotateGateOpen ||
+      document.body.hasAttribute('data-home') ||
+      document.body.dataset.shopOpen === '1'
+    const downActive = snap.isDown && snap.phase !== 'idle'
+    const visible = downActive && !uiBlocked
     wrap.hidden = !visible
     // 倒地期间执勤三键（Q/E/F）本就互斥禁用；把底部居中的三键条让位给起身环，免得手机上误触。
     if (visible) document.body.dataset.kdDown = '1'
     else delete document.body.dataset.kdDown
-    if (!visible) {
+    if (!downActive) {
       lastCount = -1
       lastFallback = -1
       lastPhase = ''
       return
     }
+    if (!visible) return
     const coarse = isCoarsePointer()
     if (coarse !== lastCoarse) {
       lastCoarse = coarse
@@ -1707,6 +1751,7 @@ export interface BikeSlipKnockdownOptions {
 /** 共享/个人电车打滑及急刹侧翻统一触发入口（供 IDOK-545 等下游复用）。 */
 export function triggerBikeSlipKnockdown(opts: BikeSlipKnockdownOptions = {}): KnockdownSnapshot {
   const target = opts.controller ?? knockdown
+  if (target.isDown) return target.getSnapshot()
   const yaw = Number.isFinite(opts.yaw) ? (opts.yaw as number) : 0
   const side: -1 | 1 = opts.side === -1 ? -1 : 1
   const spd = Number.isFinite(opts.speedMs) ? Math.max(0, opts.speedMs as number) : 5.5
@@ -1726,6 +1771,328 @@ export function triggerBikeSlipKnockdown(opts: BikeSlipKnockdownOptions = {}): K
     impactSpeed: spd,
     fromRide: opts.fromRide ?? true,
   })
+}
+
+export const OBSTACLE_TRIP_THRESHOLDS = {
+  /** 仅疾跑冲刺触发，明显高于正常步行 walk=1.65 m/s。 */
+  minSpeedMs: 5.2,
+  /** 沿障碍法线方向的正向冲击分速度下限。 */
+  minApproachMs: 4.2,
+  /** 过滤斜擦长墙/护栏；cos(angle) >= 0.55（静态柱子 >= 0.65）。 */
+  minApproachRatio: 0.55,
+  minStaticRatio: 0.65,
+  minStaticPushM: 0.018,
+} as const
+
+export interface ObstacleTripInput {
+  vx: number
+  vz: number
+  normalX?: number
+  normalZ?: number
+  pushX?: number
+  pushZ?: number
+  blocked?: boolean
+  blockedByStatic?: boolean
+  yaw?: number
+}
+
+export interface ObstacleTripAssessment {
+  severity: number
+  impactSpeed: number
+  dir: {x: number; z: number}
+}
+
+/** 评估步行高速撞障是否触发 `obstacle_trip`，过滤正常慢走及贴墙斜擦。 */
+export function evaluateObstacleTripImpact(input: ObstacleTripInput): ObstacleTripAssessment | null {
+  const vx = Number.isFinite(input.vx) ? input.vx : 0
+  const vz = Number.isFinite(input.vz) ? input.vz : 0
+  const speed = Math.hypot(vx, vz)
+  if (speed < OBSTACLE_TRIP_THRESHOLDS.minSpeedMs) return null
+
+  const pushX = Number.isFinite(input.pushX) ? (input.pushX as number) : 0
+  const pushZ = Number.isFinite(input.pushZ) ? (input.pushZ as number) : 0
+  const pushMag = Math.hypot(pushX, pushZ)
+  if (input.blockedByStatic && pushMag < OBSTACLE_TRIP_THRESHOLDS.minStaticPushM) return null
+
+  const rawNx = Number.isFinite(input.normalX) ? (input.normalX as number) : 0
+  const rawNz = Number.isFinite(input.normalZ) ? (input.normalZ as number) : 0
+  const rawNLen = Math.hypot(rawNx, rawNz)
+  const useNormal = rawNLen > 0.2
+  const nx = useNormal ? rawNx / rawNLen : pushMag > 1e-4 ? pushX / pushMag : -vx / speed
+  const nz = useNormal ? rawNz / rawNLen : pushMag > 1e-4 ? pushZ / pushMag : -vz / speed
+
+  const hasNormalOrPush = useNormal || pushMag > 1e-4
+  if (!hasNormalOrPush && (!input.blocked || speed < 5.8)) return null
+
+  const approachSpd = -(vx * nx + vz * nz)
+  const ratio = approachSpd / speed
+  const minRatio = input.blockedByStatic
+    ? OBSTACLE_TRIP_THRESHOLDS.minStaticRatio
+    : OBSTACLE_TRIP_THRESHOLDS.minApproachRatio
+  if (hasNormalOrPush && (approachSpd < OBSTACLE_TRIP_THRESHOLDS.minApproachMs || ratio < minRatio)) {
+    return null
+  }
+
+  const impactSpeed = hasNormalOrPush ? approachSpd : speed
+  const severity = clamp01(0.32 + ((impactSpeed - OBSTACLE_TRIP_THRESHOLDS.minApproachMs) / 5.4) * 0.62)
+  return {
+    severity,
+    impactSpeed,
+    dir: {x: nx, z: nz},
+  }
+}
+
+export interface TrafficSlotSample {
+  x: number
+  y: number
+  z: number
+  rx: number
+  rz: number
+  ax: number
+  az: number
+  hw: number
+  hl: number
+  h: number
+}
+
+export interface TrackedTrafficActor extends TrafficSlotSample {
+  vx: number
+  vz: number
+  speed: number
+  movedAt: number
+  streak: number
+  active: boolean
+}
+
+export interface TrafficMotionTracker {
+  step: (samples: readonly TrafficSlotSample[], count: number, nowSec: number) => void
+  findHit: (
+    preX: number,
+    preZ: number,
+    nextX: number,
+    footY: number,
+    nextZ: number,
+    pushX: number,
+    pushZ: number,
+    actorRadius: number,
+    nowSec: number,
+  ) => TrackedTrafficActor | null
+  reset: () => void
+  readonly tracks: readonly TrackedTrafficActor[]
+}
+
+const MAX_TRAFFIC_SPEED_MS = 24.0
+const MIN_TRAFFIC_HIT_SPEED_MS = 2.0
+
+function pointToRotatedObbDist(
+  px: number,
+  pz: number,
+  car: TrafficSlotSample,
+): number {
+  const dx = px - car.x
+  const dz = pz - car.z
+  const lat = dx * car.rx + dz * car.rz
+  const lng = dx * car.ax + dz * car.az
+  const ow = Math.max(0, Math.abs(lat) - car.hw)
+  const ol = Math.max(0, Math.abs(lng) - car.hl)
+  return Math.hypot(ow, ol)
+}
+
+/**
+ * 基于世界位姿 + 朝向近邻 1 对 1 匹配的行驶车流速度追踪器：
+ * 彻底隔离 `sim.actors` 出队导致下标全体左移产生的幽灵高速，并做精确局部 OBB 碰撞匹配。
+ */
+export function createTrafficMotionTracker(): TrafficMotionTracker {
+  let prevTracks: TrackedTrafficActor[] = []
+  let nextTracks: TrackedTrafficActor[] = []
+  let prevCount = 0
+  let prevSig = NaN
+  let lastStepSec = 0
+  const pairs: {curIdx: number; oldIdx: number; distSq: number}[] = []
+  let curMatched = new Uint8Array(0)
+  let oldMatched = new Uint8Array(0)
+
+  function ensureSize(n: number) {
+    if (curMatched.length < n) curMatched = new Uint8Array(Math.max(n, 320))
+    if (oldMatched.length < prevTracks.length) oldMatched = new Uint8Array(Math.max(prevTracks.length, 320))
+  }
+
+  function step(samples: readonly TrafficSlotSample[], count: number, nowSec: number): void {
+    const n = Math.max(0, Math.min(samples.length, count))
+    if (n === 0) {
+      for (const t of prevTracks) t.active = false
+      prevCount = 0
+      prevSig = NaN
+      return
+    }
+    let sig = n * 1.13
+    for (let i = 0; i < n; i++) {
+      const s = samples[i]
+      sig += s.x * 0.73 + s.z * 1.37
+    }
+    if (n === prevCount && Math.abs(sig - prevSig) < 1e-3) {
+      for (let i = 0; i < prevTracks.length; i++) {
+        const t = prevTracks[i]
+        if (t.active && nowSec - t.movedAt > 0.28) {
+          t.vx *= 0.35
+          t.vz *= 0.35
+          t.speed = Math.hypot(t.vx, t.vz)
+          if (t.speed < 0.25) t.streak = 0
+        }
+      }
+      return
+    }
+
+    const rawDt = lastStepSec > 0 ? nowSec - lastStepSec : 0.05
+    const dtObs = Math.max(0.045, Math.min(0.25, rawDt))
+    const maxMatchDist = Math.min(2.0, Math.max(0.9, 25.0 * dtObs))
+    const maxMatchDistSq = maxMatchDist * maxMatchDist
+    ensureSize(n)
+    curMatched.fill(0, 0, n)
+    oldMatched.fill(0, 0, prevTracks.length)
+    pairs.length = 0
+
+    for (let ci = 0; ci < n; ci++) {
+      const cur = samples[ci]
+      for (let oi = 0; oi < prevTracks.length; oi++) {
+        const old = prevTracks[oi]
+        if (!old.active) continue
+        if (Math.abs(cur.y - old.y) > 0.85) continue
+        if (Math.abs(cur.ax * old.ax + cur.az * old.az) < 0.72) continue
+        const dx = cur.x - old.x
+        const dz = cur.z - old.z
+        if (Math.abs(dx) > maxMatchDist || Math.abs(dz) > maxMatchDist) continue
+        const distSq = dx * dx + dz * dz
+        if (distSq <= maxMatchDistSq) pairs.push({curIdx: ci, oldIdx: oi, distSq})
+      }
+    }
+    if (pairs.length > 1) pairs.sort((a, b) => a.distSq - b.distSq)
+
+    while (nextTracks.length < n) {
+      nextTracks.push({
+        x: 0, y: 0, z: 0, rx: 1, rz: 0, ax: 0, az: 1, hw: 0.9, hl: 2.1, h: 1.6,
+        vx: 0, vz: 0, speed: 0, movedAt: nowSec, streak: 0, active: false,
+      })
+    }
+    for (let i = 0; i < nextTracks.length; i++) nextTracks[i].active = false
+
+    for (let p = 0; p < pairs.length; p++) {
+      const {curIdx, oldIdx, distSq} = pairs[p]
+      if (curMatched[curIdx] || oldMatched[oldIdx]) continue
+      curMatched[curIdx] = 1
+      oldMatched[oldIdx] = 1
+      const cur = samples[curIdx]
+      const old = prevTracks[oldIdx]
+      const dst = nextTracks[curIdx]
+      dst.x = cur.x; dst.y = cur.y; dst.z = cur.z
+      dst.rx = cur.rx; dst.rz = cur.rz; dst.ax = cur.ax; dst.az = cur.az
+      dst.hw = cur.hw; dst.hl = cur.hl; dst.h = cur.h
+      dst.active = true
+
+      const dist = Math.sqrt(distSq)
+      if (dist > 0.02) {
+        const dx = cur.x - old.x
+        const dz = cur.z - old.z
+        const ivx = dx / dtObs
+        const ivz = dz / dtObs
+        const ispd = Math.hypot(ivx, ivz)
+        const alongMove = Math.abs(dx * cur.ax + dz * cur.az)
+        const latMove = Math.abs(dx * cur.rx + dz * cur.rz)
+        const reasonableDir = ispd <= 3.5 || alongMove >= latMove * 0.6
+        if (ispd <= MAX_TRAFFIC_SPEED_MS && reasonableDir) {
+          const blend = old.streak >= 1 ? 0.55 : 1.0
+          dst.vx = old.vx * (1 - blend) + ivx * blend
+          dst.vz = old.vz * (1 - blend) + ivz * blend
+          dst.speed = Math.hypot(dst.vx, dst.vz)
+          dst.movedAt = nowSec
+          dst.streak = dst.speed >= MIN_TRAFFIC_HIT_SPEED_MS * 0.75 ? Math.min(10, old.streak + 1) : 0
+        } else {
+          dst.vx = dst.vz = dst.speed = 0
+          dst.movedAt = nowSec
+          dst.streak = 0
+        }
+      } else {
+        dst.vx = dst.vz = dst.speed = 0
+        dst.movedAt = nowSec
+        dst.streak = 0
+      }
+    }
+
+    for (let ci = 0; ci < n; ci++) {
+      if (curMatched[ci]) continue
+      const cur = samples[ci]
+      const dst = nextTracks[ci]
+      dst.x = cur.x; dst.y = cur.y; dst.z = cur.z
+      dst.rx = cur.rx; dst.rz = cur.rz; dst.ax = cur.ax; dst.az = cur.az
+      dst.hw = cur.hw; dst.hl = cur.hl; dst.h = cur.h
+      dst.vx = dst.vz = dst.speed = 0
+      dst.movedAt = nowSec
+      dst.streak = 0
+      dst.active = true
+    }
+
+    const tmp = prevTracks
+    prevTracks = nextTracks
+    nextTracks = tmp
+    prevCount = n
+    prevSig = sig
+    lastStepSec = nowSec
+  }
+
+  function findHit(
+    preX: number,
+    preZ: number,
+    nextX: number,
+    footY: number,
+    nextZ: number,
+    pushX: number,
+    pushZ: number,
+    actorRadius: number,
+    nowSec: number,
+  ): TrackedTrafficActor | null {
+    const pushMag = Math.hypot(pushX, pushZ)
+    let best: TrackedTrafficActor | null = null
+    let bestDist = Infinity
+    for (let i = 0; i < prevTracks.length; i++) {
+      const rec = prevTracks[i]
+      if (!rec.active || rec.streak < 2 || rec.speed < MIN_TRAFFIC_HIT_SPEED_MS || nowSec - rec.movedAt > 0.24) {
+        continue
+      }
+      if (footY >= rec.y + rec.h + 0.15 || footY + 1.5 <= rec.y - 0.15) continue
+      const obbDist = Math.min(
+        pointToRotatedObbDist(preX, preZ, rec),
+        pointToRotatedObbDist(nextX, nextZ, rec),
+      )
+      if (obbDist > actorRadius + 0.16) continue
+      if (pushMag > 1e-4) {
+        const fromCarX = preX - rec.x
+        const fromCarZ = preZ - rec.z
+        if (pushX * fromCarX + pushZ * fromCarZ <= -0.04 * pushMag) continue
+      }
+      if (obbDist < bestDist) {
+        bestDist = obbDist
+        best = rec
+      }
+    }
+    return best
+  }
+
+  function reset(): void {
+    for (const t of prevTracks) t.active = false
+    for (const t of nextTracks) t.active = false
+    prevCount = 0
+    prevSig = NaN
+    lastStepSec = 0
+  }
+
+  return {
+    step,
+    findHit,
+    reset,
+    get tracks() {
+      return prevTracks
+    },
+  }
 }
 
 export function isDown(): boolean {

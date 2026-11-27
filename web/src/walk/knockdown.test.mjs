@@ -958,3 +958,70 @@ test('applyKnockdownPose aligns with 20° slopes and holds elevated bridge decks
   }
   assert(minBridgeBoneY >= 155.9, `bridge deck knockdown must stay supported above deck (not fall to 148m river): minY=${minBridgeBoneY.toFixed(3)}`)
 })
+
+test('obstacle_trip thresholds reject walking & wall grazing while triggering on high-speed sprint head-on collisions', () => {
+  // Normal walking speed (1.65 m/s) or brisk jog (< 5.2 m/s) must never trip
+  assert.equal(kdMod.evaluateObstacleTripImpact({vx: 0, vz: -1.65, normalX: 0, normalZ: 1, blocked: true}), null)
+  assert.equal(kdMod.evaluateObstacleTripImpact({vx: 0, vz: -4.2, normalX: 0, normalZ: 1, blocked: true}), null)
+
+  // High-speed 9.0 m/s oblique wall grazing (< 33 deg, cos ~ 0.25 < 0.55) must slide instead of tripping
+  assert.equal(
+    kdMod.evaluateObstacleTripImpact({vx: 8.7, vz: -2.25, normalX: 0, normalZ: 1, blocked: true}),
+    null,
+    'glancing wall contact during sprint must stay upright',
+  )
+
+  // Head-on sprint at 9.0 m/s into an obstacle volume triggers heavy obstacle_trip
+  const headOn = kdMod.evaluateObstacleTripImpact({vx: 0, vz: -9.0, normalX: 0, normalZ: 1, blocked: true, yaw: 0})
+  assert.ok(headOn, '9 m/s head-on sprint into obstacle must evaluate trip')
+  assert(headOn.severity >= 0.75, `expected strong trip severity, got ${headOn.severity}`)
+  assert.deepEqual(headOn.dir, {x: 0, z: 1})
+
+  // Small lateral tap against static bollard/parked car (< 1.8cm push or grazing angle) must stay safe
+  assert.equal(
+    kdMod.evaluateObstacleTripImpact({vx: 0, vz: -8.5, pushX: 0, pushZ: 0.01, blockedByStatic: true}),
+    null,
+  )
+})
+
+test('traffic motion tracker rejects slot-reorder ghost speeds & static roadside obstacles while detecting real moving vehicle hits', () => {
+  const tracker = kdMod.createTrafficMotionTracker()
+  const makeCar = (x, y, z, ax = 0, az = 1, hw = 0.92, hl = 2.1, h = 1.6) => ({
+    x, y, z, rx: az, rz: -ax, ax, az, hw, hl, h,
+  })
+
+  // Frame 0: Car A (leading) and Car B (4.1m behind) both STOPPED at a red light
+  tracker.step([makeCar(0, 150, 10), makeCar(0, 150, 5.9)], 2, 1.0)
+  // Frame 1 (50ms later): Car A leaves array so slot 0 becomes Car B (shifted 4.1m!)
+  tracker.step([makeCar(0, 150, 5.9)], 1, 1.05)
+  // Frame 2 (50ms later): Car B still stationary at 5.9
+  tracker.step([makeCar(0, 150, 5.9)], 1, 1.1)
+  assert.equal(
+    tracker.findHit(0.2, 5.9, 0.4, 150, 5.9, 0.2, 0, 0.29, 1.1),
+    null,
+    'slot-reorder of queued cars must never fabricate ghost high speed',
+  )
+
+  // Roadside bollard hit (push at 3.8m away from a moving car on adjacent lane) must return null
+  const t0 = 2.0
+  tracker.step([makeCar(5.0, 150, 10.0), makeCar(5.0, 150, 10.6)], 1, t0)
+  tracker.step([makeCar(5.0, 150, 10.45)], 1, t0 + 0.05)
+  tracker.step([makeCar(5.0, 150, 10.9)], 1, t0 + 0.1)
+  assert(tracker.tracks[0].speed >= 8.0, `moving car speed should be ~9 m/s, got ${tracker.tracks[0].speed}`)
+  assert.equal(
+    tracker.findHit(0.9, 10.9, 0.85, 150, 10.9, -0.05, 0, 0.29, t0 + 0.1),
+    null,
+    'bollard 3.2m away from lane car OBB must never trigger vehicle_hit',
+  )
+
+  // Direct contact with that moving car (pre-push overlaps/touches OBB, pushed outward along -X) detects hit
+  const direct = tracker.findHit(4.0, 10.9, 3.82, 150, 10.9, -0.18, 0, 0.29, t0 + 0.1)
+  assert.ok(direct && direct.speed >= 8.0, 'real OBB impact by moving car must be detected')
+
+  // triggerBikeSlipKnockdown is re-entrant safe when controller is already down
+  const slipCtrl = kdMod.createKnockdownState({seed: 31})
+  const first = kdMod.triggerBikeSlipKnockdown({yaw: 0.4, side: 1, speedMs: 8.5, fromRide: true, controller: slipCtrl})
+  const second = kdMod.triggerBikeSlipKnockdown({yaw: 1.2, side: -1, speedMs: 9.0, fromRide: false, controller: slipCtrl})
+  assert.equal(second.triggerId, first.triggerId, 're-entrant slip knockdown must not overwrite active session')
+  assert.equal(second.fromRide, true, 're-entrant call must preserve fromRide=true')
+})
