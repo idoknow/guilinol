@@ -5,7 +5,9 @@ import math
 from collections import Counter
 from pathlib import Path
 
-from shapely.geometry import box
+from shapely.geometry import LineString, Point, box
+
+from features import points
 
 from check_rail_section_tracks import tile_rails
 from station_rail_reference import differences, reference_tiles, section_reference
@@ -27,6 +29,8 @@ def huancheng_survey(candidate, reference):
     """Use encoded heights on both copies of each shared endpoint."""
     design = json.loads(Path(__file__).with_name("rail-sections").joinpath("13-guilin-south.json").read_bytes())
     limits = {(v["x"], v["z"]): v for v in design["approvedCorridorVertices"]}
+    axes = {w["id"]: LineString(points(w)) for w in load_osm()
+            if w["type"] == "way" and w["id"] in (991385699, 991385700)}
     heights = {key: [] for key in limits}
     chords = []
     valid = True
@@ -50,7 +54,11 @@ def huancheng_survey(candidate, reference):
             length = math.dist(*ends)
             grade = 1000 * abs(after[1]-after[0]) / length
             valid &= grade <= 12
-            chords.append(dict(ends=ends, beforeM=before, afterM=after,
+            owners = [way for way, axis in axes.items()
+                      if all(axis.distance(Point(pt)) <= .001 for pt in ends)]
+            if len(owners) != 1:
+                raise ValueError(f"Unknown Huancheng bridge chord at {ends}")
+            chords.append(dict(way=owners[0], ends=ends, beforeM=before, afterM=after,
                                beforePermille=1000*abs(before[1]-before[0])/length, afterPermille=grade))
     vertices = []
     for pt, values in heights.items():
@@ -93,6 +101,18 @@ def compare(candidate_world, reference_world=None):
     exterior = [xy for xy, values in actual.items() if not values or
                 any(abs(y - expected[xy]) > 1e-6 for y in values)]
     segments = sum(map(len, before.values()))
+    fixed = 0
+    for key, rows in before.items():
+        actual_rows = Counter(after.get(key, []))
+        for row in rows:
+            if any((round(key[0] + row[j]/100, 6), round(key[1] + row[j+1]/100, 6))
+                   in {(v["x"], v["z"]) for v in survey["vertices"]} for j in (0, 3)):
+                continue
+            if actual_rows[tuple(row)]:
+                fixed += 1
+                actual_rows[tuple(row)] -= 1
+    survey["unchangedChords"] = fixed
+    survey["passed"] &= fixed == 1134
     return dict(huancheng=survey, referenceSegments=segments, changedChunks=changed, differences=details,
                 exteriorTies=len(expected), changedExteriorTies=exterior)
 
