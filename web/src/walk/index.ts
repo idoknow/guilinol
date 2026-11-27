@@ -1690,26 +1690,51 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
           passenger:document.body.dataset.helicopter?true:undefined,foot:!rides?.bike&&!rides?.car&&!rides?.boat&&!document.body.dataset.helicopter,yaw:figure.rotation.y,v:rc?0:poseSpeed(),gr:Number(grounded),
           sc:cigarette.wire,sb:Math.round(cigarette.length*1800),sp:puffSeq,br:brandIndex(cigarette.brand),sd:dropSeq,ss:cigarette.strength,sr:cigarette.remaining,
           bike:rides?.bike?'bike':'',bx:rides?.bike?.position.x??0,bz:rides?.bike?.position.z??0,byaw:rides?.heading??0}},()=>currentAvatar()??profile,camera,currentActivity,combat.receive,(x,y,z)=>{
+            const checkDutyOutOfShift=(px:number,py:number,pz:number)=>{
+              if(trafficDutyRef&&trafficDutyRef.getSnapshot().phase==='active'){
+                const dutyZoneId=trafficDutyRef.getSnapshot().zoneId
+                const outOfShiftZone=dutyZoneId==='shizijie'
+                  ? resolveDutyZone({x:px,y:py,z:pz})?.id!=='shizijie'
+                  : !isInBridgeDutyBounds({x:px,y:py,z:pz})&&(Math.hypot(clampToBridgeDutyBounds({x:px,y:py,z:pz}).clamped.x-px,clampToBridgeDutyBounds({x:px,y:py,z:pz}).clamped.z-pz)>12)
+                if(outOfShiftZone){
+                  trafficDutyRef.abandonDuty()
+                  window.dispatchEvent(new CustomEvent('walk:toast',{detail:{text:'位置已重置，已自动结束当前执勤班次',ms:2400}}))
+                }
+              }
+            }
+            const r=rides,fb=r?.freeBoat
+            if(r&&fb){
+              // 位置校正时自由船同步复位，人物与刚体跟到船座
+              sim.sync(x,z,true)
+              if(r.relocateBoat(x,z)){
+                const bpos=fb.position,bp=r.boatProbe(),wy=bp?bp.y:bpos.y,dest={x:bpos.x,y:wy+cfg.height/2,z:bpos.z}
+                sim.body.setTranslation(dest,true);sim.body.setNextKinematicTranslation(dest);safe.set(dest.x,dest.y,dest.z)
+                external=null;vx=vz=velocity=accumulator=0;boatBoardElapsed=BOAT_BOARD_DUR;follow(0,true)
+                resetPoseSpeed();checkDutyOutOfShift(bpos.x,wy,bpos.z);return
+              }
+              // 校正点不在可通航水面：下船回到校正点
+              r.clearBoatPose(figure);r.dismount()
+            }
+            if(r&&(r.car||r.bike)){
+              // 位置校正时车辆与速度状态同步复位
+              sim.sync(x,z,true)
+              const sup=r.car?carSupportAt(x,z,y):supportAt(x,z,y)
+              const gy=sup?sup.y:y,dest={x,y:gy+cfg.height/2+.055,z}
+              sim.body.setTranslation(dest,true);sim.body.setNextKinematicTranslation(dest)
+              safe.set(x,dest.y,z);figure.position.set(x,gy,z);external=null;vx=vz=velocity=accumulator=0
+              coyoteTimer=0;jumpTimer=0;jumpStage='none';r.stop();bikeObstacle=''
+              if(r.car){r.consumeCarImpact();prevCarSpeed=0;prevCarObstacle='';lastCarBraking=false;carShake=0;carSpeedArm=0;follow(0,true)}
+              else{prevTwoWheelSpeed=0;const c=crashSession;if(c){c.bikeOriginX=x;c.bikeOriginZ=z;c.bikeSlideX=c.bikeSlideZ=c.slideSpeed=c.riderOffsetX=c.riderOffsetZ=0}else ebikeMountElapsed=bikeConfig.mountDuration;follow(0,true)}
+              resetPoseSpeed();checkDutyOutOfShift(x,gy,z);return
+            }
+            // 路线船由航线脚本驱动，位置校正时不搬动船体；步行保持原逻辑
             const footY=y-combat.drop,dest={x,y:footY+cfg.height/2,z}
             sim.sync(x,z);sim.body.setTranslation(dest,true);sim.body.setNextKinematicTranslation(dest);sim.world.step()
             safe.set(x,dest.y,z);figure.position.set(x,footY,z)
             external=null;vx=0;vz=0;velocity=0;accumulator=0;coyoteTimer=0;jumpTimer=0;grounded=false;jumpStage='none'
             crashSession=null;standUpSession=null;pickupSession=null;bikeObstacle=''
-            if(rides?.car||rides?.bike){
-              rides.stop()
-              rides.park(figure.position)
-            }
             resetPoseSpeed()
-            if(trafficDutyRef&&trafficDutyRef.getSnapshot().phase==='active'){
-              const dutyZoneId=trafficDutyRef.getSnapshot().zoneId
-              const outOfShiftZone=dutyZoneId==='shizijie'
-                ? resolveDutyZone({x,y:footY,z})?.id!=='shizijie'
-                : !isInBridgeDutyBounds({x,y:footY,z})&&(Math.hypot(clampToBridgeDutyBounds({x,y:footY,z}).clamped.x-x,clampToBridgeDutyBounds({x,y:footY,z}).clamped.z-z)>12)
-              if(outOfShiftZone){
-                trafficDutyRef.abandonDuty()
-                window.dispatchEvent(new CustomEvent('walk:toast',{detail:{text:'位置已重置，已自动结束当前执勤班次',ms:2400}}))
-              }
-            }
+            checkDutyOutOfShift(x,footY,z)
           },captureContext)
         net.emote(emote.id);net.tick(0)
     }
