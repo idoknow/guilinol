@@ -2034,7 +2034,8 @@ const pages: Record<string, (view: View) => void> = {
         ].filter(Boolean) as Node[]
       }
       return devices.map((device) => {
-        const others = ((device.accounts ?? []) as any[]).filter((row) => String(row.uid) !== String(device.uid))
+        // device.uid 是 mp_devices 的设备主人，即被封账号本身
+        const others = ((device.accounts ?? []) as any[]).filter((peer) => String(peer.uid) !== String(device.uid))
         const peers = others.length ? `同设备 ${others.map(account).join('、')}` : ''
         const net = `网段 ${device.ip24 || dash} · 最近 ${seen(device.last)}`
         return h('li', null, copyFp(String(device.fp)), h('span', null, deviceText(device) || '设备'),
@@ -3839,14 +3840,16 @@ function screenshotTrace(refresh: () => Promise<void>) {
   const form = h('form', { class: 'adm-trace-form' }, zone, upload)
   const result = h('div', { class: 'adm-trace-result', 'aria-live': 'polite' })
   thumb.hidden = true; upload.hidden = true
-  let picked: File | null = null, preview = ''
+  // 每次换图或识别都递增；旧图的识别结果晚到时直接丢弃，免得挂在新图下面封错人
+  let picked: File | null = null, preview = '', traceSeq = 0
   const note = (heading: string, text: string, alert = false) =>
     h('div', { class: 'adm-trace-note', role: alert ? 'alert' : null }, h('b', null, heading), h('span', null, text))
   // 选中即识别：拖入、粘贴、点选后不用再点按钮；按钮留作重新识别
   const pick = (next: File | null | undefined) => {
     if (preview) URL.revokeObjectURL(preview)
+    traceSeq++
     picked = next ?? null; preview = ''
-    result.replaceChildren()
+    result.replaceChildren(); upload.classList.remove('is-busy')
     thumb.hidden = !picked; icon.hidden = !!picked; upload.hidden = !picked
     if (!picked) { title.textContent = idleTitle; meta.textContent = ''; upload.disabled = true; return }
     preview = URL.createObjectURL(picked); thumb.src = preview
@@ -3867,17 +3870,20 @@ function screenshotTrace(refresh: () => Promise<void>) {
   })
   form.addEventListener('submit', async (event) => {
     event.preventDefault()
-    if (!picked || upload.disabled || upload.classList.contains('is-busy')) return
+    if (!picked || upload.disabled) return
+    const seq = ++traceSeq, image = picked
     upload.disabled = true; upload.classList.add('is-busy')
     result.replaceChildren(h('p', { class: 'adm-sub' }, '识别中…'))
     try {
-      const { response, data } = await traceFetch('admin/trace', { method: 'POST', body: picked })
+      const { response, data } = await traceFetch('admin/trace', { method: 'POST', body: image })
+      if (seq !== traceSeq) return
       if (!response.ok) throw new Error(traceErrors[data.error] ?? `识别失败（${response.status}）`)
       result.replaceChildren(data.ok ? traceHit(data, refresh) : note('没有识别到来源', '只有登录状态下的画面带来源标记；过度裁切或压缩也会读不出。'))
     } catch (error) {
+      if (seq !== traceSeq) return
       result.replaceChildren(note('识别失败', error instanceof Error ? error.message : String(error), true))
     } finally {
-      upload.disabled = !picked; upload.classList.remove('is-busy')
+      if (seq === traceSeq) { upload.disabled = !picked; upload.classList.remove('is-busy') }
     }
   })
   return card('截图溯源', [form, result], { className: 'adm-trace' })
@@ -3906,6 +3912,8 @@ function traceHit(data: any, refresh: () => Promise<void>) {
       })
       if (ok === null) return
       await act(button, async () => {
+        // 请求期间三个处置按钮一起锁住，免得同一张截图并发两次不同范围的封禁；结束后由 sync() 恢复
+        for (const other of buttons) other.disabled = true
         const { response, data: state } = await traceFetch('admin/trace/action', {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ uid: data.uid, scope, minutes: Number(minutes.value), reason: text }),
