@@ -22,6 +22,8 @@ export type PostAudit = {
   key: string
   /** Post base minus the highest drawn surface under it. `null`: nothing hit. */
   gap: number | null
+  /** Name of the mesh that surface belongs to (an unnamed tile ground reads `Group`/`Mesh`). */
+  under: string | null
   /** Names of drawn meshes within `POST_REACH` of the post, between shin and cap height: fences, rails, poles it stands in. */
   touching: string[]
 }
@@ -96,14 +98,14 @@ export function streetFurnitureAudit(
   const postAudits: PostAudit[] = []
   for (const post of posts) {
     if (post.state !== 'drawn' || !near(post)) continue
-    const audit: PostAudit = {key: post.key, gap: null, touching: []}
+    const audit: PostAudit = {key: post.key, gap: null, under: null, touching: []}
     raycaster.set(origin.set(post.x, post.y + 2, post.z), down)
     raycaster.far = 4
     let surface: number | undefined
     for (const hit of raycaster.intersectObjects(drawn, false)) {
       // Not the awning or the tree crown overhead.
       if (hit.point.y > post.y + .5) continue
-      if (surface === undefined || hit.point.y > surface) surface = hit.point.y
+      if (surface === undefined || hit.point.y > surface) { surface = hit.point.y; audit.under = nameOf(hit.object) }
     }
     if (surface !== undefined) audit.gap = +(post.y - surface).toFixed(4)
     // Eight rays outwards from the post axis at two heights: anything drawn that close is something the post stands in.
