@@ -1,4 +1,5 @@
 import {AVATAR_KEY, sanitizeAvatar, type Avatar} from '../../../lib/avatar'
+import { readJson } from '../lib/json'
 import {cloneSave, flushThrottledSave, loadLocalSave, persistSaveSync} from '../game/save'
 import {starterOutfit} from '../game/catalog'
 
@@ -8,7 +9,7 @@ async function request(a?: Avatar, equipStarter = false) {
     a ? {method: 'PUT', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({avatar: a, equipStarter})} : {},
   )
   if (!res.ok) throw Error('角色存档暂时无法同步，请重试')
-  return sanitizeAvatar((await res.json()).avatar)
+  return sanitizeAvatar((await readJson<any>(res)).avatar)
 }
 
 function mirror(a: Avatar, equip: boolean) {

@@ -2,11 +2,12 @@ import './citizen.css'
 import {markSurface,markSession} from '../session-mark'
 import {backpackItems} from './items'
 import {queueCigarette,smokeEnabled} from './use-item'
+import { readJson } from '../lib/json'
 const status=document.querySelector('#status')!,button=document.querySelector<HTMLButtonElement>('#portrait')!
 async function openBag(){
   const response=await fetch('/api/me')
   if(!response.ok)throw Error(response.status===401?'请先登录后查看背包':'暂时无法读取背包')
-  const {uid}=await response.json()
+  const {uid}=await readJson<{uid:number}>(response)
   markSurface(document.body); markSession(uid)
   for(const item of backpackItems(uid)){
     if(item.id==='cigarette'&&!smokeEnabled())continue
