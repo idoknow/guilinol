@@ -39,7 +39,7 @@
 
 .about-body ul.ab-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:12px;align-items:start;margin:0;padding:0;list-style:none}
 .ab-card{--accent:var(--ui-jade-300);position:relative;display:flex;flex-direction:column;gap:10px;padding:14px 14px 12px;border-radius:var(--ui-r-md);
-  background:linear-gradient(160deg,rgba(244,239,226,.085),rgba(244,239,226,.03) 60%);border:1px solid var(--ui-glass-line-soft);overflow:hidden;
+  background:rgba(244,239,226,.05);border:1px solid var(--ui-glass-line-soft);overflow:hidden;
   transition:transform .25s var(--ui-ease),border-color .25s,box-shadow .25s}
 .ab-card::before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--accent);opacity:.85}
 .ab-card--lead,.ab-card--design{--accent:var(--ui-seal-light)}.ab-card--feedback{--accent:var(--ui-ochre)}

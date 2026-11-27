@@ -45,7 +45,7 @@ input.acc-code{font-size:24px!important;letter-spacing:.6em;text-align:center;pa
 .acc-sso-row[data-count="1"]{grid-template-columns:1fr}.acc-sso-row[data-count="3"]{grid-template-columns:repeat(3,minmax(0,1fr))}
 .acc-sso{--brand:var(--ui-jade-500);position:relative;display:flex;align-items:center;justify-content:center;gap:10px;min-width:0;height:56px;padding:0 12px;
   border:1px solid rgba(255,255,255,.55);border-radius:var(--ui-r-md);cursor:pointer;-webkit-tap-highlight-color:transparent;
-  background:linear-gradient(180deg,#fbf8f0,var(--ui-paper-2));color:var(--ui-ink-800);font:600 16px var(--ui-serif);letter-spacing:.14em;
+  background:var(--ui-paper);color:var(--ui-ink-800);font:600 16px var(--ui-serif);letter-spacing:.14em;
   box-shadow:0 1px 0 rgba(255,255,255,.6) inset,0 -3px 0 var(--brand) inset,0 6px 16px rgba(8,16,14,.28);
   transition:transform var(--ui-fast) var(--ui-ease),box-shadow var(--ui-fast),filter var(--ui-fast)}
 .acc-sso[data-type=qq]{--brand:#12b7f5}.acc-sso[data-type=wx]{--brand:#07c160}
