@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import {createBanStore,checkMove} from './anti-cheat.mjs'
 import {ipGate,tooFast} from './protocol-guard.mjs'
-import {grantTravel} from './travel.mjs'
+import {grantTravel,leaveHistory} from './travel.mjs'
 import {acceptSample,acceptedSpeed,shouldRecordCorrection} from './movement-sample.mjs'
 
 assert.equal(shouldRecordCorrection(null,{kind:'speed',overflow:1},0.1,1000),false)
@@ -33,10 +33,17 @@ for(const [kind,limit] of [['connection',240],['ticket',16]]){
 const socket={};for(let count=0;count<100;count++)assert.equal(tooFast(socket,0),false)
 assert.ok(tooFast(socket,0));assert.equal(tooFast(socket,1000),false)
 const player={x:1000,y:4,z:1000,posAt:10000};const now=12000
-assert.equal(grantTravel(player,'map',{x:1500,z:1500},now),false)
+assert.equal(grantTravel(player,'map',{x:1500,z:1500},now),'site')
 assert.ok(checkMove(player,1500,4,1500,now).reject)
-assert.ok(grantTravel(player,'map','spot:bridge',now));player.lastCombat=now
-assert.ok(checkMove(player,-185,4,35,now).reject);assert.equal(grantTravel(player,'map','spot:bridge',now),false)
+assert.equal(grantTravel(player,'map','spot:bridge',now),'ok');player.lastCombat=now
+assert.ok(checkMove(player,-185,4,35,now).reject);assert.equal(grantTravel(player,'map','spot:bridge',now),'combat')
+const history=leaveHistory(),first={uid:1,x:0,y:4,z:0,lastCombat:now},next={uid:1,x:1000,y:8,z:0}
+history.save(first,now+100)
+assert.deepEqual(history.restore(next,now+101),{x:0,y:4,z:0,code:'combat'})
+history.save(next,now+102);next.x=1000
+assert.equal(history.restore(next,now+5001),undefined);assert.equal(next.tpAt,now+5001)
+history.save(next,now+5002);next.x=2000
+assert.deepEqual(history.restore(next,now+5003),{x:1000,y:4,z:0,code:'cooldown'})
 const cache=createBanStore({DATABASE_URL:'postgres://unused.invalid/test'})
 cache.pool.query=async()=>{throw Error('offline')};await assert.rejects(cache.hydrate(),/offline/)
 cache.pool.query=async()=>({rows:[{kind:'uid',value:'900101',record_id:'saved'}]});await cache.hydrate()
