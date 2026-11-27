@@ -220,6 +220,7 @@ try {
   assert.equal(await page.evaluate(() => window.viewer.stream.radius), 480)
   assert.equal(await page.evaluate(k => localStorage.getItem(k), RENDER_STORAGE_KEY), null)
 
+  await page.click('.dock-more') // 拍照收在「工具」里（IDOK-468）
   await page.click('.dock-photo')
   await page.waitForFunction(() => document.body.dataset.photo === 'on')
   assert.equal(await page.evaluate(() => getComputedStyle(document.querySelector('.render-entry')).display === 'none' && getComputedStyle(document.querySelector('.render-pop')).display === 'none'), true)

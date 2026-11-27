@@ -50,7 +50,7 @@
     "凤北路":     [62, 13, 15,  0,  0,  0,  0, 10,  0,  0,  0],
     "乐群路":     [40, 15, 20,  0,  0,  0,  0, 25,  0,  0,  0]
   },
-  "doubleRowSidewalkOsmanthus": ["解放东路", "中山中路"],
+  "doubleRowSidewalkOsmanthus": [],
   "width": {"trunk":18,"primary":14,"secondary":12,"tertiary":10,"residential":6,"pedestrian":6},
   "street": {"spacing":7,"jitter":0.8,"offset":1.7,"junction":12},
   "bank": {"spacing":8.5,"offset":[2.6,9.5]},

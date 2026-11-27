@@ -76,6 +76,22 @@
   cursor: pointer;
 }
 
+.set-open {
+  flex: none;
+  font: inherit;
+  font-size: 12.5px;
+  letter-spacing: .08em;
+  padding: 7px 14px;
+  border-radius: var(--ui-r-paper, 6px);
+  border: 1px solid color-mix(in srgb, currentColor 24%, transparent);
+  background: color-mix(in srgb, currentColor 9%, transparent);
+  color: inherit;
+  cursor: pointer;
+}
+
+/* 开发读数（帧率、网速、在线人数及其 F3 键）只在 ?debug / ?verify 下出现（IDOK-468） */
+body:not([data-debug]) [data-dev-only] { display: none; }
+
 .set-seg button.on {
   background: #a9503c;
   border-color: #a9503c;

@@ -78,8 +78,8 @@ export function findOfficerInteractCandidate(
     ...(isOffDutyReport ? {isOffDutyReport: true} : {}),
     label: isOffDutyReport
       ? pendingInt > 0
-        ? `下岗交差 · 向解放桥交警领10%分成 ¥${pendingInt}`
-        : '下岗交差 · 向解放桥交警交差'
+        ? `下岗交差 ¥${pendingInt}`
+        : '下岗交差'
       : briefingDone
         ? '与解放桥交警对话 · 再接一班'
         : '与解放桥交警对话 · 领取执勤任务',

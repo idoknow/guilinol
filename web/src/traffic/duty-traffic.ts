@@ -23,6 +23,7 @@ import {
   type Variant,
 } from './models'
 import {riderPool} from './rider-pool'
+import {SIGNAL_DRIVER_RANK, citySignalClock, citySignals} from './signals'
 import {
   Traffic,
   type Actor,
@@ -965,6 +966,7 @@ export function createDutyTraffic(opts: DutyTrafficOptions = {}): DutyTrafficHan
   let activeCenter = {...defaultCenter}
   let activeRadiusM = defaultRadiusM
   let accumulator = 0
+  const signalDriver = citySignalClock.driver(SIGNAL_DRIVER_RANK.duty)
   let ownsTrafficSolids = false
   let warningHorns = 0
   let lastHitSpeedKmh: number | null = null
@@ -1266,6 +1268,7 @@ export function createDutyTraffic(opts: DutyTrafficOptions = {}): DutyTrafficHan
           : opts.sampleGround
         : undefined
 
+      citySignals.add(fallbackGraph.signals)
       const nextSim = new Traffic(fallbackGraph, random, limit, {
         classes: npcDefaults.classes,
         carMin: 0,
@@ -1475,6 +1478,9 @@ export function createDutyTraffic(opts: DutyTrafficOptions = {}): DutyTrafficHan
         : playerPos ?? {x: activeCenter.x, y: 151.7, z: activeCenter.z})
 
     accumulator += safeDt
+    // Same lights as the street sim: follow the one city clock (pre-roll above ran on the sim's own time).
+    signalDriver.advance(safeDt)
+    sim.signalShift = citySignalClock.now - accumulator - sim.time
     if (accumulator < 0.05) {
       syncVisualFrame(safeDt, accumulator, false)
       return

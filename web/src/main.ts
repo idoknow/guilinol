@@ -9,6 +9,7 @@ import {landingWarmBudget,warmShaders,type WarmBudget} from './shader-warmup'
 import {vehicleModel} from './walk/vehicle-model'
 import {bytes, fetchAsset, measureFirstWorldBytes, openingTerrain, startOverview, type Manifest} from './world'
 import {Stream} from './stream'
+import {flightFocus} from './flight-focus'
 import {flight} from './flight'
 import {look} from './look/config'
 import {gfxState} from './look/gfx-state'
@@ -145,7 +146,8 @@ async function start(loader:FullLoader,creatorSpawn=false) {
   if(params.has('debug'))Object.assign(window,{gfx})
   // tapFrame：录像在这里、present 之前拷帧（IDOK-383，主画布没开 preserveDrawingBuffer）。
   let cabinCruise=false
-  function drawMain(){if(post)stats.shadowCasters=post.render(walker?.active?walker.position:camera.position,cabinCruise);else renderer.render(scene,camera);tapFrame(renderer.domElement)}
+  const drawMark=sessionMarkPass(renderer)
+  function drawMain(){if(post)stats.shadowCasters=post.render(walker?.active?walker.position:camera.position,cabinCruise);else renderer.render(scene,camera);drawMark();tapFrame(renderer.domElement)}
   renderer.info.autoReset=false
   const hemi = new THREE.HemisphereLight(look.hemiSky,look.hemiGround,look.hemiPower); scene.add(hemi)
   const arrivalReady=import('./arrival-programs').then(module=>warmPrograms(module.arrivalPrograms()))
@@ -228,6 +230,7 @@ async function start(loader:FullLoader,creatorSpawn=false) {
   const clock = skyClock(params)
   if(!soloStart)setPreset(camera,params.get('cam')??params.get('spawn'),bounds.bbox)
   let previous=0, first=0, frame=0, sum=0, samples=0
+  const flightAhead=new THREE.Vector3()
   const stats = {firstMs:0,readyMs:0,openingRingMs:0,firstWorldBytes:0,ms:0,calls:0,shadowCasters:0,frame:0,loaded:0,pending:0,visited:0,failures:0,
     geometries:0,textures:0,dpr:currentDpr}
   function markFirstFrame(){
@@ -582,6 +585,7 @@ async function start(loader:FullLoader,creatorSpawn=false) {
     },
   })
   rangeStore.subscribe(nextCfg=>{renderUi.setConfig(nextCfg)})
+  window.addEventListener('glol:open-render-range',()=>renderUi.open())
   // IDOK-178：帧率/网速/在线人数读数与设置热键（都靠 localStorage 记住上次选择）。
   mountStats()
   mountHotkeys()
@@ -963,8 +967,9 @@ async function start(loader:FullLoader,creatorSpawn=false) {
       trafficTick?.(elapsed/1000,walker?.active&&walker.vehicle!=='foot'?walker.position:undefined,
         walker?.active?walker.position:undefined,getPlayMode()==='solo',showTraffic)
       const target=heli.lookAhead??walker?.destination??(walker?.active?walker.position:camera.position)
+      const ahead=target===camera.position?flightFocus(camera,stream.groundAt(camera.position.x,camera.position.z),stream.radius,flightAhead):undefined
       const streamStart=profiling?performance.now():0
-      stream.tick(target,heli.phase==='cruise')
+      stream.tick(target,heli.phase==='cruise',ahead)
       if(frame>=2) syncCityUpgradeProps()
       stream.updateLandmarks?.(target,undefined,heli.phase==='cruise')
       if(!walkModPromise && !stream.pending.size && camera.position.y<260) void prefetchWalk()
@@ -1058,3 +1063,4 @@ async function start(loader:FullLoader,creatorSpawn=false) {
   else if(params.get('mode')==='walk'||params.has('spawn')){await toggle(true);showMode()}
 }
 export const boot=start
+import {sessionMarkPass} from './session-mark-pass'

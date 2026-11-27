@@ -87,6 +87,8 @@ const caps = (keys: string[]) => keys.map(key => `<kbd>${key}</kbd>`).join('')
 
 // ─── 按键卡 ──────────────────────────────────────────────────────────────────────────────────────
 const FOLD_KEY = 'glol.keys.fold'
+// IDOK-468: the card keeps the six most-used rows of the current scene; 全部按键 (F1) has the rest.
+const CARD_ROWS = 6
 let card: HTMLElement | undefined
 let lastCtx: Ctx | undefined
 
@@ -115,7 +117,7 @@ function renderCard() {
   if (!card) return
   const ctx = current()
   card.querySelector('.keys-ctx')!.textContent = CTX_NAME[ctx]
-  card.querySelector('.keys-list')!.innerHTML = rows(ctx).filter(visible)
+  card.querySelector('.keys-list')!.innerHTML = rows(ctx).filter(visible).slice(0, CARD_ROWS)
     .map(row => `<li${row.id ? ` data-id="${row.id}"` : ''}><span class="keys-caps">${caps(row.keys)}</span><span>${row.label}</span></li>`).join('')
   // 第一次上某种车：卡片自动展开并闪一下，告诉玩家「这辆车的键在这儿」。
   if (lastCtx && ctx !== lastCtx && ctx !== 'walk' && ctx !== 'fly' && ctx !== 'duty') {
@@ -168,8 +170,8 @@ const FEATURES = (): Feature[] => [
     phone: '左上角的时辰条可以切晨、午、昏、夜和晴、雾、雨。'},
   getDutyGuideFeature(),
   {seal: '设', title: '设置与改键',
-    pc: `按 <kbd>${k('settings')}</kbd> 或点「设置」：改键、开关读数（<kbd>${k('stats')}</kbd>）、表情显示。左上「视野」调远处画多少，电脑卡就调小一点。`,
-    phone: '点「设置」开关读数和表情显示。左上「视野」调远处画多少，手机发烫就调小一点。'},
+    pc: `按 <kbd>${k('settings')}</kbd> 或点「设置」：改键、表情显示，「画面 · 视野与画质」调远处画多少，电脑卡就调低一点。`,
+    phone: '点「设置」：表情显示，「画面 · 视野与画质」调远处画多少，手机发烫就调低一点。'},
 ]
 
 const KEY_GROUPS = (): {title: string; rows: Row[]}[] => [
@@ -182,7 +184,7 @@ const KEY_GROUPS = (): {title: string; rows: Row[]}[] => [
   getDutyGuideKeyGroup(),
   {title: '界面', rows: [
     {keys: ['M'], label: '地图'}, {keys: ['J'], label: '景册'}, {keys: ['P'], label: '拍照'},
-    {keys: [k('settings')], label: '设置'}, {keys: [k('stats')], label: '读数'}, {keys: ['Tab'], label: '手机（街头界面）'},
+    {keys: [k('settings')], label: '设置'}, {keys: ['Tab'], label: '手机（街头界面）'},
     {keys: ['F1'], label: '这份指南'}, {keys: ['Esc'], label: '关闭 / 菜单'},
   ]},
 ]
@@ -271,12 +273,9 @@ function steps(): Step[] {
       phone: '点这里打开动作盘：点赞、奶蛙笑……联机时别人也能看到。'},
     {target: q('.minimap'), title: '地图',
       pc: '搜地名，或者点地图上任意一处，直接传送过去。快捷键 <kbd>M</kbd>。', phone: '搜地名，或者点地图上任意一处，直接传送过去。'},
-    {target: q('.dock-book'), title: '景册',
-      pc: '名胜附近地上有朱红色圆圈，走进去就盖一枚印章，集齐全城名胜。快捷键 <kbd>J</kbd>。',
-      phone: '名胜附近地上有朱红色圆圈，走进去就盖一枚印章。'},
-    {target: q('.dock-photo'), title: '拍照',
-      pc: '换时辰、天气、滤镜，拍下来直接存图。旁边的「相机」可以挑相机、录像。快捷键 <kbd>P</kbd>。',
-      phone: '换时辰、天气、滤镜，拍下来直接存图。旁边的「相机」可以挑相机、录像。'},
+    {target: q('.dock-more'), title: '工具',
+      pc: `景册、拍照、相机、无人机、设置都收在这里。名胜附近地上有朱红色圆圈，走进去盖一枚印，攒进景册（<kbd>J</kbd>）；拍照 <kbd>P</kbd>。`,
+      phone: '景册、拍照、相机、无人机、设置都收在这里。名胜附近地上有朱红色圆圈，走进去盖一枚印，攒进景册。'},
     {target: q('.btn-mode'), title: '飞上天',
       pc: '按 <kbd>V</kbd> 或点这里起飞，像无人机一样看山水；再按一次落地步行。',
       phone: '点这里起飞，像无人机一样看山水；再点一次落地步行。'},

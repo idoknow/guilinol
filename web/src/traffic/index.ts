@@ -7,6 +7,7 @@ import {getActiveDutyTraffic, getDutyTrafficExclusionZone} from './duty-traffic'
 import {riderPool} from './rider-pool'
 import {alignWheels} from './wheel-pose'
 import {interactions} from './interactions'
+import {SIGNAL_DRIVER_RANK,citySignalClock,citySignalColor,citySignalState,citySignals} from './signals'
 import {touchUi} from '../ui/input-mode'
 import {npcDefaults,validNpc} from '../../../lib/npc'
 
@@ -19,7 +20,9 @@ async function loadGraph(key:string,rules:typeof npcDefaults,surfaceAt?:Traffic[
   const signature=new Uint8Array(bytes,0,2)
   const body=signature[0]===31&&signature[1]===139?new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip')):bytes
   const decoded=await new Response(body).arrayBuffer()
-  const graph:Graph=JSON.parse(new TextDecoder().decode(decoded)),sim=new Traffic(graph,Math.random,touchUi()?MOBILE_ACTORS:MAX_ACTORS,rules,surfaceAt)
+  const graph:Graph=JSON.parse(new TextDecoder().decode(decoded))
+  citySignals.add(graph.signals)
+  const sim=new Traffic(graph,Math.random,touchUi()?MOBILE_ACTORS:MAX_ACTORS,rules,surfaceAt)
   const timing=performance.getEntriesByName(response.url).at(-1) as PerformanceResourceTiming|undefined
   return {sim,sample:{key,encodedBytes:timing?.encodedBodySize||bytes.byteLength,decodedBytes:decoded.byteLength,downloadMs:downloaded-start,parseAndIndexMs:performance.now()-downloaded}}
 }
@@ -98,6 +101,9 @@ export async function traffic(scene:THREE.Scene,camera:THREE.Camera,verify:boole
   }
   const near=(x:number,z:number,visit:(solid:Solid)=>void)=>{sim?.nearSolids(x,z,visit);getActiveDutyTraffic()?.nearSolids(x,z,visit);staticSolids(x,z,visit)}
   let accumulator=0
+  const signalDriver=citySignalClock.driver(SIGNAL_DRIVER_RANK.street)
+  const signalProbe={clock:()=>citySignalClock.now,count:()=>citySignals.size,nodes:()=>[...citySignals.nodeIds()],state:(node:number)=>{const state=citySignalState(node,{phase:0,color:'green',remaining:0,cycle:0});return state&&{...state,lanes:citySignals.spec(node)!.phases.map(phase=>phase.lanes)}},color:(node:number,lane:number)=>citySignalColor(node,lane),sim:(node:number,lane:number)=>sim?.getSignalPhase(lane,node)??null}
+  if(verify)mesh.userData.signals=signalProbe
   const probeIds=new WeakMap<object,number>();let nextProbeId=0
   batch.setColorAt(0,new THREE.Color(0xffffff))
   await warm?.(batch)
@@ -132,6 +138,8 @@ export async function traffic(scene:THREE.Scene,camera:THREE.Camera,verify:boole
     }
     if(!sim){effects.clear();return}
     accumulator+=Math.min(dt,.2)
+    // Lights follow the one city clock: this sim's signal time is `citySignalClock.now` minus the unstepped remainder.
+    signalDriver.advance(Math.min(dt,.2));sim.signalShift=citySignalClock.now-accumulator-sim.time
     if(accumulator<.05){people.animate(dt,accumulator);riders.animate(dt,accumulator,syncRiddenVehicle);return}
     camera.updateMatrixWorld()
     frustum.setFromProjectionMatrix(projection.multiplyMatrices(camera.projectionMatrix,camera.matrixWorldInverse))
