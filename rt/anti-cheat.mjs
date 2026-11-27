@@ -24,10 +24,7 @@ export const LIMITS = Object.freeze({
   combatLockMs: 5000, // 战斗中禁止瞬移
   walkGateMs: 1000, // 出拳要求过去 1 秒是走路速度
   tolerance: 1.6,   // 瞬时速度容忍倍数（掉帧/网络排队）
-  winMs: 1200,      // 持续性判定窗口：只有整段都超速才算作弊
-  winTol: 1.15,     // 窗口内平均速度容忍倍数
-  spikeM: 3,        // 单包超限但少于该距离只记数、不拒包
-  hardM: 25,        // 单包位移超过它才按硬作弊处理
+  winTol: 1.25,     // 额度补充倍率（比上限略快，吸收抖动尖峰）
 })
 
 /** 空中/载具：不限制向上速度，按载具上限放行（直升机刚上线，乘客的 foot 会被置 false） */
@@ -44,19 +41,6 @@ const BAN = {
   l2Min: num(process.env.RT_AC_BAN_2_MIN, 60),
   l3: num(process.env.RT_AC_BAN_3, 300),
   l3Min: num(process.env.RT_AC_BAN_3_MIN, 1440),
-}
-
-/** 1.2 秒滑动窗口内的平均速度（m/s）：持续超速才判定，避免单包抖动误伤。 */
-function windowSpeed(p, at, flat, dt) {
-  const win = p.moveWin ??= []
-  win.push({ at, d: Number.isFinite(flat) ? flat : 0, v: flat / Math.max(dt, .01) })
-  while (win.length && at - win[0].at > LIMITS.winMs) win.shift()
-  const speeds = win.map(entry => entry.v).sort((a, b) => a - b)
-  const median = speeds[Math.floor(speeds.length / 2)] ?? 0
-  const span = Math.max(500, at - win[0].at) / 1000
-  let total = 0
-  for (const entry of win) total += entry.d
-  return { median, avg: total / span }
 }
 
 /** 当前允许的速度（m/s）。客户端上报的 v 永不参与判定。 */
@@ -91,15 +75,22 @@ export function checkMove(p, nx, ny, nz, at) {
   // 持续性判定（2026-11 误封后修正）：单包的瞬时速度在掉帧、网络排队、切模式、
   // 以及按 Shift 冲刺的瞬间都会被放大，拿单包判定会把正常玩家拉回并记违规。
   // 这里改成「1.2 秒窗口内的平均速度」超限才拒包；单包只记数不拒。
+  // 距离额度（token bucket）：额度按**服务端单调时间**以允许速度补充，最多存 2 秒。
+  // 与客户端发包节奏、dt 抖动完全解耦；客户端上报的 v 和时间戳一律不参与判定，
+  // 所以作弊者改客户端数据只有两种结果：位移超出额度被拒，或额度耗尽后持续被拒。
   const capSpeed = airborne(p) ? LIMITS.car : speedCap(p, at)
-  const cap = capSpeed * dt * LIMITS.tolerance + LIMITS.stepM
-  const sustained = windowSpeed(p, at, flat, dt)
-  const sustainedCap = capSpeed * LIMITS.winTol
-  if (flat > LIMITS.hardM && flat / Math.max(dt, .05) > capSpeed * 3)
-    return { ok: false, kind: 'speed', overflow: flat - cap, reject: true }
-  if (sustained.median > sustainedCap && sustained.avg > capSpeed)
-    return { ok: false, kind: 'speed', overflow: flat - cap, reject: true }
-  if (flat > cap && flat > LIMITS.spikeM) return { ok: true, observation: 'speed_spike' }
+  const refill = capSpeed * LIMITS.winTol
+  const capMax = refill * (LIMITS.bankMs / 1000)
+  const bucket = p.moveBudget ??= { m: refill * 0.5, at }
+  const elapsed = Math.min(Math.max((at - bucket.at) / 1000, 0), LIMITS.bankMs / 1000)
+  bucket.at = at
+  bucket.m = Math.min(capMax, bucket.m + refill * elapsed)
+  // 抖动余量按本次间隔等比给（不再给固定的 1.2m）：固定余量会让 20Hz 下
+  // 每包白送 1.2m，等于把上限放宽到 24 m/s，作弊者可以稳定跑满这个速度。
+  const slack = Math.min(LIMITS.stepM, refill * elapsed * 0.35 + 0.05)
+  if (flat > bucket.m + slack)
+    return { ok: false, kind: 'speed', overflow: flat - bucket.m - slack, reject: true }
+  bucket.m = Math.max(0, bucket.m - flat)
   const baseline=p.altitudeBaseline??={y:p.y,at}
   if (ny<baseline.y+1) { baseline.y=ny; baseline.at=at }
   const observation= !airborne(p) && (rise>LIMITS.upMax*dt+0.5 || (ny-baseline.y>4 && at-baseline.at>8000)) ? 'altitude_unverified' : ny < -10 ? 'ground_unverified' : null

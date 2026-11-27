@@ -50,5 +50,25 @@ const assert=(c,m)=>{if(!c){fails++;console.log('FAIL',m)}else console.log('PASS
     const v=checkMove(p,x,100,0,at); if(v.reject) bad++; else {p.x=x;p.posAt=at} }
   assert(bad===0, `汽车 150km/h：拒包 ${bad} 次应为 0`)
 }
+
+// 6) 篡改：客户端谎报速度 0，但每包位移 40 m/s → 必须拒
+{
+  const p=mk(); p.v=0; p.reportedSpeed=0; let at=p.posAt, x=0, bad=0
+  for(let i=0;i<60;i++){ const dt=50; at+=dt; x+=40*dt/1000
+    const v=checkMove(p,x,100,0,at); if(v.reject) bad++; else {p.x=x;p.posAt=at} }
+  assert(bad>10, `谎报速度 0 但实跑 40m/s：应被拒（拒 ${bad}）`)
+}
+// 7) 篡改：同一毫秒内灌 20 包（burst）累计 30 米 → 必须拒
+{
+  const p=mk(); let at=p.posAt, x=0, bad=0
+  for(let i=0;i<20;i++){ at+=1; x+=1.5
+    const v=checkMove(p,x,100,0,at); if(v.reject) bad++; else {p.x=x;p.posAt=at} }
+  assert(bad>0, `1ms 内灌 20 包共 30 米：应被拒（拒 ${bad}）`)
+}
+// 8) 篡改：单包 60 米（低于瞬移阈值 200）→ 必须拒
+{
+  const p=mk(); const v=checkMove(p,60,100,0,p.posAt+100)
+  assert(!!v.reject, '单包 60 米：应被拒')
+}
 console.log(fails? `\n${fails} 项失败`:'\n全部通过')
 process.exit(fails?1:0)
