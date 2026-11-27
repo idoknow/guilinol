@@ -1,18 +1,20 @@
-/* Portrait phone gate (IDOK-144). Shown only on narrow coarse-pointer portrait screens while the city runs; hidden on the
-   title screen (resume overlay) and whenever the phone is landscape. Same ink-glass + paper card language as the loader. */
+/* Portrait phone gate (IDOK-144; S1). Shown only on narrow coarse-pointer portrait screens while the city runs; hidden on the
+   title screen and whenever the phone is landscape. A plain 墨青 sheet: one diagram, one line, one vermilion action. */
 .rotate-gate{display:none}
 @media (orientation:portrait) and (pointer:coarse) and (not (any-pointer:fine)) and (max-width:600px){
   .rotate-gate{display:grid;position:fixed;inset:0;z-index:60;place-items:center;padding:24px calc(24px + env(safe-area-inset-right)) calc(24px + env(safe-area-inset-bottom)) calc(24px + env(safe-area-inset-left));
-    background:radial-gradient(120% 80% at 50% 35%,rgba(47,74,69,.9),rgba(20,33,30,.97));
-    touch-action:none;overscroll-behavior:contain}
+    background:var(--ui-ink-900);touch-action:none;overscroll-behavior:contain}
   body[data-home] .rotate-gate{display:none}
 }
-.rotate-card{display:flex;flex-direction:column;align-items:center;gap:12px;max-width:300px;text-align:center;color:var(--ui-paper);font-family:var(--ui-serif)}
-.rotate-card h2{margin:4px 0 0;font:600 21px/1.35 var(--ui-serif);letter-spacing:.12em}
-.rotate-msg{margin:0 0 10px;font-size:14px;line-height:1.7;color:var(--ui-paper-dim);letter-spacing:.04em}
-.rotate-go{min-width:180px;min-height:var(--ui-h-lg);font-size:16px}
-.rotate-skip{margin-top:2px;padding:10px 16px;border:0;background:none;color:var(--ui-paper-dim);font:400 13px/1 var(--ui-serif);letter-spacing:.1em;text-decoration:underline;text-underline-offset:4px;text-decoration-color:var(--ui-glass-line);cursor:pointer;-webkit-tap-highlight-color:transparent}
-.rotate-phone{width:116px;height:116px}
+.rotate-card{display:flex;flex-direction:column;align-items:center;gap:12px;max-width:300px;text-align:center;color:var(--ui-text);font-family:var(--ui-serif);
+  animation:ui-rise var(--ui-slow) var(--ui-ease) both}
+.rotate-card h2{margin:8px 0 0;font:600 var(--ui-fs-lg)/1.35 var(--ui-serif);letter-spacing:var(--ui-track-title)}
+.rotate-msg{margin:0 0 12px;font-size:var(--ui-fs-sm);line-height:var(--ui-lh);color:var(--ui-text-2);letter-spacing:var(--ui-track-body)}
+.rotate-go{min-width:180px;min-height:var(--ui-h-lg);font-size:var(--ui-fs-md);letter-spacing:var(--ui-track-title)}
+.rotate-skip{min-height:var(--ui-h);margin-top:2px;padding:0 16px;border:0;background:none;color:var(--ui-text-2);font:400 13px/1 var(--ui-serif);letter-spacing:.1em;
+  text-decoration:underline;text-underline-offset:4px;text-decoration-color:var(--ui-line-strong);cursor:pointer;-webkit-tap-highlight-color:transparent}
+.rotate-skip:focus-visible{outline:2px solid var(--ui-focus);outline-offset:2px}
+.rotate-phone{width:112px;height:112px}
 /* IDOK-144 follow-up: the dock's landscape entry. Portrait phones only — the whole dock hides in landscape photo mode,
    and desktop/landscape keeps the one column it already had. Beats `.dock-buttons>button{display:flex}` on specificity. */
 .dock-buttons>.dock-rotate{display:none}
@@ -20,10 +22,11 @@
   .dock-buttons>.dock-rotate{display:flex}
   body[data-home] .dock-buttons>.dock-rotate{display:none}
 }
-.rotate-device rect:first-child{fill:var(--ui-ink-800);stroke:var(--ui-paper);stroke-width:2.5}
-.rotate-screen{fill:var(--ui-jade-500)}
-.rotate-peaks{fill:var(--ui-jade-300)}
-.rotate-arc{stroke:var(--ui-seal-light);stroke-width:3;stroke-linecap:round;stroke-linejoin:round}
-.rotate-device{transform-origin:60px 62px;animation:rotate-turn 2.8s var(--ui-ease) infinite}
-@keyframes rotate-turn{0%,22%{transform:rotate(0)}48%,78%{transform:rotate(-90deg)}100%{transform:rotate(0)}}
+/* 示意图：墨线手机 + 一道细弧。转一次停在横放，不循环 */
+.rotate-device rect:first-child{fill:none;stroke:var(--ui-text);stroke-width:2}
+.rotate-screen{fill:var(--ui-fill-2)}
+.rotate-peaks{fill:var(--ui-text-2)}
+.rotate-arc{stroke:var(--ui-text-2);stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.rotate-device{transform-origin:60px 62px;animation:rotate-turn 1.4s .4s var(--ui-ease) both}
+@keyframes rotate-turn{from{transform:rotate(0)}to{transform:rotate(-90deg)}}
 @media (prefers-reduced-motion:reduce){.rotate-device{animation:none;transform:rotate(-90deg)}}

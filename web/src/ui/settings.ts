@@ -65,7 +65,7 @@ function build() {
       </section>
       <section class="set-block">
         <h3>视角</h3>
-        <div class="set-seg" role="radiogroup" aria-label="视角">
+        <div class="set-seg" role="group" aria-label="视角">
           <button type="button" data-view="third">第三人称</button>
           <button type="button" data-view="first">第一人称</button>
         </div>
@@ -73,7 +73,7 @@ function build() {
       </section>
       <section class="set-block set-block--thumb">
         <h3>手机按键<button type="button" class="set-reset" data-thumb-reset>恢复默认</button></h3>
-        <div class="set-seg set-seg--thumb" role="radiogroup" aria-label="按键布局">${THUMB_PRESETS.map(([id, label, dots]) => `<button type="button" data-thumb="${id}">
+        <div class="set-seg set-seg--thumb" role="group" aria-label="按键布局">${THUMB_PRESETS.map(([id, label, dots]) => `<button type="button" data-thumb="${id}">
           <svg viewBox="0 0 54 34" aria-hidden="true"><rect x="1" y="1" width="52" height="32" rx="6"/>${dots}</svg><span>${label}</span>
         </button>`).join('')}</div>
         <label class="set-row set-row--range">

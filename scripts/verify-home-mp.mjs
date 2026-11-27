@@ -1,4 +1,4 @@
-// 首页联机主推 + 单人弱化保留验收（IDOK-392）：
+// 首页联机主推 + 单人弱化保留验收（IDOK-392；S1 改为目录式封面后：主次靠位置和唯一朱砂按钮）：
 // 只跑主界面，不进 3D 城，验证桌面 / 手机竖屏 / 小屏 / 手机横屏的视觉层级、默认焦点、偏好持久化与无溢出。
 import assert from 'node:assert/strict'
 import {mkdir} from 'node:fs/promises'
@@ -79,18 +79,21 @@ try {
     ['phone', {width:390, height:844}],
     ['small', {width:360, height:640}],
     ['landscape', {width:844, height:390}],
+    ['desktop-lg', {width:1440, height:900}],
+    ['landscape-lg', {width:873, height:403}],
   ]
 
   for (const [name, viewport] of viewports) {
     await page.setViewportSize(viewport)
-    await page.waitForTimeout(150)
+    await page.mouse.move(viewport.width - 2, viewport.height / 2) // 不悬停在任何一行上，按钮取静止色
+    await page.waitForTimeout(400) // 等进场错落动画（≤320 ms + 140 ms 延迟）走完
     const metrics = await page.evaluate(() => {
       const rect = sel => {
         const el = document.querySelector(sel)
         if (!el) return null
         const r = el.getBoundingClientRect()
         const st = getComputedStyle(el)
-        return {x:r.x, y:r.y, right:r.right, bottom:r.bottom, w:r.width, h:r.height, display:st.display, opacity:Number(st.opacity), fontSize:parseFloat(st.fontSize)}
+        return {x:r.x, y:r.y, right:r.right, bottom:r.bottom, w:r.width, h:r.height, display:st.display, opacity:Number(st.opacity), fontSize:parseFloat(st.fontSize), bg:st.backgroundColor}
       }
       return {
         mp: rect('.home-mode--mp'),
@@ -98,6 +101,8 @@ try {
         mpDesc: rect('.home-mode--mp .home-mode-text > span'),
         mpTitle: rect('.home-mode--mp .home-mode-text b'),
         mpBadge: rect('.home-mp-badge'),
+        tourGo: rect('.home-go--tour'),
+        descs: [...document.querySelectorAll('.home-mode-text > span')].map(el => el.textContent.trim()),
         mpLive: rect('.home-mp-live'),
         wallet: document.querySelector('.home-mode--mp .home-wallet')?.textContent?.trim() ?? '',
         tour: rect('.home-mode--tour'),
@@ -118,15 +123,16 @@ try {
     assert.ok(metrics.mp && metrics.tour && metrics.solo, `${name}: all three mode buttons exist`)
     assert.ok(metrics.mp.y < metrics.tour.y && metrics.tour.y < metrics.solo.y,
       `${name}: vertical order must be mp -> tour -> solo (${JSON.stringify({mp:metrics.mp.y, tour:metrics.tour.y, solo:metrics.solo.y})})`)
-    assert.ok(metrics.mp.h > metrics.solo.h * 1.6,
-      `${name}: mp card must be visually dominant over solo (${metrics.mp.h.toFixed(1)} vs ${metrics.solo.h.toFixed(1)})`)
-    assert.ok(metrics.mpGo.w > metrics.soloGo.w * 2,
-      `${name}: mp CTA must be full-width vs compact solo CTA (${metrics.mpGo.w.toFixed(1)} vs ${metrics.soloGo.w.toFixed(1)})`)
-    assert.ok(metrics.mpTitle.fontSize > metrics.soloTitle.fontSize + 2,
-      `${name}: mp heading font larger than solo (${metrics.mpTitle.fontSize} vs ${metrics.soloTitle.fontSize})`)
+    // S1 目录式封面：三行同构，主次只靠位置和唯一的朱砂按钮（不再有「推荐」徽章、不再放大联机卡）
+    assert.equal(metrics.mpGo.bg, 'rgb(169, 80, 60)', `${name}: mp CTA is the one vermilion action (${metrics.mpGo.bg})`)
+    assert.notEqual(metrics.soloGo.bg, metrics.mpGo.bg, `${name}: solo CTA is not vermilion`)
+    assert.notEqual(metrics.tourGo.bg, metrics.mpGo.bg, `${name}: tour CTA is not vermilion`)
+    assert.ok(metrics.mpGo.h >= metrics.soloGo.h, `${name}: mp CTA at least as tall as solo CTA (${metrics.mpGo.h} vs ${metrics.soloGo.h})`)
+    assert.ok(metrics.mpTitle.fontSize >= metrics.soloTitle.fontSize, `${name}: mp heading not smaller than solo`)
     assert.notEqual(metrics.mpDesc.display, 'none', `${name}: mp description stays visible`)
     assert.ok(metrics.mpDesc.h > 10, `${name}: mp description has visible height`)
-    assert.ok(metrics.mpBadge && metrics.mpBadge.w > 20, `${name}: mp recommended badge visible`)
+    assert.equal(metrics.mpBadge, null, `${name}: no 推荐 badge`)
+    for (const desc of metrics.descs) assert.ok([...desc].length <= 14, `${name}: mode description ≤14 chars (${desc})`)
     assert.ok(metrics.mpLive && metrics.mpLive.w > 20, `${name}: mp live count visible`)
     assert.equal(metrics.wallet, '钱包 ¥1,280', `${name}: street wallet shown on mp hero card`)
     assert.ok(metrics.solo.w > 180 && metrics.solo.h >= 40, `${name}: solo entry remains clearly clickable`)

@@ -309,7 +309,7 @@ function build(){
     d.querySelector('.acc-tabs')?.toggleAttribute('hidden',next==='social')
     const step=next==='register'?0:next==='verify'?1:-1
     steps.forEach((li,i)=>{li.classList.toggle('on',i===step);li.classList.toggle('done',i<step)})
-    lead.textContent={login:socialOptions?.length?'登录即可进入游玩，QQ / 微信 首次登录会自动建号。':'登录后即可进入游玩。提交的反馈有回复时，也会发邮件告诉你。',register:socialOptions?.length?'QQ / 微信 一键注册；也可以只用邮箱和一个昵称。':'只需要邮箱和一个昵称，一分钟就好。',
+    lead.textContent={login:socialOptions?.length?'登录即可进入游玩，QQ / 微信 首次登录会自动建号。':'',register:socialOptions?.length?'QQ / 微信 一键注册；也可以只用邮箱和一个昵称。':'只需要邮箱和一个昵称，一分钟就好。',
       verify:`六位验证码已发到 ${email||'你的邮箱'}，10 分钟内有效。没收到可以看看垃圾邮件。`,forgot:'输入注册时用的邮箱，我们会发一个六位验证码给你。',
       reset:'输入邮箱里的验证码，再设一个新密码。',profile:'',
       social:pendingSocial?.intent==='register'?(socialPhase==='code'?`验证码已发到 ${email}，10 分钟内有效。`:'邮箱和密码都可以留空：留空就直接用这个第三方账号注册；填了就要收验证码。'):'',
