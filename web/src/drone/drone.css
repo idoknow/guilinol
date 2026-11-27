@@ -37,15 +37,16 @@
 .rc .rc-batt i{display:block;height:100%;width:100%;background:#5fd07a;transition:width .3s,background .3s}
 .rc .rc-time{opacity:.86;font-variant-numeric:tabular-nums}
 .rc .rc-signal[data-warn="1"]{color:#f0a08a}
-.rc .rc-status{position:absolute;left:calc(16px + env(safe-area-inset-left));top:calc(46px + env(safe-area-inset-top));
-  font-size:10.5px;letter-spacing:.04em;opacity:.8;white-space:nowrap}
+/* IDOK-526: 悬停 / GNSS / 图传 居中夹在左右两排按钮中间，早先贴左上会被侧栏按钮压住。 */
+.rc .rc-status{position:absolute;left:50%;transform:translateX(-50%);top:calc(56px + env(safe-area-inset-top));
+  font-size:10.5px;letter-spacing:.04em;opacity:.85;white-space:nowrap;text-shadow:0 1px 6px rgba(8,14,18,.6)}
 
-/* ---------- 专业遥控：左右侧栏（返航/降落、拍照/录像/退出） ---------- */
-.rc .rc-rail{position:absolute;top:50%;transform:translateY(-50%);display:flex;flex-direction:column;gap:10px;
+/* ---------- 专业遥控：左右侧栏（机库/返航/降落、拍照/录像/退出）— 顶部横排，给竖滑杆让出侧边 ---------- */
+.rc .rc-rail{position:absolute;top:calc(44px + env(safe-area-inset-top));display:flex;flex-direction:row;gap:7px;
   pointer-events:auto}
-.rc .rc-rail-l{left:calc(16px + env(safe-area-inset-left))}
-.rc .rc-rail-r{right:calc(16px + env(safe-area-inset-right))}
-.rc .rc-side{width:54px;height:54px;padding:0;border-radius:50%;display:grid;place-items:center;font-size:11px;
+.rc .rc-rail-l{left:calc(14px + env(safe-area-inset-left))}
+.rc .rc-rail-r{right:calc(14px + env(safe-area-inset-right))}
+.rc .rc-side{width:46px;height:46px;padding:0;border-radius:50%;display:grid;place-items:center;font-size:10.5px;
   letter-spacing:.02em;opacity:.92}
 .rc .rc-side.live,.rc .rc-side[data-live="1"]{background:rgba(190,46,32,.78);border-color:rgba(255,140,120,.7)}
 
@@ -76,11 +77,33 @@
 .rc .rc-reticle::before{left:50%;top:-10px;width:1px;height:8px}
 .rc .rc-reticle::after{top:50%;left:-10px;height:1px;width:8px}
 .rc .rc-gimbal{position:absolute;right:calc(16px + env(safe-area-inset-right));
-  bottom:calc(96px + env(safe-area-inset-bottom));display:flex;align-items:center;gap:8px;pointer-events:auto;
-  font-size:10.5px;padding:5px 10px;border-radius:8px;background:rgba(0,0,0,.34);
-  border:1px solid rgba(244,239,226,.14)}
-.rc .rc-gimbal b{font-weight:600;font-variant-numeric:tabular-nums}
-.rc .rc-gimbal input{width:92px;accent-color:#f4efe2}
+  bottom:calc(196px + env(safe-area-inset-bottom));display:flex;flex-direction:column;align-items:center;gap:7px;
+  pointer-events:auto;font-size:9.5px;letter-spacing:.14em;padding:9px 6px;border-radius:12px;
+  background:rgba(0,0,0,.36);border:1px solid rgba(244,239,226,.16)}
+.rc .rc-gimbal b{font-weight:600;font-variant-numeric:tabular-nums;letter-spacing:.02em;font-size:10.5px}
+.rc .rc-gimbal span{opacity:.6;writing-mode:vertical-rl;text-orientation:upright}
+/* 竖向滑杆：竖向 writing-mode 让原生 range 变成上下拖，thumb 用小方块而不是横向胶囊 */
+.rc .rc-gimbal input{writing-mode:vertical-lr;direction:rtl;appearance:none;width:20px;height:104px;margin:0;
+  background:transparent;accent-color:#f4efe2}
+.rc .rc-gimbal input::-webkit-slider-runnable-track{width:4px;border-radius:2px;
+  background:linear-gradient(0deg,rgba(244,239,226,.85),rgba(244,239,226,.3))}
+.rc .rc-gimbal input::-webkit-slider-thumb{appearance:none;width:16px;height:16px;margin-left:-6px;border-radius:4px;
+  background:#f4efe2;border:1px solid rgba(20,30,29,.4);box-shadow:0 1px 4px rgba(0,0,0,.4)}
+.rc .rc-gimbal input::-moz-range-track{width:4px;border-radius:2px;background:rgba(244,239,226,.5)}
+.rc .rc-gimbal input::-moz-range-thumb{width:16px;height:16px;border-radius:4px;background:#f4efe2;border:1px solid rgba(20,30,29,.4)}
+/* 键盘图例：只有真按过键才出现（触屏用户看不到它）。 */
+.rc .rc-hint{display:none;position:absolute;left:calc(16px + env(safe-area-inset-left));
+  top:calc(102px + env(safe-area-inset-top));font-size:10px;letter-spacing:.02em;opacity:.65;
+  padding:4px 9px;border-radius:7px;background:rgba(10,14,13,.55);border:1px solid rgba(244,239,226,.12);
+  white-space:nowrap;max-width:calc(100vw - 32px);overflow:hidden;text-overflow:ellipsis}
+.rc.kbd .rc-hint{display:block}
+/* IDOK-526: 桌面（有鼠标）本来就用键盘飞，直接把按键图例挂出来，不必等第一次按键。 */
+@media (pointer:fine) and (min-height:521px){
+  .rc.rc-pro .rc-hint{display:block}
+}
+/* 专业遥控全程用键盘/摇杆飞，不显示鼠标指针；按钮和滑杆仍保留 pointer。 */
+.rc.rc-pro{cursor:none}
+.rc.rc-pro button,.rc.rc-pro input{cursor:pointer}
 
 .rc .rc-actions{position:absolute;left:50%;bottom:calc(14px + env(safe-area-inset-bottom));transform:translateX(-50%);
   display:flex;gap:8px;flex-wrap:wrap;justify-content:center;max-width:min(560px,92vw)}
@@ -94,7 +117,10 @@
 .rc .rc-stick i{position:absolute;left:50%;top:50%;width:34px;height:34px;margin:-17px 0 0 -17px;border-radius:50%;
   background:rgba(244,239,226,.82);box-shadow:0 2px 8px rgba(0,0,0,.35);transition:transform .05s linear}
 
-/* ---------- 傻瓜式：更少的信息，更大的按钮 ---------- */
+/* ---------- 傻瓜式：拖画面转视角（只有 mini 这种简单遥控有鼠标/手指朝向控制） ---------- */
+.rc .rc-look{position:absolute;inset:0;z-index:2;pointer-events:auto;touch-action:none;cursor:grab}
+.rc .rc-look:active,.rc[data-look] .rc-look{cursor:grabbing}
+.rc.rc-simple :is(.rc-sticks,.rc-actions,.rc-readout,.rc-top){z-index:3}
 .rc .rc-top{position:absolute;left:50%;top:calc(8px + env(safe-area-inset-top));transform:translateX(-50%);
   display:flex;align-items:center;gap:10px;padding:5px 12px;border-radius:999px;background:var(--rc-glass);
   border:1px solid var(--rc-line);white-space:nowrap;font-size:11.5px}
@@ -122,19 +148,25 @@
   opacity:0;transition:opacity .2s,transform .2s;max-width:78vw;text-align:center}
 .rc .rc-toast.show{opacity:1;transform:translate(-50%,0)}
 
-/* ---------- 横屏手机 / 小屏：把侧栏和遥测收小 ---------- */
-@media (pointer:coarse) and (max-height:500px){
-  .rc .rc-side{width:44px;height:44px;font-size:10px}
-  .rc .rc-rail{gap:7px}
+/* ---------- 横屏手机 / 小屏：把侧栏和遥测收小 ----------
+   IDOK-526: keyed on height only — a desktop window squeezed to a phone-like
+   aspect ratio must get the same compact rail/stick layout, otherwise the
+   vertical gimbal slides up into 退出. */
+@media (max-height:520px){
+  .rc .rc-side{width:40px;height:40px;font-size:9.5px}
+  .rc .rc-rail{gap:6px;top:calc(40px + env(safe-area-inset-top))}
   .rc .rc-status{display:none}
   .rc .rc-tele{font-size:10px;padding:3px 8px;max-width:46vw;overflow:hidden;text-overflow:ellipsis}
   .rc .rc-shutter{width:52px;height:52px}
   .rc .rc-shutter i{width:38px;height:38px}
   .rc .rc-shutter[data-live="1"] i{width:22px;height:22px}
   .rc .rc-modes button{padding:2px 8px;font-size:10px}
-  .rc .rc-gimbal{display:none}
-  /* 横屏手机底部的摇杆会顶到居中的侧栏，把侧栏收到摇杆上方（IDOK-255） */
-  .rc .rc-rail{top:auto;bottom:calc(184px + env(safe-area-inset-bottom));transform:none}
+  /* IDOK-526: vertical stick sits between the top rail and the corner joysticks, label dropped so it never
+     crosses 退出 above or the right stick below. */
+  .rc .rc-gimbal{bottom:calc(174px + env(safe-area-inset-bottom));padding:6px 4px;gap:4px}
+  .rc .rc-gimbal span{display:none}
+  .rc .rc-gimbal input{height:86px}
+  .rc .rc-hint{display:none!important}
   .rc .rc-big,.rc .rc-takeoff{padding:7px 14px;font-size:11.5px}
   .rc .rc-actions{bottom:calc(8px + env(safe-area-inset-bottom));gap:6px}
   .rc .rc-actions button{padding:5px 10px;font-size:11px}
@@ -149,11 +181,18 @@
   .rc.rc-simple .rc-actions .rc-big{min-height:50px;min-width:78px;font-size:16px}
   .rc.rc-simple .rc-readout{bottom:calc(70px + env(safe-area-inset-bottom))}
 }
-/* 竖屏手机：遥测行移到状态行下方，云台滑杆收起，免得压住快门和右摇杆 */
+/* 竖屏手机：遥测行挪到左摇杆上方，竖滑杆沿右边缘立着，都不压快门和摇杆 */
 @media (max-width:520px) and (orientation:portrait){
-  .rc.rc-pro .rc-tele{position:fixed;left:50%;top:calc(66px + env(safe-area-inset-top));transform:translateX(-50%);
-    font-size:10.5px;bottom:auto}
-  .rc.rc-pro .rc-gimbal{display:none}
+  /* Two-line top bar needs more room than the 44px the landscape layout assumes. */
+  .rc .rc-rail{top:calc(74px + env(safe-area-inset-top))}
+  .rc .rc-rail{gap:6px}
+  .rc .rc-side{width:44px;height:44px;font-size:10px}
+  .rc .rc-status{display:none}
+  .rc .rc-hint{top:calc(130px + env(safe-area-inset-top));white-space:normal;line-height:1.45}
+  .rc.rc-pro .rc-bottom{justify-content:flex-end}
+  .rc.rc-pro .rc-tele{position:fixed;left:calc(14px + env(safe-area-inset-left));
+    bottom:calc(250px + env(safe-area-inset-bottom));top:auto;transform:none;max-width:70vw}
+  .rc.rc-pro .rc-gimbal{bottom:calc(238px + env(safe-area-inset-bottom))}
   .rc.rc-pro .rc-sticks{bottom:calc(120px + env(safe-area-inset-bottom))}
   .rc .rc-stick{width:96px;height:96px}
 }

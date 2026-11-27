@@ -90,6 +90,8 @@ def tunnel_sections(profiles):
                               **({'fittedCarriageway': True} if chord in way.get('pavedChords', ()) else {}),
                               pairedWidth=way.get('stationWidth'),
                               stations=np.column_stack((distances-start, levels)).tolist()))
+            if way.get("retainCutBanks"):
+                bores[-1]["retainCutBanks"] = True
             apron_nodes = set(chord).intersection(way.get("turningAprons", ()))
             if apron_nodes:
                 bores[-1]["turningAprons"] = sorted(apron_nodes)
@@ -203,20 +205,86 @@ def bake(directory, manifest, paired_widths):
             passage = IndoorPassage(section["indoorPassage"], ways) if "indoorPassage" in section else None
             bridges, joints = grade_decks(directory, manifest, section["roadDecks"], ways, parts, passage)
         bake_profiles(directory, manifest, parts, elements, bridges, joints, additional=True,
-                      sample_traffic=not bridges)
+                      sample_traffic=not bridges, junction_planes=section.get("junctionPlanes"))
         finish_paving(directory, manifest, list(parts.values()), elements)
         if bridges or section.get("retainRoadNodeLevels"):
             final_traffic_ways.extend(way for way, _, _ in parts.values())
             final_traffic_ways.extend(bridges)
+    interior = [span for section in sections for span in section.get("raisedBridgeSpans", ())]
+    if interior:
+        from rail_section_bridges import raise_interior_spans
+        raise_interior_spans(directory, manifest, interior, ways)
+        final_traffic_ways.extend(dict(ways[span["way"]], tags=dict(ways[span["way"]]["tags"], bridge="yes"),
+                                       profileWidth=2*span["halfWidthM"]) for span in interior)
     from platform_grades import mark_platform_grades
     mark_platform_grades(directory, manifest, ways, sections)
     from curb_returns import apply as fit_curb_returns
     fit_curb_returns(manifest, sections)
+    mark_retained_cuts(manifest)
+    for section in sections:
+        if survey_path := section.get("landingSurvey"):
+            apply_landing_survey(manifest, json.loads(
+                (Path(__file__).with_name("rail-sections") / survey_path).read_bytes()
+            ))
     return final_traffic_ways
 
 
+def apply_landing_survey(manifest, survey):
+    """Fit surveyed lane ends to the original road and extend the native cut at a lengthened approach."""
+    roads = {(r["way"], tuple(r["nodes"])): r for r in manifest["tunnels"] if r.get("nodes")}
+    extended = []
+    for entry in survey["chords"]:
+        road = roads[entry["way"], tuple(entry["nodes"])]
+        if not np.allclose(road["portals"], entry["portalsBefore"], rtol=0, atol=1e-5):
+            raise ValueError(f"Re-survey landing on {road['way']}: approach has moved")
+        road.update(entry["profile"])
+        if entry["extendNativeCut"]:
+            extended.append(road)
+    mark_retained_cuts(dict(chunks=manifest["chunks"], tunnels=extended))
+    tiles = {tile["file"]: tile for tile in manifest["chunks"]}
+    for row in survey["paving"]:
+        paving = tiles[row["file"]].setdefault("stationPaving", {})
+        for key in ("tracksideShoulders", "crossingGrades"):
+            if key in row:
+                paving.setdefault(key, []).extend(row[key])
+
+
+def mark_retained_cuts(manifest):
+    """Remove native pavement only over the finished lanes and their joint floors."""
+    from shapely import LineString, Polygon, box
+
+    tiles = {(tile["x"], tile["z"]): tile for tile in manifest["chunks"]}
+    def add(a, b, width, footprint, y0, y1):
+        area = Polygon(footprint) if footprint else LineString([a, b]).buffer(width, cap_style="flat")
+        left, north, right, south = area.bounds
+        for x in range(math.floor(left / 256)*256, math.floor(right / 256)*256+1, 256):
+            for z in range(math.floor(north / 256)*256, math.floor(south / 256)*256+1, 256):
+                tile = tiles.get((x, z))
+                if tile is None or not area.intersects(box(x, z, x+256, z+256)):
+                    continue
+                cut = [a[0]-x, a[1]-z, b[0]-x, b[1]-z, width, y0, y1, True]
+                if footprint:
+                    cut.append([[u-x, v-z] for u, v in footprint])
+                tile.setdefault("stationPaving", {}).setdefault("retainedCuts", []).append(cut)
+
+    for road in manifest.get("tunnels", []):
+        if not road.get("retainCutBanks"):
+            continue
+        a, b = road["portals"]
+        for poly in road.get("footprint", [None]):
+            add(a[::2], b[::2], road["halfWidth"], poly, a[1], b[1])
+        for joint in road.get("joints", []):
+            if not joint or not joint["draw"]:
+                continue
+            for face in joint.get("faces", []):
+                corners = [p[::2] for p in face]
+                left, north, right, south = Polygon(corners).bounds
+                mid = (north + south)/2
+                add((left, mid), (right, mid), (south-north)/2, corners, face[0][1], face[0][1])
+
+
 def bake_profiles(directory, manifest, profiles, elements, bridge_ways=(), landings=None, *,
-                  additional=False, sample_traffic=True, bridge_approaches=()):
+                  additional=False, sample_traffic=True, bridge_approaches=(), junction_planes=None):
     import gzip
     import struct
     from collections import defaultdict
@@ -329,7 +397,7 @@ def bake_profiles(directory, manifest, profiles, elements, bridge_ways=(), landi
         build_junctions([b for b in bores if b['way'] in bridge_approaches], protected_paving)
     else:
         original_guards = protected_paving
-        build_junctions(bores, protected_paving)
+        build_junctions(bores, protected_paving, planes=junction_planes)
     for bore in bores:
         for end,node in enumerate(bore['nodes']):
             if landings and node in landings:
@@ -383,8 +451,9 @@ def bake_profiles(directory, manifest, profiles, elements, bridge_ways=(), landi
                     for col in range(math.floor(left/256),math.floor(right/256)+1):
                         for row in range(math.floor(top/256),math.floor(bottom/256)+1):
                             x,z = col*256,row*256
-                            cuts[x,z].append([left-x,middle-z,right-x,middle-z,(bottom-top)/2,
-                                              level,level,False,[[u-x,v-z] for u,v in list(face.exterior.coords)[:3]]])
+                            wedge_cut = [left-x,middle-z,right-x,middle-z,(bottom-top)/2,
+                                         level,level,False,[[u-x,v-z] for u,v in list(face.exterior.coords)[:3]]]
+                            cuts[x,z].append(wedge_cut)
     for chunk in manifest['chunks']:
         origin = chunk['x'],chunk['z']
         if origin not in active:
@@ -441,6 +510,15 @@ def bake_profiles(directory, manifest, profiles, elements, bridge_ways=(), landi
             target[take]=np.rint(raw[take]).astype('i2')
             distance[take]=lateral[take]
         ok=~protected & (wet==-32768) & np.isfinite(distance)
+        # The open-cut mesh clips the native ground and joins both walls to
+        # it. Keep its support grid under adjoining yards and foundations.
+        for bore in bores:
+            if not bore.get("retainCutBanks"):
+                continue
+            a, b = np.asarray(bore["portals"])[:, [0, 2]] - origin
+            direction = (b - a) / bore["length"]
+            along = np.clip((xx-a[0])*direction[0] + (zz-a[1])*direction[1], 0., bore["length"])
+            ok &= np.hypot(xx-a[0]-along*direction[0], zz-a[1]-along*direction[1]) > bore["halfWidth"] + 12
         ok[[0,-1],:]=False
         ok[:,[0,-1]]=False
         grid[ok]=target[ok]

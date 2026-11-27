@@ -48,6 +48,11 @@ def grade_apron(faces, stations):
 def apply(manifest, sections):
     tiles = {t["file"]: t for t in manifest["chunks"]}
     for section in sections:
+        if section.get("cutSidewalkSurvey"):
+            path = Path(__file__).with_name("rail-sections") / section["cutSidewalkSurvey"]
+            for patch in json.loads(path.read_bytes()):
+                tile = tiles[patch.pop("file")]
+                tile.setdefault("stationPaving", {}).setdefault("curbReturns", []).append(patch)
         source = section.get("curbReturnSurvey")
         if not source:
             continue

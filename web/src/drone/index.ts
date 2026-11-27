@@ -161,7 +161,9 @@ export function droneMode(host:Host, deps:{groundAt:(x:number,z:number)=>number;
   }
 
   function openHangar() {
-    if (rcActive) return
+    // IDOK-526: the hangar is reachable from inside the RC screen too — leaving the session first,
+    // otherwise the mask renders under a panel that owns the pointer layer.
+    if (rcActive) exitRc()
     renderHangar()
     mask.hidden = false
     requestAnimationFrame(() => mask.classList.add('show'))
@@ -172,6 +174,8 @@ export function droneMode(host:Host, deps:{groundAt:(x:number,z:number)=>number;
   }
 
   async function choose(id:DroneId) {
+    if (placing) return
+    if (rcActive) exitRc()
     if (placed === id) { recall(); closeHangar(); return }
     await place(id)
     closeHangar()
@@ -179,26 +183,33 @@ export function droneMode(host:Host, deps:{groundAt:(x:number,z:number)=>number;
 
   async function place(id:DroneId) {
     if(document.body.dataset.helicopter)return
-    recall()
-    placed = id
-    const built = await buildDroneAsync(id)
-    mesh = built
-    host.scene.add(built.root)
-    const spec = drone(id)
-    const origin = host.walker()?.active ? host.walker()!.position : host.camera.position
-    const yaw = host.walker()?.active ? host.walker()!.yaw : 0
-    // Ahead and a little to the right, so the third-person camera behind the walker can see it.
-    const aim = yaw - PLACE_SIDE
-    const x = origin.x - Math.sin(aim) * PLACE_DISTANCE
-    const z = origin.z - Math.cos(aim) * PLACE_DISTANCE
-    const groundY = deps.groundAt(x,z)
-    const y = (Number.isFinite(groundY) ? groundY : origin.y) + spec.height * .8
-    flight = createFlight(spec,new THREE.Vector3(x,y,z),yaw)
-    flight.load = loadGrams()
-    built.root.position.set(x,y,z)
-    built.root.rotation.y = yaw
-    showHint(`已放置 ${spec.short} · 点「飞无人机」进遥控画面`)
-    refreshDock()
+    if (placing) return
+    placing = true
+    try {
+      recall()
+      const built = await buildDroneAsync(id)
+      mesh = built
+      placed = id
+      host.scene.add(built.root)
+      const spec = drone(id)
+      const origin = host.walker()?.active ? host.walker()!.position : host.camera.position
+      const yaw = host.walker()?.active ? host.walker()!.yaw : 0
+      // Ahead and a little to the right, so the third-person camera behind the walker can see it.
+      const aim = yaw - PLACE_SIDE
+      const x = origin.x - Math.sin(aim) * PLACE_DISTANCE
+      const z = origin.z - Math.cos(aim) * PLACE_DISTANCE
+      const groundY = deps.groundAt(x,z)
+      const y = (Number.isFinite(groundY) ? groundY : origin.y) + spec.height * .8
+      flight = createFlight(spec,new THREE.Vector3(x,y,z),yaw)
+      flight.load = loadGrams()
+      built.root.position.set(x,y,z)
+      built.root.rotation.y = yaw
+      showHint(`已放置 ${spec.short} · 点物品栏的遥控器或「飞无人机」进遥控画面`)
+      refreshDock()
+      notifySlot()
+    } finally {
+      placing = false
+    }
   }
 
   function recall() {
@@ -209,6 +220,7 @@ export function droneMode(host:Host, deps:{groundAt:(x:number,z:number)=>number;
     placed = null
     hideHint()
     refreshDock()
+    notifySlot()
   }
 
   function showHint(text:string) {
@@ -347,8 +359,16 @@ export function droneMode(host:Host, deps:{groundAt:(x:number,z:number)=>number;
 
   // --- RC session
   let rcActive = false
+  let placing = false
   let ownsPhotoFlag = false
+  let lookYaw = 0
+  let lookPitch = 0
   let savedCamera:{pos:THREE.Vector3; quat:THREE.Quaternion; fov:number}|null = null
+
+  /** IDOK-526: tell the hotbar whether the 遥控器 slot should be offered. */
+  function notifySlot() {
+    window.dispatchEvent(new CustomEvent('drone:slot', {detail: {placed: !!placed, rc: rcActive}}))
+  }
 
   function enterRc() {
     if(document.body.dataset.helicopter)return
@@ -362,6 +382,8 @@ export function droneMode(host:Host, deps:{groundAt:(x:number,z:number)=>number;
       return
     }
     rcActive = true
+    lookYaw = 0
+    lookPitch = 0
     attachLoad()
     savedCamera = {pos:host.camera.position.clone(),quat:host.camera.quaternion.clone(),fov:host.camera.fov}
     host.walker()?.hold(true)
@@ -384,10 +406,17 @@ export function droneMode(host:Host, deps:{groundAt:(x:number,z:number)=>number;
       exit:() => exitRc(),
       gimbal:deg => { if (flight) flight.gimbal = deg },
       sticks:patch => input.setTouch(patch),
+      hangar:() => { exitRc(); openHangar() },
+      look:(dx,dy) => {
+        // 傻瓜式向：镜头跟手转，左右不限，上下收在 ±1.1 rad 以内免得翻过去。
+        lookYaw -= dx
+        lookPitch = THREE.MathUtils.clamp(lookPitch - dy,-1.1,1.1)
+      },
     })
     document.body.append(rc.root)
     liftOff(flight)
     refreshDock()
+    notifySlot()
   }
 
   function exitRc() {
@@ -412,6 +441,7 @@ export function droneMode(host:Host, deps:{groundAt:(x:number,z:number)=>number;
     }
     if (flight && flight.phase !== 'landed') landNow(flight)
     refreshDock()
+    notifySlot()
   }
 
   function act(action:DroneAction) {
@@ -542,7 +572,9 @@ export function droneMode(host:Host, deps:{groundAt:(x:number,z:number)=>number;
     if (rcActive && rc) {
       lensPose(flight,lens)
       host.camera.position.copy(lens.pos)
-      host.camera.rotation.set(lens.pitch,lens.yaw,0,'YXZ')
+      // IDOK-526: the 傻瓜式 remote is the only one steered by the mouse/finger — add its look offset.
+      const simple = flight.spec.rc === 'simple'
+      host.camera.rotation.set(lens.pitch + (simple ? lookPitch : 0),lens.yaw + (simple ? lookYaw : 0),0,'YXZ')
       host.camera.updateMatrixWorld()
       rc.update(telemetry(flight),!!recording)
       if (flight.phase === 'returning' && entry) entry.textContent = '返航中'
@@ -571,6 +603,22 @@ export function droneMode(host:Host, deps:{groundAt:(x:number,z:number)=>number;
 
   window.addEventListener('keydown',event => {
     if (event.code === 'Escape' && !mask.hidden) { closeHangar(); event.stopPropagation() }
+    if (!rcActive || !flight || event.ctrlKey || event.metaKey || event.altKey) return
+    // IDOK-526: Q/E walk the gimbal up and down without taking the hands off WASD/arrows.
+    if (event.code === 'KeyQ' || event.code === 'KeyE') {
+      const dir = event.code === 'KeyQ' ? -1 : 1
+      const {tiltMin,tiltMax} = flight.spec.gimbal
+      flight.gimbal = Math.round(THREE.MathUtils.clamp(flight.gimbal + dir * 3,tiltMin,tiltMax))
+      event.preventDefault()
+    }
+    // IDOK-526: G opens the hangar mid-session (same as the 机库 button).
+    if (event.code === 'KeyG') { exitRc(); openHangar(); event.preventDefault() }
+  })
+  // IDOK-526: the hotbar's 遥控器 slot enters/exits the RC session.
+  window.addEventListener('drone:rc',() => {
+    if (rcActive) { exitRc(); return }
+    if (placed && flight && flight.phase === 'landed') enterRc()
+    else openHangar()
   })
 
   const api:DroneMode = {
@@ -586,7 +634,9 @@ export function droneMode(host:Host, deps:{groundAt:(x:number,z:number)=>number;
     debugChase: view => { chase = view; chaseView() },
     debugState: () => ({placed,rc:rcActive,load:loadKind,mesh:mesh?.root.name ?? null,
       model:mesh ? {source:mesh.root.userData.source ?? 'procedural',props:mesh.props.map(node => node.name),gimbal:mesh.gimbal.name,lens:mesh.lens.name,gear:mesh.gear?.name ?? null,cargoBox:mesh.root.getObjectByName('cargo_box')?.visible ?? null} : null,
-      payload:payload ? {kind:loadKind,parts:payload.rig.children.length,figure:payload.rig.children.some(node => node.userData.dronePayloadFigure)} : null,flight:flight ? telemetry(flight) : null,recording:!!recording}),
+      payload:payload ? {kind:loadKind,parts:payload.rig.children.length,figure:payload.rig.children.some(node => node.userData.dronePayloadFigure)} : null,flight:flight ? telemetry(flight) : null,recording:!!recording,
+      // IDOK-526: simple-mode drag look offsets, so tests can see the camera actually turned.
+      look: {yaw:lookYaw,pitch:lookPitch}}),
   }
   if (typeof window !== 'undefined') { window.droneDebug = api.debugState; window.droneStep = api.debugStep; window.droneChase = api.debugChase }
   return api

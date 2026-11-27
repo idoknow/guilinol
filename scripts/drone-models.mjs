@@ -27,7 +27,7 @@ const SPEC = {
   mavic4pro: { height: 0.15, budget: 150 * KB },
   mini5pro: { height: 0.09, budget: 150 * KB },
   air3s: { height: 0.11, budget: 150 * KB },
-  inspire3: { height: 0.25, budget: 150 * KB },
+  fpv: { height: 0.12, budget: 150 * KB },
   flycart200: { height: 1.05, budget: 300 * KB },
 }
 
@@ -57,6 +57,9 @@ function cyl(r, h, seg = 12, axis = 'y', rBottom = r, caps = 'both') {
   return axisify(mergeGeometries(parts, false), axis)
 }
 const disc = (r, seg = 12, axis = 'y') => axisify(clean(new THREE.CircleGeometry(r, seg).rotateX(-PI / 2)), axis)
+// Horizontal ring (duct lip / propeller shroud): torus laid into the XZ plane and dropped at `pos`.
+const torus = (r, tube, pos = [0, 0, 0], radial = 24, tubular = 6) =>
+  clean(new THREE.TorusGeometry(r, tube, tubular, radial).rotateX(PI / 2)).translate(...pos)
 // Lathe around +Y; profile = [[radius, y], …] bottom → top.
 function lathe(profile, seg = 16, axis = 'y') {
   const g = new THREE.LatheGeometry(profile.map(([r, y]) => new THREE.Vector2(Math.max(r, 1e-5), y)), seg)
@@ -480,88 +483,73 @@ function air3s() {
   return { model: m, gearBottom: -0.058 }
 }
 
-// ---------------------------------------------------------------- Inspire 3
+// ---------------------------------------------------------------- FPV 穿越机 (IDOK-458)
+//
+// Four ducted props on a wide X frame. The ducts — a torus ring plus an accent lip around each
+// propeller — are what read as 穿越机 at a glance, so they get a real mesh instead of a painted band.
 
-function inspire3() {
-  const id = 'inspire3'
+function fpv() {
+  const id = 'fpv'
   const m = new Model(id, {
-    shell: { color: css('#33373d'), metallic: 0.25, roughness: 0.38 },
-    dark: { color: css('#1b1d21'), metallic: 0.15, roughness: 0.7 },
-    carbon: { color: css('#16181b'), metallic: 0.45, roughness: 0.3 },
-    metal: { color: css('#7d858e'), metallic: 0.85, roughness: 0.3 },
-    accent: { color: css('#d1462f'), metallic: 0.2, roughness: 0.45 },
-    glass: GLASS, rotor: ROTOR, red: LED_RED, green: LED_GREEN,
+    shell: { color: css('#343a42'), metallic: 0.25, roughness: 0.4 },
+    dark: { color: css('#15181c'), metallic: 0.2, roughness: 0.62 },
+    duct: { color: css('#22262c'), metallic: 0.15, roughness: 0.55 },
+    metal: { color: css('#7f8792'), metallic: 0.85, roughness: 0.3 },
+    accent: { color: css('#e0553f'), metallic: 0.15, roughness: 0.45 },
+    glass: GLASS, rotor: { color: hex(0x191c20), metallic: 0.1, roughness: 0.5 }, red: LED_RED, green: LED_GREEN,
   })
-  // sleek fuselage, nose dips toward the gimbal
+  // fuselage: a narrow pod that tapers both ways, nose (−z) dropped for the camera stack
   m.add(id, 'shell', loft([
-    { z: 0.25, w: 0.1, top: 0.03, bot: 0.03, y: 0.03, n: 2.6 },
-    { z: 0.21, w: 0.17, top: 0.055, bot: 0.045, y: 0.03, n: 3 },
-    { z: 0.08, w: 0.2, top: 0.07, bot: 0.05, y: 0.025, n: 3.4 },
-    { z: -0.06, w: 0.19, top: 0.068, bot: 0.05, y: 0.015, n: 3.4 },
-    { z: -0.17, w: 0.15, top: 0.05, bot: 0.045, y: -0.005, n: 3 },
-    { z: -0.24, w: 0.08, top: 0.025, bot: 0.03, y: -0.025, n: 2.6 },
-  ], 24))
-  // twin TB51 batteries on the back, red pull tabs
-  for (const sx of [-1, 1]) {
-    m.add(id, 'dark', rbox(0.062, 0.05, 0.15, 0.01, 2), [sx * 0.036, 0.1, 0.1])
-    m.add(id, 'accent', rbox(0.02, 0.008, 0.03, 0.003), [sx * 0.036, 0.128, 0.155])
-  }
-  // FPV camera on the nose crown + forward / downward vision
-  m.add(id, 'dark', rbox(0.05, 0.03, 0.04, 0.01, 2), [0, 0.07, -0.16])
-  m.add(id, 'glass', lathe([[0.011, 0], [0.008, 0.004], [0, 0.005]], 14, '-z'), [0, 0.07, -0.18])
-  for (const sx of [-1, 1]) {
-    m.add(id, 'glass', disc(0.007, 12, '-z'), [sx * 0.03, 0.0, -0.236])
-    m.add(id, 'glass', disc(0.007, 12, '-y'), [sx * 0.04, -0.034, 0.02])
-  }
-  m.add(id, 'red', rbox(0.03, 0.006, 0.004, 0.002), [0, 0.03, 0.251])
-  // DGC 2.0 quick-release plate under the nose
-  m.add(id, 'metal', rbox(0.07, 0.012, 0.06, 0.004), [0, -0.04, -0.16])
+    { z: 0.11, w: 0.05, top: 0.02, bot: 0.018, y: 0.012, n: 2.6 },
+    { z: 0.09, w: 0.088, top: 0.032, bot: 0.03, y: 0.014, n: 3 },
+    { z: 0.04, w: 0.108, top: 0.04, bot: 0.038, y: 0.012, n: 3.4 },
+    { z: -0.03, w: 0.104, top: 0.038, bot: 0.036, y: 0.008, n: 3.4 },
+    { z: -0.085, w: 0.082, top: 0.028, bot: 0.03, y: 0.0, n: 3 },
+    { z: -0.115, w: 0.05, top: 0.016, bot: 0.02, y: -0.008, n: 2.6 },
+  ], 22))
+  // battery lid with the red release catch, plus a top GPS mast
+  m.add(id, 'dark', rbox(0.062, 0.016, 0.08, 0.005, 2), [0, 0.048, 0.06])
+  m.add(id, 'accent', rbox(0.03, 0.006, 0.008, 0.002), [0, 0.058, 0.028])
+  m.add(id, 'dark', rbox(0.022, 0.014, 0.022, 0.004, 2), [0, 0.058, 0.012])
+  // camera pod: tilted nose block, big front window, single-axis gimbal drum below
+  m.add(id, 'dark', rbox(0.052, 0.038, 0.062, 0.008, 2), [0, 0.026, -0.118], [-0.34, 0, 0])
+  m.add(id, 'glass', disc(0.016, 18, '-z'), [0, 0.035, -0.148])
+  m.add(id, 'metal', cyl(0.019, 0.008, 16, '-z'), [0, 0.035, -0.145])
+  // downward vision pair + the LED strip under the tail
+  for (const sx of [-1, 1]) m.add(id, 'glass', disc(0.0055, 12, '-y'), [sx * 0.028, -0.03, -0.05])
+  m.add(id, 'green', rbox(0.026, 0.006, 0.004, 0.002), [0, -0.024, 0.108])
+  m.add(id, 'accent', sphere(0.005, 8, 4), [0, 0.028, 0.075])
 
-  // carbon frame: shoulder hinge → elbow, arms out to the motors, legs down to the T-feet
+  // ducted props: [+x,+z] [+x,−z] [−x,+z] [−x,−z] → prop_1..4, same order as the procedural rig
+  const hubs = [[0.155, 0.016, 0.125], [0.163, 0.014, -0.132], [-0.155, 0.016, 0.125], [-0.163, 0.014, -0.132]]
   m.group('gear')
-  const R = 0.2, legFoot = -0.33
-  const hubs = [] // [+x,+z] [+x,−z] [−x,+z] [−x,−z] → prop_1..4
-  for (const sx of [1, -1]) {
-    const shoulder = [sx * 0.1, 0.035, 0], elbow = [sx * 0.19, 0.055, 0]
-    m.add(id, 'metal', cyl(0.024, 0.03, 14, sx > 0 ? 'x' : '-x'), shoulder)
-    m.add(id, 'carbon', tube(shoulder, elbow, 0.014, 10))
-    m.add(id, 'accent', cyl(0.017, 0.012, 14, 'x'), [sx * 0.155, 0.05, 0])
-    m.add(id, 'dark', rbox(0.04, 0.05, 0.06, 0.012, 2), elbow)
-    for (const sz of [1, -1]) {
-      const hub = [sx * 0.255, 0.075, sz * 0.245]
-      hubs.push({ hub, front: sz < 0 })
-      m.add(id, 'carbon', tube(elbow, [hub[0], hub[1] - 0.012, hub[2]], 0.0115, 10, 0.009))
-      m.add(id, 'dark', lathe([[0.03, -0.035], [0.032, -0.01], [0.028, 0.0], [0, 0.002]], 14), hub)
-      m.add(id, 'metal', motor(0.025, 0.026), [hub[0], hub[1], hub[2]])
-      m.add(id, sz < 0 ? 'red' : 'green', sphere(0.007, 8, 4), [hub[0], hub[1] - 0.04, hub[2]])
-    }
-    // leg + foot bar (the part that swings up in flight)
-    const foot = [sx * 0.235, legFoot + 0.012, 0]
-    m.add('gear', 'carbon', tube(elbow, foot, 0.013, 10, 0.011))
-    m.add('gear', 'dark', rbox(0.026, 0.024, 0.04, 0.008), [sx * 0.233, legFoot + 0.02, 0])
-    m.add('gear', 'carbon', beam([sx * 0.235, legFoot + 0.008, -0.17], [sx * 0.235, legFoot + 0.008, 0.17], 0.018, 0.016, 0.018, 0.016, 2.4, 10))
-    for (const sz of [-1, 1]) m.add('gear', 'dark', sphere(0.011, 8, 5), [sx * 0.235, legFoot + 0.01, sz * 0.17])
+  for (const h of hubs) {
+    const [hx, hy, hz] = h
+    // arm: a flat carbon plate from the fuselage shoulder out to the duct
+    m.add(id, 'shell', beam([hx * 0.28, hy - 0.002, hz * 0.3], [hx * 0.86, hy, hz * 0.9], 0.03, 0.009, 0.024, 0.008, 3, 10))
+    // duct: the ring the propeller sits in, plus the accent lip on top
+    m.add(id, 'duct', torus(0.098, 0.0075, [hx, hy, hz], 24, 8))
+    m.add(id, 'accent', torus(0.1045, 0.0035, [hx, hy + 0.004, hz], 24, 6))
+    m.add(id, 'dark', lathe([[0.03, -0.028], [0.032, -0.008], [0.026, 0.0], [0, 0.002]], 14), [hx, hy, hz])
+    m.add(id, 'metal', motor(0.017, 0.018), [hx, hy + 0.002, hz])
+    m.add(id, hz < 0 ? 'red' : 'green', sphere(0.006, 8, 4), [hx, hy - 0.03, hz])
+    // skid rail under each duct — a cinewhoop lands on the ducts, not on legs
+    m.add('gear', 'metal', beam([hx * 0.62, -0.046, hz * 0.95], [hx * 0.62, -0.06, hz * 1.06], 0.016, 0.008, 0.014, 0.008, 3, 8))
   }
   hubs.forEach((h, i) => {
-    const p = m.group(`prop_${i + 1}`, [h.hub[0], h.hub[1] + 0.032, h.hub[2]])
-    m.add(p, 'rotor', propeller(0.19, { dir: i % 2 ? -1 : 1, chord: 0.034, hubR: 0.016 }))
+    const p = m.group(`prop_${i + 1}`, [h[0], h[1] + 0.012, h[2]])
+    m.add(p, 'rotor', propeller(0.092, { dir: i % 2 ? -1 : 1, chord: 0.02, hubR: 0.011 }))
   })
 
-  // X9-8K Air gimbal: yaw motor, L-arm down the right side, camera box, big DL prime
-  m.group('gimbal', [0, -0.05, -0.16])
-  m.add('gimbal', 'metal', cyl(0.024, 0.02, 16), [0, -0.008, 0])
-  m.add('gimbal', 'dark', beam([0, -0.02, 0], [0.075, -0.03, 0], 0.03, 0.016, 0.026, 0.016, 4, 10))
-  m.add('gimbal', 'dark', beam([0.075, -0.024, 0], [0.072, -0.1, 0], 0.024, 0.016, 0.022, 0.016, 4, 10))
-  m.add('gimbal', 'metal', cyl(0.024, 0.016, 16, 'x'), [0.066, -0.105, 0])
-  m.add('gimbal', 'accent', cyl(0.025, 0.004, 16, 'x'), [0.075, -0.105, 0])
-  m.add('gimbal', 'shell', rbox(0.1, 0.09, 0.105, 0.014, 2), [0, -0.105, 0.005])
-  m.add('gimbal', 'dark', rbox(0.06, 0.02, 0.07, 0.006), [0, -0.05, 0.01])
-  m.group('lens', [0, -0.105, -0.048], 'gimbal')
-  m.add('lens', 'dark', lathe([[0.034, 0], [0.036, 0.005], [0.036, 0.05], [0.038, 0.052], [0.038, 0.068], [0.034, 0.07], [0.028, 0.072]], 20, '-z'))
-  m.add('lens', 'accent', lathe([[0.0365, 0.034], [0.0365, 0.04]], 20, '-z'))
-  m.add('lens', 'metal', lathe([[0.037, 0.012], [0.0372, 0.03]], 20, '-z'))
-  m.add('lens', 'glass', lathe([[0.028, 0.072], [0.02, 0.075], [0, 0.0765]], 16, '-z'))
-  return { model: m, gearBottom: legFoot }
+  // camera gimbal under the nose: pitch motor + rounded cube + wide prime
+  m.group('gimbal', [0, -0.026, -0.098])
+  m.add('gimbal', 'metal', cyl(0.011, 0.009, 14), [0, 0.006, 0])
+  m.add('gimbal', 'dark', rbox(0.04, 0.034, 0.034, 0.009, 3), [0, -0.014, -0.008])
+  m.add('gimbal', 'accent', rbox(0.042, 0.004, 0.03, 0.0015), [0, 0.004, -0.008])
+  m.group('lens', [0, -0.014, -0.026], 'gimbal')
+  m.add('lens', 'metal', lathe([[0.0135, 0], [0.0135, 0.003], [0.0115, 0.004]], 18, '-z'))
+  m.add('lens', 'glass', lathe([[0.0115, 0.004], [0.007, 0.0058], [0, 0.0062]], 14, '-z'))
+  return { model: m, gearBottom: -0.062 }
 }
 
 // ---------------------------------------------------------------- FlyCart 200
@@ -686,8 +674,8 @@ const check = process.argv.includes('--check')
 const manifest = { version: 1, generator: 'scripts/drone-models.mjs', drones: {} }
 let failed = false
 if (!check) fs.mkdirSync(OUT, { recursive: true })
-const PROPS = { mavic4pro: 4, mini5pro: 4, air3s: 4, inspire3: 4, flycart200: 8 }
-for (const make of [mavic4pro, mini5pro, air3s, inspire3, flycart200]) {
+const PROPS = { mavic4pro: 4, mini5pro: 4, air3s: 4, fpv: 4, flycart200: 8 }
+for (const make of [mavic4pro, mini5pro, air3s, fpv, flycart200]) {
   const { model, gearBottom } = make()
   const root = model.build()
   const s = stats(root)

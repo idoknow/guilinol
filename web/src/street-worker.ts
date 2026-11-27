@@ -9,13 +9,14 @@ import {stationPaving,type StationPavingCut} from './station-paving'
 import {stationRoadSurface,type StationRoadSegment} from './station-road-surface'
 import {railwayGeometry,type RailSection,type RailFace,type CrossingSign} from './railways'
 import {buildRoadBarriers} from './road-barriers'
+import {medianRails} from './median-rails'
 import {isShizijieCrosswalkRing,isShizijieDecorSuppressed,isShizijieSignalSuppressed,touchesShizijieTile} from './shizijie-zone.ts'
 import {curbEdgeKeyCm,repairStreetPaths} from './ground-repair'
 import {isOuterOsmanthusBed} from './outer-osmanthus'
 import * as THREE from 'three'
 import {look} from './look/config'
 type Pair=[number,number]
-export interface StationPavingStyle {curbReturns?:CurbReturn[]; plaza?:Pair[]; platformEdges?:[Pair,Pair][]; platformGrades?:PlatformGrade[]}
+export interface StationPavingStyle {retainedCuts?:StationPavingCut[]; curbReturns?:CurbReturn[]; tracksideShoulders?:ShoulderPlane[]; crossingGrades?:ShoulderPlane[]; plaza?:Pair[]; platformEdges?:[Pair,Pair][]; platformGrades?:PlatformGrade[]}
 type Path=[number,...Pair[][]]
 type RoadCtrl=[number,number[]]
 type Lower=[number,Pair[],[number,number,number,number][]]
@@ -60,7 +61,10 @@ const ROAD_LIFT=.03
 export function streetGeometry([paths,lamps,banks,signals=[],stops=[],roadCtrl,stoneRails=[],beds=[],shops=[],decor=[],curbCuts=[],lower,platform,,stationRoads,stationCuts,shoulderPlanes,layeredRoads,panels]:Streets,ground:(x:number,z:number)=>number,rails:RailSection[]=[],signs:CrossingSign[]=[],railGround:(x:number,z:number)=>number=ground,paving?:StationPavingStyle,roadbeds=new Set<number>(),origin?:readonly [number,number], inspectSlope?:(a:THREE.Vector3,b:THREE.Vector3,c:THREE.Vector3)=>void){
   const xyz:number[]=[],rgb:number[]=[],sidewalk:number[]=[],road:number[]=[],mats:number[]=[],cols:number[]=[]
   const stationLevel=stationRoads?stationRoadSurface(stationRoads):null
+  const retained=paving?.retainedCuts && stationPaving(paving.retainedCuts, undefined, true)
   const shoulders=shoulderPlanes && stationShoulders(shoulderPlanes)
+  const trackside = paving?.tracksideShoulders && stationShoulders(paving.tracksideShoulders, 2)
+  const crossing = paving?.crossingGrades && stationShoulders(paving.crossingGrades, 2)
   const remaining=stationCuts?stationPaving(stationCuts,stationLevel?.protectedAt):null
   const baseLevel=(x:number,z:number)=>{const g=ground(x,z);const level=roadCtrl?Math.max(evalRoadCtrl(roadCtrl,x,z),g):g;return stationLevel?stationLevel.height(x,z,level):level}
   const curbSegments=curbCuts.flatMap(line=>line.slice(1).map(([x,z],i)=>
@@ -149,6 +153,29 @@ export function streetGeometry([paths,lamps,banks,signals=[],stops=[],roadCtrl,s
         emitFace(polygon[0],polygon[index-1],polygon[index],kind,u1,u2,u3,vertical,true)
       return
     }
+    if(retained && !vertical && (kind===0 || kind===5 || kind===1 || kind===2 || kind===6)){
+      // The open-cut slab is the finished carriageway. Exclude native road
+      // triangles after roadbed closure so physics and rendering agree.
+      for(const poly of retained(first,second,third))for(let j=1;j+1<poly.length;j++)
+        writeSurface(poly[0],poly[j],poly[j+1],kind,u1,u2,u3,vertical)
+      return
+    }
+    writeSurface(first,second,third,kind,u1,u2,u3,vertical)
+  }
+  function writeSurface(first:THREE.Vector3,second:THREE.Vector3,third:THREE.Vector3,kind:number,u1:number,u2:number,u3:number,vertical:boolean){
+    if (!trackside && !crossing) return writeGradedSurface(first,second,third,kind,u1,u2,u3,vertical)
+    const lane = kind === 0 || kind === 5
+    const verge = kind === 1 || kind === 2 || kind === 3 || kind === 4 || kind === 6
+    const pieces = trackside && !platformPath && (lane || verge)
+      ? trackside(first,second,third) : [[first,second,third]]
+    for (const piece of pieces) for (let i=1;i+1<piece.length;i++) {
+      const [a,b,c] = [piece[0],piece[i],piece[i+1]]
+      const finished = lane && crossing ? crossing(a,b,c,true) : [[a,b,c]]
+      for (const poly of finished) for (let j=1;j+1<poly.length;j++)
+        writeGradedSurface(poly[0],poly[j],poly[j+1],kind,u1,u2,u3,vertical)
+    }
+  }
+  function writeGradedSurface(first:THREE.Vector3,second:THREE.Vector3,third:THREE.Vector3,kind:number,u1:number,u2:number,u3:number,vertical:boolean){
     let p1=first,p2=second,p3=third,a1=u1,a2=u2,a3=u3
     if(kind!==3&&!vertical){
       const x1=Math.fround(p1.x),y1=Math.fround(p1.y),z1=Math.fround(p1.z)
@@ -331,9 +358,17 @@ export function streetGeometry([paths,lamps,banks,signals=[],stops=[],roadCtrl,s
   const awnings=look.streets.awnings.map(value=>new THREE.Color(value)),shutter=new THREE.Color(look.streets.shutter)
   const parked:number[]=[],blue=new THREE.Color(look.streets.directionSign)
   const suppressDecor=(kind:number,x:number,z:number)=>checkShizijie&&!!origin&&isShizijieDecorSuppressed(origin[0]+x,origin[1]+z,kind)
+  medianRails(decor,suppressDecor,(start,end,banner)=>{
+    const dx=end.x-start.x,dz=end.z-start.z,flat=Math.hypot(dx,dz),yaw=-Math.atan2(dz,dx)
+    const low=baseLevel(start.x,start.z),high=baseLevel(end.x,end.z),pitch=Math.atan2(high-low,flat)
+    const x=(start.x+end.x)/2,z=(start.z+end.z)/2,y=(low+high)/2+.195,span=Math.hypot(flat,high-low)
+    box(x,y+.88,z,span,.085,.07,yaw,stoneLight,pitch)
+    box(x,y+.28,z,span,.065,.07,yaw,tone.railing,pitch)
+    if(banner)box(x,y+.59,z,Math.min(1.35,span),.42,.09,yaw,awnings[2],pitch)
+  },point=>box(point.x,baseLevel(point.x,point.z)+.195+.58,point.z,.05,.6,.05))
   // 栅栏件（绿篱、机非铁栏、白护栏、石墩铁栏）整段同档：120 m 内一起画，远处不再只剩绿篱或悬空横杆。
   for(const [kind,east,south,heading,span] of decor){
-    if(kind!==1&&kind!==2&&kind!==5&&kind!==6&&kind!==7&&kind!==8)continue
+    if(kind!==5&&kind!==6&&kind!==7&&kind!==8)continue
     const x=east/10,z=south/10
     if(suppressDecor(kind,x,z))continue
     const angle=-heading/100,y=baseLevel(x,z)+.195,length=span/10
@@ -349,11 +384,6 @@ export function streetGeometry([paths,lamps,banks,signals=[],stops=[],roadCtrl,s
       box(x-length*.5*Math.cos(angle),y+.62,z+length*.5*Math.sin(angle),.32,1.24,.32,angle,stoneMid)
       for(const level of [.32,1.05])box(x,y+level,z,length,.06,.07,angle,iron)
       for(const fraction of [-.32,-.12,.12,.32])box(x+fraction*length*Math.cos(angle),y+.69,z-fraction*length*Math.sin(angle),.04,.78,.04,angle,iron)
-    }else{
-      box(x,y+.88,z,length,.085,.07,angle,stoneLight)
-      if(kind===2)box(x,y+.59,z,1.35,.42,.09,angle,awnings[2])
-      box(x,y+.28,z,length,.065,.07,angle)
-      for(const along of [-.35,0,.35])box(x+along*length*Math.cos(angle),y+.58,z-along*length*Math.sin(angle),.05,.6,.05,angle)
     }
   }
   const railLodCount=mats.length/16
@@ -544,7 +574,6 @@ export function streetGeometry([paths,lamps,banks,signals=[],stops=[],roadCtrl,s
     box(px,y+.3,pz,.34,.6,.34,0,tone.lampPole);box(px,y+2.9,pz,.14,5.2,.14,0,tone.lampPole);box(px,y+5.3,pz,1.6,.08,.08,yaw,tone.lampPole)
     for(const side of [-.75,.75])box(px+Math.cos(yaw)*side,y+5.05,pz-Math.sin(yaw)*side,.32,.42,.32,yaw,tone.lampHead)}
   for(const [east,south] of signals){const x=east/10,z=south/10;if(checkShizijie&&origin&&isShizijieSignalSuppressed(origin[0]+x,origin[1]+z))continue;const y=baseLevel(x,z);box(x,y+2.5,z,.16,5,.16);box(x,y+4.7,z,.4,.9,.3)}
-  for(const [east,south] of stops){const x=east/10,z=south/10,y=baseLevel(x,z);box(x,y+1.3,z,.12,2.6,.12);box(x,y+2.15,z,.65,.85,.12)}
   let bankAlong=0
   for(const [ax,az,bx,bz,top,bottom,endTop=top] of banks){
     const a=new THREE.Vector3(ax/10,top/10,az/10),b=new THREE.Vector3(bx/10,endTop/10,bz/10)
@@ -571,7 +600,7 @@ export function streetGeometry([paths,lamps,banks,signals=[],stops=[],roadCtrl,s
       box(mx,ym+.15,mz,Math.max(.1,span-.36),.07,.18,angle,stoneBase)
     }
   }
-  if(paving?.curbReturns)fitCurbReturns(paving.curbReturns,xyz,rgb,surfaceKinds,alongVals,road,sidewalk,k=>colors[k].toArray())
+  if(paving?.curbReturns)fitCurbReturns(paving.curbReturns,xyz,rgb,surfaceKinds,alongVals,road,sidewalk,k=>colors[k].toArray(),retained)
   const positions=new Float32Array(xyz)
   const surface=new THREE.BufferGeometry()
   surface.setAttribute('position',new THREE.BufferAttribute(positions,3))

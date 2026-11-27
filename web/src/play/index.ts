@@ -189,6 +189,7 @@ export function play(host:Host) {
       <p class="card-best"><span>最佳时段</span><b>${spot.best.label}</b><button data-act="hour">换到此时</button></p>
       <div class="card-actions"><button data-act="aim">取景</button>${getPlayMode()==='tour'&&spot.summit?'<button data-act="summit">登顶</button>':''}<button data-act="photo">拍照</button></div>`
     card.hidden = false; requestAnimationFrame(()=>card.classList.add('show'))
+    registerPageUI(card)
     card.querySelector<HTMLButtonElement>('.card-close')!.onclick = closeCard
     for(const b of Array.from(card.querySelectorAll<HTMLButtonElement>('[data-act]'))) b.onclick = ()=>act(spot,b.dataset.act!)
   }
@@ -394,3 +395,4 @@ export function play(host:Host) {
   }
   return {tick, spots, goTo, goPoint, openBook, photo, stamps, nav, get map(){return map}}
 }
+import {registerPageUI} from '../capture-page'

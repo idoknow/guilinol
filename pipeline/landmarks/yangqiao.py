@@ -97,7 +97,7 @@ def pedestrian_wings(builder, anchor):
     for along in (0, 1):
         for outer, inner in zip(profile['lateral'], profile['lateral'][1:]):
             head = [station(along, across, -.02) for across in (outer, inner)]
-            foot = [[x, 146.06-builder.surface.y, z] for x, _, z in head]
+            foot = [[x, min(top, builder.surface.ground(x, z)) - .04, z] for x, top, z in head]
             quad([*head, *reversed(foot)], 'stone')
     builder.named_parts['yangqiao_underground_vault'] = (builder.visible[first:], 'yangqiao_vault', [213,202,183,255])
     del builder.visible[first:], builder.uv[first:]

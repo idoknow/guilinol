@@ -148,6 +148,9 @@ def finish_paving(directory, manifest, profiles, elements):
         supported = {(s["way"], *s["nodes"]) for s, _, _ in local if s.get("fittedCarriageway")}
         for plane in grade_planes(local, supported, x, z, width_pad=.10, lift=.012):
             planes.append([*plane, True])
+        retained = {(s["way"], *s["nodes"]) for s, _, _ in local
+                    if s.get("retainCutBanks") and s.get("fittedCarriageway")}
+        planes.extend(grade_planes(local, retained, x, z, width_pad=.02, lift=.012))
         if planes:
             if len(streets) == 16:
                 streets.append([])
@@ -183,7 +186,8 @@ def finish_paving(directory, manifest, profiles, elements):
             bed = np.interp(along, stations, levels) - 0.22
             bed += np.maximum(0, distance - shoulder - step * math.sqrt(2)) * 0.5
             near = distance <= shoulder + step * math.sqrt(2) + 6
-            target[near] = np.minimum(target[near], bed[near])
+            if not section.get("retainCutBanks"):
+                target[near] = np.minimum(target[near], bed[near])
             if section["openCut"]:
                 # The finished slab supplies the surface on selected chords.
                 # Keep its native-asphalt cut, including sub-decimetre edge slivers.

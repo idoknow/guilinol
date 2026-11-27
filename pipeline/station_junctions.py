@@ -6,7 +6,7 @@ from shapely import LineString, MultiPoint, constrained_delaunay_triangles, unio
 from shapely.ops import split, triangulate
 
 
-def build(sections, protected):
+def build(sections, protected, *, planes=None):
     ends = defaultdict(list)
     for road in sections:
         for end, node in enumerate(road['nodes']):
@@ -14,6 +14,7 @@ def build(sections, protected):
     for node, arms in ends.items():
         if len(arms) < 2:
             continue
+        plane = (planes or {}).get(str(node))
         turning_apron = any(node in road.get("turningAprons", ()) for road, _ in arms)
         boundary = []
         controls = {}
@@ -46,7 +47,7 @@ def build(sections, protected):
                   if road.get('joints') and road['joints'][end]]
         if pivots:
             original.append(MultiPoint(pivots[0]).convex_hull)
-        footprint = hull if turning_apron else hull.intersection(union_all(original))
+        footprint = hull if turning_apron or plane else hull.intersection(union_all(original))
         if any(road['openCut'] for road,_ in arms):
             fixed = protected.query(footprint,predicate='intersects')
             if len(fixed):
@@ -98,10 +99,29 @@ def build(sections, protected):
                             break
                         vertices.append([px,height,pz])
                     faces.append(vertices)
+        retained = all(road.get("retainCutBanks") for road, _ in arms)
+        if plane:
+            elevation, dx, dz = plane
+            if np.hypot(dx, dz) > .02 or abs(elevation - y) > .001:
+                raise ValueError(f"Junction plane exceeds grade or misses its road at {node}")
+            # One plane needs only the outside corners. Narrow triangles from
+            # interior control samples amplify Float32 rounding in the renderer.
+            faces = [[[px, elevation + dx*(px-x) + dz*(pz-z), pz]
+                      for px, pz in list(triangle.exterior.coords)[:3]]
+                     for triangle in constrained_delaunay_triangles(footprint).geoms]
+        if plane or retained:
+            # The hull edges crossing an incident arm are open mouths. Only
+            # its exposed perimeter needs a retaining wall.
+            boundary = footprint.boundary.difference(union_all(original[:len(arms)]).buffer(-.001))
+            outer_edges = [[a, b] for part in getattr(boundary, "geoms", [boundary])
+                           for a, b in zip(part.coords, list(part.coords)[1:])
+                           if np.linalg.norm(np.subtract(a, b)) > .01]
         for i,(road,end) in enumerate(arms):
             joint = road.setdefault('joints',[None,None])[end] or {}
-            if turning_apron:
+            if turning_apron or plane or retained:
                 joint["wedges"] = [list(p.exterior.coords)[:-1] for p in
                                    getattr(footprint, "geoms", [footprint]) if p.area > 0]
+            if plane or retained:
+                joint["outerWallEdges"] = outer_edges
             joint.update(ring=ring,faces=faces,draw=i==0)
             road['joints'][end]=joint

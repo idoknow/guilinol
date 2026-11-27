@@ -115,6 +115,7 @@ export function mountCover(host: HTMLElement, options: CoverOptions): Cover {
   const applyTier = (t: CoverTier, scale: number) => {
     tier = t
     const s = SPECS[t]
+    u.uRays.value = s.rays ? 1 : 0
     renderer.setPixelRatio(pixelRatio(t, scale))
     reflEvery = s.reflEvery
     reflScale = s.refl
@@ -434,10 +435,11 @@ async function build(o: {
   o.u.uGround.value = view.ground
   o.rig.place(view.roof)
   const noise = o.track(noiseTexture(128))
+  o.u.uNoise.value = noise
   const normals = o.track(waterNormalTexture(128))
   const ctx: Ctx = {u: o.u, spec: o.spec, reduced: o.reduced, ground: view.ground, roof: view.roof, noise, track: o.track}
 
-  const sky = createSky(ctx, noise)
+  const sky = createSky(ctx)
   const terrain = createTerrain(ctx, view, noise)
   const lm = terrain.landmarks
   const avoid = Object.values(lm).map((l) => l.box)

@@ -452,23 +452,31 @@ export function createTrafficDutyController(
     return host.projectToScreen({x: op.x, y: op.y + 2.38, z: op.z})
   }
 
-  function emitBoundsWarning(clamped: Position): void {
+  function emitBoundsWarning(clamped: Position, emitHostClamp = true): void {
     outOfBoundsWarning = JIEFANG_DUTY_BOUNDS_WARNING
     outOfBoundsHoldSec = BOUNDS_BANNER_HOLD_SEC
-    host.onDutyBoundaryClamp?.(clamped, outOfBoundsWarning)
+    if (emitHostClamp) host.onDutyBoundaryClamp?.(clamped, outOfBoundsWarning)
     if (!ui && boundsToastCooldown <= 0) {
       boundsToastCooldown = BOUNDS_TOAST_COOLDOWN_SEC
       host.onToast?.(outOfBoundsWarning, 2200)
     }
   }
 
-  function clampPlayerPos(pos: Position): {pos: Position; clamped: boolean; warning: string | null} {
-    if (phase !== 'active') {
+  function isInActiveShiftBounds(pos: Position | null): boolean {
+    if (!shiftZone || shiftZone.id === 'jiefang') return isInBridgeDutyBounds(pos)
+    return resolveDutyZone(pos)?.id === shiftZone.id
+  }
+
+  function clampPlayerPos(
+    pos: Position,
+    options?: {emitHostClamp?: boolean},
+  ): {pos: Position; clamped: boolean; warning: string | null} {
+    if (phase !== 'active' || (shiftZone && shiftZone.id !== 'jiefang')) {
       return {pos: {x: pos.x, y: pos.y, z: pos.z}, clamped: false, warning: null}
     }
     const {clamped, outOfBounds} = clampToBridgeDutyBounds(pos)
     if (outOfBounds) {
-      emitBoundsWarning(clamped)
+      emitBoundsWarning(clamped, options?.emitHostClamp !== false)
       return {pos: clamped, clamped: true, warning: outOfBoundsWarning}
     }
     return {pos: clamped, clamped: false, warning: outOfBoundsWarning}
@@ -663,8 +671,10 @@ export function createTrafficDutyController(
       dutyKeys,
       () =>
         phase === 'active' &&
+        host.isWalking() &&
         !isKnockdownActive() &&
-        !story.isActive() &&
+        !isStoryOrOffDutyActive() &&
+        !host.isUiBlocked?.() &&
         !isEditableFocused() &&
         typeof document !== 'undefined' &&
         !document.body.hasAttribute('data-home') &&
@@ -700,7 +710,7 @@ export function createTrafficDutyController(
     const pos = host.getPlayerPos()
 
     // Priority 1: Ready-to-deliver fine slip (`<= 1.5m` handover) overrides fine-ticket opening & officer dialogue
-    if (phase === 'active' && isHandoverReady() && isInBridgeDutyBounds(pos)) {
+    if (phase === 'active' && isHandoverReady() && isInActiveShiftBounds(pos)) {
       if (walkLocks && (walkLocks.active === false || walkLocks.crashed || walkLocks.standingUp || walkLocks.pickingUpKind || walkLocks.aboardKind)) {
         return null
       }
@@ -723,8 +733,8 @@ export function createTrafficDutyController(
     }
 
     if (host.isUiBlocked?.() || isTerminalFlowActive()) return null
-    // Boss #5: during active duty, strictly forbid duty interaction outside Jiefang Bridge deck bounds
-    if (phase === 'active' && !isInBridgeDutyBounds(pos)) return null
+    // Boss #5: during active duty, strictly forbid duty interaction outside active duty shift bounds
+    if (phase === 'active' && !isInActiveShiftBounds(pos)) return null
     const activePending = phase === 'active' ? resolveActivePendingViolator(pos) : null
     const candidateActors = activePending
       ? [activePending]
@@ -861,7 +871,7 @@ export function createTrafficDutyController(
 
   function enterActiveDutyFromBriefing(): TrafficDutySnapshot {
     resetCounters()
-    shiftZone = JIEFANG_DUTY_ZONE
+    shiftZone = resolveDutyZone(host.getPlayerPos()) ?? JIEFANG_DUTY_ZONE
     phase = 'active'
     if (!gear.hasWhistle || !gear.hasFlag) {
       setGear({hasWhistle: true, hasFlag: true})
@@ -872,7 +882,12 @@ export function createTrafficDutyController(
     attachHitListener()
     host.onOfficerStateChange?.('active')
     host.onDutyStateChange?.(true)
-    host.onToast?.('解放桥交通劝导已上岗，请留在桥面执勤范围内吹哨挥旗劝导违规车', 2800)
+    host.onToast?.(
+      shiftZone.id === 'jiefang'
+        ? '解放桥交通劝导已上岗，请留在桥面执勤范围内吹哨挥旗劝导违规车'
+        : `${shiftZone.name}交通劝导已上岗，请留在执勤范围内吹哨挥旗劝导违规车`,
+      2800,
+    )
     syncCameraLock()
     syncUi()
     return getSnapshot()
@@ -1468,6 +1483,9 @@ export function createTrafficDutyController(
     pendingViolator = actor
     ui?.closePanel()
     const haltHoldSec = Math.max(stopDurationSec, 18)
+    actor.dutyState = actor.dutyState === 'pulled_over' ? 'pulled_over' : 'halted'
+    actor.haltedByDuty = true
+    actor.speed = 0
     stopTargetActor(actor, haltHoldSec)
     notifyActorPulledOver(actor, haltHoldSec)
     playWhistleSound()
@@ -1636,7 +1654,7 @@ export function createTrafficDutyController(
     if (phase === 'active') {
       dutyKeys.step(safeDt)
       const pos = host.getPlayerPos()
-      if (pos && !isInBridgeDutyBounds(pos)) {
+      if ((!shiftZone || shiftZone.id === 'jiefang') && pos && !isInBridgeDutyBounds(pos)) {
         const {clamped} = clampToBridgeDutyBounds(pos)
         emitBoundsWarning(clamped)
       } else if (outOfBoundsHoldSec > 0) {
@@ -1694,8 +1712,13 @@ export function createTrafficDutyController(
             startOfficerBriefing()
           }
         } else if (onGoZone) {
-          onGoZone('jiefang')
-          host.onToast?.('正在前往解放桥交警岗，靠近后按 F 对话', 2400)
+          void Promise.resolve(
+            host.onTeleportToZone ? host.onTeleportToZone('jiefang') : host.onTeleportToBridge?.(),
+          )
+            .then(ok => {
+              if (ok !== false) host.onToast?.('正在前往解放桥交警岗，靠近后按 F 对话', 2400)
+            })
+            .catch(() => {})
         } else {
           host.onToast?.('请前往解放桥西桥头找交警对话', 2400)
         }

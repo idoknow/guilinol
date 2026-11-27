@@ -5,7 +5,7 @@ export type ShoulderPlane = [...GradePlane, boolean?]
 
 // Intersect high pavement with the actual longitudinal grade planes. Checking
 // only the three vertices misses curb faces crossing diagonal or curved roads.
-export function stationShoulders(segments:ShoulderPlane[]){
+export function stationShoulders(segments:ShoulderPlane[], layerRange=Infinity){
   const bins=new Map<string,ShoulderPlane[]>()
   for(const seg of segments){
     const [ax,az,bx,bz,width]=seg
@@ -33,6 +33,7 @@ export function stationShoulders(segments:ShoulderPlane[]){
         const at=((p.x-ax)*dx+(p.z-az)*dz)/length
         if(at<-.006||at>length+.006||Math.abs((p.z-az)*dx-(p.x-ax)*dz)>width*length)continue
         const level=ay+(by-ay)*at/length
+        if (Math.abs(p.y-level)>layerRange) continue
         y=floor ? Math.max(y,level) : Math.min(y,level)
       }
       return y!==p.y?new Vector3(p.x,y,p.z):p
@@ -44,6 +45,8 @@ export function stationShoulders(segments:ShoulderPlane[]){
       const along=(p:Vector3)=>(p.x-ax)*ux+(p.z-az)*uz
       const side=(p:Vector3)=>(p.z-az)*ux-(p.x-ax)*uz
       const ceiling=(p:Vector3)=>ay+(by-ay)*along(p)/length
+      if ([a,b,c].every(p=>p.y>ceiling(p)+layerRange) ||
+          [a,b,c].every(p=>p.y<ceiling(p)-layerRange)) continue
       const planes=[(p:Vector3)=>along(p)+.006,(p:Vector3)=>length+.006-along(p),(p:Vector3)=>width+side(p),(p:Vector3)=>width-side(p),(p:Vector3)=>floor ? ceiling(p)-p.y : p.y-ceiling(p)]
       const next:Vector3[][]=[]
       for(const tri of pieces){

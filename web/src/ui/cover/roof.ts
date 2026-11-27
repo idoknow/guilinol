@@ -142,7 +142,7 @@ export function createRoof(ctx: Ctx, halos: Halos) {
     void main(){ vec4 w = modelMatrix * vec4(position, 1.); vW = w.xyz; vN = normalize(mat3(modelMatrix) * normal); vC = color; vE = aEmit;
       gl_Position = projectionMatrix * viewMatrix * w; }`,
     HEAD +
-      /* glsl */ `uniform sampler2D uNoise; uniform vec3 uLA[2], uLB[2], uBulb, uHero, uFlash; uniform float uNight, uRoofY, uLamps;
+      /* glsl */ `uniform vec3 uLA[2], uLB[2], uBulb, uHero, uFlash; uniform float uNight, uRoofY, uLamps;
     varying vec3 vW, vN, vC; varying float vE;
     vec3 lineLight(vec3 a, vec3 b, vec3 p, vec3 N){
       vec3 ab = b - a; float t = clamp(dot(p - a, ab) / dot(ab, ab), 0., 1.);

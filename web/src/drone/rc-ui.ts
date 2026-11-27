@@ -16,6 +16,10 @@ export interface RcHandlers {
   exit():void
   gimbal(deg:number):void
   sticks(patch:Partial<Sticks>):void
+  /** IDOK-526: open the hangar from inside the RC screen (swap drone without leaving the session). */
+  hangar():void
+  /** IDOK-526: 傻瓜式 mode only — drag the picture to swing the camera around. */
+  look(dx:number, dy:number):void
 }
 
 export interface RcView {
@@ -72,6 +76,7 @@ export function createRc(spec:DroneSpec, handlers:RcHandlers):RcView {
   on('[data-act="photo"]',() => handlers.photo())
   on('[data-act="record"]',() => handlers.record())
   on('[data-act="exit"]',() => handlers.exit())
+  on('[data-act="hangar"]',() => handlers.hangar())
 
   // Idle camera mode on the professional controller: the big shutter fires whichever mode is lit.
   let mode:Mode = 'photo'
@@ -129,6 +134,41 @@ export function createRc(spec:DroneSpec, handlers:RcHandlers):RcView {
     pad.addEventListener('pointercancel',release)
     pad.addEventListener('lostpointercapture',release)
   }
+
+  // --- 傻瓜式: drag anywhere on the picture to look around (the professional RC flies with the
+  //     sticks/keyboard instead, so it never shows a cursor). IDOK-526.
+  const lookPad = root.querySelector<HTMLElement>('.rc-look')
+  if (lookPad) {
+    let looking = false
+    let lastX = 0
+    let lastY = 0
+    lookPad.addEventListener('pointerdown',event => {
+      looking = true
+      lastX = event.clientX
+      lastY = event.clientY
+      lookPad.setPointerCapture(event.pointerId)
+      root.dataset.look = '1'
+    })
+    lookPad.addEventListener('pointermove',event => {
+      if (!looking) return
+      handlers.look((event.clientX - lastX) * LOOK_GAIN,(event.clientY - lastY) * LOOK_GAIN)
+      lastX = event.clientX
+      lastY = event.clientY
+    })
+    const stop = () => { if (looking) { looking = false; delete root.dataset.look } }
+    lookPad.addEventListener('pointerup',stop)
+    lookPad.addEventListener('pointercancel',stop)
+    lookPad.addEventListener('lostpointercapture',stop)
+  }
+
+  // --- 键盘: the moment a key arrives, surface the key legend (touch users never see it).
+  // 捕获阶段监听：飞行输入在 window 上也会拦 keydown，冒泡阶段可能被 stopImmediatePropagation 吞掉。
+  window.addEventListener('keydown',event => {
+    if (!root.isConnected || event.ctrlKey || event.metaKey || event.altKey) return
+    const flying = /^(Key[WASDQEPVR]|Arrow(Up|Down|Left|Right)|Space|Escape)$/.test(event.code)
+    if (!flying) return
+    root.classList.add('kbd')
+  }, true)
 
   function update(state:Telemetry, recording:boolean) {
     if (batteryBar) {
@@ -188,6 +228,7 @@ export function createRc(spec:DroneSpec, handlers:RcHandlers):RcView {
 }
 
 function round(value:number) { return Math.round(value * 100) / 100 }
+const LOOK_GAIN = .0032
 
 function clock(minutes:number) {
   const total = Math.max(0,Math.round(minutes * 60))
@@ -227,6 +268,7 @@ function proMarkup(spec:DroneSpec) {
     </div>
     <div class="rc-status"></div>
     <div class="rc-rail rc-rail-l">
+      <button class="rc-side" data-act="hangar" title="打开机库（换机）">机库</button>
       <button class="rc-side" data-act="rth" title="自动返航">返航</button>
       <button class="rc-side" data-act="land" title="原地降落">降落</button>
     </div>
@@ -236,7 +278,12 @@ function proMarkup(spec:DroneSpec) {
       <button class="rc-side" data-act="exit" title="退出遥控">退出</button>
     </div>
     <div class="rc-center"><div class="rc-reticle"></div></div>
-    <div class="rc-gimbal"><span>云台 <b class="rc-gimbalval"></b></span><input type="range" step="1" aria-label="云台俯仰"></div>
+    <div class="rc-gimbal" title="云台俯仰">
+      <b class="rc-gimbalval"></b>
+      <input type="range" step="1" aria-label="云台俯仰">
+      <span>云台</span>
+    </div>
+    <div class="rc-hint">WASD 平移 · ↑↓ 升降 · ←→ 偏航 · Q/E 云台 · 空格 起降 · R 返航 · P 拍照 · V 录像</div>
     <div class="rc-bottom">
       <div class="rc-tele"></div>
       <div class="rc-bottom-mid">
@@ -259,6 +306,7 @@ function simpleMarkup(spec:DroneSpec) {
       <span class="rc-battval"></span>
     </div>
     <div class="rc-center"><div class="rc-reticle"></div></div>
+    <div class="rc-look" aria-hidden="true"></div>
     <div class="rc-readout"></div>
     <div class="rc-sticks"><div class="rc-stick" data-side="left"><i></i></div><div class="rc-stick" data-side="right"><i></i></div></div>
     <div class="rc-actions">
