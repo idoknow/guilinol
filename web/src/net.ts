@@ -98,7 +98,7 @@ export function attachNet(scene:Scene,clips:AnimationClip[],getPose:()=>Pose,get
       const endpoint=localStorage.getItem('guiling.ws')||`${location.protocol==='https:'?'wss':'ws'}://${location.host}/ws`
       const previous=socket
       if(previous){previous.onopen=previous.onmessage=previous.onclose=previous.onerror=null;try{previous.close(1000,'replace')}catch{}}
-      const ws=new WebSocket(endpoint);socket=ws
+      const ws=new WebSocket(endpoint);socket=ws;welcomed=false
       ws.onopen=()=>{if(version===generation){const initial=getActivity?.();lastActKey=initial?`${initial.act}|${initial.detail??''}`:'';send({t:'join',ticket,fp:fingerprint(),dev:deviceSummary(),avatar:getAvatar(),caps:['roster3'],...(initial?{act:initial.act,actDetail:initial.detail}:{}),...getPose()})}}
       ws.onmessage=event=>{
         if(version!==generation)return
@@ -137,6 +137,8 @@ export function attachNet(scene:Scene,clips:AnimationClip[],getPose:()=>Pose,get
           }
           case 'welcome': sent=0;sentTimes=[];myId=String(msg.me?.id??'');myUid=Number(msg.me?.uid)||0;myName=String(msg.me?.name??'');setChatSelf(myUid);onCombat?.(msg.me,myId);if(subCount>0)send({t:'roster_sub',since:lastRosterV})
             if(msg.relocated){const {x,y,z,code}=msg.relocated;onSetback?.(x,y,z);rejectTravel(code)}
+            else if(msg.me?.resumed&&Number.isFinite(msg.me.x)&&Number.isFinite(msg.me.z))onSetback?.(msg.me.x,Number.isFinite(msg.me.y)?msg.me.y:getPose().y,msg.me.z)
+            welcomed=true
             // 续连（CDN 掐断后原地接管）：对账而不是清空重建，否则每 44 秒所有人的模型都会销毁再克隆一遍
             if(msg.me?.resumed){const keep=new Set((msg.players as {id:string}[]).map(p=>p.id))
               for(const p of peers.list())if(!keep.has(p.id))peers.remove(p.id)
@@ -204,7 +206,8 @@ export function attachNet(scene:Scene,clips:AnimationClip[],getPose:()=>Pose,get
   }
   function stop(){generation++;clearTimeout(timer);socket?.close(1000,'stop');socket=undefined;peers.clear();update('offline')}
   function avatarChanged(){if(state==='online')send({t:'avatar',avatar:getAvatar()})}
-  function tick(dt:number){if(state!=='online')return
+  let welcomed=false
+  function tick(dt:number){if(state!=='online'||!welcomed)return
     flushEmote();const pose=getPose(),now=performance.now()
     if(now-lastSent>=50 && socket && socket.bufferedAmount<4096){lastSent=now;send({t:'pos',...pose})}
     if(getActivity&&now-lastActCheck>=500){

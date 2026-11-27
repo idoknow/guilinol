@@ -1622,7 +1622,7 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
     const act=currentActivity()
     const inVehicle=Boolean(rides?.car||rides?.bike||rides?.boat)
     const speedMs=inVehicle?Math.abs(rides!.speed):Math.hypot(vx,vz)
-    const foot=!rides?.bike&&!rides?.car&&!rides?.boat&&!document.body.dataset.helicopter&&document.body.dataset.drone!=='rc'
+    const foot=!inVehicle&&!document.body.dataset.helicopter
     const parts:string[]=[]
     if(document.body.dataset.helicopter)parts.push('乘直升机')
     else if(act.detail)parts.push(act.detail)
@@ -1632,7 +1632,7 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
     if(combat.f.down)parts.push('倒地')
     else if(crashSession)parts.push('摔车')
     else if(crouching)parts.push('蹲行')
-    if(!inVehicle&&!document.body.dataset.helicopter&&document.body.dataset.drone!=='rc')parts.push(grounded?'地面':'空中')
+    if(foot)parts.push(grounded?'地面':'空中')
     return {
       activity:act.act,
       activityDetail:act.detail??'',
@@ -1665,13 +1665,16 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
     if(!mpEnabled()||!active||net)return
     if(!netModule){void import('../net').then(module=>{netModule=module;attachMp()}).catch(error=>console.warn('multiplayer unavailable',error));return}
     {
-        net=netModule.attachNet(scene,model.animations,()=>({x:figure.position.x,y:figure.position.y+combat.drop,z:figure.position.z,
-          passenger:document.body.dataset.helicopter?true:undefined,foot:!rides?.bike&&!rides?.car&&!rides?.boat&&!document.body.dataset.helicopter&&document.body.dataset.drone!=='rc',yaw:figure.rotation.y,v:poseSpeed(),gr:Number(grounded),
+        net=netModule.attachNet(scene,model.animations,()=>{
+          const rc=document.body.dataset.drone==='rc',body=rc?sim.body.translation():null
+          return {x:body?.x??figure.position.x,y:body?body.y-cfg.height/2:figure.position.y+combat.drop,z:body?.z??figure.position.z,
+          passenger:document.body.dataset.helicopter?true:undefined,foot:!rides?.bike&&!rides?.car&&!rides?.boat&&!document.body.dataset.helicopter,yaw:figure.rotation.y,v:rc?0:poseSpeed(),gr:Number(grounded),
           sc:cigarette.wire,sb:Math.round(cigarette.length*1800),sp:puffSeq,br:brandIndex(cigarette.brand),sd:dropSeq,ss:cigarette.strength,sr:cigarette.remaining,
-          bike:rides?.bike?'bike':'',bx:rides?.bike?.position.x??0,bz:rides?.bike?.position.z??0,byaw:rides?.heading??0}),()=>currentAvatar()??profile,camera,currentActivity,combat.receive,(x,y,z)=>{
-            const footY=y-combat.drop,dest={x,y:footY+cfg.height/2,z}
+          bike:rides?.bike?'bike':'',bx:rides?.bike?.position.x??0,bz:rides?.bike?.position.z??0,byaw:rides?.heading??0}},()=>currentAvatar()??profile,camera,currentActivity,combat.receive,(x,y,z)=>{
+            const dest={x,y:y+cfg.height/2,z}
             sim.sync(x,z);sim.body.setTranslation(dest,true);sim.body.setNextKinematicTranslation(dest)
-            safe.set(x,dest.y,z);figure.position.set(x,footY,z);vx=0;vz=0
+            safe.set(x,dest.y,z);figure.position.set(x,y-combat.drop,z);external=null;vx=vz=velocity=accumulator=0
+            poseSpeedAt=-Infinity;poseSpeedValue=0
           },captureContext)
         net.emote(emote.id);net.tick(0)
     }
@@ -2256,7 +2259,9 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
     sim.syncObstacleVolume(buildTianyuanObstacleVolume([p.x,p.y,p.z],tianyuanShopRef.rotation.y,level,extra))
   }
   // Reverse LIFO reset: apply order below is holdLayer.apply() -> smoking.tick() -> emote.tick() -> ticketHandover.tick() -> combat.tick().
-  function tick(dt:number){wheel.sync();if(!active)return;combat.resetPose();ticketHandover.reset();emote.reset();smoking?.resetPose();holdLayer.reset();
+  function tick(dt:number){wheel.sync();if(!active)return
+    if(document.body.dataset.drone==='rc'){net?.tick(dt);return}
+    combat.resetPose();ticketHandover.reset();emote.reset();smoking?.resetPose();holdLayer.reset();
     if(ticketHandover.active&&(rides?.boat||rides?.car||rides?.bike||knockdown.isDown||combat.f.down))ticketHandover.stop()
     if(emote.id&&(rides?.boat||rides?.car||rides?.bike)){emote.stop();emote.tick(.24,false)}
     const before=performance.now(),start=rides?.boat?.position??sim.body.translation();syncSceneObstacleVolumes();sim.sync(start.x,start.z,true);const footYNow=rides?.boat?start.y:start.y-cfg.height/2;rides?.nearby(start.x,start.z,footYNow);interactArbiter.sync(actionButton);syncGameTravelState();updateShopHintRings(start.x,start.z,footYNow)
