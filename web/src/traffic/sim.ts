@@ -2,15 +2,19 @@ import {SignalPlan,type SignalState} from './signals.ts'
 import {axleHeight,contactPose} from './lane-surface.ts'
 import {nearStatic,resolveContact,staticSolids,pickups,type Solid} from './contact.ts'
 import {CAR_SCALE} from '../drive/scale.ts'
+import {bayBehind,canRoute,clearance,engaged,passage,retreatTrack,type Corridor,type Profile} from './narrow.ts'
 import {clampOutsideShizijieNoPedZone,isInShizijieNoPedZone,isNearShizijiePrecinct,segmentHitsShizijieNoPedZone} from '../shizijie-zone.ts'
 export type Node = {id:number,x:number,y:number,z:number}
-export type Lane = {id:number,from:number,to:number,offset:number,width?:number,kind:'motor'|'bus'|'nonmotor',speedKmh:number,cls?:string,street?:string,npcWalks?:number[][],heights?:number[],floor?:string,gradeSeparated?:string,oneway?:boolean}
+type Crossing={osm:[string,number],bars:number,points:[number,number][],width:number}
+export type Lane = {id:number,from:number,to:number,offset:number,width?:number,kind:'motor'|'bus'|'nonmotor',speedKmh:number,cls?:string,street?:string,npcWalks?:number[][],pedProfiles?:Profile[],pedCrossings?:Crossing[],heights?:number[],floor?:string,gradeSeparated?:string,oneway?:boolean}
 type Phase = {lanes:number[],green:number,yellow:number}
 type Signal={node:number,group:number,offset:number,phases:Phase[]}
 export type Graph = {nodes:Node[],lanes:Lane[],walks:[number,number,number,number?,number[]?][],signals:Signal[]}
 export type SurfaceLookup = (x:number,z:number)=>readonly number[]|undefined
 export type Track = Lane & {
   start:Node,end:Node,dx:number,dz:number,yaw:number,length:number,walk:boolean,
+  corridor?:Corridor,
+  link?:Crossing,painted?:boolean,nextLink?:Track,
   virtual?:boolean,sourceLaneId?:number,
   outwardSign?:1|-1,dodgeMin?:number,dodgeMax?:number,tightEdge?:boolean,
   surfaceState?:'pending'|'ok'|'rejected',suspectVerge?:boolean,pairTrack?:Track,
@@ -194,7 +198,7 @@ export type Actor = {
   pitch?:number,roll?:number,arrived?:boolean,
   track:Track,dist:number,speed:number,pace?:number,kind:'car'|'scooter'|'person',down:number,dodge:number,
   x:number,y:number,z:number,yaw:number,scale:number,leaving:boolean,halfWidth:number,halfLength:number,height:number,
-  holdUntil?:number,waitingFor?:Actor,waitingSince?:number,
+  holdUntil?:number,waitingFor?:Actor,waitingSince?:number,waitingAtGate?:boolean,squeeze?:number,backing?:boolean,
   violation?:TrafficViolation,violations?:ActiveTrafficViolation[],vehicleSubtype?:VehicleSubtype,stoppedUntil?:number,cited?:boolean,
   wrongWay?:boolean,redLightActive?:boolean,redLightTrailDist?:number,
   dutyState?:DutyBehaviorState,fleeUntil?:number,haltedByDuty?:boolean,brakingForOfficer?:boolean,lastPlayerHitAt?:number,
@@ -381,8 +385,9 @@ export class Traffic {
       if(s.posD<minPos)minPos=s.posD
       if(s.negD<minNeg)minNeg=s.negD
     }
-    let maxD=Number.isFinite(minPos)?Math.min(WALK_OFFSET,Math.max(0,minPos-WALK_EDGE_KEEP)):WALK_OFFSET
-    let minD=Number.isFinite(minNeg)?-Math.min(WALK_OFFSET,Math.max(0,minNeg-WALK_EDGE_KEEP)):-WALK_OFFSET
+    const maxShift=WALK_OFFSET
+    let maxD=Number.isFinite(minPos)?Math.min(maxShift,Math.max(0,minPos-WALK_EDGE_KEEP)):maxShift
+    let minD=Number.isFinite(minNeg)?-Math.min(maxShift,Math.max(0,minNeg-WALK_EDGE_KEEP)):-maxShift
     if(this.surfaceAt){
       const nx=-track.dz,nz=track.dx
       const sampleOk=(shift:number)=>{
@@ -423,6 +428,7 @@ export class Traffic {
     const len=Math.hypot(x2-x1,z2-z1)
     if(len<WALK_MIN_LEN)return false
     const updatePair=(t:Track,sx:number,sz:number,ex:number,ez:number)=>{
+      t.corridor=undefined
       t.start.x=sx;t.start.z=sz;t.end.x=ex;t.end.z=ez
       t.length=len;t.dx=(ex-sx)/len;t.dz=(ez-sz)/len;t.yaw=Math.atan2(ex-sx,ez-sz)
       this.computeWalkSafety(t)
@@ -862,7 +868,7 @@ export class Traffic {
       if(seen.has(track))continue
       seen.add(track)
       if(!track.walk&&track.kind==='nonmotor'&&!track.virtual)this.nearbyRealNonmotor.push(track)
-      if(!track.street)continue
+      if(!track.street||track.link)continue
       let group=this.streets.get(track.street)
       if(!group){group={walk:[],motor:[],virtualNonmotor:[]};this.streets.set(track.street,group)}
       if(track.walk)group.walk.push(track)
@@ -929,7 +935,7 @@ export class Traffic {
       if(!existingBest||lane.offset>existingBest.offset)rightmostMotor.set(edgeKey,lane)
       const head=nodes.get(lane.from)!,tail=nodes.get(lane.to)!
       const yAt=(px:number,pz:number)=>{const dx=tail.x-head.x,dz=tail.z-head.z,d2=dx*dx+dz*dz||1;return head.y+(tail.y-head.y)*Math.max(0,Math.min(1,((px-head.x)*dx+(pz-head.z)*dz)/d2))}
-      for(const [x,z,east,south] of lane.npcWalks??[]){
+      for(const [walkIndex,[x,z,east,south]] of (lane.npcWalks??[]).entries()){
         const wLen=Math.hypot(east-x,south-z)
         if(wLen<WALK_MIN_LEN)continue
         const wdx=(east-x)/wLen,wdz=(south-z)/wLen
@@ -958,11 +964,40 @@ export class Traffic {
           nodes.set(from,{id:from,x:sx,z:sz,y:yAt(sx,sz)});nodes.set(to,{id:to,x:ex,z:ez,y:yAt(ex,ez)})
           const fwd=add({from,to,id:from,offset:0,cls:lane.cls,street:lane.street,kind:'nonmotor',speedKmh:5},true,false)
           const rev=add({from:to,to:from,id:to,offset:0,cls:lane.cls,street:lane.street,kind:'nonmotor',speedKmh:5},true,false)
-          if(fwd&&rev){fwd.pairTrack=rev;rev.pairTrack=fwd}
+          if(fwd&&rev){
+            fwd.pairTrack=rev;rev.pairTrack=fwd
+            const profile=lane.pedProfiles?.[walkIndex]
+            if(profile&&Math.abs((sx-x)*wdz-(sz-z)*wdx)<.001){
+              fwd.corridor={profile,length:wLen,direction:1,origin:(sx-x)*wdx+(sz-z)*wdz}
+              rev.corridor={profile,length:wLen,direction:-1,origin:(ex-x)*wdx+(ez-z)*wdz}
+              this.computeWalkSafety(fwd);this.computeWalkSafety(rev)
+            }
+          }
         }
       }
       for(const [node,other] of [[lane.from,lane.to],[lane.to,lane.from]]){
         const neighbors=arms.get(node)??new Set<number>();neighbors.add(other);arms.set(node,neighbors)
+      }
+      for(const link of lane.pedCrossings??[]){
+        if(link.points.length!==4||link.bars<3||link.width<=.5)continue
+        const forward:Track[]=[],backward:Track[]=[]
+        for(let index=0;index<3;index++){
+          const [start,end]=link.points.slice(index,index+2)
+          if(segmentHitsShizijieNoPedZone(...start,...end))break
+          if(Math.hypot(end[0]-start[0],end[1]-start[1])<.45)continue
+          const from=synthNodeId--,to=synthNodeId--
+          nodes.set(from,{id:from,x:start[0],z:start[1],y:yAt(...start)})
+          nodes.set(to,{id:to,x:end[0],z:end[1],y:yAt(...end)})
+          const base={kind:'nonmotor' as const,speedKmh:5,street:lane.street,cls:lane.cls,offset:0}
+          const fwd=add({...base,id:from,from,to},true),rev=add({...base,id:to,from:to,to:from},true)
+          if(!fwd||!rev)continue
+          fwd.pairTrack=rev;rev.pairTrack=fwd;forward.push(fwd);backward.unshift(rev)
+          for(const segment of [fwd,rev]){
+            segment.link=link;segment.painted=index===1
+            if(segment.painted){segment.surfaceState='ok';segment.tightEdge=false;segment.dodgeMax=Math.min(WALK_OFFSET,link.width/2-.25);segment.dodgeMin=-segment.dodgeMax}
+          }
+        }
+        for(const path of [forward,backward])for(let index=1;index<path.length;index++)path[index-1].nextLink=path[index]
       }
     }
     // Phase 1 fallback: synthesize a virtual right-edge nonmotor track on major motor roads lacking an adjacent cycleway.
@@ -996,18 +1031,43 @@ export class Traffic {
     for(const [node,neighbors] of arms)if(neighbors.size>=3)this.junctions.add(node)
     for(const signal of graph.signals){this.signal.set(signal.node,signal);this.junctions.delete(signal.node)}
     this.signalPlan.add(graph.signals)
+    this.linkCorridors()
+  }
+  // Each measured walk track learns the track that leads into it (the one onwardWalk would continue from)
+  // and how far back on it the nearest >=0.85 m station is, so a walker can back out of a pinch across the joint.
+  private linkCorridors(){
+    const tolerance=.45
+    for(const track of this.allTracks()){
+      const corridor=track.corridor
+      if(!corridor)continue
+      corridor.pair=track.pairTrack?.corridor
+      const {x,z}=track.start
+      for(let col=Math.floor((x-tolerance)/128);col<=Math.floor((x+tolerance)/128);col++)for(let row=Math.floor((z-tolerance)/128);row<=Math.floor((z+tolerance)/128);row++){
+        for(const prev of this.cells.get(`${col},${row}`)??[]){
+          if(!prev.walk||!prev.corridor||prev.link||prev===track||prev===track.pairTrack||prev.street!==track.street||prev.dx*track.dx+prev.dz*track.dz<.7)continue
+          const joint=Math.hypot(prev.end.x-x,prev.end.z-z)
+          if(joint>tolerance||Math.abs(trackHeight(prev,prev.length)-trackHeight(track,0))>tolerance)continue
+          const back=bayBehind(prev.corridor,prev.length),gap=back+joint
+          if(gap<=8&&gap<(corridor.behind?.gap??Infinity))corridor.behind={track:prev,target:prev.length-back,gap}
+        }
+      }
+    }
   }
   private onwardWalk(track:Track){
+    if(track.nextLink&&this.usable(track.nextLink))return {track:track.nextLink,dist:0}
     const {x,z}=track.end, tolerance=.45
     let best:{track:Track,dist:number,remaining:number}|undefined
     for(let col=Math.floor((x-tolerance)/128);col<=Math.floor((x+tolerance)/128);col++){
       for(let row=Math.floor((z-tolerance)/128);row<=Math.floor((z+tolerance)/128);row++){
         for(const next of this.cells.get(`${col},${row}`)??[]){
-          if(!next.walk||next===track||next.street!==track.street||next.dx*track.dx+next.dz*track.dz<.7)continue
+          if(!next.walk||next===track||next===track.pairTrack)continue
+          if(next.link||track.link){
+            if(next.link===track.link||Math.hypot(x-next.start.x,z-next.start.z)>tolerance)continue
+          }else if(next.street!==track.street||next.dx*track.dx+next.dz*track.dz<.7)continue
           if(!this.usable(next))continue
           const dist=Math.max(0,Math.min(next.length,(x-next.start.x)*next.dx+(z-next.start.z)*next.dz))
           const remaining=next.length-dist
-          if(remaining<WALK_MIN_LEN||(best&&remaining<=best.remaining))continue
+          if(remaining<(next.link ? .5 : WALK_MIN_LEN)||(best&&remaining<=best.remaining))continue
           const nxPt=next.start.x+dist*next.dx,nzPt=next.start.z+dist*next.dz
           if(Math.hypot(nxPt-x,nzPt-z)>tolerance)continue
           if(segmentHitsShizijieNoPedZone(next.start.x,next.start.z,next.end.x,next.end.z)||segmentHitsShizijieNoPedZone(x,z,nxPt,nzPt))continue
@@ -1063,7 +1123,7 @@ export class Traffic {
   }
   private position(actor:Actor){
     const {track,dist}=actor
-    if(actor.kind==='person'&&actor.dodge!==0){
+    if(actor.kind==='person'&&actor.dodge!==0&&!actor.squeeze){
       const lo=track.dodgeMin??-WALK_OFFSET,hi=track.dodgeMax??WALK_OFFSET
       actor.dodge=Math.max(lo,Math.min(hi,actor.dodge))
     }
@@ -1073,7 +1133,7 @@ export class Traffic {
     if(actor.kind!=='person')this.dutyConfig.constrainActorPosition?.(actor)
     if(actor.kind==='person'&&(actor.dodge!==0&&(track.tightEdge||this.surfaceAt)||isInShizijieNoPedZone(actor.x,actor.z))){
       const ks=this.surfaceAt?.(actor.x,actor.z)
-      if((track.tightEdge&&this.hitsMotorLane(actor.x,actor.z,.35))||(ks&&!isSafeWalkSurface(ks))||isInShizijieNoPedZone(actor.x,actor.z)){
+      if((track.tightEdge&&!actor.squeeze&&this.hitsMotorLane(actor.x,actor.z,.35))||(ks&&!track.painted&&!isSafeWalkSurface(ks))||isInShizijieNoPedZone(actor.x,actor.z)){
         actor.dodge=0
         actor.x=track.start.x+track.dx*dist-track.dz*track.offset
         actor.z=track.start.z+track.dz*dist+track.dx*track.offset
@@ -1268,6 +1328,7 @@ export class Traffic {
       }:{}),
       ...(spawnStreet?{spawnStreet}:{}),
     }
+    if(walk&&!canRoute(track.corridor,actor.dist,this.actors))return null
     this.position(actor)
     if(!walk&&!hl&&approachPref&&approachPref.attempt<18){
       const approach=(camera.x-actor.x)*track.dx+(camera.z-actor.z)*track.dz
@@ -1821,8 +1882,16 @@ export class Traffic {
       if(actor.down>0){actor.down-=dt;actor.waitingFor=previousBlocker;return}
       if(actor.arrived){if(!visible?.(actor))actor.leaving=true;return}
       let keepRight=false,passLeft=false
-      const safeMinDodge=person?(track.dodgeMin??-WALK_OFFSET):-WALK_OFFSET
-      const safeMaxDodge=person?(track.dodgeMax??WALK_OFFSET):WALK_OFFSET
+      const narrow=person&&track.corridor&&(track.corridor.profile[1].length||engaged(actor,this.actors))?passage(actor,this.actors):undefined
+      if(person)actor.waitingAtGate=Boolean(narrow&&narrow.limit<=.01)
+      if(narrow)advance=Math.min(advance,narrow.limit)
+      if(person)actor.backing=Boolean(narrow?.back&&narrow.back>1e-6)
+      const squeeze=narrow?.squeeze??0
+      if(person)actor.squeeze=squeeze
+      if(squeeze)advance=Math.min(advance,.5*dt)
+      const room=narrow&&track.corridor?clearance(track.corridor,actor.dist+advance,squeeze,narrow.atBay):undefined
+      const safeMinDodge=person?Math.max(track.dodgeMin??-WALK_OFFSET,room?.[0]??-Infinity):-WALK_OFFSET
+      const safeMaxDodge=person?Math.min(squeeze?2*WALK_OFFSET:track.dodgeMax??WALK_OFFSET,room?.[1]??Infinity):WALK_OFFSET
       let minDodge=safeMinDodge,maxDodge=safeMaxDodge
       const previousX=actor.x,previousZ=actor.z
       if(!person&&actor.dutyState!=='fleeing'&&actor.dutyState!=='halted'&&actor.dutyState!=='pulled_over')actor.dodge*=decay
@@ -1847,7 +1916,7 @@ export class Traffic {
               if(faster&&ahead> -1.2)passLeft=true
               if(!faster&&ahead<1.2)keepRight=true
             }
-            if(ahead>0&&lateral<.48){
+            if(ahead>0&&(lateral<.48||alignment>0&&narrow?.singleFile)&&!(squeeze&&alignment<0&&lateral>=.45)){
               const gap=Math.max(0,ahead-.52)
               advance=Math.min(advance,alignment<0?gap*.45:gap)
             }
@@ -1884,12 +1953,17 @@ export class Traffic {
       if(person){
         let target=keepRight?WALK_OFFSET:passLeft?-WALK_OFFSET:0
         // If dodging toward the carriageway side is clamped out, shift outward onto the safe sidewalk side instead.
-        if(target>safeMaxDodge&&safeMinDodge<0)target=safeMinDodge
+        if(room&&target!==0){
+          const spacing=Math.min(2*WALK_OFFSET,safeMaxDodge-safeMinDodge)
+          const leftLane=Math.max(safeMinDodge,Math.min(-spacing/2,safeMaxDodge-spacing))
+          target=target>0?leftLane+spacing:leftLane
+        }else if(target>safeMaxDodge&&safeMinDodge<0)target=safeMinDodge
         else if(target<safeMinDodge&&safeMaxDodge>0)target=safeMaxDodge
         const clampedLow=Math.max(safeMinDodge,Math.min(safeMaxDodge,minDodge))
         const clampedHigh=Math.max(clampedLow,Math.min(safeMaxDodge,maxDodge))
-        const goal=Math.max(safeMinDodge,Math.min(safeMaxDodge,Math.max(clampedLow,Math.min(clampedHigh,target))))
+        const goal=squeeze?safeMaxDodge*squeeze:narrow?.singleFile?0:Math.max(safeMinDodge,Math.min(safeMaxDodge,Math.max(clampedLow,Math.min(clampedHigh,target))))
         actor.dodge+=(goal-actor.dodge)*(1-Math.exp(-dt*(goal?3.5:1.2)))
+        if(room)actor.dodge=Math.max(safeMinDodge,Math.min(safeMaxDodge,actor.dodge))
       }
       if(!person&&!reverse&&this.junctions.has(track.to)&&track.length-actor.dist<9){
         const queue=this.queues.get(track.to)??[]
@@ -1933,7 +2007,8 @@ export class Traffic {
       }
       if(advance>=dt*.05)actor.waitingSince=undefined
       else actor.waitingSince??=this.time
-      actor.speed=advance/dt
+      if(actor.backing&&narrow?.back)advance=-Math.min(.6*dt,narrow.back)
+      actor.speed=Math.abs(advance)/dt
       if(reverse)actor.dist-=advance
       else actor.dist+=advance
       if(!person&&advance>0&&nearStatic(actor.x+dirX*advance,actor.z+dirZ*advance)){
@@ -1948,8 +2023,14 @@ export class Traffic {
       }
       if(person&&actor.dist>=track.length){
         const onward=this.onwardWalk(track)??this.shizijieTurnOrReverse(track)
-        if(onward){actor.track=onward.track;actor.dist=onward.dist;this.transitions++}
+        if(onward&&!canRoute(onward.track.corridor,onward.dist,this.actors.filter(other=>other!==actor))){actor.dist=track.length;actor.speed=0;actor.waitingAtGate=true}
+        else if(onward){actor.track=onward.track;actor.dist=onward.dist;this.transitions++}
         else{actor.dist=track.length;actor.speed=0;actor.arrived=true}
+      }else if(person&&actor.dist<0){
+        // Backing out of a pinch past this track's start continues onto the track behind, still facing forward.
+        const behind=retreatTrack(actor) as Track|undefined
+        if(behind){actor.track=behind;actor.dist=Math.max(0,behind.length+actor.dist);actor.yaw=behind.yaw;this.transitions++}
+        else actor.dist=0
       }else if(reverse&&actor.dist<=0){
         const incoming=(this.entries.get(track.from)??[]).filter(prev=>
           !prev.walk&&prev.kind==='nonmotor'&&this.usable(prev)&&prev.from!==track.to&&
@@ -2021,7 +2102,7 @@ export class Traffic {
         actor.dist=0;this.transitions++
       }
       this.position(actor)
-      if(person&&actor.track===track&&Math.hypot(actor.x-previousX,actor.z-previousZ)>1e-5)actor.yaw=Math.atan2(actor.x-previousX,actor.z-previousZ)
+      if(person&&!actor.backing&&actor.track===track&&Math.hypot(actor.x-previousX,actor.z-previousZ)>1e-5)actor.yaw=Math.atan2(actor.x-previousX,actor.z-previousZ)
       // Player collision check: sidewalk & nonmotor lane are 100% car-hit-free; walking calmly rarely gets hit;
       // motor-lane impacts only occur when running or ignoring horn, with impact speed strictly capped <= 25 km/h.
       if(actor.kind==='car'&&officer&&!officerInSafeZone&&this.onPlayerHit&&!actor.leaving&&actor.scale>=.5&&actor.speed>1.2){

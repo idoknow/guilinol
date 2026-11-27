@@ -20,8 +20,14 @@ export function sidewalk(x,z){
     if(bytes.toString('ascii',0,4)!=='GL04')throw Error(tile.file)
     const start=24+4*(size/manifest.grid+1)**2+9*bytes.readUInt32LE(4)+4*bytes.readUInt32LE(8)
     const faces=JSON.parse(bytes.toString('utf8',start,start+bytes.readUInt32LE(12)))[1][0]
-    cache.set(key,faces.filter(([kind])=>[1,4,6].includes(kind)))
+    cache.set(key,faces.filter(([kind])=>[0,1,5,6].includes(kind)))
   }
   x=(x-ox)*100;z=(z-oz)*100
-  return cache.get(key).some(([,shell,...holes])=>inside(x,z,shell)&&!holes.some(hole=>inside(x,z,hole)))
+  let allowed=false
+  for(const [kind,shell,...holes] of cache.get(key)){
+    if(!inside(x,z,shell)||holes.some(hole=>inside(x,z,hole)))continue
+    if(kind===0||kind===5)return false
+    allowed=true
+  }
+  return allowed
 }

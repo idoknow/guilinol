@@ -14,7 +14,7 @@ BODY_CLEARANCE = .35
 MAJOR = {'primary', 'trunk', 'secondary'}
 
 
-def sidewalk_faces(directory, manifest):
+def tile_polygons(directory, manifest, kinds):
     for tile in manifest['chunks']:
         data = gzip.decompress((directory / tile['file']).read_bytes())
         magic, vertices, indices, size = struct.unpack_from('<4s3I', data)
@@ -22,14 +22,25 @@ def sidewalk_faces(directory, manifest):
             raise ValueError(tile['file'])
         offset = 24 + 4 * (manifest['chunkSize'] // manifest['grid'] + 1)**2 + 9*vertices + 4*indices
         streets = json.loads(data[offset:offset+size])[1]
+        shapes = []
         for kind, *rings in streets[0]:
             # Only true outer sidewalks (1) and tactile paving (6); never planting/median verges (4).
-            if kind not in (1, 6):
+            if kind not in kinds:
                 continue
             shell, *holes = [[(tile['x']+east/100, tile['z']+south/100) for east, south in ring] for ring in rings]
             for part in shapely.get_parts(shapely.make_valid(Polygon(shell, holes))):
                 if part.geom_type == 'Polygon':
-                    yield part
+                    shapes.append((kind, part))
+        yield shapes
+
+
+def sidewalk_faces(directory, manifest):
+    for shapes in tile_polygons(directory, manifest, (0, 1, 5, 6)):
+        allowed, blocked = [], []
+        for kind, part in shapes:
+            (allowed if kind in (1, 6) else blocked).append(part)
+        yield from (part for part in shapely.get_parts(shapely.union_all(allowed).difference(shapely.union_all(blocked)))
+                    if part.geom_type == 'Polygon')
 
 
 def _is_between_motors(line, motor_lines, max_span=10.0):

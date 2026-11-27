@@ -632,7 +632,7 @@ def build(bbox, output, palette, workers=4):
     bake_traffic(output, manifest, roads)
     from npc_network import install as install_npc
     from npc_sidewalks import audit as audit_npc
-    install_npc(output, audit_npc(output, manifest))
+    install_npc(output, audit_npc(output, manifest), manifest)
     (output/'manifest.json').write_text(json.dumps(manifest,separators=(',',':'))+'\n')
     if play_region:
         from railways import bake_world as bake_railways

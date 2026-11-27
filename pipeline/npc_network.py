@@ -5,6 +5,8 @@ from pathlib import Path
 
 from common import load_osm
 from npc_sidewalks import audit
+from ped_widths import annotate_widths
+from ped_crossings import connect_crossings, crossings
 
 
 def annotate(graph, elements, report):
@@ -48,11 +50,17 @@ def save(path, data):
     path.write_bytes(gzip.compress(json.dumps(data, ensure_ascii=False, separators=(',', ':')).encode(), mtime=0))
 
 
-def install(world, report):
+def install(world, report, manifest=None):
     roads = world/'roads'
     graph_file = roads/'graph.json.gz'
     graph = json.loads(gzip.decompress(graph_file.read_bytes()))
-    enriched = annotate(graph, load_osm(), report)
+    elements=load_osm()
+    manifest=manifest or json.loads((world/'manifest.json').read_bytes())
+    enriched = annotate(graph, elements, report)
+    for lane in enriched.values():lane.pop('pedCrossings', None)
+    connect_crossings(world, manifest, graph, crossings(world,manifest,elements))
+    spans = annotate_widths(world, graph, manifest)
+    save(roads/'narrow-report.json.gz', spans)
     save(graph_file, graph)
     for cell in json.loads((roads/'cells.json').read_bytes()):
         path = roads/f'{cell}.json.gz'

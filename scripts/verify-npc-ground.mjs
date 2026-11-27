@@ -22,7 +22,7 @@ try{
     const stream=new Blob([bytes]).stream()
     const graph=await new Response(new Uint8Array(bytes)[0]===31?stream.pipeThrough(new DecompressionStream('gzip')):stream).json()
     const traffic=new Traffic(graph), loaded=new Map(), tiles=new Map(manifest.chunks.map(tile=>[`${tile.x},${tile.z}`,tile]))
-    const physics=await createPhysics(manifest,{loaded,radius:256,landmarks:new Map(),forest:{loaded:new Map()},grid:{near:()=>loaded.keys()}},{colliders:[],modelPeaks:[]}).catch(e=>{throw Error(`physics: ${e.stack}`)})
+    const physics=await createPhysics(manifest,{loaded,radius:256,landmarks:new Map(),collisionLandmarks:new Map(),forest:{loaded:new Map()},grid:{near:()=>loaded.keys()}},{colliders:[],modelPeaks:[]}).catch(e=>{throw Error(`physics: ${e.stack}`)})
     const {supportAt,carSupportAt}=playerSupport(physics)
     traffic.sampleGround=(x,z,y,car)=>(car?carSupportAt:supportAt)(x,z,y)?.y
     const batches=new Map(),models=trafficModels(),bottoms={}
