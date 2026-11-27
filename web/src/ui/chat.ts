@@ -108,6 +108,7 @@ function paintList(stick = true) {
       : channel === 'near' ? '身边 60 米内还没人说话。说一句，附近的人都能看到。'
       : '世界频道还很安静，打个招呼吧。'
     list.append(empty)
+    registerPageUI(empty,true)
   }
   if (stick) scrollToEnd()
 }
@@ -118,7 +119,7 @@ function append(m: ChatMessage) {
   list.append(row(m))
   while (list.children.length > KEEP) list.firstElementChild!.remove()
   if (stick || myUid && m.uid === myUid && !m.sys) scrollToEnd()
-  else { unread[channel]++; more.hidden = false; more.textContent = `↓ ${unread[channel]} 条新消息` }
+  else { unread[channel]++; more.hidden = false; more.textContent = `↓ ${unread[channel]} 条新消息`;registerPageUI(more,true) }
 }
 function paintTabs() {
   for (const ch of ['near', 'world'] as Channel[]) {
@@ -131,8 +132,9 @@ function paintBubble() {
   const m = latest()
   const total = open ? 0 : unread.near + unread.world
   bubbleCount.textContent = total ? String(Math.min(total, 99)) : ''
+  registerPageUI(bubbleCount,true)
   bubbleCount.hidden = !total
-  if (!m) { bubbleText.textContent = online ? '聊天 · 回车说话' : '联机后可聊天'; bubble.dataset.ch = ''; return }
+  if (!m) { bubbleText.textContent = online ? '聊天 · 回车说话' : '联机后可聊天';registerPageUI(bubbleText,true); bubble.dataset.ch = ''; return }
   bubble.dataset.ch = m.sys ? 'sys' : m.ch
   bubbleText.replaceChildren()
   const tag = document.createElement('span'); tag.className = 'chat-tag'; tag.dataset.ch = m.ch
@@ -157,6 +159,7 @@ function paintInput() {
     : channel === 'near' ? '对身边 60 米内的人说…' : '对全城的人说…'
   const n = length(input.value.trim())
   counter.textContent = `${length(input.value)}/${MAX}`
+  registerPageUI(counter,true); if(muted)registerPageUI(muteLine,true)
   counter.dataset.over = length(input.value) > MAX ? '1' : ''
   sendButton.disabled = muted || !online || sending || !n || length(input.value) > MAX
   clearInterval(muteTimer)
@@ -168,6 +171,7 @@ function grow() {
 }
 function say(text: string, tone: 'warn' | 'ok' = 'warn') {
   notice.textContent = text
+  registerPageUI(notice,true)
   notice.dataset.tone = tone
   notice.hidden = false
   clearTimeout(noticeTimer)

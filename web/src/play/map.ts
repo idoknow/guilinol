@@ -296,7 +296,7 @@ export function mapView(host:Host, atlas:Atlas, ui:{slot:HTMLElement; buttons:HT
     const p = here(), altitude = host.walker()?.active?0:Math.max(0,p.y-200)
     paint(miniCanvas.getContext('2d')!,size,size,dpr,p.x,p.z,altitude>150?.1:altitude>40?.22:.42,true)
     const found = atlas.roadAt(p.x,p.z,host.walker()?.active?18:0)?.name ?? ''
-    if(found!==lastRoad){lastRoad = found; road.textContent = found; road.hidden = !found}
+    if(found!==lastRoad){lastRoad = found; road.textContent = found; registerPageUI(road,true); road.hidden = !found}
   }
 
   // --- Full map

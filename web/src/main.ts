@@ -527,6 +527,7 @@ async function start(loader:FullLoader,creatorSpawn=false) {
   unstuckButton.onclick=()=>void unstuck()
   unstuckTitle();onPrefs(unstuckTitle)
   ;(document.querySelector('.hud-me')??document.body).append(unstuckButton)
+  registerPageUI(unstuckButton,true)
   window.addEventListener('keydown',event=>{
     if(event.repeat||isGlobalHotkeyBlocked(event.target)||!hits(event.code,'unstuck'))return
     if(!walker?.active||document.body.hasAttribute('data-home')||document.body.dataset.photo==='on')return
@@ -1063,3 +1064,4 @@ async function start(loader:FullLoader,creatorSpawn=false) {
 }
 export const boot=start
 import {sessionMarkPass} from './session-mark-pass'
+import {registerPageUI} from './capture-page'
