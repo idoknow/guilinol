@@ -2,10 +2,16 @@ import * as THREE from 'three'
 import type { XxgLayout, XxgShop } from '../contract.ts'
 import {
   SIGN_ATLAS_RECTS,
-  applySignAtlasRect,
+  XXG_BLADE_ASPECT,
+  XXG_FASCIA_ASPECT,
+  XXG_SHOP_SIGNS,
+  applyAtlasRectUv,
   createXiaoxianggangMaterials,
-  resolveShopLook,
+  isLitSignStyle,
+  type AtlasRect,
   type SignAtlasSlot,
+  type XxgShopSign,
+  type XxgSignStyle,
 } from '../look/index.ts'
 import { corridorToAabb, isColumnSkipped, rectToAabb, type Aabb2D } from './collision.ts'
 import { buildMergedBoxesGeometry, carveBoxXZ, mergeGeometries, type BoxSpec, type RectXZ } from './scene-boxes.ts'
@@ -171,47 +177,211 @@ function emitEdgeWallSegments(
   flushRun(t1)
 }
 
-function makeSignQuad(
-  cx: number,
-  cy: number,
-  cz: number,
-  width: number,
-  height: number,
-  facing: '-x' | '+x' | '-z' | '+z',
-  slot: SignAtlasSlot,
-): THREE.BufferGeometry {
-  const g = new THREE.PlaneGeometry(width, height)
-  applySignAtlasRect(g, slot, 2)
+type Facing = '-x' | '+x' | '-z' | '+z'
+
+const OPPOSITE_FACING: Readonly<Record<Facing, Facing>> = { '-x': '+x', '+x': '-x', '-z': '+z', '+z': '-z' }
+
+/** Turns a +z-facing local shape so it faces `facing`; left-to-right text stays readable from that side. */
+function orientToFacing(g: THREE.BufferGeometry, facing: Facing): void {
   if (facing === '-z') g.rotateY(Math.PI)
   else if (facing === '+x') g.rotateY(Math.PI / 2)
   else if (facing === '-x') g.rotateY(-Math.PI / 2)
-  g.translate(cx, cy, cz)
+}
+
+/** Points every UV at one texel of `rect` (raw 0..1 inside the cell): rims and edges take the cell's border colour. */
+function fillAtlasUv(g: THREE.BufferGeometry, rect: AtlasRect, rawU: number, rawV: number): void {
+  const uv = g.getAttribute('uv')
+  for (let i = 0; i < uv.count; i++) uv.setXY(i, rawU, rawV)
+  applyAtlasRectUv(g, rect, 2)
+}
+
+function placed(g: THREE.BufferGeometry, facing: Facing, x: number, y: number, z: number): THREE.BufferGeometry {
+  orientToFacing(g, facing)
+  g.translate(x, y, z)
   return g
 }
 
-const ZONE_SIGN_FALLBACK: Readonly<Record<string, readonly SignAtlasSlot[]>> = {
-  'corr-main-ew': ['atriumTiaodiao', 'boutiqueB181', 'boutiqueJiulin', 'portal10Glass', 'store1987'],
-  'corr-atrium-hub': ['atriumTiaodiao', 'boutiqueB181'],
-  'corr-atrium-ns': ['atriumTiaodiao', 'boutiqueYuyu', 'stallYilianMid12'],
-  'corr-skylight-ns': ['portal17Gold', 'portal18Navy', 'boutiqueB181'],
-  'corr-north-terrazzo': ['boutiqueYuyu', 'boutiqueJiulin', 'boutiqueB181'],
-  'corr-north-retro': ['alleyHkStreet', 'store1987', 'discountTag19', 'discountTag29', 'discountTag39', 'discountTag49'],
-  'corr-south-mid': ['stallYilianMid12', 'boutiqueYuyu', 'atriumTiaodiao'],
-  'corr-south-boutique': ['boutiqueB181', 'store1987', 'boutiqueJiulin'],
+/** Capsule lightbox: a rounded-end slab `depth` deep whose front face (at the anchor) shows the cell. */
+function makePillBox(width: number, height: number, depth: number, rect: AtlasRect): THREE.BufferGeometry {
+  const r = height * 0.5
+  const half = width * 0.5
+  const shape = new THREE.Shape()
+  shape.moveTo(-half + r, -r)
+  shape.lineTo(half - r, -r)
+  shape.absarc(half - r, 0, r, -Math.PI / 2, Math.PI / 2, false)
+  shape.lineTo(-half + r, r)
+  shape.absarc(-half + r, 0, r, Math.PI / 2, Math.PI * 1.5, false)
+  const g = new THREE.ExtrudeGeometry(shape, { depth, bevelEnabled: false, curveSegments: 8 })
+  g.translate(0, 0, -depth)
+  const pos = g.getAttribute('position')
+  const nrm = g.getAttribute('normal')
+  const uv = g.getAttribute('uv')
+  for (let i = 0; i < pos.count; i++) {
+    const cap = Math.abs(nrm.getZ(i)) > 0.5
+    uv.setXY(i, cap ? (pos.getX(i) + half) / width : 0.02, cap ? (pos.getY(i) + r) / height : 0.5)
+  }
+  return applyAtlasRectUv(g, rect, 2)
 }
 
+interface SignFrame {
+  readonly facingZ: boolean
+  /** Frontage centre along the corridor. */
+  readonly cu: number
+  readonly facade: number
+  readonly outwardSign: 1 | -1
+  readonly openFace: Facing
+  readonly frontSpan: number
+  readonly lintelBottomM: number
+  readonly ceilH: number
+}
+
+interface SignBuckets {
+  /** Glowing crafts (sign atlas, emissive). */
+  readonly lit: THREE.BufferGeometry[]
+  /** Wood and metal plates (sign atlas, ambient only). */
+  readonly paint: THREE.BufferGeometry[]
+  readonly metal: BoxSpec[]
+  readonly wood: BoxSpec[]
+}
+
+/** Fascia heights per craft: lightboxes run tallest, LED strips and engraved plates thinnest. */
+const BAND_HEIGHT_M: Readonly<Record<XxgSignStyle, number>> = {
+  lightbox: 0.4,
+  acrylic: 0.4,
+  channel: 0.36,
+  neon: 0.34,
+  led: 0.3,
+  wood: 0.38,
+  metal: 0.28,
+}
+
+/** Price tags hung in the retro alley's shop openings, in turn. */
 const DISCOUNT_TAGS: readonly SignAtlasSlot[] = ['discountTag19', 'discountTag29', 'discountTag39', 'discountTag49']
 
-function pickStoreSignSlot(
-  resolved: ReturnType<typeof resolveShopLook>,
-  frontage: string,
-  shopIndex: number,
-): SignAtlasSlot {
-  if (resolved.kind === 'sign-atlas' && resolved.slot in SIGN_ATLAS_RECTS) {
-    return resolved.slot
+/** Lintel front face, metres proud of the facade line; side pilasters reach `PILASTER_FACE`. */
+const LINTEL_FACE = 0.04
+const PILASTER_FACE = 0.08
+/** Pilaster centre, metres in from each end of the frontage. */
+const PILASTER_INSET = 0.09
+
+/**
+ * One shop's signage in the frontage frame (u along the corridor, n out of the shop, y up):
+ * the fascia by form and craft, plus an optional blade or round sign on the right-hand pilaster.
+ */
+function emitShopSign(sign: XxgShopSign, fr: SignFrame, out: SignBuckets, discountTag?: AtlasRect): void {
+  const { facingZ, cu, facade, outwardSign, openFace, frontSpan, lintelBottomM, ceilH } = fr
+  const lintelH = ceilH - lintelBottomM
+  const at = (u: number, n: number): [number, number] => (facingZ ? [cu + u, facade + outwardSign * n] : [facade + outwardSign * n, cu + u])
+  const box = (bucket: BoxSpec[], u: number, y: number, n: number, su: number, sy: number, sn: number) => {
+    const [x, z] = at(u, n)
+    bucket.push(facingZ ? { cx: x, cy: y, cz: z, sx: su, sy, sz: sn } : { cx: x, cy: y, cz: z, sx: sn, sy, sz: su })
   }
-  const pool = ZONE_SIGN_FALLBACK[frontage] ?? ['boutiqueB181', 'alleyHkStreet', 'store1987', 'stallYilianMid12']
-  return pool[shopIndex % pool.length]!
+  const quad = (target: THREE.BufferGeometry[], u: number, y: number, n: number, w: number, h: number, facing: Facing, rect: AtlasRect) => {
+    const [x, z] = at(u, n)
+    const g = new THREE.PlaneGeometry(w, h)
+    applyAtlasRectUv(g, rect, 2)
+    target.push(placed(g, facing, x, y, z))
+  }
+  const bucketFor = (style: XxgSignStyle) => (isLitSignStyle(style) ? out.lit : out.paint)
+
+  const { face, form, rect } = sign
+  const target = bucketFor(face.style)
+  const maxW = frontSpan - 0.44
+  let h = Math.min(BAND_HEIGHT_M[face.style], lintelH * 0.84)
+  let w = h * XXG_FASCIA_ASPECT
+  if (w > maxW) {
+    w = maxW
+    h = w / XXG_FASCIA_ASPECT
+  }
+  const y = lintelBottomM + lintelH * 0.5
+
+  if (form === 'hang') {
+    // Double-sided board on two rods, hung over the corridor edge.
+    const n = 0.42
+    const hy = lintelBottomM + 0.08
+    const top = hy + h * 0.5 + 0.02
+    box(out.metal, 0, hy, n, w + 0.04, h + 0.04, 0.03)
+    quad(target, 0, hy, n + 0.019, w, h, openFace, rect)
+    quad(target, 0, hy, n - 0.019, w, h, OPPOSITE_FACING[openFace], rect)
+    for (const s of [-1, 1]) box(out.metal, s * w * 0.38, (top + ceilH) * 0.5, n, 0.016, ceilH - top, 0.016)
+  } else if (form === 'pill') {
+    const depth = 0.08
+    const [x, z] = at(0, LINTEL_FACE + depth + 0.002)
+    target.push(placed(makePillBox(w, h, depth, rect), openFace, x, y, z))
+  } else {
+    switch (face.style) {
+      case 'lightbox': {
+        // The lit box runs pilaster to pilaster in the panel's own ground colour; the name panel sits centred on its face.
+        const g = new THREE.BoxGeometry(Math.max(w + 0.05, frontSpan - 0.4), h + 0.06, 0.1)
+        fillAtlasUv(g, rect, 0.035, 0.5)
+        const [x, z] = at(0, LINTEL_FACE + 0.05)
+        target.push(placed(g, openFace, x, y, z))
+        quad(target, 0, y, LINTEL_FACE + 0.104, w, h, openFace, rect)
+        break
+      }
+      case 'led':
+        box(out.metal, 0, y, LINTEL_FACE + 0.03, w + 0.04, h + 0.04, 0.06)
+        quad(target, 0, y, LINTEL_FACE + 0.064, w, h, openFace, rect)
+        break
+      case 'channel':
+      case 'neon':
+        // Letters on a dark raceway that runs pilaster to pilaster.
+        box(out.metal, 0, y, LINTEL_FACE + 0.015, frontSpan - 0.06, h + 0.12, 0.03)
+        quad(target, 0, y, LINTEL_FACE + 0.034, w, h, openFace, rect)
+        break
+      case 'wood':
+        box(out.wood, 0, y, LINTEL_FACE + 0.02, w + 0.08, h + 0.08, 0.04)
+        quad(target, 0, y, LINTEL_FACE + 0.044, w, h, openFace, rect)
+        break
+      case 'acrylic':
+        // Panel floats on four standoffs whose caps poke through.
+        quad(target, 0, y, LINTEL_FACE + 0.05, w, h, openFace, rect)
+        for (const su of [-1, 1]) for (const sv of [-1, 1]) box(out.metal, su * (w * 0.5 - 0.07), y + sv * (h * 0.5 - 0.06), LINTEL_FACE + 0.031, 0.03, 0.03, 0.062)
+        break
+      case 'metal':
+        box(out.metal, 0, y, LINTEL_FACE + 0.006, w + 0.02, h + 0.02, 0.012)
+        quad(target, 0, y, LINTEL_FACE + 0.016, w, h, openFace, rect)
+        break
+    }
+  }
+
+  if (discountTag) quad(out.lit, -frontSpan * 0.3, lintelBottomM - 0.3, LINTEL_FACE + 0.1, 0.33, 0.36, openFace, discountTag)
+
+  const extra = sign.extra
+  if (!extra) return
+  const t = bucketFor(extra.face.style)
+  const u = frontSpan * 0.5 - PILASTER_INSET
+  const sidePlus: Facing = facingZ ? '+x' : '+z'
+  const sideMinus = OPPOSITE_FACING[sidePlus]
+  if (extra.kind === 'blade') {
+    const bh = 0.9
+    const bw = bh * XXG_BLADE_ASPECT
+    const by = ceilH - 0.08 - bh * 0.5
+    const nC = PILASTER_FACE + 0.1 + bw * 0.5
+    box(out.metal, u, by, nC, 0.04, bh + 0.04, bw + 0.04)
+    quad(t, u + 0.024, by, nC, bw, bh, sidePlus, extra.rect)
+    quad(t, u - 0.024, by, nC, bw, bh, sideMinus, extra.rect)
+    for (const s of [-1, 1]) box(out.metal, u, by + s * (bh * 0.5 - 0.1), PILASTER_FACE + 0.05, 0.03, 0.03, 0.1)
+  } else {
+    const r = 0.22
+    const cy = ceilH - 0.14 - r
+    const nC = PILASTER_FACE + 0.1 + r
+    const [x, z] = at(u, nC)
+    const plus = facingZ ? [x + 0.036, z] : [x, z + 0.036]
+    const minus = facingZ ? [x - 0.036, z] : [x, z - 0.036]
+    t.push(placed(applyAtlasRectUv(new THREE.CircleGeometry(r, 28), extra.rect, 2), sidePlus, plus[0]!, cy, plus[1]!))
+    t.push(placed(applyAtlasRectUv(new THREE.CircleGeometry(r, 28), extra.rect, 2), sideMinus, minus[0]!, cy, minus[1]!))
+    const rim = new THREE.CylinderGeometry(r, r, 0.072, 28, 1, true)
+    fillAtlasUv(rim, extra.rect, 0.03, 0.03)
+    if (facingZ) rim.rotateZ(Math.PI / 2)
+    else rim.rotateX(Math.PI / 2)
+    rim.translate(x, cy, z)
+    t.push(rim)
+    // Arm from the pilaster over the disc, with a short hanger.
+    const armY = cy + r + 0.05
+    box(out.metal, u, armY, (PILASTER_FACE + nC) * 0.5 + 0.02, 0.03, 0.03, nC - PILASTER_FACE + 0.04)
+    box(out.metal, u, cy + r + 0.02, nC, 0.02, 0.05, 0.02)
+  }
 }
 
 interface ShopFrontageGeometry {
@@ -293,7 +463,7 @@ function rectContains(r: RectXZ, x: number, z: number, margin = 0): boolean {
 
 /**
  * Builds the standalone B1 indoor THREE.Scene from any validated XxgLayout.
- * Strictly <= 40 draw calls (~16 batched PBR meshes), <= 150k triangles, zero dependency on world.ts or terrain.
+ * Static scene stays within XXG_BUDGET.indoorSceneDrawCallsMax (40) draw calls so passers-by get the rest of the 80, <= 150k triangles, zero dependency on world.ts or terrain.
  */
 export function createIndoorGreyboxScene(layout: XxgLayout): IndoorGreyboxSceneHandle {
   const scene = new THREE.Scene()
@@ -423,6 +593,8 @@ export function createIndoorGreyboxScene(layout: XxgLayout): IndoorGreyboxSceneH
   const skylightFrameGeos: THREE.BufferGeometry[] = []
   const pyramidGlassGeos: THREE.BufferGeometry[] = []
   const shopSignGeos: THREE.BufferGeometry[] = []
+  const shopSignPaintGeos: THREE.BufferGeometry[] = []
+  const signBuckets: SignBuckets = { lit: shopSignGeos, paint: shopSignPaintGeos, metal: rackMetalSpecs, wood: woodCamelSpecs }
   const exitSignGeos: THREE.BufferGeometry[] = []
 
   for (let ci = 0; ci < layout.corridors.length; ci++) {
@@ -621,7 +793,6 @@ export function createIndoorGreyboxScene(layout: XxgLayout): IndoorGreyboxSceneH
       continue
     }
 
-    const resolved = resolveShopLook(matPack, shop.lookKey)
     const firstShop = getXxgFirstShop(shop)
     const isPink = shop.lookKey === 'wallBoutiquePink' || shop.lookKey === 'boutiqueB181' || shop.lookKey === 'boutiqueYuyu'
     // 首批三家强制营业（不落卷帘），其余按 lookKey 决定是否卷帘。
@@ -703,24 +874,14 @@ export function createIndoorGreyboxScene(layout: XxgLayout): IndoorGreyboxSceneH
       emitShopFitout(classifyXxgShop(shop), frame, fitoutBuckets, { hero: firstShop !== null })
     }
 
-    const signW = Math.min(2.55, Math.max(1.25, frontSpan * 0.78))
-    const signH = Math.min(0.46, lintelH * 0.84)
-    const signY = lintelBottomM + signH * 0.54
-    const signSlot = firstShop ? firstShop.sign : pickStoreSignSlot(resolved, shop.frontage, si)
-    const faceOffset = 0.04
-
-    if (facingZ) {
-      const signZ = facadeCoord + outwardSign * 0.02
-      rackMetalSpecs.push({ cx: shop.rect.x, cy: signY, cz: signZ, sx: frontSpan - 0.06, sy: signH + 0.08, sz: 0.05 })
-      shopSignGeos.push(makeSignQuad(shop.rect.x, signY, signZ + outwardSign * faceOffset, signW, signH, openFace, signSlot))
-      if (shop.frontage === 'corr-north-retro') {
-        const tagSlot = DISCOUNT_TAGS[si % DISCOUNT_TAGS.length]!
-        shopSignGeos.push(makeSignQuad(shop.rect.x + frontSpan * 0.32, lintelBottomM - 0.32, signZ + outwardSign * 0.14, 0.34, 0.38, openFace, tagSlot))
-      }
-    } else {
-      const signX = facadeCoord + outwardSign * 0.02
-      rackMetalSpecs.push({ cx: signX, cy: signY, cz: shop.rect.z, sx: 0.05, sy: signH + 0.08, sz: frontSpan - 0.06 })
-      shopSignGeos.push(makeSignQuad(signX + outwardSign * faceOffset, signY, shop.rect.z, signW, signH, openFace, signSlot))
+    const sign = XXG_SHOP_SIGNS[shop.id]
+    if (sign) {
+      emitShopSign(
+        sign,
+        { facingZ, cu: facingZ ? shop.rect.x : shop.rect.z, facade: facadeCoord, outwardSign, openFace, frontSpan, lintelBottomM, ceilH },
+        signBuckets,
+        shop.frontage === 'corr-north-retro' ? SIGN_ATLAS_RECTS[DISCOUNT_TAGS[si % DISCOUNT_TAGS.length]!] : undefined,
+      )
     }
   }
 
@@ -870,6 +1031,7 @@ export function createIndoorGreyboxScene(layout: XxgLayout): IndoorGreyboxSceneH
     )
   }
   addMergedGeos('xxg_shop_signs', shopSignGeos, matPack.signAtlasMat, true)
+  addMergedGeos('xxg_shop_signs_paint', shopSignPaintGeos, matPack.signPaintMat, true)
 
   if (exitSignGeos.length > 0) {
     const { texture, bytes } = createSafetyExitSignTexture()
@@ -898,6 +1060,7 @@ export function createIndoorGreyboxScene(layout: XxgLayout): IndoorGreyboxSceneH
     matPack.rollerShutterCream,
     matPack.stairGranite,
     matPack.signAtlasMat,
+    matPack.signPaintMat,
     matPack.rackMetal,
   ]
   for (const m of allPackMats) {

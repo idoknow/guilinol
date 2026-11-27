@@ -20,13 +20,13 @@ import {
   buildLightStripTexture,
   buildRenovatedTileMaps,
   buildRollerShutterMaps,
-  buildSignAtlasMaps,
   buildTerrazzoMaps,
   buildWallAndStoneMaps,
   createTextureUploadCache,
   type TextureBudgetSnapshot,
   type TextureUploadCache,
 } from './textures.ts'
+import { buildSignAtlasMap } from './sign-atlas.ts'
 
 export type MaterialSlotKey =
   | 'floorTerrazzo'
@@ -95,6 +95,8 @@ export interface XiaoxianggangMaterialPack {
   readonly rollerShutterCream: THREE.MeshStandardMaterial
   readonly stairGranite: THREE.MeshStandardMaterial
   readonly signAtlasMat: THREE.MeshStandardMaterial
+  /** 木牌、金属铭牌：同一张招牌图集，不自发光。 */
+  readonly signPaintMat: THREE.MeshStandardMaterial
   readonly rackMetal: THREE.MeshStandardMaterial
   readonly cache: TextureUploadCache
   setLightingBoost(boost: number): void
@@ -338,19 +340,27 @@ export function createXiaoxianggangMaterials(opts: CreateMaterialsOptions = {}):
   )
   rollerShutterCream.userData = { tiled: true, periodM: [1.0, 1.0] }
 
-  // 6. 招牌与导视合批总图集（单个 GPU 纹理服务全商业城招牌）
-  const atlas = buildSignAtlasMaps(cache)
+  // 6. 招牌合批图集：一张贴图同时作底色和自发光。灯箱、霓虹、发光字用 signAtlasMat（亮），木牌、金属铭牌用 signPaintMat（不亮）。
+  const atlas = buildSignAtlasMap(cache)
   const signAtlasMat = track(
     new THREE.MeshStandardMaterial({
       name: 'xxg_sign_atlas',
-      map: atlas.map,
-      emissiveMap: atlas.emissiveMap,
-      emissive: '#e8e2d6',
-      roughness: 0.72,
+      map: atlas,
+      emissiveMap: atlas,
+      emissive: '#ffffff',
+      roughness: 0.55,
       metalness: 0.0,
     }),
-    0.14,
-    0.18,
+    0.42,
+    0.2,
+  )
+  const signPaintMat = track(
+    new THREE.MeshStandardMaterial({
+      name: 'xxg_sign_paint',
+      map: atlas,
+      roughness: 0.78,
+      metalness: 0.08,
+    }),
   )
 
   const snapshot = cache.getSnapshot()
@@ -375,6 +385,7 @@ export function createXiaoxianggangMaterials(opts: CreateMaterialsOptions = {}):
     rollerShutterCream,
     stairGranite,
     signAtlasMat,
+    signPaintMat,
     rackMetal,
     cache,
     setLightingBoost(boost: number) {
