@@ -377,6 +377,24 @@ function clip(poly:Point[],plane:Plane){
 }
 export function fan(poly:Point[],out:number[]){for(let at=2;at<poly.length;at++)out.push(...poly[0],...poly[at-1],...poly[at])}
 
+export function carvePaving(surface:THREE.BufferGeometry,cuts:Plane[][]){
+  const flat=surface.index?surface.toNonIndexed():surface
+  const attrs=Object.entries(flat.attributes).sort(([name])=>name==='position'?-1:0)
+  const stride=attrs.reduce((sum,[,attr])=>sum+attr.itemSize,0),out:number[]=[]
+  for(let start=0;start<flat.getAttribute('position').count;start+=3){
+    const triangle=[0,1,2].map(offset=>attrs.flatMap(([,attr])=>Array.from({length:attr.itemSize},(_,i)=>attr.getComponent(start+offset,i))) as Point)
+    for(const polygon of carve(triangle,cuts)??[triangle])fan(polygon,out)
+  }
+  const result=new THREE.BufferGeometry()
+  let offset=0
+  for(const [name,attr] of attrs){
+    const data=Float32Array.from({length:out.length/stride*attr.itemSize},(_,i)=>out[Math.floor(i/attr.itemSize)*stride+offset+i%attr.itemSize])
+    result.setAttribute(name,new THREE.BufferAttribute(data,attr.itemSize));offset+=attr.itemSize
+  }
+  if(flat!==surface)flat.dispose()
+  surface.dispose();return result
+}
+
 let cachedShopMat:THREE.MeshBasicMaterial|null=null
 function getShopAtlasMaterial(shops:ShizijieShop[]){
   if(cachedShopMat)return cachedShopMat
