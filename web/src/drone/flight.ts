@@ -2,7 +2,7 @@ import * as THREE from 'three'
 import {drainPerSecond, speedLimit, type DroneSpec} from './specs'
 
 // IDOK-215: a spec-driven arcade flight model. Every clamp below comes from the aircraft's sheet
-// (web/src/drone/specs.ts) so a Mini 5 Pro really does feel tamer than an Inspire 3.
+// (web/src/drone/specs.ts) so a Mini 5 Pro really does feel tamer than an FPV racer.
 export type Phase = 'landed' | 'takeoff' | 'flying' | 'returning' | 'landing'
 
 export interface Sticks { throttle:number; yaw:number; pitch:number; roll:number }
