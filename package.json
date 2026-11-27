@@ -55,6 +55,8 @@
     "verify:traffic-heights": "uv run python pipeline/verify_traffic_heights.py",
     "verify:signals": "node --experimental-strip-types --test scripts/test-traffic-signals.mjs",
     "verify:hot-paths": "node --import tsx --test scripts/test-hot-paths.mjs && node scripts/verify-overlay-guard.mjs",
+    "verify:signal-heads": "node --import tsx --test scripts/test-signal-heads.mjs",
+    "verify:signal-heads:city": "node scripts/verify-signal-heads.mjs",
     "verify:boat": "node scripts/boat.mjs",
     "verify:jiefang-landing": "node scripts/boat.mjs --jiefang-landing",
     "perf": "node scripts/perf.mjs",
