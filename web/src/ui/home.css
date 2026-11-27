@@ -30,7 +30,7 @@ body[data-home] :is(.hud-me,.dock,.sky-ui,.hint,footer,.walk-ui,.vehicle-action,
   width:min(560px,100%);padding:calc(48px + env(safe-area-inset-top)) calc(24px + env(safe-area-inset-right)) var(--ui-s-4) calc(clamp(24px,7vw,112px) + env(safe-area-inset-left))}
 
 /* 书名：大字是主视觉（--ui-fs-3xl）；像素 Logo 收成书名上方一枚小宣纸签，像刻本封面角上的签条，只做配角 */
-.home-title{display:grid;justify-items:start;gap:14px;margin-bottom:var(--ui-s-4)}
+.home-title{display:grid;justify-items:start;gap:14px}
 .home-seal{display:block;box-sizing:border-box;width:clamp(112px,15vh,144px);padding:6px 8px 5px;background:var(--ui-paper);border-radius:var(--ui-r-xs);
   outline:1px solid var(--ui-paper-line);outline-offset:-3px}
 .home-seal img{display:block;width:100%;height:auto;mix-blend-mode:multiply}
@@ -39,6 +39,13 @@ body[data-home] :is(.hud-me,.dock,.sky-ui,.hint,footer,.walk-ui,.vehicle-action,
 
 /* 目录：三行，发丝线分隔。行、发丝线、悬停底色、焦点框四者同宽，左右对齐；内容在行内缩进 12px */
 .home-modes{display:grid;margin:0}
+/* 目录上沿 = 一笔桂林山水线（home-skyline.svg：左起象鼻山、背上普贤塔、鼻下水月洞，漓江水面，一簇峰林，最高是独秀峰）。
+   山靠右，左边是一条平水线；底边 y=39.5 就是第一行的上发丝线，所以第一行不再画自己的上线。书名在山上，目录在水里。
+   SVG 只当遮罩，颜色由这里的 --ui-line-hover 决定 */
+.home-modes::before{content:"";display:block;height:40px;background:var(--ui-line-hover);pointer-events:none;
+  -webkit-mask:url("./home-skyline.svg") right bottom/auto 100% no-repeat,linear-gradient(#000 0 0) left bottom/100% 1px no-repeat;
+  mask:url("./home-skyline.svg") right bottom/auto 100% no-repeat,linear-gradient(#000 0 0) left bottom/100% 1px no-repeat}
+.home-row:first-child::before{content:none}
 .home-row{position:relative}
 .home-row::before,.home-row:last-child::after{content:"";position:absolute;left:0;right:0;height:1px;background:var(--ui-line-strong);pointer-events:none}
 .home-row::before{top:0}.home-row:last-child::after{bottom:0}
@@ -48,6 +55,10 @@ body[data-home] :is(.hud-me,.dock,.sky-ui,.hint,footer,.walk-ui,.vehicle-action,
 .home-mode:hover{background:var(--ui-fill)}
 .home-mode:focus-visible{outline:2px solid var(--ui-focus);outline-offset:-2px;border-radius:var(--ui-r-ctl)}
 .home-mode-seal{font-size:21px}
+/* 印章是盖上去的：石刻残边遮罩（home-seal.svg：四角磨圆、三处崩口），三枚各歪一点，不是同一个模子压出来的方框。
+   遮罩只管形状，颜色仍是 .ui-seal 的令牌 */
+.home-mode-seal{-webkit-mask:url("./home-seal.svg") center/100% 100% no-repeat;mask:url("./home-seal.svg") center/100% 100% no-repeat}
+.home-mode--tour .home-mode-seal{transform:rotate(1.2deg)}.home-mode--solo .home-mode-seal{transform:rotate(-.8deg)}
 .home-mode-text{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 10px;min-width:0}
 .home-mode-text b{flex:1 0 100%;display:flex;align-items:center;gap:12px;min-width:0;white-space:nowrap;
   font:600 var(--ui-fs-lg)/1.3 var(--ui-serif);letter-spacing:var(--ui-track-title)}
