@@ -46,7 +46,7 @@ export const XXG_PALETTE = Object.freeze({
   storefrontGlassTint: swatch('#dcebf2', '15-shop-boutique-b181-queenshan.jpg', '女装橱窗通透微青钢化玻璃'),
   wallCorridorPlaster: swatch('#eceae4', '14-atrium-renovated-rest-area.jpg', '地下中庭及通道浅暖白墙柱'),
   wallBoutiquePink: swatch('#e8cccf', '15-shop-boutique-b181-queenshan.jpg', 'B181 精品女装柔粉灰墙框'),
-  stairGranite: swatch('#8c8b88', '06-portal-18-market-sign-steps.jpg', '出入口花岗岩防滑石阶与矮墙'),
+  stairGranite: swatch('#bcb1a2', '04-skylight-pyramid-interior-stairs.jpg', '采光顶楼梯间米色花岗岩防滑石阶与矮墙'),
   rollerShutterSilver: swatch('#9ca5af', '08-portal-10-glass-gallery-entry.jpg', '商业街标准银灰镀锌波纹卷帘门'),
   rollerShutterCream: swatch('#c6bfb2', '19-alley-retro-discount-racks.jpg', '老区暖灰烤漆波纹卷帘门'),
   portal18Navy: swatch('#1b3554', '06-portal-18-market-sign-steps.jpg', '18号出入口深海军蓝金属底牌'),
@@ -85,26 +85,71 @@ export const XXG_UI_TOKENS = Object.freeze({
 })
 
 /**
- * 1024×512 招牌与导视合批图集矩形分区（规范化 Canvas 坐标 0..1，y=0 在顶部）。
- * 各子区长宽比尽量对齐现实牌匾比例，贴图阶段配合 applySignAtlasRect 防文字变形。
+ * 招牌合批图集：1024×768 一张贴图，同时作底色和自发光（灯箱亮、漆面不亮由材质决定）。
+ * 规范化 Canvas 坐标 0..1，y=0 在顶部。每格长宽比即实物牌面比例，摆放时按格子比例定尺寸，文字不拉伸。
+ * - 门头：上方 5 列 × 11 行，每格 204.8×48px（约 4.27:1），53 家店每家一格。
+ * - 侧挂竖牌：门头下方一行 40×136px；圆灯箱：右侧 96×96px；底部是入口牌、安全出口和特价吊牌。
+ */
+export const XXG_SIGN_ATLAS_W = 1024
+export const XXG_SIGN_ATLAS_H = 768
+const FASCIA_COLS = 5
+const FASCIA_CELL_H = 48
+export const XXG_FASCIA_CELLS = FASCIA_COLS * 11
+export const XXG_BLADE_CELLS = 12
+export const XXG_ROUND_CELLS = 10
+
+const px = (x0: number, y0: number, x1: number, y1: number): AtlasRect =>
+  [x0 / XXG_SIGN_ATLAS_W, y0 / XXG_SIGN_ATLAS_H, x1 / XXG_SIGN_ATLAS_W, y1 / XXG_SIGN_ATLAS_H] as const
+
+/** 门头格 i（0..54）。 */
+export function fasciaCellRect(i: number): AtlasRect {
+  const col = i % FASCIA_COLS
+  const row = Math.floor(i / FASCIA_COLS)
+  return [col / FASCIA_COLS, (row * FASCIA_CELL_H) / XXG_SIGN_ATLAS_H, (col + 1) / FASCIA_COLS, ((row + 1) * FASCIA_CELL_H) / XXG_SIGN_ATLAS_H]
+}
+
+/** 侧挂竖牌格 i（0..11），40×136px。 */
+export function bladeCellRect(i: number): AtlasRect {
+  return px(i * 40, 528, i * 40 + 40, 664)
+}
+
+/** 圆灯箱格 i（0..9），96×96px。 */
+export function roundCellRect(i: number): AtlasRect {
+  const col = i % 5
+  const y = i < 5 ? 528 : 628
+  return px(480 + col * 100, y, 480 + col * 100 + 96, y + 96)
+}
+
+/** 门头格长宽比（宽/高），摆放尺寸按它算。 */
+export const XXG_FASCIA_ASPECT = XXG_SIGN_ATLAS_W / FASCIA_COLS / FASCIA_CELL_H
+export const XXG_BLADE_ASPECT = 40 / 136
+
+/**
+ * 沿用的命名格：首批 3 店与 7 家老店的门头（每家一格），入口牌、安全出口与 4 张特价吊牌。
+ * 门头格 0..11 固定给这些键，其余 43 家店依次用 12..54。
  */
 export const SIGN_ATLAS_RECTS = Object.freeze({
-  portal18Navy: [0.0, 0.0, 0.5, 0.34] as AtlasRect,
-  portal17Gold: [0.5, 0.0, 1.0, 0.34] as AtlasRect,
-  portal10Glass: [0.0, 0.34, 0.34, 0.67] as AtlasRect,
-  safetyExit: [0.34, 0.34, 0.52, 0.51] as AtlasRect,
-  store1987: [0.34, 0.51, 0.52, 0.67] as AtlasRect,
-  boutiqueB181: [0.52, 0.34, 0.78, 0.67] as AtlasRect,
-  stallYilianMid12: [0.78, 0.34, 1.0, 0.67] as AtlasRect,
-  boutiqueYuyu: [0.0, 0.67, 0.24, 1.0] as AtlasRect,
-  boutiqueJiulin: [0.24, 0.67, 0.44, 1.0] as AtlasRect,
-  atriumTiaodiao: [0.44, 0.67, 0.62, 1.0] as AtlasRect,
-  alleyHkStreet: [0.62, 0.67, 0.86, 1.0] as AtlasRect,
-  discountTag19: [0.86, 0.67, 0.93, 0.835] as AtlasRect,
-  discountTag29: [0.93, 0.67, 1.0, 0.835] as AtlasRect,
-  discountTag39: [0.86, 0.835, 0.93, 1.0] as AtlasRect,
-  discountTag49: [0.93, 0.835, 1.0, 1.0] as AtlasRect,
+  firstApparelSweet: fasciaCellRect(0),
+  firstAccessorySilver: fasciaCellRect(1),
+  firstSnackGuilin: fasciaCellRect(2),
+  store1987: fasciaCellRect(3),
+  boutiqueB181: fasciaCellRect(4),
+  stallYilianMid12: fasciaCellRect(5),
+  boutiqueYuyu: fasciaCellRect(6),
+  boutiqueJiulin: fasciaCellRect(7),
+  atriumTiaodiao: fasciaCellRect(8),
+  alleyHkStreet: fasciaCellRect(9),
+  portal18Navy: fasciaCellRect(10),
+  portal17Gold: fasciaCellRect(11),
+  portal10Glass: px(0, 668, 176, 732),
+  safetyExit: px(180, 668, 300, 728),
+  discountTag19: px(304, 668, 348, 716),
+  discountTag29: px(348, 668, 392, 716),
+  discountTag39: px(392, 668, 436, 716),
+  discountTag49: px(436, 668, 480, 716),
 })
+/** SIGN_ATLAS_RECTS 占掉的门头格数；店铺目录从这一格往后排。 */
+export const XXG_FASCIA_RESERVED = 12
 
 export type SignAtlasSlot = keyof typeof SIGN_ATLAS_RECTS
 
@@ -166,11 +211,16 @@ export function uvBoundsFromAtlasRect(rect: AtlasRect): readonly [number, number
 
 /** 将标准单位平面(PlaneGeometry 等) UV 原地重映射到指定图集子矩形 */
 export function applySignAtlasRect(geometry: THREE.BufferGeometry, slot: SignAtlasSlot, padPx = 2): THREE.BufferGeometry {
+  return applyAtlasRectUv(geometry, SIGN_ATLAS_RECTS[slot], padPx)
+}
+
+/** 同上，直接给矩形；原 UV 须在 0..1。padPx 按图集像素向内收，防止 mip 时串到邻格。 */
+export function applyAtlasRectUv(geometry: THREE.BufferGeometry, rect: AtlasRect, padPx = 2): THREE.BufferGeometry {
   const uv = geometry.getAttribute('uv')
   if (!uv) return geometry
-  const [x0, y0, x1, y1] = SIGN_ATLAS_RECTS[slot]
-  const uPad = padPx / 1024
-  const vPad = padPx / 512
+  const [x0, y0, x1, y1] = rect
+  const uPad = padPx / XXG_SIGN_ATLAS_W
+  const vPad = padPx / XXG_SIGN_ATLAS_H
   const u0 = x0 + uPad
   const u1 = x1 - uPad
   const v0 = 1 - (y1 - vPad)

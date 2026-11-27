@@ -1,5 +1,5 @@
 // 首页联机主推 + 单人弱化保留验收（IDOK-392；S1 改为目录式封面后：主次靠位置和唯一朱砂按钮）：
-// 只跑主界面，不进 3D 城，验证桌面 / 手机竖屏 / 小屏 / 手机横屏的视觉层级、默认焦点、偏好持久化与无溢出。
+// 只跑主界面，不进 3D 城，验证桌面 / 手机竖屏 / 小屏 / 手机横屏的视觉层级、默认焦点、偏好持久化、手机「更多」收起与无溢出。
 import assert from 'node:assert/strict'
 import {mkdir} from 'node:fs/promises'
 import {preview} from 'vite'
@@ -153,10 +153,38 @@ try {
     if (captureDir) {
       await page.screenshot({path:`${captureDir}/${name}.png`})
     }
+
+    // 手机收起（IDOK-468）：竖屏 / 横屏手机默认只留模式名和动作；联机说明、钱包、在线人数照常显示，
+    // 游览 / 单人说明、底部链接、署名点「更多」才出现。桌面不显示「更多」，内容始终展开。
+    const phone = viewport.width <= 760 || (viewport.height <= 520 && viewport.width > viewport.height)
+    const fold = () => page.evaluate(() => {
+      const shown = sel => { const el = document.querySelector(sel); return !!el && getComputedStyle(el).display !== 'none' && el.getBoundingClientRect().height > 0 }
+      const more = document.querySelector('.home-more')
+      return {more:shown('.home-more'), expanded:more.getAttribute('aria-expanded'), label:more.textContent.trim(),
+        tourDesc:shown('.home-mode--tour .home-mode-text > span'), soloDesc:shown('.home-mode--solo .home-mode-text > span'),
+        links:shown('.home-links'), qq:shown('.home-links [data-act=qq]'), foot:shown('.home-foot'),
+        footBottom:document.querySelector('.home-foot').getBoundingClientRect().bottom}
+    })
+    const folded = await fold()
+    if (!phone) {
+      assert.equal(folded.more, false, `${name}: no 更多 toggle on desktop`)
+      assert.ok(folded.tourDesc && folded.soloDesc && folded.qq && folded.foot, `${name}: desktop shows descriptions, links and credit`)
+    } else {
+      assert.ok(folded.more && folded.expanded === 'false' && folded.label === '更多', `${name}: 更多 toggle starts folded (${JSON.stringify(folded)})`)
+      assert.ok(!folded.tourDesc && !folded.soloDesc && !folded.links && !folded.foot, `${name}: secondary text folded on phones (${JSON.stringify(folded)})`)
+      await page.click('.home-more')
+      const open = await fold()
+      assert.ok(open.expanded === 'true' && open.label === '收起', `${name}: 更多 opens and relabels to 收起`)
+      assert.ok(open.tourDesc && open.soloDesc && open.qq && open.foot, `${name}: 更多 reveals descriptions, links and credit (${JSON.stringify(open)})`)
+      if (name !== 'small') assert.ok(open.footBottom <= viewport.height + 2, `${name}: expanded footer fits (${open.footBottom.toFixed(1)} <= ${viewport.height})`)
+      if (captureDir) { await page.waitForTimeout(400); await page.screenshot({path:`${captureDir}/${name}-more.png`}) } // 等链接进场动画走完
+      await page.click('.home-more')
+      assert.equal((await fold()).expanded, 'false', `${name}: 收起 folds back`)
+    }
   }
 
   assert.deepEqual(errors, [], 'home page must not throw errors')
-  console.log('Home multiplayer-first hierarchy, solo demotion, focus defaults and responsive layout passed')
+  console.log('Home multiplayer-first hierarchy, solo demotion, focus defaults, phone fold and responsive layout passed')
 } finally {
   await browser?.close()
   await server.close()

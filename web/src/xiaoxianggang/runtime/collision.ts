@@ -1,11 +1,11 @@
 import {
   XXG_PLAYER,
   type XxgCorridor,
-  type XxgExit,
   type XxgLayout,
   type XxgRect,
   type XxgShop,
 } from '../contract.ts'
+import { wellCollisionRegions, xxgIndoorWells, type XxgIndoorWell } from './stairwell.ts'
 
 export interface Aabb2D {
   readonly id: string
@@ -16,7 +16,7 @@ export interface Aabb2D {
 }
 
 export interface WalkableRegion2D extends Aabb2D {
-  readonly kind: 'corridor' | 'empty-shop'
+  readonly kind: 'corridor' | 'empty-shop' | 'stair'
 }
 
 export interface IndoorCollisionWorld {
@@ -28,6 +28,8 @@ export interface IndoorCollisionWorld {
   readonly walkableRegions: readonly WalkableRegion2D[]
   readonly shrunkWalkableRegions: readonly WalkableRegion2D[]
   readonly solidObstacles: readonly Aabb2D[]
+  /** The four walk-in stairwells: landing, doorway and vestibule are walkable, walls and the flight are solid. */
+  readonly wells: readonly XxgIndoorWell[]
 }
 
 export interface IndoorMoveResult {
@@ -110,6 +112,13 @@ function buildEmptyShopWalkableRegion(shop: XxgShop, corridorsById: ReadonlyMap<
   }
 }
 
+/** Shared with the scene builder so the drawn columns and the solid ones always match. */
+export function isColumnSkipped(layout: XxgLayout, wells: readonly XxgIndoorWell[], cx: number, cz: number): boolean {
+  if (layout.exits.some(e => Math.hypot(e.foot.x - cx, e.foot.z - cz) < 1.6)) return true
+  const m = layout.columns.size * 0.5 + 0.3
+  return wells.some(w => cx > w.footprint.minX - m && cx < w.footprint.maxX + m && cz > w.footprint.minZ - m && cz < w.footprint.maxZ + m)
+}
+
 export function buildIndoorCollisionWorld(
   layout: XxgLayout,
   radiusM: number = XXG_PLAYER.radius,
@@ -124,18 +133,6 @@ export function buildIndoorCollisionWorld(
     walkableRegions.push({ ...box, kind: 'corridor' })
   }
 
-  // Also ensure every exit foot has walkable connector pad to its nearest corridor
-  for (const ex of layout.exits) {
-    walkableRegions.push({
-      id: `exit-pad-${ex.portalId}`,
-      kind: 'corridor',
-      minX: ex.foot.x - 1.9,
-      maxX: ex.foot.x + 1.9,
-      minZ: ex.foot.z - 1.9,
-      maxZ: ex.foot.z + 1.9,
-    })
-  }
-
   const solidObstacles: Aabb2D[] = []
 
   for (const shop of layout.shops) {
@@ -147,18 +144,21 @@ export function buildIndoorCollisionWorld(
     }
   }
 
-  // Exit stairs are solid non-walkable AABBs per contract.ts:308
-  for (const ex of layout.exits) {
-    solidObstacles.push(rectToAabb(`stair-${ex.portalId}`, ex.stair))
+  // 真楼梯井：井底平台、门洞可走，门外没有走廊时补建的 B1 门厅也可走；两侧井壁、门两侧墙垛和平台以上整段楼梯是实心，
+  // 从井下穿过的 B1 走廊因此走不上台阶。
+  const wells = xxgIndoorWells()
+  const corridorBoxes = [...corridorsById.values()]
+  for (const w of wells) {
+    const regions = wellCollisionRegions(w, corridorBoxes)
+    for (const r of regions.walk) walkableRegions.push({ ...r, kind: r.id.endsWith('landing') ? 'stair' : 'corridor' })
+    solidObstacles.push(...regions.solid)
   }
 
-  // Structural column grid AABBs (only those overlapping walkable space matter, keep all for completeness)
+  // Structural column grid: columns next to an exit foot or inside a well footprint are not built.
   const halfCol = layout.columns.size * 0.5
   for (const cx of layout.columns.xs) {
     for (const cz of layout.columns.zs) {
-      // Skip columns that would overlap within 1.2m of an exit foot
-      const nearExit = layout.exits.some(e => Math.hypot(e.foot.x - cx, e.foot.z - cz) < 1.2 + halfCol)
-      if (nearExit) continue
+      if (isColumnSkipped(layout, wells, cx, cz)) continue
       solidObstacles.push({
         id: `col-${cx}-${cz}`,
         minX: cx - halfCol,
@@ -188,6 +188,7 @@ export function buildIndoorCollisionWorld(
     walkableRegions: Object.freeze(walkableRegions),
     shrunkWalkableRegions: Object.freeze(shrunkWalkableRegions),
     solidObstacles: Object.freeze(solidObstacles),
+    wells,
   })
 }
 
@@ -274,6 +275,8 @@ export function resolveIndoorMovement(
   startZ: number,
   deltaX: number,
   deltaZ: number,
+  /** Moving solids for this step only (the sliding well doors). */
+  extraObstacles: readonly Aabb2D[] = [],
 ): IndoorMoveResult {
   const totalDist = Math.hypot(deltaX, deltaZ)
   const steps = Math.max(1, Math.ceil(totalDist / 0.1))
@@ -296,13 +299,15 @@ export function resolveIndoorMovement(
         hitSet.add('perimeter-wall')
       }
       let obsHit = false
-      for (const obs of world.solidObstacles) {
-        const res = pushCircleOutOfAabb(x, z, world.radiusM, obs)
-        if (res.hit) {
-          x = res.x
-          z = res.z
-          hitSet.add(obs.id)
-          obsHit = true
+      for (const list of [world.solidObstacles, extraObstacles]) {
+        for (const obs of list) {
+          const res = pushCircleOutOfAabb(x, z, world.radiusM, obs)
+          if (res.hit) {
+            x = res.x
+            z = res.z
+            hitSet.add(obs.id)
+            obsHit = true
+          }
         }
       }
       if (!obsHit) break
@@ -316,10 +321,12 @@ export function resolveIndoorMovement(
     }
   }
 
+  // 室内只在 B1 地面走：台阶由世界场景负责，井底平台与 B1 同高。
+  const footY = 0
   const eyeY = Math.min(world.eyeHeightM, world.ceilingHeightM - 0.45)
   return {
     x,
-    y: 0,
+    y: footY,
     z,
     eyeY,
     ceilingClearanceM: Math.round((world.ceilingHeightM - eyeY) * 1000) / 1000,
@@ -331,28 +338,4 @@ export function resolveIndoorMovement(
 
 export function clampIndoorPitch(world: IndoorCollisionWorld, pitchRad: number): number {
   return Math.max(world.minPitchRad, Math.min(world.maxPitchRad, pitchRad))
-}
-
-/**
- * Checks whether the player is within exitTriggerRadius (1.5m) of any indoor exit foot
- * AND moving outward toward that exit's stairwell.
- */
-export function findTriggeredExit(
-  layout: XxgLayout,
-  x: number,
-  z: number,
-  vx: number,
-  vz: number,
-  triggerRadiusM: number = XXG_PLAYER.exitTriggerRadius,
-): XxgExit | null {
-  for (const ex of layout.exits) {
-    const dist = Math.hypot(x - ex.foot.x, z - ex.foot.z)
-    if (dist > triggerRadiusM) continue
-    const toStairX = ex.stair.x - ex.foot.x
-    const toStairZ = ex.stair.z - ex.foot.z
-    const len = Math.hypot(toStairX, toStairZ) || 1
-    const dot = vx * (toStairX / len) + vz * (toStairZ / len)
-    if (dot > 0.05) return ex
-  }
-  return null
 }

@@ -4,29 +4,25 @@ import {
   SZJ_FRAME,
   SZJ_PLAYER,
   SZJ_STAIRWELLS,
-  SZJ_TIMING,
-  SZJ_TRIGGER,
   getStairwell,
   indoorToStairLocal,
-  shouldExitStair,
-  stairEntryPose,
-  stairLanding,
+  indoorToWorld,
+  stairLocalToIndoor,
   validateSzjLayout,
+  worldToIndoor,
   yawFacing,
   type SzjHostContext,
   type SzjIndoorMetrics,
   type SzjShop,
   type SzjStairId,
   type SzjStairwell,
+  type SzjXZ,
 } from '../contract.ts'
+import { SZJ_LANDING } from '../frame.ts'
+import { SZJ_STAIR_DOOR, szjDoorCentre } from '../look/stairwell-geometry.ts'
 import { SHIZIJIE_B1_LAYOUT } from '../layout/index.ts'
 import { buildSzjWayfinding, type SzjHangingSign } from '../wayfinding/index.ts'
-import {
-  createStairEyeSmoother,
-  createStairLocomotionAdapter,
-  projectWorldToStair,
-  type StairPlacement,
-} from '../../locomotion/stairs/index.ts'
+import { createStairEyeSmoother, projectWorldToStair, type StairPlacement } from '../../locomotion/stairs/index.ts'
 import {
   buildSzjCollisionWorld,
   clampSzjPitch,
@@ -50,10 +46,24 @@ const LOOK_SENSITIVITY_RAD_PER_PX = 0.0026
 const KEY_TURN_RAD_PER_SEC = 1.85
 const INDOOR_CAMERA_NEAR = 0.08
 const INDOOR_CAMERA_FAR = 160
+/** walk/config pitch: the street walker's level first-person tilt (walk/camera placeFirstPersonCamera). */
+const WALKER_LEVEL_PITCH = 0.3
+/** walk/camera placeFirstPersonCamera: the lens sits this far ahead of the eye along the view. */
+const EYE_FORWARD_M = 0.08
+/** Indoor FOV and run pace match the street on a landing and fade to indoor values by FAR (m). */
+const LANDING_MATCH_NEAR_M = 2.4
+const LANDING_MATCH_FAR_M = 7
+/** Street walker depth below grade (m) where the camera starts easing into first person / is fully there. */
+const VIEW_BLEND_START_M = 0.6
+const VIEW_BLEND_FULL_M = 3.4
+/** The shutter keeps the eye this far off its plane (m) until it has rolled up past head height. */
+const SHUTTER_STANDOFF_M = 0.2
+/** Eased roll-up progress at which the shutter clears passOpen. */
+const SHUTTER_PASS_PROGRESS = 0.7
 
-function sleepMs(ms: number): Promise<void> {
-  if (ms <= 0) return Promise.resolve()
-  return new Promise(resolve => setTimeout(resolve, ms))
+function smoothstep(edge0: number, edge1: number, x: number): number {
+  const t = Math.min(1, Math.max(0, (x - edge0) / (edge1 - edge0)))
+  return t * t * (3 - 2 * t)
 }
 
 function isEditableTarget(target: EventTarget | null): boolean {
@@ -70,25 +80,6 @@ function isOverlayBlockingHud(): boolean {
     document.body.dataset?.photo === 'on' ||
     document.body.hasAttribute('data-photo')
   )
-}
-
-function makeDescentPlacement(st: SzjStairwell): StairPlacement {
-  return {
-    origin: { x: st.topIndoor.x, y: SZJ_FRAME.depth, z: st.topIndoor.z },
-    yawRad: yawFacing(st.inward),
-    profile: {
-      riser: st.profile.riser,
-      tread: st.profile.tread,
-      count: st.profile.count,
-      width: st.width,
-      baseY: SZJ_FRAME.depth,
-      direction: 'down',
-      landing: {
-        entry: st.profile.landingTop * 0.5,
-        exit: st.profile.landingFoot,
-      },
-    },
-  }
 }
 
 function makeInteractivePlacement(st: SzjStairwell): StairPlacement {
@@ -111,10 +102,11 @@ function makeInteractivePlacement(st: SzjStairwell): StairPlacement {
 }
 
 /**
- * 十字街地下街 B1 室内运行时控制器（严格实现 contract.ts v1 SzjIndoorScene）：
- * 1) 4 座楼梯触发口进入时锁定输入、强制切独立第一人称相机，经 locomotion/stairs 平滑下楼（Δy <= 0.08m/帧）；
- * 2) 室内独立 THREE.Scene + 折线通道/斜向梯井/28 铺碰撞 + 48 名非交互人气 NPC，不依赖城市 terrain / world.ts；
- * 3) 玩家沿任一楼梯上行至顶部平台平滑触发 shouldExitStair（或近口按 E），还原地面精确落点与原视角。
+ * 十字街地下街 B1 室内运行时控制器（contract.ts SzjIndoorScene）：
+ * 1) 街上行人自己走下真楼梯井，到底部平台越过 SZJ_LANDING.enter 线的同一帧换进 B1：位置、朝向、俯仰、
+ *    眼高、FOV 全部沿用，不黑屏、不过场；底部卷帘门随人靠近卷起；
+ * 2) 室内独立 THREE.Scene + 折线通道/斜向梯井碰撞 + 非交互人气 NPC，不依赖城市 terrain / world.ts；
+ * 3) 往回走过卷帘门、退到 SZJ_LANDING.exit 线即同帧把原姿态交还街上行人，接着走真楼梯上去。
  */
 export function createSzjIndoorScene(opts: CreateSzjIndoorSceneOptions = {}): SzjExtendedIndoorScene {
   const defaultCandidate = opts.layout ?? SHIZIJIE_B1_LAYOUT
@@ -132,28 +124,27 @@ export function createSzjIndoorScene(opts: CreateSzjIndoorSceneOptions = {}): Sz
         : buildContractDerivedSzjLayout()
 
   const nowFn = opts.now ?? (() => performance.now())
-  const veilFadeInMs = Math.max(0, opts.veilFadeInMs ?? SZJ_TIMING.veilFadeInMs)
-  const reenterCooldownMs = Math.max(0, opts.reenterCooldownMs ?? SZJ_TIMING.reenterCooldownMs)
-  const descentSpeed = Math.max(0.2, opts.descentSpeed ?? SZJ_TIMING.descentSpeed)
-  const entryPitchRad = (SZJ_PLAYER.entryPitchDeg * Math.PI) / 180
 
   const collisionWorld = buildSzjCollisionWorld(layout, SZJ_PLAYER.radius, SZJ_PLAYER.eyeHeight)
   const wayfinding = buildSzjWayfinding(layout)
-  const machine = createSzjRuntimeStateMachine(SZJ_STAIRWELLS, reenterCooldownMs)
+  const machine = createSzjRuntimeStateMachine(SZJ_STAIRWELLS)
 
-  const stairAdapter = createStairLocomotionAdapter({
-    eyeOffset: SZJ_PLAYER.eyeHeight,
-    maxDeltaYPerFrame: SZJ_BUDGET.eyeDyPerFrameMax,
-  })
   const flatEyeSmoother = createStairEyeSmoother({
     eyeOffset: SZJ_PLAYER.eyeHeight,
     maxDeltaYPerFrame: SZJ_BUDGET.eyeDyPerFrameMax,
   })
 
   const interactivePlacements = new Map<SzjStairId, StairPlacement>()
+  const doorCentres = new Map<SzjStairId, SzjXZ>()
+  /** Swap stations on each bottom landing (indoor x/z): FOV / pace matching is measured from here. */
+  const landingStations: SzjXZ[] = []
   for (const st of SZJ_STAIRWELLS) {
     interactivePlacements.set(st.id, makeInteractivePlacement(st))
+    doorCentres.set(st.id, szjDoorCentre(st))
+    landingStations.push(stairLocalToIndoor(st, { x: 0, z: st.length / 2 + SZJ_LANDING.enter }))
   }
+  /** Shutter roll-up progress per well, 0 closed .. 1 open (linear; eased when shown). */
+  const doorProgress = new Map<SzjStairId, number>(SZJ_STAIRWELLS.map(st => [st.id, 0]))
 
   const scene = new THREE.Scene()
   scene.name = 'szj-indoor-root'
@@ -167,7 +158,6 @@ export function createSzjIndoorScene(opts: CreateSzjIndoorSceneOptions = {}): Sz
 
   let hostCtx: SzjHostContext | null = null
   let contentHandle: SzjIndoorSceneHandle | null = null
-  let pendingExitStairId: SzjStairId | null = null
 
   const firstStair = SZJ_STAIRWELLS[0]!
   let playerX = firstStair.footIndoor.x
@@ -180,14 +170,16 @@ export function createSzjIndoorScene(opts: CreateSzjIndoorSceneOptions = {}): Sz
   let activeStairId: SzjStairId | null = null
   let activeShopId: string | null = null
   let collisionContacts = 0
-  let descentElapsedMs = 0
   let trackedInteractiveStairId: SzjStairId | null = null
+  /** Last value handed to host.setWorldViewBlend (undefined = never sent). */
+  let viewBlendSent: number | null | undefined
 
   let lastDrawCalls = 0
   let lastSwapMs = 0
   let lastBlackFrames = 0
   let lastMaxEyeDy = 0
   let currentTraverseMaxEyeDy = 0
+  /** Distance between the pose handed back and where the street walker actually resumed (m). */
   let lastLandingError = 0
 
   const pressedKeys = new Set<string>()
@@ -195,8 +187,6 @@ export function createSzjIndoorScene(opts: CreateSzjIndoorSceneOptions = {}): Sz
   let lastPointerX = 0
   let lastPointerY = 0
   let styleLinkEl: HTMLLinkElement | null = null
-  let rootEl: HTMLDivElement | null = null
-  let promptBtn: HTMLButtonElement | null = null
 
   function setBodyFlags(active: boolean): void {
     if (typeof document === 'undefined' || !document.body?.dataset) return
@@ -220,76 +210,106 @@ export function createSzjIndoorScene(opts: CreateSzjIndoorSceneOptions = {}): Sz
     }
   }
 
-  function nearestIndoorStair(px: number, pz: number): { stair: SzjStairwell; distToMouth: number } | null {
-    let best: SzjStairwell | null = null
-    let bestDist = Infinity
-    for (const st of SZJ_STAIRWELLS) {
-      const d = Math.hypot(px - st.topIndoor.x, pz - st.topIndoor.z)
-      if (d < bestDist) {
-        bestDist = d
-        best = st
-      }
-    }
-    return best ? { stair: best, distToMouth: bestDist } : null
+  function sendViewBlend(blend: number | null): void {
+    if (blend === viewBlendSent) return
+    viewBlendSent = blend
+    hostCtx?.setWorldViewBlend?.(blend)
   }
 
-  function syncPromptDom(): void {
-    if (!promptBtn) return
-    const st = machine.getState()
-    if (
-      st === 'disposed' ||
-      st === 'unmounted' ||
-      st === 'entering' ||
-      st === 'descending' ||
-      st === 'exiting' ||
-      isOverlayBlockingHud()
-    ) {
-      promptBtn.hidden = true
-      return
+  /** 1 on a bottom landing (match the street walker), 0 in the concourse proper. */
+  function landingMatch(): number {
+    let best = Infinity
+    for (const p of landingStations) best = Math.min(best, Math.hypot(playerX - p.x, playerZ - p.z))
+    return 1 - smoothstep(LANDING_MATCH_NEAR_M, LANDING_MATCH_FAR_M, best)
+  }
+
+  function doorOpen(id: SzjStairId): number {
+    const p = doorProgress.get(id) ?? 0
+    return p * p * (3 - 2 * p)
+  }
+
+  function resetDoors(): void {
+    for (const st of SZJ_STAIRWELLS) {
+      doorProgress.set(st.id, 0)
+      contentHandle?.setStairDoorOpen(st.id, 0)
     }
-    if (st === 'idle') {
-      const nearId = machine.getNearbyStairId()
-      if (!nearId) {
-        promptBtn.hidden = true
-        return
+  }
+
+  /**
+   * Shutters roll up while the player is near. A player hurrying at one rolls it faster, so it always clears
+   * head height before they reach SHUTTER_STANDOFF_M from it and nobody is stopped right after the swap.
+   */
+  function stepDoors(dt: number, vx: number, vz: number): void {
+    const d = SZJ_STAIR_DOOR
+    for (const st of SZJ_STAIRWELLS) {
+      const c = doorCentres.get(st.id)!
+      const toX = c.x - playerX
+      const toZ = c.z - playerZ
+      const dist = Math.hypot(toX, toZ)
+      const prev = doorProgress.get(st.id) ?? 0
+      let next: number
+      if (dist <= d.triggerM) {
+        const approach = dist > 1e-6 ? (vx * toX + vz * toZ) / dist : 0
+        const gap = Math.max(0.05, dist - SHUTTER_STANDOFF_M)
+        const rate = Math.max(1 / d.travelS, approach > 0 ? (SHUTTER_PASS_PROGRESS * approach) / gap : 0)
+        next = Math.min(1, prev + dt * rate)
+      } else {
+        next = Math.max(0, prev - dt / d.travelS)
       }
-      const sw = getStairwell(nearId)
-      promptBtn.dataset.szjAction = 'enter'
-      promptBtn.dataset.stairId = sw.id
-      promptBtn.textContent = '[E] 进入'
-      promptBtn.setAttribute('aria-label', `进入${sw.label}`)
-      promptBtn.hidden = false
-      return
+      if (next === prev) continue
+      doorProgress.set(st.id, next)
+      contentHandle?.setStairDoorOpen(st.id, doorOpen(st.id))
     }
-    if (st === 'inside') {
-      const near = nearestIndoorStair(playerX, playerZ)
-      if (near && near.distToMouth <= near.stair.width) {
-        promptBtn.dataset.szjAction = 'exit'
-        promptBtn.dataset.stairId = near.stair.id
-        promptBtn.textContent = '[E] 离开'
-        promptBtn.setAttribute('aria-label', `离开至${near.stair.label}`)
-        promptBtn.hidden = false
-        return
-      }
+  }
+
+  /** A shutter that has not rolled past head height keeps the eye SHUTTER_STANDOFF_M off its plane. */
+  function blockShutters(prevX: number, prevZ: number, x: number, z: number): { x: number; z: number; hit: boolean } {
+    for (const st of SZJ_STAIRWELLS) {
+      if (doorOpen(st.id) >= SZJ_STAIR_DOOR.passOpen) continue
+      const l = indoorToStairLocal(st, { x, z })
+      if (Math.abs(l.x) > st.width / 2) continue
+      const doorLz = st.length / 2 + SZJ_LANDING.door
+      const prevLz = indoorToStairLocal(st, { x: prevX, z: prevZ }).z
+      let lz = l.z
+      if (prevLz <= doorLz && lz > doorLz - SHUTTER_STANDOFF_M) lz = Math.max(Math.min(prevLz, lz), doorLz - SHUTTER_STANDOFF_M)
+      else if (prevLz > doorLz && lz < doorLz + SHUTTER_STANDOFF_M) lz = Math.min(Math.max(prevLz, lz), doorLz + SHUTTER_STANDOFF_M)
+      if (lz === l.z) continue
+      const p = stairLocalToIndoor(st, { x: l.x, z: lz })
+      return { x: p.x, z: p.z, hit: true }
     }
-    promptBtn.hidden = true
+    return { x, z, hit: false }
   }
 
   function syncIndoorCamera(): void {
-    const worldAspect = hostCtx?.worldCamera?.aspect
+    const worldCam = hostCtx?.worldCamera
+    const worldAspect = worldCam?.aspect
+    let projectionDirty = false
     if (worldAspect && Number.isFinite(worldAspect) && Math.abs(camera.aspect - worldAspect) > 1e-4) {
       camera.aspect = worldAspect
-      camera.updateProjectionMatrix()
+      projectionDirty = true
     }
+    const streetFov = worldCam && Number.isFinite(worldCam.fov) ? worldCam.fov : SZJ_PLAYER.fovDeg
+    const fov = SZJ_PLAYER.fovDeg + (streetFov - SZJ_PLAYER.fovDeg) * landingMatch()
+    if (Math.abs(camera.fov - fov) > 1e-3) {
+      camera.fov = fov
+      projectionDirty = true
+    }
+    if (projectionDirty) camera.updateProjectionMatrix()
+    // Same lens placement as walk/camera placeFirstPersonCamera: a few cm in front of the eye along the view.
+    const cp = Math.cos(playerPitch)
     camera.rotation.order = 'YXZ'
-    camera.position.set(playerX, playerEyeY, playerZ)
     camera.rotation.set(playerPitch, playerYaw, 0, 'YXZ')
+    camera.position.set(
+      playerX - Math.sin(playerYaw) * cp * EYE_FORWARD_M,
+      playerEyeY + Math.sin(playerPitch) * EYE_FORWARD_M,
+      playerZ - Math.cos(playerYaw) * cp * EYE_FORWARD_M,
+    )
     camera.updateMatrixWorld(true)
   }
 
   function renderFrame(): boolean {
     const st = machine.getState()
-    if ((st !== 'descending' && st !== 'inside' && st !== 'exiting') || !contentHandle) return false
+    if ((st !== 'inside' && st !== 'exiting') || !contentHandle) return false
     syncIndoorCamera()
     if (hostCtx?.renderer) {
       hostCtx.renderer.info.reset()
@@ -306,30 +326,7 @@ export function createSzjIndoorScene(opts: CreateSzjIndoorSceneOptions = {}): Sz
     if (st === 'disposed' || st === 'unmounted') return
     if (e.metaKey || e.ctrlKey || e.altKey) return
     if (isEditableTarget(e.target) || isOverlayBlockingHud()) return
-
-    if (e.code !== 'KeyE') {
-      pressedKeys.add(e.code)
-    }
-
-    // Lock movement & interaction triggers while entering / descending / exiting
-    if (st === 'entering' || st === 'descending' || st === 'exiting') {
-      e.preventDefault?.()
-      return
-    }
-
-    if (!e.repeat && e.code === 'KeyE') {
-      if (st === 'idle' && machine.getNearbyStairId()) {
-        e.preventDefault()
-        void enter(machine.getNearbyStairId()!)
-      } else if (st === 'inside') {
-        const near = nearestIndoorStair(playerX, playerZ)
-        if (near && near.distToMouth <= near.stair.width) {
-          e.preventDefault()
-          pendingExitStairId = near.stair.id
-          void exit()
-        }
-      }
-    }
+    pressedKeys.add(e.code)
   }
 
   function onKeyUp(e: KeyboardEvent): void {
@@ -344,7 +341,6 @@ export function createSzjIndoorScene(opts: CreateSzjIndoorSceneOptions = {}): Sz
   function onPointerDown(e: PointerEvent): void {
     if (machine.getState() !== 'inside') return
     if (e.button !== 0) return
-    if (promptBtn && e.target instanceof Node && promptBtn.contains(e.target)) return
     draggingLook = true
     lastPointerX = e.clientX
     lastPointerY = e.clientY
@@ -383,28 +379,6 @@ export function createSzjIndoorScene(opts: CreateSzjIndoorSceneOptions = {}): Sz
       }
     }
 
-    rootEl = document.createElement('div')
-    rootEl.className = 'szj-root'
-    rootEl.dataset.szjRoot = '1'
-
-    promptBtn = document.createElement('button')
-    promptBtn.type = 'button'
-    promptBtn.className = 'szj-prompt'
-    promptBtn.hidden = true
-    promptBtn.addEventListener('click', () => {
-      const action = promptBtn?.dataset.szjAction
-      const sid = promptBtn?.dataset.stairId
-      if (action === 'enter' && isValidStairId(sid)) {
-        void enter(sid)
-      } else if (action === 'exit') {
-        if (isValidStairId(sid)) pendingExitStairId = sid
-        void exit()
-      }
-    })
-
-    rootEl.append(promptBtn)
-    document.body.append(rootEl)
-
     window.addEventListener('keydown', onKeyDown)
     window.addEventListener('keyup', onKeyUp)
     window.addEventListener('blur', onWindowBlur)
@@ -424,11 +398,7 @@ export function createSzjIndoorScene(opts: CreateSzjIndoorSceneOptions = {}): Sz
       window.removeEventListener('pointerup', onPointerUp, true)
       window.removeEventListener('pointercancel', onPointerUp, true)
     }
-    promptBtn?.remove()
-    rootEl?.remove()
     styleLinkEl?.remove()
-    promptBtn = null
-    rootEl = null
     styleLinkEl = null
     pressedKeys.clear()
     draggingLook = false
@@ -448,351 +418,286 @@ export function createSzjIndoorScene(opts: CreateSzjIndoorSceneOptions = {}): Sz
     scene.background = contentHandle.scene.background
     scene.fog = contentHandle.scene.fog
     scene.add(contentHandle.scene)
+    resetDoors()
     syncIndoorCamera()
-    try {
-      const compilable = ctx.renderer as unknown as {
-        compile?: (targetScene: THREE.Object3D, targetCam: THREE.Camera) => void
-      }
-      compilable.compile?.(scene, camera)
-    } catch {
-      // Headless mock renderers may omit WebGLRenderer.compile
-    }
     mountDomAndListeners()
     machine.transitionTo('idle')
+    await prewarmGpu(ctx.renderer)
   }
 
-  async function enter(stairId: SzjStairId): Promise<boolean> {
-    if (!isValidStairId(stairId) || !hostCtx || !contentHandle) return false
-    if (!machine.transitionTo('entering')) return false
-
-    const stairDef = getStairwell(stairId)
-    pressedKeys.clear()
-    draggingLook = false
-    setBodyFlags(true)
-    syncPromptDom()
-
-    const veilHandle = hostCtx.openVeil(stairDef.label)
+  /** Compile shaders and upload textures at mount (still on the street), so the swap frame only renders. */
+  async function prewarmGpu(renderer: THREE.WebGLRenderer): Promise<void> {
     try {
-      await sleepMs(veilFadeInMs)
-      if (machine.getState() !== 'entering') {
-        setBodyFlags(false)
-        void veilHandle.done()
-        return false
-      }
-
-      const swapStart = nowFn()
-      machine.setActiveStairId(stairId)
-      pendingExitStairId = stairId
-      hostCtx.suspendWorld()
-
-      const entryPose = stairEntryPose(stairDef)
-      const placement = makeDescentPlacement(stairDef)
-      const initialFrame = stairAdapter.startScripted({
-        placement,
-        profile: placement.profile,
-        speed: descentSpeed,
-        eyeOffset: SZJ_PLAYER.eyeHeight,
-        maxDeltaYPerFrame: SZJ_BUDGET.eyeDyPerFrameMax,
+      const textures = new Set<THREE.Texture>()
+      scene.traverse(obj => {
+        const mat = (obj as THREE.Mesh).material
+        for (const m of Array.isArray(mat) ? mat : mat ? [mat] : []) {
+          for (const v of Object.values(m)) if ((v as THREE.Texture | null)?.isTexture) textures.add(v as THREE.Texture)
+        }
       })
-
-      playerX = initialFrame.position.x
-      playerFootY = initialFrame.position.y
-      playerZ = initialFrame.position.z
-      playerEyeY = initialFrame.eyeY
-      playerYaw = entryPose.yaw
-      playerPitch = entryPitchRad
-      activeStairId = stairId
-      activeShopId = null
-      descentElapsedMs = 0
-      trackedInteractiveStairId = null
-      currentTraverseMaxEyeDy = 0
-      lastMaxEyeDy = 0
-
-      syncIndoorCamera()
-      if (!machine.transitionTo('descending')) {
-        setBodyFlags(false)
-        void veilHandle.done()
-        return false
-      }
-
-      renderFrame()
-      lastSwapMs = Math.max(0, Math.round((nowFn() - swapStart) * 100) / 100)
-      lastBlackFrames = 0
-      syncPromptDom()
-
-      await veilHandle.done()
-      return true
+      if (typeof renderer.initTexture === 'function') for (const t of textures) renderer.initTexture(t)
+      if (typeof renderer.compileAsync === 'function') await renderer.compileAsync(scene, camera)
+      else if (typeof renderer.compile === 'function') renderer.compile(scene, camera)
     } catch {
-      if (machine.getState() === 'entering') {
-        setBodyFlags(false)
-        machine.setActiveStairId(null)
-        machine.transitionTo('idle')
-      }
-      await veilHandle.done().catch(() => {})
-      return false
+      // Headless mock renderers may omit these; the first indoor frame compiles instead.
     }
   }
 
-  async function exit(): Promise<boolean> {
-    if (!hostCtx) return false
-    if (!machine.transitionTo('exiting')) return false
-
-    const targetStairId: SzjStairId = pendingExitStairId ?? activeStairId ?? machine.getActiveStairId() ?? 'nw'
-    const stairDef = getStairwell(targetStairId)
-    pressedKeys.clear()
+  /** Swap into B1 this frame with an exact pose (indoor x/z, indoor foot y, host yaw, indoor pitch). */
+  function swapIn(st: SzjStairwell, x: number, z: number, footY: number, yaw: number, pitch: number): boolean {
+    if (!hostCtx || !contentHandle) return false
+    if (!machine.transitionTo('entering')) return false
+    const swapStart = nowFn()
+    const settled = resolveSzjIndoorMovement(collisionWorld, layout, x, z, SZJ_FRAME.indoorFloorY, 0, 0)
+    playerX = settled.x
+    playerZ = settled.z
+    playerFootY = settled.footY
+    activeShopId = settled.activeShopId
+    activeStairId = settled.activeStair?.id ?? null
+    trackedInteractiveStairId = null
+    // The street feet may sit a few cm off the B1 floor; start the eye there and let the smoother level it.
+    const eye = flatEyeSmoother.reset(footY, 0)
+    playerEyeY = eye.eyeY
+    playerYaw = normalizeAngleRad(yaw)
+    playerPitch = clampSzjPitch(collisionWorld, pitch)
+    currentTraverseMaxEyeDy = 0
     draggingLook = false
-    syncPromptDom()
-
-    const veilHandle = hostCtx.openVeil(stairDef.label)
-    try {
-      await sleepMs(veilFadeInMs)
-      if (machine.getState() !== 'exiting') {
-        void veilHandle.done()
-        return false
-      }
-
-      const landing = stairLanding(stairDef)
+    resetDoors()
+    machine.setActiveStairId(st.id)
+    setBodyFlags(true)
+    hostCtx.suspendWorld()
+    syncIndoorCamera()
+    if (!machine.transitionTo('inside')) {
       setBodyFlags(false)
-      stairAdapter.reset()
-      trackedInteractiveStairId = null
-
-      const resumed = await hostCtx.resumeWorldAt(landing)
-      if (!resumed) {
-        setBodyFlags(true)
-        machine.transitionTo('inside')
-        await veilHandle.done().catch(() => {})
-        return false
-      }
-
-      if (machine.getState() !== 'exiting') {
-        void veilHandle.done()
-        return false
-      }
-
-      const walkerAfter = hostCtx.getWalker()
-      lastLandingError = walkerAfter
-        ? Math.round(Math.hypot(walkerAfter.position.x - landing.x, walkerAfter.position.z - landing.z) * 10000) / 10000
-        : 0
-
-      machine.markStairExitCooldown(targetStairId, nowFn(), reenterCooldownMs)
       machine.setActiveStairId(null)
-      pendingExitStairId = null
-      activeStairId = null
-      activeShopId = null
-      // Preserve lastSwapMs from enter() per contract.ts §4 (enter swapBudgetMs <= 300ms)
-      lastBlackFrames = 0
-
       machine.transitionTo('idle')
-      syncPromptDom()
-      await veilHandle.done()
-      return true
-    } catch {
-      if (machine.getState() === 'exiting') {
-        setBodyFlags(true)
-        machine.transitionTo('inside')
-      }
-      await veilHandle.done().catch(() => {})
       return false
     }
+    lastSwapMs = Math.max(0, Math.round((nowFn() - swapStart) * 100) / 100)
+    lastBlackFrames = 0
+    return true
+  }
+
+  /** Street walker reached the bottom landing of a well: take over with the walker's own pose. */
+  function enterFromStairs(
+    st: SzjStairwell,
+    walker: { position: { x: number; y: number; z: number }; yaw?: number; pitch?: number },
+  ): boolean {
+    const indoor = worldToIndoor(walker.position)
+    return swapIn(
+      st,
+      indoor.x,
+      indoor.z,
+      walker.position.y - (st.groundY - SZJ_FRAME.depth),
+      walker.yaw ?? yawFacing(st.inward),
+      WALKER_LEVEL_PITCH - (walker.pitch ?? WALKER_LEVEL_PITCH),
+    )
+  }
+
+  /** Player walked back past the shutter to the exit line: hand the exact pose to the street walker, same frame. */
+  function exitToStairs(st: SzjStairwell): boolean {
+    const host = hostCtx
+    if (!host) return false
+    if (!machine.transitionTo('exiting')) return false
+    const swapStart = nowFn()
+    const world = indoorToWorld({ x: playerX, z: playerZ })
+    draggingLook = false
+    setBodyFlags(false)
+    sendViewBlend(1)
+    void host
+      .resumeWorldAt({
+        x: world.x,
+        z: world.z,
+        footY: playerFootY + st.groundY - SZJ_FRAME.depth,
+        yaw: playerYaw,
+        pitch: WALKER_LEVEL_PITCH - playerPitch,
+      })
+      .catch(() => false)
+    const resumed = host.getWalker()
+    lastLandingError = resumed
+      ? Math.round(Math.hypot(resumed.position.x - world.x, resumed.position.z - world.z) * 10000) / 10000
+      : 0
+    machine.setActiveStairId(null)
+    activeStairId = null
+    activeShopId = null
+    trackedInteractiveStairId = null
+    machine.transitionTo('idle')
+    lastSwapMs = Math.max(0, Math.round((nowFn() - swapStart) * 100) / 100)
+    lastBlackFrames = 0
+    return true
+  }
+
+  /** Probe/test entry: stand on that well's bottom landing just past the swap line, facing the concourse. */
+  async function enter(stairId: SzjStairId): Promise<boolean> {
+    if (!isValidStairId(stairId) || machine.getState() !== 'idle') return false
+    const st = getStairwell(stairId)
+    const at = stairLocalToIndoor(st, { x: 0, z: st.length / 2 + SZJ_LANDING.enter + 0.05 })
+    return swapIn(st, at.x, at.z, SZJ_FRAME.indoorFloorY, yawFacing(st.inward), 0)
+  }
+
+  /** Probe/test exit: back on the street walker at the nearest well's exit line, facing up the stairs. */
+  async function exit(): Promise<boolean> {
+    if (machine.getState() !== 'inside') return false
+    let best = SZJ_STAIRWELLS[0]!
+    let bestD = Infinity
+    for (const st of SZJ_STAIRWELLS) {
+      const d = Math.hypot(playerX - st.footIndoor.x, playerZ - st.footIndoor.z)
+      if (d < bestD) {
+        bestD = d
+        best = st
+      }
+    }
+    const at = stairLocalToIndoor(best, { x: 0, z: best.length / 2 + SZJ_LANDING.exit - 0.05 })
+    playerX = at.x
+    playerZ = at.z
+    playerFootY = SZJ_FRAME.indoorFloorY
+    playerYaw = yawFacing({ x: -best.inward.x, z: -best.inward.z })
+    playerPitch = 0
+    return exitToStairs(best)
+  }
+
+  /** On the street: ease the walker into first person down a well, swap in on its bottom landing. */
+  function stepSurface(): void {
+    const walker = hostCtx?.getWalker() ?? null
+    if (!walker) {
+      sendViewBlend(null)
+      return
+    }
+    const indoor = worldToIndoor(walker.position)
+    for (const st of SZJ_STAIRWELLS) {
+      const l = indoorToStairLocal(st, indoor)
+      const hl = st.length / 2
+      if (Math.abs(l.x) > st.width / 2 + 0.3 || l.z < -hl - 0.5 || l.z > hl + SZJ_LANDING.door + 0.3) continue
+      const depth = st.groundY - walker.position.y
+      sendViewBlend(smoothstep(VIEW_BLEND_START_M, VIEW_BLEND_FULL_M, depth))
+      if (l.z >= hl + SZJ_LANDING.enter && Math.abs(l.x) <= st.width / 2 && depth >= SZJ_FRAME.depth - 0.6) {
+        enterFromStairs(st, walker)
+      }
+      return
+    }
+    sendViewBlend(null)
   }
 
   function step(dtSeconds: number): void {
     const st = machine.getState()
     if (st === 'disposed' || st === 'unmounted' || !hostCtx) return
     const rawDt = Number.isFinite(dtSeconds) ? Math.max(0, Math.min(0.1, dtSeconds)) : 0
-    const nowMs = nowFn()
 
     if (st === 'idle') {
-      const walker = hostCtx.getWalker()
-      if (walker) {
-        const res = machine.detectSurfaceEntry(walker.position, walker.velocity, nowMs)
-        syncPromptDom()
-        if (res.triggeredStair) {
-          void enter(res.triggeredStair.id)
+      stepSurface()
+      return
+    }
+    if (st !== 'inside') return
+
+    contentHandle?.crowd.step(rawDt)
+    contentHandle?.atmos.step(rawDt)
+
+    if (pressedKeys.has('ArrowLeft')) {
+      playerYaw = normalizeAngleRad(playerYaw + KEY_TURN_RAD_PER_SEC * rawDt)
+    }
+    if (pressedKeys.has('ArrowRight')) {
+      playerYaw = normalizeAngleRad(playerYaw - KEY_TURN_RAD_PER_SEC * rawDt)
+    }
+
+    let forwardAxis = 0
+    let strafeAxis = 0
+    if (pressedKeys.has('KeyW') || pressedKeys.has('ArrowUp')) forwardAxis += 1
+    if (pressedKeys.has('KeyS') || pressedKeys.has('ArrowDown')) forwardAxis -= 1
+    if (pressedKeys.has('KeyD')) strafeAxis += 1
+    if (pressedKeys.has('KeyA')) strafeAxis -= 1
+
+    const isRunning = pressedKeys.has('ShiftLeft') || pressedKeys.has('ShiftRight')
+    // Running keeps the street pace on a landing so the swap never brakes the walker.
+    const baseSpeed = isRunning
+      ? SZJ_PLAYER.runSpeed + (SZJ_PLAYER.streetRunSpeed - SZJ_PLAYER.runSpeed) * landingMatch()
+      : SZJ_PLAYER.walkSpeed
+
+    const fx = -Math.sin(playerYaw)
+    const fz = -Math.cos(playerYaw)
+    const rx = Math.cos(playerYaw)
+    const rz = -Math.sin(playerYaw)
+
+    let dirX = fx * forwardAxis + rx * strafeAxis
+    let dirZ = fz * forwardAxis + rz * strafeAxis
+    const dirLen = Math.hypot(dirX, dirZ)
+    if (dirLen > 1e-6) {
+      dirX /= dirLen
+      dirZ /= dirLen
+    }
+
+    const maxSubDt = 1 / 60
+    const subSteps = Math.max(1, Math.ceil(rawDt / maxSubDt))
+    const subDt = rawDt / subSteps
+
+    for (let i = 0; i < subSteps; i++) {
+      const preMoveStair = activeStairId ? getStairwell(activeStairId) : null
+      const preLz = preMoveStair ? indoorToStairLocal(preMoveStair, { x: playerX, z: playerZ }).z : null
+      const stairScale = getStairSpeedScale(preMoveStair, preLz, dirX, dirZ)
+      const effSpeed = dirLen > 1e-6 ? baseSpeed * stairScale : 0
+      const cmdVx = dirX * effSpeed
+      const cmdVz = dirZ * effSpeed
+
+      stepDoors(subDt, cmdVx, cmdVz)
+      const moved = resolveSzjIndoorMovement(
+        collisionWorld,
+        layout,
+        playerX,
+        playerZ,
+        playerFootY,
+        cmdVx * subDt,
+        cmdVz * subDt,
+      )
+      const held = blockShutters(playerX, playerZ, moved.x, moved.z)
+
+      if (moved.hitWall || held.hit) collisionContacts += 1
+      playerX = held.x
+      playerZ = held.z
+      playerFootY = moved.footY
+      ceilingClearanceM = moved.ceilingClearanceM
+      activeShopId = moved.activeShopId
+
+      const prevEye = playerEyeY
+      if (moved.activeStair) {
+        const sw = moved.activeStair
+        const placement = interactivePlacements.get(sw.id)!
+        const proj = projectWorldToStair(placement, { x: playerX, y: playerFootY, z: playerZ })
+        if (trackedInteractiveStairId !== sw.id) {
+          flatEyeSmoother.reset(playerEyeY - SZJ_PLAYER.eyeHeight, 0)
+          trackedInteractiveStairId = sw.id
         }
+        playerEyeY = flatEyeSmoother.step(proj.sample, subDt).eyeY
+        activeStairId = sw.id
       } else {
-        syncPromptDom()
+        trackedInteractiveStairId = null
+        activeStairId = null
+        const flatSample = {
+          s: 0,
+          t: 0,
+          height: SZJ_FRAME.indoorFloorY,
+          slope: 0,
+          curvature: 0,
+          discreteHeight: SZJ_FRAME.indoorFloorY,
+          stepIndex: 0,
+          stepPhase: 0,
+          inclineRad: 0,
+          zone: 'exit-landing' as const,
+        }
+        playerEyeY = flatEyeSmoother.step(flatSample, subDt).eyeY
       }
-      return
+      recordEyeDelta(prevEye, playerEyeY)
+
+      if (moved.activeStair && dirLen > 1e-6) {
+        const sw = moved.activeStair
+        const l = indoorToStairLocal(sw, { x: playerX, z: playerZ })
+        const outward = cmdVx * sw.inward.x + cmdVz * sw.inward.z < 0
+        if (outward && Math.abs(l.x) <= sw.width / 2 && l.z <= sw.length / 2 + SZJ_LANDING.exit) {
+          exitToStairs(sw)
+          return
+        }
+      }
     }
 
-    if (st === 'descending') {
-      contentHandle?.crowd.step(rawDt)
-      contentHandle?.atmos.step(rawDt)
-      descentElapsedMs += rawDt * 1000
-      const activeId = machine.getActiveStairId() ?? 'nw'
-      const stairDef = getStairwell(activeId)
-
-      const maxSubDt = 1 / 60
-      const subSteps = Math.max(1, Math.ceil(rawDt / maxSubDt))
-      const subDt = rawDt / subSteps
-
-      for (let i = 0; i < subSteps; i++) {
-        const prevEye = playerEyeY
-        const stepped = stairAdapter.stepScripted(subDt)
-        if (!stepped) {
-          playerX = stairDef.footIndoor.x
-          playerZ = stairDef.footIndoor.z
-          playerFootY = SZJ_FRAME.indoorFloorY
-          playerEyeY = SZJ_FRAME.indoorFloorY + SZJ_PLAYER.eyeHeight
-          playerPitch = 0
-          flatEyeSmoother.reset(SZJ_FRAME.indoorFloorY, 0)
-          machine.transitionTo('inside')
-          break
-        }
-
-        const f = stepped.frame
-        playerX = f.position.x
-        playerFootY = f.position.y
-        playerZ = f.position.z
-        playerEyeY = f.eyeY
-        playerYaw = f.yawRad
-        // Ease camera pitch smoothly from entryPitchDeg (-18°) down the steps to 0° horizontal at B1 concourse
-        const levelOut = f.progress <= 0.7 ? 0 : (f.progress - 0.7) / 0.3
-        const smoothLevel = levelOut * levelOut * (3 - 2 * levelOut)
-        playerPitch = entryPitchRad * (1 - smoothLevel) + f.pitchBiasRad * (1 - smoothLevel)
-        recordEyeDelta(prevEye, playerEyeY)
-
-        if (f.done || descentElapsedMs >= SZJ_TIMING.descentMaxMs) {
-          const endPrevEye = playerEyeY
-          const targetEye = SZJ_FRAME.indoorFloorY + SZJ_PLAYER.eyeHeight
-          if (Math.abs(targetEye - endPrevEye) <= SZJ_BUDGET.eyeDyPerFrameMax + 1e-6) {
-            playerX = stairDef.footIndoor.x
-            playerZ = stairDef.footIndoor.z
-            playerFootY = SZJ_FRAME.indoorFloorY
-            playerEyeY = targetEye
-            playerPitch = 0
-            recordEyeDelta(endPrevEye, playerEyeY)
-            flatEyeSmoother.reset(SZJ_FRAME.indoorFloorY, 0)
-            activeStairId = null
-            machine.transitionTo('inside')
-            syncPromptDom()
-            break
-          }
-        }
-      }
-
-      syncIndoorCamera()
-      return
-    }
-
-    if (st === 'inside') {
-      contentHandle?.crowd.step(rawDt)
-      contentHandle?.atmos.step(rawDt)
-
-      if (pressedKeys.has('ArrowLeft')) {
-        playerYaw = normalizeAngleRad(playerYaw + KEY_TURN_RAD_PER_SEC * rawDt)
-      }
-      if (pressedKeys.has('ArrowRight')) {
-        playerYaw = normalizeAngleRad(playerYaw - KEY_TURN_RAD_PER_SEC * rawDt)
-      }
-
-      let forwardAxis = 0
-      let strafeAxis = 0
-      if (pressedKeys.has('KeyW') || pressedKeys.has('ArrowUp')) forwardAxis += 1
-      if (pressedKeys.has('KeyS') || pressedKeys.has('ArrowDown')) forwardAxis -= 1
-      if (pressedKeys.has('KeyD')) strafeAxis += 1
-      if (pressedKeys.has('KeyA')) strafeAxis -= 1
-
-      const isRunning = pressedKeys.has('ShiftLeft') || pressedKeys.has('ShiftRight')
-      const baseSpeed = isRunning ? SZJ_PLAYER.runSpeed : SZJ_PLAYER.walkSpeed
-
-      const fx = -Math.sin(playerYaw)
-      const fz = -Math.cos(playerYaw)
-      const rx = Math.cos(playerYaw)
-      const rz = -Math.sin(playerYaw)
-
-      let dirX = fx * forwardAxis + rx * strafeAxis
-      let dirZ = fz * forwardAxis + rz * strafeAxis
-      const dirLen = Math.hypot(dirX, dirZ)
-      if (dirLen > 1e-6) {
-        dirX /= dirLen
-        dirZ /= dirLen
-      }
-
-      const maxSubDt = 1 / 60
-      const subSteps = Math.max(1, Math.ceil(rawDt / maxSubDt))
-      const subDt = rawDt / subSteps
-
-      for (let i = 0; i < subSteps; i++) {
-        if (machine.getState() !== 'inside') break
-
-        const preMoveStair = activeStairId ? getStairwell(activeStairId) : null
-        const preLz = preMoveStair ? indoorToStairLocal(preMoveStair, { x: playerX, z: playerZ }).z : null
-        const stairScale = getStairSpeedScale(preMoveStair, preLz, dirX, dirZ)
-        const effSpeed = dirLen > 1e-6 ? baseSpeed * stairScale : 0
-
-        const cmdVx = dirX * effSpeed
-        const cmdVz = dirZ * effSpeed
-
-        const moved = resolveSzjIndoorMovement(
-          collisionWorld,
-          layout,
-          playerX,
-          playerZ,
-          playerFootY,
-          cmdVx * subDt,
-          cmdVz * subDt,
-        )
-
-        if (moved.hitWall) collisionContacts += 1
-        playerX = moved.x
-        playerZ = moved.z
-        playerFootY = moved.footY
-        ceilingClearanceM = moved.ceilingClearanceM
-        activeShopId = moved.activeShopId
-
-        const prevEye = playerEyeY
-        if (moved.activeStair) {
-          const sw = moved.activeStair
-          const placement = interactivePlacements.get(sw.id)!
-          const proj = projectWorldToStair(placement, { x: playerX, y: playerFootY, z: playerZ })
-          if (trackedInteractiveStairId !== sw.id) {
-            flatEyeSmoother.reset(playerEyeY - SZJ_PLAYER.eyeHeight, 0)
-            trackedInteractiveStairId = sw.id
-          }
-          const eyeState = flatEyeSmoother.step(proj.sample, subDt)
-          playerEyeY = eyeState.eyeY
-          activeStairId = sw.id
-        } else {
-          trackedInteractiveStairId = null
-          activeStairId = null
-          const flatSample = {
-            s: 0,
-            t: 0,
-            height: SZJ_FRAME.indoorFloorY,
-            slope: 0,
-            curvature: 0,
-            discreteHeight: SZJ_FRAME.indoorFloorY,
-            stepIndex: 0,
-            stepPhase: 0,
-            inclineRad: 0,
-            zone: 'exit-landing' as const,
-          }
-          const eyeState = flatEyeSmoother.step(flatSample, subDt)
-          playerEyeY = eyeState.eyeY
-        }
-        recordEyeDelta(prevEye, playerEyeY)
-
-        if (moved.activeStair && dirLen > 1e-6) {
-          const smoothedFootY = playerEyeY - SZJ_PLAYER.eyeHeight
-          if (
-            shouldExitStair(
-              moved.activeStair,
-              { x: playerX, y: Math.min(playerFootY, smoothedFootY), z: playerZ },
-              { x: cmdVx, z: cmdVz },
-            )
-          ) {
-            pendingExitStairId = moved.activeStair.id
-            void exit()
-            break
-          }
-        }
-      }
-
-      syncPromptDom()
-      syncIndoorCamera()
-    }
+    syncIndoorCamera()
   }
 
   function getMetrics(): SzjIndoorMetrics {
@@ -877,9 +782,9 @@ export function createSzjIndoorScene(opts: CreateSzjIndoorSceneOptions = {}): Sz
 
   function dispose(): void {
     if (machine.getState() === 'disposed') return
+    sendViewBlend(null)
     setBodyFlags(false)
     unmountDomAndListeners()
-    stairAdapter.reset()
     if (contentHandle) {
       scene.remove(contentHandle.scene)
       contentHandle.dispose()
@@ -887,7 +792,6 @@ export function createSzjIndoorScene(opts: CreateSzjIndoorSceneOptions = {}): Sz
     }
     scene.clear()
     hostCtx = null
-    pendingExitStairId = null
     activeStairId = null
     activeShopId = null
     lastDrawCalls = 0

@@ -1281,11 +1281,10 @@ def build_nikoniko(m: Builder):
         (31.2, -36.2),
         (-18.0, -45.2),
     ]
-    from shapely.geometry import Polygon as _ShapelyPolygon
     from plaza_seam import civic_plaza
-    from shizijie_underpass import NIKONIKO_ORIGIN, STAIRWELLS, stair_hole_ring
+    from shizijie_underpass import NIKONIKO_ORIGIN, STAIRWELLS, stair_opening_ring
     sw_stair = next(s for s in STAIRWELLS if s['corner'] == 'sw')
-    civic_plaza(m, _ShapelyPolygon(apron, [stair_hole_ring(sw_stair, NIKONIKO_ORIGIN, margin=0.05)]))
+    civic_plaza(m, apron, holes=[stair_opening_ring(sw_stair, NIKONIKO_ORIGIN, margin=0.02)])
 
     # 2. Main 6-storey retail body extruded from exact OSM footprint
     # Note: FOOTPRINT has negative signed area so m.prism() reverses pts & wall_mask;
@@ -1376,12 +1375,7 @@ def build_nikoniko(m: Builder):
     for side in range(3):
         m.sign_arc(corner_cx, corner_cz, 8.32, 30.76, 3.95, corner_yaw + side*math.tau/3,
                    span_rad=math.tau/3, sign_key='niko_crown', segs=18 if m.detail else 10)
-    from shizijie_underpass import NIKONIKO_ORIGIN, STAIRWELLS, build_surface_stairwell
-    sw_stair = next(s for s in STAIRWELLS if s['corner'] == 'sw')
-    build_surface_stairwell(
-        m, sw_stair, NIKONIKO_ORIGIN,
-        frame_mat='alum', parapet_mat='dark', glass_mat='glass', bollard_mat='red', roof_mat='alum',
-    )
+    # The SW stairwell guard, canopy and walls come from the runtime (web/src/shizijie/look/stairwell-geometry.ts).
     if m.detail:
         for lx, lz in ((56.8, 12.0), (52.0, 34.0), (14.0, -37.2), (-14.0, -42.5)):
             m.cluster_lamp(lx, m.surface.ground(lx,lz)+.04, lz, height=6.8, globes=5, collide=True)

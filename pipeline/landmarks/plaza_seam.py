@@ -27,7 +27,7 @@ def drape_walkways(model, rectangles, glass=None):
         model.pose, model.grade = pose, grade
 
 
-def civic_plaza(builder, ring, frontage=None, refine_outer=False, dressed=False, glass=None):
+def civic_plaza(builder, ring, frontage=None, refine_outer=False, dressed=False, glass=None, holes=None):
     surface = builder.surface
     rotation = np.array([[surface.cos,-surface.sin],[surface.sin,surface.cos]])
     streets = Streets(surface.surface)
@@ -63,6 +63,13 @@ def civic_plaza(builder, ring, frontage=None, refine_outer=False, dressed=False,
     if glass is not None:
         glass_world = shapely.transform(glass,lambda coords:coords@rotation+origin)
         regions = [(key,region.difference(glass_world)) for key,region in regions]+[('ruinGlass',footprint.intersection(glass_world))]
+    if holes:
+        # Open stairwells: cut the deck without moving the plaza edge falloff, so the grade stays flat up to the opening.
+        holes_world = shapely.union_all([shapely.make_valid(shapely.transform(
+            hole if isinstance(hole,shapely.Geometry) else shapely.Polygon(hole),
+            lambda coords:coords@rotation+origin)) for hole in holes])
+        if not holes_world.is_empty:
+            regions = [(key,region.difference(holes_world)) for key,region in regions]
     adjacent_faces = []
     for col in range(math.floor((west-4)/size),math.floor((east+4)/size)+1):
         for row in range(math.floor((north-4)/size),math.floor((south+4)/size)+1):
