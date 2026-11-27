@@ -29,7 +29,7 @@ export function tileCenterDistance(tile:Tile, position:THREE.Vector3){
 type TerrainLayer = {mesh:THREE.Object3D; toggle(tile:Tile, show:boolean):void}
 
 export class Stream {
-  private airportUpdate?:(distance:number)=>void
+  private airportUpdate?:(eye:THREE.Vector3)=>void
   private airportPending=false
   private airportRetry=0
   private distant?:DistantBuildings
@@ -233,12 +233,12 @@ export class Stream {
   tick(position:THREE.Vector3, aerial=false, ahead?:THREE.Vector3) {
     if(this.manifest.airportProps){
       const distance=Math.hypot(position.x+25620,position.z-7080)
-      if(this.airportUpdate)this.airportUpdate(distance)
+      if(this.airportUpdate)this.airportUpdate(position)
       else if(distance<4200&&!this.airportPending&&performance.now()>this.airportRetry){
         this.airportPending=true
         const file=this.manifest.airportProps.file
         void import('./airport-props').then(module=>module.mountAirport(this.scene,file)).then(update=>{
-          this.airportUpdate=update;update(Math.hypot(this.lastPosition.x+25620,this.lastPosition.z-7080))
+          this.airportUpdate=update;update(this.lastPosition)
         }).catch(error=>{this.airportRetry=performance.now()+10000;console.warn(file,error)}).finally(()=>{this.airportPending=false})
       }
     }

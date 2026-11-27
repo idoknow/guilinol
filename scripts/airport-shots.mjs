@@ -44,11 +44,34 @@ try {
     }, null, {timeout:120000})
     metrics[name] = await page.evaluate(async () => {
       const samples = []
-      for (let frame = 0; frame < 12; frame++) {
-        await new Promise(requestAnimationFrame)
-        samples.push(window.viewer.stats.calls)
+      const stream=window.viewer.stream, restore=[]
+      let buckets={},peakBreakdown={}
+      const count=(root,key)=>root?.traverse(node=>{
+        if(!node.isMesh)return
+        const previous=node.onBeforeRender
+        node.onBeforeRender=function(...args){
+          buckets[key]=(buckets[key]??0)+1
+          return previous.apply(this,args)
+        }
+        restore.push(()=>{node.onBeforeRender=previous})
+      })
+      for(const [entry,group] of stream.landmarks){
+        if(entry.id.startsWith('liangjiang_'))count(group,entry.id)
       }
-      return {peakCalls:Math.max(...samples), samples}
+      count(stream.scene.getObjectByName('Airport props'),'props')
+      try{
+        await new Promise(requestAnimationFrame)
+        for (let frame = 0; frame < 12; frame++) {
+          buckets={}
+          await new Promise(requestAnimationFrame)
+          const calls=window.viewer.stats.calls
+          if(!samples.length||calls>Math.max(...samples))peakBreakdown={...buckets}
+          samples.push(calls)
+        }
+      }finally{
+        for(const reset of restore)reset()
+      }
+      return {peakCalls:Math.max(...samples), samples,airportMeshSubmissionsAtPeak:peakBreakdown}
     })
     await page.screenshot({path:`${prefix}-${name}.jpg`, quality:85})
     console.log(name, metrics[name].peakCalls)

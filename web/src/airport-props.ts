@@ -69,7 +69,8 @@ function shape(kind:string, far=false){
 
 export async function mountAirport(scene:THREE.Scene,file:string){
   const rows=JSON.parse(new TextDecoder().decode(await fetchAsset(file))) as Record<string,Row[]>
-  const root=new THREE.Group(), pose=new THREE.Object3D(), planes:THREE.InstancedMesh[]=[]
+  const root=new THREE.Group(), pose=new THREE.Object3D()
+  root.name='Airport props'
   if(rows.mast)rows.mastLight=rows.mast
   const labels:THREE.BufferGeometry[]=[]
   const segments=['abcdef','bc','abdeg','abcdg','bcfg','acdfg','acdefg','abc','abcdefg','abcdfg']
@@ -87,21 +88,45 @@ export async function mountAirport(scene:THREE.Scene,file:string){
     const geometry=mergeGeometries(labels)!;labels.forEach(part=>part.dispose())
     root.add(new THREE.Mesh(geometry,new THREE.MeshStandardMaterial({name:'airport_stand_digits',color:0xffce4f})))
   }
+  type Part={geometry:THREE.BufferGeometry,instances:Row[],near:number,far:number}
+  const batches=new Map<string,Part[]>(), updates:((eye:THREE.Vector3)=>void)[]=[]
   for(const [kind,instances] of Object.entries(rows)){
     const lit=['mastLight','taxiLight','edgeLight','approachLight','papi','beacon'].includes(kind)
-    const material=new THREE.MeshStandardMaterial({vertexColors:true,side:THREE.DoubleSide,roughness:.85,emissive:lit?0x888977:0})
-    material.name=kind==='fence'?'airport_fence':kind==='airliner'?'aircraft_livery_teal':`airport_${kind}${lit?'_lit':''}`
-    if(lit)nightLit(material)
+    const name=lit?'airport_lights_lit':kind==='fence'?'airport_fence':kind==='airliner'?'aircraft_livery_teal':'airport_equipment'
+    const parts=batches.get(name)??[];batches.set(name,parts)
     for(const far of kind==='airliner'?[false,true]:[false]){
-      const mesh=new THREE.InstancedMesh(shape(kind,far),material,instances.length)
-      instances.forEach(([x,y,z,yaw,w,h,d,rise],index)=>{
-        pose.position.set(x,y,z);pose.rotation.y=yaw;pose.scale.set(w,h,d);pose.updateMatrix()
-        if(rise!==undefined)pose.matrix.elements[9]=rise
-        mesh.setMatrixAt(index,pose.matrix)
-      });mesh.computeBoundingSphere();root.add(mesh)
-      if(kind==='airliner')planes.push(mesh)
+      const range=kind==='airliner'?(far?4200:400):kind==='fence'?320:kind==='standSign'?180:lit?2000:1200
+      parts.push({geometry:shape(kind,far),instances,near:far?400:0,far:range})
     }
   }
+  for(const [name,parts] of batches){
+    const lit=name.endsWith('_lit')
+    const material=new THREE.MeshStandardMaterial({name,vertexColors:true,side:THREE.DoubleSide,roughness:.85,emissive:lit?0x888977:0})
+    if(lit)nightLit(material)
+    const batch=new THREE.BatchedMesh(parts.reduce((sum,part)=>sum+part.instances.length,0),
+      parts.reduce((sum,part)=>sum+part.geometry.attributes.position.count,0),0,material)
+    batch.name=name;batch.sortObjects=false
+    for(const {geometry,instances,near,far} of parts){
+      const geometryId=batch.addGeometry(geometry);geometry.dispose()
+      const ids=instances.map(([x,y,z,yaw,w,h,d,rise])=>{
+        const id=batch.addInstance(geometryId)
+        pose.position.set(x,y,z);pose.rotation.y=yaw;pose.scale.set(w,h,d);pose.updateMatrix()
+        if(rise!==undefined)pose.matrix.elements[9]=rise
+        batch.setMatrixAt(id,pose.matrix);return id
+      })
+      updates.push(eye=>instances.forEach(([x,y,z],index)=>{
+        const squared=(eye.x-x)**2+(eye.y-y)**2+(eye.z-z)**2
+        batch.setVisibleAt(ids[index],squared>=near*near&&squared<far*far)
+      }))
+    }
+    batch.computeBoundingSphere();root.add(batch)
+  }
   scene.add(root)
-  return (distance:number)=>{root.visible=distance<4200;if(planes.length){planes[0].visible=distance<1150;planes[1].visible=distance>=1150}}
+  const last=new THREE.Vector3(Infinity,Infinity,Infinity)
+  return (eye:THREE.Vector3)=>{
+    root.visible=(eye.x+25620)**2+(eye.z-7080)**2<4200**2
+    if(!root.visible||last.distanceToSquared(eye)<16**2)return
+    for(const update of updates)update(eye)
+    last.copy(eye)
+  }
 }
