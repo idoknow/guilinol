@@ -73,10 +73,19 @@ const OVERLAY_SELECTOR_ATTRIBUTES = [...new Set([
 ])]
 const ELEMENT_NODE = 1
 
-/** Text-only changes (a HUD counter, a timer label) cannot open or close an overlay; elements and watched attributes can. */
+/**
+ * Whether any of these DOM changes could open or close an overlay. Two kinds cannot, and both happen
+ * every frame: a HUD label swapping its text node, and a HUD element being handed the value it
+ * already has (`button.hidden = true` again), which still queues a record.
+ */
 function canChangeOverlays(records: readonly MutationRecord[]): boolean {
   for (let index = 0; index < records.length; index++) {
     const record = records[index]
+    if (record.type === 'attributes') {
+      const name = record.attributeName
+      if (!name || (record.target as Element).getAttribute(name) !== record.oldValue) return true
+      continue
+    }
     if (record.type !== 'childList') return true
     const {addedNodes, removedNodes} = record
     for (let node = 0; node < addedNodes.length; node++) if (addedNodes[node].nodeType === ELEMENT_NODE) return true
@@ -100,7 +109,7 @@ function overlayElementPresent(doc: Document, baseOnly: boolean): boolean {
   if (!overlayScan || overlayScan.doc !== doc) {
     overlayScan?.observer.disconnect()
     const scan: OverlayScan = {doc, observer: new MutationObserver(records => { if (canChangeOverlays(records)) scan.stale = true }), stale: true, base: null, full: null}
-    scan.observer.observe(doc, {subtree: true, childList: true, attributes: true, attributeFilter: OVERLAY_SELECTOR_ATTRIBUTES})
+    scan.observer.observe(doc, {subtree: true, childList: true, attributes: true, attributeOldValue: true, attributeFilter: OVERLAY_SELECTOR_ATTRIBUTES})
     overlayScan = scan
   }
   const scan = overlayScan

@@ -121,21 +121,36 @@ test('isModalOrOverlayOpen scans the page once, then only after the DOM changed'
     assert.equal(isModalOrOverlayOpen(), false)
   }
   assert.equal(page.scans.length, 3)
+  // So does a HUD element being given the value it already has, which the page reports as a change every frame.
+  assert.equal(observer.options.attributeOldValue, true)
+  const attribute = (name, oldValue, value) => ({type: 'attributes', attributeName: name, oldValue, target: {getAttribute: () => value}})
+  for (let frame = 0; frame < 20; frame++) {
+    observer.pending.push(attribute('hidden', '', ''), attribute('class', 'hud on', 'hud on'), attribute('hidden', null, null))
+    observer.callback([attribute('hidden', '', '')])
+    assert.equal(isModalOrOverlayOpen(), false)
+  }
+  assert.equal(page.scans.length, 3)
+  observer.pending.push(attribute('hidden', '', ''), attribute('hidden', '', null))
+  assert.equal(isModalOrOverlayOpen(), false)
+  assert.equal(page.scans.length, 4, 'an attribute that really changed (hidden removed) rescans')
+  observer.callback([attribute('class', 'book', 'book show')])
+  assert.equal(isModalOrOverlayOpen(), false)
+  assert.equal(page.scans.length, 5)
   observer.pending.push(textOnly, {type: 'childList', addedNodes: [{nodeType: 3}, {nodeType: 1}], removedNodes: []})
   page.open = true
   assert.equal(isModalOrOverlayOpen(), true, 'an element arriving among text nodes still counts')
-  assert.equal(page.scans.length, 4)
+  assert.equal(page.scans.length, 6)
   page.open = false
   observer.pending.push({type: 'attributes'})
   assert.equal(isModalOrOverlayOpen(), false)
-  assert.equal(page.scans.length, 5)
+  assert.equal(page.scans.length, 7)
 
   // The fine terminal uses a narrower selector while delivering; it has its own cached answer.
   page.body.dataset.tdTerminalPhase = 'deliver'
   assert.equal(isModalOrOverlayOpen(), false)
   assert.equal(isModalOrOverlayOpen(), false)
-  assert.equal(page.scans.length, 6)
-  assert.notEqual(page.scans[5], page.scans[4])
+  assert.equal(page.scans.length, 8)
+  assert.notEqual(page.scans[7], page.scans[6])
   delete page.body.dataset.tdTerminalPhase
 
   // Body flags are read live, never cached.
@@ -143,7 +158,7 @@ test('isModalOrOverlayOpen scans the page once, then only after the DOM changed'
   assert.equal(isModalOrOverlayOpen(), true)
   delete page.body.dataset.shopOpen
   assert.equal(isModalOrOverlayOpen(), false)
-  assert.equal(page.scans.length, 6)
+  assert.equal(page.scans.length, 8)
 
   // Any other document (a test double, an iframe) is scanned on every call.
   const other = fakeDocument()
@@ -151,7 +166,7 @@ test('isModalOrOverlayOpen scans the page once, then only after the DOM changed'
   assert.equal(isModalOrOverlayOpen(other), true)
   assert.equal(isModalOrOverlayOpen(other), true)
   assert.equal(other.scans.length, 2)
-  assert.equal(overlayScanCount() - before, 8)
+  assert.equal(overlayScanCount() - before, 10)
 })
 
 test('overlay selectors use only what a MutationObserver can see changing', async () => {

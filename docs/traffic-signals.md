@@ -105,6 +105,6 @@ npm run perf:city -- --hot                          # 附「谁最耗主线程 /
 
 `namedChild` 只看直接子节点：对象必须是 `scene.add(对象)` 直接挂上去的。挂深了它永远返回空；`vite dev` 下控制台会提示「exists but is not a direct child」。
 
-弹层判定新增选择器时只改 `input-guard.ts` 里的选择器常量，监听的属性会自动跟上。选择器只能用标签、class、id、属性和 `:not(...)`；不能用 `:checked`、`:popover-open`、`:focus-within`、`:has(...)` 这类状态伪类——它们变化时页面不产生变更记录，缓存会一直给旧结果（单测会拦）。只换文字的更新（HUD 读数、计时）不会触发重扫。
+弹层判定新增选择器时只改 `input-guard.ts` 里的选择器常量，监听的属性会自动跟上。选择器只能用标签、class、id、属性和 `:not(...)`；不能用 `:checked`、`:popover-open`、`:focus-within`、`:has(...)` 这类状态伪类——它们变化时页面不产生变更记录，缓存会一直给旧结果（单测会拦）。只换文字的更新（HUD 读数、计时）和重复写同一个值（每帧 `el.hidden = true`）不会触发重扫。
 
 `rig.batch(true)` 和 `rig.batch(false)` 之间不要写 `continue` / `return` / `throw`，否则这个角色的骨骼会停在上一帧（`rider-pool.ts` 的两处有单测拦）。
