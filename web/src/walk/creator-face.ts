@@ -1,4 +1,5 @@
 import * as T from 'three'
+import {characterLight} from './character-light'
 import {hairColors, skinTones, type Avatar} from '../../../lib/avatar'
 
 export type CreatorExpression = 'neutral' | 'serious' | 'smile' | 'remind' | 'thumbs_up'
@@ -116,6 +117,17 @@ function buildExpressionBuffers(
       }
   }
 
+  // A small light-coloured glint on the upper outer iris: same mesh/draw, makes the eyes read as alive.
+  // Squinting expressions shrink it with the eye so it never spills past the lids.
+  function catchlight(side: number, centerY: number, halfWidth: number, eyeH: number) {
+    const size = Math.min(1, eyeH / 0.012)
+    ribbon('#f6efe4', (t, v) => [
+      side * (0.034 - halfWidth * 0.22 + (2 * t - 1) * 0.0021 * size),
+      centerY + eyeH * 0.16 + (v - 0.5) * 0.0036 * size * Math.sin(Math.PI * t),
+      0.0021,
+    ])
+  }
+
   for (const side of [-1, 1]) {
     const eyeY = 0.065,
       baseHalfWidth = a.eyes === 3 ? 0.009 : 0.0075 + 0.001 * a.eyes,
@@ -130,6 +142,7 @@ function buildExpressionBuffers(
           0.0018,
         ]
       })
+      catchlight(side, eyeY, baseHalfWidth, baseEyeH)
       ribbon('#4a352b', (t, v) => [
         side * (0.034 + (2 * t - 1) * (baseHalfWidth + 0.002)),
         eyeY + 0.005 + (0.003 + 0.0016 * v) * Math.sin(Math.PI * t),
@@ -164,6 +177,7 @@ function buildExpressionBuffers(
           0.0018,
         ]
       })
+      catchlight(side, eyeY + eyeYShift + eyeCurveLift, halfWidth, eyeH)
 
       const lidYShift =
         expr === 'thumbs_up' ? 0.0036 : expr === 'remind' ? 0.0030 : expr === 'smile' ? 0.0018 : -0.0022
@@ -310,6 +324,22 @@ export function getCreatorExpression(root: T.Object3D | null | undefined): Creat
   return normalizeCreatorExpression(faceGroup.userData.expression as string | undefined)
 }
 
+/** Unlit ink for the face ribbons that still follows the street's night dimming like the toon skin around it. */
+function faceInk() {
+  const ink = new T.MeshBasicMaterial({vertexColors: true, side: T.DoubleSide})
+  ink.onBeforeCompile = (shader, renderer) => {
+    T.Material.prototype.onBeforeCompile.call(ink, shader, renderer)
+    shader.uniforms.uNight ??= {value: 0}
+    shader.uniforms.uLevel = characterLight.uLevel
+    shader.fragmentShader = 'uniform float uNight, uLevel;\n' + shader.fragmentShader.replace(
+      '#include <opaque_fragment>',
+      'outgoingLight *= mix(1.0, 0.38, uNight) * uLevel;\n#include <opaque_fragment>',
+    )
+  }
+  ink.customProgramCacheKey = () => 'creator-face-ink'
+  return ink
+}
+
 export function facialFeatures(geometry: T.BufferGeometry, a: Avatar) {
   const group = new T.Group(),
     front = frontOfFace(geometry)
@@ -324,7 +354,7 @@ export function facialFeatures(geometry: T.BufferGeometry, a: Avatar) {
   g.setAttribute('position', new T.Float32BufferAttribute(neutral.positions.slice(), 3))
   g.setAttribute('color', new T.Float32BufferAttribute(neutral.colors.slice(), 3))
   g.setIndex(neutral.indices)
-  const rest = new T.Mesh(g, new T.MeshBasicMaterial({vertexColors: true, side: T.DoubleSide}))
+  const rest = new T.Mesh(g, faceInk())
   rest.name = 'rest-face'
   group.add(rest)
 

@@ -45,6 +45,8 @@ async function enter(mode: PlayMode, remember = true) {
       const user = await requireUser()
       if (!user) { cancelRestore(); if (!title.shown) title.open(started); return }
     }
+    // The title camera dives on the press; let it play before the loader covers it (~0.8 s, 0 without a live cover).
+    await title.launch()
     const creator=consumeCreatorSpawn()
     if(initial){
       loader=fullLoader([{id:'engine',label:'准备引擎',weight:15},{id:'terrain',label:'载入地形',weight:20},{id:'overview',label:'铺开山水',weight:20},{id:'ring',label:'载入街区',weight:40},{id:'frame',label:'即将抵达',weight:5}]);loader.stage('engine',0,1)

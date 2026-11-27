@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>封面场景 · dev</title>
+    <style>
+      html, body { margin: 0; height: 100%; background: #0a1330; overflow: hidden; }
+      #host { position: fixed; inset: 0; touch-action: pan-y; }
+      #safe { position: fixed; left: 0; top: 0; bottom: 0; background: rgba(20, 33, 30, .28); border-right: 1px dashed rgba(244, 239, 226, .25); pointer-events: none; }
+      #safeB { position: fixed; left: 0; right: 0; bottom: 0; background: rgba(20, 33, 30, .28); border-top: 1px dashed rgba(244, 239, 226, .25); pointer-events: none; }
+      #stats { position: fixed; right: 8px; top: 8px; font: 11px/1.45 ui-monospace, monospace; color: #f4efe2; background: rgba(0, 0, 0, .35); padding: 6px 8px; border-radius: 4px; white-space: pre; z-index: 2; }
+      #stats button { font: inherit; margin-top: 4px; cursor: pointer; }
+      #hover { position: fixed; left: 50%; bottom: 16px; transform: translateX(-50%); color: #f4efe2; font: 15px serif; letter-spacing: .2em; z-index: 2; }
+    </style>
+  </head>
+  <body>
+    <div id="host"></div>
+    <div id="safe"></div>
+    <div id="safeB"></div>
+    <div id="hover"></div>
+    <div id="stats"></div>
+    <script type="module" src="./src/ui/cover/dev.ts"></script>
+  </body>
+</html>
