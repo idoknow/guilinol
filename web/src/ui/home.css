@@ -54,10 +54,16 @@ body[data-home] :is(.hud-me,.dock,.sky-ui,.hint,footer,.walk-ui,.vehicle-action,
   transition:background var(--ui-fast)}
 .home-mode:hover{background:var(--ui-fill)}
 .home-mode:focus-visible{outline:2px solid var(--ui-focus);outline-offset:-2px;border-radius:var(--ui-r-ctl)}
-.home-mode-seal{font-size:21px}
-/* 印章是盖上去的：石刻残边遮罩（home-seal.svg：四角磨圆、三处崩口），三枚各歪一点，不是同一个模子压出来的方框。
-   遮罩只管形状，颜色仍是 .ui-seal 的令牌 */
-.home-mode-seal{-webkit-mask:url("./home-seal.svg") center/100% 100% no-repeat;mask:url("./home-seal.svg") center/100% 100% no-repeat}
+/* 三枚肖形印：不再刻「联 / 游 / 街」（模式名就在右边），各刻一处桂林——
+   联机 = 日月双塔（两塔并立杉湖，月牙挂在月塔上）；游览 = 象鼻山（鼻插漓江、水月洞、背上普贤塔，洞影合成一轮圆）；
+   单人 = 漓江竹筏（一人斗笠蓑衣撑篙，身后两座峰）。
+   画面是 home-seal-*.svg 遮罩，颜色取 currentColor：朱印上是纸色，墨印上是 --ui-text-2，悬停上朱，续游当前行变朱印，规则都不用改。
+   外框仍是石刻残边遮罩（home-seal.svg：四角磨圆、三处崩口），三枚各歪一点，不是同一个模子压出来的 */
+.home-mode-seal{position:relative;font-size:23px;-webkit-mask:url("./home-seal.svg") center/100% 100% no-repeat;mask:url("./home-seal.svg") center/100% 100% no-repeat}
+.home-mode-seal::before{content:"";position:absolute;inset:0;background:currentColor}
+.home-mode--mp .home-mode-seal::before{-webkit-mask:url("./home-seal-mp.svg") center/100% 100% no-repeat;mask:url("./home-seal-mp.svg") center/100% 100% no-repeat}
+.home-mode--tour .home-mode-seal::before{-webkit-mask:url("./home-seal-tour.svg") center/100% 100% no-repeat;mask:url("./home-seal-tour.svg") center/100% 100% no-repeat}
+.home-mode--solo .home-mode-seal::before{-webkit-mask:url("./home-seal-solo.svg") center/100% 100% no-repeat;mask:url("./home-seal-solo.svg") center/100% 100% no-repeat}
 .home-mode--tour .home-mode-seal{transform:rotate(1.2deg)}.home-mode--solo .home-mode-seal{transform:rotate(-.8deg)}
 .home-mode-text{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 10px;min-width:0}
 .home-mode-text b{flex:1 0 100%;display:flex;align-items:center;gap:12px;min-width:0;white-space:nowrap;
@@ -87,7 +93,7 @@ body[data-home] :is(.hud-me,.dock,.sky-ui,.hint,footer,.walk-ui,.vehicle-action,
 .home.resume .home-mode.is-current .ui-seal--ink{color:var(--ui-paper)}
 
 /* 续游（IDOK-105）：游览行下一行文字链接，左缘对齐模式名；只有存过位置才出现 */
-.home-resume-row{padding:0 12px 10px calc(12px + 40px + var(--ui-s-4));margin-top:-6px}
+.home-resume-row{padding:0 12px 10px calc(12px + 44px + var(--ui-s-4));margin-top:-6px}
 .home-resume{min-height:28px;font-size:var(--ui-fs-sm);letter-spacing:.06em}
 .home-resume i{flex:none;width:14px;height:14px;background:currentColor;
   -webkit-mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%23000' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3 8a5 5 0 1 0 1.6-3.7'/%3E%3Cpath d='M3 2.5V5h2.5'/%3E%3C/svg%3E") center/contain no-repeat;

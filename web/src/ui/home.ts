@@ -36,7 +36,7 @@ export function home(play:(mode:PlayMode)=>void):Home {
     <div class="home-modes" role="list" aria-label="选择模式">
       <div class="home-row home-row--mp" role="listitem">
         <button type="button" class="home-mode home-mode--mp" data-umami-event="home-mp">
-          <span class="home-mode-seal ui-seal" aria-hidden="true">联</span>
+          <span class="home-mode-seal ui-seal" aria-hidden="true"></span>
           <span class="home-mode-text"><b>联机模式<i class="home-mp-live ui-num" hidden></i></b><span>同城玩家一起逛街接单</span>
             <small class="home-wallet ui-num"></small></span>
           <span class="home-go home-go--mp">进入联机</span>
@@ -44,7 +44,7 @@ export function home(play:(mode:PlayMode)=>void):Home {
       </div>
       <div class="home-row home-row--tour" role="listitem">
         <button type="button" class="home-mode home-mode--tour" data-umami-event="home-tour">
-          <span class="home-mode-seal ui-seal ui-seal--ink" aria-hidden="true">游</span>
+          <span class="home-mode-seal ui-seal ui-seal--ink" aria-hidden="true"></span>
           <span class="home-mode-text"><b>游览模式</b><span>飞遍 ${spots.length} 处名胜集印章</span>
             <small class="home-progress ui-num"></small></span>
           <span class="home-go home-go--tour">开始游览</span>
@@ -57,7 +57,7 @@ export function home(play:(mode:PlayMode)=>void):Home {
       </div>
       <div class="home-row home-row--solo" role="listitem">
         <button type="button" class="home-mode home-mode--solo" data-umami-event="home-solo">
-          <span class="home-mode-seal ui-seal ui-seal--ink" aria-hidden="true">街</span>
+          <span class="home-mode-seal ui-seal ui-seal--ink" aria-hidden="true"></span>
           <span class="home-mode-text"><b>单人模式</b><span>离线逛街，进度照存</span></span>
           <span class="home-go home-go--solo">进入</span>
         </button>
