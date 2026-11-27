@@ -6,7 +6,7 @@
     道路等级规则判定候车亭放置，输出紧凑 JSON 供客户端外挂加载。
 
 输入：
-    --world   世界块目录（含 manifest.json 与 *.glc，格式标识需为 GL04）
+    --world   世界块目录（含 manifest.json 与 *.glc，格式标识需为 GL04；同名 *.trees 的行道树算候车亭障碍）
     --osm     OSM Overpass `out body geom` JSON 快照
 
 输出：
@@ -110,10 +110,21 @@ SHELTER_ROAD_MARGIN_M: float = 0.2
 SHELTER_BLDG_MARGIN_M: float = 0.3
 SHELTER_WALKABLE_MIN_RATIO: float = 0.85
 SHELTER_OBSTACLE_MARGIN_M: float = 0.4
+# 行道树：树心到候车亭轮廓至少这么远（树池约 1 m 见方，亭不压树池）。
+SHELTER_TREE_CLEARANCE_M: float = 0.6
+# 街边摆设（.glc st[9] decor 与 st[7] beds）占位半径、半宽与偏移（单位：米）。
+CLUTTER_RAIL_KINDS: frozenset[int] = frozenset({1, 2, 5, 6, 7, 8})
+CLUTTER_EBIKE_OFFSETS_M: tuple[float, ...] = (-1.25, 0.0, 1.25)
+CLUTTER_EBIKE_RADIUS_M: float = 0.9
+CLUTTER_RAIL_HALF_WIDTH_M: float = 0.6
+CLUTTER_SIGN_RADIUS_M: float = 0.8
+CLUTTER_BOLLARD_RADIUS_M: float = 0.4
+CLUTTER_BED_RADIUS_M: float = 0.7
+TREE_RECORD_BYTES: int = 12
 SHELTER_GAP_M: float = 1.0
 
 YawSource = Literal["centreline", "kerb", "none"]
-VETO_KEYS: tuple[str, ...] = ("a", "b", "c", "d", "e", "f", "g")
+VETO_KEYS: tuple[str, ...] = ("a", "b", "c", "d", "e", "f", "g", "t", "u")
 
 
 @dataclass(frozen=True, slots=True)
@@ -130,7 +141,11 @@ class WorldData:
     buildings: list[Polygon]
     building_tree: STRtree
     pole_obstacles: list[Point]
+    trees: list[Point]
+    tree_index: STRtree
     pole_obstacle_tree: STRtree
+    clutter: list[BaseGeometry]
+    clutter_index: STRtree
 
 
 @dataclass(frozen=True, slots=True)
@@ -337,6 +352,8 @@ def read_world(world_dir: Path) -> WorldData:
     walkables: list[Polygon] = []
     buildings: list[Polygon] = []
     obstacle_coords: list[tuple[float, float]] = []
+    tree_coords: list[tuple[float, float]] = []
+    clutter: list[BaseGeometry] = []
 
     for entry in chunks:
         rel_file = entry.get("file")
@@ -406,11 +423,75 @@ def read_world(world_dir: Path) -> WorldData:
             for pt in st[4]:
                 stops.append((ox + pt[0] * 0.1, oz + pt[1] * 0.1))
 
-    if obstacle_coords:
-        obs_arr = np.asarray(obstacle_coords, dtype=np.float64)
-        pole_obstacles: list[Point] = list(points(obs_arr))
-    else:
-        pole_obstacles = []
+        # st[7]=花坛，st[9]=街边摆设（均为块局部分米）
+        if len(st) > 7 and st[7]:
+            for bed in st[7]:
+                if not isinstance(bed, list) or len(bed) < 2:
+                    continue
+                clutter.append(
+                    Point(ox + bed[0] * 0.1, oz + bed[1] * 0.1).buffer(
+                        CLUTTER_BED_RADIUS_M, 8
+                    )
+                )
+        if len(st) > 9 and st[9]:
+            for item in st[9]:
+                if not isinstance(item, list) or len(item) < 3:
+                    continue
+                kind = item[0]
+                x = ox + item[1] * 0.1
+                z = oz + item[2] * 0.1
+                if kind == 3:
+                    if len(item) < 4:
+                        continue
+                    h = item[3] * 0.01
+                    ch, sh = math.cos(h), math.sin(h)
+                    for along in CLUTTER_EBIKE_OFFSETS_M:
+                        clutter.append(
+                            Point(x + along * ch, z + along * sh).buffer(
+                                CLUTTER_EBIKE_RADIUS_M, 8
+                            )
+                        )
+                elif kind in CLUTTER_RAIL_KINDS:
+                    if len(item) < 5:
+                        continue
+                    h = item[3] * 0.01
+                    half = item[4] * 0.05
+                    if half > 1e-6:
+                        dx = half * math.cos(h)
+                        dz = half * math.sin(h)
+                        clutter.append(
+                            LineString([(x - dx, z - dz), (x + dx, z + dz)]).buffer(
+                                CLUTTER_RAIL_HALF_WIDTH_M, cap_style="flat"
+                            )
+                        )
+                    else:
+                        clutter.append(
+                            Point(x, z).buffer(CLUTTER_RAIL_HALF_WIDTH_M, 8)
+                        )
+                elif kind == 4:
+                    clutter.append(Point(x, z).buffer(CLUTTER_SIGN_RADIUS_M, 8))
+                elif kind == 11:
+                    clutter.append(Point(x, z).buffer(CLUTTER_BOLLARD_RADIUS_M, 8))
+
+        # 同名 .trees：每棵树 12 字节，开头是块局部厘米的 x、z（uint16 小端），同 web/src/forest.ts readTrees。
+        trees_path = chunk_path.with_suffix(".trees")
+        if trees_path.is_file():
+            try:
+                tree_raw = gzip.decompress(trees_path.read_bytes())
+            except OSError as exc:
+                raise ValueError(f"Failed to decompress {trees_path}: {exc}") from exc
+            if len(tree_raw) % TREE_RECORD_BYTES:
+                raise ValueError(f"Invalid vegetation payload in {trees_path}")
+            for i in range(0, len(tree_raw), TREE_RECORD_BYTES):
+                tx, tz = struct.unpack_from("<HH", tree_raw, i)
+                tree_coords.append((ox + tx * 0.01, oz + tz * 0.01))
+
+    pole_obstacles: list[Point] = (
+        list(points(np.asarray(obstacle_coords, dtype=np.float64))) if obstacle_coords else []
+    )
+    trees: list[Point] = (
+        list(points(np.asarray(tree_coords, dtype=np.float64))) if tree_coords else []
+    )
 
     return WorldData(
         chunk_count=len(chunks),
@@ -424,6 +505,10 @@ def read_world(world_dir: Path) -> WorldData:
         building_tree=STRtree(buildings),
         pole_obstacles=pole_obstacles,
         pole_obstacle_tree=STRtree(pole_obstacles),
+        trees=trees,
+        tree_index=STRtree(trees),
+        clutter=clutter,
+        clutter_index=STRtree(clutter),
     )
 
 
@@ -816,16 +901,32 @@ def _rect_hits_buildings(rect: Polygon, world: WorldData, margin: float) -> bool
     return False
 
 
-def _rect_hits_obstacles(rect: Polygon, world: WorldData, margin: float) -> bool:
-    if not world.pole_obstacles:
+def _rect_near_points(
+    rect: Polygon, pts: Sequence[Point], index: STRtree, margin: float
+) -> bool:
+    if not pts:
         return False
     minx, minz, maxx, maxz = rect.bounds
     pad = margin + 1e-3
-    idxs = world.pole_obstacle_tree.query(
-        box(minx - pad, minz - pad, maxx + pad, maxz + pad)
-    )
-    for idx in idxs:
-        if rect.distance(world.pole_obstacles[int(idx)]) <= margin:
+    for idx in index.query(box(minx - pad, minz - pad, maxx + pad, maxz + pad)):
+        if rect.distance(pts[int(idx)]) <= margin:
+            return True
+    return False
+
+
+def _rect_hits_obstacles(rect: Polygon, world: WorldData, margin: float) -> bool:
+    return _rect_near_points(rect, world.pole_obstacles, world.pole_obstacle_tree, margin)
+
+
+def _rect_hits_trees(rect: Polygon, world: WorldData, margin: float) -> bool:
+    return _rect_near_points(rect, world.trees, world.tree_index, margin)
+
+
+def _rect_hits_clutter(rect: Polygon, world: WorldData) -> bool:
+    if not world.clutter:
+        return False
+    for idx in world.clutter_index.query(rect):
+        if rect.intersects(world.clutter[int(idx)]):
             return True
     return False
 
@@ -858,7 +959,7 @@ def _eval_shelter_geometry(
     world: WorldData,
     placed_shelters: Sequence[Polygon],
 ) -> set[str]:
-    """评估单侧候选矩形的几何约束 c-g，返回未通过的条件集合。"""
+    """评估单侧候选矩形的几何约束 c-g、t 与 u（行道树、街边摆设），返回未通过的条件集合。"""
     failed: set[str] = set()
     try:
         if not road_union.is_empty and rect.distance(road_union) <= SHELTER_ROAD_MARGIN_M:
@@ -887,6 +988,18 @@ def _eval_shelter_geometry(
             failed.add("f")
     except GEOSException:
         failed.add("f")
+
+    try:
+        if _rect_hits_trees(rect, world, SHELTER_TREE_CLEARANCE_M):
+            failed.add("t")
+    except GEOSException:
+        failed.add("t")
+
+    try:
+        if _rect_hits_clutter(rect, world):
+            failed.add("u")
+    except GEOSException:
+        failed.add("u")
 
     try:
         if _rect_hits_shelters(rect, placed_shelters, SHELTER_GAP_M):
@@ -1086,6 +1199,8 @@ def _select_samples_shelter_0(
 def _print_report(report: dict[str, Any]) -> None:
     print("=== Bus Stops Pipeline Report ===")
     print(f"Chunks:            {report['chunks']}")
+    print(f"Trees:             {report['trees']}")
+    print(f"Clutter:           {report['clutter']}")
     print(f"GLC stops:         {report['glc_stops']}")
     print(f"OSM stops:         {report['osm_stops']}")
     print(f"Matched:           {report['matched']}")
@@ -1266,6 +1381,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     )
     report: dict[str, Any] = {
         "chunks": world.chunk_count,
+        "trees": len(world.trees),
+        "clutter": len(world.clutter),
         "glc_stops": len(world.stops),
         "osm_stops": len(osm.stops),
         "matched": len(matched_map),

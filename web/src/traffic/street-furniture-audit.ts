@@ -36,7 +36,38 @@ const POST_HEIGHTS = [.25, .6]
 function nameOf(object: THREE.Object3D) {
   let named: THREE.Object3D | null = object
   while (named && !named.name) named = named.parent
-  return named?.name || object.type
+  if (named?.name) return named.name
+  // Nothing in the chain is named: say what it is drawn with, so a report can tell one anonymous mesh from another.
+  const mesh = object as THREE.Mesh, material = Array.isArray(mesh.material) ? mesh.material[0] : mesh.material
+  return `${object.type}<${material?.name || material?.type || '?'}, ${mesh.geometry?.attributes?.position?.count ?? '?'} vertices>`
+}
+
+/**
+ * The highest drawn surface under each point (a ray straight down from 2 m above `y`, hits more than
+ * `above` over `y` ignored: an awning, a roof, a tree crown), with the name of the mesh it belongs to.
+ * Instanced and batched meshes (cars, trees, people, posts) and `exclude` are not ground.
+ */
+export function drawnSurfaceUnder(scene: THREE.Scene, points: readonly {x: number, y: number, z: number}[], exclude: readonly (THREE.Object3D | undefined)[] = [], above = .5): {y: number | null, under: string | null, hits: [number, string][]}[] {
+  const raycaster = new THREE.Raycaster()
+  raycaster.layers.enableAll()
+  const down = new THREE.Vector3(0, -1, 0), origin = new THREE.Vector3()
+  const drawn: THREE.Object3D[] = []
+  scene.traverseVisible(object => {
+    if ((object as THREE.Mesh).isMesh && !(object as THREE.InstancedMesh).isInstancedMesh && !(object as THREE.BatchedMesh).isBatchedMesh && !exclude.includes(object)) drawn.push(object)
+  })
+  return points.map(point => {
+    raycaster.set(origin.set(point.x, point.y + 2, point.z), down)
+    raycaster.far = 4
+    let y: number | null = null, under: string | null = null
+    // Every surface the ray met, top down: what a report needs to tell a kerb from a slab from the ground under it.
+    const hits: [number, string][] = []
+    for (const hit of raycaster.intersectObjects(drawn, false)) {
+      hits.push([+hit.point.y.toFixed(3), nameOf(hit.object)])
+      if (hit.point.y > point.y + above) continue
+      if (y === null || hit.point.y > y) { y = hit.point.y; under = nameOf(hit.object) }
+    }
+    return {y, under, hits}
+  })
 }
 
 export function streetFurnitureAudit(

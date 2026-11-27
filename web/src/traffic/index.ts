@@ -12,6 +12,7 @@ import {signalApproaches} from './signal-approach'
 import {parkingBayLines} from './parking-bays'
 import {manholeCovers} from './manhole-covers'
 import {bollards} from './bollards'
+import {busStops} from './bus-stops'
 import {drawnGround} from './drawn-ground'
 import {streetSurfaceMat} from '../streets'
 import {LANDMARK_SIGNAL_GROUPS,signalHeads} from './signal-heads'
@@ -131,16 +132,38 @@ export async function traffic(scene:THREE.Scene,camera:THREE.Camera,verify:boole
   if(covers)void warm?.(covers.mesh)
   // IDOK-399: kerb bollards beside the signal poles. One instanced mesh; they stand where `heads` found a kerb,
   // on the ground as drawn (tile ground mesh / street surface layer, `drawn-ground.ts`) where that is known, else on the collider.
-  const posts=heads&&sampleGround&&surfaceAt&&bollards(scene,sampleGround,surfaceAt,drawnGround(scene,streetSurfaceMat))
+  // One reader of the ground as drawn, shared by the posts and the bus stops.
+  const drawn=sampleGround?drawnGround(scene,streetSurfaceMat):undefined
+  const posts=heads&&sampleGround&&surfaceAt&&bollards(scene,sampleGround,surfaceAt,drawn)
   if(posts)void warm?.(posts.mesh)
-  let coversFailed=false,postsFailed=false
+  // IDOK-399 5b: bus stop signs and shelters from `street-furniture/bus-stops.json`. Two meshes (parts, name faces); same ground rules as the posts.
+  const stops=sampleGround&&busStops(scene,sampleGround,drawn)
+  if(stops){void warm?.(stops.mesh);void warm?.(stops.faces)}
+  let coversFailed=false,postsFailed=false,stopsFailed=false
   if(verify&&covers)mesh.userData.manholeCovers=covers.probe
   if(verify&&posts)mesh.userData.bollards=posts.probe
   if(verify&&(covers||posts))mesh.userData.streetFurnitureDraws=async(frames?:number)=>{const {parkingBayDraws}=await import('./parking-bay-audit');return {covers:covers?await parkingBayDraws(covers.mesh,frames):undefined,posts:posts?await parkingBayDraws(posts.mesh,frames):undefined}}
   // Verify-only: the same view with and without the covers and posts, for before/after screenshots.
   if(verify&&(covers||posts))mesh.userData.streetFurnitureShown=(shown:boolean)=>{for(const item of [covers?.mesh,posts?.mesh])if(item)(item.material as THREE.Material).visible=shown}
   if(verify&&(covers||posts))mesh.userData.streetFurnitureAudit=async(focus:{x:number,z:number},radius?:number)=>(await import('./street-furniture-audit')).streetFurnitureAudit(scene,covers?covers.mesh:undefined,covers?covers.probe().covers:[],posts?posts.mesh:undefined,posts?posts.probe().posts:[],focus,radius)
-  const near=(x:number,z:number,visit:(solid:Solid)=>void)=>{sim?.nearSolids(x,z,visit);getActiveDutyTraffic()?.nearSolids(x,z,visit);staticSolids(x,z,visit);heads?.near(x,z,visit);posts?.near(x,z,visit)}
+  if(verify&&stops){
+    mesh.userData.busStops=stops.probe
+    // Verify-only: the same view with and without the stops, for before/after screenshots.
+    mesh.userData.busStopsShown=(shown:boolean)=>{for(const item of [stops.mesh,stops.faces])(item.material as THREE.Material).visible=shown}
+    mesh.userData.busStopDraws=async(frames?:number)=>{const {parkingBayDraws}=await import('./parking-bay-audit');return {parts:await parkingBayDraws(stops.mesh,frames),faces:await parkingBayDraws(stops.faces,frames)}}
+    // Pole base and each shelter column bottom against the highest drawn surface under it (`gap`: ours minus that surface).
+    mesh.userData.busStopMeshes=()=>{const names:string[]=[];scene.traverse(object=>{if(object.name.startsWith('G2 bus stop'))names.push(object.name)});return names}
+    mesh.userData.busStopAudit=async(focus:{x:number,z:number},radius=170)=>{
+      const {drawnSurfaceUnder}=await import('./street-furniture-audit')
+      const all=stops.probe().stops.filter(stop=>stop.state==='drawn'&&(stop.x-focus.x)**2+(stop.z-focus.z)**2<=radius**2)
+      return all.map(stop=>{
+        const feet=stop.corners.filter(corner=>corner.bottom!==null)
+        const [pole,...under]=drawnSurfaceUnder(scene,[{x:stop.x,y:stop.y!,z:stop.z},...feet.map(corner=>({x:corner.x,y:corner.y!,z:corner.z}))],[stops.mesh,stops.faces])
+        return {key:stop.key,pole:{gap:pole.y===null?null:+(stop.y!-pole.y).toFixed(4),under:pole.under,hits:pole.hits},feet:under.map((hit,index)=>({gap:hit.y===null?null:+(feet[index].bottom!-hit.y).toFixed(4),ground:hit.y===null?null:+(feet[index].y!-hit.y).toFixed(4),under:hit.under,hits:hit.hits}))}
+      })
+    }
+  }
+  const near=(x:number,z:number,visit:(solid:Solid)=>void)=>{sim?.nearSolids(x,z,visit);getActiveDutyTraffic()?.nearSolids(x,z,visit);staticSolids(x,z,visit);heads?.near(x,z,visit);posts?.near(x,z,visit);stops?.near(x,z,visit)}
   const probeIds=new WeakMap<object,number>();let nextProbeId=0
   batch.setColorAt(0,new THREE.Color(0xffffff))
   await warm?.(batch)
@@ -156,13 +179,14 @@ export async function traffic(scene:THREE.Scene,camera:THREE.Camera,verify:boole
     const dutyActive=Boolean(getActiveDutyTraffic())
     if(enabled)useTrafficSolids(near)
     else if(!dutyActive)useTrafficSolids(undefined)
-    if(!enabled){effects.clear();people.clear();riders.clear();walking.clear();ridden.clear();riddenSlots.clear();mesh.count=0;hide(0,SLOTS);parkKey='';parkCount=0;curbside.clear();heads?.hide();bays?.hide();covers?.hide();posts?.hide();return}
+    if(!enabled){effects.clear();people.clear();riders.clear();walking.clear();ridden.clear();riddenSlots.clear();mesh.count=0;hide(0,SLOTS);parkKey='';parkCount=0;curbside.clear();heads?.hide();bays?.hide();covers?.hide();posts?.hide();stops?.hide();return}
     updateParking(camera.position.x,camera.position.z)
     parkLodAt-=dt;if(parkLodAt<=0){parkLodAt=.5;for(const [slot,variant,x,y,z,yaw] of parkedRows)show(slot,variant,x,y,z,yaw,1)}
     bays?.update(dt,player??camera.position)
     // A failure in the street furniture must not skip the traffic below; one warning each, not one a frame.
     try{covers?.update(dt,player??camera.position)}catch(error){if(!coversFailed){coversFailed=true;console.warn('Manhole covers unavailable',error)}}
     try{if(posts&&heads){posts.sync(heads);posts.update(dt,player??camera.position)}}catch(error){if(!postsFailed){postsFailed=true;console.warn('Bollards unavailable',error)}}
+    try{stops?.update(dt,player??camera.position)}catch(error){if(!stopsFailed){stopsFailed=true;console.warn('Bus stops unavailable',error)}}
     if(verify&&mesh.userData.staticOnly){hide(0,STATIC);mesh.count=0;mesh.userData.allMotors=[];heads?.update(dt,player??camera.position);return}
     const center=player??camera.position
     const target=`${Math.floor(center.x/512)}_${Math.floor(center.z/512)}`
