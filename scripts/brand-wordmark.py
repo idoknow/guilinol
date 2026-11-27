@@ -1,8 +1,9 @@
 """Build the title-screen wordmark 「桂林」 from Ma Shan Zheng outlines (IDOK-468).
 
 The page never loads the calligraphy font: the two glyphs are traced once into a single SVG path and used as a CSS mask
-(`.home-h1-city` in web/src/ui/home.css; colour comes from currentColor, the h1 text stays 「网上桂林」).
+(`.home-wordmark` in web/src/ui/home.css; colour comes from currentColor, the h1 text stays 「网上桂林」).
 「桂」 sits high, 「林」 a little lower and to the right, slightly overlapping it — tune DX / DY / LIN_SCALE below.
+「桂」 stands on the pixel emblem (.home-seal, placed in CSS from the printed 「桂」 ink box).
 Output:
   web/src/ui/home-wordmark.svg   viewBox in 1/1000 em, one <path>, no fill (mask reads alpha), 2-unit margin
 Prints W, H and W/H; put W/H into `--wm-ratio` on `.home-title`.
@@ -21,7 +22,7 @@ from fontTools.pens.transformPen import TransformPen
 from fontTools.pens.boundsPen import BoundsPen
 
 DX = 0.84         # 「林」 horizontal offset from 「桂」, em
-DY = 0.16         # 「林」 drop below 「桂」, em
+DY = 0.26         # 「林」下沉，「桂」下方空出来垫徽标
 LIN_SCALE = 0.96  # 「林」 scale, about the centre of its em box
 EM = 1000         # output units per em
 PAD = 2           # margin around the merged bounds, output units
@@ -77,3 +78,9 @@ for g, t in ((gui, t_gui), (lin, t_lin)):
 
 out_path.write_text(f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {W} {H}"><path d="{pen.getCommands()}"/></svg>\n')
 print(f'{out_path.relative_to(root)}  W={W} H={H} W/H={W / H:.3f}')
+
+# 「桂」 ink box in the output frame, as fractions of W / H — CSS places .home-seal under it
+gp = BoundsPen(glyphs)
+gui.draw(TransformPen(gp, shifted(t_gui)))
+gx0, gy0, gx1, gy1 = gp.bounds
+print(f'桂 ink: left {gx0/W:.4f} right {gx1/W:.4f} bottom {gy1/H:.4f}')

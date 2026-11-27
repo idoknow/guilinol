@@ -30,8 +30,7 @@ export function home(play:(mode:PlayMode)=>void):Home {
   </header>
   <div class="home-main">
     <div class="home-title">
-      <h1><span class="home-h1-net">网上</span><span class="home-h1-city"><span>桂林</span></span></h1>
-      <span class="home-seal" aria-hidden="true"><img src="./brand/emblem-clear.webp" width="363" height="136" alt=""></span>
+      <h1><span class="home-h1-net">网上</span><span class="home-h1-city"><span class="home-h1-text">桂林</span><span class="home-seal" aria-hidden="true"><img src="./brand/emblem-clear.webp" width="363" height="136" alt=""></span><i class="home-wordmark" aria-hidden="true"></i></span></h1>
     </div>
     <div class="home-modes" role="list" aria-label="选择模式">
       <div class="home-row home-row--mp" role="listitem">
