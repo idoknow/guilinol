@@ -13,6 +13,9 @@ export interface CurbReturn {
   lateral: number[]
   lanes: number[][][]
   aprons: NativeFace[]
+  // Surveyed underside of a curb bevel, clipped to the graded lane and kept
+  // below its driving surface. These faces are visual, without walk collision.
+  insetBevels?: [Point, Point, Point][]
   faces: NativeFace[]
   displacement: number[][]
 }
@@ -232,6 +235,20 @@ export function fitCurbReturns(
     ]) {
       dst.length = 0
       for (const v of src) dst.push(v)
+    }
+  }
+  // Incident sidewalk strips can overlap at bends. Append the verified inset
+  // faces after all strips so a neighboring strip cannot crop the bevel again.
+  for (const patch of patches) {
+    const [x,,z] = patch.origin
+    const [dx,dz] = patch.axis
+    for (const bevel of patch.insetBevels ?? []) {
+      for (const [s,h,n] of bevel) {
+        xyz.push(x+s*dx-n*dz,h,z+s*dz+n*dx)
+        rgb.push(...color(2))
+        kinds.push(2)
+        uv.push(0)
+      }
     }
   }
 }

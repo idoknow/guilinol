@@ -221,7 +221,32 @@ def bake(directory, manifest, paired_widths):
     from curb_returns import apply as fit_curb_returns
     fit_curb_returns(manifest, sections)
     mark_retained_cuts(manifest)
+    for section in sections:
+        if survey_path := section.get("landingSurvey"):
+            apply_landing_survey(manifest, json.loads(
+                (Path(__file__).with_name("rail-sections") / survey_path).read_bytes()
+            ))
     return final_traffic_ways
+
+
+def apply_landing_survey(manifest, survey):
+    """Fit surveyed lane ends to the original road and extend the native cut at a lengthened approach."""
+    roads = {(r["way"], tuple(r["nodes"])): r for r in manifest["tunnels"] if r.get("nodes")}
+    extended = []
+    for entry in survey["chords"]:
+        road = roads[entry["way"], tuple(entry["nodes"])]
+        if not np.allclose(road["portals"], entry["portalsBefore"], rtol=0, atol=1e-5):
+            raise ValueError(f"Re-survey landing on {road['way']}: approach has moved")
+        road.update(entry["profile"])
+        if entry["extendNativeCut"]:
+            extended.append(road)
+    mark_retained_cuts(dict(chunks=manifest["chunks"], tunnels=extended))
+    tiles = {tile["file"]: tile for tile in manifest["chunks"]}
+    for row in survey["paving"]:
+        paving = tiles[row["file"]].setdefault("stationPaving", {})
+        for key in ("tracksideShoulders", "crossingGrades"):
+            if key in row:
+                paving.setdefault(key, []).extend(row[key])
 
 
 def mark_retained_cuts(manifest):

@@ -2413,6 +2413,7 @@
       "deckVertexGradesCm": [[-253626, 444011, 16153, 16154], [-252859, 443892, 16155, 16154], [-244761, 469219, 16125, 16124], [-253888, 437167, 15848, 15849]]
     }
   ],
+  "landingSurvey": "reference/13-huancheng-landings.json",
   "cutSidewalkSurvey": "reference/13-huancheng-curbs.json",
   "junctionPlanes": {
     "9592267008": [
