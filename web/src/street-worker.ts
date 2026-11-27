@@ -16,7 +16,7 @@ import {isOuterOsmanthusBed} from './outer-osmanthus'
 import * as THREE from 'three'
 import {look} from './look/config'
 type Pair=[number,number]
-export interface StationPavingStyle {curbReturns?:CurbReturn[]; plaza?:Pair[]; platformEdges?:[Pair,Pair][]; platformGrades?:PlatformGrade[]}
+export interface StationPavingStyle {retainedCuts?:StationPavingCut[]; curbReturns?:CurbReturn[]; tracksideShoulders?:ShoulderPlane[]; crossingGrades?:ShoulderPlane[]; plaza?:Pair[]; platformEdges?:[Pair,Pair][]; platformGrades?:PlatformGrade[]}
 type Path=[number,...Pair[][]]
 type RoadCtrl=[number,number[]]
 type Lower=[number,Pair[],[number,number,number,number][]]
@@ -61,7 +61,10 @@ const ROAD_LIFT=.03
 export function streetGeometry([paths,lamps,banks,signals=[],stops=[],roadCtrl,stoneRails=[],beds=[],shops=[],decor=[],curbCuts=[],lower,platform,,stationRoads,stationCuts,shoulderPlanes,layeredRoads,panels]:Streets,ground:(x:number,z:number)=>number,rails:RailSection[]=[],signs:CrossingSign[]=[],railGround:(x:number,z:number)=>number=ground,paving?:StationPavingStyle,roadbeds=new Set<number>(),origin?:readonly [number,number], inspectSlope?:(a:THREE.Vector3,b:THREE.Vector3,c:THREE.Vector3)=>void){
   const xyz:number[]=[],rgb:number[]=[],sidewalk:number[]=[],road:number[]=[],mats:number[]=[],cols:number[]=[]
   const stationLevel=stationRoads?stationRoadSurface(stationRoads):null
+  const retained=paving?.retainedCuts && stationPaving(paving.retainedCuts, undefined, true)
   const shoulders=shoulderPlanes && stationShoulders(shoulderPlanes)
+  const trackside = paving?.tracksideShoulders && stationShoulders(paving.tracksideShoulders, 2)
+  const crossing = paving?.crossingGrades && stationShoulders(paving.crossingGrades, 2)
   const remaining=stationCuts?stationPaving(stationCuts,stationLevel?.protectedAt):null
   const baseLevel=(x:number,z:number)=>{const g=ground(x,z);const level=roadCtrl?Math.max(evalRoadCtrl(roadCtrl,x,z),g):g;return stationLevel?stationLevel.height(x,z,level):level}
   const curbSegments=curbCuts.flatMap(line=>line.slice(1).map(([x,z],i)=>
@@ -150,6 +153,29 @@ export function streetGeometry([paths,lamps,banks,signals=[],stops=[],roadCtrl,s
         emitFace(polygon[0],polygon[index-1],polygon[index],kind,u1,u2,u3,vertical,true)
       return
     }
+    if(retained && !vertical && (kind===0 || kind===5 || kind===1 || kind===2 || kind===6)){
+      // The open-cut slab is the finished carriageway. Exclude native road
+      // triangles after roadbed closure so physics and rendering agree.
+      for(const poly of retained(first,second,third))for(let j=1;j+1<poly.length;j++)
+        writeSurface(poly[0],poly[j],poly[j+1],kind,u1,u2,u3,vertical)
+      return
+    }
+    writeSurface(first,second,third,kind,u1,u2,u3,vertical)
+  }
+  function writeSurface(first:THREE.Vector3,second:THREE.Vector3,third:THREE.Vector3,kind:number,u1:number,u2:number,u3:number,vertical:boolean){
+    if (!trackside && !crossing) return writeGradedSurface(first,second,third,kind,u1,u2,u3,vertical)
+    const lane = kind === 0 || kind === 5
+    const verge = kind === 1 || kind === 2 || kind === 3 || kind === 4 || kind === 6
+    const pieces = trackside && !platformPath && (lane || verge)
+      ? trackside(first,second,third) : [[first,second,third]]
+    for (const piece of pieces) for (let i=1;i+1<piece.length;i++) {
+      const [a,b,c] = [piece[0],piece[i],piece[i+1]]
+      const finished = lane && crossing ? crossing(a,b,c,true) : [[a,b,c]]
+      for (const poly of finished) for (let j=1;j+1<poly.length;j++)
+        writeGradedSurface(poly[0],poly[j],poly[j+1],kind,u1,u2,u3,vertical)
+    }
+  }
+  function writeGradedSurface(first:THREE.Vector3,second:THREE.Vector3,third:THREE.Vector3,kind:number,u1:number,u2:number,u3:number,vertical:boolean){
     let p1=first,p2=second,p3=third,a1=u1,a2=u2,a3=u3
     if(kind!==3&&!vertical){
       const x1=Math.fround(p1.x),y1=Math.fround(p1.y),z1=Math.fround(p1.z)
@@ -575,7 +601,7 @@ export function streetGeometry([paths,lamps,banks,signals=[],stops=[],roadCtrl,s
       box(mx,ym+.15,mz,Math.max(.1,span-.36),.07,.18,angle,stoneBase)
     }
   }
-  if(paving?.curbReturns)fitCurbReturns(paving.curbReturns,xyz,rgb,surfaceKinds,alongVals,road,sidewalk,k=>colors[k].toArray())
+  if(paving?.curbReturns)fitCurbReturns(paving.curbReturns,xyz,rgb,surfaceKinds,alongVals,road,sidewalk,k=>colors[k].toArray(),retained)
   const positions=new Float32Array(xyz)
   const surface=new THREE.BufferGeometry()
   surface.setAttribute('position',new THREE.BufferAttribute(positions,3))

@@ -1,0 +1,23 @@
+{
+  "railDecks": [],
+  "roadDecks": [
+    {
+      "way": 213171576,
+      "rails": [
+        678370321,
+        994927724
+      ],
+      "halfWidthM": 3.845
+    },
+    {
+      "way": 1017592858,
+      "rails": [
+        678370321,
+        994927724
+      ],
+      "halfWidthM": 3.88
+    }
+  ],
+  "clearanceM": 7.5,
+  "wireHeightM": 6.1
+}
