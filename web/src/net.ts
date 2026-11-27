@@ -7,7 +7,7 @@ import {onUser} from './ui/account'
 import type {MpStatus} from './ui/mp-pref'
 import {setRoster,clearRoster,type RosterPlayer} from './mp-roster'
 import {fingerprint,deviceSummary} from './fingerprint'
-import {bindTravel,prepareTravel,rejectTravel,type TravelReply} from './mp-travel'
+import {bindTravel,prepareTravel,rejectTravel,travelTarget,type TravelReply} from './mp-travel'
 
 import type {CaptureClientContext, CheatCapturePacket} from './cheat-capture'
 
@@ -27,13 +27,17 @@ export function attachNet(scene:Scene,clips:AnimationClip[],getPose:()=>Pose,get
   let landingPaused=false,rejoinTimer=0
   let travelSequence=0
   bindTravel(async(reason,x,z)=>{
-    if(landingPaused && Math.hypot(getPose().x-x,getPose().z-z)>200)return rejectTravel('cooldown')
-    if(state!=='online'||Math.hypot(getPose().x-x,getPose().z-z)<=200)return true
+    const cur=getPose(),dist=Math.hypot(cur.x-x,cur.z-z)
+    if(landingPaused && dist>24)return rejectTravel('cooldown')
+    const target=travelTarget(reason,x,z)??null
+    if(state!=='online'||dist<=24)return true
+    if(dist<=200 && reason==='mp-teleport')return true
     if(travelReply)return rejectTravel('busy')
-    return prepareTravel(reason,x,z,target=>new Promise(resolve=>{
+    const precheck=target===null || dist<=200
+    return prepareTravel(reason,x,z,()=>new Promise(resolve=>{
       const timeout=setTimeout(()=>travelReply?.({ok:false,code:'timeout'}),4000)
       travelReply=result=>{clearTimeout(timeout);travelReply=undefined;resolve(result)}
-      send({t:'travel',seq:++travelSequence,reason:reason.split(':')[0],target,...(target===null?{precheck:true}:{})})
+      send({t:'travel',seq:++travelSequence,reason:reason.split(':')[0],target:precheck?null:target,...(precheck?{precheck:true}:{})})
     }),delay=>{
       const earliest=performance.now()+delay
       landingPaused=true;stop()
@@ -203,7 +207,7 @@ export function attachNet(scene:Scene,clips:AnimationClip[],getPose:()=>Pose,get
         else retry()}
     }catch{if(version===generation)retry()}
   }
-  function stop(){generation++;clearTimeout(timer);socket?.close(1000,'stop');socket=undefined;peers.clear();update('offline')}
+  function stop(){generation++;clearTimeout(timer);travelReply?.({ok:false});socket?.close(1000,'stop');socket=undefined;peers.clear();update('offline')}
   function avatarChanged(){if(state==='online')send({t:'avatar',avatar:getAvatar()})}
   let welcomed=false
   function tick(dt:number){if(state!=='online'||!welcomed)return

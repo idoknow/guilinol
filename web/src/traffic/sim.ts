@@ -671,6 +671,11 @@ export class Traffic {
   pullOverViolator(actorOrId:string|number|Actor,stopDurationSec=45):boolean{
     const actor=this.findActor(actorOrId)
     if(!actor||actor.kind!=='scooter'||actor.leaving)return false
+    if(actor.dutyState==='pulled_over'||actor.dutyState==='halted'){
+      actor.lookAtOfficer=true
+      this.stopActor(actor,Math.max(4,stopDurationSec))
+      return true
+    }
     this.beginPullOver(actor,stopDurationSec)
     return true
   }
