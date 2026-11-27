@@ -274,6 +274,8 @@ export function createCheatCaptureService(pool, env, {bucket, resolvePlace} = {}
   async function list(params) {
     await ensureCheatCaptureSchema(pool)
     const rawUid = (params.get('uid') ?? '').trim()
+    const fp = params.get('fp') || null
+    if(fp && !/^[a-f\d]{16,64}$/.test(fp))return json({error:'bad fp filter'},400)
     const kind = (params.get('kind') ?? '').trim()
     const rawLimit = Number(params.get('limit') ?? 40)
     const rawBefore = params.get('before')
@@ -305,14 +307,15 @@ export function createCheatCaptureService(pool, env, {bucket, resolvePlace} = {}
          WHERE ($1::bigint IS NULL OR c.uid = $1)
            AND ($2::text IS NULL OR c.kind = $2)
            AND ($3::bigint IS NULL OR c.captured_at < $3)
+           AND ($5::text IS NULL OR c.fp = $5)
          ORDER BY c.captured_at DESC, c.id DESC
          LIMIT $4`,
-        [uid, kind || null, before, limit],
+        [uid, kind || null, before, limit, fp],
       ),
       pool.query(
         `SELECT count(*)::int AS total FROM mp_cheat_captures
-         WHERE ($1::bigint IS NULL OR uid = $1) AND ($2::text IS NULL OR kind = $2)`,
-        [uid, kind || null],
+         WHERE ($1::bigint IS NULL OR uid = $1) AND ($2::text IS NULL OR kind = $2) AND ($3::text IS NULL OR fp = $3)`,
+        [uid, kind || null, fp],
       ),
     ])
 
