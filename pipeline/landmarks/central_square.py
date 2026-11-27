@@ -81,19 +81,130 @@ def _glass_pyramid(m: Builder, cx, cz, yaw, base_w=7.6, h=4.6):
     m.pose = (0.0, 0.0, 0.0, 0.0)
 
 
+# Walk-in stairwell geometry. Mirrors web/src/xiaoxianggang/frame.ts XXG_STAIRWELL
+# item for item (scripts/xiaoxianggang/xxg-scripts.test.mjs compares them):
+# change one, change both. Portal-local frame: x across the well, +z toward the
+# opening, -z down the stairs; y relative to the plaza grade.
+XXG_STAIR_DEPTH = 4.2
+XXG_STAIR_RISERS = 25
+XXG_STAIR_RISER = 0.168
+XXG_STAIR_TREAD = 0.30
+XXG_STAIR_Z_TOP = 4.05
+XXG_STAIR_Z_BACK = -3.97
+XXG_STAIR_HALF_WIDTH = 2.27
+XXG_DOOR_HALF_WIDTH = 1.6
+XXG_DOOR_HEIGHT = 2.5
+# Plaza grade in landmark-local y at the portals: world 153.868 - origin 153.8.
+XXG_PORTAL_GRADE = 0.068
+# (along, across, yaw offset from AXIS_YAW) for E1, E2, W1, W2.
+XXG_PORTAL_AXIAL = (
+    (-22.0, 26.5, 0.0),
+    (-22.0, -26.5, math.pi),
+    (-78.0, 19.5, 0.0),
+    (-78.0, -19.5, 0.0),
+)
+
+
+def _xxg_portals():
+    return [(*_ax_pt(along, across), AXIS_YAW + turn) for along, across, turn in XXG_PORTAL_AXIAL]
+
+
+def _portal_hole_ring(cx, cz, yaw):
+    """Plaza deck opening of one stairwell, in landmark-local (x, z) (Builder._transform rotation)."""
+    hw = XXG_STAIR_HALF_WIDTH
+    c, s = math.cos(yaw), math.sin(yaw)
+    corners = [(-hw, XXG_STAIR_Z_BACK), (hw, XXG_STAIR_Z_BACK), (hw, XXG_STAIR_Z_TOP), (-hw, XXG_STAIR_Z_TOP)]
+    return [(lx * c + lz * s + cx, -lx * s + lz * c + cz) for lx, lz in corners]
+
+
 def _underground_portal(m: Builder, cx, cz, yaw):
-    """Sunken granite stairwell entrance to '小香港商业城' underground mall."""
+    """Open granite stairwell down to the '小香港商业城' B1 doors.
+
+    The plaza deck is cut open above it (civic_plaza holes). Treads are visual
+    only: the runtime walks the player on an invisible ramp registered by
+    web/src/tunnels.ts, so the walls collide and the steps do not.
+    """
     m.pose = (cx, 0.0, cz, yaw)
-    m.box(-2.45, 0.0, 0.0, 0.36, 1.08, 8.6, 'beige', collide=True)
-    m.box(2.45, 0.0, 0.0, 0.36, 1.08, 8.6, 'beige', collide=True)
-    m.box(0.0, 0.0, -4.15, 5.26, 1.08, 0.36, 'beige', collide=True)
-    m.box(0.0, 0.02, -1.2, 4.5, 0.08, 5.6, 'dark')
-    for st in range(4):
-        m.box(0.0, 0.04, 3.6 - st * 0.75, 4.5, 0.08, 0.72, 'pave', collide=True)
-    m.beam([-2.25, 0.0, -3.8], [-2.25, 3.1, -3.8], 0.14, 'alum', sections=6, collide=True)
-    m.beam([2.25, 0.0, -3.8], [2.25, 3.1, -3.8], 0.14, 'alum', sections=6, collide=True)
-    m.box(0.0, 2.55, -3.8, 5.1, 0.88, 0.24, 'dark')
-    m.sign_quad(0.0, 2.57, -3.65, 4.95, 0.84, 'xiaoxianggang', double_sided=True)
+    grade = XXG_PORTAL_GRADE
+    y_b1 = grade - XXG_STAIR_DEPTH
+    y_base = y_b1 - 0.30
+    wall_top = grade + 1.08
+    wall_t = 0.36
+    well_w = 2.0 * XXG_STAIR_HALF_WIDTH
+    wall_x = XXG_STAIR_HALF_WIDTH + 0.5 * wall_t
+    back_z = XXG_STAIR_Z_BACK - 0.5 * wall_t
+    wall_z0, wall_z1 = XXG_STAIR_Z_BACK - wall_t, 4.30
+    z_bot = XXG_STAIR_Z_TOP - (XXG_STAIR_RISERS - 1) * XXG_STAIR_TREAD
+    nosing, glow = 'bronze', 'beige_lit'
+
+    # 25 risers x 0.168 m, 24 treads x 0.30 m; each tread's inner edge carries a bronze nosing.
+    thk, nose_w = 0.016, 0.05
+    m.box(0.0, y_base, XXG_STAIR_Z_TOP + 0.05, well_w, grade - thk - y_base, 0.10, 'beige')
+    m.box(0.0, grade - thk, XXG_STAIR_Z_TOP + 0.5 * nose_w, well_w, thk + 0.004, nose_w, nosing)
+    for i in range(XXG_STAIR_RISERS - 1):
+        top = grade - (i + 1) * XXG_STAIR_RISER
+        outer = XXG_STAIR_Z_TOP - i * XXG_STAIR_TREAD
+        inner = outer - XXG_STAIR_TREAD
+        m.box(0.0, y_base, 0.5 * (outer + inner), well_w, top - thk - y_base, XXG_STAIR_TREAD, 'beige')
+        m.box(0.0, top - thk, outer - 0.5 * (XXG_STAIR_TREAD - nose_w), well_w, thk, XXG_STAIR_TREAD - nose_w, 'pave')
+        m.box(0.0, top - thk, inner + 0.5 * nose_w, well_w, thk + 0.004, nose_w, nosing)
+    m.box(0.0, y_base, 0.5 * (XXG_STAIR_Z_BACK + z_bot), well_w, y_b1 - y_base, z_bot - XXG_STAIR_Z_BACK, 'pave')
+
+    # Side walls and the back wall rise 1.08 m above the plaza as parapets.
+    m.box(-wall_x, y_base, 0.5 * (wall_z0 + wall_z1), wall_t, wall_top - y_base, wall_z1 - wall_z0, 'beige', collide=True)
+    m.box(wall_x, y_base, 0.5 * (wall_z0 + wall_z1), wall_t, wall_top - y_base, wall_z1 - wall_z0, 'beige', collide=True)
+    door_top = y_b1 + XXG_DOOR_HEIGHT
+    pier_w = XXG_STAIR_HALF_WIDTH - XXG_DOOR_HALF_WIDTH
+    door_w = 2.0 * XXG_DOOR_HALF_WIDTH
+    for sx in (-1.0, 1.0):
+        m.box(sx * (XXG_DOOR_HALF_WIDTH + 0.5 * pier_w), y_base, back_z, pier_w, door_top - y_base, wall_t, 'beige', collide=True)
+    m.box(0.0, y_base, back_z, door_w, y_b1 - y_base, wall_t, 'beige', collide=True)
+    m.box(0.0, door_top, back_z, well_w, wall_top - door_top, wall_t, 'beige', collide=True)
+
+    # B1 doors: aluminium frame, two closed glass leaves, warm lit lobby panel behind.
+    frame_w, frame_d, sill_h = 0.08, 0.12, 0.04
+    inner_w = door_w - 2.0 * frame_w
+    inner_h = XXG_DOOR_HEIGHT - frame_w - sill_h
+    for sx in (-1.0, 1.0):
+        m.box(sx * (XXG_DOOR_HALF_WIDTH - 0.5 * frame_w), y_b1, back_z, frame_w, XXG_DOOR_HEIGHT, frame_d, 'alum', collide=True)
+    m.box(0.0, door_top - frame_w, back_z, inner_w, frame_w, frame_d, 'alum')
+    m.box(0.0, y_b1, back_z, inner_w, sill_h, frame_d, 'alum')
+    stile_w, gap = 0.06, 0.01
+    leaf_w = (XXG_DOOR_HALF_WIDTH - frame_w) - (gap + stile_w)
+    for sx in (-1.0, 1.0):
+        m.box(sx * (gap + 0.5 * stile_w), y_b1 + sill_h, back_z, stile_w, inner_h, 0.08, 'alum')
+        m.box(sx * (gap + stile_w + 0.5 * leaf_w), y_b1 + sill_h, back_z, leaf_w, inner_h, 0.04, 'glass', collide=True)
+        m.beam([sx * 0.16, y_b1 + 0.85, back_z + 0.08], [sx * 0.16, y_b1 + 1.45, back_z + 0.08], 0.02, 'alum', sections=6)
+    m.box(0.0, y_b1 - 0.10, back_z - 0.25, door_w + 0.40, XXG_DOOR_HEIGHT + 0.20, 0.06, glow)
+    m.sign_quad(0.0, door_top + 0.15, XXG_STAIR_Z_BACK + 0.02, door_w, 0.50, 'xiaoxianggang')
+
+    # Handrails 0.90 m over the nosing line, wall brackets, and a lit strip below them.
+    rail_x = XXG_STAIR_HALF_WIDTH - 0.10
+    slope_end = z_bot - XXG_STAIR_TREAD
+    rail_back = XXG_STAIR_Z_BACK + 0.12
+    strip_x = XXG_STAIR_HALF_WIDTH - 0.015
+    lo, hi = 0.70, 0.76
+    for sx in (-1.0, 1.0):
+        rx, wx = sx * rail_x, sx * XXG_STAIR_HALF_WIDTH
+        m.beam([rx, grade + 0.90, XXG_STAIR_Z_TOP], [rx, y_b1 + 0.90, slope_end], 0.03, 'alum', sections=6)
+        m.beam([rx, y_b1 + 0.90, slope_end], [rx, y_b1 + 0.90, rail_back], 0.03, 'alum', sections=6)
+        for frac in (0.04, 0.36, 0.68, 1.0):
+            bz = XXG_STAIR_Z_TOP + (slope_end - XXG_STAIR_Z_TOP) * frac
+            by = grade + 0.90 + (y_b1 - grade) * frac
+            m.beam([rx, by, bz], [wx, by, bz], 0.018, 'alum', sections=4)
+        lx = sx * strip_x
+        verts = [
+            (lx, grade + lo, XXG_STAIR_Z_TOP), (lx, y_b1 + lo, slope_end), (lx, y_b1 + lo, rail_back),
+            (lx, y_b1 + hi, rail_back), (lx, y_b1 + hi, slope_end), (lx, grade + hi, XXG_STAIR_Z_TOP),
+        ]
+        faces = [[0, 1, 4], [0, 4, 5], [1, 2, 3], [1, 3, 4]] if sx < 0 else [[0, 4, 1], [0, 5, 4], [1, 3, 2], [1, 4, 3]]
+        m.mesh(verts, faces, glow)
+
+    # Sign pylons stand on the back wall instead of over the open well.
+    for sx in (-1.0, 1.0):
+        m.beam([sx * wall_x, wall_top, back_z], [sx * wall_x, grade + 3.10, back_z], 0.14, 'alum', sections=6, collide=True)
+    m.box(0.0, grade + 2.55, back_z, 5.26, 0.88, 0.24, 'dark')
+    m.sign_quad(0.0, grade + 2.57, back_z + 0.15, 4.95, 0.84, 'xiaoxianggang', double_sided=True)
     m.pose = (0.0, 0.0, 0.0, 0.0)
 
 
@@ -175,7 +286,8 @@ def build_central_square(m: Builder):
     catalog = json.loads((Path(__file__).resolve().parents[1]/'landmarks.json').read_text())
     mask = polygon(next(entry['flatten']['polygon'] for entry in catalog if entry['id']=='central_square'))
     frontage = mask.difference(mask.buffer(-4))
-    civic_plaza(m, plaza_ring, frontage)
+    portals = _xxg_portals()
+    civic_plaza(m, plaza_ring, frontage, holes=[_portal_hole_ring(*p) for p in portals] if m.detail else None)
 
     # ------------------------------------------------------------------
     # 2. Circular Musical Fountain Assembly Plaza (center at along=+22, across=0)
@@ -251,7 +363,8 @@ def build_central_square(m: Builder):
     if m.detail:
         for side in (-1, 1):
             for row in (-46.0, -60.0, -74.0):
-                for col in (24.0, 36.0):
+                # col 26 (not 24) keeps the row -74 planters clear of the open W1/W2 stairwells.
+                for col in (26.0, 36.0):
                     bx, bz = _ax_pt(row, side * col)
                     m.pose = (bx, 0.06, bz, AXIS_YAW)
                     m.box(0, 0.0, 0, 6.6, 0.38, 6.6, 'beige', collide=True)
@@ -268,11 +381,9 @@ def build_central_square(m: Builder):
     for side in (-1, 1):
         px, pz = _ax_pt(-38.0, side * 28.0)
         _glass_pyramid(m, px, pz, AXIS_YAW, base_w=7.8, h=4.8)
-        if m.detail:
-            ux, uz = _ax_pt(-22.0, side * 26.5)
-            _underground_portal(m, ux, uz, AXIS_YAW + (0.0 if side > 0 else math.pi))
-            ux2, uz2 = _ax_pt(-78.0, side * 19.5)
-            _underground_portal(m, ux2, uz2, AXIS_YAW)
+    if m.detail:
+        for ux, uz, uyaw in portals:
+            _underground_portal(m, ux, uz, uyaw)
 
     dx_dome, dz_dome = _ax_pt(-32.0, -56.0)
     ico = trimesh.creation.icosphere(subdivisions=2 if m.detail else 1, radius=4.2)

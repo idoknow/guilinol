@@ -16,6 +16,9 @@ import {
   createTextureUploadCache,
   createXiaoxianggangMaterials,
   resolveShopLook,
+  XXG_SHOP_SIGNS,
+  XXG_SIGN_PLAQUES,
+  isLitSignStyle,
 } from './index.ts'
 import { XXG_BUDGET } from '../contract.ts'
 
@@ -108,7 +111,7 @@ test('zero duplicate GPU texture uploads across variants and shared cache re-mou
   }
 })
 
-test('material pixel synthesis encodes real terrazzo chips, ceiling light cutouts, and corrugated shutter normals', () => {
+test('material pixel synthesis encodes real terrazzo chips, ceiling boards with T-rails, and corrugated shutter normals', () => {
   const pack = createXiaoxianggangMaterials()
   try {
     // 1. 水磨石地砖：底色与分格缝及骨料碎点有真实方差
@@ -122,15 +125,18 @@ test('material pixel synthesis encodes real terrazzo chips, ceiling light cutout
     }
     assert.ok(maxLum - minLum > 90, `terrazzo contrast should exceed 90, got ${maxLum - minLum}`)
 
-    // 2. 吊顶矩阵方灯：emissiveMap 既有灭格 (0) 又有亮灯方格 (>200)
+    // 2. 吊顶：方灯改由场景几何嵌入，贴图只剩龙骨 (0) 与带柔光的矿棉板；不再烘焙亮灯格
     const ceilEm = pack.ceilingGrid.emissiveMap.image.data
-    let darkPx = 0
-    let litPx = 0
+    let railPx = 0
+    let boardPx = 0
+    let bakedLampPx = 0
     for (let i = 0; i < ceilEm.length; i += 4) {
-      if (ceilEm[i] === 0 && ceilEm[i + 1] === 0) darkPx++
-      else if (ceilEm[i] > 200) litPx++
+      if (ceilEm[i] === 0 && ceilEm[i + 1] === 0) railPx++
+      else if (ceilEm[i] >= 150 && ceilEm[i] <= 220) boardPx++
+      if (ceilEm[i] > 230) bakedLampPx++
     }
-    assert.ok(darkPx > 1000 && litPx > 1000, `ceiling must contain both dark acoustic boards (${darkPx}) and lit LED panels (${litPx})`)
+    assert.ok(railPx > 1000 && boardPx > 20000, `ceiling must contain dark T-rails (${railPx}) and softly lit boards (${boardPx})`)
+    assert.equal(bakedLampPx, 0, 'lamp panels belong to the geometry lamp matrix, not the ceiling texture')
 
     // 3. 金属波纹卷帘门法线：垂直 Y 分量应因水平波纹反复正负起伏
     const shNorm = pack.rollerShutterSilver.normalMap.image.data
@@ -177,6 +183,47 @@ test('sign atlas rects stay non-overlapping and remap PlaneGeometry UVs cleanly'
     assert.ok(u >= rect[0] && u <= rect[2], `remapped u=${u} outside [${rect[0]}, ${rect[2]}]`)
     assert.ok(v >= 1 - rect[3] && v <= 1 - rect[1], `remapped v=${v} outside [${1 - rect[3]}, ${1 - rect[1]}]`)
   }
+})
+
+test('every named B1 shop gets its own sign cell, with varied crafts and forms', () => {
+  const layout = JSON.parse(fs.readFileSync(path.join(REPO_ROOT, 'web/src/xiaoxianggang/layout/xiaoxianggang-b1.layout.json'), 'utf8'))
+  const named = layout.shops.filter(s => s.name && s.name.trim().length > 0)
+  for (const shop of named) assert.ok(XXG_SHOP_SIGNS[shop.id], `shop ${shop.id} has no sign`)
+  const ids = new Set(layout.shops.map(s => s.id))
+  for (const id of Object.keys(XXG_SHOP_SIGNS)) assert.ok(ids.has(id), `sign for unknown shop ${id}`)
+
+  // Every cell in the atlas (named slots, shop fascias, blades, rounds) is its own rectangle.
+  const legacy = new Set(Object.values(SIGN_ATLAS_RECTS))
+  const cells = Object.entries(SIGN_ATLAS_RECTS)
+  const shopRects = new Set()
+  for (const sign of Object.values(XXG_SHOP_SIGNS)) {
+    assert.equal(shopRects.has(sign.rect), false, `${sign.shopId} shares a fascia cell`)
+    shopRects.add(sign.rect)
+    if (!legacy.has(sign.rect)) cells.push([sign.shopId, sign.rect])
+    if (sign.extra) cells.push([`${sign.shopId}:${sign.extra.kind}`, sign.extra.rect])
+  }
+  for (let i = 0; i < cells.length; i++) {
+    const [nameA, a] = cells[i]
+    assert.ok(a[0] >= 0 && a[1] >= 0 && a[2] <= 1 && a[3] <= 1, `${nameA} outside the atlas`)
+    for (let j = i + 1; j < cells.length; j++) {
+      const [nameB, b] = cells[j]
+      const overlap = a[0] < b[2] - 1e-6 && a[2] > b[0] + 1e-6 && a[1] < b[3] - 1e-6 && a[3] > b[1] + 1e-6
+      assert.equal(overlap, false, `atlas cells ${nameA} and ${nameB} overlap`)
+    }
+  }
+
+  const signs = Object.values(XXG_SHOP_SIGNS)
+  const styles = new Set(signs.map(s => s.face.style))
+  const forms = new Set(signs.map(s => s.form))
+  assert.ok(styles.size >= 7, `expected 7 crafts, got ${[...styles]}`)
+  assert.ok(forms.size >= 3, `expected 3 forms, got ${[...forms]}`)
+  assert.ok(signs.some(s => !isLitSignStyle(s.face.style)) && signs.some(s => isLitSignStyle(s.face.style)))
+  assert.ok(signs.filter(s => s.extra?.kind === 'blade').length >= 6)
+  assert.ok(signs.filter(s => s.extra?.kind === 'round').length >= 6)
+  assert.ok(new Set(signs.map(s => s.cn)).size >= signs.length - 2, 'shop names should not repeat')
+
+  const text = JSON.stringify([signs.map(s => [s.cn, s.sub, s.badge, s.extra?.text]), XXG_SIGN_PLAQUES.map(p => [p.cn, p.sub, p.badge])])
+  assert.equal(/提示|Tip|小贴士|[!！]|[\p{Emoji_Presentation}]/u.test(text), false)
 })
 
 test('UI tokens and signage config comply with docs/design-rules.md (no emojis, gradients, tips, or !) ', () => {
