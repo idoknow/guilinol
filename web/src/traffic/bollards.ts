@@ -311,7 +311,8 @@ export function bollards(scene: THREE.Scene, groundAt: GroundAt, surfaceAt: Surf
       // Posts whose look found no drawn reading left this frame (or one still being taken in): one more, if there is one left.
       for (const slot of wanting) {
         if (drawnBudget <= 0) break
-        if (slots.get(slot.post.key) !== slot || slot.state !== 'drawn' || !inReach(slot)) { wanting.delete(slot); continue }
+        // Out of the queue: the wait for a reading starts afresh when the post is next looked at.
+        if (slots.get(slot.post.key) !== slot || slot.state !== 'drawn' || !inReach(slot)) { wanting.delete(slot); slot.drawnSince = -1; continue }
         if (!readDrawn(slot)) continue
         const base = baseOf(slot)
         if (Math.abs(base - slot.y) <= SAME_HEIGHT) continue

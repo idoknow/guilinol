@@ -8,8 +8,9 @@
 // - The ground mesh of each street tile (`world.ts` `detail`: the first child of the tile group, an
 //   unnamed `Mesh` on a 256 × 256 `PlaneGeometry` with a textured `MeshStandardMaterial`; the group is
 //   added straight to the scene at `(tile.x, 0, tile.z)`). It is a regular grid, read the way
-//   `walk/physics.ts` reads it; where a tunnel or underpass cut triangles out of it the remaining ones
-//   keep their order, so the cell is found by a binary search. A cell that was cut away reads nothing.
+//   `walk/physics.ts` reads it. Where a tunnel or underpass cut triangles out of it, or a platform ramp
+//   replaced some (`platform-access.ts`), the grid triangles that are left are looked up once per index
+//   buffer. A cell that was cut away or replaced reads nothing.
 // - The street surface layer (`batch.ts` `StaticLayerBatch` with `streetSurfaceMat`: pavements, roads,
 //   paint, draped up to 0.195 m above the ground mesh). One merged mesh for all tiles; its
 //   `userData.tileSlices()` says which triangles belong to which tile. The triangles of a tile are put
@@ -20,16 +21,19 @@
 import * as THREE from 'three'
 
 /**
- * Highest drawn ground or street surface at `(x, z)` within `REACH` of `near`.
+ * Highest drawn ground or street surface at `(x, z)` within `DRAWN_REACH` of `near`.
  * `undefined`: not known yet (a tile or its street surface still being taken in) — ask again later;
  * `null`: nothing drawn there that can be read.
  */
 export type DrawnGroundAt = (x: number, z: number, near: number) => number | null | undefined
 
 const TILE = 256
-const REACH = 1
+/** What counts as the ground at a point: the same band the posts accept around their collider (`bollards.ts` `HEIGHT_BAND`). A wider reach lets a deck edge 0.8 m up hide the pavement under it. */
+export const DRAWN_REACH = .6
 /** Street triangles put into buckets per call: estimated at about 0.1 ms on a desktop, under 1 ms on a phone at a quarter of the speed. */
 export const BUCKET_PER_CALL = 2048
+/** Bucket entries written per call: a long triangle lies in many buckets, so the triangle count alone does not bound the work. */
+export const BUCKET_WRITES_PER_CALL = 8192
 const BUCKET = 8
 const BUCKETS = TILE / BUCKET
 /** Scene children are looked through again at most this often (ms) when a point has no tile. */
@@ -71,6 +75,8 @@ export function drawnGround(scene: THREE.Scene, streetMaterial: THREE.Material, 
   let streets: THREE.Mesh | undefined
   let refreshedAt = -Infinity
   const buckets = new Map<object, Buckets>()
+  /** Per index buffer of a ground mesh that is not in `PlaneGeometry` order: where each grid triangle is, -1 if gone. */
+  const lookups = new WeakMap<object, Int32Array>()
 
   function refresh() {
     refreshedAt = now()
@@ -95,7 +101,7 @@ export function drawnGround(scene: THREE.Scene, streetMaterial: THREE.Material, 
     }
   }
 
-  /** Ground mesh height at a point of its tile; `null` where that cell was cut out (a tunnel mouth). */
+  /** Ground mesh height at a point of its tile; `null` where that cell was cut out (a tunnel mouth) or replaced (a platform ramp). */
   function groundY(tile: GroundTile, x: number, z: number) {
     const geometry = tile.mesh.geometry as THREE.PlaneGeometry, position = geometry.getAttribute('position'), index = geometry.index
     if (!index || (position as THREE.InterleavedBufferAttribute).isInterleavedBufferAttribute) return null
@@ -115,31 +121,35 @@ export function drawnGround(scene: THREE.Scene, streetMaterial: THREE.Material, 
       }
       return Infinity
     }
-    // Uncut tiles: the cell's two triangles are where `PlaneGeometry` put them. Cut ones: binary search.
-    let at = 2 * cell
-    if (at >= triangles || order(at) !== 2 * cell) {
-      let low = 0, high = triangles
-      while (low < high) {
-        const mid = (low + high) >> 1
-        if (order(mid) < 2 * cell) low = mid + 1
-        else high = mid
+    // Uncut tiles: the cell's two triangles are where `PlaneGeometry` put them. Cut or refined ones: looked up.
+    let first = 2 * cell, second = first + 1
+    if (second >= triangles || order(first) !== first || order(second) !== second) {
+      let lookup = lookups.get(index)
+      if (!lookup) {
+        lookup = new Int32Array(2 * segments * segments).fill(-1)
+        for (let t = 0; t < triangles; t++) {
+          const which = order(t)
+          if (which < lookup.length) lookup[which] = t
+        }
+        lookups.set(index, lookup)
       }
-      at = low
+      first = lookup[2 * cell]; second = lookup[2 * cell + 1]
     }
-    const p = position.array, xyz = (id: number) => id * 3
-    for (let t = at; t < Math.min(triangles, at + 2); t++) {
-      const which = order(t)
-      if (which !== 2 * cell && which !== 2 * cell + 1) continue
-      const i = xyz(ids[t * 3]), j = xyz(ids[t * 3 + 1]), k = xyz(ids[t * 3 + 2])
+    const p = position.array
+    for (const t of [first, second]) {
+      if (t < 0) continue
+      const i = ids[t * 3] * 3, j = ids[t * 3 + 1] * 3, k = ids[t * 3 + 2] * 3
       const y = heightIn(p[i], p[i + 1], p[i + 2], p[j], p[j + 1], p[j + 2], p[k], p[k + 1], p[k + 2], lx, lz)
       if (y !== undefined) return y
     }
-    // Neither triangle of the cell is there, or the point is on neither: cut away, something else is drawn there.
+    // Neither triangle of the cell is there, or the point is on neither: cut away or replaced, something else is drawn there.
     return null
   }
 
   function sliceOf(tile: GroundTile): Slice | undefined {
-    const slices = streets?.userData.tileSlices?.() as Slice[] | undefined
+    // The merged layer joins the scene with the first tiles; one that was not there at the last look is looked for again.
+    if (streets?.parent !== scene && now() - refreshedAt >= REFRESH_MS) refresh()
+    const slices = (streets?.parent === scene ? streets.userData.tileSlices?.() : undefined) as Slice[] | undefined
     if (!slices) return
     for (const slice of slices) if (slice.tile.x === tile.x && slice.tile.z === tile.z) return slice
   }
@@ -165,23 +175,25 @@ export function drawnGround(scene: THREE.Scene, streetMaterial: THREE.Material, 
     const triangles = Math.floor(slice.count / 3)
     if (entry.done < triangles) {
       const end = Math.min(triangles, entry.done + BUCKET_PER_CALL)
-      for (let t = entry.done; t < end; t++) {
+      let t = entry.done
+      for (let writes = 0; t < end && writes < BUCKET_WRITES_PER_CALL; t++) {
         const i = vertex(t * 3), j = vertex(t * 3 + 1), k = vertex(t * 3 + 2)
         const x0 = Math.min(p[i], p[j], p[k]) - tile.x, x1 = Math.max(p[i], p[j], p[k]) - tile.x
         const z0 = Math.min(p[i + 2], p[j + 2], p[k + 2]) - tile.z, z1 = Math.max(p[i + 2], p[j + 2], p[k + 2]) - tile.z
         const c0 = Math.max(0, Math.floor(x0 / BUCKET)), c1 = Math.min(BUCKETS - 1, Math.floor(x1 / BUCKET))
         const r0 = Math.max(0, Math.floor(z0 / BUCKET)), r1 = Math.min(BUCKETS - 1, Math.floor(z1 / BUCKET))
         for (let row = r0; row <= r1; row++) for (let col = c0; col <= c1; col++) (entry.cells[row * BUCKETS + col] ??= []).push(t)
+        writes += Math.max(0, r1 - r0 + 1) * Math.max(0, c1 - c0 + 1)
       }
-      entry.done = end
-      if (end < triangles) return undefined
+      entry.done = t
+      if (t < triangles) return undefined
     }
     const col = Math.min(BUCKETS - 1, Math.max(0, Math.floor((x - tile.x) / BUCKET))), row = Math.min(BUCKETS - 1, Math.max(0, Math.floor((z - tile.z) / BUCKET)))
     let best: number | null = null
     for (const t of entry.cells[row * BUCKETS + col] ?? []) {
       const i = vertex(t * 3), j = vertex(t * 3 + 1), k = vertex(t * 3 + 2)
       const y = heightIn(p[i], p[i + 1], p[i + 2], p[j], p[j + 1], p[j + 2], p[k], p[k + 1], p[k + 2], x, z)
-      if (y !== undefined && Math.abs(y - near) <= REACH && (best === null || y > best)) best = y
+      if (y !== undefined && Math.abs(y - near) <= DRAWN_REACH && (best === null || y > best)) best = y
     }
     return best
   }
@@ -194,7 +206,7 @@ export function drawnGround(scene: THREE.Scene, streetMaterial: THREE.Material, 
     const ground = groundY(tile, x, z)
     // The ground was cut away here (tunnel mouth, underpass): what is drawn instead is not read.
     if (ground === null) return null
-    const top = Math.abs(ground - near) <= REACH ? ground : null
+    const top = Math.abs(ground - near) <= DRAWN_REACH ? ground : null
     if (street !== null && (top === null || street > top)) return street
     return top
   }

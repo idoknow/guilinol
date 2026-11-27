@@ -521,6 +521,19 @@ test('bollards: a drawn reading still being taken in — the post waits on the c
   assert.ok(world.drawnCalls <= 4 * 60 + 4, `${world.drawnCalls} reads`)
 })
 
+test('bollards: the wait for a reading starts afresh after the player was away — no 30 s lock on the collider', () => {
+  let ready = false
+  const {world, posts, run} = town({drawn: () => ready ? 149.95 : undefined})
+  run(2)
+  assert.deepEqual(basesOf(posts), [150.12, 150.12, 150.12, 150.12])
+  // Away for longer than DRAWN_WAIT (5 s), then back with the tile still being taken in for a second.
+  run(7, {x: 55, z: 400})
+  run(1)
+  ready = true
+  run(3)
+  assert.deepEqual(basesOf(posts), [149.95, 149.95, 149.95, 149.95], `${world.drawnCalls} reads`)
+})
+
 test('bollards: at most one drawn-ground reading per frame, the eight collider reads unchanged', () => {
   const {world, posts, frame} = town({shifts: [0, 30, -40], drawn: () => 149.95})
   let mostDrawn = 0, mostGround = 0
@@ -684,7 +697,7 @@ test('drawnGround: a ground mesh with triangles cut out (tunnel mouth) is still 
 })
 
 test('drawnGround: the street surface layer is read on top of the ground, bucketed a few thousand triangles per reading', async () => {
-  const {drawnGround, BUCKET_PER_CALL} = await import('../web/src/traffic/drawn-ground.ts')
+  const {drawnGround, BUCKET_PER_CALL, DRAWN_REACH} = await import('../web/src/traffic/drawn-ground.ts')
   const scene = new THREE.Scene(), street = new THREE.MeshStandardMaterial({side: THREE.DoubleSide})
   const left = groundTile(-256, 0, 32, gentle), right = groundTile(0, 0, 32, gentle)
   const strip = pavement(0, 0, gentle)
@@ -707,7 +720,79 @@ test('drawnGround: the street surface layer is read on top of the ground, bucket
   // The other tile is read from its own part of the buffer (small: bucketed in one pass).
   const west = rayDown([left.mesh, layer], -256 + 15, 102)
   assert.ok(near(drawnAt(-256 + 15, 102, west), west, 1e-4) && near(west, gentle(15, 102) + .195, 1e-3))
-  // A surface more than a metre above the asked height is something else: only the ground is returned.
+  // A surface more than DRAWN_REACH (0.6 m) from the asked height is something else: only the ground is returned.
   const ground = rayDown([right.mesh], 120, 102)
-  assert.ok(near(drawnAt(120, 102, ground - .9), ground, 1e-4), 'pavement 1.1 m above the asked height: ground only')
+  assert.equal(DRAWN_REACH, .6)
+  assert.ok(near(drawnAt(120, 102, ground - .5), ground, 1e-4), 'pavement 0.7 m above the asked height: ground only')
+  // A deck edge 0.8 m up does not hide the pavement under it: neither is the other's business.
+  assert.ok(near(drawnAt(120, 102, ground + .195 + .5), ground + .195, 1e-4), 'asked 0.5 m above the pavement: the pavement')
+  assert.equal(drawnAt(120, 102, ground + 1.2), null, 'nothing drawn within reach of the asked height')
+})
+
+test('drawnGround: a ground mesh with triangles replaced part-way (platform ramp) is read everywhere else; the replaced cells read nothing', async () => {
+  const {drawnGround} = await import('../web/src/traffic/drawn-ground.ts')
+  const {refinePlatformTerrain} = await import('../web/src/platform-access.ts')
+  const scene = new THREE.Scene(), street = new THREE.MeshStandardMaterial({side: THREE.DoubleSide})
+  const {group, mesh} = groundTile(0, 0, 32, hilly)
+  const index = mesh.geometry.index.array, position = mesh.geometry.getAttribute('position'), faces = [], replaced = new Set()
+  // Cells (col 4–9, row 6): each triangle replaced by three (split at its centroid), so everything after shifts in the index buffer.
+  for (let col = 4; col <= 9; col++) for (const half of [0, 1]) {
+    const t = 2 * (6 * 32 + col) + half, ids = [index[t * 3], index[t * 3 + 1], index[t * 3 + 2]]
+    const [a, b, c] = ids.map(id => [position.getX(id), position.getY(id), position.getZ(id)])
+    const m = [0, 1, 2].map(axis => (a[axis] + b[axis] + c[axis]) / 3)
+    faces.push([ids, [a, b, m, b, c, m, c, a, m]])
+    replaced.add(6 * 32 + col)
+  }
+  refinePlatformTerrain(mesh.geometry, faces)
+  assert.equal(mesh.geometry.index.count / 3, 2 * 32 * 32 + 12 * 2)
+  scene.add(group, streetLayer(street, []))
+  let clock = 0
+  const drawnAt = drawnGround(scene, street, () => clock)
+  assert.equal(drawnAt(1, 1, 150), undefined)
+  clock = 5000
+  let hits = 0, ramps = 0
+  for (let x = .5; x < 256; x += 3.7) for (let z = .5; z < 256; z += 3.3) {
+    const expected = rayDown([mesh], x, z), got = drawnAt(x, z, expected)
+    if (replaced.has(Math.floor(z / 8) * 32 + Math.floor(x / 8))) {
+      ramps++
+      assert.equal(got, null, `${x}, ${z}: replaced, nothing read`)
+    } else {
+      hits++
+      assert.ok(typeof got === 'number' && near(got, expected, 1e-4), `${x}, ${z}: ${got} vs ray ${expected}`)
+    }
+  }
+  assert.ok(hits > 5000 && ramps > 20, `${hits} drawn, ${ramps} replaced`)
+})
+
+test('drawnGround: a street surface layer that joins the scene after the ground is found, and read', async () => {
+  const {drawnGround} = await import('../web/src/traffic/drawn-ground.ts')
+  const scene = new THREE.Scene(), street = new THREE.MeshStandardMaterial({side: THREE.DoubleSide})
+  const {group, mesh} = groundTile(0, 0, 32, gentle)
+  scene.add(group)
+  let clock = 0
+  const drawnAt = drawnGround(scene, street, () => clock)
+  const ground = rayDown([mesh], 120, 102)
+  assert.equal(drawnAt(120, 102, ground), undefined, 'no street surface yet: not believed for two seconds')
+  clock = 2500
+  assert.ok(near(drawnAt(120, 102, ground), ground, 1e-4), 'still none: the ground')
+  scene.add(streetLayer(street, [{tile: {x: 0, z: 0}, triangles: pavement(0, 0, gentle, {x0: 110, x1: 130})}]))
+  clock = 5000
+  let got, waits = 0
+  while ((got = drawnAt(120, 102, ground)) === undefined) assert.ok(++waits < 30, 'bucketing finishes')
+  assert.ok(near(got, ground + .195, 1e-4), `the pavement once the layer is there: ${got}`)
+})
+
+test('drawnGround: bucketing is bounded by bucket entries written too — long triangles take more passes', async () => {
+  const {drawnGround, BUCKET_WRITES_PER_CALL} = await import('../web/src/traffic/drawn-ground.ts')
+  const scene = new THREE.Scene(), street = new THREE.MeshStandardMaterial({side: THREE.DoubleSide})
+  const {group} = groundTile(0, 0, 32, () => 150)
+  // Twenty triangles, each over the whole tile: 32 × 32 buckets apiece.
+  const sheet = height => [[1, height, 1], [1, height, 510], [510, height, 1]]
+  const layer = streetLayer(street, [{tile: {x: 0, z: 0}, triangles: Array.from({length: 20}, (_, index) => sheet(150.1 + index * .01))}])
+  scene.add(group, layer)
+  const drawnAt = drawnGround(scene, street, () => 0)
+  let got, waits = 0
+  while ((got = drawnAt(60, 60, 150)) === undefined) assert.ok(++waits < 30, 'bucketing finishes')
+  assert.equal(waits, Math.ceil(20 / (BUCKET_WRITES_PER_CALL / 1024)) - 1, 'eight whole-tile triangles per pass')
+  assert.ok(near(got, 150.29, 1e-4), `the highest sheet: ${got}`)
 })
