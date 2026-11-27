@@ -73,8 +73,63 @@ BUILDINGS = [
 ]
 
 
+HALL_AXIS = math.atan2(5.50, 11.46)
+
+
+def build_stele_court(model):
+    """Hall-local bay: teaching block ends at -22 m, historic gable at -6.4 m."""
+    model.pose = (0, 0, 0, HALL_AXIS)
+    model.box(-14.2, -0.12, 1.5, 15.1, 0.30, 6.4, 'brick', True)
+    carving = trimesh.creation.icosphere(subdivisions=1)
+
+    def relief(center, scale, color='stone'):
+        model.mesh(carving.vertices * scale + center, carving.faces, color)
+
+    for gate, center in enumerate((-19.15, -14.2, -9.25)):
+        height = 3.65 if gate == 1 else 3.2
+        for offset in (-2.15, -1.25, 1.25, 2.15):
+            post = center + offset
+            crown = height if abs(offset) < 2 else height - 0.45
+            model.box(post, 0.18, 4.05, 0.43, 0.32, 0.54, 'granite', True)
+            model.box(post, 0.50, 4.05, 0.26, crown - 0.50, 0.28, 'stone', True)
+            model.box(post, crown, 4.05, 0.38, 0.13, 0.39, 'granite')
+            relief([post, crown + 0.24, 4.06], [0.13, 0.17, 0.17])
+            if model.detail:
+                relief([post, crown + 0.39, 4.14], [0.11, 0.11, 0.10])
+        for offset, span, top in ((-1.7, 1.18, height - 0.63), (0, 2.88, height - 0.23), (1.7, 1.18, height - 0.63)):
+            model.box(center + offset, top - 0.46, 4.05, span, 0.46, 0.26, 'granite')
+            model.box(center + offset, top, 4.05, span + 0.16, 0.12, 0.38, 'stone')
+            if model.detail:
+                for motif in (-0.3, 0, 0.3):
+                    relief([center + offset + motif * span, top - 0.23, 4.18], [span * 0.12, 0.08, 0.04])
+
+    for row, depth in enumerate((1.8, -0.8)):
+        for index in range(8):
+            center = -20.55 + 1.77 * index + row * 0.43
+            portrait = row == index == 0
+            rounded = (row + index) % 2 != 0
+            height = 2.44 if portrait else 2.05 + 0.12 * ((row + index) % 4)
+            width = 1.48 if portrait else 1.03
+            model.box(center, 0.18, depth, width + 0.24, 0.27, 0.58, 'granite', True)
+            model.box(center, 0.45, depth, width, height - 0.45, 0.22, 'granite', True)
+            if rounded:
+                relief([center, height, depth], [width / 2, 0.28, 0.11], 'granite')
+            else:
+                model.box(center, height - 0.10, depth, width + 0.08, 0.13, 0.30, 'stone')
+            model.box(center, 0.57, depth + 0.11, width - 0.14, height - 0.77, 0.04, 'unlit')
+            if portrait and model.detail:
+                relief([center, 1.92, depth + 0.14], [0.12, 0.17, 0.025])
+                profile = [(-0.09, 1.79), (-0.25, 1.62), (-0.39, 0.77), (0.36, 0.77), (0.24, 1.32), (0.30, 1.49), (0.10, 1.72)]
+                for start, end in zip(profile, profile[1:] + profile[:1]):
+                    model.beam([center + start[0], start[1], depth + 0.15], [center + end[0], end[1], depth + 0.15], 0.019, 'stone')
+    for center, height in ((-21.21, 0.47), (-7.18, 0.31)):
+        model.box(center, 0.18, 2.92, 0.52, 0.22, 0.66, 'granite', True)
+        relief([center, 0.42, 2.92], [0.21, height, 0.31], 'granite')
+    model.pose = (0, 0, 0, 0)
+
+
 def build_kuiguang_lou(model):
-    ang = math.atan2(5.50, 11.46)
+    ang = HALL_AXIS
     model.pose = (0.0, 0.0, 0.0, ang)
 
     w, d = 12.6, 11.2
@@ -263,6 +318,7 @@ def append_heritage_hall(folder):
     def hall(model):
         model.fit_to_grade(SCHOOL)
         build_kuiguang_lou(model)
+        build_stele_court(model)
         build_school_gate(model)
         build_flanking_facades(model)
 
