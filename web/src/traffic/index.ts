@@ -186,7 +186,7 @@ export async function traffic(scene:THREE.Scene,camera:THREE.Camera,verify:boole
       }
       if(verify&&actor.kind!=='person'){
         if(!probeIds.has(actor))probeIds.set(actor,++nextProbeId)
-        mesh.userData.motorLanes.push({id:probeIds.get(actor),street:actor.track.street,lane:actor.track.id,x:actor.x,z:actor.z,speed:actor.speed,leaving:actor.leaving})
+        mesh.userData.motorLanes.push({id:probeIds.get(actor),kind:actor.kind,street:actor.track.street,lane:actor.track.id,x:actor.x,z:actor.z,speed:actor.speed,leaving:actor.leaving})
       }
       if(verify&&actor.kind==='person'&&visible(actor)&&actor.scale>=.99)pedestrians++
       if(verify&&actor.kind!=='person'&&actor.scale>=.99)mesh.userData.allMotors.push(index)
