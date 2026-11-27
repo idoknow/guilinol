@@ -6,7 +6,7 @@ export function sessionMarkPass(renderer: THREE.WebGLRenderer) {
   const material = new THREE.ShaderMaterial({uniforms, transparent:true, depthTest:false, depthWrite:false,
     vertexShader:'void main(){gl_Position=vec4(position.xy,0.,1.);}',
     fragmentShader:`uniform sampler2D tile; uniform float height, ratio;
-      void main(){vec2 pixel=vec2(gl_FragCoord.x,height-gl_FragCoord.y)/ratio;
+      void main(){vec2 pixel=vec2(gl_FragCoord.x,height-gl_FragCoord.y);
         gl_FragColor=vec4(texture2D(tile,pixel/512.).rgb,.04);}`})
   const scene = new THREE.Scene(), camera = new THREE.Camera()
   const quad = new THREE.Mesh(new THREE.PlaneGeometry(2,2),material)
