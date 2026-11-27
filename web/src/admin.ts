@@ -92,7 +92,7 @@ async function api<T = any>(path: string, data?: unknown, method=data===undefine
             ? { cache: 'no-store' }
             : data
               ? { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) }
-              : { method },
+              : { method, cache: 'no-store' },
         )
       } catch {
         throw new ApiError(0, 'network', '网络连接失败，请检查网络后重试')
