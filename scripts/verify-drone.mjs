@@ -35,18 +35,17 @@ try {
   // The drone entry lives behind the dock's 工具 menu (web/src/play/index.ts builds .dock-buttons
   // collapsed), so open it before asserting that the button is really on screen.
   await page.waitForSelector('.dock-more', {state: 'attached', timeout: 120000})
-  await page.evaluate(() => {
-    const more = document.querySelector('.dock-more')
-    if (more instanceof HTMLElement && document.querySelector('#dock-menu')?.hasAttribute('hidden')) more.click()
-  })
   await page.waitForFunction(() => {
+    // Re-open the menu on every poll: under load the arrival veil can close it again after the first click.
+    const more = document.querySelector('.dock-more')
+    if (more instanceof HTMLElement && !document.querySelector('.ld-veil.busy') && document.querySelector('#dock-menu')?.hasAttribute('hidden')) more.click()
     const entry = document.querySelector('.dock-drone')
     if (!entry) return false
     const rect = entry.getBoundingClientRect()
     if (!rect.width) return false
     const hit = document.elementFromPoint(rect.x + rect.width / 2, rect.y + rect.height / 2)
     return !!hit && entry.contains(hit)
-  }, null, {timeout: 120000})
+  }, null, {timeout: 240000, polling: 1000})
   await page.evaluate(() => {
     const canvas = document.querySelector('canvas[data-engine]')
     if (canvas instanceof HTMLElement) {
