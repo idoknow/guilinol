@@ -500,8 +500,18 @@ function evalRoadCtrlLocal([baseMm, deltas]: RoadCtrl, lx: number, lz: number): 
 
 type FrontageBuilding = readonly [number,number,Pair[][],number,number,number,...unknown[]]
 
+export const isRenminTile=(x:number,z:number)=>x===-768&&z===256
+
+function meshHeight(field:Int16Array,east:number,south:number,step:number){
+  const column=Math.min(256/step-1,Math.floor(east/step)),row=Math.min(256/step-1,Math.floor(south/step))
+  const u=east/step-column,v=south/step-row,stride=step/4,index=(65*row+column)*stride
+  const northWest=field[index],northEast=field[index+stride],southWest=field[index+65*stride],southEast=field[index+66*stride]
+  return (u+v<=1?northWest+(northEast-northWest)*u+(southWest-northWest)*v:southEast+(southWest-southEast)*(1-u)+(northEast-southEast)*(1-v))/10
+}
+
 export function gradeRenminShoulder(tileX:number,tileZ:number,terrain:Int16Array,underlay:Int16Array,water:Int16Array,ctrl:RoadCtrl|null|undefined,buildings:readonly FrontageBuilding[]){
-  if(tileX!==-768||tileZ!==256||!ctrl)return
+  if(!isRenminTile(tileX,tileZ)||!ctrl)return
+  const before=underlay.slice(),step=water.some(value=>value!==-32768)?4:8
   const fronts=buildings.filter(part=>[4042625074,1145105554,435677566].includes(part[5]))
   for(const [base,,[ring]] of fronts){
     const bounds=ringBounds(ring)
@@ -531,6 +541,9 @@ export function gradeRenminShoulder(tileX:number,tileZ:number,terrain:Int16Array
       ctrl[1][index]=Math.min(ctrl[1][index],Math.round((cap-.10)*1000)-ctrl[0])
     })
   }
+  const after=underlay.slice()
+  const lowering=(east:number,south:number)=>meshHeight(before,east,south,step)-meshHeight(after,east,south,step)
+  return {lowering,rootHeight:(east:number,south:number,baked:number)=>lowering(east,south)>0?meshHeight(after,east,south,step):baked}
 }
 
 function extractDeckComponentsAndOpenEdges(deck: Float32Array, thin: ReadonlySet<number>) {

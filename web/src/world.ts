@@ -14,7 +14,7 @@ import {chunkWater, farWater} from './look/water'
 import type {TileBatchInput} from './batch'
 import type {Peaks} from './peaks'
 import {cutStairwellStreets,getRegisteredShizijieUnderground,groundStairwellsReady,joinPortalRoads,tunnelGeometry,type GroundCutout,type ShizijieUnderpass,type Tunnel} from './tunnels'
-import {gradeRenminShoulder,repairBridgeDeck,setBridgeRepairKeepouts} from './ground-repair'
+import {gradeRenminShoulder,isRenminTile,repairBridgeDeck,setBridgeRepairKeepouts} from './ground-repair'
 import {freezeStatic} from './static-freeze'
 
 interface Asset {file:string; bytes:number}
@@ -352,12 +352,13 @@ function buildSurfaceLookup(tile:Tile,paths:Streets){
   }
 }
 
-export async function detail(tile:Tile, signal:AbortSignal, parseSlot?:()=>Promise<void>, tunnels?:Tunnel[], groundCutouts?:GroundCutout[], underpass?:ShizijieUnderpass) {
-  const shardReady = ensureShardForTile(tile.x,tile.z)
+async function readDetailBuffer(tile:Tile,signal:AbortSignal){
   const compressed = await fetchAsset(tile.file,signal)
-  const buffer = await new Response(new Blob([compressed]).stream().pipeThrough(new DecompressionStream('gzip'))).arrayBuffer()
-  if(parseSlot) await parseSlot()
-  signal.throwIfAborted()
+  return new Response(new Blob([compressed]).stream().pipeThrough(new DecompressionStream('gzip'))).arrayBuffer()
+}
+
+const shoulderGrades=new WeakMap<Tile,ReturnType<typeof gradeRenminShoulder>>()
+function unpackDetail(tile:Tile,buffer:ArrayBuffer){
   const view = new DataView(buffer)
   if(view.getUint32(0)!==0x474c3034) throw Error('Invalid GL04 tile')
   const [vertices,count,collision,imageBytes,triangles] = [4,8,12,16,20].map(offset=>view.getUint32(offset,true))
@@ -374,7 +375,22 @@ export async function detail(tile:Tile, signal:AbortSignal, parseSlot?:()=>Promi
   if(extra!==0 && extra!==8450) throw Error('Invalid GL04 sections')
   const deck = Float32Array.from(new Int16Array(buffer.slice(end,tail)),value=>value/100)
   const underlay = extra ? new Int16Array(buffer.slice(tail)) : terrain
-  gradeRenminShoulder(tile.x,tile.z,terrain,underlay,water,paths[5],solids)
+  if(isRenminTile(tile.x,tile.z))shoulderGrades.set(tile,gradeRenminShoulder(tile.x,tile.z,terrain,underlay,water,paths[5],solids))
+  return {vertices,terrain,underlay,water,paths,rings,thin,deck,rails,signs,railCuts,offset,end,indices,positions,normals,asphalt}
+}
+
+export async function treeGroundGrade(tile:Tile,signal:AbortSignal){
+  if(!isRenminTile(tile.x,tile.z))return
+  if(!shoulderGrades.has(tile))unpackDetail(tile,await readDetailBuffer(tile,signal))
+  return shoulderGrades.get(tile)
+}
+
+export async function detail(tile:Tile, signal:AbortSignal, parseSlot?:()=>Promise<void>, tunnels?:Tunnel[], groundCutouts?:GroundCutout[], underpass?:ShizijieUnderpass) {
+  const shardReady = ensureShardForTile(tile.x,tile.z)
+  const buffer=await readDetailBuffer(tile,signal)
+  if(parseSlot) await parseSlot()
+  signal.throwIfAborted()
+  const {vertices,terrain,underlay,water,paths,rings,thin,deck,rails,signs,railCuts,offset,end,indices,positions,normals,asphalt}=unpackDetail(tile,buffer)
   const sample = (col:number,row:number)=>{
     const index = row*65+col
     return underlay[index]/10

@@ -10,12 +10,28 @@ const start=16924+9*raw.readUInt32LE(4)+4*raw.readUInt32LE(8)
 const [buildings,streets]=JSON.parse(raw.subarray(start,start+raw.readUInt32LE(12)))
 const heights=new Int16Array(raw.buffer,raw.byteOffset+24,4225).slice(),water=new Int16Array(raw.buffer,raw.byteOffset+8474,4225)
 const original=heights.slice(),visible=heights.slice(),originalPaths=structuredClone(streets)
-gradeRenminShoulder(-768,256,heights,visible,water,streets[5],buildings)
+const grade=gradeRenminShoulder(-768,256,heights,visible,water,streets[5],buildings)
 function surface(field,east,south){
   const column=Math.floor(east/4),row=Math.floor(south/4),index=row*65+column,u=east/4-column,v=south/4-row
   const a=field[index],b=field[index+1],c=field[index+65],d=field[index+66]
   return (u+v<=1?a+(b-a)*u+(c-a)*v:d+(c-d)*(1-u)+(b-d)*(1-v))/10
 }
+test('actual baked trees meet the rendered shoulder and untouched roots keep their height',()=>{
+  const trees=gunzipSync(readFileSync(process.env.RENMIN_TREES??'public/world/102_40.trees'))
+  assert.equal(trees.length%12,0)
+  let changed=0,maxError=0
+  const known=[[119.9,103.7],[125.8,106.1],[124.8,149.5]],found=new Set()
+  for(let offset=0;offset<trees.length;offset+=12){
+    const east=trees.readUInt16LE(offset)/100,south=trees.readUInt16LE(offset+2)/100,baked=trees.readInt16LE(offset+4)/10
+    const old=surface(original,east,south),revised=surface(visible,east,south),root=grade.rootHeight(east,south,baked)
+    assert(Math.abs(grade.lowering(east,south)-(old-revised))<1e-8)
+    if(old-revised<1e-8){assert.equal(root,baked);continue}
+    changed++;maxError=Math.max(maxError,Math.abs(root-revised))
+    known.forEach(([x,z],index)=>{if(Math.hypot(east-x,south-z)<.2)found.add(index)})
+    assert(Math.abs(root-revised)<=.15,JSON.stringify({east,south,root,revised}))
+  }
+  assert.equal(found.size,known.length);console.log({trees:trees.length/12,changed,maxError})
+})
 test('actual shop bases and two metres around their exterior walls remain clear',()=>{
   assert.deepEqual(heights,visible);assert(heights.every((value,index)=>value<=original[index]))
   for(const [number,expected] of [[19,1508],[22,1510],[25,1512]]){
