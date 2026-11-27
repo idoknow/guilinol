@@ -440,13 +440,14 @@ export async function detail(tile:Tile, signal:AbortSignal, parseSlot?:()=>Promi
   const activeRings = hasUpgradeShard ? rings.map(b => [...b] as Building) : rings
   const walls = vertices ? buildingGeometry(positions,normals,indices,activeRings,tile.x,tile.z) : null
   for(const [,topLevel] of activeRings) if(topLevel/10+8>maxY) maxY = topLevel/10+8
-  const repairedDeck = deck.length ? repairBridgeDeck(deck,thin,tile.x,tile.z,water,(lx,lz)=>{
+  const terrainLevel=(lx:number,lz:number)=>{
     const col=Math.min(segments-1,Math.max(0,Math.floor(lx/step))),row=Math.min(segments-1,Math.max(0,Math.floor(lz/step))),at=row*stride+col
     const u=lx/step-col,v=lz/step-row,a=heights.getY(at),b=heights.getY(at+1),c=heights.getY(at+stride),d=heights.getY(at+stride+1)
     return u+v<=1?a+(b-a)*u+(c-a)*v:d+(c-d)*(1-u)+(b-d)*(1-v)
-  },paths[0],paths[5]) : null
-  const {deck:activeDeck,thin:activeThin,asphalt:activeAsphalt,pavedTops}=yangqiaoDeck(tile,repairedDeck?.deck??deck,repairedDeck?.thin??thin,asphalt,streets)
-  const bridge = activeDeck.length ? bridgeGeometry(activeDeck,activeThin,activeAsphalt,pavedTops) : null
+  }
+  const repairedDeck = deck.length ? repairBridgeDeck(deck,thin,tile.x,tile.z,water,terrainLevel,paths[0],paths[5]) : null
+  const {deck:activeDeck,thin:activeThin,asphalt:activeAsphalt,pavedTops,flushEnds}=yangqiaoDeck(tile,repairedDeck?.deck??deck,repairedDeck?.thin??thin,asphalt,streets,terrainLevel)
+  const bridge = activeDeck.length ? bridgeGeometry(activeDeck,activeThin,activeAsphalt,pavedTops,flushEnds) : null
   const batch:TileBatchInput = {
     tile, minY, maxY, midY:heights.getY(segments/2*(stride+1)),
     walls, pond:pond?.positions ?? null, bridge,
