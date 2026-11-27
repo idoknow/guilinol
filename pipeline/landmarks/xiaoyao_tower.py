@@ -18,14 +18,41 @@ from jingjiang import Model, SWATCHES, atlas
 from xiaoyao_access import CENTER, FOOT, WIDTH
 
 
+GLOW = {  # 夜景自发光（sRGB，屏上显示≈此值），乘 uNight；按图集格分部位。按 Rock 实拍夜景取色：饱和橙金、蓝通道近 0
+    'glass': '#ff8a24',   # 檐底、封檐板：最亮
+    'green': '#ffcf6a',   # 檐下灯带
+    'gold':  '#ffd98a',   # 匾额金字
+    'sign':  '#7c300a',   # 窗心、匾底：压暗，让木棂条透出来
+    'red':   '#c03e10',   # 柱
+    'wood':  '#b8540e',   # 木构、斗拱、栏杆
+    'earth': '#4a2008',   # 山花、墙龛：压暗
+    'white': '#b07a50',   # 白石台基、栏杆：暖白地灯
+    'leaf':  '#a2704c',   # 台基团花石板
+    'tile':  '#6a2c0a',   # 瓦面：比立面暗
+    'granite': '#6a4a30',
+    'yellow':  '#a07818', # 旗
+}
+GLOW_GAIN = 1.0  # joinery_lit 自发光总增益
+WALL_WASH = [.07, .045, .025]  # stone_lit/brick_lit 城墙淡洗光
+
+
+def glow_atlas():
+    """256×256 emissive atlas: 4×4 cells of 64 px in SWATCHES order."""
+    sheet = Image.new('RGB', (256, 256))
+    for index, key in enumerate(SWATCHES):
+        sheet.paste(GLOW.get(key, '#000000'), ((index%4)*64, (index//4)*64, (index%4)*64+64, (index//4)*64+64))
+    return sheet
+
+
 class LandmarkModel(Model):
-    def __init__(self, detail, flood_roof=False):
+    def __init__(self, detail, flood_roof=False, night_glow=False):
         super().__init__(detail)
         self.curbs=[]
         self.planters=[]
         self.lamps=[]
         self.lit_tiles=[]
         self.flood_roof=flood_roof
+        self.night_glow=night_glow
 
     def fit_to_grade(self, name, datum=0.0):
         """Fit the buried skirt and lower storey to GL04, preserving roof elevations."""
@@ -61,6 +88,10 @@ class LandmarkModel(Model):
             uv = self.uv.pop()*4 - [cell%4, 3-cell//4]
             uv[..., 0] = (uv[..., 0] + (swatch=='earth'))/2
             self.planters.append((self.visible.pop(), uv))
+        elif self.night_glow and isinstance(color,str) and color in ('lamp','roof_soffit','tile'):
+            # Night glow keeps eave lamps, soffits and tiles in joinery_lit; the
+            # emissive atlas cell (green/glass/tile) decides how bright each one is.
+            super().mesh(vertices,faces,{'lamp':'green','roof_soffit':'glass','tile':'tile'}[color],collide)
         elif isinstance(color,str) and color=='lamp':
             super().mesh(vertices,faces,'wood' if self.flood_roof else 'gold',collide)
             self.lamps.append((self.visible.pop(),self.uv.pop()))
@@ -250,7 +281,7 @@ def tower(model):
 
 
 
-def generate(name='xiaoyao_tower', build=tower, folder='E', lift=None, colors=None, smooth=(), flood_roof=False, lettering=None, terrain_offset=None, lateral_offset=None):
+def generate(name='xiaoyao_tower', build=tower, folder='E', lift=None, colors=None, smooth=(), flood_roof=False, lettering=None, terrain_offset=None, lateral_offset=None, night_glow=False):
     import json
     from c_kit import landmark_surface
     from native_paving import NativePaving
@@ -265,16 +296,25 @@ def generate(name='xiaoyao_tower', build=tower, folder='E', lift=None, colors=No
         carve_medallion(image)
     if lettering:
         inscription(image, **lettering)
+    glow = None
+    if night_glow:
+        # Soffits (glass) and eave lamps (green) wear the wood cell by day.
+        index = list(SWATCHES).index('wood')
+        grain = image.crop(((index%4)*128, (index//4)*128, (index%4)*128+128, (index//4)*128+128))
+        for key in ('glass', 'green'):
+            index = list(SWATCHES).index(key)
+            image.paste(grain, ((index%4)*128, (index//4)*128))
+        glow = glow_atlas()
     target = Path(__file__).resolve().parents[2]/'public/textures/landmarks'/folder
     target.mkdir(parents=True, exist_ok=True)
     if colors is None: image.save(target/'timber-and-tile.png', optimize=True)
     scene = trimesh.Scene()
     for level in (0,1):
-        model = LandmarkModel(level==0, flood_roof)
+        model = LandmarkModel(level==0, flood_roof, night_glow)
         build(model)
         group = f'lod{level}'
         scene.graph.update(frame_to=group)
-        def add(parts, uvs, texture, name):
+        def add(parts, uvs, texture, name, emissive=None, emissive_texture=None, role=None):
             vertices = np.concatenate(parts).reshape(-1,3)
             if lateral_offset is not None:
                 vertices[:,2] += lateral_offset(vertices[:,0])
@@ -284,18 +324,25 @@ def generate(name='xiaoyao_tower', build=tower, folder='E', lift=None, colors=No
                 points, inverse = np.unique(vertices[:,::2],axis=0,return_inverse=True)
                 vertices[:,1] += np.array([terrain_offset(x,z) for x,z in points])[inverse]
             coords=np.concatenate(uvs).reshape(-1,2) if texture is not None else None
-            if coords is not None and street_roles.get(name) in ('sidewalk','curb'):
+            if coords is not None and street_roles.get(role or name) in ('sidewalk','curb'):
                 vertices,coords=pavement.clip(vertices,coords)
                 if not len(vertices):return
             mesh = trimesh.Trimesh(vertices, np.arange(len(vertices)).reshape(-1,3), process=False)
             if texture is not None:
                 material = trimesh.visual.material.PBRMaterial(name=name,baseColorTexture=texture,roughnessFactor=1,metallicFactor=0,doubleSided=True)
-                if name.endswith('_lit'):
+                if emissive is not None:
+                    material.emissiveFactor=emissive
+                    if emissive_texture is not None:
+                        material.emissiveTexture=emissive_texture
+                elif name.endswith('_lit'):
                     material.emissiveFactor=[.58,.24,.055] if name=='roof_lit' else [.85,.57,.24]
                 mesh.visual = trimesh.visual.TextureVisuals(uv=coords,material=material)
             scene.add_geometry(mesh,node_name=group+'_'+name if texture else 'collision_surface',parent_node_name=group if texture else scene.graph.base_frame)
         if model.visible:
-            add(model.visible,model.uv,image,'joinery')
+            if night_glow:
+                add(model.visible,model.uv,image,'joinery_lit',[GLOW_GAIN]*3,glow)
+            else:
+                add(model.visible,model.uv,image,'joinery')
         if model.pigmented:
             triangles,colors=zip(*model.pigmented)
             vertices=np.concatenate(triangles).reshape(-1,3)
@@ -320,7 +367,11 @@ def generate(name='xiaoyao_tower', build=tower, folder='E', lift=None, colors=No
         for key, parts in model.tile_parts.items():
             if parts:
                 cell = list(SWATCHES).index(key); left,top=128*(cell%4),128*(cell//4)
-                add([tri for tri,uv in parts],[uv for tri,uv in parts],image.crop((left,top,left+128,top+128)),key)
+                crop = image.crop((left,top,left+128,top+128))
+                if night_glow and key in ('stone','brick'):
+                    add([tri for tri,uv in parts],[uv for tri,uv in parts],crop,key+'_lit',WALL_WASH,crop,key)
+                else:
+                    add([tri for tri,uv in parts],[uv for tri,uv in parts],crop,key)
         if not level:
             add(model.solid,None,None,'collision_surface')
     scene.export(Path(sys.argv[1])/(name+'.glb'))
@@ -328,4 +379,4 @@ def generate(name='xiaoyao_tower', build=tower, folder='E', lift=None, colors=No
 
 if __name__ == '__main__':
     generate(colors={"wood":"#302d30","red":"#70312f","stone":"#cccddb","brick":"#646777",
-                     "white":"#eef0fa","granite":"#c9cbd6","earth":"#383b43","gold":"#e2c996","sign":"#363337","tile":"#404650"}, flood_roof=True)
+                     "white":"#eef0fa","granite":"#c9cbd6","earth":"#383b43","gold":"#e2c996","sign":"#363337","tile":"#404650"}, flood_roof=True, night_glow=True)
