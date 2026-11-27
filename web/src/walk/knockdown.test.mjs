@@ -797,3 +797,164 @@ test('k80/k81 腰挂打印机重做：蓝白涂装 + 护角 + 锯齿出纸口 + 
     props.dispose()
   }
 })
+
+test('high_fall thresholds reject flat jumps/stairs, scale light->heavy, and complete 5-mash recovery across all 5 KnockdownKinds', () => {
+  const flatJump = kdMod.evaluateHighFallImpact({peakDropM: 1.2, netDropM: 0, landingSpeedMs: 8.2, yaw: 0})
+  assert.equal(flatJump, null, '1.2m flat jump must not trigger high_fall')
+  const stairDrop = kdMod.evaluateHighFallImpact({peakDropM: 2.1, netDropM: 1.4, landingSpeedMs: 10.2, yaw: 0})
+  assert.equal(stairDrop, null, 'normal stairs/1.4m curb must not trigger high_fall')
+
+  const light = kdMod.evaluateHighFallImpact({peakDropM: 2.8, netDropM: 2.2, landingSpeedMs: 11.2, horizontalVx: 0, horizontalVz: 0, yaw: 0.4})
+  const medium = kdMod.evaluateHighFallImpact({peakDropM: 4.5, netDropM: 4.2, landingSpeedMs: 14.5, horizontalVx: 3.0, horizontalVz: 0, yaw: 0})
+  const heavy = kdMod.evaluateHighFallImpact({peakDropM: 7.2, netDropM: 6.8, landingSpeedMs: 18.0, horizontalVx: 0, horizontalVz: 0, yaw: 0})
+  assert.ok(light && medium && heavy)
+  assert.equal(light.tier, 'light')
+  assert.equal(medium.tier, 'medium')
+  assert.equal(heavy.tier, 'heavy')
+  assert(light.severity < medium.severity && medium.severity < heavy.severity, 'severity must increase with drop height/speed')
+
+  const straightFallKd = kdMod.createKnockdownState({seed: 3})
+  const straightSnap = straightFallKd.triggerKnockdown('high_fall', light.dir, light.severity, {
+    yaw: 0.4,
+    fallHeight: light.fallHeight,
+    verticalSpeed: light.verticalSpeed,
+    impactSpeed: light.impactSpeed,
+    fromRide: false,
+  })
+  assert.equal(straightSnap.kind, 'high_fall')
+  assert(Math.hypot(straightSnap.knockbackVel.x, straightSnap.knockbackVel.z) < 0.35, 'straight-down high_fall must not rocket horizontally')
+
+  for (const kind of ['vehicle_hit', 'bike_crash', 'high_fall', 'ebike_slip', 'obstacle_trip']) {
+    const kd = kdMod.createKnockdownState({seed: 7})
+    const snap0 = kd.triggerKnockdown(kind, 'front', 0.68, {yaw: 0.2})
+    assert.equal(snap0.kind, kind)
+    assert.equal(kd.isDown, true)
+    let elapsed = 0
+    while (kd.phase === 'falling' || kd.phase === 'stunned') {
+      kd.step(1 / 60)
+      elapsed += 1 / 60
+      assert(elapsed < 6, `${kind} stalled before mashing`)
+    }
+    assert.equal(kd.phase, 'mashing')
+    for (let m = 0; m < 5; m++) {
+      assert.equal(kd.recordRecoverMash(), m === 4)
+      kd.step(0.05)
+    }
+    assert.equal(kd.phase, 'rising')
+    while (kd.isDown) {
+      kd.step(1 / 60)
+      elapsed += 1 / 60
+      assert(elapsed < 10, `${kind} stalled in rising`)
+    }
+    assert.equal(kd.phase, 'idle')
+  }
+})
+
+test('triggerBikeSlipKnockdown and ride.ts triggerSlip + high-speed corner emergency-brake slip flow cleanly', () => {
+  const slipCtrl = kdMod.createKnockdownState({seed: 11})
+  const slipSnap = kdMod.triggerBikeSlipKnockdown({yaw: 0.5, side: -1, speedMs: 8.6, reason: 'shared_turn_slip', controller: slipCtrl})
+  assert.equal(slipSnap.kind, 'ebike_slip')
+  assert.equal(slipSnap.variant, 'bike_slide')
+  assert.equal(slipCtrl.isDown, true)
+
+  const bike = rideMod.createBikeControl()
+  bike.mount(0, 0, 'bike', {vehicleType: 'normal', autoCrash: true, drainEnabled: false, parkStart: false})
+  bike.setGear(4)
+  // Straight-line hard brake from high speed must NOT tip over
+  for (let i = 0; i < 40; i++) bike.steer(1, 0, 0.05, true)
+  assert(bike.speed > 7.5)
+  for (let i = 0; i < 20; i++) bike.steer(-1, 0, 0.05, true)
+  assert.equal(bike.crashPhase, 'none', 'straight emergency braking should not slip-crash')
+
+  // Short 0.15s brake tap while turning must NOT slip-crash (preserves S-gear tap stability)
+  for (let i = 0; i < 45; i++) bike.steer(1, 0, 0.05, true)
+  for (let i = 0; i < 3; i++) bike.steer(-1, 1, 0.05, true)
+  assert.equal(bike.crashPhase, 'none', 'brief 0.15s corner brake tap must stay upright')
+
+  // Sustained high-speed cornering emergency brake triggers slip crash
+  for (let i = 0; i < 40; i++) bike.steer(1, 0, 0.05, true)
+  for (let i = 0; i < 22; i++) {
+    bike.steer(-1, 1, 0.05, true)
+    if (bike.crashPhase !== 'none') break
+  }
+  assert.equal(bike.crashPhase, 'sliding')
+  assert.equal(bike.crashState.reason, 'slip')
+  assert.equal(bike.crashState.knockdown.kind, 'ebike_slip')
+
+  // Explicit triggerSlip API engages knockdown & recovers on 5 mashes
+  const bike2 = rideMod.createBikeControl()
+  bike2.mount(0.3, 0, 'bike', {vehicleType: 'shared', autoCrash: true, drainEnabled: false, parkStart: false})
+  bike2.steer(1, 0.5, 0.35, true)
+  const trigSnap = bike2.triggerSlip({side: 1})
+  assert.equal(trigSnap.reason, 'slip')
+  assert.equal(trigSnap.knockdown.kind, 'ebike_slip')
+  let crashSnap = trigSnap
+  for (let i = 0; i < 20; i++) crashSnap = bike2.stepCrash(0.1)
+  assert.equal(crashSnap.phase, 'downed')
+  for (let i = 0; i < 4; i++) assert.equal(bike2.mashCrashRecover(), false)
+  assert.equal(bike2.mashCrashRecover(), true)
+  for (let i = 0; i < 15; i++) crashSnap = bike2.stepCrash(0.06)
+  assert.equal(crashSnap.phase, 'bike_down')
+  assert.equal(crashSnap.knockdown.isDown, false)
+})
+
+test('applyKnockdownPose aligns with 20° slopes and holds elevated bridge decks without sinking or clipping (real GLB bones)', async () => {
+  const scene = await loadAvatarScene('figure')
+  const rig = rigMod.ensureAvatarRig(scene)
+  const bones = []
+  scene.traverse((o) => {
+    if (o.isBone && o.name !== 'root') bones.push(o)
+  })
+  const wp = new THREE.Vector3()
+  const slopeY = (x, _z) => 150 + 0.36 * x
+  const kdSlope = kdMod.createKnockdownState({seed: 19})
+  scene.rotation.set(0, 0.3, 0)
+  kdSlope.triggerKnockdown('vehicle_hit', 'back', 0.8, {yaw: 0.3})
+  let worstSlopeSink = Infinity
+  let worstSlopeClearance = Infinity
+  let mashes = 0
+  let since = 0
+  const DT = 1 / 60
+  for (let t = 0; t < 14 && kdSlope.isDown; t += DT) {
+    kdSlope.step(DT)
+    if (kdSlope.phase === 'mashing' && (since += DT) > 0.3 && mashes < 5) {
+      kdSlope.recordRecoverMash()
+      mashes++
+      since = 0
+    }
+    if (!kdSlope.isDown) break
+    if (Math.round(t / DT) % 3 === 0) {
+      const bx = 2.0, bz = -1.0
+      kdSlope.applyPose(scene, rig.joints, {x: bx, y: slopeY(bx, bz), z: bz}, slopeY)
+      rig.syncPose()
+      scene.updateMatrixWorld(true)
+      let minDelta = Infinity
+      for (const b of bones) {
+        b.getWorldPosition(wp)
+        minDelta = Math.min(minDelta, wp.y - slopeY(wp.x, wp.z))
+      }
+      worstSlopeSink = Math.min(worstSlopeSink, minDelta)
+      if (kdSlope.phase === 'stunned' || kdSlope.phase === 'mashing') {
+        worstSlopeClearance = Math.min(worstSlopeClearance, minDelta)
+      }
+    }
+  }
+  assert.equal(kdSlope.isDown, false)
+  assert(worstSlopeSink > -0.08, `20° slope lowest bone must not clip below ramp: ${worstSlopeSink.toFixed(3)}m`)
+  assert(worstSlopeClearance < 0.32, `20° slope body must stay resting on ramp: ${worstSlopeClearance.toFixed(3)}m`)
+
+  // Bridge edge scenario: deck at 156m for x <= 1.25, riverbed 148m beyond deck edge
+  const bridgeEdgeY = (x, _z) => (x <= 1.25 ? 156.0 : 148.0)
+  const kdBridge = kdMod.createKnockdownState({seed: 23})
+  scene.rotation.set(0, -1.57, 0)
+  kdBridge.triggerKnockdown('bike_crash', {x: 1, z: 0}, 0.85, {yaw: -1.57, side: 1, reason: 'lowside'})
+  for (let i = 0; i < 65; i++) kdBridge.step(DT)
+  kdBridge.applyPose(scene, rig.joints, {x: 0.9, y: 156.0, z: 0}, bridgeEdgeY)
+  rig.syncPose()
+  scene.updateMatrixWorld(true)
+  let minBridgeBoneY = Infinity
+  for (const b of bones) {
+    minBridgeBoneY = Math.min(minBridgeBoneY, b.getWorldPosition(wp).y)
+  }
+  assert(minBridgeBoneY >= 155.9, `bridge deck knockdown must stay supported above deck (not fall to 148m river): minY=${minBridgeBoneY.toFixed(3)}`)
+})
