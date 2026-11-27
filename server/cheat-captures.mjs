@@ -369,6 +369,33 @@ export function createCheatCaptureService(pool, env, {bucket, resolvePlace} = {}
     })
   }
 
+  /** 批量删除：按当前筛选（UID / 类型 / 时间游标）清空，一次最多 500 条。 */
+  async function removeMany(params, actor) {
+    await ensureCheatCaptureSchema(pool)
+    const rawUid = (params.get('uid') ?? '').trim()
+    const kind = (params.get('kind') ?? '').trim()
+    const before = Number(params.get('before') ?? '') || null
+    if (rawUid && !/^\d+$/.test(rawUid)) return json({ error: 'bad uid filter' }, 400)
+    if (kind && !VALID_KINDS.has(kind)) return json({ error: 'bad kind filter' }, 400)
+    if (before !== null && (!Number.isFinite(before) || before <= 0)) return json({ error: 'bad before cursor' }, 400)
+    const { rows } = await pool.query(
+      `DELETE FROM mp_cheat_captures WHERE id IN (
+         SELECT id FROM mp_cheat_captures
+         WHERE ($1::bigint IS NULL OR uid=$1)
+           AND ($2::text IS NULL OR kind=$2)
+           AND ($3::bigint IS NULL OR captured_at<$3)
+         ORDER BY captured_at DESC LIMIT 500
+       ) RETURNING id, uid, image_key`,
+      [rawUid || null, kind || null, before],
+    )
+    for (const row of rows) if (bucket && row.image_key) await bucket.delete(row.image_key).catch(() => {})
+    await pool.query(
+      "INSERT INTO admin_audit(actor_id,action,target_type,target_id,detail) VALUES($1,'mp.cheat_capture.delete_many','mp',$2,$3)",
+      [actor, rawUid || 'all', { kind: kind || null, before, deleted: rows.length }],
+    ).catch(() => {})
+    return json({ ok: true, deleted: rows.length })
+  }
+
   async function remove(id, actor) {
     if (!UUID_RE.test(id)) return json({error: 'not found'}, 404)
     await ensureCheatCaptureSchema(pool)
@@ -391,10 +418,11 @@ export function createCheatCaptureService(pool, env, {bucket, resolvePlace} = {}
     }
     const imgMatch = /^admin\/mp\/cheat-captures\/([^/]+)\/image$/.exec(path)
     if (imgMatch && request.method === 'GET') return image(imgMatch[1])
+    if (path === 'admin/mp/cheat-captures' && request.method === 'DELETE') return removeMany(new URL(request.url).searchParams, actor)
     const delMatch = /^admin\/mp\/cheat-captures\/([^/]+)$/.exec(path)
     if (delMatch && request.method === 'DELETE') return remove(delMatch[1], actor)
     return null
   }
 
-  return {upload, list, image, remove, adminRoute}
+  return {upload, list, image, remove, removeMany, adminRoute}
 }
