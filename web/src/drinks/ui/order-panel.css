@@ -79,6 +79,7 @@ body[data-drinks-ui-open="1"] :is(
   .walk-ui,
   .ride-hud,
   .hotbar,
+  .smoke-meter,
   .smoke-hint,
   .dock,
   .sky-ui,

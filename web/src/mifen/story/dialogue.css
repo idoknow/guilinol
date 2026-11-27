@@ -15,6 +15,7 @@ body[data-mifen-story-active="1"] :is(
   .hud-stats,
   .hud-dev,
   .hotbar,
+  .smoke-meter,
   .smoke-hint,
   .keys-card,
   .gl-mission-entry,

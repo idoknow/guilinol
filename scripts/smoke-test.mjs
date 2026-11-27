@@ -273,7 +273,7 @@ test('SmokeKit hides pack immediately on ready/light/smoking and resets carry ac
 })
 
 
-import {readPacks,brandOf,validRules,smokeDefaults} from '../web/src/smoke/data.ts'
+import {readPacks,brandOf,validRules,smokeDefaults,formatSmokeCount,isLowSmokeBurn} from '../web/src/smoke/data.ts'
 test('opened full and legacy partial packs skip the foil',()=>{
   for(const [remaining,opened,phase] of [[20,false,'sealed'],[20,true,'open'],[19,undefined,'open']]){
     const [pack]=readPacks([{brand:'dangui',remaining,opened}])
@@ -289,4 +289,67 @@ test('brand details and inclusive shop price limits',()=>{
   for(const price of [4,5,60,61]){
     assert.equal(validRules({...smokeDefaults,brands:[{id:'letu',price}]}),price>=5&&price<=60)
   }
+})
+test('taking a cigarette deducts 1 stick and updates remaining view + HUD text',()=>{
+  resetSaveForTesting(200)
+  assert.equal(buy('bailong','take-1').code,'OK')
+  const pack=getActiveSaveSnapshot().packs[0]
+  const session=new SmokeSession(()=>0.5)
+  assert.equal(session.start(pack.brand,pack.remaining,pack.opened),true)
+  session.advance(1.5) // sealed
+  session.act(()=>takeFromPack(session.brand),()=>openPack(session.brand))
+  session.advance(1.5) // open
+  assert.equal(session.view().cig,0)
+  assert.equal(session.act(()=>takeFromPack(session.brand),()=>openPack(session.brand)),true)
+  assert.equal(getActiveSaveSnapshot().packs[0].remaining,19)
+  assert.equal(session.view().remaining,19)
+  assert.equal(session.view().cig,1)
+  assert.equal(formatSmokeCount(session.view().remaining,getActiveSaveSnapshot().packs.length,'hud'),'剩余 19 / 20')
+  assert.equal(formatSmokeCount(getActiveSaveSnapshot().packs[0].remaining,getActiveSaveSnapshot().packs.length,'backpack'),'剩余 19 / 20')
+})
+test('taking the 20th stick shifts empty pack out and shows exhausted backpack state',()=>{
+  resetSaveForTesting(200)
+  assert.equal(buy('bailong','pack-exhaust').code,'OK')
+  for(let i=0;i<19;i++)assert.equal(takeFromPack('bailong'),true)
+  const lastPack=getActiveSaveSnapshot().packs[0]
+  assert.equal(lastPack.remaining,1)
+  const session=new SmokeSession(()=>0.5)
+  assert.equal(session.start(lastPack.brand,lastPack.remaining,lastPack.opened),true)
+  session.advance(1.5) // open
+  assert.equal(session.act(()=>takeFromPack(session.brand),()=>openPack(session.brand)),true)
+  assert.equal(getActiveSaveSnapshot().packs.length,0)
+  assert.equal(session.view().remaining,0)
+  assert.equal(formatSmokeCount(0,0,'hud'),'剩余 0 / 20')
+  assert.equal(formatSmokeCount(0,0,'backpack'),'已抽完')
+  assert.equal(formatSmokeCount(19,2,'hud'),'剩余 19 / 20 · 共 2 盒')
+  assert.equal(formatSmokeCount(19,2,'backpack'),'剩余 19 / 20 · 共 2 盒')
+})
+test('puff drops burn progress by 1 segment or 2 segments with seeded random and marks low at <= 2 segments',()=>{
+  // Seeded single-puff (random >= 0.2) drops 1/10 of total
+  const single=new SmokeSession(()=>0.5)
+  single.start('hehua',20,true)
+  single.advance(1.5) // open
+  single.act(()=>true) // take
+  single.advance(1.5) // ready
+  single.act(()=>true) // light
+  single.advance(1.5) // smoking
+  assert.equal(single.view().length,1)
+  assert.equal(single.act(()=>true),true)
+  assert.equal(single.strength,1)
+  assert(Math.abs(single.view().length-0.9)<1e-10)
+  assert.equal(isLowSmokeBurn(single.view().length),false)
+
+  // Seeded double-puff (random < 0.2) drops 2/10 of total and triggers low state at <= 2 segments
+  const dbl=new SmokeSession(()=>0.1)
+  dbl.start('hehua',20,true)
+  dbl.advance(1.5);dbl.act(()=>true);dbl.advance(1.5);dbl.act(()=>true);dbl.advance(1.5)
+  assert.equal(dbl.act(()=>true),true)
+  assert.equal(dbl.strength,2)
+  assert(Math.abs(dbl.view().length-0.8)<1e-10)
+  for(let i=0;i<3;i++){
+    dbl.advance(1.5)
+    assert.equal(dbl.act(()=>true),true)
+  }
+  assert(dbl.view().length<=0.2+1e-6)
+  assert.equal(isLowSmokeBurn(dbl.view().length),true)
 })
