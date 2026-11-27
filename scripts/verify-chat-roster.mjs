@@ -18,7 +18,7 @@ try {
   await input.fill('草稿')
   await page.locator('.hud-stat--mp').click()
   await page.locator('.mp-roster.show').waitFor()
-  if (process.env.QA_CAPTURE) await page.screenshot({path: process.env.QA_CAPTURE})
+  if (process.env.QA_CAPTURE) await page.screenshot({path: process.env.QA_CAPTURE, timeout: 120000})
   assert.notEqual(await page.locator('.chat-dock').getAttribute('data-open'), '1', 'opening roster must fold chat')
   await page.locator('.chat-panel').waitFor({state: 'hidden'})
   await page.keyboard.press('Enter')
