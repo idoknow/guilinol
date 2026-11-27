@@ -1,6 +1,5 @@
 import * as THREE from 'three'
 import {hotbarSlot,selectSlot} from '../ui/hotbar'
-import {prefs} from '../ui/prefs'
 import {getActiveSaveSnapshot} from '../game/save'
 import {FishingEngine,type Catch} from './engine'
 import {chargePower,resolveCast,type Point,nearestFishingShore,nearby,species,tabs,waters,xpThresholds,type Method} from './config'
@@ -12,7 +11,7 @@ import {createRod,createWaterFx} from './fx'
 import './fishing.css'
 
 type Host={canUse:()=>boolean,position:()=>Point,heading:()=>number,onLand:(x:number,z:number)=>boolean,waterAt:(x:number,z:number)=>number|null,face:(angle:number)=>void,
-  teleport:(x:number,z:number,angle:number)=>Promise<boolean>,hand:()=>THREE.Object3D|undefined,scene:THREE.Scene,camera:THREE.PerspectiveCamera}
+  teleport:(x:number,z:number,angle:number)=>Promise<boolean>,hand:()=>THREE.Object3D|undefined,scene:THREE.Scene}
 const textFocus=()=>document.activeElement?.matches('input,textarea,select,[contenteditable=true]')
 const terminal=['equip','land','snap','escape','miss','junk','empty-hook']
 const gradeClass=(grade:string)=>grade==='legendary'?'g-l':grade==='high'?'g-r':grade==='junk'?'g-j':'g-c'
@@ -69,9 +68,7 @@ export function createFishing(host:Host,verify:boolean){
   const rodKit=createRod(tipLocal),rod=rodKit.root,tip=rodKit.tip,reel=rodKit.reel;rod.name='fishing-grip'
   const fx=createWaterFx(host.scene),targetVec=new THREE.Vector3(),endVec=new THREE.Vector3()
   let flying=false,fightSurge=false,castFrom:{x:number,z:number}|undefined
-  const rodDir=new THREE.Vector3(),UP=new THREE.Vector3(0,1,0),camGoal=new THREE.Vector3(),camLook=new THREE.Vector3(),camFwd=new THREE.Vector3()
-  let camBlend=0
-  const firstPerson=()=>prefs().view==='first'
+  const rodDir=new THREE.Vector3(),UP=new THREE.Vector3(0,1,0)
   function visual(name:string,detail:unknown){
     const d=(detail??{}) as {side?:number,size?:string,surge?:boolean}
     if(name==='fight'){const was=fightSurge;fightSurge=!!d.surge;if(fightSurge&&!was&&target)fx.surge(endVec)}
@@ -242,7 +239,8 @@ export function createFishing(host:Host,verify:boolean){
     if(!active()||!drawer.hidden||event.button!==0)return
     const el=event.target as HTMLElement
     if(el!==action&&!(el.tagName==='CANVAS'&&event.pointerType==='mouse'))return
-    event.preventDefault();event.stopImmediatePropagation();el.setPointerCapture(event.pointerId);press(String(event.pointerId))
+    if(el!==action&&document.pointerLockElement!==el)return
+    event.preventDefault();event.stopImmediatePropagation();if(el===action)el.setPointerCapture(event.pointerId);press(String(event.pointerId))
   },true)
   for(const type of ['pointerup','pointercancel','lostpointercapture'] as const)window.addEventListener(type,event=>release(String(event.pointerId),type!=='pointerup'),true)
   function key(event:KeyboardEvent){if(event.code!=='Space'||!active()||textFocus()||!drawer.hidden)return
@@ -279,17 +277,7 @@ export function createFishing(host:Host,verify:boolean){
       if(method==='台钓'){
         const bite=engine.stage==='hit',bob=bite?-.09-.03*Math.sin(clock*18):Math.sin(clock*2.2)*.012+(engine.stage==='wait'&&Math.sin(clock*7.3)>.96?-.02:0)
         float.visible=!flying;float.position.set(x,y+.02+bob,z);float.rotation.z=Math.sin(clock*1.7)*.06}
-      // 等鱼 / 咬钩 / 角力时镜头拉到人和落点之间，能看清鱼影、涟漪和水花
-      if(!flying&&['wait','retrieve','approach','nibble','hit','fight'].includes(st)){
-        const p=host.position(),k=method==='台钓'?.55:.5
-        camGoal.set(p.x+(x-p.x)*k,y+5.5,p.z+(z-p.z)*k)
-        // 行走相机每帧都会把镜头放回角色身后，所以这里按自己的混合度在「跟随位」和「看水位」之间插值，
-        // 不能拿上一帧的镜头去 lerp（那会每帧来回跳，看起来像人在抽搐）；第一人称不接管镜头。
-        if(!firstPerson()){camBlend=Math.min(1,camBlend+dt*1.6);const e=camBlend*camBlend*(3-2*camBlend)
-          camLook.copy(host.camera.position).addScaledVector(camFwd.set(0,0,-1).applyQuaternion(host.camera.quaternion),10)
-          host.camera.position.lerp(camGoal,e);camLook.lerp(endVec,e);host.camera.lookAt(camLook)}}
-      else camBlend=Math.max(0,camBlend-dt*2)}
-      else camBlend=0
+    }
     // 抛竿后走开超过 1.5 m：自动收线（不把人钉在原地）
     if(castFrom&&!terminal.includes(engine.stage)){const p=host.position();if(Math.hypot(p.x-castFrom.x,p.z-castFrom.z)>1.5){const lost=engine.stage==='fight';castFrom=undefined;fx.clear();flying=false;line.visible=float.visible=false;origin=undefined;engine.cancel();engine.equip();toast(lost?'走开了 · 鱼跑了':'走动了 · 已收线','dim')}}
     if(engine.stage==='fight'){

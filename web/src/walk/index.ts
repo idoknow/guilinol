@@ -1259,7 +1259,7 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
       const heights=data.groundMesh.geometry.getAttribute('position')
       return {corner:(north-tile.z)/4*65+(west-tile.x)/4,water:data.water,bed:data.underlay,ground:index=>heights.getY(index)}
     },sim.coveredWater),face:(angle)=>{yaw=angle+Math.PI;facing=yaw+avatar.yaw;figure.rotation.y=facing},
-    teleport:(x,z,angle)=>enter(x,z,angle,'fishing'),hand:()=>avatarRig.attachmentAt?.('hand_r')??figure.getObjectByName('hand_r'),scene,camera,
+    teleport:(x,z,angle)=>enter(x,z,angle,'fishing'),hand:()=>avatarRig.attachmentAt?.('hand_r')??figure.getObjectByName('hand_r'),scene,
   },verify))
   // 钓鱼（IDOK-336）第二版（蓄力抛竿 / 咬钩 / 单键收放线）重新开放；?fishing=0 临时关闭。
   const fishingOn=verify||new URLSearchParams(location.search).get('fishing')!=='0'
