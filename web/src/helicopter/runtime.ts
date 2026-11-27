@@ -24,6 +24,9 @@ const clamp=(value:number)=>Math.max(0,Math.min(1,value))
 const ease=(value:number)=>{const unit=clamp(value);return unit**3*(10-15*unit+6*unit**2)}
 export function helicopter(scene:THREE.Scene,camera:THREE.PerspectiveCamera,walker:()=>Walker|undefined,verify:boolean){
   const model=helicopterModel(),craft=model.root,pad=new THREE.Mesh(new THREE.CylinderGeometry(helipad.radius,helipad.radius,.025,48),new THREE.MeshStandardMaterial({color:0xb5b5b5}))
+  // IDOK-527: 无人机的小地图/雷达要在场景里认出这架直升机（飞行物），给它名字和类型标签。
+  craft.name='helicopter'
+  craft.userData.aircraft='直升机'
   scene.add(craft,pad);craft.position.set(helipad.x,helipad.y,helipad.z);craft.rotation.order='YXZ';pad.position.copy(craft.position);pad.position.y-=.0125
   const wash=padDownwash(),sound=rotorSound();wash.root.position.copy(craft.position);wash.root.visible=false;scene.add(wash.root)
   const point=(name:string,out:THREE.Vector3)=>model.anchor(name).getWorldPosition(out)

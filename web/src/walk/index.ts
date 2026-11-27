@@ -3555,7 +3555,15 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
   function findUnstuck(from?:{x:number,z:number}){if(!active)return null;const p=from??rides?.boat?.position??sim.body.translation();sim.sync(p.x,p.z);const spot=sim.findFlatGround(p.x,p.z)
     if(verify)spawns.push({reason:'unstuck-probe',from:[p.x,p.z],to:spot?[spot.x,spot.z]:null,distance:spot?Math.hypot(spot.x-p.x,spot.z-p.z):null,rule:spot?.rule??'none'})
     return spot&&{x:spot.x,z:spot.z,distance:Math.hypot(spot.x-p.x,spot.z-p.z),rule:spot.rule}}
-  return {supportAt,carSupportAt,emote,get net(){return net},combat,photoSupport,enter,leave,tick,findUnstuck,get destination(){return destination},spawns,probe,boatClearance,parked(kind?:import('./ride').RideKind|'car'){return rides?.parked(kind)??[]},get freeMoorings(){return rides?.freeMoorings()??[]},get boatKind(){return rides?.freeKind??null},get obstacle(){return bikeObstacle},get vehicle(){return rides?.car?'car':rides?.bike?(rides.rideKind==='bicycle'?'bicycle':'bike'):rides?.boat?'boat':'foot'},get heading(){return rides?.heading??0},get speed(){return rides?.speed??0},get footSpeed(){return Math.hypot(vx,vz)},get active(){return active},drive(x:number,z:number,run=true){external={x,z,run}},
+  return {supportAt,carSupportAt,emote,blockedAt:(x:number,y:number,z:number)=>sim.isBlockedAt(x,y,z),
+    // IDOK-528: water surface under a point, so drones can ditch in a river/lake.
+    waterAt:(x:number,z:number)=>openWater(x,z,(west,north)=>{
+      const tile=sim.tileAt(west,north),data=tile&&stream.loaded.get(tile)
+      if(!tile||!data?.batch.pond)return
+      const heights=data.groundMesh.geometry.getAttribute('position')
+      return {corner:(north-tile.z)/4*65+(west-tile.x)/4,water:data.water,bed:data.underlay,ground:index=>heights.getY(index)}
+    },sim.coveredWater),
+    get net(){return net},combat,photoSupport,enter,leave,tick,findUnstuck,get destination(){return destination},spawns,probe,boatClearance,parked(kind?:import('./ride').RideKind|'car'){return rides?.parked(kind)??[]},get freeMoorings(){return rides?.freeMoorings()??[]},get boatKind(){return rides?.freeKind??null},get obstacle(){return bikeObstacle},get vehicle(){return rides?.car?'car':rides?.bike?(rides.rideKind==='bicycle'?'bicycle':'bike'):rides?.boat?'boat':'foot'},get heading(){return rides?.heading??0},get speed(){return rides?.speed??0},get footSpeed(){return Math.hypot(vx,vz)},get active(){return active},drive(x:number,z:number,run=true){external={x,z,run}},
     heli:{figure,arms:passengerArms(figure),available:()=>active&&!rides?.car&&!rides?.bike&&!rides?.boat&&!shopOverlay?.isOpen()&&!cigarette.active&&!crashSession&&!standUpSession&&!pickupSession&&!knockdown.isDown&&!document.body.matches('[data-fishing=on],[data-drone=rc],[data-photo=on]'),
       begin(){emote.stop();cancelSmoke();selectSlot('hand');actionButton.hidden=true;resetMotion();stopLocomotionActions();yaw=0;pitch=.38},
       view:()=>({yaw,pitch,arm}),

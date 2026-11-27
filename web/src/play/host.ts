@@ -13,6 +13,10 @@ export interface Walker {
   probe?():{surfaceY?:number; foot?:number; renderY?:number}
   /** Raise/relax the right arm while a camera is equipped (IDOK-188). */
   setCameraHold?(on:boolean,pose?:{aim?:{forward?:number;up?:number;side?:number}}):void
+  /** Solid world at a point (drone avoidance + crash detection, IDOK-529). */
+  blockedAt?(x:number,y:number,z:number):boolean
+  /** Water surface height at x/z, or null on dry land (IDOK-529). */
+  waterAt?(x:number,z:number):number|null
 }
 export interface Clock {hour:number; weather:Weather; flowing:boolean; goal:number|null; set(hour:number,weather?:Weather):void}
 export interface Host {
