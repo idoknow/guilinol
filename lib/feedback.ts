@@ -36,6 +36,13 @@ async function fields(request: Request): Promise<Record<string, unknown>> {
   if (!value || typeof value !== 'object' || Array.isArray(value)) invalid()
   return value as Record<string, unknown>
 }
+const DEFAULT_AUTO_APPROVE_EMAILS = ['xiepy244@gmail.com']
+function autoApproveEmails(env: Env) {
+  if (env.FEEDBACK_AUTO_APPROVE_EMAILS === undefined) return DEFAULT_AUTO_APPROVE_EMAILS
+  return env.FEEDBACK_AUTO_APPROVE_EMAILS.split(',')
+    .map((entry) => entry.trim().toLowerCase())
+    .filter((entry) => entry && entry !== 'none')
+}
 export async function feedback(request: Request, env: Env, path: string) {
   const method = request.method,
     bridge = path.startsWith('bridge/'),
@@ -57,6 +64,7 @@ export async function feedback(request: Request, env: Env, path: string) {
   const stmt = (sql: string, ...args: (number | string | null)[]) => env.DB.prepare(sql).bind(...args)
   let user = ''
   let isAdmin = false
+  let accountEmail = ''
   if (machine) {
     if (!env.BRIDGE_TOKEN || !auth || !equal(await hash(auth), await hash(`Bearer ${env.BRIDGE_TOKEN}`)))
       unauthorized()
@@ -80,6 +88,7 @@ export async function feedback(request: Request, env: Env, path: string) {
     if (!account?.verified) unauthorized()
     user = account.id
     isAdmin = account.role === 'admin'
+    accountEmail = account.email.toLowerCase()
     if (admin && !isAdmin) throw new Problem(403, 'forbidden', '无权限')
     if (method !== 'GET' && request.headers.get('Origin') !== new URL(request.url).origin)
       throw new Problem(403, 'origin', '请求来源不符')
@@ -125,7 +134,7 @@ export async function feedback(request: Request, env: Env, path: string) {
     return json(
       (
         await stmt(
-          "SELECT * FROM feedback WHERE status IN ('submitted','approved','need_info') OR (multica_issue IS NOT NULL AND status NOT IN ('draft','live','rejected','duplicate')) ORDER BY updated_at,id",
+          "SELECT f.*,u.email AS submitter_email,u.role AS submitter_role FROM feedback f JOIN users u ON u.id=f.user_id WHERE f.status IN ('submitted','approved','need_info') OR (f.multica_issue IS NOT NULL AND f.status NOT IN ('draft','live','rejected','duplicate')) ORDER BY f.updated_at,f.id",
         ).all()
       ).results,
     )
@@ -178,9 +187,9 @@ export async function feedback(request: Request, env: Env, path: string) {
   if (!match || (bridge&&!['status','messages','relayed','bind'].includes(match[3])) || (!bridge&&!admin&&['status','relayed','bind'].includes(match[3]))) missing()
   const [, , id, action] = match,
     row = await stmt(
-      (admin
-        ? 'SELECT f.*,u.email,u.nickname FROM feedback f JOIN users u ON u.id=f.user_id WHERE f.id=?'
-        : 'SELECT * FROM feedback WHERE id=?') + ' AND (user_id=? OR ?=1)',
+      (admin || machine
+        ? 'SELECT f.*,u.email,u.nickname,u.role AS submitter_role FROM feedback f JOIN users u ON u.id=f.user_id WHERE f.id=? AND (f.user_id=? OR ?=1)'
+        : 'SELECT * FROM feedback WHERE id=? AND (user_id=? OR ?=1)'),
       id,
       user,
       Number(
@@ -189,7 +198,7 @@ export async function feedback(request: Request, env: Env, path: string) {
           (isAdmin && method === 'GET' && (action === 'view-shot' || action?.startsWith('photos/'))) ||
           false,
       ),
-    ).first<{ status: string; multica_issue: string | null; view_json: string | null; shot_state: number }>()
+    ).first<{ kind: string; status: string; multica_issue: string | null; view_json: string | null; shot_state: number }>()
   if (!row) missing()
   if(method==='POST'&&bridge&&action==='bind'){
     const issue=text((await fields(request)).issue,128,true)!
@@ -440,14 +449,19 @@ export async function feedback(request: Request, env: Env, path: string) {
     pr = null,
     credit = null,
     guard = ''
+  const priorityAdmin = !machine && isAdmin && autoApproveEmails(env).includes(accountEmail)
+  const priorityAutoApprove = priorityAdmin && row.kind !== APPEAL
   if (action === 'submit') {
     if (row.status !== 'draft') conflict()
-    target = 'submitted'
-    message = '已提交，等待处理'
-    guard = ` AND (kind='${APPEAL}' OR (view_json IS NOT NULL AND shot_state=1 AND (kind='${BUG}' OR EXISTS(SELECT 1 FROM feedback_photos WHERE feedback_id=feedback.id AND ready=1)))) AND (SELECT count(*) FROM feedback f WHERE f.user_id=feedback.user_id AND f.submitted_at>unixepoch()-86400)<5`
+    target = priorityAutoApprove ? 'approved' : 'submitted'
+    message = priorityAutoApprove ? '管理员直提已自动批准，等待专职 Agent 开工' : '已提交，等待处理'
+    const quotaGuard = priorityAdmin
+      ? ''
+      : ' AND (SELECT count(*) FROM feedback f WHERE f.user_id=feedback.user_id AND f.submitted_at>unixepoch()-86400)<5'
+    guard = ` AND (kind='${APPEAL}' OR (view_json IS NOT NULL AND shot_state=1 AND (kind='${BUG}' OR EXISTS(SELECT 1 FROM feedback_photos WHERE feedback_id=feedback.id AND ready=1))))${quotaGuard}`
   } else if (action === 'supplement') {
     if (row.status !== 'need_info') conflict()
-    target = 'submitted'
+    target = priorityAutoApprove ? 'approved' : 'submitted'
     message = text((await fields(request)).body, 1000, true)!
     guard = " AND shot_state!=2 AND (SELECT count(*) FROM feedback_messages WHERE feedback_id=feedback.id AND author_kind!='agent' AND created_at>unixepoch()-3600)<20"
   } else if (bridge || admin) {
@@ -492,6 +506,7 @@ export async function feedback(request: Request, env: Env, path: string) {
   if (!changed.meta.changes) {
     if (
       action === 'submit' &&
+      !priorityAdmin &&
       ((await stmt(
         'SELECT count(*) AS total FROM feedback WHERE user_id=? AND submitted_at>unixepoch()-86400',
         user,

@@ -2387,7 +2387,9 @@ const pages: Record<string, (view: View) => void> = {
     if (id) return feedbackDetail(id)
     const status = params.get('status') ?? 'pending',
       query = params.get('q') ?? '',
-      user = params.get('user')
+      user = params.get('user'),
+      email = params.get('email'),
+      role = params.get('role')
     const tabs = h('div', { class: 'adm-tabs', role: 'tablist' })
     const search = h('input', { type: 'search', name: 'q', value: query, placeholder: '搜索标题、正文或提交人', 'aria-label': '搜索反馈' })
     const form = h('form', { class: 'adm-search', role: 'search' }, search, h('button', { class: 'adm-btn', type: 'submit' }, '搜索'))
@@ -2396,9 +2398,13 @@ const pages: Record<string, (view: View) => void> = {
       go({ q: search.value.trim() || null, cursor: null }, true)
     })
     const slot = h('div')
+    const mineOn = !!me?.id && user === me.id
     append(main, [
       h('div', { class: 'adm-toolbar adm-toolbar--split' }, tabs, form),
-      user && h('p', { class: 'adm-note' }, '只看某位提交人的反馈。', navLink('清除筛选', { view: 'feedback', status }, { class: 'adm-link' })),
+      (user || email || role) &&
+        h('p', { class: 'adm-note' },
+          email ? `只看邮箱 ${email} 的反馈。` : role === 'admin' ? '只看管理员账号的反馈。' : mineOn ? '只看我本人提交的反馈。' : '只看某位提交人的反馈。',
+          navLink('清除筛选', { view: 'feedback', status }, { class: 'adm-link' })),
       card(null, slot, { className: 'adm-card--flush' })])
     const paintTabs = (stats?: any) => {
       const counts = stats?.feedback ?? {}
@@ -2407,10 +2413,22 @@ const pages: Record<string, (view: View) => void> = {
         ['', '全部', stats ? Object.values(counts).reduce<number>((a, b) => a + (num(b) ?? 0), 0) : null],
         ...Object.entries(labels).filter(([k]) => k !== 'draft').map(([k, l]) => [k, l, stats ? num(counts[k]) ?? 0 : null] as [string, string, number | null]),
       ]
-      tabs.replaceChildren(...entries.map(([key, text, n]) =>
-        navLink([text, n != null ? h('em', null, n) : null], { view: 'feedback', status: key, q: query || null, user, kind: params.get('kind') }, {
-          class: `adm-tab ${status === key ? 'is-on' : ''} ${key === 'pending' && n ? 'is-alert' : ''}`, role: 'tab', 'aria-selected': String(status === key),
-        })))
+      tabs.replaceChildren(
+        ...entries.map(([key, text, n]) =>
+          navLink([text, n != null ? h('em', null, n) : null], { view: 'feedback', status: key, q: query || null, user, email, role, kind: params.get('kind') }, {
+            class: `adm-tab ${!mineOn && role !== 'admin' && status === key ? 'is-on' : ''} ${key === 'pending' && n ? 'is-alert' : ''}`, role: 'tab', 'aria-selected': String(!mineOn && role !== 'admin' && status === key),
+          })),
+        ...(me?.id
+          ? [
+              navLink('我的反馈', { view: 'feedback', status: '', user: mineOn ? null : me.id, email: null, role: null, q: query || null }, {
+                class: `adm-tab ${mineOn ? 'is-on' : ''}`, role: 'tab', 'aria-selected': String(mineOn),
+              }),
+            ]
+          : []),
+        navLink('管理员反馈', { view: 'feedback', status: '', role: role === 'admin' ? null : 'admin', user: null, email: null, q: query || null }, {
+          class: `adm-tab ${role === 'admin' ? 'is-on' : ''}`, role: 'tab', 'aria-selected': String(role === 'admin'),
+        }),
+      )
     }
     paintTabs(lastStats ?? undefined)
     api('admin/stats').then((stats) => {
@@ -2439,6 +2457,8 @@ const pages: Record<string, (view: View) => void> = {
       if (status) q.set('status', status)
       if (query) q.set('q', query)
       if (user) q.set('user', user)
+      if (email) q.set('email', email)
+      if (role) q.set('role', role)
       if(params.get('kind')==='封禁申诉')q.set('kind','封禁申诉')
       if (cursor) q.set('cursor', cursor)
       return api<{ items: any[]; next_cursor: string | null }>('admin/feedback?' + q)
