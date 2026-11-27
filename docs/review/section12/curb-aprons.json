@@ -1,0 +1,240 @@
+[
+  {
+    "way": 169505553,
+    "node": 2457187867,
+    "side": -1,
+    "samples": 2577,
+    "missing": 0,
+    "maxGrade": 0.0181358895295034,
+    "maxInheritedGrade": 0.6322005713738008,
+    "gradeViolations": 0,
+    "worstGrade": null,
+    "extentM": [
+      -3,
+      14
+    ],
+    "sampleStepM": 0.25,
+    "maximumDifferenceFromOpeningRevealM": 0.47191014698310596
+  },
+  {
+    "way": 169505553,
+    "node": 2457187867,
+    "side": 1,
+    "samples": 2500,
+    "missing": 0,
+    "maxGrade": 0.08274912184776895,
+    "maxInheritedGrade": 0.6322517841493891,
+    "gradeViolations": 0,
+    "worstGrade": null,
+    "extentM": [
+      -3,
+      14
+    ],
+    "sampleStepM": 0.25,
+    "maximumDifferenceFromOpeningRevealM": 0.4696298487810111
+  },
+  {
+    "way": 265411063,
+    "node": 6372238737,
+    "side": -1,
+    "samples": 0,
+    "missing": 0,
+    "maxGrade": 0,
+    "maxInheritedGrade": 0,
+    "gradeViolations": 0,
+    "worstGrade": null,
+    "extentM": [
+      -3,
+      14
+    ],
+    "sampleStepM": 0.25,
+    "maximumDifferenceFromOpeningRevealM": 0
+  },
+  {
+    "way": 265411063,
+    "node": 6372238737,
+    "side": 1,
+    "samples": 2760,
+    "missing": 0,
+    "maxGrade": 0.014518361163709415,
+    "maxInheritedGrade": 0.002712755023367208,
+    "gradeViolations": 0,
+    "worstGrade": null,
+    "extentM": [
+      -3,
+      14
+    ],
+    "sampleStepM": 0.25,
+    "maximumDifferenceFromOpeningRevealM": 0.13546848052411065
+  },
+  {
+    "way": 265411063,
+    "node": 6372238738,
+    "side": -1,
+    "samples": 2760,
+    "missing": 0,
+    "maxGrade": 0.30056648381162177,
+    "maxInheritedGrade": 0.49143749802590264,
+    "gradeViolations": 0,
+    "worstGrade": null,
+    "extentM": [
+      -3,
+      14
+    ],
+    "sampleStepM": 0.25,
+    "maximumDifferenceFromOpeningRevealM": 0.11227728714897012
+  },
+  {
+    "way": 265411063,
+    "node": 6372238738,
+    "side": 1,
+    "samples": 0,
+    "missing": 0,
+    "maxGrade": 0,
+    "maxInheritedGrade": 0,
+    "gradeViolations": 0,
+    "worstGrade": null,
+    "extentM": [
+      -3,
+      14
+    ],
+    "sampleStepM": 0.25,
+    "maximumDifferenceFromOpeningRevealM": 0
+  },
+  {
+    "way": 412456329,
+    "node": 6484104243,
+    "side": -1,
+    "samples": 2756,
+    "missing": 0,
+    "maxGrade": 0.10375735209822778,
+    "maxInheritedGrade": 0.4789499737347569,
+    "gradeViolations": 0,
+    "worstGrade": null,
+    "extentM": [
+      -3,
+      14
+    ],
+    "sampleStepM": 0.25,
+    "maximumDifferenceFromOpeningRevealM": 0.18721580535159887
+  },
+  {
+    "way": 412456329,
+    "node": 6484104243,
+    "side": 1,
+    "samples": 2708,
+    "missing": 0,
+    "maxGrade": 0.6040457287671188,
+    "maxInheritedGrade": 0.6052896904010368,
+    "gradeViolations": 0,
+    "worstGrade": null,
+    "extentM": [
+      -3,
+      14
+    ],
+    "sampleStepM": 0.25,
+    "maximumDifferenceFromOpeningRevealM": 0.18712325424155551
+  },
+  {
+    "way": 690703974,
+    "node": 6480631921,
+    "side": -1,
+    "samples": 640,
+    "missing": 0,
+    "maxGrade": 0.015737469938130744,
+    "maxInheritedGrade": 0.0029756156418443425,
+    "gradeViolations": 0,
+    "worstGrade": null,
+    "extentM": [
+      -3,
+      14
+    ],
+    "sampleStepM": 0.25,
+    "maximumDifferenceFromOpeningRevealM": 0.02453890848875062
+  },
+  {
+    "way": 690703974,
+    "node": 6480631921,
+    "side": 1,
+    "samples": 708,
+    "missing": 0,
+    "maxGrade": 0.006792150748538006,
+    "maxInheritedGrade": 0.0023376228123197507,
+    "gradeViolations": 0,
+    "worstGrade": null,
+    "extentM": [
+      -3,
+      14
+    ],
+    "sampleStepM": 0.25,
+    "maximumDifferenceFromOpeningRevealM": 0.010235563081806731
+  },
+  {
+    "way": 1017595561,
+    "node": 9385960964,
+    "side": -1,
+    "samples": 0,
+    "missing": 0,
+    "maxGrade": 0,
+    "maxInheritedGrade": 0,
+    "gradeViolations": 0,
+    "worstGrade": null,
+    "extentM": [
+      -3,
+      14
+    ],
+    "sampleStepM": 0.25,
+    "maximumDifferenceFromOpeningRevealM": 0
+  },
+  {
+    "way": 1017595561,
+    "node": 9385960964,
+    "side": 1,
+    "samples": 2760,
+    "missing": 0,
+    "maxGrade": 0.269523377402038,
+    "maxInheritedGrade": 0.6898200332429951,
+    "gradeViolations": 0,
+    "worstGrade": null,
+    "extentM": [
+      -3,
+      14
+    ],
+    "sampleStepM": 0.25,
+    "maximumDifferenceFromOpeningRevealM": 0.5454529097211491
+  },
+  {
+    "way": 1017595561,
+    "node": 9385960966,
+    "side": -1,
+    "samples": 2760,
+    "missing": 0,
+    "maxGrade": 0.014591281178127247,
+    "maxInheritedGrade": 0.005532842818297468,
+    "gradeViolations": 0,
+    "worstGrade": null,
+    "extentM": [
+      -3,
+      14
+    ],
+    "sampleStepM": 0.25,
+    "maximumDifferenceFromOpeningRevealM": 0.19312171605244544
+  },
+  {
+    "way": 1017595561,
+    "node": 9385960966,
+    "side": 1,
+    "samples": 1,
+    "missing": 0,
+    "maxGrade": 0,
+    "maxInheritedGrade": 0,
+    "gradeViolations": 0,
+    "worstGrade": null,
+    "extentM": [
+      -3,
+      14
+    ],
+    "sampleStepM": 0.25,
+    "maximumDifferenceFromOpeningRevealM": 0
+  }
+]
