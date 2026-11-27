@@ -498,6 +498,54 @@ function evalRoadCtrlLocal([baseMm, deltas]: RoadCtrl, lx: number, lz: number): 
   return (baseMm + sum) / 1000
 }
 
+type FrontageBuilding = readonly [number,number,Pair[][],number,number,number,...unknown[]]
+
+export const isRenminTile=(x:number,z:number)=>x===-768&&z===256
+
+function meshHeight(field:Int16Array,east:number,south:number,step:number){
+  const column=Math.min(256/step-1,Math.floor(east/step)),row=Math.min(256/step-1,Math.floor(south/step))
+  const u=east/step-column,v=south/step-row,stride=step/4,index=(65*row+column)*stride
+  const northWest=field[index],northEast=field[index+stride],southWest=field[index+65*stride],southEast=field[index+66*stride]
+  return (u+v<=1?northWest+(northEast-northWest)*u+(southWest-northWest)*v:southEast+(southWest-southEast)*(1-u)+(northEast-southEast)*(1-v))/10
+}
+
+export function gradeRenminShoulder(tileX:number,tileZ:number,terrain:Int16Array,underlay:Int16Array,water:Int16Array,ctrl:RoadCtrl|null|undefined,buildings:readonly FrontageBuilding[]){
+  if(!isRenminTile(tileX,tileZ)||!ctrl)return
+  const before=underlay.slice(),step=water.some(value=>value!==-32768)?4:8
+  const fronts=buildings.filter(part=>[4042625074,1145105554,435677566].includes(part[5]))
+  for(const [base,,[ring]] of fronts){
+    const bounds=ringBounds(ring)
+    const limit=(east:number,south:number)=>{
+      let distance=Infinity
+      for(let index=0;index<ring.length;index++){
+        const [ax,az]=ring[index], [bx,bz]=ring[(index+1)%ring.length], dx=bx-ax,dz=bz-az
+        const along=Math.max(0,Math.min(1,((east*100-ax)*dx+(south*100-az)*dz)/(dx*dx+dz*dz||1)))
+        distance=Math.min(distance,Math.hypot(east*100-ax-along*dx,south*100-az-along*dz)/100)
+      }
+      return base/10+Math.max(0,distance-8)*.075
+    }
+    const visit=(step:number,apply:(east:number,south:number,cap:number)=>void)=>{
+      for(let south=Math.max(step,Math.floor((bounds.minZ/100-44)/step)*step);south<=Math.min(256-step,bounds.maxZ/100+44);south+=step){
+        for(let east=Math.max(step,Math.floor((bounds.minX/100-44)/step)*step);east<=Math.min(256-step,bounds.maxX/100+44);east+=step){
+          if(water[south/4*65+east/4]===-32768)apply(east,south,limit(east,south))
+        }
+      }
+    }
+    visit(4,(east,south,cap)=>{
+      const index=south/4*65+east/4,height=Math.round(cap*10)
+      terrain[index]=Math.min(terrain[index],height)
+      underlay[index]=Math.min(underlay[index],height)
+    })
+    visit(8,(east,south,cap)=>{
+      const index=(south/8+1)*35+east/8+1
+      ctrl[1][index]=Math.min(ctrl[1][index],Math.round((cap-.10)*1000)-ctrl[0])
+    })
+  }
+  const after=underlay.slice()
+  const lowering=(east:number,south:number)=>meshHeight(before,east,south,step)-meshHeight(after,east,south,step)
+  return {lowering,rootHeight:(east:number,south:number,baked:number)=>lowering(east,south)>0?meshHeight(after,east,south,step):baked}
+}
+
 function extractDeckComponentsAndOpenEdges(deck: Float32Array, thin: ReadonlySet<number>) {
   const tris = Math.floor(deck.length / 9)
   const parent = new Int32Array(tris)
