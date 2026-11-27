@@ -139,6 +139,15 @@ def carve_medallion(image):
     image.paste(panel,((index%4)*128,(index//4)*128))
 
 
+def bracket(model, x, y, z):
+    """One dougong set at (x, y, z) in the current pose, projecting towards +z."""
+    model.box(x, y, z, .36, .2, .36, 'wood')            # 坐斗
+    model.box(x, y+.2, z, 1.05, .13, .16, 'wood')       # 泥道栱
+    model.box(x, y+.2, z+.28, .16, .13, .92, 'wood')    # 华栱
+    model.box(x, y+.33, z+.55, 1.35, .13, .16, 'wood')  # 瓜子栱
+    model.box(x, y+.33, z+.42, .15, .15, 1.30, 'wood')  # 昂
+
+
 def facade(model, base, half, height, upstairs):
     for side in range(4):
         model.pose = (0, 0, 0, side * np.pi / 2)
@@ -166,7 +175,7 @@ def facade(model, base, half, height, upstairs):
                 # One red lantern per bay under the first eave, outside the column line.
                 top, z = base+height, half+.45
                 if model.detail:
-                    model.beam([east, top-.32, z], [east, top-.72, z], .02, 'wood', 4)
+                    model.beam([east, top-.40, z], [east, top-.72, z], .02, 'wood', 4)
                     model.beam([east, top-1.42, z], [east, top-.72, z], .30, 'clock', 10)
                     for y in (top-.72, top-1.48):
                         model.beam([east, y, z], [east, y+.06, z], .2, 'gold', 8)
@@ -174,12 +183,18 @@ def facade(model, base, half, height, upstairs):
                 else:
                     model.beam([east, top-1.42, z], [east, top-.72, z], .30, 'clock', 4)
             if model.detail:
-                for tier in range(3):
-                    model.box(post, base+height-.6+tier*.19, half, .45+tier*.33, .19, .55+tier*.41, 'wood')
+                # Column-head and intermediate sets: two per bay under the eave.
+                for at in (post, east):
+                    bracket(model, at, base+height-.66, half)
             if upstairs:
                 model.box(east, base+.94, half+.82, width+.04, .14, .14, 'wood', True)
                 for offset in ([-.4,-.2,0,.2,.4] if model.detail else [0]):
                     model.box(east+offset*width, base, half+.82, .11, .94, .11, 'wood')
+        if model.detail:
+            # Thin plate (普拍枋) so the intermediate sets have a seat between columns.
+            model.box(0, base+height-.78, half, half*2+.3, .12, .3, 'wood')
+        else:
+            model.box(0, base+height-.66, half+.45, half*2, .46, .9, 'wood')
         model.box(0, base+height-.3, half, half*2+.5, .48, .52, 'wood')
     model.pose = (0,0,0,0)
 
@@ -273,7 +288,7 @@ def tower(model):
         model.box(0,platform-.18,edge,half*2,.18,.28,'white')
     model.pose=(0,0,0,0)
     facade(model,platform,8.85,5.05,False)
-    tiled_roof(model,0,platform+5.05,0,24.3,23.1,2.1,1.65,porch_recess=1.9,lit_edge=True)
+    tiled_roof(model,0,platform+5.05,0,24.3,23.1,2.1,1.65,porch_recess=1.9,lit_edge=True,ornate=True)
     # Projecting central porch and its gable break the first eave (19–22).
     for side in (-1,1):
         for x in (-2.6,2.6):
@@ -281,7 +296,7 @@ def tower(model):
         # The porch ridge points out towards the steps. Its gable rises above
         # the main eave and its fascia projects beyond the outer column line.
         model.pose=(0,0,side*9.36,np.pi/2)
-        tiled_roof(model,0,platform+5.17,0,5.45,8.3,2.45,.85,.84,gable_material='earth',frame_gable=True)
+        tiled_roof(model,0,platform+5.17,0,5.45,8.3,2.45,.85,.84,gable_material='earth',frame_gable=True,ornate=True)
         model.pose=(0,0,0,0 if side>0 else np.pi)
         for post in (-1.9,1.9):
             model.box(post,platform+4.92,11.45,.16,.65,.66,'wood')
@@ -307,10 +322,22 @@ def tower(model):
     upper = platform+7.4
     model.box(0,upper-.45,0,17.9,.45,17.9,'wood',True)
     facade(model,upper,7.9,4.85,True)
-    tiled_roof(model,0,upper+4.85,0,21.5,20.2,2.65,1.60,lit_edge=True)
+    tiled_roof(model,0,upper+4.85,0,21.5,20.2,2.65,1.60,lit_edge=True,ornate=True)
     model.box(0,upper+7.12,0,12,1.05,11,'wood')
+    # Bracket sets round the drum carry the top eave; spaced so the 1.35 m
+    # cross-arms of neighbours do not overlap (no coplanar z-fighting).
+    for side in range(4):
+        model.pose=(0,0,0,side*np.pi/2)
+        face,length=(5.5,12) if side%2==0 else (6,11)
+        if model.detail:
+            count=int(length/1.36)
+            for i in range(count):
+                bracket(model,-length/2+(i+.5)*length/count,upper+7.56,face)
+        else:
+            model.box(0,upper+7.56,face+.45,length,.46,.9,'wood')
+    model.pose=(0,0,0,0)
     model.box(0,upper+8.02,0,18.4,.36,17.5,'wood')
-    tiled_roof(model,0,upper+8.17,0,18.4,17.5,3.7,1.50,.76,lit_edge=True,gable_material='earth',frame_gable=True)
+    tiled_roof(model,0,upper+8.17,0,18.4,17.5,3.7,1.50,.76,lit_edge=True,gable_material='earth',frame_gable=True,ornate=True,finial=True)
     # The first-floor lanterns now hang from facade() (one per bay, all four sides).
 
 
