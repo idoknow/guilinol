@@ -74,9 +74,11 @@ let texPromise: Promise<boolean> | null = null
 const indexShardKeys = new Set<string>()
 const loadedShards = new Map<string, CityUpgradeShard>()
 const shardPromises = new Map<string, Promise<CityUpgradeShard | null>>()
-const shardFailed = new Set<string>()
+const shardRetryAfter = new Map<string, number>()
 const overridesByTile = new Map<string, Map<number, BuildingOverride>>()
-const shardToTiles = new Map<string, Set<string>>()
+const shardOverrideTiles = new Map<string, Set<string>>()
+const shardUpgradedTiles = new Map<string, Set<string>>()
+const upgradedTileRefs = new Map<string, number>()
 const upgradedTiles = new Set<string>()
 
 const toggleListeners = new Set<(on: boolean) => void>()
@@ -224,7 +226,9 @@ function shardFilename(key: string): string {
 }
 
 function indexShardOverrides(key: string, shard: CityUpgradeShard): void {
-  const tiles = new Set<string>()
+  removeShardOverrides(key)
+  const ovTiles = new Set<string>()
+  const upTiles = new Set<string>()
   const ovs = shard.overrides
   if (ovs) {
     for (const [fullKey, ov] of Object.entries(ovs)) {
@@ -239,29 +243,45 @@ function indexShardOverrides(key: string, shard: CityUpgradeShard): void {
         overridesByTile.set(tileKey, map)
       }
       map.set(partIdx, ov)
-      tiles.add(tileKey)
-      upgradedTiles.add(tileKey)
+      ovTiles.add(tileKey)
+      upTiles.add(tileKey)
     }
   }
   const fascias = shard.fascias
   if (fascias) {
     for (const f of fascias) {
       const tileKey = `${Math.floor(f[0] / 256) * 256},${Math.floor(f[2] / 256) * 256}`
-      tiles.add(tileKey)
-      upgradedTiles.add(tileKey)
+      upTiles.add(tileKey)
     }
   }
-  shardToTiles.set(key, tiles)
+  for (const tileKey of upTiles) {
+    upgradedTileRefs.set(tileKey, (upgradedTileRefs.get(tileKey) ?? 0) + 1)
+    upgradedTiles.add(tileKey)
+  }
+  shardOverrideTiles.set(key, ovTiles)
+  shardUpgradedTiles.set(key, upTiles)
 }
 
 function removeShardOverrides(key: string): void {
-  const tiles = shardToTiles.get(key)
-  if (tiles) {
-    for (const tileKey of tiles) {
+  const ovTiles = shardOverrideTiles.get(key)
+  if (ovTiles) {
+    for (const tileKey of ovTiles) {
       overridesByTile.delete(tileKey)
-      upgradedTiles.delete(tileKey)
     }
-    shardToTiles.delete(key)
+    shardOverrideTiles.delete(key)
+  }
+  const upTiles = shardUpgradedTiles.get(key)
+  if (upTiles) {
+    for (const tileKey of upTiles) {
+      const next = (upgradedTileRefs.get(tileKey) ?? 1) - 1
+      if (next <= 0) {
+        upgradedTileRefs.delete(tileKey)
+        upgradedTiles.delete(tileKey)
+      } else {
+        upgradedTileRefs.set(tileKey, next)
+      }
+    }
+    shardUpgradedTiles.delete(key)
   }
 }
 
@@ -292,20 +312,22 @@ export async function ensureShardByKey(key: string): Promise<CityUpgradeShard | 
   if (!indexShardKeys.has(key)) return null
   const existing = loadedShards.get(key)
   if (existing) return existing
-  if (shardFailed.has(key)) return null
+  const retryAt = shardRetryAfter.get(key)
+  if (retryAt !== undefined && performance.now() < retryAt) return null
   let pending = shardPromises.get(key)
   if (!pending) {
     pending = fetch(`${BASE_URL}/shards/${shardFilename(key)}`)
       .then(async res => {
         if (!res.ok) throw Error(`HTTP ${res.status}`)
         const shard = (await res.json()) as CityUpgradeShard
+        shardRetryAfter.delete(key)
         loadedShards.set(key, shard)
         indexShardOverrides(key, shard)
         for (const fn of shardListeners) fn(key, shard)
         return shard
       })
       .catch(err => {
-        shardFailed.add(key)
+        shardRetryAfter.set(key, performance.now() + 5000)
         console.warn(`City upgrade shard ${key} unavailable`, err)
         return null
       })

@@ -68,7 +68,15 @@ if (vRoof < .5) {
     vec2 contUv = vec2(vFacade / bayW, -vFloor);
     vec2 uvDx = dFdx(contUv);
     vec2 uvDy = dFdy(contUv);
-    vec2 baseUv = vec2(vFacade / bayW, clamp(1.0 - fract(max(0.0, vFloor)), 0.006, 0.994));
+    float floorFrac = fract(max(0.0, vFloor));
+    if (hasShop && vFloor >= 1.0 && vFloor < 2.0) {
+      // Keep 1F-fascia-to-2F-eave transom band (vFloor 1.00..1.44) pure clean masonry so 2D painted AC boxes
+      // and 2F balcony railings in upperLayer never poke out underneath or slice into lifted 2F grey-tile eaves.
+      floorFrac = vFloor < 1.44
+        ? mix(0.012, 0.048, (vFloor - 1.0) / 0.44)
+        : mix(0.38, 1.0, (vFloor - 1.44) / 0.56);
+    }
+    vec2 baseUv = vec2(vFacade / bayW, clamp(1.0 - floorFrac, 0.006, 0.994));
     spUvDeriv = contUv;
 
     // Near-field subtle single-step relief parallax using continuous UV derivatives (zero floor-seam spikes!)
@@ -128,8 +136,10 @@ if (vRoof < .5) {
     col *= groundAo;
     if (vFloor < 0.0) { col = diffuseColor.rgb * 0.66; spGlass = 0.0; spRough = 0.90; }
 
-    // Subtle daytime atmospheric sky-bounce lift so narrow shaded Guilin alley walls keep crisp detail
-    spExtraEmissive += col * (0.045 * (1.0 - uWindowLight));
+    // Subtle daytime sky-bounce + nighttime streetlamp/shopfront bounce floor so unlit masonry never crushes to pure black on ?gfx=low
+    vec3 nightBounceTint = mix(vec3(1.08, 0.98, 0.88), vec3(0.88, 0.95, 1.08), smoothstep(0.4, 3.0, max(0.0, vFloor)));
+    float nightBounce = mix(0.068, 0.032, smoothstep(0.2, 2.8, max(0.0, vFloor)));
+    spExtraEmissive += col * ((0.045 * (1.0 - uWindowLight)) + nightBounce * uWindowLight * nightBounceTint);
 
     // Day per-window sky/curtain reflection variation so glass never reads flat
     if (spGlass > 0.25) {
@@ -253,7 +263,7 @@ if (spActive) {
   totalEmissiveRadiance += uWarm * uWindowLight * step(.45, winHash) * winMask + neonGlow * uWindowLight;
 }`)
 }
-buildingMaterial.customProgramCacheKey = () => 'guilinol-facade-city-upgrade-2'
+buildingMaterial.customProgramCacheKey = () => 'guilinol-facade-city-upgrade-4'
 tileMaterial(buildingMaterial,true)
 
 // Vertex colours for GL04 building meshes: roofs by kind, parapets and roof boxes keep the wall colour.

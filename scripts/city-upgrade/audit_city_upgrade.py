@@ -158,8 +158,16 @@ def main():
             carriageway_bufs.append(g)
     carriageway_tree = STRtree(carriageway_bufs) if carriageway_bufs else None
 
-    def hits_landmark(geom) -> str | None:
-        for hi in guard_tree.query(geom, predicate="intersects"):
+    prop_guard_polys = []
+    for _lid, g in guard_items:
+        bg = g.buffer(0.48, quad_segs=2)
+        prepare(bg)
+        prop_guard_polys.append(bg)
+    prop_guard_tree = STRtree(prop_guard_polys) if prop_guard_polys else None
+
+    def hits_landmark(geom, prop_margin: bool = False) -> str | None:
+        tree = prop_guard_tree if (prop_margin and prop_guard_tree is not None) else guard_tree
+        for hi in tree.query(geom, predicate="intersects"):
             return guard_items[int(hi)][0]
         return None
 
@@ -175,9 +183,57 @@ def main():
     expected_shards: set[str] = set()
     sliver_only_shards: set[str] = set()
     chunk_ring_by_tile: dict[str, str] = {}
+    chunk_file_by_tile: dict[str, str] = {}
+    gl04_street_cache: dict[str, tuple[list[Polygon], list[Polygon], list[LineString]]] = {}
     tile_buildings: dict[str, list[tuple[Polygon, float]]] = {}
     bldg_chunks_count = 0
     raw_bldg_count = 0
+
+    def hits_gl04_road_or_fence(wx: float, wz: float) -> str | None:
+        tx = int(math.floor(wx / 256.0)) * 256
+        tz = int(math.floor(wz / 256.0)) * 256
+        tkey = f"{tx},{tz}"
+        fname = chunk_file_by_tile.get(tkey)
+        if not fname:
+            return None
+        if tkey not in gl04_street_cache:
+            raw = gzip.decompress((world_dir / fname).read_bytes())
+            v, cnt, col_len, _, _ = struct.unpack("<5I", raw[4:24])
+            off = 24 + 16900 + v * 9 + cnt * 4
+            streets = json.loads(raw[off : off + col_len].decode("utf-8"))[1]
+            drivable_polys: list[Polygon] = []
+            safe_polys: list[Polygon] = []
+            fence_segs: list[LineString] = []
+            for rec in streets[0]:
+                k = rec[0]
+                if k in (0, 1, 2, 4, 5, 6) and len(rec) >= 2 and len(rec[1]) >= 3:
+                    p = Polygon(rec[1], rec[2:] if len(rec) > 2 else None)
+                    if not is_valid(p):
+                        p = p.buffer(0)
+                    if p.is_empty:
+                        continue
+                    if k in (0, 2, 5):
+                        drivable_polys.append(p)
+                    else:
+                        safe_polys.append(p)
+            decor = streets[9] if len(streets) > 9 and streets[9] else []
+            for drec in decor:
+                if drec[0] in (0, 1, 2, 5, 6, 7, 8) and len(drec) >= 5:
+                    rx, rz, ang, rlen = drec[1] / 10.0, drec[2] / 10.0, -drec[3] / 100.0, drec[4] / 10.0
+                    ax, az = rx - 0.5 * rlen * math.cos(ang), rz + 0.5 * rlen * math.sin(ang)
+                    bx, bz = rx + 0.5 * rlen * math.cos(ang), rz - 0.5 * rlen * math.sin(ang)
+                    fence_segs.append(LineString([(ax, az), (bx, bz)]))
+            gl04_street_cache[tkey] = (drivable_polys, safe_polys, fence_segs)
+        drivable_polys, safe_polys, fence_segs = gl04_street_cache[tkey]
+        lx, lz = wx - tx, wz - tz
+        pt_cm = Point(lx * 100.0, lz * 100.0)
+        on_safe = any(sp.contains(pt_cm) for sp in safe_polys)
+        if not on_safe and any(dp.contains(pt_cm) for dp in drivable_polys):
+            return "gl04_carriageway_or_cycleway"
+        pt_m = Point(lx, lz)
+        if any(seg.distance(pt_m) < 0.28 for seg in fence_segs):
+            return "gl04_street_fence"
+        return None
 
     for c in selected_chunks:
         tx, tz = c["x"], c["z"]
@@ -185,6 +241,7 @@ def main():
         skey = f"{gx},{gz}"
         tkey = f"{tx},{tz}"
         chunk_ring_by_tile[tkey] = chunk_ring(tx, tz)
+        chunk_file_by_tile[tkey] = c["file"]
 
         raw = gzip.decompress((world_dir / c["file"]).read_bytes())
         verts, cnt, coll_len, _, _ = struct.unpack("<5I", raw[4:24])
@@ -329,7 +386,7 @@ def main():
             if not (0 <= aidx < max_fascia and 0.06 <= fd <= 0.16 and 0.85 <= fh <= 1.30):
                 schema_errors.append(f"Out-of-spec fascia in {skey}: {f}")
             fpt = Point(fx, fz)
-            lm_hit = hits_landmark(fpt)
+            lm_hit = hits_landmark(fpt, prop_margin=True)
             if lm_hit:
                 landmark_intrusions.append(f"fascia ({fx},{fz}) in {skey} hits landmark {lm_hit}")
             if hits_any(aero_tree, fpt):
@@ -350,7 +407,7 @@ def main():
             if not (wx0 <= bx <= wx1 and wz0 <= bz <= wz1 and 0 <= bidx < max_blade):
                 coord_errors.append(f"Out-of-bounds blade in {skey}: {bl}")
             bpt = Point(bx, bz)
-            lm_hit = hits_landmark(bpt)
+            lm_hit = hits_landmark(bpt, prop_margin=True)
             if lm_hit:
                 landmark_intrusions.append(f"blade ({bx},{bz}) in {skey} hits landmark {lm_hit}")
             if hits_any(aero_tree, bpt):
@@ -368,7 +425,7 @@ def main():
             x1, z1, x2, z2, y, nx, nz, kind = ev
             if not (wx0 <= x1 <= wx1 and wz0 <= z1 <= wz1 and wx0 <= x2 <= wx1 and wz0 <= z2 <= wz1 and kind in (0, 1)):
                 coord_errors.append(f"Out-of-bounds eave in {skey}: {ev}")
-            lm_hit = hits_landmark(LineString([(x1, z1), (x2, z2)]))
+            lm_hit = hits_landmark(LineString([(x1, z1), (x2, z2)]), prop_margin=True)
             if lm_hit:
                 landmark_intrusions.append(f"eave ({x1},{z1})-({x2},{z2}) in {skey} hits landmark {lm_hit}")
             mx, mz = (x1 + x2) * 0.5, (z1 + z2) * 0.5
@@ -384,7 +441,7 @@ def main():
             if not (wx0 <= ax <= wx1 and wz0 <= az <= wz1):
                 coord_errors.append(f"Out-of-bounds acUnit in {skey}: {ac}")
             apt = Point(ax, az)
-            lm_hit = hits_landmark(apt)
+            lm_hit = hits_landmark(apt, prop_margin=True)
             if lm_hit:
                 landmark_intrusions.append(f"acUnit ({ax},{az}) in {skey} hits landmark {lm_hit}")
             if hits_any(aero_tree, apt):
@@ -404,7 +461,11 @@ def main():
             if lm_hit:
                 landmark_intrusions.append(f"streetSign {ss['zh']} ({ss['x']},{ss['z']}) hits landmark {lm_hit}")
             if carriageway_tree and len(carriageway_tree.query(spt, predicate="intersects")) > 0:
-                roadway_intrusions.append(f"streetSign {ss['zh']} ({ss['x']},{ss['z']}) in {skey} inside carriageway")
+                roadway_intrusions.append(f"streetSign {ss['zh']} ({ss['x']},{ss['z']}) in {skey} inside OSM carriageway")
+            else:
+                gl04_hit = hits_gl04_road_or_fence(ss["x"], ss["z"])
+                if gl04_hit:
+                    roadway_intrusions.append(f"streetSign {ss['zh']} ({ss['x']},{ss['z']}) in {skey} inside {gl04_hit}")
             if hits_any(aero_tree, spt):
                 aero_intrusions.append(f"streetSign {ss['zh']} ({ss['x']},{ss['z']}) in {skey} inside aeroway")
             r = chunk_ring(int(math.floor(ss["x"] / 256.0)) * 256, int(math.floor(ss["z"] / 256.0)) * 256)

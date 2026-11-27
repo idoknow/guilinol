@@ -276,6 +276,7 @@ type FasciaTuple = NonNullable<CityUpgradeShard['fascias']>[number]
 type EaveTuple = NonNullable<CityUpgradeShard['eaves']>[number]
 
 interface ResolvedEave {
+  idx: number
   x1: number
   z1: number
   x2: number
@@ -294,7 +295,7 @@ interface ResolvedEave {
 //   both eye-level and 25-degree downward third-person camera sightlines to fascia top.
 // - kind === 1 (alley rain awning): press below fascia bottom with compact reach so awning never
 //   slices through fascia geometry or blocks eye-level / third-person view of sign letters & icons.
-function resolveEaveClearance(eave: EaveTuple, fascias: FasciaTuple[]): ResolvedEave | null {
+function resolveEaveClearance(eave: EaveTuple, fascias: FasciaTuple[], idx: number): ResolvedEave | null {
   const [x1, z1, x2, z2, ey, enx, enz, kind] = eave
   const dx = x2 - x1, dz = z2 - z1
   const elen = Math.hypot(dx, dz)
@@ -350,7 +351,7 @@ function resolveEaveClearance(eave: EaveTuple, fascias: FasciaTuple[]): Resolved
   }
 
   if (!hasOverlap) {
-    return { x1, z1, x2, z2, y: ey, nx: enx, nz: enz, kind, reach, drop, thick }
+    return { idx, x1, z1, x2, z2, y: ey, nx: enx, nz: enz, kind, reach, drop, thick }
   }
 
   if (kind === 0) {
@@ -361,7 +362,7 @@ function resolveEaveClearance(eave: EaveTuple, fascias: FasciaTuple[]): Resolved
     const needLipBot = maxFTop + Math.max(0.10, (reach - maxFd) * 0.47 + 0.08)
     const yAdj = Math.max(ey, needLipBot + drop + thick)
     if (yAdj - ey > 1.45) return null
-    return { x1, z1, x2, z2, y: yAdj, nx: enx, nz: enz, kind, reach, drop, thick }
+    return { idx, x1, z1, x2, z2, y: yAdj, nx: enx, nz: enz, kind, reach, drop, thick }
   }
 
   reach = 0.50
@@ -370,16 +371,29 @@ function resolveEaveClearance(eave: EaveTuple, fascias: FasciaTuple[]): Resolved
   // Press alley awning cleanly below fascia bottom (0.10m physical gap + unobstructed eye-level ray)
   const yAdj = Math.min(ey, minFBot - 0.10)
   if (ey - yAdj > 1.35) return null
-  return { x1, z1, x2, z2, y: yAdj, nx: enx, nz: enz, kind, reach, drop, thick }
+  return { idx, x1, z1, x2, z2, y: yAdj, nx: enx, nz: enz, kind, reach, drop, thick }
+}
+
+function resolveShardEaves(shard: CityUpgradeShard): ResolvedEave[] {
+  const eaves = shard.eaves ?? []
+  const fascias = shard.fascias ?? []
+  const out: ResolvedEave[] = []
+  for (let i = 0; i < eaves.length; i++) {
+    const resolved = resolveEaveClearance(eaves[i], fascias, i)
+    if (resolved) out.push(resolved)
+  }
+  return out
 }
 
 // Combined 2F grey-tile eaves + sun-faded alley awnings + subtle compound walls + street sign poles (1 DrawCall per shard!)
-function buildEavesAndWalls(shard: CityUpgradeShard, mat: THREE.MeshStandardMaterial): { mesh: THREE.Mesh; box: THREE.Box3 } | null {
-  const eaves = shard.eaves ?? []
-  const fascias = shard.fascias ?? []
+function buildEavesAndWalls(
+  shard: CityUpgradeShard,
+  resolvedEaves: ResolvedEave[],
+  mat: THREE.MeshStandardMaterial,
+): { mesh: THREE.Mesh; box: THREE.Box3 } | null {
   const walls = shard.walls ?? []
   const signs = shard.streetSigns ?? []
-  if (!eaves.length && !walls.length && !signs.length) return null
+  if (!resolvedEaves.length && !walls.length && !signs.length) return null
 
   const pos: number[] = [], nor: number[] = [], col: number[] = [], idx: number[] = []
   const tileMain = hexRgb(0x454a50)
@@ -389,10 +403,8 @@ function buildEavesAndWalls(shard: CityUpgradeShard, mat: THREE.MeshStandardMate
   // Sun-faded, rain-weathered Guilin alley corrugated awning tones (zero vivid plastic blue/green!)
   const awningColors = [hexRgb(0x535e69), hexRgb(0x525e57), hexRgb(0x6b5350), hexRgb(0x5c6063)]
 
-  for (let i = 0; i < eaves.length; i++) {
-    const resolved = resolveEaveClearance(eaves[i], fascias)
-    if (!resolved) continue
-    const { x1, z1, x2, z2, y, nx, nz, kind, reach, drop, thick } = resolved
+  for (let i = 0; i < resolvedEaves.length; i++) {
+    const { idx: origIdx, x1, z1, x2, z2, y, nx, nz, kind, reach, drop, thick } = resolvedEaves[i]
 
     const aTop: V3 = [x1, y, z1], bTop: V3 = [x2, y, z2]
     const cTop: V3 = [x2 + nx * reach, y - drop, z2 + nz * reach]
@@ -401,7 +413,7 @@ function buildEavesAndWalls(shard: CityUpgradeShard, mat: THREE.MeshStandardMate
     const cBot: V3 = [x2 + nx * reach, y - drop - thick, z2 + nz * reach]
     const dBot: V3 = [x1 + nx * reach, y - drop - thick, z1 + nz * reach]
 
-    const topCol = kind === 0 ? tileMain : awningColors[i % awningColors.length]
+    const topCol = kind === 0 ? tileMain : awningColors[origIdx % awningColors.length]
     const underCol = kind === 0 ? fasciaDark : hexRgb(0x3b4046)
     pushQuad(pos, nor, col, idx, aTop, dTop, cTop, bTop, topCol)
     pushQuad(pos, nor, col, idx, aBot, bBot, cBot, dBot, underCol)
@@ -463,17 +475,77 @@ function buildEavesAndWalls(shard: CityUpgradeShard, mat: THREE.MeshStandardMate
   return { mesh: freezeStatic(mesh), box: geom.boundingBox!.clone() }
 }
 
-function buildAcUnits(shard: CityUpgradeShard, shared: SharedResources): { mesh: THREE.InstancedMesh; box: THREE.Box3 } | null {
+function buildAcUnits(
+  shard: CityUpgradeShard,
+  resolvedEaves: ResolvedEave[],
+  shared: SharedResources,
+): { mesh: THREE.InstancedMesh; box: THREE.Box3 } | null {
   const list = shard.acUnits ?? []
   if (!list.length) return null
-  const inst = new THREE.InstancedMesh(shared.acGeom, shared.acMat, list.length)
+  const fascias = shard.fascias ?? []
+  const hy = 0.27
+  const kept: [number, number, number, number][] = []
+
+  for (let i = 0; i < list.length; i++) {
+    const [x, y, z, yaw] = list[i]
+    let skip = false
+    let belowTop = -Infinity
+
+    // 1. Cull 1F/2F-eave-zone AC condensers that intersect lifted 2F grey-tile eaves or alley awnings
+    for (let j = 0; j < resolvedEaves.length; j++) {
+      const re = resolvedEaves[j]
+      const dx = re.x2 - re.x1, dz = re.z2 - re.z1
+      const elen = Math.hypot(dx, dz)
+      if (elen < 0.05) continue
+      const ex = dx / elen, ez = dz / elen
+      const s = (x - re.x1) * ex + (z - re.z1) * ez
+      const perp = (x - re.x1) * re.nx + (z - re.z1) * re.nz
+      if (s >= -0.45 && s <= elen + 0.45 && perp >= -0.45 && perp <= re.reach + 0.40) {
+        const eaveBot = re.y - re.drop - re.thick
+        const eaveTop = re.kind === 0 ? re.y + 0.14 : re.y
+        if (y + hy > eaveBot - 0.14 && y - hy < eaveTop + 0.45) {
+          skip = true
+          break
+        }
+        if (eaveTop < y && eaveTop > belowTop) belowTop = eaveTop
+      }
+    }
+    if (skip) continue
+
+    // 2. Cull AC condensers wedged directly atop shopfront fascias (2F window center zone)
+    for (let j = 0; j < fascias.length; j++) {
+      const [fx, fy, fz, fyaw, fw, fh, fd] = fascias[j]
+      const fnx = Math.sin(fyaw), fnz = Math.cos(fyaw)
+      const tx = Math.cos(fyaw), tz = -Math.sin(fyaw)
+      const s = (x - fx) * tx + (z - fz) * tz
+      const perp = (x - fx) * fnx + (z - fz) * fnz
+      if (Math.abs(s) <= fw * 0.5 + 0.45 && perp >= -0.40 && perp <= fd + 0.45) {
+        const fBot = fy - fh * 0.5
+        const fTop = fy + fh * 0.5
+        if (y + hy > fBot - 0.10 && y - hy < fTop + 0.70) {
+          skip = true
+          break
+        }
+        if (fTop < y && fTop > belowTop) belowTop = fTop
+      }
+    }
+    if (skip) continue
+
+    // 3. Settle upper-storey AC condensers (-0.82m) onto the 100%-solid floor-slab spandrel beam below window sills
+    const ay = y - 0.82
+    if (belowTop > -Infinity && ay - hy < belowTop + 0.22) continue
+    kept.push([x, ay, z, yaw])
+  }
+
+  if (!kept.length) return null
+  const inst = new THREE.InstancedMesh(shared.acGeom, shared.acMat, kept.length)
   inst.name = 'city-upgrade-ac-units'
   inst.layers.set(MAIN_DETAIL_LAYER)
   inst.userData.noShadowCast = true
   const m = new THREE.Matrix4(), q = new THREE.Quaternion(), p = new THREE.Vector3(), s = new THREE.Vector3(1, 1, 1), up = new THREE.Vector3(0, 1, 0)
   const box = new THREE.Box3()
-  for (let i = 0; i < list.length; i++) {
-    const [x, y, z, yaw] = list[i]
+  for (let i = 0; i < kept.length; i++) {
+    const [x, y, z, yaw] = kept[i]
     p.set(x, y, z); q.setFromAxisAngle(up, yaw); m.compose(p, q, s); inst.setMatrixAt(i, m)
     box.expandByPoint(p)
   }
@@ -539,12 +611,14 @@ function buildShopFascias(
 
 function buildShopBlades(
   shard: CityUpgradeShard,
+  resolvedEaves: ResolvedEave[],
   mat: THREE.MeshStandardMaterial,
   grid: [number, number],
   texSize: [number, number] | null,
 ): { mesh: THREE.Mesh; box: THREE.Box3; texSize: [number, number] } | null {
   const list = shard.blades ?? []
   if (!list.length) return null
+  const fascias = shard.fascias ?? []
   const pos: number[] = [], nor: number[] = [], uv: number[] = [], idx: number[] = []
   const cols = Math.max(1, grid[0] || 8)
   const rows = Math.max(1, grid[1] || 2)
@@ -553,8 +627,46 @@ function buildShopBlades(
   const du = 1 / Math.max(1, usedSize[0])
   const dv = 1 / Math.max(1, usedSize[1])
   const w = 0.52, h = 1.42, d = 0.11
+  const hx = d * 0.5, hy = h * 0.5
 
-  for (const [x, y, z, yaw, bi] of list) {
+  for (const [x, rawY, z, yaw, bi] of list) {
+    let by = rawY
+    const tipX = x + Math.sin(yaw) * w
+    const tipZ = z + Math.cos(yaw) * w
+
+    // Lift vertical pier blade cleanly above lifted 2F grey-tile eaves / awnings so zero geometry penetrates eaves
+    for (let j = 0; j < resolvedEaves.length; j++) {
+      const re = resolvedEaves[j]
+      const dx = re.x2 - re.x1, dz = re.z2 - re.z1
+      const elen = Math.hypot(dx, dz)
+      if (elen < 0.05) continue
+      const ex = dx / elen, ez = dz / elen
+      const s0 = (x - re.x1) * ex + (z - re.z1) * ez
+      const p0 = (x - re.x1) * re.nx + (z - re.z1) * re.nz
+      const s1 = (tipX - re.x1) * ex + (tipZ - re.z1) * ez
+      const p1 = (tipX - re.x1) * re.nx + (tipZ - re.z1) * re.nz
+      if (Math.max(s0, s1) >= -0.40 && Math.min(s0, s1) <= elen + 0.40 && Math.max(p0, p1) >= -0.40 && Math.min(p0, p1) <= re.reach + 0.40) {
+        const eaveBot = re.y - re.drop - re.thick
+        const eaveTop = re.kind === 0 ? re.y + 0.14 : re.y
+        if (by + hy > eaveBot - 0.08 && by - hy < eaveTop + 0.08) {
+          by = Math.max(by, eaveTop + hy + 0.08)
+        }
+      }
+    }
+    for (let j = 0; j < fascias.length; j++) {
+      const [fx, fy, fz, fyaw, fw, fh, fd] = fascias[j]
+      const fnx = Math.sin(fyaw), fnz = Math.cos(fyaw)
+      const tx = Math.cos(fyaw), tz = -Math.sin(fyaw)
+      const s = (x - fx) * tx + (z - fz) * tz
+      const perp = (x - fx) * fnx + (z - fz) * fnz
+      if (Math.abs(s) <= fw * 0.5 + 0.35 && perp >= -0.30 && perp <= fd + 0.55) {
+        const fBot = fy - fh * 0.5, fTop = fy + fh * 0.5
+        if (by + hy > fBot - 0.08 && by - hy < fTop + 0.08) {
+          by = Math.max(by, fTop + hy + 0.10)
+        }
+      }
+    }
+
     const li = ((bi % total) + total) % total
     const col = li % cols, row = Math.floor(li / cols)
     const u0 = col / cols, u1 = (col + 1) / cols
@@ -563,8 +675,7 @@ function buildShopBlades(
     const fv0 = v0 + dv, fv1 = v1 - dv
     const bu0 = u0 + du * 2, bu1 = u0 + du * 4
     const bv1 = v1 - dv * 2, bv0 = v1 - dv * 4
-    const pt = localPt(x, y, z, yaw)
-    const hx = d * 0.5, hy = h * 0.5
+    const pt = localPt(x, by, z, yaw)
     pushUvQuad(pos, nor, uv, idx, pt(hx, -hy, 0), pt(hx, -hy, w), pt(hx, hy, w), pt(hx, hy, 0), fu0, fv0, fu1, fv1)
     pushUvQuad(pos, nor, uv, idx, pt(-hx, -hy, w), pt(-hx, -hy, 0), pt(-hx, hy, 0), pt(-hx, hy, w), fu0, fv0, fu1, fv1)
     pushUvQuad(pos, nor, uv, idx, pt(-hx, -hy, w), pt(hx, -hy, w), pt(hx, hy, w), pt(-hx, hy, w), bu0, bv0, bu1, bv1)
@@ -647,6 +758,7 @@ function buildStreetSignPlates(list: StreetSignDef[]): StreetSignBuild | null {
 interface MountedShard {
   key: string
   shard: CityUpgradeShard
+  resolvedEaves: ResolvedEave[]
   group: THREE.Group
   fascias: { mesh: THREE.Mesh; box: THREE.Box3; texSize: [number, number] } | null
   eavesWalls: { mesh: THREE.Mesh; box: THREE.Box3 } | null
@@ -699,7 +811,7 @@ export function mountCityUpgradeProps(scene: THREE.Scene) {
       const wasVisible = entry.blades.mesh.visible
       entry.group.remove(entry.blades.mesh)
       entry.blades.mesh.geometry.dispose()
-      const next = buildShopBlades(entry.shard, shared.bladeMat, bladeGrid, actualSize)
+      const next = buildShopBlades(entry.shard, entry.resolvedEaves, shared.bladeMat, bladeGrid, actualSize)
       entry.blades = next
       if (next) {
         next.mesh.visible = wasVisible
@@ -722,10 +834,11 @@ export function mountCityUpgradeProps(scene: THREE.Scene) {
     const group = new THREE.Group()
     group.name = `city-upgrade-shard:${key}`
 
+    const resolvedEaves = resolveShardEaves(shard)
     const fascias = buildShopFascias(shard, res.fasciaMat, fasciaGrid, res.fasciaTexSize)
-    const eavesWalls = buildEavesAndWalls(shard, res.eavesWallsMat)
-    const blades = buildShopBlades(shard, res.bladeMat, bladeGrid, res.bladeTexSize)
-    const acUnits = buildAcUnits(shard, res)
+    const eavesWalls = buildEavesAndWalls(shard, resolvedEaves, res.eavesWallsMat)
+    const blades = buildShopBlades(shard, resolvedEaves, res.bladeMat, bladeGrid, res.bladeTexSize)
+    const acUnits = buildAcUnits(shard, resolvedEaves, res)
     const streetSigns = buildStreetSignPlates(shard.streetSigns ?? [])
 
     if (fascias) group.add(fascias.mesh)
@@ -738,6 +851,7 @@ export function mountCityUpgradeProps(scene: THREE.Scene) {
     const entry: MountedShard = {
       key,
       shard,
+      resolvedEaves,
       group,
       fascias,
       eavesWalls,
