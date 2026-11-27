@@ -1,4 +1,5 @@
 import {readFile} from 'node:fs/promises'
+import {guardAdmin} from './web-guard-admin.mjs'
 import {securitySearch} from './security-search.mjs'
 import {enrichBans,searchBanUsers} from './ban-identities.mjs'
 import {activities,gameplay,history,record,regions} from './mp-store.mjs'
@@ -125,6 +126,7 @@ export function multiplayer(pool,env,{cache}={}){
   let cheatCaptures=null
   function setCheatCaptures(service){cheatCaptures=service}
   async function route(path,request,actor){
+    if(path.startsWith('admin/bans/'))return guardAdmin(pool,env,path,request,actor)
     const params=new URL(request.url).searchParams
     if(path==='admin/security-search')return securitySearch(pool,request)
     if(cheatCaptures&&path.startsWith('admin/mp/cheat-captures')){

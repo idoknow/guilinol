@@ -7,7 +7,7 @@ import {createAvatarOutfitController} from './outfits'
 import {facialFeatures} from './creator-face'
 import {addOutline, streetShading} from './creator-ink'
 import {starterDetails} from './starter-details'
-import {starterOutfit} from '../game/catalog'
+import {starterOutfit, type EquippedOutfit} from '../game/catalog'
 
 export function currentAvatar() {
   try {
@@ -30,6 +30,16 @@ function faceShape(face: number, y: number): [number, number] {
     default: return [1 + 0.11 * cheek - 0.15 * low, 0.02] // 宽颧脸: wide cheekbones, narrow jaw
   }
 }
+/**
+ * IDOK-386 头身比：头放大 6%、颈收短 6%，只改骨骼静止姿态（ensureAvatarRig 读作 rest，applyBones 每帧还原）。
+ * 动画只有 pelvis 位移和旋转轨，不会覆盖；头发、五官、帽子挂在头骨下同比跟随；三角面与 draw call 不变。
+ * 手骨不缩：多处手持物（鱼竿、罚单、饮料）直接挂在 hand_* 骨骼上，缩手会连带缩小它们。
+ */
+function refineProportions(scene: T.Object3D) {
+  const head = scene.getObjectByName('head')
+  head?.scale.multiplyScalar(1.06)
+  head?.position.multiplyScalar(0.94)
+}
 const models = new Map<string, ReturnType<GLTFLoader['loadAsync']>>()
 export async function characterModel(a: Avatar) {
   let pending = models.get(a.body)
@@ -40,6 +50,7 @@ export async function characterModel(a: Avatar) {
   }
   const [model, hair] = await Promise.all([pending, hairLibrary()])
   const scene = clone(model.scene) as T.Group
+  refineProportions(scene)
   scene.userData.creatorHair = hairstyle(a, hair.scene)
   scene.traverse((node) => {
     if (node instanceof T.SkinnedMesh) {
@@ -80,7 +91,7 @@ export function hairstyle(a: Avatar, library: T.Object3D) {
   mat.vertexColors = true
   mat.roughness = 0.68
   mat.side = T.FrontSide
-  streetShading(mat)
+  streetShading(mat, false, true)
   hair.traverse((n) => {
     if (n instanceof T.Mesh) {
       n.material = mat
@@ -184,9 +195,10 @@ export function disposeCharacterParts(root: T.Object3D) {
       for (const mat of Array.isArray(node.material) ? node.material : [node.material]) mat.dispose()
   })
 }
-export async function previewCharacter(a: Avatar) {
+/** @param outfit 默认是该外形的初始穿搭；封面主角传专属一套 */
+export async function previewCharacter(a: Avatar, outfit: EquippedOutfit = starterOutfit(a.look)) {
   const model = await characterModel(a),
     rig = ensureAvatarRig(model.scene)
-  styleCharacter(model.scene, rig, a).applyEquipped(starterOutfit(a.look))
+  styleCharacter(model.scene, rig, a).applyEquipped(outfit)
   return model
 }

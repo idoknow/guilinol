@@ -93,6 +93,8 @@ async function gfxAdmin(request,user){
   return json({ok:true})
 }
 const env = {...process.env, gfxAdmin,smokeAdmin,npcAdmin,mpAdmin:mp.route, perfQuery:cachedPerfQuery, DB:database(connections), FEEDBACK:bucket(process.env.S3_ENDPOINT)}
+env.loginEvent=async(ip,kind,subject)=>(await pool.query('select web_guard_event($1,$2,$3) banned',[ip,kind,subject])).rows[0].banned
+env.countProtection=category=>pool.query('select web_guard_hit($1)',[category])
 const cheatCaptures=createCheatCaptureService(pool,env,{bucket:env.FEEDBACK,resolvePlace:mp.resolvePlace})
 mp.setCheatCaptures(cheatCaptures)
 env.cheatCaptureUpload=cheatCaptures.upload
@@ -140,7 +142,8 @@ const server=serve({port:Number(process.env.PORT || 3000),fetch: async (request,
   try {
     const remoteAddr=serverEnv?.incoming?.socket?.remoteAddress??''
     const resolved=resolveClientIp(request.headers,remoteAddr)
-    const reqEnv={...env,clientIp:resolved.clientIp}
+    const acceptsVerifiedIp=process.env.VERIFIED_LOGIN_IP==='1' && ['127.0.0.1','::1','::ffff:127.0.0.1'].includes(remoteAddr)
+    const reqEnv={...env,clientIp:resolved.clientIp,acceptsVerifiedIp}
     const response=url.pathname==='/api/t'?await receive(request,connections,origin,{remoteAddr}):await onRequest({env:reqEnv,request:new Request(origin+url.pathname+url.search,request)})
     status=response.status
     if(request.method!=='GET'&&status<400&&/^\/api\/(?:admin|feedback|bridge|auth\/(?:register|verify))/.test(url.pathname)){

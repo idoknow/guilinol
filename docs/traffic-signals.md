@@ -94,6 +94,46 @@
 - `npm run verify:signal-heads:city`：无头真浏览器（先 `npm run build`）。5 个机位上核对：只多 2 个 draw call、灯杆不在机动车路面上、十字街没有重复灯头、灯色与真源一致。`-- --shots <目录>` 另存每个灯头的司机视角截图和 `cameras.json`；`-- --shots <目录> --cameras <cameras.json>` 用同一批机位给另一份构建拍对照图（不做断言）。
 - 浏览器探针（`?verify`）：`viewer.trafficProbe.signalHeads()` → `{total, pending, none, unplaced, visible, drawCalls, heads: [{key, node, group, lane, x, y, z, yaw, arm, back, kerb, shown, truth}]}`。`shown` 是从颜色缓冲读回来的亮灯，`truth` 是真源此刻的读数；`drawCalls` 是灯头组里渲染器会画的网格数（有灯头时 2，否则 0）；`unplaced` 列出还没立起来的进口和原因（`pending` / `none`）。
 
+# 路边泊位线
+
+路边停着车的地方，路面上画出泊位：每辆停放车一个，同一条路缘上隔一两个车位的两辆车之间补上空泊位。全城一个网格，1 个 draw call。
+
+| 文件 | 管什么 |
+|---|---|
+| `web/src/traffic/parking-layout.ts` | 纯计算，不依赖 three.js：从停放车数据算泊位，算每个泊位的线条顶点 |
+| `web/src/traffic/parking-bays.ts` | 把线条铺到路面上（一个网格），分帧读路面高度 |
+| `web/src/traffic/parking-bay-audit.ts` | 只在 `?verify` 下按需加载：量漆面离画出来的路面多高 |
+| `web/src/traffic/index.ts` | 停车 cell 变化时交停放车数据，每帧调一次 `update` |
+
+## 规则
+
+- **数据**：只读 `roads/parking/<cell>.json.gz` 里的停放车（`pipeline/traffic_parking.py` 写的），不改世界数据。pipeline 沿路缘每 6–7.5 m 一个车位，约一半留空，数据里只有停了车的那些。
+- **泊位**：一辆车一个。同一条路缘（同一 yaw、横向相差不到 0.4 m）上最近的两辆车，间距是 1–3 个车位时连成一串，中间补 0–2 个空泊位；相邻泊位首尾相接，各画各的两条端线，接缝处两条线重合（一个泊位不画时，旁边的照样封口）。间距对不上整数个车位的不连，各画各的，长 6 m。算出来的泊位与数据行的先后顺序无关。
+- **互压的不画**：弯道、两条车道叠在一起的地方，数据里的车比一个泊位还近（全量 36110 辆里 35 处）。每对里去掉一个：有车的优先留，同类按 key 排序留前一个，所以结果不随停车 cell 的加载顺序变。全量数据里任意两个泊位不相交（单测断言）。
+- **形状**：线宽 0.1 m，颜色用街面标线同一个色（`look.streets.surfaces[2]`）。
+  - 车贴着路缘（小路，车中心离路缘约 0.95 m）：三条线——两端端线和靠路中间的边线，路缘那一侧不画，端线离路缘 5 cm 收住。
+  - 车停在路面中间（宽路上车中心离路缘约 2.5 m）：封成四边框，两条边线离车中心一样远（1.25 m）。判据是泊位后端、中间、前端三处，从车中心往路缘方向 1.5 m 都还是机动车路面（`BAY_BOX_CLEARANCE`）。
+- **不画的泊位**（探针里计入 `none`）：
+  - 中心不在机动车路面上的；补出来的空泊位落在机动车禁行区的。判一次，不再看。
+  - 补出来的空泊位正好在支路口上的：后端、中间、前端三处里有一处，往路缘方向 4 m（`BAY_MOUTH_REACH`）还是机动车路面，就是路口，不画。真停了车的泊位不受这条影响。
+  - 路面高度和数据里差 0.6 m 以上的（上面有桥、下面有坑）：连读 6 次都这样就先不画，之后每 30 秒再读一次，读数正常了照样画上。
+- **高度**：读泊位四角的路面高度，线条按四角铺平，再抬高 1.2 cm。只铺玩家 110 m 以内的泊位，每帧最多看 4 个（16 次高度查询），最多扫过 256 个泊位找到期的。
+  - 远处地块的路面碰撞体比地形晚到几秒，先读到的可能是地形高度。所以每个泊位隔 1 秒再读，连续 3 次读数一样才算定住；定住以后每 8 秒再读一次，地块重载或晚到的路面也能改正。
+  - 街面地块或地面还没加载：1.5 秒后再看。
+- **上传**：平时只上传改了的那个泊位的顶点；换停车 cell（所有泊位在缓冲里重排）或一次攒了 64 段以上时整个缓冲上传一次。整缓冲还没传上去之前不加分段，否则 three.js 只传分段，重排过的顶点就留在显卡上的旧位置。
+- 街面交通关掉时泊位线一起隐藏。换停车 cell 时已经铺好的泊位保留高度，不重读。
+
+改规则只动 `parking-layout.ts` 和 `parking-bays.ts` 顶部的常量。
+
+## 验证
+
+- `npm run verify:parking-bays`：单测，约 2 秒。泊位怎么连、空泊位、任意朝向、互压剔除、行顺序打乱结果不变；线条顶点在路面上且朝上；三条线与四边框的判定；首帧预算、每帧扫描上限、定住后的读数频率、地形高度被路面高度改正；非路面、桥下、禁行区、支路口；画出来的顶点与上传到显卡的一致（模拟 three.js 的上传）；全量停车数据上每辆车有泊位、任意两个泊位不相交。没有世界数据的检出里最后一项跳过并写明原因。
+- `npm run verify:parking-bays:city`：无头真浏览器（先 `npm run build`）。4 个点位（两条宽路、两条居民街）× 桌面/手机两档，核对：线条网格每帧最多画 1 次（在渲染器里数实际绘制次数）、100 m 内泊位全部定住、定住后 16 秒内每个泊位只复查 1–3 次、泊位中心在机动车路面上、端线端头和四边框的路缘侧边线在路面上、每个点位四边框占比在该街道应有的范围内、有画出来的空泊位、不画的不超过 35%、漆面离画出来的路面 2–30 mm。`BAYS_SPOTS=lequn,east` 只跑指定点位。几何常量直接从 `parking-layout.ts` 读，不在脚本里另抄一份。`-- --shots <目录>` 另存总览、泊位近景、俯视截图和 `cameras.json`；`-- --shots <目录> --cameras <cameras.json>` 用同一批机位给另一份构建拍对照图（不做断言）。
+- 浏览器探针（`?verify`）：
+  - `viewer.trafficProbe.parkingBays()` → `{total, occupied, empty, drawn, boxed, settled, waiting, none, visible, drawCalls, samples, bays: [{key, x, y, z, headingX, headingZ, rear, front, occupied, state, boxed, settled, heights}]}`。`samples` 是开局以来查过的路面高度次数；`heights` 是四角读数（后端路缘侧、后端路侧、前端路侧、前端路缘侧）。
+  - `await viewer.trafficProbe.parkingBayGaps({x, z}, 半径)` → `[{key, occupied, gaps, under}]`。从上往下打射线，`gaps` 是漆面减去它下面画出来的最高表面（边线、后端线，四边框再加路缘侧边线），负数就是线被埋了（约 −8 mm 是压在街面地块自带的标线下面，那些标线比路面高 2 cm）。
+  - `await viewer.trafficProbe.parkingBayDraws(帧数)` → `{frames, draws, mostPerFrame}`。在渲染器里数这么多帧内线条网格实际画了几次、单帧最多几次。
+
 # 全城性能基线：`npm run perf:city`
 
 固定 5 个机位（十字街、解放桥、中山路口、乐群小学周边、南区主干路口），桌面和手机两档，全程无头（macOS 走 Metal，不弹窗）。

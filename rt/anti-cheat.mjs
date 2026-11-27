@@ -11,7 +11,7 @@ import pg from 'pg'
 import { randomUUID } from 'node:crypto'
 
 export const LIMITS = Object.freeze({
-  walk: 9,          // m/s 跑步
+  walk: 12,         // m/s 跑步（客户端 sprint 实测 9 m/s，留 33% 余量，避免按 Shift 就超限）
   bike: 7,          // m/s 助力车
   car: 45,          // m/s 汽车（150 km/h ≈ 41.7，留 8% 余量）
   stepM: 1.2,       // 单帧容忍
@@ -24,6 +24,10 @@ export const LIMITS = Object.freeze({
   combatLockMs: 5000, // 战斗中禁止瞬移
   walkGateMs: 1000, // 出拳要求过去 1 秒是走路速度
   tolerance: 1.6,   // 瞬时速度容忍倍数（掉帧/网络排队）
+  winMs: 1200,      // 持续性判定窗口：只有整段都超速才算作弊
+  winTol: 1.15,     // 窗口内平均速度容忍倍数
+  spikeM: 3,        // 单包超限但少于该距离只记数、不拒包
+  hardM: 25,        // 单包位移超过它才按硬作弊处理
 })
 
 const airborne = (p) => p.foot === false || Boolean(p.bike) || p.activity === 'drone'
@@ -40,6 +44,19 @@ const BAN = {
   l2Min: num(process.env.RT_AC_BAN_2_MIN, 60),
   l3: num(process.env.RT_AC_BAN_3, 300),
   l3Min: num(process.env.RT_AC_BAN_3_MIN, 1440),
+}
+
+/** 1.2 秒滑动窗口内的平均速度（m/s）：持续超速才判定，避免单包抖动误伤。 */
+function windowSpeed(p, at, flat, dt) {
+  const win = p.moveWin ??= []
+  win.push({ at, d: Number.isFinite(flat) ? flat : 0, v: flat / Math.max(dt, .01) })
+  while (win.length && at - win[0].at > LIMITS.winMs) win.shift()
+  const speeds = win.map(entry => entry.v).sort((a, b) => a - b)
+  const median = speeds[Math.floor(speeds.length / 2)] ?? 0
+  const span = Math.max(500, at - win[0].at) / 1000
+  let total = 0
+  for (const entry of win) total += entry.d
+  return { median, avg: total / span }
 }
 
 /** 当前允许的速度（m/s）。客户端上报的 v 永不参与判定。 */
@@ -71,10 +88,18 @@ export function checkMove(p, nx, ny, nz, at) {
     return { ok: true, teleport: true }
   }
 
-  // 容忍 1.6 倍瞬时速度 + 固定抖动余量：手机掉帧/网络排队会集中到一个包里，
-  // 但持续作弊（20Hz 下 40 m/s）会稳定超限，会被拒。
-  const cap = (vehicleMotion(p) ? LIMITS.car : speedCap(p, at)) * dt * LIMITS.tolerance + LIMITS.stepM
-  if (flat > cap) return { ok: false, kind: 'speed', overflow: flat - cap, reject: true }
+  // 持续性判定（2026-11 误封后修正）：单包的瞬时速度在掉帧、网络排队、切模式、
+  // 以及按 Shift 冲刺的瞬间都会被放大，拿单包判定会把正常玩家拉回并记违规。
+  // 这里改成「1.2 秒窗口内的平均速度」超限才拒包；单包只记数不拒。
+  const capSpeed = vehicleMotion(p) ? LIMITS.car : speedCap(p, at)
+  const cap = capSpeed * dt * LIMITS.tolerance + LIMITS.stepM
+  const sustained = windowSpeed(p, at, flat, dt)
+  const sustainedCap = capSpeed * LIMITS.winTol
+  if (flat > LIMITS.hardM && flat / Math.max(dt, .05) > capSpeed * 3)
+    return { ok: false, kind: 'speed', overflow: flat - cap, reject: true }
+  if (sustained.median > sustainedCap && sustained.avg > capSpeed)
+    return { ok: false, kind: 'speed', overflow: flat - cap, reject: true }
+  if (flat > cap && flat > LIMITS.spikeM) return { ok: true, observation: 'speed_spike' }
   const baseline=p.altitudeBaseline??={y:p.y,at}
   if (ny<baseline.y+1) { baseline.y=ny; baseline.at=at }
   const observation= !vehicleMotion(p) && (rise>LIMITS.upMax*dt+0.5 || (ny-baseline.y>4 && at-baseline.at>8000)) ? 'altitude_unverified' : ny < -10 ? 'ground_unverified' : null

@@ -9,6 +9,7 @@ import {alignWheels} from './wheel-pose'
 import {interactions} from './interactions'
 import {SIGNAL_DRIVER_RANK,citySignalClock,citySignalColor,citySignalState,citySignals} from './signals'
 import {signalApproaches} from './signal-approach'
+import {parkingBayLines} from './parking-bays'
 import {LANDMARK_SIGNAL_GROUPS,signalHeads} from './signal-heads'
 import {touchUi} from '../ui/input-mode'
 import {npcDefaults,validNpc} from '../../../lib/npc'
@@ -100,6 +101,8 @@ export async function traffic(scene:THREE.Scene,camera:THREE.Camera,verify:boole
         parkedRows.push([STATIC+count,variant,x,y,z,yaw]);show(STATIC+count++,variant,x,y,z,yaw,1)
       }
       hide(STATIC+count,STATIC+parkCount);parkCount=count;mesh.userData.parked=count
+      // A failure here must not reach the catch below: that one drops the cells and fetches them again.
+      try{bays?.setRows(groups.flat())}catch(error){console.warn('Parking bays unavailable',error)}
     }).catch(error=>{if(target===parkKey){parkKey='';cache.clear()}console.warn('Parking cell unavailable',error)})
   }
   let accumulator=0
@@ -110,6 +113,14 @@ export async function traffic(scene:THREE.Scene,camera:THREE.Camera,verify:boole
   const heads=surfaceAt&&signalHeads(scene,surfaceAt)
   if(verify&&heads)mesh.userData.signalHeads=heads.probe
   if(heads)void warm?.(heads.group)
+  // IDOK-399: painted bays for the parked cars above. One mesh; heights come from `sampleGround`.
+  const bays=sampleGround&&surfaceAt&&parkingBayLines(scene,sampleGround,surfaceAt)
+  if(verify&&bays){
+    mesh.userData.parkingBays=bays.probe
+    mesh.userData.parkingBayGaps=async(focus:{x:number,z:number},radius?:number)=>(await import('./parking-bay-audit')).parkingBayGaps(scene,bays.mesh,bays.probe().bays,focus,radius)
+    mesh.userData.parkingBayDraws=async(frames?:number)=>(await import('./parking-bay-audit')).parkingBayDraws(bays.mesh,frames)
+  }
+  if(bays)void warm?.(bays.mesh)
   const near=(x:number,z:number,visit:(solid:Solid)=>void)=>{sim?.nearSolids(x,z,visit);getActiveDutyTraffic()?.nearSolids(x,z,visit);staticSolids(x,z,visit);heads?.near(x,z,visit)}
   const probeIds=new WeakMap<object,number>();let nextProbeId=0
   batch.setColorAt(0,new THREE.Color(0xffffff))
@@ -126,9 +137,10 @@ export async function traffic(scene:THREE.Scene,camera:THREE.Camera,verify:boole
     const dutyActive=Boolean(getActiveDutyTraffic())
     if(enabled)useTrafficSolids(near)
     else if(!dutyActive)useTrafficSolids(undefined)
-    if(!enabled){effects.clear();people.clear();riders.clear();walking.clear();ridden.clear();riddenSlots.clear();mesh.count=0;hide(0,SLOTS);parkKey='';parkCount=0;curbside.clear();heads?.hide();return}
+    if(!enabled){effects.clear();people.clear();riders.clear();walking.clear();ridden.clear();riddenSlots.clear();mesh.count=0;hide(0,SLOTS);parkKey='';parkCount=0;curbside.clear();heads?.hide();bays?.hide();return}
     updateParking(camera.position.x,camera.position.z)
     parkLodAt-=dt;if(parkLodAt<=0){parkLodAt=.5;for(const [slot,variant,x,y,z,yaw] of parkedRows)show(slot,variant,x,y,z,yaw,1)}
+    bays?.update(dt,player??camera.position)
     if(verify&&mesh.userData.staticOnly){hide(0,STATIC);mesh.count=0;mesh.userData.allMotors=[];heads?.update(dt,player??camera.position);return}
     const center=player??camera.position
     const target=`${Math.floor(center.x/512)}_${Math.floor(center.z/512)}`

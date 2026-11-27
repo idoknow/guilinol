@@ -7,7 +7,7 @@ import {onUser} from './ui/account'
 import type {MpStatus} from './ui/mp-pref'
 import {setRoster,clearRoster,type RosterPlayer} from './mp-roster'
 import {fingerprint,deviceSummary} from './fingerprint'
-import {bindTravel,travelTarget} from './mp-travel'
+import {bindTravel,prepareTravel,rejectTravel,type TravelReply} from './mp-travel'
 
 import type {CaptureClientContext, CheatCapturePacket} from './cheat-capture'
 
@@ -23,14 +23,22 @@ export function requestRoster(on:boolean){subCount=Math.max(0,subCount+(on?1:-1)
 
 export function attachNet(scene:Scene,clips:AnimationClip[],getPose:()=>Pose,getAvatar:()=>Avatar,camera:Camera,getActivity?:()=>ActivityReport,onCombat?:(p:CombatPacket,self:string)=>void,onSetback?:(x:number,y:number,z:number)=>void,getCaptureContext?:()=>CaptureClientContext) {
   const peers=players(scene,clips,camera)
-  let travelReply:((ok:boolean)=>void)|undefined
+  let travelReply:((reply:TravelReply)=>void)|undefined
+  let landingPaused=false,rejoinTimer=0
   let travelSequence=0
   bindTravel(async(reason,x,z)=>{
+    if(landingPaused && Math.hypot(getPose().x-x,getPose().z-z)>200)return rejectTravel('cooldown')
     if(state!=='online'||Math.hypot(getPose().x-x,getPose().z-z)<=200)return true
-    const target=travelTarget(reason,x,z);if(!target||travelReply)return false
-    return new Promise(resolve=>{const timeout=setTimeout(()=>travelReply?.(false),4000)
-      travelReply=ok=>{clearTimeout(timeout);travelReply=undefined;resolve(ok)}
-      send({t:'travel',seq:++travelSequence,reason:reason.split(':')[0],target})})
+    if(travelReply)return rejectTravel('busy')
+    return prepareTravel(reason,x,z,target=>new Promise(resolve=>{
+      const timeout=setTimeout(()=>travelReply?.({ok:false,code:'timeout'}),4000)
+      travelReply=result=>{clearTimeout(timeout);travelReply=undefined;resolve(result)}
+      send({t:'travel',seq:++travelSequence,reason:reason.split(':')[0],target,...(target===null?{precheck:true}:{})})
+    }),delay=>{
+      const earliest=performance.now()+delay
+      landingPaused=true;stop()
+      return ()=>{if(!disposed)rejoinTimer=window.setTimeout(()=>{landingPaused=false;if(account&&!disposed)void connect()},Math.ceil(Math.max(0,earliest-performance.now())))}
+    })
   })
   let socket:WebSocket|undefined,attempt=0,generation=0,timer=0,lastSent=-Infinity,lastRoster=-Infinity,lastActCheck=-Infinity,disposed=false
   let lastRosterV=0,rosterPaused=false,subTimer=0
@@ -76,6 +84,7 @@ export function attachNet(scene:Scene,clips:AnimationClip[],getPose:()=>Pose,get
     timer=window.setTimeout(()=>{void connect(quiet)},Math.round(backoff*(0.8+Math.random()*0.4)))
   }
   async function connect(quiet=false){
+    if(landingPaused||disposed)return
     // 复用在用的连接：切偏好、重复触发、取票竞态都不能再建第二条（一条 tab 只许一条 socket）
     if(socket&&(socket.readyState===WebSocket.OPEN||socket.readyState===WebSocket.CONNECTING))return
     clearTimeout(timer)
@@ -95,7 +104,7 @@ export function attachNet(scene:Scene,clips:AnimationClip[],getPose:()=>Pose,get
         if(version!==generation)return
         const msg=JSON.parse(event.data)
         switch(msg.t){
-          case 'travel_result':if(msg.seq===travelSequence)travelReply?.(msg.ok===true);break
+          case 'travel_result':if(msg.seq===travelSequence)travelReply?.(msg);break
           case 'cheat_capture':{
             const packet=msg as CheatCapturePacket
             if(typeof packet.id==='string'&&typeof packet.token==='string'){
@@ -127,6 +136,7 @@ export function attachNet(scene:Scene,clips:AnimationClip[],getPose:()=>Pose,get
             peers.combat(msg);onCombat?.(msg,myId);break
           }
           case 'welcome': sent=0;sentTimes=[];myId=String(msg.me?.id??'');myUid=Number(msg.me?.uid)||0;myName=String(msg.me?.name??'');setChatSelf(myUid);onCombat?.(msg.me,myId);if(subCount>0)send({t:'roster_sub',since:lastRosterV})
+            if(msg.relocated){const {x,y,z,code}=msg.relocated;onSetback?.(x,y,z);rejectTravel(code)}
             // 续连（CDN 掐断后原地接管）：对账而不是清空重建，否则每 44 秒所有人的模型都会销毁再克隆一遍
             if(msg.me?.resumed){const keep=new Set((msg.players as {id:string}[]).map(p=>p.id))
               for(const p of peers.list())if(!keep.has(p.id))peers.remove(p.id)
@@ -224,8 +234,8 @@ export function attachNet(scene:Scene,clips:AnimationClip[],getPose:()=>Pose,get
   const manual=()=>{if(!disposed){stop();attempt=0;void connect()}}
   window.addEventListener('glol:mp-reconnect',manual)
   return {list:peers.list,send,emote,status,tick,who:()=>send({t:'who'}),probe:peers.probe,reconnect:manual,
-    dispose(){disposed=true;unsubscribe();stop();clearTimeout(timer)
-      bindTravel();travelReply?.(false)
+    dispose(){disposed=true;unsubscribe();stop();clearTimeout(timer);clearTimeout(rejoinTimer)
+      bindTravel();travelReply?.({ok:false})
       if(socket){const ws=socket;socket=undefined;ws.onopen=ws.onmessage=ws.onclose=ws.onerror=null;try{ws.close(1000,'dispose')}catch{}}
       badge?.remove();window.removeEventListener('glol:avatar-change',avatarChanged);window.removeEventListener('glol:mp-reconnect',manual)
       window.removeEventListener('pagehide',pageHide);window.removeEventListener('pageshow',pageShow);publish({state:'off',online:0})}}

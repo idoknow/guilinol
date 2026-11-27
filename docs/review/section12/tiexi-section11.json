@@ -1,0 +1,74 @@
+[
+  {
+    "section": "12",
+    "upper": 675807125,
+    "lower": 169505553,
+    "halfWidthM": 7.65,
+    "faces": 306,
+    "minimumM": 0.9606088791286993,
+    "targetM": 5.7,
+    "worst": {
+      "role": "paving-1",
+      "x": -2346.1554759411447,
+      "z": 1282.5785531604083,
+      "y": 154.30023898175108
+    },
+    "surface": "fullWidth",
+    "maximumRailToFloorM": 0.9606091720887946,
+    "shortfallM": 4.739390827911206
+  },
+  {
+    "section": "12",
+    "upper": 675807125,
+    "lower": 169505553,
+    "halfWidthM": 7.65,
+    "faces": 54,
+    "minimumM": 5.5743961789004,
+    "targetM": 5.7,
+    "worst": {
+      "role": "graded-floor",
+      "x": -2350.299706423225,
+      "z": 1281.1751573595407,
+      "y": 149.7047851573537
+    },
+    "surface": "carriageway",
+    "maximumRailToFloorM": 5.574396569869435,
+    "shortfallM": 0.12560343013056485
+  },
+  {
+    "section": "12",
+    "upper": 1017595563,
+    "lower": 169505553,
+    "halfWidthM": 7.65,
+    "faces": 229,
+    "minimumM": 1.121301087700175,
+    "targetM": 5.7,
+    "worst": {
+      "role": "paving-0",
+      "x": -2342.737067174552,
+      "z": 1281.5588252110156,
+      "y": 154.22130591229984
+    },
+    "surface": "fullWidth",
+    "maximumRailToFloorM": 2.616089224450377,
+    "shortfallM": 3.083910775549623
+  },
+  {
+    "section": "12",
+    "upper": 1017595563,
+    "lower": 169505553,
+    "halfWidthM": 7.65,
+    "faces": 38,
+    "minimumM": 5.717255547497558,
+    "targetM": 5.7,
+    "worst": {
+      "role": "graded-floor",
+      "x": -2343.4916381835938,
+      "z": 1280.6483374238014,
+      "y": 149.64866638183594
+    },
+    "surface": "carriageway",
+    "maximumRailToFloorM": 7.212044250593294,
+    "shortfallM": 0.0
+  }
+]

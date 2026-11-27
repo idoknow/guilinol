@@ -233,7 +233,7 @@ export async function startSocial(
   env: Env,
   db: D1Database,
   type: SocialType,
-  ip: string,
+  ip: string|null,
   intent: SocialIntent = 'login',
   userId?: string,
   existingStates: string[] = [],
@@ -250,7 +250,7 @@ export async function startSocial(
     if (bound) throw new Problem(409, 'already_bound', '这个平台已经绑定过账号了')
   }
   if (intent === 'register' && userId) throw new Problem(400, 'invalid_input', '注册流程不需要登录')
-  await limit(db, `social:start:${ip}`, 60, 60)
+  if(ip) await limit(db, `social:start:${ip}`, 60, 60)
 
   const state = random(32)
   await db.batch([
@@ -259,7 +259,7 @@ export async function startSocial(
     db.prepare('DELETE FROM rate_limits WHERE key IN (SELECT key FROM rate_limits WHERE until<=? LIMIT 200)').bind(now()),
     db
       .prepare('INSERT INTO social_states(state,type,intent,user_id,expires,used,ip) VALUES(?,?,?,?,?,0,?)')
-      .bind(state, type, intent, intent === 'bind' ? (userId ?? null) : null, now() + STATE_TTL, ip),
+      .bind(state, type, intent, intent === 'bind' ? (userId ?? null) : null, now() + STATE_TTL, ip??''),
   ])
 
   let body: Upstream
@@ -311,7 +311,8 @@ export async function socialCallback(env: Env, db: D1Database, request: Request)
     return back('invalid')
 
   try {
-    await limit(db, `social:callback:${requestIp(request, env)}`, 20, 60)
+    const ip=requestIp(request,env)
+    if(ip) await limit(db, `social:callback:${ip}`, 20, 60)
   } catch {
     return back('busy')
   }
@@ -650,6 +651,7 @@ export async function socialRegister(env: Env, db: D1Database, request: Request,
   if (existing?.verified) throw new Problem(409, 'email_taken', '该邮箱已注册，请直接登录后在账号设置里绑定')
 
   if (typeof body.code !== 'string' || !/^\d{6}$/.test(body.code)) {
+    if(weakPassword(password))throw new Problem(400,'weak_password','密码容易猜测，请换一个更长的独特密码')
     await reserveMail(db, email, ip)
     const salt = random(16)
     await db
@@ -775,6 +777,7 @@ export async function bindEmail(
 
   const password = typeof body.password === 'string' ? body.password : ''
   if (password && (password.length < 8 || password.length > 256)) invalid()
+  if(password&&weakPassword(password))throw new Problem(400,'weak_password','密码容易猜测，请换一个更长的独特密码')
 
   const writes = [
     db.prepare('UPDATE users SET email=?,email_placeholder=0,verified=1 WHERE id=?').bind(email, account.id),
@@ -788,3 +791,4 @@ export async function bindEmail(
   logSocial({ action: 'bind_email', password: !!password })
   return Response.json({ ok: true, email, password_set: !!password }, { headers })
 }
+import {weakPassword} from './weak-password'

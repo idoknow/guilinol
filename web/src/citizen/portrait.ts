@@ -1,9 +1,10 @@
 import {creatorStage} from '../ui/creator-stage'
+import { readJson } from '../lib/json'
 
 export async function updatePortrait(){
   const response=await fetch('/api/me/avatar')
   if(!response.ok)throw Error('暂时无法读取角色')
-  const {avatar}=await response.json()
+  const {avatar}=await readJson(response)
   if(!avatar)throw Error('请先创建角色')
   const host=document.createElement('div')
   host.style.cssText='position:fixed;left:-500px;top:0;width:192px;height:192px;pointer-events:none'

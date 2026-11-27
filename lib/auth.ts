@@ -12,6 +12,9 @@ export interface Env {
   RT_JOIN_SECRET?: string
   perfQuery?:(path:string,params:URLSearchParams,runner?:(path:string,params:URLSearchParams)=>Promise<Response>)=>Promise<Response>
   clientIp?: string
+  acceptsVerifiedIp?: boolean
+  loginEvent?:(ip:string,kind:'login-attempt'|'login-failed',subject:string|null)=>Promise<boolean>
+  countProtection?:(category:string)=>Promise<unknown>
   DB: D1Database; FEEDBACK:R2Bucket; BRIDGE_TOKEN?:string; EMAIL_DEV_LOG?: string; RESEND_API_KEY?: string
   /** 聚合登录：全部来自 Pages 环境变量/secret，不进 D1、后台不暴露 */
   SOCIAL_APPID?: string
@@ -20,8 +23,23 @@ export interface Env {
   SOCIAL_HOST?: string
   SOCIAL_REDIRECT?: string
 }
-export function requestIp(request:Request, env?:Pick<Env,'clientIp'>):string {
-  return env?.clientIp || request.headers.get('CF-Connecting-IP') || 'local'
+export function requestIp(request:Request, env:Pick<Env,'acceptsVerifiedIp'>):string|null {
+  return env.acceptsVerifiedIp===true ? trustedLoginIp(request) : null
+}
+export function trustedLoginIp(request:Request):string|null {
+  return request.headers.get('X-Glol-Ip-Trusted')==='1' ? request.headers.get('CF-Connecting-IP') : null
+}
+export async function checkLoginIp(db:D1Database,ip:string) {
+  const row=await db.prepare('SELECT hits,until FROM rate_limits WHERE key=?').bind(`login-failed:${ip}`).first<{hits:number;until:number}>()
+  if(row && row.hits>=5 && row.until>now()) limited()
+}
+export async function failedLoginIp(db:D1Database,ip:string) {
+  const time=now()
+  const row=await db.prepare(`INSERT INTO rate_limits(key,until,hits) VALUES(?,?,1) ON CONFLICT(key) DO UPDATE SET
+    hits=CASE WHEN rate_limits.until<=? THEN 1 ELSE rate_limits.hits+1 END,
+    until=CASE WHEN rate_limits.until<=? OR rate_limits.hits=4 THEN excluded.until ELSE rate_limits.until END
+    WHERE rate_limits.until<=? OR rate_limits.hits<5 RETURNING hits`).bind(`login-failed:${ip}`,time+900,time,time,time).first<{hits:number}>()
+  if(!row || row.hits>=5) limited()
 }
 export const lifetime = 30 * 86400
 export const now = () => Math.floor(Date.now()/1000)
@@ -66,14 +84,14 @@ export async function limit(db:D1Database,key:string,max:number,seconds:number) 
     WHERE rate_limits.until<=? OR rate_limits.hits<?`).bind(key,time+seconds,time,time,time,max).run()
   if (!result.meta.changes) limited()
 }
-export async function reserveMail(db:D1Database,email:string,ip:string) {
+export async function reserveMail(db:D1Database,email:string,ip:string|null) {
   // 第三方专用账号的占位邮箱（*@social.invalid）收不到信：找回密码/重发验证码一律拒绝，不去打 Resend
   if(/@social\.invalid$/i.test(email)) throw new Problem(400,'no_email','该账号还没有绑定邮箱，请用第三方登录后在「我的账号」里绑定')
   const time=now()
   const [,result]=await db.batch([db.prepare('DELETE FROM mail_events WHERE sent<=?').bind(time-3600),
     db.prepare(`INSERT INTO mail_events SELECT ?,?,? WHERE NOT EXISTS
       (SELECT 1 FROM mail_events WHERE email=? AND sent>?) AND
-      (SELECT COUNT(*) FROM mail_events WHERE ip=?)<10`).bind(ip,email,time,email,time-60,ip)])
+      (?='' OR (SELECT COUNT(*) FROM mail_events WHERE ip=?)<10)`).bind(ip??'',email,time,email,time-60,ip??'',ip??'')])
   if (!result.meta.changes) limited()
 }
 export function newCode() {

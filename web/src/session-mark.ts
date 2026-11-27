@@ -7,7 +7,12 @@ function publish(next: Tile) {
   const old = tile
   tile = next
   for (const listen of listeners) listen(next)
+  publishState()
   if (old) URL.revokeObjectURL(old.src)
+}
+
+function publishState() {
+  ;(window as any).__markInfo = {ready: !!tile, uid, dpr: window.devicePixelRatio || 1}
 }
 
 export function onTile(listen: (tile: Tile) => void) {

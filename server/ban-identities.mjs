@@ -18,7 +18,7 @@ export async function enrichBans(pool,bans){
     where fp=any($1::text[]) or fp in (select fp from mp_devices where uid=any($2::bigint[]))
     order by last desc nulls last,uid,fp`,[fps,uids])
   const accountIds=[...new Set([...uids,...devices.map(row=>row.uid)].map(String))]
-  const {rows:accounts}=await pool.query(`select uid,nickname,${lastLogin} from users where uid=any($1::bigint[])`,[accountIds])
+  const {rows:accounts}=await pool.query(`select id,uid,nickname,${lastLogin} from users where uid=any($1::bigint[])`,[accountIds])
   const byUid=new Map(accounts.map(row=>[String(row.uid),row]))
   const byDevice=new Map(),byOwner=new Map()
   function append(map,key,row){if(!map.has(key))map.set(key,[]);map.get(key).push(row)}
@@ -26,13 +26,14 @@ export async function enrichBans(pool,bans){
     append(byDevice,row.fp,row)
     append(byOwner,String(row.uid),row)
   }
-  const account=row=>byUid.get(String(row.uid))??{uid:row.uid,nickname:null,lastLogin:null}
+  const account=row=>{const user=byUid.get(String(row.uid));return {uid:row.uid,nickname:user?.nickname??null,lastLogin:user?.lastLogin??null}}
   return bans.map(row=>{
     if(row.kind==='fp'){
       const observations=byDevice.get(row.value)??[]
       return {...row,devices:observations,accounts:observations.map(account)}
     }
-    return {...row,nickname:byUid.get(String(row.value))?.nickname??null,
+    const user=byUid.get(String(row.value))
+    return {...row,nickname:user?.nickname??null,account:user?{id:user.id,nickname:user.nickname}:null,
       devices:(byOwner.get(String(row.value))??[]).map(device=>({...device,accounts:byDevice.get(device.fp).map(account)}))}
   })
 }
