@@ -48,7 +48,83 @@ export function isModalOrOverlayOpen(doc: Document = document): boolean {
   if (doc.body.dataset.drinksUiOpen === '1') return true
   const delivering = isFineTerminalDelivering(doc)
   if (doc.body.dataset.tdTerminalOpen === '1' && !delivering) return true
-  return !!doc.querySelector(delivering ? BASE_MODAL_OVERLAY_SELECTOR : MODAL_OVERLAY_SELECTOR)
+  return overlayElementPresent(doc, delivering)
+}
+
+// The selector scan walks the whole document, and walking, riding, HUD and interaction code ask
+// several times a frame. The answer can only change when the DOM changes, so it is kept until a
+// MutationObserver reports a change that could matter. `takeRecords()` is read on every call, which
+// makes a change from earlier in the same task visible at once — no frame of stale state.
+// Only the live page document is cached; a test double passed as `doc` is scanned every time.
+//
+// This is only sound while the selectors are built from tags, classes, ids, attributes and `:not()`:
+// those change through element or attribute mutations, which the observer sees. A state pseudo-class
+// (`:checked`, `:popover-open`, `:focus-within`, `:has()` …) changes without a mutation record and
+// would be served stale. `npm run verify:hot-paths` rejects one.
+/** The selectors `isModalOrOverlayOpen` scans for: [while the fine terminal is delivering, otherwise]. */
+export const MODAL_OVERLAY_SELECTORS: readonly [string, string] = [BASE_MODAL_OVERLAY_SELECTOR, MODAL_OVERLAY_SELECTOR]
+type OverlayScan = {doc: Document, observer: MutationObserver, stale: boolean, base: boolean | null, full: boolean | null}
+let overlayScan: OverlayScan | null = null
+/** Attributes the overlay selectors test, read off the selectors themselves so the two cannot drift apart. */
+const OVERLAY_SELECTOR_ATTRIBUTES = [...new Set([
+  'class',
+  ...(MODAL_OVERLAY_SELECTOR.includes('#') ? ['id'] : []),
+  ...Array.from(MODAL_OVERLAY_SELECTOR.matchAll(/\[\s*([\w-]+)/g), match => match[1]),
+])]
+const ELEMENT_NODE = 1
+
+/**
+ * Whether any of these DOM changes could open or close an overlay. Two kinds cannot, and both happen
+ * every frame: a HUD label swapping its text node, and a HUD element being handed the value it
+ * already has (`button.hidden = true` again), which still queues a record.
+ */
+function canChangeOverlays(records: readonly MutationRecord[]): boolean {
+  for (let index = 0; index < records.length; index++) {
+    const record = records[index]
+    if (record.type === 'attributes') {
+      const name = record.attributeName
+      if (!name || (record.target as Element).getAttribute(name) !== record.oldValue) return true
+      continue
+    }
+    if (record.type !== 'childList') return true
+    const {addedNodes, removedNodes} = record
+    for (let node = 0; node < addedNodes.length; node++) if (addedNodes[node].nodeType === ELEMENT_NODE) return true
+    for (let node = 0; node < removedNodes.length; node++) if (removedNodes[node].nodeType === ELEMENT_NODE) return true
+  }
+  return false
+}
+let overlayScans = 0
+
+/** How many full-document overlay scans have run; for perf probes and tests. */
+export function overlayScanCount(): number {
+  return overlayScans
+}
+
+function overlayElementPresent(doc: Document, baseOnly: boolean): boolean {
+  const selector = baseOnly ? BASE_MODAL_OVERLAY_SELECTOR : MODAL_OVERLAY_SELECTOR
+  if (typeof MutationObserver === 'undefined' || typeof document === 'undefined' || doc !== document) {
+    overlayScans++
+    return !!doc.querySelector(selector)
+  }
+  if (!overlayScan || overlayScan.doc !== doc) {
+    overlayScan?.observer.disconnect()
+    const scan: OverlayScan = {doc, observer: new MutationObserver(records => { if (canChangeOverlays(records)) scan.stale = true }), stale: true, base: null, full: null}
+    scan.observer.observe(doc, {subtree: true, childList: true, attributes: true, attributeOldValue: true, attributeFilter: OVERLAY_SELECTOR_ATTRIBUTES})
+    overlayScan = scan
+  }
+  const scan = overlayScan
+  if (canChangeOverlays(scan.observer.takeRecords())) scan.stale = true
+  if (scan.stale) {
+    scan.stale = false
+    scan.base = scan.full = null
+  }
+  const cached = baseOnly ? scan.base : scan.full
+  if (cached !== null) return cached
+  overlayScans++
+  const present = !!doc.querySelector(selector)
+  if (baseOnly) scan.base = present
+  else scan.full = present
+  return present
 }
 
 export function isGlobalHotkeyBlocked(
