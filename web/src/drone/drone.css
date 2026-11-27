@@ -306,3 +306,5 @@ body[data-drone="rc"] :is(output,.hint,footer,.sky-ui,.walk-ui,.dock,.toast,.spo
 .dock-drone[data-stage="ready"]{background:rgba(224,138,46,.32);border-color:rgba(224,138,46,.66)}
 .dock-drone[data-stage="rc"]{opacity:.6}
 @media (max-width:640px){.drone-panel .drone-grid{grid-template-columns:1fr;max-height:62vh;overflow:auto}}
+/* IDOK-548: 维修按钮只在走路时出现；遥控画面里它会压住摇杆和拍照键。 */
+body[data-drone="rc"] .drone-repair { display: none; }

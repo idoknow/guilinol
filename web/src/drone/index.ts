@@ -94,7 +94,7 @@ export function droneMode(host:Host, deps:{
   mask.innerHTML = `<div class="about-panel drone-panel" role="dialog" aria-label="无人机">
       <header><h2>无人机机库</h2><button class="about-close" aria-label="关闭">×</button></header>
       <div class="drone-grid"></div>
-      <p class="drone-foot">选一台放到身前；放好后点「飞无人机」进遥控画面。键盘：WASD 平移，↑↓ 升降，←→ 转向，R 返航，P 拍照，V 录像。</p>
+      <p class="drone-foot">选一台放到身前；放好后点物品栏的遥控器（快捷键 5）进遥控画面。键盘：WASD 平移，↑↓ 升降，←→ 转向，R 返航，P 拍照，V 录像。</p>
     </div>`
   document.body.append(mask)
   const grid = mask.querySelector<HTMLElement>('.drone-grid')!
@@ -206,15 +206,20 @@ export function droneMode(host:Host, deps:{
     }
   }
 
+  let showFrame = 0
   function openHangar() {
     // IDOK-526: the hangar is reachable from inside the RC screen too — leaving the session first,
     // otherwise the mask renders under a panel that owns the pointer layer.
     if (rcActive) exitRc()
     renderHangar()
     mask.hidden = false
-    requestAnimationFrame(() => mask.classList.add('show'))
+    cancelAnimationFrame(showFrame)
+    showFrame = requestAnimationFrame(() => mask.classList.add('show'))
   }
   function closeHangar() {
+    // A close that lands before the opening frame (slow devices) must also cancel the pending fade-in,
+    // otherwise the frame re-adds .show and the hangar stays up.
+    cancelAnimationFrame(showFrame)
     mask.classList.remove('show')
     setTimeout(() => { if (!mask.classList.contains('show')) mask.hidden = true },220)
   }
