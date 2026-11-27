@@ -29,16 +29,21 @@ for tile in manifest['chunks']:
             layers.append((kind, translate(Polygon(shell, holes).buffer(0), (tile['x']+1024)*100)))
 
 cycle = [poly for kind, poly in layers if kind == 5]
-for point in [Point(19167, 11337), Point(17781, 11409)]:
-    assert sum(poly.contains(point) for poly in cycle) == 1
-owner, = [poly for poly in cycle if poly.contains(Point(19167,11337))]
-assert owner.contains(Point(18430,11760)) or owner.contains(Point(18430,11762))
+target_cm = Point(19167,11337)
+owner, = [poly for kind,poly in layers if kind == 0 and poly.contains(target_cm)]
+assert owner.contains(Point(17781,11409))
+front = LineString([(19555,11322),(19172,11229),(18649,11320),(18183,11216),(18011,11281)])
+assert owner.covers(front) and owner.boundary.intersection(front).length == 0
+slit = box(17802,11281,18011,11359)
+assert union_all([poly for _,poly in layers if poly.intersects(slit)]).covers(slit)
+strips = [poly for poly in cycle if poly.distance(target_cm)<700]
 
 axis = LineString([(9448,8978), (28887,13696)])
 window = box(0,0,51200,25600)
 void = window.difference(union_all([poly for _,poly in layers],grid_size=1))
 cycle = union_all(cycle,grid_size=1)
 island_seeds = [Point(11530,10740),Point(15600,11310)]
+assert all(void.covers(seed) for seed in island_seeds)
 for pocket in void.geoms:
     if pocket.area<100 or pocket.distance(axis)>1200 or not pocket.disjoint(window.boundary):
         continue
@@ -46,7 +51,7 @@ for pocket in void.geoms:
         continue
     assert any(pocket.covers(seed) for seed in island_seeds), pocket.representative_point()
 if '--ride-route' in sys.argv:
-    rectangle = list(owner.minimum_rotated_rectangle.exterior.coords)
+    rectangle = list(union_all(strips).minimum_rotated_rectangle.exterior.coords)
     edges = [(end[0]-start[0],end[1]-start[1]) for start,end in zip(rectangle,rectangle[1:])]
     east,south = max(edges,key=lambda edge:edge[0]**2+edge[1]**2)
     length = (east**2+south**2)**.5 * (1 if east>0 else -1)
@@ -65,4 +70,4 @@ if '--ride-route' in sys.argv:
         assert any(poly.contains(endpoint) for kind,poly in layers if kind==0)
     print(json.dumps(dict(route=route, target=target, curbs=curbs)))
 else:
-    print('PASS: both former bare pockets paved, incident cycle lane joined, ±100 m corridor checked')
+    print('PASS: former pockets paved; former seam interior to one road, slit window fully covered, ±100 m corridor checked')

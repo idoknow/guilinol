@@ -18,7 +18,7 @@ import sys
 from pathlib import Path
 
 import numpy as np
-from shapely import difference, union_all
+from shapely import union_all
 from shapely.geometry import LineString, MultiPolygon, Point, Polygon, box
 from shapely.ops import unary_union
 
@@ -619,42 +619,31 @@ def _seal_curb_guardrail_gaps(decor: list, tile_origin: tuple[float, float], roa
     return keep
 
 
-def join_east_cycleway(paths, tile=None):
-    """Dissolve the surveyed bare pockets into their incident cycle strips (GL04 cm)."""
+def join_east_cycleway(paths):
+    """Continue the lower asphalt surface through the surveyed void (GL04 cm)."""
     polygons = {index: Polygon(item[1], item[2:]).buffer(0)
                 for index, item in enumerate(paths) if item[0] in (0, 1, 4, 5, 6)}
     window = box(17000, 10800, 20000, 11900)
-    paved = union_all(list(polygons.values()), grid_size=1)
-    vacant = difference(window, paved, grid_size=1)
-    anchors = (Point(19167, 11337), Point(17781, 11409))
+    paved = union_all([poly for poly in polygons.values() if poly.intersects(window)])
+    vacant = window.difference(paved)
+    anchors = (Point(19167, 11337), Point(17781, 11409), Point(17908, 11320))
     pockets = [part for part in getattr(vacant, 'geoms', [vacant])
                if part.disjoint(window.boundary) and any(part.covers(point) for point in anchors)]
     if not pockets:
+        if not any(paths[index][0] == 0 and poly.contains(anchors[0]) for index,poly in polygons.items()):
+            raise ValueError('Unexpected cycleway geometry: rebake from the pinned input world')
         return paths
-    fill = union_all(pockets, grid_size=1)
-    adjacent = [index for index, poly in polygons.items() if paths[index][0] == 5
-                and fill.boundary.intersection(poly.boundary.buffer(1)).length > 10]
-    if not adjacent:
-        raise ValueError('Shizijie survey pockets no longer touch a cycleway')
-    merged = union_all([fill, *(polygons[index] for index in adjacent)], grid_size=1)
-    rings = [[5, *[[[round(x), round(z)] for x,z in ring.coords[:-1]]
-                   for ring in [part.exterior, *part.interiors]]]
-             for part in getattr(merged, 'geoms', [merged])]
-    result = []
-    raised = set(tile.get('roadbeds', [])) if tile is not None else set()
-    remapped = []
-    for index, item in enumerate(paths):
-        if index in adjacent and index != adjacent[0]:
-            continue
-        sources = adjacent if index == adjacent[0] else [index]
-        for row in (rings if index == adjacent[0] else [item]):
-            if any(-source-1 in raised for source in sources):
-                remapped.append(-len(result)-1)
-            elif any(source in raised for source in sources):
-                remapped.append(len(result))
-            result.append(row)
-    if raised:
-        tile['roadbeds'] = remapped
+    fill = union_all(pockets)
+    road_index, = [index for index, poly in polygons.items() if paths[index][0] == 0
+                   and fill.boundary.intersection(poly.boundary.buffer(1)).length > 10]
+    incident_cycles = [poly for index, poly in polygons.items() if paths[index][0] == 5 and poly.intersects(fill)]
+    underlap = fill.buffer(18, join_style='mitre').intersection(union_all(incident_cycles))
+    merged = union_all([polygons[road_index], fill, underlap], grid_size=1)
+    if merged.geom_type != 'Polygon':
+        raise ValueError('Shizijie asphalt repair disconnected from its road')
+    result = paths.copy()
+    result[road_index] = [0, *[[[round(x), round(z)] for x,z in ring.coords[:-1]]
+                              for ring in [merged.exterior, *merged.interiors]]]
     return result
 
 
@@ -675,7 +664,7 @@ def patch_101_38(output: Path, *, cycle_only=False, filename='101_38.glc', tile=
     cutout_union = unary_union(cutout_polys)
 
     streets = coll[1]
-    paths = join_east_cycleway(streets[0], tile)
+    paths = join_east_cycleway(streets[0])
     if cycle_only and paths is streets[0]:
         return tile_path.stat().st_size
     new_paths = []
@@ -683,7 +672,9 @@ def patch_101_38(output: Path, *, cycle_only=False, filename='101_38.glc', tile=
     removed_bars = 0
     clipped_sw = 0
 
-    for item in ([] if cycle_only else paths):
+    raised = set(tile.get('roadbeds', [])) if tile else set()
+    remapped = []
+    for index, item in enumerate([] if cycle_only else paths):
         kind = item[0]
         rings = item[1:]
         outer_w = np.array(rings[0], dtype=float) / 100.0 + [ox, oz]
@@ -709,9 +700,15 @@ def patch_101_38(output: Path, *, cycle_only=False, filename='101_38.glc', tile=
                         new_paths.append([1, ext, *ints])
                 clipped_sw += 1
                 continue
+        if index in raised:
+            remapped.append(len(new_paths))
+        if -index-1 in raised:
+            remapped.append(-len(new_paths)-1)
         new_paths.append(item)
 
     streets[0] = paths if cycle_only else new_paths
+    if raised and not cycle_only:
+        tile['roadbeds'] = remapped
     road_union = unary_union(road_polys) if road_polys else Polygon()
     if not cycle_only and len(streets) > 9 and streets[9]:
         streets[9] = _seal_curb_guardrail_gaps(streets[9], tile_origin, road_union, cutout_union)
@@ -877,10 +874,9 @@ def apply_world(output: Path, rendered_roads=None, bake_roads: bool = True):
     manifest_path = output / 'manifest.json'
     manifest = json.loads(manifest_path.read_text())
 
-    new_size = patch_101_38(output)
     for chunk in manifest['chunks']:
         if chunk['file'] == '101_38.glc':
-            chunk['bytes'] = new_size
+            chunk['bytes'] = patch_101_38(output, tile=chunk)
             break
 
     try:
