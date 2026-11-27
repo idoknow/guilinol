@@ -287,6 +287,16 @@ export function play(host:Host) {
       return probe?.surfaceY ?? probe?.foot ?? 0
     },
     name:()=>nearestName(),
+    // IDOK-527: 空中导航的景点目标来自景册清单（取名字 + 落地坐标）。
+    spots:()=>(host.manifest.landmarks ?? [])
+      .filter(spot => Number.isFinite(spot.position[0]) && Number.isFinite(spot.position[2]))
+      .map(spot => ({label:spot.name ?? spot.id,x:spot.position[0],z:spot.position[2]})),
+    // IDOK-529: 自动避障/撞击检测用同一套实体查询（建筑、棚子、牌楼都算实体）。
+    blockedAt:(x,y,z)=>host.walker()?.blockedAt?.(x,y,z) ?? false,
+    // IDOK-529: 天空面板设的天气就是机上的天气。
+    raining:()=>host.clock.weather === 'rain',
+    // IDOK-529: 落到水面上也算落水（openWater 没有水时返回 null）。
+    waterY:(x,z)=>host.walker()?.waterAt?.(x,z) ?? null,
   })
   drone.mountEntry(buttons)
   // IDOK-350: 街景导航（路网寻路 + 场景路线 + 转向提示）；入口仍是地图面板的「标记导航」。
