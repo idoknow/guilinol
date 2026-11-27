@@ -64,6 +64,10 @@ def raise_interior_spans(directory, manifest, designs, ways):
     for design in designs:
         line = LineString(points(ways[design["way"]]))
         active.append((design, line, line.buffer(design["halfWidthM"] + .02)))
+    # Match shared GL04 vertices in integer world centimetres, including copies at tile seams.
+    corrections = {(d["way"], x, z): (before, after) for d in designs
+                   for x, z, before, after in d.get("deckVertexGradesCm", [])}
+    applied = set()
     for tile in manifest["chunks"]:
         x, z = tile["x"], tile["z"]
         size = manifest["chunkSize"]
@@ -96,6 +100,14 @@ def raise_interior_spans(directory, manifest, designs, ways):
                 if np.any((lift > .005) & ((stations < .015) | (stations > axis.length - .015))):
                     raise ValueError(f"Bridge approach reaches the end of {design['way']}")
                 new = np.rint(100 * (old + lift)).astype("<i2")
+                for i, (px, _, pz) in enumerate(face):
+                    key = (design["way"], round(x * 100) + int(px), round(z * 100) + int(pz))
+                    if key in corrections:
+                        before, after = corrections[key]
+                        if new[i] != before:
+                            raise ValueError(f"Unexpected bridge vertex elevation at {key}: {new[i]} cm")
+                        new[i] = after
+                        applied.add(key)
                 if np.any(new != face[:, 1]):
                     face[:, 1] = new
                     changed = True
@@ -103,6 +115,9 @@ def raise_interior_spans(directory, manifest, designs, ways):
         if changed:
             path.write_bytes(gzip.compress(raw, mtime=0))
             tile["bytes"] = path.stat().st_size
+
+    if corrections.keys() - applied:
+        raise ValueError(f"Missing bridge vertices: {corrections.keys() - applied}")
 
 
 def grade_decks(directory, manifest, designs, ways, profiles, passage=None, *, preserve_paving=False):

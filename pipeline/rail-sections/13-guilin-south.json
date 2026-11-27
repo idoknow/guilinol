@@ -2400,7 +2400,8 @@
       "crossingRange": [420, 452],
       "deckM": 166.35,
       "approachGrade": 0.045,
-      "transitionM": 12
+      "transitionM": 12,
+      "deckVertexGradesCm": [[-254742, 441219, 15958, 15959], [-253975, 441159, 15960, 15959]]
     },
     {
       "way": 1017592858,
@@ -2408,7 +2409,8 @@
       "crossingRange": [259, 294],
       "deckM": 166.35,
       "approachGrade": 0.045,
-      "transitionM": 12
+      "transitionM": 12,
+      "deckVertexGradesCm": [[-253626, 444011, 16153, 16154], [-252859, 443892, 16155, 16154]]
     }
   ],
   "cutSidewalkSurvey": "reference/13-huancheng-curbs.json",
