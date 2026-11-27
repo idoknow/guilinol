@@ -27,7 +27,7 @@ function southInlay(tile:{x:number,z:number},road:Float32Array,ground:(x:number,
   const rows=[0,1].map(row=>[vertex(tile,row,col),vertex(tile,row,col+1)])
   const centers=[[.3539,.41535,.499,.505,.57005,.6317],[.377,.44,.499,.505,.565,.628]]
   const yellow=new Color(0xe8bb43),parts:BufferGeometry[]=[]
-  const [west,east]=rows[0],edgeTriangles=[]
+  const [west,east]=rows[0],edgeTriangles:Float32Array[]=[]
   for(let at=0;at<road.length;at+=9){
     const triangle=road.subarray(at,at+9)
     if([0,2].some(axis=>Math.max(triangle[axis],triangle[axis+3],triangle[axis+6])<Math.min(west[axis],east[axis])||
