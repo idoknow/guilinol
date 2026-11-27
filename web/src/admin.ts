@@ -3847,7 +3847,7 @@ async function traceFetch(path: string, init: RequestInit) {
 }
 function screenshotTrace(refresh: () => Promise<void>) {
   const maxBytes = 12 * 1024 * 1024, idleTitle = '拖入、粘贴或点击选择截图'
-  const file = h('input', { type: 'file', accept: 'image/png,image/jpeg', class: 'adm-drop-input', 'aria-label': '选择截图', title: 'PNG / JPEG，不超过 12 MiB' }) as HTMLInputElement
+  const file = h('input', { type: 'file', accept: 'image/png,image/jpeg,image/jpg', class: 'adm-drop-input', 'aria-label': '选择截图', title: 'PNG / JPEG，不超过 12 MiB' }) as HTMLInputElement
   const thumb = h('img', { class: 'adm-drop-thumb', alt: '' }) as HTMLImageElement
   const icon = h('span', { class: 'adm-drop-icon', 'aria-hidden': 'true' }, '⇡')
   const title = h('b', null, idleTitle), meta = h('span', null)
@@ -3860,6 +3860,15 @@ function screenshotTrace(refresh: () => Promise<void>) {
   let picked: File | null = null, preview = '', traceSeq = 0
   const note = (heading: string, text: string, alert = false) =>
     h('div', { class: 'adm-trace-note', role: alert ? 'alert' : null }, h('b', null, heading), h('span', null, text))
+  /** 按文件头识别真实类型：PNG 89 50 4E 47，JPEG FF D8 FF。 */
+  const sniffImage = async (file: File): Promise<'png' | 'jpeg' | null> => {
+    const head = new Uint8Array(await file.slice(0, 4).arrayBuffer().catch(() => new ArrayBuffer(0)))
+    if (head[0] === 0x89 && head[1] === 0x50 && head[2] === 0x4e && head[3] === 0x47) return 'png'
+    if (head[0] === 0xff && head[1] === 0xd8 && head[2] === 0xff) return 'jpeg'
+    // 文件头读不到（极少见）时退回 MIME，避免误伤
+    if (head.length === 0 && /^image\/(png|jpe?g)$/i.test(file.type)) return /jpe?g/i.test(file.type) ? 'jpeg' : 'png'
+    return null
+  }
   // 选中即识别：拖入、粘贴、点选后不用再点按钮；按钮留作重新识别
   const pick = (next: File | null | undefined) => {
     if (preview) URL.revokeObjectURL(preview)
@@ -3871,10 +3880,20 @@ function screenshotTrace(refresh: () => Promise<void>) {
     preview = URL.createObjectURL(picked); thumb.src = preview
     title.textContent = picked.name || '粘贴的截图'
     meta.textContent = fmt.bytes(picked.size)
-    const problem = !/^image\/(png|jpeg)$/.test(picked.type) ? '只支持 PNG 或 JPEG' : picked.size > maxBytes ? '截图超过 12 MiB' : ''
-    upload.disabled = !!problem
-    if (problem) result.replaceChildren(note('换一张截图', problem, true))
-    else form.requestSubmit()
+    // 有些来源（手机相册、剪贴板、部分截图工具）给的 MIME 是 image/jpg、
+    // application/octet-stream 甚至是空字符串，只看 MIME 会把合规原图拒掉，
+    // 这里按文件头判断真实类型。
+    const image = picked
+    const seq = traceSeq
+    upload.disabled = true
+    void (async () => {
+      const kind = await sniffImage(image)
+      if (picked !== image || seq !== traceSeq) return
+      const problem = !kind ? '只支持 PNG 或 JPEG（请传原图，不要改扩展名）' : image.size > maxBytes ? '截图超过 12 MiB' : ''
+      upload.disabled = !!problem
+      if (problem) result.replaceChildren(note('换一张截图', problem, true))
+      else form.requestSubmit()
+    })()
   }
   file.addEventListener('change', () => pick(file.files?.[0]))
   zone.addEventListener('dragover', (event) => { event.preventDefault(); zone.classList.add('is-over') })
