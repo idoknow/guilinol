@@ -25,12 +25,20 @@ import {
 import {riderPool} from './rider-pool'
 import {SIGNAL_DRIVER_RANK, citySignalClock, citySignals} from './signals'
 import {
+  CITY_NONMOTOR_VIOLATION_RATE,
   Traffic,
+  VIOLATOR_NO_HELMET_CONDITIONAL_RATE,
+  actorHasAnyViolation,
+  actorHasViolation,
+  getActorViolations,
+  type ActiveTrafficViolation,
   type Actor,
   type ActorHandSide,
   type ActorLifecycleCallback,
   type ActorLifecycleEvent,
+  type ActorViolationSnapshot,
   type DutyCrossSectionZone,
+  type DutyStoryOverrideConfig,
   type DutyViolationWeights,
   type Graph,
   type HitSeverity,
@@ -44,6 +52,7 @@ import {
   type TicketReceivedCallback,
   type TicketReceivedEvent,
   type TrafficViolation,
+  type TrafficViolationPolicy,
   type ViolatorPulledOverCallback,
   type ViolatorPulledOverEvent,
   type WhistleFlagHaltResult,
@@ -65,10 +74,13 @@ import {
 export const JIEFANG_DUTY_CENTER = Object.freeze({x: -168, z: 40})
 export const JIEFANG_DUTY_RADIUS_M = 240
 export const JIEFANG_DUTY_ROAD_CELL = '-1_0'
-export const JIEFANG_MAX_VIOLATOR_RATIO = 0.15
-export const JIEFANG_MAX_CONCURRENT_VIOLATORS = 2
-export const JIEFANG_VIOLATOR_RESPAWN_COOLDOWN_S = 20
+export const JIEFANG_NONMOTOR_VIOLATION_RATE = CITY_NONMOTOR_VIOLATION_RATE
+export const JIEFANG_NO_HELMET_CONDITIONAL_RATE = VIOLATOR_NO_HELMET_CONDITIONAL_RATE
+export const JIEFANG_MAX_VIOLATOR_RATIO = 0.60
+export const JIEFANG_MAX_CONCURRENT_VIOLATORS = 16
+export const JIEFANG_VIOLATOR_RESPAWN_COOLDOWN_S = 0
 export const JIEFANG_PULLOVER_OUTER_ABS_Z = 15.2
+export const JIEFANG_SIDEWALK_PULLOVER_ABS_Z = 17.4
 export const JIEFANG_APPROACH_MIN_DIST_M = 60
 export const JIEFANG_HIDDEN_PLAYER_MIN_DIST_M = 90
 export const JIEFANG_HIDDEN_FRUSTUM_MAX_DIST_M = 120
@@ -171,8 +183,18 @@ export function constrainJiefangActorPosition(actor: Actor): void {
   const south = lz >= 0
   let clampedLz = lz
   if (actor.kind === 'scooter') {
-    const band = south ? JIEFANG_CROSS_SECTION.southNonmotor : JIEFANG_CROSS_SECTION.northNonmotor
-    clampedLz = Math.max(band.safeMinZ, Math.min(band.safeMaxZ, lz))
+    if (actorHasViolation(actor, 'sidewalk_riding')) {
+      // Sidewalk-riding violator (story override / encroachment): route cleanly between tactile paving (±16.93) and lamp posts (±18.9)
+      const sw = south ? JIEFANG_CROSS_SECTION.southSidewalk : JIEFANG_CROSS_SECTION.northSidewalk
+      const swMin = south ? Math.max(sw.minZ + 1.05, 17.25) : Math.max(sw.minZ + 3.25, -18.25)
+      const swMax = south ? Math.min(sw.maxZ - 3.25, 18.25) : Math.min(sw.maxZ - 1.05, -17.25)
+      clampedLz = south
+        ? Math.max(swMin, Math.min(swMax, Math.max(lz, swMin + 0.4)))
+        : Math.max(swMin, Math.min(swMax, Math.min(lz, swMax - 0.4)))
+    } else {
+      const band = south ? JIEFANG_CROSS_SECTION.southNonmotor : JIEFANG_CROSS_SECTION.northNonmotor
+      clampedLz = Math.max(band.safeMinZ, Math.min(band.safeMaxZ, lz))
+    }
   } else if (actor.kind === 'car' && lx >= JIEFANG_CROSS_SECTION.minX - 4 && lx <= JIEFANG_CROSS_SECTION.maxX + 4) {
     const band = south ? JIEFANG_CROSS_SECTION.southMotor : JIEFANG_CROSS_SECTION.northMotor
     const margin = Math.min(1.05, Math.max(0.85, actor.halfWidth || 0.9))
@@ -248,18 +270,20 @@ export function playDutyWarningHornSound(actor?: {kind?: string}): boolean {
 }
 
 /**
- * Bridge-native violation weights (restrained base rate, further hard-capped by
- * `maxViolatorRatio <= 0.15`, `maxConcurrentViolators <= 2`, and `violatorCooldownSec >= 20`).
+ * Bridge-native violation weights aligned with the 60% non-motor violation baseline
+ * (and 80% conditional `no_helmet` rate via `pickTwoWheelProfile`).
+ * Story mode can dynamically override density, violation rate, and `sidewalk_riding` via `setStoryOverride()`.
  * Bridge deck bounds single source of truth lives in `web/src/traffic-duty/jiefang-railings.ts`.
  */
 export const JIEFANG_DUTY_WEIGHTS: Readonly<DutyViolationWeights> = Object.freeze({
-  none: 52,
-  no_helmet: 13,
-  ebike_overload: 14,
+  none: 40,
+  no_helmet: 20,
+  ebike_overload: 13,
   bike_double: 8,
-  illegal_mod: 7,
-  wrong_way: 6,
+  illegal_mod: 10,
+  wrong_way: 9,
   red_light_run: 0,
+  sidewalk_riding: 0,
 })
 
 export interface DutyTrafficOptions {
@@ -276,6 +300,10 @@ export interface DutyTrafficOptions {
   desiredScooters?: number
   actorLimit?: number
   weights?: DutyViolationWeights
+  /** Optional violation/compliance rule policy overrides (e.g. nonmotorViolationRate, noHelmetGivenViolatorRate, allowSidewalkRiding). */
+  policy?: TrafficViolationPolicy
+  /** Optional initial story-mode override configuration (density, sidewalk_riding, violation rate). */
+  storyOverride?: DutyStoryOverrideConfig | null
   /** Restrict spawned lanes to Jiefang Bridge deck (with Y elevation check); defaults to true near Jiefang Bridge. */
   bridgeDeckOnly?: boolean
   maxViolatorRatio?: number
@@ -319,6 +347,11 @@ export interface DutyTrafficStats {
   scooters: number
   violators: number
   violatorRatio: number
+  nonmotorViolationRate: number
+  noHelmetViolatorRate: number
+  multiViolationCount: number
+  sidewalkRidingViolators: number
+  storyOverrideActive: boolean
   violatorCooldownRemainingSec: number
   warningHorns: number
   sidewalkTwoWheelers: number
@@ -338,6 +371,14 @@ export interface DutyTrafficHandle {
   step(dt: number, playerPos?: Position | null, opts?: DutyTrafficStepOptions): void
   getTraffic(): Traffic | undefined
   getActors(): readonly Actor[]
+  /** Dynamically overrides regional violation density, `sidewalk_riding`, and caps for duty story mode. */
+  setStoryOverride(override: DutyStoryOverrideConfig | null): void
+  clearStoryOverride(): void
+  getStoryOverride(): Readonly<DutyStoryOverrideConfig> | null
+  /** Queries the full deduplicated multi-violation list for a given actor or actorId. */
+  getActorViolations(actorIdOrActor: string | number | Actor): ActiveTrafficViolation[]
+  /** Queries snapshots of active violators including complete violation list, bitmask, and heading vector. */
+  getViolatorSnapshots(opts?: {includeCited?: boolean}): ActorViolationSnapshot[]
   onPlayerHit(listener: PlayerHitCallback): () => void
   onPlayerHorn(listener: PlayerHornCallback): () => void
   onViolatorPulledOver(listener: ViolatorPulledOverCallback): () => void
@@ -379,11 +420,20 @@ let activeDutyRef:
       radius: number
       getActorHandBone: DutyTrafficHandle['getActorHandBone']
       receiveTicket: DutyTrafficHandle['receiveTicket']
+      setStoryOverride: DutyTrafficHandle['setStoryOverride']
+      getStoryOverride: DutyTrafficHandle['getStoryOverride']
+      getViolatorSnapshots: DutyTrafficHandle['getViolatorSnapshots']
     }
   | undefined
 
 export function getActiveDutyTraffic(): Traffic | undefined {
   return activeDutyRef?.sim
+}
+
+export function setActiveDutyStoryOverride(override: DutyStoryOverrideConfig | null): boolean {
+  if (!activeDutyRef) return false
+  activeDutyRef.setStoryOverride(override)
+  return true
 }
 
 export function getActorHandBone(
@@ -801,7 +851,7 @@ interface DutyVisuals {
   slotShown: Uint8Array
   transforms: Float64Array
   pose: THREE.Object3D
-  variants: WeakMap<object, {full: Variant; bare?: Variant; subtype?: TwoWheelSubtype; violation?: TrafficViolation; noHelmet?: boolean; u: number; v: number}>
+  variants: WeakMap<object, {full: Variant; bare?: Variant; subtype?: TwoWheelSubtype; violation?: TrafficViolation; violationMask?: number; noHelmet?: boolean; u: number; v: number}>
   riddenSlots: Map<object, {slot: number; variant: Variant}>
   ridden: Set<object>
   slots: number
@@ -843,7 +893,7 @@ function mountDutyVisuals(
   const riders = riderPool(scene, camera, sampleGround)
   const variants = new WeakMap<
     object,
-    {full: Variant; bare?: Variant; subtype?: TwoWheelSubtype; violation?: TrafficViolation; noHelmet?: boolean; u: number; v: number}
+    {full: Variant; bare?: Variant; subtype?: TwoWheelSubtype; violation?: TrafficViolation; violationMask?: number; noHelmet?: boolean; u: number; v: number}
   >()
   const riddenSlots = new Map<object, {slot: number; variant: Variant}>()
   const ridden = new Set<object>()
@@ -939,6 +989,16 @@ export function createDutyTraffic(opts: DutyTrafficOptions = {}): DutyTrafficHan
   const hasExplicitCars = opts.desiredCars !== undefined
   const hasExplicitScooters = opts.desiredScooters !== undefined
   const weights = opts.weights ?? JIEFANG_DUTY_WEIGHTS
+  const basePolicy: TrafficViolationPolicy = {
+    nonmotorViolationRate: JIEFANG_NONMOTOR_VIOLATION_RATE,
+    noHelmetGivenViolatorRate: JIEFANG_NO_HELMET_CONDITIONAL_RATE,
+    allowSidewalkRiding: false,
+    ...opts.policy,
+  }
+  let storyOverride: DutyStoryOverrideConfig | null =
+    opts.storyOverride && opts.storyOverride.active !== false
+      ? {active: true, ...opts.storyOverride}
+      : null
   const maxViolatorRatio = opts.maxViolatorRatio ?? JIEFANG_MAX_VIOLATOR_RATIO
   const maxConcurrentViolators = opts.maxConcurrentViolators ?? JIEFANG_MAX_CONCURRENT_VIOLATORS
   const violatorCooldownSec = opts.violatorCooldownSec ?? JIEFANG_VIOLATOR_RESPAWN_COOLDOWN_S
@@ -1116,8 +1176,12 @@ export function createDutyTraffic(opts: DutyTrafficOptions = {}): DutyTrafficHan
     const baseZ = track.start.z + track.dz * actor.dist + track.dx * track.offset
     const [, baseLz] = worldToJiefangBridgeLocal(baseX, baseZ)
     const xs = getJiefangCrossSection()
-    const targetLocalZ =
-      baseLz < 0
+    const isSidewalkRider = actorHasViolation(actor, 'sidewalk_riding')
+    const targetLocalZ = isSidewalkRider
+      ? baseLz < 0
+        ? Math.max(xs.northSidewalk.minZ + 1.25, -JIEFANG_SIDEWALK_PULLOVER_ABS_Z)
+        : Math.min(xs.southSidewalk.maxZ - 1.25, JIEFANG_SIDEWALK_PULLOVER_ABS_Z)
+      : baseLz < 0
         ? Math.max(xs.northNonmotor.minZ + 0.35, -JIEFANG_PULLOVER_OUTER_ABS_Z)
         : Math.min(xs.southNonmotor.maxZ - 0.35, JIEFANG_PULLOVER_OUTER_ABS_Z)
     const c = Math.cos(JIEFANG_BRIDGE_ROTATION_Y)
@@ -1125,7 +1189,8 @@ export function createDutyTraffic(opts: DutyTrafficOptions = {}): DutyTrafficHan
     const latLocalZ = -track.dz * s + track.dx * c
     const rawTotalOffset = Math.abs(latLocalZ) > 0.2 ? (targetLocalZ - baseLz) / latLocalZ : 1.135
     const wrongWayOff = actor.wrongWay ? -0.55 : 0
-    const targetDodge = Math.max(-1.85, Math.min(1.85, rawTotalOffset - wrongWayOff))
+    const maxBound = isSidewalkRider ? 4.2 : 1.85
+    const targetDodge = Math.max(-maxBound, Math.min(maxBound, rawTotalOffset - wrongWayOff))
     return {targetDodge, targetLocalZ}
   }
 
@@ -1322,6 +1387,8 @@ export function createDutyTraffic(opts: DutyTrafficOptions = {}): DutyTrafficHan
         maxViolatorRatio,
         maxConcurrentViolators,
         violatorCooldownSec,
+        policy: basePolicy,
+        storyOverride,
         classifyOfficerZone: deckOnly ? classifyJiefangCrossSectionZone : undefined,
         constrainActorPosition: deckOnly ? constrainJiefangActorPosition : undefined,
         computePullOverTarget: deckOnly ? computeBridgePullOverTarget : undefined,
@@ -1357,6 +1424,9 @@ export function createDutyTraffic(opts: DutyTrafficOptions = {}): DutyTrafficHan
         radius: activeRadiusM,
         getActorHandBone: getActorHandBoneInternal,
         receiveTicket: receiveTicketInternal,
+        setStoryOverride: setStoryOverrideInternal,
+        getStoryOverride: () => storyOverride,
+        getViolatorSnapshots: (qOpts?: {includeCited?: boolean}) => sim?.getViolatorSnapshots(qOpts) ?? [],
       }
       registerSolidsIfStandalone()
 
@@ -1427,12 +1497,28 @@ export function createDutyTraffic(opts: DutyTrafficOptions = {}): DutyTrafficHan
       if (index >= visuals!.slots) return
       let entry = visuals!.variants.get(actor)
       const spec = actor.kind === 'scooter' ? resolveTwoWheelSpec(actor) : undefined
-      if (!entry || (spec && (entry.subtype !== spec.subtype || entry.violation !== spec.violation || entry.noHelmet !== spec.noHelmet))) {
+      if (
+        !entry ||
+        (spec &&
+          (entry.subtype !== spec.subtype ||
+            entry.violation !== spec.violation ||
+            entry.violationMask !== spec.violationMask ||
+            entry.noHelmet !== spec.noHelmet))
+      ) {
         const u = entry?.u ?? random()
         const v = entry?.v ?? random()
         if (spec) {
-          const pair = visuals!.models.twoWheelVariant(spec.subtype, spec.violation, u, v, spec.noHelmet)
-          entry = {full: pair.full, bare: pair.bare, subtype: spec.subtype, violation: spec.violation, noHelmet: spec.noHelmet, u, v}
+          const pair = visuals!.models.twoWheelVariant(spec.subtype, spec.violation, u, v, spec.noHelmet, spec.violations)
+          entry = {
+            full: pair.full,
+            bare: pair.bare,
+            subtype: spec.subtype,
+            violation: spec.violation,
+            violationMask: spec.violationMask,
+            noHelmet: spec.noHelmet,
+            u,
+            v,
+          }
         } else {
           entry = {full: visuals!.models.variant(actor.kind, u, v), u, v}
         }
@@ -1501,6 +1587,13 @@ export function createDutyTraffic(opts: DutyTrafficOptions = {}): DutyTrafficHan
     syncVisualFrame(safeDt, accumulator, true)
   }
 
+  function setStoryOverrideInternal(override: DutyStoryOverrideConfig | null): void {
+    storyOverride = override && override.active !== false ? {active: true, ...override} : null
+    if (sim) {
+      sim.setStoryOverride(storyOverride)
+    }
+  }
+
   return {
     start,
     stop,
@@ -1517,6 +1610,17 @@ export function createDutyTraffic(opts: DutyTrafficOptions = {}): DutyTrafficHan
     step,
     getTraffic: () => sim,
     getActors: () => sim?.actors ?? [],
+    setStoryOverride: setStoryOverrideInternal,
+    clearStoryOverride() {
+      setStoryOverrideInternal(null)
+    },
+    getStoryOverride: () => storyOverride,
+    getActorViolations(actorIdOrActor: string | number | Actor) {
+      return sim?.getActorViolations(actorIdOrActor) ?? []
+    },
+    getViolatorSnapshots(qOpts?: {includeCited?: boolean}) {
+      return sim?.getViolatorSnapshots(qOpts) ?? []
+    },
     onPlayerHit(listener: PlayerHitCallback) {
       hitListeners.add(listener)
       return () => {
@@ -1611,6 +1715,10 @@ export function createDutyTraffic(opts: DutyTrafficOptions = {}): DutyTrafficHan
       let cars = 0
       let scooters = 0
       let violators = 0
+      let totalViolatorScooters = 0
+      let noHelmetViolators = 0
+      let multiViolationCount = 0
+      let sidewalkRidingViolators = 0
       let fleeing = 0
       let halted = 0
       let braking = 0
@@ -1628,7 +1736,14 @@ export function createDutyTraffic(opts: DutyTrafficOptions = {}): DutyTrafficHan
           if (isOnJiefangBridgeDeck(a) && classifyJiefangCrossSectionZone(a) === 'sidewalk') {
             sidewalkTwoWheelers++
           }
-          if (!a.cited && a.violation && a.violation !== 'none') violators++
+          const viols = getActorViolations(a)
+          if (viols.length > 0) {
+            totalViolatorScooters++
+            if (viols.includes('no_helmet')) noHelmetViolators++
+            if (viols.length >= 2) multiViolationCount++
+            if (viols.includes('sidewalk_riding')) sidewalkRidingViolators++
+            if (!a.cited && actorHasAnyViolation(a)) violators++
+          }
         }
         if (a.dutyState === 'fleeing' || a.dutyState === 'evading') fleeing++
         if (a.dutyState === 'halted' || a.haltedByDuty) halted++
@@ -1642,6 +1757,11 @@ export function createDutyTraffic(opts: DutyTrafficOptions = {}): DutyTrafficHan
         scooters,
         violators,
         violatorRatio: total > 0 ? Number((violators / total).toFixed(4)) : 0,
+        nonmotorViolationRate: scooters > 0 ? Number((totalViolatorScooters / scooters).toFixed(4)) : 0,
+        noHelmetViolatorRate: totalViolatorScooters > 0 ? Number((noHelmetViolators / totalViolatorScooters).toFixed(4)) : 0,
+        multiViolationCount,
+        sidewalkRidingViolators,
+        storyOverrideActive: Boolean(storyOverride && storyOverride.active !== false),
         violatorCooldownRemainingSec: Number((sim?.getViolatorCooldownRemaining() ?? 0).toFixed(2)),
         warningHorns,
         sidewalkTwoWheelers,

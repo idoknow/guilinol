@@ -62,7 +62,7 @@ export async function traffic(scene:THREE.Scene,camera:THREE.Camera,verify:boole
   const geometryIds=models.geometries.map(g=>batch.addGeometry(g))
   const slotGeometry=new Int16Array(SLOTS).fill(-1),slotPaint:(THREE.Color|undefined)[]=[],slotShown=new Uint8Array(SLOTS)
   for(let slot=0;slot<SLOTS;slot++){batch.addInstance(geometryIds[0]);batch.setVisibleAt(slot,false)}
-  const variants=new WeakMap<object,{full:Variant,bare?:Variant,subtype?:TwoWheelSubtype,violation?:TrafficViolation,noHelmet?:boolean,u:number,v:number}>()
+  const variants=new WeakMap<object,{full:Variant,bare?:Variant,subtype?:TwoWheelSubtype,violation?:TrafficViolation,violationMask?:number,noHelmet?:boolean,u:number,v:number}>()
   const pose=new THREE.Object3D();pose.rotation.order='YXZ'
   const transforms=new Float64Array(SLOTS*8).fill(NaN)
   const FAR=75**2 // IDOK-253: detailed car meshes only near the camera, light stand-ins beyond 75 m
@@ -226,18 +226,24 @@ export async function traffic(scene:THREE.Scene,camera:THREE.Camera,verify:boole
     riddenSlots.clear()
     let motors=0,pedestrians=0,queued=0,redStops=0
     if(verify){mesh.userData.simTime=sim.time;mesh.userData.motorIds.length=0;mesh.userData.approaches=[];mesh.userData.allMotors=[];mesh.userData.motorLanes=[];mesh.userData.pedestriansDetail=[]}
+    let totalNpc=0,compliantNpc=0,totalScooters=0,violatorScooters=0,noHelmetScooters=0,multiViolScooters=0,helmetVisualMismatch=0
     sim.actors.forEach((actor,index)=>{
+      if(verify){
+        totalNpc++
+        if(actor.laneCompliant!==false)compliantNpc++
+      }
       if(verify&&actor.kind==='person'){
         const s=sim!.sideClearances(actor.x,actor.z,actor.track.dx,actor.track.dz)
         mesh.userData.pedestriansDetail.push({
           street:actor.track.street,cls:actor.track.cls,x:actor.x,y:actor.y,z:actor.z,speed:actor.speed,dodge:actor.dodge,
+          laneCompliant:actor.laneCompliant!==false,encroachmentKind:actor.encroachmentKind??'none',
           hitsMotor:sim!.hitsMotorLane(actor.x,actor.z,.35),betweenMotors:s.betweenMotors,
           surface:surfaceAt?.(actor.x,actor.z)??null,
         })
       }
       if(verify&&actor.kind!=='person'){
         if(!probeIds.has(actor))probeIds.set(actor,++nextProbeId)
-        mesh.userData.motorLanes.push({id:probeIds.get(actor),kind:actor.kind,street:actor.track.street,lane:actor.track.id,x:actor.x,z:actor.z,speed:actor.speed,leaving:actor.leaving})
+        mesh.userData.motorLanes.push({id:probeIds.get(actor),kind:actor.kind,street:actor.track.street,lane:actor.track.id,x:actor.x,z:actor.z,speed:actor.speed,leaving:actor.leaving,laneCompliant:actor.laneCompliant!==false,encroachmentKind:actor.encroachmentKind??'none'})
       }
       if(verify&&actor.kind==='person'&&visible(actor)&&actor.scale>=.99)pedestrians++
       if(verify&&actor.kind!=='person'&&actor.scale>=.99)mesh.userData.allMotors.push(index)
@@ -249,17 +255,27 @@ export async function traffic(scene:THREE.Scene,camera:THREE.Camera,verify:boole
       }
       let entry=variants.get(actor)
       const spec=actor.kind==='scooter'?resolveTwoWheelSpec(actor):undefined
-      if(!entry||(spec&&(entry.subtype!==spec.subtype||entry.violation!==spec.violation||entry.noHelmet!==spec.noHelmet))){
+      if(!entry||(spec&&(entry.subtype!==spec.subtype||entry.violation!==spec.violation||entry.violationMask!==spec.violationMask||entry.noHelmet!==spec.noHelmet))){
         const u=entry?.u??Math.random(),v=entry?.v??Math.random()
         if(spec){
-          const pair=models.twoWheelVariant(spec.subtype,spec.violation,u,v,spec.noHelmet)
-          entry={full:pair.full,bare:pair.bare,subtype:spec.subtype,violation:spec.violation,noHelmet:spec.noHelmet,u,v}
+          const pair=models.twoWheelVariant(spec.subtype,spec.violation,u,v,spec.noHelmet,spec.violations)
+          entry={full:pair.full,bare:pair.bare,subtype:spec.subtype,violation:spec.violation,violationMask:spec.violationMask,noHelmet:spec.noHelmet,u,v}
         }else{
           entry={full:models.variant(actor.kind,u,v),u,v}
         }
         variants.set(actor,entry)
         const geometry=models.geometries[entry.full.geometry];if(!geometry.boundingBox)geometry.computeBoundingBox()
         const {min,max}=geometry.boundingBox!;actor.halfWidth=Math.max(-min.x,max.x);actor.halfLength=Math.max(-min.z,max.z);actor.height=max.y
+      }
+      if(verify&&spec){
+        totalScooters++
+        if(spec.violations.length>0){
+          violatorScooters++
+          if(spec.noHelmet)noHelmetScooters++
+          if(spec.violations.length>=2)multiViolScooters++
+        }
+        const geomHasHelmet=Boolean(models.geometries[entry.full.geometry]?.userData?.hasHelmet)
+        if(geomHasHelmet===spec.noHelmet)helmetVisualMismatch++
       }
       if(walking.has(actor)){hide(index,index+1);return}
       const isRidden=ridden.has(actor)&&!!entry.bare
@@ -271,6 +287,20 @@ export async function traffic(scene:THREE.Scene,camera:THREE.Camera,verify:boole
     riders.animate(dt,accumulator,syncRiddenVehicle)
     effects.tick(sim.actors,sim.time,elapsed,player,!!vehicle,actor=>variants.get(actor)?.full.geometry??0)
     hide(sim.actors.length,STATIC)
-    if(verify)Object.assign(mesh.userData,{motors,pedestrians,queued,redStops})
+    if(verify){
+      Object.assign(mesh.userData,{
+        motors,pedestrians,queued,redStops,
+        ruleStats:{
+          totalNpc,compliantNpc,
+          laneComplianceRate:totalNpc?+(compliantNpc/totalNpc).toFixed(4):1,
+          totalScooters,violatorScooters,
+          nonmotorViolationRate:totalScooters?+(violatorScooters/totalScooters).toFixed(4):0,
+          noHelmetScooters,
+          noHelmetGivenViolatorRate:violatorScooters?+(noHelmetScooters/violatorScooters).toFixed(4):0,
+          multiViolScooters,
+          helmetVisualMismatch,
+        },
+      })
+    }
   }
 }

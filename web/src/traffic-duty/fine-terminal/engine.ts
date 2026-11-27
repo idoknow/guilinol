@@ -74,6 +74,7 @@ export function resolveFineTable(custom?: Partial<DutyFineTable>): DutyFineTable
     illegal_mod: Math.max(1, Math.round(custom?.illegal_mod ?? R8_DEFAULT_FINE_YUAN.illegal_mod)),
     wrong_way: Math.max(1, Math.round(custom?.wrong_way ?? R8_DEFAULT_FINE_YUAN.wrong_way)),
     red_light_run: Math.max(1, Math.round(custom?.red_light_run ?? R8_DEFAULT_FINE_YUAN.red_light_run)),
+    sidewalk_riding: Math.max(1, Math.round(custom?.sidewalk_riding ?? R8_DEFAULT_FINE_YUAN.sidewalk_riding)),
   }
 }
 
