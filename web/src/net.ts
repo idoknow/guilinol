@@ -205,7 +205,8 @@ export function attachNet(scene:Scene,clips:AnimationClip[],getPose:()=>Pose,get
   function stop(){generation++;clearTimeout(timer);socket?.close(1000,'stop');socket=undefined;peers.clear();update('offline')}
   function avatarChanged(){if(state==='online')send({t:'avatar',avatar:getAvatar()})}
   function tick(dt:number){if(state!=='online')return
-    flushEmote();const pose=getPose(),now=performance.now();if(now-lastSent>=50){lastSent=now;send({t:'pos',...pose})}
+    flushEmote();const pose=getPose(),now=performance.now()
+    if(now-lastSent>=50 && socket && socket.bufferedAmount<4096){lastSent=now;send({t:'pos',...pose})}
     if(getActivity&&now-lastActCheck>=500){
       lastActCheck=now
       const next=getActivity()
