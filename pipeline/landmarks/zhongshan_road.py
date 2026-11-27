@@ -375,12 +375,17 @@ def build_zhongshan_road(m: Builder):
         # (road, fraction_along, station_key)
         (east_road, 0.78, 'bus_shizijie'),
         (west_roads[0], 0.16, 'bus_shizijie'),
+        (east_road, 0.31, None),
+        (west_roads[1], 0.42, None),
     ]
     bus_pullin_zones = []
     for road, frac, station_key in bus_specs:
         sw_line = road.line.offset_curve(road.width / 2.0 + max(road.right, 2.5) * 0.58)
         d = sw_line.length * frac
         pt = sw_line.interpolate(d)
+        bus_pullin_zones.append(pt.buffer(11.5))
+        if station_key is None:
+            continue
         p_a = sw_line.interpolate(max(0.0, d - 1.0))
         p_b = sw_line.interpolate(min(sw_line.length, d + 1.0))
         tx, tz = p_b.x - p_a.x, p_b.y - p_a.y
@@ -394,7 +399,6 @@ def build_zhongshan_road(m: Builder):
         shelter_yaw = math.atan2(-inward_z, inward_x)
         lx, lz = pt.x - AX, pt.y - AZ
         _bus_shelter(m, lx, m.surface.ground(lx,lz), lz, shelter_yaw, station_key=station_key)
-        bus_pullin_zones.append(pt.buffer(11.5))
 
     divider_mask = unary_union([junc_mask, *bus_pullin_zones])
     road_surface, sidewalk = surfaces('zhongshan_road', 260)

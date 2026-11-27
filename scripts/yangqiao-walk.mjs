@@ -10,14 +10,19 @@ try{
   browser=await chromium.launch(browserOptions());const page=await browser.newPage({viewport:{width:480,height:270}})
   await page.goto(`${server.resolvedUrls.local[0]}?verify&radius=320&flow=0`)
   await page.waitForFunction(()=>window.viewer?.stats.firstMs>0,null,{timeout:120000})
-  if(!await page.evaluate(()=>viewer.walkTo(-1092.1,351.3,0,'bridge-audit')))throw Error('Cannot load bridge')
+  const northOnly=process.argv.includes('--north-only'),northWalk=[[-1033.2,253],[-1029.2,243],[-1025.63,233],[-1022.04,223]],entry=northOnly?northWalk[0]:[-1092.1,351.3]
+  await page.evaluate(([x,z])=>viewer.camera.position.set(x,175,z),entry)
+  await page.waitForFunction(([x,z])=>viewer.manifest.chunks.filter(tile=>Math.hypot(tile.x+128-x,tile.z+128-z)<260).every(tile=>viewer.stream.loaded.has(tile)),entry,{timeout:180000})
+  if(!await page.evaluate(([x,z])=>viewer.walkTo(x,z,0,'bridge-audit'),entry))throw Error('Cannot enter audit route')
   for(const [name,points] of Object.entries({
     west:[[-1092.1,351.3],[-1057.8,308.5]],east:[[-1063.1,376.2],[-1030,330.3]],
     ronghuBank:[[-1072,299.8],[-1104.7,282.6]],shanhuBank:[[-1016.6,342.3],[-988.3,369.1]],
     westApproaches:[[-1099.39,362.08],[-1052.83,299.04]],
     eastApproaches:[[-1068.88,384.46],[-1023.84,322.06]],
     crossing:[[-1076.11,330.56],[-1059.25,343.42],[-1076.11,330.56]],
+    northWestSidewalk:northWalk,
   })){
+    if(northOnly&&name!=='northWestSidewalk')continue
     const result=await page.evaluate(async({name,points,profile})=>{
       const viewer=window.viewer,{walk,stream}=viewer
       walk.leave();if(!await walk.enter(...points[0],0,name,false,AbortSignal.timeout(85000)))return {ok:false,reason:'cannot enter'}
@@ -52,7 +57,7 @@ try{
           }
           if(Math.hypot(x-probe.x,z-probe.z)>=.45)return {ok:false,x:probe.x,z:probe.z,stalls:1,resets:probe.resets-resets,foot:probe.foot,contacts:probe.contactSources}
         }
-        return {ok:probe.resets===resets&&Object.values(seams).every(gap=>gap<=.03),totalTicks,resets:probe.resets-resets,stalls:0,...(name==='crossing'?{seams}:{})}
+        return {ok:probe.resets===resets&&Object.values(seams).every(gap=>gap<=.03),totalTicks,resets:probe.resets-resets,stalls:0,...(name==='northWestSidewalk'?{start:points[0],finish:[probe.x,probe.z],metres:Math.hypot(probe.x-points[0][0],probe.z-points[0][1])}:{}),...(name==='crossing'?{seams}:{})}
       }finally{walk.drive(0,0,false);viewer.resume()}
     },{name,points,profile})
     console.log(name,JSON.stringify(result));if(!result.ok)process.exitCode=1

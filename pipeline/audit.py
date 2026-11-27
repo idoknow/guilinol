@@ -104,6 +104,21 @@ def apply_landmark_exceptions(rules, *categories):
     return allowed
 
 
+def yangqiao_occupancy(root):
+    profile = json.loads((root / 'pipeline/data/landmarks/yangqiao-grade.json').read_bytes())
+    south, north = (np.array(profile[end]) for end in ('south','north'))
+    def band(left, right):
+        corners = []
+        for along in (profile['stations'][0], profile['stations'][-1]):
+            west, east = south + along * (north - south)
+            corners.append([west + across * (east - west) for across in (left, right)])
+        return Polygon(corners[0] + corners[1][::-1])
+    lateral = profile['lateral']
+    ring = band(lateral[0], lateral[-1])
+    asphalt = band(lateral[2], lateral[3])
+    return ring, asphalt, ring.difference(asphalt)
+
+
 def run_audit(world_dir: Path, root: Path) -> dict:
     manifest = json.loads((world_dir / 'manifest.json').read_text())
     left, top, width, depth = manifest['extent']
@@ -426,6 +441,7 @@ def run_audit(world_dir: Path, root: Path) -> dict:
                                           f'procedural building seed={seed} overlaps sidewalk {inter_sw.area:.1f} m²'))
 
     lm_block_footprints = {}
+    bridge_ring, bridge_road, bridge_walk = yangqiao_occupancy(root)
     for lid, ldata in landmarks.items():
         ctris = ldata['coll_tris']
         cnorms = ldata['coll_normals']
@@ -447,11 +463,14 @@ def run_audit(world_dir: Path, root: Path) -> dict:
         if foot.is_empty:
             continue
         inter_r = foot.intersection(u_road0)
+        inter_s = foot.intersection(u_sidewalk)
+        if foot.intersects(bridge_ring):
+            inter_r = inter_r.difference(bridge_ring).union(foot.intersection(bridge_road))
+            inter_s = inter_s.difference(bridge_ring).union(foot.intersection(bridge_walk))
         if inter_r.area > 0.5:
             rp = inter_r.representative_point()
             bldg_issues.append(make_issue('landmarkOnCarriageway', rp.x, rp.y, inter_r.area,
                                           f'landmark {lid} collision* overlaps carriageway {inter_r.area:.1f} m²', landmark=lid))
-        inter_s = foot.intersection(u_sidewalk)
         if inter_s.area > 0.5:
             rp = inter_s.representative_point()
             bldg_issues.append(make_issue('landmarkOnSidewalk', rp.x, rp.y, inter_s.area,
