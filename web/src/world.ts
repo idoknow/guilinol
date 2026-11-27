@@ -30,6 +30,7 @@ export function physicalBuildingRings(tile:Tile, rendered:Building[]):Building[]
   })
 }
 export interface Manifest {
+  airportProps?:Asset
   region?:import('../../lib/play-region').Region
   tunnels?:Tunnel[]
   groundCutouts?:GroundCutout[]

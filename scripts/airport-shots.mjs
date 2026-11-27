@@ -10,6 +10,9 @@ const views = [
   ['t1-front', [-25250,190,6950], [-25500,180,6860]],
   ['tower', [-25290,184,6600], [-25380,200,6543]],
   ['hangar-cargo', [-25950,215,5750], [-25620,178,5850]],
+  ['departure-walk', [-25467,184,7410], [-25520,190,7420]],
+  ['stand-walk', [-25894,177,7644], [-25874,180,7640]],
+  ['threshold-walk', [-26366,177,8248], [-26354,177,8170]],
 ]
 const prefix = process.argv[2] ?? 'captures/airport/before'
 await mkdir(dirname(prefix), {recursive:true})

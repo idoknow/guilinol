@@ -64,7 +64,7 @@ def ground_features(bounds, school_grounds=()):
                 continue
         if tags.get('natural') == 'water' or tags.get('waterway') == 'riverbank' or 'water' in tags:
             key = 'water'
-        elif (tags.get('natural') in ('wood', 'grassland', 'scrub') or tags.get('leisure') in ('park','garden','pitch')
+        elif ((element['type']=='relation' and element['id']==13846706) or tags.get('natural') in ('wood', 'grassland', 'scrub') or tags.get('leisure') in ('park','garden','pitch')
               or tags.get('landuse') in ('forest','grass','meadow','recreation_ground','village_green')):
             key = 'green'
         elif tags.get('aeroway') in ('runway','taxiway','apron') and element['type'] != 'node':
@@ -225,6 +225,8 @@ def buildings(bounds, elevation, peaks, layout, carriageway_mask=None, sidewalk_
             heights.append((base, base+3.2*floors, 3, floors, ident%65536, center, [], False))
     for element, footprint, solid in airport_buildings:
         palace.append(footprint)
+        if f"way/{element['id']}" in layout.airport_replacements:
+            continue
         for poly in polygons(solid.intersection(bounds)):
             center=poly.representative_point()
             floors=int(element['tags'].get('building:levels','2'))

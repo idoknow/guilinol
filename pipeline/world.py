@@ -165,7 +165,7 @@ def build(bbox, output, palette, workers=4):
     width,depth = map(int,end-start)
     raster_bounds = box(*start,*end)
     bounds = play_region.geometry if play_region else raster_bounds
-    layout = Layout()
+    layout = Layout(bounds)
     reference = None if play_region else city_water_window(city,layout,start,end)
     layers = ground_features(bounds,layout.school_grounds)
     mountain_trees = []
@@ -416,6 +416,9 @@ def build(bbox, output, palette, workers=4):
         for poly in features:
             mask, corner = stencil(poly,left,top,1)
             texture.paste(palette[layer],corner,mask)
+    if pavement is not None and not pavement.is_empty:
+        from airport_pavement import bake_airport
+        bake_airport(texture,left,top,bounds,stencil,palette)
     for campus in layout.allow_unmapped_court:
         if not bounds.covers(campus) or any(campus.covers(field.representative_point())
                 for layer in ('schoolTrack','schoolCourt') for field in layers[layer]):
@@ -609,6 +612,9 @@ def build(bbox, output, palette, workers=4):
     print('Terrain SHA-256:', digest.hexdigest())
     if play_region:
         manifest['region'] = play_region.manifest()
+        from airport_props import write_props
+        props = write_props(output,bounds,ground_mesh_at)
+        if props: manifest['airportProps'] = props
     from station_site import mark_station_tiles
     mark_station_tiles(chunks)
     manifest['landmarks'] = landmarks

@@ -330,6 +330,17 @@ def run(directory):
                   tolerances=dict(bearingBand=BEARING_BAND, land=[-SINK,FLOAT], bridgeEnd=.30),
                   floatingCraft=[dict(landmark=name,center=[x,z],radius=r,draft=d,reason=why)
                                  for name, boats in CRAFT.items() for x,z,r,d,why in boats])
+    manifest = json.loads((world.directory/'manifest.json').read_text())
+    if 'airportProps' in manifest:
+        rows = json.loads((world.directory/manifest['airportProps']['file']).read_text())
+        errors = []
+        for x,y,z,yaw,_,_,span,rise in rows['fence']:
+            for end in (-.5,.5):
+                east,south=x+end*span*np.sin(yaw),z+end*span*np.cos(yaw)
+                gap=y+end*rise-world.sample(east,south,include_peaks=False)[0]
+                if not -SINK <= gap <= FLOAT: errors.append([east,south,gap])
+        result['airportFence'] = dict(panels=len(rows['fence']),failures=len(errors),examples=errors[:20])
+        result['failures'] += len(errors)
     (directory/'grounding.json').write_text(json.dumps(result, separators=(',',':'))+'\n')
     return result
 
