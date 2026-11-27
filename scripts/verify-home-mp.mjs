@@ -1,5 +1,6 @@
-// 首页联机主推 + 单人弱化保留验收（IDOK-392）：
-// 只跑主界面，不进 3D 城，验证桌面 / 手机竖屏 / 小屏 / 手机横屏的视觉层级、默认焦点、偏好持久化与无溢出。
+// 首页联机主推 + 单人弱化保留验收（IDOK-392，IDOK-468 宣纸版）：
+// 只跑主界面，不进 3D 城，验证桌面 / 手机竖屏 / 小屏 / 手机横屏的视觉层级、默认焦点、偏好持久化与无溢出；
+// 纸上只有联机一个朱砂按钮；手机默认收起说明和链接，点「更多」展开。
 import assert from 'node:assert/strict'
 import {mkdir} from 'node:fs/promises'
 import {preview} from 'vite'
@@ -69,7 +70,7 @@ try {
   // live.ts 默认 4s 后拉一次 /api/live；等它把 12 人在线渲染出来
   await page.waitForFunction(() => {
     const el = document.querySelector('.home-mp-live')
-    return !!el && !el.hidden && el.textContent.trim() === '12'
+    return !!el && !el.hidden && el.textContent.trim() === '12 人在线'
   }, null, {timeout:12000})
 
   if (captureDir) await mkdir(captureDir, {recursive:true})
@@ -97,7 +98,10 @@ try {
         mpGo: rect('.home-go--mp'),
         mpDesc: rect('.home-mode--mp .home-mode-text > span'),
         mpTitle: rect('.home-mode--mp .home-mode-text b'),
-        mpBadge: rect('.home-mp-badge'),
+        seals: [...document.querySelectorAll('.home-go, .home-links .ui-btn, .home-resume, .home-more')]
+          .filter(el => getComputedStyle(el).backgroundColor === getComputedStyle(document.documentElement).getPropertyValue('--ui-seal').trim().replace(/^#(..)(..)(..)$/, (_, r, g, b) => `rgb(${parseInt(r, 16)}, ${parseInt(g, 16)}, ${parseInt(b, 16)})`))
+          .map(el => el.className),
+        more: rect('.home-more'),
         mpLive: rect('.home-mp-live'),
         wallet: document.querySelector('.home-mode--mp .home-wallet')?.textContent?.trim() ?? '',
         tour: rect('.home-mode--tour'),
@@ -124,9 +128,28 @@ try {
       `${name}: mp CTA must be full-width vs compact solo CTA (${metrics.mpGo.w.toFixed(1)} vs ${metrics.soloGo.w.toFixed(1)})`)
     assert.ok(metrics.mpTitle.fontSize > metrics.soloTitle.fontSize + 2,
       `${name}: mp heading font larger than solo (${metrics.mpTitle.fontSize} vs ${metrics.soloTitle.fontSize})`)
-    assert.notEqual(metrics.mpDesc.display, 'none', `${name}: mp description stays visible`)
-    assert.ok(metrics.mpDesc.h > 10, `${name}: mp description has visible height`)
-    assert.ok(metrics.mpBadge && metrics.mpBadge.w > 20, `${name}: mp recommended badge visible`)
+    assert.deepEqual(metrics.seals, ['home-go home-go--mp'], `${name}: the mp CTA is the only vermilion button`)
+    if (name === 'desktop') {
+      assert.ok(metrics.mpDesc.h > 10, `${name}: mp description visible on desktop`)
+      assert.equal(metrics.more.display, 'none', `${name}: no 更多 toggle on desktop`)
+      assert.ok(metrics.links.h > 20, `${name}: links visible on desktop`)
+    } else {
+      // 手机默认收起：说明、链接、署名都藏在「更多」后面，点开才出现，再点收回
+      assert.equal(metrics.mpDesc.display, 'none', `${name}: mp description collapsed on phones`)
+      assert.equal(metrics.links.display, 'none', `${name}: links collapsed on phones`)
+      assert.ok(metrics.more.w > 40 && metrics.more.bottom <= viewport.height + 1, `${name}: 更多 toggle on screen`)
+      await page.click('.home-more')
+      const open = await page.evaluate(() => ({
+        expanded: document.querySelector('.home-more').getAttribute('aria-expanded'),
+        label: document.querySelector('.home-more').textContent.trim(),
+        desc: document.querySelector('.home-mode--mp .home-mode-text > span').getBoundingClientRect().height,
+        qq: getComputedStyle(document.querySelector('.home-links [data-act=qq]')).display,
+      }))
+      assert.deepEqual([open.expanded, open.label, open.desc > 10, open.qq], ['true', '收起', true, 'flex'], `${name}: 更多 expands description and links`)
+      if (captureDir) await page.screenshot({path:`${captureDir}/${name}-more.png`})
+      await page.click('.home-more')
+      assert.equal(await page.evaluate(() => document.querySelector('.home-more').getAttribute('aria-expanded')), 'false', `${name}: 收起 collapses again`)
+    }
     assert.ok(metrics.mpLive && metrics.mpLive.w > 20, `${name}: mp live count visible`)
     assert.equal(metrics.wallet, '钱包 ¥1,280', `${name}: street wallet shown on mp hero card`)
     assert.ok(metrics.solo.w > 180 && metrics.solo.h >= 40, `${name}: solo entry remains clearly clickable`)

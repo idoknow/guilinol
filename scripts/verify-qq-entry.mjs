@@ -1,4 +1,4 @@
-// 首页 QQ 群入口：导航按钮在桌面 / 手机 / 小屏都在视野内，弹层里是二维码 + 可复制的群号。
+// 首页 QQ 群入口：导航按钮在桌面 / 手机 / 小屏都可达（手机先点「更多」），弹层里是二维码 + 可复制的群号。
 // 只跑主界面，不进城市，所以不需要世界资产，几秒就能跑完。
 import assert from 'node:assert/strict'
 import {preview} from 'vite'
@@ -25,6 +25,8 @@ try {
 
   for (const [name,viewport] of [['desktop',{width:1280,height:720}],['phone',{width:390,height:844}],['small',{width:360,height:640}]]){
     await page.setViewportSize(viewport)
+    // 手机上链接收在「更多」里（IDOK-468），先展开
+    if (await page.locator('.home-more').isVisible() && await page.getAttribute('.home-more','aria-expanded')!=='true') await page.click('.home-more')
     const button = await page.evaluate(()=>{
       const element = document.querySelector('.home-links [data-act=qq]')
       const box = element.getBoundingClientRect()

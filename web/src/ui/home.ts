@@ -26,26 +26,25 @@ export function home(play:(mode:PlayMode)=>void):Home {
   <div class="home-bg" aria-hidden="true">${slides.map(([file],i)=>`<img alt="" decoding="async" ${i?'data-src':'src'}="./home/${file}.webp"${i?'':' class="on"'}>`).join('')}</div>
   <div class="home-shade" aria-hidden="true"></div>
   <header class="home-top">
+    <button type="button" class="home-douyin" data-umami-event="home-douyin" aria-label="抖音官方号 ${DOUYIN_NAME}，点开看二维码">
+      <img class="home-douyin-code" src="./icons/douyin-code.webp" width="560" height="560" decoding="async" loading="lazy" alt="">
+      <img class="home-douyin-mark" src="./icons/douyin-mark.webp" width="284" height="120" alt=""><span>官方号</span>
+    </button>
     <button type="button" class="ui-btn home-account" data-umami-event="home-account"></button>
   </header>
   <div class="home-main">
     <div class="home-title">
       <span class="home-seal" aria-hidden="true"><img src="./brand/emblem.webp" width="371" height="144" alt=""></span>
       <h1>网上桂林</h1>
-      <p class="home-tag">一座按真实地图搭起来的 3D 桂林。<br>同城联机逛街骑车赚钱，也能飞上天看山水。</p>
-      <p class="home-meta"><span>同城实时联机</span><span>登录就能玩</span><span>电脑 · 手机都行</span></p>
+      <p class="home-tag">按真实地图搭起来的 3D 桂林</p>
     </div>
     <div class="home-modes" role="list">
       <button type="button" class="home-mode home-mode--mp" role="listitem" data-umami-event="home-mp">
-        <span class="home-mode-seal" aria-hidden="true">联</span>
-        <span class="home-mode-text"><b>联机模式<em class="home-mp-badge">推荐</em><i class="home-mp-live" hidden></i></b><span>同城玩家一起逛街骑车、接单送米粉、钓鱼换装，实时看到彼此外形和昵称。</span>
-          <small class="home-wallet"></small></span>
+        <span class="home-mode-text"><b>联机模式<i class="home-mp-live" hidden></i></b><span>和同城玩家一起逛街、骑车接单、钓鱼换装</span><small class="home-wallet"></small></span>
         <span class="home-go home-go--mp">进入联机</span>
       </button>
       <button type="button" class="home-mode home-mode--tour" role="listitem" data-umami-event="home-tour">
-        <span class="home-mode-seal" aria-hidden="true">游</span>
-        <span class="home-mode-text"><b>游览模式</b><span>自由飞行看山水，走遍 ${spots.length} 处名胜集印章。</span>
-          <small class="home-progress"></small></span>
+        <span class="home-mode-text"><b>游览模式</b><span>飞着看山水，集齐 ${spots.length} 处名胜印章</span><small class="home-progress"></small></span>
         <span class="home-go home-go--tour">开始游览</span>
       </button>
       <div class="home-resume-row" role="listitem" hidden>
@@ -54,23 +53,20 @@ export function home(play:(mode:PlayMode)=>void):Home {
         </button>
       </div>
       <button type="button" class="home-mode home-mode--solo" role="listitem" data-umami-event="home-solo">
-        <span class="home-mode-seal" aria-hidden="true">街</span>
-        <span class="home-mode-text"><b>单人模式</b><span>离线独自逛街接单，保留完整进度与存档。</span></span>
+        <span class="home-mode-text"><b>单人模式</b><span>离线逛街接单，进度照常保存</span></span>
         <span class="home-go home-go--solo">进入</span>
       </button>
     </div>
-    <nav class="home-links">
+    <nav class="home-links" id="home-links" aria-label="更多">
       <button type="button" class="ui-btn ui-btn--ghost" data-act="guide" data-umami-event="home-guide">玩法说明</button>
       <button type="button" class="ui-btn ui-btn--ghost" data-act="about" data-umami-event="home-about">关于游戏</button>
       <button type="button" class="ui-btn ui-btn--ghost" data-act="qq" data-umami-event="home-qq">QQ 群</button>
       <a class="ui-btn ui-btn--ghost" href="${SOURCE_URL}" target="_blank" rel="noopener" data-umami-event="home-source-link">源代码 ↗</a>
     </nav>
+    <p class="home-foot"><span class="home-credit">受 <a href="https://nanningol.com" target="_blank" rel="noopener" data-umami-event="home-thanks-nanning">网上南宁</a> 启发 · 地图数据 © OpenStreetMap 贡献者 <span class="home-ver">· v${__APP_VERSION__}</span></span></p>
+    <button type="button" class="home-more" aria-expanded="false" aria-controls="home-links">更多</button>
   </div>
-  <button type="button" class="home-douyin" data-umami-event="home-douyin" aria-label="抖音官方号 ${DOUYIN_NAME}，点开看二维码">
-    <img class="home-douyin-code" src="./icons/douyin-code.webp" width="560" height="560" decoding="async" loading="lazy" alt="">
-    <span class="home-douyin-text"><img class="home-douyin-mark" src="./icons/douyin-mark.webp" width="284" height="120" alt=""><b>${DOUYIN_NAME}</b><small>官方号 · 扫码关注</small></span>
-  </button>
-  <div class="home-foot"><span class="home-caption" aria-live="off"></span><span class="home-credit">受 <a href="https://nanningol.com" target="_blank" rel="noopener" data-umami-event="home-thanks-nanning">网上南宁</a> 启发 · 地图数据 © OpenStreetMap 贡献者 <span class="home-ver">· v${__APP_VERSION__}</span></span></div>`
+  <span class="home-caption" aria-hidden="true"></span>`
   const progress = root.querySelector('.home-progress')!
   progress.textContent = stamps ? `已集 ${Math.min(stamps,spots.length)} / ${spots.length} 枚印章` : ''
   const go = root.querySelector<HTMLElement>('.home-go--tour')!, tour = root.querySelector<HTMLButtonElement>('.home-mode--tour')!
@@ -112,7 +108,11 @@ export function home(play:(mode:PlayMode)=>void):Home {
   const mpLive = root.querySelector<HTMLElement>('.home-mp-live')!
   startLive()
   mp.onclick = ()=>press(mp,'正在连接',()=>{setMpEnabled(true); play('solo')})
-  onMpOnline(value=>{mpLive.hidden = !value; if(value) mpLive.textContent = String(value)})
+  onMpOnline(value=>{mpLive.hidden = !value; if(value) mpLive.textContent = `${value} 人在线`})
+  // 手机上纸片默认收起：说明、链接、署名点「更多」才出现（IDOK-468）。桌面 CSS 里始终展开，按钮不显示。
+  const more = root.querySelector<HTMLButtonElement>('.home-more')!
+  more.onclick = ()=>{const open = !root.classList.contains('more'); root.classList.toggle('more',open)
+    more.setAttribute('aria-expanded',String(open)); more.textContent = open ? '收起' : '更多'}
   const account = root.querySelector<HTMLButtonElement>('.home-account')!
   account.onclick = ()=>pending(account,openAccount)
   onUser(user=>{account.innerHTML = user?`<i class="home-avatar"></i><span></span>`:'<span>登录 / 注册</span>'

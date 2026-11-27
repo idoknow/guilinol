@@ -8,7 +8,7 @@
 /* 填充和圆点都用 transform 推进：合成线程上跑，主线程忙着解码街区时也不会和百分比脱节 */
 .ld-full .boot-bar{position:relative;height:4px;overflow:visible;border-radius:2px;background:rgba(42,61,60,.14)}
 .ld-full .boot-bar i,.ld-full .boot-bar b{position:absolute;inset:0;transition:transform .35s var(--ui-ease)}
-.ld-full .boot-bar i{width:auto;border-radius:2px;background:linear-gradient(90deg,var(--ui-seal),var(--ui-seal-hi));
+.ld-full .boot-bar i{width:auto;border-radius:2px;background:var(--ui-seal);
   transform-origin:left center;transform:scaleX(var(--fraction,0))}
 .ld-full .boot-bar b{transform:translateX(calc((var(--fraction,0) - 1) * 100%));pointer-events:none}
 .ld-full .boot-bar b:after{content:'';position:absolute;right:-4px;top:-2px;width:8px;height:8px;border-radius:50%;

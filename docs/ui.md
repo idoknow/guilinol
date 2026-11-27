@@ -11,10 +11,10 @@
 | 材质 | 用在哪 | 主要变量 |
 |---|---|---|
 | 青玉玻璃 | 浮在画面上的控件：HUD 按钮、时辰天气条、深色对话框（关于、账号、反馈、玩法） | `--ui-glass` `--ui-glass-strong` `--ui-glass-solid` `--ui-glass-line` |
-| 宣纸 | 需要阅读的东西：景点卡、景册、地图、主界面的游览模式卡、输入框 | `--ui-paper` `--ui-paper-2` `--ui-ink` `--ui-ink-soft` |
+| 宣纸 | 需要阅读的东西：景点卡、景册、地图、主界面那张纸、输入框 | `--ui-paper` `--ui-paper-2` `--ui-ink` `--ui-ink-soft` `--ui-ink-line` |
 | 朱砂印 | 当前画面上**唯一**最重要的动作（开始游览、提交、盖印、下车），以及印章本身 | `--ui-seal` `--ui-seal-hi` |
 
-朱砂不做装饰；同一屏只出现一个朱砂主按钮。
+朱砂不做装饰；同一屏只出现一个朱砂主按钮。朱砂按钮平涂，不加彩色投影或高光。
 
 ## 形状与字
 
@@ -25,11 +25,11 @@
 
 ## 组件
 
-`theme.css` 提供：`.ui-btn`（玻璃）、`.ui-btn--seal`（主动作）、`.ui-btn--paper`、`.ui-btn--ghost`、`.ui-btn--lg`、`.ui-icon-btn`、`.ui-panel`/`.about-panel`（深色对话框）、`.ui-field`（宣纸输入框）、`.ui-tag`、`.ui-seal`（印章字块）。
+`theme.css` 提供：`.ui-btn`（玻璃）、`.ui-btn--seal`（主动作）、`.ui-btn--paper`、`.ui-btn--ink`（宣纸上的墨线次按钮）、`.ui-btn--ghost`、`.ui-btn--lg`、`.ui-icon-btn`、`.ui-panel`/`.about-panel`（深色对话框）、`.ui-field`（宣纸输入框）、`.ui-tag`、`.ui-seal`（印章字块）。
 
 ## 页面结构
 
-- **主界面** `web/src/ui/home.ts`：直接打开网站时先到这里。背景是游戏内实景截图轮播（`public/home/*.webp`，用 `node scripts/home-shots.mjs` 从构建产物重新生成）。游览模式可玩；故事模式置灰写“即将推出”。右上登录/注册，左上和底部是开源地址。
+- **主界面** `web/src/ui/home.ts`：直接打开网站时先到这里。背景是游戏内实景截图轮播（`public/home/*.webp`，用 `node scripts/home-shots.mjs` 从构建产物重新生成），右下角写当前景名。实景上压一张宣纸（IDOK-468）：Logo、标题、三个入口（联机＝唯一朱砂按钮，游览＝墨线按钮，单人＝文字按钮）、链接和署名都在纸上；不加徽章、图标块、卖点列表。右上两枚青玉胶囊：抖音官方号、登录/注册。手机竖屏纸片贴底，横屏靠左；手机默认只露标题和三个入口，说明、链接、署名收在「更多」里（`.home.more`）。验收：`npm run verify:home`。
 - **游戏内**：左上“菜单 + 账号”（属于“你”），右上 dock（地图、模式、景册、拍照、反馈，属于“游戏”）。菜单或 Esc 回主界面，3D 场景暂停。
 - **带参数的链接直接进游戏**：`?verify` `?spawn` `?view` `?mode` `?cam` `?feedback` `?play`（分享、反馈视角、测试脚本都靠它）。
 

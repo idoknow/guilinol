@@ -1,7 +1,7 @@
-/* 主界面：实景截图做底，左侧暗渐变托住文字。品牌（桂字印、衬线大标题）保留山水印；
-   IDOK-392 主推“联机模式”为视觉主卡（深青沥青、亮青玉主按钮 + 街头标线 + 钱包进度），
-   游览模式保留为次要青玉玻璃横条，单人模式弱化为沉静紧凑入口但随时可进。 */
-.home{position:fixed;inset:0;z-index:80;overflow:hidden auto;color:var(--ui-paper);font-family:var(--ui-serif);background:var(--ui-ink-900);
+/* 主界面「一纸入城」（IDOK-468）：实景截图铺满，左边压一张宣纸，标题、入口、链接都写在纸上。
+   纸上只有一个朱砂按钮（进入联机，IDOK-392 主推）；游览是墨线次按钮，单人是文字按钮——层级靠材质和尺寸，不靠徽章、高光、图标块。
+   手机竖屏：宣纸收成底部纸片；手机横屏：纸片靠左。手机默认收起说明、链接和署名，点「更多」展开（.home.more）。 */
+.home{position:fixed;inset:0;z-index:80;display:flex;flex-direction:column;overflow:hidden auto;color:var(--ui-ink);font-family:var(--ui-serif);background:var(--ui-ink-900);
   opacity:0;transition:opacity .45s ease}
 .home.show{opacity:1}
 body[data-home] :is(.hud-me,.dock,.sky-ui,.hint,footer,.walk-ui,.vehicle-action,.summit-pill,.road-name,.toast){visibility:hidden}
@@ -9,132 +9,141 @@ body[data-home] :is(.hud-me,.dock,.sky-ui,.hint,footer,.walk-ui,.vehicle-action,
 .home-bg{position:fixed;inset:0;overflow:hidden}
 .home-bg img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:0;transform:scale(1.08);transition:opacity 1.6s ease,transform 9s linear}
 .home-bg img.on{opacity:1;transform:scale(1)}
+/* 只为顶部胶囊和右下景名托一层薄暗，文字都在纸上，不再需要整面压暗 */
 .home-shade{position:fixed;inset:0;pointer-events:none;
-  background:linear-gradient(90deg,rgba(20,33,30,.86) 0,rgba(20,33,30,.62) 34%,rgba(20,33,30,.12) 62%,rgba(20,33,30,0) 80%),
-    linear-gradient(0deg,rgba(20,33,30,.7) 0,rgba(20,33,30,0) 26%),linear-gradient(180deg,rgba(20,33,30,.45) 0,rgba(20,33,30,0) 18%)}
+  background:linear-gradient(180deg,rgba(20,33,30,.42) 0,rgba(20,33,30,0) 20%,rgba(20,33,30,0) 78%,rgba(20,33,30,.42) 100%)}
 
-.home-top{position:absolute;inset:0 0 auto 0;z-index:2;pointer-events:none;display:flex;justify-content:flex-end;align-items:center;gap:12px;
-  padding:calc(16px + env(safe-area-inset-top)) calc(22px + env(safe-area-inset-right)) 0 calc(22px + env(safe-area-inset-left))}
+/* 顶栏：抖音官方号、登录，两枚同高的青玉胶囊 */
+.home-top{position:absolute;inset:0 0 auto 0;z-index:2;pointer-events:none;display:flex;justify-content:flex-end;align-items:center;gap:8px;
+  padding:calc(16px + env(safe-area-inset-top)) calc(20px + env(safe-area-inset-right)) 0 calc(20px + env(safe-area-inset-left))}
 .home-top>*{pointer-events:auto}
 .home-account{padding:0 16px 0 12px}
 .home-avatar{width:26px;height:26px;margin-left:-6px;border-radius:50%;display:grid;place-items:center;font:600 13px/1 var(--ui-serif);font-style:normal;background:var(--ui-jade-500);letter-spacing:0}
+.home-douyin{display:inline-flex;align-items:center;gap:8px;box-sizing:border-box;min-height:var(--ui-h);padding:0 14px 0 4px;cursor:pointer;
+  font:500 13px/1 var(--ui-serif);letter-spacing:.1em;color:var(--ui-paper);background:var(--ui-glass);border:1px solid var(--ui-glass-line);border-radius:var(--ui-r-pill);
+  -webkit-tap-highlight-color:transparent;transition:background var(--ui-fast)}
+.home-douyin:focus-visible{outline:2px solid var(--ui-jade-300);outline-offset:2px}
+.home-douyin-code{display:block;width:calc(var(--ui-h) - 10px);height:calc(var(--ui-h) - 10px);border-radius:50%}
+.home-douyin-mark{display:block;width:auto;height:13px}
 
-.home-main{position:relative;box-sizing:border-box;min-height:calc(100dvh - 38px);display:flex;flex-direction:column;justify-content:center;gap:16px;
-  width:min(570px,100%);padding:22px calc(22px + env(safe-area-inset-right)) 14px calc(clamp(22px,6vw,88px) + env(safe-area-inset-left))}
-.home-title{position:relative;animation:home-rise .8s var(--ui-ease) both}
-/* 成员设计的像素 Logo（IDOK-148）：贴在一小张宣纸上，正常文档流置于标题上方，避免矮屏裁切或压住顶部胶囊 */
-.home-seal{position:relative;display:block;width:fit-content;margin:0 0 10px -4px;padding:5px 8px 4px;border-radius:var(--ui-r-paper);background:var(--ui-paper);
-  box-shadow:var(--ui-shadow-1),inset 0 0 0 1px var(--ui-paper-line);transform:rotate(-3deg);transform-origin:left bottom}
-.home-seal img{display:block;width:116px;height:auto;mix-blend-mode:multiply}
-.home-title h1{margin:0;font:700 clamp(42px,5.6vw,64px)/1.05 var(--ui-serif);letter-spacing:.16em;text-shadow:0 4px 30px rgba(10,18,16,.45)}
-.home-tag{margin:10px 0 0;font-size:clamp(14.5px,1.35vw,16px);line-height:1.65;letter-spacing:.05em;color:rgba(244,239,226,.92);text-shadow:0 2px 12px rgba(10,18,16,.5)}
-.home-meta{display:flex;flex-wrap:wrap;gap:6px 14px;margin:10px 0 0;font-size:12.5px;letter-spacing:.1em;color:rgba(244,239,226,.84);text-shadow:0 1px 8px rgba(10,18,16,.55)}
-.home-meta span::before{content:"";display:inline-block;width:5px;height:5px;margin:0 7px 2px 0;border-radius:50%;background:var(--ui-seal-light)}
+/* 宣纸 */
+.home-main{position:relative;z-index:1;box-sizing:border-box;display:flex;flex-direction:column;gap:22px;flex:none;
+  width:min(388px,calc(100% - 40px));margin:auto 0 auto calc(clamp(20px,6vw,88px) + env(safe-area-inset-left));padding:30px 28px 16px;
+  color:var(--ui-ink);background:var(--ui-paper);border-radius:var(--ui-r-paper);box-shadow:var(--ui-shadow-2);
+  animation:home-rise .7s var(--ui-ease) both}
+.home-title{display:grid;gap:8px;justify-items:start}
+.home-seal{display:block;margin:0 0 4px -6px}
+.home-seal img{display:block;width:108px;height:auto;mix-blend-mode:multiply}
+.home-title h1{margin:0 -.24em 0 0;font:700 44px/1.1 var(--ui-serif);letter-spacing:.24em;color:var(--ui-ink)}
+.home-tag{margin:0;font-size:14px;line-height:1.6;letter-spacing:.08em;color:var(--ui-ink-soft)}
 
-.home-modes{display:grid;gap:8px;animation:home-rise .8s .12s var(--ui-ease) both}
-.home-mode{display:grid;grid-template-columns:auto 1fr;grid-template-areas:"seal text" "go go";align-items:center;gap:12px 16px;width:100%;box-sizing:border-box;padding:18px 18px 16px;
-  text-align:left;font-family:var(--ui-serif);border-radius:var(--ui-r-lg);border:0;-webkit-tap-highlight-color:transparent}
-.home-mode-seal{grid-area:seal;width:52px;height:52px;display:grid;place-items:center;border-radius:8px;font:700 28px/1 var(--ui-serif);transform:rotate(-4deg)}
-.home-mode-text{grid-area:text;display:grid;gap:5px;min-width:0}
-.home-mode-text b{display:flex;align-items:center;gap:8px;font-size:21px;font-weight:700;letter-spacing:.18em}
-.home-mode-text>span{font-size:13.5px;line-height:1.65;letter-spacing:.04em}
-.home-progress,.home-wallet{font-size:12px;letter-spacing:.1em}.home-progress:empty,.home-wallet:empty{display:none}
-.home-go{grid-area:go;display:flex;align-items:center;justify-content:center;width:100%;min-height:46px;box-sizing:border-box;border-radius:var(--ui-r-pill);pointer-events:none}
-/* IDOK-105 续游条：游览卡下方一条青玉玻璃窄条，像压在宣纸下的书签；只有存过位置才出现。 */
-.home-resume-row{margin-top:-4px}.home-resume-row[hidden]{display:none}
-.home-resume{display:flex;align-items:center;gap:12px;width:100%;box-sizing:border-box;padding:10px 16px 10px 14px;border-radius:12px;cursor:pointer;
-  font:500 14px/1.3 var(--ui-serif);letter-spacing:.12em;color:var(--ui-paper);text-align:left;
-  background:var(--ui-glass-strong);border:1px solid var(--ui-glass-line-soft);
-  transition:background var(--ui-fast),border-color var(--ui-fast),transform .25s var(--ui-ease)}
-.home-resume:hover{background:var(--ui-glass-solid);border-color:var(--ui-glass-line);transform:translateX(3px)}
-.home-resume:active{transform:scale(.985)}
-.home-resume:focus-visible{outline:2px solid var(--ui-jade-300);outline-offset:2px}
-.home-resume i{flex:none;width:24px;height:24px;border-radius:50%;background:var(--ui-jade-500) center/13px no-repeat;
-  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%23f4efe2' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3 8a5 5 0 1 0 1.6-3.7'/%3E%3Cpath d='M3 2.5V5h2.5'/%3E%3C/svg%3E")}
+/* 三个入口 */
+.home-modes{display:grid;gap:8px}
+.home-mode{display:grid;align-items:center;box-sizing:border-box;width:100%;margin:0;padding:0;text-align:left;font:inherit;color:inherit;
+  background:none;border:0;border-radius:0;cursor:pointer;-webkit-tap-highlight-color:transparent}
+/* 焦点画在按钮胶囊上：进主界面时默认焦点落在主推入口，按 Enter 即进，看起来像系统的默认按钮 */
+.home-mode:focus-visible{outline:none}
+.home-mode:focus-visible .home-go{outline:2px solid var(--ui-jade-700);outline-offset:3px}
+/* 纯触屏没有键盘，进主界面时的程序焦点不画框 */
+@media (hover:none) and (pointer:coarse){.home-mode:focus-visible .home-go{outline:none}}
+.home-mode-text{display:grid;gap:4px;min-width:0}
+.home-mode-text b{display:flex;align-items:baseline;flex-wrap:wrap;gap:4px 12px;font-weight:600;letter-spacing:.16em}
+.home-mode-text>span{font-size:13px;line-height:1.6;letter-spacing:.04em;color:var(--ui-ink-soft)}
+.home-progress,.home-wallet{font-size:12.5px;letter-spacing:.06em;color:var(--ui-ink-soft);font-variant-numeric:tabular-nums}
+.home-progress:empty,.home-wallet:empty{display:none}
+.home-mode-text:has(.home-progress:not(:empty))>span{display:none}
+.home-go{display:flex;align-items:center;justify-content:center;box-sizing:border-box;border-radius:var(--ui-r-pill);pointer-events:none;white-space:nowrap;
+  transition:background var(--ui-fast),border-color var(--ui-fast),color var(--ui-fast),transform var(--ui-fast)}
+
+.home-mode--mp{grid-template-columns:1fr;gap:14px;padding-bottom:6px}
+.home-mode--mp .home-mode-text{grid-template-columns:1fr auto;align-items:baseline;column-gap:12px}
+.home-mode--mp .home-mode-text b{font-size:20px;font-weight:700}
+.home-mode--mp .home-mode-text>span{grid-column:1/-1}
+.home-mode--mp .home-wallet{grid-row:1;grid-column:2}
+.home-mp-live{display:inline-flex;align-items:center;gap:6px;font:500 12.5px/1 var(--ui-serif);font-style:normal;letter-spacing:.06em;color:var(--ui-jade-700)}
+.home-mp-live::before{content:"";width:6px;height:6px;border-radius:50%;background:var(--ui-jade-500)}
+.home-go--mp{min-height:var(--ui-h-lg);font:600 16px/1 var(--ui-serif);letter-spacing:.32em;text-indent:.32em;color:var(--ui-paper);background:var(--ui-seal)}
+.home-mode--mp:active .home-go--mp{transform:scale(.985)}
+
+.home-mode--tour,.home-mode--solo{grid-template-columns:1fr auto;gap:12px;min-height:50px}
+.home-mode--tour{padding-top:14px;border-top:1px solid var(--ui-paper-line)}
+.home-mode--tour .home-mode-text b,.home-mode--solo .home-mode-text b{font-size:16px}
+.home-go--tour{min-height:var(--ui-h);padding:0 16px;font:500 13.5px/1 var(--ui-serif);letter-spacing:.14em;text-indent:.14em;color:var(--ui-ink);border:1px solid var(--ui-ink-line)}
+.home-mode--solo .home-mode-text b{font-weight:500;color:var(--ui-ink-soft)}
+.home-go--solo{min-height:var(--ui-h);padding:0 12px;font:500 13.5px/1 var(--ui-serif);letter-spacing:.14em;text-indent:.14em;color:var(--ui-ink-soft);border:1px solid transparent}
+.home-mode.is-current .home-go--tour,.home-mode.is-current .home-go--solo{color:var(--ui-ink);border-color:var(--ui-ink-soft)}
+.home-mode--tour:active .home-go,.home-mode--solo:active .home-go{transform:scale(.97)}
+
+/* IDOK-105 续游：游览下方一行墨青文字，只有存过位置才出现 */
+.home-resume-row{margin-top:-6px}
+.home-resume{display:flex;align-items:center;gap:8px;box-sizing:border-box;width:calc(100% + 20px);min-height:36px;margin:0 -10px;padding:0 10px;cursor:pointer;
+  font:500 13px/1.3 var(--ui-serif);letter-spacing:.08em;text-align:left;color:var(--ui-jade-700);background:none;border:0;border-radius:var(--ui-r-sm);
+  -webkit-tap-highlight-color:transparent;transition:background var(--ui-fast)}
+.home-resume:focus-visible{outline:2px solid var(--ui-jade-700);outline-offset:2px}
+.home-resume i{flex:none;width:14px;height:14px;background:currentColor;
+  -webkit-mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%23000' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3 8a5 5 0 1 0 1.6-3.7'/%3E%3Cpath d='M3 2.5V5h2.5'/%3E%3C/svg%3E") center/contain no-repeat;
+  mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%23000' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3 8a5 5 0 1 0 1.6-3.7'/%3E%3Cpath d='M3 2.5V5h2.5'/%3E%3C/svg%3E") center/contain no-repeat}
 .home-resume span{flex:1;min-width:0}
-.home-resume small{flex:none;font-size:12px;letter-spacing:.08em;color:var(--ui-paper-dim)}
-/* 联机模式（IDOK-392 主推）：深青沥青 Hero 卡，青玉亮边 + 底部街头标线 + 推荐/在线标识 + 全宽青玉主按钮。 */
-.home-mode--mp{--mp-jade:var(--ui-jade-300,#8fc1b5);--mp-jade-hi:#a7d8cc;--gold:var(--st-gold,#ffc53d);--asphalt:var(--st-asphalt-solid,#121519);
-  cursor:pointer;position:relative;overflow:hidden;padding:16px 18px 15px;gap:11px 15px;
-  color:var(--st-white,#f6f4ef);font-family:var(--st-sans,system-ui,sans-serif);
-  background:radial-gradient(120% 145% at 0% 0%,rgba(143,193,181,.24),rgba(143,193,181,.04) 48%,transparent 76%),rgba(16,25,24,.92);
-  box-shadow:0 24px 58px rgba(6,10,10,.56),inset 0 0 0 1px rgba(143,193,181,.34),inset 4px 0 0 var(--mp-jade);
-  transition:transform .25s var(--ui-ease),box-shadow .25s,background .25s}
-.home-mode--mp::after{content:"";position:absolute;inset:auto 0 0 0;height:3px;pointer-events:none;
-  background:repeating-linear-gradient(90deg,rgba(143,193,181,.55) 0 18px,transparent 18px 34px);opacity:.4}
-.home-mode--mp:hover{transform:translateY(-2px);
-  box-shadow:0 28px 66px rgba(6,10,10,.64),inset 0 0 0 1px rgba(167,216,204,.6),inset 4px 0 0 var(--mp-jade-hi)}
-.home-mode--mp:active{transform:scale(.985)}
-.home-mode--mp:focus-visible{outline:none;box-shadow:0 24px 58px rgba(6,10,10,.56),inset 0 0 0 2px var(--mp-jade-hi),inset 4px 0 0 var(--mp-jade-hi)}
-.home-mode--mp .home-mode-seal{width:54px;height:54px;border-radius:11px;transform:none;
-  font:900 28px/1 var(--st-sans,sans-serif);color:var(--ui-ink-900);
-  background:linear-gradient(180deg,var(--mp-jade-hi),var(--mp-jade));
-  box-shadow:0 3px 0 rgba(12,38,34,.75),0 8px 20px rgba(143,193,181,.24)}
-.home-mode--mp .home-mode-text{gap:6px}
-.home-mode--mp .home-mode-text b{display:flex;align-items:center;flex-wrap:wrap;gap:8px;white-space:nowrap;
-  font:900 22px/1.15 var(--st-sans,sans-serif);letter-spacing:.12em;color:var(--st-white,#f6f4ef)}
-.home-mode--mp .home-mode-text>span{font-size:13.5px;line-height:1.65;letter-spacing:.02em;color:rgba(244,239,226,.82)}
-.home-mode--mp .home-wallet{font:700 13px/1.2 var(--st-num,sans-serif);letter-spacing:.04em;color:var(--gold)}
-.home-mp-badge{display:inline-flex;align-items:center;padding:3px 8px;border-radius:999px;white-space:nowrap;
-  font:700 11px/1.1 var(--st-sans,sans-serif);font-style:normal;letter-spacing:.08em;color:var(--asphalt);background:var(--gold)}
-.home-mp-live{font:600 11.5px/1 var(--st-sans,sans-serif);font-style:normal;letter-spacing:.05em;padding:4px 9px 4px 20px;border-radius:999px;position:relative;white-space:nowrap;
-  color:var(--mp-jade-hi);background:rgba(143,193,181,.16);box-shadow:inset 0 0 0 1px rgba(143,193,181,.32)}
-.home-mp-live::before{content:"";position:absolute;left:7px;top:50%;width:6px;height:6px;margin-top:-3px;border-radius:50%;
-  background:var(--mp-jade-hi);box-shadow:0 0 0 3px rgba(143,193,181,.24);animation:home-live-pulse 2.2s ease-in-out infinite}
-.home-mp-live::after{content:" 人在线"}
-.home-mp-live[hidden]{display:none}
-.home-go--mp{min-height:44px;font:900 16px/1 var(--st-sans,sans-serif);letter-spacing:.26em;text-indent:.26em;color:var(--ui-ink-900);
-  background:linear-gradient(180deg,var(--mp-jade-hi),var(--mp-jade));
-  box-shadow:0 3px 0 rgba(20,58,52,.9),0 12px 28px rgba(143,193,181,.26);transition:filter .15s ease}
-.home-mode--mp:hover .home-go--mp{filter:brightness(1.06)}
-/* 游览模式：次要紧凑横条，青玉玻璃 + 朱砂线框印章。 */
-.home-mode--tour{cursor:pointer;grid-template-columns:auto 1fr auto;grid-template-areas:"seal text go";
-  padding:10px 14px;gap:8px 13px;color:var(--ui-paper);background:var(--ui-glass-strong);
-  border:1px solid var(--ui-glass-line-soft);
-  transition:transform .25s var(--ui-ease),background .25s,border-color .25s}
-.home-mode--tour:hover,.home-mode--tour.is-current{background:var(--ui-glass-solid);border-color:var(--ui-glass-line)}
-.home-mode--tour:hover{transform:translateY(-1px)}
-.home-mode--tour:active{transform:scale(.985)}
-.home-mode--tour:focus-visible{outline:2px solid var(--ui-jade-300);outline-offset:2px}
-.home-mode--tour .home-mode-seal{width:40px;height:40px;font-size:21px;color:var(--ui-seal-light);border:1.5px solid var(--ui-seal-light)}
-.home-mode--tour .home-mode-text{gap:3px}
-.home-mode--tour .home-mode-text b{font-size:16.5px;font-weight:600;letter-spacing:.14em}
-.home-mode--tour .home-mode-text>span{font-size:12.5px;line-height:1.45;color:var(--ui-paper-dim)}
-.home-mode--tour .home-progress{font-weight:500;color:var(--ui-seal-light)}
-.home-go--tour{width:auto;min-height:36px;padding:0 15px;white-space:nowrap;
-  font:500 13.5px/1 var(--ui-serif);letter-spacing:.14em;text-indent:.14em;color:var(--ui-paper);border:1px solid var(--ui-glass-line)}
-.home-mode--tour:hover .home-go--tour{background:rgba(244,239,226,.08)}
-/* 单人模式（IDOK-392 弱化保留）：沉静的低存在感窄条，不再抢夺主视觉，但清晰保留离线入口。 */
-.home-mode--solo{cursor:pointer;grid-template-columns:auto 1fr auto;grid-template-areas:"seal text go";
-  padding:8px 14px;gap:8px 12px;border-radius:var(--ui-r-md);color:rgba(244,239,226,.82);
-  background:rgba(20,33,30,.52);border:1px solid rgba(244,239,226,.12);
-  transition:background .2s,border-color .2s,color .2s,transform .2s var(--ui-ease)}
-.home-mode--solo:hover,.home-mode--solo.is-current{color:var(--ui-paper);background:var(--ui-glass-strong);border-color:rgba(244,239,226,.28)}
-.home-mode--solo:active{transform:scale(.988)}
-.home-mode--solo:focus-visible{outline:2px solid var(--ui-jade-300);outline-offset:2px}
-.home-mode--solo .home-mode-seal{width:34px;height:34px;border-radius:7px;transform:none;
-  font:600 17px/1 var(--ui-serif);color:var(--ui-paper-dim);background:rgba(244,239,226,.04);border:1px solid rgba(244,239,226,.22)}
-.home-mode--solo:hover .home-mode-seal,.home-mode--solo.is-current .home-mode-seal{color:var(--ui-paper);border-color:rgba(244,239,226,.42)}
-.home-mode--solo .home-mode-text{gap:2px}
-.home-mode--solo .home-mode-text b{font-size:15px;font-weight:500;letter-spacing:.12em}
-.home-mode--solo .home-mode-text>span{font-size:12px;line-height:1.4;letter-spacing:.03em;color:rgba(244,239,226,.64)}
-.home-go--solo{width:auto;min-height:32px;padding:0 13px;white-space:nowrap;
-  font:500 13px/1 var(--ui-serif);letter-spacing:.12em;text-indent:.12em;
-  color:var(--ui-paper-dim);background:transparent;border:1px solid rgba(244,239,226,.2);
-  transition:color .15s,border-color .15s,background .15s}
-.home-mode--solo:hover .home-go--solo,.home-mode--solo.is-current .home-go--solo{
-  color:var(--ui-paper);border-color:var(--ui-glass-line);background:rgba(244,239,226,.07)}
+.home-resume small{flex:none;font-size:12px;letter-spacing:.06em;color:var(--ui-ink-soft)}
 
-.home-links{display:flex;flex-wrap:wrap;gap:4px;margin-left:-10px;animation:home-rise .8s .22s var(--ui-ease) both}
-.home-links .ui-btn{min-height:34px;padding:0 12px;color:rgba(244,239,226,.86);font-size:13.5px}
-
-.home-foot{position:relative;display:flex;justify-content:space-between;align-items:flex-end;gap:12px;
-  padding:0 calc(22px + env(safe-area-inset-right)) calc(12px + env(safe-area-inset-bottom)) calc(clamp(22px,6vw,88px) + env(safe-area-inset-left));font-size:11px;letter-spacing:.08em;color:var(--ui-paper-dim)}
-.home-credit a{color:inherit;text-decoration:underline;text-decoration-color:var(--ui-seal-light);text-underline-offset:3px}.home-credit a:hover{color:var(--ui-paper)}
+/* 纸底的链接和署名 */
+.home-links{display:flex;flex-wrap:wrap;gap:2px;margin:0 -10px}
+.home-links .ui-btn{min-height:34px;padding:0 10px;font-size:13px;color:var(--ui-ink-soft);background:none;border-color:transparent}
+.home-links .ui-btn:focus-visible{outline-color:var(--ui-jade-700)}
+.home-foot{margin:-14px 0 0;font-size:11px;line-height:1.7;letter-spacing:.06em;color:var(--ui-ink-soft)}
+.home-credit a{color:inherit;text-decoration:underline;text-decoration-color:var(--ui-ink-line);text-underline-offset:3px}
 .home-ver{white-space:nowrap}
-.home-caption{font-size:13px;letter-spacing:.24em;color:var(--ui-paper);display:flex;align-items:center;gap:10px}
-.home-caption::before{content:"";width:22px;height:1px;background:var(--ui-seal-light)}
+.home-more{display:none}
+.home-caption{position:absolute;z-index:1;right:calc(22px + env(safe-area-inset-right));bottom:calc(16px + env(safe-area-inset-bottom));pointer-events:none;
+  font-size:13px;letter-spacing:.24em;color:var(--ui-paper);text-shadow:0 1px 8px rgba(10,18,16,.6)}
+
+@media (hover:hover){
+  .home-douyin:hover{background:var(--ui-glass-strong)}
+  .home-mode--mp:hover .home-go--mp{background:var(--ui-seal-hi)}
+  .home-mode--tour:hover .home-go--tour{background:var(--ui-paper-2);border-color:var(--ui-ink-soft)}
+  .home-mode--solo:hover .home-go--solo{color:var(--ui-ink);background:var(--ui-paper-2)}
+  .home-resume:hover,.home-links .ui-btn:hover,.home-more:hover{color:var(--ui-ink);background:var(--ui-paper-2)}
+  .home-credit a:hover{color:var(--ui-ink)}
+}
 @keyframes home-rise{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+
+/* 手机：收起说明、链接、署名，只留标题 + 三个入口 + 「更多」 */
+@media (max-width:760px),(max-height:520px) and (orientation:landscape){
+  .home-main{gap:14px}
+  .home-title{grid-template-columns:1fr auto;align-items:center;gap:0 12px}
+  .home-title h1{grid-row:1;grid-column:1;font-size:30px;letter-spacing:.2em;margin-right:-.2em}
+  .home-seal{grid-row:1;grid-column:2;margin:0}.home-seal img{width:80px}
+  .home-mode--mp{gap:10px;padding-bottom:2px}
+  .home-mode--mp .home-mode-text b{font-size:18px}
+  .home-mode--tour .home-mode-text b,.home-mode--solo .home-mode-text b{font-size:15px}
+  .home-tag,.home-mode-text>span,.home-links,.home-foot,.home-caption{display:none}
+  .home-mode--tour{padding-top:10px}
+  .home-mode--solo{min-height:44px}
+  .home-more{display:flex;align-self:center;align-items:center;gap:8px;min-height:34px;margin:-10px 0 -2px;padding:0 14px;cursor:pointer;
+    font:500 13px/1 var(--ui-serif);letter-spacing:.14em;color:var(--ui-ink-soft);background:none;border:0;border-radius:var(--ui-r-pill);-webkit-tap-highlight-color:transparent}
+  .home-more::after{content:"";width:6px;height:6px;border:solid currentColor;border-width:0 1.5px 1.5px 0;transform:translateY(-2px) rotate(45deg);transition:transform var(--ui-fast)}
+  .home-more[aria-expanded=true]::after{transform:translateY(2px) rotate(-135deg)}
+  .home-more:focus-visible{outline:2px solid var(--ui-jade-700);outline-offset:2px}
+  .home.more .home-tag,.home.more .home-mode--mp .home-mode-text>span,.home.more .home-foot{display:block}
+  .home.more .home-mode-text:has(.home-progress:not(:empty))>span{display:none}
+  .home.more .home-mode--tour .home-mode-text>span,.home.more .home-mode--solo .home-mode-text>span{display:block}
+  .home.more .home-links{display:flex}
+  .home.more .home-foot{margin-top:-10px}
+}
+/* 手机竖屏：宣纸是贴底纸片，上半屏留给实景 */
+@media (max-width:760px){
+  .home-main{width:100%;margin:auto 0 0;padding:18px calc(20px + env(safe-area-inset-right)) calc(10px + env(safe-area-inset-bottom)) calc(20px + env(safe-area-inset-left));
+    border-radius:var(--ui-r-paper) var(--ui-r-paper) 0 0;box-shadow:0 -12px 40px rgba(12,20,20,.28)}
+}
+/* 手机横屏：纸片靠左，右边是实景和顶栏 */
+@media (max-height:520px) and (orientation:landscape){
+  .home-top{padding-top:calc(12px + env(safe-area-inset-top))}
+  .home-main{width:min(352px,calc(100% - 32px));margin:auto 0 auto calc(16px + env(safe-area-inset-left));padding:14px 20px 6px;gap:10px}
+  .home-title h1{font-size:26px}.home-seal img{width:68px}
+  .home-go--mp{min-height:42px}
+  .home-mode--tour,.home-mode--solo{min-height:44px}
+  .home-mode--tour{padding-top:8px}
+}
 
 /* 玩法说明 */
 kbd{display:inline-block;min-width:1.5em;padding:1px 5px;margin:0 1px;border-radius:5px;text-align:center;font:600 11.5px/1.5 ui-monospace,monospace;color:var(--ui-ink-800);background:var(--ui-paper);box-shadow:0 2px 0 rgba(244,239,226,.35)}
@@ -148,92 +157,9 @@ kbd{display:inline-block;min-width:1.5em;padding:1px 5px;margin:0 1px;border-rad
 .qq-num{font:600 19px/1.2 ui-monospace,SFMono-Regular,monospace;letter-spacing:.14em;color:var(--ui-paper);-webkit-user-select:all;user-select:all}
 .qq-copy{font-size:13px}
 
-/* 抖音官方号（IDOK-272）：右下角一张小码卡，点开放大 + 复制抖音号。码是官方分享图裁出的圆形码，白底圆，透明外圈。
-   手机竖屏/横屏底部被模式卡占满，收成左上角一枚小胶囊（和右上账号按钮对称）。 */
-.home-douyin{position:absolute;z-index:1;right:calc(22px + env(safe-area-inset-right));bottom:calc(58px + env(safe-area-inset-bottom));
-  display:grid;grid-template-columns:auto auto;align-items:center;gap:12px;padding:10px 16px 10px 10px;cursor:pointer;text-align:left;
-  font:inherit;color:var(--ui-paper);background:var(--ui-glass);border:1px solid var(--ui-glass-line-soft);border-radius:var(--ui-r-lg);
-  box-shadow:var(--ui-shadow-1);-webkit-tap-highlight-color:transparent;
-  transition:background var(--ui-fast),border-color var(--ui-fast),transform var(--ui-fast);animation:home-rise .8s .35s var(--ui-ease) both}
-.home-douyin:hover{background:var(--ui-glass-strong);border-color:var(--ui-glass-line);transform:translateY(-2px)}
-.home-douyin:focus-visible{outline:2px solid var(--ui-jade-300);outline-offset:2px}
-.home-douyin-code{display:block;width:84px;height:84px;filter:drop-shadow(0 2px 6px rgba(10,18,16,.3))}
-.home-douyin-text{display:grid;gap:5px;justify-items:start}
-.home-douyin-mark{display:block;width:auto;height:19px}
-.home-douyin-text b{font:600 14px/1.2 var(--ui-serif);letter-spacing:.04em}
-.home-douyin-text small{font-size:11.5px;letter-spacing:.1em;color:var(--ui-paper-dim)}
+/* 抖音官方号（IDOK-272）：顶栏一枚胶囊，点开放大二维码 + 复制抖音号 */
 .about-panel.qq--douyin .qq-code{width:min(280px,100%);max-height:none;border-radius:0}
 .qq--douyin .qq-note b{display:block;margin-bottom:2px;font-size:15px;color:var(--ui-paper);letter-spacing:.04em}
-@media (max-width:760px),(max-height:520px) and (orientation:landscape){
-  .home-douyin{right:auto;bottom:auto;top:calc(16px + env(safe-area-inset-top));left:calc(22px + env(safe-area-inset-left));
-    min-height:var(--ui-h);padding:4px 14px 4px 4px;gap:8px;border-radius:var(--ui-r-pill);border-color:var(--ui-glass-line)}
-  .home-douyin-code{width:30px;height:30px;filter:none}
-  .home-douyin-text{grid-auto-flow:column;align-items:center;gap:7px}.home-douyin-mark{height:13px}.home-douyin-text b,.home-douyin-text small{display:none}
-  .home-douyin-text::after{content:"官方号";font-size:12px;letter-spacing:.1em;color:var(--ui-paper-dim)}
-}
-
-@media (max-width:760px){
-  .home-shade{background:linear-gradient(0deg,rgba(20,33,30,.92) 0,rgba(20,33,30,.7) 46%,rgba(20,33,30,.15) 74%,rgba(20,33,30,.35) 100%)}
-  .home-top{position:relative;pointer-events:auto}
-  .home-main{justify-content:flex-end;min-height:calc(100dvh - 102px);padding-top:12px;padding-bottom:12px;gap:14px;width:100%}
-  .home-seal{margin:0 0 8px -2px}.home-seal img{width:98px}
-  .home-tag{font-size:14.5px}
-  .home-mode--mp{padding:15px 15px 14px;gap:11px 12px}
-  .home-mode--mp .home-mode-seal{width:46px;height:46px;font-size:24px}
-  .home-mode--mp .home-mode-text b{font-size:19px;letter-spacing:.08em;gap:6px}
-  .home-mode--mp .home-mode-text>span{font-size:13px;line-height:1.55}
-  .home-mp-badge{padding:2.5px 7px;font-size:10.5px}
-  .home-mp-live{padding:3px 7px 3px 16px;font-size:11px}.home-mp-live::before{left:6px}.home-mp-live::after{content:" 人"}
-  .home-go--mp{min-height:44px;font-size:15.5px;letter-spacing:.22em;text-indent:.22em}
-  .home-mode--tour{padding:10px 12px;gap:8px 10px}.home-mode--tour .home-mode-seal{width:36px;height:36px;font-size:19px}
-  .home-mode--tour .home-mode-text b{font-size:16px}.home-mode--tour .home-mode-text>span{display:none}
-  .home-go--tour{min-height:34px;padding:0 13px;font-size:13px;letter-spacing:.12em;text-indent:.12em}
-  .home-mode--solo{padding:8px 12px;gap:8px 10px}.home-mode--solo .home-mode-seal{width:30px;height:30px;font-size:15px}
-  .home-mode--solo .home-mode-text b{font-size:14.5px}.home-mode--solo .home-mode-text>span{display:none}
-  .home-go--solo{min-height:30px;padding:0 12px;font-size:12.5px;letter-spacing:.1em;text-indent:.1em}
-  .home-links{justify-content:center;margin-left:0;gap:2px}
-  .home-links .ui-btn{padding:0 10px;font-size:13px;min-height:34px}
-  .home-foot{flex-direction:column;align-items:center;gap:4px}.home-caption{display:none}.home-credit{text-align:center}
-}
-/* 矮屏手机（如 360x640）：进一步收敛字号与间距，保证首屏不与顶部胶囊重叠且完整落屏 */
-@media (max-width:760px) and (max-height:700px){
-  .home-top{padding-top:calc(10px + env(safe-area-inset-top))}
-  .home-douyin{top:calc(10px + env(safe-area-inset-top))}
-  .home-main{min-height:calc(100dvh - 84px);padding-top:8px;padding-bottom:8px;gap:10px}
-  .home-seal{margin-bottom:6px;padding:4px 7px 3px}.home-seal img{width:80px}
-  .home-title h1{font-size:36px}
-  .home-tag{margin-top:6px;font-size:13.5px;line-height:1.5}
-  .home-meta{margin-top:6px;gap:4px 10px;font-size:11.5px;letter-spacing:.05em}
-  .home-modes{gap:6px}
-  .home-mode--mp{padding:11px 13px;gap:8px 11px}.home-mode--mp .home-mode-seal{width:42px;height:42px;font-size:22px}
-  .home-mode--mp .home-mode-text{gap:4px}.home-mode--mp .home-mode-text b{font-size:18px}
-  .home-mode--mp .home-mode-text>span{font-size:12.5px;line-height:1.45}.home-go--mp{min-height:40px;font-size:15px}
-  .home-mode--tour{padding:8px 11px}.home-mode--solo{padding:7px 11px}
-  .home-resume{padding:8px 12px;font-size:13px}
-  .home-links .ui-btn{padding:0 8px;font-size:12.5px;min-height:32px}
-  .home-foot{padding-bottom:calc(8px + env(safe-area-inset-bottom))}
-}
-/* 横屏手机：标题和模式左右排，联机卡保持主推展开，游览/单人保持紧凑单行 */
-@media (max-height:520px) and (orientation:landscape){
-  .home-top{position:relative;pointer-events:auto;padding-top:calc(10px + env(safe-area-inset-top))}
-  .home-douyin{top:calc(10px + env(safe-area-inset-top))}
-  .home-main{width:100%;min-height:calc(100dvh - 78px);display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.15fr);align-content:center;column-gap:24px;row-gap:10px;padding-top:6px;padding-bottom:8px}
-  .home-title h1{font-size:40px}.home-seal{display:none}.home-tag{margin-top:8px;font-size:13.5px;line-height:1.55}.home-meta{display:none}
-  .home-modes{grid-row:span 2;gap:6px}
-  .home-mode--mp{padding:11px 13px 10px;gap:7px 11px}.home-mode--mp .home-mode-seal{width:42px;height:42px;font-size:22px}
-  .home-mode--mp .home-mode-text{gap:3px}.home-mode--mp .home-mode-text b{font-size:18px;letter-spacing:.08em;gap:6px}.home-mode--mp .home-mode-text>span{font-size:12.5px;line-height:1.45}
-  .home-mp-live::after{content:" 人"}.home-go--mp{min-height:36px;font-size:14.5px}
-  .home-mode--tour{padding:7px 11px;gap:8px 10px}.home-mode--tour .home-mode-seal{width:34px;height:34px;font-size:18px}
-  .home-mode--tour .home-mode-text b{font-size:15px}.home-mode--tour .home-mode-text>span{display:none}
-  .home-go--tour{min-height:32px;padding:0 12px;font-size:12.5px;letter-spacing:.12em;text-indent:.12em}
-  .home-mode--solo{padding:6px 11px;gap:8px 10px}.home-mode--solo .home-mode-seal{width:30px;height:30px;font-size:15px}
-  .home-mode--solo .home-mode-text b{font-size:14px}.home-mode--solo .home-mode-text>span{display:none}
-  .home-go--solo{min-height:30px;padding:0 11px;font-size:12px;letter-spacing:.1em;text-indent:.1em}
-  .home-resume{padding:7px 12px;font-size:13px}
-  .home-links{margin-left:-8px;gap:2px;align-self:end}.home-links .ui-btn{padding:0 9px;font-size:12.5px;min-height:32px}
-  .ui-btn--lg{min-height:42px}.home-foot{padding-bottom:calc(8px + env(safe-area-inset-bottom))}
-  .home-shade{background:linear-gradient(90deg,rgba(20,33,30,.85) 0,rgba(20,33,30,.55) 50%,rgba(20,33,30,.7) 100%)}
-}
 
 /* IDOK-216 按下即反馈：进入要等登录 / 存档 / 角色几次网络往返，卡片先转起来，其它入口暂停 */
 .home-go .home-spin{width:15px;height:15px;margin-right:10px;flex:none;border-radius:50%;border:2px solid currentColor;border-right-color:transparent;opacity:.85;animation:home-spin .8s linear infinite}
@@ -246,5 +172,4 @@ kbd{display:inline-block;min-width:1.5em;padding:1px 5px;margin:0 1px;border-rad
 .home .ui-btn[aria-busy=true]::after{content:"";width:11px;height:11px;border-radius:50%;border:2px solid currentColor;border-right-color:transparent;animation:home-spin .8s linear infinite}
 @keyframes home-spin{to{transform:rotate(360deg)}}
 @keyframes home-breathe{50%{filter:brightness(1.12)}}
-@keyframes home-live-pulse{0%,100%{box-shadow:0 0 0 3px rgba(143,193,181,.24)}50%{box-shadow:0 0 0 6px rgba(143,193,181,.06)}}
-@media (prefers-reduced-motion:reduce){.home-go .home-spin,.home .ui-btn[aria-busy=true]::after{animation-duration:2.4s}.home-mode[aria-busy=true] .home-go,.home-mp-live::before{animation:none}}
+@media (prefers-reduced-motion:reduce){.home-go .home-spin,.home .ui-btn[aria-busy=true]::after{animation-duration:2.4s}.home-mode[aria-busy=true] .home-go{animation:none}}

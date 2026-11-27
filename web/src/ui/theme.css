@@ -15,6 +15,8 @@
   /* 宣纸 */
   --ui-paper:#f4efe2;--ui-paper-2:#e9e1cf;--ui-paper-3:#efe8d8;--ui-paper-dim:rgba(244,239,226,.7);
   --ui-ink:#2a302c;--ui-ink-soft:#5d655f;--ui-paper-line:rgba(60,60,50,.14);
+  /* 纸上的墨线：宣纸上次按钮的描边、链接下划线（比 paper-line 深一档，能当可点的边） */
+  --ui-ink-line:rgba(42,48,44,.3);
   /* 朱砂 */
   --ui-seal:#a9503c;--ui-seal-hi:#bd5e48;--ui-seal-light:#d0694c;--ui-seal-wash:rgba(169,80,60,.12);
   /* 赭石：只用于「关于」页的反馈类标记，与朱砂（设计/主动作）、青玉（代码）区分 */
@@ -46,7 +48,8 @@ body{font-family:var(--ui-serif)}
 .ui-btn:hover{background:var(--ui-glass-strong)}
 .ui-btn:active{transform:scale(.96)}
 .ui-btn:focus-visible,.ui-icon-btn:focus-visible,.ui-tab:focus-visible{outline:2px solid var(--ui-jade-300);outline-offset:2px}
-.ui-btn--seal{background:var(--ui-seal);border-color:var(--ui-seal);box-shadow:0 6px 18px rgba(169,80,60,.32)}
+/* 朱砂是一枚印，不发光：平涂，不加彩色投影 */
+.ui-btn--seal{color:var(--ui-paper);background:var(--ui-seal);border-color:var(--ui-seal)}
 .ui-btn--seal:hover{background:var(--ui-seal-hi);border-color:var(--ui-seal-hi)}
 .ui-btn--paper{background:var(--ui-paper);border-color:var(--ui-paper);color:var(--ui-ink)}
 .ui-btn--paper:hover{background:#fffaf0}
@@ -54,6 +57,12 @@ body{font-family:var(--ui-serif)}
 .ui-btn--ghost:hover{background:rgba(244,239,226,.08);color:var(--ui-paper)}
 .ui-btn--lg{min-height:var(--ui-h-lg);padding:0 28px;font-size:17px;letter-spacing:.2em}
 .ui-btn--block{display:flex;width:100%}
+/* 横屏手机高度只有 ~390px，大按钮收一档（原写在 home.css 里却作用于全站，挪到这里明说） */
+@media (max-height:520px) and (orientation:landscape){.ui-btn--lg{min-height:42px}}
+/* 宣纸上的次按钮：墨线描边，和纸上的朱砂主按钮配对 */
+.ui-btn--ink{color:var(--ui-ink);background:none;border-color:var(--ui-ink-line)}
+.ui-btn--ink:hover{background:var(--ui-paper-2);border-color:var(--ui-ink-soft)}
+.ui-btn--ink:focus-visible{outline-color:var(--ui-jade-700)}
 .ui-btn[disabled],.ui-btn[aria-disabled=true]{cursor:default;color:var(--ui-disabled);background:rgba(24,40,37,.32);border-color:var(--ui-glass-line-soft);box-shadow:none;transform:none}
 .ui-icon-btn{display:inline-grid;place-items:center;flex:none;width:34px;height:34px;padding:0;border-radius:50%;cursor:pointer;font:400 20px/1 var(--ui-serif);
   color:var(--ui-paper-dim);background:rgba(244,239,226,.08);border:1px solid var(--ui-glass-line-soft);transition:background var(--ui-fast),color var(--ui-fast)}
