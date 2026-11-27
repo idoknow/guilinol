@@ -10,7 +10,7 @@ import sys
 
 import numpy as np
 import trimesh
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image, ImageColor, ImageDraw, ImageFont
 
 from shop_lettering import letters
 from xiaoyao_roof import tiled_roof
@@ -52,6 +52,7 @@ class LandmarkModel(Model):
         self.planters=[]
         self.lamps=[]
         self.lit_tiles=[]
+        self.court=[]
         self.flood_roof=flood_roof
         self.night_glow=night_glow
 
@@ -89,6 +90,19 @@ class LandmarkModel(Model):
             uv = self.uv.pop()*4 - [cell%4, 3-cell//4]
             uv[..., 0] = (uv[..., 0] + (swatch=='earth'))/2
             self.planters.append((self.visible.pop(), uv))
+        elif isinstance(color,str) and color=='court':
+            # Wall-top granite keeps its own tile material: 'pave' carries the
+            # sidewalk seam role and is swapped for the beige street paving at runtime.
+            super().mesh(vertices,faces,'pave',collide)
+            self.court.append(self.tile_parts['pave'].pop())
+        elif isinstance(color,str) and color=='unlit':
+            # Stele board and iron gate stay dark at night: sample inside one
+            # brick of the joinery atlas's brick cell (uniform dark grey, black in
+            # the glow atlas) instead of a glowing cell.
+            super().mesh(vertices,faces,'sign',collide)
+            sign,brick=(list(SWATCHES).index(key) for key in ('sign','brick'))
+            coords=(self.uv.pop()*4-[sign%4,3-sign//4]-.03)/.94
+            self.uv.append((coords*[24/128,10/128]+[20/128,1-29/128]+[brick%4,3-brick//4])/4)
         elif self.night_glow and isinstance(color,str) and color in ('lamp','roof_soffit','tile'):
             # Night glow keeps eave lamps, soffits and tiles in joinery_lit; the
             # emissive atlas cell (green/glass/tile) decides how bright each one is.
@@ -137,6 +151,45 @@ def carve_medallion(image):
         brush.line(outline,fill='#c9ced8',width=2)
     brush.ellipse((57,57,71,71),outline='#bcc3cd',width=2)
     image.paste(panel,((index%4)*128,(index//4)*128))
+
+
+def dress_masonry(image):
+    """Repaint the world-UV 'stone' and 'pave' cells (Rock 30–34): pale ashlar
+    courses for the city wall, mottled grey granite slabs for the top and stairs.
+    Both cells tile seamlessly; joints wrap modulo 128 px."""
+    rng = np.random.default_rng(499)
+    rgb = lambda color: np.array(ImageColor.getrgb(color), float)
+    def put(key, pixels):
+        index = list(SWATCHES).index(key)
+        image.paste(Image.fromarray(np.uint8(np.clip(pixels, 0, 255))), ((index%4)*128, (index//4)*128))
+    # 'stone': 128 px = 3.2 m x 1.2 m -> three 0.4 m courses of 0.8 m blocks.
+    # Three courses cannot alternate 0/16 across the tile seam, so the third
+    # course is set at 8 px to keep every bed joint staggered.
+    wall, joint, top = np.empty((128, 128, 3)), rgb('#8e8d88'), 0
+    for height, offset in zip((43, 43, 42), (0, 16, 8)):
+        for block in range(4):
+            columns = np.arange(block*32+offset, block*32+offset+32) % 128
+            wall[top:top+height, columns] = rgb('#c4c3bd') + rng.integers(-10, 11)
+            wall[top:top+height, columns[:2]] = joint
+        wall[top:top+2] = joint
+        top += height
+    put('stone', wall + rng.normal(0, 3, (128, 128, 1)))
+    # 'pave': 128 px = 3.2 m x 1.6 m -> four 0.4 m rows of 0.8 m granite slabs.
+    palette = ['#8b8c8a', '#9c9d9a', '#a9aaa6', '#7d7e7c']
+    slabs, joint, specks = np.empty((128, 128, 3)), rgb('#606160'), []
+    for row in range(4):
+        top = row*32
+        for block in range(4):
+            left = block*32 + (row%2)*16
+            columns = np.arange(left, left+32) % 128
+            slabs[top:top+32, columns] = rgb(palette[rng.choice(4, p=[.35, .35, .2, .1])]) + rng.integers(-5, 6)
+            slabs[top:top+32, columns[:2]] = joint
+            specks.append((top + rng.integers(2, 32, 12), (left + rng.integers(2, 32, 12)) % 128))
+        slabs[top:top+2] = joint
+    slabs += rng.normal(0, 6, (128, 128, 1))
+    for rows, columns in specks:
+        slabs[rows, columns] = rgb('#5a5b59')
+    put('pave', slabs)
 
 
 def bracket(model, x, y, z):
@@ -199,12 +252,12 @@ def facade(model, base, half, height, upstairs):
     model.pose = (0,0,0,0)
 
 
-def steps(m, start, end, x, z, dx, dz, count, width):
+def steps(m, start, end, x, z, dx, dz, count, width, color='pave'):
     for index in range(count):
         distance = index + .5
         top = start + (end-start)*(index+1)/count
         m.box(x+distance*dx, start-.12, z+distance*dz,
-              abs(dx) or width, top-start+.12, abs(dz) or width, 'pave', True)
+              abs(dx) or width, top-start+.12, abs(dz) or width, color, True)
 
 
 def white_rail(m, x, z, dx, dz, bays, base):
@@ -229,7 +282,7 @@ def tower(model):
         center_x,center_z = (left+right)/2,(back+front)/2
         width,depth = right-left,front-back
         model.foundation(surface,center_x,-.36,center_z,width,court+.36,depth,'stone',covered_top=True)
-        model.box(center_x,court-.16,center_z,width,.16,depth,'pave',True)
+        model.box(center_x,court-.16,center_z,width,.16,depth,'court',True)
         model.box(center_x,court-.55,center_z,width+.16,.24,depth+.16,'granite')
     count = 48
     tread = -FOOT/count
@@ -245,17 +298,78 @@ def tower(model):
             continue
         model.box(16.7,court,z,.6,.88,2.15,'brick',True)
         model.box(16.7,court+.88,z,.62,.38,1.04,'brick')
-    # Shallow recessed panels and stone door surround on the riverside wall (30–34).
-    for z in (-18,6):
-        model.box(17.01,.68,z,.12,2.32,6.6,'granite')
-        model.box(17.09,.82,z,.08,2.02,6.25,'earth')
+    # Dark-grey crenellations carry on round the north and south walls (30–34);
+    # the west face stays open for the long stair and the corridor junction.
+    for z in (-32+.3,16-.3):
         if model.detail:
-            for i in range(18):
-                model.box(17.14,1.36+(i%3)*.09,z-2.8+i*.33,.05,.54,.055,'granite')
-    model.box(17.08,0,12,.22,2.42,1.8,'wood')
-    for z in (10.94,13.06):
+            pitch = 34/16
+            for x in -17+pitch*(np.arange(16)+.5):
+                model.box(x,court,z,pitch,.88,.6,'brick',True)
+                model.box(x,court+.88,z,1.04,.38,.62,'brick')
+        else:
+            model.box(0,court,z,34,1.1,.6,'brick',True)
+    # Large stele on the riverside wall: granite surround, near-black board, thin
+    # gold frame and gold glyph columns. Placeholder blocks only: the real text
+    # has not been verified. Read top-down, right (-z, title) to left.
+    model.box(17.01,.68,-18,.12,2.32,6.6,'granite')
+    model.box(17.09,.82,-18,.08,2.02,6.25,'unlit')
+    for y in (.88,2.71):
+        model.box(17.15,y,-18,.04,.07,6.13,'gold')
+    for z in (-18-3.03,-18+3.03):
+        model.box(17.15,.88,z,.04,1.9,.07,'gold')
+    if model.detail:
+        def glyph(z,top,w,h):
+            # Flag yellow, not plaque gold: the glyphs only glimmer at night.
+            model.mesh([[17.145,top-h,z-w/2],[17.145,top,z-w/2],[17.145,top,z+w/2],[17.145,top-h,z+w/2]],[[0,1,2],[0,2,3]],'yellow')
+        for column in range(14):
+            z = -20.6+column*.4
+            for k in range(4 if column==0 else 6):
+                if column==0:
+                    glyph(z,2.61-k*.40,.12,.30)
+                else:
+                    glyph(z,2.61-k*.28,.07,.16)
+    # Riverside gate just south of the stele and north of the stair landing:
+    # grey iron leaf, stone posts and lintel, projecting hood, small pediment.
+    door = -12
+    model.box(17.06,0,door,.16,2.42,1.8,'unlit')
+    if model.detail:
+        for z in np.linspace(door-.72,door+.72,5):
+            model.box(17.15,.1,z,.05,2.2,.05,'tile')
+    for z in (door-1.06,door+1.06):
         model.box(17.25,0,z,.5,2.58,.34,'granite')
-    model.box(17.21,2.55,12,.56,.30,2.65,'granite')
+    model.box(17.21,2.55,door,.56,.30,2.65,'granite')
+    model.box(17.3,2.85,door,.7,.16,3.1,'granite')
+    base,apex = 3.01,3.55
+    model.mesh([[17.0,base,door-1.3],[17.4,base,door-1.3],[17.4,apex,door],[17.0,apex,door],[17.0,base,door+1.3],[17.4,base,door+1.3]],
+               [[1,2,5],[0,3,2],[0,2,1],[5,2,3],[5,3,4]],'granite')
+    # Guardian lions on plinths either side of the gate, facing the street.
+    # Visual only: the street belongs to the world mesh, so nothing collides.
+    def orb(center,radius,subdivisions):
+        shape = trimesh.creation.icosphere(subdivisions=subdivisions,radius=radius)
+        model.mesh(shape.vertices+center,shape.faces,'granite')
+    for z in (door-1.85,door+1.85):
+        x = 17.75
+        model.box(x,0,z,.9,.55,.75,'granite')
+        if not model.detail:
+            continue
+        model.box(x-.12,.55,z,.55,.45,.6,'granite')                 # haunches
+        model.beam([x+.05,.6,z],[x+.12,1.25,z],.2,'granite',8)      # chest
+        orb([x+.12,1.35,z],.27,1)                                    # mane
+        orb([x+.3,1.4,z],.2,0)                                       # head
+        for side in (-.13,.13):
+            model.beam([x+.25,.55,z+side],[x+.18,1.0,z+side],.06,'granite',5)
+        if z < door:
+            orb([x+.33,.67,z-.1],.12,0)                              # embroidered ball
+    # Sloping ashlar retaining wall along the outer side of the riverside stair,
+    # hiding the tread ends, with a dark-grey coping. Treads keep the collision.
+    low,high,face = 15.08,-5.08,20.44
+    rise = lambda z: court*(low-z)/(low-high)+.18
+    model.mesh([[face,-.12,high],[face,rise(high),high],[face,rise(low),low],[face,-.12,low]],[[0,1,2],[0,2,3]],'stone')
+    # Coping section: .24 wide, .14 proud of the wall top; its inner face drops
+    # .2 so no gap opens above the stepped treads.
+    ring = lambda z: [[face+.02,rise(z),z],[face+.02,rise(z)+.14,z],[face-.22,rise(z)+.14,z],[face-.22,rise(z)-.2,z]]
+    model.mesh(ring(low)+ring(high),[[0,1,2],[0,2,3],[4,6,5],[4,7,6]]+
+               [tri for i in range(4) for tri in ([i,(i+1)%4,4+(i+1)%4],[i,4+(i+1)%4,4+i])],'brick')
     # Yellow pennants with red borders along the crenellations (Rock photos).
     for z in np.linspace(-29.5,13.5,9):
         if -10 < z < -5:
@@ -268,8 +382,18 @@ def tower(model):
             for end in corners[:2]:
                 model.beam(end,corners[2],.03,'clock',4)
     model.box(0,court,0,23.8,platform-court,22.6,'white',True)
+    if model.detail:
+        # Dark divider band in the wall-top paving, 1 m outside the white
+        # terrace; the north and south runs break for the 5 m terrace steps.
+        def strip(x0,x1,z0,z1):
+            y = court+.012
+            model.mesh([[x0,y,z0],[x0,y,z1],[x1,y,z1],[x1,y,z0]],[[0,1,2],[0,2,3]],'earth')
+        for sign in (-1,1):
+            strip(*sorted((sign*12.9,sign*13.25)),-12.3,12.3)
+            for x0,x1 in ((-13.25,-2.5),(2.5,13.25)):
+                strip(x0,x1,*sorted((sign*12.3,sign*12.65)))
     for sign in (-1,1):
-        steps(model,court,platform,0,sign*14.5,0,-sign*.4,8,5)
+        steps(model,court,platform,0,sign*14.5,0,-sign*.4,8,5,'court')
         white_rail(model,-11.75,sign*11.1,2.28,0,4,platform)
         white_rail(model,2.63,sign*11.1,2.28,0,4,platform)
         white_rail(model,sign*11.75,-11.1,0,2.22,10,platform)
@@ -342,7 +466,7 @@ def tower(model):
 
 
 
-def generate(name='xiaoyao_tower', build=tower, folder='E', lift=None, colors=None, smooth=(), flood_roof=False, lettering=None, terrain_offset=None, lateral_offset=None, night_glow=False, cells=None):
+def generate(name='xiaoyao_tower', build=tower, folder='E', lift=None, colors=None, smooth=(), flood_roof=False, lettering=None, terrain_offset=None, lateral_offset=None, night_glow=False, cells=None, masonry=False):
     import json
     from c_kit import landmark_surface
     from native_paving import NativePaving
@@ -370,6 +494,8 @@ def generate(name='xiaoyao_tower', build=tower, folder='E', lift=None, colors=No
         # Flat-fill whole cells (e.g. the unused clock face becomes lantern red).
         index = list(SWATCHES).index(key)
         image.paste(color, ((index%4)*128, (index//4)*128, (index%4)*128+128, (index//4)*128+128))
+    if masonry:
+        dress_masonry(image)
     target = Path(__file__).resolve().parents[2]/'public/textures/landmarks'/folder
     target.mkdir(parents=True, exist_ok=True)
     if colors is None: image.save(target/'timber-and-tile.png', optimize=True)
@@ -379,7 +505,7 @@ def generate(name='xiaoyao_tower', build=tower, folder='E', lift=None, colors=No
         build(model)
         group = f'lod{level}'
         scene.graph.update(frame_to=group)
-        def add(parts, uvs, texture, name, emissive=None, emissive_texture=None, role=None):
+        def add(parts, uvs, texture, name, emissive=None, emissive_texture=None, role=None, roughness=1):
             vertices = np.concatenate(parts).reshape(-1,3)
             if lateral_offset is not None:
                 vertices[:,2] += lateral_offset(vertices[:,0])
@@ -394,7 +520,7 @@ def generate(name='xiaoyao_tower', build=tower, folder='E', lift=None, colors=No
                 if not len(vertices):return
             mesh = trimesh.Trimesh(vertices, np.arange(len(vertices)).reshape(-1,3), process=False)
             if texture is not None:
-                material = trimesh.visual.material.PBRMaterial(name=name,baseColorTexture=texture,roughnessFactor=1,metallicFactor=0,doubleSided=True)
+                material = trimesh.visual.material.PBRMaterial(name=name,baseColorTexture=texture,roughnessFactor=roughness,metallicFactor=0,doubleSided=True)
                 if emissive is not None:
                     material.emissiveFactor=emissive
                     if emissive_texture is not None:
@@ -437,12 +563,16 @@ def generate(name='xiaoyao_tower', build=tower, folder='E', lift=None, colors=No
                     add([tri for tri,uv in parts],[uv for tri,uv in parts],crop,key+'_lit',WALL_WASH,crop,key)
                 else:
                     add([tri for tri,uv in parts],[uv for tri,uv in parts],crop,key)
+        if model.court:
+            cell = list(SWATCHES).index('pave'); left,top=128*(cell%4),128*(cell//4)
+            add([tri for tri,uv in model.court],[uv for tri,uv in model.court],
+                image.crop((left,top,left+128,top+128)),'court_pave',roughness=.96)  # differs from pave so gltfpack keeps both
         if not level:
             add(model.solid,None,None,'collision_surface')
     scene.export(Path(sys.argv[1])/(name+'.glb'))
 
 
 if __name__ == '__main__':
-    generate(colors={"wood":"#4e3a32","red":"#4a2a26","stone":"#cccddb","brick":"#646777",
-                     "white":"#eef0fa","granite":"#c9cbd6","earth":"#383b43","gold":"#e2c996","sign":"#3a2c28","tile":"#45484e"},
-             flood_roof=True, night_glow=True, cells={'clock': '#a8261c'})
+    generate(colors={"wood":"#4e3a32","red":"#4a2a26","stone":"#c4c3bd","brick":"#55575a",
+                     "white":"#eef0fa","granite":"#c3c3bf","earth":"#383b43","gold":"#e2c996","sign":"#3a2c28","tile":"#45484e"},
+             flood_roof=True, night_glow=True, cells={'clock': '#a8261c'}, masonry=True)
