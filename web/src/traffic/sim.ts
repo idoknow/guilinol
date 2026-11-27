@@ -2,7 +2,7 @@ import {SignalPlan,type SignalState} from './signals.ts'
 import {axleHeight,contactPose} from './lane-surface.ts'
 import {nearStatic,resolveContact,staticSolids,pickups,type Solid} from './contact.ts'
 import {CAR_SCALE} from '../drive/scale.ts'
-import {canRoute,clearance,passage,type Corridor,type Profile} from './narrow.ts'
+import {bayBehind,canRoute,clearance,engaged,passage,retreatTrack,type Corridor,type Profile} from './narrow.ts'
 import {clampOutsideShizijieNoPedZone,isInShizijieNoPedZone,isNearShizijiePrecinct,segmentHitsShizijieNoPedZone} from '../shizijie-zone.ts'
 export type Node = {id:number,x:number,y:number,z:number}
 type Crossing={osm:[string,number],bars:number,points:[number,number][],width:number}
@@ -1031,6 +1031,27 @@ export class Traffic {
     for(const [node,neighbors] of arms)if(neighbors.size>=3)this.junctions.add(node)
     for(const signal of graph.signals){this.signal.set(signal.node,signal);this.junctions.delete(signal.node)}
     this.signalPlan.add(graph.signals)
+    this.linkCorridors()
+  }
+  // Each measured walk track learns the track that leads into it (the one onwardWalk would continue from)
+  // and how far back on it the nearest >=0.85 m station is, so a walker can back out of a pinch across the joint.
+  private linkCorridors(){
+    const tolerance=.45
+    for(const track of this.allTracks()){
+      const corridor=track.corridor
+      if(!corridor)continue
+      corridor.pair=track.pairTrack?.corridor
+      const {x,z}=track.start
+      for(let col=Math.floor((x-tolerance)/128);col<=Math.floor((x+tolerance)/128);col++)for(let row=Math.floor((z-tolerance)/128);row<=Math.floor((z+tolerance)/128);row++){
+        for(const prev of this.cells.get(`${col},${row}`)??[]){
+          if(!prev.walk||!prev.corridor||prev.link||prev===track||prev===track.pairTrack||prev.street!==track.street||prev.dx*track.dx+prev.dz*track.dz<.7)continue
+          const joint=Math.hypot(prev.end.x-x,prev.end.z-z)
+          if(joint>tolerance||Math.abs(trackHeight(prev,prev.length)-trackHeight(track,0))>tolerance)continue
+          const back=bayBehind(prev.corridor,prev.length),gap=back+joint
+          if(gap<=8&&gap<(corridor.behind?.gap??Infinity))corridor.behind={track:prev,target:prev.length-back,gap}
+        }
+      }
+    }
   }
   private onwardWalk(track:Track){
     if(track.nextLink&&this.usable(track.nextLink))return {track:track.nextLink,dist:0}
@@ -1861,14 +1882,14 @@ export class Traffic {
       if(actor.down>0){actor.down-=dt;actor.waitingFor=previousBlocker;return}
       if(actor.arrived){if(!visible?.(actor))actor.leaving=true;return}
       let keepRight=false,passLeft=false
-      const narrow=person&&track.corridor?.profile[1].length?passage(actor,this.actors):undefined
+      const narrow=person&&track.corridor&&(track.corridor.profile[1].length||engaged(actor,this.actors))?passage(actor,this.actors):undefined
       if(person)actor.waitingAtGate=Boolean(narrow&&narrow.limit<=.01)
       if(narrow)advance=Math.min(advance,narrow.limit)
       if(person)actor.backing=Boolean(narrow?.back&&narrow.back>1e-6)
       const squeeze=narrow?.squeeze??0
       if(person)actor.squeeze=squeeze
       if(squeeze)advance=Math.min(advance,.5*dt)
-      const room=narrow&&track.corridor?clearance(track.corridor,actor.dist+advance,.25-.049*squeeze,narrow.atBay):undefined
+      const room=narrow&&track.corridor?clearance(track.corridor,actor.dist+advance,squeeze,narrow.atBay):undefined
       const safeMinDodge=person?Math.max(track.dodgeMin??-WALK_OFFSET,room?.[0]??-Infinity):-WALK_OFFSET
       const safeMaxDodge=person?Math.min(squeeze?2*WALK_OFFSET:track.dodgeMax??WALK_OFFSET,room?.[1]??Infinity):WALK_OFFSET
       let minDodge=safeMinDodge,maxDodge=safeMaxDodge
@@ -2005,6 +2026,11 @@ export class Traffic {
         if(onward&&!canRoute(onward.track.corridor,onward.dist,this.actors.filter(other=>other!==actor))){actor.dist=track.length;actor.speed=0;actor.waitingAtGate=true}
         else if(onward){actor.track=onward.track;actor.dist=onward.dist;this.transitions++}
         else{actor.dist=track.length;actor.speed=0;actor.arrived=true}
+      }else if(person&&actor.dist<0){
+        // Backing out of a pinch past this track's start continues onto the track behind, still facing forward.
+        const behind=retreatTrack(actor) as Track|undefined
+        if(behind){actor.track=behind;actor.dist=Math.max(0,behind.length+actor.dist);actor.yaw=behind.yaw;this.transitions++}
+        else actor.dist=0
       }else if(reverse&&actor.dist<=0){
         const incoming=(this.entries.get(track.from)??[]).filter(prev=>
           !prev.walk&&prev.kind==='nonmotor'&&this.usable(prev)&&prev.from!==track.to&&
