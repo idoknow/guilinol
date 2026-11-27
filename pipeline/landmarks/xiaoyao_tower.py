@@ -31,6 +31,7 @@ GLOW = {  # 夜景自发光（sRGB，屏上显示≈此值），乘 uNight；按
     'tile':  '#6a2c0a',   # 瓦面：比立面暗
     'granite': '#6a4a30',
     'yellow':  '#a07818', # 旗
+    'clock':   '#ff1c0c', # 红灯笼：比立面橙更红，夜里跳出来
 }
 GLOW_GAIN = 1.0  # joinery_lit 自发光总增益
 WALL_WASH = [.07, .045, .025]  # stone_lit/brick_lit 城墙淡洗光
@@ -148,7 +149,8 @@ def facade(model, base, half, height, upstairs):
             model.beam([post, base, half], [post, base+height, half], .24, 'red', 10 if model.detail else 4, True)
             if bay or upstairs:
                 if model.detail:
-                    model.box(east, base, half-1.4, width-.14, 1.05, .18, 'wood', True)
+                    # Upstairs: white sill panel under the dark lattice (Rock photos).
+                    model.box(east, base, half-1.4, width-.14, 1.05, .18, 'white' if upstairs else 'wood', True)
                     model.box(east, base+1.05, half-1.55, width-.14, height-1.35, .12, 'sign', True)
                 else:
                     model.box(east, base, half-1.4, width-.14, height-.3, .18, 'wood')
@@ -157,6 +159,20 @@ def facade(model, base, half, height, upstairs):
                         model.box(east+offset, base+1.05, half-1.3, .07, height-1.35, .075, 'wood')
                     for lift in np.arange(1.35, height-.3, .65):
                         model.box(east, base+lift, half-1.3, width-.14, .07, .075, 'wood')
+                if upstairs:
+                    # White frieze tight under the eave, in front of the mullions / LOD1 wall.
+                    model.box(east, base+height-.95, half-1.22, width-.14, .55, .1, 'white')
+            if not upstairs:
+                # One red lantern per bay under the first eave, outside the column line.
+                top, z = base+height, half+.45
+                if model.detail:
+                    model.beam([east, top-.32, z], [east, top-.72, z], .02, 'wood', 4)
+                    model.beam([east, top-1.42, z], [east, top-.72, z], .30, 'clock', 10)
+                    for y in (top-.72, top-1.48):
+                        model.beam([east, y, z], [east, y+.06, z], .2, 'gold', 8)
+                    model.beam([east, top-1.70, z], [east, top-1.48, z], .05, 'gold', 4)
+                else:
+                    model.beam([east, top-1.42, z], [east, top-.72, z], .30, 'clock', 4)
             if model.detail:
                 for tier in range(3):
                     model.box(post, base+height-.6+tier*.19, half, .45+tier*.33, .19, .55+tier*.41, 'wood')
@@ -225,9 +241,17 @@ def tower(model):
     for z in (10.94,13.06):
         model.box(17.25,0,z,.5,2.58,.34,'granite')
     model.box(17.21,2.55,12,.56,.30,2.65,'granite')
-    for z in (-29,-17,-3,11):
+    # Yellow pennants with red borders along the crenellations (Rock photos).
+    for z in np.linspace(-29.5,13.5,9):
+        if -10 < z < -5:
+            continue
         model.beam([16.55,court,z],[16.55,court+3.5,z],.055,'wood')
-        model.mesh([[16.55,court+3.45,z],[16.55,court+2.45,z],[16.48,court+2.85,z+1.48]],[[0,1,2]],'yellow')
+        corners=[[16.55,court+3.45,z],[16.55,court+2.45,z],[16.48,court+2.85,z+1.48]]
+        model.mesh(corners,[[0,1,2]],'yellow')
+        if model.detail:
+            # The hoist edge sits inside the pole, so only the two free edges get a border.
+            for end in corners[:2]:
+                model.beam(end,corners[2],.03,'clock',4)
     model.box(0,court,0,23.8,platform-court,22.6,'white',True)
     for sign in (-1,1):
         steps(model,court,platform,0,sign*14.5,0,-sign*.4,8,5)
@@ -261,9 +285,23 @@ def tower(model):
         model.pose=(0,0,0,0 if side>0 else np.pi)
         for post in (-1.9,1.9):
             model.box(post,platform+4.92,11.45,.16,.65,.66,'wood')
-        model.box(0,platform+4.0,11.72,4.6,1.05,.22,'wood')
-        model.box(0,platform+4.06,11.84,4.34,.92,.04,'sign')
-        letters(model,'逍遙樓',(0,platform+4.15,11.88),3.10,.72,'gold')
+        # Dark plaque, gold frame, pale-gold text read right to left: front
+        # porch (-z) 楚越雄風, back porch (+z) 山水清音.
+        model.box(0,platform+3.98,11.72,4.7,1.12,.2,'sign')
+        for y in (platform+3.98,platform+5.02):
+            model.box(0,y,11.85,4.7,.08,.06,'gold')
+        for x in (-2.31,2.31):
+            model.box(x,platform+3.98,11.85,.08,1.12,.06,'gold')
+        letters(model,'風雄越楚' if side<0 else '音清水山',(0,platform+4.10,11.86),3.6,.86,'gold')
+        if model.detail:
+            # Couplet boards on the two front columns (r .26 at z 10.7); the
+            # characters are placeholders only — the actual couplet is unverified.
+            for x in (-2.6,2.6):
+                model.box(x,platform+1.0,11.0,.46,3.1,.06,'sign')
+                for edge in (-.21,.21):
+                    model.box(x+edge,platform+1.0,11.045,.04,3.1,.03,'gold')
+                for y in np.linspace(platform+1.25,platform+3.85,7):
+                    model.box(x,y-.13,11.045,.26,.26,.02,'gold')  # y is the block centre
         model.pose=(0,0,0,0)
     model.box(0,platform,0,8.2,4.8,.26,'wood',True)
     upper = platform+7.4
@@ -273,15 +311,11 @@ def tower(model):
     model.box(0,upper+7.12,0,12,1.05,11,'wood')
     model.box(0,upper+8.02,0,18.4,.36,17.5,'wood')
     tiled_roof(model,0,upper+8.17,0,18.4,17.5,3.7,1.50,.76,lit_edge=True,gable_material='earth',frame_gable=True)
-    if model.detail:
-        for side in (-1,1):
-            for x in (-6,-3,3,6):
-                model.beam([x,platform+4.17,side*8.9],[x,platform+5.32,side*8.9],.05,'wood')
-                model.beam([x,platform+3.65,side*8.9],[x,platform+4.25,side*8.9],.28,'red',10)
+    # The first-floor lanterns now hang from facade() (one per bay, all four sides).
 
 
 
-def generate(name='xiaoyao_tower', build=tower, folder='E', lift=None, colors=None, smooth=(), flood_roof=False, lettering=None, terrain_offset=None, lateral_offset=None, night_glow=False):
+def generate(name='xiaoyao_tower', build=tower, folder='E', lift=None, colors=None, smooth=(), flood_roof=False, lettering=None, terrain_offset=None, lateral_offset=None, night_glow=False, cells=None):
     import json
     from c_kit import landmark_surface
     from native_paving import NativePaving
@@ -305,6 +339,10 @@ def generate(name='xiaoyao_tower', build=tower, folder='E', lift=None, colors=No
             index = list(SWATCHES).index(key)
             image.paste(grain, ((index%4)*128, (index//4)*128))
         glow = glow_atlas()
+    for key, color in (cells or {}).items():
+        # Flat-fill whole cells (e.g. the unused clock face becomes lantern red).
+        index = list(SWATCHES).index(key)
+        image.paste(color, ((index%4)*128, (index//4)*128, (index%4)*128+128, (index//4)*128+128))
     target = Path(__file__).resolve().parents[2]/'public/textures/landmarks'/folder
     target.mkdir(parents=True, exist_ok=True)
     if colors is None: image.save(target/'timber-and-tile.png', optimize=True)
@@ -378,5 +416,6 @@ def generate(name='xiaoyao_tower', build=tower, folder='E', lift=None, colors=No
 
 
 if __name__ == '__main__':
-    generate(colors={"wood":"#302d30","red":"#70312f","stone":"#cccddb","brick":"#646777",
-                     "white":"#eef0fa","granite":"#c9cbd6","earth":"#383b43","gold":"#e2c996","sign":"#363337","tile":"#404650"}, flood_roof=True, night_glow=True)
+    generate(colors={"wood":"#4e3a32","red":"#4a2a26","stone":"#cccddb","brick":"#646777",
+                     "white":"#eef0fa","granite":"#c9cbd6","earth":"#383b43","gold":"#e2c996","sign":"#3a2c28","tile":"#45484e"},
+             flood_roof=True, night_glow=True, cells={'clock': '#a8261c'})
