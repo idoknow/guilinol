@@ -13,7 +13,7 @@ try {
   page.on('pageerror',error=>console.error(error.message))
   await page.addInitScript(()=>localStorage.setItem('glol.avatar.v1',JSON.stringify({body:'f',v:1,createdAt:123,skin:2,face:1,brows:0,eyes:0,hair:'f_bun',hairColor:1,look:'sport'})))
   const poses=[],trace=[]
-  let socket,resumeOffset
+  let socket,resumeOffset,relocate=false
   await page.route('**/api/**',route=>route.fulfill({json:route.request().url().endsWith('/me')?
     {id:'pilot',uid:900001,nickname:'Pilot'}:{ticket:'local-test'}}))
   await page.routeWebSocket('**/ws',ws=>{
@@ -22,7 +22,7 @@ try {
       const packet=JSON.parse(raw)
       if(packet.t==='join'){
         const resume=resumeOffset===undefined?{}:{x:packet.x+resumeOffset,y:packet.y,z:packet.z,resumed:true}
-        ws.send(JSON.stringify({t:'welcome',me:{id:'pilot',uid:900001,name:'Pilot',...resume},online:1,players:[]}))
+        ws.send(JSON.stringify({t:'welcome',me:{id:'pilot',uid:900001,name:'Pilot',...resume},...(relocate?{relocated:{...resume,code:'resume_position'}}:{}),online:1,players:[]}))
       }
       if(packet.t==='join'||packet.t==='pos'){poses.push(packet);trace.push({t:packet.t,x:packet.x,y:packet.y,z:packet.z,v:packet.v,foot:packet.foot,gr:packet.gr})}
     })
@@ -52,16 +52,26 @@ try {
     const flight=await page.evaluate(()=>window.droneStep(.1,250))
     await page.keyboard.up('ArrowUp');await page.keyboard.up('KeyW')
     assert.ok(flight.distance>100&&flight.agl>5,JSON.stringify(flight));await samples()
-    check(start,origin)
+    console.log('unassisted RC drift',check(start,origin))
+    if(!reconnect){
+      await page.evaluate(()=>{
+        const walker=window.viewer.walk
+        for(let frame=0;frame<120;frame++){walker.drive(1,0,false);walker.tick(1/60)}
+        walker.releaseDrive()
+      });await samples();console.log('RC with external walk input drift',check(start,origin))
+      const combat=dn=>socket.send(JSON.stringify({t:'combat',id:'pilot',hp:dn?0:100,dn,remaining:dn?8000:0,progress:0,helper:''}))
+      combat(1);await page.waitForFunction(()=>window.viewer.walk.combat.f.down&&window.viewer.walk.combat.drop>0)
+      combat(0);await page.waitForFunction(()=>!window.viewer.walk.combat.f.down&&window.viewer.walk.combat.drop===0)
+    }
     if(reconnect){
-      for(const offset of [.5,8]){
-        resumeOffset=offset
+      for(const offset of [10,12]){
+        resumeOffset=offset;relocate=offset===12
         socket.close({code:4001,reason:'replaced'})
         await page.waitForFunction(()=>window.viewer.walk.net.status().state==='replaced')
         const before=poses.length
         await page.evaluate(()=>window.viewer.walk.net.reconnect());await samples()
         const join=poses[before];assert.equal(join.t,'join');assert.ok(distance(join,origin)<.05)
-        assert.ok(check(before+1,{...join,x:join.x+(offset===8?8:0)})<.05)
+        assert.ok(check(before+1,{...join,x:join.x+(relocate?offset:0)})<.05)
       }
       socket.send(JSON.stringify({t:'setback',x:origin.x,y:origin.y,z:origin.z}))
       await samples();check(poses.length-2,origin)
@@ -72,7 +82,7 @@ try {
   }
   if(process.env.POSE_TRACE)await writeFile(process.env.POSE_TRACE,JSON.stringify(trace))
   const motion=()=>page.evaluate(()=>({position:window.viewer.walk.position.toArray(),speed:window.viewer.walk.footSpeed}))
-  resumeOffset=.5
+  resumeOffset=10;relocate=false
   for(let cycle=1;cycle<=2;cycle++){
     await delay(44000)
     await page.evaluate(async()=>{

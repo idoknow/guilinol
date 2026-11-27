@@ -14,7 +14,6 @@ import type {CaptureClientContext, CheatCapturePacket} from './cheat-capture'
 function publish(detail:MpStatus){window.dispatchEvent(new CustomEvent('glol:mp-status',{detail}))}
 
 type State='connecting'|'online'|'offline'|'replaced'
-const RESUME_ALIGNMENT_METERS=8
 export type ActivityReport={act:string;detail?:string}
 let rosterRequester:(()=>void)|null=null
 let subCount=0
@@ -138,11 +137,6 @@ export function attachNet(scene:Scene,clips:AnimationClip[],getPose:()=>Pose,get
           }
           case 'welcome': sent=0;sentTimes=[];myId=String(msg.me?.id??'');myUid=Number(msg.me?.uid)||0;myName=String(msg.me?.name??'');setChatSelf(myUid);onCombat?.(msg.me,myId);if(subCount>0)send({t:'roster_sub',since:lastRosterV})
             if(msg.relocated){const {x,y,z,code}=msg.relocated;onSetback?.(x,y,z);rejectTravel(code)}
-            else if(msg.me?.resumed&&Number.isFinite(msg.me.x)&&Number.isFinite(msg.me.z)){
-              const local=getPose()
-              if(local.foot===true&&Math.hypot(msg.me.x-local.x,msg.me.z-local.z)>=RESUME_ALIGNMENT_METERS)
-                onSetback?.(msg.me.x,Number.isFinite(msg.me.y)?msg.me.y:local.y,msg.me.z)
-            }
             welcomed=true
             // 续连（CDN 掐断后原地接管）：对账而不是清空重建，否则每 44 秒所有人的模型都会销毁再克隆一遍
             if(msg.me?.resumed){const keep=new Set((msg.players as {id:string}[]).map(p=>p.id))

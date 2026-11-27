@@ -2260,7 +2260,8 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
   }
   // Reverse LIFO reset: apply order below is holdLayer.apply() -> smoking.tick() -> emote.tick() -> ticketHandover.tick() -> combat.tick().
   function tick(dt:number){wheel.sync();if(!active)return
-    if(document.body.dataset.drone==='rc'){net?.tick(dt);return}
+    const piloting=document.body.dataset.drone==='rc'
+    if(piloting)external=null
     combat.resetPose();ticketHandover.reset();emote.reset();smoking?.resetPose();holdLayer.reset();
     if(ticketHandover.active&&(rides?.boat||rides?.car||rides?.bike||knockdown.isDown||combat.f.down))ticketHandover.stop()
     if(emote.id&&(rides?.boat||rides?.car||rides?.bike)){emote.stop();emote.tick(.24,false)}
@@ -2334,8 +2335,8 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
     }
     // 拿着鱼竿也能走动（需求方：不要把人固定在原地）；抛出去后走开会自动收线
     const fishingOnFoot=false
-    const read=input.read(dt),keys=held||fishingOnFoot?still:read
-    const rideCtrl=held?ZERO_RIDE_INPUT:input.readRideControls()
+    const read=input.read(dt),keys=held||piloting||fishingOnFoot?still:read
+    const rideCtrl=held||piloting?ZERO_RIDE_INPUT:input.readRideControls()
     const kdSnap=knockdown.step(Math.min(.12,Math.max(0,dt)))
     if(kdSnap.isDown!==wasKnockdownDown){
       document.body.dataset.tdKnockdown=kdSnap.isDown?'1':'0'
@@ -2478,7 +2479,7 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
     }
     const aboardGround=wasCar||wasBike
     if(keys.jump&&!combat.f.down&&!combat.f.helping&&!aboardGround&&!busyFootAnim)jumpTimer=cfg.jumpBuffer
-    accumulator+=Math.min(.12,dt)
+    accumulator=piloting?0:accumulator+Math.min(.12,dt)
     while(accumulator>=step-1e-7){accumulator=Math.max(0,accumulator-step);steps++;simSteps++;elapsed+=step
       if(grounded)coyoteTimer=cfg.coyote;else coyoteTimer=Math.max(0,coyoteTimer-step)
       if(!aboardGround&&!busyFootAnim&&jumpTimer>0&&coyoteTimer>0){
