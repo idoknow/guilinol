@@ -1,20 +1,19 @@
 #!/usr/bin/env node
 /**
- * Headless Metal/SwiftShader Playwright visual comparison & QA verification script
- * for Guilin Online City Upgrade v1+ full-city (R1 regression + R2/R3 outer-ring) acceptance.
+ * Full-City 4,080-chunk / 952-shard Headless Metal Chromium Visual & Steady-State QA (IDOK-437 / IDOK-434).
  *
- * Captures pixel-aligned Before (cityUpgrade=false) vs After (cityUpgrade=true, 96-shop 8x12)
- * side-by-side comparisons across 4 representative outer-ring corridors (day sunny + rain night)
- * plus 1 R1 Sanduo Road regression check:
- *   1. Guilin Railway Station (桂林站周边 · 中山南路/上海路) [R2/R3]
- *   2. Qixing / Jiefang Bridge East (解放桥东 / 七星 · 栖霞路/东江路) [R2]
- *   3. Nanmen Bridge (南门桥 · 中山中路/西城路/南环路) [R2]
- *   4. Beiji Square (北极广场周边 · 环城北一路/中山北路) [R3]
- *   5. Sanduo Road (三多路百米 · R1 96款招牌回归核验) [R1]
+ * Captures pixel-aligned Before (cityUpgrade=false) vs After (cityUpgrade=true) comparisons
+ * across all 6 outer-ring districts + R1 Sanduo Road regression check (day sunny + night):
+ *   1. 临桂新区 (世纪大道/万达)
+ *   2. 桂林北站周边 (站前路/北辰路)
+ *   3. 七星东 / 三里店 / 高新区
+ *   4. 花江桂电 / 尧山东
+ *   5. 瓦窑 / 凯风路 (城南)
+ *   6. 两江国际机场周边 (静区零商业招牌 + 克制村镇)
+ *   7. 三多路百米 (R1 零退化 + 夜景橱窗色温明暗层次)
  *
- * Enforces strict zero-error gates: 0 console errors, 0 pageerrors, 0 HTTP 404/5xx,
- * indexedShards === 96, fasciaGrid === [8, 12], DrawCall delta <= +10.
- * Strictly headless (never opens visible browser windows on shared macOS host).
+ * Also executes a single-session cross-city teleport stability test across 4 distant districts
+ * verifying shard eviction (`loadedShards` / `mountedPropGroups` stay bounded, DrawCall delta <= +10).
  */
 import fs from 'node:fs'
 import path from 'node:path'
@@ -22,60 +21,64 @@ import { spawnSync } from 'node:child_process'
 import { chromium } from 'playwright'
 import { preview } from 'vite'
 
-const OUT_DIR = process.argv[2] || '/tmp/city-upgrade-outer-shots'
+const OUT_DIR = process.argv[2] || '/tmp/city-upgrade-4080-shots'
 fs.mkdirSync(OUT_DIR, { recursive: true })
 
-// 5 viewpoints aimed directly at upgraded commercial streets (camera positioned in roadway clear of walls)
 const VIEWS = [
   {
-    id: '01_guilin_station',
-    label: '桂林站周边 · 中山南路/上海路 (R2/R3)',
-    pos: [-1919, 159.2, 1966],
-    look: [-1903, 158.0, 1998],
-    modes: [
-      { key: 'day', query: 'time=13.5' },
-      { key: 'rain_night', query: 'time=21.5&weather=rain' },
-    ],
+    id: '01_lingui',
+    label: '临桂新区 · 世纪东路现代商圈 (R4)',
+    pos: [-10150.9, 188.0, 3294.1],
+    look: [-10215.0, 162.0, 3272.0],
+    expectProps: true,
   },
   {
-    id: '02_qixing_jiefang_east',
-    label: '解放桥东 / 七星片区 · 栖霞路/东江路 (R2)',
-    pos: [120, 155.5, -62],
-    look: [106, 154.5, -106],
-    modes: [
-      { key: 'day', query: 'time=13.5' },
-      { key: 'rain_night', query: 'time=21.5&weather=rain' },
-    ],
+    id: '02_guilin_north',
+    label: '桂林北站周边 · 八里四路/站前片区 (R4)',
+    pos: [651.0, 186.0, -7357.6],
+    look: [586.0, 162.0, -7376.0],
+    expectProps: true,
   },
   {
-    id: '03_nanmen_bridge',
-    label: '南门桥 · 中山南路商街 (R2)',
-    pos: [-1754.0, 160.2, 1026.3],
-    look: [-1779.5, 160.0, 1050.3],
-    modes: [
-      { key: 'day', query: 'time=13.5' },
-      { key: 'rain_night', query: 'time=21.5&weather=rain' },
-    ],
+    id: '03_qixing_east',
+    label: '七星东 / 三里店 / 高新区 · 芳香路 (R3)',
+    pos: [2190.8, 184.0, 281.7],
+    look: [2256.0, 159.0, 265.0],
+    expectProps: true,
   },
   {
-    id: '04_beiji_square',
-    label: '北极广场 · 中山北路商街 (R3)',
-    pos: [-620.1, 160.8, -2088.4],
-    look: [-607.4, 161.0, -2121.0],
-    modes: [
-      { key: 'day', query: 'time=13.5' },
-      { key: 'rain_night', query: 'time=21.5&weather=rain' },
-    ],
+    id: '04_huajiang_yaoshan',
+    label: '花江桂电 / 尧山东 · 白墙灰瓦建筑群 (R4)',
+    pos: [5242.7, 182.6, 735.0],
+    look: [5180.7, 158.6, 693.0],
+    expectProps: false,
   },
   {
-    id: '05_sanduo_r1_reg',
-    label: '三多路百米 · R1 96款招牌回归 (R1)',
+    id: '05_wayao_kaifeng',
+    label: '瓦窑 / 凯风路 · 城南商住过渡街景 (R4)',
+    pos: [-962.7, 159.1, 5347.4],
+    look: [-939.0, 159.6, 5355.7],
+    expectProps: true,
+  },
+  {
+    id: '06_airport',
+    label: '两江国际机场周边 · 临苏路静区零招牌 (R4)',
+    pos: [-16587.1, 188.0, 7344.9],
+    look: [-16652.0, 161.0, 7335.0],
+    expectProps: false,
+  },
+  {
+    id: '07_sanduo_r1',
+    label: '三多路百米 · R1 零退化与夜景橱窗 (R1)',
     pos: [-1224.5, 160.0, -41.0],
     look: [-1189.6, 160.4, -38.6],
-    modes: [
-      { key: 'day', query: 'time=13.5' },
-    ],
+    expectProps: true,
   },
+]
+
+const MODES = [
+  { key: 'day', zh: '晴午', query: 'time=13.5' },
+  { key: 'night', zh: '夜景', query: 'time=21.5' },
 ]
 
 const server = await preview({
@@ -100,176 +103,238 @@ const consoleErrors = []
 const pageErrors = []
 const badResponses = []
 const metrics = []
+const crossCityTrace = []
 let verifiedStats = null
 
-async function capturePair(view, mode) {
+async function waitViewReady(page, expectProps, label) {
+  try {
+    await page.waitForFunction((reqProps) => {
+      const v = window.viewer
+      const { stats, stream, camera, manifest, cityUpgrade } = v
+      const cu = cityUpgrade.getStats()
+      const chunksReady = !stats.pending && (!stream.queue || stream.queue.length === 0) && manifest.chunks.every(
+        t => Math.hypot(t.x + 128 - camera.position.x, t.z + 128 - camera.position.z) > stream.radius || stream.loaded.has(t),
+      )
+      return chunksReady && cu.indexReady && cu.texturesReady && cu.loadedShards > 0 && (!reqProps || cu.mountedPropGroups > 0)
+    }, expectProps, { timeout: 120000 })
+  } catch (err) {
+    const diag = await page.evaluate(() => {
+      const v = window.viewer
+      return {
+        frame: v?.stats?.frame,
+        pending: v?.stats?.pending,
+        loaded: v?.stream?.loaded?.size,
+        cam: v?.camera?.position?.toArray(),
+        cu: v?.cityUpgrade?.getStats?.(),
+      }
+    }).catch(() => null)
+    console.error(`[timeout-diag] ${label}:`, JSON.stringify(diag))
+    throw err
+  }
+  await page.waitForTimeout(1600)
+}
+
+async function sampleCalls(page) {
+  return page.evaluate(async () => {
+    const v = window.viewer
+    const samples = []
+    for (let i = 0; i < 20; i++) {
+      await new Promise(r => requestAnimationFrame(r))
+      if (typeof v.stats?.calls === 'number' && v.stats.calls > 0) samples.push(v.stats.calls)
+    }
+    await v.freeze()
+    const cu = v.cityUpgrade.getStats()
+    const calls = samples.length ? Math.min(...samples) : (v.stats?.calls ?? -1)
+    return { cu, calls, loadedTiles: v.stream?.loaded?.size ?? -1 }
+  })
+}
+
+async function captureMode(mode) {
   const ctx = await browser.newContext({ viewport: { width: 1280, height: 720 } })
   const page = await ctx.newPage()
-  // Static vite preview has no Cloudflare Worker backend; stub /api/** cleanly like audit.mjs
   await page.route('**/api/**', route => route.fulfill({ status: 204, body: '' }))
-  page.on('pageerror', e => pageErrors.push(`${view.id}/${mode.key}: ${e.message}`))
+  page.on('pageerror', e => pageErrors.push(`${mode.key}: ${e.message}`))
   page.on('console', m => {
-    if (m.type() === 'error') consoleErrors.push(`${view.id}/${mode.key}: ${m.text()}`)
+    if (m.type() === 'error') consoleErrors.push(`${mode.key}: ${m.text()}`)
   })
   page.on('response', r => {
-    if (r.status() >= 400) badResponses.push(`${view.id}/${mode.key}: ${r.status()} ${r.url()}`)
+    if (r.status() >= 400) badResponses.push(`${mode.key}: ${r.status()} ${r.url()}`)
   })
 
   const url = `${baseUrl}/?verify&loading=skip&gfx=mid&${mode.query}&cityUpgrade=1`
   await page.goto(url, { waitUntil: 'domcontentloaded' })
   await page.waitForFunction(() => Boolean(window.viewer?.stats?.firstMs > 0 && window.viewer?.cityUpgrade), null, { timeout: 90000 })
 
-  // Switch into clean flight camera (stops walker override) and place at target viewpoint
-  await page.evaluate(({ pos, look }) => {
-    const v = window.viewer
-    if (typeof v.flight === 'function') v.flight()
-    v.camera.position.set(pos[0], pos[1], pos[2])
-    v.camera.lookAt(look[0], look[1], look[2])
-    v.camera.updateMatrixWorld()
-  }, { pos: view.pos, look: view.look })
+  for (let vi = 0; vi < VIEWS.length; vi++) {
+    const view = VIEWS[vi]
+    // Enable cityUpgrade and fly to target viewpoint (same session tests cross-city eviction too!)
+    await page.evaluate(({ pos, look, needResume }) => {
+      const v = window.viewer
+      if (needResume) v.resume()
+      v.cityUpgrade.setEnabled(true)
+      if (typeof v.flight === 'function') v.flight()
+      v.camera.position.set(pos[0], pos[1], pos[2])
+      v.camera.lookAt(look[0], look[1], look[2])
+      v.camera.updateMatrixWorld()
+    }, { pos: view.pos, look: view.look, needResume: vi > 0 })
 
-  // Wait for chunks + city-upgrade textures & shards to load
-  await page.waitForFunction(() => {
-    const v = window.viewer
-    const { stats, stream, camera, manifest, cityUpgrade } = v
-    const cu = cityUpgrade.getStats()
-    const chunksReady = !stats.pending && manifest.chunks.every(
-      t => Math.hypot(t.x + 128 - camera.position.x, t.z + 128 - camera.position.z) > stream.radius || stream.loaded.has(t),
+    await waitViewReady(page, view.expectProps, `${view.id}/${mode.key}`)
+    const afterStats = await sampleCalls(page)
+    verifiedStats = afterStats.cu
+    if (mode.key === 'day') {
+      crossCityTrace.push({
+        view: view.id,
+        loadedTiles: afterStats.loadedTiles,
+        loadedShards: afterStats.cu.loadedShards,
+        mountedPropGroups: afterStats.cu.mountedPropGroups,
+        upgradedTiles: afterStats.cu.upgradedTiles,
+      })
+    }
+
+    const afterPng = path.join(OUT_DIR, `${view.id}_${mode.key}_after.png`)
+    await page.screenshot({ path: afterPng })
+
+    // Toggle cityUpgrade OFF at exact same camera pose for Before shot
+    await page.evaluate(() => {
+      const v = window.viewer
+      v.resume()
+      v.cityUpgrade.setEnabled(false)
+    })
+    await page.waitForTimeout(800)
+    const beforeStats = await sampleCalls(page)
+    const beforePng = path.join(OUT_DIR, `${view.id}_${mode.key}_before.png`)
+    await page.screenshot({ path: beforePng })
+
+    const dcDelta = afterStats.calls >= 0 && beforeStats.calls >= 0 ? afterStats.calls - beforeStats.calls : null
+    metrics.push({
+      view: view.id,
+      mode: mode.key,
+      beforeCalls: beforeStats.calls,
+      afterCalls: afterStats.calls,
+      dcDelta,
+      loadedTiles: afterStats.loadedTiles,
+      cu: afterStats.cu,
+    })
+    console.log(
+      `[shot] ${view.id} (${mode.key}): calls ${beforeStats.calls} -> ${afterStats.calls} (delta ${dcDelta}) | ` +
+      `indexed=${afterStats.cu.indexedShards} loadedShards=${afterStats.cu.loadedShards} mounted=${afterStats.cu.mountedPropGroups} tiles=${afterStats.loadedTiles}`,
     )
-    return chunksReady && cu.indexReady && cu.texturesReady && cu.loadedShards > 0 && cu.mountedPropGroups > 0
-  }, null, { timeout: 120000 })
-
-  // Let textures & WebGL2 mipmaps settle, then sample steady-state main-pass draw calls (min over 10 frames filters periodic shadow-map refresh spikes)
-  await page.waitForTimeout(1400)
-
-  const afterStats = await page.evaluate(async () => {
-    const v = window.viewer
-    const samples = []
-    for (let i = 0; i < 10; i++) {
-      await new Promise(r => requestAnimationFrame(r))
-      if (typeof v.stats?.calls === 'number' && v.stats.calls > 0) samples.push(v.stats.calls)
-    }
-    await v.freeze()
-    const cu = v.cityUpgrade.getStats()
-    const calls = samples.length ? Math.min(...samples) : (v.stats?.calls ?? -1)
-    return { cu, calls }
-  })
-  verifiedStats = afterStats.cu
-
-  const afterPng = path.join(OUT_DIR, `${view.id}_${mode.key}_after.png`)
-  await page.screenshot({ path: afterPng })
-
-  // Toggle cityUpgrade OFF at the EXACT same camera & frame environment for Before shot
-  await page.evaluate(() => {
-    const v = window.viewer
-    v.resume()
-    v.cityUpgrade.setEnabled(false)
-  })
-  await page.waitForTimeout(900)
-
-  const beforeStats = await page.evaluate(async () => {
-    const v = window.viewer
-    const samples = []
-    for (let i = 0; i < 10; i++) {
-      await new Promise(r => requestAnimationFrame(r))
-      if (typeof v.stats?.calls === 'number' && v.stats.calls > 0) samples.push(v.stats.calls)
-    }
-    await v.freeze()
-    const cu = v.cityUpgrade.getStats()
-    const calls = samples.length ? Math.min(...samples) : (v.stats?.calls ?? -1)
-    return { cu, calls }
-  })
-
-  const beforePng = path.join(OUT_DIR, `${view.id}_${mode.key}_before.png`)
-  await page.screenshot({ path: beforePng })
+  }
 
   await ctx.close()
-  const dcDelta = afterStats.calls >= 0 && beforeStats.calls >= 0 ? afterStats.calls - beforeStats.calls : null
-  metrics.push({
-    view: view.id,
-    mode: mode.key,
-    beforeCalls: beforeStats.calls,
-    afterCalls: afterStats.calls,
-    dcDelta,
-    cu: afterStats.cu,
-  })
-  console.log(
-    `[shot] ${view.id} (${mode.key}): calls ${beforeStats.calls} -> ${afterStats.calls} (delta ${dcDelta}) | ` +
-    `shards=${afterStats.cu.indexedShards} loaded=${afterStats.cu.loadedShards} mounted=${afterStats.cu.mountedPropGroups} grid=${afterStats.cu.fasciaGrid}`,
-  )
 }
 
 try {
-  for (const view of VIEWS) {
-    for (const mode of view.modes) {
-      await capturePair(view, mode)
-    }
+  for (const mode of MODES) {
+    await captureMode(mode)
   }
 } finally {
   await browser.close()
   server.httpServer.close()
 }
 
-// Stitch side-by-side before/after comparisons via Python Pillow
+// Stitch clean comparison contact sheets via Python Pillow
 const pyScript = `
 from pathlib import Path
 from PIL import Image, ImageDraw, ImageFont
 
 out = Path(${JSON.stringify(OUT_DIR)})
-views = ${JSON.stringify(VIEWS.map(v => ({ id: v.id, label: v.label, modes: v.modes.map(m => m.key) })))}
-font = None
+views = ${JSON.stringify(VIEWS.map(v => ({ id: v.id, label: v.label })))}
+modes = ${JSON.stringify(MODES.map(m => ({ key: m.key, zh: m.zh })))}
+
+font_sm = None
+font_lg = None
 for p in ["/System/Library/Fonts/PingFang.ttc", "/System/Library/Fonts/STHeiti Medium.ttc"]:
     if Path(p).exists():
-        font = ImageFont.truetype(p, 18)
+        font_sm = ImageFont.truetype(p, 16)
+        font_lg = ImageFont.truetype(p, 20)
         break
 
+# 1. Per-view before/after pairs
 for v in views:
-    for mk in v["modes"]:
-        b = Image.open(out / f"{v['id']}_{mk}_before.png").convert("RGB").resize((720, 405), Image.Resampling.LANCZOS)
-        a = Image.open(out / f"{v['id']}_{mk}_after.png").convert("RGB").resize((720, 405), Image.Resampling.LANCZOS)
-        comp = Image.new("RGB", (1444, 445), (22, 24, 28))
-        comp.paste(b, (0, 40))
-        comp.paste(a, (724, 40))
+    for m in modes:
+        b = Image.open(out / f"{v['id']}_{m['key']}_before.png").convert("RGB").resize((640, 360), Image.Resampling.LANCZOS)
+        a = Image.open(out / f"{v['id']}_{m['key']}_after.png").convert("RGB").resize((640, 360), Image.Resampling.LANCZOS)
+        comp = Image.new("RGB", (1284, 396), (22, 24, 28))
+        comp.paste(b, (0, 36))
+        comp.paste(a, (644, 36))
         d = ImageDraw.Draw(comp)
-        d.rectangle([720, 0, 723, 445], fill=(220, 224, 228))
-        mode_zh = "晴午" if mk == "day" else "雨夜"
-        d.text((14, 8), f"原版 GL04 · {v['label']} [{mode_zh}]", fill=(210, 215, 220), font=font)
-        d.text((738, 8), f"城建 v1+ 全城版 (96款一店一色) · {v['label']} [{mode_zh}]", fill=(255, 218, 128), font=font)
-        comp.save(out / f"{v['id']}_{mk}_compare.jpg", quality=90)
-print("Stitched comparison sheets in", out)
+        d.rectangle([640, 0, 643, 396], fill=(220, 224, 228))
+        d.text((12, 8), f"原版 GL04 · {v['label']} [{m['zh']}]", fill=(210, 215, 220), font=font_sm)
+        d.text((656, 8), f"城建 v1+ 全图版 (4,080 区块) · {v['label']} [{m['zh']}]", fill=(255, 218, 128), font=font_sm)
+        comp.save(out / f"{v['id']}_{m['key']}_compare.jpg", quality=88)
+
+# 2. Outer-ring 6-district contact sheets (day & night, 2 cols x 3 rows, each cell before|after)
+outer = views[:6]
+for m in modes:
+    cell_w, cell_h, hdr = 964, 304, 34
+    cols, rows = 2, 3
+    sheet = Image.new("RGB", (cols * cell_w + 16, rows * cell_h + 52), (16, 18, 22))
+    sd = ImageDraw.Draw(sheet)
+    sd.text((18, 12), f"城建 v1+ 全开放地图 (4,080 区块 / 952 分片) · 外环 6 大区 Before / After 实拍 [{m['zh']}]", fill=(255, 224, 140), font=font_lg)
+    for idx, v in enumerate(outer):
+        r, c = divmod(idx, cols)
+        x0 = 6 + c * cell_w
+        y0 = 48 + r * cell_h
+        b = Image.open(out / f"{v['id']}_{m['key']}_before.png").convert("RGB").resize((476, 268), Image.Resampling.LANCZOS)
+        a = Image.open(out / f"{v['id']}_{m['key']}_after.png").convert("RGB").resize((476, 268), Image.Resampling.LANCZOS)
+        sheet.paste(b, (x0, y0 + hdr))
+        sheet.paste(a, (x0 + 480, y0 + hdr))
+        sd.rectangle([x0 + 476, y0, x0 + 479, y0 + hdr + 268], fill=(180, 185, 195))
+        sd.text((x0 + 8, y0 + 7), f"Before · {v['label']}", fill=(200, 206, 214), font=font_sm)
+        sd.text((x0 + 488, y0 + 7), f"After · 城建 v1+", fill=(255, 218, 128), font=font_sm)
+    sheet.save(out / f"outer6_{m['key']}_sheet.jpg", quality=88)
+
+# 3. Sanduo R1 regression + night shopfront showcase sheet (day + night stacked)
+s_day = Image.open(out / "07_sanduo_r1_day_compare.jpg")
+s_night = Image.open(out / "07_sanduo_r1_night_compare.jpg")
+s_sheet = Image.new("RGB", (s_day.width, s_day.height + s_night.height + 6), (16, 18, 22))
+s_sheet.paste(s_day, (0, 0))
+s_sheet.paste(s_night, (0, s_day.height + 6))
+s_sheet.save(out / "sanduo_r1_day_night_sheet.jpg", quality=90)
+print("Stitched all comparison sheets in", out)
 `
+
 const pyBin = fs.existsSync('/Users/pan-work/guilinol/.venv/bin/python')
   ? '/Users/pan-work/guilinol/.venv/bin/python'
   : 'python3'
 const stitch = spawnSync(pyBin, ['-c', pyScript], { stdio: 'inherit' })
 if (stitch.status !== 0) {
-  console.error('Stitching comparisons failed')
+  console.error('Stitching failed')
   process.exit(1)
 }
 
 const assertions = []
-if (!verifiedStats || verifiedStats.indexedShards !== 96) {
-  assertions.push(`Expected indexedShards=96, got ${verifiedStats?.indexedShards}`)
+if (!verifiedStats || verifiedStats.indexedShards !== 952) {
+  assertions.push(`Expected indexedShards=952, got ${verifiedStats?.indexedShards}`)
 }
-if (!verifiedStats || verifiedStats.fasciaGrid?.[0] !== 8 || verifiedStats.fasciaGrid?.[1] !== 12) {
-  assertions.push(`Expected fasciaGrid=[8,12], got ${JSON.stringify(verifiedStats?.fasciaGrid)}`)
+if (!verifiedStats || verifiedStats.fasciaGrid?.[0] !== 6 || verifiedStats.fasciaGrid?.[1] !== 16) {
+  assertions.push(`Expected fasciaGrid=[6,16], got ${JSON.stringify(verifiedStats?.fasciaGrid)}`)
 }
 for (const m of metrics) {
-  if (m.dcDelta !== null && m.dcDelta > 12) {
-    assertions.push(`DrawCall delta too high at ${m.view}/${m.mode}: +${m.dcDelta}`)
+  if (m.dcDelta !== null && m.dcDelta > 10) {
+    assertions.push(`DrawCall delta > +10 at ${m.view}/${m.mode}: +${m.dcDelta}`)
+  }
+}
+for (const t of crossCityTrace) {
+  if (t.loadedShards > 36) {
+    assertions.push(`Shard eviction leak suspected at ${t.view}: loadedShards=${t.loadedShards}`)
   }
 }
 
-const summary = { metrics, consoleErrors, pageErrors, badResponses, assertions }
+const summary = { metrics, crossCityTrace, consoleErrors, pageErrors, badResponses, assertions }
 fs.writeFileSync(path.join(OUT_DIR, 'summary.json'), JSON.stringify(summary, null, 2))
-console.log('QA Summary:', JSON.stringify({
+console.log('CROSS_CITY_TRACE:', JSON.stringify(crossCityTrace))
+console.log('QA_SUMMARY:', JSON.stringify({
   pairs: metrics.length,
   indexedShards: verifiedStats?.indexedShards,
   fasciaGrid: verifiedStats?.fasciaGrid,
+  maxDcDelta: Math.max(...metrics.map(m => m.dcDelta ?? -999)),
+  maxLoadedShards: Math.max(...crossCityTrace.map(t => t.loadedShards)),
   consoleErrors: consoleErrors.length,
   pageErrors: pageErrors.length,
   badResponses: badResponses.length,
-  assertions: assertions.length,
+  assertions,
 }))
 
 if (consoleErrors.length || pageErrors.length || badResponses.length || assertions.length) {

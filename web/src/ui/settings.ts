@@ -44,7 +44,7 @@ function build() {
         <label class="set-row set-row--range"><span class="set-what"><b>总音量</b><small>骑车和鸣笛</small></span><input data-volume type="range" min="0" max="1" step="0.01"><span class="set-val" data-volume-out></span></label>
         <label class="set-row"><span class="set-what"><b>静音</b><small>关闭全部游戏音效</small></span><input data-mute type="checkbox"></label>
       </section>
-      <section class="set-block">
+      <section class="set-block" data-dev-only>
         <h3>读数显示</h3>
         ${STAT_ROWS.map(([id, label, hint]) => `<label class="set-row">
           <span class="set-what"><b>${label}</b><small>${hint}</small></span>
@@ -61,10 +61,11 @@ function build() {
       <section class="set-block">
         <h3>画面</h3>
         <label class="set-row"><span class="set-what"><b>进入时自动全屏</b><small>触屏设备进入游戏时尝试切到横屏</small></span><input data-fullscreen type="checkbox"></label>
+        <div class="set-row"><span class="set-what"><b>视野与画质</b><small>远处画多少、光影档位；卡顿或发烫时调低</small></span><button type="button" class="set-open" data-render-range>调整</button></div>
       </section>
       <section class="set-block">
         <h3>视角</h3>
-        <div class="set-seg" role="radiogroup" aria-label="视角">
+        <div class="set-seg" role="group" aria-label="视角">
           <button type="button" data-view="third">第三人称</button>
           <button type="button" data-view="first">第一人称</button>
         </div>
@@ -72,7 +73,7 @@ function build() {
       </section>
       <section class="set-block set-block--thumb">
         <h3>手机按键<button type="button" class="set-reset" data-thumb-reset>恢复默认</button></h3>
-        <div class="set-seg set-seg--thumb" role="radiogroup" aria-label="按键布局">${THUMB_PRESETS.map(([id, label, dots]) => `<button type="button" data-thumb="${id}">
+        <div class="set-seg set-seg--thumb" role="group" aria-label="按键布局">${THUMB_PRESETS.map(([id, label, dots]) => `<button type="button" data-thumb="${id}">
           <svg viewBox="0 0 54 34" aria-hidden="true"><rect x="1" y="1" width="52" height="32" rx="6"/>${dots}</svg><span>${label}</span>
         </button>`).join('')}</div>
         <label class="set-row set-row--range">
@@ -87,7 +88,7 @@ function build() {
       </section>
       <section class="set-block set-block--keys">
         <h3>键位<button type="button" class="set-reset">恢复默认</button></h3>
-        <ul class="set-keys">${ACTIONS.map(action => `<li>
+        <ul class="set-keys">${ACTIONS.map(action => `<li${action.id === 'stats' ? ' data-dev-only' : ''}>
           <span class="set-what"><b>${action.label}</b></span>
           <button type="button" class="set-key" data-action="${action.id}"></button>
         </li>`).join('')}</ul>
@@ -120,6 +121,11 @@ function build() {
   })
   window.addEventListener('keydown', event => {
     if (event.code === 'Escape' && !mask!.hidden) close()
+  })
+  // 视野与画质面板（render-range.ts）不再常驻 HUD（IDOK-468），从这里打开：先收起设置，免得面板压在遮罩下面。
+  mask.querySelector<HTMLButtonElement>('[data-render-range]')!.addEventListener('click', () => {
+    close()
+    window.dispatchEvent(new Event('glol:open-render-range'))
   })
   for (const input of Array.from(mask.querySelectorAll<HTMLInputElement>('[data-stat]'))) {
     input.addEventListener('change', () => {

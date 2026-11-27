@@ -42,7 +42,7 @@ try {
       await page.request.post(origin+'/api/auth/register',{headers:{Origin:origin},data:{email,password,nickname}})
       await page.request.post(origin+'/api/auth/verify',{headers:{Origin:origin},data:{email,password,code:await code('verify')}})
       assert.equal((await page.request.get(origin+'/api/me')).status(),200)
-      await page.goto(origin+'/?verify');await page.locator('.dock-feedback').waitFor({timeout:120000})
+      await page.goto(origin+'/?verify');await page.locator('.dock-feedback').waitFor({state:'attached',timeout:120000})
       await (await import('./feedback-test.mjs')).uiTest(page,origin,sql)
     }else{
     await page.goto(origin+'/?verify');await page.locator('.account-entry').click();if(feedbackUI)await page.evaluate(()=>window.viewer.freeze())

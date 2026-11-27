@@ -50,9 +50,6 @@ export interface SzjSignRuntimeMetrics {
 export interface CreateSzjIndoorSceneOptions {
   readonly layout?: SzjLayout
   readonly now?: () => number
-  readonly veilFadeInMs?: number
-  readonly reenterCooldownMs?: number
-  readonly descentSpeed?: number
   readonly maxNpcs?: number
   readonly seed?: string | number
   readonly atmosPreset?: SzjAtmosPresetName

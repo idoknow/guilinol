@@ -15,7 +15,8 @@
   --td-paper: var(--ui-paper, #f4efe2);
   --td-ink: var(--ui-ink-900, #14211e);
   --td-beacon: #e2f524;
-  --td-r-pill: var(--ui-r-pill, 999px);
+  /* 方角印框（IDOK-468）：HUD 条与按钮不再是胶囊 */
+  --td-r-pill: var(--ui-r-paper, 6px);
   --td-r-panel: var(--ui-r-lg, 18px);
   --td-r-card: var(--ui-r-sm, 8px);
   --td-h: 34px;
@@ -232,11 +233,6 @@ body:has(.gl-mission-hud:not([hidden])) .td-bar {
   letter-spacing: 0.05em;
   white-space: nowrap;
   cursor: pointer;
-}
-
-.td-officer-marker.is-near {
-  background: var(--td-accent);
-  box-shadow: inset 0 0 0 1.5px var(--td-paper);
 }
 
 /* ---------- 桥面执勤范围出界警告 ---------- */
@@ -694,6 +690,13 @@ dialog.td-panel::backdrop {
     top: calc(212px + env(safe-area-inset-top));
   }
 
+  /* 饮品店叫号面板占左侧（drinks/ui/order-panel.css：left 124、宽不超过 300）：交警入口挪到面板右边，不叠在叫号上（IDOK-468） */
+  body:has(.drinks-pickup-hud:not([hidden])) .td-entry {
+    left: calc(436px + env(safe-area-inset-left));
+    transform: none;
+    max-width: calc(100vw - 584px - env(safe-area-inset-left) - env(safe-area-inset-right));
+  }
+
   body:has(.gl-mission-hud:not([hidden])) .td-bounds-banner {
     top: calc(250px + env(safe-area-inset-top));
   }
@@ -742,4 +745,9 @@ dialog.td-panel::backdrop {
   .td-hud-root * {
     transition: none !important;
   }
+}
+
+/* 纯触屏没有键盘：[F] 之类的键帽不出现（IDOK-468） */
+@media (hover: none) and (pointer: coarse) and (not (any-pointer: fine)) {
+  .td-kbd { display: none; }
 }

@@ -27,7 +27,7 @@ def is_shard_empty(payload: dict) -> bool:
 
 def build_index(
     out_dir: Path,
-    fascia_grid: tuple[int, int] = (8, 12),
+    fascia_grid: tuple[int, int] = (6, 16),
     world_dir: Path | None = None,
     write_path: Path | None = None,
 ) -> dict:
@@ -109,7 +109,7 @@ def main():
     ap = argparse.ArgumentParser(description="Merge public/city-upgrade/shards/*.json into ordered index.json.")
     ap.add_argument("--out-dir", type=Path, default=REPO_ROOT / "public/city-upgrade")
     ap.add_argument("--world-dir", type=Path, default=None, help="Optional world directory for chunk-aligned ring lookup")
-    ap.add_argument("--fascia-grid", choices=("8x8", "8x12"), default="8x12")
+    ap.add_argument("--fascia-grid", choices=("8x8", "8x12", "6x16"), default="6x16")
     ap.add_argument("--output", type=Path, default=None, help="Optional custom output path for index.json")
     args = ap.parse_args()
 

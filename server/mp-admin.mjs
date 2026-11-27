@@ -1,4 +1,6 @@
 import {readFile} from 'node:fs/promises'
+import {securitySearch} from './security-search.mjs'
+import {enrichBans,searchBanUsers} from './ban-identities.mjs'
 import {activities,gameplay,history,record,regions} from './mp-store.mjs'
 
 const json=(value,status=200)=>Response.json(value,{status,headers:{'cache-control':'no-store'}})
@@ -116,8 +118,23 @@ export function multiplayer(pool,env,{cache}={}){
     }
     return name?{name,dist:Math.round(Math.sqrt(best))}:null
   }
+  async function resolvePlace(x,z){
+    await loadLandmarks()
+    return nearestPlace(x,z)
+  }
+  let cheatCaptures=null
+  function setCheatCaptures(service){cheatCaptures=service}
   async function route(path,request,actor){
     const params=new URL(request.url).searchParams
+    if(path==='admin/security-search')return securitySearch(pool,request)
+    if(cheatCaptures&&path.startsWith('admin/mp/cheat-captures')){
+      const handled=await cheatCaptures.adminRoute(path,request,actor)
+      if(handled)return handled
+    }
+    if(path==='admin/user-search'){
+      if(request.method!=='GET')return json({error:'method not allowed'},405)
+      return json(await searchBanUsers(pool,(params.get('q')??'').trim().slice(0,128)))
+    }
     // 联机封禁：列表 / 手动封禁 / 人工解封（转发到 rt，由 rt 的 RT_ADMIN_TOKEN 鉴权）
     if(path==='admin/bans'||path==='admin/ban'||path==='admin/unban'){
       if(!env.RT_ADMIN_TOKEN)return json({error:'disabled'},503)
@@ -126,7 +143,9 @@ export function multiplayer(pool,env,{cache}={}){
         const init={method:request.method,redirect:'error',signal:AbortSignal.timeout(6000),headers:{'X-Admin-Token':env.RT_ADMIN_TOKEN,'content-type':'application/json'}}
         if(request.method!=='GET')init.body=JSON.stringify({...(await request.json().catch(()=>({}))),actor})
         const response=await fetch(target,init)
-        return json(await response.json().catch(()=>({})))
+        const body=await response.json().catch(()=>({}))
+        if(response.ok&&path==='admin/bans'&&Array.isArray(body.bans))body.bans=await enrichBans(pool,body.bans)
+        return json(body,response.status)
       }catch{return json({error:'rt unavailable'},503)}
     }
     if(path.startsWith('admin/chat/')){
@@ -166,7 +185,7 @@ export function multiplayer(pool,env,{cache}={}){
         server:{...server,landmarkCount:landmarks.length,landmarkSource},
         players:safePlayers,
         bans,
-        events:events.map(({ip,nodeIp,...event})=>event),
+        events:events.filter(event=>event.type!=='session-device').map(({ip,nodeIp,...event})=>event),
         chat,
         activities:safeActivities,
         activityBreakdown,
@@ -232,5 +251,5 @@ export function multiplayer(pool,env,{cache}={}){
       await record(pool,snapshot,new Date(),nearestPlace)
     }catch(error){console.warn('mp sample failed',error.code??error.message)}finally{pending=false}
   }
-  return {route,start(){void sample();const timer=setInterval(sample,60000);timer.unref();return ()=>clearInterval(timer)}}
+  return {route,resolvePlace,setCheatCaptures,start(){void sample();const timer=setInterval(sample,60000);timer.unref();return ()=>clearInterval(timer)}}
 }

@@ -32,45 +32,49 @@ export function home(play:(mode:PlayMode)=>void):Home {
     <div class="home-title">
       <span class="home-seal" aria-hidden="true"><img src="./brand/emblem.webp" width="371" height="144" alt=""></span>
       <h1>网上桂林</h1>
-      <p class="home-tag">一座按真实地图搭起来的 3D 桂林。<br>同城联机逛街骑车赚钱，也能飞上天看山水。</p>
-      <p class="home-meta"><span>同城实时联机</span><span>登录就能玩</span><span>电脑 · 手机都行</span></p>
     </div>
-    <div class="home-modes" role="list">
-      <button type="button" class="home-mode home-mode--mp" role="listitem" data-umami-event="home-mp">
-        <span class="home-mode-seal" aria-hidden="true">联</span>
-        <span class="home-mode-text"><b>联机模式<em class="home-mp-badge">推荐</em><i class="home-mp-live" hidden></i></b><span>同城玩家一起逛街骑车、接单送米粉、钓鱼换装，实时看到彼此外形和昵称。</span>
-          <small class="home-wallet"></small></span>
-        <span class="home-go home-go--mp">进入联机</span>
-      </button>
-      <button type="button" class="home-mode home-mode--tour" role="listitem" data-umami-event="home-tour">
-        <span class="home-mode-seal" aria-hidden="true">游</span>
-        <span class="home-mode-text"><b>游览模式</b><span>自由飞行看山水，走遍 ${spots.length} 处名胜集印章。</span>
-          <small class="home-progress"></small></span>
-        <span class="home-go home-go--tour">开始游览</span>
-      </button>
-      <div class="home-resume-row" role="listitem" hidden>
-        <button type="button" class="home-resume" data-umami-event="home-resume">
-          <i aria-hidden="true"></i><span>回到上次离开的地方</span><small class="home-resume-ago"></small>
+    <div class="home-modes" role="list" aria-label="选择模式">
+      <div class="home-row home-row--mp" role="listitem">
+        <button type="button" class="home-mode home-mode--mp" data-umami-event="home-mp">
+          <span class="home-mode-seal ui-seal" aria-hidden="true">联</span>
+          <span class="home-mode-text"><b>联机模式<i class="home-mp-live ui-num" hidden></i></b><span>同城玩家一起逛街接单</span>
+            <small class="home-wallet ui-num"></small></span>
+          <span class="home-go home-go--mp">进入联机</span>
         </button>
       </div>
-      <button type="button" class="home-mode home-mode--solo" role="listitem" data-umami-event="home-solo">
-        <span class="home-mode-seal" aria-hidden="true">街</span>
-        <span class="home-mode-text"><b>单人模式</b><span>离线独自逛街接单，保留完整进度与存档。</span></span>
-        <span class="home-go home-go--solo">进入</span>
-      </button>
+      <div class="home-row home-row--tour" role="listitem">
+        <button type="button" class="home-mode home-mode--tour" data-umami-event="home-tour">
+          <span class="home-mode-seal ui-seal ui-seal--ink" aria-hidden="true">游</span>
+          <span class="home-mode-text"><b>游览模式</b><span>飞遍 ${spots.length} 处名胜集印章</span>
+            <small class="home-progress ui-num"></small></span>
+          <span class="home-go home-go--tour">开始游览</span>
+        </button>
+        <div class="home-resume-row" hidden>
+          <button type="button" class="home-resume ui-link" data-umami-event="home-resume">
+            <i aria-hidden="true"></i><span>回到上次离开的地方</span><small class="home-resume-ago"></small>
+          </button>
+        </div>
+      </div>
+      <div class="home-row home-row--solo" role="listitem">
+        <button type="button" class="home-mode home-mode--solo" data-umami-event="home-solo">
+          <span class="home-mode-seal ui-seal ui-seal--ink" aria-hidden="true">街</span>
+          <span class="home-mode-text"><b>单人模式</b><span>离线逛街，进度照存</span></span>
+          <span class="home-go home-go--solo">进入</span>
+        </button>
+      </div>
     </div>
-    <nav class="home-links">
+    <nav class="home-links" aria-label="更多">
       <button type="button" class="ui-btn ui-btn--ghost" data-act="guide" data-umami-event="home-guide">玩法说明</button>
       <button type="button" class="ui-btn ui-btn--ghost" data-act="about" data-umami-event="home-about">关于游戏</button>
       <button type="button" class="ui-btn ui-btn--ghost" data-act="qq" data-umami-event="home-qq">QQ 群</button>
-      <a class="ui-btn ui-btn--ghost" href="${SOURCE_URL}" target="_blank" rel="noopener" data-umami-event="home-source-link">源代码 ↗</a>
+      <a class="ui-btn ui-btn--ghost" href="${SOURCE_URL}" target="_blank" rel="noopener" data-umami-event="home-source-link">源代码<span aria-hidden="true"> ↗</span></a>
     </nav>
   </div>
   <button type="button" class="home-douyin" data-umami-event="home-douyin" aria-label="抖音官方号 ${DOUYIN_NAME}，点开看二维码">
     <img class="home-douyin-code" src="./icons/douyin-code.webp" width="560" height="560" decoding="async" loading="lazy" alt="">
-    <span class="home-douyin-text"><img class="home-douyin-mark" src="./icons/douyin-mark.webp" width="284" height="120" alt=""><b>${DOUYIN_NAME}</b><small>官方号 · 扫码关注</small></span>
+    <span class="home-douyin-text"><img class="home-douyin-mark" src="./icons/douyin-mark.webp" width="284" height="120" alt=""><b>${DOUYIN_NAME}</b></span>
   </button>
-  <div class="home-foot"><span class="home-caption" aria-live="off"></span><span class="home-credit">受 <a href="https://nanningol.com" target="_blank" rel="noopener" data-umami-event="home-thanks-nanning">网上南宁</a> 启发 · 地图数据 © OpenStreetMap 贡献者 <span class="home-ver">· v${__APP_VERSION__}</span></span></div>`
+  <div class="home-foot"><span class="home-caption" aria-live="off"></span><span class="home-credit">受 <a href="https://nanningol.com" target="_blank" rel="noopener" data-umami-event="home-thanks-nanning">网上南宁</a> 启发 · 地图 © OpenStreetMap 贡献者 <span class="home-ver">· v${__APP_VERSION__}</span></span></div>`
   const progress = root.querySelector('.home-progress')!
   progress.textContent = stamps ? `已集 ${Math.min(stamps,spots.length)} / ${spots.length} 枚印章` : ''
   const go = root.querySelector<HTMLElement>('.home-go--tour')!, tour = root.querySelector<HTMLButtonElement>('.home-mode--tour')!
@@ -200,7 +204,7 @@ function codeCard(card:CodeCard) {
       <div class="qq-body">
         <img class="qq-code" src="${card.img}" width="${card.w}" height="${card.h}" decoding="async" alt="${card.alt}">
         <p class="qq-note">${card.note}</p>
-        <div class="qq-row"><b class="qq-num">${card.num}</b><button type="button" class="ui-btn ui-btn--ghost qq-copy">${card.copyLabel}</button></div>
+        <div class="qq-row"><b class="qq-num">${card.num}</b><button type="button" class="ui-btn ui-btn--line qq-copy">${card.copyLabel}</button></div>
       </div>
     </div>`
     const close = () => { m.hidden = true }

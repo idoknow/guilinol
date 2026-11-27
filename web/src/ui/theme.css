@@ -1,35 +1,77 @@
-/* 网上桂林 UI 体系「山水印」 — the one place colours, shapes and motion are defined.
+/* 网上桂林 UI 体系「山水印」（S1 重做）— the one place colours, shapes, type and motion are defined.
    Three materials, each with one job:
-   · 青玉玻璃 (jade glass)  — controls that float over the scene: HUD buttons, dark dialogs.
-   · 宣纸     (rice paper)  — things you read: spot cards, 景册, the map, the title-screen cards.
-   · 朱砂印   (vermilion)   — the single most important action on screen, and stamps. Never decoration.
-   Shapes: controls are pills, dialogs are 18 px cards, paper is 6 px sheets. Type is one serif.
-   Every component file (hud.css, play.css, feedback.css, account.css, home.css) reads these tokens;
-   do not introduce new colours elsewhere — add a token here and document it in docs/ui.md. */
+   · 墨青纸 (ink-jade sheet) — dialogs and controls over the scene. Opaque, one hairline, no glow.
+   · 宣纸   (rice paper)     — things you read: spot cards, 景册, the map, the title slip, inputs.
+   · 朱砂   (vermilion)      — the single main action on screen, urgent states, and seals. Never decoration.
+   Shapes: controls are 4 px "printing blocks", dialogs are 8 px sheets with one inset 印框 line, paper is 6 px.
+   Type: one serif, a seven-step size ladder (3xl is the cover title only), wide tracking for titles only. Numbers tabular, ¥ with a sans fallback.
+   Every component file reads these tokens; do not introduce new colours elsewhere —
+   add a token here and document it in docs/ui.md. */
 :root{
+  /* --- 字 ---------------------------------------------------------------------------------------- */
   --ui-serif:"Noto Serif SC","Source Han Serif SC","Songti SC","STSong",serif;
-  /* 青玉 */
-  --ui-ink-900:#14211e;--ui-ink-800:#1c2c2a;--ui-jade-700:#2f4a45;--ui-jade-500:#4f7f7a;--ui-jade-300:#8fc1b5;
-  --ui-glass:rgba(22,37,34,.66);--ui-glass-strong:rgba(22,37,34,.82);--ui-glass-solid:rgba(22,36,33,.9);
-  --ui-glass-line:rgba(244,239,226,.3);--ui-glass-line-soft:rgba(244,239,226,.16);
-  /* 宣纸 */
-  --ui-paper:#f4efe2;--ui-paper-2:#e9e1cf;--ui-paper-3:#efe8d8;--ui-paper-dim:rgba(244,239,226,.7);
-  --ui-ink:#2a302c;--ui-ink-soft:#5d655f;--ui-paper-line:rgba(60,60,50,.14);
-  /* 朱砂 */
+  /* 数字与金额：衬线优先，缺「¥」字形的机器逐字回落到无衬线 */
+  --ui-num:"Noto Serif SC","Source Han Serif SC","Songti SC","PingFang SC","Microsoft YaHei",system-ui,sans-serif;
+  --ui-sans:"PingFang SC","HarmonyOS Sans SC","Noto Sans CJK SC","Source Han Sans SC","Microsoft YaHei",system-ui,sans-serif;
+  /* 字号阶梯：只用这七级；3xl 只给封面书名「网上桂林」一处 */
+  --ui-fs-xs:12px;--ui-fs-sm:14px;--ui-fs-md:16px;--ui-fs-lg:20px;--ui-fs-xl:28px;--ui-fs-2xl:44px;--ui-fs-3xl:60px;
+  /* 字距：正文正常，控件略开，标题宽，封面大字最宽 */
+  --ui-track-body:.04em;--ui-track:.1em;--ui-track-title:.2em;--ui-track-display:.32em;
+  --ui-lh-tight:1.25;--ui-lh:1.65;
+
+  /* --- 墨青（深色面） ----------------------------------------------------------------------------- */
+  --ui-ink-950:#0e1614;--ui-ink-900:#14211e;--ui-ink-800:#1c2c2a;--ui-jade-700:#2f4a45;--ui-jade-500:#4f7f7a;--ui-jade-300:#8fc1b5;
+  --ui-surface:#16211e;            /* 对话框底：不透明的墨青纸 */
+  --ui-surface-2:#1d2a27;          /* 面上再抬一级：悬停行、分段控件的选中底 */
+  --ui-surface-float:rgba(20,32,29,.86); /* 常驻在画面上的控件底（不开模糊） */
+  --ui-text:#f4efe2;--ui-text-2:rgba(244,239,226,.7);--ui-text-3:rgba(244,239,226,.46);
+  --ui-line:rgba(244,239,226,.14); /* 唯一的发丝线 */
+  --ui-line-strong:rgba(244,239,226,.3); /* 控件描边 / 照片上的分隔线 */
+  --ui-line-hover:rgba(244,239,226,.46);
+  --ui-frame-line:#353e39;          /* 对话框内衬印框：--ui-line 叠在 --ui-surface 上的不透明等值色，两段重叠处不会加深 */
+  --ui-fill:rgba(244,239,226,.06);--ui-fill-2:rgba(244,239,226,.12); /* 悬停 / 按下 */
+  --ui-scrim:rgba(8,13,12,.56);    /* 模态遮罩 */
+  /* 旧名（HUD 与各玩法仍在用，值并入新体系） */
+  --ui-glass:rgba(22,37,34,.7);--ui-glass-strong:rgba(22,37,34,.84);--ui-glass-solid:var(--ui-surface);
+  --ui-glass-line:var(--ui-line-strong);--ui-glass-line-soft:var(--ui-line);
+
+  /* --- 宣纸 -------------------------------------------------------------------------------------- */
+  --ui-paper:#f4efe2;--ui-paper-2:#e9e1cf;--ui-paper-3:#efe8d8;--ui-paper-hi:#fbf8f0;--ui-paper-dim:rgba(244,239,226,.7);
+  --ui-ink:#2a302c;--ui-ink-soft:#5d655f;--ui-ink-3:#8a8f86;--ui-paper-line:rgba(60,60,50,.16);
+  --ui-paper-line-strong:rgba(42,48,44,.3);--ui-paper-fill:rgba(42,48,44,.06); /* 纸上的控件描边 / 悬停底 */
+
+  /* --- 朱砂 -------------------------------------------------------------------------------------- */
   --ui-seal:#a9503c;--ui-seal-hi:#bd5e48;--ui-seal-light:#d0694c;--ui-seal-wash:rgba(169,80,60,.12);
-  /* 赭石：只用于「关于」页的反馈类标记，与朱砂（设计/主动作）、青玉（代码）区分 */
+  /* 赭石：只用于「关于」页的反馈类标记 */
   --ui-ochre:#c49a4a;--ui-ochre-wash:rgba(196,154,74,.16);
-  /* 状态 */
+  /* 状态（文字色，配文字或 aria 一起用，不单靠颜色） */
   --ui-ok:#8fc1b5;--ui-warn:#e2b878;--ui-error:#f0b9a6;--ui-disabled:rgba(244,239,226,.38);
-  /* 形状 */
-  --ui-r-pill:999px;--ui-r-lg:18px;--ui-r-md:12px;--ui-r-sm:8px;--ui-r-paper:6px;
+  --ui-focus:#8fc1b5;
+
+  /* --- 形状 -------------------------------------------------------------------------------------- */
+  --ui-r-xs:2px;   /* 印章、标签、键帽 */
+  --ui-r-sm:4px;   /* 控件、输入框 */
+  --ui-r-ctl:var(--ui-r-sm);
+  --ui-r-md:6px;   /* 面内的小卡 */
+  --ui-r-lg:8px;   /* 对话框 */
+  --ui-r-paper:6px;
+  --ui-r-pill:999px; /* 只给圆点、计数角标；控件不再用 */
+  --ui-frame:5px;  /* 对话框内衬印框离边距离 */
+  --ui-frame-pad:calc(var(--ui-frame) + 1px + var(--ui-s-2)); /* 14px：印框 + 线 + 一档间距；对话框内容（含滚动区）一律收在这条边以内 */
   --ui-h:38px;--ui-h-lg:48px;
-  /* 不对活画布做背景模糊（IDOK-297）：每个 backdrop-filter 元素每帧都要回读并模糊整张 WebGL 帧，
-     常驻 HUD 改为更实的青玉底 + 细描边。只有模态遮罩（dialog::backdrop、全屏 mask、加载雾幕）可用 --ui-blur-mask。 */
+  /* 间距：4 的倍数 */
+  --ui-s-1:4px;--ui-s-2:8px;--ui-s-3:12px;--ui-s-4:16px;--ui-s-5:24px;--ui-s-6:32px;--ui-s-7:48px;
+
+  /* 不对活画布做背景模糊（IDOK-297）。只有模态遮罩（dialog::backdrop、全屏 mask、加载雾幕）可用 --ui-blur-mask。 */
   --ui-blur:none;--ui-blur-mask:blur(4px);
-  --ui-shadow-1:0 4px 14px rgba(12,20,20,.22);--ui-shadow-2:0 18px 50px rgba(12,20,20,.32);
+  /* 投影只给浮在 3D 画面上的宣纸卡（教程卡、景点卡）；对话框靠遮罩和印框，不加投影 */
+  --ui-shadow-1:0 1px 3px rgba(8,14,13,.28);--ui-shadow-2:0 14px 36px rgba(8,14,13,.34);
+
+  /* --- 动效 -------------------------------------------------------------------------------------- */
   --ui-ease:cubic-bezier(.2,.8,.2,1);--ui-fast:.15s;--ui-slow:.32s;
-  --ui-track:.1em;
+  --ui-rise:8px;   /* 进场位移上限 */
+  --ui-press:.97;  /* 按下缩放 */
+
   /* legacy aliases (play.css / feedback.css were written against these names) */
   --glass:var(--ui-glass);--glass-strong:var(--ui-glass-strong);--paper:var(--ui-paper);--paper-deep:var(--ui-paper-2);
   --ink:var(--ui-ink);--ink-soft:var(--ui-ink-soft);--seal:var(--ui-seal);--seal-light:var(--ui-seal-light);--line:var(--ui-glass-line);--serif:var(--ui-serif)}
@@ -37,55 +79,99 @@
 [hidden]{display:none!important}
 body{font-family:var(--ui-serif)}
 
-/* --- 按钮 ------------------------------------------------------------------------------------- */
-.ui-btn{display:inline-flex;align-items:center;justify-content:center;gap:.45em;box-sizing:border-box;min-height:var(--ui-h);padding:0 18px;
-  font:500 14px/1 var(--ui-serif);letter-spacing:var(--ui-track);text-decoration:none;white-space:nowrap;cursor:pointer;
-  color:var(--ui-paper);background:var(--ui-glass);border:1px solid var(--ui-glass-line);border-radius:var(--ui-r-pill);
-  -webkit-tap-highlight-color:transparent;user-select:none;-webkit-user-select:none;
-  transition:background var(--ui-fast),border-color var(--ui-fast),transform var(--ui-fast),box-shadow var(--ui-fast),color var(--ui-fast)}
-.ui-btn:hover{background:var(--ui-glass-strong)}
-.ui-btn:active{transform:scale(.96)}
-.ui-btn:focus-visible,.ui-icon-btn:focus-visible,.ui-tab:focus-visible{outline:2px solid var(--ui-jade-300);outline-offset:2px}
-.ui-btn--seal{background:var(--ui-seal);border-color:var(--ui-seal);box-shadow:0 6px 18px rgba(169,80,60,.32)}
+/* --- 按钮：小圆角版刻块。默认墨青、--seal 主动作、--paper 宣纸、--line 线框次按钮、--ghost 纯文字 ------ */
+.ui-btn{display:inline-flex;align-items:center;justify-content:center;gap:.45em;box-sizing:border-box;min-height:var(--ui-h);padding:0 16px;
+  font:500 var(--ui-fs-sm)/1 var(--ui-serif);letter-spacing:var(--ui-track);text-decoration:none;white-space:nowrap;cursor:pointer;
+  color:var(--ui-text);background:var(--ui-glass);border:1px solid var(--ui-line-strong);border-radius:var(--ui-r-ctl);
+  -webkit-tap-highlight-color:transparent;touch-action:manipulation;user-select:none;-webkit-user-select:none;
+  transition:background var(--ui-fast),border-color var(--ui-fast),transform var(--ui-fast),color var(--ui-fast)}
+.ui-btn:hover{background:var(--ui-glass-strong);border-color:var(--ui-line-hover)}
+.ui-btn:active{transform:scale(var(--ui-press))}
+.ui-btn:focus-visible,.ui-icon-btn:focus-visible,.ui-tab:focus-visible,.ui-link:focus-visible{outline:2px solid var(--ui-focus);outline-offset:2px}
+.ui-btn--seal{color:var(--ui-paper);background:var(--ui-seal);border-color:var(--ui-seal)}
 .ui-btn--seal:hover{background:var(--ui-seal-hi);border-color:var(--ui-seal-hi)}
-.ui-btn--paper{background:var(--ui-paper);border-color:var(--ui-paper);color:var(--ui-ink)}
-.ui-btn--paper:hover{background:#fffaf0}
-.ui-btn--ghost{background:none;border-color:transparent;color:var(--ui-paper-dim)}
-.ui-btn--ghost:hover{background:rgba(244,239,226,.08);color:var(--ui-paper)}
-.ui-btn--lg{min-height:var(--ui-h-lg);padding:0 28px;font-size:17px;letter-spacing:.2em}
+.ui-btn--paper{color:var(--ui-ink);background:var(--ui-paper);border-color:var(--ui-paper)}
+.ui-btn--paper:hover{background:var(--ui-paper-hi);border-color:var(--ui-paper-hi)}
+.ui-btn--line{color:var(--ui-text);background:none;border-color:var(--ui-line-strong)}
+.ui-btn--line:hover{background:var(--ui-fill);border-color:var(--ui-line-hover)}
+.ui-btn--ghost{color:var(--ui-text-2);background:none;border-color:transparent}
+.ui-btn--ghost:hover{color:var(--ui-text);background:var(--ui-fill);border-color:transparent}
+.ui-btn--lg{min-height:var(--ui-h-lg);padding:0 24px;font-size:var(--ui-fs-md);letter-spacing:var(--ui-track-title)}
 .ui-btn--block{display:flex;width:100%}
-.ui-btn[disabled],.ui-btn[aria-disabled=true]{cursor:default;color:var(--ui-disabled);background:rgba(24,40,37,.32);border-color:var(--ui-glass-line-soft);box-shadow:none;transform:none}
-.ui-icon-btn{display:inline-grid;place-items:center;flex:none;width:34px;height:34px;padding:0;border-radius:50%;cursor:pointer;font:400 20px/1 var(--ui-serif);
-  color:var(--ui-paper-dim);background:rgba(244,239,226,.08);border:1px solid var(--ui-glass-line-soft);transition:background var(--ui-fast),color var(--ui-fast)}
-.ui-icon-btn:hover{background:rgba(244,239,226,.16);color:var(--ui-paper)}
+.ui-btn[disabled],.ui-btn[aria-disabled=true]{cursor:default;color:var(--ui-disabled);background:none;border-color:var(--ui-line);transform:none}
+.ui-icon-btn{display:inline-grid;place-items:center;flex:none;box-sizing:border-box;width:34px;height:34px;padding:0;border-radius:var(--ui-r-ctl);cursor:pointer;font:400 20px/1 var(--ui-serif);
+  color:var(--ui-text-2);background:none;border:1px solid var(--ui-line);-webkit-tap-highlight-color:transparent;
+  transition:background var(--ui-fast),color var(--ui-fast),transform var(--ui-fast)}
+.ui-icon-btn:hover{background:var(--ui-fill);color:var(--ui-text)}
+.ui-icon-btn:active{transform:scale(var(--ui-press))}
+/* 文字链接：底部链接、续游一类次要入口 */
+.ui-link{display:inline-flex;align-items:center;gap:.4em;padding:0;border:0;background:none;cursor:pointer;font:inherit;letter-spacing:inherit;color:var(--ui-text-2);
+  text-decoration:underline;text-decoration-color:var(--ui-line-strong);text-decoration-thickness:1px;text-underline-offset:.32em;transition:color var(--ui-fast),text-decoration-color var(--ui-fast)}
+.ui-link:hover{color:var(--ui-text);text-decoration-color:currentColor}
+/* 数字：等宽，金额带「¥」也不缺字 */
+.ui-num{font-family:var(--ui-num);font-variant-numeric:tabular-nums;letter-spacing:.02em}
 
-/* --- 面板：深青玻璃对话框（关于 / 账号 / 反馈 / 玩法） --------------------------------------- */
-.ui-panel,.about-panel{box-sizing:border-box;color:var(--ui-paper);background:var(--ui-glass-solid);border:1px solid var(--ui-glass-line-soft);border-radius:var(--ui-r-lg);
-  box-shadow:var(--ui-shadow-2);font-family:var(--ui-serif)}
+/* --- 面板：墨青纸对话框（关于 / 账号 / 反馈 / 玩法 / 设置）。一条内衬印框线，无外描边、无投影 -------------- */
+/* 印框 = 面板自己的一条 outline（一层、闭合、不拼接；圆角随 border-radius 同心内收）。
+   面板四周是 --ui-frame-pad 宽的透明边框（底色铺满边框区）：滚动内容只在边框以内裁切，
+   所以不论面板自己滚还是里面的正文滚，内容都收在印框线以内、不压线；outline 画在盒子上，不随内容滚。 */
+.ui-panel,.about-panel{box-sizing:border-box;color:var(--ui-text);background:var(--ui-surface);border:var(--ui-frame-pad) solid transparent;border-radius:var(--ui-r-lg);
+  outline:1px solid var(--ui-frame-line);outline-offset:calc(-1px - var(--ui-frame));box-shadow:none;font-family:var(--ui-serif);
+  scrollbar-width:thin;scrollbar-color:var(--ui-line-strong) transparent}
+/* 对话框拿到焦点时浏览器会换掉 outline；保持印框不变 */
+.ui-panel:focus,.ui-panel:focus-visible,.about-panel:focus,.about-panel:focus-visible{outline:1px solid var(--ui-frame-line);outline-offset:calc(-1px - var(--ui-frame))}
 dialog.ui-panel,dialog.about-panel{padding:0;margin:auto}
-dialog.ui-panel::backdrop,dialog.about-panel::backdrop{background:rgba(12,20,20,.5);backdrop-filter:var(--ui-blur-mask)}
-.about-panel>header,.ui-panel>header{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:16px 18px 12px;border-bottom:1px solid var(--ui-glass-line-soft)}
-.about-panel h2,.ui-panel h2{margin:0;font-size:18px;font-weight:600;letter-spacing:.2em}
-/* every dialog's close is the same round ×; the text stays for screen readers and tests */
-.about-panel>header .about-close,.ui-panel>header .about-close{position:relative;flex:none;width:34px;height:34px;min-height:0;padding:0;border-radius:50%;font-size:0;cursor:pointer;
-  color:var(--ui-paper-dim);background:rgba(244,239,226,.08);border:1px solid var(--ui-glass-line-soft);transition:background var(--ui-fast),color var(--ui-fast)}
-.about-panel>header .about-close::before,.ui-panel>header .about-close::before{content:"×" / "";font:400 21px/32px var(--ui-serif);position:absolute;inset:0;text-align:center}
-.about-panel>header .about-close:hover,.ui-panel>header .about-close:hover{background:rgba(244,239,226,.16);color:var(--ui-paper)}
+dialog.ui-panel::backdrop,dialog.about-panel::backdrop{background:var(--ui-scrim);backdrop-filter:var(--ui-blur-mask)}
+/* 边框已让出 14px，页眉内边距相应收小：标题仍离面板外沿约 22px */
+.about-panel>header,.ui-panel>header{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:4px 2px 8px 8px;border-bottom:0}
+/* 游戏外的几张对话框（关于 / 设置 / 玩法指南 / 二维码）：页眉不动，只有正文在印框里滚。
+   游戏内仍用 .about-mask 的面板（无人机等）保持 hud.css 的整面滚动 + 吸顶页眉，同样不会越过印框。 */
+.about-mask>.about-panel:is(.about-panel--wide,.settings,.guide-sheet,.qq){display:flex;flex-direction:column;overflow:hidden}
+.about-mask>.about-panel:is(.about-panel--wide,.settings,.guide-sheet,.qq)>header{position:static;flex:none;background:none}
+.about-mask>.about-panel>:is(.about-body,.set-body,.guide-body,.qq-body){flex:1 1 auto;min-height:0;overflow:auto;overscroll-behavior:contain;
+  scrollbar-width:thin;scrollbar-color:var(--ui-line-strong) transparent}
+.about-panel h2,.ui-panel h2{margin:0;font:600 var(--ui-fs-lg)/var(--ui-lh-tight) var(--ui-serif);letter-spacing:var(--ui-track-title)}
+/* every dialog's close is the same square ×; the text stays for screen readers and tests */
+.about-panel>header .about-close,.ui-panel>header .about-close{position:relative;flex:none;width:36px;height:36px;min-height:0;padding:0;border-radius:var(--ui-r-ctl);font-size:0;cursor:pointer;
+  color:var(--ui-text-2);background:none;border:0;-webkit-tap-highlight-color:transparent;transition:background var(--ui-fast),color var(--ui-fast)}
+.about-panel>header .about-close::before,.ui-panel>header .about-close::before{content:"×" / "";position:absolute;inset:0;display:grid;place-items:center;font:300 26px/1 var(--ui-serif)}
+.about-panel>header .about-close:hover,.ui-panel>header .about-close:hover{background:var(--ui-fill);color:var(--ui-text)}
+.about-panel>header .about-close:focus-visible,.ui-panel>header .about-close:focus-visible{outline:2px solid var(--ui-focus);outline-offset:-2px}
+@media (pointer:coarse) and (not (any-pointer:fine)){.about-panel>header .about-close,.ui-panel>header .about-close{width:var(--ui-h);height:var(--ui-h)}}
 
-/* --- 表单 ------------------------------------------------------------------------------------- */
-.ui-field{display:grid;gap:6px;font-size:13px;letter-spacing:.06em;color:var(--ui-paper-dim)}
-.ui-input,.ui-field input:not([type=checkbox]):not([type=radio]){box-sizing:border-box;width:100%;min-height:44px;padding:10px 12px;font:16px var(--ui-serif);color:var(--ui-ink-800);
-  background:var(--ui-paper);border:1px solid transparent;border-radius:var(--ui-r-sm);transition:border-color var(--ui-fast),box-shadow var(--ui-fast)}
-.ui-input:focus,.ui-field input:focus{outline:none;border-color:var(--ui-jade-300);box-shadow:0 0 0 3px rgba(143,193,181,.28)}
-.ui-field ::placeholder{color:#8a8f86}
+/* 宣纸面：需要读的卡（S2/S3 的景点卡、景册、票据都从这里取） */
+.ui-sheet{box-sizing:border-box;color:var(--ui-ink);background:var(--ui-paper);border-radius:var(--ui-r-paper);box-shadow:inset 0 0 0 1px var(--ui-paper-line)}
+.ui-sheet .ui-btn--line{color:var(--ui-ink);border-color:var(--ui-paper-line-strong)}.ui-sheet .ui-btn--line:hover{background:var(--ui-paper-fill);border-color:var(--ui-ink-soft)}
+.ui-sheet .ui-btn--ghost{color:var(--ui-ink-soft)}.ui-sheet .ui-btn--ghost:hover{color:var(--ui-ink);background:var(--ui-paper-fill)}
+.ui-sheet .ui-link{color:var(--ui-ink-soft);text-decoration-color:var(--ui-paper-line-strong)}.ui-sheet .ui-link:hover{color:var(--ui-ink)}
 
-/* --- 标签与印 --------------------------------------------------------------------------------- */
-.ui-tag{display:inline-flex;align-items:center;gap:4px;padding:3px 9px;border-radius:var(--ui-r-pill);font:500 11.5px/1.2 var(--ui-serif);letter-spacing:.1em;
-  color:var(--ui-paper);background:rgba(244,239,226,.14);border:1px solid var(--ui-glass-line-soft)}
-.ui-tag--seal{background:var(--ui-seal);border-color:var(--ui-seal)}
-.ui-seal{display:inline-grid;place-items:center;flex:none;width:1.9em;height:1.9em;border-radius:5px;font:700 1em/1 var(--ui-serif);color:var(--ui-paper);background:var(--ui-seal);
-  box-shadow:inset 0 0 0 2px var(--ui-seal),inset 0 0 0 3.5px rgba(244,239,226,.82);transform:rotate(-4deg)}
-@media (prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;transition-duration:.01ms!important}}
+/* --- 表单：宣纸输入框 --------------------------------------------------------------------------- */
+.ui-field{display:grid;gap:6px;font-size:var(--ui-fs-xs);letter-spacing:.08em;color:var(--ui-text-2)}
+.ui-input,.ui-field input:not([type=checkbox]):not([type=radio]){box-sizing:border-box;width:100%;min-height:44px;padding:10px 12px;font:var(--ui-fs-md) var(--ui-serif);letter-spacing:.02em;color:var(--ui-ink);
+  background:var(--ui-paper);border:1px solid transparent;border-radius:var(--ui-r-sm);transition:border-color var(--ui-fast),background var(--ui-fast)}
+.ui-input:hover,.ui-field input:not([type=checkbox]):not([type=radio]):hover{background:var(--ui-paper-hi)}
+.ui-input:focus,.ui-field input:focus{outline:2px solid var(--ui-focus);outline-offset:1px;border-color:var(--ui-ink-soft)}
+.ui-input[aria-invalid=true],.ui-field input[aria-invalid=true]{border-color:var(--ui-seal)}
+.ui-field ::placeholder{color:var(--ui-ink-3)}
+
+/* --- 标签与印 ----------------------------------------------------------------------------------- */
+.ui-tag{display:inline-flex;align-items:center;gap:4px;padding:3px 7px;border-radius:var(--ui-r-xs);font:500 var(--ui-fs-xs)/1.2 var(--ui-serif);letter-spacing:.1em;
+  color:var(--ui-text-2);background:none;border:1px solid var(--ui-line-strong)}
+.ui-tag--seal{color:var(--ui-paper);background:var(--ui-seal);border-color:var(--ui-seal)}
+/* 印章字块。默认白文（朱底白字，主选/已盖）；--line 朱文（朱线朱字）；--ink 墨线（未选/次要） */
+.ui-seal{display:inline-grid;place-items:center;flex:none;box-sizing:border-box;width:1.9em;height:1.9em;border-radius:var(--ui-r-xs);font:700 1em/1 var(--ui-serif);letter-spacing:0;
+  color:var(--ui-paper);background:var(--ui-seal);box-shadow:inset 0 0 0 2px var(--ui-seal),inset 0 0 0 3px rgba(244,239,226,.72);transform:rotate(-2deg)}
+.ui-seal--line{color:var(--ui-seal-light);background:none;box-shadow:inset 0 0 0 1.5px currentColor}
+.ui-seal--ink{color:var(--ui-text-2);background:none;box-shadow:inset 0 0 0 1px var(--ui-line-strong)}
+.ui-sheet .ui-seal--line{color:var(--ui-seal)}.ui-sheet .ui-seal--ink{color:var(--ui-ink-soft);box-shadow:inset 0 0 0 1px var(--ui-paper-line-strong)}
+
+/* --- 动效：进场一次性错落淡入（≤8px、≤320ms），按下 .97；唯一允许循环的是加载转圈 ------------------- */
+@keyframes ui-rise{from{opacity:0;transform:translateY(var(--ui-rise))}to{opacity:1;transform:none}}
+@keyframes ui-spin{to{transform:rotate(360deg)}}
+.ui-rise{animation:ui-rise var(--ui-slow) var(--ui-ease) both;animation-delay:var(--ui-delay,0ms)}
+.ui-spin{display:inline-block;flex:none;box-sizing:border-box;width:14px;height:14px;border-radius:50%;border:1.5px solid currentColor;border-right-color:transparent;opacity:.85;animation:ui-spin .8s linear infinite}
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}
+  .ui-spin{animation-duration:2.4s!important;animation-iteration-count:infinite!important}}
 :root {
   /* 区域地图（IDOK-115）：开放区域外是同一张宣纸上淡墨罩染，名字压在罩染之上 */
   --region-mask: rgba(96, 90, 72, .30);
@@ -104,7 +190,6 @@ dialog.ui-panel::backdrop,dialog.about-panel::backdrop{background:rgba(12,20,20,
 }
 :root {
   /* 管理后台（IDOK-129）：宣纸上的数据卡片。卡片比纸底亮一档，图表六色取自青玉、朱砂、赭石、黛蓝。 */
-  --ui-paper-hi: #fbf8f0;
   --ui-good: #3f7a6c;
   --ui-bad: #b0472f;
   --adm-c1: #4f7f7a; --adm-c2: #c0634a; --adm-c3: #c49a4a; --adm-c4: #2f4a45; --adm-c5: #7d8fae; --adm-c6: #9aa36f;

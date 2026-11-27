@@ -21,7 +21,6 @@ import {
   mountLazyXiaoxianggang,
   portalLanding,
   rotateLocal,
-  shouldEnterPortal,
   validateXxgLayout,
   worldToIndoor,
   worldToPortalLocal,
@@ -34,9 +33,14 @@ import {
   createIndoorGreyboxScene,
   createXxgIndoorScene,
   createXxgRuntimeStateMachine,
-  findTriggeredExit,
+  doorLeafRects,
+  locateInWell,
   resolveIndoorMovement,
+  xxgIndoorWells,
 } from './index.ts'
+import { toIndoor } from './stairwell.ts'
+import { XXG_STAIRWELL, stairwellFloorY, yawFacing } from '../frame.ts'
+import { normalizeAngleRad } from './types.ts'
 import { XIAOXIANGGANG_B1_LAYOUT } from '../layout/index.ts'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
@@ -231,8 +235,8 @@ test('Stage 1 greybox layout & coordinate frame strictly conform to contract.ts 
   assert.throws(() => assertValidXxgLayout({ ...STAGE1_GREYBOX_LAYOUT, ceilingHeight: 1.8 }), /ceilingHeight/)
 })
 
-test('runtime state machine enforces XXG_TRANSITIONS, portal walk-in trigger, and exit cooldown hysteresis', () => {
-  const sm = createXxgRuntimeStateMachine(XXG_PORTALS, 1500)
+test('runtime state machine enforces XXG_TRANSITIONS and tracks the active portal', () => {
+  const sm = createXxgRuntimeStateMachine()
   assert.equal(sm.getState(), 'unmounted')
 
   // Illegal transitions from unmounted must fail cleanly without throwing
@@ -241,28 +245,13 @@ test('runtime state machine enforces XXG_TRANSITIONS, portal walk-in trigger, an
   assert.equal(sm.transitionTo('exiting'), false)
 
   assert.equal(sm.transitionTo('idle'), true)
-  assert.equal(sm.getState(), 'idle')
-
-  for (const portal of XXG_PORTALS) {
-    // Stationary player on stairs (vel = 0) must NOT auto-trigger entry
-    const stepPos = {
-      x: portal.world.x + rotateLocal({ x: 0, z: 2.2 }, portal.yaw).x,
-      y: portal.groundY + 0.875,
-      z: portal.world.z + rotateLocal({ x: 0, z: 2.2 }, portal.yaw).z,
-    }
-    assert.equal(shouldEnterPortal(portal, stepPos, { x: 0, z: 0 }), false)
-    assert.equal(sm.detectSurfaceEntry(stepPos, { x: 0, z: 0 }, 1000).triggeredPortal, null)
-
-    // Walking inward across thresholdZ <= 3.0 triggers entry
-    const inwardVel = { x: portal.inward.x * 1.5, z: portal.inward.z * 1.5 }
-    const trig = sm.detectSurfaceEntry(stepPos, inwardVel, 1000)
-    assert.equal(trig.triggeredPortal?.id, portal.id)
-
-    // Cooldown suppresses immediate bounce re-entry, then re-arms after cooldown expires
-    sm.markPortalExitCooldown(portal.id, 2000, 1500)
-    assert.equal(sm.detectSurfaceEntry(stepPos, inwardVel, 2800).triggeredPortal, null)
-    assert.equal(sm.detectSurfaceEntry(stepPos, inwardVel, 3600).triggeredPortal?.id, portal.id)
-  }
+  assert.equal(sm.transitionTo('entering'), true)
+  sm.setActivePortalId('W2')
+  assert.equal(sm.getActivePortalId(), 'W2')
+  assert.equal(sm.transitionTo('inside'), true)
+  assert.equal(sm.transitionTo('entering'), false)
+  assert.equal(sm.transitionTo('exiting'), true)
+  assert.equal(sm.transitionTo('idle'), true)
 
   // Verify transition table parity with contract.ts
   for (const [from, allowed] of Object.entries(XXG_TRANSITIONS)) {
@@ -308,14 +297,27 @@ test('indoor collision blocks walls (zero tunneling), slides smoothly, enters bo
   assert.equal(hitBay2Back.hitWall, true)
   assert.ok(Math.abs(hitBay2Back.x - expectedRear2) < 1e-4)
 
-  // 5. Stairwell solid obstacle push-out & exit trigger directionality
-  const e2Exit = STAGE1_GREYBOX_LAYOUT.exits.find(e => e.portalId === 'E2')
-  assert.equal(findTriggeredExit(STAGE1_GREYBOX_LAYOUT, e2Exit.foot.x, e2Exit.foot.z, 0, 1.5), null, 'walking inward must not exit')
-  assert.equal(
-    findTriggeredExit(STAGE1_GREYBOX_LAYOUT, e2Exit.foot.x, e2Exit.foot.z, 0, -1.5)?.portalId,
-    'E2',
-    'walking toward E2 stair must trigger exit',
-  )
+  // 5. Stairwells: vestibule -> doorway -> landing is walkable, a closed door blocks it, the flight is solid.
+  for (const w of xxgIndoorWells()) {
+    const up = { x: toIndoor(w, 0, 1).x - w.cx, z: toIndoor(w, 0, 1).z - w.cz }
+    const walkUp = (obstacles, metres) => {
+      const start = toIndoor(w, 0, -5.8)
+      let x = start.x
+      let z = start.z
+      for (let i = 0; i < Math.round(metres / 0.1); i++) {
+        const r = resolveIndoorMovement(world, STAGE1_GREYBOX_LAYOUT, x, z, up.x * 0.1, up.z * 0.1, obstacles)
+        x = r.x
+        z = r.z
+      }
+      return locateInWell(x, z)
+    }
+    const open = walkUp([], 4)
+    assert.equal(open?.well.portalId, w.portalId)
+    assert.ok(open.lz >= XXG_STAIRWELL.exitZ, `${w.portalId} open door reaches the landing, lz=${open.lz}`)
+    assert.ok(open.lz <= XXG_STAIRWELL.zBottom + 1e-3, `${w.portalId} flight above the landing stays solid, lz=${open.lz}`)
+    const closed = walkUp(doorLeafRects(w, 0), 4)
+    assert.ok(closed.lz < XXG_STAIRWELL.zBack - 0.2, `${w.portalId} closed door blocks the doorway, lz=${closed.lz}`)
+  }
 
   assert.equal(clampIndoorPitch(world, 3.0), world.maxPitchRad)
   assert.equal(clampIndoorPitch(world, -3.0), world.minPitchRad)
@@ -332,9 +334,13 @@ test('greybox scene stays well under 40 draw calls and disposes every geometry, 
   let disposedGeoms = 0
   let disposedMats = 0
   let disposedTexs = 0
+  // Meshes may share a material (the stairwell door stiles reuse the skylight frame metal): count each once.
+  const seenMats = new Set()
   handle.scene.traverse(obj => {
     if (obj instanceof THREE.Mesh) {
       obj.geometry.addEventListener('dispose', () => disposedGeoms++)
+      if (seenMats.has(obj.material)) return
+      seenMats.add(obj.material)
       obj.material.addEventListener('dispose', () => disposedMats++)
       if (obj.material.map) {
         obj.material.map.addEventListener('dispose', () => disposedTexs++)
@@ -388,7 +394,7 @@ test('repeated enter/exit cycles across all 4 portals leave zero DOM/scene resid
       },
     }
 
-    const indoor = createXxgIndoorScene({ veilFadeInMs: 0, reenterCooldownMs: 50 })
+    const indoor = createXxgIndoorScene({ layout: STAGE1_GREYBOX_LAYOUT, veilFadeInMs: 0 })
     assert.equal(indoor.state, 'unmounted')
     assert.equal(await indoor.enter('E1'), false)
     assert.equal(await indoor.exit(), false)
@@ -409,7 +415,7 @@ test('repeated enter/exit cycles across all 4 portals leave zero DOM/scene resid
       assert.equal(env.body.dataset.xxgActive, '1')
       // worldCamera is never mutated (first-person uses indoor.camera)
       assert.deepEqual(worldCamera.position.toArray(), initialWorldCamPos)
-      assert.equal(indoor.camera.position.y, XXG_PLAYER.eyeHeight)
+      assert.ok(Math.abs(indoor.camera.position.y - XXG_PLAYER.eyeHeight) < 0.02)
 
       // Reject concurrent enter while already inside
       assert.equal(await indoor.enter('W2'), false)
@@ -447,6 +453,158 @@ test('repeated enter/exit cycles across all 4 portals leave zero DOM/scene resid
     assert.equal(veilDones, 16)
     indoor.dispose()
   })
+})
+
+test('default createXxgIndoorScene loads full 53-shop B1 layout with PBR materials within budget', async () => {
+  const env = createMockDomEnvironment()
+  await withMockGlobals(env, async () => {
+    const renderer = createCountingRenderer()
+    const worldCamera = new THREE.PerspectiveCamera(55, 16 / 9, 1, 2000)
+    const indoor = createXxgIndoorScene({ veilFadeInMs: 0 })
+    await indoor.mount({
+      renderer,
+      worldCamera,
+      bodyFlag: 'xxgActive',
+      getWalker: () => null,
+      openVeil: () => ({ done: async () => {} }),
+      suspendWorld() {},
+      resumeWorldAt: async () => true,
+    })
+    assert.equal(indoor.getLayout().shops.length, 53)
+    for (const pid of XXG_PORTAL_IDS) {
+      assert.equal(await indoor.enter(pid), true)
+      assert.equal(indoor.renderFrame(), true)
+      const metrics = indoor.getMetrics()
+      assert.ok(metrics.drawCalls >= 10 && metrics.drawCalls <= XXG_BUDGET.indoorDrawCallsMax, `drawCalls=${metrics.drawCalls}`)
+      assert.ok(metrics.textureBytes <= XXG_BUDGET.indoorTextureBytesMax)
+      const contactsBefore = indoor.getPlayerSnapshot().collisionContacts
+      const collideKey = pid === 'W2' ? 'KeyA' : 'KeyD'
+      env.mockWindow.dispatchKey('keydown', collideKey)
+      for (let f = 0; f < 40; f++) indoor.step(0.05)
+      env.mockWindow.dispatchKey('keyup', collideKey)
+      assert.ok(indoor.getPlayerSnapshot().collisionContacts > contactsBefore, `${pid} wall collision must engage`)
+      assert.equal(await indoor.exit(), true)
+    }
+    indoor.dispose()
+  })
+})
+
+test('楼梯井无缝换场：街面楼梯视角渐变、井底平台同帧进场位姿连续、开门走进 B1、倒走回平台同帧交还街面且不回弹', async () => {
+  const env = createMockDomEnvironment()
+  const hadNode = 'Node' in globalThis
+  if (!hadNode) globalThis.Node = class {}
+  try {
+    await withMockGlobals(env, async () => {
+      let t = 0
+      const portal = getPortal('E1')
+      const local = (lx, lz) => {
+        const o = rotateLocal({ x: lx, z: lz }, portal.yaw)
+        return { x: portal.world.x + o.x, z: portal.world.z + o.z }
+      }
+      const downYaw = yawFacing(portal.inward)
+      const walker = { position: { x: 0, y: 0, z: 0 }, velocity: { x: 0, z: 0 }, yaw: downYaw, pitch: 0.3 }
+      const placeWalker = lz => {
+        const p = local(0, lz)
+        walker.position = { x: p.x, y: portal.groundY + stairwellFloorY(lz), z: p.z }
+      }
+      const blends = []
+      const landings = []
+      let suspended = 0
+      const indoor = createXxgIndoorScene({ veilFadeInMs: 0, crowdMaxAgents: 0, now: () => t })
+      await indoor.mount({
+        renderer: createCountingRenderer(),
+        worldCamera: new THREE.PerspectiveCamera(55, 16 / 9, 1, 2000),
+        bodyFlag: 'xxgActive',
+        getWalker: () => walker,
+        openVeil: () => ({ done: async () => {} }),
+        suspendWorld() {
+          suspended++
+        },
+        resumeWorldAt: async point => {
+          landings.push(point)
+          return true
+        },
+        setWorldViewBlend: b => blends.push(b),
+      })
+
+      // ① Street side: no blend on the apron, a partial blend mid-flight, no swap anywhere above the landing.
+      placeWalker(5)
+      indoor.step(0.016)
+      assert.equal(blends.at(-1) ?? null, null)
+      placeWalker(0)
+      indoor.step(0.016)
+      assert.equal(indoor.state, 'idle')
+      assert.ok(blends.at(-1) > 0.05 && blends.at(-1) < 0.95, `mid-flight blend ${blends.at(-1)}`)
+      placeWalker(-3.3)
+      indoor.step(0.016)
+      assert.equal(indoor.state, 'idle', 'landing edge inside the hysteresis band must not swap')
+
+      // ② Past enterZ on the landing: same-frame swap, foot / yaw / look direction carried over.
+      placeWalker(-3.6)
+      t = 100
+      indoor.step(0.016)
+      assert.equal(indoor.state, 'inside')
+      assert.equal(suspended, 1)
+      assert.equal(env.body.dataset.xxgActive, '1')
+      const inSnap = indoor.getPlayerSnapshot()
+      const expectIndoor = worldToIndoor(walker.position)
+      assert.ok(Math.hypot(inSnap.x - expectIndoor.x, inSnap.z - expectIndoor.z) < 1e-3, 'indoor foot = walker foot')
+      assert.ok(Math.abs(indoor.camera.position.y - XXG_PLAYER.eyeHeight) < 1e-3, `eye ${indoor.camera.position.y}`)
+      const look = new THREE.Vector3()
+      indoor.camera.getWorldDirection(look)
+      const lookWorld = (() => {
+        const a = indoorToWorld({ x: 0, z: 0 })
+        const b = indoorToWorld({ x: look.x, z: look.z })
+        return { x: b.x - a.x, z: b.z - a.z }
+      })()
+      const wantLook = { x: -Math.sin(downYaw), z: -Math.cos(downYaw) }
+      const lookLen = Math.hypot(lookWorld.x, lookWorld.z)
+      assert.ok(Math.hypot(lookWorld.x / lookLen - wantLook.x, lookWorld.z / lookLen - wantLook.z) < 1e-3, 'look direction carried over')
+      assert.ok(Math.abs(look.y) < 1e-3, 'level walker pitch stays level indoors')
+      assert.equal(indoor.renderFrame(), true)
+      assert.ok(indoor.getMetrics().lastSwapMs <= XXG_BUDGET.swapMsMax)
+      assert.equal(indoor.getMetrics().lastBlackFrames, 0)
+      assert.equal(inSnap.doorsOpen[0], 0, 'doors start closed and slide open on approach')
+
+      // ③ Doors open within their travel time; walking on passes the doorway into the B1 vestibule.
+      for (let f = 0; f < 12; f++) indoor.step(0.05)
+      assert.ok(indoor.getPlayerSnapshot().doorsOpen[0] > 0.99)
+      env.mockWindow.dispatchKey('keydown', 'KeyW')
+      for (let f = 0; f < 40; f++) indoor.step(0.05)
+      env.mockWindow.dispatchKey('keyup', 'KeyW')
+      const inB1 = indoor.getPlayerSnapshot()
+      assert.equal(indoor.state, 'inside')
+      const poseB1 = locateInWell(inB1.x, inB1.z)
+      assert.ok(!poseB1 || poseB1.lz < XXG_STAIRWELL.zBack - 0.4, `walked through the door, lz=${poseB1?.lz}`)
+
+      // ④ Backing up onto the landing hands the exact pose back to the street in the same step.
+      env.mockWindow.dispatchKey('keydown', 'KeyS')
+      for (let f = 0; f < 120 && indoor.state === 'inside'; f++) indoor.step(0.05)
+      env.mockWindow.dispatchKey('keyup', 'KeyS')
+      assert.equal(indoor.state, 'idle')
+      assert.equal(env.body.dataset.xxgActive, undefined)
+      const back = landings.at(-1)
+      assert.ok(back, 'resumeWorldAt called')
+      assert.ok(Math.abs(back.footY - (portal.groundY - XXG_STAIRWELL.depth)) < 1e-6)
+      assert.ok(Math.abs(normalizeAngleRad(back.yaw - downYaw)) < 1e-3, `yaw ${back.yaw} vs ${downYaw}`)
+      assert.ok(Math.abs(back.pitch - 0.3) < 1e-3)
+      const backLocal = worldToPortalLocal(portal, back)
+      assert.ok(backLocal.z >= XXG_STAIRWELL.exitZ && backLocal.z < XXG_STAIRWELL.zBottom, `exit lz=${backLocal.z}`)
+      assert.equal(blends.at(-1), 1, 'street resumes in first person')
+
+      // ⑤ Standing where the street resumed must not bounce straight back in; stepping down again re-enters.
+      walker.position = { x: back.x, y: back.footY, z: back.z }
+      for (let f = 0; f < 10; f++) indoor.step(0.016)
+      assert.equal(indoor.state, 'idle')
+      placeWalker(-3.6)
+      indoor.step(0.016)
+      assert.equal(indoor.state, 'inside')
+      indoor.dispose()
+      assert.equal(blends.at(-1), null)
+    })
+  } finally {
+    if (!hadNode) delete globalThis.Node
+  }
 })
 
 test('dispose from any state (including mid-inside) releases GPU resources, DOM, and window listeners with zero leaks', async () => {

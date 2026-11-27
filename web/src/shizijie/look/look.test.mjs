@@ -503,3 +503,20 @@ test('integrate: floor & sign onBeforeCompile chain THREE.Material.prototype.onB
     pack.dispose()
   }
 })
+
+test('street stairwell kit: one merged batch per material within a small draw-call and triangle budget', async () => {
+  const { createSurfaceStairwells } = await import('./surface-stairwells.ts')
+  const kit = createSurfaceStairwells()
+  try {
+    let meshes = 0
+    kit.group.traverse(o => {
+      if (o instanceof THREE.Mesh) meshes += 1
+    })
+    assert.equal(kit.drawCalls, meshes)
+    assert.ok(kit.drawCalls <= 14, `surface stairwell drawCalls ${kit.drawCalls} > 14`)
+    assert.ok(kit.triangles > 0 && kit.triangles <= 20000, `surface stairwell tris ${kit.triangles}`)
+    assert.ok(kit.group.getObjectByName('szj-surface-shutter'), 'closed shutter drawn at each B1 door')
+  } finally {
+    kit.dispose()
+  }
+})

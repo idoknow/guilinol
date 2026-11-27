@@ -9,11 +9,13 @@ import {
   SZJ_STAIRWELLS,
   SZJ_STAIR_IDS,
   getStairwell,
+  indoorToStairLocal,
   indoorToWorld,
-  stairLanding,
   stairLocalToIndoor,
+  worldToIndoor,
   yawFacing,
 } from '../index.ts'
+import { SZJ_LANDING, szjGroundStairwells } from '../frame.ts'
 import { createSzjIndoorScene } from './index.ts'
 
 function createMockDom() {
@@ -186,6 +188,74 @@ function createCountingRenderer() {
   }
 }
 
+/** walk/config: level first-person tilt, walking pace, and walk/camera lens offset of the street walker. */
+const WALKER_LEVEL_PITCH = 0.3
+const STREET_WALK_SPEED = 1.65
+const EYE_HEIGHT = 1.62
+const EYE_FORWARD_M = 0.08
+/** One visible frame of camera motion allowed at a swap; strict pose match below it. */
+const SWAP_FRAME_JUMP_MAX_M = 0.05
+const SWAP_POSE_ERR_MAX_M = 0.01
+const SWAP_ANGLE_ERR_MAX_DEG = 0.1
+const SWAP_FOV_ERR_MAX_DEG = 0.1
+
+const round = (v, k = 10000) => Math.round(v * k) / k
+
+/** tunnels.ts stairwellLocal + stairwellFloor: the street walker's ramp collider height under (x, z). */
+function rampFootAt(g, x, z) {
+  const dx = x - g.x
+  const dz = z - g.z
+  const lz = dx * Math.sin(g.yaw) + dz * Math.cos(g.yaw)
+  const y = g.grade - g.riser / 2 - (g.riser / g.tread) * (g.zTop - lz)
+  return Math.min(g.grade, Math.max(g.grade - g.depth, y))
+}
+
+/** walk/camera placeFirstPersonCamera for a walker foot pose: world lens position, view direction, fov. */
+function streetCameraPose(walker, fov) {
+  const p = walker.pitch - WALKER_LEVEL_PITCH
+  const look = new THREE.Vector3(
+    -Math.sin(walker.yaw) * Math.cos(p),
+    -Math.sin(p),
+    -Math.cos(walker.yaw) * Math.cos(p),
+  )
+  const pos = new THREE.Vector3(walker.position.x, walker.position.y + EYE_HEIGHT, walker.position.z).addScaledVector(
+    look,
+    EYE_FORWARD_M,
+  )
+  return { pos, look, fov }
+}
+
+/** The B1 camera as the street would see it (indoor y 0 is that well's B1 floor in world y). */
+function indoorCameraPose(camera, st) {
+  camera.updateMatrixWorld(true)
+  const w = indoorToWorld({ x: camera.position.x, z: camera.position.z })
+  const look = new THREE.Vector3()
+  camera.getWorldDirection(look)
+  return {
+    pos: new THREE.Vector3(w.x, camera.position.y + st.groundY - SZJ_FRAME.depth, w.z),
+    look,
+    fov: camera.fov,
+  }
+}
+
+/** Indoor lens for a player snapshot, mirroring controller syncIndoorCamera. */
+function snapshotCameraPose(snap, st, fov) {
+  const cp = Math.cos(snap.pitch)
+  const look = new THREE.Vector3(-Math.sin(snap.yaw) * cp, Math.sin(snap.pitch), -Math.cos(snap.yaw) * cp)
+  const w = indoorToWorld({ x: snap.x, z: snap.z })
+  const pos = new THREE.Vector3(w.x, snap.eyeY + st.groundY - SZJ_FRAME.depth, w.z).addScaledVector(look, EYE_FORWARD_M)
+  return { pos, look, fov }
+}
+
+function poseError(a, b) {
+  const dot = Math.min(1, Math.max(-1, a.look.dot(b.look)))
+  return {
+    posM: round(a.pos.distanceTo(b.pos)),
+    angleDeg: round((Math.acos(dot) * 180) / Math.PI),
+    fovDeg: round(Math.abs(a.fov - b.fov)),
+  }
+}
+
 export async function runHeadlessFourMouthVerification(opts = {}) {
   const outDir = opts.outDir ?? '/tmp/szj-headless-verify'
   const dt = 1 / 60
@@ -205,10 +275,12 @@ export async function runHeadlessFourMouthVerification(opts = {}) {
   const savedWorldCamRot = worldCamera.rotation.clone()
 
   let worldSuspended = false
+  let viewBlend = null
   let walkerState = {
     position: { x: SZJ_FRAME.originWorld.x, y: SZJ_FRAME.surfaceY, z: SZJ_FRAME.originWorld.z },
     velocity: { x: 0, z: 0 },
     yaw: 0,
+    pitch: WALKER_LEVEL_PITCH,
   }
 
   const hostCtx = {
@@ -216,42 +288,36 @@ export async function runHeadlessFourMouthVerification(opts = {}) {
     worldCamera,
     bodyFlag: 'szjActive',
     getWalker: () => (worldSuspended ? null : walkerState),
-    openVeil: () => ({
-      async done() {},
-    }),
     suspendWorld() {
       worldSuspended = true
     },
     async resumeWorldAt(pt) {
       worldSuspended = false
       walkerState = {
-        position: { x: pt.x, y: SZJ_FRAME.surfaceY, z: pt.z },
+        position: { x: pt.x, y: pt.footY ?? SZJ_FRAME.surfaceY, z: pt.z },
         velocity: { x: 0, z: 0 },
         yaw: pt.yaw,
+        pitch: pt.pitch ?? WALKER_LEVEL_PITCH,
       }
       return true
     },
+    setWorldViewBlend(b) {
+      viewBlend = b
+    },
   }
 
-  const indoor = createSzjIndoorScene({
-    now: () => nowMs,
-    veilFadeInMs: 0,
-    reenterCooldownMs: 1500,
-  })
+  const indoor = createSzjIndoorScene({ now: () => nowMs })
+  const ramps = new Map(szjGroundStairwells().map(g => [g.id.replace(/^szj-/, ''), g]))
 
   const mouthReports = []
   let globalBlackFrames = 0
   let globalMaxEyeDy = 0
   let globalMaxLandingErr = 0
 
+  /** Host frame: B1 draws while suspended, else the street draws; a suspended frame with no B1 is black. */
   const renderHostTick = () => {
     const indoorRendered = indoor.renderFrame()
-    if (!indoorRendered && worldSuspended) {
-      // Gap frame where world is suspended AND indoor did not render => black frame!
-      globalBlackFrames += 1
-      return true
-    }
-    if (indoorRendered && renderer.info.render.calls === 0) {
+    if ((!indoorRendered && worldSuspended) || (indoorRendered && renderer.info.render.calls === 0)) {
       globalBlackFrames += 1
       return true
     }
@@ -263,138 +329,143 @@ export async function runHeadlessFourMouthVerification(opts = {}) {
 
     for (const stairId of SZJ_STAIR_IDS) {
       const st = getStairwell(stairId)
+      const ramp = ramps.get(stairId)
+      const hl = st.length / 2
       nowMs += 2500
-
-      // 1. Place walker on street 1.2m outside mouth and walk inward across shouldEnterStair threshold
-      const startWorld = indoorToWorld(stairLocalToIndoor(st, { x: 0, z: -st.length * 0.5 - 1.2 }))
-      walkerState = {
-        position: { x: startWorld.x, y: st.groundY, z: startWorld.z },
-        velocity: { x: st.inward.x * 1.6, z: st.inward.z * 1.6 },
-        yaw: yawFacing(st.inward),
-      }
-
       let mouthBlackFrames = 0
-      let surfaceWalkFrames = 0
-      while (indoor.state === 'idle' && surfaceWalkFrames < 180) {
-        walkerState = {
-          ...walkerState,
-          position: {
-            x: walkerState.position.x + walkerState.velocity.x * dt,
-            y: st.groundY,
-            z: walkerState.position.z + walkerState.velocity.z * dt,
-          },
-        }
+      let mouthMaxDy = 0
+      const tick = () => {
         nowMs += dt * 1000
         indoor.step(dt)
         if (renderHostTick()) mouthBlackFrames += 1
-        surfaceWalkFrames += 1
       }
+      const visibleEye = () =>
+        worldSuspended ? indoorCameraPose(indoor.camera, st).pos.y : streetCameraPose(walkerState, worldCamera.fov).pos.y
 
-      // Flush microtasks so async enter() completes swap -> 'descending'
-      await new Promise(r => setTimeout(r, 5))
-      if (renderHostTick()) mouthBlackFrames += 1
-
-      const enteredDescending = indoor.state === 'descending'
-      const entryVisibleSigns = indoor.getVisibleHangingSigns()
-
-      // 2. Step 60fps through locked-input scripted descent until 'inside'
-      const descentEyeSamples = [indoor.getPlayerSnapshot().eyeY]
-      let descentMaxDy = 0
-      let descentMonotonic = true
+      // 1. Street walker steps off the apron and walks down the open ramp until B1 takes over on the landing.
+      const start = indoorToWorld(stairLocalToIndoor(st, { x: 0, z: -hl - 1.2 }))
+      walkerState = {
+        position: { x: start.x, y: rampFootAt(ramp, start.x, start.z), z: start.z },
+        velocity: { x: st.inward.x * STREET_WALK_SPEED, z: st.inward.z * STREET_WALK_SPEED },
+        yaw: yawFacing(st.inward),
+        pitch: WALKER_LEVEL_PITCH,
+      }
+      let streetBlendBeforeWell = viewBlend
       let descentFrames = 0
-
-      // Attempt pressing KeyW / KeyA during descent to verify input is locked
-      env.mockWindow.dispatchKey('keydown', 'KeyA')
-      while (indoor.state === 'descending' && descentFrames < 600) {
-        const prevEye = indoor.getPlayerSnapshot().eyeY
-        nowMs += dt * 1000
-        indoor.step(dt)
-        if (renderHostTick()) mouthBlackFrames += 1
-        const curEye = indoor.getPlayerSnapshot().eyeY
-        const dy = Math.abs(curEye - prevEye)
-        if (dy > descentMaxDy) descentMaxDy = dy
-        if (curEye > prevEye + 1e-6) descentMonotonic = false
-        descentEyeSamples.push(curEye)
+      let descentMonotonic = true
+      let blendMonotonic = true
+      let lastBlend = 0
+      let prevStreetCam = streetCameraPose(walkerState, worldCamera.fov)
+      let swapWalker = walkerState
+      indoor.step(dt)
+      streetBlendBeforeWell = viewBlend
+      while (indoor.state === 'idle' && descentFrames < 900) {
+        const prevEye = visibleEye()
+        prevStreetCam = streetCameraPose(walkerState, worldCamera.fov)
+        const x = walkerState.position.x + walkerState.velocity.x * dt
+        const z = walkerState.position.z + walkerState.velocity.z * dt
+        walkerState = { ...walkerState, position: { x, y: rampFootAt(ramp, x, z), z } }
+        swapWalker = walkerState
+        tick()
+        const eye = visibleEye()
+        mouthMaxDy = Math.max(mouthMaxDy, Math.abs(eye - prevEye))
+        if (eye > prevEye + 1e-6) descentMonotonic = false
+        if (indoor.state === 'idle') {
+          if (viewBlend !== null && viewBlend < lastBlend - 1e-9) blendMonotonic = false
+          lastBlend = viewBlend ?? lastBlend
+        }
         descentFrames += 1
       }
-      env.mockWindow.dispatchKey('keyup', 'KeyA')
+      const enteredFromRamp = indoor.state === 'inside'
+      const swapInLz = indoorToStairLocal(st, worldToIndoor(swapWalker.position)).z
+      const swapInSamePose = poseError(
+        streetCameraPose(swapWalker, worldCamera.fov),
+        indoorCameraPose(indoor.camera, st),
+      )
+      const swapInFrameJumpM = round(prevStreetCam.pos.distanceTo(indoorCameraPose(indoor.camera, st).pos))
+      const viewBlendAtSwap = lastBlend
+      const entryVisibleSigns = indoor.getVisibleHangingSigns()
 
-      const reachedIndoors = indoor.state === 'inside'
-      const footSnap = indoor.getPlayerSnapshot()
-      const footDistFromContract = Math.hypot(footSnap.x - st.footIndoor.x, footSnap.z - st.footIndoor.z)
-      const footSignMetrics = indoor.getSignMetrics()
-
-      // 3. Walk 30 frames forward into B1 concourse, measure indoor metrics, then turn around & climb back up
+      // 2. Keep walking: the roller shutter must clear without braking the player.
+      const walkStep = 1.6 * dt
+      let minWalkRatio = Infinity
       env.mockWindow.dispatchKey('keydown', 'KeyW')
-      for (let i = 0; i < 30; i++) {
-        nowMs += dt * 1000
-        indoor.step(dt)
-        if (renderHostTick()) mouthBlackFrames += 1
+      for (let i = 0; i < 90; i++) {
+        const before = indoor.getPlayerSnapshot()
+        tick()
+        const after = indoor.getPlayerSnapshot()
+        const adv = (after.x - before.x) * st.inward.x + (after.z - before.z) * st.inward.z
+        if (i > 0) minWalkRatio = Math.min(minWalkRatio, adv / walkStep)
       }
       env.mockWindow.dispatchKey('keyup', 'KeyW')
-
+      const passedLz = indoorToStairLocal(st, indoor.getPlayerSnapshot()).z
+      const passedShutter = passedLz > hl + SZJ_LANDING.door + 0.5
+      const reachedIndoors = indoor.state === 'inside'
+      const footSignMetrics = indoor.getSignMetrics()
       const indoorMetrics = indoor.getMetrics()
 
-      // Walk backward (KeyS = outward along -inward up the stairwell) all the way to shouldExitStair
-      const ascentEyeSamples = [indoor.getPlayerSnapshot().eyeY]
-      let ascentMaxDy = 0
-      let ascentMonotonic = true
+      // 3. Back out through the shutter (KeyS) until the street walker takes over on the landing.
       let ascentFrames = 0
-
+      let ascentMonotonic = true
+      let prevIndoorCam = indoorCameraPose(indoor.camera, st)
       env.mockWindow.dispatchKey('keydown', 'KeyS')
       while (indoor.state === 'inside' && ascentFrames < 900) {
-        const prevEye = indoor.getPlayerSnapshot().eyeY
-        nowMs += dt * 1000
-        indoor.step(dt)
-        if (renderHostTick()) mouthBlackFrames += 1
-        const curEye = indoor.getPlayerSnapshot().eyeY
-        const dy = Math.abs(curEye - prevEye)
-        if (dy > ascentMaxDy) ascentMaxDy = dy
-        if (curEye < prevEye - 1e-6) ascentMonotonic = false
-        ascentEyeSamples.push(curEye)
+        prevIndoorCam = indoorCameraPose(indoor.camera, st)
+        const prevEye = visibleEye()
+        tick()
+        const eye = visibleEye()
+        mouthMaxDy = Math.max(mouthMaxDy, Math.abs(eye - prevEye))
+        if (eye < prevEye - 1e-6) ascentMonotonic = false
         ascentFrames += 1
       }
       env.mockWindow.dispatchKey('keyup', 'KeyS')
-
-      // Flush async exit() swap -> 'idle'
-      await new Promise(r => setTimeout(r, 5))
-      if (renderHostTick()) mouthBlackFrames += 1
-
       const exitedToIdle = indoor.state === 'idle' && !worldSuspended
-      const expectedLanding = stairLanding(st)
-      const landingErrorM = Math.hypot(
-        walkerState.position.x - expectedLanding.x,
-        walkerState.position.z - expectedLanding.z,
-      )
-      const mouthMaxDy = Math.max(descentMaxDy, ascentMaxDy)
-      if (mouthMaxDy > globalMaxEyeDy) globalMaxEyeDy = mouthMaxDy
-      if (landingErrorM > globalMaxLandingErr) globalMaxLandingErr = landingErrorM
+      const exitSnap = indoor.getPlayerSnapshot()
+      const streetAfterExit = streetCameraPose(walkerState, worldCamera.fov)
+      const swapOutSamePose = poseError(snapshotCameraPose(exitSnap, st, worldCamera.fov), streetAfterExit)
+      const swapOutFrameJumpM = round(prevIndoorCam.pos.distanceTo(streetAfterExit.pos))
+      const swapOutLz = indoorToStairLocal(st, worldToIndoor(walkerState.position)).z
+      const landingErrorM = indoor.getMetrics().lastLandingError
+
+      // 4. Climb the street ramp and step off the mouth: no re-entry, camera back to the street rig.
+      let climbFrames = 0
+      let reentered = false
+      while (climbFrames < 900) {
+        const x = walkerState.position.x - st.inward.x * STREET_WALK_SPEED * dt
+        const z = walkerState.position.z - st.inward.z * STREET_WALK_SPEED * dt
+        walkerState = { ...walkerState, position: { x, y: rampFootAt(ramp, x, z), z } }
+        tick()
+        if (indoor.state !== 'idle') reentered = true
+        climbFrames += 1
+        if (indoorToStairLocal(st, worldToIndoor(walkerState.position)).z < -hl - 1) break
+      }
+      const blendClearedOnStreet = viewBlend === null
+
+      globalMaxEyeDy = Math.max(globalMaxEyeDy, mouthMaxDy)
+      globalMaxLandingErr = Math.max(globalMaxLandingErr, landingErrorM)
 
       mouthReports.push({
         stairId,
         label: st.label,
-        enteredDescending,
+        enteredFromRamp,
         reachedIndoors,
+        passedShutter,
         exitedToIdle,
+        reentered,
         descentFrames,
-        descentMaxEyeDyM: Math.round(descentMaxDy * 100000) / 100000,
         descentMonotonic,
-        footDistFromContractM: Math.round(footDistFromContract * 10000) / 10000,
         ascentFrames,
-        ascentMaxEyeDyM: Math.round(ascentMaxDy * 100000) / 100000,
         ascentMonotonic,
+        maxEyeDyM: round(mouthMaxDy, 100000),
+        streetBlendBeforeWell,
+        viewBlendAtSwap,
+        blendMonotonic,
+        blendClearedOnStreet,
+        swapIn: { stairLocalZ: round(swapInLz, 1000), ...swapInSamePose, frameJumpM: swapInFrameJumpM },
+        swapOut: { stairLocalZ: round(swapOutLz, 1000), ...swapOutSamePose, frameJumpM: swapOutFrameJumpM },
+        minWalkProgressRatio: round(minWalkRatio, 1000),
         blackFrames: mouthBlackFrames,
-        expectedLanding: {
-          x: Math.round(expectedLanding.x * 1000) / 1000,
-          z: Math.round(expectedLanding.z * 1000) / 1000,
-          yaw: Math.round(expectedLanding.yaw * 10000) / 10000,
-        },
-        actualLanding: {
-          x: Math.round(walkerState.position.x * 1000) / 1000,
-          z: Math.round(walkerState.position.z * 1000) / 1000,
-          yaw: Math.round(walkerState.yaw * 10000) / 10000,
-        },
-        landingErrorM: Math.round(landingErrorM * 10000) / 10000,
+        landingErrorM,
         entryVisibleSignCount: entryVisibleSigns.length,
         footVisibleSignCount: footSignMetrics.visibleSignCount,
         footVisibleSignIds: footSignMetrics.visibleSignIds,
@@ -413,6 +484,7 @@ export async function runHeadlessFourMouthVerification(opts = {}) {
     indoor.dispose()
     const zeroLeaksAfterDispose =
       indoor.state === 'disposed' &&
+      viewBlend === null &&
       env.body.children.length === 1 &&
       env.head.children.length === 0 &&
       env.mockWindow.totalListenerCount() === 0
@@ -427,49 +499,47 @@ export async function runHeadlessFourMouthVerification(opts = {}) {
       failures.push(`wallWayfindingPlaqueCount(${finalSignMetrics.wallWayfindingPlaqueCount}) !== 0`)
     }
     for (const m of mouthReports) {
-      if (!m.enteredDescending) failures.push(`${m.stairId}: did not enter descending`)
-      if (!m.reachedIndoors) failures.push(`${m.stairId}: did not reach indoors`)
-      if (!m.exitedToIdle) failures.push(`${m.stairId}: did not exit to surface idle`)
-      if (!m.descentMonotonic) failures.push(`${m.stairId}: descent eyeY non-monotonic`)
-      if (!m.ascentMonotonic) failures.push(`${m.stairId}: ascent eyeY non-monotonic`)
-      if (m.descentMaxEyeDyM > SZJ_BUDGET.eyeDyPerFrameMax) {
-        failures.push(`${m.stairId}: descentMaxEyeDy ${m.descentMaxEyeDyM} > ${SZJ_BUDGET.eyeDyPerFrameMax}`)
+      const id = m.stairId
+      if (m.streetBlendBeforeWell !== null) failures.push(`${id}: street walker view blend ${m.streetBlendBeforeWell} before the well`)
+      if (!m.enteredFromRamp) failures.push(`${id}: walking down the ramp did not swap into B1`)
+      if (!m.reachedIndoors) failures.push(`${id}: left B1 while walking in`)
+      if (!m.passedShutter) failures.push(`${id}: did not walk through the roller shutter`)
+      if (m.minWalkProgressRatio < 0.8) failures.push(`${id}: shutter braked the player (${m.minWalkProgressRatio} of pace)`)
+      if (!m.exitedToIdle) failures.push(`${id}: backing out did not swap to the street walker`)
+      if (m.reentered) failures.push(`${id}: re-entered B1 while climbing out`)
+      if (!m.descentMonotonic) failures.push(`${id}: eye rose while walking down`)
+      if (!m.ascentMonotonic) failures.push(`${id}: eye dropped while backing out`)
+      if (!m.blendMonotonic) failures.push(`${id}: first-person blend went backwards on the way down`)
+      if (m.viewBlendAtSwap < 1) failures.push(`${id}: view blend ${m.viewBlendAtSwap} < 1 at swap`)
+      if (!m.blendClearedOnStreet) failures.push(`${id}: view blend not released on the street`)
+      if (m.maxEyeDyM > SZJ_BUDGET.eyeDyPerFrameMax) failures.push(`${id}: maxEyeDy ${m.maxEyeDyM} > ${SZJ_BUDGET.eyeDyPerFrameMax}`)
+      for (const [k, s] of [['swapIn', m.swapIn], ['swapOut', m.swapOut]]) {
+        if (s.posM > SWAP_POSE_ERR_MAX_M) failures.push(`${id}: ${k} lens moved ${s.posM}m > ${SWAP_POSE_ERR_MAX_M}`)
+        if (s.angleDeg > SWAP_ANGLE_ERR_MAX_DEG) failures.push(`${id}: ${k} view turned ${s.angleDeg}° > ${SWAP_ANGLE_ERR_MAX_DEG}`)
+        if (s.fovDeg > SWAP_FOV_ERR_MAX_DEG) failures.push(`${id}: ${k} fov changed ${s.fovDeg}° > ${SWAP_FOV_ERR_MAX_DEG}`)
+        if (s.frameJumpM > SWAP_FRAME_JUMP_MAX_M) failures.push(`${id}: ${k} frame jump ${s.frameJumpM}m > ${SWAP_FRAME_JUMP_MAX_M}`)
       }
-      if (m.ascentMaxEyeDyM > SZJ_BUDGET.eyeDyPerFrameMax) {
-        failures.push(`${m.stairId}: ascentMaxEyeDy ${m.ascentMaxEyeDyM} > ${SZJ_BUDGET.eyeDyPerFrameMax}`)
-      }
-      if (m.blackFrames > SZJ_BUDGET.blackFramesMax) {
-        failures.push(`${m.stairId}: blackFrames ${m.blackFrames} > ${SZJ_BUDGET.blackFramesMax}`)
-      }
-      if (m.landingErrorM >= SZJ_BUDGET.landingErrorMax) {
-        failures.push(`${m.stairId}: landingErrorM ${m.landingErrorM} >= ${SZJ_BUDGET.landingErrorMax}`)
-      }
-      if (m.metrics.lastSwapMs > SZJ_BUDGET.swapMsMax) {
-        failures.push(`${m.stairId}: swapMs ${m.metrics.lastSwapMs} > ${SZJ_BUDGET.swapMsMax}`)
-      }
-      if (m.metrics.drawCalls > SZJ_BUDGET.indoorDrawCallsMax) {
-        failures.push(`${m.stairId}: drawCalls ${m.metrics.drawCalls} > ${SZJ_BUDGET.indoorDrawCallsMax}`)
-      }
-      if (m.metrics.triangles > SZJ_BUDGET.indoorTrianglesMax) {
-        failures.push(`${m.stairId}: triangles ${m.metrics.triangles} > ${SZJ_BUDGET.indoorTrianglesMax}`)
-      }
-      if (m.footVisibleSignCount < 1) {
-        failures.push(`${m.stairId}: footVisibleSignCount ${m.footVisibleSignCount} < 1`)
-      }
+      if (m.blackFrames > SZJ_BUDGET.blackFramesMax) failures.push(`${id}: blackFrames ${m.blackFrames} > ${SZJ_BUDGET.blackFramesMax}`)
+      if (m.landingErrorM >= SZJ_BUDGET.landingErrorMax) failures.push(`${id}: landingErrorM ${m.landingErrorM} >= ${SZJ_BUDGET.landingErrorMax}`)
+      if (m.metrics.lastSwapMs > SZJ_BUDGET.swapMsMax) failures.push(`${id}: swapMs ${m.metrics.lastSwapMs} > ${SZJ_BUDGET.swapMsMax}`)
+      if (m.metrics.drawCalls > SZJ_BUDGET.indoorDrawCallsMax) failures.push(`${id}: drawCalls ${m.metrics.drawCalls} > ${SZJ_BUDGET.indoorDrawCallsMax}`)
+      if (m.metrics.triangles > SZJ_BUDGET.indoorTrianglesMax) failures.push(`${id}: triangles ${m.metrics.triangles} > ${SZJ_BUDGET.indoorTrianglesMax}`)
+      if (m.footVisibleSignCount < 1) failures.push(`${id}: footVisibleSignCount ${m.footVisibleSignCount} < 1`)
     }
     if (!worldCameraPreserved) failures.push('worldCamera mutated')
-    if (!zeroLeaksAfterDispose) failures.push('dispose leaked DOM or window listeners')
+    if (!zeroLeaksAfterDispose) failures.push('dispose leaked DOM, window listeners or the view blend')
 
     const report = {
       ok: failures.length === 0,
       failures,
       summary: {
         mouthsVerified: mouthReports.map(m => m.stairId),
-        maxPerFrameEyeDyM: Math.round(globalMaxEyeDy * 100000) / 100000,
+        maxPerFrameEyeDyM: round(globalMaxEyeDy, 100000),
         eyeDyBudgetMaxM: SZJ_BUDGET.eyeDyPerFrameMax,
         totalBlackFrames: globalBlackFrames,
-        maxLandingErrorM: Math.round(globalMaxLandingErr * 10000) / 10000,
+        maxLandingErrorM: round(globalMaxLandingErr),
         landingErrorBudgetMaxM: SZJ_BUDGET.landingErrorMax,
+        maxSwapFrameJumpM: Math.max(...mouthReports.flatMap(m => [m.swapIn.frameJumpM, m.swapOut.frameJumpM])),
         indoorDrawCalls: finalMetrics.drawCalls,
         drawCallsBudgetMax: SZJ_BUDGET.indoorDrawCallsMax,
         indoorTriangles: finalMetrics.triangles,
@@ -504,9 +574,9 @@ export async function runHeadlessFourMouthVerification(opts = {}) {
 const isCli =
   process.argv[1] && path.resolve(process.argv[1]) === path.resolve(fileURLToPath(import.meta.url))
 if (isCli) {
-  runHeadlessFourMouthVerification()
+  runHeadlessFourMouthVerification({ outDir: process.argv[2] })
     .then(report => {
-      console.log(JSON.stringify(report, null, 2))
+      console.log(JSON.stringify({ ok: report.ok, failures: report.failures, summary: report.summary }, null, 2))
       if (!report.ok) process.exit(1)
     })
     .catch(err => {

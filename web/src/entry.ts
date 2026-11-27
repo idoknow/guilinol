@@ -19,6 +19,7 @@ const params = new URLSearchParams(location.search)
 if (params.has('verify') || params.has('debug')) document.body.dataset.debug = ''
 const deepLink = isDeepLink(params)
 watchForUpdates()
+onUser(user => markSession(user?.uid ?? null))
 // Playing requires a signed-in account (IDOK-99). Local test harnesses (Playwright on 127.0.0.1 with deep-link params) skip it.
 const harness = deepLink && ['127.0.0.1', 'localhost'].includes(location.hostname)
 
@@ -127,3 +128,4 @@ else {
   const warm = () => void loadEngine().catch(()=>{})
   if ('requestIdleCallback' in window) requestIdleCallback(warm, {timeout: 2500}); else setTimeout(warm, 1200)
 }
+import {markSession} from './session-mark'

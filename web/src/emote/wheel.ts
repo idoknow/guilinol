@@ -21,17 +21,17 @@ export function emoteWheel(allowed: () => boolean, play: (id: number) => void) {
   overlay.hidden = true
   overlay.append(disc)
   document.body.append(toggle, overlay)
-  const slots = Array.from({length: 8}, (_, i) => {
-    const a = (i * Math.PI) / 4,
-      button = document.createElement('button'),
-      entry = emotes[i]
+  // 轮盘按实际动作数均分（IDOK-468）：有几个动作就分几格，不留空位；分隔线由 --emote-n 画。
+  disc.style.setProperty('--emote-n', String(emotes.length))
+  const slots = emotes.map((entry, i) => {
+    const a = (i * 2 * Math.PI) / emotes.length,
+      button = document.createElement('button')
     button.type = 'button'
     button.className = 'emote-slot'
-    button.disabled = !entry
     button.style.left = 50 + 35 * Math.sin(a) + '%'
     button.style.top = 50 - 35 * Math.cos(a) + '%'
-    button.setAttribute('aria-label', entry?.label ?? '空位')
-    if (entry) button.innerHTML = '<svg viewBox="0 0 24 24"><path d="' + icons[i] + '"/></svg>'
+    button.setAttribute('aria-label', entry.label)
+    button.innerHTML = '<svg viewBox="0 0 24 24"><path d="' + icons[i] + '"/></svg>'
     button.onclick = () => choose(i)
     disc.append(button)
     return button
@@ -69,7 +69,8 @@ export function emoteWheel(allowed: () => boolean, play: (id: number) => void) {
     select(-1)
   }
   function angle(x: number, y: number) {
-    return Math.hypot(x, y) < 18 ? -1 : (Math.round((Math.atan2(x, -y) * 4) / Math.PI) + 8) % 8
+    const n = slots.length
+    return Math.hypot(x, y) < 18 ? -1 : (Math.round((Math.atan2(x, -y) * n) / (2 * Math.PI)) + n) % n
   }
   function pointer(event: PointerEvent) {
     const box = disc.getBoundingClientRect()

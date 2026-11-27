@@ -14,6 +14,7 @@ import {openWater} from '../fishing/surface'
 import {fishingMarks} from '../fishing/marks'
 import '../fishing/report'
 import {createSteles} from '../fishing/steles'
+import {createSpotSigns} from '../play/spot-signs'
 import {getActiveSaveSnapshot,openPack,takeFromPack} from '../game/save'
 import {rules,validRules} from '../smoke/data'
 import {createSmokePrompt} from '../smoke/prompt'
@@ -24,7 +25,7 @@ import {mpEnabled} from '../ui/mp-pref'
 import * as THREE from 'three'
 import {passengerTop} from './passenger-height'
 import {passengerArms} from '../helicopter/arms'
-import {tunnelFloor,underpassFloor} from '../tunnels'
+import {openWellAt,tunnelFloor,underpassFloor} from '../tunnels'
 import {getCarFreeAt} from '../game/car-free'
 import {CAR_SCALE} from '../drive/scale'
 import R from '@dimforge/rapier3d-compat'
@@ -47,7 +48,7 @@ import {
   type ObstacleVolumeSpec,
 } from './obstacle-volumes'
 import {resolveContact} from '../traffic/contact'
-import {createCameraRig} from './camera'
+import {createCameraRig,placeFirstPersonCamera} from './camera'
 import {isFirstPerson} from './view-mode'
 import {createEbikeGripPose} from './ebike-grip'
 import {hits,bindingLabel,isDutyScopeActive} from '../input/keymap'
@@ -66,6 +67,7 @@ import {getPlayMode, onPlayMode, soloServices} from '../game/play-mode'
 import {PERSONAL_EBIKE_MODELS} from '../game/catalog'
 import {findNearbyServiceBay, findNearbyShopTrigger, getShop, listShops} from '../game/shops'
 import {getQuietZoneAt} from '../game/quiet-zones'
+import {namedChild} from '../scene-named'
 import {emit as emitGameEvent, getState as getGameState, onEvent as onGameEvent, onState,
   setPrompt, updateTravel, type ActiveVehicleState, type EquippedOutfit, type PersistedEbikeVisual,
   type PersonalEbikeModelId, type PlayerMode} from '../game/state'
@@ -1256,6 +1258,7 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
   const FISH_NEAR=40
   const fishMarks=fishingOn?fishingMarks(scene):undefined
   const steles=fishingOn?createSteles(scene,sim.syncObstacleVolume):undefined
+  const spotSigns=createSpotSigns(scene,sim.syncObstacleVolume)
   window.addEventListener('fishing:slot',()=>{if(!fishingOn)return
     void loadFishing().then(session=>session.toggle())})
   if(verify)Object.assign(window,{fishing:{teleportToSpot:async(id:string)=>(await loadFishing()).teleportToSpot(id)}})
@@ -1326,6 +1329,8 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
     return best
   }
   function visualFloorAt(x:number,z:number,baseY:number){
+    // Open-well treads are visual only; snapping onto each tread top bobs the figure and the first-person eye per riser.
+    if(openWellAt(x,z,baseY))return baseY
     let best=baseY
     const cellKey=`${Math.floor(x/4)},${Math.floor(z/4)}`
     for(const [entry,root] of stream.landmarks){
@@ -1610,6 +1615,35 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
       return false
     },
   })
+  function captureContext(){
+    const act=currentActivity()
+    const inVehicle=Boolean(rides?.car||rides?.bike||rides?.boat)
+    const speedMs=inVehicle?Math.abs(rides!.speed):Math.hypot(vx,vz)
+    const foot=!rides?.bike&&!rides?.car&&!rides?.boat&&!document.body.dataset.helicopter&&document.body.dataset.drone!=='rc'
+    const parts:string[]=[]
+    if(document.body.dataset.helicopter)parts.push('乘直升机')
+    else if(act.detail)parts.push(act.detail)
+    else if(act.act==='idle')parts.push('原地待机')
+    else if(act.act==='walk')parts.push(speedMs>cfg.walk*1.15?'跑步':'步行')
+    else parts.push(act.act)
+    if(combat.f.down)parts.push('倒地')
+    else if(crashSession)parts.push('摔车')
+    else if(crouching)parts.push('蹲行')
+    if(!inVehicle&&!document.body.dataset.helicopter&&document.body.dataset.drone!=='rc')parts.push(grounded?'地面':'空中')
+    return {
+      activity:act.act,
+      activityDetail:act.detail??'',
+      stateLabel:parts.join(' · '),
+      speedMs,
+      verticalSpeedMs:velocity,
+      grounded,
+      foot,
+      bike:rides?.car?'car':rides?.bike?'bike':rides?.boat?'boat':'',
+      x:figure.position.x,
+      y:figure.position.y+combat.drop,
+      z:figure.position.z,
+    }
+  }
   function attachMp(){
     if(!mpEnabled()||!active||net)return
     if(!netModule){void import('../net').then(module=>{netModule=module;attachMp()}).catch(error=>console.warn('multiplayer unavailable',error));return}
@@ -1617,14 +1651,14 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
         net=netModule.attachNet(scene,model.animations,()=>({x:figure.position.x,y:figure.position.y+combat.drop,z:figure.position.z,
           foot:!rides?.bike&&!rides?.car&&!rides?.boat&&!document.body.dataset.helicopter&&document.body.dataset.drone!=='rc',yaw:figure.rotation.y,v:rides?.bike?Math.abs(rides.speed):Math.hypot(vx,vz),gr:Number(grounded),
           sc:cigarette.wire,sb:Math.round(cigarette.length*1800),sp:puffSeq,br:brandIndex(cigarette.brand),sd:dropSeq,ss:cigarette.strength,sr:cigarette.remaining,
-          bike:rides?.bike?'bike':'',bx:rides?.bike?.position.x??0,bz:rides?.bike?.position.z??0,byaw:rides?.heading??0}),()=>currentAvatar()??profile,camera,currentActivity,combat.receive,(x,y,z)=>{figure.position.set(x,Math.max(0,y-combat.drop),z);vx=0;vz=0})
+          bike:rides?.bike?'bike':'',bx:rides?.bike?.position.x??0,bz:rides?.bike?.position.z??0,byaw:rides?.heading??0}),()=>currentAvatar()??profile,camera,currentActivity,combat.receive,(x,y,z)=>{figure.position.set(x,Math.max(0,y-combat.drop),z);vx=0;vz=0},captureContext)
         net.emote(emote.id);net.tick(0)
     }
   }
   addEventListener('glol:mp-pref',()=>{if(mpEnabled())attachMp();else disconnect()})
   function disconnect(){combat.reset();net?.dispose();net=undefined}
   function leave(){disconnect();resetWalk()}
-  function resetWalk(){combat.hide();cancelSmoke();knockdown.reset();wasKnockdownDown=false;dutyFlagHoldMode=null;dutyFlagHoldTimer=0;document.body.dataset.tdKnockdown='0';if(hotbarSlot()==='smoke')selectSlot('hand');ticketHandover.stop();ticketHandover.reset();emote.stop();emote.reset();smoking?.dispose();smoking=undefined;holdLayer.reset();camHoldBlend=0;wheel.close();cigarette.stop();if(shopOverlay?.isOpen())shopOverlay?.close('fly');outfitController.setRidingEbike(false);finishActiveTestRide('mode_switch');shopHintGroup.visible=false;ebikeShowroomGroup.visible=false;shopEbikeShowcaseRig.root.visible=false;for(const item of showroomBikes)item.snapped=false;destination=null;active=false;crashSession=null;standUpSession=null;pickupSession=null;crashRecoverQueued=false;twoWheelOp=createInitialTwoWheelOpState();carHeadlight='off';carHeadlightManual=false;clearAllDowned();releaseDynamicCar();releaseDynamicBike();input.syncRideHud(null,null);rides?.clearBoatPose(figure);rides?.show(false);actionButton.hidden=true;setPrompt(null);updateTravel('fly',null);if(wasCar||wasBike)applyFootController();wasBoat=wasBike=wasCar=false;bikeObstacle='';boatBoardElapsed=BOAT_BOARD_DUR;boatLandElapsed=BOAT_LAND_DUR;ridePose.reset();driverPose.reset(false);clearAvatarPose(figure);stopLocomotionActions();mixer.stopAllAction();resetMotion();figure.visible=false;input.show(false);external=null;lastTianyuanSyncKey='';tianyuanShopRef=null;sim.clear();camera.near=1;camera.updateProjectionMatrix()}
+  function resetWalk(){combat.hide();cancelSmoke();knockdown.reset();wasKnockdownDown=false;dutyFlagHoldMode=null;dutyFlagHoldTimer=0;document.body.dataset.tdKnockdown='0';if(hotbarSlot()==='smoke')selectSlot('hand');ticketHandover.stop();ticketHandover.reset();emote.stop();emote.reset();smoking?.dispose();smoking=undefined;holdLayer.reset();camHoldBlend=0;wheel.close();cigarette.stop();if(shopOverlay?.isOpen())shopOverlay?.close('fly');outfitController.setRidingEbike(false);finishActiveTestRide('mode_switch');shopHintGroup.visible=false;ebikeShowroomGroup.visible=false;shopEbikeShowcaseRig.root.visible=false;for(const item of showroomBikes)item.snapped=false;destination=null;active=false;crashSession=null;standUpSession=null;pickupSession=null;crashRecoverQueued=false;twoWheelOp=createInitialTwoWheelOpState();carHeadlight='off';carHeadlightManual=false;clearAllDowned();releaseDynamicCar();releaseDynamicBike();input.syncRideHud(null,null);rides?.clearBoatPose(figure);rides?.show(false);actionButton.hidden=true;setPrompt(null);updateTravel('fly',null);if(wasCar||wasBike)applyFootController();wasBoat=wasBike=wasCar=false;bikeObstacle='';boatBoardElapsed=BOAT_BOARD_DUR;boatLandElapsed=BOAT_LAND_DUR;ridePose.reset();driverPose.reset(false);clearAvatarPose(figure);stopLocomotionActions();mixer.stopAllAction();resetMotion();figure.visible=false;input.show(false);external=null;lastTianyuanSyncKey='';sim.clear();camera.near=1;camera.updateProjectionMatrix()}
   function canPlaceCrashOffset(x:number,z:number,refY:number,fromX?:number,fromZ?:number){
     if(!sim.withinBounds(x,z))return false
     if(sim.insideHouse(x,z,refY+.4))return false
@@ -1780,6 +1814,8 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
     }
     return true
   }
+  let viewBlend:number|null=null
+  const blendFrom=new THREE.Vector3(),blendTurn=new THREE.Quaternion(),blendEye=new THREE.Quaternion()
   function follow(dt=0,snap=false){const pos=sim.body.translation(),footY=pos.y-cfg.height/2
     figure.position.set(pos.x,footY,pos.z)
     if(downedBikes.size>0)syncAllDownedPoses()
@@ -2089,13 +2125,23 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
       lastFollowFov=camera.fov
     }
     // IDOK-178: 第一人称只在落地步行时生效，骑车/开车/坐船一律回到第三人称，免得镜头钻进车壳。
-    const firstPerson=isFirstPerson()&&!rides?.bike&&!rides?.car&&!rides?.boat
-    rig.update(camera,figure.position,yaw+shakeYaw,pitch+shakePitch+knockdown.cameraPitchBias,arm+ridePose.cameraArm(!!rides?.bike,dt,snap)+driverPose.cameraArm(!!rides?.car,dt,snap)+(rides?.car?carSpeedArm:0),dt,snap,!!rides?.car,firstPerson,combat.f.down ? .72 : 0)
+    const onFoot=!rides?.bike&&!rides?.car&&!rides?.boat,blend=onFoot&&viewBlend!==null?viewBlend:0
+    const firstPerson=(isFirstPerson()||blend>=1)&&onFoot
+    const camYaw=yaw+shakeYaw,camPitch=pitch+shakePitch+knockdown.cameraPitchBias,lowerFocus=combat.f.down ? .72 : 0
+    // Open-stairwell blend: pull the arm in with the blend so its collision ray never reaches the well lip or the slab over
+    // the landing; a clamp kicking in or letting go mid-blend is a visible camera jump.
+    rig.update(camera,figure.position,camYaw,camPitch,(arm+ridePose.cameraArm(!!rides?.bike,dt,snap)+driverPose.cameraArm(!!rides?.car,dt,snap)+(rides?.car?carSpeedArm:0))*(1-blend)**2,dt,snap,!!rides?.car,firstPerson,lowerFocus)
     if(sim.clampCamera(figure.position,camera.position,firstPerson?.18:cfg.camRadius)&&!firstPerson){
       camera.lookAt(rig.focus)
     }
+    // Open stairwells (小香港, 十字街): ease the third-person camera into the eyes by foot depth, no second rig pass.
+    if(!firstPerson&&blend>0){
+      blendFrom.copy(camera.position);blendTurn.copy(camera.quaternion)
+      placeFirstPersonCamera(camera,figure.position,camYaw,camPitch,lowerFocus);blendEye.copy(camera.quaternion)
+      camera.position.lerpVectors(blendFrom,camera.position,blend);camera.quaternion.copy(blendTurn).slerp(blendEye,blend)
+    }
     // 只在切换的那一下动 figure.visible，不每帧覆盖拍照模式「隐藏人物」、商店展台等别处的设定。
-    const hideAvatar=firstPerson&&!cigarette.active
+    const hideAvatar=(firstPerson||blend>.8)&&!cigarette.active
     if(hideAvatar!==firstPersonHidden){firstPersonHidden=hideAvatar;figure.visible=active&&!hideAvatar}
   }
   const terrainRay=new THREE.Raycaster(undefined,new THREE.Vector3(0,-1,0))
@@ -2172,10 +2218,10 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
       camDist:rig.distance,camClipped:rig.clipped,camBlocked:rig.blocked,camCeiling:rig.ceilingClearance,camInHouse:sim.insideHouse(camera.position.x,camera.position.z,camera.position.y),
       outfit:outfitController.getSnapshot(),
       boat:rides?.boatProbe()??null}}
-  let tianyuanShopRef:THREE.Object3D|null=null
+  const tianyuanShop=namedChild(scene,TIANYUAN_VOLUME_ID)
   let lastTianyuanSyncKey=''
   function syncSceneObstacleVolumes(){
-    if(!tianyuanShopRef?.parent) tianyuanShopRef=scene.getObjectByName(TIANYUAN_VOLUME_ID)??null
+    const tianyuanShopRef=tianyuanShop()
     if(!tianyuanShopRef){
       if(lastTianyuanSyncKey){lastTianyuanSyncKey='';sim.removeObstacleVolume(TIANYUAN_VOLUME_ID)}
       return
@@ -2196,6 +2242,7 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
     showFishingSlot(fishingOn&&!rides?.bike&&!rides?.boat&&!rides?.car&&(hotbarSlot()==='fishing'||nearestFishingShore(start.x,start.z).distance<=FISH_NEAR))
     fishMarks?.tick(start.x,start.z,dt,hotbarSlot()==='fishing',start.y)
     steles?.tick(start.x,start.z)
+    spotSigns.tick(start.x,start.z)
     if(isDutyScopeActive()){
       if(cigarette.active||hotbarSlot()==='smoke'){
         cancelSmokeForDuty(cigarette.active,dt)
@@ -3277,7 +3324,24 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
       mash:()=>knockdown.recordRecoverMash(),
       forceRise:(instant?:boolean)=>knockdown.forceRise(instant),
     },
-    get yaw(){return yaw},hold(on:boolean){held=on;external=null;if(on){rides?.stop();vx=vz=0}},face(heading:number,tilt=cfg.pitch){yaw=heading;pitch=tilt;if(active)follow(0,true)},showFigure(on:boolean){figure.visible=on&&active},
+    get yaw(){return yaw},get pitch(){return pitch},
+    /** Continue walking from an exact pose (seamless scene swap): no spawn search, no stream wait, no camera snap-back. */
+    resumeAt(x:number,footY:number,z:number,heading:number,tilt=cfg.pitch){
+      if(!active)return false
+      sim.sync(x,z)
+      // The caller's foot is the walk line; settle the capsule down onto it from just above, or on a ramp it starts
+      // embedded (~0.1 m) and pops out mid-stairs a few seconds later.
+      const lift=.3,at={x,y:footY+cfg.height/2+lift,z}
+      sim.body.setTranslation(at,true);sim.body.setNextKinematicTranslation(at);sim.world.step()
+      sim.controller.computeColliderMovement(sim.capsule,{x:0,y:-lift-.05,z:0});at.y+=sim.controller.computedMovement().y
+      sim.body.setTranslation(at,true);sim.body.setNextKinematicTranslation(at);sim.world.step();safe.set(at.x,at.y,at.z);resetMotion()
+      held=false;external=null;yaw=heading;pitch=tilt;facing=yaw+avatar.yaw;figure.rotation.y=facing
+      firstPersonHidden=false;figure.visible=true;restoreFootLocomotion(avatar.clips.idle);follow(0,true)
+      return true
+    },
+    /** 0 = normal camera, 1 = first person; null hands the camera back to the view-mode setting. */
+    setViewBlend(value:number|null){viewBlend=value===null?null:THREE.MathUtils.clamp(value,0,1)},
+    hold(on:boolean){held=on;external=null;if(on){rides?.stop();vx=vz=0}},face(heading:number,tilt=cfg.pitch){yaw=heading;pitch=tilt;if(active)follow(0,true)},showFigure(on:boolean){figure.visible=on&&active},
     // IDOK-182: 右手挂点给相机用（axis-aligned，-Z 朝前）；没有骨骼时回落到 figure 本身。
     handAnchor(){return avatarRig.attachmentAt?.('hand_r')??figure.getObjectByName('hand_r')??figure},
     waterSightBlocked:(eye:THREE.Vector3,water:THREE.Vector3)=>sim.pathBlocked(eye.x,eye.z,water.x,water.z,eye.y,water.y+.1),

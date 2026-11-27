@@ -9,12 +9,14 @@ import {landingWarmBudget,warmShaders,type WarmBudget} from './shader-warmup'
 import {vehicleModel} from './walk/vehicle-model'
 import {bytes, fetchAsset, measureFirstWorldBytes, openingTerrain, startOverview, type Manifest} from './world'
 import {Stream} from './stream'
+import {flightFocus} from './flight-focus'
 import {flight} from './flight'
 import {look} from './look/config'
 import {gfxState} from './look/gfx-state'
 import {installAtmosphere, outerGround, sky} from './look/atmosphere'
 import {startPeaks} from './peaks'
 import {presets,setPreset,pickSpawn,spawnPool} from './presets'
+import {allowLanding} from './mp-travel'
 import {plazaSpawn} from './helicopter/site'
 import {helicopter} from './helicopter/runtime'
 import {isDeepLink} from './deeplink'
@@ -144,7 +146,8 @@ async function start(loader:FullLoader,creatorSpawn=false) {
   if(params.has('debug'))Object.assign(window,{gfx})
   // tapFrame：录像在这里、present 之前拷帧（IDOK-383，主画布没开 preserveDrawingBuffer）。
   let cabinCruise=false
-  function drawMain(){if(post)stats.shadowCasters=post.render(walker?.active?walker.position:camera.position,cabinCruise);else renderer.render(scene,camera);tapFrame(renderer.domElement)}
+  const drawMark=sessionMarkPass(renderer)
+  function drawMain(){if(post)stats.shadowCasters=post.render(walker?.active?walker.position:camera.position,cabinCruise);else renderer.render(scene,camera);drawMark();tapFrame(renderer.domElement)}
   renderer.info.autoReset=false
   const hemi = new THREE.HemisphereLight(look.hemiSky,look.hemiGround,look.hemiPower); scene.add(hemi)
   const arrivalReady=import('./arrival-programs').then(module=>warmPrograms(module.arrivalPrograms()))
@@ -227,6 +230,7 @@ async function start(loader:FullLoader,creatorSpawn=false) {
   const clock = skyClock(params)
   if(!soloStart)setPreset(camera,params.get('cam')??params.get('spawn'),bounds.bbox)
   let previous=0, first=0, frame=0, sum=0, samples=0
+  const flightAhead=new THREE.Vector3()
   const stats = {firstMs:0,readyMs:0,openingRingMs:0,firstWorldBytes:0,ms:0,calls:0,shadowCasters:0,frame:0,loaded:0,pending:0,visited:0,failures:0,
     geometries:0,textures:0,dpr:currentDpr}
   function markFirstFrame(){
@@ -379,6 +383,7 @@ async function start(loader:FullLoader,creatorSpawn=false) {
       if(name&&!parent&&!matchMedia('(prefers-reduced-motion: reduce)').matches)await new Promise(resolve=>setTimeout(resolve,450))
       if(signal.aborted)return false
       cover.progress(.3,'步行模块已就绪')
+      if(!await allowLanding(reason,x,z))return false
       completed=await player.enter(x,z,yaw,reason,false,signal,cover.progress)
       if(completed&&request){stream.tick(player.position);stream.updateLandmarks?.(player.position);cover.progress(1);return true}
       signal.throwIfAborted()
@@ -580,6 +585,7 @@ async function start(loader:FullLoader,creatorSpawn=false) {
     },
   })
   rangeStore.subscribe(nextCfg=>{renderUi.setConfig(nextCfg)})
+  window.addEventListener('glol:open-render-range',()=>renderUi.open())
   // IDOK-178：帧率/网速/在线人数读数与设置热键（都靠 localStorage 记住上次选择）。
   mountStats()
   mountHotkeys()
@@ -751,25 +757,22 @@ async function start(loader:FullLoader,creatorSpawn=false) {
     arbiterWired: true,
   })
   walker?.setTrafficDuty?.(trafficDuty)
-  let xxgPrevPos: { x: number; z: number } | null = null
-  const xxg = mountLazyXiaoxianggang(
-    {
+  // 小香港、十字街共用一份宿主桥：楼梯井里按深度渐入第一人称，换场同帧 resumeAt 原姿态，不跳。
+  const indoorHost = (tag: 'xxg' | 'szj', onWalk?: () => void) => {
+    let prev: { x: number; z: number } | null = null
+    return {
       renderer,
       worldCamera: camera,
-      bodyFlag: 'xxgActive',
       getWalker: () => {
-        if (!walker?.active || walker.vehicle !== 'foot') {
-          xxgPrevPos = null
-          return null
-        }
-        const p = walker.position
-        const vel = xxgPrevPos ? { x: p.x - xxgPrevPos.x, z: p.z - xxgPrevPos.z } : { x: 0, z: 0 }
-        xxgPrevPos = { x: p.x, z: p.z }
-        return { position: { x: p.x, y: p.y, z: p.z }, velocity: vel }
+        onWalk?.()
+        if (!walker?.active || walker.vehicle !== 'foot') return prev = null
+        const p = walker.position, velocity = prev ? { x: p.x - prev.x, z: p.z - prev.z } : { x: 0, z: 0 }
+        prev = { x: p.x, z: p.z }
+        return { position: { x: p.x, y: p.y - walkConfig.height * 0.5, z: p.z }, velocity, yaw: walker.yaw, pitch: walker.pitch }
       },
       openVeil: () => {
         const el = document.createElement('div')
-        el.className = 'xxg-veil is-active'
+        el.className = `${tag}-veil is-active`
         document.body.append(el)
         return { async done() { el.remove() } }
       },
@@ -777,72 +780,30 @@ async function start(loader:FullLoader,creatorSpawn=false) {
         walker?.hold(true)
         walker?.showFigure(false)
       },
-      resumeWorldAt: async pt => {
-        xxgPrevPos = { x: pt.x, z: pt.z }
+      resumeWorldAt: async (pt: { x: number; z: number; yaw: number; footY?: number; pitch?: number }) => {
+        prev = { x: pt.x, z: pt.z }
         if (!walker) return false
+        if (pt.footY !== undefined && walker.resumeAt(pt.x, pt.footY, pt.z, pt.yaw, pt.pitch)) return true
         walker.hold(false)
         walker.showFigure(true)
-        return walker.enter(pt.x, pt.z, pt.yaw, 'xxg-exit', false)
+        return walker.enter(pt.x, pt.z, pt.yaw, `${tag}-exit`, false)
       },
-    },
-    { eager: params.has('xxg'), veilFadeInMs: 80 },
-  )
-  let szjPrevPos: { x: number; z: number } | null = null
-  let szjHoodsLoading: Promise<void> | null = null
-  const ensureSzjHoods = () => {
-    if (szjHoodsLoading) return
-    szjHoodsLoading = import('./shizijie/look/index')
-      .then(mod => {
-        const pack = mod.createShizijieMaterials()
-        const hoods = mod.createSurfaceStairwellHoods(pack, { worldSpace: true })
-        for (const child of hoods.children) {
-          const gy = sampleMissionGroundY(child.position.x, child.position.z)
-          if (Number.isFinite(gy)) child.position.y = gy
-        }
-        scene.add(hoods)
-      })
+      setWorldViewBlend: (blend: number | null) => walker?.setViewBlend(blend),
+    }
+  }
+  const xxg = mountLazyXiaoxianggang({ ...indoorHost('xxg'), bodyFlag: 'xxgActive' }, { eager: params.has('xxg'), veilFadeInMs: 80 })
+  // 十字街四个楼梯井的地面版（与 B1 同一份几何），镜头进入 400m 内再加载。
+  let szjStairsLoading: Promise<void> | null = null
+  const ensureSzjStairs = () => {
+    if (szjStairsLoading || Math.hypot(camera.position.x + 879.75, camera.position.z + 169.63) > 400) return
+    szjStairsLoading = import('./shizijie/look/surface-stairwells')
+      .then(mod => { scene.add(mod.createSurfaceStairwells().group) })
       .catch(error => {
-        szjHoodsLoading = null
-        console.warn('Shizijie surface canopies unavailable', error)
+        szjStairsLoading = null
+        console.warn('Shizijie surface stairwells unavailable', error)
       })
   }
-  if (params.has('szj')) ensureSzjHoods()
-  const szj = mountLazyShizijie(
-    {
-      renderer,
-      worldCamera: camera,
-      bodyFlag: 'szjActive',
-      getWalker: () => {
-        if (!walker?.active || walker.vehicle !== 'foot') {
-          szjPrevPos = null
-          return null
-        }
-        const p = walker.position
-        if (Math.hypot(p.x + 879.75, p.z + 169.63) < 160) ensureSzjHoods()
-        const vel = szjPrevPos ? { x: p.x - szjPrevPos.x, z: p.z - szjPrevPos.z } : { x: 0, z: 0 }
-        szjPrevPos = { x: p.x, z: p.z }
-        return { position: { x: p.x, y: p.y - walkConfig.height * 0.5, z: p.z }, velocity: vel }
-      },
-      openVeil: () => {
-        const el = document.createElement('div')
-        el.className = 'szj-veil is-active'
-        document.body.append(el)
-        return { async done() { el.remove() } }
-      },
-      suspendWorld: () => {
-        walker?.hold(true)
-        walker?.showFigure(false)
-      },
-      resumeWorldAt: async pt => {
-        szjPrevPos = { x: pt.x, z: pt.z }
-        if (!walker) return false
-        walker.hold(false)
-        walker.showFigure(true)
-        return walker.enter(pt.x, pt.z, pt.yaw, 'szj-exit', false)
-      },
-    },
-    { eager: params.has('szj'), veilFadeInMs: 80 },
-  )
+  const szj = mountLazyShizijie({ ...indoorHost('szj', ensureSzjStairs), bodyFlag: 'szjActive' }, { eager: params.has('szj') })
   prepareLandingContent=async()=>{
     mifen.step(0)
     const probe=mifen.getProbe() as ReturnType<typeof mifen.getProbe>&{ensureLoaded?:()=>Promise<unknown>}
@@ -1006,8 +967,9 @@ async function start(loader:FullLoader,creatorSpawn=false) {
       trafficTick?.(elapsed/1000,walker?.active&&walker.vehicle!=='foot'?walker.position:undefined,
         walker?.active?walker.position:undefined,getPlayMode()==='solo',showTraffic)
       const target=heli.lookAhead??walker?.destination??(walker?.active?walker.position:camera.position)
+      const ahead=target===camera.position?flightFocus(camera,stream.groundAt(camera.position.x,camera.position.z),stream.radius,flightAhead):undefined
       const streamStart=profiling?performance.now():0
-      stream.tick(target,heli.phase==='cruise')
+      stream.tick(target,heli.phase==='cruise',ahead)
       if(frame>=2) syncCityUpgradeProps()
       stream.updateLandmarks?.(target,undefined,heli.phase==='cruise')
       if(!walkModPromise && !stream.pending.size && camera.position.y<260) void prefetchWalk()
@@ -1101,3 +1063,4 @@ async function start(loader:FullLoader,creatorSpawn=false) {
   else if(params.get('mode')==='walk'||params.has('spawn')){await toggle(true);showMode()}
 }
 export const boot=start
+import {sessionMarkPass} from './session-mark-pass'

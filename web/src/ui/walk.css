@@ -183,7 +183,7 @@ body[data-home] :is(.ride-hud,.vehicle-action,.walk-ui){display:none!important}
   .ride-bat-bar{width:22px;height:7px}
   .ride-bat-pct{font-size:9.5px}
   .ride-lean-bar{width:20px;height:5px}
-  footer{box-sizing:border-box;left:calc(50% - 52px);max-width:calc(100vw - 364px - env(safe-area-inset-left) - env(safe-area-inset-right));font-size:8px;overflow:hidden;text-overflow:ellipsis}
+  /* 署名在顶边题签里（hud.css），不再和快捷栏、载具条抢底边 */
   .ride-gear-btn,.ride-park,.ride-light,.ride-turn-left,.ride-turn-right,.ride-hazard,.ride-horn,.ride-cruise,.ride-sound{padding:1.5px 4px;font-size:9px}
   output{top:calc(142px + env(safe-area-inset-top));bottom:auto;left:calc(12px + env(safe-area-inset-left));max-width:124px}
 }
@@ -230,6 +230,15 @@ body[data-home] :is(.ride-hud,.vehicle-action,.walk-ui){display:none!important}
   :root body[data-hotbar=on] .vehicle-action{bottom:calc(82px + env(safe-area-inset-bottom))}
   /* 载入街区的小角标原本在左上第五行，左手模式下动作键会顶到那里；横屏挪到时辰条下方正中。 */
   :root .ld-corner{left:50%;right:auto;bottom:auto;top:calc(100px + env(safe-area-inset-top));transform:translateX(-50%)}
+}
+/* 手里捧着饮品时，[F] 提示叠在饮品条上方，不被压住（IDOK-468）。饮品条贴底 80 / 横屏 74、高 46–50（drinks/hold/drink-action.css），
+   提示站到 134 以上；手机竖屏饮品条抬到 226，提示站到 284 以上，同时不低于摇杆列。 */
+:root body:has(.drinks-hold-hud:not([hidden])) .vehicle-action{bottom:calc(134px + env(safe-area-inset-bottom))}
+@media (pointer:coarse) and (not (any-pointer:fine)) and (min-height:501px){
+  :root body:has(.drinks-hold-hud:not([hidden])) .vehicle-action{bottom:max(calc(var(--stick-top) + 110px),calc(134px + env(safe-area-inset-bottom)))}
+}
+@media (pointer:coarse) and (not (any-pointer:fine)) and (max-width:640px) and (min-height:501px){
+  :root body:has(.drinks-hold-hud:not([hidden])) .vehicle-action{bottom:max(calc(var(--stick-top) + 110px),calc(284px + env(safe-area-inset-bottom)))}
 }
 
 .walk-ui .btn-smoke{position:fixed;right:calc(196px + var(--sr));bottom:calc(108px + var(--sb));min-width:54px;height:46px;padding:0 14px;border-radius:23px;touch-action:manipulation;
