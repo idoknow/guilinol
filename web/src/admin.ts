@@ -1789,10 +1789,132 @@ const pages: Record<string, (view: View) => void> = {
       speed: '超速移动', teleport: '违规瞬移', head_overlap: '贴在他人头顶跟随', altitude_unverified: '异常升空 / 滞空（仅记录）', ground_unverified: '疑似钻地（仅记录）',
       mount_player: '请求骑乘他人', foreign_position: '改写他人位置', oversize: '超大消息', invalid_packet: '非法消息', packet_rate: '刷包超频',
     }
-    const detailLabel: Record<string, string> = { overflow: '超出 (m)', to: '落点', peer: '对象玩家', target: '对象玩家', size: '大小', rate: '频率' }
+    const detailLabel: Record<string, string> = { overflow: '超出 (m)', to: '落点', peer: '对象玩家', target: '对象玩家', size: '大小', rate: '频率', speed: '速度 (m/s)', flatSpeed: '水平速度 (m/s)', vspeed: '垂直速度 (m/s)', reportedSpeed: '客户端速度 (m/s)' }
     const attack = new Set(['mount_player', 'foreign_position', 'oversize', 'invalid_packet', 'packet_rate'])
     const coord = (value: unknown) => Array.isArray(value) ? value.map((n) => Math.round(Number(n))).join(', ') : ''
     const clock = (at: number) => { const d = new Date(at); return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}:${String(d.getSeconds()).padStart(2, '0')}` }
+    type CheatCaptureItem = {
+      id: string
+      uid: number
+      nickname: string
+      accountId: string | null
+      fp: string
+      kind: string
+      capturedAt: number
+      uploadedAt: number
+      stateLabel: string
+      serverState: string
+      speedMs: number
+      clientSpeedMs: number | null
+      pos: [number, number, number]
+      attemptPos: [number, number, number] | null
+      landmark: string
+      landmarkDist: number | null
+      imageBytes: number
+      width: number | null
+      height: number | null
+      imageUrl: string
+      meta?: Record<string, any>
+    }
+    let latestCaptures: CheatCaptureItem[] = []
+    let latestCaptureTotal = 0
+    const formatSpeed = (speedMs: number, clientSpeedMs?: number | null) => {
+      const kmh = (speedMs * 3.6).toFixed(1)
+      const base = `${speedMs.toFixed(1)} m/s（${kmh} km/h）`
+      return clientSpeedMs != null && Math.abs(clientSpeedMs - speedMs) >= 1.5
+        ? `${base} · 客户端 ${clientSpeedMs.toFixed(1)} m/s`
+        : base
+    }
+    const formatCapturePos = (item: CheatCaptureItem) => {
+      const place = item.landmark ? `${item.landmark}${item.landmarkDist != null ? ` 约 ${item.landmarkDist}m` : ''} · ` : ''
+      const base = `${place}(${Math.round(item.pos[0])}, ${Math.round(item.pos[1])}, ${Math.round(item.pos[2])})`
+      if (item.attemptPos) {
+        return `${base} → 落点 (${Math.round(item.attemptPos[0])}, ${Math.round(item.attemptPos[1])}, ${Math.round(item.attemptPos[2])})`
+      }
+      return base
+    }
+    const prefillBanFromCapture = (item: CheatCaptureItem) => {
+      clearSearch()
+      nick.value = item.nickname || ''
+      banUidIn.value = String(item.uid)
+      banFpIn.value = item.fp || ''
+      banMinSel.value = '1440'
+      banReasonIn.value = `${kindLabel[item.kind] ?? item.kind}（自动抓拍取证 ${item.id.slice(0, 8)}）`
+      banForms.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      banReasonIn.focus()
+    }
+    const openCaptureLightbox = (item: CheatCaptureItem) => {
+      document.querySelectorAll('dialog.adm-capture-lightbox').forEach((d) => d.remove())
+      const closeBtn = h('button', { type: 'button', class: 'adm-btn adm-btn--sm adm-btn--ghost' }, '关闭')
+      const banBtn = h('button', { type: 'button', class: 'adm-btn adm-btn--sm adm-btn--danger' }, '去封禁此账号')
+      const delBtn = h('button', { type: 'button', class: 'adm-btn adm-btn--sm adm-btn--ghost' }, '删除抓拍') as HTMLButtonElement
+      const playerEl = item.accountId
+        ? navLink(`${item.nickname || '未命名'} · UID ${item.uid}`, { view: 'users', id: item.accountId }, { class: 'adm-link' })
+        : h('b', null, `${item.nickname || '未命名'} · UID ${item.uid}`)
+      const dialog = h('dialog', { class: 'ui-panel adm-dialog adm-capture-lightbox' },
+        h('header', { class: 'adm-capture-lb-head' },
+          h('div', null,
+            playerEl,
+            ' ',
+            h('span', { class: `adm-pill ${attack.has(item.kind) ? 'is-bad' : 'adm-ban-auto'}` }, kindLabel[item.kind] ?? item.kind),
+            h('span', { class: 'adm-sub' }, ` · ${when(new Date(item.capturedAt), true)}`)),
+          h('div', { class: 'adm-capture-lb-actions' },
+            h('a', { href: item.imageUrl, target: '_blank', rel: 'noopener noreferrer', class: 'adm-btn adm-btn--sm adm-btn--ghost' }, '原图 ↗'),
+            banBtn,
+            delBtn,
+            closeBtn)),
+        h('div', { class: 'adm-capture-lb-body' },
+          h('img', { src: item.imageUrl, alt: `UID ${item.uid} 反外挂取证截图`, class: 'adm-capture-lb-img' }),
+          h('dl', { class: 'adm-facts adm-capture-lb-facts' },
+            h('dt', null, '当前状态'), h('dd', null, item.stateLabel + (item.serverState && item.serverState !== item.stateLabel ? `（服务端：${item.serverState}）` : '')),
+            h('dt', null, '当前速度'), h('dd', null, formatSpeed(item.speedMs, item.clientSpeedMs)),
+            h('dt', null, '当前位置'), h('dd', null, formatCapturePos(item)),
+            h('dt', null, '图像信息'), h('dd', null, `${item.width ?? '?'}×${item.height ?? '?'} · ${fmt.bytes(item.imageBytes)} · 记录 ${item.id.slice(0, 8)}`),
+            item.fp && h('dt', null, '设备指纹'), item.fp && h('dd', null, h('code', null, item.fp))))) as HTMLDialogElement
+      closeBtn.onclick = () => dialog.close()
+      banBtn.onclick = () => { dialog.close(); prefillBanFromCapture(item) }
+      delBtn.onclick = async () => {
+        if (!confirm(`确认删除 UID ${item.uid} 的这条取证截图？删除后无法恢复。`)) return
+        delBtn.disabled = true
+        try {
+          await api(`admin/mp/cheat-captures/${encodeURIComponent(item.id)}`, undefined, 'DELETE')
+          toast('已删除抓拍记录')
+          dialog.close()
+          void loadBans()
+        } catch (error) {
+          delBtn.disabled = false
+          alert(String((error as Error)?.message ?? error))
+        }
+      }
+      dialog.addEventListener('click', (event) => { if (event.target === dialog) dialog.close() })
+      dialog.addEventListener('close', () => dialog.remove())
+      document.body.append(dialog)
+      dialog.showModal()
+    }
+    const captureCard = (item: CheatCaptureItem) => {
+      const thumb = h('button', { type: 'button', class: 'adm-capture-thumb', 'aria-label': `查看 UID ${item.uid} 的取证大图` },
+        h('img', { src: item.imageUrl, loading: 'lazy', alt: `UID ${item.uid} ${kindLabel[item.kind] ?? item.kind} 自动截图` }),
+        h('span', { class: `adm-pill adm-capture-badge ${attack.has(item.kind) ? 'is-bad' : 'adm-ban-auto'}` }, kindLabel[item.kind] ?? item.kind))
+      thumb.onclick = () => openCaptureLightbox(item)
+      const who = item.accountId
+        ? navLink(`${item.nickname || '未命名'} · UID ${item.uid}`, { view: 'users', id: item.accountId }, { class: 'adm-link' })
+        : h('b', null, `${item.nickname || '未命名'} · UID ${item.uid}`)
+      const inspectBtn = h('button', { type: 'button', class: 'adm-btn adm-btn--sm adm-btn--ghost' }, '查看大图')
+      inspectBtn.onclick = () => openCaptureLightbox(item)
+      const quickBanBtn = h('button', { type: 'button', class: 'adm-btn adm-btn--sm adm-btn--danger' }, '填表封禁')
+      quickBanBtn.onclick = () => prefillBanFromCapture(item)
+      return h('article', { class: 'adm-capture-card' },
+        thumb,
+        h('div', { class: 'adm-capture-body' },
+          h('div', { class: 'adm-capture-head' },
+            who,
+            h('span', { class: 'adm-sub adm-nowrap' }, when(new Date(item.capturedAt)))),
+          h('dl', { class: 'adm-capture-facts' },
+            h('dt', null, '状态'), h('dd', null, item.stateLabel || item.serverState || '—'),
+            h('dt', null, '速度'), h('dd', null, formatSpeed(item.speedMs, item.clientSpeedMs)),
+            h('dt', null, '位置'), h('dd', null, formatCapturePos(item))),
+          h('div', { class: 'adm-capture-actions' }, inspectBtn, quickBanBtn)))
+    }
     const reviewCard = (review: any) => {
       const events = (Array.isArray(review.evidence) ? review.evidence : []) as any[]
       const counts = new Map<string, number>()
@@ -1814,6 +1936,18 @@ const pages: Record<string, (view: View) => void> = {
       }
       const dismissBtn = h('button', { type: 'button', class: 'adm-btn adm-btn--sm adm-btn--ghost' }, '不处罚') as HTMLButtonElement
       dismissBtn.onclick = () => { if (confirm(`结束 UID ${review.uid} 的复核，不处罚？`)) void act(dismissBtn, () => api('admin/unban', { uid: review.uid, reviewId: review.id, dismiss: true })) }
+      const matchingShots = latestCaptures.filter((shot) => Number(shot.uid) === Number(review.uid)).slice(0, 3)
+      const shotsStrip = matchingShots.length
+        ? h('div', { class: 'adm-review-shots' },
+            h('span', { class: 'adm-sub' }, `关联自动抓拍（${matchingShots.length}）：`),
+            h('div', { class: 'adm-review-shot-list' }, ...matchingShots.map((shot) => {
+              const btn = h('button', { type: 'button', class: 'adm-review-shot-btn', title: `${kindLabel[shot.kind] ?? shot.kind} · ${formatSpeed(shot.speedMs)}` },
+                h('img', { src: shot.imageUrl, loading: 'lazy', alt: `UID ${shot.uid} 抓拍缩略图` }),
+                h('span', null, `${kindLabel[shot.kind] ?? shot.kind} · ${shot.speedMs.toFixed(1)}m/s`))
+              btn.onclick = () => openCaptureLightbox(shot)
+              return btn
+            })))
+        : null
       return h('article', { class: 'adm-review' },
         h('header', { class: 'adm-review-head' },
           h('div', null,
@@ -1821,6 +1955,7 @@ const pages: Record<string, (view: View) => void> = {
             h('span', { class: 'adm-sub' }, ` · ${when(new Date(Number(review.opened_ms)))} 进入复核 · ${events.length} 条证据`)),
           h('div', { class: 'adm-chips' }, ...[...counts].map(([k, n]) =>
             h('span', { class: `adm-pill ${attack.has(k) ? 'is-bad' : 'adm-ban-auto'}` }, `${kindLabel[k] ?? k} ×${n}`)))),
+        shotsStrip,
         h('details', { class: 'adm-review-evidence' },
           h('summary', null, '证据时间线'),
           h('div', { class: 'adm-table-wrap' }, h('table', { class: 'adm-table adm-table--dense' },
@@ -1833,17 +1968,55 @@ const pages: Record<string, (view: View) => void> = {
             }))))),
         h('div', { class: 'adm-review-actions' }, reasonIn, minutesSel, confirmBtn, dismissBtn))
     }
-    const banStats = h('div', { class: 'adm-kpis adm-kpis--small' })
+    const banStats = h('div', { class: 'adm-kpis adm-kpis--small adm-kpis--6' })
     const reviewSlot = h('div', { class: 'adm-reviews' })
-    const loadBans = async () => {
+    const captureSlot = h('div')
+    const captureUidIn = h('input', { type: 'search', name: 'capuid', placeholder: '按 UID 筛选', 'aria-label': '按 UID 筛选抓拍' }) as HTMLInputElement
+    const captureKindSel = h('select', { name: 'capkind', class: 'adm-select', 'aria-label': '按违规类型筛选抓拍' },
+      h('option', { value: '' }, '全部违规类型'),
+      ...Object.entries(kindLabel).map(([k, label]) => h('option', { value: k }, label))) as HTMLSelectElement
+    const captureRefreshBtn = h('button', { type: 'button', class: 'adm-btn adm-btn--sm adm-btn--ghost' }, '刷新')
+    const captureFilterForm = h('form', { class: 'adm-mp-filters adm-capture-filters', role: 'search' },
+      h('label', null, 'UID', captureUidIn),
+      h('label', null, '类型', captureKindSel),
+      h('button', { type: 'submit', class: 'adm-btn adm-btn--sm' }, '筛选'),
+      captureRefreshBtn)
+    const loadCaptures = async () => {
+      const q = new URLSearchParams({ limit: '24' })
+      const uidFilter = captureUidIn.value.trim()
+      if (/^\d+$/.test(uidFilter)) q.set('uid', uidFilter)
+      if (captureKindSel.value) q.set('kind', captureKindSel.value)
       try {
-        const data = await api<any>('admin/bans', undefined, 'GET')
+        const result = await api<{ captures?: CheatCaptureItem[]; total?: number }>(`admin/mp/cheat-captures?${q}`, undefined, 'GET')
+        latestCaptures = Array.isArray(result?.captures) ? result.captures : []
+        latestCaptureTotal = Number(result?.total ?? latestCaptures.length)
+        captureSlot.replaceChildren(latestCaptures.length
+          ? h('div', { class: 'adm-capture-grid' }, ...latestCaptures.map(captureCard))
+          : emptyState('暂无外挂自动抓拍', '联机服务端监测到玩家疑似超速、瞬移、升空或协议攻击时，会自动抓拍玩家画面并附带状态、速度与位置信息上传到此。'))
+      } catch (error) {
+        captureSlot.replaceChildren(errorState(error as Error, () => void loadCaptures()))
+      }
+    }
+    captureFilterForm.addEventListener('submit', (event) => {
+      event.preventDefault()
+      void loadCaptures()
+    })
+    captureKindSel.addEventListener('change', () => void loadCaptures())
+    captureRefreshBtn.onclick = () => void loadCaptures()
+    const loadBans = async () => {
+      const [bansRes] = await Promise.allSettled([
+        api<any>('admin/bans', undefined, 'GET'),
+        loadCaptures(),
+      ])
+      if (bansRes.status === 'fulfilled') {
+        const data = bansRes.value
         const rows = (data?.bans ?? []) as any[]
         const reviews = (data?.reviews ?? []) as any[]
         const count = (actor: string) => rows.filter((row) => row.actor === actor).length
         banStats.replaceChildren(
           serverStat('生效封禁', String(rows.length), `${when(new Date())} 刷新`),
           serverStat('待复核', String(reviews.length), reviews.length ? '多类违规，等待人工确认' : '没有待处理'),
+          serverStat('自动抓拍', String(latestCaptureTotal), latestCaptureTotal ? '已留存画面与遥测' : '暂无抓拍'),
           serverStat('外挂自动短封', String(count('auto'))),
           serverStat('攻击自动短封', String(count('protocol'))),
           serverStat('人工封禁', String(rows.length - count('auto') - count('protocol'))))
@@ -1853,7 +2026,9 @@ const pages: Record<string, (view: View) => void> = {
             h('thead', null, h('tr', null, ['分类', '对象', '原因', '到期', ''].map((t) => h('th', null, t)))),
             h('tbody', null, ...rows.map(banRow))))
           : sub('当前没有生效中的封禁'))
-      } catch (error) { banSlot.replaceChildren(errorState(error as Error, () => void loadBans())) }
+      } else {
+        banSlot.replaceChildren(errorState(bansRes.reason as Error, () => void loadBans()))
+      }
     }
     banForms.addEventListener('submit', async (event) => {
       event.preventDefault()
@@ -1876,13 +2051,16 @@ const pages: Record<string, (view: View) => void> = {
     })
     const manualCard = card('人工封禁', banForms, { sub: '立即生效，在线玩家会被断开并看到原因与申诉入口。' })
     const reviewCardWrap = card('待复核', reviewSlot, { sub: '多类违规只进复核，由管理员看过证据后决定是否处罚。' })
+    const captureCardWrap = card('外挂自动抓拍取证', [captureFilterForm, captureSlot], {
+      sub: '监测到玩家疑似开挂或协议攻击时自动截图并上传，画面内置当前状态、当前速度与当前位置；点击图片可查看原图。',
+    })
 
     paintTop(views.find((v) => v.key === 'security')!, [h('span', { class: 'adm-live-dot', 'aria-hidden': 'true' }), h('span', { class: 'adm-sub adm-live-stamp' }, '每 10 秒刷新'),
       navLink('联机概况 →', { view: 'mp' }, { class: 'adm-link' })])
-    main.append(h('div', { class: 'adm-stack' }, card('封禁管理', [banStats, reviewCardWrap, banCard, manualCard]), screenshotTrace(loadBans)))
+    main.append(h('div', { class: 'adm-stack' }, card('封禁管理', [banStats, reviewCardWrap, banCard, manualCard]), captureCardWrap, screenshotTrace(loadBans)))
     void loadBans()
     refreshTimer = window.setInterval(() => {
-      if (document.visibilityState === 'visible' && ![reviewSlot,banSlot].some(slot=>slot.querySelector('details[open]') || slot.contains(document.activeElement))) void loadBans()
+      if (document.visibilityState === 'visible' && !document.querySelector('dialog.adm-dialog') && ![reviewSlot, banSlot, captureFilterForm, captureSlot].some(slot => slot.querySelector('details[open]') || slot.contains(document.activeElement))) void loadBans()
     }, 10000)
   },
   mp() {

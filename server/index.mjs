@@ -13,6 +13,7 @@ import {cardRoutes} from './update-cards.mjs'
 import {createReadiness} from './readiness.mjs'
 import {presence, mpPresence} from './live.mjs'
 import {multiplayer} from './mp-admin.mjs'
+import {createCheatCaptureService} from './cheat-captures.mjs'
 import {npcDefaults,validNpc} from '../lib/npc.ts'
 import {resolveClientIp} from './client-ip.mjs'
 import {createPerfCache} from './perf-cache.mjs'
@@ -92,6 +93,9 @@ async function gfxAdmin(request,user){
   return json({ok:true})
 }
 const env = {...process.env, gfxAdmin,smokeAdmin,npcAdmin,mpAdmin:mp.route, perfQuery:cachedPerfQuery, DB:database(connections), FEEDBACK:bucket(process.env.S3_ENDPOINT)}
+const cheatCaptures=createCheatCaptureService(pool,env,{bucket:env.FEEDBACK,resolvePlace:mp.resolvePlace})
+mp.setCheatCaptures(cheatCaptures)
+env.cheatCaptureUpload=cheatCaptures.upload
 const origin = new URL(process.env.PUBLIC_ORIGIN).origin
 Object.assign(env,traceRoutes(pool,env))
 env.updateCards=cardRoutes(pool,env)

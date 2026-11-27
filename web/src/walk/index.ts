@@ -1613,6 +1613,35 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
       return false
     },
   })
+  function captureContext(){
+    const act=currentActivity()
+    const inVehicle=Boolean(rides?.car||rides?.bike||rides?.boat)
+    const speedMs=inVehicle?Math.abs(rides!.speed):Math.hypot(vx,vz)
+    const foot=!rides?.bike&&!rides?.car&&!rides?.boat&&!document.body.dataset.helicopter&&document.body.dataset.drone!=='rc'
+    const parts:string[]=[]
+    if(document.body.dataset.helicopter)parts.push('乘直升机')
+    else if(act.detail)parts.push(act.detail)
+    else if(act.act==='idle')parts.push('原地待机')
+    else if(act.act==='walk')parts.push(speedMs>cfg.walk*1.15?'跑步':'步行')
+    else parts.push(act.act)
+    if(combat.f.down)parts.push('倒地')
+    else if(crashSession)parts.push('摔车')
+    else if(crouching)parts.push('蹲行')
+    if(!inVehicle&&!document.body.dataset.helicopter&&document.body.dataset.drone!=='rc')parts.push(grounded?'地面':'空中')
+    return {
+      activity:act.act,
+      activityDetail:act.detail??'',
+      stateLabel:parts.join(' · '),
+      speedMs,
+      verticalSpeedMs:velocity,
+      grounded,
+      foot,
+      bike:rides?.car?'car':rides?.bike?'bike':rides?.boat?'boat':'',
+      x:figure.position.x,
+      y:figure.position.y+combat.drop,
+      z:figure.position.z,
+    }
+  }
   function attachMp(){
     if(!mpEnabled()||!active||net)return
     if(!netModule){void import('../net').then(module=>{netModule=module;attachMp()}).catch(error=>console.warn('multiplayer unavailable',error));return}
@@ -1620,7 +1649,7 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
         net=netModule.attachNet(scene,model.animations,()=>({x:figure.position.x,y:figure.position.y+combat.drop,z:figure.position.z,
           foot:!rides?.bike&&!rides?.car&&!rides?.boat&&!document.body.dataset.helicopter&&document.body.dataset.drone!=='rc',yaw:figure.rotation.y,v:rides?.bike?Math.abs(rides.speed):Math.hypot(vx,vz),gr:Number(grounded),
           sc:cigarette.wire,sb:Math.round(cigarette.length*1800),sp:puffSeq,br:brandIndex(cigarette.brand),sd:dropSeq,ss:cigarette.strength,sr:cigarette.remaining,
-          bike:rides?.bike?'bike':'',bx:rides?.bike?.position.x??0,bz:rides?.bike?.position.z??0,byaw:rides?.heading??0}),()=>currentAvatar()??profile,camera,currentActivity,combat.receive,(x,y,z)=>{figure.position.set(x,Math.max(0,y-combat.drop),z);vx=0;vz=0})
+          bike:rides?.bike?'bike':'',bx:rides?.bike?.position.x??0,bz:rides?.bike?.position.z??0,byaw:rides?.heading??0}),()=>currentAvatar()??profile,camera,currentActivity,combat.receive,(x,y,z)=>{figure.position.set(x,Math.max(0,y-combat.drop),z);vx=0;vz=0},captureContext)
         net.emote(emote.id);net.tick(0)
     }
   }

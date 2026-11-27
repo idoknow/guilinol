@@ -760,3 +760,46 @@ a.adm-kpi:hover{border-color:var(--ui-jade-500);box-shadow:var(--ui-shadow-1);tr
 .adm-protect td{vertical-align:top}
 @media (max-width:640px){.adm-review-actions .adm-btn{flex:1}.adm-review-actions .adm-select{flex:1;max-width:none}}
 .adm-card-actions .adm-link+.adm-link{margin-left:14px}
+
+/* 外挂自动抓拍取证（IDOK-458） */
+.adm-kpis--6{grid-template-columns:repeat(6,minmax(0,1fr))}
+@media (max-width:1120px){.adm-kpis--6{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media (max-width:640px){.adm-kpis--6{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.adm-capture-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(310px,1fr));gap:14px;margin-top:12px}
+.adm-capture-card{display:flex;flex-direction:column;overflow:hidden;border-radius:var(--ui-r-md);background:var(--ui-paper-hi);border:1px solid var(--ui-paper-line);box-shadow:0 1px 2px rgba(20,24,28,.04)}
+.adm-capture-thumb{position:relative;display:block;width:100%;aspect-ratio:16/9;padding:0;border:0;background:#0e1319;cursor:pointer;overflow:hidden}
+.adm-capture-thumb img{display:block;width:100%;height:100%;object-fit:cover;transition:transform .2s ease}
+.adm-capture-thumb:hover img{transform:scale(1.02)}
+.adm-capture-badge{position:absolute;top:8px;right:8px;left:auto;background:rgba(20,33,30,.88);color:#f8fafc;border:1px solid rgba(255,255,255,.22);box-shadow:0 2px 6px rgba(0,0,0,.35)}
+.adm-capture-badge.is-bad{background:rgba(185,28,28,.94);color:#fff}
+.adm-capture-badge.adm-ban-auto{background:rgba(180,83,9,.94);color:#fff}
+.adm-capture-body{display:grid;gap:8px;padding:12px 14px;flex:1}
+.adm-capture-head{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap}
+.adm-capture-head b,.adm-capture-head a{font:600 14px/1.3 var(--num);color:var(--ui-ink)}
+.adm-capture-facts{display:grid;grid-template-columns:36px 1fr;gap:4px 8px;margin:0;font-size:12.5px;line-height:1.45}
+.adm-capture-facts dt{color:var(--ui-ink-soft);font-weight:500}
+.adm-capture-facts dd{margin:0;color:var(--ui-ink);font-family:var(--num);word-break:break-word}
+.adm-capture-actions{display:flex;gap:8px;margin-top:auto;padding-top:4px}
+.adm-review-shots{display:grid;gap:6px}
+.adm-review-shot-list{display:flex;flex-wrap:wrap;gap:8px}
+.adm-review-shot-btn{display:flex;align-items:center;gap:8px;padding:4px 8px 4px 4px;border:1px solid var(--ui-paper-line);border-radius:var(--ui-r-sm);background:var(--ui-paper);cursor:pointer;font-size:12px;color:var(--ui-ink)}
+.adm-review-shot-btn:hover{border-color:var(--ui-jade-500)}
+.adm-review-shot-btn img{width:64px;height:36px;object-fit:cover;border-radius:3px;background:#0e1319;display:block}
+.adm-capture-lightbox{width:min(96vw,1040px);max-width:none;padding:0;overflow:hidden;background:var(--ui-paper-hi);color:var(--ui-ink);border:1px solid var(--ui-paper-line)}
+.adm-capture-lb-head{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px;padding:12px 16px;border-bottom:1px solid var(--ui-paper-line);background:var(--ui-paper-hi);color:var(--ui-ink)}
+.adm-capture-lb-actions{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.adm-capture-lb-actions a.adm-btn--ghost{color:var(--ui-jade-700);text-decoration:none}
+.adm-capture-lb-actions a.adm-btn--ghost:hover{color:var(--ui-ink)}
+.adm-capture-lb-body{display:grid;gap:12px;padding:14px 16px;max-height:82vh;overflow:auto;background:var(--ui-paper-hi);color:var(--ui-ink)}
+.adm-capture-lb-img{display:block;width:100%;max-height:62vh;object-fit:contain;border-radius:var(--ui-r-sm);background:#0c1117;border:1px solid var(--ui-paper-line)}
+.adm-capture-lb-facts{margin:0}
+.adm-capture-lb-facts dt{color:var(--ui-ink-soft)}
+.adm-capture-lb-facts dd{color:var(--ui-ink)}
+@media (max-width:640px){
+  .adm-capture-filters label{flex:1 1 100%}
+  .adm-capture-filters .adm-select,.adm-capture-filters input[type=search]{flex:1;width:100%;max-width:none}
+  .adm-capture-grid{grid-template-columns:1fr}
+  .adm-capture-actions .adm-btn{flex:1}
+  .adm-capture-lb-actions{width:100%}
+  .adm-capture-lb-actions .adm-btn,.adm-capture-lb-actions a{flex:1;text-align:center}
+}

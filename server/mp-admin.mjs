@@ -117,8 +117,18 @@ export function multiplayer(pool,env,{cache}={}){
     }
     return name?{name,dist:Math.round(Math.sqrt(best))}:null
   }
+  async function resolvePlace(x,z){
+    await loadLandmarks()
+    return nearestPlace(x,z)
+  }
+  let cheatCaptures=null
+  function setCheatCaptures(service){cheatCaptures=service}
   async function route(path,request,actor){
     const params=new URL(request.url).searchParams
+    if(cheatCaptures&&path.startsWith('admin/mp/cheat-captures')){
+      const handled=await cheatCaptures.adminRoute(path,request,actor)
+      if(handled)return handled
+    }
     if(path==='admin/user-search'){
       if(request.method!=='GET')return json({error:'method not allowed'},405)
       return json(await searchBanUsers(pool,(params.get('q')??'').trim().slice(0,128)))
@@ -239,5 +249,5 @@ export function multiplayer(pool,env,{cache}={}){
       await record(pool,snapshot,new Date(),nearestPlace)
     }catch(error){console.warn('mp sample failed',error.code??error.message)}finally{pending=false}
   }
-  return {route,start(){void sample();const timer=setInterval(sample,60000);timer.unref();return ()=>clearInterval(timer)}}
+  return {route,resolvePlace,setCheatCaptures,start(){void sample();const timer=setInterval(sample,60000);timer.unref();return ()=>clearInterval(timer)}}
 }
