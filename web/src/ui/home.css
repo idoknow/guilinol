@@ -199,16 +199,16 @@ kbd{display:inline-block;min-width:1.5em;padding:1px 5px;margin:0 1px;border-rad
   .home-mode-text>span{font-size:var(--ui-fs-xs)}
   .home-foot{padding-bottom:calc(8px + env(safe-area-inset-bottom))}
 }
-/* --- 横屏手机（844×390、873×403）：书名左、目录右，一屏放下 ---------------------------------------- */
+/* --- 横屏手机（844×390、873×403）：目录左（同电脑），右半让给封面场景，书名落在人物脚边，一屏放下 ------------ */
 @media (max-height:520px) and (orientation:landscape){
-  /* 左半是书名 + 场景人物，中间留亮；目录列（约 48% 起）压实 */
-  .home-shade{background:linear-gradient(90deg,color-mix(in srgb,var(--ui-ink-950) 80%,transparent) 0,color-mix(in srgb,var(--ui-ink-950) 36%,transparent) 28%,color-mix(in srgb,var(--ui-ink-950) 36%,transparent) 42%,color-mix(in srgb,var(--ui-ink-950) 82%,transparent) 54%,color-mix(in srgb,var(--ui-ink-950) 86%,transparent) 100%)}
+  /* 目录列（左 ~52%）压实；右半是夕阳、象鼻山、书名和人物，只留薄压暗 */
+  .home-shade{background:linear-gradient(90deg,color-mix(in srgb,var(--ui-ink-950) 86%,transparent) 0,color-mix(in srgb,var(--ui-ink-950) 82%,transparent) 46%,color-mix(in srgb,var(--ui-ink-950) 34%,transparent) 58%,color-mix(in srgb,var(--ui-ink-950) 28%,transparent) 100%)}
   .home-top{padding-top:calc(10px + env(safe-area-inset-top))}
   .home-douyin{top:calc(10px + env(safe-area-inset-top))}
-  .home-main{width:100%;min-height:calc(100dvh - 26px);display:grid;grid-template-columns:minmax(0,1fr) minmax(340px,1.3fr);grid-template-areas:"title modes" "title links";
+  .home-main{width:100%;min-height:calc(100dvh - 26px);display:grid;grid-template-columns:minmax(340px,1.3fr) minmax(0,1fr);grid-template-areas:"modes title" "links title";
     align-content:center;column-gap:clamp(24px,5vw,56px);row-gap:var(--ui-s-1);
-    padding:calc(58px + env(safe-area-inset-top)) calc(20px + env(safe-area-inset-right)) var(--ui-s-1) calc(clamp(20px,5vw,56px) + env(safe-area-inset-left))}
-  .home-title{grid-area:title;align-self:center;margin-bottom:0}
+    padding:calc(58px + env(safe-area-inset-top)) calc(clamp(20px,5vw,56px) + env(safe-area-inset-right)) var(--ui-s-1) calc(20px + env(safe-area-inset-left))}
+  .home-title{grid-area:title;align-self:end;margin-bottom:0}
   .home-title{--h1:clamp(54px,15vh,68px)}
   .home-modes{grid-area:modes;margin:0}
   .home-links{grid-area:links;margin:0 0 0 2px}
@@ -241,7 +241,7 @@ kbd{display:inline-block;min-width:1.5em;padding:1px 5px;margin:0 1px;border-rad
   .home-links{margin-top:0}
 }
 @media (max-height:520px) and (orientation:landscape){
-  .home-main{grid-template-areas:"title modes" "title links" "title more"}
+  .home-main{grid-template-areas:"modes title" "links title" "more title"}
   .home-more{grid-area:more;justify-self:start;margin-left:2px}
 }
 /* 触屏：文字链接与续游也要够手指按 */
