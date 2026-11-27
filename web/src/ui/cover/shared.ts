@@ -124,10 +124,10 @@ float sunRays(vec3 d){
   vec3 R = normalize(cross(uSunDir, vec3(0., 1., 0.))), U = cross(R, uSunDir);
   vec2 p = vec2(dot(d, R), dot(d, U));
   vec2 q = p / (length(p) + 1e-4);
-  float n = texture2D(uNoise, q * .55 + vec2(uTime * .003, .37)).r * .65 + texture2D(uNoise, q * 1.4 + vec2(-uTime * .005, .71)).g * .35;
+  float n = texture2D(uNoise, q * .55 + vec2(fract(uTime * .003), .37)).r * .65 + texture2D(uNoise, q * 1.4 + vec2(fract(-uTime * .005), .71)).g * .35;
   float r = (smoothstep(.42, .72, n) * 2. - 1.) * exp(-acos(clamp(dot(d, uSunDir), -1., 1.)) * 3.2);
-  // 太阳下方（峰林那侧）弱化
-  return p.y < 0. ? r * .35 : r;
+  // 太阳下方（峰林那侧）弱化：软过渡，避免日心水平线折痕
+  return r * mix(.35, 1., smoothstep(-.05, .02, p.y));
 }
 vec3 skyColor(vec3 d){
   float h = max(d.y, 0.);
@@ -152,7 +152,8 @@ vec3 skyColor(vec3 d){
   }
   // 日轮紧光环：HDR，经 ACES 成白金
   // 光环色偏日晕：uSunCol 经 disp 上限近乎中性，过曝后发青白
-  if (uSunK.y > 0.) c += mix(uSunCol, uGlow, .6) * (pow(s, 900.) * 1.6 + pow(s, 160.) * .35) * uSunK.y;
+  // 落山后淡出（拖时间轴到蓝调/夜不残留光环）
+  if (uSunK.y > 0.) c += mix(uSunCol, uGlow, .6) * (pow(s, 900.) * 1.6 + pow(s, 160.) * .35) * uSunK.y * smoothstep(-.06, .03, uSunDir.y);
   return mix(c, uHaze, smoothstep(0., -.06, d.y));
 }
 // 天空光束：光柱提亮、暗柱压暗（只给天空盒用，不进 skyColor：fogColor 每个地物片元都会调 skyColor）
@@ -169,7 +170,7 @@ vec3 skyRays(vec3 c, vec3 d){
 vec3 fogColor(vec3 d){
   vec3 fd = normalize(vec3(d.x, max(d.y, 0.) * .4 + .012, d.z));
   vec3 fc = mix(skyColor(fd), uHaze, uSkyK.z);
-  fc += uGlow * pow(max(dot(normalize(d), uSunDir), 0.), 12.) * uSunK2.z;
+  fc += uGlow * pow(max(dot(normalize(d), uSunDir), 0.), 12.) * uSunK2.z * smoothstep(-.06, .03, uSunDir.y);
   return fc;
 }
 `
@@ -193,13 +194,15 @@ vec3 applyAir(vec3 c, vec3 w, vec3 D, float dist){
 export const GLSL_LIGHT = /* glsl */ `
 uniform vec3 uAmbUp, uAmbDn, uSunLight, uRim;
 vec3 shade(vec3 alb, vec3 N, vec3 V){
+  float sunUp = smoothstep(-.05, .04, uSunDir.y);
   // 逆光剪影：朝太阳看时植被绿去饱和，避免和暖雾混成橄榄灰（uRim.z = SUN.sil）
-  if (uRim.z > 0.) { float b = max(dot(-V, uSunDir), 0.); alb = mix(alb, vec3(dot(alb, vec3(.36, .46, .18))) * vec3(1.04, .94, .9), clamp(b * b * uRim.z * smoothstep(-.05, .04, uSunDir.y), 0., 1.)); }
+  if (uRim.z > 0.) { float b = max(dot(-V, uSunDir), 0.); alb = mix(alb, vec3(dot(alb, vec3(.36, .46, .18))) * vec3(1.04, .94, .9), clamp(b * b * uRim.z * sunUp, 0., 1.)); }
   vec3 amb = mix(uAmbDn, uAmbUp, N.y * .5 + .5);
   float sd = max((dot(N, uSunDir) + .12) / 1.12, 0.);
   vec3 c = alb * (amb + uSunLight * sd);
   float edge = pow(1. - abs(dot(N, V)), 3.), back = pow(max(dot(-V, uSunDir), 0.), 4.);
-  return c + uGlow * edge * back * .35 * uRim.x;
+  // 金边加倍只在太阳在天时生效；落山后回到原 1 倍
+  return c + uGlow * edge * back * .35 * mix(1., uRim.x, sunUp);
 }
 `
 
