@@ -558,10 +558,54 @@ export class Traffic {
     for(let step=0;step<=steps;step++){const along=track.length*step/steps;pickups.near(track.start.x+track.dx*along-track.dz*track.offset,track.start.z+track.dz*along+track.dx*track.offset,inspect)}
     hits.sort((a,b)=>a.dist-b.dist);cache.set(track,{revision:pickups.revision,hits});return hits
   }
+  private hasParkingHitInRange(track:Track,minDist:number,maxDist:number){
+    const hits=this.parkingHits(track)
+    for(let i=0;i<hits.length;i++){
+      const d=hits[i].dist
+      if(d>=minDist&&d<maxDist)return true
+      if(d>=maxDist)break
+    }
+    return false
+  }
   private adjacent(track:Track){return (this.exits.get(track.from)??[]).filter(next=>next!==track&&!next.walk&&next.kind===track.kind&&next.to===track.to&&next.street===track.street&&Math.abs(next.offset-track.offset)<=(next.width??3)/2+(track.width??3)/2+.1&&!this.parkingHits(next).length)}
   private usable(track:Track){return track.walk?this.resolveWalkSurface(track):!this.parkingHits(track).length||!!this.adjacent(track).length}
   private cells=new Map<string,Track[]>()
   private obstacles=new Map<number,(Position|Actor)[]>()
+  private obstaclePool:(Position|Actor)[][]=[]
+  private activeObstacleBins:(Position|Actor)[][]=[]
+  private liveActors=new Set<Actor>()
+  private occupiedJunctions=new Map<number,Actor>()
+  private spawnCounts=new Map<string,number>()
+  private waitVisited=new Set<Actor>()
+  private waitChain=new Set<Actor>()
+  private starvedActors:Actor[]=[]
+  private exitChoices:Track[]=[]
+  private exitStraight:Track[]=[]
+  private stepCamera:Position={x:0,y:0,z:0}
+  private stepVisible?:(point:Position)=>boolean
+  private stepWarm=false
+  private stepDutyOnly=false
+  private readonly checkHiddenSpawn=(point:Position)=>{
+    if(this.stepWarm||!this.stepVisible)return true
+    const radial=(point.x-this.stepCamera.x)**2+(point.z-this.stepCamera.z)**2
+    return radial>VISIBLE_SPAWN_MIN**2||radial>15**2&&!this.stepVisible(point)
+  }
+  private readonly checkDutyHidden=(point:Position)=>{
+    if(this.stepWarm||!this.stepVisible)return true
+    const radial=(point.x-this.stepCamera.x)**2+(point.z-this.stepCamera.z)**2
+    if(this.stepDutyOnly)return radial>22**2&&(!this.stepVisible(point)||radial>55**2)
+    return radial>VISIBLE_SPAWN_MIN**2||(radial>18**2&&!this.stepVisible(point))
+  }
+  private insertObstacle(item:Position|Actor){
+    const key=Math.floor(item.x/16)*65536+Math.floor(item.z/16)
+    let bin=this.obstacles.get(key)
+    if(!bin){
+      bin=this.obstaclePool.pop()??[]
+      this.obstacles.set(key,bin)
+      this.activeObstacleBins.push(bin)
+    }
+    bin.push(item)
+  }
   nearSolids=(x:number,z:number,visit:(actor:Actor)=>void)=>{
     const col=Math.floor(x/16),row=Math.floor(z/16)
     for(let east=col-1;east<=col+1;east++)for(let south=row-1;south<=row+1;south++){
@@ -572,26 +616,39 @@ export class Traffic {
   private random:()=>number
   private checkWaitsAt=0
   private warmUntil=-1
-  private lastCamera?:Position
+  private hasLastCamera=false
+  private lastCamera:Position={x:0,y:0,z:0}
   private streets=new Map<string,{walk:Track[],motor:Track[],virtualNonmotor:Track[]}>()
   private nearbyRealNonmotor:Track[]=[]
   private cellKey=''
   private dutyConfig:DutyTrafficConfig={active:false}
   private dutyTracksCache=new Map<string,{nonmotor:Track[],motor:Track[]}>()
+  private lastDutyCx=NaN
+  private lastDutyCz=NaN
+  private lastDutyR=NaN
+  private lastDutyTracks?:{nonmotor:Track[],motor:Track[]}
+  private defaultDutyZone:DutyZoneConfig={center:DEFAULT_DUTY_CENTER,radius:DEFAULT_DUTY_RADIUS}
+  private defaultDutyZones:DutyZoneConfig[]=[]
   private dutyOfficer?:DutyOfficerContext
-  private prevOfficerPos?:Position
+  private hasPrevOfficerPos=false
+  private prevOfficerPos:Position={x:0,y:0,z:0}
   private officerSpeed=0
   private externalExclusion?:{center:{x:number,z:number},radius:number}
   private lastHitAt=-Infinity
   private lastViolatorCitedAt=-Infinity
   private countedCitedActors=new WeakSet<Actor>()
   setDutyConfig(config:Partial<DutyTrafficConfig>){
+    const prevDutyOnly=Boolean(this.dutyConfig.dutyOnly)
     this.dutyConfig={...this.dutyConfig,...config}
+    if(Boolean(this.dutyConfig.dutyOnly)!==prevDutyOnly){
+      this.dutyTracksCache.clear()
+      this.lastDutyTracks=undefined
+    }
   }
   getDutyConfig():Readonly<DutyTrafficConfig>{return this.dutyConfig}
   setDutyOfficer(ctx:DutyOfficerContext|null|undefined){
     this.dutyOfficer=ctx??undefined
-    if(!ctx||!ctx.active){this.prevOfficerPos=undefined;this.officerSpeed=0}
+    if(!ctx||!ctx.active){this.hasPrevOfficerPos=false;this.officerSpeed=0}
   }
   getDutyOfficer():Readonly<DutyOfficerContext>|undefined{return this.dutyOfficer}
   notifyViolatorCited(actor?:Actor){
@@ -1118,8 +1175,10 @@ export class Traffic {
   isJunction(node:number){return this.junctions.has(node)||this.signal.has(node)}
   inherit(previous:Traffic){
     this.time=previous.time
-    this.warmUntil=previous.warmUntil;this.lastCamera=previous.lastCamera
-    this.dutyConfig={...previous.dutyConfig};this.dutyTracksCache.clear()
+    this.warmUntil=previous.warmUntil
+    this.hasLastCamera=previous.hasLastCamera
+    this.lastCamera.x=previous.lastCamera.x;this.lastCamera.y=previous.lastCamera.y;this.lastCamera.z=previous.lastCamera.z
+    this.dutyConfig={...previous.dutyConfig};this.dutyTracksCache.clear();this.lastDutyTracks=undefined
     for(const actor of previous.actors){
       const track=this.exits.get(actor.track.from)?.find(candidate=>candidate.id===actor.track.id&&candidate.kind===actor.track.kind&&!!candidate.virtual===!!actor.track.virtual)
       if(track){actor.track=track;this.actors.push(actor);actorOwners.set(actor,this)}
@@ -1377,9 +1436,10 @@ export class Traffic {
     return actor
   }
   private getDutyTracks(cx:number,cz:number,radius:number):{nonmotor:Track[],motor:Track[]}{
+    if(cx===this.lastDutyCx&&cz===this.lastDutyCz&&radius===this.lastDutyR&&this.lastDutyTracks)return this.lastDutyTracks
     const key=`${cx.toFixed(2)},${cz.toFixed(2)},${radius.toFixed(1)}`
     const cached=this.dutyTracksCache.get(key)
-    if(cached)return cached
+    if(cached){this.lastDutyCx=cx;this.lastDutyCz=cz;this.lastDutyR=radius;this.lastDutyTracks=cached;return cached}
     const rSq=radius**2
     const bridgeNm:Track[]=[],realNm:Track[]=[],virtNm:Track[]=[]
     const bridgeMotor:Track[]=[],otherMotor:Track[]=[]
@@ -1403,26 +1463,27 @@ export class Traffic {
       :realNm.length?[...realNm,...virtNm]:virtNm.length?virtNm:(this.dutyConfig.dutyOnly?[]:motor)
     const result={nonmotor,motor}
     this.dutyTracksCache.set(key,result)
+    this.lastDutyCx=cx;this.lastDutyCz=cz;this.lastDutyR=radius;this.lastDutyTracks=result
     return result
   }
   private stepDutySpawns(camera:Position,visible:((point:Position)=>boolean)|undefined,budget:number,warm=false):number{
     if(!this.dutyConfig.active||budget<=0||this.actors.length>=this.actorLimit)return budget
-    const zones:readonly DutyZoneConfig[]=this.dutyConfig.zones?.length
-      ?this.dutyConfig.zones
-      :[{
-        center:this.dutyConfig.center??DEFAULT_DUTY_CENTER,
-        radius:this.dutyConfig.radius??DEFAULT_DUTY_RADIUS,
-        weights:this.dutyConfig.weights,
-        desiredCars:this.dutyConfig.desiredCars,
-        desiredScooters:this.dutyConfig.desiredScooters,
-      }]
-    const dutyOnly=Boolean(this.dutyConfig.dutyOnly)
-    const dutyHidden=(point:Position)=>{
-      if(warm||!visible)return true
-      const radial=(point.x-camera.x)**2+(point.z-camera.z)**2
-      if(dutyOnly)return radial>22**2&&(!visible(point)||radial>55**2)
-      return radial>VISIBLE_SPAWN_MIN**2||(radial>18**2&&!visible(point))
+    let zones:readonly DutyZoneConfig[]
+    if(this.dutyConfig.zones?.length){
+      zones=this.dutyConfig.zones
+    }else{
+      const z=this.defaultDutyZone
+      z.center=this.dutyConfig.center??DEFAULT_DUTY_CENTER
+      z.radius=this.dutyConfig.radius??DEFAULT_DUTY_RADIUS
+      z.weights=this.dutyConfig.weights
+      z.desiredCars=this.dutyConfig.desiredCars
+      z.desiredScooters=this.dutyConfig.desiredScooters
+      if(this.defaultDutyZones.length!==1)this.defaultDutyZones=[z]
+      zones=this.defaultDutyZones
     }
+    const dutyOnly=Boolean(this.dutyConfig.dutyOnly)
+    this.stepCamera=camera;this.stepVisible=visible;this.stepWarm=warm;this.stepDutyOnly=dutyOnly
+    const dutyHidden=this.checkDutyHidden
     const hl=this.dutyConfig.hiddenLifecycle
     const defaultScooters=Math.min(10,Math.max(4,Math.floor(this.actorLimit*.1)))
     for(const zone of zones){
@@ -1463,41 +1524,43 @@ export class Traffic {
     return budget
   }
   step(dt:number,camera:Position,vehicle?:Position,visible?:(point:Position)=>boolean,profile?:(spawn:number,grid:number,motion:number)=>void){
-    if(!this.dutyConfig.dutyOnly)latestTrafficRef=new WeakRef(this)
-    else if(!latestTrafficRef?.deref())latestTrafficRef=new WeakRef(this)
+    const currentRef=latestTrafficRef?.deref()
+    if(!this.dutyConfig.dutyOnly){if(currentRef!==this)latestTrafficRef=new WeakRef(this)}
+    else if(!currentRef)latestTrafficRef=new WeakRef(this)
     const start=profile?performance.now():0
     this.time+=dt
     this.syncCitedViolatorCooldown()
     if(this.dutyOfficer?.active){
       const op=this.dutyOfficer.pos
-      if(this.prevOfficerPos&&dt>0){
+      if(this.hasPrevOfficerPos&&dt>0){
         const moved=Math.hypot(op.x-this.prevOfficerPos.x,op.z-this.prevOfficerPos.z)
         this.officerSpeed=moved>8?0:moved/dt
       }else{
         this.officerSpeed=0
       }
-      this.prevOfficerPos={x:op.x,y:op.y,z:op.z}
+      this.prevOfficerPos.x=op.x;this.prevOfficerPos.y=op.y;this.prevOfficerPos.z=op.z
+      this.hasPrevOfficerPos=true
     }else{
-      this.prevOfficerPos=undefined
+      this.hasPrevOfficerPos=false
       this.officerSpeed=0
     }
-    if(!this.lastCamera||Math.hypot(camera.x-this.lastCamera.x,camera.z-this.lastCamera.z)>TELEPORT)this.warmUntil=this.time+WARMUP_S
-    this.lastCamera={x:camera.x,y:camera.y,z:camera.z}
+    if(!this.hasLastCamera||Math.hypot(camera.x-this.lastCamera.x,camera.z-this.lastCamera.z)>TELEPORT)this.warmUntil=this.time+WARMUP_S
+    this.lastCamera.x=camera.x;this.lastCamera.y=camera.y;this.lastCamera.z=camera.z
+    this.hasLastCamera=true
     const warm=this.time<this.warmUntil
     const dutyOnly=Boolean(this.dutyConfig.active&&this.dutyConfig.dutyOnly)
     const hl=this.dutyConfig.hiddenLifecycle
     // IDOK-236: also never materialise a car on top of the camera/player (the frustum test says "not visible" there).
-    const hiddenSpawn=(point:Position)=>{
-      if(warm||!visible)return true
-      const radial=(point.x-camera.x)**2+(point.z-camera.z)**2
-      return radial>VISIBLE_SPAWN_MIN**2||radial>15**2&&!visible(point)
-    }
-    const kept:Actor[]=[]
+    this.stepCamera=camera;this.stepVisible=visible;this.stepWarm=warm;this.stepDutyOnly=dutyOnly
+    const hiddenSpawn=this.checkHiddenSpawn
+    let write=0
     if(dutyOnly){
       const zCenter=this.dutyConfig.zones?.[0]?.center??this.dutyConfig.center??DEFAULT_DUTY_CENTER
       const zRad=(this.dutyConfig.zones?.[0]?.radius??this.dutyConfig.radius??DEFAULT_DUTY_RADIUS)+(hl?280:90)
-      for(const actor of this.actors){
-        const outOfRange=(actor.x-zCenter.x)**2+(actor.z-zCenter.z)**2>zRad**2&&(actor.x-camera.x)**2+(actor.z-camera.z)**2>(hl?340:200)**2
+      const zRadSq=zRad*zRad,camRadSq=(hl?340:200)**2
+      for(let i=0;i<this.actors.length;i++){
+        const actor=this.actors[i]
+        const outOfRange=(actor.x-zCenter.x)**2+(actor.z-zCenter.z)**2>zRadSq&&(actor.x-camera.x)**2+(actor.z-camera.z)**2>camRadSq
         if(hl){
           if(actor.pendingRecycle||outOfRange||actor.leaving){
             const gate=this.evalHiddenGate(actor,camera,visible,hl)
@@ -1509,87 +1572,132 @@ export class Traffic {
             actor.leaving=false
             this.deferredDespawnCount++
           }
-          kept.push(actor)
+          this.actors[write++]=actor
         }else{
-          if((!actor.leaving||actor.scale>0)&&!outOfRange)kept.push(actor)
+          if((!actor.leaving||actor.scale>0)&&!outOfRange)this.actors[write++]=actor
           else this.emitLifecycle('despawn',actor,camera,visible)
         }
       }
     }else{
-      for(const actor of this.actors){
-        if((!actor.leaving||actor.scale>0)&&(actor.x-camera.x)**2+(actor.z-camera.z)**2<=200**2)kept.push(actor)
+      for(let i=0;i<this.actors.length;i++){
+        const actor=this.actors[i]
+        if((!actor.leaving||actor.scale>0)&&(actor.x-camera.x)**2+(actor.z-camera.z)**2<=200**2)this.actors[write++]=actor
         else this.emitLifecycle('despawn',actor,camera,visible)
       }
     }
-    this.actors=kept
-    const counts=new Map<string,number>()
-    for(const actor of this.actors){const key=(actor.spawnStreet??actor.track.street)+':'+actor.track.walk;counts.set(key,(counts.get(key)??0)+1)}
+    this.actors.length=write
     let budget=hl?2:(warm?48:8)
-    if(!dutyOnly){
+    if(!dutyOnly&&budget>0&&this.actors.length<this.actorLimit){
+      const counts=this.spawnCounts;counts.clear()
+      let scooterCount=0,motorCount=0
+      for(let i=0;i<this.actors.length;i++){
+        const actor=this.actors[i]
+        const key=(actor.spawnStreet??actor.track.street)+':'+actor.track.walk
+        counts.set(key,(counts.get(key)??0)+1)
+        if(actor.kind!=='person'){motorCount++;if(actor.kind==='scooter')scooterCount++}
+      }
       const scooterShare=this.dutyConfig.active?(this.dutyConfig.twoWheelShare??.52):.36
-      for(const [street,group] of this.sites(camera))for(const walk of [false,true]){
-        const key=street+':'+walk,existing=counts.get(key)??0
-        const low=walk?this.rules.personMin:this.rules.carMin,high=walk?this.rules.personMax:this.rules.carMax
-        const desired=this.actorLimit===MOBILE_ACTORS?low:Math.ceil((low+high)/2)
-        if(existing>=desired||budget<=0)continue
-        if(walk){
-          if(!group.walk.length)continue
-          const walkPool=this.collectCandidates(group.walk,camera)
-          for(let count=existing,attempt=0;walkPool.candidates.length&&count<desired&&attempt<24&&budget>0&&this.actors.length<this.actorLimit;attempt++){
-            if(this.trySpawnFromPool(walkPool,'person',camera,hiddenSpawn)){count++;budget--}
-          }
-          continue
-        }
-        if(!group.motor.length)continue
-        const motorPool=this.collectCandidates(group.motor,camera)
-        if(!motorPool.candidates.length)continue
-        const otherMotor=this.actors.find(actor=>!actor.track.walk&&!actor.leaving&&actor.track.street===street)
-        let virtualPool:ReturnType<Traffic['collectCandidates']>|undefined
-        let realNmPool:ReturnType<Traffic['collectCandidates']>|undefined
-        for(let count=existing,attempt=0;count<desired&&attempt<24&&budget>0&&this.actors.length<this.actorLimit;attempt++){
-          const pref={attempt,otherMotor}
-          const scooter=this.actors.filter(other=>other.kind==='scooter').length<Math.round((1+this.actors.filter(other=>other.kind!=='person').length)*scooterShare)
-          if(!scooter){
-            if(this.trySpawnFromPool(motorPool,'car',camera,hiddenSpawn,undefined,false,undefined,false,visible,pref)){count++;budget--}
+      let sharedRealNmPool:ReturnType<Traffic['collectCandidates']>|undefined
+      const pref:{attempt:number,otherMotor?:Actor}={attempt:0,otherMotor:undefined}
+      spawnStreets:for(const [street,group] of this.sites(camera)){
+        for(let w=0;w<2;w++){
+          if(budget<=0||this.actors.length>=this.actorLimit)break spawnStreets
+          const walk=w===1
+          const key=street+':'+walk,existing=counts.get(key)??0
+          const low=walk?this.rules.personMin:this.rules.carMin,high=walk?this.rules.personMax:this.rules.carMax
+          const desired=this.actorLimit===MOBILE_ACTORS?low:Math.ceil((low+high)/2)
+          if(existing>=desired)continue
+          if(walk){
+            if(!group.walk.length)continue
+            const walkPool=this.collectCandidates(group.walk,camera)
+            for(let count=existing,attempt=0;walkPool.candidates.length&&count<desired&&attempt<24&&budget>0&&this.actors.length<this.actorLimit;attempt++){
+              if(this.trySpawnFromPool(walkPool,'person',camera,hiddenSpawn)){count++;budget--}
+            }
             continue
           }
-          if(realNmPool===undefined&&this.nearbyRealNonmotor.length){
-            const localNm=this.nearbyRealNonmotor.filter(t=>pointToSegmentDistSq(camera.x,camera.z,t.start.x,t.start.z,t.end.x,t.end.z)<=180**2)
-            realNmPool=this.collectCandidates(localNm,camera)
+          if(!group.motor.length)continue
+          const motorPool=this.collectCandidates(group.motor,camera)
+          if(!motorPool.candidates.length)continue
+          let otherMotor:Actor|undefined
+          for(let i=0;i<this.actors.length;i++){
+            const a=this.actors[i]
+            if(!a.track.walk&&!a.leaving&&a.track.street===street){otherMotor=a;break}
           }
-          if(realNmPool?.candidates.length&&this.trySpawnFromPool(realNmPool,'scooter',camera,hiddenSpawn,street,false,undefined,false,visible,pref)){count++;budget--;continue}
-          if(virtualPool===undefined)virtualPool=this.collectCandidates(group.virtualNonmotor,camera)
-          if(virtualPool.candidates.length&&this.trySpawnFromPool(virtualPool,'scooter',camera,hiddenSpawn,street,false,undefined,false,visible,pref)){count++;budget--;continue}
-          if(this.trySpawnFromPool(motorPool,'scooter',camera,hiddenSpawn,street,false,undefined,false,visible,pref)){count++;budget--}
+          pref.otherMotor=otherMotor
+          let virtualPool:ReturnType<Traffic['collectCandidates']>|undefined
+          for(let count=existing,attempt=0;count<desired&&attempt<24&&budget>0&&this.actors.length<this.actorLimit;attempt++){
+            pref.attempt=attempt
+            const scooter=scooterCount<Math.round((1+motorCount)*scooterShare)
+            if(!scooter){
+              if(this.trySpawnFromPool(motorPool,'car',camera,hiddenSpawn,undefined,false,undefined,false,visible,pref)){count++;budget--;motorCount++}
+              continue
+            }
+            if(sharedRealNmPool===undefined&&this.nearbyRealNonmotor.length){
+              const localNm:Track[]=[]
+              for(let i=0;i<this.nearbyRealNonmotor.length;i++){
+                const t=this.nearbyRealNonmotor[i]
+                if(pointToSegmentDistSq(camera.x,camera.z,t.start.x,t.start.z,t.end.x,t.end.z)<=180**2)localNm.push(t)
+              }
+              sharedRealNmPool=this.collectCandidates(localNm,camera)
+            }
+            if(sharedRealNmPool?.candidates.length&&this.trySpawnFromPool(sharedRealNmPool,'scooter',camera,hiddenSpawn,street,false,undefined,false,visible,pref)){count++;budget--;motorCount++;scooterCount++;continue}
+            if(virtualPool===undefined)virtualPool=this.collectCandidates(group.virtualNonmotor,camera)
+            if(virtualPool.candidates.length&&this.trySpawnFromPool(virtualPool,'scooter',camera,hiddenSpawn,street,false,undefined,false,visible,pref)){count++;budget--;motorCount++;scooterCount++;continue}
+            if(this.trySpawnFromPool(motorPool,'scooter',camera,hiddenSpawn,street,false,undefined,false,visible,pref)){count++;budget--;motorCount++;scooterCount++}
+          }
         }
       }
     }
     if(this.dutyConfig.active)budget=this.stepDutySpawns(camera,visible,budget,warm)
     const spawned=profile?performance.now():0
-    for(const [node,queue] of this.queues){
-      const retained=queue.filter(actor=>this.actors.includes(actor)&&!actor.leaving&&(actor.track.to===node||actor.track.from===node&&actor.dist<6))
-      if(retained.length)this.queues.set(node,retained);else this.queues.delete(node)
+    const hasQueues=this.queues.size>0
+    const hasJunctions=this.junctions.size>0
+    const liveActors=this.liveActors
+    const occupiedJunctions=this.occupiedJunctions
+    if(hasQueues)liveActors.clear()
+    if(hasJunctions)occupiedJunctions.clear()
+    for(let i=0;i<this.activeObstacleBins.length;i++){
+      const bin=this.activeObstacleBins[i]
+      bin.length=0
+      this.obstaclePool.push(bin)
     }
-    const obstacles=this.obstacles;obstacles.clear()
-    for(const obstacle of vehicle?[...this.actors,vehicle]:this.actors){
-      const key=Math.floor(obstacle.x/16)*65536+Math.floor(obstacle.z/16)
-      const bin=obstacles.get(key)
-      if(bin)bin.push(obstacle);else obstacles.set(key,[obstacle])
+    this.activeObstacleBins.length=0
+    this.obstacles.clear()
+    for(let i=0;i<this.actors.length;i++){
+      const actor=this.actors[i]
+      if(hasQueues)liveActors.add(actor)
+      if(hasJunctions&&actor.kind!=='person'&&actor.dist<6&&this.junctions.has(actor.track.from)&&!occupiedJunctions.has(actor.track.from))occupiedJunctions.set(actor.track.from,actor)
+      this.insertObstacle(actor)
+    }
+    if(vehicle)this.insertObstacle(vehicle)
+    if(hasQueues){
+      for(const [node,queue] of this.queues){
+        let qWrite=0
+        for(let i=0;i<queue.length;i++){
+          const actor=queue[i]
+          if(liveActors.has(actor)&&!actor.leaving&&(actor.track.to===node||actor.track.from===node&&actor.dist<6))queue[qWrite++]=actor
+        }
+        queue.length=qWrite
+        if(!qWrite)this.queues.delete(node)
+      }
     }
     const gridded=profile?performance.now():0
     this.advanceActors(dt,camera,visible)
+    this.stepVisible=undefined
     profile?.(spawned-start,gridded-spawned,performance.now()-gridded)
   }
   private advanceActors(dt:number,camera:Position,visible?:(point:Position)=>boolean){
     const decay=Math.exp(-dt*1.2)
     const hl=this.dutyConfig.hiddenLifecycle
-    for(const actor of this.actors)this.advanceActor(actor,dt,decay,camera,visible)
+    for(let i=0;i<this.actors.length;i++)this.advanceActor(this.actors[i],dt,decay,camera,visible)
     if(this.time>=this.checkWaitsAt){
       this.checkWaitsAt=this.time+1
-      const visited=new Set<Actor>()
-      for(const start of this.actors){
+      const visited=this.waitVisited;visited.clear()
+      const chain=this.waitChain
+      for(let i=0;i<this.actors.length;i++){
+        const start=this.actors[i]
         if(!start.waitingFor||visited.has(start))continue
-        const chain=new Set<Actor>()
+        chain.clear()
         let actor:Actor|undefined=start
         while(actor?.waitingFor&&!actor.leaving&&this.time-(actor.waitingSince??this.time)>=6){
           if(chain.has(actor)){
@@ -1607,17 +1715,26 @@ export class Traffic {
           visited.add(actor);chain.add(actor);actor=actor.waitingFor
         }
       }
-      const starved=this.actors.find(actor=>actor.kind!=='person'&&!actor.leaving&&actor.waitingFor&&
-        actor.waitingFor.waitingSince===undefined&&!actor.waitingFor.leaving&&this.green(actor.track)&&
-        this.time-(actor.waitingSince??this.time)>=18)
-      if(starved){
-        if(hl){starved.ghostPassUntil=this.time+4.0;starved.waitingFor=undefined;starved.waitingSince=undefined}
-        else starved.leaving=true
+      const starved=this.starvedActors;starved.length=0
+      for(let i=0;i<this.actors.length;i++){
+        const actor=this.actors[i]
+        if(actor.kind!=='person'&&!actor.leaving&&actor.waitingFor&&
+          actor.waitingFor.waitingSince===undefined&&!actor.waitingFor.leaving&&this.green(actor.track)&&
+          this.time-(actor.waitingSince??this.time)>=18){
+          starved.push(actor)
+        }
       }
+      for(let i=0;i<starved.length;i++){
+        const actor=starved[i]
+        if(hl){actor.ghostPassUntil=this.time+4.0;actor.waitingFor=undefined;actor.waitingSince=undefined}
+        else actor.leaving=true
+      }
+      starved.length=0
     }
+    let write=0
     if(hl){
-      const survivors:Actor[]=[]
-      for(const actor of this.actors){
+      for(let i=0;i<this.actors.length;i++){
+        const actor=this.actors[i]
         if(!Number.isFinite(actor.y))continue
         if(actor.pendingRecycle){
           const gate=this.evalHiddenGate(actor,camera,visible,hl)
@@ -1627,12 +1744,15 @@ export class Traffic {
           }
           this.deferredDespawnCount++
         }
-        survivors.push(actor)
+        this.actors[write++]=actor
       }
-      this.actors=survivors
     }else{
-      this.actors=this.actors.filter(actor=>Number.isFinite(actor.y))
+      for(let i=0;i<this.actors.length;i++){
+        const actor=this.actors[i]
+        if(Number.isFinite(actor.y))this.actors[write++]=actor
+      }
     }
+    this.actors.length=write
   }
   private advanceActor(actor:Actor,dt:number,decay:number,camera:Position,visible?:(point:Position)=>boolean){
       const obstacles=this.obstacles
@@ -1653,7 +1773,7 @@ export class Traffic {
       if(person&&track.surfaceState==='pending'&&this.surfaceAt){
         if(!this.resolveWalkSurface(track)){actor.leaving=true;return}
       }
-      if(!person&&this.parkingHits(track).some(hit=>hit.dist>=actor.dist-2&&hit.dist<actor.dist+28)){
+      if(!person&&this.hasParkingHitInRange(track,actor.dist-2,actor.dist+28)){
         const options=this.adjacent(track),next=options.find(lane=>!this.actors.some(other=>other!==actor&&other.track===lane&&Math.abs(other.dist-actor.dist)<10))
         if(next){actor.dodge+=track.offset-next.offset;actor.track=track=next}
         else if(!options.length&&!visible?.(actor)&&!this.dutyConfig.hiddenLifecycle){actor.leaving=true;return}
@@ -1776,15 +1896,13 @@ export class Traffic {
             }
           }
         }
-        if(actor.fleeUntil!==undefined){
-          if(this.time<actor.fleeUntil){
-            maxSpeed*=1.55
-            accelRate=5.5
-          }else{
-            actor.fleeUntil=undefined
-            if(actor.dutyState==='fleeing'||actor.dutyState==='evading')actor.dutyState='normal'
-          }
-        }else if(actor.fleeUntil!==undefined){
+      }
+      // Keep flee expiration outside the officer guard so cited/halted/off-duty scooters never stay stuck fleeing.
+      if(actor.fleeUntil!==undefined){
+        if(!person&&officer&&!actor.cited&&!actor.haltedByDuty&&this.time<actor.fleeUntil){
+          maxSpeed*=1.55
+          accelRate=5.5
+        }else{
           actor.fleeUntil=undefined
           if(actor.dutyState==='fleeing'||actor.dutyState==='evading')actor.dutyState='normal'
         }
@@ -1900,16 +2018,24 @@ export class Traffic {
       let minDodge=safeMinDodge,maxDodge=safeMaxDodge
       const previousX=actor.x,previousZ=actor.z
       if(!person&&actor.dutyState!=='fleeing'&&actor.dutyState!=='halted'&&actor.dutyState!=='pulled_over')actor.dodge*=decay
-      const left=Math.floor((actor.x-7)/16),right=Math.floor((actor.x+7)/16),top=Math.floor((actor.z-7)/16),bottom=Math.floor((actor.z+7)/16)
+      let minX:number,maxX:number,minZ:number,maxZ:number
+      if(person){
+        minX=actor.x-4.2;maxX=actor.x+4.2;minZ=actor.z-4.2;maxZ=actor.z+4.2
+      }else{
+        const lookAhead=actor.speed>3?14:7
+        const endX=actor.x+dirX*lookAhead,endZ=actor.z+dirZ*lookAhead
+        minX=(actor.x<endX?actor.x:endX)-2.5;maxX=(actor.x>endX?actor.x:endX)+2.5
+        minZ=(actor.z<endZ?actor.z:endZ)-2.5;maxZ=(actor.z>endZ?actor.z:endZ)+2.5
+      }
+      const left=Math.floor(minX/16),right=Math.floor(maxX/16),top=Math.floor(minZ/16),bottom=Math.floor(maxZ/16)
       let crossTrafficBlocked=false
       nearby:for(let col=left;col<=right;col++)for(let row=top;row<=bottom;row++){
         const bin=obstacles.get(col*65536+row)
         if(!bin)continue
         for(let index=0;index<bin.length;index++){
         const other=bin[index]
-        if(other===actor||Math.abs(other.y-actor.y)>2)continue
+        if(other===actor||other.x<minX||other.x>maxX||other.z<minZ||other.z>maxZ||Math.abs(other.y-actor.y)>2)continue
         const dx=other.x-actor.x,dz=other.z-actor.z
-        if(Math.abs(dx)>7||Math.abs(dz)>7)continue
         const ahead=dx*dirX+dz*dirZ,lateral=Math.abs(dx*dirZ-dz*dirX)
         if(person){
           if('kind' in other && other.kind==='person'){
@@ -1948,7 +2074,20 @@ export class Traffic {
           const headOnStuck='kind' in other&&Boolean(other.wrongWay)!==reverse&&actor.waitingSince!==undefined&&this.time-actor.waitingSince>=4
           if(!ghostActive&&!headOnStuck&&ahead>0&&lateral<minLat){
             const stopGap=actor.kind==='scooter'&&!otherIsCar?2.8:5
-            advance=Math.min(advance,Math.max(0,ahead-stopGap))
+            const margin=Math.max(0,ahead-stopGap)
+            let limit=margin
+            if(margin>0&&ahead<=14){
+              let leaderSpeed=0
+              if('kind' in other&&other.kind!=='person'){
+                const oDirX=other.wrongWay?-other.track.dx:other.track.dx
+                const oDirZ=other.wrongWay?-other.track.dz:other.track.dz
+                const align=oDirX*dirX+oDirZ*dirZ
+                if(align>=0.2)leaderSpeed=other.speed*align
+              }
+              const smoothLimit=(leaderSpeed+Math.sqrt(8*margin))*dt
+              if(smoothLimit<limit)limit=smoothLimit
+            }
+            advance=Math.min(advance,limit)
             if(advance<1e-6&&'kind' in other)actor.waitingFor=other
             if(!advance)break nearby
           }
@@ -1977,7 +2116,14 @@ export class Traffic {
           if(follower<0)queue.push(actor);else queue.splice(follower,0,actor)
         }
         this.queues.set(track.to,queue)
-        const occupied=this.actors.find(other=>other!==actor&&other.kind!=='person'&&other.track.from===track.to&&other.dist<6)
+        let occupied=this.occupiedJunctions.get(track.to)
+        if(occupied===actor){
+          occupied=undefined
+          for(let i=0;i<this.actors.length;i++){
+            const other=this.actors[i]
+            if(other!==actor&&other.kind!=='person'&&other.track.from===track.to&&other.dist<6){occupied=other;break}
+          }
+        }
         if(occupied||queue[0]!==actor){
           const gap=Math.max(0,track.length-actor.dist-3)
           if(gap<1e-6)actor.waitingFor=occupied??queue[0]
@@ -1992,8 +2138,9 @@ export class Traffic {
           if(distToLine<=6)actor.redLightActive=true
         }else{
           const gap=Math.max(0,track.length-actor.dist-1)
+          const limit=gap<=22?Math.min(gap,Math.sqrt(7*gap)*dt):gap
           if(advance>gap)this.stopped++
-          advance=Math.min(advance,gap)
+          advance=Math.min(advance,limit)
         }
       }
       if(actor.violation==='red_light_run'){
@@ -2028,7 +2175,7 @@ export class Traffic {
       }
       if(person&&actor.dist>=track.length){
         const onward=this.onwardWalk(track)??this.shizijieTurnOrReverse(track)
-        if(onward&&!canRoute(onward.track.corridor,onward.dist,this.actors.filter(other=>other!==actor))){actor.dist=track.length;actor.speed=0;actor.waitingAtGate=true}
+        if(onward&&!canRoute(onward.track.corridor,onward.dist,this.actors,actor)){actor.dist=track.length;actor.speed=0;actor.waitingAtGate=true}
         else if(onward){actor.track=onward.track;actor.dist=onward.dist;this.transitions++}
         else{actor.dist=track.length;actor.speed=0;actor.arrived=true}
       }else if(person&&actor.dist<0){
@@ -2039,7 +2186,7 @@ export class Traffic {
       }else if(reverse&&actor.dist<=0){
         const incoming=(this.entries.get(track.from)??[]).filter(prev=>
           !prev.walk&&prev.kind==='nonmotor'&&this.usable(prev)&&prev.from!==track.to&&
-          !this.parkingHits(prev).some(hit=>hit.dist>prev.length-12))
+          !this.hasParkingHitInRange(prev,prev.length-12,Infinity))
         if(!incoming.length){
           actor.dist=0
           this.position(actor)
@@ -2060,25 +2207,30 @@ export class Traffic {
         actor.dist=actor.track.length
         this.transitions++
       }else if(!reverse&&actor.dist>=track.length){
-        const exits=this.exits.get(track.to)??[]
-        let choices:Track[]
-        if(actor.kind==='car'){
-          // IDOK-378: prefer same-street motor exits, but follow connected motor lanes across street-name changes
-          const motorExits=exits.filter(next=>this.usable(next)&&!this.parkingHits(next).some(hit=>hit.dist<12)&&!next.walk&&next.to!==track.from&&next.kind!=='nonmotor')
-          const sameStreet=track.street?motorExits.filter(next=>next.street===track.street):motorExits
-          choices=sameStreet.length?sameStreet:motorExits
-        }else{
-          // Duty mode strictly confines scooters to nonmotor lanes; regular city traffic prefers real -> virtual nonmotor -> motor,
-          // following connected lanes across street-name changes (IDOK-378) whenever same-street exits run out.
-          const legal=exits.filter(next=>this.usable(next)&&!this.parkingHits(next).some(hit=>hit.dist<12)&&!next.walk&&next.to!==track.from&&
-            (this.dutyConfig.dutyOnly?next.kind==='nonmotor':(next.kind==='nonmotor'||next.kind==='motor')))
-          const realNm=legal.filter(next=>next.kind==='nonmotor'&&!next.virtual)
-          const sameRealNm=track.street?realNm.filter(next=>next.street===track.street):realNm
-          const virtNm=legal.filter(next=>next.kind==='nonmotor'&&next.virtual)
-          const sameVirtNm=track.street?virtNm.filter(next=>next.street===track.street):virtNm
-          const motorFb=legal.filter(next=>next.kind==='motor')
-          const sameMotorFb=track.street?motorFb.filter(next=>next.street===track.street):motorFb
-          choices=sameRealNm.length?sameRealNm:realNm.length?realNm:sameVirtNm.length?sameVirtNm:virtNm.length?virtNm:sameMotorFb.length?sameMotorFb:motorFb
+        const exits=this.exits.get(track.to)
+        const choices=this.exitChoices;choices.length=0
+        let bestTier=99
+        if(exits&&exits.length){
+          const street=track.street,isCar=actor.kind==='car',dutyOnly=Boolean(this.dutyConfig.dutyOnly)
+          for(let i=0;i<exits.length;i++){
+            const next=exits[i]
+            if(next.walk||next.to===track.from)continue
+            let tier:number
+            if(isCar){
+              if(next.kind==='nonmotor')continue
+              tier=!street||next.street===street?0:1
+            }else{
+              if(dutyOnly?next.kind!=='nonmotor':(next.kind!=='nonmotor'&&next.kind!=='motor'))continue
+              const same=!street||next.street===street
+              if(next.kind==='nonmotor'&&!next.virtual)tier=same?0:1
+              else if(next.kind==='nonmotor')tier=same?2:3
+              else tier=same?4:5
+            }
+            if(tier>bestTier)continue
+            if(!this.usable(next)||this.hasParkingHitInRange(next,-Infinity,12))continue
+            if(tier<bestTier){bestTier=tier;choices.length=0}
+            choices.push(next)
+          }
         }
         if(!choices.length){
           actor.dist=track.length
@@ -2100,11 +2252,23 @@ export class Traffic {
             actor.redLightTrailDist=0
           }
         }
-        const onward=choices.filter(next=>next.to!==track.from)
-        const pool=onward.length?onward:choices
-        const straight=pool.filter(next=>next.dx*track.dx+next.dz*track.dz>.88)
-        actor.track=straight.length&&this.random()<.85?straight.reduce((best,next)=>Math.abs(next.offset-track.offset)<Math.abs(best.offset-track.offset)?next:best):pool[Math.floor(this.random()*pool.length)]
+        const straight=this.exitStraight;straight.length=0
+        for(let i=0;i<choices.length;i++){
+          const next=choices[i]
+          if(next.dx*track.dx+next.dz*track.dz>.88)straight.push(next)
+        }
+        if(straight.length&&this.random()<.85){
+          let best=straight[0],bestDiff=Math.abs(best.offset-track.offset)
+          for(let i=1;i<straight.length;i++){
+            const cand=straight[i],diff=Math.abs(cand.offset-track.offset)
+            if(diff<bestDiff){best=cand;bestDiff=diff}
+          }
+          actor.track=best
+        }else{
+          actor.track=choices[Math.floor(this.random()*choices.length)]
+        }
         actor.dist=0;this.transitions++
+        if(!this.occupiedJunctions.has(actor.track.from))this.occupiedJunctions.set(actor.track.from,actor)
       }
       this.position(actor)
       if(person&&!actor.backing&&actor.track===track&&Math.hypot(actor.x-previousX,actor.z-previousZ)>1e-5)actor.yaw=Math.atan2(actor.x-previousX,actor.z-previousZ)
