@@ -1307,6 +1307,111 @@ def _icon_dimsum(vc: VectorCanvas):
         vc.stroke_line((vx, 0.24), (vx, 0.44), width=0.020, color=bamboo_dark)
 
 
+def _icon_camera(vc: VectorCanvas):
+    """24. 山水旅拍/摄影馆: 复古旁轴相机机身 + 顶置取景器与快门钮 + 多层镀膜镜头光圈."""
+    ink = rgba(tone("#1E2428", 0.08))
+    body_top = rgba(tone("#D8D2C5", 0.10))
+    body_leather = rgba(tone("#2F4846", 0.16))
+    metal = rgba(tone("#BCC4CA", 0.08))
+    lens_outer = rgba(tone("#2A3138", 0.10))
+    lens_glass = rgba(tone("#3B6E7C", 0.18))
+    lens_core = rgba(tone("#1B3640", 0.16))
+    gold = rgba(tone("#D6B26A", 0.16))
+    glint = rgba((246, 250, 252))
+
+    # Top shutter button & mode dial
+    vc.rounded_rect(-0.38, -0.50, -0.18, -0.34, radius=0.04, fill=gold, outline=ink, width=0.028)
+    vc.rounded_rect(0.20, -0.48, 0.42, -0.34, radius=0.04, fill=metal, outline=ink, width=0.028)
+
+    # Classic rangefinder upper metallic deck + textured lower leatherette body
+    vc.rounded_rect(-0.56, -0.38, 0.56, 0.44, radius=0.12, fill=body_leather, outline=ink, width=0.038)
+    vc.rounded_rect(-0.56, -0.38, 0.56, -0.10, radius=0.10, fill=body_top, outline=ink, width=0.034)
+    vc.stroke_line((-0.54, -0.10), (0.54, -0.10), width=0.032, color=gold)
+
+    # Viewfinder window & flash sensor on top plate
+    vc.rounded_rect(-0.44, -0.30, -0.22, -0.17, radius=0.03, fill=lens_glass, outline=ink, width=0.024)
+    vc.circle(0.38, -0.24, 0.055, fill=gold, outline=ink, width=0.022)
+
+    # Multi-ring optical prime lens barrel centered slightly below midline
+    vc.circle(0.02, 0.08, 0.34, fill=metal, outline=ink, width=0.036)
+    vc.circle(0.02, 0.08, 0.27, fill=lens_outer, outline=gold, width=0.024)
+    vc.circle(0.02, 0.08, 0.19, fill=lens_glass, outline=ink, width=0.026)
+    vc.circle(0.02, 0.08, 0.10, fill=lens_core, outline=None)
+    # Crisp optical coating glints
+    vc.circle(-0.05, 0.01, 0.048, fill=glint)
+    vc.circle(0.09, 0.14, 0.024, fill=glint)
+
+
+def _icon_music(vc: VectorCanvas):
+    """25. 琴行/器乐工坊: 原木民谣吉他共鸣箱 + 音孔饰圈 + 琴颈弦轴 + 琴弦与八分音符."""
+    ink = rgba(tone("#231D18", 0.08))
+    spruce = rgba(tone("#D8AE6A", 0.16))
+    mahogany = rgba(tone("#8C4A2B", 0.16))
+    hole = rgba(tone("#2A1E17", 0.10))
+    cream = rgba((246, 242, 232))
+    note_c = rgba(tone("#E4C878", 0.16))
+
+    # Diagonal fretboard & headstock extending toward top-right
+    neck = [(-0.04, -0.02), (0.36, -0.42), (0.45, -0.33), (0.05, 0.07)]
+    vc.polygon(neck, fill=mahogany, outline=ink, width=0.030)
+    head = [(0.35, -0.43), (0.50, -0.56), (0.58, -0.48), (0.45, -0.33)]
+    vc.polygon(head, fill=mahogany, outline=ink, width=0.028)
+    for px, py in ((0.41, -0.53), (0.48, -0.58), (0.56, -0.43), (0.60, -0.49)):
+        vc.circle(px, py, 0.028, fill=cream, outline=ink, width=0.016)
+
+    # Figure-8 acoustic guitar soundbox (lower bout + upper bout)
+    pts_lo = rotated_ellipse_pts(-0.18, 0.20, 0.31, 0.25, -45.0, steps=28)
+    pts_hi = rotated_ellipse_pts(0.02, 0.00, 0.22, 0.18, -45.0, steps=24)
+    vc.polygon(pts_lo, fill=spruce, outline=ink, width=0.036)
+    vc.polygon(pts_hi, fill=spruce, outline=ink, width=0.034)
+    # Seamless soundbox interior fill over waist seam
+    pts_lo_in = rotated_ellipse_pts(-0.18, 0.20, 0.28, 0.22, -45.0, steps=20)
+    vc.polygon(pts_lo_in, fill=spruce, outline=None)
+
+    # Bridge & rosette soundhole
+    bridge = [(-0.34, 0.24), (-0.22, 0.36), (-0.17, 0.31), (-0.29, 0.19)]
+    vc.polygon(bridge, fill=mahogany, outline=ink, width=0.022)
+    vc.circle(-0.06, 0.08, 0.105, fill=hole, outline=mahogany, width=0.026)
+
+    # Three taut strings from bridge to headstock
+    for off in (-0.028, 0.0, 0.028):
+        vc.stroke_line((-0.26 + off, 0.28 + off), (0.40 + off, -0.38 + off), width=0.015, color=cream)
+
+    # Floating eighth note in upper-left space
+    vc.circle(-0.38, -0.18, 0.068, fill=note_c, outline=ink, width=0.024)
+    vc.stroke_line((-0.32, -0.18), (-0.32, -0.48), width=0.032, color=note_c)
+    vc.stroke_quad((-0.32, -0.48), (-0.18, -0.44), (-0.20, -0.32), width=0.030, color=note_c)
+
+
+def _icon_engineering(vc: VectorCanvas):
+    """26. 工程咨询/建筑造价: 现代双子楼宇蓝图立面 + 精密工程圆规 + 标尺基线."""
+    ink = rgba(tone("#1B2634", 0.08))
+    tower_hi = rgba(tone("#DCE6F0", 0.10))
+    tower_mid = rgba(tone("#8CA8C4", 0.16))
+    brass = rgba(tone("#DFBC68", 0.16))
+    win = rgba(tone("#2A4666", 0.16))
+
+    # Left & center architectural stepped towers
+    vc.polygon([(-0.46, 0.42), (-0.46, -0.24), (-0.16, -0.38), (-0.16, 0.42)], fill=tower_hi, outline=ink, width=0.034)
+    vc.polygon([(-0.18, 0.42), (-0.18, -0.12), (0.12, -0.12), (0.12, 0.42)], fill=tower_mid, outline=ink, width=0.032)
+    for wy in (-0.18, -0.04, 0.10, 0.24):
+        vc.stroke_line((-0.39, wy), (-0.23, wy), width=0.028, color=win)
+    for wy in (0.02, 0.16, 0.28):
+        vc.stroke_line((-0.11, wy), (0.04, wy), width=0.026, color=win)
+
+    # Precision brass drafting compass on right side
+    vc.stroke_line((0.24, -0.46), (0.24, -0.34), width=0.036, color=brass)
+    vc.stroke_line((0.24, -0.32), (0.06, 0.38), width=0.044, color=brass)
+    vc.stroke_line((0.24, -0.32), (0.44, 0.38), width=0.044, color=brass)
+    vc.circle(0.24, -0.32, 0.075, fill=brass, outline=ink, width=0.028)
+    # Compass crossbar arc
+    vc.stroke_quad((0.10, 0.10), (0.25, 0.16), (0.40, 0.10), width=0.028, color=tower_hi)
+
+    # Ground datum baseline & tick marks
+    vc.stroke_line((-0.54, 0.42), (0.54, 0.42), width=0.040, color=brass)
+    vc.stroke_line((-0.54, 0.42), (0.54, 0.42), width=0.018, color=ink)
+
+
 ICON_REGISTRY: dict[str, Callable[[VectorCanvas], None]] = {
     "noodle": _icon_noodle,
     "pharmacy": _icon_pharmacy,
@@ -1331,6 +1436,9 @@ ICON_REGISTRY: dict[str, Callable[[VectorCanvas], None]] = {
     "wellness": _icon_wellness,
     "pet": _icon_pet,
     "dimsum": _icon_dimsum,
+    "camera": _icon_camera,
+    "music": _icon_music,
+    "engineering": _icon_engineering,
 }
 
 # Preferred medallion geometry per industry (shield strictly reserved for pharmacy!)
@@ -1358,6 +1466,9 @@ DEFAULT_BADGE_SHAPE: dict[str, str] = {
     "wellness": "circle",
     "pet": "squircle",
     "dimsum": "circle",
+    "camera": "squircle",
+    "music": "circle",
+    "engineering": "octagon",
 }
 
 ICON_NAMES: tuple[str, ...] = tuple(ICON_REGISTRY.keys())

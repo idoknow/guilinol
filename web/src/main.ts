@@ -276,7 +276,7 @@ async function start(loader:FullLoader,creatorSpawn=false) {
   async function loadFullScene(){
     const [manifest]=await Promise.all([
       previousWorld?Promise.resolve(previousWorld):readManifest(),
-      isCityUpgradeEnabled()?preloadCityUpgradeIndex():Promise.resolve(null),
+      preloadCityUpgradeIndex(),
     ])
     playBounds=manifest
     clampOpening()
@@ -910,6 +910,18 @@ async function start(loader:FullLoader,creatorSpawn=false) {
     lastView:async()=>(await import('./play/feedback-view')).currentView(host,'saved'),
     setView:async(view)=>(await import('./play/feedback-view')).setView(host,view),
     fly:takeFlight,get cinema(){return cinema},set cinema(on){cinema=on}}
+  // IDOK-105: declare before `animate` and `publishViewer` so `viewer.resume()` during shader warm-up never hits TDZ.
+  const persistView = isDeepLink(openParams) ? null : (() => {
+    let lastWrite = 0
+    const write = (force = false) => {
+      if (!force && Date.now() - lastWrite < 15000) return
+      lastWrite = Date.now()
+      void host.lastView().then(saveLastView).catch(() => {})
+    }
+    addEventListener('pagehide', () => write(true))
+    document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') write(true) })
+    return write
+  })()
   const sampleFrame=instrument(renderer,()=>{
     const mode=tour?.map?.active?'map':paused?'menu':walker?.active?(walker.vehicle==='foot'?'walk':'drive'):'fly'
     const position=walker && (mode==='walk'||mode==='drive')?walker.position:camera.position
@@ -1044,19 +1056,6 @@ async function start(loader:FullLoader,creatorSpawn=false) {
   }
   if(!walkProgramsReady)await warmPrograms(scene)
   renderer.setAnimationLoop(animate)
-  // IDOK-105: keep the last view fresh so "回到上次离开的地方" can restore it. Deep-linked
-  // sessions (`?verify`, `?slot`, shares…) never write it — tests and shared links must not pollute.
-  const persistView = isDeepLink(openParams) ? null : (() => {
-    let lastWrite = 0
-    const write = (force = false) => {
-      if (!force && Date.now() - lastWrite < 15000) return
-      lastWrite = Date.now()
-      void host.lastView().then(saveLastView).catch(() => {})
-    }
-    addEventListener('pagehide', () => write(true))
-    document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') write(true) })
-    return write
-  })()
   const token=params.get('view')
   if(soloStart||creatorSpawn)return
   if(token){try{if(token.length>4096)throw Error();await host.setView(JSON.parse(atob(token.replace(/-/g,'+').replace(/_/g,'/'))))}catch{console.warn('Invalid feedback view')}}

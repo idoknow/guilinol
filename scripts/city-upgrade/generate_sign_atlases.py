@@ -64,8 +64,11 @@ LUXURY_ANCHORS: dict[str, tuple[str, str, str]] = {
     "books":      ("READING",  "09:00-22:00", "静心书屋"),
     "hotel_home": ("STAY",     "24H CHECK-IN","江畔雅居"),
     "food":       ("TAPROOM",  "18:00-02:00", "晚间小酌"),
-    "digital":    ("CAMERA",   "09:00-20:00", "旅拍纪实"),
-    "wellness":   ("WELLNESS", "08:00-21:30", "身心平衡"),
+    "digital":     ("DIGITAL",  "09:30-21:30", "数码快修"),
+    "camera":      ("CAMERA",   "09:00-20:00", "旅拍纪实"),
+    "music":       ("MUSIC",    "09:30-21:30", "器乐工坊"),
+    "engineering": ("CONSULT",  "09:00-18:00", "工程顾问"),
+    "wellness":    ("WELLNESS", "08:00-21:30", "身心平衡"),
 }
 
 LUXURY_ANCHOR_OVERRIDES: dict[str, tuple[str, str, str]] = {
@@ -564,17 +567,17 @@ def render_single_fascia(idx: int, spec, cw: int = 1280, ch: int = 320) -> tuple
         kicker = (badge_tag or "GUILIN BOUTIQUE").upper().replace("·", "/").strip()
         kicker_disp = " ".join(list(kicker)) if (kicker.isascii() and len(kicker) <= 13) else kicker
         kf = fit_font(da, kicker_disp, tx1 - tx0, 25, "latin" if kicker_disp.isascii() else "sans_med", min_size=18)
-        draw_channel_text(da, de, (tx0, 72), kicker_disp, kf, sub_fg, eff_bg, anchor="lm", shadow_depth=0, emit_gain=0.84)
+        draw_channel_text(da, de, (tx0, 66), kicker_disp, kf, sub_fg, eff_bg, anchor="lm", shadow_depth=0, emit_gain=0.84)
 
-        # Short titles (<=4 chars) get refined spacious character tracking + slightly bolder presence
+        # Short titles (<=4 chars) get refined spacious character tracking + clear vertical margin above divider
         display_title = " ".join(list(title)) if (len(title) <= 4 and not title.isascii()) else title
-        ft = fit_font(da, display_title, tx1 - tx0, 102, fstyle, min_size=52)
+        ft = fit_font(da, display_title, tx1 - tx0, 98, fstyle, min_size=50)
         fs = fit_font(da, sub, tx1 - tx0, 36, "sans_med", min_size=24)
         # Soft modern luxury shadow (never heavy dated black block drop shadow!)
-        draw_channel_text(da, de, (tx0, 152), display_title, ft, title_fg, eff_bg, anchor="lm", shadow_depth=3, emit_gain=0.90)
-        da.line([(tx0, 208), (tx1, 208)], fill=decor, width=2)
-        de.line([(tx0, 208), (tx1, 208)], fill=decor + (140,), width=2)
-        draw_channel_text(da, de, (tx0, 248), sub, fs, sub_fg, eff_bg, anchor="lm", shadow_depth=0, emit_gain=0.84)
+        draw_channel_text(da, de, (tx0, 140), display_title, ft, title_fg, eff_bg, anchor="lm", shadow_depth=3, emit_gain=0.90)
+        da.line([(tx0, 210), (tx1, 210)], fill=decor, width=2)
+        de.line([(tx0, 210), (tx1, 210)], fill=decor + (140,), width=2)
+        draw_channel_text(da, de, (tx0, 250), sub, fs, sub_fg, eff_bg, anchor="lm", shadow_depth=0, emit_gain=0.84)
 
     else:  # duotone_banner
         # Bold contrasting left color block (slanted trapezoid) + bottom subtitle ribbon
