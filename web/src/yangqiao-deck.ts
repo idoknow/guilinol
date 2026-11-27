@@ -1,8 +1,19 @@
 import profile from '../../pipeline/data/landmarks/yangqiao-grade.json'
+import channel from '../../pipeline/data/landmarks/yangqiao-channel.json'
 import type {BufferGeometry} from 'three'
 import {carve,carvePaving,fan,type Plane,type Point} from './tunnels'
 
 const mix=(start:number,end:number,fraction:number)=>start+(end-start)*fraction
+export function openYangqiaoChannel(tile:{x:number,z:number},bed:Int16Array,water:Int16Array){
+  if(tile.z!==256||!(tile.x===-1280||tile.x===-1024))return
+  for(const [east,south,level] of channel.cuts){
+    const column:number=(east-tile.x)/4,row:number=(south-tile.z)/4
+    if(column<0||column>64||row<0||row>64)continue
+    const index=row*65+column
+    bed[index]=Math.min(bed[index],level)
+    if(bed[index]<channel.waterDm)water[index]=channel.waterDm
+  }
+}
 function vertex(tile:{x:number,z:number},row:number,col:number):Point{
   const station=profile.stations[row],fraction=profile.lateral[col]
   const coordinate=(axis:number)=>mix(mix(profile.south[0][axis],profile.south[1][axis],fraction),mix(profile.north[0][axis],profile.north[1][axis],fraction),station)
@@ -27,16 +38,23 @@ export function yangqiaoDeck(tile:{x:number,z:number},deck:Float32Array,thin:Set
     }return out
   }
   const result=outside(deck,true)
-  if(streets.surface)streets.surface=carvePaving(streets.surface,[planes])
+  const paint:{planes:Plane[],height:(point:Point)=>number}[]=[]
   streets.sidewalk=Float32Array.from(outside(streets.sidewalk));streets.road=Float32Array.from(outside(streets.road))
   const tileExterior:Plane[][]=[[point=>-point[0]],[point=>point[0]-256]]
   for(let row=0;row<lastRow;row++)for(let col=0;col<lastCol;col++){
     const quad=[vertex(tile,row,col),vertex(tile,row,col+1),vertex(tile,row+1,col+1),vertex(tile,row+1,col)]
     const faces=[[quad[0],quad[1],quad[2]],[quad[0],quad[2],quad[3]]]
+    for(const [first,second,third] of faces){
+      const bx=second[0]-first[0],bz=second[2]-first[2],cx=third[0]-first[0],cz=third[2]-first[2],det=bx*cz-bz*cx
+      const face=[first,second,third]
+      paint.push({planes:face.map((start,index)=>{const end=face[(index+1)%3];return point=>(point[0]-start[0])*(end[2]-start[2])-(point[2]-start[2])*(end[0]-start[0])}),
+        height:point=>first[1]+((point[0]-first[0])*cz-(point[2]-first[2])*cx)/det*(second[1]-first[1])+(bx*(point[2]-first[2])-bz*(point[0]-first[0]))/det*(third[1]-first[1])})
+    }
     for(const face of faces)for(const piece of carve(face,tileExterior)??[face]){
       const first=result.length/9;fan(piece,result)
       for(let index=first;index<result.length/9;index++){newThin.add(index);if(col===2)newAsphalt.push(index)}
     }
   }
+  if(streets.surface)streets.surface=carvePaving(streets.surface,[planes],paint)
   return {deck:Float32Array.from(result),thin:newThin,asphalt:newAsphalt}
 }

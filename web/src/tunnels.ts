@@ -377,13 +377,21 @@ function clip(poly:Point[],plane:Plane){
 }
 export function fan(poly:Point[],out:number[]){for(let at=2;at<poly.length;at++)out.push(...poly[0],...poly[at-1],...poly[at])}
 
-export function carvePaving(surface:THREE.BufferGeometry,cuts:Plane[][]){
+export function carvePaving(surface:THREE.BufferGeometry,cuts:Plane[][],paint?:{planes:Plane[],height:(point:Point)=>number}[]){
   const flat=surface.index?surface.toNonIndexed():surface
   const attrs=Object.entries(flat.attributes).sort(([name])=>name==='position'?-1:0)
   const stride=attrs.reduce((sum,[,attr])=>sum+attr.itemSize,0),out:number[]=[]
   for(let start=0;start<flat.getAttribute('position').count;start+=3){
     const triangle=[0,1,2].map(offset=>attrs.flatMap(([,attr])=>Array.from({length:attr.itemSize},(_,i)=>attr.getComponent(start+offset,i))) as Point)
     for(const polygon of carve(triangle,cuts)??[triangle])fan(polygon,out)
+    if(paint&&flat.getAttribute('aSurface').getX(start)===2){
+      for(const patch of paint){
+        let polygon=triangle
+        for(const plane of patch.planes){polygon=clip(polygon,plane);if(polygon.length<3)break}
+        for(const point of polygon)point[1]=patch.height(point)+.022
+        fan(polygon,out)
+      }
+    }
   }
   const result=new THREE.BufferGeometry()
   let offset=0

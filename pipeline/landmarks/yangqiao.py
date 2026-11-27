@@ -38,17 +38,33 @@ def pedestrian_wings(builder, anchor):
     for side, inward in [(.001, .005), (.999, -.005)]:
         for bay in range(14):
             start, end = bay / 14, (bay + 1) / 14
-            section = [(side, 0), (side, 1), (side + inward, 1), (side + inward, 0)]
-            for (across, height), (other, top) in zip(section, section[1:]):
-                panel = [station(start, across, height), station(start, other, top),
-                         station(end, other, top), station(end, across, height)]
-                quad(panel if inward > 0 else panel[::-1], 'stone', True)
+            for base, cap in [(0, .19), (.86, 1)]:
+                section = [(side, base), (side, cap), (side + inward, cap), (side + inward, base)]
+                for (across, height), (other, top) in zip(section, section[1:] + section[:1]):
+                    panel = [station(start, across, height), station(start, other, top),
+                             station(end, other, top), station(end, across, height)]
+                    quad(panel if inward > 0 else panel[::-1], 'stone', True)
+            for middle in np.linspace(start, end, 7)[1:-1]:
+                x, base, z = station(middle, side + inward / 2, .18)
+                builder.cylinder_y(x, base, .70, z, .065, 'white', sections=8, collide=True)
         for along in np.linspace(0, 1, 15):
             x, level, z = station(along, side + inward, 0)
             builder.box(x, level, z, .32, 1.15, .32, 'stone', collide=True)
-        for along in (0, .32, .68, 1):
+        for along in (.025, .32, .68, .975):
             x, level, z = station(along, side + 3 * inward, 0)
-            builder.cluster_lamp(x, level, z, height=4.2, globes=3)
+            builder.cylinder_y(x, level, .65, z, .27, 'stone')
+            builder.cylinder_y(x, level + .65, 2.8, z, .105, 'bronze')
+            builder.cylinder_y(x, level + 3.45, .55, z, .24, 'white_lit')
+
+    for along, end in zip(profile['stations'], profile['stations'][1:]):
+        along = max(along, profile['stations'][0]+.002)
+        end = min(end, profile['stations'][-1]-.002)
+        for across in (.377, .44, .565, .628):
+            quad([station(along, across-.0016, .027), station(along, across+.0016, .027),
+                  station(end, across+.0016, .027), station(end, across-.0016, .027)], 'white')
+        for lateral, top, other, height in [(.496, 0, .496, .11), (.496, .11, .509, .11), (.509, .11, .509, 0)]:
+            quad([station(along,lateral,top),station(along,other,height),
+                  station(end,other,height),station(end,lateral,top)], 'beige')
 
     for start, end in [(0, .30), (.33, .67), (.70, 1)]:
         for step in range(16):
@@ -65,7 +81,7 @@ def pedestrian_wings(builder, anchor):
     for start, end in [(.30, .33), (.67, .70)]:
         ring = [(start, 0), (start, 1), (end, 1), (end, 0)]
         heads = [station(along, across, -.45) for along, across in ring]
-        feet = [[x, builder.surface.ground(x, z) - .04, z] for x, _, z in heads]
+        feet = [[x, min(builder.surface.ground(x, z),146.1-builder.surface.y) - .04, z] for x, _, z in heads]
         for index in range(4):
             other = (index + 1) % 4
             quad([feet[index], feet[other], heads[other], heads[index]], 'stone')

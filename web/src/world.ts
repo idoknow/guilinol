@@ -5,7 +5,7 @@ import {ensureShardForTile,hasShardForTile} from './city-upgrade/state'
 import {loadStreetGeometry} from './street-loader'
 import type {StationPavingStyle,Streets} from './street-worker'
 import {bridgeGeometry} from './look/bridge'
-import {yangqiaoDeck} from './yangqiao-deck'
+import {openYangqiaoChannel,yangqiaoDeck} from './yangqiao-deck'
 import {look} from './look/config'
 import {nightGround} from './look/night'
 import {countryside,setupCountryside,touchesCountryside} from './look/countryside'
@@ -405,6 +405,13 @@ export async function detail(tile:Tile, signal:AbortSignal, parseSlot?:()=>Promi
   if(parseSlot)await parseSlot()
   const group = new THREE.Group()
   group.position.set(tile.x,0,tile.z)
+  if(step===4&&tile.z===256&&(tile.x===-1280||tile.x===-1024)){
+    const bed=underlay.slice();openYangqiaoChannel(tile,bed,water)
+    for(let index=0;index<bed.length;index++)if(bed[index]!==underlay[index]){
+      heights.setY(index,bed[index]/10);underlay[index]=bed[index];terrain[index]=bed[index]
+    }
+    geometry.computeVertexNormals();geometry.computeBoundingSphere()
+  }
   // Cut after street construction to preserve the original carriageway grade.
   for(const [index,cm] of railCuts)heights.setY(index,cm/100)
   if(railCuts.length){geometry.computeVertexNormals();geometry.computeBoundingSphere()}

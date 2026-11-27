@@ -9,6 +9,19 @@ const center=[-1062,342]
 const views=[['plan',0,0,0,0],['south',-25,34,18,-26],['north',25,-36,-18,26],
   ['west-walk',-15,-10,-41,-25],['east-walk',16,11,50,24],['ronghu',-63,-12,0,0],
   ['shanhu',56,23,0,0],['water-west',-30,-16,28,16],['water-east',31,20,-28,-16]]
+if(process.argv.includes('--water-survey')){
+  views.length=0
+  for(const [index,[x,z]] of [[-1170,288],[-1120,315],[-1102,314],[-1092,326],[-1040,371],[-1015,384],[-987,409],[-977,430]].entries()){
+    const bearing=index*Math.PI/4,dx=x-center[0],dz=z-center[1]
+    views.push([`water-${index*45}`,dx,dz,dx+55*Math.sin(bearing),dz-55*Math.cos(bearing)])
+  }
+}
+if(process.argv.includes('--bridge-photos')){
+  views.length=0
+  for(const [name,x,z,tx,tz] of [['water-glql012',-1122,302,-1082.91,333.17],['water-glql012_02',-1014,387,-1045.49,348.16],['water-glql012_03',-1106,312,-1066.78,343.01],['water-glql012_04',-1018,384,-1039.46,338.84]]){
+    views.push([name,x-center[0],z-center[1],tx-center[0],tz-center[1]])
+  }
+}
 if(process.argv.includes('--photos')){
   views.length=0
   for(const [id,lat,lon,bearing] of [
@@ -16,7 +29,7 @@ if(process.argv.includes('--photos')){
     ['89188',25.276530,110.289472,35],['89216',25.276672,110.290194,178],
     ['glass',25.277462,110.288562,269],['north-road',25.277569,110.289795,214],
   ]){
-    const dx=(lon-110.3)*111320*Math.cos(25.28*Math.PI/180)-center[0],dz=(25.28-lat)*110574-center[1]
+    const dx=(id==='89216'?-995:(lon-110.3)*111320*Math.cos(25.28*Math.PI/180))-center[0],dz=(id==='89216'?396:(25.28-lat)*110574)-center[1]
     views.push([id,dx,dz,dx+50*Math.sin(bearing*Math.PI/180),dz-50*Math.cos(bearing*Math.PI/180)])
   }
 }
