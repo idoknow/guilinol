@@ -983,6 +983,7 @@ wss.on('connection', (ws, req) => {
         // 冲突时让**新连接顶掉旧连接**（旧连接收 4001 'replaced'，客户端收到后不再自动重连）：
         // 原来「拒绝后来者」的写法会让用户换设备后一直连不上，还以为服务坏了。
         const previous = [...players.values()].find(p => p.uid === uid)
+        obs.event('session-device', {id:previous?.dead ? previous.id : id, uid, ip}, {fp:fp || null})
         if (previous && previous.ws !== ws) {
           // 续连：上一个连接是被 CDN/网络掐断的（dead），不是顶号。原地接管，不播 leave/join。
           if (previous.dead) {
