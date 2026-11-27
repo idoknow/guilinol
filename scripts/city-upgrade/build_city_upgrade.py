@@ -121,7 +121,7 @@ ROAD_PINYIN: dict[str, str] = {
     "解放西路": "JIEFANG XILU", "象山南路": "XIANGSHAN NANLU", "贡后巷": "GONGHOU XIANG",
     "辅星路": "FUXING LU", "金星路": "JINXING LU", "铁佛路": "TIEFO LU",
     "铁西中路": "TIEXI ZHONGLU", "铁西西巷": "TIEXI XIXIANG", "铁西路": "TIEXI LU",
-    "银锭路": "YINDING LU", "阳桥": "YANG QIAO", "雉山路": "ZHISHAN LU",
+    "银锭路": "YINDING LU", "雉山路": "ZHISHAN LU",
     "驿前横里": "YIQIAN HENGLI", "骖鸾路": "CANLUAN LU", "骝马山北巷": "LIUMASHAN BEIXIANG",
     "龙珠路": "LONGZHU LU", "龙船坪路": "LONGCHUANPING LU", "龙隐桥": "LONGYIN QIAO",
     "龙隐路": "LONGYIN LU", "府后里": "FUHOU LI", "府东里": "FUDONG LI",

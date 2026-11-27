@@ -78,6 +78,15 @@ class Surface:
             return np.frombuffer(data, '<i2', n*n, offset).reshape(n, n)
         water = field(24 + field_bytes)
         ground = field(tail if extra else 24).astype(float) / 10
+        if origin in ((-1280, 256), (-1024, 256)):
+            channel = json.loads((Path(__file__).resolve().parents[1] / 'data/landmarks/yangqiao-channel.json').read_bytes())
+            water = water.copy()
+            for east, south, level in channel['cuts']:
+                column, row = (east-origin[0])//self.grid, (south-origin[1])//self.grid
+                if 0 <= column < n and 0 <= row < n:
+                    ground[row,column] = min(ground[row,column], level/10)
+                    if ground[row,column] < channel['waterDm']/10:
+                        water[row,column] = channel['waterDm']
         # world.ts stitches dry chunk edges to the 32 m overview grid.
         for edge, wet in ((ground[0], water[0]), (ground[-1], water[-1]),
                           (ground[:, 0], water[:, 0]), (ground[:, -1], water[:, -1])):
