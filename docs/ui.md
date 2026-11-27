@@ -57,7 +57,7 @@ S1（2026-11）重做了「游戏外」界面（主界面、账号、加载、�
 | `--ui-fs-lg` | 20px | 对话框标题、模式名 |
 | `--ui-fs-xl` | 28px | 页标题 |
 | `--ui-fs-2xl` | 44px | 手机上的封面书名、少数大数字 |
-| `--ui-fs-3xl` | 60px | 电脑封面书名「网上桂林」（只此一处，字距 `--ui-track-display`）；Logo 只是书名上方一枚小宣纸签 |
+| `--ui-fs-3xl` | 60px | 大标题上限。封面书名是例外的字标（IDOK-468）：「网上」竖排一列 +「桂林」两枚大字，字号走 `.home-title` 的 `--h1`（电脑 88–112px、竖屏手机 72–88px、横屏 54–68px）；Logo 去白底垫在「桂」下方当底座（位置按 brand-wordmark.py 打印的「桂」墨迹框）；竖屏手机书名压在目录正上方，上半屏留给封面场景。「桂林」用马善政体（Ma Shan Zheng，OFL）轮廓做 CSS 遮罩字标（`web/src/ui/home-wordmark.svg`，`scripts/brand-wordmark.py` 生成），「桂」高「林」低错落；h1 文字仍是「网上桂林」；页面不加载书法字体 |
 
 - 字距：正文 `--ui-track-body`（.04em）、按钮 `--ui-track`（.1em）、标题 `--ui-track-title`（.2em）、大标题 `--ui-track-display`（.32em）。行高 `--ui-lh-tight`（1.25）/ `--ui-lh`（1.65）。
 
@@ -108,7 +108,12 @@ S1（2026-11）重做了「游戏外」界面（主界面、账号、加载、�
 5. 循环动画（呼吸、脉冲、闪烁）改成一次性入场或静态状态；保留加载转圈。
 6. 改样式不改钩子：`class` / `id` / `data-*` / `aria-*` 是 TS 和 `scripts/*.mjs` 在用的，删之前 `rg` 一遍。
 7. 桌面 1440×900、1280×720，手机横屏 844×390、873×403，竖屏 390×844 都看一遍，触屏可点区域 ≥ 42px。
-8. 字不当图形：和封面三枚肖形印同理，按钮上单独一两个字撑起来的「图标」换成刻线小像。手机拇指键（`web/src/ui/thumb-glyphs.css`）：跳 = 腾空小人、蹲 = 下蹲小人、远近 = 近实远虚两座峰、叫车 = 共享电驴、翘头 = 抬前轮电驴（开车时 `body[data-ride=car]` 换成 (P) 手刹，摔车 `data-ride-crash="1"` 换成撑起小人，`data-locked="1"` 变淡）、±挡 = 双箭头、压弯 = 倾车、拳 = 出拳小人、表情 = 笑脸；「扶」只在救人时出现，保留字。图是 `thumb-*.svg`（24 网格、黑 = 亮部）遮罩 + `currentColor`，字仍留在按钮里（`font-size:0`），读屏和脚本不受影响；指南手机表用同一枚 `.thumb-ico`。小地图「北」、顶栏「接活」是 `home-seal.svg` 残边小朱印。街头皮肤 `body[data-hud=street]` 按 docs/style.md 第二期，不套这一条。
+8. 字不当图形：和封面三枚肖形印同理，按钮上单独一两个字撑起来的「图标」换成刻线小像，取桂林山水里的物件，不画通用火柴人 / 笑脸。手机拇指键（`web/src/ui/thumb-glyphs.css`）：跳 = 跃鲤、蹲 = 压低的斗笠蓑衣、远近 = 近实远虚两座峰、叫车 = 共享电驴、翘头 = 抬前轮电驴（开车时 `body[data-ride=car]` 换成 (P) 手刹，摔车 `data-ride-crash="1"` 换成蓑笠翁起身，`data-locked="1"` 变淡）、±挡 = 双箭头、压弯 = 燕掠弯道、拳 = 正面拳、表情 = 折扇；「扶」只在救人时出现，保留字。图是 `thumb-*.svg`（24 网格、黑 = 亮部）遮罩 + `currentColor`，字仍留在按钮里（`font-size:0`），读屏和脚本不受影响；指南手机表用同一枚 `.thumb-ico`。小地图「北」是 `home-seal.svg` 残边小朱印。街头皮肤 `body[data-hud=street]` 按 docs/style.md 第二期，不套这一条。
+9. 按钮一律特制（IDOK-468 老板定，长期有效）：新做或改动的按钮不许直接套通用胶囊 / 圆钮 / 系统图标，要落在下面这套「匾 · 印 · 签」语言里，或在此基础上再特制：
+   - 匾：HUD 上常驻的一组键是一块墨青纸面（`--ui-surface-float`，无外描边），内衬一道 3px 印框（`::after` + `--ui-line-strong`），悬停只在印框内铺底，按下印压。左上 `.hud-me`（菜单三笔 `hud-menu.svg`、名章 / 蓑笠翁 `hud-guest.svg`、线装书指南 `hud-guide.svg`、圆相复位 `hud-unstuck.svg`）、工具键（笔筒 `hud-tools.svg`）、任务条、交通劝导条都是这块匾。
+   - 印：唯一主动作是朱砂印。横条主键用 `seal-bar.svg` 残边遮罩（交通劝导「开始执勤 / 吹哨」）；列表里每行的动作是四字方印（接单大厅 `.mb-btn`，`home-seal.svg` 遮罩，平时淡墨框，悬停 / 聚焦 / 按下才盖成朱砂，满屏只有手下一枚红）；挂在牌子边上的是骑缝竖印（钱包「接活」）。被遮罩的键焦点环必须收进印内（`outline-offset` 取负）。
+   - 签：读的信息、选中 / 开着的状态用宣纸签（`--ui-paper` 底 + `--ui-ink` 字）：任务线路名、景册赏金、页签选中、工具展开。
+   - 小像按第 8 条刻，不用 emoji、系统图标或一两个字撑图形；数字用 `--ui-num`，钱用 `--ui-ochre`；循环动画不用。
 
 ## 登录注册流程
 
@@ -122,6 +127,6 @@ S1（2026-11）重做了「游戏外」界面（主界面、账号、加载、�
 
 ## Logo 与「关于」页（IDOK-148）
 
-- Logo 是成员设计的像素画，原图 `docs/brand/logo-source.jpg`。`python3 scripts/brand-logo.py` 生成全部派生图：`public/brand/logo.webp`（关于页、进城加载卡）、`emblem.webp`（主界面标题上的宣纸小卡、关于页 Logo 设计者卡）、`favicon-32.png` / `brand/favicon-64.png`、`apple-touch-icon.png`、`brand/icon-*.png`（manifest）。
-- Logo 底是白的：放在浅色/宣纸底上时给 `<img>` 加 `mix-blend-mode:multiply`，白底就透出底色；不要直接放在深色面上。
+- Logo 是成员设计的像素画，原图 `docs/brand/logo-source.jpg`。`python3 scripts/brand-logo.py` 生成全部派生图：`public/brand/logo.webp`（关于页、进城加载卡）、`emblem.webp`（关于页 Logo 设计者卡）、`emblem-clear.webp`（外圈白底抠成透明，主界面书名落款）、`favicon-32.png` / `brand/favicon-64.png`、`apple-touch-icon.png`、`brand/icon-*.png`（manifest）。
+- `logo.webp` / `emblem.webp` 底是白的：放在浅色/宣纸底上时给 `<img>` 加 `mix-blend-mode:multiply`，白底就透出底色；深色面上用 `emblem-clear.webp`，不要贴白底卡片。
 - 「关于」页的贡献者名单在 `web/src/ui/contributors.ts`，按人列，每项贡献只写几个字（写代码 / 设计 / 实拍 / 反馈），不贴仓库 contributors。头像是该账号在游戏里的角色外形（`avatar` 字段，取自线上存档 `glol.avatar.v1`；没建角色的用默认外形），改完跑 `CHROMIUM=/usr/bin/chromium node scripts/contributor-portraits.mjs` 重新渲染 `public/contributors/*.webp`。玩家反馈处理完后，把反馈者的游戏昵称和反馈内容加进去（页面上写了「被采纳的反馈会署上你的昵称」）。只写昵称与公开主页。

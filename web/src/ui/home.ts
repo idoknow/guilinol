@@ -35,8 +35,7 @@ export function home(play:(mode:PlayMode)=>void):Home {
   </header>
   <div class="home-main">
     <div class="home-title">
-      <span class="home-seal" aria-hidden="true"><img src="./brand/emblem.webp" width="371" height="144" alt=""></span>
-      <h1>网上桂林</h1>
+      <h1><span class="home-h1-net">网上</span><span class="home-h1-city"><span class="home-h1-text">桂林</span><span class="home-seal" aria-hidden="true"><img src="./brand/emblem-clear.webp" width="363" height="136" alt=""></span><i class="home-wordmark" aria-hidden="true"></i></span></h1>
     </div>
     <div class="home-modes" role="list" aria-label="选择模式">
       <div class="home-row home-row--mp" role="listitem">
@@ -156,6 +155,7 @@ export function home(play:(mode:PlayMode)=>void):Home {
   const params = new URLSearchParams(location.search)
   const bg = root.querySelector<HTMLElement>('.home-bg')!, main = root.querySelector<HTMLElement>('.home-main')!
   const modes = root.querySelector<HTMLElement>('.home-modes')!
+  const title = root.querySelector<HTMLElement>('.home-title')!
   const UI = 'button,a,input,select,textarea,label,dialog,[role=dialog],.about-mask,.home-top'
   const narrow = matchMedia('(max-width:760px)'), short = matchMedia('(max-height:520px) and (orientation:landscape)')
   let cover:Cover|undefined, coverWanted = false, coverOff = params.has('nocover')
@@ -166,10 +166,10 @@ export function home(play:(mode:PlayMode)=>void):Home {
     if(on) holds.add(reason); else holds.delete(reason)
     if(!swoop) syncHolds()
   }
-  // The menu covers the left column (desktop), the thumb zone at the bottom (portrait phone) or the right column
-  // (landscape phone); the scene frames the hero and landmarks in the rest.
+  // The menu covers the left column (desktop), the title + thumb zone at the bottom (portrait phone: the title sits right
+  // above the modes) or the right column (landscape phone); the scene frames the hero and landmarks in the rest.
   const safe = ()=>narrow.matches
-    ? {left:0, right:0, bottom:Math.max(0, innerHeight - modes.getBoundingClientRect().top + 8)}
+    ? {left:0, right:0, bottom:Math.max(0, innerHeight - title.getBoundingClientRect().top + 8)}
     : short.matches
       ? {left:0, right:Math.max(0, innerWidth - modes.getBoundingClientRect().left + 8), bottom:0}
       : {left:Math.max(0, main.getBoundingClientRect().right - 40), right:0, bottom:0}

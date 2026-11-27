@@ -1,14 +1,14 @@
 /* 解放桥交通劝导玩法 HUD · 严守 docs/design-rules.md（山水印：单字体 --ui-serif、实心青玉 --ui-glass-solid、朱砂单强调色、0渐变、0玻璃模糊、0emoji、0内滚、0重叠） */
 :root {
   --td-font: var(--ui-serif, "Noto Serif SC", "Source Han Serif SC", "Songti SC", serif);
-  --td-surface: var(--ui-glass-solid, rgba(22, 36, 33, 0.94));
-  --td-surface-hover: rgba(28, 46, 42, 0.96);
-  --td-line: rgba(244, 239, 226, 0.2);
-  --td-fill: rgba(244, 239, 226, 0.08);
-  --td-fill-2: rgba(244, 239, 226, 0.16);
-  --td-text: var(--ui-paper, #f4efe2);
-  --td-text-2: rgba(244, 239, 226, 0.72);
-  --td-text-3: rgba(244, 239, 226, 0.48);
+  --td-surface: var(--ui-surface-float);
+  --td-surface-hover: var(--ui-surface-float);
+  --td-line: var(--ui-line);
+  --td-fill: var(--ui-fill);
+  --td-fill-2: var(--ui-fill-2);
+  --td-text: var(--ui-text);
+  --td-text-2: var(--ui-text-2);
+  --td-text-3: var(--ui-text-3);
   --td-accent: var(--ui-seal, #a9503c);
   --td-accent-hi: var(--ui-seal-hi, #bd5e48);
   --td-accent-text: var(--ui-seal-light, #d0694c);
@@ -201,9 +201,7 @@ body:has(.knockdown-hud:not([hidden]), .td-story-dialog:not([hidden]), .td-fine-
 }
 
 .td-stat--earnings.is-nonzero {
-  background: rgba(231, 193, 122, 0.16);
-  box-shadow: inset 0 0 0 1px rgba(231, 193, 122, 0.48);
-  color: #e7c17a;
+  color: var(--ui-ochre);
 }
 
 .td-bar .td-btn {
@@ -212,9 +210,10 @@ body:has(.knockdown-hud:not([hidden]), .td-story-dialog:not([hidden]), .td-fine-
   font-size: 12.5px;
 }
 
+/* 任务条下面还有一到两行委托人台词（.st-sub，到 ~142px），交警牌挂在它下面（IDOK-468） */
 body:has(.gl-mission-hud:not([hidden])) .td-entry,
 body:has(.gl-mission-hud:not([hidden])) .td-bar {
-  top: calc(114px + env(safe-area-inset-top));
+  top: calc(150px + env(safe-area-inset-top));
 }
 
 /* ---------- 解放桥交警 3D 投影头顶提示 ---------- */
@@ -254,7 +253,7 @@ body:has(.gl-mission-hud:not([hidden])) .td-bar {
 }
 
 body:has(.gl-mission-hud:not([hidden])) .td-bounds-banner {
-  top: calc(208px + env(safe-area-inset-top));
+  top: calc(244px + env(safe-area-inset-top));
 }
 
 /* ---------- 执勤中哨子 / 指挥旗操作条（挂顶栏下方，零压底栏/倒地提示/罚款机） ---------- */
@@ -272,7 +271,7 @@ body:has(.gl-mission-hud:not([hidden])) .td-bounds-banner {
 }
 
 body:has(.gl-mission-hud:not([hidden])) .td-signal-dock {
-  top: calc(156px + env(safe-area-inset-top));
+  top: calc(192px + env(safe-area-inset-top));
 }
 
 .td-signal-dock .td-btn:disabled {
@@ -295,8 +294,8 @@ body:has(.gl-mission-hud:not([hidden])) .td-signal-dock {
   height: 20px;
   padding: 0 5px;
   border-radius: 5px;
-  background: rgba(12, 20, 18, 0.56);
-  box-shadow: inset 0 0 0 1px rgba(244, 239, 226, 0.28);
+  background: var(--ui-fill-2);
+  box-shadow: inset 0 0 0 1px var(--ui-line-strong);
   color: var(--td-paper);
   font: 600 11px/1 var(--td-font);
   letter-spacing: 0.02em;
@@ -379,7 +378,7 @@ dialog.td-panel {
 }
 
 dialog.td-panel::backdrop {
-  background: rgba(12, 20, 20, 0.56);
+  background: var(--ui-scrim);
 }
 
 .td-panel-head {
@@ -579,6 +578,115 @@ dialog.td-panel::backdrop {
 
 /* ---------- 手机竖屏（390x844） ---------- */
 
+/* ---------- 按钮特制（IDOK-468）：与顶栏匾、接单方印同一套语言 ----------
+   HUD 条 = 墨青纸面 + 内衬印框；普通键 = 墨线框；主动作（开始执勤 / 吹哨）= 一条残边朱印（seal-bar.svg 遮罩）；
+   页签选中 = 宣纸；按下 = 印压。只改样式，class / aria 不动。被遮罩的键焦点环收进印内，不会被裁掉。 */
+.td-entry,
+.td-bar,
+.td-signal-dock {
+  box-shadow: none;
+}
+.td-entry::after,
+.td-bar::after,
+.td-signal-dock::after,
+dialog.td-panel::after {
+  content: "";
+  position: absolute;
+  inset: 3px;
+  border: 1px solid var(--ui-line-strong);
+  border-radius: var(--ui-r-xs);
+  pointer-events: none;
+}
+dialog.td-panel {
+  background: var(--ui-surface);
+  box-shadow: none;
+}
+dialog.td-panel::after {
+  inset: var(--ui-frame);
+  border-color: var(--ui-frame-line);
+  border-radius: calc(var(--ui-r-lg) - var(--ui-frame));
+}
+.td-bar {
+  padding-block: 5px;
+}
+.td-signal-dock {
+  padding: 6px;
+}
+.td-entry:hover::after {
+  border-color: var(--ui-line-hover);
+}
+.td-entry:active {
+  background: color-mix(in srgb, var(--ui-seal) 72%, var(--ui-surface-float));
+}
+.td-entry-best,
+.td-stat {
+  font-family: var(--ui-num);
+}
+.td-stat--earnings {
+  padding: 0 0 0 10px;
+  border-radius: 0;
+  background: none;
+  box-shadow: none;
+  border-left: 1px solid var(--ui-line);
+}
+.td-btn {
+  border-radius: var(--ui-r-xs);
+  background: none;
+  box-shadow: inset 0 0 0 1px var(--ui-line-strong);
+  color: var(--ui-text);
+  font-weight: 600;
+}
+.td-btn:hover {
+  background: var(--ui-fill);
+  box-shadow: inset 0 0 0 1px var(--ui-line-hover);
+}
+.td-btn:active {
+  transform: scale(var(--ui-press));
+}
+.td-btn--primary,
+.td-whistle-btn {
+  background: var(--ui-seal);
+  box-shadow: none;
+  color: var(--ui-paper);
+  font-weight: 600;
+  -webkit-mask: url("../ui/seal-bar.svg") center/100% 100% no-repeat;
+  mask: url("../ui/seal-bar.svg") center/100% 100% no-repeat;
+}
+.td-btn--primary:hover,
+.td-whistle-btn:hover {
+  background: var(--ui-seal-hi);
+  box-shadow: none;
+}
+.td-btn--primary:focus-visible,
+.td-whistle-btn:focus-visible {
+  outline: 1.5px solid var(--ui-paper);
+  outline-offset: -5px;
+}
+.td-tab {
+  border-radius: var(--ui-r-xs);
+  transition: background var(--ui-fast), color var(--ui-fast);
+}
+.td-tab:hover {
+  background: var(--ui-fill);
+  color: var(--ui-text);
+}
+.td-tab[aria-selected="true"] {
+  background: var(--ui-paper);
+  color: var(--ui-ink-900);
+}
+.td-close {
+  display: grid;
+  place-items: center;
+  padding: 0 0 2px;
+  border-radius: var(--ui-r-ctl);
+  background: none;
+  box-shadow: none;
+  font: 300 24px/1 var(--ui-serif);
+}
+.td-close:hover {
+  background: var(--ui-fill);
+}
+
 @media (max-width: 560px) {
   .td-entry,
   .td-bar {
@@ -632,9 +740,12 @@ dialog.td-panel::backdrop {
     padding: 5px 11px;
   }
 
-  body:has(.gl-mission-hud:not([hidden])) .td-entry,
   body:has(.gl-mission-hud:not([hidden])) .td-bar {
     top: calc(292px + env(safe-area-inset-top));
+  }
+  /* 手机上任务条高度随步骤文字变（两到四行），交警指路牌挂在下面必压住计时 / 放弃：跑单时先收起，单子结束自动回来（IDOK-468） */
+  body:has(.gl-mission-hud:not([hidden])) .td-entry {
+    display: none;
   }
 
   body:has(.gl-mission-hud:not([hidden])) .td-signal-dock {
@@ -681,9 +792,12 @@ dialog.td-panel::backdrop {
     font-size: 12px;
   }
 
-  body:has(.gl-mission-hud:not([hidden])) .td-entry,
   body:has(.gl-mission-hud:not([hidden])) .td-bar {
     top: calc(174px + env(safe-area-inset-top));
+  }
+  /* 手机上任务条高度随步骤文字变（两到四行），交警指路牌挂在下面必压住计时 / 放弃：跑单时先收起，单子结束自动回来（IDOK-468） */
+  body:has(.gl-mission-hud:not([hidden])) .td-entry {
+    display: none;
   }
 
   body:has(.gl-mission-hud:not([hidden])) .td-signal-dock {

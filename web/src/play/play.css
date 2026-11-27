@@ -11,10 +11,17 @@
 .dock-bar{grid-area:bar;display:flex;gap:6px;position:relative}
 .dock-bar>button{box-sizing:border-box;height:var(--ui-h);padding:0 14px;border-radius:var(--ui-r-paper);font-size:14px;letter-spacing:var(--ui-track);display:inline-flex;align-items:center;gap:8px}
 .dock .btn-mode{position:static}
-/* 工具图标：田字四方印，和左上「菜单」的三道横线区分开 */
-.dock-more::before{content:"";width:4px;height:4px;margin:0 6px 6px 0;background:currentColor;box-shadow:6px 0 currentColor,0 6px currentColor,6px 6px currentColor;opacity:.9}
-.dock-more[aria-expanded=true]{background:var(--ui-paper);color:var(--ui-ink-900);border-color:var(--ui-paper)}
-.dock-more[aria-expanded=true]:hover{background:var(--ui-paper-3)}
+/* 工具 / 起飞：和左上那块匾同一种材质（IDOK-468）——墨青纸面、无外描边、内衬一道印框；工具的小像是笔筒里斜插三支笔。
+   展开时整块换宣纸（选中态），印框随之换成纸上的墨线。 */
+.dock .dock-bar>button{position:relative;border:0;background:var(--ui-surface-float)}
+.dock-bar>button::after{content:"";position:absolute;inset:3px;border:1px solid var(--ui-line-strong);border-radius:var(--ui-r-xs);pointer-events:none}
+.dock-bar>button:hover{background:var(--ui-surface-float);color:var(--ui-paper)}
+.dock-bar>button:hover::after{border-color:var(--ui-line-hover)}
+.dock-bar>button:active{background:color-mix(in srgb,var(--ui-seal) 72%,transparent)}
+.dock-more::before{content:"";flex:none;width:18px;height:18px;background:currentColor;-webkit-mask:url("../ui/hud-tools.svg") center/contain no-repeat;mask:url("../ui/hud-tools.svg") center/contain no-repeat}
+.dock .dock-bar>.dock-more[aria-expanded=true]{background:var(--ui-paper);color:var(--ui-ink-900)}
+.dock .dock-bar>.dock-more[aria-expanded=true]:hover{background:var(--ui-paper-3);color:var(--ui-ink-900)}
+.dock-more[aria-expanded=true]::after{border-color:var(--ui-paper-line-strong)}
 /* 工具册页：一张墨青纸，内衬一道纸色细线（印框），条目是纸面上的字，不再各自是一颗胶囊。
    挂在工具条里、贴「工具」按钮正下方右对齐弹出，不参与 dock 排版，展开时 dock 不变宽、不盖左边的 HUD。 */
 .dock-buttons{position:absolute;top:calc(100% + 8px);right:0;width:max-content;display:grid;grid-template-columns:repeat(2,auto);gap:2px;padding:7px;box-sizing:border-box;
