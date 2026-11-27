@@ -232,7 +232,12 @@ def buildings(bounds, elevation, peaks, layout, carriageway_mask=None, sidewalk_
             floors=int(element['tags'].get('building:levels','2'))
             base=elevation(center.x,center.y)
             footprints.append(poly)
-            heights.append((base,base+3.1*floors,0,floors,element['id']%65536,center,[],False))
+            tags=element['tags']
+            use=' '.join(tags.get(key,'') for key in ('name','building','office'))
+            kind=(0 if tags.get('barrier')=='toll_booth' else
+                  5 if floors>=3 or '办公' in use or 'office' in use else
+                  6 if footprint.area>550 or '仓' in use else 7)
+            heights.append((base,base+3.1*floors,kind,floors,element['id']%65536,center,[],False))
     palace_index = STRtree(palace)
     with (Path(RAW)/'overture_buildings.csv').open() as source:
         for row in csv.DictReader(source, delimiter='\t'):
