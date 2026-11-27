@@ -178,7 +178,7 @@ def _street_facade(m: Builder, p0, p1, nx_sign, y0, ground_h, total_h, wall_mat,
     m.pose = (0.0, 0.0, 0.0, 0.0)
 
 
-def _bus_shelter(m: Builder, x, y0, z, yaw, station_key='bus_shizijie'):
+def _bus_shelter(m: Builder, x, y0, z, yaw, station_key='bus_shizijie', *, graded=False):
     """Guilin Zhongshan Road modern transit bus shelter + CJK station totem."""
     # Local +X of pose points toward carriageway; local +Z runs along sidewalk.
     m.pose = (x, y0, z, yaw)
@@ -186,7 +186,13 @@ def _bus_shelter(m: Builder, x, y0, z, yaw, station_key='bus_shizijie'):
     outline = m._transform([[-1.25,0,-5.6],[1.25,0,-5.6],[1.25,0,5.6],[-1.25,0,5.6]])[:,::2]
     m.pose = (0,0,0,0)
     civic_plaza(m,outline,refine_outer=True)
-    m.pose = (x,y0,z,yaw)
+    def place_above_pavement(samples):
+        m.pose = (x,y0,z,yaw)
+        if graded:
+            rise = max(m.feet_at_grade(samples)) + .195
+            m.pose = (x,y0+rise,z,yaw)
+
+    place_above_pavement([[sx,0,sz] for sx in (-1.25,1.25) for sz in (-5.6,0,5.6)])
     for sz in (-4.6, -1.5, 1.5, 4.6):
         base=m.feet_at_grade([[-.82,0,sz]])[0]-.035
         m.beam([-0.82, base, sz], [-0.82, 2.95, sz], 0.08, 'bronze', sections=6, collide=True)
@@ -195,16 +201,19 @@ def _bus_shelter(m: Builder, x, y0, z, yaw, station_key='bus_shizijie'):
 
     # Back route-map & transit lightboxes facing +X toward waiting passengers
     for sz, col in ((-3.1, 'blue'), (0.0, 'white'), (3.1, 'red')):
+        place_above_pavement([[-.82,0,sz+end] for end in (-1.19,0,1.19)])
         for sign in (-1,1):
             m.box(-.82,.08,sz+sign*.92,.14,2.34,.13,'bronze',footing=True)
         m.box(-0.78, 0.52, sz, 0.18, 1.85, 2.38, 'dark', collide=True)
         if m.detail:
             m.box(-0.67, 0.65, sz, 0.04, 1.58, 2.16, col)
+    place_above_pavement([[-.22,0,end] for end in (-2.2,0,2.2)])
     m.box(-0.22, 0.48, 0.0, 0.46, 0.08, 4.4, 'alum', collide=True)
     for bz in (-1.8, 0.0, 1.8):
         m.box(-0.22, 0.08, bz, 0.40, 0.40, 0.12, 'dark',footing=True)
 
     # Tall double-sided bus-stop totem ('十字街' / '阳桥') facing along sidewalk (+Z / -Z)
+    place_above_pavement([[.76,0,5.25]])
     m.box(0.76, 0.08, 5.25, 0.72, 2.82, 0.16, 'dark', collide=True,footing=True)
     m.sign_quad(0.76, 1.15, 5.35, 0.66, 1.68, station_key, double_sided=True)
     m.box(0.76, 0.18, 5.25, 0.66, 0.92, 0.18, 'blue')
@@ -393,7 +402,8 @@ def build_zhongshan_road(m: Builder):
         # Local +X = (cos(yaw), -sin(yaw)) == normalized (inward_x, inward_z) -> yaw = atan2(-inward_z, inward_x)
         shelter_yaw = math.atan2(-inward_z, inward_x)
         lx, lz = pt.x - AX, pt.y - AZ
-        _bus_shelter(m, lx, m.surface.ground(lx,lz), lz, shelter_yaw, station_key=station_key)
+        _bus_shelter(m, lx, m.surface.ground(lx,lz), lz, shelter_yaw, station_key=station_key,
+                     graded=road is west_roads[0] and station_key == 'bus_shizijie')
         bus_pullin_zones.append(pt.buffer(11.5))
 
     divider_mask = unary_union([junc_mask, *bus_pullin_zones])
