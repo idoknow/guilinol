@@ -39,26 +39,19 @@ export function yangqiaoDeck(tile:{x:number,z:number},deck:Float32Array,thin:Set
       }
     }return out
   }
-  const result=outside(deck,true),walkPaving:number[]=[]
-  const paint:{planes:Plane[],height:(point:Point)=>number}[]=[]
+  const result=outside(deck,true),walkPaving:number[]=[],pavedTops=new Set<number>()
   streets.sidewalk=Float32Array.from(outside(streets.sidewalk));streets.road=Float32Array.from(outside(streets.road))
   const tileExterior:Plane[][]=[[point=>-point[0]],[point=>point[0]-256]]
   for(let row=0;row<lastRow;row++)for(let col=0;col<lastCol;col++){
     const quad=[vertex(tile,row,col),vertex(tile,row,col+1),vertex(tile,row+1,col+1),vertex(tile,row+1,col)]
     const faces=[[quad[0],quad[1],quad[2]],[quad[0],quad[2],quad[3]]]
-    for(const [first,second,third] of faces){
-      const bx=second[0]-first[0],bz=second[2]-first[2],cx=third[0]-first[0],cz=third[2]-first[2],det=bx*cz-bz*cx
-      const face=[first,second,third]
-      paint.push({planes:face.map((start,index)=>{const end=face[(index+1)%3];return point=>(point[0]-start[0])*(end[2]-start[2])-(point[2]-start[2])*(end[0]-start[0])}),
-        height:point=>first[1]+((point[0]-first[0])*cz-(point[2]-first[2])*cx)/det*(second[1]-first[1])+(bx*(point[2]-first[2])-bz*(point[0]-first[0]))/det*(third[1]-first[1])})
-    }
     for(const face of faces)for(const piece of carve(face,tileExterior)??[face]){
       const first=result.length/9;fan(piece,result)
       if(col!==2)fan(piece,walkPaving)
-      for(let index=first;index<result.length/9;index++){newThin.add(index);if(col===2)newAsphalt.push(index)}
+      for(let index=first;index<result.length/9;index++){newThin.add(index);if(col===2)newAsphalt.push(index);else pavedTops.add(index)}
     }
   }
-  if(streets.surface)streets.surface=carvePaving(streets.surface,[planes],paint)
+  if(streets.surface)streets.surface=carvePaving(streets.surface,[planes])
   if(walkPaving.length){
     const paving=new BufferGeometry()
     paving.setAttribute('position',new Float32BufferAttribute(walkPaving,3));bindStreetSurface(paving,'sidewalk')
@@ -67,5 +60,19 @@ export function yangqiaoDeck(tile:{x:number,z:number},deck:Float32Array,thin:Set
       const merged=mergeGeometries([streets.surface,paving]);streets.surface.dispose();paving.dispose();streets.surface=merged
     }else streets.surface=paving
   }
-  return {deck:Float32Array.from(result),thin:newThin,asphalt:newAsphalt}
+  return {deck:Float32Array.from(result),thin:newThin,asphalt:newAsphalt,pavedTops}
+}
+
+export function approachDecor(tile:{x:number,z:number},decor:number[][]){
+  if(tile.z!==256||!(tile.x===-1280||tile.x===-1024))return decor
+  const end=profile.stations.length-1
+  const lane=[vertex(tile,0,2),vertex(tile,0,3),vertex(tile,end,3),vertex(tile,end,2)]
+  for(const [near,far] of [[0,3],[1,2]]){
+    const dx=lane[far][0]-lane[near][0],dz=lane[far][2]-lane[near][2],scale=10/Math.hypot(dx,dz)
+    lane[near][0]-=dx*scale;lane[near][2]-=dz*scale;lane[far][0]+=dx*scale;lane[far][2]+=dz*scale
+  }
+  return decor.filter(([kind,east,south])=>kind!==1||!lane.every(([ax,,az],index)=>{
+    const [bx,,bz]=lane[(index+1)%lane.length]
+    return (east/10-ax)*(bz-az)-(south/10-az)*(bx-ax)>=0
+  }))
 }

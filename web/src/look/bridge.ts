@@ -156,7 +156,7 @@ if (uGroundUpgrade > 0.5 && brSkyFill > 0.0) {
 }
 
 const asphaltColor=new THREE.Color(look.streets.surfaces[0])
-export function bridgeGeometry(deck:Float32Array,thin:Set<number>,asphalt:number[]) {
+export function bridgeGeometry(deck:Float32Array,thin:Set<number>,asphalt:number[],pavedTops?:Set<number>) {
   top.set(look.bridgeTop); side.set(look.bridgeSide)
   const key = (at:number)=>`${Math.round(deck[at]*20)},${Math.round(deck[at+1]*20)},${Math.round(deck[at+2]*20)}`
   const edges = new Map<string,[number,number,number]>()
@@ -166,14 +166,17 @@ export function bridgeGeometry(deck:Float32Array,thin:Set<number>,asphalt:number
     if(seen) seen[2]++; else edges.set(id,[a,b,1])
   }
   const open = [...edges.values()].filter(edge=>edge[2]===1)
-  const positions = new Float32Array(deck.length+open.length*18), colors = new Float32Array(positions.length), edge = new Float32Array(positions.length/3)
-  positions.set(deck)
-  for(let at=0;at<deck.length;at+=3) top.toArray(colors,at)
-  for(const triangle of asphalt) for(let corner=0;corner<3;corner++) {
-    const vertex=triangle*3+corner
-    asphaltColor.toArray(colors,vertex*3);edge[vertex]=-1
+  const positions = new Float32Array(deck.length-(pavedTops?.size??0)*9+open.length*18), colors = new Float32Array(positions.length), edge = new Float32Array(positions.length/3)
+  const road=new Set(asphalt)
+  let out=0
+  for(let at=0;at<deck.length;at+=9){
+    if(pavedTops?.has(at/9))continue
+    const paved=road.has(at/9)
+    for(let coord=at;coord<at+9;coord+=3){
+      positions[out]=deck[coord];positions[out+1]=deck[coord+1];positions[out+2]=deck[coord+2];
+      (paved?asphaltColor:top).toArray(colors,out);if(paved)edge[out/3]=-1;out+=3
+    }
   }
-  let out = deck.length
   for(const [a,b] of open) {
     const depth = thin.has(Math.floor(a/9))?.6:look.bridgeDepth
     const ax=deck[a],ay=deck[a+1],az=deck[a+2],bx=deck[b],by=deck[b+1],bz=deck[b+2]

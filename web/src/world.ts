@@ -5,7 +5,7 @@ import {ensureShardForTile,hasShardForTile} from './city-upgrade/state'
 import {loadStreetGeometry} from './street-loader'
 import type {StationPavingStyle,Streets} from './street-worker'
 import {bridgeGeometry} from './look/bridge'
-import {openYangqiaoChannel,yangqiaoDeck} from './yangqiao-deck'
+import {approachDecor,openYangqiaoChannel,yangqiaoDeck} from './yangqiao-deck'
 import {look} from './look/config'
 import {nightGround} from './look/night'
 import {countryside,setupCountryside,touchesCountryside} from './look/countryside'
@@ -394,6 +394,7 @@ export async function detail(tile:Tile, signal:AbortSignal, parseSlot?:()=>Promi
   })
   for(const [,topLevel] of rings) if(topLevel/10+8>maxY) maxY = topLevel/10+8
   const heights = geometry.getAttribute('position')
+  if(paths[9])paths[9]=approachDecor(tile,paths[9])
   const streets = await loadStreetGeometry(paths,step,heights,rails,signs,railCuts,tile.stationPaving,tile.roadbeds,[tile.x,tile.z])
   if(tunnels)joinPortalRoads(tile,tunnels,[streets.road,streets.sidewalk,...(streets.surface?[streets.surface.getAttribute('position').array as Float32Array]:[])])
   await groundStairwellsReady
@@ -444,8 +445,8 @@ export async function detail(tile:Tile, signal:AbortSignal, parseSlot?:()=>Promi
     const u=lx/step-col,v=lz/step-row,a=heights.getY(at),b=heights.getY(at+1),c=heights.getY(at+stride),d=heights.getY(at+stride+1)
     return u+v<=1?a+(b-a)*u+(c-a)*v:d+(c-d)*(1-u)+(b-d)*(1-v)
   },paths[0],paths[5]) : null
-  const {deck:activeDeck,thin:activeThin,asphalt:activeAsphalt}=yangqiaoDeck(tile,repairedDeck?.deck??deck,repairedDeck?.thin??thin,asphalt,streets)
-  const bridge = activeDeck.length ? bridgeGeometry(activeDeck,activeThin,activeAsphalt) : null
+  const {deck:activeDeck,thin:activeThin,asphalt:activeAsphalt,pavedTops}=yangqiaoDeck(tile,repairedDeck?.deck??deck,repairedDeck?.thin??thin,asphalt,streets)
+  const bridge = activeDeck.length ? bridgeGeometry(activeDeck,activeThin,activeAsphalt,pavedTops) : null
   const batch:TileBatchInput = {
     tile, minY, maxY, midY:heights.getY(segments/2*(stride+1)),
     walls, pond:pond?.positions ?? null, bridge,

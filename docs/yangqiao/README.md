@@ -4,6 +4,10 @@
 
 ### GL04 数据同步
 
+桥头对照（左 `676a43c1`，右为修订后）：[南、北桥头](approaches-r8.jpg)。两头斜栏来自 GL04 街道装饰 `kind=1`，不是地标栏杆。新车行带及两端各 10 m 内不再实例化该类合成护栏；两翼栏杆碰撞不变。步道顶面只渲染铺装，桥面碰撞连续。
+
+水面同机位（左 `main@9d98f6de`，右为修订后）：[东、西水面](water-main-r8.jpg)。两台相机高度均为 149.7 m；main 上方也有暗区，尤其东侧。对照能确认暗区并非本 PR 新增，但不能只凭截图判定光照原因。
+
 `world.ts` 在生成街面后调用 `yangqiaoDeck`：仅处理 `100_40.glc`（世界 XZ 原点 `-1280,256`）和 `101_40.glc`（`-1024,256`）。全宽可行走面和视觉铺装取同一组顶点：`pipeline/data/landmarks/yangqiao-grade.json` 的 `south` / `north` 是 OSM 桥缘端点，`stations`、`lateral` 和 `levels` 是沿桥、横桥的位置与 GL04 街面顶高（米）。步道用引道同款 `sidewalk` 材质；中间两条贴地线表示双向车道分隔，不是实体栏。
 
 重新生成世界时，在新 manifest 核对两瓦片原点和桥缘；按同一采样站重取两股道路、两岸引道人行道顶高（不要取 DEM），更新 grade。另核对 `yangqiao-channel.json` 的 4 m 河床节点与 148.1 m 水位。随后 `npm run landmarks -- zhongshan_road`、`npm run build`，七路线重验接缝，并在下图机位重拍。如果原生 GL04 已包含相同桥面和河床，应同时撤下运行时替换与离线采样修正，不要叠加第二层碰撞。
