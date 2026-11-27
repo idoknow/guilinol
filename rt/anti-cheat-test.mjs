@@ -2,6 +2,12 @@
 import {spawn} from 'node:child_process'
 import WebSocket from 'ws'
 import {createHmac} from 'node:crypto'
+import {passengerMove} from './flight-passenger.mjs'
+import {checkMove} from './anti-cheat.mjs'
+import {register} from 'tsx/esm/api'
+register()
+const {aircraftPose}=await import('../web/src/helicopter/flight.ts')
+const {services,routeVersion}=await import('../lib/helicopter-clock.ts')
 
 const SECRET = 'test-secret'
 const ADMIN = 'admin-token'
@@ -63,11 +69,32 @@ for (let i = 0; i < 34; i++) { dx += 0.3; driver.pos(dx, 3, 0, {bike: 'bike'}); 
 for (let i = 0; i < 30; i++) { dx += 2.08; driver.pos(dx, 3, 0, {bike: 'bike'}); await sleep(50) }  // 41.7 m/s = 150 km/h
 ok(driver.setbacks() === 0, '开车 150 km/h：无误报')
 
-// 直升机/载具：foot=false 时向上速度不受限（飞行是合法玩法）
-const flyerOk = client(900150, 'heli')
-await flyerOk.ready; flyerOk.join(); await sleep(400)
-for (let i = 1; i <= 40; i++) { flyerOk.pos(0, 3 + i * 2, 0, {foot: false, bike: 'heli'}); await sleep(50) }  // 40 m/s 爬升
-ok(flyerOk.setbacks() === 0, '直升机爬升 40 m/s：无误报')
+for(const [mode,plan] of Object.entries(services)){
+  const player={uid:900150,x:-805,y:154,z:258}
+  const flight={uid:player.uid,ticket:'10',seat:2,mode,t0:100000,route_version:routeVersion}
+  let events=0
+  for(let elapsed=-7000;elapsed<=(plan.total+5)*1000;elapsed+=100){
+    const at=flight.t0+elapsed,pose=aircraftPose(at,flight.t0,mode)
+    const msg={x:pose.x+.6,y:pose.y+.7,z:pose.z-1,foot:false,bike:'',passenger:true}
+    const verdict=passengerMove(flight,player,msg,at)
+    if(!verdict?.ok)events++
+    else Object.assign(player,msg)
+  }
+  ok(events===0,`有效座位 ${mode} 全程：${events} 次误报`)
+  const away={x:0,y:300,z:200,passenger:true}
+  ok(passengerMove(flight,player,away,flight.t0+50000)?.reject,'有效座位不能偏离航线')
+  const at=flight.t0+60000,seat={...aircraftPose(at,flight.t0,mode),passenger:true}
+  const rejoin={...seat,posAt:at,uid:player.uid}
+  ok(passengerMove(flight,rejoin,seat,at)?.ok,'机上重连仍须贴合航线')
+  ok(passengerMove(flight,{...rejoin,uid:900151},seat,at)?.reject,'其他 UID 不能借用座位')
+  ok(passengerMove(flight,{...player,flightTicket:null},seat,at)?.reject,'不能从地面跳到巡航中的座位')
+}
+ok(checkMove({x:0,y:3,z:0,posAt:1000,foot:false,bike:''},0,103,0,1100).observation==='altitude_unverified','旧版乘客姿态不是高度豁免')
+const unseated=client(900150,'not-seated')
+await unseated.ready;unseated.join();await sleep(400)
+unseated.pos(0,105,0,{foot:false,bike:'',passenger:true});await sleep(200)
+ok(unseated.got.some(packet=>packet.t==='setback'&&packet.kind==='teleport'),'未获座位的乘客声明被拒并判违规')
+unseated.ws.close()
 
 // ── 2. 作弊必须被拦
 console.log('\n[2] 作弊必须被拦')

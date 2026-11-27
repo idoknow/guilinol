@@ -2,6 +2,7 @@ import {preview} from 'vite'
 import {chromium} from 'playwright'
 import {browserOptions} from './qa-browser.mjs'
 import {mkdir} from 'node:fs/promises'
+import {readFile} from 'node:fs/promises'
 import assert from 'node:assert/strict'
 import {register} from 'tsx/esm/api'
 import {spawn} from 'node:child_process'
@@ -10,9 +11,11 @@ register()
 const {services}=await import('../lib/helicopter-clock.ts');const {withQueueDatabase}=await import('./test-helicopter-queue.mjs'),{fixture}=await import('./heli-fixture.mjs')
 await withQueueDatabase(async pool=>{
 const api=await fixture(pool)
+const audit=process.env.HELI_RT_AUDIT==='1'
+if(audit)for(const migration of ['024-mp-anti-cheat','025-mp-reviews'])await pool.query(await readFile(`deploy/postgres/${migration}.sql`,'utf8'))
 const output=process.env.HELI_CAPTURE_DIR??'captures/helicopter',server=await preview({root:'web',configFile:'web/vite.config.ts',plugins:[api.plugin],...(process.env.HELI_COMPARE_DIST?{build:{outDir:process.env.HELI_COMPARE_DIST}}:{}),preview:{host:'127.0.0.1',port:0}})
 let browser
-const rt=spawn(process.execPath,['rt/server-realtime.mjs'],{env:{PORT:'0',RT_BIND_HOST:'127.0.0.1',RT_JOIN_SECRET:api.secret},stdio:['ignore','pipe','inherit']})
+const rt=spawn(process.execPath,[process.env.HELI_RT_ENTRY??'rt/server-realtime.mjs'],{env:{PORT:'0',RT_BIND_HOST:'127.0.0.1',RT_JOIN_SECRET:api.secret,...(audit?{DATABASE_URL:pool.options.connectionString}:{})},stdio:['ignore','pipe','inherit']})
 try{
   const endpoint=await new Promise((resolve,reject)=>{rt.stdout.on('data',data=>{const url=data.toString().match(/ws:\/\/127\.0\.0\.1:\d+\/ws/);if(url)resolve(url[0])});rt.once('exit',code=>reject(Error(`RT exited: ${code}`)));rt.once('error',reject)})
   await mkdir(output,{recursive:true});browser=await chromium.launch(browserOptions(true))
@@ -31,6 +34,23 @@ try{
     return {frames:count,fps:1000*count/intervals.reduce((sum,value)=>sum+value,0),p50:percentile(.5),p95:percentile(.95),p99:percentile(.99)}
   },quick?8:120).then(sample=>{console.log('FRAME_SAMPLE',JSON.stringify({label,...sample}));return sample.fps})
   const url=`${origin}/?verify&solo=1&mp=1&flow=0&radius=480${process.env.HELI_PROFILE?'&frameProfile':''}`
+  if(audit){
+    const frames=[]
+    page.on('websocket',socket=>socket.on('framesent',({payload})=>{const packet=JSON.parse(String(payload));frames.push({at:Date.now(),type:packet.t,foot:packet.foot,bike:packet.bike,y:packet.y})}))
+    await page.goto(url.replace('mp=1','mp=0'),{waitUntil:'domcontentloaded'})
+    await page.waitForFunction(()=>window.viewer?.walk?.active,null,{timeout:180000})
+    assert.ok(await page.evaluate(()=>window.viewer.walkTo(-805.8,257.6,-1.57,'benchmark')))
+    await page.evaluate(()=>{localStorage.setItem('glol.mp','1');window.dispatchEvent(new CustomEvent('glol:mp-pref',{detail:true}))})
+    await page.locator('.heli-prompt').click();await page.getByRole('button',{name:'加入队列'}).click()
+    const start=Date.now();await page.getByRole('button',{name:'确认登机'}).click();await phase('ascend');await phase('cruise')
+    await page.waitForFunction(()=>window.viewer.heli.phase==='landed',null,{timeout:480000});await page.keyboard.press('KeyF');await phase('idle')
+    const exit=Date.now();await new Promise(resolve=>setTimeout(resolve,30000))
+    const events=(await pool.query('SELECT kind,count(*)::int AS count FROM mp_cheat_events WHERE uid=100001 AND at BETWEEN $1 AND $2 GROUP BY kind',[start,Date.now()])).rows
+    const air=frames.filter(frame=>frame.type==='pos'&&frame.y>200),windowFrames=frames.filter(frame=>Math.abs(frame.at-exit)<=30000)
+    const peak=Math.max(0,...windowFrames.map(frame=>windowFrames.filter(next=>next.at>=frame.at&&next.at<frame.at+1000).length))
+    console.log('HELI_RT_AUDIT',JSON.stringify({start,exit,events,airPackets:air.length,airMode:air[0],peakMessagesPerSecond:peak}))
+    assert.ok(air.length>20);assert.deepEqual(events,[]);return
+  }
   if(process.env.HELI_B_ONLY){
     const started=Date.now(),path=request=>new URL(request.url()).pathname
     other.on('console',message=>console.log('B console',message.type(),message.text().slice(0,240)))

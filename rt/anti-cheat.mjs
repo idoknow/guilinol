@@ -27,8 +27,8 @@ export const LIMITS = Object.freeze({
   winTol: 1.25,     // 额度补充倍率（比上限略快，吸收抖动尖峰）
 })
 
-/** 空中/载具：不限制向上速度，按载具上限放行（直升机刚上线，乘客的 foot 会被置 false） */
 const airborne = (p) => p.foot === false || Boolean(p.bike) || p.activity === 'drone'
+const vehicleMotion = (p) => Boolean(p.bike && p.bike!=='heli') || p.activity==='drone' || (p.foot===false && (p.activity==='car' || p.activity==='boat'))
 const attackKinds=new Set(['mount_player','foreign_position','oversize','invalid_packet','packet_rate'])
 // 阈值按"合法玩家 0~5 次/10 分钟、脚本 150+ 次"的实测分布取，宁可漏也不误封：
 // 40 次 → 3 分钟（强制下线冷静一下）；150 次 → 1 小时；300 次 → 24 小时
@@ -78,7 +78,7 @@ export function checkMove(p, nx, ny, nz, at) {
   // 距离额度（token bucket）：额度按**服务端单调时间**以允许速度补充，最多存 2 秒。
   // 与客户端发包节奏、dt 抖动完全解耦；客户端上报的 v 和时间戳一律不参与判定，
   // 所以作弊者改客户端数据只有两种结果：位移超出额度被拒，或额度耗尽后持续被拒。
-  const capSpeed = airborne(p) ? LIMITS.car : speedCap(p, at)
+  const capSpeed = vehicleMotion(p) ? LIMITS.car : speedCap(p, at)
   const refill = capSpeed * LIMITS.winTol
   const capMax = refill * (LIMITS.bankMs / 1000)
   const bucket = p.moveBudget ??= { m: refill * 0.5, at }
@@ -93,7 +93,7 @@ export function checkMove(p, nx, ny, nz, at) {
   bucket.m = Math.max(0, bucket.m - flat)
   const baseline=p.altitudeBaseline??={y:p.y,at}
   if (ny<baseline.y+1) { baseline.y=ny; baseline.at=at }
-  const observation= !airborne(p) && (rise>LIMITS.upMax*dt+0.5 || (ny-baseline.y>4 && at-baseline.at>8000)) ? 'altitude_unverified' : ny < -10 ? 'ground_unverified' : null
+  const observation= !vehicleMotion(p) && (rise>LIMITS.upMax*dt+0.5 || (ny-baseline.y>4 && at-baseline.at>8000)) ? 'altitude_unverified' : ny < -10 ? 'ground_unverified' : null
   return { ok: true, observation }
 }
 
