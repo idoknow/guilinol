@@ -291,6 +291,11 @@ def adjust_prior_roads(name, profiles, sections):
                 raise ValueError(f"Invalid replacement chainage on {wid}")
             replacement = rounded_profile(knots, start)
             replacement[:, 0] += start
+            if segment.get("followNativeCeiling"):
+                # Include both sets of knots so the ceiling holds between samples as well.
+                at = np.union1d(replacement[:, 0], native[(native[:, 0] > start) & (native[:, 0] < end), 0])
+                h = np.minimum(np.interp(at, *replacement.T), np.interp(at, *native.T))
+                replacement = np.column_stack((at, h))
             before = native[native[:, 0] < start - .00001]
             after = native[native[:, 0] > end + .00001]
             profile = np.vstack((before, replacement, after))

@@ -1,3 +1,4 @@
+import {fitCurbReturns,type CurbReturn} from './curb-returns'
 import {platformShift, type PlatformGrade} from './platform-grade'
 import {panelCut} from './crossing-panels'
 import {stationShoulders,type GradePlane,type ShoulderPlane} from './station-shoulders'
@@ -10,10 +11,11 @@ import {railwayGeometry,type RailSection,type RailFace,type CrossingSign} from '
 import {buildRoadBarriers} from './road-barriers'
 import {isShizijieCrosswalkRing,isShizijieDecorSuppressed,isShizijieSignalSuppressed,touchesShizijieTile} from './shizijie-zone.ts'
 import {curbEdgeKeyCm,repairStreetPaths} from './ground-repair'
+import {isOuterOsmanthusBed} from './outer-osmanthus'
 import * as THREE from 'three'
 import {look} from './look/config'
 type Pair=[number,number]
-export interface StationPavingStyle {plaza?:Pair[]; platformEdges?:[Pair,Pair][]; platformGrades?:PlatformGrade[]}
+export interface StationPavingStyle {curbReturns?:CurbReturn[]; plaza?:Pair[]; platformEdges?:[Pair,Pair][]; platformGrades?:PlatformGrade[]}
 type Path=[number,...Pair[][]]
 type RoadCtrl=[number,number[]]
 type Lower=[number,Pair[],[number,number,number,number][]]
@@ -329,21 +331,30 @@ export function streetGeometry([paths,lamps,banks,signals=[],stops=[],roadCtrl,s
   const awnings=look.streets.awnings.map(value=>new THREE.Color(value)),shutter=new THREE.Color(look.streets.shutter)
   const parked:number[]=[],blue=new THREE.Color(look.streets.directionSign)
   const suppressDecor=(kind:number,x:number,z:number)=>checkShizijie&&!!origin&&isShizijieDecorSuppressed(origin[0]+x,origin[1]+z,kind)
+  // 栅栏件（绿篱、机非铁栏、白护栏、石墩铁栏）整段同档：120 m 内一起画，远处不再只剩绿篱或悬空横杆。
   for(const [kind,east,south,heading,span] of decor){
-    if(kind===5||kind===6||kind===7){
-      const x=east/10,z=south/10
-      if(suppressDecor(kind,x,z))continue
-      const y=baseLevel(x,z)+.195
-      const height=kind===7?.68+.06*Math.sin(east*.13+south*.07):.44
-      box(x,y+height/2,z,span/10+.04,height,kind===7?.74:.95,-heading/100,hedge)
-      continue
-    }
-    if(kind!==1&&kind!==2)continue
+    if(kind!==1&&kind!==2&&kind!==5&&kind!==6&&kind!==7&&kind!==8)continue
     const x=east/10,z=south/10
     if(suppressDecor(kind,x,z))continue
-    const angle=-heading/100,y=baseLevel(x,z)+.195
-    box(x,y+.88,z,span/10,.085,.07,angle,stoneLight)
-    if(kind===2)box(x,y+.59,z,1.35,.42,.09,angle,awnings[2])
+    const angle=-heading/100,y=baseLevel(x,z)+.195,length=span/10
+    if(kind===5||kind===6||kind===7){
+      const height=kind===7?.68+.06*Math.sin(east*.13+south*.07):.44
+      box(x,y+height/2,z,length+.04,height,kind===7?.74:.95,angle,hedge)
+      if(kind===7)continue
+      const offset=kind===5?.58:-.58
+      const fx=x+offset*Math.sin(angle),fz=z+offset*Math.cos(angle)
+      for(const level of [.24,.60])box(fx,y+level,fz,length+.04,.055,.055,angle,iron)
+      for(const shift of [-.4,0,.4])box(fx+shift*length*Math.cos(angle),y+.31,fz-shift*length*Math.sin(angle),.055,.62,.055,angle,iron)
+    }else if(kind===8){
+      box(x-length*.5*Math.cos(angle),y+.62,z+length*.5*Math.sin(angle),.32,1.24,.32,angle,stoneMid)
+      for(const level of [.32,1.05])box(x,y+level,z,length,.06,.07,angle,iron)
+      for(const fraction of [-.32,-.12,.12,.32])box(x+fraction*length*Math.cos(angle),y+.69,z-fraction*length*Math.sin(angle),.04,.78,.04,angle,iron)
+    }else{
+      box(x,y+.88,z,length,.085,.07,angle,stoneLight)
+      if(kind===2)box(x,y+.59,z,1.35,.42,.09,angle,awnings[2])
+      box(x,y+.28,z,length,.065,.07,angle)
+      for(const along of [-.35,0,.35])box(x+along*length*Math.cos(angle),y+.58,z-along*length*Math.sin(angle),.05,.6,.05,angle)
+    }
   }
   const railLodCount=mats.length/16
   for(const [kind,east,south,heading,span] of decor){
@@ -355,30 +366,15 @@ export function streetGeometry([paths,lamps,banks,signals=[],stops=[],roadCtrl,s
         const px=x+along*Math.cos(angle),pz=z-along*Math.sin(angle)
         object.position.set(px,baseLevel(px,pz)+.195,pz);object.rotation.y=angle+.75;object.scale.setScalar(1);object.updateMatrix();parked.push(...object.matrix.elements)
       }
-    }else if(kind===5||kind===6){
-      const length=span/10,offset=kind===5?.58:-.58
-      const fx=x+offset*Math.sin(angle),fz=z+offset*Math.cos(angle)
-      for(const level of [.24,.60])box(fx,y+level,fz,length+.04,.055,.055,angle,iron)
-      for(const shift of [-.4,0,.4])box(fx+shift*length*Math.cos(angle),y+.31,fz-shift*length*Math.sin(angle),.055,.62,.055,angle,iron)
-    }else if(kind===8){
-      const length=span/10
-      box(x-length*.5*Math.cos(angle),y+.62,z+length*.5*Math.sin(angle),.32,1.24,.32,angle,stoneMid)
-      for(const level of [.32,1.05])box(x,y+level,z,length,.06,.07,angle,iron)
-      for(const fraction of [-.32,-.12,.12,.32])box(x+fraction*length*Math.cos(angle),y+.69,z-fraction*length*Math.sin(angle),.04,.78,.04,angle,iron)
     }else if(kind===10){
       box(x,baseLevel(x,z)+.075,z,span/10,.012,.1,angle,parkingYellow)
     }else if(kind===11){
       for(let band=0;band<5;band++)box(x,y+.09+band*.18,z,.21,.18,.21,angle,band%2?iron:parkingYellow)
     }else if(kind===9){
       box(x,y+.012,z,span/10+.01,.018,.12,angle,stoneLight)
-    }else if(kind===7){
-      continue
     }else if(kind===4){
       box(x,y+1.5,z,.12,3,.12,angle);box(x,y+2.7,z,.09,.65,1.35,angle,blue)
       box(x,y+2.72,z,.1,.045,.85,angle,stoneLight)
-    }else{
-      box(x,y+.28,z,span/10,.065,.07,angle)
-      for(const along of [-.35,0,.35])box(x+along*span/10*Math.cos(angle),y+.58,z-along*span/10*Math.sin(angle),.05,.6,.05,angle)
     }
   }
   for(const [east,south,base,heading,width,variant,arterial] of shops){
@@ -389,7 +385,7 @@ export function streetGeometry([paths,lamps,banks,signals=[],stops=[],roadCtrl,s
   }
   for(const [east,south,heading,arterial] of beds){
     const x=east/10,z=south/10,y=baseLevel(x,z)+.195,angle=-heading/100
-    if(!arterial){
+    if(!arterial&&!(origin&&isOuterOsmanthusBed(origin[0]+x,origin[1]+z,heading/100))){
       for(const side of [-1,1]){
         box(x+side*.45*Math.sin(angle),y+.1,z+side*.45*Math.cos(angle),1,.2,.1,angle,stoneMid)
         box(x+side*.45*Math.cos(angle),y+.1,z-side*.45*Math.sin(angle),.1,.2,.8,angle,stoneMid)
@@ -575,6 +571,7 @@ export function streetGeometry([paths,lamps,banks,signals=[],stops=[],roadCtrl,s
       box(mx,ym+.15,mz,Math.max(.1,span-.36),.07,.18,angle,stoneBase)
     }
   }
+  if(paving?.curbReturns)fitCurbReturns(paving.curbReturns,xyz,rgb,surfaceKinds,alongVals,road,sidewalk,k=>colors[k].toArray())
   const positions=new Float32Array(xyz)
   const surface=new THREE.BufferGeometry()
   surface.setAttribute('position',new THREE.BufferAttribute(positions,3))

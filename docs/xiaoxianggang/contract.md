@@ -73,7 +73,8 @@ veil 是半透明的雾层，所以转场期间它背后的每一帧都必须是
 
 | 字段 | 值 |
 | --- | --- |
-| `indoorDrawCallsMax` | 40 |
+| `indoorDrawCallsMax` | 80。静态场景 + 主线同款带骨骼路人（每人约 7 次，视锥外的人隐藏、不计入） |
+| `indoorSceneDrawCallsMax` | 40。静态场景（灰盒、店铺、楼梯井）自身的上限，余量全部给路人 |
 | `indoorTrianglesMax` | 150000 |
 | `indoorTextureBytesMax` | 8 MiB（和 Hy2 的 look 验收一致） |
 | `swapMsMax` | 300（等于 `swapBudgetMs`） |
@@ -157,6 +158,6 @@ Hy1 产出数据，Carbon 读取，Hy2 按 `lookKey` 贴素材。所有坐标都
 Stage 1 收口时，由组长根据真实的 git diff、`tsc -p web --noEmit`、runtime 和 layout 单测，以及 DEV 实景录屏做终审。重点核对：
 - 4 个入口任选 2 个，真实走进去再走出来。
 - `lastSwapMs` ≤ 300，`lastBlackFrames` = 0。
-- 室内 draw calls ≤ 40。
+- 室内 draw calls ≤ 80，其中静态场景 ≤ 40。
 - 落点和表 2 的偏差 ≤ 0.05m，视角恢复正确。
 - 控制台 error 为 0。

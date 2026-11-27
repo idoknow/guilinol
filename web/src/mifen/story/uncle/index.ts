@@ -1,6 +1,7 @@
 import * as THREE from 'three'
 import {mainDetail} from '../../../look/mirror-layer'
 import {shareAtmosphere} from '../../../look/atmosphere'
+import {instantiateFigure, loadFigureTemplate, setJoint, type FigureInstance, type FigureLook, type FigureTemplate} from '../../figure-people'
 import {
   getUnclePortraitUrl,
   PLAYER_PORTRAIT,
@@ -26,6 +27,23 @@ export {
 export const UNCLE_SPOT: readonly [number, number, number] = [-0.18, 0, 7.62]
 
 export type UncleMarkerMode = 'new' | 'none'
+
+/** 表叔外观：与玩家/路人同一套创建角色参数——中年方下颌、剑眉、花白寸头、藏青牛仔外套 */
+const UNCLE_LOOK: FigureLook = {
+  v: 1,
+  body: 'm',
+  skin: 3,
+  face: 2,
+  brows: 3,
+  eyes: 2,
+  hair: 'm_buzz',
+  hairColor: 3,
+  look: 'denim',
+  createdAt: 1,
+  height: 1.0,
+  girth: 1.08,
+  hairTint: '#4b4a4c',
+}
 
 export interface UncleNpcOptions {
   /** 可选场景容器；传入时自动挂载 group，dispose 时自动移除 */
@@ -677,6 +695,121 @@ export function createUncleNpc(opts: UncleNpcOptions = {}): UncleNpcController {
   if (opts.scene) opts.scene.add(group)
   mainDetail(group)
 
+  // ─── 现版本身体：figure.glb 同款角色 + 围裙/搭肩毛巾/右腕绷带/左腕手表；模型到位前先用上面的方块身体 ───
+  const fabricGeo = (g: THREE.BufferGeometry, rect: AtlasUvRect, colorHex = 0xffffff) => {
+    const uv = g.getAttribute('uv')
+    const [u0, v0, u1, v1] = rect
+    const col = new THREE.Color(colorHex)
+    const cols = new Float32Array(uv.count * 3)
+    for (let i = 0; i < uv.count; i++) {
+      uv.setXY(i, u0 + THREE.MathUtils.clamp(uv.getX(i), 0, 1) * (u1 - u0), v0 + THREE.MathUtils.clamp(uv.getY(i), 0, 1) * (v1 - v0))
+      cols.set([col.r, col.g, col.b], i * 3)
+    }
+    g.setAttribute('color', new THREE.BufferAttribute(cols, 3))
+    return ownGeo(g)
+  }
+  let figure: (FigureInstance & {headBone?: THREE.Object3D}) | undefined
+  const mountFigure = (t: FigureTemplate) => {
+    const inst = instantiateFigure(t)
+    inst.mixer.stopAllAction()
+    inst.rig.clearPose()
+    const holder = inst.holder
+    holder.updateMatrixWorld(true)
+    const bone = (name: string) => holder.getObjectByName(name)
+    const at = (name: string) => bone(name)?.getWorldPosition(new THREE.Vector3()) ?? new THREE.Vector3()
+    // 采蒙皮顶点找身前/身后表面（组空间：面朝 +z，解剖左侧 +x）
+    const surface: THREE.Vector3[] = []
+    const v = new THREE.Vector3()
+    holder.traverse(node => {
+      if (!(node instanceof THREE.SkinnedMesh)) return
+      const count = node.geometry.getAttribute('position').count
+      for (let i = 0; i < count; i += 2) surface.push(node.getVertexPosition(i, v).applyMatrix4(node.matrixWorld).clone())
+    })
+    const depthAt = (y: number, halfX = 0.1) => {
+      let front = -Infinity
+      let back = Infinity
+      for (const p of surface) {
+        if (Math.abs(p.y - y) > 0.035 || Math.abs(p.x) > halfX) continue
+        front = Math.max(front, p.z)
+        back = Math.min(back, p.z)
+      }
+      return Number.isFinite(front) ? {front, back} : {front: 0.13, back: -0.13}
+    }
+    const chest = at('spine_03')
+    const pelvis = at('pelvis')
+    const neckP = at('neck_01')
+    const shoulderL = at('upperarm_l')
+    const knee = at('calf_l')
+    const hipHalf = Math.abs(at('thigh_l').x - at('thigh_r').x) / 2 + 0.1
+
+    const attach = (boneName: string, mesh: THREE.Mesh) => {
+      ;(bone(boneName) ?? holder).attach(mesh)
+    }
+    // 围裙护胸
+    const bibTop = chest.y + 0.1
+    const waistY = pelvis.y + 0.1
+    const bibMid = (bibTop + waistY) / 2
+    const bib = new THREE.Mesh(fabricGeo(new THREE.BoxGeometry(0.24, bibTop - waistY, 0.01), UV_APRON), bodyMasterMat)
+    bib.name = 'tianyuan.uncle-apron-bib'
+    bib.position.set(0, bibMid, depthAt(bibMid).front + 0.008)
+    attach('spine_03', bib)
+    // 围裙下摆：一片平布贴胯前垂到膝上，下沿略外飘不穿腿
+    const hemY = knee.y + 0.08
+    const skirtFront = depthAt(pelvis.y, 0.12).front + 0.012
+    const skirt = new THREE.Mesh(fabricGeo(new THREE.BoxGeometry(hipHalf * 1.8, waistY - hemY, 0.01), UV_APRON), bodyMasterMat)
+    skirt.name = 'tianyuan.uncle-apron-skirt'
+    skirt.rotation.x = -0.06
+    skirt.position.set(0, (waistY + hemY) / 2, skirtFront + 0.01)
+    attach('pelvis', skirt)
+    // 搭肩毛巾（解剖左肩，前搭胸、后垂背）
+    const towelX = THREE.MathUtils.lerp(neckP.x, shoulderL.x, 0.6)
+    const towelTopY = shoulderL.y + 0.075
+    const chestDepth = depthAt(chest.y + 0.06, 0.2)
+    const towelTop = new THREE.Mesh(fabricGeo(new THREE.BoxGeometry(0.12, 0.03, chestDepth.front - chestDepth.back + 0.03), UV_TOWEL), bodyMasterMat)
+    towelTop.position.set(towelX, towelTopY, (chestDepth.front + chestDepth.back) / 2)
+    const towelFront = new THREE.Mesh(fabricGeo(new THREE.BoxGeometry(0.12, 0.28, 0.022), UV_TOWEL), bodyMasterMat)
+    towelFront.position.set(towelX, towelTopY - 0.14, chestDepth.front + 0.014)
+    const towelBack = new THREE.Mesh(fabricGeo(new THREE.BoxGeometry(0.12, 0.22, 0.022), UV_TOWEL), bodyMasterMat)
+    towelBack.position.set(towelX, towelTopY - 0.11, chestDepth.back - 0.014)
+    for (const m of [towelTop, towelFront, towelBack]) {
+      m.name = 'tianyuan.uncle-towel'
+      attach('spine_03', m)
+    }
+    // 右腕绷带、左腕手表：沿小臂方向套在腕根
+    const wrist = (side: 'l' | 'r', t: number) => {
+      const elbow = at('lowerarm_' + side)
+      const hand = at('hand_' + side)
+      const dir = hand.clone().sub(elbow)
+      return {center: elbow.add(dir.clone().multiplyScalar(t)), q: new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir.normalize())}
+    }
+    const wr = wrist('r', 0.74)
+    const bandage = new THREE.Mesh(fabricGeo(new THREE.CylinderGeometry(0.047, 0.043, 0.13, 10), UV_BANDAGE), bodyMasterMat)
+    bandage.name = 'tianyuan.uncle-bandage'
+    bandage.position.copy(wr.center)
+    bandage.quaternion.copy(wr.q)
+    attach('lowerarm_r', bandage)
+    const wl = wrist('l', 0.86)
+    const strap = new THREE.Mesh(fabricGeo(new THREE.CylinderGeometry(0.042, 0.042, 0.03, 10), UV_WHITE, 0x4a2f1d), bodyMasterMat)
+    strap.name = 'tianyuan.uncle-watch'
+    strap.position.copy(wl.center)
+    strap.quaternion.copy(wl.q)
+    const dial = new THREE.Mesh(fabricGeo(new THREE.CylinderGeometry(0.022, 0.022, 0.012, 12), UV_WATCH), bodyMasterMat)
+    dial.position.copy(wl.center).add(new THREE.Vector3(0.042, 0, 0))
+    dial.rotation.z = Math.PI / 2
+    attach('lowerarm_l', strap)
+    attach('lowerarm_l', dial)
+
+    figure = Object.assign(inst, {headBone: bone('head')})
+    uncleSkinned.visible = false
+    group.add(holder)
+    mainDetail(holder)
+  }
+  loadFigureTemplate(UNCLE_LOOK)
+    .then(t => {
+      if (!disposed) mountFigure(t)
+    })
+    .catch(error => console.warn('uncle figure unavailable', error))
+
   // 运行时状态
   let markerMode: UncleMarkerMode = 'new'
   let talking = false
@@ -769,6 +902,7 @@ export function createUncleNpc(opts: UncleNpcOptions = {}): UncleNpcController {
 
     headWorld(out = new THREE.Vector3()) {
       group.updateMatrixWorld(true)
+      if (figure?.headBone) return figure.headBone.getWorldPosition(out).add(new THREE.Vector3(0, 0.09, 0))
       return headPivot.getWorldPosition(out)
     },
 
@@ -839,6 +973,20 @@ export function createUncleNpc(opts: UncleNpcOptions = {}): UncleNpcController {
 
       const talkNod = Math.sin(t * 4.6) * 0.045 * talkBlend
       headPivot.rotation.set(curHeadPitch + talkNod + breath * 0.015, curHeadYaw, 0)
+      if (figure) {
+        // 方块身体与角色同为面朝 +z、解剖左在 +x：同名关节直接换算，不左右互换
+        const j = figure.rig.joints
+        figure.rig.batch?.(true)
+        setJoint(j.Torso, torsoPivot.rotation.x, 0, 0)
+        setJoint(j.Head, headPivot.rotation.x, headPivot.rotation.y, 0)
+        setJoint(j.ArmL, leftArmRig.shoulder.rotation.x, leftArmRig.shoulder.rotation.y, leftArmRig.shoulder.rotation.z)
+        setJoint(j.ForearmL, leftArmRig.elbow.rotation.x, 0, 0)
+        // 缠绷带的右手护在腹前：角色关节直接给（ArmR y+ 把小臂收向身体中线，Forearm x+ 屈肘）
+        j.ArmR?.rotation.set(0.3 + 0.12 * talkBlend + Math.sin(t * 2.1) * 0.025, 0.6 + 0.08 * talkBlend, -0.06)
+        j.ForearmR?.rotation.set(1.2 + 0.15 * talkBlend - gestureWave * 0.05 * talkBlend, 0, 0)
+        figure.rig.batch?.(false)
+        figure.holder.position.y = bodyPivot.position.y
+      }
 
       const mouthTalkAmp = talkBlend > 0.05 ? Math.max(0, Math.sin(t * 11.5)) * talkBlend : 0
       applyExpressionPose(curExpr, mouthTalkAmp)
@@ -864,6 +1012,7 @@ export function createUncleNpc(opts: UncleNpcOptions = {}): UncleNpcController {
     dispose() {
       if (disposed) return
       disposed = true
+      figure?.dispose()
       skeleton.dispose()
       group.removeFromParent()
       for (const g of geos) g.dispose()

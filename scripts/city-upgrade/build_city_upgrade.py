@@ -300,10 +300,16 @@ def shard_in_sector(gx: int, gz: int, sector: str) -> bool:
         return True
     if sector == "west":
         return gx <= -6
+    if sector == "north":
+        return gx >= -5 and gz <= -6
+    if sector == "east":
+        return gx >= 3 and gz >= -5
     if sector == "ne":
         return gx >= 3 or (gx >= -5 and gz <= -6)
     if sector == "south":
         return -5 <= gx <= 2 and gz >= 7
+    if sector == "es":
+        return (gx >= 3 and gz >= -5) or (-5 <= gx <= 2 and gz >= 7)
     if sector == "edge":
         return -5 <= gx <= 2 and -5 <= gz <= 6
     raise ValueError(f"Unknown sector: {sector}")
@@ -536,6 +542,22 @@ def build_landmark_guard(
 
         # 4. Exact 2D structural GLB mesh footprint (prevents ANY overhang/collision with hand-crafted GLBs!)
         lm_mf = mf_lms.get(lid)
+        if not lm_mf and entry.get("model") and entry.get("anchor"):
+            anch = entry["anchor"]
+            ax = az = None
+            if isinstance(anch, list) and len(anch) == 2:
+                ax, az = ll2xz(float(anch[1]), float(anch[0]))
+            elif isinstance(anch, str) and anch in osm_by_key:
+                ap = osm_element_area(osm_by_key[anch])
+                if not ap.is_empty:
+                    ax, az = ap.centroid.x, ap.centroid.y
+            if ax is not None and az is not None:
+                lm_mf = {
+                    "file": entry["model"],
+                    "position": [ax, 0.0, az],
+                    "rotation": float(entry.get("rotation", 0.0)),
+                    "sphere": [0.0, 0.0, 0.0, 120.0],
+                }
         if lm_mf and lid not in natural_peak_ids:
             fp = _load_glb_fp(lid, lm_mf)
             if not fp.is_empty:
@@ -730,6 +752,15 @@ def load_osm_full(osm_path: Path, x0: float, x1: float, z0: float, z1: float):
                     if am in ("school", "hospital"):
                         compounds.append((tags.get("name", am), am, poly))
 
+            if (
+                tags.get("railway") in ("station", "platform")
+                or tags.get("building") == "train_station"
+                or tags.get("public_transport") == "station"
+            ) and len(pts) >= 4 and pts[0] == pts[-1]:
+                rpoly = make_valid(Polygon(pts))
+                if not rpoly.is_empty and rpoly.area > 120:
+                    quiet_zones.append(rpoly)
+
             lu = tags.get("landuse")
             if lu == "residential" and len(pts) >= 4:
                 poly = make_valid(Polygon(pts))
@@ -760,6 +791,14 @@ def load_osm_full(osm_path: Path, x0: float, x1: float, z0: float, z1: float):
                     quiet_zones.append(poly)
                     if tags.get("amenity") in ("school", "hospital"):
                         compounds.append((tags.get("name", tags["amenity"]), tags["amenity"], poly))
+            elif (
+                tags.get("railway") in ("station", "platform")
+                or tags.get("building") == "train_station"
+                or tags.get("public_transport") == "station"
+            ):
+                poly = osm_element_area(el)
+                if not poly.is_empty and poly.area > 120 and poly.intersects(query_box):
+                    quiet_zones.append(poly)
 
     return {
         "osm_by_key": osm_by_key,
@@ -1112,7 +1151,7 @@ def main():
     t0 = time.time()
     ap = argparse.ArgumentParser(description="Build full-city Guilin v1+ 512m spatial upgrade shards.")
     ap.add_argument("--ring", choices=("r1", "r2", "r3", "r4", "all"), default="all", help="Target ring(s) to generate")
-    ap.add_argument("--sector", choices=("west", "ne", "south", "edge", "all"), default="all", help="Target spatial sector")
+    ap.add_argument("--sector", choices=("west", "north", "east", "ne", "south", "es", "edge", "all"), default="all", help="Target spatial sector")
     ap.add_argument("--world-dir", type=Path, default=None)
     ap.add_argument("--cmab", type=Path, default=None)
     ap.add_argument("--osm", type=Path, default=None)
@@ -1120,7 +1159,7 @@ def main():
     ap.add_argument("--overture", type=Path, default=None)
     ap.add_argument("--landmarks-glb-dir", type=Path, default=None)
     ap.add_argument("--out-dir", type=Path, default=REPO_ROOT / "public/city-upgrade")
-    ap.add_argument("--fascia-grid", choices=("8x8", "8x12"), default="8x12")
+    ap.add_argument("--fascia-grid", choices=("8x8", "8x12", "6x16"), default="6x16")
     ap.add_argument("--merge-existing", action="store_true", help="Preserve existing shards outside selected --ring/--sector")
     ap.add_argument("--no-index", action="store_true", help="Write shard JSONs only; do not touch index.json")
     ap.add_argument("--allow-dev-world", action="store_true", help="Allow running against 325-chunk dev_bbox world")
@@ -1738,25 +1777,76 @@ def main():
                 tdx, tdz = p_b.x - p_a.x, p_b.y - p_a.y
                 tlen = math.hypot(tdx, tdz) or 1.0
                 tx_u, tz_u = tdx / tlen, tdz / tlen
-                # Setback dynamically past carriageway curb based on road class, try both corners if needed
+                # Setback dynamically past actual GL04 carriageway/cycleway/fence onto sidewalk or clear verge
+                chunk_file_map = {f"{c['x']},{c['z']}": c["file"] for c, _ in selected_chunks}
                 base_lat = 10.2 if hw1 in ("trunk", "primary") else (8.4 if hw1 == "secondary" else (6.8 if hw1 == "tertiary" else 5.4))
                 chosen = None
-                for side in (1.0, -1.0):
-                    for extra in (0.0, 2.2):
-                        lat_d = base_lat + extra
-                        along_d = 9.0 if hw2 in ("trunk", "primary", "secondary") else 6.5
-                        sx = ix + (-tz_u) * (lat_d * side) + tx_u * along_d
-                        sz = iz + tx_u * (lat_d * side) + tz_u * along_d
-                        spt = Point(sx, sz)
-                        if not active_chunks_poly.contains(spt):
-                            continue
-                        if hits_landmark(spt, margin=2.5) or hits_water(spt, margin=3.0) or hits_carriageway(spt) or hits_aeroway(spt, margin=60.0) or in_any_poly(spt, quiet_tree, osm_data["quiet_zones"]):
-                            continue
-                        # Ensure sign doesn't clip inside a building
-                        if cmab_tree.query(spt, predicate="intersects").size > 0:
-                            continue
-                        chosen = (sx, sz)
-                        break
+                for pass_require_sidewalk in (True, False):
+                    for along_d in (
+                        (9.0, 14.0, -9.0, 19.0, -14.0)
+                        if hw2 in ("trunk", "primary", "secondary")
+                        else (6.5, 11.0, -6.5, 16.0, -11.0)
+                    ):
+                        for extra in (0.0, 1.8, 3.6, 5.6, 8.0, 10.5, 13.5, -1.6):
+                            lat_d = max(4.2, base_lat + extra)
+                            for side in (1.0, -1.0):
+                                sx = ix + (-tz_u) * (lat_d * side) + tx_u * along_d
+                                sz = iz + tx_u * (lat_d * side) + tz_u * along_d
+                                spt = Point(sx, sz)
+                                if not active_chunks_poly.contains(spt):
+                                    continue
+                                if hits_landmark(spt, margin=2.5) or hits_water(spt, margin=3.0) or hits_carriageway(spt) or hits_aeroway(spt, margin=60.0) or in_any_poly(spt, quiet_tree, osm_data["quiet_zones"]):
+                                    continue
+                                if cmab_tree.query(spt.buffer(0.6), predicate="intersects").size > 0:
+                                    continue
+                                # Check GL04 rendered street polygons & fences
+                                stx, stz = int(math.floor(sx / 256.0)) * 256, int(math.floor(sz / 256.0)) * 256
+                                sfname = chunk_file_map.get(f"{stx},{stz}")
+                                if not sfname:
+                                    continue
+                                sraw = gzip.decompress((world_dir / sfname).read_bytes())
+                                sv, scnt, scol_len, _, _ = struct.unpack("<5I", sraw[4:24])
+                                soff = 24 + 16900 + sv * 9 + scnt * 4
+                                sstreets = json.loads(sraw[soff : soff + scol_len].decode("utf-8"))[1]
+                                slx, slz = sx - stx, sz - stz
+                                spt_cm = Point(slx * 100.0, slz * 100.0)
+                                on_sw = False
+                                on_drv = False
+                                for srec in sstreets[0]:
+                                    skind = srec[0]
+                                    if skind in (0, 1, 2, 4, 5, 6) and len(srec) >= 2 and len(srec[1]) >= 3:
+                                        spoly = Polygon(srec[1], srec[2:] if len(srec) > 2 else None)
+                                        if not is_valid(spoly):
+                                            spoly = spoly.buffer(0)
+                                        if skind == 1 and spoly.contains(spt_cm) and spoly.boundary.distance(spt_cm) >= 35.0:
+                                            on_sw = True
+                                        elif skind in (4, 6) and spoly.contains(spt_cm):
+                                            on_sw = True
+                                        elif skind in (0, 2, 5) and spoly.buffer(35.0).contains(spt_cm):
+                                            on_drv = True
+                                if on_drv and not on_sw:
+                                    continue
+                                if pass_require_sidewalk and not on_sw:
+                                    continue
+                                sdecor = sstreets[9] if len(sstreets) > 9 and sstreets[9] else []
+                                hit_fence = False
+                                spt_m = Point(slx, slz)
+                                for drec in sdecor:
+                                    if drec[0] in (0, 1, 2, 5, 6, 7, 8) and len(drec) >= 5:
+                                        rx, rz, ang, rlen = drec[1] / 10.0, drec[2] / 10.0, -drec[3] / 100.0, drec[4] / 10.0
+                                        ax, az = rx - 0.5 * rlen * math.cos(ang), rz + 0.5 * rlen * math.sin(ang)
+                                        bx, bz = rx + 0.5 * rlen * math.cos(ang), rz - 0.5 * rlen * math.sin(ang)
+                                        if LineString([(ax, az), (bx, bz)]).distance(spt_m) < 0.38:
+                                            hit_fence = True
+                                            break
+                                if hit_fence:
+                                    continue
+                                chosen = (sx, sz)
+                                break
+                            if chosen:
+                                break
+                        if chosen:
+                            break
                     if chosen:
                         break
                 if not chosen:

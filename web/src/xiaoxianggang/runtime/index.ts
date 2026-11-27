@@ -12,7 +12,6 @@ export {
   clampIndoorPitch,
   corridorToAabb,
   detectActiveShop,
-  findTriggeredExit,
   rectToAabb,
   resolveIndoorMovement,
   type Aabb2D,
@@ -30,6 +29,15 @@ export {
   createXxgRuntimeStateMachine,
   type XxgRuntimeStateMachine,
 } from './state-machine.ts'
+
+export {
+  XXG_WELL_DOOR,
+  distanceToNearestLanding,
+  doorLeafRects,
+  locateInWell,
+  xxgIndoorWells,
+  type XxgIndoorWell,
+} from './stairwell.ts'
 
 export { createXxgIndoorScene } from './controller.ts'
 export { XXG_PORTALS } from '../contract.ts'

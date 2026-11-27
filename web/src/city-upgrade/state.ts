@@ -61,8 +61,12 @@ function readUrlOverride(): boolean | null {
   return null
 }
 
+export type CityUpgradeQuality = 'low' | 'mid' | 'high'
+
 const urlOverride = readUrlOverride()
 let enabled = urlOverride !== null ? urlOverride : true
+let currentQuality: CityUpgradeQuality = 'mid'
+let maxTextureAnisotropy = 8
 let indexData: CityUpgradeIndex | null = null
 let indexPromise: Promise<CityUpgradeIndex | null> | null = null
 let texPromise: Promise<boolean> | null = null
@@ -70,12 +74,16 @@ let texPromise: Promise<boolean> | null = null
 const indexShardKeys = new Set<string>()
 const loadedShards = new Map<string, CityUpgradeShard>()
 const shardPromises = new Map<string, Promise<CityUpgradeShard | null>>()
-const shardFailed = new Set<string>()
+const shardRetryAfter = new Map<string, number>()
 const overridesByTile = new Map<string, Map<number, BuildingOverride>>()
-const shardToTiles = new Map<string, Set<string>>()
+const shardOverrideTiles = new Map<string, Set<string>>()
+const shardUpgradedTiles = new Map<string, Set<string>>()
+const upgradedTileRefs = new Map<string, number>()
 const upgradedTiles = new Set<string>()
 
 const toggleListeners = new Set<(on: boolean) => void>()
+const qualityListeners = new Set<(q: CityUpgradeQuality) => void>()
+const anisoListeners = new Set<(aniso: number) => void>()
 const shardListeners = new Set<(key: string, shard: CityUpgradeShard | null) => void>()
 
 function createDummyArrayTexture(): THREE.DataArrayTexture {
@@ -101,6 +109,14 @@ export function isCityUpgradeEnabled(): boolean {
   return enabled
 }
 
+export function getCityUpgradeQuality(): CityUpgradeQuality {
+  return currentQuality
+}
+
+export function getCityUpgradeAnisotropy(): number {
+  return maxTextureAnisotropy
+}
+
 export function setCityUpgradeEnabled(next: boolean): boolean {
   if (enabled === next) return false
   enabled = next
@@ -109,14 +125,32 @@ export function setCityUpgradeEnabled(next: boolean): boolean {
   return true
 }
 
-export function syncCityUpgradeQuality(quality: 'low' | 'mid' | 'high'): boolean {
-  const target = urlOverride !== null ? urlOverride : quality !== 'low'
+export function syncCityUpgradeQuality(quality: CityUpgradeQuality): boolean {
+  const qualityChanged = currentQuality !== quality
+  currentQuality = quality
+  if (qualityChanged) {
+    for (const fn of qualityListeners) fn(quality)
+  }
+  // Keep city-upgrade enabled on 'low' (mobile default & auto-downgrade) so players
+  // always keep crisp vector-icon signage instead of falling back to blank plastic boxes.
+  // Quality tier controls prop draw distances & AC culling in props.ts.
+  const target = urlOverride !== null ? urlOverride : true
   return setCityUpgradeEnabled(target)
 }
 
 export function onCityUpgradeToggle(fn: (on: boolean) => void): () => void {
   toggleListeners.add(fn)
   return () => toggleListeners.delete(fn)
+}
+
+export function onCityUpgradeQuality(fn: (q: CityUpgradeQuality) => void): () => void {
+  qualityListeners.add(fn)
+  return () => qualityListeners.delete(fn)
+}
+
+export function onCityUpgradeAnisotropy(fn: (aniso: number) => void): () => void {
+  anisoListeners.add(fn)
+  return () => anisoListeners.delete(fn)
 }
 
 export function onCityUpgradeShard(fn: (key: string, shard: CityUpgradeShard | null) => void): () => void {
@@ -163,21 +197,23 @@ export function getBuildingOverride(tileX: number, tileZ: number, partIndex: num
 }
 
 export function isCoordInUpgradedTile(wx: number, wz: number): boolean {
-  if (!enabled || !upgradedTiles.size) return false
+  if (!enabled) return false
   const tx = Math.floor(wx / 256) * 256
   const tz = Math.floor(wz / 256) * 256
-  return upgradedTiles.has(`${tx},${tz}`)
+  return upgradedTiles.has(`${tx},${tz}`) || hasShardForTile(tx, tz)
 }
 
 export function getCityUpgradeStats() {
   return {
     enabled,
+    quality: currentQuality,
+    anisotropy: maxTextureAnisotropy,
     indexReady: indexData !== null,
     texturesReady: cityUpgradeUniforms.uFacadeReady.value,
     indexedShards: indexShardKeys.size,
     loadedShards: loadedShards.size,
     upgradedTiles: upgradedTiles.size,
-    fasciaGrid: indexData?.fasciaGrid ?? [8, 6],
+    fasciaGrid: indexData?.fasciaGrid ?? [6, 16],
   }
 }
 
@@ -190,7 +226,9 @@ function shardFilename(key: string): string {
 }
 
 function indexShardOverrides(key: string, shard: CityUpgradeShard): void {
-  const tiles = new Set<string>()
+  removeShardOverrides(key)
+  const ovTiles = new Set<string>()
+  const upTiles = new Set<string>()
   const ovs = shard.overrides
   if (ovs) {
     for (const [fullKey, ov] of Object.entries(ovs)) {
@@ -205,21 +243,45 @@ function indexShardOverrides(key: string, shard: CityUpgradeShard): void {
         overridesByTile.set(tileKey, map)
       }
       map.set(partIdx, ov)
-      tiles.add(tileKey)
-      upgradedTiles.add(tileKey)
+      ovTiles.add(tileKey)
+      upTiles.add(tileKey)
     }
   }
-  shardToTiles.set(key, tiles)
+  const fascias = shard.fascias
+  if (fascias) {
+    for (const f of fascias) {
+      const tileKey = `${Math.floor(f[0] / 256) * 256},${Math.floor(f[2] / 256) * 256}`
+      upTiles.add(tileKey)
+    }
+  }
+  for (const tileKey of upTiles) {
+    upgradedTileRefs.set(tileKey, (upgradedTileRefs.get(tileKey) ?? 0) + 1)
+    upgradedTiles.add(tileKey)
+  }
+  shardOverrideTiles.set(key, ovTiles)
+  shardUpgradedTiles.set(key, upTiles)
 }
 
 function removeShardOverrides(key: string): void {
-  const tiles = shardToTiles.get(key)
-  if (tiles) {
-    for (const tileKey of tiles) {
+  const ovTiles = shardOverrideTiles.get(key)
+  if (ovTiles) {
+    for (const tileKey of ovTiles) {
       overridesByTile.delete(tileKey)
-      upgradedTiles.delete(tileKey)
     }
-    shardToTiles.delete(key)
+    shardOverrideTiles.delete(key)
+  }
+  const upTiles = shardUpgradedTiles.get(key)
+  if (upTiles) {
+    for (const tileKey of upTiles) {
+      const next = (upgradedTileRefs.get(tileKey) ?? 1) - 1
+      if (next <= 0) {
+        upgradedTileRefs.delete(tileKey)
+        upgradedTiles.delete(tileKey)
+      } else {
+        upgradedTileRefs.set(tileKey, next)
+      }
+    }
+    shardUpgradedTiles.delete(key)
   }
 }
 
@@ -250,20 +312,22 @@ export async function ensureShardByKey(key: string): Promise<CityUpgradeShard | 
   if (!indexShardKeys.has(key)) return null
   const existing = loadedShards.get(key)
   if (existing) return existing
-  if (shardFailed.has(key)) return null
+  const retryAt = shardRetryAfter.get(key)
+  if (retryAt !== undefined && performance.now() < retryAt) return null
   let pending = shardPromises.get(key)
   if (!pending) {
     pending = fetch(`${BASE_URL}/shards/${shardFilename(key)}`)
       .then(async res => {
         if (!res.ok) throw Error(`HTTP ${res.status}`)
         const shard = (await res.json()) as CityUpgradeShard
+        shardRetryAfter.delete(key)
         loadedShards.set(key, shard)
         indexShardOverrides(key, shard)
         for (const fn of shardListeners) fn(key, shard)
         return shard
       })
       .catch(err => {
-        shardFailed.add(key)
+        shardRetryAfter.set(key, performance.now() + 5000)
         console.warn(`City upgrade shard ${key} unavailable`, err)
         return null
       })
@@ -349,9 +413,13 @@ async function loadStripAsArrayTexture(
 }
 
 export function loadCityUpgradeTextures(renderer: THREE.WebGLRenderer): Promise<boolean> {
+  const aniso = Math.min(8, Math.max(1, renderer.capabilities.getMaxAnisotropy()))
+  if (maxTextureAnisotropy !== aniso) {
+    maxTextureAnisotropy = aniso
+    for (const fn of anisoListeners) fn(aniso)
+  }
   if (!enabled) return Promise.resolve(false)
   if (texPromise) return texPromise
-  const aniso = Math.min(8, renderer.capabilities.getMaxAnisotropy())
   texPromise = (async () => {
     const albedo = await loadStripAsArrayTexture(`${BASE_URL}/facade-albedo.webp`, aniso)
     if (!albedo || !enabled) { albedo?.dispose(); texPromise = null; return false }

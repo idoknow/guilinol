@@ -182,7 +182,7 @@ function underDeck(points: Vertex[], deck: Vertex[], depth: number) {
 }
 
 type RoadOverpass = {way:number; halfWidthM:number; lower:number[]; minimumM:number}
-export function visibleSurfaces(world: string, ids: Set<number>, closure: Set<number>, reference?: Tunnel[], coveredRoads = false, overpasses: RoadOverpass[] = []) {
+export function visibleSurfaces(world: string, ids: Set<number>, closure: Set<number>, reference?: Tunnel[], coveredRoads = false, overpasses: RoadOverpass[] = [], surveyMargin = 2) {
   const manifest = JSON.parse(fs.readFileSync(path.join(world, 'manifest.json'), 'utf8'))
   const strips = (reference ?? (manifest.tunnels as Tunnel[]))
     .filter((t) => ids.has(t.way))
@@ -190,7 +190,7 @@ export function visibleSurfaces(world: string, ids: Set<number>, closure: Set<nu
       const [[x, , z], [bx, , bz]] = t.portals,
         dx = (bx - x) / t.length,
         dz = (bz - z) / t.length,
-        w = t.halfWidth + 2
+        w = t.halfWidth + surveyMargin
       return {
         t,
         x,

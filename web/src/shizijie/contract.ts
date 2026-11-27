@@ -15,6 +15,7 @@
  * 路线 A 不挖地：地面只放入口罩（Hy2 look），楼梯和地下街全部在独立室内场景里。
  */
 import type * as THREE from 'three'
+import { SZJ_WELLS } from './frame.ts'
 
 export const SZJ_CONTRACT_VERSION = 1 as const
 
@@ -147,7 +148,7 @@ export interface SzjStairwell {
   readonly bottomIndoor: SzjXZ
   /** 底部落脚点，室内坐标，y = 0。脚本下楼的终点。 */
   readonly footIndoor: SzjXZ
-  /** 地面入口高度（m）。 */
+  /** 地面入口高度（m）：该井口实测步行地面高（frame.ts SZJ_WELLS.grade）。 */
   readonly groundY: number
 }
 
@@ -183,7 +184,7 @@ function makeStairwell(src: SzjStairwellSource): SzjStairwell {
     topIndoor: stairOffset(src.local, yaw, 0, -hl + landingTop / 2),
     bottomIndoor: stairOffset(src.local, yaw, 0, hl),
     footIndoor: stairOffset(src.local, yaw, 0, hl + S.footRun),
-    groundY: SZJ_FRAME.surfaceY,
+    groundY: SZJ_WELLS.find(w => w.id === src.id)?.grade ?? SZJ_FRAME.surfaceY,
   }
 }
 
@@ -293,11 +294,10 @@ export function stairEntryPose(st: SzjStairwell): { x: number; y: number; z: num
 // ---------------------------------------------------------------------------
 
 /**
- * 进入：越线 → 锁输入 → openVeil → 等 veilFadeInMs → suspendWorld → 室内相机放到 stairEntryPose
- *       （强制第一人称，俯角 entryPitchDeg）→ 首帧 → veil.done() 同时开始脚本下楼
- *       （水平匀速 descentSpeed，从 topIndoor 走到 footIndoor，视线高度走 locomotion/stairs）→ 交还控制。
- * 离开：玩家自己走上楼梯（locomotion/stairs 平滑）→ shouldExitStair → openVeil → 等 veilFadeInMs
- *       → resumeWorldAt(stairLanding) → veil.done()，宿主恢复进来前的视角。
+ * 进入：街上行人自己走下真楼梯，在底部平台越过 frame.ts SZJ_LANDING.enter 线 → 同帧 suspendWorld，
+ *       室内相机接手原姿态（位置、yaw、pitch、眼高、FOV），底部卷帘门随人靠近卷起。
+ * 离开：玩家往回穿过卷帘门、退到 SZJ_LANDING.exit 线 → 同帧 resumeWorldAt(原姿态 + footY)，接着走真楼梯上去。
+ * 没有遮罩、没有脚本下楼；veil / descent 字段只留给 scripts/verify-shizijie.mjs 的离线几何校验。
  */
 export const SZJ_TIMING = {
   prefetchRadiusM: 60,
@@ -343,14 +343,13 @@ export const SZJ_BUDGET = {
 // 5. 室内场景接口
 // ---------------------------------------------------------------------------
 
-export type SzjState = 'unmounted' | 'idle' | 'entering' | 'descending' | 'inside' | 'exiting' | 'disposed'
+export type SzjState = 'unmounted' | 'idle' | 'entering' | 'inside' | 'exiting' | 'disposed'
 
 /** 允许的状态迁移；表外迁移必须忽略并返回 false，不抛错。 */
 export const SZJ_TRANSITIONS: Readonly<Record<SzjState, readonly SzjState[]>> = {
   unmounted: ['idle', 'disposed'],
   idle: ['entering', 'disposed'],
-  entering: ['descending', 'idle', 'disposed'],
-  descending: ['inside', 'disposed'],
+  entering: ['inside', 'idle', 'disposed'],
   inside: ['exiting', 'disposed'],
   exiting: ['idle', 'inside', 'disposed'],
   disposed: [],
@@ -360,15 +359,19 @@ export function canTransition(from: SzjState, to: SzjState): boolean {
   return SZJ_TRANSITIONS[from].includes(to)
 }
 
-/** 宿主能力，全部由整合步在 main.ts 落地（SHARE+）。与小香港同构，bodyFlag 不同。 */
+/** 宿主能力，由 main.ts 落地（与小香港共用同一份宿主桥），bodyFlag 不同。 */
 export interface SzjHostContext {
   readonly renderer: THREE.WebGLRenderer
   readonly worldCamera: THREE.PerspectiveCamera
-  /** 步行中返回玩家世界位置（脚底）与水平速度；骑车、开车、飞行时返回 null。 */
-  getWalker(): { position: { x: number; y: number; z: number }; velocity: SzjXZ } | null
-  openVeil(destination: string): { done(): Promise<void> }
+  /**
+   * 步行中返回玩家世界位置（脚底）、水平速度与镜头姿态（walk 的 yaw/pitch）；骑车、开车、飞行时返回 null。
+   */
+  getWalker(): { position: { x: number; y: number; z: number }; velocity: SzjXZ; yaw?: number; pitch?: number } | null
   suspendWorld(): void
-  resumeWorldAt(point: { x: number; z: number; yaw: number }): Promise<boolean>
+  /** 把街上行人放回 (x, footY, z)，原 yaw/pitch 接着走；同一帧完成。 */
+  resumeWorldAt(point: { x: number; z: number; yaw: number; footY?: number; pitch?: number }): Promise<boolean>
+  /** 楼梯井里按深度把街上镜头渐入第一人称：0 = 平时视角，1 = 第一人称，null = 交还视角设置。 */
+  setWorldViewBlend?(blend: number | null): void
   /** 室内期间 runtime 设 document.body.dataset.szjActive = '1'。 */
   readonly bodyFlag: 'szjActive'
 }
@@ -382,7 +385,7 @@ export interface SzjIndoorMetrics {
   lastBlackFrames: number
   /** 最近一次上/下楼过程中视线高度的最大单帧变化（m）。 */
   lastMaxEyeDy: number
-  /** 最近一次出来时落点与 stairLanding 的距离（m）。 */
+  /** 最近一次出来时交还的姿态与街上行人实际落点的距离（m）。 */
   lastLandingError: number
 }
 
@@ -395,9 +398,9 @@ export interface SzjIndoorScene {
   readonly scene: THREE.Scene
   readonly camera: THREE.PerspectiveCamera
   mount(ctx: SzjHostContext): Promise<void>
-  /** idle → entering → descending → inside。 */
+  /** idle → entering → inside（同帧）。探针入口：直接站到该井底部平台换场线内。 */
   enter(stairId: SzjStairId): Promise<boolean>
-  /** inside → exiting → idle。 */
+  /** inside → exiting → idle（同帧）。探针出口：站到最近井的出场线外交还街上行人。 */
   exit(): Promise<boolean>
   step(dtSeconds: number): void
   getMetrics(): SzjIndoorMetrics
@@ -405,10 +408,13 @@ export interface SzjIndoorScene {
 }
 
 export const SZJ_PLAYER = {
-  eyeHeight: 1.6,
+  /** Same as walk/camera.ts placeFirstPersonCamera, so the swap on a bottom landing keeps the eye height. */
+  eyeHeight: 1.62,
   radius: 0.3,
   walkSpeed: 1.6,
   runSpeed: 3.2,
+  /** walk/config run: on a bottom landing the indoor run pace matches the street so the swap never brakes. */
+  streetRunSpeed: 9,
   /** 楼梯上水平速度倍率（上楼 / 下楼）。 */
   stairUpSpeedScale: 0.75,
   stairDownSpeedScale: 0.85,

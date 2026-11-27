@@ -656,6 +656,8 @@ def build(bbox, output, palette, workers=4):
         bake_rail_earthworks(output, manifest)
         (output/'manifest.json').write_text(json.dumps(manifest,separators=(',',':'))+'\n')
     manifest['damPassageVersion'] = 1
+    from shizijie_underpass import bake_cycleway
+    bake_cycleway(output, manifest)
     (output/'manifest.json').write_text(json.dumps(manifest,separators=(',',':'))+'\n')
     subprocess.run(['node',Path(__file__).resolve().parents[1]/'scripts/bake-dams.mjs',output],check=True)
     if play_region:

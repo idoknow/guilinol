@@ -1,4 +1,5 @@
 import './about.css'
+import { readJson } from '../lib/json'
 import {photoCredits} from './photo-credits'
 import {SOURCE_URL} from './source'
 import {contributors, KIND_LABEL, type ContribKind, type Contributor} from './contributors'
@@ -128,7 +129,7 @@ async function loadFeedbackPeople():Promise<FeedbackPerson[]> {
   try {
     const response = await fetch('/api/contributors', {signal: AbortSignal.timeout(8000)})
     if (!response.ok) return []
-    const rows = await response.json()
+    const rows = await readJson<unknown>(response)
     return Array.isArray(rows) ? rows.filter(row => typeof row?.name === 'string' && Array.isArray(row.items)) : []
   } catch {
     return []

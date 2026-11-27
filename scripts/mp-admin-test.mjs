@@ -44,7 +44,7 @@ test('two players: private RT state, role gate, public-safe admin state, persist
     await pool.query('insert into sessions values($1,$2,unixepoch()+600)',[createHash('sha256').update(token).digest('hex'),name])
     const client=new WebSocket(rt.base.replace('http','ws')+'/ws',{headers:{'x-forwarded-for':ip,'user-agent':'fixture'}});sockets.push(client);await once(client,'open')
     const body=Buffer.from(JSON.stringify({name,uid:Number(uid),exp:Math.floor(Date.now()/1000)+55})).toString('base64url')
-    client.send(JSON.stringify({t:'join',ticket:body+'.'+createHmac('sha256',secret).update(body).digest('base64url')}));await once(client,'message')
+    client.send(JSON.stringify({t:'join',fp:'abcd'.repeat(4),ticket:body+'.'+createHmac('sha256',secret).update(body).digest('base64url')}));await once(client,'message')
   }
   const api=await service('server/index.mjs',{RT_INTERNAL_URL:rt.base,RT_ADMIN_TOKEN:secret,KICK_TOKEN:secret,
     MP_WORLD_MANIFEST_URL:`http://127.0.0.1:${manifest.address().port}/world/manifest.json`},'/api/health')
@@ -103,11 +103,27 @@ test('two players: private RT state, role gate, public-safe admin state, persist
   assert.equal(fbSnap.server.landmarkSource,'builtin')
   assert.equal(fbSnap.players[0].landmark,'象鼻山')
   assert.equal(fbSnap.players[0].landmarkDist,0)
-  const storedSession=(await pool.query('select client_ip,node_ip from mp_sessions where uid=$1',[uid])).rows[0]
-  assert.deepEqual(storedSession,{client_ip:ip,node_ip:ip})
+  const storedSession=(await pool.query('select client_ip,node_ip,fp from mp_sessions where uid=$1',[uid])).rows[0]
+  assert.deepEqual(storedSession,{client_ip:ip,node_ip:ip,fp:'abcd'.repeat(4)})
   const {sessions}=await (await call('/sessions?uid='+uid)).json();assert.equal(sessions.length,1);assert.equal(sessions[0].closeCode,4003);assert.equal(sessions[0].reason,'fixture kick')
   const history=await (await call('/history?range=24h')).json();assert.ok(history.series.length);assert.equal(history.daily.at(-1).sessions,2);assert.equal(history.daily.at(-1).dau,2)
   assert.ok((await (await call('/history?range=30d')).json()).series.length)
   if(process.env.MP_SAMPLE_FILE)await writeFile(process.env.MP_SAMPLE_FILE,JSON.stringify({snapshot,history},null,2))
   const exit=once(rt.child,'exit');rt.child.kill();await exit;assert.equal((await (await call()).json()).rt,'down')
+})
+
+test('active bans resolve offline account IDs and names, never device owners',async context=>{
+  const {multiplayer}=await import('../server/mp-admin.mjs')
+  const storage=await fixture({postgresOnly:true}),pool=new pg.Pool({connectionString:storage.env.DATABASE_URL})
+  context.after(async()=>{await pool.end();await storage.close()})
+  const {rows:[{uid}]}=await pool.query("insert into users(id,email,nickname,salt,digest) values('offline','offline@example.test','测试昵称','','') returning uid")
+  const bans=[{kind:'uid',value:uid},{kind:'uid',value:'999999999'},{kind:'fp',value:uid}]
+  context.mock.method(globalThis,'fetch',async()=>Response.json({bans}))
+  const {route}=multiplayer(pool,{RT_ADMIN_TOKEN:'fixture'})
+  const response=await route('admin/bans',new Request('http://localhost/api/admin/bans'),'admin')
+  assert.equal(response.status,200)
+  const active=(await response.json()).bans
+  assert.deepEqual(active[0].account,{id:'offline',nickname:'测试昵称'})
+  assert.equal(active[1].account,null)
+  assert.equal(active[2].account,undefined)
 })

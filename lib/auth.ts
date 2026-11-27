@@ -1,4 +1,5 @@
 export interface Env {
+  cheatCaptureUpload?:(request:Request,account:SessionAccount)=>Promise<Response>
   traceTile?:(uid:number)=>Promise<Response>
   traceAdmin?:(path:string,request:Request,actor:string)=>Promise<Response>
   helicopter?:(user:string,action:string,body:Record<string,unknown>)=>Promise<unknown>

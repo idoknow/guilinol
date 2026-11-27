@@ -28,7 +28,8 @@
     "ronghu_primary": {"campus_paving": "plaza"},
     "minzhu_primary": {"campus_paving": "plaza"},
     "zhonghua_primary": {"campus_paving": "plaza"},
-    "renmin_hospital": {"road": "road", "sidewalk": "sidewalk", "curb": "curb"}
+    "renmin_hospital": {"road": "road", "sidewalk": "sidewalk", "curb": "curb"},
+    "zhongqu_police": {"road": "road", "sidewalk": "sidewalk", "curb": "curb"}
   },
   "atlas": {
     "guilin_theater": {"material": "guilin_theater_atlas", "role": "sidewalk", "box": [0, 0.5, 0.25, 0.75]},

@@ -1,7 +1,8 @@
-/* 主界面：实景截图做底，左侧暗渐变托住文字。品牌（桂字印、衬线大标题）保留山水印；
-   IDOK-392 主推“联机模式”为视觉主卡（深青沥青、亮青玉主按钮 + 街头标线 + 钱包进度），
-   游览模式保留为次要青玉玻璃横条，单人模式弱化为沉静紧凑入口但随时可进。 */
-.home{position:fixed;inset:0;z-index:80;overflow:hidden auto;color:var(--ui-paper);font-family:var(--ui-serif);background:var(--ui-ink-900);
+/* 主界面（S1 重做）：刻本封面。
+   大字书名是主视觉，像素 Logo 去白底垫在「桂」下方；再下面是「目录」——三行模式，发丝线分隔，
+   每行 = 印章字 + 模式名 + 一行说明 + 右侧动作。联机是唯一朱砂主按钮（回到主界面时换成当前模式），
+   其余是墨线印 + 线框按钮。背景是实景轮播或 IDOK-386 的实时夜景，文字只靠压暗层托住，不加卡片。 */
+.home{position:fixed;inset:0;z-index:80;overflow:hidden auto;color:var(--ui-text);font-family:var(--ui-serif);background:var(--ui-ink-900);
   opacity:0;transition:opacity .45s ease}
 .home.show{opacity:1}
 body[data-home] :is(.hud-me,.dock,.sky-ui,.hint,footer,.walk-ui,.vehicle-action,.summit-pill,.road-name,.toast){visibility:hidden}
@@ -9,242 +10,250 @@ body[data-home] :is(.hud-me,.dock,.sky-ui,.hint,footer,.walk-ui,.vehicle-action,
 .home-bg{position:fixed;inset:0;overflow:hidden}
 .home-bg img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:0;transform:scale(1.08);transition:opacity 1.6s ease,transform 9s linear}
 .home-bg img.on{opacity:1;transform:scale(1)}
+/* IDOK-386 实时封面：画布叠在海报图上，首帧出来再淡入；场景接管拖拽，竖向滑动仍留给页面滚动 */
+.home-bg canvas{opacity:0;transition:opacity 1.4s ease}
+.home.live .home-bg canvas{opacity:1}
+.home[data-cover=loading],.home[data-cover=live]{touch-action:pan-y}
+/* 可读性压暗：左侧托住书名和目录，上下各一道收边（不是装饰渐变） */
 .home-shade{position:fixed;inset:0;pointer-events:none;
-  background:linear-gradient(90deg,rgba(20,33,30,.86) 0,rgba(20,33,30,.62) 34%,rgba(20,33,30,.12) 62%,rgba(20,33,30,0) 80%),
-    linear-gradient(0deg,rgba(20,33,30,.7) 0,rgba(20,33,30,0) 26%),linear-gradient(180deg,rgba(20,33,30,.45) 0,rgba(20,33,30,0) 18%)}
+  background:linear-gradient(90deg,color-mix(in srgb,var(--ui-ink-950) 90%,transparent) 0,color-mix(in srgb,var(--ui-ink-950) 74%,transparent) 32%,color-mix(in srgb,var(--ui-ink-950) 18%,transparent) 58%,transparent 76%),
+    linear-gradient(0deg,color-mix(in srgb,var(--ui-ink-950) 62%,transparent) 0,transparent 24%),
+    linear-gradient(180deg,color-mix(in srgb,var(--ui-ink-950) 40%,transparent) 0,transparent 16%)}
 
+/* --- 顶栏：右上账号 ------------------------------------------------------------------------------ */
 .home-top{position:absolute;inset:0 0 auto 0;z-index:2;pointer-events:none;display:flex;justify-content:flex-end;align-items:center;gap:12px;
-  padding:calc(16px + env(safe-area-inset-top)) calc(22px + env(safe-area-inset-right)) 0 calc(22px + env(safe-area-inset-left))}
+  padding:calc(16px + env(safe-area-inset-top)) calc(24px + env(safe-area-inset-right)) 0 calc(24px + env(safe-area-inset-left))}
 .home-top>*{pointer-events:auto}
-.home-account{padding:0 16px 0 12px}
-.home-avatar{width:26px;height:26px;margin-left:-6px;border-radius:50%;display:grid;place-items:center;font:600 13px/1 var(--ui-serif);font-style:normal;background:var(--ui-jade-500);letter-spacing:0}
+.home-account{padding:0 14px;background:var(--ui-surface-float)}
+.home-account:has(.home-avatar){padding-left:8px}
+.home-avatar{display:grid;place-items:center;flex:none;width:24px;height:24px;border-radius:var(--ui-r-xs);font:600 var(--ui-fs-xs)/1 var(--ui-serif);font-style:normal;letter-spacing:0;
+  color:var(--ui-ink);background:var(--ui-paper)}
 
-.home-main{position:relative;box-sizing:border-box;min-height:calc(100dvh - 38px);display:flex;flex-direction:column;justify-content:center;gap:16px;
-  width:min(570px,100%);padding:22px calc(22px + env(safe-area-inset-right)) 14px calc(clamp(22px,6vw,88px) + env(safe-area-inset-left))}
-.home-title{position:relative;animation:home-rise .8s var(--ui-ease) both}
-/* 成员设计的像素 Logo（IDOK-148）：贴在一小张宣纸上，正常文档流置于标题上方，避免矮屏裁切或压住顶部胶囊 */
-.home-seal{position:relative;display:block;width:fit-content;margin:0 0 10px -4px;padding:5px 8px 4px;border-radius:var(--ui-r-paper);background:var(--ui-paper);
-  box-shadow:var(--ui-shadow-1),inset 0 0 0 1px var(--ui-paper-line);transform:rotate(-3deg);transform-origin:left bottom}
-.home-seal img{display:block;width:116px;height:auto;mix-blend-mode:multiply}
-.home-title h1{margin:0;font:700 clamp(42px,5.6vw,64px)/1.05 var(--ui-serif);letter-spacing:.16em;text-shadow:0 4px 30px rgba(10,18,16,.45)}
-.home-tag{margin:10px 0 0;font-size:clamp(14.5px,1.35vw,16px);line-height:1.65;letter-spacing:.05em;color:rgba(244,239,226,.92);text-shadow:0 2px 12px rgba(10,18,16,.5)}
-.home-meta{display:flex;flex-wrap:wrap;gap:6px 14px;margin:10px 0 0;font-size:12.5px;letter-spacing:.1em;color:rgba(244,239,226,.84);text-shadow:0 1px 8px rgba(10,18,16,.55)}
-.home-meta span::before{content:"";display:inline-block;width:5px;height:5px;margin:0 7px 2px 0;border-radius:50%;background:var(--ui-seal-light)}
+/* --- 主列 --------------------------------------------------------------------------------------- */
+.home-main{position:relative;box-sizing:border-box;min-height:calc(100dvh - 40px);display:flex;flex-direction:column;justify-content:center;gap:var(--ui-s-6);
+  width:min(560px,100%);padding:calc(48px + env(safe-area-inset-top)) calc(24px + env(safe-area-inset-right)) var(--ui-s-4) calc(clamp(24px,7vw,112px) + env(safe-area-inset-left))}
 
-.home-modes{display:grid;gap:8px;animation:home-rise .8s .12s var(--ui-ease) both}
-.home-mode{display:grid;grid-template-columns:auto 1fr;grid-template-areas:"seal text" "go go";align-items:center;gap:12px 16px;width:100%;box-sizing:border-box;padding:18px 18px 16px;
-  text-align:left;font-family:var(--ui-serif);border-radius:var(--ui-r-lg);border:0;-webkit-tap-highlight-color:transparent}
-.home-mode-seal{grid-area:seal;width:52px;height:52px;display:grid;place-items:center;border-radius:8px;font:700 28px/1 var(--ui-serif);transform:rotate(-4deg)}
-.home-mode-text{grid-area:text;display:grid;gap:5px;min-width:0}
-.home-mode-text b{display:flex;align-items:center;gap:8px;font-size:21px;font-weight:700;letter-spacing:.18em}
-.home-mode-text>span{font-size:13.5px;line-height:1.65;letter-spacing:.04em}
-.home-progress,.home-wallet{font-size:12px;letter-spacing:.1em}.home-progress:empty,.home-wallet:empty{display:none}
-.home-go{grid-area:go;display:flex;align-items:center;justify-content:center;width:100%;min-height:46px;box-sizing:border-box;border-radius:var(--ui-r-pill);pointer-events:none}
-/* IDOK-105 续游条：游览卡下方一条青玉玻璃窄条，像压在宣纸下的书签；只有存过位置才出现。 */
-.home-resume-row{margin-top:-4px}.home-resume-row[hidden]{display:none}
-.home-resume{display:flex;align-items:center;gap:12px;width:100%;box-sizing:border-box;padding:10px 16px 10px 14px;border-radius:12px;cursor:pointer;
-  font:500 14px/1.3 var(--ui-serif);letter-spacing:.12em;color:var(--ui-paper);text-align:left;
-  background:var(--ui-glass-strong);border:1px solid var(--ui-glass-line-soft);
-  transition:background var(--ui-fast),border-color var(--ui-fast),transform .25s var(--ui-ease)}
-.home-resume:hover{background:var(--ui-glass-solid);border-color:var(--ui-glass-line);transform:translateX(3px)}
-.home-resume:active{transform:scale(.985)}
-.home-resume:focus-visible{outline:2px solid var(--ui-jade-300);outline-offset:2px}
-.home-resume i{flex:none;width:24px;height:24px;border-radius:50%;background:var(--ui-jade-500) center/13px no-repeat;
-  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%23f4efe2' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3 8a5 5 0 1 0 1.6-3.7'/%3E%3Cpath d='M3 2.5V5h2.5'/%3E%3C/svg%3E")}
-.home-resume span{flex:1;min-width:0}
-.home-resume small{flex:none;font-size:12px;letter-spacing:.08em;color:var(--ui-paper-dim)}
-/* 联机模式（IDOK-392 主推）：深青沥青 Hero 卡，青玉亮边 + 底部街头标线 + 推荐/在线标识 + 全宽青玉主按钮。 */
-.home-mode--mp{--mp-jade:var(--ui-jade-300,#8fc1b5);--mp-jade-hi:#a7d8cc;--gold:var(--st-gold,#ffc53d);--asphalt:var(--st-asphalt-solid,#121519);
-  cursor:pointer;position:relative;overflow:hidden;padding:16px 18px 15px;gap:11px 15px;
-  color:var(--st-white,#f6f4ef);font-family:var(--st-sans,system-ui,sans-serif);
-  background:radial-gradient(120% 145% at 0% 0%,rgba(143,193,181,.24),rgba(143,193,181,.04) 48%,transparent 76%),rgba(16,25,24,.92);
-  box-shadow:0 24px 58px rgba(6,10,10,.56),inset 0 0 0 1px rgba(143,193,181,.34),inset 4px 0 0 var(--mp-jade);
-  transition:transform .25s var(--ui-ease),box-shadow .25s,background .25s}
-.home-mode--mp::after{content:"";position:absolute;inset:auto 0 0 0;height:3px;pointer-events:none;
-  background:repeating-linear-gradient(90deg,rgba(143,193,181,.55) 0 18px,transparent 18px 34px);opacity:.4}
-.home-mode--mp:hover{transform:translateY(-2px);
-  box-shadow:0 28px 66px rgba(6,10,10,.64),inset 0 0 0 1px rgba(167,216,204,.6),inset 4px 0 0 var(--mp-jade-hi)}
-.home-mode--mp:active{transform:scale(.985)}
-.home-mode--mp:focus-visible{outline:none;box-shadow:0 24px 58px rgba(6,10,10,.56),inset 0 0 0 2px var(--mp-jade-hi),inset 4px 0 0 var(--mp-jade-hi)}
-.home-mode--mp .home-mode-seal{width:54px;height:54px;border-radius:11px;transform:none;
-  font:900 28px/1 var(--st-sans,sans-serif);color:var(--ui-ink-900);
-  background:linear-gradient(180deg,var(--mp-jade-hi),var(--mp-jade));
-  box-shadow:0 3px 0 rgba(12,38,34,.75),0 8px 20px rgba(143,193,181,.24)}
-.home-mode--mp .home-mode-text{gap:6px}
-.home-mode--mp .home-mode-text b{display:flex;align-items:center;flex-wrap:wrap;gap:8px;white-space:nowrap;
-  font:900 22px/1.15 var(--st-sans,sans-serif);letter-spacing:.12em;color:var(--st-white,#f6f4ef)}
-.home-mode--mp .home-mode-text>span{font-size:13.5px;line-height:1.65;letter-spacing:.02em;color:rgba(244,239,226,.82)}
-.home-mode--mp .home-wallet{font:700 13px/1.2 var(--st-num,sans-serif);letter-spacing:.04em;color:var(--gold)}
-.home-mp-badge{display:inline-flex;align-items:center;padding:3px 8px;border-radius:999px;white-space:nowrap;
-  font:700 11px/1.1 var(--st-sans,sans-serif);font-style:normal;letter-spacing:.08em;color:var(--asphalt);background:var(--gold)}
-.home-mp-live{font:600 11.5px/1 var(--st-sans,sans-serif);font-style:normal;letter-spacing:.05em;padding:4px 9px 4px 20px;border-radius:999px;position:relative;white-space:nowrap;
-  color:var(--mp-jade-hi);background:rgba(143,193,181,.16);box-shadow:inset 0 0 0 1px rgba(143,193,181,.32)}
-.home-mp-live::before{content:"";position:absolute;left:7px;top:50%;width:6px;height:6px;margin-top:-3px;border-radius:50%;
-  background:var(--mp-jade-hi);box-shadow:0 0 0 3px rgba(143,193,181,.24);animation:home-live-pulse 2.2s ease-in-out infinite}
-.home-mp-live::after{content:" 人在线"}
-.home-mp-live[hidden]{display:none}
-.home-go--mp{min-height:44px;font:900 16px/1 var(--st-sans,sans-serif);letter-spacing:.26em;text-indent:.26em;color:var(--ui-ink-900);
-  background:linear-gradient(180deg,var(--mp-jade-hi),var(--mp-jade));
-  box-shadow:0 3px 0 rgba(20,58,52,.9),0 12px 28px rgba(143,193,181,.26);transition:filter .15s ease}
-.home-mode--mp:hover .home-go--mp{filter:brightness(1.06)}
-/* 游览模式：次要紧凑横条，青玉玻璃 + 朱砂线框印章。 */
-.home-mode--tour{cursor:pointer;grid-template-columns:auto 1fr auto;grid-template-areas:"seal text go";
-  padding:10px 14px;gap:8px 13px;color:var(--ui-paper);background:var(--ui-glass-strong);
-  border:1px solid var(--ui-glass-line-soft);
-  transition:transform .25s var(--ui-ease),background .25s,border-color .25s}
-.home-mode--tour:hover,.home-mode--tour.is-current{background:var(--ui-glass-solid);border-color:var(--ui-glass-line)}
-.home-mode--tour:hover{transform:translateY(-1px)}
-.home-mode--tour:active{transform:scale(.985)}
-.home-mode--tour:focus-visible{outline:2px solid var(--ui-jade-300);outline-offset:2px}
-.home-mode--tour .home-mode-seal{width:40px;height:40px;font-size:21px;color:var(--ui-seal-light);border:1.5px solid var(--ui-seal-light)}
-.home-mode--tour .home-mode-text{gap:3px}
-.home-mode--tour .home-mode-text b{font-size:16.5px;font-weight:600;letter-spacing:.14em}
-.home-mode--tour .home-mode-text>span{font-size:12.5px;line-height:1.45;color:var(--ui-paper-dim)}
-.home-mode--tour .home-progress{font-weight:500;color:var(--ui-seal-light)}
-.home-go--tour{width:auto;min-height:36px;padding:0 15px;white-space:nowrap;
-  font:500 13.5px/1 var(--ui-serif);letter-spacing:.14em;text-indent:.14em;color:var(--ui-paper);border:1px solid var(--ui-glass-line)}
-.home-mode--tour:hover .home-go--tour{background:rgba(244,239,226,.08)}
-/* 单人模式（IDOK-392 弱化保留）：沉静的低存在感窄条，不再抢夺主视觉，但清晰保留离线入口。 */
-.home-mode--solo{cursor:pointer;grid-template-columns:auto 1fr auto;grid-template-areas:"seal text go";
-  padding:8px 14px;gap:8px 12px;border-radius:var(--ui-r-md);color:rgba(244,239,226,.82);
-  background:rgba(20,33,30,.52);border:1px solid rgba(244,239,226,.12);
-  transition:background .2s,border-color .2s,color .2s,transform .2s var(--ui-ease)}
-.home-mode--solo:hover,.home-mode--solo.is-current{color:var(--ui-paper);background:var(--ui-glass-strong);border-color:rgba(244,239,226,.28)}
-.home-mode--solo:active{transform:scale(.988)}
-.home-mode--solo:focus-visible{outline:2px solid var(--ui-jade-300);outline-offset:2px}
-.home-mode--solo .home-mode-seal{width:34px;height:34px;border-radius:7px;transform:none;
-  font:600 17px/1 var(--ui-serif);color:var(--ui-paper-dim);background:rgba(244,239,226,.04);border:1px solid rgba(244,239,226,.22)}
-.home-mode--solo:hover .home-mode-seal,.home-mode--solo.is-current .home-mode-seal{color:var(--ui-paper);border-color:rgba(244,239,226,.42)}
-.home-mode--solo .home-mode-text{gap:2px}
-.home-mode--solo .home-mode-text b{font-size:15px;font-weight:500;letter-spacing:.12em}
-.home-mode--solo .home-mode-text>span{font-size:12px;line-height:1.4;letter-spacing:.03em;color:rgba(244,239,226,.64)}
-.home-go--solo{width:auto;min-height:32px;padding:0 13px;white-space:nowrap;
-  font:500 13px/1 var(--ui-serif);letter-spacing:.12em;text-indent:.12em;
-  color:var(--ui-paper-dim);background:transparent;border:1px solid rgba(244,239,226,.2);
-  transition:color .15s,border-color .15s,background .15s}
-.home-mode--solo:hover .home-go--solo,.home-mode--solo.is-current .home-go--solo{
-  color:var(--ui-paper);border-color:var(--ui-glass-line);background:rgba(244,239,226,.07)}
+/* 书名（IDOK-468 二改）：一枚字标——「网上」竖排一列，「桂林」两枚大字，像刻本题签的「小字领、大字立」，四字仍按「网上桂林」读。
+   「桂林」是马善政体轮廓做的遮罩字标（home-wordmark.svg，scripts/brand-wordmark.py 生成），「桂」高「林」低；文字留在视觉隐藏的 span 里。
+   像素徽标去掉白底（emblem-clear.webp），垫在「桂」下方当底座（宽取「桂」墨迹 82%，与「桂」脚交叠约 0.03em），
+   位置按 brand-wordmark.py 打印的「桂」墨迹框换算成百分比；字号走 --h1，徽标跟着字号缩放。
+   字标是遮罩背景，text-shadow 不生效，阴影放在 h1 的 drop-shadow 上。 */
+.home-title{--h1:clamp(88px,12.6vh,112px);
+  --wm-ratio:1.570; /* 字标宽高比，由 scripts/brand-wordmark.py 打印 */
+  display:flex;align-items:flex-end;padding-left:calc(var(--h1) * .14)}
+.home-title h1{display:flex;align-items:stretch;gap:calc(var(--h1) * .1);margin:0;font:700 var(--h1)/1 var(--ui-serif);
+  filter:drop-shadow(0 2px 18px color-mix(in srgb,var(--ui-ink-950) 55%,transparent))}
+.home-h1-net{writing-mode:vertical-rl;padding:.06em .22em 0 0;border-right:1px solid var(--ui-line-strong);font-size:.4em;font-weight:600;letter-spacing:.2em}
+.home-h1-city{position:relative;display:block;flex:none;height:calc(var(--h1) * 1.3);aspect-ratio:var(--wm-ratio,1.57)}
+.home-wordmark{position:absolute;inset:0;background:currentColor;
+  -webkit-mask:url(./home-wordmark.svg) left bottom/contain no-repeat;mask:url(./home-wordmark.svg) left bottom/contain no-repeat}
+.home-h1-text{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
+/* 「桂」墨迹 left .0011 / right .5097，徽标取 82% 居中 → left 4.7%、width 41.7%；底边对齐「林」脚 */
+.home-seal{position:absolute;left:4.7%;bottom:0;width:41.7%;margin:0}
+.home-seal img{display:block;width:100%;height:auto}
 
-.home-links{display:flex;flex-wrap:wrap;gap:4px;margin-left:-10px;animation:home-rise .8s .22s var(--ui-ease) both}
-.home-links .ui-btn{min-height:34px;padding:0 12px;color:rgba(244,239,226,.86);font-size:13.5px}
+/* 目录：三行，发丝线分隔。行、发丝线、悬停底色、焦点框四者同宽，左右对齐；内容在行内缩进 12px */
+.home-modes{display:grid;margin:0}
+/* 目录上沿 = 一笔桂林山水线（home-skyline.svg：左起象鼻山、背上普贤塔、鼻下水月洞，漓江水面，一簇峰林，最高是独秀峰）。
+   山靠右，左边是一条平水线；底边 y=39.5 就是第一行的上发丝线，所以第一行不再画自己的上线。书名在山上，目录在水里。
+   SVG 只当遮罩，颜色由这里的 --ui-line-hover 决定 */
+.home-modes::before{content:"";display:block;height:40px;background:var(--ui-line-hover);pointer-events:none;
+  -webkit-mask:url("./home-skyline.svg") right bottom/auto 100% no-repeat,linear-gradient(#000 0 0) left bottom/100% 1px no-repeat;
+  mask:url("./home-skyline.svg") right bottom/auto 100% no-repeat,linear-gradient(#000 0 0) left bottom/100% 1px no-repeat}
+.home-row:first-child::before{content:none}
+.home-row{position:relative}
+.home-row::before,.home-row:last-child::after{content:"";position:absolute;left:0;right:0;height:1px;background:var(--ui-line-strong);pointer-events:none}
+.home-row::before{top:0}.home-row:last-child::after{bottom:0}
+.home-mode{display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;column-gap:var(--ui-s-4);width:100%;box-sizing:border-box;margin:0;padding:14px 12px;
+  font:inherit;color:inherit;text-align:left;background:none;border:0;border-radius:var(--ui-r-ctl);cursor:pointer;-webkit-tap-highlight-color:transparent;
+  transition:background var(--ui-fast)}
+.home-mode:hover{background:var(--ui-fill)}
+.home-mode:focus-visible{outline:2px solid var(--ui-focus);outline-offset:-2px;border-radius:var(--ui-r-ctl)}
+/* 三枚肖形印：不再刻「联 / 游 / 街」（模式名就在右边），各刻一处桂林——
+   联机 = 日月双塔（两塔并立杉湖，月牙挂在月塔上）；游览 = 象鼻山（鼻插漓江、水月洞、背上普贤塔，洞影合成一轮圆）；
+   单人 = 漓江竹筏（一人斗笠蓑衣撑篙，身后两座峰）。
+   画面是 home-seal-*.svg 遮罩，颜色取 currentColor：朱印上是纸色，墨印上是 --ui-text-2，悬停上朱，续游当前行变朱印，规则都不用改。
+   外框仍是石刻残边遮罩（home-seal.svg：四角磨圆、三处崩口），三枚各歪一点，不是同一个模子压出来的 */
+.home-mode-seal{position:relative;font-size:23px;-webkit-mask:url("./home-seal.svg") center/100% 100% no-repeat;mask:url("./home-seal.svg") center/100% 100% no-repeat}
+.home-mode-seal::before{content:"";position:absolute;inset:0;background:currentColor}
+.home-mode--mp .home-mode-seal::before{-webkit-mask:url("./home-seal-mp.svg") center/100% 100% no-repeat;mask:url("./home-seal-mp.svg") center/100% 100% no-repeat}
+.home-mode--tour .home-mode-seal::before{-webkit-mask:url("./home-seal-tour.svg") center/100% 100% no-repeat;mask:url("./home-seal-tour.svg") center/100% 100% no-repeat}
+.home-mode--solo .home-mode-seal::before{-webkit-mask:url("./home-seal-solo.svg") center/100% 100% no-repeat;mask:url("./home-seal-solo.svg") center/100% 100% no-repeat}
+.home-mode--tour .home-mode-seal{transform:rotate(1.2deg)}.home-mode--solo .home-mode-seal{transform:rotate(-.8deg)}
+.home-mode-text{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 10px;min-width:0}
+.home-mode-text b{flex:1 0 100%;display:flex;align-items:center;gap:12px;min-width:0;white-space:nowrap;
+  font:600 var(--ui-fs-lg)/1.3 var(--ui-serif);letter-spacing:var(--ui-track-title)}
+.home-mode-text>span{font-size:var(--ui-fs-sm);line-height:1.5;letter-spacing:var(--ui-track-body);color:var(--ui-text-2)}
+.home-progress,.home-wallet{font-size:var(--ui-fs-xs);line-height:1.5;color:var(--ui-text-3)}
+.home-progress:empty,.home-wallet:empty{display:none}
+/* 在线人数：联机名旁一枚小数字 */
+.home-mp-live{display:inline-flex;align-items:center;gap:6px;font-style:normal;font-weight:400;font-size:var(--ui-fs-xs);letter-spacing:.02em;color:var(--ui-text-2)}
+.home-mp-live::before{content:"";width:6px;height:6px;border-radius:50%;background:var(--ui-ok)}
+.home-mp-live::after{content:"人在线";font-family:var(--ui-serif);letter-spacing:.08em}
+
+/* 右侧动作：默认线框；主动作朱砂实底。按下缩在按钮上，不缩整行 */
+.home-go{display:inline-flex;align-items:center;justify-content:center;gap:8px;box-sizing:border-box;min-height:36px;padding:0 14px;white-space:nowrap;pointer-events:none;
+  font:500 var(--ui-fs-sm)/1 var(--ui-serif);letter-spacing:var(--ui-track);color:var(--ui-text);
+  border:1px solid var(--ui-line-strong);border-radius:var(--ui-r-ctl);transition:background var(--ui-fast),border-color var(--ui-fast),transform var(--ui-fast)}
+.home-mode:hover .home-go{background:var(--ui-fill);border-color:var(--ui-line-hover)}
+.home-mode:active .home-go{transform:scale(var(--ui-press))}
+/* 主行：首页是联机；从游戏里回来时是当前模式。和其它两行同高同内边距，只靠朱砂实底区分主次 */
+.home:not(.resume) .home-go--mp,.home.resume .home-mode.is-current .home-go{font-weight:600;
+  color:var(--ui-paper);background:var(--ui-seal);border-color:var(--ui-seal)}
+.home:not(.resume) .home-mode--mp:hover .home-go--mp,.home.resume .home-mode.is-current:hover .home-go{background:var(--ui-seal-hi);border-color:var(--ui-seal-hi)}
+.home.resume .home-mode.is-current .home-mode-seal{color:var(--ui-paper);background:var(--ui-seal);box-shadow:inset 0 0 0 2px var(--ui-seal),inset 0 0 0 3px rgba(244,239,226,.72)}
+.home.resume .home-mode--mp:not(.is-current) .home-mode-seal{color:var(--ui-text-2);background:none;box-shadow:inset 0 0 0 1px var(--ui-line-strong)}
+/* 次要行悬停：墨线印着上朱色 */
+.home-mode:is(:hover,:focus-visible) .ui-seal--ink{color:var(--ui-seal-light);box-shadow:inset 0 0 0 1.5px currentColor}
+.home.resume .home-mode.is-current .ui-seal--ink{color:var(--ui-paper)}
+
+/* 续游（IDOK-105）：游览行下一行文字链接，左缘对齐模式名；只有存过位置才出现 */
+.home-resume-row{padding:0 12px 10px calc(12px + 44px + var(--ui-s-4));margin-top:-6px}
+.home-resume{min-height:28px;font-size:var(--ui-fs-sm);letter-spacing:.06em}
+.home-resume i{flex:none;width:14px;height:14px;background:currentColor;
+  -webkit-mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%23000' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3 8a5 5 0 1 0 1.6-3.7'/%3E%3Cpath d='M3 2.5V5h2.5'/%3E%3C/svg%3E") center/contain no-repeat;
+  mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%23000' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3 8a5 5 0 1 0 1.6-3.7'/%3E%3Cpath d='M3 2.5V5h2.5'/%3E%3C/svg%3E") center/contain no-repeat}
+.home-resume small{font-size:var(--ui-fs-xs);letter-spacing:.04em;color:var(--ui-text-3)}
+.home-resume small:not(:empty)::before{content:"· "}
+
+/* 底部链接：一行安静的文字 */
+.home-links{display:flex;flex-wrap:wrap;align-items:center;gap:0 2px;margin:-12px 0 0 2px}
+.home-links .ui-btn{min-height:34px;padding:0 10px;font-size:var(--ui-fs-sm);letter-spacing:var(--ui-track);color:var(--ui-text-2)}
+.home-links .ui-btn:hover{color:var(--ui-text);background:none;text-decoration:underline;text-decoration-color:var(--ui-line-hover);text-underline-offset:.32em}
 
 .home-foot{position:relative;display:flex;justify-content:space-between;align-items:flex-end;gap:12px;
-  padding:0 calc(22px + env(safe-area-inset-right)) calc(12px + env(safe-area-inset-bottom)) calc(clamp(22px,6vw,88px) + env(safe-area-inset-left));font-size:11px;letter-spacing:.08em;color:var(--ui-paper-dim)}
-.home-credit a{color:inherit;text-decoration:underline;text-decoration-color:var(--ui-seal-light);text-underline-offset:3px}.home-credit a:hover{color:var(--ui-paper)}
-.home-ver{white-space:nowrap}
-.home-caption{font-size:13px;letter-spacing:.24em;color:var(--ui-paper);display:flex;align-items:center;gap:10px}
-.home-caption::before{content:"";width:22px;height:1px;background:var(--ui-seal-light)}
-@keyframes home-rise{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+  padding:0 calc(24px + env(safe-area-inset-right)) calc(14px + env(safe-area-inset-bottom)) calc(clamp(24px,7vw,112px) + env(safe-area-inset-left));
+  font-size:var(--ui-fs-xs);line-height:1.5;letter-spacing:.06em;color:var(--ui-text-3)}
+.home-credit a{color:inherit;text-decoration:underline;text-decoration-color:var(--ui-line-strong);text-underline-offset:3px}.home-credit a:hover{color:var(--ui-text)}
+.home-ver{white-space:nowrap;font-variant-numeric:tabular-nums}
+.home-caption{display:flex;align-items:center;gap:10px;font-size:var(--ui-fs-xs);letter-spacing:var(--ui-track-title);color:var(--ui-text-2)}
+.home-caption::before{content:"";width:20px;height:1px;background:var(--ui-line-hover)}
 
-/* 玩法说明 */
-kbd{display:inline-block;min-width:1.5em;padding:1px 5px;margin:0 1px;border-radius:5px;text-align:center;font:600 11.5px/1.5 ui-monospace,monospace;color:var(--ui-ink-800);background:var(--ui-paper);box-shadow:0 2px 0 rgba(244,239,226,.35)}
+/* 进场：一次性错落淡入，每次打开主界面重放一次 */
+.home.show :is(.home-title,.home-row,.home-links,.home-douyin){animation:ui-rise var(--ui-slow) var(--ui-ease) both}
+.home.show .home-row--mp{animation-delay:60ms}.home.show .home-row--tour{animation-delay:100ms}.home.show .home-row--solo{animation-delay:140ms}
+.home.show .home-links{animation-delay:180ms}.home.show .home-douyin{animation-delay:220ms}
 
-/* QQ 群：一张群二维码卡片 + 群号（手机上扫不了自己的屏，群号要能一键复制）。 */
-.about-panel.qq{width:min(400px,100%)}
-.qq-body{display:grid;justify-items:center;gap:12px;padding:14px 18px 20px;text-align:center}
-.qq-code{display:block;width:auto;height:auto;max-width:min(320px,100%);max-height:min(58vh,500px);border-radius:14px}
-.qq-note{margin:0;font-size:12.5px;line-height:1.7;letter-spacing:.06em;color:var(--ui-paper-dim)}
-.qq-row{display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:10px}
-.qq-num{font:600 19px/1.2 ui-monospace,SFMono-Regular,monospace;letter-spacing:.14em;color:var(--ui-paper);-webkit-user-select:all;user-select:all}
-.qq-copy{font-size:13px}
+/* 玩法说明等处的键帽 */
+kbd{display:inline-block;min-width:1.5em;padding:1px 5px;margin:0 1px;border-radius:var(--ui-r-xs);text-align:center;font:600 11.5px/1.5 ui-monospace,monospace;color:var(--ui-ink);background:var(--ui-paper);box-shadow:inset 0 -1px 0 var(--ui-paper-line)}
 
-/* 抖音官方号（IDOK-272）：右下角一张小码卡，点开放大 + 复制抖音号。码是官方分享图裁出的圆形码，白底圆，透明外圈。
-   手机竖屏/横屏底部被模式卡占满，收成左上角一枚小胶囊（和右上账号按钮对称）。 */
-.home-douyin{position:absolute;z-index:1;right:calc(22px + env(safe-area-inset-right));bottom:calc(58px + env(safe-area-inset-bottom));
-  display:grid;grid-template-columns:auto auto;align-items:center;gap:12px;padding:10px 16px 10px 10px;cursor:pointer;text-align:left;
-  font:inherit;color:var(--ui-paper);background:var(--ui-glass);border:1px solid var(--ui-glass-line-soft);border-radius:var(--ui-r-lg);
-  box-shadow:var(--ui-shadow-1);-webkit-tap-highlight-color:transparent;
-  transition:background var(--ui-fast),border-color var(--ui-fast),transform var(--ui-fast);animation:home-rise .8s .35s var(--ui-ease) both}
-.home-douyin:hover{background:var(--ui-glass-strong);border-color:var(--ui-glass-line);transform:translateY(-2px)}
-.home-douyin:focus-visible{outline:2px solid var(--ui-jade-300);outline-offset:2px}
-.home-douyin-code{display:block;width:84px;height:84px;filter:drop-shadow(0 2px 6px rgba(10,18,16,.3))}
-.home-douyin-text{display:grid;gap:5px;justify-items:start}
-.home-douyin-mark{display:block;width:auto;height:19px}
-.home-douyin-text b{font:600 14px/1.2 var(--ui-serif);letter-spacing:.04em}
-.home-douyin-text small{font-size:11.5px;letter-spacing:.1em;color:var(--ui-paper-dim)}
-.about-panel.qq--douyin .qq-code{width:min(280px,100%);max-height:none;border-radius:0}
-.qq--douyin .qq-note b{display:block;margin-bottom:2px;font-size:15px;color:var(--ui-paper);letter-spacing:.04em}
+/* --- 二维码弹层（QQ 群 / 抖音官方号）：一张码 + 号码一键复制 --------------------------------------- */
+.about-panel.qq{width:min(360px,100%)}
+.qq-body{display:grid;justify-items:center;align-content:start;gap:14px;padding:4px 10px 10px;text-align:center}
+.qq-code{display:block;width:auto;height:auto;max-width:min(280px,100%);max-height:min(48vh,420px);border-radius:var(--ui-r-sm)}
+.qq-note{margin:0;font-size:var(--ui-fs-xs);line-height:1.7;letter-spacing:var(--ui-track-body);color:var(--ui-text-2)}
+.qq-row{display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:12px}
+.qq-num{font:600 var(--ui-fs-lg)/1.2 var(--ui-num);font-variant-numeric:tabular-nums;letter-spacing:.08em;color:var(--ui-text);-webkit-user-select:all;user-select:all}
+.qq-copy{font-size:var(--ui-fs-sm)}
+.about-panel.qq--douyin .qq-code{width:min(240px,100%);max-height:none;border-radius:0}
+.qq--douyin .qq-note b{display:block;margin-bottom:4px;font-size:var(--ui-fs-md);letter-spacing:.04em;color:var(--ui-text)}
+
+/* 抖音官方号（IDOK-272）：电脑右下一张小码签；手机收成左上一枚小钮（和右上账号对称） */
+.home-douyin{position:absolute;z-index:1;right:calc(24px + env(safe-area-inset-right));bottom:calc(52px + env(safe-area-inset-bottom));
+  display:grid;grid-template-columns:auto auto;align-items:center;gap:12px;padding:8px 16px 8px 8px;cursor:pointer;text-align:left;
+  font:inherit;color:var(--ui-text);background:var(--ui-surface-float);border:0;border-radius:var(--ui-r-sm);
+  -webkit-tap-highlight-color:transparent;transition:background var(--ui-fast),transform var(--ui-fast)}
+/* 匾（同游戏内左上一块匾）：墨青纸面、无外描边，内衬一道 3px 印框；二维码原样不动 */
+.home-douyin::after{content:"";position:absolute;inset:3px;border:1px solid var(--ui-line-strong);border-radius:var(--ui-r-xs);pointer-events:none;transition:border-color var(--ui-fast)}
+.home-douyin:hover::after{border-color:var(--ui-line-hover)}
+.home-douyin:active{transform:scale(var(--ui-press))}
+.home-douyin:focus-visible{outline:2px solid var(--ui-focus);outline-offset:2px}
+.home-douyin-code{display:block;width:64px;height:64px}
+.home-douyin-text{display:grid;gap:8px;justify-items:start}
+.home-douyin-mark{display:block;width:auto;height:16px}
+.home-douyin-text b{font:600 var(--ui-fs-sm)/1.2 var(--ui-serif);letter-spacing:.04em}
 @media (max-width:760px),(max-height:520px) and (orientation:landscape){
-  .home-douyin{right:auto;bottom:auto;top:calc(16px + env(safe-area-inset-top));left:calc(22px + env(safe-area-inset-left));
-    min-height:var(--ui-h);padding:4px 14px 4px 4px;gap:8px;border-radius:var(--ui-r-pill);border-color:var(--ui-glass-line)}
-  .home-douyin-code{width:30px;height:30px;filter:none}
-  .home-douyin-text{grid-auto-flow:column;align-items:center;gap:7px}.home-douyin-mark{height:13px}.home-douyin-text b,.home-douyin-text small{display:none}
-  .home-douyin-text::after{content:"官方号";font-size:12px;letter-spacing:.1em;color:var(--ui-paper-dim)}
+  .home-douyin{right:auto;bottom:auto;top:calc(16px + env(safe-area-inset-top));left:calc(20px + env(safe-area-inset-left));
+    min-height:var(--ui-h);padding:6px 13px 6px 6px;gap:9px;border-radius:var(--ui-r-sm)}
+  .home-douyin-code{width:30px;height:30px}
+  .home-douyin-text{grid-auto-flow:column;align-items:center;gap:7px}.home-douyin-mark{height:13px}.home-douyin-text b{display:none}
+  .home-douyin-text::after{content:"官方号";font-size:var(--ui-fs-xs);letter-spacing:.1em;color:var(--ui-text-2)}
 }
 
+/* --- 竖屏手机：上半屏留给封面场景（IDOK-386 实时夜景按书名上沿算安全区），书名压在目录正上方 ------------- */
+/* 整组落在拇指区，底部链接收进「更多」 */
 @media (max-width:760px){
-  .home-shade{background:linear-gradient(0deg,rgba(20,33,30,.92) 0,rgba(20,33,30,.7) 46%,rgba(20,33,30,.15) 74%,rgba(20,33,30,.35) 100%)}
-  .home-top{position:relative;pointer-events:auto}
-  .home-main{justify-content:flex-end;min-height:calc(100dvh - 102px);padding-top:12px;padding-bottom:12px;gap:14px;width:100%}
-  .home-seal{margin:0 0 8px -2px}.home-seal img{width:98px}
-  .home-tag{font-size:14.5px}
-  .home-mode--mp{padding:15px 15px 14px;gap:11px 12px}
-  .home-mode--mp .home-mode-seal{width:46px;height:46px;font-size:24px}
-  .home-mode--mp .home-mode-text b{font-size:19px;letter-spacing:.08em;gap:6px}
-  .home-mode--mp .home-mode-text>span{font-size:13px;line-height:1.55}
-  .home-mp-badge{padding:2.5px 7px;font-size:10.5px}
-  .home-mp-live{padding:3px 7px 3px 16px;font-size:11px}.home-mp-live::before{left:6px}.home-mp-live::after{content:" 人"}
-  .home-go--mp{min-height:44px;font-size:15.5px;letter-spacing:.22em;text-indent:.22em}
-  .home-mode--tour{padding:10px 12px;gap:8px 10px}.home-mode--tour .home-mode-seal{width:36px;height:36px;font-size:19px}
-  .home-mode--tour .home-mode-text b{font-size:16px}.home-mode--tour .home-mode-text>span{display:none}
-  .home-go--tour{min-height:34px;padding:0 13px;font-size:13px;letter-spacing:.12em;text-indent:.12em}
-  .home-mode--solo{padding:8px 12px;gap:8px 10px}.home-mode--solo .home-mode-seal{width:30px;height:30px;font-size:15px}
-  .home-mode--solo .home-mode-text b{font-size:14.5px}.home-mode--solo .home-mode-text>span{display:none}
-  .home-go--solo{min-height:30px;padding:0 12px;font-size:12.5px;letter-spacing:.1em;text-indent:.1em}
-  .home-links{justify-content:center;margin-left:0;gap:2px}
-  .home-links .ui-btn{padding:0 10px;font-size:13px;min-height:34px}
-  .home-foot{flex-direction:column;align-items:center;gap:4px}.home-caption{display:none}.home-credit{text-align:center}
+  /* 上半屏是封面场景，只在顶栏留一层薄压暗；书名起点（约 50%）往下逐渐压实托住文字 */
+  .home-shade{background:linear-gradient(0deg,color-mix(in srgb,var(--ui-ink-950) 94%,transparent) 0,color-mix(in srgb,var(--ui-ink-950) 84%,transparent) 40%,color-mix(in srgb,var(--ui-ink-950) 30%,transparent) 56%,color-mix(in srgb,var(--ui-ink-950) 6%,transparent) 74%,color-mix(in srgb,var(--ui-ink-950) 30%,transparent) 100%)}
+  .home-top{padding-left:calc(20px + env(safe-area-inset-left));padding-right:calc(20px + env(safe-area-inset-right))}
+  .home-main{justify-content:flex-start;min-height:calc(100dvh - 56px);width:100%;gap:var(--ui-s-5);
+    padding:calc(84px + env(safe-area-inset-top)) calc(20px + env(safe-area-inset-right)) var(--ui-s-2) calc(20px + env(safe-area-inset-left))}
+  .home-modes{margin-top:0}
+  .home-title{margin:auto 0 0}
+  .home-title{--h1:clamp(72px,21vw,88px)}
+  .home-mode{column-gap:var(--ui-s-3);padding:12px}
+  .home-mode-seal{font-size:18px}
+  .home-mode-text b{gap:10px;font-size:var(--ui-fs-md);letter-spacing:.16em}
+  .home-resume-row{padding-left:calc(12px + 34px + var(--ui-s-3))}
+  .home-links{justify-content:center;margin:auto 0 0}
+  .home-foot{flex-direction:column;align-items:center;gap:4px;text-align:center;padding-left:calc(20px + env(safe-area-inset-left));padding-right:calc(20px + env(safe-area-inset-right))}
+  .home-caption{display:none}
 }
-/* 矮屏手机（如 360x640）：进一步收敛字号与间距，保证首屏不与顶部胶囊重叠且完整落屏 */
+/* 矮竖屏（360×640 一类）：再收一档 */
 @media (max-width:760px) and (max-height:700px){
   .home-top{padding-top:calc(10px + env(safe-area-inset-top))}
   .home-douyin{top:calc(10px + env(safe-area-inset-top))}
-  .home-main{min-height:calc(100dvh - 84px);padding-top:8px;padding-bottom:8px;gap:10px}
-  .home-seal{margin-bottom:6px;padding:4px 7px 3px}.home-seal img{width:80px}
-  .home-title h1{font-size:36px}
-  .home-tag{margin-top:6px;font-size:13.5px;line-height:1.5}
-  .home-meta{margin-top:6px;gap:4px 10px;font-size:11.5px;letter-spacing:.05em}
-  .home-modes{gap:6px}
-  .home-mode--mp{padding:11px 13px;gap:8px 11px}.home-mode--mp .home-mode-seal{width:42px;height:42px;font-size:22px}
-  .home-mode--mp .home-mode-text{gap:4px}.home-mode--mp .home-mode-text b{font-size:18px}
-  .home-mode--mp .home-mode-text>span{font-size:12.5px;line-height:1.45}.home-go--mp{min-height:40px;font-size:15px}
-  .home-mode--tour{padding:8px 11px}.home-mode--solo{padding:7px 11px}
-  .home-resume{padding:8px 12px;font-size:13px}
-  .home-links .ui-btn{padding:0 8px;font-size:12.5px;min-height:32px}
+  .home-main{min-height:calc(100dvh - 48px);padding-top:calc(64px + env(safe-area-inset-top));gap:var(--ui-s-4)}
+  .home-title{--h1:64px}
+  .home-mode{padding:9px 12px}
+  .home-mode-text>span{font-size:var(--ui-fs-xs)}
   .home-foot{padding-bottom:calc(8px + env(safe-area-inset-bottom))}
 }
-/* 横屏手机：标题和模式左右排，联机卡保持主推展开，游览/单人保持紧凑单行 */
+/* --- 横屏手机（844×390、873×403）：书名左、目录右，一屏放下 ---------------------------------------- */
 @media (max-height:520px) and (orientation:landscape){
-  .home-top{position:relative;pointer-events:auto;padding-top:calc(10px + env(safe-area-inset-top))}
+  /* 左半是书名 + 场景人物，中间留亮；目录列（约 48% 起）压实 */
+  .home-shade{background:linear-gradient(90deg,color-mix(in srgb,var(--ui-ink-950) 80%,transparent) 0,color-mix(in srgb,var(--ui-ink-950) 36%,transparent) 28%,color-mix(in srgb,var(--ui-ink-950) 36%,transparent) 42%,color-mix(in srgb,var(--ui-ink-950) 82%,transparent) 54%,color-mix(in srgb,var(--ui-ink-950) 86%,transparent) 100%)}
+  .home-top{padding-top:calc(10px + env(safe-area-inset-top))}
   .home-douyin{top:calc(10px + env(safe-area-inset-top))}
-  .home-main{width:100%;min-height:calc(100dvh - 78px);display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.15fr);align-content:center;column-gap:24px;row-gap:10px;padding-top:6px;padding-bottom:8px}
-  .home-title h1{font-size:40px}.home-seal{display:none}.home-tag{margin-top:8px;font-size:13.5px;line-height:1.55}.home-meta{display:none}
-  .home-modes{grid-row:span 2;gap:6px}
-  .home-mode--mp{padding:11px 13px 10px;gap:7px 11px}.home-mode--mp .home-mode-seal{width:42px;height:42px;font-size:22px}
-  .home-mode--mp .home-mode-text{gap:3px}.home-mode--mp .home-mode-text b{font-size:18px;letter-spacing:.08em;gap:6px}.home-mode--mp .home-mode-text>span{font-size:12.5px;line-height:1.45}
-  .home-mp-live::after{content:" 人"}.home-go--mp{min-height:36px;font-size:14.5px}
-  .home-mode--tour{padding:7px 11px;gap:8px 10px}.home-mode--tour .home-mode-seal{width:34px;height:34px;font-size:18px}
-  .home-mode--tour .home-mode-text b{font-size:15px}.home-mode--tour .home-mode-text>span{display:none}
-  .home-go--tour{min-height:32px;padding:0 12px;font-size:12.5px;letter-spacing:.12em;text-indent:.12em}
-  .home-mode--solo{padding:6px 11px;gap:8px 10px}.home-mode--solo .home-mode-seal{width:30px;height:30px;font-size:15px}
-  .home-mode--solo .home-mode-text b{font-size:14px}.home-mode--solo .home-mode-text>span{display:none}
-  .home-go--solo{min-height:30px;padding:0 11px;font-size:12px;letter-spacing:.1em;text-indent:.1em}
-  .home-resume{padding:7px 12px;font-size:13px}
-  .home-links{margin-left:-8px;gap:2px;align-self:end}.home-links .ui-btn{padding:0 9px;font-size:12.5px;min-height:32px}
-  .ui-btn--lg{min-height:42px}.home-foot{padding-bottom:calc(8px + env(safe-area-inset-bottom))}
-  .home-shade{background:linear-gradient(90deg,rgba(20,33,30,.85) 0,rgba(20,33,30,.55) 50%,rgba(20,33,30,.7) 100%)}
+  .home-main{width:100%;min-height:calc(100dvh - 26px);display:grid;grid-template-columns:minmax(0,1fr) minmax(340px,1.3fr);grid-template-areas:"title modes" "title links";
+    align-content:center;column-gap:clamp(24px,5vw,56px);row-gap:var(--ui-s-1);
+    padding:calc(58px + env(safe-area-inset-top)) calc(20px + env(safe-area-inset-right)) var(--ui-s-1) calc(clamp(20px,5vw,56px) + env(safe-area-inset-left))}
+  .home-title{grid-area:title;align-self:center;margin-bottom:0}
+  .home-title{--h1:clamp(54px,15vh,68px)}
+  .home-modes{grid-area:modes;margin:0}
+  .home-links{grid-area:links;margin:0 0 0 2px}
+  .home-mode{column-gap:var(--ui-s-3);padding:7px 12px}
+  .home-mode-seal{font-size:16px}
+  .home-mode-text{row-gap:1px}
+  .home-mode-text b{gap:10px;font-size:var(--ui-fs-md);letter-spacing:.16em}
+  .home-mode-text>span{font-size:var(--ui-fs-xs)}
+  .home-go{min-height:32px;padding:0 12px;font-size:13px}
+  .home-resume-row{padding:0 12px 4px calc(12px + 30px + var(--ui-s-3));margin-top:-4px}
+  .home-foot{padding-bottom:calc(6px + env(safe-area-inset-bottom));padding-left:calc(clamp(20px,5vw,56px) + env(safe-area-inset-left))}
+}
+/* --- 手机收起（IDOK-468）：竖屏和横屏手机默认只留「印章 + 模式名 + 动作」，联机那行保留一句说明（主推）。
+   游览 / 单人的说明、底部链接、署名收进「更多」；钱包、印章进度、在线人数、续游是状态，始终显示。
+   唯一状态 = .home-more 的 aria-expanded；桌面不显示按钮，内容始终展开。 ---------------------------------- */
+.home-more{display:none}
+@media (max-width:760px),(max-height:520px) and (orientation:landscape){
+  .home:has(.home-more[aria-expanded=false]) :is(.home-row--tour,.home-row--solo) .home-mode-text>span,
+  .home:has(.home-more[aria-expanded=false]) :is(.home-links,.home-foot){display:none}
+  .home-more{display:inline-flex;align-self:center;min-height:34px;padding:0 10px;font-size:var(--ui-fs-sm);letter-spacing:var(--ui-track)}
+  .home-more::after{content:"";width:6px;height:6px;margin:-3px 0 0 2px;border:solid currentColor;border-width:0 1.5px 1.5px 0;transform:rotate(45deg);transition:transform var(--ui-fast)}
+  .home-more[aria-expanded=true]::after{margin-top:3px;transform:rotate(-135deg)}
+  .home-more:hover{color:var(--ui-text);background:none}
+  /* 展开时链接重新播一次进场动画：去掉首屏错落的 180ms 延迟，点了立刻出来 */
+  .home:has(.home-more[aria-expanded=true]) .home-links{animation-delay:0ms}
+  .home-main:has(.home-more[aria-expanded=false]){min-height:100dvh}
+}
+/* 竖屏：「更多」紧跟目录下方；书名上方的 margin:auto 把整组推到拇指区，展开后链接也跟在目录下面 */
+@media (max-width:760px){
+  .home-links{margin-top:0}
+}
+@media (max-height:520px) and (orientation:landscape){
+  .home-main{grid-template-areas:"title modes" "title links" "title more"}
+  .home-more{grid-area:more;justify-self:start;margin-left:2px}
+}
+/* 触屏：文字链接与续游也要够手指按 */
+@media (pointer:coarse) and (not (any-pointer:fine)){
+  .home-links .ui-btn,.home-more,.home-resume{min-height:var(--ui-h)}
+  .home-resume-row{padding-bottom:0}
 }
 
-/* IDOK-216 按下即反馈：进入要等登录 / 存档 / 角色几次网络往返，卡片先转起来，其它入口暂停 */
-.home-go .home-spin{width:15px;height:15px;margin-right:10px;flex:none;border-radius:50%;border:2px solid currentColor;border-right-color:transparent;opacity:.85;animation:home-spin .8s linear infinite}
-.home-mode--tour .home-spin,.home-mode--solo .home-spin{width:13px;height:13px;margin-right:6px}
-.home-go:has(.home-spin){letter-spacing:.16em;text-indent:.16em}
+/* --- IDOK-216 按下即反馈：进入要等登录 / 存档 / 角色几次网络往返，按钮里先转起来，其它入口暂停 ------- */
+.home-go .home-spin{width:14px;height:14px;flex:none;box-sizing:border-box;border-radius:50%;border:1.5px solid currentColor;border-right-color:transparent;opacity:.85;animation:ui-spin .8s linear infinite}
 .home-mode[aria-busy=true]{cursor:progress}
-.home-mode[aria-busy=true] .home-go{animation:home-breathe 1.6s ease-in-out infinite}
-.home[data-busy] .home-mode:not([aria-busy]),.home[data-busy] .home-resume{opacity:.55;pointer-events:none;transition:opacity .2s}
+.home[data-busy] .home-mode:not([aria-busy]),.home[data-busy] .home-resume{opacity:.5;pointer-events:none;transition:opacity .2s}
 .home .ui-btn[aria-busy=true]{cursor:progress;opacity:.7}
-.home .ui-btn[aria-busy=true]::after{content:"";width:11px;height:11px;border-radius:50%;border:2px solid currentColor;border-right-color:transparent;animation:home-spin .8s linear infinite}
-@keyframes home-spin{to{transform:rotate(360deg)}}
-@keyframes home-breathe{50%{filter:brightness(1.12)}}
-@keyframes home-live-pulse{0%,100%{box-shadow:0 0 0 3px rgba(143,193,181,.24)}50%{box-shadow:0 0 0 6px rgba(143,193,181,.06)}}
-@media (prefers-reduced-motion:reduce){.home-go .home-spin,.home .ui-btn[aria-busy=true]::after{animation-duration:2.4s}.home-mode[aria-busy=true] .home-go,.home-mp-live::before{animation:none}}
+.home .ui-btn[aria-busy=true]::after{content:"";width:11px;height:11px;box-sizing:border-box;border-radius:50%;border:1.5px solid currentColor;border-right-color:transparent;animation:ui-spin .8s linear infinite}
+@media (prefers-reduced-motion:reduce){.home-go .home-spin,.home .ui-btn[aria-busy=true]::after{animation-duration:2.4s!important;animation-iteration-count:infinite!important}}

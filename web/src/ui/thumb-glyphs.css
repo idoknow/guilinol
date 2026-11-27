@@ -1,0 +1,37 @@
+/* 拇指键刻线小像（IDOK-468，和封面三枚肖形印同一路数）：手机上的字键「跃 / 蹲 / 远近 / 叫车 / 翘头·手刹·爬起 / ±挡 / 压弯 / 拳 / 表情」
+   不再把字当图形，各换一枚桂林物件刻线小像——跃鲤、压低的斗笠蓑衣、近实远虚两座峰、共享电驴、翘头电驴 / (P) / 蓑笠翁起身、双箭头、燕掠弯道、正面拳、折扇。
+   字仍留在按钮里（font-size:0），读屏念 aria-label / 原字，测试照旧按 class 找键。
+   图是 thumb-*.svg 遮罩（24 网格，黑=亮部，生成器不入库），颜色跟 currentColor：常态纸色，选中态翻成纸底墨像。
+   「扶」（救援）保留字：只在救人时出现，字比图快。
+   只管默认 HUD：街头皮肤 body[data-hud=street]（docs/style.md 第二期，禁衬线和印）不动。 */
+body:not([data-hud=street]) .walk-ui :is(.btn-jump,.btn-crouch,.btn-view,.btn-hail,.btn-wheelie,.btn-gear-up,.btn-gear-down,.btn-tuck),
+body:not([data-hud=street]) :is(.emote-toggle,.cb-btn-punch){font-size:0;letter-spacing:0}
+body:not([data-hud=street]) .walk-ui :is(.btn-jump,.btn-crouch,.btn-view,.btn-hail,.btn-wheelie,.btn-gear-up,.btn-gear-down,.btn-tuck)::before,
+body:not([data-hud=street]) :is(.emote-toggle,.cb-btn-punch)::before,
+.thumb-ico{content:"";background:currentColor;-webkit-mask:var(--glyph) center/contain no-repeat;mask:var(--glyph) center/contain no-repeat}
+body:not([data-hud=street]) .walk-ui :is(.btn-jump,.btn-crouch,.btn-view,.btn-hail,.btn-wheelie,.btn-gear-up,.btn-gear-down,.btn-tuck)::before,
+body:not([data-hud=street]) :is(.emote-toggle,.cb-btn-punch)::before{position:absolute;inset:0;margin:auto;width:var(--g,56%);height:var(--g,56%);pointer-events:none}
+
+.walk-ui .btn-jump,.thumb-ico--jump{--glyph:url("./thumb-jump.svg");--g:50%}
+.walk-ui .btn-crouch,.thumb-ico--crouch{--glyph:url("./thumb-crouch.svg")}
+.walk-ui .btn-view,.thumb-ico--view{--glyph:url("./thumb-view.svg");--g:60%}
+.walk-ui .btn-hail,.thumb-ico--hail{--glyph:url("./thumb-hail.svg");--g:60%}
+.walk-ui .btn-wheelie{--glyph:url("./thumb-wheelie.svg");--g:54%}
+/* A 槽一键多义：开车时是手刹，摔车后是爬起（walk.ts 改字，body 上已有 data-ride / data-ride-crash），禁翘头时淡下去 */
+body[data-ride=car] .walk-ui .btn-wheelie{--glyph:url("./thumb-brake.svg");--g:58%}
+body[data-ride-crash="1"]:not([data-ride=car]) .walk-ui .btn-wheelie{--glyph:url("./thumb-getup.svg");--g:56%}
+body:not([data-hud=street]) .walk-ui .btn-wheelie[data-locked="1"]::before{opacity:.4}
+.walk-ui .btn-gear-up{--glyph:url("./thumb-gear-up.svg");--g:52%}
+.walk-ui .btn-gear-down{--glyph:url("./thumb-gear-down.svg");--g:52%}
+.walk-ui .btn-tuck{--glyph:url("./thumb-tuck.svg");--g:60%}
+.cb-btn-punch{--glyph:url("./thumb-punch.svg");--g:58%}
+.emote-toggle,.thumb-ico--emote{--glyph:url("./thumb-emote.svg");--g:54%}
+
+/* 表情键原来是带字的药丸；字收起后改成和别的拇指键一样的圆 */
+body:not([data-hud=street]) .emote-toggle{width:calc(44px*var(--k,1));height:calc(44px*var(--k,1));padding:0;border-radius:50%;box-sizing:border-box}
+
+/* 选中态（蹲着 / 拉远 / 翘头 / 压弯）：纸底墨像，不再用朱色——朱只给主操作 */
+body:not([data-hud=street]) .walk-ui :is(.btn-crouch,.btn-view,.btn-wheelie,.btn-tuck).on{background:var(--ui-paper);border-color:var(--ui-paper);color:var(--ui-ink);box-shadow:none}
+
+/* 指南里的同款小像：跟着文字走，1.5em 见方 */
+.thumb-ico{display:inline-block;width:1.5em;height:1.5em;margin-right:.25em;vertical-align:-.36em}

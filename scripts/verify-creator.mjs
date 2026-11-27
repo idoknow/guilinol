@@ -156,6 +156,8 @@ try {
     assert.equal(await creator.count(), 0)
     assert.deepEqual(await page.evaluate(() => JSON.parse(localStorage.getItem('glol.avatar.v1'))), saved)
     if (width === 390) {
+      // Touch entry auto-requests fullscreen (#360); the browser refuses to resize a fullscreen window.
+      await page.evaluate(() => document.fullscreenElement && document.exitFullscreen())
       await page.setViewportSize({width:height,height:width})
       await page.evaluate(() => window.dispatchEvent(new Event('game:open-wardrobe')))
       await page.click('.shop-edit-character')

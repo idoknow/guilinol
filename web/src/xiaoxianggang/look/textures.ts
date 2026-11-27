@@ -4,20 +4,13 @@
  * 约定：
  * 1. 所有可平铺建筑 PBR 贴图使用纯确定性 RGBA 像素缓冲（DataTexture），
  *    在浏览器 WebGL 与 headless Node 测试环境下产出一致分辨率与精确字节体积。
- * 2. 招牌合批图集在浏览器中使用高清 Canvas2D 矢量化字体绘制，在 Node 无 DOM
- *    环境中生成同等分辨率 RGBA 区块缓冲区（含真实配色框与清晰字体位图条纹）以验证显存预算。
+ * 2. 招牌合批图集见 sign-atlas.ts（浏览器 Canvas2D 绘制，Node 下同尺寸色块缓冲）。
  * 3. TextureUploadCache 按逻辑 key 唯一缓存：相同材质变体共用同一 THREE.Texture 实例，
  *    从根本上保证 WebGLTextures 零重复上传与显存严格受控（≤ 8 MiB）。
  */
 
 import * as THREE from 'three'
-import {
-  SIGN_ATLAS_RECTS,
-  XXG_PALETTE,
-  XXG_SIGN_FONTS,
-  XXG_TEXTURE_BUDGET_BYTES,
-  type AtlasRect,
-} from './palette.ts'
+import { XXG_PALETTE, XXG_TEXTURE_BUDGET_BYTES } from './palette.ts'
 
 export interface TextureBudgetEntry {
   readonly key: string
@@ -198,7 +191,7 @@ function heightFieldToNormalRgba(height: Float32Array, w: number, h: number, str
   return out
 }
 
-function configureDataTexture(
+export function configureDataTexture(
   data: Uint8Array,
   w: number,
   h: number,
@@ -218,7 +211,7 @@ function configureDataTexture(
   return tex
 }
 
-function fillPixelRect(
+export function fillPixelRect(
   buf: Uint8Array,
   w: number,
   h: number,
@@ -243,23 +236,6 @@ function fillPixelRect(
       buf[idx + 3] = rgba[3]
     }
   }
-}
-
-function strokePixelRect(
-  buf: Uint8Array,
-  w: number,
-  h: number,
-  x0: number,
-  y0: number,
-  rw: number,
-  rh: number,
-  border: number,
-  rgba: readonly [number, number, number, number],
-): void {
-  fillPixelRect(buf, w, h, x0, y0, rw, border, rgba)
-  fillPixelRect(buf, w, h, x0, y0 + rh - border, rw, border, rgba)
-  fillPixelRect(buf, w, h, x0, y0, border, rh, rgba)
-  fillPixelRect(buf, w, h, x0 + rw - border, y0, border, rh, rgba)
 }
 
 // ───────────────────────────── 各建筑贴图合成器 ─────────────────────────────
@@ -432,7 +408,7 @@ export function buildRenovatedTileMaps(cache: TextureUploadCache): {
         const m = tileNoise(x, y, NS, 16, 77)
         height[y * NS + x] = isGrout ? 0.25 : 0.9 + (m - 0.5) * 0.04
         const i = (y * NS + x) * 4
-        const rv = isGrout ? 210 : clampByte(92 + (m - 0.5) * 26)
+        const rv = isGrout ? 215 : clampByte(172 + (m - 0.5) * 26)
         rough[i] = rough[i + 1] = rough[i + 2] = rv
         rough[i + 3] = 255
       }
@@ -471,6 +447,9 @@ export function buildRenovatedTileMaps(cache: TextureUploadCache): {
   }
 }
 
+/** 吊顶矿棉板自发光底值（0..255）：让朝下的板面在半球光下不发灰，龙骨保持 0。 */
+export const CEILING_BOARD_GLOW = 188
+
 export function buildCeilingGridMaps(cache: TextureUploadCache): {
   map: THREE.Texture
   emissiveMap: THREE.Texture
@@ -480,7 +459,6 @@ export function buildCeilingGridMaps(cache: TextureUploadCache): {
   const RS = 128
   const [br, bg, bb] = XXG_PALETTE.ceilingBoard.rgb
   const [rr, rg, rb] = XXG_PALETTE.ceilingGridRail.rgb
-  const [lr, lg, lb] = XXG_PALETTE.ceilingLampCool.rgb
 
   let cached: { albedo: Uint8Array; emissive: Uint8Array; rough: Uint8Array } | null = null
   const ensure = () => {
@@ -496,10 +474,10 @@ export function buildCeilingGridMaps(cache: TextureUploadCache): {
         const tx = Math.floor(x / 128)
         const lx = x % 128
         const isRail = lx < 3 || ly < 3 || lx > 124 || ly > 124
-        // 对角格嵌入 600×600 方灯面板（匹配 #11/#13 方灯矩阵）
-        const isLampCell = (tx + ty) % 2 === 0
-        const inLampDiffuser = isLampCell && lx >= 10 && lx <= 117 && ly >= 10 && ly <= 117
+        // 方灯改由场景几何按 600mm 格对齐嵌入（runtime/indoor-scene.ts 方灯矩阵），贴图只留矿棉板与龙骨。
+        // 板面带一层柔和自发光，模拟地下廊道灯光在浅色吊顶上的漫反射；龙骨不发光，保留深灰分格线。
         const grain = (tileNoise(x, y, S, 4, 91) - 0.5) * 9
+        const fissure = tileNoise(x, y, S, 2, 37 + tx * 3 + ty * 5) > 0.84 ? -10 : 0
         const i = (y * S + x) * 4
         if (isRail) {
           albedo[i] = rr
@@ -508,21 +486,15 @@ export function buildCeilingGridMaps(cache: TextureUploadCache): {
           albedo[i + 3] = 255
           emissive[i] = emissive[i + 1] = emissive[i + 2] = 0
           emissive[i + 3] = 255
-        } else if (inLampDiffuser) {
-          albedo[i] = lr
-          albedo[i + 1] = lg
-          albedo[i + 2] = lb
-          albedo[i + 3] = 255
-          emissive[i] = lr
-          emissive[i + 1] = lg
-          emissive[i + 2] = lb
-          emissive[i + 3] = 255
         } else {
-          albedo[i] = clampByte(br + grain)
-          albedo[i + 1] = clampByte(bg + grain)
-          albedo[i + 2] = clampByte(bb + grain)
+          albedo[i] = clampByte(br + grain + fissure)
+          albedo[i + 1] = clampByte(bg + grain + fissure)
+          albedo[i + 2] = clampByte(bb + grain + fissure)
           albedo[i + 3] = 255
-          emissive[i] = emissive[i + 1] = emissive[i + 2] = 0
+          const glow = clampByte(CEILING_BOARD_GLOW + grain * 0.6 + fissure)
+          emissive[i] = glow
+          emissive[i + 1] = glow
+          emissive[i + 2] = clampByte(glow - 4)
           emissive[i + 3] = 255
         }
       }
@@ -535,9 +507,8 @@ export function buildCeilingGridMaps(cache: TextureUploadCache): {
         const tx = Math.floor(x / 64)
         const lx = x % 64
         const isRail = lx < 2 || ly < 2 || lx > 61 || ly > 61
-        const isLamp = (tx + ty) % 2 === 0 && lx >= 5 && lx <= 58 && ly >= 5 && ly <= 58
         const i = (y * RS + x) * 4
-        const rv = isLamp ? 48 : isRail ? 120 : 216
+        const rv = isRail ? 120 : 216 - ((tx + ty) % 2) * 8
         rough[i] = rough[i + 1] = rough[i + 2] = rv
         rough[i + 3] = 255
       }
@@ -836,379 +807,4 @@ export function buildWallAndStoneMaps(cache: TextureUploadCache): {
 
 function xEdgeOrBar(coord: number, size: number): boolean {
   return coord % (size / 2) < 3
-}
-
-// ───────────────────────────── 1024×512 招牌总图集 ─────────────────────────────
-
-interface SignBlockSpec {
-  readonly rect: AtlasRect
-  readonly bg: readonly [number, number, number]
-  readonly border: readonly [number, number, number]
-  readonly ink: readonly [number, number, number]
-  readonly subInk: readonly [number, number, number]
-  /** backlitPanel=true: 灯箱发光在浅底上、黑字不发光；false: 暗底亮字自发光 */
-  readonly backlitPanel: boolean
-  readonly glow: readonly [number, number, number]
-  readonly outlineStroke?: boolean
-  readonly cn: string
-  readonly en?: string
-  readonly badge?: string
-  readonly badgeStyle?: 'box' | 'cornerText'
-  readonly fontKind?: 'sans' | 'serif'
-}
-
-const SIGN_BLOCKS: readonly SignBlockSpec[] = [
-  {
-    rect: SIGN_ATLAS_RECTS.portal18Navy,
-    bg: XXG_PALETTE.portal18Navy.rgb,
-    border: [224, 212, 182],
-    ink: XXG_PALETTE.portal17RedInk.rgb,
-    subInk: [242, 244, 248],
-    backlitPanel: false,
-    glow: [232, 92, 74],
-    outlineStroke: true,
-    cn: '小香港商业城',
-    en: 'Xiao Xiang Gang Commercial Market',
-    badge: '18号 出入口',
-    badgeStyle: 'box',
-    fontKind: 'sans',
-  },
-  {
-    rect: SIGN_ATLAS_RECTS.portal17Gold,
-    bg: XXG_PALETTE.portal17Bronze.rgb,
-    border: [244, 234, 206],
-    ink: XXG_PALETTE.portal17RedInk.rgb,
-    subInk: [252, 250, 245],
-    backlitPanel: false,
-    glow: [236, 98, 76],
-    outlineStroke: true,
-    cn: '小香港商业城',
-    en: 'Xiao Xiang Gang Commercial Market',
-    badge: '17号 出入口',
-    badgeStyle: 'box',
-    fontKind: 'sans',
-  },
-  {
-    rect: SIGN_ATLAS_RECTS.portal10Glass,
-    bg: [236, 240, 244],
-    border: [94, 108, 124],
-    ink: [28, 38, 52],
-    subInk: [64, 78, 94],
-    backlitPanel: true,
-    glow: [220, 232, 244],
-    cn: '小香港商业城',
-    en: '10号出入口',
-    fontKind: 'sans',
-  },
-  {
-    rect: SIGN_ATLAS_RECTS.safetyExit,
-    bg: XXG_PALETTE.safetyExitGreen.rgb,
-    border: [238, 252, 244],
-    ink: [252, 255, 252],
-    subInk: [232, 252, 240],
-    backlitPanel: false,
-    glow: [164, 255, 198],
-    cn: '安全出口',
-    en: 'EXIT',
-    fontKind: 'sans',
-  },
-  {
-    rect: SIGN_ATLAS_RECTS.store1987,
-    bg: [24, 26, 32],
-    border: [212, 206, 196],
-    ink: [250, 246, 236],
-    subInk: [212, 206, 198],
-    backlitPanel: false,
-    glow: [255, 246, 224],
-    cn: '1987',
-    en: 'BOUTIQUE',
-    fontKind: 'serif',
-  },
-  {
-    rect: SIGN_ATLAS_RECTS.boutiqueB181,
-    bg: XXG_PALETTE.wallBoutiquePink.rgb,
-    border: [248, 242, 244],
-    ink: [28, 22, 24],
-    subInk: [72, 54, 58],
-    backlitPanel: true,
-    glow: [236, 204, 208],
-    cn: 'QUEEN.SHANSHAN.',
-    en: 'KOREAN BOUTIQUE',
-    badge: 'B181',
-    badgeStyle: 'cornerText',
-    fontKind: 'serif',
-  },
-  {
-    rect: SIGN_ATLAS_RECTS.stallYilianMid12,
-    bg: [246, 244, 238],
-    border: [194, 182, 168],
-    ink: [26, 20, 18],
-    subInk: [76, 62, 52],
-    backlitPanel: true,
-    glow: [248, 240, 222],
-    cn: '依莲 yilian',
-    en: '中区12号',
-    fontKind: 'sans',
-  },
-  {
-    rect: SIGN_ATLAS_RECTS.boutiqueYuyu,
-    bg: [250, 248, 244],
-    border: [188, 174, 154],
-    ink: [26, 22, 18],
-    subInk: [78, 62, 48],
-    backlitPanel: true,
-    glow: [252, 246, 232],
-    cn: '优优家',
-    en: 'YuYu',
-    fontKind: 'sans',
-  },
-  {
-    rect: SIGN_ATLAS_RECTS.boutiqueJiulin,
-    bg: XXG_PALETTE.boutiqueJiulinDark.rgb,
-    border: [198, 192, 182],
-    ink: [252, 250, 246],
-    subInk: [216, 212, 204],
-    backlitPanel: false,
-    glow: [252, 246, 234],
-    cn: '玖琳',
-    en: 'JIULIN A316',
-    fontKind: 'serif',
-  },
-  {
-    rect: SIGN_ATLAS_RECTS.atriumTiaodiao,
-    bg: XXG_PALETTE.atriumTiaodiaoAmber.rgb,
-    border: [252, 232, 198],
-    ink: [44, 22, 8],
-    subInk: [72, 38, 16],
-    backlitPanel: true,
-    glow: [246, 186, 108],
-    cn: '我的调调',
-    en: '中庭休息区',
-    fontKind: 'sans',
-  },
-  {
-    rect: SIGN_ATLAS_RECTS.alleyHkStreet,
-    bg: XXG_PALETTE.hkAlleyBlue.rgb,
-    border: [232, 240, 252],
-    ink: [252, 254, 255],
-    subInk: [218, 236, 255],
-    backlitPanel: false,
-    glow: [216, 234, 255],
-    cn: '小香港·港街',
-    en: 'FASHION 韩国女装',
-    fontKind: 'sans',
-  },
-  {
-    rect: SIGN_ATLAS_RECTS.discountTag19,
-    bg: XXG_PALETTE.discountTagYellow.rgb,
-    border: [24, 20, 16],
-    ink: [18, 16, 14],
-    subInk: [152, 20, 18],
-    backlitPanel: true,
-    glow: [236, 198, 54],
-    cn: '¥19',
-    en: '特价',
-    fontKind: 'sans',
-  },
-  {
-    rect: SIGN_ATLAS_RECTS.discountTag29,
-    bg: XXG_PALETTE.discountTagRed.rgb,
-    border: [250, 244, 236],
-    ink: [255, 252, 246],
-    subInk: [254, 228, 140],
-    backlitPanel: false,
-    glow: [244, 146, 128],
-    cn: '¥29',
-    en: '清仓',
-    fontKind: 'sans',
-  },
-  {
-    rect: SIGN_ATLAS_RECTS.discountTag39,
-    bg: XXG_PALETTE.discountTagYellow.rgb,
-    border: [24, 20, 16],
-    ink: [18, 16, 14],
-    subInk: [152, 20, 18],
-    backlitPanel: true,
-    glow: [236, 198, 54],
-    cn: '¥39',
-    en: '任选',
-    fontKind: 'sans',
-  },
-  {
-    rect: SIGN_ATLAS_RECTS.discountTag49,
-    bg: XXG_PALETTE.discountTagRed.rgb,
-    border: [250, 244, 236],
-    ink: [255, 252, 246],
-    subInk: [254, 228, 140],
-    backlitPanel: false,
-    glow: [244, 146, 128],
-    cn: '¥49',
-    en: '最新款',
-    fontKind: 'sans',
-  },
-]
-
-const cssRgb = (c: readonly [number, number, number]) => `rgb(${c[0]},${c[1]},${c[2]})`
-
-function drawSignAtlasCanvas(w: number, h: number, isEmissive: boolean): THREE.CanvasTexture {
-  const canvas = document.createElement('canvas')
-  canvas.width = w
-  canvas.height = h
-  const ctx = canvas.getContext('2d')!
-  ctx.fillStyle = isEmissive ? '#000000' : '#1b1d22'
-  ctx.fillRect(0, 0, w, h)
-
-  // 强制按 1024×512 逻辑坐标系绘制，再等比缩放到目标画布，杜绝低分发光遮罩字体重影错位
-  const LOGICAL_W = 1024
-  const LOGICAL_H = 512
-  ctx.save()
-  ctx.scale(w / LOGICAL_W, h / LOGICAL_H)
-
-  for (const s of SIGN_BLOCKS) {
-    const x = s.rect[0] * LOGICAL_W
-    const y = s.rect[1] * LOGICAL_H
-    const bw = (s.rect[2] - s.rect[0]) * LOGICAL_W
-    const bh = (s.rect[3] - s.rect[1]) * LOGICAL_H
-    const pad = Math.max(4, Math.round(Math.min(bw, bh) * 0.045))
-
-    if (isEmissive) {
-      const bgScale = s.backlitPanel ? 0.56 : 0.14
-      ctx.fillStyle = cssRgb([
-        Math.round(s.bg[0] * bgScale),
-        Math.round(s.bg[1] * bgScale),
-        Math.round(s.bg[2] * bgScale),
-      ])
-    } else {
-      ctx.fillStyle = cssRgb(s.bg)
-    }
-    ctx.fillRect(x, y, bw, bh)
-
-    ctx.strokeStyle = isEmissive ? (s.backlitPanel ? cssRgb(s.glow) : '#181818') : cssRgb(s.border)
-    ctx.lineWidth = Math.max(2, Math.round(Math.min(bw, bh) * 0.025))
-    ctx.strokeRect(x + pad, y + pad, bw - pad * 2, bh - pad * 2)
-
-    if (s.badge && s.badgeStyle === 'cornerText') {
-      ctx.fillStyle = isEmissive ? '#000000' : cssRgb(s.ink)
-      ctx.textAlign = 'right'
-      ctx.textBaseline = 'bottom'
-      ctx.font = `700 18px ${XXG_SIGN_FONTS.sans}`
-      ctx.fillText(s.badge, x + bw - pad * 2.2, y + bh - pad * 1.8)
-    } else if (s.badge) {
-      const badgeW = Math.round(bw * 0.21)
-      const badgeH = Math.round(bh * 0.34)
-      const bx = x + bw - badgeW - pad * 2.2
-      const by = y + pad * 2.2
-      ctx.fillStyle = isEmissive ? '#585858' : '#faf8f2'
-      ctx.fillRect(bx, by, badgeW, badgeH)
-      ctx.strokeStyle = isEmissive ? '#111111' : '#202428'
-      ctx.lineWidth = 2
-      ctx.strokeRect(bx, by, badgeW, badgeH)
-      ctx.fillStyle = isEmissive ? '#000000' : '#181a1f'
-      ctx.textAlign = 'center'
-      ctx.textBaseline = 'middle'
-      ctx.font = `700 ${Math.round(badgeH * 0.38)}px ${XXG_SIGN_FONTS.sans}`
-      ctx.fillText(s.badge, bx + badgeW / 2, by + badgeH / 2, badgeW - 8)
-    }
-
-    const fontStack = s.fontKind === 'serif' ? XXG_SIGN_FONTS.serif : XXG_SIGN_FONTS.sans
-    const reserveRight = s.badge && s.badgeStyle !== 'cornerText' ? bw * 0.25 : pad * 2.5
-    const textRegionW = bw - pad * 2.5 - reserveRight
-    const centerX = x + pad * 1.5 + textRegionW * 0.5
-    const mainY = s.en ? y + bh * 0.40 : y + bh * 0.52
-    const charFactor = Math.max(2.6, s.cn.length * 0.85)
-    const mainPx = Math.max(18, Math.round(Math.min(bh * (s.en ? 0.33 : 0.38), textRegionW / charFactor)))
-
-    ctx.textAlign = 'center'
-    ctx.textBaseline = 'middle'
-    ctx.font = `700 ${mainPx}px ${fontStack}`
-    const mainColor = isEmissive ? (s.backlitPanel ? '#000000' : cssRgb(s.glow)) : cssRgb(s.ink)
-    if (!isEmissive && s.outlineStroke) {
-      ctx.lineWidth = 3.5
-      ctx.strokeStyle = '#f8f6f0'
-      ctx.strokeText(s.cn, centerX, mainY, textRegionW * 0.94)
-    }
-    ctx.fillStyle = mainColor
-    ctx.fillText(s.cn, centerX, mainY, textRegionW * 0.94)
-
-    if (s.en) {
-      const subPx = Math.max(12, Math.round(Math.min(bh * 0.17, textRegionW / Math.max(4, s.en.length * 0.62))))
-      ctx.font = `700 ${subPx}px ${XXG_SIGN_FONTS.sans}`
-      ctx.fillStyle = isEmissive ? (s.backlitPanel ? '#000000' : cssRgb(s.glow)) : cssRgb(s.subInk)
-      ctx.fillText(s.en, centerX, y + bh * 0.74, textRegionW * 0.94)
-    }
-  }
-  ctx.restore()
-
-  const tex = new THREE.CanvasTexture(canvas)
-  tex.colorSpace = THREE.SRGBColorSpace
-  tex.flipY = true
-  tex.wrapS = THREE.ClampToEdgeWrapping
-  tex.wrapT = THREE.ClampToEdgeWrapping
-  tex.minFilter = THREE.LinearMipmapLinearFilter
-  tex.magFilter = THREE.LinearFilter
-  tex.anisotropy = 2
-  tex.needsUpdate = true
-  return tex
-}
-
-function drawSignAtlasNodeData(w: number, h: number, isEmissive: boolean): THREE.DataTexture {
-  const data = new Uint8Array(w * h * 4)
-  for (let i = 0; i < data.length; i += 4) {
-    data[i] = isEmissive ? 0 : 27
-    data[i + 1] = isEmissive ? 0 : 29
-    data[i + 2] = isEmissive ? 0 : 34
-    data[i + 3] = 255
-  }
-
-  for (const s of SIGN_BLOCKS) {
-    const x = s.rect[0] * w
-    const y = s.rect[1] * h
-    const bw = (s.rect[2] - s.rect[0]) * w
-    const bh = (s.rect[3] - s.rect[1]) * h
-    const bg: readonly [number, number, number, number] = isEmissive
-      ? [Math.round(s.bg[0] * 0.24), Math.round(s.bg[1] * 0.24), Math.round(s.bg[2] * 0.24), 255]
-      : [s.bg[0], s.bg[1], s.bg[2], 255]
-    fillPixelRect(data, w, h, x, y, bw, bh, bg)
-    const borderCol: readonly [number, number, number, number] = isEmissive
-      ? [s.glow[0], s.glow[1], s.glow[2], 255]
-      : [s.border[0], s.border[1], s.border[2], 255]
-    strokePixelRect(data, w, h, x + 2, y + 2, bw - 4, bh - 4, 2, borderCol)
-    const inkCol: readonly [number, number, number, number] = isEmissive
-      ? [s.glow[0], s.glow[1], s.glow[2], 255]
-      : [s.ink[0], s.ink[1], s.ink[2], 255]
-    fillPixelRect(data, w, h, x + bw * 0.16, y + bh * 0.34, bw * 0.56, Math.max(4, bh * 0.18), inkCol)
-    if (s.badge) {
-      fillPixelRect(data, w, h, x + bw * 0.76, y + bh * 0.14, bw * 0.18, bh * 0.28, [248, 246, 240, 255])
-    }
-  }
-
-  return configureDataTexture(data, w, h, isEmissive ? 'emissive' : 'albedo', false)
-}
-
-export function buildSignAtlasMaps(cache: TextureUploadCache): {
-  map: THREE.Texture
-  emissiveMap: THREE.Texture
-} {
-  const AW = 1024
-  const AH = 512
-  const EW = 512
-  const EH = 256
-  const hasDom = typeof document !== 'undefined'
-
-  return {
-    map: cache.acquire({
-      key: 'xxg:sign-atlas:albedo',
-      width: AW,
-      height: AH,
-      kind: 'albedo',
-      build: () => (hasDom ? drawSignAtlasCanvas(AW, AH, false) : drawSignAtlasNodeData(AW, AH, false)),
-    }),
-    emissiveMap: cache.acquire({
-      key: 'xxg:sign-atlas:emissive',
-      width: EW,
-      height: EH,
-      kind: 'emissive',
-      build: () => (hasDom ? drawSignAtlasCanvas(EW, EH, true) : drawSignAtlasNodeData(EW, EH, true)),
-    }),
-  }
 }

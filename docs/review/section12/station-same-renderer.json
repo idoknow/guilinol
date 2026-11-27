@@ -1,0 +1,22 @@
+{
+  "openingWorld": "f11a9657",
+  "mainRenderer": "19201f1d",
+  "mainRendererComparison": {
+    "stationHallChanged": false,
+    "buildingMeshChanges": [],
+    "fixedFootprints": 65,
+    "pavementChanges": {}
+  },
+  "sectionRendererComparison": {
+    "stationHallChanged": false,
+    "buildingMeshChanges": [],
+    "fixedFootprints": 65,
+    "pavementChanges": {}
+  },
+  "fixedRoadRecords": {
+    "fixedWays": 48,
+    "referenceChords": 245,
+    "changedChords": []
+  },
+  "equivalentMain": "cbdd8746"
+}

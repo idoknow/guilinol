@@ -29,6 +29,9 @@ export const look = {
   },
   sunColor: 0xfff0d4, sunPower: 2.7,
   hemiSky: 0xc9dcea, hemiGround: 0x6f6a5e, hemiPower: 1.2,
+  // 树木阴影下限（look/trees.ts）：树冠底面和背光树干的顶点色已烘焙暗面，实时光照再压一次会落到调色
+  // 对比度的黑位以下，整片变纯黑。按反照率 × 半球天光色 × 此系数给下限，只抬暗面，受光面不变。
+  treeShadeFloor: .8,
   exposure: 1.0,
   // Phase 2 colour grade, applied in every fogged material before fog (look/atmosphere.ts):
   // saturation, contrast around mid-grey; per time of day in time.ts (day / night values here).

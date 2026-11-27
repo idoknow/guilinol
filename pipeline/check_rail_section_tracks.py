@@ -99,8 +99,9 @@ if __name__ == "__main__":
     if args.all:
         from check_station_corridor_vertices import compare
         corridor = compare(args.world)
-        if corridor["referenceSegments"] != 1139 or corridor["changedChunks"]:
-            parser.exit(1, f"Station corridor differs from #300: {corridor['changedChunks']}\n")
+        if (corridor["referenceSegments"] != 1139 or corridor["changedChunks"] or
+                corridor["exteriorTies"] != 13 or corridor["changedExteriorTies"]):
+            parser.exit(1, f"Station corridor or section 11 ties differ: {corridor}\n")
         pipeline = Path(__file__).resolve().parent
         first_section = pipeline / "rail-audits"
         paths = [

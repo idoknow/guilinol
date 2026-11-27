@@ -9,71 +9,16 @@ export interface LazyMifenOptions {
   eagerVerify?: boolean
 }
 
-function isInputFocused(target: EventTarget | null): boolean {
-  if (!(target instanceof HTMLElement)) return false
-  const tag = target.tagName
-  return tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || target.isContentEditable
-}
-
 /**
  * 田源米粉轻量懒加载入口：不静态导入 Three.js/shop-mesh/materials/audio/story，
- * 保证首包 main.js 零 mifen 代码；玩家靠近三多路 <140m、按 N 键或点胶囊时才动态加载。
+ * 保证首包 main.js 零 mifen 代码；玩家靠近三多路 <140m 时才动态加载。
+ * 没有玩家侧传送入口（IDOK-468）：只能走、骑车或叫车过去。teleportToShop 只留给 verify/QA 探针。
  */
 export function mountLazyTianyuanMifen(ctx: MifenMountContext, opts: LazyMifenOptions = {}): MifenController {
   let real: MifenController | null = null
   let loading: Promise<MifenController> | null = null
   let disposed = false
   let lastDist = Infinity
-
-  // 轻量占位传送胶囊（挂载真模块后立即销毁，避免未进店区域加载整套 mifen CSS/3D）
-  const stubBtn = document.createElement('button')
-  stubBtn.type = 'button'
-  stubBtn.className = 'mifen-pill mifen-pill--lazy'
-  stubBtn.setAttribute('aria-label', '前往田源米粉，快捷键 N')
-  stubBtn.innerHTML = '<span>田源米粉</span><kbd style="font:600 11px/1 ui-monospace,monospace;padding:2px 6px;border-radius:999px;background:rgba(244,239,226,.12);color:#e9e3d4">N</kbd>'
-  const initHidden = document.body.hasAttribute('data-home') || document.body.hasAttribute('data-photo')
-  stubBtn.hidden = initHidden
-  Object.assign(stubBtn.style, {
-    position: 'fixed',
-    left: 'calc(14px + env(safe-area-inset-left))',
-    top: 'calc(58px + env(safe-area-inset-top))',
-    zIndex: '9',
-    height: '34px',
-    display: initHidden ? 'none' : 'inline-flex',
-    alignItems: 'center',
-    gap: '10px',
-    padding: '0 7px 0 14px',
-    borderRadius: '999px',
-    border: 'none',
-    boxShadow: 'inset 0 0 0 1px rgba(244,239,226,.14)',
-    background: 'rgba(22,36,33,.9)',
-    color: '#f4efe2',
-    font: '400 13px/1 var(--ui-serif,"Noto Serif SC","Songti SC",serif)',
-    letterSpacing: '0.02em',
-    whiteSpace: 'nowrap',
-    cursor: 'pointer',
-  })
-  const syncStubPlacement = (): void => {
-    const coarsePortrait =
-      typeof window.matchMedia === 'function' &&
-      window.matchMedia('(pointer: coarse) and (not (any-pointer: fine)) and (max-width: 520px)').matches
-    const shortLandscape =
-      typeof window.matchMedia === 'function' && window.matchMedia('(max-height: 480px)').matches
-    stubBtn.style.top = shortLandscape
-      ? 'calc(50px + env(safe-area-inset-top))'
-      : coarsePortrait
-        ? 'calc(104px + env(safe-area-inset-top))'
-        : 'calc(58px + env(safe-area-inset-top))'
-  }
-  syncStubPlacement()
-  window.addEventListener('resize', syncStubPlacement)
-  document.body.append(stubBtn)
-
-  function teardownStub(): void {
-    window.removeEventListener('keydown', onLazyKeyDown)
-    window.removeEventListener('resize', syncStubPlacement)
-    stubBtn.remove()
-  }
 
   function ensureLoaded(): Promise<MifenController> {
     if (real) return Promise.resolve(real)
@@ -88,7 +33,6 @@ export function mountLazyTianyuanMifen(ctx: MifenMountContext, opts: LazyMifenOp
               dispose() {},
             }
           }
-          teardownStub()
           real = mod.mountTianyuanMifen(ctx)
           return real
         })
@@ -104,22 +48,6 @@ export function mountLazyTianyuanMifen(ctx: MifenMountContext, opts: LazyMifenOp
     const ctrl = await ensureLoaded()
     return ctrl.teleportToShop()
   }
-
-  stubBtn.addEventListener('click', () => {
-    void teleportToShop()
-  })
-
-  function onLazyKeyDown(e: KeyboardEvent): void {
-    if (real || disposed) return
-    if (e.repeat || e.metaKey || e.ctrlKey || e.altKey) return
-    if (isInputFocused(e.target)) return
-    if (document.body.hasAttribute('data-home')) return
-    if (e.code === 'KeyN') {
-      e.preventDefault()
-      void teleportToShop()
-    }
-  }
-  window.addEventListener('keydown', onLazyKeyDown)
 
   if (opts.eagerVerify) void ensureLoaded()
 
@@ -155,11 +83,6 @@ export function mountLazyTianyuanMifen(ctx: MifenMountContext, opts: LazyMifenOp
         real.step(dt)
         return
       }
-      const inHome = document.body.hasAttribute('data-home') || document.body.hasAttribute('data-photo')
-      if (stubBtn.hidden !== inHome) {
-        stubBtn.hidden = inHome
-        stubBtn.style.display = inHome ? 'none' : 'inline-flex'
-      }
       if (!loading) {
         const ref = ctx.getPlayerPos() ?? ctx.camera.position
         const dx = ref.x - SHOP_CENTER_X
@@ -177,7 +100,6 @@ export function mountLazyTianyuanMifen(ctx: MifenMountContext, opts: LazyMifenOp
     },
     dispose() {
       disposed = true
-      teardownStub()
       real?.dispose()
       real = null
     },

@@ -14,9 +14,11 @@ export {blendPasserbyWeights, syncPasserbyActions}
 // pedestrians stay in the traffic BatchedMesh as one-draw stand-ins.
 
 type Walker = {x:number,y:number,z:number,yaw:number,speed:number,scale:number,down:number,kind:string,leaving:boolean}
-type Template = {scene:THREE.Object3D,clips:THREE.AnimationClip[]}
-type View = {root:THREE.Group,mixer?:THREE.AnimationMixer,walk?:THREE.AnimationAction,idle?:THREE.AnimationAction,
-  moving:boolean,walkWeight:number,template:number,placed:boolean,lastGx:number,lastGz:number,lastGy:number,groundAcc:number,animAcc:number}
+export type PasserbyTemplate = {scene:THREE.Object3D,clips:THREE.AnimationClip[]}
+type Template = PasserbyTemplate
+/** One cloned passer-by and its walk/idle clips. */
+export type PasserbyGait = {instance:THREE.Object3D,mixer:THREE.AnimationMixer,walk?:THREE.AnimationAction,idle?:THREE.AnimationAction,moving:boolean,walkWeight:number}
+type View = PasserbyGait&{root:THREE.Group,template:number,placed:boolean,lastGx:number,lastGz:number,lastGy:number,groundAcc:number,animAcc:number}
 
 // Street mix — present-day casual first; uniforms/office are a minority.
 const LOOK_WEIGHTS:Record<(typeof looks)[number],number>={basic:5,sport:8,outdoor:9,chinese:6,office:4,campus:3,
@@ -133,6 +135,58 @@ function createRoundedBackpack(paletteIdx: number): THREE.Mesh {
   return mesh
 }
 
+/** One street passer-by model: rigged character with its age look (hair tint, height and girth, student backpack). The street crowd and 小香港 B1 both build theirs here. */
+export async function buildPasserby(look:ReturnType<typeof randomPasserby>,random:()=>number,warm?:(root:THREE.Object3D)=>Promise<void>):Promise<PasserbyTemplate>{
+  const mod=await import('../walk/character')
+  const model=await mod.previewCharacter(look)
+  const hairMesh=model.scene.userData.creatorHair as THREE.Object3D|undefined
+  model.scene.userData={}
+  // 老人白发 / 花白：发型网格的顶点色是相对底色的比例，换底色即可
+  if(look.hairTint)hairMesh?.traverse(node=>{if(node instanceof THREE.Mesh)(node.material as THREE.MeshStandardMaterial).color.set(look.hairTint!)})
+  // 身高与体型：绕脚底缩放（角色原点在脚底），不改贴地
+  model.scene.scale.set(look.girth*look.height,look.height,look.girth*look.height)
+  if(look.age==='student'){
+    const torso=model.scene.getObjectByName('attach_torso')
+    if(torso)torso.add(createRoundedBackpack(Math.floor(random()*BACKPACK_PALETTES.length)))
+  }
+  await warm?.(model.scene)
+  return {scene:model.scene,clips:model.animations}
+}
+
+/** Clones a passer-by with walk and idle clips at random phases, already posed (never the bind T-pose). */
+export function passerbyInstance(t:PasserbyTemplate,speed:number):PasserbyGait{
+  const instance=clone(t.scene)
+  const mixer=new THREE.AnimationMixer(instance)
+  const clip=(name:string)=>t.clips.find(item=>item.name===name)
+  const walkClip=clip(figure.clips.walk),idleClip=clip(figure.clips.idle)
+  const walk=walkClip?mixer.clipAction(walkClip):undefined,idle=idleClip?mixer.clipAction(idleClip):undefined
+  const moving=speed>.15
+  const walkWeight=moving?1:0
+  if(walk){
+    walk.reset().setLoop(THREE.LoopRepeat,Infinity)
+    walk.setEffectiveTimeScale(THREE.MathUtils.clamp(speed/STRIDE,.45,1.25))
+    walk.time=Math.random()*walk.getClip().duration
+  }
+  if(idle){
+    idle.reset().setLoop(THREE.LoopRepeat,Infinity)
+    idle.setEffectiveTimeScale(1)
+    idle.time=Math.random()*idle.getClip().duration
+  }
+  syncPasserbyActions(walk,idle,walkWeight)
+  // Always evaluate frame 0 immediately so newly spawned or culled/far NPCs never display GLB bind-pose T-Pose.
+  mixer.update(0)
+  instance.updateMatrixWorld(true)
+  return {instance,mixer,walk,idle,moving,walkWeight}
+}
+
+/** Per frame: blend walk and idle, and match the stride to the walking speed (m/s). Advancing the mixer is up to the caller. */
+export function passerbyGait(view:PasserbyGait,speed:number,dt:number){
+  view.moving=speed>.15
+  view.walkWeight=blendPasserbyWeights(view.walkWeight,view.moving,dt)
+  syncPasserbyActions(view.walk,view.idle,view.walkWeight)
+  if(view.walk)view.walk.timeScale=THREE.MathUtils.clamp(speed/STRIDE,.45,1.25)
+}
+
 export function crowd(scene:THREE.Scene,camera:THREE.Camera,groundAt?:(x:number,z:number,y:number,car:boolean)=>number|undefined,warm?:(root:THREE.Object3D)=>Promise<void>){
   const mobile=touchUi()
   // IDOK-253: 每街只有 4–8 人，视距内的路人全部用带骨骼的角色，不再在近中景露出方块替身
@@ -144,24 +198,7 @@ export function crowd(scene:THREE.Scene,camera:THREE.Camera,groundAt?:(x:number,
   const random=()=>{seed=(seed*1664525+1013904223)>>>0;return seed/2**32}
   function template(index:number){
     if(!templates[index]){
-      const look=randomPasserby(random)
-      templates[index]=import('../walk/character').then(async mod=>{
-        const model=await mod.previewCharacter(look)
-        const hairMesh=model.scene.userData.creatorHair as THREE.Object3D|undefined
-        model.scene.userData={}
-        // 老人白发 / 花白：发型网格的顶点色是相对底色的比例，换底色即可
-        if(look.hairTint)hairMesh?.traverse(node=>{if(node instanceof THREE.Mesh)(node.material as THREE.MeshStandardMaterial).color.set(look.hairTint!)})
-        // 身高与体型：绕脚底缩放（角色原点在脚底），不改贴地
-        model.scene.scale.set(look.girth*look.height,look.height,look.girth*look.height)
-        if(look.age==='student'){
-          const torso=model.scene.getObjectByName('attach_torso')
-          if(torso)torso.add(createRoundedBackpack(Math.floor(random()*BACKPACK_PALETTES.length)))
-        }
-        const t={scene:model.scene,clips:model.animations}
-        await warm?.(model.scene)
-        ready[index]=t
-        return t
-      })
+      templates[index]=buildPasserby(randomPasserby(random),random,warm).then(t=>(ready[index]=t))
       templates[index]!.catch(error=>{templates[index]=undefined;console.warn('passer-by unavailable',error)})
     }
     return ready[index]
@@ -181,31 +218,11 @@ export function crowd(scene:THREE.Scene,camera:THREE.Camera,groundAt?:(x:number,
       if(readyIdx>=0){index=readyIdx;assigned.set(walker,index);t=ready[readyIdx]}
     }
     if(!t)return
-    const root=new THREE.Group(),instance=clone(t.scene)
-    root.name='G2 passer-by';root.add(instance)
-    const mixer=new THREE.AnimationMixer(instance)
-    const clip=(name:string)=>t.clips.find(item=>item.name===name)
-    const walkClip=clip(figure.clips.walk),idleClip=clip(figure.clips.idle)
-    const walk=walkClip?mixer.clipAction(walkClip):undefined,idle=idleClip?mixer.clipAction(idleClip):undefined
-    const moving=walker.speed>.15
-    const walkWeight=moving?1:0
-    if(walk){
-      walk.reset().setLoop(THREE.LoopRepeat,Infinity)
-      walk.setEffectiveTimeScale(THREE.MathUtils.clamp(walker.speed/STRIDE,.45,1.25))
-      walk.time=Math.random()*walk.getClip().duration
-    }
-    if(idle){
-      idle.reset().setLoop(THREE.LoopRepeat,Infinity)
-      idle.setEffectiveTimeScale(1)
-      idle.time=Math.random()*idle.getClip().duration
-    }
-    syncPasserbyActions(walk,idle,walkWeight)
-    // Always evaluate frame 0 immediately so newly spawned or culled/far NPCs never display GLB bind-pose T-Pose.
-    mixer.update(0)
-    instance.updateMatrixWorld(true)
+    const root=new THREE.Group(),gait=passerbyInstance(t,walker.speed)
+    root.name='G2 passer-by';root.add(gait.instance)
     scene.add(root)
     mainDetail(root)
-    const view={root,mixer,walk,idle,moving,walkWeight,template:index,placed:false,lastGx:NaN,lastGz:NaN,lastGy:walker.y,groundAcc:0,animAcc:0}
+    const view={root,...gait,template:index,placed:false,lastGx:NaN,lastGz:NaN,lastGy:walker.y,groundAcc:0,animAcc:0}
     active.set(walker,view)
     return view
   }
@@ -251,12 +268,8 @@ export function crowd(scene:THREE.Scene,camera:THREE.Camera,groundAt?:(x:number,
         }
         pos.y=view.lastGy
         view.root.scale.setScalar(Math.max(.001,walker.scale))
-        const moving=walker.speed>.15
         const prevWeight=view.walkWeight
-        view.moving=moving
-        view.walkWeight=blendPasserbyWeights(view.walkWeight,moving,dt)
-        syncPasserbyActions(view.walk,view.idle,view.walkWeight)
-        if(view.walk)view.walk.timeScale=THREE.MathUtils.clamp(walker.speed/STRIDE,.45,1.25)
+        passerbyGait(view,walker.speed,dt)
         // 视锥外路人跳过骨骼动画更新，远距 (>45m) 降频到 25Hz，近景或过渡中保持逐帧流畅
         bound.center.set(pos.x,pos.y+.9,pos.z);bound.radius=1.8
         if(!frustum.intersectsSphere(bound)){

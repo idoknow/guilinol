@@ -6,31 +6,58 @@ html,body{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;-
 img{-webkit-user-drag:none;user-drag:none}body{margin:0;background:var(--ui-ink-900)}canvas{display:block;touch-action:none}
 
 /* 一套玻璃按钮：所有浮在画面上的控件共用同一材质、同一按下态 */
-.walk-ui button,.btn-mode,.btn-menu,.account-entry,.vehicle-action,.dock-buttons>button,.photo-exit{font-family:var(--ui-serif);color:var(--ui-paper);background:var(--ui-glass);
+.walk-ui button,.btn-mode,.btn-menu,.account-entry,.vehicle-action,.dock-bar>button,.photo-exit{font-family:var(--ui-serif);color:var(--ui-paper);background:var(--ui-glass);
   border:1px solid var(--ui-glass-line);touch-action:none;user-select:none;-webkit-user-select:none;
   -webkit-tap-highlight-color:transparent;cursor:pointer;transition:background var(--ui-fast),transform var(--ui-fast),border-color var(--ui-fast)}
-.walk-ui button:hover,.btn-mode:hover,.btn-menu:hover,.account-entry:hover,.dock-buttons>button:hover{background:var(--ui-glass-strong)}
-.walk-ui button:active,.btn-mode:active,.btn-menu:active,.account-entry:active,.dock-buttons>button:active,.vehicle-action:active{background:rgba(169,80,60,.7);transform:scale(.95)}
+.walk-ui button:hover,.btn-mode:hover,.btn-menu:hover,.account-entry:hover,.dock-bar>button:hover{background:var(--ui-glass-strong)}
+.walk-ui button:active,.btn-mode:active,.btn-menu:active,.account-entry:active,.dock-bar>button:active,.vehicle-action:active{background:rgba(169,80,60,.7);transform:scale(.95)}
 
 /* 左上：菜单 + 账号 */
 .hud-me{position:fixed;left:calc(12px + env(safe-area-inset-left));top:calc(12px + env(safe-area-inset-top));z-index:5;display:flex;gap:8px;align-items:center}
-.btn-menu,.account-entry{display:inline-flex;align-items:center;gap:7px;box-sizing:border-box;height:var(--ui-h);padding:0 15px 0 12px;border-radius:var(--ui-r-pill);font-size:14px;letter-spacing:var(--ui-track)}
+.btn-menu,.account-entry{display:inline-flex;align-items:center;gap:7px;box-sizing:border-box;height:var(--ui-h);padding:0 15px 0 12px;border-radius:var(--ui-r-paper);font-size:14px;letter-spacing:var(--ui-track)}
 .btn-menu::before{content:"";width:15px;height:11px;background:linear-gradient(currentColor 0 0) 0 0/100% 1.5px no-repeat,linear-gradient(currentColor 0 0) 0 50%/70% 1.5px no-repeat,linear-gradient(currentColor 0 0) 0 100%/100% 1.5px no-repeat}
 .account-entry{max-width:11em;padding-left:5px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
 .account-entry::before{content:attr(data-initial) / "";flex:none;width:28px;height:28px;border-radius:50%;display:grid;place-items:center;font-size:13px;letter-spacing:0;
-  color:var(--ui-paper);background:var(--ui-jade-500);box-shadow:inset 0 0 0 1px rgba(244,239,226,.35)}
+  color:var(--ui-paper);background:var(--ui-jade-500);box-shadow:inset 0 0 0 1px rgba(244,239,226,.35);border-radius:3px}
 .account-entry[data-guest]::before{content:"" / "";background:rgba(244,239,226,.16) center/16px no-repeat url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='%23f4efe2'%3E%3Ccircle cx='8' cy='5.2' r='3'/%3E%3Cpath d='M2.2 14.5c.5-3.2 2.9-5 5.8-5s5.3 1.8 5.8 5z'/%3E%3C/svg%3E")}
 
+/* 左上一块匾（IDOK-468）：菜单 / 账号 / 指南 / 复位不再是四个各带边框的玻璃块，合成一块墨青纸面、内衬一道印框（同对话框的印框）；
+   键与键之间只靠留白分开。每个键仍是整高（--ui-h）可点，悬停 / 按下的底色只铺在印框以内。小像都是同一支笔画的 hud-*.svg 遮罩 + currentColor。
+   街头皮肤 body[data-hud=street] 按 docs/style.md 第二期，不套这一块。 */
+body:not([data-hud=street]) .hud-me{gap:0;padding:0 4px;border-radius:var(--ui-r-sm);background:var(--ui-surface-float)}
+body:not([data-hud=street]) .hud-me::after{content:"";position:absolute;inset:3px;border:1px solid var(--ui-line-strong);border-radius:var(--ui-r-xs);pointer-events:none}
+body:not([data-hud=street]) .hud-me>:is(.btn-menu,.account-entry,.btn-guide,.btn-unstuck){--hud-wash:transparent;border:0;border-radius:0;box-shadow:none;
+  background:linear-gradient(var(--hud-wash),var(--hud-wash)) center/100% calc(100% - 8px) no-repeat}
+body:not([data-hud=street]) .hud-me>:is(.btn-menu,.account-entry,.btn-guide,.btn-unstuck):hover{--hud-wash:var(--ui-fill-2)}
+body:not([data-hud=street]) .hud-me>:is(.btn-menu,.account-entry,.btn-guide,.btn-unstuck):active{--hud-wash:color-mix(in srgb,var(--ui-seal) 72%,transparent);transform:scale(var(--ui-press))}
+body:not([data-hud=street]) .hud-me>:is(.btn-menu,.account-entry,.btn-guide,.btn-unstuck):focus-visible{outline:2px solid var(--ui-focus);outline-offset:-4px}
+body:not([data-hud=street]) .btn-menu::before{width:18px;height:18px;background:currentColor;-webkit-mask:url("./hud-menu.svg") center/contain no-repeat;mask:url("./hud-menu.svg") center/contain no-repeat}
+/* 账号：游客是一枚斗笠翁小像；登录后头像字刻成一方残边朱文名章 */
+body:not([data-hud=street]) .account-entry::before{background:var(--ui-seal);box-shadow:none;border-radius:0;transform:rotate(-3deg);width:24px;height:24px;font-size:13px;
+  -webkit-mask:url("./home-seal.svg") center/100% 100% no-repeat;mask:url("./home-seal.svg") center/100% 100% no-repeat}
+body:not([data-hud=street]) .account-entry[data-guest]::before{background:currentColor;transform:none;width:22px;height:22px;
+  -webkit-mask:url("./hud-guest.svg") center/contain no-repeat;mask:url("./hud-guest.svg") center/contain no-repeat}
+body:not([data-hud=street]) .account-entry{padding-left:9px}
+/* 指南：「?」换成一册线装书；字留给读屏（aria-label 玩法指南） */
+body:not([data-hud=street]) .hud-me>.btn-guide{position:relative;font-size:0}
+body:not([data-hud=street]) .hud-me>.btn-guide::before{content:"";position:absolute;inset:0;margin:auto;width:18px;height:18px;background:currentColor;
+  -webkit-mask:url("./hud-guide.svg") center/contain no-repeat;mask:url("./hud-guide.svg") center/contain no-repeat}
+/* 复位：一笔圆相；确认态（车 / 船上第二次点）是印框里一方朱砂，不再循环闪 */
+body:not([data-hud=street]) .hud-me>.btn-unstuck svg{display:none}
+body:not([data-hud=street]) .hud-me>.btn-unstuck::before{content:"";flex:none;width:18px;height:18px;background:currentColor;
+  -webkit-mask:url("./hud-unstuck.svg") center/contain no-repeat;mask:url("./hud-unstuck.svg") center/contain no-repeat}
+body:not([data-hud=street]) .hud-me>.btn-unstuck.armed{--hud-wash:var(--ui-seal);animation:none;color:var(--ui-paper)}
+
 /* 右上 dock 里的模式切换 */
-.btn-mode{position:fixed;right:calc(14px + env(safe-area-inset-right));top:calc(12px + env(safe-area-inset-top));padding:8px 16px;border-radius:var(--ui-r-pill);font-size:14px;letter-spacing:var(--ui-track)}
+.btn-mode{position:fixed;right:calc(14px + env(safe-area-inset-right));top:calc(12px + env(safe-area-inset-top));padding:8px 16px;border-radius:var(--ui-r-paper);font-size:14px;letter-spacing:var(--ui-track)}
 
 /* 时辰 / 天气 */
 .sky-ui[hidden]{display:none!important}
-.sky-ui{position:fixed;left:calc(12px + env(safe-area-inset-left));top:calc(60px + env(safe-area-inset-top));display:flex;align-items:center;gap:6px;padding:4px 6px 4px 12px;border-radius:var(--ui-r-pill);
+.sky-ui{position:fixed;left:calc(12px + env(safe-area-inset-left));top:calc(60px + env(safe-area-inset-top));display:flex;align-items:center;gap:6px;padding:4px 6px 4px 12px;border-radius:var(--ui-r-paper);
   background:var(--ui-glass);border:1px solid var(--ui-glass-line-soft);color:var(--ui-paper);font-size:13px;letter-spacing:.06em;user-select:none;-webkit-user-select:none}
 .sky-time{min-width:7.6em;opacity:.92}.sky-group{display:flex;gap:2px;padding-left:6px;border-left:1px solid var(--ui-glass-line-soft)}
-.sky-ui button{font-family:inherit;font-size:13px;color:var(--ui-paper);background:none;border:0;border-radius:var(--ui-r-pill);width:26px;height:24px;padding:0;cursor:pointer;opacity:.72;transition:background var(--ui-fast),opacity var(--ui-fast);-webkit-tap-highlight-color:transparent}
-.sky-ui button:hover{opacity:1}.sky-ui button.on{background:rgba(169,80,60,.75);opacity:1}.sky-ui .sky-flow{font-size:10px;width:24px;border-left:1px solid var(--ui-glass-line-soft);border-radius:0 11px 11px 0}
+.sky-ui button{font-family:inherit;font-size:13px;color:var(--ui-paper);background:none;border:0;border-radius:3px;width:26px;height:24px;padding:0;cursor:pointer;opacity:.72;transition:background var(--ui-fast),opacity var(--ui-fast);-webkit-tap-highlight-color:transparent}
+.sky-ui button:hover{opacity:1}.sky-ui button.on{background:rgba(169,80,60,.75);opacity:1}.sky-ui .sky-flow{font-size:10px;width:24px;border-left:1px solid var(--ui-glass-line-soft);border-radius:0 3px 3px 0}
 /* IDOK-158: fold the panel down to the clock, so a phone in landscape keeps the top edge clear.
    The control has to read as a control: a bare ‹ at 55% opacity looked like decoration and was
    missed, so it carries its own glass chip and a drawn chevron instead of a text glyph. */
@@ -47,18 +74,20 @@ img{-webkit-user-drag:none;user-drag:none}body{margin:0;background:var(--ui-ink-
 output,footer,.hint{position:fixed;left:10px;background:var(--ui-glass);color:var(--ui-paper);font:11px/1.4 var(--ui-serif);padding:3px 10px;border-radius:var(--ui-r-pill);pointer-events:none}
 output{top:auto;bottom:10px;font-family:ui-monospace,monospace;display:none}body[data-debug] output{display:block}
 footer{left:auto;right:10px;bottom:10px;font-size:10px;opacity:.75}
-/* IDOK-239/374 测试画面声明 + 访问地址：接在右下署名之后（.beta-note 在 footer 内） */
+/* IDOK-239/374 测试画面声明 + 访问地址：接在右下署名之后（.beta-note 在 footer 内）。IDOK-468：只在 ?debug / ?verify 下出现 */
+body:not([data-debug]) .beta-note{display:none}
 .beta-note::before{content:" · "}.beta-note b{font-weight:600;letter-spacing:.04em}
 .hint{left:50%;bottom:36px;transform:translateX(-50%);font-size:12px;line-height:1.5;letter-spacing:.06em;padding:5px 16px;white-space:nowrap;opacity:.92}
-.toast{position:fixed;left:50%;top:18%;z-index:30;transform:translate(-50%,-8px);background:var(--ui-glass-strong);color:var(--ui-paper);font-size:15px;letter-spacing:.08em;padding:10px 20px;border-radius:var(--ui-r-md);
+.toast{position:fixed;left:50%;top:18%;z-index:30;transform:translate(-50%,-8px);background:var(--ui-glass-strong);color:var(--ui-paper);font-size:15px;letter-spacing:.08em;padding:10px 20px;border-radius:var(--ui-r-paper);
   border:1px solid var(--ui-glass-line-soft);opacity:0;pointer-events:none;transition:opacity .35s,transform .35s}
 /* IDOK-349：入场时文字立即可读，只保留 8px 下落位移；退场仍按上面的 .35s 淡出。
    在主线程繁忙时，Chromium 的 opacity 过渡可能迟迟不开始，提示会在若干帧里保持完全透明。 */
 .toast.show{opacity:1;transform:translate(-50%,0);transition:transform .35s}
 
 /* 载具上下车 */
-.vehicle-action{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(78px + env(safe-area-inset-bottom));padding:10px 24px;border-radius:var(--ui-r-pill);z-index:2;font-size:15px;letter-spacing:.12em;
-  background:var(--ui-seal);border-color:var(--ui-seal);box-shadow:0 6px 18px rgba(169,80,60,.32)}
+.vehicle-action{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(78px + env(safe-area-inset-bottom));padding:10px 24px;border-radius:var(--ui-r-paper);z-index:2;font-size:15px;letter-spacing:.12em;
+  /* 唯一主动作：平面朱砂 + 内衬一道纸色细线（印框），不发光 */
+  background:var(--ui-seal);border-color:var(--ui-seal);box-shadow:inset 0 0 0 3px var(--ui-seal),inset 0 0 0 4px rgba(244,239,226,.5)}
 .vehicle-action:active{transform:translateX(-50%) scale(.94)}
 body[data-photo] .vehicle-action{display:none}
 body[data-aboard] .btn-jump{display:none}
@@ -98,9 +127,10 @@ body[data-aboard] .btn-jump{display:none}
   .sky-ui{top:calc(58px + env(safe-area-inset-top));font-size:12px}.sky-ui button{width:30px;height:28px}
   .sky-ui .sky-fold{width:30px}.sky-ui .sky-fold::before{width:7px;height:7px;border-width:2px}
   .hint{display:none}
-  footer{left:50%;right:auto;transform:translateX(-50%);bottom:calc(6px + env(safe-area-inset-bottom));font-size:9px;opacity:.6;white-space:nowrap}
-  /* 手机上整行放不下：测试声明在同一块署名里换到第二行，网址不被省略号截掉 */
-  footer{text-align:center;border-radius:8px}footer .beta-note{display:block}footer .beta-note::before{content:none}
+  /* 手机底边是摇杆、快捷栏和拇指键：数据署名挂到顶边正中，做成一枚小题签；完整来源在「关于」 */
+  footer{left:50%;right:auto;top:0;bottom:auto;transform:translateX(-50%);max-width:max(200px,calc(100vw - 560px));min-width:0;overflow:hidden;text-overflow:ellipsis;
+    font-size:8px;line-height:11px;padding:0 8px;border-radius:0 0 4px 4px;opacity:.6;white-space:nowrap;text-align:center}
+  footer .beta-note{display:block}footer .beta-note::before{content:none}
   .btn-menu{padding:0 12px}.btn-menu span{display:none}
   .about-cols{grid-template-columns:1fr}}
 @media (pointer:coarse) and (not (any-pointer:fine)) and (max-height:500px){

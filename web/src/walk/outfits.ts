@@ -109,6 +109,7 @@ const TOP_RECIPES: Record<string, TopRecipe> = {
   top_night_moto: {primary: '#161b22', sleeve: '#1f2630', trim: '#20d6c1', inner: '#2b3440'},
   top_traffic_volunteer: {primary: '#d8ee1e', sleeve: '#192332', trim: '#d8ee1e', inner: '#192332'},
   top_traffic_police_shirt: {primary: '#7ab8e6', sleeve: '#7ab8e6', trim: '#18253c', inner: '#18253c'},
+  top_cover_dusk: {primary: '#d3c19f', sleeve: '#d3c19f', trim: '#bfab86', inner: '#e8decb'},
 }
 
 const BOTTOM_RECIPES: Record<string, BottomRecipe> = {
@@ -121,6 +122,7 @@ const BOTTOM_RECIPES: Record<string, BottomRecipe> = {
   bottom_night_moto: {main: '#181c22', belt: '#20d6c1'},
   bottom_traffic_duty: {main: '#1b2330', belt: '#dce6ee'},
   bottom_police_trousers: {main: '#1a263a', belt: '#1b2028'},
+  bottom_cover_dusk: {main: '#34405a', belt: '#1f232b'},
 }
 
 const SHOES_RECIPES: Record<string, ShoesRecipe> = {
@@ -132,6 +134,7 @@ const SHOES_RECIPES: Record<string, ShoesRecipe> = {
   shoes_guochao_sneaker: {upper: '#2a2d31', accent: '#d8b46a', sole: '#4a3121'},
   shoes_night_moto: {upper: '#171a1f', accent: '#20d6c1', sole: '#ffc53d'},
   shoes_traffic_duty: {upper: '#16191e', accent: '#2f3844', sole: '#111418'},
+  shoes_cover_dusk: {upper: '#efebe3', accent: '#b9a27d', sole: '#f5f2ec'},
 }
 
 const STARTER_PATTERNS: Record<string, number> = {
@@ -141,6 +144,7 @@ const STARTER_PATTERNS: Record<string, number> = {
   top_starter_track: 3,
   top_starter_shell: 4,
   top_starter_hoodie: 5,
+  top_cover_dusk: 6,
 }
 
 /** The daypack modelled into figure.glb (hidden since IDOK-133; colours kept for the recolour pass). */

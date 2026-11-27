@@ -18,66 +18,43 @@ import type * as THREE from 'three'
 export const XXG_CONTRACT_VERSION = 1 as const
 
 // ---------------------------------------------------------------------------
-// 1. 坐标系（唯一）
+// 1. 坐标系（唯一）：数值与纯函数住在 frame.ts（主包可安全导入，用于地面开洞注册），这里转出。
+//    室内局部坐标系 = 中心广场轴向坐标系：原点在广场锚点正下方，室内地面 y = 0；+X = 世界向量 E，+Z = 世界向量 S。
+//    每个下沉口在室内的位置就是 central_square.py 里的 _ax_pt 参数，地下出口正好落在地面入口下方。
 // ---------------------------------------------------------------------------
 
-export interface XxgXZ {
-  readonly x: number
-  readonly z: number
-}
+import {
+  XXG_AXIS_YAW,
+  XXG_FRAME,
+  XXG_PORTAL_SPECS,
+  XXG_STAIRWELL,
+  indoorToWorld,
+  rotateLocal,
+  stairwellFloorY,
+  stairwellViewBlend,
+  worldToIndoor,
+  yawFacing,
+  type XxgPortalId,
+  type XxgXZ,
+} from './frame.ts'
 
-/**
- * 室内局部坐标系 = 中心广场轴向坐标系：
- *   原点：广场锚点正下方，室内地面 y = 0；单位：米；Y 朝上；
- *   +X：沿广场主轴朝东南偏东（体育馆方向，世界向量 E）；
- *   +Z：横跨主轴朝南（世界向量 S）。
- * 这样每个下沉口在室内的位置就是 central_square.py 里的 _ax_pt 参数，地下出口正好落在地面入口下方。
- * E、S 直接沿用 pipeline 的取值（非严格单位长，行列式 0.99956，正值，右手系不变）；
- * indoorToWorld 与 pipeline 逐位一致，worldToIndoor 用精确逆矩阵，往返误差 < 1e-9m。
- */
-export const XXG_FRAME = {
-  units: 'm',
-  anchorWorld: { x: -845, z: 232 },
-  axisE: { x: 0.938, z: 0.346 },
-  axisS: { x: -0.346, z: 0.938 },
-  /** 地面入口处的世界地面高（m）。 */
-  surfaceY: 153.868,
-  /** 室内地面 y。室内场景独立渲染，不和世界高程发生关系。 */
-  indoorFloorY: 0,
-} as const
-
-/** 室内 (x, z) → 世界 (x, z)。只用于小地图、指南针和出口落点换算。 */
-export function indoorToWorld(p: XxgXZ): XxgXZ {
-  const { anchorWorld: a, axisE: e, axisS: s } = XXG_FRAME
-  return { x: a.x + p.x * e.x + p.z * s.x, z: a.z + p.x * e.z + p.z * s.z }
+export {
+  XXG_AXIS_YAW,
+  XXG_FRAME,
+  XXG_PORTAL_SPECS,
+  XXG_STAIRWELL,
+  indoorToWorld,
+  rotateLocal,
+  stairwellFloorY,
+  stairwellViewBlend,
+  worldToIndoor,
+  yawFacing,
 }
-
-/** 世界 (x, z) → 室内 (x, z)：[E S] 的精确逆。 */
-export function worldToIndoor(p: XxgXZ): XxgXZ {
-  const { anchorWorld: a, axisE: e, axisS: s } = XXG_FRAME
-  const det = e.x * s.z - s.x * e.z
-  const dx = p.x - a.x
-  const dz = p.z - a.z
-  return { x: (s.z * dx - s.x * dz) / det, z: (-e.z * dx + e.x * dz) / det }
-}
-
-/** 世界里 Object3D.rotation.y = yaw 时，局部 (x, z) 的世界位置（与 pipeline Builder._xf 同一公式）。 */
-export function rotateLocal(local: XxgXZ, yaw: number): XxgXZ {
-  const c = Math.cos(yaw)
-  const s = Math.sin(yaw)
-  return { x: local.x * c + local.z * s, z: -local.x * s + local.z * c }
-}
-
-/** 宿主 walkTo / camera.rotation.y 的朝向约定：相机看向 (-sin yaw, -cos yaw)。 */
-export function yawFacing(dir: XxgXZ): number {
-  return Math.atan2(-dir.x, -dir.z)
-}
+export type { XxgPortalId, XxgXZ }
 
 // ---------------------------------------------------------------------------
-// 2. 四个下沉入口
+// 2. 四个下沉入口（真楼梯井：地面开洞，25 级踏步直下 B1，井底平台门前换场）
 // ---------------------------------------------------------------------------
-
-export type XxgPortalId = 'E1' | 'E2' | 'W1' | 'W2'
 
 export const XXG_PORTAL_IDS: readonly XxgPortalId[] = ['E1', 'E2', 'W1', 'W2']
 
@@ -96,34 +73,19 @@ export interface XxgPortal {
   readonly inward: XxgXZ
 }
 
-/** 入口局部触发区（局部坐标，单位米）：台阶范围内越过阈线 thresholdZ 且朝内走即进入。 */
+/** Veiled exit (map, tests): drop the walker on the street at portal-local (0, landingZ), facing out. */
 export const XXG_PORTAL_TRIGGER = {
-  halfWidth: 2.1,
-  zMin: -1.2,
-  zMax: 3.96,
-  /** 越过这条线（局部 z 小于它）且移动方向与 inward 点积 > 0 时触发 enter。 */
-  thresholdZ: 3.0,
-  /** 与 groundY 的竖直容差。 */
-  yTolerance: 2,
-  /** 出来后的落点：局部 (0, landingZ)，即开口外 1.5m，面朝外。 */
+  /** 1.75 m past the top nosing, clear of the parapet opening. */
   landingZ: 5.8,
 } as const
 
-const AXIS_YAW = Math.atan2(-0.938, -0.346)
-
-function portal(id: XxgPortalId, label: string, along: number, across: number, yaw: number): XxgPortal {
-  const indoor = { x: along, z: across }
-  const world = indoorToWorld(indoor)
-  const back = rotateLocal({ x: 0, z: -1 }, yaw)
-  return { id, label, indoor, world, groundY: XXG_FRAME.surfaceY, yaw, inward: back }
-}
-
-export const XXG_PORTALS: readonly XxgPortal[] = [
-  portal('E1', '东南入口', -22, 26.5, AXIS_YAW),
-  portal('E2', '东北入口', -22, -26.5, AXIS_YAW + Math.PI),
-  portal('W1', '西南入口', -78, 19.5, AXIS_YAW),
-  portal('W2', '西北入口', -78, -19.5, AXIS_YAW),
-]
+export const XXG_PORTALS: readonly XxgPortal[] = XXG_PORTAL_SPECS.map(spec => {
+  const indoor = { x: spec.along, z: spec.across }
+  return {
+    id: spec.id, label: spec.label, indoor, world: indoorToWorld(indoor),
+    groundY: XXG_FRAME.surfaceY, yaw: spec.yaw, inward: rotateLocal({ x: 0, z: -1 }, spec.yaw),
+  }
+})
 
 export function getPortal(id: XxgPortalId): XxgPortal {
   const hit = XXG_PORTALS.find(p => p.id === id)
@@ -143,15 +105,6 @@ export function portalLanding(portalDef: XxgPortal): { x: number; z: number; yaw
   return { x: portalDef.world.x + off.x, z: portalDef.world.z + off.z, yaw: yawFacing(outward) }
 }
 
-/** 玩家当前位置与速度是否触发进入。纯函数，runtime 每帧调用。 */
-export function shouldEnterPortal(portalDef: XxgPortal, pos: { x: number; y: number; z: number }, vel: XxgXZ): boolean {
-  if (Math.abs(pos.y - portalDef.groundY) > XXG_PORTAL_TRIGGER.yTolerance) return false
-  const l = worldToPortalLocal(portalDef, pos)
-  if (Math.abs(l.x) > XXG_PORTAL_TRIGGER.halfWidth) return false
-  if (l.z < XXG_PORTAL_TRIGGER.zMin || l.z > XXG_PORTAL_TRIGGER.thresholdZ) return false
-  return vel.x * portalDef.inward.x + vel.z * portalDef.inward.z > 0
-}
-
 // ---------------------------------------------------------------------------
 // 3. 转场时序与性能预算
 // ---------------------------------------------------------------------------
@@ -167,12 +120,13 @@ export const XXG_TIMING = {
   veilFadeOutMs: 420,
   /** 从触发到可操作的总上限。 */
   totalMaxMs: 1000,
-  /** 出来后同一入口的再触发冷却，防止落点抖动来回进出。 */
-  reenterCooldownMs: 1500,
 } as const
 
 export const XXG_BUDGET = {
-  indoorDrawCallsMax: 40,
+  /** 室内总 draw calls：静态场景 + 主线同款带骨骼路人（每人约 7 次，视锥外隐藏不计）。 */
+  indoorDrawCallsMax: 80,
+  /** 其中静态场景（灰盒、店铺、楼梯井）自身的上限，余量全部给路人。 */
+  indoorSceneDrawCallsMax: 40,
   indoorTrianglesMax: 150_000,
   /** 室内纹理总字节（GPU 估算），与 Hy2 look 验收一致。 */
   indoorTextureBytesMax: 8 * 1024 * 1024,
@@ -208,14 +162,19 @@ export interface XxgHostContext {
   readonly renderer: THREE.WebGLRenderer
   /** 世界相机；室内不改它，只在出来时由宿主恢复。 */
   readonly worldCamera: THREE.PerspectiveCamera
-  /** 步行中返回玩家世界位置与水平速度；骑车、开车、飞行时返回 null（不触发入口）。 */
-  getWalker(): { position: { x: number; y: number; z: number }; velocity: XxgXZ } | null
+  /** 步行中返回玩家世界位置（y = 脚底）、本帧水平位移与视角；骑车、开车、飞行时返回 null（不触发入口）。 */
+  getWalker(): { position: { x: number; y: number; z: number }; velocity: XxgXZ; yaw?: number; pitch?: number } | null
   /** 打开转场遮罩，直接用 web/src/ui/loading.ts 的 veil(label, { destination })。 */
   openVeil(destination: string): { done(): Promise<void> }
   /** 暂停世界：停步行输入与物理、停世界渲染；宿主主循环改为调用 indoor.step + 渲染 indoor.scene。 */
   suspendWorld(): void
-  /** 恢复世界，把玩家放到落点（同步放置，入口周边区块一直在内存里，不走网络）。 */
-  resumeWorldAt(point: { x: number; z: number; yaw: number }): Promise<boolean>
+  /**
+   * 恢复世界并把玩家放回去。带 footY 时按原姿态原地续走（井底平台无感换场：位置、高度、朝向、俯仰都不变）；
+   * 不带 footY 时走旧的找落点放置。同步完成，入口周边区块一直在内存里，不走网络。
+   */
+  resumeWorldAt(point: { x: number; z: number; yaw: number; footY?: number; pitch?: number }): Promise<boolean>
+  /** 井内第一人称渐变：0 = 原视角，1 = 第一人称，null = 交还宿主视角设置。 */
+  setWorldViewBlend?(blend: number | null): void
   /** 室内期间宿主键盘、触屏处理要让路：runtime 设 document.body.dataset.xxgActive = '1'。 */
   readonly bodyFlag: 'xxgActive'
 }
@@ -245,7 +204,7 @@ export interface XxgIndoorScene {
   enter(portalId: XxgPortalId): Promise<boolean>
   /** inside → exiting → idle。时序：openVeil → 等 veilFadeInMs → resumeWorldAt(portalLanding) → veil.done()。 */
   exit(): Promise<boolean>
-  /** 每帧；inside 时推进室内玩家并检测出口，idle 时检测入口触发。 */
+  /** 每帧；idle 时跟随井里的步行者（视角渐变、井底平台换场），inside 时推进室内玩家，走回平台即换回街面。 */
   step(dtSeconds: number): void
   getMetrics(): XxgIndoorMetrics
   /** 任意状态 → disposed：释放几何、材质、纹理、DOM、监听器，删除 bodyFlag；可重复调用。 */
@@ -254,13 +213,14 @@ export interface XxgIndoorScene {
 
 /** 室内第一人称玩家参数。 */
 export const XXG_PLAYER = {
-  eyeHeight: 1.6,
+  /** Same as walk/camera.ts placeFirstPersonCamera, so the swap at the well landing keeps the eye height. */
+  eyeHeight: 1.62,
   radius: 0.3,
   walkSpeed: 1.6,
   runSpeed: 3.2,
+  /** walk/config run: on a well landing the indoor run pace matches the street so the swap never brakes. */
+  streetRunSpeed: 9,
   fovDeg: 70,
-  /** 离开出口楼梯底部进入「出去」触发：站在出口区域内且朝外走。 */
-  exitTriggerRadius: 1.5,
 } as const
 
 // ---------------------------------------------------------------------------

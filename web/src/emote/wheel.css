@@ -23,7 +23,12 @@
   width: min(72vmin, 300px);
   aspect-ratio: 1;
   border-radius: 50%;
-  background-image: repeating-conic-gradient(from -22.5deg, #e3eee452 0 0.5deg, transparent 0.5deg 45deg);
+  /* 分隔线：每格 360°/n，从格子正中往回半格起画，线落在相邻两格之间 */
+  background-image: repeating-conic-gradient(
+    from calc(-180deg / var(--emote-n, 8)),
+    #e3eee452 0 0.5deg,
+    transparent 0.5deg calc(360deg / var(--emote-n, 8))
+  );
   box-shadow: 0 8px 36px #10231c48;
 }
 .emote-slot,
@@ -48,13 +53,6 @@
   stroke-width: 1.7;
   stroke-linejoin: round;
   stroke-linecap: round;
-}
-.emote-slot:disabled:after {
-  content: '';
-  width: 5px;
-  height: 5px;
-  border: 1px solid #93a9a0;
-  border-radius: 50%;
 }
 .emote-slot.selected {
   background: #89bcaa50;

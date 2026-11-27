@@ -41,13 +41,15 @@ const connect = async (c) => { await new Promise((r) => c.ws.on('open', r)); c.j
 // 1. 少量违规（低于阈值）不封
 console.log('\n[1] 低于阈值不封')
 const few = await connect(client(910001, 'few'))
-for (let i = 1; i <= 2; i++) { few.pos(700, 3, 700); await sleep(2200) }   // 2 次未授权瞬移（阈值 3）
+for (let i = 1; i <= 4; i++) { few.pos(700, 3, 700); await sleep(120) }
+ok(few.got.some(m=>m.t==='cheat_capture'&&m.kind==='teleport'),'纠偏事件触发抓拍')
+ok(!few.got.some(m=>m.t==='banned'),'同次拉回连续收到拒绝包不累计封禁')
 const again = await connect(client(910001, 'few'))   // 重连同 uid（旧连接被顶掉，新连接仍能进）
 ok(again.got.some((m) => m.t === 'welcome'), '2 次违规（阈值 3）：重连仍可进')
 
 // 2. 达到阈值 → 自动封；封后重连被拦
 console.log('\n[2] 达到阈值自动封')
-for (let i = 1; i <= 2; i++) { again.pos(700, 3, 700); await sleep(2200) }   // 累计 4 次 ≥ 3
+for (let i = 1; i <= 2; i++) { again.pos(700, 3, 700); await sleep(2200) }
 await sleep(500)
 const bansNow = await fetch(`http://127.0.0.1:${PORT}/admin/bans`, {headers: {'x-admin-token': ADMIN}}).then((r) => r.json()).catch(() => ({}))
 console.log('    封禁列表:', JSON.stringify(bansNow).slice(0, 200))

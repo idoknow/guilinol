@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { execFileSync } from 'node:child_process'
-import { mkdirSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import test from 'node:test'
@@ -13,12 +13,16 @@ import {
 import {
   auditXxgProdProbe,
   buildPreviewArgs,
+  DEFAULT_FRAME,
   evaluateXxgChecks,
+  indoorToWorld,
   loadPortalCatalog,
+  measureSeam,
   normalizePortalId,
   parseVerifyArgs,
   SURFACE_PLAZA_Y,
 } from './verify-xxg-indoor.mjs'
+import { XXG_FIRST_SHOP_SHOTS, XXG_REF_SHOTS, parseShootArgs } from './shoot-xxg-refs.mjs'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 
@@ -150,7 +154,7 @@ test('auditXxgProdProbe 与 evaluateXxgChecks 精确检出 Stage 1 全部性能/
     errors: ['pageerror: crash'],
     surface: { y: 149.2, expectedY: 153.868 },
     enter: { enteredIndoor: false, transitionMs: 520, blackFrameDetected: true },
-    indoor: { autoFirstPerson: false, drawCalls: 62, collisionHeld: false },
+    indoor: { autoFirstPerson: false, drawCalls: 92, collisionHeld: false },
     exit: { returnedToSurface: false, returnDistM: 9.5, viewRestored: false },
     repeatCycles: { completed: 1, residualNodes: 3, residualDom: 2 },
     prodProbeAudit: { enforce: true, leakedKeys: ['viewer.xxg.forceEnter'] },
@@ -160,6 +164,38 @@ test('auditXxgProdProbe 与 evaluateXxgChecks 精确检出 Stage 1 全部性能/
   assert.ok(fail.failures.some(f => f.startsWith('TRANSITION_TOO_SLOW')))
   assert.ok(fail.failures.some(f => f.startsWith('INDOOR_DRAW_CALLS_EXCEEDED')))
   assert.ok(fail.failures.some(f => f.startsWith('SCENE_NODE_LEAK')))
+})
+
+test('measureSeam 与 evaluateXxgChecks：换场那一帧挪动不超过相邻步长才算无缝，瞬移到街面判跳变', () => {
+  const b1 = DEFAULT_FRAME.surfaceY - DEFAULT_FRAME.stairDepth
+  // Indoor player walking +x (indoor yaw -PI/2 looks along +x) on the landing, then the world walker continues.
+  const indoorFrames = [0, 1, 2, 3].map(i => ({ indoor: true, p: { x: -18.6 + 0.08 * i, y: 0, z: 26.5, eyeY: 1.62, yaw: -Math.PI / 2 } }))
+  const worldAt = (ix, jump = 0) => {
+    const w = indoorToWorld({ x: ix + jump, z: 26.5 })
+    const dir = { x: DEFAULT_FRAME.axisE.x, z: DEFAULT_FRAME.axisE.z }
+    return { indoor: false, w: { x: w.x, y: b1 + 0.9, z: w.z }, foot: b1, cam: { x: w.x + dir.x * 0.08, y: b1 + 1.62, z: w.z + dir.z * 0.08, fx: dir.x, fz: dir.z } }
+  }
+  const smooth = [...indoorFrames, ...[4, 5, 6].map(i => worldAt(-18.6 + 0.08 * i))]
+  const ok = measureSeam(smooth, false)
+  assert.equal(ok.frame, 4)
+  assert.ok(Math.abs(ok.stepM - 0.08) < 1e-3, `step ${ok.stepM}`)
+  assert.ok(ok.footM < 0.1 && ok.footDy < 1e-3 && ok.eyeM < 0.09 && ok.yawRad < 0.01, JSON.stringify(ok))
+
+  const jumped = [...indoorFrames, ...[4, 5, 6].map(i => worldAt(-18.6 + 0.08 * i, 9))]
+  const bad = measureSeam(jumped, false)
+  const base = {
+    errors: [],
+    enter: { enteredIndoor: true, seam: ok },
+    indoor: { autoFirstPerson: true },
+    exit: { returnedToSurface: true, seam: bad },
+    repeatCycles: { completed: 2 },
+  }
+  assert.deepEqual(evaluateXxgChecks({ ...base, exit: { returnedToSurface: true, seam: ok } }).failures, [])
+  const verdict = evaluateXxgChecks(base)
+  assert.equal(verdict.ok, false)
+  assert.ok(verdict.failures.some(f => f.startsWith('EXIT_SEAM_JUMP(foot')), verdict.failures.join(','))
+  assert.ok(evaluateXxgChecks({ ...base, exit: { returnedToSurface: true, seam: null } }).failures.includes('EXIT_SEAM_NOT_RECORDED'))
+  assert.equal(measureSeam(indoorFrames, false), null)
 })
 
 test('verify-xxg-indoor 与 stage-gate CLI --dry-run 命中 contract.ts(E1..W2) 且预览参数齐全', () => {
@@ -193,4 +229,22 @@ test('verify-xxg-indoor 与 stage-gate CLI --dry-run 命中 contract.ts(E1..W2) 
     blockedCode = err.status
   }
   assert.equal(blockedCode, 2)
+})
+
+test('shoot-xxg-refs 机位覆盖 refs/ 里全部室内实拍（04–20），首批三店各有一张，参数解析带默认值', () => {
+  const refsDir = join(__dirname, '../../docs/xiaoxianggang/refs')
+  const indoorRefs = readdirSync(refsDir).filter(f => /^(0[4-9]|1\d|20)-.+\.jpg$/.test(f)).sort()
+  assert.equal(indoorRefs.length, 17)
+  assert.deepEqual(XXG_REF_SHOTS.map(s => s.ref).sort(), indoorRefs)
+  for (const s of XXG_REF_SHOTS) {
+    assert.ok(existsSync(join(refsDir, s.ref)))
+    assert.ok(Number.isFinite(s.x) && Number.isFinite(s.z) && Number.isFinite(s.yaw))
+  }
+  const ids = new Set(XXG_FIRST_SHOP_SHOTS.map(s => s.id))
+  for (const id of ['shop-apparel', 'shop-accessory', 'shop-snack']) assert.ok(ids.has(id), id)
+  assert.deepEqual(parseShootArgs([]), { out: '/tmp/xxg-ref-shots', only: null, width: 540, warmup: 40 })
+  const o = parseShootArgs(['--only', '04, 05', '--width', '100', '--warmup', '0'])
+  assert.deepEqual(o.only, ['04', '05'])
+  assert.equal(o.width, 180)
+  assert.equal(o.warmup, 0)
 })

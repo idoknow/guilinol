@@ -1,7 +1,7 @@
 import * as THREE from 'three'
 import type {Tile} from './world'
 
-type Point=[number,number,number]
+export type Point=[number,number,number]
 import * as station from './station-tunnels'
 export type Tunnel=station.Tunnel
 export {floorLevel,nearbyTunnels} from './station-tunnels'
@@ -9,6 +9,10 @@ export type GroundCutout={
   id:string,corner?:string,kind?:string,center:Point,yaw:number,width:number,length:number,
   topY:number,floorY:number,polygon:[number,number][]
 }
+/** Open stairwell drawn by a landmark: the host only cuts terrain and adds an invisible stepped-ramp 'road' collider
+ * (ground-stairwells.ts). `land` extends the bottom landing under the grade to that local z and walls the well in
+ * invisibly (sides and that end). */
+export type GroundStairwell={id:string,x:number,z:number,grade:number,yaw:number,halfWidth:number,zTop:number,zBack:number,depth:number,riser:number,tread:number,land?:number}
 export type ShizijieCorridor={way?:number,id?:string,points:[number,number][],halfWidth:number}
 export type ShizijieShutter={x:number,z:number,yaw:number,width:number,height:number,code:string}
 export type ShizijieShop={x:number,z:number,yaw:number,width:number,height:number,name:string,accent:string,glow:string,index:number}
@@ -240,8 +244,18 @@ function queryUnderpassFloor(cutouts:GroundCutout[],ug:ShizijieUnderpass|undefin
   return undefined
 }
 
+// Landmark stairwells live in a lazy chunk; tile and tree builds await it, the per-frame queries just skip until then.
+let wells:typeof import('./ground-stairwells')|undefined
+export const groundStairwellsReady=import('./ground-stairwells').then(kit=>{wells=kit},error=>console.error(error))
+
+/** True on a landmark open-stairwell ramp (open to the sky, unlike the covered underpass). */
+export const openWellAt=(x:number,z:number,foot:number)=>wells?.floorAt(x,z,foot)!==undefined
+
 /** Query pedestrian underpass floor elevation (Shizijie 4 stairwells + 15-way ring concourse + shizijie.json underground). Excludes motor-vehicle tunnels. */
+
 export function underpassFloor(cutouts:GroundCutout[]|undefined,underpass:ShizijieUnderpass|undefined,x:number,z:number,foot:number){
+  const well=wells?.floorAt(x,z,foot)
+  if(well!==undefined)return well
   const primary=queryUnderpassFloor(cutouts??registeredCutouts,underpass??registeredUnderpass,undefined,x,z,foot)
   if(primary!==undefined)return primary
   if(registeredLandmarkUnderground){
@@ -310,10 +324,10 @@ export function treeBlocked(x:number,y:number,z:number){
     const lx=dx*cos-dz*sin,lz=dx*sin+dz*cos
     if(Math.abs(lx)<=c.width*.5+1.8&&Math.abs(lz)<=c.length*.5+2.0)return true
   }
-  return false
+  return wells?.blocksTree(x,z)??false
 }
 
-type Plane=(point:Point)=>number
+export type Plane=(point:Point)=>number
 export function joinPortalRoads(tile:Tile,tunnels:Tunnel[],buffers:Float32Array[]){
   for(const tunnel of tunnels){
     if(tunnel.nodes)continue
@@ -333,6 +347,25 @@ export function joinPortalRoads(tile:Tile,tunnels:Tunnel[],buffers:Float32Array[
     }
   }
 }
+/** Pieces of a polygon left outside every convex cut (planes >= 0 inside), or null when no cut touches it. */
+export function carve(poly:Point[],cuts:Plane[][]){
+  let pieces=[poly],changed=false
+  for(const planes of cuts){
+    const remaining:Point[][]=[]
+    for(const piece of pieces){
+      if(planes.some(plane=>piece.every(p=>plane(p)<=0))){remaining.push(piece);continue}
+      let inside=piece
+      for(const plane of planes){const outside=clip(inside,p=>-plane(p));if(outside.length>=3)remaining.push(outside);inside=clip(inside,plane)}
+      changed=true
+    }
+    pieces=remaining
+  }
+  return changed?pieces:null
+}
+/** Open the street surface and walk soups over landmark stairwells (ground-stairwells.ts). */
+export function cutStairwellStreets(tile:Tile,streets:{road:Float32Array,sidewalk:Float32Array,surface:THREE.BufferGeometry|null}){
+  wells?.cutStreets(tile,streets)
+}
 function clip(poly:Point[],plane:Plane){
   const result:Point[]=[]
   for(let index=0;index<poly.length;index++){
@@ -342,7 +375,7 @@ function clip(poly:Point[],plane:Plane){
   }
   return result
 }
-function fan(poly:Point[],out:number[]){for(let at=2;at<poly.length;at++)out.push(...poly[0],...poly[at-1],...poly[at])}
+export function fan(poly:Point[],out:number[]){for(let at=2;at<poly.length;at++)out.push(...poly[0],...poly[at-1],...poly[at])}
 
 let cachedShopMat:THREE.MeshBasicMaterial|null=null
 function getShopAtlasMaterial(shops:ShizijieShop[]){
@@ -426,7 +459,7 @@ export function tunnelGeometry(
   const cutouts=extraCutouts.length?[...baseCutouts,...extraCutouts]:baseCutouts
   const ug=underpass??registeredUnderpass??registeredLandmarkUnderground?.underpass
   const extraWalkPoly=underpass||registeredUnderpass?registeredLandmarkUnderground?.walkPolygon:undefined
-  const parts={floor:[] as number[],interior:[] as number[],portal:[] as number[],band:[] as number[],lamp:[] as number[],lane:[] as number[],ceiling:[] as number[]}
+  const parts={floor:[] as number[],interior:[] as number[],portal:[] as number[],band:[] as number[],lamp:[] as number[],lane:[] as number[],ceiling:[] as number[],ghost:[] as number[]}
   const shopPos:number[]=[],shopUv:number[]=[]
   const cuts:Plane[][]=[]
   const limits:Plane[]=[p=>p[0],p=>256-p[0],p=>p[2],p=>256-p[2]]
@@ -514,6 +547,10 @@ export function tunnelGeometry(
     // End wall behind stair entry & soffit bulkhead where deep stair enters corridor
     quad([toTile(-hwr,c.topY,hlr),toTile(hwr,c.topY,hlr),toTile(hwr,c.floorY+head,hlr),toTile(-hwr,c.floorY+head,hlr)],'portal')
   }
+
+  // Landmark stairwells: exact terrain hole + invisible ramp profile and walls.
+  const stairwellParts=wells?.tileWells(tile)
+  if(stairwellParts){cuts.push(...stairwellParts.cuts);for(const q of stairwellParts.quads)quad(q,'ghost')}
 
   // Shizijie "小香港" -4.2m underground concourse (15-way OSM network, central ring atrium, 16 shutters + 16 lit shops)
   if(ug&&ug.center[0]+90>=tile.x&&ug.center[0]-90<=tile.x+256&&ug.center[2]+90>=tile.z&&ug.center[2]-90<=tile.z+256){
@@ -676,22 +713,11 @@ export function tunnelGeometry(
     }
   }
 
-  if(!parts.floor.length&&!cuts.length)return null
+  if(!parts.floor.length&&!parts.ghost.length&&!cuts.length)return null
   const pos=ground.getAttribute('position'),index=ground.index!,vertices:number[]=[],keep:number[]=[]
   for(let at=0;at<index.count;at+=3){
-    const ids=[0,1,2].map(off=>index.getX(at+off)),triangle=ids.map(id=>[pos.getX(id),pos.getY(id),pos.getZ(id)] as Point)
-    let pieces=[triangle],changed=false
-    for(const planes of cuts){
-      const remaining:Point[][]=[]
-      for(const piece of pieces){
-        if(planes.some(plane=>piece.every(p=>plane(p)<=0))){remaining.push(piece);continue}
-        let inside=piece
-        for(const plane of planes){const outside=clip(inside,p=>-plane(p));if(outside.length>=3)remaining.push(outside);inside=clip(inside,plane)}
-        changed=true
-      }
-      pieces=remaining
-    }
-    if(changed)pieces.forEach(poly=>fan(poly,vertices));else keep.push(...ids)
+    const ids=[0,1,2].map(off=>index.getX(at+off)),pieces=carve(ids.map(id=>[pos.getX(id),pos.getY(id),pos.getZ(id)]),cuts)
+    if(pieces)pieces.forEach(poly=>fan(poly,vertices));else keep.push(...ids)
   }
   ground.setIndex(keep)
   const looks:Record<string,THREE.Material>={
@@ -718,6 +744,8 @@ export function tunnelGeometry(
     shopMesh.name='shizijie_xiaoxianggang_shops'
     lampMesh.add(shopMesh)
   }
+  const ghost=parts.ghost.length?mesh(parts.ghost,'road'):undefined
+  if(ghost){ghost.visible=false;ghost.name='tunnel_stairwell_ramp'}
   return {fringe,floor:mesh(parts.floor,'road'),interior:mesh(parts.interior,'interior'),portal:mesh(parts.portal,'portal'),
-    band:mesh(parts.band,'band'),ceiling:mesh(parts.ceiling,'ceiling'),lamp:lampMesh,lane:mesh(parts.lane,'lane')}
+    band:mesh(parts.band,'band'),ceiling:mesh(parts.ceiling,'ceiling'),lamp:lampMesh,lane:mesh(parts.lane,'lane'),ghost}
 }
