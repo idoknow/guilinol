@@ -1,5 +1,7 @@
 import unittest
 from math import cos, sin
+from shapely.geometry import Point
+import numpy as np
 
 from airport_pavement import pavement_sources
 from airport_props import layout
@@ -22,6 +24,17 @@ class LiangjiangSnapshot(unittest.TestCase):
     def test_fixture_counts_and_panel_ends(self):
         def grade(east,south): return 170+.08*east+.11*south
         props=layout(self.elements,self.bounds,grade)
+        _,sources=pavement_sources(self.elements)
+        runway=sources['runway'][0][1]
+        lamps=[Point(east,south) for east,_,south,*_ in props['approachLight']]
+        self.assertGreaterEqual(min(self.bounds.boundary.distance(lamp) for lamp in lamps),5)
+        for tip,inner in [(runway.coords[0],runway.coords[1]),(runway.coords[-1],runway.coords[-2])]:
+            direction=np.subtract(tip,inner); direction/=np.linalg.norm(direction)
+            farthest=max(np.dot(np.subtract(lamp.coords[0],tip),direction) for lamp in lamps)
+            expected=900 if tip[1]<runway.centroid.y else 585
+            self.assertAlmostEqual(farthest,expected,places=2)
+        for east,base,south,*_ in props['approachLight']:
+            self.assertAlmostEqual(base,grade(east,south),delta=.001)
         for kind,count in [('bridgePivot',31),('bridgeDock',31),('beacon',3),('standSign',66)]:
             self.assertEqual(len(props[kind]),count)
         for kind in ('airliner','cart','bus','tug','fuel','stairs','fence','mast'):

@@ -341,6 +341,18 @@ def run(directory):
                 if not -SINK <= gap <= FLOAT: errors.append([east,south,gap])
         result['airportFence'] = dict(panels=len(rows['fence']),failures=len(errors),examples=errors[:20])
         result['failures'] += len(errors)
+        from airport_props import APPROACH_MARGIN
+        from play_region import PlayRegion
+        safe=PlayRegion().geometry.buffer(-APPROACH_MARGIN)
+        errors=[]
+        for east,base,south,*_ in rows['approachLight']:
+            if not safe.covers(shapely.Point(east,south)):
+                errors.append([east,south,'outside inset'])
+                continue
+            gap=base-world.sample(east,south,include_peaks=False)[0]
+            if not -SINK <= gap <= FLOAT: errors.append([east,south,gap])
+        result['airportApproachLights']=dict(posts=len(rows['approachLight']),failures=len(errors),examples=errors[:20])
+        result['failures']+=len(errors)
     (directory/'grounding.json').write_text(json.dumps(result, separators=(',',':'))+'\n')
     return result
 

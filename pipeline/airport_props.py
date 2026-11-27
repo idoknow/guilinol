@@ -11,6 +11,23 @@ from airport_pavement import pavement_sources
 from common import load_osm
 from features import area, points
 
+APPROACH_MARGIN = 5.0
+
+
+def approach_points(tip, forward, inset):
+    tip=np.asarray(tip)
+    right=np.array([forward[1],-forward[0]])
+    axis=LineString([tip,tip+900*forward]).intersection(inset)
+    segment=next((part for part in getattr(axis,'geoms',[axis]) if not part.is_empty and
+                  part.geom_type=='LineString' and part.distance(Point(tip))<.001),None)
+    if segment is None: return
+    limit=min(900,math.floor(segment.length+.000001))
+    stations=list(range(30,limit+1,30))
+    if stations and limit-stations[-1]>=5: stations.append(limit)
+    for station in stations:
+        for shift in ((-10,-5,0,5,10) if station%150==0 else (0,)):
+            point=tip+station*forward+shift*right
+            if inset.covers(Point(point)): yield point
 
 def layout(elements, bounds, ground):
     field,sources = pavement_sources(elements)
@@ -67,15 +84,14 @@ def layout(elements, bounds, ground):
         for shift,kind in [(10,['tug','cart','stairs','fuel','bus'][(len(occupied)-1)%5]),(15,'cart')]:
             point=center+right*shift+forward*10
             if not buildings.intersects(Point(point).buffer(3)): put(kind,point,angle(forward))
+    light_inset=bounds.buffer(-APPROACH_MARGIN-.002)
     for _,line in sources['runway']:
         for side in (-1,1):
             edge=line.offset_curve(side*23)
             for station in np.arange(0,edge.length,60): put('edgeLight',edge.interpolate(station).coords[0])
         for tip,inner in [(line.coords[0],line.coords[1]),(line.coords[-1],line.coords[-2])]:
             forward=vector(inner,tip); right=np.array([forward[1],-forward[0]])
-            for distance in range(30,901,30):
-                for shift in ((-10,-5,0,5,10) if distance%150==0 else (0,)):
-                    put('approachLight',tip+distance*forward+shift*right)
+            for point in approach_points(tip,forward,light_inset): put('approachLight',point)
             for shift in (35,43,51,59): put('papi',tip-290*forward+shift*right,angle(forward))
             put('windsock',tip-110*forward+70*right)
     for _,line in sources['taxiway']:

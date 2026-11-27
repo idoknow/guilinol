@@ -5,6 +5,7 @@ import math
 import numpy as np
 from PIL import ImageDraw
 from shapely.geometry import LineString
+from shapely.ops import unary_union
 
 from common import load_osm
 from features import area, points, polygons
@@ -54,10 +55,15 @@ def bake_airport(texture,left,top,bounds,stencil,palette):
                 if not area(row).is_empty: continue
                 stroke(line,'marking_yellow')
                 for side in (-1,1): stroke(line.offset_curve(side*(float(row['tags'].get('width',23))/2-1)),'marking_yellow')
+    apron_area=unary_union([area(row) for row,_ in sources['apron']])
     for _,line in sources['parking_position']:
         stroke(line,'marking_yellow')
         end=np.array(line.coords[-1]); delta=end-line.coords[-2]; normal=np.array([-delta[1],delta[0]])/max(np.linalg.norm(delta),.1)
         stroke(LineString([end-3*normal,end+3*normal]),'marking_yellow')
+        along=np.array([normal[1],-normal[0]])
+        equipment=LineString([end+normal*side+along*depth for side,depth in
+                              [(6,-4),(13,-4),(13,-14),(6,-14),(6,-4)]])
+        stroke(equipment.intersection(apron_area),'marking_red')
     for row,line in sources['runway']:
         if row['tags'].get('ref')!='01/19': continue
         ends=sorted([np.array(line.coords[0]),np.array(line.coords[-1])],key=lambda pair:pair[1])

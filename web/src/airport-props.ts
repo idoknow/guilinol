@@ -55,6 +55,7 @@ function shape(kind:string, far=false){
   }else if(['taxiLight','approachLight','edgeLight','papi','beacon','mastLight'].includes(kind)){
     const color=kind==='taxiLight'?0x5284e8:kind==='papi'?0xef5942:white
     oval(color,0,kind==='mastLight'?29:.38,0,kind==='mastLight'?2.4:.36,.22,kind==='mastLight'?2.4:.36)
+    if(kind==='approachLight')box(tire,0,.11,0,.12,.22,.12)
   }else{
     const long=kind==='bus'?9:kind==='fuel'?7:kind==='cart'?3:4.2
     box(silver,0,.95,0,2,1,long);box(kind==='cart'?silver:glass,0,1.85,long*.27,1.96,.98,long*.34)
@@ -70,6 +71,22 @@ export async function mountAirport(scene:THREE.Scene,file:string){
   const rows=JSON.parse(new TextDecoder().decode(await fetchAsset(file))) as Record<string,Row[]>
   const root=new THREE.Group(), pose=new THREE.Object3D(), planes:THREE.InstancedMesh[]=[]
   if(rows.mast)rows.mastLight=rows.mast
+  const labels:THREE.BufferGeometry[]=[]
+  const segments=['abcdef','bc','abdeg','abcdg','bcfg','acdfg','acdefg','abc','abcdefg','abcdfg']
+  rows.standSign?.forEach(([east,height,south,yaw],index)=>{
+    const digits=String(index+1).padStart(2,'0')
+    const bars=[['a',0,.22],['b',.13,.11],['c',.13,-.11],['d',0,-.22],['e',-.13,-.11],['f',-.13,.11],['g',0,0]] as const
+    for(const [pos,digit] of [...digits].entries())for(const [name,dx,dy] of bars){
+      if(!segments[Number(digit)].includes(name))continue
+      const horiz='adg'.includes(name)
+      labels.push(new THREE.PlaneGeometry(horiz?.24:.045,horiz?.045:.18)
+        .translate((pos-.5)*.44+dx,1.6+dy,.086).rotateY(yaw).translate(east,height,south))
+    }
+  })
+  if(labels.length){
+    const geometry=mergeGeometries(labels)!;labels.forEach(part=>part.dispose())
+    root.add(new THREE.Mesh(geometry,new THREE.MeshStandardMaterial({name:'airport_stand_digits',color:0xffce4f})))
+  }
   for(const [kind,instances] of Object.entries(rows)){
     const lit=['mastLight','taxiLight','edgeLight','approachLight','papi','beacon'].includes(kind)
     const material=new THREE.MeshStandardMaterial({vertexColors:true,side:THREE.DoubleSide,roughness:.85,emissive:lit?0x888977:0})
