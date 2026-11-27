@@ -1054,7 +1054,9 @@ export function mountTianyuanMifen(ctx: MifenMountContext): MifenController {
   function railFitKeyOf(tickets: RailTicket[]): string {
     const body = document.body
     const ids = tickets.slice(0, MAX_TICKETS).map(t => t.id).join(',')
-    return `${innerWidth}x${innerHeight}|${lastBarBottom}|${body.dataset.mifenCooking}${body.dataset.mifenDrawer}|${body.dataset.thumbLayout}${body.dataset.thumbHand}${body.style.getPropertyValue('--thumb-scale')}|${ids}`
+    // 超出 MAX_TICKETS 时多一行「还有 N 张」，要算进 key，否则第 6 张进来不重量会内滚
+    const more = tickets.length > MAX_TICKETS ? '+' : ''
+    return `${innerWidth}x${innerHeight}|${lastBarBottom}|${body.dataset.mifenCooking}|${body.dataset.mifenDrawer}|${body.dataset.thumbLayout}|${body.dataset.thumbHand}|${body.style.getPropertyValue('--thumb-scale')}|${ids}${more}`
   }
 
   function renderTickets(tickets: RailTicket[]): void {
@@ -1064,7 +1066,7 @@ export function mountTianyuanMifen(ctx: MifenMountContext): MifenController {
       return
     }
     railFitKey = key
-    railCap = MAX_TICKETS
+    railCap = Math.min(MAX_TICKETS, tickets.length)
     paintTicketRail(tickets, railCap)
     while (railCap > 1 && ticketRailEl.scrollHeight > ticketRailEl.clientHeight + 1) {
       railCap -= 1
