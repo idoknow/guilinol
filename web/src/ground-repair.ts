@@ -498,6 +498,22 @@ function evalRoadCtrlLocal([baseMm, deltas]: RoadCtrl, lx: number, lz: number): 
   return (baseMm + sum) / 1000
 }
 
+export function gradeRenminShoulder(tileX:number,tileZ:number,terrain:Int16Array,underlay:Int16Array,water:Int16Array,ctrl:RoadCtrl|null|undefined){
+  if(tileX!==-768||tileZ!==256||!ctrl)return
+  const startX=121.99,startZ=117.85,dx=35.20,dz=14.50
+  for(let row=24;row<=39;row++)for(let col=25;col<=44;col++){
+    const east=col*4,south=row*4,index=row*65+col
+    if(water[index]!==-32768)continue
+    const along=Math.max(0,Math.min(1,((east-startX)*dx+(south-startZ)*dz)/(dx*dx+dz*dz)))
+    const distance=Math.hypot(east-startX-along*dx,south-startZ-along*dz)
+    if(distance>=18)continue
+    const weight=Math.min(1,(18-distance)/10)
+    const fill=Math.floor(underlay[index]+weight*(10*evalRoadCtrlLocal(ctrl,east,south)-underlay[index]))
+    underlay[index]=Math.max(underlay[index],fill)
+    terrain[index]=Math.max(terrain[index],fill)
+  }
+}
+
 function extractDeckComponentsAndOpenEdges(deck: Float32Array, thin: ReadonlySet<number>) {
   const tris = Math.floor(deck.length / 9)
   const parent = new Int32Array(tris)

@@ -14,7 +14,7 @@ import {chunkWater, farWater} from './look/water'
 import type {TileBatchInput} from './batch'
 import type {Peaks} from './peaks'
 import {cutStairwellStreets,getRegisteredShizijieUnderground,groundStairwellsReady,joinPortalRoads,tunnelGeometry,type GroundCutout,type ShizijieUnderpass,type Tunnel} from './tunnels'
-import {repairBridgeDeck,setBridgeRepairKeepouts} from './ground-repair'
+import {gradeRenminShoulder,repairBridgeDeck,setBridgeRepairKeepouts} from './ground-repair'
 import {freezeStatic} from './static-freeze'
 
 interface Asset {file:string; bytes:number}
@@ -374,6 +374,7 @@ export async function detail(tile:Tile, signal:AbortSignal, parseSlot?:()=>Promi
   if(extra!==0 && extra!==8450) throw Error('Invalid GL04 sections')
   const deck = Float32Array.from(new Int16Array(buffer.slice(end,tail)),value=>value/100)
   const underlay = extra ? new Int16Array(buffer.slice(tail)) : terrain
+  gradeRenminShoulder(tile.x,tile.z,terrain,underlay,water,paths[5])
   const sample = (col:number,row:number)=>{
     const index = row*65+col
     return underlay[index]/10
