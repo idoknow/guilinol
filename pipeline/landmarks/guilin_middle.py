@@ -85,23 +85,37 @@ def build_stele_court(model):
     def relief(center, scale, color='stone'):
         model.mesh(carving.vertices * scale + center, carving.faces, color)
 
-    for gate, center in enumerate((-19.15, -14.2, -9.25)):
-        height = 3.65 if gate == 1 else 3.2
-        for offset in (-2.15, -1.25, 1.25, 2.15):
+    for gate, center in enumerate((-18.7, -14.2, -9.7)):
+        height, opening = (5.8, 2.6) if gate == 1 else (5.0, 2.3)
+        shaft = 0.48
+        spacing = opening + shaft
+        crown = 0.18 + height
+        lintel = crown - (1.5 if gate == 1 else 1.4)
+        for offset in (-spacing / 2, spacing / 2):
             post = center + offset
-            crown = height if abs(offset) < 2 else height - 0.45
-            model.box(post, 0.18, 4.05, 0.43, 0.32, 0.54, 'granite', True)
-            model.box(post, 0.50, 4.05, 0.26, crown - 0.50, 0.28, 'stone', True)
-            model.box(post, crown, 4.05, 0.38, 0.13, 0.39, 'granite')
-            relief([post, crown + 0.24, 4.06], [0.13, 0.17, 0.17])
-            if model.detail:
-                relief([post, crown + 0.39, 4.14], [0.11, 0.11, 0.10])
-        for offset, span, top in ((-1.7, 1.18, height - 0.63), (0, 2.88, height - 0.23), (1.7, 1.18, height - 0.63)):
-            model.box(center + offset, top - 0.46, 4.05, span, 0.46, 0.26, 'granite')
-            model.box(center + offset, top, 4.05, span + 0.16, 0.12, 0.38, 'stone')
-            if model.detail:
-                for motif in (-0.3, 0, 0.3):
-                    relief([center + offset + motif * span, top - 0.23, 4.18], [span * 0.12, 0.08, 0.04])
+            model.box(post, 0.18, 4.05, shaft, height, shaft, 'granite', True)
+            for side in (-1, 1):
+                depth = 4.05 + side * 0.41
+                model.box(post, 0.18, depth, 0.52, 0.35, 0.49, 'granite', True)
+                relief([post, 0.83, depth], [0.25, 0.56, 0.27], 'granite')
+                if model.detail:
+                    for flank in (-1, 1):
+                        previous = None
+                        for angle in np.linspace(0, 2.25 * math.pi, 15):
+                            radius = 0.19 - 0.021 * angle
+                            point = [post + flank * 0.235, 0.92 + radius * math.sin(angle), depth + radius * math.cos(angle)]
+                            if previous is not None:
+                                model.beam(previous, point, 0.025, 'stone', 5)
+                            previous = point
+            model.box(post, crown, 4.05, 0.55, 0.14, 0.55, 'granite')
+            relief([post, crown + 0.31, 4.05], [0.18, 0.22, 0.20], 'granite')
+            relief([post, crown + 0.51, 4.14], [0.14, 0.14, 0.13], 'stone')
+        for level in (lintel - 0.81, lintel - 0.18):
+            model.box(center, level, 4.05, spacing + 0.60, 0.18, 0.44, 'granite')
+        model.box(center, lintel - 0.63, 4.05, opening, 0.45, 0.28, 'stone')
+        if model.detail:
+            for motif in (-0.34, -0.17, 0, 0.17, 0.34):
+                relief([center + motif * opening, lintel - 0.40, 4.20], [0.20, 0.13, 0.05], 'granite')
 
     for row, depth in enumerate((1.8, -0.8)):
         for index in range(8):
@@ -111,20 +125,17 @@ def build_stele_court(model):
             height = 2.44 if portrait else 2.05 + 0.12 * ((row + index) % 4)
             width = 1.48 if portrait else 1.03
             model.box(center, 0.18, depth, width + 0.24, 0.27, 0.58, 'granite', True)
-            model.box(center, 0.45, depth, width, height - 0.45, 0.22, 'granite', True)
+            model.box(center, 0.45, depth, width, height - 0.45, 0.22, 'stone', True)
             if rounded:
-                relief([center, height, depth], [width / 2, 0.28, 0.11], 'granite')
+                relief([center, height, depth], [width / 2, 0.28, 0.11], 'stone')
             else:
                 model.box(center, height - 0.10, depth, width + 0.08, 0.13, 0.30, 'stone')
-            model.box(center, 0.57, depth + 0.11, width - 0.14, height - 0.77, 0.04, 'unlit')
+            model.box(center, 0.57, depth + 0.11, width - 0.14, height - 0.77, 0.04, 'white')
             if portrait and model.detail:
                 relief([center, 1.92, depth + 0.14], [0.12, 0.17, 0.025])
                 profile = [(-0.09, 1.79), (-0.25, 1.62), (-0.39, 0.77), (0.36, 0.77), (0.24, 1.32), (0.30, 1.49), (0.10, 1.72)]
                 for start, end in zip(profile, profile[1:] + profile[:1]):
                     model.beam([center + start[0], start[1], depth + 0.15], [center + end[0], end[1], depth + 0.15], 0.019, 'stone')
-    for center, height in ((-21.21, 0.47), (-7.18, 0.31)):
-        model.box(center, 0.18, 2.92, 0.52, 0.22, 0.66, 'granite', True)
-        relief([center, 0.42, 2.92], [0.21, height, 0.31], 'granite')
     model.pose = (0, 0, 0, 0)
 
 
