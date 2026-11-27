@@ -14,7 +14,7 @@ import {
   getViolatorHeldReceipt,
   isViolatorHoldingReceipt,
 } from '../traffic-duty/handover/receipt-model.ts'
-import type {TrafficViolation, TwoWheelActorLike, TwoWheelSubtype} from './models'
+import type {ActiveTrafficViolation, TrafficViolation, TwoWheelActorLike, TwoWheelSubtype} from './models'
 import {resolveTwoWheelSpec} from './models'
 import type {Actor} from './sim.ts'
 
@@ -77,9 +77,21 @@ export const MOBILE_RIDER_LIMIT = 4
 export const DESKTOP_MAX_SKELETONS = 16
 export const MOBILE_MAX_SKELETONS = 8
 
-export function riderSkeletonCost(violation: TrafficViolation, fourOnOverload = false): number {
-  if (violation === 'ebike_overload') return fourOnOverload ? 4 : 3
-  if (violation === 'bike_double') return 2
+export function resolveRiderDriverHasHelmet(actor: TwoWheelActorLike): boolean {
+  return !resolveTwoWheelSpec(actor).noHelmet
+}
+
+export function riderSkeletonCost(
+  violationOrList: TrafficViolation | readonly ActiveTrafficViolation[],
+  fourOnOverload = false,
+): number {
+  if (Array.isArray(violationOrList)) {
+    if (violationOrList.includes('ebike_overload')) return fourOnOverload ? 4 : 3
+    if (violationOrList.includes('bike_double')) return 2
+    return 1
+  }
+  if (violationOrList === 'ebike_overload') return fourOnOverload ? 4 : 3
+  if (violationOrList === 'bike_double') return 2
   return 1
 }
 
@@ -116,8 +128,8 @@ export function selectWithinSkeletonBudget<T extends TwoWheelActorLike>(
   let usedSkeletons = 0
   for (const a of candidates) {
     if (selected.length >= limit) break
-    const {violation} = resolveTwoWheelSpec(a)
-    const cost = riderSkeletonCost(violation, isFourOnOverload(a))
+    const spec = resolveTwoWheelSpec(a)
+    const cost = riderSkeletonCost(spec.violations.length ? spec.violations : spec.violation, isFourOnOverload(a))
     if (usedSkeletons + cost > maxSkeletons) continue
     selected.push(a)
     usedSkeletons += cost
@@ -492,13 +504,15 @@ export function riderPool(
     violation: TrafficViolation,
   ): RiderSlotSpec[] | undefined {
     const meta = getActorMeta(actor)
+    const spec = resolveTwoWheelSpec(actor)
+    const wantHelmet = !spec.noHelmet
 
     if (subtype === 'bicycle') {
       const used = new Set<number>()
-      const driverTpl = pickTemplateIndex(false, false, used)
+      const driverTpl = pickTemplateIndex(wantHelmet, false, used)
       if (driverTpl === undefined) return undefined
       used.add(driverTpl)
-      if (violation === 'bike_double') {
+      if (spec.hasBikeDouble || violation === 'bike_double') {
         const passTpl = pickTemplateIndex(false, false, used)
         if (passTpl === undefined) return undefined
         return [
@@ -517,15 +531,13 @@ export function riderPool(
       return [{templateIdx: driverTpl, scale: figureConfig.scale * 0.96, x: 0, y: 0.046, z: 0.23, ry: 0, pose: 'bicycle_driver'}]
     }
 
-    const {noHelmet} = resolveTwoWheelSpec(actor)
-
     // E-bike variants (distinct template index per rider so outfits/hairstyles never clone-twin)
-    if (violation === 'ebike_overload') {
+    if (spec.hasOverload || violation === 'ebike_overload') {
       const used = new Set<number>()
       const frontChildTpl = pickTemplateIndex(false, true, used)
       if (frontChildTpl === undefined) return undefined
       used.add(frontChildTpl)
-      const driverTpl = pickTemplateIndex(!noHelmet, false, used)
+      const driverTpl = pickTemplateIndex(wantHelmet, false, used)
       if (driverTpl === undefined) return undefined
       used.add(driverTpl)
       const rearTpl = pickTemplateIndex(false, false, used)
@@ -548,7 +560,6 @@ export function riderPool(
       ]
     }
 
-    const wantHelmet = !noHelmet
     const preferred = ready[meta.driverIdx]
     const driverTpl = preferred && preferred.hasHelmet === wantHelmet ? meta.driverIdx : pickTemplateIndex(wantHelmet)
     if (driverTpl === undefined) return undefined
@@ -617,7 +628,8 @@ export function riderPool(
       // IMPORTANT: Call ensureAvatarRig BEFORE adding/moving slot transforms (ensureAvatarRig resets root transforms!)
       const rig = ensureAvatarRig(inst)
       slot.add(inst)
-      setPose(rig, s.pose, initialPedal, actor.speed > 0.15, s.scale, frame, inst, violation === 'ebike_overload')
+      const spec = resolveTwoWheelSpec(actor)
+      setPose(rig, s.pose, initialPedal, actor.speed > 0.15, s.scale, frame, inst, spec.hasOverload)
       units.push({slot, root: inst, rig, pose: s.pose, baseY: s.y, scale: s.scale})
     }
     const driverUnit = units.find(u => u.pose === 'ebike_driver' || u.pose === 'bicycle_driver') ?? units[0]
@@ -657,11 +669,11 @@ export function riderPool(
 
     scene.add(root)
     mainDetail(root)
-    const {noHelmet} = resolveTwoWheelSpec(actor)
+    const spec = resolveTwoWheelSpec(actor)
     const view: RiderView = {
       root,
       frame,
-      signature: `${subtype}:${violation}:${noHelmet ? 'nh' : 'h'}`,
+      signature: `${subtype}:${violation}:${spec.violationMask}:${spec.noHelmet ? 'nh' : 'h'}`,
       units,
       placed: false,
       pedalPhase: initialPedal,
@@ -694,11 +706,11 @@ export function riderPool(
       }
       const shown = new Set<object>()
       for (const actor of near) {
-        const {subtype, violation, noHelmet} = resolveTwoWheelSpec(actor)
-        const sig = `${subtype}:${violation}:${noHelmet ? 'nh' : 'h'}`
+        const spec = resolveTwoWheelSpec(actor)
+        const sig = `${spec.subtype}:${spec.violation}:${spec.violationMask}:${spec.noHelmet ? 'nh' : 'h'}`
         const existing = active.get(actor)
         if (existing && existing.signature !== sig) release(actor, existing)
-        if (active.has(actor) || build(actor, subtype, violation)) shown.add(actor)
+        if (active.has(actor) || build(actor, spec.subtype, spec.violation)) shown.add(actor)
       }
       return shown
     },
@@ -838,15 +850,22 @@ export function riderPool(
       return LIMIT
     },
     probe: () =>
-      [...active.entries()].map(([actor, v]) => ({
-        signature: v.signature,
-        riderCount: v.units.length,
-        x: +v.root.position.x.toFixed(2),
-        y: +v.root.position.y.toFixed(2),
-        z: +v.root.position.z.toFixed(2),
-        yaw: +v.root.rotation.y.toFixed(3),
-        violation: actor.violation ?? 'none',
-        subtype: actor.vehicleSubtype ?? 'ebike',
-      })),
+      [...active.entries()].map(([actor, v]) => {
+        const spec = resolveTwoWheelSpec(actor)
+        return {
+          signature: v.signature,
+          riderCount: v.units.length,
+          x: +v.root.position.x.toFixed(2),
+          y: +v.root.position.y.toFixed(2),
+          z: +v.root.position.z.toFixed(2),
+          yaw: +v.root.rotation.y.toFixed(3),
+          violation: spec.violation,
+          violations: spec.violations,
+          violationMask: spec.violationMask,
+          noHelmet: spec.noHelmet,
+          hasHelmet: !spec.noHelmet,
+          subtype: spec.subtype,
+        }
+      }),
   }
 }
