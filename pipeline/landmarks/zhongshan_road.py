@@ -185,14 +185,31 @@ def _bus_shelter(m: Builder, x, y0, z, yaw, station_key='bus_shizijie', *, grade
     from plaza_seam import civic_plaza
     outline = m._transform([[-1.25,0,-5.6],[1.25,0,-5.6],[1.25,0,5.6],[-1.25,0,5.6]])[:,::2]
     m.pose = (0,0,0,0)
+    paving_start = len(m.tiled['pave'])
     civic_plaza(m,outline,refine_outer=True)
-    def place_above_pavement(samples):
+    paving = [triangle for batch, _ in m.tiled['pave'][paving_start:] for triangle in batch]
+
+    def pavement(sx, sz):
+        east, _, south = m._transform([[sx,0,sz]])[0]
+        height = m.surface.ground(east,south)
+        for triangle in paving:
+            start, second, third = triangle
+            edges = np.array([second-start, third-start])
+            matrix = edges[:,[0,2]].T
+            if abs(np.linalg.det(matrix)) < 1e-10:
+                continue
+            weights = np.linalg.solve(matrix, [east-start[0],south-start[2]])
+            if min(weights) >= -1e-8 and sum(weights) <= 1+1e-8:
+                height = max(height, start[1] + weights @ edges[:,1])
+        return height
+
+    def place_roof_or_totem(samples):
         m.pose = (x,y0,z,yaw)
         if graded:
             rise = max(m.feet_at_grade(samples)) + .195
             m.pose = (x,y0+rise,z,yaw)
 
-    place_above_pavement([[sx,0,sz] for sx in (-1.25,1.25) for sz in (-5.6,0,5.6)])
+    place_roof_or_totem([[sx,0,sz] for sx in (-1.25,1.25) for sz in (-5.6,0,5.6)])
     for sz in (-4.6, -1.5, 1.5, 4.6):
         base=m.feet_at_grade([[-.82,0,sz]])[0]-.035
         m.beam([-0.82, base, sz], [-0.82, 2.95, sz], 0.08, 'bronze', sections=6, collide=True)
@@ -201,19 +218,43 @@ def _bus_shelter(m: Builder, x, y0, z, yaw, station_key='bus_shizijie', *, grade
 
     # Back route-map & transit lightboxes facing +X toward waiting passengers
     for sz, col in ((-3.1, 'blue'), (0.0, 'white'), (3.1, 'red')):
-        place_above_pavement([[-.82,0,sz+end] for end in (-1.19,0,1.19)])
+        grade = max(pavement(-.78,sz+end) for end in (-1.19,0,1.19)) if graded else y0
+        m.pose = (x,grade,z,yaw)
         for sign in (-1,1):
             m.box(-.82,.08,sz+sign*.92,.14,2.34,.13,'bronze',footing=True)
-        m.box(-0.78, 0.52, sz, 0.18, 1.85, 2.38, 'dark', collide=True)
+        if graded:
+            vertices, faces = [], [(0,2,1),(0,3,2)]
+            for along in np.linspace(sz-1.19,sz+1.19,13):
+                offset = len(vertices)
+                vertices.extend([[-.87,pavement(-.87,along)-grade+.10,along],
+                                 [-.69,pavement(-.69,along)-grade+.10,along],
+                                 [-.69,2.37,along],[-.87,2.37,along]])
+                if offset:
+                    for corner in range(4):
+                        first = offset-4+corner
+                        second = offset-4+(corner+1)%4
+                        faces.extend([(first,second,second+4),(first,second+4,first+4)])
+            faces.extend([(offset,offset+1,offset+2),(offset,offset+2,offset+3)])
+            m.mesh(vertices,faces,'dark',collide=True)
+        else:
+            m.box(-0.78, 0.52, sz, 0.18, 1.85, 2.38, 'dark', collide=True)
         if m.detail:
             m.box(-0.67, 0.65, sz, 0.04, 1.58, 2.16, col)
-    place_above_pavement([[-.22,0,end] for end in (-2.2,0,2.2)])
-    m.box(-0.22, 0.48, 0.0, 0.46, 0.08, 4.4, 'alum', collide=True)
-    for bz in (-1.8, 0.0, 1.8):
-        m.box(-0.22, 0.08, bz, 0.40, 0.40, 0.12, 'dark',footing=True)
+    if graded:
+        for centre in (-.25,.85,1.95):
+            grade = max(pavement(sx,centre+end) for sx in (-.40,-.04) for end in (-.24,0,.24))
+            m.pose = (x,grade,z,yaw)
+            m.box(-.22,.34,centre,.36,.08,.48,'alum',collide=True)
+            for end in (-.18,.18):
+                m.box(-.22,0,centre+end,.32,.34,.10,'dark',footing=True)
+    else:
+        m.pose = (x,y0,z,yaw)
+        m.box(-0.22, 0.48, 0.0, 0.46, 0.08, 4.4, 'alum', collide=True)
+        for bz in (-1.8, 0.0, 1.8):
+            m.box(-0.22, 0.08, bz, 0.40, 0.40, 0.12, 'dark',footing=True)
 
     # Tall double-sided bus-stop totem ('十字街' / '阳桥') facing along sidewalk (+Z / -Z)
-    place_above_pavement([[.76,0,5.25]])
+    place_roof_or_totem([[.76,0,5.25]])
     m.box(0.76, 0.08, 5.25, 0.72, 2.82, 0.16, 'dark', collide=True,footing=True)
     m.sign_quad(0.76, 1.15, 5.35, 0.66, 1.68, station_key, double_sided=True)
     m.box(0.76, 0.18, 5.25, 0.66, 0.92, 0.18, 'blue')
