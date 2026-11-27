@@ -5,8 +5,8 @@ import {build} from 'esbuild'
 import {Miniflare} from 'miniflare'
 import {preview} from 'vite'
 import {chromium} from 'playwright'
-import {view} from './feedback-view-fixture.mjs'
 import {uiTest} from './feedback-test.mjs'
+import {view} from './feedback-view-fixture.mjs'
 
 const bundle=await build({stdin:{contents:`import {onRequest} from './functions/api/[[path]].ts';export default {fetch(request,env){return onRequest({request,env})}}`,resolveDir:process.cwd()},write:false,bundle:true,format:'esm'})
 const worker=new Miniflare({modules:true,script:bundle.outputFiles[0].text,compatibilityDate:'2025-06-01',d1Databases:['DB'],r2Buckets:['FEEDBACK'],bindings:{BRIDGE_TOKEN:'local-test',EMAIL_DEV_LOG:'1'}})
@@ -68,7 +68,15 @@ try{
   assert.equal(byRole.items.length,7)
   const idx=await db.prepare("SELECT name FROM sqlite_master WHERE type='index' AND name='feedback_user_status'").first()
   assert.equal(idx?.name,'feedback_user_status')
-  console.log('Isolated Worker: approval gate, user/admin chat, reply deduplication, quota, mail debounce, unsubscribe and priority admin route passed')
+  const blankBug=(await call('feedback','user',{view,kind:'游戏 bug',title:'空描述',body:'   ',lat:25.28,lon:110.3})).id
+  await call(`feedback/${blankBug}/submit`,'user',{},409)
+  await call(`feedback/${blankBug}`,'user',null,200,'DELETE')
+  const okBug=(await call('feedback','user',{view,kind:'游戏 bug',title:'有描述',body:'骑车过桥卡住',lat:25.28,lon:110.3})).id
+  await call(`feedback/${okBug}/submit`,'user',{},200)
+  const plainNoPhoto=(await call('feedback','user',{view,kind:'其他',title:'无图普通',body:'有文字无图',lat:25.28,lon:110.3})).id
+  await call(`feedback/${plainNoPhoto}/submit`,'user',{},409)
+  await call(`feedback/${plainNoPhoto}`,'user',null,200,'DELETE')
+  console.log('Isolated Worker: approval gate, user/admin chat, reply deduplication, quota, mail debounce, bug submit guard, unsubscribe and priority admin route passed')
   if(process.argv.includes('--ui')){
     await db.prepare("UPDATE users SET email='walker@example.test' WHERE id='user'").run()
     const server=await preview({configFile:false,build:{outDir:'dist'},preview:{host:'127.0.0.1',port:0,proxy:{'/api':{target:(await worker.ready).origin,changeOrigin:true,rewriteWsOrigin:false,configure(proxy){proxy.on('proxyReq',req=>req.setHeader('Origin',(new URL(req.protocol+'//'+req.getHeader('host'))).origin))}}}}})

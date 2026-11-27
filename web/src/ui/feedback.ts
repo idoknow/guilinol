@@ -1,17 +1,19 @@
-import {getPlayMode} from '../game/play-mode'
-import {record} from '../telemetry'
+import { getPlayMode } from '../game/play-mode'
+import { record } from '../telemetry'
 import type { Host } from '../play/host'
 import type { mapView } from '../play/map'
-import { APPEAL,kinds, labels, photosOptional, type FeedbackView } from '../../../lib/feedback-contract'
+import { spots, waterDocks } from '../play/spots'
+import { APPEAL, kinds, labels, photosOptional, type FeedbackView } from '../../../lib/feedback-contract'
 import { ll2xz, xz2ll } from '../../../lib/projection'
 import { readJson, jsonError } from '../lib/json'
 import { photoPicker } from './feedback-photo'
 import { cameraSupported, shootFeedbackPhoto } from './feedback-camera'
+import { inline } from './loading'
 import './feedback.css'
 
 type MapApi = ReturnType<typeof mapView>
 interface Item {
-  messages:{id:number;author_kind:string;author_name:string;body:string;created_at:number}[]
+  messages: { id: number; author_kind: string; author_name: string; body: string; created_at: number }[]
   view: FeedbackView | null
   has_view_shot: boolean
   id: string
@@ -26,6 +28,7 @@ interface Item {
   photos: { n: number }[]
   events: { status: string; message: string; created_at: number; screenshot_url: string | null }[]
 }
+
 async function api<T>(path: string, data?: object): Promise<T> {
   const response = await fetch(
     '/api/' + path,
@@ -37,13 +40,16 @@ async function api<T>(path: string, data?: object): Promise<T> {
   if (!response.ok) throw Error(result.error?.message ?? `请求失败（${response.status}）`)
   return result
 }
+
 function el<K extends keyof HTMLElementTagNameMap>(tag: K, text = '', className = '') {
   const node = document.createElement(tag)
   node.textContent = text
   if (className) node.className = className
   return node
 }
+
 const ROUTE = '【沿路拍摄】'
+const truncateChars = (value: string, max: number) => Array.from(value).slice(0, max).join('')
 const when = (seconds: number) =>
   new Date(seconds * 1000).toLocaleString('zh-CN', {
     month: 'numeric',
@@ -51,171 +57,75 @@ const when = (seconds: number) =>
     hour: '2-digit',
     minute: '2-digit',
   })
+
 function pill(status: string) {
   return el('span', labels[status] ?? status, `fb-pill fb-status--${status}`)
 }
 
-/** Location picker drawn with the game's own map painter: drag to pan, wheel/pinch to zoom, tap to drop the pin. */
-function locationPicker(
-  host: Host,
-  map: MapApi,
-  start: { x: number; z: number },
-  onPick: (x: number, z: number) => void,
-) {
-  const wrap = el('div', '', 'fb-map'),
-    canvas = el('canvas'),
-    tools = el('div', '', 'fb-map-tools'),
-    hint = el('p', '拖动平移 · 滚轮或双指缩放 · 点一下放置定位针', 'fb-map-hint')
-  canvas.setAttribute('aria-label', '在地图上点选反馈位置')
-  const tool = (label: string, aria: string, fn: () => void) => {
-    const b = el('button', label)
-    b.type = 'button'
-    b.setAttribute('aria-label', aria)
-    b.title = aria
-    b.onclick = fn
-    tools.append(b)
-  }
-  wrap.append(canvas, tools, hint)
-  const [left, top, width, depth] = map.extent
-  const view = { x: start.x, z: start.z, scale: 0.9 }
-  let pin = { ...start },
-    frame = 0
-  const clamp = () => {
-    view.scale = Math.min(3, Math.max(0.08, view.scale))
-    view.x = Math.min(left + width, Math.max(left, view.x))
-    view.z = Math.min(top + depth, Math.max(top, view.z))
-  }
-  function draw() {
-    frame = 0
-    const w = canvas.clientWidth,
-      h = canvas.clientHeight
-    if (!w || !h) return
-    const dpr = Math.min(2, devicePixelRatio)
-    if (canvas.width !== Math.round(w * dpr) || canvas.height !== Math.round(h * dpr)) {
-      canvas.width = Math.round(w * dpr)
-      canvas.height = Math.round(h * dpr)
-    }
-    const g = canvas.getContext('2d')!
-    map.paint(g, w, h, dpr, view.x, view.z, view.scale, false)
-    // Pin: vermilion seal drop with a paper core, tip on the chosen point.
-    const x = w / 2 + (pin.x - view.x) * view.scale,
-      y = h / 2 + (pin.z - view.z) * view.scale
-    g.setTransform(dpr, 0, 0, dpr, 0, 0)
-    g.fillStyle = 'rgba(42,48,44,.22)'
-    g.beginPath()
-    g.ellipse(x, y, 7, 2.6, 0, 0, Math.PI * 2)
-    g.fill()
-    g.fillStyle = '#a9503c'
-    g.strokeStyle = '#f4efe2'
-    g.lineWidth = 2
-    g.beginPath()
-    g.arc(x, y - 19, 9, Math.PI * 0.82, Math.PI * 2.18)
-    g.lineTo(x, y)
-    g.closePath()
-    g.fill()
-    g.stroke()
-    g.fillStyle = '#f4efe2'
-    g.beginPath()
-    g.arc(x, y - 19, 3.2, 0, Math.PI * 2)
-    g.fill()
-  }
-  const redraw = () => {
-    if (!frame) frame = requestAnimationFrame(draw)
-  }
-  const pointers = new Map<number, { x: number; y: number }>()
-  let moved = 0,
-    pinch = 0
-  canvas.onpointerdown = (e) => {
-    canvas.setPointerCapture(e.pointerId)
-    pointers.set(e.pointerId, { x: e.clientX, y: e.clientY })
-    moved = 0
-    if (pointers.size === 2) {
-      const [a, b] = [...pointers.values()]
-      pinch = Math.hypot(a.x - b.x, a.y - b.y)
-    }
-  }
-  canvas.onpointermove = (e) => {
-    const last = pointers.get(e.pointerId)
-    if (!last) return
-    if (pointers.size === 1) {
-      view.x -= (e.clientX - last.x) / view.scale
-      view.z -= (e.clientY - last.y) / view.scale
-      moved += Math.abs(e.clientX - last.x) + Math.abs(e.clientY - last.y)
-      wrap.classList.toggle('fb-map--drag', moved > 6)
-    }
-    pointers.set(e.pointerId, { x: e.clientX, y: e.clientY })
-    if (pointers.size === 2) {
-      const [a, b] = [...pointers.values()],
-        d = Math.hypot(a.x - b.x, a.y - b.y)
-      if (pinch) view.scale *= d / pinch
-      pinch = d
-      moved = 99
-    }
-    clamp()
-    redraw()
-  }
-  canvas.onpointerup = (e) => {
-    pointers.delete(e.pointerId)
-    pinch = 0
-    wrap.classList.remove('fb-map--drag')
-    if (moved < 6 && pointers.size === 0) {
-      const r = canvas.getBoundingClientRect()
-      pin = {
-        x: view.x + (e.clientX - r.left - r.width / 2) / view.scale,
-        z: view.z + (e.clientY - r.top - r.height / 2) / view.scale,
-      }
-      onPick(pin.x, pin.z)
-      redraw()
-    }
-  }
-  canvas.onpointercancel = (e) => {
-    pointers.delete(e.pointerId)
-    pinch = 0
-  }
-  canvas.onwheel = (e) => {
-    e.preventDefault()
-    const r = canvas.getBoundingClientRect(),
-      ox = e.clientX - r.left - r.width / 2,
-      oy = e.clientY - r.top - r.height / 2
-    const before = { x: view.x + ox / view.scale, z: view.z + oy / view.scale }
-    view.scale *= Math.exp(-e.deltaY * 0.0015)
-    clamp()
-    view.x = before.x - ox / view.scale
-    view.z = before.z - oy / view.scale
-    clamp()
-    redraw()
-  }
-  const zoom = (k: number) => {
-    view.scale *= k
-    clamp()
-    redraw()
-  }
-  tool('+', '放大', () => zoom(1.5))
-  tool('−', '缩小', () => zoom(1 / 1.5))
-  tool('◎', '回到我现在的位置', () => {
-    const walker = host.walker(),
-      p = walker?.active ? walker.position : host.camera.position
-    view.x = pin.x = p.x
-    view.z = pin.z = p.z
-    onPick(pin.x, pin.z)
-    redraw()
-  })
-  const resize = new ResizeObserver(redraw)
-  resize.observe(canvas)
-  return {
-    node: wrap,
-    setPin(x: number, z: number) {
-      view.x = pin.x = x
-      view.z = pin.z = z
-      onPick(x, z)
-      redraw()
-    },
-    dispose: () => resize.disconnect(),
-  }
+function pickDefaultPosition(host: Host, view?: FeedbackView | null) {
+  const player = host.walker()?.active ? host.walker()!.position : host.camera.position
+  const target = view?.target
+  const chosen = target && (view?.landmark_id || target.distance <= 250) ? target : player
+  return { x: chosen.x, z: chosen.z }
 }
 
-export async function openFeedback(host: Host, ensureMap: () => Promise<MapApi | undefined>,initialId?:string,banId?:string) {
-  record('funnel',{step:'feedbackOpen'})
+function describeLocation(
+  host: Host,
+  x: number,
+  z: number,
+  view?: FeedbackView | null,
+  mapApi?: MapApi,
+) {
+  const parts: string[] = []
+  const landmarkName = view?.landmark_id
+    ? host.manifest.landmarks?.find((entry) => entry.id === view.landmark_id)?.name ?? view.landmark_id
+    : undefined
+  if (landmarkName) parts.push(landmarkName)
+
+  const road = mapApi?.roadAt(x, z, 60)?.name
+  if (road && !parts.some((p) => p.includes(road))) parts.push(`${road}附近`)
+
+  if (!landmarkName && host.manifest.landmarks?.length) {
+    const nearLandmark = host.manifest.landmarks
+      .filter((entry) => entry.name)
+      .map((entry) => ({
+        name: entry.name!,
+        dist: Math.hypot(entry.position[0] - x, entry.position[2] - z),
+      }))
+      .sort((a, b) => a.dist - b.dist)[0]
+    if (nearLandmark && nearLandmark.dist <= 90 && !parts.some((p) => p.includes(nearLandmark.name))) {
+      parts.unshift(nearLandmark.dist <= 30 ? nearLandmark.name : `${nearLandmark.name}附近`)
+    }
+  }
+
+  if (!parts.length) {
+    const places = [...spots, ...waterDocks]
+      .map((p) => ({ name: p.name, dist: Math.hypot(p.x - x, p.z - z) }))
+      .sort((a, b) => a.dist - b.dist)
+    const nearest = places[0]
+    if (nearest && nearest.dist <= 220) {
+      parts.push(nearest.dist <= 65 ? nearest.name : `${nearest.name}附近`)
+    }
+  }
+
+  if (!parts.length && host.manifest.peaks?.entries?.length) {
+    const peak = host.manifest.peaks.entries
+      .map((p) => ({ name: p.name, dist: Math.hypot(p.center[0] - x, p.center[2] - z) }))
+      .sort((a, b) => a.dist - b.dist)[0]
+    if (peak && peak.dist <= 260) parts.push(`${peak.name}附近`)
+  }
+
+  if (!parts.length) parts.push(view?.mode === 'walk' ? '步行当前位置' : '桂林城区')
+  return parts.join(' · ')
+}
+
+export async function openFeedback(
+  host: Host,
+  ensureMap: () => Promise<MapApi | undefined>,
+  initialId?: string,
+  banId?: string,
+) {
+  record('funnel', { step: 'feedbackOpen' })
   if (document.querySelector('.fb-panel,.fb-aim-bar')) return
   const dialog = el('dialog', '', 'about-panel fb-panel')
   dialog.setAttribute('aria-label', '反馈')
@@ -230,15 +140,17 @@ export async function openFeedback(host: Host, ensureMap: () => Promise<MapApi |
   header.append(title, tabs, close)
   dialog.append(header, body, note)
   document.body.append(dialog)
+
   let captured: Awaited<ReturnType<Host['captureView']>> | undefined
   try {
-    if(!initialId&&!banId)captured = await host.captureView()
+    if (!initialId && !banId) captured = await host.captureView()
   } catch (error) {
     note.textContent = String(error)
   }
   dialog.showModal()
   requestAnimationFrame(() => dialog.classList.add('fb-open'))
   close.onclick = () => dialog.close()
+
   let dispose = () => {},
     busy = false,
     onPaste: ((files: File[]) => void) | undefined
@@ -252,7 +164,7 @@ export async function openFeedback(host: Host, ensureMap: () => Promise<MapApi |
   dialog.onclick = (event) => {
     if (event.target === dialog && !busy) dialog.close()
   }
-  for (const event of ['keydown', 'keyup']) dialog.addEventListener(event, (event) => event.stopPropagation())
+  for (const event of ['keydown', 'keyup']) dialog.addEventListener(event, (e) => e.stopPropagation())
   dialog.addEventListener('paste', (event) => {
     const files = Array.from(event.clipboardData?.files ?? []).filter((file) =>
       file.type.startsWith('image/'),
@@ -261,6 +173,7 @@ export async function openFeedback(host: Host, ensureMap: () => Promise<MapApi |
     event.preventDefault()
     onPaste(files)
   })
+
   async function run(work: () => Promise<void>) {
     if (busy) return
     busy = true
@@ -277,6 +190,7 @@ export async function openFeedback(host: Host, ensureMap: () => Promise<MapApi |
       dialog.classList.remove('fb-busy')
     }
   }
+
   function reset(heading: string, tab: 'new' | 'mine' | '') {
     dispose()
     dispose = () => {}
@@ -284,6 +198,7 @@ export async function openFeedback(host: Host, ensureMap: () => Promise<MapApi |
     title.textContent = heading
     body.replaceChildren()
     note.textContent = ''
+    note.classList.remove('fb-note--error')
     tabs.replaceChildren()
     for (const [key, label, go] of [
       ['new', '新反馈', () => form()],
@@ -297,6 +212,7 @@ export async function openFeedback(host: Host, ensureMap: () => Promise<MapApi |
     }
     body.scrollTop = 0
   }
+
   function button(parent: HTMLElement, text: string, work: () => Promise<void>, kind = '') {
     const node = el('button', text, 'fb-btn' + (kind ? ' fb-btn--' + kind : ''))
     node.type = 'button'
@@ -304,12 +220,15 @@ export async function openFeedback(host: Host, ensureMap: () => Promise<MapApi |
     parent.append(node)
     return node
   }
+
   async function list() {
     const items = await api<Item[]>('feedback?mine=1')
     reset('我的反馈', 'mine')
     if (!items.length) {
       const empty = el('div', '', 'fb-empty')
-      empty.append(el('p', '还没有反馈。看到哪里建得不对、缺了什么，拍几张照片告诉我们；遇到游戏 bug 也可以直接描述，不用传照片。'))
+      empty.append(
+        el('p', '还没有提交过反馈。点开新反馈会自动带上当前画面和位置，写一句说明就能提交。'),
+      )
       button(empty, '提交第一条反馈', () => form(), 'primary')
       body.append(empty)
       return
@@ -329,6 +248,7 @@ export async function openFeedback(host: Host, ensureMap: () => Promise<MapApi |
     }
     body.append(ul)
   }
+
   async function detail(id: string) {
     const item = await api<Item>('feedback/' + id)
     reset('反馈详情', 'mine')
@@ -372,37 +292,102 @@ export async function openFeedback(host: Host, ensureMap: () => Promise<MapApi |
     }
     body.append(el('h4', '进度与对话', 'fb-section-title'))
     const timeline = el('ol', '', 'fb-timeline')
-    const paintChat=(record:Item)=>{timeline.replaceChildren();head.replaceChildren(el('h3',record.title),pill(record.status))
-    for (const event of [...record.events,...record.messages].sort((left,right)=>left.created_at-right.created_at)) {
-      if('author_kind' in event){const msg=el('li','',`fb-msg fb-msg--${event.author_kind}`),meta=el('span','','fb-msg-meta');meta.append(el('b',event.author_kind==='user'?'我':event.author_name),el('time',when(event.created_at)));msg.append(meta,el('p',event.body,'fb-msg-body'));timeline.append(msg);continue}
-      const line = el('li', '', `fb-status--${event.status}`)
-      line.append(el('b', labels[event.status] ?? event.status), el('time', when(event.created_at)))
-      if (event.message && event.message !== labels[event.status]) line.append(el('p', event.message))
-      if (event.screenshot_url) {
-        const link = el('a', '查看建模截图')
-        link.href = event.screenshot_url
-        link.rel = 'noreferrer'
-        link.target = '_blank'
-        line.append(link)
+    const paintChat = (record: Item) => {
+      timeline.replaceChildren()
+      head.replaceChildren(el('h3', record.title), pill(record.status))
+      for (const event of [...record.events, ...record.messages].sort(
+        (left, right) => left.created_at - right.created_at,
+      )) {
+        if ('author_kind' in event) {
+          const msg = el('li', '', `fb-msg fb-msg--${event.author_kind}`),
+            meta = el('span', '', 'fb-msg-meta')
+          meta.append(
+            el('b', event.author_kind === 'user' ? '我' : event.author_name),
+            el('time', when(event.created_at)),
+          )
+          msg.append(meta, el('p', event.body, 'fb-msg-body'))
+          timeline.append(msg)
+          continue
+        }
+        const line = el('li', '', `fb-status--${event.status}`)
+        line.append(el('b', labels[event.status] ?? event.status), el('time', when(event.created_at)))
+        if (event.message && event.message !== labels[event.status]) line.append(el('p', event.message))
+        if (event.screenshot_url) {
+          const link = el('a', '查看建模截图')
+          link.href = event.screenshot_url
+          link.rel = 'noreferrer'
+          link.target = '_blank'
+          line.append(link)
+        }
+        timeline.append(line)
       }
-      timeline.append(line)
+      if (!record.events.length) timeline.append(el('li', '还没有进度记录', 'fb-status--draft'))
     }
-    if (!record.events.length) timeline.append(el('li', '还没有进度记录', 'fb-status--draft'))};paintChat(item);timeline.classList.add('fb-chat')
+    paintChat(item)
+    timeline.classList.add('fb-chat')
     body.append(timeline)
     const actions = el('div', '', 'fb-actions')
     body.append(actions)
-    if(!['draft','live','rejected','duplicate'].includes(item.status)){
-      const input=el('textarea'),photo=el('input'),compose=el('div','','fb-compose'),attach=el('label','','fb-compose-attach'),tools=el('div','','fb-compose-tools');input.maxLength=1000;input.rows=2;input.placeholder='回复协调人，或补充说明…';input.setAttribute('aria-label','回复内容');photo.type='file';photo.accept='image/jpeg,image/png,image/webp';photo.setAttribute('aria-label','回复照片');attach.append(photo,el('span','附照片'));photo.onchange=()=>{attach.querySelector('span')!.textContent=photo.files?.[0]?'已选 1 张':'附照片'};tools.append(attach);compose.append(input,tools);body.insertBefore(compose,actions)
-      button(tools,'发送回复',async()=>{let message=input.value.trim();if(!message)throw Error('请输入回复');const attachment=photo.files?.[0];if(attachment){const fresh=await api<Item>('feedback/'+id),slot=Math.max(0,...fresh.photos.map(p=>p.n))+1;if(slot>20)throw Error('照片数量已达上限');message+=`（照片 #${slot}）`;if([...message].length>1000)throw Error('回复过长');const upload=await fetch(`/api/feedback/${id}/photos/${slot}`,{method:'PUT',body:attachment});if(!upload.ok)throw Error('照片上传失败')}await api(`feedback/${id}/messages`,{body:message});await detail(id)})
+    if (!['draft', 'live', 'rejected', 'duplicate'].includes(item.status)) {
+      const input = el('textarea'),
+        photo = el('input'),
+        compose = el('div', '', 'fb-compose'),
+        attach = el('label', '', 'fb-compose-attach'),
+        tools = el('div', '', 'fb-compose-tools')
+      input.maxLength = 1000
+      input.rows = 2
+      input.placeholder = '回复协调人，或补充说明…'
+      input.setAttribute('aria-label', '回复内容')
+      photo.type = 'file'
+      photo.accept = 'image/jpeg,image/png,image/webp'
+      photo.setAttribute('aria-label', '回复照片')
+      attach.append(photo, el('span', '附照片'))
+      photo.onchange = () => {
+        attach.querySelector('span')!.textContent = photo.files?.[0] ? '已选 1 张' : '附照片'
+      }
+      tools.append(attach)
+      compose.append(input, tools)
+      body.insertBefore(compose, actions)
+      button(tools, '发送回复', async () => {
+        let message = input.value.trim()
+        if (!message) throw Error('请输入回复')
+        const attachment = photo.files?.[0]
+        if (attachment) {
+          const fresh = await api<Item>('feedback/' + id),
+            slot = Math.max(0, ...fresh.photos.map((p) => p.n)) + 1
+          if (slot > 20) throw Error('照片数量已达上限')
+          message += `（照片 #${slot}）`
+          if ([...message].length > 1000) throw Error('回复过长')
+          const upload = await fetch(`/api/feedback/${id}/photos/${slot}`, { method: 'PUT', body: attachment })
+          if (!upload.ok) throw Error('照片上传失败')
+        }
+        await api(`feedback/${id}/messages`, { body: message })
+        await detail(id)
+      })
     }
-    const refresh=async()=>{if(document.hidden||!timeline.isConnected)return;try{const latest=await api<Item>('feedback/'+id);if(timeline.isConnected)paintChat(latest)}catch{}}
-    const timer=setInterval(refresh,15000);document.addEventListener('visibilitychange',refresh);const previous=dispose;dispose=()=>{clearInterval(timer);document.removeEventListener('visibilitychange',refresh);previous()}
-    if (getPlayMode()==='tour' && (item.view || item.status === 'live'))
+    const refresh = async () => {
+      if (document.hidden || !timeline.isConnected) return
+      try {
+        const latest = await api<Item>('feedback/' + id)
+        if (timeline.isConnected) paintChat(latest)
+      } catch {
+        /* ignore background refresh errors */
+      }
+    }
+    const timer = setInterval(refresh, 15000)
+    document.addEventListener('visibilitychange', refresh)
+    const previous = dispose
+    dispose = () => {
+      clearInterval(timer)
+      document.removeEventListener('visibilitychange', refresh)
+      previous()
+    }
+    if (getPlayMode() === 'tour' && (item.view || item.status === 'live'))
       button(
         actions,
         '飞过去看看',
         async () => {
-          if (getPlayMode()==='solo')return
+          if (getPlayMode() === 'solo') return
           if (item.view) {
             await host.setView(item.view)
             dialog.close()
@@ -431,248 +416,172 @@ export async function openFeedback(host: Host, ensureMap: () => Promise<MapApi |
         'quiet',
       )
   }
+
   async function form(item?: Item) {
     const supplement = item?.status === 'need_info'
-    reset(supplement ? '补充信息' : item ? '继续上传' : '提交反馈', item ? '' : 'new')
-    const form = el('form', '', 'fb-form')
-    body.append(form)
+    reset(supplement ? '补充信息' : item ? '继续上传' : '反馈', item ? '' : 'new')
+    const formEl = el('form', '', item ? 'fb-form fb-form--legacy' : 'fb-form fb-form--onepage')
+    body.append(formEl)
+
     let id = item?.id
-    let selection = item ? undefined : captured
-    const position = selection?.view.target ?? selection?.view ?? host.camera.position
-    let location = item ? { lat: item.lat, lon: item.lon } : xz2ll(position.x, position.z)
-    const section = (n: string, heading: string) => {
-      const box = el('section', '', 'fb-step')
-      const h = el('h3')
-      h.append(el('i', n), heading)
-      box.append(h)
-      form.append(box)
-      return box
+    let draftSignature = ''
+    let selection: Awaited<ReturnType<Host['captureView']>> | undefined
+    if (!item && !banId) {
+      if (captured) {
+        selection = captured
+        captured = undefined
+      } else {
+        try {
+          selection = await host.captureView()
+        } catch (error) {
+          note.textContent = String(error)
+        }
+      }
     }
-    const field = (parent: HTMLElement, label: string, control: HTMLElement, hint = '') => {
-      const wrapper = el('label', '', 'fb-field')
-      wrapper.append(el('span', label), control)
-      if (hint) wrapper.append(el('small', hint))
-      parent.append(wrapper)
-      return wrapper
-    }
+    let useDefaultShot = !!selection
+    let viewShotUploaded = false
+    let defaultPhotoUploaded = false
+    let formDisposed = false
+    let activePos = pickDefaultPosition(host, selection?.view)
+    let location = item ? { lat: item.lat, lon: item.lon } : xz2ll(activePos.x, activePos.z)
+    let mapApi: MapApi | undefined
+    let locSummary = item ? '' : describeLocation(host, activePos.x, activePos.z, selection?.view, mapApi)
+
     const kind = el('div', '', 'fb-chips'),
       name = el('input'),
-      description = el('textarea'),
-      route = el('textarea'),
-      mode = { route: false }
-    let routeField: HTMLElement | undefined,
-      describeField: HTMLElement | undefined
-    // 当前类型是否允许不传照片（游戏 bug，IDOK-219）；补充/续传沿用原反馈的类型。
+      description = el('textarea')
+    let describeField: HTMLElement | undefined
+
     const chosenKind = () =>
       item?.kind ?? (kind.querySelector('input:checked') as HTMLInputElement | null)?.value ?? kinds[0]
-    let applyKind = () => {}
-    let pin: (x: number, z: number) => void = () => {}
-    const preview = (where: HTMLElement) => {
-      const box = el('div', '', 'fb-view'),
-        figure = el('figure', '', 'fb-view-frame'),
-        image = el('img', '', 'fb-view-shot'),
-        cross = el('span', '＋', 'fb-view-cross'),
-        info = el('p'),
-        aim = el('button', '重新取景', 'fb-btn')
-      aim.type = 'button'
-      image.alt = '反馈时看到的画面'
-      figure.append(image, cross)
-      box.append(el('h4', '你看到的画面'), figure, info, aim)
-      where.append(box)
-      let url = ''
-      const paint = () => {
-        if (url) URL.revokeObjectURL(url)
-        const view = selection?.view ?? item?.view
-        if (selection) {
-          url = URL.createObjectURL(selection.shot)
-          image.src = url
-        } else if (item?.has_view_shot) image.src = `/api/feedback/${item.id}/view-shot`
-        figure.hidden = !image.src
-        cross.hidden = !view?.target
-        info.textContent = view
-          ? `${view.lat.toFixed(5)}, ${view.lon.toFixed(5)} · 朝向 ${view.heading.toFixed(1)}° · ${host.manifest.landmarks?.find((entry) => entry.id === view.landmark_id)?.name ?? view.landmark_id ?? '未命中地标'}`
-          : '未取得截图，请重新取景'
-      }
-      paint()
-      const prev = dispose
-      dispose = () => {
-        URL.revokeObjectURL(url)
-        prev()
-      }
-      aim.onclick = () => {
-        dialog.remove()
-        dialog.removeAttribute('open')
-        const bar = el('aside', '', 'fb-aim-bar'),
-          take = el('button', '截取'),
-          cancel = el('button', '取消')
-        bar.append('移动到要反馈的位置，对准物体后点“截取”', take, cancel)
-        document.body.append(bar)
-        const restore = () => {
-          bar.remove()
-          document.exitPointerLock?.()
-          document.body.append(dialog)
-          dialog.showModal()
-          aim.focus()
-        }
-        cancel.onclick = restore
-        take.onclick = async () => {
-          take.disabled = cancel.disabled = true
-          try {
-            selection = await host.captureView()
-            const pos = selection.view.target ?? selection.view
-            pin(pos.x, pos.z)
-            paint()
-          } catch (error) {
-            note.textContent = String(error)
-          } finally {
-            restore()
-          }
-        }
-      }
+    let syncSummary = () => {}
+
+    // —— 1. 截图区域（一页模式为紧凑横卡，续传/补充沿用视角预览） ——
+    const mediaCard = el('section', '', 'fb-media')
+    mediaCard.hidden = !!banId && !item && !selection
+    const previewWrap = el('figure', '', 'fb-view-frame'),
+      previewImg = el('img', '', 'fb-view-shot'),
+      previewCross = el('span', '＋', 'fb-view-cross')
+    previewImg.alt = '反馈问题截图'
+    previewWrap.append(previewImg, previewCross)
+
+    const mediaMain = el('div', '', 'fb-media-main'),
+      mediaHead = el('div', '', 'fb-media-head'),
+      mediaTitle = el('strong', '当前游戏画面', 'fb-media-title'),
+      mediaMeta = el('span', '默认附图，可直接提交', 'fb-media-meta'),
+      mediaActions = el('div', '', 'fb-media-actions'),
+      retakeBtn = el('button', '重拍', 'fb-mini-btn'),
+      replaceBtn = el('button', '更换', 'fb-mini-btn'),
+      removeBtn = el('button', '移除', 'fb-mini-btn fb-mini-btn--quiet'),
+      captureNowBtn = el('button', '截取当前画面', 'fb-mini-btn'),
+      pickBtn = el('button', '选择图片', 'fb-mini-btn')
+    retakeBtn.type = replaceBtn.type = removeBtn.type = captureNowBtn.type = pickBtn.type = 'button'
+    mediaHead.append(mediaTitle, mediaMeta)
+    mediaActions.append(retakeBtn, replaceBtn, removeBtn)
+
+    const pickerHost = el('div', '', 'fb-media-picker')
+    mediaMain.append(mediaHead, mediaActions, pickerHost)
+    mediaCard.append(previewWrap, mediaMain)
+    formEl.append(mediaCard)
+
+    // —— 2. 自动位置摘要条（仅新反馈且非封禁申诉） ——
+    const locBar = el('div', '', 'fb-loc'),
+      locLeft = el('div', '', 'fb-loc-main'),
+      locTag = el('span', '当前位置', 'fb-loc-tag'),
+      locName = el('strong', '', 'fb-loc-name'),
+      locCoords = el('span', '', 'fb-loc-coords ui-num')
+    locLeft.append(locTag, locName)
+    locBar.append(locLeft, locCoords)
+    if (!item && !banId) formEl.append(locBar)
+
+    const updateLocationDisplay = () => {
+      if (item || banId) return
+      const view = selection?.view
+      locSummary = describeLocation(host, activePos.x, activePos.z, view, mapApi)
+      locName.textContent = locSummary
+      const headingText = view ? ` · 朝向 ${Math.round(view.heading)}°` : ''
+      locCoords.textContent = `${location.lat.toFixed(5)}, ${location.lon.toFixed(5)}${headingText}`
     }
-    if (item) preview(section('', '游戏视角'))
-    if (!item) {
-      const where = section('1', '在哪里')
-      where.hidden=!!banId
-      preview(where)
-      const rule = el('div', '', 'fb-rule')
-      rule.innerHTML =
-        '<b>每次只反馈一个地点。</b>如果是沿一条路连续拍的多张照片，请选「沿路拍摄」，写清从哪里走到哪里、朝哪个方向走，照片按行走顺序添加。'
-      const modes = el('div', '', 'fb-seg')
-      modes.setAttribute('role', 'radiogroup')
-      const addr = el('p', '', 'fb-addr')
-      where.append(rule, modes)
-      const slot = el('div', '', 'fb-map fb-map--loading')
-      const hint=el('p','','fb-map-hint');inline(hint,{label:'地图加载中…'});slot.append(hint)
-      where.append(slot, addr)
-      const describe = (x: number, z: number) => {
-        location = xz2ll(x, z)
-        const road = mapApi?.roadAt(x, z, 40)?.name
-        addr.replaceChildren(
-          el('b', (mode.route ? '起点：' : '') + (road ? road + '附近' : '已选位置')),
-          el('span', `${location.lat.toFixed(5)}, ${location.lon.toFixed(5)}`),
-        )
-      }
-      let mapApi: MapApi | undefined
-      for (const [value, label] of [
-        [false, '单个地点'],
-        [true, '沿路拍摄'],
-      ] as const) {
-        const b = el('button', label)
-        b.type = 'button'
-        b.setAttribute('role', 'radio')
-        b.setAttribute('aria-checked', String(mode.route === value))
-        b.onclick = () => {
-          mode.route = value
-          for (const other of Array.from(modes.children))
-            other.setAttribute('aria-checked', String(other === b))
-          routeField!.hidden = !value
-          route.required = value
-          const p = ll2xz(location.lat, location.lon)
-          describe(p.x, p.z)
-        }
-        modes.append(b)
-      }
-      route.maxLength = 600
-      route.rows = 2
-      route.placeholder = '例：从十字街沿解放东路向东走到解放桥西桥头，照片按行走顺序排列'
-      routeField = field(where, '行走路径和方向', route, '写清起点、终点和行走方向；起点就是地图上的定位针')
-      routeField.hidden = true
-      pin = describe
-      describe(position.x, position.z)
-      void ensureMap().then((api) => {
-        if (!api || !slot.isConnected) {
-          if (slot.isConnected)
-            slot.replaceChildren(el('p', '地图暂时不可用，将使用你当前所在的位置', 'fb-map-hint'))
-          return
-        }
-        mapApi = api
-        const picker = locationPicker(host, api, ll2xz(location.lat, location.lon), describe)
-        pin = picker.setPin
-        slot.replaceWith(picker.node)
-        const prev = dispose
-        dispose = () => {
-          picker.dispose()
-          prev()
-        }
-        const p = ll2xz(location.lat, location.lon)
-        describe(p.x, p.z)
+    updateLocationDisplay()
+
+    if (!item && !banId) {
+      void ensureMap().then((apiResult) => {
+        if (!apiResult || formDisposed) return
+        mapApi = apiResult
+        updateLocationDisplay()
       })
-      const what = section('2', '哪里不对')
+    }
+
+    // —— 3. 类型、标题与文字描述 ——
+    if (!item) {
+      const what = el('div', '', 'fb-what')
       kind.setAttribute('role', 'radiogroup')
-      kinds.forEach((value, i) => {
+      kind.setAttribute('aria-label', '问题类型')
+      const visibleKinds = banId ? kinds : kinds.filter((value) => value !== APPEAL)
+      visibleKinds.forEach((value, i) => {
         const chip = el('label', '', 'fb-chip'),
           radio = el('input')
         radio.type = 'radio'
         radio.name = 'fb-kind'
         radio.value = value
-        radio.checked = banId ? value===APPEAL : i === 0
-        radio.onchange = () => applyKind()
+        radio.checked = banId ? value === APPEAL : i === 0
+        radio.onchange = () => syncSummary()
         chip.append(radio, el('span', value))
         kind.append(chip)
       })
       what.append(kind)
-      name.required = true
+
+      const fields = el('div', '', 'fb-fields')
+      const field = (label: string, control: HTMLElement) => {
+        const wrapper = el('label', '', 'fb-field')
+        wrapper.append(el('span', label), control)
+        fields.append(wrapper)
+        return wrapper
+      }
       name.maxLength = 40
       name.placeholder = '一句话说明，例如：逍遥楼屋顶颜色不对'
-      field(what, '标题', name)
+      field('标题', name)
       description.maxLength = 1400
-      description.rows = 3
-      if (banId) {name.value=APPEAL;description.value=`封禁记录 ID：${banId}\n申诉说明：`}
-      description.placeholder = '哪里和现实不一样？现实中是什么样子？'
-      describeField = field(what, '描述（可选）', description)
+      description.rows = 2
+      if (banId) {
+        name.value = APPEAL
+        description.value = `封禁记录 ID：${banId}\n申诉说明：`
+      }
+      description.placeholder = '补充细节（可选，不填标题也会自动按位置命名）'
+      describeField = field('描述（可选）', description)
+      what.append(fields)
+      formEl.append(what)
     } else if (supplement) {
-      const what = section('1', '补充说明')
+      const what = el('div', '', 'fb-fields')
+      const wrapper = el('label', '', 'fb-field')
       description.required = true
       description.maxLength = 2000
-      description.rows = 4
+      description.rows = 3
       description.placeholder = '按处理意见补充信息'
-      field(what, '补充内容', description)
+      wrapper.append(el('span', '补充内容'), description)
+      what.append(wrapper)
+      formEl.append(what)
     }
-    const shots = section(item ? (supplement ? '2' : '1') : '3', '照片')
-    const shotsTitle = shots.querySelector('h3')!,
-      shotsHint = el('p', '', 'fb-step-hint')
-    shots.append(shotsHint)
+
+    // —— 4. 底部提交栏 ——
     const footer = el('div', '', 'fb-submit'),
       count = el('span', '', 'fb-count'),
       send = el('button', supplement ? '提交补充' : '提交反馈', 'fb-btn fb-btn--primary')
     send.type = 'submit'
     footer.append(count, send)
-    form.append(footer)
+    formEl.append(footer)
+
+    let shotUrl = ''
+    const clearShotUrl = () => {
+      if (shotUrl) {
+        URL.revokeObjectURL(shotUrl)
+        shotUrl = ''
+      }
+    }
+
     let photoCount = item?.photos.length ?? 0
-    const setCount = (n: number) => {
-      photoCount = n
-      count.textContent = n
-        ? `已选 ${n} 张${photosOptional(chosenKind()) ? '截图' : '照片'}`
-        : photosOptional(chosenKind())
-          ? '截图可选，不传也能提交'
-          : '至少需要 1 张照片'
-      count.classList.toggle('fb-count--empty', !n)
-    }
-    applyKind = () => {
-      const bug = photosOptional(chosenKind())
-      if(chosenKind()===APPEAL) {
-        shotsHint.textContent='可选：附上封禁通知截图。请勿填写密码或验证码。'
-        description.placeholder='请输入封禁记录 ID，说明希望复核的情况。'
-        description.required=true
-        setCount(photoCount);return
-      }
-      shotsTitle.lastChild!.textContent = bug ? '截图（可选）' : '照片'
-      shotsHint.textContent = bug
-        ? '上面已经自动附上了你看到的游戏画面。出错提示、卡住的界面等可以再截图补充，没有也可以直接提交。'
-        : '尽量多拍几个角度：正面、左右两侧、背面、远景和细节。可以给每张标上视角。'
-      if (!item) {
-        name.placeholder = bug ? '一句话说明，例如：骑车过桥时卡住了' : '一句话说明，例如：逍遥楼屋顶颜色不对'
-        description.placeholder = bug
-          ? '你做了什么、期望发生什么、实际发生了什么？用的是手机还是电脑、什么浏览器？'
-          : '哪里和现实不一样？现实中是什么样子？'
-        description.required = bug
-        describeField!.querySelector('span')!.textContent = bug ? '描述（必填）' : '描述（可选）'
-      }
-      setCount(photoCount)
-    }
     const picker = photoPicker(
-      shots,
+      pickerHost,
       item?.photos.map((photo) => photo.n) ?? [],
       (message) => {
         note.textContent = message
@@ -680,10 +589,12 @@ export async function openFeedback(host: Host, ensureMap: () => Promise<MapApi |
       },
       () => id,
       run,
-      setCount,
-      cameraSupported()
+      (n) => {
+        photoCount = n
+        syncSummary()
+      },
+      item && cameraSupported()
         ? async () => {
-            // 收起弹窗但不关闭（onclose 会销毁表单），拍完原样放回，已填内容和滚动位置都保留。
             const scroll = body.scrollTop
             dialog.remove()
             dialog.removeAttribute('open')
@@ -701,52 +612,322 @@ export async function openFeedback(host: Host, ensureMap: () => Promise<MapApi |
             }
           }
         : undefined,
+      { compact: !item },
     )
-    applyKind()
-    onPaste = (files) => picker.add(files)
+
+    const paintMedia = () => {
+      clearShotUrl()
+      if (item) {
+        mediaCard.classList.toggle('fb-media--empty', !item.has_view_shot && !selection)
+        if (selection) {
+          shotUrl = URL.createObjectURL(selection.shot)
+          previewImg.src = shotUrl
+          previewWrap.hidden = false
+          previewCross.hidden = !selection.view.target
+          mediaTitle.textContent = '已重新取景'
+          mediaMeta.textContent = `${selection.view.lat.toFixed(5)}, ${selection.view.lon.toFixed(5)}`
+        } else if (item.has_view_shot) {
+          previewImg.src = `/api/feedback/${item.id}/view-shot`
+          previewWrap.hidden = false
+          previewCross.hidden = !item.view?.target
+          mediaTitle.textContent = '当前反馈画面'
+          mediaMeta.textContent = item.view
+            ? `${item.view.lat.toFixed(5)}, ${item.view.lon.toFixed(5)}`
+            : '保留原画面'
+        } else {
+          previewImg.removeAttribute('src')
+          previewWrap.hidden = true
+          mediaTitle.textContent = '附加照片'
+          mediaMeta.textContent = photoCount ? `已附 ${photoCount} 张` : '可直接添加照片'
+        }
+        mediaActions.replaceChildren(retakeBtn)
+        return
+      }
+
+      if (banId && !useDefaultShot && !photoCount) {
+        mediaCard.hidden = false
+        mediaCard.classList.add('fb-media--empty')
+        previewWrap.hidden = true
+        previewImg.removeAttribute('src')
+        mediaTitle.textContent = '申诉截图（可选）'
+        mediaMeta.textContent = '可附上封禁提示截图'
+        mediaActions.replaceChildren(pickBtn)
+        return
+      }
+
+      mediaCard.hidden = false
+      if (photoCount > 0) {
+        mediaCard.classList.remove('fb-media--empty')
+        mediaCard.classList.add('fb-media--custom')
+        previewWrap.hidden = true
+        previewImg.removeAttribute('src')
+        mediaTitle.textContent = `已选图片（${photoCount} 张）`
+        mediaMeta.textContent = selection ? '已保留当前视角供定位' : '随反馈一起上传'
+        mediaActions.replaceChildren(
+          ...(banId ? [] : [retakeBtn]),
+          replaceBtn,
+          removeBtn,
+        )
+        replaceBtn.textContent = '继续添加'
+        return
+      }
+
+      mediaCard.classList.remove('fb-media--custom')
+      if (useDefaultShot && selection) {
+        mediaCard.classList.remove('fb-media--empty')
+        shotUrl = URL.createObjectURL(selection.shot)
+        previewImg.src = shotUrl
+        previewWrap.hidden = false
+        previewCross.hidden = !selection.view.target
+        mediaTitle.textContent = '当前游戏画面'
+        mediaMeta.textContent = '默认附图 · 可直接提交'
+        replaceBtn.textContent = '更换'
+        mediaActions.replaceChildren(retakeBtn, replaceBtn, removeBtn)
+      } else {
+        mediaCard.classList.add('fb-media--empty')
+        previewWrap.hidden = true
+        previewImg.removeAttribute('src')
+        mediaTitle.textContent = photosOptional(chosenKind()) ? '暂未附带图片（可选）' : '暂未附带图片'
+        mediaMeta.textContent = photosOptional(chosenKind())
+          ? '可直接提交，也可补截图'
+          : '可截取当前画面或从本地选择'
+        mediaActions.replaceChildren(...(banId ? [] : [captureNowBtn]), pickBtn)
+      }
+    }
+
+    syncSummary = () => {
+      const current = chosenKind()
+      const bug = photosOptional(current)
+      paintMedia()
+      if (!item) {
+        if (current === APPEAL) {
+          name.placeholder = '封禁申诉'
+          description.placeholder = '请输入封禁记录 ID，说明希望复核的情况。'
+          description.required = true
+          describeField!.querySelector('span')!.textContent = '描述（必填）'
+        } else {
+          name.placeholder = bug
+            ? '一句话说明，例如：骑车过桥时卡住了'
+            : '一句话说明，例如：逍遥楼屋顶颜色不对'
+          description.placeholder = bug
+            ? '发生了什么、如何触发、使用的是电脑还是手机？'
+            : '补充细节（可选，不填标题也会自动按位置命名）'
+          description.required = bug
+          describeField!.querySelector('span')!.textContent = bug ? '描述（必填）' : '描述（可选）'
+        }
+      }
+
+      const hasDefault = useDefaultShot && !!selection
+      const readyText = photoCount
+        ? `已附 ${photoCount} 张图片${!item && !banId ? '与当前位置' : ''}`
+        : hasDefault
+          ? '已带当前画面与位置'
+          : bug
+            ? current === APPEAL
+              ? '可直接提交申诉'
+              : '截图可选，可直接提交'
+            : '请截取画面或选择图片'
+      count.textContent = readyText
+      count.classList.toggle('fb-count--empty', !photoCount && !hasDefault && !bug)
+    }
+
+    const startAim = () => {
+      dialog.remove()
+      dialog.removeAttribute('open')
+      const bar = el('aside', '', 'fb-aim-bar'),
+        take = el('button', '截取'),
+        cancel = el('button', '取消')
+      bar.append('移动到要反馈的位置，对准物体后点“截取”', take, cancel)
+      document.body.append(bar)
+      const restore = () => {
+        bar.remove()
+        document.exitPointerLock?.()
+        document.body.append(dialog)
+        dialog.showModal()
+        retakeBtn.focus()
+      }
+      cancel.onclick = restore
+      take.onclick = async () => {
+        take.disabled = cancel.disabled = true
+        try {
+          selection = await host.captureView()
+          useDefaultShot = true
+          viewShotUploaded = false
+          defaultPhotoUploaded = false
+          activePos = pickDefaultPosition(host, selection.view)
+          location = xz2ll(activePos.x, activePos.z)
+          updateLocationDisplay()
+          syncSummary()
+        } catch (error) {
+          note.textContent = String(error)
+          note.classList.add('fb-note--error')
+        } finally {
+          restore()
+        }
+      }
+    }
+
+    retakeBtn.onclick = () => {
+      if (!busy) startAim()
+    }
+    replaceBtn.onclick = () => {
+      if (!busy) picker.open()
+    }
+    pickBtn.onclick = () => {
+      if (!busy) picker.open()
+    }
+    removeBtn.onclick = () => {
+      if (busy) return
+      useDefaultShot = false
+      picker.clear()
+      syncSummary()
+    }
+    captureNowBtn.onclick = () =>
+      void run(async () => {
+        selection = await host.captureView()
+        useDefaultShot = true
+        viewShotUploaded = false
+        defaultPhotoUploaded = false
+        activePos = pickDefaultPosition(host, selection.view)
+        location = xz2ll(activePos.x, activePos.z)
+        updateLocationDisplay()
+        syncSummary()
+      })
+
+    if (!item) {
+      mediaCard.ondragover = (event) => {
+        event.preventDefault()
+        if (!busy) mediaCard.classList.add('fb-media--over')
+      }
+      mediaCard.ondragleave = () => mediaCard.classList.remove('fb-media--over')
+      mediaCard.ondrop = (event) => {
+        event.preventDefault()
+        mediaCard.classList.remove('fb-media--over')
+        if (busy) return
+        const files = event.dataTransfer?.files
+        if (files?.length) picker.add(Array.from(files))
+      }
+    }
+
+    syncSummary()
+    onPaste = (files) => {
+      if (!busy) picker.add(files)
+    }
     const prevDispose = dispose
     dispose = () => {
+      formDisposed = true
+      clearShotUrl()
       picker.dispose()
       prevDispose()
     }
-    form.onsubmit = (event) => {
+
+    formEl.onsubmit = (event) => {
       event.preventDefault()
       void run(async () => {
-        if (!picker.count() && !photosOptional(chosenKind())) throw Error('请至少添加一张照片')
-        if (!supplement && photosOptional(chosenKind()) && !description.value.trim()) throw Error('请描述一下遇到的问题')
-        const text =
-          mode.route && route.value.trim()
-            ? `${ROUTE}${route.value.trim()}\n\n${description.value.trim()}`
-            : description.value.trim()
-        send.textContent = '正在上传…'
+        const current = chosenKind()
+        const bug = photosOptional(current)
+        const hasDefault = !item && useDefaultShot && !!selection
+        const hasAnyImage = picker.count() > 0 || hasDefault
+        if (!hasAnyImage && !bug) throw Error('请截取当前画面或选择一张图片')
+        if (!supplement && bug && !description.value.trim()) throw Error('请描述一下遇到的问题')
+
+        const text = description.value.trim()
+        const fallbackName = truncateChars(`${current} · ${locSummary || '当前位置'}`, 40)
+        const resolvedTitle =
+          name.value.trim() || (text ? truncateChars(text.replace(/\s+/g, ' '), 40) : fallbackName)
+
+        send.textContent = '正在提交…'
         try {
+          const appeal = current === APPEAL
+          if (!item && !appeal && !selection) {
+            try {
+              selection = await host.captureView()
+              viewShotUploaded = false
+              defaultPhotoUploaded = false
+              activePos = pickDefaultPosition(host, selection.view)
+              location = xz2ll(activePos.x, activePos.z)
+              updateLocationDisplay()
+            } catch {
+              throw Error('请先截取游戏画面')
+            }
+          }
+          const nextSignature = !item
+            ? JSON.stringify({
+                current,
+                resolvedTitle,
+                text,
+                useDefaultShot,
+                lat: appeal ? 0 : location.lat,
+                lon: appeal ? 0 : location.lon,
+                view: appeal ? null : selection?.view ?? null,
+              })
+            : ''
+          if (!item && id && draftSignature && draftSignature !== nextSignature) {
+            const deleted = await fetch(`/api/feedback/${id}`, { method: 'DELETE' })
+            if (!deleted.ok && deleted.status !== 404) throw Error(await jsonError(deleted))
+            id = undefined
+            draftSignature = ''
+            viewShotUploaded = false
+            defaultPhotoUploaded = false
+            picker.resetDone()
+          }
           if (!id) {
-            const appeal=chosenKind()===APPEAL
-            if (!selection&&!appeal) throw Error('请先截取游戏画面')
+            if (!appeal && !selection) throw Error('请先截取游戏画面')
             id = (
               await api<{ id: string }>('feedback', {
-                ...(appeal?xz2ll(0,0):location),
-                view: appeal?null:selection?.view,
-                heading: appeal?null:selection?.view.heading,
-                landmark_id: appeal?null:selection?.view.landmark_id,
-                kind: chosenKind(),
-                title: name.value.trim(),
+                ...(appeal ? xz2ll(0, 0) : location),
+                view: appeal ? null : selection?.view,
+                heading: appeal ? null : selection?.view.heading,
+                landmark_id: appeal ? null : selection?.view.landmark_id,
+                kind: current,
+                title: resolvedTitle,
                 body: text,
               })
             ).id
-            for (const box of Array.from(form.querySelectorAll<HTMLElement>('.fb-step')))
-              box.inert = box !== shots
+            draftSignature = nextSignature
           }
-          if (selection && chosenKind()!==APPEAL) {
+
+          const shouldUploadViewShot =
+            current !== APPEAL && !!selection && (useDefaultShot || picker.count() > 0) && !viewShotUploaded
+          if (shouldUploadViewShot && selection) {
             const response = await fetch(`/api/feedback/${id}/view-shot`, {
               method: 'PUT',
-              headers: { 'Content-Type': 'image/jpeg', 'X-Feedback-View': JSON.stringify(selection.view).replace(/[^\x20-\x7e]/g,char=>'\\u'+char.charCodeAt(0).toString(16).padStart(4,'0')) },
+              headers: {
+                'Content-Type': 'image/jpeg',
+                'X-Feedback-View': JSON.stringify(selection.view).replace(
+                  /[^\x20-\x7e]/g,
+                  (char) => '\\u' + char.charCodeAt(0).toString(16).padStart(4, '0'),
+                ),
+              },
               body: selection.shot,
             })
             if (!response.ok) throw Error(await jsonError(response))
+            viewShotUploaded = true
           }
-          await picker.upload(id)
-          await api(`feedback/${id}/${supplement ? 'supplement' : 'submit'}`, { body: text });if(!supplement)record('funnel',{step:'feedbackSuccess'})
+
+          if (picker.count() > 0) {
+            await picker.upload(id)
+          } else if (
+            !item &&
+            current !== APPEAL &&
+            useDefaultShot &&
+            selection &&
+            !defaultPhotoUploaded
+          ) {
+            const uploadDefault = await fetch(`/api/feedback/${id}/photos/1`, {
+              method: 'PUT',
+              headers: {
+                'Content-Type': 'image/jpeg',
+                'X-Photo-Meta': encodeURIComponent(JSON.stringify({})),
+              },
+              body: selection.shot,
+            })
+            if (!uploadDefault.ok) throw Error(await jsonError(uploadDefault))
+            defaultPhotoUploaded = true
+          }
+
+          await api(`feedback/${id}/${supplement ? 'supplement' : 'submit'}`, { body: text })
+          if (!supplement) record('funnel', { step: 'feedbackSuccess' })
         } finally {
           send.textContent = supplement ? '提交补充' : '提交反馈'
         }
@@ -755,6 +936,7 @@ export async function openFeedback(host: Host, ensureMap: () => Promise<MapApi |
       })
     }
   }
+
   await run(async () => {
     const me = await fetch('/api/me')
     if (me.status === 401) {
@@ -764,7 +946,7 @@ export async function openFeedback(host: Host, ensureMap: () => Promise<MapApi |
       empty.append(
         el(
           'p',
-          '发现哪里建得不像、位置不对或者缺了建筑？登录后上传照片，AI 会按照片重新建模，你可以在这里跟踪进度。',
+          '发现哪里建得不像、位置不对或遇到问题？登录后点开反馈即可自动带上当前画面和位置，一键提交。',
         ),
       )
       button(
@@ -780,7 +962,7 @@ export async function openFeedback(host: Host, ensureMap: () => Promise<MapApi |
       return
     }
     if (!me.ok) throw Error('账号暂时不可用')
-    if(initialId)await detail(initialId);else await form()
+    if (initialId) await detail(initialId)
+    else await form()
   })
 }
-import {inline} from './loading'

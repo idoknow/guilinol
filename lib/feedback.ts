@@ -458,7 +458,7 @@ export async function feedback(request: Request, env: Env, path: string) {
     const quotaGuard = priorityAdmin
       ? ''
       : ' AND (SELECT count(*) FROM feedback f WHERE f.user_id=feedback.user_id AND f.submitted_at>unixepoch()-86400)<5'
-    guard = ` AND (kind='${APPEAL}' OR (view_json IS NOT NULL AND shot_state=1 AND (kind='${BUG}' OR EXISTS(SELECT 1 FROM feedback_photos WHERE feedback_id=feedback.id AND ready=1))))${quotaGuard}`
+    guard = ` AND (kind='${APPEAL}' OR (view_json IS NOT NULL AND ((kind='${BUG}' AND shot_state!=2 AND length(trim(body))>0) OR (shot_state=1 AND EXISTS(SELECT 1 FROM feedback_photos WHERE feedback_id=feedback.id AND ready=1)))))${quotaGuard}`
   } else if (action === 'supplement') {
     if (row.status !== 'need_info') conflict()
     target = priorityAutoApprove ? 'approved' : 'submitted'
