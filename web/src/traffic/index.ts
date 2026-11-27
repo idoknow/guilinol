@@ -12,6 +12,8 @@ import {signalApproaches} from './signal-approach'
 import {parkingBayLines} from './parking-bays'
 import {manholeCovers} from './manhole-covers'
 import {bollards} from './bollards'
+import {drawnGround} from './drawn-ground'
+import {streetSurfaceMat} from '../streets'
 import {LANDMARK_SIGNAL_GROUPS,signalHeads} from './signal-heads'
 import {touchUi} from '../ui/input-mode'
 import {npcDefaults,validNpc} from '../../../lib/npc'
@@ -104,7 +106,8 @@ export async function traffic(scene:THREE.Scene,camera:THREE.Camera,verify:boole
       }
       hide(STATIC+count,STATIC+parkCount);parkCount=count;mesh.userData.parked=count
       // A failure here must not reach the catch below: that one drops the cells and fetches them again.
-      try{bays?.setRows(groups.flat());covers?.recheck()}catch(error){console.warn('Parking bays unavailable',error)}
+      try{bays?.setRows(groups.flat())}catch(error){console.warn('Parking bays unavailable',error)}
+      try{covers?.recheck()}catch(error){console.warn('Manhole covers recheck failed',error)}
     }).catch(error=>{if(target===parkKey){parkKey='';cache.clear()}console.warn('Parking cell unavailable',error)})
   }
   let accumulator=0
@@ -126,9 +129,11 @@ export async function traffic(scene:THREE.Scene,camera:THREE.Camera,verify:boole
   // IDOK-399: manhole covers and gully grates along the lanes of the loaded road cell. One mesh; they keep off the bay lines above.
   const covers=sampleGround&&surfaceAt&&manholeCovers(scene,sampleGround,surfaceAt,bays?(x,z,margin)=>bays.blocks(x,z,margin):undefined)
   if(covers)void warm?.(covers.mesh)
-  // IDOK-399: kerb bollards beside the signal poles. One instanced mesh; they stand where `heads` found a kerb.
-  const posts=heads&&sampleGround&&surfaceAt&&bollards(scene,sampleGround,surfaceAt)
+  // IDOK-399: kerb bollards beside the signal poles. One instanced mesh; they stand where `heads` found a kerb,
+  // on the ground as drawn (tile ground mesh / street surface layer, `drawn-ground.ts`) where that is known, else on the collider.
+  const posts=heads&&sampleGround&&surfaceAt&&bollards(scene,sampleGround,surfaceAt,drawnGround(scene,streetSurfaceMat))
   if(posts)void warm?.(posts.mesh)
+  let coversFailed=false,postsFailed=false
   if(verify&&covers)mesh.userData.manholeCovers=covers.probe
   if(verify&&posts)mesh.userData.bollards=posts.probe
   if(verify&&(covers||posts))mesh.userData.streetFurnitureDraws=async(frames?:number)=>{const {parkingBayDraws}=await import('./parking-bay-audit');return {covers:covers?await parkingBayDraws(covers.mesh,frames):undefined,posts:posts?await parkingBayDraws(posts.mesh,frames):undefined}}
@@ -155,8 +160,9 @@ export async function traffic(scene:THREE.Scene,camera:THREE.Camera,verify:boole
     updateParking(camera.position.x,camera.position.z)
     parkLodAt-=dt;if(parkLodAt<=0){parkLodAt=.5;for(const [slot,variant,x,y,z,yaw] of parkedRows)show(slot,variant,x,y,z,yaw,1)}
     bays?.update(dt,player??camera.position)
-    covers?.update(dt,player??camera.position)
-    if(posts&&heads){posts.sync(heads);posts.update(dt,player??camera.position)}
+    // A failure in the street furniture must not skip the traffic below; one warning each, not one a frame.
+    try{covers?.update(dt,player??camera.position)}catch(error){if(!coversFailed){coversFailed=true;console.warn('Manhole covers unavailable',error)}}
+    try{if(posts&&heads){posts.sync(heads);posts.update(dt,player??camera.position)}}catch(error){if(!postsFailed){postsFailed=true;console.warn('Bollards unavailable',error)}}
     if(verify&&mesh.userData.staticOnly){hide(0,STATIC);mesh.count=0;mesh.userData.allMotors=[];heads?.update(dt,player??camera.position);return}
     const center=player??camera.position
     const target=`${Math.floor(center.x/512)}_${Math.floor(center.z/512)}`
