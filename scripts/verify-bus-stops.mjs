@@ -1,7 +1,9 @@
 // IDOK-399 stage 5b — verify bus stop signs and shelters at real stops in a real browser: the file
 // loads, every stop within 170 m of the walker is drawn and settled, shelters stand clear of the
 // carriageway and of buildings, each column reaches 0.3 m under the ground that is drawn, two draw
-// calls, no page errors. Screenshots: each spot with and without the stops, and a close-up of a sign.
+// calls, no page errors. Stage 5c also verifies that no parked shared e-bikes are drawn, returned
+// by nearestBike(), or takeable via takeBike() inside any bus shelter clearance zone. Screenshots:
+// each spot with and without the stops, and a close-up of a sign.
 // Run `npm run build` first (or set PERF_DIST), then:
 //   node --import tsx scripts/verify-bus-stops.mjs [--shots dir] [--profile desktop|mobile|both]
 // BUS_STOP_SPOTS=qixing,sanlidian picks spots.
@@ -11,7 +13,8 @@ import {join, resolve} from 'node:path'
 import {chromium} from 'playwright'
 import {preview} from 'vite'
 import {telemetryPreview} from './telemetry-preview.mjs'
-import {BURIED, MAX_SHOWN, SHOW_RADIUS} from '../web/src/traffic/bus-stop-layout.ts'
+import {BURIED, MAX_SHOWN, SHOW_RADIUS, parseBusStops} from '../web/src/traffic/bus-stop-layout.ts'
+import {EBIKE_SHELTER_MARGIN, ShelterClearance, clearsParkedBike} from '../web/src/traffic/bus-shelter-clearance.ts'
 
 const SPOT_TIMEOUT_MS = 180_000
 const PROBE_WAIT_MS = 60_000
@@ -21,6 +24,10 @@ const DRAW_FRAMES = 40
 const SHOT_SETTLE_MS = 1500
 /** A stop in the file and one in the probe are the same within this (keys are rounded to the centimetre). */
 const SAME_STOP = 0.05
+const EBIKE_RADIUS = 60
+const EBIKE_DRAW_RADIUS = 30
+const EBIKE_NEAREST_REACH = 6
+const EBIKE_CLEARED_REACH = 1.5
 
 // Column bottom minus the highest drawn surface under it: 0.3 m under its ground, give or take what the drawn-ground reading misses.
 const FOOT_GAP_MIN = -0.35
@@ -40,10 +47,12 @@ const PROFILES = {
 // The camera looks at `stops[0]`; every listed stop must be drawn, the shelters standing.
 const SPOTS = [
   {id: 'qixing', label: '七星公园站牌', stops: [{at: [256.44, 167.30], shelter: false}, {at: [212.27, 39.08], shelter: false}, {at: [211.88, 72.90], shelter: false}]},
+  {id: 'xiangshan', label: '象山公园两亭（原被电动车占）', ebikes: true, stops: [{at: [-1170.76, 1079.63], shelter: true}, {at: [-1154.36, 1086.7], shelter: true}]},
   {id: 'nanmenqiao', label: '南门桥南亭', stops: [{at: [-1777.74, 1085.53], shelter: true}]},
   {id: 'sanlidian', label: '三里店广场两亭', stops: [{at: [1315.17, 1842.71], shelter: true}, {at: [1318.72, 1872.72], shelter: true}]},
   {id: 'pengjialing', label: '彭家岭两亭', stops: [{at: [1398.66, -1052.13], shelter: true}, {at: [1446.26, -973.36], shelter: true}]},
-  {id: 'xinjian', label: '新建路口站牌', stops: [{at: [-136.96, -4134.16], shelter: false}, {at: [-158.11, -4135.61], shelter: false}]},
+  {id: 'xinjian', label: '新建路口一亭一牌', stops: [{at: [-136.96, -4134.16], shelter: true}, {at: [-158.11, -4135.61], shelter: false}]},
+  {id: 'huayuancun', label: '花园村两亭（原被电动车占）', ebikes: true, stops: [{at: [1196.52, -110.1], shelter: true}, {at: [1233.89, -109.81], shelter: true}]},
 ]
 
 function parseArgs(argv) {
@@ -272,6 +281,153 @@ async function verifySpot(browser, baseUrl, profileName, profile, spot, options)
       if (inspected.probe.atlas.used > 32) failures.push(`${tag}: atlas ${inspected.probe.atlas.used} cells`)
       if (!inspected.probe.atlas.texture) failures.push(`${tag}: no name atlas texture`)
 
+      // Parked shared e-bikes: none drawn, returned by nearestBike(), or takeable inside a shelter zone or cleared row.
+      const parsed = parseBusStops({version: 1, stops: rows})
+      if (!parsed) failures.push(`${tag}: parseBusStops returned null`)
+      const clearance = new ShelterClearance(parsed?.stops ?? [], EBIKE_SHELTER_MARGIN)
+      const origins = spot.stops.map(stop => stop.at)
+      const inSpotRadius = (x, z, r = EBIKE_RADIUS) => origins.some(([ox, oz]) => Math.hypot(x - ox, z - oz) <= r)
+      const nearZones = clearance.zones.filter(zone => inSpotRadius(zone.x, zone.z))
+
+      // If no e-bike within 30 m has triggered the lazy clearance loader yet, warm it up before waiting.
+      await page.evaluate(() => {
+        const probe = window.viewer?.trafficProbe
+        const getState = () => probe?.busShelterClearance?.()?.state
+        if (getState() !== 'idle') return
+        const b = window.viewer?.stream?.batches
+        if (!b) return
+        for (const {parked} of b.items.values()) {
+          if (!parked) continue
+          const count = Math.floor(parked.length / 16)
+          for (let i = 0; i < count; i++) {
+            b.nearestBike(parked[i * 16 + 12], parked[i * 16 + 14], undefined, 1)
+            if (getState() !== 'idle') return
+          }
+        }
+      })
+
+      const clearanceStatus = await page
+        .waitForFunction(() => {
+          const s = window.viewer?.trafficProbe?.busShelterClearance?.()
+          return s && (s.state === 'ready' || s.state === 'failed') ? s : null
+        }, null, {timeout: PROBE_WAIT_MS})
+        .then(handle => handle.jsonValue(), () => null)
+
+      let ebikes = {raw: 0, cleared: 0, nearCam: 0, drawn: 0, skipped: true}
+      if (!clearanceStatus) {
+        const last = await page.evaluate(() => window.viewer?.trafficProbe?.busShelterClearance?.() ?? null).catch(() => null)
+        failures.push(`${tag}: busShelterClearance did not reach ready within ${PROBE_WAIT_MS / 1000}s (state=${last?.state ?? 'missing'})`)
+      } else if (clearanceStatus.state === 'failed') {
+        failures.push(`${tag}: busShelterClearance failed after ${clearanceStatus.attempts} attempt(s)`)
+      } else {
+        await page.evaluate(async () => {
+          for (let i = 0; i < 3; i++) await new Promise(resolve => requestAnimationFrame(resolve))
+        })
+        const ebikeProbe = await page.evaluate(({origins, radius, rawRadius, drawRadius, reach, zones}) => {
+          const b = window.viewer.stream.batches
+          const inRadius = (x, z, r) => origins.some(([ox, oz]) => Math.hypot(x - ox, z - oz) <= r)
+          const cam = b.lastFurniturePos
+          const raw = []
+          for (const {tile, parked} of b.items.values()) {
+            if (!parked) continue
+            const tileKey = `${tile.x}:${tile.z}`
+            const count = Math.floor(parked.length / 16)
+            for (let i = 0; i < count; i++) {
+              const off = i * 16
+              const x = parked[off + 12], y = parked[off + 13], z = parked[off + 14]
+              if (inRadius(x, z, rawRadius)) {
+                const nearCam = Boolean(cam) && (x - cam.x) ** 2 + (y - cam.y) ** 2 + (z - cam.z) ** 2 <= drawRadius ** 2
+                raw.push({id: `${tileKey}:${i}`, x, z, m8: parked[off + 8], m10: parked[off + 10], tile: tileKey, index: i, nearCam})
+              }
+            }
+          }
+          const drawn = []
+          if (b.parked && b.parked.visible && b.parked.count > 0) {
+            const arr = b.parked.instanceMatrix.array
+            for (let k = 0; k < b.parked.count; k++) {
+              const x = arr[k * 16 + 12], z = arr[k * 16 + 14]
+              if (inRadius(x, z, radius)) drawn.push({x, z})
+            }
+          }
+          const nearest = zones.map(zone => {
+            const bike = b.nearestBike(zone.x, zone.z, undefined, reach)
+            return {key: zone.key, bike: bike ? {id: bike.id, x: bike.x, z: bike.z} : null}
+          })
+          return {raw, drawn, nearest}
+        }, {origins, radius: EBIKE_RADIUS, rawRadius: EBIKE_RADIUS + 5, drawRadius: EBIKE_DRAW_RADIUS, reach: EBIKE_NEAREST_REACH, zones: nearZones.map(({key, x, z}) => ({key, x, z}))})
+
+        const byTile = new Map()
+        for (const bike of ebikeProbe.raw) {
+          let list = byTile.get(bike.tile)
+          if (!list) { list = []; byTile.set(bike.tile, list) }
+          list.push(bike)
+        }
+        const tileArrays = new Map()
+        for (const [tile, bikes] of byTile) {
+          let maxIndex = -1
+          for (const bike of bikes) if (bike.index > maxIndex) maxIndex = bike.index
+          const arr = new Float32Array((maxIndex + 1) * 16)
+          arr.fill(NaN)
+          for (const bike of bikes) {
+            const off = bike.index * 16
+            arr[off + 8] = bike.m8
+            arr[off + 10] = bike.m10
+            arr[off + 12] = bike.x
+            arr[off + 14] = bike.z
+          }
+          tileArrays.set(tile, arr)
+        }
+        const clearedIds = new Set()
+        const allCleared = []
+        const rawInRadius = []
+        const clearedBikes = []
+        for (const bike of ebikeProbe.raw) {
+          const cleared = clearsParkedBike(clearance, tileArrays.get(bike.tile), bike.index)
+          if (cleared) {
+            clearedIds.add(bike.id)
+            allCleared.push(bike)
+          }
+          if (inSpotRadius(bike.x, bike.z)) {
+            rawInRadius.push(bike)
+            if (cleared) clearedBikes.push(bike)
+          }
+        }
+        const drawnBlocked = ebikeProbe.drawn.filter(bike =>
+          clearance.blocks(bike.x, bike.z)
+          || allCleared.some(cleared => Math.abs(bike.x - cleared.x) < 0.01 && Math.abs(bike.z - cleared.z) < 0.01),
+        )
+        if (drawnBlocked.length) failures.push(`${tag}: ${drawnBlocked.length} drawn e-bike(s) inside a shelter zone or cleared row: ${drawnBlocked.slice(0, 3).map(bike => `${round(bike.x, 2)},${round(bike.z, 2)}`).join('; ')}`)
+
+        const clearedCheck = clearedBikes.length
+          ? await page.evaluate(({bikes, reach}) => {
+              const b = window.viewer.stream.batches
+              const nearest = bikes.map(pt => {
+                const bike = b.nearestBike(pt.x, pt.z, undefined, reach)
+                return {key: pt.id, bike: bike ? {id: bike.id, x: bike.x, z: bike.z} : null}
+              })
+              const taken = []
+              for (const pt of bikes) {
+                if (b.takeBike(pt.id)) { b.returnBike(pt.id); taken.push(pt.id) }
+              }
+              return {nearest, taken}
+            }, {bikes: clearedBikes.map(({id, x, z}) => ({id, x, z})), reach: EBIKE_CLEARED_REACH})
+          : {nearest: [], taken: []}
+
+        const nearestBlocked = [...ebikeProbe.nearest, ...clearedCheck.nearest].filter(entry =>
+          entry.bike && (clearedIds.has(entry.bike.id) || clearance.blocks(entry.bike.x, entry.bike.z)),
+        )
+        if (nearestBlocked.length) failures.push(`${tag}: ${nearestBlocked.length} nearestBike() result(s) cleared: ${nearestBlocked.slice(0, 3).map(entry => `${entry.key}->${entry.bike.id}`).join(', ')}`)
+        if (clearedCheck.taken.length) failures.push(`${tag}: ${clearedCheck.taken.length} cleared e-bike(s) takeable via takeBike(): ${clearedCheck.taken.slice(0, 4).join(', ')}`)
+
+        const nearCam = clearedBikes.filter(bike => bike.nearCam).length
+        if (spot.ebikes) {
+          if (!clearedBikes.length) failures.push(`${tag}: expected cleared e-bikes inside shelter zones, got 0/${rawInRadius.length} raw`)
+          else if (!nearCam) failures.push(`${tag}: expected >=1 cleared e-bike within ${EBIKE_DRAW_RADIUS} m of camera, got 0/${clearedBikes.length} cleared`)
+          if (!ebikeProbe.drawn.length) failures.push(`${tag}: expected nearby e-bikes drawn outside shelter zones, got 0/${rawInRadius.length} raw`)
+        }
+        ebikes = {raw: rawInRadius.length, cleared: clearedBikes.length, nearCam, drawn: ebikeProbe.drawn.length}
+      }
+
       if (shotsDir) {
         const main = listed[0].stop
         if (main) await captureCameras(page, profileName, spot.id, buildCameras(spot, main, listed.slice(1).map(entry => entry.stop).filter(Boolean)), shotsDir)
@@ -288,6 +444,7 @@ async function verifySpot(browser, baseUrl, profileName, profile, spot, options)
         // Per stop: where it stands (pole base, collider under it, each column foot) and every drawn surface under those points.
         heights: drawn.map(stop => ({key: stop.key, name: stop.name, y: stop.y, support: stop.support, corners: stop.corners.map(corner => ({y: corner.y, support: corner.support, bottom: corner.bottom})), audit: inspected.audit.find(item => item.key === stop.key) ?? null})),
         buildingsChecked: inspected.buildingsRead,
+        ebikes,
         draws: inspected.draws, rendererCalls: inspected.calls,
         pageErrors: diag.pageErrors, consoleErrors: diag.consoleErrors,
       }
@@ -331,7 +488,10 @@ try {
   if (args.shotsDir) await writeFile(join(args.shotsDir, 'verify-bus-stops.json'), JSON.stringify({timestamp: new Date().toISOString(), browser: browser.version(), renderer, results, failures, ok: !failures.length}, null, 2) + '\n')
   for (const row of results) {
     if (row.error) { console.log(`${row.profile}/${row.spot}: ERROR ${row.error}`); continue }
-    console.log(`${row.profile}/${row.spot}: ${row.near} stops drawn (${row.shelters} shelters, skipped ${row.skipped.length}), feet gap ${row.footGap.min}…${row.footGap.median}…${row.footGap.max} m (nulls ${row.footGap.nulls}/${row.footGap.count}), pole gap ${row.poleGap.min}…${row.poleGap.max}; draws ${row.draws.parts?.mostPerFrame}+${row.draws.faces?.mostPerFrame}; atlas ${row.probe.atlas.used}/${row.probe.atlas.capacity}; buildings ${row.buildingsChecked ? 'checked' : 'NOT checked (stream.loaded rings unreadable)'}; settle ${row.settleMs} ms`)
+    const ebikeSummary = row.ebikes.skipped
+      ? ', e-bikes skipped (clearance not ready)'
+      : `, e-bikes ${row.ebikes.cleared}/${row.ebikes.raw} cleared (${row.ebikes.nearCam} near camera), ${row.ebikes.drawn} drawn`
+    console.log(`${row.profile}/${row.spot}: ${row.near} stops drawn (${row.shelters} shelters, skipped ${row.skipped.length}), feet gap ${row.footGap.min}…${row.footGap.median}…${row.footGap.max} m (nulls ${row.footGap.nulls}/${row.footGap.count}), pole gap ${row.poleGap.min}…${row.poleGap.max}; draws ${row.draws.parts?.mostPerFrame}+${row.draws.faces?.mostPerFrame}; atlas ${row.probe.atlas.used}/${row.probe.atlas.capacity}; buildings ${row.buildingsChecked ? 'checked' : 'NOT checked (stream.loaded rings unreadable)'}; settle ${row.settleMs} ms${ebikeSummary}`)
   }
   if (failures.length) {
     console.log(`\nFAIL (${failures.length}):`)

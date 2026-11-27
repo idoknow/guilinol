@@ -10,6 +10,7 @@ import {look} from './look/config'
 import {flags} from './debug'
 import {tunnelLiningMaterial,tunnelLightMaterial} from './station-tunnels'
 import {freezeStatic} from './static-freeze'
+import {busShelterClearsParked, onBusShelterClearance} from './traffic/bus-shelter-clearance'
 import {
   hasShardForTile,
   isCityUpgradeEnabled,
@@ -364,7 +365,7 @@ export class ChunkBatcher {
         const distance=(east-x)**2+(south-z)**2
         if(distance>=best||footY!==undefined&&Math.abs(footY-height)>1.5)continue
         const id=`${tile.x}:${tile.z}:${offset/16}`
-        if(this.takenBikes.has(id)||vehicleForbiddenAt(east,south)||isTianyuanExcludedParkedBike(east,south)||isWangchengDrinksExcludedParkedBike(east,south))continue
+        if(this.takenBikes.has(id)||vehicleForbiddenAt(east,south)||isTianyuanExcludedParkedBike(east,south)||isWangchengDrinksExcludedParkedBike(east,south)||busShelterClearsParked(parked,offset/16))continue
         nearest={id,x:east,y:height,z:south,yaw:Math.atan2(parked[offset+8],parked[offset+10])};best=distance
       }
     }
@@ -377,7 +378,7 @@ export class ChunkBatcher {
     if(!Number.isInteger(index)||index<0||id!==`${east}:${south}:${index}`)return false
     for(const {tile,parked} of this.items.values()){
       if(tile.x!==east||tile.z!==south||index>=parked.length/16)continue
-      if(vehicleForbiddenAt(parked[16*index+12],parked[16*index+14])||isTianyuanExcludedParkedBike(parked[16*index+12],parked[16*index+14])||isWangchengDrinksExcludedParkedBike(parked[16*index+12],parked[16*index+14]))return false
+      if(vehicleForbiddenAt(parked[16*index+12],parked[16*index+14])||isTianyuanExcludedParkedBike(parked[16*index+12],parked[16*index+14])||isWangchengDrinksExcludedParkedBike(parked[16*index+12],parked[16*index+14])||busShelterClearsParked(parked,index))return false
       this.takenBikes.add(id);this.furnitureStale=true;return true
     }
     return false
@@ -400,6 +401,8 @@ export class ChunkBatcher {
     scene.add(this.tunnelLining.mesh,this.tunnelLights.mesh)
     onCityUpgradeShard(() => this.invalidateFurniture())
     onCityUpgradeToggle(() => this.invalidateFurniture())
+    // IDOK-399 5c: a row of e-bikes with one inside a bus shelter's footprint is neither drawn nor rideable (indices, hence ids, unchanged).
+    onBusShelterClearance(() => this.invalidateFurniture())
   }
 
   add(input:TileBatchInput) {
@@ -562,7 +565,7 @@ export class ChunkBatcher {
           }
         }
         if(tileDistance<=32){
-          for(let index=0;index<item.parked.length/16;index++)if(near(item.parked,index)&&(!this.takenBikes.size||!this.takenBikes.has(`${tile.x}:${tile.z}:${index}`)))bikes.push(index)
+          for(let index=0;index<item.parked.length/16;index++)if(near(item.parked,index)&&(!this.takenBikes.size||!this.takenBikes.has(`${tile.x}:${tile.z}:${index}`))&&!busShelterClearsParked(item.parked,index))bikes.push(index)
           for(let index=item.railLodCount;index<item.detailCount;index++){
             if(hideOldShops && isCityUpgradeExcludedShopBox(item.furnitureMatrices,index,tileUpgraded))continue
             if(near(item.furnitureMatrices,index))boxes.push(index)

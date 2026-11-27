@@ -274,8 +274,9 @@ npm run perf:city -- --hot                          # 附「谁最耗主线程 /
 ## 数据
 
 - `public/street-furniture/bus-stops.json`，`version: 1`，每行 `[x, z, yaw, shelter, side, name, en]`：站牌杆位置（路缘后 0.6 m）、朝向（`n` = 指向车行道的法向）、有无候车亭、候车亭在杆的哪侧（亭心在杆沿 `t` 的 `side × 2.6 m` 处，`-1` 为 `−t`，其余为 `+t`）、中文名、英文名（可空）。
-- 由 `pipeline/bus_stops.py` 从 OSM 快照加 `public/world` 生成；**世界重烘后要重跑**：`uv run --locked python pipeline/bus_stops.py --world public/world --osm <快照> --out public/street-furniture/bus-stops.json`。文件里的 `world` 字段记的是生成时的世界指纹。现有 219 站、183 个有站名、26 个带候车亭。
-- 候车亭只在放得下的站立：不压车行道、不进建筑、离路灯和信号灯杆 ≥ 0.4 m、离行道树树心 ≥ 0.6 m（读各块的 `.trees`，亭不压树池）、不压世界块里已有的街边摆设（`decor`：共享电动车每辆按半径 0.9 m、护栏和绿篱两侧各 0.6 m、指路牌杆 0.8 m、警示柱 0.4 m；`beds` 花坛 0.7 m）；一侧放不下换另一侧，两侧都不行只立站牌。
+- 由 `pipeline/bus_stops.py` 从 OSM 快照加 `public/world` 生成；**世界重烘后要重跑**：`uv run --locked python pipeline/bus_stops.py --world public/world --osm <快照> --out public/street-furniture/bus-stops.json`。文件里的 `world` 字段记的是生成时的世界指纹。现有 219 站、183 个有站名、58 个带候车亭。
+- 候车亭只在放得下的站立：不压车行道、不进建筑、离路灯和信号灯杆 ≥ 0.4 m、离行道树树心 ≥ 0.6 m（读各块的 `.trees`，亭不压树池）、不压世界块里已有的街边摆设（`decor`：护栏和绿篱两侧各 0.6 m、指路牌杆 0.8 m、警示柱 0.4 m；`beds` 花坛 0.7 m）；一侧放不下换另一侧，两侧都不行只立站牌。共享电动车（`decor` kind 3）不算占位，由运行时让开（见下条）。
+- 电动车让亭（IDOK-399 5c）：`web/src/traffic/bus-shelter-clearance.ts` 自己读同一份 json，把每个候车亭的平面轮廓四周外扩 0.9 m 作为禁停区；一排三辆（同一 `decor` 项）里只要有一辆车心落在区内，整排不画（`batch.ts` 渲染选取）、`nearestBike` 不给、`takeBike` 拒绝，不留贴着站杆的孤车。同排靠 `parked` 数组相邻项判定（同朝向、车心相距 1.25 m 的倍数），不靠下标取模，因为个别区块先按坐标删过车。不删 `parked` 数组项，车的 id（区块:下标）不变；结果只取决于 json 与车的坐标，各客户端一致。数据到达前车照常画，到达后刷新一次。电动车没有碰撞体、不上小地图、不联机同步，所以这三处就是全部消费方。
 - 十字街地标范围（`SHIZIJIE_DECOR_EXCLUSION_POLY`）内的站运行时不画（地标模型自带街景），探针里计入 `excluded`。
 
 ## 规则
@@ -301,8 +302,8 @@ npm run perf:city -- --hot                          # 附「谁最耗主线程 /
 
 ## 验证
 
-- `npm run verify:bus-stops`（`scripts/test-bus-stops.mjs`）：解析与坐标系、真数据全部能排版、索引与暴力一致、选站滞回与 24 上限、两侧候车亭几何、碰撞体（前沿敞开）、底座与高差、站名排版、图集 LRU；运行时：载入前不画、重试节奏与次数、每帧预算、四脚最高且立柱各到各的地面、画面地面 vs 碰撞面、台阶不立亭、三角形绕序与牌面朝向、碰撞、170/190 回收、沉降与跳变读数。
-- `npm run verify:bus-stops:city`（`scripts/verify-bus-stops.mjs`，先 `npm run build`）：七星公园 `qixing`（只有站牌）、南门桥南 `nanmenqiao`、三里店广场 `sanlidian`（两亭）、彭家岭 `pengjialing`（两亭）、新建路口 `xinjian`（只有站牌）5 个点位 × 桌面/手机，核对 json 已载、170 m 内应画的站全部画出并定住、候车亭外轮廓与四角不在车行道（kind 0/5）上、不在建筑里（读不到建筑轮廓时报告「未查」）、立柱脚离画出来的地面 −0.35…+0.03 m、杆底 ±6 cm、每帧 ≤ 3 次绘制、没有页面错误；存前后对照图和 3 m 近景。`BUS_STOP_SPOTS=qixing,sanlidian` 只跑指定点位，`--shots <目录>` 存图和 `verify-bus-stops.json`。
+- `npm run verify:bus-stops`（`scripts/test-bus-stops.mjs`）：解析与坐标系、真数据全部能排版、索引与暴力一致、选站滞回与 24 上限、两侧候车亭几何、碰撞体（前沿敞开）、底座与高差、站名排版、图集 LRU；运行时：载入前不画、重试节奏与次数、每帧预算、四脚最高且立柱各到各的地面、画面地面 vs 碰撞面、台阶不立亭、三角形绕序与牌面朝向、碰撞、170/190 回收、沉降与跳变读数；电动车让亭（5c）：亭区几何与余量、网格索引与暴力一致、真数据 58 亭、注册表载入/重试/失败/复位、同排整组判定（组内只有一辆落区也整排不摆）。`npm run check:batcher` 另核对 `nearestBike` / `takeBike` / 停车网格三处一致和整排清除。
+- `npm run verify:bus-stops:city`（`scripts/verify-bus-stops.mjs`，先 `npm run build`）：七星公园 `qixing`（只有站牌）、南门桥南 `nanmenqiao`、三里店广场 `sanlidian`（两亭）、彭家岭 `pengjialing`（两亭）、新建路口 `xinjian`（一亭一牌）、象山公园 `xiangshan`（两亭，5b 时被电动车占位）、花园村 `huayuancun`（两亭，同上）7 个点位 × 桌面/手机，核对 json 已载、170 m 内应画的站全部画出并定住、候车亭外轮廓与四角不在车行道（kind 0/5）上、不在建筑里（读不到建筑轮廓时报告「未查」）、立柱脚离画出来的地面 −0.35…+0.03 m、杆底 ±6 cm、每帧 ≤ 3 次绘制、没有页面错误；亭区数据就绪后，30 m 内停放车在亭区（含 0.9 m 余量）里的整排既不画出、`nearestBike` 选不到、`takeBike` 也取不走；存前后对照图和 3 m 近景。`BUS_STOP_SPOTS=qixing,sanlidian` 只跑指定点位，`--shots <目录>` 存图和 `verify-bus-stops.json`。
 - 浏览器探针（`?verify`）：
   - `viewer.trafficProbe.busStops()` → `{load, attempts, total, excluded, shown, drawn, settled, visible, drawCalls, meshes, atlas, focus, stops: [{key, slot, x, z, yaw, side, shelter, shelterState, name, state, y, support, settled, spread, cell, named, corners, outline}]}`。
   - `viewer.trafficProbe.busStopsShown(false / true)` 临时隐藏 / 恢复，拍对照图用。
@@ -315,4 +316,4 @@ npm run perf:city -- --hot                          # 附「谁最耗主线程 /
 - 只画最近 24 个站；十字街地标范围内不画；json 拿不到（5 次都失败）就没有站牌。
 - 站名画布 1024² 整张上传，已节流到每 0.5 秒一次，手机上首次进入密集站区可能有一次小卡顿。
 - 数据跟世界指纹走：世界重烘后不重跑 `pipeline/bus_stops.py`，站点可能偏离人行道、候车亭可能撞上新种的行道树。
-- 候车亭只有 26 个：路边的共享电动车（全城 12.6 万组）和行道树占掉了大部分站旁的空地，数据侧让亭子避开它们。要多立亭，得让 `street-worker.ts` 摆车时让开候车亭，再放宽 `pipeline/bus_stops.py` 的 `CLUTTER_EBIKE_RADIUS_M`（只避树时是 63 个）。
+- 候车亭 58 个（5b 时 26 个）：电动车改由运行时让开后，剩下挡亭的是行道树、花坛、指路牌和护栏。
