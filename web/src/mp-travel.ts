@@ -22,7 +22,7 @@ export function rejectTravel(code?:string){
 export async function prepareTravel(reason:string,x:number,z:number,request:(target:string|null)=>Promise<TravelReply>,leave:(delay:number)=>()=>void){
   const target=travelTarget(reason,x,z)??null,reply=await request(target)
   if(!reply.ok)return rejectTravel(reply.code)
+  if(reply.leave&&typeof reply.rejoinAfterMs==='number')return leave(reply.rejoinAfterMs)
   if(target)return true
-  if(!reply.leave||typeof reply.rejoinAfterMs!=='number')return rejectTravel()
-  return leave(reply.rejoinAfterMs)
+  return rejectTravel()
 }

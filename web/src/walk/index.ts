@@ -106,7 +106,13 @@ import {
 } from './ebike-fx'
 import type {vehicles} from './vehicles'
 import type {DrinksInteractCandidate} from '../drinks'
-import type {TrafficDutyController} from '../traffic-duty'
+import {
+  clampToBridgeDutyBounds,
+  isInBridgeDutyBounds,
+  resolveDutyTeleportDeckY,
+  resolveDutyZone,
+  type TrafficDutyController,
+} from '../traffic-duty'
 
 let rapierReady:Promise<void>|undefined
 let avatarReady:Promise<GLTF>|undefined
@@ -1409,7 +1415,7 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
     ()=>{if(isExternalCameraActive())return;arm=arm>(cfg.far+cfg.near)/2?cfg.near:cfg.far;if(active)follow(0,true)},
     ()=>(arm-cfg.zoomMin)/(cfg.zoomMax-cfg.zoomMin))
   if(smokeEnabled())document.querySelector('.walk-ui')!.append(smokeHint)
-  const safe=new THREE.Vector3(),posOut=new THREE.Vector3(),wish=new THREE.Vector2();const spawns:object[]=[]
+  const safe=new THREE.Vector3(),posOut=new THREE.Vector3(),footOut=new THREE.Vector3(),wish=new THREE.Vector2();const spawns:object[]=[]
   let external:{x:number,z:number,run:boolean}|null=null,blockedWater=false,held=false
   const still={right:0,forward:0,run:false,crouch:false,jump:false}
   function setSnap(on:boolean){if(snapEnabled===on)return;snapEnabled=on;if(on)sim.controller.enableSnapToGround(cfg.snap);else sim.controller.disableSnapToGround()}
@@ -1500,7 +1506,7 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
     }
     return ready
   }
-  async function enter(x:number,z:number,heading:number,reason:string,override=false,signal?:AbortSignal,progress?:(fraction:number,detail:string)=>void){
+  async function enter(x:number,z:number,heading:number,reason:string,override=false,signal?:AbortSignal,progress?:(fraction:number,detail:string)=>void,targetY?:number){
     const started=performance.now()
     function fail(cause:string,detail:object={}){
       console.warn('walk:enter-failed',JSON.stringify({reason,x,z,cause,elapsedMs:Math.round(performance.now()-started),loaded:stream.loaded.size,queued:stream.queuedTiles,pending:stream.pending.size,...detail}))
@@ -1554,11 +1560,21 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
     sim.sync(x,z);if(!place(x,z,reason,override,gpsSpot,(why,cx,cz,hitY,slope)=>{
       const sample=rejected[why]??={count:0,x:cx,z:cz,hitY:hitY??null,slope};sample.count++
     })){disconnect();window.dispatchEvent(new CustomEvent('walk:spawn-failed',{detail:{x,z,reason:'no-walkable-support'}}));return fail('no-walkable-support',{rejected})}
+    if(targetY!==undefined&&Number.isFinite(targetY)){
+      const cur=sim.body.translation(),curFootY=cur.y-cfg.height/2
+      if(Math.abs(curFootY-targetY)>0.5||Math.hypot(cur.x-x,cur.z-z)>0.8){
+        const sampledY=carSupportAt(x,z,targetY)?.y
+        const deckY=resolveDutyTeleportDeckY(sampledY,targetY)
+        const clampedTarget={x,y:deckY+0.055+cfg.height/2,z}
+        sim.body.setTranslation(clampedTarget,true);sim.body.setNextKinematicTranslation(clampedTarget);sim.world.step()
+        safe.set(clampedTarget.x,clampedTarget.y,clampedTarget.z)
+      }
+    }
     active=true;rides?.show(true);requestAnimationFrame(()=>requestAnimationFrame(loadRides));figure.visible=true;firstPersonHidden=false
     yaw=heading;facing=yaw+avatar.yaw;figure.rotation.y=facing;input.show(true);accumulator=0;rig.reset(arm)
     restoreFootLocomotion(avatar.clips.idle)
     syncGameTravelState()
-    camera.near=.08;camera.updateProjectionMatrix();follow(0,true)
+    camera.near=.08;camera.updateProjectionMatrix();follow(0,true);resetPoseSpeed()
     if(takeCigaretteIntent(sessionStorage)&&smokeEnabled()){
       chooseSmoke()
     }
@@ -1651,6 +1667,9 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
   // 开车/船/无人机/直升机/乘客位时恒为 0，服务端拿到 reportedSpeed=0 无法交叉验证，
   // 后台取证也看不到真实速度。改为按相邻两次采样位移/时间求速度，全模式通用。
   let poseSpeedAt=0, poseSpeedX=0, poseSpeedZ=0, poseSpeedValue=0
+  function resetPoseSpeed(){
+    poseSpeedAt=-Infinity; poseSpeedValue=0; poseSpeedX=figure.position.x; poseSpeedZ=figure.position.z
+  }
   function poseSpeed(){
     const at=performance.now(), x=figure.position.x, z=figure.position.z
     const dt=(at-poseSpeedAt)/1000
@@ -1671,17 +1690,37 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
           passenger:document.body.dataset.helicopter?true:undefined,foot:!rides?.bike&&!rides?.car&&!rides?.boat&&!document.body.dataset.helicopter,yaw:figure.rotation.y,v:rc?0:poseSpeed(),gr:Number(grounded),
           sc:cigarette.wire,sb:Math.round(cigarette.length*1800),sp:puffSeq,br:brandIndex(cigarette.brand),sd:dropSeq,ss:cigarette.strength,sr:cigarette.remaining,
           bike:rides?.bike?'bike':'',bx:rides?.bike?.position.x??0,bz:rides?.bike?.position.z??0,byaw:rides?.heading??0}},()=>currentAvatar()??profile,camera,currentActivity,combat.receive,(x,y,z)=>{
-            const dest={x,y:y+cfg.height/2,z}
-            sim.sync(x,z);sim.body.setTranslation(dest,true);sim.body.setNextKinematicTranslation(dest)
-            safe.set(x,dest.y,z);figure.position.set(x,y-combat.drop,z);external=null;vx=vz=velocity=accumulator=0
-            poseSpeedAt=-Infinity;poseSpeedValue=0
+            const footY=y-combat.drop,dest={x,y:footY+cfg.height/2,z}
+            sim.sync(x,z);sim.body.setTranslation(dest,true);sim.body.setNextKinematicTranslation(dest);sim.world.step()
+            safe.set(x,dest.y,z);figure.position.set(x,footY,z)
+            external=null;vx=0;vz=0;velocity=0;accumulator=0;coyoteTimer=0;jumpTimer=0;grounded=false;jumpStage='none'
+            crashSession=null;standUpSession=null;pickupSession=null;bikeObstacle=''
+            if(rides?.car||rides?.bike){
+              rides.stop()
+              rides.park(figure.position)
+            }
+            resetPoseSpeed()
+            if(trafficDutyRef&&trafficDutyRef.getSnapshot().phase==='active'){
+              const dutyZoneId=trafficDutyRef.getSnapshot().zoneId
+              const outOfShiftZone=dutyZoneId==='shizijie'
+                ? resolveDutyZone({x,y:footY,z})?.id!=='shizijie'
+                : !isInBridgeDutyBounds({x,y:footY,z})&&(Math.hypot(clampToBridgeDutyBounds({x,y:footY,z}).clamped.x-x,clampToBridgeDutyBounds({x,y:footY,z}).clamped.z-z)>12)
+              if(outOfShiftZone){
+                trafficDutyRef.abandonDuty()
+                window.dispatchEvent(new CustomEvent('walk:toast',{detail:{text:'位置已重置，已自动结束当前执勤班次',ms:2400}}))
+              }
+            }
           },captureContext)
         net.emote(emote.id);net.tick(0)
     }
   }
   addEventListener('glol:mp-pref',()=>{if(mpEnabled())attachMp();else disconnect()})
   function disconnect(){combat.reset();net?.dispose();net=undefined}
-  function leave(){disconnect();resetWalk()}
+  function leave(){
+    disconnect()
+    if(trafficDutyRef?.getSnapshot().phase==='active')trafficDutyRef.abandonDuty()
+    resetWalk()
+  }
   function resetWalk(){combat.hide();cancelSmoke();knockdown.reset();wasKnockdownDown=false;dutyFlagHoldMode=null;dutyFlagHoldTimer=0;document.body.dataset.tdKnockdown='0';if(hotbarSlot()==='smoke')selectSlot('hand');ticketHandover.stop();ticketHandover.reset();emote.stop();emote.reset();smoking?.dispose();smoking=undefined;holdLayer.reset();camHoldBlend=0;wheel.close();cigarette.stop();if(shopOverlay?.isOpen())shopOverlay?.close('fly');outfitController.setRidingEbike(false);finishActiveTestRide('mode_switch');shopHintGroup.visible=false;ebikeShowroomGroup.visible=false;shopEbikeShowcaseRig.root.visible=false;for(const item of showroomBikes)item.snapped=false;destination=null;active=false;crashSession=null;standUpSession=null;pickupSession=null;crashRecoverQueued=false;twoWheelOp=createInitialTwoWheelOpState();carHeadlight='off';carHeadlightManual=false;clearAllDowned();releaseDynamicCar();releaseDynamicBike();input.syncRideHud(null,null);rides?.clearBoatPose(figure);rides?.show(false);actionButton.hidden=true;setPrompt(null);updateTravel('fly',null);if(wasCar||wasBike)applyFootController();wasBoat=wasBike=wasCar=false;bikeObstacle='';boatBoardElapsed=BOAT_BOARD_DUR;boatLandElapsed=BOAT_LAND_DUR;ridePose.reset();driverPose.reset(false);clearAvatarPose(figure);stopLocomotionActions();mixer.stopAllAction();resetMotion();figure.visible=false;input.show(false);external=null;lastTianyuanSyncKey='';sim.clear();camera.near=1;camera.updateProjectionMatrix()}
   function canPlaceCrashOffset(x:number,z:number,refY:number,fromX?:number,fromZ?:number){
     if(!sim.withinBounds(x,z))return false
@@ -2816,10 +2855,17 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
         }
       }
       if(trafficDutyRef&&trafficDutyRef.getSnapshot().phase==='active'){
-        const dutyClamp=trafficDutyRef.clampPlayerPos({x:next.x,y:next.y-cfg.height/2,z:next.z})
+        const dutyClamp=trafficDutyRef.clampPlayerPos({x:next.x,y:next.y-cfg.height/2,z:next.z},{emitHostClamp:false})
         if(dutyClamp.clamped){
-          next.x=dutyClamp.pos.x;next.z=dutyClamp.pos.z;vx=vz=bikeSpeed=0
-          if(rides?.bike||rides?.car)rides.stop()
+          next.x=dutyClamp.pos.x
+          next.y=dutyClamp.pos.y+cfg.height/2
+          next.z=dutyClamp.pos.z
+          vx=vz=velocity=bikeSpeed=0
+          if(rides?.bike||rides?.car){
+            rides.stop()
+            figure.position.set(next.x,dutyClamp.pos.y,next.z)
+            rides.park(figure.position)
+          }
         }
       }
       traveled+=Math.hypot(next.x-pos.x,next.z-pos.z);sim.body.setNextKinematicTranslation(next);sim.world.step();if(grounded&&!blockedWater)safe.set(next.x,next.y,next.z)
@@ -3291,9 +3337,13 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
     setTrafficDuty(ctrl:TrafficDutyController|null){trafficDutyRef=ctrl},
     setTrafficVolunteerMode(on:boolean){
       document.body.dataset.tdDutyActive=on?'1':'0'
-      if(on)document.body.dataset.duty='active'
-      else delete document.body.dataset.duty
-      if(on)cancelSmokeForDuty(true)
+      if(on){
+        document.body.dataset.duty='active'
+        combat.stop()
+        cancelSmokeForDuty(true)
+      }else{
+        delete document.body.dataset.duty
+      }
       if(trafficVolunteerActive===on)return
       trafficVolunteerActive=on
       syncWalkOutfit()
@@ -3336,8 +3386,17 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
       if(!active||rides?.boat)return
       const cur=sim.body.translation()
       const target={x:pos.x,y:Number.isFinite(pos.y)?pos.y+cfg.height/2:cur.y,z:pos.z}
+      const footY=target.y-cfg.height/2
+      const jumped=Math.hypot(target.x-cur.x,target.z-cur.z)>0.5||Math.abs(target.y-cur.y)>0.5
+      sim.sync(target.x,target.z)
       sim.body.setTranslation(target,true);sim.body.setNextKinematicTranslation(target);sim.world.step()
-      vx=vz=0;rides?.stop()
+      safe.set(target.x,target.y,target.z);figure.position.set(target.x,footY,target.z)
+      vx=vz=velocity=0;coyoteTimer=0;jumpTimer=0;jumpStage='none'
+      if(rides?.car||rides?.bike){
+        rides.stop()
+        rides.park(figure.position)
+      }
+      if(jumped)resetPoseSpeed()
     },
     dutyPropsHandle:dutyProps,
     getDutyPropsHandle:()=>dutyProps,
@@ -3392,5 +3451,6 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
       figure.getObjectByName('hand_r')?.getWorldPosition(holdEffector)
       return {aim:{...holdAim},blend:camHoldBlend,hand:[holdEffector.x,holdEffector.y,holdEffector.z],target:[holdTarget.x,holdTarget.y,holdTarget.z]}
     },
-    get position(){const pos=rides?.boat?.position??sim.body.translation();return posOut.set(pos.x,pos.y,pos.z)}}
+    get position(){const pos=rides?.boat?.position??sim.body.translation();return posOut.set(pos.x,pos.y,pos.z)},
+    get footPosition(){const pos=rides?.boat?.position??sim.body.translation();return footOut.set(pos.x,rides?.boat?pos.y:pos.y-cfg.height/2,pos.z)}}
 }

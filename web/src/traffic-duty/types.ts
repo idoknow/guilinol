@@ -598,7 +598,7 @@ export interface TrafficDutyController {
   canOpenStory(): boolean
   canOpenFineTerminal(): boolean
   /** Clamps player position inside Jiefang Bridge bounds during active duty and emits warning if clamped. */
-  clampPlayerPos(pos: Position): {pos: Position; clamped: boolean; warning: string | null}
+  clampPlayerPos(pos: Position, options?: {emitHostClamp?: boolean}): {pos: Position; clamped: boolean; warning: string | null}
   getInteractCandidate(walkLocks?: {
     active?: boolean
     modalOrOverlayBlocked?: boolean
