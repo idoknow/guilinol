@@ -55,6 +55,8 @@ const PACK_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="6.5" y="
 // 鱼竿：斜挑的竿身 + 竿尖垂线和浮标，和其他格同一套 1.6 描边
 const ROD_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 20.5 19.5 4"/><path d="M19.5 4v10.2"/><path d="M18.3 14.2h2.4l-.5 3.3h-1.4z"/><circle cx="7.2" cy="16.8" r="1.6"/><path d="M3.5 20.5l2.3-2.3" stroke-width="3"/></svg>'
 const SHOP_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9.5 5.5 4h13L20 9.5"/><path d="M4 9.5c0 1.4 1.2 2.4 2.7 2.4s2.6-1 2.6-2.4c0 1.4 1.2 2.4 2.7 2.4s2.7-1 2.7-2.4c0 1.4 1.1 2.4 2.6 2.4S20 10.9 20 9.5"/><path d="M5.5 12v8h13v-8"/><path d="M10 20v-4.5h4V20"/></svg>'
+// IDOK-526: 无人机遥控器 —— 一块带两根摇杆的遥控面板，和空手 / 相机同一套 1.6 描边。
+const REMOTE_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="8.5" width="14" height="12" rx="2"/><circle cx="9.2" cy="14" r="2"/><circle cx="14.8" cy="14" r="2"/><path d="M8.5 8.5 6.5 3.5M15.5 8.5l2-5"/><path d="M10.4 18.2h3.2"/></svg>'
 export function mountHotbar() {
   if (bar) return
   bar = document.createElement('nav')
@@ -81,6 +83,9 @@ export function mountHotbar() {
     bar.querySelector('[data-shop]')!.addEventListener('click',()=>window.dispatchEvent(new Event('smoke:shop')))
   }
   bar.insertAdjacentHTML('beforeend',`<button hidden type="button" class="hotbar-slot hotbar-rod" data-slot="fishing" title="鱼竿（4）" aria-label="鱼竿（4）"><kbd>4</kbd>${ROD_ICON}<span>鱼竿</span></button>`)
+  // IDOK-526: 无人机遥控器 —— 只有场上停着一台无人机时才出现，点它直接进遥控画面。
+  bar.insertAdjacentHTML('beforeend',`<button hidden type="button" class="hotbar-slot hotbar-drone" data-act="drone" title="无人机遥控器（5）" aria-label="无人机遥控器（5）"><kbd>5</kbd>${REMOTE_ICON}<span>遥控器</span></button>`)
+  const droneButton = bar.querySelector<HTMLButtonElement>('.hotbar-drone')!
   fishingButton=bar.querySelector('[data-slot=fishing]')
   for (const button of Array.from(bar.querySelectorAll<HTMLButtonElement>('.hotbar-slot'))) {
     button.addEventListener('pointerdown', event => event.preventDefault())
@@ -100,7 +105,23 @@ export function mountHotbar() {
     else if (event.code === 'Digit1') selectSlot('hand')
     else if (event.code === 'Digit2') selectSlot('camera')
     else if (event.code === 'Digit4') window.dispatchEvent(new Event('fishing:slot'))
+    else if (event.code === 'Digit5' && droneButton && !droneButton.hidden) window.dispatchEvent(new Event('drone:rc'))
   })
+  // 遥控器格子的显隐由无人机模式在放置 / 收回 / 进出遥控时广播。
+  const syncDrone = (info?:{placed?:boolean; rc?:boolean}) => {
+    if (!droneButton) return
+    const placed = info ? !!info.placed : droneButton.dataset.placed === '1'
+    droneButton.hidden = !placed
+    droneButton.dataset.placed = String(placed)
+    const rc = !!info?.rc
+    droneButton.classList.toggle('on', rc)
+    droneButton.title = rc ? '遥控中（5）' : '无人机遥控器（5）'
+    droneButton.setAttribute('aria-pressed', String(rc))
+    if (rc) selectSlot('hand')
+  }
+  window.addEventListener('drone:slot', event => syncDrone((event as CustomEvent<{placed:boolean; rc:boolean}>).detail))
+  droneButton.addEventListener('pointerdown', event => event.preventDefault())
+  droneButton.addEventListener('click', () => window.dispatchEvent(new Event('drone:rc')))
   const label = () => {
     const name = camera(prefs().gear.equipped)?.name
     const camButton = bar?.querySelector<HTMLButtonElement>('[data-slot=camera]')

@@ -32,6 +32,13 @@ try {
 
   await page.goto(url, {waitUntil: 'domcontentloaded', timeout: 120000})
   await page.waitForFunction(() => window.viewer?.walk?.active, null, {timeout: 120000})
+  // The drone entry lives behind the dock's 工具 menu (web/src/play/index.ts builds .dock-buttons
+  // collapsed), so open it before asserting that the button is really on screen.
+  await page.waitForSelector('.dock-more', {state: 'attached', timeout: 120000})
+  await page.evaluate(() => {
+    const more = document.querySelector('.dock-more')
+    if (more instanceof HTMLElement && document.querySelector('#dock-menu')?.hasAttribute('hidden')) more.click()
+  })
   await page.waitForFunction(() => {
     const entry = document.querySelector('.dock-drone')
     if (!entry) return false
@@ -73,7 +80,7 @@ try {
   console.log('hangar', JSON.stringify(hangar))
   assert.equal(hangar.open, true, 'hangar should open')
   assert.equal(hangar.cards, 5, 'five aircraft')
-  assert.deepEqual(hangar.names, ['DJI Mavic 4 Pro','DJI Mini 5 Pro','DJI Air 3S','DJI Inspire 3','DJI FlyCart 200'])
+  assert.deepEqual(hangar.names, ['DJI Mavic 4 Pro','DJI Mini 5 Pro','DJI Air 3S','DJI FPV 穿越机','DJI FlyCart 200'])
   assert.equal(hangar.loads, 4, 'FlyCart exposes four load presets')
 
   // 2) place the Mini 5 Pro
@@ -143,6 +150,28 @@ try {
   await page.mouse.up()
   console.log('touch', JSON.stringify({speed: touched.speed}))
   assert.ok(touched.speed > 0.2, 'right stick banks the aircraft')
+
+  // IDOK-284: the simple controller has no look stick; dragging the empty screen turns the camera.
+  const pad = await page.evaluate(() => {
+    const layer = document.querySelector('.rc-look')
+    if (!layer) return null
+    const rect = layer.getBoundingClientRect()
+    const x = rect.x + rect.width / 2
+    const y = rect.y + rect.height / 2
+    return {x, y, hit: document.elementFromPoint(x, y)?.className ?? null}
+  })
+  assert.ok(pad, 'the simple controller has a drag-look layer')
+  assert.match(pad.hit ?? '', /rc-look/, `the middle of the screen is the drag-look layer (${pad.hit})`)
+  await page.mouse.move(pad.x, pad.y)
+  await page.mouse.down()
+  await page.mouse.move(pad.x - 90, pad.y + 40, {steps: 4})
+  const during = await page.evaluate(() => ({flag: document.querySelector('.rc')?.dataset.look ?? null, look: window.droneDebug().look}))
+  await page.mouse.up()
+  const released = await page.evaluate(() => ({flag: document.querySelector('.rc')?.dataset.look ?? null, look: window.droneDebug().look}))
+  console.log('drag look', JSON.stringify({during, released}))
+  assert.equal(during.flag, '1', 'dragging flags the look layer')
+  assert.equal(released.flag, null, 'releasing clears the drag flag')
+  assert.ok(during.look.yaw > 0.1, `dragging left turns the camera right (yaw ${during.look.yaw})`)
 
   // 7) photo
   await tap('.rc [data-act="photo"]')
@@ -251,7 +280,7 @@ try {
   assert.match(pro.tele, /^H [\d.]+m\s+D \d+m\s+H\.S [\d.]+m\/s/, `pro telemetry line: ${pro.tele}`)
   assert.equal(pro.shutter, true)
   assert.deepEqual(pro.modes, ['照片', '录像'])
-  assert.deepEqual(pro.sideActions, ['rth', 'land', 'photo', 'record', 'exit'])
+  assert.deepEqual(pro.sideActions, ['hangar', 'rth', 'land', 'photo', 'record', 'exit'])
   assert.equal(pro.gimbal, true)
   assert.equal(pro.load, 200, 'cargo at the rating is 200 kg')
   // The 照片/录像 chips drive what the big shutter fires.
@@ -267,6 +296,37 @@ try {
   assert.equal(sling.model.props.length, 8, 'FlyCart spins eight props')
   assert.equal(sling.model.cargoBox, false, 'cargo box comes off in winch mode')
   assert.equal(sling.payload.kind, 'cargo')
+  // IDOK-284: Q/E tilt the gimbal from the keyboard without touching the slider.
+  const gimbalStart = await page.evaluate(() => {
+    const input = document.querySelector('.rc-gimbal input')
+    input.value = '0'
+    input.dispatchEvent(new Event('input', {bubbles: true}))
+    return window.droneDebug().flight.gimbal
+  })
+  await page.keyboard.press('KeyQ')
+  const gimbalDown = await page.evaluate(() => window.droneDebug().flight.gimbal)
+  await page.keyboard.press('KeyE')
+  const gimbalBack = await page.evaluate(() => window.droneDebug().flight.gimbal)
+  console.log('gimbal keys', JSON.stringify({gimbalStart, gimbalDown, gimbalBack}))
+  assert.equal(gimbalDown, gimbalStart - 3, 'KeyQ tilts the gimbal down 3°')
+  assert.equal(gimbalBack, gimbalStart, 'KeyE tilts it back')
+  // IDOK-284: the hangar button inside the RC screen leaves the session and reopens the 机库.
+  await tap('.rc [data-act="hangar"]')
+  await page.waitForFunction(() => !document.querySelector('.rc') && !document.querySelector('.drone-mask')?.hidden, null, {timeout: 20000})
+  await tap('.drone-mask .about-close')
+  // Let the aircraft finish coming home before the hotbar hand-off (re-entry needs it landed).
+  await page.evaluate(() => window.droneStep(0.1, 120))
+  await page.waitForFunction(() => window.droneDebug().flight.phase === 'landed', null, {timeout: 60000})
+  // IDOK-284: the hotbar grew a 无人机遥控器 slot once a drone is out; tapping it re-enters RC.
+  const slot = await page.evaluate(() => {
+    const node = document.querySelector('.hotbar-drone')
+    return {shown: !!node && !node.hidden, act: node?.getAttribute('data-act') ?? null}
+  })
+  console.log('hotbar slot', JSON.stringify(slot))
+  assert.equal(slot.shown, true, 'the hotbar shows the 无人机遥控器 slot once a drone is placed')
+  assert.equal(slot.act, 'drone')
+  await tap('.hotbar-drone')
+  await page.waitForFunction(() => document.body.dataset.drone === 'rc' && !!document.querySelector('.rc.rc-pro'), null, {timeout: 20000})
   await tap('.rc [data-act="exit"]')
 
   assert.deepEqual(errors, [], 'no page errors')

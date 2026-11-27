@@ -232,37 +232,56 @@ function buildAir3S(spec:DroneSpec):DroneMesh {
   return {root,props,gimbal,lens,lights:[light],gear}
 }
 
-function buildInspire3(spec:DroneSpec):DroneMesh {
-  const {root,body,props} = armature(spec,{bodyW:.30,bodyH:.12,bodyD:.46,reach:.70,motorR:.042,propR:.28})
-  // twin carbon booms read as "cinema" even in the low-poly pass
-  const carbon = mat('#1d2024',.4,.5)
-  for (const side of [-1,1]) {
-    const boom = box(.44,.03,.03,carbon,0)
-    boom.position.set(side * .34,.03,-.02)
-    boom.rotation.y = side * .18
-    body.add(boom)
+// IDOK-458: the FPV breakaway — four ducted props on a wide X frame, nose camera pod tilted up so the
+// pilot sees the props in frame at 140 km/h. The ducts are what make it read as a 穿越机 and not a Mini.
+function buildFpv(spec:DroneSpec):DroneMesh {
+  const {root,body,props} = armature(spec,{bodyW:.115,bodyH:.048,bodyD:.17,reach:.245,motorR:.021,propR:.098})
+  // duct rings: one torus around each prop, riding in the arm group so they tilt with the arms
+  for (const prop of props) {
+    const ring = new THREE.Mesh(new THREE.TorusGeometry(.098,.0075,8,24),mat(spec.color.dark,.55,.3))
+    ring.rotation.x = Math.PI / 2
+    ring.position.copy(prop.position)
+    ring.position.y -= .012
+    prop.parent?.add(ring)
+    const lip = new THREE.Mesh(new THREE.TorusGeometry(.104,.004,6,24),mat(spec.color.accent,.5,.35))
+    lip.rotation.x = Math.PI / 2
+    lip.position.copy(ring.position)
+    lip.position.y -= .004
+    prop.parent?.add(lip)
   }
-  const {gimbal,lens} = gimbalBlock(spec,{w:.11,h:.10,d:.11},1)
-  gimbal.position.set(0,-.02,-.30)
+  // camera pod: fixed nose block with a tilted lens, plus a single-axis gimbal drum underneath
+  const pod = box(.056,.042,.07,mat(spec.color.dark,.5,.35),.08)
+  pod.position.set(0,.028,-.105)
+  pod.rotation.x = -.34
+  body.add(pod)
+  const podFace = cyl(.019,.019,.012,16,mat('#0b1016',.15,.7))
+  podFace.rotation.x = Math.PI / 2 - .34
+  podFace.position.set(0,.036,-.142)
+  body.add(podFace)
+  const {gimbal,lens} = gimbalBlock(spec,{w:.05,h:.044,d:.05},1)
+  gimbal.position.set(0,-.038,-.09)
   body.add(gimbal)
-  // big DL lens barrel out front
-  const lensBarrel = cyl(.045,.05,.13,18,mat(spec.color.dark,.35,.7))
-  lensBarrel.rotation.x = Math.PI / 2
-  lensBarrel.position.set(0,0,-.09)
-  lens.add(lensBarrel)
-  const gear = landingGear('transform',.34,.17,mat(spec.color.metal,.35,.8))
+  // no landing legs on a cinewhoop: two skid rails under the ducts
+  const gear = new THREE.Group()
+  gear.name = 'gear'
+  for (const sx of [-1,1]) {
+    const rail = box(.2,.008,.014,mat(spec.color.metal,.4,.8),0)
+    rail.position.set(sx * .075,-.062,.01)
+    gear.add(rail)
+    for (const sz of [-1,1]) {
+      const strut = box(.008,.026,.008,mat(spec.color.dark,.6,.35),0)
+      strut.position.set(sx * .075,-.048,sz * .05)
+      gear.add(strut)
+    }
+  }
   body.add(gear)
-  // FPV camera pod
-  const fpv = box(.05,.035,.04,mat(spec.color.dark,.5,.4),.1)
-  fpv.position.set(0,.055,-.2)
-  body.add(fpv)
-  const fpvLens = sphere(.012,mat('#0b1016',.15,.7),10)
-  fpvLens.position.set(0,.055,-.222)
-  body.add(fpvLens)
-  const light = sphere(.01,glow('#d1462f'),8)
-  light.position.set(0,-.05,.2)
+  const light = sphere(.006,glow('#35c26a'),8)
+  light.position.set(0,-.022,.09)
   body.add(light)
-  return {root,props,gimbal,lens,lights:[light],gear}
+  const fpvLamp = sphere(.005,glow('#e0553f'),8)
+  fpvLamp.position.set(0,.03,.075)
+  body.add(fpvLamp)
+  return {root,props,gimbal,lens,lights:[light,fpvLamp],gear}
 }
 
 function buildFlyCart(spec:DroneSpec):DroneMesh {
@@ -294,7 +313,7 @@ function buildFlyCart(spec:DroneSpec):DroneMesh {
 }
 
 const builders:Record<DroneId,(spec:DroneSpec)=>DroneMesh> = {
-  mavic4pro:buildMavic4, mini5pro:buildMini5, air3s:buildAir3S, inspire3:buildInspire3, flycart200:buildFlyCart,
+  mavic4pro:buildMavic4, mini5pro:buildMini5, air3s:buildAir3S, fpv:buildFpv, flycart200:buildFlyCart,
 }
 
 export function buildDrone(id:DroneId):DroneMesh {
