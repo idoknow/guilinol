@@ -61,7 +61,8 @@ export function mountStreetHud(source:HudSource, opts:{phone?:boolean; onApp?:(i
   addEventListener('game:event', onGameEvent)
   if(opts.phone) togglePhone(true)
 
-  function render(s:Readonly<HudState>) {
+  function render(s:Readonly<HudState>) {updatePageUI(root,()=>paint(s))}
+  function paint(s:Readonly<HudState>) {
     $('.st-money').textContent = `¥${money(s.money)}`
     $('.st-phone-cash b').textContent = `¥${money(s.money)}`
     $('.st-clock').textContent = s.clock ? `${s.clock.time} · ${s.clock.weather}` : ''
@@ -74,7 +75,7 @@ export function mountStreetHud(source:HudSource, opts:{phone?:boolean; onApp?:(i
       const meter = $('.st-meter'); meter.hidden = !m.meter
       if(m.meter){meter.querySelector('span')!.textContent = m.meter.label; meter.querySelector('em')!.style.width = `${Math.round(m.meter.value*100)}%`}
       const sub = $('.st-sub'); sub.hidden = !m.line
-      if(m.line) sub.innerHTML = `<b>${m.line.who}</b>${m.line.text}`
+      if(m.line){const speaker=document.createElement('b');speaker.textContent=m.line.who;sub.replaceChildren(speaker,m.line.text)}
     }
     const v = s.vehicle, speed = $('.st-speed'); speed.hidden = !v
     if(v) {
@@ -136,4 +137,4 @@ export function demoSource(name:string|null):HudSource {
   const state = {...base, ...(states[name ?? 'noodle'] ?? {})}
   return {get:()=>state, on:()=>()=>{}}
 }
-import {registerPageUI} from '../capture-page'
+import {registerPageUI,updatePageUI} from '../capture-page'
