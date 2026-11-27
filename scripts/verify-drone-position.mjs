@@ -13,14 +13,17 @@ try {
   page.on('pageerror',error=>console.error(error.message))
   await page.addInitScript(()=>localStorage.setItem('glol.avatar.v1',JSON.stringify({body:'f',v:1,createdAt:123,skin:2,face:1,brows:0,eyes:0,hair:'f_bun',hairColor:1,look:'sport'})))
   const poses=[],trace=[]
-  let socket,resume
+  let socket,resumeOffset
   await page.route('**/api/**',route=>route.fulfill({json:route.request().url().endsWith('/me')?
     {id:'pilot',uid:900001,nickname:'Pilot'}:{ticket:'local-test'}}))
   await page.routeWebSocket('**/ws',ws=>{
     socket=ws
     ws.onMessage(raw=>{
       const packet=JSON.parse(raw)
-      if(packet.t==='join')ws.send(JSON.stringify({t:'welcome',me:{id:'pilot',uid:900001,name:'Pilot',...resume},online:1,players:[]}))
+      if(packet.t==='join'){
+        const resume=resumeOffset===undefined?{}:{x:packet.x+resumeOffset,y:packet.y,z:packet.z,resumed:true}
+        ws.send(JSON.stringify({t:'welcome',me:{id:'pilot',uid:900001,name:'Pilot',...resume},online:1,players:[]}))
+      }
       if(packet.t==='join'||packet.t==='pos'){poses.push(packet);trace.push({t:packet.t,x:packet.x,y:packet.y,z:packet.z,v:packet.v,foot:packet.foot,gr:packet.gr})}
     })
   })
@@ -51,13 +54,15 @@ try {
     assert.ok(flight.distance>100&&flight.agl>5,JSON.stringify(flight));await samples()
     check(start,origin)
     if(reconnect){
-      resume={...origin,x:origin.x+2,resumed:true};delete resume.t
-      const before=poses.length
-      socket.close({code:4001,reason:'replaced'})
-      await page.waitForFunction(()=>window.viewer.walk.net.status().state==='replaced')
-      await page.evaluate(()=>window.viewer.walk.net.reconnect());await samples()
-      assert.equal(poses[before].t,'join');assert.ok(distance(poses[before],origin)<1)
-      check(before+1,resume)
+      for(const offset of [.5,8]){
+        resumeOffset=offset
+        socket.close({code:4001,reason:'replaced'})
+        await page.waitForFunction(()=>window.viewer.walk.net.status().state==='replaced')
+        const before=poses.length
+        await page.evaluate(()=>window.viewer.walk.net.reconnect());await samples()
+        const join=poses[before];assert.equal(join.t,'join');assert.ok(distance(join,origin)<.05)
+        assert.ok(check(before+1,{...join,x:join.x+(offset===8?8:0)})<.05)
+      }
       socket.send(JSON.stringify({t:'setback',x:origin.x,y:origin.y,z:origin.z}))
       await samples();check(poses.length-2,origin)
     }
@@ -66,4 +71,23 @@ try {
     console.log({reconnect,distance:flight.distance,agl:flight.agl,pilotDrift:check(reconnect?exit:start,origin)})
   }
   if(process.env.POSE_TRACE)await writeFile(process.env.POSE_TRACE,JSON.stringify(trace))
+  const motion=()=>page.evaluate(()=>({position:window.viewer.walk.position.toArray(),speed:window.viewer.walk.footSpeed}))
+  resumeOffset=.5
+  for(let cycle=1;cycle<=2;cycle++){
+    await delay(44000)
+    await page.evaluate(async()=>{
+      await window.viewer.freeze()
+      const walker=window.viewer.walk
+      walker.drive(1,0,false);for(let frame=0;frame<8;frame++)walker.tick(1/60)
+      window.resumeObserved=false
+      const online=event=>{if(event.detail.state==='online'){window.resumeObserved=true;removeEventListener('glol:mp-status',online)}}
+      addEventListener('glol:mp-status',online)
+    })
+    const before=await motion();assert.ok(before.speed>.2)
+    socket.close({code:1011,reason:'periodic disconnect'})
+    await page.waitForFunction(()=>window.resumeObserved)
+    assert.deepEqual(await motion(),before)
+    console.log({walkingResume:cycle,offset:resumeOffset,retainedSpeed:before.speed})
+    await page.evaluate(()=>{window.viewer.walk.releaseDrive();window.viewer.resume()});await samples()
+  }
 } finally {await browser?.close();await site.close()}
