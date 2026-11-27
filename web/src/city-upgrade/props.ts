@@ -923,10 +923,13 @@ export function mountCityUpgradeProps(scene: THREE.Scene) {
     const eavesDist = isAerial ? (isLow ? 110 : 180) : Math.min(streetRadius, isLow ? 95 : 145)
     const bladeDist = isAerial ? 0 : Math.min(streetRadius, isLow ? 60 : 110)
     const acDist = isAerial || isLow ? 0 : Math.min(streetRadius, 75)
-    const signDist = isAerial ? 0 : Math.min(streetRadius, isLow ? 65 : 85)
+    // Street sign poles are merged into eavesWalls (1 draw call/shard); tie plate visibility to eavesWalls
+    // so poles never appear bare at 85–145 m, on low quality, in aerial view, or across a 512 m shard.
+    const signDist = eavesDist
 
     for (const entry of mounted.values()) {
       let anyVis = false
+      let eavesVis = false
       if (entry.fascias) {
         const v = fasciaDist > 0 && entry.fascias.box.distanceToPoint(cam) <= fasciaDist && frustum.intersectsBox(entry.fascias.box)
         entry.fascias.mesh.visible = v
@@ -935,6 +938,7 @@ export function mountCityUpgradeProps(scene: THREE.Scene) {
       if (entry.eavesWalls) {
         const v = eavesDist > 0 && entry.eavesWalls.box.distanceToPoint(cam) <= eavesDist && frustum.intersectsBox(entry.eavesWalls.box)
         entry.eavesWalls.mesh.visible = v
+        eavesVis = v
         anyVis ||= v
       }
       if (entry.blades) {
@@ -948,7 +952,10 @@ export function mountCityUpgradeProps(scene: THREE.Scene) {
         anyVis ||= v
       }
       if (entry.streetSigns) {
-        const v = signDist > 0 && entry.streetSigns.box.distanceToPoint(cam) <= signDist && frustum.intersectsBox(entry.streetSigns.box)
+        const inFrustum = frustum.intersectsBox(entry.streetSigns.box)
+        const v = entry.eavesWalls
+          ? eavesVis && inFrustum
+          : signDist > 0 && entry.streetSigns.box.distanceToPoint(cam) <= signDist && inFrustum
         entry.streetSigns.mesh.visible = v
         anyVis ||= v
       }
