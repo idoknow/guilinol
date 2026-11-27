@@ -9,6 +9,8 @@ import {setRoster,clearRoster,type RosterPlayer} from './mp-roster'
 import {fingerprint,deviceSummary} from './fingerprint'
 import {bindTravel,prepareTravel,rejectTravel,type TravelReply} from './mp-travel'
 
+import type {CaptureClientContext, CheatCapturePacket} from './cheat-capture'
+
 function publish(detail:MpStatus){window.dispatchEvent(new CustomEvent('glol:mp-status',{detail}))}
 
 type State='connecting'|'online'|'offline'|'replaced'
@@ -19,7 +21,7 @@ let subCount=0
  *  计数放在模块级：地图可能比 socket 先打开，联网后要补发订阅。 */
 export function requestRoster(on:boolean){subCount=Math.max(0,subCount+(on?1:-1));rosterRequester?.()}
 
-export function attachNet(scene:Scene,clips:AnimationClip[],getPose:()=>Pose,getAvatar:()=>Avatar,camera:Camera,getActivity?:()=>ActivityReport,onCombat?:(p:CombatPacket,self:string)=>void,onSetback?:(x:number,y:number,z:number)=>void) {
+export function attachNet(scene:Scene,clips:AnimationClip[],getPose:()=>Pose,getAvatar:()=>Avatar,camera:Camera,getActivity?:()=>ActivityReport,onCombat?:(p:CombatPacket,self:string)=>void,onSetback?:(x:number,y:number,z:number)=>void,getCaptureContext?:()=>CaptureClientContext) {
   const peers=players(scene,clips,camera)
   let travelReply:((reply:TravelReply)=>void)|undefined
   let landingPaused=false,rejoinTimer=0
@@ -43,7 +45,7 @@ export function attachNet(scene:Scene,clips:AnimationClip[],getPose:()=>Pose,get
   let lastActKey=''
   let state:State='offline',online=0
   // AOI 之后 peers 只有身边 ~150m 的人；整座城的人来自服务端每 5s 一次的 roster（只有位置，没有朝向）
-  let myId='',far=new Map<string,RosterPlayer>()
+  let myId='',myUid=0,myName='',far=new Map<string,RosterPlayer>()
   const badge=new URLSearchParams(location.search).has('debug')?document.createElement('output'):null
   if(badge){badge.style.cssText='position:fixed;top:0;right:0;z-index:99;background:white;color:black';document.body.append(badge)}
   let sequence=0, desired=0, sent=-1
@@ -103,6 +105,27 @@ export function attachNet(scene:Scene,clips:AnimationClip[],getPose:()=>Pose,get
         const msg=JSON.parse(event.data)
         switch(msg.t){
           case 'travel_result':if(msg.seq===travelSequence)travelReply?.(msg);break
+          case 'cheat_capture':{
+            const packet=msg as CheatCapturePacket
+            if(typeof packet.id==='string'&&typeof packet.token==='string'){
+              void import('./cheat-capture').then(module=>module.triggerCheatCapture(packet,()=>{
+                if(getCaptureContext){
+                  const snap=getCaptureContext()
+                  return {...snap,uid:snap.uid||myUid,nickname:snap.nickname||myName}
+                }
+                const pose=getPose(),act=getActivity?.()
+                return {
+                  uid:myUid,nickname:myName,
+                  activity:act?.act??'walk',activityDetail:act?.detail??'',
+                  stateLabel:act?.detail||act?.act||'步行',
+                  speedMs:pose.v??0,verticalSpeedMs:0,grounded:pose.gr!==0,
+                  foot:pose.foot!==false,bike:pose.bike??'',
+                  x:pose.x,y:pose.y,z:pose.z,
+                }
+              })).catch(()=>{})
+            }
+            break
+          }
           case 'banned':window.dispatchEvent(new CustomEvent('glol:mp-ban',{detail:msg}));break
           case 'chat':case 'chat_hist':case 'chat_del':case 'chat_mute':case 'chat_ack':receiveChat(msg);break
           case 'combat': {
@@ -112,7 +135,7 @@ export function attachNet(scene:Scene,clips:AnimationClip[],getPose:()=>Pose,get
             if(msg.id===myId&&msg.by)peers.reveal(msg.by)
             peers.combat(msg);onCombat?.(msg,myId);break
           }
-          case 'welcome': sent=0;sentTimes=[];myId=String(msg.me?.id??'');setChatSelf(Number(msg.me?.uid)||0);onCombat?.(msg.me,myId);if(subCount>0)send({t:'roster_sub',since:lastRosterV})
+          case 'welcome': sent=0;sentTimes=[];myId=String(msg.me?.id??'');myUid=Number(msg.me?.uid)||0;myName=String(msg.me?.name??'');setChatSelf(myUid);onCombat?.(msg.me,myId);if(subCount>0)send({t:'roster_sub',since:lastRosterV})
             if(msg.relocated){const {x,y,z,code}=msg.relocated;onSetback?.(x,y,z);rejectTravel(code)}
             // 续连（CDN 掐断后原地接管）：对账而不是清空重建，否则每 44 秒所有人的模型都会销毁再克隆一遍
             if(msg.me?.resumed){const keep=new Set((msg.players as {id:string}[]).map(p=>p.id))

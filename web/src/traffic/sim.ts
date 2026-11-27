@@ -1,3 +1,4 @@
+import {SignalPlan,type SignalState} from './signals.ts'
 import {axleHeight,contactPose} from './lane-surface.ts'
 import {nearStatic,resolveContact,staticSolids,pickups,type Solid} from './contact.ts'
 import {CAR_SCALE} from '../drive/scale.ts'
@@ -520,6 +521,9 @@ export class Traffic {
   deferredSpawnCount=0
   deferredDespawnCount=0
   private signal=new Map<number,Signal>()
+  private signalPlan=new SignalPlan()
+  /** Seconds added to `time` when reading lights; the host sets it so this sim follows `citySignalClock`. */
+  signalShift=0
   private junctions=new Set<number>()
   private queues=new Map<number,Actor[]>()
   private exits=new Map<number,Track[]>()
@@ -834,9 +838,13 @@ export class Traffic {
     return {affected:halted.length+fled.length,halted,fled}
   }
   hasSignal(nodeId:number):boolean{return this.signal.has(nodeId)}
-  getSignalPhase(laneId:number,toNode:number,time=this.time):'green'|'red'|'yellow'|null{
+  /** Phase a signalised node is serving (see `SignalPlan.state`); `null` when the node has no signal. */
+  getSignalState(node:number,time=this.time+this.signalShift,out?:SignalState):SignalState|null{
+    return this.signalPlan.state(node,time,out)
+  }
+  getSignalPhase(laneId:number,toNode:number,time=this.time+this.signalShift):'green'|'red'|'yellow'|null{
     if(!this.signal.has(toNode))return null
-    return this.phase({id:laneId,from:0,to:toNode,offset:0,kind:'motor',speedKmh:30},time)
+    return this.phase({id:laneId,to:toNode},time)
   }
   stopActor(actor:Actor,durationSec=4):boolean{
     if(!actor||!Number.isFinite(durationSec)||durationSec<0)return false
@@ -987,6 +995,7 @@ export class Traffic {
     }
     for(const [node,neighbors] of arms)if(neighbors.size>=3)this.junctions.add(node)
     for(const signal of graph.signals){this.signal.set(signal.node,signal);this.junctions.delete(signal.node)}
+    this.signalPlan.add(graph.signals)
   }
   private onwardWalk(track:Track){
     const {x,z}=track.end, tolerance=.45
@@ -1090,18 +1099,11 @@ export class Traffic {
     }
     actor.yaw=actor.wrongWay?Math.atan2(-track.dx,-track.dz):track.yaw
   }
-  phase(track:Lane,time=this.time):'green'|'red'|'yellow'{
-    const signal=this.signal.get(track.to)
-    if(!signal)return 'green'
-    const {phases,offset}=signal
-    let local=(time+offset)%phases.reduce((sum,p)=>sum+p.green+p.yellow,0)
-    for(const phase of phases){
-      if(local<phase.green+phase.yellow)return !phase.lanes.includes(track.id)?'red':local<phase.green?'green':'yellow'
-      local-=phase.green+phase.yellow
-    }
-    return 'red'
+  /** Light a lane sees at its end node. Arithmetic lives in `SignalPlan`; this only picks the time. */
+  phase(track:{id:number,to:number},time=this.time+this.signalShift):'green'|'red'|'yellow'{
+    return this.signalPlan.color(track.to,track.id,time)??(this.signal.has(track.to)?'red':'green')
   }
-  green(track:Lane,time=this.time){
+  green(track:{id:number,to:number},time=this.time+this.signalShift){
     return this.phase(track,time)==='green'
   }
   private collectCandidates(tracks:readonly Track[],camera:Position,searchRadius=200){

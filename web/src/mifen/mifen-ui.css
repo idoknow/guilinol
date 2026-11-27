@@ -55,8 +55,13 @@
   display: none !important;
 }
 
-body[data-mifen-cooking="1"] :is(.hint, .vehicle-action, .walk-ui, .ride-hud, .hotbar, .smoke-hint, .hud-stats, .gl-mission-entry, .gl-mission-hud, .beta-note, .drinks-hold-hud, output, footer),
-body[data-mifen-drawer="1"] :is(.hint, .vehicle-action, .walk-ui, .ride-hud, .hotbar, .smoke-hint, .hud-stats, .gl-mission-entry, .gl-mission-hud, .beta-note, .drinks-hold-hud, output, footer) {
+body[data-mifen-cooking="1"] :is(.hint, .vehicle-action, .walk-ui, .cb-controls, .cb-hp, .ride-hud, .hotbar, .smoke-hint, .hud-stats, .gl-mission-entry, .gl-mission-hud, .beta-note, .drinks-hold-hud, output, footer),
+body[data-mifen-drawer="1"] :is(.hint, .vehicle-action, .walk-ui, .cb-controls, .cb-hp, .ride-hud, .hotbar, .smoke-hint, .hud-stats, .gl-mission-entry, .gl-mission-hud, .beta-note, .drinks-hold-hud, output, footer) {
+  display: none !important;
+}
+
+/* 店内用不上的宿主入口（渲染范围、键位卡）让位给粉票栏，与十字街店内一致。 */
+body[data-mifen-indoor="1"] :is(.render-entry, .render-pop, .keys-card) {
   display: none !important;
 }
 
@@ -217,7 +222,7 @@ body[data-mifen-drawer="1"] :is(.hint, .vehicle-action, .walk-ui, .ride-hud, .ho
   left: calc(14px + env(safe-area-inset-left));
   top: max(102px, calc(var(--mf-bar-bottom, 58px) + 8px));
   width: 232px;
-  max-height: calc(100dvh - max(102px, var(--mf-bar-bottom, 58px) + 8px) - 24px - env(safe-area-inset-bottom));
+  max-height: calc(100dvh - max(102px, var(--mf-bar-bottom, 58px) + 8px) - 120px - env(safe-area-inset-bottom));
   overflow-y: auto;
   scrollbar-width: thin;
   margin: 0;
@@ -844,8 +849,8 @@ body[data-mifen-drawer="1"] :is(.hint, .vehicle-action, .walk-ui, .ride-hud, .ho
 }
 
 @media (max-width: 768px), (max-height: 480px) {
-  body[data-mifen-indoor="1"] :is(.hud-me, .sky-ui, .dock, .minimap, .hotbar, .smoke-hint, .hint, .hud-stats, .gl-mission-entry, .gl-mission-hud, .beta-note, .drinks-hold-hud, .drinks-pickup-hud, output, footer),
-  body:has(.mifen-bar:not([hidden])) :is(.hud-me, .sky-ui, .dock, .minimap, .hotbar, .smoke-hint, .hint, .hud-stats, .gl-mission-entry, .gl-mission-hud, .beta-note, .drinks-hold-hud, .drinks-pickup-hud, output, footer),
+  body[data-mifen-indoor="1"] :is(.hud-me, .sky-ui, .dock, .minimap, .hotbar, .smoke-hint, .hint, .hud-stats, .cb-hp, .gl-mission-entry, .gl-mission-hud, .beta-note, .drinks-hold-hud, .drinks-pickup-hud, output, footer),
+  body:has(.mifen-bar:not([hidden])) :is(.hud-me, .sky-ui, .dock, .minimap, .hotbar, .smoke-hint, .hint, .hud-stats, .cb-hp, .gl-mission-entry, .gl-mission-hud, .beta-note, .drinks-hold-hud, .drinks-pickup-hud, output, footer),
   body[data-mifen-drawer="1"] :is(.hud-me, .sky-ui, .dock, .minimap, .walk-ui, .vehicle-action, .ride-hud, .hotbar, .smoke-hint, .hint, .hud-stats, .gl-mission-entry, .gl-mission-hud, .beta-note, .drinks-hold-hud, .drinks-pickup-hud, output, footer),
   body[data-mifen-cooking="1"] :is(.hud-me, .sky-ui, .dock, .minimap, .hotbar, .smoke-hint, .hint, .hud-stats, .gl-mission-entry, .gl-mission-hud, .beta-note, .drinks-hold-hud, .drinks-pickup-hud, output, footer) {
     display: none !important;
@@ -957,6 +962,19 @@ body[data-mifen-drawer="1"] :is(.hint, .vehicle-action, .walk-ui, .ride-hud, .ho
 
   .mifen-cook-steps {
     margin: 8px 0 10px;
+  }
+}
+
+/* 横屏手机：店内宿主顶栏已隐藏，粉票栏从经营条下方排到摇杆顶边（walk.css 的 --stick-top）为止，左手模式随摇杆换到右边。 */
+@media (pointer: coarse) and (not (any-pointer: fine)) and (max-height: 480px) {
+  .mifen-tickets {
+    top: calc(var(--mf-bar-bottom, 48px) + 6px);
+    max-height: calc(100dvh - var(--mf-bar-bottom, 48px) - 18px - var(--stick-top, 130px));
+  }
+
+  body[data-thumb-hand="left"] .mifen-tickets {
+    left: auto;
+    right: calc(10px + env(safe-area-inset-right));
   }
 }
 

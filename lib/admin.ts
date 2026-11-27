@@ -81,9 +81,12 @@ export async function adminList(db: D1Database, path: string, params: URLSearchP
     const where=filters.length?' WHERE '+filters.join(' AND '):''
     const {results}=await db.prepare(`SELECT aa.*,
       a.nickname AS actor_nickname,a.email AS actor_email,a.email_placeholder AS actor_placeholder,
-      t.nickname AS target_nickname,t.email AS target_email,t.email_placeholder AS target_placeholder
+      t.nickname AS target_nickname,t.email AS target_email,t.email_placeholder AS target_placeholder,
+      mp.id AS mp_account_id,mp.nickname AS mp_nickname
       FROM admin_audit aa
       LEFT JOIN users a ON a.id=aa.actor_id
+      LEFT JOIN users mp ON ((aa.target_type='mp' AND aa.action IN ('mp.ban','mp.unban','mp.dismiss','mp.cheat_capture.delete')) OR (aa.target_type='uid' AND aa.action='mp.kick'))
+        AND mp.uid=CASE WHEN length(aa.target_id) BETWEEN 1 AND 15 AND ltrim(aa.target_id,'0123456789')='' THEN CAST(aa.target_id AS BIGINT) END
       LEFT JOIN users t ON aa.target_type='user' AND t.id=aa.target_id${where} ORDER BY aa.id DESC LIMIT 51`).bind(...args).all()
     return json({items:results.slice(0,50).map(row=>({...row,detail:typeof row.detail==='string'?JSON.parse(row.detail):row.detail})),
       next_cursor:results.length>50?String(results[49].id):null})

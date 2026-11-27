@@ -17,6 +17,7 @@ import {hotbarSlot,mountHotbar,riding,showHotbar} from '../ui/hotbar'
 import {setCameraShown} from '../gear/hand'
 import {droneMode} from '../drone'
 import {navigation} from './nav'
+import {namedChild} from '../scene-named'
 
 const KEY = 'glol.stamps', ARRIVE = 12, REARM = 40, MARK_LAYER = 2
 const ease = (t:number)=>t<.5?4*t*t*t:1-Math.pow(-2*t+2,3)/2
@@ -64,16 +65,32 @@ export function play(host:Host) {
     return down.intersectObject(host.peaks,true)[0]?.point.y ?? NaN
   }
 
-  // --- HUD dock (top right): mode button lives here too, so mobile has one column of controls.
-  const dock = document.createElement('nav'); dock.className = 'dock'
+  // --- HUD dock (top right): minimap, then one 工具 menu for 景册 / 拍照 / 反馈 / 视角 / 设置 / 相机 / 无人机
+  // (IDOK-468: eight always-on pills became one entry). The mode button (起飞, tour only) stays on the bar.
+  const dock = document.createElement('nav'); dock.className = 'dock'; dock.setAttribute('aria-label','地图与工具')
   const book = button('景册','打开景册（J）','dock-book'), shutter = button('拍照','拍照模式（P）','dock-photo')
   const count = document.createElement('small'); book.append(count)
   const slot = document.createElement('div'); slot.className = 'dock-mini'
-  const buttons = document.createElement('div'); buttons.className = 'dock-buttons'
-  buttons.append(book,shutter); dock.append(slot,buttons); document.body.append(dock)
+  const bar = document.createElement('div'); bar.className = 'dock-bar'
+  const more = document.createElement('button'); more.type = 'button'; more.className = 'dock-more'; more.textContent = '工具'
+  more.title = '工具：景册、拍照、相机、无人机、设置'
+  const buttons = document.createElement('div'); buttons.className = 'dock-buttons'; buttons.id = 'dock-menu'; buttons.hidden = true
+  buttons.setAttribute('role','group'); buttons.setAttribute('aria-label','工具')
+  more.setAttribute('aria-controls',buttons.id); more.setAttribute('aria-expanded','false')
+  const setMenu = (open:boolean)=>{
+    // 收起时焦点若还在册页里，交还给「工具」按钮，键盘和读屏不会掉回页面开头
+    if(!open&&buttons.contains(document.activeElement))more.focus()
+    buttons.hidden = !open; more.setAttribute('aria-expanded',String(open)); dock.classList.toggle('open',open)
+  }
+  more.onclick = ()=>setMenu(buttons.hidden)
+  // Picking an item closes the menu; so do a tap elsewhere and Esc (captured first so Esc doesn't also open 主菜单).
+  buttons.addEventListener('click',event=>{if((event.target as Element).closest('button'))setMenu(false)})
+  document.addEventListener('pointerdown',event=>{if(!buttons.hidden&&!dock.contains(event.target as Node))setMenu(false)})
+  addEventListener('keydown',event=>{if(event.code==='Escape'&&!buttons.hidden){setMenu(false);event.preventDefault()}},true)
+  bar.append(more,buttons); buttons.append(book,shutter); dock.append(slot,bar); document.body.append(dock)
   mountHotbar()
   const modeButton = document.querySelector<HTMLButtonElement>('.btn-mode')
-  if(modeButton) buttons.prepend(modeButton)
+  if(modeButton) bar.prepend(modeButton)
   function button(text:string,label:string,cls:string){const b = document.createElement('button'); b.className = cls; b.textContent = text
     b.setAttribute('aria-label',label); b.title = label; return b}
   const refreshCount = ()=>{count.textContent = `${stamps.size}/${spots.length}`}
@@ -296,13 +313,14 @@ export function play(host:Host) {
 
   // --- Per-frame: marker placement/fade, arrival, summit pill.
   // Indoor & shop-building occlusion keeps distant scenic stamps (秀/街/巷/楼) from floating through walls.
-  let shopObj:THREE.Object3D|null = null
-  let drinksShopObj:THREE.Object3D|null = null
+  // Both shops are added straight under the scene by their own modules, and only once the player is near.
+  const mifenShop = namedChild(host.scene,'tianyuan_mifen_shop'), drinksShop = namedChild(host.scene,'wangcheng_drinks_shop')
   const tmpLocalA = new THREE.Vector3(), tmpLocalB = new THREE.Vector3(), tmpMarkWorld = new THREE.Vector3()
+  const shopObjs:{mifen:THREE.Object3D|null, drinks:THREE.Object3D|null} = {mifen: null, drinks: null}
   function resolveShopObjs() {
-    if(!shopObj?.parent) shopObj = host.scene.getObjectByName('tianyuan_mifen_shop') ?? null
-    if(!drinksShopObj?.parent) drinksShopObj = host.scene.getObjectByName('wangcheng_drinks_shop') ?? null
-    return {mifen: shopObj, drinks: drinksShopObj}
+    shopObjs.mifen = mifenShop()
+    shopObjs.drinks = drinksShop()
+    return shopObjs
   }
   function pointInsideMifenShop(pos:THREE.Vector3, shop:THREE.Object3D) {
     shop.worldToLocal(tmpLocalA.copy(pos))

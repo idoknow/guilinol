@@ -1,8 +1,9 @@
 import './walk.css'
+import './thumb-glyphs.css'
 import {walkConfig as cfg} from '../walk/config'
 import type {CarDynamicTelemetry} from '../walk/car'
 import type {EbikeRideControlInput, EbikeTelemetrySnapshot} from '../walk/ebike-fx'
-import {isGlobalHotkeyBlocked, isModalOrOverlayOpen, isTouchInControlZone} from '../walk/input-guard'
+import {isGlobalHotkeyBlocked, isIndoorSceneActive, isModalOrOverlayOpen, isTextInputTarget, isTouchInControlZone} from '../walk/input-guard'
 import {hits, type Action} from '../input/keymap'
 import {shouldSuppressRideGearKey} from '../traffic-duty/duty-keys'
 import {rideSoundMuted, setRideSoundMuted} from '../walk/ride-sound-pref'
@@ -251,8 +252,18 @@ const held=(action:Action)=>{let on=false;keys.forEach(code=>{if(!on&&hits(code,
     resetStick()
   }).observe(document.body,{attributes:true,attributeFilter:['data-aboard','data-photo','data-shop-open']})
 
+  const MOVE_ACTIONS:readonly Action[]=['forward','back','left','right','run']
+  /** While an indoor scene holds the walker, keep only movement keys, so walking up the stairs out of it never stops. */
+  function carriesIntoStreet(event:KeyboardEvent){
+    return isIndoorSceneActive()&&!isTextInputTarget(event.target)&&document.body.dataset.photo!=='on'
+      &&!isModalOrOverlayOpen(document,{ignoreIndoor:true})&&MOVE_ACTIONS.some(a=>hits(event.code,a))
+  }
   window.addEventListener('keydown',event=>{
-    if(!active()||isGlobalHotkeyBlocked(event.target))return
+    if(!active())return
+    if(isGlobalHotkeyBlocked(event.target)){
+      if(carriesIntoStreet(event))keys.add(event.code)
+      return
+    }
     keys.add(event.code)
     const ridingTwoWheel=document.body.dataset.ride==='bike'||document.body.dataset.ride==='bicycle'
     const drivingCar=document.body.dataset.ride==='car'
@@ -299,12 +310,12 @@ const held=(action:Action)=>{let on=false;keys.forEach(code=>{if(!on&&hits(code,
     if((event.code!=='AltLeft'&&event.code!=='AltRight')||event.repeat||!active())return
     event.preventDefault()
     if(document.pointerLockElement===canvas)document.exitPointerLock?.()
-    else if(document.body.dataset.photo!=='on'&&!isModalOrOverlayOpen())(canvas.requestPointerLock() as unknown as Promise<void>|undefined)?.catch?.(()=>{})
+    else if(document.body.dataset.photo!=='on'&&!isModalOrOverlayOpen(document,{ignoreIndoor:true}))(canvas.requestPointerLock() as unknown as Promise<void>|undefined)?.catch?.(()=>{})
   })
   window.addEventListener('keyup',event=>{if(event.code==='AltLeft'||event.code==='AltRight')event.preventDefault()})
   /** Hand the cursor back whenever a menu, dialog or photo mode needs it. */
   function releaseLockIfBlocked(){
-    if(document.pointerLockElement===canvas&&(isModalOrOverlayOpen()||document.body.dataset.photo==='on'))document.exitPointerLock?.()
+    if(document.pointerLockElement===canvas&&(isModalOrOverlayOpen(document,{ignoreIndoor:true})||document.body.dataset.photo==='on'))document.exitPointerLock?.()
   }
   // Watch on a timer while locked (rAF can stall when the walker is held, e.g. photo mode).
   let lockWatch=0
@@ -332,7 +343,7 @@ const held=(action:Action)=>{let on=false;keys.forEach(code=>{if(!on&&hits(code,
       // IDOK-150: desktop mouse-look. Solo mode starts straight in walk, so the lock that the tour
       // flight controls used to grab never happens — request it here. Photo mode keeps drag-to-look
       // (its shutter/filters need a free cursor); drag stays as the fallback if the lock is refused.
-      if(event.button===0&&document.body.dataset.photo!=='on'&&!isModalOrOverlayOpen()&&document.pointerLockElement!==canvas)
+      if(event.button===0&&document.body.dataset.photo!=='on'&&!isModalOrOverlayOpen(document,{ignoreIndoor:true})&&document.pointerLockElement!==canvas)
         (canvas.requestPointerLock() as unknown as Promise<void>|undefined)?.catch?.(()=>{})
       mouseDown=true;lastMouse={x:event.clientX,y:event.clientY};safeCapture(canvas,event.pointerId)
     }else{

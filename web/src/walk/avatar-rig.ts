@@ -287,6 +287,12 @@ export function ensureAvatarRig(root: THREE.Group, tintHex: string | null = null
   const qShinR = new THREE.Quaternion()
 
   const worldQuats = new Map<THREE.Object3D, THREE.Quaternion>()
+  // applyBones runs for every posed figure every frame: its per-bone results and limb chains are reused, not reallocated.
+  const worldQuatPool = new Map<THREE.Object3D, THREE.Quaternion>()
+  const charUpperL = new THREE.Quaternion(), charLowerL = new THREE.Quaternion()
+  const charUpperR = new THREE.Quaternion(), charLowerR = new THREE.Quaternion()
+  const charThighL = new THREE.Quaternion(), charCalfL = new THREE.Quaternion()
+  const charThighR = new THREE.Quaternion(), charCalfR = new THREE.Quaternion()
 
   function setBoneFromCharDelta(name: string, charDelta: THREE.Quaternion, preDrop: THREE.Quaternion | null) {
     const rest = boneRestMap.get(name)
@@ -309,7 +315,9 @@ export function ensureAvatarRig(root: THREE.Group, tintHex: string | null = null
 
     _qParentInv.copy(baseParentQ).invert()
     bone.quaternion.copy(_qParentInv).multiply(targetWorld)
-    worldQuats.set(bone, targetWorld.clone())
+    let world = worldQuatPool.get(bone)
+    if (!world) worldQuatPool.set(bone, world = new THREE.Quaternion())
+    worldQuats.set(bone, world.copy(targetWorld))
   }
 
   function applyBones() {
@@ -354,29 +362,29 @@ export function ensureAvatarRig(root: THREE.Group, tintHex: string | null = null
     setBoneFromCharDelta('head', qHeadFull, null)
 
     setBoneFromCharDelta('clavicle_l', qSpine3, null)
-    const charUpperL = new THREE.Quaternion().copy(qSpine3).multiply(qArmL)
+    charUpperL.copy(qSpine3).multiply(qArmL)
     setBoneFromCharDelta('upperarm_l', charUpperL, Q_DROP_L)
-    const charLowerL = new THREE.Quaternion().copy(charUpperL).multiply(qForearmL)
+    charLowerL.copy(charUpperL).multiply(qForearmL)
     setBoneFromCharDelta('lowerarm_l', charLowerL, Q_DROP_L)
     setBoneFromCharDelta('hand_l', charLowerL, Q_DROP_L)
 
     setBoneFromCharDelta('clavicle_r', qSpine3, null)
-    const charUpperR = new THREE.Quaternion().copy(qSpine3).multiply(qArmR)
+    charUpperR.copy(qSpine3).multiply(qArmR)
     setBoneFromCharDelta('upperarm_r', charUpperR, Q_DROP_R)
-    const charLowerR = new THREE.Quaternion().copy(charUpperR).multiply(qForearmR)
+    charLowerR.copy(charUpperR).multiply(qForearmR)
     setBoneFromCharDelta('lowerarm_r', charLowerR, Q_DROP_R)
     setBoneFromCharDelta('hand_r', charLowerR, Q_DROP_R)
 
-    const charThighL = new THREE.Quaternion().copy(qHips).multiply(qThighL)
+    charThighL.copy(qHips).multiply(qThighL)
     setBoneFromCharDelta('thigh_l', charThighL, null)
-    const charCalfL = new THREE.Quaternion().copy(charThighL).multiply(qShinL)
+    charCalfL.copy(charThighL).multiply(qShinL)
     setBoneFromCharDelta('calf_l', charCalfL, null)
     setBoneFromCharDelta('foot_l', charCalfL, null)
     setBoneFromCharDelta('ball_l', charCalfL, null)
 
-    const charThighR = new THREE.Quaternion().copy(qHips).multiply(qThighR)
+    charThighR.copy(qHips).multiply(qThighR)
     setBoneFromCharDelta('thigh_r', charThighR, null)
-    const charCalfR = new THREE.Quaternion().copy(charThighR).multiply(qShinR)
+    charCalfR.copy(charThighR).multiply(qShinR)
     setBoneFromCharDelta('calf_r', charCalfR, null)
     setBoneFromCharDelta('foot_r', charCalfR, null)
     setBoneFromCharDelta('ball_r', charCalfR, null)
@@ -401,11 +409,11 @@ export function ensureAvatarRig(root: THREE.Group, tintHex: string | null = null
     const arr = state[name]
     const rotation: AvatarJointRotation = {
       get x() { return arr[0] },
-      set x(v: number) { arr[0] = v; proceduralActive = true; applyBones() },
+      set x(v: number) { arr[0] = v; proceduralActive = true; if(!batching)applyBones() },
       get y() { return arr[1] },
-      set y(v: number) { arr[1] = v; proceduralActive = true; applyBones() },
+      set y(v: number) { arr[1] = v; proceduralActive = true; if(!batching)applyBones() },
       get z() { return arr[2] },
-      set z(v: number) { arr[2] = v; proceduralActive = true; applyBones() },
+      set z(v: number) { arr[2] = v; proceduralActive = true; if(!batching)applyBones() },
       set(x: number, y: number, z: number) {
         arr[0] = x; arr[1] = y; arr[2] = z
         proceduralActive = true

@@ -31,6 +31,18 @@ async function handle(request:Request,env:Env) {
   const stmt=(sql:string,...args:(string|number)[])=>db.prepare(sql).bind(...args)
   if(method==='GET'&&path==='unsubscribe')return unsubscribe(env,url)
   if(method==='GET'&&path==='contributors')return feedbackContributors(env)
+  if(path==='mp/cheat-capture'){
+    if(method!=='POST')throw new Problem(405,'method','需要 POST')
+    if(request.headers.get('Origin')!==url.origin)throw new Problem(403,'origin','请求来源不符')
+    if(!env.cheatCaptureUpload)throw new Problem(503,'cheat_capture_disabled','取证上传暂不可用')
+    const account=await sessionAccount(db,await sessionHash(request));if(!account?.verified)unauthorized()
+    return env.cheatCaptureUpload(request,account)
+  }
+  if(path==='trace/tile' && env.traceTile){
+    if(method!=='GET')throw new Problem(405,'method','需要 GET')
+    const account=await sessionAccount(db,await sessionHash(request));if(!account?.verified)unauthorized()
+    return env.traceTile(Number(account.uid))
+  }
   if(env.updateCards && /^(?:admin\/)?updates(?:\/|$)/.test(path)) return env.updateCards(request,path)
   if(/^(feedback|bridge|admin)(\/|$)/.test(path)) return feedback(request,env,path)
   if(path==='me/save')return cloudSave(request,env)

@@ -10,37 +10,45 @@
   gap: 8px;
   height: 34px;
   padding: 0 12px;
-  border-radius: 17px;
-  border: 1px solid rgba(255, 255, 255, 0.22);
-  background: rgba(14, 17, 21, 0.78);
-  color: #f6f4ef;
-  font-family: "PingFang SC", "Noto Sans CJK SC", "Source Han Sans SC", system-ui, sans-serif;
+  border-radius: var(--ui-r-paper, 6px);
+  border: 1px solid var(--ui-glass-line, rgba(244, 239, 226, 0.3));
+  background: var(--ui-glass-solid, rgba(22, 36, 33, 0.9));
+  color: var(--ui-paper, #f4efe2);
+  font-family: var(--ui-serif, serif);
   font-size: 13px;
-  font-weight: 700;
+  font-weight: 600;
+  letter-spacing: 0.06em;
   cursor: pointer;
   white-space: nowrap;
   user-select: none;
   -webkit-user-select: none;
 }
 .gl-mission-entry:hover {
-  background: rgba(14, 17, 21, 0.92);
-  border-color: rgba(255, 197, 61, 0.65);
+  background: var(--ui-glass-solid, rgba(22, 36, 33, 0.9));
+  border-color: var(--ui-ochre, #c49a4a);
 }
 .gl-mission-entry b {
-  color: #ffc53d;
+  /* 金额用无衬线：衬线栈在部分机器上没有「¥」字形，会只剩数字 */
+  font-family: var(--ui-sans, system-ui, sans-serif);
+  color: var(--ui-ochre, #c49a4a);
   font-variant-numeric: tabular-nums;
 }
+/* 「接活」是一方小朱印：石刻残边遮罩（和封面印同一个 home-seal.svg）、略歪，不是圆角色块 */
 .gl-mission-entry i {
   font-style: normal;
   font-size: 11px;
-  padding: 2px 7px;
-  border-radius: 999px;
-  background: #20d6c1;
-  color: #101216;
+  padding: 3px 6px 3px 7px;
+  background: var(--ui-seal, #a9503c);
+  color: var(--ui-paper, #f4efe2);
+  letter-spacing: 0.1em;
+  transform: rotate(-2deg);
+  -webkit-mask: url("../ui/home-seal.svg") center/100% 100% no-repeat;
+  mask: url("../ui/home-seal.svg") center/100% 100% no-repeat;
 }
 .gl-mission-entry.quiet i {
-  background: rgba(255, 61, 79, 0.9);
-  color: #fff;
+  background: transparent;
+  color: var(--ui-paper-dim, rgba(244, 239, 226, 0.7));
+  box-shadow: inset 0 0 0 1px var(--ui-glass-line, rgba(244, 239, 226, 0.3));
 }
 
 .gl-mission-hud {
@@ -373,13 +381,14 @@ dialog.mission-board::backdrop {
   }
 }
 
-/* Landscape phone (844x390, 640x360): park in the clear channel between .sky-ui (<=400px) and .dock (right ~113px) */
+/* Landscape phone (844x390, 640x360): the entry sits in the top row, in the clear span between the top-left buttons
+   (end ~290px) and the dock's 工具 button, so the 工具 menu opening below it never covers it (IDOK-468). */
 @media (pointer:coarse) and (not (any-pointer:fine)) and (max-height: 500px) {
   .gl-mission-entry {
-    left: auto;
-    right: calc(122px + env(safe-area-inset-right));
-    top: calc(10px + env(safe-area-inset-top));
-    transform: none;
+    left: calc(50% + 40px);
+    right: auto;
+    top: calc(14px + env(safe-area-inset-top));
+    transform: translateX(-50%);
     height: 30px;
     padding: 0 10px;
     font-size: 12px;
@@ -404,10 +413,10 @@ dialog.mission-board::backdrop {
 }
 
 /* Short landscape phones (IDOK-146): the dock is a top row (play.css), the minimap is 72px wide, and the thumb cluster
-   starts ~143px above the bottom edge. The entry pill and the card stack in the clear middle band below .sky-ui and
-   the dock (incl. the minimap), left of 跑/跃 and clear of the left stick. */
+   starts ~143px above the bottom edge. The entry pill rides the top row (IDOK-468); the card stacks in the clear middle
+   band below the dock (incl. the minimap), left of 跑/跃 and clear of the left stick. */
 @media (pointer:coarse) and (not (any-pointer:fine)) and (max-height:430px){
-  .gl-mission-entry{left:auto;right:calc(182px + env(safe-area-inset-right));top:calc(92px + env(safe-area-inset-top));transform:none;height:28px;padding:0 10px;font-size:12px}
+  .gl-mission-entry{left:calc(50% + 40px);right:auto;top:calc(14px + env(safe-area-inset-top));transform:translateX(-50%);height:28px;padding:0 10px;font-size:12px}
   .gl-mission-hud{left:auto;right:calc(182px + env(safe-area-inset-right));top:calc(126px + env(safe-area-inset-top));transform:none;
     width:min(296px,calc(100vw - 312px - env(safe-area-inset-left) - env(safe-area-inset-right)));align-items:flex-end}
   .gl-mission-hud .st-mission{align-items:flex-end}

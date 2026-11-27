@@ -1,89 +1,131 @@
-/* 账号对话框 · 山水印：青玉玻璃面板、宣纸输入框、朱砂主按钮 */
-dialog.account{width:min(25rem,calc(100% - 24px));max-height:calc(100dvh - 24px);overflow:auto;opacity:0;transform:translateY(10px) scale(.985);
+/* 账号对话框（S1）：墨青纸面板 + 宣纸输入框；提交是这一屏唯一的朱砂按钮。
+   标签页是刻本式下划线，步骤是方印数字，第三方登录是宣纸按钮（品牌色只留在图标上）。 */
+dialog.account{width:min(25rem,calc(100% - 24px));max-height:calc(100dvh - 24px);overflow:auto;opacity:0;transform:translateY(var(--ui-rise));
   transition:opacity .22s,transform var(--ui-slow) var(--ui-ease),overlay .22s allow-discrete,display .22s allow-discrete}
 dialog.account[open]{opacity:1;transform:none}
-@starting-style{dialog.account[open]{opacity:0;transform:translateY(10px) scale(.985)}}
-.account>header{border-bottom:0;padding-bottom:4px}
-.acc-tabs{display:flex;margin:6px 18px 0;padding:3px;border-radius:var(--ui-r-pill);background:rgba(244,239,226,.07);border:1px solid var(--ui-glass-line-soft)}
-.acc-tabs button{flex:1;height:34px;border:0;border-radius:var(--ui-r-pill);background:none;cursor:pointer;font:500 14px var(--ui-serif);letter-spacing:.3em;text-indent:.3em;color:var(--ui-paper-dim);transition:background var(--ui-fast),color var(--ui-fast)}
-.acc-tabs button[aria-selected=true]{background:var(--ui-paper);color:var(--ui-ink-800)}
+@starting-style{dialog.account[open]{opacity:0;transform:translateY(var(--ui-rise))}}
+.account>header{padding-bottom:4px}
+
+/* 登录 / 注册：两枚下划线标签 */
+.acc-tabs{display:flex;gap:var(--ui-s-5);margin:4px 8px 0;box-shadow:inset 0 -1px 0 var(--ui-line)}
+.acc-tabs button{position:relative;min-height:var(--ui-h);padding:0 2px;border:0;background:none;cursor:pointer;-webkit-tap-highlight-color:transparent;
+  font:500 var(--ui-fs-md)/1 var(--ui-serif);letter-spacing:var(--ui-track-title);color:var(--ui-text-3);transition:color var(--ui-fast)}
+.acc-tabs button:hover{color:var(--ui-text-2)}
+.acc-tabs button[aria-selected=true]{color:var(--ui-text)}
+.acc-tabs button[aria-selected=true]::after{content:"";position:absolute;left:0;right:.2em;bottom:0;height:2px;background:currentColor}
+.acc-tabs button:focus-visible{outline:2px solid var(--ui-focus);outline-offset:-2px}
 .account:not([data-screen=login]):not([data-screen=register]) .acc-tabs{display:none}
-.acc-steps{display:none;list-style:none;margin:14px 18px 0;padding:0;counter-reset:s;gap:6px}
+.acc-tabs[hidden]{display:none}
+
+/* 注册三步：方印数字 + 细线 */
+.acc-steps{display:none;list-style:none;margin:12px 8px 0;padding:0;counter-reset:s;gap:8px}
 .account:is([data-screen=register],[data-screen=verify]) .acc-steps{display:flex}
-.acc-steps li{counter-increment:s;flex:1;display:flex;align-items:center;gap:6px;font-size:12px;letter-spacing:.08em;color:var(--ui-paper-dim);white-space:nowrap}
-.acc-steps li::before{content:counter(s);flex:none;width:20px;height:20px;border-radius:50%;display:grid;place-items:center;font-size:11px;border:1px solid var(--ui-glass-line);letter-spacing:0}
-.acc-steps li:not(:last-child)::after{content:"";flex:1;height:1px;background:var(--ui-glass-line-soft)}
-.acc-steps li.on{color:var(--ui-paper)}.acc-steps li.on::before{background:var(--ui-seal);border-color:var(--ui-seal);color:var(--ui-paper)}
-.acc-steps li.done::before{content:"✓";background:var(--ui-jade-500);border-color:var(--ui-jade-500);color:var(--ui-paper)}
-.acc-body{display:grid;gap:14px;padding:14px 18px 6px}
-.acc-lead{margin:0;font-size:13px;line-height:1.7;letter-spacing:.04em;color:var(--ui-paper-dim)}.acc-lead:empty{display:none}
+.acc-steps li{counter-increment:s;flex:1;display:flex;align-items:center;gap:8px;font-size:var(--ui-fs-xs);letter-spacing:.08em;color:var(--ui-text-3);white-space:nowrap}
+.acc-steps li::before{content:counter(s);flex:none;box-sizing:border-box;width:20px;height:20px;display:grid;place-items:center;border-radius:var(--ui-r-xs);
+  font:600 11px/1 var(--ui-num);letter-spacing:0;box-shadow:inset 0 0 0 1px var(--ui-line-strong)}
+.acc-steps li:not(:last-child)::after{content:"";flex:1;height:1px;background:var(--ui-line)}
+.acc-steps li.on{color:var(--ui-text)}.acc-steps li.on::before{color:var(--ui-ink);background:var(--ui-paper);box-shadow:none}
+.acc-steps li.done{color:var(--ui-text-2)}.acc-steps li.done::before{content:"✓";color:var(--ui-text-2)}
+
+.acc-body{display:grid;gap:14px;padding:16px 8px 4px}
+.acc-lead{margin:0;font-size:var(--ui-fs-sm);line-height:var(--ui-lh);letter-spacing:var(--ui-track-body);color:var(--ui-text-2)}.acc-lead:empty{display:none}
 .account .fields{display:grid;gap:12px}
-.account .ui-field small{font-size:11.5px;opacity:.75}
+.account .ui-field small{font-size:var(--ui-fs-xs);color:var(--ui-text-3);letter-spacing:.04em}
 .acc-pass{position:relative;display:block}.acc-pass input{padding-right:46px}
-.acc-eye{position:absolute;right:4px;top:50%;transform:translateY(-50%);width:38px;height:36px;border:0;border-radius:var(--ui-r-sm);background:none;cursor:pointer;color:var(--ui-ink-soft)}
-.acc-eye::before{content:"";position:absolute;left:50%;top:50%;width:18px;height:11px;transform:translate(-50%,-50%);border:1.6px solid currentColor;border-radius:50% / 60%}
+.acc-eye{position:absolute;right:3px;top:50%;transform:translateY(-50%);width:40px;height:38px;border:0;border-radius:var(--ui-r-sm);background:none;cursor:pointer;color:var(--ui-ink-3)}
+.acc-eye:hover{color:var(--ui-ink-soft)}
+.acc-eye::before{content:"";position:absolute;left:50%;top:50%;width:18px;height:11px;transform:translate(-50%,-50%);border:1.5px solid currentColor;border-radius:50% / 60%}
 .acc-eye::after{content:"";position:absolute;left:50%;top:50%;width:5px;height:5px;transform:translate(-50%,-50%);border-radius:50%;background:currentColor}
-.acc-eye[data-on]{color:var(--ui-seal)}
-input.acc-code{font-size:24px!important;letter-spacing:.6em;text-align:center;padding-left:.6em!important;font-variant-numeric:tabular-nums}
-.acc-check{display:flex;align-items:center;gap:10px;font-size:14px;letter-spacing:.04em;cursor:pointer}
-.acc-check input{width:18px;height:18px;accent-color:var(--ui-seal)}
+.acc-eye[data-on]{color:var(--ui-ink)}
+.acc-eye:focus-visible{outline:2px solid var(--ui-focus);outline-offset:-2px}
+input.acc-code{font:600 24px/1 var(--ui-num)!important;letter-spacing:.6em;text-align:center;padding-left:.6em!important;font-variant-numeric:tabular-nums}
+.acc-check{display:flex;align-items:center;gap:10px;min-height:var(--ui-h);font-size:var(--ui-fs-sm);letter-spacing:var(--ui-track-body);cursor:pointer}
+.acc-check input{width:18px;height:18px;margin:0;accent-color:var(--ui-paper)}
+
+/* 我的账号：方印头像 + 昵称 */
 .acc-who{display:flex;align-items:center;gap:14px}.acc-who:empty{display:none}
-.acc-avatar{width:52px;height:52px;border-radius:50%;display:grid;place-items:center;font:600 22px var(--ui-serif);background:var(--ui-jade-500);box-shadow:inset 0 0 0 2px rgba(244,239,226,.3)}
-.acc-who b{display:block;font-size:17px;letter-spacing:.08em}.acc-who small{font-size:12px;color:var(--ui-paper-dim)}
-.acc-msg{margin:0;min-height:1.4em;font-size:13px;line-height:1.5;color:var(--ui-jade-300)}.acc-msg:empty{min-height:0;margin:-7px 0}
+.acc-avatar{flex:none;width:48px;height:48px;border-radius:var(--ui-r-sm);display:grid;place-items:center;font:600 22px/1 var(--ui-serif);color:var(--ui-ink);background:var(--ui-paper)}
+.acc-avatar img{width:100%;height:100%;object-fit:cover;border-radius:inherit;display:block}
+.acc-avatar--brand{background:transparent;padding:0;overflow:visible}
+.acc-avatar--brand .social-icon{width:100%;height:100%}
+.acc-who b{display:block;font-size:var(--ui-fs-md);font-weight:600;letter-spacing:.08em}.acc-who small{font-size:var(--ui-fs-xs);color:var(--ui-text-2)}
+
+/* 结果与错误：文字说清，颜色只是辅助 */
+.acc-msg{margin:0;min-height:1.4em;font-size:var(--ui-fs-sm);line-height:1.5;color:var(--ui-text-2)}.acc-msg:empty{min-height:0;margin:-7px 0}
 .acc-msg[data-kind=error]{color:var(--ui-error)}.acc-msg[data-kind=ok]{color:var(--ui-ok)}
+.acc-msg a{text-decoration:underline;text-underline-offset:3px;margin-left:4px;color:inherit}
 .account[data-busy] .acc-submit{opacity:.7;pointer-events:none}
+.acc-submit{min-height:var(--ui-h-lg);font-size:var(--ui-fs-md);letter-spacing:var(--ui-track-title)}
 .acc-links{display:flex;justify-content:center;flex-wrap:wrap;gap:4px;margin-top:-4px}.acc-links:empty{display:none}
 .acc-links .ui-btn{min-height:34px;font-size:13px;padding:0 12px}
-.acc-guest{margin:6px 18px 0;padding:12px 0 16px;border-top:1px solid var(--ui-glass-line-soft);text-align:center;font-size:12.5px;letter-spacing:.06em;color:var(--ui-paper-dim)}
-.acc-guest button{font:inherit;color:var(--ui-paper);background:none;border:0;padding:0;cursor:pointer;text-decoration:underline;text-decoration-color:var(--ui-seal-light);text-underline-offset:3px}
+.acc-guest{margin:8px 8px 0;padding:12px 0 6px;border-top:1px solid var(--ui-line);text-align:center;font-size:var(--ui-fs-xs);letter-spacing:.06em;color:var(--ui-text-3)}
+.acc-guest button{font:inherit;color:var(--ui-text);background:none;border:0;padding:0;cursor:pointer;text-decoration:underline;text-decoration-color:var(--ui-line-hover);text-underline-offset:3px}
+.acc-guest button:focus-visible{outline:2px solid var(--ui-focus);outline-offset:2px}
 .account:not([data-screen=login]) .acc-guest{display:none}
+@media (pointer:coarse) and (not (any-pointer:fine)){.acc-links .ui-btn{min-height:var(--ui-h)}}
 
-/* 第三方登录 / 注册：QQ、微信 置顶的大按钮（宣纸底 + 品牌色描边），下面才是邮箱表单 */
+/* 第三方登录 / 注册：QQ、微信置顶，宣纸按钮，品牌色只在图标上；下面才是邮箱表单 */
 .acc-quick{display:grid;gap:14px}.acc-quick[hidden]{display:none}
-.acc-sso-row{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;padding-top:6px}
+.acc-sso-row{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;padding-top:4px}
 .acc-sso-row[data-count="1"]{grid-template-columns:1fr}.acc-sso-row[data-count="3"]{grid-template-columns:repeat(3,minmax(0,1fr))}
-.acc-sso{--brand:var(--ui-jade-500);position:relative;display:flex;align-items:center;justify-content:center;gap:10px;min-width:0;height:56px;padding:0 12px;
-  border:1px solid rgba(255,255,255,.55);border-radius:var(--ui-r-md);cursor:pointer;-webkit-tap-highlight-color:transparent;
-  background:linear-gradient(180deg,#fbf8f0,var(--ui-paper-2));color:var(--ui-ink-800);font:600 16px var(--ui-serif);letter-spacing:.14em;
-  box-shadow:0 1px 0 rgba(255,255,255,.6) inset,0 -3px 0 var(--brand) inset,0 6px 16px rgba(8,16,14,.28);
-  transition:transform var(--ui-fast) var(--ui-ease),box-shadow var(--ui-fast),filter var(--ui-fast)}
+.acc-sso{--brand:var(--ui-jade-500);position:relative;display:flex;align-items:center;justify-content:center;gap:10px;min-width:0;height:52px;padding:0 12px;box-sizing:border-box;
+  border:1px solid var(--ui-paper);border-radius:var(--ui-r-ctl);cursor:pointer;-webkit-tap-highlight-color:transparent;
+  background:var(--ui-paper);color:var(--ui-ink);font:600 var(--ui-fs-md)/1 var(--ui-serif);letter-spacing:.14em;
+  transition:background var(--ui-fast),transform var(--ui-fast)}
 .acc-sso[data-type=qq]{--brand:#12b7f5}.acc-sso[data-type=wx]{--brand:#07c160}
 .acc-sso>span:not(.acc-last){overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.acc-sso .social-icon{width:28px;height:28px;box-shadow:0 0 0 2px #fff,0 2px 6px rgba(0,0,0,.18)}
-.acc-sso-mark{flex:none;width:28px;height:28px;border-radius:50%;display:grid;place-items:center;background:var(--brand);color:var(--ui-paper);font-size:14px;letter-spacing:0}
-@media (hover:hover){.acc-sso:hover{transform:translateY(-1px);filter:brightness(1.03);box-shadow:0 1px 0 rgba(255,255,255,.6) inset,0 -4px 0 var(--brand) inset,0 10px 22px rgba(8,16,14,.34)}}
-.acc-sso:active{transform:translateY(1px);box-shadow:0 1px 0 rgba(255,255,255,.6) inset,0 -2px 0 var(--brand) inset,0 3px 8px rgba(8,16,14,.26)}
-.acc-sso:focus-visible{outline:2px solid var(--brand);outline-offset:3px}
+.acc-sso .social-icon{width:26px;height:26px}
+.acc-sso-mark{flex:none;width:26px;height:26px;border-radius:50%;display:grid;place-items:center;background:var(--brand);color:var(--ui-paper);font-size:13px;letter-spacing:0}
+@media (hover:hover){.acc-sso:hover{background:var(--ui-paper-hi)}}
+.acc-sso:active{transform:scale(var(--ui-press))}
+.acc-sso:focus-visible{outline:2px solid var(--ui-focus);outline-offset:2px}
 .account[data-busy] .acc-sso{opacity:.7;pointer-events:none}
-.acc-or{display:flex;align-items:center;gap:12px;margin:0;font-size:12px;letter-spacing:.2em;color:var(--ui-paper-dim);white-space:nowrap}
-.acc-or::before,.acc-or::after{content:"";flex:1;height:1px;background:var(--ui-glass-line-soft)}
+.acc-or{display:flex;align-items:center;gap:12px;margin:0;font-size:var(--ui-fs-xs);letter-spacing:var(--ui-track-title);color:var(--ui-text-3);white-space:nowrap}
+.acc-or::before,.acc-or::after{content:"";flex:1;height:1px;background:var(--ui-line)}
 
-/* 「上次登录」角标：右上角一枚小朱印，压在按钮边上 */
+/* 「上次登录」角标：压在按钮右上角的一枚小签 */
 .has-last{position:relative;overflow:visible}
-.acc-last{position:absolute;top:-9px;right:8px;z-index:1;padding:2px 7px 2px 8px;border-radius:5px;pointer-events:none;
-  background:var(--ui-seal);color:#fff8ee;font:600 10.5px/1.4 var(--ui-serif);letter-spacing:.12em;white-space:nowrap;
-  box-shadow:0 0 0 1.5px rgba(251,248,240,.9),0 3px 8px rgba(80,24,12,.35);transform:rotate(2deg)}
-.acc-submit .acc-last{top:-9px;right:14px;background:var(--ui-paper);color:var(--ui-seal);box-shadow:0 0 0 1.5px var(--ui-seal),0 3px 8px rgba(80,24,12,.3)}
+.acc-last{position:absolute;top:-8px;right:8px;z-index:1;padding:2px 6px;border-radius:var(--ui-r-xs);pointer-events:none;
+  background:var(--ui-ink-800);color:var(--ui-paper);font:500 11px/1.4 var(--ui-serif);letter-spacing:.1em;white-space:nowrap;box-shadow:inset 0 0 0 1px var(--ui-line-strong)}
+.acc-submit .acc-last{top:-8px;right:12px;background:var(--ui-paper);color:var(--ui-ink);box-shadow:inset 0 0 0 1px var(--ui-paper-line)}
 
 /* 「我的账号」里绑定第三方 */
 .acc-social{display:grid;grid-template-columns:repeat(auto-fit,minmax(9.5rem,1fr));gap:8px;margin-top:10px;width:100%}
 .acc-social .ui-btn{justify-content:center}
-.acc-avatar img{width:100%;height:100%;object-fit:cover;border-radius:inherit;display:block}
-.acc-tabs[hidden]{display:none}
-
-/* 平台图标（QQ / 微信 官方品牌图，public/icons 自托管） */
 .acc-social-btn{display:flex;align-items:center;justify-content:center;gap:8px}
+.acc-social .ui-btn--ghost{border-color:var(--ui-line-strong);color:var(--ui-text)}
+/* 平台图标（QQ / 微信 官方品牌图，public/icons 自托管） */
 .social-icon{width:18px;height:18px;flex:none;border-radius:50%;display:block}
-.acc-avatar--brand{background:transparent;padding:0;overflow:visible}
-.acc-avatar--brand .social-icon{width:100%;height:100%}
 
 /* 已绑定的第三方账号 */
 .acc-bindings{display:grid;gap:6px;margin-top:4px}
-.acc-bind-empty{color:var(--ink-soft,#5d655f);font-size:12px}
-.acc-bind-row{display:flex;align-items:center;gap:8px;padding:7px 10px;background:rgba(255,255,255,.06);border-radius:9px;font-size:13px}
+.acc-bind-title{display:block;margin:2px 0;font-size:var(--ui-fs-xs);letter-spacing:.08em;color:var(--ui-text-3)}
+.acc-bind-empty{font-size:var(--ui-fs-xs);color:var(--ui-text-3)}
+.acc-bind-row{display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:var(--ui-r-sm);background:var(--ui-fill);font-size:13px}
 .acc-bind-name{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.acc-bind-state{flex:none;font-size:11px;padding:1px 8px;border-radius:999px;background:rgba(120,180,140,.22);color:inherit;opacity:.85}
-.acc-msg a{text-decoration:underline;margin-left:4px}
+.acc-bind-state{flex:none;padding:2px 6px;border-radius:var(--ui-r-xs);font-size:11px;letter-spacing:.08em;color:var(--ui-text-2);box-shadow:inset 0 0 0 1px var(--ui-line-strong)}
 
-.acc-bind-title{display:block;font-size:12px;opacity:.6;margin:2px 0 2px}
+/* 横屏手机（844×390、873×403）：邮箱、密码、「登录」一屏放下，不用滚。
+   · 登录 / 注册两屏：书名「登录」与下面的标签页重复，标题只留给读屏，标签页顶到第一行、右边让出关闭钮；
+   · 字段标签放到输入框左侧（标签文字仍在 <label> 里）；
+   · 印框外沿收一档（frame + 线 + 4px），各段间距收紧。注册、找回、验证码等其它步骤同一节奏。 */
+@media (max-height:500px) and (orientation:landscape){
+  dialog.account{width:min(27rem,calc(100% - 24px));max-height:calc(100dvh - 12px);border-width:calc(var(--ui-frame) + 1px + var(--ui-s-1))}
+  .account>header{padding:2px 0 2px 8px}
+  .account:is([data-screen=login],[data-screen=register])>header{display:block;height:0;padding:0}
+  .account:is([data-screen=login],[data-screen=register])>header h2{position:absolute;width:1px;height:1px;margin:-1px;padding:0;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0}
+  .account:is([data-screen=login],[data-screen=register])>header .about-close{position:absolute;top:0;right:0;z-index:1}
+  .account:is([data-screen=login],[data-screen=register]) .acc-tabs{margin:0 calc(var(--ui-h) + var(--ui-s-2)) 0 8px}
+  .acc-steps{margin-top:8px}
+  .acc-body{gap:10px;padding:10px 8px 2px}
+  .acc-lead{font-size:var(--ui-fs-xs);line-height:1.55}
+  .account .fields{gap:8px}
+  .account .ui-field{grid-template-columns:4.5em minmax(0,1fr);align-items:center;column-gap:var(--ui-s-2);row-gap:2px}
+  .account .ui-field>:not(input):not(.acc-pass){grid-column:2}
+  .acc-check{min-height:36px}
+  .acc-sso{height:var(--ui-h)}
+  .acc-quick{gap:10px}
+  .acc-links{margin-top:-6px}
+  .acc-guest{margin-top:2px;padding:6px 0 2px}
+}
+@media (prefers-reduced-motion:reduce){dialog.account{transition:none}}

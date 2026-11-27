@@ -5,6 +5,7 @@
 //  · 新手引导 .coach —— 第一次进城时按真实 HUD 位置点亮 4–6 步（找不到的按钮自动跳过），只出现一次，可在指南里重看。
 // 键名一律走 keymap 的 bindingLabel，玩家改键后这里跟着变。
 import './guide.css'
+import './thumb-glyphs.css'
 import {
   bindingLabel,
   getDutyCardRows,
@@ -87,6 +88,8 @@ const caps = (keys: string[]) => keys.map(key => `<kbd>${key}</kbd>`).join('')
 
 // ─── 按键卡 ──────────────────────────────────────────────────────────────────────────────────────
 const FOLD_KEY = 'glol.keys.fold'
+// IDOK-468: the card keeps the six most-used rows of the current scene; 全部按键 (F1) has the rest.
+const CARD_ROWS = 6
 let card: HTMLElement | undefined
 let lastCtx: Ctx | undefined
 
@@ -115,7 +118,7 @@ function renderCard() {
   if (!card) return
   const ctx = current()
   card.querySelector('.keys-ctx')!.textContent = CTX_NAME[ctx]
-  card.querySelector('.keys-list')!.innerHTML = rows(ctx).filter(visible)
+  card.querySelector('.keys-list')!.innerHTML = rows(ctx).filter(visible).slice(0, CARD_ROWS)
     .map(row => `<li${row.id ? ` data-id="${row.id}"` : ''}><span class="keys-caps">${caps(row.keys)}</span><span>${row.label}</span></li>`).join('')
   // 第一次上某种车：卡片自动展开并闪一下，告诉玩家「这辆车的键在这儿」。
   if (lastCtx && ctx !== lastCtx && ctx !== 'walk' && ctx !== 'fly' && ctx !== 'duty') {
@@ -135,13 +138,13 @@ type Feature = {seal: string; title: string; pc: string; phone: string; only?: '
 const FEATURES = (): Feature[] => [
   {seal: '行', title: '走路与视角',
     pc: `${caps(move())} 走，<kbd>${k('run')}</kbd> 跑，<kbd>${k('jump')}</kbd> 跳，<kbd>${k('crouch')}</kbd> 蹲。按住鼠标拖动转视角，滚轮拉远拉近，<kbd>${k('view')}</kbd> 切第一 / 第三人称。`,
-    phone: '左下摇杆走路，推到底就是跑；右半边屏幕滑动转视角，双指捏合拉远拉近。右下「跃」「蹲」是跳、蹲；按住「远近」上下拖动调视距，轻点切近 / 远。按键位置在「设置 → 手机按键」里改。'},
+    phone: '左下摇杆走路，推到底就是跑；右半边屏幕滑动转视角，双指捏合拉远拉近。右下腾空小人是跳、下蹲小人是蹲；按住两座山的键上下拖动调视距，轻点切近 / 远。按键位置在「设置 → 手机按键」里改。'},
   {seal: '情', title: '表情动作',
     pc: `<b>长按</b> <kbd>${k('emote')}</kbd> 打开动作盘，鼠标移到想做的动作上松手；<b>短按</b> <kbd>${k('emote')}</kbd> 重播上一个。联机时别人也能看到。`,
-    phone: '点右边「表情」打开动作盘，再点一个动作。联机时别人也能看到。'},
+    phone: '点右边笑脸键打开动作盘，再点一个动作。联机时别人也能看到。'},
   {seal: '骑', title: '骑车、开车、划船',
     pc: `走到路边的电驴、单车、汽车或码头的船旁边，按 <kbd>${k('interact')}</kbd> 上去，再按一次下来。附近没车可以按 <kbd>L</kbd> 叫一辆共享电驴。上车后左下按键卡会换成这辆车的键。`,
-    phone: '走到车旁边，点屏幕下方出现的上车按钮。附近没车就点右下「叫车」，共享电驴会停到你身边。骑上去后右下会换成挡位、翘头、压弯这些按钮。'},
+    phone: '走到车旁边，点屏幕下方出现的上车按钮。附近没车就点右下电驴键叫车，共享电驴会停到你身边。骑上去后右下会换成挡位、翘头、压弯这些按钮。'},
   {seal: '活', title: '接活赚钱', only: 'solo',
     pc: '点屏幕上方的「¥ 接活」，挑一单：送米粉、跑腿、拉客、跑环城夜赛。跟着地图上的路线走，完成就进账。',
     phone: '点屏幕上方的「¥ 接活」，挑一单：送米粉、跑腿、拉客、跑环城夜赛。跟着地图上的路线走，完成就进账。'},
@@ -168,8 +171,8 @@ const FEATURES = (): Feature[] => [
     phone: '左上角的时辰条可以切晨、午、昏、夜和晴、雾、雨。'},
   getDutyGuideFeature(),
   {seal: '设', title: '设置与改键',
-    pc: `按 <kbd>${k('settings')}</kbd> 或点「设置」：改键、开关读数（<kbd>${k('stats')}</kbd>）、表情显示。左上「视野」调远处画多少，电脑卡就调小一点。`,
-    phone: '点「设置」开关读数和表情显示。左上「视野」调远处画多少，手机发烫就调小一点。'},
+    pc: `按 <kbd>${k('settings')}</kbd> 或点「设置」：改键、表情显示，「画面 · 视野与画质」调远处画多少，电脑卡就调低一点。`,
+    phone: '点「设置」：表情显示，「画面 · 视野与画质」调远处画多少，手机发烫就调低一点。'},
 ]
 
 const KEY_GROUPS = (): {title: string; rows: Row[]}[] => [
@@ -182,15 +185,17 @@ const KEY_GROUPS = (): {title: string; rows: Row[]}[] => [
   getDutyGuideKeyGroup(),
   {title: '界面', rows: [
     {keys: ['M'], label: '地图'}, {keys: ['J'], label: '景册'}, {keys: ['P'], label: '拍照'},
-    {keys: [k('settings')], label: '设置'}, {keys: [k('stats')], label: '读数'}, {keys: ['Tab'], label: '手机（街头界面）'},
+    {keys: [k('settings')], label: '设置'}, {keys: ['Tab'], label: '手机（街头界面）'},
     {keys: ['F1'], label: '这份指南'}, {keys: ['Esc'], label: '关闭 / 菜单'},
   ]},
 ]
 
+// 拇指键是刻线小像（thumb-glyphs.css），表里画同一枚像再配一个字，玩家对着屏幕就能认
+const glyph = (name: string) => `<i class="thumb-ico thumb-ico--${name}" aria-hidden="true"></i>`
 const TOUCH_ROWS: [string, string][] = [
   ['左下摇杆', '走路；推到底是跑'], ['右半屏滑动', '转视角'], ['双指捏合', '拉远拉近'],
-  ['跃 / 蹲', '跳、蹲'], ['按住「远近」上下拖', '调视距；轻点切近 / 远'], ['叫车', '叫一辆共享电驴到身边'], ['上车 / 下车', '车旁边出现，点一下'],
-  ['表情', '打开动作盘'], ['右上小地图', '点开大地图，搜地名、传送'], ['右上一排', '起飞、景册、拍照、相机、设置（含手机按键布局）'], ['左上「视野」', '画面远近与流畅度'],
+  [`${glyph('jump')}跳 ${glyph('crouch')}蹲`, '蹲是开关，再点一下站起'], [`${glyph('view')}视距`, '按住上下拖调远近；轻点切近 / 远'], [`${glyph('hail')}叫车`, '叫一辆共享电驴到身边'], ['上车 / 下车', '车旁边出现，点一下'],
+  [`${glyph('emote')}表情`, '打开动作盘'], ['右上小地图', '点开大地图，搜地名、传送'], ['右上一排', '起飞、景册、拍照、相机、设置（含手机按键布局）'], ['左上「视野」', '画面远近与流畅度'],
 ]
 
 let sheet: HTMLDivElement | undefined
@@ -271,12 +276,9 @@ function steps(): Step[] {
       phone: '点这里打开动作盘：点赞、奶蛙笑……联机时别人也能看到。'},
     {target: q('.minimap'), title: '地图',
       pc: '搜地名，或者点地图上任意一处，直接传送过去。快捷键 <kbd>M</kbd>。', phone: '搜地名，或者点地图上任意一处，直接传送过去。'},
-    {target: q('.dock-book'), title: '景册',
-      pc: '名胜附近地上有朱红色圆圈，走进去就盖一枚印章，集齐全城名胜。快捷键 <kbd>J</kbd>。',
-      phone: '名胜附近地上有朱红色圆圈，走进去就盖一枚印章。'},
-    {target: q('.dock-photo'), title: '拍照',
-      pc: '换时辰、天气、滤镜，拍下来直接存图。旁边的「相机」可以挑相机、录像。快捷键 <kbd>P</kbd>。',
-      phone: '换时辰、天气、滤镜，拍下来直接存图。旁边的「相机」可以挑相机、录像。'},
+    {target: q('.dock-more'), title: '工具',
+      pc: `景册、拍照、相机、无人机、设置都收在这里。名胜附近地上有朱红色圆圈，走进去盖一枚印，攒进景册（<kbd>J</kbd>）；拍照 <kbd>P</kbd>。`,
+      phone: '景册、拍照、相机、无人机、设置都收在这里。名胜附近地上有朱红色圆圈，走进去盖一枚印，攒进景册。'},
     {target: q('.btn-mode'), title: '飞上天',
       pc: '按 <kbd>V</kbd> 或点这里起飞，像无人机一样看山水；再按一次落地步行。',
       phone: '点这里起飞，像无人机一样看山水；再点一次落地步行。'},

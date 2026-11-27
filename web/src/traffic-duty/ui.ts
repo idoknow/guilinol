@@ -246,6 +246,8 @@ export function mountTrafficDutyUi(opts: TrafficDutyUiOptions): TrafficDutyUiHan
   let renderedEarnings = ''
   let renderedCount = ''
   let renderedWhistleText = ''
+  // 全局 [F] 提示按钮（walk/vehicles.ts 建、interact-arbiter 写 data-interact-action），断开后重新找。
+  let promptEl: HTMLButtonElement | null = null
   let pendingFallbackResolve: ((res: FineTerminalResult) => void) | null = null
 
   function renderViolationGrid(items: readonly {label: string; value: string}[]): string {
@@ -474,11 +476,16 @@ export function mountTrafficDutyUi(opts: TrafficDutyUiOptions): TrafficDutyUiHan
       entry.hidden = !showEntry
     }
 
+    // 距离只报一处（IDOK-468）：交警在画面里时由头顶标记报，走到跟前由 [F] 提示接手，入口只留名字。
+    const officerInView =
+      !snapshot.terminalOpen &&
+      !snapshot.knockdownActive &&
+      Boolean(snapshot.officerScreen?.visible) &&
+      snapshot.officerDistanceM !== null &&
+      snapshot.officerDistanceM <= 180
     const nextEntryLabel =
-      snapshot.officerDistanceM !== null
-        ? snapshot.officerDistanceM <= DEFAULT_OFFICER_TALK_RANGE_M
-          ? '解放桥交警 · 按 F 对话'
-          : `解放桥交警 · ${Math.round(snapshot.officerDistanceM)}m`
+      snapshot.officerDistanceM !== null && snapshot.officerDistanceM > DEFAULT_OFFICER_TALK_RANGE_M && !officerInView
+        ? `解放桥交警 · ${Math.round(snapshot.officerDistanceM)}m`
         : '解放桥交警'
     if (nextEntryLabel !== renderedEntryLabel) {
       renderedEntryLabel = nextEntryLabel
@@ -495,29 +502,20 @@ export function mountTrafficDutyUi(opts: TrafficDutyUiOptions): TrafficDutyUiHan
       }
     }
 
-    // Overhead screen-space officer marker (idle: briefing entry; active: prominent off-duty check-in guide)
+    // Overhead screen-space officer marker: only a locator while the officer is out of talking range.
+    // Within range the standard [F] prompt (.vehicle-action) carries 领任务 / 下岗交差, so the marker steps aside (IDOK-468).
     const showMarker =
       !snapshot.storyActive &&
       !snapshot.terminalOpen &&
       !snapshot.knockdownActive &&
       Boolean(snapshot.officerScreen?.visible) &&
       snapshot.officerDistanceM !== null &&
+      snapshot.officerDistanceM > DEFAULT_OFFICER_TALK_RANGE_M &&
       snapshot.officerDistanceM <= 180
     officerMarker.hidden = !showMarker
     if (showMarker && snapshot.officerScreen && snapshot.officerDistanceM !== null) {
-      const near = snapshot.officerDistanceM <= DEFAULT_OFFICER_TALK_RANGE_M
-      const isOffDuty = snapshot.phase === 'active' || (snapshot.phase === 'summary' && snapshot.pendingEarningsYuan > 0)
-      const label = isOffDuty
-        ? near
-          ? snapshot.pendingEarningsYuan > 0
-            ? `解放桥交警 · [F] 下岗交差（待领 ¥${snapshot.pendingEarningsYuan}）`
-            : '解放桥交警 · [F] 下岗交差'
-          : `解放桥交警 · 下岗交差 ${Math.round(snapshot.officerDistanceM)}m`
-        : near
-          ? '解放桥交警 · [F] 领任务'
-          : `解放桥交警 · ${Math.round(snapshot.officerDistanceM)}m`
+      const label = `解放桥交警 · ${Math.round(snapshot.officerDistanceM)}m`
       if (officerMarker.textContent !== label) officerMarker.textContent = label
-      officerMarker.classList.toggle('is-near', near)
       officerMarker.style.left = `${snapshot.officerScreen.x.toFixed(1)}px`
       officerMarker.style.top = `${snapshot.officerScreen.y.toFixed(1)}px`
     }
@@ -548,6 +546,11 @@ export function mountTrafficDutyUi(opts: TrafficDutyUiOptions): TrafficDutyUiHan
         renderedFine = fineText
         fineEl.textContent = fineText
       }
+      // 下岗交差只出现一处：[F] 提示真的在报「下岗交差」时（仲裁选中了交警，而不是下车/上车），状态栏这颗按钮才让位。
+      if (!promptEl?.isConnected) promptEl = document.querySelector<HTMLButtonElement>('.vehicle-action')
+      const reportAtPrompt =
+        Boolean(candidate?.isOffDutyReport) && !!promptEl && !promptEl.hidden && promptEl.dataset.interactAction === 'talk_officer'
+      if (offDutyBarBtn.hidden !== reportAtPrompt) offDutyBarBtn.hidden = reportAtPrompt
       const earningsText = `待领10% ¥${snapshot.pendingEarningsYuan}`
       if (earningsText !== renderedEarnings) {
         renderedEarnings = earningsText

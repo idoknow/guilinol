@@ -138,6 +138,7 @@ export async function uiTest(page, origin,sql) {
   const click = (name) => fb.getByRole('button', { name, exact: true }).click()
   await page.evaluate(()=>{const viewer=window.viewer;viewer.camera.position.set(-1530,168,-82);viewer.camera.lookAt(-1530,161,-116);viewer.resume()})
   await page.waitForFunction(()=>[...window.viewer.stream.landmarks.keys()].some(entry=>entry.id==='yiwu_old_house'),null,{timeout:120000})
+  await page.locator('.dock-more').click() // 反馈收在「工具」里（IDOK-468）
   await page.locator('.dock-feedback').click()
   await fb.locator('.fb-map canvas').waitFor({ timeout: 60000 })
   await page.waitForTimeout(400)
@@ -247,6 +248,7 @@ export async function uiTest(page, origin,sql) {
   await page.evaluate(()=>window.viewer.freeze())
   const replay=await page.evaluate(view=>{const camera=window.viewer.camera;return {meters:Math.hypot(camera.position.x-view.x,camera.position.y-view.y,camera.position.z-view.z),yaw:Math.abs(camera.rotation.y*180/Math.PI-view.yaw),pitch:Math.abs(camera.rotation.x*180/Math.PI-view.pitch)}},stored)
   assert.ok(Object.values(replay).every(value=>value<.5),JSON.stringify(replay));console.log('Deep link camera replay errors:',replay);await shot('deep-link-replay')
+  await page.locator('.dock-more').click() // 反馈收在「工具」里（IDOK-468）
   await page.locator('.dock-feedback').click()
   await fb.getByLabel('标题').waitFor()
   await fb.locator('.fb-map canvas').waitFor()

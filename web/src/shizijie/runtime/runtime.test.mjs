@@ -33,6 +33,8 @@ import {
   resolveSzjIndoorMovement,
 } from './index.ts'
 import { runHeadlessFourMouthVerification } from './verify-headless.mjs'
+import { SZJ_B1_CEILING_H, SZJ_LANDING, SZJ_ORIGIN, SZJ_STAIR, SZJ_WELLS, szjGroundStairwells } from '../frame.ts'
+import { SZJ_STAIR_DOOR, szjDoorCentre } from '../look/stairwell-geometry.ts'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
@@ -86,19 +88,13 @@ test('state machine enforces SZJ_TRANSITIONS, surface walk-in trigger, and exit 
       else if (from === 'entering') {
         m.transitionTo('idle')
         m.transitionTo('entering')
-      } else if (from === 'descending') {
-        m.transitionTo('idle')
-        m.transitionTo('entering')
-        m.transitionTo('descending')
       } else if (from === 'inside') {
         m.transitionTo('idle')
         m.transitionTo('entering')
-        m.transitionTo('descending')
         m.transitionTo('inside')
       } else if (from === 'exiting') {
         m.transitionTo('idle')
         m.transitionTo('entering')
-        m.transitionTo('descending')
         m.transitionTo('inside')
         m.transitionTo('exiting')
       } else if (from === 'disposed') {
@@ -150,7 +146,7 @@ test('state machine enforces SZJ_TRANSITIONS, surface walk-in trigger, and exit 
   assert.equal(coolExpired.triggeredStair?.id, 'ne')
 })
 
-test('k5 & k6: headless 4-mouth walkthrough enters -> reaches indoors -> exits with Δy <= 0.08m, 0 black frames, landing error < 0.5m, drawCalls <= 60, tris <= 200k', async () => {
+test('k5 & k6: headless 4-mouth walk down the street ramp swaps into B1 and back with no camera jump, Δy <= 0.08m, 0 black frames, drawCalls <= 60, tris <= 200k', async () => {
   const report = await runHeadlessFourMouthVerification({ outDir: '/tmp/szj-headless-verify' })
   assert.equal(report.ok, true, `Headless failures: ${report.failures.join('; ')}`)
   assert.deepEqual(report.summary.mouthsVerified, ['nw', 'ne', 'se', 'sw'])
@@ -262,11 +258,9 @@ test('mountLazyShizijie exposes clean read-only probe and szj-ui.css obeys theme
         position: { x: SZJ_FRAME.originWorld.x, y: SZJ_FRAME.surfaceY, z: SZJ_FRAME.originWorld.z },
         velocity: { x: 0, z: 0 },
       }),
-      openVeil: () => ({ async done() {} }),
       suspendWorld() {},
       resumeWorldAt: async () => true,
     },
-    { veilFadeInMs: 0 },
   )
 
   const probeKeys = Object.keys(lazy.getProbe())
@@ -341,5 +335,54 @@ test('k11 & k12: ceiling-hung wayfinding signs match wayfinding output 1:1, >=1 
     assert.ok(m.metrics.triangles <= SZJ_BUDGET.indoorTrianglesMax)
     assert.ok(m.metrics.lastSwapMs <= SZJ_BUDGET.swapMsMax)
     assert.ok(m.footVisibleSignCount >= 1, `${m.stairId} expected >=1 sign in view, got ${m.footVisibleSignCount}`)
+  }
+})
+
+test('frame.ts well rows mirror the contract and pipeline STAIRWELLS, and the host ramp ends on the B1 landing', () => {
+  assert.equal(SZJ_ORIGIN.x, SZJ_FRAME.originWorld.x)
+  assert.equal(SZJ_ORIGIN.z, SZJ_FRAME.originWorld.z)
+  assert.equal(SZJ_B1_CEILING_H, SHIZIJIE_B1_LAYOUT.ceilingHeight)
+  const py = fs.readFileSync(path.join(__dirname, '../../../../pipeline/shizijie_underpass.py'), 'utf8')
+  assert.deepEqual(SZJ_WELLS.map(w => w.id), [...SZJ_STAIR_IDS])
+  for (const w of SZJ_WELLS) {
+    const st = getStairwell(w.id)
+    assert.deepEqual([st.indoor.x, st.indoor.z, st.yawDeg, st.width, st.length], [w.x, w.z, w.yawDeg, w.width, w.length])
+    assert.equal(st.groundY, w.grade)
+    const row = py.slice(py.indexOf(`'shizijie_stair_${w.id}'`)).slice(0, 400)
+    assert.match(row, new RegExp(`'shizijie': \\(${w.x.toFixed(1)}, ${w.z.toFixed(1)}\\)`), `${w.id} centre`)
+    assert.match(row, new RegExp(`'yawDeg': ${w.yawDeg.toFixed(1)},`), `${w.id} yaw`)
+    assert.match(row, new RegExp(`'width': ${w.width.toFixed(1)},`), `${w.id} width`)
+    assert.match(row, new RegExp(`'length': ${w.length.toFixed(1)},`), `${w.id} length`)
+  }
+  assert.ok(SZJ_STAIR.count * SZJ_STAIR.tread <= SZJ_WELLS[0].length)
+  assert.ok(SZJ_LANDING.exit < SZJ_LANDING.enter && SZJ_LANDING.enter < SZJ_LANDING.door, 'exit < enter < door hysteresis')
+  for (const g of szjGroundStairwells()) {
+    const bottom = g.grade - g.riser / 2 - (g.riser / g.tread) * (g.zTop - g.land)
+    assert.ok(bottom <= g.grade - g.depth, `${g.id}: ramp reaches the B1 floor before the door`)
+    assert.ok(g.land < g.zBack, `${g.id}: landing runs past the hole under the grade`)
+  }
+})
+
+test('B1 roller shutters sit on the door line and roll fully up', () => {
+  const content = createSzjIndoorSceneContent(SHIZIJIE_B1_LAYOUT)
+  try {
+    for (const st of SZJ_STAIRWELLS) {
+      let mesh = null
+      content.scene.traverse(o => {
+        if (o.name === `szj-stair-shutter-${st.id}`) mesh = o
+      })
+      assert.ok(mesh, `${st.id} shutter`)
+      const c = szjDoorCentre(st)
+      assert.ok(Math.hypot(mesh.position.x - c.x, mesh.position.z - c.z) < 1e-6)
+      assert.ok(Math.abs(mesh.position.y - (SZJ_FRAME.indoorFloorY + SZJ_STAIR_DOOR.height)) < 1e-6)
+      content.setStairDoorOpen(st.id, 0.5)
+      assert.ok(mesh.visible && Math.abs(mesh.scale.y - 0.5) < 1e-9)
+      content.setStairDoorOpen(st.id, 1)
+      assert.equal(mesh.visible, false)
+      content.setStairDoorOpen(st.id, 0)
+      assert.ok(mesh.visible && mesh.scale.y === 1)
+    }
+  } finally {
+    content.dispose()
   }
 })

@@ -19,6 +19,8 @@ export interface LazyXiaoxianggangHandle {
       isIndoor: boolean
       metrics: XxgIndoorMetrics
       player: ReturnType<XxgExtendedIndoorScene['getPlayerSnapshot']> | null
+      /** 人群与路人画面：在场人数、外观槽位、这一帧画出的人数与开销；未挂载或人群关闭时为 null。 */
+      crowd: ReturnType<XxgExtendedIndoorScene['getCrowdMetrics']>
     }
     getMetrics(): XxgIndoorMetrics
     getPortals(): readonly XxgPortal[]
@@ -76,6 +78,7 @@ export function mountLazyXiaoxianggang(
       isIndoor: isIndoor(),
       metrics: getMetrics(),
       player: instance ? instance.getPlayerSnapshot() : null,
+      crowd: instance ? instance.getCrowdMetrics() : null,
     }),
     getMetrics,
     getPortals: () => portals,
