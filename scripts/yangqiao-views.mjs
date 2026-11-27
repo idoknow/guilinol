@@ -37,7 +37,7 @@ const server=await preview({root:'web',configFile:'web/vite.config.ts',plugins:[
 let browser
 try{
   browser=await chromium.launch({executablePath:process.env.CHROMIUM,args:['--use-angle=swiftshader','--enable-unsafe-swiftshader']})
-  const page=await browser.newPage({viewport:{width:800,height:600}})
+  const page=await browser.newPage({viewport:{width:1280,height:960}})
   await page.goto(`${server.resolvedUrls.local[0]}?verify&flow=0&radius=320&time=12`)
   await page.waitForFunction(()=>window.viewer?.stats.firstMs>0,null,{timeout:120000})
   for(const [name,dx,dz,tx,tz] of views){

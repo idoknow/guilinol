@@ -558,6 +558,7 @@ class Builder:
         self.detail = detail
         self.follow_grade = False
         self.visible = []
+        self.named_parts = {}
         self.uv = []
         self.tiled = {k: [] for k in self.TILED_SCALES}
         self.sign_tris = []
@@ -995,6 +996,12 @@ def export_landmark(name, build_fn, *, reuse_atlas=False):
         build_fn(builder)
         layer = f'lod{lod}'
         scene.graph.update(frame_to=layer)
+
+        for part, (triangles, material, color) in builder.named_parts.items():
+            mesh = pack_tris(triangles)
+            mesh.visual = trimesh.visual.TextureVisuals(material=trimesh.visual.material.PBRMaterial(
+                name=material, baseColorFactor=color, doubleSided=True, roughnessFactor=.92, metallicFactor=0))
+            scene.add_geometry(mesh, node_name=f'{layer}_{part}', parent_node_name=layer)
 
         if builder.visible:
             mesh = pack_tris(builder.visible)

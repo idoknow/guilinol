@@ -37,6 +37,7 @@ def pedestrian_wings(builder, anchor):
 
     for side, inward in [(.001, .005), (.999, -.005)]:
         for bay in range(14):
+            first = len(builder.visible)
             start, end = bay / 14, (bay + 1) / 14
             for base, cap in [(0, .19), (.86, 1)]:
                 section = [(side, base), (side, cap), (side + inward, cap), (side + inward, base)]
@@ -47,9 +48,12 @@ def pedestrian_wings(builder, anchor):
             for middle in np.linspace(start, end, 7)[1:-1]:
                 x, base, z = station(middle, side + inward / 2, .18)
                 builder.cylinder_y(x, base, .70, z, .065, 'white', sections=8, collide=True)
-        for along in np.linspace(0, 1, 15):
-            x, level, z = station(along, side + inward, 0)
-            builder.box(x, level, z, .32, 1.15, .32, 'stone', collide=True)
+            for along in ([start, end] if bay == 13 else [start]):
+                x, level, z = station(along, side + inward, 0)
+                builder.box(x, level, z, .32, 1.15, .32, 'stone', collide=True)
+            bank = 'west' if inward > 0 else 'east'
+            builder.named_parts[f'yangqiao_rail_{bank}_{bay:02d}'] = (builder.visible[first:], 'yangqiao_rail', [211,211,211,255])
+            del builder.visible[first:], builder.uv[first:]
         for along in (.025, .32, .68, .975):
             x, level, z = station(along, side + 3 * inward, 0)
             builder.cylinder_y(x, level, .65, z, .27, 'stone')
@@ -62,26 +66,35 @@ def pedestrian_wings(builder, anchor):
         for across in (.377, .44, .565, .628):
             quad([station(along, across-.0016, .027), station(along, across+.0016, .027),
                   station(end, across+.0016, .027), station(end, across-.0016, .027)], 'white')
-        for lateral, top, other, height in [(.496, 0, .496, .11), (.496, .11, .509, .11), (.509, .11, .509, 0)]:
-            quad([station(along,lateral,top),station(along,other,height),
-                  station(end,other,height),station(end,lateral,top)], 'beige')
+        for stripe in (.499, .505):
+            quad([station(along,stripe-.0015,.027),station(along,stripe+.0015,.027),
+                  station(end,stripe+.0015,.027),station(end,stripe-.0015,.027)], 'yellow_pave')
 
+    first = len(builder.visible)
     for start, end in [(0, .30), (.33, .67), (.70, 1)]:
-        for step in range(16):
-            pair = [step / 16, (step + 1) / 16]
+        for step in range(64):
+            pair = [step / 64, (step + 1) / 64]
             arch = [(start + phase * (end - start), -.48 - 2.3 * (2 * phase - 1)**2) for phase in pair]
             (left, low), (right, high) = arch
             for side in (0, 1):
-                face = [station(left, side, -.45), station(right, side, -.45),
+                face = [station(left, side, -.02), station(right, side, -.02),
                         station(right, side, high), station(left, side, low)]
                 quad(face if side == 0 else face[::-1], 'stone')
-            quad([station(left, 0, low), station(right, 0, high),
-                  station(right, 1, high), station(left, 1, low)], 'stone')
+            for outer, inner in zip(profile['lateral'], profile['lateral'][1:]):
+                quad([station(left, outer, low), station(right, outer, high),
+                      station(right, inner, high), station(left, inner, low)], 'stone')
 
     for start, end in [(.30, .33), (.67, .70)]:
         ring = [(start, 0), (start, 1), (end, 1), (end, 0)]
-        heads = [station(along, across, -.45) for along, across in ring]
+        heads = [station(along, across, -.02) for along, across in ring]
         feet = [[x, min(builder.surface.ground(x, z),146.1-builder.surface.y) - .04, z] for x, _, z in heads]
         for index in range(4):
             other = (index + 1) % 4
             quad([feet[index], feet[other], heads[other], heads[index]], 'stone')
+    for along in (0, 1):
+        for outer, inner in zip(profile['lateral'], profile['lateral'][1:]):
+            head = [station(along, across, -.02) for across in (outer, inner)]
+            foot = [[x, 146.06-builder.surface.y, z] for x, _, z in head]
+            quad([*head, *reversed(foot)], 'stone')
+    builder.named_parts['yangqiao_underground_vault'] = (builder.visible[first:], 'yangqiao_vault', [213,202,183,255])
+    del builder.visible[first:], builder.uv[first:]

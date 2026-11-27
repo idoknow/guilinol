@@ -1,6 +1,8 @@
 import profile from '../../pipeline/data/landmarks/yangqiao-grade.json'
 import channel from '../../pipeline/data/landmarks/yangqiao-channel.json'
-import type {BufferGeometry} from 'three'
+import {BufferGeometry,Float32BufferAttribute} from 'three'
+import {mergeGeometries} from 'three/addons/utils/BufferGeometryUtils.js'
+import {bindStreetSurface} from './streets'
 import {carve,carvePaving,fan,type Plane,type Point} from './tunnels'
 
 const mix=(start:number,end:number,fraction:number)=>start+(end-start)*fraction
@@ -37,7 +39,7 @@ export function yangqiaoDeck(tile:{x:number,z:number},deck:Float32Array,thin:Set
       }
     }return out
   }
-  const result=outside(deck,true)
+  const result=outside(deck,true),walkPaving:number[]=[]
   const paint:{planes:Plane[],height:(point:Point)=>number}[]=[]
   streets.sidewalk=Float32Array.from(outside(streets.sidewalk));streets.road=Float32Array.from(outside(streets.road))
   const tileExterior:Plane[][]=[[point=>-point[0]],[point=>point[0]-256]]
@@ -52,9 +54,18 @@ export function yangqiaoDeck(tile:{x:number,z:number},deck:Float32Array,thin:Set
     }
     for(const face of faces)for(const piece of carve(face,tileExterior)??[face]){
       const first=result.length/9;fan(piece,result)
+      if(col!==2)fan(piece,walkPaving)
       for(let index=first;index<result.length/9;index++){newThin.add(index);if(col===2)newAsphalt.push(index)}
     }
   }
   if(streets.surface)streets.surface=carvePaving(streets.surface,[planes],paint)
+  if(walkPaving.length){
+    const paving=new BufferGeometry()
+    paving.setAttribute('position',new Float32BufferAttribute(walkPaving,3));bindStreetSurface(paving,'sidewalk')
+    if(streets.surface){
+      paving.setAttribute('aSurface',new Float32BufferAttribute(paving.getAttribute('aSurface').array,1))
+      const merged=mergeGeometries([streets.surface,paving]);streets.surface.dispose();paving.dispose();streets.surface=merged
+    }else streets.surface=paving
+  }
   return {deck:Float32Array.from(result),thin:newThin,asphalt:newAsphalt}
 }
