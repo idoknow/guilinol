@@ -36,7 +36,7 @@
     "build": "node scripts/photo-credits.mjs && tsc -p web && vite build web --config web/vite.config.ts && node scripts/og.mjs",
     "preview": "vite preview web --config web/vite.config.ts",
     "postbuild": "node scripts/bake-dams.mjs dist/world",
-    "verify:flight": "node --import tsx --test scripts/test-flight-focus.mjs && node scripts/flight.mjs",
+    "verify:flight": "node --import tsx --test scripts/test-flight-focus.mjs scripts/test-flight-controls.mjs && node scripts/flight.mjs",
     "verify:spawn": "node scripts/spawn-pool.mjs --check",
     "verify:atlas": "node --experimental-strip-types scripts/atlas.mjs",
     "verify:walk": "npm run verify:walk:quick",
