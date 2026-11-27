@@ -21,6 +21,33 @@ img{-webkit-user-drag:none;user-drag:none}body{margin:0;background:var(--ui-ink-
   color:var(--ui-paper);background:var(--ui-jade-500);box-shadow:inset 0 0 0 1px rgba(244,239,226,.35);border-radius:3px}
 .account-entry[data-guest]::before{content:"" / "";background:rgba(244,239,226,.16) center/16px no-repeat url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='%23f4efe2'%3E%3Ccircle cx='8' cy='5.2' r='3'/%3E%3Cpath d='M2.2 14.5c.5-3.2 2.9-5 5.8-5s5.3 1.8 5.8 5z'/%3E%3C/svg%3E")}
 
+/* 左上一块匾（IDOK-468）：菜单 / 账号 / 指南 / 复位不再是四个各带边框的玻璃块，合成一块墨青纸面、内衬一道印框（同对话框的印框）；
+   键与键之间只靠留白分开。每个键仍是整高（--ui-h）可点，悬停 / 按下的底色只铺在印框以内。小像都是同一支笔画的 hud-*.svg 遮罩 + currentColor。
+   街头皮肤 body[data-hud=street] 按 docs/style.md 第二期，不套这一块。 */
+body:not([data-hud=street]) .hud-me{gap:0;padding:0 4px;border-radius:var(--ui-r-sm);background:var(--ui-surface-float)}
+body:not([data-hud=street]) .hud-me::after{content:"";position:absolute;inset:3px;border:1px solid var(--ui-line-strong);border-radius:var(--ui-r-xs);pointer-events:none}
+body:not([data-hud=street]) .hud-me>:is(.btn-menu,.account-entry,.btn-guide,.btn-unstuck){--hud-wash:transparent;border:0;border-radius:0;box-shadow:none;
+  background:linear-gradient(var(--hud-wash),var(--hud-wash)) center/100% calc(100% - 8px) no-repeat}
+body:not([data-hud=street]) .hud-me>:is(.btn-menu,.account-entry,.btn-guide,.btn-unstuck):hover{--hud-wash:var(--ui-fill-2)}
+body:not([data-hud=street]) .hud-me>:is(.btn-menu,.account-entry,.btn-guide,.btn-unstuck):active{--hud-wash:color-mix(in srgb,var(--ui-seal) 72%,transparent);transform:scale(var(--ui-press))}
+body:not([data-hud=street]) .hud-me>:is(.btn-menu,.account-entry,.btn-guide,.btn-unstuck):focus-visible{outline:2px solid var(--ui-focus);outline-offset:-4px}
+body:not([data-hud=street]) .btn-menu::before{width:18px;height:18px;background:currentColor;-webkit-mask:url("./hud-menu.svg") center/contain no-repeat;mask:url("./hud-menu.svg") center/contain no-repeat}
+/* 账号：游客是一枚斗笠翁小像；登录后头像字刻成一方残边朱文名章 */
+body:not([data-hud=street]) .account-entry::before{background:var(--ui-seal);box-shadow:none;border-radius:0;transform:rotate(-3deg);width:24px;height:24px;font-size:13px;
+  -webkit-mask:url("./home-seal.svg") center/100% 100% no-repeat;mask:url("./home-seal.svg") center/100% 100% no-repeat}
+body:not([data-hud=street]) .account-entry[data-guest]::before{background:currentColor;transform:none;width:22px;height:22px;
+  -webkit-mask:url("./hud-guest.svg") center/contain no-repeat;mask:url("./hud-guest.svg") center/contain no-repeat}
+body:not([data-hud=street]) .account-entry{padding-left:9px}
+/* 指南：「?」换成一册线装书；字留给读屏（aria-label 玩法指南） */
+body:not([data-hud=street]) .hud-me>.btn-guide{position:relative;font-size:0}
+body:not([data-hud=street]) .hud-me>.btn-guide::before{content:"";position:absolute;inset:0;margin:auto;width:18px;height:18px;background:currentColor;
+  -webkit-mask:url("./hud-guide.svg") center/contain no-repeat;mask:url("./hud-guide.svg") center/contain no-repeat}
+/* 复位：一笔圆相；确认态（车 / 船上第二次点）是印框里一方朱砂，不再循环闪 */
+body:not([data-hud=street]) .hud-me>.btn-unstuck svg{display:none}
+body:not([data-hud=street]) .hud-me>.btn-unstuck::before{content:"";flex:none;width:18px;height:18px;background:currentColor;
+  -webkit-mask:url("./hud-unstuck.svg") center/contain no-repeat;mask:url("./hud-unstuck.svg") center/contain no-repeat}
+body:not([data-hud=street]) .hud-me>.btn-unstuck.armed{--hud-wash:var(--ui-seal);animation:none;color:var(--ui-paper)}
+
 /* 右上 dock 里的模式切换 */
 .btn-mode{position:fixed;right:calc(14px + env(safe-area-inset-right));top:calc(12px + env(safe-area-inset-top));padding:8px 16px;border-radius:var(--ui-r-paper);font-size:14px;letter-spacing:var(--ui-track)}
 
