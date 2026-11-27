@@ -2,13 +2,13 @@
 import * as T from 'three'
 import {GLSL_OUT, HEAD, REFLECT, shader, type Ctx} from './shared'
 
-export function createSky(ctx: Ctx, noise: T.Texture) {
+export function createSky(ctx: Ctx) {
   const geo = ctx.track(new T.SphereGeometry(24000, 48, 24))
   const mat = shader(
     ctx,
     /* glsl */ `varying vec3 vD; void main(){ vD = position; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.); }`,
     HEAD +
-      /* glsl */ `uniform sampler2D uNoise; uniform vec3 uCloudLit, uCloudDark; uniform float uTime, uStars, uNight, uStarK;
+      /* glsl */ `uniform vec3 uCloudLit, uCloudDark; uniform float uStars, uNight, uStarK;
     varying vec3 vD;
     float layer(vec2 p, float cover){
       float n = texture2D(uNoise, p).r * .55 + texture2D(uNoise, p * 2.3 + .17).g * .3 + texture2D(uNoise, p * 5.1 - .31).b * .15;
@@ -17,8 +17,9 @@ export function createSky(ctx: Ctx, noise: T.Texture) {
     void main(){
       vec3 d = normalize(vD);
       vec3 c = skyColor(d);
+      c = skyRays(c, d);
       // 太阳：盘面 + 贴地被大气压扁变红（盘面亮度远超 1，经 ACES 成白里透金）
-      float s = dot(d, uSunDir), r = .0165;
+      float s = dot(d, uSunDir), r = uSunK.x;
       float aa = fwidth(s) * 1.5;
       float disc = smoothstep(cos(r) - aa, cos(r) + aa * .5, s);
       c += uSunCol * disc * mix(4., 14., smoothstep(-.01, .05, uSunDir.y));
@@ -55,7 +56,7 @@ export function createSky(ctx: Ctx, noise: T.Texture) {
       gl_FragColor = vec4(c, 1.);
       ${GLSL_OUT}
     }`,
-    {uNoise: {value: noise}, uStarK: {value: 1}},
+    {uStarK: {value: 1}},
     {side: T.BackSide, depthWrite: false},
   )
   const mesh = new T.Mesh(geo, mat)

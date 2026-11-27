@@ -99,12 +99,16 @@ def chunks(roads,banks,bounds,water,sample,exclude,ped_areas=(),replace_exclude=
     xing_tree = STRtree(xing_pts) if xing_pts else None
     cores = junction_cores(roads)
     crosswalk_groups = []
+    median_gaps = []
+    tagged_width = {(node['lat'], node['lon']): node['tags'].get('width') for node in load_osm()
+                    if node['type']=='node' and node.get('tags',{}).get('highway')=='crossing'}
+    width_at = {ll2xz(*coord): width for coord,width in tagged_width.items() if width}
     crossing_centres = []
     lane_stripes = []
     lamp_candidates = []
 
     from shizijie_underpass import in_shizijie_clear_zone
-    def emit_crosswalk(line, width, left_w, right_w, dist, sign_away, with_stop, search=0, approach=None):
+    def emit_crosswalk(line, width, left_w, right_w, dist, sign_away, with_stop, search=0, approach=None, crossing_width=None):
         if not 0 <= dist <= line.length:
             return
         mid = np.array(line.interpolate(dist).coords[0])
@@ -135,7 +139,7 @@ def chunks(roads,banks,bounds,water,sample,exclude,ped_areas=(),replace_exclude=
         group = unary_union(bars)
         if cores.query(group, predicate='intersects').size:
             if search < 24:
-                emit_crosswalk(line, width, left_w, right_w, dist + sign_away * 2, sign_away, with_stop, search + 2, approach)
+                emit_crosswalk(line, width, left_w, right_w, dist + sign_away * 2, sign_away, with_stop, search + 2, approach, crossing_width)
             return
         if not suppress_crosswalk and any(Point(mid).distance(c) < 8 for c in crossing_centres):
             return
@@ -144,7 +148,13 @@ def chunks(roads,banks,bounds,water,sample,exclude,ped_areas=(),replace_exclude=
         crosswalk_groups.append(group)
         if not (suppress_crosswalk or no_zebra):
             crossing_centres.append(Point(mid))
-            gaps.append(LineString([mid - normal * (width / 2 + left_w + 1), mid + normal * (width / 2 + right_w + 1)]).buffer(2.05, cap_style='flat'))
+            axis = LineString([mid - normal * (width / 2 + left_w + 1), mid + normal * (width / 2 + right_w + 1)])
+            gaps.append(axis.buffer(2.05, cap_style='flat'))
+            try:
+                half_width = float(crossing_width) / 2 if crossing_width else 2.05
+            except ValueError:
+                half_width = 2.05
+            median_gaps.append(axis.buffer(half_width if half_width > 0 else 2.05, cap_style='flat'))
 
     for road in roads:
         line,width,kind = road.line,road.width,road.kind
@@ -186,7 +196,7 @@ def chunks(roads,banks,bounds,water,sample,exclude,ped_areas=(),replace_exclude=
             directions = (-1,1) if feature=='traffic_signals' else (1,)
             for direction in directions:
                 offset = (width/2+3) if feature=='traffic_signals' else 0
-                emit_crosswalk(line, width, road.left, road.right, along + direction * offset, direction, feature == 'traffic_signals', approach=road)
+                emit_crosswalk(line, width, road.left, road.right, along + direction * offset, direction, feature == 'traffic_signals', approach=road, crossing_width=width_at.get(point.coords[0]))
         if kind in CONFIG['mainStreets']:
             section = road.dimensions
             for side,available in ((-1,road.left),(1,road.right)):
@@ -379,11 +389,28 @@ def chunks(roads,banks,bounds,water,sample,exclude,ped_areas=(),replace_exclude=
         *(Point(coord).buffer(max(widths)/2+11) for coord,widths in junctions.items() if len(widths)>2),
         *(LineString(points(el)).buffer(1.5) for el in load_osm() if el['type']=='way' and el.get('tags',{}).get('highway') in ('footway','path','steps') and len(points(el))>1),
     ])
-    def anchor(pt, heading, kind, span=0):
+    crossing_ways = []
+    for element in load_osm():
+        tags = element.get('tags', {})
+        if element['type'] != 'way' or tags.get('footway') != 'crossing':
+            continue
+        coords = points(element)
+        if len(coords) >= 2 and tags.get('bridge') != 'yes' and tags.get('tunnel') != 'yes':
+            try:
+                width = float(tags.get('width', 3.8))
+            except ValueError:
+                width = 3.8
+            crossing_ways.append(LineString(coords).buffer(width / 2, cap_style='flat'))
+    median_crossings = STRtree([*median_gaps,*crossing_ways])
+
+    def anchor(pt, heading, kind, span=0, endpoints=()):
         if not bounds.contains(pt):
             return
         origin = tuple(math.floor(v/CHUNK)*CHUNK for v in pt.coords[0])
-        decor[origin].append([kind,round((pt.x-origin[0])*10),round((pt.y-origin[1])*10),round(heading*100),round(span*10)])
+        record = [kind,round((pt.x-origin[0])*10),round((pt.y-origin[1])*10),round(heading*100),round(span*10)]
+        for x, z in endpoints:
+            record.extend((round((x-origin[0])*100), round((z-origin[1])*100)))
+        decor[origin].append(record)
 
     arterial_roads = [road for road in roads if road.oneway and road.kind in ('trunk','primary')]
     arterial_index = STRtree([road.line for road in arterial_roads])
@@ -436,22 +463,28 @@ def chunks(roads,banks,bounds,water,sample,exclude,ped_areas=(),replace_exclude=
 
         if (road.divided or road.oneway and road.name) and road.kind in ('trunk','primary'):
             span = density['railSpan']
-            for seq, along in enumerate(np.arange(span/2,line.length-span/2,span)):
-                center,heading = frame(along)
-                if road.oneway:
-                    center = paired_midpoint(center,heading)
-                    if center is None:
-                        continue
-                half = np.array([math.cos(heading),math.sin(heading)])*span/2
-                segment = LineString([np.asarray(center.coords[0])-half,np.asarray(center.coords[0])+half])
-                for masks in (obstacles,layers[4]):
+            coords = np.asarray(line.coords)
+            corners = np.cumsum(np.hypot(*np.diff(coords,axis=0).T))
+            stations = sorted(set(np.linspace(0,line.length,max(1,round(line.length/span))+1)) | set(corners[:-1]))
+            axis = []
+            for station in stations:
+                point, heading = frame(station)
+                axis.append(paired_midpoint(point,heading) if road.oneway else point)
+            for seq,(start,end) in enumerate(zip(axis,axis[1:])):
+                if start is None or end is None or start.distance(end)<.015:
+                    continue
+                along = (stations[seq]+stations[seq+1])/2
+                segment = LineString([start,end])
+                heading = math.atan2(end.y-start.y,end.x-start.x)
+                for masks in (obstacles,median_crossings):
                     for index in masks.query(segment,predicate='intersects'):
                         segment = segment.difference(masks.geometries[index])
                 for piece in getattr(segment,'geoms',[segment]):
-                    if piece.length>=.35:
+                    if piece.geom_type=='LineString' and piece.length>=.015:
                         planting = RULES['plantedMedian'].get(str(road.way))
                         green = planting and planting['stationMetres'][0]<=along<=planting['stationMetres'][1]
-                        anchor(piece.centroid,heading,7 if green else 1 if seq%10 or piece.length<1.5 else 2,piece.length)
+                        anchor(piece.centroid,heading,7 if green else 1 if seq%10 or piece.length<1.5 else 2,
+                               piece.length, () if green else (piece.coords[0],piece.coords[-1]))
         for side,available in ((-1,road.left),(1,road.right)):
             if not available:
                 continue

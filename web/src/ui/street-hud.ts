@@ -47,6 +47,7 @@ export function mountStreetHud(source:HudSource, opts:{phone?:boolean; onApp?:(i
       <ol class="st-apps">${APPS.map(a=>`<li><button type="button" data-app="${a.id}"><i style="--tint:${a.tint}">${a.glyph}</i><span>${a.name}</span></button></li>`).join('')}</ol>
       <footer><kbd>Tab</kbd> 收起</footer></div></aside>`
   document.body.append(root)
+  registerPageUI(root)
   const $ = <T extends HTMLElement>(sel:string)=>root.querySelector<T>(sel)!
   const phone = $('.st-phone'), phoneButton = $('.st-phone-btn')
   const togglePhone = (on = phone.hidden)=>{phone.hidden = !on; document.body.toggleAttribute('data-phone', on)}
@@ -135,3 +136,4 @@ export function demoSource(name:string|null):HudSource {
   const state = {...base, ...(states[name ?? 'noodle'] ?? {})}
   return {get:()=>state, on:()=>()=>{}}
 }
+import {registerPageUI} from '../capture-page'

@@ -94,6 +94,7 @@ function row(m: ChatMessage) {
   head.append(tag, name, time)
   const body = document.createElement('p'); body.textContent = m.text
   li.append(head, body)
+  registerPageUI(li,true)
   return li
 }
 function paintList(stick = true) {
@@ -138,6 +139,7 @@ function paintBubble() {
   tag.textContent = m.sys ? '公告' : LABEL[m.ch]
   const who = document.createElement('b'); who.textContent = m.sys ? '' : `${m.name}：`
   bubbleText.append(tag, who, document.createTextNode(m.text))
+  registerPageUI(bubbleText,true)
 }
 function remaining() {
   if (mute.until === -1) return '永久'
@@ -302,6 +304,7 @@ function build() {
     openChat(true)
   })
   document.body.append(root)
+  registerPageUI(root)
 }
 
 export function mountChat() {
@@ -355,3 +358,4 @@ export function mountChat() {
   chatStore.onSelf(uid => { myUid = uid })
   paintTabs(); paintInput(); paintBubble()
 }
+import {registerPageUI} from '../capture-page'

@@ -126,6 +126,8 @@ export function signalHeads(scene: THREE.Scene, surfaceAt: SurfaceAt) {
   let structureUsed = 0
   let cursor = 0, placeTimer = 0, elapsed = 0
   let lensColor: THREE.BufferAttribute | undefined
+  /** Bumped whenever a pole is added or the lot cleared, so followers (`bollards.ts`) can skip unchanged frames. */
+  let revision = 0
   /** The poles as obstacles for the player on foot and at the wheel. Street NPCs never leave their lanes and paths. */
   const poles = new SolidGrid()
 
@@ -145,6 +147,7 @@ export function signalHeads(scene: THREE.Scene, surfaceAt: SurfaceAt) {
     heads = []
     structureUsed = 0
     poles.clear()
+    revision++
   }
 
   function write(mesh: THREE.Mesh, source: Template, at: number, placement: HeadPlacement, withColor: boolean) {
@@ -181,6 +184,7 @@ export function signalHeads(scene: THREE.Scene, surfaceAt: SurfaceAt) {
     structureUsed += body.count
     write(lens, withArm ? templates.armLens : templates.postLens, slot * LENS_VERTICES, placement, false)
     heads.push({approach, placement, slot})
+    revision++
     poles.add({x: placement.x, y: placement.y, z: placement.z, yaw: placement.yaw, halfWidth: .11, halfLength: .11, height: withArm ? ARM_POLE_HEIGHT : POST_POLE_HEIGHT})
     structure.geometry.setDrawRange(0, structureUsed)
     lens.geometry.setDrawRange(0, heads.length * LENS_VERTICES)
@@ -266,6 +270,14 @@ export function signalHeads(scene: THREE.Scene, surfaceAt: SurfaceAt) {
     /** Poles near a point, for contact resolution. Hidden poles do not block anything. */
     near(x: number, z: number, visit: (solid: Solid) => void) {
       if (group.visible) poles.near(x, z, visit)
+    },
+    /** Every approach that has a pole standing, with where it stands. Read-only. */
+    placed(visit: (approach: SignalApproach, placement: HeadPlacement) => void) {
+      for (const head of heads) visit(head.approach, head.placement)
+    },
+    /** Goes up each time a pole is added or the poles are cleared; unchanged = `placed` would visit the same. */
+    get revision() {
+      return revision
     },
     /** Street traffic is switched off: no lights either. The next `update` shows them again. */
     hide() {

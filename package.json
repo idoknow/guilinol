@@ -59,6 +59,8 @@
     "verify:signal-heads:city": "node scripts/verify-signal-heads.mjs",
     "verify:parking-bays": "node --import tsx --test scripts/test-parking-bays.mjs",
     "verify:parking-bays:city": "node --import tsx scripts/verify-parking-bays.mjs",
+    "verify:street-furniture": "node --import tsx --test scripts/test-manholes.mjs scripts/test-bollards.mjs",
+    "verify:street-furniture:city": "node --import tsx scripts/verify-street-furniture.mjs",
     "verify:boat": "node scripts/boat.mjs",
     "verify:jiefang-landing": "node scripts/boat.mjs --jiefang-landing",
     "perf": "node scripts/perf.mjs",

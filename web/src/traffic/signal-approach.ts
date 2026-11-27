@@ -166,7 +166,7 @@ export function signalApproaches(graph: ApproachGraph, skipGroups?: ReadonlySet<
 }
 
 /** The piece of the approach `back` metres before the node, and how far along it (from its near end) that is. */
-function pieceAt(approach: SignalApproach, back: number): [ApproachSegment, number] {
+export function pieceAt(approach: SignalApproach, back: number): [ApproachSegment, number] {
   let before = 0
   for (const segment of approach.path) {
     if (back <= before + segment.length) return [segment, back - before]
@@ -196,7 +196,7 @@ const drivable = (kinds: readonly number[]) => kinds.includes(SURFACE_ROAD) || k
  * Distance from the rightmost lane centre to the kerb, `back` metres before the node.
  * `undefined` = a tile is missing; `NaN` = the lane centre is not on a road there; `Infinity` = no kerb in reach.
  */
-function kerbDistance(approach: SignalApproach, back: number, surfaceAt: SurfaceAt): number | undefined {
+export function kerbDistance(approach: SignalApproach, back: number, surfaceAt: SurfaceAt): number | undefined {
   const [segment, along] = pieceAt(approach, back)
   const rightX = -segment.headingZ, rightZ = segment.headingX
   const laneX = segment.endX - segment.headingX * along + rightX * segment.right

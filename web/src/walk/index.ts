@@ -1622,7 +1622,7 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
     const act=currentActivity()
     const inVehicle=Boolean(rides?.car||rides?.bike||rides?.boat)
     const speedMs=inVehicle?Math.abs(rides!.speed):Math.hypot(vx,vz)
-    const foot=!rides?.bike&&!rides?.car&&!rides?.boat&&!document.body.dataset.helicopter&&document.body.dataset.drone!=='rc'
+    const foot=!inVehicle&&!document.body.dataset.helicopter
     const parts:string[]=[]
     if(document.body.dataset.helicopter)parts.push('乘直升机')
     else if(act.detail)parts.push(act.detail)
@@ -1632,7 +1632,7 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
     if(combat.f.down)parts.push('倒地')
     else if(crashSession)parts.push('摔车')
     else if(crouching)parts.push('蹲行')
-    if(!inVehicle&&!document.body.dataset.helicopter&&document.body.dataset.drone!=='rc')parts.push(grounded?'地面':'空中')
+    if(foot)parts.push(grounded?'地面':'空中')
     return {
       activity:act.act,
       activityDetail:act.detail??'',
@@ -1647,17 +1647,34 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
       z:figure.position.z,
     }
   }
+  // 客户端上报速度：以前直接取 Math.hypot(vx,vz)，只有步行时这两个分量才被写，
+  // 开车/船/无人机/直升机/乘客位时恒为 0，服务端拿到 reportedSpeed=0 无法交叉验证，
+  // 后台取证也看不到真实速度。改为按相邻两次采样位移/时间求速度，全模式通用。
+  let poseSpeedAt=0, poseSpeedX=0, poseSpeedZ=0, poseSpeedValue=0
+  function poseSpeed(){
+    const at=performance.now(), x=figure.position.x, z=figure.position.z
+    const dt=(at-poseSpeedAt)/1000
+    if(dt>0.02&&dt<2){
+      const measured=Math.hypot(x-poseSpeedX,z-poseSpeedZ)/dt
+      if(Number.isFinite(measured)) poseSpeedValue=measured
+    }
+    poseSpeedAt=at; poseSpeedX=x; poseSpeedZ=z
+    return Math.round(poseSpeedValue*100)/100
+  }
   function attachMp(){
     if(!mpEnabled()||!active||net)return
     if(!netModule){void import('../net').then(module=>{netModule=module;attachMp()}).catch(error=>console.warn('multiplayer unavailable',error));return}
     {
-        net=netModule.attachNet(scene,model.animations,()=>({x:figure.position.x,y:figure.position.y+combat.drop,z:figure.position.z,
-          passenger:document.body.dataset.helicopter?true:undefined,foot:!rides?.bike&&!rides?.car&&!rides?.boat&&!document.body.dataset.helicopter&&document.body.dataset.drone!=='rc',yaw:figure.rotation.y,v:rides?.bike?Math.abs(rides.speed):Math.hypot(vx,vz),gr:Number(grounded),
+        net=netModule.attachNet(scene,model.animations,()=>{
+          const rc=document.body.dataset.drone==='rc',body=rc?sim.body.translation():null
+          return {x:body?.x??figure.position.x,y:body?body.y-cfg.height/2:figure.position.y+combat.drop,z:body?.z??figure.position.z,
+          passenger:document.body.dataset.helicopter?true:undefined,foot:!rides?.bike&&!rides?.car&&!rides?.boat&&!document.body.dataset.helicopter,yaw:figure.rotation.y,v:rc?0:poseSpeed(),gr:Number(grounded),
           sc:cigarette.wire,sb:Math.round(cigarette.length*1800),sp:puffSeq,br:brandIndex(cigarette.brand),sd:dropSeq,ss:cigarette.strength,sr:cigarette.remaining,
-          bike:rides?.bike?'bike':'',bx:rides?.bike?.position.x??0,bz:rides?.bike?.position.z??0,byaw:rides?.heading??0}),()=>currentAvatar()??profile,camera,currentActivity,combat.receive,(x,y,z)=>{
-            const footY=y-combat.drop,dest={x,y:footY+cfg.height/2,z}
+          bike:rides?.bike?'bike':'',bx:rides?.bike?.position.x??0,bz:rides?.bike?.position.z??0,byaw:rides?.heading??0}},()=>currentAvatar()??profile,camera,currentActivity,combat.receive,(x,y,z)=>{
+            const dest={x,y:y+cfg.height/2,z}
             sim.sync(x,z);sim.body.setTranslation(dest,true);sim.body.setNextKinematicTranslation(dest)
-            safe.set(x,dest.y,z);figure.position.set(x,footY,z);vx=0;vz=0
+            safe.set(x,dest.y,z);figure.position.set(x,y-combat.drop,z);external=null;vx=vz=velocity=accumulator=0
+            poseSpeedAt=-Infinity;poseSpeedValue=0
           },captureContext)
         net.emote(emote.id);net.tick(0)
     }
@@ -2242,7 +2259,10 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
     sim.syncObstacleVolume(buildTianyuanObstacleVolume([p.x,p.y,p.z],tianyuanShopRef.rotation.y,level,extra))
   }
   // Reverse LIFO reset: apply order below is holdLayer.apply() -> smoking.tick() -> emote.tick() -> ticketHandover.tick() -> combat.tick().
-  function tick(dt:number){wheel.sync();if(!active)return;combat.resetPose();ticketHandover.reset();emote.reset();smoking?.resetPose();holdLayer.reset();
+  function tick(dt:number){wheel.sync();if(!active)return
+    const piloting=document.body.dataset.drone==='rc'
+    if(piloting)external=null
+    combat.resetPose();ticketHandover.reset();emote.reset();smoking?.resetPose();holdLayer.reset();
     if(ticketHandover.active&&(rides?.boat||rides?.car||rides?.bike||knockdown.isDown||combat.f.down))ticketHandover.stop()
     if(emote.id&&(rides?.boat||rides?.car||rides?.bike)){emote.stop();emote.tick(.24,false)}
     const before=performance.now(),start=rides?.boat?.position??sim.body.translation();syncSceneObstacleVolumes();sim.sync(start.x,start.z,true);const footYNow=rides?.boat?start.y:start.y-cfg.height/2;rides?.nearby(start.x,start.z,footYNow);interactArbiter.sync(actionButton);syncGameTravelState();updateShopHintRings(start.x,start.z,footYNow)
@@ -2315,8 +2335,8 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
     }
     // 拿着鱼竿也能走动（需求方：不要把人固定在原地）；抛出去后走开会自动收线
     const fishingOnFoot=false
-    const read=input.read(dt),keys=held||fishingOnFoot?still:read
-    const rideCtrl=held?ZERO_RIDE_INPUT:input.readRideControls()
+    const read=input.read(dt),keys=held||piloting||fishingOnFoot?still:read
+    const rideCtrl=held||piloting?ZERO_RIDE_INPUT:input.readRideControls()
     const kdSnap=knockdown.step(Math.min(.12,Math.max(0,dt)))
     if(kdSnap.isDown!==wasKnockdownDown){
       document.body.dataset.tdKnockdown=kdSnap.isDown?'1':'0'
@@ -2459,7 +2479,7 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
     }
     const aboardGround=wasCar||wasBike
     if(keys.jump&&!combat.f.down&&!combat.f.helping&&!aboardGround&&!busyFootAnim)jumpTimer=cfg.jumpBuffer
-    accumulator+=Math.min(.12,dt)
+    accumulator=piloting?0:accumulator+Math.min(.12,dt)
     while(accumulator>=step-1e-7){accumulator=Math.max(0,accumulator-step);steps++;simSteps++;elapsed+=step
       if(grounded)coyoteTimer=cfg.coyote;else coyoteTimer=Math.max(0,coyoteTimer-step)
       if(!aboardGround&&!busyFootAnim&&jumpTimer>0&&coyoteTimer>0){

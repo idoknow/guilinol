@@ -54,6 +54,7 @@ export function buildingGeometry(
     const startVertex=cursor
     const ov:BuildingOverride|undefined = !walkPlane && tileX!==undefined && tileZ!==undefined ? getBuildingOverride(tileX,tileZ,partIdx) : undefined
     const baseY=base/10
+    const foundationY=tileX===-1280 && tileZ===256 && seed===3294284245 && !raised && !walkPlane ? 150.9 : undefined
     const level=ov ? baseY+ov.h : origTop/10
     const floors=ov ? ov.f : origFloors
     // Keep collision rings top & floor count synced when city-upgrade CMAB height override is active
@@ -95,6 +96,10 @@ export function buildingGeometry(
            positions[at]!==loop[i][0] || positions[at+2]!==loop[i][1] ||
            positions[at+6]!==loop[(i+1)%loop.length][0] ||
            positions[at+8]!==loop[(i+1)%loop.length][1])continue
+        if(foundationY!==undefined){
+          xyz[at+1]=Math.min(xyz[at+1],foundationY)
+          xyz[at+10]=Math.min(xyz[at+10],foundationY)
+        }
         // GL04 packs each opaque quad as 0:bottom A, 1:top A, 2:top B, 3:bottom B
         if(ov){
           xyz[at+4]=level
@@ -128,6 +133,7 @@ export function buildingGeometry(
         }
       }
     }
+    if(foundationY!==undefined)part[0]=Math.min(base,Math.round(foundationY*10))
     if(walkPlane){
       const [dx,dz,intercept]=walkPlane
       for(let i=startVertex;i<cursor;i++){
