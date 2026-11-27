@@ -966,9 +966,13 @@ a.adm-kpi:hover{border-color:var(--ui-jade-500);box-shadow:var(--ui-shadow-1);tr
 }
 @media (max-width:640px){
   .adm-sec-cap .adm-card-head{flex-wrap:wrap}
-  .adm-cap-filter{flex:1 1 100%}
-  .adm-cap-filter .adm-select{flex:1;max-width:none}
-  .adm-cap-filter input{flex:1}
+  /* 三个筛选控件按比例分满一行；固定宽会把卡片撑出屏幕 */
+  .adm-sec-cap .adm-card-actions,.adm-cap-filter{flex:1 1 100%;min-width:0}
+  .adm-cap-filter .adm-select{flex:1 1 0;min-width:0;max-width:none}
+  .adm-cap-filter input,.adm-cap-filter [name=capfp]{flex:1 1 0;width:0}
+  .adm-cap-filter [name=capfp]{flex-grow:1.6}
+  /* 类型、速度、地点放不下时折行，不压到删除按钮 */
+  .adm-cap-line+.adm-cap-line{flex-wrap:wrap;row-gap:2px}
   .adm-capture-lb-who{flex-wrap:wrap;white-space:normal}
   .adm-capture-lb-actions{width:100%}
   .adm-capture-lb-actions .adm-btn{flex:1}
