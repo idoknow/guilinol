@@ -492,6 +492,11 @@ def main():
         # Slice the continuous ground-floor walls two metres above that corner.
         # At Gunanmen compare the western hall walls above the shared terrace to its OSM building.
         elevation=None if key in BRIDGES or key=='zhuangyuan_gallery' else {'central_square':8,'ronghu':4,'nikoniko':10,'wangcheng_mall':6,'gunanmen':8.2,'xiaoyao_tower':9}.get(key,2)
+        if spec.get('expandedAirport'):
+            from landmarks.liangjiang_grade import Grade
+            name=key.removeprefix('liangjiang_')
+            grade=Grade(name,area(element).centroid)
+            elevation=float(grade.samples.max()-grade.datum)+(7.5 if name in ('t1','t2') else 2.5)
         component_box=((-22,3,-3),(22,7,3)) if key=='zhuangyuan_gallery' else None
         shape=footprint(ROOT/'public'/spec['model'],entry,window,elevation,component_box)
         row['measurement']='visible deck projection' if elevation is None else f'wall section at local y={elevation} m'
@@ -511,6 +516,7 @@ def main():
         if key=='xiaoyao_tower':delta=min(delta,90-delta)
         row['angleDeg']=round(delta,2)
         passed=center<=5 and (iou is None or iou>=.7) and delta<=5
+        if spec.get('expandedAirport'): passed=center<=.5 and iou is not None and iou>=.95 and delta<=5
         group=key+':'+row['component'] if 'component' in row else key
         row['photos']={str(number):photo_hits(shape,photos[f'IMG_{number}.jpg']) for number in PHOTO_TARGETS.get(group,()) if photos is not None}
         row['status']='pass' if passed and photos_pass(row['photos'],spec.get('photoExifSuspect')) else 'fail'
