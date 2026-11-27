@@ -91,8 +91,16 @@ export function photoPicker(
     container.append(grid)
   }
 
-  const entries = new Map<number, { done: boolean; upload: (id: string) => Promise<void> }>(),
-    urls: string[] = []
+  const entries = new Map<
+      number,
+      { done: boolean; url: string; reset: () => void; upload: (id: string) => Promise<void> }
+    >(),
+    urls = new Set<string>()
+  const revokeUrl = (url?: string) => {
+    if (!url) return
+    URL.revokeObjectURL(url)
+    urls.delete(url)
+  }
   const sync = () => {
     const total = used.length + entries.size
     if (!compact) zone.classList.toggle('fb-drop--compact', total > 0)
@@ -114,6 +122,8 @@ export function photoPicker(
         }
         const index = used.indexOf(slot)
         if (index >= 0) used.splice(index, 1)
+        const removed = entries.get(slot)
+        if (removed) revokeUrl(removed.url)
         entries.delete(slot)
         cell.remove()
         sync()
@@ -155,13 +165,21 @@ export function photoPicker(
       view.add(new Option('视角', ''))
       views.forEach((label) => view.add(new Option(label)))
       image.alt = file.name
-      image.src = URL.createObjectURL(file)
-      urls.push(image.src)
+      const previewUrl = URL.createObjectURL(file)
+      image.src = previewUrl
+      urls.add(previewUrl)
       wireRemove(remove, slot, cell)
       cell.append(image, view, note, remove)
       grid.append(cell)
       const entry = {
         done: false,
+        url: previewUrl,
+        reset() {
+          entry.done = false
+          note.textContent = ''
+          cell.classList.remove('fb-photo--done', 'fb-photo--error')
+          view.disabled = false
+        },
         async upload(id: string) {
           if (entry.done) return
           note.textContent = '正在处理'
@@ -217,9 +235,14 @@ export function photoPicker(
 
   function clear() {
     if (!entries.size) return
+    for (const entry of entries.values()) revokeUrl(entry.url)
     entries.clear()
     for (const node of Array.from(grid.querySelectorAll('.fb-photo--new'))) node.remove()
     sync()
+  }
+
+  function resetDone() {
+    for (const entry of entries.values()) entry.reset()
   }
 
   picker.onchange = () => {
@@ -234,6 +257,7 @@ export function photoPicker(
     container.ondragleave = () => zone.classList.remove('fb-drop--over')
     container.ondrop = (event) => {
       event.preventDefault()
+      event.stopPropagation()
       zone.classList.remove('fb-drop--over')
       if (!picker.disabled) add(event.dataTransfer?.files ?? null)
     }
@@ -243,9 +267,13 @@ export function photoPicker(
     open: () => picker.click(),
     add: (files: File[]) => add(files as unknown as FileList),
     clear,
+    resetDone,
     pending: () => [...entries.values()].filter((entry) => !entry.done).length,
     count: () => used.length + entries.size,
     upload,
-    dispose: () => urls.forEach((url) => URL.revokeObjectURL(url)),
+    dispose: () => {
+      urls.forEach((url) => URL.revokeObjectURL(url))
+      urls.clear()
+    },
   }
 }

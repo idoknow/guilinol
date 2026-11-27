@@ -140,6 +140,9 @@ export async function apiTest({ api, origin, cookie, sql, getCookie }) {
       await uploadShot(origin, cookie, next)
       await photo(next, 1, 200)
     } else {
+      const blankBug = (await api('feedback', { ...draft, kind: '游戏 bug', body: '   ' })).id
+      await api(`feedback/${blankBug}/submit`, {}, 409)
+      await api(`feedback/${blankBug}`, null, 200, null, { method: 'DELETE' })
       const plain = await create()
       await uploadShot(origin, cookie, plain)
       await api(`feedback/${plain}/submit`, {}, 409)

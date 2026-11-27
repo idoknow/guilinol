@@ -65,8 +65,8 @@ function pill(status: string) {
 function pickDefaultPosition(host: Host, view?: FeedbackView | null) {
   const player = host.walker()?.active ? host.walker()!.position : host.camera.position
   const target = view?.target
-  if (target && (view?.landmark_id || target.distance <= 250)) return target
-  return player
+  const chosen = target && (view?.landmark_id || target.distance <= 250) ? target : player
+  return { x: chosen.x, z: chosen.z }
 }
 
 function describeLocation(
@@ -424,10 +424,24 @@ export async function openFeedback(
     body.append(formEl)
 
     let id = item?.id
-    let selection = item ? undefined : captured
+    let draftSignature = ''
+    let selection: Awaited<ReturnType<Host['captureView']>> | undefined
+    if (!item && !banId) {
+      if (captured) {
+        selection = captured
+        captured = undefined
+      } else {
+        try {
+          selection = await host.captureView()
+        } catch (error) {
+          note.textContent = String(error)
+        }
+      }
+    }
     let useDefaultShot = !!selection
     let viewShotUploaded = false
     let defaultPhotoUploaded = false
+    let formDisposed = false
     let activePos = pickDefaultPosition(host, selection?.view)
     let location = item ? { lat: item.lat, lon: item.lon } : xz2ll(activePos.x, activePos.z)
     let mapApi: MapApi | undefined
@@ -492,7 +506,7 @@ export async function openFeedback(
 
     if (!item && !banId) {
       void ensureMap().then((apiResult) => {
-        if (!apiResult || !locBar.isConnected) return
+        if (!apiResult || formDisposed) return
         mapApi = apiResult
         updateLocationDisplay()
       })
@@ -753,10 +767,17 @@ export async function openFeedback(
       }
     }
 
-    retakeBtn.onclick = startAim
-    replaceBtn.onclick = () => picker.open()
-    pickBtn.onclick = () => picker.open()
+    retakeBtn.onclick = () => {
+      if (!busy) startAim()
+    }
+    replaceBtn.onclick = () => {
+      if (!busy) picker.open()
+    }
+    pickBtn.onclick = () => {
+      if (!busy) picker.open()
+    }
     removeBtn.onclick = () => {
+      if (busy) return
       useDefaultShot = false
       picker.clear()
       syncSummary()
@@ -773,22 +794,28 @@ export async function openFeedback(
         syncSummary()
       })
 
-    mediaCard.ondragover = (event) => {
-      event.preventDefault()
-      mediaCard.classList.add('fb-media--over')
-    }
-    mediaCard.ondragleave = () => mediaCard.classList.remove('fb-media--over')
-    mediaCard.ondrop = (event) => {
-      event.preventDefault()
-      mediaCard.classList.remove('fb-media--over')
-      const files = event.dataTransfer?.files
-      if (files?.length) picker.add(Array.from(files))
+    if (!item) {
+      mediaCard.ondragover = (event) => {
+        event.preventDefault()
+        if (!busy) mediaCard.classList.add('fb-media--over')
+      }
+      mediaCard.ondragleave = () => mediaCard.classList.remove('fb-media--over')
+      mediaCard.ondrop = (event) => {
+        event.preventDefault()
+        mediaCard.classList.remove('fb-media--over')
+        if (busy) return
+        const files = event.dataTransfer?.files
+        if (files?.length) picker.add(Array.from(files))
+      }
     }
 
     syncSummary()
-    onPaste = (files) => picker.add(files)
+    onPaste = (files) => {
+      if (!busy) picker.add(files)
+    }
     const prevDispose = dispose
     dispose = () => {
+      formDisposed = true
       clearShotUrl()
       picker.dispose()
       prevDispose()
@@ -811,8 +838,40 @@ export async function openFeedback(
 
         send.textContent = '正在提交…'
         try {
+          const appeal = current === APPEAL
+          if (!item && !appeal && !selection) {
+            try {
+              selection = await host.captureView()
+              viewShotUploaded = false
+              defaultPhotoUploaded = false
+              activePos = pickDefaultPosition(host, selection.view)
+              location = xz2ll(activePos.x, activePos.z)
+              updateLocationDisplay()
+            } catch {
+              throw Error('请先截取游戏画面')
+            }
+          }
+          const nextSignature = !item
+            ? JSON.stringify({
+                current,
+                resolvedTitle,
+                text,
+                useDefaultShot,
+                lat: appeal ? 0 : location.lat,
+                lon: appeal ? 0 : location.lon,
+                view: appeal ? null : selection?.view ?? null,
+              })
+            : ''
+          if (!item && id && draftSignature && draftSignature !== nextSignature) {
+            const deleted = await fetch(`/api/feedback/${id}`, { method: 'DELETE' })
+            if (!deleted.ok && deleted.status !== 404) throw Error(await jsonError(deleted))
+            id = undefined
+            draftSignature = ''
+            viewShotUploaded = false
+            defaultPhotoUploaded = false
+            picker.resetDone()
+          }
           if (!id) {
-            const appeal = current === APPEAL
             if (!appeal && !selection) throw Error('请先截取游戏画面')
             id = (
               await api<{ id: string }>('feedback', {
@@ -825,6 +884,7 @@ export async function openFeedback(
                 body: text,
               })
             ).id
+            draftSignature = nextSignature
           }
 
           const shouldUploadViewShot =
