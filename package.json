@@ -57,6 +57,8 @@
     "verify:hot-paths": "node --import tsx --test scripts/test-hot-paths.mjs && node scripts/verify-overlay-guard.mjs",
     "verify:signal-heads": "node --import tsx --test scripts/test-signal-heads.mjs",
     "verify:signal-heads:city": "node scripts/verify-signal-heads.mjs",
+    "verify:parking-bays": "node --import tsx --test scripts/test-parking-bays.mjs",
+    "verify:parking-bays:city": "node --import tsx scripts/verify-parking-bays.mjs",
     "verify:boat": "node scripts/boat.mjs",
     "verify:jiefang-landing": "node scripts/boat.mjs --jiefang-landing",
     "perf": "node scripts/perf.mjs",
