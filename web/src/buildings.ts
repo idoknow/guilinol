@@ -7,6 +7,10 @@ type Pair=[number,number]
 type Vertex=[number,number,number]
 export type Building=[number,number,Pair[][],number,number,number,number[],Pair[],number,boolean?,Vertex?]
 
+export function isLegacyKuiguangSliver(tileX:number|undefined,tileZ:number|undefined,part:Building){
+  return tileX===-1536 && tileZ===-256 && part[5]===21599642 && part[6][0]===15316 && part[6][1]===6529
+}
+
 function orientedRectFromLoop(loop:Pair[]):{center:THREE.Vector2; along:THREE.Vector2; side:THREE.Vector2; halfLen:number; halfWid:number}|null{
   if(loop.length<3)return null
   let bestArea=Infinity, best:{center:THREE.Vector2; along:THREE.Vector2; side:THREE.Vector2; halfLen:number; halfWid:number}|null=null
@@ -52,6 +56,14 @@ export function buildingGeometry(
     const part=parts[partIdx]
     const [base,origTop,loops,origKind,origFloors,seed,anchor,rectangle,complex,raised,walkPlane]=part
     const startVertex=cursor
+    if(isLegacyKuiguangSliver(tileX,tileZ,part)){
+      const endVertex=cursor+20
+      const first=faces.findIndex(index=>index===cursor || (index>cursor && index<endVertex))
+      if(first<0)throw Error('Missing legacy Kuiguang quad')
+      faces.splice(first,30)
+      for(;cursor<endVertex;cursor++){kinds[cursor]=0;roofs[cursor]=0;floor[cursor]=0;facade[cursor]=0}
+      continue
+    }
     const ov:BuildingOverride|undefined = !walkPlane && tileX!==undefined && tileZ!==undefined ? getBuildingOverride(tileX,tileZ,partIdx) : undefined
     const baseY=base/10
     const foundationY=tileX===-1280 && tileZ===256 && seed===3294284245 && !raised && !walkPlane ? 150.9 : undefined
