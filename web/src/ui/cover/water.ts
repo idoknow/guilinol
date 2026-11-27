@@ -1,6 +1,6 @@
 // 漓江水面：镜像相机反射 RT（斜裁剪面）+ 滚动法线 + Fresnel + 落日碎金带 + 夜里双塔/象鼻山灯光倒影光柱。
 import * as T from 'three'
-import {PALETTE} from './config'
+import {PALETTE, SUN} from './config'
 import {GLSL_OUT, HEAD, REFLECT, disp, shader, type Ctx} from './shared'
 import type {ViewData} from './view'
 
@@ -19,8 +19,8 @@ export function createWater(ctx: Ctx, view: ViewData, normalTex: T.Texture, nois
     /* glsl */ `uniform mat4 uTexMat; varying vec3 vW; varying vec4 vR;
     void main(){ vec4 w = modelMatrix * vec4(position, 1.); vW = w.xyz; vR = uTexMat * w; gl_Position = projectionMatrix * viewMatrix * w; }`,
     HEAD +
-      /* glsl */ `uniform sampler2D uRefl, uNrm, uNoise; uniform vec4 uLP[${WATER_LIGHTS}]; uniform vec3 uLC[${WATER_LIGHTS}];
-    uniform vec3 uWater; uniform float uTime, uNight;
+      /* glsl */ `uniform sampler2D uRefl, uNrm; uniform vec4 uLP[${WATER_LIGHTS}]; uniform vec3 uLC[${WATER_LIGHTS}];
+    uniform vec3 uWater; uniform float uNight; uniform vec2 uGlit;
     varying vec3 vW; varying vec4 vR;
     void main(){
       vec3 toC = cameraPosition - vW; float dist = length(toC); vec3 V = toC / dist; vec3 D = -V;
@@ -41,12 +41,14 @@ export function createWater(ctx: Ctx, view: ViewData, normalTex: T.Texture, nois
       vec2 dh = normalize(D.xz);
       vec3 sd = uSunDir; sd.y = max(sd.y, -.02);
       float az = 1. - dot(dh, normalize(sd.xz));
-      float col = exp(-az / mix(.0006, .004, nearF));
-      float vprof = .25 + .75 * exp(-pow((D.y + sd.y) * 6., 2.));
+      // uGlit：碎金强度、方位宽度倍数（config SUN.glitter）
+      float col = exp(-az / (mix(.0006, .004, nearF) * uGlit.y));
+      float vy = (D.y + sd.y) * 6.;
+      float vprof = .25 + .75 * exp(-vy * vy);
       float sp = pow(max(dot(Rg, sd), 0.), 140.);
       float flick = smoothstep(.55, .9, texture2D(uNoise, p * .05 + vec2(t * .04, -t * .025)).a);
       float sunUp = smoothstep(-.05, .02, uSunDir.y);
-      c += uSunCol * col * vprof * (.05 + 3. * sp + 3. * flick * sp) * sunUp;
+      c += uSunCol * col * vprof * (.05 + 3. * sp + 3. * flick * sp) * sunUp * uGlit.x;
       // 灯光倒影光柱（金塔 / 银塔 / 象鼻山泛光）
       for (int i = 0; i < ${WATER_LIGHTS}; i++) {
         vec3 Lp = uLP[i].xyz;
@@ -68,6 +70,7 @@ export function createWater(ctx: Ctx, view: ViewData, normalTex: T.Texture, nois
       uLP: {value: lightPos},
       uLC: {value: lightCol},
       uWater: {value: disp(PALETTE.water, 1)},
+      uGlit: {value: new T.Vector2(SUN.glitter.k, SUN.glitter.width)},
     },
   )
   // 只铺在水面掩码范围内（掩码外是地面，水面平面在地面之下也看不到）

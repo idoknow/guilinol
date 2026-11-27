@@ -1,6 +1,6 @@
 // 跨模块共用：色彩换算、随时间变化的共享 uniform、天空/大气/地形 GLSL、资源追踪。
 import * as T from 'three'
-import {AIR, DEG, SKY_KEYS, VIEW, dirAz} from './config'
+import {AIR, DEG, SKY_KEYS, SUN, VIEW, dirAz} from './config'
 import {GLSL_NOISE} from './noise'
 import type {Spec} from './quality'
 
@@ -30,8 +30,20 @@ const keyed = SKY_KEYS.map((k) => ({
 }))
 
 export function makeUniforms() {
+  const {sun} = SUN
   return {
     uTime: {value: 0},
+    /** 共用噪声贴图（build 时赋值） */
+    uNoise: {value: null as T.Texture | null},
+    /** 太阳光效（见 config SUN）：(日轮半径, 紧光环, 前向散射, HG g)、(大日晕, 天空光束, 雾向阳散射) */
+    uSunK: {value: new T.Vector4(sun.disc, sun.aureole, sun.mie, sun.mieG)},
+    uSunK2: {value: new T.Vector3(sun.glow, sun.rays, sun.fogSun)},
+    /** 天空：(地平暖带高, 太阳附近暖带加高, 雾里混霾比例, 橙蓝过渡抬黄) */
+    uSkyK: {value: new T.Vector4(SUN.sky.band, SUN.sky.sunBand, SUN.sky.fogHaze, SUN.sky.lift)},
+    /** 逆光金边、远山脊线倍数、逆光剪影去饱和 */
+    uRim: {value: new T.Vector3(SUN.rim, SUN.ridge, SUN.sil)},
+    /** 天空光束开关（画质档位） */
+    uRays: {value: 1},
     uZen: {value: new T.Color()},
     uMid: {value: new T.Color()},
     uHor: {value: new T.Color()},
@@ -101,23 +113,65 @@ export interface Ctx {
 }
 
 export const GLSL_SKY = /* glsl */ `
+uniform sampler2D uNoise; uniform float uTime;
 uniform vec3 uZen, uMid, uHor, uSunCol, uGlow, uHaze, uSunDir;
+uniform vec4 uSunK, uSkyK; uniform vec3 uSunK2; uniform float uRays;
+// 丁达尔光束：绕太阳轴的极角上取两层一维噪声 → 光柱为正、峰林/云挡出的暗柱为负，离太阳越远越弱
+// 极角用平面内单位向量在噪声图上画圆采样（等价 atan 取角，但没有 ±π 处的接缝）
+float sunRays(vec3 d){
+  // 离太阳 >73° 衰减项已 <2%，直接跳过两次噪声采样
+  if (dot(d, uSunDir) < .3) return 0.;
+  vec3 R = normalize(cross(uSunDir, vec3(0., 1., 0.))), U = cross(R, uSunDir);
+  vec2 p = vec2(dot(d, R), dot(d, U));
+  vec2 q = p / (length(p) + 1e-4);
+  float n = texture2D(uNoise, q * .55 + vec2(uTime * .003, .37)).r * .65 + texture2D(uNoise, q * 1.4 + vec2(-uTime * .005, .71)).g * .35;
+  float r = (smoothstep(.42, .72, n) * 2. - 1.) * exp(-acos(clamp(dot(d, uSunDir), -1., 1.)) * 3.2);
+  // 太阳下方（峰林那侧）弱化
+  return p.y < 0. ? r * .35 : r;
+}
 vec3 skyColor(vec3 d){
   float h = max(d.y, 0.);
   vec2 dh = normalize(d.xz + 1e-5), sh = normalize(uSunDir.xz + 1e-5);
   float azs = dot(dh, sh), az = max(azs, 0.), s = max(dot(d, uSunDir), 0.);
   // 背对太阳的地平线更冷更暗（暮光带），镜面反射里才有冷暖对比
   vec3 hor = mix(mix(uMid, uHaze, .45), uHor, smoothstep(-.7, .6, azs));
-  vec3 c = mix(hor, uMid, smoothstep(0., .17, h));
+  // 太阳附近的暖带更高；橙 → 蓝的过渡中段抬一点黄，免得混成灰粉/橄榄
+  float t1 = smoothstep(0., uSkyK.x + uSkyK.y * pow(az, 6.), h);
+  vec3 c = mix(hor, uMid, t1);
+  c += vec3(.9, .72, .28) * uSkyK.w * t1 * (1. - t1) * 4. * (.4 + .6 * az) * dot(uHor, vec3(.33));
   c = mix(c, uZen, smoothstep(.1, .75, h));
   float band = exp(-h * 9.);
   // 日晕用混合不用叠加：暖光叠在蓝天上会调出洋红
-  c = mix(c, uGlow, clamp(band * (pow(az, 5.) * .3 + pow(az, 36.) * .55) + pow(s, 14.) * .4, 0., 1.));
+  c = mix(c, uGlow, clamp(band * (pow(az, 5.) * .3 + pow(az, 36.) * .55) + pow(s, 14.) * .4 * uSunK2.x, 0., 1.));
   c += uSunCol * pow(s, 380.) * 2.2;
+  // 前向散射晕（Henyey-Greenstein）：同样混向日晕色；太阳落山后淡出
+  if (uSunK.z > 0.) {
+    float g = uSunK.w, q = max(1. + g * g - 2. * g * dot(d, uSunDir), 1e-4);
+    float hg = (1. - g * g) / (q * sqrt(q)) * (1. - g) * .25;
+    c = mix(c, uGlow * 1.15, clamp(hg * uSunK.z, 0., .95) * smoothstep(-.06, .03, uSunDir.y));
+  }
+  // 日轮紧光环：HDR，经 ACES 成白金
+  // 光环色偏日晕：uSunCol 经 disp 上限近乎中性，过曝后发青白
+  if (uSunK.y > 0.) c += mix(uSunCol, uGlow, .6) * (pow(s, 900.) * 1.6 + pow(s, 160.) * .35) * uSunK.y;
   return mix(c, uHaze, smoothstep(0., -.06, d.y));
 }
+// 天空光束：光柱提亮、暗柱压暗（只给天空盒用，不进 skyColor：fogColor 每个地物片元都会调 skyColor）
+vec3 skyRays(vec3 c, vec3 d){
+  float k = uSunK2.y * smoothstep(-.06, .03, uSunDir.y);
+  if (uRays > .5 && k > 0.) {
+    float r = sunRays(d);
+    c *= 1. + r * k * smoothstep(-.02, .06, d.y) * (r > 0. ? 1. : .5);
+  }
+  return c;
+}
 // 雾色：该方向贴地平线的天色，混一点霾色（远峰「融进」身后那片天）
-vec3 fogColor(vec3 d){ return mix(skyColor(normalize(vec3(d.x, max(d.y, 0.) * .4 + .012, d.z))), uHaze, .3); }
+// 向阳一侧的雾更亮更暖（远峰一层层透出来）
+vec3 fogColor(vec3 d){
+  vec3 fd = normalize(vec3(d.x, max(d.y, 0.) * .4 + .012, d.z));
+  vec3 fc = mix(skyColor(fd), uHaze, uSkyK.z);
+  fc += uGlow * pow(max(dot(normalize(d), uSunDir), 0.), 12.) * uSunK2.z;
+  return fc;
+}
 `
 
 /** 大气透视：距离雾 + 贴地霾（谷底更浓，峰顶露出来）。 */
@@ -128,19 +182,24 @@ vec3 applyAir(vec3 c, vec3 w, vec3 D, float dist){
   float de = max(dist - 150., 0.);
   float fd = 1. - exp(-de * uAir.x);
   float fh = uAir.z * exp(-max(w.y - uGround, 0.) * uAir.y) * (1. - exp(-de * uAir.x * 2.5));
-  return mix(c, fogColor(D), clamp(fd + fh * (1. - fd), 0., 1.));
+  float f = clamp(fd + fh * (1. - fd), 0., 1.);
+  // 近景不起雾：跳过 fogColor（内含整套天色 + 日晕计算）
+  if (f < .002) return c;
+  return mix(c, fogColor(D), f);
 }
 `
 
 /** 地形/建筑受光：半球天光 + 包裹漫射直射光 + 逆光轮廓（silhouette 朝太阳的一侧发金边）。 */
 export const GLSL_LIGHT = /* glsl */ `
-uniform vec3 uAmbUp, uAmbDn, uSunLight;
+uniform vec3 uAmbUp, uAmbDn, uSunLight, uRim;
 vec3 shade(vec3 alb, vec3 N, vec3 V){
+  // 逆光剪影：朝太阳看时植被绿去饱和，避免和暖雾混成橄榄灰（uRim.z = SUN.sil）
+  if (uRim.z > 0.) { float b = max(dot(-V, uSunDir), 0.); alb = mix(alb, vec3(dot(alb, vec3(.36, .46, .18))) * vec3(1.04, .94, .9), clamp(b * b * uRim.z * smoothstep(-.05, .04, uSunDir.y), 0., 1.)); }
   vec3 amb = mix(uAmbDn, uAmbUp, N.y * .5 + .5);
   float sd = max((dot(N, uSunDir) + .12) / 1.12, 0.);
   vec3 c = alb * (amb + uSunLight * sd);
   float edge = pow(1. - abs(dot(N, V)), 3.), back = pow(max(dot(-V, uSunDir), 0.), 4.);
-  return c + uGlow * edge * back * .35;
+  return c + uGlow * edge * back * .35 * uRim.x;
 }
 `
 
