@@ -1,7 +1,8 @@
 import './citizen.css'
 import {markSurface,markSession} from '../session-mark'
+import { readJson, readJsonOrNull } from '../lib/json'
 markSurface(document.body)
-void fetch('/api/me',{cache:'no-store'}).then(async response=>{if(response.ok) markSession((await response.json()).uid)}).catch(()=>{})
+void fetch('/api/me',{cache:'no-store'}).then(async response=>{if(response.ok) markSession((await readJsonOrNull<{uid:number}>(response))?.uid ?? null)}).catch(()=>{})
 import qrCode from 'qrcode-generator'
 import {cardUrl} from './items'
 
@@ -10,7 +11,7 @@ async function show(){
   if(!/^[1-9]\d{5,15}$/.test(uid)||!Number.isSafeInteger(Number(uid)))throw Error('卡号无效')
   const response=await fetch(`/api/citizen/${uid}`)
   if(!response.ok)throw Error(response.status===404?'没有找到这张市民卡':'暂时无法读取市民卡')
-  const card=await response.json()
+  const card=await readJson(response)
   const fields=document.querySelector('#fields')!
   document.querySelector('#uid')!.textContent=String(card.uid)
   document.title=`${card.nickname} 的市民卡 · 网上桂林`
