@@ -1,6 +1,6 @@
 import {bindingLabel, hits} from '../../input/keymap.ts'
 import {generateSimulatedQrMatrix} from '../handover/receipt-model.ts'
-import {ACTIVE_VIOLATIONS, VIOLATION_LABELS, type ActiveViolation} from '../types.ts'
+import {ALL_ACTIVE_VIOLATIONS, VIOLATION_LABELS, type ActiveViolation} from '../types.ts'
 import {R8_DEFAULT_FINE_YUAN, resolveFineTable} from './engine.ts'
 import {createFineTerminalModel, type FineTerminalVisualModel} from './model.ts'
 import type {FineTerminalOpenOptions, FineTerminalSession, FineTerminalSnapshot} from './types.ts'
@@ -370,7 +370,7 @@ export function mountFineTerminalOverlay(
 
       const chips = doc.createElement('div')
       chips.className = 'td-ft-chips'
-      for (const v of ACTIVE_VIOLATIONS) {
+      for (const v of ALL_ACTIVE_VIOLATIONS) {
         const selected = snap.violations.includes(v)
         const btn = doc.createElement('button')
         btn.type = 'button'

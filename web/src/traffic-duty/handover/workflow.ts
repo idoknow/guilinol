@@ -18,7 +18,7 @@ import {
   generateSimulatedReceiptNo,
   normalizeViolationStack,
 } from '../fine-terminal/engine.ts'
-import {ACTIVE_VIOLATIONS, resolveActorViolations, type ActiveViolation} from '../types.ts'
+import {isActiveViolation, resolveActorViolations, type ActiveViolation} from '../types.ts'
 import {createHandoverCloseupController} from './camera-closeup.ts'
 import {sharedCitationLedger, type CitationLedger} from './ledger.ts'
 import {
@@ -81,9 +81,9 @@ function resolveInitialStack(options: HandoverWorkflowOptions): ActiveViolation[
     }
   }
   const single =
-    options.violation && ACTIVE_VIOLATIONS.includes(options.violation)
+    options.violation && isActiveViolation(options.violation)
       ? options.violation
-      : options.actor.violation && options.actor.violation !== 'none' && ACTIVE_VIOLATIONS.includes(options.actor.violation)
+      : options.actor.violation && options.actor.violation !== 'none' && isActiveViolation(options.actor.violation)
         ? options.actor.violation
         : 'no_helmet'
   return [single]
@@ -469,7 +469,7 @@ export function startHandoverWorkflow(
     },
     setViolation(nextViol: ActiveViolation, syncDefaultFine = true) {
       if (stage !== 'input') return false
-      if (!ACTIVE_VIOLATIONS.includes(nextViol)) return false
+      if (!isActiveViolation(nextViol)) return false
       violations = [nextViol]
       syncViolationDerived(syncDefaultFine)
       completeAllTyping()
@@ -486,7 +486,7 @@ export function startHandoverWorkflow(
     },
     toggleViolation(targetViol: ActiveViolation, syncDefaultFine = true) {
       if (stage !== 'input') return false
-      if (!ACTIVE_VIOLATIONS.includes(targetViol)) return false
+      if (!isActiveViolation(targetViol)) return false
       const exists = violations.includes(targetViol)
       if (exists && violations.length <= 1) return false
       violations = exists ? violations.filter(v => v !== targetViol) : [...violations, targetViol]

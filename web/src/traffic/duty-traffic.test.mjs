@@ -75,6 +75,20 @@ await build({
         jiefangDeckWorldY,
         worldToJiefangBridgeLocal,
       } from './web/src/traffic-duty/jiefang-railings.ts'
+      export {curbside} from './web/src/traffic/contact.ts'
+      export {
+        ALL_ACTIVE_VIOLATIONS,
+        computeFineYuan,
+        computeFineYuanStack as computeDutyFineYuanStack,
+        isActiveViolation,
+        resolveActorViolations,
+      } from './web/src/traffic-duty/types.ts'
+      export {isCitableViolator} from './web/src/traffic-duty/arbiter.ts'
+      export {
+        createFineTerminalSession,
+        normalizeViolationStack,
+      } from './web/src/traffic-duty/fine-terminal/engine.ts'
+      export {createCitationLedger} from './web/src/traffic-duty/handover/ledger.ts'
       export {
         mountShizijieSignalsOverlay,
         SHIZIJIE_ORIGIN,
@@ -166,6 +180,16 @@ const {
   receiveDutyTicket,
   setActiveDutyStoryOverride,
   sliceDutySubgraph,
+  curbside,
+  ALL_ACTIVE_VIOLATIONS,
+  computeFineYuan,
+  computeDutyFineYuanStack,
+  isActiveViolation,
+  resolveActorViolations,
+  isCitableViolator,
+  createFineTerminalSession,
+  normalizeViolationStack,
+  createCitationLedger,
   mountShizijieSignalsOverlay,
   SHIZIJIE_ORIGIN,
 } = await import(pathToFileURL(bundleFile).href)
@@ -1938,8 +1962,35 @@ test('IDOK-539 API-4: duty story-mode override API dynamically raises regional v
 
     let peakSidewalkOnDeck = 0
     let sawStackedSidewalk = false
+    let swTotalFrames = 0
+    let swStallFrames = 0
+    let peakStalledSw = 0
+    const southFwdLz = []
+    const southRevLz = []
+    const northFwdLz = []
+    const northRevLz = []
     for (let i = 0; i < 2400; i++) {
       duty.step(0.05, officerPos, {officerActive: true})
+      const liveActors = duty.getActors()
+      let stalledThisTick = 0
+      for (const a of liveActors) {
+        if (a.kind !== 'scooter' || a.leaving || a.pendingRecycle) continue
+        if (!actorHasViolation(a, 'sidewalk_riding') || !isOnJiefangBridgeDeck(a)) continue
+        swTotalFrames++
+        if (a.speed < 0.25) {
+          swStallFrames++
+          stalledThisTick++
+        }
+        const [, lz] = worldToJiefangBridgeLocal(a.x, a.z)
+        if (lz >= 0) {
+          if (a.wrongWay) southRevLz.push(lz)
+          else southFwdLz.push(lz)
+        } else {
+          if (a.wrongWay) northRevLz.push(lz)
+          else northFwdLz.push(lz)
+        }
+      }
+      if (stalledThisTick > peakStalledSw) peakStalledSw = stalledThisTick
       if (i % 20 === 0) {
         const snaps = duty.getViolatorSnapshots()
         let onDeckSidewalk = 0
@@ -1975,6 +2026,33 @@ test('IDOK-539 API-4: duty story-mode override API dynamically raises regional v
     assert.ok(peakSidewalkOnDeck >= 1, 'at least one sidewalk_riding violator must ride on Jiefang Bridge sidewalk deck')
     assert.equal(sawStackedSidewalk, true, 'sidewalk_riding must stack with other violations (e.g. no_helmet)')
 
+    // Deadlock & dual sub-lane regression audit across full 120s story run
+    assert.ok(swTotalFrames >= 200, `expected >= 200 on-deck sidewalk scooter frames, got ${swTotalFrames}`)
+    const stallRate = swStallFrames / swTotalFrames
+    assert.ok(
+      stallRate < 0.12,
+      `sidewalk_riding stall rate must stay < 12% without head-on deadlock, got ${(stallRate * 100).toFixed(2)}% (${swStallFrames}/${swTotalFrames}, peakStalled=${peakStalledSw})`,
+    )
+    assert.ok(peakStalledSw <= 3, `expected peak simultaneously stalled sidewalk scooters <= 3, got ${peakStalledSw}`)
+    if (southFwdLz.length > 0 && southRevLz.length > 0) {
+      const avgFwd = southFwdLz.reduce((a, b) => a + b, 0) / southFwdLz.length
+      const avgRev = southRevLz.reduce((a, b) => a + b, 0) / southRevLz.length
+      assert.ok(
+        Math.abs(avgRev - avgFwd) >= 0.6,
+        `south sidewalk forward (${avgFwd.toFixed(2)}) and reverse (${avgRev.toFixed(2)}) sub-lanes must be >=0.60m apart`,
+      )
+      assert.ok(avgFwd >= 17.25 && avgRev <= 18.45, `south sidewalk sub-lanes must stay cleanly between tactile (±16.93) and lamp posts (±18.9)`)
+    }
+    if (northFwdLz.length > 0 && northRevLz.length > 0) {
+      const avgFwd = northFwdLz.reduce((a, b) => a + b, 0) / northFwdLz.length
+      const avgRev = northRevLz.reduce((a, b) => a + b, 0) / northRevLz.length
+      assert.ok(
+        Math.abs(avgRev - avgFwd) >= 0.6,
+        `north sidewalk forward (${avgFwd.toFixed(2)}) and reverse (${avgRev.toFixed(2)}) sub-lanes must be >=0.60m apart`,
+      )
+      assert.ok(avgFwd <= -17.25 && avgRev >= -18.45, `north sidewalk sub-lanes must stay cleanly between tactile (±16.93) and lamp posts (±18.9)`)
+    }
+
     // Verify sidewalk_riding violator pull-over stays safely on sidewalk without railing clip
     const swActor = duty.getViolatorSnapshots().find(s => s.hasSidewalkRiding && isOnJiefangBridgeDeck(s))?.actor
     if (swActor) {
@@ -1991,5 +2069,303 @@ test('IDOK-539 API-4: duty story-mode override API dynamically raises regional v
   } finally {
     unsub()
     duty.stop()
+  }
+})
+
+test('IDOK-539 FIX-1: head-on stuck opposing scooters receive sustained ghostPassUntil and pass cleanly without 1-tick re-freeze deadlock', () => {
+  const graph = makeStraightCorridorGraph()
+  const sim = new Traffic(graph, makeSeededRng(53911), 10, {
+    classes: ['cycleway'],
+    carMin: 0,
+    carMax: 0,
+    personMin: 0,
+    personMax: 0,
+  })
+  const track = [...sim.allTracks()].find(t => t.id === 20)
+  assert.ok(track)
+  const makeScooter = (id, dist, wrongWay) => ({
+    id,
+    track,
+    dist,
+    speed: 5.5,
+    kind: 'scooter',
+    down: 0,
+    dodge: wrongWay ? 0.55 : 0, // force exact same lateral Z for head-on collision test
+    x: track.start.x + dist,
+    y: 151.7,
+    z: track.offset,
+    yaw: wrongWay ? Math.atan2(-track.dx, -track.dz) : track.yaw,
+    scale: 1,
+    leaving: false,
+    halfWidth: 0.3,
+    halfLength: 0.85,
+    height: 1.5,
+    violation: wrongWay ? 'wrong_way' : 'sidewalk_riding',
+    violations: [wrongWay ? 'wrong_way' : 'sidewalk_riding'],
+    violationMask: encodeViolationMask([wrongWay ? 'wrong_way' : 'sidewalk_riding']),
+    vehicleSubtype: 'ebike',
+    laneCompliant: false,
+    encroachmentKind: 'scooter_on_sidewalk',
+    encroachOffset: 0,
+    wrongWay,
+    cited: false,
+    dutyState: 'normal',
+  })
+  const fwd = makeScooter('headon_fwd', 20, false)
+  const rev = makeScooter('headon_rev', 32, true)
+  sim.actors.push(fwd, rev)
+
+  let sawGhostPass = false
+  for (let i = 0; i < 180; i++) {
+    // Keep same lateral line so head-on stall definitely triggers ghostPassUntil
+    rev.dodge = 0.55
+    sim.step(0.05, {x: 26, y: 151.7, z: 5})
+    if ((fwd.ghostPassUntil ?? 0) > sim.time || (rev.ghostPassUntil ?? 0) > sim.time) {
+      sawGhostPass = true
+    }
+  }
+  assert.equal(sawGhostPass, true, 'head-on stuck scooters must activate sustained ghostPassUntil to break deadlock')
+  assert.ok(fwd.dist > 45, `forward scooter must pass cleanly past head-on opponent, got dist=${fwd.dist.toFixed(2)}`)
+  assert.ok(rev.dist < 10, `reverse scooter must pass cleanly past head-on opponent, got dist=${rev.dist.toFixed(2)}`)
+})
+
+test('IDOK-539 FIX-2: sidewalk_riding is recognized, citable, normalized, recorded in ledger, and billed ¥50 (¥100 stacked with no_helmet) across traffic-duty', () => {
+  assert.ok(ALL_ACTIVE_VIOLATIONS.includes('sidewalk_riding'))
+  assert.equal(isActiveViolation('sidewalk_riding'), true)
+  const swOnlyActor = {
+    kind: 'scooter',
+    leaving: false,
+    scale: 1,
+    cited: false,
+    violation: 'sidewalk_riding',
+    violations: ['sidewalk_riding'],
+  }
+  assert.deepEqual(resolveActorViolations(swOnlyActor), ['sidewalk_riding'])
+  assert.equal(isCitableViolator(swOnlyActor), true)
+  assert.equal(computeFineYuan('sidewalk_riding'), 50)
+  assert.equal(computeDutyFineYuanStack(['sidewalk_riding', 'no_helmet']), 100)
+  assert.deepEqual(normalizeViolationStack(['sidewalk_riding']), ['sidewalk_riding'])
+  assert.deepEqual(normalizeViolationStack(['sidewalk_riding', 'no_helmet']), ['sidewalk_riding', 'no_helmet'])
+
+  // Fine terminal session single + stacked + toggle
+  const session = createFineTerminalSession({
+    headless: true,
+    violations: ['sidewalk_riding', 'no_helmet'],
+  })
+  const snapStacked = session.getSnapshot()
+  assert.deepEqual(snapStacked.violations, ['sidewalk_riding', 'no_helmet'])
+  assert.equal(snapStacked.fineYuan, 100)
+  assert.equal(snapStacked.lineItems.length, 2)
+  assert.equal(session.setViolation('sidewalk_riding'), true)
+  const snapSingle = session.getSnapshot()
+  assert.deepEqual(snapSingle.violations, ['sidewalk_riding'])
+  assert.equal(snapSingle.fineYuan, 50)
+
+  // Ledger serialization / restore preserves sidewalk_riding
+  const ledger = createCitationLedger()
+  ledger.record({
+    receiptNo: 'JLQ-SW-0001',
+    vehicleKey: 'veh_sw_1',
+    plateNo: '桂C·电模5390',
+    violation: 'sidewalk_riding',
+    violations: ['sidewalk_riding', 'no_helmet'],
+    fineYuan: 100,
+    lineItems: [
+      {violation: 'sidewalk_riding', label: '走人行道', fineYuan: 50},
+      {violation: 'no_helmet', label: '未戴头盔', fineYuan: 50},
+    ],
+    issuedAtMs: Date.now(),
+  })
+  const ledger2 = createCitationLedger()
+  const restored = ledger2.restore(ledger.serialize())
+  assert.equal(restored, 1)
+  const rec = ledger2.getRecord('veh_sw_1')
+  assert.ok(rec)
+  assert.equal(rec.violation, 'sidewalk_riding')
+  assert.deepEqual(rec.violations, ['sidewalk_riding', 'no_helmet'])
+  assert.equal(rec.fineYuan, 100)
+})
+
+test('IDOK-539 FIX-3: static obstacle prediction includes encroachOffset (stops at encroached solid, ignores phantom centerline solid)', () => {
+  const graph = {
+    nodes: [
+      {id: 1, x: 0, y: 151.7, z: 0},
+      {id: 2, x: 80, y: 151.7, z: 0},
+    ],
+    lanes: [
+      {id: 30, from: 1, to: 2, offset: 0, width: 2.2, kind: 'nonmotor', speedKmh: 26, cls: 'cycleway', street: 'EncroachTest'},
+    ],
+    signals: [],
+    walks: [],
+  }
+  const sim = new Traffic(graph, makeSeededRng(53913), 4, {
+    classes: ['cycleway'],
+    carMin: 0,
+    carMax: 0,
+    personMin: 0,
+    personMax: 0,
+  })
+  const track = [...sim.allTracks()].find(t => t.id === 30)
+  assert.ok(track)
+  const makeEncroachScooter = id => ({
+    id,
+    track,
+    dist: 10,
+    speed: 6.0,
+    kind: 'scooter',
+    down: 0,
+    dodge: 0,
+    x: 10,
+    y: 151.7,
+    z: 1.65,
+    yaw: track.yaw,
+    scale: 1,
+    leaving: false,
+    halfWidth: 0.3,
+    halfLength: 0.85,
+    height: 1.5,
+    violation: 'sidewalk_riding',
+    violations: ['sidewalk_riding'],
+    violationMask: encodeViolationMask(['sidewalk_riding']),
+    vehicleSubtype: 'ebike',
+    laneCompliant: false,
+    encroachmentKind: 'scooter_on_sidewalk',
+    encroachOffset: 1.65,
+    cited: false,
+    dutyState: 'normal',
+  })
+
+  // Case A: solid directly in encroached path at (25, 1.65) MUST stop the scooter before x=25
+  const removeHit = curbside.add({x: 25, y: 151.7, z: 1.65, yaw: 0, halfWidth: 0.45, halfLength: 0.45, height: 2.2})
+  try {
+    sim.actors.length = 0
+    const sA = makeEncroachScooter('enc_hit')
+    sim.actors.push(sA)
+    for (let i = 0; i < 120; i++) sim.step(0.05, {x: 25, y: 151.7, z: 1.65})
+    assert.ok(sA.x < 24.5, `encroaching scooter at z=1.65 must stop before static obstacle at (25, 1.65), got x=${sA.x.toFixed(2)}`)
+  } finally {
+    removeHit()
+  }
+
+  // Case B: solid on un-encroached track centerline (25, 0) MUST NOT phantom-block scooter riding at z=1.65
+  const removeCenter = curbside.add({x: 25, y: 151.7, z: 0, yaw: 0, halfWidth: 0.45, halfLength: 0.45, height: 2.2})
+  try {
+    sim.actors.length = 0
+    const sB = makeEncroachScooter('enc_clear')
+    sim.actors.push(sB)
+    for (let i = 0; i < 120; i++) sim.step(0.05, {x: 25, y: 151.7, z: 1.65})
+    assert.ok(sB.x > 35, `encroaching scooter at z=1.65 must pass centerline solid at (25, 0) without phantom block, got x=${sB.x.toFixed(2)}`)
+  } finally {
+    removeCenter()
+  }
+})
+
+test('IDOK-539 FIX-4: storyOverride.weights beats basePolicy, Traffic.inherit preserves rulePolicy, and finalWrongWay=false strips wrong_way tag', async () => {
+  // 1) Precedence: story.nonmotorViolationRate > story.weights > policy.nonmotorViolationRate > weights > default
+  const rng = makeSeededRng(53914)
+  let violFromStoryWeights = 0
+  let swFromStoryWeights = 0
+  const N = 1000
+  for (let i = 0; i < N; i++) {
+    const p = pickTwoWheelProfile(rng, {none: 40, no_helmet: 60}, true, {
+      policy: {nonmotorViolationRate: 0.60, allowSidewalkRiding: false},
+      storyOverride: {active: true, weights: {none: 0, sidewalk_riding: 100}},
+    })
+    if (p.violations.length > 0) violFromStoryWeights++
+    if (p.violations.includes('sidewalk_riding')) swFromStoryWeights++
+  }
+  assert.equal(violFromStoryWeights, N, `storyOverride.weights={none:0, sidewalk_riding:100} must yield 100% violations over basePolicy=0.60, got ${violFromStoryWeights}/${N}`)
+  assert.ok(swFromStoryWeights >= 400, `storyOverride.weights with sidewalk_riding=100 must enable and spawn sidewalk_riding, got ${swFromStoryWeights}/${N}`)
+
+  // Live createDutyTraffic with storyOverride.weights only (no explicit nonmotorViolationRate)
+  const duty = createDutyTraffic({
+    graph: jiefangCellGraph,
+    desiredCars: 0,
+    desiredScooters: 20,
+    maxViolatorRatio: 1.0,
+    maxConcurrentViolators: 20,
+    violatorCooldownSec: 0,
+    random: makeSeededRng(53915),
+    storyOverride: {active: true, weights: {none: 0, sidewalk_riding: 100}},
+  })
+  const liveSpawns = []
+  const unsub = duty.onActorSpawn(ev => {
+    if (ev.kind === 'scooter') liveSpawns.push(getActorViolations(ev.actor))
+  })
+  try {
+    await duty.start()
+    const [ox, oz] = jiefangBridgeLocalToWorld(-97.5, 18.0)
+    const officerPos = {x: ox, y: jiefangDeckWorldY(ox, oz), z: oz}
+    for (let i = 0; i < 400; i++) duty.step(0.05, officerPos, {officerActive: true})
+    assert.ok(liveSpawns.length >= 15, `expected >= 15 live scooter spawns, got ${liveSpawns.length}`)
+    const liveViolRate = liveSpawns.filter(v => v.length > 0).length / liveSpawns.length
+    assert.ok(liveViolRate >= 0.95, `createDutyTraffic storyOverride.weights={none:0,sidewalk_riding:100} must not be capped to 60%, got ${(liveViolRate * 100).toFixed(1)}%`)
+    assert.ok(liveSpawns.some(v => v.includes('sidewalk_riding')), 'createDutyTraffic storyOverride.weights must spawn sidewalk_riding')
+  } finally {
+    unsub()
+    duty.stop()
+  }
+
+  // 2) Traffic.inherit copies rulePolicy cleanly (including nested secondaryWeights)
+  const graph = makeStraightCorridorGraph()
+  const prev = new Traffic(graph, makeSeededRng(53916), 10)
+  prev.setRulePolicy({
+    laneComplianceRate: 0.92,
+    nonmotorViolationRate: 0.85,
+    allowSidewalkRiding: false,
+    secondaryWeights: {illegal_mod: 77},
+  })
+  const next = new Traffic(graph, makeSeededRng(53917), 10)
+  next.inherit(prev)
+  assert.deepEqual(next.getRulePolicy(), prev.getRulePolicy())
+  prev.setRulePolicy({nonmotorViolationRate: 0.25, secondaryWeights: {illegal_mod: 1}})
+  assert.equal(next.getRulePolicy().nonmotorViolationRate, 0.85)
+  assert.equal(next.getRulePolicy().secondaryWeights?.illegal_mod, 77)
+
+  // 3) finalWrongWay === false on motor-only track strips 'wrong_way' from violations / violationMask / violation
+  const motorOnlyGraph = {
+    nodes: [
+      {id: 1, x: 0, y: 151.7, z: 0},
+      {id: 2, x: 180, y: 151.7, z: 0},
+    ],
+    lanes: [
+      {id: 101, from: 1, to: 2, offset: 0, width: 3.5, kind: 'motor', speedKmh: 35, cls: 'service', street: 'MotorOnlyLane', gradeSeparated: 'jiefang'},
+      {id: 102, from: 2, to: 1, offset: 3.5, width: 3.5, kind: 'motor', speedKmh: 35, cls: 'service', street: 'MotorOnlyLane', gradeSeparated: 'jiefang'},
+    ],
+    signals: [],
+    walks: [],
+  }
+  const motorSim = new Traffic(motorOnlyGraph, makeSeededRng(53918), 30, {
+    classes: ['service'],
+    carMin: 20,
+    carMax: 30,
+    personMin: 0,
+    personMax: 0,
+  })
+  motorSim.setRulePolicy({
+    nonmotorViolationRate: 1.0,
+    noHelmetGivenViolatorRate: 0.5,
+    allowSidewalkRiding: false,
+    secondaryWeights: {
+      wrong_way: 100,
+      ebike_overload: 0,
+      bike_double: 0,
+      illegal_mod: 0,
+      red_light_run: 0,
+      sidewalk_riding: 0,
+    },
+  })
+  const motorScooters = []
+  motorSim.onActorSpawn = ev => {
+    if (ev.kind === 'scooter') motorScooters.push(ev.actor)
+  }
+  for (let i = 0; i < 60; i++) motorSim.step(0.05, {x: 90, y: 151.7, z: 0})
+  assert.ok(motorScooters.length >= 5, `expected >= 5 scooters spawned on motor-only fallback graph, got ${motorScooters.length}`)
+  for (const s of motorScooters) {
+    assert.equal(s.track.kind, 'motor', 'expected motor-only fallback track')
+    assert.ok(!s.wrongWay, 'scooter on motor-only track must have finalWrongWay === false')
+    assert.equal(actorHasViolation(s, 'wrong_way'), false, 'wrong_way tag must be stripped when finalWrongWay === false')
+    assert.notEqual(s.violation, 'wrong_way', 'primary violation must not remain wrong_way when finalWrongWay === false')
+    assert.equal(s.violationMask, encodeViolationMask(getActorViolations(s)), 'violationMask must stay consistent after stripping wrong_way')
   }
 })

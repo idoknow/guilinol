@@ -33,6 +33,11 @@ export const ACTIVE_VIOLATIONS: readonly ActiveViolation[] = Object.freeze([
   'red_light_run',
 ])
 
+export const ALL_ACTIVE_VIOLATIONS: readonly ActiveViolation[] = Object.freeze([
+  ...ACTIVE_VIOLATIONS,
+  'sidewalk_riding',
+])
+
 export interface DutyFineTable {
   no_helmet: number
   bike_double: number
@@ -629,7 +634,7 @@ export function formatDutyReportTitle(totalFineYuan: number, zoneName?: string |
   return `${prefix} · 10分钟模拟罚单 ¥${Math.max(0, Math.round(totalFineYuan))}`
 }
 
-const ACTIVE_VIOLATION_SET = new Set<string>(ACTIVE_VIOLATIONS)
+const ACTIVE_VIOLATION_SET = new Set<string>(ALL_ACTIVE_VIOLATIONS)
 
 export function isActiveViolation(value: unknown): value is ActiveViolation {
   return typeof value === 'string' && ACTIVE_VIOLATION_SET.has(value)

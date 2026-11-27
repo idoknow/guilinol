@@ -185,12 +185,25 @@ export function constrainJiefangActorPosition(actor: Actor): void {
   if (actor.kind === 'scooter') {
     if (actorHasViolation(actor, 'sidewalk_riding')) {
       // Sidewalk-riding violator (story override / encroachment): route cleanly between tactile paving (±16.93) and lamp posts (±18.9)
+      // Separate forward (!wrongWay) and reverse (wrongWay) into dual sub-lanes (~0.74m apart > 0.42m opposite minLat & 0.60m combined widths)
+      // so bidirectional sidewalk violators pass cleanly without head-on deadlocks or clipping tactile strip/lamp posts.
       const sw = south ? JIEFANG_CROSS_SECTION.southSidewalk : JIEFANG_CROSS_SECTION.northSidewalk
-      const swMin = south ? Math.max(sw.minZ + 1.05, 17.25) : Math.max(sw.minZ + 3.25, -18.25)
-      const swMax = south ? Math.min(sw.maxZ - 3.25, 18.25) : Math.min(sw.maxZ - 1.05, -17.25)
-      clampedLz = south
-        ? Math.max(swMin, Math.min(swMax, Math.max(lz, swMin + 0.4)))
-        : Math.max(swMin, Math.min(swMax, Math.min(lz, swMax - 0.4)))
+      const pullingOver = actor.dutyState === 'pulling_over' || actor.dutyState === 'pulled_over'
+      if (pullingOver) {
+        const swMin = south ? Math.max(sw.minZ + 1.05, 17.25) : Math.max(sw.minZ + 3.05, -18.45)
+        const swMax = south ? Math.min(sw.maxZ - 3.05, 18.45) : Math.min(sw.maxZ - 1.05, -17.25)
+        clampedLz = Math.max(swMin, Math.min(swMax, lz))
+      } else {
+        const targetAbs = actor.wrongWay ? 18.22 : 17.48
+        const halfBand = 0.08
+        const subMin = south
+          ? Math.max(sw.minZ + 1.15, targetAbs - halfBand)
+          : Math.max(sw.minZ + 3.1, -(targetAbs + halfBand))
+        const subMax = south
+          ? Math.min(sw.maxZ - 3.1, targetAbs + halfBand)
+          : Math.min(sw.maxZ - 1.15, -(targetAbs - halfBand))
+        clampedLz = Math.max(subMin, Math.min(subMax, lz))
+      }
     } else {
       const band = south ? JIEFANG_CROSS_SECTION.southNonmotor : JIEFANG_CROSS_SECTION.northNonmotor
       clampedLz = Math.max(band.safeMinZ, Math.min(band.safeMaxZ, lz))
@@ -990,7 +1003,7 @@ export function createDutyTraffic(opts: DutyTrafficOptions = {}): DutyTrafficHan
   const hasExplicitScooters = opts.desiredScooters !== undefined
   const weights = opts.weights ?? JIEFANG_DUTY_WEIGHTS
   const basePolicy: TrafficViolationPolicy = {
-    nonmotorViolationRate: JIEFANG_NONMOTOR_VIOLATION_RATE,
+    ...(opts.weights === undefined ? {nonmotorViolationRate: JIEFANG_NONMOTOR_VIOLATION_RATE} : {}),
     noHelmetGivenViolatorRate: JIEFANG_NO_HELMET_CONDITIONAL_RATE,
     allowSidewalkRiding: false,
     ...opts.policy,
