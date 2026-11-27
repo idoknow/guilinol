@@ -9,6 +9,7 @@ import {stationPaving,type StationPavingCut} from './station-paving'
 import {stationRoadSurface,type StationRoadSegment} from './station-road-surface'
 import {railwayGeometry,type RailSection,type RailFace,type CrossingSign} from './railways'
 import {buildRoadBarriers} from './road-barriers'
+import {medianRails} from './median-rails'
 import {isShizijieCrosswalkRing,isShizijieDecorSuppressed,isShizijieSignalSuppressed,touchesShizijieTile} from './shizijie-zone.ts'
 import {curbEdgeKeyCm,repairStreetPaths} from './ground-repair'
 import {isOuterOsmanthusBed} from './outer-osmanthus'
@@ -331,9 +332,17 @@ export function streetGeometry([paths,lamps,banks,signals=[],stops=[],roadCtrl,s
   const awnings=look.streets.awnings.map(value=>new THREE.Color(value)),shutter=new THREE.Color(look.streets.shutter)
   const parked:number[]=[],blue=new THREE.Color(look.streets.directionSign)
   const suppressDecor=(kind:number,x:number,z:number)=>checkShizijie&&!!origin&&isShizijieDecorSuppressed(origin[0]+x,origin[1]+z,kind)
+  medianRails(decor,suppressDecor,(start,end,banner)=>{
+    const dx=end.x-start.x,dz=end.z-start.z,flat=Math.hypot(dx,dz),yaw=-Math.atan2(dz,dx)
+    const low=baseLevel(start.x,start.z),high=baseLevel(end.x,end.z),pitch=Math.atan2(high-low,flat)
+    const x=(start.x+end.x)/2,z=(start.z+end.z)/2,y=(low+high)/2+.195,span=Math.hypot(flat,high-low)
+    box(x,y+.88,z,span,.085,.07,yaw,stoneLight,pitch)
+    box(x,y+.28,z,span,.065,.07,yaw,tone.railing,pitch)
+    if(banner)box(x,y+.59,z,Math.min(1.35,span),.42,.09,yaw,awnings[2],pitch)
+  },point=>box(point.x,baseLevel(point.x,point.z)+.195+.58,point.z,.05,.6,.05))
   // 栅栏件（绿篱、机非铁栏、白护栏、石墩铁栏）整段同档：120 m 内一起画，远处不再只剩绿篱或悬空横杆。
   for(const [kind,east,south,heading,span] of decor){
-    if(kind!==1&&kind!==2&&kind!==5&&kind!==6&&kind!==7&&kind!==8)continue
+    if(kind!==5&&kind!==6&&kind!==7&&kind!==8)continue
     const x=east/10,z=south/10
     if(suppressDecor(kind,x,z))continue
     const angle=-heading/100,y=baseLevel(x,z)+.195,length=span/10
@@ -349,11 +358,6 @@ export function streetGeometry([paths,lamps,banks,signals=[],stops=[],roadCtrl,s
       box(x-length*.5*Math.cos(angle),y+.62,z+length*.5*Math.sin(angle),.32,1.24,.32,angle,stoneMid)
       for(const level of [.32,1.05])box(x,y+level,z,length,.06,.07,angle,iron)
       for(const fraction of [-.32,-.12,.12,.32])box(x+fraction*length*Math.cos(angle),y+.69,z-fraction*length*Math.sin(angle),.04,.78,.04,angle,iron)
-    }else{
-      box(x,y+.88,z,length,.085,.07,angle,stoneLight)
-      if(kind===2)box(x,y+.59,z,1.35,.42,.09,angle,awnings[2])
-      box(x,y+.28,z,length,.065,.07,angle)
-      for(const along of [-.35,0,.35])box(x+along*length*Math.cos(angle),y+.58,z-along*length*Math.sin(angle),.05,.6,.05,angle)
     }
   }
   const railLodCount=mats.length/16
