@@ -252,3 +252,76 @@ export function fitCurbReturns(
     }
   }
 }
+
+export interface VergeCurbOptions {
+  /** Top elevation offset of the verge strip above baseLevel (default 0.195 m). */
+  topOffset: number
+  /** Bottom elevation offset meeting carriageway/cycleway asphalt (default 0.045 m). */
+  bottomOffset?: number
+  /** Quantized cm edge keys where bridged seams should omit vertical curb walls. */
+  skipCurbEdges?: ReadonlySet<string>
+  /** Key generator matching ground-repair.curbEdgeKeyCm. */
+  edgeKeyCm?: (ax: number, az: number, bx: number, bz: number) => string
+  /** Optional platform / lower-road flags that disable terrain skirt clamp. */
+  clampToGround?: boolean
+}
+
+/**
+ * Emits crisp granite vertical curb walls around three-band street verges (path kind=4),
+ * bridging the height transition between carriageway (+0.045 m), cycleway (+0.060 m),
+ * and raised green/planter verges (+0.195 m). Vertical faces are rendered in granite curb
+ * tone (kind=1, vertical=true) without adding walkable top collision.
+ */
+export function emitVergeCurbWalls(
+  loops: readonly (readonly { x: number; y: number }[])[],
+  vectorAt: (x: number, z: number, offset: number) => Vector3,
+  groundAt: (x: number, z: number) => number,
+  emitTriangle: (a: Vector3, b: Vector3, c: Vector3, kind: number, vertical: boolean) => void,
+  options: VergeCurbOptions,
+): number {
+  const topOffset = options.topOffset
+  const bottomOffset = options.bottomOffset ?? 0.045
+  const skip = options.skipCurbEdges
+  const edgeKey = options.edgeKeyCm
+  const clamp = options.clampToGround ?? true
+  let emittedQuads = 0
+
+  for (const loop of loops) {
+    const n = loop.length
+    if (n < 3) continue
+    for (let i = 0; i < n; i++) {
+      const a = loop[i]
+      const b = loop[(i + 1) % n]
+      if (
+        (a.x === b.x && (a.x <= 0.02 || a.x >= 255.98)) ||
+        (a.y === b.y && (a.y <= 0.02 || a.y >= 255.98))
+      ) continue
+      const segLen = Math.hypot(b.x - a.x, b.y - a.y)
+      if (segLen < 0.08) continue
+      if (skip && skip.size && edgeKey && skip.has(edgeKey(a.x * 100, a.y * 100, b.x * 100, b.y * 100))) continue
+
+      const steps = Math.max(1, Math.ceil(segLen / 4))
+      for (let j = 0; j < steps; j++) {
+        const u0 = j / steps
+        const u1 = (j + 1) / steps
+        const px = a.x + (b.x - a.x) * u0
+        const pz = a.y + (b.y - a.y) * u0
+        const qx = a.x + (b.x - a.x) * u1
+        const qz = a.y + (b.y - a.y) * u1
+
+        const topP = vectorAt(px, pz, topOffset)
+        const topQ = vectorAt(qx, qz, topOffset)
+        const botP = vectorAt(px, pz, bottomOffset)
+        const botQ = vectorAt(qx, qz, bottomOffset)
+        if (clamp) {
+          botP.y = Math.max(botP.y - 0.35, Math.min(botP.y, groundAt(px, pz) - 0.02))
+          botQ.y = Math.max(botQ.y - 0.35, Math.min(botQ.y, groundAt(qx, qz) - 0.02))
+        }
+        emitTriangle(botP, topP, topQ, 1, true)
+        emitTriangle(botP, topQ, botQ, 1, true)
+        emittedQuads++
+      }
+    }
+  }
+  return emittedQuads
+}
