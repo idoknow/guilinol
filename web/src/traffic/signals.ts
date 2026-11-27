@@ -192,3 +192,10 @@ export function citySignalColor(node: number, lane: number): SignalColor | null 
 export function citySignalState(node: number, out?: SignalState): SignalState | null {
   return citySignals.state(node, citySignalClock.now, out)
 }
+
+/** Lens colours (sRGB hex), lit and dark. Every signal head in town uses these, so they all match. */
+export const SIGNAL_LENS_HEX = {
+  red: {lit: 0xff3b30, off: 0x281414},
+  yellow: {lit: 0xffc53d, off: 0x262010},
+  green: {lit: 0x25e07d, off: 0x10261b},
+} as const

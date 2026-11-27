@@ -71,19 +71,26 @@ export async function record(pool,state,at=new Date(),resolveLandmark=null){
       sessions.set(item.id,item)
     }
     const cleanIp=value=>{const s=typeof value==='string'?value.replace(/^::ffff:/,''):'';return isIP(s)?s:null}
+    const deviceEvents=new Map(events.filter(event=>event.type==='session-device').map(event=>[event.id,event]))
     const lookup=await regions(client,[...sessions.values()])
     const rows=[...sessions.values()].map(item=>({id:item.id,uid:item.uid,name:item.name,joined_at:new Date(item.joinedAt),
       left_at:item.type==='leave'?new Date(item.ts):null,last_seen:new Date(item.ts??at),reason:item.reason,close_code:item.closeCode,region:lookup(item.ip),
-      client_ip:cleanIp(item.ip),node_ip:cleanIp(item.nodeIp)}))
+      client_ip:cleanIp(item.ip),node_ip:cleanIp(item.nodeIp),
+      fp:deviceEvents.get(item.id)?.uid===item.uid && deviceEvents.get(item.id)?.ip===item.ip ? deviceEvents.get(item.id)?.fp ?? '' : null}))
     await client.query('savepoint mp_ip_cols')
-    try{
-      await client.query(`insert into mp_sessions(instance,id,uid,name,joined_at,left_at,last_seen,reason,close_code,region,client_ip,node_ip)
+    const upsertSessions=withFingerprint=>client.query(`insert into mp_sessions(instance,id,uid,name,joined_at,left_at,last_seen,reason,close_code,region,client_ip,node_ip${withFingerprint?',fp':''})
         select $1,s.* from jsonb_to_recordset($2) as s(id text,uid bigint,name text,
-        joined_at timestamptz,left_at timestamptz,last_seen timestamptz,reason text,close_code integer,region jsonb,client_ip text,node_ip text)
+        joined_at timestamptz,left_at timestamptz,last_seen timestamptz,reason text,close_code integer,region jsonb,client_ip text,node_ip text${withFingerprint?',fp text':''})
         on conflict(instance,id) do update set left_at=coalesce(excluded.left_at,mp_sessions.left_at),
         reason=coalesce(excluded.reason,mp_sessions.reason),close_code=coalesce(excluded.close_code,mp_sessions.close_code),
         last_seen=greatest(mp_sessions.last_seen,excluded.last_seen),
+        ${withFingerprint?"fp=case when excluded.fp is not null then nullif(excluded.fp,'') when excluded.client_ip=mp_sessions.client_ip then mp_sessions.fp end,":''}
         client_ip=coalesce(excluded.client_ip,mp_sessions.client_ip),node_ip=coalesce(excluded.node_ip,mp_sessions.node_ip)`,[instance,JSON.stringify(rows)])
+    try{
+      try{await upsertSessions(true)}catch(error){
+        if(error?.code!=='42703')throw error
+        await client.query('rollback to savepoint mp_ip_cols');await upsertSessions(false)
+      }
       await client.query('release savepoint mp_ip_cols')
     }catch(error){
       if(error?.code!=='42703')throw error

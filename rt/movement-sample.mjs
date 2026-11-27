@@ -12,3 +12,8 @@ export function acceptedSpeed(player,at){
   if(!last || at-last.at>500 || last.at-first.at<250)return null
   return +(1000*(last.distance-first.distance)/(last.at-first.at)).toFixed(2)
 }
+
+export function shouldRecordCorrection(previous,verdict,stepSeconds,at){
+  if(verdict.kind==='speed' && stepSeconds<0.25 && verdict.overflow<=2)return false
+  return previous?.kind!==verdict.kind || at>=previous.until
+}

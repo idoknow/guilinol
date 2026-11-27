@@ -25,7 +25,7 @@ import {mpEnabled} from '../ui/mp-pref'
 import * as THREE from 'three'
 import {passengerTop} from './passenger-height'
 import {passengerArms} from '../helicopter/arms'
-import {tunnelFloor,underpassFloor} from '../tunnels'
+import {openWellAt,tunnelFloor,underpassFloor} from '../tunnels'
 import {getCarFreeAt} from '../game/car-free'
 import {CAR_SCALE} from '../drive/scale'
 import R from '@dimforge/rapier3d-compat'
@@ -48,7 +48,7 @@ import {
   type ObstacleVolumeSpec,
 } from './obstacle-volumes'
 import {resolveContact} from '../traffic/contact'
-import {createCameraRig} from './camera'
+import {createCameraRig,placeFirstPersonCamera} from './camera'
 import {isFirstPerson} from './view-mode'
 import {createEbikeGripPose} from './ebike-grip'
 import {hits,bindingLabel,isDutyScopeActive} from '../input/keymap'
@@ -1329,6 +1329,8 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
     return best
   }
   function visualFloorAt(x:number,z:number,baseY:number){
+    // Open-well treads are visual only; snapping onto each tread top bobs the figure and the first-person eye per riser.
+    if(openWellAt(x,z,baseY))return baseY
     let best=baseY
     const cellKey=`${Math.floor(x/4)},${Math.floor(z/4)}`
     for(const [entry,root] of stream.landmarks){
@@ -1812,6 +1814,8 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
     }
     return true
   }
+  let viewBlend:number|null=null
+  const blendFrom=new THREE.Vector3(),blendTurn=new THREE.Quaternion(),blendEye=new THREE.Quaternion()
   function follow(dt=0,snap=false){const pos=sim.body.translation(),footY=pos.y-cfg.height/2
     figure.position.set(pos.x,footY,pos.z)
     if(downedBikes.size>0)syncAllDownedPoses()
@@ -2121,13 +2125,23 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
       lastFollowFov=camera.fov
     }
     // IDOK-178: 第一人称只在落地步行时生效，骑车/开车/坐船一律回到第三人称，免得镜头钻进车壳。
-    const firstPerson=isFirstPerson()&&!rides?.bike&&!rides?.car&&!rides?.boat
-    rig.update(camera,figure.position,yaw+shakeYaw,pitch+shakePitch+knockdown.cameraPitchBias,arm+ridePose.cameraArm(!!rides?.bike,dt,snap)+driverPose.cameraArm(!!rides?.car,dt,snap)+(rides?.car?carSpeedArm:0),dt,snap,!!rides?.car,firstPerson,combat.f.down ? .72 : 0)
+    const onFoot=!rides?.bike&&!rides?.car&&!rides?.boat,blend=onFoot&&viewBlend!==null?viewBlend:0
+    const firstPerson=(isFirstPerson()||blend>=1)&&onFoot
+    const camYaw=yaw+shakeYaw,camPitch=pitch+shakePitch+knockdown.cameraPitchBias,lowerFocus=combat.f.down ? .72 : 0
+    // Open-stairwell blend: pull the arm in with the blend so its collision ray never reaches the well lip or the slab over
+    // the landing; a clamp kicking in or letting go mid-blend is a visible camera jump.
+    rig.update(camera,figure.position,camYaw,camPitch,(arm+ridePose.cameraArm(!!rides?.bike,dt,snap)+driverPose.cameraArm(!!rides?.car,dt,snap)+(rides?.car?carSpeedArm:0))*(1-blend)**2,dt,snap,!!rides?.car,firstPerson,lowerFocus)
     if(sim.clampCamera(figure.position,camera.position,firstPerson?.18:cfg.camRadius)&&!firstPerson){
       camera.lookAt(rig.focus)
     }
+    // Open stairwells (小香港, 十字街): ease the third-person camera into the eyes by foot depth, no second rig pass.
+    if(!firstPerson&&blend>0){
+      blendFrom.copy(camera.position);blendTurn.copy(camera.quaternion)
+      placeFirstPersonCamera(camera,figure.position,camYaw,camPitch,lowerFocus);blendEye.copy(camera.quaternion)
+      camera.position.lerpVectors(blendFrom,camera.position,blend);camera.quaternion.copy(blendTurn).slerp(blendEye,blend)
+    }
     // 只在切换的那一下动 figure.visible，不每帧覆盖拍照模式「隐藏人物」、商店展台等别处的设定。
-    const hideAvatar=firstPerson&&!cigarette.active
+    const hideAvatar=(firstPerson||blend>.8)&&!cigarette.active
     if(hideAvatar!==firstPersonHidden){firstPersonHidden=hideAvatar;figure.visible=active&&!hideAvatar}
   }
   const terrainRay=new THREE.Raycaster(undefined,new THREE.Vector3(0,-1,0))
@@ -3310,7 +3324,24 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
       mash:()=>knockdown.recordRecoverMash(),
       forceRise:(instant?:boolean)=>knockdown.forceRise(instant),
     },
-    get yaw(){return yaw},hold(on:boolean){held=on;external=null;if(on){rides?.stop();vx=vz=0}},face(heading:number,tilt=cfg.pitch){yaw=heading;pitch=tilt;if(active)follow(0,true)},showFigure(on:boolean){figure.visible=on&&active},
+    get yaw(){return yaw},get pitch(){return pitch},
+    /** Continue walking from an exact pose (seamless scene swap): no spawn search, no stream wait, no camera snap-back. */
+    resumeAt(x:number,footY:number,z:number,heading:number,tilt=cfg.pitch){
+      if(!active)return false
+      sim.sync(x,z)
+      // The caller's foot is the walk line; settle the capsule down onto it from just above, or on a ramp it starts
+      // embedded (~0.1 m) and pops out mid-stairs a few seconds later.
+      const lift=.3,at={x,y:footY+cfg.height/2+lift,z}
+      sim.body.setTranslation(at,true);sim.body.setNextKinematicTranslation(at);sim.world.step()
+      sim.controller.computeColliderMovement(sim.capsule,{x:0,y:-lift-.05,z:0});at.y+=sim.controller.computedMovement().y
+      sim.body.setTranslation(at,true);sim.body.setNextKinematicTranslation(at);sim.world.step();safe.set(at.x,at.y,at.z);resetMotion()
+      held=false;external=null;yaw=heading;pitch=tilt;facing=yaw+avatar.yaw;figure.rotation.y=facing
+      firstPersonHidden=false;figure.visible=true;restoreFootLocomotion(avatar.clips.idle);follow(0,true)
+      return true
+    },
+    /** 0 = normal camera, 1 = first person; null hands the camera back to the view-mode setting. */
+    setViewBlend(value:number|null){viewBlend=value===null?null:THREE.MathUtils.clamp(value,0,1)},
+    hold(on:boolean){held=on;external=null;if(on){rides?.stop();vx=vz=0}},face(heading:number,tilt=cfg.pitch){yaw=heading;pitch=tilt;if(active)follow(0,true)},showFigure(on:boolean){figure.visible=on&&active},
     // IDOK-182: 右手挂点给相机用（axis-aligned，-Z 朝前）；没有骨骼时回落到 figure 本身。
     handAnchor(){return avatarRig.attachmentAt?.('hand_r')??figure.getObjectByName('hand_r')??figure},
     waterSightBlocked:(eye:THREE.Vector3,water:THREE.Vector3)=>sim.pathBlocked(eye.x,eye.z,water.x,water.z,eye.y,water.y+.1),

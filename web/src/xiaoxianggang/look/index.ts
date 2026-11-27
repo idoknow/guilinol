@@ -11,6 +11,11 @@ export {
   XXG_PHOTO_COMPARISON_PAIRS,
   uvBoundsFromAtlasRect,
   applySignAtlasRect,
+  applyAtlasRectUv,
+  XXG_SIGN_ATLAS_W,
+  XXG_SIGN_ATLAS_H,
+  XXG_FASCIA_ASPECT,
+  XXG_BLADE_ASPECT,
   type AtlasRect,
   type SwatchSpec,
   type SignAtlasSlot,
@@ -25,7 +30,6 @@ export {
   buildLightStripTexture,
   buildRollerShutterMaps,
   buildWallAndStoneMaps,
-  buildSignAtlasMaps,
   type TextureUploadCache,
   type TextureBudgetSnapshot,
   type TextureBudgetEntry,
@@ -39,3 +43,15 @@ export {
   type MaterialSlotKey,
   type ResolvedShopLook,
 } from './materials.ts'
+
+export { buildSignAtlasMap } from './sign-atlas.ts'
+export {
+  XXG_SHOP_SIGNS,
+  XXG_SIGN_PLAQUES,
+  isLitSignStyle,
+  type XxgShopSign,
+  type XxgSignExtra,
+  type XxgSignFace,
+  type XxgSignForm,
+  type XxgSignStyle,
+} from './shop-signs.ts'

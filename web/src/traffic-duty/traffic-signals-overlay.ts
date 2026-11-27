@@ -2,7 +2,7 @@ import * as THREE from 'three'
 import {mainDetail} from '../look/mirror-layer'
 import {getActiveDutyTraffic} from '../traffic/duty-traffic.ts'
 import {getLatestTraffic, type Traffic} from '../traffic/sim.ts'
-import {SIGNAL_DRIVER_RANK, SignalPlan, citySignalClock, citySignals, type SignalColor, type SignalState} from '../traffic/signals.ts'
+import {SIGNAL_DRIVER_RANK, SIGNAL_LENS_HEX, SignalPlan, citySignalClock, citySignals, type SignalColor, type SignalState} from '../traffic/signals.ts'
 
 /**
  * Pure-frontend dynamic traffic-signal lens overlay for Shizijie's 4 cantilevered gantries
@@ -88,11 +88,7 @@ const LENS_Y = {
   green: 5.69,
 } as const
 
-const LENS_HEX = {
-  red: {lit: 0xff3b30, off: 0x281414},
-  yellow: {lit: 0xffc53d, off: 0x262010},
-  green: {lit: 0x25e07d, off: 0x10261b},
-} as const
+const LENS_HEX = SIGNAL_LENS_HEX
 
 /** Programme used until a road cell carrying the Shizijie signal has loaded; mirrors `graph.json.gz`. */
 const SHIZIJIE_FALLBACK_PLAN = new SignalPlan([{

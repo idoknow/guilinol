@@ -8,6 +8,8 @@ import {riderPool} from './rider-pool'
 import {alignWheels} from './wheel-pose'
 import {interactions} from './interactions'
 import {SIGNAL_DRIVER_RANK,citySignalClock,citySignalColor,citySignalState,citySignals} from './signals'
+import {signalApproaches} from './signal-approach'
+import {LANDMARK_SIGNAL_GROUPS,signalHeads} from './signal-heads'
 import {touchUi} from '../ui/input-mode'
 import {npcDefaults,validNpc} from '../../../lib/npc'
 
@@ -22,9 +24,10 @@ async function loadGraph(key:string,rules:typeof npcDefaults,surfaceAt?:Traffic[
   const decoded=await new Response(body).arrayBuffer()
   const graph:Graph=JSON.parse(new TextDecoder().decode(decoded))
   citySignals.add(graph.signals)
+  const approaches=signalApproaches(graph,LANDMARK_SIGNAL_GROUPS)
   const sim=new Traffic(graph,Math.random,touchUi()?MOBILE_ACTORS:MAX_ACTORS,rules,surfaceAt)
   const timing=performance.getEntriesByName(response.url).at(-1) as PerformanceResourceTiming|undefined
-  return {sim,sample:{key,encodedBytes:timing?.encodedBodySize||bytes.byteLength,decodedBytes:decoded.byteLength,downloadMs:downloaded-start,parseAndIndexMs:performance.now()-downloaded}}
+  return {sim,approaches,sample:{key,encodedBytes:timing?.encodedBodySize||bytes.byteLength,decodedBytes:decoded.byteLength,downloadMs:downloaded-start,parseAndIndexMs:performance.now()-downloaded}}
 }
 
 export async function traffic(scene:THREE.Scene,camera:THREE.Camera,verify:boolean,sampleGround?:Traffic['sampleGround'],warm?:(root:THREE.Object3D)=>Promise<void>,surfaceAt?:Traffic['surfaceAt']){
@@ -99,11 +102,15 @@ export async function traffic(scene:THREE.Scene,camera:THREE.Camera,verify:boole
       hide(STATIC+count,STATIC+parkCount);parkCount=count;mesh.userData.parked=count
     }).catch(error=>{if(target===parkKey){parkKey='';cache.clear()}console.warn('Parking cell unavailable',error)})
   }
-  const near=(x:number,z:number,visit:(solid:Solid)=>void)=>{sim?.nearSolids(x,z,visit);getActiveDutyTraffic()?.nearSolids(x,z,visit);staticSolids(x,z,visit)}
   let accumulator=0
   const signalDriver=citySignalClock.driver(SIGNAL_DRIVER_RANK.street)
   const signalProbe={clock:()=>citySignalClock.now,count:()=>citySignals.size,nodes:()=>[...citySignals.nodeIds()],state:(node:number)=>{const state=citySignalState(node,{phase:0,color:'green',remaining:0,cycle:0});return state&&{...state,lanes:citySignals.spec(node)!.phases.map(phase=>phase.lanes)}},color:(node:number,lane:number)=>citySignalColor(node,lane),sim:(node:number,lane:number)=>sim?.getSignalPhase(lane,node)??null}
   if(verify)mesh.userData.signals=signalProbe
+  // IDOK-399: a signal head for every approach of the loaded road cell. They read `citySignals`; they never drive the clock.
+  const heads=surfaceAt&&signalHeads(scene,surfaceAt)
+  if(verify&&heads)mesh.userData.signalHeads=heads.probe
+  if(heads)void warm?.(heads.group)
+  const near=(x:number,z:number,visit:(solid:Solid)=>void)=>{sim?.nearSolids(x,z,visit);getActiveDutyTraffic()?.nearSolids(x,z,visit);staticSolids(x,z,visit);heads?.near(x,z,visit)}
   const probeIds=new WeakMap<object,number>();let nextProbeId=0
   batch.setColorAt(0,new THREE.Color(0xffffff))
   await warm?.(batch)
@@ -119,27 +126,28 @@ export async function traffic(scene:THREE.Scene,camera:THREE.Camera,verify:boole
     const dutyActive=Boolean(getActiveDutyTraffic())
     if(enabled)useTrafficSolids(near)
     else if(!dutyActive)useTrafficSolids(undefined)
-    if(!enabled){effects.clear();people.clear();riders.clear();walking.clear();ridden.clear();riddenSlots.clear();mesh.count=0;hide(0,SLOTS);parkKey='';parkCount=0;curbside.clear();return}
+    if(!enabled){effects.clear();people.clear();riders.clear();walking.clear();ridden.clear();riddenSlots.clear();mesh.count=0;hide(0,SLOTS);parkKey='';parkCount=0;curbside.clear();heads?.hide();return}
     updateParking(camera.position.x,camera.position.z)
     parkLodAt-=dt;if(parkLodAt<=0){parkLodAt=.5;for(const [slot,variant,x,y,z,yaw] of parkedRows)show(slot,variant,x,y,z,yaw,1)}
-    if(verify&&mesh.userData.staticOnly){hide(0,STATIC);mesh.count=0;mesh.userData.allMotors=[];return}
+    if(verify&&mesh.userData.staticOnly){hide(0,STATIC);mesh.count=0;mesh.userData.allMotors=[];heads?.update(dt,player??camera.position);return}
     const center=player??camera.position
     const target=`${Math.floor(center.x/512)}_${Math.floor(center.z/512)}`
     if(target!==key){
       key=target
-      if(cells.has(key))void loadGraph(key,rules,surfaceAt).then(({sim:next,sample})=>{
+      if(cells.has(key))void loadGraph(key,rules,surfaceAt).then(({sim:next,approaches,sample})=>{
         if(key!==target)return
         if(verify){mesh.userData.loads.push(sample);if(mesh.userData.loads.length>64)mesh.userData.loads.shift()}
         next.sampleGround=sampleGround
         next.surfaceAt=surfaceAt
-        if(sim)next.inherit(sim);sim=next
+        if(sim)next.inherit(sim);sim=next;heads?.setApproaches(approaches)
       }).catch(error=>console.warn('Traffic cell unavailable',error))
-      else {sim=undefined;people.clear();riders.clear();walking.clear();ridden.clear();riddenSlots.clear();mesh.count=0;hide(0,STATIC)}
+      else {sim=undefined;heads?.setApproaches([]);people.clear();riders.clear();walking.clear();ridden.clear();riddenSlots.clear();mesh.count=0;hide(0,STATIC)}
     }
-    if(!sim){effects.clear();return}
+    if(!sim){effects.clear();heads?.update(dt,center);return}
     accumulator+=Math.min(dt,.2)
     // Lights follow the one city clock: this sim's signal time is `citySignalClock.now` minus the unstepped remainder.
     signalDriver.advance(Math.min(dt,.2));sim.signalShift=citySignalClock.now-accumulator-sim.time
+    heads?.update(dt,center)
     if(accumulator<.05){people.animate(dt,accumulator);riders.animate(dt,accumulator,syncRiddenVehicle);return}
     camera.updateMatrixWorld()
     frustum.setFromProjectionMatrix(projection.multiplyMatrices(camera.projectionMatrix,camera.matrixWorldInverse))

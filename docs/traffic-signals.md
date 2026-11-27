@@ -61,6 +61,39 @@
   - `state(node)` 相位、颜色、剩余秒、各相位车道
   - `color(node, lane)` 真源读数；`sim(node, lane)` 街面 sim 读数（两者应始终相同）
 
+# 全城信号灯头
+
+每个有信号的路口，每个进口立一个灯头：司机右手边路缘上、路口前几米、面朝来车。十字街除外，那里的龙门架在地标模型里，由 `traffic-duty/traffic-signals-overlay.ts` 点亮（`signal-heads.ts` 的 `LANDMARK_SIGNAL_GROUPS`）。
+
+| 文件 | 管什么 |
+|---|---|
+| `web/src/traffic/signal-approach.ts` | 纯计算，不依赖 three.js：从路网算出进口，再从街面数据找灯杆位置 |
+| `web/src/traffic/signal-heads.ts` | 把全部灯头画成两个网格（杆与灯箱一个、灯片一个），全城共 2 个 draw call |
+| `web/src/traffic/index.ts` | 换路网 cell 时交进口表，每帧调一次 `update` |
+
+## 摆位规则
+
+- **进口**：驶入信号节点、在该节点相位表里、起点不属于同一路口的机动车道。同一对「起点 > 信号节点」的车道算一个进口，一个进口一个灯头。全量路网 195 个进口 / 51 个路口，每个进口只属于一个相位（单测核对）。
+- **灯杆**：从节点沿车道往回 5–41 m 逐段找；每处从最右车道中心向右找路缘（第一处既不是路面也不是护栏、再往外 0.75 m 仍然两者都不是的点），并要求再往回 3 m 处路缘距离相差不超过 1 m，这样灯杆落在转角弧线之外。杆立在路缘外 0.75 m。
+- **只沿真实车道找**：进口自己的车道不够长时（全量路网里 12 个进口不到 8 m），接着沿喂给它的那一条路往回走（`SignalApproach.path`）。遇到另一个信号节点、分叉或汇入（对齐的上游不止一条）、转弯超过约 26°、高架，就停。绝不沿直线外推到车道起点之外；折线总长不到 8 m 的进口没有灯头（当前路网里没有，单测断言）。
+- **样式**：`tertiary`、`residential`、`service`、`unclassified`、`living_street` 这些小路，以及路缘离最右车道中心不到 2.25 m 的进口，灯头直接装在 3.75 m 立杆上；其余用 7.2 m 杆加悬臂，悬臂伸到最右车道中心上方，最长 6.5 m。
+- **没有灯头的进口**：高架和桥上的车道（`gradeSeparated`）不算进口；车道中心不在街面数据的路面上（缺数据），或 18 m 内找不到路缘的，探针里计入 `none`。
+- 灯杆对步行和开车的玩家是障碍物（`signal-heads.ts` 自己的 `SolidGrid`，经 `traffic/index.ts` 的 `near` 接入），隐藏时不挡路。街面 NPC 只走车道和步道，不受影响。
+- 位置不写进世界数据，运行时算；420 m 以外或街面地块没加载到的进口先挂起（探针里的 `pending`），玩家走近后补上，找到的位置整局记住。
+- 找路缘的开销有上限：每 0.1 秒只看一个进口的 2 个距离（一次最多约 300 次街面查询，单测断言），没找完下次接着找；地块没到的进口 1.5 秒后再看，已排除的距离不重扫。
+
+改规则只动 `signal-approach.ts` 顶部的常量。
+
+## 灯色
+
+灯头不推时钟，只读 `citySignals.color(节点, 车道, citySignalClock.now)`。每帧比对，灯色变了才写那一个灯头的颜色缓冲。街面交通关掉时灯头一起隐藏；`?verify` 的 `staticOnly` 模式下灯头照常更新。镜片颜色用 `signals.ts` 的 `SIGNAL_LENS_HEX`，和十字街龙门架同一组。
+
+## 验证
+
+- `npm run verify:signal-heads`：单测，约 1 秒。合成路口上的进口筛选、路缘与转角、朝向、悬臂、地块未加载、隔离带不算路缘；短进口沿上游折线找、分叉/急弯/上游信号/高架处停；分帧续扫与退避；网格里亮灯镜片的实际位置；一整个周期里颜色缓冲与真源逐帧一致；灯色不变时不上传缓冲。
+- `npm run verify:signal-heads:city`：无头真浏览器（先 `npm run build`）。5 个机位上核对：只多 2 个 draw call、灯杆不在机动车路面上、十字街没有重复灯头、灯色与真源一致。`-- --shots <目录>` 另存每个灯头的司机视角截图和 `cameras.json`；`-- --shots <目录> --cameras <cameras.json>` 用同一批机位给另一份构建拍对照图（不做断言）。
+- 浏览器探针（`?verify`）：`viewer.trafficProbe.signalHeads()` → `{total, pending, none, unplaced, visible, drawCalls, heads: [{key, node, group, lane, x, y, z, yaw, arm, back, kerb, shown, truth}]}`。`shown` 是从颜色缓冲读回来的亮灯，`truth` 是真源此刻的读数；`drawCalls` 是灯头组里渲染器会画的网格数（有灯头时 2，否则 0）；`unplaced` 列出还没立起来的进口和原因（`pending` / `none`）。
+
 # 全城性能基线：`npm run perf:city`
 
 固定 5 个机位（十字街、解放桥、中山路口、乐群小学周边、南区主干路口），桌面和手机两档，全程无头（macOS 走 Metal，不弹窗）。

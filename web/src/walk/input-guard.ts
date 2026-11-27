@@ -37,13 +37,20 @@ export function isTextInputTarget(target: EventTarget | null): boolean {
   return !!(target as Element).closest(TEXT_INPUT_SELECTOR)
 }
 
-export function isModalOrOverlayOpen(doc: Document = document): boolean {
+/**
+ * 小香港 / 十字街 indoor scenes: the walker is held, but they are not menus. Movement keys and pointer lock carry
+ * across the stairwell swap so the street walk resumes mid-stride on the way out.
+ */
+export function isIndoorSceneActive(doc: Document = document): boolean {
+  return doc.body.dataset.xxgActive === '1' || doc.body.dataset.szjActive === '1'
+}
+
+export function isModalOrOverlayOpen(doc: Document = document, options?: {ignoreIndoor?: boolean}): boolean {
   if (doc.body.hasAttribute('data-home')) return true
   if (doc.body.dataset.shopOpen === '1') return true
   if (doc.body.dataset.fishMenu === '1') return true
   if (doc.body.dataset.mifenStoryActive === '1') return true
-  if (doc.body.dataset.xxgActive === '1') return true
-  if (doc.body.dataset.szjActive === '1') return true
+  if (!options?.ignoreIndoor && isIndoorSceneActive(doc)) return true
   if (doc.body.dataset.tdStoryActive === '1') return true
   if (doc.body.dataset.drinksUiOpen === '1') return true
   const delivering = isFineTerminalDelivering(doc)

@@ -90,7 +90,7 @@ export function mountLazyShizijie(
     Boolean(
       !disposed &&
         instance &&
-        (instance.state === 'descending' || instance.state === 'inside' || instance.state === 'exiting'),
+        (instance.state === 'inside' || instance.state === 'exiting'),
     )
   const getMetrics = () => (instance ? instance.getMetrics() : { ...ZERO_METRICS })
 

@@ -20,13 +20,13 @@ import {
   buildLightStripTexture,
   buildRenovatedTileMaps,
   buildRollerShutterMaps,
-  buildSignAtlasMaps,
   buildTerrazzoMaps,
   buildWallAndStoneMaps,
   createTextureUploadCache,
   type TextureBudgetSnapshot,
   type TextureUploadCache,
 } from './textures.ts'
+import { buildSignAtlasMap } from './sign-atlas.ts'
 
 export type MaterialSlotKey =
   | 'floorTerrazzo'
@@ -95,6 +95,8 @@ export interface XiaoxianggangMaterialPack {
   readonly rollerShutterCream: THREE.MeshStandardMaterial
   readonly stairGranite: THREE.MeshStandardMaterial
   readonly signAtlasMat: THREE.MeshStandardMaterial
+  /** 木牌、金属铭牌：同一张招牌图集，不自发光。 */
+  readonly signPaintMat: THREE.MeshStandardMaterial
   readonly rackMetal: THREE.MeshStandardMaterial
   readonly cache: TextureUploadCache
   setLightingBoost(boost: number): void
@@ -145,14 +147,14 @@ export function createXiaoxianggangMaterials(opts: CreateMaterialsOptions = {}):
       name: 'xxg_floor_renovated',
       map: renovated.map,
       normalMap: renovated.normalMap,
-      normalScale: new THREE.Vector2(0.55, 0.55),
+      normalScale: new THREE.Vector2(0.45, 0.45),
       roughnessMap: renovated.roughnessMap,
       roughness: 1,
-      metalness: 0.06,
-      emissive: '#f9f5eb',
+      metalness: 0,
+      emissive: '#dfd8cc',
     }),
-    0.06,
-    0.08,
+    0.01,
+    0.02,
   )
   floorRenovated.userData = { tiled: true, periodM: [1.6, 1.6] }
 
@@ -197,11 +199,11 @@ export function createXiaoxianggangMaterials(opts: CreateMaterialsOptions = {}):
       emissiveMap: ceiling.emissiveMap,
       roughnessMap: ceiling.roughnessMap,
       roughness: 1,
-      metalness: 0.08,
-      emissive: '#ffffff',
+      metalness: 0.06,
+      emissive: '#fff4e2',
     }),
-    1.15,
-    0.55,
+    0.62,
+    0.30,
   )
   ceilingGrid.userData = { tiled: true, periodM: [1.2, 1.2] }
 
@@ -213,11 +215,11 @@ export function createXiaoxianggangMaterials(opts: CreateMaterialsOptions = {}):
       map: stripTex,
       emissiveMap: stripTex,
       emissive: '#e6f1ff',
-      roughness: 0.22,
-      metalness: 0.05,
+      roughness: 0.24,
+      metalness: 0.04,
     }),
-    1.15,
-    0.55,
+    0.68,
+    0.32,
   )
 
   const lightStripWarm = track(
@@ -267,14 +269,14 @@ export function createXiaoxianggangMaterials(opts: CreateMaterialsOptions = {}):
       name: 'xxg_storefront_glass',
       color: XXG_PALETTE.storefrontGlassTint.hex,
       transparent: true,
-      opacity: 0.22,
+      opacity: 0.34,
       roughness: 0.08,
-      metalness: 0.12,
+      metalness: 0.16,
       depthWrite: false,
-      emissive: '#d8eef8',
+      emissive: '#cfe7f3',
     }),
-    0.04,
     0.06,
+    0.08,
   )
 
   const stairGranite = track(
@@ -284,7 +286,7 @@ export function createXiaoxianggangMaterials(opts: CreateMaterialsOptions = {}):
       roughnessMap: wallAndStone.graniteRoughness,
       roughness: 1,
       metalness: 0.05,
-      emissive: '#8f8e8b',
+      emissive: '#a39a8d',
     }),
     0.02,
     0.04,
@@ -338,19 +340,27 @@ export function createXiaoxianggangMaterials(opts: CreateMaterialsOptions = {}):
   )
   rollerShutterCream.userData = { tiled: true, periodM: [1.0, 1.0] }
 
-  // 6. 招牌与导视合批总图集（单个 GPU 纹理服务全商业城招牌）
-  const atlas = buildSignAtlasMaps(cache)
+  // 6. 招牌合批图集：一张贴图同时作底色和自发光。灯箱、霓虹、发光字用 signAtlasMat（亮），木牌、金属铭牌用 signPaintMat（不亮）。
+  const atlas = buildSignAtlasMap(cache)
   const signAtlasMat = track(
     new THREE.MeshStandardMaterial({
       name: 'xxg_sign_atlas',
-      map: atlas.map,
-      emissiveMap: atlas.emissiveMap,
+      map: atlas,
+      emissiveMap: atlas,
       emissive: '#ffffff',
-      roughness: 0.34,
+      roughness: 0.55,
+      metalness: 0.0,
+    }),
+    0.42,
+    0.2,
+  )
+  const signPaintMat = track(
+    new THREE.MeshStandardMaterial({
+      name: 'xxg_sign_paint',
+      map: atlas,
+      roughness: 0.78,
       metalness: 0.08,
     }),
-    0.28,
-    0.35,
   )
 
   const snapshot = cache.getSnapshot()
@@ -375,6 +385,7 @@ export function createXiaoxianggangMaterials(opts: CreateMaterialsOptions = {}):
     rollerShutterCream,
     stairGranite,
     signAtlasMat,
+    signPaintMat,
     rackMetal,
     cache,
     setLightingBoost(boost: number) {
