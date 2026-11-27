@@ -112,10 +112,8 @@ SHELTER_WALKABLE_MIN_RATIO: float = 0.85
 SHELTER_OBSTACLE_MARGIN_M: float = 0.4
 # 行道树：树心到候车亭轮廓至少这么远（树池约 1 m 见方，亭不压树池）。
 SHELTER_TREE_CLEARANCE_M: float = 0.6
-# 街边摆设（.glc st[9] decor 与 st[7] beds）占位半径、半宽与偏移（单位：米）。
+# 街边摆设（.glc st[9] decor 与 st[7] beds）占位半径与半宽（单位：米）；共享电动车不在此列，见下方读 st[9] 处。
 CLUTTER_RAIL_KINDS: frozenset[int] = frozenset({1, 2, 5, 6, 7, 8})
-CLUTTER_EBIKE_OFFSETS_M: tuple[float, ...] = (-1.25, 0.0, 1.25)
-CLUTTER_EBIKE_RADIUS_M: float = 0.9
 CLUTTER_RAIL_HALF_WIDTH_M: float = 0.6
 CLUTTER_SIGN_RADIUS_M: float = 0.8
 CLUTTER_BOLLARD_RADIUS_M: float = 0.4
@@ -440,18 +438,9 @@ def read_world(world_dir: Path) -> WorldData:
                 kind = item[0]
                 x = ox + item[1] * 0.1
                 z = oz + item[2] * 0.1
-                if kind == 3:
-                    if len(item) < 4:
-                        continue
-                    h = item[3] * 0.01
-                    ch, sh = math.cos(h), math.sin(h)
-                    for along in CLUTTER_EBIKE_OFFSETS_M:
-                        clutter.append(
-                            Point(x + along * ch, z + along * sh).buffer(
-                                CLUTTER_EBIKE_RADIUS_M, 8
-                            )
-                        )
-                elif kind in CLUTTER_RAIL_KINDS:
+                # kind 3（路边共享电动车）不算占位：运行时 web/src/traffic/bus-shelter-clearance.ts
+                # 把落在候车亭占地（含余量）里的电动车整辆不摆、不可骑（IDOK-399 5c）。
+                if kind in CLUTTER_RAIL_KINDS:
                     if len(item) < 5:
                         continue
                     h = item[3] * 0.01

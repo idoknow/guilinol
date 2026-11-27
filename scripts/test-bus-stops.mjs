@@ -16,6 +16,10 @@ import {
 } from '../web/src/traffic/bus-stop-layout.ts'
 import {GROUND_REFERENCE, SETTLE_LOOKS, busStops} from '../web/src/traffic/bus-stops.ts'
 import {resolveContact} from '../web/src/traffic/contact.ts'
+import {
+  EBIKE_GROUP_SPACING, EBIKE_SHELTER_MARGIN, ShelterClearance, busShelterClearsParked, clearsParkedBike, busShelterBlocksBike, busShelterClearanceState,
+  onBusShelterClearance, setBusShelterClearance, shelterZone, zoneContains,
+} from '../web/src/traffic/bus-shelter-clearance.ts'
 import {SHIZIJIE_DECOR_EXCLUSION_POLY, SHIZIJIE_ORIGIN, pointInRelPoly, toShizijieRel} from '../web/src/shizijie-zone.ts'
 
 const near = (a, b, tolerance = 1e-6) => Math.abs(a - b) <= tolerance
@@ -492,4 +496,417 @@ test('runtime: a name is shown in the frame its canvas goes to the GPU, not befo
   }
   assert.ok(sawLate, 'some names were painted between uploads (the upload is throttled)')
   assert.equal(named.size, 12, 'all shown in the end')
+})
+
+// ——— e-bike shelter clearance (stage 5c) ———
+
+test('clearance zone: outline corners lie inside for both sides and arbitrary yaw, margin ±0.01 straddles boundary', () => {
+  const margin = EBIKE_SHELTER_MARGIN
+  const centreOut = (SHELTER_BACK + SHELTER_FRONT) / 2
+  const point = {x: 0, z: 0}
+  for (const side of [1, -1]) {
+    for (const yaw of [0, 0.37, Math.PI / 2, -1.1, Math.PI, -2.4]) {
+      const parsed = parseBusStops(file([[0, 0, yaw, 1, side, '测试站', '']]))
+      assert.equal(parsed.stops.length, 1)
+      const stop = parsed.stops[0], zone = shelterZone(stop, margin)
+      assert.ok(near(zone.halfAlong, SHELTER_LENGTH / 2 + margin))
+      assert.ok(near(zone.halfOut, (SHELTER_FRONT - SHELTER_BACK) / 2 + margin))
+      const centreAlong = side * SHELTER_OFFSET
+      for (const corner of shelterOutline(stop)) {
+        toWorld(stop, corner.along, corner.out, point)
+        assert.equal(zoneContains(zone, point.x, point.z), true, `corner inside (side=${side}, yaw=${yaw})`)
+        const tDir = Math.sign(corner.along - centreAlong)
+        const nDir = Math.sign(corner.out - centreOut)
+        toWorld(stop, corner.along + tDir * (margin - 0.01), corner.out, point)
+        assert.equal(zoneContains(zone, point.x, point.z), true, 't margin-0.01 inside')
+        toWorld(stop, corner.along + tDir * (margin + 0.01), corner.out, point)
+        assert.equal(zoneContains(zone, point.x, point.z), false, 't margin+0.01 outside')
+        toWorld(stop, corner.along, corner.out + nDir * (margin - 0.01), point)
+        assert.equal(zoneContains(zone, point.x, point.z), true, 'n margin-0.01 inside')
+        toWorld(stop, corner.along, corner.out + nDir * (margin + 0.01), point)
+        assert.equal(zoneContains(zone, point.x, point.z), false, 'n margin+0.01 outside')
+        toWorld(stop, corner.along + tDir * (margin - 0.01), corner.out + nDir * (margin - 0.01), point)
+        assert.equal(zoneContains(zone, point.x, point.z), true, 'corner diagonal margin-0.01 inside')
+        toWorld(stop, corner.along + tDir * (margin + 0.01), corner.out + nDir * (margin + 0.01), point)
+        assert.equal(zoneContains(zone, point.x, point.z), false, 'corner diagonal margin+0.01 outside')
+      }
+    }
+  }
+})
+
+test('clearance index: shelter-only, matches brute force on 2000 deterministic points across 64 m grid boundaries', () => {
+  const makeStop = (id, x, z, yaw, shelter, side) => {
+    const nx = Math.sin(yaw), nz = Math.cos(yaw)
+    return {id, key: `${x.toFixed(2)},${z.toFixed(2)}`, x, z, yaw, shelter, side, name: '', en: '', tx: nz, tz: -nx, nx, nz}
+  }
+  let seed = 3995
+  const rand = () => (seed = (seed * 1103515245 + 12345) % 2147483648) / 2147483648
+
+  const stops = [
+    // Crosses both x=64 and z=64 (zone centre at 64.6, 63.85; spans x∈[61.6,67.6], z∈[62.2,65.5]).
+    makeStop(0, 62, 65, 0, true, 1),
+    // Crosses x=-64 and z=-64 at a diagonal yaw.
+    makeStop(1, -63.5, -63.5, 0.7, true, -1),
+    // Crosses x=0 and z=0.
+    makeStop(2, -2, 1.2, 0.25, true, 1),
+    // Crosses x=128.
+    makeStop(3, 127.5, -20, Math.PI / 3, true, 1),
+    // Bare pole right next to a grid line: must be ignored.
+    makeStop(4, 64, -64, 0, false, 1),
+  ]
+  for (let i = stops.length; i < 32; i++) {
+    const x = rand() * 320 - 128, z = rand() * 320 - 128, yaw = rand() * Math.PI * 2 - Math.PI
+    const shelter = i < 25, side = i % 2 === 0 ? 1 : -1
+    stops.push(makeStop(i, x, z, yaw, shelter, side))
+  }
+
+  const clearance = new ShelterClearance(stops)
+  assert.equal(clearance.zones.length, stops.filter(stop => stop.shelter).length)
+
+  // Bare pole from parsed data is excluded too.
+  const fromParsed = new ShelterClearance(parseBusStops(file([A, B, C])).stops)
+  assert.deepEqual(fromParsed.zones.map(zone => zone.key), ['0.00,0.00', '20.00,0.00'])
+
+  // All four 64 m quadrants of stop 0 return its key.
+  for (const [qx, qz] of [[62.5, 63.0], [65.5, 63.0], [62.5, 65.0], [65.5, 65.0]]) {
+    assert.equal(clearance.blocks(qx, qz), true)
+    assert.equal(clearance.zoneAt(qx, qz)?.key, stops[0].key)
+  }
+
+  let hits = 0, misses = 0, crossCellHits = 0
+  for (let i = 0; i < 2000; i++) {
+    let x, z
+    if (i < 1000) {
+      const zone = clearance.zones[i % clearance.zones.length]
+      x = zone.x + (rand() * 12 - 6)
+      z = zone.z + (rand() * 12 - 6)
+    } else {
+      x = rand() * 360 - 148
+      z = rand() * 360 - 148
+    }
+    const expected = clearance.zones.find(zone => zoneContains(zone, x, z)) ?? null
+    const got = clearance.zoneAt(x, z)
+    assert.equal(clearance.blocks(x, z), expected !== null, `blocks mismatch at (${x}, ${z})`)
+    assert.equal(got?.key ?? null, expected?.key ?? null, `zoneAt mismatch at (${x}, ${z})`)
+    if (expected) {
+      hits++
+      if (Math.floor(x / 64) !== Math.floor(expected.x / 64) || Math.floor(z / 64) !== Math.floor(expected.z / 64)) {
+        crossCellHits++
+      }
+    } else {
+      misses++
+    }
+  }
+  assert.ok(hits > 100 && misses > 100 && crossCellHits > 0, `expected mixed hits/misses across cells (hits=${hits}, misses=${misses}, crossCell=${crossCellHits})`)
+})
+
+test('clearance: the real bus-stops.json has 58 shelter zones and blocks every zone centre', () => {
+  const data = JSON.parse(readFileSync(new URL('../public/street-furniture/bus-stops.json', import.meta.url), 'utf8'))
+  const parsed = parseBusStops(data)
+  assert.ok(parsed)
+  const expected = parsed.stops.filter(stop => stop.shelter).length
+  const clearance = new ShelterClearance(parsed.stops)
+  assert.equal(clearance.zones.length, expected)
+  assert.equal(clearance.zones.length, 58)
+  for (const zone of clearance.zones) {
+    assert.equal(clearance.blocks(zone.x, zone.z), true, zone.key)
+  }
+})
+
+test('clearance registry: idle in node without fetching, notifies on set, unsubscribes, resets on null', () => {
+  const originalFetch = globalThis.fetch
+  let fetches = 0
+  let off = () => {}
+  try {
+    globalThis.fetch = () => { fetches++; throw new Error('unexpected fetch in node') }
+    setBusShelterClearance(null)
+    assert.deepEqual(busShelterClearanceState(), {state: 'idle', zones: 0, attempts: 0})
+    assert.equal(busShelterBlocksBike(2.6, -1.15), false)
+    assert.deepEqual(busShelterClearanceState(), {state: 'idle', zones: 0, attempts: 0})
+    assert.equal(fetches, 0)
+
+    let calls = 0
+    off = onBusShelterClearance(() => { calls++ })
+    const parsed = parseBusStops(file([A, C]))
+    const centre = shelterZone(parsed.stops[0])
+    setBusShelterClearance(parsed)
+    assert.deepEqual(busShelterClearanceState(), {state: 'ready', zones: 1, attempts: 0})
+    assert.equal(calls, 1)
+    assert.equal(busShelterBlocksBike(centre.x, centre.z), true)
+    assert.equal(busShelterBlocksBike(500, 500), false)
+
+    off()
+    setBusShelterClearance(parsed)
+    assert.equal(calls, 1, 'unsubscribed listener is not called again')
+
+    setBusShelterClearance(null)
+    assert.deepEqual(busShelterClearanceState(), {state: 'idle', zones: 0, attempts: 0})
+    assert.equal(busShelterBlocksBike(centre.x, centre.z), false)
+    assert.equal(fetches, 0)
+  } finally {
+    off()
+    setBusShelterClearance(null)
+    globalThis.fetch = originalFetch
+  }
+})
+
+test('clearance row: clears whole 3-bike group when one bike enters a shelter zone, caps 6-in-a-row at 3', () => {
+  const pushBike = (out, px, pz, yaw) => {
+    const s = Math.sin(yaw), c = Math.cos(yaw)
+    out.push(c, 0, -s, 0, 0, 1, 0, 0, s, 0, c, 0, px, 0.195, pz, 1)
+  }
+  const pushGroup = (out, x, z, heading) => {
+    const angle = -heading / 100
+    const yaw = angle + 0.75
+    for (const along of [-EBIKE_GROUP_SPACING, 0, EBIKE_GROUP_SPACING]) {
+      pushBike(out, x + along * Math.cos(angle), z - along * Math.sin(angle), yaw)
+    }
+  }
+
+  // Two shelters far apart: stop 0 hits one bike in group 1, stop 1 hits bike 0 of the 6-bike run.
+  const parsed = parseBusStops(file([
+    [0, 0, 0, 1, 1, '北站', ''],
+    [200, 0, 0, 1, 1, '南站', ''],
+  ]))
+  assert.ok(parsed)
+  const clearance = new ShelterClearance(parsed.stops)
+  const zone0 = shelterZone(parsed.stops[0])
+  const zone1 = shelterZone(parsed.stops[1])
+
+  const raw = []
+  // Group 0 (indices 0..2): far away.
+  pushGroup(raw, -40, 0, 50)
+
+  // Group 1 (indices 3..5): angled row; only the last bike (index 5, along=+1.25) sits inside zone0.
+  const h1 = -35, a1 = -h1 / 100
+  const hit1x = zone0.x - zone0.halfAlong + 0.2, hit1z = zone0.z
+  pushGroup(raw, hit1x - EBIKE_GROUP_SPACING * Math.cos(a1), hit1z + EBIKE_GROUP_SPACING * Math.sin(a1), h1)
+
+  // Group 2 (indices 6..8): far away.
+  pushGroup(raw, 80, 30, -120)
+
+  // Groups 3 & 4 (indices 9..14): two groups joined end-to-end (6 in a row, 1.25 m apart throughout);
+  // only the first bike (index 9) sits inside zone1.
+  const h2 = 0, a2 = -h2 / 100
+  const hit2x = zone1.x + zone1.halfAlong - 0.2, hit2z = zone1.z
+  const g3x = hit2x + EBIKE_GROUP_SPACING * Math.cos(a2), g3z = hit2z - EBIKE_GROUP_SPACING * Math.sin(a2)
+  pushGroup(raw, g3x, g3z, h2)
+  pushGroup(raw, g3x + 3 * EBIKE_GROUP_SPACING * Math.cos(a2), g3z - 3 * EBIKE_GROUP_SPACING * Math.sin(a2), h2)
+
+  const parked = new Float32Array(raw)
+  const bikeBlocks = i => clearance.blocks(parked[i * 16 + 12], parked[i * 16 + 14])
+
+  // Verify only index 5 (in groups 0..2) and index 9 (in the 6-bike run) lie directly inside a zone.
+  for (let i = 0; i < 15; i++) {
+    assert.equal(bikeBlocks(i), i === 5 || i === 9, `direct zone hit mismatch at bike ${i}`)
+  }
+  for (let i = 9; i < 14; i++) {
+    const d = Math.hypot(parked[(i + 1) * 16 + 12] - parked[i * 16 + 12], parked[(i + 1) * 16 + 14] - parked[i * 16 + 14])
+    assert.ok(Math.abs(d - EBIKE_GROUP_SPACING) < 1e-4, `6-bike spacing at ${i}: ${d}`)
+  }
+
+  for (const i of [0, 1, 2]) assert.equal(clearsParkedBike(clearance, parked, i), false, `group 0 bike ${i}`)
+  for (const i of [3, 4, 5]) assert.equal(clearsParkedBike(clearance, parked, i), true, `group 1 bike ${i}`)
+  for (const i of [6, 7, 8]) assert.equal(clearsParkedBike(clearance, parked, i), false, `group 2 bike ${i}`)
+  for (const i of [9, 10, 11]) assert.equal(clearsParkedBike(clearance, parked, i), true, `6-run bike ${i}`)
+  for (const i of [12, 13, 14]) assert.equal(clearsParkedBike(clearance, parked, i), false, `6-run bike ${i}`)
+})
+
+test('clearance row: yaw mismatch or NaN gap breaks the chain, out-of-bounds never throws, registry matches', () => {
+  const pushBike = (out, px, pz, yaw) => {
+    const s = Math.sin(yaw), c = Math.cos(yaw)
+    out.push(c, 0, -s, 0, 0, 1, 0, 0, s, 0, c, 0, px, 0.195, pz, 1)
+  }
+
+  const parsed = parseBusStops(file([[0, 0, 0, 1, 1, '测试站', '']]))
+  assert.ok(parsed)
+  const clearance = new ShelterClearance(parsed.stops)
+  const zone = shelterZone(parsed.stops[0])
+  const x0 = zone.x + zone.halfAlong - 0.2, z0 = zone.z
+
+  // Middle bike has a different yaw: stops the walk from index 2 to index 0.
+  const yawBreak = []
+  pushBike(yawBreak, x0, z0, 0.75)
+  pushBike(yawBreak, x0 + EBIKE_GROUP_SPACING, z0, 0.75 + 0.4)
+  pushBike(yawBreak, x0 + 2 * EBIKE_GROUP_SPACING, z0, 0.75)
+  const yawArr = new Float32Array(yawBreak)
+  assert.equal(clearance.blocks(x0, z0), true)
+  assert.equal(clearance.blocks(x0 + EBIKE_GROUP_SPACING, z0), false)
+  assert.equal(clearance.blocks(x0 + 2 * EBIKE_GROUP_SPACING, z0), false)
+  assert.equal(clearsParkedBike(clearance, yawArr, 0), true)
+  assert.equal(clearsParkedBike(clearance, yawArr, 1), false)
+  assert.equal(clearsParkedBike(clearance, yawArr, 2), false)
+
+  // Reverse direction: hit at index 2, different yaw at index 1 breaks the walk from index 0.
+  const revBreak = []
+  const rx2 = zone.x - zone.halfAlong + 0.2
+  pushBike(revBreak, rx2 - 2 * EBIKE_GROUP_SPACING, z0, 0.75)
+  pushBike(revBreak, rx2 - EBIKE_GROUP_SPACING, z0, 0.75 + 0.4)
+  pushBike(revBreak, rx2, z0, 0.75)
+  const revArr = new Float32Array(revBreak)
+  assert.equal(clearsParkedBike(clearance, revArr, 0), false)
+  assert.equal(clearsParkedBike(clearance, revArr, 1), false)
+  assert.equal(clearsParkedBike(clearance, revArr, 2), true)
+
+  // Sparse NaN slot in the middle also breaks the chain (as used by verify-bus-stops.mjs).
+  const nanArr = new Float32Array(3 * 16)
+  nanArr.fill(NaN)
+  nanArr.set(yawArr.subarray(0, 16), 0)
+  nanArr.set(yawArr.subarray(32, 48), 32)
+  assert.equal(clearsParkedBike(clearance, nanArr, 0), true)
+  assert.equal(clearsParkedBike(clearance, nanArr, 1), false)
+  assert.equal(clearsParkedBike(clearance, nanArr, 2), false)
+
+  // Out-of-bounds indices and empty/short arrays never throw and return false.
+  for (const bad of [-10, -1, 3, 4, 100, 0.5, NaN]) {
+    assert.equal(clearsParkedBike(clearance, yawArr, bad), false, `oob index ${bad}`)
+  }
+  assert.equal(clearsParkedBike(clearance, new Float32Array(0), 0), false)
+  assert.equal(clearsParkedBike(clearance, new Float32Array(12), 0), false)
+
+  // 2-bike array at edges (index±2 out of bounds) still clears its valid mate.
+  const twoBikes = []
+  pushBike(twoBikes, x0, z0, 0.75)
+  pushBike(twoBikes, x0 + EBIKE_GROUP_SPACING, z0, 0.75)
+  const twoArr = new Float32Array(twoBikes)
+  assert.equal(clearsParkedBike(clearance, twoArr, 0), true)
+  assert.equal(clearsParkedBike(clearance, twoArr, 1), true)
+
+  // Registry helper mirrors busShelterBlocksBike: idle -> false, ready -> row-aware, null -> idle.
+  const originalFetch = globalThis.fetch
+  let fetches = 0
+  try {
+    globalThis.fetch = () => { fetches++; throw new Error('unexpected fetch in node') }
+    setBusShelterClearance(null)
+    assert.equal(busShelterClearsParked(twoArr, 0), false)
+    assert.equal(busShelterClearsParked(twoArr, 1), false)
+    assert.equal(fetches, 0)
+
+    setBusShelterClearance(parsed)
+    assert.equal(busShelterClearsParked(twoArr, 0), true)
+    assert.equal(busShelterClearsParked(twoArr, 1), true)
+    assert.equal(busShelterClearsParked(yawArr, 2), false)
+
+    setBusShelterClearance(null)
+    assert.equal(busShelterClearsParked(twoArr, 1), false)
+    assert.equal(fetches, 0)
+  } finally {
+    setBusShelterClearance(null)
+    globalThis.fetch = originalFetch
+  }
+})
+
+test('shelter clearance loader: deduplicates, retries to failed, resets, guards generation, and notifies on ready', async () => {
+  const origFetch = globalThis.fetch
+  const origSetTimeout = globalThis.setTimeout
+  const origClearTimeout = globalThis.clearTimeout
+  const origWarn = console.warn
+  const hadLocation = Object.hasOwn(globalThis, 'location')
+  const origLocation = globalThis.location
+
+  const timers = new Map()
+  let nextTimerId = 1
+  let fetches = 0
+  let warns = 0
+  let unsub = null
+
+  const dummyParked = new Float32Array(16)
+  const B1 = [100, 100, 0, 1, 1, '北站', 'North']
+  const B2 = [200, 200, 0, 1, 1, '南站', 'South']
+
+  try {
+    globalThis.location = {href: 'http://localhost/'}
+    globalThis.setTimeout = (fn, ms) => {
+      const id = nextTimerId++
+      timers.set(id, {fn, ms})
+      return id
+    }
+    globalThis.clearTimeout = id => { timers.delete(id) }
+    console.warn = () => { warns++ }
+
+    setBusShelterClearance(null)
+    assert.deepEqual(busShelterClearanceState(), {state: 'idle', zones: 0, attempts: 0})
+
+    // 1) Concurrent calls deduplicate to one fetch; LOAD_ATTEMPTS consecutive failures -> state 'failed' + one warn.
+    globalThis.fetch = async () => {
+      fetches++
+      return {ok: false, status: 503, json: async () => ({})}
+    }
+    assert.equal(busShelterBlocksBike(0, 0), false)
+    assert.equal(busShelterClearsParked(dummyParked, 0), false)
+    assert.equal(fetches, 1)
+    assert.deepEqual(busShelterClearanceState(), {state: 'loading', zones: 0, attempts: 1})
+    await flush()
+
+    for (let attempt = 1; attempt < LOAD_ATTEMPTS; attempt++) {
+      assert.equal(warns, 0)
+      assert.equal(busShelterClearanceState().state, 'loading')
+      assert.equal(timers.size, 1)
+      const [[id, {fn, ms}]] = [...timers.entries()]
+      assert.equal(ms, LOAD_RETRY * 1000)
+      timers.delete(id)
+      fn()
+      await flush()
+    }
+    assert.equal(fetches, LOAD_ATTEMPTS)
+    assert.equal(timers.size, 0)
+    assert.equal(warns, 1)
+    assert.deepEqual(busShelterClearanceState(), {state: 'failed', zones: 0, attempts: LOAD_ATTEMPTS})
+    assert.equal(busShelterBlocksBike(0, 0), false)
+    assert.equal(busShelterClearsParked(dummyParked, 0), false)
+    assert.equal(fetches, LOAD_ATTEMPTS)
+
+    // 2) setBusShelterClearance(null) resets back to idle and allows reloading; stale in-flight response is ignored (generation).
+    setBusShelterClearance(null)
+    assert.deepEqual(busShelterClearanceState(), {state: 'idle', zones: 0, attempts: 0})
+
+    let resolveStale = null
+    globalThis.fetch = () => {
+      fetches++
+      return new Promise(resolve => { resolveStale = resolve })
+    }
+    assert.equal(busShelterClearsParked(dummyParked, 0), false)
+    assert.equal(fetches, LOAD_ATTEMPTS + 1)
+    assert.deepEqual(busShelterClearanceState(), {state: 'loading', zones: 0, attempts: 1})
+
+    let notified = 0
+    unsub = onBusShelterClearance(() => { notified++ })
+    const manual = parseBusStops(file([A]))
+    assert.ok(manual)
+    setBusShelterClearance(manual)
+    assert.equal(notified, 1)
+    assert.deepEqual(busShelterClearanceState(), {state: 'ready', zones: 1, attempts: 1})
+    assert.equal(busShelterBlocksBike(2.6, -1.15), true)
+    assert.equal(busShelterBlocksBike(102.6, 98.85), false)
+
+    resolveStale({ok: true, json: async () => file([B1, B2])})
+    await flush()
+    assert.equal(notified, 1)
+    assert.deepEqual(busShelterClearanceState(), {state: 'ready', zones: 1, attempts: 1})
+    assert.equal(busShelterBlocksBike(2.6, -1.15), true)
+    assert.equal(busShelterBlocksBike(102.6, 98.85), false)
+
+    // 3) Successful fetch moves state to 'ready' and notifies listeners.
+    setBusShelterClearance(null)
+    notified = 0
+    globalThis.fetch = async () => {
+      fetches++
+      return {ok: true, json: async () => file([B1, B2])}
+    }
+    assert.equal(busShelterBlocksBike(102.6, 98.85), false)
+    await flush()
+    assert.equal(notified, 1)
+    assert.deepEqual(busShelterClearanceState(), {state: 'ready', zones: 2, attempts: 1})
+    assert.equal(busShelterBlocksBike(102.6, 98.85), true)
+    assert.equal(busShelterBlocksBike(2.6, -1.15), false)
+  } finally {
+    unsub?.()
+    setBusShelterClearance(null)
+    globalThis.fetch = origFetch
+    globalThis.setTimeout = origSetTimeout
+    globalThis.clearTimeout = origClearTimeout
+    console.warn = origWarn
+    if (hadLocation) globalThis.location = origLocation
+    else delete globalThis.location
+  }
 })

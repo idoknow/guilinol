@@ -13,6 +13,7 @@ import {parkingBayLines} from './parking-bays'
 import {manholeCovers} from './manhole-covers'
 import {bollards} from './bollards'
 import {busStops} from './bus-stops'
+import {busShelterClearanceState} from './bus-shelter-clearance'
 import {drawnGround} from './drawn-ground'
 import {streetSurfaceMat} from '../streets'
 import {LANDMARK_SIGNAL_GROUPS,signalHeads} from './signal-heads'
@@ -148,6 +149,8 @@ export async function traffic(scene:THREE.Scene,camera:THREE.Camera,verify:boole
   if(verify&&(covers||posts))mesh.userData.streetFurnitureAudit=async(focus:{x:number,z:number},radius?:number)=>(await import('./street-furniture-audit')).streetFurnitureAudit(scene,covers?covers.mesh:undefined,covers?covers.probe().covers:[],posts?posts.mesh:undefined,posts?posts.probe().posts:[],focus,radius)
   if(verify&&stops){
     mesh.userData.busStops=stops.probe
+    // IDOK-399 5c: whether the e-bike clearance around shelters has its data (batch.ts asks it, it loads on its own).
+    mesh.userData.busShelterClearance=busShelterClearanceState
     // Verify-only: the same view with and without the stops, for before/after screenshots.
     mesh.userData.busStopsShown=(shown:boolean)=>{for(const item of [stops.mesh,stops.faces])(item.material as THREE.Material).visible=shown}
     mesh.userData.busStopDraws=async(frames?:number)=>{const {parkingBayDraws}=await import('./parking-bay-audit');return {parts:await parkingBayDraws(stops.mesh,frames),faces:await parkingBayDraws(stops.faces,frames)}}
