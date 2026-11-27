@@ -1,8 +1,10 @@
+import {Vector3} from 'three'
 // Surveyed native curb strips at the ends of a graded road. Clip render and
 // collision faces to the same footprint; carry the original reveal with the grade.
 type Point = number[]
 type NativeFace = [number, Point, Point, Point]
 export interface CurbReturn {
+  sidewalkOnly?: boolean
   origin: number[]
   axis: number[]
   along: number[]
@@ -62,6 +64,7 @@ export function fitCurbReturns(
   road: number[],
   sidewalk: number[],
   color: (kind: number) => number[],
+  cutCarriageway?: (a: Vector3, b: Vector3, c: Vector3) => Vector3[][],
 ) {
   for (const patch of patches) {
     const {
@@ -111,8 +114,8 @@ export function fitCurbReturns(
     const original: Triangle[] = []
     function cut(points: Point[]) {
       if (
-        points.every((p) => p[1] > y + 1.4) ||
-        points.every((p) => p[1] < y - 1.4) ||
+        points.every((p) => p[1] > y + (patch.sidewalkOnly ? 5 : 1.4)) ||
+        points.every((p) => p[1] < y - (patch.sidewalkOnly ? 5 : 1.4)) ||
         planes.some((f) => points.every((p) => f(p) < 0))
       )
         return
@@ -151,7 +154,7 @@ export function fitCurbReturns(
         rgb[3 * j + 2],
         uv[j],
       ])
-      const outside = [0, 1, 2, 3, 6].includes(kind) ? cut(points) : undefined
+      const outside = (patch.sidewalkOnly ? [1, 2, 6] : [0, 1, 2, 3, 6]).includes(kind) ? cut(points) : undefined
       if (!outside) {
         write(points, kind)
         continue
@@ -159,7 +162,7 @@ export function fitCurbReturns(
       original.push({ points, kind })
       for (const poly of outside) write(poly, kind)
     }
-    for (const buffer of [road, sidewalk]) {
+    for (const buffer of patch.sidewalkOnly ? [sidewalk] : [road, sidewalk]) {
       const kept: number[] = []
       for (let i = 0; i < buffer.length; i += 9) {
         const face = [0, 3, 6].map((j) => buffer.slice(i + j, i + j + 3))
@@ -189,7 +192,11 @@ export function fitCurbReturns(
         const other = weight < 1 ? sample(original, px, pz, kind, native) : native
         return [px, other + weight * (native - other), pz, ...color(kind), 0]
       })
-      for (const poly of outsideLanes(pts)) {
+      const exposed = patch.sidewalkOnly && cutCarriageway
+        ? cutCarriageway(...pts.map(p => new Vector3(p[0], p[1], p[2])) as [Vector3, Vector3, Vector3])
+            .map(poly => poly.map(p => [p.x, p.y, p.z, ...color(kind), 0]))
+        : outsideLanes(pts)
+      for (const poly of exposed) {
         write(poly, kind)
         if (kind === 0 || kind === 1 || kind === 6) {
           for (let j = 1; j + 1 < poly.length; j++) {

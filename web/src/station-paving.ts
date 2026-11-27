@@ -18,7 +18,7 @@ export function split(poly:Point[],side:(p:Point)=>number):[Point[],Point[]]{
 
 // Preserve the original triangles beyond every rebuilt strip. Covered bores
 // also keep independently supported roads overhead.
-export function stationPaving(cuts:Cut[],protectedAt?:(x:number,z:number)=>boolean){
+export function stationPaving(cuts:Cut[],protectedAt?:(x:number,z:number)=>boolean, fullBounds=false){
   const bins=new Map<string,Cut[]>()
   for(const cut of cuts){
     const [ax,az,bx,bz,w]=cut
@@ -32,6 +32,11 @@ export function stationPaving(cuts:Cut[],protectedAt?:(x:number,z:number)=>boole
   return (a:Point,b:Point,c:Point)=>{
     const candidates=new Set<Cut>()
     for(const p of [a,b,c])for(const cut of bins.get(Math.floor(p.x/8)+','+Math.floor(p.z/8))??[])candidates.add(cut)
+    if(fullBounds){
+      for(let i=Math.floor(Math.min(a.x,b.x,c.x)/8);i<=Math.floor(Math.max(a.x,b.x,c.x)/8);i++)
+        for(let j=Math.floor(Math.min(a.z,b.z,c.z)/8);j<=Math.floor(Math.max(a.z,b.z,c.z)/8);j++)
+          for(const cut of bins.get(i+','+j)??[])candidates.add(cut)
+    }
     let polygons=[[a,b,c]]
     for(const [ax,az,bx,bz,width,ay,by,open,footprint] of candidates){
       const len=Math.hypot(bx-ax,bz-az),dx=(bx-ax)/len,dz=(bz-az)/len

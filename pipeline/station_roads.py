@@ -90,6 +90,8 @@ def tunnel_sections(profiles):
                               **({'fittedCarriageway': True} if chord in way.get('pavedChords', ()) else {}),
                               pairedWidth=way.get('stationWidth'),
                               stations=np.column_stack((distances-start, levels)).tolist()))
+            if way.get("retainCutBanks"):
+                bores[-1]["retainCutBanks"] = True
             apron_nodes = set(chord).intersection(way.get("turningAprons", ()))
             if apron_nodes:
                 bores[-1]["turningAprons"] = sorted(apron_nodes)
@@ -203,7 +205,7 @@ def bake(directory, manifest, paired_widths):
             passage = IndoorPassage(section["indoorPassage"], ways) if "indoorPassage" in section else None
             bridges, joints = grade_decks(directory, manifest, section["roadDecks"], ways, parts, passage)
         bake_profiles(directory, manifest, parts, elements, bridges, joints, additional=True,
-                      sample_traffic=not bridges)
+                      sample_traffic=not bridges, junction_planes=section.get("junctionPlanes"))
         finish_paving(directory, manifest, list(parts.values()), elements)
         if bridges or section.get("retainRoadNodeLevels"):
             final_traffic_ways.extend(way for way, _, _ in parts.values())
@@ -222,7 +224,7 @@ def bake(directory, manifest, paired_widths):
 
 
 def bake_profiles(directory, manifest, profiles, elements, bridge_ways=(), landings=None, *,
-                  additional=False, sample_traffic=True, bridge_approaches=()):
+                  additional=False, sample_traffic=True, bridge_approaches=(), junction_planes=None):
     import gzip
     import struct
     from collections import defaultdict
@@ -335,13 +337,14 @@ def bake_profiles(directory, manifest, profiles, elements, bridge_ways=(), landi
         build_junctions([b for b in bores if b['way'] in bridge_approaches], protected_paving)
     else:
         original_guards = protected_paving
-        build_junctions(bores, protected_paving)
+        build_junctions(bores, protected_paving, planes=junction_planes)
     for bore in bores:
         for end,node in enumerate(bore['nodes']):
             if landings and node in landings:
                 bore.setdefault('joints',[None,None])[end] = landings[node]
     install_native_ties(bores, profiles)
     cuts = defaultdict(list)
+    retained_cuts = defaultdict(list)
     for t in bores:
         guards = protected_paving if t['way'] in bridge_approaches else original_guards
         a,b=t['portals']
@@ -364,6 +367,8 @@ def bake_profiles(directory, manifest, profiles, elements, bridge_ways=(), landi
             for row in range(low[1],high[1]+1):
                 x,z=col*256,row*256
                 entry=[a[0]-x,a[2]-z,b[0]-x,b[2]-z,width,a[1],b[1],t['openCut']]
+                if t.get("retainCutBanks"):
+                    retained_cuts[x,z].append(entry)
                 if 'footprint' not in t:
                     cuts[x,z].append(entry)
                 else:
@@ -389,12 +394,17 @@ def bake_profiles(directory, manifest, profiles, elements, bridge_ways=(), landi
                     for col in range(math.floor(left/256),math.floor(right/256)+1):
                         for row in range(math.floor(top/256),math.floor(bottom/256)+1):
                             x,z = col*256,row*256
-                            cuts[x,z].append([left-x,middle-z,right-x,middle-z,(bottom-top)/2,
-                                              level,level,False,[[u-x,v-z] for u,v in list(face.exterior.coords)[:3]]])
+                            wedge_cut = [left-x,middle-z,right-x,middle-z,(bottom-top)/2,
+                                         level,level,False,[[u-x,v-z] for u,v in list(face.exterior.coords)[:3]]]
+                            cuts[x,z].append(wedge_cut)
+                            if t.get("retainCutBanks"):
+                                retained_cuts[x,z].append(wedge_cut)
     for chunk in manifest['chunks']:
         origin = chunk['x'],chunk['z']
         if origin not in active:
             continue
+        if origin in retained_cuts:
+            chunk.setdefault('stationPaving', {})['retainedCuts'] = retained_cuts[origin]
         segments = tiles[origin]
         path = directory / chunk['file']
         native_tile = path.read_bytes()
@@ -447,6 +457,15 @@ def bake_profiles(directory, manifest, profiles, elements, bridge_ways=(), landi
             target[take]=np.rint(raw[take]).astype('i2')
             distance[take]=lateral[take]
         ok=~protected & (wet==-32768) & np.isfinite(distance)
+        # The open-cut mesh clips the native ground and joins both walls to
+        # it. Keep its support grid under adjoining yards and foundations.
+        for bore in bores:
+            if not bore.get("retainCutBanks"):
+                continue
+            a, b = np.asarray(bore["portals"])[:, [0, 2]] - origin
+            direction = (b - a) / bore["length"]
+            along = np.clip((xx-a[0])*direction[0] + (zz-a[1])*direction[1], 0., bore["length"])
+            ok &= np.hypot(xx-a[0]-along*direction[0], zz-a[1]-along*direction[1]) > bore["halfWidth"] + 12
         ok[[0,-1],:]=False
         ok[:,[0,-1]]=False
         grid[ok]=target[ok]

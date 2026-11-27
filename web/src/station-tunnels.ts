@@ -9,7 +9,7 @@ export const tunnelLiningMaterial=new THREE.MeshStandardMaterial({side:THREE.Dou
 export const tunnelLightMaterial=new THREE.MeshBasicMaterial({side:THREE.DoubleSide,vertexColors:true})
 
 type Point=[number,number,number]
-export type Tunnel={way:number,nodes?:[number,number],portals:[Point,Point],length:number,halfWidth:number,clearance:number,approach:number,approachEnds?:[number,number],mouths?:[boolean,boolean],openEnds?:[number,number],nativePaving?:boolean,wallSide?:number,wallTop?:number[],openCut?:boolean,footprint?:[number,number][][],joints?:({ring:[number,number][],wedges?:[number,number][][],faces?:Point[][],draw:boolean}|null)[],stations:[number,number][]}
+export type Tunnel={way:number,nodes?:[number,number],portals:[Point,Point],length:number,halfWidth:number,clearance:number,approach:number,approachEnds?:[number,number],mouths?:[boolean,boolean],openEnds?:[number,number],nativePaving?:boolean,wallSide?:number,wallTop?:number[],openCut?:boolean,retainCutBanks?:boolean,footprint?:[number,number][][],joints?:({ring:[number,number][],wedges?:[number,number][][],faces?:Point[][],outerWallEdges?:[number,number][][],draw:boolean}|null)[],stations:[number,number][]}
 
 function frame(tunnel:Tunnel){
   const [start,end]=tunnel.portals, ux=(end[0]-start[0])/tunnel.length,uz=(end[2]-start[2])/tunnel.length
@@ -138,7 +138,8 @@ export function tunnelGeometry(tile:Tile,ground:THREE.PlaneGeometry,tunnels:Tunn
     function local(s:number,d:number,y:number){const p=axes.point(s,d,y);p[0]-=tile.x;p[2]-=tile.z;return p}
     const station=(p:Point)=>axes.station(p[0]+tile.x,p[2]+tile.z),side=(p:Point)=>axes.lateral(p[0]+tile.x,p[2]+tile.z)
     const [first,last]=openEnds(tunnel)
-    const footprint=(from:number,to:number):Plane[]=>[p=>station(p)-from,p=>to-station(p),p=>width-side(p),p=>width+side(p)]
+    const verge=tunnel.retainCutBanks ? 2 : 0
+    const footprint=(from:number,to:number):Plane[]=>[p=>station(p)-from,p=>to-station(p),p=>width+verge-side(p),p=>width+verge+side(p)]
     const patches=tunnel.footprint?.map(ring=>footprintPlanes(ring).map(fn=>(p:Point)=>fn(p[0]+tile.x,p[2]+tile.z)))??[[]]
     const addCut=(planes:Plane[],roof?: (p:Point)=>number)=>{for(const patch of patches)cuts.push({planes:[...planes,...patch],roof})}
     for(const [from,to] of [[0,first],[tunnel.length-last,tunnel.length]])if(to>from)addCut(footprint(from,to))
@@ -154,11 +155,11 @@ export function tunnelGeometry(tile:Tile,ground:THREE.PlaneGeometry,tunnels:Tunn
       }
       addCut(footprint(first,tunnel.length-last),roof)
     }
-    const quad=(points:Point[],part:keyof typeof parts)=>{
+    const quad=(points:Point[],part:keyof typeof parts, trimWall=true)=>{
       let floorParts=[points]
-      if(part==='floor'){
+      if(part==='floor' || (part==='portal' && trimWall)){
         for(const joint of tunnel.joints??[]){
-          if(!joint?.faces)continue
+          if(!joint?.faces || (part==='portal' && !joint.outerWallEdges))continue
           const ring=joint.ring, planes=footprintPlanes(ring)
           const outside:Point[][]=[]
           for(let poly of floorParts){
@@ -168,6 +169,28 @@ export function tunnelGeometry(tile:Tile,ground:THREE.PlaneGeometry,tunnels:Tunn
               const piece=clip(poly,p=>-plane(p))
               if(piece.length>=3)outside.push(piece)
               poly=clip(poly,plane)
+              if(!poly.length)break
+            }
+          }
+          floorParts=outside
+        }
+      }
+      // At oblique junctions one arm's wall can cross the adjacent lane
+      // beyond the joint hull. Keep only the exterior of the joined cuts.
+      if(part==='portal' && tunnel.retainCutBanks){
+        for(const other of tunnels){
+          if(other===tunnel || !other.retainCutBanks)continue
+          const otherAxes=frame(other)
+          const at=(p:Point)=>otherAxes.station(p[0]+tile.x,p[2]+tile.z)
+          const offset=(p:Point)=>otherAxes.lateral(p[0]+tile.x,p[2]+tile.z)
+          const planes:Plane[]=[at,p=>other.length-at(p),p=>other.halfWidth+2-offset(p),p=>other.halfWidth+2+offset(p)]
+          const outside:Point[][]=[]
+          for(let poly of floorParts){
+            if(planes.some(fn=>poly.every(p=>fn(p)<=0))){outside.push(poly);continue}
+            for(const fn of planes){
+              const piece=clip(poly,p=>-fn(p))
+              if(piece.length>=3)outside.push(piece)
+              poly=clip(poly,fn)
               if(!poly.length)break
             }
           }
@@ -194,9 +217,11 @@ export function tunnelGeometry(tile:Tile,ground:THREE.PlaneGeometry,tunnels:Tunn
         const planes=edges.map(([a,b])=>(p:Point)=>winding*((b[0]-a[0])*(p[2]-a[2])-(b[2]-a[2])*(p[0]-a[0])))
         // The two rectangular strips leave a wedge at a bend. Carry the same
         // headroom cut through that wedge as through either adjoining section.
-        addCut(planes,covered?()=>floor+head+stationRoofDepth-.35:undefined)
+        if(tunnel.retainCutBanks)cuts.push({planes})
+        else addCut(planes,covered?()=>floor+head+stationRoofDepth-.35:undefined)
         if(!joint.faces)quad(ring,'floor')
         if(covered)quad(ring.map(([x,,z])=>[x,floor+head,z]),'ceiling')
+        if(joint.outerWallEdges)continue
         for(const [a,b] of edges){
           if(side(a)*side(b)<=0)continue
           if(joint.wedges){
@@ -212,6 +237,11 @@ export function tunnelGeometry(tile:Tile,ground:THREE.PlaneGeometry,tunnels:Tunn
           const top=(p:Point):Point=>[p[0],covered?floor+head:Math.max(floor,groundY(p)),p[2]]
           quad([a,b,top(b),top(a)],covered?'interior':'portal')
         }
+      }
+      for(const [from,to] of joint.outerWallEdges??[]){
+        const edge=(xz:number[]):Point=>[xz[0]-tile.x,floorLevel(tunnel,xz[0],xz[1])??floor,xz[1]-tile.z]
+        const a=edge(from),b=edge(to)
+        quad([a,b,[b[0],Math.max(b[1],groundY(b)),b[2]],[a[0],Math.max(a[1],groundY(a)),a[2]]],'portal',false)
       }
     }
     for(let i=1;i<tunnel.stations.length;i++){
@@ -232,7 +262,17 @@ export function tunnelGeometry(tile:Tile,ground:THREE.PlaneGeometry,tunnels:Tunn
           quad([oa,ob,local(b,edge,by),local(a,edge,ay)],'portal')
         }
       }
-      quad([al,bl,leftB,leftA],open?'portal':'interior');quad([br,ar,rightA,rightB],open?'portal':'interior')
+      if(open && verge){
+        for(const sign of [-1,1]){
+          const va=local(a,sign*(width+verge),ay-.12),vb=local(b,sign*(width+verge),by-.12)
+          // The shelf supports the surveyed curb and sidewalk. Place the
+          // retaining face at the back of the sidewalk, against native ground.
+          quad([local(a,sign*width,ay-.12),local(b,sign*width,by-.12),vb,va],'portal')
+          quad([va,vb,top(vb),top(va)],'portal')
+        }
+      }else{
+        quad([al,bl,leftB,leftA],open?'portal':'interior');quad([br,ar,rightA,rightB],open?'portal':'interior')
+      }
       if(!open)quad([top(al),top(bl),top(br),top(ar)],'ceiling')
       if(!open){
         // 青绿 glazed-tile dado, warm lamp strips and a dashed centre line (IDOK-165 visual pass)
