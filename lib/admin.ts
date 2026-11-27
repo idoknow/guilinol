@@ -158,7 +158,9 @@ export async function adminList(db: D1Database, path: string, params: URLSearchP
   }
   if (!users) {
     const status = params.get('status'),
-      user = params.get('user')
+      user = params.get('user'),
+      email = params.get('email')?.trim().toLowerCase(),
+      role = params.get('role')
     if(status==='pending')filters.push(pendingFilter)
     else if (status) {
       if (!Object.hasOwn(labels, status)) invalid()
@@ -170,12 +172,21 @@ export async function adminList(db: D1Database, path: string, params: URLSearchP
       filters.push('f.user_id=?')
       args.push(user)
     }
+    if (email) {
+      filters.push('LOWER(u.email)=?')
+      args.push(email)
+    }
+    if (role) {
+      if (!['admin', 'user'].includes(role)) invalid()
+      filters.push('u.role=?')
+      args.push(role)
+    }
   }
   const select = users
     ? `u.id,u.email,u.nickname,u.verified,u.role,u.created_at,u.signup_method,u.email_placeholder,u.banned_at,u.ban_reason,
     (SELECT count(*) FROM feedback WHERE user_id=u.id) feedback_count,
     (SELECT max(submitted_at) FROM feedback WHERE user_id=u.id) last_submitted_at FROM users u`
-    : `f.id,f.user_id,f.title,f.kind,f.status,u.email,u.nickname,f.lat,f.lon,f.multica_issue,f.pr_url,f.submitted_at,f.updated_at,
+    : `f.id,f.user_id,f.title,f.kind,f.status,u.email,u.nickname,u.role AS submitter_role,f.lat,f.lon,f.multica_issue,f.pr_url,f.submitted_at,f.updated_at,
     (SELECT count(*) FROM feedback_messages WHERE feedback_id=f.id AND author_kind='user' AND id>f.admin_read_id) unread,(SELECT count(*) FROM feedback_photos WHERE feedback_id=f.id AND ready=1) photo_count FROM feedback f JOIN users u ON u.id=f.user_id`
   const { results } = await db
     .prepare(

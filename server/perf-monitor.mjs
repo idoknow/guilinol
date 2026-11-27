@@ -52,6 +52,7 @@ async function ensureAdminIndexes(pool){
   const statements=[
     'CREATE INDEX CONCURRENTLY IF NOT EXISTS users_created_at ON users (created_at)',
     'CREATE INDEX CONCURRENTLY IF NOT EXISTS feedback_submitted_at ON feedback (submitted_at) WHERE submitted_at IS NOT NULL',
+    'CREATE INDEX CONCURRENTLY IF NOT EXISTS feedback_user_status ON feedback (user_id, status, updated_at)',
     "CREATE INDEX CONCURRENTLY IF NOT EXISTS feedback_messages_unread ON feedback_messages (feedback_id, id) WHERE author_kind = 'user'",
     'CREATE INDEX CONCURRENTLY IF NOT EXISTS admin_audit_type_id ON admin_audit (target_type, id DESC)',
     "CREATE INDEX CONCURRENTLY IF NOT EXISTS chat_messages_pending ON chat_messages (id DESC) WHERE status = 'pending'",
