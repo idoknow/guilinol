@@ -1047,8 +1047,35 @@ export function mountTianyuanMifen(ctx: MifenMountContext): MifenController {
     )
   }
 
+  // 粉票栏只放得下的条数，其余并进「还有 N 张」，任何视口都不内滚、不压摇杆。
+  // 票序、视口、顶栏底边、做粉/抽屉、手机按键布局任一变化才重新量，平时每帧零布局读取。
+  let railCap = MAX_TICKETS
+  let railFitKey = ''
+  function railFitKeyOf(tickets: RailTicket[]): string {
+    const body = document.body
+    const ids = tickets.slice(0, MAX_TICKETS).map(t => t.id).join(',')
+    // 超出 MAX_TICKETS 时多一行「还有 N 张」，要算进 key，否则第 6 张进来不重量会内滚
+    const more = tickets.length > MAX_TICKETS ? '+' : ''
+    return `${innerWidth}x${innerHeight}|${lastBarBottom}|${body.dataset.mifenCooking}|${body.dataset.mifenDrawer}|${body.dataset.thumbLayout}|${body.dataset.thumbHand}|${body.style.getPropertyValue('--thumb-scale')}|${ids}${more}`
+  }
+
   function renderTickets(tickets: RailTicket[]): void {
-    const shown = tickets.slice(0, MAX_TICKETS)
+    const key = railFitKeyOf(tickets)
+    if (key === railFitKey) {
+      paintTicketRail(tickets, railCap)
+      return
+    }
+    railFitKey = key
+    railCap = Math.min(MAX_TICKETS, tickets.length)
+    paintTicketRail(tickets, railCap)
+    while (railCap > 1 && ticketRailEl.scrollHeight > ticketRailEl.clientHeight + 1) {
+      railCap -= 1
+      paintTicketRail(tickets, railCap)
+    }
+  }
+
+  function paintTicketRail(tickets: RailTicket[], cap: number): void {
+    const shown = tickets.slice(0, cap)
     const shownIds = new Set(shown.map(t => t.id))
     for (const [id, li] of ticketEls) {
       if (shownIds.has(id)) continue
