@@ -1644,12 +1644,26 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
       z:figure.position.z,
     }
   }
+  // 客户端上报速度：以前直接取 Math.hypot(vx,vz)，只有步行时这两个分量才被写，
+  // 开车/船/无人机/直升机/乘客位时恒为 0，服务端拿到 reportedSpeed=0 无法交叉验证，
+  // 后台取证也看不到真实速度。改为按相邻两次采样位移/时间求速度，全模式通用。
+  let poseSpeedAt=0, poseSpeedX=0, poseSpeedZ=0, poseSpeedValue=0
+  function poseSpeed(){
+    const at=performance.now(), x=figure.position.x, z=figure.position.z
+    const dt=(at-poseSpeedAt)/1000
+    if(dt>0.02&&dt<2){
+      const measured=Math.hypot(x-poseSpeedX,z-poseSpeedZ)/dt
+      if(Number.isFinite(measured)) poseSpeedValue=measured
+    }
+    poseSpeedAt=at; poseSpeedX=x; poseSpeedZ=z
+    return Math.round(poseSpeedValue*100)/100
+  }
   function attachMp(){
     if(!mpEnabled()||!active||net)return
     if(!netModule){void import('../net').then(module=>{netModule=module;attachMp()}).catch(error=>console.warn('multiplayer unavailable',error));return}
     {
         net=netModule.attachNet(scene,model.animations,()=>({x:figure.position.x,y:figure.position.y+combat.drop,z:figure.position.z,
-          passenger:document.body.dataset.helicopter?true:undefined,foot:!rides?.bike&&!rides?.car&&!rides?.boat&&!document.body.dataset.helicopter&&document.body.dataset.drone!=='rc',yaw:figure.rotation.y,v:rides?.bike?Math.abs(rides.speed):Math.hypot(vx,vz),gr:Number(grounded),
+          passenger:document.body.dataset.helicopter?true:undefined,foot:!rides?.bike&&!rides?.car&&!rides?.boat&&!document.body.dataset.helicopter&&document.body.dataset.drone!=='rc',yaw:figure.rotation.y,v:poseSpeed(),gr:Number(grounded),
           sc:cigarette.wire,sb:Math.round(cigarette.length*1800),sp:puffSeq,br:brandIndex(cigarette.brand),sd:dropSeq,ss:cigarette.strength,sr:cigarette.remaining,
           bike:rides?.bike?'bike':'',bx:rides?.bike?.position.x??0,bz:rides?.bike?.position.z??0,byaw:rides?.heading??0}),()=>currentAvatar()??profile,camera,currentActivity,combat.receive,(x,y,z)=>{
             const footY=y-combat.drop,dest={x,y:footY+cfg.height/2,z}
