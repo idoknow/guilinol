@@ -11,6 +11,19 @@ from play_region import PlayRegion
 
 
 class ScenicFenceTest(unittest.TestCase):
+    def test_independent_landside_fixture(self):
+        field=box(0,0,100,100)
+        buildings=box(40,40,50,50)
+        paths=[LineString([(0,25),(20,25)]),LineString([(0,75),(20,75)])]
+        fence=unary_union(list(scenery_fence(field,buildings,paths,field)))
+        original,=scenery_fence(field,buildings,[],field)
+        openings=sorted(original.difference(fence).geoms,key=lambda line:line.centroid.y)
+        self.assertEqual(len(openings),len(paths))
+        for opening,path,center in zip(openings,paths,[(4,25),(4,75)],strict=True):
+            self.assertEqual(opening.centroid.coords[0],center)
+            self.assertAlmostEqual(opening.length,16)
+            self.assertTrue(fence.disjoint(path))
+
     def test_detour_preserves_ring_except_at_game_route(self):
         field=box(0,0,100,100)
         buildings=box(80,30,105,50).union(box(30,30,40,40))
