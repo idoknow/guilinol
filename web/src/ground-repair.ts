@@ -498,19 +498,38 @@ function evalRoadCtrlLocal([baseMm, deltas]: RoadCtrl, lx: number, lz: number): 
   return (baseMm + sum) / 1000
 }
 
-export function gradeRenminShoulder(tileX:number,tileZ:number,terrain:Int16Array,underlay:Int16Array,water:Int16Array,ctrl:RoadCtrl|null|undefined){
+type FrontageBuilding = readonly [number,number,Pair[][],number,number,number,...unknown[]]
+
+export function gradeRenminShoulder(tileX:number,tileZ:number,terrain:Int16Array,underlay:Int16Array,water:Int16Array,ctrl:RoadCtrl|null|undefined,buildings:readonly FrontageBuilding[]){
   if(tileX!==-768||tileZ!==256||!ctrl)return
-  const startX=121.99,startZ=117.85,dx=35.20,dz=14.50
-  for(let row=24;row<=39;row++)for(let col=25;col<=44;col++){
-    const east=col*4,south=row*4,index=row*65+col
-    if(water[index]!==-32768)continue
-    const along=Math.max(0,Math.min(1,((east-startX)*dx+(south-startZ)*dz)/(dx*dx+dz*dz)))
-    const distance=Math.hypot(east-startX-along*dx,south-startZ-along*dz)
-    if(distance>=18)continue
-    const weight=Math.min(1,(18-distance)/10)
-    const fill=Math.floor(underlay[index]+weight*(10*evalRoadCtrlLocal(ctrl,east,south)-underlay[index]))
-    underlay[index]=Math.max(underlay[index],fill)
-    terrain[index]=Math.max(terrain[index],fill)
+  const fronts=buildings.filter(part=>[4042625074,1145105554,435677566].includes(part[5]))
+  for(const [base,,[ring]] of fronts){
+    const bounds=ringBounds(ring)
+    const limit=(east:number,south:number)=>{
+      let distance=Infinity
+      for(let index=0;index<ring.length;index++){
+        const [ax,az]=ring[index], [bx,bz]=ring[(index+1)%ring.length], dx=bx-ax,dz=bz-az
+        const along=Math.max(0,Math.min(1,((east*100-ax)*dx+(south*100-az)*dz)/(dx*dx+dz*dz||1)))
+        distance=Math.min(distance,Math.hypot(east*100-ax-along*dx,south*100-az-along*dz)/100)
+      }
+      return base/10+Math.max(0,distance-8)*.075
+    }
+    const visit=(step:number,apply:(east:number,south:number,cap:number)=>void)=>{
+      for(let south=Math.max(step,Math.floor((bounds.minZ/100-44)/step)*step);south<=Math.min(256-step,bounds.maxZ/100+44);south+=step){
+        for(let east=Math.max(step,Math.floor((bounds.minX/100-44)/step)*step);east<=Math.min(256-step,bounds.maxX/100+44);east+=step){
+          if(water[south/4*65+east/4]===-32768)apply(east,south,limit(east,south))
+        }
+      }
+    }
+    visit(4,(east,south,cap)=>{
+      const index=south/4*65+east/4,height=Math.round(cap*10)
+      terrain[index]=Math.min(terrain[index],height)
+      underlay[index]=Math.min(underlay[index],height)
+    })
+    visit(8,(east,south,cap)=>{
+      const index=(south/8+1)*35+east/8+1
+      ctrl[1][index]=Math.min(ctrl[1][index],Math.round((cap-.10)*1000)-ctrl[0])
+    })
   }
 }
 

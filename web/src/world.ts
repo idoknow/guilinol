@@ -374,7 +374,7 @@ export async function detail(tile:Tile, signal:AbortSignal, parseSlot?:()=>Promi
   if(extra!==0 && extra!==8450) throw Error('Invalid GL04 sections')
   const deck = Float32Array.from(new Int16Array(buffer.slice(end,tail)),value=>value/100)
   const underlay = extra ? new Int16Array(buffer.slice(tail)) : terrain
-  gradeRenminShoulder(tile.x,tile.z,terrain,underlay,water,paths[5])
+  gradeRenminShoulder(tile.x,tile.z,terrain,underlay,water,paths[5],solids)
   const sample = (col:number,row:number)=>{
     const index = row*65+col
     return underlay[index]/10
