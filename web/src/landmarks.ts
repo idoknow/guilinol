@@ -4,6 +4,7 @@ import {warmShaders} from './shader-warmup'
 import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js'
 import {MeshoptDecoder} from 'three/addons/libs/meshopt_decoder.module.js'
 import {nightLit} from './look/night'
+import {airportLook} from './look/airport'
 import {sharedKtx2Loader} from './look/tiles'
 import {bindStreetSurface,streetSurfaceMat} from './streets'
 import seamConfig from '../../pipeline/seam-surfaces.json'
@@ -456,7 +457,7 @@ export function landmarkStream(
         for(const value of Object.values(original))if(value instanceof THREE.Texture)retired.add(value)
         node.geometry=node.geometry.clone();bindStreetSurface(node.geometry,kind);node.material=streetSurfaceMat
       }else for(const material of [original].flat()){
-        if(!litApplied.has(material)){litApplied.add(material);nightLit(material)}
+        if(!litApplied.has(material)){litApplied.add(material);if(!airportLook(material))nightLit(material)}
       }
     })
     // Release replaced paving/sidewalk textures & materials immediately instead of holding them until unload.
