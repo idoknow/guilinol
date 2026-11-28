@@ -4,17 +4,20 @@ import {nearStatic,resolveContact,staticSolids,pickups,type Solid} from './conta
 import {CAR_SCALE} from '../drive/scale.ts'
 import {bayBehind,canRoute,clearance,engaged,passage,retreatTrack,type Corridor,type Profile} from './narrow.ts'
 import {clampOutsideShizijieNoPedZone,isInShizijieNoPedZone,isNearShizijiePrecinct,segmentHitsShizijieNoPedZone} from '../shizijie-zone.ts'
+import {QUIET_ZONES,QUIET_ZONE_BUFFER_M,isPointInQuietZone,normalizeQuietZones,segmentHitsQuietZone,type QuietZonePolygon} from '../game/quiet-zones.ts'
 export type Node = {id:number,x:number,y:number,z:number}
 type Crossing={osm:[string,number],bars:number,points:[number,number][],width:number}
 export type Lane = {id:number,from:number,to:number,offset:number,width?:number,kind:'motor'|'bus'|'nonmotor',speedKmh:number,cls?:string,street?:string,npcWalks?:number[][],pedProfiles?:Profile[],pedCrossings?:Crossing[],heights?:number[],floor?:string,gradeSeparated?:string,oneway?:boolean}
 type Phase = {lanes:number[],green:number,yellow:number}
 type Signal={node:number,group:number,offset:number,phases:Phase[]}
-export type Graph = {nodes:Node[],lanes:Lane[],walks:[number,number,number,number?,number[]?][],signals:Signal[]}
+export type PedSignalControl={signalNode:number,conflictMask:number}
+export type Graph = {nodes:Node[],lanes:Lane[],walks:[number,number,number,number?,number[]?][],signals:Signal[],quiet?:readonly QuietZonePolygon[]}
 export type SurfaceLookup = (x:number,z:number)=>readonly number[]|undefined
 export type Track = Lane & {
   start:Node,end:Node,dx:number,dz:number,yaw:number,length:number,walk:boolean,
   corridor?:Corridor,
-  link?:Crossing,painted?:boolean,nextLink?:Track,
+  link?:Crossing,painted?:boolean,nextLink?:Track,pedSignal?:PedSignalControl,
+  inQuietZone?:boolean,nearQuietZone?:boolean,
   virtual?:boolean,sourceLaneId?:number,
   outwardSign?:1|-1,dodgeMin?:number,dodgeMax?:number,tightEdge?:boolean,
   surfaceState?:'pending'|'ok'|'rejected',suspectVerge?:boolean,pairTrack?:Track,
@@ -289,7 +292,7 @@ export type Actor = {
   pitch?:number,roll?:number,arrived?:boolean,
   track:Track,dist:number,speed:number,pace?:number,kind:'car'|'scooter'|'person',down:number,dodge:number,
   x:number,y:number,z:number,yaw:number,scale:number,leaving:boolean,halfWidth:number,halfLength:number,height:number,
-  holdUntil?:number,waitingFor?:Actor,waitingSince?:number,waitingAtGate?:boolean,squeeze?:number,backing?:boolean,
+  holdUntil?:number,waitingFor?:Actor,waitingSince?:number,waitingAtGate?:boolean,waitingForSignal?:boolean,squeeze?:number,backing?:boolean,
   violation?:TrafficViolation,violations?:ActiveTrafficViolation[],violationMask?:number,vehicleSubtype?:VehicleSubtype,stoppedUntil?:number,cited?:boolean,
   laneCompliant?:boolean,encroachmentKind?:LaneEncroachmentKind,encroachOffset?:number,
   wrongWay?:boolean,redLightActive?:boolean,redLightTrailDist?:number,
@@ -960,8 +963,11 @@ export class Traffic {
   time=0
   crossed=0
   stopped=0
+  pedCrossed=0
+  pedStopped=0
   transitions=0
   onCross?: (track:Lane,time:number)=>void
+  onPedCross?: (track:Track,time:number)=>void
   onPlayerHit?: PlayerHitCallback
   onPlayerHorn?: PlayerHornCallback
   onViolatorPulledOver?: ViolatorPulledOverCallback
@@ -972,6 +978,13 @@ export class Traffic {
   deferredDespawnCount=0
   private signal=new Map<number,Signal>()
   private signalPlan=new SignalPlan()
+  private signalPhaseDirs=new Map<number,[number,number][][]>()
+  private pedSigScratch:SignalState={phase:0,color:'green',remaining:0,cycle:0}
+  private quietZones:readonly QuietZonePolygon[]=QUIET_ZONES
+  private quietMinX=Infinity
+  private quietMaxX=-Infinity
+  private quietMinZ=Infinity
+  private quietMaxZ=-Infinity
   /** Seconds added to `time` when reading lights; the host sets it so this sim follows `citySignalClock`. */
   signalShift=0
   private junctions=new Set<number>()
@@ -1011,8 +1024,8 @@ export class Traffic {
     }
     return false
   }
-  private adjacent(track:Track){return (this.exits.get(track.from)??[]).filter(next=>next!==track&&!next.walk&&next.kind===track.kind&&next.to===track.to&&next.street===track.street&&Math.abs(next.offset-track.offset)<=(next.width??3)/2+(track.width??3)/2+.1&&!this.parkingHits(next).length)}
-  private usable(track:Track){return track.walk?this.resolveWalkSurface(track):!this.parkingHits(track).length||!!this.adjacent(track).length}
+  private adjacent(track:Track){return (this.exits.get(track.from)??[]).filter(next=>next!==track&&!next.walk&&!next.inQuietZone&&next.kind===track.kind&&next.to===track.to&&next.street===track.street&&Math.abs(next.offset-track.offset)<=(next.width??3)/2+(track.width??3)/2+.1&&!this.parkingHits(next).length)}
+  private usable(track:Track){return track.walk?this.resolveWalkSurface(track):!track.inQuietZone&&(!this.parkingHits(track).length||!!this.adjacent(track).length)}
   private cells=new Map<string,Track[]>()
   private obstacles=new Map<number,(Position|Actor)[]>()
   private obstaclePool:(Position|Actor)[][]=[]
@@ -1416,6 +1429,56 @@ export class Traffic {
     if(!this.signal.has(toNode))return null
     return this.phase({id:laneId,to:toNode},time)
   }
+  private computePedConflictMask(signalNode:number,dx:number,dz:number):number|null{
+    const phaseDirs=this.signalPhaseDirs.get(signalNode)
+    if(!phaseDirs||phaseDirs.length<2)return null
+    const len=Math.hypot(dx,dz)
+    if(len<1e-6)return null
+    const ndx=dx/len,ndz=dz/len
+    let conflictMask=0
+    for(let p=0;p<phaseDirs.length&&p<31;p++){
+      const dirs=phaseDirs[p]
+      for(let i=0;i<dirs.length;i++){
+        if(Math.abs(dirs[i][0]*ndx+dirs[i][1]*ndz)<=.75){conflictMask|=1<<p;break}
+      }
+    }
+    const allMask=(1<<Math.min(phaseDirs.length,31))-1
+    if(!conflictMask||(allMask&~conflictMask)===0)return null
+    return conflictMask
+  }
+  /** Pedestrian signal phase for a direction (dx, dz) at a signalised node using the unified SignalPlan. */
+  getPedestrianSignalPhase(signalNode:number,dx:number,dz:number,time=this.time+this.signalShift):'green'|'red'|'yellow'|null{
+    const conflictMask=this.computePedConflictMask(signalNode,dx,dz)
+    if(conflictMask===null)return null
+    const state=this.signalPlan.state(signalNode,time,this.pedSigScratch)
+    if(!state)return null
+    return (conflictMask&(1<<state.phase))!==0?'red':state.color
+  }
+  /** Pedestrian signal phase bound to a painted crossing track (`null` when unsignalised). */
+  pedestrianPhase(track:Track,time=this.time+this.signalShift):'green'|'red'|'yellow'|null{
+    const ctrl=track.pedSignal
+    if(!ctrl)return null
+    const state=this.signalPlan.state(ctrl.signalNode,time,this.pedSigScratch)
+    if(!state)return null
+    return (ctrl.conflictMask&(1<<state.phase))!==0?'red':state.color
+  }
+  /** Returns whether `(x, z)` lies inside any configured campus quiet zone (plus outer buffer). */
+  isPointQuiet(x:number,z:number,bufferM=QUIET_ZONE_BUFFER_M):boolean{
+    if(!this.quietZones.length)return false
+    const pad=Math.max(0,bufferM)
+    if(x<this.quietMinX-pad||x>this.quietMaxX+pad||z<this.quietMinZ-pad||z>this.quietMaxZ+pad)return false
+    return isPointInQuietZone(x,z,pad,this.quietZones)
+  }
+  private trackHitsQuietZone(track:Track,bufferM=QUIET_ZONE_BUFFER_M):boolean{
+    if(!this.quietZones.length)return false
+    const off=track.offset||0
+    const ax=track.start.x-track.dz*off,az=track.start.z+track.dx*off
+    const bx=track.end.x-track.dz*off,bz=track.end.z+track.dx*off
+    const pad=Math.max(0,bufferM)
+    const minX=ax<bx?ax:bx,maxX=ax>bx?ax:bx,minZ=az<bz?az:bz,maxZ=az>bz?az:bz
+    if(maxX<this.quietMinX-pad||minX>this.quietMaxX+pad||maxZ<this.quietMinZ-pad||minZ>this.quietMaxZ+pad)return false
+    return segmentHitsQuietZone(ax,az,bx,bz,pad,this.quietZones)
+  }
   stopActor(actor:Actor,durationSec=4):boolean{
     if(!actor||!Number.isFinite(durationSec)||durationSec<0)return false
     actor.stoppedUntil=this.time+durationSec
@@ -1448,6 +1511,14 @@ export class Traffic {
     this.actorLimit=actorLimit
     this.random=random
     this.surfaceAt=surfaceAt
+    this.quietZones=Array.isArray(graph.quiet)?normalizeQuietZones(graph.quiet):QUIET_ZONES
+    for(const zone of this.quietZones){
+      const [minX,minZ,maxX,maxZ]=zone.bbox
+      if(minX<this.quietMinX)this.quietMinX=minX
+      if(maxX>this.quietMaxX)this.quietMaxX=maxX
+      if(minZ<this.quietMinZ)this.quietMinZ=minZ
+      if(maxZ>this.quietMaxZ)this.quietMaxZ=maxZ
+    }
     const nodes=new Map(graph.nodes.map(node=>[node.id,node]))
     // Index every motor/bus lane in the graph (all road classes) to enforce strict pedestrian carriageway exclusion.
     for(const lane of graph.lanes){
@@ -1471,6 +1542,10 @@ export class Traffic {
       if(length<.5)return undefined
       const track:Track={...lane,start,end,length,dx:(end.x-start.x)/length,dz:(end.z-start.z)/length,yaw:Math.atan2(end.x-start.x,end.z-start.z),walk,virtual,sourceLaneId,surfaceState:walk?'pending':'ok'}
       if(walk)this.computeWalkSafety(track)
+      else if(this.quietZones.length){
+        track.inQuietZone=this.trackHitsQuietZone(track,QUIET_ZONE_BUFFER_M)
+        track.nearQuietZone=track.inQuietZone||this.trackHitsQuietZone(track,QUIET_ZONE_BUFFER_M+6)
+      }
       const exits=this.exits.get(start.id)??[];exits.push(track);this.exits.set(start.id,exits)
       const entries=this.entries.get(end.id)??[];entries.push(track);this.entries.set(end.id,entries)
       this.registerTrackCells(track)
@@ -1595,7 +1670,78 @@ export class Traffic {
     for(const [node,neighbors] of arms)if(neighbors.size>=3)this.junctions.add(node)
     for(const signal of graph.signals){this.signal.set(signal.node,signal);this.junctions.delete(signal.node)}
     this.signalPlan.add(graph.signals)
+    this.buildPedestrianSignalIndex(graph,nodes)
     this.linkCorridors()
+  }
+  private buildPedestrianSignalIndex(graph:Graph,nodes:Map<number,Node>){
+    if(!this.signal.size)return
+    const sigLaneIds=new Set<number>()
+    for(const sig of this.signal.values()){
+      for(const phase of sig.phases)for(const lid of phase.lanes)sigLaneIds.add(lid)
+    }
+    type SigLaneGeom={dx:number,dz:number,ax:number,az:number,bx:number,bz:number}
+    const laneGeom=new Map<number,SigLaneGeom>()
+    for(const lane of graph.lanes){
+      if(!sigLaneIds.has(lane.id))continue
+      const a=nodes.get(lane.from),b=nodes.get(lane.to)
+      if(!a||!b)continue
+      const len=Math.hypot(b.x-a.x,b.z-a.z)
+      if(len<.5)continue
+      const dx=(b.x-a.x)/len,dz=(b.z-a.z)/len,off=lane.offset||0
+      laneGeom.set(lane.id,{dx,dz,ax:a.x-dz*off,az:a.z+dx*off,bx:b.x-dz*off,bz:b.z+dx*off})
+    }
+    type SigEntry={node:number,x:number,z:number,phaseSegs:SigLaneGeom[][]}
+    const sigGrid=new Map<number,SigEntry[]>()
+    for(const sig of this.signal.values()){
+      if(!this.signalPlan.has(sig.node))continue
+      const sn=nodes.get(sig.node)
+      if(!sn)continue
+      const phaseDirs:[number,number][][]=[]
+      const phaseSegs:SigLaneGeom[][]=[]
+      for(const phase of sig.phases){
+        const dirs:[number,number][]=[],segs:SigLaneGeom[]=[]
+        for(const lid of phase.lanes){
+          const g=laneGeom.get(lid)
+          if(!g)continue
+          segs.push(g)
+          if(!dirs.some(([vx,vz])=>Math.abs(vx*g.dx+vz*g.dz)>.995))dirs.push([g.dx,g.dz])
+        }
+        phaseDirs.push(dirs);phaseSegs.push(segs)
+      }
+      this.signalPhaseDirs.set(sig.node,phaseDirs)
+      const k=Math.floor(sn.x/64)*65536+Math.floor(sn.z/64)
+      const bucket=sigGrid.get(k)??[];bucket.push({node:sig.node,x:sn.x,z:sn.z,phaseSegs});sigGrid.set(k,bucket)
+    }
+    const MAX_RADIUS=48,CLOSE_RADIUS=32,CONFLICT_LANE_DIST_SQ=16**2
+    for(const track of this.allTracks()){
+      if(!track.walk||!track.painted)continue
+      const mx=(track.start.x+track.end.x)*.5,mz=(track.start.z+track.end.z)*.5
+      const col=Math.floor(mx/64),row=Math.floor(mz/64)
+      let bestNode=0,bestMask=0,bestDistSq=MAX_RADIUS*MAX_RADIUS
+      let found=false
+      for(let dc=-1;dc<=1;dc++)for(let dr=-1;dr<=1;dr++){
+        const bucket=sigGrid.get((col+dc)*65536+(row+dr))
+        if(!bucket)continue
+        for(const entry of bucket){
+          const dSq=(mx-entry.x)**2+(mz-entry.z)**2
+          if(dSq>bestDistSq)continue
+          const mask=this.computePedConflictMask(entry.node,track.dx,track.dz)
+          if(mask===null)continue
+          if(dSq>CLOSE_RADIUS*CLOSE_RADIUS){
+            let nearConflict=false
+            for(let p=0;p<entry.phaseSegs.length&&!nearConflict;p++){
+              if((mask&(1<<p))===0)continue
+              for(const seg of entry.phaseSegs[p]){
+                if(pointToSegmentDistSq(mx,mz,seg.ax,seg.az,seg.bx,seg.bz)<=CONFLICT_LANE_DIST_SQ){nearConflict=true;break}
+              }
+            }
+            if(!nearConflict)continue
+          }
+          bestDistSq=dSq;bestNode=entry.node;bestMask=mask;found=true
+        }
+      }
+      if(found)track.pedSignal={signalNode:bestNode,conflictMask:bestMask}
+    }
   }
   // Each measured walk track learns the track that leads into it (the one onwardWalk would continue from)
   // and how far back on it the nearest >=0.85 m station is, so a walker can back out of a pinch across the joint.
@@ -1687,7 +1833,7 @@ export class Traffic {
     this.dutyConfig={...previous.dutyConfig};this.dutyTracksCache.clear();this.lastDutyTracks=undefined
     for(const actor of previous.actors){
       const track=this.exits.get(actor.track.from)?.find(candidate=>candidate.id===actor.track.id&&candidate.kind===actor.track.kind&&!!candidate.virtual===!!actor.track.virtual)
-      if(track){actor.track=track;this.actors.push(actor);actorOwners.set(actor,this)}
+      if(track&&(actor.kind==='person'||!track.inQuietZone)){actor.track=track;this.actors.push(actor);actorOwners.set(actor,this)}
     }
     for(const [node,queue] of previous.queues)if(this.junctions.has(node))this.queues.set(node,queue.filter(actor=>this.actors.includes(actor)))
   }
@@ -1702,6 +1848,17 @@ export class Traffic {
     const totalOffset=track.offset+actor.dodge+encroachLat+(actor.wrongWay?WRONG_WAY_LATERAL_OFFSET:0)
     actor.x=track.start.x+track.dx*dist-track.dz*totalOffset
     actor.z=track.start.z+track.dz*dist+track.dx*totalOffset
+    if(actor.kind!=='person'&&track.nearQuietZone&&!track.inQuietZone&&this.isPointQuiet(actor.x,actor.z)){
+      actor.dodge=0
+      if(actor.encroachOffset)actor.encroachOffset=0
+      const baseOff=track.offset+(actor.wrongWay?WRONG_WAY_LATERAL_OFFSET:0)
+      actor.x=track.start.x+track.dx*dist-track.dz*baseOff
+      actor.z=track.start.z+track.dz*dist+track.dx*baseOff
+      if(actor.wrongWay&&this.isPointQuiet(actor.x,actor.z)){
+        actor.x=track.start.x+track.dx*dist-track.dz*track.offset
+        actor.z=track.start.z+track.dz*dist+track.dx*track.offset
+      }
+    }
     if(actor.kind!=='person')this.dutyConfig.constrainActorPosition?.(actor)
     if(actor.kind==='person'&&(actor.dodge!==0&&(track.tightEdge||this.surfaceAt)||isInShizijieNoPedZone(actor.x,actor.z))){
       const ks=this.surfaceAt?.(actor.x,actor.z)
@@ -1943,6 +2100,7 @@ export class Traffic {
     }
     if(walk&&!canRoute(track.corridor,actor.dist,this.actors))return null
     this.position(actor)
+    if(!walk&&this.isPointQuiet(actor.x,actor.z))return null
     if(!walk&&!hl&&approachPref&&approachPref.attempt<18){
       const approach=(camera.x-actor.x)*track.dx+(camera.z-actor.z)*track.dz
       if(approach<10||approach>150)return null
@@ -2309,6 +2467,8 @@ export class Traffic {
       let {track}=actor;const person=actor.kind==='person'
       const previousBlocker=actor.waitingFor
       actor.waitingFor=undefined
+      if(person)actor.waitingForSignal=false
+      let waitingSignalYaw:number|undefined
       if(actor.pendingRecycle){
         const spd=Math.max(4.5,actor.recycleSpeed??6)
         const hx=actor.recycleHeadingX??(actor.wrongWay?-track.dx:track.dx)
@@ -2400,6 +2560,7 @@ export class Traffic {
       const reverse=Boolean(actor.wrongWay)
       let dirX=reverse?-track.dx:track.dx,dirZ=reverse?-track.dz:track.dz
       let maxSpeed=(person?(actor.pace??=(actor.encroachmentKind==='pedestrian_jaywalk'?1.28:1.1)+.6*this.random()):Math.min(track.speedKmh/3.6,actor.kind==='car'?12:7))
+      if(person&&track.painted&&track.pedSignal&&this.pedestrianPhase(track)!=='green')maxSpeed=Math.max(maxSpeed,1.65)
       let accelRate=2
       actor.brakingForOfficer=false
       actor.honkingForOfficer=false
@@ -2610,16 +2771,26 @@ export class Traffic {
             continue
           }
           const distanceSq=dx*dx+dz*dz
+          const otherNpcVeh='kind' in other&&other.kind!=='person'
+          if(track.painted&&otherNpcVeh&&other.speed<=.25){
+            // Stopped vehicle behind stop line must not freeze a pedestrian already clearing a green crosswalk.
+            if(ahead>-.3&&ahead<2.2&&lateral<other.halfWidth+.65){
+              advance=0;actor.waitingFor=other;break nearby
+            }
+            continue
+          }
           if(distanceSq<1.44){actor.down=2;advance=0;if('kind' in other)actor.waitingFor=other;break nearby}
           if(distanceSq<16){
             advance=0;if('kind' in other)actor.waitingFor=other;break nearby
           }
         }else{
-          const otherIsCar='kind' in other&&other.kind==='car'
+          const otherIsNpc='kind' in other
+          // Pedestrians waiting at the curb for a red/yellow crossing signal do not block moving carriageway traffic.
+          if(otherIsNpc&&other.kind==='person'&&other.waitingForSignal&&!other.track.painted)continue
+          const otherIsCar=otherIsNpc&&other.kind==='car'
           if(hasRedLightViol&&otherIsCar&&ahead>0&&ahead<4.2&&lateral<2.5){
             crossTrafficBlocked=true
           }
-          const otherIsNpc='kind' in other
           const oppositeScooters=actor.kind==='scooter'&&otherIsNpc&&other.kind==='scooter'&&Boolean(other.wrongWay)!==reverse
           const minLat=oppositeScooters?.42:(actor.kind==='scooter'||(otherIsNpc&&other.kind==='scooter'))?(actor.kind==='car'||otherIsCar?1.25:.95):1.8
           let ghostActive=actor.ghostPassUntil!==undefined&&this.time<actor.ghostPassUntil
@@ -2725,6 +2896,22 @@ export class Traffic {
           actor.redLightActive=false
         }
       }
+      if(person&&!track.painted&&track.nextLink?.painted&&track.nextLink.pedSignal){
+        const nextPedPhase=this.pedestrianPhase(track.nextLink)
+        if(nextPedPhase&&nextPedPhase!=='green'){
+          const gap=Math.max(0,track.length-actor.dist-.15)
+          const limit=gap<=1.8?Math.min(gap,Math.sqrt(3.2*gap)*dt):gap
+          if(gap<=.05){
+            advance=0
+            actor.waitingForSignal=true
+            waitingSignalYaw=track.nextLink.yaw
+            this.pedStopped++
+          }else if(advance>limit){
+            advance=limit
+          }
+        }
+      }
+      const prevWaitingSince=actor.waitingSince
       if(advance>=dt*.05)actor.waitingSince=undefined
       else actor.waitingSince??=this.time
       if(actor.backing&&narrow?.back)advance=-Math.min(.6*dt,narrow.back)
@@ -2744,20 +2931,50 @@ export class Traffic {
           nextX=actor.x;nextZ=actor.z
           actor.x=prevX;actor.z=prevZ
         }
+        if(track.nearQuietZone&&!this.isPointQuiet(actor.x,actor.z)&&this.isPointQuiet(nextX,nextZ)){
+          // Never allow a vehicle to cross into a campus quiet zone even if placed on a boundary-straddling track.
+          const baseOff=track.offset+(reverse?WRONG_WAY_LATERAL_OFFSET:0)
+          let cX=track.start.x+track.dx*actor.dist-track.dz*baseOff
+          let cZ=track.start.z+track.dz*actor.dist+track.dx*baseOff
+          if(reverse&&this.isPointQuiet(cX,cZ)){
+            cX=track.start.x+track.dx*actor.dist-track.dz*track.offset
+            cZ=track.start.z+track.dz*actor.dist+track.dx*track.offset
+          }
+          if(!this.isPointQuiet(cX,cZ)){
+            actor.dodge=0;if(actor.encroachOffset)actor.encroachOffset=0
+            nextX=cX;nextZ=cZ
+          }else{
+            actor.speed=0
+            actor.dist+=reverse?advance:-advance
+            actor.waitingSince=prevWaitingSince??this.time
+            if(!this.dutyConfig.hiddenLifecycle&&!visible?.(actor))actor.leaving=true
+            return
+          }
+        }
         if(nearStatic(nextX,nextZ)){
           const next={x:nextX,y:actor.y,z:nextZ}
           const yaw=reverse?Math.atan2(-track.dx,-track.dz):track.yaw
           if(resolveContact(next,next.y,yaw,actor.halfWidth,actor.halfLength,staticSolids)){
             actor.speed=0
             actor.dist+=reverse?advance:-advance
+            actor.waitingSince=prevWaitingSince??this.time
+            if(!this.dutyConfig.hiddenLifecycle&&!visible?.(actor)&&this.time-actor.waitingSince>=8){
+              actor.leaving=true
+            }
             return
           }
         }
       }
       if(person&&actor.dist>=track.length){
         const onward=this.onwardWalk(track)??this.shizijieTurnOrReverse(track)
-        if(onward&&!canRoute(onward.track.corridor,onward.dist,this.actors,actor)){actor.dist=track.length;actor.speed=0;actor.waitingAtGate=true}
-        else if(onward){actor.track=onward.track;actor.dist=onward.dist;this.transitions++}
+        if(onward&&onward.track.painted&&onward.track.pedSignal&&this.pedestrianPhase(onward.track)!=='green'){
+          actor.dist=track.length;actor.speed=0;actor.waitingForSignal=true;waitingSignalYaw=onward.track.yaw;this.pedStopped++
+        }else if(onward&&!canRoute(onward.track.corridor,onward.dist,this.actors,actor)){actor.dist=track.length;actor.speed=0;actor.waitingAtGate=true}
+        else if(onward){
+          const enteringCrossing=Boolean(!track.painted&&onward.track.painted)
+          actor.track=onward.track;actor.dist=onward.dist;this.transitions++
+          if(enteringCrossing){this.pedCrossed++;this.onPedCross?.(onward.track,this.time)}
+        }
         else{actor.dist=track.length;actor.speed=0;actor.arrived=true}
       }else if(person&&actor.dist<0){
         // Backing out of a pinch past this track's start continues onto the track behind, still facing forward.
@@ -2795,7 +3012,7 @@ export class Traffic {
           const street=track.street,isCar=actor.kind==='car',dutyOnly=Boolean(this.dutyConfig.dutyOnly)
           for(let i=0;i<exits.length;i++){
             const next=exits[i]
-            if(next.walk||next.to===track.from)continue
+            if(next.walk||next.to===track.from||next.inQuietZone)continue
             let tier:number
             if(isCar){
               if(next.kind==='nonmotor')continue
@@ -2852,7 +3069,8 @@ export class Traffic {
         if(!this.occupiedJunctions.has(actor.track.from))this.occupiedJunctions.set(actor.track.from,actor)
       }
       this.position(actor)
-      if(person&&!actor.backing&&actor.track===track&&Math.hypot(actor.x-previousX,actor.z-previousZ)>1e-5)actor.yaw=Math.atan2(actor.x-previousX,actor.z-previousZ)
+      if(person&&actor.waitingForSignal&&waitingSignalYaw!==undefined)actor.yaw=waitingSignalYaw
+      else if(person&&!actor.backing&&actor.track===track&&Math.hypot(actor.x-previousX,actor.z-previousZ)>1e-5)actor.yaw=Math.atan2(actor.x-previousX,actor.z-previousZ)
       // Player collision check: sidewalk & nonmotor lane are 100% car-hit-free; walking calmly rarely gets hit;
       // motor-lane impacts only occur when running or ignoring horn, with impact speed strictly capped <= 25 km/h.
       if(actor.kind==='car'&&officer&&!officerInSafeZone&&this.onPlayerHit&&!actor.leaving&&actor.scale>=.5&&actor.speed>1.2){

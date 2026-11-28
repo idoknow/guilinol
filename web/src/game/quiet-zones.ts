@@ -48,10 +48,72 @@ function withinBufferOfPolygon(x: number, z: number, poly: readonly (readonly [n
   return false
 }
 
-export function getQuietZoneAt(x: number, z: number, bufferM = QUIET_ZONE_BUFFER_M): QuietZonePolygon | null {
+function orientation2D(ax: number, az: number, bx: number, bz: number, cx: number, cz: number): number {
+  return (bx - ax) * (cz - az) - (bz - az) * (cx - ax)
+}
+
+function onSegment2D(ax: number, az: number, bx: number, bz: number, px: number, pz: number): boolean {
+  return (
+    px >= Math.min(ax, bx) - 1e-9 &&
+    px <= Math.max(ax, bx) + 1e-9 &&
+    pz >= Math.min(az, bz) - 1e-9 &&
+    pz <= Math.max(az, bz) + 1e-9
+  )
+}
+
+function segmentsIntersect2D(
+  ax: number,
+  az: number,
+  bx: number,
+  bz: number,
+  cx: number,
+  cz: number,
+  dx: number,
+  dz: number,
+): boolean {
+  const o1 = orientation2D(ax, az, bx, bz, cx, cz)
+  const o2 = orientation2D(ax, az, bx, bz, dx, dz)
+  const o3 = orientation2D(cx, cz, dx, dz, ax, az)
+  const o4 = orientation2D(cx, cz, dx, dz, bx, bz)
+  if (((o1 > 0 && o2 < 0) || (o1 < 0 && o2 > 0)) && ((o3 > 0 && o4 < 0) || (o3 < 0 && o4 > 0))) return true
+  if (Math.abs(o1) <= 1e-9 && onSegment2D(ax, az, bx, bz, cx, cz)) return true
+  if (Math.abs(o2) <= 1e-9 && onSegment2D(ax, az, bx, bz, dx, dz)) return true
+  if (Math.abs(o3) <= 1e-9 && onSegment2D(cx, cz, dx, dz, ax, az)) return true
+  if (Math.abs(o4) <= 1e-9 && onSegment2D(cx, cz, dx, dz, bx, bz)) return true
+  return false
+}
+
+export function normalizeQuietZones(
+  zones: readonly {id: string; name?: string; bbox?: readonly [number, number, number, number]; polygon: readonly (readonly [number, number])[]}[],
+): QuietZonePolygon[] {
+  const out: QuietZonePolygon[] = []
+  for (const zone of zones) {
+    if (!zone?.polygon || zone.polygon.length < 3) continue
+    let bbox = zone.bbox
+    if (!bbox || bbox.length !== 4) {
+      let minX = Infinity, minZ = Infinity, maxX = -Infinity, maxZ = -Infinity
+      for (const [px, pz] of zone.polygon) {
+        if (px < minX) minX = px
+        if (px > maxX) maxX = px
+        if (pz < minZ) minZ = pz
+        if (pz > maxZ) maxZ = pz
+      }
+      bbox = [minX, minZ, maxX, maxZ]
+    }
+    out.push({id: zone.id, name: zone.name ?? zone.id, bbox, polygon: zone.polygon})
+  }
+  return out
+}
+
+export function getQuietZoneAt(
+  x: number,
+  z: number,
+  bufferM = QUIET_ZONE_BUFFER_M,
+  zones: readonly QuietZonePolygon[] = QUIET_ZONES,
+): QuietZonePolygon | null {
   if (!Number.isFinite(x) || !Number.isFinite(z)) return null
   const pad = Math.max(0, bufferM)
-  for (const zone of QUIET_ZONES) {
+  for (const zone of zones) {
     const [minX, minZ, maxX, maxZ] = zone.bbox
     if (x < minX - pad || x > maxX + pad || z < minZ - pad || z > maxZ + pad) continue
     if (pointInPolygon(x, z, zone.polygon) || withinBufferOfPolygon(x, z, zone.polygon, pad)) {
@@ -61,8 +123,48 @@ export function getQuietZoneAt(x: number, z: number, bufferM = QUIET_ZONE_BUFFER
   return null
 }
 
-export function isPointInQuietZone(x: number, z: number, bufferM = QUIET_ZONE_BUFFER_M): boolean {
-  return getQuietZoneAt(x, z, bufferM) !== null
+export function isPointInQuietZone(
+  x: number,
+  z: number,
+  bufferM = QUIET_ZONE_BUFFER_M,
+  zones: readonly QuietZonePolygon[] = QUIET_ZONES,
+): boolean {
+  return getQuietZoneAt(x, z, bufferM, zones) !== null
+}
+
+export function segmentHitsQuietZone(
+  ax: number,
+  az: number,
+  bx: number,
+  bz: number,
+  bufferM = QUIET_ZONE_BUFFER_M,
+  zones: readonly QuietZonePolygon[] = QUIET_ZONES,
+): boolean {
+  if (!zones.length || !Number.isFinite(ax) || !Number.isFinite(az) || !Number.isFinite(bx) || !Number.isFinite(bz)) {
+    return false
+  }
+  const pad = Math.max(0, bufferM)
+  const segMinX = ax < bx ? ax : bx
+  const segMaxX = ax > bx ? ax : bx
+  const segMinZ = az < bz ? az : bz
+  const segMaxZ = az > bz ? az : bz
+  const len = Math.hypot(bx - ax, bz - az)
+  const steps = Math.max(2, Math.ceil(len / 4))
+  for (const zone of zones) {
+    const [minX, minZ, maxX, maxZ] = zone.bbox
+    if (segMaxX < minX - pad || segMinX > maxX + pad || segMaxZ < minZ - pad || segMinZ > maxZ + pad) continue
+    const poly = zone.polygon
+    for (let i = 0; i <= steps; i++) {
+      const t = i / steps
+      const px = ax + (bx - ax) * t
+      const pz = az + (bz - az) * t
+      if (pointInPolygon(px, pz, poly) || withinBufferOfPolygon(px, pz, poly, pad)) return true
+    }
+    for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+      if (segmentsIntersect2D(ax, az, bx, bz, poly[j][0], poly[j][1], poly[i][0], poly[i][1])) return true
+    }
+  }
+  return false
 }
 
 // Stage 1B compatibility aliases (IDOK-123)
