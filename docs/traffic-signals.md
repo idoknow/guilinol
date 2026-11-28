@@ -334,3 +334,25 @@ npm run perf:city -- --hot                          # 附「谁最耗主线程 /
 ## 验证
 - `npm run verify:sim-order`（`scripts/test-sim-order.mjs`）：覆盖 `fleeUntil` 复位、多车同时饿死解救、红灯平顺制动、跟车平顺减速、池化障碍/队列清理、6 级两轮出口选路、`canRoute(exclude)` 与 `inherit()`。
 - 回归全套：`verify:signals`、`traffic-duty.test.mjs`、`test-npc-pose-and-sidewalk.mjs`、`test-traffic-wall.ts`、`verify-traffic-recovery.mjs`、`verify-traffic.mjs`、`verify-traffic-popin.mjs`、`traffic-city-stalls.mjs`、`verify:hot-paths`。
+
+# 行人等红绿灯、斑马线过街与校园安静区限流（IDOK-399 阶段 7）
+
+集中在 `web/src/traffic/sim.ts`、`web/src/game/quiet-zones.ts` 与 `web/src/traffic/index.ts`，衔接 `IDOK-277`（`#492`）斑马线/窄廊让行与阶段 1 统一信号真源（`SignalPlan` / `citySignals`）。
+
+## 行人等灯与斑马线过街
+- **统一信号真源**：构造期按 `graph.signals` 为每个多相位信号节点索引各相位车道方向向量，为每条路口斑马线（`lane.pedCrossings` 生成的 `painted === true` 轨道，距信号节点 ≤ 32 m，或在 32–48 m 内且距冲突车道 ≤ 16 m）绑定 `pedSignal = { signalNode, conflictMask }`。单相位或全向冲突节点不绑定，避免永久红灯死等；非路口路段斑马线保持无灯通行。
+- **相位计算**：`sim.pedestrianPhase(track)` 与 `sim.getPedestrianSignalPhase(node, dx, dz)` 复用 `SignalPlan.state(node, time + signalShift)`（零分配，与 `sim.phase` / `citySignals` 同钟同源）。任意与斑马线方向夹角 ≥ 41°（`|dot| ≤ 0.75`）的冲突车流相位处于绿/黄灯时行人灯为 `'red'`；冲突车流全红时与平行车流同享 `'green'` / `'yellow'`。
+- **停等与清空**：
+  - 未踏入斑马线的行人在 `'red'` / `'yellow'` 时于路缘前平顺制动停等（引道停在入口前 0.15 m，直连人行道停在轨道端头），设置独立标志 `waitingForSignal = true`（不复用窄廊 `waitingAtGate`），朝向转向斑马线方向，站立切换 `idle` 动作，后方同向行人按 0.52 m 间距自然排队；绿灯亮起依次放行并计入 `pedCrossed` / `onPedCross`。
+  - 已在斑马线上（`track.painted`）的行人不因中途变灯卡在马路中央，黄/红灯期间小幅提速清空（≥ 1.65 m/s）；停止线前静止车辆不冻住绿灯斑马线上的行人，站在路缘等红灯的行人也不误拦车行道正常行驶车辆。
+- **浏览器探针（`?verify`）**：`trafficProbe.signals.ped(node, dx, dz)`、`pedestriansDetail[].waitingForSignal` / `onCrossing`。
+
+## 校园安静区防机动车与非机动车
+- **双源读取**：`Traffic` 优先读取 `graph.quiet`（缺 `bbox` 时由 `normalizeQuietZones` 补算）；当流式 512 m cell 未携带 `quiet` 字段时自动回退内置 25 所校园 `QUIET_ZONES`（含 5 m 外扩缓冲）。
+- **全路径拦截车辆、保留步行**：构造期为非步行车道预计算 `inQuietZone`（`segmentHitsQuietZone`）与 `nearQuietZone`（+6 m 门控），热路径零额外几何开销。
+  - 禁补车：`usable()` 排除 `inQuietZone` 车道，`trySpawnFromPool()` 对机动车与非机动车（含常规与执勤模式）再做点位复核。
+  - 禁驶入：正向末端选路、逆行入口选路与换道（`adjacent`）一律过滤 `inQuietZone`；`position()` 与步进边界对 `nearQuietZone` 车辆拦住横向越界偏移（`encroachOffset` / `dodge`）及跨边界驶入。
+  - 步行保留：`walk` 轨道不受安静区拦截，校园周边与内部步行人流正常生成与通行。
+
+## 验证
+- `npm run verify:pedestrians`（`scripts/test-pedestrians.mjs`）：覆盖 2/3/1 相位真源一致性与 `signalShift` 同步、带引道/无引道斑马线红黄灯停等与绿灯放行、多行人排队、斑马线清空与静止车/路缘行人防互锁、无灯斑马线与窄廊 `waitingAtGate` 解耦、`graph.quiet` 与内置 `QUIET_ZONES` 双源防补车/防驶入/防逆行/防越界偏移及校园行人保留、真实桂林全城路网 25 所校园实测。

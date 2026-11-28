@@ -114,7 +114,7 @@ export async function traffic(scene:THREE.Scene,camera:THREE.Camera,verify:boole
   }
   let accumulator=0
   const signalDriver=citySignalClock.driver(SIGNAL_DRIVER_RANK.street)
-  const signalProbe={clock:()=>citySignalClock.now,count:()=>citySignals.size,nodes:()=>[...citySignals.nodeIds()],state:(node:number)=>{const state=citySignalState(node,{phase:0,color:'green',remaining:0,cycle:0});return state&&{...state,lanes:citySignals.spec(node)!.phases.map(phase=>phase.lanes)}},color:(node:number,lane:number)=>citySignalColor(node,lane),sim:(node:number,lane:number)=>sim?.getSignalPhase(lane,node)??null}
+  const signalProbe={clock:()=>citySignalClock.now,count:()=>citySignals.size,nodes:()=>[...citySignals.nodeIds()],state:(node:number)=>{const state=citySignalState(node,{phase:0,color:'green',remaining:0,cycle:0});return state&&{...state,lanes:citySignals.spec(node)!.phases.map(phase=>phase.lanes)}},color:(node:number,lane:number)=>citySignalColor(node,lane),sim:(node:number,lane:number)=>sim?.getSignalPhase(lane,node)??null,ped:(node:number,dx:number,dz:number)=>sim?.getPedestrianSignalPhase(node,dx,dz)??null}
   if(verify)mesh.userData.signals=signalProbe
   // IDOK-399: a signal head for every approach of the loaded road cell. They read `citySignals`; they never drive the clock.
   const heads=surfaceAt&&signalHeads(scene,surfaceAt)
@@ -237,6 +237,7 @@ export async function traffic(scene:THREE.Scene,camera:THREE.Camera,verify:boole
         mesh.userData.pedestriansDetail.push({
           street:actor.track.street,cls:actor.track.cls,x:actor.x,y:actor.y,z:actor.z,speed:actor.speed,dodge:actor.dodge,
           laneCompliant:actor.laneCompliant!==false,encroachmentKind:actor.encroachmentKind??'none',
+          waitingForSignal:Boolean(actor.waitingForSignal),onCrossing:Boolean(actor.track.painted),
           hitsMotor:sim!.hitsMotorLane(actor.x,actor.z,.35),betweenMotors:s.betweenMotors,
           surface:surfaceAt?.(actor.x,actor.z)??null,
         })
