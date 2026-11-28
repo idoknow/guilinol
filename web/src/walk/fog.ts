@@ -1,10 +1,10 @@
-// 走过才解锁的地图迷雾（IDOK-588 / IDOK-590）
+// 走过才解锁的地图迷雾（IDOK-588 / IDOK-605）
 //
 // 规则：走到哪儿，就把周围 FOG_REVEAL 米（10 m）的一圈格子点亮；没点亮的地方在地图上是雾。
 // 进度先写 localStorage（离线也能攒），登录后按「只增不减」的并集同步到 /api/walk/fog：
 // 服务端记的是每个账号走过的格子号，换设备接着开图，多人之间互不影响。
 //
-// IDOK-590：格子从 32 m 收到 8 m，本地缓存换到 v2；v1 的旧格子号在新网格上没有意义，读到就丢。
+// IDOK-605：格子从 32 m 收到 8 m，本地缓存换到 v2；v1 的旧格子号在新网格上没有意义，读到就丢。
 
 import {fogCell, fogReveal, FOG_CELL_KM2, FOG_POST_LIMIT, fogValidKey} from '../../../lib/fog'
 
