@@ -10,6 +10,7 @@ export const REQUIRED_TABLES = [
   'users', 'sessions', 'email_codes', 'rate_limits',
   'social_identities', 'social_states', 'social_pending',
   'player_saves', 'player_ledger_txns',
+  'walk_fog',
   'admin_audit',
   'chat_settings','chat_messages','chat_mutes','chat_words','chat_seed_seen',
   'mp_online_minute','mp_online_hour','mp_sessions',

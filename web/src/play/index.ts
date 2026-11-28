@@ -18,6 +18,7 @@ import {setCameraShown} from '../gear/hand'
 import {droneMode} from '../drone'
 import {navigation} from './nav'
 import {namedChild} from '../scene-named'
+import {fogAreaKm2,fogBoot,fogCount,fogRevealAt,fogWalk} from '../walk/fog'
 
 const KEY = 'glol.stamps', ARRIVE = 12, REARM = 40, MARK_LAYER = 2
 const ease = (t:number)=>t<.5?4*t*t*t:1-Math.pow(-2*t+2,3)/2
@@ -149,6 +150,10 @@ export function play(host:Host) {
     await travel(async()=>{leaveSummit(); await host.walkTo(tx,tz,tx===x&&tz===z?(host.walker()?.yaw??0):yaw,'map',name)})
   }
   let atlas:import('../map/atlas').Atlas|undefined, map:ReturnType<typeof mapView>|undefined
+  // IDOK-579：开图进度——先用本地存的，登录了再跟服务端并一次（离线/未登录只是不同步）。
+  void fogBoot()
+  // 套件用：读已探明格子数/面积，或直接点亮一格（走在路上太慢，验证只看迷雾层对不对）。
+  ;(window as unknown as {mapFog?:unknown}).mapFog = {count:fogCount,area:fogAreaKm2,reveal:fogRevealAt}
   // Atlas loads only after the scene has been running a couple of seconds, never inside the first-frame budget.
   let mapLoading:Promise<ReturnType<typeof mapView>|undefined>|undefined
   const ensureMap = (background=false)=>{if(mapLoading)return mapLoading;const done=inlineBusy(slot,'载入地图',{quiet:background});return mapLoading = import('../map/atlas').then(m=>m.loadAtlas(host.manifest)).then(loaded=>{
@@ -363,6 +368,8 @@ export function play(host:Host) {
     pulse += dt
     if(!mapRequested&&pulse>mapRetryAt){mapRequested = true; loadMap()}
     const walker = host.walker(), walking = !!walker?.active, p = walking?walker!.position:host.camera.position
+    // IDOK-579：走到哪儿，地图开到哪儿；遥控无人机飞出去的航线不算「走过」。
+    if(!drone.active) fogWalk(p.x,p.z)
     // IDOK-238（Rock）：默认空手、手臂跟走路动画；底部物品栏切到「相机」才拿机身、抬到胸前。
     // 每帧都喂一次 setCameraShown：walker 是首帧之后才拿到的，只在状态翻转时调用会漏掉持机姿势。
     const onFoot = walking && !photo.active && !isRackOpen() && !riding()
