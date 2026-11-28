@@ -136,21 +136,41 @@ export async function apiTest({ api, origin, cookie, sql, getCookie }) {
   await (await import('./admin-test.mjs')).apiTest({ api, sql, id, second, photo, origin, cookie })
   cookie = getCookie()
   for (let count = 1; count <= 5; count++) {
-    // IDOK-219 / IDOK-497: 游戏 bug supports submitting without screenshot/photo when user removes it.
-    const next = count === 1 ? (await api('feedback', { ...draft, kind: '游戏 bug' })).id : await create()
-    if (count > 1) {
+    // IDOK-219 / IDOK-497: 游戏 bug supports submitting without screenshot/photo/view when user removes it or capture fails.
+    const next =
+      count === 1
+        ? (await api('feedback', { ...draft, kind: '游戏 bug', view: null, heading: null, landmark_id: null })).id
+        : count === 2
+          ? (await api('feedback', { ...draft, kind: '游戏 bug', view: null, heading: null, landmark_id: null })).id
+          : await create()
+    if (count === 2) {
+      await photo(next, 1, 200)
+    } else if (count > 2) {
       await uploadShot(origin, cookie, next)
       await photo(next, 1, 200)
     } else {
-      const blankBug = (await api('feedback', { ...draft, kind: '游戏 bug', body: '   ' })).id
+      const blankBug = (await api('feedback', { ...draft, kind: '游戏 bug', view: null, body: '   ' })).id
       await api(`feedback/${blankBug}/submit`, {}, 409)
       await api(`feedback/${blankBug}`, null, 200, null, { method: 'DELETE' })
+      await api('feedback', { ...draft, kind: '其他', view: null }, 400)
       const plain = await create()
       await uploadShot(origin, cookie, plain)
       await api(`feedback/${plain}/submit`, {}, 409)
       await api(`feedback/${plain}`, null, 200, null, { method: 'DELETE' })
     }
     await api(`feedback/${next}/submit`, {}, count === 5 ? 429 : 200)
+    if (count === 1) {
+      const bugNoView = await api(`feedback/${next}`)
+      assert.equal(bugNoView.view, null)
+      assert.equal(bugNoView.has_view_shot, false)
+      assert.equal(bugNoView.photos.length, 0)
+    }
+    if (count === 2) {
+      const bugPhotoNoView = await api(`feedback/${next}`)
+      assert.equal(bugPhotoNoView.view, null)
+      assert.equal(bugPhotoNoView.has_view_shot, false)
+      assert.equal(bugPhotoNoView.photos.length, 1)
+    }
   }
   console.log('Feedback: private photos, quota, transitions, idempotency and supplement passed')
   const appeal = (await api('feedback', { ...draft, kind: '封禁申诉' })).id
@@ -420,5 +440,33 @@ export async function uiTest(page, origin, sql) {
   await fb.locator('.fb-pill.fb-status--submitted').waitFor({ timeout: 120000 })
   assert.match(await fb.locator('.fb-facts').innerText(), /游戏 bug/)
   await shot('bug-submitted')
+  await click('关闭')
+
+  // 回归测试：当默认截屏失败（如镜头位于反馈框外）时，非 bug 类型提示「请先截取游戏画面」，
+  // 切换为「游戏 bug」后底部提示「截图可选，可直接提交」，可直接无图/无 view 提交而不报「请先截取游戏画面」。
+  await page.evaluate(() => {
+    window.viewer.camera.position.set(4500, 180, 0)
+  })
+  await page.locator('.dock-more').click()
+  await page.locator('.dock-feedback').click()
+  await fb.waitFor({ timeout: 60000 })
+  await fb.locator('.fb-count', { hasText: '请先截取游戏画面' }).waitFor()
+  await fb.getByText('游戏 bug', { exact: true }).click()
+  await fb.locator('.fb-count', { hasText: '截图可选，可直接提交' }).waitFor()
+  await fb.getByLabel('标题').fill('边界外无截图直接提交 bug')
+  await fb.getByLabel('描述（必填）').fill('镜头超出范围截屏失败，直接无图提交验证')
+  await click('提交反馈')
+  await fb
+    .locator('.fb-pill.fb-status--submitted')
+    .waitFor({ timeout: 120000 })
+    .catch(async (error) => {
+      throw Error(`${error.message}: ${await fb.innerText()}`)
+    })
+  const [noShotBug] = await (await page.request.get(origin + '/api/feedback?mine=1')).json()
+  const noShotDetail = await (await page.request.get(`${origin}/api/feedback/${noShotBug.id}`)).json()
+  assert.equal(noShotDetail.kind, '游戏 bug')
+  assert.equal(noShotDetail.view, null)
+  assert.equal(noShotDetail.has_view_shot, false)
+  assert.equal(noShotDetail.photos.length, 0)
   await click('关闭')
 }

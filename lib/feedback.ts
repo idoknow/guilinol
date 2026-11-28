@@ -1,6 +1,6 @@
 import { type Env, Problem, equal, hash, invalid, limited, now, sessionAccount, sessionHash, unauthorized } from './auth'
 import { ll2xz } from './projection'
-import { APPEAL, BUG, TERMINAL_STATUSES, appealEdges, edges, extractBanRecordId, kinds, labels, stripAppealTemplate, views, validView } from './feedback-contract'
+import { APPEAL, BUG, TERMINAL_STATUSES, appealEdges, edges, extractBanRecordId, kinds, labels, photosOptional, stripAppealTemplate, views, validView } from './feedback-contract'
 import { adminList, adminMergeUsers, adminSetEmail, adminSetPassword, adminUserDetail, audit, setBan, setRole } from './admin'
 import {flushMail} from './feedback-mail'
 
@@ -166,7 +166,7 @@ export async function feedback(request: Request, env: Env, path: string) {
       Math.abs(point.x) > 3072.000001 ||
       Math.abs(point.z) > 3328.000001 ||
       !kinds.includes(kindStr) ||
-      !(kindStr === APPEAL && data.view == null) && !validView(data.view)
+      !(photosOptional(kindStr) && data.view == null) && !validView(data.view)
     )
       invalid()
     let banRecordId: string | null = null
@@ -502,7 +502,7 @@ export async function feedback(request: Request, env: Env, path: string) {
     const quotaGuard = priorityAdmin
       ? ''
       : ' AND (SELECT count(*) FROM feedback f WHERE f.user_id=feedback.user_id AND f.submitted_at>unixepoch()-86400)<5'
-    guard = ` AND ((kind='${APPEAL}' AND length(trim(body))>0) OR (view_json IS NOT NULL AND ((kind='${BUG}' AND shot_state!=2 AND length(trim(body))>0) OR (shot_state=1 AND EXISTS(SELECT 1 FROM feedback_photos WHERE feedback_id=feedback.id AND ready=1)))))${quotaGuard}`
+    guard = ` AND ((kind IN ('${APPEAL}','${BUG}') AND shot_state!=2 AND length(trim(body))>0) OR (view_json IS NOT NULL AND shot_state=1 AND EXISTS(SELECT 1 FROM feedback_photos WHERE feedback_id=feedback.id AND ready=1)))${quotaGuard}`
   } else if (action === 'supplement') {
     if (row.status !== 'need_info') conflict()
     target = priorityAutoApprove ? 'approved' : 'submitted'

@@ -71,8 +71,22 @@ try{
   const blankBug=(await call('feedback','user',{view,kind:'游戏 bug',title:'空描述',body:'   ',lat:25.28,lon:110.3})).id
   await call(`feedback/${blankBug}/submit`,'user',{},409)
   await call(`feedback/${blankBug}`,'user',null,200,'DELETE')
+  const blankBugNoView=(await call('feedback','user',{view:null,kind:'游戏 bug',title:'无视角空描述',body:'   ',lat:25.28,lon:110.3})).id
+  await call(`feedback/${blankBugNoView}/submit`,'user',{},409)
+  await call(`feedback/${blankBugNoView}`,'user',null,200,'DELETE')
+  await call('feedback','user',{view:null,kind:'其他',title:'非bug无视角',body:'应该被拒',lat:25.28,lon:110.3},400)
   const okBug=(await call('feedback','user',{view,kind:'游戏 bug',title:'有描述',body:'骑车过桥卡住',lat:25.28,lon:110.3})).id
   await call(`feedback/${okBug}/submit`,'user',{},200)
+  const okBugNoView=(await call('feedback','user',{view:null,heading:null,landmark_id:null,kind:'游戏 bug',title:'无截图bug',body:'截屏失败但文字清楚',lat:25.28,lon:110.3})).id
+  await call(`feedback/${okBugNoView}/submit`,'user',{},200)
+  const bugNoViewDetail=await call(`feedback/${okBugNoView}`,'user')
+  assert.equal(bugNoViewDetail.view,null);assert.equal(bugNoViewDetail.has_view_shot,false);assert.equal(bugNoViewDetail.photos.length,0)
+  const okBugPhotoNoView=(await call('feedback','user',{view:null,heading:null,landmark_id:null,kind:'游戏 bug',title:'无视角带本地图',body:'上传本地截图反馈',lat:25.28,lon:110.3})).id
+  const bugPhotoRes=await worker.dispatchFetch(`https://example.test/api/feedback/${okBugPhotoNoView}/photos/1`,{method:'PUT',headers:{Origin:'https://example.test',Cookie:'glol_session='+'a'.repeat(64),'Content-Type':'image/jpeg','Content-Length':String(image.length)},body:image})
+  assert.equal(bugPhotoRes.status,200,await bugPhotoRes.text())
+  await call(`feedback/${okBugPhotoNoView}/submit`,'user',{},200)
+  const bugPhotoDetail=await call(`feedback/${okBugPhotoNoView}`,'user')
+  assert.equal(bugPhotoDetail.view,null);assert.equal(bugPhotoDetail.has_view_shot,false);assert.equal(bugPhotoDetail.photos.length,1)
   const plainNoPhoto=(await call('feedback','user',{view,kind:'其他',title:'无图普通',body:'有文字无图',lat:25.28,lon:110.3})).id
   await call(`feedback/${plainNoPhoto}/submit`,'user',{},409)
   await call(`feedback/${plainNoPhoto}`,'user',null,200,'DELETE')
