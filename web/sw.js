@@ -10,7 +10,8 @@
  */
 const BUILD = '__BUILD__'
 const VERSION = 'glol-' + BUILD
-const MANIFEST_URL = '/precache-manifest.json?b=' + BUILD
+// 清单由构建时内联进来（与 sw.js 同版本，天然一致）；留一个空数组回退给老构建
+const PRECACHE = /*__PRECACHE__*/[]
 const NAV_TIMEOUT_MS = 3000
 const CONCURRENCY = 4
 const CACHE_FIRST = [/^\/assets\//, /^\/(?:favicon-32\.png|apple-touch-icon\.png|manifest\.webmanifest)$/]
@@ -34,11 +35,7 @@ async function pool(items, limit, worker) {
 self.addEventListener('install', (event) => {
   event.waitUntil((async () => {
     const cache = await caches.open(VERSION)
-    let files = []
-    try {
-      const response = await fetch(MANIFEST_URL, { cache: 'no-store' })
-      if (response.ok) files = ((await response.json()).files || [])
-    } catch { /* 清单拿不到就退化为不预缓存 */ }
+    const files = Array.isArray(PRECACHE) ? PRECACHE : []
     await pool(files, CONCURRENCY, async (url) => {
       // 只有带内容哈希的 /assets/ 才能跨版本复用；HTML 与图标每次都必须重新下载，
       // 否则入口页会永远停在第一次安装的版本（旧 HTML 引用已删除的分片 → 白屏）。

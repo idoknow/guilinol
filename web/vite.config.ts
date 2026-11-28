@@ -1,5 +1,5 @@
 import {defineConfig, type Plugin} from 'vite'
-import {existsSync, readFileSync, readdirSync, writeFileSync} from 'node:fs'
+import {existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync} from 'node:fs'
 import {execFileSync} from 'node:child_process'
 import {dirname, join} from 'node:path'
 import {fileURLToPath} from 'node:url'
@@ -26,6 +26,7 @@ function rapierExternalWasm(): Plugin {
 }
 
 export default defineConfig({
+  define:{__BUILD_SHA__:JSON.stringify(buildSha())},
   publicDir: '../public',
   plugins: [rapierExternalWasm(), {name:'world-preloads',transformIndexHtml(_,ctx){
     if(ctx.filename!==join(root,'web/index.html'))return []
@@ -68,10 +69,15 @@ export default defineConfig({
     })
     const files = [...new Set([...walk(dist), ...entries])]
     writeFileSync(join(dist,'precache-manifest.json'), JSON.stringify({build:sha,files}))
-    const source = readFileSync(join(root,'web/sw.js'),'utf8').replace('__BUILD__', sha)
-    writeFileSync(join(dist,'sw.js'), source)
-    // 紧急回滚件：SW 出问题时把 dist/sw-kill.js 覆盖成 dist/sw.js 即可全量收回
-    writeFileSync(join(dist,'sw-kill.js'), readFileSync(join(root,'web/sw-kill.js'),'utf8'))
+    const source = readFileSync(join(root,'web/sw.js'),'utf8')
+      .replace('__BUILD__', sha)
+      // 清单内联：避免再发一次 /precache-manifest.json 请求（CDN 会缓存它，导致旧 SW 拿到新清单 → 404）
+      .replace('/*__PRECACHE__*/[]', JSON.stringify(files))
+    // 关键：文件名不带 .js —— CDN 对 js|css|… 配了 365 天缓存且忽略 Cache-Control，
+    // 放在根上会导致 SW 永远不更新。放在 /sw/<sha> 既不命中后缀规则，URL 又天然随版本变化。
+    mkdirSync(join(dist,'sw'),{recursive:true})
+    writeFileSync(join(dist,'sw',sha), source)
+    writeFileSync(join(dist,'sw-kill'), readFileSync(join(root,'web/sw-kill.js'),'utf8'))
   }}, {name:'error-pages',generateBundle(){
     // IDOK-420: self-contained error pages, copied byte-for-byte (no Vite HTML transform) to dist/errors/.
     // Edit via scripts/build-error-pages.mjs; the CDN copy is pushed from the ops repo.

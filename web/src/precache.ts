@@ -12,7 +12,7 @@ export function registerPrecache() {
   if (connection?.effectiveType && /(^|-)2g$|3g/.test(connection.effectiveType)) return
 
   const register = () => {
-    navigator.serviceWorker.register('/sw.js', { scope: '/' }).catch(() => {})
+    navigator.serviceWorker.register(`/sw/${__BUILD_SHA__}`, { scope: '/' }).catch(() => {})
   }
   const whenIdle = () => {
     if ('requestIdleCallback' in window) {
