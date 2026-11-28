@@ -43,19 +43,23 @@ test('天气按时段切分，同一时段全服一致，且只会是三种天�
   }
 })
 
-test('天气分布贴近原有权重（晴天为主），且早晚各有雾', () => {
+test('清晨雾的频率确实高于其它时段（不是同一套权重套全天）', () => {
   const counts = {clear: 0, mist: 0, rain: 0}
-  const slots = 24 * 60 // 三天
-  for (let index = 0; index < slots; index++) counts[weatherAt(EPOCH_MS + index * WEATHER_SPELL_MS)]++
+  let morningSlots = 0, morningMist = 0, otherSlots = 0, otherMist = 0
+  const slots = 24 * 60 * 30 // 三十天，够把 55% / 14% 的差距拉出来
+  for(let index = 0; index < slots; index++) {
+    const at = EPOCH_MS + index * WEATHER_SPELL_MS, hour = hourAt(at), weather = weatherAt(at)
+    counts[weather]++
+    if(hour >= 4.5 && hour < 9.5) {morningSlots++; if(weather === 'mist') morningMist++}
+    else {otherSlots++; if(weather === 'mist') otherMist++}
+  }
+  const morningRate = morningMist / morningSlots, otherRate = otherMist / otherSlots
+  // 目标 55% vs 约 14%；留足统计余量，但仍能识别"全天用同一套权重"（那样两者会几乎相等）。
+  assert.ok(morningRate > otherRate * 2.5,
+    `清晨起雾率 ${(morningRate*100).toFixed(1)}% 应当显著高于其它时段 ${(otherRate*100).toFixed(1)}%`)
+  assert.ok(morningRate > .4, `清晨起雾率应接近 55%，实际 ${(morningRate*100).toFixed(1)}%`)
   assert.ok(counts.clear > counts.mist && counts.clear > counts.rain, JSON.stringify(counts))
   assert.ok(counts.rain > 0 && counts.mist > 0)
-  // 至少有一个清晨时段是雾（4.5–9.5 点里起雾概率过半）。
-  let morningMist = false
-  for (let index = 0; index < 24 * 20 && !morningMist; index++) {
-    const at = EPOCH_MS + index * WEATHER_SPELL_MS
-    if (hourAt(at) >= 4.5 && hourAt(at) < 9.5 && weatherAt(at) === 'mist') morningMist = true
-  }
-  assert.ok(morningMist)
 })
 
 test('剩余时段在 (0, 时段长度] 内，并在换段时归零', () => {

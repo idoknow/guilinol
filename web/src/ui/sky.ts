@@ -13,8 +13,8 @@ import {onWorldClock, worldSnapshot} from '../global-time'
 // becomes an editor for a *local* preview (deliberate mood picks, photo mode, `clock.set()`), and the
 // 「全服」 button hands control back.
 //
-// Capture harnesses stay reproducible: `?time=`, `?weather=` and `?flow=0` still pin everything, and a
-// bare `?verify` keeps the historical deterministic 10:00 start (the world clock is wall-clock time, so
+// Capture harnesses stay reproducible: `?time=`, `?weather=`, `?flow=0` pin everything, and a bare
+// `?verify` keeps the historical deterministic 10:00 start (the world clock is wall-clock time, so
 // letting it through would make every screenshot depend on when it ran). Pass `?worldtime=1` on a
 // `?verify` link to opt into the world clock — `scripts/verify-world-time.mjs` does exactly that.
 // Solo (IDOK-154): no panel — the clock follows the world by itself.
@@ -23,7 +23,7 @@ const skies:[string,Weather,string][] = [['晴','clear','clear'],['雾','mist','
 const WEATHERS:Weather[] = ['clear','mist','rain']
 /** Seconds to absorb the remaining lag against the world hour; small enough to stay invisible. */
 const CATCH_UP_S = 0.6
-/** Cap on the catch-up gain: a long stall must not apply the whole correction in one frame. */
+/** Hard cap on the per-frame catch-up gain, so an arbitrarily large `dt` can never hard-cut the sky. */
 const MAX_GAIN = 0.25
 /** A weather spell lasts 3 game minutes, so ease into a new one instead of cutting. */
 const WORLD_BLEND_MS = 12000
@@ -190,7 +190,7 @@ export function skyClock(params:URLSearchParams) {
       } else if(world) {
         // Advance at the canonical rate using the RAW dt (a 1–2 FPS device must not fall behind just
         // because its frames are long — IDOK-502 review), then pull toward the 全服 hour with a gain
-        // based on the CAPPED step, so a stall can sweep fast but never apply the whole gap in one frame.
+        // based on a cap, so a stall can sweep fast but never apply the whole gap in one frame.
         const next = worldSnapshot()
         hour = (hour + dt*clock.rate) % 24
         let delta = ((next.hour - hour) % 24 + 24) % 24
@@ -205,7 +205,7 @@ export function skyClock(params:URLSearchParams) {
         // IDOK-502 review: only touch the DOM when the visible text actually changed — `tick` runs per
         // frame and blind refresh() calls (textContent/disabled/attributes) cost real time on phones.
         const text = label(hour)
-        if(text !== shownHour || lockState() !== lockedShown){shownHour = text; refresh()}
+        if(text !== shownHour || locked() !== lockedShown){shownHour = text; refresh()}
       } else if(flowing) {
         hour = (hour + dt*clock.rate) % 24
         blendMs = MANUAL_BLEND_MS
@@ -220,7 +220,5 @@ export function skyClock(params:URLSearchParams) {
       goal = null; world = false; flowing = false; blendMs = MANUAL_BLEND_MS; refresh()
     },
   }
-  /** Current lock state, readable inside `tick` without re-running `locked()` twice. */
-  function lockState(){return locked()}
   return clock
 }

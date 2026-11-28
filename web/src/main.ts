@@ -30,7 +30,7 @@ import {MAIN_DETAIL_LAYER} from './look/mirror-layer'
 import {rain} from './look/rain'
 import {windowLight} from './look/buildings'
 import {skyClock} from './ui/sky'
-import {installWorldClock, worldNow, clockSource, worldSnapshot} from './global-time'
+import {installWorldClock, worldNow, clockSource, clockFailures, worldSnapshot, calibrateWorldClock} from './global-time'
 import type {Host} from './play/host'
 import {streamIndicator,veil,type FullLoader,type Veil} from './ui/loading'
 import {loadTiles} from './look/tiles'
@@ -886,11 +886,14 @@ async function start(loader:FullLoader,creatorSpawn=false) {
     async photoSupport(x:number,z:number,bridgeRadius?:number){return (await loadWalker()).photoSupport(x,z,bridgeRadius)},
     peaksStats:peaks.stats,clock,env,
     /** IDOK-502: read-only view of the全服 clock, for the HUD and for headless consistency checks.
-     *  `hour` is what this client is rendering; `targetHour` is the authoritative全服 hour from the
-     *  server-calibrated clock (they converge within a fraction of a game minute under normal drift). */
+     *  `now` is this client's estimate of the server epoch; `hour` is what it is rendering;
+     *  `targetHour` is the authoritative全服 hour from the calibrated clock. */
     worldClock:()=>{const snap=worldSnapshot()
-      return {now:worldNow(),source:clockSource(),local:!clock.world,hour:clock.hour,weather:clock.weather,
+      return {now:worldNow(),source:clockSource(),failures:clockFailures(),local:!clock.world,linked:!!clock.linked,
+        anchored:!!clock.anchored,hour:clock.hour,weather:clock.weather,
         targetHour:snap.hour,targetWeather:snap.weather,remainingMs:snap.remainingMs}},
+    /** IDOK-502: force a calibration now (used by scripts/verify-world-time.mjs). */
+    calibrateWorldClock:()=>calibrateWorldClock({force:true}),
     get tour(){return tour},get walk(){return walker},...(params.has('verify')?{heli}:{}),
     flight: takeFlight,
     setPreset(name:string){if(getPlayMode()==='solo')return {ok:false,code:'FLIGHT_DISABLED_IN_SOLO'}

@@ -356,7 +356,11 @@ export function photoMode(host: Host, place: () => string, onCapture?: () => voi
     bar.classList.remove('rec')
     active = false
     host.clock.flowing = saved.flowing
-    host.clock.world = saved.world
+    // IDOK-502 review: restoring the saved `world` kept the player on a private timeline if the photo was
+    // opened from a local preview, and it went stale when multiplayer connected mid-shot. Online players
+    // must come back to the 全服 clock; offline players get their previous state back unchanged.
+    host.clock.world = host.clock.linked ? true : saved.world
+    if (host.clock.linked) host.clock.flowing = true
     host.walker()?.hold(false)
     host.walker()?.showFigure(true)
     host.camera.fov = saved.fov

@@ -78,6 +78,8 @@ export interface EbikeMountOptions {
   drainEnabled?: boolean
   autoCrash?: boolean
   parkStart?: boolean
+  /** IDOK-502: optional computed night level (0 day … 1 night) so headlights track the sky, not the clock. */
+  envNight?: number
   envHour?: number
   sharedSlipEnabled?: boolean
   sharedSlipRng?: (() => number) | null
@@ -835,14 +837,18 @@ export function createBikeControl() {
     return setHeadlight(next, true)
   }
 
-  function setEnvironmentHour(hour: number) {
+  function setEnvironmentHour(hour: number, night?: number) {
     const policy = headlightPolicyFor(kind, vehicleType)
     if (policy.maxMode === 'off' || kind === 'bicycle') {
       headlight = 'off'
       return
     }
     if ((policy.switchable && headlightManual) || batteryPct <= 0 || crashPhase !== 'none') return
-    const isNight = hour >= 18.2 || hour < 6.2
+    // IDOK-502: prefer the evaluated night level when the caller has it. `env.night` already folds in the
+    // hour, the weather dimming and the dusk ramp, so an overcast afternoon lights the lamps and the
+    // headlight together — a fixed clock cut left them disagreeing. Falls back to main's fixed-hour rule
+    // (18.2/6.2) for callers that mount with only `envHour`.
+    const isNight = typeof night === 'number' && Number.isFinite(night) ? night >= .45 : hour >= 18.2 || hour < 6.2
     headlight = clampHeadlightForVehicle(kind, vehicleType, isNight ? 'low' : 'off')
   }
 
@@ -1445,7 +1451,7 @@ export function createBikeControl() {
       }
       parkLocked = kind === 'bike' ? (options?.parkStart ?? !isVerifyMode()) : false
       kickstandDown = parkLocked
-      if (options?.envHour !== undefined) setEnvironmentHour(options.envHour)
+      if (options?.envHour !== undefined || options?.envNight !== undefined) setEnvironmentHour(options.envHour ?? 12, options.envNight)
       headlight = clampHeadlightForVehicle(kind, vehicleType, headlight)
       gripLimitRad = spec().crash.mandatoryFallLeanRad
     },

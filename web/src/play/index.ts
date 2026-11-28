@@ -201,7 +201,8 @@ export function play(host:Host) {
   }
   function closeCard(){card.classList.remove('show'); shown = null; setTimeout(()=>{if(!shown) card.hidden = true},260)}
   async function act(spot:Spot, what:string) {
-    if(what==='hour') {host.clock.flowing = false; host.clock.goal = spot.best.hour}
+    // IDOK-502 review: 「换到此时」 pins a local hour, so it must not bypass the multiplayer lock either.
+    if(what==='hour') {if(!host.clock.linked) {host.clock.flowing = false; host.clock.goal = spot.best.hour}}
     if(what==='aim') {const w = host.walker(); if(w?.active) w.face(yawToward(spot.x,spot.z,spot.at),.12); else await goTo(spot); closeCard()}
     if(what==='summit') {closeCard(); await climb(spot)}
     if(what==='photo') {closeCard(); photo.open()}
