@@ -59,7 +59,7 @@ const when = (seconds: number) =>
   })
 
 function pill(status: string) {
-  return el('span', labels[status] ?? status, `fb-pill fb-status--${status}`)
+  return el('span', labels[status] ?? status, `fb-pill fb-status--${status === 'resolved' ? 'live' : status}`)
 }
 
 function pickDefaultPosition(host: Host, view?: FeedbackView | null) {
@@ -309,7 +309,7 @@ export async function openFeedback(
           timeline.append(msg)
           continue
         }
-        const line = el('li', '', `fb-status--${event.status}`)
+        const line = el('li', '', `fb-status--${event.status === 'resolved' ? 'live' : event.status}`)
         line.append(el('b', labels[event.status] ?? event.status), el('time', when(event.created_at)))
         if (event.message && event.message !== labels[event.status]) line.append(el('p', event.message))
         if (event.screenshot_url) {
@@ -328,7 +328,7 @@ export async function openFeedback(
     body.append(timeline)
     const actions = el('div', '', 'fb-actions')
     body.append(actions)
-    if (!['draft', 'live', 'rejected', 'duplicate'].includes(item.status)) {
+    if (!['draft', 'live', 'rejected', 'duplicate', 'resolved'].includes(item.status)) {
       const input = el('textarea'),
         photo = el('input'),
         compose = el('div', '', 'fb-compose'),

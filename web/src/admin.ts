@@ -532,7 +532,7 @@ function labelTables(root: ParentNode) {
   }
 }
 function pill(status: string) {
-  return h('span', { class: `adm-pill adm-status--${status}` }, labels[status] ?? status)
+  return h('span', { class: `adm-pill adm-status--${status === 'resolved' ? 'live' : status}` }, labels[status] ?? status)
 }
 function select(name: string, value: string, options: ([string, string] | { group: string; items: [string, string][] })[], onchange: (value: string) => void, aria?: string) {
   const node = h('select', { name, 'aria-label': aria ?? name, class: 'adm-select' })
@@ -3776,7 +3776,7 @@ function feedbackDetail(id: string) {
                     event.message && h('p', { class: 'adm-event-text' }, event.message),
                     event.screenshot_url && /^https:\/\//.test(event.screenshot_url) && h('a', { class: 'adm-link', href: event.screenshot_url, target: '_blank', rel: 'noopener noreferrer' }, '查看截图 ↗'))))
           : emptyState('还没有进度'),
-        !['draft', 'live', 'rejected', 'duplicate'].includes(item.status) && compose(path),
+        !['draft', 'live', 'rejected', 'duplicate', 'resolved'].includes(item.status) && compose(path),
       ]))
     // 右栏：处理面板
     const actions = h('aside', { class: 'adm-detail-side' },
@@ -3799,7 +3799,7 @@ function feedbackDetail(id: string) {
                 b.addEventListener('click', () => runTransition(b, t))
                 return b
               }))
-          : !approve && h('p', { class: 'adm-sub' }, ['live', 'rejected', 'duplicate'].includes(item.status) ? '这条反馈已结束，没有可执行的操作。' : '制作流程进行中，状态会由制作方自动推进。'),
+          : !approve && h('p', { class: 'adm-sub' }, ['live', 'rejected', 'duplicate', 'resolved'].includes(item.status) ? '这条反馈已结束，没有可执行的操作。' : '制作流程进行中，状态会由制作方自动推进。'),
       ]),
       card('信息', h('dl', { class: 'adm-facts adm-facts--stack' },
         h('dt', null, '提交人'), h('dd', null, h('span', { class: 'adm-who' }, h('b', null, item.nickname), h('small', null, item.email)),

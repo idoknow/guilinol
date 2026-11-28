@@ -91,6 +91,7 @@ export async function apiTest({ api, origin, cookie, sql, getCookie }) {
   assert.equal((await api('bridge/pending', null, 200, null, { headers: bridge }))[0].id, id)
   assert.deepEqual(Buffer.from(await (await photo(id, 1, 200, bridge, 'GET')).arrayBuffer()), picture)
   await move(id, 'live', 409)
+  await move(id, 'resolved', 409)
   await move(id, 'approved', 409)
   await move(id, 'queued', 409)
   await api('admin/' + path + '/status', { status: 'approved' }, 403)
@@ -113,6 +114,7 @@ export async function apiTest({ api, origin, cookie, sql, getCookie }) {
   assert.equal((await api('me')).notify_email, false)
   await move(id, 'queued')
   await move(id, 'reviewing')
+  await move(id, 'resolved', 409)
   await move(id, 'reviewing')
   await move(id, 'queued', 409)
   await move(id, 'modelling')
@@ -151,6 +153,19 @@ export async function apiTest({ api, origin, cookie, sql, getCookie }) {
     await api(`feedback/${next}/submit`, {}, count === 5 ? 429 : 200)
   }
   console.log('Feedback: private photos, quota, transitions, idempotency and supplement passed')
+  const appeal = (await api('feedback', { ...draft, kind: '封禁申诉' })).id
+  const submittedAppeal = (await api('feedback', { ...draft, kind: '封禁申诉' })).id
+  await sql(`UPDATE feedback SET status='submitted' WHERE id='${submittedAppeal}'`)
+  await move(submittedAppeal, 'resolved')
+  assert.equal((await api(`feedback/${submittedAppeal}`)).status, 'resolved')
+  await sql(`UPDATE feedback SET status='reviewing' WHERE id='${appeal}'`)
+  await api(`bridge/feedback/${appeal}/status`, { status: 'resolved' }, 400, null, { headers: bridge })
+  await move(appeal, 'resolved')
+  assert.equal((await api(`feedback/${appeal}`)).events.at(-1).message, 'resolved')
+  await api(`feedback/${appeal}/messages`, { body: '再回复' }, 409)
+  await api(`feedback/${appeal}/supplement`, { body: '再补充' }, 409)
+  await photo(appeal, 1, 409)
+  assert.ok(!(await api('bridge/pending', null, 200, null, { headers: bridge })).some(row => row.id === appeal))
 }
 
 async function assertOnePageFit(fb, label) {
