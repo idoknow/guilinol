@@ -1,0 +1,390 @@
+/* IDOK-544 载具操控台 · 青玉「山水印」：匾（墨青纸面 + 内衬印框）、印（朱 / 青玉实底）、签（纸色小条）。
+   电驴「车把仪匾」/ 轿车「中控台匾」/ 小船「舟楫罗盘匾」共用 .ride-hud，手机拇指专用键共用 .walk-ui 的槽位。
+   规矩：零 backdrop-filter；功能键一律 vehicle-*.svg 刻线小像（黑 = 亮部，跟 currentColor），字留在按钮里（font-size:0）给读屏和 E2E；
+   高频量（速度 / 转速 / 倾角 / 罗盘角）只走 CSS 变量；只在 body[data-aboard] 时生效，不碰徒步状态的任何拇指键。
+   walk.css 不改：这里靠 .vc-hud 前缀和 html body 前缀压过它。 */
+
+/* ── 尺寸刻度 ───────────────────────────────────────────── */
+.ride-hud.vc-hud{--vc-k:28px;--vc-dial:46px;--vc-pad-y:7px;--vc-pad-x:12px;--vc-gap:12px;--vc-prnd-w:22px;--vc-num:17px;--vc-unit:7.5px;--vc-fs:11px}
+.vc-hud [hidden]{display:none!important}
+
+/* ── 匾：对齐 IDOK-542 S2 方角墨青纸面 + 3px 内衬印框、零毛玻璃 ────── */
+html body .ride-hud.vc-hud{box-sizing:border-box;flex-wrap:nowrap;align-items:center;gap:0 var(--vc-gap);padding:var(--vc-pad-y) var(--vc-pad-x);
+  border-radius:var(--ui-plaque-r,var(--ui-r-sm));border:1px solid transparent;outline:1px solid var(--ui-plaque-frame,var(--ui-line-strong));outline-offset:calc(-1px - var(--ui-plaque-inset,3px));
+  background:linear-gradient(180deg,rgba(143,193,181,.075),rgba(143,193,181,0) 52%),var(--ui-plaque,var(--ui-surface-float));
+  box-shadow:var(--ui-shadow-1);color:var(--ui-text);font:500 var(--vc-fs)/1 var(--ui-serif);letter-spacing:.02em;backdrop-filter:none;-webkit-backdrop-filter:none}
+/* 小船进门：bike / bicycle / car 的显示规则在 walk.css，船这里补上（:where 压低权重，十字街等遮罩仍能藏住它） */
+:where(body[data-aboard][data-ride="boat"]) .ride-hud{display:flex}
+.vc-hud::before,.vc-hud::after{content:none}
+.vc-hud .ride-keys{display:none}
+/* 桌面展平三道分组带为一条横匾；手机按带换行，外框严密包裹最宽行、零死黑留白 */
+.vc-hud .vc-band{display:contents}
+
+.vc-hud .vc-grp{display:inline-flex;align-items:center;gap:6px;flex:none}
+.vc-hud .vc-grp:not(.vc-meter):not(.vc-boat){padding-left:var(--vc-gap);border-left:1px solid var(--ui-line)}
+.vc-hud .vc-t{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
+
+/* ── 刻线键：方框里一枚小像，状态靠纸 / 青玉 / 朱三种翻色；按压手感对齐 542 S2 ── */
+.vc-hud :is(.vc-key,.vc-pedal,.vc-helm-btn){position:relative;display:inline-block;flex:none;box-sizing:border-box;width:var(--vc-k);height:var(--vc-k);margin:0;padding:0;
+  font-size:0;line-height:0;letter-spacing:0;text-decoration:none;color:var(--ui-text-2);background:var(--ui-fill);border:1px solid var(--ui-line);border-radius:var(--ui-r-ctl);
+  cursor:pointer;-webkit-tap-highlight-color:transparent;touch-action:manipulation;
+  transition:background-color var(--ui-fast),color var(--ui-fast),border-color var(--ui-fast),box-shadow var(--ui-fast),transform var(--ui-fast) var(--ui-ease)}
+.vc-hud :is(.vc-key,.vc-pedal,.vc-helm-btn)::before{content:"";position:absolute;inset:0;margin:auto;width:var(--vc-g,64%);height:var(--vc-g,64%);pointer-events:none;
+  background:currentColor;-webkit-mask:var(--glyph) center/contain no-repeat;mask:var(--glyph) center/contain no-repeat}
+.vc-hud :is(.vc-key,.vc-pedal,.vc-helm-btn):hover{color:var(--ui-text);border-color:var(--ui-line-hover);background:var(--ui-wash-hover,var(--ui-fill-2))}
+.vc-hud :is(.vc-key,.vc-pedal,.vc-helm-btn):active{transform:scale(var(--ui-press,.97));transition-duration:var(--ui-press-t,90ms);transition-timing-function:var(--ui-ease-press,cubic-bezier(.3,0,.5,1))}
+.vc-hud :is(.vc-key,.vc-pedal,.vc-helm-btn,.ride-gear-btn,.vc-prnd-btn,.ride-state):focus:not(:focus-visible){outline:none}
+.vc-hud :is(.vc-key,.vc-pedal,.vc-helm-btn,.ride-gear-btn,.vc-prnd-btn):focus-visible{outline:var(--ui-focus-w,2px) solid var(--ui-focus,var(--ui-paper));outline-offset:1px}
+/* 选中 = 纸底墨像 */
+.vc-hud :is(.vc-key,.vc-pedal,.vc-helm-btn).on{background:var(--ui-paper);border-color:var(--ui-paper);color:var(--ui-ink)}
+
+.vc-hud .ride-park{--glyph:url("./vehicle-park.svg");--vc-g:70%}
+.vc-hud .vc-kickstand{--glyph:url("./vehicle-kickstand-up.svg");--vc-g:70%}
+.vc-hud .vc-kickstand[data-state="down"]{--glyph:url("./vehicle-kickstand-down.svg")}
+.vc-hud .ride-light{--glyph:url("./vehicle-light-off.svg");--vc-g:70%}
+.vc-hud .ride-light[data-mode="low"]{--glyph:url("./vehicle-light-low.svg")}
+.vc-hud .ride-light[data-mode="high"]{--glyph:url("./vehicle-light-high.svg")}
+.vc-hud .ride-turn-left{--glyph:url("./vehicle-turn-left.svg")}
+.vc-hud .ride-turn-right{--glyph:url("./vehicle-turn-right.svg")}
+.vc-hud .ride-hazard{--glyph:url("./vehicle-hazard.svg")}
+.vc-hud .ride-horn{--glyph:url("./vehicle-horn.svg")}
+.vc-hud[data-vc-ride="bicycle"] .ride-horn{--glyph:url("./vehicle-bell.svg")}
+.vc-hud .ride-cruise{--glyph:url("./vehicle-cruise.svg");--vc-g:68%}
+.vc-hud .ride-sound{--glyph:url("./vehicle-sound-on.svg");--vc-g:60%}
+.vc-hud .ride-sound[aria-pressed="false"]{--glyph:url("./vehicle-sound-off.svg");color:var(--ui-text-3);border-style:dashed;text-decoration:none}
+.vc-hud .ride-mod{--glyph:url("./vehicle-mod.svg");--vc-g:58%}
+.vc-hud .vc-ignition{--glyph:url("./vehicle-ignition.svg");--vc-g:56%}
+.vc-hud .vc-pedal[data-pedal="gas"]{--glyph:url("./vehicle-pedal-gas.svg");--vc-g:78%}
+.vc-hud .vc-pedal[data-pedal="brake"]{--glyph:url("./vehicle-pedal-brake.svg");--vc-g:78%}
+.vc-hud .vc-pedal[data-pedal="hb"]{--glyph:url("./thumb-brake.svg");--vc-g:70%}
+.vc-hud:is([data-vc-ride="bike"],[data-vc-ride="bicycle"]) .vc-pedal[data-pedal="gas"]{--glyph:url("./vehicle-throttle.svg");--vc-g:72%}
+.vc-hud:is([data-vc-ride="bike"],[data-vc-ride="bicycle"]) .vc-pedal[data-pedal="brake"]{--glyph:url("./vehicle-brake-lever.svg");--vc-g:72%}
+.vc-hud .vc-boat-light{--glyph:url("./vehicle-lantern.svg");--vc-g:68%}
+.vc-hud .vc-helm-btn[data-helm="fwd"]{--glyph:url("./vehicle-oar.svg");--vc-g:66%}
+.vc-hud[data-vc-free="freeRaft"] .vc-helm-btn[data-helm="fwd"]{--glyph:url("./vehicle-pole.svg")}
+.vc-hud .vc-helm-btn[data-helm="back"]{--glyph:url("./vehicle-backpaddle.svg")}
+.vc-hud .vc-helm-btn[data-helm="port"]{--glyph:url("./vehicle-rudder-left.svg")}
+.vc-hud .vc-helm-btn[data-helm="stbd"]{--glyph:url("./vehicle-rudder-right.svg")}
+
+/* 状态翻色：远光 = 青玉冰色；转向 = 赭；双闪 / P 挡 = 朱；定速 = 青玉底显目标速度 */
+.vc-hud .ride-light[data-mode="high"].on{background:var(--ui-jade-300);border-color:var(--ui-jade-300);color:var(--ui-ink);box-shadow:0 0 0 2px rgba(143,193,181,.26)}
+.vc-hud :is(.ride-turn-left,.ride-turn-right).armed{color:var(--ui-ochre);border-color:rgba(196,154,74,.7)}
+.vc-hud :is(.ride-turn-left,.ride-turn-right).on{background:var(--ui-ochre);border-color:var(--ui-ochre);color:var(--ui-ink)}
+.vc-hud .ride-hazard.armed{color:var(--ui-seal-light);border-color:rgba(208,105,76,.72)}
+.vc-hud .ride-hazard.on{background:var(--ui-seal-light);border-color:var(--ui-seal-light);color:var(--ui-paper)}
+.vc-hud .ride-park.on{background:var(--ui-seal);border-color:var(--ui-seal-light);color:var(--ui-paper);box-shadow:inset 0 0 0 1px rgba(244,239,226,.35)}
+.vc-hud .ride-cruise.on{background:var(--ui-jade-300);border-color:var(--ui-jade-300);color:var(--ui-ink)}
+.vc-hud .ride-cruise.on[data-target]::before{content:attr(data-target);display:grid;place-items:center;width:auto;height:auto;background:none;-webkit-mask:none;mask:none;
+  font:700 11px/1 var(--ui-num);letter-spacing:0;color:inherit}
+.vc-hud .ride-mod[data-mod="ghostfire"]{color:var(--ui-seal-light);border-color:rgba(208,105,76,.6)}
+.vc-hud .ride-mod[data-mod="neon"]{color:var(--ui-jade-300);border-color:rgba(143,193,181,.6)}
+
+/* 共享车：车灯锁定（灰、虚线、角上一枚实心小锁），禁用过渡防白底残留，不挂 [L] 键帽；压过 walk.css 0.58 透明度保持角标锐利 */
+.vc-hud .vc-lock{display:none}
+html body .ride-hud.vc-hud .ride-light[data-locked="1"],html body .ride-hud.vc-hud .ride-light[data-locked="1"].on{opacity:1;background:transparent;background-clip:padding-box;border-style:dashed;border-color:var(--ui-line-strong);color:var(--ui-text-3);box-shadow:none;cursor:not-allowed;transition:none}
+.vc-hud .ride-light[data-locked="1"]::after{display:none!important}
+.vc-hud .ride-light[data-locked="1"] .vc-lock{display:block;position:absolute;top:-4px;right:-4px;width:12px;height:12px;border-radius:50%;background:var(--ui-ink);box-shadow:0 0 0 1px var(--ui-line-strong);pointer-events:none;z-index:2}
+.vc-hud .ride-light[data-locked="1"] .vc-lock::before{content:"";position:absolute;inset:1.5px;background:var(--ui-paper);-webkit-mask:url("./vehicle-lock.svg") center/contain no-repeat;mask:url("./vehicle-lock.svg") center/contain no-repeat}
+
+/* ── 车速：青玉弧（270°，底下缺口放挡位小字）+ 等宽数字；朱色小刻 = 本挡 / 锁速上限 ─── */
+.vc-hud .vc-meter{position:relative;display:inline-grid;place-items:center;width:var(--vc-dial);height:var(--vc-dial);gap:0}
+.vc-hud .vc-dial{position:absolute;inset:0;border-radius:50%;pointer-events:none}
+.vc-hud .vc-dial::before{content:"";position:absolute;inset:0;border-radius:50%;
+  background:conic-gradient(from -135deg,var(--vc-arc,var(--ui-jade-300)) 0deg calc(var(--vc-speed,0)*270deg),rgba(244,239,226,.13) calc(var(--vc-speed,0)*270deg) 270deg,transparent 270deg);
+  -webkit-mask:radial-gradient(farthest-side,transparent calc(100% - 3px),#000 calc(100% - 2.5px));mask:radial-gradient(farthest-side,transparent calc(100% - 3px),#000 calc(100% - 2.5px))}
+.vc-hud .vc-dial::after{content:"";position:absolute;left:50%;top:-2px;width:2px;height:7px;margin-left:-1px;border-radius:1px;background:var(--ui-seal-light);
+  transform-origin:50% calc(var(--vc-dial)/2 + 2px);transform:rotate(calc(-135deg + var(--vc-limit,1)*270deg))}
+.vc-hud .ride-speed{position:relative;display:grid;justify-items:center;gap:2px;min-width:0;font:inherit;letter-spacing:0}
+.vc-hud[data-vc-ride="car"] .ride-speed{transform:translateY(-2px)}
+.vc-hud .vc-num{font:600 var(--vc-num)/1 var(--ui-num);font-variant-numeric:tabular-nums;color:var(--ui-text)}
+.vc-hud .vc-unit{font:500 var(--vc-unit)/1 var(--ui-num);color:var(--ui-text-3);letter-spacing:.04em;white-space:nowrap}
+.vc-hud .vc-scale{display:none;position:relative;width:24px;height:3px;border-radius:2px;background:rgba(244,239,226,.14);overflow:hidden}
+.vc-hud .vc-scale i{position:absolute;inset:0;background:var(--ui-jade-300);transform-origin:0 50%;transform:scaleX(var(--vc-speed,0))}
+.vc-hud .vc-scale::after{content:"";position:absolute;top:0;bottom:0;left:calc(var(--vc-limit,1)*100% - 1px);width:1px;background:var(--ui-seal-light)}
+/* .ride-gear 文案照写（E2E 读它），电驴 / 单车上只给读屏；轿车放在弧底缺口里当自动挡小字 */
+.vc-hud .ride-gear{position:absolute;width:1px;height:1px;margin:-1px;padding:0;border:0;overflow:hidden;clip-path:inset(50%);white-space:nowrap;background:none}
+.vc-hud[data-vc-ride="car"] .ride-gear{left:50%;bottom:-2px;width:auto;height:auto;margin:0;clip-path:none;transform:translateX(-50%);padding:0 2px;
+  font:700 9px/1 var(--ui-num);letter-spacing:.02em;color:var(--ui-jade-300);background:none;border-radius:0}
+.vc-hud[data-engine="off"] .vc-meter{opacity:.42}
+
+/* ── 电量格（五格）/ 转速条，倾角风险条（朱刻 = 易摔线） ─────────── */
+.vc-hud .ride-bat{display:inline-flex;align-items:center;gap:5px}
+.vc-hud .ride-bat-bar{position:relative;box-sizing:border-box;width:32px;height:11px;padding:1.5px;border-radius:2px;background:rgba(8,14,12,.55);border:1px solid var(--ui-line-strong)}
+.vc-hud .ride-bat-bar::after{right:-3px;top:2.5px;width:2px;height:4px;background:var(--ui-line-strong)}
+.vc-hud .ride-bat-bar::before{content:"";position:absolute;inset:1.5px;z-index:1;pointer-events:none;
+  background:repeating-linear-gradient(90deg,transparent 0 calc(20% - 1px),rgba(14,24,22,.95) calc(20% - 1px) 20%)}
+.vc-hud .ride-bat-bar i{display:block;width:100%;height:100%;border-radius:1px;background:var(--ui-jade-300);transform-origin:0 50%;transform:scaleX(var(--vc-bat,1));transition:transform .2s,background-color .2s}
+.vc-hud .ride-bat[data-level="low"] .ride-bat-bar i{background:var(--ui-ochre)}
+.vc-hud .ride-bat[data-level="crit"] .ride-bat-bar i{background:var(--ui-seal-light)}
+.vc-hud .ride-bat-pct{min-width:2.6em;font:600 10.5px/1 var(--ui-num);font-variant-numeric:tabular-nums;color:var(--ui-text-2);letter-spacing:0;white-space:nowrap}
+.vc-hud[data-vc-ride="car"] .ride-bat-pct::after{content:" rpm";font-size:8px;font-weight:500;opacity:.68;letter-spacing:.02em}
+.vc-hud .ride-bat[data-level="low"] .ride-bat-pct{color:var(--ui-ochre)}
+.vc-hud .ride-bat[data-level="crit"] .ride-bat-pct{color:var(--ui-seal-light)}
+.vc-hud[data-vc-ride="car"] .ride-bat-bar{width:36px;height:7px;padding:1px;border-radius:4px}
+.vc-hud[data-vc-ride="car"] .ride-bat-bar::before,.vc-hud[data-vc-ride="car"] .ride-bat-bar::after{display:none}
+.vc-hud[data-vc-ride="car"] .ride-bat-bar i{border-radius:3px;transition:transform .08s linear,background-color .2s}
+.vc-hud .ride-lean-bar{position:relative;display:inline-block;box-sizing:border-box;width:30px;height:6px;padding:0;border-radius:3px;background:rgba(8,14,12,.55);border:1px solid var(--ui-line);overflow:hidden}
+.vc-hud .ride-lean-bar i{position:absolute;inset:0;width:auto;height:auto;border-radius:0;background:var(--ui-jade-300);transform-origin:0 50%;transform:scaleX(var(--vc-lean,0));transition:transform .08s linear,background-color .12s}
+.vc-hud .ride-lean-bar::after{content:"";position:absolute;top:0;bottom:0;left:82%;width:1px;background:var(--ui-seal-light);opacity:.85}
+.vc-hud .ride-lean-bar[data-level="warn"] i{background:var(--ui-ochre)}
+.vc-hud .ride-lean-bar[data-level="crit"] i{background:var(--ui-seal-light)}
+
+/* ── 身份印：电摩朱印 / 共享青玉印 / 单车赭印 / 轿车墨印 ─────────── */
+.vc-hud .ride-type{box-sizing:border-box;display:inline-grid;place-items:center;height:20px;padding:0 5px;border-radius:var(--ui-r-xs);
+  font:600 11px/1 var(--ui-serif);letter-spacing:.06em;color:var(--ui-paper);background:var(--ui-seal);border:0;box-shadow:inset 0 0 0 1.5px var(--ui-seal),inset 0 0 0 2.5px rgba(244,239,226,.42)}
+.vc-hud .ride-type[data-kind="shared"]{background:var(--ui-jade-700);box-shadow:inset 0 0 0 1.5px var(--ui-jade-700),inset 0 0 0 2.5px rgba(143,193,181,.6);color:var(--ui-paper)}
+.vc-hud .ride-type[data-kind="bicycle"]{background:var(--ui-ochre);box-shadow:inset 0 0 0 1.5px var(--ui-ochre),inset 0 0 0 2.5px rgba(42,48,44,.35);color:var(--ui-ink)}
+.vc-hud .ride-type[data-kind="car"]{background:var(--ui-ink);box-shadow:inset 0 0 0 1px var(--ui-line-strong),inset 0 0 0 2.5px var(--ui-ink),inset 0 0 0 3.5px rgba(244,239,226,.3);color:var(--ui-paper)}
+
+/* ── 挡位：一条凹槽里的纸签 ─────────────────────────────── */
+.vc-hud .ride-gears{gap:2px;padding:2px;border-radius:var(--ui-r-ctl);background:rgba(8,14,12,.4);box-shadow:inset 0 0 0 1px var(--ui-line)}
+.vc-hud .vc-grp.ride-gears+.vc-grp{margin-left:0}
+.vc-hud .ride-gear-btn{box-sizing:border-box;min-width:26px;height:22px;padding:0 6px;border:0;border-radius:var(--ui-r-xs);background:transparent;color:var(--ui-text-3);
+  font:600 11px/1 var(--ui-num),var(--ui-serif);letter-spacing:.02em;cursor:pointer;transition:background-color var(--ui-fast),color var(--ui-fast)}
+.vc-hud .ride-gear-btn:hover{background:var(--ui-fill-2);color:var(--ui-text)}
+.vc-hud .ride-gear-btn.on{background:var(--ui-paper);color:var(--ui-ink);box-shadow:0 1px 0 rgba(0,0,0,.28)}
+.vc-hud[data-vc-ride="car"] .ride-gear-btn{font-family:var(--ui-serif);padding:0 7px}
+.vc-hud .vc-cap{display:none}
+/* 共享车：挡位按钮收起，容器保留以展示朱文「25 km/h 锁速」（压过 walk.css IDOK-545 的 .ride-gears display:none） */
+.vc-hud[data-vc-tier="shared"] .ride-gear-btn{display:none}
+html body .ride-hud.vc-hud[data-vc-tier="shared"] .ride-gears{display:inline-flex;padding:0;background:none;box-shadow:none}
+.vc-hud[data-vc-tier="shared"] .vc-cap{display:inline-flex;align-items:center;gap:2px;box-sizing:border-box;height:22px;padding:0 7px;white-space:nowrap;
+  font:600 10.5px/1 var(--ui-serif);letter-spacing:.06em;color:var(--ui-seal-light);border:1.5px solid var(--ui-seal-light);border-radius:var(--ui-r-xs);
+  box-shadow:inset 0 0 0 1.5px rgba(20,32,29,.9),inset 0 0 0 2.5px rgba(208,105,76,.38)}
+.vc-hud .vc-cap b{font:700 12px/1 var(--ui-num);letter-spacing:0}
+
+/* ── 中控：圆形点火钮 + P·R·N·D 凹槽排挡 + 「请先挂 P 挡」朱签 ───────── */
+.vc-hud .vc-car{position:relative;display:none}
+.vc-hud[data-vc-ride="car"] .vc-car{display:inline-flex;gap:8px}
+.vc-hud .vc-ignition{width:calc(var(--vc-k) + 4px);height:calc(var(--vc-k) + 4px);border-radius:50%;color:var(--ui-jade-300);border-color:rgba(143,193,181,.5);
+  background:radial-gradient(circle at 50% 38%,rgba(143,193,181,.22),rgba(143,193,181,.04) 72%);box-shadow:0 0 0 2px rgba(143,193,181,.14)}
+.vc-hud .vc-ignition:hover{color:var(--ui-paper);border-color:var(--ui-jade-300)}
+.vc-hud .vc-ign-ring{position:absolute;inset:-4px;border-radius:50%;pointer-events:none;
+  background:conic-gradient(var(--ui-jade-300) var(--vc-sweep),transparent 0);
+  -webkit-mask:radial-gradient(farthest-side,transparent calc(100% - 1.5px),#000 calc(100% - 1px));mask:radial-gradient(farthest-side,transparent calc(100% - 1.5px),#000 calc(100% - 1px))}
+.vc-hud .vc-ignition[data-engine="on"]{animation:vc-ign-pulse .32s var(--ui-ease) 1}
+.vc-hud .vc-ignition[data-engine="on"] .vc-ign-ring{animation:vc-ign-sweep .32s var(--ui-ease) 1 both}
+.vc-hud .vc-ignition[data-engine="off"]{color:var(--ui-text-3);background:var(--ui-ink);border-color:var(--ui-line);box-shadow:inset 0 1px 3px rgba(0,0,0,.5)}
+.vc-hud .vc-ignition[data-engine="off"] .vc-ign-ring{opacity:0}
+@property --vc-sweep{syntax:'<angle>';inherits:false;initial-value:360deg}
+@keyframes vc-ign-sweep{from{--vc-sweep:0deg;opacity:.35}to{--vc-sweep:360deg;opacity:1}}
+@keyframes vc-ign-pulse{from{box-shadow:0 0 0 0 rgba(143,193,181,.55)}to{box-shadow:0 0 0 7px rgba(143,193,181,0)}}
+
+.vc-hud .vc-prnd{position:relative;display:inline-grid;grid-template-columns:repeat(4,var(--vc-prnd-w));box-sizing:border-box;height:calc(var(--vc-k) - 2px);padding:2px;
+  border-radius:var(--ui-r-ctl);background:rgba(6,12,10,.66);box-shadow:inset 0 1px 3px rgba(0,0,0,.6),inset 0 0 0 1px var(--ui-line)}
+.vc-hud .vc-prnd-slot{position:absolute;top:2px;bottom:2px;left:2px;width:var(--vc-prnd-w);border-radius:var(--ui-r-xs);background:var(--ui-paper);
+  box-shadow:0 1px 0 rgba(0,0,0,.35),inset 0 -1px 0 rgba(42,48,44,.18);transform:translateX(calc(var(--vc-prnd-i,0)*100%));transition:transform var(--ui-fast) var(--ui-ease);pointer-events:none}
+.vc-hud .vc-prnd-btn{position:relative;z-index:1;display:grid;place-items:center;margin:0;padding:0;border:0;border-radius:var(--ui-r-xs);background:transparent;
+  color:var(--ui-text-3);font:700 11px/1 var(--ui-num);letter-spacing:0;cursor:pointer;-webkit-tap-highlight-color:transparent;transition:color var(--ui-fast)}
+.vc-hud .vc-prnd-btn::after{content:"";position:absolute;bottom:1px;left:50%;width:2px;height:2px;margin-left:-1px;border-radius:50%;background:var(--ui-line-strong)}
+.vc-hud .vc-prnd-btn:hover{color:var(--ui-text)}
+.vc-hud .vc-prnd-btn[aria-checked="true"]{color:var(--ui-ink)}
+.vc-hud .vc-prnd-btn[aria-checked="true"]::after{background:rgba(42,48,44,.45)}
+.vc-hud .vc-prnd[data-warn-p="1"] .vc-prnd-btn[data-prnd="P"]{color:var(--ui-seal-light);box-shadow:inset 0 0 0 1.5px var(--ui-seal-light);animation:vc-nudge .28s var(--ui-ease) 1}
+.vc-hud .vc-prnd[data-warn-p="1"] .vc-prnd-btn[data-prnd="P"]::after{display:none}
+.vc-hud .vc-warn{display:inline-flex;align-items:center;box-sizing:border-box;height:22px;padding:0 8px;white-space:nowrap;border-radius:var(--ui-r-xs);
+  font:600 10.5px/1 var(--ui-serif);letter-spacing:.08em;color:var(--ui-paper);background:var(--ui-seal);box-shadow:inset 0 0 0 2px var(--ui-seal),inset 0 0 0 3px rgba(244,239,226,.45)}
+@keyframes vc-nudge{0%,100%{transform:none}35%{transform:translateY(-2px)}70%{transform:translateY(1px)}}
+
+/* ── 桌面踏板：右油门高窄竖纹、左刹车宽矮横纹、空格手刹；W / S 按下时真的往下沉 ── */
+.vc-hud .vc-pedals{display:none;gap:6px}
+.vc-hud .vc-pedal{border-radius:5px}
+.vc-hud[data-vc-ride="car"] .vc-pedals{align-items:flex-end}
+.vc-hud[data-vc-ride="car"] .vc-pedal[data-pedal="brake"]{width:34px;height:24px}
+.vc-hud[data-vc-ride="car"] .vc-pedal[data-pedal="gas"]{width:24px;height:32px}
+.vc-hud[data-vc-ride="car"] .vc-pedal[data-pedal="hb"]{width:30px;height:24px;margin-left:2px}
+.vc-hud:not([data-vc-ride="car"]) .vc-pedal[data-pedal="hb"]{display:none}
+.vc-hud .vc-pedal.on{transform:translateY(2px);background:var(--ui-paper);border-color:var(--ui-paper);color:var(--ui-ink);box-shadow:inset 0 2px 3px rgba(42,48,44,.3)}
+
+/* ── 骑行键组 / 灯组：各载具只留自己的键 ───────────────────── */
+.vc-hud .vc-kickstand.on{background:var(--ui-paper);border-color:var(--ui-paper);color:var(--ui-ink)}
+.vc-hud[data-vc-ride="car"] .vc-drive{display:none}
+.vc-hud[data-vc-ride="car"] .ride-horn{display:inline-block}
+.vc-hud[data-vc-ride="car"] .ride-horn.on{background:var(--ui-paper);border-color:var(--ui-paper);color:var(--ui-ink)}
+
+/* ── 舟楫罗盘：青玉盘面、朱色北针、北东南西清疏不压针 ───────── */
+.vc-hud .vc-boat{display:none}
+.vc-hud[data-vc-ride="boat"]{--vc-dial:50px}
+.vc-hud[data-vc-ride="boat"] .vc-boat{display:inline-flex;gap:10px}
+.vc-hud[data-vc-ride="boat"] :is(.vc-meter,.vc-id,.vc-gauges,.ride-gears,.vc-car,.vc-pedals,.vc-drive,.vc-lights,.ride-state,.vc-band--2,.vc-band--3){display:none}
+.vc-hud[data-vc-ride="boat"] .vc-grp.vc-boat{padding-left:0;border-left:0}
+.vc-hud .vc-compass{position:relative;flex:none;width:var(--vc-dial);height:var(--vc-dial);border-radius:50%;
+  background:radial-gradient(circle,rgba(143,193,181,.16),rgba(6,12,10,.62) 72%);
+  box-shadow:inset 0 0 0 1px var(--ui-line-strong),inset 0 0 0 4px rgba(6,12,10,.38),inset 0 0 0 5px var(--ui-line)}
+.vc-hud .vc-compass::after{content:"";position:absolute;left:50%;top:-1px;width:0;height:0;margin-left:-3.5px;border:3.5px solid transparent;border-top:5px solid var(--ui-paper);border-bottom:0;z-index:2}
+.vc-hud .vc-compass-card{position:absolute;inset:0;border-radius:50%;transform:rotate(var(--vc-compass-deg,0deg));background:none}
+.vc-hud .vc-compass-card::before{content:"";position:absolute;inset:0;border-radius:50%;
+  background:repeating-conic-gradient(from -1.5deg,rgba(244,239,226,.34) 0 3deg,transparent 3deg 45deg);
+  -webkit-mask:radial-gradient(farthest-side,transparent calc(100% - 3.5px),#000 calc(100% - 3px));mask:radial-gradient(farthest-side,transparent calc(100% - 3.5px),#000 calc(100% - 3px))}
+.vc-hud .vc-compass-needle{position:absolute;left:50%;top:32%;bottom:32%;width:4.5px;margin-left:-2.25px;
+  background:linear-gradient(180deg,var(--ui-seal-light) 0 50%,rgba(244,239,226,.62) 50% 100%);clip-path:polygon(50% 0,100% 50%,50% 100%,0 50%)}
+.vc-hud .vc-compass-card b{position:absolute;left:50%;top:50%;font:600 8.5px/1 var(--ui-serif);letter-spacing:0;color:var(--ui-text-2);
+  transform:translate(-50%,-50%) rotate(var(--a)) translateY(calc(var(--vc-dial)*-.365)) rotate(calc(-1*var(--a) - var(--vc-compass-deg,0deg)))}
+.vc-hud .vc-compass-card b[data-dir="n"]{--a:0deg;color:var(--ui-seal-light);font-weight:700}
+.vc-hud .vc-compass-card b[data-dir="e"]{--a:90deg}
+.vc-hud .vc-compass-card b[data-dir="s"]{--a:180deg}
+.vc-hud .vc-compass-card b[data-dir="w"]{--a:270deg}
+.vc-hud .vc-boat-read{display:inline-grid;justify-items:start;gap:4px}
+.vc-hud .vc-boat-speed{display:inline-flex;align-items:baseline;gap:2px}
+.vc-hud .vc-boat-kind{display:inline-block;padding:2px 5px 2px 4px;border-left:2px solid var(--ui-seal);border-radius:1px;
+  font:600 10px/1 var(--ui-serif);letter-spacing:.12em;color:var(--ui-ink);background:var(--ui-paper-2)}
+.vc-hud .vc-boat-status{display:inline-flex;align-items:center;gap:5px;font:500 11px/1 var(--ui-serif);letter-spacing:.06em;color:var(--ui-text-2);white-space:nowrap}
+.vc-hud .vc-boat-status::before{content:"";width:6px;height:6px;border-radius:50%;background:var(--ui-jade-300);box-shadow:0 0 0 2px rgba(143,193,181,.18)}
+.vc-hud .vc-boat-status[data-state="info"]::before{background:var(--ui-ochre);box-shadow:0 0 0 2px rgba(196,154,74,.2)}
+.vc-hud .vc-boat-status[data-state="warn"]{color:var(--ui-seal-light)}
+.vc-hud .vc-boat-status[data-state="warn"]::before{background:var(--ui-seal-light);box-shadow:0 0 0 2px rgba(208,105,76,.22)}
+.vc-hud .vc-boat-light.on{background:var(--ui-ochre);border-color:var(--ui-ochre);color:var(--ui-ink);box-shadow:0 0 0 2px rgba(196,154,74,.24),0 0 12px rgba(196,154,74,.36)}
+.vc-hud .vc-helm{display:none;gap:6px}
+.vc-hud[data-vc-tier="tour"] :is(.vc-boat-light,.vc-helm){display:none}
+
+/* ── 状态签：纸色小条；警告时翻成朱签；共享闲置旧文案视觉收起（保留 textContent 兼容旧脚本） ── */
+.vc-hud .ride-state{display:inline-flex;align-items:center;gap:4px;box-sizing:border-box;height:22px;max-width:100%;padding:0 8px;margin:0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;
+  border:1px solid var(--ui-line-strong);border-radius:var(--ui-r-xs);background:rgba(244,239,226,.1);color:var(--ui-text);font:500 11px/1 var(--ui-serif);letter-spacing:.04em;cursor:default}
+.vc-hud .ride-state[data-shared-legacy="1"]{display:none!important}
+.vc-hud .ride-state[data-warn="1"]{background:var(--ui-seal);border-color:var(--ui-seal-light);color:var(--ui-paper);cursor:pointer}
+.vc-hud .ride-state[data-warn="1"]::before{content:"";flex:none;width:11px;height:11px;background:currentColor;
+  -webkit-mask:url("./vehicle-alert.svg") center/contain no-repeat;mask:url("./vehicle-alert.svg") center/contain no-repeat}
+
+/* ── 桌面：一块横匾；键角小键帽清疏不撞车；状态签与未挂P提醒浮在匾上方零抖动 ── */
+.vc-hud [data-key]::after{display:none}
+@media (hover:hover) and (pointer:fine){
+  html body .ride-hud.vc-hud{bottom:calc(130px + env(safe-area-inset-bottom))}
+  .vc-hud [data-key]::after{content:attr(data-key);display:block;position:absolute;right:-2px;bottom:-2px;z-index:2;box-sizing:border-box;min-width:12px;height:12px;padding:0 2.5px;
+    border:1px solid var(--ui-line-strong);border-radius:2px;background:#0f1917;color:var(--ui-text-2);font:600 8.5px/10px ui-monospace,SFMono-Regular,Menlo,monospace;
+    letter-spacing:0;text-align:center;pointer-events:none}
+  .vc-hud .vc-ignition[data-key]::after{right:auto;left:50%;bottom:-5px;transform:translateX(-50%)}
+  .vc-hud:is([data-vc-ride="car"],[data-vc-ride="bike"],[data-vc-ride="bicycle"]) .vc-pedals{display:inline-flex}
+  .vc-hud[data-vc-tier="boat"] .vc-helm{display:inline-flex}
+  .vc-hud .ride-state{position:absolute;left:50%;bottom:calc(100% + 7px);transform:translateX(-50%);max-width:none;box-shadow:var(--ui-shadow-1)}
+  /* 未挂 P 挡提醒浮于挡槽正上方，零横向 Layout Shift */
+  .vc-hud .vc-warn{position:absolute;left:50%;bottom:calc(100% + 14px);transform:translateX(-50%);z-index:4;
+    box-shadow:var(--ui-shadow-1),inset 0 0 0 2px var(--ui-seal),inset 0 0 0 3px rgba(244,239,226,.45)}
+}
+
+/* ── 手机：三道分组带独立紧包裹（消灭超宽空黑盒），内边距贴合 542 3px 印框留足净空 ── */
+@media (pointer:coarse) and (not (any-pointer:fine)){
+  .ride-hud.vc-hud{--vc-k:22px;--vc-dial:36px;--vc-pad-y:6px;--vc-pad-x:8px;--vc-gap:6px;--vc-prnd-w:22px;--vc-num:14px;--vc-unit:7.5px;--vc-fs:10px}
+  .vc-hud[data-vc-ride="boat"]{--vc-dial:36px;--vc-k:24px}
+  html body .ride-hud.vc-hud{flex-direction:column;flex-wrap:nowrap;align-items:flex-start;gap:4px;border-radius:var(--ui-plaque-r,var(--ui-r-sm));width:max-content}
+  .vc-hud .vc-band{display:flex;flex-wrap:nowrap;align-items:center;gap:5px;width:auto}
+  .vc-hud .vc-grp{gap:4px}
+  .vc-hud .vc-grp:not(.vc-meter):not(.vc-boat){padding-left:0;border-left:0}
+  .vc-hud .vc-meter{display:inline-flex;align-items:center;gap:4px;width:auto;height:var(--vc-k)}
+  .vc-hud .vc-dial{display:none}
+  .vc-hud .ride-speed{display:inline-flex;align-items:baseline;gap:1px;transform:none}
+  .vc-hud .vc-scale{display:block}
+  .vc-hud[data-vc-ride="car"] .vc-scale{display:none}
+  .vc-hud[data-vc-ride="car"] .ride-gear{position:absolute;width:1px;height:1px;margin:-1px;overflow:hidden;clip-path:inset(50%)}
+  .vc-hud .ride-type{height:18px;padding:0 4px;font-size:10px}
+  .vc-hud .ride-gear-btn{min-width:22px;height:20px;padding:0 4px;font-size:10px}
+  .vc-hud[data-vc-ride="car"] .ride-gear-btn{padding:0 6px}
+  .vc-hud[data-vc-tier="shared"] .vc-cap{height:20px;padding:0 6px;font-size:10px}
+  .vc-hud .vc-cap b{font-size:11px}
+  .vc-hud .ride-bat{gap:3px}
+  .vc-hud .ride-bat-bar{width:24px;height:9px;padding:1px}
+  .vc-hud .ride-bat-pct{font-size:9.5px}
+  .vc-hud .ride-lean-bar{width:22px;height:5px}
+  .vc-hud .ride-state{display:inline-flex;height:18px;padding:0 6px;font-size:10px;min-width:0;flex:0 1 auto}
+  .vc-hud .ride-state[data-warn="1"]::before{width:9px;height:9px}
+  .vc-hud .vc-ignition{width:24px;height:24px}
+  .vc-hud .vc-ign-ring{inset:-2px}
+  .vc-hud .vc-prnd{height:23px}
+  .vc-hud .vc-prnd-btn{font-size:10.5px}
+  .vc-hud .vc-warn{height:18px;padding:0 6px;font-size:10px;letter-spacing:.04em}
+  .vc-hud .vc-boat{gap:7px}
+  /* 手机 36px 罗盘：用清晰朱白菱形针 + 顶准线 + 外圈刻度，去糊字 */
+  .vc-hud .vc-compass-card b{display:none}
+  .vc-hud .vc-compass-needle{top:22%;bottom:22%;width:5px;margin-left:-2.5px}
+  .vc-hud .vc-boat-read{gap:3px}
+  .vc-hud .vc-boat-kind{font-size:9.5px;padding:1.5px 4px 1.5px 3.5px}
+  .vc-hud .vc-boat-status{font-size:10px;gap:4px}
+  .vc-hud .ride-light[data-locked="1"] .vc-lock{width:11px;height:11px;top:-2px;right:-2px}
+  .vc-hud .ride-cruise.on[data-target]::before{font-size:9.5px}
+}
+/* 竖屏：匾紧贴 542 统一「下车」朱印上方 9px，左对齐让开右侧 dock 列 */
+@media (pointer:coarse) and (not (any-pointer:fine)) and (max-width:520px) and (min-height:501px){
+  html body .ride-hud.vc-hud{bottom:calc(var(--stick-top) + 162px)}
+}
+/* 横屏：双行 Grid 严密包裹（消灭 100px 死黑边），下沉至 bottom 14px 留足 ≥8px 呼吸距，且「下车」与匾共用同一水平中心轴 */
+@media (pointer:coarse) and (not (any-pointer:fine)) and (max-height:500px){
+  :root body[data-aboard]{
+    --vc-l:calc(env(safe-area-inset-left) + (var(--j-x) + var(--j-d))*var(--k) + 8px);
+    --vc-r:calc(env(safe-area-inset-right) + max(var(--b-x) + var(--b-d),var(--c-x) + var(--c-d),var(--d-x) + var(--d-d))*var(--k) + 8px);
+  }
+  :root body[data-aboard][data-thumb-hand=left]{
+    --vc-l:calc(env(safe-area-inset-left) + max(var(--b-x) + var(--b-d),var(--c-x) + var(--c-d),var(--d-x) + var(--d-d))*var(--k) + 8px);
+    --vc-r:calc(env(safe-area-inset-right) + (var(--j-x) + var(--j-d))*var(--k) + 8px);
+  }
+  html body .ride-hud.vc-hud{--vc-pad-y:6px;--vc-pad-x:9px;--vc-k:22px;--vc-prnd-w:21px;
+    display:none;grid-template-columns:auto auto;align-items:center;justify-items:center;gap:4px 7px;
+    left:var(--vc-l);right:var(--vc-r);bottom:calc(10px + env(safe-area-inset-bottom));margin-inline:auto;width:max-content;max-width:calc(100vw - var(--vc-l) - var(--vc-r));transform:none}
+  html body[data-aboard]:is([data-ride="bike"],[data-ride="bicycle"],[data-ride="car"],[data-ride="boat"]) .ride-hud.vc-hud{display:grid}
+  .vc-hud .vc-band--1{grid-row:1;grid-column:1}
+  .vc-hud .vc-band--2{grid-row:1;grid-column:2}
+  .vc-hud .vc-band--3{grid-row:2;grid-column:1 / -1;justify-content:center}
+  .vc-hud[data-vc-ride="boat"] .vc-band--1{grid-column:1 / -1}
+  /* 横屏「下车 / 靠岸下船」与下方匾同轴居中 + 紧凑高度；材质/残边/焦点环完全沿用 542 统一朱印规范 */
+  html body[data-aboard] .vehicle-action{box-sizing:border-box;left:var(--vc-l);right:var(--vc-r);bottom:calc(86px + env(safe-area-inset-bottom));margin-inline:auto;width:max-content;height:30px;padding-block:0;padding-inline:16px;line-height:30px;white-space:nowrap;transform:none}
+  html body[data-aboard] .vehicle-action:active{transform:scale(var(--ui-press-seal,.94));transition-duration:var(--ui-press-t,90ms);transition-timing-function:var(--ui-ease-press,cubic-bezier(.3,0,.5,1))}
+}
+/* 捧着饮品时「下车」印被抬到 134，匾跟着让上去（桌面） */
+@media (hover:hover) and (pointer:fine){
+  :root body[data-aboard]:has(.drinks-hold-hud:not([hidden])) .ride-hud.vc-hud{bottom:calc(182px + env(safe-area-inset-bottom))}
+}
+
+/* ── 手机拇指专用键（只在上车后出现，徒步状态一个都不显示；视觉对齐 IDOK-542 残边圆印框与 90ms 快压） ── */
+.walk-ui .vc-thumb{position:fixed;display:none;place-items:center;box-sizing:border-box;margin:0;padding:0;border-radius:50%;font-size:0;letter-spacing:0;touch-action:none;
+  left:auto;right:calc(var(--sr) + (var(--x) + var(--d)*var(--ox,0))*var(--k));bottom:calc(var(--sb) + (var(--y) + var(--d)*var(--oy,0))*var(--k));
+  width:calc(var(--d)*var(--w,1)*var(--k));height:calc(var(--d)*var(--h,1)*var(--k));
+  transition:background-color var(--ui-fast),border-color var(--ui-fast),color var(--ui-fast),transform var(--ui-fast) var(--ui-ease)}
+body[data-thumb-hand=left] .walk-ui .vc-thumb{right:auto;left:calc(var(--sl) + (var(--x) + var(--d)*var(--ox,0))*var(--k))}
+.walk-ui .vc-thumb::before{content:"";position:absolute;inset:0;margin:auto;width:var(--g,56%);height:var(--g,56%);pointer-events:none;
+  background:currentColor;-webkit-mask:var(--glyph) center/contain no-repeat;mask:var(--glyph) center/contain no-repeat}
+body:not([data-hud=street]) .walk-ui :is(.vc-thumb--row,.vc-thumb--back,.vc-thumb--port,.vc-thumb--stbd)::after{
+  content:"";position:absolute;inset:3px;border-radius:50%;pointer-events:none;box-shadow:inset 0 0 0 1px var(--ui-line-hover);
+  -webkit-mask-image:var(--ui-mask-round,none);mask-image:var(--ui-mask-round,none);
+  -webkit-mask-position:center;mask-position:center;-webkit-mask-size:100% 100%;mask-size:100% 100%;-webkit-mask-repeat:no-repeat;mask-repeat:no-repeat}
+body:not([data-hud=street]) .walk-ui :is(.vc-thumb--gas,.vc-thumb--brake)::after{
+  content:"";position:absolute;inset:3px;border-radius:inherit;pointer-events:none;box-shadow:inset 0 0 0 1px var(--ui-line-hover)}
+.walk-ui .vc-thumb.on{background:var(--ui-paper);border-color:var(--ui-paper);color:var(--ui-ink);box-shadow:none;
+  transform:scale(var(--ui-press,.97));transition-duration:var(--ui-press-t,90ms);transition-timing-function:var(--ui-ease-press,cubic-bezier(.3,0,.5,1))}
+body:not([data-hud=street]) .walk-ui .vc-thumb.on::after{box-shadow:inset 0 0 0 1px var(--ui-paper-line-strong)}
+
+/* 轿车：A 油门（高窄竖纹）/ B 大刹车踏板（宽矮横纹，顺手主位）/ C 手刹（中性淡框次位，拉起才翻色）；加减挡收起 */
+.walk-ui .vc-thumb--gas{--x:var(--a-x);--y:var(--a-y);--d:var(--a-d);--w:.74;--ox:.13;--g:64%;--glyph:url("./vehicle-pedal-gas.svg");border-radius:12px}
+.walk-ui .vc-thumb--brake{--x:var(--b-x);--y:var(--b-y);--d:var(--b-d);--w:1.06;--h:.78;--ox:-.03;--oy:.11;--g:72%;--glyph:url("./vehicle-pedal-brake.svg");border-radius:10px}
+html body[data-aboard][data-ride="car"] .walk-ui .btn-wheelie{--x:var(--c-x);--y:var(--c-y);--d:var(--c-d);border-color:var(--ui-line-strong)}
+
+/* 小船：A 推进（木橹 / 竹篙），下方「左舵 — 右舵」严格水平成对，底中「倒桨」；左手模式保持左在左、右在右 */
+.walk-ui .vc-thumb--row{--x:var(--a-x);--y:var(--a-y);--d:var(--a-d);--g:56%;--glyph:url("./vehicle-oar.svg")}
+.walk-ui[data-vc-free="freeRaft"] .vc-thumb--row{--glyph:url("./vehicle-pole.svg")}
+.walk-ui .vc-thumb--port{--x:134px;--y:86px;--d:50px;--glyph:url("./vehicle-rudder-left.svg")}
+.walk-ui .vc-thumb--stbd{--x:74px;--y:86px;--d:50px;--glyph:url("./vehicle-rudder-right.svg")}
+.walk-ui .vc-thumb--back{--x:106px;--y:26px;--d:46px;--glyph:url("./vehicle-backpaddle.svg")}
+body[data-thumb-hand=left] .walk-ui .vc-thumb--port{--x:74px}
+body[data-thumb-hand=left] .walk-ui .vc-thumb--stbd{--x:134px}
+@media (pointer:coarse) and (not (any-pointer:fine)) and (max-height:500px){
+  .walk-ui .vc-thumb--port{--x:126px;--y:66px;--d:44px}
+  .walk-ui .vc-thumb--stbd{--x:72px;--y:66px;--d:44px}
+  .walk-ui .vc-thumb--back{--x:100px;--y:14px;--d:42px}
+  body[data-thumb-hand=left] .walk-ui .vc-thumb--port{--x:72px}
+  body[data-thumb-hand=left] .walk-ui .vc-thumb--stbd{--x:126px}
+}
+html body[data-aboard][data-ride="car"] .walk-ui[data-vc-tier="car"] :is(.vc-thumb--gas,.vc-thumb--brake){display:grid}
+html body[data-aboard][data-ride="boat"] .walk-ui[data-vc-tier="boat"] :is(.vc-thumb--row,.vc-thumb--back,.vc-thumb--port,.vc-thumb--stbd){display:grid}
+html body[data-aboard][data-ride="car"] .walk-ui :is(.btn-gear-up,.btn-gear-down),
+html body[data-aboard] .walk-ui[data-vc-tier="shared"] :is(.btn-gear-up,.btn-gear-down){display:none}
+
+/* 共享电车禁翘头键：让出 ::after 给 542 残边圆印框，用独立 .vc-thumb-lock 实心墨圆白锁角标（px 绝对尺寸防 font-size:0） */
+.walk-ui .btn-wheelie .vc-wheelie-t{pointer-events:none}
+.walk-ui .btn-wheelie .vc-thumb-lock{display:none}
+html body[data-aboard] .walk-ui .btn-wheelie[data-locked="1"]{opacity:1;overflow:visible}
+html body[data-aboard] .walk-ui .btn-wheelie[data-locked="1"] .vc-thumb-lock{display:block;position:absolute;top:2px;right:2px;width:16px;height:16px;border-radius:50%;
+  background:var(--ui-ink);box-shadow:0 0 0 1px var(--ui-line-strong);pointer-events:none;z-index:2}
+html body[data-aboard] .walk-ui .btn-wheelie[data-locked="1"] .vc-thumb-lock::before{content:"";position:absolute;inset:2.5px;background:var(--ui-paper);
+  -webkit-mask:url("./vehicle-lock.svg") center/contain no-repeat;mask:url("./vehicle-lock.svg") center/contain no-repeat}
+
+@media (prefers-reduced-motion:reduce){
+  .vc-hud *,.vc-hud *::before,.vc-hud *::after,.walk-ui .vc-thumb{animation:none!important;transition:none!important}
+  .vc-hud .vc-ign-ring{--vc-sweep:360deg}
+}

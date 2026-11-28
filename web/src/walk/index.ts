@@ -36,6 +36,7 @@ import type {PeaksGroup} from '../peaks'
 import type {Manifest} from '../world'
 import type {Stream} from '../stream'
 import {walkInput} from '../ui/walk'
+import type {BoatHudState, VehicleRideControlInput} from '../ui/vehicle-controls'
 import {defaultAvatar} from '../../../lib/avatar'
 import {currentAvatar,characterModel,disposeCharacterParts,styleCharacter} from './character'
 import {avatar} from '../look/avatar'
@@ -644,7 +645,7 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
   const ebikeAudio=createEbikeAudioEngine()
   void ebikeAudio.prepare()
   window.addEventListener(RIDE_SOUND_EVENT,event=>ebikeAudio.setMuted((event as CustomEvent<boolean>).detail))
-  const ZERO_RIDE_INPUT:EbikeRideControlInput={gearDelta:0,gearSelect:null,wheelie:false,tuck:false,recover:false,cycleMod:false,parkToggle:false,kickstandToggle:false,headlightCycle:false,turnLeftToggle:false,turnRightToggle:false,hazardToggle:false,horn:false,hornPulse:false,cruiseToggle:false}
+  const ZERO_RIDE_INPUT:VehicleRideControlInput={gearDelta:0,gearSelect:null,wheelie:false,tuck:false,recover:false,cycleMod:false,parkToggle:false,kickstandToggle:false,headlightCycle:false,turnLeftToggle:false,turnRightToggle:false,hazardToggle:false,horn:false,hornPulse:false,cruiseToggle:false,carHorn:false,carHornPulse:false,ignitionToggle:false,carGearSelect:null,boatLightToggle:false}
   const ebikeMountStartPos=new THREE.Vector3(), ebikeMountStartRot=new Map<RiderJointName,[number,number,number]>()
   let ebikeMountStartYaw=0, ebikeMountElapsed=bikeConfig.mountDuration
   let mountedStaticBike:THREE.Object3D|null=null
@@ -1312,6 +1313,7 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
     if(active&&rides?.boat&&!event.repeat&&!isGlobalHotkeyBlocked(event.target)&&event.code==='KeyL'){
       event.preventDefault()
       const lit=rides.toggleBoatLight(env.night)
+      boatLightCached=lit;boatLightDirty=false;boatLightNightPrev=env.night>.12
       window.dispatchEvent(new CustomEvent('walk:boat-light',{detail:{lit,manual:true}}))
       if(!verify||stuntMode)window.dispatchEvent(new CustomEvent('walk:toast',{detail:{text:lit?'船灯已点亮':'船灯已关闭',ms:1400}}))
       return
@@ -1700,6 +1702,21 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
     delta=>{if(isExternalCameraActive())return;arm=THREE.MathUtils.clamp(arm+delta*.013,cfg.zoomMin,cfg.zoomMax);if(active)follow(0,true)},
     ()=>{if(isExternalCameraActive())return;arm=arm>(cfg.far+cfg.near)/2?cfg.near:cfg.far;if(active)follow(0,true)},
     ()=>(arm-cfg.zoomMin)/(cfg.zoomMax-cfg.zoomMin))
+  const warnCarNotInP=()=>{if(rides?.car&&carGearbox.strict&&carGearbox.selector!=='P')input.vehicleControls.triggerNotInPWarn(2000)}
+  actionButton.addEventListener('pointerenter',warnCarNotInP)
+  actionButton.addEventListener('focus',warnCarNotInP)
+  const carHudBox:{strict:boolean;ignition:'off'|'cranking'|'on';selector:CarGearSelector}={strict:false,ignition:'off',selector:'P'}
+  const boatHudBox:BoatHudState={probe:null,heading:0,speed:null,freeKind:null,isTourBoat:false,lightOn:false}
+  let boatLightCached=false, boatLightDirty=true, boatLightNightPrev=false
+  const readBoatLightLit=(force=false)=>{
+    const nightOn=env.night>.12
+    if(force||boatLightDirty||nightOn!==boatLightNightPrev){
+      boatLightCached=rides?.boatLightProbe()?.lit??false
+      boatLightDirty=false
+      boatLightNightPrev=nightOn
+    }
+    return boatLightCached
+  }
   if(smokeEnabled())document.querySelector('.walk-ui')!.append(smokeHint)
   const safe=new THREE.Vector3(),posOut=new THREE.Vector3(),footOut=new THREE.Vector3(),wish=new THREE.Vector2();const spawns:object[]=[]
   let external:{x:number,z:number,run:boolean}|null=null,blockedWater=false,held=false
@@ -2455,7 +2472,8 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
         dt,
       })
       driverPose.updateDriving(figure.position,rides.heading,active)
-      input.syncCarHud(carTel,carHeadlight)
+      carHudBox.strict=carGearbox.strict;carHudBox.ignition=carGearbox.ignitionState;carHudBox.selector=carGearbox.selector
+      input.syncCarHud(carTel,carHeadlight,carHudBox)
       const targetSpeedArm=carTel?.gtaPhysics?Math.min(carConfig.speedCameraPull,Math.max(0,(Math.hypot(rides.carVelX,rides.carVelZ)-8.5)*.095)):0
       carSpeedArm=dt>0?THREE.MathUtils.damp(carSpeedArm,targetSpeedArm,4.5,Math.min(.12,dt)):targetSpeedArm
       if(dt>0&&carShake>0){carShake=Math.max(0,carShake-3.8*Math.min(.12,dt));carShakePhase+=Math.min(.12,dt)*46}
@@ -2888,16 +2906,24 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
         if(wasCar||wasBike)applyFootController()
         wasBike=wasCar=false;if(traveller)traveller.rotation.set(0,0,0);ridePose.reset();driverPose.reset(active);input.clearRun()}
       const prevHeading=rides.heading
+      if(!held&&input.vehicleControls.consumePulses().boatLightToggle){
+        const lit=rides.toggleBoatLight(env.night)
+        boatLightCached=lit;boatLightDirty=false;boatLightNightPrev=env.night>.12
+        window.dispatchEvent(new CustomEvent('walk:boat-light',{detail:{lit,manual:true}}))
+        if(!verify||stuntMode)window.dispatchEvent(new CustomEvent('walk:toast',{detail:{text:lit?'船灯已点亮':'船灯已关闭',ms:1400}}))
+      }
       if(!held)rides.steerBoat(read.forward,read.right,Math.min(.12,dt))
       if(boatBoardElapsed<BOAT_BOARD_DUR)yaw+=shortestAngle(yaw,rides.heading)*(1-Math.exp(-12*Math.min(.12,Math.max(1/60,dt))))
       else yaw+=rides.heading-prevHeading
       rides.poseBoat(figure,read.forward,read.right,Math.min(.12,dt))
       const bpos=rides.freeBoat.position, bp=rides.boatProbe(), wy=bp?bp.y:bpos.y
+      boatHudBox.probe=bp;boatHudBox.heading=rides.heading;boatHudBox.speed=bp?.speed??rides.speed;boatHudBox.freeKind=rides.freeKind;boatHudBox.isTourBoat=false;boatHudBox.lightOn=readBoatLightLit(firstFrame)
+      input.syncBoatHud(boatHudBox)
       sim.body.setTranslation({x:bpos.x,y:wy+cfg.height/2,z:bpos.z},true)
       sim.body.setNextKinematicTranslation({x:bpos.x,y:wy+cfg.height/2,z:bpos.z})
       wasBoat=true;follow(dt,false);combat.hide();net?.tick(dt);return
     }
-    if(rides?.boat){releaseDynamicBike();input.syncRideHud(null,'boat');if(!held)rides.advance(Math.min(.25,dt));if(!wasBoat){if(wasCar||wasBike){applyFootController();wasCar=wasBike=false;driverPose.reset(active)}yaw=rides.heading+.95;sit()}wasBoat=!!rides.boat;follow(dt);combat.hide();net?.tick(dt);return}
+    if(rides?.boat){releaseDynamicBike();input.syncRideHud(null,'boat');input.vehicleControls.consumePulses();if(!held)rides.advance(Math.min(.25,dt));boatHudBox.probe=null;boatHudBox.heading=rides.heading;boatHudBox.speed=null;boatHudBox.freeKind=null;boatHudBox.isTourBoat=true;boatHudBox.lightOn=readBoatLightLit(!wasBoat);input.syncBoatHud(boatHudBox);if(!wasBoat){if(wasCar||wasBike){applyFootController();wasCar=wasBike=false;driverPose.reset(active)}yaw=rides.heading+.95;sit()}wasBoat=!!rides.boat;follow(dt);combat.hide();net?.tick(dt);return}
     if(wasBoat){wasBoat=false;clearAvatarPose(figure);restoreFootLocomotion(avatar.clips.idle)}
     if((rides?.car||rides?.bike)&&!vehicleCollisionReady(start.x,start.y,start.z)){
       rides.stop();vx=vz=accumulator=0;bikeObstacle='streaming';return
@@ -3070,6 +3096,12 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
           const hlText=carHeadlight==='high'?'轿车远光灯已开启':carHeadlight==='low'?'轿车近光灯已开启':'轿车大灯已关闭'
           window.dispatchEvent(new CustomEvent('walk:toast',{detail:{text:hlText,ms:1600}}))
         }
+      }
+      if(carGearbox.strict&&rideCtrl.ignitionToggle){
+        handleCarGearboxResult(carGearbox.ignition(undefined,rides.speed))
+      }
+      if(carGearbox.strict&&rideCtrl.carGearSelect){
+        handleCarGearboxResult(carGearbox.shift(rideCtrl.carGearSelect,{speedMs:rides.speed,brake:lastCarBraking}))
       }
       if(rideCtrl.gearSelect!==null)rides.setCarModeByIndex(rideCtrl.gearSelect)
       else if(rideCtrl.gearDelta!==0){
@@ -4114,8 +4146,8 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
     },
     boat:{
       get light(){return rides?.boatLightProbe()?.lit??false},
-      toggleLight(){return rides?.toggleBoatLight(env.night)??false},
-      setLight(on:boolean|null){return rides?.setBoatLight(on)??null},
+      toggleLight(){const lit=rides?.toggleBoatLight(env.night)??false;boatLightCached=lit;boatLightDirty=false;boatLightNightPrev=env.night>.12;return lit},
+      setLight(on:boolean|null){const res=rides?.setBoatLight(on)??null;boatLightDirty=true;return res},
       probe(){return rides?.boatLightProbe()??null},
     },
     get geoHeld(){return held},releaseDrive(){external=null},
