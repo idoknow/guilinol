@@ -2604,7 +2604,7 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
     const camYaw=yaw+shakeYaw,camPitch=pitch+shakePitch+knockdown.cameraPitchBias,lowerFocus=combat.f.down ? .72 : 0
     // Open-stairwell blend: pull the arm in with the blend so its collision ray never reaches the well lip or the slab over
     // the landing; a clamp kicking in or letting go mid-blend is a visible camera jump.
-    rig.update(camera,figure.position,camYaw,camPitch,(arm+ridePose.cameraArm(!!rides?.bike,dt,snap)+driverPose.cameraArm(!!rides?.car,dt,snap)+(rides?.car?carSpeedArm:0))*(1-blend)**2,dt,snap,!!rides?.car,firstPerson,lowerFocus)
+    rig.update(camera,figure.position,camYaw,camPitch,(arm+ridePose.cameraArm(!!rides?.bike,dt,snap)+driverPose.cameraArm(!!rides?.car,dt,snap)+(rides?.car?carSpeedArm:0))*(1-blend)**2,dt,snap,!!rides?.car,firstPerson,lowerFocus,onFoot&&viewBlend===null)
     if(sim.clampCamera(figure.position,camera.position,firstPerson?.18:cfg.camRadius)&&!firstPerson){
       camera.lookAt(rig.focus)
     }

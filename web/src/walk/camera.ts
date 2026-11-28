@@ -48,7 +48,8 @@ export function createCameraRig(sim:Physics, tunnels:Tunnel[] = []) {
   }
 
   let priorFov:number|undefined
-  function update(camera:THREE.PerspectiveCamera, figurePos:THREE.Vector3, yaw:number, pitch:number, desiredDist:number, dt:number, snap=false,driving=false,first=false,lowerFocus=0) {
+  let recoveryHold=0
+  function update(camera:THREE.PerspectiveCamera, figurePos:THREE.Vector3, yaw:number, pitch:number, desiredDist:number, dt:number, snap=false,driving=false,first=false,lowerFocus=0,walking=true) {
     if(driving && priorFov===undefined){priorFov=camera.fov;camera.fov=driveCamera.fov;camera.updateProjectionMatrix()}
     else if(!driving && priorFov!==undefined){camera.fov=priorFov;priorFov=undefined;camera.updateProjectionMatrix()}
     // IDOK-178 第一人称：相机直接落在眼睛上，不做第三人称那一整套防穿透/天花板收束（那条路径会
@@ -97,11 +98,17 @@ export function createCameraRig(sim:Physics, tunnels:Tunnel[] = []) {
     const safeDist = castClear(dir,targetDist)
 
     lastClipped = ducked || safeDist<desiredDist-.05
+    const elapsed=THREE.MathUtils.clamp(dt,0,.1)
+    if(!walking||!initialized||snap)recoveryHold=0
+    else if(lastClipped&&safeDist<=currentDist)recoveryHold=.12
     if(!initialized || snap || safeDist<=currentDist) {
       currentDist = safeDist
       initialized = true
     } else {
-      currentDist = THREE.MathUtils.damp(currentDist,safeDist,cfg.camRecover,Math.min(.1,Math.max(0,dt)))
+      const recovering=Math.max(0,elapsed-recoveryHold)
+      recoveryHold=Math.max(0,recoveryHold-elapsed)
+      const next=THREE.MathUtils.damp(currentDist,safeDist,cfg.camRecover,recovering)
+      currentDist=walking?Math.min(next,currentDist+6*recovering):next
     }
 
     function undergroundAt(x:number, z:number, footY:number) {
