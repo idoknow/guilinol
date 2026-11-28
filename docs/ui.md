@@ -93,6 +93,26 @@ S1（2026-11）重做了「游戏外」界面（主界面、账号、加载、�
 - 新增：`--ui-surface` `--ui-surface-2` `--ui-surface-float` `--ui-ink-950` `--ui-text*` `--ui-line*` `--ui-fill*` `--ui-scrim`、`--ui-paper-hi`（从后台块挪到全局）`--ui-ink-3` `--ui-paper-line*` `--ui-paper-fill`、字号 / 字距 / 行高 / 间距 / 阴影 / `--ui-rise` `--ui-press`、`--ui-sans` `--ui-num`。
 - `--ui-h` / `--ui-h-lg`、颜色 `--ui-seal*` `--ui-paper*` `--ui-ink*`、区域与后台 `:root` 块不变。
 
+## 令牌改了什么（S2 · IDOK-542 按键）
+
+只加不改，旧令牌全保留：
+
+| 令牌 | 值 | 用途 |
+| --- | --- | --- |
+| `--ui-plaque` `--ui-plaque-frame` `--ui-plaque-inset` `--ui-plaque-r` | `--ui-surface-float` / `--ui-line-strong` / 3px / `--ui-r-sm` | 匾：常驻一组键的墨青纸面、内衬印框色、印框离边、圆角 |
+| `--ui-wash-hover` `--ui-wash-press` | `--ui-fill-2` / 朱砂 72% | 匾内键悬停铺底 / 按下印压 |
+| `--ui-press-t` `--ui-ease-press` | 90ms / `cubic-bezier(.3,0,.5,1)` | 按下快压；松手仍按 `--ui-fast` 回弹 |
+| `--ui-press-seal` | .94 | 朱印按下缩放（比 `--ui-press` 压得深） |
+| `--ui-focus-w` `--ui-focus-in` | 2px / -4px | 焦点环粗细；遮罩键、匾内键的焦点环向内收 |
+| `--ui-ico-sm` `--ui-ico` `--ui-ico-lg` | 16 / 18 / 22px | 刻线小像尺寸：时辰栏 / 匾内键 / 物品栏 |
+| `--ui-key` `--ui-fs-key` | 18px / 10px | 宣纸键帽边长与字号（10px 是七级字号阶梯外唯一例外，只给单键字） |
+| `--ui-hit` | 42px | 触屏最小可点区 |
+| `--ui-mask-bar` `--ui-mask-seal` `--ui-mask-round` | `seal-bar.svg` / `home-seal.svg` / `seal-round.svg` | 横条残边印 / 方印 / 圆印遮罩 |
+
+`.ui-btn` / `.ui-icon-btn` 补齐手感：按下 `--ui-press-t` + `--ui-ease-press` 快压；`--seal` 按下压到 `--ui-press-seal`、`--paper` 压到 `--ui-paper-2`、`--line` / `--ghost` 压到 `--ui-fill-2`（裸 `.ui-btn` 不改按下底色，组件自定的底色不受影响）；焦点环用 `--ui-focus-w`。
+
+新原语（theme.css）：`.ui-plaque`（匾，宿主须自带定位）、`.ui-seal-btn`（残边朱印键，`--square` / `--round` 换方印 / 圆印，焦点环收进印内）、`.ui-slip`（宣纸签）、`.ui-key`（宣纸键帽）、`.ui-ico`（`--ico` 指向一枚 `ico-*.svg`，`--sm` / `--lg`）、`.ui-hit`（透明 `::before` 撑到 `--ui-hit` 见方，画面不变）。
+
 ## 页面结构
 
 - **主界面** `web/src/ui/home.ts`：直接打开网站时先到这里。背景是游戏内实景截图轮播（`public/home/*.webp`，用 `node scripts/home-shots.mjs` 从构建产物重新生成）。左栏：宣纸小卡 Logo + 大标题是主角；下面是「目录式」模式行——肖形印 + 名称 + 一句不超过 14 字的说明 + 右侧动作。目录上沿是一笔桂林山水线（`web/src/ui/home-skyline.svg`：象鼻山、普贤塔、水月洞、漓江、峰林），它的底边就是第一行的上发丝线；三枚模式印是桂林肖形印，不刻字（模式名就在旁边）：联机 = 日月双塔（`home-seal-mp.svg`）、游览 = 象鼻山水月洞（`home-seal-tour.svg`）、单人 = 漓江竹筏渔翁（`home-seal-solo.svg`），画面用 `::before` + `currentColor` 上色，所以朱印 / 墨印 / 悬停 / 续游当前行的配色规则不用动；外框用 `home-seal.svg` 做石刻残边，各歪一点。这些 SVG 只当遮罩（注释里不能出现 `--`，否则整张失效），生成脚本不入库，改形状直接改 SVG，颜色仍走 `--ui-*` 令牌，改形状只改 SVG。「联机」是唯一朱砂按钮，旁边小字显示在线人数；「游览」「单机」是线框按钮；「回到上次」是游览行下面的一行文字链接（继续游戏时主动作挪到当前模式那一行）。底部链接一行安静文字；抖音二维码桌面在右下角、手机收成左上小按钮。右上是账号。手机（竖屏 ≤760px、横屏高 ≤520px）默认收起：只留印章 + 模式名 + 动作，联机行保留说明；游览 / 单人说明、底部链接、署名收进目录下方的「更多」，钱包、印章进度、在线人数、续游始终显示。唯一状态是 `.home-more` 的 `aria-expanded`，CSS 用 `:has()` 读它，不另加 class。改结构后跑 `node scripts/verify-home-mp.mjs`。
@@ -114,6 +134,15 @@ S1（2026-11）重做了「游戏外」界面（主界面、账号、加载、�
    - 印：唯一主动作是朱砂印。横条主键用 `seal-bar.svg` 残边遮罩（交通劝导「开始执勤 / 吹哨」）；列表里每行的动作是四字方印（接单大厅 `.mb-btn`，`home-seal.svg` 遮罩，平时淡墨框，悬停 / 聚焦 / 按下才盖成朱砂，满屏只有手下一枚红）；挂在牌子边上的是骑缝竖印（钱包「接活」）。被遮罩的键焦点环必须收进印内（`outline-offset` 取负）。
    - 签：读的信息、选中 / 开着的状态用宣纸签（`--ui-paper` 底 + `--ui-ink` 字）：任务线路名、景册赏金、页签选中、工具展开。
    - 小像按第 8 条刻，不用 emoji、系统图标或一两个字撑图形；数字用 `--ui-num`，钱用 `--ui-ochre`；循环动画不用。
+10. S2 按键规范「山水印」（IDOK-542，批 1 落在常驻底边）：
+   - 只换材质，不动 fixed 元素的位置和尺寸盒子：去外描边时留 `1px solid transparent`，分组竖线改 `border-left-color:transparent`，键宽高不改。和街头皮肤共用的控件，新材质一律写在 `body:not([data-hud=street])` 下。
+   - 匾（`--ui-plaque*`，`::after` 内衬印框）：`.hud-me`、时辰天气栏 `.sky-ui`、物品栏 `.hotbar`、读数条 `.hud-stats`、按键卡 `.keys-card`（折叠态也是方角匾，不再是药丸）。匾内键悬停 `--ui-wash-hover`，按下 `--ui-wash-press` + `--ui-press`（`--ui-press-t` 快压）。
+   - 签：选中 / 开着的状态一律宣纸签——时辰天气的当前时辰与天气、物品栏手上拿着的那格（只有这一格露名字，香烟格「丢弃」态照常露字；未选中格只露小像）、香烟包数角标（`--ui-num`）、拇指键的蹲 / 远近 / 翘头 / 压弯。
+   - 印：`[F]` 交互键 `.vehicle-action`（上车 / 上船 / 进店 / 共享电驴不再各配描边或霓虹底）和抽烟下一步 `.btn-smoke` 是 `--ui-mask-bar` 残边朱印，按下 `--ui-press-seal`，焦点环 `outline-offset:-5px` 收进印内；桌面 `[F]` 键帽是 `::before` 读 `aria-keyshortcuts` 的宣纸小方块（`--ui-key` / `--ui-fs-key`），不加子节点、不改 `textContent`。
+   - 拇指键：底色仍是 `var(--ui-glass)`、字体仍是 Noto Serif SC（`scripts/walk-quick.mjs` 逐键量），`::after` 叠一道离边 3px 的细圆印框，外沿套 `--ui-mask-round` 咬出崩口；选中态框线随纸底换墨线。
+   - 摇杆是青玉罗盘：平的半透墨青盘面（不做径向渐变）+ 青玉细圈 + 四向刻度，摇杆头是宣纸圆片内衬青玉圈。远近滑轨是实色墨青刻度尺（不开 `backdrop-filter`），当前视距是一枚朱砂小圆印。
+   - 刻线小像：`web/src/ui/ico-*.svg`，24 网格、黑 = 亮部，阴刻细线用 SVG `<mask>` 挖空，单枚 ≤ 2.5KB，**文件里不能出现 `--`（注释也不行）**，否则 CSS `mask` 整张失效。时辰 `ico-sky-dawn/noon/dusk/night`（晨 = 半日出地平线、午 = 高日照峰林、昏 = 日落峰后、夜 = 新月孤星），天气 `ico-sky-clear/mist/rain`，流转 `ico-flow-play`（暂停时显示）/ `ico-flow-pause`（两根竹节，流转时显示），物品栏 `ico-hand/camera/smoke/shop/rod/remote`。时辰栏按 `sky.ts` 写的 `data-sky` 选图，物品栏按 `data-slot` / `data-shop` / `data-act` 选图；字留在键里（`font-size:0` 或 `aria-label`）。圆印遮罩 `seal-round.svg` 外沿贴满 24 网格、三处崩口。
+   - 循环动画：联机「连接中」的呼吸闪（`hud-mp-breath`）去掉，改静止赭黄点。
 
 ## 登录注册流程
 

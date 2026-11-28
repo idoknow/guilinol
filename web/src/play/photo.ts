@@ -222,7 +222,7 @@ export function photoMode(host: Host, place: () => string, onCapture?: () => voi
     const share = navigator.canShare?.({files: [file]}) && touchUi()
     shot.innerHTML = `<img alt="刚拍的照片"><figcaption>
       <span class="shot-meta">${body().short} · ${focalLabel(focalValue())} · ${shutterLabel(settingsNow.shutter)} · ISO ${settingsNow.iso}</span>
-      <a download="${name}">保存</a>${share ? '<button>分享</button>' : ''}<button class="shot-close" aria-label="收起">×</button></figcaption>`
+      <a class="shot-save" download="${name}">保存</a>${share ? '<button type="button" class="shot-share">分享</button>' : ''}<button type="button" class="shot-close" aria-label="收起">×</button></figcaption>`
     shot.querySelector('img')!.src = shotUrl
     shot.querySelector<HTMLAnchorElement>('a')!.href = shotUrl
     shot.querySelector<HTMLButtonElement>('figcaption button:not(.shot-close)')?.addEventListener('click', () => void navigator.share({files: [file], title: '网上桂林'}).catch(() => {}))

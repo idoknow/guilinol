@@ -30,8 +30,19 @@ body:not([data-hud=street]) .walk-ui .btn-wheelie[data-locked="1"]::before{opaci
 /* 表情键原来是带字的药丸；字收起后改成和别的拇指键一样的圆 */
 body:not([data-hud=street]) .emote-toggle{width:calc(44px*var(--k,1));height:calc(44px*var(--k,1));padding:0;border-radius:50%;box-sizing:border-box}
 
-/* 选中态（蹲着 / 拉远 / 翘头 / 压弯）：纸底墨像，不再用朱色——朱只给主操作 */
+/* 圆印框（IDOK-542）：每枚拇指键内衬一道细圆框（离边 3px），外沿套 seal-round.svg 残边遮罩，框线随印边咬出几处崩口，像一方旧圆印。
+   只叠在 ::after 上：键的底色仍是 hud.css 的 var(--ui-glass)、字体仍是 Noto Serif SC（walk-quick 逐键量这两项），盒子不动。 */
+body:not([data-hud=street]) .walk-ui :is(.btn-jump,.btn-crouch,.btn-view,.btn-hail,.btn-wheelie,.btn-gear-up,.btn-gear-down,.btn-tuck)::after,
+body:not([data-hud=street]) :is(.emote-toggle,.cb-btn-punch)::after{content:"";position:absolute;inset:3px;border-radius:50%;pointer-events:none;
+  box-shadow:inset 0 0 0 1px var(--ui-line-hover);
+  -webkit-mask:var(--ui-mask-round) center/100% 100% no-repeat;mask:var(--ui-mask-round) center/100% 100% no-repeat}
+/* 默认 HUD 下叫车键收掉旧亮绿外圈与内阴影，只保留一道柔和青玉圆印框与青玉电驴，彻底消除双圈 */
+body:not([data-hud=street]) .walk-ui .btn-hail{border-color:var(--ui-glass-line);box-shadow:none;color:var(--ui-jade-300)}
+body:not([data-hud=street]) .walk-ui .btn-hail::after{box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--ui-jade-300) 68%,transparent)}
+
+/* 选中态（蹲着 / 拉远 / 翘头 / 压弯）：纸底墨像，不再用朱色——朱只给主操作；圆印框随纸底换成墨线 */
 body:not([data-hud=street]) .walk-ui :is(.btn-crouch,.btn-view,.btn-wheelie,.btn-tuck).on{background:var(--ui-paper);border-color:var(--ui-paper);color:var(--ui-ink);box-shadow:none}
+body:not([data-hud=street]) .walk-ui :is(.btn-crouch,.btn-view,.btn-wheelie,.btn-tuck).on::after{box-shadow:inset 0 0 0 1px var(--ui-paper-line-strong)}
 
 /* 指南里的同款小像：跟着文字走，1.5em 见方 */
 .thumb-ico{display:inline-block;width:1.5em;height:1.5em;margin-right:.25em;vertical-align:-.36em}

@@ -34,6 +34,14 @@ body[data-thumb-layout=corner]{
 .walk-ui{--sr:env(safe-area-inset-right);--sl:env(safe-area-inset-left);--sb:env(safe-area-inset-bottom)}
 .walk-ui .joystick{left:calc(var(--sl) + var(--j-x)*var(--k));right:auto;bottom:calc(var(--sb) + var(--j-y)*var(--k));width:calc(var(--j-d)*var(--k));height:calc(var(--j-d)*var(--k))}
 .walk-ui .joystick-knob{width:calc(var(--j-d)*var(--k)*.41);height:calc(var(--j-d)*var(--k)*.41)}
+/* 摇杆 = 青玉罗盘（IDOK-542）：盘面是平的半透墨青（hud.css，不做径向渐变），里面一道青玉细圈 + 四向刻度；
+   摇杆头是一枚宣纸圆片、内衬青玉圈。只换材质，盒子和定位不动；街头皮肤（street-hud.css）不套。 */
+body:not([data-hud=street]) .walk-ui .joystick{border-color:var(--ui-line-strong)}
+body:not([data-hud=street]) .walk-ui .joystick::before{content:"";position:absolute;inset:7%;border-radius:50%;pointer-events:none;opacity:.85;
+  box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--ui-jade-300) 45%,transparent);
+  background:linear-gradient(var(--ui-jade-300),var(--ui-jade-300)) 50% 0/1.5px 9% no-repeat,linear-gradient(var(--ui-jade-300),var(--ui-jade-300)) 50% 100%/1.5px 9% no-repeat,
+    linear-gradient(var(--ui-jade-300),var(--ui-jade-300)) 0 50%/9% 1.5px no-repeat,linear-gradient(var(--ui-jade-300),var(--ui-jade-300)) 100% 50%/9% 1.5px no-repeat}
+body:not([data-hud=street]) .walk-ui .joystick-knob{background:var(--ui-paper);box-shadow:inset 0 0 0 3px var(--ui-paper),inset 0 0 0 4px var(--ui-jade-500),var(--ui-shadow-1)}
 .walk-ui :is(.btn-crouch,.btn-jump,.btn-view,.btn-wheelie,.btn-gear-up,.btn-gear-down,.btn-tuck,.btn-hail){position:fixed;border-radius:50%;place-items:center;padding:0;box-sizing:border-box;
   left:auto;right:calc(var(--sr) + var(--x)*var(--k));bottom:calc(var(--sb) + var(--y)*var(--k));width:calc(var(--d)*var(--k));height:calc(var(--d)*var(--k));font-size:calc(var(--fs)*var(--k))}
 .walk-ui :is(.btn-crouch,.btn-jump,.btn-view,.btn-hail){display:grid}
@@ -54,15 +62,16 @@ body[data-thumb-hand=left] .walk-ui :is(.btn-crouch,.btn-jump,.btn-view,.btn-whe
 /* 远近（IDOK-256）：按住上下拖动连续变焦。按下时按钮上方展开一条竖向滑轨，圆点 = 当前视距（上近下远）。 */
 .walk-ui .btn-view{overflow:visible}
 .walk-ui .btn-view>span{pointer-events:none}
-.walk-ui .btn-view .view-rail{position:absolute;left:50%;bottom:calc(100% + 8px);width:30px;--rail-h:118px;height:var(--rail-h);margin-left:-15px;box-sizing:border-box;padding:6px 0;border-radius:15px;
+/* IDOK-542：滑轨是一把实色墨青刻度尺（不开背景模糊，IDOK-297），一根脊线 + 每 8px 一道刻度，当前视距是一枚朱砂小圆印。 */
+.walk-ui .btn-view .view-rail{position:absolute;left:50%;bottom:calc(100% + 8px);width:30px;--rail-h:118px;height:var(--rail-h);margin-left:-15px;box-sizing:border-box;padding:6px 0;border-radius:var(--ui-r-sm);
   display:flex;flex-direction:column;justify-content:space-between;align-items:center;pointer-events:none;
-  background:rgba(24,40,37,.72);border:1px solid rgba(244,239,226,.42);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);
+  background:var(--ui-surface);border:1px solid var(--ui-line-strong);
   opacity:0;transform:translateY(6px) scaleY(.6);transform-origin:50% 100%;transition:opacity .18s,transform .18s}
-.walk-ui .btn-view .view-rail b{font:600 11px/1 var(--ui-serif,serif);color:rgba(244,239,226,.78);letter-spacing:0}
-.walk-ui .btn-view .view-rail::before{content:"";position:absolute;left:50%;top:24px;bottom:24px;width:2px;margin-left:-1px;border-radius:1px;
-  background:repeating-linear-gradient(180deg,rgba(244,239,226,.55) 0 2px,transparent 2px 10px)}
+.walk-ui .btn-view .view-rail b{font:600 11px/1 var(--ui-serif,serif);color:var(--ui-text-2);letter-spacing:0}
+.walk-ui .btn-view .view-rail::before{content:"";position:absolute;left:50%;top:24px;bottom:24px;width:9px;margin-left:-4.5px;
+  background:linear-gradient(var(--ui-line-strong),var(--ui-line-strong)) 50% 0/1px 100% no-repeat,repeating-linear-gradient(180deg,var(--ui-line-hover) 0 1px,transparent 1px 8px)}
 .walk-ui .btn-view .view-rail s{position:absolute;left:50%;top:calc(24px + (var(--rail-h) - 48px)*var(--z,.4));width:14px;height:14px;margin:-7px 0 0 -7px;border-radius:50%;
-  background:var(--ui-seal-light,#d6785c);box-shadow:0 0 0 2px rgba(244,239,226,.9),0 2px 6px rgba(0,0,0,.35)}
+  background:var(--ui-seal);box-shadow:0 0 0 2px var(--ui-paper)}
 .walk-ui .btn-view.dragging .view-rail{opacity:1;transform:none}
 /* 拖远近时滑轨会伸到表情键（F 槽）上方，先把表情键藏起来。 */
 body[data-zooming] .emote-toggle{visibility:hidden}
@@ -154,13 +163,13 @@ body[data-ride-type="shared"] .ride-gears{display:none}
 body[data-aboard][data-ride="bike"][data-ride-type="shared"] .walk-ui :is(.btn-gear-up,.btn-gear-down){display:none}
 body[data-ride-type="shared"] .ride-light[data-locked="1"]{opacity:.58;cursor:not-allowed}
 body[data-ride-type="shared"] .btn-wheelie[data-locked="1"]{opacity:.48}
-.vehicle-action[data-ebike-tier="shared"]{border-color:rgba(168,194,204,.85)}
-.vehicle-action[data-interact="shop"]{border-color:rgba(255,197,61,.88);background:rgba(14,17,21,.82);color:#fff6dc}
 body[data-home] :is(.ride-hud,.vehicle-action,.walk-ui){display:none!important}
 .toast{z-index:30;box-sizing:border-box;width:max-content;max-width:min(520px,calc(100vw - 32px));text-align:center;line-height:1.45;border:1px solid rgba(244,239,226,.34)}
+/* 桌面 [F] 键帽（IDOK-542）：一枚宣纸小方块，纯 CSS 读 aria-keyshortcuts，不加子节点、不动 textContent；
+   朱印本身不发光、不描边（上车 / 进店 / 共享电驴统一，见 hud.css）。 */
 @media (hover:hover) and (pointer:fine){
-  .vehicle-action{box-shadow:0 4px 16px rgba(18,30,28,.28),0 0 0 1px rgba(214,120,92,.35)}
-  .vehicle-action::before{content:attr(aria-keyshortcuts);display:inline-grid;place-items:center;min-width:1.45em;height:1.45em;margin-right:.55em;padding:0 .24em;border-radius:5px;border:1px solid rgba(244,239,226,.72);background:linear-gradient(180deg,rgba(244,239,226,.26),rgba(244,239,226,.12));box-shadow:0 2px 0 rgba(244,239,226,.38),inset 0 1px 0 rgba(255,255,255,.28);font:600 12px/1 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:0;vertical-align:1px}
+  .vehicle-action::before{content:attr(aria-keyshortcuts);display:inline-grid;place-items:center;box-sizing:border-box;min-width:var(--ui-key);height:var(--ui-key);margin-right:.55em;padding:0 .3em;
+    border-radius:var(--ui-r-xs);color:var(--ui-ink);background:var(--ui-paper);box-shadow:inset 0 -1.5px 0 var(--ui-paper-line-strong);font:600 var(--ui-fs-key)/1 var(--ui-num);letter-spacing:0;vertical-align:1px}
 }
 @media (pointer:coarse) and (not (any-pointer:fine)){
   .vehicle-action{bottom:calc(230px + env(safe-area-inset-bottom));max-width:calc(100vw - 168px);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -249,4 +258,10 @@ body[data-home] :is(.ride-hud,.vehicle-action,.walk-ui){display:none!important}
 /* 抽烟的下一步：朱砂底，和普通灰绿按键区分开；按下时轻压 */
 .walk-ui .btn-smoke:active{transform:scale(.96);background:var(--ui-seal)}
 .walk-ui .btn-smoke[hidden]{display:none}
+/* IDOK-542：默认 HUD 下是一块残边朱印牌（--ui-mask-bar），实色朱砂、无描边无投影；盒子、定位和按下位移（smoke/meter.css）都不动 */
+body:not([data-hud=street]) .walk-ui .btn-smoke{border-color:transparent;border-radius:0;box-shadow:none;background:var(--ui-seal);
+  -webkit-mask:var(--ui-mask-bar) center/100% 100% no-repeat;mask:var(--ui-mask-bar) center/100% 100% no-repeat}
+body:not([data-hud=street]) .walk-ui .btn-smoke:hover{background:var(--ui-seal-hi)}
+body:not([data-hud=street]) .walk-ui .btn-smoke:active{background:var(--ui-seal);transition-duration:var(--ui-press-t);transition-timing-function:var(--ui-ease-press)}
+body:not([data-hud=street]) .walk-ui .btn-smoke:focus-visible{outline:1.5px solid var(--ui-paper);outline-offset:-5px}
 @media(max-height:500px){.walk-ui .btn-smoke{right:calc(183px + var(--sr));bottom:calc(84px + var(--sb))}}

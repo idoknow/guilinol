@@ -4,51 +4,49 @@
 .cb-ui { pointer-events: none; color: var(--ui-paper, #f4efe2); }
 .cb-ui [hidden], .cb-ui[hidden] { display: none !important; }
 
-/* --- 自身气血（左下） ------------------------------------------------------------------- */
+/* --- 自身气血（左下：方角墨青细匾，去胶囊与渐变，浅/深背景均保持清晰可读） ----------------- */
 .cb-hp {
   --hp: 1; --down: 0;
-  --hp-a: #5f9688; --hp-b: var(--ui-jade-300, #8fc1b5);
+  --hp-a: var(--ui-jade-500, #4f7f7a); --hp-b: var(--ui-jade-300, #8fc1b5);
   position: fixed; z-index: 5;
   left: calc(12px + env(safe-area-inset-left));
   bottom: calc(90px + env(safe-area-inset-bottom));
   display: flex; align-items: center; gap: 7px;
-  height: 22px; box-sizing: border-box; padding: 0 9px 0 8px;
-  border-radius: var(--ui-r-pill, 999px);
-  background: rgba(22, 37, 34, .5);
-  border: 1px solid var(--ui-glass-line-soft, rgba(244, 239, 226, .16));
-  box-shadow: 0 2px 8px rgba(12, 20, 20, .16);
-  font: 10.5px/1 var(--ui-serif, serif);
+  height: 24px; box-sizing: border-box; padding: 0 9px 0 8px;
+  border-radius: var(--ui-plaque-r, 4px);
+  background: var(--ui-plaque, rgba(20, 32, 29, .88));
+  border: 1px solid var(--ui-line-strong, rgba(244, 239, 226, .3));
+  box-shadow: none;
+  font: 11px/1 var(--ui-serif, serif);
   letter-spacing: .08em;
   user-select: none; -webkit-user-select: none;
-  transition: opacity .6s var(--ui-ease, ease), background .3s;
+  transition: opacity .35s var(--ui-ease, ease), background .3s;
 }
-.cb-hp.is-calm { opacity: .5; }
+.cb-hp.is-calm { opacity: .82; }
 .cb-hp.is-mid { --hp-a: #a9853f; --hp-b: var(--ui-warn, #e2b878); }
 .cb-hp.is-low { --hp-a: var(--ui-seal, #a9503c); --hp-b: var(--ui-seal-light, #d0694c); }
-.cb-hp-label { color: var(--ui-paper-dim, rgba(244, 239, 226, .7)); }
+.cb-hp-label { color: var(--ui-text-2, rgba(244, 239, 226, .74)); }
 .cb-hp-track {
   position: relative; width: 96px; height: 4px; overflow: hidden;
-  border-radius: 2px; background: rgba(244, 239, 226, .13);
-  box-shadow: inset 0 0 0 .5px rgba(12, 20, 20, .35);
+  border-radius: 1px; background: var(--ui-fill-2, rgba(244, 239, 226, .14));
+  box-shadow: none;
 }
 .cb-hp-fill, .cb-hp-lag {
   position: absolute; inset: 0; border-radius: inherit;
   transform-origin: left center; transform: scaleX(var(--hp));
 }
 .cb-hp-fill {
-  background: linear-gradient(90deg, var(--hp-a), var(--hp-b));
+  background: var(--hp-b);
   transition: transform .22s var(--ui-ease, ease), background .3s;
 }
 /* 掉血时先留一截淡纸色「余痕」，0.25 s 后再追上，掉血过程看得清又不跳变 */
 .cb-hp-lag { background: rgba(244, 239, 226, .42); transition: transform .55s .25s ease-out; }
 .cb-hp-text {
   min-width: 3ch; text-align: right;
-  font: 10.5px/1 ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing: 0;
-  font-variant-numeric: tabular-nums; color: rgba(244, 239, 226, .62);
+  font: 600 10.5px/1 var(--ui-num, ui-monospace, monospace); letter-spacing: 0;
+  font-variant-numeric: tabular-nums; color: var(--ui-text-2, rgba(244, 239, 226, .74));
 }
-.cb-hp.is-low .cb-hp-fill { animation: cb-breathe 1.2s ease-in-out infinite; }
 .cb-hp.is-low .cb-hp-text { color: var(--ui-error, #f0b9a6); }
-@keyframes cb-breathe { 50% { opacity: .55; } }
 
 /* 倒地：槽改成倒计时（纸色细条从满缩到空），数字换成「待救援 12s」 */
 .cb-hp.is-down { background: rgba(60, 28, 22, .55); border-color: rgba(208, 105, 76, .35); }
@@ -139,9 +137,13 @@
   .cb-controls button { --cb-x: calc(var(--b-x, 142px) + var(--b-d, 54px) + 16px); --cb-y: var(--b-y, 98px); }
 }
 
-/* 新手「按键」卡片展开时（268px 宽、从 44px 往上），气血挪到卡片右侧同一底线 */
+/* 新手「按键」卡片展开时（268px 宽），气血挪到卡片右侧聊天气泡正上方；聊屉/名册展开时再避让到面板右侧 */
 @media (pointer: fine) {
   body:has(.keys-card:not(.folded)) .cb-hp { left: calc(12px + 268px + 10px + env(safe-area-inset-left)); bottom: calc(44px + env(safe-area-inset-bottom)); }
+  body:has(.keys-card:not(.folded)):has(.chat-dock:not([hidden])) .cb-hp { bottom: calc(86px + env(safe-area-inset-bottom)); }
+  body:has(.keys-card.folded):has(.chat-dock:not([hidden])) .cb-hp { bottom: calc(126px + env(safe-area-inset-bottom)); }
+  body:has(.chat-dock[data-open="1"]) .cb-hp { left: calc(12px + 340px + 10px + env(safe-area-inset-left)); bottom: calc(48px + env(safe-area-inset-bottom)); }
+  body:has(.mp-roster:not([hidden])) .cb-hp { left: calc(12px + 300px + 10px + env(safe-area-inset-left)); bottom: calc(46px + env(safe-area-inset-bottom)); }
 }
 /* 窄桌面窗口：聊天气泡被抬到 84px，气血跟着抬 */
 @media (pointer: fine) and (max-width: 1100px) {

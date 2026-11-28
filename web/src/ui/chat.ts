@@ -104,9 +104,9 @@ function paintList(stick = true) {
   if (!items.length) {
     const empty = document.createElement('li'); empty.className = 'chat-empty'
     empty.textContent = !online ? '联机后才能聊天'
-      : !loaded[channel] ? '正在取最近的消息…'
-      : channel === 'near' ? '身边 60 米内还没人说话。说一句，附近的人都能看到。'
-      : '世界频道还很安静，打个招呼吧。'
+      : !loaded[channel] ? '载入中…'
+      : channel === 'near' ? '附近还没人说话'
+      : '世界频道很安静'
     list.append(empty)
     registerPageUI(empty,true)
   }
@@ -248,17 +248,17 @@ function build() {
   root.setAttribute('aria-label', '聊天')
   root.hidden = true
   root.innerHTML = `
-    <button type="button" class="chat-bubble" title="聊天（回车）">
+    <button type="button" class="chat-bubble ui-hit" title="聊天（回车）">
       <span class="chat-bubble-mark" aria-hidden="true">聊</span><span class="chat-bubble-text"></span><span class="chat-bubble-count" hidden></span>
     </button>
     <div class="chat-panel" role="dialog" aria-label="聊天">
       <div class="chat-grip" title="上下拖动调整高度，双击复位" aria-hidden="true"></div>
       <header class="chat-head" title="按住拖动位置，双击复位">
         <div class="chat-tabs" role="tablist">
-          <button type="button" role="tab" class="chat-tab" data-ch="near">附近<small>60 m</small></button>
-          <button type="button" role="tab" class="chat-tab" data-ch="world">世界</button>
+          <button type="button" role="tab" class="chat-tab ui-hit" data-ch="near">附近<small>60 m</small></button>
+          <button type="button" role="tab" class="chat-tab ui-hit" data-ch="world">世界</button>
         </div>
-        <button type="button" class="chat-fold" aria-label="收起聊天" title="收起（Esc）">–</button>
+        <button type="button" class="chat-fold ui-hit" aria-label="收起聊天" title="收起（Esc）">–</button>
       </header>
       <ol class="chat-list" aria-live="polite"></ol>
       <button type="button" class="chat-more" hidden></button>
@@ -269,7 +269,7 @@ function build() {
           <textarea class="chat-input" rows="1" maxlength="${MAX * 2}" enterkeyhint="send" autocomplete="off"></textarea>
           <button type="button" class="chat-send">发送</button>
         </div>
-        <div class="chat-meta"><span>回车发送 · Shift+回车换行</span><span class="chat-count"></span></div>
+        <div class="chat-meta"><span class="chat-count"></span></div>
       </div>
     </div>`
   bubble = root.querySelector('.chat-bubble')!

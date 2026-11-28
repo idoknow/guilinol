@@ -50,4 +50,7 @@
   `0 模态/输入阻断 > 1 摔车/起身/扶车锁定 > 2 载具中仅下车（店门口骑车仅弱提示先下车） > 3 扶起倒地车 > 4 商店/充修工位（压制 4.2m 上车） > 5 上车（个人车 +0.6m 优先） > 6 船坞/码头`。
 - **`web/src/walk/input-guard.ts`**：`MODAL_OVERLAY_SELECTOR` 与 `TOUCH_UI_SELECTOR` 覆盖 `.shop-overlay` / `.wardrobe-overlay` / `.garage-overlay` / `.mission-hud`；进店设置 `data-shop-open="1"` 并调用 `clearTransientInput()` 锁输入，退店回滚未购预览并恢复街面位姿。
 - **`web/src/game/commerce.ts`**：6 步原子扣款 `executePurchase()` 与防刷发奖 `creditReward()`（重入锁 `IN_FLIGHT` + 幂等键 `IDEMPOTENT_REPLAY` + 单一真源计价 `PRICE_MISMATCH` + 已拥有 `ALREADY_OWNED` + 余额不足 `INSUFFICIENT_FUNDS` + 先写盘后提交内存态 `PERSIST_FAILED` 零脏状态）。
-- **`web/src/ui/shop-overlay.ts` & `shop-overlay.css`**：柏油黑 `rgba(14,17,21,.80)` + 桂花金 `#ffc53d` + 漓江青 `#20d6c1` + 警示红 `#ff3d4f`，在桌面 `1280×720`、手机竖屏 `390×844`、手机横屏 `844×390` 三端满足零矩形重叠与触控热区门禁。
+- **`web/src/ui/shop-overlay.ts` & `shop-overlay.css`**：两张皮共用一套结构，颜色 / 字体 / 圆角只走 `--shop-*` 令牌，在桌面 `1280×720`、手机竖屏 `390×844`、手机横屏 `844×390` 三端满足零矩形重叠与触控热区门禁（按钮桌面 ≥ 34px、竖屏 ≥ 44px、横屏 ≥ 40px；桌面 3D 舞台 ≥ 65% 宽）。
+  - **默认皮走「山水印」**（`docs/ui.md` S2 / IDOK-542）：`--shop-*` 映射到 `theme.css` 的 `--ui-*`——抽屉是墨青纸面（`--ui-surface`）+ 往里缩 `--ui-frame` 的内衬印框，无外描边、无投影、分区不画线；页签选中、选中商品卡、试穿条、头盔开关「开」都是宣纸签（`--ui-paper` 底 `--ui-ink` 字）；底栏唯一主动作（购买 / 立即穿戴 / 设为常用车）是 `--ui-mask-bar` 残边朱印，焦点环收进印内；「正在穿戴 / 当前主力车 / 已装备」退成宣纸签，「暂无可操作项 / 购买中」退成淡线框；余额不足是朱砂淡底线框，不是第二枚朱印；金额 `--ui-ochre`，字体 `--ui-serif`，数字 `--ui-num` + `tabular-nums`。
+  - **`body[data-hud=street]` 保留原街头青金**：柏油黑 `rgba(14,17,21,.82)` + 桂花金 `#ffc53d` + 漓江青 `#20d6c1` + 警示红 `#ff3d4f`，无衬线 `--shop-sans`，不画印框、不套朱印遮罩。
+  - 两张皮都不用 `999px` 胶囊：舞台说明 `.shop-orbit-pill`、试穿条 `.shop-preview-banner`、`.shop-helmet-toggle` / `.shop-edit-character` 一律方角签 / 版刻键。

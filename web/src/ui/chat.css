@@ -1,48 +1,68 @@
-/* 游戏内聊天（IDOK-248）：青玉玻璃，和左下读数、同城名册同一块材质。
+/* 游戏内聊天（IDOK-248 · IDOK-542 S2「山水印」）：收起是一块墨青匾（竹叶话框小像 ico-chat.svg），
+   展开是墨青纸面 + 内衬印框的抽屉；页签选中是宣纸签，发送是残边朱印。无胶囊、无投影。
    频道色：附近 = 青玉，世界 = 赭黄；官方公告 = 朱砂印。只用 theme.css 里的 token。 */
-.chat-dock { --chat-near: var(--ui-jade-300, #8fc1b5); --chat-world: var(--ui-warn, #e2b878); }
+.chat-dock { --chat-near: var(--ui-jade-300); --chat-world: var(--ui-warn); }
 
-/* --- 收起：左缘迷你气泡 ------------------------------------------------------------------- */
+/* --- 收起：左缘墨青匾 ------------------------------------------------------------------- */
 .chat-bubble {
   position: fixed; z-index: 6;
   left: calc(12px + env(safe-area-inset-left));
   bottom: calc(48px + env(safe-area-inset-bottom));
-  display: flex; align-items: center; gap: 8px;
+  display: flex; align-items: center; gap: 6px;
   max-width: min(320px, calc(100vw - 24px)); height: 34px; box-sizing: border-box;
-  padding: 0 12px 0 4px; border-radius: var(--ui-r-pill);
-  background: var(--ui-glass, rgba(24, 40, 37, .5)); border: 1px solid var(--ui-glass-line-soft);
-  color: var(--ui-paper); font: 13px/1 var(--ui-serif); text-align: left; cursor: pointer;
-  -webkit-tap-highlight-color: transparent;
-  box-shadow: var(--ui-shadow-1);
+  padding: 0 10px 0 6px; border: 0; border-radius: var(--ui-plaque-r);
+  background: var(--ui-plaque); color: var(--ui-text); font: 13px/1 var(--ui-serif); text-align: left; cursor: pointer;
+  -webkit-tap-highlight-color: transparent; touch-action: manipulation;
   transition: background var(--ui-fast), transform var(--ui-fast), opacity var(--ui-fast);
 }
-.chat-bubble:hover { background: var(--ui-glass-strong); }
-.chat-bubble:active { transform: scale(.97); }
-.chat-bubble:focus-visible { outline: 2px solid var(--ui-jade-300); outline-offset: 2px; }
-.chat-bubble-mark {
-  flex: none; display: grid; place-items: center; width: 26px; height: 26px; border-radius: 50%;
-  background: rgba(143, 193, 181, .2); color: var(--ui-jade-300); font: 600 13px/1 var(--ui-serif);
-  box-shadow: inset 0 0 0 1px rgba(143, 193, 181, .35);
+/* 桌面避让左下按键卡：按键卡展开时聊天气泡站到按键卡右侧；折叠时站到折叠匾上方，绝不互相遮挡 */
+@media (pointer: fine) {
+  body:has(.keys-card:not(.folded)) .chat-bubble {
+    left: calc(12px + 268px + 10px + env(safe-area-inset-left));
+    bottom: calc(44px + env(safe-area-inset-bottom));
+    max-width: min(280px, calc(100vw - 320px));
+  }
+  body:has(.keys-card.folded) .chat-bubble {
+    bottom: calc(84px + env(safe-area-inset-bottom));
+  }
 }
-.chat-bubble[data-ch="sys"] .chat-bubble-mark { background: var(--ui-seal); color: var(--ui-paper); box-shadow: none; }
-.chat-bubble-text { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; color: var(--ui-paper-dim); letter-spacing: .03em; }
-.chat-bubble-text b { font-weight: 600; color: var(--ui-paper); }
+.chat-bubble::after {
+  content: ""; position: absolute; inset: var(--ui-plaque-inset); border: 1px solid var(--ui-plaque-frame);
+  border-radius: var(--ui-r-xs); pointer-events: none;
+}
+.chat-bubble:hover { background: var(--ui-surface-2); }
+.chat-bubble:active { transform: scale(var(--ui-press)); transition-duration: var(--ui-press-t); transition-timing-function: var(--ui-ease-press); }
+.chat-bubble:focus-visible { outline: var(--ui-focus-w) solid var(--ui-focus); outline-offset: 2px; }
+/* 「聊」字留在 DOM 里（font-size:0），画面是竹叶话框刻线小像 */
+.chat-bubble-mark { flex: none; display: grid; place-items: center; width: 22px; height: 22px; font-size: 0; color: var(--ui-jade-300); }
+.chat-bubble-mark::before {
+  content: ""; width: var(--ui-ico); height: var(--ui-ico); background: currentColor;
+  -webkit-mask: url("./ico-chat.svg") center/contain no-repeat; mask: url("./ico-chat.svg") center/contain no-repeat;
+}
+.chat-bubble[data-ch="sys"] .chat-bubble-mark { color: var(--ui-seal-light); }
+.chat-bubble-text { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; color: var(--ui-text-2); letter-spacing: var(--ui-track-body); }
+.chat-bubble-text b { font-weight: 600; color: var(--ui-text); }
 .chat-bubble-text .chat-tag { margin-right: 6px; }
+/* 未读：朱砂小签（方角、等宽数字） */
 .chat-bubble-count {
-  flex: none; min-width: 18px; height: 18px; padding: 0 5px; box-sizing: border-box; border-radius: 9px;
-  background: var(--ui-seal); color: var(--ui-paper); font: 600 11px/18px ui-monospace, SFMono-Regular, Menlo, monospace; text-align: center;
+  flex: none; min-width: 18px; height: 18px; padding: 0 5px; box-sizing: border-box; border-radius: var(--ui-r-xs);
+  background: var(--ui-seal); color: var(--ui-paper); font: 600 11px/18px var(--ui-num); font-variant-numeric: tabular-nums;
+  letter-spacing: 0; text-align: center;
 }
 .chat-dock[data-open="1"] .chat-bubble { opacity: 0; pointer-events: none; transform: translateY(6px); }
 
-/* --- 展开：面板 ------------------------------------------------------------------------------ */
+/* --- 展开：墨青纸面 + 内衬印框 ----------------------------------------------------------------- */
+/* 印框是面板自己的 outline（往里缩 --ui-frame）；面板留 8px 内距，标题、列表滚动条、输入区都收在印框以内 */
 .chat-panel {
   position: fixed; z-index: 7;
   left: calc(12px + env(safe-area-inset-left));
   bottom: calc(48px + env(safe-area-inset-bottom));
   display: flex; flex-direction: column;
   width: min(340px, calc(100vw - 24px)); height: 300px; box-sizing: border-box;
-  border-radius: 16px; background: rgba(22, 37, 34, .88); border: 1px solid var(--ui-glass-line-soft);
-  box-shadow: var(--ui-shadow-2); color: var(--ui-paper); font: 13px/1.45 var(--ui-serif);
+  padding: calc(var(--ui-frame) + 3px);
+  border-radius: var(--ui-r-lg); background: var(--ui-surface); border: 0;
+  outline: 1px solid var(--ui-frame-line); outline-offset: calc(-1px - var(--ui-frame));
+  color: var(--ui-text); font: 13px/1.45 var(--ui-serif);
   opacity: 0; transform: translateY(10px) scale(.98); transform-origin: left bottom; pointer-events: none; visibility: hidden;
   transition: opacity .18s var(--ui-ease), transform .18s var(--ui-ease), visibility 0s .18s;
 }
@@ -52,95 +72,121 @@
 /* 顶边拖手：调高度 */
 .chat-grip { position: absolute; left: 0; right: 0; top: -5px; height: 12px; cursor: ns-resize; touch-action: none; }
 .chat-grip::after {
-  content: ""; position: absolute; left: 50%; top: 9px; width: 36px; height: 3px; margin-left: -18px; border-radius: 2px;
-  background: rgba(244, 239, 226, .22); transition: background var(--ui-fast);
+  content: ""; position: absolute; left: 50%; top: 9px; width: 36px; height: 3px; margin-left: -18px; border-radius: var(--ui-r-xs);
+  background: var(--ui-line-strong); transition: background var(--ui-fast);
 }
 .chat-grip:hover::after, .chat-dock[data-dragging="height"] .chat-grip::after { background: var(--ui-jade-300); }
 
-.chat-head { display: flex; align-items: center; gap: 8px; padding: 12px 10px 8px 12px; cursor: grab; touch-action: none; border-bottom: 1px solid rgba(244, 239, 226, .1); }
+.chat-head { display: flex; align-items: center; gap: 8px; padding: 4px 2px 6px 4px; cursor: grab; touch-action: none; }
 .chat-dock[data-dragging="move"] .chat-head { cursor: grabbing; }
-.chat-tabs { display: flex; gap: 2px; padding: 2px; border-radius: var(--ui-r-pill); background: rgba(12, 20, 20, .32); }
+/* 方角分段签：一道线框住两枚签，选中是宣纸签 */
+.chat-tabs { display: flex; gap: 2px; padding: 2px; border-radius: var(--ui-r-sm); box-shadow: inset 0 0 0 1px var(--ui-line-strong); }
 .chat-tab {
-  position: relative; display: inline-flex; align-items: baseline; gap: 4px; height: 28px; padding: 0 14px; border: 0; border-radius: var(--ui-r-pill);
-  background: none; color: var(--ui-paper-dim); font: 500 13px/28px var(--ui-serif); letter-spacing: .12em; cursor: pointer;
+  position: relative; display: inline-flex; align-items: baseline; gap: 4px; height: 28px; padding: 0 12px; border: 0; border-radius: var(--ui-r-xs);
+  background: none; color: var(--ui-text-2); font: 500 13px/28px var(--ui-serif); letter-spacing: var(--ui-track); cursor: pointer;
+  -webkit-tap-highlight-color: transparent; touch-action: manipulation;
   transition: background var(--ui-fast), color var(--ui-fast);
 }
-.chat-tab small { font: 10px/1 ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing: 0; opacity: .7; }
-.chat-tab:hover { color: var(--ui-paper); }
-.chat-tab[aria-selected="true"] { background: rgba(244, 239, 226, .14); color: var(--ui-paper); box-shadow: inset 0 0 0 1px rgba(244, 239, 226, .16); }
-.chat-tab[data-ch="near"][aria-selected="true"] { color: var(--chat-near); }
-.chat-tab[data-ch="world"][aria-selected="true"] { color: var(--chat-world); }
-.chat-tab:focus-visible { outline: 2px solid var(--ui-jade-300); outline-offset: 1px; }
+.chat-tab small { font: 10px/1 var(--ui-num); letter-spacing: 0; opacity: .7; }
+.chat-tab:hover { color: var(--ui-text); background: var(--ui-fill); }
+.chat-tab[aria-selected="true"] { background: var(--ui-paper); color: var(--ui-ink); }
+.chat-tab[aria-selected="true"]:hover { background: var(--ui-paper-hi); }
+.chat-tab[aria-selected="true"] small { opacity: 1; color: var(--ui-ink-soft); }
+.chat-tab:focus-visible { outline: var(--ui-focus-w) solid var(--ui-focus); outline-offset: 1px; }
+/* 别的频道有新消息：宣纸小签（等宽数字） */
 .chat-tab[data-unread]:not([data-unread=""])::after {
-  content: attr(data-unread); position: absolute; top: -4px; right: -2px; min-width: 15px; height: 15px; padding: 0 4px; box-sizing: border-box;
-  border-radius: 8px; background: var(--ui-seal); color: var(--ui-paper); font: 600 10px/15px ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing: 0;
+  content: attr(data-unread); position: absolute; top: -6px; right: -3px; min-width: 15px; height: 15px; padding: 0 4px; box-sizing: border-box;
+  border-radius: var(--ui-r-xs); background: var(--ui-paper); color: var(--ui-ink); box-shadow: inset 0 0 0 1px var(--ui-paper-line-strong);
+  font: 600 var(--ui-fs-key)/15px var(--ui-num); font-variant-numeric: tabular-nums; letter-spacing: 0; text-align: center;
 }
+.chat-tab[aria-selected="true"][data-unread]:not([data-unread=""])::after { background: var(--ui-ink); color: var(--ui-paper); box-shadow: none; }
+/* 收起：卷帘小像方形键（字「–」留在 DOM，aria-label 不变） */
 .chat-fold {
-  margin-left: auto; flex: none; width: 28px; height: 28px; padding: 0; border-radius: 50%; cursor: pointer;
-  border: 1px solid var(--ui-glass-line-soft); background: rgba(244, 239, 226, .08); color: var(--ui-paper-dim); font: 400 18px/1 var(--ui-serif);
-  transition: background var(--ui-fast), color var(--ui-fast);
+  position: relative; margin-left: auto; flex: none; display: grid; place-items: center; width: 32px; height: 32px; padding: 0;
+  border: 1px solid var(--ui-line-strong); border-radius: var(--ui-r-sm); background: none; color: var(--ui-text-2); font-size: 0; cursor: pointer;
+  -webkit-tap-highlight-color: transparent; touch-action: manipulation;
+  transition: background var(--ui-fast), color var(--ui-fast), border-color var(--ui-fast), transform var(--ui-fast);
 }
-.chat-fold:hover { background: rgba(244, 239, 226, .16); color: var(--ui-paper); }
+.chat-fold::after {
+  content: ""; width: var(--ui-ico); height: var(--ui-ico); background: currentColor;
+  -webkit-mask: url("./ico-fold.svg") center/contain no-repeat; mask: url("./ico-fold.svg") center/contain no-repeat;
+}
+.chat-fold:hover { background: var(--ui-fill); color: var(--ui-text); border-color: var(--ui-line-hover); }
+.chat-fold:active { transform: scale(var(--ui-press)); transition-duration: var(--ui-press-t); transition-timing-function: var(--ui-ease-press); }
+.chat-fold:focus-visible { outline: var(--ui-focus-w) solid var(--ui-focus); outline-offset: 2px; }
 
 /* 消息列表 */
 .chat-list {
-  flex: 1; min-height: 0; margin: 0; padding: 6px 8px 6px 12px; list-style: none; overflow-y: auto; overscroll-behavior: contain;
-  scrollbar-width: thin; scrollbar-color: rgba(244, 239, 226, .25) transparent;
+  flex: 1; min-height: 0; margin: 0; padding: 4px 2px 4px 4px; list-style: none; overflow-y: auto; overscroll-behavior: contain;
+  scrollbar-width: thin; scrollbar-color: var(--ui-line-strong) transparent;
 }
-.chat-msg { padding: 5px 4px 6px; border-radius: 8px; }
+.chat-msg { padding: 5px 4px 6px; border-radius: var(--ui-r-sm); }
 .chat-msg + .chat-msg { margin-top: 1px; }
 .chat-msg-head { display: flex; align-items: center; gap: 6px; min-width: 0; }
-.chat-msg-head b { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; font-size: 12.5px; letter-spacing: .04em; color: rgba(244, 239, 226, .86); }
-.chat-msg-head time { margin-left: auto; flex: none; font: 10.5px/1 ui-monospace, SFMono-Regular, Menlo, monospace; color: rgba(244, 239, 226, .42); }
-.chat-msg p { margin: 2px 0 0; color: var(--ui-paper); font-size: 13.5px; line-height: 1.5; white-space: pre-wrap; overflow-wrap: anywhere; }
+.chat-msg-head b { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; font-size: 12.5px; letter-spacing: var(--ui-track-body); color: var(--ui-text); }
+.chat-msg-head time { margin-left: auto; flex: none; font: 10.5px/1 var(--ui-num); font-variant-numeric: tabular-nums; color: var(--ui-text-3); }
+.chat-msg p { margin: 2px 0 0; color: var(--ui-text); font-size: 13.5px; line-height: 1.5; white-space: pre-wrap; overflow-wrap: anywhere; }
 .chat-msg[data-self] .chat-msg-head b { color: var(--ui-jade-300); }
 .chat-msg[data-self] .chat-msg-head b::after { content: "（我）"; font-weight: 400; font-size: 11px; opacity: .7; }
 .chat-msg[data-sys] { margin: 4px 0; padding: 7px 9px 8px; background: var(--ui-seal-wash); box-shadow: inset 2px 0 0 var(--ui-seal-light); }
-.chat-msg[data-sys] .chat-msg-head b { color: #f3c2b1; }
-.chat-msg[data-sys] p { color: #fbe9e1; }
-.chat-msg[data-sys="mute"] { background: rgba(226, 184, 120, .12); box-shadow: inset 2px 0 0 var(--ui-warn); }
+.chat-msg[data-sys] .chat-msg-head b { color: var(--ui-error); }
+.chat-msg[data-sys] p { color: var(--ui-text); }
+.chat-msg[data-sys="mute"] { background: var(--ui-ochre-wash); box-shadow: inset 2px 0 0 var(--ui-warn); }
 
 .chat-tag {
-  display: inline-block; flex: none; padding: 1px 5px; border-radius: 4px; font: 500 10px/1.4 var(--ui-serif); letter-spacing: .08em; vertical-align: 1px;
-  color: var(--chat-world); background: rgba(226, 184, 120, .14); box-shadow: inset 0 0 0 1px rgba(226, 184, 120, .3);
+  display: inline-block; flex: none; padding: 1px 5px; border-radius: var(--ui-r-xs); font: 500 10px/1.4 var(--ui-serif); letter-spacing: .08em; vertical-align: 1px;
+  color: var(--chat-world); background: color-mix(in srgb, var(--chat-world) 14%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--chat-world) 30%, transparent);
 }
-.chat-tag[data-ch="near"] { color: var(--chat-near); background: rgba(143, 193, 181, .14); box-shadow: inset 0 0 0 1px rgba(143, 193, 181, .32); }
+.chat-tag[data-ch="near"] {
+  color: var(--chat-near); background: color-mix(in srgb, var(--chat-near) 14%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--chat-near) 32%, transparent);
+}
 .chat-msg[data-sys] .chat-tag, .chat-bubble[data-ch="sys"] .chat-tag { color: var(--ui-paper); background: var(--ui-seal); box-shadow: none; }
-.chat-empty { padding: 18px 8px; color: rgba(244, 239, 226, .55); font-size: 12.5px; text-align: center; letter-spacing: .04em; }
+.chat-empty { padding: 18px 8px; color: var(--ui-text-3); font-size: var(--ui-fs-xs); text-align: center; letter-spacing: var(--ui-track-body); }
 
+/* 跳到最新：宣纸小签 */
 .chat-more {
-  position: absolute; left: 50%; bottom: 96px; transform: translateX(-50%); height: 24px; padding: 0 12px; border: 0; border-radius: var(--ui-r-pill);
-  background: var(--ui-jade-500); color: var(--ui-paper); font: 12px/24px var(--ui-serif); letter-spacing: .06em; cursor: pointer; box-shadow: var(--ui-shadow-1);
+  position: absolute; left: 50%; bottom: 96px; transform: translateX(-50%); height: 24px; padding: 0 10px; border: 0; border-radius: var(--ui-r-xs);
+  background: var(--ui-paper); color: var(--ui-ink); font: 500 12px/24px var(--ui-serif); letter-spacing: var(--ui-track-body); cursor: pointer;
 }
-.chat-more:hover { background: var(--ui-jade-700); }
+.chat-more:hover { background: var(--ui-paper-hi); }
+.chat-more:focus-visible { outline: var(--ui-focus-w) solid var(--ui-focus); outline-offset: 2px; }
 
 /* 输入区 */
-.chat-foot { padding: 8px 10px 8px 12px; border-top: 1px solid rgba(244, 239, 226, .1); }
-.chat-notice, .chat-mute { margin: 0 0 6px; padding: 5px 9px; border-radius: 8px; font-size: 12px; line-height: 1.4; letter-spacing: .03em; }
-.chat-notice { background: rgba(240, 185, 166, .14); color: var(--ui-error); }
-.chat-notice[data-tone="ok"] { background: rgba(143, 193, 181, .14); color: var(--ui-jade-300); }
-.chat-mute { background: rgba(169, 80, 60, .22); color: #f3c2b1; }
-.chat-mute::before { content: "禁"; display: inline-grid; place-items: center; width: 16px; height: 16px; margin-right: 6px; border-radius: 3px; background: var(--ui-seal); color: var(--ui-paper); font-size: 10px; vertical-align: -2px; }
+.chat-foot { padding: 6px 2px 0 4px; }
+.chat-notice, .chat-mute { margin: 0 0 6px; padding: 5px 9px; border-radius: var(--ui-r-sm); font-size: var(--ui-fs-xs); line-height: 1.4; letter-spacing: var(--ui-track-body); }
+.chat-notice { background: color-mix(in srgb, var(--ui-error) 14%, transparent); color: var(--ui-error); }
+.chat-notice[data-tone="ok"] { background: color-mix(in srgb, var(--ui-jade-300) 14%, transparent); color: var(--ui-jade-300); }
+.chat-mute { background: color-mix(in srgb, var(--ui-seal) 22%, transparent); color: var(--ui-error); }
+.chat-mute::before { content: "禁"; display: inline-grid; place-items: center; width: 16px; height: 16px; margin-right: 6px; border-radius: var(--ui-r-xs); background: var(--ui-seal); color: var(--ui-paper); font-size: 10px; vertical-align: -2px; }
 .chat-compose { display: flex; align-items: flex-end; gap: 8px; }
 .chat-input {
   flex: 1; min-width: 0; height: 34px; max-height: 78px; box-sizing: border-box; margin: 0; padding: 7px 10px; resize: none;
-  border: 1px solid transparent; border-radius: var(--ui-r-sm); background: var(--ui-paper); color: var(--ui-ink-800);
-  font: 14px/1.4 var(--ui-serif); transition: border-color var(--ui-fast), box-shadow var(--ui-fast), background var(--ui-fast);
+  border: 1px solid transparent; border-radius: var(--ui-r-sm); background: var(--ui-paper); color: var(--ui-ink);
+  font: 14px/1.4 var(--ui-serif); transition: border-color var(--ui-fast), background var(--ui-fast);
 }
-.chat-input:focus { outline: none; border-color: var(--ui-jade-300); box-shadow: 0 0 0 3px rgba(143, 193, 181, .28); }
-.chat-input::placeholder { color: #8a8f86; }
-.chat-input:disabled { background: rgba(244, 239, 226, .14); color: var(--ui-disabled); cursor: not-allowed; }
-.chat-input:disabled::placeholder { color: rgba(244, 239, 226, .45); }
+.chat-input:focus { outline: var(--ui-focus-w) solid var(--ui-focus); outline-offset: 1px; }
+.chat-input::placeholder { color: var(--ui-ink-3); }
+.chat-input:disabled { background: var(--ui-fill-2); color: var(--ui-disabled); cursor: not-allowed; }
+.chat-input:disabled::placeholder { color: var(--ui-text-3); }
+/* 发送：残边朱印，焦点环收进印内；发不了时退成淡线框 */
 .chat-send {
-  flex: none; height: 34px; padding: 0 14px; border: 1px solid var(--ui-seal); border-radius: var(--ui-r-pill); cursor: pointer;
-  background: var(--ui-seal); color: var(--ui-paper); font: 500 13px/1 var(--ui-serif); letter-spacing: .12em;
-  box-shadow: 0 4px 12px rgba(169, 80, 60, .3); transition: background var(--ui-fast), transform var(--ui-fast);
+  flex: none; height: 34px; padding: 0 16px; border: 0; border-radius: 0; cursor: pointer;
+  background: var(--ui-seal); color: var(--ui-paper); font: 600 13px/1 var(--ui-serif); letter-spacing: var(--ui-track);
+  -webkit-mask: var(--ui-mask-bar) center/100% 100% no-repeat; mask: var(--ui-mask-bar) center/100% 100% no-repeat;
+  -webkit-tap-highlight-color: transparent; touch-action: manipulation;
+  transition: background var(--ui-fast), transform var(--ui-fast) var(--ui-ease);
 }
 .chat-send:hover { background: var(--ui-seal-hi); }
-.chat-send:active { transform: scale(.96); }
-.chat-send:disabled { cursor: default; background: rgba(24, 40, 37, .4); border-color: var(--ui-glass-line-soft); color: var(--ui-disabled); box-shadow: none; transform: none; }
-.chat-meta { display: flex; justify-content: space-between; margin-top: 5px; font-size: 10.5px; color: rgba(244, 239, 226, .42); letter-spacing: .04em; }
-.chat-count { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+.chat-send:active { background: var(--ui-seal); transform: scale(var(--ui-press-seal)); transition-duration: var(--ui-press-t); transition-timing-function: var(--ui-ease-press); }
+.chat-send:focus-visible { outline: 1.5px solid var(--ui-paper); outline-offset: -5px; }
+.chat-send:disabled {
+  cursor: default; background: none; color: var(--ui-disabled); border-radius: var(--ui-r-sm); box-shadow: inset 0 0 0 1px var(--ui-line);
+  -webkit-mask: none; mask: none; transform: none;
+}
+.chat-meta { display: flex; justify-content: flex-end; margin-top: 4px; font: 10.5px/1 var(--ui-num); color: var(--ui-text-3); letter-spacing: 0; }
+.chat-count { font-variant-numeric: tabular-nums; }
 .chat-count[data-over="1"] { color: var(--ui-error); }
 
 /* 和其他界面让位 */
@@ -152,11 +198,11 @@ body:has(.mp-roster:not([hidden])) .chat-dock { display: none; }
 @media (pointer: fine) and (max-width: 1100px) {
   .chat-bubble, .chat-panel { bottom: calc(84px + env(safe-area-inset-bottom)); }
 }
-/* 手机：左下是摇杆 → 气泡停在摇杆上方；面板展开时盖住摇杆（打字时本来也不走路） */
+/* 手机：左下是摇杆 → 气泡停在摇杆上方；面板展开时盖住摇杆（打字时本来也不走路）。
+   匾、页签、收起键都挂了 .ui-hit，可点区撑到 --ui-hit 见方，画面不变 */
 @media (pointer: coarse) and (not (any-pointer: fine)) {
-  .chat-bubble { bottom: calc(170px + env(safe-area-inset-bottom)); max-width: min(240px, 52vw); height: 32px; }
+  .chat-bubble { bottom: calc(170px + env(safe-area-inset-bottom)); max-width: min(240px, 52vw); height: 34px; }
   .chat-panel { bottom: calc(8px + env(safe-area-inset-bottom)); width: min(340px, 56vw); }
-  .chat-meta span:first-child { display: none; }
   .chat-input { font-size: 16px; }
 }
 @media (pointer: coarse) and (not (any-pointer: fine)) and (max-height: 500px) {

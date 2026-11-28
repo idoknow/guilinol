@@ -22,7 +22,6 @@ function build(): HTMLElement {
   root.hidden = true
   root.innerHTML = `<section class="gear-panel" role="dialog" aria-label="相机包">
       <header><h2>相机包</h2><button class="gear-close" aria-label="关闭">×</button></header>
-      <p class="gear-tip">选一台戴上，落地后点「拍照」就用它取景出片。</p>
       <div class="gear-list"></div>
     </section>`
   root.addEventListener('click', event => {

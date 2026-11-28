@@ -1,10 +1,99 @@
-/* Universal Shop / Wardrobe / Service Overlay (docs/style.md Phase 2 桂林街头 + docs/commerce-shops-spec.md §2.4).
- * Palette: asphalt black rgba(14,17,21,.82), osmanthus gold #ffc53d, Lijiang jade #20d6c1, alert red #ff3d4f.
- * Zero rice-paper / zero serif inside gameplay shop UI; tabular-nums for all prices/balances/specs.
+/* Universal Shop / Wardrobe / Service Overlay (docs/commerce-shops-spec.md §2.4).
+ * 两张皮共用一套结构，颜色、字体、圆角只走下面的 --shop-* 令牌：
+ *  - 默认「山水印」（docs/ui.md S2 / IDOK-542）：墨青纸面内衬印框抽屉、宣纸选中态、唯一主动作是残边朱印、
+ *    金额赭石 --ui-ochre、衬线 --ui-serif + 等宽数字 --ui-num；
+ *  - body[data-hud=street]（docs/style.md 第二期桂林街头）：柏油黑 + 桂花金 + 漓江青 + 警示红，原样保留。
+ * 两张皮都不用胶囊：舞台上的说明、试穿条、头盔开关一律方角签。价格 / 余额 / 参数一律等宽数字。
  */
 
 :root {
   --shop-sans: "PingFang SC", "HarmonyOS Sans SC", "Noto Sans CJK SC", "Source Han Sans SC", "Microsoft YaHei", system-ui, sans-serif;
+  --shop-font: var(--ui-serif);
+  --shop-num: var(--ui-num);
+  --shop-w-strong: 600;
+  --shop-w-mid: 500;
+  /* 面与字 */
+  --shop-bg: var(--ui-surface);
+  --shop-bg-card: var(--ui-fill);
+  --shop-bg-card-active: var(--ui-paper);
+  --shop-border: var(--ui-line-strong);
+  --shop-white: var(--ui-text);
+  --shop-dim: var(--ui-text-2);
+  --shop-gold: var(--ui-ochre);
+  --shop-jade: var(--ui-jade-300);
+  --shop-red: var(--ui-error);
+  --shop-ink: var(--ui-ink);
+  /* 抽屉：无外描边、无投影，分区不画线（印框见文末山水印段） */
+  --shop-edge: transparent;
+  --shop-shadow: none;
+  --shop-rule: transparent;
+  --shop-rule-soft: transparent;
+  --shop-rule-foot: transparent;
+  --shop-float: var(--ui-surface-float);
+  --shop-tab-bg: transparent;
+  --shop-opts-bg: transparent;
+  --shop-footer-bg: transparent;
+  /* 卡片与读数 */
+  --shop-card-line: var(--ui-line);
+  --shop-card-hover: var(--ui-line-hover);
+  --shop-card-on-line: var(--ui-paper);
+  --shop-swatch-line: var(--ui-line-hover);
+  --shop-track: var(--ui-line);
+  --shop-meter: var(--ui-jade-300);
+  /* 选中 / 开着：宣纸签 */
+  --shop-on-bg: var(--ui-paper);
+  --shop-on-line: var(--ui-paper);
+  --shop-on-fg: var(--ui-ink);
+  --shop-badge-bg: transparent;
+  --shop-badge-fg: var(--ui-text-2);
+  --shop-badge-line: var(--ui-line-strong);
+  --shop-banner-bg: var(--ui-paper);
+  --shop-banner-line: var(--ui-paper);
+  --shop-banner-fg: var(--ui-ink);
+  --shop-toggle-bg: transparent;
+  --shop-toggle-line: var(--ui-line-strong);
+  --shop-toggle-on-bg: var(--ui-paper);
+  --shop-toggle-on-line: var(--ui-paper);
+  --shop-toggle-on-fg: var(--ui-ink);
+  /* 状态行 */
+  --shop-msg-bg: var(--ui-surface-2);
+  --shop-msg-line: var(--ui-line-strong);
+  --shop-msg-fg: var(--ui-ok);
+  --shop-msg-warn-bg: var(--ui-seal-wash);
+  --shop-msg-warn-line: var(--ui-seal);
+  --shop-msg-warn-fg: var(--ui-error);
+  /* 按钮：版刻线框；主动作朱印（购买 / 穿戴 / 设为常用车） */
+  --shop-btn-bg: transparent;
+  --shop-btn-line: var(--ui-line-strong);
+  --shop-cta-bg: var(--ui-seal);
+  --shop-cta-line: var(--ui-seal);
+  --shop-cta-fg: var(--ui-paper);
+  --shop-equip-bg: var(--ui-seal);
+  --shop-equip-line: var(--ui-seal);
+  --shop-equip-fg: var(--ui-paper);
+  --shop-warn-bg: var(--ui-seal-wash);
+  --shop-warn-line: var(--ui-seal);
+  --shop-warn-fg: var(--ui-error);
+  --shop-sec-line: var(--ui-line-strong);
+  --shop-sec-fg: var(--ui-text);
+  /* 圆角 */
+  --shop-r-drawer: var(--ui-r-lg);
+  --shop-r-sheet: var(--ui-r-lg);
+  --shop-r-side: var(--ui-r-lg);
+  --shop-r-tag: var(--ui-r-xs);
+  --shop-r-badge: var(--ui-r-xs);
+  --shop-r-tab: var(--ui-r-xs);
+  --shop-r-card: var(--ui-r-md);
+  --shop-r-btn: var(--ui-r-ctl);
+  --shop-r-msg: var(--ui-r-xs);
+}
+
+/* 街头皮：docs/style.md 第二期原配色，一项不改 */
+body[data-hud=street] {
+  --shop-font: var(--shop-sans);
+  --shop-num: var(--shop-sans);
+  --shop-w-strong: 800;
+  --shop-w-mid: 700;
   --shop-bg: rgba(14, 17, 21, 0.82);
   --shop-bg-card: rgba(255, 255, 255, 0.06);
   --shop-bg-card-active: rgba(32, 214, 193, 0.14);
@@ -15,6 +104,63 @@
   --shop-jade: #20d6c1;
   --shop-red: #ff3d4f;
   --shop-ink: #101318;
+  --shop-edge: var(--shop-border);
+  --shop-shadow: 0 20px 56px rgba(0, 0, 0, 0.52);
+  --shop-rule: rgba(255, 255, 255, 0.09);
+  --shop-rule-soft: rgba(255, 255, 255, 0.07);
+  --shop-rule-foot: rgba(255, 255, 255, 0.1);
+  --shop-float: rgba(14, 17, 21, 0.72);
+  --shop-tab-bg: rgba(255, 255, 255, 0.05);
+  --shop-opts-bg: rgba(255, 255, 255, 0.03);
+  --shop-footer-bg: rgba(10, 12, 16, 0.88);
+  --shop-card-line: rgba(255, 255, 255, 0.1);
+  --shop-card-hover: rgba(255, 255, 255, 0.28);
+  --shop-card-on-line: var(--shop-jade);
+  --shop-swatch-line: rgba(255, 255, 255, 0.45);
+  --shop-track: rgba(255, 255, 255, 0.14);
+  --shop-meter: var(--shop-jade);
+  --shop-on-bg: var(--shop-jade);
+  --shop-on-line: var(--shop-jade);
+  --shop-on-fg: var(--shop-ink);
+  --shop-badge-bg: var(--shop-jade);
+  --shop-badge-fg: var(--shop-ink);
+  --shop-badge-line: transparent;
+  --shop-banner-bg: rgba(14, 17, 21, 0.8);
+  --shop-banner-line: rgba(32, 214, 193, 0.55);
+  --shop-banner-fg: var(--shop-jade);
+  --shop-toggle-bg: rgba(255, 255, 255, 0.08);
+  --shop-toggle-line: rgba(255, 255, 255, 0.22);
+  --shop-toggle-on-bg: rgba(32, 214, 193, 0.2);
+  --shop-toggle-on-line: rgba(32, 214, 193, 0.6);
+  --shop-toggle-on-fg: var(--shop-jade);
+  --shop-msg-bg: rgba(32, 214, 193, 0.14);
+  --shop-msg-line: rgba(32, 214, 193, 0.4);
+  --shop-msg-fg: var(--shop-jade);
+  --shop-msg-warn-bg: rgba(255, 61, 79, 0.16);
+  --shop-msg-warn-line: rgba(255, 61, 79, 0.5);
+  --shop-msg-warn-fg: #ff8c96;
+  --shop-btn-bg: rgba(255, 255, 255, 0.08);
+  --shop-btn-line: rgba(255, 255, 255, 0.18);
+  --shop-cta-bg: var(--shop-gold);
+  --shop-cta-line: var(--shop-gold);
+  --shop-cta-fg: var(--shop-ink);
+  --shop-equip-bg: var(--shop-jade);
+  --shop-equip-line: var(--shop-jade);
+  --shop-equip-fg: var(--shop-ink);
+  --shop-warn-bg: rgba(255, 61, 79, 0.22);
+  --shop-warn-line: var(--shop-red);
+  --shop-warn-fg: #ffb3ba;
+  --shop-sec-line: rgba(32, 214, 193, 0.5);
+  --shop-sec-fg: var(--shop-jade);
+  --shop-r-drawer: 18px;
+  --shop-r-sheet: 20px;
+  --shop-r-side: 16px;
+  --shop-r-tag: 6px;
+  --shop-r-badge: 5px;
+  --shop-r-tab: 10px;
+  --shop-r-card: 12px;
+  --shop-r-btn: 11px;
+  --shop-r-msg: 9px;
 }
 
 /* Hide competing HUD layers whenever a shop/wardrobe/garage overlay is active to guarantee zero overlap. */
@@ -27,6 +173,7 @@ body[data-shop-open="1"] :is(
   .hud-me,
   .render-entry,
   .render-pop,
+  .keys-card,
   .hint,
   .st-hud,
   .minimap,
@@ -44,7 +191,7 @@ body[data-shop-open="1"] :is(
   z-index: 24;
   display: none;
   pointer-events: none;
-  font-family: var(--shop-sans);
+  font-family: var(--shop-font);
   color: var(--shop-white);
   user-select: none;
   -webkit-user-select: none;
@@ -89,29 +236,31 @@ body[data-shop-open="1"] :is(
   pointer-events: none;
 }
 
+/* 舞台说明：方角签（不再是胶囊） */
 .shop-orbit-pill {
   display: inline-flex;
   align-items: center;
   gap: 6px;
   padding: 6px 12px;
-  border-radius: 999px;
-  background: rgba(14, 17, 21, 0.72);
+  border-radius: var(--shop-r-tag);
+  background: var(--shop-float);
   border: 1px solid var(--shop-border);
   font-size: 12px;
-  font-weight: 700;
+  font-weight: var(--shop-w-mid);
   color: var(--shop-dim);
 }
 
+/* 试穿中：宣纸签（街头皮仍是青边黑底） */
 .shop-preview-banner {
   align-self: center;
   pointer-events: none;
   padding: 6px 14px;
-  border-radius: 999px;
-  background: rgba(14, 17, 21, 0.8);
-  border: 1px solid rgba(32, 214, 193, 0.55);
-  color: var(--shop-jade);
+  border-radius: var(--shop-r-tag);
+  background: var(--shop-banner-bg);
+  border: 1px solid var(--shop-banner-line);
+  color: var(--shop-banner-fg);
   font-size: 12.5px;
-  font-weight: 700;
+  font-weight: var(--shop-w-mid);
   letter-spacing: 0.03em;
 }
 
@@ -129,10 +278,10 @@ body[data-shop-open="1"] :is(
   pointer-events: auto;
   display: flex;
   flex-direction: column;
-  border-radius: 18px;
+  border-radius: var(--shop-r-drawer);
   background: var(--shop-bg);
-  border: 1px solid var(--shop-border);
-  box-shadow: 0 20px 56px rgba(0, 0, 0, 0.52);
+  border: 1px solid var(--shop-edge);
+  box-shadow: var(--shop-shadow);
   overflow: hidden;
 }
 
@@ -143,7 +292,7 @@ body[data-shop-open="1"] :is(
   justify-content: space-between;
   gap: 10px;
   padding: 14px 16px 10px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.09);
+  border-bottom: 1px solid var(--shop-rule);
 }
 
 .shop-title-wrap {
@@ -157,18 +306,19 @@ body[data-shop-open="1"] :is(
   display: inline-block;
   width: fit-content;
   font-size: 10.5px;
-  font-weight: 800;
+  font-weight: var(--shop-w-strong);
   letter-spacing: 0.08em;
-  color: var(--shop-ink);
-  background: var(--shop-jade);
-  border-radius: 5px;
+  color: var(--shop-badge-fg);
+  background: var(--shop-badge-bg);
+  box-shadow: inset 0 0 0 1px var(--shop-badge-line);
+  border-radius: var(--shop-r-badge);
   padding: 2px 6px;
 }
 
 .shop-title {
   margin: 0;
   font-size: 17px;
-  font-weight: 800;
+  font-weight: var(--shop-w-strong);
   letter-spacing: 0.02em;
   white-space: nowrap;
   overflow: hidden;
@@ -190,8 +340,9 @@ body[data-shop-open="1"] :is(
 }
 
 .shop-wallet-val {
+  font-family: var(--shop-num);
   font-size: 22px;
-  font-weight: 800;
+  font-weight: var(--shop-w-strong);
   line-height: 1.05;
   color: var(--shop-gold);
   font-variant-numeric: tabular-nums;
@@ -200,11 +351,11 @@ body[data-shop-open="1"] :is(
 .shop-tabs {
   flex: none;
   display: flex;
-  gap: 6px;
-  padding: 10px 14px 8px;
+  gap: 4px;
+  padding: 8px 14px;
   overflow-x: auto;
   scrollbar-width: none;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+  border-bottom: 1px solid var(--shop-rule-soft);
 }
 
 .shop-tabs::-webkit-scrollbar {
@@ -214,12 +365,13 @@ body[data-shop-open="1"] :is(
 .shop-tab {
   flex: none;
   min-height: 34px;
-  padding: 6px 12px;
-  border-radius: 10px;
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  background: rgba(255, 255, 255, 0.05);
+  min-width: 34px;
+  padding: 6px 8.5px;
+  border-radius: var(--shop-r-tab);
+  border: 1px solid var(--shop-border);
+  background: var(--shop-tab-bg);
   color: var(--shop-dim);
-  font: 700 12.5px/1 var(--shop-sans);
+  font: var(--shop-w-mid) 12px/1 var(--shop-font);
   cursor: pointer;
   touch-action: manipulation;
   -webkit-tap-highlight-color: transparent;
@@ -227,9 +379,9 @@ body[data-shop-open="1"] :is(
 }
 
 .shop-tab.on {
-  background: var(--shop-jade);
-  border-color: var(--shop-jade);
-  color: var(--shop-ink);
+  background: var(--shop-on-bg);
+  border-color: var(--shop-on-line);
+  color: var(--shop-on-fg);
 }
 
 .shop-wardrobe-opts {
@@ -239,8 +391,8 @@ body[data-shop-open="1"] :is(
   justify-content: space-between;
   gap: 8px;
   padding: 7px 14px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
-  background: rgba(255, 255, 255, 0.03);
+  border-bottom: 1px solid var(--shop-rule-soft);
+  background: var(--shop-opts-bg);
 }
 
 .shop-wardrobe-opts[hidden] {
@@ -248,6 +400,8 @@ body[data-shop-open="1"] :is(
 }
 
 .shop-wardrobe-summary {
+  flex: 1 1 auto;
+  min-width: 0;
   font-size: 11.5px;
   color: var(--shop-dim);
   white-space: nowrap;
@@ -255,42 +409,46 @@ body[data-shop-open="1"] :is(
   text-overflow: ellipsis;
 }
 
+/* 修改外形 / 骑行自动头盔：方角版刻键，开着是宣纸签 */
+.shop-edit-character,
 .shop-helmet-toggle {
   flex: none;
-  min-height: 28px;
+  min-height: 34px;
   padding: 4px 10px;
-  border-radius: 999px;
-  border: 1px solid rgba(255, 255, 255, 0.22);
-  background: rgba(255, 255, 255, 0.08);
-  color: var(--shop-text);
-  font-size: 11.5px;
-  font-weight: 700;
+  border-radius: var(--shop-r-tag);
+  border: 1px solid var(--shop-toggle-line);
+  background: var(--shop-toggle-bg);
+  color: var(--shop-white);
+  font: var(--shop-w-mid) 11.5px/1 var(--shop-font);
   cursor: pointer;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  transition: background 0.14s, color 0.14s, border-color 0.14s;
 }
 
 .shop-helmet-toggle.on {
-  background: rgba(32, 214, 193, 0.2);
-  border-color: rgba(32, 214, 193, 0.6);
-  color: var(--shop-jade);
+  background: var(--shop-toggle-on-bg);
+  border-color: var(--shop-toggle-on-line);
+  color: var(--shop-toggle-on-fg);
 }
 
 .shop-status-msg {
   flex: none;
   margin: 8px 14px 0;
   padding: 7px 10px;
-  border-radius: 9px;
+  border-radius: var(--shop-r-msg);
   font-size: 12px;
-  font-weight: 700;
+  font-weight: var(--shop-w-mid);
   line-height: 1.35;
-  background: rgba(32, 214, 193, 0.14);
-  border: 1px solid rgba(32, 214, 193, 0.4);
-  color: var(--shop-jade);
+  background: var(--shop-msg-bg);
+  border: 1px solid var(--shop-msg-line);
+  color: var(--shop-msg-fg);
 }
 
 .shop-status-msg[data-tone="warn"] {
-  background: rgba(255, 61, 79, 0.16);
-  border-color: rgba(255, 61, 79, 0.5);
-  color: #ff8c96;
+  background: var(--shop-msg-warn-bg);
+  border-color: var(--shop-msg-warn-line);
+  color: var(--shop-msg-warn-fg);
 }
 
 .shop-status-msg[hidden] {
@@ -314,10 +472,11 @@ body[data-shop-open="1"] :is(
   flex-direction: column;
   gap: 6px;
   padding: 10px 12px;
-  border-radius: 12px;
+  border-radius: var(--shop-r-card);
   background: var(--shop-bg-card);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  border: 1px solid var(--shop-card-line);
   color: var(--shop-white);
+  font-family: var(--shop-font);
   text-align: left;
   cursor: pointer;
   touch-action: manipulation;
@@ -326,12 +485,12 @@ body[data-shop-open="1"] :is(
 }
 
 .shop-card:hover {
-  border-color: rgba(255, 255, 255, 0.28);
+  border-color: var(--shop-card-hover);
 }
 
 .shop-card.selected {
   background: var(--shop-bg-card-active);
-  border-color: var(--shop-jade);
+  border-color: var(--shop-card-on-line);
 }
 
 .shop-card-top {
@@ -353,12 +512,12 @@ body[data-shop-open="1"] :is(
   width: 14px;
   height: 14px;
   border-radius: 4px;
-  border: 1px solid rgba(255, 255, 255, 0.45);
+  border: 1px solid var(--shop-swatch-line);
 }
 
 .shop-card-name {
   font-size: 14px;
-  font-weight: 800;
+  font-weight: var(--shop-w-strong);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -366,8 +525,9 @@ body[data-shop-open="1"] :is(
 
 .shop-card-price {
   flex: none;
+  font-family: var(--shop-num);
   font-size: 14px;
-  font-weight: 800;
+  font-weight: var(--shop-w-strong);
   font-variant-numeric: tabular-nums;
   color: var(--shop-gold);
 }
@@ -407,14 +567,14 @@ body[data-shop-open="1"] :is(
 .shop-spec-bar {
   height: 4px;
   border-radius: 2px;
-  background: rgba(255, 255, 255, 0.14);
+  background: var(--shop-track);
   overflow: hidden;
 }
 
 .shop-spec-bar i {
   display: block;
   height: 100%;
-  background: var(--shop-jade);
+  background: var(--shop-meter);
   border-radius: 2px;
 }
 
@@ -424,18 +584,18 @@ body[data-shop-open="1"] :is(
   align-items: center;
   gap: 8px;
   padding: 12px 14px calc(12px + env(safe-area-inset-bottom));
-  border-top: 1px solid rgba(255, 255, 255, 0.1);
-  background: rgba(10, 12, 16, 0.88);
+  border-top: 1px solid var(--shop-rule-foot);
+  background: var(--shop-footer-bg);
 }
 
 .shop-btn {
   min-height: 44px;
   padding: 0 14px;
-  border-radius: 11px;
-  border: 1px solid rgba(255, 255, 255, 0.18);
-  background: rgba(255, 255, 255, 0.08);
+  border-radius: var(--shop-r-btn);
+  border: 1px solid var(--shop-btn-line);
+  background: var(--shop-btn-bg);
   color: var(--shop-white);
-  font: 800 13.5px/1 var(--shop-sans);
+  font: var(--shop-w-strong) 13.5px/1 var(--shop-font);
   font-variant-numeric: tabular-nums;
   cursor: pointer;
   touch-action: manipulation;
@@ -454,29 +614,29 @@ body[data-shop-open="1"] :is(
 
 .shop-btn--primary {
   flex: 1 1 auto;
-  background: var(--shop-gold);
-  border-color: var(--shop-gold);
-  color: var(--shop-ink);
+  background: var(--shop-cta-bg);
+  border-color: var(--shop-cta-line);
+  color: var(--shop-cta-fg);
 }
 
 .shop-btn--equip {
   flex: 1 1 auto;
-  background: var(--shop-jade);
-  border-color: var(--shop-jade);
-  color: var(--shop-ink);
+  background: var(--shop-equip-bg);
+  border-color: var(--shop-equip-line);
+  color: var(--shop-equip-fg);
 }
 
 .shop-btn--warn {
   flex: 1 1 auto;
-  background: rgba(255, 61, 79, 0.22);
-  border-color: var(--shop-red);
-  color: #ffb3ba;
+  background: var(--shop-warn-bg);
+  border-color: var(--shop-warn-line);
+  color: var(--shop-warn-fg);
 }
 
 .shop-btn--secondary {
   flex: none;
-  border-color: rgba(32, 214, 193, 0.5);
-  color: var(--shop-jade);
+  border-color: var(--shop-sec-line);
+  color: var(--shop-sec-fg);
 }
 
 .shop-btn--close {
@@ -484,7 +644,135 @@ body[data-shop-open="1"] :is(
   min-width: 72px;
 }
 
-/* Mobile Portrait (e.g. 390x844): top 44% 3D preview stage, bottom 56% rounded drawer, >=44x44px touch targets */
+/* ---------- 山水印（默认皮）：印框、朱印、宣纸选中。街头皮不吃这一段 ---------- */
+
+/* 抽屉内衬印框：往里缩 --ui-frame 的一道实色线，不加外描边和投影 */
+body:not([data-hud=street]) .shop-drawer::after {
+  content: "";
+  position: absolute;
+  inset: var(--ui-frame);
+  border: 1px solid var(--ui-frame-line);
+  border-radius: var(--ui-r-sm);
+  pointer-events: none;
+}
+
+/* 列表滚动条收进印框以内（卡片位置不变：外距 + 内距 = 原 14px） */
+body:not([data-hud=street]) .shop-list {
+  margin-inline: calc(var(--ui-frame) + 1px);
+  padding-inline: calc(14px - var(--ui-frame) - 1px);
+  scrollbar-width: thin;
+  scrollbar-color: var(--ui-line-strong) transparent;
+}
+
+body:not([data-hud=street]) :is(.shop-title, .shop-tab, .shop-btn, .shop-edit-character, .shop-helmet-toggle) {
+  letter-spacing: var(--ui-track-body);
+}
+
+body:not([data-hud=street]) .shop-title {
+  letter-spacing: var(--ui-track);
+}
+
+body:not([data-hud=street]) :is(.shop-badge, .shop-wallet small, .shop-wardrobe-summary) {
+  font-size: var(--ui-fs-xs);
+}
+
+/* 悬停 / 焦点 */
+body:not([data-hud=street]) .shop-tab:not(.on):hover,
+body:not([data-hud=street]) :is(.shop-edit-character, .shop-helmet-toggle:not(.on)):hover {
+  color: var(--ui-text);
+  background: var(--ui-fill);
+  border-color: var(--ui-line-hover);
+}
+
+body:not([data-hud=street]) :is(.shop-btn--secondary, .shop-btn--close):hover:not(:disabled) {
+  background: var(--ui-fill);
+  border-color: var(--ui-line-hover);
+}
+
+body:not([data-hud=street]) :is(.shop-tab, .shop-card, .shop-btn, .shop-edit-character, .shop-helmet-toggle):focus-visible {
+  outline: var(--ui-focus-w) solid var(--ui-focus);
+  outline-offset: 2px;
+}
+
+body:not([data-hud=street]) .shop-tabs .shop-tab:focus-visible {
+  outline-offset: -3px;
+}
+
+/* 唯一主动作：残边朱印（购买 / 立即穿戴 / 设为常用车），焦点环收进印内 */
+body:not([data-hud=street]) .shop-btn:is(.shop-btn--primary, .shop-btn--equip):not(:disabled) {
+  border-color: transparent;
+  letter-spacing: var(--ui-track);
+  -webkit-mask: var(--ui-mask-bar) center/100% 100% no-repeat;
+  mask: var(--ui-mask-bar) center/100% 100% no-repeat;
+  transition: background var(--ui-fast), transform var(--ui-fast) var(--ui-ease);
+}
+
+body:not([data-hud=street]) .shop-btn:is(.shop-btn--primary, .shop-btn--equip):not(:disabled):hover {
+  background: var(--ui-seal-hi);
+}
+
+body:not([data-hud=street]) .shop-btn:is(.shop-btn--primary, .shop-btn--equip):active:not(:disabled) {
+  background: var(--ui-seal);
+  transform: scale(var(--ui-press-seal));
+  transition-duration: var(--ui-press-t);
+  transition-timing-function: var(--ui-ease-press);
+}
+
+body:not([data-hud=street]) .shop-btn:is(.shop-btn--primary, .shop-btn--equip):focus-visible {
+  outline: 1.5px solid var(--ui-paper);
+  outline-offset: -5px;
+}
+
+/* 没得点：暂无可操作项 / 购买中 → 淡线框；正在穿戴 / 当前主力车 / 已装备 → 宣纸签（读的状态） */
+body:not([data-hud=street]) .shop-btn:disabled {
+  opacity: 1;
+  cursor: default;
+  color: var(--ui-disabled);
+  background: none;
+  border-color: var(--ui-line);
+}
+
+body:not([data-hud=street]) .shop-btn--equip:disabled {
+  color: var(--ui-ink);
+  background: var(--ui-paper);
+  border-color: var(--ui-paper);
+  border-radius: var(--ui-r-xs);
+}
+
+/* 选中卡是宣纸：卡内字、价、读数条随纸换墨 */
+body:not([data-hud=street]) .shop-card.selected {
+  color: var(--ui-ink);
+}
+
+body:not([data-hud=street]) .shop-card.selected :is(.shop-card-desc, .shop-spec) {
+  color: var(--ui-ink-soft);
+}
+
+body:not([data-hud=street]) .shop-card.selected .shop-card-price {
+  color: color-mix(in srgb, var(--ui-ochre) 52%, var(--ui-ink));
+}
+
+body:not([data-hud=street]) .shop-card.selected .shop-card-price.owned {
+  color: var(--ui-jade-700);
+}
+
+body:not([data-hud=street]) .shop-card.selected .shop-card-price.insufficient {
+  color: var(--ui-seal);
+}
+
+body:not([data-hud=street]) .shop-card.selected .shop-swatch {
+  border-color: var(--ui-paper-line-strong);
+}
+
+body:not([data-hud=street]) .shop-card.selected .shop-spec-bar {
+  background: var(--ui-paper-line);
+}
+
+body:not([data-hud=street]) .shop-card.selected .shop-spec-bar i {
+  background: var(--ui-jade-700);
+}
+
+/* Mobile Portrait (e.g. 390x844): top 44% 3D preview stage, bottom 56% drawer, >=44x44px touch targets */
 @media (max-width: 899px) and (min-height: 501px) {
   .shop-stage {
     left: 0;
@@ -502,7 +790,7 @@ body[data-shop-open="1"] :is(
     bottom: 0;
     width: auto;
     height: 56%;
-    border-radius: 20px 20px 0 0;
+    border-radius: var(--shop-r-sheet) var(--shop-r-sheet) 0 0;
     border-left: 0;
     border-right: 0;
     border-bottom: 0;
@@ -528,8 +816,9 @@ body[data-shop-open="1"] :is(
     padding: 6px 12px;
   }
 
+  .shop-edit-character,
   .shop-helmet-toggle {
-    min-height: 36px;
+    min-height: 44px;
   }
 
   .shop-tab {
@@ -570,7 +859,7 @@ body[data-shop-open="1"] :is(
     bottom: 0;
     left: auto;
     width: 44%;
-    border-radius: 16px 0 0 16px;
+    border-radius: var(--shop-r-side) 0 0 var(--shop-r-side);
     border-right: 0;
     border-top: 0;
     border-bottom: 0;
@@ -602,8 +891,9 @@ body[data-shop-open="1"] :is(
     padding: 5px 10px;
   }
 
+  .shop-edit-character,
   .shop-helmet-toggle {
-    min-height: 32px;
+    min-height: 40px;
     font-size: 11px;
   }
 
@@ -618,6 +908,10 @@ body[data-shop-open="1"] :is(
     padding: 8px 10px;
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 6px;
+  }
+
+  body:not([data-hud=street]) .shop-list {
+    padding-inline: calc(10px - var(--ui-frame) - 1px);
   }
 
   .shop-card {

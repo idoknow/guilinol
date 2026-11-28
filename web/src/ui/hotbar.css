@@ -1,4 +1,7 @@
-/* 物品栏（IDOK-238）：底部居中、青玉玻璃两格。选中格用朱砂描边——这是「手上拿着什么」的唯一提示。 */
+/* 物品栏（IDOK-238 → IDOK-542）：底部居中一排格子。每格一枚刻线小像（ico-*.svg 遮罩 + currentColor，按 data-slot / data-shop / data-act 选），
+   hotbar.ts 不再内联 SVG。默认 HUD 下整条是一块墨青匾（内衬印框，同 .hud-me / 时辰栏）：未选中格只露小像，
+   选中格（手上拿着的东西）翻成宣纸签、小像下写名字——这是「手上拿着什么」的唯一提示；香烟格进「丢弃」态时照常露字。
+   街头皮肤 body[data-hud=street] 不套匾，保持玻璃格 + 朱线选中。只换材质：条和格的盒子尺寸、定位都不动。 */
 .hotbar{position:fixed;left:50%;bottom:calc(12px + env(safe-area-inset-bottom));transform:translateX(-50%);z-index:4;display:flex;gap:6px;padding:5px;
   border-radius:var(--ui-r-md);background:var(--ui-glass-solid);border:1px solid var(--ui-glass-line-soft);
   box-shadow:var(--ui-shadow-1);user-select:none;-webkit-user-select:none;touch-action:manipulation}
@@ -6,13 +9,28 @@
 .hotbar-slot[hidden]{display:none}
 .hotbar-slot{position:relative;width:54px;height:50px;box-sizing:border-box;padding:6px 0 4px;margin:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;
   border-radius:var(--ui-r-sm);border:1px solid transparent;background:rgba(244,239,226,.06);color:var(--ui-paper-dim);font:11px/1 var(--ui-serif);letter-spacing:.08em;cursor:pointer;
-  transition:background var(--ui-fast) var(--ui-ease),border-color var(--ui-fast) var(--ui-ease),color var(--ui-fast) var(--ui-ease)}
-.hotbar-slot svg{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
-.hotbar-slot kbd{all:unset;position:absolute;left:5px;top:4px;font:600 9px/1 var(--ui-serif);color:rgba(244,239,226,.45)}
+  transition:background var(--ui-fast) var(--ui-ease),border-color var(--ui-fast) var(--ui-ease),color var(--ui-fast) var(--ui-ease),transform var(--ui-fast) var(--ui-ease)}
+.hotbar-slot::before{content:"";flex:none;width:var(--ui-ico-lg);height:var(--ui-ico-lg);background:currentColor;pointer-events:none;
+  -webkit-mask:var(--ico) center/contain no-repeat;mask:var(--ico) center/contain no-repeat}
+.hotbar-slot[data-slot=hand]{--ico:url("./ico-hand.svg")}.hotbar-slot[data-slot=camera]{--ico:url("./ico-camera.svg")}
+.hotbar-slot[data-slot=smoke]{--ico:url("./ico-smoke.svg")}.hotbar-slot[data-shop]{--ico:url("./ico-shop.svg")}
+.hotbar-slot[data-slot=fishing]{--ico:url("./ico-rod.svg")}.hotbar-slot[data-act=drone]{--ico:url("./ico-remote.svg")}
+.hotbar-slot kbd{all:unset;position:absolute;left:5px;top:4px;font:600 9px/1 var(--ui-num);color:rgba(244,239,226,.45)}
 .hotbar-slot:hover{background:rgba(244,239,226,.12);color:var(--ui-paper)}
 .hotbar-slot.on{background:rgba(169,80,60,.22);border-color:var(--ui-seal-light);color:var(--ui-paper)}
 .hotbar-slot.on kbd{color:var(--ui-paper-dim)}
 .hotbar-slot:focus-visible{outline:2px solid var(--ui-jade-300);outline-offset:1px}
+/* 默认 HUD：墨青匾 + 宣纸签。边框留 1px 透明，内边距 6px 给宣纸选中格四周留出与印框线的呼吸间隙 */
+body:not([data-hud=street]) .hotbar{padding:6px;border-color:transparent;border-radius:var(--ui-plaque-r);background:var(--ui-plaque);box-shadow:none}
+body:not([data-hud=street]) .hotbar::after{content:"";position:absolute;inset:calc(var(--ui-plaque-inset) - 1px);border:1px solid var(--ui-plaque-frame);border-radius:var(--ui-r-xs);pointer-events:none}
+body:not([data-hud=street]) .hotbar-slot{border-radius:var(--ui-r-xs);background:none;color:var(--ui-text-2)}
+body:not([data-hud=street]) .hotbar-slot:not(.on):not([data-discard=true])>span{display:none}
+body:not([data-hud=street]) .hotbar-slot:is(.on,[data-discard=true])::before{width:var(--ui-ico);height:var(--ui-ico)}
+body:not([data-hud=street]) .hotbar-slot:hover{background:var(--ui-wash-hover);color:var(--ui-text)}
+body:not([data-hud=street]) .hotbar-slot:active{background:var(--ui-wash-press);color:var(--ui-paper);transform:scale(var(--ui-press));transition-duration:var(--ui-press-t);transition-timing-function:var(--ui-ease-press)}
+body:not([data-hud=street]) .hotbar-slot.on{background:var(--ui-paper);border-color:transparent;color:var(--ui-ink)}
+body:not([data-hud=street]) .hotbar-slot.on kbd{color:var(--ui-ink-3)}
+body:not([data-hud=street]) .hotbar-slot:focus-visible{outline:var(--ui-focus-w) solid var(--ui-focus);outline-offset:-2px}
 /* 物品栏在时，把原本贴底的提示条往上让 */
 body[data-hotbar=on] .hint{bottom:calc(76px + env(safe-area-inset-bottom))}
 /* 抬起只对鼠标/触控板生效：触屏上 .vehicle-action 已由 walk.css 的 coarse 规则抬到摇杆之上
@@ -24,14 +42,15 @@ body[data-hotbar=on] .hint{bottom:calc(76px + env(safe-area-inset-bottom))}
   .hotbar-slot kbd{display:none}
   .hotbar-slot{width:50px;height:46px}
 }
-/* 香烟格角标：持有包数，朱砂小印；0 包时退成灰圈，提示该去香烟铺了 */
-.pack-count{position:absolute;right:3px;top:3px;min-width:13px;height:13px;padding:0 3px;box-sizing:border-box;border-radius:7px;
-  background:var(--ui-seal);color:var(--ui-paper);font:600 9px/13px var(--ui-serif);text-align:center;letter-spacing:0;box-shadow:0 0 0 1px rgba(20,33,30,.5)}
-.pack-count.empty{background:transparent;color:var(--ui-paper-dim);box-shadow:inset 0 0 0 1px rgba(244,239,226,.35)}
-/* 香烟铺入口：跟在香烟格右边，竖线隔开，表示「这是买东西的地方，不是手上拿的物品」 */
-.hotbar-shop{margin-left:5px;width:58px}
-.hotbar-shop::before{content:"";position:absolute;left:-6px;top:9px;bottom:9px;width:1px;background:var(--ui-glass-line-soft)}
-.hotbar-shop svg{stroke:var(--ui-jade-300)}
+/* 香烟格角标：持有包数，一枚宣纸小签（--ui-num 等宽数字，IDOK-542）；0 包时退成空心线框，提示该去香烟铺了 */
+.pack-count{position:absolute;right:4px;top:4px;min-width:13px;height:13px;padding:0 3px;box-sizing:border-box;border-radius:var(--ui-r-xs);
+  background:var(--ui-paper);color:var(--ui-ink);font:600 9px/13px var(--ui-num);font-variant-numeric:tabular-nums;text-align:center;letter-spacing:0;box-shadow:0 0 0 1px var(--ui-ink-900)}
+.pack-count.empty{background:transparent;color:var(--ui-text-2);box-shadow:inset 0 0 0 1px var(--ui-line-hover)}
+body:not([data-hud=street]) .hotbar-slot.on .pack-count.empty{color:var(--ui-ink-3);box-shadow:inset 0 0 0 1px var(--ui-paper-line-strong)}
+/* 香烟铺入口：淡竖线与手持格区隔，铺面小像用柔和纸色微染青玉，不跳脱 */
+.hotbar-shop{margin-left:7px;width:56px}
+.hotbar-shop::after{content:"";position:absolute;left:-7px;top:11px;bottom:11px;width:1px;background:var(--ui-line);pointer-events:none}
+.hotbar-shop::before{background:color-mix(in srgb,var(--ui-paper) 72%,var(--ui-jade-300))}
 .pack-stage{position:absolute;inset:0;display:grid;place-items:center;perspective:600px;pointer-events:none}
 .pack-stage[hidden]{display:none}
 .pack-preview{position:relative;width:96px;height:150px;transform-style:preserve-3d}

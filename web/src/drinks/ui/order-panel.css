@@ -110,12 +110,17 @@ body[data-drinks-ui-open="1"] > footer {
   gap: 6px;
   min-height: var(--dr-h);
   padding: 0 13px;
-  border-radius: 999px;
+  border-radius: var(--ui-r-sm, 4px);
+  box-shadow: inset 0 0 0 1px var(--ui-line-strong, rgba(244, 239, 226, 0.28));
   background: var(--dr-fill);
   color: var(--dr-text);
   white-space: nowrap;
   flex-shrink: 0;
-  transition: background-color 0.15s ease;
+  transition: background-color 0.15s ease, transform 0.09s ease;
+}
+
+.drinks-btn:active:not(:disabled) {
+  transform: scale(var(--ui-press, 0.97));
 }
 
 .drinks-btn:hover {
@@ -212,7 +217,8 @@ body[data-drinks-ui-open="1"] > footer {
 .drinks-tab {
   min-height: 30px;
   padding: 0 11px;
-  border-radius: 999px;
+  border-radius: var(--ui-r-xs, 2px);
+  box-shadow: inset 0 0 0 1px var(--ui-line, rgba(244, 239, 226, 0.16));
   background: var(--dr-fill);
   color: var(--dr-text-2);
   font-size: 12.5px;
@@ -374,7 +380,7 @@ body[data-drinks-ui-open="1"] > footer {
 
 .drinks-ticket-bar {
   height: 3px;
-  border-radius: 999px;
+  border-radius: 1px;
   background: var(--dr-line);
   overflow: hidden;
 }
@@ -409,7 +415,8 @@ body[data-drinks-ui-open="1"] > footer {
 .drinks-chip {
   min-height: 28px;
   padding: 0 10px;
-  border-radius: 999px;
+  border-radius: var(--ui-r-xs, 2px);
+  box-shadow: inset 0 0 0 1px var(--ui-line, rgba(244, 239, 226, 0.16));
   background: var(--dr-fill);
   color: var(--dr-text-2);
   font-size: 12px;
@@ -474,12 +481,15 @@ body[data-drinks-ui-open="1"] > footer {
   left: calc(12px + env(safe-area-inset-left));
   top: calc(144px + env(safe-area-inset-top));
   z-index: 12;
-  width: min(300px, calc(100vw - 32px));
+  width: min(286px, calc(100vw - 32px));
   max-height: calc(100dvh - 300px - env(safe-area-inset-top) - env(safe-area-inset-bottom));
   display: flex;
   flex-direction: column;
   gap: 8px;
-  padding: 10px 12px;
+  padding: 11px 13px;
+  border-radius: var(--ui-plaque-r, 4px);
+  outline: 1px solid var(--ui-plaque-frame, rgba(244, 239, 226, 0.3));
+  outline-offset: calc(-1px - var(--ui-plaque-inset, 3px));
   overflow: hidden;
 }
 
