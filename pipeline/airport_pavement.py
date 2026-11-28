@@ -63,7 +63,9 @@ def write_markings(output,bounds,ground):
     field,sources=pavement_sources(load_osm())
     if field is None or not bounds.intersects(field): return None
     vertices=defaultdict(list)
+    runways=unary_union([line.buffer(float(row['tags'].get('width',45))/2,cap_style='flat') for row,line in sources['runway']]).buffer(.002)
     def polygon(shape,color):
+        if color=='marking_yellow': shape=shape.difference(runways)
         for part in polygons(shape.intersection(bounds)):
             if part.area<.001: continue
             points,faces=trimesh.creation.triangulate_polygon(part,engine='earcut')
@@ -79,7 +81,22 @@ def write_markings(output,bounds,ground):
         if sources[kind]:
             for row,line in sources[kind]:
                 if not area(row).is_empty: continue
-                stroke(line,'marking_yellow')
+                width=float(row['tags'].get('width',23))
+                stroke(line.difference(runways),'marking_yellow')
+                crossings=line.intersection(runways.buffer(8).boundary)
+                if line.intersects(runways):
+                    for point in getattr(crossings,'geoms',[crossings]):
+                        if point.is_empty or point.geom_type!='Point': continue
+                        station=line.project(point)
+                        before=np.array(line.interpolate(max(0,station-1)).coords[0]); after=np.array(line.interpolate(min(line.length,station+1)).coords[0])
+                        direction=after-before; direction/=max(np.linalg.norm(direction),.001)
+                        center=np.array(point.coords[0]); lateral=np.array([-direction[1],direction[0]])
+                        if runways.distance(line.interpolate(min(line.length,station+1)))>runways.distance(point): direction*=-1
+                        for offset in (-.75,-.25,.25,.75):
+                            origin=center+offset*direction; half=width/2-1
+                            for begin in ([-half] if offset<0 else np.arange(-half,half,2)):
+                                end=half if offset<0 else min(begin+1,half)
+                                stroke(LineString([origin+begin*lateral,origin+end*lateral]),'marking_yellow',.22)
                 for side in (-1,1): stroke(line.offset_curve(side*(float(row['tags'].get('width',23))/2-1)),'marking_yellow')
     apron_area=unary_union([area(row) for row,_ in sources['apron']])
     for _,line in sources['parking_position']:

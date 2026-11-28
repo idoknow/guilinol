@@ -49,7 +49,17 @@ def airfield():
 def level_pavement(pavement, terrain, original, left, top):
     if pavement is None or pavement.is_empty:
         return
-    x0,z0,x1,z1=pavement.bounds
+    from scipy.ndimage import distance_transform_edt
+    from airport_pavement import pavement_sources
+    _,sources=pavement_sources(load_osm())
+    strips=[]
+    for kind,default in [('runway',45),('taxiway',23)]:
+        for row,line in sources[kind]:
+            strip=area(row)
+            if strip.is_empty: strip=line.buffer(float(row['tags'].get('width',default))/2,cap_style='flat')
+            strips.append(strip)
+    core=unary_union(strips).buffer(15+GRID*2)
+    x0,z0,x1,z1=pavement.union(core).buffer(32).bounds
     cols=np.arange(max(0,int((x0-left)//GRID)), min(terrain.shape[1],int((x1-left)//GRID)+2))
     rows=np.arange(max(0,int((z0-top)//GRID)), min(terrain.shape[0],int((z1-top)//GRID)+2))
     if not cols.size or not rows.size:
@@ -59,6 +69,14 @@ def level_pavement(pavement, terrain, original, left, top):
     if rr.size:
         target=int(np.median(original[rows[rr],cols[cc]]))
         terrain[rows[rr],cols[cc]]=original[rows[rr],cols[cc]]=target
+        if not core.is_empty:
+            shoulder=intersects_xy(core,left+cols[None,:]*GRID,top+rows[:,None]*GRID)
+            distance=distance_transform_edt(~shoulder)*GRID
+            blend=np.clip(1-distance/32,0,1)
+            blend=blend*blend*(3-2*blend)
+            selection=np.ix_(rows,cols)
+            for heights in (original,terrain):
+                heights[selection]=np.rint(heights[selection]*(1-blend)+target*blend)
 
 
 def clear_pavement_trees(records, origin, pavement):

@@ -332,6 +332,21 @@ def run(directory):
                                  for name, boats in CRAFT.items() for x,z,r,d,why in boats])
     manifest = json.loads((world.directory/'manifest.json').read_text())
     if 'airportProps' in manifest:
+        from airport_pavement import pavement_sources, load_osm
+        _,sources=pavement_sources(load_osm())
+        checks=[]
+        for row,line in sources['runway']:
+            if row['tags'].get('ref')!='01/19': continue
+            axis=np.subtract(line.coords[-1],line.coords[0]); axis/=np.linalg.norm(axis)
+            cross=np.array([-axis[1],axis[0]])
+            for station in np.arange(0,line.length+1,4):
+                center=np.array(line.interpolate(station).coords[0]); base=world.sample(*center,include_peaks=False)[0]
+                for offset in (-36,-20,20,36):
+                    delta=abs(world.sample(*(center+offset*cross),include_peaks=False)[0]-base)
+                    checks.append(delta)
+        failures=sum(delta>.12 for delta in checks) if checks else 1
+        result['airportRunwayCrossfall']=dict(samples=len(checks),maxDelta=max(checks,default=None),failures=failures)
+        result['failures']+=failures
         rows = json.loads((world.directory/manifest['airportProps']['file']).read_text())
         errors = []
         for x,y,z,yaw,_,_,span,rise in rows['fence']:

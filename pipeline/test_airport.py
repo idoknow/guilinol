@@ -7,6 +7,10 @@ import numpy as np
 from airport_pavement import pavement_sources
 from airport_props import layout, scenery_fence
 from common import load_osm
+from pathlib import Path
+from tempfile import TemporaryDirectory
+import json
+import shapely
 from play_region import PlayRegion
 
 
@@ -46,6 +50,18 @@ class LiangjiangSnapshot(unittest.TestCase):
         self.assertEqual([row['id'] for row,_ in sources['runway']],[35449799])
         for kind,count in [('taxiway',96),('apron',2),('parking_position',66)]:
             self.assertEqual(len(sources[kind]),count)
+
+    def test_finished_yellow_mesh_excludes_runway(self):
+        from airport_pavement import write_markings
+        _,sources=pavement_sources(self.elements)
+        with TemporaryDirectory() as tmp:
+            target=Path(tmp)
+            result=write_markings(target,self.bounds,lambda east,south:165.)
+            yellow=json.loads((target/result['file']).read_text())['marking_yellow']
+        faces=shapely.polygons(np.asarray(yellow).reshape(-1,3,3)[:,:,[0,2]])
+        strip=sources['runway'][0][1].buffer(22.5,cap_style='flat')
+        self.assertGreater(len(faces),0)
+        self.assertFalse(np.any(shapely.intersects(faces,strip)))
 
     def test_fixture_counts_and_panel_ends(self):
         def grade(east,south): return 170+.08*east+.11*south

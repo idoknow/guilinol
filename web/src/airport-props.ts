@@ -8,9 +8,14 @@ const silver=0xd0d5d6, tire=0x364046, glass=0x598696, white=0xe2e5e2, teal=0x248
 
 function shape(kind:string, far=false){
   const parts:THREE.BufferGeometry[]=[]
-  function add(source:THREE.BufferGeometry,color:number,x:number,y:number,z:number){
+  function add(source:THREE.BufferGeometry,color:number,x:number,y:number,z:number,net=false){
     const geo=source.index?source.toNonIndexed():source
     geo.deleteAttribute('uv'); geo.translate(x,y,z)
+    if(kind==='fence'){
+      const pos=geo.attributes.position,uv=new Float32Array(pos.count*2)
+      if(net)for(let i=0;i<pos.count;i++)uv.set([pos.getZ(i)*20,pos.getY(i)*4],i*2)
+      geo.setAttribute('uv',new THREE.BufferAttribute(uv,2))
+    }
     const tint=new THREE.Color(color), colors=new Float32Array(geo.attributes.position.count*3)
     for(let index=0;index<colors.length;index+=3)tint.toArray(colors,index)
     geo.setAttribute('color',new THREE.BufferAttribute(colors,3));parts.push(geo)
@@ -20,16 +25,25 @@ function shape(kind:string, far=false){
   function oval(color:number,x:number,y:number,z:number,w:number,h:number,d:number){
     add(new THREE.SphereGeometry(1,far?8:12,far?4:8).scale(w,h,d),color,x,y,z)
   }
-  function wing(stations:number[][],color:number){
+  function wing(stations:number[][],color:number,thickness?:number[]){
+    if(thickness){
+      const upper=stations.map(([x,y,z],index)=>[x,y+thickness[index]/2,z]),lower=stations.map(([x,y,z],index)=>[x,y-thickness[index]/2,z])
+      wing(upper,color);wing([...lower].reverse(),color)
+      for(let i=0;i<4;i++){const j=(i+1)%4;wing([upper[i],lower[i],lower[j],upper[j]],color)}
+      return
+    }
     const geo=new THREE.BufferGeometry();geo.setAttribute('position',new THREE.Float32BufferAttribute(stations.flat(),3))
     geo.setIndex([0,1,2,0,2,3]);geo.computeVertexNormals();add(geo,color,0,0,0)
   }
   if(kind==='airliner'){
     oval(white,0,3.6,0,2,2,17); oval(teal,0,3.4,0,2.02,.3,15.8)
     for(const side of [-1,1]){
-      wing([[side,3,4],[side*17,3.9,-5],[side*17,4,-7],[side,3,-3]],silver)
-      wing([[side,4,-10],[side*6,4.4,-15],[side*6,4.4,-16],[side,4,-14]],white)
-      if(!far){oval(silver,side*6,2,-.4,.95,.95,2.1);oval(tire,side*1.8,.59,-2,.35,.59,.59)
+      wing([[side,3.5,4],[side*17,4.6,-5],[side*17,4.6,-7],[side,3.5,-3]],silver,[1,.3,.3,1])
+      wing([[side,4,-10],[side*6,4.6,-15],[side*6,4.6,-16],[side,4,-14]],white,[.5,.12,.12,.5])
+      if(!far){
+        add(new THREE.CylinderGeometry(.97,.87,4,10).rotateX(Math.PI/2),silver,side*6,2,.1)
+        add(new THREE.CircleGeometry(.76,10),tire,side*6,2,2.11)
+        box(silver,side*6,3,0,.26,.95,1.3);oval(tire,side*1.8,.59,-2,.35,.59,.59)
         for(let station=-11;station<=11;station+=1.2)oval(glass,side*1.95,4,station,.13,.19,.24)}
     }
     wing([[0,4,-15],[0,10,-16],[0,10,-14],[0,4,-7]],teal)
@@ -49,8 +63,9 @@ function shape(kind:string, far=false){
     box(silver,0,14.7,0,.42,29.4,.42);oval(silver,0,29.4,0,2.4,.25,2.4)
   }else if(kind==='fence'){
     box(silver,0,1.28,-.5,.08,2.56,.018)
-    for(const level of [.16,.64,1.12,1.60,2.08,2.48])box(silver,0,level,0,.035,.025,1)
-    for(const station of [-.34,-.16,.02,.20,.38])box(silver,0,1.15,station,.025,2.3,.006)
+    add(new THREE.PlaneGeometry(1,2.42).rotateY(Math.PI/2),silver,0,1.26,0,true)
+    add(new THREE.BoxGeometry(.05,.5,.012).rotateZ(-Math.PI/4),silver,.17,2.68,-.5)
+    for(const offset of [.05,.18,.31])box(silver,offset,2.5+offset,0,.018,.018,1)
   }else if(kind==='standSign'){
     box(tire,0,1.6,0,1.7,.8,.16);box(silver,0,.6,0,.12,1.2,.12)
   }else if(kind==='windsock'){
@@ -118,6 +133,16 @@ export async function mountAirport(scene:THREE.Scene,file:string,markingsFile?:s
   for(const [name,parts] of batches){
     const lit=name.endsWith('_lit')
     const material=new THREE.MeshStandardMaterial({name,vertexColors:true,side:THREE.DoubleSide,roughness:.85,emissive:lit?0x888977:0})
+    if(name==='airport_fence'){
+      const size=32,data=new Uint8Array(size*size*4)
+      for(let y=0;y<size;y++)for(let x=0;x<size;x++){
+        const line=Math.min(...[x+y,x-y].map(value=>Math.abs(value-size*Math.round(value/size))))
+        data.fill(line<=2?255:0,4*(y*size+x),4*(y*size+x+1))
+      }
+      const alpha=new THREE.DataTexture(data,size,size);alpha.wrapS=alpha.wrapT=THREE.RepeatWrapping
+      alpha.magFilter=THREE.LinearFilter;alpha.generateMipmaps=true;alpha.minFilter=THREE.LinearMipmapLinearFilter;alpha.needsUpdate=true
+      material.alphaMap=alpha;material.alphaTest=.22
+    }
     if(lit)nightLit(material)
     const batch=new THREE.BatchedMesh(parts.reduce((sum,part)=>sum+part.instances.length,0),
       parts.reduce((sum,part)=>sum+part.geometry.attributes.position.count,0),0,material)
