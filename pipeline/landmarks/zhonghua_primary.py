@@ -60,7 +60,8 @@ STREET_SETBACK = [
 ]
 BUILDINGS = [
     dict(bid='B1', source_id='2048ed26-fa86-4e34-8959-9b0b2e253237', floors=5, floor_h=3.4, roof='flat_rail', wall_reg='wall_main', base_reg='wall_base', parapet_reg='wall_accent'),
-    dict(bid='B2', source_id='608f802c-5541-4c52-9c03-5f3f8bcc362a', floors=2, floor_h=3.4, roof='flat_rail', wall_reg='wall_main', base_reg='wall_base', parapet_reg='wall_accent')
+    dict(bid='B2', source_id='way/1531318257', floors=2, floor_h=3.4, roof='flat_rail', wall_reg='wall_main', base_reg='wall_base', parapet_reg='wall_accent'),
+    dict(bid='B3', source_id='way/1531318256', floors=2, floor_h=3.4, roof='flat_rail', wall_reg='wall_main', base_reg='wall_base', parapet_reg='wall_accent'),
 ]
 
 

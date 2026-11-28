@@ -43,7 +43,7 @@ def layout(module):
         key = style['source_id']
         shape = area(osm[key]) if key.startswith('way/') else overture_geometry(overture[key])
         shape = local(shape)
-        if module.SCHOOL == 'zhonghua_primary':
+        if module.SCHOOL == 'zhonghua_primary' and style['bid'] == 'B1':
             shape = shape.intersection(setback).simplify(0.3)
         # The facade builder accepts a single ring. Open a narrow seam to each
         # courtyard so the roof and ground-floor footprint retain the void.
