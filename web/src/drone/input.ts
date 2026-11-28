@@ -12,6 +12,14 @@ const KEY_AXES:Record<string,keyof Sticks> = {
   ArrowUp:'throttle', ArrowDown:'throttle', ArrowLeft:'yaw', ArrowRight:'yaw',
 }
 
+// IDOK-589: 手指离开摇杆垫时残留的几个百分点、手柄回中时的抖动，都会让飞机慢慢跑偏。
+// 摇杆量小于 5% 一律当 0，剩下的按原值走。
+const NOISE = .05
+function soften(sticks:Sticks):Sticks {
+  const axis = (value:number) => Math.abs(value) < NOISE ? 0 : value
+  return {throttle:axis(sticks.throttle),yaw:axis(sticks.yaw),pitch:axis(sticks.pitch),roll:axis(sticks.roll)}
+}
+
 export class PilotInput {
   enabled = false
   private keys = new Set<string>()
@@ -50,6 +58,10 @@ export class PilotInput {
   onAction(fn:(action:DroneAction)=>void) { this.actionSink = fn }
   setTouch(patch:Partial<Sticks>) { Object.assign(this.touch,patch) }
   resetTouch() { this.touch = {...CENTER} }
+  // IDOK-589: 进遥控前必须把手里的摇杆/按键清干净 —— 上一趟松手时丢了 pointerup、
+  // 或者下机时 W 还按着，都会让新起的飞机「自己往某个方向飞」。
+  clearKeys() { this.keys.clear() }
+  reset() { this.keys.clear(); this.touch = {...CENTER} }
   setInvert(patch:Partial<typeof this.invert>) { Object.assign(this.invert,patch) }
   get inverted() { return {...this.invert} }
 
@@ -182,9 +194,8 @@ export class PilotInput {
       }
       const left = {x:axis(0,this.invert.yaw),y:axis(1,!this.invert.throttle)}
       const right = {x:axis(2,this.invert.roll),y:axis(3,!this.invert.pitch)}
-      if (left.x || left.y || right.x || right.y) {
-        return {throttle:left.y,yaw:left.x,pitch:right.y,roll:right.x}
-      }
+      const shaped = soften({throttle:left.y,yaw:left.x,pitch:right.y,roll:right.x})
+      if (shaped.throttle || shaped.yaw || shaped.pitch || shaped.roll) return shaped
     }
 
     // Vendor HID stick, if the pilot calibrated one.
@@ -197,11 +208,12 @@ export class PilotInput {
         return axis.invert ? -scaled : scaled
       }
       const sticks = {throttle:value(1),yaw:value(0),pitch:value(3),roll:value(2)}
-      if (sticks.throttle || sticks.yaw || sticks.pitch || sticks.roll) return sticks
+      const shaped = soften(sticks)
+      if (shaped.throttle || shaped.yaw || shaped.pitch || shaped.roll) return shaped
     }
 
     // Touch sticks from the on-screen pads.
-    return {...this.touch}
+    return soften({...this.touch})
   }
 
   sources():Sources {

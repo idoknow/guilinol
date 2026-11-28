@@ -127,8 +127,12 @@ export function stepFlight(flight:Flight, dt:number, sticks:Sticks, groundAt:(x:
   flight.yaw -= THREE.MathUtils.degToRad(90) * ctrl.yaw * dt
 
   // Wind: published resistance is the point where the aircraft holds position, so drift is gentle.
-  const wind = Math.sin(flight.elapsed * .21) * spec.wind * .06
-  flight.pos.x += wind * dt
+  // IDOK-589: 原来的风只沿 x 轴推，而且 0.78 m/s 在这个尺度上肉眼就是「悬停时自己往一边滑」。
+  // 现在两轴各吹一点点、幅度压到 0.2 m/s 以内，看起来是微微晃而不是自己跑。
+  const gust = Math.sin(flight.elapsed * .21) * spec.wind * .015
+  const gustZ = Math.cos(flight.elapsed * .17) * spec.wind * .015
+  flight.pos.x += gust * dt
+  flight.pos.z += gustZ * dt
   flight.pos.addScaledVector(flight.vel,dt)
 
   // Ceiling: 500 m above the takeoff point, and never below the terrain.
