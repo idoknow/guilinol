@@ -7,6 +7,7 @@ import * as THREE from 'three'
 import type {Host} from './host'
 import type {Atlas, Place} from '../map/atlas'
 import {spots, waterDocks, type Spot, type WaterDock} from './spots'
+import {mapLandmarks, LANDMARK_KIND_LABEL, type LandmarkKind, type MapLandmark} from './map-landmarks'
 import fishShores from '../fishing/shores.json'
 import {isGlobalHotkeyBlocked} from '../walk/input-guard'
 import {builtBoundary,loadRegional,northwest as regionNW,southeast as regionSE} from '../map/regional'
@@ -23,14 +24,51 @@ import {touchUi} from '../ui/input-mode'
 const C = {paper:'#efe8d8', green:'#d3dcc0', water:'#a6c9c1', waterEdge:'#86ada5', building:'#e0d6c3', buildingEdge:'#cdc1aa',
   road:'#fcfaf3', casing:'#cbbea4', major:'#f8ebcb', majorCasing:'#c4a676', path:'#b7aa90', ink:'#2a302c', inkSoft:'#5d655f',
   peak:'#7f9a7b', peakDark:'#4f6b55', seal:'#a9503c', sealSoft:'rgba(169,80,60,.55)', paperText:'#f4efe2',
+  lmHub:'#2c4257', lmScenic:'#2f5d4b', lmCivic:'#8c5a2b', lmCampus:'#5c4569', lmFill:'rgba(244,239,226,.94)',
   shop:'#d9822b', shopText:'#9c4e0e', route:'#20d6c1', peer:'#2f7d70',
   halo:'rgba(239,232,216,.92)', roadHalo:'rgba(252,250,243,.95)', fog:'rgba(9,11,13,.945)'}
 // Phase 2 街头 palette (docs/style.md 第二期 · 小地图): night-asphalt ground, grey roads, white arterials, jade water.
 const STREET:typeof C = {paper:'#1b1f25', green:'#1f3329', water:'#17414c', waterEdge:'#245866', building:'#2a2f37', buildingEdge:'#353b45',
   road:'#7d838c', casing:'#14171b', major:'#e9e6de', majorCasing:'#0d0f12', path:'#4c525b', ink:'#f6f4ef', inkSoft:'#c9ccd2',
   peak:'#2d4a3a', peakDark:'#203629', seal:'#20d6c1', sealSoft:'rgba(32,214,193,.5)', paperText:'#101216',
+  lmHub:'#66b2ff', lmScenic:'#4bd4a0', lmCivic:'#e8b058', lmCampus:'#b896e8', lmFill:'rgba(27,31,37,.92)',
   shop:'#f5b841', shopText:'#ffd166', route:'#20d6c1', peer:'#8fe3ff',
   halo:'rgba(16,18,22,.9)', roadHalo:'rgba(16,18,22,.9)', fog:'rgba(4,6,8,.955)'}
+function landmarkColor(kind:LandmarkKind){
+  return kind==='hub'?C.lmHub:kind==='scenic'?C.lmScenic:kind==='civic'?C.lmCivic:C.lmCampus
+}
+function drawOctagon(g:CanvasRenderingContext2D, half:number){
+  const c = half*.52
+  g.beginPath()
+  g.moveTo(-half+c,-half); g.lineTo(half-c,-half); g.lineTo(half,-half+c); g.lineTo(half,half-c)
+  g.lineTo(half-c,half); g.lineTo(-half+c,half); g.lineTo(-half,half-c); g.lineTo(-half,-half+c)
+  g.closePath()
+}
+function drawLandmarkBadge(g:CanvasRenderingContext2D, x:number, y:number, s:number, m:MapLandmark, selected:boolean){
+  const col = landmarkColor(m.kind), half = s/2
+  g.save(); g.translate(x,y)
+  if(selected){
+    g.save(); g.globalAlpha = .3; g.strokeStyle = col; g.lineWidth = 3.2
+    drawOctagon(g,half+3.5); g.stroke(); g.restore()
+  }
+  drawOctagon(g,half)
+  if(m.tier===1){
+    g.strokeStyle = C.halo; g.lineWidth = 2.4; g.stroke()
+    g.fillStyle = col; g.fill()
+    if(s>=14){
+      g.save(); g.globalAlpha = .42; g.strokeStyle = C.paperText; g.lineWidth = .9
+      drawOctagon(g,half-2.1); g.stroke(); g.restore()
+    }
+    g.fillStyle = C.paperText
+  }else{
+    g.fillStyle = C.lmFill; g.fill()
+    g.strokeStyle = col; g.lineWidth = 1.45; g.stroke()
+    g.fillStyle = col
+  }
+  g.font = `600 ${Math.round(s*.56)}px ${SERIF}`
+  g.fillText(m.glyph,0,s*.04)
+  g.restore()
+}
 export function setMapPalette(name:'ink'|'street'){if(name==='street')Object.assign(C,STREET)}
 const SERIF = '"Noto Serif SC","Source Han Serif SC","Songti SC",serif'
 const CELL = 256
@@ -88,6 +126,7 @@ export function mapView(host:Host, atlas:Atlas, ui:{slot:HTMLElement; buttons:HT
   const peaks = host.manifest.peaks.entries.map(p=>({x:p.center[0],z:p.center[2],h:p.center[1]-((p as {baseHeight?:number}).baseHeight??150),name:/[一-鿿]/.test(p.name)&&!/^\d/.test(p.name)?p.name:''}))
   const placeLabels = atlas.places.filter(p=>p.k!=='road'&&p.k!=='peak'&&p.k!=='water')
   const built=builtBoundary(host.manifest), style=getComputedStyle(document.documentElement)
+  const activeLandmarks=mapLandmarks.filter(m=>built.contains(m.x,m.z))
   // Pan limit = regional sheet ∪ playable bbox (+~600 m), so an expanded world (IDOK-170 花江, 110.424E)
   // is never clipped by the fixed regional-map frame.
   const [bS,bW,bN,bE]=host.manifest.bbox, pad=.006, bNW=ll2xz(bN+pad,bW-pad), bSE=ll2xz(bS-pad,bE+pad)
@@ -180,24 +219,31 @@ export function mapView(host:Host, atlas:Atlas, ui:{slot:HTMLElement; buttons:HT
       if(!free(x-bw/2-2,y-size/2-2,bw+4,size+4)) return false
       g.lineWidth = 3.2; g.strokeStyle = C.halo; g.strokeText(s,x,y); g.fillStyle = color; g.fillText(s,x,y); return true}
     g.textAlign = 'center'; g.textBaseline = 'middle'
-    // Spots, shops and the player go into `taken` first so labels never cover them.
+    // Spots, regional landmarks, shops and the player go into `taken` first so labels never cover them.
     taken.push([hx-12,hy-12,hx+12,hy+12])
     const seals = spots.map(s=>({s,x:sx(s.x),y:sz(s.z)})).filter(o=>o.x>-20&&o.y>-20&&o.x<w+20&&o.y<h+20)
     const sealSize = mini?13:20
     for(const o of seals) taken.push([o.x-sealSize/2,o.y-sealSize/2,o.x+sealSize/2,o.y+sealSize/2])
+    const visibleLandmarks = activeLandmarks
+      .map(m=>({m,x:sx(m.x),y:sz(m.z),s:mini?(m.tier===1?11:9.5):(m.tier===1?19:16)}))
+      .filter(o=>o.x>-24&&o.y>-24&&o.x<w+24&&o.y<h+24)
+    for(const o of visibleLandmarks) taken.push([o.x-o.s/2-1,o.y-o.s/2-1,o.x+o.s/2+1,o.y+o.s/2+1])
     const shopPins = listShops().map(shop=>({shop,x:sx(shop.triggerPos[0]),y:sz(shop.triggerPos[2])})).filter(o=>o.x>-24&&o.y>-24&&o.x<w+24&&o.y<h+24)
     const shopSize = mini?14:21
-    // 钓点（IDOK-336）：青色圆印「钓」，大地图标名字
-    const fishPins = fishShores.map(f=>({f,x:sx(f.spot.x),y:sz(f.spot.z)})).filter(o=>o.x>-20&&o.y>-20&&o.x<w+20&&o.y<h+20)
-    const fishSize = mini?12:18
-    for(const o of fishPins) taken.push([o.x-fishSize/2-2,o.y-fishSize/2-2,o.x+fishSize/2+2,o.y+fishSize/2+2])
+    // 钓点（IDOK-336）：中景缩放不压地标，拉近到滨水层级（scale >= 0.22）再显现圆印与钓点名
+    const showFish = mini || scale >= .22
+    const fishPins = showFish ? fishShores.map(f=>({f,x:sx(f.spot.x),y:sz(f.spot.z)})).filter(o=>o.x>-20&&o.y>-20&&o.x<w+20&&o.y<h+20) : []
+    const fishSize = mini?11:17
     for(const o of shopPins) taken.push([o.x-shopSize/2-2,o.y-shopSize/2-2,o.x+shopSize/2+2,o.y+shopSize/2+2])
+    if(scale>=.24) for(const o of fishPins) taken.push([o.x-fishSize/2-2,o.y-fishSize/2-2,o.x+fishSize/2+2,o.y+fishSize/2+2])
     if(!mini) {
       for(const o of shopPins) text(o.shop.mapMarker.label,o.x,o.y+shopSize*.5+10,12.5,o.shop.kind==='ebike'?'#20d6c1':C.shopText,'700')
       for(const o of seals) text(o.s.name,o.x,o.y+sealSize*.5+10,13,C.seal,'600')
-      for(const o of fishPins) text(o.f.name.replace('漓江·','')+' 钓点',o.x,o.y+fishSize*.5+10,12,'#1d7f74','600')
-      for(const p of peaks) if(p.name&&scale>.12) text(p.name,sx(p.x),sz(p.z)+12,12,C.peakDark)
-      if(scale>.22) for(const p of placeLabels) {const x = sx(p.x), y = sz(p.z); if(x>0&&y>0&&x<w&&y<h) text(p.n,x,y,11.5,C.inkSoft)}
+      for(const o of visibleLandmarks) if(o.m.tier===1) text(scale<.13?(o.m.short??o.m.name):o.m.name,o.x,o.y+o.s*.5+10,12.5,landmarkColor(o.m.kind),'600')
+      for(const o of visibleLandmarks) if(o.m.tier===2) text(scale<.16?(o.m.short??o.m.name):o.m.name,o.x,o.y+o.s*.5+9,11.5,landmarkColor(o.m.kind),'600')
+      if(scale>=.24) for(const o of fishPins) text(o.f.name.replace('漓江·','')+' 钓点',o.x,o.y+fishSize*.5+10,12,'#1d7f74','600')
+      for(const p of peaks) if(p.name&&scale>.14) text(p.name,sx(p.x),sz(p.z)+12,12,C.peakDark)
+      if(scale>.24) for(const p of placeLabels) {const x = sx(p.x), y = sz(p.z); if(x>0&&y>0&&x<w&&y<h) text(p.n,x,y,11.5,C.inkSoft)}
     }
     // Road names along the longest segment.
     if(scale>(mini?.28:.25)) for(const r of visible) {
@@ -209,20 +255,22 @@ export function mapView(host:Host, atlas:Atlas, ui:{slot:HTMLElement; buttons:HT
       g.save(); g.translate(x,y); g.rotate(r.label.angle); g.lineWidth = 3; g.strokeStyle = C.roadHalo; g.strokeText(r.n,0,0)
       g.fillStyle = C.inkSoft; g.fillText(r.n,0,0); g.restore()
     }
+    for(const o of fishPins) {
+      const s = fishSize
+      g.save(); g.translate(o.x,o.y)
+      g.fillStyle = '#20d6c1'; g.strokeStyle = '#0f3b36'; g.lineWidth = mini ? 1.4 : 1.8
+      g.beginPath(); g.arc(0,0,s/2,0,Math.PI*2); g.fill(); g.stroke()
+      g.fillStyle = '#0f2a27'; g.font = `700 ${Math.round(s*.6)}px ${SERIF}`; g.fillText('钓',0,s*.05)
+      g.restore()
+    }
+    for(const o of visibleLandmarks) if(o.m.tier===2) drawLandmarkBadge(g,o.x,o.y,o.s,o.m,pin?.landmark?.id===o.m.id)
+    for(const o of visibleLandmarks) if(o.m.tier===1) drawLandmarkBadge(g,o.x,o.y,o.s,o.m,pin?.landmark?.id===o.m.id)
     for(const o of seals) {
       const s = sealSize, done = ui.stamps.has(o.s.id)
       g.save(); g.translate(o.x,o.y); g.rotate(-.07)
       g.fillStyle = done?C.seal:'rgba(244,239,226,.95)'; g.strokeStyle = C.seal; g.lineWidth = done?1:1.4
       g.beginPath(); g.roundRect(-s/2,-s/2,s,s,s*.16); g.fill(); g.stroke()
       g.fillStyle = done?C.paperText:C.seal; g.font = `600 ${s*.62}px ${SERIF}`; g.fillText(o.s.seal,0,s*.04); g.restore()
-    }
-    for(const o of fishPins) {
-      const s = fishSize
-      g.save(); g.translate(o.x,o.y)
-      g.fillStyle = '#20d6c1'; g.strokeStyle = '#0f3b36'; g.lineWidth = mini ? 1.4 : 2
-      g.beginPath(); g.arc(0,0,s/2,0,Math.PI*2); g.fill(); g.stroke()
-      g.fillStyle = '#0f2a27'; g.font = `700 ${Math.round(s*.6)}px ${SERIF}`; g.fillText('钓',0,s*.05)
-      g.restore()
     }
     for(const o of shopPins) {
       const s = shopSize, isEbike = o.shop.kind === 'ebike'
@@ -238,13 +286,77 @@ export function mapView(host:Host, atlas:Atlas, ui:{slot:HTMLElement; buttons:HT
     }
     g.fillStyle=style.getPropertyValue('--region-mask');g.fill(mask,'evenodd')
     g.strokeStyle=style.getPropertyValue('--region-boundary');g.lineWidth=px(parseFloat(style.getPropertyValue('--region-boundary-width')));g.stroke(built.path)
-    ;(regional??edge)?.labels(g,x0,z0,x1,z1,scale,style,(x,z)=>!far&&built.contains(x,z))
+    // Far overview (scale < 0.09): pre-layout Tier-1 regional landmarks + core central anchors so
+    // regional district labels cleanly yield wherever a landmark badge occupies the same spot.
+    const farMarks:{m:MapLandmark,x:number,y:number,label:string,ly:number}[] = []
+    const farSeals:{s:Spot,x:number,y:number,ly:number}[] = []
+    const farBadgeSize = 15
+    if(far&&!mini) {
+      g.save(); g.setTransform(dpr,0,0,dpr,0,0); g.font = `600 11.5px ${SERIF}`
+      const farTaken:[number,number,number,number][] = [[hx-12,hy-12,hx+12,hy+12]]
+      const fits = (x:number,y:number,bw:number,bh:number)=>!farTaken.some(([a,b,c,d])=>x<c&&x+bw>a&&y<d&&y+bh>b)
+      const place = (x:number,y:number,label:string,pad:number)=>{
+        const iconBox:[number,number,number,number] = [x-pad,y-pad,x+pad,y+pad]
+        if(!fits(iconBox[0],iconBox[1],pad*2,pad*2)) return null
+        const bw = g.measureText(label).width
+        for(const ly of [y+farBadgeSize*.5+9, y-farBadgeSize*.5-9]) {
+          if(fits(x-bw/2-2,ly-7,bw+4,14)) {
+            farTaken.push(iconBox,[x-bw/2-2,ly-7,x+bw/2+2,ly+7])
+            return ly
+          }
+        }
+        return null
+      }
+      for(const m of activeLandmarks) {
+        if(m.tier!==1) continue
+        const x = sx(m.x), y = sz(m.z)
+        if(x<-20||y<-20||x>w+20||y>h+20) continue
+        const label = m.short??m.name, ly = place(x,y,label,farBadgeSize/2+3)
+        if(ly!==null) farMarks.push({m,x,y,label,ly})
+      }
+      for(const s of spots) {
+        if(!built.contains(s.x,s.z)) continue
+        const x = sx(s.x), y = sz(s.z)
+        if(x<-20||y<-20||x>w+20||y>h+20) continue
+        const ly = place(x,y,s.name,16)
+        if(ly!==null) farSeals.push({s,x,y,ly})
+      }
+      g.restore()
+    }
+    const skipRegional = (x:number,z:number)=>{
+      if(!far) return built.contains(x,z)
+      if(!built.contains(x,z)) return false
+      const rx = sx(x), ry = sz(z)
+      for(const o of farMarks) if(Math.abs(o.x-rx)<46 && Math.abs(o.y-ry)<30) return true
+      for(const o of farSeals) if(Math.abs(o.x-rx)<54 && Math.abs(o.y-ry)<34) return true
+      return Math.abs(hx-rx)<44 && Math.abs(hy-ry)<28
+    }
+    ;(regional??edge)?.labels(g,x0,z0,x1,z1,scale,style,skipRegional)
     g.setTransform(dpr,0,0,dpr,0,0)
+    if(far&&!mini) {
+      g.textAlign = 'center'; g.textBaseline = 'middle'; g.font = `600 11.5px ${SERIF}`
+      const farText = (label:string,x:number,y:number,color:string)=>{
+        g.lineWidth = 3; g.strokeStyle = C.halo; g.strokeText(label,x,y); g.fillStyle = color; g.fillText(label,x,y)
+      }
+      for(const o of farSeals) farText(o.s.name,o.x,o.ly,C.seal)
+      for(const o of farMarks) farText(o.label,o.x,o.ly,landmarkColor(o.m.kind))
+      for(const o of farMarks) drawLandmarkBadge(g,o.x,o.y,farBadgeSize,o.m,pin?.landmark?.id===o.m.id)
+      for(const o of farSeals) {
+        const done = ui.stamps.has(o.s.id)
+        g.save(); g.translate(o.x,o.y); g.rotate(-.07)
+        g.fillStyle = done?C.seal:'rgba(244,239,226,.95)'; g.strokeStyle = C.seal; g.lineWidth = done?1:1.3
+        g.beginPath(); g.roundRect(-farBadgeSize/2,-farBadgeSize/2,farBadgeSize,farBadgeSize,farBadgeSize*.16); g.fill(); g.stroke()
+        g.fillStyle = done?C.paperText:C.seal; g.font = `600 ${Math.round(farBadgeSize*.6)}px ${SERIF}`; g.fillText(o.s.seal,0,farBadgeSize*.04); g.restore()
+      }
+    }
     paintFog(g,w,h,dpr,cx,cz,scale)
     if(navTarget) {
       // IDOK-350: the road route (漓江青, dark casing so it reads on both palettes); straight dashed line only
       // while planning or when no connected road was found.
       const nx = sx(navTarget.x), ny = sz(navTarget.z), path = ui.navPath?.()
+      const navLm = activeLandmarks.find(m=>Math.hypot(m.x-navTarget!.x,m.z-navTarget!.z)<2)
+      const navSpot = !navLm ? spots.find(s=>Math.hypot(s.x-navTarget!.x,s.z-navTarget!.z)<2) : undefined
+      const ringR = mini ? 10 : 14
       g.save(); g.lineCap = g.lineJoin = 'round'
       if(path&&path.length>=4) {
         const line = new Path2D(); line.moveTo(sx(path[0]),sz(path[1]))
@@ -255,13 +367,31 @@ export function mapView(host:Host, atlas:Atlas, ui:{slot:HTMLElement; buttons:HT
         const ex = sx(path[path.length-2]), ey = sz(path[path.length-1])
         if(Math.hypot(ex-nx,ey-ny)>3){g.setLineDash([4,4]); g.lineWidth = 2; g.beginPath(); g.moveTo(ex,ey); g.lineTo(nx,ny); g.stroke(); g.setLineDash([])}
       } else {
+        const dx = nx-hx, dy = ny-hy, len = Math.hypot(dx,dy)
+        const trim = (navLm||navSpot) && len>ringR+12 ? ringR : 0
         g.strokeStyle = C.route; g.lineWidth = mini ? 2 : 2.5; g.setLineDash([6,4])
-        g.beginPath(); g.moveTo(hx,hy); g.lineTo(nx,ny); g.stroke()
+        g.beginPath(); g.moveTo(hx,hy); g.lineTo(nx-(trim?dx/len*trim:0),ny-(trim?dy/len*trim:0)); g.stroke()
         g.setLineDash([])
       }
       if(nx > -24 && ny > -24 && nx < w + 24 && ny < h + 24) {
-        g.fillStyle = 'rgba(32,214,193,.26)'; g.beginPath(); g.arc(nx,ny,mini?11:16,0,Math.PI*2); g.fill()
-        g.fillStyle = C.route; g.strokeStyle = C.paperText; g.lineWidth = 2; g.beginPath(); g.arc(nx,ny,mini?5.5:7.5,0,Math.PI*2); g.fill(); g.stroke()
+        if(navLm||navSpot) {
+          g.fillStyle = 'rgba(32,214,193,.22)'; g.beginPath(); g.arc(nx,ny,mini?12:18,0,Math.PI*2); g.fill()
+          g.strokeStyle = C.route; g.lineWidth = mini?2:2.5; g.beginPath(); g.arc(nx,ny,ringR,0,Math.PI*2); g.stroke()
+          g.textAlign = 'center'; g.textBaseline = 'middle'
+          if(navLm) {
+            const s = mini?(navLm.tier===1?11:9.5):far?farBadgeSize:(navLm.tier===1?19:16)
+            drawLandmarkBadge(g,nx,ny,s,navLm,false)
+          } else if(navSpot) {
+            const s = mini?13:far?farBadgeSize:20, done = ui.stamps.has(navSpot.id)
+            g.save(); g.translate(nx,ny); g.rotate(-.07)
+            g.fillStyle = done?C.seal:'rgba(244,239,226,.95)'; g.strokeStyle = C.seal; g.lineWidth = done?1:1.4
+            g.beginPath(); g.roundRect(-s/2,-s/2,s,s,s*.16); g.fill(); g.stroke()
+            g.fillStyle = done?C.paperText:C.seal; g.font = `600 ${s*.62}px ${SERIF}`; g.fillText(navSpot.seal,0,s*.04); g.restore()
+          }
+        } else {
+          g.fillStyle = 'rgba(32,214,193,.26)'; g.beginPath(); g.arc(nx,ny,mini?11:16,0,Math.PI*2); g.fill()
+          g.fillStyle = C.route; g.strokeStyle = C.paperText; g.lineWidth = 2; g.beginPath(); g.arc(nx,ny,mini?5.5:7.5,0,Math.PI*2); g.fill(); g.stroke()
+        }
       }
       g.restore()
     }
@@ -336,7 +466,7 @@ export function mapView(host:Host, atlas:Atlas, ui:{slot:HTMLElement; buttons:HT
   const sheet = document.createElement('section'); sheet.className = 'atlas'; sheet.hidden = true
   sheet.innerHTML = `<canvas></canvas><div class="atlas-search"><input type="search" placeholder="搜地名" aria-label="搜索地点" enterkeyhint="search"><div class="atlas-docks">${shops.map(sh=>`<button type="button" class="atlas-shop-btn" data-shop="${sh.shopId}">${sh.mapMarker.label} · ${sh.mapMarker.badge}</button>`).join('')}${waterDocks.map(d=>`<button type="button" data-dock="${d.id}">${d.name} · ${d.badge}</button>`).join('')}</div><ol></ol></div>
     <button class="atlas-close" aria-label="关闭地图">×</button><button class="atlas-here" aria-label="回到我的位置">◎</button>
-    <div class="atlas-pop" hidden></div><p class="atlas-legend">朱印＝观景点 · 商铺签＝商圈商铺 · <span class="atlas-travel-legend">已开放区域可传送 · </span><span class="atlas-fog"></span>© OpenStreetMap contributors</p>`
+    <div class="atlas-pop" hidden></div><p class="atlas-legend">朱印＝景册 · 八角标＝区域地标 · 商铺签＝商圈商铺 · <span class="atlas-travel-legend">已开放区域可传送 · </span><span class="atlas-fog"></span>© OpenStreetMap contributors</p>`
   document.body.append(sheet)
   markSurface(sheet)
   const canvas = sheet.querySelector('canvas')!, input = sheet.querySelector('input')!, results = sheet.querySelector('ol')!, pop = sheet.querySelector<HTMLElement>('.atlas-pop')!
@@ -344,7 +474,7 @@ export function mapView(host:Host, atlas:Atlas, ui:{slot:HTMLElement; buttons:HT
   for(const b of Array.from(sheet.querySelectorAll<HTMLButtonElement>('.atlas-docks button[data-dock]'))) b.onclick = ()=>{const d = waterDocks.find(x=>x.id===b.dataset.dock); if(d){close(); ui.goDock(d)}}
   const view = {x:0,z:0,scale:.5}
   const fogText = sheet.querySelector<HTMLElement>('.atlas-fog')!
-  let pin:{x:number,z:number,name:string,spot?:Spot,dock?:WaterDock,shop?:ShopTriggerDef,peer?:RosterPlayer}|null = null
+  let pin:{x:number,z:number,name:string,spot?:Spot,landmark?:MapLandmark,dock?:WaterDock,shop?:ShopTriggerDef,peer?:RosterPlayer}|null = null
   let navTarget:{x:number,z:number,name:string}|null = null
   function redraw() {
     if(sheet.hidden) return
@@ -354,9 +484,12 @@ export function mapView(host:Host, atlas:Atlas, ui:{slot:HTMLElement; buttons:HT
     {const km2 = fogAreaKm2(); fogText.textContent = `已探明 ${km2.toFixed(km2<1?2:1)} km² `}
     if(pin) {
       const x = w/2+(pin.x-view.x)*view.scale, y = h/2+(pin.z-view.z)*view.scale
-      if(!pin.spot&&!pin.shop&&!pin.peer){g.setTransform(dpr,0,0,dpr,0,0); g.fillStyle = C.ink; g.beginPath(); g.arc(x,y-14,7,0,Math.PI*2); g.moveTo(x-5.5,y-10); g.lineTo(x,y); g.lineTo(x+5.5,y-10); g.fill()
+      if(pin.landmark&&view.scale<.09){
+        g.setTransform(dpr,0,0,dpr,0,0); g.textAlign = 'center'; g.textBaseline = 'middle'
+        drawLandmarkBadge(g,x,y,15,pin.landmark,true)
+      }else if(!pin.spot&&!pin.landmark&&!pin.shop&&!pin.peer){g.setTransform(dpr,0,0,dpr,0,0); g.fillStyle = C.ink; g.beginPath(); g.arc(x,y-14,7,0,Math.PI*2); g.moveTo(x-5.5,y-10); g.lineTo(x,y); g.lineTo(x+5.5,y-10); g.fill()
         g.fillStyle = C.paper; g.beginPath(); g.arc(x,y-14,2.6,0,Math.PI*2); g.fill()}
-      pop.style.transform = `translate(${Math.round(x)}px,${Math.round(y-(pin.peer?12:pin.spot||pin.shop?20:26))}px) translate(-50%,-100%)`
+      pop.style.transform = `translate(${Math.round(x)}px,${Math.round(y-(pin.peer?12:pin.spot||pin.landmark||pin.shop?20:26))}px) translate(-50%,-100%)`
     }
   }
   function clampView(){view.scale = Math.min(3,Math.max(Math.min(sheet.clientWidth/(southeast.x-northwest.x),sheet.clientHeight/(southeast.z-northwest.z))*.9,view.scale))
@@ -378,7 +511,7 @@ export function mapView(host:Host, atlas:Atlas, ui:{slot:HTMLElement; buttons:HT
     if(pin) {
       if(!built.contains(pin.x,pin.z)){pop.textContent='未开放'; redraw(); return}
       const me = roster().me
-      const sub = pin.peer?`同城玩家${pin.peer.uid?` · ${pin.peer.uid}`:''}${me?` · ${bearing(me,pin.peer)}`:''}`:pin.shop?pin.shop.displayName:pin.spot?pin.spot.sub:pin.dock?pin.dock.sub:atlas.roadAt(pin.x,pin.z,40)?.name ?? ''
+      const sub = pin.peer?`同城玩家${pin.peer.uid?` · ${pin.peer.uid}`:''}${me?` · ${bearing(me,pin.peer)}`:''}`:pin.shop?pin.shop.displayName:pin.spot?pin.spot.sub:pin.landmark?`${pin.landmark.region} · ${pin.landmark.sub}`:pin.dock?pin.dock.sub:atlas.roadAt(pin.x,pin.z,40)?.name ?? ''
       const isNav = !!navTarget && Math.hypot(navTarget.x-pin.x,navTarget.z-pin.z)<1
       pop.innerHTML = `<b>${pin.name}</b>${sub&&sub!==pin.name?`<span>${sub}</span>`:''}<button type="button" data-act="go" ${getPlayMode()==='solo'?'hidden disabled':''}>前往</button><button type="button" class="atlas-nav-btn" data-act="nav">${isNav?'取消导航':'标记导航'}</button>`
       pop.querySelector<HTMLButtonElement>('[data-act="nav"]')!.onclick = ()=>{
@@ -396,10 +529,11 @@ export function mapView(host:Host, atlas:Atlas, ui:{slot:HTMLElement; buttons:HT
   function focus(x:number,z:number,scale=Math.max(view.scale,1.1)){view.x = x; view.z = z; view.scale = scale; clampView()}
   input.oninput = ()=>{
     const q = input.value.trim()
-    const hits:{name:string,sub:string,x:number,z:number,spot?:Spot,dock?:WaterDock,shop?:ShopTriggerDef}[] = q?[
+    const hits:{name:string,sub:string,x:number,z:number,spot?:Spot,landmark?:MapLandmark,dock?:WaterDock,shop?:ShopTriggerDef}[] = q?[
       ...listShops().filter(s=>s.displayName.includes(q)||s.brandName.includes(q)||s.mapMarker.label.includes(q)||s.mapMarker.badge.includes(q)||s.mapMarker.keywords.includes(q)).map(s=>({name:s.mapMarker.label,sub:'商铺 · '+s.displayName,x:s.triggerPos[0],z:s.triggerPos[2],shop:s})),
       ...waterDocks.filter(d=>d.name.includes(q)||d.sub.includes(q)||d.keywords.includes(q)).map(d=>({name:d.name,sub:'水边开船 · '+d.badge,x:d.x,z:d.z,dock:d})),
       ...spots.filter(s=>s.name.includes(q)||s.sub.includes(q)).map(s=>({name:s.name,sub:'观景点 · '+s.sub,x:s.x,z:s.z,spot:s})),
+      ...activeLandmarks.filter(m=>m.name.includes(q)||m.short?.includes(q)||m.sub.includes(q)||m.region.includes(q)||m.keywords?.includes(q)).map(m=>({name:m.name,sub:`${LANDMARK_KIND_LABEL[m.kind]} · ${m.region} · ${m.sub}`,x:m.x,z:m.z,landmark:m})),
       ...fishShores.filter(f=>f.name.includes(q)||'钓鱼钓点渔'.includes(q)).map(f=>({name:f.name+' 钓点',sub:'钓鱼 · 走近按 4 切鱼竿',x:f.spot.x,z:f.spot.z})),
       ...atlas.search(q,8).map((p:Place)=>({name:p.n,sub:{peak:'山',scenic:'景点',gate:'城门',bridge:'桥',water:'水面',park:'公园',museum:'博物馆',memorial:'纪念地',road:'道路',school:'学校'}[p.k],x:p.x,z:p.z}))]:[]
     const seen = new Set<string>()
@@ -413,7 +547,7 @@ export function mapView(host:Host, atlas:Atlas, ui:{slot:HTMLElement; buttons:HT
       }
       seen.add(hit.name)
       const li = document.createElement('li'); li.innerHTML = `<b>${hit.name}</b><span>${hit.sub}</span>`
-      li.onclick = ()=>{focus(hit.x,hit.z); setPin({x:hit.x,z:hit.z,name:hit.name,spot:hit.spot,dock:hit.dock,shop:hit.shop}); results.innerHTML = ''; input.blur()}
+      li.onclick = ()=>{focus(hit.x,hit.z); setPin({x:hit.x,z:hit.z,name:hit.name,spot:hit.spot,landmark:hit.landmark,dock:hit.dock,shop:hit.shop}); results.innerHTML = ''; input.blur()}
       results.append(li)}
     if(q&&!seen.size) results.innerHTML = '<li class="none">没有找到</li>'
   }
@@ -432,13 +566,15 @@ export function mapView(host:Host, atlas:Atlas, ui:{slot:HTMLElement; buttons:HT
   canvas.onpointerup = e=>{pointers.delete(e.pointerId); pinch = 0
     if(moved<6&&pointers.size===0) {
       const r = canvas.getBoundingClientRect(), x = view.x+(e.clientX-r.left-r.width/2)/view.scale, z = view.z+(e.clientY-r.top-r.height/2)/view.scale
-      const nearShop = built.contains(x,z)&&listShops().find(s=>built.contains(s.triggerPos[0],s.triggerPos[2])&&Math.hypot(s.triggerPos[0]-x,s.triggerPos[2]-z)*view.scale<18)
-      const near = !nearShop&&built.contains(x,z)&&spots.find(s=>built.contains(s.x,s.z)&&Math.hypot(s.x-x,s.z-z)*view.scale<16)
       const r2 = (o:{x:number,z:number})=>Math.hypot(o.x-x,o.z-z)*view.scale
+      const nearShop = built.contains(x,z)&&listShops().find(s=>built.contains(s.triggerPos[0],s.triggerPos[2])&&Math.hypot(s.triggerPos[0]-x,s.triggerPos[2]-z)*view.scale<18)
+      const near = !nearShop&&built.contains(x,z)&&spots.filter(s=>built.contains(s.x,s.z)&&r2(s)<16).sort((a,b)=>r2(a)-r2(b))[0]
+      const nearLandmark = !nearShop&&!near&&built.contains(x,z)&&activeLandmarks.filter(m=>(m.tier===1||view.scale>=.09)&&r2(m)<16).sort((a,b)=>r2(a)-r2(b))[0]
       const nearPeer = roster().players.filter(p=>r2(p)<14).sort((a,b)=>r2(a)-r2(b))[0]
       if(nearPeer) setPin({x:nearPeer.x,z:nearPeer.z,name:nearPeer.name,peer:nearPeer})
       else if(nearShop) setPin({x:nearShop.triggerPos[0],z:nearShop.triggerPos[2],name:nearShop.mapMarker.label,shop:nearShop})
       else if(near) setPin({x:near.x,z:near.z,name:near.name,spot:near})
+      else if(nearLandmark) setPin({x:nearLandmark.x,z:nearLandmark.z,name:nearLandmark.name,landmark:nearLandmark})
       else setPin({x,z,name:atlas.roadAt(x,z,40)?.name ?? '这里'})
     }}
   canvas.onpointercancel = e=>{pointers.delete(e.pointerId); pinch = 0}

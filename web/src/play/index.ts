@@ -2,6 +2,7 @@ import * as THREE from 'three'
 import {inlineBusy} from '../ui/loading'
 import './play.css'
 import {spots, waterDocks, yawToward, type Spot, type WaterDock} from './spots'
+import {mapLandmarks, type MapLandmark} from './map-landmarks'
 import type {Host} from './host'
 import {photoMode} from './photo'
 import {mapView} from './map'
@@ -325,7 +326,10 @@ export function play(host:Host) {
     if(summit&&p.distanceTo(summit.eye)<60) return summit.spot.summit!.label
     let best:Spot|null = null, dist = 450
     for(const s of spots){const d = Math.hypot(s.x-p.x,s.z-p.z); if(d<dist){dist = d; best = s}}
-    return best?.name ?? map?.roadName() ?? ''
+    if(best) return best.name
+    let bestLm:MapLandmark|null = null, lmDist = 650
+    for(const m of mapLandmarks){const d = Math.hypot(m.x-p.x,m.z-p.z); if(d<lmDist){lmDist = d; bestLm = m}}
+    return bestLm?.name ?? map?.roadName() ?? ''
   }
 
   // --- Per-frame: marker placement/fade, arrival, summit pill.
