@@ -64,7 +64,19 @@ self.addEventListener('fetch', (event) => {
         if (response && response.ok) cache.put('/index.html', response.clone()).catch(() => {})
         return response
       } catch {
-        return (await cache.match('/index.html')) || (await cache.match('/')) || Response.error()
+        // 回落到「同一页面」的缓存：/admin/ 回落 admin 的 HTML，市民卡/背包各回各的，
+        // 不能一律回落 /index.html——否则离线打开后台会看到游戏首页。
+        const path = url.pathname
+        const candidates = path.startsWith('/admin')
+          ? ['/admin/index.html', '/admin/']
+          : path.startsWith('/id') ? ['/id.html']
+          : path.startsWith('/backpack') ? ['/backpack.html']
+          : ['/index.html', '/']
+        for (const candidate of candidates) {
+          const hit = await cache.match(candidate)
+          if (hit) return hit
+        }
+        return Response.error()
       }
     })())
     return
