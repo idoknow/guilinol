@@ -6,6 +6,7 @@ export interface Env {
   fishing?:{record:(user:string,body:unknown)=>Promise<unknown>,boards:(zone:string|null)=>Promise<unknown>}
   updateCards?:(request:Request, path:string)=>Promise<Response>
   mpAdmin?:(path:string,request:Request,actor:string)=>Promise<Response>
+  appealTriage?:(input:{uid:number;userId:string;banRecordId:string|null;body:string})=>Promise<{ownerMismatch?:boolean;recordId?:string|null;triage?:Record<string,unknown>|null}>
   smokeAdmin?:(request:Request,user:string)=>Promise<Response>
   gfxAdmin?:(request:Request,user:string)=>Promise<Response>
   npcAdmin?:(request:Request)=>Promise<Response>

@@ -1,5 +1,5 @@
 // 网上桂林 · 管理后台。单页：?view= 路由，所有数据来自 /api/admin/*（见 docs/telemetry.md）。
-import { labels, viewToken } from '../../lib/feedback-contract'
+import { APPEAL, TERMINAL_STATUSES, labels, viewToken } from '../../lib/feedback-contract'
 import './ui/theme.css'
 import './admin.css'
 import {markSession,markSurface} from './session-mark'
@@ -2437,19 +2437,26 @@ const pages: Record<string, (view: View) => void> = {
       paintSide()
       paintTabs(stats)
     }).catch(() => {})
-    const rowsOf = (items: any[]) => items.map((item) =>
-      h('tr', { class: 'adm-row-link', onclick: ((event: MouseEvent) => {
+    const rowsOf = (items: any[]) => items.map((item) => {
+      const triage = typeof item.appeal_triage === 'string'
+        ? (() => { try { return JSON.parse(item.appeal_triage) } catch { return null } })()
+        : item.appeal_triage
+      const subParts = [`${item.kind ?? ''}`, `${num(item.photo_count) ?? 0} 张照片`]
+      if (item.ban_record_id) subParts.push(`记录 ${String(item.ban_record_id).slice(0, 14)}`)
+      return h('tr', { class: 'adm-row-link', onclick: ((event: MouseEvent) => {
         if ((event.target as HTMLElement).closest('a')) return
         go({ view: 'feedback', id: item.id })
       }) as EventListener },
       h('td', null,
         navLink(item.title, { view: 'feedback', id: item.id }, { class: 'adm-row-title' }),
+        triage?.suspected_misban ? h('span', { class: 'adm-pill adm-ban-auto' }, '疑似误封') : null,
         num(item.unread) ? h('em', { class: 'adm-unread' }, `${item.unread} 条新回复`) : null,
-        h('small', { class: 'adm-row-sub' }, `${item.kind ?? ''} · ${num(item.photo_count) ?? 0} 张照片`)),
+        h('small', { class: 'adm-row-sub' }, subParts.join(' · '))),
       h('td', null, pill(item.status)),
       h('td', null, h('span', { class: 'adm-who' }, h('b', null, item.nickname), h('small', null, item.email))),
       h('td', null, when(unix(item.submitted_at))),
-      h('td', null, ago(unix(item.updated_at)))))
+      h('td', null, ago(unix(item.updated_at))))
+    })
     const body = h('tbody')
     const more = h('div', { class: 'adm-more' })
     const load = (cursor?: string) => {
@@ -3712,18 +3719,22 @@ function feedbackDetail(id: string) {
   main.append(slot)
   async(slot, () => api<any>(path), (item) => {
     document.title = `${item.title} · 反馈 · 管理后台`
+    const isAppeal = item.kind === APPEAL
+    const isTerminal = (TERMINAL_STATUSES as readonly string[]).includes(item.status)
     const transitions: { status: string; label: string; needs_message: boolean }[] = item.allowed_transitions ?? []
-    const approve = transitions.find((t) => t.status === 'approved')
+    const approve = isAppeal ? undefined : transitions.find((t) => t.status === 'approved')
     const others = transitions.filter((t) => t.status !== 'approved')
     const runTransition = async (button: HTMLButtonElement, t: { status: string; label: string; needs_message: boolean }) =>
       act(button, async () => {
-        const destructive = ['rejected', 'duplicate'].includes(t.status)
+        const destructive = ['rejected', 'duplicate', 'upheld'].includes(t.status)
         const message = await confirmDialog({
           title: t.status === 'approved' ? '发起 AI 制作' : `改为「${t.label}」`,
           tone: t.status === 'approved' || destructive ? 'seal' : 'jade',
           confirm: t.status === 'approved' ? '确认发起' : '确认',
           body: h('p', null,
             t.status === 'approved' ? '确认信息足够后发起制作。协调人会收到开工通知，桥接进程随后把它放入制作队列。'
+            : t.status === 'unbanned' ? '确认已在安全中心解除限制后，将通知提交人并结案。'
+            : t.status === 'upheld' ? '提交人会看到维持原判结果与说明，申诉随之结案。'
             : t.status === 'need_info' ? '提交人会收到邮件，请写清还缺什么信息。'
             : destructive ? '提交人会看到状态和说明。这个操作之后通常不再继续处理。'
             : `状态将从「${labels[item.status]}」改为「${t.label}」。`),
@@ -3739,14 +3750,42 @@ function feedbackDetail(id: string) {
     // 左栏：内容
     const photos = (item.photos ?? []) as any[]
     const timeline = [...(item.events ?? []), ...(item.messages ?? [])].sort((a, b) => a.created_at - b.created_at)
+    const triage = item.appeal_triage && typeof item.appeal_triage === 'object' ? item.appeal_triage : null
+    const triageRecText: Record<string, string> = {
+      recommend_unban: '建议优先核实解封',
+      manual_review: '需人工核查证据',
+      record_not_found: '未匹配到封禁记录',
+    }
+    const triageCard = isAppeal && triage
+      ? card('自动初审摘要', [
+          h('div', { class: 'adm-state' },
+            triage.suspected_misban
+              ? h('span', { class: 'adm-pill adm-ban-auto' }, '疑似误封')
+              : h('span', { class: 'adm-pill' }, triageRecText[String(triage.recommendation ?? '')] ?? '初审参考'),
+            triage.suspected_misban && triage.recommendation
+              ? h('span', { class: 'adm-sub' }, triageRecText[String(triage.recommendation)] ?? '')
+              : null),
+          Array.isArray(triage.summary) && triage.summary.length
+            ? h('ul', { class: 'adm-triage-list' }, triage.summary.slice(0, 8).map((line: unknown) => h('li', null, String(line))))
+            : null,
+        ])
+      : null
     const content = h('div', { class: 'adm-detail-main' },
-      card('反馈内容', [
+      triageCard,
+      card(isAppeal ? '申诉内容' : '反馈内容', [
         h('p', { class: 'adm-body' }, item.body),
-        h('dl', { class: 'adm-facts' },
-          h('dt', null, '类型'), h('dd', null, item.kind ?? dash),
-          h('dt', null, '位置'), h('dd', null, `${item.lon}, ${item.lat}`),
-          h('dt', null, '朝向'), h('dd', null, item.heading ?? dash),
-          h('dt', null, '地标'), h('dd', null, item.landmark_id ?? dash)),
+        isAppeal
+          ? h('dl', { class: 'adm-facts' },
+              h('dt', null, '类型'), h('dd', null, item.kind ?? dash),
+              h('dt', null, '记录编号'), h('dd', null,
+                item.ban_record_id
+                  ? [h('code', null, item.ban_record_id), ' ', navLink('去安全中心核查 ↗', { view: 'security', q: item.ban_record_id }, { class: 'adm-link' })]
+                  : dash))
+          : h('dl', { class: 'adm-facts' },
+              h('dt', null, '类型'), h('dd', null, item.kind ?? dash),
+              h('dt', null, '位置'), h('dd', null, `${item.lon}, ${item.lat}`),
+              h('dt', null, '朝向'), h('dd', null, item.heading ?? dash),
+              h('dt', null, '地标'), h('dd', null, item.landmark_id ?? dash)),
       ]),
       (item.view || item.has_view_shot) &&
         card('游戏视角', [
@@ -3776,7 +3815,7 @@ function feedbackDetail(id: string) {
                     event.message && h('p', { class: 'adm-event-text' }, event.message),
                     event.screenshot_url && /^https:\/\//.test(event.screenshot_url) && h('a', { class: 'adm-link', href: event.screenshot_url, target: '_blank', rel: 'noopener noreferrer' }, '查看截图 ↗'))))
           : emptyState('还没有进度'),
-        !['draft', 'live', 'rejected', 'duplicate', 'resolved'].includes(item.status) && compose(path),
+        item.status !== 'draft' && !isTerminal && compose(path),
       ]))
     // 右栏：处理面板
     const actions = h('aside', { class: 'adm-detail-side' },
@@ -3795,11 +3834,18 @@ function feedbackDetail(id: string) {
           ? h('div', { class: 'adm-transitions' },
               h('p', { class: 'adm-sub' }, approve ? '或者' : '可以改为'),
               others.map((t) => {
-                const b = h('button', { type: 'button', class: `adm-btn ${['rejected', 'duplicate'].includes(t.status) ? 'adm-btn--danger' : 'adm-btn--ghost'}` }, t.label)
+                const cls = ['rejected', 'duplicate', 'upheld'].includes(t.status)
+                  ? 'adm-btn--danger'
+                  : t.status === 'unbanned'
+                    ? 'adm-btn--jade'
+                    : 'adm-btn--ghost'
+                const b = h('button', { type: 'button', class: `adm-btn ${cls}` }, t.label)
                 b.addEventListener('click', () => runTransition(b, t))
                 return b
               }))
-          : !approve && h('p', { class: 'adm-sub' }, ['live', 'rejected', 'duplicate', 'resolved'].includes(item.status) ? '这条反馈已结束，没有可执行的操作。' : '制作流程进行中，状态会由制作方自动推进。'),
+          : !approve && h('p', { class: 'adm-sub' }, isTerminal
+              ? (isAppeal ? '这条申诉已结案，没有可执行的操作。' : '这条反馈已结束，没有可执行的操作。')
+              : '制作流程进行中，状态会由制作方自动推进。'),
       ]),
       card('信息', h('dl', { class: 'adm-facts adm-facts--stack' },
         h('dt', null, '提交人'), h('dd', null, h('span', { class: 'adm-who' }, h('b', null, item.nickname), h('small', null, item.email)),
