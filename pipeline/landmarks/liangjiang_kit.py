@@ -93,7 +93,7 @@ def terminal_one(batch, footprint, solid):
             rib=footprint.intersection(box(low,station,high,station+.24))
             batch.slab(rib,lambda x,z:arch(x,z)+.4,lambda x,z:arch(x,z)+.62,'airport_structure')
     span=min(38,(south-north)*.25)
-    front=[(east-6+6*cos(angle),span*sin(angle)) for angle in np.linspace(-pi/2,pi/2,33)]
+    front=[(east-7.7+6*cos(angle),span*sin(angle)) for angle in np.linspace(-pi/2,pi/2,33)]
     from shapely.geometry import Polygon
     lobby=Polygon([(east-9,-span),*front,(east-9,span)])
     batch.slab(lobby,1.4,9.8,'airport_glass_lit')

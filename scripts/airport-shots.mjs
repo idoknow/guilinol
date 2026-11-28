@@ -39,6 +39,7 @@ try {
   await page.waitForFunction(() => window.viewer?.camera, null, {timeout:180000})
   const metrics = {}
   for (const [name, eye, target] of views) {
+    if(process.env.AIRPORT_VIEW && process.env.AIRPORT_VIEW!==name)continue
     await page.evaluate(([eye,target,name]) => {
       const { camera, manifest } = window.viewer
       window.viewer.clock.set(name==='terminal-night'?22:11)
