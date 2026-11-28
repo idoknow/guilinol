@@ -5,9 +5,9 @@ import { adminList, adminMergeUsers, adminSetEmail, adminSetPassword, adminUserD
 import {flushMail} from './feedback-mail'
 
 const json = (value: unknown) => Response.json(value, { headers: { 'Cache-Control': 'private, no-store' } })
-function transitions(current: string, bridge: boolean) {
-  return (edges[current]??[]).filter(status=>status!==(bridge?'approved':'queued')).map(status=>({
-    status,label:labels[status],needs_message:['need_info','rejected','duplicate'].includes(status),
+function transitions(current: string, kind: string, bridge: boolean) {
+  return (edges[current]??[]).filter(status=>status!==(bridge?'approved':'queued') && (status!=='resolved' || kind===APPEAL)).map(status=>({
+    status,label:labels[status],needs_message:['need_info','rejected','duplicate','resolved'].includes(status),
   }))
 }
 function missing(): never {
@@ -134,7 +134,7 @@ export async function feedback(request: Request, env: Env, path: string) {
     return json(
       (
         await stmt(
-          "SELECT f.*,u.email AS submitter_email,u.role AS submitter_role FROM feedback f JOIN users u ON u.id=f.user_id WHERE f.status IN ('submitted','approved','need_info') OR (f.multica_issue IS NOT NULL AND f.status NOT IN ('draft','live','rejected','duplicate')) ORDER BY f.updated_at,f.id",
+          "SELECT f.*,u.email AS submitter_email,u.role AS submitter_role FROM feedback f JOIN users u ON u.id=f.user_id WHERE f.status IN ('submitted','approved','need_info') OR (f.multica_issue IS NOT NULL AND f.status NOT IN ('draft','live','rejected','duplicate','resolved')) ORDER BY f.updated_at,f.id",
         ).all()
       ).results,
     )
@@ -209,9 +209,9 @@ export async function feedback(request: Request, env: Env, path: string) {
     await stmt('UPDATE feedback_messages SET relayed_at=coalesce(relayed_at,unixepoch()) WHERE feedback_id=? AND id=?',id,number((await fields(request)).id,1,Number.MAX_SAFE_INTEGER)).run();return json({ok:true})
   }
   if(method==='POST'&&action==='messages'){
-    if(['live','rejected','duplicate','draft'].includes(row.status))conflict()
+    if(['live','rejected','duplicate','resolved','draft'].includes(row.status))conflict()
     const data=await fields(request),body=text(data.body,1000,true)!,kind=bridge?'agent':admin?'admin':'user',source=bridge?text(data.source,200,true):null
-    const [result]=await env.DB.batch([stmt(`INSERT INTO feedback_messages(feedback_id,author_kind,author_name,body,source,relayed_at) SELECT ?,?,?,?,?,? WHERE EXISTS(SELECT 1 FROM feedback WHERE id=? AND status NOT IN ('draft','live','rejected','duplicate')) AND (?='agent' OR (SELECT count(*) FROM feedback_messages WHERE feedback_id=? AND author_kind!='agent' AND created_at>unixepoch()-3600)<20) ON CONFLICT(feedback_id,source) DO NOTHING`,id,kind,bridge?'协调人':admin?'管理员':'提交人',body,source,bridge?now():null,id,kind,id),...(admin?[audit(env.DB,user,'reply','feedback',id,{})]:[])])
+    const [result]=await env.DB.batch([stmt(`INSERT INTO feedback_messages(feedback_id,author_kind,author_name,body,source,relayed_at) SELECT ?,?,?,?,?,? WHERE EXISTS(SELECT 1 FROM feedback WHERE id=? AND status NOT IN ('draft','live','rejected','duplicate','resolved')) AND (?='agent' OR (SELECT count(*) FROM feedback_messages WHERE feedback_id=? AND author_kind!='agent' AND created_at>unixepoch()-3600)<20) ON CONFLICT(feedback_id,source) DO NOTHING`,id,kind,bridge?'协调人':admin?'管理员':'提交人',body,source,bridge?now():null,id,kind,id),...(admin?[audit(env.DB,user,'reply','feedback',id,{})]:[])])
     if(!result.meta.changes&&!bridge)limited();return json({ok:true})
   }
   const shotKey = `fb/${id}/view.jpg`
@@ -318,7 +318,7 @@ export async function feedback(request: Request, env: Env, path: string) {
       has_view_shot: row.shot_state === 1,
       ...(admin
         ? {
-            allowed_transitions: transitions(row.status,false),
+            allowed_transitions: transitions(row.status,row.kind,false),
             issue_url: row.multica_issue
               ? `https://multica.ai/idoknow/issues/${encodeURIComponent(row.multica_issue)}`
               : null,
@@ -348,7 +348,7 @@ export async function feedback(request: Request, env: Env, path: string) {
         },
       })
     }
-    if (!['draft', 'need_info'].includes(row.status) && (method!=='PUT'||['live','rejected','duplicate'].includes(row.status)||await stmt('SELECT 1 FROM feedback_photos WHERE feedback_id=? AND n=?',id,slot).first())) conflict()
+    if (!['draft', 'need_info'].includes(row.status) && (method!=='PUT'||['live','rejected','duplicate','resolved'].includes(row.status)||await stmt('SELECT 1 FROM feedback_photos WHERE feedback_id=? AND n=?',id,slot).first())) conflict()
     if (method === 'DELETE') {
       const photo = await stmt(
         `DELETE FROM feedback_photos WHERE feedback_id=? AND n=? AND EXISTS(SELECT 1 FROM feedback WHERE id=? AND status=?) RETURNING r2_key`,
@@ -468,7 +468,7 @@ export async function feedback(request: Request, env: Env, path: string) {
     const data = await fields(request)
     target = String(data.status)
     if (bridge && target === row.status && target!=='approved' && edges[target]) return json({ ok: true })
-    const change=transitions(row.status,bridge).find(item=>item.status===target)
+    const change=transitions(row.status,row.kind,bridge).find(item=>item.status===target)
     if (!change) conflict()
     message=text(data.message,2000,change.needs_message)||change.label
     if (bridge) {

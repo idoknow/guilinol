@@ -14,6 +14,7 @@ export const labels: Record<string, string> = {
   modelling: 'AI 建模中',
   reviewing: '审核中',
   live: '已上线',
+  resolved: '已处理',
   need_info: '需要补充信息',
   rejected: '未采纳',
   duplicate: '与已有反馈重复',
@@ -21,11 +22,11 @@ export const labels: Record<string, string> = {
 export const edges: Record<string, string[]> = {
   submitted: ['approved','need_info','rejected','duplicate'],
   approved: ['queued'],
-  queued: ['modelling', 'reviewing', 'live', 'need_info', 'rejected', 'duplicate'],
-  modelling: ['reviewing', 'live', 'need_info', 'rejected', 'duplicate'],
-  reviewing: ['modelling', 'live', 'need_info', 'rejected', 'duplicate'],
+  queued: ['modelling', 'reviewing', 'live', 'need_info', 'rejected', 'duplicate', 'resolved'],
+  modelling: ['reviewing', 'live', 'need_info', 'rejected', 'duplicate', 'resolved'],
+  reviewing: ['modelling', 'live', 'need_info', 'rejected', 'duplicate', 'resolved'],
   // 问了提交人但没等回复就修好并上线了（IDOK-180/181）：bridge 可直接标已上线
-  need_info: ['approved','live','rejected', 'duplicate'],
+  need_info: ['approved','live','rejected', 'duplicate', 'resolved'],
 }
 
 type Point = { x: number; y: number; z: number; lat: number; lon: number }
