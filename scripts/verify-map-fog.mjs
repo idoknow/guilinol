@@ -48,11 +48,15 @@ try {
 
   // 全屏地图：图例要有「已探明 N km²」，画面上要同时存在压黑与点亮的像素。
   // 点小地图圆盘开图（M 会被 isGlobalHotkeyBlocked 挡掉，验证模式下有遮罩层）。
+  // 地图在场景跑起来几秒后才懒加载，小地图圆盘出现之前点击会落空。
+  await page.waitForFunction(() => !!document.querySelector('.minimap canvas'), null, {timeout: 180000, polling: 500})
+  // 进场后可能还有一段「正在前往目的地」的过场遮罩（会吞掉点击），等它散掉再开图。
+  await page.waitForFunction(() => !document.querySelector('.ld-veil'), null, {timeout: 240000, polling: 500})
   await page.evaluate(() => document.querySelector('.minimap')?.click())
   await page.waitForFunction(() => !document.querySelector('.atlas')?.hidden, null, {timeout: 60000, polling: 250})
   await page.waitForFunction(() => (document.querySelector('.atlas-fog')?.textContent ?? '').includes('已探明'), null, {timeout: 30000, polling: 250})
   const legend = await page.evaluate(() => document.querySelector('.atlas-fog')?.textContent ?? '')
-  assert.match(legend, /已探明 \d+\.\d+ km²/, `legend should report the explored area, got ${legend}`)
+  assert.match(legend, /已探明 \d+\.\d{1,2} km²/, `legend should report the explored area, got ${legend}`)
   await page.waitForTimeout(1200)   // 地图每 0.2 s 重画一次，等一帧画完
   const pixels = await page.evaluate(() => {
     const canvas = document.querySelector('.atlas canvas')

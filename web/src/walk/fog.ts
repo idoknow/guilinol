@@ -7,6 +7,8 @@
 import {fogCell, fogReveal, FOG_POST_LIMIT, fogValidKey} from '../../../lib/fog'
 
 const STORAGE_KEY = 'glol.fog.v1'
+/** 本地这份进度属于哪个账号：换号登录时不把上一个人的开图并到新账号上。 */
+const OWNER_KEY = 'glol.fog.owner'
 /** 走路时多久记一次（毫秒）——比每帧便宜，也不会漏掉路口。 */
 const TRACK_MS = 220
 /** 有新格子之后多久推一次服务端。 */
@@ -117,6 +119,11 @@ export async function fogPull():Promise<{owner:string|null, cells:number}> {
   } catch {}
   if (!owner) return {owner: null, cells: cells.size}
   account = owner
+  // 本地进度是别的账号的：清掉，只用这个账号自己的；没归属（未登录时走的）就认领过来。
+  let previous: string | null = null
+  try { previous = localStorage.getItem(OWNER_KEY) } catch {}
+  if (previous && previous !== owner) { cells.clear(); synced.clear(); version++; save() }
+  try { localStorage.setItem(OWNER_KEY, owner) } catch {}
   try {
     const response = await fetch('/api/walk/fog', {
       headers: {'X-Fog-Owner': owner},

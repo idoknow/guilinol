@@ -351,7 +351,7 @@ export function mapView(host:Host, atlas:Atlas, ui:{slot:HTMLElement; buttons:HT
     const w = sheet.clientWidth, h = sheet.clientHeight, dpr = Math.min(2,devicePixelRatio)
     if(canvas.width!==Math.round(w*dpr)||canvas.height!==Math.round(h*dpr)){canvas.width = Math.round(w*dpr); canvas.height = Math.round(h*dpr)}
     const g = canvas.getContext('2d')!; paint(g,w,h,dpr,view.x,view.z,view.scale,false)
-    fogText.textContent = `已探明 ${fogAreaKm2().toFixed(1)} km² `
+    {const km2 = fogAreaKm2(); fogText.textContent = `已探明 ${km2.toFixed(km2<1?2:1)} km² `}
     if(pin) {
       const x = w/2+(pin.x-view.x)*view.scale, y = h/2+(pin.z-view.z)*view.scale
       if(!pin.spot&&!pin.shop&&!pin.peer){g.setTransform(dpr,0,0,dpr,0,0); g.fillStyle = C.ink; g.beginPath(); g.arc(x,y-14,7,0,Math.PI*2); g.moveTo(x-5.5,y-10); g.lineTo(x,y); g.lineTo(x+5.5,y-10); g.fill()
