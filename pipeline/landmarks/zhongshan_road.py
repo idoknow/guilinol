@@ -333,8 +333,61 @@ def _planter_divider_curve(m: Builder, world_line: LineString):
         m.pose = (0.0, 0.0, 0.0, 0.0)
 
 
+def sanduo_footbridge(m: Builder):
+    """Approaches to the existing GL04 deck (OSM 1469989701, top 158.61 m).
+
+    Ways 1469989702/3 meet the west landing; 1469989704 crosses the east
+    landing at its middle node. Run a flight to each of the four sidewalks.
+    """
+    def local(lat, lon):
+        return np.array(ll2xz(lat, lon)) - [AX, AZ]
+
+    west = local(25.2797577, 110.2904579)
+    east = local(25.2796609, 110.2907991)
+    level = 158.61 - m.surface.y
+    axis = (east - west) / np.linalg.norm(east - west)
+    side = np.array([-axis[1], axis[0]])
+    for sign in (-1, 1):
+        start = west + side * sign * 1.68 + axis * 1.35
+        end = east + side * sign * 1.68 - axis * 1.35
+        def rail_point(point, height):
+            return [point[0], level + height, point[1]]
+        m.beam(rail_point(start, 1.03), rail_point(end, 1.03), .055, 'alum')
+        m.beam(rail_point(start, .51), rail_point(end, .51), .035, 'alum')
+        for point in np.linspace(start, end, 16):
+            m.cylinder_y(point[0], level, 1.03, point[1], .055, 'alum', sections=6)
+
+    for landing, ends in ((west, [(25.2794586, 110.2903574), (25.2799372, 110.2905181)]),
+                          (east, [(25.2794934, 110.2907425), (25.2798511, 110.2908635)])):
+        grade = m.surface.ground(*landing)
+        m.cylinder_y(landing[0], grade - .2, level - grade, landing[1], .5, 'beige', collide=True)
+        for endpoint in ends:
+            bottom = local(*endpoint)
+            dx, dz = bottom - landing
+            length = math.hypot(dx, dz)
+            low = m.surface.ground(*bottom) + .10
+            count = math.ceil((level - low) / .16)
+            rise = (level - low) / count
+            landing_run = 1.85
+            run = (length - landing_run) / count
+            m.pose = (landing[0], 0, landing[1], math.atan2(dx, dz))
+            m.box(0, level - .29, landing_run / 2, 2.7, .31, landing_run, 'beige', collide=True)
+            for index in range(count):
+                top = level - (index + 1) * rise
+                m.box(0, top - .30, landing_run + (index + .5) * run,
+                      2.7, .30, run, 'beige', collide=True)
+            for edge in (-1.30, 1.30):
+                for height in (.55, 1.03):
+                    m.beam([edge, level + height, landing_run], [edge, low + height, length], .045, 'alum')
+                for fraction in np.linspace(0, 1, math.ceil(length / 2.2)):
+                    m.cylinder_y(edge, level - fraction * (level - low) - .10, 1.13,
+                                 landing_run + fraction * (length - landing_run), .045, 'alum', sections=6)
+        m.pose = (0., 0., 0., 0.)
+
+
 def build_zhongshan_road(m: Builder):
     m.surface = landmark_surface('zhongshan_road')
+    sanduo_footbridge(m)
     pedestrian_wings(m, (AX, AZ))
     # ------------------------------------------------------------------
     # 1. West Frontage 1: Commercial Complex way/675593163 (6F / 20.6 m)
