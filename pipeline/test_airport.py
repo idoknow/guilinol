@@ -65,6 +65,12 @@ class LiangjiangSnapshot(unittest.TestCase):
             self.assertEqual(len(props[kind]),count)
         for kind in ('airliner','cart','bus','tug','fuel','stairs','fence','mast'):
             self.assertGreater(len(props[kind]),0)
+        contacts=[]
+        docks=np.asarray(props['bridgeDock'])[:,:3]+[0,5.2,0]
+        for east,height,south,yaw,scale,*_ in props['airliner']:
+            door=np.array([east,height,south])+scale*np.array([12*sin(yaw)-1.75*cos(yaw),4.05,12*cos(yaw)+1.75*sin(yaw)])
+            contacts.append(np.linalg.norm(docks-door,axis=1).min())
+        self.assertGreaterEqual(sum(distance<.1 for distance in contacts),15)
         for east,height,south,yaw,_,_,span,rise in props['fence']:
             for end in [-.5,.5]:
                 actual=grade(east+end*span*sin(yaw),south+end*span*cos(yaw))

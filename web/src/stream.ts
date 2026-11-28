@@ -237,7 +237,7 @@ export class Stream {
       else if(distance<4200&&!this.airportPending&&performance.now()>this.airportRetry){
         this.airportPending=true
         const file=this.manifest.airportProps.file
-        void import('./airport-props').then(module=>module.mountAirport(this.scene,file)).then(update=>{
+        void import('./airport-props').then(module=>module.mountAirport(this.scene,file,this.manifest.airportMarkings?.file)).then(update=>{
           this.airportUpdate=update;update(this.lastPosition)
         }).catch(error=>{this.airportRetry=performance.now()+10000;console.warn(file,error)}).finally(()=>{this.airportPending=false})
       }

@@ -156,6 +156,7 @@ def raw_overture_footprints(bounds):
 def buildings(bounds, elevation, peaks, layout, carriageway_mask=None, sidewalk_mask=None, airport_buildings=()):
     footprints, heights = [], []
     grounds = unary_union(layout.school_grounds)
+    airport_boundary=next((area(row) for row in load_osm() if row['type']=='relation' and row['id']==13846706), Polygon()) if airport_buildings else Polygon()
     rules = json.loads(Path(__file__).with_name('building-kinds.json').read_text())
     districts = unary_union([Polygon([ll2xz(*ll) for ll in ring]) for ring in rules['oldDistrictsLatLon']])
     campuses = STRtree([area(el) for el in load_osm() if el['type']!='node' and any(
@@ -268,7 +269,9 @@ def buildings(bounds, elevation, peaks, layout, carriageway_mask=None, sidewalk_
                         base = elevation(center.x, center.y)
                         footprints.append(sub)
                         kind = 0
-                        if grounds.covers(center):
+                        if airport_boundary.covers(center):
+                            kind=5 if floors>=3 else 6 if sub.area>550 else 7
+                        elif grounds.covers(center):
                             kind = 3
                         elif floors<=rules['oldMaxFloors'] and districts.covers(center):
                             kind = 1

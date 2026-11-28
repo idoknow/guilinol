@@ -615,6 +615,9 @@ def build(bbox, output, palette, workers=4):
         from airport_props import write_props
         props = write_props(output,bounds,ground_mesh_at)
         if props: manifest['airportProps'] = props
+        from airport_pavement import write_markings
+        markings=write_markings(output,bounds,ground_mesh_at)
+        if markings: manifest['airportMarkings']=markings
     from station_site import mark_station_tiles
     mark_station_tiles(chunks)
     manifest['landmarks'] = landmarks

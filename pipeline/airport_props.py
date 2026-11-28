@@ -6,7 +6,7 @@ from pathlib import Path
 
 import numpy as np
 from shapely.geometry import LineString, Point, Polygon
-from shapely.ops import unary_union
+from shapely.ops import nearest_points, unary_union
 
 from airport_pavement import pavement_sources
 from common import load_osm
@@ -63,7 +63,7 @@ def layout(elements, bounds, ground):
     def angle(direction): return math.atan2(direction[0],direction[1])
     def path(kind,start,end,lift=0):
         put(kind,(np.array(start)+end)/2,angle(vector(start,end)),(1,1,np.linalg.norm(np.subtract(end,start))),lift)
-    docks=[]; bridges=[]
+    docks=[]; bridges=[]; links=[]; dock_levels={}
     for row in elements:
         tags=row.get('tags',{}); coords=points(row)
         if row['type']!='way' or len(coords)<2: continue
@@ -71,9 +71,9 @@ def layout(elements, bounds, ground):
         if not field.intersects(line): continue
         if tags.get('aeroway')=='jet_bridge':
             if terminals.distance(Point(coords[-1])) < terminals.distance(Point(coords[0])): coords.reverse()
-            for idx,(start,end) in enumerate(zip(coords,coords[1:])):
-                path('bridgeFixed' if idx==0 else 'bridgeMobile',start,end)
-            put('bridgePivot',coords[-2]); put('bridgeDock',coords[-1],angle(vector(coords[-2],coords[-1])))
+            if terminals.distance(Point(coords[0]))>.1:
+                coords.insert(0,nearest_points(terminals,Point(coords[0]))[0].coords[0])
+            links.append(coords)
             docks.append(np.array(coords[-1])); bridges.append(line.buffer(1.5))
         elif tags.get('aeroway')=='navigationaid': put('beacon',line.centroid.coords[0])
     occupied=[]; used=set(); bridge_area=unary_union(bridges)
@@ -86,19 +86,29 @@ def layout(elements, bounds, ground):
         put('standSign',end+7*right,angle(forward))
         if index%5 >= (3 if near else 1) or (near and dock in used): continue
         size=1.22 if index%11==0 else 1
-        for side in (1,-1):
-            nose=docks[dock]+side*3.7*right+4*forward if near else end
-            center=nose-17*size*forward
-            outline=Polygon([center+size*(lateral*right+station*forward) for lateral,station in
-                             [(0,17),(2.1,12),(2.1,4),(17,-5),(17,-7),(2,-4),(1.6,-11),(6,-15),(0,-17),(-6,-15),(-1.6,-11),(-2,-4),(-17,-7),(-17,-5),(-2.1,4),(-2.1,12)]])
-            if not buildings.intersects(outline) and not bridge_area.intersects(outline) and not any(other.intersects(outline) for other in occupied): break
-        else: continue
+        center=end-11*size*forward
+        outline=Polygon([center+size*(lateral*right+station*forward) for lateral,station in
+                         [(0,17),(2.1,12),(2.1,4),(17,-5),(17,-7),(2,-4),(1.6,-11),(6,-15),(0,-17),(-6,-15),(-1.6,-11),(-2,-4),(-17,-7),(-17,-5),(-2.1,4),(-2.1,12)]])
+        if buildings.intersects(outline) or any(other.intersects(outline) for other in occupied): continue
         occupied.append(outline)
-        if near: used.add(dock)
+        if near:
+            used.add(dock)
+            links[dock][-1]=center+size*(12*forward-1.75*right)
+            dock_levels[dock]=ground(*center)+4.05*size
         put('airliner',center,angle(forward),(size,size,size))
         for shift,kind in [(10,['tug','cart','stairs','fuel','bus'][(len(occupied)-1)%5]),(15,'cart')]:
             point=center+right*shift+forward*10
             if not buildings.intersects(Point(point).buffer(3)): put(kind,point,angle(forward))
+    for index,coords in enumerate(links):
+        end_level=dock_levels.get(index,ground(*coords[-1])+5.2)
+        if len(coords)==2: coords.insert(1,(np.asarray(coords[0])+coords[1])*.5)
+        for section,(start,end) in enumerate(zip(coords,coords[1:])):
+            mid=(np.asarray(start)+end)*.5;delta=np.subtract(end,start)
+            first=ground(*start)+5.2;last=end_level if section==len(coords)-2 else ground(*end)+5.2
+            kind='bridgeFixed' if section==0 else 'bridgeMobile'
+            put(kind,mid,angle(vector(start,end)),(1,1,np.linalg.norm(delta)),(first+last)/2-5.2-ground(*mid))
+            rows[kind][-1].append(round(last-first,3))
+        put('bridgePivot',coords[-2]);put('bridgeDock',coords[-1],angle(vector(coords[-2],coords[-1])),lift=end_level-ground(*coords[-1])-5.2)
     light_inset=bounds.buffer(-APPROACH_MARGIN-.002)
     for _,line in sources['runway']:
         for side in (-1,1):

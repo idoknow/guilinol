@@ -52,7 +52,8 @@ export function buildingGeometry(
     const part=parts[partIdx]
     const [base,origTop,loops,origKind,origFloors,seed,anchor,rectangle,complex,raised,walkPlane]=part
     const startVertex=cursor
-    const ov:BuildingOverride|undefined = !walkPlane && tileX!==undefined && tileZ!==undefined ? getBuildingOverride(tileX,tileZ,partIdx) : undefined
+    const aviation=origKind>=5&&origKind<=7
+    const ov:BuildingOverride|undefined = !aviation && !walkPlane && tileX!==undefined && tileZ!==undefined ? getBuildingOverride(tileX,tileZ,partIdx) : undefined
     const baseY=base/10
     const level=ov ? baseY+ov.h : origTop/10
     const floors=ov ? ov.f : origFloors
@@ -60,7 +61,6 @@ export function buildingGeometry(
     if(ov){ part[1]=Math.round(level*10); part[4]=floors }
     const hasShop=!!ov && ov.s>=0
     const kind=ov ? (hasShop ? 32 + ov.u + ov.s*8 : 16 + ov.u) : origKind
-    const aviation=origKind>=5&&origKind<=7
     const roofTint=ov ? (ov.r===1 ? 0x50575a : ov.r===2 ? 0x2f6c56 : ov.r===3 ? 0x747779 : 0x6f7274) : aviation ? 0xa4a8a5 : undefined
     const wallTint=ov ? ov.c : aviation ? 0xd6d9d5 : undefined
 

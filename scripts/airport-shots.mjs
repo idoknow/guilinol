@@ -1,4 +1,4 @@
-import { mkdir, writeFile } from 'node:fs/promises'
+import { mkdir, writeFile, readFile } from 'node:fs/promises'
 import { dirname } from 'node:path'
 import { chromium } from 'playwright'
 import { preview } from 'vite'
@@ -10,11 +10,23 @@ const views = [
   ['t2-airside', [-25950,200,7100], [-25620,182,7430]],
   ['t1-front', [-25250,190,6950], [-25500,180,6860]],
   ['tower', [-25290,184,6600], [-25380,200,6543]],
-  ['hangar-cargo', [-25950,215,5750], [-25620,178,5850]],
-  ['departure-walk', [-25467,184,7410], [-25520,190,7420]],
+  ['hangar-cargo', [-26095,233,5850], [-25620,175,5850]],
+  ['departure-walk', [-25455.6,179,7432], [-25480.6,179,7432]],
   ['stand-walk', [-25894,177,7644], [-25874,180,7640]],
   ['threshold-walk', [-26366,177,8248], [-26354,177,8170]],
 ]
+const table=JSON.parse(await readFile(process.env.AIRPORT_SHOT_PROPS??'dist/world/airport-props.json','utf8'))
+function detail(name,kind,distance,height,azimuth=0){
+  const [east,ground,south,yaw]=table[kind][0],angle=yaw+azimuth
+  views.push([name,[east+distance*Math.sin(angle),ground+height,south+distance*Math.cos(angle)],
+    [east,ground+(kind==='standSign'?1.6:1.15),south]])
+}
+detail('stand-number','standSign',6,2)
+detail('ground-service','bus',12,3,.85)
+detail('papi','papi',15,2,.7)
+detail('approach','approachLight',15,2,.55)
+detail('scenic-fence','fence',8,2,.95)
+views.push(['terminal-night',[-25950,207,7100],[-25620,182,7430]])
 const prefix = process.argv[2] ?? 'captures/airport/before'
 await mkdir(dirname(prefix), {recursive:true})
 const server = process.env.BASE ? null : await preview({root:'web',configFile:'web/vite.config.ts',preview:{host:'127.0.0.1',port:0}})
@@ -27,19 +39,20 @@ try {
   await page.waitForFunction(() => window.viewer?.camera, null, {timeout:180000})
   const metrics = {}
   for (const [name, eye, target] of views) {
-    await page.evaluate(([eye,target]) => {
+    await page.evaluate(([eye,target,name]) => {
       const { camera, manifest } = window.viewer
+      window.viewer.clock.set(name==='terminal-night'?22:11)
       if (!manifest.region || manifest.dev_bbox) throw Error('Airport shots require the expanded world')
       camera.position.set(...eye)
       camera.lookAt(...target)
       camera.updateMatrixWorld()
-    }, [eye,target])
+    }, [eye,target,name])
     await page.waitForTimeout(4000)
     await page.waitForFunction(() => {
       const { stream, manifest, camera } = window.viewer
       const nearby = manifest.chunks.filter(tile => Math.hypot(tile.x + 128 - camera.position.x,
         tile.z + 128 - camera.position.z) <= stream.radius)
-      return nearby.length && nearby.every(tile => stream.loaded.has(tile)) &&
+      return (!manifest.airportProps||stream.scene.getObjectByName('Airport props')) && !stream.updateLandmarks?.pendingCount?.() && nearby.length && nearby.every(tile => stream.loaded.has(tile)) &&
         !stream.pending.size && !stream.forest.pending.size
     }, null, {timeout:120000})
     metrics[name] = await page.evaluate(async () => {

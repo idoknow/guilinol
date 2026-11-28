@@ -12,7 +12,7 @@ from shapely.geometry import box, LineString
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from airport import airfield
 from features import polygons
-from shop_lettering import letters
+from airport_lettering import outline
 from liangjiang_grade import Grade
 
 
@@ -63,6 +63,45 @@ class Batch:
                 name=material,baseColorFactor=[*color,255],roughnessFactor=.65,metallicFactor=.12,
                 doubleSided=True,emissiveFactor=[.30,.24,.12] if material.endswith('_lit') else None))
             scene.add_geometry(mesh,node_name=f'{group}_{material}',parent_node_name=group)
+
+
+def front_sign(batch,text,easting,base,width,height):
+    if batch.level==2: return
+    shape=outline(text)
+    left,bottom,right,top=shape.bounds
+    batch.slab(box(easting-.3,-width/2-.75,easting,width/2+.75),base-.45,base+height+.45,'airport_structure')
+    for polygon in polygons(shape):
+        vertices,faces=trimesh.creation.triangulate_polygon(polygon,engine='earcut')
+        batch.mesh([(easting+.05,base+height*(up-bottom)/(top-bottom),width*(.5-(along-left)/(right-left)))
+                    for along,up in vertices],faces,'airport_red')
+
+
+def terminal_one(batch, footprint, solid):
+    west,north,east,south=footprint.bounds
+    batch.slab(solid,-.2,6.8,'airport_concrete')
+    batch.slab(footprint,6.8,9,'airport_glass_lit')
+    def arch(easting,southing):
+        phase=(2*easting-west-east)/(east-west)
+        return 9+13*np.sqrt(max(0,1-phase**2))
+    cuts=np.linspace(west,east,(33,17,9)[batch.level])
+    for low,high in zip(cuts,cuts[1:]):
+        strip=footprint.intersection(box(low,north,high,south))
+        batch.slab(strip,9,arch,'airport_glass_lit')
+        batch.slab(strip,arch,lambda x,z:arch(x,z)+.4,'airport_roof_metal')
+    for station in np.linspace(north+2,south-2,(18,9,3)[batch.level]):
+        for low,high in zip(cuts,cuts[1:]):
+            rib=footprint.intersection(box(low,station,high,station+.24))
+            batch.slab(rib,lambda x,z:arch(x,z)+.4,lambda x,z:arch(x,z)+.62,'airport_structure')
+    span=min(38,(south-north)*.25)
+    front=[(east-6+6*cos(angle),span*sin(angle)) for angle in np.linspace(-pi/2,pi/2,33)]
+    from shapely.geometry import Polygon
+    lobby=Polygon([(east-9,-span),*front,(east-9,span)])
+    batch.slab(lobby,1.4,9.8,'airport_glass_lit')
+    batch.slab(lobby,9.8,10.4,'airport_red')
+    for offset in range(6):
+        step=translate(lobby,2.5-offset*.42,0)
+        batch.slab(step,offset*.24,(offset+1)*.24,'airport_concrete')
+    front_sign(batch,'桂林',east+.2,10.8,13,5.3)
 
 
 def terminal(batch, footprint, solid, t2):
@@ -121,11 +160,12 @@ def terminal(batch, footprint, solid, t2):
                 batch.beam((boundary,sill,station),(boundary,sill+5.45,station),.15,'airport_structure')
             for low,high in zip(np.linspace(-6,6,7)[:-1],np.linspace(-6,6,7)[1:]):
                 batch.mesh([(front_x(z),y,z) for z,y in [(low,sill+2),(high,sill+2),(high,sill+5.45),(low,sill+5.45)]],[(0,1,2),(0,2,3)],'airport_structure')
-        class FrontSign:
-            detail = batch.detail
-            def mesh(self, vertices, faces, material):
-                batch.mesh([(front_x(-along)+.012+depth,height,-along) for along,height,depth in vertices],faces,material)
-        letters(FrontSign(),'桂林两江国际机场' if t2 else '桂林',(0,sill+2,0),34 if t2 else 12,3.4,'airport_red')
+        frontage=front_x(0)
+        for lower,upper,depth,material in [(6.5,7,8,'airport_concrete'),(11,11.45,10,'airport_roof_metal')]:
+            batch.slab(box(frontage-2,-24,frontage+depth,24),lower,upper,material)
+        for station in [-21,-7,7,21]:
+            batch.beam((frontage+7,-.04,station),(frontage+7,11.05,station),.32,'airport_structure')
+        front_sign(batch,'桂林两江国际机场',frontage+.4,12.4,34,3.6)
 
 
 def tower(batch, footprint):
@@ -191,7 +231,8 @@ def generate(name, way):
     scene = trimesh.Scene()
     for level in range(3):
         batch = Batch(level)
-        if name in ('t1','t2'): terminal(batch,foot,solid,name=='t2')
+        if name=='t1': terminal_one(batch,foot,solid)
+        elif name=='t2': terminal(batch,foot,solid,True)
         elif name=='tower': tower(batch,foot)
         else: warehouse(batch,foot,name=='hangar')
         batch.finish(scene,f'lod{level}',grade)

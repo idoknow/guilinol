@@ -1,10 +1,13 @@
-"""Bake markings into the native one-metre ground map; no coplanar decals."""
+"""Bake pavement albedo; export paint separately from the metre-scale raster."""
 from collections import defaultdict
 import math
+import json
 
 import numpy as np
 from PIL import ImageDraw
 from shapely.geometry import LineString
+from shapely.geometry import Polygon
+import trimesh
 from shapely.ops import unary_union
 
 from common import load_osm
@@ -50,7 +53,30 @@ def bake_airport(texture,left,top,bounds,stencil,palette):
             width=float(row['tags'].get('width',default_width)); strip=area(row)
             if strip.is_empty: strip=line.buffer(width/2,cap_style='flat')
             fill(strip,'runway_asphalt')
-        if kind=='taxiway':
+    for row in load_osm():
+        if row['type']!='node' and row.get('tags',{}).get('amenity')=='parking':
+            parking=area(row)
+            if field.intersects(parking): fill(parking,'runway_asphalt')
+
+
+def write_markings(output,bounds,ground):
+    field,sources=pavement_sources(load_osm())
+    if field is None or not bounds.intersects(field): return None
+    vertices=defaultdict(list)
+    def polygon(shape,color):
+        for part in polygons(shape.intersection(bounds)):
+            if part.area<.001: continue
+            points,faces=trimesh.creation.triangulate_polygon(part,engine='earcut')
+            for east,south in points[faces].reshape(-1,2):
+                vertices[color].extend((round(east,3),round(ground(east,south)+.025,3),round(south,3)))
+    def stroke(shape,color,width=.23):
+        for line in getattr(shape,'geoms',[shape]):
+            if line.geom_type!='LineString' or line.is_empty: continue
+            coords=list(line.segmentize(3).coords)
+            for start,end in zip(coords,coords[1:]):
+                polygon(LineString([start,end]).buffer(width/2,cap_style='flat'),color)
+    for kind in ('taxiway',):
+        if sources[kind]:
             for row,line in sources[kind]:
                 if not area(row).is_empty: continue
                 stroke(line,'marking_yellow')
@@ -72,17 +98,23 @@ def bake_airport(texture,left,top,bounds,stencil,palette):
             across=np.array([-along[1],along[0]])
             def bar(station,offset,length,width):
                 start=begin+station*along+offset*across
-                draw.polygon([xy(start+forward*along+side*across) for forward,side in
-                              [(0,-width/2),(length,-width/2),(length,width/2),(0,width/2)]],fill=palette['marking_white'])
+                stroke(LineString([start,start+length*along]),'marking_white',width)
             for side in (-1,1):
                 bar(0,side*21,length/2,1)
-                for offset in (3,7,11,15,19): bar(8,side*offset,28,2)
+                for offset in (2.7,6.3,9.9,13.5,17.1,20.7): bar(8,side*offset,30,1.8)
                 bar(300,side*13,42,6)
                 for station in (150,450,600): bar(station,side*10,22,2)
             for station in range(100,int(length/2)-22,50): bar(station,0,25,1.5)
-            digits={'0':['111','101','101','101','111'],'1':['010','110','010','010','111'],
-                    '9':['111','101','111','001','111']}
-            for digit_index,digit in enumerate(number):
-                for index,scan in enumerate(digits[digit]):
-                    for column,pixel in enumerate(scan):
-                        if pixel=='1': bar(60+(4-index)*3,(column+digit_index*4-3)*2,3,2)
+            outer=[(0,1),(1,0),(4,0),(5,1),(5,8),(4,9),(1,9),(0,8)]
+            digits={'0':Polygon(outer,[[(1.3,1.4),(3.7,1.4),(3.7,7.6),(1.3,7.6)]]),
+                    '1':Polygon([(1,6.4),(1,7.9),(2.6,9),(3.7,9),(3.7,0),(2.3,0),(2.3,7)]),
+                    '9':Polygon([(0,4.5),(0,8),(1,9),(4,9),(5,8),(5,1),(4,0),(1,0),(0,1),(0,2),(1.4,2),(1.4,1.4),(3.7,1.4),(3.7,3.5),(1,3.5)],
+                                [[(1.3,5),(3.7,5),(3.7,7.6),(1.3,7.6)]])}
+            for index,digit in enumerate(number):
+                def transform(ring):
+                    return [begin+(60+up)*along+(across_pos+index*7-6)*across for across_pos,up in ring.coords]
+                glyph=digits[digit]
+                polygon(Polygon(transform(glyph.exterior),[transform(hole) for hole in glyph.interiors]),'marking_white')
+    file=output/'airport-markings.json'
+    file.write_text(json.dumps(vertices,separators=(',',':')))
+    return dict(file=file.name,bytes=file.stat().st_size)
