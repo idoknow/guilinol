@@ -57,10 +57,11 @@ def _model_structure_footprint(glb_path: Path, px: float, pz: float, rot_deg: fl
 
 
 class Layout:
-    def __init__(self):
+    def __init__(self, bounds=None):
         root = Path(__file__).resolve().parent
         self.entries = []
         self.ids = set()
+        self.airport_replacements = set()
         self.flatten = []
         self.flatten_transitions = []
         self.school_grounds = []
@@ -74,6 +75,10 @@ class Layout:
         peak_models = {peak['model'] for peak in json.loads((root/'peaks.json').read_text()) if peak.get('model')}
         for entry in json.loads((root/'landmarks.json').read_text()):
             anchor = entry['anchor']
+            if entry.get('expandedAirport'):
+                if anchor not in osm or (bounds is not None and not bounds.intersects(area(osm[anchor]))):
+                    continue
+                self.airport_replacements.update(entry['replace'])
             if isinstance(anchor,str):
                 element = osm[anchor]
                 if element['type']=='node':
@@ -131,7 +136,7 @@ class Layout:
                 metadata['sphere'] = [*rounded, math.ceil((radius+math.dist(center,rounded))*1000)/1000]
                 self.entries.append((x,z,dict(id=entry['id'],name=entry['name'],file=entry['model'],
                     rotation=entry.get('rotation',0),collision=entry['collision'],bytes=model.stat().st_size,
-                    **metadata)))
+                    **({'farRadius': entry['farRadius']} if 'farRadius' in entry else {}), **metadata)))
         model_polys = []
         for x, z, entry in self.entries:
             if entry['id'] in ('fubo', 'diecai', 'duxiu'):

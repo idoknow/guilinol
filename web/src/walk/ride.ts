@@ -3,6 +3,7 @@ import * as T from 'three'
 import type {Stream} from '../stream'
 import type {Tile} from '../world'
 import {clearAvatarPose, getAvatarJoints} from './avatar-rig'
+import {headlightPolicyFor} from './vehicle-lights'
 import {
   applyKnockdownPose,
   createKnockdownState,
@@ -38,8 +39,18 @@ import {
   type TwoWheelCrashReason,
 } from './config'
 
+import {
+  clampHeadlightForVehicle,
+  createSharedTurnSlipDetector,
+  isSharedEbike,
+  isSharedEbikeGearLocked,
+  isSharedHeadlightSwitchLocked,
+  type SharedTurnSlipStats,
+} from './shared-ebike-logic'
+
 export type RideKind = 'bike' | 'bicycle'
 export type ExtendedTwoWheelCrashReason = TwoWheelCrashReason | 'slip'
+export type TwoWheelCrashCause = '' | 'shared_turn_slip'
 
 export interface EbikeStepControl {
   wheelie?: boolean | number
@@ -68,6 +79,9 @@ export interface EbikeMountOptions {
   autoCrash?: boolean
   parkStart?: boolean
   envHour?: number
+  sharedSlipEnabled?: boolean
+  sharedSlipRng?: (() => number) | null
+  sharedSlipMountGraceSec?: number
 }
 
 export interface TwoWheelSurfaceState {
@@ -100,6 +114,7 @@ export interface TwoWheelPickupResult {
 export interface TwoWheelCrashSnapshot {
   phase: TwoWheelCrashPhase
   reason: ExtendedTwoWheelCrashReason
+  cause: TwoWheelCrashCause
   side: -1 | 1
   kind: RideKind
   bikePos: {x: number; y: number; z: number}
@@ -189,6 +204,7 @@ export interface EbikeDynamicTelemetry {
   offRoadSurface: boolean
   crashPhase: TwoWheelCrashPhase
   crashReason: ExtendedTwoWheelCrashReason
+  crashCause: TwoWheelCrashCause
   crashSide: -1 | 1
   bikeIsDown: boolean
   riderOnFoot: boolean
@@ -507,7 +523,13 @@ export function createBikeControl() {
   let riderPos = {x: 0, y: 0, z: 0}
   let crashPhase: TwoWheelCrashPhase = 'none'
   let crashReason: ExtendedTwoWheelCrashReason = ''
+  let crashCause: TwoWheelCrashCause = ''
   let crashSide: -1 | 1 = 1
+  let sharedSlipEnabled = false
+  let sharedSlipRng: (() => number) | null = null
+  let sharedSlipDetector = createSharedTurnSlipDetector()
+  let lastGearLockToastAt = 0
+  let lastLightLockToastAt = 0
   let crashElapsed = 0
   let phaseElapsed = 0
   let bikeRoll = 0
@@ -529,7 +551,7 @@ export function createBikeControl() {
   }
 
   function defaultGearFor(targetKind: RideKind) {
-    return targetKind === 'bicycle' ? BICYCLE_DEFAULT_GEAR : EBIKE_DEFAULT_GEAR
+    return targetKind === 'bicycle' ? BICYCLE_DEFAULT_GEAR : profile.defaultGear
   }
 
   function currentGearSpec(): EbikeGearProfile {
@@ -619,6 +641,7 @@ export function createBikeControl() {
   function clearCrashState() {
     crashPhase = 'none'
     crashReason = ''
+    crashCause = ''
     crashElapsed = 0
     phaseElapsed = 0
     bikeRoll = 0
@@ -653,6 +676,8 @@ export function createBikeControl() {
     lastBatteryStatus = 'normal'
     drainEnabledOverride = undefined
     autoCrashOverride = undefined
+    sharedSlipEnabled = false
+    sharedSlipDetector.reset(false)
     justRecoveredToRide = false
     parkLocked = false
     kickstandDown = false
@@ -750,27 +775,75 @@ export function createBikeControl() {
     return setKickstand(!kickstandDown, silent)
   }
 
+  function notifySharedGearLocked() {
+    if (isVerifySilentMode()) return
+    const now = typeof performance !== 'undefined' ? performance.now() : Date.now()
+    if (now - lastGearLockToastAt < 1800) return
+    lastGearLockToastAt = now
+    emitToast(parkLocked ? 'P 档驻车中，按 S / P / K 解除驻车' : '共享电动车单档运行，无法调档', 1800)
+  }
+
+  function notifyHeadlightPolicyRejected(msg: string) {
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('walk:headlight-policy', {
+        detail: {kind, vehicleType, rejected: true, reason: msg},
+      }))
+    }
+    if (isVerifySilentMode()) return
+    const now = typeof performance !== 'undefined' ? performance.now() : Date.now()
+    if (now - lastLightLockToastAt < 1800) return
+    lastLightLockToastAt = now
+    emitToast(msg, 2000)
+  }
+
   function setHeadlight(mode: EbikeHeadlightMode, manual = true) {
+    const policy = headlightPolicyFor(kind, vehicleType)
+    const switchLocked = !policy.switchable || isSharedHeadlightSwitchLocked(kind, vehicleType)
+    if (switchLocked) {
+      if (manual) {
+        notifyHeadlightPolicyRejected(policy.rejectMessage ?? '共享车辆锁定基础车灯，无法切换远近光')
+        return headlight
+      }
+      const clamped = clampHeadlightForVehicle(kind, vehicleType, mode)
+      if (kind === 'bike' && batteryPct <= 0 && clamped !== 'off') {
+        headlight = 'off'
+        return headlight
+      }
+      headlight = policy.maxMode === 'off' ? 'off' : policy.maxMode === 'low' && clamped === 'high' ? 'low' : clamped
+      return headlight
+    }
     if (kind === 'bike' && batteryPct <= 0 && mode !== 'off') {
       headlight = 'off'
       if (manual && !isVerifySilentMode()) emitToast('电量耗尽，无法开启头灯', 1800)
       return headlight
     }
-    headlight = mode
+    const clampedMode: EbikeHeadlightMode =
+      policy.maxMode === 'off' ? 'off' : policy.maxMode === 'low' && mode === 'high' ? 'low' : mode
+    headlight = clampedMode
     if (manual) headlightManual = true
     return headlight
   }
 
   function cycleHeadlight() {
+    const policy = headlightPolicyFor(kind, vehicleType)
+    if (!policy.switchable || isSharedHeadlightSwitchLocked(kind, vehicleType)) {
+      notifyHeadlightPolicyRejected(policy.rejectMessage ?? '共享车辆锁定基础车灯，无法切换远近光')
+      return headlight
+    }
     const order: readonly EbikeHeadlightMode[] = ['off', 'low', 'high']
     const next = order[(order.indexOf(headlight) + 1) % order.length]
     return setHeadlight(next, true)
   }
 
   function setEnvironmentHour(hour: number) {
-    if (headlightManual || batteryPct <= 0 || crashPhase !== 'none') return
-    const isNight = hour >= 18.5 || hour < 6.0
-    headlight = isNight ? 'low' : 'off'
+    const policy = headlightPolicyFor(kind, vehicleType)
+    if (policy.maxMode === 'off' || kind === 'bicycle') {
+      headlight = 'off'
+      return
+    }
+    if ((policy.switchable && headlightManual) || batteryPct <= 0 || crashPhase !== 'none') return
+    const isNight = hour >= 18.2 || hour < 6.2
+    headlight = clampHeadlightForVehicle(kind, vehicleType, isNight ? 'low' : 'off')
   }
 
   function setTurnSignal(next: EbikeTurnSignal) {
@@ -840,6 +913,11 @@ export function createBikeControl() {
   }
 
   function setGear(nextGear: number) {
+    if (isSharedEbikeGearLocked(kind, vehicleType)) {
+      gear = 1
+      if (Math.round(nextGear) !== 1 || parkLocked) notifySharedGearLocked()
+      return parkLocked ? 0 : gear
+    }
     const list = activeGears()
     gear = T.MathUtils.clamp(Math.round(nextGear), 1, list.length)
     if (parkLocked || kickstandDown) unlockParkIfNeeded(true, true)
@@ -852,6 +930,11 @@ export function createBikeControl() {
   }
 
   function shiftGear(delta: number) {
+    if (isSharedEbikeGearLocked(kind, vehicleType)) {
+      gear = 1
+      if (delta !== 0) notifySharedGearLocked()
+      return parkLocked ? 0 : gear
+    }
     if (kind === 'bike' && parkLocked) {
       // Pressing gear-up (E) from P unlocks safely (clamping D3/S -> D2, keeping D1 -> D1);
       // pressing gear-down (Q) in P keeps P locked (returns 0).
@@ -869,9 +952,12 @@ export function createBikeControl() {
     if (vehicleType === 'shared') {
       mods = null
       modelId = null
+      headlightManual = false
+      headlight = clampHeadlightForVehicle(kind, vehicleType, headlight)
     }
     profile = computeActiveProfile()
-    gear = T.MathUtils.clamp(gear, 1, activeGears().length)
+    gear = T.MathUtils.clamp(vehicleType === 'shared' ? 1 : gear, 1, activeGears().length)
+    sharedSlipDetector.reset(false)
     return profile
   }
 
@@ -928,12 +1014,21 @@ export function createBikeControl() {
       || (spd >= s.crash.angledImpactCrashMs && (Math.abs(preLeanRad) >= s.crash.angledImpactLeanRad || preWheelieRad >= .12))
   }
 
-  function triggerCrash(reason: Exclude<ExtendedTwoWheelCrashReason, ''>, side?: -1 | 1, probe?: TwoWheelCrashWorldProbe): TwoWheelCrashSnapshot {
+  function triggerCrash(
+    reason: Exclude<ExtendedTwoWheelCrashReason, ''>,
+    side?: -1 | 1,
+    probe?: TwoWheelCrashWorldProbe,
+    cause: TwoWheelCrashCause = '',
+  ): TwoWheelCrashSnapshot {
     if (crashPhase !== 'none') return crashSnapshot()
     const resolvedSide: -1 | 1 = side ?? (Math.abs(lean) > .05 ? (lean > 0 ? -1 : 1) : (steerInput >= 0 ? 1 : -1))
-    const entrySpd = Math.max(Math.abs(speed), reason === 'loopout' ? 4.4 : (reason === 'lowside' || reason === 'slip') ? 5.0 : 3.4)
+    const isSharedTurnSlip = cause === 'shared_turn_slip'
+    const entrySpd = isSharedTurnSlip
+      ? Math.max(Math.abs(speed), 3.6)
+      : Math.max(Math.abs(speed), reason === 'loopout' ? 4.4 : (reason === 'lowside' || reason === 'slip') ? 5.0 : 3.4)
     crashPhase = 'sliding'
     crashReason = reason
+    crashCause = cause
     crashSide = resolvedSide
     crashElapsed = 0
     phaseElapsed = 0
@@ -996,7 +1091,7 @@ export function createBikeControl() {
         : reason === 'loopout'
           ? `翘头过度后翻！连按空格（或点击起身）5次站起，再扶起${vehicleName}`
           : `撞击倒地！连按空格（或点击起身）5次站起，再扶起${vehicleName}`
-    if (!isVerifySilentMode()) emitToast(msg, 2800)
+    if (!isVerifySilentMode() && !isSharedTurnSlip) emitToast(msg, 2800)
     return crashSnapshot()
   }
 
@@ -1171,6 +1266,7 @@ export function createBikeControl() {
     return {
       phase: crashPhase,
       reason: crashReason,
+      cause: crashCause,
       side: crashSide,
       kind,
       bikePos: {...bikePos},
@@ -1273,6 +1369,7 @@ export function createBikeControl() {
       offRoadSurface,
       crashPhase,
       crashReason,
+      crashCause,
       crashSide,
       bikeIsDown: snap.bikeIsDown,
       riderOnFoot: snap.riderOnFoot,
@@ -1336,9 +1433,20 @@ export function createBikeControl() {
       lastBatteryStatus = batteryStatusOf(batteryPct)
       drainEnabledOverride = options?.drainEnabled
       autoCrashOverride = options?.autoCrash
+      sharedSlipEnabled = options?.sharedSlipEnabled ?? false
+      if (options?.sharedSlipRng !== undefined) sharedSlipRng = options.sharedSlipRng
+      if (options?.sharedSlipMountGraceSec !== undefined) {
+        sharedSlipDetector = createSharedTurnSlipDetector({
+          mountGraceSec: options.sharedSlipMountGraceSec,
+          rng: sharedSlipRng ?? undefined,
+        })
+      } else {
+        sharedSlipDetector.reset(false)
+      }
       parkLocked = kind === 'bike' ? (options?.parkStart ?? !isVerifyMode()) : false
       kickstandDown = parkLocked
       if (options?.envHour !== undefined) setEnvironmentHour(options.envHour)
+      headlight = clampHeadlightForVehicle(kind, vehicleType, headlight)
       gripLimitRad = spec().crash.mandatoryFallLeanRad
     },
     setGear,
@@ -1349,6 +1457,17 @@ export function createBikeControl() {
     setUpgrades,
     setBattery,
     setAutoCrash(on: boolean | undefined) { autoCrashOverride = on },
+    setSharedSlipEnabled(on: boolean) { sharedSlipEnabled = on },
+    setSharedSlipRng(rng: (() => number) | null) {
+      sharedSlipRng = rng
+      sharedSlipDetector.setRng(rng)
+    },
+    get sharedSlipStats(): SharedTurnSlipStats { return sharedSlipDetector.getStats() },
+    forceSharedTurnSlip(side?: -1 | 1, probe?: TwoWheelCrashWorldProbe): TwoWheelCrashSnapshot {
+      if (crashPhase !== 'none') return crashSnapshot()
+      const resolvedSide: -1 | 1 = side ?? (Math.abs(lean) > .05 ? (lean > 0 ? -1 : 1) : (steerInput >= 0 ? 1 : -1))
+      return triggerCrash('slip', resolvedSide, probe, 'shared_turn_slip')
+    },
     setPark,
     togglePark,
     setKickstand,
@@ -1486,7 +1605,9 @@ export function createBikeControl() {
             if (!isVerifySilentMode()) {
               emitToast(
                 kind === 'bike'
-                  ? 'P 档防误拧保护中 · 轻捏刹车(S) / 按 P / 按 1-4 解锁出发'
+                  ? isSharedEbike(kind, vehicleType)
+                    ? 'P 档防误拧保护中 · 轻捏刹车(S) / 按 P / 按 K 解锁出发'
+                    : 'P 档防误拧保护中 · 轻捏刹车(S) / 按 P / 按 1-4 解锁出发'
                   : '边撑已放下 · 按 K 或轻捏刹车(S) 收起边撑',
                 2200,
               )
@@ -1620,6 +1741,23 @@ export function createBikeControl() {
       const dirSign = speed < -.05 ? -1 : 1
       const frontGripFactor = wheelie > .18 ? T.MathUtils.lerp(1, .52, T.MathUtils.clamp((wheelie - .18) / .35, 0, 1)) : 1
       heading -= steerInput * omega * dirSign * frontGripFactor * cdt
+
+      // Shared e-bike turn-event slip check (1% per deliberate turn, never 60fps re-rolled).
+      if (isSharedEbike(kind, vehicleType)) {
+        const slipCheck = sharedSlipDetector.step({
+          dt: cdt,
+          speed,
+          steerInput,
+          dYaw: shortestAngle(prevHeading, heading),
+          isSharedEbike: true,
+          enabled: sharedSlipEnabled && (canAutoCrash() || sharedSlipRng !== null),
+          rng: sharedSlipRng ?? (isVerifyMode() ? () => 1 : undefined),
+        })
+        if (slipCheck.slipped) {
+          triggerCrash('slip', slipCheck.side, undefined, 'shared_turn_slip')
+          return speed
+        }
+      }
 
       // Wheelie side balance: too much cornering load or a yanked bar while on the back wheel fills the tip meter.
       const lift = T.MathUtils.clamp((wheelie - .1) / (WHEELIE_MAX_RAD - .1), 0, 1)

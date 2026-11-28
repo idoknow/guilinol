@@ -19,7 +19,15 @@ export interface CraftState {
   /** Parked aircraft trickle back up; the one in the air does not. */
   charging:boolean
   damage:DamageRecord|null
+  /**
+   * IDOK-530: 机身完整度 0..100，撞击按力度扣分，进水量满了一并扣到底；
+   * 跌破 DAMAGE_INTEGRITY 才算「损坏」，在此之前只是越来越难飞（也会在遥控里显示）。
+   */
+  integrity:number
 }
+
+/** 完整度低于这个值就是「损坏」，得走近维修。 */
+export const DAMAGE_INTEGRITY = 20
 
 /** Minutes of wall clock for a flat battery to come back — the hangar is a slow charger. */
 const CHARGE_SECONDS = 90
@@ -28,7 +36,7 @@ const KEY = 'glol.drone-health'
 const states = new Map<DroneId,CraftState>()
 
 function blank():CraftState {
-  return {battery:100,charging:true,damage:null}
+  return {battery:100,charging:true,damage:null,integrity:100}
 }
 
 function load() {
@@ -42,6 +50,7 @@ function load() {
       if (!entry) continue
       const state = states.get(id)!
       if (Number.isFinite(entry.battery)) state.battery = clampBattery(entry.battery as number)
+      if (Number.isFinite(entry.integrity)) state.integrity = clampBattery(entry.integrity as number)
       state.charging = entry.charging !== false
       const damage = entry.damage
       if (damage && typeof damage.cause === 'string' && Number.isFinite(damage.x)) {
@@ -86,6 +95,28 @@ export function damageOf(id:DroneId):DamageRecord|null {
   return stateOf(id).damage
 }
 
+export function integrityOf(id:DroneId):number {
+  return stateOf(id).integrity
+}
+
+/**
+ * IDOK-530: 撞击/进水扣完整度。伤害不直接等于损坏 —— 只是把机身越弄越脆，
+ * 跌破 DAMAGE_INTEGRITY 才由调用方判定为损坏。返回扣完之后的完整度。
+ */
+export function addWear(id:DroneId, amount:number):number {
+  const state = stateOf(id)
+  if (amount <= 0) return state.integrity
+  state.integrity = clampBattery(state.integrity - amount)
+  dirty = true
+  return state.integrity
+}
+
+export function setIntegrity(id:DroneId, value:number) {
+  const state = stateOf(id)
+  state.integrity = clampBattery(value)
+  dirty = true
+}
+
 /** Ground the aircraft: battery drain, damage and parking all go through here. */
 export function setBattery(id:DroneId, battery:number, charging:boolean) {
   const state = stateOf(id)
@@ -109,6 +140,8 @@ export function raiseDamage(id:DroneId, cause:DamageCause, at:{x:number;y:number
 export function clearDamage(id:DroneId, battery?:number) {
   const state = stateOf(id)
   state.damage = null
+  // IDOK-530: 修好就是修好 —— 扳手走完 30 秒，机身完整度一起补满。
+  state.integrity = 100
   if (battery !== undefined) state.battery = clampBattery(battery)
   state.charging = true
   dirty = true

@@ -2,7 +2,12 @@ import './mission-ui.css'
 import {spots} from '../play/spots'
 import {listMissionsForUi, type MissionRunnerEngine} from './missions'
 import {getActiveSaveSnapshot as getSaveSnapshot} from './save'
-import {getState, onState, type GameState} from './state'
+import {getState, onEvent, onState, type GameState} from './state'
+
+/** 共享电车理赔入账（= walk/shared-ebike-logic.ts SHARED_EBIKE_COMPENSATION_REASON）；钱包只对这一笔做跳动反馈 */
+const COMPENSATION_REASON = 'shared_ebike_compensation'
+const WALLET_BOUNCE_MS = 680
+const WALLET_DELTA_MS = 900
 
 export interface MissionUiController {
   openBoard(): void
@@ -187,6 +192,37 @@ export function mountMissionUi(
   const off = onState(renderHud)
   renderHud(getState())
 
+  // IDOK-545：理赔到账时方孔钱与金额跳一下，牌侧飘出一枚金色 +¥ 浮标（900ms 后自毁）
+  let bounceTimer = 0
+  let deltaTimer = 0
+  let deltaTag: HTMLElement | null = null
+  function pulseWallet(delta: number): void {
+    entry.classList.remove('is-comp-bounce')
+    void entry.offsetWidth // 连续两笔时从头再跳
+    entry.classList.add('is-comp-bounce')
+    clearTimeout(bounceTimer)
+    bounceTimer = window.setTimeout(() => {
+      entry.classList.remove('is-comp-bounce')
+      bounceTimer = 0
+    }, WALLET_BOUNCE_MS)
+    clearTimeout(deltaTimer)
+    deltaTag?.remove()
+    const tag = document.createElement('span')
+    tag.className = 'gl-wallet-delta'
+    tag.setAttribute('aria-hidden', 'true')
+    tag.textContent = `+¥${Math.round(delta).toLocaleString('zh-CN')}`
+    entry.append(tag)
+    deltaTag = tag
+    deltaTimer = window.setTimeout(() => {
+      tag.remove()
+      if (deltaTag === tag) deltaTag = null
+      deltaTimer = 0
+    }, WALLET_DELTA_MS)
+  }
+  const offWallet = onEvent(ev => {
+    if (ev.type === 'money:change' && ev.delta > 0 && ev.reason === COMPENSATION_REASON) pulseWallet(ev.delta)
+  })
+
   return {
     openBoard,
     closeBoard,
@@ -195,6 +231,11 @@ export function mountMissionUi(
     },
     dispose() {
       off()
+      offWallet()
+      clearTimeout(bounceTimer)
+      clearTimeout(deltaTimer)
+      deltaTag?.remove()
+      deltaTag = null
       entry.remove()
       hud.remove()
       dialog.remove()

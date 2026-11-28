@@ -128,7 +128,7 @@ export function multiplayer(pool,env,{cache}={}){
   async function route(path,request,actor){
     if(path.startsWith('admin/bans/'))return guardAdmin(pool,env,path,request,actor)
     const params=new URL(request.url).searchParams
-    if(path==='admin/security-search')return securitySearch(pool,request)
+    if(path==='admin/security-search')return securitySearch(pool,request,actor)
     if(cheatCaptures&&path.startsWith('admin/mp/cheat-captures')){
       const handled=await cheatCaptures.adminRoute(path,request,actor)
       if(handled)return handled
@@ -136,6 +136,201 @@ export function multiplayer(pool,env,{cache}={}){
     if(path==='admin/user-search'){
       if(request.method!=='GET')return json({error:'method not allowed'},405)
       return json(await searchBanUsers(pool,(params.get('q')??'').trim().slice(0,128)))
+    }
+    // 按记录编号查封禁总账、关联事件与抓拍（一屏审申诉用；优先合并 RT 实时状态，RT 不可用时回退 PG）
+    if(path==='admin/ban-record'){
+      if(request.method!=='GET')return json({error:'method not allowed'},405)
+      const id=(params.get('id')??'').trim()
+      if(!id||!/^[A-Za-z0-9_-]{6,64}$/.test(id))return json({error:'invalid record id'},400)
+      const safeQuery=async(sql,args)=>{
+        try{return (await pool.query(sql,args)).rows}catch(err){
+          if(['42P01','42703'].includes(err?.code)||/does not exist|no such/i.test(String(err?.message??'')))return []
+          throw err
+        }
+      }
+      const normalizeRecord=(raw)=>{
+        if(!raw||typeof raw!=='object')return null
+        const uidVal=raw.uid!=null&&Number.isFinite(Number(raw.uid))?Number(raw.uid):null
+        const fpVal=raw.fp?String(raw.fp):null
+        const recId=String(raw.id??raw.recordId??raw.record_id??id)
+        return {
+          id:recId,
+          kind:raw.kind||(uidVal!=null?'uid':'fp'),
+          value:raw.value!=null?String(raw.value):(uidVal!=null?String(uidVal):fpVal||''),
+          uid:uidVal,
+          fp:fpVal,
+          tier:raw.tier??'ban',
+          reason:raw.reason??'',
+          actor:raw.actor??'',
+          policy_version:raw.policy_version??raw.policyVersion??null,
+          created_ms:raw.created_ms??raw.createdAt??raw.created_at??null,
+          until_ms:raw.until_ms??raw.until??null,
+          revoked_ms:raw.revoked_ms??raw.revokedAt??raw.revoked_at??null,
+          revoked_by:raw.revoked_by??raw.revokedBy??null,
+          revoke_reason:raw.revoke_reason??raw.revokedReason??raw.revoked_reason??null,
+          health:raw.health??raw.health_snapshot??null,
+        }
+      }
+      let rtData=null
+      if(env.RT_ADMIN_TOKEN){
+        try{
+          const resp=await fetch(`${base}/admin/ban-record?id=${encodeURIComponent(id)}`,{
+            headers:{'X-Admin-Token':env.RT_ADMIN_TOKEN},signal:AbortSignal.timeout(4000),redirect:'error',
+          })
+          if(resp.ok)rtData=await resp.json().catch(()=>null)
+        }catch{}
+      }
+      const [pgRec]=await safeQuery(
+        `select record_id as id,
+                case when uid is not null then 'uid' else 'fp' end as kind,
+                coalesce(uid::text, fp, '') as value,
+                uid::float8 as uid, fp, tier, reason, actor, policy_version,
+                created_at::float8 as created_ms, until_ms::float8 as until_ms,
+                revoked_at::float8 as revoked_ms, revoked_by, revoked_reason as revoke_reason,
+                health_snapshot as health
+         from mp_ban_records where record_id=$1 limit 1`,
+        [id],
+      )
+      const record=normalizeRecord(rtData?.record??pgRec??null)
+      if(!record)return json({record:null,account:null,events:[],captures:[],relatedAccounts:[]})
+      const targetUid=record.uid!=null?String(record.uid):(record.kind==='uid'&&/^\d+$/.test(String(record.value))?String(record.value):null)
+      const targetFp=record.fp||(record.kind==='fp'?String(record.value):'')
+      const [account]=targetUid
+        ? await safeQuery('select id, uid::float8 as uid, nickname, email, created_at from users where uid=$1 limit 1',[targetUid])
+        : []
+      let events=Array.isArray(rtData?.events)&&rtData.events.length?rtData.events:await safeQuery(
+        'select id, uid::float8 as uid, fp, kind, at::float8 as at, detail, health, record_id from mp_cheat_events where record_id=$1 order by at desc limit 50',
+        [id],
+      )
+      if(!events.length&&targetUid&&Number.isFinite(Number(record.created_ms))){
+        const createdMs=Number(record.created_ms)
+        events=await safeQuery(
+          'select id, uid::float8 as uid, fp, kind, at::float8 as at, detail from mp_cheat_events where uid=$1 and at between $2 and $3 order by at desc limit 30',
+          [targetUid,createdMs-10*60_000,createdMs+60_000],
+        )
+      }
+      let captures=await safeQuery(
+        `select id, uid::float8 as uid, nickname, fp, kind, record_id as "recordId",
+                captured_at::float8 as "capturedAt", state_label as "stateLabel", server_state as "serverState",
+                speed_ms::float8 as "speedMs", client_speed_ms::float8 as "clientSpeedMs",
+                landmark, landmark_dist as "landmarkDist", meta, width, height, image_bytes as "imageBytes"
+         from mp_cheat_captures where record_id=$1 order by captured_at desc limit 12`,
+        [id],
+      )
+      if(!captures.length&&targetUid&&Number.isFinite(Number(record.created_ms))){
+        const createdMs=Number(record.created_ms)
+        captures=await safeQuery(
+          `select id, uid::float8 as uid, nickname, fp, kind,
+                  captured_at::float8 as "capturedAt", state_label as "stateLabel", server_state as "serverState",
+                  speed_ms::float8 as "speedMs", client_speed_ms::float8 as "clientSpeedMs",
+                  landmark, landmark_dist as "landmarkDist", meta, width, height, image_bytes as "imageBytes"
+           from mp_cheat_captures where uid=$1 and captured_at between $2 and $3 order by captured_at desc limit 8`,
+          [targetUid,createdMs-10*60_000,createdMs+2*60_000],
+        )
+      }
+      const relatedAccounts=targetFp
+        ? await safeQuery(
+            `select d.uid::float8 as uid, u.nickname, d.last::float8 as last
+             from mp_devices d left join users u using(uid)
+             where d.fp=$1 order by d.last desc nulls last, d.uid limit 50`,
+            [targetFp],
+          )
+        : []
+      return json({
+        record,
+        account:account??null,
+        events,
+        captures:captures.map(c=>({...c,imageUrl:`/api/admin/mp/cheat-captures/${encodeURIComponent(c.id)}/image`})),
+        relatedAccounts,
+      })
+    }
+    // 按时间窗批量撤销误封（转发到 rt 并写管理审计）
+    if(path==='admin/unban-window'){
+      if(request.method!=='POST')return json({error:'method not allowed'},405)
+      if(!env.RT_ADMIN_TOKEN)return json({error:'disabled'},503)
+      const body=await request.json().catch(()=>null)
+      const fromMs=Number(body?.fromMs),toMs=Number(body?.toMs)
+      const kind=typeof body?.kind==='string'?body.kind.trim().slice(0,40):''
+      const reason=typeof body?.reason==='string'?body.reason.trim().slice(0,200):''
+      if(!Number.isFinite(fromMs)||!Number.isFinite(toMs)||toMs<=fromMs||toMs-fromMs>7*86400_000){
+        return json({error:'无效的时间窗（最多 7 天）'},400)
+      }
+      try{
+        const response=await fetch(base+'/admin/unban-window',{
+          method:'POST',redirect:'error',signal:AbortSignal.timeout(10000),
+          headers:{'X-Admin-Token':env.RT_ADMIN_TOKEN,'content-type':'application/json'},
+          body:JSON.stringify({fromMs,toMs,kind:kind||undefined,reason:reason||'时间窗批量撤销',actor}),
+        })
+        const result=await response.json().catch(()=>({}))
+        if(response.ok){
+          await pool.query(
+            "insert into admin_audit(actor_id,action,target_type,target_id,detail) values($1,'mp.unban_window','mp','window',$2)",
+            [actor,{fromMs,toMs,kind:kind||null,reason:reason||null,revoked:result.revoked??result.count??0}],
+          ).catch(()=>{})
+        }
+        return json(result,response.status)
+      }catch{return json({error:'rt unavailable'},503)}
+    }
+    // 一键解封并回复申诉（或直接维持原判结案）：先确保 RT 解封成功，再原子落库申诉状态与回复消息
+    if(path==='admin/appeal-resolve'){
+      if(request.method!=='POST')return json({error:'method not allowed'},405)
+      const body=await request.json().catch(()=>null)
+      const feedbackId=typeof body?.feedbackId==='string'?body.feedbackId.trim():''
+      const status=body?.status==='upheld'?'upheld':'unbanned'
+      const message=typeof body?.message==='string'?body.message.trim():''
+      if(!feedbackId||!/^[\w-]{6,64}$/.test(feedbackId)||!message||Array.from(message).length>1000){
+        return json({error:'参数无效，请填写 1-1000 字回复说明'},400)
+      }
+      const {rows:[fb]}=await pool.query(
+        'select f.id, f.user_id, f.kind, f.status, f.ban_record_id, u.uid::float8 as account_uid from feedback f join users u on u.id=f.user_id where f.id=$1 limit 1',
+        [feedbackId],
+      ).catch(async err=>{
+        if(err?.code==='42703'||/no such column|does not exist/i.test(String(err?.message??''))){
+          return pool.query('select f.id, f.user_id, f.kind, f.status, u.uid::float8 as account_uid from feedback f join users u on u.id=f.user_id where f.id=$1 limit 1',[feedbackId])
+        }
+        throw err
+      })
+      if(!fb)return json({error:'未找到申诉记录'},404)
+      if(fb.kind!=='封禁申诉')return json({error:'该反馈不是封禁申诉'},409)
+      if(!['submitted','need_info'].includes(fb.status))return json({error:'该申诉已结案，不可重复操作'},409)
+      let unbanned=null
+      if(status==='unbanned'){
+        if(!env.RT_ADMIN_TOKEN)return json({error:'联机解封服务未启用'},503)
+        let targetUid=body?.uid!=null&&Number.isSafeInteger(Number(body.uid))?Number(body.uid):null
+        let targetFp=typeof body?.fp==='string'&&body.fp.trim()?body.fp.trim():undefined
+        const recordId=(typeof body?.recordId==='string'&&body.recordId.trim())||fb.ban_record_id||undefined
+        if(recordId&&(!targetUid||!targetFp)){
+          const {rows:[rec]}=await pool.query('select uid::float8 as uid, fp from mp_ban_records where record_id=$1 limit 1',[recordId]).catch(()=>({rows:[]}))
+          if(rec){
+            if(!targetUid&&rec.uid!=null)targetUid=Number(rec.uid)
+            if(!targetFp&&rec.fp)targetFp=String(rec.fp)
+          }
+        }
+        if(!targetUid&&fb.account_uid!=null)targetUid=Number(fb.account_uid)
+        if(!targetUid&&!targetFp&&!recordId)return json({error:'无法定位需要解封的账号或记录'},400)
+        try{
+          const resp=await fetch(base+'/admin/unban',{
+            method:'POST',redirect:'error',signal:AbortSignal.timeout(6000),
+            headers:{'X-Admin-Token':env.RT_ADMIN_TOKEN,'content-type':'application/json'},
+            body:JSON.stringify({uid:targetUid||undefined,fp:targetFp,recordId,reason:message.slice(0,200),actor}),
+          })
+          const rtBody=await resp.json().catch(()=>({}))
+          if(!resp.ok)return json({error:rtBody.error||'联机解封失败，申诉状态未变更'},resp.status)
+          unbanned=rtBody
+        }catch{return json({error:'联机服务不可用，申诉状态未变更'},503)}
+      }
+      const updated=await pool.query(
+        `update feedback set status=$1, updated_at=extract(epoch from now())::bigint where id=$2 and status in ('submitted','need_info')`,
+        [status,feedbackId],
+      )
+      if(!updated.rowCount)return json({error:'该申诉状态已变化，请刷新后重试'},409)
+      await pool.query('insert into feedback_events(feedback_id,status,message) values($1,$2,$3)',[feedbackId,status,message])
+      await pool.query("insert into feedback_messages(feedback_id,author_kind,author_name,body) values($1,'admin','管理员',$2)",[feedbackId,message])
+      await pool.query(
+        "insert into admin_audit(actor_id,action,target_type,target_id,detail) values($1,'appeal.resolve','feedback',$2,$3)",
+        [actor,feedbackId,{status,recordId:fb.ban_record_id??body?.recordId??null,unbanned:!!unbanned}],
+      ).catch(()=>{})
+      return json({ok:true,status,unbanned})
     }
     // 联机封禁：列表 / 手动封禁 / 人工解封（转发到 rt，由 rt 的 RT_ADMIN_TOKEN 鉴权）
     if(path==='admin/bans'||path==='admin/ban'||path==='admin/unban'){

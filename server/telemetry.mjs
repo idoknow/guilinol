@@ -9,7 +9,8 @@ const labels = {vid:/^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-
   signature:/^[a-f0-9]{8}$/,errorKind:/^(error|rejection|webgl|chunk)$/,step:/^(loginOpen|loginSuccess|feedbackOpen|feedbackSuccess)$/,source:/^probe$/,node:/^(cn-gz-tencent-02|cn-sh-tencent-01)$/,target:/^(home|manifest|chunk[1-5]|health)$/,cfCache:/^(|HIT|MISS|BYPASS|EXPIRED|STALE|UPDATING|REVALIDATED|DYNAMIC)$/,device:/^(desktop|mobile)$/,os:/^(Android|iPhone|iPad|Windows|Mac OS X|Linux|other)$/i,browser:/^(Edg|Firefox|Chrome|Safari|other)$/,
   playMode:/^(tour|solo)$/,mode:/^(menu|walk|fly|map|drive)$/,grid:/^(|-?\d{1,6},-?\d{1,6})$/,category:/^(manifest|landmark|chunk|basis|other)$/,
   api:/^(feedback|login|other)$/,effectiveType:/^(slow-2g|2g|3g|4g)$/,quality:/^default$/,build:/^[a-f0-9]{40}$/,world:/^[a-f0-9]{64}$/,
-  gpu:/^[\p{L}\p{N} (),.:_+/@\[\]-]{1,160}$/u,kind:/^(firstFrame|playable|navigation|window|chunk|teleport|switch|mapOpen|resource|api|contextLost|error|probe|session|vitals|retry|failure|funnel)$/}
+  missingLandmarks:/^(?:[a-zA-Z0-9_-]{1,64}(?:,[a-zA-Z0-9_-]{1,64}){0,11})?$/,
+  gpu:/^[\p{L}\p{N} (),.:_+/@\[\]-]{1,160}$/u,kind:/^(firstFrame|playable|navigation|window|chunk|teleport|switch|mapOpen|resource|api|contextLost|error|probe|session|vitals|retry|failure|funnel|collisionTimeout)$/}
 const contextKeys = new Set('vid firstDay returnVisit language referrer maxTextureSize webgl2 source node device os browser cores memory width height dpr effectiveType rtt downlink quality build world gpu'.split(' '))
 function valid(fields,context) {
   return fields && typeof fields==='object' && !Array.isArray(fields) && Object.entries(fields).every(([k,v])=>
@@ -17,6 +18,7 @@ function valid(fields,context) {
       Object.hasOwn(labels,k)&&typeof v==='string'&&labels[k].test(v)))
 }
 const eventFields = {
+  collisionTimeout:['missingLandmarks','ms'],
   session:[...sessionKeys,'playMode'],vitals:['lcp','cls','inp','fcp'],retry:['category'],failure:['category'],funnel:['step'],
   probe:['target','dns','tcp','tls','ttfb','total','status'],
   navigation:['dns','tcp','tls','ttfb','dcl','load'],resource:['category','count','bytes','cache','p50','p95','cfCache'],

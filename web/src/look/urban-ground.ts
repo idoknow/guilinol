@@ -178,7 +178,7 @@ function getUrbanGroundUniforms():Record<string,THREE.IUniform> {
 export function urbanGround(material:THREE.Material):void {
   const previous = material.onBeforeCompile
   const cache = material.customProgramCacheKey()
-  material.customProgramCacheKey = ()=>cache + '-urban-ground-1'
+  material.customProgramCacheKey = ()=>cache + '-urban-ground-2'
   material.onBeforeCompile = function(shader:Shader, renderer) {
     previous.call(this, shader, renderer)
     Object.assign(shader.uniforms, getUrbanGroundUniforms())
@@ -363,7 +363,9 @@ if (uGroundUpgrade > 0.5) {
     vec3 ugR1 = cross(ugDpy, normal), ugR2 = cross(normal, ugDpx);
     float ugDet = dot(ugDpx, ugR1);
     if (abs(ugDet) > 1e-7) {
-      normal = normalize(abs(ugDet) * normal - sign(ugDet) * (ugHx * ugR1 + ugHy * ugR2));
+      vec3 gradient = ugHx * ugR1 + ugHy * ugR2;
+      float boundedScale = max(abs(ugDet), length(gradient) * 4.);
+      normal = normalize(normal - sign(ugDet) * gradient / mix(abs(ugDet), boundedScale, uNight));
     }
   }
 }`)

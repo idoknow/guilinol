@@ -5,6 +5,13 @@ export const BUG = '游戏 bug'
 export const APPEAL = '封禁申诉'
 export const kinds = ['缺失建筑', '位置或朝向不对', '外观不像', '道路水系', BUG, APPEAL, '其他']
 export const photosOptional = (kind?: string | null) => kind === BUG || kind === APPEAL
+export const isAppealKind = (kind?: string | null) => kind === APPEAL
+export const appealReasons = [
+  '当时网络卡顿或断线重连',
+  '正常骑行、乘船或乘直升机',
+  '误触或不清楚触发原因',
+  '其他情况',
+] as const
 export const views = ['正面', '左侧', '右侧', '背面', '远景', '细节', '内部']
 export const labels: Record<string, string> = {
   draft: '草稿',
@@ -14,10 +21,14 @@ export const labels: Record<string, string> = {
   modelling: 'AI 建模中',
   reviewing: '审核中',
   live: '已上线',
+  resolved: '已处理',
   need_info: '需要补充信息',
   rejected: '未采纳',
   duplicate: '与已有反馈重复',
+  unbanned: '已核实并解除限制',
+  upheld: '已核实，维持原判',
 }
+export const TERMINAL_STATUSES = ['live', 'resolved', 'rejected', 'duplicate', 'unbanned', 'upheld'] as const
 export const edges: Record<string, string[]> = {
   submitted: ['approved','need_info','rejected','duplicate'],
   approved: ['queued'],
@@ -26,6 +37,33 @@ export const edges: Record<string, string[]> = {
   reviewing: ['modelling', 'live', 'need_info', 'rejected', 'duplicate'],
   // 问了提交人但没等回复就修好并上线了（IDOK-180/181）：bridge 可直接标已上线
   need_info: ['approved','live','rejected', 'duplicate'],
+}
+/** 封禁申诉独立状态机：绝不流向 AI 建模队列（approved）；兼容历史存量队列状态与 resolved 终态（IDOK-565）。 */
+export const appealEdges: Record<string, string[]> = {
+  submitted: ['unbanned', 'upheld', 'resolved', 'need_info', 'rejected', 'duplicate'],
+  queued: ['unbanned', 'upheld', 'resolved', 'need_info', 'rejected', 'duplicate'],
+  modelling: ['unbanned', 'upheld', 'resolved', 'need_info', 'rejected', 'duplicate'],
+  reviewing: ['unbanned', 'upheld', 'resolved', 'need_info', 'rejected', 'duplicate'],
+  need_info: ['unbanned', 'upheld', 'resolved', 'rejected', 'duplicate'],
+}
+
+const BAN_ID_RE = /\b([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|legacy-\d+)\b/i
+export function extractBanRecordId(body: string): string | null {
+  const m = BAN_ID_RE.exec(String(body ?? ''))
+  return m ? m[1] : null
+}
+
+/** 去除旧版或手写申诉模板前缀与编号行后，返回用户真正填写的实质说明。 */
+export function stripAppealTemplate(body: string): string {
+  const lines = String(body ?? '')
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .map((line) => {
+      if (/^(?:封禁记录\s*ID|记录编号|记录\s*ID)\s*[:：]\s*[A-Za-z0-9_-]*$/i.test(line)) return ''
+      return line.replace(/^(?:申诉说明|申诉理由|补充说明)\s*[:：]\s*/i, '').trim()
+    })
+    .filter(Boolean)
+  return lines.join('\n').trim()
 }
 
 type Point = { x: number; y: number; z: number; lat: number; lon: number }

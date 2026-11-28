@@ -41,10 +41,11 @@ test('two players: private RT state, role gate, public-safe admin state, persist
   for(const [index,name] of ['Alice','Bob'].entries()){
     const {rows:[{uid}]}=await pool.query(`insert into users(id,email,nickname,salt,digest,verified,role) values($1,$2,$1,'','',1,$3) returning uid`,[name,name+'@example.test',index?'user':'admin'])
     const token=randomBytes(32).toString('hex');tokens.push(token)
+    await pool.query('insert into mp_positions(uid,x,y,z) values($1,$2,0,$3)',[uid,index?500:10,index?500:20])
     await pool.query('insert into sessions values($1,$2,unixepoch()+600)',[createHash('sha256').update(token).digest('hex'),name])
     const client=new WebSocket(rt.base.replace('http','ws')+'/ws',{headers:{'x-forwarded-for':ip,'user-agent':'fixture'}});sockets.push(client);await once(client,'open')
     const body=Buffer.from(JSON.stringify({name,uid:Number(uid),exp:Math.floor(Date.now()/1000)+55})).toString('base64url')
-    client.send(JSON.stringify({t:'join',fp:'abcd'.repeat(4),ticket:body+'.'+createHmac('sha256',secret).update(body).digest('base64url')}));await once(client,'message')
+    client.send(JSON.stringify({t:'join',fp:'abcd'.repeat(4),ticket:body+'.'+createHmac('sha256',secret).update(body).digest('base64url')}));await once(client,'message',{signal:AbortSignal.timeout(5000)})
   }
   const api=await service('server/index.mjs',{RT_INTERNAL_URL:rt.base,RT_ADMIN_TOKEN:secret,KICK_TOKEN:secret,
     MP_WORLD_MANIFEST_URL:`http://127.0.0.1:${manifest.address().port}/world/manifest.json`},'/api/health')
@@ -54,9 +55,9 @@ test('two players: private RT state, role gate, public-safe admin state, persist
   assert.equal((await chatSettings(1)).status,403);assert.equal((await (await chatSettings(0)).json()).unmoderated_policy,'local_only')
   await pool.query(`insert into perf_network values('192.0.2.0/24','CN','测试地区','测试市','测试网络')`)
   for(let attempt=0;attempt<120;attempt++){if((await raw()).players.every(player=>player.rttMs!==null))break;await delay(100)}
-  sockets[0].send(JSON.stringify({t:'pos',x:10,z:20}))
+  sockets[0].send(JSON.stringify({t:'pos',x:10,y:0,z:20}))
   sockets[0].send(JSON.stringify({t:'act',act:'fishing',detail:'岸边垂钓'}))
-  sockets[1].send(JSON.stringify({t:'pos',x:500,z:500,bike:'ebike_01'}))
+  sockets[1].send(JSON.stringify({t:'pos',x:500,y:0,z:500,bike:'ebike_01'}))
   await delay(1100)
   sockets[0].send(JSON.stringify({t:'act',act:'mifen',detail:'田源米粉'}))
   await delay(150)
@@ -97,7 +98,8 @@ test('two players: private RT state, role gate, public-safe admin state, persist
   // 兜底地标验证：即使 manifest URL 不可达，也不得返回 null/野外，应命中内置桂林核心地标
   const fallbackApi=await service('server/index.mjs',{RT_INTERNAL_URL:rt.base,RT_ADMIN_TOKEN:secret,KICK_TOKEN:secret,
     MP_WORLD_MANIFEST_URL:'http://127.0.0.1:1/world/manifest.json'},'/api/health')
-  sockets[0].send(JSON.stringify({t:'pos',x:-685,z:1182}))
+  const permit=once(sockets[0],'message');sockets[0].send(JSON.stringify({t:'travel',target:'spot:elephant',reason:'map'}));await permit
+  sockets[0].send(JSON.stringify({t:'pos',x:-685,y:0,z:1182}))
   await delay(100)
   const fbSnap=await (await fetch(fallbackApi.base+'/api/admin/mp',{headers:{cookie:'glol_session='+tokens[0]}})).json()
   assert.equal(fbSnap.server.landmarkSource,'builtin')

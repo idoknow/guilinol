@@ -50,6 +50,7 @@ test('attachNet declares vstate1 on join and sends vstate before pos on mobility
       onclose = null
       onerror = null
       constructor() {
+        MockWebSocket.instance = this
         queueMicrotask(() => {
           this.onopen?.()
           this.onmessage?.({data: JSON.stringify({t: 'welcome', me: {id: 'p1', uid: 100001, name: 'Test'}, online: 1, players: []})})
@@ -88,6 +89,7 @@ test('attachNet declares vstate1 on join and sends vstate before pos on mobility
       undefined,
       undefined,
       () => mode,
+      reason => { assert.equal(reason,'rejected'); mode={mode:'foot'} },
     )
 
     await new Promise(resolve => setTimeout(resolve, 30))
@@ -121,6 +123,11 @@ test('attachNet declares vstate1 on join and sends vstate before pos on mobility
     assert.equal(sent[0]?.mode, 'drone')
     assert.equal(sent[1]?.t, 'pos')
 
+    const ack = seq => MockWebSocket.instance.onmessage({data:JSON.stringify({t:'vstate_ack',ok:false,reason:'rejected',mode:'foot',seq})})
+    ack(sent[0].seq-1)
+    assert.equal(mode.mode,'drone')
+    ack(sent[0].seq)
+    assert.equal(mode.mode,'foot')
     net.dispose()
   } finally {
     rmSync(dir, {recursive: true, force: true})

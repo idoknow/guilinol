@@ -197,7 +197,11 @@ if (vRoof < .5) {
     c = mix(c, wall * uLine, 1. - step(.045, fl));
     vec3 avg = mix(wall, glass, cover) * mix(1., uLine, .045);
     if (f < 0.) { c = wall * .74; avg = c; }
-    else if (vKind > 3.5 && vKind < 15.5) {
+    else if (vKind >= 4.5 && vKind < 7.5) {
+      float band = vKind < 5.5 ? box1(fl,.32,.77) : box1(fl,.68,.87);
+      win = band * step(.04,fract(vFacade/(vKind<5.5?12.:20.)));
+      c = mix(wall,glass,win); cover=vKind<5.5?.42:.17; avg=mix(wall,glass,cover);
+    } else if (vKind > 3.5 && vKind < 15.5) {
       float strip = box1(fract(vFacade / 34.), .055, .14);
       win = max(strip, box1(fl, .31, .85) * box1(bx, .15, .85));
       glass = mix(glass, vec3(.23, .51, .52), strip);

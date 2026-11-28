@@ -1,7 +1,7 @@
 import {getPlayMode,onPlayMode} from '../game/play-mode'
 import './street-hud.css'
 import {isGlobalHotkeyBlocked} from '../walk/input-guard'
-import {getState, onState} from '../game/state'
+import {getState, onEvent, onState} from '../game/state'
 
 // Phase 2 街头 HUD (docs/style.md 第二期 · HUD). Pure view: it renders whatever state it is given and never
 // touches engine objects. G1+ wires `mountStreetHud` to `onState` from web/src/game/state.ts; until then
@@ -27,6 +27,9 @@ const APPS = [
   {id:'settings', glyph:'设', name:'设置', tint:'#9aa3ad'},
 ]
 const money = (n:number)=>n.toLocaleString('zh-CN')
+/** 共享电车理赔入账（= walk/shared-ebike-logic.ts SHARED_EBIKE_COMPENSATION_REASON）；钱只对这一笔做跳动反馈 */
+const COMPENSATION_REASON = 'shared_ebike_compensation'
+const CASH_BOUNCE_MS = 680, CASH_DELTA_MS = 900
 const clockText = (s:number)=>`${String(Math.floor(s/60)).padStart(2,'0')}:${String(Math.floor(s%60)).padStart(2,'0')}`
 
 export function mountStreetHud(source:HudSource, opts:{phone?:boolean; onApp?:(id:string)=>void}={}) {
@@ -98,7 +101,23 @@ export function mountStreetHud(source:HudSource, opts:{phone?:boolean; onApp?:(i
   renderMode()
   const offMode = onPlayMode(renderMode)
   const off = source.on(render)
-  return {root, togglePhone, dispose(){offMode(); off(); removeEventListener('keydown', onKeyDown); removeEventListener('game:event', onGameEvent); root.remove(); delete document.body.dataset.hud}}
+  // IDOK-545：理赔到账时金额跳一下，旁边飘出一枚金色 +¥ 浮标（900ms 后自毁）
+  const cash = $('.st-cash'), cashMoney = $('.st-money')
+  let bounceTimer = 0, deltaTimer = 0, deltaTag:HTMLElement|null = null
+  function pulseCash(delta:number) {
+    if(cashMoney.hidden) return
+    cash.classList.remove('is-comp-bounce'); void cash.offsetWidth; cash.classList.add('is-comp-bounce')
+    clearTimeout(bounceTimer)
+    bounceTimer = window.setTimeout(()=>{cash.classList.remove('is-comp-bounce'); bounceTimer = 0}, CASH_BOUNCE_MS)
+    clearTimeout(deltaTimer); deltaTag?.remove()
+    const tag = document.createElement('span'); tag.className = 'st-cash-delta'; tag.setAttribute('aria-hidden', 'true')
+    tag.textContent = `+¥${money(Math.round(delta))}`
+    cash.append(tag); deltaTag = tag
+    deltaTimer = window.setTimeout(()=>{tag.remove(); if(deltaTag===tag) deltaTag = null; deltaTimer = 0}, CASH_DELTA_MS)
+  }
+  const offCash = onEvent(ev=>{if(ev.type==='money:change'&&ev.delta>0&&ev.reason===COMPENSATION_REASON) pulseCash(ev.delta)})
+  return {root, togglePhone, dispose(){offMode(); off(); offCash(); clearTimeout(bounceTimer); clearTimeout(deltaTimer); deltaTag?.remove(); deltaTag = null
+    removeEventListener('keydown', onKeyDown); removeEventListener('game:event', onGameEvent); root.remove(); delete document.body.dataset.hud}}
 }
 
 export function gameStateHudSource():HudSource {

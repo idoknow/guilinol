@@ -29,6 +29,9 @@ export function tileCenterDistance(tile:Tile, position:THREE.Vector3){
 type TerrainLayer = {mesh:THREE.Object3D; toggle(tile:Tile, show:boolean):void}
 
 export class Stream {
+  private airportUpdate?:(eye:THREE.Vector3)=>void
+  private airportPending=false
+  private airportRetry=0
   private distant?:DistantBuildings
   get tileRevision(){return this.revision}
   private revision=0
@@ -228,6 +231,17 @@ export class Stream {
   private readonly aerialBudget=deriveRangeMetrics(256)
   /** `ahead`: a second streaming centre in front of a free-flight camera (see flight-focus.ts). */
   tick(position:THREE.Vector3, aerial=false, ahead?:THREE.Vector3) {
+    if(this.manifest.airportProps){
+      const distance=Math.hypot(position.x+25620,position.z-7080)
+      if(this.airportUpdate)this.airportUpdate(position)
+      else if(distance<4200&&!this.airportPending&&performance.now()>this.airportRetry){
+        this.airportPending=true
+        const file=this.manifest.airportProps.file
+        void import('./airport-props').then(module=>module.mountAirport(this.scene,file,this.manifest.airportMarkings?.file)).then(update=>{
+          this.airportUpdate=update;update(this.lastPosition)
+        }).catch(error=>{this.airportRetry=performance.now()+10000;console.warn(file,error)}).finally(()=>{this.airportPending=false})
+      }
+    }
     this.lastPosition.copy(position)
     const configured=this.rangeStore.getMetrics()
     const metrics = aerial&&configured.radius>this.aerialBudget.radius?this.aerialBudget:configured

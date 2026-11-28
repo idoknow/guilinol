@@ -2,6 +2,7 @@ import {getPlayMode, lastPlayMode, linkedPlayMode, setPlayMode, type PlayMode} f
 import './telemetry'
 import './ui/theme.css'
 import './ui/hud.css'
+registerPrecache()
 // 禁止右键菜单和长按菜单（输入框除外），避免手机长按按钮弹出复制/保存图片
 document.addEventListener('contextmenu',event=>{if(!(event.target as Element|null)?.closest?.('input,textarea,[contenteditable]:not([contenteditable=false])'))event.preventDefault()})
 document.addEventListener('dragstart',event=>{if((event.target as Element|null)?.tagName==='IMG')event.preventDefault()})
@@ -12,6 +13,7 @@ import {isDeepLink} from './deeplink'
 import {cancelRestore} from './lastview'
 import {fullLoader,veil,inlineBusy,type FullLoader,type Veil} from './ui/loading'
 import {watchForUpdates} from './ui/update-check'
+import {registerPrecache} from './precache'
 
 // Page entry. A plain visit lands on the title screen (ui/home.ts) and the 3D city (main.ts, three.js + world data)
 // only boots on 开始游览. Deep links — shares, feedback views, test harnesses — skip the title screen and boot directly.
@@ -27,16 +29,18 @@ let engine: Promise<typeof import('./main')> | undefined
 const loadEngine = () => engine ??= import('./main')
 let started = false
 
-const title = home(mode => {
+import {mpEnabled,setMpEnabled,waitForOnline} from './ui/mp-pref'
+const title = home((mode,online) => {
   if (!started && !entering) fullscreenOnEntry()
-  void enter(mode)
+  void enter(mode,true,online)
 })
 window.addEventListener('glol:registered',()=>void enter(lastPlayMode()))
 let entering = false
-async function enter(mode: PlayMode, remember = true) {
+async function enter(mode: PlayMode, remember = true, online=mode==='solo'&&mpEnabled()) {
   if (entering) return
   entering = true
   const previous=getPlayMode(),initial=!started,controller=new AbortController()
+  const wasOnline=mpEnabled(),changed=previous!==mode||wasOnline!==online
   let loader:FullLoader|undefined,cover:Veil|undefined,timer=0,cancelTimer=0
   let main:typeof import('./main')|undefined
   const cancel=()=>{controller.abort();if(initial)location.replace(location.pathname)}
@@ -63,17 +67,35 @@ async function enter(mode: PlayMode, remember = true) {
     main=await loadEngine();clearInterval(timer);loader?.stage('engine',1,1)
     main.setTitleTransition({signal:controller.signal,view:cover,cancel})
     controller.signal.throwIfAborted()
+    if(started&&changed)main.leaveLocation()
+    if(changed||remember)setMpEnabled(online,!online&&mode==='solo')
     await setPlayMode(mode,false,controller.signal)
     if(started)await main.waitForMode()
+    if(started&&changed&&previous===mode)await main.enterLocation()
     controller.signal.throwIfAborted()
     title.close()
     if(started){if(creator)await main.spawnCreatedCharacter();main.setPaused(false)}
     else {hud(main);await main.boot(loader!,creator);started=true}
+    if(!initial&&online&&remember&&changed){
+      try{await waitForOnline(controller.signal)}catch{
+        main.setTitleTransition(undefined)
+        main.leaveLocation(false)
+        setMpEnabled(wasOnline,previous==='solo'&&!wasOnline)
+        await setPlayMode(previous,false)
+        await main.waitForMode()
+        if(previous===mode)await main.enterLocation()
+        main.setPaused(false)
+        window.dispatchEvent(new CustomEvent('walk:toast',{detail:{text:'未能连接联机服务，已返回原模式',ms:3200}}))
+        return
+      }
+    }
     controller.signal.throwIfAborted()
     if(remember)await setPlayMode(mode,true)
   } catch(error) {
     if(loader){loader.fail(error instanceof Error&&error.message.includes('街区')?error.message:'网络或场景资源不可用，请重试',()=>{sessionStorage.setItem('glol.retryMode',mode);location.reload()});return}
-    main?.setTitleTransition(undefined);await setPlayMode(previous,false);await main?.waitForMode();main?.setPaused(true)
+    main?.setTitleTransition(undefined)
+    if(changed&&started){main?.leaveLocation(false);setMpEnabled(wasOnline);await setPlayMode(previous,false);await main?.waitForMode();if(previous===mode)await main?.enterLocation()}
+    main?.setPaused(true)
     title.open(started)
     if(!controller.signal.aborted)window.alert(error instanceof Error ? error.message : '无法进入模式')
   } finally {

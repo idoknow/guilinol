@@ -25,7 +25,9 @@ import {
   type EbikeStepControl,
   type RideKind,
 } from './ride'
-import {vehicleModel} from './vehicle-model'
+import {setStaticBikeKickstand, vehicleModel} from './vehicle-model'
+import {createBoatLanternRig, type BoatLanternProbe} from './vehicle-lights'
+import {resolveDismountSupport, resolveKickstandStrict} from './kickstand'
 import {KICKSTAND_REST_ROLL_RAD} from './ebike-state-coupling'
 import type {BoatCandidateSnapshot, VehicleCandidateSnapshot} from './interact-arbiter'
 import {soloServices} from '../game/play-mode'
@@ -55,6 +57,7 @@ export type BikeInstanceState = {
   visualMods?: PersistedEbikeVisual
   parkLocked?: boolean
   kickstandDown?: boolean
+  damaged?: boolean
 }
 
 export interface SummonPersonalBikeResult {
@@ -93,6 +96,28 @@ function computeWorldVehiclesVersion(buffer: ArrayBuffer, bikesCount: number) {
 }
 type Physics = Awaited<ReturnType<typeof createPhysics>>
 export type FreeDismountTarget = {x: number; y: number; z: number; rule: string; heading: number}
+export interface UnsupportedDismountInfo {
+  mesh: T.Mesh
+  x: number
+  y: number
+  z: number
+  yaw: number
+  lean: number
+  speed: number
+  vehicleType: EbikeVehicleType
+  battery: number
+  paint: number
+}
+
+export interface CarDismountInfo {
+  x: number
+  y: number
+  z: number
+  heading: number
+  pitch: number
+  speed: number
+}
+
 export interface VehiclesEnv {
   sim: Physics
   stream: Stream
@@ -101,12 +126,17 @@ export interface VehiclesEnv {
   externalArbiter?: boolean
   isFootAnimBusy?: () => boolean
   supportYAt?: (x: number, z: number, refY: number) => number
+  kickstandStrict?: () => boolean
+  onUnsupportedDismount?: (info: UnsupportedDismountInfo) => void
+  onCarDismount?: (mesh: T.Mesh, info: CarDismountInfo) => boolean
+  carGearLabel?: (innerGear: number) => string
 }
 export interface VehicleInteractSnapshot {
   aboardKind: 'car' | 'bike' | 'bicycle' | 'free_boat' | 'tour_boat' | null
   tourDisembarkQueued: boolean
   nearDownedVehicle: VehicleCandidateSnapshot | null
   nearVehicle: VehicleCandidateSnapshot | null
+  nearDamagedVehicle?: VehicleCandidateSnapshot | null
   nearBoat: BoatCandidateSnapshot | null
 }
 interface Data {
@@ -337,7 +367,8 @@ export async function vehicles(
     const isShared = vehicleType === 'shared'
     const mesh = marker('bike', paint, isShared)
     mesh.position.set(x, y, z)
-    mesh.rotation.y = angle
+    mesh.rotation.order = 'YXZ'
+    mesh.rotation.set(0, angle, KICKSTAND_REST_ROLL_RAD, 'YXZ')
     const restoredBattery = persistedBatteries.get(spawnCoordKey) ?? 100
     mesh.userData.paint = paint
     mesh.userData.shared = isShared
@@ -405,6 +436,9 @@ export async function vehicles(
   queueSpawns('car', data.cars ?? [])
 
   const {routes, docks} = data
+  const tourLanternGroup = new T.Group()
+  tourLanternGroup.name = 'tour-boat-lanterns'
+  group.add(tourLanternGroup)
   const vessels = routes.map(route => {
     const pink = route.kind === 'boat' && [route.start, route.end].includes('桂湖')
     const mesh = vehicleModel(route.kind, pink ? 1 : 0)
@@ -412,6 +446,14 @@ export async function vehicles(
     group.add(mesh)
     return mesh
   })
+  const vesselLanterns = routes.map(route => {
+    const pink = route.kind === 'boat' && [route.start, route.end].includes('桂湖')
+    const kind = route.kind === 'raft' ? 'freeRaft' : pink ? 'cruise' : 'huafang'
+    const rig = createBoatLanternRig(kind)
+    tourLanternGroup.add(rig.group)
+    return rig
+  })
+  let tourManualLightOn: boolean | null = null
   const piers = new Map<string, T.Mesh>()
   const pierShape = new T.BoxGeometry(1, 1, 1)
   const pierMaterial = new T.MeshStandardMaterial({color: 0x816a50})
@@ -469,6 +511,8 @@ export async function vehicles(
   let decorDistance = Infinity
   let nearDownedBike: T.Object3D | null = null
   let nearDownedDist = Infinity
+  let nearDamagedBike: T.Object3D | null = null
+  let nearDamagedDist = Infinity
   let nearRoute = -1
   let nearRouteDist = Infinity
   let segment = 1
@@ -559,6 +603,7 @@ export async function vehicles(
     const parkLocked = parkOverride?.parkLocked ?? prev?.parkLocked ?? true
     const kickstandDown = parkOverride?.kickstandDown ?? prev?.kickstandDown ?? true
     const durabilityPct = (mesh.userData.durability as number | undefined) ?? prev?.durabilityPct ?? 100
+    const damaged = Boolean(mesh.userData.damaged || prev?.damaged)
     const state: BikeInstanceState = {
       vehicleType: bikeCtrl.vehicleType,
       ownership,
@@ -570,6 +615,7 @@ export async function vehicles(
       visualMods: prev?.visualMods,
       parkLocked,
       kickstandDown,
+      damaged,
     }
     bikeStates.set(mesh, state)
     mesh.userData.vehicleType = state.vehicleType
@@ -580,6 +626,7 @@ export async function vehicles(
     mesh.userData.durability = durabilityPct
     mesh.userData.parkLocked = parkLocked
     mesh.userData.kickstandDown = kickstandDown
+    mesh.userData.damaged = damaged
     const oldKey = mesh.userData.coordKey as string | undefined
     const newKey = bikeCoordKey(mesh.position.x, mesh.position.z)
     if (oldKey && oldKey !== newKey) bikeCoordStates.delete(oldKey)
@@ -597,7 +644,7 @@ export async function vehicles(
 
   function attachMeshToCell(mesh: T.Mesh) {
     let record: T.Object3D = mesh
-    if (mesh.userData.parkedModel && !mesh.userData.downed) {
+    if (mesh.userData.parkedModel && !mesh.userData.downed && !mesh.userData.rolling && !mesh.userData.damaged) {
       record = marker(mesh.name, mesh.userData.paint, mesh.userData.shared)
       record.position.copy(mesh.position)
       record.quaternion.copy(mesh.quaternion)
@@ -695,20 +742,62 @@ export async function vehicles(
     activeTestRideMesh = null
   }
 
-  function reset() {
+  function reset(opts?: {unsupportedBike?: boolean; rollingCar?: boolean}) {
     if (route >= 0) vessels[route].position.fromArray(routes[route].path[0])
     freeBoats?.reset()
     if (car) {
       car.rotation.set(carCtrl.pitch, carCtrl.heading, 0, 'YXZ')
+      if (opts?.rollingCar) {
+        car.userData.rolling = true
+        car.visible = false
+      } else {
+        car.userData.rolling = false
+      }
       attachMeshToCell(car)
     }
+    let unsupportedInfo: UnsupportedDismountInfo | null = null
     if (bike) {
       delete bike.userData.sharedUnlockSession
       const isEbike = bikeCtrl.kind === 'bike'
-      saveBikeInstanceState(bike, {parkLocked: isEbike, kickstandDown: true})
-      bike.rotation.set(bikeCtrl.pitch, bikeCtrl.heading, isEbike ? KICKSTAND_REST_ROLL_RAD : 0, 'YXZ')
-      if (bike.userData.decorId) bike.userData.parkedModel = 'bike:1:true'
-      attachMeshToCell(bike)
+      if (bike.userData.damaged) {
+        // P1-1: 摔车报废后起身前离开 walk 直接运营回收，防止直立停回原地变僵尸报废车
+        recycleDamagedBike(bike)
+      } else if (isEbike && opts?.unsupportedBike) {
+        const savedType = bikeCtrl.vehicleType
+        const savedBat = bikeCtrl.batteryPct
+        const savedYaw = bikeCtrl.heading
+        const savedLean = bikeCtrl.lean
+        const savedSpeed = bikeCtrl.speed
+        const savedPaint = (bike.userData.paint as number | undefined) ?? 0
+        saveBikeInstanceState(bike, {parkLocked: false, kickstandDown: false})
+        bike.rotation.set(0, savedYaw, 0, 'YXZ')
+        bike.visible = true
+        bike.userData.downed = true
+        bike.userData.tipping = true
+        setStaticBikeKickstand(bike, false)
+        if (bike.userData.decorId) bike.userData.parkedModel = 'bike:1:true'
+        attachMeshToCell(bike)
+        unsupportedInfo = {
+          mesh: bike,
+          x: bike.position.x,
+          y: bike.position.y,
+          z: bike.position.z,
+          yaw: savedYaw,
+          lean: savedLean,
+          speed: savedSpeed,
+          vehicleType: savedType,
+          battery: savedBat,
+          paint: savedPaint,
+        }
+      } else {
+        saveBikeInstanceState(bike, {parkLocked: isEbike, kickstandDown: true})
+        bike.userData.downed = false
+        bike.userData.tipping = false
+        if (isEbike) setStaticBikeKickstand(bike, true)
+        bike.rotation.set(bikeCtrl.pitch, bikeCtrl.heading, isEbike ? KICKSTAND_REST_ROLL_RAD : 0, 'YXZ')
+        if (bike.userData.decorId) bike.userData.parkedModel = 'bike:1:true'
+        attachMeshToCell(bike)
+      }
     }
     car = null
     bike = null
@@ -722,15 +811,33 @@ export async function vehicles(
     delete document.body.dataset.vehicleOwnership
     bikeCtrl.reset()
     carCtrl.reset()
+    if (unsupportedInfo) env?.onUnsupportedDismount?.(unsupportedInfo)
   }
 
-  function dismountDownedBike(x: number, y: number, z: number, yaw: number, roll: number, lift: number) {
+  function parkRolledCar(mesh: T.Mesh, x: number, y: number, z: number, yaw: number, pitch = 0) {
+    detachMeshFromCells(mesh)
+    mesh.position.set(x, y, z)
+    mesh.rotation.set(pitch, yaw, 0, 'YXZ')
+    mesh.userData.rolling = false
+    mesh.visible = true
+    attachMeshToCell(mesh)
+    syncHud()
+  }
+
+  function dismountDownedBike(x: number, y: number, z: number, yaw: number, roll: number, lift: number, damaged = false) {
     if (!bike) return false
     const mesh = bike
     mesh.position.set(x, y + lift, z)
     mesh.rotation.set(0, yaw, roll, 'YXZ')
     mesh.visible = true
     mesh.userData.downed = true
+    mesh.userData.tipping = false
+    if (mesh.name === 'bike') setStaticBikeKickstand(mesh, false)
+    if (damaged) {
+      mesh.userData.damaged = true
+      delete mesh.userData.sharedUnlockSession
+      clearUnlockedSharedSession()
+    }
     saveBikeInstanceState(mesh, {parkLocked: false, kickstandDown: false})
     attachMeshToCell(mesh)
     bike = null
@@ -740,6 +847,17 @@ export async function vehicles(
     bikeCtrl.reset()
     syncHud()
     return true
+  }
+
+  function recycleDamagedBike(mesh: T.Mesh | null) {
+    if (!mesh) return
+    const cell = mesh.parent as T.Group | null
+    if (nearDamagedBike === mesh) { nearDamagedBike = null; nearDamagedDist = Infinity }
+    if (nearDownedBike === mesh) { nearDownedBike = null; nearDownedDist = Infinity }
+    if (nearBike === mesh) { nearBike = null; nearBikeDist = Infinity }
+    if (lastBike === mesh) lastBike = null
+    detachMeshFromCells(mesh)
+    if (cell && parkedCells.has(cell)) refreshBatch(cell)
   }
 
   function relocateParkedBike(
@@ -754,7 +872,9 @@ export async function vehicles(
     mesh.position.set(x, y, z)
     mesh.rotation.set(0, yaw, roll, 'YXZ')
     mesh.userData.downed = false
+    mesh.userData.tipping = false
     if (mesh.name === 'bike') {
+      setStaticBikeKickstand(mesh, parkState?.kickstandDown ?? true)
       const prev = bikeStates.get(mesh)
       const prevOwnership = prev?.ownership ?? ((mesh.userData.ownership as VehicleOwnership | undefined) ?? 'shared')
       const nextState: BikeInstanceState = {
@@ -786,6 +906,10 @@ export async function vehicles(
   }
 
   function mountBikeMesh(target: T.Object3D, forceBoard = false): boolean {
+    if (target.userData.damaged) {
+      window.dispatchEvent(new CustomEvent('walk:toast', {detail: {text: '该共享电动车已摔坏，无法再次解锁骑行', ms: 2400}}))
+      return false
+    }
     const prevKey = (target.userData.coordKey as string | undefined) ?? bikeCoordKey(target.position.x, target.position.z)
     const safePos =
       !forceBoard && board
@@ -816,6 +940,7 @@ export async function vehicles(
           sessionKey: unlockSessionKey,
           soloEnabled: isSoloActive(),
           alreadyUnlocked: wasAlreadyUnlocked,
+          damaged: Boolean(target.userData.damaged),
         },
         soloServices()?.commerce.unlockSharedEbike,
       )
@@ -830,6 +955,7 @@ export async function vehicles(
     }
 
     const targetMesh = takeRecord(target)
+    targetMesh.rotation.reorder('YXZ')
     targetMesh.position.set(safePos.x, safePos.bikeY, safePos.z)
     const rideKind: RideKind = targetMesh.name === 'bicycle' ? 'bicycle' : 'bike'
     const saved = bikeStates.get(targetMesh) ?? bikeCoordStates.get(prevKey)
@@ -888,9 +1014,23 @@ export async function vehicles(
   function interact() {
     if (!active) return
     if (car) {
-      if (land(car.position.x, car.position.z, carCtrl.heading, car.position.y, 'car')) reset()
+      const carMesh = car
+      const cx = carMesh.position.x, cy = carMesh.position.y, cz = carMesh.position.z
+      const cHeading = carCtrl.heading, cPitch = carCtrl.pitch, cSpeed = carCtrl.speed
+      if (land(cx, cz, cHeading, cy, 'car')) {
+        const rollingCar = env?.onCarDismount?.(carMesh, {x: cx, y: cy, z: cz, heading: cHeading, pitch: cPitch, speed: cSpeed}) ?? false
+        reset({rollingCar})
+      }
     } else if (bike) {
-      if (land(bike.position.x, bike.position.z, bikeCtrl.heading, bike.position.y)) reset()
+      const strict = env?.kickstandStrict?.() ?? resolveKickstandStrict({verify: isVerifySilentMode(), param: null})
+      const support = resolveDismountSupport({
+        kind: bikeCtrl.kind,
+        kickstandDown: bikeCtrl.kickstandDown,
+        strict,
+      })
+      if (land(bike.position.x, bike.position.z, bikeCtrl.heading, bike.position.y)) {
+        reset({unsupportedBike: support === 'tip_over'})
+      }
     } else if (freeBoats?.active) {
       const spot = freeBoats.dismount(docks, s => !!env?.landFree(s))
       if (spot) {
@@ -988,6 +1128,7 @@ export async function vehicles(
       return {
         kind,
         downed: !!mesh.userData.downed,
+        damaged: !!mesh.userData.damaged,
         distance,
         ...(tier ? {ebikeTier: tier} : {}),
         ...(ownership ? {ownership} : {}),
@@ -1008,6 +1149,7 @@ export async function vehicles(
       nearVehicle: nearDecor
         ? {kind: 'bike', downed: false, distance: decorDistance, ownership: 'shared', ebikeTier: 'shared', alreadyUnlocked: false}
         : toVehicleSnap(nearBike, nearBikeDist),
+      nearDamagedVehicle: toVehicleSnap(nearDamagedBike, nearDamagedDist),
       nearBoat,
     }
   }
@@ -1024,6 +1166,8 @@ export async function vehicles(
     nearBikeDist = Infinity
     nearDownedBike = null
     nearDownedDist = Infinity
+    nearDamagedBike = null
+    nearDamagedDist = Infinity
     nearRoute = -1
     nearRouteDist = Infinity
     let bestScore = 4.6
@@ -1045,13 +1189,16 @@ export async function vehicles(
           const distance = Math.hypot(mesh.position.x - x, mesh.position.z - z)
           const isCar = mesh.name === 'car'
           const downed = !!mesh.userData.downed
-          const reach = downed ? 4.4 : isCar ? 4.6 : 4.2
-          const visible = distance < 110
+          const tipping = !!mesh.userData.tipping
+          const rolling = !!mesh.userData.rolling
+          const damaged = !!mesh.userData.damaged
+          const reach = downed || damaged ? 4.4 : isCar ? 4.6 : 4.2
+          const visible = rolling ? false : distance < 110
           if (visible && mesh.name === 'bike' && mesh.userData.parkedModel) {
             const farModel = distance >= 40 ? 'bike:far' : ''
             if (farModel && !models.has(farModel)) models.set(farModel,parkedParts(vehicleModel('bike',0,{distant:true,shared:true})))
             if (farModel !== mesh.userData.farModel) { mesh.userData.farModel=farModel; visibilityChanged=true }
-            if (distance < 18 && !downed && env?.supportYAt && now >= (mesh.userData.nextGroundProbe ?? 0)) {
+            if (distance < 18 && !downed && !damaged && env?.supportYAt && now >= (mesh.userData.nextGroundProbe ?? 0)) {
               mesh.userData.nextGroundProbe = now + 1000
               const ground = env.supportYAt(mesh.position.x,mesh.position.z,mesh.position.y)
               if (Number.isFinite(ground) && Math.abs(mesh.position.y-ground)>.015) {
@@ -1063,10 +1210,13 @@ export async function vehicles(
           if (visible !== mesh.visible && mesh.userData.parkedModel) visibilityChanged = true
           mesh.visible = visible
           const vertOk = footY === undefined || Math.abs(mesh.position.y - footY) <= 1.5
-          if (downed && distance < reach && distance < nearDownedDist && vertOk) {
+          if (damaged && distance < reach && distance < nearDamagedDist && vertOk) {
+            nearDamagedBike = mesh
+            nearDamagedDist = distance
+          } else if (downed && !tipping && !damaged && distance < reach && distance < nearDownedDist && vertOk) {
             nearDownedBike = mesh
             nearDownedDist = distance
-          } else if (!downed && distance < reach && vertOk) {
+          } else if (!downed && !damaged && distance < reach && vertOk) {
             // Personal owned e-bikes receive a 0.6 m priority bias when parked beside shared bikes (spec §2.2).
             const score = mesh.userData.ownership === 'personal' ? Math.max(0, distance - 0.6) : distance
             if (score < bestScore) {
@@ -1076,7 +1226,7 @@ export async function vehicles(
             }
           }
           const hintCap = isCar ? 28 : 24
-          if (distance < hintCap && vertOk && (!bestHint || distance < bestHint.dist)) {
+          if (!damaged && distance < hintCap && vertOk && (!bestHint || distance < bestHint.dist)) {
             bestHint = {x: mesh.position.x, y: mesh.position.y, z: mesh.position.z, dist: distance, reach, radius: isCar ? 2.35 : 1.15}
           }
         }
@@ -1257,7 +1407,7 @@ export async function vehicles(
     if (!spot) return false
     let closest: T.Object3D | undefined, best = Infinity
     for (const cell of visibleCells) for (const record of cell.children) {
-      if (record.name !== 'bike' || (!isSoloActive() && !record.userData.shared) || !record.userData.parkedModel || record.userData.downed || record.userData.ownership !== 'shared') continue
+      if (record.name !== 'bike' || (!isSoloActive() && !record.userData.shared) || !record.userData.parkedModel || record.userData.downed || record.userData.damaged || record.userData.ownership !== 'shared') continue
       const distance = Math.hypot(record.position.x-playerPos.x,record.position.z-playerPos.z)
       if (distance<best) { best=distance; closest=record }
     }
@@ -1457,13 +1607,21 @@ export async function vehicles(
     get isShared() { return bike && bikeCtrl.kind === 'bike' ? bikeCtrl.isShared : false },
     get bikeOwnership(): VehicleOwnership | null { return bike ? ((bike.userData.ownership as VehicleOwnership | undefined) ?? 'shared') : null },
     get bikeInstanceId(): string | null { return bike ? ((bike.userData.instanceId as string | undefined) ?? null) : null },
+    get bikeSpawnKey(): string | null {
+      if (!bike) return null
+      return (bike.userData.spawnCoordKey as string | undefined) ?? (bike.userData.coordKey as string | undefined) ?? bikeCoordKey(bike.position.x, bike.position.z)
+    },
     get bikeModelId(): PersonalEbikeModelId | null { return bike ? ((bike.userData.modelId as PersonalEbikeModelId | undefined) ?? null) : null },
     get bikeDurabilityPct(): number { return bike ? ((bike.userData.durability as number | undefined) ?? 100) : 100 },
     get ebikeTier(): EbikeTier | null { return bike && bikeCtrl.kind === 'bike' ? bikeCtrl.tier : null },
     get ebikeGear() { return bike ? bikeCtrl.gear : 2 },
     get ebikeBattery() { return bike && bikeCtrl.kind === 'bike' ? bikeCtrl.batteryPct : 100 },
     get ebikeTelemetry(): EbikeDynamicTelemetry | null { return bike ? bikeCtrl.telemetry() : null },
-    get carTelemetry(): CarDynamicTelemetry | null { return car ? carCtrl.telemetry() : null },
+    get carTelemetry(): CarDynamicTelemetry | null {
+      if (!car) return null
+      const tel = carCtrl.telemetry()
+      return env?.carGearLabel ? {...tel, gearLabel: env.carGearLabel(tel.gear)} : tel
+    },
     get carVelX() { return carCtrl.velX },
     get carVelZ() { return carCtrl.velZ },
     get carRoll() { return carCtrl.roll },
@@ -1515,6 +1673,19 @@ export async function vehicles(
     shiftEbikeGear(delta: number) { return bike ? bikeCtrl.shiftGear(delta) : 2 },
     resetEbikeGearOnRecover() { return bike ? bikeCtrl.resetGearToCompliant() : 2 },
     setAutoCrash(on: boolean | undefined) { bikeCtrl.setAutoCrash(on) },
+    setSharedSlipEnabled(on: boolean) { bikeCtrl.setSharedSlipEnabled(on) },
+    setSharedSlipRng(rng: (() => number) | null) { bikeCtrl.setSharedSlipRng(rng) },
+    get sharedSlipStats() { return bikeCtrl.sharedSlipStats },
+    forceSharedTurnSlip(side?: -1 | 1) { return bike ? bikeCtrl.forceSharedTurnSlip(side) : null },
+    recycleDamagedBike,
+    markCurrentBikeDamaged() {
+      if (!bike) return false
+      bike.userData.damaged = true
+      delete bike.userData.sharedUnlockSession
+      clearUnlockedSharedSession()
+      saveBikeInstanceState(bike, {parkLocked: false, kickstandDown: false})
+      return true
+    },
     setEbikePark(on: boolean, silent = false) { return bike ? bikeCtrl.setPark(on, silent) : false },
     toggleEbikePark(silent = false) { return bike ? bikeCtrl.togglePark(silent) : false },
     setEbikeKickstand(on: boolean, silent = false) { return bike ? bikeCtrl.setKickstand(on, silent) : false },
@@ -1532,6 +1703,7 @@ export async function vehicles(
     toggleEbikeCruise(silent = false) { return bike ? bikeCtrl.toggleCruise(silent) : false },
     dismountDownedBike,
     relocateParkedBike,
+    parkRolledCar,
     summonPersonalBike,
     hailBike,
     spawnPersonalBikeAtBay,
@@ -1593,6 +1765,54 @@ export async function vehicles(
     boatProbe() { return freeBoats?.probe() ?? null },
     relocateBoat(x: number, z: number) { return freeBoats?.relocate(x, z) ?? false },
     freeMoorings() { return freeBoats?.moorings() ?? [] },
+    syncBoatLanterns(night: number, viewerX: number, viewerZ: number) {
+      const MAX_SHIMMER = 4
+      let used = freeBoats ? freeBoats.syncLanterns(night, viewerX, viewerZ, MAX_SHIMMER) : 0
+      const order: number[] = []
+      if (route >= 0) order.push(route)
+      for (let i = 0; i < vessels.length; i++) if (i !== route) order.push(i)
+      for (const idx of order) {
+        const vMesh = vessels[idx]
+        const rig = vesselLanterns[idx]
+        if (!vMesh.visible) {
+          rig.update({night: 0, distance: 9999, manualOn: false, allowShimmer: false})
+          continue
+        }
+        rig.group.position.copy(vMesh.position)
+        rig.group.quaternion.copy(vMesh.quaternion)
+        const dist = Math.hypot(vMesh.position.x - viewerX, vMesh.position.z - viewerZ)
+        const allowShimmer = used < MAX_SHIMMER && dist <= 260
+        rig.update({
+          night,
+          distance: dist,
+          manualOn: idx === route ? tourManualLightOn : null,
+          allowShimmer,
+        })
+        if (rig.probe().shimmerVisible) used++
+      }
+    },
+    toggleBoatLight(night = 0): boolean {
+      if (freeBoats?.active) return freeBoats.toggleLight(night)
+      if (route >= 0) {
+        const cur = vesselLanterns[route]?.probe().lit ?? (tourManualLightOn ?? night > 0.12)
+        tourManualLightOn = !cur
+        return tourManualLightOn
+      }
+      return false
+    },
+    setBoatLight(on: boolean | null): boolean | null {
+      if (freeBoats?.active) return freeBoats.setLight(on)
+      if (route >= 0) {
+        tourManualLightOn = on
+        return tourManualLightOn
+      }
+      return null
+    },
+    boatLightProbe(): BoatLanternProbe | null {
+      if (freeBoats?.active) return freeBoats.lightProbe()
+      if (route >= 0) return vesselLanterns[route]?.probe() ?? null
+      return null
+    },
     parked(kind?: RideKind | 'car'): Position[] {
       const out: Position[] = []
       for (const cell of cells.values()) {

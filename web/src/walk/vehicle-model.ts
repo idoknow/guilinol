@@ -4,7 +4,19 @@ import * as T from 'three'
 import {CAR_SCALE} from '../drive/scale'
 import {mergeGeometries} from 'three/addons/utils/BufferGeometryUtils.js'
 import type {TwoWheelHeadlightMode} from './ebike-state-coupling'
-import {createHeadlightBeamRig, type HeadlightBeamProbe} from './vehicle-lights.ts'
+import {
+  KICKSTAND,
+  buildKickstandGeometry,
+  kickstandDeployCurve,
+  stepKickstandBlend,
+} from './kickstand'
+import {
+  LIGHT_PALETTE,
+  buildLampClusterGeometry,
+  createHeadlightBeamRig,
+  createLampClusterMaterial,
+  type HeadlightBeamProbe,
+} from './vehicle-lights'
 
 const material=new T.MeshStandardMaterial({vertexColors:true,flatShading:true})
 const cache=new Map<string,T.BufferGeometry>()
@@ -46,14 +58,16 @@ export interface StaticBikeVisualOptions {
   headlightTier?: 0 | 1 | 2
 }
 
-export function vehicleModel(kind:string,paint=0,options?:{shared?:boolean;distant?:boolean;visual?:StaticBikeVisualOptions}){
+export function vehicleModel(kind:string,paint=0,options?:{shared?:boolean;distant?:boolean;kickstand?:boolean;visual?:StaticBikeVisualOptions}){
   const isSharedBike=kind==='shared_bike'||(kind==='bike'&&!!options?.shared)
   const effectiveKind=isSharedBike?'shared_bike':kind
   const vis=effectiveKind==='bike'?options?.visual:undefined
   const visKey=vis
     ? `:${vis.paintColor??''}:${vis.windshield??'none'}:${vis.topbox??'none'}:${vis.goldShock?1:0}:${vis.tailWing?1:0}:${vis.exhaust?1:0}:${vis.angelEye?(vis.angelEyeColor??1):0}:${vis.underglow?(vis.underglowColor??1):0}:${vis.headlightTier??0}`
     : ''
-  const key=effectiveKind+paint+visKey+(options?.distant?':far':'')
+  const wantKickstand=(effectiveKind==='bike'||isSharedBike)&&!options?.distant&&(options?.kickstand??true)
+  const ksKey=(effectiveKind==='bike'||isSharedBike)&&!options?.distant?(wantKickstand?':ks1':':ks0'):''
+  const key=effectiveKind+paint+visKey+ksKey+(options?.distant?':far':'')
   if(effectiveKind==='car'){
     if(!cache.has(key)){const g=buildCarGeometry(paint);g.scale(CAR_SCALE,CAR_SCALE,CAR_SCALE);g.computeBoundingSphere();g.computeBoundingBox();cache.set(key,g)}
     const mesh=new T.Mesh(cache.get(key),material);mesh.name=kind;mesh.userData.paint=paint;return mesh
@@ -73,6 +87,7 @@ export function vehicleModel(kind:string,paint=0,options?:{shared?:boolean;dista
       const shell=bikeGeometry(color,options?.distant)
       shell.setAttribute('uv',new T.BufferAttribute(new Float32Array(shell.attributes.position.count*2),2))
       parts.push(shell)
+      if(wantKickstand)parts.push(buildKickstandGeometry(true))
       if(vis)accessories(vis,color,(_joint,geom,tint)=>part(geom,tint,0,0,0))
     }else if(effectiveKind==='bicycle'){
       // Guilin muted city palette (sage, terracotta, linen ivory, karst slate) — no commercial bike-share brand colors or logos.
@@ -166,6 +181,16 @@ export function vehicleModel(kind:string,paint=0,options?:{shared?:boolean;dista
     mesh.add(crank)
   }
   return mesh
+}
+
+/** Swaps a static parked e-bike mesh between deployed (`:ks1`) and stowed (`:ks0`) kickstand shell geometry (0 extra draw calls). */
+export function setStaticBikeKickstand(mesh: T.Mesh, down: boolean): void {
+  if (mesh.name !== 'bike') return
+  const paint = (mesh.userData.paint as number | undefined) ?? 0
+  const shared = !!mesh.userData.shared
+  const visual = mesh.userData.visualMods as StaticBikeVisualOptions | undefined
+  const nextGeom = vehicleModel('bike', paint, {shared, visual, kickstand: down}).geometry
+  if (mesh.geometry !== nextGeom) mesh.geometry = nextGeom
 }
 
 // Four understated Guilin street sedan finishes: pearl ivory, Lijiang slate blue, karst silver, osmanthus burgundy.
@@ -651,6 +676,12 @@ export interface CarVisualRig {
     handbrake?: boolean
     headlight?: TwoWheelHeadlightMode
     night?: number
+    crankDim?: number
+    engineRunning?: boolean
+    engageKick?: number
+    hazard?: boolean
+    leftSignalLit?: boolean
+    rightSignalLit?: boolean
   }) => void
   probe: () => {
     roll: number
@@ -738,10 +769,9 @@ export function createDynamicEbike(paint = 0, initialMods?: Partial<EbikeModConf
 
   const baseHex = EBIKE_STOCK_PAINTS[((paint % 4) + 4) % 4]
   const bodyMat = trackM(new T.MeshStandardMaterial({color: baseHex, flatShading: true, roughness: .55, metalness: .1}))
-  const darkMat = trackM(new T.MeshStandardMaterial({color: 0x2b2e32, flatShading: true, roughness: .85}))
-  const alloyMat = trackM(new T.MeshStandardMaterial({color: 0xb6bec4, flatShading: true, roughness: .4, metalness: .45}))
-  const headMat = trackM(new T.MeshBasicMaterial({color: 0xfff3d4}))
-  const tailMat = trackM(new T.MeshBasicMaterial({color: 0xb32622}))
+  const kickstandMat = trackM(new T.MeshStandardMaterial({vertexColors: true, flatShading: true, roughness: .46, metalness: .35}))
+  const headCluster = createLampClusterMaterial()
+  const tailCluster = createLampClusterMaterial()
   const chassisModMat = trackM(new T.MeshStandardMaterial({vertexColors: true, flatShading: true, roughness: .5, metalness: .3}))
   const frontModMat = trackM(new T.MeshStandardMaterial({vertexColors: true, flatShading: true, roughness: .35, metalness: .25, forceSinglePass: true}))
   const underglowModMat = trackM(new T.MeshBasicMaterial({vertexColors: true, transparent: true, depthWrite: false, side: T.FrontSide, forceSinglePass: true}))
@@ -775,7 +805,34 @@ export function createDynamicEbike(paint = 0, initialMods?: Partial<EbikeModConf
   chassis.add(rearWheel)
   const shellSlot = new T.Group(); shellSlot.name = 'mod-shell'
   shellSlot.add(baked(3,0,REAR_Z,true), baked(3,0,REAR_Z,false))
-  const tailLamp = makeSolidPart(trackG(new T.BoxGeometry(.12,.035,.02)),tailMat,0,.66,.85-REAR_Z)
+  const tailLampGeom = trackG(buildLampClusterGeometry([
+    {
+      channel: 0,
+      pos: [0, .66, .85 - REAR_Z],
+      size: [.12, .035, .02],
+      dir: [0, 0, 1],
+      color: LIGHT_PALETTE.brakeCore,
+      offColor: LIGHT_PALETTE.lensOffTail,
+      haloSize: .34,
+      haloColor: LIGHT_PALETTE.brakeHalo,
+      wetGroundY: 0,
+      wetWidth: .24,
+    },
+    ...([-1, 1] as const).map(side => ({
+      channel: (side < 0 ? 2 : 3) as 2 | 3,
+      pos: [side * .15, .63, .51 - REAR_Z] as const,
+      size: [.06, .04, .05] as const,
+      dir: [side * .25, 0, .96] as const,
+      color: LIGHT_PALETTE.amberTurn,
+      offColor: 0x4e3c1b,
+      haloSize: .36,
+      wetGroundY: 0,
+      wetWidth: .22,
+    })),
+  ]))
+  const tailLamp = new T.Mesh(tailLampGeom, tailCluster.materials)
+  tailLamp.name = 'ebike-tail-cluster'
+  tailLamp.renderOrder = 3
   chassis.add(shellSlot,tailLamp)
 
   // Rear shock slot keeps baseline struts; optional gold canisters batch into chassisModMesh.
@@ -812,7 +869,32 @@ export function createDynamicEbike(paint = 0, initialMods?: Partial<EbikeModConf
   frontAssembly.add(frontWheel,baked(2,0,-.43,true),baked(2,0,-.43,false))
 
   const headlightSlot = new T.Group(); headlightSlot.name = 'mod-headlight'
-  const headLens = makeSolidPart(trackG(new T.BoxGeometry(.16, .09, .04)), headMat, 0,cowlLamp.y,cowlLamp.z-steeringZ)
+  const headLensGeom = trackG(buildLampClusterGeometry([
+    {
+      channel: 0,
+      pos: [0, cowlLamp.y, cowlLamp.z - steeringZ],
+      size: [.16, .09, .04],
+      dir: [0, 0, -1],
+      color: LIGHT_PALETTE.bikeLow,
+      offColor: LIGHT_PALETTE.lensOffFront,
+      haloSize: .42,
+      haloColor: LIGHT_PALETTE.bikeHigh,
+      wetGroundY: 0,
+      wetWidth: .28,
+    },
+    ...([-1, 1] as const).map(side => ({
+      channel: (side < 0 ? 2 : 3) as 2 | 3,
+      pos: [side * .155, .71, -.09] as const,
+      size: [.06, .04, .05] as const,
+      dir: [side * .28, 0, -.96] as const,
+      color: LIGHT_PALETTE.amberTurn,
+      offColor: 0x4e3c1b,
+      haloSize: .34,
+    })),
+  ]))
+  const headLens = new T.Mesh(headLensGeom, headCluster.materials)
+  headLens.name = 'ebike-head-cluster'
+  headLens.renderOrder = 3
   const beamRig = createHeadlightBeamRig('bike')
   beamRig.group.position.set(0,cowlLamp.y,cowlLamp.z-steeringZ-.03)
   headlightSlot.add(headLens, beamRig.group)
@@ -824,33 +906,14 @@ export function createDynamicEbike(paint = 0, initialMods?: Partial<EbikeModConf
   frontModMesh.visible = false
   frontAssembly.add(frontModMesh)
 
-  // Batched amber turn-signal lamps (zero dynamic lights, 0 draw calls when off, <=2 draw calls when both flashing).
-  const signalLeftMat = trackM(new T.MeshBasicMaterial({color: 0xffa824}))
-  const signalRightMat = trackM(new T.MeshBasicMaterial({color: 0xffa824}))
-  const makeMergedSignalGeom = (side: -1 | 1) => {
-    const frontPod = new T.BoxGeometry(.06, .04, .05).translate(side * .155, .71, -.43 - REAR_Z - .09)
-    const rearPod = new T.BoxGeometry(.06, .04, .05).translate(side * .15, .63, .51 - REAR_Z)
-    const merged = mergeGeometries([frontPod, rearPod], false)
-    frontPod.dispose()
-    rearPod.dispose()
-    return trackG(merged)
-  }
-  const leftSignalMesh = new T.Mesh(makeMergedSignalGeom(-1), signalLeftMat)
-  leftSignalMesh.name = 'ebike-signal-left'
-  leftSignalMesh.visible = false
-  const rightSignalMesh = new T.Mesh(makeMergedSignalGeom(1), signalRightMat)
-  rightSignalMesh.name = 'ebike-signal-right'
-  rightSignalMesh.visible = false
-  chassis.add(leftSignalMesh, rightSignalMesh)
-
-  // Articulated left side kickstand (stowed back while riding/crashed, swings down when parked).
+  // Articulated left side kickstand merged into 1 draw call (stowed along swingarm while riding/crashed, deploys cleanly to ground when parked).
   const kickstandPivot = new T.Group()
   kickstandPivot.name = 'ebike-kickstand'
-  kickstandPivot.position.set(-.15, .25, .14 - REAR_Z)
-  const standLeg = makeSolidPart(trackG(new T.BoxGeometry(.026, .27, .026)), darkMat, 0, -.135, 0)
-  const standFoot = makeSolidPart(trackG(new T.BoxGeometry(.056, .016, .056)), alloyMat, 0, -.27, 0)
-  kickstandPivot.add(standLeg, standFoot)
-  kickstandPivot.rotation.set(1.42, 0, 0)
+  kickstandPivot.position.set(KICKSTAND.pivot[0], KICKSTAND.pivot[1], KICKSTAND.pivot[2] - REAR_Z)
+  const kickstandMesh = new T.Mesh(trackG(buildKickstandGeometry(false)), kickstandMat)
+  kickstandMesh.name = 'ebike-kickstand-mesh'
+  kickstandPivot.add(kickstandMesh)
+  kickstandPivot.rotation.set(KICKSTAND.stowedRotX, 0, KICKSTAND.stowedRotZ)
   chassis.add(kickstandPivot)
 
   // Rider seat anchor aligned to vehicle-space (0, 0, +0.23) -> wheeliePivot (0, 0, -0.30)
@@ -944,6 +1007,7 @@ export function createDynamicEbike(paint = 0, initialMods?: Partial<EbikeModConf
     underglowSlot.visible = !shared && cfg.underglow
     tailWingSlot.visible = !shared && cfg.tailWing
     exhaustSlot.visible = !shared && cfg.exhaust
+    beamRig.setTier(shared ? 0 : (cfg.headlightTier ?? 0))
     rebuildModMeshes(shared, cfg, resolvedBodyColor)
   }
 
@@ -1007,18 +1071,16 @@ export function createDynamicEbike(paint = 0, initialMods?: Partial<EbikeModConf
       if (crashed) {
         kickstandBlend = 0
       } else {
-        kickstandBlend = state.dt > 0
-          ? T.MathUtils.damp(kickstandBlend, wantStand ? 1 : 0, 12, Math.min(.12, state.dt))
-          : (wantStand ? 1 : 0)
-        if (!wantStand && kickstandBlend < 1e-3) kickstandBlend = 0
+        kickstandBlend = stepKickstandBlend(kickstandBlend, wantStand, state.dt)
       }
+      const curvedStand = kickstandDeployCurve(kickstandBlend, wantStand)
       kickstandPivot.rotation.set(
-        T.MathUtils.lerp(1.42, .22, kickstandBlend),
+        T.MathUtils.lerp(KICKSTAND.stowedRotX, KICKSTAND.deployedRotX, curvedStand),
         0,
-        T.MathUtils.lerp(0, .42, kickstandBlend),
+        T.MathUtils.lerp(KICKSTAND.stowedRotZ, KICKSTAND.deployedRotZ, curvedStand),
       )
 
-      const standTilt = !crashed && Math.abs(state.lean) < .01 ? -kickstandBlend * .105 : 0
+      const standTilt = !crashed && Math.abs(state.lean) < .01 ? kickstandBlend * KICKSTAND.leanRad : 0
       leanPivot.rotation.set(0, 0, state.lean + standTilt)
       weightPivot.rotation.set(crashed ? 0 : T.MathUtils.clamp(state.longPitch ?? 0, -.12, .12), 0, 0)
       wheeliePivot.position.y = .228 * (1 - Math.cos(state.wheelie))
@@ -1032,7 +1094,8 @@ export function createDynamicEbike(paint = 0, initialMods?: Partial<EbikeModConf
       frontWheel.rotation.x -= state.wheelie > .08 ? spinDelta * .35 : spinDelta
 
       const hlMode: TwoWheelHeadlightMode = state.headlight ?? 'off'
-      headMat.color.setHex(hlMode === 'high' ? 0xffffff : hlMode === 'low' ? 0xfff5d4 : 0xc6c9be)
+      const batGain = state.batteryDepleted ? .42 : 1
+      headCluster.setChannel(0, (hlMode === 'high' ? 1.55 : hlMode === 'low' ? 1.0 : 0) * batGain)
       beamRig.update({
         mode: hlMode,
         night: state.night ?? 0,
@@ -1051,17 +1114,21 @@ export function createDynamicEbike(paint = 0, initialMods?: Partial<EbikeModConf
       } else if (!state.hazard) {
         hazardClock = 0
       }
-      leftSignalMesh.visible = leftLit
-      rightSignalMesh.visible = rightLit
+      headCluster.setChannel(2, leftLit ? 1.35 : 0)
+      headCluster.setChannel(3, rightLit ? 1.35 : 0)
+      tailCluster.setChannel(2, leftLit ? 1.35 : 0)
+      tailCluster.setChannel(3, rightLit ? 1.35 : 0)
       lastLeftSig = leftLit
       lastRightSig = rightLit
 
       const brakeOn = !!(state.brakeLight || state.braking || state.speed < -.05)
       lastBrakeLamp = brakeOn
-      tailMat.color.setHex(brakeOn ? 0xff4238 : hlMode !== 'off' ? 0xd03028 : 0x99201c)
+      tailCluster.setChannel(0, brakeOn ? 1.45 : hlMode !== 'off' ? 0.65 : 0)
     },
     dispose() {
       beamRig.dispose()
+      headCluster.dispose()
+      tailCluster.dispose()
       chassisModGeom?.dispose()
       frontModGeom?.dispose()
       underglowModGeom?.dispose()
@@ -1256,9 +1323,8 @@ export function createDynamicCar(paint = 0): CarVisualRig {
   const bodyMat = trackM(new T.MeshStandardMaterial({vertexColors: true, flatShading: true}))
   const wheelMat = trackM(new T.MeshStandardMaterial({vertexColors: true, flatShading: true}))
   const caliperMat = trackM(new T.MeshStandardMaterial({color: CAR_WHEEL_PALETTE.brakeBright, flatShading: true}))
-  const brakeLampMat = trackM(new T.MeshBasicMaterial({color: 0x7a1714}))
-  const reverseLampMat = trackM(new T.MeshBasicMaterial({color: 0x3b4046}))
-  const headLampMat = trackM(new T.MeshBasicMaterial({color: 0xd6d4c8}))
+  const frontLampCluster = createLampClusterMaterial()
+  const rearLampCluster = createLampClusterMaterial()
 
   const bodyCache = new Map<number, T.BufferGeometry>()
   const getBodyGeom = (p: number) => {
@@ -1283,16 +1349,84 @@ export function createDynamicCar(paint = 0): CarVisualRig {
   bodyMesh.position.set(0, -CG_Y, 0)
   suspensionPivot.add(bodyMesh)
 
-  for (const side of [-1, 1]) {
-    const yaw = -side * .20
-    const br = makeSolidPart(trackG(new T.BoxGeometry(.345, .048, .022)), brakeLampMat, side * .61, .85 - CG_Y, 2.222)
-    br.rotation.set(-.06, yaw, 0)
-    const rev = makeSolidPart(trackG(new T.BoxGeometry(.245, .034, .022)), reverseLampMat, side * .57, .775 - CG_Y, 2.222)
-    rev.rotation.set(-.06, yaw, 0)
-    const hl = makeSolidPart(trackG(new T.BoxGeometry(.22, .072, .024)), headLampMat, side * .62, .645 - CG_Y, -2.232)
-    hl.rotation.set(.08, side * .22, 0)
-    suspensionPivot.add(br, rev, hl)
+  // Merge all 6 car lamp housings + halos + rain-night wet streaks into 2 draw calls (front + rear, -4 draw calls).
+  const frontClusterGeom = trackG(buildLampClusterGeometry([
+    forSideLamp(-1),
+    forSideLamp(1),
+    forFrontTurnLamp(-1),
+    forFrontTurnLamp(1),
+  ]))
+  function forSideLamp(side: -1 | 1) {
+    return {
+      channel: 0 as const,
+      pos: [side * .62, .645 - CG_Y, -2.232] as const,
+      size: [.22, .072, .024] as const,
+      rot: [.08, side * .22, 0] as const,
+      dir: [0, 0, -1] as const,
+      color: LIGHT_PALETTE.carLow,
+      offColor: LIGHT_PALETTE.lensOffFront,
+      haloSize: .52,
+      haloColor: LIGHT_PALETTE.carHigh,
+      wetGroundY: -CG_Y,
+      wetWidth: .34,
+    }
   }
+  function forFrontTurnLamp(side: -1 | 1) {
+    return {
+      channel: (side < 0 ? 2 : 3) as 2 | 3,
+      pos: [side * .77, .645 - CG_Y, -2.18] as const,
+      size: [.07, .052, .024] as const,
+      rot: [.08, side * .35, 0] as const,
+      dir: [side * .35, 0, -.94] as const,
+      color: LIGHT_PALETTE.amberTurn,
+      offColor: 0x5c4620,
+      haloSize: .28,
+    }
+  }
+  const rearClusterGeom = trackG(buildLampClusterGeometry([
+    ...([-1, 1] as const).map(side => ({
+      channel: 0 as const, // tail + brake
+      pos: [side * .61, .85 - CG_Y, 2.222] as const,
+      size: [.345, .048, .022] as const,
+      rot: [-.06, -side * .20, 0] as const,
+      dir: [0, 0, 1] as const,
+      color: LIGHT_PALETTE.brakeCore,
+      offColor: LIGHT_PALETTE.lensOffTail,
+      haloSize: .44,
+      haloColor: LIGHT_PALETTE.brakeHalo,
+      wetGroundY: -CG_Y,
+      wetWidth: .36,
+    })),
+    ...([-1, 1] as const).map(side => ({
+      channel: 1 as const, // reverse warm white
+      pos: [side * .57, .775 - CG_Y, 2.222] as const,
+      size: [.245, .034, .022] as const,
+      rot: [-.06, -side * .20, 0] as const,
+      dir: [0, 0, 1] as const,
+      color: LIGHT_PALETTE.reverseWarm,
+      offColor: LIGHT_PALETTE.lensOffReverse,
+      haloSize: .30,
+      wetGroundY: -CG_Y,
+      wetWidth: .26,
+    })),
+    ...([-1, 1] as const).map(side => ({
+      channel: (side < 0 ? 2 : 3) as 2 | 3, // rear amber hazard/turn
+      pos: [side * .79, .80 - CG_Y, 2.18] as const,
+      size: [.08, .048, .022] as const,
+      rot: [-.06, -side * .32, 0] as const,
+      dir: [side * .28, 0, .96] as const,
+      color: LIGHT_PALETTE.amberTurn,
+      offColor: 0x5c4620,
+      haloSize: .30,
+    })),
+  ]))
+  const frontLampMesh = new T.Mesh(frontClusterGeom, frontLampCluster.materials)
+  frontLampMesh.name = 'car-front-lamps'
+  frontLampMesh.renderOrder = 3
+  const rearLampMesh = new T.Mesh(rearClusterGeom, rearLampCluster.materials)
+  rearLampMesh.name = 'car-rear-lamps'
+  rearLampMesh.renderOrder = 3
+  suspensionPivot.add(frontLampMesh, rearLampMesh)
 
   const carBeamRig = createHeadlightBeamRig('car')
   carBeamRig.group.position.set(0, .64 - CG_Y, -2.24)
@@ -1332,6 +1466,7 @@ export function createDynamicCar(paint = 0): CarVisualRig {
 
   let roll = 0, pitch = 0, heave = 0, heaveVel = 0, prevSpeed = 0, wheelSpin = 0, rearWheelSpin = 0, steerAngle = 0
   let lastBraking = false, lastReversing = false, lastHandbrake = false, roadPhase = 0
+  let tailGlow = 0, headGlow = 0, carHazardClock = 0, kickPitch = 0
 
   function clearEffects() {
     for (const p of smokePool) {
@@ -1377,8 +1512,11 @@ export function createDynamicCar(paint = 0): CarVisualRig {
       heaveVel += (-225 * heave - 14 * heaveVel) * cdt
       heave = T.MathUtils.clamp(heave + heaveVel * cdt, -.09, .09)
 
+      if (state.engageKick) kickPitch += state.engageKick
+      kickPitch = T.MathUtils.damp(kickPitch, 0, 14, cdt)
+
       suspensionPivot.position.set(0, CG_Y + heave + roadRumble, 0)
-      suspensionPivot.rotation.set(pitch, 0, roll, 'YXZ')
+      suspensionPivot.rotation.set(pitch + kickPitch, 0, roll, 'YXZ')
 
       steerAngle = T.MathUtils.damp(steerAngle, -state.steerInput * .44, 14, cdt)
       fl.steerGroup.rotation.y = steerAngle > 0 ? steerAngle * 1.07 : steerAngle * .93
@@ -1444,10 +1582,35 @@ export function createDynamicCar(paint = 0): CarVisualRig {
       lastReversing = state.reversing
       lastHandbrake = !!state.handbrake
       const hlMode: TwoWheelHeadlightMode = state.headlight ?? 'off'
-      headLampMat.color.setHex(hlMode === 'high' ? 0xffffff : hlMode === 'low' ? 0xfff4d6 : 0xd6d4c8)
-      carBeamRig.update({mode: hlMode, night: state.night ?? 0})
-      brakeLampMat.color.setHex(state.braking || state.handbrake ? 0xff3b30 : hlMode !== 'off' ? 0xba2822 : 0x7a1714)
-      reverseLampMat.color.setHex(state.reversing ? 0xf8fafc : 0x3b4046)
+      const crankDim = state.crankDim !== undefined ? T.MathUtils.clamp(state.crankDim, 0, 1) : 1
+      const engineOn = state.engineRunning !== false
+      const targetHead = (hlMode === 'high' ? 1.65 : hlMode === 'low' ? 1.05 : engineOn ? 0.24 : 0) * crankDim
+      const targetTail = (state.braking || state.handbrake ? 1.55 : hlMode !== 'off' ? 0.72 : engineOn ? 0.18 : 0) * crankDim
+      // Incandescent-style smooth lamp decay on engine-off (~0.35s fade)
+      headGlow = state.dt > 0 ? T.MathUtils.damp(headGlow, targetHead, targetHead >= headGlow ? 28 : 8.5, cdt) : targetHead
+      tailGlow = state.dt > 0 ? T.MathUtils.damp(tailGlow, targetTail, targetTail >= tailGlow ? 28 : 8.5, cdt) : targetTail
+
+      let leftSig = !!state.leftSignalLit
+      let rightSig = !!state.rightSignalLit
+      if (state.hazard && state.leftSignalLit === undefined && state.rightSignalLit === undefined) {
+        carHazardClock += Math.max(0, state.dt)
+        const pulse = Math.sin(carHazardClock * Math.PI * 3.6) >= 0
+        leftSig = pulse
+        rightSig = pulse
+      } else if (!state.hazard) {
+        carHazardClock = 0
+      }
+
+      frontLampCluster.setChannel(0, headGlow)
+      frontLampCluster.setChannel(2, leftSig ? 1.25 : 0)
+      frontLampCluster.setChannel(3, rightSig ? 1.25 : 0)
+
+      rearLampCluster.setChannel(0, tailGlow)
+      rearLampCluster.setChannel(1, state.reversing && engineOn ? 1.25 * crankDim : 0)
+      rearLampCluster.setChannel(2, leftSig ? 1.25 : 0)
+      rearLampCluster.setChannel(3, rightSig ? 1.25 : 0)
+
+      carBeamRig.update({mode: hlMode, night: state.night ?? 0, crankDim})
     },
     probe() {
       let smokeActive = 0
@@ -1465,6 +1628,8 @@ export function createDynamicCar(paint = 0): CarVisualRig {
     dispose() {
       clearEffects()
       carBeamRig.dispose()
+      frontLampCluster.dispose()
+      rearLampCluster.dispose()
       for (const item of disposables) item.dispose()
       for (const g of bodyCache.values()) g.dispose()
       smokeGroup.removeFromParent()

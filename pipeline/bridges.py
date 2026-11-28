@@ -10,7 +10,7 @@ from shapely.geometry.polygon import orient
 from common import load_osm
 import bridgeheads
 import station_footbridge
-from features import points, polygons
+from features import area, points, polygons
 from landmarks.jiefang_layout import SPAN_WAYS
 
 
@@ -136,6 +136,7 @@ def bridge_tiles(bounds, sample, routes=(), raised=(), plans=None, west_portal=N
         if isinstance(replace, list):
             replaced.update(key for key in replace if isinstance(key, str))
     ways = load_osm()
+    airport = next((area(row) for row in ways if row['type']=='relation' and row['id']==13846706),None)
     station_nodes = next((set(w['nodes']) for w in ways if w['type'] == 'way'
                           and w['id'] == station_footbridge.BRIDGE), set())
     for way in ways:
@@ -153,6 +154,8 @@ def bridge_tiles(bounds, sample, routes=(), raised=(), plans=None, west_portal=N
         if way['id'] in raised and not (plans and way['id'] in plans):
             coords = raised[way['id']][0]
         line = LineString(coords)
+        if tags.get('aeroway')=='jet_bridge' and airport is not None and airport.intersects(line):
+            continue
         if not bounds.intersects(line) or not line.length:
             continue
         sections = []

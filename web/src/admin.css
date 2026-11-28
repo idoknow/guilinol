@@ -204,8 +204,9 @@ a.adm-kpi:hover{border-color:var(--ui-jade-500);box-shadow:var(--ui-shadow-1);tr
 .adm-status--submitted,.adm-status--need_info{background:var(--ui-seal-wash);color:var(--ui-seal)}
 .adm-status--approved,.adm-status--queued{background:rgba(196,154,74,.18);color:#7a5c1e}
 .adm-status--modelling,.adm-status--reviewing{background:rgba(79,127,122,.16);color:var(--ui-jade-700)}
-.adm-status--live{background:var(--ui-jade-500);color:var(--ui-paper)}
-.adm-status--rejected,.adm-status--duplicate,.adm-status--draft,.adm-muted{background:var(--ui-paper-2);color:#8a8a84}
+.adm-status--live,.adm-status--resolved,.adm-status--unbanned{background:var(--ui-jade-500);color:var(--ui-paper)}
+.adm-status--rejected,.adm-status--duplicate,.adm-status--upheld,.adm-status--draft,.adm-muted{background:var(--ui-paper-2);color:#8a8a84}
+.adm-triage-list{margin:8px 0 0;padding-left:18px;display:grid;gap:4px;font-size:13px;line-height:1.55;color:var(--ui-ink-soft)}
 .adm-ok{background:rgba(79,127,122,.14);color:var(--ui-jade-700)}
 .adm-role--admin{background:var(--ui-jade-700);color:var(--ui-paper)}
 .adm-kind--error,.adm-kind--rejection{background:var(--ui-seal-wash);color:var(--ui-seal)}
@@ -794,15 +795,15 @@ a.adm-kpi:hover{border-color:var(--ui-jade-500);box-shadow:var(--ui-shadow-1);tr
 .adm-sec-bans .adm-card-actions .adm-link+.adm-link{margin-left:0}
 .adm-sec-bans .adm-card-actions .adm-btn[aria-expanded="true"]{background:var(--ui-paper-3);border-color:var(--ui-jade-500);color:var(--ui-jade-700)}
 .adm-sec-bans .adm-tab{cursor:pointer;font-family:var(--ui-serif)}
-.adm-sec-manual{display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:10px;border-radius:var(--ui-r-sm);background:var(--ui-paper-3);border:1px solid var(--ui-paper-line)}
-.adm-sec-manual input{min-width:0;padding:5px 9px;font:13px/1.4 var(--sans);color:var(--ui-ink);background:var(--ui-paper-hi);border:1px solid var(--ui-paper-line);border-radius:var(--ui-r-sm)}
-.adm-sec-manual input:focus{outline:none;border-color:var(--ui-jade-500);box-shadow:0 0 0 3px rgba(79,127,122,.18)}
+.adm-sec-manual,.adm-sec-window{display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:10px;border-radius:var(--ui-r-sm);background:var(--ui-paper-3);border:1px solid var(--ui-paper-line)}
+.adm-sec-manual input,.adm-sec-window input{min-width:0;padding:5px 9px;font:13px/1.4 var(--sans);color:var(--ui-ink);background:var(--ui-paper-hi);border:1px solid var(--ui-paper-line);border-radius:var(--ui-r-sm)}
+.adm-sec-manual input:focus,.adm-sec-window input:focus{outline:none;border-color:var(--ui-jade-500);box-shadow:0 0 0 3px rgba(79,127,122,.18)}
 .adm-sec-manual [name=banuid]{flex:0 1 104px}
 .adm-sec-manual [name=banfp]{flex:1 1 140px}
 .adm-sec-manual [name=banreason]{flex:1.4 1 140px}
-.adm-sec-manual .adm-select{flex:none;padding:5px 24px 5px 8px;font-size:13px}
-.adm-sec-manual .adm-btn{flex:none}
-.adm-sec-manual .adm-sec-hint{flex-basis:100%}
+.adm-sec-manual .adm-select,.adm-sec-window .adm-select{flex:none;padding:5px 24px 5px 8px;font-size:13px}
+.adm-sec-manual .adm-btn,.adm-sec-window .adm-btn{flex:none}
+.adm-sec-manual .adm-sec-hint,.adm-sec-window .adm-sec-hint{flex-basis:100%}
 .adm-sec-table{table-layout:fixed}
 .adm-sec-table th:nth-child(1){width:36%}
 .adm-sec-table th:nth-child(3){width:76px}
@@ -977,4 +978,79 @@ a.adm-kpi:hover{border-color:var(--ui-jade-500);box-shadow:var(--ui-shadow-1);tr
   .adm-capture-lb-who{flex-wrap:wrap;white-space:normal}
   .adm-capture-lb-actions{width:100%}
   .adm-capture-lb-actions .adm-btn{flex:1}
+}
+
+/* 封禁总账 · 申诉一屏审（IDOK-503 P7）
+   宽屏：左读申诉，右栏「证据 → 处置」贴顶、超高时自身滚动；档位墨色、生效朱砂、撤销玉青，状态都有文字 */
+.adm-detail--appeal{grid-template-columns:minmax(0,1fr) clamp(320px,30vw,380px)}
+.adm-detail--appeal .adm-detail-side{max-height:calc(100vh - 100px);overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin;padding-bottom:2px}
+.adm-rec{display:grid;gap:10px;min-width:0}
+.adm-rec-state{display:flex;flex-wrap:wrap;align-items:center;gap:6px 8px;margin:0;font:12.5px/1.5 var(--num);color:var(--ui-ink-soft)}
+.adm-rec-state .adm-pill{padding:0 9px}
+.adm-rec-state[data-rec-tier=ban] .adm-rec-tier{background:var(--ui-ink);color:var(--ui-paper)}
+.adm-rec-state[data-rec-tier=cooldown] .adm-rec-tier{background:var(--ui-ochre-wash);color:var(--ui-ink)}
+.adm-rec-state[data-rec-state=active] .adm-rec-pill{background:var(--ui-seal-wash);color:var(--ui-seal)}
+.adm-rec-state[data-rec-state=expired] .adm-rec-pill{color:var(--ui-ink-3)}
+.adm-rec-state[data-rec-state=revoked] .adm-rec-pill{color:var(--ui-jade-700)}
+.adm-rec-tail{min-width:0;overflow-wrap:anywhere}
+.adm-rec-who{display:flex;flex-wrap:wrap;align-items:center;gap:4px 8px}
+.adm-rec-who .adm-pill{padding:0 8px;font-size:11.5px}
+.adm-rec-fp{font:12.5px var(--num);color:var(--ui-ink)}
+.adm-rec-shots{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px}
+.adm-rec-shot{position:relative;display:block;aspect-ratio:16/9;overflow:hidden;border:1px solid var(--ui-paper-line);border-radius:var(--ui-r-sm);background:var(--ui-ink-950);cursor:zoom-in}
+.adm-rec-shot img{display:block;width:100%;height:100%;object-fit:cover}
+.adm-rec-shot:hover{border-color:var(--ui-seal)}
+.adm-rec-shot:focus-visible{outline:2px solid var(--ui-jade-500);outline-offset:2px}
+.adm-rec-shot[data-more]::after{content:attr(data-more);position:absolute;inset:0;display:grid;place-items:center;background:var(--ui-scrim);color:var(--ui-text);font:600 13px var(--num)}
+.adm-rec-more{justify-self:start}
+.adm-rec-events{max-height:240px;overflow:auto;border:1px solid var(--ui-paper-line);border-radius:var(--ui-r-sm)}
+/* 安全中心 · 记录号检索结果 */
+.adm-rec-title{display:inline-flex;flex-wrap:wrap;align-items:baseline;gap:6px;min-width:0}
+.adm-rec-title code{font:600 13px var(--num);letter-spacing:0;color:var(--ui-ink);overflow-wrap:anywhere}
+.adm-rec-links{display:flex;flex-wrap:wrap;align-items:center;gap:6px}
+.adm-rec-appeal{display:inline-flex;align-items:center;gap:6px}
+/* 一键处置：快捷短语是宣纸签，点即填入；主次两键并排，流转按钮退到虚线下 */
+.adm-appeal-act .adm-card-body{gap:10px}
+.adm-appeal-phrases,.adm-sec-presets{display:flex;flex-wrap:wrap;gap:6px}
+.adm-appeal-phrase,.adm-sec-preset{padding:3px 10px;border:1px solid var(--ui-paper-line);border-radius:var(--ui-r-pill);background:var(--ui-paper-3);font:500 12.5px/1.5 var(--ui-serif);letter-spacing:.06em;
+  color:var(--ui-ink-soft);cursor:pointer;transition:background var(--ui-fast),border-color var(--ui-fast),color var(--ui-fast)}
+.adm-appeal-phrase:hover,.adm-sec-preset:hover{border-color:var(--ui-jade-500);color:var(--ui-jade-700)}
+.adm-appeal-phrase:focus-visible,.adm-sec-preset:focus-visible{outline:2px solid var(--ui-jade-500);outline-offset:2px}
+.adm-appeal-phrase[aria-pressed=true]{background:var(--ui-paper-hi);border-color:var(--ui-jade-500);color:var(--ui-jade-700)}
+.adm-appeal-act textarea{min-height:96px}
+.adm-appeal-foot{display:flex;align-items:baseline;gap:10px;margin-top:-4px}
+.adm-appeal-count{margin-left:auto;font:12px var(--num);color:var(--ui-ink-3);font-variant-numeric:tabular-nums}
+.adm-appeal-main{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.adm-appeal-main .adm-btn{min-height:38px;padding:0 10px}
+.adm-appeal-more{display:flex;flex-wrap:wrap;gap:6px;padding-top:10px;border-top:1px dashed var(--ui-paper-line)}
+.adm-dialog-quote{margin:0;max-height:30vh;overflow:auto;padding:8px 12px;border-left:2px solid var(--ui-line-strong);background:var(--ui-fill);color:var(--ui-text-2);font-size:13.5px;line-height:1.65;white-space:pre-wrap;overflow-wrap:anywhere}
+/* 封禁表：设备行的关联账号数 */
+.adm-ban-accounts{margin-left:8px;padding:0 7px;font-size:11.5px;vertical-align:1px}
+/* 按时间窗撤销：快捷窗口一行，起止时间一组，类型 / 原因 / 提交随宽度折行 */
+.adm-sec-presets{flex-basis:100%}
+.adm-sec-preset{background:var(--ui-paper-hi)}
+.adm-sec-preset[aria-pressed=true]{background:var(--ui-jade-700);border-color:var(--ui-jade-700);color:var(--ui-paper)}
+.adm-sec-range{display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);align-items:center;gap:6px;flex:1 1 340px;min-width:0}
+.adm-sec-range span{font-size:12.5px;color:var(--ui-ink-soft)}
+.adm-sec-window [name=winreason]{flex:1 1 160px}
+@media (max-width:1100px){
+  .adm-detail--appeal{grid-template-columns:minmax(0,1fr)}
+  .adm-detail--appeal .adm-detail-side{max-height:none;overflow:visible;padding-bottom:0}
+}
+/* 平板：证据与处置并排，省一屏滚动 */
+@media (min-width:821px) and (max-width:1100px){
+  .adm-detail--appeal .adm-detail-side{grid-template-columns:repeat(2,minmax(0,1fr));align-items:start}
+}
+@media (max-width:820px){
+  .adm-appeal-main .adm-btn{min-height:42px}
+  .adm-appeal-phrase,.adm-sec-preset{padding:5px 12px}
+  .adm-sec-range{flex-basis:100%}
+}
+@media (max-width:640px){
+  .adm-sec-presets>*,.adm-appeal-more>*{flex:1 1 auto}
+  .adm-sec-range{grid-template-columns:minmax(0,1fr)}
+  .adm-sec-range span{display:none}
+  .adm-sec-window .adm-select,.adm-sec-window [name=winreason]{flex:1 1 100%;max-width:none}
+  .adm-sec-window .adm-btn{flex:1 1 100%;min-height:38px}
+  .adm-rec-shots{gap:4px}
 }

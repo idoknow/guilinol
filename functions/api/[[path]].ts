@@ -8,6 +8,7 @@ import {feedbackContributors} from '../../lib/contributors'
 import {bindEmail,isSocialType,socialCallback,socialConfig,socialConfirm,socialPending,socialRegister,socialStates,startSocial,userSocialIdentities} from '../../lib/social'
 import {unsubscribe} from '../../lib/feedback-mail'
 import {cloudSave} from '../../lib/cloud-save'
+import {walkFog} from '../../lib/walk-fog'
 import {weakPassword} from '../../lib/weak-password'
 type User = SessionAccount & {salt:string;digest:string;locked_until:number}
 const profile=(user:SessionAccount)=>({id:user.id,uid:user.uid,email:user.email,nickname:user.nickname,verified:!!user.verified,role:user.role,notify_email:!!user.notify_email,email_placeholder:!!user.email_placeholder})
@@ -47,6 +48,7 @@ async function handle(request:Request,env:Env) {
   if(env.updateCards && /^(?:admin\/)?updates(?:\/|$)/.test(path)) return env.updateCards(request,path)
   if(/^(feedback|bridge|admin)(\/|$)/.test(path)) return feedback(request,env,path)
   if(path==='me/save')return cloudSave(request,env)
+  if(path==='walk/fog')return walkFog(request,env)
   if(path==='helicopter'&&env.helicopter){
     if(method!=='POST')throw new Problem(405,'method','需要 POST')
     if(request.headers.get('Origin')!==url.origin)throw new Problem(403,'origin','请求来源不符')

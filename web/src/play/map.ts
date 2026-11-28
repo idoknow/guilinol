@@ -1,4 +1,6 @@
 import {nearestPlayable} from '../../../lib/play-region'
+import {FOG_CELL, fogCellCenter} from '../../../lib/fog'
+import {fogAreaKm2, fogCells} from '../walk/fog'
 import {getPlayMode} from '../game/play-mode'
 import {operation} from '../telemetry'
 import * as THREE from 'three'
@@ -24,14 +26,14 @@ const C = {paper:'#efe8d8', green:'#d3dcc0', water:'#a6c9c1', waterEdge:'#86ada5
   peak:'#7f9a7b', peakDark:'#4f6b55', seal:'#a9503c', sealSoft:'rgba(169,80,60,.55)', paperText:'#f4efe2',
   lmHub:'#2c4257', lmScenic:'#2f5d4b', lmCivic:'#8c5a2b', lmCampus:'#5c4569', lmFill:'rgba(244,239,226,.94)',
   shop:'#d9822b', shopText:'#9c4e0e', route:'#20d6c1', peer:'#2f7d70',
-  halo:'rgba(239,232,216,.92)', roadHalo:'rgba(252,250,243,.95)'}
+  halo:'rgba(239,232,216,.92)', roadHalo:'rgba(252,250,243,.95)', fog:'rgba(9,11,13,.945)'}
 // Phase 2 街头 palette (docs/style.md 第二期 · 小地图): night-asphalt ground, grey roads, white arterials, jade water.
 const STREET:typeof C = {paper:'#1b1f25', green:'#1f3329', water:'#17414c', waterEdge:'#245866', building:'#2a2f37', buildingEdge:'#353b45',
   road:'#7d838c', casing:'#14171b', major:'#e9e6de', majorCasing:'#0d0f12', path:'#4c525b', ink:'#f6f4ef', inkSoft:'#c9ccd2',
   peak:'#2d4a3a', peakDark:'#203629', seal:'#20d6c1', sealSoft:'rgba(32,214,193,.5)', paperText:'#101216',
   lmHub:'#66b2ff', lmScenic:'#4bd4a0', lmCivic:'#e8b058', lmCampus:'#b896e8', lmFill:'rgba(27,31,37,.92)',
   shop:'#f5b841', shopText:'#ffd166', route:'#20d6c1', peer:'#8fe3ff',
-  halo:'rgba(16,18,22,.9)', roadHalo:'rgba(16,18,22,.9)'}
+  halo:'rgba(16,18,22,.9)', roadHalo:'rgba(16,18,22,.9)', fog:'rgba(4,6,8,.955)'}
 function landmarkColor(kind:LandmarkKind){
   return kind==='hub'?C.lmHub:kind==='scenic'?C.lmScenic:kind==='civic'?C.lmCivic:C.lmCampus
 }
@@ -145,6 +147,35 @@ export function mapView(host:Host, atlas:Atlas, ui:{slot:HTMLElement; buttons:HT
   }
   const here = ()=>{const w = host.walker(); return w?.active?w.position:host.camera.position}
 
+  // --- 迷雾（IDOK-588）：只有走过的地方才是亮的，和 GTA 线下版的开图手感一致。
+  // 先在离屏 canvas 上铺一层墨，再把「走过的格子」用 destination-out 挖成洞，整层贴上主画布。
+  // 离屏画布比屏幕大一圈（FOG_PAD），这样高斯模糊的边缘落在屏幕外，不会在四边漏出透明缝。
+  const FOG_PAD = 16
+  const fogLayer = document.createElement('canvas')
+  function paintFog(g:CanvasRenderingContext2D, w:number, h:number, dpr:number, cx:number, cz:number, scale:number) {
+    const pw = Math.max(1,Math.round(w*dpr)), ph = Math.max(1,Math.round(h*dpr)), pad = Math.round(FOG_PAD*dpr)
+    if(fogLayer.width!==pw+pad*2||fogLayer.height!==ph+pad*2){fogLayer.width = pw+pad*2; fogLayer.height = ph+pad*2}
+    const mg = fogLayer.getContext('2d'); if(!mg) return
+    mg.setTransform(1,0,0,1,0,0); mg.globalCompositeOperation = 'source-over'
+    mg.fillStyle = C.fog; mg.fillRect(0,0,fogLayer.width,fogLayer.height)
+    const cells = fogCells()
+    if(cells.size) {
+      mg.globalCompositeOperation = 'destination-out'; mg.fillStyle = '#000'
+      const reach = 1/scale, x0 = cx-reach*w/2-FOG_CELL, x1 = cx+reach*w/2+FOG_CELL
+      const z0 = cz-reach*h/2-FOG_CELL, z1 = cz+reach*h/2+FOG_CELL
+      const r = Math.max(1.5, FOG_CELL*scale*.84*dpr)
+      for(const key of cells) {
+        const c = fogCellCenter(key)
+        if(c.x<x0||c.x>x1||c.z<z0||c.z>z1) continue      // 一屏只画看得见的格子
+        mg.beginPath(); mg.arc(pad+(w/2+(c.x-cx)*scale)*dpr, pad+(h/2+(c.z-cz)*scale)*dpr, r, 0, Math.PI*2); mg.fill()
+      }
+    }
+    mg.globalCompositeOperation = 'source-over'
+    g.save(); g.setTransform(1,0,0,1,0,0)
+    g.filter = 'blur(4px)'; g.drawImage(fogLayer,-pad,-pad); g.filter = 'none'
+    g.restore()
+  }
+
   // --- Painter
   function paint(g:CanvasRenderingContext2D, w:number, h:number, dpr:number, cx:number, cz:number, scale:number, mini:boolean) {
     g.setTransform(dpr,0,0,dpr,0,0); g.fillStyle = C.paper; g.fillRect(0,0,w,h)
@@ -194,7 +225,6 @@ export function mapView(host:Host, atlas:Atlas, ui:{slot:HTMLElement; buttons:HT
     const sealSize = mini?13:20
     for(const o of seals) taken.push([o.x-sealSize/2,o.y-sealSize/2,o.x+sealSize/2,o.y+sealSize/2])
     const visibleLandmarks = activeLandmarks
-      .filter(m=>m.tier===1||scale>=.085)
       .map(m=>({m,x:sx(m.x),y:sz(m.z),s:mini?(m.tier===1?11:9.5):(m.tier===1?19:16)}))
       .filter(o=>o.x>-24&&o.y>-24&&o.x<w+24&&o.y<h+24)
     for(const o of visibleLandmarks) taken.push([o.x-o.s/2-1,o.y-o.s/2-1,o.x+o.s/2+1,o.y+o.s/2+1])
@@ -319,6 +349,7 @@ export function mapView(host:Host, atlas:Atlas, ui:{slot:HTMLElement; buttons:HT
         g.fillStyle = done?C.paperText:C.seal; g.font = `600 ${Math.round(farBadgeSize*.6)}px ${SERIF}`; g.fillText(o.s.seal,0,farBadgeSize*.04); g.restore()
       }
     }
+    paintFog(g,w,h,dpr,cx,cz,scale)
     if(navTarget) {
       // IDOK-350: the road route (漓江青, dark casing so it reads on both palettes); straight dashed line only
       // while planning or when no connected road was found.
@@ -435,13 +466,14 @@ export function mapView(host:Host, atlas:Atlas, ui:{slot:HTMLElement; buttons:HT
   const sheet = document.createElement('section'); sheet.className = 'atlas'; sheet.hidden = true
   sheet.innerHTML = `<canvas></canvas><div class="atlas-search"><input type="search" placeholder="搜地名、商铺、路名、码头、山名" aria-label="搜索地点" enterkeyhint="search"><div class="atlas-docks">${shops.map(sh=>`<button type="button" class="atlas-shop-btn" data-shop="${sh.shopId}">${sh.mapMarker.label} · ${sh.mapMarker.badge}</button>`).join('')}${waterDocks.map(d=>`<button type="button" data-dock="${d.id}">${d.name} · ${d.badge}</button>`).join('')}</div><ol></ol></div>
     <button class="atlas-close" aria-label="关闭地图">×</button><button class="atlas-here" aria-label="回到我的位置">◎</button>
-    <div class="atlas-pop" hidden></div><p class="atlas-legend">朱印＝景册 · 八角标＝区域地标 · 霓标＝商圈商铺 · <span class="atlas-travel-legend">已开放区域可传送 · </span> © OpenStreetMap contributors</p>`
+    <div class="atlas-pop" hidden></div><p class="atlas-legend">朱印＝景册 · 八角标＝区域地标 · 霓标＝商圈商铺 · <span class="atlas-travel-legend">已开放区域可传送 · </span><span class="atlas-fog"></span>© OpenStreetMap contributors</p>`
   document.body.append(sheet)
   markSurface(sheet)
   const canvas = sheet.querySelector('canvas')!, input = sheet.querySelector('input')!, results = sheet.querySelector('ol')!, pop = sheet.querySelector<HTMLElement>('.atlas-pop')!
   for(const b of Array.from(sheet.querySelectorAll<HTMLButtonElement>('.atlas-docks button[data-shop]'))) b.onclick = ()=>{const sh = listShops().find(x=>x.shopId===b.dataset.shop); if(sh){close(); if(ui.goShop) ui.goShop(sh); else ui.goPoint(sh.triggerPos[0],sh.triggerPos[2],sh.displayName)}}
   for(const b of Array.from(sheet.querySelectorAll<HTMLButtonElement>('.atlas-docks button[data-dock]'))) b.onclick = ()=>{const d = waterDocks.find(x=>x.id===b.dataset.dock); if(d){close(); ui.goDock(d)}}
   const view = {x:0,z:0,scale:.5}
+  const fogText = sheet.querySelector<HTMLElement>('.atlas-fog')!
   let pin:{x:number,z:number,name:string,spot?:Spot,landmark?:MapLandmark,dock?:WaterDock,shop?:ShopTriggerDef,peer?:RosterPlayer}|null = null
   let navTarget:{x:number,z:number,name:string}|null = null
   function redraw() {
@@ -449,9 +481,13 @@ export function mapView(host:Host, atlas:Atlas, ui:{slot:HTMLElement; buttons:HT
     const w = sheet.clientWidth, h = sheet.clientHeight, dpr = Math.min(2,devicePixelRatio)
     if(canvas.width!==Math.round(w*dpr)||canvas.height!==Math.round(h*dpr)){canvas.width = Math.round(w*dpr); canvas.height = Math.round(h*dpr)}
     const g = canvas.getContext('2d')!; paint(g,w,h,dpr,view.x,view.z,view.scale,false)
+    {const km2 = fogAreaKm2(); fogText.textContent = `已探明 ${km2.toFixed(km2<1?2:1)} km² `}
     if(pin) {
       const x = w/2+(pin.x-view.x)*view.scale, y = h/2+(pin.z-view.z)*view.scale
-      if(!pin.spot&&!pin.landmark&&!pin.shop&&!pin.peer){g.setTransform(dpr,0,0,dpr,0,0); g.fillStyle = C.ink; g.beginPath(); g.arc(x,y-14,7,0,Math.PI*2); g.moveTo(x-5.5,y-10); g.lineTo(x,y); g.lineTo(x+5.5,y-10); g.fill()
+      if(pin.landmark&&view.scale<.09){
+        g.setTransform(dpr,0,0,dpr,0,0); g.textAlign = 'center'; g.textBaseline = 'middle'
+        drawLandmarkBadge(g,x,y,15,pin.landmark,true)
+      }else if(!pin.spot&&!pin.landmark&&!pin.shop&&!pin.peer){g.setTransform(dpr,0,0,dpr,0,0); g.fillStyle = C.ink; g.beginPath(); g.arc(x,y-14,7,0,Math.PI*2); g.moveTo(x-5.5,y-10); g.lineTo(x,y); g.lineTo(x+5.5,y-10); g.fill()
         g.fillStyle = C.paper; g.beginPath(); g.arc(x,y-14,2.6,0,Math.PI*2); g.fill()}
       pop.style.transform = `translate(${Math.round(x)}px,${Math.round(y-(pin.peer?12:pin.spot||pin.landmark||pin.shop?20:26))}px) translate(-50%,-100%)`
     }
@@ -533,7 +569,7 @@ export function mapView(host:Host, atlas:Atlas, ui:{slot:HTMLElement; buttons:HT
       const r2 = (o:{x:number,z:number})=>Math.hypot(o.x-x,o.z-z)*view.scale
       const nearShop = built.contains(x,z)&&listShops().find(s=>built.contains(s.triggerPos[0],s.triggerPos[2])&&Math.hypot(s.triggerPos[0]-x,s.triggerPos[2]-z)*view.scale<18)
       const near = !nearShop&&built.contains(x,z)&&spots.filter(s=>built.contains(s.x,s.z)&&r2(s)<16).sort((a,b)=>r2(a)-r2(b))[0]
-      const nearLandmark = !nearShop&&!near&&built.contains(x,z)&&activeLandmarks.filter(m=>(m.tier===1||view.scale>=.085)&&r2(m)<16).sort((a,b)=>r2(a)-r2(b))[0]
+      const nearLandmark = !nearShop&&!near&&built.contains(x,z)&&activeLandmarks.filter(m=>(m.tier===1||view.scale>=.09)&&r2(m)<16).sort((a,b)=>r2(a)-r2(b))[0]
       const nearPeer = roster().players.filter(p=>r2(p)<14).sort((a,b)=>r2(a)-r2(b))[0]
       if(nearPeer) setPin({x:nearPeer.x,z:nearPeer.z,name:nearPeer.name,peer:nearPeer})
       else if(nearShop) setPin({x:nearShop.triggerPos[0],z:nearShop.triggerPos[2],name:nearShop.mapMarker.label,shop:nearShop})

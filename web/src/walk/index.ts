@@ -1,3 +1,4 @@
+import {record} from '../telemetry'
 import {combatController} from '../combat/controller'
 import {config as combatConfig} from '../combat/net'
 import {cameraHoldLayer, DEFAULT_CAMERA_HOLD_AIM} from './camera-hold'
@@ -57,7 +58,9 @@ import {touchUi} from '../ui/input-mode'
 import {look} from '../look/config'
 import {env} from '../look/time'
 import {createDriverPose} from './car'
-import {createRiderPose,notifyDismountBlocked} from './ride'
+import {createRiderPose,notifyDismountBlocked,type TwoWheelCrashCause} from './ride'
+import {isSharedHeadlightSwitchLocked,SHARED_EBIKE_COMPENSATION_YUAN} from './shared-ebike-logic'
+import {createDamagedBikeSignSprite,hideCompensationBanner,showCompensationBanner} from '../ui/compensation-banner'
 import {createEbikeAudioEngine} from './ebike-audio'
 import {RIDE_SOUND_EVENT} from './ride-sound-pref'
 import {clearAvatarPose, ensureAvatarRig, getAvatarJoint, getAvatarJoints} from './avatar-rig'
@@ -91,6 +94,27 @@ import {
   type StaticBikeVisualOptions,
   type TwoWheelVisualRig,
 } from './vehicle-model'
+import {LIGHT_PALETTE, buildLampClusterGeometry, createLampClusterMaterial} from './vehicle-lights'
+import {
+  chooseTipSide,
+  createTipOver,
+  resolveKickstandStrict,
+  stepTipOver,
+  tipLift,
+  type TipOverSim,
+} from './kickstand'
+import {
+  createCarGearbox,
+  createCarRollaway,
+  resolveCarStrict,
+  stepCarRollaway,
+  type CarGearSelector,
+  type CarGearboxAssist,
+  type CarGearboxEvent,
+  type CarGearboxPersisted,
+  type CarGearboxResult,
+  type CarRollawaySim,
+} from './car-gearbox'
 import {
   applyEbikeVisualAndRider,
   createEbikeFxController,
@@ -258,6 +282,11 @@ type DownedBikeEntry={
   modPreset:EbikeModPreset
   paint:number
   hazardOverlay?:THREE.Group
+  tip?:TipOverSim
+  wallLean?:boolean
+  damaged?:boolean
+  damagedSign?:THREE.Sprite
+  spawnKey?:string
 }
 
 function setRiderJoints(joints:RiderJoints,targets:Partial<Record<RiderJointName,[number,number,number]>>,blend=1){
@@ -596,7 +625,17 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
   const gtaCarParam=searchParams?.get('gtacar')==='1'
   const defaultCarGta=!verify||gtaCarParam
   let carGtaOverride:boolean|undefined=undefined
+  let kickstandStrict=resolveKickstandStrict({verify,param:searchParams?.get('kickstandStrict')??null})
+  const carGearbox=createCarGearbox({
+    strict:resolveCarStrict({verify,param:searchParams?.get('carStrict')??null}),
+    assist:{autoIgnite:touchUi(),autoDrive:touchUi()},
+  })
+  const carPersistedGearbox=new WeakMap<THREE.Object3D,CarGearboxPersisted>()
+  type CarRollawaySession={mesh:THREE.Mesh;sim:CarRollawaySim;beepTimer:number}
+  let carRollaway:CarRollawaySession|null=null
+  let carEngageKick=0
   let carShake=0, carShakePhase=0, carSpeedArm=0
+  let bikeTipShake=0, bikeTipShakePhase=0
   function ebikeModUpgrades(vType:EbikeVehicleType,preset:EbikeModPreset):EbikeUpgradeMods|null{
     if(vType==='shared'||preset==='stock')return null
     return preset==='ghostfire'?{motorLevel:1,controllerLevel:1,batteryLevel:1}:{motorLevel:2,controllerLevel:2,batteryLevel:2}
@@ -633,6 +672,8 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
     slideSpeed:number
     elapsed:number
     reason:Exclude<EbikeCrashReason,''>
+    damaged?:boolean
+    spawnKey?:string
   }
   type StandUpSession={elapsed:number;duration:number;side:-1|1;x:number;y:number;z:number;startYaw:number;targetYaw:number}
   type PickupSession={rec:DownedBikeEntry;elapsed:number;duration:number;startYaw:number}
@@ -1067,7 +1108,7 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
     const footY=rides?.boat?pos.y:pos.y-cfg.height/2
     const quietZone=getQuietZoneAt(pos.x,pos.z)
     const vSnap=rides?.getInteractSnapshot()??{
-      aboardKind:null,tourDisembarkQueued:false,nearDownedVehicle:null,nearVehicle:null,nearBoat:null,
+      aboardKind:null,tourDisembarkQueued:false,nearDownedVehicle:null,nearVehicle:null,nearDamagedVehicle:null,nearBoat:null,
     }
     const soloEnabled=getPlayMode()==='solo'
     const handoverReady=Boolean(trafficDutyRef?.isHandoverReady?.())
@@ -1103,6 +1144,7 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
       nearTrafficViolator,
       nearDutyOfficer,
       nearVehicle:vSnap.nearVehicle,
+      nearDamagedVehicle:vSnap.nearDamagedVehicle??null,
       nearBoat:vSnap.nearBoat,
     }
   }
@@ -1131,6 +1173,12 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
     },
     onVehicleOrBoatInteract(){
       rides?.interact()
+    },
+    onDamagedVehicleInteract(){
+      const now=performance.now()
+      if(now-lastDamagedHintAt<1800)return
+      lastDamagedHintAt=now
+      window.dispatchEvent(new CustomEvent('walk:toast',{detail:{text:'该共享电动车已摔坏报废，无法再次解锁或骑行',ms:2200}}))
     },
     onSoftHint(text){
       window.dispatchEvent(new CustomEvent('walk:toast',{detail:{text,ms:2200}}))
@@ -1236,12 +1284,38 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
     return true
   }
   let sharedWheelieHintAt=0
+  let lastDamagedHintAt=0
   window.addEventListener('walk:hail',()=>{if(!knockdown.isDown)hailSharedBike(getPlayMode()==='solo'?'点「解锁共享电动车（¥2）」出发':'点「骑电动车」出发')})
   window.addEventListener('keydown',event=>{
     if(active&&cigarette.active&&!event.repeat&&!isGlobalHotkeyBlocked(event.target)&&!isModalOrOverlayOpen()){
       if(event.code==='Escape'){selectSlot('hand')}
     }
     if(active)ebikeAudio.unlock()
+    if(active&&rides?.car&&!event.repeat&&!isGlobalHotkeyBlocked(event.target)){
+      if(event.code==='KeyK'){
+        event.preventDefault()
+        handleCarGearboxResult(carGearbox.ignition(undefined,rides.speed))
+        return
+      }
+      if(event.code==='Digit0'){
+        event.preventDefault()
+        handleCarGearboxResult(carGearbox.shift('P',{speedMs:rides.speed,brake:lastCarBraking}))
+        return
+      }
+      if(event.code==='KeyB'){
+        event.preventDefault()
+        const on=carGearbox.toggleHazard()
+        if(!verify||stuntMode)window.dispatchEvent(new CustomEvent('walk:toast',{detail:{text:on?'轿车双闪已开启':'轿车双闪已关闭',ms:1400}}))
+        return
+      }
+    }
+    if(active&&rides?.boat&&!event.repeat&&!isGlobalHotkeyBlocked(event.target)&&event.code==='KeyL'){
+      event.preventDefault()
+      const lit=rides.toggleBoatLight(env.night)
+      window.dispatchEvent(new CustomEvent('walk:boat-light',{detail:{lit,manual:true}}))
+      if(!verify||stuntMode)window.dispatchEvent(new CustomEvent('walk:toast',{detail:{text:lit?'船灯已点亮':'船灯已关闭',ms:1400}}))
+      return
+    }
     if(active && !knockdown.isDown && event.code==='KeyL' && !event.repeat && !isGlobalHotkeyBlocked(event.target) && hailSharedBike(getPlayMode()==='solo'?'按 F 付 ¥2 解锁':'按 F 上车'))return
     if(active&&!event.repeat&&event.code==='KeyO'&&!isGlobalHotkeyBlocked(event.target)&&!isModalOrOverlayOpen()&&!shopOverlay?.isOpen()){
       openSafeWardrobe()
@@ -1252,44 +1326,182 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
   let bicyclePedalPhase=0, bicycleFootWeight=1
   let prevCarSpeed=0, prevCarObstacle='', lastCarBraking=false
   let actionButtonEl:HTMLButtonElement|null=null
-  const downedHazardGeo=new THREE.BoxGeometry(.08,.055,.07)
-  const downedHazardMat=new THREE.MeshBasicMaterial({color:0xffa824})
-  function attachDownedHazard(mesh:THREE.Mesh){
+  const MAX_WORLD_DAMAGED_BIKES=3
+  const DAMAGED_BIKE_RECYCLE_DIST_M=60
+  const downedHazardGeo=buildLampClusterGeometry([
+    ...([-1,1] as const).map(side=>({
+      channel:0 as const,
+      pos:[side*.17,.72,-.54] as const,
+      size:[.075,.05,.06] as const,
+      dir:[side*.35,.25,-.90] as const,
+      color:LIGHT_PALETTE.amberTurn,
+      offColor:0x4e3c1b,
+      haloSize:.46,
+    })),
+    ...([-1,1] as const).map(side=>({
+      channel:0 as const,
+      pos:[side*.17,.64,.52] as const,
+      size:[.075,.05,.06] as const,
+      dir:[side*.35,.25,.90] as const,
+      color:LIGHT_PALETTE.amberTurn,
+      offColor:0x4e3c1b,
+      haloSize:.48,
+    })),
+  ])
+  const downedDamagedHazardGeo=buildLampClusterGeometry([
+    ...([-1,1] as const).map(side=>({
+      channel:0 as const,
+      pos:[side*.17,.72,-.54] as const,
+      size:[.08,.055,.065] as const,
+      dir:[side*.35,.25,-.90] as const,
+      color:0xe64b32,
+      offColor:0x521d16,
+      haloSize:.52,
+    })),
+    ...([-1,1] as const).map(side=>({
+      channel:0 as const,
+      pos:[side*.17,.64,.52] as const,
+      size:[.08,.055,.065] as const,
+      dir:[side*.35,.25,.90] as const,
+      color:0xe64b32,
+      offColor:0x521d16,
+      haloSize:.54,
+    })),
+  ])
+  const downedHazardCluster=createLampClusterMaterial()
+  downedHazardCluster.setChannel(0,1.45)
+  function attachDownedHazard(mesh:THREE.Mesh,damaged=false){
     const g=new THREE.Group()
     g.name='downed-hazard-flashers'
-    for(const sx of [-.17,.17]){
-      const front=new THREE.Mesh(downedHazardGeo,downedHazardMat)
-      front.position.set(sx,.72,-.54)
-      const rear=new THREE.Mesh(downedHazardGeo,downedHazardMat)
-      rear.position.set(sx,.64,.52)
-      g.add(front,rear)
-    }
+    const lamps=new THREE.Mesh(damaged?downedDamagedHazardGeo:downedHazardGeo,downedHazardCluster.materials)
+    lamps.renderOrder=3
+    g.add(lamps)
     mesh.add(g)
     return g
   }
   function removeDownedHazard(rec:DownedBikeEntry){
     if(rec.hazardOverlay){rec.hazardOverlay.removeFromParent();rec.hazardOverlay=undefined}
+    if(rec.damagedSign){rec.damagedSign.removeFromParent();rec.damagedSign=undefined}
+  }
+  function recycleDownedDamagedEntry(rec:DownedBikeEntry){
+    removeDownedHazard(rec)
+    rides?.recycleDamagedBike(rec.mesh)
+    downedBikes.delete(rec)
+  }
+  function syncCarDomDataset(){
+    if(rides?.car&&carGearbox.strict){
+      document.body.dataset.carIgnition=carGearbox.ignitionState
+      document.body.dataset.carGear=carGearbox.selector
+    }else{
+      delete document.body.dataset.carIgnition
+      delete document.body.dataset.carGear
+    }
+  }
+  function handleCarGearboxEvent(ev:CarGearboxEvent|0|undefined){
+    if(!ev)return
+    if(ev.type==='crank_start'){
+      ebikeAudio.playCarCrank()
+      window.dispatchEvent(new CustomEvent('walk:car-ignition',{detail:{ignition:'cranking'}}))
+    }else if(ev.type==='engine_started'){
+      ebikeAudio.playCarEngineStart()
+      carRig.triggerImpact(.14)
+      carShake=Math.max(carShake,.18)
+      window.dispatchEvent(new CustomEvent('walk:car-ignition',{detail:{ignition:'on'}}))
+      if(!verify||stuntMode)window.dispatchEvent(new CustomEvent('walk:toast',{detail:{text:'发动机已启动 · 按 E 挂 D 挡起步',ms:1800}}))
+    }else if(ev.type==='engine_stopped'){
+      ebikeAudio.playCarEngineStop()
+      window.dispatchEvent(new CustomEvent('walk:car-ignition',{detail:{ignition:'off'}}))
+      if(!verify||stuntMode)window.dispatchEvent(new CustomEvent('walk:toast',{detail:{text:'发动机已熄火',ms:1500}}))
+    }else if(ev.type==='shifted'){
+      ebikeAudio.playCarShift(ev.to)
+      if(ev.engageKick!==0)carEngageKick=ev.engageKick
+      window.dispatchEvent(new CustomEvent('walk:car-gear',{detail:{from:ev.from,to:ev.to}}))
+      if(!verify||stuntMode){
+        const msg=ev.to==='P'?'已挂入 P 挡驻车':ev.to==='R'?'已挂入 R 挡倒车':ev.to==='N'?'已挂入 N 空挡':'已挂入 D 挡前进'
+        window.dispatchEvent(new CustomEvent('walk:toast',{detail:{text:msg,ms:1400}}))
+      }
+    }else if(ev.type==='reject'){
+      window.dispatchEvent(new CustomEvent('walk:car-reject',{detail:{action:ev.action,reason:ev.reason,text:ev.text}}))
+      if(!verify||stuntMode)window.dispatchEvent(new CustomEvent('walk:toast',{detail:{text:ev.text,ms:2000}}))
+    }
+    syncCarDomDataset()
+  }
+  function handleCarGearboxResult(res:CarGearboxResult):CarGearboxResult{
+    handleCarGearboxEvent(res.event)
+    return res
+  }
+  function settleCarRollaway(emitPhase:'stop'|'epb'|'remount'='stop'){
+    if(!carRollaway)return
+    const sess=carRollaway
+    carRollaway=null
+    const reason=sess.sim.stopReason||(emitPhase==='epb'?'epb':'stopped')
+    if(emitPhase!=='remount'){
+      carPersistedGearbox.set(sess.mesh,{ignition:'off',selector:'P',hazard:false})
+      rides?.parkRolledCar(sess.mesh,sess.sim.x,sess.sim.y,sess.sim.z,sess.sim.heading,sess.sim.pitch)
+      if(!rides?.car)releaseDynamicCar()
+    }
+    window.dispatchEvent(new CustomEvent('walk:car-rollaway',{detail:{phase:emitPhase,distance:+sess.sim.distance.toFixed(3),reason}}))
   }
   function findDownedNear(x:number,z:number,radius=.95):DownedBikeEntry|null{
     let best:DownedBikeEntry|null=null, bestD=radius
     for(const rec of downedBikes){
+      if(rec.tip||rec.damaged)continue
       const d=Math.hypot(rec.x-x,rec.z-z)
       if(d<bestD){bestD=d;best=rec}
     }
     return best
   }
-  function syncAllDownedPoses(){
+  function syncAllDownedPoses(dt=0,playerX?:number,playerZ?:number){
     const flashOn=((performance.now()*.0018)%1)<.5
+    const cdt=Math.min(.12,Math.max(0,dt))
+    const pPos=sim.body.translation()
     for(const rec of downedBikes){
-      if(rec.hazardOverlay)rec.hazardOverlay.visible=flashOn
+      if(rec.damaged&&playerX!==undefined&&playerZ!==undefined){
+        if(Math.hypot(rec.x-playerX,rec.z-playerZ)>DAMAGED_BIKE_RECYCLE_DIST_M){
+          recycleDownedDamagedEntry(rec)
+          continue
+        }
+      }
+      if(rec.tip&&cdt>0){
+        const stepRes=stepTipOver(rec.tip,cdt)
+        rec.roll=-rec.side*rec.tip.roll
+        rec.lift=tipLift(rec.tip.roll,rec.tip.hop)
+        if(stepRes&&typeof stepRes==='object'){
+          ebikeAudio.playTipOverImpact(stepRes.impact)
+          const dist=Math.hypot(rec.x-pPos.x,rec.z-pPos.z)
+          if(dist<6)bikeTipShake=Math.max(bikeTipShake,.12*stepRes.impact)
+          if(stepRes.bounce===1){
+            if(rec.kind==='bike'&&rec.battery>0&&!rec.hazardOverlay)rec.hazardOverlay=attachDownedHazard(rec.mesh)
+            window.dispatchEvent(new CustomEvent('walk:ebike-tipover',{detail:{phase:'impact',impact:stepRes.impact,bounce:stepRes.bounce,side:rec.side,wallLean:!!rec.wallLean}}))
+            if(!verify||kickstandStrict||stuntMode)window.dispatchEvent(new CustomEvent('walk:toast',{detail:{text:'电动车倒了 · 靠近按 F 扶起',ms:2400}}))
+          }
+        }
+        if(stepRes==='rest'||rec.tip.phase==='rest'){
+          rec.roll=-rec.side*rec.tip.restRoll
+          rec.lift=tipLift(rec.tip.restRoll,0)
+          rec.tip=undefined
+          rec.mesh.userData.tipping=false
+          window.dispatchEvent(new CustomEvent('walk:ebike-tipover',{detail:{phase:'rest',side:rec.side,wallLean:!!rec.wallLean}}))
+        }
+      }
+      if(rec.hazardOverlay)rec.hazardOverlay.visible=true
+      if(rec.damagedSign){
+        rec.damagedSign.visible=rec.mesh.visible
+        rec.damagedSign.position.set(rec.x,rec.y+1.1,rec.z)
+      }
       if(pickupSession?.rec===rec)continue
       rec.mesh.visible=true
       rec.mesh.position.set(rec.x,rec.y+rec.lift,rec.z)
       rec.mesh.rotation.set(0,rec.yaw,rec.roll,'YXZ')
     }
+    downedHazardCluster.setChannel(0,flashOn?1.45:0)
   }
   function clearAllDowned(){
-    for(const rec of downedBikes){
+    for(const rec of [...downedBikes]){
+      if(rec.damaged){
+        recycleDownedDamagedEntry(rec)
+        continue
+      }
       removeDownedHazard(rec)
       rec.mesh.userData.downed=false
       rec.mesh.position.set(rec.x,rec.y,rec.z)
@@ -1505,7 +1717,10 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
         if(!found){notifyDismountBlocked();return false}
         const prevCarPos=new THREE.Vector3(x,carY,z)
         if(!place(x,z,'dismount',true,found))return false
-        releaseDynamicCar()
+        const exitPlan=carGearbox.planDismount(rides?.pitch??0)
+        if(exitPlan==='safe'||exitPlan==='auto_off'){
+          releaseDynamicCar()
+        }
         facing=bikeHeading+avatar.yaw
         driverPose.startDismount(prevCarPos,bikeHeading,active);input.clearRun();return true
       }
@@ -1543,7 +1758,64 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
       const check=sim.findLocalMount(cur.x,cur.y-cfg.height/2,cur.z,bx,by,bz)
       if(!check.ok){notifyDismountBlocked(check.reason==='blocked'?'中间有遮挡，绕过去再骑':'这里太窄了，挪一挪再骑');return null}
       return check
-    },{sim,stream,actionButton,externalArbiter:true,isFootAnimBusy:()=>!!(standUpSession||pickupSession||crashSession||knockdown.isDown),supportYAt:(x,z,refY)=>supportAt(x,z,refY)?.y??refY,landFree:spot=>{sim.sync(spot.x,spot.z)
+    },{sim,stream,actionButton,externalArbiter:true,isFootAnimBusy:()=>!!(standUpSession||pickupSession||crashSession||knockdown.isDown),supportYAt:(x,z,refY)=>supportAt(x,z,refY)?.y??refY,
+      kickstandStrict:()=>kickstandStrict,
+      onUnsupportedDismount:info=>{
+        const p=sim.body.translation()
+        const rx=Math.cos(info.yaw), rz=-Math.sin(info.yaw)
+        const toPlayerDot=(p.x-info.x)*rx+(p.z-info.z)*rz
+        const awaySign=toPlayerDot<0?1:-1
+        const probeY=info.y+.5
+        const awayFree=!sim.pathBlocked(info.x,info.z,info.x+rx*awaySign*1.0,info.z+rz*awaySign*1.0,probeY)
+        const towardFree=!sim.pathBlocked(info.x,info.z,info.x-rx*awaySign*1.0,info.z-rz*awaySign*1.0,probeY)
+        const playerDist=Math.hypot(p.x-info.x,p.z-info.z)
+        const choice=chooseTipSide({heading:info.yaw,bike:{x:info.x,z:info.z},player:{x:p.x,z:p.z},awayFree,towardFree,playerDist})
+        const tipSim=createTipOver(info.lean,info.speed,choice.restRoll)
+        const entry:DownedBikeEntry={
+          mesh:info.mesh,kind:'bike',x:info.x,y:info.y,z:info.z,yaw:info.yaw,
+          side:choice.side,roll:0,lift:0,vehicleType:info.vehicleType,battery:info.battery,
+          modPreset:'stock',paint:info.paint,tip:tipSim,wallLean:choice.wallLean,
+        }
+        info.mesh.userData.downedSide=choice.side
+        downedBikes.add(entry)
+        twoWheelOp=resolveTwoWheelTransition(twoWheelOp,{type:'dismount_unsupported',kind:'bike'}).state
+        window.dispatchEvent(new CustomEvent('walk:ebike-tipover',{detail:{phase:'start',side:choice.side,wallLean:choice.wallLean}}))
+        if(!verify||kickstandStrict||stuntMode)window.dispatchEvent(new CustomEvent('walk:toast',{detail:{text:'没撑侧撑，电动车正在倒地！',ms:1800}}))
+      },
+      onCarDismount:(mesh,info)=>{
+        const plan=carGearbox.planDismount(info.pitch)
+        if(plan==='safe'){
+          ebikeAudio.playCarLockChirp()
+          carPersistedGearbox.set(mesh,{ignition:'off',selector:'P',hazard:false})
+          syncCarDomDataset()
+          return false
+        }
+        if(plan==='auto_off'){
+          carGearbox.ignition(false,0)
+          ebikeAudio.playCarEngineStop()
+          ebikeAudio.playCarLockChirp()
+          carPersistedGearbox.set(mesh,{ignition:'off',selector:'P',hazard:false})
+          syncCarDomDataset()
+          if(!verify||carGearbox.strict||stuntMode)window.dispatchEvent(new CustomEvent('walk:toast',{detail:{text:'已挂 P 挡并自动熄火落锁',ms:1800}}))
+          return false
+        }
+        carPersistedGearbox.set(mesh,carGearbox.persist())
+        const rollSim=createCarRollaway({plan,x:info.x,y:info.y,z:info.z,heading:info.heading,pitch:info.pitch,initialSpeed:info.speed})
+        carRollaway={mesh,sim:rollSim,beepTimer:0}
+        mountedStaticCar=mesh
+        carRig.setPaint((mesh.userData.paint as number|undefined)??0)
+        carRig.root.visible=true
+        syncCarDomDataset()
+        ebikeAudio.playCarRollawayBeep()
+        window.dispatchEvent(new CustomEvent('walk:car-rollaway',{detail:{phase:'start',distance:0,reason:plan}}))
+        if(!verify||carGearbox.strict||stuntMode){
+          const msg=plan==='unsecured_flat'?'⚠ 未挂 P 挡驻车！请按 F 上车挂入 P 挡':'⚠ 未挂 P 挡，车辆正在溜车！按 F 上车接管'
+          window.dispatchEvent(new CustomEvent('walk:toast',{detail:{text:msg,ms:2600}}))
+        }
+        return true
+      },
+      carGearLabel:inner=>carGearbox.displayGear(inner),
+      landFree:spot=>{sim.sync(spot.x,spot.z)
       const prevBoatPos=figure.position.clone(),prevBoatYaw=figure.rotation.y
       if(sim.insideHouse(spot.x,spot.z)||!sim.freeCapsule(spot.x,spot.y,spot.z)||!place(spot.x,spot.z,spot.rule,true,spot))return false
       rides?.clearBoatPose(figure);restoreFootLocomotion(avatar.clips.idle);boatLandFrom.copy(prevBoatPos);boatLandYaw=prevBoatYaw;boatLandElapsed=0;boatBoardElapsed=BOAT_BOARD_DUR
@@ -1620,7 +1892,11 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
     destination=null
     if(signal?.aborted)return fail('aborted')
     const missingTiles=needed.filter(tile=>!stream.loaded.has(tile)).map(tile=>tile.file),missingLandmarks=supports.filter(entry=>!collisionReady(entry)).map(entry=>entry.id)
-    if(missingTiles.length||missingLandmarks.length)return fail('collision-load-timeout',{missingTiles,missingLandmarks})
+    if(missingTiles.length||missingLandmarks.length){
+      record('collisionTimeout',{ms:Math.round(performance.now()-started),missingLandmarks:missingLandmarks.filter(id=>/^[a-zA-Z0-9_-]{1,64}$/.test(id)).slice(0,12).join(',')})
+      if(reason==='flight')window.dispatchEvent(new CustomEvent('walk:toast',{detail:{text:'附近街区和建筑还在加载，请稍后再点「落地步行」',ms:5000}}))
+      return fail('collision-load-timeout',{missingTiles,missingLandmarks})
+    }
     let gpsSpot:ReturnType<typeof sim.findWalkableSpawn>|undefined
     if(reason==='geolocation'){
       syncSceneObstacleVolumes();sim.sync(x,z);gpsSpot=sim.findWalkableSpawn(x,z,false,true)
@@ -1818,7 +2094,27 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
             crashSession=null;standUpSession=null;pickupSession=null;bikeObstacle='';knockdown.reset();syncKnockdownDomState(false);resetAirTracker(footY)
             resetPoseSpeed()
             checkDutyOutOfShift(x,footY,z)
-          },captureContext,currentMobility)
+          },captureContext,currentMobility,()=>{
+            if(document.body.dataset.drone==='rc')window.dispatchEvent(new Event('drone:rc'))
+            rides?.clearBoatPose(figure);rides?.dismount()
+            window.dispatchEvent(new CustomEvent('walk:toast',{detail:{text:'此处无法使用载具，已回到步行',ms:2400}}))
+          },async(x,savedY,z,valid)=>{
+            const target=new THREE.Vector3(x,savedY,z),tile=sim.tileAt(x,z),until=performance.now()+10000
+            if(!tile)throw Error('missing landing tile')
+            while(valid()&&performance.now()<until){
+              stream.prioritize(x,z);stream.tick(target)
+              if(stream.loaded.has(tile)&&vehicleCollisionReady(x,savedY,z)){
+                sim.sync(x,z,true)
+                const terrain=sim.surface(x,z,'ground'),support=sim.groundSurface(x,z,savedY)
+                if(terrain){
+                  if(support&&(support.kind!=='landmark'||isInBridgeDutyBounds({x,y:support.y,z})))return support.y+.055
+                  return terrain.y+.055
+                }
+              }
+              await new Promise(resolve=>setTimeout(resolve,16))
+            }
+            throw Error('landing collision unavailable')
+          })
         net.emote(emote.id);net.tick(0)
     }
   }
@@ -1829,7 +2125,7 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
     if(trafficDutyRef?.getSnapshot().phase==='active')trafficDutyRef.abandonDuty()
     resetWalk()
   }
-  function resetWalk(){combat.hide();cancelSmoke();knockdown.reset();syncKnockdownDomState(false);resetAirTracker();trafficTracker.reset();prevContactKnockdownAt=-9999;prevObstacleTripAt=-9999;dutyFlagHoldMode=null;dutyFlagHoldTimer=0;if(hotbarSlot()==='smoke')selectSlot('hand');ticketHandover.stop();ticketHandover.reset();emote.stop();emote.reset();smoking?.dispose();smoking=undefined;holdLayer.reset();camHoldBlend=0;wheel.close();cigarette.stop();if(shopOverlay?.isOpen())shopOverlay?.close('fly');outfitController.setRidingEbike(false);finishActiveTestRide('mode_switch');shopHintGroup.visible=false;ebikeShowroomGroup.visible=false;shopEbikeShowcaseRig.root.visible=false;for(const item of showroomBikes)item.snapped=false;destination=null;active=false;crashSession=null;standUpSession=null;pickupSession=null;twoWheelOp=createInitialTwoWheelOpState();carHeadlight='off';carHeadlightManual=false;clearAllDowned();releaseDynamicCar();releaseDynamicBike();input.syncRideHud(null,null);rides?.clearBoatPose(figure);rides?.show(false);actionButton.hidden=true;setPrompt(null);updateTravel('fly',null);if(wasCar||wasBike)applyFootController();wasBoat=wasBike=wasCar=false;bikeObstacle='';boatBoardElapsed=BOAT_BOARD_DUR;boatLandElapsed=BOAT_LAND_DUR;ridePose.reset();driverPose.reset(false);clearAvatarPose(figure);stopLocomotionActions();mixer.stopAllAction();resetMotion();figure.visible=false;input.show(false);external=null;lastTianyuanSyncKey='';sim.clear();camera.near=1;camera.updateProjectionMatrix()}
+  function resetWalk(){settleCarRollaway('stop');hideCompensationBanner();combat.hide();cancelSmoke();knockdown.reset();syncKnockdownDomState(false);resetAirTracker();trafficTracker.reset();prevContactKnockdownAt=-9999;prevObstacleTripAt=-9999;dutyFlagHoldMode=null;dutyFlagHoldTimer=0;if(hotbarSlot()==='smoke')selectSlot('hand');ticketHandover.stop();ticketHandover.reset();emote.stop();emote.reset();smoking?.dispose();smoking=undefined;holdLayer.reset();camHoldBlend=0;wheel.close();cigarette.stop();if(shopOverlay?.isOpen())shopOverlay?.close('fly');outfitController.setRidingEbike(false);finishActiveTestRide('mode_switch');shopHintGroup.visible=false;ebikeShowroomGroup.visible=false;shopEbikeShowcaseRig.root.visible=false;for(const item of showroomBikes)item.snapped=false;destination=null;active=false;crashSession=null;standUpSession=null;pickupSession=null;twoWheelOp=createInitialTwoWheelOpState();carHeadlight='off';carHeadlightManual=false;delete document.body.dataset.carIgnition;delete document.body.dataset.carGear;clearAllDowned();releaseDynamicCar();releaseDynamicBike();input.syncRideHud(null,null);rides?.clearBoatPose(figure);rides?.show(false);actionButton.hidden=true;setPrompt(null);updateTravel('fly',null);if(wasCar||wasBike)applyFootController();wasBoat=wasBike=wasCar=false;bikeObstacle='';boatBoardElapsed=BOAT_BOARD_DUR;boatLandElapsed=BOAT_LAND_DUR;ridePose.reset();driverPose.reset(false);clearAvatarPose(figure);stopLocomotionActions();mixer.stopAllAction();resetMotion();figure.visible=false;input.show(false);external=null;lastTianyuanSyncKey='';sim.clear();camera.near=1;camera.updateProjectionMatrix()}
   function canPlaceCrashOffset(x:number,z:number,refY:number,fromX?:number,fromZ?:number){
     if(!sim.withinBounds(x,z))return false
     if(sim.insideHouse(x,z,refY+.4))return false
@@ -1845,7 +2141,7 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
   function triggerTwoWheelCrash(
     reason:Exclude<EbikeCrashReason,''>,
     side:-1|1,
-    kdOpts?:{kind?:KnockdownKind;reason?:string;severity?:number;dir?:{x:number;z:number};speedMs?:number;suppressToast?:boolean},
+    kdOpts?:{kind?:KnockdownKind;reason?:string;severity?:number;dir?:{x:number;z:number};speedMs?:number;suppressToast?:boolean;crashCause?:TwoWheelCrashCause;bypassCompGate?:boolean},
   ){
     if(crashSession||!rides?.bike)return
     const kind=rides.rideKind==='bicycle'?'bicycle':'bike'
@@ -1853,6 +2149,8 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
     const sideX=Math.cos(rides.heading)*side, sideZ=-Math.sin(rides.heading)*side
     const paint=(rides.bike.userData.paint as number|undefined)??0
     const vehicleType:EbikeVehicleType=kind==='bike'?(rides.vehicleType??(rides.isShared||rides.bike.userData.shared?'shared':'normal')):'normal'
+    const isSharedTurnSlip=kind==='bike'&&vehicleType==='shared'&&kdOpts?.crashCause==='shared_turn_slip'
+    const spawnKey=isSharedTurnSlip?(rides.bikeSpawnKey??undefined):undefined
     const battery=kind==='bike'?(rides.ebikeBattery??ebikeFx.battery):100
     const modPreset=kind==='bike'?ebikeFx.modPreset:'stock'
     const fx=-Math.sin(rides.heading), fz=-Math.cos(rides.heading)
@@ -1879,12 +2177,33 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
       bikeOriginX:p.x,bikeOriginZ:p.z,
       bikeSlideX:0,bikeSlideZ:0,
       riderOffsetX:rx,riderOffsetZ:rz,
-      slideSpeed:THREE.MathUtils.clamp(Math.max(4.0,Math.abs(kdOpts?.speedMs??(prevTwoWheelSpeed||rides.speed))),4.0,12.5),
+      slideSpeed:THREE.MathUtils.clamp(Math.max(isSharedTurnSlip?3.6:4.0,Math.abs(kdOpts?.speedMs??(prevTwoWheelSpeed||rides.speed))),isSharedTurnSlip?3.6:4.0,12.5),
       elapsed:0,reason,
+      damaged:isSharedTurnSlip,
+      spawnKey,
     }
     rides.stop()
     const crashSeverity=THREE.MathUtils.clamp((crashSession.slideSpeed-3.5)/9,0.1,1)
     if(kind==='bike'){
+      if(isSharedTurnSlip){
+        rides.markCurrentBikeDamaged()
+        const solo=soloServices()
+        if(solo&&spawnKey){
+          const compRes=solo.commerce.creditSharedEbikeCompensation({
+            bikeKey:spawnKey,
+            amount:SHARED_EBIKE_COMPENSATION_YUAN,
+            bypassGate:Boolean(kdOpts?.bypassCompGate),
+          })
+          if(compRes.ok&&compRes.credited>0){
+            showCompensationBanner({
+              amount:compRes.credited,
+              balanceAfter:compRes.balanceAfter,
+            })
+          }else if(!verify||stuntMode){
+            window.dispatchEvent(new CustomEvent('walk:toast',{detail:{text:'共享电动车打滑摔坏无法继续骑行，本次暂未发放理赔',ms:2600}}))
+          }
+        }
+      }
       rides.applyPersonalCrashDamage(crashSeverity)
       emitGameEvent({type:'crash',severity:crashSeverity,vehicleId:rides.bikeInstanceId??undefined})
       rides.setEbikePark(false,true)
@@ -1913,8 +2232,8 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
     })
     syncKnockdownDomState(true)
     if(kind==='bike'&&ebikeFx.crashPhase==='none'){
-      ebikeFx.triggerCrash(reason,side,rides.heading,crashSession.slideSpeed,!!kdOpts?.suppressToast)
-    }else if(!kdOpts?.suppressToast&&(!verify||stuntMode)){
+      ebikeFx.triggerCrash(reason,side,rides.heading,crashSession.slideSpeed,Boolean(kdOpts?.suppressToast||isSharedTurnSlip))
+    }else if(!kdOpts?.suppressToast&&!isSharedTurnSlip&&(!verify||stuntMode)){
       window.dispatchEvent(new CustomEvent('walk:toast',{detail:{
         text:reason==='lowside'?'压弯过低打滑摔车！连按空格或点击起身 5 次先站起，再去扶车'
           :reason==='slip'?'急刹侧滑摔车！连按空格或点击起身 5 次先站起，再去扶车'
@@ -1979,6 +2298,12 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
       knockdown.forceRise(true)
       syncKnockdownDomState(false)
     }
+    const isDamaged=Boolean(c.damaged||c.mesh.userData.damaged)
+    const damagedSign=isDamaged?createDamagedBikeSignSprite():undefined
+    if(damagedSign){
+      damagedSign.position.set(bx,by+1.1,bz)
+      scene.add(damagedSign)
+    }
     const entry:DownedBikeEntry={
       mesh:c.mesh,
       kind:c.kind,
@@ -1991,12 +2316,22 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
       battery:c.battery,
       modPreset:c.modPreset,
       paint:c.paint,
-      hazardOverlay:c.kind==='bike'&&c.battery>0?attachDownedHazard(c.mesh):undefined,
+      hazardOverlay:c.kind==='bike'&&(isDamaged||c.battery>0)?attachDownedHazard(c.mesh,isDamaged):undefined,
+      damaged:isDamaged,
+      damagedSign,
+      spawnKey:c.spawnKey,
     }
     if(c.kind==='bike')rides.resetEbikeGearOnRecover()
-    rides.dismountDownedBike(bx,by,bz,entry.yaw,entry.roll,entry.lift)
+    rides.dismountDownedBike(bx,by,bz,entry.yaw,entry.roll,entry.lift,isDamaged)
     entry.mesh.userData.downedSide=c.side
     downedBikes.add(entry)
+    if(isDamaged){
+      const damagedList=[...downedBikes].filter(item=>item.damaged)
+      while(damagedList.length>MAX_WORLD_DAMAGED_BIKES){
+        const oldest=damagedList.shift()
+        if(oldest&&oldest!==entry)recycleDownedDamagedEntry(oldest)
+      }
+    }
     twoWheelOp=resolveTwoWheelTransition(twoWheelOp,{type:'standup',kind:c.kind}).state
     releaseDynamicBike()
     input.syncRideHud(null,null)
@@ -2019,7 +2354,9 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
     if(traveller)traveller.rotation.set(0,0,0)
     if(!verify||stuntMode){
       window.dispatchEvent(new CustomEvent('walk:toast',{detail:{
-        text:`已起身站稳，走近按 F 扶起${c.kind==='bicycle'?'单车':'电动车'}`,
+        text:isDamaged
+          ?'已起身站稳，该共享电动车已摔坏报废，无法再次骑行'
+          :`已起身站稳，走近按 F 扶起${c.kind==='bicycle'?'单车':'电动车'}`,
         ms:2200,
       }}))
     }
@@ -2056,7 +2393,7 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
   const blendFrom=new THREE.Vector3(),blendTurn=new THREE.Quaternion(),blendEye=new THREE.Quaternion()
   function follow(dt=0,snap=false){const pos=sim.body.translation(),footY=pos.y-cfg.height/2
     figure.position.set(pos.x,footY,pos.z)
-    if(downedBikes.size>0)syncAllDownedPoses()
+    if(downedBikes.size>0)syncAllDownedPoses(dt,pos.x,pos.z)
     if(rides?.boat){
       const seatX=rides.boat.position.x, seatY=rides.boat.position.y+rides.boatSeatOffset, seatZ=rides.boat.position.z
       if(rides.freeBoat&&boatBoardElapsed<BOAT_BOARD_DUR){
@@ -2093,20 +2430,28 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
       }
       rides.park(figure.position)
       const carTel=rides.carTelemetry
+      const carEngineOn=carGearbox.engineRunning
+      const effectiveCarHl:TwoWheelHeadlightMode=carEngineOn||carGearbox.ignitionState==='cranking'?carHeadlight:'off'
+      const kickThisFrame=carEngageKick
+      carEngageKick=0
       carRig.update({
         pos:figure.position,
         heading:rides.heading,
         groundPitch:rides.pitch,
         speed:rides.speed,
         steerInput:rides.steerInput,
-        braking:carTel?.braking??lastCarBraking,
-        reversing:carTel?.reversing??rides.speed<-.05,
+        braking:carGearbox.brakeLamp(0,rides.speed,carTel?.handbrake??false)||(carTel?.braking??lastCarBraking),
+        reversing:carGearbox.reverseLamp()||(carTel?.reversing??rides.speed<-.05),
         dynRoll:carTel?.dynRoll,
         dynPitch:carTel?.dynPitch,
         driftIntensity:carTel?.driftIntensity??0,
         handbrake:carTel?.handbrake??false,
-        headlight:carHeadlight,
+        headlight:effectiveCarHl,
         night:env.night,
+        crankDim:carGearbox.crankDimFactor,
+        engineRunning:carEngineOn,
+        engageKick:kickThisFrame,
+        hazard:carGearbox.hazard,
         dt,
       })
       driverPose.updateDriving(figure.position,rides.heading,active)
@@ -2298,7 +2643,7 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
         input.syncRideHud(ebikeState,'bicycle')
       }
     }else if(!rides?.boat){
-      releaseDynamicCar()
+      if(!carRollaway)releaseDynamicCar()
       releaseDynamicBike()
       input.syncRideHud(null,null)
       if(knockdown.isDown){
@@ -2345,9 +2690,12 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
       }
     }
     if(dt>0&&knockdown.cameraShake>.005)dutyKnockdownShakePhase+=Math.min(.12,dt)*42
+    if(dt>0&&bikeTipShake>.002){bikeTipShake=Math.max(0,bikeTipShake-2.4*Math.min(.12,dt));bikeTipShakePhase+=Math.min(.12,dt)*38}
     const kdShake=knockdown.cameraShake
-    const shakeYaw=(rides?.car&&carShake>.01?Math.sin(carShakePhase)*carShake*.018:0)+(kdShake>.005?Math.sin(dutyKnockdownShakePhase)*kdShake*.024:0)
-    const shakePitch=(rides?.car&&carShake>.01?Math.cos(carShakePhase*1.3)*carShake*.012:0)+(kdShake>.005?Math.cos(dutyKnockdownShakePhase*1.25)*kdShake*.016:0)
+    const tipShakeYaw=bikeTipShake>.002?Math.sin(bikeTipShakePhase)*bikeTipShake*.015:0
+    const tipShakePitch=bikeTipShake>.002?Math.cos(bikeTipShakePhase*1.2)*bikeTipShake*.010:0
+    const shakeYaw=(rides?.car&&carShake>.01?Math.sin(carShakePhase)*carShake*.018:0)+(kdShake>.005?Math.sin(dutyKnockdownShakePhase)*kdShake*.024:0)+tipShakeYaw
+    const shakePitch=(rides?.car&&carShake>.01?Math.cos(carShakePhase*1.3)*carShake*.012:0)+(kdShake>.005?Math.cos(dutyKnockdownShakePhase*1.25)*kdShake*.016:0)+tipShakePitch
     // Pause third-person follow camera while story shots or ticket handover closeup owns the camera.
     const externalCam=isExternalCameraActive()
     if(externalCam){
@@ -2370,7 +2718,7 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
     const camYaw=yaw+shakeYaw,camPitch=pitch+shakePitch+knockdown.cameraPitchBias,lowerFocus=combat.f.down ? .72 : 0
     // Open-stairwell blend: pull the arm in with the blend so its collision ray never reaches the well lip or the slab over
     // the landing; a clamp kicking in or letting go mid-blend is a visible camera jump.
-    rig.update(camera,figure.position,camYaw,camPitch,(arm+ridePose.cameraArm(!!rides?.bike,dt,snap)+driverPose.cameraArm(!!rides?.car,dt,snap)+(rides?.car?carSpeedArm:0))*(1-blend)**2,dt,snap,!!rides?.car,firstPerson,lowerFocus)
+    rig.update(camera,figure.position,camYaw,camPitch,(arm+ridePose.cameraArm(!!rides?.bike,dt,snap)+driverPose.cameraArm(!!rides?.car,dt,snap)+(rides?.car?carSpeedArm:0))*(1-blend)**2,dt,snap,!!rides?.car,firstPerson,lowerFocus,onFoot&&viewBlend===null)
     if(sim.clampCamera(figure.position,camera.position,firstPerson?.18:cfg.camRadius)&&!firstPerson){
       camera.lookAt(rig.focus)
     }
@@ -2452,6 +2800,10 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
       }:null,
       carRig:carRig.root.visible?carRig.probe():null,
       carTelemetry:rides?.carTelemetry??null,
+      carGearbox:rides?.car?carGearbox.snapshot(rides.carTelemetry?.gear??1,rides.speed,lastCarBraking):null,
+      carRollaway:carRollaway?{active:carRollaway.sim.active,distance:+carRollaway.sim.distance.toFixed(3),plan:carRollaway.sim.plan,stopReason:carRollaway.sim.stopReason}:null,
+      kickstand:{down:!!ebikeState?.kickstandDown,strict:kickstandStrict,tipping:Array.from(downedBikes).some(r=>!!r.tip),downedCount:downedBikes.size},
+      boatLight:rides?.boatLightProbe()??null,
       twoWheelFlow:(crashSession&&knockdown.phase==='rising')||standUpSession?'standing_up':crashSession?'crashed':pickupSession?'picking_up':rides?.bike?'riding':'foot',
       downedCount:downedBikes.size,
       downedBikes:Array.from(downedBikes).map(r=>({kind:r.kind,x:r.x,z:r.z,roll:r.roll,dist:Math.hypot(r.x-pos.x,r.z-pos.z)})),
@@ -2481,7 +2833,7 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
     combat.resetPose();ticketHandover.reset();emote.reset();smoking?.resetPose();holdLayer.reset();
     if(ticketHandover.active&&(rides?.boat||rides?.car||rides?.bike||knockdown.isDown||combat.f.down))ticketHandover.stop()
     if(emote.id&&(rides?.boat||rides?.car||rides?.bike)){emote.stop();emote.tick(.24,false)}
-    const before=performance.now(),start=rides?.boat?.position??sim.body.translation();syncSceneObstacleVolumes();sim.sync(start.x,start.z,true);const footYNow=rides?.boat?start.y:start.y-cfg.height/2;rides?.nearby(start.x,start.z,footYNow);interactArbiter.sync(actionButton);syncGameTravelState();updateShopHintRings(start.x,start.z,footYNow)
+    const before=performance.now(),start=rides?.boat?.position??sim.body.translation();syncSceneObstacleVolumes();sim.sync(start.x,start.z,true);const footYNow=rides?.boat?start.y:start.y-cfg.height/2;rides?.nearby(start.x,start.z,footYNow);rides?.syncBoatLanterns(env.night,start.x,start.z);interactArbiter.sync(actionButton);syncGameTravelState();updateShopHintRings(start.x,start.z,footYNow)
     showFishingSlot(fishingOn&&!rides?.bike&&!rides?.boat&&!rides?.car&&(hotbarSlot()==='fishing'||nearestFishingShore(start.x,start.z).distance<=FISH_NEAR))
     fishMarks?.tick(start.x,start.z,dt,hotbarSlot()==='fishing',start.y)
     steles?.tick(start.x,start.z)
@@ -2573,10 +2925,14 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
     let bikeSpeed=(rides?.car||rides?.bike)?rides.speed:0
     if((wasCar&&!rides?.car)||(wasBike&&!rides?.bike)){
       applyFootController()
-      if(wasCar&&!rides?.car){releaseDynamicCar();figure.visible=active}
+      if(wasCar&&!rides?.car){if(!carRollaway)releaseDynamicCar();syncCarDomDataset();figure.visible=active}
       if(wasBike&&!rides?.bike){releaseDynamicBike();input.syncRideHud(null,rides?.car?'car':null)}
     }
     if(rides?.car&&!wasCar){
+      const resumedFromRollaway=!!(carRollaway&&carRollaway.mesh===rides.car)
+      if(carRollaway){
+        settleCarRollaway(resumedFromRollaway?'remount':'stop')
+      }
       const cx=rides.car.position.x,cz=rides.car.position.z,cur=sim.body.translation()
       sim.sync(cx,cz,true)
       const sup=carSupportAt(cx,cz,rides.car.position.y)
@@ -2591,10 +2947,17 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
       stopLocomotionActions();bikeObstacle='';bikeSpeed=0
       mountedStaticCar=rides.car;mountedStaticCar.visible=false
       carRig.setPaint((mountedStaticCar.userData.paint as number|undefined)??0)
-      carRig.root.visible=true;prevCarSpeed=0;prevCarObstacle='';lastCarBraking=false;carShake=0;carSpeedArm=0
+      carRig.root.visible=true;prevCarSpeed=0;prevCarObstacle='';lastCarBraking=false;carShake=0;carSpeedArm=0;carEngageKick=0
       const useCarGta=carGtaOverride??defaultCarGta
       rides.setCarGtaPhysics(useCarGta)
       rides.setCarMode(useCarGta?'street':'cruise')
+      carGearbox.resetForMount(resumedFromRollaway?carPersistedGearbox.get(rides.car):undefined)
+      syncCarDomDataset()
+      if(carGearbox.strict&&carGearbox.ignitionState==='cranking'){
+        ebikeAudio.playCarCrank()
+      }else if(carGearbox.strict&&!resumedFromRollaway&&(!verify||stuntMode)){
+        window.dispatchEvent(new CustomEvent('walk:toast',{detail:{text:'已上车（P 挡熄火）· 按 K 点火，按 E 挂 D 挡',ms:2200}}))
+      }
       carHeadlightManual=false
       carHeadlight=env.night>=.45?'low':'off'
     }
@@ -2662,12 +3025,28 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
     wasBike=!!rides?.bike
     if(wasBike&&rides?.bike&&!crashSession){
       rides.setEbikeEnvironmentHour(env.hour)
+      const isSharedBikeNow=rides.rideKind==='bike'&&rides.isShared
+      const spawnKeyNow=rides.bikeSpawnKey??''
+      const soloSvc=soloServices()
+      const slipAllowed=
+        isSharedBikeNow
+        &&getPlayMode()==='solo'
+        &&grounded
+        &&!getQuietZoneAt(start.x,start.z)
+        &&trafficDutyRef?.getSnapshot().phase!=='active'
+        &&document.body.dataset.photo!=='on'
+        &&document.body.dataset.drone!=='rc'
+        &&Boolean(spawnKeyNow&&soloSvc?.commerce.canCreditSharedEbikeCompensation(spawnKeyNow).allowed)
+      rides.setSharedSlipEnabled(slipAllowed)
       // Consume one-shot pulse inputs ONCE per rendered frame (never inside multi-substep physics loop).
       if(rideCtrl.parkToggle)rides.toggleEbikePark()
       if(rideCtrl.kickstandToggle)rides.toggleEbikeKickstand()
       if(rideCtrl.headlightCycle){
+        const beforeHl=rides.ebikeTelemetry?.headlight??'off'
+        const rKindNow=rides.rideKind==='bicycle'?'bicycle':'bike'
+        const vTypeNow=rides.vehicleType??'normal'
         const nextHl=rides.cycleEbikeHeadlight()
-        if(!verify||stuntMode){
+        if(nextHl!==beforeHl&&!isSharedHeadlightSwitchLocked(rKindNow,vTypeNow)&&(!verify||stuntMode)){
           const hlText=nextHl==='high'?'远光灯已开启':nextHl==='low'?'近光灯已开启':'车灯已关闭'
           window.dispatchEvent(new CustomEvent('walk:toast',{detail:{text:hlText,ms:1600}}))
         }
@@ -2680,6 +3059,7 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
       if(rideCtrl.gearSelect!==null)rides.setEbikeGear(rideCtrl.gearSelect)
       else if(rideCtrl.gearDelta!==0)rides.shiftEbikeGear(rideCtrl.gearDelta)
     }else if(wasCar&&rides?.car){
+      handleCarGearboxEvent(carGearbox.tick(Math.min(.12,Math.max(0,dt))))
       if(!carHeadlightManual){
         carHeadlight=env.night>=.45?'low':'off'
       }
@@ -2692,7 +3072,13 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
         }
       }
       if(rideCtrl.gearSelect!==null)rides.setCarModeByIndex(rideCtrl.gearSelect)
-      else if(rideCtrl.gearDelta!==0)rides.shiftCarMode(rideCtrl.gearDelta)
+      else if(rideCtrl.gearDelta!==0){
+        if(carGearbox.strict){
+          handleCarGearboxResult(carGearbox.lever(rideCtrl.gearDelta>0?'down':'up',{speedMs:rides.speed,brake:lastCarBraking}))
+        }else{
+          rides.shiftCarMode(rideCtrl.gearDelta)
+        }
+      }
     }
     const aboardGround=wasCar||wasBike
     if(keys.jump&&!combat.f.down&&!combat.f.helping&&!aboardGround&&!busyFootAnim)jumpTimer=cfg.jumpBuffer
@@ -2708,7 +3094,12 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
       if(wasCar&&rides?.car){
         const previous=rides.heading
         driverPose.advanceMount(step)
-        bikeSpeed=rides.steerCar(keys.forward,keys.right,step,driverPose.mounted,{handbrake:rideCtrl.wheelie})
+        const pedalRes=carGearbox.pedals(keys.forward,rides.speed,step)
+        if(pedalRes.hint)handleCarGearboxEvent(pedalRes.hint)
+        if(carGearbox.strict&&carGearbox.selector==='P'){
+          rides.stop()
+        }
+        bikeSpeed=rides.steerCar(pedalRes.forward,keys.right,step,driverPose.mounted,{handbrake:rideCtrl.wheelie||pedalRes.holdBrake})
         wish.set(-Math.sin(rides.heading),-Math.cos(rides.heading))
         vx=rides.carVelX;vz=rides.carVelZ
         const carTel=rides.carTelemetry
@@ -3245,6 +3636,10 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
         twoWheelOp=completed
         removeDownedHazard(rec)
         ebikeAudio.playPickupComplete()
+        if(!verify||kickstandStrict||stuntMode){
+          const upMsg=rec.kind==='bike'?'电动车已扶起，侧撑已放好':'单车已扶起'
+          window.dispatchEvent(new CustomEvent('walk:toast',{detail:{text:upMsg,ms:1600}}))
+        }
         const restRoll=computeParkedRoll(false,0,rec.kind==='bike'&&completed.kickstandDown)
         if(rides){
           rides.relocateParkedBike(rec.mesh,rx,ry,rz,rec.yaw,restRoll,{parkLocked:completed.parkLocked,kickstandDown:completed.kickstandDown})
@@ -3259,6 +3654,47 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
             text:`${rec.kind==='bicycle'?'单车':'电动车'}已扶正立好边撑，按 F 上车`,
             ms:2000,
           }}))
+        }
+      }
+    }
+    if(carRollaway&&!rides?.car){
+      const rs=carRollaway.sim
+      const pCur=sim.body.translation()
+      const stopReason=stepCarRollaway(rs,clampedFrameDt,{
+        segmentBlocked:(x0,z0,x1,z1,y)=>sim.pathBlocked(x0,z0,x1,z1,y),
+        isWet:(x,z)=>sim.wet(x,z),
+        supportY:(x,z,refY)=>carSupportAt(x,z,refY)?.y??null,
+        playerPos:()=>({x:pCur.x,z:pCur.z}),
+      })
+      carRollaway.mesh.position.set(rs.x,rs.y,rs.z)
+      carRollaway.mesh.rotation.set(rs.pitch,rs.heading,0,'YXZ')
+      carRollaway.beepTimer+=clampedFrameDt
+      if(carRollaway.beepTimer>=0.34){
+        carRollaway.beepTimer=0
+        ebikeAudio.playCarRollawayBeep()
+      }
+      carRig.update({
+        pos:_rigPosTmp.set(rs.x,rs.y,rs.z),
+        heading:rs.heading,
+        groundPitch:rs.pitch,
+        speed:rs.speed,
+        steerInput:0,
+        braking:false,
+        reversing:rs.speed<-.05||rs.plan==='creep_rev',
+        handbrake:false,
+        headlight:env.night>=.45?'low':'off',
+        night:env.night,
+        engineRunning:rs.plan==='creep_fwd'||rs.plan==='creep_rev',
+        hazard:true,
+        dt:clampedFrameDt,
+      })
+      if(stopReason){
+        if(rs.impactTriggered)carRig.triggerImpact(.16)
+        const phase=stopReason==='epb'?'epb':'stop'
+        settleCarRollaway(phase)
+        if(!verify||stuntMode){
+          const msg=stopReason==='epb'?'电子驻车已自动介入并挂入 P 挡':'溜车已受阻停住，已自动挂入 P 挡'
+          window.dispatchEvent(new CustomEvent('walk:toast',{detail:{text:msg,ms:2200}}))
         }
       }
     }
@@ -3312,7 +3748,7 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
         }
         if(ebikeFx.vehicleType==='shared'&&rideCtrl.wheelie&&(rides.ebikeTelemetry?.speed??0)>=1.5&&performance.now()-sharedWheelieHintAt>3200){
           sharedWheelieHintAt=performance.now()
-          window.dispatchEvent(new CustomEvent('walk:toast',{detail:{text:'共享电动车限速 18 km/h 且禁止翘头，去十字街买个人电摩吧',ms:2200}}))
+          window.dispatchEvent(new CustomEvent('walk:toast',{detail:{text:'共享电动车限速 25 km/h 且禁止翘头，去十字街买个人电摩吧',ms:2200}}))
         }
         const rawTel=rides.ebikeTelemetry
         if(rawTel){
@@ -3385,7 +3821,11 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
         })
         if(mountedStaticBike)mountedStaticBike.userData.battery=ebikeState.battery
         if(rawTel&&rawTel.crashPhase!=='none'){
-          triggerTwoWheelCrash(rawTel.crashReason||'lowside',rawTel.crashSide??(rides.lean>=0?1:-1),{suppressToast:true})
+          triggerTwoWheelCrash(rawTel.crashReason||'lowside',rawTel.crashSide??(rides.lean>=0?1:-1),{
+            suppressToast:true,
+            crashCause:rawTel.crashCause,
+            reason:rawTel.crashCause==='shared_turn_slip'?'shared_turn_slip':undefined,
+          })
         }
         prevTwoWheelSpeed=Math.abs(rides.speed)
       }else{
@@ -3588,6 +4028,20 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
       get state(){return ebikeState},
       triggerCrash(reason:Exclude<EbikeCrashReason,''>='lowside',side:-1|1=1){if(rides?.bike)triggerTwoWheelCrash(reason,side)},
       triggerSlip:(opts?:BikeSlipKnockdownOptions)=>triggerBikeSlipKnockdownAction(opts),
+      setSharedSlipRng(rng:(()=>number)|null){rides?.setSharedSlipRng(rng)},
+      get sharedSlipStats(){return rides?.sharedSlipStats??null},
+      forceSharedTurnSlip(side:-1|1=1,opts?:{bypassCompGate?:boolean}){
+        if(!rides?.bike||rides.rideKind!=='bike'||!rides.isShared||crashSession)return false
+        rides.forceSharedTurnSlip(side)
+        triggerTwoWheelCrash('slip',side,{
+          kind:'ebike_slip',
+          reason:'shared_turn_slip',
+          crashCause:'shared_turn_slip',
+          suppressToast:true,
+          bypassCompGate:verify?Boolean(opts?.bypassCompGate):false,
+        })
+        return true
+      },
       recover(){return crashSession?beginStandUpFromCrash(true):false},
       pickupNearest(){
         if(rides?.bike||rides?.car||rides?.boat||standUpSession||pickupSession)return false
@@ -3609,6 +4063,17 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
       setPark(on:boolean,silent=false){if(crashSession)return false;return rides?.setEbikePark(on,silent)??false},
       toggleKickstand(silent=false){if(crashSession)return false;return rides?.toggleEbikeKickstand(silent)??false},
       setKickstand(on:boolean,silent=false){if(crashSession)return false;return rides?.setEbikeKickstand(on,silent)??false},
+      setKickstandStrict(on:boolean){kickstandStrict=!!on},
+      tipOverStatus(){
+        const activeTip=Array.from(downedBikes).find(r=>!!r.tip)
+        return {
+          strict:kickstandStrict,
+          tipping:!!activeTip,
+          phase:activeTip?.tip?.phase??null,
+          roll:activeTip?.roll??null,
+          downedCount:downedBikes.size,
+        }
+      },
       cycleLight(){if(crashSession)return 'off' as EbikeHeadlightMode;return rides?.cycleEbikeHeadlight()??'off'},
       cycleHeadlight(){if(crashSession)return 'off' as EbikeHeadlightMode;return rides?.cycleEbikeHeadlight()??'off'},
       setHeadlight(mode:TwoWheelHeadlightMode){if(crashSession)return 'off' as EbikeHeadlightMode;return rides?.setEbikeHeadlight(mode,true)??'off'},
@@ -3624,11 +4089,34 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
     },
     car:{
       get telemetry(){return rides?.carTelemetry??null},
+      get state(){return rides?.car?carGearbox.snapshot(rides.carTelemetry?.gear??1,rides.speed,lastCarBraking):null},
+      ignition(on?:boolean):CarGearboxResult{
+        if(!rides?.car)return {ok:false,state:carGearbox.snapshot(),reason:'not_in_car',text:'未在汽车内'}
+        return handleCarGearboxResult(carGearbox.ignition(on,rides.speed))
+      },
+      shift(sel:CarGearSelector):CarGearboxResult{
+        if(!rides?.car)return {ok:false,state:carGearbox.snapshot(),reason:'not_in_car',text:'未在汽车内'}
+        return handleCarGearboxResult(carGearbox.shift(sel,{speedMs:rides.speed,brake:lastCarBraking}))
+      },
+      lever(dir:'up'|'down'):CarGearboxResult{
+        if(!rides?.car)return {ok:false,state:carGearbox.snapshot(),reason:'not_in_car',text:'未在汽车内'}
+        return handleCarGearboxResult(carGearbox.lever(dir,{speedMs:rides.speed,brake:lastCarBraking}))
+      },
+      setStrict(on:boolean){carGearbox.setStrict(on);syncCarDomDataset()},
+      setAssist(patch:Partial<CarGearboxAssist>){carGearbox.setAssist(patch)},
+      setHazard(on:boolean){return carGearbox.setHazard(on)},
+      rollaway(){return carRollaway?{active:carRollaway.sim.active,distance:+carRollaway.sim.distance.toFixed(3),reason:carRollaway.sim.stopReason||carRollaway.sim.plan}:null},
       setMode(mode:CarDriveMode){return rides?.setCarMode(mode)??mode},
       shiftMode(delta:number){return rides?.shiftCarMode(delta)??'street'},
       setGtaPhysics(on:boolean|undefined){carGtaOverride=on;if(on!==undefined)rides?.setCarGtaPhysics(on)},
       cycleLight(){carHeadlight=nextHeadlightMode(carHeadlight);carHeadlightManual=true;return carHeadlight},
       setHeadlight(mode:TwoWheelHeadlightMode){carHeadlight=mode;carHeadlightManual=true;return carHeadlight},
+    },
+    boat:{
+      get light(){return rides?.boatLightProbe()?.lit??false},
+      toggleLight(){return rides?.toggleBoatLight(env.night)??false},
+      setLight(on:boolean|null){return rides?.setBoatLight(on)??null},
+      probe(){return rides?.boatLightProbe()??null},
     },
     get geoHeld(){return held},releaseDrive(){external=null},
     shop:{

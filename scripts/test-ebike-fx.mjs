@@ -90,7 +90,7 @@ try {
   await page.evaluate(() => window.viewer.walk.tick(1 / 60))
   assert.equal(await page.textContent('.ride-gear'), 'D3')
 
-  // Switch to shared e-bike -> capped at 18 km/h on S, badge = 共享, hides .ride-mod
+  // Switch to shared e-bike -> capped at 25 km/h single gear D, badge = 共享, hides .ride-mod & rejects gear shift
   await page.evaluate(() => {
     window.viewer.walk.ebike.setVehicleType('shared')
     window.viewer.walk.tick(1 / 60)
@@ -99,8 +99,8 @@ try {
   assert.equal(await page.evaluate(() => getComputedStyle(document.querySelector('.ride-mod')).display), 'none')
   await page.keyboard.press('e')
   await page.evaluate(() => window.viewer.walk.tick(1 / 60))
-  assert.equal(await page.textContent('.ride-gear'), 'S')
-  assert.equal(await page.evaluate(() => window.viewer.walk.probe().ebike.maxKmh), 18)
+  assert.equal(await page.textContent('.ride-gear'), 'D')
+  assert.equal(await page.evaluate(() => window.viewer.walk.probe().ebike.maxKmh), 25)
 
   // Low battery & critical battery warning HUD
   await page.evaluate(() => {

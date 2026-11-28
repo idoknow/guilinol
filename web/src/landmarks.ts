@@ -4,6 +4,7 @@ import {warmShaders} from './shader-warmup'
 import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js'
 import {MeshoptDecoder} from 'three/addons/libs/meshopt_decoder.module.js'
 import {nightLit} from './look/night'
+import {airportLook} from './look/airport'
 import {sharedKtx2Loader} from './look/tiles'
 import {bindStreetSurface,streetSurfaceMat} from './streets'
 import seamConfig from '../../pipeline/seam-surfaces.json'
@@ -16,7 +17,7 @@ export {landmarkCulling}
 
 export interface Landmark {
   id:string; name?:string; file:string; position:[number,number,number]; rotation:number; collision:'mesh'|'box'|'none'; lods:string[]
-  sphere:[number,number,number,number]; bytes:number
+  sphere:[number,number,number,number]; bytes:number; farRadius?:number
   solid?:[number,number,[number,number][]][]
 }
 export type LoadedLandmarks = Map<Landmark,THREE.Group>
@@ -236,6 +237,8 @@ export function landmarkStream(
   options?:LandmarkStreamOptions,
 ){
   const loaderReady=sharedKtx2Loader(renderer).then(basis=>new GLTFLoader().setKTX2Loader(createCachedKtx2Loader(basis)).setMeshoptDecoder(MeshoptDecoder))
+  const query=new URLSearchParams(location.search),profileId=query.has('verify')&&query.get('collisionProfile')
+  let requestedAt=0,fetchedAt=0,parsingAt=0
   const pending=new Set<Landmark>(), priorityPending=new Set<Landmark>(), retry=new Map<Landmark,number>()
   const states=new WeakMap<THREE.Group,LandmarkState>()
   const fetchedQueue:FetchedEntry[]=[]
@@ -294,10 +297,12 @@ export function landmarkStream(
     options?.onPendingChange?.()
     if(isPriority)priorityPending.add(entry)
     if(retry.has(entry))record('retry',{category:'landmark'})
+    if(entry.id===profileId)requestedAt=performance.now()
     fetch('./'+entry.file).then(response=>{
       if(!response.ok)throw Error(`HTTP ${response.status}`)
       return response.arrayBuffer()
     }).then(buffer=>{
+      if(entry.id===profileId)fetchedAt=performance.now()
       fetchedQueue.push({entry,buffer,isPriority})
       schedulePump()
     }).catch(error=>{
@@ -319,6 +324,7 @@ export function landmarkStream(
     }
     parsing=true
     void loaderReady.then(loader=>new Promise<THREE.Group>((resolve,reject)=>{
+      if(entry.id===profileId)parsingAt=performance.now()
       loader.parse(buffer,'./',gltf=>resolve(gltf.scene),reject)
     })).then(group=>{
       parsing=false
@@ -326,6 +332,7 @@ export function landmarkStream(
       if(entry.collision!=='none'){
         group.updateMatrixWorld(true)
         options?.collisionLandmarks?.set(entry,group)
+        if(entry.id===profileId){const readyAt=performance.now();console.info('collision:ready',JSON.stringify({id:entry.id,fetchMs:Math.round(fetchedAt-requestedAt),queueMs:Math.round(parsingAt-fetchedAt),decodeAndRegisterMs:Math.round(readyAt-parsingAt),totalMs:Math.round(readyAt-requestedAt)}))}
       }
       decodedQueue.push({entry,group,isPriority})
       schedulePump()
@@ -340,9 +347,10 @@ export function landmarkStream(
   }
 
   function entryCutoffs(entry:Landmark,metrics:RenderRangeMetrics,guardDist:number){
-    const load=Math.max(guardDist,metrics.landmarkLoadRadius)
-    const fadeCutoff=Math.max(guardDist,entry.lods.includes('lod2')?metrics.landmarkLoadRadius:metrics.landmarkLod1)
-    const unload=Math.max(guardDist+80,metrics.landmarkUnloadRadius)
+    const far=entry.farRadius??0
+    const load=Math.max(guardDist,metrics.landmarkLoadRadius,far)
+    const fadeCutoff=Math.max(guardDist,entry.lods.includes('lod2')?load:metrics.landmarkLod1)
+    const unload=Math.max(guardDist+80,metrics.landmarkUnloadRadius,far+80)
     return {load,fadeCutoff,unload}
   }
 
@@ -455,7 +463,7 @@ export function landmarkStream(
         for(const value of Object.values(original))if(value instanceof THREE.Texture)retired.add(value)
         node.geometry=node.geometry.clone();bindStreetSurface(node.geometry,kind);node.material=streetSurfaceMat
       }else for(const material of [original].flat()){
-        if(!litApplied.has(material)){litApplied.add(material);nightLit(material)}
+        if(!litApplied.has(material)){litApplied.add(material);if(!airportLook(material))nightLit(material)}
       }
     })
     // Release replaced paving/sidewalk textures & materials immediately instead of holding them until unload.

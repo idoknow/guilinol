@@ -164,7 +164,10 @@ export const RTH_CRUISE_AGL = 25
 function homeSticks(flight:Flight, groundY:number):Sticks {
   const toHome = flight.home.clone().sub(flight.pos)
   const dist = Math.hypot(toHome.x,toHome.z)
-  if (dist < 1.2 && flight.agl < 1.5) {
+  // IDOK-530: 到家了就落 —— 老判据要求 dist<1.2 且 agl<1.5 才切 landing，
+  // 结果飞机在人物头顶 25 m 上绕圈、永远差这零点几米。现在只要压到 8 m 内、高度已经贴近地面
+  // （风把机身吹偏一两米也可能），就直接进 landing，让降落逻辑把它按到机库地坪上。
+  if (dist < 8 && flight.agl < 2.5) {
     flight.phase = 'landing'
     return {throttle:-1,yaw:0,pitch:0,roll:0}
   }
@@ -175,10 +178,28 @@ function homeSticks(flight:Flight, groundY:number):Sticks {
   // altitude instead, then drop straight onto the pad once it is overhead.
   const ceilingAgl = Math.max(RTH_CRUISE_AGL, flight.home.y - groundY + RTH_CRUISE_AGL)
   let throttle = 0
-  if (dist < 8) throttle = flight.agl > 3 ? -.5 : -.35
-  else if (flight.agl > ceilingAgl + 3) throttle = -.3
-  else if (flight.agl < ceilingAgl - 2) throttle = .32
-  return {throttle, yaw:THREE.MathUtils.clamp(-delta * 1.6,-1,1), pitch:dist > 4 ? .6 : .25, roll:0}
+  let pitch = 0
+  if (dist > 12) {
+    pitch = .6
+    if (flight.agl > ceilingAgl + 3) throttle = -.3
+    else if (flight.agl < ceilingAgl - 2) throttle = .32
+  } else if (dist > 6) {
+    // 接近段：机头对准了就别再猛推，慢慢压到机库上方，免得到家门口冲过去再绕回来。
+    pitch = .28
+    if (flight.agl > ceilingAgl + 3) throttle = -.3
+  } else {
+    // 已经在自己头顶：不再前推，垂直下降，落到 4 m 以下交给 landing。
+    pitch = 0
+    throttle = flight.agl > 2.2 ? -.6 : -.45
+  }
+  return {throttle, yaw:THREE.MathUtils.clamp(-delta * 1.6,-1,1), pitch, roll:0}
+}
+
+/** IDOK-530: 取消返航 —— 遥控里那个「取消返航」，回到手动悬停。 */
+export function cancelReturn(flight:Flight) {
+  if (flight.phase !== 'returning') return false
+  flight.phase = 'flying'
+  return true
 }
 
 /** Camera pose for the RC view: lens position + gimbal attitude. */

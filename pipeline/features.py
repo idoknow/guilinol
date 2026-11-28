@@ -64,7 +64,7 @@ def ground_features(bounds, school_grounds=()):
                 continue
         if tags.get('natural') == 'water' or tags.get('waterway') == 'riverbank' or 'water' in tags:
             key = 'water'
-        elif (tags.get('natural') in ('wood', 'grassland', 'scrub') or tags.get('leisure') in ('park','garden','pitch')
+        elif ((element['type']=='relation' and element['id']==13846706) or tags.get('natural') in ('wood', 'grassland', 'scrub') or tags.get('leisure') in ('park','garden','pitch')
               or tags.get('landuse') in ('forest','grass','meadow','recreation_ground','village_green')):
             key = 'green'
         elif tags.get('aeroway') in ('runway','taxiway','apron') and element['type'] != 'node':
@@ -156,6 +156,7 @@ def raw_overture_footprints(bounds):
 def buildings(bounds, elevation, peaks, layout, carriageway_mask=None, sidewalk_mask=None, airport_buildings=()):
     footprints, heights = [], []
     grounds = unary_union(layout.school_grounds)
+    airport_boundary=next((area(row) for row in load_osm() if row['type']=='relation' and row['id']==13846706), Polygon()) if airport_buildings else Polygon()
     rules = json.loads(Path(__file__).with_name('building-kinds.json').read_text())
     districts = unary_union([Polygon([ll2xz(*ll) for ll in ring]) for ring in rules['oldDistrictsLatLon']])
     campuses = STRtree([area(el) for el in load_osm() if el['type']!='node' and any(
@@ -225,12 +226,19 @@ def buildings(bounds, elevation, peaks, layout, carriageway_mask=None, sidewalk_
             heights.append((base, base+3.2*floors, 3, floors, ident%65536, center, [], False))
     for element, footprint, solid in airport_buildings:
         palace.append(footprint)
+        if f"way/{element['id']}" in layout.airport_replacements:
+            continue
         for poly in polygons(solid.intersection(bounds)):
             center=poly.representative_point()
             floors=int(element['tags'].get('building:levels','2'))
             base=elevation(center.x,center.y)
             footprints.append(poly)
-            heights.append((base,base+3.1*floors,0,floors,element['id']%65536,center,[],False))
+            tags=element['tags']
+            use=' '.join(tags.get(key,'') for key in ('name','building','office'))
+            kind=(0 if tags.get('barrier')=='toll_booth' else
+                  5 if floors>=3 or '办公' in use or 'office' in use else
+                  6 if footprint.area>550 or '仓' in use else 7)
+            heights.append((base,base+3.1*floors,kind,floors,element['id']%65536,center,[],False))
     palace_index = STRtree(palace)
     with (Path(RAW)/'overture_buildings.csv').open() as source:
         for row in csv.DictReader(source, delimiter='\t'):
@@ -261,7 +269,9 @@ def buildings(bounds, elevation, peaks, layout, carriageway_mask=None, sidewalk_
                         base = elevation(center.x, center.y)
                         footprints.append(sub)
                         kind = 0
-                        if grounds.covers(center):
+                        if airport_boundary.covers(center):
+                            kind=5 if floors>=3 else 6 if sub.area>550 else 7
+                        elif grounds.covers(center):
                             kind = 3
                         elif floors<=rules['oldMaxFloors'] and districts.covers(center):
                             kind = 1

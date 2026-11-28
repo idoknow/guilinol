@@ -951,6 +951,7 @@ class SchoolBuilder:
                            corridor_reg: str = 'wall_accent',
                            bay_target_m: float = 3.6,
                            instanced_windows: bool = True,
+                           low_plinth: bool = False,
                            win_frame_reg: str = 'win_frame'):
         """Extrude exact OSM/Overture polygon, grounded via `ground()`, with instanced 3D window & rail modules."""
         old = self.pose
@@ -959,6 +960,13 @@ class SchoolBuilder:
         n = len(pts)
         g_corners = [self.ground(x, z) for x, z in pts]
         y_base = min(g_corners)
+        if low_plinth:
+            for start, end in zip(pts, pts[1:] + pts[:1]):
+                steps = max(1, math.ceil(math.dist(start, end)))
+                for sample in range(1, steps):
+                    fraction = sample / steps
+                    y_base = min(y_base, self.ground(start[0] + (end[0] - start[0]) * fraction,
+                                                    start[1] + (end[1] - start[1]) * fraction))
         sill = max(g_corners) + 0.12
         total_h = floors * floor_h
 
@@ -975,8 +983,8 @@ class SchoolBuilder:
             })
 
         # Grounded plinth skirt from ground(x,z)-0.04 up to sill + ground floor base
-        plinth_top = max(sill + 0.65, y_base + 0.75)
-        self.prism(pts, y_base - 0.04, plinth_top - (y_base - 0.04), 'wall_base', cap_region='pave_grey', collide=False, ground_skirt=True)
+        plinth_top = y_base + 0.45 if low_plinth else max(sill + 0.65, y_base + 0.75)
+        self.prism(pts, y_base - 0.04, plinth_top - (y_base - 0.04), 'wall_base', cap_region='pave_grey', collide=False, ground_skirt=not low_plinth)
 
         # Collision prism from y_base to y_base + total_h
         if self.collide:
@@ -1024,7 +1032,7 @@ class SchoolBuilder:
                     self.add_quad_world([(bx0, draw_fy0, bz0), (bx1, draw_fy0, bz1), (bx1, fy1, bz1), (bx0, fy1, bz0)],
                                         reg, full_rect=(reg in ('win_wall', 'win_base')))
                     # Instanced 3D window frame unit in lod0 (projected flush on wall)
-                    if self.detail and instanced_windows and fl >= 1 and bay_len >= 2.2 and not is_corridor:
+                    if self.detail and instanced_windows and (fl >= 1 or low_plinth) and bay_len >= 2.2 and not is_corridor:
                         mx, mz = (bx0 + bx1) * 0.5, (bz0 + bz1) * 0.5
                         win_w = min(2.6, bay_len * 0.68)
                         self.add_instance(

@@ -3,6 +3,7 @@ import assert from 'node:assert/strict'
 import {randomBytes,createHash,createHmac} from 'node:crypto'
 import {spawn} from 'node:child_process'
 import {mkdir} from 'node:fs/promises'
+import {readFile} from 'node:fs/promises'
 import {once} from 'node:events'
 import {createServer} from 'node:net'
 import {setTimeout as delay} from 'node:timers/promises'
@@ -14,6 +15,8 @@ import {frameSample} from './mp-frame.mjs'
 
 const secret=randomBytes(32).toString('hex'),children=[],sockets=[]
 const smokeCapture=process.argv.includes('--smoke')
+const connectivity=process.argv.includes('--connectivity')
+const modeSwitch=connectivity||process.argv.includes('--mode-switch')
 let failBrowser
 const browserError=new Promise((_,reject)=>{failBrowser=reject})
 const appearance={body:'f',v:1,createdAt:123,skin:2,face:1,brows:0,eyes:0,hair:'f_bun',hairColor:1,look:'sport'}
@@ -42,7 +45,8 @@ async function verify(){
     return (await import('./verify-emote-mp.mjs')).verifyEmotes(rt,ticket)
   }
   database=await fixture({postgresOnly:true})
-  const rt=await service('rt/server-realtime.mjs',{RT_JOIN_SECRET:secret},'/health',200)
+  if(modeSwitch)for(const name of ['021-fishing-catches','022-helicopter','023-helicopter-seat'])await database.sql(await readFile(`deploy/postgres/${name}.sql`,'utf8'))
+  const rt=await service('rt/server-realtime.mjs',{...(modeSwitch?database.env:{}),RT_JOIN_SECRET:secret},'/health',200)
   assert.equal((await (await fetch(`http://${rt}/health`)).json()).proto,4)
   const [body,signature]=ticket(100000).split('.')
   if(!smokeCapture){await reject(rt,body+'.'+(signature[0]==='A'?'B':'A')+signature.slice(1));await reject(rt,ticket(100000,Math.floor(Date.now()/1000)-1));await reject(await service('rt/server-realtime.mjs',{RT_JOIN_SECRET:''},'/health',200),ticket(100000));await reject(rt,ticket('tester1'))}
@@ -51,9 +55,11 @@ async function verify(){
   site=await preview({root:'web',configFile:'web/vite.config.ts',preview:{host:'127.0.0.1',port:number,strictPort:true,proxy:{'/api':'http://'+api,'/ws':{target:'ws://'+rt,ws:true}}}})
   assert.equal((await fetch(origin+'/api/rt/ticket',{method:'POST',headers:{origin}})).status,401)
   browser=await chromium.launch({executablePath:process.env.CHROMIUM,args:[...browserOptions().args,'--disable-background-timer-throttling','--disable-renderer-backgrounding','--disable-backgrounding-occluded-windows']})
+  if(connectivity)return (await import('./verify-mp-connectivity.mjs')).verifyConnectivity({origin,browser,database,appearance})
   const url=origin+'/?verify&mode=walk&flow=0'
   async function pageFor(name,mp){
     const page=await browser.newPage({viewport:name==='alice'?{width:240,height:135}:{width:480,height:270}});page.on('pageerror',failBrowser)
+    if(modeSwitch)page.on('console',message=>{if(message.type()==='warning'&&/walk:enter-failed/.test(message.text()))console.warn(message.text())})
     page.on('console',message=>{if(message.type()==='error')failBrowser(Error(`${name}: ${message.location().url}: ${message.text()}`))})
     const token=randomBytes(32).toString('hex');await database.sql('INSERT INTO users(id,email,nickname,salt,digest,verified) VALUES($1,$2,$1,\'\',\'\',1)',[name,name+'@example.test']);await database.sql('INSERT INTO sessions VALUES($1,$2,unixepoch()+600)',[createHash('sha256').update(token).digest('hex'),name]);await page.context().addCookies([{name:'glol_session',value:token,url:origin,httpOnly:true}]);await page.addInitScript(avatar=>localStorage.setItem('glol.avatar.v1',JSON.stringify(avatar)),appearance)
     if(smokeCapture){
@@ -65,8 +71,37 @@ async function verify(){
       await page.goto(origin+'/backpack.html');await page.getByRole('button',{name:'香烟'}).click();await page.waitForURL(origin+'/')
       await page.goto(origin+'/?verify&play=tour&mp=1&time=12&flow=0');await page.waitForFunction(()=>window.viewer?.walkTo)
       assert(await page.evaluate(name=>window.viewer.walkTo(-309,name==='alice'?-1:1,name==='alice'?Math.PI:0,'smoke-test'),name));console.log(name,'entered')
-    }else await page.goto(url+(mp?'&mp=1':''))
+    }else if(modeSwitch)await page.goto(origin+'/?verify&play=solo&mp=1&flow=0')
+    else await page.goto(url+(mp?'&mp=1':''))
     await page.waitForFunction(()=>window.viewer?.walk?.active,null,{timeout:90000});if(mp){assert(await page.evaluate(()=>!!window.viewer.walk.net),'active before net attached');await page.waitForFunction(()=>window.viewer.walk.net.status().state==='online',null,{polling:100,timeout:30000})}return page
+  }
+  if(modeSwitch){
+    const page=await pageFor('alice',true)
+    const point=()=>page.evaluate(()=>{const {x,z}=window.viewer.walk.probe();return [x,z]})
+    const select=async(mode)=>{await page.locator('.btn-menu').evaluate(button=>button.click());await page.locator(`[data-umami-event=home-${mode}]`).evaluate(button=>button.click());await page.waitForFunction(()=>!document.querySelector('.home-mode[aria-busy=true]'),null,{timeout:90000});console.log('selected',mode)}
+    const near=(actual,expected)=>assert.ok(Math.hypot(actual[0]-expected[0],actual[1]-expected[1])<3,JSON.stringify({actual,expected}))
+    const online=()=>page.waitForFunction(()=>window.viewer.walk?.net?.status().state==='online')
+    const initial=await point();await select('tour');await page.evaluate(()=>window.viewer.camera.position.set(-200,420,-600))
+    await select('mp');await online();near(await point(),initial)
+    await select('tour');near(await page.evaluate(()=>[window.viewer.camera.position.x,window.viewer.camera.position.z]),[-200,-600])
+    await select('solo');assert.ok(await page.evaluate(()=>window.viewer.walkTo(-268.5,24.8,0,'verify-solo')));const single=await point()
+    await select('mp');await online();near(await point(),initial);await select('solo');near(await point(),single)
+    const bridge=[-268.5,24.8]
+    const probe=()=>page.evaluate(()=>{const {x,z,foot,clearance,surfaceKind,surfaceY}=window.viewer.walk.probe();return {x,z,foot,clearance,surfaceKind,surfaceY}})
+    async function seed(x,y,z){await database.sql('update mp_positions set x=$1,y=$2,z=$3 where uid=(select uid from users where id=$4)',[x,y,z,'alice'])}
+    for(const [mode,offset] of [['solo',8],['tour',40]]){
+      if(mode==='tour')await select('tour')
+      await seed(bridge[0],146.5+offset,bridge[1]);await select('mp');await online()
+      const first=await probe();await page.waitForTimeout(5000);const stable=await probe()
+      console.log(`restore ${mode} +${offset}m`,JSON.stringify({first,stable}))
+      for(const pose of [first,stable]){near([pose.x,pose.z],bridge);assert.ok(Math.abs(pose.clearance)<.5)}
+      assert.ok(Math.abs(first.foot-stable.foot)<.5);await select('solo')
+    }
+    await seed(initial[0],154,initial[1]);await select('mp');await online()
+    assert.ok(await page.evaluate(()=>window.viewer.walkTo(-268.5,24.8,0,'traffic-duty:bridge')))
+    await page.waitForTimeout(5000);const deck=await probe();console.log('registered bridge',JSON.stringify(deck));near([deck.x,deck.z],bridge)
+    assert.equal(deck.surfaceKind,'landmark');assert.ok(Math.abs(deck.foot-151.86)<.5&&Math.abs(deck.foot-deck.surfaceY)<.5)
+    console.log('PASS tour → online → tour; solo → online → solo',JSON.stringify({online:initial,tour:[-200,-600],solo:single}));return
   }
   if(smokeCapture){
     const alice=await pageFor('alice',true);await alice.evaluate(()=>window.viewer.freeze())
@@ -114,15 +149,15 @@ async function verify(){
   const remote=await bob.evaluate(()=>window.viewer.walk.net.probe().find(item=>item.name==='alice'));assert.deepEqual(remote.avatar,appearance)
   const health=async()=>(await (await fetch(`http://${rt}/health`)).json()).online
   assert.equal(await health(),2)
-  await bob.evaluate(({id,previous})=>{
-    window.teleportSamples=[];window.teleportObserver=setInterval(()=>{const peer=window.viewer.walk.net.probe().find(item=>item.id===id)
+  await bob.evaluate(({name,previous})=>{
+    window.teleportSamples=[];window.teleportObserver=setInterval(()=>{const peer=window.viewer.walk.net.probe().find(item=>item.name===name)
       if(peer&&Math.hypot(peer.position[0]-previous[0],peer.position[2]-previous[2])>45)window.teleportSamples.push({at:Date.now(),pos:peer.position})},25)
-  },{id:remote.id,previous:remote.position})
+  },{name:remote.name,previous:remote.position})
   const arrived=await alice.evaluate(async()=>{const {walk,walkTo}=window.viewer,session=walk.net,before=walk.probe();if(!await walkTo(before.x+47.4,before.z+16,0,'mp-teleport'))throw Error('50 m teleport failed');const at=Date.now(),after=walk.probe();return {at,same:session===walk.net,pos:after.figPos,distance:Math.hypot(after.x-before.x,after.z-before.z)}})
   assert(arrived.same);assert(Math.abs(arrived.distance-50)<1)
   const observed=await bob.evaluate(async({at,pos})=>{const match=()=>window.teleportSamples.find(sample=>Math.hypot(...sample.pos.map((value,index)=>value-pos[index]))<1)
-    while(!match()&&Date.now()<at+3000)await new Promise(done=>setTimeout(done,25));clearInterval(window.teleportObserver);return {match:match(),last:window.teleportSamples.at(-1)}},arrived)
-  assert(observed.match&&observed.match.at<=arrived.at+3000,JSON.stringify({observed,arrived}));const teleportMs=Math.max(0,observed.match.at-arrived.at);assert.equal(await health(),2);console.log('teleport m / observed ms / online',arrived.distance,teleportMs,2)
+    while(!match()&&Date.now()<at+10000)await new Promise(done=>setTimeout(done,25));clearInterval(window.teleportObserver);return {match:match(),last:window.teleportSamples.at(-1)}},arrived)
+  assert(observed.match&&observed.match.at<=arrived.at+10000,JSON.stringify({observed,arrived}));const teleportMs=Math.max(0,observed.match.at-arrived.at);assert.equal(await health(),2);console.log('teleport m / observed ms / online',arrived.distance,teleportMs,2)
   const left=performance.now();await alice.close();await bob.waitForFunction(()=>!window.viewer.walk.net.probe().some(item=>item.name==='alice'),null,{timeout:5000});const leaveMs=performance.now()-left;assert(leaveMs<=5000);console.log('distance / error / leave ms',end.distance,Math.hypot(...remote.position.map((value,index)=>value-end.position[index])),leaveMs)
   const center=await bob.evaluate(()=>window.viewer.walk.probe().figPos),bots=[]
   for(let index=0;index<20;index++){

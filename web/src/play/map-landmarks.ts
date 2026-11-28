@@ -15,7 +15,7 @@ export interface MapLandmark {
   glyph: string
   kind: LandmarkKind
   region: LandmarkRegion
-  /** 1 = 全域总览（含缩远模式）常显；2 = 中近景（scale >= 0.085）显现 */
+  /** 1 = 全域总览（含缩远模式）常显；2 = 中近景（scale >= 0.09）显现 */
   tier: 1 | 2
   sub: string
   keywords?: string

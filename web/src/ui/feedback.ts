@@ -3,7 +3,7 @@ import { record } from '../telemetry'
 import type { Host } from '../play/host'
 import type { mapView } from '../play/map'
 import { spots, waterDocks } from '../play/spots'
-import { APPEAL, kinds, labels, photosOptional, type FeedbackView } from '../../../lib/feedback-contract'
+import { APPEAL, TERMINAL_STATUSES, appealReasons, kinds, labels, photosOptional, stripAppealTemplate, type FeedbackView } from '../../../lib/feedback-contract'
 import { ll2xz, xz2ll } from '../../../lib/projection'
 import { readJson, jsonError } from '../lib/json'
 import { photoPicker } from './feedback-photo'
@@ -23,6 +23,7 @@ interface Item {
   lat: number
   lon: number
   body: string
+  ban_record_id?: string | null
   submitted_at?: number | null
   updated_at?: number
   photos: { n: number }[]
@@ -57,6 +58,24 @@ const when = (seconds: number) =>
     hour: '2-digit',
     minute: '2-digit',
   })
+
+const TERMINAL = new Set<string>(TERMINAL_STATUSES)
+const LAST_BAN_KEY = 'glol.lastMpBan'
+const LAST_BAN_KEEP_MS = 24 * 60 * 60 * 1000
+function readRecentBanId(): string {
+  try {
+    const raw = globalThis.sessionStorage?.getItem(LAST_BAN_KEY)
+    if (!raw) return ''
+    const parsed = JSON.parse(raw) as { recordId?: unknown; savedAt?: unknown } | null
+    if (!parsed || typeof parsed !== 'object') return ''
+    const savedAt = typeof parsed.savedAt === 'number' ? parsed.savedAt : NaN
+    const age = Date.now() - savedAt
+    if (!(age >= 0 && age <= LAST_BAN_KEEP_MS)) return ''
+    return typeof parsed.recordId === 'string' ? parsed.recordId.trim().slice(0, 64) : ''
+  } catch {
+    return ''
+  }
+}
 
 function pill(status: string) {
   return el('span', labels[status] ?? status, `fb-pill fb-status--${status}`)
@@ -270,7 +289,10 @@ export async function openFeedback(
     const facts = el('dl', '', 'fb-facts')
     const fact = (k: string, v: string) => v && facts.append(el('dt', k), el('dd', v))
     fact('类型', item.kind ?? '')
-    fact('位置', `${item.lat.toFixed(5)}, ${item.lon.toFixed(5)}`)
+    fact('记录编号', item.ban_record_id ?? '')
+    if (item.kind !== APPEAL || Math.abs(item.lat) > 1e-4 || Math.abs(item.lon) > 1e-4) {
+      fact('位置', `${item.lat.toFixed(5)}, ${item.lon.toFixed(5)}`)
+    }
     fact('行走路径', route)
     fact('描述', text)
     body.append(facts)
@@ -328,7 +350,7 @@ export async function openFeedback(
     body.append(timeline)
     const actions = el('div', '', 'fb-actions')
     body.append(actions)
-    if (!['draft', 'live', 'rejected', 'duplicate'].includes(item.status)) {
+    if (item.status !== 'draft' && !TERMINAL.has(item.status)) {
       const input = el('textarea'),
         photo = el('input'),
         compose = el('div', '', 'fb-compose'),
@@ -447,10 +469,14 @@ export async function openFeedback(
     let mapApi: MapApi | undefined
     let locSummary = item ? '' : describeLocation(host, activePos.x, activePos.z, selection?.view, mapApi)
 
+    const recentBanId = !item ? (banId?.trim() || readRecentBanId()) : ''
     const kind = el('div', '', 'fb-chips'),
       name = el('input'),
+      banRecordInput = el('input'),
+      appealReasonWrap = el('div', '', 'fb-appeal-reasons'),
       description = el('textarea')
     let describeField: HTMLElement | undefined
+    let banRecordField: HTMLElement | undefined
 
     const chosenKind = () =>
       item?.kind ?? (kind.querySelector('input:checked') as HTMLInputElement | null)?.value ?? kinds[0]
@@ -517,7 +543,7 @@ export async function openFeedback(
       const what = el('div', '', 'fb-what')
       kind.setAttribute('role', 'radiogroup')
       kind.setAttribute('aria-label', '问题类型')
-      const visibleKinds = banId ? kinds : kinds.filter((value) => value !== APPEAL)
+      const visibleKinds = banId || recentBanId ? kinds : kinds.filter((value) => value !== APPEAL)
       visibleKinds.forEach((value, i) => {
         const chip = el('label', '', 'fb-chip'),
           radio = el('input')
@@ -541,12 +567,34 @@ export async function openFeedback(
       name.maxLength = 40
       name.placeholder = '一句话说明，例如：逍遥楼屋顶颜色不对'
       field('标题', name)
-      description.maxLength = 1400
-      description.rows = 2
-      if (banId) {
-        name.value = APPEAL
-        description.value = `封禁记录 ID：${banId}\n申诉说明：`
+
+      banRecordInput.type = 'text'
+      banRecordInput.maxLength = 64
+      banRecordInput.placeholder = '自动带入或粘贴记录编号（可选）'
+      banRecordInput.setAttribute('data-field', 'ban-record-id')
+      if (recentBanId) banRecordInput.value = recentBanId
+      banRecordField = field('记录编号（可选）', banRecordInput)
+      banRecordField.hidden = !banId
+
+      appealReasonWrap.setAttribute('role', 'group')
+      appealReasonWrap.setAttribute('aria-label', '常见情况快捷填写')
+      for (const reasonText of appealReasons) {
+        const chipBtn = el('button', reasonText, 'fb-reason-chip')
+        chipBtn.type = 'button'
+        chipBtn.onclick = () => {
+          const cur = description.value.trim()
+          if (!cur) description.value = reasonText + '：'
+          else if (!cur.includes(reasonText)) description.value = `${reasonText}；${cur}`
+          description.focus()
+        }
+        appealReasonWrap.append(chipBtn)
       }
+      appealReasonWrap.hidden = !banId
+      fields.append(appealReasonWrap)
+
+      description.maxLength = 1400
+      description.rows = 3
+      if (banId) name.value = APPEAL
       description.placeholder = '补充细节（可选，不填标题也会自动按位置命名）'
       describeField = field('描述（可选）', description)
       what.append(fields)
@@ -644,13 +692,14 @@ export async function openFeedback(
         return
       }
 
-      if (banId && !useDefaultShot && !photoCount) {
+      const isAppealMode = !!banId || chosenKind() === APPEAL
+      if (isAppealMode && !useDefaultShot && !photoCount) {
         mediaCard.hidden = false
         mediaCard.classList.add('fb-media--empty')
         previewWrap.hidden = true
         previewImg.removeAttribute('src')
         mediaTitle.textContent = '申诉截图（可选）'
-        mediaMeta.textContent = '可附上封禁提示截图'
+        mediaMeta.textContent = '可附上提示或异常截图'
         mediaActions.replaceChildren(pickBtn)
         return
       }
@@ -700,12 +749,19 @@ export async function openFeedback(
       const bug = photosOptional(current)
       paintMedia()
       if (!item) {
-        if (current === APPEAL) {
+        const isAppeal = current === APPEAL
+        if (banRecordField) banRecordField.hidden = !isAppeal
+        appealReasonWrap.hidden = !isAppeal
+        if (!banId) locBar.hidden = isAppeal
+        if (isAppeal) {
+          if (!name.value.trim()) name.value = APPEAL
+          if (!banRecordInput.value.trim() && recentBanId) banRecordInput.value = recentBanId
           name.placeholder = '封禁申诉'
-          description.placeholder = '请输入封禁记录 ID，说明希望复核的情况。'
+          description.placeholder = '请说明当时正在做什么、网络或画面情况'
           description.required = true
-          describeField!.querySelector('span')!.textContent = '描述（必填）'
+          describeField!.querySelector('span')!.textContent = '申诉说明（必填）'
         } else {
+          if (name.value.trim() === APPEAL) name.value = ''
           name.placeholder = bug
             ? '一句话说明，例如：骑车过桥时卡住了'
             : '一句话说明，例如：逍遥楼屋顶颜色不对'
@@ -832,13 +888,17 @@ export async function openFeedback(
         if (!supplement && bug && !description.value.trim()) throw Error('请描述一下遇到的问题')
 
         const text = description.value.trim()
+        const appeal = current === APPEAL
+        const recordIdVal = appeal ? banRecordInput.value.trim() : ''
+        if (!supplement && appeal && Array.from(stripAppealTemplate(text)).length < 2) {
+          throw Error('请填写具体的申诉说明，不能留空或只保留模板')
+        }
         const fallbackName = truncateChars(`${current} · ${locSummary || '当前位置'}`, 40)
         const resolvedTitle =
           name.value.trim() || (text ? truncateChars(text.replace(/\s+/g, ' '), 40) : fallbackName)
 
         send.textContent = '正在提交…'
         try {
-          const appeal = current === APPEAL
           if (!item && !appeal && !selection) {
             try {
               selection = await host.captureView()
@@ -856,6 +916,7 @@ export async function openFeedback(
                 current,
                 resolvedTitle,
                 text,
+                recordIdVal,
                 useDefaultShot,
                 lat: appeal ? 0 : location.lat,
                 lon: appeal ? 0 : location.lon,
@@ -882,6 +943,7 @@ export async function openFeedback(
                 kind: current,
                 title: resolvedTitle,
                 body: text,
+                ...(appeal && recordIdVal ? { ban_record_id: recordIdVal } : {}),
               })
             ).id
             draftSignature = nextSignature
@@ -932,7 +994,7 @@ export async function openFeedback(
           send.textContent = supplement ? '提交补充' : '提交反馈'
         }
         await detail(id)
-        note.textContent = '已提交，我们会尽快处理。进度会显示在这里。'
+        note.textContent = appeal ? '申诉已提交，我们会尽快核实并在进度中回复。' : '已提交，我们会尽快处理。进度会显示在这里。'
       })
     }
   }

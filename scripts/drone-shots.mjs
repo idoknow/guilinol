@@ -14,13 +14,10 @@ const server = await preview({plugins: [telemetryPreview], root: 'web', configFi
 const base = `http://127.0.0.1:${server.httpServer.address().port}`
 // near / far chase framing per aircraft: [distance, height, side] in metres
 const FRAMES = {
-  mavic4pro: {near: [1.1, 0.45, 0.5], far: [1.9, 0.75, 0.9]},
-  mini5pro: {near: [0.9, 0.35, 0.4], far: [1.3, 0.5, 0.6]},
-  air3s: {near: [0.95, 0.4, 0.45], far: [1.6, 0.65, 0.75]},
   fpv: {near: [1.5, 0.5, 0.9], far: [2.6, 1.0, 1.5]},
   flycart200: {near: [5, 2, 2.4], far: [9, 2.6, 4]},
 }
-const RUNS = [['mavic4pro'], ['mini5pro'], ['air3s'], ['fpv'], ['flycart200', 'person'], ['flycart200', 'car']]
+const RUNS = [['fpv'], ['flycart200', 'person'], ['flycart200', 'car']]
 let browser
 try {
   browser = await chromium.launch({executablePath: process.env.CHROMIUM, args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader']})

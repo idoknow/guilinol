@@ -73,6 +73,13 @@ try {
     const deniedTicket=await api('rt/ticket',{},403,'banned');assert.equal(deniedTicket.ticket,undefined)
     await sql(`UPDATE users SET banned_at=0,ban_reason='' WHERE id='${me.id}'`)
     await (await import('./citizen-test.mjs')).citizenTest({origin,me,cookie,sql,api})
+    // IDOK-588 地图迷雾：GET 空 → POST 并集只增不减 → 非法格子/超量/跨站拒绝。
+    assert.deepEqual((await api('walk/fog')).cells,[])
+    assert.deepEqual(await api('walk/fog',{add:[5,7,5]}).then(r=>[r.count,r.added]),[2,2])
+    assert.deepEqual(await api('walk/fog',{add:[7,9]}).then(r=>[r.count,r.added]),[3,1])
+    assert.deepEqual((await api('walk/fog')).cells.sort((a,b)=>a-b),[5,7,9])
+    await api('walk/fog',{add:[-1]},400,'invalid_input');await api('walk/fog',{add:[1.5]},400,'invalid_input');await api('walk/fog',{add:Array.from({length:601},(_,i)=>i)},400,'invalid_input')
+    await api('walk/fog',{add:[11]},403,'origin',{headers:{Origin:'https://example.test'}})
     console.log('Verification requires the latest registration password: missing and stale passwords rejected; current password accepted')
     assert.equal((await api('me',{nickname:'江岸' },200,null,{method:'PATCH'})).nickname,'江岸');const sessionRows=(await sql('SELECT digest FROM sessions'))[0].results;assert.equal(sessionRows.length,1);assert.notEqual(sessionRows[0].digest,cookie.split('=')[1]);assert.notEqual((await sql('SELECT digest FROM users'))[0].results[0].digest,password)
     await api('auth/logout',{});await api('me',null,401,'unauthorized');await api('auth/login',login)

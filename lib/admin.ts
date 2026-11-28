@@ -182,18 +182,31 @@ export async function adminList(db: D1Database, path: string, params: URLSearchP
       args.push(role)
     }
   }
-  const select = users
+  const selectBase = users
     ? `u.id,u.email,u.nickname,u.verified,u.role,u.created_at,u.signup_method,u.email_placeholder,u.banned_at,u.ban_reason,
     (SELECT count(*) FROM feedback WHERE user_id=u.id) feedback_count,
     (SELECT max(submitted_at) FROM feedback WHERE user_id=u.id) last_submitted_at FROM users u`
     : `f.id,f.user_id,f.title,f.kind,f.status,u.email,u.nickname,u.role AS submitter_role,f.lat,f.lon,f.multica_issue,f.pr_url,f.submitted_at,f.updated_at,
     (SELECT count(*) FROM feedback_messages WHERE feedback_id=f.id AND author_kind='user' AND id>f.admin_read_id) unread,(SELECT count(*) FROM feedback_photos WHERE feedback_id=f.id AND ready=1) photo_count FROM feedback f JOIN users u ON u.id=f.user_id`
-  const { results } = await db
-    .prepare(
-      `SELECT ${alias}.rowid AS page_key,${select} ${filters.length ? 'WHERE ' + filters.join(' AND ') : ''} ORDER BY ${alias}.rowid DESC LIMIT 51`,
-    )
-    .bind(...args)
-    .all()
+  const selectWithAppeal = users ? selectBase : `f.ban_record_id,f.appeal_triage,${selectBase}`
+  let results: Record<string, unknown>[]
+  try {
+    results = (await db
+      .prepare(
+        `SELECT ${alias}.rowid AS page_key,${selectWithAppeal} ${filters.length ? 'WHERE ' + filters.join(' AND ') : ''} ORDER BY ${alias}.rowid DESC LIMIT 51`,
+      )
+      .bind(...args)
+      .all()).results
+  } catch (error) {
+    if (!users && /column|no such column/i.test(String((error as Error)?.message ?? error))) {
+      results = (await db
+        .prepare(
+          `SELECT ${alias}.rowid AS page_key,${selectBase} ${filters.length ? 'WHERE ' + filters.join(' AND ') : ''} ORDER BY ${alias}.rowid DESC LIMIT 51`,
+        )
+        .bind(...args)
+        .all()).results
+    } else throw error
+  }
   const page = results.slice(0,50)
   const social = new Map<unknown, Record<string,unknown>[]>()
   if (users && page.length) {
@@ -206,9 +219,15 @@ export async function adminList(db: D1Database, path: string, params: URLSearchP
       social.set(user_id,group)
     }
   }
+  const parseTriage = (raw: unknown) => {
+    if (typeof raw !== 'string') return raw ?? null
+    try { return JSON.parse(raw) } catch { return null }
+  }
   return json({
     items: page
-      .map(({ page_key, ...row }) => (users ? { ...row, verified: !!row.verified, email_placeholder: !!row.email_placeholder, social: social.get(row.id) ?? [] } : row)),
+      .map(({ page_key, ...row }) => (users
+        ? { ...row, verified: !!row.verified, email_placeholder: !!row.email_placeholder, social: social.get(row.id) ?? [] }
+        : { ...row, ban_record_id: row.ban_record_id ?? null, appeal_triage: parseTriage(row.appeal_triage) })),
     next_cursor: results.length > 50 ? String(results[49].page_key) : null,
   })
 }

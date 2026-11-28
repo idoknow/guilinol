@@ -1,4 +1,7 @@
 [
+ {"id":"liangjiang_t2","name":"两江机场二号航站楼","osm":["way/631243397"],"viewOnly":true,"refs":[{"title":"Scenic harmony — BIAD roof structure and architectural rendering","page":"https://aecmag.com/features/scenic-harmony-autodesk-3dmodelling/","license":"View only; no reproduction rights assumed","viewOnly":true}]},
+ {"id":"liangjiang_t1","name":"两江机场一号航站楼","osm":["way/334128971"],"viewOnly":true,"refs":[{"title":"GuilinAirport.jpg","author":"Fanghong","license":"CC BY-SA 4.0","page":"https://commons.wikimedia.org/wiki/File:GuilinAirport.jpg","viewOnly":true}]},
+ {"id":"liangjiang_tower","name":"两江机场塔台","osm":["way/334129261"],"viewOnly":true,"refs":[{"title":"Terminal at Guilin airport, 07-2014.JPG","author":"Sunnya343","license":"CC BY-SA 4.0","page":"https://commons.wikimedia.org/wiki/File:Terminal_at_Guilin_airport,_07-2014.JPG","viewOnly":true}]},
  {"id":"chuanshan_tourism","name":"桂林市旅游职业中等专业学校（穿山校区）","osm":["way/647468198"],"group":"G4","viewOnly":true,"refs":[{"title":"Guilin Vocational Secondary School of Tourism, Chuanshan campus","year":2024,"page":"https://commons.wikimedia.org/wiki/File:Guilin_Vocational_Secondary_School_of_Tourism,_Chuanshan_campus_(20240217164236).jpg","viewOnly":true}]},
  {"id":"guilin_technical","name":"桂林技师学院","osm":["way/646911647"],"group":"G4","viewOnly":true,"refs":[{"title":"学院正门（桂林技师学院官网校园风光）","page":"https://gljsxy.com/info/image-6.html","viewOnly":true}]},
  {"id":"guilin_thirteen","name":"桂林市第十三中学","osm":["way/669069474"],"group":"G1","viewOnly":true,"facade":"schematic","refs":[]},
