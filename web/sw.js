@@ -40,7 +40,9 @@ self.addEventListener('install', (event) => {
       if (response.ok) files = ((await response.json()).files || [])
     } catch { /* 清单拿不到就退化为不预缓存 */ }
     await pool(files, CONCURRENCY, async (url) => {
-      const existing = await reuse(url)
+      // 只有带内容哈希的 /assets/ 才能跨版本复用；HTML 与图标每次都必须重新下载，
+      // 否则入口页会永远停在第一次安装的版本（旧 HTML 引用已删除的分片 → 白屏）。
+      const existing = url.startsWith('/assets/') ? await reuse(url) : null
       if (existing) { await cache.put(url, existing.clone()); return }
       const response = await fetch(new Request(url, { cache: 'reload' }))
       if (response.ok) await cache.put(url, response.clone())
@@ -67,10 +69,11 @@ self.addEventListener('message', (event) => {
 
 /** 导航回落候选：先找请求本身，再按路径找对应页面，最后才回首页 */
 function fallbackCandidates(url) {
-  const exact = [url.href]
+  const exact = [url.origin + url.pathname]
   const path = url.pathname
   if (path.startsWith('/admin')) return [...exact, '/admin/index.html', '/admin/', '/index.html']
-  if (path.startsWith('/id')) return [...exact, '/id.html', '/index.html']
+  // 只认 /id 与 /id.html，避免匹配 /idoknow… 之类
+  if (path === '/id' || path.startsWith('/id.')) return [...exact, '/id.html', '/index.html']
   if (path.startsWith('/backpack')) return [...exact, '/backpack.html', '/index.html']
   return [...exact, '/index.html', '/']
 }
@@ -85,9 +88,11 @@ self.addEventListener('fetch', (event) => {
   if (request.mode === 'navigate') {
     event.respondWith((async () => {
       const cache = await caches.open(VERSION)
+      // 缓存键用 origin+pathname：分享链接的 ?code= 之类不会每条都占一个缓存条目
+      const key = url.origin + url.pathname
       const network = fetch(request).then((response) => {
-        // 按请求本身存：/backpack.html 的响应不能覆盖 /index.html
-        if (response.ok) cache.put(request, response.clone()).catch(() => {})
+        // 按路径存：/backpack.html 的响应不能覆盖 /index.html
+        if (response.ok) cache.put(key, response.clone()).catch(() => {})
         return response
       })
       const cached = async () => {
