@@ -189,6 +189,7 @@ export function play(host:Host) {
       <p class="card-best"><span>最佳时段</span><b>${spot.best.label}</b><button data-act="hour">换到此时</button></p>
       <div class="card-actions"><button data-act="aim">取景</button>${getPlayMode()==='tour'&&spot.summit?'<button data-act="summit">登顶</button>':''}<button data-act="photo">拍照</button></div>`
     card.hidden = false; requestAnimationFrame(()=>card.classList.add('show'))
+    registerPageUI(card)
     card.querySelector<HTMLButtonElement>('.card-close')!.onclick = closeCard
     for(const b of Array.from(card.querySelectorAll<HTMLButtonElement>('[data-act]'))) b.onclick = ()=>act(spot,b.dataset.act!)
   }
@@ -287,6 +288,16 @@ export function play(host:Host) {
       return probe?.surfaceY ?? probe?.foot ?? 0
     },
     name:()=>nearestName(),
+    // IDOK-527: 空中导航的景点目标来自景册清单（取名字 + 落地坐标）。
+    spots:()=>(host.manifest.landmarks ?? [])
+      .filter(spot => Number.isFinite(spot.position[0]) && Number.isFinite(spot.position[2]))
+      .map(spot => ({label:spot.name ?? spot.id,x:spot.position[0],z:spot.position[2]})),
+    // IDOK-529: 自动避障/撞击检测用同一套实体查询（建筑、棚子、牌楼都算实体）。
+    blockedAt:(x,y,z)=>host.walker()?.blockedAt?.(x,y,z) ?? false,
+    // IDOK-529: 天空面板设的天气就是机上的天气。
+    raining:()=>host.clock.weather === 'rain',
+    // IDOK-529: 落到水面上也算落水（openWater 没有水时返回 null）。
+    waterY:(x,z)=>host.walker()?.waterAt?.(x,z) ?? null,
   })
   drone.mountEntry(buttons)
   // IDOK-350: 街景导航（路网寻路 + 场景路线 + 转向提示）；入口仍是地图面板的「标记导航」。
@@ -394,3 +405,4 @@ export function play(host:Host) {
   }
   return {tick, spots, goTo, goPoint, openBook, photo, stamps, nav, get map(){return map}}
 }
+import {registerPageUI} from '../capture-page'

@@ -64,6 +64,12 @@ def check(world, design, ways=None):
         end = 0.0
         for lo, hi in sorted(spans):
             if lo > end + 0.002:
+                # A spur can leave the playable polygon and re-enter the same section.
+                from play_region import PlayRegion
+                missing = substring(sections[wid], end, lo)
+                if missing.intersection(PlayRegion().geometry).length <= .002:
+                    end = hi
+                    continue
                 raise ValueError(f"Missing encoded rail on {wid} after {end:.3f} m")
             end = max(end, hi)
         if abs(end - sections[wid].length) > 0.002:
@@ -99,7 +105,7 @@ if __name__ == "__main__":
     if args.all:
         from check_station_corridor_vertices import compare
         corridor = compare(args.world)
-        if (corridor["referenceSegments"] != 1139 or corridor["changedChunks"] or
+        if (not corridor["huancheng"]["passed"] or corridor["referenceSegments"] != 1139 or corridor["changedChunks"] or
                 corridor["exteriorTies"] != 13 or corridor["changedExteriorTies"]):
             parser.exit(1, f"Station corridor or section 11 ties differ: {corridor}\n")
         pipeline = Path(__file__).resolve().parent

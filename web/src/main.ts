@@ -21,6 +21,8 @@ import {plazaSpawn} from './helicopter/site'
 import {helicopter} from './helicopter/runtime'
 import {isDeepLink} from './deeplink'
 import {readLastView, saveLastView, consumeRestore, applyLastView} from './lastview'
+import {readMpSpot, saveMpSpot} from './mp-spot'
+import {mpEnabled} from './ui/mp-pref'
 import {walkConfig} from './walk/config'
 import {atmo, env, evaluate, setFogMetrics} from './look/time'
 import {prepareMirror, renderMirror, WATER_LAYER} from './look/water'
@@ -77,6 +79,7 @@ import {
   mountShizijieSignalsOverlay,
   openFineTerminal,
   resolveDutyTeleportDeckY,
+  resolveDutyZone,
   sharedCitationLedger,
   type DutyTrafficBridge,
   type TrafficDutyController,
@@ -383,8 +386,23 @@ async function start(loader:FullLoader,creatorSpawn=false) {
       if(name&&!parent&&!matchMedia('(prefers-reduced-motion: reduce)').matches)await new Promise(resolve=>setTimeout(resolve,450))
       if(signal.aborted)return false
       cover.progress(.3,'步行模块已就绪')
-      completed=await enterLanding(reason,x,z,()=>{signal.throwIfAborted();return player.enter(x,z,yaw,reason,false,signal,cover.progress)})
+      const desiredY=typeof targetY==='number'&&Number.isFinite(targetY)
+        ? targetY
+        : (reason==='traffic-duty'||name==='解放桥')&&isOnJiefangBridgeDeck({x,z})
+          ? jiefangDeckWorldY(x,z)
+          : undefined
+      completed=await enterLanding(reason,x,z,()=>{signal.throwIfAborted();return player.enter(x,z,yaw,reason,false,signal,cover.progress,desiredY)})
       if(!completed)return false
+      const activeDutyZoneId=trafficDuty?.getSnapshot().phase==='active'?trafficDuty.getSnapshot().zoneId:null
+      const stillInDuty=
+        activeDutyZoneId==='shizijie'
+          ? resolveDutyZone({x,y:desiredY??151.45,z})?.id==='shizijie'
+          : activeDutyZoneId==='jiefang'
+            ? isOnJiefangBridgeDeck({x,z})
+            : true
+      if(activeDutyZoneId&&!stillInDuty){
+        trafficDuty!.abandonDuty()
+      }
       if(completed&&request){stream.tick(player.position);stream.updateLandmarks?.(player.position);cover.progress(1);return true}
       signal.throwIfAborted()
       if(completed){
@@ -434,7 +452,12 @@ async function start(loader:FullLoader,creatorSpawn=false) {
   async function landSolo(initial:boolean) {
     if(walker?.active)return
     const gate = walkConfig.gate
-    const point = initial && !isDeepLink(openParams) ? plazaSpawn : initial && !opening ? gate : {x:camera.position.x,z:camera.position.z,yaw:camera.rotation.y}
+    const fresh = initial && !isDeepLink(openParams)
+    // IDOK-566: 联机模式回到上次站的位置；落不下去再走广场 → 出生门。
+    const resume = fresh && mpEnabled() ? readMpSpot() : null
+    if(resume&&await walkTo(resume.x,resume.z,resume.yaw,'solo-resume'))return
+    titleTransition?.signal.throwIfAborted()
+    const point = fresh ? plazaSpawn : initial && !opening ? gate : {x:camera.position.x,z:camera.position.z,yaw:camera.rotation.y}
     if(await walkTo(point.x,point.z,point.yaw,'solo'))return
     titleTransition?.signal.throwIfAborted()
     if(await walkTo(gate.x,gate.z,gate.yaw,'solo-fallback'))return
@@ -527,6 +550,7 @@ async function start(loader:FullLoader,creatorSpawn=false) {
   unstuckButton.onclick=()=>void unstuck()
   unstuckTitle();onPrefs(unstuckTitle)
   ;(document.querySelector('.hud-me')??document.body).append(unstuckButton)
+  registerPageUI(unstuckButton,true)
   window.addEventListener('keydown',event=>{
     if(event.repeat||isGlobalHotkeyBlocked(event.target)||!hits(event.code,'unstuck'))return
     if(!walker?.active||document.body.hasAttribute('data-home')||document.body.dataset.photo==='on')return
@@ -648,8 +672,9 @@ async function start(loader:FullLoader,creatorSpawn=false) {
   const shizijieSignals = mountShizijieSignalsOverlay(scene, { groundAt: dutyGroundAt })
   const dutyProjVec = new THREE.Vector3()
   let activeFineTargetActor: import('./traffic/sim').Actor | null = null
+  const walkerFootPos = () => (walker?.active ? (walker.footPosition ?? walker.position) : null)
   trafficDuty = createTrafficDuty({
-    getPlayerPos: () => (walker?.active ? walker.position : null),
+    getPlayerPos: walkerFootPos,
     getPlayerYaw: () => walker?.yaw ?? 0,
     getPlayerObject: () => walker?.figure ?? null,
     isWalking: () => !!walker?.active,
@@ -693,7 +718,7 @@ async function start(loader:FullLoader,creatorSpawn=false) {
           plateNo: req.plateNo ?? req.plate,
           zoneName: req.zoneName,
           vehicleSubtype: req.vehicleSubtype,
-          getPlayerPos: req.getPlayerPos ?? (() => (walker?.active ? walker.position : null)),
+          getPlayerPos: req.getPlayerPos ?? walkerFootPos,
           ledger: sharedCitationLedger,
           enforceDuplicateCheck: true,
           printerMountMode: 'hand',
@@ -917,6 +942,11 @@ async function start(loader:FullLoader,creatorSpawn=false) {
       if (!force && Date.now() - lastWrite < 15000) return
       lastWrite = Date.now()
       void host.lastView().then(saveLastView).catch(() => {})
+      // IDOK-566: 联机步行时记下脚下位置（室内、直升机、切换中不记，免得下次落进店里或半空）。
+      if (getPlayMode() === 'solo' && mpEnabled() && walker?.active && !switching && !heli.active && !szj.isIndoor() && !xxg.isIndoor()) {
+        const p = walker.position
+        saveMpSpot({x: p.x, z: p.z, yaw: walker.yaw})
+      }
     }
     addEventListener('pagehide', () => write(true))
     document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') write(true) })
@@ -994,11 +1024,11 @@ async function start(loader:FullLoader,creatorSpawn=false) {
       solo?.step(stepDt)
       mifen.step(stepDt)
       drinks?.step(stepDt)
-      dutyTraffic.step(stepDt, walker?.active ? walker.position : null, {
+      dutyTraffic.step(stepDt, walkerFootPos(), {
         officerActive: trafficDuty?.getSnapshot().phase === 'active',
         officerYaw: walker?.yaw ?? 0,
         officerRunning: Boolean(walker?.active && walker.vehicle === 'foot' && (walker.footSpeed ?? 0) > 4.6),
-        vehiclePos: walker?.active && walker.vehicle !== 'foot' ? walker.position : undefined,
+        vehiclePos: walker?.active && walker.vehicle !== 'foot' ? (walkerFootPos() ?? undefined) : undefined,
       })
       trafficDuty?.step(stepDt)
       dutyOfficers.update(stepDt)
@@ -1063,3 +1093,4 @@ async function start(loader:FullLoader,creatorSpawn=false) {
 }
 export const boot=start
 import {sessionMarkPass} from './session-mark-pass'
+import {registerPageUI} from './capture-page'

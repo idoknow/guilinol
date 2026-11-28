@@ -39,6 +39,7 @@ import {
 } from './config'
 
 export type RideKind = 'bike' | 'bicycle'
+export type ExtendedTwoWheelCrashReason = TwoWheelCrashReason | 'slip'
 
 export interface EbikeStepControl {
   wheelie?: boolean | number
@@ -98,7 +99,7 @@ export interface TwoWheelPickupResult {
 
 export interface TwoWheelCrashSnapshot {
   phase: TwoWheelCrashPhase
-  reason: TwoWheelCrashReason
+  reason: ExtendedTwoWheelCrashReason
   side: -1 | 1
   kind: RideKind
   bikePos: {x: number; y: number; z: number}
@@ -187,7 +188,7 @@ export interface EbikeDynamicTelemetry {
   wetSurface: boolean
   offRoadSurface: boolean
   crashPhase: TwoWheelCrashPhase
-  crashReason: TwoWheelCrashReason
+  crashReason: ExtendedTwoWheelCrashReason
   crashSide: -1 | 1
   bikeIsDown: boolean
   riderOnFoot: boolean
@@ -474,6 +475,7 @@ export function createBikeControl() {
   let tucking = false
   let braking = false
   let brakeInLeanHold = 0
+  let hardBrakeSlipHold = 0
   let gripLimitRad = bcfg.crash.mandatoryFallLeanRad
   let crashRisk = 0
   let leanRateNow = 0
@@ -504,7 +506,7 @@ export function createBikeControl() {
   let bikePos = {x: 0, y: 0, z: 0}
   let riderPos = {x: 0, y: 0, z: 0}
   let crashPhase: TwoWheelCrashPhase = 'none'
-  let crashReason: TwoWheelCrashReason = ''
+  let crashReason: ExtendedTwoWheelCrashReason = ''
   let crashSide: -1 | 1 = 1
   let crashElapsed = 0
   let phaseElapsed = 0
@@ -628,6 +630,7 @@ export function createBikeControl() {
     crashRisk = 0
     leanRateNow = 0
     brakeInLeanHold = 0
+    hardBrakeSlipHold = 0
     knockdown.reset()
   }
 
@@ -636,6 +639,7 @@ export function createBikeControl() {
     drainPerSec = wheelie = wheelieVel = wheelieLoad = wheelieTip = wheelieSteerPrev = longPitch = 0
     tucking = braking = false
     brakeInLeanHold = 0
+    hardBrakeSlipHold = 0
     onPavement = wetSurface = offRoadSurface = false
     gripLimitRad = spec().crash.mandatoryFallLeanRad
     kind = 'bike'
@@ -924,10 +928,10 @@ export function createBikeControl() {
       || (spd >= s.crash.angledImpactCrashMs && (Math.abs(preLeanRad) >= s.crash.angledImpactLeanRad || preWheelieRad >= .12))
   }
 
-  function triggerCrash(reason: Exclude<TwoWheelCrashReason, ''>, side?: -1 | 1, probe?: TwoWheelCrashWorldProbe): TwoWheelCrashSnapshot {
+  function triggerCrash(reason: Exclude<ExtendedTwoWheelCrashReason, ''>, side?: -1 | 1, probe?: TwoWheelCrashWorldProbe): TwoWheelCrashSnapshot {
     if (crashPhase !== 'none') return crashSnapshot()
     const resolvedSide: -1 | 1 = side ?? (Math.abs(lean) > .05 ? (lean > 0 ? -1 : 1) : (steerInput >= 0 ? 1 : -1))
-    const entrySpd = Math.max(Math.abs(speed), reason === 'loopout' ? 4.4 : reason === 'lowside' ? 5.0 : 3.4)
+    const entrySpd = Math.max(Math.abs(speed), reason === 'loopout' ? 4.4 : (reason === 'lowside' || reason === 'slip') ? 5.0 : 3.4)
     crashPhase = 'sliding'
     crashReason = reason
     crashSide = resolvedSide
@@ -941,6 +945,8 @@ export function createBikeControl() {
     riderStandProgress = 0
     pickupProgress = 0
     justRecoveredToRide = false
+    brakeInLeanHold = 0
+    hardBrakeSlipHold = 0
 
     // Immediately kick rider off to opposite-or-forward separation vector so rider never overlaps fallen bike.
     const fwdX = -Math.sin(bikeYaw), fwdZ = -Math.cos(bikeYaw)
@@ -971,21 +977,25 @@ export function createBikeControl() {
     const severity = T.MathUtils.clamp((entrySpd - 2.4) / 8.5, 0.32, 1.0)
     const impactDir = reason === 'loopout'
       ? {x: Math.sin(bikeYaw), z: Math.cos(bikeYaw)}
-      : reason === 'lowside'
+      : reason === 'lowside' || reason === 'slip'
         ? {x: Math.cos(bikeYaw) * resolvedSide, z: -Math.sin(bikeYaw) * resolvedSide}
         : {x: Math.sin(bikeYaw), z: Math.cos(bikeYaw)}
-    knockdown.triggerKnockdown('bike_crash', impactDir, severity, {
+    knockdown.triggerKnockdown(reason === 'slip' ? 'ebike_slip' : 'bike_crash', impactDir, severity, {
       yaw: bikeYaw,
       side: resolvedSide,
       reason,
+      impactSpeed: entrySpd,
+      fromRide: true,
     })
 
     const vehicleName = kind === 'bicycle' ? '单车' : '电车'
     const msg = reason === 'lowside'
-      ? `压弯过低打滑摔车！人将先爬起，再走近扶起${vehicleName}`
-      : reason === 'loopout'
-        ? `翘头过度后翻！人将先爬起，再走近扶起${vehicleName}`
-        : `撞击倒地！连按空格（或点击起身）5次站起，再扶起${vehicleName}`
+      ? `压弯过低打滑摔车！连按空格（或点击起身）5次站起，再扶起${vehicleName}`
+      : reason === 'slip'
+        ? `急刹侧滑摔车！连按空格（或点击起身）5次站起，再扶起${vehicleName}`
+        : reason === 'loopout'
+          ? `翘头过度后翻！连按空格（或点击起身）5次站起，再扶起${vehicleName}`
+          : `撞击倒地！连按空格（或点击起身）5次站起，再扶起${vehicleName}`
     if (!isVerifySilentMode()) emitToast(msg, 2800)
     return crashSnapshot()
   }
@@ -1235,7 +1245,7 @@ export function createBikeControl() {
       effectiveFallLeanRad: effectiveRad,
       effectiveFallDeg: +(effectiveRad * 180 / Math.PI).toFixed(1),
       leanDangerRatio: +leanDanger.toFixed(3),
-      crashRisk: +Math.max(leanDanger, wheelieDanger).toFixed(3),
+      crashRisk: +Math.max(leanDanger, wheelieDanger, hardBrakeSlipHold).toFixed(3),
       wheelieTip: +wheelieDanger.toFixed(3),
       wheelie,
       wheelieVel,
@@ -1358,6 +1368,11 @@ export function createBikeControl() {
     setRiderWorldPos,
     setSurfaceCondition,
     triggerCrash,
+    triggerSlip(opts?: {side?: -1 | 1; reason?: Exclude<ExtendedTwoWheelCrashReason, ''>; probe?: TwoWheelCrashWorldProbe}): TwoWheelCrashSnapshot {
+      if (crashPhase !== 'none') return crashSnapshot()
+      const resolvedSide: -1 | 1 = opts?.side ?? (Math.abs(lean) > .05 ? (lean > 0 ? -1 : 1) : (steerInput >= 0 ? 1 : -1))
+      return triggerCrash(opts?.reason ?? 'slip', resolvedSide, opts?.probe)
+    },
     tryImpactCrash(preSpeedMs: number): boolean {
       if (crashPhase !== 'none' || !shouldImpactCrash(preSpeedMs, lean, wheelie)) return false
       triggerCrash('impact', steerInput >= 0 ? 1 : -1)
@@ -1665,6 +1680,14 @@ export function createBikeControl() {
       } else {
         brakeInLeanHold = Math.max(0, brakeInLeanHold - cdt * 3.5)
       }
+      // Sustained high-speed emergency brake while sharply steering triggers rear-wheel slip lowside (0.15s brake taps stay safe).
+      const slipMinSpd = (wetSurface || offRoadSurface) ? 5.4 : 6.8
+      const slipHoldDur = (wetSurface || offRoadSurface) ? .38 : .55
+      if (braking && Math.abs(steerInput) >= .6 && Math.abs(lean) >= .28 && (absSpd >= slipMinSpd || (hardBrakeSlipHold > .08 && absSpd >= 4.2))) {
+        hardBrakeSlipHold = Math.min(1, hardBrakeSlipHold + cdt / slipHoldDur)
+      } else {
+        hardBrakeSlipHold = Math.max(0, hardBrakeSlipHold - cdt * 4.5)
+      }
       let fallAngle = s.crash.mandatoryFallLeanRad
       if (wetSurface) fallAngle -= s.crash.wetGripPenaltyRad
       if (offRoadSurface) fallAngle -= s.crash.offRoadGripPenaltyRad
@@ -1673,11 +1696,15 @@ export function createBikeControl() {
 
       const leanRatio = Math.abs(lean) / gripLimitRad
       const wheelieRatio = wheelieRisk()
-      crashRisk = T.MathUtils.clamp(Math.max(leanRatio, wheelieRatio), 0, 1)
+      crashRisk = T.MathUtils.clamp(Math.max(leanRatio, wheelieRatio, hardBrakeSlipHold), 0, 1)
 
       if (canAutoCrash()) {
         if (wheelieTip >= 1) {
           triggerCrash('lowside', steerInput >= 0 ? 1 : -1)
+          return speed
+        }
+        if (hardBrakeSlipHold >= 1) {
+          triggerCrash('slip', lean >= 0 ? -1 : 1)
           return speed
         }
         if (Math.abs(lean) >= gripLimitRad && absSpd >= 2.2) {

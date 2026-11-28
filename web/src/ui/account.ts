@@ -168,7 +168,7 @@ export async function editCharacter(){
 export function accountEntry(parent:HTMLElement){
   const entry=document.createElement('button')
   entry.type='button';entry.className='account-entry';entry.setAttribute('aria-haspopup','dialog')
-  onUser(value=>{entry.textContent=value?.nickname??'登录';entry.dataset.initial=value?initial(value.nickname):'';entry.toggleAttribute('data-guest',!value)})
+  onUser(value=>{entry.textContent=value?.nickname??'登录';registerPageUI(entry,true);entry.dataset.initial=value?initial(value.nickname):'';entry.toggleAttribute('data-guest',!value)})
   entry.textContent='登录';entry.dataset.initial='';entry.toggleAttribute('data-guest',true)
   entry.onclick=()=>void openAccount()
   parent.append(entry);return entry
@@ -451,3 +451,4 @@ function build(){
   for(const type of ['keydown','keyup'])d.addEventListener(type,event=>event.stopPropagation())
   document.body.append(d)
 }
+import {registerPageUI} from '../capture-page'

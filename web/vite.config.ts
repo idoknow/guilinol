@@ -1,10 +1,11 @@
 import {defineConfig, type Plugin} from 'vite'
-import {existsSync, readFileSync, readdirSync} from 'node:fs'
+import {existsSync, readFileSync, readdirSync, writeFileSync} from 'node:fs'
 import {execFileSync} from 'node:child_process'
 import {dirname, join} from 'node:path'
 import {fileURLToPath} from 'node:url'
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..')
+let pwaBuildFailed = false
 const version = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8')).version as string
 const buildSha=()=>execFileSync('git',['rev-parse','HEAD'],{cwd:root,encoding:'utf8'}).trim()
 
@@ -49,6 +50,28 @@ export default defineConfig({
   }, generateBundle(){
     const sha = buildSha()
     this.emitFile({type:'asset',fileName:'version.json',source:JSON.stringify({sha})})
+  }}, {name:'pwa-precache',apply:'build',buildEnd(error){pwaBuildFailed=Boolean(error)},closeBundle(){
+    // 打包完成后扫 dist 目录生成清单：HTML 页面在 Vite 的 generateBundle 之后才落盘，
+    // 在 generateBundle 里扫 bundle 会漏掉所有 .html，导致离线时无页面可回落。
+    const dist = join(root,'dist')
+    if(pwaBuildFailed || !existsSync(dist))return
+    const sha = buildSha()
+    // 只收 /assets/（带哈希）+ 4 个入口页 + 3 个固定图标；
+    // public/ 下的贴图、city-upgrade、smoke 等不带哈希，收进来只会白下白占空间。
+    const entries = new Set(['/index.html','/admin/index.html','/id.html','/backpack.html',
+      '/manifest.webmanifest','/favicon-32.png','/apple-touch-icon.png'])
+    const walk = (dir: string, prefix = ''): string[] => readdirSync(dir,{withFileTypes:true}).flatMap(entry => {
+      const rel = prefix ? prefix + '/' + entry.name : entry.name
+      if(entry.isDirectory()) return entry.name === 'assets' ? walk(join(dir,entry.name), rel) : []
+      // /assets/ 下全部收（带内容哈希）；根目录只收白名单
+      return (rel.startsWith('assets/') || entries.has('/' + rel)) ? ['/' + rel] : []
+    })
+    const files = [...new Set([...walk(dist), ...entries])]
+    writeFileSync(join(dist,'precache-manifest.json'), JSON.stringify({build:sha,files}))
+    const source = readFileSync(join(root,'web/sw.js'),'utf8').replace('__BUILD__', sha)
+    writeFileSync(join(dist,'sw.js'), source)
+    // 紧急回滚件：SW 出问题时把 dist/sw-kill.js 覆盖成 dist/sw.js 即可全量收回
+    writeFileSync(join(dist,'sw-kill.js'), readFileSync(join(root,'web/sw-kill.js'),'utf8'))
   }}, {name:'error-pages',generateBundle(){
     // IDOK-420: self-contained error pages, copied byte-for-byte (no Vite HTML transform) to dist/errors/.
     // Edit via scripts/build-error-pages.mjs; the CDN copy is pushed from the ops repo.

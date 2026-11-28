@@ -237,6 +237,8 @@ def road_profiles(section, ways, widths):
             local["maxTrafficOffset"] = road["maxTrafficOffset"]
         if road.get("stackedRoad"):
             local["stackedRoad"] = True
+        if road.get("retainCutBanks"):
+            local["retainCutBanks"] = True
         if "width" in road:
             local["profileWidth"] = road["width"]
         if wid in widths:
@@ -250,7 +252,8 @@ def road_profiles(section, ways, widths):
             profile = samples([(s - start, y) for s, y in knots], transition=1.0)
         if np.max(abs(np.diff(profile[:, 1]) / np.diff(profile[:, 0]))) > road.get("maximumGrade", .05) + 1e-6:
             raise ValueError(f"Excessive road grade on {wid}")
-        result[wid] = local, LineString(coords), profile
+        key = (wid, local["nodes"][0]) if wid in result else wid
+        result[key] = local, LineString(coords), profile
     return result
 
 

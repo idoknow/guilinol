@@ -65,16 +65,16 @@ def run(world, faces):
         else:
             platforms.append(LineString(xy).buffer(float(tags.get("width", "1")) / 2))
     platform = union_all(platforms).buffer(XY_TOLERANCE)
-    design = json.loads(
-        (ROOT / "pipeline/rail-audits/05-guilinbei-bridges.json").read_bytes()
-    )
-    checked = check_overbridges(world, design)
-    if any(r["minimumM"] < r["targetM"] for r in checked):
-        raise ValueError("Overbridge clearance failed")
+    widths = {}
+    for path in sorted((ROOT / "pipeline/rail-audits").glob("*-bridges.json")):
+        design = json.loads(path.read_bytes())
+        checked = check_overbridges(world, design)
+        if any(r["minimumM"] < r["targetM"] for r in checked):
+            raise ValueError(f"Overbridge clearance failed for {path.stem}")
+        widths.update({d["way"]: d["halfWidthM"] for d in design["roadDecks"]})
     first = coupled_road_crossings(world)
     if any(r["minimumM"] < r["targetM"] - 1e-7 for r in first):
         raise ValueError("First-section deck clearance failed")
-    widths = {d["way"]: d["halfWidthM"] for d in design["roadDecks"]}
     widths.update({r["road"]: 5 for r in first if r["road"] in BRIDGES})
     decks = {
         wid: LineString(points(ways[wid])).buffer(width + 0.02, cap_style="flat")

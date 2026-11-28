@@ -94,11 +94,15 @@ def load_landmark_meshes(root: Path, manifest: dict):
             edges = {child: parent for parent, child, _ in sc.graph.to_edgelist()}
             coll_tris, vis_tris = [], []
             coll_normals, vis_normals = [], []
+            rail_faces = []
+            visual_rails = []
             for node in sc.graph.nodes_geometry:
                 cur = node
                 in_coll, in_lod12 = False, False
+                rail = False
                 while cur and cur != sc.graph.base_frame:
                     nm = str(cur).lower()
+                    rail |= nm == 'collision_yangqiao_rail'
                     if nm.startswith('collision'):
                         in_coll = True
                     if nm in ('lod1', 'lod2'):
@@ -114,10 +118,14 @@ def load_landmark_meshes(root: Path, manifest: dict):
                 if in_coll:
                     coll_tris.append(tris)
                     coll_normals.append(norms)
+                    rail_faces.append(np.full(len(tris), rail, dtype=bool))
                 else:
                     vis_tris.append(tris)
                     vis_normals.append(norms)
+                    visual_rails.append(np.full(len(tris), getattr(getattr(g.visual, 'material', None), 'name', '') == 'yangqiao_rail', dtype=bool))
             out[lm['id']] = {
+                'rail_faces': np.concatenate(rail_faces) if rail_faces else np.zeros(0, dtype=bool),
+                'visual_rails': np.concatenate(visual_rails) if visual_rails else np.zeros(0, dtype=bool),
                 'entry': lm,
                 'coll_tris': np.concatenate(coll_tris, axis=0) if coll_tris else np.zeros((0, 3, 3)),
                 'coll_normals': np.concatenate(coll_normals, axis=0) if coll_normals else np.zeros((0, 3)),
@@ -125,5 +133,3 @@ def load_landmark_meshes(root: Path, manifest: dict):
                 'vis_normals': np.concatenate(vis_normals, axis=0) if vis_normals else np.zeros((0, 3)),
             }
     return out
-
-

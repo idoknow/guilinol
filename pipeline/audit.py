@@ -18,6 +18,7 @@ from shapely import box as box_array, prepare, STRtree, build_area, contains_xy,
 from shapely.geometry import LineString, Point, Polygon, box
 from shapely.ops import nearest_points, polygonize, unary_union
 from landmark_solids import load_landmark_meshes, structural_footprint, slice_tris_at_y, solid_projection
+from yangqiao_structure import base_faces, foreign_visual
 
 from landmarks.jiefang_layout import SPAN_WAYS, world_road_sections
 from common import CHUNK, GRID, OUT, load_osm, xz2ll
@@ -102,6 +103,22 @@ def apply_landmark_exceptions(rules, *categories):
                 remaining.append(issue)
         findings[:] = remaining
     return allowed
+
+
+def yangqiao_occupancy(root):
+    profile = json.loads((root / 'pipeline/data/landmarks/yangqiao-grade.json').read_bytes())
+    south, north = (np.array(profile[end]) for end in ('south','north'))
+    def band(left, right):
+        corners = []
+        for along in (profile['stations'][0], profile['stations'][-1]):
+            west, east = south + along * (north - south)
+            corners.append([west + across * (east - west) for across in (left, right)])
+        return Polygon(corners[0] + corners[1][::-1])
+    lateral = profile['lateral']
+    ring = band(lateral[0], lateral[-1])
+    def region(role):
+        return unary_union([band(lateral[index], lateral[index+1]) for index, kind in enumerate(profile['bands']) if kind == role])
+    return ring, region('asphalt'), region('walk'), region('structure')
 
 
 def run_audit(world_dir: Path, root: Path) -> dict:
@@ -426,7 +443,13 @@ def run_audit(world_dir: Path, root: Path) -> dict:
                                           f'procedural building seed={seed} overlaps sidewalk {inter_sw.area:.1f} m²'))
 
     lm_block_footprints = {}
+    bridge_ring, bridge_road, bridge_walk, bridge_structure = yangqiao_occupancy(root)
+    structure_faces = list(base_faces(root))
     for lid, ldata in landmarks.items():
+        foreign = foreign_visual(ldata['vis_tris'], ldata['visual_rails'], structure_faces)
+        if foreign is not None:
+            bldg_issues.append(make_issue('landmarkOnRailBase', foreign.x, foreign.y, 1,
+                                          f'non-rail mesh above Yangqiao rail base: {lid}', landmark=lid))
         ctris = ldata['coll_tris']
         cnorms = ldata['coll_normals']
         if not len(ctris):
@@ -447,11 +470,22 @@ def run_audit(world_dir: Path, root: Path) -> dict:
         if foot.is_empty:
             continue
         inter_r = foot.intersection(u_road0)
+        inter_s = foot.intersection(u_sidewalk)
+        if foot.intersects(bridge_ring):
+            inter_r = inter_r.difference(bridge_ring).union(foot.intersection(bridge_road))
+            inter_s = inter_s.difference(bridge_ring).union(foot.intersection(bridge_walk))
+            other = rel[~ldata['rail_faces'][np.abs(cnorms[:, 1]) < 0.72]]
+            if len(other):
+                other_foot = unary_union([slice_tris_at_y(other, level) for level in (.6, 1.2)])
+                misplaced = other_foot.intersection(bridge_structure)
+                if misplaced.area > 0:
+                    point = misplaced.representative_point()
+                    bldg_issues.append(make_issue('landmarkOnRailBase', point.x, point.y, misplaced.area,
+                                                  f'non-rail collision on Yangqiao rail base: {lid}', landmark=lid))
         if inter_r.area > 0.5:
             rp = inter_r.representative_point()
             bldg_issues.append(make_issue('landmarkOnCarriageway', rp.x, rp.y, inter_r.area,
                                           f'landmark {lid} collision* overlaps carriageway {inter_r.area:.1f} m²', landmark=lid))
-        inter_s = foot.intersection(u_sidewalk)
         if inter_s.area > 0.5:
             rp = inter_s.representative_point()
             bldg_issues.append(make_issue('landmarkOnSidewalk', rp.x, rp.y, inter_s.area,

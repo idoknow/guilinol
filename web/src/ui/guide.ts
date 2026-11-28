@@ -153,7 +153,7 @@ const FEATURES = (): Feature[] => [
     phone: '走进街边的服装店、车行，可以花钱买新衣服、新电驴和改装件。'},
   {seal: '飞', title: '飞上天', only: 'free',
     pc: `按 <kbd>V</kbd> 起飞，${caps(move())} 飞，<kbd>Q</kbd> / <kbd>E</kbd> 降 / 升，<kbd>Shift</kbd> 加速；再按 <kbd>V</kbd> 落地步行。`,
-    phone: '点右上「起飞」。一根手指拖动转方向，两根手指拖着走；点「落地步行」回到地面。'},
+    phone: '点右上「起飞」。单指拖动看四周，双指拖动水平飞行，三指上滑升高、下滑降低；点「落地步行」回到地面。'},
   {seal: '图', title: '地图与传送',
     pc: `按 <kbd>M</kbd> 或点右上角小圆图。可以搜地名，点地图上任意一处就直接过去；右上角小圆图随时告诉你在哪条路。卡进墙里或掉进水里，点左上「复位」或按 <kbd>${k('unstuck')}</kbd>，回到最近的平地。`,
     phone: '点右上角小圆图打开大地图，搜地名或点地图上任意一处，直接传送过去。卡进墙里或掉进水里，点左上的复位按钮回到最近的平地。'},
@@ -370,6 +370,7 @@ export function mountGuide(opts: {autoTour: boolean}) {
   help.onclick = () => openGuide()
   const me = document.querySelector('.hud-me')
   if (me) me.append(help); else document.body.append(help)
+  registerPageUI(help,Boolean(me))
 
   addEventListener('keydown', event => {
     if (event.repeat || isGlobalHotkeyBlocked(event.target)) return
@@ -392,4 +393,4 @@ export function mountGuide(opts: {autoTour: boolean}) {
     if (calm >= 3) { clearInterval(timer); void startTour() }
   }, 400)
 }
-
+import {registerPageUI} from '../capture-page'

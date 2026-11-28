@@ -4,7 +4,7 @@ import type {TwoWheelHeadlightMode} from './ebike-state-coupling'
 import type {EbikeTurnSignal} from './config'
 
 export type EbikeCrashPhase = 'none' | 'crashed' | 'recovering'
-export type EbikeCrashReason = '' | 'impact' | 'lowside' | 'loopout'
+export type EbikeCrashReason = '' | 'impact' | 'lowside' | 'loopout' | 'slip'
 export type EbikeVehicleType = EbikeVehicleKind
 
 const isVerifySilent = () =>
@@ -275,7 +275,7 @@ export function createEbikeFxController() {
     lowBatteryWarned = battery <= 20
   }
 
-  function triggerCrash(reason: Exclude<EbikeCrashReason, ''>, side: -1 | 1, heading: number, entrySpeed: number) {
+  function triggerCrash(reason: Exclude<EbikeCrashReason, ''>, side: -1 | 1, heading: number, entrySpeed: number, silentToast = false) {
     if (crashPhase !== 'none') return
     crashPhase = 'crashed'
     crashReason = reason
@@ -289,14 +289,16 @@ export function createEbikeFxController() {
     const sideX = Math.cos(heading) * side, sideZ = -Math.sin(heading) * side
     riderEjectX = -sideX * .55
     riderEjectZ = -sideZ * .55
-    if (!isVerifySilent()) {
+    if (!silentToast && !isVerifySilent()) {
       window.dispatchEvent(new CustomEvent('walk:toast', {
         detail: {
           text: reason === 'lowside'
-            ? '压弯过低打滑摔车！按空格或方向键人先爬起，再去扶车'
-            : reason === 'loopout'
-              ? '翘头翻车！按空格或方向键人先爬起，再去扶车'
-              : '猛烈撞击倒车！按空格或方向键人先爬起，再去扶车',
+            ? '压弯过低打滑摔车！连按空格或点击起身 5 次先站起，再去扶车'
+            : reason === 'slip'
+              ? '急刹侧滑摔车！连按空格或点击起身 5 次先站起，再去扶车'
+              : reason === 'loopout'
+                ? '翘头翻车！连按空格或点击起身 5 次先站起，再去扶车'
+                : '猛烈撞击倒车！连按空格或点击起身 5 次先站起，再去扶车',
           ms: 2600,
         },
       }))

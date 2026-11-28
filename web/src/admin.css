@@ -204,8 +204,9 @@ a.adm-kpi:hover{border-color:var(--ui-jade-500);box-shadow:var(--ui-shadow-1);tr
 .adm-status--submitted,.adm-status--need_info{background:var(--ui-seal-wash);color:var(--ui-seal)}
 .adm-status--approved,.adm-status--queued{background:rgba(196,154,74,.18);color:#7a5c1e}
 .adm-status--modelling,.adm-status--reviewing{background:rgba(79,127,122,.16);color:var(--ui-jade-700)}
-.adm-status--live{background:var(--ui-jade-500);color:var(--ui-paper)}
-.adm-status--rejected,.adm-status--duplicate,.adm-status--draft,.adm-muted{background:var(--ui-paper-2);color:#8a8a84}
+.adm-status--live,.adm-status--resolved,.adm-status--unbanned{background:var(--ui-jade-500);color:var(--ui-paper)}
+.adm-status--rejected,.adm-status--duplicate,.adm-status--upheld,.adm-status--draft,.adm-muted{background:var(--ui-paper-2);color:#8a8a84}
+.adm-triage-list{margin:8px 0 0;padding-left:18px;display:grid;gap:4px;font-size:13px;line-height:1.55;color:var(--ui-ink-soft)}
 .adm-ok{background:rgba(79,127,122,.14);color:var(--ui-jade-700)}
 .adm-role--admin{background:var(--ui-jade-700);color:var(--ui-paper)}
 .adm-kind--error,.adm-kind--rejection{background:var(--ui-seal-wash);color:var(--ui-seal)}

@@ -105,18 +105,18 @@ const held=(action:Action)=>{let on=false;keys.forEach(code=>{if(!on&&hits(code,
   const touches=new Map<number,{x:number,y:number}>()
   let mouseDown=false, lastMouse={x:0,y:0}, pinchDist=0
 
-  function resetRideTouchControls(){
+  function resetRideTouchControls(preserveRecover=false){
     wheelieTouch=false;wheeliePointer=-1;btnWheelie.classList.remove('on')
     tuckTouch=false;tuckPointer=-1;btnTuck.classList.remove('on');btnTuck.setAttribute('aria-pressed','false')
     hornTouch=false;hornPointer=-1;hornPulse=false;hornBtn.classList.remove('on')
-    gearDelta=0;gearSelect=null;recoverPulse=false;cycleModPulse=false
+    gearDelta=0;gearSelect=null;if(!preserveRecover)recoverPulse=false;cycleModPulse=false
     parkTogglePulse=false;kickstandTogglePulse=false;headlightCyclePulse=false
     turnLeftPulse=false;turnRightPulse=false;hazardPulse=false;cruisePulse=false
   }
-  function clearTransientInput(clearKeys=true){
+  function clearTransientInput(clearKeys=true,preserveRecover=false){
     if(clearKeys)keys.clear()
     jump=false;crouch=false;syncCrouch();endView()
-    resetRideTouchControls()
+    resetRideTouchControls(preserveRecover)
     touches.clear();mouseDown=false;pinchDist=0
     resetStick()
   }
@@ -200,9 +200,17 @@ const held=(action:Action)=>{let on=false;keys.forEach(code=>{if(!on&&hits(code,
   btnGearDown.onpointerdown=event=>{event.preventDefault();event.stopPropagation();gearDelta-=1}
   btnWheelie.onpointerdown=event=>{
     event.preventDefault();event.stopPropagation()
+    const kdActive=document.body.dataset.tdKnockdown==='1'
+    const rideCrashed=document.body.dataset.rideCrash==='1'
+    if(kdActive||rideCrashed){
+      if(kdActive)window.dispatchEvent(new CustomEvent('walk:knockdown-mash'))
+      else recoverPulse=true
+      btnWheelie.classList.add('on')
+      wheeliePointer=event.pointerId;safeCapture(btnWheelie,event.pointerId)
+      return
+    }
     wheeliePointer=event.pointerId;safeCapture(btnWheelie,event.pointerId)
     wheelieTouch=true
-    if(document.body.dataset.rideCrash==='1')recoverPulse=true
     btnWheelie.classList.add('on')
   }
   const endWheelie=(event:PointerEvent)=>{if(event.pointerId===wheeliePointer){wheelieTouch=false;wheeliePointer=-1;btnWheelie.classList.remove('on')}}
@@ -244,7 +252,11 @@ const held=(action:Action)=>{let on=false;keys.forEach(code=>{if(!on&&hits(code,
     btn.onclick=event=>{event.stopPropagation();const g=Number(btn.dataset.gear);if(g>=1)gearSelect=g}
   }
   stateEl.onpointerdown=event=>{event.stopPropagation()}
-  stateEl.onclick=event=>{event.stopPropagation();if(document.body.dataset.rideCrash==='1')recoverPulse=true}
+  stateEl.onclick=event=>{
+    event.stopPropagation()
+    if(document.body.dataset.tdKnockdown==='1')window.dispatchEvent(new CustomEvent('walk:knockdown-mash'))
+    else if(document.body.dataset.rideCrash==='1')recoverPulse=true
+  }
   new MutationObserver(()=>{
     if(document.body.dataset.photo==='on'||document.body.dataset.shopOpen==='1'){clearTransientInput(true);return}
     crouch=false;syncCrouch()
@@ -270,6 +282,7 @@ const held=(action:Action)=>{let on=false;keys.forEach(code=>{if(!on&&hits(code,
     const aboard=document.body.hasAttribute('data-aboard')
     const crashed=document.body.dataset.rideCrash==='1'
     if(!event.repeat&&hits(event.code,'jump')){
+      if(document.body.dataset.tdKnockdown==='1'){event.preventDefault();return}
       if(ridingTwoWheel)recoverPulse=true
       else if(!drivingCar){crouch=false;syncCrouch();jump=true}
       event.preventDefault()
@@ -401,8 +414,9 @@ const held=(action:Action)=>{let on=false;keys.forEach(code=>{if(!on&&hits(code,
     },
     /** Movement intent for this frame. */
     read(dt?:number){
-      if(isModalOrOverlayOpen()){
-        if(keys.size||jump||crouch||stick.mag>0)clearTransientInput(true)
+      if(isModalOrOverlayOpen()||document.body.dataset.tdKnockdown==='1'){
+        const preserve=document.body.dataset.tdKnockdown==='1'||document.body.dataset.rideCrash==='1'
+        if(keys.size||jump||crouch||stick.mag>0)clearTransientInput(true,preserve)
         return {right:0,forward:0,run:false,crouch:false,jump:false}
       }
       if(document.body.hasAttribute('data-aboard')&&crouch){crouch=false;syncCrouch()}
@@ -422,23 +436,23 @@ const held=(action:Action)=>{let on=false;keys.forEach(code=>{if(!on&&hits(code,
           turnRightToggle:false,hazardToggle:false,horn:false,hornPulse:false,cruiseToggle:false,
         }
       }
-      const crashed=document.body.dataset.rideCrash==='1'
+      const crashed=document.body.dataset.rideCrash==='1'||document.body.dataset.tdKnockdown==='1'
       const out:EbikeRideControlInput={
-        gearDelta,
-        gearSelect,
+        gearDelta:crashed?0:gearDelta,
+        gearSelect:crashed?null:gearSelect,
         wheelie:crashed?false:(keys.has('Space')||wheelieTouch),
         tuck:crashed?false:(keys.has('ShiftLeft')||keys.has('ShiftRight')||tuckTouch),
         recover:recoverPulse,
-        cycleMod:cycleModPulse,
-        parkToggle:parkTogglePulse,
-        kickstandToggle:kickstandTogglePulse,
-        headlightCycle:headlightCyclePulse,
-        turnLeftToggle:turnLeftPulse,
-        turnRightToggle:turnRightPulse,
-        hazardToggle:hazardPulse,
+        cycleMod:crashed?false:cycleModPulse,
+        parkToggle:crashed?false:parkTogglePulse,
+        kickstandToggle:crashed?false:kickstandTogglePulse,
+        headlightCycle:crashed?false:headlightCyclePulse,
+        turnLeftToggle:crashed?false:turnLeftPulse,
+        turnRightToggle:crashed?false:turnRightPulse,
+        hazardToggle:crashed?false:hazardPulse,
         horn:crashed?false:(keys.has('KeyH')||hornTouch),
         hornPulse:crashed?false:hornPulse,
-        cruiseToggle:cruisePulse,
+        cruiseToggle:crashed?false:cruisePulse,
       }
       gearDelta=0;gearSelect=null;recoverPulse=false;cycleModPulse=false
       parkTogglePulse=false;kickstandTogglePulse=false;headlightCyclePulse=false
@@ -522,7 +536,7 @@ const held=(action:Action)=>{let on=false;keys.forEach(code=>{if(!on&&hits(code,
       document.body.dataset.rideCrash=crashed?'1':'0'
       if(crashed){
         stateEl.hidden=false;stateEl.dataset.warn='1'
-        stateEl.textContent='摔车 · 空格先爬起'
+        stateEl.textContent='摔车中'
         btnWheelie.textContent='爬起';btnWheelie.classList.add('on')
       }else if(state.crashPhase==='recovering'){
         stateEl.hidden=false;stateEl.dataset.warn='0'

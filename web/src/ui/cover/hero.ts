@@ -5,7 +5,7 @@ import type {Avatar} from '../../../../lib/avatar'
 import {COVER_HERO_OUTFIT, starterOutfit, type EquippedOutfit} from '../../game/catalog'
 import {currentAvatar, disposeCharacterParts, previewCharacter} from '../../walk/character'
 import {resetCharacterLight, setCharacterLight} from '../../walk/character-light'
-import {FRAME, SITE, dirAz} from './config'
+import {FRAME, SITE, SUN, dirAz} from './config'
 import {PoseLayer} from './pose'
 
 type Model = Awaited<ReturnType<typeof previewCharacter>>
@@ -224,7 +224,7 @@ export class Hero {
     this.key.set(to.x * 0.55 - to.z * 0.65, 0.55, to.z * 0.55 + to.x * 0.65)
     setCharacterLight({
       keyFrom: [this.key.x, this.key.y, this.key.z],
-      rim: l(a.rim, b.rim) + flash * 0.4,
+      rim: l(a.rim, b.rim) * SUN.heroRim + flash * 0.4,
       rimColor: C[0].set(a.rimColor).lerp(C[1].set(b.rimColor), k),
       rimFrom: [this.rim.x, this.rim.y, this.rim.z],
       shade: C[2].set(a.shade).lerp(C[3].set(b.shade), k),

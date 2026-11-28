@@ -1125,6 +1125,22 @@ export function createFreeBoats(env: BoatEnv) {
     }
   }
 
+  // 位置校正时将自由船同步复位到目标坐标，保留朝向并清零速度；目标不在可通航水面时返回 false
+  function relocate(x: number, z: number): boolean {
+    const slot = activeSlot
+    const nextWaterY = waterAt(x, z)
+    if (!slot || nextWaterY === null) return false
+    boatX = x
+    boatZ = z
+    waterY = nextWaterY
+    vx = vz = vLong = vLat = angVel = 0
+    clearState()
+    slot.mesh.position.set(boatX, waterY, boatZ)
+    slot.mesh.rotation.set(0, heading, 0, 'YXZ')
+    lastClearance = measureClearancePoints(slot.spec, boatX, boatZ, heading, waterY, false).footprintClearance
+    return true
+  }
+
   return {
     get active() { return activeSlot },
     get boat() { return activeSlot?.mesh ?? null },
@@ -1140,6 +1156,7 @@ export function createFreeBoats(env: BoatEnv) {
     clearance,
     dismount,
     probe,
+    relocate,
     stop() { vx = vz = vLong = vLat = angVel = 0 },
     reset,
     moorings() {

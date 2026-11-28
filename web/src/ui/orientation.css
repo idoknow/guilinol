@@ -5,6 +5,9 @@
   .rotate-gate{display:grid;position:fixed;inset:0;z-index:60;place-items:center;padding:24px calc(24px + env(safe-area-inset-right)) calc(24px + env(safe-area-inset-bottom)) calc(24px + env(safe-area-inset-left));
     background:var(--ui-ink-900);touch-action:none;overscroll-behavior:contain}
   body[data-home] .rotate-gate{display:none}
+  /* Flying starts from wherever the drone was placed, and the RC screen works fine in portrait — the rotate card would
+     sit on top of the remote and block take-off. It comes back the moment the pilot leaves the RC screen. IDOK-526. */
+  body[data-drone="rc"] .rotate-gate{display:none}
 }
 .rotate-card{display:flex;flex-direction:column;align-items:center;gap:12px;max-width:300px;text-align:center;color:var(--ui-text);font-family:var(--ui-serif);
   animation:ui-rise var(--ui-slow) var(--ui-ease) both}

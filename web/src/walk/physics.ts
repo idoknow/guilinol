@@ -552,11 +552,21 @@ export async function createPhysics(manifest:Manifest,stream:Stream,peaks:PeaksG
   const bikeWallFilter=(coll:R.Collider)=>{const k=kinds.get(coll.handle);return k==='landmark'||k==='peak'||k==='rail'||k==='building'||k==='tree'}
   const canTrafficPush=trafficPushGuard(world,capsule,bikeWallFilter,insideHouse)
   const landmarkFilter=(coll:R.Collider)=>kinds.get(coll.handle)==='landmark'
+  const bridgeSurfaceFilter=(coll:R.Collider)=>bridgeSurfaces.has(coll.handle)
+  const coveredWaterFilter=(coll:R.Collider)=>{const kind=kinds.get(coll.handle);return !!kind&&kind!=='ground'&&kind!=='overview'}
+  const kindFilters=new Map<Kind,(coll:R.Collider)=>boolean>()
+  const filterForKind=(kind:Kind|'bridgeSurface')=>{
+    if(kind==='deck')return deckFilter
+    if(kind==='bridgeSurface')return bridgeSurfaceFilter
+    let fn=kindFilters.get(kind)
+    if(!fn){fn=(coll:R.Collider)=>kinds.get(coll.handle)===kind;kindFilters.set(kind,fn)}
+    return fn
+  }
   const walkableFilter=(coll:R.Collider)=>{const k=kinds.get(coll.handle);return k==='deck'||k==='deckThin'||k==='sidewalk'||k==='road'||k==='ground'||k==='overview'||k==='landmark'}
   function surface(east:number,south:number,kind:Kind|'bridgeSurface',origin=4000,reach=6000){
     if(kind==='bridgeSurface'&&!bridgeSurfaces.size)return null
     surfaceRay.origin.x=east;surfaceRay.origin.y=origin;surfaceRay.origin.z=south
-    const hit=world.castRayAndGetNormal(surfaceRay,reach,false,undefined,undefined,capsule,undefined,kind==='deck'?deckFilter:kind==='bridgeSurface'?coll=>bridgeSurfaces.has(coll.handle):coll=>kinds.get(coll.handle)===kind)
+    const hit=world.castRayAndGetNormal(surfaceRay,reach,false,undefined,undefined,capsule,undefined,filterForKind(kind))
     const thin=!!hit&&(thinDecks.has(hit.collider.handle)||kinds.get(hit.collider.handle)==='deckThin')
     return hit?{y:origin-hit.timeOfImpact,slope:Math.acos(Math.min(1,Math.abs(hit.normal.y))),thin}:null
   }
@@ -569,11 +579,33 @@ export async function createPhysics(manifest:Manifest,stream:Stream,peaks:PeaksG
     if(slope>cfg.slope+.18)return null
     return {y:origin-hit.timeOfImpact,slope,kind:kinds.get(hit.collider.handle)!}
   }
+  const knockdownSeamOffsets:readonly [number,number][]=[[0,0],[.08,0],[-.08,0],[0,.08],[0,-.08]]
+  function sampleKnockdownGround(east:number,south:number,refFootY:number){
+    const origin=refFootY+.55
+    const maxSlope=cfg.slope+.22
+    for(const [dx,dz] of knockdownSeamOffsets){
+      surfaceRay.origin.x=east+dx;surfaceRay.origin.y=origin;surfaceRay.origin.z=south+dz
+      const hit=world.castRayAndGetNormal(surfaceRay,1.15,false,undefined,undefined,capsule,undefined,walkableFilter)
+      if(!hit)continue
+      const slope=Math.acos(Math.min(1,Math.abs(hit.normal.y)))
+      if(slope>maxSlope)continue
+      const y=origin-hit.timeOfImpact
+      if(y>refFootY+.55)continue
+      return {y,slope,kind:kinds.get(hit.collider.handle)!}
+    }
+    let best:{y:number;slope:number;kind:Kind}|null=null
+    for(const kind of ['deck','landmark','sidewalk','road','ground'] as const){
+      const hit=surface(east,south,kind,origin,1.35)
+      if(!hit||hit.slope>maxSlope||hit.y>refFootY+.55)continue
+      if(!best||Math.abs(hit.y-refFootY)<Math.abs(best.y-refFootY)){
+        best={y:hit.y,slope:hit.slope,kind}
+      }
+    }
+    return best
+  }
   const fishingColumn=new R.Cuboid(1,150,1)
   function coveredWater(x:number,z:number,height:number){
-    return !!world.intersectionWithShape({x,y:height+150-.02,z},identity,fishingColumn,undefined,undefined,capsule,undefined,coll=>{
-      const kind=kinds.get(coll.handle);return !!kind&&kind!=='ground'&&kind!=='overview'
-    })
+    return !!world.intersectionWithShape({x,y:height+150-.02,z},identity,fishingColumn,undefined,undefined,capsule,undefined,coveredWaterFilter)
   }
   function waterCeiling(east:number,south:number,waterY:number){
     let bottom=Infinity
@@ -790,5 +822,5 @@ export async function createPhysics(manifest:Manifest,stream:Stream,peaks:PeaksG
       return k==='building'||k==='rail'||k==='peak'||k==='tree'||k==='landmark'
     })
   }
-  return {world,body,capsule,controller,kinds,sources,sync,clear,overlaps,tileAt,hasDeck,surface,groundSurface,coveredWater,waterCeiling,waterOverlap,carOverlap,raycastObstacle,bikePathBlocked,pathBlocked,freeCapsule,wet,insideHouse,withinBounds,findWalkableSpawn,findFlatGround,findLocalDismount,findLocalMount,findCarDismount,findCarMount,isBlockedAt,canTrafficPush,syncObstacleVolume,removeObstacleVolume,getObstacleVolumeIds,resolveObstacleStep,clampCamera}
+  return {world,body,capsule,controller,kinds,sources,sync,clear,overlaps,tileAt,hasDeck,surface,groundSurface,sampleKnockdownGround,coveredWater,waterCeiling,waterOverlap,carOverlap,raycastObstacle,bikePathBlocked,pathBlocked,freeCapsule,wet,insideHouse,withinBounds,findWalkableSpawn,findFlatGround,findLocalDismount,findLocalMount,findCarDismount,findCarMount,isBlockedAt,canTrafficPush,syncObstacleVolume,removeObstacleVolume,getObstacleVolumeIds,resolveObstacleStep,clampCamera}
 }

@@ -6,6 +6,7 @@ export interface Env {
   fishing?:{record:(user:string,body:unknown)=>Promise<unknown>,boards:(zone:string|null)=>Promise<unknown>}
   updateCards?:(request:Request, path:string)=>Promise<Response>
   mpAdmin?:(path:string,request:Request,actor:string)=>Promise<Response>
+  appealTriage?:(input:{uid:number;userId:string;banRecordId:string|null;body:string})=>Promise<{ownerMismatch?:boolean;recordId?:string|null;triage?:Record<string,unknown>|null}>
   smokeAdmin?:(request:Request,user:string)=>Promise<Response>
   gfxAdmin?:(request:Request,user:string)=>Promise<Response>
   npcAdmin?:(request:Request)=>Promise<Response>
@@ -15,7 +16,7 @@ export interface Env {
   acceptsVerifiedIp?: boolean
   loginEvent?:(ip:string,kind:'login-attempt'|'login-failed',subject:string|null)=>Promise<boolean>
   countProtection?:(category:string)=>Promise<unknown>
-  DB: D1Database; FEEDBACK:R2Bucket; BRIDGE_TOKEN?:string; EMAIL_DEV_LOG?: string; RESEND_API_KEY?: string
+  DB: D1Database; FEEDBACK:R2Bucket; BRIDGE_TOKEN?:string; EMAIL_DEV_LOG?: string; RESEND_API_KEY?: string; FEEDBACK_AUTO_APPROVE_EMAILS?: string
   /** 聚合登录：全部来自 Pages 环境变量/secret，不进 D1、后台不暴露 */
   SOCIAL_APPID?: string
   SOCIAL_APPKEY?: string

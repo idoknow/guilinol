@@ -1,10 +1,11 @@
 import {cacheResponse} from './telemetry'
 import * as THREE from 'three'
-import {buildingGeometry,type Building} from './buildings'
+import {buildingGeometry,isLegacyKuiguangSliver,type Building} from './buildings'
 import {ensureShardForTile,hasShardForTile} from './city-upgrade/state'
 import {loadStreetGeometry} from './street-loader'
 import type {StationPavingStyle,Streets} from './street-worker'
 import {bridgeGeometry} from './look/bridge'
+import {approachDecor,openYangqiaoChannel,yangqiaoDeck} from './yangqiao-deck'
 import {look} from './look/config'
 import {nightGround} from './look/night'
 import {countryside,setupCountryside,touchesCountryside} from './look/countryside'
@@ -13,21 +14,21 @@ import {chunkWater, farWater} from './look/water'
 import type {TileBatchInput} from './batch'
 import type {Peaks} from './peaks'
 import {cutStairwellStreets,getRegisteredShizijieUnderground,groundStairwellsReady,joinPortalRoads,tunnelGeometry,type GroundCutout,type ShizijieUnderpass,type Tunnel} from './tunnels'
-import {repairBridgeDeck,setBridgeRepairKeepouts} from './ground-repair'
+import {gradeRenminShoulder,isRenminTile,repairBridgeDeck,setBridgeRepairKeepouts} from './ground-repair'
 import {freezeStatic} from './static-freeze'
 
 interface Asset {file:string; bytes:number}
 import {refinePlatformTerrain,type RefinedTerrainFace} from './platform-access'
 export interface Tile extends Asset {buildingColliderRings?:Record<number,Building[2]>; platformAccess?:RefinedTerrainFace[]; x:number; z:number; stationPaving?:StationPavingStyle; roadbeds?:number[]}
 export function physicalBuildingRings(tile:Tile, rendered:Building[]):Building[]{
-  if(!tile.buildingColliderRings)return rendered
-  return rendered.map((building,i)=>{
+  const rings=!tile.buildingColliderRings?rendered:rendered.map((building,i)=>{
     const loops=tile.buildingColliderRings?.[i]
     if(!loops)return building
     const physical:Building=[...building]
     physical[2]=loops
     return physical
   })
+  return tile.x===-1536 && tile.z===-256 ? rings.filter(part=>!isLegacyKuiguangSliver(tile.x,tile.z,part)) : rings
 }
 export interface Manifest {
   airportProps?:Asset
@@ -353,12 +354,13 @@ function buildSurfaceLookup(tile:Tile,paths:Streets){
   }
 }
 
-export async function detail(tile:Tile, signal:AbortSignal, parseSlot?:()=>Promise<void>, tunnels?:Tunnel[], groundCutouts?:GroundCutout[], underpass?:ShizijieUnderpass) {
-  const shardReady = ensureShardForTile(tile.x,tile.z)
+async function readDetailBuffer(tile:Tile,signal:AbortSignal){
   const compressed = await fetchAsset(tile.file,signal)
-  const buffer = await new Response(new Blob([compressed]).stream().pipeThrough(new DecompressionStream('gzip'))).arrayBuffer()
-  if(parseSlot) await parseSlot()
-  signal.throwIfAborted()
+  return new Response(new Blob([compressed]).stream().pipeThrough(new DecompressionStream('gzip'))).arrayBuffer()
+}
+
+const shoulderGrades=new WeakMap<Tile,ReturnType<typeof gradeRenminShoulder>>()
+function unpackDetail(tile:Tile,buffer:ArrayBuffer){
   const view = new DataView(buffer)
   if(view.getUint32(0)!==0x474c3034) throw Error('Invalid GL04 tile')
   const [vertices,count,collision,imageBytes,triangles] = [4,8,12,16,20].map(offset=>view.getUint32(offset,true))
@@ -375,6 +377,22 @@ export async function detail(tile:Tile, signal:AbortSignal, parseSlot?:()=>Promi
   if(extra!==0 && extra!==8450) throw Error('Invalid GL04 sections')
   const deck = Float32Array.from(new Int16Array(buffer.slice(end,tail)),value=>value/100)
   const underlay = extra ? new Int16Array(buffer.slice(tail)) : terrain
+  if(isRenminTile(tile.x,tile.z))shoulderGrades.set(tile,gradeRenminShoulder(tile.x,tile.z,terrain,underlay,water,paths[5],solids))
+  return {vertices,terrain,underlay,water,paths,rings,thin,deck,rails,signs,railCuts,offset,end,indices,positions,normals,asphalt}
+}
+
+export async function treeGroundGrade(tile:Tile,signal:AbortSignal){
+  if(!isRenminTile(tile.x,tile.z))return
+  if(!shoulderGrades.has(tile))unpackDetail(tile,await readDetailBuffer(tile,signal))
+  return shoulderGrades.get(tile)
+}
+
+export async function detail(tile:Tile, signal:AbortSignal, parseSlot?:()=>Promise<void>, tunnels?:Tunnel[], groundCutouts?:GroundCutout[], underpass?:ShizijieUnderpass) {
+  const shardReady = ensureShardForTile(tile.x,tile.z)
+  const buffer=await readDetailBuffer(tile,signal)
+  if(parseSlot) await parseSlot()
+  signal.throwIfAborted()
+  const {vertices,terrain,underlay,water,paths,rings,thin,deck,rails,signs,railCuts,offset,end,indices,positions,normals,asphalt}=unpackDetail(tile,buffer)
   const sample = (col:number,row:number)=>{
     const index = row*65+col
     return underlay[index]/10
@@ -395,6 +413,7 @@ export async function detail(tile:Tile, signal:AbortSignal, parseSlot?:()=>Promi
   })
   for(const [,topLevel] of rings) if(topLevel/10+8>maxY) maxY = topLevel/10+8
   const heights = geometry.getAttribute('position')
+  if(paths[9])paths[9]=approachDecor(tile,paths[9])
   const streets = await loadStreetGeometry(paths,step,heights,rails,signs,railCuts,tile.stationPaving,tile.roadbeds,[tile.x,tile.z])
   if(tunnels)joinPortalRoads(tile,tunnels,[streets.road,streets.sidewalk,...(streets.surface?[streets.surface.getAttribute('position').array as Float32Array]:[])])
   await groundStairwellsReady
@@ -406,6 +425,13 @@ export async function detail(tile:Tile, signal:AbortSignal, parseSlot?:()=>Promi
   if(parseSlot)await parseSlot()
   const group = new THREE.Group()
   group.position.set(tile.x,0,tile.z)
+  if(step===4&&tile.z===256&&(tile.x===-1280||tile.x===-1024)){
+    const bed=underlay.slice();openYangqiaoChannel(tile,bed,water)
+    for(let index=0;index<bed.length;index++)if(bed[index]!==underlay[index]){
+      heights.setY(index,bed[index]/10);underlay[index]=bed[index];terrain[index]=bed[index]
+    }
+    geometry.computeVertexNormals();geometry.computeBoundingSphere()
+  }
   // Cut after street construction to preserve the original carriageway grade.
   for(const [index,cm] of railCuts)heights.setY(index,cm/100)
   if(railCuts.length){geometry.computeVertexNormals();geometry.computeBoundingSphere()}
@@ -433,14 +459,14 @@ export async function detail(tile:Tile, signal:AbortSignal, parseSlot?:()=>Promi
   const activeRings = hasUpgradeShard ? rings.map(b => [...b] as Building) : rings
   const walls = vertices ? buildingGeometry(positions,normals,indices,activeRings,tile.x,tile.z) : null
   for(const [,topLevel] of activeRings) if(topLevel/10+8>maxY) maxY = topLevel/10+8
-  const repairedDeck = deck.length ? repairBridgeDeck(deck,thin,tile.x,tile.z,water,(lx,lz)=>{
+  const terrainLevel=(lx:number,lz:number)=>{
     const col=Math.min(segments-1,Math.max(0,Math.floor(lx/step))),row=Math.min(segments-1,Math.max(0,Math.floor(lz/step))),at=row*stride+col
     const u=lx/step-col,v=lz/step-row,a=heights.getY(at),b=heights.getY(at+1),c=heights.getY(at+stride),d=heights.getY(at+stride+1)
     return u+v<=1?a+(b-a)*u+(c-a)*v:d+(c-d)*(1-u)+(b-d)*(1-v)
-  },paths[0],paths[5]) : null
-  const activeDeck = repairedDeck ? repairedDeck.deck : deck
-  const activeThin = repairedDeck ? repairedDeck.thin : thin
-  const bridge = activeDeck.length ? bridgeGeometry(activeDeck,activeThin,asphalt) : null
+  }
+  const repairedDeck = deck.length ? repairBridgeDeck(deck,thin,tile.x,tile.z,water,terrainLevel,paths[0],paths[5]) : null
+  const {deck:activeDeck,thin:activeThin,asphalt:activeAsphalt,pavedTops,flushEnds}=yangqiaoDeck(tile,repairedDeck?.deck??deck,repairedDeck?.thin??thin,asphalt,streets,terrainLevel)
+  const bridge = activeDeck.length ? bridgeGeometry(activeDeck,activeThin,activeAsphalt,pavedTops,flushEnds) : null
   const batch:TileBatchInput = {
     tile, minY, maxY, midY:heights.getY(segments/2*(stride+1)),
     walls, pond:pond?.positions ?? null, bridge,

@@ -16,7 +16,11 @@ const dir = await mkdtemp(join(tmpdir(), 'glol-batch-'))
 const outfile = join(dir, 'batch.mjs')
 
 await build({
-  entryPoints: ['web/src/batch.ts'],
+  stdin: {
+    contents: "export {ChunkBatcher} from './web/src/batch.ts'\nexport {setBusShelterClearance} from './web/src/traffic/bus-shelter-clearance.ts'\n",
+    resolveDir: process.cwd(),
+    loader: 'ts',
+  },
   outfile,
   bundle: true,
   format: 'esm',
@@ -24,7 +28,7 @@ await build({
   logLevel: 'silent',
 })
 
-const {ChunkBatcher} = await import(`${pathToFileURL(outfile).href}`)
+const {ChunkBatcher, setBusShelterClearance} = await import(`${pathToFileURL(outfile).href}`)
 
 const failures = []
 const check = (label, actual, expected) => {
@@ -126,6 +130,81 @@ batcher.remove(initial.tile);batcher.add(bikeTile())
 check('no duplicate after tile reload',batcher.nearestBike(515,260,150,2),null)
 batcher.returnBike(candidate.id)
 check('restored same instance',batcher.nearestBike(515,260,150,2).id,candidate.id)
+const shelterYaw = 0, shelterNx = Math.sin(shelterYaw), shelterNz = Math.cos(shelterYaw)
+const shelterStopX = 515 - 2.6, shelterStopZ = 260 + 1.15
+const shelterStop = {
+  id: 0,
+  key: `${shelterStopX.toFixed(2)},${shelterStopZ.toFixed(2)}`,
+  x: shelterStopX,
+  z: shelterStopZ,
+  yaw: shelterYaw,
+  shelter: true,
+  side: 1,
+  name: '',
+  en: '',
+  tx: shelterNz,
+  tz: -shelterNx,
+  nx: shelterNx,
+  nz: shelterNz,
+}
+setBusShelterClearance({stops: [shelterStop], excluded: []})
+check('bike inside bus shelter clearance has no boarding candidate', batcher.nearestBike(515, 260, 150, 2), null)
+check('bike inside bus shelter clearance cannot be checked out by id', batcher.takeBike(candidate.id), false)
+setBusShelterClearance(null)
+check('bike restored after bus shelter clearance cleared', batcher.nearestBike(515, 260, 150, 2)?.id ?? null, candidate.id)
+// Render-loop closure: stationary camera must hide/restore parked mesh via onBusShelterClearance -> invalidateFurniture.
+const bikeFocus = new THREE.Vector3(515, 150, 260)
+const bikeCamera = new THREE.PerspectiveCamera(55, 1.5, 0.5, 5000)
+bikeCamera.position.set(515, 151.6, 265)
+bikeCamera.lookAt(515, 150, 260)
+bikeCamera.updateMatrixWorld()
+batcher.update(bikeFocus, bikeCamera)
+check('parked bike drawn before bus shelter clearance arrives', Boolean(batcher.parked?.visible) && batcher.parked?.count === 1, true)
+setBusShelterClearance({stops: [shelterStop], excluded: []})
+batcher.update(bikeFocus, bikeCamera)
+check('parked bike hidden on stationary camera after bus shelter clearance arrives', batcher.parked?.count === 0 && batcher.parked?.visible === false, true)
+setBusShelterClearance(null)
+batcher.update(bikeFocus, bikeCamera)
+check('parked bike drawn again after bus shelter clearance cleared', Boolean(batcher.parked?.visible) && batcher.parked?.count === 1, true)
+
+// Whole-row clearance: 3 bikes spaced 1.25 m apart on a fresh tile (512, 0) near (600, 240); shelter zone covers only index 0.
+const rowTileX = 512, rowTileZ = 0
+const rowCenterX = 600, rowCenterZ = 240
+const rowYaw = 0.75
+const rowPositions = [-1.25, 0, 1.25].map(dx => [rowCenterX + dx, rowCenterZ])
+const rowParked = new Float32Array(rowPositions.length * 16)
+const rowMat = new THREE.Matrix4()
+rowPositions.forEach(([wx, wz], i) => {
+  rowMat.makeRotationY(rowYaw).setPosition(wx - rowTileX, 150, wz - rowTileZ)
+  rowParked.set(rowMat.elements, i * 16)
+})
+const rowTile = {...tile(rowTileX, rowTileZ), parked: rowParked}
+batcher.add(rowTile)
+const rowIds = rowPositions.map((_, i) => `${rowTileX}:${rowTileZ}:${i}`)
+check('all 3 row bikes available before shelter clearance', rowPositions.map(([wx, wz]) => batcher.nearestBike(wx, wz, 150, 0.5)?.id ?? null), rowIds)
+// Shelter zone centred at (596.25, 240) with halfAlong=3.0 (x in [593.25, 599.25]): covers 598.75 only, leaves 600.00 and 601.25 outside.
+const rowShelterX = 596.25 - 2.6, rowShelterZ = 240 + 1.15
+const rowShelterStop = {
+  ...shelterStop,
+  id: 1,
+  key: `${rowShelterX.toFixed(2)},${rowShelterZ.toFixed(2)}`,
+  x: rowShelterX,
+  z: rowShelterZ,
+}
+setBusShelterClearance({stops: [rowShelterStop], excluded: []})
+check('whole row cleared from nearestBike when only bike 0 is in shelter zone', rowPositions.map(([wx, wz]) => batcher.nearestBike(wx, wz, 150, 2)), [null, null, null])
+check('whole row blocked from takeBike when only bike 0 is in shelter zone', rowIds.map(id => batcher.takeBike(id)), [false, false, false])
+const rowFocus = new THREE.Vector3(rowCenterX, 150, rowCenterZ)
+const rowCamera = new THREE.PerspectiveCamera(55, 1.5, 0.5, 5000)
+rowCamera.position.set(rowCenterX, 151.6, rowCenterZ + 5)
+rowCamera.lookAt(rowCenterX, 150, rowCenterZ)
+rowCamera.updateMatrixWorld()
+batcher.update(rowFocus, rowCamera)
+check('whole row hidden from parked mesh when only bike 0 is in shelter zone', batcher.parked?.count === 0 && batcher.parked?.visible === false, true)
+setBusShelterClearance(null)
+batcher.update(rowFocus, rowCamera)
+check('whole row restored in parked mesh after shelter clearance cleared', Boolean(batcher.parked?.visible) && batcher.parked?.count === 3, true)
+batcher.remove(rowTile.tile)
 batcher.add({...tile(-768,-256),parked:Float32Array.from(new THREE.Matrix4().makeTranslation(180,150,44).elements)})
 check('decor in pedestrian district has no boarding candidate',batcher.nearestBike(-588,-212,150,2),null)
 check('decor in pedestrian district cannot be checked out by id',batcher.takeBike('-768:-256:0'),false)

@@ -98,6 +98,8 @@ env.countProtection=category=>pool.query('select web_guard_hit($1)',[category])
 const cheatCaptures=createCheatCaptureService(pool,env,{bucket:env.FEEDBACK,resolvePlace:mp.resolvePlace})
 mp.setCheatCaptures(cheatCaptures)
 env.cheatCaptureUpload=cheatCaptures.upload
+const appealMod=await import('./appeal-triage.mjs').catch(()=>null)
+if(appealMod?.createAppealTriage)env.appealTriage=appealMod.createAppealTriage(pool)
 const origin = new URL(process.env.PUBLIC_ORIGIN).origin
 Object.assign(env,traceRoutes(pool,env))
 env.updateCards=cardRoutes(pool,env)

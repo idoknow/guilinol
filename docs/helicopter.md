@@ -1,10 +1,8 @@
 # 观光直升机资产接口
 
-## 联机乘客校验
+## 联机观光同步
 
-RT 每秒读取一次已确认的航班（`helicopter_queue` 关联登录 UID），不按位置包查询数据库。放行范围是服务端时钟对应的一小段三维航迹，含座位相对机身的偏移；不是整条航线或整个高空。没有座位的 `passenger` 声明不能授权移动。读库超时仍拒绝异常位置，但 `flight_unverified` 不计入自动封禁。观光排队心跳走 HTTP，机上的位置上报沿用原 WebSocket 节拍。
-
-RT 镜像只包含 `rt/`。修改路线、高程或航班时钟后，运行 `node --import tsx scripts/bake-rt-flight.mjs` 同步 `rt/flight-paths.json`，再运行 `node rt/anti-cheat-test.mjs`。实乘检查：`npm run world:dev && npm run build && CHROMIUM=/usr/bin/chromium HELI_QUICK=1 HELI_RT_AUDIT=1 node scripts/heli-e2e.mjs`，使用本地临时账号、Postgres 和真实航班时钟，输出事件计数与下机前后 30 秒最大发包数。
+观光排队心跳走 HTTP，登机后机上位置上报沿用既有 WebSocket 节拍，服务端按已确认航班校验乘客身份与航线状态。修改路线、高程或航班时钟后，请在私有运维仓叠加环境中运行对应航迹烘焙与回归门禁。实乘检查：`npm run world:dev && npm run build && CHROMIUM=/usr/bin/chromium HELI_QUICK=1 HELI_RT_AUDIT=1 node scripts/heli-e2e.mjs`。
 
 机头沿本地 +Z，+Y 朝上，+X 为驾驶员左侧，单位为米。三个 GLB 共用原点及挂点。Vite 从仓库根目录的 `public/models/` 提供下列资产。
 

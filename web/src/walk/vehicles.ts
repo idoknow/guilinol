@@ -1591,6 +1591,7 @@ export async function vehicles(
     clearBoatPose(figure: T.Group) { freeBoats?.clearPoseJoints(figure) },
     boatClearance(figure: T.Group, skinned?: T.SkinnedMesh) { return freeBoats?.clearance(figure, skinned) ?? null },
     boatProbe() { return freeBoats?.probe() ?? null },
+    relocateBoat(x: number, z: number) { return freeBoats?.relocate(x, z) ?? false },
     freeMoorings() { return freeBoats?.moorings() ?? [] },
     parked(kind?: RideKind | 'car'): Position[] {
       const out: Position[] = []

@@ -20,8 +20,8 @@ Yangqiao Commons series (00..11-2024.jpg) and 2018–2025 street views:
   planter dividers placed on each carriageway's outermost lane line
   (width * ((lanes - 1) / lanes - 0.5)) so the outer lane next to the sidewalk
   is a clean bike lane with no motor-lane markings outside the planters
-  (89188-Guilin.jpg), sidewalk camphor street trees, 4 bus shelters (十字街 /
-  阳桥), and Yangqiao municipal blue road sign gantry.
+  (89188-Guilin.jpg), sidewalk camphor street trees, Shizijie bus shelters,
+  and Yangqiao municipal blue road sign gantry.
 """
 from collections import defaultdict
 import json
@@ -44,6 +44,7 @@ from road_profile import RULES, pair_carriageways, profile  # noqa: E402
 from c_kit import landmark_surface
 from shizijie_layout import surfaces
 from nikoniko import Builder, export_landmark  # noqa: E402
+from yangqiao import pedestrian_wings
 
 
 AX, AZ = ll2xz(25.2790956, 110.2903834)
@@ -178,15 +179,38 @@ def _street_facade(m: Builder, p0, p1, nx_sign, y0, ground_h, total_h, wall_mat,
     m.pose = (0.0, 0.0, 0.0, 0.0)
 
 
-def _bus_shelter(m: Builder, x, y0, z, yaw, station_key='bus_shizijie'):
+def _bus_shelter(m: Builder, x, y0, z, yaw, station_key='bus_shizijie', *, graded=False):
     """Guilin Zhongshan Road modern transit bus shelter + CJK station totem."""
     # Local +X of pose points toward carriageway; local +Z runs along sidewalk.
     m.pose = (x, y0, z, yaw)
     from plaza_seam import civic_plaza
     outline = m._transform([[-1.25,0,-5.6],[1.25,0,-5.6],[1.25,0,5.6],[-1.25,0,5.6]])[:,::2]
     m.pose = (0,0,0,0)
+    paving_start = len(m.tiled['pave'])
     civic_plaza(m,outline,refine_outer=True)
-    m.pose = (x,y0,z,yaw)
+    paving = [triangle for batch, _ in m.tiled['pave'][paving_start:] for triangle in batch]
+
+    def pavement(sx, sz):
+        east, _, south = m._transform([[sx,0,sz]])[0]
+        height = m.surface.ground(east,south)
+        for triangle in paving:
+            start, second, third = triangle
+            edges = np.array([second-start, third-start])
+            matrix = edges[:,[0,2]].T
+            if abs(np.linalg.det(matrix)) < 1e-10:
+                continue
+            weights = np.linalg.solve(matrix, [east-start[0],south-start[2]])
+            if min(weights) >= -1e-8 and sum(weights) <= 1+1e-8:
+                height = max(height, start[1] + weights @ edges[:,1])
+        return height
+
+    def place_roof_or_totem(samples):
+        m.pose = (x,y0,z,yaw)
+        if graded:
+            rise = max(m.feet_at_grade(samples)) + .195
+            m.pose = (x,y0+rise,z,yaw)
+
+    place_roof_or_totem([[sx,0,sz] for sx in (-1.25,1.25) for sz in (-5.6,0,5.6)])
     for sz in (-4.6, -1.5, 1.5, 4.6):
         base=m.feet_at_grade([[-.82,0,sz]])[0]-.035
         m.beam([-0.82, base, sz], [-0.82, 2.95, sz], 0.08, 'bronze', sections=6, collide=True)
@@ -195,16 +219,43 @@ def _bus_shelter(m: Builder, x, y0, z, yaw, station_key='bus_shizijie'):
 
     # Back route-map & transit lightboxes facing +X toward waiting passengers
     for sz, col in ((-3.1, 'blue'), (0.0, 'white'), (3.1, 'red')):
+        grade = max(pavement(-.78,sz+end) for end in (-1.19,0,1.19)) if graded else y0
+        m.pose = (x,grade,z,yaw)
         for sign in (-1,1):
             m.box(-.82,.08,sz+sign*.92,.14,2.34,.13,'bronze',footing=True)
-        m.box(-0.78, 0.52, sz, 0.18, 1.85, 2.38, 'dark', collide=True)
+        if graded:
+            vertices, faces = [], [(0,2,1),(0,3,2)]
+            for along in np.linspace(sz-1.19,sz+1.19,13):
+                offset = len(vertices)
+                vertices.extend([[-.87,pavement(-.87,along)-grade+.10,along],
+                                 [-.69,pavement(-.69,along)-grade+.10,along],
+                                 [-.69,2.37,along],[-.87,2.37,along]])
+                if offset:
+                    for corner in range(4):
+                        first = offset-4+corner
+                        second = offset-4+(corner+1)%4
+                        faces.extend([(first,second,second+4),(first,second+4,first+4)])
+            faces.extend([(offset,offset+1,offset+2),(offset,offset+2,offset+3)])
+            m.mesh(vertices,faces,'dark',collide=True)
+        else:
+            m.box(-0.78, 0.52, sz, 0.18, 1.85, 2.38, 'dark', collide=True)
         if m.detail:
             m.box(-0.67, 0.65, sz, 0.04, 1.58, 2.16, col)
-    m.box(-0.22, 0.48, 0.0, 0.46, 0.08, 4.4, 'alum', collide=True)
-    for bz in (-1.8, 0.0, 1.8):
-        m.box(-0.22, 0.08, bz, 0.40, 0.40, 0.12, 'dark',footing=True)
+    if graded:
+        for centre in (-.25,.85,1.95):
+            grade = max(pavement(sx,centre+end) for sx in (-.40,-.04) for end in (-.24,0,.24))
+            m.pose = (x,grade,z,yaw)
+            m.box(-.22,.34,centre,.36,.08,.48,'alum',collide=True)
+            for end in (-.18,.18):
+                m.box(-.22,0,centre+end,.32,.34,.10,'dark',footing=True)
+    else:
+        m.pose = (x,y0,z,yaw)
+        m.box(-0.22, 0.48, 0.0, 0.46, 0.08, 4.4, 'alum', collide=True)
+        for bz in (-1.8, 0.0, 1.8):
+            m.box(-0.22, 0.08, bz, 0.40, 0.40, 0.12, 'dark',footing=True)
 
     # Tall double-sided bus-stop totem ('十字街' / '阳桥') facing along sidewalk (+Z / -Z)
+    place_roof_or_totem([[.76,0,5.25]])
     m.box(0.76, 0.08, 5.25, 0.72, 2.82, 0.16, 'dark', collide=True,footing=True)
     m.sign_quad(0.76, 1.15, 5.35, 0.66, 1.68, station_key, double_sided=True)
     m.box(0.76, 0.18, 5.25, 0.66, 0.92, 0.18, 'blue')
@@ -282,8 +333,62 @@ def _planter_divider_curve(m: Builder, world_line: LineString):
         m.pose = (0.0, 0.0, 0.0, 0.0)
 
 
+def sanduo_footbridge(m: Builder):
+    """Approaches to the existing GL04 deck (OSM 1469989701, top 158.61 m).
+
+    Ways 1469989702/3 meet the west landing; 1469989704 crosses the east
+    landing at its middle node. Run a flight to each of the four sidewalks.
+    """
+    def local(lat, lon):
+        return np.array(ll2xz(lat, lon)) - [AX, AZ]
+
+    west = local(25.2797577, 110.2904579)
+    east = local(25.2796609, 110.2907991)
+    level = 158.61 - m.surface.y
+    axis = (east - west) / np.linalg.norm(east - west)
+    side = np.array([-axis[1], axis[0]])
+    for sign in (-1, 1):
+        start = west + side * sign * 1.68 + axis * 1.35
+        end = east + side * sign * 1.68 - axis * 1.35
+        def rail_point(point, height):
+            return [point[0], level + height, point[1]]
+        m.beam(rail_point(start, 1.03), rail_point(end, 1.03), .055, 'alum')
+        m.beam(rail_point(start, .51), rail_point(end, .51), .035, 'alum')
+        for point in np.linspace(start, end, 16):
+            m.cylinder_y(point[0], level, 1.03, point[1], .055, 'alum', sections=6)
+
+    for landing, ends in ((west, [(25.2794586, 110.2903574), (25.2799372, 110.2905181)]),
+                          (east, [(25.2794934, 110.2907425), (25.2798511, 110.2908635)])):
+        grade = m.surface.ground(*landing)
+        m.cylinder_y(landing[0], grade - .2, level - grade, landing[1], .5, 'beige', collide=True)
+        for endpoint in ends:
+            bottom = local(*endpoint)
+            dx, dz = bottom - landing
+            length = math.hypot(dx, dz)
+            low = m.surface.ground(*bottom) + .10
+            count = math.ceil((level - low) / .16)
+            rise = (level - low) / count
+            landing_run = 1.85
+            run = (length - landing_run) / count
+            m.pose = (landing[0], 0, landing[1], math.atan2(dx, dz))
+            m.box(0, level - .29, landing_run / 2, 2.7, .31, landing_run, 'beige', collide=True)
+            for index in range(count):
+                top = level - (index + 1) * rise
+                m.box(0, top - .30, landing_run + (index + .5) * run,
+                      2.7, .30, run, 'beige', collide=True)
+            for edge in (-1.30, 1.30):
+                for height in (.55, 1.03):
+                    m.beam([edge, level + height, landing_run], [edge, low + height, length], .045, 'alum')
+                for fraction in np.linspace(0, 1, math.ceil(length / 2.2)):
+                    m.cylinder_y(edge, level - fraction * (level - low) - .10, 1.13,
+                                 landing_run + fraction * (length - landing_run), .045, 'alum', sections=6)
+        m.pose = (0., 0., 0., 0.)
+
+
 def build_zhongshan_road(m: Builder):
     m.surface = landmark_surface('zhongshan_road')
+    sanduo_footbridge(m)
+    pedestrian_wings(m, (AX, AZ))
     # ------------------------------------------------------------------
     # 1. West Frontage 1: Commercial Complex way/675593163 (6F / 20.6 m)
     # ------------------------------------------------------------------
@@ -327,7 +432,7 @@ def build_zhongshan_road(m: Builder):
     m.box(-2.0, 5.0, 0.85, 3.8, 23.2, 0.85, 'dark')
     m.sign_quad(-2.0, 12.6, 1.32, 3.4, 14.4, 'jinma_vert')
     m.box(-18.0, 17.6, 0.78, 14.6, 1.85, 0.28, 'dark')
-    m.sign_quad(-18.0, 17.66, 0.96, 14.3, 1.72, 'hexie_sign')
+    m.sign_quad(-18.0, 17.66, 0.925, 14.3, 1.72, 'hexie_sign')
     m.pose = (0.0, 0.0, 0.0, 0.0)
 
     # ------------------------------------------------------------------
@@ -368,19 +473,22 @@ def build_zhongshan_road(m: Builder):
     east_road = by_way[258911170]
     west_roads = [by_way[259016852], by_way[259020518]]
 
-    # Place 4 bus shelters directly on the paired carriageways' 2.5 m sidewalks
+    # Yangqiao platforms 2642197676 / 2643390973 are already emitted by streets.py south of the bridge.
     bus_specs = [
         # (road, fraction_along, station_key)
         (east_road, 0.78, 'bus_shizijie'),
         (west_roads[0], 0.16, 'bus_shizijie'),
-        (east_road, 0.31, 'bus_yangqiao'),
-        (west_roads[1], 0.42, 'bus_yangqiao'),
+        (east_road, 0.31, None),
+        (west_roads[1], 0.42, None),
     ]
     bus_pullin_zones = []
     for road, frac, station_key in bus_specs:
         sw_line = road.line.offset_curve(road.width / 2.0 + max(road.right, 2.5) * 0.58)
         d = sw_line.length * frac
         pt = sw_line.interpolate(d)
+        bus_pullin_zones.append(pt.buffer(11.5))
+        if station_key is None:
+            continue
         p_a = sw_line.interpolate(max(0.0, d - 1.0))
         p_b = sw_line.interpolate(min(sw_line.length, d + 1.0))
         tx, tz = p_b.x - p_a.x, p_b.y - p_a.y
@@ -393,8 +501,8 @@ def build_zhongshan_road(m: Builder):
         # Local +X = (cos(yaw), -sin(yaw)) == normalized (inward_x, inward_z) -> yaw = atan2(-inward_z, inward_x)
         shelter_yaw = math.atan2(-inward_z, inward_x)
         lx, lz = pt.x - AX, pt.y - AZ
-        _bus_shelter(m, lx, m.surface.ground(lx,lz), lz, shelter_yaw, station_key=station_key)
-        bus_pullin_zones.append(pt.buffer(11.5))
+        _bus_shelter(m, lx, m.surface.ground(lx,lz), lz, shelter_yaw, station_key=station_key,
+                     graded=road is west_roads[0] and station_key == 'bus_shizijie')
 
     divider_mask = unary_union([junc_mask, *bus_pullin_zones])
     road_surface, sidewalk = surfaces('zhongshan_road', 260)

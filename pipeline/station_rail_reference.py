@@ -12,11 +12,20 @@ def reference_tiles():
 
 
 def section_reference(tiles):
-    """Apply only the five surveyed railhead corrections at the Tiexi siding bridge."""
+    """Apply the surveyed Tiexi and Huancheng bridge corrections to the #300 datum."""
     file = Path(__file__).with_name("rail-sections") / "12-guilin-station.json"
     changes = {(r["x"], r["z"]): r for r in json.loads(file.read_bytes())["approvedCorridorVertices"]}
     if len(changes) != 5:
         raise ValueError("Incomplete Tiexi siding vertex list")
+    south = file.with_name("13-guilin-south.json")
+    local = json.loads(south.read_bytes())["approvedCorridorVertices"]
+    if len(local) != 4 or len({(r["x"], r["z"]) for r in local}) != 4:
+        raise ValueError("Incomplete Huancheng bridge vertex list")
+    for r in local:
+        drop = round((r["referenceM"] - r["railheadM"]) * 1000, 6)
+        if not r["minimumDropMm"] <= drop <= r["maximumDropMm"]:
+            raise ValueError(f"Huancheng correction outside approved range at {r['x']}, {r['z']}")
+        changes[r["x"], r["z"]] = r
     seen = set()
     for (x, z), rows in tiles.items():
         for i, chord in enumerate(rows):
@@ -31,7 +40,7 @@ def section_reference(tiles):
                     seen.add(xy)
             rows[i] = row
     if seen != changes.keys():
-        raise ValueError("Tiexi correction outside reference corridor")
+        raise ValueError("Rail correction outside reference corridor")
     return tiles
 
 

@@ -1,14 +1,21 @@
+import {Vector3} from 'three'
 // Surveyed native curb strips at the ends of a graded road. Clip render and
 // collision faces to the same footprint; carry the original reveal with the grade.
 type Point = number[]
 type NativeFace = [number, Point, Point, Point]
 export interface CurbReturn {
+  roadOnly?: boolean
+  abutmentDropM?: number
+  sidewalkOnly?: boolean
   origin: number[]
   axis: number[]
   along: number[]
   lateral: number[]
   lanes: number[][][]
   aprons: NativeFace[]
+  // Surveyed underside of a curb bevel, clipped to the graded lane and kept
+  // below its driving surface. These faces are visual, without walk collision.
+  insetBevels?: [Point, Point, Point][]
   faces: NativeFace[]
   displacement: number[][]
 }
@@ -62,6 +69,7 @@ export function fitCurbReturns(
   road: number[],
   sidewalk: number[],
   color: (kind: number) => number[],
+  cutCarriageway?: (a: Vector3, b: Vector3, c: Vector3) => Vector3[][],
 ) {
   for (const patch of patches) {
     const {
@@ -111,8 +119,8 @@ export function fitCurbReturns(
     const original: Triangle[] = []
     function cut(points: Point[]) {
       if (
-        points.every((p) => p[1] > y + 1.4) ||
-        points.every((p) => p[1] < y - 1.4) ||
+        points.every((p) => p[1] > y + (patch.sidewalkOnly ? 5 : 1.4)) ||
+        points.every((p) => p[1] < y - (patch.sidewalkOnly ? 5 : 1.4)) ||
         planes.some((f) => points.every((p) => f(p) < 0))
       )
         return
@@ -123,6 +131,20 @@ export function fitCurbReturns(
         if (a.length < 3) return
         if (b.length >= 3) remnants.push(b)
         inner = a
+      }
+      // Keep the original render and collision triangles through a bridge
+      // landing. Translate curb and street together so their reveal is preserved.
+      const drop = patch.abutmentDropM
+      if (drop !== undefined) {
+        for (const strip of split(inner, along)) {
+          if (strip.length < 3) continue
+          remnants.push(strip.map(p => {
+            const q = p.slice()
+            q[1] -= drop * (1 - Math.max(0, along(p)) / end)
+            return q
+          }))
+        }
+        return remnants
       }
       outsideLanes(inner, remnants)
       return remnants
@@ -151,7 +173,7 @@ export function fitCurbReturns(
         rgb[3 * j + 2],
         uv[j],
       ])
-      const outside = [0, 1, 2, 3, 6].includes(kind) ? cut(points) : undefined
+      const outside = (patch.roadOnly ? [0] : patch.sidewalkOnly ? [1, 2, 6] : [0, 1, 2, 3, 6]).includes(kind) ? cut(points) : undefined
       if (!outside) {
         write(points, kind)
         continue
@@ -159,7 +181,7 @@ export function fitCurbReturns(
       original.push({ points, kind })
       for (const poly of outside) write(poly, kind)
     }
-    for (const buffer of [road, sidewalk]) {
+    for (const buffer of patch.roadOnly ? [road] : patch.sidewalkOnly ? [sidewalk] : [road, sidewalk]) {
       const kept: number[] = []
       for (let i = 0; i < buffer.length; i += 9) {
         const face = [0, 3, 6].map((j) => buffer.slice(i + j, i + j + 3))
@@ -189,7 +211,11 @@ export function fitCurbReturns(
         const other = weight < 1 ? sample(original, px, pz, kind, native) : native
         return [px, other + weight * (native - other), pz, ...color(kind), 0]
       })
-      for (const poly of outsideLanes(pts)) {
+      const exposed = patch.sidewalkOnly && cutCarriageway
+        ? cutCarriageway(...pts.map(p => new Vector3(p[0], p[1], p[2])) as [Vector3, Vector3, Vector3])
+            .map(poly => poly.map(p => [p.x, p.y, p.z, ...color(kind), 0]))
+        : outsideLanes(pts)
+      for (const poly of exposed) {
         write(poly, kind)
         if (kind === 0 || kind === 1 || kind === 6) {
           for (let j = 1; j + 1 < poly.length; j++) {
@@ -211,4 +237,91 @@ export function fitCurbReturns(
       for (const v of src) dst.push(v)
     }
   }
+  // Incident sidewalk strips can overlap at bends. Append the verified inset
+  // faces after all strips so a neighboring strip cannot crop the bevel again.
+  for (const patch of patches) {
+    const [x,,z] = patch.origin
+    const [dx,dz] = patch.axis
+    for (const bevel of patch.insetBevels ?? []) {
+      for (const [s,h,n] of bevel) {
+        xyz.push(x+s*dx-n*dz,h,z+s*dz+n*dx)
+        rgb.push(...color(2))
+        kinds.push(2)
+        uv.push(0)
+      }
+    }
+  }
+}
+
+export interface VergeCurbOptions {
+  /** Top elevation offset of the verge strip above baseLevel (default 0.195 m). */
+  topOffset: number
+  /** Bottom elevation offset meeting carriageway/cycleway asphalt (default 0.045 m). */
+  bottomOffset?: number
+  /** Quantized cm edge keys where bridged seams should omit vertical curb walls. */
+  skipCurbEdges?: ReadonlySet<string>
+  /** Key generator matching ground-repair.curbEdgeKeyCm. */
+  edgeKeyCm?: (ax: number, az: number, bx: number, bz: number) => string
+  /** Optional platform / lower-road flags that disable terrain skirt clamp. */
+  clampToGround?: boolean
+}
+
+/**
+ * Emits crisp granite vertical curb walls around three-band street verges (path kind=4),
+ * bridging the height transition between carriageway (+0.045 m), cycleway (+0.060 m),
+ * and raised green/planter verges (+0.195 m). Vertical faces are rendered in granite curb
+ * tone (kind=1, vertical=true) without adding walkable top collision.
+ */
+export function emitVergeCurbWalls(
+  loops: readonly (readonly { x: number; y: number }[])[],
+  vectorAt: (x: number, z: number, offset: number) => Vector3,
+  groundAt: (x: number, z: number) => number,
+  emitTriangle: (a: Vector3, b: Vector3, c: Vector3, kind: number, vertical: boolean) => void,
+  options: VergeCurbOptions,
+): number {
+  const topOffset = options.topOffset
+  const bottomOffset = options.bottomOffset ?? 0.045
+  const skip = options.skipCurbEdges
+  const edgeKey = options.edgeKeyCm
+  const clamp = options.clampToGround ?? true
+  let emittedQuads = 0
+
+  for (const loop of loops) {
+    const n = loop.length
+    if (n < 3) continue
+    for (let i = 0; i < n; i++) {
+      const a = loop[i]
+      const b = loop[(i + 1) % n]
+      if (
+        (a.x === b.x && (a.x <= 0.02 || a.x >= 255.98)) ||
+        (a.y === b.y && (a.y <= 0.02 || a.y >= 255.98))
+      ) continue
+      const segLen = Math.hypot(b.x - a.x, b.y - a.y)
+      if (segLen < 0.08) continue
+      if (skip && skip.size && edgeKey && skip.has(edgeKey(a.x * 100, a.y * 100, b.x * 100, b.y * 100))) continue
+
+      const steps = Math.max(1, Math.ceil(segLen / 4))
+      for (let j = 0; j < steps; j++) {
+        const u0 = j / steps
+        const u1 = (j + 1) / steps
+        const px = a.x + (b.x - a.x) * u0
+        const pz = a.y + (b.y - a.y) * u0
+        const qx = a.x + (b.x - a.x) * u1
+        const qz = a.y + (b.y - a.y) * u1
+
+        const topP = vectorAt(px, pz, topOffset)
+        const topQ = vectorAt(qx, qz, topOffset)
+        const botP = vectorAt(px, pz, bottomOffset)
+        const botQ = vectorAt(qx, qz, bottomOffset)
+        if (clamp) {
+          botP.y = Math.max(botP.y - 0.35, Math.min(botP.y, groundAt(px, pz) - 0.02))
+          botQ.y = Math.max(botQ.y - 0.35, Math.min(botQ.y, groundAt(qx, qz) - 0.02))
+        }
+        emitTriangle(botP, topP, topQ, 1, true)
+        emitTriangle(botP, topQ, botQ, 1, true)
+        emittedQuads++
+      }
+    }
+  }
+  return emittedQuads
 }

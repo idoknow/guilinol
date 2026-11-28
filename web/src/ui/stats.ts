@@ -37,6 +37,7 @@ export function mountStats() {
   mpTile.hidden = true
   chip.append(fpsTile, netTile, onlineTile, mpTile)
   document.body.append(chip)
+  registerPageUI(chip)
 
   let frames = 0
   let frameAt = performance.now()
@@ -60,6 +61,7 @@ export function mountStats() {
 
   function paintFps() {
     fpsTile.textContent = `${fps.toFixed(0)} FPS`
+    registerPageUI(fpsTile,true)
   }
 
   function paintNet() {
@@ -99,12 +101,14 @@ export function mountStats() {
     bytes = 0
     byteAt = now
     netTile.textContent = speed(rate)
+    registerPageUI(netTile,true)
   }, NET_WINDOW)
 
   startLive()
   onOnline(value => {
     online = value
     onlineTile.textContent = value === null ? '' : `在线 ${value}`
+    registerPageUI(onlineTile,true)
     syncVisibility()
   })
   onPrefs(syncVisibility)
@@ -118,6 +122,7 @@ export function mountStats() {
       : mp.state === 'replaced' ? '已在其他设备联机 · 重连'
       : signedIn ? '联机已断开 · 重连' : '登录后联机'
     mpTile.title = mp.state === 'online' ? '查看同城在线玩家和他们的位置' : ''
+    registerPageUI(mpTile,true)
     if (mp.state === 'online') mpTile.setAttribute('aria-label', `同城在线 ${mp.online} 人`)
     else mpTile.removeAttribute('aria-label')
     syncVisibility()
@@ -139,3 +144,4 @@ export function mountStats() {
   requestAnimationFrame(loop)
   return chip
 }
+import {registerPageUI} from '../capture-page'

@@ -1,13 +1,17 @@
 import { type Env, Problem, equal, hash, invalid, limited, now, sessionAccount, sessionHash, unauthorized } from './auth'
 import { ll2xz } from './projection'
-import { APPEAL,BUG, edges, kinds, labels, views, validView } from './feedback-contract'
+import { APPEAL, BUG, TERMINAL_STATUSES, appealEdges, edges, extractBanRecordId, kinds, labels, stripAppealTemplate, views, validView } from './feedback-contract'
 import { adminList, adminMergeUsers, adminSetEmail, adminSetPassword, adminUserDetail, audit, setBan, setRole } from './admin'
 import {flushMail} from './feedback-mail'
 
 const json = (value: unknown) => Response.json(value, { headers: { 'Cache-Control': 'private, no-store' } })
-function transitions(current: string, bridge: boolean) {
-  return (edges[current]??[]).filter(status=>status!==(bridge?'approved':'queued')).map(status=>({
-    status,label:labels[status],needs_message:['need_info','rejected','duplicate'].includes(status),
+const TERMINAL = new Set<string>(TERMINAL_STATUSES)
+function transitions(current: string, bridge: boolean, kind?: string | null) {
+  const table = kind === APPEAL ? appealEdges : edges
+  return (table[current] ?? []).filter((status) => kind === APPEAL || status !== (bridge ? 'approved' : 'queued')).map((status) => ({
+    status,
+    label: labels[status],
+    needs_message: ['need_info', 'rejected', 'duplicate', 'resolved', 'unbanned', 'upheld'].includes(status),
   }))
 }
 function missing(): never {
@@ -36,6 +40,13 @@ async function fields(request: Request): Promise<Record<string, unknown>> {
   if (!value || typeof value !== 'object' || Array.isArray(value)) invalid()
   return value as Record<string, unknown>
 }
+const DEFAULT_AUTO_APPROVE_EMAILS = ['xiepy244@gmail.com']
+function autoApproveEmails(env: Env) {
+  if (env.FEEDBACK_AUTO_APPROVE_EMAILS === undefined) return DEFAULT_AUTO_APPROVE_EMAILS
+  return env.FEEDBACK_AUTO_APPROVE_EMAILS.split(',')
+    .map((entry) => entry.trim().toLowerCase())
+    .filter((entry) => entry && entry !== 'none')
+}
 export async function feedback(request: Request, env: Env, path: string) {
   const method = request.method,
     bridge = path.startsWith('bridge/'),
@@ -56,7 +67,9 @@ export async function feedback(request: Request, env: Env, path: string) {
   }
   const stmt = (sql: string, ...args: (number | string | null)[]) => env.DB.prepare(sql).bind(...args)
   let user = ''
+  let accountUid = 0
   let isAdmin = false
+  let accountEmail = ''
   if (machine) {
     if (!env.BRIDGE_TOKEN || !auth || !equal(await hash(auth), await hash(`Bearer ${env.BRIDGE_TOKEN}`)))
       unauthorized()
@@ -79,7 +92,9 @@ export async function feedback(request: Request, env: Env, path: string) {
     const account = await sessionAccount(env.DB,await sessionHash(request))
     if (!account?.verified) unauthorized()
     user = account.id
+    accountUid = Number(account.uid) || 0
     isAdmin = account.role === 'admin'
+    accountEmail = account.email.toLowerCase()
     if (admin && !isAdmin) throw new Problem(403, 'forbidden', '无权限')
     if (method !== 'GET' && request.headers.get('Origin') !== new URL(request.url).origin)
       throw new Problem(403, 'origin', '请求来源不符')
@@ -125,7 +140,7 @@ export async function feedback(request: Request, env: Env, path: string) {
     return json(
       (
         await stmt(
-          "SELECT * FROM feedback WHERE status IN ('submitted','approved','need_info') OR (multica_issue IS NOT NULL AND status NOT IN ('draft','live','rejected','duplicate')) ORDER BY updated_at,id",
+          "SELECT f.*,u.email AS submitter_email,u.role AS submitter_role FROM feedback f JOIN users u ON u.id=f.user_id WHERE f.status IN ('submitted','approved','need_info') OR (f.multica_issue IS NOT NULL AND f.status NOT IN ('draft','live','resolved','rejected','duplicate','unbanned','upheld')) ORDER BY f.updated_at,f.id",
         ).all()
       ).results,
     )
@@ -144,32 +159,59 @@ export async function feedback(request: Request, env: Env, path: string) {
     const data = await fields(request),
       lat = number(data.lat, -90, 90),
       lon = number(data.lon, -180, 180),
-      point = ll2xz(lat, lon)
+      point = ll2xz(lat, lon),
+      kindStr = String(data.kind),
+      bodyStr = text(data.body ?? '', 2000) ?? ''
     if (
       Math.abs(point.x) > 3072.000001 ||
       Math.abs(point.z) > 3328.000001 ||
-      !kinds.includes(String(data.kind)) ||
-      !(data.kind===APPEAL && data.view==null) && !validView(data.view)
+      !kinds.includes(kindStr) ||
+      !(kindStr === APPEAL && data.view == null) && !validView(data.view)
     )
       invalid()
+    let banRecordId: string | null = null
+    let appealTriage: Record<string, unknown> | null = null
+    if (kindStr === APPEAL) {
+      if (Array.from(stripAppealTemplate(bodyStr)).length < 2) {
+        throw new Problem(400, 'empty_appeal', '请填写具体的申诉说明，不能留空或只保留模板')
+      }
+      const rawRecordId = text(data.ban_record_id, 64)
+      if (rawRecordId && !/^[A-Za-z0-9_-]{6,64}$/.test(rawRecordId)) invalid()
+      banRecordId = rawRecordId || extractBanRecordId(bodyStr)
+      if (env.appealTriage) {
+        const result = await env.appealTriage({ uid: accountUid, userId: user, banRecordId, body: bodyStr })
+        if (result?.ownerMismatch) {
+          throw new Problem(403, 'record_owner_mismatch', '该记录编号不属于当前账号')
+        }
+        if (result?.recordId) banRecordId = result.recordId
+        if (result?.triage) appealTriage = result.triage
+      }
+    }
     const id = crypto.randomUUID()
-    const created = await stmt(
-      `INSERT INTO feedback(id,user_id,kind,title,body,lat,lon,heading,landmark_id,view_json) SELECT ?,?,?,?,?,?,?,?,?,?
-       WHERE (SELECT count(*) FROM feedback WHERE user_id=? AND status='draft')<3`,
-      id,
-      user,
-      String(data.kind),
-      text(data.title, 40, true),
-      text(data.body ?? '', 2000),
-      lat,
-      lon,
-      data.heading == null ? null : number(data.heading, 0, 360),
-      text(data.landmark_id, 120),
-      data.view==null?null:JSON.stringify(data.view),
-      user,
-    ).run()
+    const titleStr = text(data.title, 40, true)
+    const headingVal = data.heading == null ? null : number(data.heading, 0, 360)
+    const landmarkVal = text(data.landmark_id, 120)
+    const viewJson = data.view == null ? null : JSON.stringify(data.view)
+    let created
+    try {
+      created = await stmt(
+        `INSERT INTO feedback(id,user_id,kind,title,body,lat,lon,heading,landmark_id,view_json,ban_record_id,appeal_triage) SELECT ?,?,?,?,?,?,?,?,?,?,?,?
+         WHERE (SELECT count(*) FROM feedback WHERE user_id=? AND status='draft')<3`,
+        id, user, kindStr, titleStr, bodyStr, lat, lon, headingVal, landmarkVal, viewJson,
+        banRecordId, appealTriage ? JSON.stringify(appealTriage) : null, user,
+      ).run()
+    } catch (error) {
+      // 兼容尚未迁移 ban_record_id / appeal_triage 列的旧环境
+      if (/column|no such column/i.test(String((error as Error)?.message ?? error))) {
+        created = await stmt(
+          `INSERT INTO feedback(id,user_id,kind,title,body,lat,lon,heading,landmark_id,view_json) SELECT ?,?,?,?,?,?,?,?,?,?
+           WHERE (SELECT count(*) FROM feedback WHERE user_id=? AND status='draft')<3`,
+          id, user, kindStr, titleStr, bodyStr, lat, lon, headingVal, landmarkVal, viewJson, user,
+        ).run()
+      } else throw error
+    }
     if (!created.meta.changes) throw new Problem(429, 'draft_limit', '最多保留 3 条草稿，请先提交或删除草稿')
-    return json({ id })
+    return json({ id, ...(banRecordId ? { ban_record_id: banRecordId } : {}) })
   }
   const match =
     /^(bridge\/|admin\/)?feedback\/([\w-]+)(?:\/(submit|supplement|status|messages|relayed|bind|view-shot|photos\/(?:[1-9]|1\d|20)))?$/.exec(
@@ -178,9 +220,9 @@ export async function feedback(request: Request, env: Env, path: string) {
   if (!match || (bridge&&!['status','messages','relayed','bind'].includes(match[3])) || (!bridge&&!admin&&['status','relayed','bind'].includes(match[3]))) missing()
   const [, , id, action] = match,
     row = await stmt(
-      (admin
-        ? 'SELECT f.*,u.email,u.nickname FROM feedback f JOIN users u ON u.id=f.user_id WHERE f.id=?'
-        : 'SELECT * FROM feedback WHERE id=?') + ' AND (user_id=? OR ?=1)',
+      (admin || machine
+        ? 'SELECT f.*,u.email,u.nickname,u.role AS submitter_role FROM feedback f JOIN users u ON u.id=f.user_id WHERE f.id=? AND (f.user_id=? OR ?=1)'
+        : 'SELECT * FROM feedback WHERE id=? AND (user_id=? OR ?=1)'),
       id,
       user,
       Number(
@@ -189,7 +231,7 @@ export async function feedback(request: Request, env: Env, path: string) {
           (isAdmin && method === 'GET' && (action === 'view-shot' || action?.startsWith('photos/'))) ||
           false,
       ),
-    ).first<{ status: string; multica_issue: string | null; view_json: string | null; shot_state: number }>()
+    ).first<{ kind: string; status: string; body?: string; ban_record_id?: string | null; appeal_triage?: unknown; multica_issue: string | null; view_json: string | null; shot_state: number }>()
   if (!row) missing()
   if(method==='POST'&&bridge&&action==='bind'){
     const issue=text((await fields(request)).issue,128,true)!
@@ -200,9 +242,9 @@ export async function feedback(request: Request, env: Env, path: string) {
     await stmt('UPDATE feedback_messages SET relayed_at=coalesce(relayed_at,unixepoch()) WHERE feedback_id=? AND id=?',id,number((await fields(request)).id,1,Number.MAX_SAFE_INTEGER)).run();return json({ok:true})
   }
   if(method==='POST'&&action==='messages'){
-    if(['live','rejected','duplicate','draft'].includes(row.status))conflict()
+    if(TERMINAL.has(row.status)||row.status==='draft')conflict()
     const data=await fields(request),body=text(data.body,1000,true)!,kind=bridge?'agent':admin?'admin':'user',source=bridge?text(data.source,200,true):null
-    const [result]=await env.DB.batch([stmt(`INSERT INTO feedback_messages(feedback_id,author_kind,author_name,body,source,relayed_at) SELECT ?,?,?,?,?,? WHERE EXISTS(SELECT 1 FROM feedback WHERE id=? AND status NOT IN ('draft','live','rejected','duplicate')) AND (?='agent' OR (SELECT count(*) FROM feedback_messages WHERE feedback_id=? AND author_kind!='agent' AND created_at>unixepoch()-3600)<20) ON CONFLICT(feedback_id,source) DO NOTHING`,id,kind,bridge?'协调人':admin?'管理员':'提交人',body,source,bridge?now():null,id,kind,id),...(admin?[audit(env.DB,user,'reply','feedback',id,{})]:[])])
+    const [result]=await env.DB.batch([stmt(`INSERT INTO feedback_messages(feedback_id,author_kind,author_name,body,source,relayed_at) SELECT ?,?,?,?,?,? WHERE EXISTS(SELECT 1 FROM feedback WHERE id=? AND status NOT IN ('draft','live','resolved','rejected','duplicate','unbanned','upheld')) AND (?='agent' OR (SELECT count(*) FROM feedback_messages WHERE feedback_id=? AND author_kind!='agent' AND created_at>unixepoch()-3600)<20) ON CONFLICT(feedback_id,source) DO NOTHING`,id,kind,bridge?'协调人':admin?'管理员':'提交人',body,source,bridge?now():null,id,kind,id),...(admin?[audit(env.DB,user,'reply','feedback',id,{})]:[])])
     if(!result.meta.changes&&!bridge)limited();return json({ok:true})
   }
   const shotKey = `fb/${id}/view.jpg`
@@ -300,8 +342,16 @@ export async function feedback(request: Request, env: Env, path: string) {
   if (!action && method === 'GET'){
     const messages=(await stmt('SELECT id,author_kind,author_name,body,created_at,relayed_at FROM feedback_messages WHERE feedback_id=? ORDER BY created_at,id',id).all()).results
     if(admin&&messages.length)await stmt('UPDATE feedback SET admin_read_id=max(admin_read_id,?) WHERE id=?',Number(messages.at(-1)?.id),id).run()
+    let parsedTriage: unknown = null
+    if ((admin || machine) && row.appeal_triage != null) {
+      if (typeof row.appeal_triage === 'string') {
+        try { parsedTriage = JSON.parse(row.appeal_triage) } catch { parsedTriage = null }
+      } else parsedTriage = row.appeal_triage
+    }
     return json({
       ...row,
+      ban_record_id: row.ban_record_id ?? null,
+      appeal_triage: admin || machine ? parsedTriage : undefined,
       messages,
       view_json: undefined,
       shot_state: undefined,
@@ -309,7 +359,7 @@ export async function feedback(request: Request, env: Env, path: string) {
       has_view_shot: row.shot_state === 1,
       ...(admin
         ? {
-            allowed_transitions: transitions(row.status,false),
+            allowed_transitions: transitions(row.status, false, row.kind),
             issue_url: row.multica_issue
               ? `https://multica.ai/idoknow/issues/${encodeURIComponent(row.multica_issue)}`
               : null,
@@ -339,7 +389,7 @@ export async function feedback(request: Request, env: Env, path: string) {
         },
       })
     }
-    if (!['draft', 'need_info'].includes(row.status) && (method!=='PUT'||['live','rejected','duplicate'].includes(row.status)||await stmt('SELECT 1 FROM feedback_photos WHERE feedback_id=? AND n=?',id,slot).first())) conflict()
+    if (!['draft', 'need_info'].includes(row.status) && (method!=='PUT'||TERMINAL.has(row.status)||await stmt('SELECT 1 FROM feedback_photos WHERE feedback_id=? AND n=?',id,slot).first())) conflict()
     if (method === 'DELETE') {
       const photo = await stmt(
         `DELETE FROM feedback_photos WHERE feedback_id=? AND n=? AND EXISTS(SELECT 1 FROM feedback WHERE id=? AND status=?) RETURNING r2_key`,
@@ -440,21 +490,30 @@ export async function feedback(request: Request, env: Env, path: string) {
     pr = null,
     credit = null,
     guard = ''
+  const priorityAdmin = !machine && isAdmin && autoApproveEmails(env).includes(accountEmail)
+  const priorityAutoApprove = priorityAdmin && row.kind !== APPEAL
   if (action === 'submit') {
     if (row.status !== 'draft') conflict()
-    target = 'submitted'
-    message = '已提交，等待处理'
-    guard = ` AND (kind='${APPEAL}' OR (view_json IS NOT NULL AND shot_state=1 AND (kind='${BUG}' OR EXISTS(SELECT 1 FROM feedback_photos WHERE feedback_id=feedback.id AND ready=1)))) AND (SELECT count(*) FROM feedback f WHERE f.user_id=feedback.user_id AND f.submitted_at>unixepoch()-86400)<5`
+    if (row.kind === APPEAL && Array.from(stripAppealTemplate(String(row.body ?? ''))).length < 2) {
+      throw new Problem(400, 'empty_appeal', '请填写具体的申诉说明，不能留空或只保留模板')
+    }
+    target = priorityAutoApprove ? 'approved' : 'submitted'
+    message = priorityAutoApprove ? '管理员直提已自动批准，等待专职 Agent 开工' : '已提交，等待处理'
+    const quotaGuard = priorityAdmin
+      ? ''
+      : ' AND (SELECT count(*) FROM feedback f WHERE f.user_id=feedback.user_id AND f.submitted_at>unixepoch()-86400)<5'
+    guard = ` AND ((kind='${APPEAL}' AND length(trim(body))>0) OR (view_json IS NOT NULL AND ((kind='${BUG}' AND shot_state!=2 AND length(trim(body))>0) OR (shot_state=1 AND EXISTS(SELECT 1 FROM feedback_photos WHERE feedback_id=feedback.id AND ready=1)))))${quotaGuard}`
   } else if (action === 'supplement') {
     if (row.status !== 'need_info') conflict()
-    target = 'submitted'
+    target = priorityAutoApprove ? 'approved' : 'submitted'
     message = text((await fields(request)).body, 1000, true)!
     guard = " AND shot_state!=2 AND (SELECT count(*) FROM feedback_messages WHERE feedback_id=feedback.id AND author_kind!='agent' AND created_at>unixepoch()-3600)<20"
   } else if (bridge || admin) {
     const data = await fields(request)
     target = String(data.status)
-    if (bridge && target === row.status && target!=='approved' && edges[target]) return json({ ok: true })
-    const change=transitions(row.status,bridge).find(item=>item.status===target)
+    const activeTable = row.kind === APPEAL ? appealEdges : edges
+    if (bridge && target === row.status && target!=='approved' && activeTable[target]) return json({ ok: true })
+    const change=transitions(row.status,bridge,row.kind).find(item=>item.status===target)
     if (!change) conflict()
     message=text(data.message,2000,change.needs_message)||change.label
     if (bridge) {
@@ -492,15 +551,17 @@ export async function feedback(request: Request, env: Env, path: string) {
   if (!changed.meta.changes) {
     if (
       action === 'submit' &&
+      !priorityAdmin &&
       ((await stmt(
         'SELECT count(*) AS total FROM feedback WHERE user_id=? AND submitted_at>unixepoch()-86400',
         user,
       ).first<number>('total')) ?? 0) >= 5
     )
       limited()
+    const activeTable = row.kind === APPEAL ? appealEdges : edges
     if (
       bridge &&
-      edges[target] &&
+      activeTable[target] &&
       (await stmt('SELECT status FROM feedback WHERE id=?', id).first('status')) === target
     )
       return json({ ok: true })

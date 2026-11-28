@@ -94,6 +94,7 @@ function row(m: ChatMessage) {
   head.append(tag, name, time)
   const body = document.createElement('p'); body.textContent = m.text
   li.append(head, body)
+  registerPageUI(li,true)
   return li
 }
 function paintList(stick = true) {
@@ -107,6 +108,7 @@ function paintList(stick = true) {
       : channel === 'near' ? '身边 60 米内还没人说话。说一句，附近的人都能看到。'
       : '世界频道还很安静，打个招呼吧。'
     list.append(empty)
+    registerPageUI(empty,true)
   }
   if (stick) scrollToEnd()
 }
@@ -117,7 +119,7 @@ function append(m: ChatMessage) {
   list.append(row(m))
   while (list.children.length > KEEP) list.firstElementChild!.remove()
   if (stick || myUid && m.uid === myUid && !m.sys) scrollToEnd()
-  else { unread[channel]++; more.hidden = false; more.textContent = `↓ ${unread[channel]} 条新消息` }
+  else { unread[channel]++; more.hidden = false; more.textContent = `↓ ${unread[channel]} 条新消息`;registerPageUI(more,true) }
 }
 function paintTabs() {
   for (const ch of ['near', 'world'] as Channel[]) {
@@ -130,14 +132,16 @@ function paintBubble() {
   const m = latest()
   const total = open ? 0 : unread.near + unread.world
   bubbleCount.textContent = total ? String(Math.min(total, 99)) : ''
+  registerPageUI(bubbleCount,true)
   bubbleCount.hidden = !total
-  if (!m) { bubbleText.textContent = online ? '聊天 · 回车说话' : '联机后可聊天'; bubble.dataset.ch = ''; return }
+  if (!m) { bubbleText.textContent = online ? '聊天 · 回车说话' : '联机后可聊天';registerPageUI(bubbleText,true); bubble.dataset.ch = ''; return }
   bubble.dataset.ch = m.sys ? 'sys' : m.ch
   bubbleText.replaceChildren()
   const tag = document.createElement('span'); tag.className = 'chat-tag'; tag.dataset.ch = m.ch
   tag.textContent = m.sys ? '公告' : LABEL[m.ch]
   const who = document.createElement('b'); who.textContent = m.sys ? '' : `${m.name}：`
   bubbleText.append(tag, who, document.createTextNode(m.text))
+  registerPageUI(bubbleText,true)
 }
 function remaining() {
   if (mute.until === -1) return '永久'
@@ -155,6 +159,7 @@ function paintInput() {
     : channel === 'near' ? '对身边 60 米内的人说…' : '对全城的人说…'
   const n = length(input.value.trim())
   counter.textContent = `${length(input.value)}/${MAX}`
+  registerPageUI(counter,true); if(muted)registerPageUI(muteLine,true)
   counter.dataset.over = length(input.value) > MAX ? '1' : ''
   sendButton.disabled = muted || !online || sending || !n || length(input.value) > MAX
   clearInterval(muteTimer)
@@ -166,6 +171,7 @@ function grow() {
 }
 function say(text: string, tone: 'warn' | 'ok' = 'warn') {
   notice.textContent = text
+  registerPageUI(notice,true)
   notice.dataset.tone = tone
   notice.hidden = false
   clearTimeout(noticeTimer)
@@ -182,12 +188,13 @@ function select(ch: Channel) {
 }
 export function openChat(focus = false) {
   if (!root || !online) return
+  dispatchEvent(new Event('glol:chat-open'))
   open = true
   root.dataset.open = '1'
   unread[channel] = 0
   placePanel(); paintTabs(); paintInput(); paintList(); paintBubble()
   if (online) chatStore.history(channel)
-  if (focus) requestAnimationFrame(() => input.focus({preventScroll: true}))
+  if (focus) requestAnimationFrame(() => { if (open) input.focus({preventScroll: true}) })
 }
 export function closeChat() {
   if (!root || !open) return
@@ -302,11 +309,13 @@ function build() {
     openChat(true)
   })
   document.body.append(root)
+  registerPageUI(root)
 }
 
 export function mountChat() {
   if (root) return
   build()
+  addEventListener('glol:roster-open', closeChat)
   chatStore.subscribe(event => {
     switch (event.t) {
       case 'chat': {
@@ -355,3 +364,4 @@ export function mountChat() {
   chatStore.onSelf(uid => { myUid = uid })
   paintTabs(); paintInput(); paintBubble()
 }
+import {registerPageUI} from '../capture-page'

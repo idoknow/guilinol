@@ -2,7 +2,7 @@ import * as THREE from 'three'
 import {drainPerSecond, speedLimit, type DroneSpec} from './specs'
 
 // IDOK-215: a spec-driven arcade flight model. Every clamp below comes from the aircraft's sheet
-// (web/src/drone/specs.ts) so a Mini 5 Pro really does feel tamer than an Inspire 3.
+// (web/src/drone/specs.ts) so a Mini 5 Pro really does feel tamer than an FPV racer.
 export type Phase = 'landed' | 'takeoff' | 'flying' | 'returning' | 'landing'
 
 export interface Sticks { throttle:number; yaw:number; pitch:number; roll:number }
@@ -158,6 +158,9 @@ export function stepFlight(flight:Flight, dt:number, sticks:Sticks, groundAt:(x:
   return flight
 }
 
+/** Height (metres above the ground under the aircraft) the aircraft cruises home at. */
+export const RTH_CRUISE_AGL = 25
+
 function homeSticks(flight:Flight, groundY:number):Sticks {
   const toHome = flight.home.clone().sub(flight.pos)
   const dist = Math.hypot(toHome.x,toHome.z)
@@ -167,8 +170,15 @@ function homeSticks(flight:Flight, groundY:number):Sticks {
   }
   const wantYaw = Math.atan2(-toHome.x,-toHome.z)
   const delta = Math.atan2(Math.sin(wantYaw - flight.yaw),Math.cos(wantYaw - flight.yaw))
-  const throttle = flight.agl > Math.max(8, (flight.pos.y - groundY) * .4) ? .35 : (flight.agl > 3 ? 0 : -.5)
-  return {throttle, yaw:THREE.MathUtils.clamp(-delta * 1.6,-1,1), pitch:dist > 4 ? .6 : 0, roll:0}
+  // IDOK-529: the old line kept feeding +0.35 throttle for as long as the aircraft was high, so a
+  // return trip climbed until it hit the 500 m ceiling and never came down. Fly a fixed cruise
+  // altitude instead, then drop straight onto the pad once it is overhead.
+  const ceilingAgl = Math.max(RTH_CRUISE_AGL, flight.home.y - groundY + RTH_CRUISE_AGL)
+  let throttle = 0
+  if (dist < 8) throttle = flight.agl > 3 ? -.5 : -.35
+  else if (flight.agl > ceilingAgl + 3) throttle = -.3
+  else if (flight.agl < ceilingAgl - 2) throttle = .32
+  return {throttle, yaw:THREE.MathUtils.clamp(-delta * 1.6,-1,1), pitch:dist > 4 ? .6 : .25, roll:0}
 }
 
 /** Camera pose for the RC view: lens position + gimbal attitude. */

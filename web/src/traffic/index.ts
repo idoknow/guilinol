@@ -12,6 +12,8 @@ import {signalApproaches} from './signal-approach'
 import {parkingBayLines} from './parking-bays'
 import {manholeCovers} from './manhole-covers'
 import {bollards} from './bollards'
+import {busStops} from './bus-stops'
+import {busShelterClearanceState} from './bus-shelter-clearance'
 import {drawnGround} from './drawn-ground'
 import {streetSurfaceMat} from '../streets'
 import {LANDMARK_SIGNAL_GROUPS,signalHeads} from './signal-heads'
@@ -60,7 +62,7 @@ export async function traffic(scene:THREE.Scene,camera:THREE.Camera,verify:boole
   const geometryIds=models.geometries.map(g=>batch.addGeometry(g))
   const slotGeometry=new Int16Array(SLOTS).fill(-1),slotPaint:(THREE.Color|undefined)[]=[],slotShown=new Uint8Array(SLOTS)
   for(let slot=0;slot<SLOTS;slot++){batch.addInstance(geometryIds[0]);batch.setVisibleAt(slot,false)}
-  const variants=new WeakMap<object,{full:Variant,bare?:Variant,subtype?:TwoWheelSubtype,violation?:TrafficViolation,noHelmet?:boolean,u:number,v:number}>()
+  const variants=new WeakMap<object,{full:Variant,bare?:Variant,subtype?:TwoWheelSubtype,violation?:TrafficViolation,violationMask?:number,noHelmet?:boolean,u:number,v:number}>()
   const pose=new THREE.Object3D();pose.rotation.order='YXZ'
   const transforms=new Float64Array(SLOTS*8).fill(NaN)
   const FAR=75**2 // IDOK-253: detailed car meshes only near the camera, light stand-ins beyond 75 m
@@ -112,7 +114,7 @@ export async function traffic(scene:THREE.Scene,camera:THREE.Camera,verify:boole
   }
   let accumulator=0
   const signalDriver=citySignalClock.driver(SIGNAL_DRIVER_RANK.street)
-  const signalProbe={clock:()=>citySignalClock.now,count:()=>citySignals.size,nodes:()=>[...citySignals.nodeIds()],state:(node:number)=>{const state=citySignalState(node,{phase:0,color:'green',remaining:0,cycle:0});return state&&{...state,lanes:citySignals.spec(node)!.phases.map(phase=>phase.lanes)}},color:(node:number,lane:number)=>citySignalColor(node,lane),sim:(node:number,lane:number)=>sim?.getSignalPhase(lane,node)??null}
+  const signalProbe={clock:()=>citySignalClock.now,count:()=>citySignals.size,nodes:()=>[...citySignals.nodeIds()],state:(node:number)=>{const state=citySignalState(node,{phase:0,color:'green',remaining:0,cycle:0});return state&&{...state,lanes:citySignals.spec(node)!.phases.map(phase=>phase.lanes)}},color:(node:number,lane:number)=>citySignalColor(node,lane),sim:(node:number,lane:number)=>sim?.getSignalPhase(lane,node)??null,ped:(node:number,dx:number,dz:number)=>sim?.getPedestrianSignalPhase(node,dx,dz)??null}
   if(verify)mesh.userData.signals=signalProbe
   // IDOK-399: a signal head for every approach of the loaded road cell. They read `citySignals`; they never drive the clock.
   const heads=surfaceAt&&signalHeads(scene,surfaceAt)
@@ -131,16 +133,40 @@ export async function traffic(scene:THREE.Scene,camera:THREE.Camera,verify:boole
   if(covers)void warm?.(covers.mesh)
   // IDOK-399: kerb bollards beside the signal poles. One instanced mesh; they stand where `heads` found a kerb,
   // on the ground as drawn (tile ground mesh / street surface layer, `drawn-ground.ts`) where that is known, else on the collider.
-  const posts=heads&&sampleGround&&surfaceAt&&bollards(scene,sampleGround,surfaceAt,drawnGround(scene,streetSurfaceMat))
+  // One reader of the ground as drawn, shared by the posts and the bus stops.
+  const drawn=sampleGround?drawnGround(scene,streetSurfaceMat):undefined
+  const posts=heads&&sampleGround&&surfaceAt&&bollards(scene,sampleGround,surfaceAt,drawn)
   if(posts)void warm?.(posts.mesh)
-  let coversFailed=false,postsFailed=false
+  // IDOK-399 5b: bus stop signs and shelters from `street-furniture/bus-stops.json`. Two meshes (parts, name faces); same ground rules as the posts.
+  const stops=sampleGround&&busStops(scene,sampleGround,drawn)
+  if(stops){void warm?.(stops.mesh);void warm?.(stops.faces)}
+  let coversFailed=false,postsFailed=false,stopsFailed=false
   if(verify&&covers)mesh.userData.manholeCovers=covers.probe
   if(verify&&posts)mesh.userData.bollards=posts.probe
   if(verify&&(covers||posts))mesh.userData.streetFurnitureDraws=async(frames?:number)=>{const {parkingBayDraws}=await import('./parking-bay-audit');return {covers:covers?await parkingBayDraws(covers.mesh,frames):undefined,posts:posts?await parkingBayDraws(posts.mesh,frames):undefined}}
   // Verify-only: the same view with and without the covers and posts, for before/after screenshots.
   if(verify&&(covers||posts))mesh.userData.streetFurnitureShown=(shown:boolean)=>{for(const item of [covers?.mesh,posts?.mesh])if(item)(item.material as THREE.Material).visible=shown}
   if(verify&&(covers||posts))mesh.userData.streetFurnitureAudit=async(focus:{x:number,z:number},radius?:number)=>(await import('./street-furniture-audit')).streetFurnitureAudit(scene,covers?covers.mesh:undefined,covers?covers.probe().covers:[],posts?posts.mesh:undefined,posts?posts.probe().posts:[],focus,radius)
-  const near=(x:number,z:number,visit:(solid:Solid)=>void)=>{sim?.nearSolids(x,z,visit);getActiveDutyTraffic()?.nearSolids(x,z,visit);staticSolids(x,z,visit);heads?.near(x,z,visit);posts?.near(x,z,visit)}
+  if(verify&&stops){
+    mesh.userData.busStops=stops.probe
+    // IDOK-399 5c: whether the e-bike clearance around shelters has its data (batch.ts asks it, it loads on its own).
+    mesh.userData.busShelterClearance=busShelterClearanceState
+    // Verify-only: the same view with and without the stops, for before/after screenshots.
+    mesh.userData.busStopsShown=(shown:boolean)=>{for(const item of [stops.mesh,stops.faces])(item.material as THREE.Material).visible=shown}
+    mesh.userData.busStopDraws=async(frames?:number)=>{const {parkingBayDraws}=await import('./parking-bay-audit');return {parts:await parkingBayDraws(stops.mesh,frames),faces:await parkingBayDraws(stops.faces,frames)}}
+    // Pole base and each shelter column bottom against the highest drawn surface under it (`gap`: ours minus that surface).
+    mesh.userData.busStopMeshes=()=>{const names:string[]=[];scene.traverse(object=>{if(object.name.startsWith('G2 bus stop'))names.push(object.name)});return names}
+    mesh.userData.busStopAudit=async(focus:{x:number,z:number},radius=170)=>{
+      const {drawnSurfaceUnder}=await import('./street-furniture-audit')
+      const all=stops.probe().stops.filter(stop=>stop.state==='drawn'&&(stop.x-focus.x)**2+(stop.z-focus.z)**2<=radius**2)
+      return all.map(stop=>{
+        const feet=stop.corners.filter(corner=>corner.bottom!==null)
+        const [pole,...under]=drawnSurfaceUnder(scene,[{x:stop.x,y:stop.y!,z:stop.z},...feet.map(corner=>({x:corner.x,y:corner.y!,z:corner.z}))],[stops.mesh,stops.faces])
+        return {key:stop.key,pole:{gap:pole.y===null?null:+(stop.y!-pole.y).toFixed(4),under:pole.under,hits:pole.hits},feet:under.map((hit,index)=>({gap:hit.y===null?null:+(feet[index].bottom!-hit.y).toFixed(4),ground:hit.y===null?null:+(feet[index].y!-hit.y).toFixed(4),under:hit.under,hits:hit.hits}))}
+      })
+    }
+  }
+  const near=(x:number,z:number,visit:(solid:Solid)=>void)=>{sim?.nearSolids(x,z,visit);getActiveDutyTraffic()?.nearSolids(x,z,visit);staticSolids(x,z,visit);heads?.near(x,z,visit);posts?.near(x,z,visit);stops?.near(x,z,visit)}
   const probeIds=new WeakMap<object,number>();let nextProbeId=0
   batch.setColorAt(0,new THREE.Color(0xffffff))
   await warm?.(batch)
@@ -156,13 +182,14 @@ export async function traffic(scene:THREE.Scene,camera:THREE.Camera,verify:boole
     const dutyActive=Boolean(getActiveDutyTraffic())
     if(enabled)useTrafficSolids(near)
     else if(!dutyActive)useTrafficSolids(undefined)
-    if(!enabled){effects.clear();people.clear();riders.clear();walking.clear();ridden.clear();riddenSlots.clear();mesh.count=0;hide(0,SLOTS);parkKey='';parkCount=0;curbside.clear();heads?.hide();bays?.hide();covers?.hide();posts?.hide();return}
+    if(!enabled){effects.clear();people.clear();riders.clear();walking.clear();ridden.clear();riddenSlots.clear();mesh.count=0;hide(0,SLOTS);parkKey='';parkCount=0;curbside.clear();heads?.hide();bays?.hide();covers?.hide();posts?.hide();stops?.hide();return}
     updateParking(camera.position.x,camera.position.z)
     parkLodAt-=dt;if(parkLodAt<=0){parkLodAt=.5;for(const [slot,variant,x,y,z,yaw] of parkedRows)show(slot,variant,x,y,z,yaw,1)}
     bays?.update(dt,player??camera.position)
     // A failure in the street furniture must not skip the traffic below; one warning each, not one a frame.
     try{covers?.update(dt,player??camera.position)}catch(error){if(!coversFailed){coversFailed=true;console.warn('Manhole covers unavailable',error)}}
     try{if(posts&&heads){posts.sync(heads);posts.update(dt,player??camera.position)}}catch(error){if(!postsFailed){postsFailed=true;console.warn('Bollards unavailable',error)}}
+    try{stops?.update(dt,player??camera.position)}catch(error){if(!stopsFailed){stopsFailed=true;console.warn('Bus stops unavailable',error)}}
     if(verify&&mesh.userData.staticOnly){hide(0,STATIC);mesh.count=0;mesh.userData.allMotors=[];heads?.update(dt,player??camera.position);return}
     const center=player??camera.position
     const target=`${Math.floor(center.x/512)}_${Math.floor(center.z/512)}`
@@ -199,18 +226,25 @@ export async function traffic(scene:THREE.Scene,camera:THREE.Camera,verify:boole
     riddenSlots.clear()
     let motors=0,pedestrians=0,queued=0,redStops=0
     if(verify){mesh.userData.simTime=sim.time;mesh.userData.motorIds.length=0;mesh.userData.approaches=[];mesh.userData.allMotors=[];mesh.userData.motorLanes=[];mesh.userData.pedestriansDetail=[]}
+    let totalNpc=0,compliantNpc=0,totalScooters=0,violatorScooters=0,noHelmetScooters=0,multiViolScooters=0,helmetVisualMismatch=0
     sim.actors.forEach((actor,index)=>{
+      if(verify){
+        totalNpc++
+        if(actor.laneCompliant!==false)compliantNpc++
+      }
       if(verify&&actor.kind==='person'){
         const s=sim!.sideClearances(actor.x,actor.z,actor.track.dx,actor.track.dz)
         mesh.userData.pedestriansDetail.push({
           street:actor.track.street,cls:actor.track.cls,x:actor.x,y:actor.y,z:actor.z,speed:actor.speed,dodge:actor.dodge,
+          laneCompliant:actor.laneCompliant!==false,encroachmentKind:actor.encroachmentKind??'none',
+          waitingForSignal:Boolean(actor.waitingForSignal),onCrossing:Boolean(actor.track.painted),
           hitsMotor:sim!.hitsMotorLane(actor.x,actor.z,.35),betweenMotors:s.betweenMotors,
           surface:surfaceAt?.(actor.x,actor.z)??null,
         })
       }
       if(verify&&actor.kind!=='person'){
         if(!probeIds.has(actor))probeIds.set(actor,++nextProbeId)
-        mesh.userData.motorLanes.push({id:probeIds.get(actor),kind:actor.kind,street:actor.track.street,lane:actor.track.id,x:actor.x,z:actor.z,speed:actor.speed,leaving:actor.leaving})
+        mesh.userData.motorLanes.push({id:probeIds.get(actor),kind:actor.kind,street:actor.track.street,lane:actor.track.id,x:actor.x,z:actor.z,speed:actor.speed,leaving:actor.leaving,laneCompliant:actor.laneCompliant!==false,encroachmentKind:actor.encroachmentKind??'none'})
       }
       if(verify&&actor.kind==='person'&&visible(actor)&&actor.scale>=.99)pedestrians++
       if(verify&&actor.kind!=='person'&&actor.scale>=.99)mesh.userData.allMotors.push(index)
@@ -222,17 +256,27 @@ export async function traffic(scene:THREE.Scene,camera:THREE.Camera,verify:boole
       }
       let entry=variants.get(actor)
       const spec=actor.kind==='scooter'?resolveTwoWheelSpec(actor):undefined
-      if(!entry||(spec&&(entry.subtype!==spec.subtype||entry.violation!==spec.violation||entry.noHelmet!==spec.noHelmet))){
+      if(!entry||(spec&&(entry.subtype!==spec.subtype||entry.violation!==spec.violation||entry.violationMask!==spec.violationMask||entry.noHelmet!==spec.noHelmet))){
         const u=entry?.u??Math.random(),v=entry?.v??Math.random()
         if(spec){
-          const pair=models.twoWheelVariant(spec.subtype,spec.violation,u,v,spec.noHelmet)
-          entry={full:pair.full,bare:pair.bare,subtype:spec.subtype,violation:spec.violation,noHelmet:spec.noHelmet,u,v}
+          const pair=models.twoWheelVariant(spec.subtype,spec.violation,u,v,spec.noHelmet,spec.violations)
+          entry={full:pair.full,bare:pair.bare,subtype:spec.subtype,violation:spec.violation,violationMask:spec.violationMask,noHelmet:spec.noHelmet,u,v}
         }else{
           entry={full:models.variant(actor.kind,u,v),u,v}
         }
         variants.set(actor,entry)
         const geometry=models.geometries[entry.full.geometry];if(!geometry.boundingBox)geometry.computeBoundingBox()
         const {min,max}=geometry.boundingBox!;actor.halfWidth=Math.max(-min.x,max.x);actor.halfLength=Math.max(-min.z,max.z);actor.height=max.y
+      }
+      if(verify&&spec){
+        totalScooters++
+        if(spec.violations.length>0){
+          violatorScooters++
+          if(spec.noHelmet)noHelmetScooters++
+          if(spec.violations.length>=2)multiViolScooters++
+        }
+        const geomHasHelmet=Boolean(models.geometries[entry.full.geometry]?.userData?.hasHelmet)
+        if(geomHasHelmet===spec.noHelmet)helmetVisualMismatch++
       }
       if(walking.has(actor)){hide(index,index+1);return}
       const isRidden=ridden.has(actor)&&!!entry.bare
@@ -244,6 +288,20 @@ export async function traffic(scene:THREE.Scene,camera:THREE.Camera,verify:boole
     riders.animate(dt,accumulator,syncRiddenVehicle)
     effects.tick(sim.actors,sim.time,elapsed,player,!!vehicle,actor=>variants.get(actor)?.full.geometry??0)
     hide(sim.actors.length,STATIC)
-    if(verify)Object.assign(mesh.userData,{motors,pedestrians,queued,redStops})
+    if(verify){
+      Object.assign(mesh.userData,{
+        motors,pedestrians,queued,redStops,
+        ruleStats:{
+          totalNpc,compliantNpc,
+          laneComplianceRate:totalNpc?+(compliantNpc/totalNpc).toFixed(4):1,
+          totalScooters,violatorScooters,
+          nonmotorViolationRate:totalScooters?+(violatorScooters/totalScooters).toFixed(4):0,
+          noHelmetScooters,
+          noHelmetGivenViolatorRate:violatorScooters?+(noHelmetScooters/violatorScooters).toFixed(4):0,
+          multiViolScooters,
+          helmetVisualMismatch,
+        },
+      })
+    }
   }
 }

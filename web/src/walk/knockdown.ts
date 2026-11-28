@@ -14,7 +14,7 @@ import type {AvatarJointMap, AvatarJointName} from './avatar-rig'
  * 用简化正向运动学求身体最低点贴地，保证全程身体不悬空不穿地。
  */
 
-export type KnockdownKind = 'vehicle_hit' | 'bike_crash'
+export type KnockdownKind = 'vehicle_hit' | 'bike_crash' | 'high_fall' | 'ebike_slip' | 'obstacle_trip'
 export type KnockdownPhase = 'idle' | 'falling' | 'stunned' | 'mashing' | 'rising'
 export type KnockdownVariant =
   | 'front_launch'
@@ -64,6 +64,82 @@ export interface KnockdownTriggerOptions {
   yaw?: number
   side?: -1 | 1
   reason?: string
+  /** 高处坠落的垂直落差（米）。 */
+  fallHeight?: number
+  /** 落地时的向下冲击速度（正值 m/s）。 */
+  verticalSpeed?: number
+  /** 触发时的水平行进/撞击速度（m/s）。 */
+  impactSpeed?: number
+  /** 是否从两轮车骑行姿态触发。 */
+  fromRide?: boolean
+}
+
+export const HIGH_FALL_THRESHOLDS = {
+  /** 离地最高点到落地面的最小落差（m）；普通跳跃约 1.2m 不会触发。 */
+  minPeakDropM: 2.6,
+  /** 起跳点到落地面的净高差（m）；屏蔽平跳、上坡跳和普通台阶。 */
+  minNetDropM: 1.8,
+  /** 触地前最小垂直速度（m/s）。 */
+  minLandingSpeedMs: 10.8,
+  mediumDropM: 4.0,
+  heavyDropM: 6.2,
+} as const
+
+export interface HighFallImpactInput {
+  peakDropM: number
+  netDropM: number
+  landingSpeedMs: number
+  horizontalVx?: number
+  horizontalVz?: number
+  yaw?: number
+}
+
+export interface HighFallImpactAssessment {
+  tier: 'light' | 'medium' | 'heavy'
+  severity: number
+  fallHeight: number
+  verticalSpeed: number
+  impactSpeed: number
+  dir: {x: number; z: number}
+}
+
+/** 评估落地是否达到高空摔落阈值，并计算档位、力度与冲击方向。 */
+export function evaluateHighFallImpact(input: HighFallImpactInput): HighFallImpactAssessment | null {
+  const peakDropM = Number.isFinite(input.peakDropM) ? Math.max(0, input.peakDropM) : 0
+  const netDropM = Number.isFinite(input.netDropM) ? input.netDropM : 0
+  const landingSpeedMs = Number.isFinite(input.landingSpeedMs) ? Math.max(0, input.landingSpeedMs) : 0
+  if (
+    peakDropM < HIGH_FALL_THRESHOLDS.minPeakDropM
+    || netDropM < HIGH_FALL_THRESHOLDS.minNetDropM
+    || landingSpeedMs < HIGH_FALL_THRESHOLDS.minLandingSpeedMs
+  ) {
+    return null
+  }
+  const fallHeight = Math.max(netDropM, peakDropM * 0.92)
+  const hFrac = clamp01((fallHeight - HIGH_FALL_THRESHOLDS.minNetDropM) / 5.4)
+  const vFrac = clamp01((landingSpeedMs - HIGH_FALL_THRESHOLDS.minLandingSpeedMs) / 9.0)
+  const severity = clamp01(0.24 + 0.56 * hFrac + 0.25 * vFrac)
+  const tier: 'light' | 'medium' | 'heavy' =
+    fallHeight >= HIGH_FALL_THRESHOLDS.heavyDropM || severity >= 0.78
+      ? 'heavy'
+      : fallHeight >= HIGH_FALL_THRESHOLDS.mediumDropM || severity >= 0.52
+        ? 'medium'
+        : 'light'
+  const hx = Number.isFinite(input.horizontalVx) ? (input.horizontalVx as number) : 0
+  const hz = Number.isFinite(input.horizontalVz) ? (input.horizontalVz as number) : 0
+  const hSpeed = Math.hypot(hx, hz)
+  const yaw = input.yaw ?? 0
+  const dir = hSpeed > 0.35
+    ? {x: hx / hSpeed, z: hz / hSpeed}
+    : {x: -Math.sin(yaw) * 0.25, z: -Math.cos(yaw) * 0.25}
+  return {
+    tier,
+    severity,
+    fallHeight,
+    verticalSpeed: landingSpeedMs,
+    impactSpeed: hSpeed,
+    dir,
+  }
 }
 
 export interface KnockdownSnapshot {
@@ -115,6 +191,7 @@ export interface KnockdownSnapshot {
   landed?: boolean
   lastMashAgeSec?: number
   mashWindowSec?: number
+  fromRide?: boolean
 }
 
 export interface KnockdownHudHandle {
@@ -153,7 +230,12 @@ export interface KnockdownController {
   forceRise: (instant?: boolean) => boolean
   reset: () => void
   getSnapshot: () => KnockdownSnapshot
-  applyPose: (figure: T.Object3D, joints?: Partial<AvatarJointMap>, basePos?: {x: number; y: number; z: number}) => void
+  applyPose: (
+    figure: T.Object3D,
+    joints?: Partial<AvatarJointMap>,
+    basePos?: {x: number; y: number; z: number},
+    sampleGroundY?: (x: number, z: number) => number | null,
+  ) => void
   attachHud: (container?: HTMLElement | null) => KnockdownHudHandle
 }
 
@@ -270,9 +352,19 @@ export function resolveKnockdownVariant(
   const absRight = Math.abs(local.right)
   const absFwd = Math.abs(local.forward)
 
-  if (kind === 'bike_crash') {
-    if (opts?.reason === 'lowside' || sev >= 0.4) return 'bike_slide'
+  if (kind === 'bike_crash' || kind === 'ebike_slip') {
+    if (opts?.reason === 'lowside' || opts?.reason === 'slip' || kind === 'ebike_slip' || sev >= 0.4) {
+      return sev < 0.28 && opts?.side === undefined ? 'stagger_kneel' : 'bike_slide'
+    }
     return 'forward_sprawl'
+  }
+  if (kind === 'high_fall') {
+    if (sev < 0.38) return 'stagger_kneel'
+    if (absRight > 0.48 && absRight >= absFwd * 0.9) {
+      return local.right < 0 ? 'side_topple_l' : 'side_topple_r'
+    }
+    if (local.forward >= -0.15 && sev < 0.78) return 'forward_sprawl'
+    return 'front_launch'
   }
   if (sev < 0.35) return 'stagger_kneel'
   if (absRight > 0.45 && absRight >= absFwd * 0.85) {
@@ -489,7 +581,7 @@ function fallKeys(
   local: {forward: number; right: number},
   fromRide = false,
 ): Key[] {
-  const keys = fallKeysFromStand(variant, sev, side, rolls, local)
+  const keys = fallKeysFromStand(variant, sev, side, rolls, local, fromRide)
   if (!fromRide || variant === 'bike_slide') return keys
   // 从车上摔：起手是骑姿，撞击帧往前多栽一点（车头一顿人往前飞）
   const [, hit, ...rest] = keys
@@ -497,7 +589,14 @@ function fallKeys(
   return [{t: 0, p: RIDE}, {...hit, p: withO(hit.p, lean, Math.max(hit.p.air ?? 0, 0.12))}, ...rest]
 }
 
-function fallKeysFromStand(variant: KnockdownVariant, sev: number, side: number, rolls: number, local: {forward: number; right: number}): Key[] {
+function fallKeysFromStand(
+  variant: KnockdownVariant,
+  sev: number,
+  side: number,
+  rolls: number,
+  local: {forward: number; right: number},
+  fromRide = false,
+): Key[] {
   const chain0 = recoveryChain(variant, side)[0]
   const s = side >= 0 ? 1 : -1
   if (variant === 'front_launch') {
@@ -572,7 +671,7 @@ function fallKeysFromStand(variant: KnockdownVariant, sev: number, side: number,
   // bike_slide：甩出 → 侧身砸地 → 侧滑 → 向前侧滚 rolls 圈 → 趴下
   const tuck: JointPose = {Torso: [-0.3, 0, 0], Head: [-0.35, 0, 0], ArmL: [1.0, 0, 0.2], ArmR: [1.0, 0, -0.2], ForearmL: [1.6, 0, 0], ForearmR: [1.6, 0, 0], ThighL: [0.55, 0, 0], ThighR: [0.5, 0, 0], ShinL: [-0.85, 0, 0], ShinR: [-0.8, 0, 0]}
   const keys: Key[] = [
-    {t: 0, p: RIDE},
+    {t: 0, p: fromRide ? RIDE : STAND},
     {t: 0.1, ease: 'out', p: pose([0, 0, 0.7], {Torso: [0, 0, 0.2], ArmL: [0.5, 0, -1.3], ArmR: [1.2, 0, 0.5], ThighL: [0.6, 0, 0], ThighR: [0.6, 0, 0], ShinL: [-0.8, 0, 0], ShinR: [-0.8, 0, 0]}, 0.16)},
     {t: 0.22, ease: 'out', p: pose([0, 0, HALF_PI], {Torso: [0, 0, -0.15], Head: [0, 0, -0.4], ArmL: [1.2, 0, -0.4], ForearmL: [0.8, 0, 0], ArmR: [0.9, 0, 0.4], ForearmR: [1.0, 0, 0], ThighL: [0.5, 0, 0], ThighR: [0.4, 0, 0], ShinL: [-0.7, 0, 0], ShinR: [-0.6, 0, 0]})},
     {t: 0.3, p: pose([-0.15, 0, HALF_PI], tuck)},
@@ -764,7 +863,8 @@ export function evaluateKnockdownPose(snap: KnockdownSnapshot): KnockdownEvalPos
   let sway = 0
 
   if (snap.phase === 'falling') {
-    out = sampleKeys(fallKeys(variant, snap.severity, side, snap.rolls ?? 1, snap.directionLocal, snap.kind === 'bike_crash'), snap.fallU ?? 0)
+    const fromRide = snap.fromRide ?? (snap.kind === 'bike_crash' || snap.kind === 'ebike_slip')
+    out = sampleKeys(fallKeys(variant, snap.severity, side, snap.rolls ?? 1, snap.directionLocal, fromRide), snap.fallU ?? 0)
   } else if (snap.phase === 'stunned' || snap.phase === 'mashing' || snap.phase === 'rising') {
     const rising = snap.phase === 'rising'
     const r = rising ? clamp01(snap.riseProgress) : 0
@@ -822,6 +922,12 @@ export function evaluateKnockdownPose(snap: KnockdownSnapshot): KnockdownEvalPos
 
 const _qYaw = new T.Quaternion()
 const _qSway = new T.Quaternion()
+const _qSlope = new T.Quaternion()
+const _qWorld = new T.Quaternion()
+const _slopeNormal = new T.Vector3()
+const _upProbe = new T.Vector3()
+const _ptTmp = new T.Vector3()
+const _pelvisTmp = new T.Vector3()
 const _axisY = new T.Vector3(0, 1, 0)
 const _axisZ = new T.Vector3(0, 0, 1)
 
@@ -834,14 +940,15 @@ export function knockdownBodyPose(snap: KnockdownSnapshot): {ev: KnockdownEvalPo
 }
 
 /**
- * 把快照姿态应用到 figure：整体朝向（相对倒地瞬间偏航）、骨盆锚定、最低点贴地、关节旋转。
- * `basePos.y` 视为地面高度。
+ * 把快照姿态应用到 figure：整体朝向（相对倒地瞬间偏航）、坡度贴合、骨盆锚定、多点最低贴地。
+ * 传入 `sampleGroundY` 时按脚下坡面法线和肢体分布多点防穿模，兼容斜坡、楼梯与桥面边缘。
  */
 export function applyKnockdownPose(
   figure: T.Object3D,
   joints: Partial<AvatarJointMap> | undefined,
   snap: KnockdownSnapshot,
   basePos?: {x: number; y: number; z: number},
+  sampleGroundY?: (x: number, z: number) => number | null,
 ): void {
   const ud = figure.userData as {kdTriggerId?: number; kdBaseYaw?: number}
   if (!snap.isDown || snap.phase === 'idle' || !snap.variant) {
@@ -862,12 +969,74 @@ export function applyKnockdownPose(
   const {ev, qBody, fp} = knockdownBodyPose(snap)
   _qYaw.setFromAxisAngle(_axisY, baseYaw)
   figure.rotation.order = 'YXZ'
-  figure.quaternion.copy(_qYaw).multiply(qBody)
-  if (basePos) {
-    // 骨盆水平锚在 basePos：身体绕骨盆转，不会整段甩出去；最低点贴地面
-    const off = new T.Vector3(-fp.pelvis.x, 0, -fp.pelvis.z).applyQuaternion(_qYaw)
-    figure.position.set(basePos.x + off.x, basePos.y - fp.minY + ev.air, basePos.z + off.z)
+
+  if (!basePos) {
+    figure.quaternion.copy(_qYaw).multiply(qBody)
+    if (joints) {
+      for (const name of JOINTS) {
+        const v = ev.j[name]
+        joints[name]?.rotation.set(v[0], v[1], v[2])
+      }
+    }
+    return
   }
+
+  _qSlope.identity()
+  let centerGy = basePos.y
+  if (sampleGroundY) {
+    const sampledCenter = sampleGroundY(basePos.x, basePos.z)
+    if (sampledCenter !== null && Number.isFinite(sampledCenter) && Math.abs(sampledCenter - basePos.y) <= 0.7) {
+      centerGy = sampledCenter
+    }
+    // 站姿人保持竖直；贴地躺卧时随坡面倾斜以防头脚插入斜坡。
+    _upProbe.set(0, 1, 0).applyQuaternion(qBody)
+    const lieW = clamp01((0.88 - _upProbe.y) / 0.65) * clamp01(1 - ev.air / 0.14)
+    if (lieW > 0.01) {
+      const d = 0.55
+      const rawPx = sampleGroundY(basePos.x + d, basePos.z)
+      const rawNx = sampleGroundY(basePos.x - d, basePos.z)
+      const rawPz = sampleGroundY(basePos.x, basePos.z + d)
+      const rawNz = sampleGroundY(basePos.x, basePos.z - d)
+      const valid = (v: number | null) => v !== null && Number.isFinite(v) && Math.abs(v - centerGy) <= 0.45 ? v : null
+      const px = valid(rawPx), nx = valid(rawNx)
+      const pz = valid(rawPz), nz = valid(rawNz)
+      const gx = px !== null && nx !== null ? (px - nx) / (2 * d) : px !== null ? (px - centerGy) / d : nx !== null ? (centerGy - nx) / d : 0
+      const gz = pz !== null && nz !== null ? (pz - nz) / (2 * d) : pz !== null ? (pz - centerGy) / d : nz !== null ? (centerGy - nz) / d : 0
+      const gradMag = Math.hypot(gx, gz)
+      const maxGrad = 0.78
+      const scale = gradMag > maxGrad ? maxGrad / gradMag : 1
+      _slopeNormal.set(-gx * scale, 1, -gz * scale).normalize()
+      _qSlope.setFromUnitVectors(_axisY, _slopeNormal)
+      if (lieW < 0.999) {
+        _qWorld.identity()
+        _qSlope.slerp(_qWorld, 1 - lieW)
+      }
+    }
+  }
+
+  _qWorld.copy(_qSlope).multiply(_qYaw)
+  figure.quaternion.copy(_qWorld).multiply(qBody)
+
+  _pelvisTmp.copy(fp.pelvis).applyQuaternion(_qWorld)
+  let reqFigY = centerGy - fp.minY
+  if (sampleGroundY) {
+    reqFigY = -Infinity
+    for (const it of fp.points) {
+      _ptTmp.copy(it.p).applyQuaternion(_qWorld)
+      const wx = basePos.x + _ptTmp.x - _pelvisTmp.x
+      const wz = basePos.z + _ptTmp.z - _pelvisTmp.z
+      const s = sampleGroundY(wx, wz)
+      // 悬空探出桥沿或高台边缘时忽略深坑采样，按桥面基准高度支撑身体。
+      const gy = s !== null && Number.isFinite(s) && s >= centerGy - 0.55
+        ? Math.min(centerGy + 0.38, s)
+        : centerGy
+      const candidateY = gy - (_ptTmp.y - it.r)
+      if (candidateY > reqFigY) reqFigY = candidateY
+    }
+    if (!Number.isFinite(reqFigY)) reqFigY = centerGy - fp.minY
+  }
+  figure.position.set(basePos.x - _pelvisTmp.x, reqFigY + ev.air, basePos.z - _pelvisTmp.z)
+
   if (joints) {
     for (const name of JOINTS) {
       const v = ev.j[name]
@@ -912,6 +1081,7 @@ export function createKnockdownState(options?: KnockdownOptions): KnockdownContr
   let phase: KnockdownPhase = 'idle'
   let kind: KnockdownKind | null = null
   let variant: KnockdownVariant | null = null
+  let fromRide = false
   let severity = 0
   let side = 1
   let rolls = 1
@@ -960,6 +1130,7 @@ export function createKnockdownState(options?: KnockdownOptions): KnockdownContr
     phase = 'idle'
     kind = null
     variant = null
+    fromRide = false
     severity = 0
     side = 1
     rolls = 1
@@ -1028,6 +1199,7 @@ export function createKnockdownState(options?: KnockdownOptions): KnockdownContr
       landed,
       lastMashAgeSec: Math.max(0, sinceMash),
       mashWindowSec,
+      fromRide,
     }
   }
 
@@ -1040,16 +1212,23 @@ export function createKnockdownState(options?: KnockdownOptions): KnockdownContr
     const sev = clamp01(Number.isFinite(nextSeverity) ? nextSeverity : 0.65)
     const dirInfo = resolveKnockdownDirection(dir, opts?.yaw ?? 0)
     const nextVariant = resolveKnockdownVariant(dir, sev, nextKind, opts)
-    const impulse =
+    const defaultImpulse =
       nextVariant === 'front_launch' ? 3.2 + sev * 5.0
         : nextVariant === 'stagger_kneel' ? 1.5 + sev * 1.8
           : nextVariant === 'bike_slide' ? 3.0 + sev * 4.0
             : nextVariant === 'forward_sprawl' ? 2.4 + sev * 3.6
               : 2.6 + sev * 3.6
+    // 高处坠落主要受重力垂直冲击，保留原水平惯性而不在垂直落点无端向后猛弹。
+    const impulse = nextKind === 'high_fall'
+      ? Math.min(3.8, Math.max(0, opts?.impactSpeed ?? 0) * 0.65)
+      : opts?.impactSpeed !== undefined && Number.isFinite(opts.impactSpeed)
+        ? Math.min(defaultImpulse, Math.max(1.2, opts.impactSpeed * 0.72))
+        : defaultImpulse
 
     phase = 'falling'
     kind = nextKind
     variant = nextVariant
+    fromRide = opts?.fromRide ?? (nextKind === 'bike_crash' || nextKind === 'ebike_slip')
     severity = sev
     side = resolveSide(nextVariant, dirInfo, opts)
     rolls = nextVariant === 'bike_slide' && sev >= 0.8 ? 2 : 1
@@ -1242,8 +1421,8 @@ export function createKnockdownState(options?: KnockdownOptions): KnockdownContr
     forceRise,
     reset,
     getSnapshot,
-    applyPose(figure, joints, basePos) {
-      applyKnockdownPose(figure, joints, getSnapshot(), basePos)
+    applyPose(figure, joints, basePos, sampleGroundY) {
+      applyKnockdownPose(figure, joints, getSnapshot(), basePos, sampleGroundY)
     },
     attachHud,
   }
@@ -1253,9 +1432,12 @@ export function createKnockdownState(options?: KnockdownOptions): KnockdownContr
 
 const HUD_STYLE_ID = 'knockdown-hud-style'
 const HUD_CSS = `
-.knockdown-hud{position:fixed;left:50%;bottom:calc(96px + env(safe-area-inset-bottom));transform:translateX(-50%);z-index:88;display:flex;flex-direction:row;align-items:center;gap:12px;padding:6px 16px 6px 6px;border-radius:999px;background:rgba(14,20,24,.5);border:1px solid rgba(255,212,120,.22);box-shadow:0 6px 18px rgba(0,0,0,.28);backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px);max-width:calc(100vw - 24px);box-sizing:border-box;pointer-events:none;user-select:none;-webkit-user-select:none;font:600 14px/1.35 system-ui,-apple-system,"PingFang SC",sans-serif;color:#f6f1e4;text-shadow:0 1px 3px rgba(0,0,0,.55)}
+.knockdown-hud{position:fixed;left:50%;bottom:calc(96px + env(safe-area-inset-bottom));transform:translateX(-50%);z-index:25;display:flex;flex-direction:row;align-items:center;gap:12px;padding:6px 16px 6px 6px;border-radius:999px;background:rgba(14,20,24,.5);border:1px solid rgba(255,212,120,.22);box-shadow:0 6px 18px rgba(0,0,0,.28);backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px);max-width:calc(100vw - 24px);box-sizing:border-box;pointer-events:none;user-select:none;-webkit-user-select:none;font:600 14px/1.35 system-ui,-apple-system,"PingFang SC",sans-serif;color:#f6f1e4;text-shadow:0 1px 3px rgba(0,0,0,.55)}
 .knockdown-hud[hidden]{display:none}
 body:not([data-hotbar=on]) .knockdown-hud{bottom:calc(28px + env(safe-area-inset-bottom))}
+body[data-kd-down]:is([data-aboard],[data-ride-crash="1"]) .knockdown-hud{bottom:calc(184px + env(safe-area-inset-bottom))}
+@media (hover:hover) and (pointer:fine) and (min-width:1180px){body[data-kd-down][data-ride-crash="1"] .ride-hud{left:calc(50% + 56px)}}
+@media (hover:hover) and (pointer:fine) and (max-width:1179px){body[data-kd-down] .ride-hud .ride-state{display:none}}
 .knockdown-hud .kd-info{display:flex;flex-direction:column;align-items:flex-start;gap:5px;min-width:0}
 body[data-kd-down] .td-duty-keys-dock,body[data-kd-down] .beta-note,body[data-kd-down] .hint{opacity:0;visibility:hidden;pointer-events:none;transition:opacity .18s}
 .knockdown-hud .kd-title{font-size:15px;letter-spacing:.04em;white-space:nowrap}
@@ -1275,16 +1457,56 @@ body[data-kd-down] .td-duty-keys-dock,body[data-kd-down] .beta-note,body[data-kd
 .knockdown-hud .kd-ring.kd-pulse{animation:kd-pulse 1s ease-in-out infinite}
 .knockdown-hud .kd-ring.kd-burst::after{content:"";position:absolute;inset:-6px;border-radius:50%;border:3px solid rgba(255,220,140,.9);animation:kd-burst .32s ease-out forwards}
 .knockdown-hud .kd-ring.kd-done .kd-fill{stroke:#4ade80}
-.knockdown-hud .kd-segs{display:flex;gap:6px}
-.knockdown-hud .kd-seg{padding:2px 9px;border-radius:99px;font-size:12px;background:rgba(14,20,24,.6);border:1px solid rgba(255,255,255,.14);opacity:.6;transition:all .15s}
+.knockdown-hud .kd-segs{display:flex;gap:5px;flex-wrap:nowrap}
+.knockdown-hud .kd-seg{padding:2px 8px;border-radius:99px;font-size:12px;white-space:nowrap;flex:0 0 auto;background:rgba(14,20,24,.6);border:1px solid rgba(255,255,255,.14);opacity:.6;transition:all .15s}
 .knockdown-hud .kd-seg.kd-on{opacity:1;background:rgba(245,158,11,.35);border-color:rgba(255,212,120,.7)}
-.knockdown-hud .kd-sub{font-size:12px;opacity:.85;min-height:16px}
+.knockdown-hud .kd-sub{font-size:12px;opacity:.85;min-height:16px;white-space:nowrap}
 .knockdown-hud.kd-shake{animation:kd-shake .3s ease-out}
 @keyframes kd-pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.06)}}
 @keyframes kd-burst{from{opacity:1;transform:scale(.9)}to{opacity:0;transform:scale(1.25)}}
 @keyframes kd-shake{0%,100%{transform:translateX(-50%)}25%{transform:translateX(calc(-50% - 6px))}75%{transform:translateX(calc(-50% + 6px))}}
-@media (pointer:coarse){.knockdown-hud .kd-ring{width:112px;height:112px}.knockdown-hud .kd-key{min-width:66px;padding:12px 9px;font-size:17px}}
-@media (max-width:420px){.knockdown-hud{gap:8px;padding-right:10px}.knockdown-hud .kd-seg{padding:2px 6px;font-size:11px}.knockdown-hud .kd-title{font-size:13px}}
+@media (pointer:coarse){
+  .knockdown-hud .kd-ring{width:104px;height:104px}
+  .knockdown-hud .kd-key{min-width:62px;padding:10px 9px;font-size:16px}
+}
+@media (pointer:coarse) and (not (any-pointer:fine)) and (min-height:501px){
+  .knockdown-hud,
+  body:not([data-hotbar=on]) .knockdown-hud,
+  body[data-kd-down]:is([data-aboard],[data-ride-crash="1"]) .knockdown-hud{
+    top:calc(232px + env(safe-area-inset-top));bottom:auto;padding:5px 14px 5px 5px;gap:10px
+  }
+  .knockdown-hud .kd-ring{width:90px;height:90px}
+  .knockdown-hud .kd-key{min-width:54px;padding:9px 7px;font-size:15px}
+}
+@media (pointer:coarse) and (not (any-pointer:fine)) and (min-height:501px) and (max-height:700px){
+  .knockdown-hud,
+  body:not([data-hotbar=on]) .knockdown-hud,
+  body[data-kd-down]:is([data-aboard],[data-ride-crash="1"]) .knockdown-hud{
+    top:calc(182px + env(safe-area-inset-top));bottom:auto
+  }
+}
+@media (pointer:coarse) and (not (any-pointer:fine)) and (max-height:500px){
+  .knockdown-hud,
+  body:not([data-hotbar=on]) .knockdown-hud{
+    left:calc(50% - 24px);bottom:calc(76px + env(safe-area-inset-bottom));top:auto;
+    gap:8px;padding:3px 12px 3px 4px
+  }
+  body[data-kd-down]:is([data-aboard],[data-ride-crash="1"]) .knockdown-hud{
+    left:calc(50% - 24px);bottom:calc(18px + env(safe-area-inset-bottom));top:auto;
+    gap:8px;padding:3px 12px 3px 4px
+  }
+  body[data-kd-down]:is([data-aboard],[data-ride-crash="1"]) .ride-hud{display:none!important}
+  .knockdown-hud .kd-ring{width:46px;height:46px}
+  .knockdown-hud .kd-track,.knockdown-hud .kd-fill{stroke-width:8}
+  .knockdown-hud .kd-key{min-width:34px;padding:4px 4px 5px;border-radius:8px;font-size:11px;box-shadow:0 2px 0 #a8885a,0 4px 8px rgba(0,0,0,.35)}
+  .knockdown-hud .kd-key small{display:none}
+  .knockdown-hud .kd-info{gap:2px}
+  .knockdown-hud .kd-title{font-size:12px;line-height:1.15}
+  .knockdown-hud .kd-segs{gap:3px}
+  .knockdown-hud .kd-seg{padding:1px 6px;font-size:10px;line-height:1.2}
+  .knockdown-hud .kd-sub{font-size:9.5px;line-height:1.15;min-height:0}
+}
+@media (max-width:440px){.knockdown-hud{gap:8px;padding:6px 10px 6px 6px}.knockdown-hud .kd-seg{padding:2px 6px;font-size:11px;white-space:nowrap}.knockdown-hud .kd-title{font-size:13px}.knockdown-hud .kd-sub{font-size:11px}}
 @media (prefers-reduced-motion:reduce){.knockdown-hud .kd-ring.kd-pulse,.knockdown-hud.kd-shake{animation:none}}
 `
 
@@ -1297,10 +1519,17 @@ const BREATH_CAPTION: Record<KnockdownBreathState, string> = {
 
 function isCoarsePointer(): boolean {
   try {
-    return typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches
+    if (typeof matchMedia === 'function') {
+      if (matchMedia('(pointer: coarse)').matches) return true
+      if (matchMedia('(any-pointer: coarse)').matches && typeof innerWidth === 'number' && innerWidth <= 900) return true
+    }
+    if (typeof navigator !== 'undefined' && navigator.maxTouchPoints > 0 && typeof innerWidth === 'number' && innerWidth <= 900) {
+      return true
+    }
   } catch {
-    return false
+    // ignore
   }
+  return false
 }
 
 function createKnockdownHud(container: HTMLElement | null | undefined, onMash: () => void): KnockdownHudHandle {
@@ -1319,7 +1548,7 @@ function createKnockdownHud(container: HTMLElement | null | undefined, onMash: (
   const C = 2 * Math.PI * R
   const R2 = 54
   const C2 = 2 * Math.PI * R2
-  const coarse = isCoarsePointer()
+  let lastCoarse = isCoarsePointer()
 
   const wrap = document.createElement('div')
   wrap.className = 'knockdown-hud'
@@ -1333,13 +1562,14 @@ function createKnockdownHud(container: HTMLElement | null | undefined, onMash: (
   const ring = document.createElement('button')
   ring.type = 'button'
   ring.className = 'kd-ring'
-  ring.setAttribute('aria-label', coarse ? '连点起身' : '连按空格起身')
+  ring.setAttribute('aria-label', lastCoarse ? '连点起身' : '连按空格起身')
   // 段落刻度：第 1/3/4 下分别进入 趴撑/跪撑/单膝
   const ticks = [1, 3, 4].map((n) => {
     const a = (n / 5) * Math.PI * 2
     return `<line class="kd-tick" x1="${(60 + Math.cos(a) * (R - 6)).toFixed(1)}" y1="${(60 + Math.sin(a) * (R - 6)).toFixed(1)}" x2="${(60 + Math.cos(a) * (R + 6)).toFixed(1)}" y2="${(60 + Math.sin(a) * (R + 6)).toFixed(1)}"/>`
   }).join('')
-  ring.innerHTML = `<svg viewBox="0 0 120 120" aria-hidden="true"><defs><linearGradient id="kd-grad" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#f59e0b"/><stop offset="1" stop-color="#facc15"/></linearGradient></defs><circle class="kd-track" cx="60" cy="60" r="${R}"/><circle class="kd-fill" cx="60" cy="60" r="${R}" stroke-dasharray="${C.toFixed(2)}" stroke-dashoffset="${C.toFixed(2)}"/><circle class="kd-timer" cx="60" cy="60" r="${R2}" stroke-dasharray="${C2.toFixed(2)}" stroke-dashoffset="${C2.toFixed(2)}"/>${ticks}</svg><span class="kd-key">${coarse ? '起身' : '空格'}<small>${coarse ? '连点' : 'SPACE'}</small></span>`
+  ring.innerHTML = `<svg viewBox="0 0 120 120" aria-hidden="true"><defs><linearGradient id="kd-grad" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#f59e0b"/><stop offset="1" stop-color="#facc15"/></linearGradient></defs><circle class="kd-track" cx="60" cy="60" r="${R}"/><circle class="kd-fill" cx="60" cy="60" r="${R}" stroke-dasharray="${C.toFixed(2)}" stroke-dashoffset="${C.toFixed(2)}"/><circle class="kd-timer" cx="60" cy="60" r="${R2}" stroke-dasharray="${C2.toFixed(2)}" stroke-dashoffset="${C2.toFixed(2)}"/>${ticks}</svg><span class="kd-key">${lastCoarse ? '起身' : '空格'}<small>${lastCoarse ? '连点' : 'SPACE'}</small></span>`
+  const keyEl = ring.querySelector<HTMLSpanElement>('.kd-key')
   const fill = ring.querySelector<SVGCircleElement>('.kd-fill')
   const timer = ring.querySelector<SVGCircleElement>('.kd-timer')
 
@@ -1394,16 +1624,35 @@ function createKnockdownHud(container: HTMLElement | null | undefined, onMash: (
   window.addEventListener('keydown', onKey, true)
 
   const sync = (snap: KnockdownSnapshot) => {
-    const visible = snap.isDown && snap.phase !== 'idle'
+    const portraitRotateGateOpen =
+      typeof window !== 'undefined' &&
+      typeof matchMedia === 'function' &&
+      matchMedia('(orientation:portrait) and (pointer:coarse) and (not (any-pointer:fine)) and (max-width:600px)').matches &&
+      !document.body.hasAttribute('data-home') &&
+      document.body.dataset.drone !== 'rc' &&
+      document.getElementsByClassName('rotate-gate').length > 0
+    const uiBlocked =
+      portraitRotateGateOpen ||
+      document.body.hasAttribute('data-home') ||
+      document.body.dataset.shopOpen === '1'
+    const downActive = snap.isDown && snap.phase !== 'idle'
+    const visible = downActive && !uiBlocked
     wrap.hidden = !visible
     // 倒地期间执勤三键（Q/E/F）本就互斥禁用；把底部居中的三键条让位给起身环，免得手机上误触。
     if (visible) document.body.dataset.kdDown = '1'
     else delete document.body.dataset.kdDown
-    if (!visible) {
+    if (!downActive) {
       lastCount = -1
       lastFallback = -1
       lastPhase = ''
       return
+    }
+    if (!visible) return
+    const coarse = isCoarsePointer()
+    if (coarse !== lastCoarse) {
+      lastCoarse = coarse
+      ring.setAttribute('aria-label', coarse ? '连点起身' : '连按空格起身')
+      if (keyEl) keyEl.innerHTML = `${coarse ? '起身' : '空格'}<small>${coarse ? '连点' : 'SPACE'}</small>`
     }
     const seg = snap.recoverySegment ?? 0
     const frac = snap.phase === 'rising' ? 1 : snap.mashProgress
@@ -1419,7 +1668,14 @@ function createKnockdownHud(container: HTMLElement | null | undefined, onMash: (
     title.classList.toggle('kd-alert', snap.phase === 'falling')
 
     if (snap.phase === 'falling') {
-      title.textContent = snap.kind === 'bike_crash' ? '摔车了！' : '被撞倒了！'
+      const fallTitle: Record<KnockdownKind, string> = {
+        bike_crash: '摔车了！',
+        ebike_slip: '打滑摔车！',
+        high_fall: '高处摔落！',
+        obstacle_trip: '绊倒了！',
+        vehicle_hit: '被撞倒了！',
+      }
+      title.textContent = (snap.kind && fallTitle[snap.kind]) || '被撞倒了！'
       sub.textContent = ''
     } else if (snap.phase === 'stunned') {
       title.textContent = '先缓一缓…'
@@ -1471,6 +1727,372 @@ export function triggerKnockdown(
   opts?: KnockdownTriggerOptions,
 ): KnockdownSnapshot {
   return knockdown.triggerKnockdown(kind, dir, severity, opts)
+}
+
+export interface BikeSlipKnockdownOptions {
+  /** 骑行/摔滑瞬间的朝向角（弧度）。 */
+  yaw?: number
+  /** 侧滑倾向：-1 向左、+1 向右。 */
+  side?: -1 | 1
+  /** 打滑前车速（m/s），用于换算力度与滑行冲量；默认约 5.5 m/s。 */
+  speedMs?: number
+  /** 可选冲击方向覆写。 */
+  dir?: KnockdownDirInput
+  /** 原因标签（如 'shared_turn_slip' / 'hard_brake' / 'slip'）。 */
+  reason?: string
+  /** 力度 0..1 覆写。 */
+  severity?: number
+  /** 是否从骑行坐姿起倒（默认 true）。 */
+  fromRide?: boolean
+  /** 指定状态机实例；省略时使用全局 knockdown。 */
+  controller?: KnockdownController
+}
+
+/** 共享/个人电车打滑及急刹侧翻统一触发入口（供 IDOK-545 等下游复用）。 */
+export function triggerBikeSlipKnockdown(opts: BikeSlipKnockdownOptions = {}): KnockdownSnapshot {
+  const target = opts.controller ?? knockdown
+  if (target.isDown) return target.getSnapshot()
+  const yaw = Number.isFinite(opts.yaw) ? (opts.yaw as number) : 0
+  const side: -1 | 1 = opts.side === -1 ? -1 : 1
+  const spd = Number.isFinite(opts.speedMs) ? Math.max(0, opts.speedMs as number) : 5.5
+  const severity = opts.severity !== undefined
+    ? clamp01(opts.severity)
+    : clamp01(0.38 + Math.max(0, spd - 2.2) / 11.5)
+  const rightX = Math.cos(yaw), rightZ = -Math.sin(yaw)
+  const fwdX = -Math.sin(yaw), fwdZ = -Math.cos(yaw)
+  const dir: KnockdownDirInput = opts.dir ?? {
+    x: rightX * side * 0.85 + fwdX * 0.52,
+    z: rightZ * side * 0.85 + fwdZ * 0.52,
+  }
+  return target.triggerKnockdown('ebike_slip', dir, severity, {
+    yaw,
+    side,
+    reason: opts.reason ?? 'slip',
+    impactSpeed: spd,
+    fromRide: opts.fromRide ?? true,
+  })
+}
+
+export const OBSTACLE_TRIP_THRESHOLDS = {
+  /** 仅疾跑冲刺触发，明显高于正常步行 walk=1.65 m/s。 */
+  minSpeedMs: 5.2,
+  /** 沿障碍法线方向的正向冲击分速度下限。 */
+  minApproachMs: 4.2,
+  /** 过滤斜擦长墙/护栏；cos(angle) >= 0.55（静态柱子 >= 0.65）。 */
+  minApproachRatio: 0.55,
+  minStaticRatio: 0.65,
+  minStaticPushM: 0.018,
+} as const
+
+export interface ObstacleTripInput {
+  vx: number
+  vz: number
+  normalX?: number
+  normalZ?: number
+  pushX?: number
+  pushZ?: number
+  blocked?: boolean
+  blockedByStatic?: boolean
+  yaw?: number
+}
+
+export interface ObstacleTripAssessment {
+  severity: number
+  impactSpeed: number
+  dir: {x: number; z: number}
+}
+
+/** 评估步行高速撞障是否触发 `obstacle_trip`，过滤正常慢走及贴墙斜擦。 */
+export function evaluateObstacleTripImpact(input: ObstacleTripInput): ObstacleTripAssessment | null {
+  const vx = Number.isFinite(input.vx) ? input.vx : 0
+  const vz = Number.isFinite(input.vz) ? input.vz : 0
+  const speed = Math.hypot(vx, vz)
+  if (speed < OBSTACLE_TRIP_THRESHOLDS.minSpeedMs) return null
+
+  const pushX = Number.isFinite(input.pushX) ? (input.pushX as number) : 0
+  const pushZ = Number.isFinite(input.pushZ) ? (input.pushZ as number) : 0
+  const pushMag = Math.hypot(pushX, pushZ)
+  if (input.blockedByStatic && pushMag < OBSTACLE_TRIP_THRESHOLDS.minStaticPushM) return null
+
+  const rawNx = Number.isFinite(input.normalX) ? (input.normalX as number) : 0
+  const rawNz = Number.isFinite(input.normalZ) ? (input.normalZ as number) : 0
+  const rawNLen = Math.hypot(rawNx, rawNz)
+  const useNormal = rawNLen > 0.2
+  const nx = useNormal ? rawNx / rawNLen : pushMag > 1e-4 ? pushX / pushMag : -vx / speed
+  const nz = useNormal ? rawNz / rawNLen : pushMag > 1e-4 ? pushZ / pushMag : -vz / speed
+
+  const hasNormalOrPush = useNormal || pushMag > 1e-4
+  if (!hasNormalOrPush && (!input.blocked || speed < 5.8)) return null
+
+  const approachSpd = -(vx * nx + vz * nz)
+  const ratio = approachSpd / speed
+  const minRatio = input.blockedByStatic
+    ? OBSTACLE_TRIP_THRESHOLDS.minStaticRatio
+    : OBSTACLE_TRIP_THRESHOLDS.minApproachRatio
+  if (hasNormalOrPush && (approachSpd < OBSTACLE_TRIP_THRESHOLDS.minApproachMs || ratio < minRatio)) {
+    return null
+  }
+
+  const impactSpeed = hasNormalOrPush ? approachSpd : speed
+  const severity = clamp01(0.32 + ((impactSpeed - OBSTACLE_TRIP_THRESHOLDS.minApproachMs) / 5.4) * 0.62)
+  return {
+    severity,
+    impactSpeed,
+    dir: {x: nx, z: nz},
+  }
+}
+
+export interface TrafficSlotSample {
+  x: number
+  y: number
+  z: number
+  rx: number
+  rz: number
+  ax: number
+  az: number
+  hw: number
+  hl: number
+  h: number
+}
+
+export interface TrackedTrafficActor extends TrafficSlotSample {
+  vx: number
+  vz: number
+  speed: number
+  movedAt: number
+  streak: number
+  active: boolean
+}
+
+export interface TrafficMotionTracker {
+  step: (samples: readonly TrafficSlotSample[], count: number, nowSec: number) => void
+  findHit: (
+    preX: number,
+    preZ: number,
+    nextX: number,
+    footY: number,
+    nextZ: number,
+    pushX: number,
+    pushZ: number,
+    actorRadius: number,
+    nowSec: number,
+  ) => TrackedTrafficActor | null
+  reset: () => void
+  readonly tracks: readonly TrackedTrafficActor[]
+}
+
+const MAX_TRAFFIC_SPEED_MS = 24.0
+const MIN_TRAFFIC_HIT_SPEED_MS = 2.0
+
+function pointToRotatedObbDist(
+  px: number,
+  pz: number,
+  car: TrafficSlotSample,
+): number {
+  const dx = px - car.x
+  const dz = pz - car.z
+  const lat = dx * car.rx + dz * car.rz
+  const lng = dx * car.ax + dz * car.az
+  const ow = Math.max(0, Math.abs(lat) - car.hw)
+  const ol = Math.max(0, Math.abs(lng) - car.hl)
+  return Math.hypot(ow, ol)
+}
+
+/**
+ * 基于世界位姿 + 朝向近邻 1 对 1 匹配的行驶车流速度追踪器：
+ * 彻底隔离 `sim.actors` 出队导致下标全体左移产生的幽灵高速，并做精确局部 OBB 碰撞匹配。
+ */
+export function createTrafficMotionTracker(): TrafficMotionTracker {
+  let prevTracks: TrackedTrafficActor[] = []
+  let nextTracks: TrackedTrafficActor[] = []
+  let prevCount = 0
+  let prevSig = NaN
+  let lastStepSec = 0
+  const pairs: {curIdx: number; oldIdx: number; distSq: number}[] = []
+  let curMatched = new Uint8Array(0)
+  let oldMatched = new Uint8Array(0)
+
+  function ensureSize(n: number) {
+    if (curMatched.length < n) curMatched = new Uint8Array(Math.max(n, 320))
+    if (oldMatched.length < prevTracks.length) oldMatched = new Uint8Array(Math.max(prevTracks.length, 320))
+  }
+
+  function step(samples: readonly TrafficSlotSample[], count: number, nowSec: number): void {
+    const n = Math.max(0, Math.min(samples.length, count))
+    if (n === 0) {
+      for (const t of prevTracks) t.active = false
+      prevCount = 0
+      prevSig = NaN
+      return
+    }
+    let sig = n * 1.13
+    for (let i = 0; i < n; i++) {
+      const s = samples[i]
+      sig += s.x * 0.73 + s.z * 1.37
+    }
+    if (n === prevCount && Math.abs(sig - prevSig) < 1e-3) {
+      for (let i = 0; i < prevTracks.length; i++) {
+        const t = prevTracks[i]
+        if (t.active && nowSec - t.movedAt > 0.28) {
+          t.vx *= 0.35
+          t.vz *= 0.35
+          t.speed = Math.hypot(t.vx, t.vz)
+          if (t.speed < 0.25) t.streak = 0
+        }
+      }
+      return
+    }
+
+    const rawDt = lastStepSec > 0 ? nowSec - lastStepSec : 0.05
+    const dtObs = Math.max(0.045, Math.min(0.25, rawDt))
+    const maxMatchDist = Math.min(2.0, Math.max(0.9, 25.0 * dtObs))
+    const maxMatchDistSq = maxMatchDist * maxMatchDist
+    ensureSize(n)
+    curMatched.fill(0, 0, n)
+    oldMatched.fill(0, 0, prevTracks.length)
+    pairs.length = 0
+
+    for (let ci = 0; ci < n; ci++) {
+      const cur = samples[ci]
+      for (let oi = 0; oi < prevTracks.length; oi++) {
+        const old = prevTracks[oi]
+        if (!old.active) continue
+        if (Math.abs(cur.y - old.y) > 0.85) continue
+        if (Math.abs(cur.ax * old.ax + cur.az * old.az) < 0.72) continue
+        const dx = cur.x - old.x
+        const dz = cur.z - old.z
+        if (Math.abs(dx) > maxMatchDist || Math.abs(dz) > maxMatchDist) continue
+        const distSq = dx * dx + dz * dz
+        if (distSq <= maxMatchDistSq) pairs.push({curIdx: ci, oldIdx: oi, distSq})
+      }
+    }
+    if (pairs.length > 1) pairs.sort((a, b) => a.distSq - b.distSq)
+
+    while (nextTracks.length < n) {
+      nextTracks.push({
+        x: 0, y: 0, z: 0, rx: 1, rz: 0, ax: 0, az: 1, hw: 0.9, hl: 2.1, h: 1.6,
+        vx: 0, vz: 0, speed: 0, movedAt: nowSec, streak: 0, active: false,
+      })
+    }
+    for (let i = 0; i < nextTracks.length; i++) nextTracks[i].active = false
+
+    for (let p = 0; p < pairs.length; p++) {
+      const {curIdx, oldIdx, distSq} = pairs[p]
+      if (curMatched[curIdx] || oldMatched[oldIdx]) continue
+      curMatched[curIdx] = 1
+      oldMatched[oldIdx] = 1
+      const cur = samples[curIdx]
+      const old = prevTracks[oldIdx]
+      const dst = nextTracks[curIdx]
+      dst.x = cur.x; dst.y = cur.y; dst.z = cur.z
+      dst.rx = cur.rx; dst.rz = cur.rz; dst.ax = cur.ax; dst.az = cur.az
+      dst.hw = cur.hw; dst.hl = cur.hl; dst.h = cur.h
+      dst.active = true
+
+      const dist = Math.sqrt(distSq)
+      if (dist > 0.02) {
+        const dx = cur.x - old.x
+        const dz = cur.z - old.z
+        const ivx = dx / dtObs
+        const ivz = dz / dtObs
+        const ispd = Math.hypot(ivx, ivz)
+        const alongMove = Math.abs(dx * cur.ax + dz * cur.az)
+        const latMove = Math.abs(dx * cur.rx + dz * cur.rz)
+        const reasonableDir = ispd <= 3.5 || alongMove >= latMove * 0.6
+        if (ispd <= MAX_TRAFFIC_SPEED_MS && reasonableDir) {
+          const blend = old.streak >= 1 ? 0.55 : 1.0
+          dst.vx = old.vx * (1 - blend) + ivx * blend
+          dst.vz = old.vz * (1 - blend) + ivz * blend
+          dst.speed = Math.hypot(dst.vx, dst.vz)
+          dst.movedAt = nowSec
+          dst.streak = dst.speed >= MIN_TRAFFIC_HIT_SPEED_MS * 0.75 ? Math.min(10, old.streak + 1) : 0
+        } else {
+          dst.vx = dst.vz = dst.speed = 0
+          dst.movedAt = nowSec
+          dst.streak = 0
+        }
+      } else {
+        dst.vx = dst.vz = dst.speed = 0
+        dst.movedAt = nowSec
+        dst.streak = 0
+      }
+    }
+
+    for (let ci = 0; ci < n; ci++) {
+      if (curMatched[ci]) continue
+      const cur = samples[ci]
+      const dst = nextTracks[ci]
+      dst.x = cur.x; dst.y = cur.y; dst.z = cur.z
+      dst.rx = cur.rx; dst.rz = cur.rz; dst.ax = cur.ax; dst.az = cur.az
+      dst.hw = cur.hw; dst.hl = cur.hl; dst.h = cur.h
+      dst.vx = dst.vz = dst.speed = 0
+      dst.movedAt = nowSec
+      dst.streak = 0
+      dst.active = true
+    }
+
+    const tmp = prevTracks
+    prevTracks = nextTracks
+    nextTracks = tmp
+    prevCount = n
+    prevSig = sig
+    lastStepSec = nowSec
+  }
+
+  function findHit(
+    preX: number,
+    preZ: number,
+    nextX: number,
+    footY: number,
+    nextZ: number,
+    pushX: number,
+    pushZ: number,
+    actorRadius: number,
+    nowSec: number,
+  ): TrackedTrafficActor | null {
+    const pushMag = Math.hypot(pushX, pushZ)
+    let best: TrackedTrafficActor | null = null
+    let bestDist = Infinity
+    for (let i = 0; i < prevTracks.length; i++) {
+      const rec = prevTracks[i]
+      if (!rec.active || rec.streak < 2 || rec.speed < MIN_TRAFFIC_HIT_SPEED_MS || nowSec - rec.movedAt > 0.24) {
+        continue
+      }
+      if (footY >= rec.y + rec.h + 0.15 || footY + 1.5 <= rec.y - 0.15) continue
+      const obbDist = Math.min(
+        pointToRotatedObbDist(preX, preZ, rec),
+        pointToRotatedObbDist(nextX, nextZ, rec),
+      )
+      if (obbDist > actorRadius + 0.16) continue
+      if (pushMag > 1e-4) {
+        const fromCarX = preX - rec.x
+        const fromCarZ = preZ - rec.z
+        if (pushX * fromCarX + pushZ * fromCarZ <= -0.04 * pushMag) continue
+      }
+      if (obbDist < bestDist) {
+        bestDist = obbDist
+        best = rec
+      }
+    }
+    return best
+  }
+
+  function reset(): void {
+    for (const t of prevTracks) t.active = false
+    for (const t of nextTracks) t.active = false
+    prevCount = 0
+    prevSig = NaN
+    lastStepSec = 0
+  }
+
+  return {
+    step,
+    findHit,
+    reset,
+    get tracks() {
+      return prevTracks
+    },
+  }
 }
 
 export function isDown(): boolean {

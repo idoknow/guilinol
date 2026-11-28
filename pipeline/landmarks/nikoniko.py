@@ -558,6 +558,8 @@ class Builder:
         self.detail = detail
         self.follow_grade = False
         self.visible = []
+        self.named_parts = {}
+        self.named_solids = {}
         self.uv = []
         self.tiled = {k: [] for k in self.TILED_SCALES}
         self.sign_tris = []
@@ -996,6 +998,12 @@ def export_landmark(name, build_fn, *, reuse_atlas=False):
         layer = f'lod{lod}'
         scene.graph.update(frame_to=layer)
 
+        for part, (triangles, material, color) in builder.named_parts.items():
+            mesh = pack_tris(triangles)
+            mesh.visual = trimesh.visual.TextureVisuals(material=trimesh.visual.material.PBRMaterial(
+                name=material, baseColorFactor=color, doubleSided=True, roughnessFactor=.92, metallicFactor=0))
+            scene.add_geometry(mesh, node_name=f'{layer}_{part}', parent_node_name=layer)
+
         if builder.visible:
             mesh = pack_tris(builder.visible)
             uv = np.concatenate(builder.uv, axis=0).reshape(-1, 2)
@@ -1052,6 +1060,9 @@ def export_landmark(name, build_fn, *, reuse_atlas=False):
         if lod == 0 and builder.solid:
             coll = pack_tris(builder.solid)
             scene.add_geometry(coll, node_name='collision_surface')
+        if lod == 0:
+            for part, triangles in builder.named_solids.items():
+                scene.add_geometry(pack_tris(triangles), node_name=f'collision_{part}')
 
     out_dir = Path(sys.argv[1])
     out_dir.mkdir(parents=True, exist_ok=True)

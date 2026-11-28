@@ -16,12 +16,22 @@ export interface RcHandlers {
   exit():void
   gimbal(deg:number):void
   sticks(patch:Partial<Sticks>):void
+  /** IDOK-526: open the hangar from inside the RC screen (swap drone without leaving the session). */
+  hangar():void
+  /** IDOK-526: 傻瓜式 mode only — drag the picture to swing the camera around. */
+  look(dx:number, dy:number):void
+  /** IDOK-529: 自动避障开关（遥控画面里随时可以关掉）。 */
+  avoid(on:boolean):void
 }
 
 export interface RcView {
   root:HTMLElement
   update(telemetry:Telemetry, recording:boolean):void
   setRecording(on:boolean):void
+  /** IDOK-529: 绿色返航条，null = 不在返航。 */
+  setReturning(distance:number|null):void
+  /** IDOK-529: 避障按钮的状态（blocked = 正在避让）。 */
+  setAvoid(on:boolean, blocked:boolean):void
   toast(text:string):void
 }
 
@@ -61,17 +71,53 @@ export function createRc(spec:DroneSpec, handlers:RcHandlers):RcView {
     rth.dataset.act = 'rth'
     rth.textContent = '返航'
     actions.append(rth)
+    // IDOK-529: 傻瓜式遥控也给一个避障开关，坏天/贴楼飞的时候能关掉。
+    const avoid = document.createElement('button')
+    avoid.dataset.act = 'avoid'
+    avoid.className = 'rc-avoid on'
+    avoid.textContent = '避障'
+    actions.append(avoid)
   }
   const on = (selector:string, run:() => void) => {
     const node = root.querySelector<HTMLElement>(selector)
     if (node) node.onclick = run
   }
   on('[data-act="takeoff"]',() => handlers.takeoff())
-  on('[data-act="land"]',() => handlers.land())
+  // IDOK-527: 侧栏的「降落」和中央的起飞/降落是同一个动作，删掉侧栏那个免得两个「降落」并排。
   on('[data-act="rth"]',() => handlers.rth())
   on('[data-act="photo"]',() => handlers.photo())
   on('[data-act="record"]',() => handlers.record())
   on('[data-act="exit"]',() => handlers.exit())
+  on('[data-act="hangar"]',() => handlers.hangar())
+  // IDOK-529: 避障开关 —— 遥控画面里常驻，随时能关。
+  let avoidOn = true
+  on('[data-act="avoid"]',() => {
+    avoidOn = !avoidOn
+    handlers.avoid(avoidOn)
+    setAvoid(avoidOn,false)
+  })
+  const rthBanner = q<HTMLElement>('.rc-rth-banner')
+  const rthDist = q<HTMLElement>('.rc-rth-dist')
+
+  function setAvoid(on:boolean, blocked:boolean) {
+    avoidOn = on
+    for (const node of Array.from(root.querySelectorAll<HTMLElement>('[data-act="avoid"]'))) {
+      node.classList.toggle('on',on)
+      node.dataset.blocked = blocked ? '1' : '0'
+      node.textContent = on ? '避障' : '避障关'
+      node.title = on ? '自动避障已打开（点一下关掉）' : '自动避障已关闭（点一下打开）'
+    }
+  }
+
+  function setReturning(distance:number|null) {
+    if (!rthBanner) return
+    const active = distance !== null
+    rthBanner.hidden = !active
+    root.dataset.rth = active ? '1' : '0'
+    if (active && rthDist) {
+      rthDist.textContent = distance! >= 1000 ? `${(distance! / 1000).toFixed(1)} km` : `${distance!.toFixed(0)} m`
+    }
+  }
 
   // Idle camera mode on the professional controller: the big shutter fires whichever mode is lit.
   let mode:Mode = 'photo'
@@ -130,6 +176,41 @@ export function createRc(spec:DroneSpec, handlers:RcHandlers):RcView {
     pad.addEventListener('lostpointercapture',release)
   }
 
+  // --- 傻瓜式: drag anywhere on the picture to look around (the professional RC flies with the
+  //     sticks/keyboard instead, so it never shows a cursor). IDOK-526.
+  const lookPad = root.querySelector<HTMLElement>('.rc-look')
+  if (lookPad) {
+    let looking = false
+    let lastX = 0
+    let lastY = 0
+    lookPad.addEventListener('pointerdown',event => {
+      looking = true
+      lastX = event.clientX
+      lastY = event.clientY
+      lookPad.setPointerCapture(event.pointerId)
+      root.dataset.look = '1'
+    })
+    lookPad.addEventListener('pointermove',event => {
+      if (!looking) return
+      handlers.look((event.clientX - lastX) * LOOK_GAIN,(event.clientY - lastY) * LOOK_GAIN)
+      lastX = event.clientX
+      lastY = event.clientY
+    })
+    const stop = () => { if (looking) { looking = false; delete root.dataset.look } }
+    lookPad.addEventListener('pointerup',stop)
+    lookPad.addEventListener('pointercancel',stop)
+    lookPad.addEventListener('lostpointercapture',stop)
+  }
+
+  // --- 键盘: the moment a key arrives, surface the key legend (touch users never see it).
+  // 捕获阶段监听：飞行输入在 window 上也会拦 keydown，冒泡阶段可能被 stopImmediatePropagation 吞掉。
+  window.addEventListener('keydown',event => {
+    if (!root.isConnected || event.ctrlKey || event.metaKey || event.altKey) return
+    const flying = /^(Key[WASDQEPVR]|Arrow(Up|Down|Left|Right)|Space|Escape)$/.test(event.code)
+    if (!flying) return
+    root.classList.add('kbd')
+  }, true)
+
   function update(state:Telemetry, recording:boolean) {
     if (batteryBar) {
       batteryBar.style.width = `${Math.max(0,Math.min(100,state.battery))}%`
@@ -184,10 +265,11 @@ export function createRc(spec:DroneSpec, handlers:RcHandlers):RcView {
     toastTimer = window.setTimeout(() => toastBox.classList.remove('show'),2600)
   }
 
-  return {root,update,setRecording,toast}
+  return {root,update,setRecording,setReturning,setAvoid,toast}
 }
 
 function round(value:number) { return Math.round(value * 100) / 100 }
+const LOOK_GAIN = .0032
 
 function clock(minutes:number) {
   const total = Math.max(0,Math.round(minutes * 60))
@@ -227,8 +309,9 @@ function proMarkup(spec:DroneSpec) {
     </div>
     <div class="rc-status"></div>
     <div class="rc-rail rc-rail-l">
+      <button class="rc-side" data-act="hangar" title="打开机库（换机）">机库</button>
       <button class="rc-side" data-act="rth" title="自动返航">返航</button>
-      <button class="rc-side" data-act="land" title="原地降落">降落</button>
+      <button class="rc-side rc-avoid on" data-act="avoid" title="自动避障（点一下关掉）">避障</button>
     </div>
     <div class="rc-rail rc-rail-r">
       <button class="rc-side" data-act="photo" title="拍照">拍照</button>
@@ -236,7 +319,13 @@ function proMarkup(spec:DroneSpec) {
       <button class="rc-side" data-act="exit" title="退出遥控">退出</button>
     </div>
     <div class="rc-center"><div class="rc-reticle"></div></div>
-    <div class="rc-gimbal"><span>云台 <b class="rc-gimbalval"></b></span><input type="range" step="1" aria-label="云台俯仰"></div>
+    <div class="rc-rth-banner" hidden><span class="rc-rth-dash"></span><b>返航中</b><span class="rc-rth-dist"></span><span class="rc-rth-dash"></span></div>
+    <div class="rc-gimbal" title="云台俯仰">
+      <b class="rc-gimbalval"></b>
+      <input type="range" step="1" aria-label="云台俯仰">
+      <span>云台</span>
+    </div>
+    <div class="rc-hint">WASD 平移 · ↑↓ 升降 · ←→ 偏航 · Q/E 云台 · 空格 起降 · R 返航 · P 拍照 · V 录像 · T 目标 · B 自动飞</div>
     <div class="rc-bottom">
       <div class="rc-tele"></div>
       <div class="rc-bottom-mid">
@@ -259,6 +348,8 @@ function simpleMarkup(spec:DroneSpec) {
       <span class="rc-battval"></span>
     </div>
     <div class="rc-center"><div class="rc-reticle"></div></div>
+    <div class="rc-rth-banner" hidden><span class="rc-rth-dash"></span><b>返航中</b><span class="rc-rth-dist"></span><span class="rc-rth-dash"></span></div>
+    <div class="rc-look" aria-hidden="true"></div>
     <div class="rc-readout"></div>
     <div class="rc-sticks"><div class="rc-stick" data-side="left"><i></i></div><div class="rc-stick" data-side="right"><i></i></div></div>
     <div class="rc-actions">
