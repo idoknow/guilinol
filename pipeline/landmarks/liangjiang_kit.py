@@ -101,6 +101,8 @@ def terminal_one(batch, footprint, solid):
     for offset in range(6):
         step=translate(lobby,2.5-offset*.42,0)
         batch.slab(step,offset*.24,(offset+1)*.24,'airport_concrete')
+    if batch.level<2:
+        batch.slab(box(east-3,-7.5,east+.25,7.5),9.8,10.4,'airport_red')
     front_sign(batch,'桂林',east+.2,10.8,13,5.3)
 
 
@@ -174,7 +176,8 @@ def terminal_two(batch, footprint, solid):
             batch.slab(box(frontage-2,-24,frontage+depth,24),lower,upper,material)
         for station in [-21,-7,7,21]:
             batch.beam((frontage+7,-.04,station),(frontage+7,11.05,station),.32,'airport_structure')
-        front_sign(batch,'桂林两江国际机场',frontage+.4,12.4,34,3.6)
+        batch.slab(box(frontage+9.5,-17.8,frontage+10.1,17.8),11.4,12,'airport_structure')
+        front_sign(batch,'桂林两江国际机场',frontage+10.05,12.4,34,3.6)
 
 
 def tower(batch, footprint):

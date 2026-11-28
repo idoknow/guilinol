@@ -49,7 +49,8 @@ try{
       await page.waitForFunction(()=>window.viewer?.stats.firstMs>0,null,{timeout:120000})
       const row=await page.evaluate(()=>{
         const first=window.viewer.stats.firstMs
-        return {first,marks:window.openingProbe,assets:[...new Set(performance.getEntriesByType('resource')
+        const airportRequests=performance.getEntriesByType('resource').filter(item=>item.startTime<=first&&/airport|liangjiang/i.test(item.name)).map(item=>new URL(item.name).pathname)
+        return {first,airportRequests,marks:window.openingProbe,assets:[...new Set(performance.getEntriesByType('resource')
           .filter(item=>item.startTime<=first&&item.name.startsWith(location.origin+'/assets/')).map(item=>new URL(item.name).pathname)
           .filter(name=>/\.(js|css)$/.test(name)))].sort()}
       })

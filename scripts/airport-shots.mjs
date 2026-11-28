@@ -1,5 +1,5 @@
 import { mkdir, writeFile, readFile } from 'node:fs/promises'
-import { dirname } from 'node:path'
+import { dirname, resolve } from 'node:path'
 import { chromium } from 'playwright'
 import { preview } from 'vite'
 import { browserOptions } from './qa-browser.mjs'
@@ -38,7 +38,7 @@ detail('scenic-fence','fence',8,2,.95)
 views.push(['terminal-night',[-25950,207,7100],[-25620,182,7430]])
 const prefix = process.argv[2] ?? 'captures/airport/before'
 await mkdir(dirname(prefix), {recursive:true})
-const server = process.env.BASE ? null : await preview({root:'web',configFile:'web/vite.config.ts',preview:{host:'127.0.0.1',port:0}})
+const server = process.env.BASE ? null : await preview({root:'web',configFile:'web/vite.config.ts',build:{outDir:resolve(process.env.AIRPORT_DIST??'dist')},preview:{host:'127.0.0.1',port:0}})
 let browser
 try {
   browser = await chromium.launch(browserOptions())

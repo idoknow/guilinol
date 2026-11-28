@@ -52,12 +52,13 @@ def level_pavement(pavement, terrain, original, left, top):
     from scipy.ndimage import distance_transform_edt
     from airport_pavement import pavement_sources
     _,sources=pavement_sources(load_osm())
-    strips=[]
+    strips=[]; runway_seams=[]
     for kind,default in [('runway',45),('taxiway',23)]:
         for row,line in sources[kind]:
             strip=area(row)
             if strip.is_empty: strip=line.buffer(float(row['tags'].get('width',default))/2,cap_style='flat')
             strips.append(strip)
+            if kind=='runway': runway_seams.append(strip.buffer(15+32+GRID*2))
     core=unary_union(strips).buffer(15+GRID*2)
     x0,z0,x1,z1=pavement.union(core).buffer(32).bounds
     cols=np.arange(max(0,int((x0-left)//GRID)), min(terrain.shape[1],int((x1-left)//GRID)+2))
@@ -71,6 +72,9 @@ def level_pavement(pavement, terrain, original, left, top):
         terrain[rows[rr],cols[cc]]=original[rows[rr],cols[cc]]=target
         if not core.is_empty:
             shoulder=intersects_xy(core,left+cols[None,:]*GRID,top+rows[:,None]*GRID)
+            east=left+cols[None,:]*GRID; south=top+rows[:,None]*GRID
+            anchors=((east%256==0)&(south%32==0))|((south%256==0)&(east%32==0))
+            shoulder|=anchors & intersects_xy(unary_union(runway_seams),east,south)
             distance=distance_transform_edt(~shoulder)*GRID
             blend=np.clip(1-distance/32,0,1)
             blend=blend*blend*(3-2*blend)
