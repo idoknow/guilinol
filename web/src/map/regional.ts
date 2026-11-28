@@ -54,7 +54,7 @@ export async function loadRegional(file:string){
   labels(g:CanvasRenderingContext2D,left:number,top:number,right:number,bottom:number,scale:number,style:CSSStyleDeclaration,skip:(x:number,z:number)=>boolean){
     const far=scale<.09, size=parseFloat(css(style,'--region-font-size'))
     g.textAlign='center'; g.textBaseline='alphabetic'; g.lineJoin='round'; g.strokeStyle=css(style,'--region-halo'); g.lineWidth=3/scale
-    for(const [kind,name,x,z] of labels){if(!name||x<left||x>right||z<top||z>bottom||(far?kind!=='district':skip(x,z)))continue
+    for(const [kind,name,x,z] of labels){if(!name||x<left||x>right||z<top||z>bottom||(far&&kind!=='district')||skip(x,z))continue
       const district=kind==='district'
       g.font=`${district?600:400} ${(district?size+2:size)/scale}px ${css(style,'--region-font')}`
       g.fillStyle=css(style,district?'--region-label':'--region-label-soft')
