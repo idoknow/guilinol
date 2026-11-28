@@ -92,6 +92,7 @@
     "verify:drone": "node scripts/verify-drone.mjs",
     "verify:recording": "node scripts/verify-recording.mjs",
     "verify:creator": "tsx scripts/verify-creator.mjs",
+    "test:mp-spot": "node --import tsx --test scripts/mp-spot-test.mjs",
     "test:emote": "node --experimental-strip-types --test scripts/emote-test.mjs",
     "test:rt-aoi": "node scripts/rt-aoi-check.mjs",
     "chat:words:import": "node scripts/chat-words-import.mjs",
