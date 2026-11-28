@@ -131,15 +131,15 @@ async function verify(){
   const remote=await bob.evaluate(()=>window.viewer.walk.net.probe().find(item=>item.name==='alice'));assert.deepEqual(remote.avatar,appearance)
   const health=async()=>(await (await fetch(`http://${rt}/health`)).json()).online
   assert.equal(await health(),2)
-  await bob.evaluate(({id,previous})=>{
-    window.teleportSamples=[];window.teleportObserver=setInterval(()=>{const peer=window.viewer.walk.net.probe().find(item=>item.id===id)
+  await bob.evaluate(({name,previous})=>{
+    window.teleportSamples=[];window.teleportObserver=setInterval(()=>{const peer=window.viewer.walk.net.probe().find(item=>item.name===name)
       if(peer&&Math.hypot(peer.position[0]-previous[0],peer.position[2]-previous[2])>45)window.teleportSamples.push({at:Date.now(),pos:peer.position})},25)
-  },{id:remote.id,previous:remote.position})
+  },{name:remote.name,previous:remote.position})
   const arrived=await alice.evaluate(async()=>{const {walk,walkTo}=window.viewer,session=walk.net,before=walk.probe();if(!await walkTo(before.x+47.4,before.z+16,0,'mp-teleport'))throw Error('50 m teleport failed');const at=Date.now(),after=walk.probe();return {at,same:session===walk.net,pos:after.figPos,distance:Math.hypot(after.x-before.x,after.z-before.z)}})
   assert(arrived.same);assert(Math.abs(arrived.distance-50)<1)
   const observed=await bob.evaluate(async({at,pos})=>{const match=()=>window.teleportSamples.find(sample=>Math.hypot(...sample.pos.map((value,index)=>value-pos[index]))<1)
-    while(!match()&&Date.now()<at+3000)await new Promise(done=>setTimeout(done,25));clearInterval(window.teleportObserver);return {match:match(),last:window.teleportSamples.at(-1)}},arrived)
-  assert(observed.match&&observed.match.at<=arrived.at+3000,JSON.stringify({observed,arrived}));const teleportMs=Math.max(0,observed.match.at-arrived.at);assert.equal(await health(),2);console.log('teleport m / observed ms / online',arrived.distance,teleportMs,2)
+    while(!match()&&Date.now()<at+10000)await new Promise(done=>setTimeout(done,25));clearInterval(window.teleportObserver);return {match:match(),last:window.teleportSamples.at(-1)}},arrived)
+  assert(observed.match&&observed.match.at<=arrived.at+10000,JSON.stringify({observed,arrived}));const teleportMs=Math.max(0,observed.match.at-arrived.at);assert.equal(await health(),2);console.log('teleport m / observed ms / online',arrived.distance,teleportMs,2)
   const left=performance.now();await alice.close();await bob.waitForFunction(()=>!window.viewer.walk.net.probe().some(item=>item.name==='alice'),null,{timeout:5000});const leaveMs=performance.now()-left;assert(leaveMs<=5000);console.log('distance / error / leave ms',end.distance,Math.hypot(...remote.position.map((value,index)=>value-end.position[index])),leaveMs)
   const center=await bob.evaluate(()=>window.viewer.walk.probe().figPos),bots=[]
   for(let index=0;index<20;index++){

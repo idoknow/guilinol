@@ -34,7 +34,6 @@ export function attachNet(scene:Scene,clips:AnimationClip[],getPose:()=>Pose,get
     if(landingPaused && dist>24)return rejectTravel('cooldown')
     const target=travelTarget(reason,x,z)??null
     if(state!=='online'||dist<=24)return true
-    if(dist<=200 && reason==='mp-teleport')return true
     if(travelReply)return rejectTravel('busy')
     if(!target&&dist>200)return rejectTravel('site')
     const precheck=dist<=200

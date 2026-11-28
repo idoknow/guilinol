@@ -652,9 +652,11 @@ test('IDOK-500 (3/4): 中距(24..200m)预检断连与远距(>200m)放行及 prec
   assert.equal(shortOk, true)
   assert.equal(ws1.sent.slice(sentBeforeShort).filter((m) => m.t === 'travel').length, 0)
 
-  // b) mp-teleport <=200m: stays online (verify:mp contract)
-  const mpOk = await mod.enterLanding('mp-teleport', -138, 51, async () => true)
-  assert.equal(mpOk, true)
+  const mpCheck = mod.enterLanding('mp-teleport', -138, 51, async () => assert.fail('precheck refused'))
+  const localRequest=ws1.sent.at(-1)
+  assert.equal(localRequest.precheck,true);assert.equal(localRequest.target,null)
+  ws1.emitServer({t:'travel_result',seq:localRequest.seq,ok:false,code:'combat'})
+  assert.equal(await mpCheck,false)
   assert.equal(net.status().state, 'online')
 
   // c) Medium range 24..200m: spot:bridge (-185, 35) -> traffic-duty:bridge (-268.5, 24.8) = 84.1m
