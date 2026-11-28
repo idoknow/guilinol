@@ -2041,6 +2041,22 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
             if(document.body.dataset.drone==='rc')window.dispatchEvent(new Event('drone:rc'))
             rides?.clearBoatPose(figure);rides?.dismount()
             window.dispatchEvent(new CustomEvent('walk:toast',{detail:{text:'此处无法使用载具，已回到步行',ms:2400}}))
+          },async(x,savedY,z,valid)=>{
+            const target=new THREE.Vector3(x,savedY,z),tile=sim.tileAt(x,z),until=performance.now()+10000
+            if(!tile)throw Error('missing landing tile')
+            while(valid()&&performance.now()<until){
+              stream.prioritize(x,z);stream.tick(target)
+              if(stream.loaded.has(tile)&&vehicleCollisionReady(x,savedY,z)){
+                sim.sync(x,z,true)
+                const terrain=sim.surface(x,z,'ground'),support=sim.groundSurface(x,z,savedY)
+                if(terrain){
+                  if(support&&(support.kind!=='landmark'||isInBridgeDutyBounds({x,y:support.y,z})))return support.y+.055
+                  return terrain.y+.055
+                }
+              }
+              await new Promise(resolve=>setTimeout(resolve,16))
+            }
+            throw Error('landing collision unavailable')
           })
         net.emote(emote.id);net.tick(0)
     }

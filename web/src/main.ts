@@ -390,7 +390,7 @@ async function start(loader:FullLoader,creatorSpawn=false) {
       cover.progress(.3,'步行模块已就绪')
       const desiredY=typeof targetY==='number'&&Number.isFinite(targetY)
         ? targetY
-        : (reason==='traffic-duty'||name==='解放桥')&&isOnJiefangBridgeDeck({x,z})
+        : (reason==='traffic-duty'||reason==='traffic-duty:bridge'||name==='解放桥')&&isOnJiefangBridgeDeck({x,z})
           ? jiefangDeckWorldY(x,z)
           : undefined
       completed=await enterLanding(reason,x,z,()=>{signal.throwIfAborted();return player.enter(x,z,yaw,reason,false,signal,cover.progress,desiredY)})
