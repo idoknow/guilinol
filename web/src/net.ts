@@ -156,7 +156,7 @@ export function attachNet(scene:Scene,clips:AnimationClip[],getPose:()=>Pose,get
             attempt=0;update('online',msg.online);break
           case 'online':update('online',msg.online);break
           case 'roster':far=new Map();for(const [id,name,x,z,joinedAt] of msg.players as [string,string,number,number,number][])if(id!==myId)far.set(id,{id,name,x,z,yaw:0,v:0,bike:false,joinedAt,far:true});lastRoster=-Infinity;break
-          // 服务端判定这次移动不合法（超速/飞天/非法瞬移）：把自己拉回服务端认可的位置
+          // 服务端没认可这次上车/上船/起飞：只处理当前这次请求的拒绝，退回步行并对齐到服务端位置
           case 'vstate_ack':{
             const local=getMobility?.()
             if(msg.ok!==false || (msg.seq!=null && msg.seq!==mobilitySeq) || !local || `${local.mode}|${local.id??''}`!==lastMobKey)break
@@ -164,6 +164,7 @@ export function attachNet(scene:Scene,clips:AnimationClip[],getPose:()=>Pose,get
             if([msg.x,msg.y,msg.z].every(Number.isFinite))onSetback?.(msg.x,msg.y,msg.z)
             lastMobKey=msg.mode==='foot'?'foot|':''
             break}
+          // 服务端判定这次移动不合法（超速/飞天/非法瞬移）：把自己拉回服务端认可的位置
           case 'setback':{
             if(typeof msg.x==='number'&&typeof msg.z==='number')onSetback?.(msg.x,typeof msg.y==='number'?msg.y:0,msg.z)
             break}

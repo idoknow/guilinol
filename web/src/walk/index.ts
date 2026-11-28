@@ -2035,7 +2035,7 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
           },captureContext,currentMobility,()=>{
             if(document.body.dataset.drone==='rc')window.dispatchEvent(new Event('drone:rc'))
             rides?.clearBoatPose(figure);rides?.dismount()
-            window.dispatchEvent(new CustomEvent('walk:toast',{detail:{text:'未能切换移动状态，已返回步行',ms:2400}}))
+            window.dispatchEvent(new CustomEvent('walk:toast',{detail:{text:'此处无法使用载具，已回到步行',ms:2400}}))
           })
         net.emote(emote.id);net.tick(0)
     }
