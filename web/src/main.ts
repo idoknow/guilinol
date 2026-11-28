@@ -5,7 +5,7 @@ import {inRegion,nearestPlayable} from '../../lib/play-region'
 import {installGeolocation} from './geolocation'
 import {identifyWorld,instrument,operation,record} from './telemetry'
 import * as THREE from 'three'
-import {landingWarmBudget,warmShaders,type WarmBudget} from './shader-warmup'
+import {landingWarmBudget,shouldWarmLanding,warmShaders,type WarmBudget} from './shader-warmup'
 import {vehicleModel} from './walk/vehicle-model'
 import {bytes, fetchAsset, measureFirstWorldBytes, openingTerrain, startOverview, type Manifest} from './world'
 import {Stream} from './stream'
@@ -412,6 +412,8 @@ async function start(loader:FullLoader,creatorSpawn=false) {
         await Promise.race([prepareLandingContent?.(),interrupted]);clearTimeout(deadline)
         stream.tick(player.position)
         stream.updateLandmarks?.(player.position)
+      }
+      if(completed&&shouldWarmLanding(reason,touchUi(),renderer.extensions.has('KHR_parallel_shader_compile'))){
         const budget=landingWarmBudget(start)
         const skipped=new Promise<void>(resolve=>budget.signal.aborted?resolve():budget.signal.addEventListener('abort',()=>resolve(),{once:true}))
         try{

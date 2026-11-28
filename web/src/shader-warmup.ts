@@ -36,6 +36,10 @@ function reflectionQueue(renderer:WebGLRenderer){
 const queues=new WeakMap<WebGLRenderer,ReturnType<typeof reflectionQueue>>()
 export type WarmBudget={signal:AbortSignal,progress:()=>void}
 
+export function shouldWarmLanding(reason:string,touch:boolean,parallelCompile:boolean){
+  return reason!=='flight'||!touch||parallelCompile
+}
+
 export function landingWarmBudget(start:number){
   const stop=new AbortController(),end=start+120_000
   let timer:number
