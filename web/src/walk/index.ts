@@ -1,3 +1,4 @@
+import {record} from '../telemetry'
 import {combatController} from '../combat/controller'
 import {config as combatConfig} from '../combat/net'
 import {cameraHoldLayer, DEFAULT_CAMERA_HOLD_AIM} from './camera-hold'
@@ -1834,7 +1835,11 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
     destination=null
     if(signal?.aborted)return fail('aborted')
     const missingTiles=needed.filter(tile=>!stream.loaded.has(tile)).map(tile=>tile.file),missingLandmarks=supports.filter(entry=>!collisionReady(entry)).map(entry=>entry.id)
-    if(missingTiles.length||missingLandmarks.length)return fail('collision-load-timeout',{missingTiles,missingLandmarks})
+    if(missingTiles.length||missingLandmarks.length){
+      record('collisionTimeout',{ms:Math.round(performance.now()-started),missingLandmarks:missingLandmarks.filter(id=>/^[a-zA-Z0-9_-]{1,64}$/.test(id)).slice(0,12).join(',')})
+      if(reason==='flight')window.dispatchEvent(new CustomEvent('walk:toast',{detail:{text:'附近街区和建筑还在加载，请稍后再点「落地步行」',ms:5000}}))
+      return fail('collision-load-timeout',{missingTiles,missingLandmarks})
+    }
     let gpsSpot:ReturnType<typeof sim.findWalkableSpawn>|undefined
     if(reason==='geolocation'){
       syncSceneObstacleVolumes();sim.sync(x,z);gpsSpot=sim.findWalkableSpawn(x,z,false,true)
