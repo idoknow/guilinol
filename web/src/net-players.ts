@@ -1,5 +1,6 @@
 import {remoteSeat} from './helicopter/remote-seat'
 import {ensureAvatarRig,type AvatarRig} from './walk/avatar-rig'
+import {createLocomotionAnimator,createRemoteLocomotionFeed,type LocomotionAnimator} from './walk/locomotion-anim'
 import {Fighter} from './combat/state'
 import {pose as combatPose} from './combat/poses'
 import {config,type CombatPacket} from './combat/net'
@@ -56,7 +57,7 @@ function visual(player:Player) {
   const root=new THREE.Group(), name=label(player.name), bike=vehicleModel('bike')
   registerNameplate(name)
   root.position.set(player.x,player.y,player.z); root.add(name); bike.visible=false
-  return {root,name,bike,rig:undefined as AvatarRig|undefined,posed:false,wasSeated:false,over:undefined as HTMLElement|undefined,played:-1,emote:undefined as ReturnType<typeof emotePlayback>|undefined,smoke:new RemoteSmoke(),kit:undefined as ReturnType<typeof smokeVisual>|undefined,mixer:undefined as THREE.AnimationMixer|undefined,action:undefined as THREE.AnimationAction|undefined,key:''}
+  return {root,name,bike,rig:undefined as AvatarRig|undefined,posed:false,wasSeated:false,over:undefined as HTMLElement|undefined,played:-1,emote:undefined as ReturnType<typeof emotePlayback>|undefined,smoke:new RemoteSmoke(),kit:undefined as ReturnType<typeof smokeVisual>|undefined,mixer:undefined as THREE.AnimationMixer|undefined,action:undefined as THREE.AnimationAction|undefined,key:'',loco:undefined as LocomotionAnimator|undefined,locoFeed:undefined as ReturnType<typeof createRemoteLocomotionFeed>|undefined}
 }
 
 export function players(scene:THREE.Scene,clips:THREE.AnimationClip[],camera:THREE.Camera) {
@@ -84,7 +85,9 @@ export function players(scene:THREE.Scene,clips:THREE.AnimationClip[],camera:THR
     let entry=templates.get(key); if(!entry){entry={model:template(appearance),refs:0};templates.set(key,entry)}
     entry.refs++
     void entry.model.then(model=>{if(visible.get(player.id)!==view)return
-      const instance=clone(model); view.root.add(instance);view.rig=ensureAvatarRig(instance as THREE.Group);view.mixer=new THREE.AnimationMixer(instance);view.emote=emotePlayback(instance,undefined,view.mixer)
+      const instance=clone(model); view.root.add(instance);view.rig=ensureAvatarRig(instance as THREE.Group)
+      view.loco=createLocomotionAnimator(instance,appearance.body);view.locoFeed=createRemoteLocomotionFeed(view.loco) // IDOK-602, created at bind rest
+      view.mixer=new THREE.AnimationMixer(instance);view.emote=emotePlayback(instance,undefined,view.mixer)
       const idleClip=clips.find(item=>item.name===figure.clips.idle)
       if(idleClip){const idleAct=view.mixer.clipAction(idleClip);idleAct.reset().setEffectiveWeight(1).play();view.action=idleAct;view.mixer.update(0)}
     }).catch(error=>console.warn('remote character unavailable',error))
@@ -119,10 +122,11 @@ export function players(scene:THREE.Scene,clips:THREE.AnimationClip[],camera:THR
         view.name.scale.set(height*view.name.userData.aspect,height,1);view.name.position.y=NAME_Y+height/2-NAME_H/2
         view.name.material.opacity=Math.min(1,(NAME_FAR-away)/(NAME_FAR-NAME_NEAR))
       }
-      // Reverse LIFO reset: apply order below is emote.tick() -> kit.tick().
+      // Reverse LIFO reset: apply order below is loco.update() -> emote.tick() -> kit.tick().
       if(view.posed){view.rig?.clearPose();view.posed=false}
       view.kit?.resetPose()
       view.emote?.reset()
+      view.loco?.reset()
       const inRange=Math.hypot(player.x-local.x,player.z-local.z)<80
       bounds.center.set(player.x,player.y+.9,player.z)
       const eligible=enabled&&view.root.visible&&inRange&&frustum.intersectsSphere(bounds)&&performance.now()<(player.expires??0)
@@ -140,6 +144,8 @@ export function players(scene:THREE.Scene,clips:THREE.AnimationClip[],camera:THR
           view.action.fadeOut(.12);action.reset().setEffectiveWeight(1).fadeIn(.12).play();view.action=action
         }
         view.mixer.update(dt)}
+      // Procedural run/jump: vy and touchdown come from the smoothed root height and gr. No protocol change.
+      view.locoFeed?.(dt,pos.y,player.y,!!player.gr,player.v,view.root.rotation.y,!seated&&!player.bike&&!!view.mixer&&away<70)
       view.emote?.tick(dt,player.v>.12)
       if(enableSmoke&&view.mixer){
         if(player.sc&&!view.kit)view.kit=smokeVisual(scene,view.root)
