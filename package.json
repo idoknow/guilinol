@@ -16,7 +16,7 @@
     "verify:admin": "node scripts/auth-test.mjs --admin-ui",
     "test:smoke": "node --import tsx --test scripts/smoke-test.mjs",
     "dev:full": "npm run build && wrangler d1 migrations apply glol --local && wrangler pages dev dist --binding EMAIL_DEV_LOG=1",
-    "test:api": "node --test scripts/test-projection.mjs && node scripts/auth-test.mjs",
+    "test:api": "node --test scripts/test-projection.mjs && node --import tsx --test scripts/test-feedback-optional-shot.mjs && node scripts/auth-test.mjs",
     "verify:feedback": "node scripts/auth-test.mjs --feedback-ui",
     "verify:entry-session": "node scripts/verify-entry-session.mjs",
     "verify:auth": "node scripts/auth-test.mjs --ui",

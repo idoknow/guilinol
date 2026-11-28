@@ -3,11 +3,20 @@ import { record } from '../telemetry'
 import type { Host } from '../play/host'
 import type { mapView } from '../play/map'
 import { spots, waterDocks } from '../play/spots'
-import { APPEAL, TERMINAL_STATUSES, appealReasons, kinds, labels, photosOptional, stripAppealTemplate, type FeedbackView } from '../../../lib/feedback-contract'
+import { APPEAL, TERMINAL_STATUSES, appealReasons, kinds, labels, photosOptional, type FeedbackView } from '../../../lib/feedback-contract'
 import { ll2xz, xz2ll } from '../../../lib/projection'
 import { readJson, jsonError } from '../lib/json'
 import { photoPicker } from './feedback-photo'
 import { cameraSupported, shootFeedbackPhoto } from './feedback-camera'
+import {
+  buildFeedbackDraftPayload,
+  clampFeedbackPosition,
+  describeFeedbackMedia,
+  safeFeedbackLocation,
+  shouldUploadDefaultShotPhoto,
+  shouldUploadFeedbackViewShot,
+  validateFeedbackSubmit,
+} from './feedback-state'
 import { inline } from './loading'
 import './feedback.css'
 
@@ -82,10 +91,10 @@ function pill(status: string) {
 }
 
 function pickDefaultPosition(host: Host, view?: FeedbackView | null) {
-  const player = host.walker()?.active ? host.walker()!.position : host.camera.position
+  const player = host.walker()?.active ? host.walker()!.position : host.camera?.position
   const target = view?.target
   const chosen = target && (view?.landmark_id || target.distance <= 250) ? target : player
-  return { x: chosen.x, z: chosen.z }
+  return clampFeedbackPosition(chosen)
 }
 
 function describeLocation(
@@ -160,11 +169,18 @@ export async function openFeedback(
   dialog.append(header, body, note)
   document.body.append(dialog)
 
+  const canCapture = typeof host.captureView === 'function'
   let captured: Awaited<ReturnType<Host['captureView']>> | undefined
-  try {
-    if (!initialId && !banId) captured = await host.captureView()
-  } catch (error) {
-    note.textContent = String(error)
+  let initialCaptureAttempted = false
+  let initialCaptureFailed = false
+  if (canCapture && !initialId && !banId) {
+    initialCaptureAttempted = true
+    try {
+      captured = await host.captureView()
+    } catch {
+      initialCaptureFailed = true
+      // 默认取景失败不阻断反馈弹窗打开，用户可稍后重截或按类型无图提交
+    }
   }
   dialog.showModal()
   requestAnimationFrame(() => dialog.classList.add('fb-open'))
@@ -447,16 +463,25 @@ export async function openFeedback(
 
     let id = item?.id
     let draftSignature = ''
+    let mediaResetSeq = 0
+    let captureFailed = false
     let selection: Awaited<ReturnType<Host['captureView']>> | undefined
     if (!item && !banId) {
       if (captured) {
         selection = captured
         captured = undefined
-      } else {
+        initialCaptureAttempted = false
+        initialCaptureFailed = false
+      } else if (initialCaptureAttempted) {
+        captureFailed = initialCaptureFailed
+        initialCaptureAttempted = false
+        initialCaptureFailed = false
+      } else if (canCapture) {
         try {
           selection = await host.captureView()
-        } catch (error) {
-          note.textContent = String(error)
+        } catch {
+          captureFailed = true
+          // 切回新反馈时自动取景失败不阻断表单，按类型在界面提示
         }
       }
     }
@@ -518,10 +543,11 @@ export async function openFeedback(
       locCoords = el('span', '', 'fb-loc-coords ui-num')
     locLeft.append(locTag, locName)
     locBar.append(locLeft, locCoords)
-    if (!item && !banId) formEl.append(locBar)
+    locBar.hidden = !!banId
+    if (!item) formEl.append(locBar)
 
     const updateLocationDisplay = () => {
-      if (item || banId) return
+      if (item) return
       const view = selection?.view
       locSummary = describeLocation(host, activePos.x, activePos.z, view, mapApi)
       locName.textContent = locSummary
@@ -530,7 +556,7 @@ export async function openFeedback(
     }
     updateLocationDisplay()
 
-    if (!item && !banId) {
+    if (!item) {
       void ensureMap().then((apiResult) => {
         if (!apiResult || formDisposed) return
         mapApi = apiResult
@@ -603,9 +629,9 @@ export async function openFeedback(
       const what = el('div', '', 'fb-fields')
       const wrapper = el('label', '', 'fb-field')
       description.required = true
-      description.maxLength = 2000
+      description.maxLength = 1000
       description.rows = 3
-      description.placeholder = '按处理意见补充信息'
+      description.placeholder = '按处理意见补充信息（最多 1000 字）'
       wrapper.append(el('span', '补充内容'), description)
       what.append(wrapper)
       formEl.append(what)
@@ -688,60 +714,55 @@ export async function openFeedback(
           mediaTitle.textContent = '附加照片'
           mediaMeta.textContent = photoCount ? `已附 ${photoCount} 张` : '可直接添加照片'
         }
-        mediaActions.replaceChildren(retakeBtn)
+        mediaActions.replaceChildren(...(canCapture ? [retakeBtn] : []))
         return
       }
 
-      const isAppealMode = !!banId || chosenKind() === APPEAL
-      if (isAppealMode && !useDefaultShot && !photoCount) {
-        mediaCard.hidden = false
-        mediaCard.classList.add('fb-media--empty')
-        previewWrap.hidden = true
-        previewImg.removeAttribute('src')
-        mediaTitle.textContent = '申诉截图（可选）'
-        mediaMeta.textContent = '可附上提示或异常截图'
-        mediaActions.replaceChildren(pickBtn)
-        return
-      }
-
+      const presentation = describeFeedbackMedia({
+        kind: chosenKind(),
+        hasItem: false,
+        hasSelection: !!selection,
+        useDefaultShot,
+        photoCount,
+        canCapture,
+        captureFailed,
+      })
       mediaCard.hidden = false
-      if (photoCount > 0) {
-        mediaCard.classList.remove('fb-media--empty')
-        mediaCard.classList.add('fb-media--custom')
-        previewWrap.hidden = true
-        previewImg.removeAttribute('src')
-        mediaTitle.textContent = `已选图片（${photoCount} 张）`
-        mediaMeta.textContent = selection ? '已保留当前视角供定位' : '随反馈一起上传'
-        mediaActions.replaceChildren(
-          ...(banId ? [] : [retakeBtn]),
-          replaceBtn,
-          removeBtn,
-        )
-        replaceBtn.textContent = '继续添加'
-        return
-      }
+      mediaCard.classList.toggle('fb-media--empty', presentation.mode === 'empty' || presentation.mode === 'appeal-empty')
+      mediaCard.classList.toggle('fb-media--custom', presentation.mode === 'photos')
+      mediaTitle.textContent = presentation.title
+      mediaMeta.textContent = presentation.meta
+      replaceBtn.textContent = presentation.replaceLabel
 
-      mediaCard.classList.remove('fb-media--custom')
-      if (useDefaultShot && selection) {
-        mediaCard.classList.remove('fb-media--empty')
+      if (presentation.mode === 'default-shot' && selection) {
         shotUrl = URL.createObjectURL(selection.shot)
         previewImg.src = shotUrl
         previewWrap.hidden = false
         previewCross.hidden = !selection.view.target
-        mediaTitle.textContent = '当前游戏画面'
-        mediaMeta.textContent = '默认附图 · 可直接提交'
-        replaceBtn.textContent = '更换'
-        mediaActions.replaceChildren(retakeBtn, replaceBtn, removeBtn)
-      } else {
-        mediaCard.classList.add('fb-media--empty')
-        previewWrap.hidden = true
-        previewImg.removeAttribute('src')
-        mediaTitle.textContent = photosOptional(chosenKind()) ? '暂未附带图片（可选）' : '暂未附带图片'
-        mediaMeta.textContent = photosOptional(chosenKind())
-          ? '可直接提交，也可补截图'
-          : '可截取当前画面或从本地选择'
-        mediaActions.replaceChildren(...(banId ? [] : [captureNowBtn]), pickBtn)
+        mediaActions.replaceChildren(
+          ...(presentation.showRetake ? [retakeBtn] : []),
+          replaceBtn,
+          removeBtn,
+        )
+        return
       }
+
+      previewWrap.hidden = true
+      previewImg.removeAttribute('src')
+      if (presentation.mode === 'photos') {
+        mediaActions.replaceChildren(
+          ...(presentation.showCaptureNow ? [captureNowBtn] : []),
+          ...(presentation.showRetake ? [retakeBtn] : []),
+          replaceBtn,
+          removeBtn,
+        )
+        return
+      }
+
+      mediaActions.replaceChildren(
+        ...(presentation.showCaptureNow ? [captureNowBtn] : []),
+        pickBtn,
+      )
     }
 
     syncSummary = () => {
@@ -752,7 +773,7 @@ export async function openFeedback(
         const isAppeal = current === APPEAL
         if (banRecordField) banRecordField.hidden = !isAppeal
         appealReasonWrap.hidden = !isAppeal
-        if (!banId) locBar.hidden = isAppeal
+        locBar.hidden = isAppeal
         if (isAppeal) {
           if (!name.value.trim()) name.value = APPEAL
           if (!banRecordInput.value.trim() && recentBanId) banRecordInput.value = recentBanId
@@ -773,18 +794,19 @@ export async function openFeedback(
         }
       }
 
-      const hasDefault = useDefaultShot && !!selection
-      const readyText = photoCount
-        ? `已附 ${photoCount} 张图片${!item && !banId ? '与当前位置' : ''}`
-        : hasDefault
-          ? '已带当前画面与位置'
-          : bug
-            ? current === APPEAL
-              ? '可直接提交申诉'
-              : '截图可选，可直接提交'
-            : '请截取画面或选择图片'
-      count.textContent = readyText
-      count.classList.toggle('fb-count--empty', !photoCount && !hasDefault && !bug)
+      const presentation = describeFeedbackMedia({
+        kind: current,
+        hasItem: !!item,
+        supplement,
+        itemHasViewShot: !!item?.has_view_shot,
+        hasSelection: !!selection,
+        useDefaultShot,
+        photoCount,
+        canCapture,
+        captureFailed,
+      })
+      count.textContent = presentation.countText
+      count.classList.toggle('fb-count--empty', presentation.countEmpty)
     }
 
     const startAim = () => {
@@ -807,16 +829,21 @@ export async function openFeedback(
         take.disabled = cancel.disabled = true
         try {
           selection = await host.captureView()
+          captureFailed = false
           useDefaultShot = true
           viewShotUploaded = false
           defaultPhotoUploaded = false
           activePos = pickDefaultPosition(host, selection.view)
           location = xz2ll(activePos.x, activePos.z)
           updateLocationDisplay()
+          note.textContent = ''
+          note.classList.remove('fb-note--error')
           syncSummary()
         } catch (error) {
-          note.textContent = String(error)
+          captureFailed = true
+          note.textContent = String((error as Error)?.message || error)
           note.classList.add('fb-note--error')
+          syncSummary()
         } finally {
           restore()
         }
@@ -824,7 +851,7 @@ export async function openFeedback(
     }
 
     retakeBtn.onclick = () => {
-      if (!busy) startAim()
+      if (!busy && canCapture) startAim()
     }
     replaceBtn.onclick = () => {
       if (!busy) picker.open()
@@ -835,12 +862,21 @@ export async function openFeedback(
     removeBtn.onclick = () => {
       if (busy) return
       useDefaultShot = false
+      mediaResetSeq += 1
       picker.clear()
       syncSummary()
     }
     captureNowBtn.onclick = () =>
       void run(async () => {
-        selection = await host.captureView()
+        if (!canCapture) throw Error('当前无法截取游戏画面')
+        try {
+          selection = await host.captureView()
+          captureFailed = false
+        } catch (error) {
+          captureFailed = true
+          syncSummary()
+          throw error
+        }
         useDefaultShot = true
         viewShotUploaded = false
         defaultPhotoUploaded = false
@@ -881,36 +917,49 @@ export async function openFeedback(
       event.preventDefault()
       void run(async () => {
         const current = chosenKind()
-        const bug = photosOptional(current)
-        const hasDefault = !item && useDefaultShot && !!selection
-        const hasAnyImage = picker.count() > 0 || hasDefault
-        if (!hasAnyImage && !bug) throw Error('请截取当前画面或选择一张图片')
-        if (!supplement && bug && !description.value.trim()) throw Error('请描述一下遇到的问题')
-
-        const text = description.value.trim()
         const appeal = current === APPEAL
+        const optional = photosOptional(current)
+        const text = (item && !supplement ? item.body ?? '' : description.value).trim()
         const recordIdVal = appeal ? banRecordInput.value.trim() : ''
-        if (!supplement && appeal && Array.from(stripAppealTemplate(text)).length < 2) {
-          throw Error('请填写具体的申诉说明，不能留空或只保留模板')
-        }
+        const check = validateFeedbackSubmit({
+          kind: current,
+          hasItem: !!item,
+          supplement,
+          itemHasViewShot: !!item?.has_view_shot,
+          hasSelection: !!selection,
+          useDefaultShot,
+          photoCount: picker.count(),
+          canCapture,
+          captureFailed,
+          bodyText: text,
+          banRecordId: recordIdVal,
+        })
+        if (!check.ok) throw Error(check.error)
+
         const fallbackName = truncateChars(`${current} · ${locSummary || '当前位置'}`, 40)
         const resolvedTitle =
           name.value.trim() || (text ? truncateChars(text.replace(/\s+/g, ' '), 40) : fallbackName)
 
+        let skippedDefaultShot = false
         send.textContent = '正在提交…'
         try {
-          if (!item && !appeal && !selection) {
+          if (check.needsAutoCapture && !selection) {
+            if (!canCapture) throw Error('请先截取游戏画面')
             try {
               selection = await host.captureView()
+              captureFailed = false
               viewShotUploaded = false
               defaultPhotoUploaded = false
               activePos = pickDefaultPosition(host, selection.view)
               location = xz2ll(activePos.x, activePos.z)
               updateLocationDisplay()
             } catch {
+              captureFailed = true
+              syncSummary()
               throw Error('请先截取游戏画面')
             }
           }
+          const safeLoc = appeal ? xz2ll(0, 0) : safeFeedbackLocation(location)
           const nextSignature = !item
             ? JSON.stringify({
                 current,
@@ -918,8 +967,9 @@ export async function openFeedback(
                 text,
                 recordIdVal,
                 useDefaultShot,
-                lat: appeal ? 0 : location.lat,
-                lon: appeal ? 0 : location.lon,
+                mediaResetSeq,
+                lat: safeLoc.lat,
+                lon: safeLoc.lon,
                 view: appeal ? null : selection?.view ?? null,
               })
             : ''
@@ -933,59 +983,81 @@ export async function openFeedback(
             picker.resetDone()
           }
           if (!id) {
-            if (!appeal && !selection) throw Error('请先截取游戏画面')
+            if (!optional && !selection) throw Error('请先截取游戏画面')
             id = (
-              await api<{ id: string }>('feedback', {
-                ...(appeal ? xz2ll(0, 0) : location),
-                view: appeal ? null : selection?.view,
-                heading: appeal ? null : selection?.view.heading,
-                landmark_id: appeal ? null : selection?.view.landmark_id,
-                kind: current,
-                title: resolvedTitle,
-                body: text,
-                ...(appeal && recordIdVal ? { ban_record_id: recordIdVal } : {}),
-              })
+              await api<{ id: string }>(
+                'feedback',
+                buildFeedbackDraftPayload({
+                  kind: current,
+                  title: resolvedTitle,
+                  body: text,
+                  location: safeLoc,
+                  view: selection?.view ?? null,
+                  banRecordId: recordIdVal,
+                }),
+              )
             ).id
             draftSignature = nextSignature
           }
 
-          const shouldUploadViewShot =
-            current !== APPEAL && !!selection && (useDefaultShot || picker.count() > 0) && !viewShotUploaded
+          const defaultShotOptionalFallback = !item && optional && !appeal && picker.count() === 0
+          const shouldUploadViewShot = shouldUploadFeedbackViewShot({
+            kind: current,
+            hasSelection: !!selection,
+            useDefaultShot,
+            photoCount: picker.count(),
+            viewShotUploaded,
+          })
           if (shouldUploadViewShot && selection) {
-            const response = await fetch(`/api/feedback/${id}/view-shot`, {
-              method: 'PUT',
-              headers: {
-                'Content-Type': 'image/jpeg',
-                'X-Feedback-View': JSON.stringify(selection.view).replace(
-                  /[^\x20-\x7e]/g,
-                  (char) => '\\u' + char.charCodeAt(0).toString(16).padStart(4, '0'),
-                ),
-              },
-              body: selection.shot,
-            })
-            if (!response.ok) throw Error(await jsonError(response))
-            viewShotUploaded = true
+            try {
+              const response = await fetch(`/api/feedback/${id}/view-shot`, {
+                method: 'PUT',
+                headers: {
+                  'Content-Type': 'image/jpeg',
+                  'X-Feedback-View': JSON.stringify(selection.view).replace(
+                    /[^\x20-\x7e]/g,
+                    (char) => '\\u' + char.charCodeAt(0).toString(16).padStart(4, '0'),
+                  ),
+                },
+                body: selection.shot,
+              })
+              if (!response.ok) throw Error(await jsonError(response))
+              viewShotUploaded = true
+            } catch (error) {
+              if (!defaultShotOptionalFallback) throw error
+              skippedDefaultShot = true
+            }
           }
 
           if (picker.count() > 0) {
             await picker.upload(id)
           } else if (
-            !item &&
-            current !== APPEAL &&
-            useDefaultShot &&
-            selection &&
-            !defaultPhotoUploaded
+            !skippedDefaultShot &&
+            shouldUploadDefaultShotPhoto({
+              hasItem: !!item,
+              kind: current,
+              hasSelection: !!selection,
+              useDefaultShot,
+              photoCount: picker.count(),
+              defaultPhotoUploaded,
+            }) &&
+            selection
           ) {
-            const uploadDefault = await fetch(`/api/feedback/${id}/photos/1`, {
-              method: 'PUT',
-              headers: {
-                'Content-Type': 'image/jpeg',
-                'X-Photo-Meta': encodeURIComponent(JSON.stringify({})),
-              },
-              body: selection.shot,
-            })
-            if (!uploadDefault.ok) throw Error(await jsonError(uploadDefault))
-            defaultPhotoUploaded = true
+            try {
+              const uploadDefault = await fetch(`/api/feedback/${id}/photos/1`, {
+                method: 'PUT',
+                headers: {
+                  'Content-Type': 'image/jpeg',
+                  'X-Photo-Meta': encodeURIComponent(JSON.stringify({})),
+                },
+                body: selection.shot,
+              })
+              if (!uploadDefault.ok) throw Error(await jsonError(uploadDefault))
+              defaultPhotoUploaded = true
+            } catch (error) {
+              if (!defaultShotOptionalFallback) throw error
+              skippedDefaultShot = true
+            }
           }
 
           await api(`feedback/${id}/${supplement ? 'supplement' : 'submit'}`, { body: text })
@@ -994,7 +1066,11 @@ export async function openFeedback(
           send.textContent = supplement ? '提交补充' : '提交反馈'
         }
         await detail(id)
-        note.textContent = appeal ? '申诉已提交，我们会尽快核实并在进度中回复。' : '已提交，我们会尽快处理。进度会显示在这里。'
+        note.textContent = appeal
+          ? '申诉已提交，我们会尽快核实并在进度中回复。'
+          : skippedDefaultShot
+            ? '已提交（默认截图上传失败，已自动改为无图提交）。'
+            : '已提交，我们会尽快处理。进度会显示在这里。'
       })
     }
   }

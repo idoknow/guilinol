@@ -10,8 +10,8 @@ let build: string | undefined
 async function currentBuild(): Promise<string> {
   if (build !== undefined) return build
   const sha = (await (await fetch('/version.json')).json()).sha
-  build = typeof sha === 'string' ? sha : ''
-  return build
+  if (typeof sha === 'string' && /^[a-f0-9]{40}$/.test(sha)) build = sha
+  return typeof sha === 'string' ? sha : ''
 }
 
 export function setView(host: Host, view: unknown) {
