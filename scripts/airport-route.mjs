@@ -14,7 +14,7 @@ const url='http://127.0.0.1:'+server.httpServer.address().port
 let browser
 try {
   browser=await chromium.launch(browserOptions())
-  for(const route of ['drive','walk','lingui-walk']){
+  for(const route of ['drive','walk','lingui-walk','terminal-walk']){
     if(process.argv.length>2 && !process.argv.includes('--'+route))continue
     const mode=route==='drive'?'drive':'walk'
     const corridor=(kind,start,end)=>{
@@ -25,6 +25,8 @@ try {
     let path
     if(route==='lingui-walk'){
       path=corridor('walk',legs[0],legs[1])
+    }else if(route==='terminal-walk'){
+      path=corridor('walk',legs[2],legs[3])
     }else if(mode==='walk'){
       // Tower and expo are modeled as shared street corridors. Join the
       // walking polyline at actual shared vertices, with no spawn between legs.
@@ -61,7 +63,7 @@ try {
     const page=await browser.newPage()
     try {
       await page.goto(url+'/?verify&mode=walk&flow=0')
-      await page.waitForFunction(()=>window.viewer?.walk?.active && window.viewer.walk.parked('car').length>0,null,{timeout:90000})
+      await page.waitForFunction(driving=>window.viewer?.walk?.active && (!driving || window.viewer.walk.parked('car').length>0),mode==='drive',{timeout:90000})
       const start=mode==='drive'?[car[0],car[2]]:path[0]
       const readyBy=Date.now()+60000
       while(Date.now()<readyBy){
@@ -134,7 +136,12 @@ try {
           window.viewer.resume()
         }
       },{mode,path})
-      console.log(route,result)
+      if(route==='terminal-walk'){
+        const [east,south]=path.at(-1)
+        const error=Math.hypot(result.position[0]-east,result.position[2]-south)
+        assert.ok(error<2,'Walker did not arrive at the landside destination')
+        console.log(route,{waypoints:result.waypoints,resets:result.resets,arrivalErrorM:error})
+      }else console.log(route,result)
     }finally{await page.close()}
   }
 }finally{await browser?.close();await server.close()}

@@ -1,0 +1,147 @@
+"""Deterministic visual props, grounded on the same triangles as the player."""
+from collections import defaultdict
+import json
+import math
+from pathlib import Path
+
+import numpy as np
+from shapely.geometry import LineString, Point, Polygon
+from shapely.ops import nearest_points, unary_union
+
+from airport_pavement import pavement_sources
+from common import load_osm
+from features import area, points
+
+APPROACH_MARGIN = 5.0
+
+
+def approach_points(tip, forward, inset):
+    tip=np.asarray(tip)
+    right=np.array([forward[1],-forward[0]])
+    axis=LineString([tip,tip+900*forward]).intersection(inset)
+    segment=next((part for part in getattr(axis,'geoms',[axis]) if not part.is_empty and
+                  part.geom_type=='LineString' and part.distance(Point(tip))<.001),None)
+    if segment is None: return
+    limit=min(900,math.floor(segment.length+.000001))
+    stations=list(range(30,limit+1,30))
+    if stations and limit-stations[-1]>=5: stations.append(limit)
+    for station in stations:
+        for shift in ((-10,-5,0,5,10) if station%150==0 else (0,)):
+            point=tip+station*forward+shift*right
+            if inset.covers(Point(point)): yield point
+
+def scenery_fence(field, buildings, routes, bounds):
+    footprint = field.buffer(-4).difference(buildings.buffer(3))
+    public_space = unary_union([route.buffer(8) for route in routes])
+    for piece in getattr(footprint, 'geoms', [footprint]):
+        if piece.is_empty or piece.geom_type != 'Polygon': continue
+        visible = piece.exterior.difference(public_space).intersection(bounds)
+        for line in getattr(visible, 'geoms', [visible]):
+            if not line.is_empty and line.geom_type in ('LineString','LinearRing'): yield line
+
+
+def landside_routes():
+    definition = json.loads(Path(__file__).with_name('region.json').read_bytes())
+    return [LineString(route['geometry']['coordinates']) for route in definition['corridors']
+            if route['end'] == '两江机场' and route['mode'] in ('drive','walk')]
+
+
+def layout(elements, bounds, ground):
+    field,sources = pavement_sources(elements)
+    if field is None or not field.intersects(bounds): return {}
+    buildings = unary_union([area(row) for row in elements if row['type']=='way' and
+                             row.get('tags',{}).get('building') and field.intersects(area(row))])
+    terminals = unary_union([area(row) for row in elements if row['type']=='way' and row['id'] in (334128971,631243397)])
+    rows = defaultdict(list)
+    def put(kind, pair, yaw=0, scale=(1,1,1), lift=0):
+        east,south = pair
+        if bounds.covers(Point(east,south)):
+            rows[kind].append([round(value,3) for value in (east,ground(east,south)+lift,south,yaw,*scale)])
+    def vector(start,end):
+        delta = np.subtract(end,start)
+        return delta / max(.001,np.linalg.norm(delta))
+    def angle(direction): return math.atan2(direction[0],direction[1])
+    def path(kind,start,end,lift=0):
+        put(kind,(np.array(start)+end)/2,angle(vector(start,end)),(1,1,np.linalg.norm(np.subtract(end,start))),lift)
+    docks=[]; bridges=[]; links=[]; dock_levels={}
+    for row in elements:
+        tags=row.get('tags',{}); coords=points(row)
+        if row['type']!='way' or len(coords)<2: continue
+        line=LineString(coords)
+        if not field.intersects(line): continue
+        if tags.get('aeroway')=='jet_bridge':
+            if terminals.distance(Point(coords[-1])) < terminals.distance(Point(coords[0])): coords.reverse()
+            if terminals.distance(Point(coords[0]))>.1:
+                coords.insert(0,nearest_points(terminals,Point(coords[0]))[0].coords[0])
+            links.append(coords)
+            docks.append(np.array(coords[-1])); bridges.append(line.buffer(1.5))
+        elif tags.get('aeroway')=='navigationaid': put('beacon',line.centroid.coords[0])
+    occupied=[]; used=set(); bridge_area=unary_union(bridges)
+    for index,(_,line) in enumerate(sorted(sources['parking_position'],key=lambda pair:pair[0]['id'])):
+        coords=list(line.coords)
+        if terminals.distance(Point(coords[0])) < terminals.distance(Point(coords[-1])): coords.reverse()
+        end=np.array(coords[-1]); forward=vector(coords[-2],end); right=np.array([forward[1],-forward[0]])
+        dock=min(range(len(docks)),key=lambda key:np.linalg.norm(docks[key]-end)) if docks else None
+        near=dock is not None and np.linalg.norm(docks[dock]-end)<55
+        put('standSign',end+7*right,angle(forward))
+        if index%5 >= (3 if near else 1) or (near and dock in used): continue
+        size=1.22 if index%11==0 else 1
+        center=end-11*size*forward
+        outline=Polygon([center+size*(lateral*right+station*forward) for lateral,station in
+                         [(0,17),(2.1,12),(2.1,4),(17,-5),(17,-7),(2,-4),(1.6,-11),(6,-15),(0,-17),(-6,-15),(-1.6,-11),(-2,-4),(-17,-7),(-17,-5),(-2.1,4),(-2.1,12)]])
+        if buildings.intersects(outline) or any(other.intersects(outline) for other in occupied): continue
+        occupied.append(outline)
+        if near:
+            used.add(dock)
+            links[dock][-1]=center+size*(12*forward-1.75*right)
+            dock_levels[dock]=ground(*center)+4.05*size
+        put('airliner',center,angle(forward),(size,size,size))
+        for shift,kind in [(10,['tug','cart','stairs','fuel','bus'][(len(occupied)-1)%5]),(15,'cart')]:
+            point=center+right*shift+forward*10
+            if not buildings.intersects(Point(point).buffer(3)): put(kind,point,angle(forward))
+    for index,coords in enumerate(links):
+        end_level=dock_levels.get(index,ground(*coords[-1])+5.2)
+        if len(coords)==2: coords.insert(1,(np.asarray(coords[0])+coords[1])*.5)
+        for section,(start,end) in enumerate(zip(coords,coords[1:])):
+            mid=(np.asarray(start)+end)*.5;delta=np.subtract(end,start)
+            first=ground(*start)+5.2;last=end_level if section==len(coords)-2 else ground(*end)+5.2
+            kind='bridgeFixed' if section==0 else 'bridgeMobile'
+            put(kind,mid,angle(vector(start,end)),(1,1,np.linalg.norm(delta)),(first+last)/2-5.2-ground(*mid))
+            rows[kind][-1].append(round(last-first,3))
+        put('bridgePivot',coords[-2]);put('bridgeDock',coords[-1],angle(vector(coords[-2],coords[-1])),lift=end_level-ground(*coords[-1])-5.2)
+    light_inset=bounds.buffer(-APPROACH_MARGIN-.002)
+    for _,line in sources['runway']:
+        for side in (-1,1):
+            edge=line.offset_curve(side*23)
+            for station in np.arange(0,edge.length,60): put('edgeLight',edge.interpolate(station).coords[0])
+        for tip,inner in [(line.coords[0],line.coords[1]),(line.coords[-1],line.coords[-2])]:
+            forward=vector(inner,tip); right=np.array([forward[1],-forward[0]])
+            for point in approach_points(tip,forward,light_inset): put('approachLight',point)
+            for shift in (35,43,51,59): put('papi',tip-290*forward+shift*right,angle(forward))
+            put('windsock',tip-110*forward+70*right)
+    for _,line in sources['taxiway']:
+        for station in np.arange(25,line.length,60): put('taxiLight',line.interpolate(station).coords[0])
+    for row,_ in sources['apron']:
+        edge=area(row).exterior
+        for station in np.arange(0,edge.length,120):
+            point=edge.interpolate(station)
+            if buildings.distance(point)>10 and bridge_area.distance(point)>6: put('mast',point.coords[0])
+    for segment in scenery_fence(field, buildings, landside_routes(), bounds):
+        coords=list(segment.coords)
+        for start,end in zip(coords,coords[1:]):
+            count=max(1,math.ceil(math.dist(start,end)/5)); delta=np.subtract(end,start)/count
+            for idx in range(count):
+                first=start+idx*delta;last=first+delta
+                center=(first+last)/2
+                base,tip=ground(*first),ground(*last)
+                rows['fence'].append([round(float(value),4) for value in
+                    (center[0],(base+tip)/2,center[1],angle(vector(first,last)),1,1,np.linalg.norm(delta),tip-base)])
+    return rows
+
+
+def write_props(output,bounds,ground):
+    rows=layout(load_osm(),bounds,ground)
+    if not rows: return None
+    file=output/'airport-props.json'
+    file.write_text(json.dumps(rows,separators=(',',':')))
+    return dict(file=file.name,bytes=file.stat().st_size)

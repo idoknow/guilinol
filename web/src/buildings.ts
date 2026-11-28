@@ -64,7 +64,8 @@ export function buildingGeometry(
       for(;cursor<endVertex;cursor++){kinds[cursor]=0;roofs[cursor]=0;floor[cursor]=0;facade[cursor]=0}
       continue
     }
-    const ov:BuildingOverride|undefined = !walkPlane && tileX!==undefined && tileZ!==undefined ? getBuildingOverride(tileX,tileZ,partIdx) : undefined
+    const aviation=origKind>=5&&origKind<=7
+    const ov:BuildingOverride|undefined = !aviation && !walkPlane && tileX!==undefined && tileZ!==undefined ? getBuildingOverride(tileX,tileZ,partIdx) : undefined
     const baseY=base/10
     const foundationY=tileX===-1280 && tileZ===256 && seed===3294284245 && !raised && !walkPlane ? 150.9 : undefined
     const level=ov ? baseY+ov.h : origTop/10
@@ -73,8 +74,8 @@ export function buildingGeometry(
     if(ov){ part[1]=Math.round(level*10); part[4]=floors }
     const hasShop=!!ov && ov.s>=0
     const kind=ov ? (hasShop ? 32 + ov.u + ov.s*8 : 16 + ov.u) : origKind
-    const roofTint=ov ? (ov.r===1 ? 0x50575a : ov.r===2 ? 0x2f6c56 : ov.r===3 ? 0x747779 : 0x6f7274) : undefined
-    const wallTint=ov ? ov.c : undefined
+    const roofTint=ov ? (ov.r===1 ? 0x50575a : ov.r===2 ? 0x2f6c56 : ov.r===3 ? 0x747779 : 0x6f7274) : aviation ? 0xa4a8a5 : undefined
+    const wallTint=ov ? ov.c : aviation ? 0xd6d9d5 : undefined
 
     function tag(index:number,isRoof:number,f:number,u:number,tintHex?:number){
       kinds[index]=kind;floor[index]=f;facade[index]=u;roofs[index]=isRoof
@@ -140,7 +141,7 @@ export function buildingGeometry(
           face([[x,level,z],[x,level+ph,z],[ex,level+ph,ez],[ex,level,ez]],true,wallTint)
           const dx=ex-x, dz=ez-z, l=len||1, inX=-dz/l*0.26, inZ=dx/l*0.26
           face([[x,level+ph,z],[x+inX,level+ph,z+inZ],[ex+inX,level+ph,ez+inZ],[ex,level+ph,ez]],true,0x8a8c8d)
-        } else if(!ov && !origKind && !isEdgeClipped){
+        } else if(!ov && (!origKind||aviation) && !isEdgeClipped){
           face([[x,level,z],[x,level+.9,z],[ex,level+.9,ez],[ex,level,ez]],true)
         }
       }
@@ -199,6 +200,9 @@ export function buildingGeometry(
       continue
     }
 
+    if(aviation&&anchor.length){
+      addBox(anchor[0]/100,level,anchor[1]/100,1.6,.85,1.3,0x818c8c)
+    }
     if(!anchor.length||origKind>=3)continue
     const [cx,cz]=anchor.map(v=>v/100)
     if(!origKind){for(let box=0;box<seed%3;box++){

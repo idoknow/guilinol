@@ -31,6 +31,8 @@ export function physicalBuildingRings(tile:Tile, rendered:Building[]):Building[]
   return tile.x===-1536 && tile.z===-256 ? rings.filter(part=>!isLegacyKuiguangSliver(tile.x,tile.z,part)) : rings
 }
 export interface Manifest {
+  airportProps?:Asset
+  airportMarkings?:Asset
   region?:import('../../lib/play-region').Region
   tunnels?:Tunnel[]
   groundCutouts?:GroundCutout[]

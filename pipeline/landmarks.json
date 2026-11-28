@@ -1,4 +1,9 @@
 [
+  {"id":"liangjiang_t2","name":"两江机场二号航站楼","anchor":"way/631243397","model":"landmarks/liangjiang_t2.glb","collision":"mesh","replace":["way/631243397"],"farRadius":3000,"expandedAirport":true},
+  {"id":"liangjiang_t1","name":"两江机场一号航站楼","anchor":"way/334128971","model":"landmarks/liangjiang_t1.glb","collision":"mesh","replace":["way/334128971"],"farRadius":3000,"expandedAirport":true},
+  {"id":"liangjiang_tower","name":"两江机场塔台","anchor":"way/334129261","model":"landmarks/liangjiang_tower.glb","collision":"mesh","replace":["way/334129261"],"farRadius":3000,"expandedAirport":true},
+  {"id":"liangjiang_hangar","name":"两江机场机库","anchor":"way/631243406","model":"landmarks/liangjiang_hangar.glb","collision":"mesh","replace":["way/631243406"],"expandedAirport":true},
+  {"id":"liangjiang_cargo","name":"两江机场航空货运站","anchor":"way/1034544714","model":"landmarks/liangjiang_cargo.glb","collision":"mesh","replace":["way/1034544714"],"expandedAirport":true},
   {"id":"guilin_station","name":"桂林站","anchor":[110.278235,25.263846],"rotation":0,"model":"landmarks/guilin_station.glb","collision":"mesh","positionBits":16,"replace":["way/819178841","way/1017598902","way/1017598916","way/1017598908"]},
   {"id":"yiwu_old_house","name":"翊武路青砖老楼","anchor":"way/702352880","rotation":-100.2,"model":"landmarks/yiwu_old_house.glb","replace":["way/702352880"],"collision":"mesh"},
   {"id":"yiwu_office","name":"翊武路白色办公楼","anchor":"way/675974225","rotation":77.4,"model":"landmarks/yiwu_office.glb","replace":["way/675974225"],"collision":"mesh"},

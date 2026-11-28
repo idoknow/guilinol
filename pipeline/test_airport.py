@@ -1,0 +1,93 @@
+import unittest
+from math import cos, sin
+from shapely.geometry import LineString, Point, box
+from shapely.ops import unary_union
+import numpy as np
+
+from airport_pavement import pavement_sources
+from airport_props import layout, scenery_fence
+from common import load_osm
+from pathlib import Path
+from tempfile import TemporaryDirectory
+import json
+import shapely
+from play_region import PlayRegion
+
+
+class ScenicFenceTest(unittest.TestCase):
+    def test_independent_landside_fixture(self):
+        field=box(0,0,100,100)
+        buildings=box(40,40,50,50)
+        paths=[LineString([(0,25),(20,25)]),LineString([(0,75),(20,75)])]
+        fence=unary_union(list(scenery_fence(field,buildings,paths,field)))
+        original,=scenery_fence(field,buildings,[],field)
+        openings=sorted(original.difference(fence).geoms,key=lambda line:line.centroid.y)
+        self.assertEqual(len(openings),len(paths))
+        for opening,path,center in zip(openings,paths,[(4,25),(4,75)],strict=True):
+            self.assertEqual(opening.centroid.coords[0],center)
+            self.assertAlmostEqual(opening.length,16)
+            self.assertTrue(fence.disjoint(path))
+
+    def test_detour_preserves_ring_except_at_game_route(self):
+        field=box(0,0,100,100)
+        buildings=box(80,30,105,50).union(box(30,30,40,40))
+        ring,=scenery_fence(field,buildings,[],field)
+        self.assertTrue(ring.is_ring)
+        self.assertAlmostEqual(ring.distance(buildings),3,delta=.02)
+        route=LineString([(0,50),(20,50)])
+        cut=unary_union(list(scenery_fence(field,buildings,[route],field)))
+        self.assertTrue(cut.equals(ring.difference(route.buffer(8))))
+
+
+class LiangjiangSnapshot(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.elements=load_osm()
+        cls.bounds=PlayRegion().geometry
+
+    def test_only_local_surfaces(self):
+        _,sources=pavement_sources(self.elements)
+        self.assertEqual([row['id'] for row,_ in sources['runway']],[35449799])
+        for kind,count in [('taxiway',96),('apron',2),('parking_position',66)]:
+            self.assertEqual(len(sources[kind]),count)
+
+    def test_finished_yellow_mesh_excludes_runway(self):
+        from airport_pavement import write_markings
+        _,sources=pavement_sources(self.elements)
+        with TemporaryDirectory() as tmp:
+            target=Path(tmp)
+            result=write_markings(target,self.bounds,lambda east,south:165.)
+            yellow=json.loads((target/result['file']).read_text())['marking_yellow']
+        faces=shapely.polygons(np.asarray(yellow).reshape(-1,3,3)[:,:,[0,2]])
+        strip=sources['runway'][0][1].buffer(22.5,cap_style='flat')
+        self.assertGreater(len(faces),0)
+        self.assertFalse(np.any(shapely.intersects(faces,strip)))
+
+    def test_fixture_counts_and_panel_ends(self):
+        def grade(east,south): return 170+.08*east+.11*south
+        props=layout(self.elements,self.bounds,grade)
+        _,sources=pavement_sources(self.elements)
+        runway=sources['runway'][0][1]
+        lamps=[Point(east,south) for east,_,south,*_ in props['approachLight']]
+        self.assertGreaterEqual(min(self.bounds.boundary.distance(lamp) for lamp in lamps),5)
+        for tip,inner in [(runway.coords[0],runway.coords[1]),(runway.coords[-1],runway.coords[-2])]:
+            direction=np.subtract(tip,inner); direction/=np.linalg.norm(direction)
+            farthest=max(np.dot(np.subtract(lamp.coords[0],tip),direction) for lamp in lamps)
+            expected=900 if tip[1]<runway.centroid.y else 585
+            self.assertAlmostEqual(farthest,expected,places=2)
+        for east,base,south,*_ in props['approachLight']:
+            self.assertAlmostEqual(base,grade(east,south),delta=.001)
+        for kind,count in [('bridgePivot',31),('bridgeDock',31),('beacon',3),('standSign',66)]:
+            self.assertEqual(len(props[kind]),count)
+        for kind in ('airliner','cart','bus','tug','fuel','stairs','fence','mast'):
+            self.assertGreater(len(props[kind]),0)
+        contacts=[]
+        docks=np.asarray(props['bridgeDock'])[:,:3]+[0,5.2,0]
+        for east,height,south,yaw,scale,*_ in props['airliner']:
+            door=np.array([east,height,south])+scale*np.array([12*sin(yaw)-1.75*cos(yaw),4.05,12*cos(yaw)+1.75*sin(yaw)])
+            contacts.append(np.linalg.norm(docks-door,axis=1).min())
+        self.assertGreaterEqual(sum(distance<.1 for distance in contacts),15)
+        for east,height,south,yaw,_,_,span,rise in props['fence']:
+            for end in [-.5,.5]:
+                actual=grade(east+end*span*sin(yaw),south+end*span*cos(yaw))
+                self.assertAlmostEqual(height+end*rise,actual,places=3)
