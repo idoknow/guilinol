@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import {chromium} from 'playwright'
 import {preview} from 'vite'
 
-// IDOK-579 地图迷雾冒烟测试：
+// IDOK-588 地图迷雾冒烟测试：
 //   走过的地方在地图上亮着、没走过的压黑；点亮进度写 localStorage；全屏地图图例报「已探明 N km²」。
 //   服务端 /api/walk/fog 在本地 preview 里没有后端，必须安静降级（本地照常记、页面不报错）。
 const start = performance.now()

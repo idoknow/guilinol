@@ -108,7 +108,7 @@ export function mapView(host:Host, atlas:Atlas, ui:{slot:HTMLElement; buttons:HT
   }
   const here = ()=>{const w = host.walker(); return w?.active?w.position:host.camera.position}
 
-  // --- 迷雾（IDOK-579）：只有走过的地方才是亮的，和 GTA 线下版的开图手感一致。
+  // --- 迷雾（IDOK-588）：只有走过的地方才是亮的，和 GTA 线下版的开图手感一致。
   // 先在离屏 canvas 上铺一层墨，再把「走过的格子」用 destination-out 挖成洞，整层贴上主画布。
   // 离屏画布比屏幕大一圈（FOG_PAD），这样高斯模糊的边缘落在屏幕外，不会在四边漏出透明缝。
   const FOG_PAD = 16
