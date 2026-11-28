@@ -23,7 +23,7 @@ let subCount=0
  *  计数放在模块级：地图可能比 socket 先打开，联网后要补发订阅。 */
 export function requestRoster(on:boolean){subCount=Math.max(0,subCount+(on?1:-1));rosterRequester?.()}
 
-export function attachNet(scene:Scene,clips:AnimationClip[],getPose:()=>Pose,getAvatar:()=>Avatar,camera:Camera,getActivity?:()=>ActivityReport,onCombat?:(p:CombatPacket,self:string)=>void,onSetback?:(x:number,y:number,z:number)=>void,getCaptureContext?:()=>CaptureClientContext,getMobility?:()=>MobilityState) {
+export function attachNet(scene:Scene,clips:AnimationClip[],getPose:()=>Pose,getAvatar:()=>Avatar,camera:Camera,getActivity?:()=>ActivityReport,onCombat?:(p:CombatPacket,self:string)=>void,onSetback?:(x:number,y:number,z:number)=>void,getCaptureContext?:()=>CaptureClientContext,getMobility?:()=>MobilityState,restoreHeight?:(x:number,y:number,z:number,valid:()=>boolean)=>Promise<number>) {
   const peers=players(scene,clips,camera)
   let travelReply:((reply:TravelReply)=>void)|undefined
   let arrival:'restore'|'travel'|'resume'='restore'
@@ -107,7 +107,7 @@ export function attachNet(scene:Scene,clips:AnimationClip[],getPose:()=>Pose,get
       if(previous){previous.onopen=previous.onmessage=previous.onclose=previous.onerror=null;try{previous.close(1000,'replace')}catch{}}
       const ws=new WebSocket(endpoint);socket=ws;welcomed=false
       ws.onopen=()=>{if(version===generation){const initial=getActivity?.();lastActKey=initial?`${initial.act}|${initial.detail??''}`:'';const mob=getMobility?.();lastMobKey=mob?`${mob.mode}|${mob.id??''}`:'';send({t:'join',ticket,fp:fingerprint(),dev:deviceSummary(),avatar:getAvatar(),caps:['roster3','vstate1'],...(initial?{act:initial.act,actDetail:initial.detail}:{}),...(mob?{vmode:mob.mode,...(mob.id?{vid:mob.id}:{})}:{}),arrival,...(arrival==='restore'?{}:getPose())})}}
-      ws.onmessage=event=>{
+      ws.onmessage=async event=>{
         if(version!==generation)return
         const msg=JSON.parse(event.data)
         switch(msg.t){
@@ -143,7 +143,14 @@ export function attachNet(scene:Scene,clips:AnimationClip[],getPose:()=>Pose,get
             peers.combat(msg);onCombat?.(msg,myId);break
           }
           case 'welcome': sent=0;sentTimes=[];myId=String(msg.me?.id??'');myUid=Number(msg.me?.uid)||0;myName=String(msg.me?.name??'');setChatSelf(myUid);onCombat?.(msg.me,myId);if(subCount>0)send({t:'roster_sub',since:lastRosterV})
-            if(msg.relocated){const {x,y,z,code}=msg.relocated;onSetback?.(x,y,z);if(code)rejectTravel(code)}
+            if(msg.relocated){const {x,y,z,code}=msg.relocated
+              let floor=y
+              if(restoreHeight&&arrival==='restore'){
+                const valid=()=>version===generation&&ws===socket&&ws.readyState===WebSocket.OPEN
+                try{floor=await restoreHeight(x,y,z,valid)}catch{if(valid())ws.close(4000,'landing unavailable');return}
+                if(!valid())return
+              }
+              onSetback?.(x,floor,z);if(code)rejectTravel(code)}
             welcomed=true;arrival='resume'
             // 续连（CDN 掐断后原地接管）：对账而不是清空重建，否则每 44 秒所有人的模型都会销毁再克隆一遍
             if(msg.me?.resumed){const keep=new Set((msg.players as {id:string}[]).map(p=>p.id))
@@ -154,7 +161,7 @@ export function attachNet(scene:Scene,clips:AnimationClip[],getPose:()=>Pose,get
           case 'players':
             peers.clear();for(const player of msg.players)peers.add(player)
             attempt=0;update('online',msg.online);break
-          case 'online':update('online',msg.online);break
+          case 'online':if(welcomed)update('online',msg.online);break
           case 'roster':far=new Map();for(const [id,name,x,z,joinedAt] of msg.players as [string,string,number,number,number][])if(id!==myId)far.set(id,{id,name,x,z,yaw:0,v:0,bike:false,joinedAt,far:true});lastRoster=-Infinity;break
           // 服务端判定这次移动不合法（超速/飞天/非法瞬移）：把自己拉回服务端认可的位置
           case 'setback':{

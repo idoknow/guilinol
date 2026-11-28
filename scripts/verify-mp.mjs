@@ -45,7 +45,7 @@ async function verify(){
   }
   database=await fixture({postgresOnly:true})
   if(modeSwitch)for(const name of ['021-fishing-catches','022-helicopter','023-helicopter-seat'])await database.sql(await readFile(`deploy/postgres/${name}.sql`,'utf8'))
-  const rt=await service('rt/server-realtime.mjs',{RT_JOIN_SECRET:secret},'/health',200)
+  const rt=await service('rt/server-realtime.mjs',{...(modeSwitch?database.env:{}),RT_JOIN_SECRET:secret},'/health',200)
   assert.equal((await (await fetch(`http://${rt}/health`)).json()).proto,4)
   const [body,signature]=ticket(100000).split('.')
   if(!smokeCapture){await reject(rt,body+'.'+(signature[0]==='A'?'B':'A')+signature.slice(1));await reject(rt,ticket(100000,Math.floor(Date.now()/1000)-1));await reject(await service('rt/server-realtime.mjs',{RT_JOIN_SECRET:''},'/health',200),ticket(100000));await reject(rt,ticket('tester1'))}
@@ -57,6 +57,7 @@ async function verify(){
   const url=origin+'/?verify&mode=walk&flow=0'
   async function pageFor(name,mp){
     const page=await browser.newPage({viewport:name==='alice'?{width:240,height:135}:{width:480,height:270}});page.on('pageerror',failBrowser)
+    if(modeSwitch)page.on('console',message=>{if(message.type()==='warning'&&/walk:enter-failed/.test(message.text()))console.warn(message.text())})
     page.on('console',message=>{if(message.type()==='error')failBrowser(Error(`${name}: ${message.location().url}: ${message.text()}`))})
     const token=randomBytes(32).toString('hex');await database.sql('INSERT INTO users(id,email,nickname,salt,digest,verified) VALUES($1,$2,$1,\'\',\'\',1)',[name,name+'@example.test']);await database.sql('INSERT INTO sessions VALUES($1,$2,unixepoch()+600)',[createHash('sha256').update(token).digest('hex'),name]);await page.context().addCookies([{name:'glol_session',value:token,url:origin,httpOnly:true}]);await page.addInitScript(avatar=>localStorage.setItem('glol.avatar.v1',JSON.stringify(avatar)),appearance)
     if(smokeCapture){
@@ -83,6 +84,21 @@ async function verify(){
     await select('tour');near(await page.evaluate(()=>[window.viewer.camera.position.x,window.viewer.camera.position.z]),[-200,-600])
     await select('solo');assert.ok(await page.evaluate(()=>window.viewer.walkTo(-268.5,24.8,0,'verify-solo')));const single=await point()
     await select('mp');await online();near(await point(),initial);await select('solo');near(await point(),single)
+    const bridge=[-268.5,24.8]
+    const probe=()=>page.evaluate(()=>{const {x,z,foot,clearance,surfaceKind,surfaceY}=window.viewer.walk.probe();return {x,z,foot,clearance,surfaceKind,surfaceY}})
+    async function seed(x,y,z){await database.sql('update mp_positions set x=$1,y=$2,z=$3 where uid=(select uid from users where id=$4)',[x,y,z,'alice'])}
+    for(const [mode,offset] of [['solo',8],['tour',40]]){
+      if(mode==='tour')await select('tour')
+      await seed(bridge[0],146.5+offset,bridge[1]);await select('mp');await online()
+      const first=await probe();await page.waitForTimeout(5000);const stable=await probe()
+      console.log(`restore ${mode} +${offset}m`,JSON.stringify({first,stable}))
+      for(const pose of [first,stable]){near([pose.x,pose.z],bridge);assert.ok(Math.abs(pose.clearance)<.5)}
+      assert.ok(Math.abs(first.foot-stable.foot)<.5);await select('solo')
+    }
+    await seed(initial[0],154,initial[1]);await select('mp');await online()
+    assert.ok(await page.evaluate(()=>window.viewer.walkTo(-268.5,24.8,0,'traffic-duty:bridge')))
+    await page.waitForTimeout(5000);const deck=await probe();console.log('registered bridge',JSON.stringify(deck));near([deck.x,deck.z],bridge)
+    assert.equal(deck.surfaceKind,'landmark');assert.ok(Math.abs(deck.foot-151.86)<.5&&Math.abs(deck.foot-deck.surfaceY)<.5)
     console.log('PASS tour → online → tour; solo → online → solo',JSON.stringify({online:initial,tour:[-200,-600],solo:single}));return
   }
   if(smokeCapture){

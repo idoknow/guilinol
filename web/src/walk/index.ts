@@ -1818,7 +1818,23 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
             crashSession=null;standUpSession=null;pickupSession=null;bikeObstacle='';knockdown.reset();syncKnockdownDomState(false);resetAirTracker(footY)
             resetPoseSpeed()
             checkDutyOutOfShift(x,footY,z)
-          },captureContext,currentMobility)
+          },captureContext,currentMobility,async(x,savedY,z,valid)=>{
+            const target=new THREE.Vector3(x,savedY,z),tile=sim.tileAt(x,z),until=performance.now()+10000
+            if(!tile)throw Error('missing landing tile')
+            while(valid()&&performance.now()<until){
+              stream.prioritize(x,z);stream.tick(target)
+              if(stream.loaded.has(tile)&&vehicleCollisionReady(x,savedY,z)){
+                sim.sync(x,z,true)
+                const terrain=sim.surface(x,z,'ground'),support=sim.groundSurface(x,z,savedY)
+                if(terrain){
+                  if(support&&(support.kind!=='landmark'||isInBridgeDutyBounds({x,y:support.y,z})))return support.y+.055
+                  return terrain.y+.055
+                }
+              }
+              await new Promise(resolve=>setTimeout(resolve,16))
+            }
+            throw Error('landing collision unavailable')
+          })
         net.emote(emote.id);net.tick(0)
     }
   }
