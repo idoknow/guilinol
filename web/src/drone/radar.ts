@@ -1,10 +1,9 @@
 import type {DroneSpec} from './specs'
 
-// IDOK-527: 空中导航 + 小地图 + 穿越机雷达。
-// 小小一块玻璃，圆心永远是自己（正北朝上），俯视半径 `range` 米：
-//   · 小地图：所有飞行器（自己 / 同场景的直升机）、玩家、机库，以及附近景点；
-//   · 雷达：只有 FPV 穿越机才有的扫描扇面，扫到飞机就在盘面上留一个三秒的亮点；
-//   · 导航：目标名 + 距离 + 方位，`自动飞` 让飞控自己转过去（按住摇杆即接管）。
+// IDOK-527/530: 空中导航盘。原来叫「雷达」，只在穿越机上才把飞行物扫出来；现在改成**地图**：
+// 盘面上永远能看到机库、自己、玩家、所有飞行物（起飞的无人机/观光直升机…）和附近景点，
+// 而扫描扇面留着当动效 —— 扇面扫过飞行物时给它一个亮环，扫完也照样看得见。
+// 点一下盘面就是「在地图上选个点」，飞控会把它当成导航目标（可以接着按自动飞过去）。
 export type MarkKind = 'self' | 'air' | 'player' | 'home' | 'spot'
 
 export interface NavMark {
@@ -16,7 +15,7 @@ export interface NavMark {
   agl?:number
 }
 
-export interface NavTarget {label:string; x:number; z:number}
+export interface NavTarget {label:string; x:number; z:number; picked?:boolean}
 
 export interface NavState {
   /** 自己的位置与机头朝向（rad，正北为 0，逆时针增加，与 flight.yaw 同号）。 */
@@ -25,7 +24,7 @@ export interface NavState {
   yaw:number
   marks:NavMark[]
   target:NavTarget|null
-  /** FPV 才有扫描扇面。 */
+  /** 是否画扫描扇面（穿越机）。 */
   radar:boolean
   range:number
   auto:boolean
@@ -34,6 +33,8 @@ export interface NavState {
 export interface NavHandlers {
   cycle():void
   auto():void
+  /** IDOK-530: 在地图上点了一个坐标（世界坐标，米）。 */
+  pick(x:number, z:number):void
 }
 
 export interface NavView {
@@ -56,8 +57,8 @@ export function createNav(spec:DroneSpec, handlers:NavHandlers):NavView {
   const root = document.createElement('div')
   root.className = `rc-nav rc-nav--${spec.id}`
   root.innerHTML = `
-    <div class="rc-nav-head"><span class="rc-nav-kicker">${spec.id === 'fpv' ? '雷达' : '小地图'}</span><button class="rc-nav-tg" type="button"></button></div>
-    <canvas class="rc-nav-map" width="132" height="132" aria-label="飞行器小地图"></canvas>
+    <div class="rc-nav-head"><span class="rc-nav-kicker">地图</span><button class="rc-nav-tg" type="button"></button></div>
+    <canvas class="rc-nav-map" width="132" height="132" aria-label="飞行地图（点一下选导航点）"></canvas>
     <div class="rc-nav-foot"><span class="rc-nav-dist">—</span><span class="rc-nav-brg"></span></div>
     <button class="rc-nav-auto" type="button">自动飞</button>`
   const canvas = root.querySelector<HTMLCanvasElement>('.rc-nav-map')!
@@ -70,20 +71,32 @@ export function createNav(spec:DroneSpec, handlers:NavHandlers):NavView {
   autoButton.onclick = () => handlers.auto()
 
   const ctx = canvas.getContext('2d')!
-  /** 每个飞行器上一次被扫到的时刻，雷达亮点据此淡出。 */
+  /** 每个飞行器上一次被扫到的时刻，扇面扫过时给它一个亮环（位置仍然一直显示）。 */
   const seen = new Map<string, number>()
   let sweepBearing = 0
   let last = performance.now()
+  let state:NavState|null = null
 
   const key = (mark:NavMark) => `${mark.kind}:${mark.label}`
   const wrap = (angle:number) => ((angle % (Math.PI * 2)) + Math.PI * 3) % (Math.PI * 2) - Math.PI
 
-  function draw(state:NavState) {
+  // IDOK-530: 点盘面 = 选点。屏幕位移换算回世界坐标（正北朝上，所以 -z 向上）。
+  canvas.addEventListener('pointerup',event => {
+    if (!state) return
+    const rect = canvas.getBoundingClientRect()
+    const half = rect.width / 2
+    const unit = (half - 2) / state.range
+    const dx = (event.clientX - rect.left - half) / unit
+    const dz = (event.clientY - rect.top - half) / unit
+    handlers.pick(state.x + dx,state.z + dz)
+  })
+
+  function draw(current:NavState) {
     const now = performance.now()
     const dt = Math.min(120,now - last)
     last = now
-    // 扇面按方位角走：0 = 正北，顺时针一圈。
-    if (state.radar) sweepBearing = (sweepBearing + dt / SWEEP_MS * Math.PI * 2) % (Math.PI * 2)
+    // 扇面按方位角走：0 = 正北，顺时针一圈。地图模式下也留着，只当动效。
+    sweepBearing = (sweepBearing + dt / SWEEP_MS * Math.PI * 2) % (Math.PI * 2)
 
     const dpr = Math.min(2,window.devicePixelRatio || 1)
     const box = canvas.clientWidth || 132
@@ -92,14 +105,12 @@ export function createNav(spec:DroneSpec, handlers:NavHandlers):NavView {
       canvas.height = Math.round(box * dpr)
     }
     const size = canvas.width
-    const c = size / 2
-    const radius = c - 2 * dpr
     ctx.setTransform(1,0,0,1,0,0)
     ctx.clearRect(0,0,size,size)
     ctx.scale(dpr,dpr)
     const half = size / dpr / 2
-    const R = radius / dpr
-    const unit = R / state.range
+    const R = half - 2
+    const unit = R / current.range
 
     // 盘面
     const disc = ctx.createRadialGradient(half,half,half * .1,half,half,half)
@@ -120,10 +131,10 @@ export function createNav(spec:DroneSpec, handlers:NavHandlers):NavView {
     ctx.textBaseline = 'top'
     ctx.fillText('N',half,2)
 
-    // 扫描扇面
-    if (state.radar) {
+    // 扫描扇面（穿越机）
+    if (current.radar) {
       const wedge = ctx.createRadialGradient(half,half,0,half,half,half)
-      wedge.addColorStop(0,'rgba(120,220,160,.32)')
+      wedge.addColorStop(0,'rgba(120,220,160,.30)')
       wedge.addColorStop(1,'rgba(120,220,160,0)')
       ctx.fillStyle = wedge
       ctx.beginPath(); ctx.moveTo(half,half)
@@ -136,44 +147,42 @@ export function createNav(spec:DroneSpec, handlers:NavHandlers):NavView {
     }
 
     const project = (x:number,z:number) => {
-      const dx = (x - state.x) * unit
-      const dz = (z - state.z) * unit
+      const dx = (x - current.x) * unit
+      const dz = (z - current.z) * unit
       return {x:half + dx,y:half + dz,d:Math.hypot(dx,dz)}
     }
 
-    for (const mark of state.marks) {
+    for (const mark of current.marks) {
       if (mark.kind === 'self') continue
       const spot = project(mark.x,mark.z)
       const inside = spot.d <= R + .5
-      const flying = mark.kind === 'air'
-      let alpha = inside ? 1 : .22
-      if (state.radar && flying) {
-        // 方位：正北为 0，顺时针（屏幕坐标里 +z 向南）
-        const bearing = (Math.atan2(mark.x - state.x,-(mark.z - state.z)) + Math.PI * 2) % (Math.PI * 2)
-        if (inside && Math.abs(wrap(sweepBearing - bearing)) < .2) seen.set(key(mark),now)
-        // 扫到过一次就记住位置（亮度下限 .36），不然扇面转过之后盘面上一片空。
+      // 地图：盘面外的东西压到边缘上画个半透明的，让飞行员知道方向（不再像雷达那样直接消失）。
+      const edge = inside ? null : R / spot.d
+      const px = inside ? spot.x : half + (spot.x - half) * edge!
+      const py = inside ? spot.y : half + (spot.y - half) * edge!
+      let alpha = inside ? 1 : .38
+      if (mark.kind === 'air') {
+        // 扇面扫过的瞬间给个亮环，扫完也照样显示（地图模式）。
+        const bearing = (Math.atan2(mark.x - current.x,-(mark.z - current.z)) + Math.PI * 2) % (Math.PI * 2)
+        if (Math.abs(wrap(sweepBearing - bearing)) < .2) seen.set(key(mark),now)
         const hit = seen.get(key(mark))
-        alpha = inside ? (hit === undefined ? 0 : Math.max(.36,1 - (now - hit) / HOLD_MS)) : .18
-        if (alpha <= .02) continue
-      } else if (mark.kind === 'air' && !inside) {
-        continue
+        if (hit !== undefined && now - hit < HOLD_MS) alpha = Math.min(1,.55 + (1 - (now - hit) / HOLD_MS) * .45)
       }
-      // 飞行物的标签带上距离：雷达要回答的是「附近有什么、多远」。
       const label = mark.kind === 'air'
-        ? `${mark.label} ${fmtRange(Math.hypot(mark.x - state.x,mark.z - state.z))}`
+        ? `${mark.label} ${fmtRange(Math.hypot(mark.x - current.x,mark.z - current.z))}`
         : mark.label
-      drawMark(ctx,spot.x,spot.y,TONE[mark.kind],mark.kind,alpha,label,half * 2)
+      drawMark(ctx,px,py,TONE[mark.kind],mark.kind,alpha,label,half * 2)
     }
 
-    if (state.target) {
-      const spot = project(state.target.x,state.target.z)
+    if (current.target) {
+      const spot = project(current.target.x,current.target.z)
       const clampedX = half + (spot.x - half) * Math.min(1,R / Math.max(spot.d,.0001))
       const clampedY = half + (spot.y - half) * Math.min(1,R / Math.max(spot.d,.0001))
       ctx.strokeStyle = 'rgba(244,239,226,.5)'
       ctx.setLineDash([3,3])
       ctx.beginPath(); ctx.moveTo(half,half); ctx.lineTo(clampedX,clampedY); ctx.stroke()
       ctx.setLineDash([])
-      ctx.strokeStyle = '#f4efe2'
+      ctx.strokeStyle = current.target.picked ? '#7fb8d8' : '#f4efe2'
       ctx.lineWidth = 1.5
       ctx.beginPath(); ctx.arc(clampedX,clampedY,4.5,0,Math.PI * 2); ctx.stroke()
     }
@@ -181,33 +190,35 @@ export function createNav(spec:DroneSpec, handlers:NavHandlers):NavView {
     // 自己：三角形照着机头方向转（yaw 越大越往西，屏幕即逆时针）
     ctx.save()
     ctx.translate(half,half)
-    ctx.rotate(-state.yaw)
+    ctx.rotate(-current.yaw)
     ctx.fillStyle = '#f4efe2'
     ctx.beginPath(); ctx.moveTo(0,-6); ctx.lineTo(4.4,4.6); ctx.lineTo(0,2.4); ctx.lineTo(-4.4,4.6); ctx.closePath(); ctx.fill()
     ctx.restore()
   }
 
-  function update(state:NavState) {
-    const label = state.target?.label ?? '选目标'
+  function update(next:NavState) {
+    state = next
+    const label = next.target?.label ?? '选目标'
     toggle.textContent = label
-    // 盘面上报了到几架飞机——「扫描到附近的飞行物」得有个数字，不然扇面只是装饰。
-    const nearby = state.marks.filter(mark => mark.kind === 'air'
-      && Math.hypot(mark.x - state.x,mark.z - state.z) <= state.range).length
-    kicker.textContent = `${state.radar ? '雷达' : '小地图'}${nearby ? ` ${nearby}` : ''} · ${fmtRange(state.range)}`
-    if (state.target) {
-      const dist = Math.hypot(state.target.x - state.x,state.target.z - state.z)
-      const bearing = (Math.atan2(state.target.x - state.x,-(state.target.z - state.z)) * 180 / Math.PI + 360) % 360
+    const nearby = next.marks.filter(mark => mark.kind === 'air'
+      && Math.hypot(mark.x - next.x,mark.z - next.z) <= next.range).length
+    // 地图上把「附近有几架飞行物」报出来，扫掠只是动效。
+    kicker.textContent = `${next.radar ? '雷达' : '地图'}${nearby ? ` ${nearby}` : ''} · ${fmtRange(next.range)}`
+    if (next.target) {
+      const dist = Math.hypot(next.target.x - next.x,next.target.z - next.z)
+      const bearing = (Math.atan2(next.target.x - next.x,-(next.target.z - next.z)) * 180 / Math.PI + 360) % 360
       distText.textContent = `${dist >= 1000 ? (dist / 1000).toFixed(2) + ' km' : Math.round(dist) + ' m'}`
       brgText.textContent = `${['北','东北','东','东南','南','西南','西','西北'][Math.round(bearing / 45) % 8]} ${Math.round(bearing)}°`
     } else {
       distText.textContent = '—'
-      brgText.textContent = ''
+      brgText.textContent = '点地图选点'
     }
-    autoButton.classList.toggle('on',state.auto)
-    autoButton.textContent = state.auto ? '取消自动' : '自动飞'
-    autoButton.hidden = !state.target
-    root.dataset.radar = state.radar ? '1' : '0'
-    draw(state)
+    autoButton.classList.toggle('on',next.auto)
+    autoButton.textContent = next.auto ? '取消自动' : '自动飞'
+    autoButton.hidden = !next.target
+    root.dataset.radar = next.radar ? '1' : '0'
+    root.dataset.picked = next.target?.picked ? '1' : '0'
+    draw(next)
   }
 
   return {root,update}

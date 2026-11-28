@@ -76,7 +76,7 @@ try {
   page.on('pageerror', e => console.error('pageerror', e))
   await page.goto(`http://127.0.0.1:${server.address().port}/`)
   await page.waitForFunction('window.ready')
-  const LABELS = { mavic4pro: 'DJI Mavic 4 Pro', mini5pro: 'DJI Mini 5 Pro', air3s: 'DJI Air 3S', fpv: 'DJI FPV 穿越机', flycart200: 'DJI FlyCart 200' }
+  const LABELS = { fpv: 'GLI FPV 穿越机', flycart200: 'GLI FlyCart 200' }
   const results = []
   for (const id of Object.keys(LABELS)) {
     const s = await page.evaluate(([id, l]) => window.render(id, l), [id, LABELS[id]])

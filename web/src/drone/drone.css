@@ -288,20 +288,49 @@ body[data-drone="rc"] :is(output,.hint,footer,.sky-ui,.walk-ui,.dock,.toast,.spo
 .drone-card .drone-batt b{font-weight:600;opacity:.9;margin-left:auto;letter-spacing:.02em}
 .drone-card .drone-batt.is-low i{background:linear-gradient(90deg,#e0553f,#e08a2e)}
 .drone-card .drone-batt.is-charging i{animation:drone-charge 1.6s ease-in-out infinite}
-.drone-card .drone-batt.is-broken i{width:0}
-.drone-card .drone-batt.is-broken b{color:#f0b4a6}
+/* IDOK-530: 损坏的卡也保留电量读数，损坏状态单独一枚红 chip。 */
+.drone-damage{display:inline-flex;align-items:center;gap:4px;margin-top:4px;font-size:10px;letter-spacing:.04em;
+  color:#ffb4a6;border:1px solid rgba(224,85,63,.6);background:rgba(224,85,63,.2);border-radius:999px;padding:1px 7px}
 @keyframes drone-charge{0%,100%{opacity:.55}50%{opacity:1}}
 .drone-card.broken{border-color:rgba(224,85,63,.65);background:rgba(224,85,63,.1)}
 .drone-card.broken .drone-cta{color:#f0b4a6}
 /* IDOK-529: 走路靠近残骸时出现的维修按钮（30 秒进度条）。 */
+/* IDOK-530: 进度条改成一整条细槽（i 是轨道、u 是已经修好的部分），文字更小更密。 */
 .drone-repair{position:fixed;left:50%;bottom:calc(140px + env(safe-area-inset-bottom));transform:translateX(-50%);
-  z-index:24;display:flex;flex-direction:column;gap:4px;align-items:center;min-width:200px;padding:10px 16px;
-  border-radius:999px;border:1px solid rgba(244,239,226,.3);background:rgba(18,22,22,.78);color:#f4efe2;
+  z-index:24;display:flex;flex-direction:column;gap:5px;align-items:center;min-width:224px;padding:9px 16px 12px;
+  border-radius:18px;border:1px solid rgba(244,239,226,.3);background:rgba(18,22,22,.78);color:#f4efe2;
   font-family:inherit;cursor:pointer;backdrop-filter:blur(8px)}
-.drone-repair b{font-size:12.5px;font-weight:600;letter-spacing:.04em}
-.drone-repair span{font-size:10.5px;opacity:.68}
-.drone-repair i{position:absolute;left:6px;right:6px;bottom:4px;height:3px;border-radius:999px;background:#3ddc84}
-.drone-repair.on{border-color:rgba(61,220,132,.7)}
+.drone-repair b{font-size:12px;font-weight:600;letter-spacing:.03em}
+.drone-repair span{font-size:10px;opacity:.62;letter-spacing:.02em}
+.drone-repair i{display:block;width:100%;height:4px;border-radius:999px;background:rgba(244,239,226,.16);overflow:hidden}
+.drone-repair u{display:block;height:100%;border-radius:999px;background:linear-gradient(90deg,#3ddc84,#7dffb4);
+  transition:width .12s linear;text-decoration:none}
+.drone-repair.on{border-color:rgba(61,220,132,.7);box-shadow:0 0 0 1px rgba(61,220,132,.22),0 10px 28px rgba(0,0,0,.36)}
+.drone-repair.on u{box-shadow:0 0 10px rgba(61,220,132,.6)}
+/* IDOK-530: 机库卡上的「完整度 N%」——撞过但还没坏的机身带着伤排队。 */
+.drone-wear{display:inline-flex;align-items:center;gap:4px;margin-top:2px;font-size:10px;letter-spacing:.04em;
+  color:#f0c8a0;border:1px solid rgba(240,180,120,.38);background:rgba(224,138,46,.16);border-radius:999px;padding:1px 7px}
+.drone-wear.is-low{color:#ffb4a6;border-color:rgba(240,120,90,.6);background:rgba(200,70,50,.22)}
+/* IDOK-530: 顶栏的完整度 / 进水 chip。 */
+.rc .rc-hull,.rc .rc-wet{font-size:9.5px;letter-spacing:.03em;padding:1px 6px;border-radius:999px;
+  border:1px solid rgba(244,239,226,.28);background:rgba(244,239,226,.08);opacity:.82}
+.rc .rc-hull[data-warn="1"]{border-color:rgba(240,180,120,.7);background:rgba(224,138,46,.24);color:#ffcf9a;opacity:1}
+.rc .rc-wet{color:#a9d8f5;border-color:rgba(140,200,240,.4);background:rgba(90,150,200,.22)}
+.rc .rc-wet[data-warn="1"]{color:#ffb4a6;border-color:rgba(240,120,90,.72);background:rgba(200,70,50,.3);opacity:1}
+.rc .rc-wet[hidden]{display:none}
+/* IDOK-530: 返航条下面的「取消返航」。 */
+.rc .rc-rth-cancel{margin-top:2px;padding:3px 10px;border-radius:999px;border:1px solid rgba(125,255,180,.5);
+  background:rgba(20,40,30,.72);color:#9ff3c0;font-size:10px;letter-spacing:.06em;font-family:inherit;cursor:pointer}
+.rc .rc-rth-cancel:hover{background:rgba(32,64,46,.85)}
+/* IDOK-530: 避障红边 —— 四面各一层渐隐红色，透明度由 --rc-near-* 驱动（越近越浓）。 */
+.rc .rc-near{position:absolute;inset:0;z-index:1;pointer-events:none;opacity:0;transition:opacity .18s ease-out}
+.rc .rc-near[data-side="front"]{background:linear-gradient(to top,rgba(255,60,40,0),rgba(255,60,40,.92) 22%,rgba(255,60,40,0) 62%);opacity:var(--rc-near-front,0)}
+.rc .rc-near[data-side="back"]{background:linear-gradient(to bottom,rgba(255,60,40,0),rgba(255,60,40,.92) 22%,rgba(255,60,40,0) 62%);opacity:var(--rc-near-back,0)}
+.rc .rc-near[data-side="left"]{background:linear-gradient(to right,rgba(255,60,40,0),rgba(255,60,40,.92) 22%,rgba(255,60,40,0) 62%);opacity:var(--rc-near-left,0)}
+.rc .rc-near[data-side="right"]{background:linear-gradient(to left,rgba(255,60,40,0),rgba(255,60,40,.92) 22%,rgba(255,60,40,0) 62%);opacity:var(--rc-near-right,0)}
+.rc[data-blocked="1"] .rc-reticle{border-color:rgba(255,90,60,.9);box-shadow:0 0 0 1px rgba(255,90,60,.35),0 0 18px rgba(255,70,40,.45)}
+.rc .rc-near-veil{position:absolute;inset:0;z-index:0;pointer-events:none;box-shadow:inset 0 0 60px 12px rgba(255,60,40,.5);
+  opacity:var(--rc-near-max,0);transition:opacity .18s ease-out}
 .drone-panel .drone-foot{margin:4px 18px 14px;font-size:11px;opacity:.6;line-height:1.5}
 .dock-drone[data-stage="ready"]{background:rgba(224,138,46,.32);border-color:rgba(224,138,46,.66)}
 .dock-drone[data-stage="rc"]{opacity:.6}

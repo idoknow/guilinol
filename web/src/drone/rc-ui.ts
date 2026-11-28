@@ -22,6 +22,8 @@ export interface RcHandlers {
   look(dx:number, dy:number):void
   /** IDOK-529: 自动避障开关（遥控画面里随时可以关掉）。 */
   avoid(on:boolean):void
+  /** IDOK-530: 返航途中「取消返航」，回到手动悬停。 */
+  cancel():void
 }
 
 export interface RcView {
@@ -32,6 +34,10 @@ export interface RcView {
   setReturning(distance:number|null):void
   /** IDOK-529: 避障按钮的状态（blocked = 正在避让）。 */
   setAvoid(on:boolean, blocked:boolean):void
+  /** IDOK-530: 四面障碍距离（米，Infinity = 空），靠得太近的那一边屏幕会泛红。 */
+  setProximity(front:number, back:number, left:number, right:number):void
+  /** IDOK-530: 机身完整度与进水量（%），显示在状态条上。 */
+  setHealth(integrity:number, moisture:number):void
   toast(text:string):void
 }
 
@@ -89,6 +95,8 @@ export function createRc(spec:DroneSpec, handlers:RcHandlers):RcView {
   on('[data-act="record"]',() => handlers.record())
   on('[data-act="exit"]',() => handlers.exit())
   on('[data-act="hangar"]',() => handlers.hangar())
+  // IDOK-530: 返航途中随时可以取消 —— 中央返航条右边那个按钮。
+  on('[data-act="cancel"]',() => handlers.cancel())
   // IDOK-529: 避障开关 —— 遥控画面里常驻，随时能关。
   let avoidOn = true
   on('[data-act="avoid"]',() => {
@@ -98,6 +106,9 @@ export function createRc(spec:DroneSpec, handlers:RcHandlers):RcView {
   })
   const rthBanner = q<HTMLElement>('.rc-rth-banner')
   const rthDist = q<HTMLElement>('.rc-rth-dist')
+  // IDOK-530: 顶栏的机身完整度 / 进水量读数（修不修看这两个数字）。
+  const hullValue = q<HTMLElement>('.rc-hull')
+  const wetValue = q<HTMLElement>('.rc-wet')
 
   function setAvoid(on:boolean, blocked:boolean) {
     avoidOn = on
@@ -116,6 +127,31 @@ export function createRc(spec:DroneSpec, handlers:RcHandlers):RcView {
     root.dataset.rth = active ? '1' : '0'
     if (active && rthDist) {
       rthDist.textContent = distance! >= 1000 ? `${(distance! / 1000).toFixed(1)} km` : `${distance!.toFixed(0)} m`
+    }
+  }
+
+  // IDOK-530: 避障的「看得见的边界」——哪一侧离楼太近，画面那一侧就泛红，越近越红。
+  function setProximity(front:number, back:number, left:number, right:number) {
+    const warn = (meters:number) => Math.max(0,Math.min(1,1 - meters / 8))
+    const values = {front:warn(front),back:warn(back),left:warn(left),right:warn(right)}
+    for (const [side, value] of Object.entries(values)) {
+      root.style.setProperty(`--rc-near-${side}`,value.toFixed(3))
+    }
+    // 四面里最危险的那一侧再把整屏压一层红晕，提醒「再往前就撞了」。
+    root.style.setProperty('--rc-near-max',Math.max(values.front,values.back,values.left,values.right).toFixed(3))
+    root.dataset.blocked = Math.min(front,back,left,right) < 2.4 ? '1' : '0'
+  }
+
+  function setHealth(integrity:number, moisture:number) {
+    if (hullValue) {
+      hullValue.textContent = `完整度 ${Math.round(integrity)}%`
+      hullValue.dataset.warn = integrity < 45 ? '1' : '0'
+    }
+    if (wetValue) {
+      const wet = Math.round(moisture)
+      wetValue.hidden = wet < 4
+      wetValue.textContent = `进水 ${wet}%`
+      wetValue.dataset.warn = wet > 60 ? '1' : '0'
     }
   }
 
@@ -265,7 +301,7 @@ export function createRc(spec:DroneSpec, handlers:RcHandlers):RcView {
     toastTimer = window.setTimeout(() => toastBox.classList.remove('show'),2600)
   }
 
-  return {root,update,setRecording,setReturning,setAvoid,toast}
+  return {root,update,setRecording,setReturning,setAvoid,setProximity,setHealth,toast}
 }
 
 function round(value:number) { return Math.round(value * 100) / 100 }
@@ -294,12 +330,17 @@ function statusLine(state:Telemetry) {
 
 function proMarkup(spec:DroneSpec) {
   return `
+    <div class="rc-near-veil"></div>
+    <div class="rc-near" data-side="front"></div><div class="rc-near" data-side="back"></div>
+    <div class="rc-near" data-side="left"></div><div class="rc-near" data-side="right"></div>
     <div class="rc-topbar">
       <div class="rc-tb-l">
         <span class="rc-mode">N</span>
         <span class="rc-bars" data-kind="rc" data-level="4" title="遥控信号"><i></i><i></i><i></i><i></i></span>
         <span class="rc-bars" data-kind="hd" data-level="4" title="图传信号"><i></i><i></i><i></i><i></i></span>
         <span class="rc-gps" title="GNSS 卫星"><b></b>18</span>
+        <span class="rc-hull" title="机身完整度">完整度 100%</span>
+        <span class="rc-wet" hidden title="机内进水">进水 0%</span>
       </div>
       <div class="rc-tb-r">
         <span class="rc-batt"><i></i></span>
@@ -319,13 +360,13 @@ function proMarkup(spec:DroneSpec) {
       <button class="rc-side" data-act="exit" title="退出遥控">退出</button>
     </div>
     <div class="rc-center"><div class="rc-reticle"></div></div>
-    <div class="rc-rth-banner" hidden><span class="rc-rth-dash"></span><b>返航中</b><span class="rc-rth-dist"></span><span class="rc-rth-dash"></span></div>
+    <div class="rc-rth-banner" hidden><span class="rc-rth-dash"></span><b>返航中</b><span class="rc-rth-dist"></span><span class="rc-rth-dash"></span><button class="rc-rth-cancel" data-act="cancel" type="button">取消返航</button></div>
     <div class="rc-gimbal" title="云台俯仰">
       <b class="rc-gimbalval"></b>
-      <input type="range" step="1" aria-label="云台俯仰">
+      <input type="range" step=".5" aria-label="云台俯仰">
       <span>云台</span>
     </div>
-    <div class="rc-hint">WASD 平移 · ↑↓ 升降 · ←→ 偏航 · Q/E 云台 · 空格 起降 · R 返航 · P 拍照 · V 录像 · T 目标 · B 自动飞</div>
+    <div class="rc-hint">WASD 平移 · ↑↓ 升降 · ←→ 偏航 · Q/E 云台 · 空格 起降 · R 返航 · X 取消返航 · P 拍照 · V 录像 · T 目标 · B 自动飞</div>
     <div class="rc-bottom">
       <div class="rc-tele"></div>
       <div class="rc-bottom-mid">
@@ -342,13 +383,18 @@ function proMarkup(spec:DroneSpec) {
 
 function simpleMarkup(spec:DroneSpec) {
   return `
+    <div class="rc-near-veil"></div>
+    <div class="rc-near" data-side="front"></div><div class="rc-near" data-side="back"></div>
+    <div class="rc-near" data-side="left"></div><div class="rc-near" data-side="right"></div>
     <div class="rc-top">
       <span class="rc-model">${spec.name}</span>
       <span class="rc-batt"><i></i></span>
       <span class="rc-battval"></span>
+      <span class="rc-hull" title="机身完整度">完整度 100%</span>
+      <span class="rc-wet" hidden title="机内进水">进水 0%</span>
     </div>
     <div class="rc-center"><div class="rc-reticle"></div></div>
-    <div class="rc-rth-banner" hidden><span class="rc-rth-dash"></span><b>返航中</b><span class="rc-rth-dist"></span><span class="rc-rth-dash"></span></div>
+    <div class="rc-rth-banner" hidden><span class="rc-rth-dash"></span><b>返航中</b><span class="rc-rth-dist"></span><span class="rc-rth-dash"></span><button class="rc-rth-cancel" data-act="cancel" type="button">取消返航</button></div>
     <div class="rc-look" aria-hidden="true"></div>
     <div class="rc-readout"></div>
     <div class="rc-sticks"><div class="rc-stick" data-side="left"><i></i></div><div class="rc-stick" data-side="right"><i></i></div></div>
