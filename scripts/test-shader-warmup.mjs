@@ -1,6 +1,13 @@
 import assert from 'node:assert/strict'
 import {test} from 'node:test'
-import {landingWarmBudget,warmShaders} from '../web/src/shader-warmup.ts'
+import {landingWarmBudget,shouldWarmLanding,warmShaders} from '../web/src/shader-warmup.ts'
+
+test('manual touch landing need not wait for synchronous shader compilation',()=>{
+  assert.equal(shouldWarmLanding('flight',true,false),false)
+  assert.equal(shouldWarmLanding('flight',true,true),true)
+  assert.equal(shouldWarmLanding('flight',false,false),true)
+  assert.equal(shouldWarmLanding('solo',true,false),true)
+})
 
 test('landing warm-up renews on progress but never beyond the landing cap',t=>{
   let now=89_000
