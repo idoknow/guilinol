@@ -13,10 +13,12 @@
  *     bidirectionally (side-stand power cutoff: kickstand down => P-gear locked; P unlocked => kickstand stowed).
  */
 
+import {KICKSTAND} from './kickstand'
+
 export type TwoWheelHeadlightMode = 'off' | 'low' | 'high'
 export type TwoWheelVehicleKind = 'bike' | 'bicycle'
 
-export const KICKSTAND_REST_ROLL_RAD = -0.105
+export const KICKSTAND_REST_ROLL_RAD = KICKSTAND.leanRad
 export const PARK_ENGAGE_MAX_SPEED_MS = 1.25
 export const NIGHT_AUTO_HEADLIGHT_THRESHOLD = 0.45
 
@@ -41,14 +43,15 @@ export function createInitialTwoWheelOpState(): TwoWheelOperationalState {
 export type TwoWheelLifecycleEvent =
   | {type: 'mount'; kind: TwoWheelVehicleKind; verifyMode: boolean; nightLevel: number; parkStart?: boolean}
   | {type: 'dismount'; kind: TwoWheelVehicleKind}
+  | {type: 'dismount_unsupported'; kind: TwoWheelVehicleKind}
   | {type: 'crash'; kind: TwoWheelVehicleKind}
   | {type: 'standup'; kind: TwoWheelVehicleKind}
   | {type: 'pickup_start'; kind: TwoWheelVehicleKind}
   | {type: 'pickup_complete'; kind: TwoWheelVehicleKind}
   | {type: 'toggle_park'; kind: TwoWheelVehicleKind; speedMs: number; crashLocked: boolean; force?: boolean}
   | {type: 'toggle_kickstand'; kind: TwoWheelVehicleKind; speedMs: number; crashLocked: boolean; force?: boolean}
-  | {type: 'cycle_headlight'; kind: TwoWheelVehicleKind; crashLocked: boolean}
-  | {type: 'set_headlight'; kind: TwoWheelVehicleKind; mode: TwoWheelHeadlightMode; manual?: boolean}
+  | {type: 'cycle_headlight'; kind: TwoWheelVehicleKind; crashLocked: boolean; shared?: boolean}
+  | {type: 'set_headlight'; kind: TwoWheelVehicleKind; mode: TwoWheelHeadlightMode; manual?: boolean; shared?: boolean}
   | {type: 'night_sync'; kind: TwoWheelVehicleKind; nightLevel: number; crashLocked: boolean}
 
 export interface TwoWheelTransitionResult {
@@ -104,6 +107,16 @@ export function resolveTwoWheelTransition(
       next.parkLocked = event.kind === 'bike'
       next.kickstandDown = true
       next.hazard = false
+      next.headlight = 'off'
+      next.headlightManual = false
+      return {state: next, changed: true}
+    }
+
+    case 'dismount_unsupported': {
+      // Rider dismounted without deploying the side stand: vehicle tips over with hazard flashers on.
+      next.parkLocked = false
+      next.kickstandDown = false
+      next.hazard = event.kind === 'bike'
       next.headlight = 'off'
       next.headlightManual = false
       return {state: next, changed: true}
@@ -169,7 +182,7 @@ export function resolveTwoWheelTransition(
     }
 
     case 'cycle_headlight': {
-      if (event.kind !== 'bike') return {state: prev, changed: false, rejectedReason: 'not_supported'}
+      if (event.kind !== 'bike' || event.shared) return {state: prev, changed: false, rejectedReason: 'not_supported'}
       if (event.crashLocked) return {state: prev, changed: false, rejectedReason: 'crash_locked'}
       next.headlight = nextHeadlightMode(prev.headlight)
       next.headlightManual = true
@@ -178,6 +191,9 @@ export function resolveTwoWheelTransition(
 
     case 'set_headlight': {
       if (event.kind !== 'bike') return {state: prev, changed: false, rejectedReason: 'not_supported'}
+      if (event.shared && event.manual && event.mode === 'high') {
+        return {state: prev, changed: false, rejectedReason: 'not_supported'}
+      }
       next.headlight = event.mode
       if (event.manual !== undefined) next.headlightManual = event.manual
       return {state: next, changed: next.headlight !== prev.headlight}
