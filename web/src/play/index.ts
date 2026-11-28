@@ -153,7 +153,9 @@ export function play(host:Host) {
   // IDOK-588：开图进度——先用本地存的，登录了再跟服务端并一次（离线/未登录只是不同步）。
   void fogBoot()
   // 套件用：读已探明格子数/面积，或直接点亮一格（走在路上太慢，验证只看迷雾层对不对）。
-  ;(window as unknown as {mapFog?:unknown}).mapFog = {count:fogCount,area:fogAreaKm2,reveal:fogRevealAt}
+  // open/close 也走这里：加载遮罩（.ld-veil）在流式加载期间有 document 级捕获监听，合成点击到不了小地图。
+  ;(window as unknown as {mapFog?:unknown}).mapFog = {count:fogCount,area:fogAreaKm2,reveal:fogRevealAt,
+    open:async()=>{const view = await ensureMap(); view?.open()}, close:()=>map?.close()}
   // Atlas loads only after the scene has been running a couple of seconds, never inside the first-frame budget.
   let mapLoading:Promise<ReturnType<typeof mapView>|undefined>|undefined
   const ensureMap = (background=false)=>{if(mapLoading)return mapLoading;const done=inlineBusy(slot,'载入地图',{quiet:background});return mapLoading = import('../map/atlas').then(m=>m.loadAtlas(host.manifest)).then(loaded=>{

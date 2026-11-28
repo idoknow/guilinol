@@ -44,6 +44,14 @@ body[data-photo=on] :is(output,.hint,footer,.sky-ui,.walk-ui,.dock,.toast,.spot-
 /* 「北」是一方小朱印（石刻残边遮罩，同封面印），不是纸色圆角签 */
 .minimap i{position:absolute;left:50%;top:3px;transform:translateX(-50%) rotate(-3deg);font:600 10px/1 var(--serif);font-style:normal;color:var(--ui-paper);
   background:var(--ui-seal);padding:3px 3px 2px;-webkit-mask:url("../ui/home-seal.svg") center/100% 100% no-repeat;mask:url("../ui/home-seal.svg") center/100% 100% no-repeat}
+/* IDOK-590：桌面端小地图做成 GTA 那种「随朝向转的圆角方框」—— 深色包边 + 细白内描边，
+   「北」沿着内圈绕着跑（transform 里的角度由 map.ts 每帧写进 --north-angle / --north-r）。 */
+@media (hover:hover) and (pointer:fine){
+  .minimap.gta{width:150px;height:150px;border-radius:18px;border:3px solid #0d1114;
+    box-shadow:0 0 0 1px rgba(13,17,20,.8),0 0 0 3px rgba(244,239,226,.34) inset,0 10px 26px rgba(8,12,14,.42)}
+  .minimap.gta i{left:50%;top:50%;padding:2px 3px 1px;font-size:9.5px;
+    transform:translate(-50%,-50%) rotate(var(--north-angle,0rad)) translateY(calc(-1 * var(--north-r,62px))) rotate(calc(-1 * var(--north-angle,0rad)))}
+}
 .road-name{font:13px/1 var(--serif);letter-spacing:.12em;color:var(--paper);background:var(--glass);
   padding:5px 10px;border-radius:12px;max-width:150px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 

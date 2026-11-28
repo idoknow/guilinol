@@ -1,5 +1,5 @@
 import {nearestPlayable} from '../../../lib/play-region'
-import {FOG_CELL, fogCellCenter} from '../../../lib/fog'
+import {FOG_AXIS, FOG_CELL, FOG_ORIGIN} from '../../../lib/fog'
 import {fogAreaKm2, fogCells} from '../walk/fog'
 import {getPlayMode} from '../game/play-mode'
 import {operation} from '../telemetry'
@@ -24,13 +24,18 @@ const C = {paper:'#efe8d8', green:'#d3dcc0', water:'#a6c9c1', waterEdge:'#86ada5
   road:'#fcfaf3', casing:'#cbbea4', major:'#f8ebcb', majorCasing:'#c4a676', path:'#b7aa90', ink:'#2a302c', inkSoft:'#5d655f',
   peak:'#7f9a7b', peakDark:'#4f6b55', seal:'#a9503c', sealSoft:'rgba(169,80,60,.55)', paperText:'#f4efe2',
   shop:'#d9822b', shopText:'#9c4e0e', route:'#20d6c1', peer:'#2f7d70',
-  halo:'rgba(239,232,216,.92)', roadHalo:'rgba(252,250,243,.95)', fog:'rgba(9,11,13,.945)'}
+  halo:'rgba(239,232,216,.92)', roadHalo:'rgba(252,250,243,.95)',
+  // IDOK-590：未探索区域改成「雾」而不是墨块 —— 冷灰的水汽，压住细节但仍隐约看得出山形水势。
+  fog:'rgba(104,116,122,.93)', fogVeil:'rgba(84,98,105,.22)',
+  // 小地图只有 150 px，浅雾会把整盘糊成一块灰：换更厚的一档，走过的街道才像被点亮。
+  fogMini:'rgba(120,128,132,.9)'}
 // Phase 2 街头 palette (docs/style.md 第二期 · 小地图): night-asphalt ground, grey roads, white arterials, jade water.
 const STREET:typeof C = {paper:'#1b1f25', green:'#1f3329', water:'#17414c', waterEdge:'#245866', building:'#2a2f37', buildingEdge:'#353b45',
   road:'#7d838c', casing:'#14171b', major:'#e9e6de', majorCasing:'#0d0f12', path:'#4c525b', ink:'#f6f4ef', inkSoft:'#c9ccd2',
   peak:'#2d4a3a', peakDark:'#203629', seal:'#20d6c1', sealSoft:'rgba(32,214,193,.5)', paperText:'#101216',
   shop:'#f5b841', shopText:'#ffd166', route:'#20d6c1', peer:'#8fe3ff',
-  halo:'rgba(16,18,22,.9)', roadHalo:'rgba(16,18,22,.9)', fog:'rgba(4,6,8,.955)'}
+  halo:'rgba(16,18,22,.9)', roadHalo:'rgba(16,18,22,.9)',
+  fog:'rgba(64,76,84,.84)', fogVeil:'rgba(102,116,124,.26)', fogMini:'rgba(56,62,68,.9)'}
 export function setMapPalette(name:'ink'|'street'){if(name==='street')Object.assign(C,STREET)}
 const SERIF = '"Noto Serif SC","Source Han Serif SC","Songti SC",serif'
 const CELL = 256
@@ -108,32 +113,68 @@ export function mapView(host:Host, atlas:Atlas, ui:{slot:HTMLElement; buttons:HT
   }
   const here = ()=>{const w = host.walker(); return w?.active?w.position:host.camera.position}
 
-  // --- 迷雾（IDOK-588）：只有走过的地方才是亮的，和 GTA 线下版的开图手感一致。
-  // 先在离屏 canvas 上铺一层墨，再把「走过的格子」用 destination-out 挖成洞，整层贴上主画布。
+  // --- 迷雾（IDOK-588 / IDOK-590）：只有走过的地方才是亮的，和 GTA 线下版的开图手感一致。
+  // 先在离屏 canvas 上铺一层水汽（底色 + 世界锚定的云斑），再把「走过的格子」挖掉，整层贴上主画布。
+  // 挖洞按行合并成长条：8 m 一格，逐格画圆在全图缩放下是几万次 arc，合并后只画几十上百条矩形。
   // 离屏画布比屏幕大一圈（FOG_PAD），这样高斯模糊的边缘落在屏幕外，不会在四边漏出透明缝。
   const FOG_PAD = 16
   const fogLayer = document.createElement('canvas')
-  function paintFog(g:CanvasRenderingContext2D, w:number, h:number, dpr:number, cx:number, cz:number, scale:number) {
+  /** 世界坐标上的稳定伪随机（同一块云每次重画都在同一个位置，不会闪）。 */
+  const cloudHash = (ix:number, iz:number) => {
+    const value = Math.sin(ix * 12.9898 + iz * 78.233) * 43758.5453
+    return value - Math.floor(value)
+  }
+  function paintFog(g:CanvasRenderingContext2D, w:number, h:number, dpr:number, cx:number, cz:number, scale:number, mini:boolean) {
     const pw = Math.max(1,Math.round(w*dpr)), ph = Math.max(1,Math.round(h*dpr)), pad = Math.round(FOG_PAD*dpr)
     if(fogLayer.width!==pw+pad*2||fogLayer.height!==ph+pad*2){fogLayer.width = pw+pad*2; fogLayer.height = ph+pad*2}
     const mg = fogLayer.getContext('2d'); if(!mg) return
     mg.setTransform(1,0,0,1,0,0); mg.globalCompositeOperation = 'source-over'
-    mg.fillStyle = C.fog; mg.fillRect(0,0,fogLayer.width,fogLayer.height)
+    mg.fillStyle = mini ? C.fogMini : C.fog; mg.fillRect(0,0,fogLayer.width,fogLayer.height)
+    const reach = 1/scale
+    // 云斑：按 220 m 的世界网格撒，位置跟着相机走（不是贴在屏幕上的一层脏点）。
+    // 小地图一屏只有 160 m 见方，云斑在这个尺度上只会变成脏点 —— 小地图只留纯雾。
+    if(!mini) {
+      const grid = 220
+      const gx0 = Math.floor((cx-reach*w/2)/grid), gx1 = Math.floor((cx+reach*w/2)/grid)
+      const gz0 = Math.floor((cz-reach*h/2)/grid), gz1 = Math.floor((cz+reach*h/2)/grid)
+      const veilFade = C.fogVeil.replace(/,([\d.]+)\)$/,',0)')
+      for(let gz = gz0; gz <= gz1; gz++) for(let gx = gx0; gx <= gx1; gx++) {
+        const h1 = cloudHash(gx,gz), h2 = cloudHash(gx+91,gz-37)
+        const wx = (gx+.5+(h1-.5)*1.7)*grid, wz = (gz+.5+(h2-.5)*1.7)*grid
+        const sxp = pad+(w/2+(wx-cx)*scale)*dpr, syp = pad+(h/2+(wz-cz)*scale)*dpr
+        const rp = Math.max(6, grid*(.5+h1*.95)*scale*dpr)
+        if(sxp+rp<0||syp+rp<0||sxp-rp>fogLayer.width||syp-rp>fogLayer.height) continue
+        const grad = mg.createRadialGradient(sxp,syp,0,sxp,syp,rp)
+        grad.addColorStop(0,C.fogVeil); grad.addColorStop(1,veilFade)
+        mg.fillStyle = grad; mg.beginPath(); mg.arc(sxp,syp,rp,0,Math.PI*2); mg.fill()
+      }
+    }
     const cells = fogCells()
     if(cells.size) {
       mg.globalCompositeOperation = 'destination-out'; mg.fillStyle = '#000'
-      const reach = 1/scale, x0 = cx-reach*w/2-FOG_CELL, x1 = cx+reach*w/2+FOG_CELL
-      const z0 = cz-reach*h/2-FOG_CELL, z1 = cz+reach*h/2+FOG_CELL
-      const r = Math.max(1.5, FOG_CELL*scale*.84*dpr)
-      for(const key of cells) {
-        const c = fogCellCenter(key)
-        if(c.x<x0||c.x>x1||c.z<z0||c.z>z1) continue      // 一屏只画看得见的格子
-        mg.beginPath(); mg.arc(pad+(w/2+(c.x-cx)*scale)*dpr, pad+(h/2+(c.z-cz)*scale)*dpr, r, 0, Math.PI*2); mg.fill()
+      const cellPx = FOG_CELL*scale*dpr
+      const ix0 = Math.max(0,Math.floor((cx-reach*w/2-FOG_ORIGIN)/FOG_CELL))
+      const ix1 = Math.min(FOG_AXIS-1,Math.floor((cx+reach*w/2-FOG_ORIGIN)/FOG_CELL))
+      const iz0 = Math.max(0,Math.floor((cz-reach*h/2-FOG_ORIGIN)/FOG_CELL))
+      const iz1 = Math.min(FOG_AXIS-1,Math.floor((cz+reach*h/2-FOG_ORIGIN)/FOG_CELL))
+      const ox = pad+(w/2-cx*scale)*dpr, oy = pad+(h/2-cz*scale)*dpr
+      for(let iz = iz0; iz <= iz1; iz++) {
+        const row = iz*FOG_AXIS
+        let run = -1
+        for(let ix = ix0; ix <= ix1+1; ix++) {
+          const on = ix <= ix1 && cells.has(row+ix)
+          if(on) { if(run < 0) run = ix; continue }
+          if(run < 0) continue
+          const left = FOG_ORIGIN+run*FOG_CELL, top = FOG_ORIGIN+iz*FOG_CELL
+          // 纵向各放 0.35 格：相邻两行才会连成一片，不然 8 m 的台阶会在雾里露出锯齿。
+          mg.fillRect(ox+left*scale*dpr,oy+(top-FOG_CELL*.35)*scale*dpr,(ix-run)*cellPx+1,cellPx*1.7+1)
+          run = -1
+        }
       }
     }
     mg.globalCompositeOperation = 'source-over'
     g.save(); g.setTransform(1,0,0,1,0,0)
-    g.filter = 'blur(4px)'; g.drawImage(fogLayer,-pad,-pad); g.filter = 'none'
+    g.filter = 'blur(2px)'; g.drawImage(fogLayer,-pad,-pad); g.filter = 'none'
     g.restore()
   }
 
@@ -240,7 +281,7 @@ export function mapView(host:Host, atlas:Atlas, ui:{slot:HTMLElement; buttons:HT
     g.strokeStyle=style.getPropertyValue('--region-boundary');g.lineWidth=px(parseFloat(style.getPropertyValue('--region-boundary-width')));g.stroke(built.path)
     ;(regional??edge)?.labels(g,x0,z0,x1,z1,scale,style,(x,z)=>!far&&built.contains(x,z))
     g.setTransform(dpr,0,0,dpr,0,0)
-    paintFog(g,w,h,dpr,cx,cz,scale)
+    paintFog(g,w,h,dpr,cx,cz,scale,mini)
     if(navTarget) {
       // IDOK-350: the road route (漓江青, dark casing so it reads on both palettes); straight dashed line only
       // while planning or when no connected road was found.
@@ -319,13 +360,38 @@ export function mapView(host:Host, atlas:Atlas, ui:{slot:HTMLElement; buttons:HT
   const road = document.createElement('div'); road.className = 'road-name'
   ui.slot.append(mini,road)
   // IDOK-256: the minimap disc is the only map entry (the old「地图」dock button opened the same atlas). M still works.
+  // IDOK-590：桌面端小地图走 GTA 那种「随朝向转的圆角方框」，触屏仍是上北下南的圆盘。
+  const spin = document.createElement('canvas')
+  const fine = ()=>matchMedia('(hover:hover) and (pointer:fine)').matches
+  mini.classList.toggle('gta',fine())
   let lastRoad = ''
   function drawMini() {
     const size = mini.clientWidth; if(!size) return
     const dpr = Math.min(2,devicePixelRatio)
     if(miniCanvas.width!==Math.round(size*dpr)){miniCanvas.width = miniCanvas.height = Math.round(size*dpr)}
     const p = here(), altitude = host.walker()?.active?0:Math.max(0,p.y-200)
-    paint(miniCanvas.getContext('2d')!,size,size,dpr,p.x,p.z,altitude>150?.1:altitude>40?.22:.42,true)
+    const scale = altitude>150?.1:altitude>40?.22:.42
+    const g = miniCanvas.getContext('2d')!
+    const walker = host.walker()
+    // 屏幕上的朝向向量（x 向右、y 向下，世界 z 就是屏幕 y）。
+    let fx:number, fz:number
+    if(walker?.active) { fx = -Math.sin(walker.yaw); fz = -Math.cos(walker.yaw) }
+    else { const d = host.camera.getWorldDirection(new THREE.Vector3()); fx = d.x; fz = d.z }
+    const theta = -Math.PI/2 - Math.atan2(fz,fx)
+    if(mini.classList.contains('gta')) {
+      // 整张地图按「朝哪儿、哪边朝上」转，玩家箭头永远指屏幕正上方 —— GTA 的手感。
+      const side = Math.round(size*dpr*1.45)
+      if(spin.width!==side){spin.width = spin.height = side}
+      const sg = spin.getContext('2d')!
+      sg.setTransform(1,0,0,1,0,0); sg.clearRect(0,0,side,side)
+      paint(sg,side/dpr,side/dpr,dpr,p.x,p.z,scale*1.45,true)
+      g.setTransform(1,0,0,1,0,0); g.clearRect(0,0,size*dpr,size*dpr)
+      g.save(); g.translate(size*dpr/2,size*dpr/2); g.rotate(theta); g.drawImage(spin,-side/2,-side/2); g.restore()
+    } else {
+      paint(g,size,size,dpr,p.x,p.z,scale,true)
+    }
+    mini.style.setProperty('--north-angle',`${theta}rad`)
+    mini.style.setProperty('--north-r',`${Math.max(10,size/2-11)}px`)
     const found = atlas.roadAt(p.x,p.z,host.walker()?.active?18:0)?.name ?? ''
     if(found!==lastRoad){lastRoad = found; road.textContent = found; road.hidden = !found}
   }
@@ -350,7 +416,9 @@ export function mapView(host:Host, atlas:Atlas, ui:{slot:HTMLElement; buttons:HT
     const w = sheet.clientWidth, h = sheet.clientHeight, dpr = Math.min(2,devicePixelRatio)
     if(canvas.width!==Math.round(w*dpr)||canvas.height!==Math.round(h*dpr)){canvas.width = Math.round(w*dpr); canvas.height = Math.round(h*dpr)}
     const g = canvas.getContext('2d')!; paint(g,w,h,dpr,view.x,view.z,view.scale,false)
-    fogText.textContent = `已探明 ${fogAreaKm2().toFixed(1)} km² `
+    const explored = fogAreaKm2()
+    // IDOK-590：8 m 一格之后，走一段街才 0.01 km²，用公顷报出来更直观。
+    fogText.textContent = `已探明 ${explored >= 1 ? `${explored.toFixed(1)} km²` : `${(explored * 100).toFixed(1)} 公顷`} `
     if(pin) {
       const x = w/2+(pin.x-view.x)*view.scale, y = h/2+(pin.z-view.z)*view.scale
       if(!pin.spot&&!pin.shop&&!pin.peer){g.setTransform(dpr,0,0,dpr,0,0); g.fillStyle = C.ink; g.beginPath(); g.arc(x,y-14,7,0,Math.PI*2); g.moveTo(x-5.5,y-10); g.lineTo(x,y); g.lineTo(x+5.5,y-10); g.fill()
