@@ -6,13 +6,15 @@ import {mapLandmarks, type MapLandmark} from './map-landmarks'
 import type {Host} from './host'
 import {photoMode} from './photo'
 import {mapView} from './map'
-import {isGlobalHotkeyBlocked, shouldPhotoYieldKeyPFromDom} from '../walk/input-guard'
+import {isAdminUserFromDom, isGlobalHotkeyBlocked} from '../walk/input-guard'
 import {getPlayMode,soloServices,onPlayMode} from '../game/play-mode'
 import {checkForUpdate} from '../ui/update-check'
 import {type ShopTriggerDef} from '../game/shops'
 import {getState, onState} from '../game/state'
 import {mountLandscapeEntry} from '../ui/orientation'
 import {mountSettingsEntry,mountViewEntry} from '../ui/settings'
+import {isAdminUser,isCurrentUserAdmin,onUser} from '../ui/account'
+import {bindKeyPShortcuts,getKeyPHotkeyHint} from '../ui/hotkeys'
 import {bindRackGuard,isRackOpen,mountRackEntry} from '../ui/gear-rack'
 import {hotbarSlot,mountHotbar,riding,showHotbar} from '../ui/hotbar'
 import {setCameraShown} from '../gear/hand'
@@ -169,11 +171,32 @@ export function play(host:Host) {
   const loadMap = ()=>void ensureMap(true)
   let mapRequested = !(host.manifest as {atlas?:unknown}).atlas
   const feedbackEntry=button('反馈','反馈','dock-feedback');buttons.append(feedbackEntry)
+  let feedbackOpening = false
+  const openFeedbackPanel = () => {
+    if (feedbackOpening || document.querySelector('.fb-panel,.fb-aim-bar')) return
+    feedbackOpening = true
+    document.exitPointerLock?.()
+    void import('../ui/feedback')
+      .then(module => module.openFeedback(host, () => { mapRequested = true; return ensureMap() }))
+      .finally(() => { feedbackOpening = false })
+  }
+  const syncAdminKeyPHints = (admin: boolean) => {
+    const hint = getKeyPHotkeyHint(admin)
+    feedbackEntry.setAttribute('aria-label', hint.feedbackLabel)
+    feedbackEntry.title = hint.feedbackLabel
+    if (hint.feedbackKey) feedbackEntry.setAttribute('aria-keyshortcuts', hint.feedbackKey)
+    else feedbackEntry.removeAttribute('aria-keyshortcuts')
+    shutter.setAttribute('aria-label', hint.photoLabel)
+    shutter.title = hint.photoLabel
+    shutter.setAttribute('aria-keyshortcuts', hint.photoKey)
+  }
+  syncAdminKeyPHints(isCurrentUserAdmin() || isAdminUserFromDom(document))
+  onUser(user => syncAdminKeyPHints(isAdminUser(user)))
   window.addEventListener('glol:mp-ban',event=>{
     const detail=(event as CustomEvent).detail
     void import('../ui/mp-ban').then(module=>module.showMpBan(detail,recordId=>void import('../ui/feedback').then(feedback=>feedback.openFeedback(host,()=>{mapRequested=true;return ensureMap()},undefined,recordId))))
   })
-  feedbackEntry.onclick=()=>void import('../ui/feedback').then(module=>module.openFeedback(host,()=>{mapRequested = true; return ensureMap()}))
+  feedbackEntry.onclick=()=>openFeedbackPanel()
   const feedbackId=new URLSearchParams(location.search).get('feedback');if(feedbackId&&/^[\w-]{1,128}$/.test(feedbackId))void import('../ui/feedback').then(module=>module.openFeedback(host,()=>{mapRequested=true;return ensureMap()},feedbackId))
   // IDOK-144: portrait phones can tap back into landscape after dismissing the gate (see ui/orientation.ts).
   mountLandscapeEntry(buttons)
@@ -309,16 +332,20 @@ export function play(host:Host) {
   drone.mountEntry(buttons)
   // IDOK-350: 街景导航（路网寻路 + 场景路线 + 转向提示）；入口仍是地图面板的「标记导航」。
   const nav = navigation(host,{visible:()=>!photo.active&&!drone.active&&document.body.dataset.photo!=='on',onEnd:()=>map?.setNavTarget(null,false)})
+  bindKeyPShortcuts({
+    isAdmin: () => isCurrentUserAdmin() || isAdminUserFromDom(document),
+    isDroneActive: () => drone.active,
+    isPhotoActive: () => photo.active,
+    openPhoto: () => photo.open(),
+    closePhoto: () => photo.close(),
+    openFeedback: openFeedbackPanel,
+  })
   window.addEventListener('keydown',event=>{
     if(event.repeat) return
     if(drone.active) return
     if(event.code==='Escape') {if(photo.active) photo.close(); else if(!map?.active) closeAll(); return}
     if(isGlobalHotkeyBlocked(event.target,{allowPhoto:photo.active})) return
     if(event.code==='KeyJ'&&!photo.active) sheet.hidden?openBook():closeBook()
-    if(event.code==='KeyP'){
-      if(shouldPhotoYieldKeyPFromDom(event,photo.active)) return
-      photo.active?photo.close():photo.open()
-    }
   })
 
   function nearestName() {

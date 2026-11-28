@@ -2,8 +2,14 @@
  * Shared keyboard & touch conflict guards across walking, riding, driving, photo mode, map, and UI modals.
  * Ensures:
  *  - Typing in input/textarea/select/contenteditable or open dialogs/title screen never triggers world hotkeys.
- *  - `KeyP` yields cleanly to e-bike P-gear while riding an e-bike (photo remains openable via Shift+P or HUD button,
- *    and `KeyP` always exits photo mode when already open).
+ *  - `KeyP` conflict priority:
+ *      1. Text inputs / other modals / drone RC never trigger world `KeyP` actions.
+ *      2. When photo mode is already active, `KeyP` always exits photo mode (both admins and players).
+ *      3. Signed-in admins pressing bare `KeyP` open/toggle the feedback/bug-report dialog across walking/flying/riding/driving
+ *         (admins can still open photo mode via `Shift+P` or the HUD button, and toggle e-bike P-gear via `0` or the HUD button;
+ *         sedans do not bind `KeyP` for P-gear so driving has no key conflict).
+ *      4. Non-admin players pressing bare `KeyP` while riding an upright e-bike yield to e-bike P-gear
+ *         (photo remains openable via `Shift+P` or HUD button); otherwise bare `KeyP` opens photo mode.
  *  - Touch taps inside mobile controls / HUD overlays never leak into canvas camera rotation or pinch zoom.
  */
 
@@ -45,7 +51,7 @@ export function isIndoorSceneActive(doc: Document = document): boolean {
   return doc.body.dataset.xxgActive === '1' || doc.body.dataset.szjActive === '1'
 }
 
-export function isModalOrOverlayOpen(doc: Document = document, options?: {ignoreIndoor?: boolean}): boolean {
+function hasBodyModalFlag(doc: Document, options?: {ignoreIndoor?: boolean}): boolean {
   if (doc.body.hasAttribute('data-home')) return true
   if (doc.body.dataset.shopOpen === '1') return true
   if (doc.body.dataset.fishMenu === '1') return true
@@ -55,7 +61,26 @@ export function isModalOrOverlayOpen(doc: Document = document, options?: {ignore
   if (doc.body.dataset.drinksUiOpen === '1') return true
   const delivering = isFineTerminalDelivering(doc)
   if (doc.body.dataset.tdTerminalOpen === '1' && !delivering) return true
-  return overlayElementPresent(doc, delivering)
+  return false
+}
+
+export function isModalOrOverlayOpen(doc: Document = document, options?: {ignoreIndoor?: boolean}): boolean {
+  if (hasBodyModalFlag(doc, options)) return true
+  return overlayElementPresent(doc, isFineTerminalDelivering(doc))
+}
+
+function hasOtherModalOrOverlayOpen(doc: Document, exclude: Element): boolean {
+  if (hasBodyModalFlag(doc)) return true
+  const selector = isFineTerminalDelivering(doc) ? BASE_MODAL_OVERLAY_SELECTOR : MODAL_OVERLAY_SELECTOR
+  if (typeof doc.querySelectorAll === 'function') {
+    const nodes = doc.querySelectorAll(selector)
+    for (let i = 0; i < nodes.length; i++) {
+      if (nodes[i] !== exclude) return true
+    }
+    return false
+  }
+  const found = doc.querySelector(selector)
+  return !!found && found !== exclude
 }
 
 // The selector scan walks the whole document, and walking, riding, HUD and interaction code ask
@@ -145,8 +170,122 @@ export function isGlobalHotkeyBlocked(
   return false
 }
 
+export function isAdminUserFromDom(doc: Document = document): boolean {
+  return doc.body?.dataset?.userRole === 'admin'
+}
+
+export function isFeedbackPanelOpen(doc: Document = document): boolean {
+  const dialog = doc.querySelector<HTMLDialogElement>('dialog.fb-panel')
+  return !!dialog && (dialog.open === true || (typeof dialog.hasAttribute === 'function' && dialog.hasAttribute('open')))
+}
+
+export function closeOpenFeedbackDialog(doc: Document = document): boolean {
+  const dialog = doc.querySelector<HTMLDialogElement>('dialog.fb-panel[open]')
+    ?? (isFeedbackPanelOpen(doc) ? doc.querySelector<HTMLDialogElement>('dialog.fb-panel') : null)
+  if (!dialog || dialog.classList?.contains('fb-busy')) return false
+  if (dialog.dataset) dialog.dataset.fbClosing = '1'
+  if (typeof dialog.close === 'function') dialog.close()
+  else dialog.removeAttribute?.('open')
+  return true
+}
+
 export interface PhotoKeyPContext {
   photoActive: boolean
+  isAdmin?: boolean
+  shiftKey?: boolean
+  altKey?: boolean
+  ctrlKey?: boolean
+  metaKey?: boolean
+  aboard: boolean
+  rideKind?: string
+  rideCrashed?: boolean
+}
+
+export interface AdminKeyPClaimContext {
+  isAdmin: boolean
+  photoActive?: boolean
+  shiftKey?: boolean
+  altKey?: boolean
+  ctrlKey?: boolean
+  metaKey?: boolean
+}
+
+/**
+ * Whether bare `KeyP` is reserved for the signed-in admin's feedback/bug-report shortcut
+ * rather than e-bike P-gear or opening photo mode.
+ */
+export function shouldAdminFeedbackClaimKeyP(ctx: AdminKeyPClaimContext): boolean {
+  if (!ctx.isAdmin || ctx.photoActive) return false
+  return !(ctx.shiftKey || ctx.altKey || ctx.ctrlKey || ctx.metaKey)
+}
+
+export function shouldAdminFeedbackClaimKeyPFromDom(
+  event: Pick<KeyboardEvent, 'shiftKey' | 'altKey' | 'ctrlKey' | 'metaKey'>,
+  doc: Document = document,
+  options?: {isAdmin?: boolean; photoActive?: boolean},
+): boolean {
+  return shouldAdminFeedbackClaimKeyP({
+    isAdmin: options?.isAdmin ?? isAdminUserFromDom(doc),
+    photoActive: options?.photoActive ?? doc.body?.dataset?.photo === 'on',
+    shiftKey: event.shiftKey,
+    altKey: event.altKey,
+    ctrlKey: event.ctrlKey,
+    metaKey: event.metaKey,
+  })
+}
+
+/**
+ * Resolves the `KeyP` conflict between Admin Feedback, global Photo Mode, and e-bike P-gear park lock:
+ *  - When photo mode is already active, `KeyP` always closes it.
+ *  - Modifier combos (`Shift+P` / `Alt+P`) still open photo mode even for admins or while riding an e-bike.
+ *  - Signed-in admins yield bare `KeyP` from photo mode to the admin feedback dialog (across walking/flying/riding/driving).
+ *  - Non-admin bare `KeyP` while mounted on an upright e-bike yields to P-gear instead of opening photo mode.
+ */
+export function shouldPhotoYieldKeyP(ctx: PhotoKeyPContext): boolean {
+  if (ctx.photoActive) return false
+  if (ctx.shiftKey || ctx.altKey || ctx.ctrlKey || ctx.metaKey) return false
+  if (ctx.isAdmin) return true
+  return ctx.aboard && ctx.rideKind === 'bike' && !ctx.rideCrashed
+}
+
+export function shouldPhotoYieldKeyPFromDom(
+  event: KeyboardEvent,
+  photoActive: boolean,
+  doc: Document = document,
+  options?: {isAdmin?: boolean},
+): boolean {
+  return shouldPhotoYieldKeyP({
+    photoActive,
+    isAdmin: options?.isAdmin ?? isAdminUserFromDom(doc),
+    shiftKey: event.shiftKey,
+    altKey: event.altKey,
+    ctrlKey: event.ctrlKey,
+    metaKey: event.metaKey,
+    aboard: doc.body.hasAttribute('data-aboard'),
+    rideKind: doc.body.dataset.ride,
+    rideCrashed: doc.body.dataset.rideCrash === '1',
+  })
+}
+
+export type KeyPAction =
+  | 'admin-feedback-open'
+  | 'admin-feedback-close'
+  | 'photo-open'
+  | 'photo-close'
+  | 'ebike-park'
+  | 'ignore'
+
+export interface KeyPActionContext {
+  isAdmin: boolean
+  photoActive: boolean
+  feedbackOpen: boolean
+  feedbackPending?: boolean
+  feedbackBusy?: boolean
+  feedbackAiming?: boolean
+  droneActive?: boolean
+  textInputTarget: boolean
+  otherModalOpen: boolean
+  repeat?: boolean
   shiftKey?: boolean
   altKey?: boolean
   ctrlKey?: boolean
@@ -157,20 +296,62 @@ export interface PhotoKeyPContext {
 }
 
 /**
- * Resolves the `KeyP` conflict between global Photo Mode and e-bike P-gear park lock:
- *  - When photo mode is already active, `KeyP` always closes it.
- *  - Modifier combos (`Shift+P` / `Alt+P`) still open photo mode even while riding.
- *  - Bare `KeyP` while mounted on an upright e-bike yields to P-gear instead of opening photo mode.
+ * Single conflict-resolution arbiter for `event.code === 'KeyP'`:
+ *  1. Repeat / text-input focus / drone RC / pending feedback capture -> `'ignore'`.
+ *  2. Feedback dialog already open: bare `KeyP` by an admin closes it unless busy or covered by another modal.
+ *  3. Any other modal/overlay or browser shortcut (`Ctrl+P` / `Cmd+P`) -> `'ignore'`.
+ *  4. Active photo mode -> `'photo-close'` (keeps photo exit intuitive for both admins and normal users).
+ *  5. Signed-in admin bare `KeyP` (all non-modal gameplay states, including walking/flying/riding/driving) ->
+ *     `'admin-feedback-open'` (or `'ignore'` while `.fb-aim-bar` re-capture aim mode is active).
+ *     Admins open photo mode via `Shift+P` / `Alt+P` or the HUD button, and toggle e-bike P-gear via `0` or the HUD button.
+ *     Sedans do not bind `KeyP` for P-gear (`Q`/`E` + HUD `P·R·N·D`), so driving has zero overlap.
+ *  6. Non-admin players keep the exact legacy behavior (`'ebike-park'` on upright e-bike, else `'photo-open'`).
  */
-export function shouldPhotoYieldKeyP(ctx: PhotoKeyPContext): boolean {
-  if (ctx.photoActive) return false
-  if (ctx.shiftKey || ctx.altKey || ctx.ctrlKey || ctx.metaKey) return false
-  return ctx.aboard && ctx.rideKind === 'bike' && !ctx.rideCrashed
+export function resolveKeyPAction(ctx: KeyPActionContext): KeyPAction {
+  if (ctx.repeat || ctx.textInputTarget || ctx.droneActive || ctx.feedbackPending) return 'ignore'
+  const hasModifier = !!(ctx.shiftKey || ctx.altKey || ctx.ctrlKey || ctx.metaKey)
+  if (ctx.feedbackOpen) {
+    if (ctx.isAdmin && !hasModifier && !ctx.otherModalOpen && !ctx.feedbackBusy) {
+      return 'admin-feedback-close'
+    }
+    return 'ignore'
+  }
+  if (ctx.otherModalOpen || ctx.ctrlKey || ctx.metaKey) return 'ignore'
+  if (ctx.photoActive) return 'photo-close'
+  if (ctx.isAdmin && !hasModifier) {
+    return ctx.feedbackAiming ? 'ignore' : 'admin-feedback-open'
+  }
+  if (shouldPhotoYieldKeyP({...ctx, isAdmin: false})) return 'ebike-park'
+  return 'photo-open'
 }
 
-export function shouldPhotoYieldKeyPFromDom(event: KeyboardEvent, photoActive: boolean, doc: Document = document): boolean {
-  return shouldPhotoYieldKeyP({
+export function resolveKeyPActionFromDom(
+  event: Pick<KeyboardEvent, 'target' | 'repeat' | 'shiftKey' | 'altKey' | 'ctrlKey' | 'metaKey'>,
+  options?: {photoActive?: boolean; isAdmin?: boolean; droneActive?: boolean; doc?: Document},
+): KeyPAction {
+  const doc = options?.doc ?? document
+  const photoActive = options?.photoActive ?? doc.body?.dataset?.photo === 'on'
+  const isAdmin = options?.isAdmin ?? isAdminUserFromDom(doc)
+  const textInputTarget = isTextInputTarget(event.target) || isTextInputTarget(doc.activeElement ?? null)
+  const fbPanel = doc.querySelector<HTMLDialogElement>('dialog.fb-panel')
+  const fbClosing = fbPanel?.dataset?.fbClosing === '1'
+  const feedbackOpen = !!fbPanel && !fbClosing && (fbPanel.open === true || (typeof fbPanel.hasAttribute === 'function' && fbPanel.hasAttribute('open')))
+  const feedbackPending = !!fbPanel && !feedbackOpen && !fbClosing
+  const feedbackBusy = feedbackOpen && !!fbPanel.classList?.contains('fb-busy')
+  const feedbackAiming = !fbPanel && !!doc.querySelector('.fb-aim-bar')
+  const otherModalOpen = feedbackOpen ? hasOtherModalOrOverlayOpen(doc, fbPanel) : isModalOrOverlayOpen(doc)
+
+  return resolveKeyPAction({
+    isAdmin,
     photoActive,
+    feedbackOpen,
+    feedbackPending,
+    feedbackBusy,
+    feedbackAiming,
+    droneActive: options?.droneActive,
+    textInputTarget,
+    otherModalOpen,
+    repeat: event.repeat,
     shiftKey: event.shiftKey,
     altKey: event.altKey,
     ctrlKey: event.ctrlKey,

@@ -4,7 +4,7 @@ import './vehicle-controls.css'
 import {walkConfig as cfg} from '../walk/config'
 import type {CarDynamicTelemetry} from '../walk/car'
 import type {EbikeTelemetrySnapshot} from '../walk/ebike-fx'
-import {isGlobalHotkeyBlocked, isIndoorSceneActive, isModalOrOverlayOpen, isTextInputTarget, isTouchInControlZone} from '../walk/input-guard'
+import {isGlobalHotkeyBlocked, isIndoorSceneActive, isModalOrOverlayOpen, isTextInputTarget, isTouchInControlZone, shouldAdminFeedbackClaimKeyPFromDom} from '../walk/input-guard'
 import {hits, type Action} from '../input/keymap'
 import {shouldSuppressRideGearKey} from '../traffic-duty/duty-keys'
 import {rideSoundMuted, setRideSoundMuted} from '../walk/ride-sound-pref'
@@ -302,7 +302,7 @@ const held=(action:Action)=>{let on=false;keys.forEach(code=>{if(!on&&hits(code,
         hornPulse=true
         vc.noteCarHorn(true,'key')
       }
-      else if(event.code==='KeyP'&&document.body.dataset.ride==='bike'&&!crashed&&!event.shiftKey&&!event.altKey&&!event.ctrlKey&&!event.metaKey){
+      else if(event.code==='KeyP'&&document.body.dataset.ride==='bike'&&!crashed&&!event.shiftKey&&!event.altKey&&!event.ctrlKey&&!event.metaKey&&!shouldAdminFeedbackClaimKeyPFromDom(event)){
         parkTogglePulse=true
         event.preventDefault()
       }
