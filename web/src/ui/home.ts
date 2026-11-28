@@ -1,6 +1,6 @@
 import {getPlayMode, lastPlayMode, type PlayMode} from '../game/play-mode'
 import {openGuide} from './guide'
-import {mpEnabled, mpExplicitlyDisabled} from './mp-pref'
+import {mpEnabled, mpExplicitlyDisabled, setMpEnabled} from './mp-pref'
 import {onMpOnline, startLive} from './live'
 import './home.css'
 import {spots} from '../play/spots'
@@ -23,7 +23,7 @@ export interface Home {open(resume:boolean):void; close():void; idle():void; rea
   /** Resolves once the entry dive (started by a mode card) has played far enough for the loader to cover it. */
   launch():Promise<void>}
 
-export function home(play:(mode:PlayMode,online?:boolean)=>void):Home {
+export function home(play:(mode:PlayMode)=>void):Home {
   const root = document.createElement('section')
   root.className = 'home'; root.setAttribute('aria-label','网上桂林 · 主界面')
   const stamps = (()=>{try{return (JSON.parse(localStorage.getItem('glol.stamps')??'[]') as unknown[]).length}catch{return 0}})()
@@ -111,8 +111,8 @@ export function home(play:(mode:PlayMode,online?:boolean)=>void):Home {
     const timer = setTimeout(()=>button.setAttribute('aria-busy','true'),120)
     void task().finally(()=>{clearTimeout(timer); button.removeAttribute('aria-busy')})
   }
-  solo.onclick = ()=>press(solo,'正在进入',()=>play('solo',false))
-  tour.onclick = ()=>press(tour,'正在进入',()=>play('tour',false))
+  solo.onclick = ()=>press(solo,'正在进入',()=>{setMpEnabled(false,true); play('solo')})
+  tour.onclick = ()=>press(tour,'正在进入',()=>{setMpEnabled(false); play('tour')})
   // IDOK-105: a slim strip under the tour card, shown only when a usable last view is stored.
   // 开始游览 still opens on a random frame; this is the opt-in way back.
   const resumeRow = root.querySelector<HTMLElement>('.home-resume-row')!, resumeAgo = root.querySelector('.home-resume-ago')!
@@ -131,7 +131,7 @@ export function home(play:(mode:PlayMode,online?:boolean)=>void):Home {
   const mp = root.querySelector<HTMLButtonElement>('.home-mode--mp')!, mpGo = root.querySelector('.home-go--mp')!
   const mpLive = root.querySelector<HTMLElement>('.home-mp-live')!
   startLive()
-  mp.onclick = ()=>press(mp,'正在连接',()=>play('solo',true))
+  mp.onclick = ()=>press(mp,'正在连接',()=>{setMpEnabled(true); play('solo')})
   onMpOnline(value=>{mpLive.hidden = !value; if(value) mpLive.textContent = String(value)})
   const account = root.querySelector<HTMLButtonElement>('.home-account')!
   account.onclick = ()=>pending(account,openAccount)

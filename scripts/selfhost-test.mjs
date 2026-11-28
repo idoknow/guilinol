@@ -78,7 +78,6 @@ export async function fixture({postgresOnly=false}={}) {
       await migrate('028-web-guard')
       await migrate('029-feedback-user-status-index')
       await migrate('031-feedback-appeal')
-      await migrate('032-mp-positions')
     }
     await migrate('001-schema');await replay()
     if(!postgresOnly){

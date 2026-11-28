@@ -26,15 +26,3 @@ export function setMpEnabled(on: boolean, rememberOff = false) {
 
 export type MpState = 'off' | 'connecting' | 'online' | 'offline' | 'replaced'
 export interface MpStatus {state: MpState; online: number}
-
-let state:MpState='off'
-window.addEventListener('glol:mp-status',event=>{state=(event as CustomEvent<MpStatus>).detail.state})
-export function waitForOnline(signal:AbortSignal){
-  if(state==='online')return Promise.resolve()
-  return new Promise<void>((resolve,reject)=>{
-    const finish=(ok:boolean)=>{clearTimeout(timer);window.removeEventListener('glol:mp-status',check);signal.removeEventListener('abort',cancel);if(ok)resolve();else reject(Error('未能连接联机服务，请重试'))}
-    const check=()=>{if(state==='online')finish(true)}
-    const cancel=()=>finish(false),timer=window.setTimeout(cancel,15000)
-    window.addEventListener('glol:mp-status',check);signal.addEventListener('abort',cancel,{once:true});if(signal.aborted)cancel()
-  })
-}

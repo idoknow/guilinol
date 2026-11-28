@@ -26,7 +26,6 @@ export function requestRoster(on:boolean){subCount=Math.max(0,subCount+(on?1:-1)
 export function attachNet(scene:Scene,clips:AnimationClip[],getPose:()=>Pose,getAvatar:()=>Avatar,camera:Camera,getActivity?:()=>ActivityReport,onCombat?:(p:CombatPacket,self:string)=>void,onSetback?:(x:number,y:number,z:number)=>void,getCaptureContext?:()=>CaptureClientContext,getMobility?:()=>MobilityState) {
   const peers=players(scene,clips,camera)
   let travelReply:((reply:TravelReply)=>void)|undefined
-  let arrival:'restore'|'travel'|'resume'='restore'
   let landingPaused=false,rejoinTimer=0
   let travelSequence=0
   bindTravel(async(reason,x,z)=>{
@@ -34,16 +33,16 @@ export function attachNet(scene:Scene,clips:AnimationClip[],getPose:()=>Pose,get
     if(landingPaused && dist>24)return rejectTravel('cooldown')
     const target=travelTarget(reason,x,z)??null
     if(state!=='online'||dist<=24)return true
+    if(dist<=200 && reason==='mp-teleport')return true
     if(travelReply)return rejectTravel('busy')
-    if(!target&&dist>200)return rejectTravel('site')
-    const precheck=dist<=200
+    const precheck=target===null || dist<=200
     return prepareTravel(reason,x,z,()=>new Promise(resolve=>{
       const timeout=setTimeout(()=>travelReply?.({ok:false,code:'timeout'}),4000)
       travelReply=result=>{clearTimeout(timeout);travelReply=undefined;resolve(result)}
-      send({t:'travel',seq:++travelSequence,reason:reason.split(':')[0],target,...(precheck?{precheck:true}:{})})
+      send({t:'travel',seq:++travelSequence,reason:reason.split(':')[0],target:precheck?null:target,...(precheck?{precheck:true}:{})})
     }),delay=>{
       const earliest=performance.now()+delay
-      landingPaused=true;stop();arrival='travel'
+      landingPaused=true;stop()
       return ()=>{if(!disposed)rejoinTimer=window.setTimeout(()=>{landingPaused=false;if(account&&!disposed)void connect()},Math.ceil(Math.max(0,earliest-performance.now())))}
     })
   })
@@ -106,7 +105,7 @@ export function attachNet(scene:Scene,clips:AnimationClip[],getPose:()=>Pose,get
       const previous=socket
       if(previous){previous.onopen=previous.onmessage=previous.onclose=previous.onerror=null;try{previous.close(1000,'replace')}catch{}}
       const ws=new WebSocket(endpoint);socket=ws;welcomed=false
-      ws.onopen=()=>{if(version===generation){const initial=getActivity?.();lastActKey=initial?`${initial.act}|${initial.detail??''}`:'';const mob=getMobility?.();lastMobKey=mob?`${mob.mode}|${mob.id??''}`:'';send({t:'join',ticket,fp:fingerprint(),dev:deviceSummary(),avatar:getAvatar(),caps:['roster3','vstate1'],...(initial?{act:initial.act,actDetail:initial.detail}:{}),...(mob?{vmode:mob.mode,...(mob.id?{vid:mob.id}:{})}:{}),arrival,...(arrival==='restore'?{}:getPose())})}}
+      ws.onopen=()=>{if(version===generation){const initial=getActivity?.();lastActKey=initial?`${initial.act}|${initial.detail??''}`:'';const mob=getMobility?.();lastMobKey=mob?`${mob.mode}|${mob.id??''}`:'';send({t:'join',ticket,fp:fingerprint(),dev:deviceSummary(),avatar:getAvatar(),caps:['roster3','vstate1'],...(initial?{act:initial.act,actDetail:initial.detail}:{}),...(mob?{vmode:mob.mode,...(mob.id?{vid:mob.id}:{})}:{}),...getPose()})}}
       ws.onmessage=event=>{
         if(version!==generation)return
         const msg=JSON.parse(event.data)
@@ -143,8 +142,8 @@ export function attachNet(scene:Scene,clips:AnimationClip[],getPose:()=>Pose,get
             peers.combat(msg);onCombat?.(msg,myId);break
           }
           case 'welcome': sent=0;sentTimes=[];myId=String(msg.me?.id??'');myUid=Number(msg.me?.uid)||0;myName=String(msg.me?.name??'');setChatSelf(myUid);onCombat?.(msg.me,myId);if(subCount>0)send({t:'roster_sub',since:lastRosterV})
-            if(msg.relocated){const {x,y,z,code}=msg.relocated;onSetback?.(x,y,z);if(code)rejectTravel(code)}
-            welcomed=true;arrival='resume'
+            if(msg.relocated){const {x,y,z,code}=msg.relocated;onSetback?.(x,y,z);rejectTravel(code)}
+            welcomed=true
             // 续连（CDN 掐断后原地接管）：对账而不是清空重建，否则每 44 秒所有人的模型都会销毁再克隆一遍
             if(msg.me?.resumed){const keep=new Set((msg.players as {id:string}[]).map(p=>p.id))
               for(const p of peers.list())if(!keep.has(p.id))peers.remove(p.id)
@@ -237,12 +236,11 @@ export function attachNet(scene:Scene,clips:AnimationClip[],getPose:()=>Pose,get
     const seen=new Set(live.map(p=>p.id));return [...live,...[...far.values()].filter(p=>!seen.has(p.id))]}
   let account:string|null|undefined
   const unsubscribe=onUser(user=>{const id=user?.id??null;if(id===account)return
-    account=id;stop();arrival='restore';if(id){attempt=0;void connect()}})
+    account=id;stop();if(id){attempt=0;void connect()}})
   window.addEventListener('glol:avatar-change',avatarChanged)
   // 切后台/关页面时干净收尾：手机浏览器经常直接冻结 WebSocket，主动关掉能立刻把服务端名额还回去，
   // 不用等心跳超时——这也是「同一账号第二次连不上」的常见来源。
   const pageHide=()=>{
-    arrival='restore'
     bindChat()
     clearTimeout(timer);generation++
     const ws=socket;socket=undefined

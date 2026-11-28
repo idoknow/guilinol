@@ -58,8 +58,6 @@ installAtmosphere()
 let paused=false
 let modeReady = Promise.resolve()
 export const waitForMode = () => modeReady
-export let leaveLocation:(remember?:boolean)=>void=()=>{}
-export let enterLocation:()=>Promise<void>=async()=>{}
 export function setPaused(on:boolean){paused=on}
 import {mountDevHud} from './ui/hud-dev'
 import {armOrientationGate} from './ui/orientation'
@@ -169,7 +167,7 @@ async function start(loader:FullLoader,creatorSpawn=false) {
   // `restoring` is a FeedbackView only when the player picked "回到上次离开的地方" AND a usable view
   // is stored; a stale/cleared record must fall back to pickSpawn(), not the fixed camera.
   const soloStart = getPlayMode() === 'solo'
-  const opening = soloStart ? null : forcedSlot !== null
+  const opening = soloStart ? (!isDeepLink(openParams) ? readLastView() : null) : forcedSlot !== null
     ? spawnPool.find(slot => slot.id === forcedSlot) ?? spawnPool[0]
     : isDeepLink(openParams) ? null : consumeRestore() ? readLastView() ?? pickSpawn() : pickSpawn()
   const hasDowntown = left<=-2304 && top<=-2560 && left+width>=1280 && top+depth>=3328
@@ -456,10 +454,10 @@ async function start(loader:FullLoader,creatorSpawn=false) {
     const gate = walkConfig.gate
     const fresh = initial && !isDeepLink(openParams)
     // IDOK-566: 联机模式回到上次站的位置；落不下去再走广场 → 出生门。
-    const resume = !mpEnabled()&&(!initial||fresh)?readMpSpot(localStorage,Date.now(),'glol.soloSpot'):null
+    const resume = fresh && mpEnabled() ? readMpSpot() : null
     if(resume&&await walkTo(resume.x,resume.z,resume.yaw,'solo-resume'))return
     titleTransition?.signal.throwIfAborted()
-    const point = !initial||fresh||mpEnabled() ? plazaSpawn : gate
+    const point = fresh ? plazaSpawn : initial && !opening ? gate : {x:camera.position.x,z:camera.position.z,yaw:camera.rotation.y}
     if(await walkTo(point.x,point.z,point.yaw,'solo'))return
     titleTransition?.signal.throwIfAborted()
     if(await walkTo(gate.x,gate.z,gate.yaw,'solo-fallback'))return
@@ -582,16 +580,15 @@ async function start(loader:FullLoader,creatorSpawn=false) {
       else mounted.dispose()
     }
   }
-  const tourCamera=camera.clone()
-  function saveSolo(){if(!mpEnabled()&&walker?.active&&!switching&&!heli.active&&!szj.isIndoor()&&!xxg.isIndoor())saveMpSpot({x:walker.position.x,z:walker.position.z,yaw:walker.yaw},localStorage,Date.now(),'glol.soloSpot')}
-  leaveLocation=(remember=true)=>{
-    if(remember){if(getPlayMode()==='tour')tourCamera.copy(camera);else saveSolo()}
-    if(walker?.active)walker.leave()
-  }
-  enterLocation=async()=>{if(getPlayMode()==='solo')await landSolo(false);else {camera.position.copy(tourCamera.position);camera.quaternion.copy(tourCamera.quaternion);camera.fov=tourCamera.fov;camera.updateProjectionMatrix()}}
-  onPlayMode(()=>{
+  onPlayMode((mode,prev)=>{
     modeReady=(async()=>{
-      await enterLocation()
+      if(mode==='solo')await landSolo(false)
+      else if(prev==='solo' && walker?.active){
+        const {x,z}=walker.position
+        takeFlight()
+        camera.position.x=x
+        camera.position.z=z
+      }
       await syncSolo()
       showMode()
     })()
@@ -944,8 +941,12 @@ async function start(loader:FullLoader,creatorSpawn=false) {
     const write = (force = false) => {
       if (!force && Date.now() - lastWrite < 15000) return
       lastWrite = Date.now()
-      if(getPlayMode()==='tour')void host.lastView().then(view=>{if(getPlayMode()==='tour')saveLastView(view)}).catch(()=>{})
-      else saveSolo()
+      void host.lastView().then(saveLastView).catch(() => {})
+      // IDOK-566: 联机步行时记下脚下位置（室内、直升机、切换中不记，免得下次落进店里或半空）。
+      if (getPlayMode() === 'solo' && mpEnabled() && walker?.active && !switching && !heli.active && !szj.isIndoor() && !xxg.isIndoor()) {
+        const p = walker.position
+        saveMpSpot({x: p.x, z: p.z, yaw: walker.yaw})
+      }
     }
     addEventListener('pagehide', () => write(true))
     document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') write(true) })

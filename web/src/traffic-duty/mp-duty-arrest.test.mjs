@@ -652,11 +652,9 @@ test('IDOK-500 (3/4): 中距(24..200m)预检断连与远距(>200m)放行及 prec
   assert.equal(shortOk, true)
   assert.equal(ws1.sent.slice(sentBeforeShort).filter((m) => m.t === 'travel').length, 0)
 
-  const mpCheck = mod.enterLanding('mp-teleport', -138, 51, async () => assert.fail('precheck refused'))
-  const localRequest=ws1.sent.at(-1)
-  assert.equal(localRequest.precheck,true);assert.equal(localRequest.target,null)
-  ws1.emitServer({t:'travel_result',seq:localRequest.seq,ok:false,code:'combat'})
-  assert.equal(await mpCheck,false)
+  // b) mp-teleport <=200m: stays online (verify:mp contract)
+  const mpOk = await mod.enterLanding('mp-teleport', -138, 51, async () => true)
+  assert.equal(mpOk, true)
   assert.equal(net.status().state, 'online')
 
   // c) Medium range 24..200m: spot:bridge (-185, 35) -> traffic-duty:bridge (-268.5, 24.8) = 84.1m
@@ -668,7 +666,7 @@ test('IDOK-500 (3/4): 中距(24..200m)预检断连与远距(>200m)放行及 prec
   })
   const travelReq = ws1.sent.findLast((m) => m.t === 'travel')
   assert.equal(travelReq.precheck, true, '24..200m teleport must send precheck=true')
-  assert.equal(travelReq.target, 'traffic-duty:bridge', 'known medium-distance site survives the precheck disconnect')
+  assert.equal(travelReq.target, null, '24..200m precheck must send target=null so server saves leave history & grants rejoin')
   assert.equal(travelReq.reason, 'traffic-duty')
 
   // Simulate server precheckLeave reply with tiny rejoin window so test finishes fast
@@ -690,10 +688,8 @@ test('IDOK-500 (3/4): 中距(24..200m)预检断连与远距(>200m)放行及 prec
   const ws2 = MockSocket.instances.at(-1)
   assert.ok(ws2 && ws2 !== ws1, 'socket must reconnect after rejoinAfterMs')
   await new Promise((r) => setTimeout(r, 5))
-  assert.equal(ws2.sent.find(m=>m.t==='join')?.arrival,'travel')
   ws2.emitServer({t: 'welcome', me: {id: 'p1', uid: 10001, name: '交警测试', hp: 100, dn: 0, progress: 0}, online: 1, players: []})
   assert.equal(net.status().state, 'online')
-  assert.equal(await mod.enterLanding('geolocation',3000,2400,()=>assert.fail('unknown site')),false)
 
   // d) Long range >200m to known site: Jiefang bridge (-268.5, 24.8) -> Shizijie crossing (-855.47, -171.47)
   const farPromise = mod.enterLanding('traffic-duty:crossing', -855.47, -171.47, async () => true)
@@ -865,3 +861,4 @@ test('IDOK-500 (5/5): 开单拦截保留车辆静止不滑走（pullOverViolator
   assert.equal(sjCtrl.getSnapshot().citedCount, 1)
   sjCtrl.dispose()
 })
+
