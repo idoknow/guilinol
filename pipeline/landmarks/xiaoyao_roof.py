@@ -132,6 +132,9 @@ def tiled_roof(model, x, y, z, width, depth, rise, wing, ridge_fraction=.63, por
                 # the central batten and bargeboards; shortened on low gables.
                 apex=point(side,0,5)+[e*.18,0,0]
                 scale=min(1,.8*(top-bottom)/1.3)
+                bracket=apex-[0,.10*scale,0]
+                model.beam(bracket-[e*.21,0,0],bracket,.045,'wood',6)
+                model.beam(bracket,apex-[0,1.14*scale,0],.035,'gold',6)
                 fish=[(0,-.05),(.28,-.45),(0,-1.05),(-.28,-.45),(0,-1.0),(.22,-1.3),(-.22,-1.3)]
                 model.mesh([apex+[0,dy*scale,lateral*scale] for lateral,dy in fish],
                            [[0,1,2],[0,2,3],[4,5,6]],'gold')
