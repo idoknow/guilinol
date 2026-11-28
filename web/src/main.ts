@@ -6,7 +6,7 @@ import {installGeolocation} from './geolocation'
 import {identifyWorld,instrument,operation,record} from './telemetry'
 import * as THREE from 'three'
 import {landingWarmBudget,warmShaders,type WarmBudget} from './shader-warmup'
-import {vehicleModel} from './walk/vehicle-model'
+import {vehicleModel,createDynamicEbike,createDynamicBicycle} from './walk/vehicle-model'
 import {bytes, fetchAsset, measureFirstWorldBytes, openingTerrain, startOverview, type Manifest} from './world'
 import {Stream} from './stream'
 import {flightFocus} from './flight-focus'
@@ -400,7 +400,37 @@ async function start(loader:FullLoader,creatorSpawn=false) {
             parked.setColorAt(0,new THREE.Color(0xffffff))
             const variants=new THREE.Group(),mapped=new THREE.MeshStandardMaterial({map:new THREE.Texture(),flatShading:true})
             variants.add(parked,new THREE.Mesh(bike.geometry,mapped))
-            try{await Promise.race([warmPrograms(variants,budget),skipped,interrupted])}finally{parked.dispose();mapped.dispose()}
+            // IDOK-449: the *mounted* two-wheeler is a dynamic rig whose material set (shared livery,
+            // emissive trim, mod presets) is not covered by the static parked-bike variants above, so
+            // its programs used to compile lazily on the first mount. That single frame blocked for
+            // tens of seconds under CPU throttle (41.5s at 4x), which delayed publishing the riding
+            // state past the caller's 8s window. Warm the rigs here, while the landing cover is up.
+            // The dummy render pass below also builds the GPU pipelines for those programs: the
+            // compile() call alone only compiles the shader sources, and the first real draw of each
+            // new program still stalled the frame it appeared in (first mount stayed slow ~50% of runs).
+            const dynamicRigs=[createDynamicEbike(1,undefined,'shared'),createDynamicBicycle(1)]
+            for(const rig of dynamicRigs){rig.root.visible=true;variants.add(rig.root)}
+            try{
+              await Promise.race([warmPrograms(variants,budget),skipped,interrupted])
+              if(!budget.signal.aborted){
+                // Real draw pass: compile() only builds the shader sources; the first actual draw of
+                // each new program still built its GPU pipeline lazily and stalled the mount frame.
+                // The rig sits at the world origin while the camera looks elsewhere, so disable
+                // frustum culling on every child or the render draws nothing and pipelines stay cold.
+                const warmScene=new THREE.Scene()
+                variants.traverse(obj=>{obj.frustumCulled=false})
+                warmScene.add(variants)
+                renderer.render(warmScene,camera)
+                warmScene.remove(variants)
+                // Give the reflection queue time to observe the programs the draw created and to
+                // complete their uniform/attribute reflection before the cover lifts.
+                await Promise.race([warmPrograms(variants,budget),skipped,interrupted])
+              }
+            }
+            finally{
+              for(const rig of dynamicRigs){variants.remove(rig.root);rig.root.visible=false}
+              parked.dispose();mapped.dispose()
+            }
           }
           signal.throwIfAborted()
           await Promise.race([warmPrograms(scene,budget),skipped,interrupted]);signal.throwIfAborted()

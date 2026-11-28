@@ -2426,6 +2426,14 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
       }
       crashSession=null;prevTwoWheelSpeed=0
       bicyclePedalPhase=0;bicycleFootWeight=1
+      // IDOK-449: publish the riding state in the same turn as the mount. The per-frame tick only
+      // fills `ebikeState` on the *next* frame, and that frame can be blocked for seconds by
+      // first-mount shader compilation, so `walk.vehicle` already reported 'bike' while
+      // `walk.ebike.state` was still null.
+      if(rides.rideKind==='bike'){
+        ebikeState=ebikeFx.step(0,{speed:0,heading:rides.heading,lean:0,steerInput:0,braking:false,obstacle:'',allowAutoCrash:false},ZERO_RIDE_INPUT)
+        input.syncRideHud(ebikeState,'bike')
+      }
       rides.setAutoCrash(autoCrashOverride??(!verify||stuntMode))
       sim.controller.enableAutostep(bikeConfig.step,cfg.stepWidth,false)
       sim.controller.setMaxSlopeClimbAngle(bikeConfig.maxSlope)

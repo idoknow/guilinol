@@ -7,6 +7,9 @@ import {preview} from 'vite'
 import {applyCpuThrottle, browserOptions} from './qa-browser.mjs'
 
 const ROOT = resolve(import.meta.dirname, '..')
+// GLOL_CPU_THROTTLE slows the whole page, including world loading and reloads, by that factor. Only
+// loading budgets scale with it; every gameplay/latency assertion stays absolute.
+const throttle = Math.max(1, Number(process.env.GLOL_CPU_THROTTLE ?? 1) || 1)
 const baselinePath = resolve(import.meta.dirname, 'mission-layout-main.json')
 const mainDist = process.env.RECORD_MAIN_LAYOUT_DIST
 const baseline = mainDist ? {
@@ -103,12 +106,35 @@ function inspectHudLayoutScript() {
 }
 
 async function measureVehicles(page, viewport, mission) {
+  // The fourth field lists the prompt wordings a fixture may legitimately show. A shared e-bike in
+  // solo mode announces its ¥2 unlock fee and switches to a "continue riding" wording once already
+  // unlocked (IDOK-421), so a single historical string is no longer accurate.
   const fixtures = [
-    ['foot', -588, -212, ''], ['bike', -539, -95, '骑电动车'],
-    ['bicycle', 585, 1384, '骑单车'], ['car', -572, -92, '开车'],
-    ['boat', -1340, 326, '划小船'],
+    ['foot', -588, -212, []], ['bike', -539, -95, ['解锁共享电动车（¥2）', '继续骑共享电车', '骑电动车']],
+    ['bicycle', 585, 1384, ['骑单车']], ['car', -572, -92, ['开车']],
+    ['boat', -1340, 326, ['划小船']],
   ]
-  for (const [kind, east, south, label] of fixtures) {
+  // Each fixture measures one travel mode's HUD, so every iteration must start and end on foot.
+  // Relying on the previous fixture's vehicle to be gone made this order-dependent: pressing [F] while
+  // still mounted dismounts instead of mounting, and the next fixture then waited forever.
+  const ensureFoot = async () => {
+    for (let attempt = 0; attempt < 20; attempt++) {
+      const onFoot = await page.evaluate(() => {
+        if (window.viewer.walk.vehicle === 'foot') return true
+        window.viewer.walk.shop.triggerInteract()
+        return false
+      })
+      if (onFoot) return
+      try {
+        await page.waitForFunction(() => window.viewer.walk.vehicle === 'foot', null, {timeout: 2000})
+        return
+      } catch {}
+    }
+    throw Error(`${mission}: could not return to foot between vehicle fixtures`)
+  }
+
+  for (const [kind, east, south, labels] of fixtures) {
+    await ensureFoot()
     const landed = await page.evaluate(async ([kind, east, south]) => {
       const {walk, walkTo} = window.viewer
       if (kind !== 'foot' && kind !== 'boat') {
@@ -120,9 +146,12 @@ async function measureVehicles(page, viewport, mission) {
       return walkTo(east,south,0,'layout-fixture')
     }, [kind,east,south])
     assert(landed, `no ${kind} fixture`)
-    if (label) {
+    if (labels.length) {
       await page.evaluate(() => document.querySelector('.spot-card.show .card-close')?.click())
-      await page.waitForFunction(label => document.querySelector('.vehicle-action:not([hidden])')?.textContent.includes(label), label)
+      await page.waitForFunction(labels => {
+        const el = document.querySelector('.vehicle-action:not([hidden])')
+        return labels.some(label => el?.textContent?.includes(label))
+      }, labels)
       await page.keyboard.press('f')
     }
     await page.waitForFunction(kind => window.viewer.walk.vehicle===kind, kind)
@@ -135,7 +164,7 @@ async function measureVehicles(page, viewport, mission) {
 
 async function waitForWalkReady(page) {
   let lastProgress, lastChange = performance.now()
-  const deadline = lastChange + 240000
+  const deadline = lastChange + 240000 * throttle
   while (performance.now() < deadline) {
     const state = await page.evaluate(() => {
       const viewer = window.viewer
@@ -145,15 +174,17 @@ async function waitForWalkReady(page) {
     if (state.walking && state.game && state.tour && state.loaded >= 6) return
     const progress = JSON.stringify(state)
     if (progress !== lastProgress) {lastChange = performance.now(); lastProgress = progress}
-    if (performance.now() - lastChange > 90000) break
+    if (performance.now() - lastChange > 90000 * throttle) break
     await page.waitForTimeout(500)
   }
-  throw Error(`Mission walk startup stalled or exceeded 240s: ${lastProgress}`)
+  throw Error(`Mission walk startup stalled or exceeded ${240 * throttle}s: ${lastProgress}`)
 }
 
 async function verifyViewportLayout(browser, baseUrl, label, viewport, hasTouch) {
   const ctx = await browser.newContext({viewport, hasTouch, isMobile: hasTouch})
   await ctx.route('**/api/t', route => route.fulfill({status:204}))
+  await ctx.route('**/api/helicopter', route => route.fulfill({status: 200, contentType: 'application/json',
+    body: JSON.stringify({code: 'OK', now: Date.now(), state: 'idle', mine: null, ahead: 0, eta: 0, flight: null})}))
   const page = await ctx.newPage()
   await applyCpuThrottle(page)
   const errors = []
@@ -214,6 +245,11 @@ try {
   // -------------------------------------------------------------------------
   const ctx = await browser.newContext({viewport: {width: 1280, height: 720}})
   await ctx.route('**/api/t', route => route.fulfill({status:204}))
+  // `vite preview` serves no Functions, and the helicopter runtime polls its queue every 2.5s in solo
+  // mode. Without a stub every poll logs a 404 and the page-error assertion below fails for a reason
+  // unrelated to gameplay. Same reasoning as the /api/t stub above.
+  await ctx.route('**/api/helicopter', route => route.fulfill({status: 200, contentType: 'application/json',
+    body: JSON.stringify({code: 'OK', now: Date.now(), state: 'idle', mine: null, ahead: 0, eta: 0, flight: null})}))
   const page = await ctx.newPage()
   await applyCpuThrottle(page)
   page.on('pageerror', err => errors.push(`pageerror: ${err.message}`))
@@ -311,7 +347,9 @@ try {
   console.log('PASS errand-01', JSON.stringify({arrivedAtPickup, arrivedAtDelivery, ...afterErrand}))
 
   // 4. Reload persistence check
-  await page.reload()
+  //    The reload budget scales with GLOL_CPU_THROTTLE: at 4x the page boots 4x slower, which is the
+  //    deliberate slowdown this test asks for, not a stall. No gameplay assertion is relaxed.
+  await page.reload({timeout: 30000 * throttle})
   await waitForWalkReady(page)
   const afterReload = await page.evaluate(() => ({
     money: window.viewer.game.getState().money,
@@ -368,10 +406,32 @@ try {
     return list[0]
   })
   assert.ok(parkedBike, 'expected parked shared ebike nearby to test real crash state machine')
-  assert(await page.evaluate(b => window.viewer.walkTo(b[0], b[2], 0, 'e2e-mount-bike'), parkedBike))
-  await page.waitForFunction(() => document.querySelector('.vehicle-action')?.dataset.interactAction === 'mount_vehicle', null, {timeout:8000})
+  // The prompt depends on the walker's proximity scan, which refreshes on its own tick; re-land and
+  // retry instead of racing it once.
+  let mountPromptReady = false
+  for (let attempt = 0; attempt < 3 && !mountPromptReady; attempt++) {
+    assert(await page.evaluate(b => window.viewer.walkTo(b[0], b[2], 0, 'e2e-mount-bike'), parkedBike))
+    try {
+      await page.waitForFunction(() => document.querySelector('.vehicle-action')?.dataset.interactAction === 'mount_vehicle', null, {timeout: 8000})
+      mountPromptReady = true
+    } catch {}
+  }
+  assert.ok(mountPromptReady, 'shared e-bike mount prompt never appeared')
+  const moneyBeforeMount = await page.evaluate(() => window.viewer.game.getState().money)
+  const mountPressedAt = Date.now()
   await page.keyboard.press('KeyF')
   await page.waitForFunction(() => window.viewer.walk.vehicle === 'bike' && window.viewer.walk.ebike.state !== null, null, {timeout: 8000})
+  // IDOK-449: the reported bug looked like "the riding state never arrives". It did arrive, but only
+  // after a multi-second stall, because the first mount frame blocked on shader compilation. Assert the
+  // latency as well: a mount that only just squeezes in under the 8s wait is still the bug.
+  const mountMs = Date.now() - mountPressedAt
+  assert.ok(mountMs < 5000, `shared e-bike mount must become observable well under 5s, took ${mountMs}ms`)
+  console.log('PASS shared-ebike mount', JSON.stringify({mountMs}))
+  // A shared e-bike mount settles the ¥2 unlock fee atomically (IDOK-421). Pin the fee, not a balance,
+  // so a silent fee change still fails here instead of drifting the later totals silently.
+  const sharedUnlockFee = await page.evaluate(() => window.viewer.game.getState().money) - moneyBeforeMount
+  assert.equal(sharedUnlockFee, -2, 'mounting a shared e-bike must charge exactly ¥2')
+  const afterUnlock = moneyBeforeMount + sharedUnlockFee
 
   const crashSoupCheck = await page.evaluate(async () => {
     const runFrames = async n => {
@@ -392,7 +452,7 @@ try {
 
   // Dismount if still nearby or abandon -> deliver noodle-01 cleanly -> buy T1 outfit -> repeat scaling
   await page.evaluate(async () => {
-    // Re-pick noodle-01 fresh and walk step 0 & 1 so we earn full ¥300 (¥380 + ¥300 = ¥680)
+    // Re-pick noodle-01 fresh and walk step 0 & 1 so we earn full ¥300.
     window.viewer.game.missions.abandon()
     window.viewer.game.missions.start('noodle-01')
     const s0 = window.viewer.game.getState().mission.target
@@ -416,9 +476,9 @@ try {
     })
     return {moneyAfterN1, buyRes, equippedTop: window.viewer.game.getState().wardrobe.equipped.top}
   })
-  assert.equal(outfitAndRepeatCheck.moneyAfterN1, 680)
+  assert.equal(outfitAndRepeatCheck.moneyAfterN1, afterUnlock + 300)
   assert.equal(outfitAndRepeatCheck.buyRes.ok, true)
-  assert.equal(outfitAndRepeatCheck.buyRes.balanceAfter, 200)
+  assert.equal(outfitAndRepeatCheck.buyRes.balanceAfter, afterUnlock + 300 - 480)
   assert.equal(outfitAndRepeatCheck.equippedTop, 'top_guilin_hoodie')
 
   // Repeat noodle-01 verifying payout scales down from ¥300 to ¥180 (¥140 + ¥40)
@@ -434,7 +494,7 @@ try {
   })
   await page.waitForFunction(() => window.viewer.game.getState().mission === null, null, {timeout: 15000})
   const afterRepeat = await page.evaluate(() => window.viewer.game.getState().money)
-  assert.equal(afterRepeat, 380, 'repeat full-soup noodle-01 must pay ¥180 (200 -> 380), not ¥300')
+  assert.equal(afterRepeat, (afterUnlock + 300 - 480) + 180, 'repeat full-soup noodle-01 must pay ¥180, not ¥300')
 
   // 7. Quiet zone runtime checks (libin_middle, guilin_middle, plus Spot ¥120 idempotency)
   const quietAndSpotCheck = await page.evaluate(async () => {
@@ -443,6 +503,7 @@ try {
     // Teleport onto a known walkable spot (duxiu) to verify ¥120 spot bounty + reload idempotency
     const duxiu = window.viewer.tour.spots.find(s => s.id === 'duxiu')
     const {game,walk}=window.viewer,events=[]
+    const moneyBeforeSpot = game.getState().money
     const off=game.onEvent(event=>events.push(event))
     const arrived=await window.viewer.walkTo(duxiu.x,duxiu.z,0,'e2e-walk-to-stamp')
     await new Promise(r => setTimeout(r, 300))
@@ -450,18 +511,18 @@ try {
     off()
     const diagnostic={arrived,landing:walk.spawns.at(-1),events,ledger:game.save.getSnapshot().economy.txHistoryRing}
     const secondTry = window.viewer.game.commerce.claimSpotBounty('duxiu')
-    return {libinId: libin?.id, guilinId: guilin?.id, moneyAfterSpot, secondCode: secondTry.code,diagnostic}
+    return {libinId: libin?.id, guilinId: guilin?.id, moneyBeforeSpot, moneyAfterSpot, secondCode: secondTry.code,diagnostic}
   })
   console.log('独秀峰首次打卡',JSON.stringify(quietAndSpotCheck))
   assert.equal(quietAndSpotCheck.libinId, 'libin_middle')
   assert.equal(quietAndSpotCheck.guilinId, 'guilin_middle')
-  assert.equal(quietAndSpotCheck.moneyAfterSpot, 500, '380 + 120 duxiu spot bounty = 500')
+  assert.equal(quietAndSpotCheck.moneyAfterSpot, quietAndSpotCheck.moneyBeforeSpot + 120, 'duxiu spot bounty must pay exactly ¥120')
   assert.equal(quietAndSpotCheck.secondCode, 'ALREADY_CLAIMED')
 
-  await page.reload()
+  await page.reload({timeout: 30000 * throttle})
   await waitForWalkReady(page)
   const moneyPostSpotReload = await page.evaluate(() => window.viewer.game.getState().money)
-  assert.equal(moneyPostSpotReload, 500, 'spot bounty must stay at 500 without re-paying after reload')
+  assert.equal(moneyPostSpotReload, quietAndSpotCheck.moneyAfterSpot, 'spot bounty must not be repaid after reload')
 
   assert.deepEqual(errors, [], `desktop E2E errors: ${errors.join('; ')}`)
   await ctx.close()
