@@ -29,6 +29,10 @@ totalEmissiveRadiance += (vPick > .55 ? uJade : uWarm) * uNight * .09 * (1. - sm
 // Phase 2 湿路面 (shared by street surfaces and landmark paving): rain darkens the ground; at night each
 // lamp pool (22 m grid, \`cell\`/\`f\`) mirrors as a long streak pointing at the camera, half of them tinted
 // by a neon colour. Needs vFogWorld, uRain, uNight, uLamp, uNeon[6] and \`flatG\` (1 on level ground).
+const LAMP_FIELD = `float lampDetail = (1. - smoothstep(18., 65., abs(cameraPosition.y - vFogWorld.y)))
+    * (1. - smoothstep(55., 150., distance(cameraPosition, vFogWorld)));
+  float pool = mix(.184, 1. - smoothstep(.06, .4, length(f)), lampDetail);`
+
 const WET_GLSL = `if (uRain > .01) {
     diffuseColor.rgb *= mix(1., ${look.streets.wetDarken.toFixed(2)}, uRain);
     vec2 vd = normalize(vFogWorld.xz - cameraPosition.xz + 1e-4);
@@ -37,7 +41,7 @@ const WET_GLSL = `if (uRain > .01) {
     float streak = exp(-across * across / .0011) * smoothstep(-.48, -.12, along) * (1. - smoothstep(-.02, .06, along));
     float cellHash = fract(sin(dot(cell, vec2(12.9898, 78.233))) * 43758.5453);
     vec3 tint = cellHash > .5 ? uNeon[int(min(5., floor(fract(cellHash * 9.7) * 6.)))] : uLamp;
-    totalEmissiveRadiance += tint * uRain * uNight * flatG * (streak * 1.2 * near + .01);
+    totalEmissiveRadiance += uRain * uNight * flatG * (tint * streak * 1.2 * near * lampDetail + mix(uLamp, tint, lampDetail) * .01);
   }`
 
 // Street surfaces: pools of sodium light every ~22 m plus a faint wash; lamp heads (the .32×.42 boxes
@@ -54,7 +58,7 @@ uniform float uNight; uniform vec3 uLamp; uniform float uRain; uniform vec3 uNeo
   float station=dot(bridgeDelta,vec2(.96815,.25038));
   if(vSurface<.5 && station>65. && station<71. && abs(dot(bridgeDelta,vec2(-.25038,.96815)))<7.4)
     diffuseColor.rgb=vec3(.37,.095,.075);
-  float pool = 1. - smoothstep(.06, .4, length(f));
+  ${LAMP_FIELD}
   // Only the walking surfaces catch lamp light; embankment faces stay dark.
   vec3 gn = normalize(cross(dFdx(vFogWorld), dFdy(vFogWorld)));
   float flatG = smoothstep(.75, .95, abs(gn.y));
@@ -63,7 +67,7 @@ uniform float uNight; uniform vec3 uLamp; uniform float uRain; uniform vec3 uNeo
   }
 #endif`)
   }
-  surface.customProgramCacheKey = ()=>'guilinol-street-night-3'
+  surface.customProgramCacheKey = ()=>'guilinol-street-night-4'
   furniture.onBeforeCompile = (shader:Shader)=>{
     shareAtmosphere(shader); shader.uniforms.uLamp = {value:c(look.roadLight)}
     shader.vertexShader = shader.vertexShader.replace('#include <common>',`#include <common>
@@ -164,7 +168,7 @@ uniform float uNight; uniform vec3 uLamp; uniform float uRain; uniform vec3 uNeo
 { vec2 cell = floor(vFogWorld.xz / 22.), f = vFogWorld.xz / 22. - cell - .5;
   vec3 gn = normalize(cross(dFdx(vFogWorld), dFdy(vFogWorld)));
   float flatG = smoothstep(.75, .95, abs(gn.y));
-  float pool = 1. - smoothstep(.06, .4, length(f));
+  ${LAMP_FIELD}
   totalEmissiveRadiance += uLamp * uNight * (.045 + .36 * pool) * flatG * (1. - .35 * uRain);
   if (flatG > .5) { ${WET_GLSL} }
   else {
@@ -176,5 +180,5 @@ uniform float uNight; uniform vec3 uLamp; uniform float uRain; uniform vec3 uNeo
   } }
 #endif`)
   }
-  material.customProgramCacheKey = ()=>'guilinol-landmark-night-2'
+  material.customProgramCacheKey = ()=>'guilinol-landmark-night-3'
 }
