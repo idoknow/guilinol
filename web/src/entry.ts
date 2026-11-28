@@ -2,6 +2,7 @@ import {getPlayMode, lastPlayMode, linkedPlayMode, setPlayMode, type PlayMode} f
 import './telemetry'
 import './ui/theme.css'
 import './ui/hud.css'
+registerPrecache()
 // 禁止右键菜单和长按菜单（输入框除外），避免手机长按按钮弹出复制/保存图片
 document.addEventListener('contextmenu',event=>{if(!(event.target as Element|null)?.closest?.('input,textarea,[contenteditable]:not([contenteditable=false])'))event.preventDefault()})
 document.addEventListener('dragstart',event=>{if((event.target as Element|null)?.tagName==='IMG')event.preventDefault()})
@@ -12,6 +13,7 @@ import {isDeepLink} from './deeplink'
 import {cancelRestore} from './lastview'
 import {fullLoader,veil,inlineBusy,type FullLoader,type Veil} from './ui/loading'
 import {watchForUpdates} from './ui/update-check'
+import {registerPrecache} from './precache'
 
 // Page entry. A plain visit lands on the title screen (ui/home.ts) and the 3D city (main.ts, three.js + world data)
 // only boots on 开始游览. Deep links — shares, feedback views, test harnesses — skip the title screen and boot directly.

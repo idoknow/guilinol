@@ -49,6 +49,17 @@ export default defineConfig({
   }, generateBundle(){
     const sha = buildSha()
     this.emitFile({type:'asset',fileName:'version.json',source:JSON.stringify({sha})})
+  }}, {name:'pwa-precache',generateBundle(_options,bundle){
+    // PWA 预缓存：只预缓存构建产物（js/css/html/图标/manifest），world 资源交给 SW 运行时缓存。
+    const sha = buildSha()
+    const keep = /\.(?:js|css|html|webmanifest|png|svg|ico|webp)$/
+    const files = Object.keys(bundle).filter(name => keep.test(name) && !name.startsWith('errors/'))
+      .map(name => '/' + name)
+    files.push('/manifest.webmanifest','/favicon-32.png','/apple-touch-icon.png')
+    const unique = [...new Set(files)]
+    this.emitFile({type:'asset',fileName:'precache-manifest.json',source:JSON.stringify({build:sha,files:unique})})
+    const source = readFileSync(join(root,'web/sw.js'),'utf8').replace('__BUILD__', sha)
+    this.emitFile({type:'asset',fileName:'sw.js',source})
   }}, {name:'error-pages',generateBundle(){
     // IDOK-420: self-contained error pages, copied byte-for-byte (no Vite HTML transform) to dist/errors/.
     // Edit via scripts/build-error-pages.mjs; the CDN copy is pushed from the ops repo.
