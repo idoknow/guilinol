@@ -21,6 +21,8 @@ import {plazaSpawn} from './helicopter/site'
 import {helicopter} from './helicopter/runtime'
 import {isDeepLink} from './deeplink'
 import {readLastView, saveLastView, consumeRestore, applyLastView} from './lastview'
+import {readMpSpot, saveMpSpot} from './mp-spot'
+import {mpEnabled} from './ui/mp-pref'
 import {walkConfig} from './walk/config'
 import {atmo, env, evaluate, setFogMetrics} from './look/time'
 import {prepareMirror, renderMirror, WATER_LAYER} from './look/water'
@@ -450,7 +452,12 @@ async function start(loader:FullLoader,creatorSpawn=false) {
   async function landSolo(initial:boolean) {
     if(walker?.active)return
     const gate = walkConfig.gate
-    const point = initial && !isDeepLink(openParams) ? plazaSpawn : initial && !opening ? gate : {x:camera.position.x,z:camera.position.z,yaw:camera.rotation.y}
+    const fresh = initial && !isDeepLink(openParams)
+    // IDOK-566: 联机模式回到上次站的位置；落不下去再走广场 → 出生门。
+    const resume = fresh && mpEnabled() ? readMpSpot() : null
+    if(resume&&await walkTo(resume.x,resume.z,resume.yaw,'solo-resume'))return
+    titleTransition?.signal.throwIfAborted()
+    const point = fresh ? plazaSpawn : initial && !opening ? gate : {x:camera.position.x,z:camera.position.z,yaw:camera.rotation.y}
     if(await walkTo(point.x,point.z,point.yaw,'solo'))return
     titleTransition?.signal.throwIfAborted()
     if(await walkTo(gate.x,gate.z,gate.yaw,'solo-fallback'))return
@@ -935,6 +942,11 @@ async function start(loader:FullLoader,creatorSpawn=false) {
       if (!force && Date.now() - lastWrite < 15000) return
       lastWrite = Date.now()
       void host.lastView().then(saveLastView).catch(() => {})
+      // IDOK-566: 联机步行时记下脚下位置（室内、直升机、切换中不记，免得下次落进店里或半空）。
+      if (getPlayMode() === 'solo' && mpEnabled() && walker?.active && !switching && !heli.active && !szj.isIndoor() && !xxg.isIndoor()) {
+        const p = walker.position
+        saveMpSpot({x: p.x, z: p.z, yaw: walker.yaw})
+      }
     }
     addEventListener('pagehide', () => write(true))
     document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') write(true) })
