@@ -1,3 +1,4 @@
+import {buildRoadMarkings,type RoadMarkingGraph} from './road-markings.ts'
 import {fitCurbReturns,type CurbReturn} from './curb-returns'
 import {platformShift, type PlatformGrade} from './platform-grade'
 import {panelCut} from './crossing-panels'
@@ -58,7 +59,7 @@ function lowerHeight(x:number,z:number,base:number,terrain:number,[,corners,prof
 }
 
 const ROAD_LIFT=.03
-export function streetGeometry([paths,lamps,banks,signals=[],stops=[],roadCtrl,stoneRails=[],beds=[],shops=[],decor=[],curbCuts=[],lower,platform,,stationRoads,stationCuts,shoulderPlanes,layeredRoads,panels]:Streets,ground:(x:number,z:number)=>number,rails:RailSection[]=[],signs:CrossingSign[]=[],railGround:(x:number,z:number)=>number=ground,paving?:StationPavingStyle,roadbeds=new Set<number>(),origin?:readonly [number,number], inspectSlope?:(a:THREE.Vector3,b:THREE.Vector3,c:THREE.Vector3)=>void){
+export function streetGeometry([paths,lamps,banks,signals=[],stops=[],roadCtrl,stoneRails=[],beds=[],shops=[],decor=[],curbCuts=[],lower,platform,,stationRoads,stationCuts,shoulderPlanes,layeredRoads,panels]:Streets,ground:(x:number,z:number)=>number,rails:RailSection[]=[],signs:CrossingSign[]=[],railGround:(x:number,z:number)=>number=ground,paving?:StationPavingStyle,roadbeds=new Set<number>(),origin?:readonly [number,number], inspectSlope?:(a:THREE.Vector3,b:THREE.Vector3,c:THREE.Vector3)=>void, roadGraph?:RoadMarkingGraph|null){
   const xyz:number[]=[],rgb:number[]=[],sidewalk:number[]=[],road:number[]=[],mats:number[]=[],cols:number[]=[]
   const stationLevel=stationRoads?stationRoadSurface(stationRoads):null
   const retained=paving?.retainedCuts && stationPaving(paving.retainedCuts, undefined, true)
@@ -108,6 +109,7 @@ export function streetGeometry([paths,lamps,banks,signals=[],stops=[],roadCtrl,s
     return new THREE.Vector3(pt.x,(lower&&lowerPath?lowerHeight(pt.x,pt.y,base,ground(pt.x,pt.y),lower):base)+offset,pt.y)
   }
   const surfaceKinds:number[]=[],alongVals:number[]=[]
+  const roadTriOffsets:number[]=[],cycleTriOffsets:number[]=[],obstacleTriOffsets:number[]=[]
   const fenceXyz:number[]=[],fenceRgb:number[]=[],fenceAlong:number[]=[]
   function triangle(first:THREE.Vector3,second:THREE.Vector3,third:THREE.Vector3,kind:number,u1=0,u2=0,u3=0,vertical=false){
     if(kind===1 && paving?.platformGrades) {
@@ -225,6 +227,7 @@ export function streetGeometry([paths,lamps,banks,signals=[],stops=[],roadCtrl,s
       const dux=p2.x-p1.x,duz=p2.z-p1.z,dvx=p3.x-p1.x,dvz=p3.z-p1.z
       const det=dux*dvz-duz*dvx
       for(const poly of cutPanels(src))for(let j=2;j<poly.length;j++){
+        if(!vertical&&(kind===0||kind===5))(kind===5?cycleTriOffsets:roadTriOffsets).push(xyz.length)
         for(const [x,y,z] of [poly[0],poly[j-1],poly[j]]){
           xyz.push(x,y,z);rgb.push(c.r,c.g,c.b);surfaceKinds.push(textureChannel)
           alongVals.push(a1+((x-p1.x)*dvz-(z-p1.z)*dvx)/det*(a2-a1)+
@@ -233,6 +236,8 @@ export function streetGeometry([paths,lamps,banks,signals=[],stops=[],roadCtrl,s
       }
       return
     }
+    if(!vertical&&(kind===0||kind===5))(kind===5?cycleTriOffsets:roadTriOffsets).push(xyz.length)
+    else if(!vertical&&(kind===1||kind===4||kind===6))obstacleTriOffsets.push(xyz.length)
     surfaceKinds.push(textureChannel,textureChannel,textureChannel)
     if(platformTop)alongVals.push(edgeDistance(p1),edgeDistance(p2),edgeDistance(p3))
     else alongVals.push(a1,a2,a3)
@@ -242,11 +247,14 @@ export function streetGeometry([paths,lamps,banks,signals=[],stops=[],roadCtrl,s
   const repaired=repairStreetPaths(paths)
   const activePaths=repaired.paths
   const skipCurbEdges=repaired.skipCurbEdges
+  const legacyKind2=activePaths.filter(([k])=>k===2)
+  const hasHostRoad=activePaths.some(([k])=>k===0||k===5)
   for(const [index,[kind,...rings]] of activePaths.entries()){
     platformPath=!!platform && index>=platform[0] && index<platform[1]
     lowerPath=!!lower && index>=lower[0] && index<paths.length
     const loops=rings.map(ring=>ring.map(([x,z])=>new THREE.Vector2(x/100,z/100)))
     if(kind===2&&checkShizijie&&origin&&rings[0]?.length>=4&&isShizijieCrosswalkRing(loops[0].map(v=>[v.x,v.y] as const),origin[0],origin[1]))continue
+    if(kind===2&&hasHostRoad)continue
     const tris=THREE.ShapeUtils.triangulateShape(loops[0],loops.slice(1)),points=loops.flat()
     const protectedDeck=roadbeds.has(-index-1)
     const lifted=roadbeds.has(index)||protectedDeck
@@ -397,7 +405,7 @@ export function streetGeometry([paths,lamps,banks,signals=[],stops=[],roadCtrl,s
         object.position.set(px,baseLevel(px,pz)+.195,pz);object.rotation.y=angle+.75;object.scale.setScalar(1);object.updateMatrix();parked.push(...object.matrix.elements)
       }
     }else if(kind===10){
-      box(x,baseLevel(x,z)+.075,z,span/10,.012,.1,angle,parkingYellow)
+      if(!hasHostRoad)box(x,baseLevel(x,z)+.075,z,span/10,.012,.1,angle,parkingYellow)
     }else if(kind===11){
       for(let band=0;band<5;band++)box(x,y+.09+band*.18,z,.21,.18,.21,angle,band%2?iron:parkingYellow)
     }else if(kind===9){
@@ -601,6 +609,14 @@ export function streetGeometry([paths,lamps,banks,signals=[],stops=[],roadCtrl,s
     }
   }
   if(paving?.curbReturns)fitCurbReturns(paving.curbReturns,xyz,rgb,surfaceKinds,alongVals,road,sidewalk,k=>colors[k].toArray(),retained)
+  if(roadTriOffsets.length||cycleTriOffsets.length){
+    const markOrigin=origin??([0,0] as const)
+    buildRoadMarkings({
+      origin:markOrigin,xyz,rgb,surfaceKinds,alongVals,roadTriOffsets,cycleTriOffsets,obstacleTriOffsets,legacyKind2,decor,roadGraph,
+      shizijieCheck:checkShizijie,
+      shouldSuppressCrosswalk:checkShizijie&&origin?ring=>isShizijieCrosswalkRing(ring,origin[0],origin[1]):undefined,
+    })
+  }
   const positions=new Float32Array(xyz)
   const surface=new THREE.BufferGeometry()
   surface.setAttribute('position',new THREE.BufferAttribute(positions,3))
@@ -623,10 +639,10 @@ export function streetGeometry([paths,lamps,banks,signals=[],stops=[],roadCtrl,s
 }
 
 export type StreetData=ReturnType<typeof streetGeometry>
-export interface StreetRequest {id:number; paths:Streets; paving?:StationPavingStyle; roadbeds?:number[]; rails?:RailSection[]; signs?:CrossingSign[]; railCuts?:[number,number][]; step:number; elevations:Float32Array; origin?:readonly [number,number]}
+export interface StreetRequest {id:number; paths:Streets; paving?:StationPavingStyle; roadbeds?:number[]; rails?:RailSection[]; signs?:CrossingSign[]; railCuts?:[number,number][]; step:number; elevations:Float32Array; origin?:readonly [number,number]; roadGraph?:RoadMarkingGraph|null}
 export type StreetResponse={id:number; data:StreetData}|{id:number; error:string}
 
-if(typeof self!=='undefined')self.onmessage=({data:{id,paths,step,elevations,paving,rails=[],signs=[],railCuts=[],roadbeds=[],origin}}:MessageEvent<StreetRequest>)=>{
+if(typeof self!=='undefined')self.onmessage=({data:{id,paths,step,elevations,paving,rails=[],signs=[],railCuts=[],roadbeds=[],origin,roadGraph}}:MessageEvent<StreetRequest>)=>{
   try {
     const segments=256/step, stride=segments+1
     const sample=(grid:Float32Array)=>(x:number,z:number)=>{
@@ -636,7 +652,7 @@ if(typeof self!=='undefined')self.onmessage=({data:{id,paths,step,elevations,pav
     }
     const cut=railCuts.length?elevations.slice():elevations
     for(const [i,cm] of railCuts)cut[i]=cm/100
-    const data=streetGeometry(paths,sample(elevations),rails,signs,sample(cut),paving,new Set(roadbeds),origin)
+    const data=streetGeometry(paths,sample(elevations),rails,signs,sample(cut),paving,new Set(roadbeds),origin,undefined,roadGraph)
     const transfer=Object.values(data).flatMap(value=>typeof value==='number'?[]:[value.buffer])
     self.postMessage({id,data} satisfies StreetResponse,{transfer})
   } catch(error) {
