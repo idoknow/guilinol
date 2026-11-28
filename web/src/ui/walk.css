@@ -150,6 +150,9 @@ body[data-photo="on"] .ride-hud{display:none!important}
 body[data-ride="bicycle"] :is(.ride-mod,.ride-bat,.ride-park,.ride-light,.ride-turn-left,.ride-turn-right,.ride-hazard,.ride-cruise){display:none}
 body[data-ride="car"] :is(.ride-sound,.ride-mod,.ride-park,.ride-turn-left,.ride-turn-right,.ride-hazard,.ride-horn,.ride-cruise,.ride-lean-bar){display:none}
 body[data-ride-type="shared"] .ride-mod{display:none}
+body[data-ride-type="shared"] .ride-gears{display:none}
+body[data-aboard][data-ride="bike"][data-ride-type="shared"] .walk-ui :is(.btn-gear-up,.btn-gear-down){display:none}
+body[data-ride-type="shared"] .ride-light[data-locked="1"]{opacity:.58;cursor:not-allowed}
 body[data-ride-type="shared"] .btn-wheelie[data-locked="1"]{opacity:.48}
 .vehicle-action[data-ebike-tier="shared"]{border-color:rgba(168,194,204,.85)}
 .vehicle-action[data-interact="shop"]{border-color:rgba(255,197,61,.88);background:rgba(14,17,21,.82);color:#fff6dc}

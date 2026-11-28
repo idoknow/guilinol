@@ -26,11 +26,13 @@ export type InteractionActionKind =
   | 'open_shop'
   | 'open_service'
   | 'mount_vehicle'
+  | 'damaged_vehicle'
   | 'board_boat'
 
 export interface VehicleCandidateSnapshot {
   kind: 'car' | 'bike' | 'bicycle'
   downed: boolean
+  damaged?: boolean
   distance: number
   ownership?: 'shared' | 'personal' | 'test_ride'
   ebikeTier?: 'shared' | 'normal'
@@ -84,6 +86,7 @@ export interface InteractionContext {
   nearTrafficViolator?: {label: string; violation: string; fineYuan: number; action?: 'handover_ticket' | 'talk_officer' | 'whistle_cite'} | null
   nearDutyOfficer?: TrafficDutyOfficerSnapshot | null
   nearVehicle: VehicleCandidateSnapshot | null
+  nearDamagedVehicle?: VehicleCandidateSnapshot | null
   nearBoat: BoatCandidateSnapshot | null
 }
 
@@ -142,7 +145,7 @@ export function resolveInteraction(ctx: InteractionContext): InteractionDecision
   }
 
   // Priority 3: On foot near downed two-wheeler -> pickup first so shop entrance never soft-locks
-  if (ctx.nearDownedVehicle) {
+  if (ctx.nearDownedVehicle && !ctx.nearDownedVehicle.damaged) {
     return {
       priority: 3,
       action: 'pickup_downed',
@@ -215,8 +218,8 @@ export function resolveInteraction(ctx: InteractionContext): InteractionDecision
     }
   }
 
-  // Priority 5: On foot near mountable vehicle
-  if (ctx.nearVehicle) {
+  // Priority 5: On foot near mountable vehicle (healthy vehicle always takes precedence over damaged)
+  if (ctx.nearVehicle && !ctx.nearVehicle.damaged) {
     const v = ctx.nearVehicle
     // In Solo economy mode, rentable shared e-bikes clearly display the ¥2 unlock fee;
     // Tour mode (no wallet) and personal/bicycle/car keep their original concise prompts.
@@ -252,6 +255,19 @@ export function resolveInteraction(ctx: InteractionContext): InteractionDecision
     }
   }
 
+  // Fallback notice when standing beside a damaged shared e-bike with no usable vehicle/boat in reach
+  const damagedTarget = ctx.nearDamagedVehicle ?? (ctx.nearVehicle?.damaged ? ctx.nearVehicle : ctx.nearDownedVehicle?.damaged ? ctx.nearDownedVehicle : null)
+  if (damagedTarget) {
+    return {
+      priority: 6,
+      action: 'damaged_vehicle',
+      label: '已损坏 · 无法骑行',
+      disabled: false,
+      ebikeTier: 'shared',
+      ownership: 'shared',
+    }
+  }
+
   return {priority: 7, action: 'none', label: '', disabled: true}
 }
 
@@ -265,6 +281,7 @@ export interface InteractArbiterCallbacks {
   onTalkOfficer?: () => void
   onWhistleCite?: () => void
   onVehicleOrBoatInteract: () => void
+  onDamagedVehicleInteract?: () => void
   onSoftHint?: (text: string) => void
   onDecisionChange?: (decision: InteractionDecision) => void
 }
@@ -347,6 +364,10 @@ export function createInteractArbiter(callbacks: InteractArbiterCallbacks): Inte
     }
     if (decision.action === 'whistle_cite') {
       callbacks.onWhistleCite?.()
+      return decision
+    }
+    if (decision.action === 'damaged_vehicle') {
+      callbacks.onDamagedVehicleInteract?.()
       return decision
     }
     callbacks.onVehicleOrBoatInteract()

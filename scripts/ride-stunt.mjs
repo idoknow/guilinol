@@ -352,7 +352,7 @@ try {
     assert.equal(sharedMount.typeText, '共享')
     assert.equal(sharedMount.modDisplay, 'none')
     assert.equal(sharedMount.eb.modPreset, 'stock', 'shared bike must reject G mod change')
-    assert(sharedMount.eb.maxKmh <= 18, 'shared bike must mount at <= 18 km/h')
+    assert(sharedMount.eb.maxKmh <= 25, 'shared bike must mount at <= 25 km/h')
     await unlockAndShift(page, 4)
     const sharedPeak = await page.evaluate(() => {
       const {walk} = window.viewer
@@ -377,8 +377,8 @@ try {
       for (let i = 0; i < 30; i++) walk.tick(1 / 60)
       return {peak, peakWheelie, maxKmh: walk.probe().ebike.maxKmh}
     })
-    assert.equal(sharedPeak.maxKmh, 18)
-    assert(sharedPeak.peak >= 14 && sharedPeak.peak <= 18.2, `shared peak unexpected: ${JSON.stringify(sharedPeak)}`)
+    assert.equal(sharedPeak.maxKmh, 25)
+    assert(sharedPeak.peak >= 20 && sharedPeak.peak <= 25.2, `shared peak unexpected: ${JSON.stringify(sharedPeak)}`)
     assert.equal(sharedPeak.peakWheelie, 0, `shared bike must prohibit wheelies: ${JSON.stringify(sharedPeak)}`)
     metrics.sharedPeakKmh = +sharedPeak.peak.toFixed(1)
     await interactF(page, '下车')

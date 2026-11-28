@@ -21,6 +21,7 @@ export interface SharedEbikeUnlockRequest {
   soloEnabled: boolean
   alreadyUnlocked: boolean
   feeYuan?: number
+  damaged?: boolean
 }
 
 export type SharedEbikeUnlockCode =
@@ -30,6 +31,7 @@ export type SharedEbikeUnlockCode =
   | 'TOUR_FREE_FALLBACK'
   | 'IN_PROGRESS'
   | 'BLOCKED'
+  | 'DAMAGED'
 
 export interface SharedEbikeUnlockDecision {
   ok: boolean
@@ -101,6 +103,19 @@ export function requestSharedEbikeUnlock(
 ): SharedEbikeUnlockDecision {
   const feeYuan = Math.max(0, Math.round(req.feeYuan ?? SHARED_EBIKE_V1_DEFAULT_FEE_YUAN))
 
+  // Hard lockout before any custom hook or tour-mode fallback: a damaged shared e-bike can never be unlocked again.
+  if (req.damaged) {
+    return {
+      ok: false,
+      code: 'DAMAGED',
+      charged: 0,
+      balanceAfter: null,
+      feeYuan: 0,
+      message: '该共享电动车已摔坏，无法再次解锁骑行',
+      phase: 'blocked',
+    }
+  }
+
   if (customHooks.beforeUnlock) {
     const hooked = customHooks.beforeUnlock(req)
     if (hooked) return hooked
@@ -150,7 +165,7 @@ export function requestSharedEbikeUnlock(
     charged: res.charged,
     balanceAfter: res.balanceAfter,
     feeYuan: res.feeYuan,
-    message: res.charged > 0 ? `已扣 ¥${res.charged} 解锁共享电动车（限速 18 km/h · 禁翘头）` : '',
+    message: res.charged > 0 ? `已扣 ¥${res.charged} 解锁共享电动车（限速 25 km/h · 单档 · 禁翘头）` : '',
     phase: 'active',
   }
 }

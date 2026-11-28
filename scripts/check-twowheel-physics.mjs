@@ -175,7 +175,7 @@ try {
   eb.setUpgrades({motorLevel: 3, controllerLevel: 3})
   eb.setGear(4)
   for (let i = 0; i < 120; i++) eb.steer(1, 0, 0.05, true, {wheelie: 1})
-  check('shared bike capped at 18 km/h, disables wheelie & rejects mods', +(eb.speed * 3.6).toFixed(1) <= 18.2 && eb.wheelie === 0 && !eb.telemetry().upgraded, `${(eb.speed * 3.6).toFixed(1)} km/h wheelie=${eb.wheelie}`)
+  check('shared bike capped at 25 km/h, single gear, disables wheelie & rejects mods', +(eb.speed * 3.6).toFixed(1) <= 25.2 && eb.gear === 1 && eb.gearCount === 1 && eb.wheelie === 0 && !eb.telemetry().upgraded, `${(eb.speed * 3.6).toFixed(1)} km/h wheelie=${eb.wheelie}`)
 
   const ped = createBikeControl()
   ped.mount(0, 0, 'bicycle', {autoCrash: true})

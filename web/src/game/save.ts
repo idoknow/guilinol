@@ -75,10 +75,18 @@ export interface MissionHistoryEntry {
   lastAt: number
 }
 
+export interface SharedEbikeCompSaveState {
+  lastAt: number
+  dayKey: string
+  dayCount: number
+}
+
 export interface SaveEconomyBlock {
   helicopterTours: number
   claimedSpotBounties: string[]
   claimedMissionFirstClear: string[]
+  claimedSharedEbikeComp: string[]
+  sharedEbikeCompState: SharedEbikeCompSaveState
   completedMissionCounts: Record<string, number>
   missionHistory: Record<string, MissionHistoryEntry>
   txHistoryRing: LedgerTxRecord[]
@@ -318,6 +326,8 @@ export function createDefaultSave(nowMs = Date.now()): LocalSaveV1 {
       helicopterTours: 0,
       claimedSpotBounties: [],
       claimedMissionFirstClear: [],
+      claimedSharedEbikeComp: [],
+      sharedEbikeCompState: {lastAt: 0, dayKey: '', dayCount: 0},
       completedMissionCounts: {},
       missionHistory: {},
       txHistoryRing: [],
@@ -363,6 +373,12 @@ export function cloneSave(save: LocalSaveV1): LocalSaveV1 {
       helicopterTours: save.economy.helicopterTours,
       claimedSpotBounties: [...save.economy.claimedSpotBounties],
       claimedMissionFirstClear: [...save.economy.claimedMissionFirstClear],
+      claimedSharedEbikeComp: [...(save.economy.claimedSharedEbikeComp ?? [])],
+      sharedEbikeCompState: {
+        lastAt: save.economy.sharedEbikeCompState?.lastAt ?? 0,
+        dayKey: save.economy.sharedEbikeCompState?.dayKey ?? '',
+        dayCount: save.economy.sharedEbikeCompState?.dayCount ?? 0,
+      },
       completedMissionCounts: {...save.economy.completedMissionCounts},
       missionHistory,
       txHistoryRing: save.economy.txHistoryRing.map(tx => ({...tx})),
@@ -449,6 +465,23 @@ export function sanitizeSave(raw: unknown, nowMs = Date.now()): {save: LocalSave
     ...(Array.isArray(rawEco?.firstClearClaimed) ? rawEco!.firstClearClaimed : []),
     ...(Array.isArray(raw.firstClearClaimed) ? raw.firstClearClaimed : []),
   ])
+  const claimedSharedEbikeComp = uniqueStrings([
+    ...(Array.isArray(rawEco?.claimedSharedEbikeComp) ? rawEco!.claimedSharedEbikeComp : []),
+  ]).slice(-512)
+  const rawCompState = rawEco && isPlainObject(rawEco.sharedEbikeCompState) ? rawEco.sharedEbikeCompState : null
+  const sharedEbikeCompState: SharedEbikeCompSaveState = {
+    lastAt:
+      rawCompState && typeof rawCompState.lastAt === 'number' && Number.isFinite(rawCompState.lastAt) && rawCompState.lastAt > 0
+        ? Math.trunc(rawCompState.lastAt)
+        : 0,
+    dayKey: rawCompState && typeof rawCompState.dayKey === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(rawCompState.dayKey)
+      ? rawCompState.dayKey
+      : '',
+    dayCount:
+      rawCompState && typeof rawCompState.dayCount === 'number' && Number.isFinite(rawCompState.dayCount) && rawCompState.dayCount > 0
+        ? Math.min(99, Math.trunc(rawCompState.dayCount))
+        : 0,
+  }
 
   const completedMissionCounts: Record<string, number> = {}
   const missionHistory: Record<string, MissionHistoryEntry> = {}
@@ -503,6 +536,8 @@ export function sanitizeSave(raw: unknown, nowMs = Date.now()): {save: LocalSave
       helicopterTours: typeof rawEco?.helicopterTours === 'number' && Number.isSafeInteger(rawEco.helicopterTours) ? Math.max(0, rawEco.helicopterTours) : 0,
       claimedSpotBounties,
       claimedMissionFirstClear,
+      claimedSharedEbikeComp,
+      sharedEbikeCompState,
       completedMissionCounts,
       missionHistory,
       txHistoryRing: sanitizeTxRing(rawEco?.txHistoryRing),
@@ -788,6 +823,21 @@ export function mergeCloudAndLocalSave(localRaw: LocalSaveV1, cloudRaw: LocalSav
   const ownedPresetIds = uniqueStrings([...cloud.wardrobe.ownedPresetIds, ...local.wardrobe.ownedPresetIds])
   const claimedSpotBounties = uniqueStrings([...cloud.economy.claimedSpotBounties, ...local.economy.claimedSpotBounties])
   const claimedMissionFirstClear = uniqueStrings([...cloud.economy.claimedMissionFirstClear, ...local.economy.claimedMissionFirstClear])
+  const claimedSharedEbikeComp = uniqueStrings([...cloud.economy.claimedSharedEbikeComp, ...local.economy.claimedSharedEbikeComp]).slice(-512)
+  const cComp = cloud.economy.sharedEbikeCompState
+  const lComp = local.economy.sharedEbikeCompState
+  const mergedCompDayKey = cComp.dayKey >= lComp.dayKey ? cComp.dayKey : lComp.dayKey
+  const mergedCompDayCount =
+    cComp.dayKey === lComp.dayKey
+      ? Math.max(cComp.dayCount, lComp.dayCount)
+      : mergedCompDayKey === cComp.dayKey
+        ? cComp.dayCount
+        : lComp.dayCount
+  const sharedEbikeCompState: SharedEbikeCompSaveState = {
+    lastAt: Math.max(cComp.lastAt, lComp.lastAt),
+    dayKey: mergedCompDayKey,
+    dayCount: mergedCompDayCount,
+  }
 
   const completedMissionCounts: Record<string, number> = {...cloud.economy.completedMissionCounts}
   const missionHistory: Record<string, MissionHistoryEntry> = {}
@@ -868,6 +918,8 @@ export function mergeCloudAndLocalSave(localRaw: LocalSaveV1, cloudRaw: LocalSav
       helicopterTours: Math.max(local.economy.helicopterTours, cloud.economy.helicopterTours),
       claimedSpotBounties,
       claimedMissionFirstClear,
+      claimedSharedEbikeComp,
+      sharedEbikeCompState,
       completedMissionCounts,
       missionHistory,
       txHistoryRing,

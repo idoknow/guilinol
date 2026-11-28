@@ -51,7 +51,7 @@ before(async () => {
   const resolveWorkspaceExternals = {
     name: 'resolve-workspace-externals',
     setup(buildCtx) {
-      buildCtx.onResolve({filter: /^three$/}, () => ({path: threeEntryUrl, external: true}))
+      buildCtx.onResolve({filter: /^three(\/.*)?$/}, args => ({path: import.meta.resolve(args.path), external: true}))
       buildCtx.onResolve({filter: /^@dimforge\/rapier3d-compat$/}, () => ({path: rapierEntryUrl, external: true}))
     },
   }

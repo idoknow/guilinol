@@ -1,0 +1,129 @@
+/* IDOK-545 共享电车「理赔回执」：转弯摔车后商家赔偿到账（compensation-banner.ts 驱动 data-comp-state / is-*）。
+   山水印体系：不透明墨青纸 + 发丝外描边 + 5px 内衬印框；左朱砂白文印「赔」，中原文 + 钱包余额，右金色到账大字。
+   不开 backdrop-filter（IDOK-297 活画布红线）；pointer-events:none，不拦点击、不挡触摸起身。
+   层级 28：盖在 .knockdown-hud(25) 之上、.toast(30) 之下。
+   位置：桌面落在钱包牌（.gl-mission-entry 底边 ~46px）之下；手机竖屏避开顶部菜单 / 钱包牌，离底部倒地条还有大段余量；
+   手机横屏收成紧凑一行（≤64px），不碰底部倒地条。 */
+.comp-banner{
+  --comp-gold:#f2c76a;
+  --comp-gold-glow:rgba(196,154,74,.3);
+  --comp-stroke:rgba(8,14,13,.92);
+  position:fixed;left:0;right:0;top:calc(60px + env(safe-area-inset-top));z-index:28;
+  box-sizing:border-box;width:min(460px,calc(100vw - 32px));margin:0 auto;
+  display:grid;grid-template-columns:44px minmax(0,1fr) auto;align-items:center;column-gap:14px;
+  padding:14px 20px 14px 14px;
+  color:var(--ui-text);background:var(--ui-surface);
+  border:1px solid var(--ui-line-strong);border-radius:var(--ui-r-lg);
+  outline:1px solid var(--ui-frame-line);outline-offset:calc(-1px - var(--ui-frame));
+  box-shadow:var(--ui-shadow-2);
+  font-family:var(--ui-serif);
+  pointer-events:none;user-select:none;-webkit-user-select:none;
+}
+.comp-banner[hidden]{display:none}
+
+/* 左：朱砂白文印「赔」（内一道宣纸细印框），落定后斜 -4° */
+.comp-seal{position:relative;display:grid;place-items:center;box-sizing:border-box;width:44px;height:44px;
+  border-radius:var(--ui-r-xs);background:var(--ui-seal);color:var(--ui-paper);
+  box-shadow:inset 0 0 0 3px var(--ui-seal),inset 0 0 0 4px rgba(244,239,226,.78);
+  font:700 26px/1 var(--ui-serif);letter-spacing:0;
+  opacity:0;transform:rotate(-4deg);transform-origin:50% 56%}
+/* 落印时朱砂边向外晕开一圈 */
+.comp-seal::after{content:"";position:absolute;inset:-6px;border:1.5px solid var(--ui-seal-light);border-radius:3px;opacity:0;pointer-events:none}
+
+/* 中：原文 + 钱包余额 */
+.comp-text{display:grid;gap:4px;min-width:0}
+.comp-copy{margin:0;font:600 var(--ui-fs-md)/1.4 var(--ui-serif);letter-spacing:.04em;color:var(--ui-text);text-wrap:balance;overflow-wrap:anywhere}
+.comp-balance{margin:0;font:500 13px/1.2 var(--ui-num);font-variant-numeric:tabular-nums;letter-spacing:.06em;color:var(--ui-text-2)}
+.comp-sr{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
+
+/* 右：金色到账大字。::after 是同字同位的「定稿」层——平时透明只占住最终宽度（滚数时不挤动左边文字），
+   定格时作金光的载体（background-clip:text，光只走在字形里）。 */
+.comp-amount{position:relative;display:inline-grid;justify-items:end;align-items:center;
+  font:700 56px/1 var(--ui-num);font-variant-numeric:tabular-nums;letter-spacing:-.01em;white-space:nowrap;
+  color:var(--comp-gold);-webkit-text-stroke:2px var(--comp-stroke);paint-order:stroke fill;
+  text-shadow:0 2px 0 rgba(8,14,13,.6),0 0 16px var(--comp-gold-glow);
+  transform-origin:72% 58%}
+.comp-amount>.comp-amount-roll,.comp-amount::after{grid-area:1/1}
+.comp-amount::after{content:attr(data-final);color:transparent;-webkit-text-stroke:0;text-shadow:none;pointer-events:none;
+  background:linear-gradient(105deg,transparent 44%,rgba(255,247,222,.95) 50%,transparent 56%) 100% 0/300% 100% no-repeat;
+  -webkit-background-clip:text;background-clip:text}
+
+/* --- 节奏：入场 180ms → 落印 300ms + 卡片一震 → 滚数（JS）→ 定格轻弹 + 金光 → 淡出 220ms --------------- */
+@keyframes comp-in{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:none}}
+@keyframes comp-out{from{opacity:1;transform:none}to{opacity:0;transform:translateY(-4px)}}
+@keyframes comp-fade-in{from{opacity:0}to{opacity:1}}
+@keyframes comp-fade-out{from{opacity:1}to{opacity:0}}
+@keyframes comp-shake{0%,100%{transform:none}20%{transform:translate(-1.5px,1px)}45%{transform:translate(1.5px,-.5px)}70%{transform:translate(-.75px,.5px)}}
+@keyframes comp-stamp{
+  0%{opacity:0;transform:scale(1.6) rotate(-12deg);animation-timing-function:cubic-bezier(.55,0,.85,.35)}
+  58%{opacity:1;transform:scale(.94) rotate(-4deg);animation-timing-function:cubic-bezier(.2,.8,.3,1)}
+  100%{opacity:1;transform:scale(1) rotate(-4deg)}}
+@keyframes comp-bloom{0%{opacity:.75;transform:scale(.88)}100%{opacity:0;transform:scale(1.32)}}
+@keyframes comp-pop{0%{transform:none}34%{transform:scale(1.14)}64%{transform:scale(.97)}100%{transform:none}}
+@keyframes comp-shine{from{background-position:100% 0}to{background-position:0 0}}
+
+.comp-banner[data-comp-state="entering"]{animation:comp-in 180ms var(--ui-ease) both}
+/* 印落下的那一帧（落印 58% ≈ 175ms）卡片跟着一震 */
+.comp-banner[data-comp-state="shown"].is-stamp{animation:comp-shake 200ms linear 165ms both}
+.comp-banner[data-comp-state="exiting"]{animation:comp-out 220ms cubic-bezier(.4,0,1,1) both}
+.comp-banner.is-stamp .comp-seal{animation:comp-stamp 300ms both}
+.comp-banner.is-stamp .comp-seal::after{animation:comp-bloom 420ms cubic-bezier(.2,.8,.2,1) 170ms both}
+.comp-banner.is-settled .comp-seal{opacity:1}
+.comp-banner.is-pop .comp-amount{animation:comp-pop 340ms cubic-bezier(.3,.7,.4,1) both}
+.comp-banner.is-pop .comp-amount::after{animation:comp-shine 620ms cubic-bezier(.3,.6,.4,1) 90ms both}
+
+/* 减动效：不砸印、不震、不滚数（JS 直接写最终金额），只留淡入淡出。
+   theme.css 会把全站动画压成 .01ms，这里显式把两段淡入淡出要回来（只动 opacity）。 */
+@media (prefers-reduced-motion:reduce){
+  .comp-banner[data-comp-state="entering"]{animation:comp-fade-in 180ms ease-out both!important}
+  .comp-banner[data-comp-state="exiting"]{animation:comp-fade-out 220ms ease-in both!important}
+  .comp-banner[data-comp-state="shown"]{animation:none!important}
+  .comp-banner .comp-seal{animation:none!important;opacity:1;transform:rotate(-4deg)}
+  .comp-banner .comp-seal::after,.comp-banner .comp-amount,.comp-banner .comp-amount::after{animation:none!important}
+}
+
+/* 手机竖屏：避开顶部菜单 / 钱包牌，总高 ≤108px */
+@media (pointer:coarse) and (not (any-pointer:fine)) and (min-height:501px),(max-width:520px){
+  .comp-banner{top:calc(58px + env(safe-area-inset-top));column-gap:12px;padding:10px 14px 10px 12px}
+  .comp-text{gap:2px}
+  .comp-copy{line-height:1.28}
+  .comp-balance{font-size:12px}
+  .comp-amount{font-size:42px;-webkit-text-stroke-width:1.5px}
+}
+@media (max-width:359px){
+  .comp-copy{font-size:14px}
+  .comp-amount{font-size:36px}
+}
+/* 手机横屏：紧凑一行，总高 ≤64px（1 + 9 + 44 + 9 + 1） */
+@media (max-height:500px){
+  .comp-banner{top:calc(52px + env(safe-area-inset-top));width:min(480px,calc(100vw - 32px));column-gap:12px;padding:9px 16px 9px 9px}
+  .comp-text{gap:2px}
+  .comp-copy{font-size:15px;line-height:1.3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .comp-balance{font-size:12px}
+  .comp-amount{font-size:36px;-webkit-text-stroke-width:1.5px}
+}
+
+body[data-home] .comp-banner,
+body[data-photo="on"] .comp-banner,
+body[data-shop-open="1"] .comp-banner{display:none!important}
+
+/* 横幅在场时，把通用 .toast 与手机横屏载入角标 .ld-corner 避让开，杜绝互压 */
+body[data-comp-banner="1"]:not([data-home]):not([data-photo="on"]):not([data-shop-open="1"]) .toast{top:calc(168px + env(safe-area-inset-top))}
+body[data-comp-banner="1"]:not([data-home]):not([data-photo="on"]):not([data-shop-open="1"]) .ld-corner{opacity:0;pointer-events:none;transition:opacity var(--ui-fast)}
+@media (max-height:500px){
+  body[data-comp-banner="1"]:not([data-home]):not([data-photo="on"]):not([data-shop-open="1"]) .toast{top:calc(126px + env(safe-area-inset-top))}
+}
+@media (pointer:coarse) and (not (any-pointer:fine)) and (max-width:520px){
+  body[data-comp-banner="1"]:not([data-home]):not([data-photo="on"]):not([data-shop-open="1"]) .toast{top:calc(348px + env(safe-area-inset-top))}
+}
+
+/* --- 损坏的共享电车：交互提示换「故障」态 ----------------------------------------------------------- */
+/* 左一道朱砂竖条、沉暗墨青底、清晰暖白警示字；桌面 [F] 键帽淡成虚线框——这辆车不能骑。
+   body 前缀把特异性抬过 walk.css 的 .vehicle-action[data-ebike-tier] 等同级规则，与样式表加载先后无关。 */
+body .vehicle-action[data-interact-action="damaged_vehicle"]{
+  color:#f7ded5;background:rgba(20,32,29,.92);border-color:rgba(208,105,76,.78);
+  box-shadow:inset 3px 0 0 var(--ui-seal-light);cursor:not-allowed}
+@media (hover:hover) and (pointer:fine){
+  body .vehicle-action[data-interact-action="damaged_vehicle"]{box-shadow:inset 3px 0 0 var(--ui-seal-light),0 4px 16px rgba(18,30,28,.34)}
+  body .vehicle-action[data-interact-action="damaged_vehicle"]::before{opacity:.58;background:none;box-shadow:none;border-style:dashed}
+}

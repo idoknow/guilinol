@@ -118,6 +118,65 @@ body[data-szj-indoor="1"] .gl-mission-hud {
   display: none !important;
 }
 
+/* IDOK-545 共享电车理赔到账：方孔钱与金额跳一下（680ms），牌侧飘出一枚金色 +¥ 浮标（900ms 轻抬淡出后自毁）。
+   只动牌里的子元素，不碰牌本身的 translateX 定位；浮标在牌侧而非牌下，不与其下方的理赔回执相叠。 */
+.gl-mission-entry.is-comp-bounce b {
+  animation: gl-wallet-bounce 680ms var(--ui-ease) both;
+}
+.gl-mission-entry.is-comp-bounce::before {
+  animation: gl-wallet-coin 680ms var(--ui-ease) both;
+}
+.gl-wallet-delta {
+  position: absolute;
+  z-index: 2;
+  left: calc(100% + 16px);
+  top: 50%;
+  translate: 0 -50%;
+  pointer-events: none;
+  white-space: nowrap;
+  font: 700 15px/1 var(--ui-num);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
+  color: #f2c76a;
+  text-shadow: 0 1px 0 rgba(8, 14, 13, 0.85), 0 0 8px rgba(8, 14, 13, 0.6);
+  animation: gl-wallet-delta 900ms var(--ui-ease) both;
+}
+@keyframes gl-wallet-bounce {
+  0% { transform: none; }
+  22% { transform: translateY(-4px) scale(1.12); }
+  46% { transform: translateY(0) scale(0.97); }
+  68% { transform: translateY(-1.5px) scale(1.03); }
+  100% { transform: none; }
+}
+@keyframes gl-wallet-coin {
+  0% { transform: none; }
+  24% { transform: translateY(-4px) rotate(-18deg) scale(1.15); }
+  50% { transform: rotate(10deg); }
+  74% { transform: rotate(-4deg); }
+  100% { transform: none; }
+}
+@keyframes gl-wallet-delta {
+  0% { opacity: 0; transform: translateY(6px) scale(0.9); }
+  18% { opacity: 1; transform: none; }
+  68% { opacity: 1; transform: translateY(-4px); }
+  100% { opacity: 0; transform: translateY(-10px); }
+}
+@keyframes gl-wallet-delta-fade {
+  0% { opacity: 0; }
+  18%, 68% { opacity: 1; }
+  100% { opacity: 0; }
+}
+/* 减动效：不跳；浮标只淡入淡出（theme.css 把动画压成 .01ms，这里显式要回只动 opacity 的那一段） */
+@media (prefers-reduced-motion: reduce) {
+  .gl-mission-entry.is-comp-bounce b,
+  .gl-mission-entry.is-comp-bounce::before {
+    animation: none !important;
+  }
+  .gl-wallet-delta {
+    animation: gl-wallet-delta-fade 900ms ease-out both !important;
+  }
+}
+
 /* 任务条：一块墨青小牌、内衬印框（同钱包）。线路名是一枚宣纸小签，计时用 --ui-num，「放弃」是印框里一枚淡字键 */
 .gl-mission-hud .st-mission {
   position: static;
@@ -546,6 +605,11 @@ dialog.mission-board::backdrop {
   }
   .gl-mission-hud .st-sub {
     display: none;
+  }
+  /* 横屏牌右边紧挨工具栏，浮标改从左侧（顶栏空档）飘出 */
+  .gl-wallet-delta {
+    left: auto;
+    right: calc(100% + 10px);
   }
 }
 
