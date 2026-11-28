@@ -1683,6 +1683,16 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
     }
     return performance.now()-lastMoveTs>15000?{act:'idle',detail:''}:{act:'walk',detail:''}
   }
+  function currentMobility():import('../net').MobilityState{
+    if(document.body.dataset.drone==='rc')return {mode:'drone'}
+    if(rides?.car)return {mode:'car',id:rides.car.uuid}
+    if(rides?.bike)return {mode:rides.rideKind==='bicycle'?'bicycle':'bike',id:rides.bikeInstanceId||rides.bike.uuid}
+    if(rides?.boat){
+      const kind=rides.getInteractSnapshot?.().aboardKind
+      return {mode:'boat',id:kind==='tour_boat'?'tour':'free'}
+    }
+    return {mode:'foot'}
+  }
   const combat=combatController({canvas,figure,camera,rig:avatarRig,
     allowed:()=>usable()&&grounded&&!held&&!crashSession&&!standUpSession&&!pickupSession&&!knockdown.isDown&&!emote.id&&
       !document.querySelector('.emote-overlay:not([hidden])')&&hotbarSlot()==='hand'&&!cigarette.active&&document.body.dataset.drone!=='rc',
@@ -1808,7 +1818,7 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
             crashSession=null;standUpSession=null;pickupSession=null;bikeObstacle='';knockdown.reset();syncKnockdownDomState(false);resetAirTracker(footY)
             resetPoseSpeed()
             checkDutyOutOfShift(x,footY,z)
-          },captureContext)
+          },captureContext,currentMobility)
         net.emote(emote.id);net.tick(0)
     }
   }

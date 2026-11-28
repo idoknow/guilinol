@@ -15,13 +15,15 @@ function publish(detail:MpStatus){window.dispatchEvent(new CustomEvent('glol:mp-
 
 type State='connecting'|'online'|'offline'|'replaced'
 export type ActivityReport={act:string;detail?:string}
+export type MobilityMode='foot'|'bike'|'bicycle'|'car'|'boat'|'drone'
+export type MobilityState={mode:MobilityMode;id?:string}
 let rosterRequester:(()=>void)|null=null
 let subCount=0
 /** 地图 / 玩家列表调用：on=true 开始收远距离名册，false 停止。引用计数，两个面板同时开也安全。
  *  计数放在模块级：地图可能比 socket 先打开，联网后要补发订阅。 */
 export function requestRoster(on:boolean){subCount=Math.max(0,subCount+(on?1:-1));rosterRequester?.()}
 
-export function attachNet(scene:Scene,clips:AnimationClip[],getPose:()=>Pose,getAvatar:()=>Avatar,camera:Camera,getActivity?:()=>ActivityReport,onCombat?:(p:CombatPacket,self:string)=>void,onSetback?:(x:number,y:number,z:number)=>void,getCaptureContext?:()=>CaptureClientContext) {
+export function attachNet(scene:Scene,clips:AnimationClip[],getPose:()=>Pose,getAvatar:()=>Avatar,camera:Camera,getActivity?:()=>ActivityReport,onCombat?:(p:CombatPacket,self:string)=>void,onSetback?:(x:number,y:number,z:number)=>void,getCaptureContext?:()=>CaptureClientContext,getMobility?:()=>MobilityState) {
   const peers=players(scene,clips,camera)
   let travelReply:((reply:TravelReply)=>void)|undefined
   let landingPaused=false,rejoinTimer=0
@@ -46,7 +48,7 @@ export function attachNet(scene:Scene,clips:AnimationClip[],getPose:()=>Pose,get
   })
   let socket:WebSocket|undefined,attempt=0,generation=0,timer=0,lastSent=-Infinity,lastRoster=-Infinity,lastActCheck=-Infinity,disposed=false
   let lastRosterV=0,rosterPaused=false,subTimer=0
-  let lastActKey=''
+  let lastActKey='',lastMobKey=''
   let state:State='offline',online=0
   // AOI 之后 peers 只有身边 ~150m 的人；整座城的人来自服务端每 5s 一次的 roster（只有位置，没有朝向）
   let myId='',myUid=0,myName='',far=new Map<string,RosterPlayer>()
@@ -103,7 +105,7 @@ export function attachNet(scene:Scene,clips:AnimationClip[],getPose:()=>Pose,get
       const previous=socket
       if(previous){previous.onopen=previous.onmessage=previous.onclose=previous.onerror=null;try{previous.close(1000,'replace')}catch{}}
       const ws=new WebSocket(endpoint);socket=ws;welcomed=false
-      ws.onopen=()=>{if(version===generation){const initial=getActivity?.();lastActKey=initial?`${initial.act}|${initial.detail??''}`:'';send({t:'join',ticket,fp:fingerprint(),dev:deviceSummary(),avatar:getAvatar(),caps:['roster3'],...(initial?{act:initial.act,actDetail:initial.detail}:{}),...getPose()})}}
+      ws.onopen=()=>{if(version===generation){const initial=getActivity?.();lastActKey=initial?`${initial.act}|${initial.detail??''}`:'';const mob=getMobility?.();lastMobKey=mob?`${mob.mode}|${mob.id??''}`:'';send({t:'join',ticket,fp:fingerprint(),dev:deviceSummary(),avatar:getAvatar(),caps:['roster3','vstate1'],...(initial?{act:initial.act,actDetail:initial.detail}:{}),...(mob?{vmode:mob.mode,...(mob.id?{vid:mob.id}:{})}:{}),...getPose()})}}
       ws.onmessage=event=>{
         if(version!==generation)return
         const msg=JSON.parse(event.data)
@@ -210,8 +212,17 @@ export function attachNet(scene:Scene,clips:AnimationClip[],getPose:()=>Pose,get
   function stop(){generation++;clearTimeout(timer);travelReply?.({ok:false});socket?.close(1000,'stop');socket=undefined;peers.clear();update('offline')}
   function avatarChanged(){if(state==='online')send({t:'avatar',avatar:getAvatar()})}
   let welcomed=false
+  function syncMobility(pose:Pose){
+    if(!getMobility)return
+    const next=getMobility()
+    const key=`${next.mode}|${next.id??''}`
+    if(key===lastMobKey)return
+    lastMobKey=key
+    send({t:'vstate',mode:next.mode,...(next.id?{id:next.id}:{}),x:pose.x,y:pose.y,z:pose.z})
+  }
   function tick(dt:number){if(state!=='online'||!welcomed)return
     flushEmote();const pose=getPose(),now=performance.now()
+    syncMobility(pose)
     if(now-lastSent>=50 && socket && socket.bufferedAmount<4096){lastSent=now;send({t:'pos',...pose})}
     if(getActivity&&now-lastActCheck>=500){
       lastActCheck=now
