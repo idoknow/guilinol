@@ -1,31 +1,83 @@
-/* 联机封禁提示（S1）：墨青纸对话框 + 一枚「封」字白文印 + 宣纸信息签；主动作「申诉」用朱砂 */
-dialog.mp-ban{width:min(24rem,calc(100% - 24px));max-height:calc(100dvh - 24px);overflow:auto;opacity:0;transform:translateY(var(--ui-rise));
+/* 联机受限提示（IDOK-503）：墨青纸对话框 + 一枚残边印 + 宣纸信息签 + 两枚特制键。档位挂在 dialog[data-tier]：
+   cooldown 冷却 = 赭石朱文「歇」、主键是赭线匾「继续单人游览」，整屏不着朱砂；
+   ban 封禁 = 白文朱砂「封」、主键是残边朱印「申诉」。次键是墨线匾，与主键等大。 */
+dialog.mp-ban{width:min(25rem,calc(100% - 24px));max-height:calc(100dvh - 24px);overflow:auto;overscroll-behavior:contain;
+  opacity:0;transform:translateY(var(--ui-rise));
   transition:opacity .22s,transform var(--ui-slow) var(--ui-ease),overlay .22s allow-discrete,display .22s allow-discrete}
 dialog.mp-ban[open]{opacity:1;transform:none}
 @starting-style{dialog.mp-ban[open]{opacity:0;transform:translateY(var(--ui-rise))}}
 .mp-ban>header{padding-bottom:0}
-.mp-ban-head{display:flex;align-items:center;gap:12px}
-.mp-ban-seal{flex:none;display:grid;place-items:center;width:36px;height:36px;border-radius:var(--ui-r-xs);transform:rotate(-2deg);
-  font:700 18px/1 var(--ui-serif);color:var(--ui-paper);background:var(--ui-seal);box-shadow:inset 0 0 0 2px var(--ui-seal),inset 0 0 0 3px rgba(244,239,226,.72)}
-.mp-ban-lede{margin:14px 8px 0;font-size:var(--ui-fs-sm);line-height:var(--ui-lh);color:var(--ui-text-2)}
-.mp-ban-sheet{margin:16px 8px 0;padding:2px 14px;border-radius:var(--ui-r-paper);background:var(--ui-paper);color:var(--ui-ink);display:grid}
-.mp-ban-row{display:grid;grid-template-columns:4.6em 1fr;gap:10px;align-items:baseline;padding:10px 0;border-top:1px solid var(--ui-paper-line);font-size:var(--ui-fs-sm);line-height:1.55}
+.mp-ban-head{display:flex;align-items:center;gap:var(--ui-s-3);min-width:0}
+
+/* 印：home-seal.svg 石刻残边。封 = 白文（朱底、内衬一道宣纸细框）；歇 = 赭石朱文（淡赭底、赭字赭框） */
+.mp-ban-seal{flex:none;display:grid;place-items:center;width:40px;height:40px;font:700 20px/1 var(--ui-serif);letter-spacing:0;
+  color:var(--ui-paper);background:var(--ui-seal);box-shadow:inset 0 0 0 3px var(--ui-seal),inset 0 0 0 4px color-mix(in srgb,var(--ui-paper) 72%,transparent);
+  transform:rotate(-3deg);-webkit-mask:url("./home-seal.svg") center/100% 100% no-repeat;mask:url("./home-seal.svg") center/100% 100% no-repeat}
+.mp-ban[data-tier=cooldown] .mp-ban-seal{color:var(--ui-ochre);background:var(--ui-ochre-wash);box-shadow:inset 0 0 0 1.5px var(--ui-ochre);transform:rotate(2deg)}
+
+.mp-ban-lede{margin:var(--ui-s-3) 8px 0;font-size:var(--ui-fs-sm);line-height:var(--ui-lh);letter-spacing:var(--ui-track-body);color:var(--ui-text-2)}
+
+/* 签：读的信息全在一张宣纸签上，行间一道纸线 */
+.mp-ban-sheet{margin:var(--ui-s-4) 8px 0;padding:2px 14px;border-radius:var(--ui-r-paper);background:var(--ui-paper);color:var(--ui-ink);display:grid}
+.mp-ban-row{display:grid;grid-template-columns:3.4em 1fr;gap:10px;align-items:baseline;padding:10px 0;border-top:1px solid var(--ui-paper-line);font-size:var(--ui-fs-sm);line-height:1.55}
 .mp-ban-row:first-child{border-top:0}
-.mp-ban-row dt{color:var(--ui-ink-soft);font-size:var(--ui-fs-xs);letter-spacing:.2em}
+.mp-ban-row dt{color:var(--ui-ink-soft);font-size:var(--ui-fs-xs);letter-spacing:var(--ui-track-title)}
 .mp-ban-row dd{margin:0;min-width:0;overflow-wrap:anywhere}
 .mp-ban-reason{font-weight:600}
-.mp-ban-left{display:block;margin-top:2px;font-size:var(--ui-fs-xs);color:var(--ui-seal);font-variant-numeric:tabular-nums}
+.mp-ban-row[data-field=until] dd{display:flex;flex-direction:column;gap:2px}
+.mp-ban-at,.mp-ban-left{font-family:var(--ui-num);font-variant-numeric:tabular-nums}
+.mp-ban-left{font-size:var(--ui-fs-xs);color:var(--ui-seal)}
+/* 冷却档的重点是「还要等多久」：倒计时放大在上，钟点退成注脚；不用朱砂 */
+.mp-ban[data-tier=cooldown] .mp-ban-left{order:-1;font-size:var(--ui-fs-md);font-weight:600;color:var(--ui-ink)}
+.mp-ban[data-tier=cooldown] .mp-ban-at{font-size:var(--ui-fs-xs);color:var(--ui-ink-soft)}
+.mp-ban[data-expired] .mp-ban-left{color:var(--ui-ink)}
+
 .mp-ban-id{display:flex;align-items:center;gap:8px}
-.mp-ban-id code{flex:1;min-width:0;font:12.5px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--ui-ink-soft);overflow-wrap:anywhere}
-.mp-ban-copy{flex:none;min-height:28px;padding:0 10px;border-radius:var(--ui-r-ctl);border:1px solid var(--ui-paper-line-strong);background:none;
-  font:500 var(--ui-fs-xs)/1 var(--ui-serif);color:var(--ui-ink);cursor:pointer;transition:background var(--ui-fast)}
-.mp-ban-copy:hover{background:var(--ui-paper-fill)}
-.mp-ban-copy:focus-visible{outline:2px solid var(--ui-focus);outline-offset:2px}
-.mp-ban-note{margin:12px 8px 0;font-size:var(--ui-fs-xs);line-height:1.65;color:var(--ui-text-3)}
-.mp-ban-actions{display:flex;gap:10px;padding:16px 8px 8px}
-.mp-ban-actions .ui-btn{flex:1}
-.mp-ban-actions .ui-btn--ghost{border-color:var(--ui-line-strong);color:var(--ui-text)}
-@media (pointer:coarse) and (not (any-pointer:fine)){.mp-ban-copy{min-height:36px}}
-@media (max-width:420px){dialog.mp-ban{width:100%;max-width:100%;margin:auto 0 0;border-radius:var(--ui-r-lg) var(--ui-r-lg) 0 0;transform:translateY(24px)}
-  .mp-ban-actions{flex-direction:column-reverse;padding-bottom:calc(8px + env(safe-area-inset-bottom))}}
-@media (prefers-reduced-motion:reduce){dialog.mp-ban{transition:none}}
+.mp-ban-id code{flex:1;min-width:0;font:12.5px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--ui-ink-soft);overflow-wrap:anywhere;user-select:all;-webkit-user-select:all}
+/* 复制钮：签上再压一枚小签（亮纸 + 一道纸线），按下印压；已复制时线加深 */
+.mp-ban-copy{flex:none;min-width:3.8em;min-height:36px;padding:0 10px;border:0;border-radius:var(--ui-r-xs);cursor:pointer;
+  font:500 var(--ui-fs-xs)/1 var(--ui-serif);letter-spacing:var(--ui-track);color:var(--ui-ink);background:var(--ui-paper-hi);
+  box-shadow:inset 0 0 0 1px var(--ui-paper-line-strong);-webkit-tap-highlight-color:transparent;touch-action:manipulation;
+  transition:background var(--ui-fast),box-shadow var(--ui-fast),transform var(--ui-fast)}
+.mp-ban-copy:hover{background:var(--ui-paper-2)}
+.mp-ban-copy:active{transform:scale(var(--ui-press))}
+.mp-ban-copy[data-state]{box-shadow:inset 0 0 0 1px var(--ui-ink-soft)}
+.mp-ban-copy:focus-visible{outline:2px solid var(--ui-jade-700);outline-offset:2px}
+
+.mp-ban-note{margin:var(--ui-s-3) 8px 0;font-size:var(--ui-fs-xs);line-height:var(--ui-lh);color:var(--ui-text-3)}
+
+/* 匾：墨青纸面 + 3px 内衬印框，悬停只在框内铺底，按下印压。主次等大，次键同样好点 */
+.mp-ban-actions{display:flex;gap:10px;padding:var(--ui-s-4) 8px 8px}
+.mp-ban-act{position:relative;isolation:isolate;flex:1 1 0;display:inline-flex;align-items:center;justify-content:center;box-sizing:border-box;
+  min-width:0;min-height:calc(var(--ui-h) + 4px);padding:0 14px;border:0;border-radius:var(--ui-r-ctl);cursor:pointer;
+  font:500 var(--ui-fs-sm)/1 var(--ui-serif);letter-spacing:var(--ui-track);white-space:nowrap;color:var(--ui-text);background:none;
+  -webkit-tap-highlight-color:transparent;touch-action:manipulation;user-select:none;-webkit-user-select:none;
+  transition:background var(--ui-fast),color var(--ui-fast),transform var(--ui-fast)}
+.mp-ban-act::after{content:"";position:absolute;inset:3px;z-index:-1;border-radius:var(--ui-r-xs);box-shadow:inset 0 0 0 1px var(--ui-line-strong);
+  pointer-events:none;transition:background var(--ui-fast),box-shadow var(--ui-fast)}
+.mp-ban-act:hover::after{background:var(--ui-fill);box-shadow:inset 0 0 0 1px var(--ui-line-hover)}
+.mp-ban-act:active{transform:scale(var(--ui-press))}
+.mp-ban-act:focus-visible{outline:2px solid var(--ui-focus);outline-offset:2px}
+.mp-ban-act[data-rank=primary]{background:var(--ui-surface-2);font-weight:600}
+/* 冷却主键：赭线匾 */
+.mp-ban[data-tier=cooldown] .mp-ban-act[data-rank=primary]::after{box-shadow:inset 0 0 0 1px var(--ui-ochre)}
+.mp-ban[data-tier=cooldown] .mp-ban-act[data-rank=primary]:hover::after{background:var(--ui-ochre-wash)}
+/* 封禁主键：seal-bar.svg 残边朱印，内衬一道宣纸细框；被遮罩，焦点改成内框加粗（收在印内） */
+.mp-ban[data-tier=ban] .mp-ban-act[data-rank=primary]{color:var(--ui-paper);background:var(--ui-seal);letter-spacing:var(--ui-track-title);
+  -webkit-mask:url("./seal-bar.svg") center/100% 100% no-repeat;mask:url("./seal-bar.svg") center/100% 100% no-repeat}
+.mp-ban[data-tier=ban] .mp-ban-act[data-rank=primary]::after{inset:5px;box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--ui-paper) 55%,transparent)}
+.mp-ban[data-tier=ban] .mp-ban-act[data-rank=primary]:hover{background:var(--ui-seal-hi)}
+.mp-ban[data-tier=ban] .mp-ban-act[data-rank=primary]:hover::after{background:none}
+.mp-ban[data-tier=ban] .mp-ban-act[data-rank=primary]:focus-visible{outline:none}
+.mp-ban[data-tier=ban] .mp-ban-act[data-rank=primary]:focus-visible::after{box-shadow:inset 0 0 0 2px var(--ui-paper)}
+
+@media (pointer:coarse) and (not (any-pointer:fine)){.mp-ban-copy{min-height:40px}}
+/* 窄屏：底部抽屉。抽屉停在安全区之上，下方用同色补满，印框和按钮都不进 Home 条 */
+@media (max-width:420px){
+  dialog.mp-ban{--mp-safe:env(safe-area-inset-bottom,0px);width:100%;max-width:100%;max-height:calc(100dvh - 12px - var(--mp-safe));margin:auto 0 var(--mp-safe);
+    border-radius:var(--ui-r-lg) var(--ui-r-lg) 0 0;box-shadow:0 var(--mp-safe) 0 0 var(--ui-surface)}
+  .mp-ban-actions{flex-direction:column-reverse}
+}
+@media (prefers-reduced-motion:reduce){dialog.mp-ban,.mp-ban-act,.mp-ban-copy{transition:none}.mp-ban-act:active,.mp-ban-copy:active{transform:none}}
+/* 高对比模式下遮罩会吃掉形状：退回系统色方框 */
+@media (forced-colors:active){.mp-ban-seal,.mp-ban-act{-webkit-mask:none;mask:none;border:1px solid ButtonText}}
