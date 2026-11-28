@@ -83,6 +83,7 @@ import {
   resolveDutyTeleportDeckY,
   resolveDutyZone,
   sharedCitationLedger,
+  shouldEnableDutyEntryShortcut,
   type DutyTrafficBridge,
   type TrafficDutyController,
 } from './traffic-duty'
@@ -678,6 +679,7 @@ async function start(loader:FullLoader,creatorSpawn=false) {
   const dutyProjVec = new THREE.Vector3()
   let activeFineTargetActor: import('./traffic/sim').Actor | null = null
   const walkerFootPos = () => (walker?.active ? (walker.footPosition ?? walker.position) : null)
+  const dutyEntryShortcut = shouldEnableDutyEntryShortcut({ search: location.search })
   trafficDuty = createTrafficDuty({
     getPlayerPos: walkerFootPos,
     getPlayerYaw: () => walker?.yaw ?? 0,
@@ -780,10 +782,14 @@ async function start(loader:FullLoader,creatorSpawn=false) {
     },
     onDutyBoundaryClamp: clamped => walker?.clampPosition?.(clamped),
     onToast: (text, ms) => showToast(text, ms),
-    onTeleportToZone: zoneId => {
-      const z = DUTY_ZONES.find(item => item.id === zoneId) ?? DUTY_ZONES[0]
-      return walkTo(z.teleport.x, z.teleport.z, z.teleport.yaw, 'traffic-duty', z.name, undefined, z.teleport.y)
-    },
+    enableEntryShortcut: dutyEntryShortcut,
+    alwaysShowEntry: dutyEntryShortcut,
+    onTeleportToZone: dutyEntryShortcut
+      ? zoneId => {
+          const z = DUTY_ZONES.find(item => item.id === zoneId) ?? DUTY_ZONES[0]
+          return walkTo(z.teleport.x, z.teleport.z, z.teleport.yaw, 'traffic-duty', z.name, undefined, z.teleport.y)
+        }
+      : undefined,
     arbiterWired: true,
   })
   walker?.setTrafficDuty?.(trafficDuty)

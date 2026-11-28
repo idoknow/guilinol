@@ -37,6 +37,7 @@ interface EscapeSafeBand {
 export interface TrafficDutyUiOptions {
   container: HTMLElement
   arbiterWired: boolean
+  showEntryShortcut?: boolean
   alwaysShowEntry: boolean
   onTalkOfficer: () => void
   onReportOffDuty?: () => void
@@ -78,21 +79,28 @@ export function mountTrafficDutyUi(opts: TrafficDutyUiOptions): TrafficDutyUiHan
   root.className = 'td-hud-root'
   opts.container.append(root)
 
-  // Idle guidance pill: opens duty info / leaderboard / teleport to officer — NEVER directly starts duty
-  const entry = document.createElement('button')
-  entry.type = 'button'
-  entry.className = 'td-entry'
-  entry.dataset.tdEntry = '1'
-  entry.setAttribute('aria-label', '查看解放桥交警执勤站与榜单')
-  const entryLabelEl = document.createElement('span')
-  entryLabelEl.className = 'td-entry-label'
-  entryLabelEl.textContent = '解放桥交警'
-  const entryBestEl = document.createElement('span')
-  entryBestEl.className = 'td-entry-best'
-  entryBestEl.hidden = true
-  entry.append(entryLabelEl, entryBestEl)
-  stopPointerLeak(entry)
-  root.append(entry)
+  const showEntryShortcut = Boolean(opts.showEntryShortcut ?? opts.alwaysShowEntry)
+  let entry: HTMLButtonElement | null = null
+  let entryLabelEl: HTMLSpanElement | null = null
+  let entryBestEl: HTMLSpanElement | null = null
+  if (showEntryShortcut) {
+    // Opt-in beta guidance pill: opens duty info / leaderboard / teleport to officer — NEVER directly starts duty
+    entry = document.createElement('button')
+    entry.type = 'button'
+    entry.className = 'td-entry'
+    entry.dataset.tdEntry = '1'
+    entry.hidden = true
+    entry.setAttribute('aria-label', '查看解放桥交警执勤站与榜单')
+    entryLabelEl = document.createElement('span')
+    entryLabelEl.className = 'td-entry-label'
+    entryLabelEl.textContent = '解放桥交警'
+    entryBestEl = document.createElement('span')
+    entryBestEl.className = 'td-entry-best'
+    entryBestEl.hidden = true
+    entry.append(entryLabelEl, entryBestEl)
+    stopPointerLeak(entry)
+    root.append(entry)
+  }
 
   // Screen-space overhead badge pinned to the Jiefang Bridge officer so players spot him immediately
   const officerMarker = document.createElement('button')
@@ -339,16 +347,17 @@ export function mountTrafficDutyUi(opts: TrafficDutyUiOptions): TrafficDutyUiHan
     const nearOfficer = snap?.officerDistanceM !== null && snap?.officerDistanceM !== undefined && snap.officerDistanceM <= DEFAULT_OFFICER_TALK_RANGE_M + 0.5
     const fineSig = ALL_ACTIVE_VIOLATIONS.map(k => fines[k]).join(',')
     let nextSig = ''
+    const canGoBridge = Boolean(opts.onGoZone || opts.onGoBridge)
     if (activeTab === 'rank') {
-      nextSig = `rank|${snap?.phase !== 'active' ? 1 : 0}|${nearOfficer ? 1 : 0}|${leaderboardSig(lb)}`
+      nextSig = `rank|${snap?.phase !== 'active' ? 1 : 0}|${nearOfficer ? 1 : 0}|${canGoBridge ? 1 : 0}|${leaderboardSig(lb)}`
     } else if (snap?.phase === 'summary') {
       const bdSig = ALL_ACTIVE_VIOLATIONS.map(k => snap.breakdown[k] ?? 0).join(',')
-      nextSig = `summary|${snap.totalFineYuan}|${snap.settledEarningsYuan}|${snap.pendingEarningsYuan}|${snap.citedCount}|${snap.lastRecordRank ?? ''}|${snap.reportTitle ?? ''}|${nearOfficer ? 1 : 0}|${bdSig}`
+      nextSig = `summary|${snap.totalFineYuan}|${snap.settledEarningsYuan}|${snap.pendingEarningsYuan}|${snap.citedCount}|${snap.lastRecordRank ?? ''}|${snap.reportTitle ?? ''}|${nearOfficer ? 1 : 0}|${canGoBridge ? 1 : 0}|${bdSig}`
     } else if (snap?.phase === 'active') {
       nextSig = `active|${nearOfficer ? 1 : 0}|${fineSig}`
     } else {
       const distBucket = snap?.officerDistanceM != null ? Math.round(snap.officerDistanceM) : -1
-      nextSig = `idle|${nearOfficer ? 1 : 0}|${distBucket}|${opts.onGoZone || opts.onGoBridge ? 1 : 0}|${fineSig}`
+      nextSig = `idle|${nearOfficer ? 1 : 0}|${distBucket}|${canGoBridge ? 1 : 0}|${fineSig}`
     }
 
     if (nextSig !== renderedPanelSig) {
@@ -408,7 +417,9 @@ export function mountTrafficDutyUi(opts: TrafficDutyUiOptions): TrafficDutyUiHan
             ? `<button type="button" class="td-btn td-btn--primary" data-td-action="report-off-duty">${nearOfficer ? '向交警交差领分成' : '去交警岗交差领分成'}</button>`
             : nearOfficer
               ? `<button type="button" class="td-btn td-btn--primary" data-td-action="talk-officer">找交警再接一班</button>`
-              : `<button type="button" class="td-btn td-btn--primary" data-td-action="go-bridge">回解放桥交警岗</button>`
+              : canGoBridge
+                ? `<button type="button" class="td-btn td-btn--primary" data-td-action="go-bridge">回解放桥交警岗</button>`
+                : `<button type="button" class="td-btn" data-td-action="close">知道了</button>`
         bodyEl.innerHTML = `
           <section class="td-summary-card" aria-label="执勤战报">
             <div class="td-report-title" data-td-report-title="1">${escapeHtml(titleText)}</div>
@@ -492,38 +503,40 @@ export function mountTrafficDutyUi(opts: TrafficDutyUiOptions): TrafficDutyUiHan
     lastSnapshot = snapshot
     lastLeaderboard = leaderboard
 
-    const showEntry =
-      snapshot.phase !== 'active' &&
-      !snapshot.storyActive &&
-      (opts.alwaysShowEntry || snapshot.inDutyZone || (snapshot.officerDistanceM !== null && snapshot.officerDistanceM <= 260))
-    if (showEntry !== renderedEntryShow) {
-      renderedEntryShow = showEntry
-      entry.hidden = !showEntry
-    }
+    if (entry && entryLabelEl && entryBestEl) {
+      const showEntry =
+        snapshot.phase !== 'active' &&
+        !snapshot.storyActive &&
+        (opts.alwaysShowEntry || snapshot.inDutyZone || (snapshot.officerDistanceM !== null && snapshot.officerDistanceM <= 260))
+      if (showEntry !== renderedEntryShow) {
+        renderedEntryShow = showEntry
+        entry.hidden = !showEntry
+      }
 
-    // 距离只报一处（IDOK-468）：交警在画面里时由头顶标记报，走到跟前由 [F] 提示接手，入口只留名字。
-    const officerInView =
-      !snapshot.terminalOpen &&
-      !snapshot.knockdownActive &&
-      Boolean(snapshot.officerScreen?.visible) &&
-      snapshot.officerDistanceM !== null &&
-      snapshot.officerDistanceM <= 180
-    const nextEntryLabel =
-      snapshot.officerDistanceM !== null && snapshot.officerDistanceM > DEFAULT_OFFICER_TALK_RANGE_M && !officerInView
-        ? `解放桥交警 · ${Math.round(snapshot.officerDistanceM)}m`
-        : '解放桥交警'
-    if (nextEntryLabel !== renderedEntryLabel) {
-      renderedEntryLabel = nextEntryLabel
-      entryLabelEl.textContent = nextEntryLabel
-    }
+      // 距离只报一处（IDOK-468）：交警在画面里时由头顶标记报，走到跟前由 [F] 提示接手，入口只留名字。
+      const officerInView =
+        !snapshot.terminalOpen &&
+        !snapshot.knockdownActive &&
+        Boolean(snapshot.officerScreen?.visible) &&
+        snapshot.officerDistanceM !== null &&
+        snapshot.officerDistanceM <= 180
+      const nextEntryLabel =
+        snapshot.officerDistanceM !== null && snapshot.officerDistanceM > DEFAULT_OFFICER_TALK_RANGE_M && !officerInView
+          ? `解放桥交警 · ${Math.round(snapshot.officerDistanceM)}m`
+          : '解放桥交警'
+      if (nextEntryLabel !== renderedEntryLabel) {
+        renderedEntryLabel = nextEntryLabel
+        entryLabelEl.textContent = nextEntryLabel
+      }
 
-    if (leaderboard.bestFineYuan !== renderedBestFine) {
-      renderedBestFine = leaderboard.bestFineYuan
-      if (leaderboard.bestFineYuan > 0) {
-        entryBestEl.hidden = false
-        entryBestEl.textContent = `¥${leaderboard.bestFineYuan}`
-      } else {
-        entryBestEl.hidden = true
+      if (leaderboard.bestFineYuan !== renderedBestFine) {
+        renderedBestFine = leaderboard.bestFineYuan
+        if (leaderboard.bestFineYuan > 0) {
+          entryBestEl.hidden = false
+          entryBestEl.textContent = `¥${leaderboard.bestFineYuan}`
+        } else {
+          entryBestEl.hidden = true
+        }
       }
     }
 
@@ -846,10 +859,12 @@ export function mountTrafficDutyUi(opts: TrafficDutyUiOptions): TrafficDutyUiHan
     })
   }
 
-  entry.onclick = () => {
-    activeTab = 'duty'
-    renderPanel()
-    if (!dialog.open) dialog.showModal()
+  if (entry) {
+    entry.onclick = () => {
+      activeTab = 'duty'
+      renderPanel()
+      if (!dialog.open) dialog.showModal()
+    }
   }
 
   officerMarker.onclick = () => {
