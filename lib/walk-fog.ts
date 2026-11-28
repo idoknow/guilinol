@@ -1,7 +1,7 @@
 import {type Env,Problem,invalid,now,sessionAccount,sessionHash,unauthorized} from './auth'
 import {FOG_MAX_CELLS,FOG_POST_LIMIT,fogValidKey} from './fog'
 
-// 地图迷雾（IDOK-579）：个人进度存服务器，换设备接着开图。
+// 地图迷雾（IDOK-588）：个人进度存服务器，换设备接着开图。
 // 存的是「走过的 32 m 格子号」，稀疏文本 —— 走一小时也就几百格，几十 KB 封顶。
 const decode = (text:string|null|undefined):number[] =>
   text ? text.split(',').map(Number).filter(fogValidKey) : []

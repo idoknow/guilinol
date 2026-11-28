@@ -78,7 +78,7 @@ body[data-photo=on] :is(output,.hint,footer,.sky-ui,.walk-ui,.dock,.toast,.spot-
 .atlas-pop .atlas-nav-btn{background:rgba(245,166,35,.18);color:#ffd166;border:1px solid rgba(245,166,35,.45);letter-spacing:.08em}
 .atlas-legend{position:absolute;left:50%;bottom:calc(14px + env(safe-area-inset-bottom));transform:translateX(-50%);margin:0;font:12px var(--serif);color:var(--ink-soft);
   background:rgba(252,250,243,.85);padding:4px 12px;border-radius:12px;white-space:nowrap;pointer-events:none}
-/* IDOK-579：开图进度（走过才解锁），跟图例同一行，压暗一点当副标题 */
+/* IDOK-588：开图进度（走过才解锁），跟图例同一行，压暗一点当副标题 */
 .atlas-fog{color:var(--ink-soft);opacity:.72}
 /* 窄屏图例多了一段开图进度会溢出两侧，允许换行 */
 @media (max-width:560px){.atlas-legend{white-space:normal;max-width:calc(100vw - 28px);text-align:center;line-height:1.55}}
