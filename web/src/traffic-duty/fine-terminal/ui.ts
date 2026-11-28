@@ -101,6 +101,43 @@ body[data-shop-open='1'] .td-fine-terminal { display: none !important; }
 .td-ft-btn:disabled { opacity: 0.48; cursor: default; }
 .td-ft-meta { font-size: 11px; color: rgba(244, 239, 226, 0.68); margin: 3px 0 0; }
 .td-ft-warn { font-size: 11.5px; color: #e69d8d; margin: 5px 0 0; }
+.td-ft-input-layout { display: contents; }
+.td-ft-col-left, .td-ft-col-right { display: contents; }
+@media (hover: none) and (pointer: coarse) and (not (any-pointer: fine)) {
+  .td-ft-kbd { display: none; }
+}
+@media (max-height: 520px) {
+  .td-fine-terminal {
+    left: calc(10px + env(safe-area-inset-left, 0px));
+    top: calc(8px + env(safe-area-inset-top, 0px));
+    width: min(590px, calc(100vw - 20px - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px)));
+    max-height: calc(100dvh - 16px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
+    padding: 8px 11px 9px;
+    border-radius: 12px;
+  }
+  .td-ft-hero { gap: 8px; padding-bottom: 6px; margin-bottom: 6px; }
+  .td-ft-illust { width: 38px; height: 44px; }
+  .td-ft-head { margin-bottom: 4px; }
+  .td-ft-title { font-size: 13px; }
+  .td-ft-step { font-size: 10px; padding: 2px 4px; }
+  .td-ft-input-layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1.18fr) minmax(0, 0.82fr);
+    gap: 10px;
+    align-items: start;
+  }
+  .td-ft-col-left, .td-ft-col-right { display: flex; flex-direction: column; min-width: 0; }
+  .td-ft-field { gap: 2px; margin-bottom: 5px; }
+  .td-ft-label { font-size: 10.5px; }
+  .td-ft-input, .td-ft-select { padding: 4px 7px; font-size: 12px; }
+  .td-ft-chips { gap: 4px; margin-bottom: 0; }
+  .td-ft-chip { padding: 4px 6px; font-size: 11px; }
+  .td-ft-ticket { padding: 7px 9px; margin-bottom: 6px; font-size: 11.5px; line-height: 1.4; }
+  .td-ft-line-row { font-size: 11.5px; }
+  .td-ft-line-total { font-size: 12.5px; }
+  .td-ft-actions { margin-top: 4px; gap: 6px; }
+  .td-ft-btn { padding: 6px 9px; font-size: 12px; }
+}
 `
 
 function ensureStylesInjected(doc: Document): void {
@@ -398,17 +435,26 @@ export function mountFineTerminalOverlay(
       const cancelBtn = doc.createElement('button')
       cancelBtn.className = 'td-ft-btn'
       cancelBtn.type = 'button'
-      cancelBtn.textContent = '收起 (Esc)'
+      cancelBtn.innerHTML = '收起<span class="td-ft-kbd"> (Esc)</span>'
       cancelBtn.addEventListener('click', () => session.cancel('cancelled'))
 
       const printBtn = doc.createElement('button')
       printBtn.className = 'td-ft-btn td-ft-btn-primary'
       printBtn.type = 'button'
-      printBtn.textContent = `打印吐纸 ¥${snap.fineYuan} (Enter)`
+      printBtn.innerHTML = `打印吐纸 ¥${snap.fineYuan}<span class="td-ft-kbd"> (Enter)</span>`
       printBtn.addEventListener('click', () => session.confirmInput())
 
       actions.append(cancelBtn, printBtn)
-      root.append(plateField, chipLbl, chips, previewBox, actions)
+      const layout = doc.createElement('div')
+      layout.className = 'td-ft-input-layout'
+      const colLeft = doc.createElement('div')
+      colLeft.className = 'td-ft-col-left'
+      colLeft.append(plateField, chipLbl, chips)
+      const colRight = doc.createElement('div')
+      colRight.className = 'td-ft-col-right'
+      colRight.append(previewBox, actions)
+      layout.append(colLeft, colRight)
+      root.append(layout)
     } else if (snap.phase === 'printing') {
       const box = doc.createElement('div')
       box.className = 'td-ft-ticket'
@@ -436,7 +482,7 @@ export function mountFineTerminalOverlay(
       const cancelBtn = doc.createElement('button')
       cancelBtn.className = 'td-ft-btn'
       cancelBtn.type = 'button'
-      cancelBtn.textContent = '中止打印 (Esc)'
+      cancelBtn.innerHTML = '中止打印<span class="td-ft-kbd"> (Esc)</span>'
       cancelBtn.addEventListener('click', () => session.cancel('cancelled'))
       actions.appendChild(cancelBtn)
 
@@ -444,7 +490,7 @@ export function mountFineTerminalOverlay(
         const tearBtn = doc.createElement('button')
         tearBtn.className = 'td-ft-btn td-ft-btn-primary'
         tearBtn.type = 'button'
-        tearBtn.textContent = '扯下凭单 (Enter)'
+        tearBtn.innerHTML = '扯下凭单<span class="td-ft-kbd"> (Enter)</span>'
         tearBtn.addEventListener('click', () => session.tearOff())
         actions.appendChild(tearBtn)
       }

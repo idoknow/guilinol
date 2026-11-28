@@ -1,9 +1,11 @@
 import './ui.css'
+import {formatEscapeAriaLabel} from './jiefang-escape.ts'
 import {
-  ACTIVE_VIOLATIONS,
+  ALL_ACTIVE_VIOLATIONS,
   DEFAULT_OFFICER_TALK_RANGE_M,
   formatViolationFormula,
   VIOLATION_LABELS,
+  type DutyBubbleSnapshot,
   type DutyFineTable,
   type DutySignalKind,
   type DutyZoneId,
@@ -13,6 +15,24 @@ import {
   type TrafficDutyInteractCandidate,
   type TrafficDutySnapshot,
 } from './types.ts'
+
+/** 逃逸气泡：距视口边缘最小留白（px）。 */
+const ESCAPE_EDGE_MARGIN_PX = 12
+/** 逃逸气泡：与顶部 HUD / 底部执勤三键坞的最小间距（px）。 */
+const ESCAPE_HUD_GAP_PX = 8
+/** 逃逸气泡：尾巴高度（px，需与 ui.css `--td-escape-tail` 一致）。 */
+const ESCAPE_TAIL_PX = 9
+/** 逃逸气泡：尾巴距气泡左右边缘的最小内缩（px）。 */
+const ESCAPE_TAIL_INSET_PX = 16
+/** 逃逸气泡淡出时长（与 ui.css 200ms 一致）。 */
+const ESCAPE_FADE_OUT_MS = 200
+const ESCAPE_FADE_OUT_SEC = ESCAPE_FADE_OUT_MS / 1000
+
+interface EscapeSafeBand {
+  width: number
+  top: number
+  bottom: number
+}
 
 export interface TrafficDutyUiOptions {
   container: HTMLElement
@@ -84,6 +104,9 @@ export function mountTrafficDutyUi(opts: TrafficDutyUiOptions): TrafficDutyUiHan
   stopPointerLeak(officerMarker)
   root.append(officerMarker)
 
+  const topStack = document.createElement('div')
+  topStack.className = 'td-top-stack'
+
   // Active duty status strip: real-time count, total fines, 10% pending commission & prominent off-duty check-in button
   const bar = document.createElement('section')
   bar.className = 'td-bar'
@@ -123,15 +146,6 @@ export function mountTrafficDutyUi(opts: TrafficDutyUiOptions): TrafficDutyUiHan
   abandonBarBtn.textContent = '放弃'
   bar.append(timerEl, countEl, fineEl, earningsEl, offDutyBarBtn, rankBarBtn, abandonBarBtn)
   stopPointerLeak(bar)
-  root.append(bar)
-
-  // Out-of-bounds warning banner while on duty
-  const boundsBanner = document.createElement('div')
-  boundsBanner.className = 'td-bounds-banner'
-  boundsBanner.dataset.tdBoundsBanner = '1'
-  boundsBanner.setAttribute('role', 'status')
-  boundsBanner.hidden = true
-  root.append(boundsBanner)
 
   // Active duty whistle, command-flag & ticket 3-key action dock (desktop keycaps + touch buttons)
   const signalDock = document.createElement('div')
@@ -159,7 +173,16 @@ export function mountTrafficDutyUi(opts: TrafficDutyUiOptions): TrafficDutyUiHan
   const ticketSig = makeSignalBtn('ticket', 'F', '开单')
   signalDock.append(whistleSig.btn, stopSig.btn, goSig.btn, ticketSig.btn)
   stopPointerLeak(signalDock)
-  root.append(signalDock)
+
+  // Out-of-bounds warning banner while on duty
+  const boundsBanner = document.createElement('div')
+  boundsBanner.className = 'td-bounds-banner'
+  boundsBanner.dataset.tdBoundsBanner = '1'
+  boundsBanner.setAttribute('role', 'status')
+  boundsBanner.hidden = true
+
+  topStack.append(bar, signalDock, boundsBanner)
+  root.append(topStack)
 
   // Standalone fallback interact button (only shown when walk/interact-arbiter is not wired)
   const whistleBtn = document.createElement('button')
@@ -251,7 +274,9 @@ export function mountTrafficDutyUi(opts: TrafficDutyUiOptions): TrafficDutyUiHan
   let pendingFallbackResolve: ((res: FineTerminalResult) => void) | null = null
 
   function renderViolationGrid(items: readonly {label: string; value: string}[]): string {
-    return `<div class="td-rules-grid">${items
+    // 7 项（含「走人行道」）改 4 列两行：桌面与手机横屏 844×390 均不内滚
+    const cls = items.length >= 7 ? 'td-rules-grid td-rules-grid--7' : 'td-rules-grid'
+    return `<div class="${cls}" data-td-rules-count="${items.length}">${items
       .map(item => `<div class="td-rule-item"><span>${item.label}</span><strong>${item.value}</strong></div>`)
       .join('')}</div>`
   }
@@ -312,12 +337,12 @@ export function mountTrafficDutyUi(opts: TrafficDutyUiOptions): TrafficDutyUiHan
     if (headingEl.textContent !== headingText) headingEl.textContent = headingText
 
     const nearOfficer = snap?.officerDistanceM !== null && snap?.officerDistanceM !== undefined && snap.officerDistanceM <= DEFAULT_OFFICER_TALK_RANGE_M + 0.5
-    const fineSig = ACTIVE_VIOLATIONS.map(k => fines[k]).join(',')
+    const fineSig = ALL_ACTIVE_VIOLATIONS.map(k => fines[k]).join(',')
     let nextSig = ''
     if (activeTab === 'rank') {
       nextSig = `rank|${snap?.phase !== 'active' ? 1 : 0}|${nearOfficer ? 1 : 0}|${leaderboardSig(lb)}`
     } else if (snap?.phase === 'summary') {
-      const bdSig = ACTIVE_VIOLATIONS.map(k => snap.breakdown[k]).join(',')
+      const bdSig = ALL_ACTIVE_VIOLATIONS.map(k => snap.breakdown[k] ?? 0).join(',')
       nextSig = `summary|${snap.totalFineYuan}|${snap.settledEarningsYuan}|${snap.pendingEarningsYuan}|${snap.citedCount}|${snap.lastRecordRank ?? ''}|${snap.reportTitle ?? ''}|${nearOfficer ? 1 : 0}|${bdSig}`
     } else if (snap?.phase === 'active') {
       nextSig = `active|${nearOfficer ? 1 : 0}|${fineSig}`
@@ -362,13 +387,13 @@ export function mountTrafficDutyUi(opts: TrafficDutyUiOptions): TrafficDutyUiHan
       }
 
       const rulesHtml = renderViolationGrid(
-        ACTIVE_VIOLATIONS.map(k => ({label: VIOLATION_LABELS[k], value: `¥${fines[k]}`})),
+        ALL_ACTIVE_VIOLATIONS.map(k => ({label: VIOLATION_LABELS[k], value: `¥${fines[k]}`})),
       )
 
       if (snap?.phase === 'summary') {
         const titleText = snap.reportTitle ?? ''
         const countsHtml = renderViolationGrid(
-          ACTIVE_VIOLATIONS.map(k => ({label: VIOLATION_LABELS[k], value: `${snap.breakdown[k]} 起`})),
+          ALL_ACTIVE_VIOLATIONS.map(k => ({label: VIOLATION_LABELS[k], value: `${snap.breakdown[k] ?? 0} 起`})),
         )
         const earningsLine =
           snap.settledEarningsYuan > 0
@@ -604,31 +629,153 @@ export function mountTrafficDutyUi(opts: TrafficDutyUiOptions): TrafficDutyUiHan
 
     const activeIds = new Set(snapshot.bubbles.map(b => b.id))
     for (const child of Array.from(bubblesLayer.children)) {
-      const id = (child as HTMLElement).dataset.tdBubbleId
-      if (!id || !activeIds.has(id)) child.remove()
+      const el = child as HTMLElement
+      const id = el.dataset.tdBubbleId
+      if (id && activeIds.has(id)) continue
+      if (el.dataset.tdBubbleKind === 'escape') retireEscapeBubble(el)
+      else el.remove()
     }
+    let escapeBand: EscapeSafeBand | null = null
     for (const bubble of snapshot.bubbles) {
+      const kind = bubble.kind === 'escape' ? 'escape' : 'citation'
       let el = bubblesLayer.querySelector<HTMLElement>(`[data-td-bubble-id="${bubble.id}"]`)
       if (!el) {
-        el = document.createElement('div')
-        el.className = 'td-bubble'
-        el.dataset.tdBubbleId = bubble.id
-        el.setAttribute('role', 'status')
-        const strong = document.createElement('strong')
-        strong.textContent = bubble.title
-        const span = document.createElement('span')
-        span.textContent = bubble.line
-        el.append(strong, span)
+        el = kind === 'escape' ? createEscapeBubble(bubble) : createCitationBubble(bubble)
         bubblesLayer.append(el)
       }
       el.hidden = !bubble.visible
-      if (bubble.visible) {
+      if (!bubble.visible) continue
+      if (kind === 'escape') {
+        if (!escapeBand) escapeBand = measureEscapeSafeBand()
+        placeEscapeBubble(el, bubble, escapeBand)
+        if (bubble.remainingSec <= ESCAPE_FADE_OUT_SEC) el.classList.add('td-bubble--leaving')
+      } else {
         el.style.left = `${bubble.screenX.toFixed(1)}px`
         el.style.top = `${bubble.screenY.toFixed(1)}px`
       }
     }
 
     if (dialog.open) renderPanel()
+  }
+
+  // ─── 气泡：开单（米纸）/ 逃逸（墨玉）───
+
+  function createCitationBubble(bubble: DutyBubbleSnapshot): HTMLElement {
+    const el = document.createElement('div')
+    el.className = 'td-bubble'
+    el.dataset.tdBubbleId = bubble.id
+    el.dataset.tdBubbleKind = 'citation'
+    el.setAttribute('role', 'status')
+    const strong = document.createElement('strong')
+    strong.textContent = bubble.title
+    const span = document.createElement('span')
+    span.textContent = bubble.line
+    el.append(strong, span)
+    return el
+  }
+
+  function createEscapeBubble(bubble: DutyBubbleSnapshot): HTMLElement {
+    const el = document.createElement('div')
+    el.className = 'td-bubble td-bubble--escape'
+    el.dataset.tdBubbleId = bubble.id
+    el.dataset.tdBubbleKind = 'escape'
+    el.setAttribute('role', 'status')
+    const shout = bubble.shout ?? bubble.title
+    const vow = bubble.vow ?? bubble.line
+    el.setAttribute(
+      'aria-label',
+      bubble.violations && bubble.violations.length > 0
+        ? formatEscapeAriaLabel(bubble.violations)
+        : `违规车加速逃离：${shout}${vow}`,
+    )
+    const shoutEl = document.createElement('strong')
+    shoutEl.className = 'td-bubble-shout'
+    shoutEl.dataset.tdBubblePart = 'shout'
+    shoutEl.textContent = shout
+    const vowEl = document.createElement('span')
+    vowEl.className = 'td-bubble-vow'
+    vowEl.dataset.tdBubblePart = 'vow'
+    vowEl.textContent = vow
+    el.append(shoutEl, vowEl)
+    return el
+  }
+
+  const retireTimers = new Set<ReturnType<typeof setTimeout>>()
+
+  /** 逃逸气泡退场：200ms 淡出后移除；减少动态效果时立即移除。 */
+  function retireEscapeBubble(el: HTMLElement): void {
+    if (el.dataset.tdBubbleRetiring === '1') return
+    el.dataset.tdBubbleRetiring = '1'
+    if (prefersReducedMotion() || el.hidden) {
+      el.remove()
+      return
+    }
+    el.classList.add('td-bubble--leaving')
+    const timer = globalThis.setTimeout(() => {
+      retireTimers.delete(timer)
+      el.remove()
+    }, ESCAPE_FADE_OUT_MS + 40)
+    retireTimers.add(timer)
+  }
+
+  /** 逃逸气泡可用安全带：顶部避开执勤条 / 信号坞 / 越界横幅，底部避开执勤三键坞与独立吹哨键。 */
+  function measureEscapeSafeBand(): EscapeSafeBand {
+    const vw =
+      (typeof window !== 'undefined' ? window.innerWidth : 0) ||
+      (typeof document !== 'undefined' ? document.documentElement?.clientWidth : 0) ||
+      0
+    const vh =
+      (typeof window !== 'undefined' ? window.innerHeight : 0) ||
+      (typeof document !== 'undefined' ? document.documentElement?.clientHeight : 0) ||
+      0
+    let top = ESCAPE_EDGE_MARGIN_PX
+    for (const hudEl of [bar, signalDock, boundsBanner]) {
+      if (hudEl.hidden || !hudEl.isConnected) continue
+      const r = hudEl.getBoundingClientRect()
+      if (r.width <= 0 || r.height <= 0 || r.top > vh * 0.5) continue
+      top = Math.max(top, r.bottom + ESCAPE_HUD_GAP_PX)
+    }
+    let bottom = vh - ESCAPE_EDGE_MARGIN_PX
+    const dock = typeof document !== 'undefined' ? document.querySelector<HTMLElement>('.td-duty-keys-dock') : null
+    for (const lowEl of [dock, whistleBtn]) {
+      if (!lowEl || lowEl.hidden || !lowEl.isConnected) continue
+      const r = lowEl.getBoundingClientRect()
+      if (r.width > 0 && r.height > 0 && r.top > vh * 0.4) bottom = Math.min(bottom, r.top - ESCAPE_HUD_GAP_PX)
+    }
+    return {width: vw, top, bottom}
+  }
+
+  function placeEscapeBubble(el: HTMLElement, bubble: DutyBubbleSnapshot, band: EscapeSafeBand): void {
+    const w = el.offsetWidth
+    const h = el.offsetHeight
+    const minX = ESCAPE_EDGE_MARGIN_PX + w / 2
+    const maxX = Math.max(minX, band.width - ESCAPE_EDGE_MARGIN_PX - w / 2)
+    const x = Math.min(maxX, Math.max(minX, bubble.screenX))
+    // 锚点 = 尾巴尖（骑手头顶）；气泡主体位于锚点上方 h + 尾巴高度
+    const minY = band.top + h + ESCAPE_TAIL_PX
+    const maxY = band.bottom
+    if (minY > maxY) {
+      // 矮屏 + 越界横幅同时出现时安全带不足：本帧不显示，绝不压住顶部状态条或底部执勤键
+      el.hidden = true
+      return
+    }
+    const y = Math.min(maxY, Math.max(minY, bubble.screenY))
+    el.style.left = `${x.toFixed(1)}px`
+    el.style.top = `${y.toFixed(1)}px`
+    const tailLimit = Math.max(0, w / 2 - ESCAPE_TAIL_INSET_PX)
+    const tailShift = Math.max(-tailLimit, Math.min(tailLimit, bubble.screenX - x))
+    el.style.setProperty('--td-tail-x', `${tailShift.toFixed(1)}px`)
+    // 被纵向夹紧（骑手贴近顶部 HUD / 底部按键）时尾巴已无法指向骑手：收起尾巴
+    el.dataset.tdTail = Math.abs(y - bubble.screenY) > 2 ? 'off' : 'on'
+  }
+
+  function prefersReducedMotion(): boolean {
+    if (typeof matchMedia !== 'function') return false
+    try {
+      return matchMedia('(prefers-reduced-motion: reduce)').matches
+    } catch {
+      return false
+    }
   }
 
   function openFallbackFineTerminal(req: FineTerminalRequest): Promise<FineTerminalResult> {
@@ -757,6 +904,8 @@ export function mountTrafficDutyUi(opts: TrafficDutyUiOptions): TrafficDutyUiHan
     isPanelOpen: () => dialog.open || fallbackFineDialog.open,
     openFallbackFineTerminal,
     dispose() {
+      for (const t of retireTimers) globalThis.clearTimeout(t)
+      retireTimers.clear()
       if (pendingFallbackResolve) {
         pendingFallbackResolve({issued: false, cancelled: true})
         pendingFallbackResolve = null

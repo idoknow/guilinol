@@ -10,16 +10,24 @@
   align-items: center;
   gap: 8px;
   max-width: calc(100vw - 24px);
-  padding: 5px 6px 5px 14px;
-  border-radius: 999px;
-  background: var(--ui-glass-solid, rgba(22, 36, 33, 0.94));
-  color: var(--ui-paper, #f4efe2);
-  box-shadow: inset 0 0 0 1px rgba(244, 239, 226, 0.16);
+  padding: 6px 8px 6px 14px;
+  border-radius: var(--ui-plaque-r, 4px);
+  background: var(--ui-plaque, rgba(20, 32, 29, 0.92));
+  color: var(--ui-text, #f4efe2);
+  box-shadow: none;
   font: 500 13px/1.2 var(--ui-serif, "Noto Serif SC", "Source Han Serif SC", "Songti SC", serif);
   font-variant-numeric: tabular-nums;
   user-select: none;
   -webkit-user-select: none;
   pointer-events: auto;
+}
+.drinks-hold-hud::after {
+  content: "";
+  position: absolute;
+  inset: var(--ui-plaque-inset, 3px);
+  border: 1px solid var(--ui-plaque-frame, rgba(244, 239, 226, 0.3));
+  border-radius: var(--ui-r-xs, 2px);
+  pointer-events: none;
 }
 
 .drinks-hold-hud[hidden] {
@@ -42,42 +50,54 @@
 }
 
 .drinks-hold-btn {
+  position: relative;
+  z-index: 1;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-height: 36px;
-  padding: 0 14px;
-  border: 0;
-  border-radius: 999px;
-  background: rgba(244, 239, 226, 0.12);
-  color: var(--ui-paper, #f4efe2);
+  gap: 5px;
+  min-height: 34px;
+  padding: 0 12px;
+  border: 1px solid var(--ui-line-strong, rgba(244, 239, 226, 0.3));
+  border-radius: var(--ui-r-sm, 4px);
+  background: var(--ui-fill, rgba(244, 239, 226, 0.08));
+  color: var(--ui-text, #f4efe2);
   font: inherit;
   white-space: nowrap;
   cursor: pointer;
-  transition: background-color 0.08s ease;
+  transition: background-color var(--ui-fast, 0.15s), transform var(--ui-fast, 0.15s);
 }
 
 .drinks-hold-btn:hover {
-  background: rgba(244, 239, 226, 0.2);
+  background: var(--ui-wash-hover, rgba(244, 239, 226, 0.16));
+}
+
+.drinks-hold-btn:active {
+  transform: scale(var(--ui-press, 0.97));
 }
 
 .drinks-hold-btn--primary {
-  background: var(--ui-seal, #a9503c);
-  color: #fbf7ee;
+  background: var(--ui-paper, #f4efe2);
+  border-color: var(--ui-paper, #f4efe2);
+  color: var(--ui-ink, #2a302c);
   font-weight: 600;
 }
 
 .drinks-hold-btn--primary:hover {
-  background: var(--ui-seal-hi, #bd5e48);
+  background: var(--ui-paper-hi, #fbf8f0);
 }
 
 .drinks-hold-key {
   display: none;
-  font: 600 10.5px/1 ui-monospace, SFMono-Regular, Menlo, monospace;
-  padding: 2px 5px;
-  border-radius: 5px;
-  background: rgba(251, 247, 238, 0.22);
-  color: #fbf7ee;
+  font: 600 var(--ui-fs-key, 10px)/1 var(--ui-num, sans-serif);
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  box-sizing: border-box;
+  border-radius: var(--ui-r-xs, 2px);
+  background: var(--ui-paper-2, #e9e1cf);
+  color: var(--ui-ink, #2a302c);
+  box-shadow: inset 0 -1px 0 var(--ui-paper-line-strong, rgba(42, 48, 44, 0.3));
 }
 
 @media (hover: hover) and (pointer: fine) {

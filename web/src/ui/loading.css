@@ -81,9 +81,10 @@
 .ld-veil.travel svg{width:24px;height:24px;margin-top:20px}
 .ld-veil.travel p{font-size:var(--ui-fs-xs);letter-spacing:.16em;color:var(--ui-ink-soft)}
 
-/* ── 三级 · 角落 ─────────────────────────────────────────── */
-.ld-corner{position:fixed;right:16px;bottom:110px;z-index:55;display:flex;align-items:center;gap:8px;padding:6px 12px 6px 10px;
-  border:1px solid var(--ui-line);border-radius:var(--ui-r-ctl);background:var(--ui-surface-float);
+/* ── 三级 · 角落（z-index:4 永不反盖展开的工具册页，统入墨青匾印框） ─── */
+.ld-corner{position:fixed;right:16px;bottom:110px;z-index:4;display:flex;align-items:center;gap:8px;padding:6px 12px 6px 10px;
+  border:0;border-radius:var(--ui-plaque-r);background:var(--ui-plaque);
+  outline:1px solid var(--ui-plaque-frame);outline-offset:calc(-1px - var(--ui-plaque-inset));
   color:var(--ui-text-2);font-size:11px;letter-spacing:.06em;
   font-variant-numeric:tabular-nums;pointer-events:none;animation:ld-in .2s var(--ui-ease)}
 .ld-corner[hidden]{display:none}

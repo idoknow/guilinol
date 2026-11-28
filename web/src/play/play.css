@@ -1,44 +1,75 @@
-/* M4 sightseeing HUD on the 山水印 tokens (web/src/ui/theme.css): jade glass for controls on the scene,
-   rice paper for things you read, vermilion seal for the one thing that matters. Glass button material lives in hud.css. */
+/* M4 sightseeing HUD on the 山水印 tokens (web/src/ui/theme.css): ink-jade plaques for controls on the scene,
+   rice paper for things you read, vermilion seal for the one thing that matters. Glass button material lives in hud.css.
+   IDOK-542 批 2：只换材质，不动 fixed 元素的位置和尺寸盒子；新小像是 ../ui/ico-*.svg 遮罩 + currentColor。 */
 
-/* Dock: top-right column — mode, 景册, 拍照 (the map joins it once the atlas lands). */
 /* 右上 dock（IDOK-468）：小地图 + 一行「工具」。景册、拍照、反馈、视角、设置、相机、无人机都收在工具册页里，点开才出现；
-   起飞（游览模式）留在工具旁。材质同左上：墨青纸面、方角印框，朱砂只给计数和按下。 */
+   起飞（游览模式）留在工具旁。 */
 .dock{position:fixed;right:calc(12px + env(safe-area-inset-right));top:calc(12px + env(safe-area-inset-top));z-index:5;
   display:grid;grid-template-areas:"mini" "bar";justify-items:end;align-items:start;gap:8px}
-.dock.open{z-index:6}
+.dock.open{z-index:56}
 .dock-mini{grid-area:mini;display:flex;flex-direction:column;align-items:center;gap:6px}
 .dock-bar{grid-area:bar;display:flex;gap:6px;position:relative}
-.dock-bar>button{box-sizing:border-box;height:var(--ui-h);padding:0 14px;border-radius:var(--ui-r-paper);font-size:14px;letter-spacing:var(--ui-track);display:inline-flex;align-items:center;gap:8px}
-.dock .btn-mode{position:static}
-/* 工具 / 起飞：和左上那块匾同一种材质（IDOK-468）——墨青纸面、无外描边、内衬一道印框；工具的小像是笔筒里斜插三支笔。
-   展开时整块换宣纸（选中态），印框随之换成纸上的墨线。 */
-.dock .dock-bar>button{position:relative;border:0;background:var(--ui-surface-float)}
-.dock-bar>button::after{content:"";position:absolute;inset:3px;border:1px solid var(--ui-line-strong);border-radius:var(--ui-r-xs);pointer-events:none}
-.dock-bar>button:hover{background:var(--ui-surface-float);color:var(--ui-paper)}
-.dock-bar>button:hover::after{border-color:var(--ui-line-hover)}
-.dock-bar>button:active{background:color-mix(in srgb,var(--ui-seal) 72%,transparent)}
-.dock-more::before{content:"";flex:none;width:18px;height:18px;background:currentColor;-webkit-mask:url("../ui/hud-tools.svg") center/contain no-repeat;mask:url("../ui/hud-tools.svg") center/contain no-repeat}
-.dock .dock-bar>.dock-more[aria-expanded=true]{background:var(--ui-paper);color:var(--ui-ink-900)}
-.dock .dock-bar>.dock-more[aria-expanded=true]:hover{background:var(--ui-paper-3);color:var(--ui-ink-900)}
-.dock-more[aria-expanded=true]::after{border-color:var(--ui-paper-line-strong)}
-/* 工具册页：一张墨青纸，内衬一道纸色细线（印框），条目是纸面上的字，不再各自是一颗胶囊。
-   挂在工具条里、贴「工具」按钮正下方右对齐弹出，不参与 dock 排版，展开时 dock 不变宽、不盖左边的 HUD。 */
+.dock-bar>button{box-sizing:border-box;height:var(--ui-h);padding:0 14px;border-radius:var(--ui-plaque-r);font-size:var(--ui-fs-sm);letter-spacing:var(--ui-track);display:inline-flex;align-items:center;gap:8px}
+.dock .btn-mode{position:relative;top:auto;right:auto;bottom:auto;left:auto}
+body[data-mifen-indoor="1"] .dock .btn-mode{display:none!important}
+/* 工具 / 起飞：各是一块匾（--ui-plaque*）——墨青纸面、无外描边、内衬一道印框。悬停只在印框内铺底，按下印压朱砂。
+   工具的小像是笔筒里斜插三支笔，起飞是一只纸鸢。展开时「工具」整块换宣纸签（选中态），印框随之换成纸上的墨线。 */
+.dock .dock-bar>button{--pl-wash:transparent;position:relative;border:0;color:var(--ui-text)}
+.dock .dock-bar>button,.dock .dock-bar>button:is(:hover,:active){
+  background:linear-gradient(var(--pl-wash),var(--pl-wash)) center/calc(100% - 2 * var(--ui-plaque-inset) - 2px) calc(100% - 2 * var(--ui-plaque-inset) - 2px) no-repeat,var(--ui-plaque)}
+.dock-bar>button::after{content:"";position:absolute;inset:var(--ui-plaque-inset);border:1px solid var(--ui-plaque-frame);border-radius:var(--ui-r-xs);pointer-events:none}
+.dock .dock-bar>button:hover{--pl-wash:var(--ui-wash-hover)}
+.dock .dock-bar>button:hover::after{border-color:var(--ui-line-hover)}
+.dock .dock-bar>button:active{--pl-wash:var(--ui-wash-press);color:var(--ui-paper);transform:scale(var(--ui-press));transition-duration:var(--ui-press-t);transition-timing-function:var(--ui-ease-press)}
+.dock .dock-bar>button:focus-visible{outline:var(--ui-focus-w) solid var(--ui-focus);outline-offset:var(--ui-focus-in)}
+.dock-more::before,.dock .btn-mode::before{content:"";flex:none;width:var(--ui-ico);height:var(--ui-ico);background:currentColor;
+  -webkit-mask:var(--ico) center/contain no-repeat;mask:var(--ico) center/contain no-repeat}
+.dock-more{--ico:url("../ui/hud-tools.svg")}
+.dock .btn-mode{--ico:url("../ui/hud-fly.svg")}
+.dock .dock-bar>.dock-more[aria-expanded=true]{color:var(--ui-ink);background:var(--ui-paper)}
+.dock .dock-bar>.dock-more[aria-expanded=true]:hover{background:var(--ui-paper-hi)}
+.dock .dock-bar>.dock-more[aria-expanded=true]:active{background:var(--ui-paper-2)}
+.dock .dock-bar>.dock-more[aria-expanded=true]::after{border-color:var(--ui-paper-line-strong)}
+/* 工具册页：一张不透明的墨青纸（--ui-surface），只有一道内衬印框（outline 内收，一层、闭合，不再是外框 + 两道内衬 + 投影）。
+   每条 = 刻线小像（::before 读 --ico）+ 名称 + 桌面键帽（::after 读 aria-keyshortcuts，不加子节点、不动 textContent）。
+   挂在工具条里、贴「工具」按钮正下方右对齐弹出，不参与 dock 排版；边框留 1px 透明，盒子尺寸与改前一致。 */
 .dock-buttons{position:absolute;top:calc(100% + 8px);right:0;width:max-content;display:grid;grid-template-columns:repeat(2,auto);gap:2px;padding:7px;box-sizing:border-box;
-  background:var(--ui-ink-900);border:1px solid var(--ui-glass-line);border-radius:var(--ui-r-paper);
-  box-shadow:inset 0 0 0 3px var(--ui-ink-900),inset 0 0 0 4px var(--ui-glass-line-soft),var(--ui-shadow-1)}
+  background:var(--ui-surface);border:1px solid transparent;border-radius:var(--ui-r-sm);box-shadow:none;
+  outline:1px solid var(--ui-frame-line);outline-offset:calc(-2px - var(--ui-plaque-inset))}
 .dock-buttons[hidden]{display:none}
-/* 册页条目只在这里定样式（不吃 hud.css 的玻璃胶囊材质），不靠 CSS 加载顺序 */
-.dock-buttons>button{box-sizing:border-box;min-width:6.5em;height:38px;padding:0 12px;border:0;border-radius:4px;background:transparent;
-  font-family:var(--ui-serif);font-size:14px;letter-spacing:.14em;color:var(--ui-paper);display:flex;align-items:center;justify-content:space-between;gap:8px;
-  cursor:pointer;touch-action:none;user-select:none;-webkit-user-select:none;-webkit-tap-highlight-color:transparent;transition:background var(--ui-fast)}
-.dock-buttons>button:hover{background:rgba(244,239,226,.1)}
-.dock-buttons>button:active{background:rgba(169,80,60,.7)}
-.dock small{font:600 11px/1 var(--ui-serif);letter-spacing:0;color:var(--ui-paper);background:var(--ui-seal);border-radius:3px;padding:3px 5px}
+/* 册页条目只在这里定样式（不吃 hud.css 的玻璃材质），不靠 CSS 加载顺序 */
+.dock-buttons>button{position:relative;box-sizing:border-box;min-width:6.5em;height:38px;padding:0 12px;border:0;border-radius:var(--ui-r-xs);background:transparent;
+  font-family:var(--ui-serif);font-size:var(--ui-fs-sm);letter-spacing:.14em;color:var(--ui-text);display:flex;align-items:center;justify-content:flex-start;gap:8px;
+  cursor:pointer;touch-action:none;user-select:none;-webkit-user-select:none;-webkit-tap-highlight-color:transparent;
+  transition:background var(--ui-fast),color var(--ui-fast),transform var(--ui-fast)}
+.dock-buttons>:is(.dock-book,.dock-photo,.dock-feedback,.dock-view,.dock-settings,.dock-gear,.dock-drone,.dock-rotate)::before{content:"";flex:none;width:var(--ui-ico);height:var(--ui-ico);
+  background:currentColor;-webkit-mask:var(--ico) center/contain no-repeat;mask:var(--ico) center/contain no-repeat}
+/* 景册 = 经折册页带小印、拍照 = 取景框框住象鼻山、反馈 = 竹简毛笔、视角 = 蓑笠翁背影看一峰、设置 = 算盘三档、
+   相机 = 相机、无人机 = 桨盘画成方孔钱、横屏 = 手卷横展 */
+.dock-book{--ico:url("../ui/ico-book.svg")}.dock-photo{--ico:url("../ui/ico-photo.svg")}.dock-feedback{--ico:url("../ui/ico-feedback.svg")}
+.dock-view{--ico:url("../ui/ico-view.svg")}.dock-settings{--ico:url("../ui/ico-settings.svg")}.dock-gear{--ico:url("../ui/ico-camera.svg")}
+.dock-drone{--ico:url("../ui/ico-drone.svg")}.dock-rotate{--ico:url("../ui/ico-rotate.svg")}
+.dock-buttons>button:hover{background:var(--ui-wash-hover)}
+.dock-buttons>button:active{color:var(--ui-paper);background:var(--ui-wash-press);transform:scale(var(--ui-press));transition-duration:var(--ui-press-t);transition-timing-function:var(--ui-ease-press)}
+.dock-buttons>button:focus-visible{outline:var(--ui-focus-w) solid var(--ui-focus);outline-offset:-2px}
+/* 无人机已放好（drone.css 的 data-stage=ready）：开着的状态 = 宣纸签，不再是琥珀底 */
+.dock-buttons>.dock-drone[data-stage=ready]{color:var(--ui-ink);background:var(--ui-paper);border-color:transparent}
+.dock-buttons>.dock-drone[data-stage=ready]:hover{background:var(--ui-paper-hi)}
+.dock-buttons>.dock-drone[data-stage=ready]:active{background:var(--ui-paper-2)}
+/* 景册计数：墨青纸上细线框数字签（与右侧宣纸快捷键帽区分，不撞脸） */
+.dock small{margin-left:auto;padding:2px 5px;border-radius:var(--ui-r-xs);font:600 var(--ui-fs-xs)/1 var(--ui-num);font-variant-numeric:tabular-nums;letter-spacing:.02em;
+  color:var(--ui-text-2);background:var(--ui-fill);box-shadow:inset 0 0 0 1px var(--ui-line-strong)}
+@media (hover:hover) and (pointer:fine){
+  .dock-buttons>button[aria-keyshortcuts]::after{content:attr(aria-keyshortcuts);flex:none;margin-left:auto;display:inline-grid;place-items:center;box-sizing:border-box;
+    min-width:var(--ui-key);height:var(--ui-key);padding:0 4px;border-radius:var(--ui-r-xs);font:600 var(--ui-fs-key)/1 var(--ui-num);letter-spacing:0;
+    color:var(--ui-ink);background:var(--ui-paper);box-shadow:inset 0 -1.5px 0 var(--ui-paper-line-strong)}
+  /* 景册条已有计数签（margin-left:auto 顶到右边），键帽紧跟在签后 */
+  .dock-buttons>.dock-book[aria-keyshortcuts]::after{margin-left:0}
+}
 body[data-photo=on] :is(output,.hint,footer,.sky-ui,.walk-ui,.dock,.toast,.spot-card,.book,.summit-pill,.minimap,.road-name,.hud-me,.emote-toggle,.emote-overlay){display:none!important}
 
-/* Minimap: a paper disc with a thin jade rim; north tick on top. */
-.minimap{position:relative;width:132px;height:132px;padding:0;border-radius:50%;overflow:hidden;cursor:pointer;background:#efe8d8;
+/* Minimap: a paper disc with a thin rim; north tick on top. */
+.minimap{position:relative;width:132px;height:132px;padding:0;border-radius:50%;overflow:hidden;cursor:pointer;background:var(--ui-paper-3);
   border:3px solid rgba(244,239,226,.9);box-shadow:0 0 0 1px rgba(28,44,42,.35),0 6px 18px rgba(20,30,28,.28);-webkit-tap-highlight-color:transparent}
 .minimap canvas{display:block;width:100%;height:100%}
 /* 「北」是一方小朱印（石刻残边遮罩，同封面印），不是纸色圆角签 */
@@ -46,121 +77,225 @@ body[data-photo=on] :is(output,.hint,footer,.sky-ui,.walk-ui,.dock,.toast,.spot-
   background:var(--ui-seal);padding:3px 3px 2px;-webkit-mask:url("../ui/home-seal.svg") center/100% 100% no-repeat;mask:url("../ui/home-seal.svg") center/100% 100% no-repeat}
 .road-name{font:13px/1 var(--serif);letter-spacing:.12em;color:var(--paper);background:var(--glass);
   padding:5px 10px;border-radius:12px;max-width:150px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+/* 路名（IDOK-542）：挂在小地图下方的一枚宣纸题签——纸底墨字、内衬一道细墨框（同书画题签）。街头皮肤用 street-hud.css 自己那套 */
+body:not([data-hud=street]) .road-name{font:var(--ui-fs-xs)/1 var(--ui-serif);letter-spacing:var(--ui-track);color:var(--ui-ink);background:var(--ui-paper);border-radius:var(--ui-r-xs);
+  box-shadow:inset 0 0 0 2px var(--ui-paper),inset 0 0 0 3px var(--ui-paper-line-strong),var(--ui-shadow-1)}
 
 .road-name:empty{display:none}
 
-/* Full map */
-.atlas{position:fixed;inset:0;z-index:12;background:#efe8d8;opacity:0;transition:opacity .22s}
+/* Full map：整张宣纸 */
+.atlas{position:fixed;inset:0;z-index:12;background:var(--ui-paper-3);opacity:0;transition:opacity .22s}
 .atlas.show{opacity:1}
 .atlas canvas{position:absolute;inset:0;width:100%;height:100%;touch-action:none;cursor:grab}
 .atlas canvas:active{cursor:grabbing}
-.atlas-search{position:absolute;left:calc(14px + env(safe-area-inset-left));top:calc(14px + env(safe-area-inset-top));width:min(320px,calc(100vw - 90px));font-family:var(--serif)}
-.atlas-search input{box-sizing:border-box;width:100%;font:15px var(--serif);padding:10px 14px;border-radius:22px;border:1px solid rgba(60,60,50,.18);background:rgba(252,250,243,.96);
-  color:var(--ink);outline:none;box-shadow:0 6px 20px rgba(60,50,30,.14)}
-.atlas-search input:focus{border-color:rgba(169,80,60,.6)}
+.atlas-search{position:absolute;left:calc(14px + env(safe-area-inset-left));top:calc(14px + env(safe-area-inset-top));width:min(320px,calc(100vw - 90px));font-family:var(--ui-serif)}
+/* 搜索框：方角宣纸笺（纸面亮一档 + 纸上墨线），聚焦换深墨线 + 青玉焦点环（同 .ui-input） */
+.atlas-search input{box-sizing:border-box;width:100%;font:var(--ui-fs-md) var(--ui-serif);letter-spacing:.02em;padding:10px 14px;border-radius:var(--ui-r-sm);border:1px solid var(--ui-paper-line-strong);
+  background:var(--ui-paper-hi);color:var(--ui-ink);outline:none;box-shadow:var(--ui-shadow-1);transition:border-color var(--ui-fast)}
+.atlas-search input::placeholder{color:var(--ui-ink-3)}
+.atlas-search input:focus{border-color:var(--ui-ink-soft)}
+.atlas-search input:focus-visible{outline:var(--ui-focus-w) solid var(--ui-focus);outline-offset:1px}
+/* 码头 / 商铺直达：方角小签，不再是 14px 胶囊和霓虹青金。码头 = 宣纸签 + 竹筏撑篙，商铺 = 墨青地签 + 铺面 */
 .atlas-docks{display:flex;gap:6px;margin:6px 0 0;flex-wrap:wrap}
-.atlas-docks button{font:12.5px var(--serif);letter-spacing:.06em;border:1px solid rgba(169,80,60,.45);border-radius:14px;padding:5px 11px;background:rgba(252,250,243,.95);color:var(--seal);cursor:pointer;box-shadow:0 4px 12px rgba(60,50,30,.12)}
-.atlas-docks button:hover{background:var(--seal);color:var(--paper)}
-.atlas-docks button.atlas-shop-btn{border-color:rgba(32,214,193,.72);background:rgba(16,20,26,.92);color:#ffc53d;font-weight:700}
-.atlas-docks button.atlas-shop-btn:hover{background:#20d6c1;color:#101418}
-.atlas-search ol{list-style:none;margin:6px 0 0;padding:0;border-radius:12px;overflow:hidden;background:rgba(252,250,243,.97);box-shadow:0 10px 26px rgba(60,50,30,.16)}
+.atlas-docks button{--ico:url("../ui/ico-boat.svg");position:relative;display:inline-flex;align-items:center;gap:5px;box-sizing:border-box;min-height:30px;padding:0 10px 0 8px;
+  font:500 var(--ui-fs-xs)/1 var(--ui-serif);letter-spacing:.06em;color:var(--ui-ink);background:var(--ui-paper-hi);border:1px solid var(--ui-paper-line-strong);border-radius:var(--ui-r-xs);
+  cursor:pointer;box-shadow:var(--ui-shadow-1);-webkit-tap-highlight-color:transparent;transition:background var(--ui-fast),border-color var(--ui-fast),transform var(--ui-fast)}
+.atlas-docks button::before{content:"";flex:none;width:var(--ui-ico-sm);height:var(--ui-ico-sm);background:currentColor;
+  -webkit-mask:var(--ico) center/contain no-repeat;mask:var(--ico) center/contain no-repeat}
+.atlas-docks button:hover{background:var(--ui-paper);border-color:var(--ui-ink-soft)}
+.atlas-docks button.atlas-shop-btn{--ico:url("../ui/ico-shop.svg");color:var(--ui-text);background:var(--ui-surface);border-color:var(--ui-surface)}
+.atlas-docks button.atlas-shop-btn:hover{background:var(--ui-surface-2);border-color:var(--ui-surface-2)}
+.atlas-docks button:active{transform:scale(var(--ui-press));transition-duration:var(--ui-press-t);transition-timing-function:var(--ui-ease-press)}
+.atlas-docks button:focus-visible{outline:var(--ui-focus-w) solid var(--ui-focus);outline-offset:2px}
+.atlas-search ol{list-style:none;margin:6px 0 0;padding:0;border-radius:var(--ui-r-sm);overflow:hidden;background:var(--ui-paper-hi);box-shadow:var(--ui-shadow-1),inset 0 0 0 1px var(--ui-paper-line)}
 .atlas-search ol:empty{display:none}
-.atlas-search li{display:flex;align-items:baseline;gap:10px;padding:9px 14px;cursor:pointer;border-top:1px solid rgba(60,60,50,.08)}
-.atlas-search li:first-child{border-top:0}.atlas-search li:hover{background:rgba(169,80,60,.08)}
-.atlas-search li b{font-weight:600;color:var(--ink)}.atlas-search li span{font-size:12px;color:var(--ink-soft)}.atlas-search li.none{color:var(--ink-soft);cursor:default}
-.atlas-close,.atlas-here{position:absolute;right:calc(14px + env(safe-area-inset-right));width:42px;height:42px;border-radius:50%;border:1px solid rgba(60,60,50,.18);
-  background:rgba(252,250,243,.96);color:var(--ink);font-size:22px;line-height:1;cursor:pointer;box-shadow:0 6px 18px rgba(60,50,30,.14)}
-.atlas-close{top:calc(14px + env(safe-area-inset-top))}.atlas-here{bottom:calc(16px + env(safe-area-inset-bottom));font-size:20px;color:var(--seal)}
-.atlas-pop{position:absolute;left:0;top:0;display:flex;align-items:center;gap:8px;white-space:nowrap;padding:6px 6px 6px 14px;border-radius:20px;
-  background:var(--ink);color:var(--paper);font:14px var(--serif);box-shadow:0 8px 22px rgba(20,30,28,.3);pointer-events:auto}
-.atlas-pop span{font-size:12px;opacity:.7}
-.atlas-pop button{font:13px var(--serif);letter-spacing:.15em;border:0;border-radius:var(--ui-r-pill);padding:6px 12px;background:var(--seal);color:var(--paper);cursor:pointer}
-.atlas-pop .atlas-nav-btn{background:rgba(245,166,35,.18);color:#ffd166;border:1px solid rgba(245,166,35,.45);letter-spacing:.08em}
-.atlas-legend{position:absolute;left:50%;bottom:calc(14px + env(safe-area-inset-bottom));transform:translateX(-50%);margin:0;font:12px var(--serif);color:var(--ink-soft);
-  background:rgba(252,250,243,.85);padding:4px 12px;border-radius:12px;white-space:nowrap;pointer-events:none}
+.atlas-search li{display:flex;align-items:baseline;gap:10px;padding:9px 14px;cursor:pointer;border-top:1px solid var(--ui-paper-line)}
+.atlas-search li:first-child{border-top:0}.atlas-search li:hover{background:var(--ui-paper-fill)}
+.atlas-search li b{font-weight:600;color:var(--ui-ink)}.atlas-search li span{font-size:var(--ui-fs-xs);color:var(--ui-ink-soft)}.atlas-search li.none{color:var(--ui-ink-soft);cursor:default}
+/* 关闭 = 方形 ×；回到我的位置 = 司南小像（字留在 DOM 里给读屏和脚本，font-size:0） */
+.atlas-close,.atlas-here{position:absolute;right:calc(14px + env(safe-area-inset-right));width:42px;height:42px;padding:0;border-radius:var(--ui-r-sm);border:1px solid var(--ui-paper-line-strong);
+  background:var(--ui-paper-hi);color:var(--ui-ink);font:300 26px/1 var(--ui-serif);cursor:pointer;box-shadow:var(--ui-shadow-1);-webkit-tap-highlight-color:transparent;
+  transition:background var(--ui-fast),border-color var(--ui-fast),transform var(--ui-fast)}
+.atlas-close:hover,.atlas-here:hover{background:var(--ui-paper);border-color:var(--ui-ink-soft)}
+.atlas-close:active,.atlas-here:active{background:var(--ui-paper-2);transform:scale(var(--ui-press));transition-duration:var(--ui-press-t);transition-timing-function:var(--ui-ease-press)}
+.atlas-close:focus-visible,.atlas-here:focus-visible{outline:var(--ui-focus-w) solid var(--ui-focus);outline-offset:2px}
+.atlas-close{top:calc(14px + env(safe-area-inset-top))}.atlas-here{bottom:calc(16px + env(safe-area-inset-bottom));font-size:0}
+.atlas-here::before{content:"";position:absolute;inset:0;margin:auto;width:var(--ui-ico-lg);height:var(--ui-ico-lg);background:currentColor;pointer-events:none;
+  -webkit-mask:url("../ui/ico-here.svg") center/contain no-repeat;mask:url("../ui/ico-here.svg") center/contain no-repeat}
+/* 地点浮牌：墨青纸 + 内衬印框。「前往」是唯一主动作 = 残边朱印；「标记 / 取消导航」= 线框签 + 曲折航线小像 */
+.atlas-pop{position:absolute;left:0;top:0;display:flex;align-items:center;gap:8px;white-space:nowrap;padding:6px 6px 6px 14px;border-radius:var(--ui-plaque-r);
+  background:var(--ui-surface);color:var(--ui-text);font:var(--ui-fs-sm) var(--ui-serif);box-shadow:var(--ui-shadow-1);pointer-events:auto}
+.atlas-pop::after{content:"";position:absolute;inset:var(--ui-plaque-inset);border:1px solid var(--ui-plaque-frame);border-radius:var(--ui-r-xs);pointer-events:none}
+.atlas-pop span{font-size:var(--ui-fs-xs);color:var(--ui-text-2)}
+.atlas-pop button{position:relative;display:inline-flex;align-items:center;gap:4px;box-sizing:border-box;min-height:30px;padding:0 14px;border:0;border-radius:0;
+  font:600 var(--ui-fs-sm)/1 var(--ui-serif);letter-spacing:var(--ui-track);color:var(--ui-paper);background:var(--ui-seal);cursor:pointer;-webkit-tap-highlight-color:transparent;
+  -webkit-mask:var(--ui-mask-bar) center/100% 100% no-repeat;mask:var(--ui-mask-bar) center/100% 100% no-repeat;transition:background var(--ui-fast),box-shadow var(--ui-fast),transform var(--ui-fast)}
+.atlas-pop button:hover{background:var(--ui-seal-hi)}
+.atlas-pop button:active{background:var(--ui-seal);transform:scale(var(--ui-press-seal));transition-duration:var(--ui-press-t);transition-timing-function:var(--ui-ease-press)}
+.atlas-pop button:focus-visible{outline:1.5px solid var(--ui-paper);outline-offset:-5px}
+.atlas-pop .atlas-nav-btn{padding:0 10px 0 8px;font-weight:500;letter-spacing:.08em;color:var(--ui-text);background:none;border-radius:var(--ui-r-xs);box-shadow:inset 0 0 0 1px var(--ui-line-strong);
+  -webkit-mask:none;mask:none}
+.atlas-pop .atlas-nav-btn::before{content:"";flex:none;width:var(--ui-ico-sm);height:var(--ui-ico-sm);background:currentColor;
+  -webkit-mask:url("../ui/ico-route.svg") center/contain no-repeat;mask:url("../ui/ico-route.svg") center/contain no-repeat}
+.atlas-pop .atlas-nav-btn:hover{background:var(--ui-fill);box-shadow:inset 0 0 0 1px var(--ui-line-hover)}
+.atlas-pop .atlas-nav-btn:active{background:var(--ui-fill-2);transform:scale(var(--ui-press))}
+.atlas-pop .atlas-nav-btn:focus-visible{outline:var(--ui-focus-w) solid var(--ui-focus);outline-offset:2px}
+.atlas-legend{position:absolute;left:50%;bottom:calc(14px + env(safe-area-inset-bottom));transform:translateX(-50%);margin:0;font:var(--ui-fs-xs) var(--ui-serif);color:var(--ui-ink-soft);
+  background:color-mix(in srgb,var(--ui-paper-hi) 85%,transparent);padding:4px 12px;border-radius:var(--ui-r-xs);white-space:nowrap;pointer-events:none}
 /* IDOK-588：开图进度（走过才解锁），跟图例同一行，压暗一点当副标题 */
-.atlas-fog{color:var(--ink-soft);opacity:.72}
+.atlas-fog{color:var(--ui-ink-soft);opacity:.72}
 /* 窄屏图例多了一段开图进度会溢出两侧，允许换行 */
 @media (max-width:560px){.atlas-legend{white-space:normal;max-width:calc(100vw - 28px);text-align:center;line-height:1.55}}
 
 
-/* Spot card: rice paper sheet sliding in from the right; bottom sheet on phones. */
+/* Spot card: rice paper sheet sliding in from the right; bottom sheet on phones. 纯纸面，不加装饰渐变。 */
 .spot-card{position:fixed;right:calc(16px + env(safe-area-inset-right));top:50%;width:300px;box-sizing:border-box;z-index:6;
-  background:var(--paper);color:var(--ink);font-family:var(--serif);padding:22px 22px 18px;border-radius:6px;
-  box-shadow:0 18px 50px rgba(20,30,28,.28),inset 0 0 0 1px rgba(90,80,60,.12);
-  background-image:linear-gradient(180deg,rgba(255,255,255,.35),rgba(255,255,255,0) 40%),radial-gradient(circle at 80% 0,rgba(169,80,60,.06),transparent 50%);
-  transform:translate(24px,-50%);opacity:0;transition:transform .32s cubic-bezier(.2,.8,.2,1),opacity .25s}
+  background:var(--ui-paper);color:var(--ui-ink);font-family:var(--ui-serif);padding:22px 22px 18px;border-radius:var(--ui-r-paper);
+  box-shadow:var(--ui-shadow-2),inset 0 0 0 1px var(--ui-paper-line);
+  transform:translate(24px,-50%);opacity:0;transition:transform var(--ui-slow) var(--ui-ease),opacity .25s}
 .spot-card.show{transform:translate(0,-50%);opacity:1}
 .spot-card h2{margin:0;font-size:26px;letter-spacing:.18em;font-weight:600}
-.card-sub{margin:4px 0 12px;color:var(--ink-soft);font-size:13px;letter-spacing:.08em}
-.card-intro{margin:0 0 14px;font-size:14px;line-height:1.85;text-align:justify}
-.card-best{display:flex;align-items:center;gap:8px;margin:0 0 14px;padding:8px 0;border-top:1px solid rgba(60,60,50,.14);border-bottom:1px solid rgba(60,60,50,.14);font-size:13px}
-.card-best span{color:var(--ink-soft)}.card-best b{font-weight:600;flex:1}
-.spot-card button,.book button{font-family:var(--serif);cursor:pointer;-webkit-tap-highlight-color:transparent}
-.card-best button{border:1px solid rgba(169,80,60,.5);color:var(--seal);background:none;border-radius:14px;padding:4px 10px;font-size:12px}
+.card-sub{margin:4px 0 12px;color:var(--ui-ink-soft);font-size:13px;letter-spacing:.08em}
+.card-intro{margin:0 0 14px;font-size:var(--ui-fs-sm);line-height:1.85;text-align:justify}
+.card-best{display:flex;align-items:center;gap:8px;margin:0 0 14px;padding:8px 0;border-top:1px solid var(--ui-paper-line);border-bottom:1px solid var(--ui-paper-line);font-size:13px}
+.card-best span{color:var(--ui-ink-soft)}.card-best b{font-weight:600;flex:1}
+.spot-card button,.book button{font-family:var(--ui-serif);cursor:pointer;-webkit-tap-highlight-color:transparent}
+/* 纸上的键：墨线框（宣纸面墨线键）；整张卡只有「取景」一枚朱印 */
+.card-best button{position:relative;flex:none;box-sizing:border-box;min-height:28px;padding:0 10px;border:1px solid var(--ui-paper-line-strong);border-radius:var(--ui-r-sm);
+  background:none;color:var(--ui-ink);font-size:var(--ui-fs-xs);letter-spacing:var(--ui-track);transition:background var(--ui-fast),border-color var(--ui-fast),transform var(--ui-fast)}
+.card-best button:hover{background:var(--ui-paper-fill);border-color:var(--ui-ink-soft)}
+.card-best button:active{transform:scale(var(--ui-press));transition-duration:var(--ui-press-t);transition-timing-function:var(--ui-ease-press)}
 .card-actions{display:flex;gap:8px}
-.card-actions button{flex:1;border:0;border-radius:var(--ui-r-pill);padding:9px 0;font-size:14px;letter-spacing:.2em;background:var(--paper-deep);color:var(--ink);transition:background .15s}
-.card-actions button:first-child{background:var(--seal);color:var(--paper)}
-.card-actions button:hover{filter:brightness(1.05)}
-.card-close{position:absolute;right:8px;top:6px;width:32px;height:32px;border:0;background:none;color:var(--ink-soft);font-size:22px;line-height:1;cursor:pointer}
-.card-seal{position:absolute;right:22px;top:20px;width:46px;height:46px;display:grid;place-items:center;border-radius:6px;box-sizing:border-box;
-  font:600 24px/1 var(--serif);color:rgba(169,80,60,.55);border:2px dashed rgba(169,80,60,.45);transform:rotate(-4deg)}
+.card-actions button{position:relative;flex:1;box-sizing:border-box;min-height:var(--ui-h);padding:0;border:0;border-radius:var(--ui-r-sm);font-size:var(--ui-fs-sm);letter-spacing:var(--ui-track-title);
+  color:var(--ui-ink);background:none;box-shadow:inset 0 0 0 1px var(--ui-paper-line-strong);transition:background var(--ui-fast),box-shadow var(--ui-fast),transform var(--ui-fast)}
+.card-actions button:hover{background:var(--ui-paper-fill);box-shadow:inset 0 0 0 1px var(--ui-ink-soft)}
+.card-actions button:active{transform:scale(var(--ui-press));transition-duration:var(--ui-press-t);transition-timing-function:var(--ui-ease-press)}
+.card-actions button:first-child{font-weight:600;color:var(--ui-paper);background:var(--ui-seal);box-shadow:none;border-radius:0;
+  -webkit-mask:var(--ui-mask-bar) center/100% 100% no-repeat;mask:var(--ui-mask-bar) center/100% 100% no-repeat}
+.card-actions button:first-child:hover{background:var(--ui-seal-hi);box-shadow:none}
+.card-actions button:first-child:active{background:var(--ui-seal);transform:scale(var(--ui-press-seal))}
+.spot-card :is(.card-best,.card-actions) button:focus-visible{outline:var(--ui-focus-w) solid var(--ui-focus);outline-offset:2px}
+.card-actions button:first-child:focus-visible{outline:1.5px solid var(--ui-paper);outline-offset:-5px}
+.card-close{position:absolute;right:8px;top:6px;width:32px;height:32px;padding:0;border:0;border-radius:var(--ui-r-sm);background:none;color:var(--ui-ink-soft);font-size:22px;line-height:1;cursor:pointer;
+  transition:background var(--ui-fast),color var(--ui-fast)}
+.card-close:hover{color:var(--ui-ink);background:var(--ui-paper-fill)}
+.card-close:focus-visible{outline:var(--ui-focus-w) solid var(--ui-focus);outline-offset:-2px}
+/* 小键补可点区（同 .ui-hit）：画面不变，透明伪元素撑到 --ui-hit 见方 */
+:is(.card-close,.card-best button,.summit-pill button,.gear-close,body>.photo-exit)::before{content:"";position:absolute;left:50%;top:50%;
+  width:max(100%,var(--ui-hit));height:max(100%,var(--ui-hit));transform:translate(-50%,-50%)}
+.card-seal{position:absolute;right:22px;top:20px;width:46px;height:46px;display:grid;place-items:center;border-radius:var(--ui-r-md);box-sizing:border-box;
+  font:600 24px/1 var(--serif);color:color-mix(in srgb,var(--ui-seal) 55%,transparent);border:2px dashed color-mix(in srgb,var(--ui-seal) 45%,transparent);transform:rotate(-4deg)}
 .spot-card .card-seal{right:44px}
-.card-seal.done{color:var(--paper);background:var(--seal);border:2px solid var(--seal);box-shadow:inset 0 0 0 3px var(--seal),inset 0 0 0 4.5px rgba(244,239,226,.85)}
+.card-seal.done{color:var(--ui-paper);background:var(--ui-seal);border:2px solid var(--ui-seal);box-shadow:inset 0 0 0 3px var(--ui-seal),inset 0 0 0 4.5px color-mix(in srgb,var(--ui-paper) 85%,transparent)}
 .card-seal.fresh{animation:stamp .55s cubic-bezier(.3,1.4,.5,1) .25s both}
 @keyframes stamp{0%{transform:scale(2.2) rotate(-14deg);opacity:0}60%{opacity:1}100%{transform:scale(1) rotate(-4deg);opacity:1}}
 
-/* 景册 */
+/* 景册：宣纸对话框 + 内衬印框（透明边框把滚到底的内容收在印框内）；每行一道发丝线，「前往 / 领¥」是方印 */
 .book{position:fixed;left:50%;top:50%;width:min(560px,calc(100vw - 32px));max-height:calc(100vh - 48px);overflow:auto;box-sizing:border-box;z-index:7;
-  background:var(--paper);color:var(--ink);font-family:var(--serif);border-radius:6px;padding:20px 22px;box-shadow:0 24px 70px rgba(20,30,28,.35);
-  transform:translate(-50%,-46%);opacity:0;transition:transform .3s cubic-bezier(.2,.8,.2,1),opacity .25s}
+  background:var(--ui-paper);color:var(--ui-ink);font-family:var(--ui-serif);border:var(--ui-frame-pad) solid transparent;border-radius:var(--ui-r-lg);padding:6px 8px 8px;
+  outline:1px solid var(--ui-paper-line-strong);outline-offset:calc(-1px - var(--ui-frame));box-shadow:var(--ui-shadow-2);
+  transform:translate(-50%,-46%);opacity:0;transition:transform .3s var(--ui-ease),opacity .25s;scrollbar-width:thin;scrollbar-color:var(--ui-paper-line-strong) transparent}
 .book.show{transform:translate(-50%,-50%);opacity:1}
 .book header{position:relative;margin-bottom:10px}.book h2{margin:0;font-size:24px;letter-spacing:.3em}
-.book header p{margin:4px 0 0;font-size:13px;color:var(--ink-soft)}.book header b{color:var(--seal)}
-.book ol{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:1fr 1fr;gap:8px}
-.book li{position:relative;display:flex;align-items:center;gap:12px;padding:10px 10px 10px 12px;border-radius:5px;background:rgba(255,255,255,.4);box-shadow:inset 0 0 0 1px rgba(60,60,50,.1)}
+.book header p{margin:4px 0 0;font-size:13px;color:var(--ui-ink-soft)}.book header b{font-family:var(--ui-num);font-variant-numeric:tabular-nums;color:var(--ui-ink)}
+.book ol{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:1fr 1fr;gap:0 20px;border-top:1px solid var(--ui-paper-line-strong)}
+.book li{position:relative;display:flex;align-items:center;gap:12px;padding:8px 2px 8px 0;border-bottom:1px solid var(--ui-paper-line)}
 .book li .card-seal{position:static;flex:none;width:40px;height:40px;font-size:21px}
-.book li>div:nth-child(2){flex:1;min-width:0}.book h3{margin:0;font-size:16px;letter-spacing:.1em}
-.book li p{margin:2px 0 0;font-size:11.5px;color:var(--ink-soft);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.book li button{border:1px solid rgba(169,80,60,.5);background:none;color:var(--seal);border-radius:14px;padding:4px 10px;font-size:12px;flex:none}
-.book li button:hover{background:var(--seal);color:var(--paper)}
-.book-docks{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-top:12px;padding-top:10px;border-top:1px solid rgba(60,60,50,.14)}
-.book-docks span{font-size:12.5px;color:var(--ink-soft);letter-spacing:.08em}
+.book li>div:nth-child(2){flex:1;min-width:0}.book h3{margin:0;font-size:var(--ui-fs-md);letter-spacing:.1em}
+.book li p{margin:2px 0 0;font-size:var(--ui-fs-xs);color:var(--ui-ink-soft);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.book li button{position:relative;flex:none;box-sizing:border-box;width:44px;height:44px;padding:0 6px 0 calc(6px + .12em);border:0;border-radius:0;
+  font:600 var(--ui-fs-xs)/1.25 var(--ui-num);letter-spacing:.12em;white-space:normal;word-break:break-all;text-align:center;color:var(--ui-ink);background:none;
+  box-shadow:inset 0 0 0 1.5px var(--ui-paper-line-strong);transform:rotate(-3deg);
+  -webkit-mask:var(--ui-mask-seal) center/100% 100% no-repeat;mask:var(--ui-mask-seal) center/100% 100% no-repeat;
+  transition:background var(--ui-fast),color var(--ui-fast),box-shadow var(--ui-fast),transform var(--ui-fast)}
+.book li button:is(:hover,:focus-visible){color:var(--ui-paper);background:var(--ui-seal);box-shadow:none}
+.book li button:active{color:var(--ui-paper);background:var(--ui-seal-hi);box-shadow:none;transform:rotate(-3deg) scale(var(--ui-press-seal));
+  transition-duration:var(--ui-press-t);transition-timing-function:var(--ui-ease-press)}
+.book li button:focus-visible{outline:1.5px solid var(--ui-paper);outline-offset:-6px}
+/* 水边开船直达：不另起标题，每枚是纸上墨线小签 + 竹筏撑篙小像（组名留给读屏，见 index.ts aria-label） */
+.book-docks{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:12px;padding-top:10px}
 .book-docks>div{display:flex;gap:8px;flex-wrap:wrap}
-.book-docks button{border:1px solid rgba(169,80,60,.55);background:rgba(169,80,60,.08);color:var(--seal);border-radius:14px;padding:5px 12px;font-size:12.5px;letter-spacing:.06em}
-.book-docks button:hover{background:var(--seal);color:var(--paper)}
+.book-docks button{position:relative;display:inline-flex;align-items:center;gap:5px;box-sizing:border-box;min-height:30px;padding:0 10px 0 8px;border:1px solid var(--ui-paper-line-strong);
+  border-radius:var(--ui-r-xs);background:none;color:var(--ui-ink);font-size:var(--ui-fs-xs);letter-spacing:.06em;transition:background var(--ui-fast),border-color var(--ui-fast),transform var(--ui-fast)}
+.book-docks button::before{content:"";flex:none;width:var(--ui-ico-sm);height:var(--ui-ico-sm);background:currentColor;
+  -webkit-mask:url("../ui/ico-boat.svg") center/contain no-repeat;mask:url("../ui/ico-boat.svg") center/contain no-repeat}
+.book-docks button:hover{background:var(--ui-paper-fill);border-color:var(--ui-ink-soft)}
+.book-docks button:active{transform:scale(var(--ui-press));transition-duration:var(--ui-press-t);transition-timing-function:var(--ui-ease-press)}
+.book-docks button:focus-visible{outline:var(--ui-focus-w) solid var(--ui-focus);outline-offset:2px}
 
-/* Summit pill */
+/* Summit：山巅一块墨青匾 + 内衬印框，「下山」是残边朱印 */
 .summit-pill{position:fixed;left:50%;top:calc(14px + env(safe-area-inset-top));transform:translateX(-50%);z-index:5;display:flex;align-items:center;gap:10px;
-  padding:5px 6px 5px 16px;border-radius:20px;background:var(--glass);color:var(--paper);font:15px var(--serif);letter-spacing:.2em}
-.summit-pill button{font:13px var(--serif);letter-spacing:.15em;border:0;border-radius:var(--ui-r-pill);padding:6px 12px;background:var(--seal);color:var(--paper);cursor:pointer}
+  padding:5px 6px 5px 16px;border-radius:var(--ui-plaque-r);background:var(--ui-plaque);color:var(--ui-text);font:15px var(--ui-serif);letter-spacing:.2em}
+.summit-pill::after{content:"";position:absolute;inset:var(--ui-plaque-inset);border:1px solid var(--ui-plaque-frame);border-radius:var(--ui-r-xs);pointer-events:none}
+.summit-pill button{position:relative;box-sizing:border-box;min-height:30px;padding:0 14px;border:0;font:600 13px var(--ui-serif);letter-spacing:.15em;color:var(--ui-paper);background:var(--ui-seal);cursor:pointer;
+  -webkit-mask:var(--ui-mask-bar) center/100% 100% no-repeat;mask:var(--ui-mask-bar) center/100% 100% no-repeat;-webkit-tap-highlight-color:transparent;
+  transition:background var(--ui-fast),transform var(--ui-fast)}
+.summit-pill button:hover{background:var(--ui-seal-hi)}
+.summit-pill button:active{background:var(--ui-seal);transform:scale(var(--ui-press-seal));transition-duration:var(--ui-press-t);transition-timing-function:var(--ui-ease-press)}
+.summit-pill button:focus-visible{outline:1.5px solid var(--ui-paper);outline-offset:-5px}
 
-/* Photo mode */
+/* Photo mode：一块墨青匾 + 内衬印框；分段是方角版刻，选中 = 宣纸签；快门是一枚圆形残边朱印 */
 .photo-bar{position:fixed;left:50%;bottom:calc(14px + env(safe-area-inset-bottom));transform:translateX(-50%);z-index:8;box-sizing:border-box;
-  width:min(720px,calc(100vw - 24px));padding:10px 96px 10px 14px;border-radius:16px;background:var(--glass-strong);
-  color:var(--paper);font:13px var(--serif);display:flex;flex-direction:column;gap:8px;user-select:none;-webkit-user-select:none}
+  width:min(720px,calc(100vw - 24px));padding:10px 96px 10px 14px;border-radius:var(--ui-plaque-r);background:var(--ui-plaque);
+  color:var(--ui-text);font:13px var(--ui-serif);display:flex;flex-direction:column;gap:8px;user-select:none;-webkit-user-select:none}
+.photo-bar::after{content:"";position:absolute;inset:var(--ui-plaque-inset);border:1px solid var(--ui-plaque-frame);border-radius:var(--ui-r-xs);pointer-events:none}
 .photo-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
-.photo-hour{display:flex;align-items:center;gap:10px;flex:1;min-width:220px}.photo-hour span{min-width:7.4em;letter-spacing:.06em}
-.photo-hour input{flex:1;accent-color:var(--seal-light)}
-.chips{display:flex;gap:2px;padding:2px;border-radius:13px;background:rgba(244,239,226,.08)}
-.chips button{font:13px var(--serif);color:var(--paper);background:none;border:0;border-radius:11px;padding:4px 9px;cursor:pointer;opacity:.72;-webkit-tap-highlight-color:transparent}
-.chips button:hover{opacity:1}.chips button.on{background:rgba(169,80,60,.75);opacity:1}
-.photo-shutter{position:absolute;right:14px;top:50%;transform:translateY(-50%);width:64px;height:64px;border-radius:50%;border:3px solid var(--paper);background:none;padding:0;cursor:pointer;display:grid;place-items:center}
-.photo-shutter i{display:block;width:50px;height:50px;border-radius:50%;background:var(--seal);transition:transform .12s}
-.photo-shutter:active i{transform:scale(.86)}
-.photo-exit{position:fixed;right:calc(14px + env(safe-area-inset-right));top:calc(12px + env(safe-area-inset-top));width:40px;height:40px;border-radius:50%;
-  border:1px solid var(--line);background:var(--glass);color:var(--paper);font-size:22px;line-height:1;cursor:pointer}
+.photo-hour{display:flex;align-items:center;gap:10px;flex:1;min-width:220px}.photo-hour span{min-width:7.4em;letter-spacing:.06em;font-variant-numeric:tabular-nums}
+.photo-hour input{flex:1;appearance:none;-webkit-appearance:none;height:18px;margin:0;background:transparent;cursor:pointer}
+.photo-hour input::-webkit-slider-runnable-track{height:3px;border-radius:1px;background:var(--ui-line-strong)}
+.photo-hour input::-webkit-slider-thumb{appearance:none;-webkit-appearance:none;width:12px;height:12px;margin-top:-4.5px;border-radius:var(--ui-r-xs);background:var(--ui-paper);border:1.5px solid var(--ui-seal)}
+.photo-hour input::-moz-range-track{height:3px;border-radius:1px;background:var(--ui-line-strong)}
+.photo-hour input::-moz-range-thumb{width:12px;height:12px;border-radius:var(--ui-r-xs);background:var(--ui-paper);border:1.5px solid var(--ui-seal)}
+.chips{display:flex;gap:2px;padding:2px;border-radius:var(--ui-r-xs);background:var(--ui-fill);box-shadow:inset 0 0 0 1px var(--ui-line)}
+.chips button{position:relative;display:inline-flex;align-items:center;gap:4px;font:13px var(--ui-serif);letter-spacing:.06em;color:var(--ui-text-2);background:none;border:0;border-radius:var(--ui-r-xs);
+  padding:4px 9px;cursor:pointer;-webkit-tap-highlight-color:transparent;transition:background var(--ui-fast),color var(--ui-fast),transform var(--ui-fast)}
+.chips button:hover{color:var(--ui-text);background:var(--ui-wash-hover)}
+.chips button:active{color:var(--ui-paper);background:var(--ui-wash-press);transform:scale(var(--ui-press));transition-duration:var(--ui-press-t);transition-timing-function:var(--ui-ease-press)}
+.chips button.on{color:var(--ui-ink);background:var(--ui-paper)}.chips button.on:hover{background:var(--ui-paper-hi)}
+.chips button:focus-visible{outline:var(--ui-focus-w) solid var(--ui-focus);outline-offset:-1px}
+/* 天气、人物、换机配小像（字仍在键里）；落款是一枚墨线小方印 */
+.chips :is([data-v=clear],[data-v=mist],[data-v=rain],[data-v=figure],[data-v=rack])::before{content:"";flex:none;width:var(--ui-ico-sm);height:var(--ui-ico-sm);margin-left:-2px;
+  background:currentColor;-webkit-mask:var(--ico) center/contain no-repeat;mask:var(--ico) center/contain no-repeat}
+.chips [data-v=clear]{--ico:url("../ui/ico-sky-clear.svg")}.chips [data-v=mist]{--ico:url("../ui/ico-sky-mist.svg")}.chips [data-v=rain]{--ico:url("../ui/ico-sky-rain.svg")}
+.chips [data-v=figure]{--ico:url("../ui/hud-guest.svg")}.chips [data-v=rack]{--ico:url("../ui/ico-camera.svg")}
+.chips [data-v=sign]::before{content:"";flex:none;box-sizing:border-box;width:11px;height:11px;margin:0 1px 0 -1px;border:1.5px solid currentColor;border-radius:1px;transform:rotate(-4deg)}
+.photo-shutter{position:absolute;right:14px;top:50%;transform:translateY(-50%);width:64px;height:64px;border:0;border-radius:0;background:var(--ui-seal);padding:0;cursor:pointer;display:grid;place-items:center;
+  -webkit-mask:var(--ui-mask-round) center/100% 100% no-repeat;mask:var(--ui-mask-round) center/100% 100% no-repeat;-webkit-tap-highlight-color:transparent;
+  transition:background var(--ui-fast),transform var(--ui-fast)}
+/* 圆印里的一道纸色内圈（印框）；焦点时内圈加粗，不靠外描边（会被圆印遮罩裁掉） */
+.photo-shutter i{display:block;width:50px;height:50px;border-radius:50%;box-shadow:inset 0 0 0 1.5px var(--ui-paper);transition:box-shadow var(--ui-fast)}
+.photo-shutter:hover{background:var(--ui-seal-hi)}
+.photo-shutter:focus-visible{outline:none}.photo-shutter:focus-visible i{box-shadow:inset 0 0 0 3px var(--ui-paper)}
+/* 退出拍照：墨青方形印键（匾 + 内衬印框），盒子仍是 40 + 1px 透明边 */
+body>.photo-exit{--pl-wash:transparent;position:fixed;right:calc(14px + env(safe-area-inset-right));top:calc(12px + env(safe-area-inset-top));width:40px;height:40px;padding:0;
+  border-radius:var(--ui-plaque-r);border:1px solid transparent;color:var(--ui-text);font:300 24px/1 var(--ui-serif);cursor:pointer;
+  background:linear-gradient(var(--pl-wash),var(--pl-wash)) center/calc(100% - 8px) calc(100% - 8px) no-repeat,var(--ui-plaque)}
+body>.photo-exit::after{content:"";position:absolute;inset:calc(var(--ui-plaque-inset) - 1px);border:1px solid var(--ui-plaque-frame);border-radius:var(--ui-r-xs);pointer-events:none}
+body>.photo-exit:hover{--pl-wash:var(--ui-wash-hover)}
+body>.photo-exit:active{--pl-wash:var(--ui-wash-press);color:var(--ui-paper);transform:scale(var(--ui-press));transition-duration:var(--ui-press-t);transition-timing-function:var(--ui-ease-press)}
+body>.photo-exit:focus-visible{outline:var(--ui-focus-w) solid var(--ui-focus);outline-offset:var(--ui-focus-in)}
 .photo-flash{position:fixed;inset:0;background:#fff;opacity:0;pointer-events:none;z-index:30}
 .photo-flash.go{animation:flash .45s ease-out}
 @keyframes flash{0%{opacity:.85}100%{opacity:0}}
-.photo-shot{position:fixed;left:calc(14px + env(safe-area-inset-left));top:calc(14px + env(safe-area-inset-top));margin:0;z-index:9;width:200px;padding:6px 6px 0;background:var(--paper);border-radius:4px;
-  box-shadow:0 14px 40px rgba(0,0,0,.3);transform:rotate(-2deg)}
+.photo-shot{position:fixed;left:calc(14px + env(safe-area-inset-left));top:calc(14px + env(safe-area-inset-top));margin:0;z-index:9;width:200px;padding:6px 6px 0;background:var(--ui-paper);color:var(--ui-ink);
+  border-radius:var(--ui-r-sm);box-shadow:var(--ui-shadow-2);transform:rotate(-2deg)}
 .photo-shot.in{animation:drop .5s cubic-bezier(.2,.9,.3,1.2)}
 @keyframes drop{0%{transform:translate(30vw,30vh) rotate(8deg) scale(1.6);opacity:0}100%{transform:rotate(-2deg);opacity:1}}
-.photo-shot img{display:block;width:100%;border-radius:2px}
-.photo-shot figcaption{display:flex;gap:6px;align-items:center;padding:6px 0;font:13px var(--serif)}
-.photo-shot a,.photo-shot button{flex:1;text-align:center;text-decoration:none;color:var(--paper);background:var(--seal);border:0;border-radius:var(--ui-r-pill);padding:6px 0;font:13px var(--serif);letter-spacing:.15em;cursor:pointer}
-.photo-shot .shot-close{flex:none;width:30px;background:none;color:var(--ink-soft);font-size:18px;letter-spacing:0}
+.photo-shot img{display:block;width:100%;border-radius:var(--ui-r-xs)}
+.photo-shot figcaption{display:flex;gap:6px;align-items:center;padding:6px 0;font:13px var(--ui-serif)}
+/* 保存 = 朱砂主印（残边横条）；分享 = 纸上墨线副键 */
+.photo-shot a,.photo-shot button{position:relative;flex:1;display:inline-flex;align-items:center;justify-content:center;box-sizing:border-box;min-height:30px;padding:0;text-align:center;text-decoration:none;
+  border:0;font:600 13px var(--ui-serif);letter-spacing:.15em;cursor:pointer;-webkit-tap-highlight-color:transparent;transition:background var(--ui-fast),box-shadow var(--ui-fast),transform var(--ui-fast)}
+.photo-shot a{color:var(--ui-paper);background:var(--ui-seal);-webkit-mask:var(--ui-mask-bar) center/100% 100% no-repeat;mask:var(--ui-mask-bar) center/100% 100% no-repeat}
+.photo-shot a:hover{background:var(--ui-seal-hi)}
+.photo-shot a:active{background:var(--ui-seal);transform:scale(var(--ui-press-seal));transition-duration:var(--ui-press-t);transition-timing-function:var(--ui-ease-press)}
+.photo-shot a:focus-visible{outline:1.5px solid var(--ui-paper);outline-offset:-5px}
+.photo-shot button:not(.shot-close){font-weight:500;color:var(--ui-ink);background:none;border-radius:var(--ui-r-sm);box-shadow:inset 0 0 0 1px var(--ui-paper-line-strong)}
+.photo-shot button:not(.shot-close):hover{background:var(--ui-paper-fill);box-shadow:inset 0 0 0 1px var(--ui-ink-soft)}
+.photo-shot button:not(.shot-close):active{transform:scale(var(--ui-press));transition-duration:var(--ui-press-t);transition-timing-function:var(--ui-ease-press)}
+.photo-shot button:focus-visible{outline:var(--ui-focus-w) solid var(--ui-focus);outline-offset:1px}
+.photo-shot .shot-close{flex:none;width:30px;border-radius:var(--ui-r-sm);background:none;color:var(--ui-ink-soft);font:300 20px/1 var(--ui-serif);letter-spacing:0}
+.photo-shot .shot-close:hover{color:var(--ui-ink);background:var(--ui-paper-fill)}
 
 /* Phones */
 @media (pointer:coarse) and (not (any-pointer:fine)){
@@ -169,17 +304,21 @@ body[data-photo=on] :is(output,.hint,footer,.sky-ui,.walk-ui,.dock,.toast,.spot-
     transform:translate(-50%,24px)}
   .spot-card.show{transform:translate(-50%,0)}
   .spot-card h2{font-size:22px}.card-intro{font-size:13px;line-height:1.7;margin-bottom:10px}.card-best{margin-bottom:10px;padding:6px 0}
-  .card-actions button{padding:10px 0}
+  .card-actions button{padding:0}
   .photo-bar{padding:8px 84px 8px 10px;gap:6px}.photo-shutter{width:58px;height:58px}.photo-shutter i{width:44px;height:44px}
   .chips button{padding:6px 9px}.photo-hour{min-width:180px}
   .photo-shot{width:150px}
   .summit-pill{top:auto;bottom:calc(24px + env(safe-area-inset-bottom))}
+  /* 触屏可点区 ≥ --ui-hit：排成一行的小键只纵向撑（不压左右邻键）；码头签行距放到 8px，两行的热区不互压 */
+  .atlas-docks{gap:8px}.atlas-docks button{min-height:34px}
+  :is(.chips button,.atlas-docks button,.atlas-pop button,.photo-shot a,.photo-shot button)::after{content:"";position:absolute;left:0;right:0;top:50%;
+    height:max(100%,var(--ui-hit));transform:translateY(-50%)}
 }
 @media (pointer:coarse) and (not (any-pointer:fine)) and (max-height:500px){
   /* 横屏：工具条在小地图左侧，册页从工具条下方展开，三列更矮，不伸进右侧拇指区 */
   .dock{grid-template-areas:"bar mini";gap:6px 8px}.minimap{width:96px;height:96px}
   .dock-bar>button{height:34px;padding:0 12px;font-size:13px}
-  .dock-buttons{grid-template-columns:repeat(3,auto)}.dock-buttons>button{height:34px;min-width:5.5em;font-size:13px}
+  .dock-buttons{grid-template-columns:repeat(3,auto)}.dock-buttons>button{height:34px;min-width:4.8em;padding:0 9px;gap:6px;font-size:13px}
   .atlas-legend{display:none}
   .spot-card{max-height:calc(100vh - 20px);overflow:auto;width:min(560px,calc(100vw - 260px))}
   .card-intro{font-size:12.5px;line-height:1.6}
@@ -207,41 +346,60 @@ body[data-photo=on] :is(output,.hint,footer,.sky-ui,.walk-ui,.dock,.toast,.spot-
   .dock-buttons>button{height:32px;font-size:12.5px}
   body:not([data-hud=street]) .dock-mini{position:relative}
   body:not([data-hud=street]) .dock .minimap{width:72px;height:72px;border-width:2px}
-  body:not([data-hud=street]) .dock .road-name{position:absolute;left:50%;top:58px;transform:translateX(-50%);max-width:96px;padding:3px 7px;font-size:10.5px;letter-spacing:.06em}
+  body:not([data-hud=street]) .dock .road-name{position:absolute;left:50%;top:58px;transform:translateX(-50%);max-width:96px;padding:3px 7px;font-size:10.5px;letter-spacing:.06em;
+    box-shadow:inset 0 0 0 1px var(--ui-paper-line-strong),var(--ui-shadow-1)}
 }
 
 /* Camera gear (IDOK-182) */
-.photo-actions{position:absolute;right:14px;top:50%;transform:translateY(-50%);display:flex;align-items:center;gap:10px}
+.photo-actions{position:absolute;right:14px;top:50%;transform:translateY(-50%);display:flex;align-items:center;gap:12px}
 .photo-actions .photo-shutter{position:static;transform:none}
+.photo-actions .photo-shutter:active{background:var(--ui-seal);transform:scale(var(--ui-press-seal));transition-duration:var(--ui-press-t);transition-timing-function:var(--ui-ease-press)}
 /* 录像 + 快门两颗键并排，给它们让出右侧空间，免得压住「雨」 */
 .photo-bar{padding-right:150px}
-.photo-rec{width:44px;height:44px;border-radius:50%;border:2px solid var(--paper);background:none;padding:0;cursor:pointer;display:grid;place-items:center;opacity:.85}
-.photo-rec i{display:block;width:22px;height:22px;border-radius:50%;background:#c8402c;transition:border-radius .16s,transform .12s}
-.photo-bar.rec .photo-rec i{border-radius:3px;transform:scale(.72)}
+.photo-rec{width:44px;height:44px;border-radius:50%;border:2px solid var(--ui-paper-dim);background:none;padding:0;cursor:pointer;display:grid;place-items:center;
+  -webkit-tap-highlight-color:transparent;transition:border-color var(--ui-fast),transform var(--ui-fast)}
+.photo-rec:hover{border-color:var(--ui-paper)}
+.photo-rec:active{transform:scale(var(--ui-press));transition-duration:var(--ui-press-t);transition-timing-function:var(--ui-ease-press)}
+.photo-rec:focus-visible{outline:var(--ui-focus-w) solid var(--ui-focus);outline-offset:2px}
+.photo-rec i{display:block;width:22px;height:22px;border-radius:50%;background:var(--ui-seal-light);transition:border-radius .16s,transform .12s}
+.photo-bar.rec .photo-rec i{border-radius:var(--ui-r-xs);transform:scale(.72)}
+/* 录制中角标：一枚静止的朱砂小签（不闪），时长用等宽数字 */
 .cg-rec{position:fixed;left:calc(14px + env(safe-area-inset-left));top:calc(64px + env(safe-area-inset-top));display:flex;align-items:center;gap:7px;
-  font:12px ui-monospace,monospace;color:#fff;background:rgba(200,64,44,.78);border-radius:9px;padding:4px 9px}
-.cg-rec i{width:8px;height:8px;border-radius:50%;background:#fff;animation:recblink 1s steps(2) infinite}
-@keyframes recblink{50%{opacity:.25}}
-.photo-shot .shot-meta{flex:1;font:10.5px ui-monospace,monospace;opacity:.7;line-height:1.3}
-.gear-mask{position:fixed;inset:0;z-index:92;display:grid;place-items:center;padding:16px;background:rgba(12,16,15,.5);backdrop-filter:var(--ui-blur-mask)}
+  font:var(--ui-fs-xs) var(--ui-num);font-variant-numeric:tabular-nums;color:var(--ui-paper);background:var(--ui-seal);border-radius:var(--ui-r-xs);padding:4px 9px}
+.cg-rec i{width:8px;height:8px;border-radius:50%;background:var(--ui-paper)}
+.photo-shot .shot-meta{flex:1;font:10.5px/1.3 var(--ui-num);font-variant-numeric:tabular-nums;letter-spacing:0;color:var(--ui-ink-soft)}
+/* 相机包：宣纸对话框 + 一道内衬印框（同 .ui-panel 的 outline 内收）；每台机身是纸上亮一档的小卡，
+   右下角徽章是方印——未装备淡墨框，已装备盖成朱砂（整张面板唯一一枚红） */
+.gear-mask{position:fixed;inset:0;z-index:92;display:grid;place-items:center;padding:16px;background:var(--ui-scrim);backdrop-filter:var(--ui-blur-mask)}
 .gear-mask[hidden]{display:none}
-.gear-panel{width:min(680px,100%);max-height:calc(100vh - 40px);overflow:auto;padding:18px 20px 20px;border-radius:16px;background:var(--ui-paper);color:var(--ink,#1d2320);box-shadow:0 24px 60px rgba(0,0,0,.4)}
-.gear-mask.in .gear-panel{animation:gearin .28s ease-out}
+.gear-panel{box-sizing:border-box;width:min(680px,100%);max-height:calc(100vh - 40px);display:flex;flex-direction:column;overflow:hidden;border:var(--ui-frame-pad) solid transparent;padding:4px 6px 6px;border-radius:var(--ui-r-lg);
+  background:var(--ui-paper);color:var(--ui-ink);font-family:var(--ui-serif);box-shadow:none;outline:1px solid var(--ui-paper-line-strong);outline-offset:calc(-1px - var(--ui-frame))}
+.gear-mask.in .gear-panel{animation:gearin .28s var(--ui-ease)}
 @keyframes gearin{0%{transform:translateY(14px)}100%{transform:none}}
-.gear-panel header{display:flex;align-items:center;justify-content:space-between}
-.gear-panel h2{margin:0;font:600 20px var(--serif,serif);letter-spacing:.12em}
-.gear-close{border:0;background:none;font-size:24px;line-height:1;cursor:pointer;color:inherit;opacity:.6}
-.gear-tip{margin:6px 0 14px;font:13px var(--serif,serif);opacity:.66}
-.gear-list{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:10px}
-.gear-card{position:relative;display:flex;flex-direction:column;gap:5px;text-align:left;padding:12px 13px 34px;border-radius:12px;border:1px solid rgba(29,35,32,.16);
-  background:rgba(255,255,255,.4);cursor:pointer;color:inherit;font:13px var(--serif,serif)}
-.gear-card.on{border-color:var(--seal,#a9503c);box-shadow:inset 0 0 0 1px var(--seal,#a9503c)}
-.gear-name{font:600 14.5px var(--serif,serif)}
-.gear-tag{font-size:12px;opacity:.66}
-.gear-spec{display:grid;grid-template-columns:auto 1fr;gap:1px 8px;margin-top:4px;font:11.5px ui-monospace,monospace;opacity:.72}
-.gear-spec i{font-style:normal;opacity:.66}
-.gear-badge{position:absolute;right:12px;bottom:10px;font:11.5px var(--serif,serif);padding:3px 9px;border-radius:999px;background:rgba(29,35,32,.08)}
-.gear-card.on .gear-badge{background:var(--seal,#a9503c);color:var(--ui-paper,#f4efe2)}
+.gear-panel header{flex:none;display:flex;align-items:center;justify-content:space-between;gap:12px;margin:0 0 12px}
+.gear-panel h2{margin:0;font:600 var(--ui-fs-lg)/var(--ui-lh-tight) var(--ui-serif);letter-spacing:var(--ui-track-title)}
+.gear-close{position:relative;flex:none;width:36px;height:36px;padding:0;border:0;border-radius:var(--ui-r-sm);background:none;font:300 26px/1 var(--ui-serif);cursor:pointer;color:var(--ui-ink-soft);
+  -webkit-tap-highlight-color:transparent;transition:background var(--ui-fast),color var(--ui-fast)}
+.gear-close:hover{color:var(--ui-ink);background:var(--ui-paper-fill)}
+.gear-close:focus-visible{outline:var(--ui-focus-w) solid var(--ui-focus);outline-offset:-2px}
+.gear-list{flex:1 1 auto;min-height:0;overflow:auto;overscroll-behavior:contain;display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:10px;
+  scrollbar-width:thin;scrollbar-color:var(--ui-paper-line-strong) transparent}
+.gear-card{position:relative;display:flex;flex-direction:column;gap:5px;text-align:left;padding:12px 13px 40px;border-radius:var(--ui-r-md);border:1px solid var(--ui-paper-line-strong);
+  background:var(--ui-paper-hi);box-shadow:inset 0 0 0 3px var(--ui-paper-hi),inset 0 0 0 4px var(--ui-paper-line);cursor:pointer;color:inherit;font:13px var(--ui-serif);
+  -webkit-tap-highlight-color:transparent;transition:border-color var(--ui-fast),box-shadow var(--ui-fast),transform var(--ui-fast)}
+.gear-card:hover{border-color:var(--ui-ink-soft)}
+.gear-card:active{transform:scale(var(--ui-press));transition-duration:var(--ui-press-t);transition-timing-function:var(--ui-ease-press)}
+.gear-card:focus-visible{outline:var(--ui-focus-w) solid var(--ui-focus);outline-offset:2px}
+.gear-card.on{border-color:var(--ui-ink-soft);box-shadow:inset 0 0 0 3px var(--ui-paper-hi),inset 0 0 0 4px var(--ui-ink-soft)}
+.gear-name{font:600 var(--ui-fs-sm) var(--ui-serif);letter-spacing:.06em}
+.gear-tag{font-size:var(--ui-fs-xs);color:var(--ui-ink-soft)}
+.gear-spec{display:grid;grid-template-columns:auto 1fr;gap:1px 8px;margin-top:4px;font:11.5px/1.5 var(--ui-num);font-variant-numeric:tabular-nums;color:var(--ui-ink-soft)}
+.gear-spec i{font-style:normal;color:var(--ui-ink-3)}
+.gear-badge{position:absolute;right:12px;bottom:10px;display:inline-grid;place-items:center;box-sizing:border-box;min-height:24px;padding:0 8px;font:600 var(--ui-fs-xs)/1 var(--ui-serif);letter-spacing:.12em;
+  color:var(--ui-ink-soft);background:none;box-shadow:inset 0 0 0 1.5px var(--ui-paper-line-strong);transform:rotate(-2deg);
+  -webkit-mask:var(--ui-mask-seal) center/100% 100% no-repeat;mask:var(--ui-mask-seal) center/100% 100% no-repeat;transition:background var(--ui-fast),color var(--ui-fast),box-shadow var(--ui-fast)}
+.gear-card:hover .gear-badge{color:var(--ui-ink);box-shadow:inset 0 0 0 1.5px var(--ui-ink-soft)}
+.gear-card.on .gear-badge{color:var(--ui-paper);background:var(--ui-seal);box-shadow:none}
 @media (pointer:coarse) and (not (any-pointer:fine)) and (max-height:430px){
   .photo-actions{gap:8px}.photo-rec{width:40px;height:40px}
 }

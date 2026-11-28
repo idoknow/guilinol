@@ -18,6 +18,20 @@ import {
   HANDOVER_MAX_DISTANCE_M,
   sharedCitationLedger,
 } from './handover/index.ts'
+import {
+  ESCAPE_BUBBLE_DURATION_SEC,
+  applyEscapeImpulse,
+  classifyInterceptAspect,
+  escapeFleeProbability,
+  isActorStoppedOrTicketing,
+  isJiefangStoryModeActive,
+  markEscapeCause,
+  requestJiefangStoryMode,
+  resolveEscapeBubbleCap,
+  subscribeDutyEscape,
+  tryEmitDutyEscape,
+  type DutyEscapeEvent,
+} from './jiefang-escape.ts'
 import {createLocalLeaderboardProvider, type TrafficDutyLeaderboardProvider} from './leaderboard.ts'
 import {
   createDutyStoryDirector,
@@ -30,7 +44,6 @@ import {
   clampToBridgeDutyBounds,
   computeCommissionYuan,
   computeFineYuanStack,
-  DEFAULT_FINE_YUAN,
   DEFAULT_OFFICER_TALK_RANGE_M,
   DEFAULT_SIGNAL_RANGE_M,
   DEFAULT_STOP_DURATION_SEC,
@@ -45,10 +58,12 @@ import {
   JIEFANG_DUTY_ZONE,
   PLAYER_COMMISSION_RATE,
   resolveActorViolations,
+  resolveDutyFineTable,
   resolveDutyZone,
   TRAFFIC_DUTY_DURATION_SEC,
   VIOLATION_BUBBLE_LINES,
   type ActiveViolation,
+  type DutyBubbleKind,
   type DutyBubbleSnapshot,
   type DutyFineTable,
   type DutyGearState,
@@ -177,6 +192,26 @@ interface ActiveBubble {
   line: string
   fineYuan: number
   remainingSec: number
+  kind: DutyBubbleKind
+  durationSec: number
+  violations?: ActiveViolation[]
+  shout?: string
+  vow?: string
+}
+
+/** 手机 / 触屏判定（不引入 `ui/input-mode.ts`，避免导入期挂监听）。 */
+function isCoarsePointerUi(): boolean {
+  if (typeof document !== 'undefined' && document.documentElement?.dataset?.touch !== undefined) {
+    const v = document.documentElement.dataset.touch
+    if (v === '1' || v === 'true') return true
+    if (v === '0' || v === 'false') return false
+  }
+  if (typeof matchMedia !== 'function') return false
+  try {
+    return matchMedia('(pointer: coarse) and (not (any-pointer: fine))').matches
+  } catch {
+    return false
+  }
 }
 
 function emptyBreakdown(): ViolationBreakdown {
@@ -203,15 +238,8 @@ export function createTrafficDutyController(
   const officerTalkRangeM = Math.max(3.0, host.officerTalkRangeM ?? DEFAULT_OFFICER_TALK_RANGE_M)
   const signalRangeM = Math.max(8.0, host.signalRangeM ?? DEFAULT_SIGNAL_RANGE_M)
   const stopDurationSec = Math.max(1.5, host.stopDurationSec ?? DEFAULT_STOP_DURATION_SEC)
-  const fineTable: DutyFineTable = {
-    no_helmet: Math.max(1, Math.round(host.fineTable?.no_helmet ?? DEFAULT_FINE_YUAN.no_helmet)),
-    bike_double: Math.max(1, Math.round(host.fineTable?.bike_double ?? DEFAULT_FINE_YUAN.bike_double)),
-    ebike_overload: Math.max(1, Math.round(host.fineTable?.ebike_overload ?? DEFAULT_FINE_YUAN.ebike_overload)),
-    illegal_mod: Math.max(1, Math.round(host.fineTable?.illegal_mod ?? DEFAULT_FINE_YUAN.illegal_mod)),
-    wrong_way: Math.max(1, Math.round(host.fineTable?.wrong_way ?? DEFAULT_FINE_YUAN.wrong_way)),
-    red_light_run: Math.max(1, Math.round(host.fineTable?.red_light_run ?? DEFAULT_FINE_YUAN.red_light_run)),
-    sidewalk_riding: Math.max(1, Math.round(host.fineTable?.sidewalk_riding ?? DEFAULT_FINE_YUAN.sidewalk_riding)),
-  }
+  const fineTable: DutyFineTable = resolveDutyFineTable(host.fineTable)
+  const rng = host.random ?? Math.random
   const leaderboard = options?.leaderboard ?? createLocalLeaderboardProvider()
   let cachedLeaderboard = leaderboard.load()
 
@@ -322,14 +350,102 @@ export function createTrafficDutyController(
 
   function startTrafficBridge(): void {
     lastTrafficApplied = undefined
+    startJiefangStoryMode()
     host.trafficBridge?.start?.()
     applyTrafficDutyConfig(true)
   }
 
   function stopTrafficBridge(): void {
+    stopJiefangStoryMode()
     applyTrafficDutyConfig(false)
     host.trafficBridge?.stop?.()
     lastTrafficApplied = undefined
+  }
+
+  // ─── IDOK-541 解放桥剧情执勤：正面拦车几何 + 逃逸气泡 ───
+
+  let unsubscribeEscape: (() => void) | null = null
+  let storyModeRequested = false
+
+  function startJiefangStoryMode(): void {
+    if (host.enforceFrontalIntercept === false) return
+    const isJiefang = (shiftZone?.id ?? JIEFANG_DUTY_ZONE.id) === 'jiefang'
+    const explicitEnforce = host.enforceFrontalIntercept === true
+    if (!explicitEnforce && (!isJiefang || !host.trafficBridge)) return
+    if (isJiefang && host.trafficBridge) {
+      storyModeRequested = true
+      requestJiefangStoryMode(true)
+    }
+    unsubscribeEscape?.()
+    unsubscribeEscape = subscribeDutyEscape(onDutyEscape)
+  }
+
+  function clearEscapeBubbles(): void {
+    for (let i = bubbles.length - 1; i >= 0; i--) {
+      if (bubbles[i].kind === 'escape') bubbles.splice(i, 1)
+    }
+  }
+
+  function removeEscapeBubbleForActor(actor: Actor | null | undefined): void {
+    if (!actor) return
+    for (let i = bubbles.length - 1; i >= 0; i--) {
+      if (bubbles[i].kind === 'escape' && bubbles[i].actor === actor) bubbles.splice(i, 1)
+    }
+  }
+
+  function stopJiefangStoryMode(): void {
+    unsubscribeEscape?.()
+    unsubscribeEscape = null
+    clearEscapeBubbles()
+    if (storyModeRequested) {
+      storyModeRequested = false
+      requestJiefangStoryMode(false)
+    }
+  }
+
+  /** 显式 host 配置优先；否则仅在解放桥剧情覆盖已在真实桥面车流落地时开启。 */
+  function isFrontalInterceptOn(): boolean {
+    if (host.enforceFrontalIntercept !== undefined) return host.enforceFrontalIntercept === true
+    return phase === 'active' && storyModeRequested && shiftZone?.id === 'jiefang' && isJiefangStoryModeActive()
+  }
+
+  function currentSimTime(): number | undefined {
+    const t = activeTraffic()?.time
+    return typeof t === 'number' && Number.isFinite(t) ? t : undefined
+  }
+
+  function onDutyEscape(ev: DutyEscapeEvent): void {
+    if (disposed || phase !== 'active') return
+    if (citedActors.has(ev.actor) || ev.actor.cited) return
+    if (pendingViolator === ev.actor) pendingViolator = null
+    for (let i = bubbles.length - 1; i >= 0; i--) {
+      if (bubbles[i].actor === ev.actor && bubbles[i].kind === 'escape') bubbles.splice(i, 1)
+    }
+    const cap = resolveEscapeBubbleCap(isCoarsePointerUi())
+    let escapeCount = 0
+    for (const b of bubbles) if (b.kind === 'escape') escapeCount++
+    if (escapeCount >= cap) return
+    bubbles.push({
+      id: `tde_${++bubbleSeq}`,
+      actor: ev.actor,
+      title: ev.shout,
+      line: ev.vow,
+      fineYuan: 0,
+      remainingSec: ESCAPE_BUBBLE_DURATION_SEC,
+      durationSec: ESCAPE_BUBBLE_DURATION_SEC,
+      kind: 'escape',
+      violations: [...ev.violations],
+      shout: ev.shout,
+      vow: ev.vow,
+    })
+  }
+
+  /** F 拦截（`interceptViolator`）在侧面 / 车尾失败：加速跑路 + 逃逸气泡。 */
+  function escapeFromIntercept(actor: Actor, aspect: 'side' | 'rear', officerPos: Position): void {
+    applyEscapeImpulse(actor, {simTime: currentSimTime() ?? 0, officer: officerPos})
+    markEscapeCause(actor, 'intercept', aspect)
+    tryEmitDutyEscape({actor, cause: 'intercept', aspect})
+    if (pendingViolator === actor) pendingViolator = null
   }
 
   function syncDutyBodyAndPanels(on: boolean): void {
@@ -443,6 +559,11 @@ export function createTrafficDutyController(
         screenX: proj?.x ?? 0,
         screenY: proj?.y ?? 0,
         visible: Boolean(proj?.visible),
+        kind: item.kind,
+        durationSec: item.durationSec,
+        ...(item.violations ? {violations: [...item.violations]} : {}),
+        ...(item.shout !== undefined ? {shout: item.shout} : {}),
+        ...(item.vow !== undefined ? {vow: item.vow} : {}),
       }
     })
   }
@@ -629,6 +750,12 @@ export function createTrafficDutyController(
     resolveViolatorHandBone: actor => host.trafficBridge?.getActorHandBone?.(actor, 'right') ?? null,
     sound: shouldMountDom,
     onToast: msg => host.onToast?.(msg, 2400),
+    enforceFrontalIntercept: () => isFrontalInterceptOn(),
+    random: rng,
+    getSimTime: () => currentSimTime(),
+    onViolatorEscaped: actor => {
+      if (pendingViolator === actor) pendingViolator = null
+    },
     onTicketStarted: (_wf, actor) => {
       pendingViolator = actor
       syncCameraLock()
@@ -1237,6 +1364,7 @@ export function createTrafficDutyController(
       }
       if (newlyHaltedTarget) {
         pendingViolator = newlyHaltedTarget
+        removeEscapeBubbleForActor(newlyHaltedTarget)
         notifyActorPulledOver(newlyHaltedTarget, Math.max(stopDurationSec, 14))
         const haltedViols = resolveActorViolations(newlyHaltedTarget as Actor & {violations?: readonly TrafficViolation[]})
         if (haltedViols.length > 1) {
@@ -1265,6 +1393,9 @@ export function createTrafficDutyController(
       if (lastDutyKeysGestureSeq === seqBefore) {
         dispatchDutyKeysGesture('whistle')
       }
+      for (const halted of res.haltedFleeingActors) {
+        removeEscapeBubbleForActor(halted)
+      }
       if (res.haltedFleeingActors.length > 0 && !pendingViolator) {
         pendingViolator = res.haltedFleeingActors[0]
       }
@@ -1282,11 +1413,15 @@ export function createTrafficDutyController(
       }
       if (res.targetActor) {
         pendingViolator = res.targetActor
+        // 正面拦停立刻清除该车及旧逃逸残留气泡，避免「已拦停」下还留着「走咯！」
+        clearEscapeBubbles()
         const targetViols = resolveActorViolations(res.targetActor as Actor & {violations?: readonly TrafficViolation[]})
         if (targetViols.length > 1) {
           host.onToast?.(`已拦停 · 数罪并罚：${formatViolationBreakdownFormula(targetViols, fineTable)}`, 2600)
         }
       }
+      syncUi()
+    } else if (res.reason === 'escaped') {
       syncUi()
     }
     return res
@@ -1423,6 +1558,9 @@ export function createTrafficDutyController(
       line,
       fineYuan,
       remainingSec: BUBBLE_DURATION_SEC,
+      durationSec: BUBBLE_DURATION_SEC,
+      kind: 'citation',
+      violations: [...resolvedViolations],
     })
 
     const result: WhistleCiteResult = {
@@ -1480,15 +1618,50 @@ export function createTrafficDutyController(
     const fineYuan = candidate.fineYuan
     const distance = candidate.distance
 
+    const haltHoldSec = Math.max(stopDurationSec, 18)
+    const enforceFrontal = isFrontalInterceptOn() && pos !== null
+    const alreadyStopped =
+      actor.dutyState === 'halted' ||
+      actor.dutyState === 'pulled_over' ||
+      actor.dutyState === 'pulling_over' ||
+      Boolean(actor.haltedByDuty) ||
+      actor.speed <= 0.35
+    if (enforceFrontal && !alreadyStopped && pos) {
+      // IDOK-541：侧面 0.80 / 车尾 0.85 概率加速跑路（已在逃逸中时侧后方不可反复刷停）；正面 100% 拦下
+      const aspect = classifyInterceptAspect(actor, pos)
+      const alreadyFleeing = actor.dutyState === 'fleeing' || actor.dutyState === 'evading'
+      if (aspect !== 'front' && (alreadyFleeing || rng() < escapeFleeProbability(aspect))) {
+        escapeFromIntercept(actor, aspect, pos)
+        host.onToast?.(
+          aspect === 'rear' ? '从车尾拦车，对方加速跑了——站到车头正前方再拦' : '从侧面拦车，对方加速跑了——站到车头正前方再拦',
+          2200,
+        )
+        syncUi()
+        return {ok: false, reason: 'escaped', actor, violation, distance}
+      }
+    }
+
     // Lock this halted violator until their ticket is issued (cannot halt/intercept next vehicle mid-citation)
     pendingViolator = actor
+    clearEscapeBubbles()
     ui?.closePanel()
-    const haltHoldSec = Math.max(stopDurationSec, 18)
-    actor.dutyState = actor.dutyState === 'pulled_over' ? 'pulled_over' : 'halted'
-    actor.haltedByDuty = true
-    actor.speed = 0
-    stopTargetActor(actor, haltHoldSec)
-    notifyActorPulledOver(actor, haltHoldSec)
+    let smoothPulled = false
+    if (enforceFrontal && !alreadyStopped) {
+      // 正面拦车：打断逃逸，平滑靠边（sim.pullOverViolator → beginPullOver）
+      if (actor.dutyState === 'fleeing' || actor.dutyState === 'evading') actor.dutyState = 'normal'
+      actor.fleeUntil = undefined
+      actor.whistleSlowUntil = undefined
+      actor.brakingForOfficer = false
+      host.trafficBridge?.onViolatorPulledOver?.(actor, haltHoldSec)
+      smoothPulled = actor.dutyState === 'pulling_over' || actor.dutyState === 'pulled_over'
+    }
+    if (!smoothPulled) {
+      actor.dutyState = actor.dutyState === 'pulled_over' ? 'pulled_over' : 'halted'
+      actor.haltedByDuty = true
+      actor.speed = 0
+      stopTargetActor(actor, haltHoldSec)
+      notifyActorPulledOver(actor, haltHoldSec)
+    }
     playWhistleSound()
     host.propsBridge?.playGesture?.('whistle')
 
@@ -1664,9 +1837,13 @@ export function createTrafficDutyController(
       }
     }
 
+    const terminalBusy = isTerminalFlowActive()
     for (let i = bubbles.length - 1; i >= 0; i--) {
-      bubbles[i].remainingSec -= safeDt
-      if (bubbles[i].remainingSec <= 0 || bubbles[i].actor.leaving) {
+      const b = bubbles[i]
+      b.remainingSec -= safeDt
+      const escapeStale =
+        b.kind === 'escape' && (terminalBusy || isActorStoppedOrTicketing(b.actor))
+      if (b.remainingSec <= 0 || b.actor.leaving || escapeStale) {
         bubbles.splice(i, 1)
       }
     }
@@ -1844,6 +2021,7 @@ export function createTrafficDutyController(
         host.onDutyStateChange?.(false)
         phase = 'idle'
       }
+      stopJiefangStoryMode()
       syncCameraLock()
       clearBubbles()
       ui?.dispose()

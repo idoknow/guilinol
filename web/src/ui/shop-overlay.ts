@@ -475,7 +475,7 @@ export function mountShopOverlay(hooks: ShopOverlayHooks = {}): ShopOverlayHandl
     wardrobeOptsEl.hidden = !isWardrobe
     if (isWardrobe) {
       const ownedCount = s.wardrobe.ownedItemIds.length
-      wardrobeSummaryEl.textContent = `已解锁 ${ownedCount} 件单品 · 支持 5 槽位自由混搭`
+      wardrobeSummaryEl.textContent = `已解锁 ${ownedCount} 件`
       const helmetOn = s.wardrobe.autoHelmetOnRide
       helmetToggleBtn.textContent = `骑行自动头盔：${helmetOn ? '开' : '关'}`
       helmetToggleBtn.setAttribute('aria-pressed', String(helmetOn))

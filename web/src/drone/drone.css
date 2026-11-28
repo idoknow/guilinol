@@ -3,8 +3,11 @@
 .rc{position:fixed;inset:0;z-index:70;pointer-events:none;font:12px/1.35 ui-monospace,SFMono-Regular,Menlo,monospace;
   color:#f4efe2;text-shadow:0 1px 2px rgba(0,0,0,.55);--rc-glass:rgba(18,26,25,.62);--rc-line:rgba(244,239,226,.22)}
 .rc button{pointer-events:auto;font:inherit;color:inherit;background:var(--rc-glass);border:1px solid var(--rc-line);
-  border-radius:999px;padding:7px 13px;cursor:pointer;transition:background .15s,color .15s}
+  border-radius:var(--ui-r-sm);padding:7px 13px;cursor:pointer;-webkit-tap-highlight-color:transparent;touch-action:manipulation;
+  transition:background var(--ui-fast),color var(--ui-fast),transform var(--ui-fast)}
 .rc button:hover{background:rgba(40,54,52,.62)}
+.rc button:active{transform:scale(var(--ui-press));transition-duration:var(--ui-press-t);transition-timing-function:var(--ui-ease-press)}
+.rc button:focus-visible{outline:var(--ui-focus-w) solid var(--ui-focus);outline-offset:2px}
 
 /* ---------- 专业遥控：DJI Fly 顶栏（飞行模式 / 遥控与图传信号 / GNSS / 电量与剩余时间） ---------- */
 .rc .rc-topbar{position:absolute;left:0;right:0;top:0;display:flex;align-items:center;justify-content:space-between;
@@ -23,49 +26,65 @@
 .rc .rc-bars[data-level="2"] i:nth-child(-n+2),
 .rc .rc-bars[data-level="3"] i:nth-child(-n+3),
 .rc .rc-bars[data-level="4"] i:nth-child(-n+4){background:#f4efe2}
-.rc .rc-bars[data-kind="hd"] i{background:rgba(120,196,255,.26)}
+.rc .rc-bars[data-kind="hd"] i{background:color-mix(in srgb,var(--ui-jade-300) 28%,transparent)}
 .rc .rc-bars[data-kind="hd"][data-level="1"] i:nth-child(-n+1),
 .rc .rc-bars[data-kind="hd"][data-level="2"] i:nth-child(-n+2),
 .rc .rc-bars[data-kind="hd"][data-level="3"] i:nth-child(-n+3),
-.rc .rc-bars[data-kind="hd"][data-level="4"] i:nth-child(-n+4){background:#78c4ff}
+.rc .rc-bars[data-kind="hd"][data-level="4"] i:nth-child(-n+4){background:var(--ui-jade-300)}
 .rc .rc-gps{display:inline-flex;align-items:center;gap:5px;opacity:.9}
 .rc .rc-gps b{width:9px;height:9px;border-radius:50%;border:1.5px solid rgba(244,239,226,.85);position:relative}
 .rc .rc-gps b::after{content:"";position:absolute;left:50%;top:50%;width:3px;height:3px;margin:-1.5px;
   border-radius:50%;background:#f4efe2}
-.rc .rc-batt{display:inline-block;width:42px;height:8px;border:1px solid var(--rc-line);border-radius:3px;overflow:hidden;
-  position:relative;background:rgba(0,0,0,.3)}
-.rc .rc-batt i{display:block;height:100%;width:100%;background:#5fd07a;transition:width .3s,background .3s}
+.rc .rc-batt{display:inline-block;width:42px;height:8px;border:1px solid var(--rc-line);border-radius:var(--ui-r-xs);overflow:hidden;
+  position:relative;background:rgba(0,0,0,.35)}
+.rc .rc-batt i{display:block;height:100%;width:100%;background:var(--ui-ok);transition:width .3s,background .3s}
 .rc .rc-time{opacity:.86;font-variant-numeric:tabular-nums}
-.rc .rc-signal[data-warn="1"]{color:#f0a08a}
-/* IDOK-526: 悬停 / GNSS / 图传 居中夹在左右两排按钮中间，早先贴左上会被侧栏按钮压住。 */
-.rc .rc-status{position:absolute;left:50%;transform:translateX(-50%);top:calc(56px + env(safe-area-inset-top));
-  font-size:10.5px;letter-spacing:.04em;opacity:.85;white-space:nowrap;text-shadow:0 1px 6px rgba(8,14,18,.6)}
+.rc .rc-signal[data-warn="1"]{color:var(--ui-error)}
+/* IDOK-526 / IDOK-542: 悬停 / GNSS / 图传 墨青小签底板，压亮背景仍清晰可读。 */
+.rc .rc-status{position:absolute;left:50%;transform:translateX(-50%);top:calc(50px + env(safe-area-inset-top));
+  padding:4px 12px;border-radius:var(--ui-plaque-r);background:var(--ui-plaque);color:var(--ui-text);
+  outline:1px solid var(--ui-plaque-frame);outline-offset:calc(-1px - var(--ui-plaque-inset));
+  font-size:10.5px;letter-spacing:.06em;white-space:nowrap;text-shadow:none}
 
 /* ---------- 专业遥控：左右侧栏（机库/返航/降落、拍照/录像/退出）— 顶部横排，给竖滑杆让出侧边 ---------- */
 .rc .rc-rail{position:absolute;top:calc(44px + env(safe-area-inset-top));display:flex;flex-direction:row;gap:7px;
   pointer-events:auto}
 .rc .rc-rail-l{left:calc(14px + env(safe-area-inset-left))}
 .rc .rc-rail-r{right:calc(14px + env(safe-area-inset-right))}
-.rc .rc-side{width:46px;height:46px;padding:0;border-radius:50%;display:grid;place-items:center;font-size:10.5px;
-  letter-spacing:.02em;opacity:.92}
-.rc .rc-side.live,.rc .rc-side[data-live="1"]{background:rgba(190,46,32,.78);border-color:rgba(255,140,120,.7)}
-/* IDOK-529: 避障开关 + 中央绿色返航条。 */
-.rc .rc-side.rc-avoid{font-size:10px}
-.rc .rc-side.rc-avoid.on{background:rgba(45,120,80,.6);border-color:rgba(110,220,160,.6)}
-.rc .rc-side.rc-avoid[data-blocked="1"]{background:rgba(190,120,32,.85);border-color:rgba(255,196,120,.85);
-  animation:rc-avoid-pulse .9s ease-in-out infinite}
-@keyframes rc-avoid-pulse{0%,100%{box-shadow:0 0 0 0 rgba(255,196,120,.0)}50%{box-shadow:0 0 0 6px rgba(255,196,120,.18)}}
+/* IDOK-542 S3「山水印」：六个侧栏键 = 46px 方形匾（墨青底 + 内衬细框）+ 刻线小像。
+   字留在 DOM 里只是 font-size:0（verify-drone 读 .rc [data-act] 的 textContent，title 照旧给悬停说明）。
+   录像中 = 朱底；避障开 = 宣纸签，关 = 小像压暗；挡路 = 赭黄底，不闪。 */
+.rc .rc-side{position:relative;width:46px;height:46px;padding:0;border-color:transparent;border-radius:var(--ui-plaque-r);
+  display:grid;place-items:center;background:var(--ui-plaque);color:var(--ui-text);font-size:0;letter-spacing:0}
+.rc .rc-side::before{content:"";width:var(--ui-ico-lg);height:var(--ui-ico-lg);background:currentColor;
+  -webkit-mask:center/contain no-repeat;mask:center/contain no-repeat}
+.rc .rc-side::after{content:"";position:absolute;inset:var(--ui-plaque-inset);border:1px solid var(--ui-plaque-frame);
+  border-radius:1px;pointer-events:none}
+.rc .rc-side[data-act="hangar"]::before{-webkit-mask-image:url("../ui/ico-hangar.svg");mask-image:url("../ui/ico-hangar.svg")}
+.rc .rc-side[data-act="rth"]::before{-webkit-mask-image:url("../ui/ico-rth.svg");mask-image:url("../ui/ico-rth.svg")}
+.rc .rc-side[data-act="avoid"]::before{-webkit-mask-image:url("../ui/ico-avoid.svg");mask-image:url("../ui/ico-avoid.svg")}
+.rc .rc-side[data-act="photo"]::before{-webkit-mask-image:url("../ui/ico-camera.svg");mask-image:url("../ui/ico-camera.svg")}
+.rc .rc-side[data-act="record"]::before{-webkit-mask-image:url("../ui/ico-rec.svg");mask-image:url("../ui/ico-rec.svg")}
+.rc .rc-side[data-act="exit"]::before{-webkit-mask-image:url("../ui/ico-exit.svg");mask-image:url("../ui/ico-exit.svg")}
+.rc .rc-side:hover{background:var(--ui-surface-2)}
+.rc .rc-side:hover::after{border-color:var(--ui-line-hover)}
+.rc .rc-side.live,.rc .rc-side[data-live="1"]{background:var(--ui-seal);color:var(--ui-paper)}
+.rc .rc-side.live::after,.rc .rc-side[data-live="1"]::after{border-color:color-mix(in srgb,var(--ui-paper) 42%,transparent)}
+/* IDOK-529: 避障开关 + 中央返航条。 */
+.rc .rc-side.rc-avoid{color:var(--ui-text-3)}
+.rc .rc-side.rc-avoid.on{background:var(--ui-paper);color:var(--ui-ink)}
+.rc .rc-side.rc-avoid.on::after{border-color:var(--ui-paper-line-strong)}
+.rc .rc-side.rc-avoid[data-blocked="1"]{background:var(--ui-warn);color:var(--ui-ink)}
+.rc .rc-side.rc-avoid[data-blocked="1"]::after{border-color:var(--ui-paper-line-strong)}
 .rc .rc-rth-banner{position:absolute;left:50%;top:calc(46% + 26px);transform:translateX(-50%);
-  display:flex;align-items:center;gap:10px;padding:7px 14px;border-radius:999px;
-  border:1px solid rgba(61,220,132,.55);background:rgba(10,26,18,.72);color:#b8f5d0;
-  font-size:12px;letter-spacing:.1em;pointer-events:none;white-space:nowrap;
-  box-shadow:0 0 22px rgba(61,220,132,.25);z-index:3}
+  display:flex;align-items:center;gap:10px;padding:8px 16px;border:0;border-radius:var(--ui-plaque-r);
+  background:var(--ui-surface);color:var(--ui-text);outline:1px solid var(--ui-plaque-frame);
+  outline-offset:calc(-1px - var(--ui-plaque-inset));font-family:var(--ui-serif);
+  font-size:12px;letter-spacing:.1em;pointer-events:none;white-space:nowrap;text-shadow:none;box-shadow:none;z-index:3}
 .rc .rc-rth-banner[hidden]{display:none}
-.rc .rc-rth-banner b{font-weight:600;color:#7dffb4}
-.rc .rc-rth-dash{width:34px;height:2px;border-radius:2px;
-  background:repeating-linear-gradient(90deg,#3ddc84 0 8px,transparent 8px 16px);
-  animation:rc-rth-run .8s linear infinite}
-@keyframes rc-rth-run{to{background-position:16px 0}}
+.rc .rc-rth-banner b{font-weight:600;color:var(--ui-ok)}
+.rc .rc-rth-dash{width:34px;height:2px;
+  background:repeating-linear-gradient(90deg,var(--ui-ok) 0 8px,transparent 8px 14px)}
 
 /* ---------- 专业遥控：底部遥测行 + 快门 ---------- */
 .rc .rc-bottom{position:absolute;left:0;right:0;bottom:0;display:flex;align-items:flex-end;justify-content:space-between;
@@ -73,20 +92,30 @@
   calc(18px + env(safe-area-inset-left));background:linear-gradient(0deg,rgba(8,12,12,.62),rgba(8,12,12,0));
   pointer-events:none}
 .rc .rc-bottom>*{pointer-events:auto}
-.rc .rc-tele{font-size:11px;letter-spacing:.03em;white-space:nowrap;padding:5px 10px;border-radius:7px;
-  background:rgba(10,14,13,.6);border:1px solid rgba(244,239,226,.16);
-  font-variant-numeric:tabular-nums}
-.rc .rc-bottom-mid{position:absolute;left:50%;bottom:calc(12px + env(safe-area-inset-bottom));
-  transform:translateX(-50%);display:flex;flex-direction:column;align-items:center;gap:7px}
-.rc .rc-modes{display:flex;gap:6px}
-.rc .rc-modes button{padding:3px 10px;font-size:10.5px;opacity:.62;background:rgba(0,0,0,.4)}
-.rc .rc-modes button.on{opacity:1;background:rgba(244,239,226,.92);color:#16201e;font-weight:600;
-  border-color:transparent;text-shadow:none}
-.rc .rc-shutter{width:62px;height:62px;padding:0;border-radius:50%;border:3px solid rgba(244,239,226,.92);
-  background:rgba(244,239,226,.12);display:grid;place-items:center}
-.rc .rc-shutter i{display:block;width:46px;height:46px;border-radius:50%;background:#f4efe2;transition:all .15s}
-.rc .rc-shutter[data-live="1"] i{width:26px;height:26px;border-radius:8px;background:#e0553f}
-.rc .rc-takeoff{padding:9px 18px;font-size:12.5px}
+.rc .rc-tele{font-size:11px;letter-spacing:.03em;white-space:nowrap;padding:6px 12px;border:0;border-radius:var(--ui-plaque-r);
+  background:var(--ui-plaque);outline:1px solid var(--ui-plaque-frame);outline-offset:calc(-1px - var(--ui-plaque-inset));
+  color:var(--ui-text);text-shadow:none;font-variant-numeric:tabular-nums}
+.rc .rc-bottom-mid{position:absolute;left:50%;bottom:calc(16px + env(safe-area-inset-bottom));
+  transform:translateX(-50%);display:flex;flex-direction:column;align-items:center;gap:10px}
+.rc .rc-modes{display:flex;gap:2px;padding:2px;border-radius:var(--ui-r-sm);background:var(--ui-plaque);
+  box-shadow:inset 0 0 0 1px var(--ui-line-strong)}
+.rc .rc-modes button{padding:4px 11px;font-size:11px;border:0;border-radius:var(--ui-r-xs);color:var(--ui-text-2);background:none;text-shadow:none}
+.rc .rc-modes button:hover{color:var(--ui-text);background:var(--ui-wash-hover)}
+.rc .rc-modes button.on{background:var(--ui-paper);color:var(--ui-ink);font-weight:600}
+/* 快门 = 画面里唯一的圆朱印（--ui-mask-round 毛边）；里面一圈宣纸，录像中收成宣纸小方块。 */
+.rc .rc-shutter{width:62px;height:62px;padding:0;border:0;border-radius:50%;background:var(--ui-seal);
+  -webkit-mask:var(--ui-mask-round) center/100% 100% no-repeat;mask:var(--ui-mask-round) center/100% 100% no-repeat;
+  display:grid;place-items:center;text-shadow:none}
+.rc .rc-shutter:hover{background:var(--ui-seal-hi)}
+.rc .rc-shutter:active{transform:scale(var(--ui-press-seal))}
+.rc .rc-shutter:focus-visible{outline:1.5px solid var(--ui-paper);outline-offset:-5px}
+.rc .rc-shutter i{display:block;box-sizing:border-box;width:40px;height:40px;border-radius:50%;
+  border:2px solid var(--ui-paper);background:none;transition:width var(--ui-fast),height var(--ui-fast),border-radius var(--ui-fast),background var(--ui-fast)}
+.rc .rc-shutter[data-live="1"] i{width:20px;height:20px;border-radius:var(--ui-r-xs);background:var(--ui-paper)}
+.rc .rc-takeoff{position:relative;padding:10px 20px;border:0;border-radius:var(--ui-plaque-r);background:var(--ui-plaque);
+  color:var(--ui-text);font:600 13px/1 var(--ui-serif);letter-spacing:var(--ui-track);text-shadow:none;
+  outline:1px solid var(--ui-plaque-frame);outline-offset:calc(-1px - var(--ui-plaque-inset))}
+.rc .rc-takeoff:hover{background:var(--ui-surface-2)}
 
 .rc .rc-center{position:absolute;inset:0;display:grid;place-items:center}
 .rc .rc-reticle{width:44px;height:44px;border:1px solid rgba(244,239,226,.5);border-radius:50%;position:relative;opacity:.55}
@@ -95,8 +124,9 @@
 .rc .rc-reticle::after{top:50%;left:-10px;height:1px;width:8px}
 .rc .rc-gimbal{position:absolute;right:calc(16px + env(safe-area-inset-right));
   bottom:calc(196px + env(safe-area-inset-bottom));display:flex;flex-direction:column;align-items:center;gap:7px;
-  pointer-events:auto;font-size:9.5px;letter-spacing:.14em;padding:9px 6px;border-radius:12px;
-  background:rgba(0,0,0,.36);border:1px solid rgba(244,239,226,.16)}
+  pointer-events:auto;font-size:9.5px;letter-spacing:.14em;padding:10px 7px;border:0;border-radius:var(--ui-plaque-r);
+  background:var(--ui-plaque);outline:1px solid var(--ui-plaque-frame);outline-offset:calc(-1px - var(--ui-plaque-inset));
+  color:var(--ui-text);text-shadow:none}
 .rc .rc-gimbal b{font-weight:600;font-variant-numeric:tabular-nums;letter-spacing:.02em;font-size:10.5px}
 .rc .rc-gimbal span{opacity:.6;writing-mode:vertical-rl;text-orientation:upright}
 /* 竖向滑杆：竖向 writing-mode 让原生 range 变成上下拖，thumb 用小方块而不是横向胶囊 */
@@ -108,10 +138,11 @@
   background:#f4efe2;border:1px solid rgba(20,30,29,.4);box-shadow:0 1px 4px rgba(0,0,0,.4)}
 .rc .rc-gimbal input::-moz-range-track{width:4px;border-radius:2px;background:rgba(244,239,226,.5)}
 .rc .rc-gimbal input::-moz-range-thumb{width:16px;height:16px;border-radius:4px;background:#f4efe2;border:1px solid rgba(20,30,29,.4)}
-/* 键盘图例：只有真按过键才出现（触屏用户看不到它）。 */
+/* 键盘图例：实色墨青匾（去整体 opacity:.65，压在亮招牌前也清晰可读）。 */
 .rc .rc-hint{display:none;position:absolute;left:calc(16px + env(safe-area-inset-left));
-  top:calc(102px + env(safe-area-inset-top));font-size:10px;letter-spacing:.02em;opacity:.65;
-  padding:4px 9px;border-radius:7px;background:rgba(10,14,13,.55);border:1px solid rgba(244,239,226,.12);
+  top:calc(102px + env(safe-area-inset-top));font-size:10.5px;letter-spacing:.03em;color:var(--ui-text-2);
+  padding:6px 12px;border:0;border-radius:var(--ui-plaque-r);background:var(--ui-plaque);
+  outline:1px solid var(--ui-plaque-frame);outline-offset:calc(-1px - var(--ui-plaque-inset));text-shadow:none;
   white-space:nowrap;max-width:calc(100vw - 32px);overflow:hidden;text-overflow:ellipsis}
 .rc.kbd .rc-hint{display:block}
 /* IDOK-526: 桌面（有鼠标）本来就用键盘飞，直接把按键图例挂出来，不必等第一次按键。 */
@@ -124,36 +155,40 @@
 
 .rc .rc-actions{position:absolute;left:50%;bottom:calc(14px + env(safe-area-inset-bottom));transform:translateX(-50%);
   display:flex;gap:8px;flex-wrap:wrap;justify-content:center;max-width:min(560px,92vw)}
-.rc .rc-actions button.live{background:rgba(190,46,32,.72);border-color:rgba(255,140,120,.6)}
+.rc .rc-actions button.live{background:var(--ui-seal);border-color:transparent;color:var(--ui-paper);text-shadow:none}
 .rc .rc-sticks{position:absolute;left:0;right:0;bottom:calc(60px + env(safe-area-inset-bottom));display:flex;
   justify-content:space-between;padding:0 22px;pointer-events:none}
 .rc.rc-pro .rc-sticks{bottom:calc(96px + env(safe-area-inset-bottom))}
-.rc .rc-stick{pointer-events:auto;width:106px;height:106px;border-radius:50%;border:1px solid var(--rc-line);
-  background:radial-gradient(circle at 50% 40%,rgba(244,239,226,.12),rgba(20,30,29,.42));position:relative;touch-action:none}
-.rc .rc-stick::before{content:"";position:absolute;inset:34%;border-radius:50%;border:1px dashed rgba(244,239,226,.25)}
+.rc .rc-stick{pointer-events:auto;width:106px;height:106px;border-radius:50%;border:1px solid var(--ui-line-strong);
+  background:
+    linear-gradient(var(--ui-jade-300),var(--ui-jade-300)) 50% 6px/1.5px 6px no-repeat,
+    linear-gradient(var(--ui-jade-300),var(--ui-jade-300)) 50% calc(100% - 6px)/1.5px 6px no-repeat,
+    linear-gradient(var(--ui-jade-300),var(--ui-jade-300)) 6px 50%/6px 1.5px no-repeat,
+    linear-gradient(var(--ui-jade-300),var(--ui-jade-300)) calc(100% - 6px) 50%/6px 1.5px no-repeat,
+    color-mix(in srgb,var(--ui-surface) 58%,transparent);
+  position:relative;touch-action:none}
+.rc .rc-stick::before{content:"";position:absolute;inset:26%;border-radius:50%;border:1px solid var(--ui-line)}
 .rc .rc-stick i{position:absolute;left:50%;top:50%;width:34px;height:34px;margin:-17px 0 0 -17px;border-radius:50%;
-  background:rgba(244,239,226,.82);box-shadow:0 2px 8px rgba(0,0,0,.35);transition:transform .05s linear}
+  background:var(--ui-paper);box-shadow:inset 0 0 0 3px var(--ui-paper),inset 0 0 0 4px var(--ui-jade-500);transition:transform .05s linear}
 
-/* ---------- 空中导航：小地图 + 雷达 + 目标距离 ----------
-   IDOK-527: 一块巴掌大的玻璃盘，圆心永远是自己（正北朝上）。FPV 才画扫描扇面，
-   扫到的飞行器在三秒里淡出，所以「雷达」不是装饰，而是知道附近有谁在飞。 */
-.rc .rc-nav{position:absolute;left:calc(14px + env(safe-area-inset-left));top:calc(176px + env(safe-area-inset-top));
-  width:132px;padding:7px 7px 6px;border-radius:12px;display:flex;flex-direction:column;gap:5px;
-  background:linear-gradient(180deg,rgba(16,24,24,.72),rgba(10,15,15,.62));border:1px solid var(--rc-line);
-  box-shadow:0 6px 20px rgba(0,0,0,.28);pointer-events:auto;z-index:2}
+/* ---------- 空中导航：墨青匾 + 雷达 + 目标距离 ---------- */
+.rc .rc-nav{position:absolute;left:calc(14px + env(safe-area-inset-left));top:calc(144px + env(safe-area-inset-top));
+  width:136px;padding:10px 9px 9px;border:0;border-radius:var(--ui-plaque-r);display:flex;flex-direction:column;gap:8px;
+  background:var(--ui-plaque);outline:1px solid var(--ui-plaque-frame);outline-offset:calc(-1px - var(--ui-plaque-inset));
+  color:var(--ui-text);text-shadow:none;box-shadow:none;pointer-events:auto;z-index:2}
 .rc .rc-nav-head{display:flex;align-items:center;gap:5px;min-width:0}
-.rc .rc-nav-kicker{font-size:9px;letter-spacing:.16em;opacity:.5;text-transform:uppercase;flex:none}
-.rc .rc-nav-tg{flex:1;min-width:0;padding:1px 0;border:0;background:none;color:#f4efe2;font:inherit;font-size:10px;
+.rc .rc-nav-kicker{font-size:9.5px;letter-spacing:.14em;color:var(--ui-text-2);flex:none}
+.rc .rc-nav-tg{flex:1;min-width:0;padding:1px 0;border:0;background:none;color:var(--ui-text);font:inherit;font-size:10.5px;
   font-weight:600;text-align:right;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:pointer}
-.rc .rc-nav-tg:hover{color:#ffe6b8}
+.rc .rc-nav-tg:hover{color:var(--ui-ochre)}
 .rc .rc-nav-map{display:block;width:100%;height:auto;aspect-ratio:1;border-radius:50%}
-.rc .rc-nav-foot{display:flex;align-items:baseline;justify-content:space-between;gap:6px;font-size:10px;
-  font-variant-numeric:tabular-nums;opacity:.82}
-.rc .rc-nav-brg{opacity:.66;white-space:nowrap}
-.rc .rc-nav-auto{min-height:24px;border-radius:7px;border:1px solid rgba(244,239,226,.2);
-  background:rgba(244,239,226,.08);color:#f4efe2;font:inherit;font-size:10.5px;letter-spacing:.06em;cursor:pointer}
-.rc .rc-nav-auto:hover{background:rgba(244,239,226,.16)}
-.rc .rc-nav-auto.on{background:rgba(120,220,160,.26);border-color:rgba(140,235,175,.6);color:#eaffe9}
+.rc .rc-nav-foot{display:flex;align-items:baseline;justify-content:space-between;gap:6px;font-size:10.5px;
+  font-variant-numeric:tabular-nums;color:var(--ui-text-2)}
+.rc .rc-nav-brg{color:var(--ui-text-3);white-space:nowrap}
+.rc .rc-nav-auto{min-height:26px;border-radius:var(--ui-r-xs);border:1px solid var(--ui-line-strong);
+  background:var(--ui-fill);color:var(--ui-text);font:500 11px/1 var(--ui-serif);letter-spacing:.08em;cursor:pointer}
+.rc .rc-nav-auto:hover{background:var(--ui-wash-hover)}
+.rc .rc-nav-auto.on{background:var(--ui-paper);border-color:var(--ui-paper);color:var(--ui-ink);font-weight:600}
 .rc .rc-nav-auto[hidden]{display:none}
 
 /* ---------- 傻瓜式：拖画面转视角（只有 mini 这种简单遥控有鼠标/手指朝向控制） ---------- */
@@ -161,29 +196,37 @@
 .rc .rc-look:active,.rc[data-look] .rc-look{cursor:grabbing}
 .rc.rc-simple :is(.rc-sticks,.rc-actions,.rc-readout,.rc-top){z-index:3}
 .rc .rc-top{position:absolute;left:50%;top:calc(8px + env(safe-area-inset-top));transform:translateX(-50%);
-  display:flex;align-items:center;gap:10px;padding:5px 12px;border-radius:999px;background:var(--rc-glass);
+  display:flex;align-items:center;gap:10px;padding:5px 12px;border-radius:var(--ui-plaque-r);background:var(--rc-glass);
   border:1px solid var(--rc-line);white-space:nowrap;font-size:11.5px}
 .rc .rc-model{font-weight:600;letter-spacing:.02em}
 .rc.rc-simple .rc-actions{bottom:calc(58px + env(safe-area-inset-bottom))}
 .rc.rc-simple .rc-alt,.rc.rc-simple .rc-speed,.rc.rc-simple .rc-compass,.rc.rc-simple .rc-signal,
 .rc.rc-simple .rc-time{display:none}
 .rc .rc-readout{position:absolute;left:50%;bottom:calc(150px + env(safe-area-inset-bottom));transform:translateX(-50%);
-  font-size:11px;white-space:nowrap;padding:5px 12px;border-radius:999px;background:var(--rc-glass);
+  font-size:11px;white-space:nowrap;padding:5px 12px;border-radius:var(--ui-plaque-r);background:var(--rc-glass);
   border:1px solid var(--rc-line);font-variant-numeric:tabular-nums}
 .rc.rc-simple .rc-readout{font-size:12.5px;bottom:calc(118px + env(safe-area-inset-bottom))}
 .rc.rc-simple .rc-sticks{bottom:calc(150px + env(safe-area-inset-bottom))}
 .rc.rc-simple .rc-stick{width:132px;height:132px}
-/* 傻瓜式大按键：起飞/降落是琥珀色主键，其余 48px 触控目标 */
+/* 傻瓜式大按键：地面上「起飞」是朱印主键，飞起来后「降落」换宣纸签；其余 48px 触控目标 */
 .rc.rc-simple .rc-actions{bottom:calc(22px + env(safe-area-inset-bottom));gap:12px;align-items:center;max-width:94vw}
 .rc.rc-simple .rc-actions button{min-width:64px;min-height:48px;padding:0 18px;font-size:15px;letter-spacing:.08em}
-.rc.rc-simple .rc-actions .rc-big{min-width:92px;min-height:58px;font-size:18px;font-weight:600;
-  background:rgba(224,138,46,.82);border-color:rgba(255,200,140,.75);color:#1c1408;text-shadow:none}
-.rc.rc-simple:is([data-phase="flying"],[data-phase="returning"],[data-phase="takeoff"]) .rc-actions .rc-big{background:rgba(244,239,226,.9)}
+.rc.rc-simple .rc-actions .rc-big{min-width:92px;min-height:58px;font-size:18px;font-weight:600;font-family:var(--ui-serif);
+  border:0;border-radius:0;background:var(--ui-seal);color:var(--ui-paper);text-shadow:none;
+  -webkit-mask:var(--ui-mask-bar) center/100% 100% no-repeat;mask:var(--ui-mask-bar) center/100% 100% no-repeat}
+.rc.rc-simple .rc-actions .rc-big:hover{background:var(--ui-seal-hi)}
+.rc.rc-simple .rc-actions .rc-big:active{transform:scale(var(--ui-press-seal))}
+.rc.rc-simple .rc-actions .rc-big:focus-visible{outline:1.5px solid var(--ui-paper);outline-offset:-5px}
+.rc.rc-simple:is([data-phase="flying"],[data-phase="returning"],[data-phase="takeoff"]) .rc-actions .rc-big{
+  border-radius:var(--ui-r-sm);background:var(--ui-paper);color:var(--ui-ink);-webkit-mask:none;mask:none}
+.rc.rc-simple:is([data-phase="flying"],[data-phase="returning"],[data-phase="takeoff"]) .rc-actions .rc-big:hover{background:var(--ui-paper-hi)}
+.rc.rc-simple:is([data-phase="flying"],[data-phase="returning"],[data-phase="takeoff"]) .rc-actions .rc-big:focus-visible{outline:var(--ui-focus-w) solid var(--ui-focus);outline-offset:2px}
 .rc.rc-simple .rc-readout{font-size:14px;bottom:calc(98px + env(safe-area-inset-bottom))}
 .rc.rc-simple .rc-sticks{bottom:calc(140px + env(safe-area-inset-bottom))}
 
-.rc .rc-toast{position:absolute;left:50%;top:calc(78px + env(safe-area-inset-top));transform:translate(-50%,-6px);
-  background:rgba(24,34,32,.86);border:1px solid var(--rc-line);border-radius:10px;padding:7px 12px;font-size:11.5px;
+.rc .rc-toast{position:absolute;left:50%;top:calc(92px + env(safe-area-inset-top));transform:translate(-50%,-6px);
+  background:var(--ui-surface);border:0;border-radius:var(--ui-plaque-r);padding:8px 14px;font:500 12px/1.3 var(--ui-serif);letter-spacing:.06em;
+  color:var(--ui-text);text-shadow:none;outline:1px solid var(--ui-plaque-frame);outline-offset:calc(-1px - var(--ui-plaque-inset));
   opacity:0;transition:opacity .2s,transform .2s;max-width:78vw;text-align:center}
 .rc .rc-toast.show{opacity:1;transform:translate(-50%,0)}
 
@@ -192,13 +235,14 @@
    aspect ratio must get the same compact rail/stick layout, otherwise the
    vertical gimbal slides up into 退出. */
 @media (max-height:520px){
-  .rc .rc-side{width:40px;height:40px;font-size:9.5px}
+  .rc .rc-side{width:40px;height:40px}
+  .rc .rc-side::before{width:20px;height:20px}
   .rc .rc-rail{gap:6px;top:calc(40px + env(safe-area-inset-top))}
   .rc .rc-status{display:none}
   .rc .rc-tele{font-size:10px;padding:3px 8px;max-width:46vw;overflow:hidden;text-overflow:ellipsis}
   .rc .rc-shutter{width:52px;height:52px}
-  .rc .rc-shutter i{width:38px;height:38px}
-  .rc .rc-shutter[data-live="1"] i{width:22px;height:22px}
+  .rc .rc-shutter i{width:34px;height:34px}
+  .rc .rc-shutter[data-live="1"] i{width:17px;height:17px}
   .rc .rc-modes button{padding:2px 8px;font-size:10px}
   /* IDOK-526: vertical stick sits between the top rail and the corner joysticks, label dropped so it never
      crosses 退出 above or the right stick below. */
@@ -229,7 +273,7 @@
   /* Two-line top bar needs more room than the 44px the landscape layout assumes. */
   .rc .rc-rail{top:calc(74px + env(safe-area-inset-top))}
   .rc .rc-rail{gap:6px}
-  .rc .rc-side{width:44px;height:44px;font-size:10px}
+  .rc .rc-side{width:44px;height:44px}
   .rc .rc-status{display:none}
   .rc .rc-hint{top:calc(130px + env(safe-area-inset-top));white-space:normal;line-height:1.45}
   /* IDOK-527: 竖屏导航盘落在左侧栏下方，别压住按键图例。 */
@@ -243,8 +287,9 @@
 }
 /* 无人机没在遥控时：场景里的小提示 */
 .drone-hint{position:fixed;left:50%;bottom:calc(96px + env(safe-area-inset-bottom));transform:translateX(-50%);
-  padding:8px 14px;border-radius:999px;background:rgba(18,26,25,.6);color:#f4efe2;font-size:12px;
-  border:1px solid rgba(244,239,226,.24);z-index:40;pointer-events:none;white-space:nowrap}
+  padding:8px 16px;border:0;border-radius:var(--ui-plaque-r);background:var(--ui-plaque);color:var(--ui-text);
+  outline:1px solid var(--ui-plaque-frame);outline-offset:calc(-1px - var(--ui-plaque-inset));
+  font:12px/1.35 var(--ui-serif);letter-spacing:var(--ui-track-body);z-index:40;pointer-events:none;white-space:nowrap}
 body[data-home] .drone-hint{display:none}
 /* 遥控时让出 HUD：与 photo 模式同一份清单，取景框里只留 RC 自己的仪表 */
 body[data-drone="rc"] :is(output,.hint,footer,.sky-ui,.walk-ui,.dock,.toast,.spot-card,.book,.summit-pill,
@@ -256,12 +301,22 @@ body[data-drone="rc"] :is(output,.hint,footer,.sky-ui,.walk-ui,.dock,.toast,.spo
 .drone-panel{width:min(980px,100%)}
 .drone-panel .drone-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(236px,1fr));gap:12px;padding:14px 18px 6px;
   max-height:min(58vh,520px);overflow-y:auto}
-.drone-card{display:flex;flex-direction:column;gap:6px;text-align:left;padding:13px 14px;border-radius:14px;cursor:pointer;
-  background:rgba(244,239,226,.06);border:1px solid rgba(244,239,226,.16);color:var(--ui-paper,#f4efe2);
-  font:inherit;transition:background .15s,border-color .15s,transform .15s}
-.drone-card:hover{background:rgba(244,239,226,.13);border-color:rgba(244,239,226,.34);transform:translateY(-1px)}
-.drone-card.out{border-color:rgba(224,138,46,.7);background:rgba(224,138,46,.12)}
-.drone-card .drone-name{font-size:15px;font-weight:600;letter-spacing:.02em}
+/* IDOK-542 S3：机型卡 = 墨青印框卡（抬一级底 + 内衬细框），不浮起；放到身前的那架换宣纸框 + 「出动」宣纸签，
+   行动键也成宣纸签；损坏的卡框线转朱。 */
+.drone-card{position:relative;display:flex;flex-direction:column;gap:6px;text-align:left;padding:15px 16px;
+  border:0;border-radius:var(--ui-r-md);cursor:pointer;background:var(--ui-surface-2);color:var(--ui-text);
+  font:inherit;-webkit-tap-highlight-color:transparent;
+  transition:background var(--ui-fast),transform var(--ui-fast)}
+.drone-card::after{content:"";position:absolute;inset:4px;border:1px solid var(--ui-line-strong);border-radius:var(--ui-r-xs);
+  pointer-events:none;transition:border-color var(--ui-fast)}
+.drone-card:hover{background:color-mix(in srgb,var(--ui-surface-2) 90%,var(--ui-paper))}
+.drone-card:hover::after{border-color:var(--ui-line-hover)}
+.drone-card:active{transform:scale(var(--ui-press));transition-duration:var(--ui-press-t);transition-timing-function:var(--ui-ease-press)}
+.drone-card:focus-visible{outline:var(--ui-focus-w) solid var(--ui-focus);outline-offset:2px}
+.drone-card.out::after{border-color:var(--ui-paper)}
+.drone-card .drone-name{display:flex;align-items:center;gap:8px;font-size:15px;font-weight:600;letter-spacing:.02em}
+.drone-card.out .drone-name::after{content:"出动";flex:none;padding:2px 6px;border-radius:var(--ui-r-xs);
+  background:var(--ui-paper);color:var(--ui-ink);font-size:10.5px;font-weight:600;line-height:1.2;letter-spacing:var(--ui-track-body)}
 .drone-card .drone-tag{font-size:11.5px;opacity:.72;line-height:1.4}
 .drone-card dl{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:2px 8px;margin:6px 0 2px;font-size:11px}
 .drone-card dl>div{display:flex;gap:5px;min-width:0}
@@ -269,59 +324,74 @@ body[data-drone="rc"] :is(output,.hint,footer,.sky-ui,.walk-ui,.dock,.toast,.spo
 .drone-card dd{margin:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .drone-card .drone-load{font-size:10.5px;opacity:.8}
 .drone-card .drone-loads{display:flex;gap:5px;flex-wrap:wrap;margin:2px 0 4px}
-.drone-card .drone-loads i{font-style:normal;font-size:10px;padding:2px 7px;border-radius:999px;
-  border:1px solid rgba(244,239,226,.22);opacity:.72}
-.drone-card .drone-loads i.on{background:rgba(224,138,46,.3);border-color:rgba(224,138,46,.7);opacity:1}
+.drone-card .drone-loads i{font-style:normal;font-size:10px;padding:2px 7px;border-radius:var(--ui-r-xs);
+  border:1px solid var(--ui-line-strong);color:var(--ui-text-2)}
+.drone-card .drone-loads i.on{background:var(--ui-paper);border-color:var(--ui-paper);color:var(--ui-ink)}
 /* 超重档：按重量放行，飞不动的档位直接划掉并给出理由（IDOK-255）。 */
 .drone-card .drone-loads i.over{opacity:.4;text-decoration:line-through;cursor:not-allowed}
 .drone-card .drone-cargo{display:flex;align-items:center;gap:8px;margin:2px 0 4px;font-size:10.5px}
-.drone-card .drone-cargo input{flex:1;min-width:0;accent-color:#e08a2e}
-.drone-card .drone-cargo b{font-weight:600;opacity:.85}
-.drone-card .drone-note{color:#f0b4a6;font-size:10.5px;line-height:1.4;margin:2px 0 2px}
-.drone-card .drone-cta{margin-top:auto;font-size:11.5px;letter-spacing:.12em;opacity:.85}
-/* IDOK-529: battery meter + damage state on every hangar card. */
-.drone-card .drone-batt{display:flex;align-items:center;gap:7px;font-size:10.5px;margin-top:4px}
-.drone-card .drone-batt::before{content:'';flex:1;height:5px;border-radius:999px;background:rgba(244,239,226,.16);overflow:hidden}
-.drone-card .drone-batt{position:relative;padding-left:0}
-.drone-card .drone-batt i{position:absolute;left:0;top:50%;transform:translateY(-50%);height:5px;border-radius:999px;
-  background:linear-gradient(90deg,#5fd07a,#9ae08c);max-width:calc(100% - 46px)}
-.drone-card .drone-batt b{font-weight:600;opacity:.9;margin-left:auto;letter-spacing:.02em}
-.drone-card .drone-batt.is-low i{background:linear-gradient(90deg,#e0553f,#e08a2e)}
+.drone-card .drone-cargo input{flex:1;min-width:0;accent-color:var(--ui-ochre)}
+.drone-card .drone-cargo b{font-weight:600;font-family:var(--ui-num);font-variant-numeric:tabular-nums;color:var(--ui-text-2)}
+.drone-card .drone-note{color:var(--ui-error);font-size:10.5px;line-height:1.4;margin:2px 0 2px}
+.drone-card .drone-cta{align-self:flex-start;margin-top:auto;padding:3px 9px;border:1px solid var(--ui-line-strong);border-radius:var(--ui-r-xs);
+  font-size:11.5px;letter-spacing:.12em;color:var(--ui-text-2);transition:border-color var(--ui-fast),color var(--ui-fast)}
+.drone-card:hover .drone-cta{border-color:var(--ui-line-hover);color:var(--ui-text)}
+.drone-card.out .drone-cta{padding:3px 10px;border-color:transparent;border-radius:var(--ui-r-xs);background:var(--ui-paper);color:var(--ui-ink);font-weight:600}
+/* IDOK-529 / IDOK-530 / IDOK-542 S3：轨道和电量条叠在同一个网格格子里，实色不闪（充电中轻呼吸）。 */
+.drone-card .drone-batt{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;column-gap:8px;
+  font-size:10.5px;margin-top:4px}
+.drone-card .drone-batt::before{content:"";grid-area:1/1;height:5px;border-radius:1px;background:var(--ui-line)}
+.drone-card .drone-batt i{grid-area:1/1;justify-self:start;max-width:100%;height:5px;border-radius:1px;background:var(--ui-ok)}
+.drone-card .drone-batt b{grid-area:1/2;font-weight:600;font-family:var(--ui-num);font-variant-numeric:tabular-nums;
+  color:var(--ui-text-2);letter-spacing:.02em}
+.drone-card .drone-batt.is-low i{background:var(--ui-seal-light)}
+.drone-card .drone-batt.is-low b{color:var(--ui-seal-light)}
 .drone-card .drone-batt.is-charging i{animation:drone-charge 1.6s ease-in-out infinite}
-/* IDOK-530: 损坏的卡也保留电量读数，损坏状态单独一枚红 chip。 */
-.drone-damage{display:inline-flex;align-items:center;gap:4px;margin-top:4px;font-size:10px;letter-spacing:.04em;
-  color:#ffb4a6;border:1px solid rgba(224,85,63,.6);background:rgba(224,85,63,.2);border-radius:999px;padding:1px 7px}
 @keyframes drone-charge{0%,100%{opacity:.55}50%{opacity:1}}
-.drone-card.broken{border-color:rgba(224,85,63,.65);background:rgba(224,85,63,.1)}
-.drone-card.broken .drone-cta{color:#f0b4a6}
-/* IDOK-529: 走路靠近残骸时出现的维修按钮（30 秒进度条）。 */
-/* IDOK-530: 进度条改成一整条细槽（i 是轨道、u 是已经修好的部分），文字更小更密。 */
+/* IDOK-530 / IDOK-542: 损坏的卡保留电量读数，损坏/完整度状态各用一枚方角小签。 */
+.drone-damage{display:inline-flex;align-items:center;align-self:flex-start;gap:4px;margin-top:4px;font-size:10px;letter-spacing:.04em;
+  color:var(--ui-error);border:1px solid color-mix(in srgb,var(--ui-seal-light) 60%,transparent);
+  background:color-mix(in srgb,var(--ui-seal) 20%,transparent);border-radius:var(--ui-r-xs);padding:1px 7px}
+.drone-wear{display:inline-flex;align-items:center;align-self:flex-start;gap:4px;margin-top:2px;font-size:10px;letter-spacing:.04em;
+  color:var(--ui-ochre);border:1px solid color-mix(in srgb,var(--ui-ochre) 45%,transparent);
+  background:color-mix(in srgb,var(--ui-ochre) 14%,transparent);border-radius:var(--ui-r-xs);padding:1px 7px}
+.drone-wear.is-low{color:var(--ui-error);border-color:color-mix(in srgb,var(--ui-seal-light) 60%,transparent);
+  background:color-mix(in srgb,var(--ui-seal) 22%,transparent)}
+.drone-card.broken{background:color-mix(in srgb,var(--ui-seal) 10%,var(--ui-surface-2))}
+.drone-card.broken::after{border-color:color-mix(in srgb,var(--ui-seal-light) 60%,transparent)}
+.drone-card.broken .drone-cta{color:var(--ui-error)}
+/* IDOK-529 / IDOK-530 / IDOK-542 S3：走路靠近残骸的 30 秒维修匾（实色墨青，0 backdrop-filter + 内衬细框 + 细槽进度条 i/u）。 */
 .drone-repair{position:fixed;left:50%;bottom:calc(140px + env(safe-area-inset-bottom));transform:translateX(-50%);
-  z-index:24;display:flex;flex-direction:column;gap:5px;align-items:center;min-width:224px;padding:9px 16px 12px;
-  border-radius:18px;border:1px solid rgba(244,239,226,.3);background:rgba(18,22,22,.78);color:#f4efe2;
-  font-family:inherit;cursor:pointer;backdrop-filter:blur(8px)}
-.drone-repair b{font-size:12px;font-weight:600;letter-spacing:.03em}
-.drone-repair span{font-size:10px;opacity:.62;letter-spacing:.02em}
-.drone-repair i{display:block;width:100%;height:4px;border-radius:999px;background:rgba(244,239,226,.16);overflow:hidden}
-.drone-repair u{display:block;height:100%;border-radius:999px;background:linear-gradient(90deg,#3ddc84,#7dffb4);
-  transition:width .12s linear;text-decoration:none}
-.drone-repair.on{border-color:rgba(61,220,132,.7);box-shadow:0 0 0 1px rgba(61,220,132,.22),0 10px 28px rgba(0,0,0,.36)}
-.drone-repair.on u{box-shadow:0 0 10px rgba(61,220,132,.6)}
-/* IDOK-530: 机库卡上的「完整度 N%」——撞过但还没坏的机身带着伤排队。 */
-.drone-wear{display:inline-flex;align-items:center;gap:4px;margin-top:2px;font-size:10px;letter-spacing:.04em;
-  color:#f0c8a0;border:1px solid rgba(240,180,120,.38);background:rgba(224,138,46,.16);border-radius:999px;padding:1px 7px}
-.drone-wear.is-low{color:#ffb4a6;border-color:rgba(240,120,90,.6);background:rgba(200,70,50,.22)}
-/* IDOK-530: 顶栏的完整度 / 进水 chip。 */
-.rc .rc-hull,.rc .rc-wet{font-size:9.5px;letter-spacing:.03em;padding:1px 6px;border-radius:999px;
-  border:1px solid rgba(244,239,226,.28);background:rgba(244,239,226,.08);opacity:.82}
-.rc .rc-hull[data-warn="1"]{border-color:rgba(240,180,120,.7);background:rgba(224,138,46,.24);color:#ffcf9a;opacity:1}
-.rc .rc-wet{color:#a9d8f5;border-color:rgba(140,200,240,.4);background:rgba(90,150,200,.22)}
-.rc .rc-wet[data-warn="1"]{color:#ffb4a6;border-color:rgba(240,120,90,.72);background:rgba(200,70,50,.3);opacity:1}
+  z-index:24;display:flex;flex-direction:column;gap:5px;align-items:center;min-width:224px;
+  padding:10px 18px 12px;border:0;border-radius:var(--ui-plaque-r);background:var(--ui-surface);color:var(--ui-text);
+  font:inherit;font-family:var(--ui-serif);cursor:pointer;-webkit-tap-highlight-color:transparent;touch-action:manipulation;
+  transition:background var(--ui-fast),transform var(--ui-fast)}
+.drone-repair::after{content:"";position:absolute;inset:var(--ui-plaque-inset);border:1px solid var(--ui-plaque-frame);
+  border-radius:1px;pointer-events:none}
+.drone-repair:hover{background:var(--ui-surface-2)}
+.drone-repair:active{transform:translateX(-50%) scale(var(--ui-press));transition-duration:var(--ui-press-t);
+  transition-timing-function:var(--ui-ease-press)}
+.drone-repair:focus-visible{outline:var(--ui-focus-w) solid var(--ui-focus);outline-offset:2px}
+.drone-repair b{font-size:12px;font-weight:600;letter-spacing:.04em}
+.drone-repair span{font-size:10px;color:var(--ui-text-2);letter-spacing:.02em}
+.drone-repair i{display:block;width:100%;height:4px;border-radius:1px;background:var(--ui-line-strong);overflow:hidden}
+.drone-repair u{display:block;height:100%;border-radius:1px;background:var(--ui-ok);transition:width .12s linear;text-decoration:none}
+.drone-repair.on::after{border-color:color-mix(in srgb,var(--ui-ok) 72%,transparent)}
+/* IDOK-530 / IDOK-542: 顶栏的完整度 / 进水方角小签。 */
+.rc .rc-hull,.rc .rc-wet{font-size:9.5px;letter-spacing:.03em;padding:1px 6px;border-radius:var(--ui-r-xs);
+  border:1px solid var(--ui-line-strong);background:var(--ui-fill);color:var(--ui-text-2);text-shadow:none}
+.rc .rc-hull[data-warn="1"]{border-color:color-mix(in srgb,var(--ui-ochre) 68%,transparent);
+  background:color-mix(in srgb,var(--ui-ochre) 22%,transparent);color:var(--ui-ochre)}
+.rc .rc-wet{color:var(--ui-jade-300);border-color:color-mix(in srgb,var(--ui-jade-300) 45%,transparent);
+  background:color-mix(in srgb,var(--ui-jade-500) 24%,transparent)}
+.rc .rc-wet[data-warn="1"]{color:var(--ui-error);border-color:color-mix(in srgb,var(--ui-seal-light) 70%,transparent);
+  background:color-mix(in srgb,var(--ui-seal) 28%,transparent)}
 .rc .rc-wet[hidden]{display:none}
-/* IDOK-530: 返航条下面的「取消返航」。 */
-.rc .rc-rth-cancel{margin-top:2px;padding:3px 10px;border-radius:999px;border:1px solid rgba(125,255,180,.5);
-  background:rgba(20,40,30,.72);color:#9ff3c0;font-size:10px;letter-spacing:.06em;font-family:inherit;cursor:pointer}
-.rc .rc-rth-cancel:hover{background:rgba(32,64,46,.85)}
+/* IDOK-530 / IDOK-542: 返航条内的「取消返航」方角小键。 */
+.rc .rc-rth-cancel{pointer-events:auto;margin-left:4px;padding:3px 10px;border-radius:var(--ui-r-xs);
+  border:1px solid color-mix(in srgb,var(--ui-ok) 52%,transparent);background:var(--ui-surface-2);color:var(--ui-ok);
+  font:600 10.5px/1.2 var(--ui-serif);letter-spacing:.06em;cursor:pointer;text-shadow:none}
+.rc .rc-rth-cancel:hover{background:var(--ui-paper);border-color:var(--ui-paper);color:var(--ui-ink)}
 /* IDOK-530: 避障红边 —— 四面各一层渐隐红色，透明度由 --rc-near-* 驱动（越近越浓）。 */
 .rc .rc-near{position:absolute;inset:0;z-index:1;pointer-events:none;opacity:0;transition:opacity .18s ease-out}
 .rc .rc-near[data-side="front"]{background:linear-gradient(to top,rgba(255,60,40,0),rgba(255,60,40,.92) 22%,rgba(255,60,40,0) 62%);opacity:var(--rc-near-front,0)}

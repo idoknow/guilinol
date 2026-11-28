@@ -28,6 +28,29 @@
 /* photo mode / drone / home screen hide it like the other HUD */
 body[data-photo=on] .nav-card,body[data-home] .nav-card{display:none}
 
+/* IDOK-542 批 2：默认（山水印）HUD 下的导航卡——一块墨青匾 + 内衬印框，不发光不投影；转向标是一枚宣纸签（青玉笔画），
+   偏航（lost）换暖黄签；距离、剩余用 --ui-num；结束键是方形 ×（宽度 + 左外边距 = 原来的宽 + 内边距 + 分隔线，列宽不变）。
+   只换材质：卡片位置、列宽、行高与改前一致。街头皮肤（body[data-hud=street]）仍用上面的沥青色板，不受影响。 */
+body:not([data-hud=street]) .nav-card{border-radius:var(--ui-plaque-r);background:var(--ui-plaque);color:var(--ui-text);font-family:var(--ui-serif);box-shadow:none}
+body:not([data-hud=street]) .nav-card::after{content:"";position:absolute;inset:var(--ui-plaque-inset);border:1px solid var(--ui-plaque-frame);border-radius:var(--ui-r-xs);pointer-events:none}
+body:not([data-hud=street]) .nav-glyph{border-radius:var(--ui-r-xs);background:var(--ui-paper);color:var(--ui-jade-700);box-shadow:inset 0 -2px 0 var(--ui-paper-line-strong)}
+body:not([data-hud=street]) .nav-card[data-kind=lost] .nav-glyph{background:var(--ui-warn);color:var(--ui-ink)}
+body:not([data-hud=street]) .nav-dist{font-family:var(--ui-num);font-weight:600;color:var(--ui-text)}
+body:not([data-hud=street]) .nav-what{font-weight:600;letter-spacing:var(--ui-track-body)}
+body:not([data-hud=street]) .nav-meta{font-weight:400;color:var(--ui-text-2)}
+body:not([data-hud=street]) .nav-left{font-family:var(--ui-num);color:var(--ui-jade-300)}
+body:not([data-hud=street]) .nav-stop{position:relative;align-self:center;box-sizing:content-box;width:34px;height:34px;margin-left:7px;padding:0;border:0;border-radius:var(--ui-r-sm);
+  display:grid;place-items:center;color:var(--ui-text-2);background:none;font:300 24px/1 var(--ui-serif);-webkit-tap-highlight-color:transparent;
+  transition:background var(--ui-fast),color var(--ui-fast),transform var(--ui-fast)}
+/* 小键补可点区（同 .ui-hit）：画面不变，透明 ::before 撑到 --ui-hit 见方 */
+body:not([data-hud=street]) .nav-stop::before{content:"";position:absolute;left:50%;top:50%;width:max(100%,var(--ui-hit));height:max(100%,var(--ui-hit));transform:translate(-50%,-50%)}
+body:not([data-hud=street]) .nav-stop:hover{color:var(--ui-text);background:var(--ui-wash-hover)}
+body:not([data-hud=street]) .nav-stop:active{color:var(--ui-paper);background:var(--ui-wash-press);transform:scale(var(--ui-press));transition-duration:var(--ui-press-t);transition-timing-function:var(--ui-ease-press)}
+body:not([data-hud=street]) .nav-stop:focus-visible{outline:var(--ui-focus-w) solid var(--ui-focus);outline-offset:-2px}
+@media (pointer:coarse) and (not (any-pointer:fine)),(max-width:560px){
+  body:not([data-hud=street]) .nav-stop{width:26px;height:26px;margin-left:5px;font-size:20px}
+}
+
 /* 触屏（手机/平板，与 input-mode.ts 的 TOUCH_UI_QUERY 一致）：右侧 dock 整列是保留区；左上依次是菜单、商铺/时辰条、视野按钮、载入街区提示，卡片排在它们下面、dock 左侧 */
 @media (pointer:coarse) and (not (any-pointer:fine)),(max-width:560px){
   .nav-card{left:calc(10px + env(safe-area-inset-left));top:calc(234px + env(safe-area-inset-top));transform:none;animation:none;

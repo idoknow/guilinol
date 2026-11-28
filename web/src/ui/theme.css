@@ -71,6 +71,20 @@
   --ui-ease:cubic-bezier(.2,.8,.2,1);--ui-fast:.15s;--ui-slow:.32s;
   --ui-rise:8px;   /* 进场位移上限 */
   --ui-press:.97;  /* 按下缩放 */
+  /* 按键手感（IDOK-542 S2）：按下 90ms 快压、松手按 --ui-fast 回弹；朱印压得更深一点 */
+  --ui-press-t:90ms;--ui-ease-press:cubic-bezier(.3,0,.5,1);
+  --ui-press-seal:.94;
+  /* 焦点环：一律 2px 青玉；遮罩键 / 匾内键的焦点环向内收（负 offset），不被遮罩裁掉 */
+  --ui-focus-w:2px;--ui-focus-in:-4px;
+  /* 匾：常驻一组键共用的一块墨青纸面 + 内衬 3px 印框；悬停只在印框内铺底，按下印压朱砂 */
+  --ui-plaque:var(--ui-surface-float);--ui-plaque-frame:var(--ui-line-strong);--ui-plaque-inset:3px;--ui-plaque-r:var(--ui-r-sm);
+  --ui-wash-hover:var(--ui-fill-2);--ui-wash-press:color-mix(in srgb,var(--ui-seal) 72%,transparent);
+  /* 刻线小像尺寸（*.svg 遮罩 + currentColor）与键帽 */
+  --ui-ico-sm:16px;--ui-ico:18px;--ui-ico-lg:22px;
+  --ui-key:18px;--ui-fs-key:10px; /* 键帽字是阶梯外唯一的例外：只给 [F] [1] 这类单键字 */
+  --ui-hit:42px;   /* 触屏最小可点区 */
+  /* 印形遮罩：横条残边（主动作条）/ 方印残边 / 圆印残边 */
+  --ui-mask-bar:url("./seal-bar.svg");--ui-mask-seal:url("./home-seal.svg");--ui-mask-round:url("./seal-round.svg");
 
   /* legacy aliases (play.css / feedback.css were written against these names) */
   --glass:var(--ui-glass);--glass-strong:var(--ui-glass-strong);--paper:var(--ui-paper);--paper-deep:var(--ui-paper-2);
@@ -86,8 +100,10 @@ body{font-family:var(--ui-serif)}
   -webkit-tap-highlight-color:transparent;touch-action:manipulation;user-select:none;-webkit-user-select:none;
   transition:background var(--ui-fast),border-color var(--ui-fast),transform var(--ui-fast),color var(--ui-fast)}
 .ui-btn:hover{background:var(--ui-glass-strong);border-color:var(--ui-line-hover)}
-.ui-btn:active{transform:scale(var(--ui-press))}
-.ui-btn:focus-visible,.ui-icon-btn:focus-visible,.ui-tab:focus-visible,.ui-link:focus-visible{outline:2px solid var(--ui-focus);outline-offset:2px}
+/* 按下：90ms 快压（--ui-press-t / --ui-ease-press），松手按 --ui-fast 回弹；朱印压到 --ui-press-seal。
+   按下底色只给四个修饰类（写在 :hover 之后才盖得住悬停）；裸 .ui-btn 不改按下底色，各组件自己写的底色不受影响 */
+.ui-btn:active,.ui-icon-btn:active{transform:scale(var(--ui-press));transition-duration:var(--ui-press-t);transition-timing-function:var(--ui-ease-press)}
+.ui-btn:focus-visible,.ui-icon-btn:focus-visible,.ui-tab:focus-visible,.ui-link:focus-visible{outline:var(--ui-focus-w) solid var(--ui-focus);outline-offset:2px}
 .ui-btn--seal{color:var(--ui-paper);background:var(--ui-seal);border-color:var(--ui-seal)}
 .ui-btn--seal:hover{background:var(--ui-seal-hi);border-color:var(--ui-seal-hi)}
 .ui-btn--paper{color:var(--ui-ink);background:var(--ui-paper);border-color:var(--ui-paper)}
@@ -96,6 +112,9 @@ body{font-family:var(--ui-serif)}
 .ui-btn--line:hover{background:var(--ui-fill);border-color:var(--ui-line-hover)}
 .ui-btn--ghost{color:var(--ui-text-2);background:none;border-color:transparent}
 .ui-btn--ghost:hover{color:var(--ui-text);background:var(--ui-fill);border-color:transparent}
+.ui-btn--seal:active{background:var(--ui-seal);border-color:var(--ui-seal);transform:scale(var(--ui-press-seal))}
+.ui-btn--paper:active{background:var(--ui-paper-2);border-color:var(--ui-paper-2)}
+.ui-btn--line:active,.ui-btn--ghost:active{background:var(--ui-fill-2)}
 .ui-btn--lg{min-height:var(--ui-h-lg);padding:0 24px;font-size:var(--ui-fs-md);letter-spacing:var(--ui-track-title)}
 .ui-btn--block{display:flex;width:100%}
 .ui-btn[disabled],.ui-btn[aria-disabled=true]{cursor:default;color:var(--ui-disabled);background:none;border-color:var(--ui-line);transform:none}
@@ -103,13 +122,38 @@ body{font-family:var(--ui-serif)}
   color:var(--ui-text-2);background:none;border:1px solid var(--ui-line);-webkit-tap-highlight-color:transparent;
   transition:background var(--ui-fast),color var(--ui-fast),transform var(--ui-fast)}
 .ui-icon-btn:hover{background:var(--ui-fill);color:var(--ui-text)}
-.ui-icon-btn:active{transform:scale(var(--ui-press))}
 /* 文字链接：底部链接、续游一类次要入口 */
 .ui-link{display:inline-flex;align-items:center;gap:.4em;padding:0;border:0;background:none;cursor:pointer;font:inherit;letter-spacing:inherit;color:var(--ui-text-2);
   text-decoration:underline;text-decoration-color:var(--ui-line-strong);text-decoration-thickness:1px;text-underline-offset:.32em;transition:color var(--ui-fast),text-decoration-color var(--ui-fast)}
 .ui-link:hover{color:var(--ui-text);text-decoration-color:currentColor}
 /* 数字：等宽，金额带「¥」也不缺字 */
 .ui-num{font-family:var(--ui-num);font-variant-numeric:tabular-nums;letter-spacing:.02em}
+
+/* --- 按键原语「匾 · 印 · 签」（IDOK-542 S2，docs/ui.md「S2 按键规范」） ------------------------------ */
+/* 匾：一组常驻键共用的墨青纸面 + 内衬印框。宿主须自带定位（fixed / absolute / relative），原语不改位置 */
+.ui-plaque{box-sizing:border-box;color:var(--ui-text);background:var(--ui-plaque);border-radius:var(--ui-plaque-r)}
+.ui-plaque::after{content:"";position:absolute;inset:var(--ui-plaque-inset);border:1px solid var(--ui-plaque-frame);border-radius:var(--ui-r-xs);pointer-events:none}
+/* 印：唯一主动作。残边朱印遮罩（默认横条；--square 方印、--round 圆印），焦点环收进印内 */
+.ui-seal-btn{display:inline-flex;align-items:center;justify-content:center;gap:.45em;box-sizing:border-box;min-height:var(--ui-h);padding:0 18px;border:0;cursor:pointer;
+  font:600 var(--ui-fs-sm)/1 var(--ui-serif);letter-spacing:var(--ui-track);color:var(--ui-paper);background:var(--ui-seal);
+  -webkit-mask:var(--ui-mask-bar) center/100% 100% no-repeat;mask:var(--ui-mask-bar) center/100% 100% no-repeat;
+  -webkit-tap-highlight-color:transparent;touch-action:manipulation;transition:background var(--ui-fast),transform var(--ui-fast) var(--ui-ease)}
+.ui-seal-btn--square{-webkit-mask-image:var(--ui-mask-seal);mask-image:var(--ui-mask-seal)}
+.ui-seal-btn--round{aspect-ratio:1;padding:0;-webkit-mask-image:var(--ui-mask-round);mask-image:var(--ui-mask-round)}
+.ui-seal-btn:hover{background:var(--ui-seal-hi)}
+.ui-seal-btn:active{background:var(--ui-seal);transform:scale(var(--ui-press-seal));transition-duration:var(--ui-press-t);transition-timing-function:var(--ui-ease-press)}
+.ui-seal-btn:focus-visible{outline:1.5px solid var(--ui-paper);outline-offset:-5px}
+/* 签：读的信息、选中 / 开着的状态。宣纸底墨字 */
+.ui-slip{box-sizing:border-box;color:var(--ui-ink);background:var(--ui-paper);border-radius:var(--ui-r-xs)}
+/* 键帽：宣纸小方块，单键字（F / 1 / Esc） */
+.ui-key{display:inline-grid;place-items:center;box-sizing:border-box;min-width:var(--ui-key);height:var(--ui-key);padding:0 4px;border-radius:var(--ui-r-xs);
+  font:600 var(--ui-fs-key)/1 var(--ui-num);letter-spacing:0;color:var(--ui-ink);background:var(--ui-paper);box-shadow:inset 0 -1.5px 0 var(--ui-paper-line-strong)}
+/* 刻线小像：--ico 指向一枚 24 网格遮罩（ico-*.svg），颜色跟 currentColor */
+.ui-ico{display:inline-block;flex:none;width:var(--ui-ico);height:var(--ui-ico);background:currentColor;
+  -webkit-mask:var(--ico) center/contain no-repeat;mask:var(--ico) center/contain no-repeat}
+.ui-ico--sm{width:var(--ui-ico-sm);height:var(--ui-ico-sm)}.ui-ico--lg{width:var(--ui-ico-lg);height:var(--ui-ico-lg)}
+/* 小键补可点区：画面不变，透明 ::before 撑到 --ui-hit 见方。宿主须是定位元素，且邻键间距够，不然热区互相压 */
+.ui-hit::before{content:"";position:absolute;left:50%;top:50%;width:max(100%,var(--ui-hit));height:max(100%,var(--ui-hit));transform:translate(-50%,-50%)}
 
 /* --- 面板：墨青纸对话框（关于 / 账号 / 反馈 / 玩法 / 设置）。一条内衬印框线，无外描边、无投影 -------------- */
 /* 印框 = 面板自己的一条 outline（一层、闭合、不拼接；圆角随 border-radius 同心内收）。
