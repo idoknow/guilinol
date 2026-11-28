@@ -173,17 +173,23 @@ try {
     a.hour.toFixed(4), b.hour.toFixed(4), a.night.toFixed(3), b.night.toFixed(3), clockErrLabel(a), clockErrLabel(b), gap.toFixed(3))
 
   // ---- 2. 联机状态重复上报不得惊群 ------------------------------------------------
-  const before = healthHits.get('bob')
+  // 设计保证：没有中间非 online 状态的重复 `online` 上报，最多触发一次校时（15 秒冷却兜底）。
+  // 为了让断言确定化，先打一个 `offline` 把状态打下去，再连发 6 个 `online`：
+  // 第 1 个是真实跃迁（+1），后 5 个必须全部被跃迁判断挡掉。若惊群存在，这里会是 +6。
   await bob.bringToFront()
-  // net.ts 每收到一次在线人数广播就重发 state:'online'；这里模拟 6 次紧凑上报。
+  await new Promise(done => setTimeout(done, 1000))
+  await bob.evaluate(() => window.dispatchEvent(new CustomEvent('glol:mp-status', {detail:{state:'offline', online:0}})))
+  await new Promise(done => setTimeout(done, 400))
+  const before = healthHits.get('bob')
   for(let index = 0; index < 6; index++) {
     await bob.evaluate(() => window.dispatchEvent(new CustomEvent('glol:mp-status', {detail:{state:'online', online:2}})))
     await new Promise(done => setTimeout(done, 120))
   }
   await new Promise(done => setTimeout(done, 1200))
   const afterBurst = healthHits.get('bob')
-  assert.equal(afterBurst, before, `重复的 online 上报不该触发校时（多打了 ${afterBurst - before} 次 /api/health）`)
-  console.log('联机重复上报 6 次 → 额外请求:', afterBurst - before)
+  const burstExtra = afterBurst - before
+  assert.ok(burstExtra <= 1, `6 次重复 online 上报最多 1 次校时，实际多打 ${burstExtra} 次（惊群未修复）`)
+  console.log('offline→6×online：额外请求 =', burstExtra, '（期望 1：首个 online 跃迁，其余被挡）')
 
   // ---- 3. offline → online 跃迁会重新校时 -----------------------------------------
   await bob.evaluate(() => window.dispatchEvent(new CustomEvent('glol:mp-status', {detail:{state:'offline', online:0}})))
