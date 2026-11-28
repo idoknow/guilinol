@@ -15,7 +15,8 @@ import {
 } from '../input/keymap'
 import {onPrefs} from './prefs'
 import {getPlayMode} from '../game/play-mode'
-import {isGlobalHotkeyBlocked} from '../walk/input-guard'
+import {isAdminUserFromDom, isGlobalHotkeyBlocked} from '../walk/input-guard'
+import {getKeyPHotkeyHint} from './hotkeys'
 import {touchUi} from './input-mode'
 
 type Ctx = 'walk' | 'duty' | 'fly' | 'bike' | 'bicycle' | 'car' | 'boat'
@@ -37,14 +38,20 @@ function rows(ctx: Ctx): Row[] {
       {keys: [k('interact')], label: '上车 / 交互'}, {keys: [k('emote')], label: '表情（长按）', id: 'emote'},
       {keys: ['L'], label: '叫共享电驴', solo: true}, {keys: ['O'], label: '随身衣橱', solo: true},
       {keys: [k('view')], label: '第一 / 第三人称'}, {keys: ['V'], label: '起飞', free: true},
-      {keys: ['1', '2'], label: '空手 / 相机'}, {keys: ['M'], label: '地图'}, {keys: ['P'], label: '拍照'},
+      {keys: ['1', '2'], label: '空手 / 相机'}, {keys: ['M'], label: '地图'},
+      ...(isAdminUserFromDom()
+        ? [{keys: ['P'], label: '报错 / 反馈（管理员）'}, {keys: ['Shift', 'P'], label: '拍照'}]
+        : [{keys: ['P'], label: '拍照'}]),
     ]
     case 'duty': return getDutyCardRows()
     case 'fly': return [
       {keys: move(), label: '飞'}, {keys: ['Q', 'E'], label: '降 / 升'},
       {keys: ['Shift'], label: '加速'}, {keys: ['V'], label: '落地步行'},
       {keys: ['M'], label: '地图传送'}, {keys: ['J'], label: '景册'},
-      {keys: ['P'], label: '拍照'}, {keys: ['Esc'], label: '菜单'},
+      ...(isAdminUserFromDom()
+        ? [{keys: ['P'], label: '报错 / 反馈（管理员）'}, {keys: ['Shift', 'P'], label: '拍照'}]
+        : [{keys: ['P'], label: '拍照'}]),
+      {keys: ['Esc'], label: '菜单'},
     ]
     case 'bike': return [
       {keys: move(), label: '骑'}, {keys: ['Q', 'E'], label: '降 / 升挡'},
@@ -161,7 +168,9 @@ const FEATURES = (): Feature[] => [
     pc: '名胜附近地上有朱红色圆圈，走进去就盖一枚印章。按 <kbd>J</kbd> 翻景册，看还差哪几处，也能从景册直接去。',
     phone: '名胜附近地上有朱红色圆圈，走进去就盖一枚印章。点「景册」看还差哪几处，也能从景册直接去。'},
   {seal: '摄', title: '拍照与相机',
-    pc: '按 <kbd>P</kbd> 或点「拍照」进入拍照模式，可以换时辰、天气和滤镜，拍完直接存图。点「相机」挑一台相机戴上，拍出来就是那台相机的画质，还能录像。',
+    pc: isAdminUserFromDom()
+      ? '按 <kbd>Shift</kbd>+<kbd>P</kbd> 或点「拍照」进入拍照模式（拍照中按 <kbd>P</kbd> 退出）；管理员常态按 <kbd>P</kbd> 直达报错/反馈弹窗。点「相机」挑一台相机戴上，拍出来就是那台相机的画质，还能录像。'
+      : '按 <kbd>P</kbd> 或点「拍照」进入拍照模式，可以换时辰、天气和滤镜，拍完直接存图。点「相机」挑一台相机戴上，拍出来就是那台相机的画质，还能录像。',
     phone: '点「拍照」进入拍照模式，可以换时辰、天气和滤镜。点「相机」挑一台相机戴上，还能录像。'},
   {seal: '物', title: '背包里的东西',
     pc: `按 <kbd>3</kbd> 或从背包选中香烟，用 <kbd>${k('interact')}</kbd> 跟随提示操作，再按 <kbd>3</kbd> 丢弃。`,
@@ -184,7 +193,10 @@ const KEY_GROUPS = (): {title: string; rows: Row[]}[] => [
   {title: '船', rows: rows('boat')},
   getDutyGuideKeyGroup(),
   {title: '界面', rows: [
-    {keys: ['M'], label: '地图'}, {keys: ['J'], label: '景册'}, {keys: ['P'], label: '拍照'},
+    {keys: ['M'], label: '地图'}, {keys: ['J'], label: '景册'},
+    ...(isAdminUserFromDom()
+      ? [{keys: ['P'], label: '报错 / 反馈（管理员）'}, {keys: ['Shift', 'P'], label: '拍照（拍照中按 P 退出）'}]
+      : [{keys: ['P'], label: '拍照'}]),
     {keys: [k('settings')], label: '设置'}, {keys: ['Tab'], label: '手机（街头界面）'},
     {keys: ['F1'], label: '这份指南'}, {keys: ['Esc'], label: '关闭 / 菜单'},
   ]},
@@ -241,9 +253,10 @@ function renderSheet(tab: Tab) {
     body.innerHTML = `<dl class="guide-touch">${TOUCH_ROWS.map(([what, how]) => `<dt>${what}</dt><dd>${how}</dd>`).join('')}</dl>
       <p class="guide-note">接了蓝牙键盘也能用键盘玩，按键和电脑一样。</p>`
   } else {
+    const adminHint = getKeyPHotkeyHint(isAdminUserFromDom())
     body.innerHTML = `<div class="guide-keygrid">${KEY_GROUPS().map(group => `<section><h3>${group.title}</h3><ul>${group.rows.filter(row => !mode || visible(row))
       .map(row => `<li><span class="keys-caps">${caps(row.keys)}</span><span>${row.label}</span></li>`).join('')}</ul></section>`).join('')}</div>
-      <p class="guide-note">改过的键这里会跟着变；在「设置」里可以改键。</p>`
+      <p class="guide-note">改过的键这里会跟着变；在「设置」里可以改键。</p>${adminHint.conflictNote ? `<p class="guide-note">${adminHint.conflictNote}</p>` : ''}`
   }
   body.scrollTop = 0
 }
@@ -378,7 +391,7 @@ export function mountGuide(opts: {autoTour: boolean}) {
   })
 
   renderCard()
-  new MutationObserver(renderCard).observe(document.body, {attributes: true, attributeFilter: ['data-mode', 'data-aboard', 'data-ride', 'data-duty', 'data-td-duty-active']})
+  new MutationObserver(renderCard).observe(document.body, {attributes: true, attributeFilter: ['data-mode', 'data-aboard', 'data-ride', 'data-duty', 'data-td-duty-active', 'data-user-role']})
   onPrefs(renderCard)
 
   if (!opts.autoTour || localStorage.getItem(TOUR_KEY)) return
