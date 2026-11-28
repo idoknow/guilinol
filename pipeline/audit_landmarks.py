@@ -298,7 +298,7 @@ def main():
             model=ROOT/'public'/spec['model'];components=[]
             for source,roof in spec['auditBuildings'].items():
                 reference=area(osm[source]) if source in osm else overture[source]
-                shape=footprint(model,entry,elevation=6 if roof is None else None,roof=roof)
+                shape=footprint(model,entry,elevation=spec.get('auditFloorElevation',6) if roof is None else None,roof=roof)
                 parts=list(getattr(shape,'geoms',[shape]))
                 selected=max(parts,key=lambda part:part.intersection(reference).area,default=Polygon())
                 if roof is not None:
