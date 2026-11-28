@@ -2,9 +2,10 @@ import {isIP} from 'node:net'
 
 const uid = value => /^\d+$/.test(value) && Number.isSafeInteger(Number(value))
 const ip = value => !value.includes('%') && isIP(value)
+const recordId = value => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value) || /^legacy-\d+$/i.test(value)
 const fingerprint = value => /^[a-f\d]{16,64}$/i.test(value)
 export function detectKind(value) {
-  return uid(value) ? 'uid' : ip(value) ? 'ip' : fingerprint(value) ? 'fp' : 'nick'
+  return recordId(value) ? 'record' : uid(value) ? 'uid' : ip(value) ? 'ip' : fingerprint(value) ? 'fp' : 'nick'
 }
 
 const active = '(until_ms is null or until_ms > extract(epoch from now())*1000)'
@@ -63,14 +64,86 @@ async function byIp(rows,value) {
   return {summary:{...summary,...geo},accounts,devices,subnet}
 }
 
+async function byRecord(rows, value) {
+  const safeRows = async (sql, args) => {
+    try { return await rows(sql, args) } catch (error) {
+      if (['42P01', '42703'].includes(error?.code) || /does not exist|no such/i.test(String(error?.message ?? ''))) return []
+      throw error
+    }
+  }
+  const [rec] = await safeRows(
+    `select id, kind, value, uid::float8 as uid, fp, tier, reason, actor, policy_version,
+            created_ms::float8 as created_ms, until_ms::float8 as until_ms,
+            revoked_ms::float8 as revoked_ms, revoked_by, revoke_reason, health, meta
+     from mp_ban_records where id=$1 limit 1`,
+    [value],
+  )
+  if (!rec) return { record: null, account: null, events: [], captures: [], appeals: [], relatedAccounts: [] }
+  const targetUid = rec.uid != null ? String(rec.uid) : (rec.kind === 'uid' && uid(String(rec.value)) ? String(rec.value) : null)
+  const targetFp = rec.fp || (rec.kind === 'fp' ? String(rec.value) : '')
+  const [account] = targetUid
+    ? await safeRows(
+        `select id, uid::float8 as uid, nickname, email, created_at from users where uid=$1 limit 1`,
+        [targetUid],
+      )
+    : []
+  let events = await safeRows(
+    `select id, uid::float8 as uid, fp, kind, at::float8 as at, detail, health, record_id
+     from mp_cheat_events where record_id=$1 order by at desc limit 50`,
+    [value],
+  )
+  if (!events.length && targetUid && Number.isFinite(rec.created_ms)) {
+    events = await safeRows(
+      `select id, uid::float8 as uid, fp, kind, at::float8 as at, detail
+       from mp_cheat_events where uid=$1 and at between $2 and $3 order by at desc limit 30`,
+      [targetUid, rec.created_ms - 10 * 60_000, rec.created_ms + 60_000],
+    )
+  }
+  let captures = await safeRows(
+    `select id, uid::float8 as uid, nickname, fp, kind, record_id as "recordId",
+            captured_at::float8 as "capturedAt", state_label as "stateLabel", server_state as "serverState",
+            speed_ms::float8 as "speedMs", client_speed_ms::float8 as "clientSpeedMs",
+            landmark, landmark_dist as "landmarkDist", meta, width, height, image_bytes as "imageBytes"
+     from mp_cheat_captures where record_id=$1 order by captured_at desc limit 12`,
+    [value],
+  )
+  if (!captures.length && targetUid && Number.isFinite(rec.created_ms)) {
+    captures = await safeRows(
+      `select id, uid::float8 as uid, nickname, fp, kind,
+              captured_at::float8 as "capturedAt", state_label as "stateLabel", server_state as "serverState",
+              speed_ms::float8 as "speedMs", client_speed_ms::float8 as "clientSpeedMs",
+              landmark, landmark_dist as "landmarkDist", meta, width, height, image_bytes as "imageBytes"
+       from mp_cheat_captures where uid=$1 and captured_at between $2 and $3 order by captured_at desc limit 8`,
+      [targetUid, rec.created_ms - 10 * 60_000, rec.created_ms + 2 * 60_000],
+    )
+  }
+  const formattedCaptures = captures.map((row) => ({
+    ...row,
+    imageUrl: `/api/admin/mp/cheat-captures/${encodeURIComponent(row.id)}/image`,
+  }))
+  const relatedAccounts = targetFp
+    ? await safeRows(
+        `select d.uid::float8 as uid, u.nickname, d.last::float8 as last
+         from mp_devices d left join users u using(uid)
+         where d.fp=$1 order by d.last desc nulls last, d.uid limit 50`,
+        [targetFp],
+      )
+    : []
+  const appeals = await safeRows(
+    `select id, title, status, submitted_at, updated_at from feedback where ban_record_id=$1 order by updated_at desc limit 10`,
+    [value],
+  )
+  return { record: rec, account: account ?? null, events, captures: formattedCaptures, appeals, relatedAccounts }
+}
+
 const reply=(body,status=200)=>Response.json(body,{status,headers:{'Cache-Control':'no-store'}})
-export async function securitySearch(pool,request) {
+export async function securitySearch(pool,request,actor=null) {
   if(request.method!=='GET')return reply({error:{message:'仅支持 GET'}},405)
   const params=new URL(request.url).searchParams,raw=params.get('q')??'',value=raw.trim()
   let kind=params.get('kind')??'auto'
   if(kind==='auto')kind=detectKind(value)
-  if(!value || raw.length>128 || value.includes('\0') || !Object.hasOwn({uid,ip,fp:fingerprint,nick:true},kind)
-    || (kind==='uid'&&!uid(value)) || (kind==='fp'&&!fingerprint(value)) || (kind==='ip'&&!ip(value)))return reply({error:{message:'无效的查询条件'}},400)
+  if(!value || raw.length>128 || value.includes('\0') || !Object.hasOwn({record:recordId,uid,ip,fp:fingerprint,nick:true},kind)
+    || (kind==='record'&&!recordId(value)) || (kind==='uid'&&!uid(value)) || (kind==='fp'&&!fingerprint(value)) || (kind==='ip'&&!ip(value)))return reply({error:{message:'无效的查询条件'}},400)
   const client=await pool.connect(),deadline=performance.now()+3000
   try {
     await client.query('begin isolation level repeatable read read only')
@@ -81,6 +154,7 @@ export async function securitySearch(pool,request) {
       return (await client.query(sql,args)).rows
     }
     let result
+    if(kind==='record')result=await byRecord(rows,value)
     if(kind==='nick')result={candidates:await rows(`select uid,nickname from users where nickname ilike $1
       order by (lower(nickname)=lower($2)) desc,uid limit 10`,['%'+value.replace(/[\\_%]/g,'\\$&')+'%',value])}
     if(kind==='uid')result=await profile(rows,String(Number(value)))
@@ -91,6 +165,12 @@ export async function securitySearch(pool,request) {
       result={device:device??null}
     }
     await client.query('commit')
+    if (actor) {
+      pool.query(
+        "insert into admin_audit(actor_id,action,target_type,target_id,detail) values($1,'security.search','security',$2,$3)",
+        [actor, kind, { kind, query: value.slice(0, 80) }],
+      ).catch(() => {})
+    }
     return reply({kind,...result})
   }catch(error){
     await client.query('rollback')
