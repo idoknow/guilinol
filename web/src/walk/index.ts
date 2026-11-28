@@ -3004,7 +3004,7 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
       mountedStaticBike.visible=false
       const paint=(mountedStaticBike.userData.paint as number|undefined)??0
       const rKind=rides.rideKind==='bicycle'?'bicycle':'bike'
-      rides.setEbikeEnvironmentHour(env.hour)
+      rides.setEbikeEnvironmentHour(env.hour, env.night)
       const initTel=rides.ebikeTelemetry
       twoWheelOp=resolveTwoWheelTransition(twoWheelOp,{type:'mount',kind:rKind,verifyMode:verify,nightLevel:env.night,parkStart:initTel?.parkLocked}).state
       if(initTel){
@@ -3050,7 +3050,7 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
     wasCar=!!rides?.car
     wasBike=!!rides?.bike
     if(wasBike&&rides?.bike&&!crashSession){
-      rides.setEbikeEnvironmentHour(env.hour)
+      rides.setEbikeEnvironmentHour(env.hour, env.night)
       const isSharedBikeNow=rides.rideKind==='bike'&&rides.isShared
       const spawnKeyNow=rides.bikeSpawnKey??''
       const soloSvc=soloServices()

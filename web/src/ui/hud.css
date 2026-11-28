@@ -83,8 +83,19 @@ body:not([data-hud=street]) .hud-me>.btn-unstuck.armed{--hud-wash:var(--ui-seal)
 .sky-ui .sky-fold:active{color:var(--ui-text);background:var(--ui-jade-700)}
 .sky-ui.folded .sky-fold::before{transform:translate(-1px,0) rotate(-45deg)}
 .sky-ui.folded{gap:0;padding:6px 6px 6px 12px}
-.sky-ui.folded .sky-group,.sky-ui.folded .sky-flow{display:none}
-.sky-ui.folded .sky-time{min-width:0;margin-right:6px}
+.sky-ui.folded .sky-group,.sky-ui.folded .sky-flow,.sky-ui.folded .sky-follow{display:none}
+.sky-ui.folded .sky-time{min-width:0;margin-right:5px}
+/* 收起态「全服/本地」标签要留右侧间距，否则会顶到展开按钮的 `>` 边框上压字（IDOK-502 审核 P0-2）。 */
+.sky-ui.folded .sky-src{margin-right:6px}
+/* IDOK-502 全服统一时间：时辰右边一个小标签说明「全服 / 全服·本机 / 本地」，本地预览时可以一键回到全服。
+   走 IDOK-542 的匾额配色令牌，不再用硬编码的朱砂红。 */
+.sky-src{font-size:10px;line-height:1;opacity:.62;letter-spacing:.02em;white-space:nowrap}
+.sky-ui .sky-follow{font-size:10px;width:auto;min-width:34px;height:22px;padding:0 7px;opacity:1;line-height:1;
+  color:var(--ui-paper);background:var(--ui-seal);border-radius:var(--ui-r-xs);white-space:nowrap;letter-spacing:.04em}
+.sky-ui .sky-follow:hover{background:var(--ui-seal-hi)}
+.sky-ui.locked .sky-group,.sky-ui.locked .sky-flow{opacity:.5}
+.sky-ui.locked button:disabled{cursor:default;opacity:.45}
+.sky-ui.locked button.on{color:var(--ui-text-2);background:var(--ui-surface-2)}
 
 /* 底部提示、气泡、署名（限定 body>output，防止误伤设置面板里的 <output>） */
 body>output,footer,.hint{position:fixed;left:10px;background:var(--ui-glass);color:var(--ui-paper);font:11px/1.4 var(--ui-serif);padding:3px 10px;border-radius:var(--ui-r-pill);pointer-events:none}

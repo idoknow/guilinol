@@ -989,6 +989,9 @@ export async function vehicles(
       batteryPct: savedBat,
       mods,
       envHour: skyEnv.hour,
+      // IDOK-502: overcast/rainy skies darken `env.night` well before 18:30, so hand the actual level over
+      // instead of letting the bike re-derive night from the raw hour.
+      envNight: skyEnv.night,
     })
     if (rideKind === 'bike' && ownership === 'shared') {
       if (!wasAlreadyUnlocked) {
@@ -1692,7 +1695,8 @@ export async function vehicles(
     toggleEbikeKickstand(silent = false) { return bike ? bikeCtrl.toggleKickstand(silent) : false },
     setEbikeHeadlight(mode: EbikeHeadlightMode, manual = true) { return bike ? bikeCtrl.setHeadlight(mode, manual) : 'off' },
     cycleEbikeHeadlight() { return bike ? bikeCtrl.cycleHeadlight() : 'off' },
-    setEbikeEnvironmentHour(hour: number) { if (bike) bikeCtrl.setEnvironmentHour(hour) },
+    // IDOK-502: pass the evaluated night level too, so the headlight matches the lamps under overcast skies.
+    setEbikeEnvironmentHour(hour: number, night?: number) { if (bike) bikeCtrl.setEnvironmentHour(hour, night) },
     setEbikeTurnSignal(dir: EbikeTurnSignal) { return bike ? bikeCtrl.setTurnSignal(dir) : 'off' },
     toggleEbikeTurnSignal(dir: Exclude<EbikeTurnSignal, 'off'>) { return bike ? bikeCtrl.toggleTurnSignal(dir) : 'off' },
     setEbikeHazard(on: boolean) { return bike ? bikeCtrl.setHazard(on) : false },

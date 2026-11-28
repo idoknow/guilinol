@@ -72,7 +72,9 @@ async function handle(request:Request,env:Env) {
   if(path.startsWith('citizen/'))return citizen(request,env,path)
   if(!Object.hasOwn(methods,path)) throw new Problem(404,'not_found','接口不存在')
   if(!methods[path].includes(method)) throw new Problem(405,'method','不支持的请求方式')
-  if(path==='health')return json({ok:true})
+  // IDOK-502: `now` is the全服 clock authority. Clients calibrate against it (RTT/2 compensated) so
+  // every player sees the same hour and weather; it is public and read-only, like `ok`.
+  if(path==='health')return json({ok:true,now:Date.now()})
   if(method!=='GET'&&request.headers.get('Origin')!==url.origin) throw new Problem(403,'origin','请求来源不符')
   let body:Record<string,unknown>={}
   if(method!=='GET'&&path!=='auth/logout'&&path!=='rt/ticket') {

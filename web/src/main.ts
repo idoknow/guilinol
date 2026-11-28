@@ -30,6 +30,7 @@ import {MAIN_DETAIL_LAYER} from './look/mirror-layer'
 import {rain} from './look/rain'
 import {windowLight} from './look/buildings'
 import {skyClock} from './ui/sky'
+import {installWorldClock, worldNow, clockSource, clockFailures, worldSnapshot, calibrateWorldClock} from './global-time'
 import type {Host} from './play/host'
 import {streamIndicator,veil,type FullLoader,type Veil} from './ui/loading'
 import {loadTiles} from './look/tiles'
@@ -234,6 +235,8 @@ async function start(loader:FullLoader,creatorSpawn=false) {
   }
   resize(); window.addEventListener('resize',resize)
   const clock = skyClock(params)
+  // IDOK-502: start the全服 clock calibration early so the opening frame is already on world time.
+  installWorldClock(params)
   if(!soloStart)setPreset(camera,params.get('cam')??params.get('spawn'),bounds.bbox)
   let previous=0, first=0, frame=0, sum=0, samples=0
   const flightAhead=new THREE.Vector3()
@@ -887,7 +890,17 @@ async function start(loader:FullLoader,creatorSpawn=false) {
     deriveRangeMetrics,
     setView:(view:unknown)=>host.setView(view),
     async photoSupport(x:number,z:number,bridgeRadius?:number){return (await loadWalker()).photoSupport(x,z,bridgeRadius)},
-    peaksStats:peaks.stats,clock,env,get tour(){return tour},get walk(){return walker},...(params.has('verify')?{heli}:{}),
+    peaksStats:peaks.stats,clock,env,
+    /** IDOK-502: read-only view of the全服 clock, for the HUD and for headless consistency checks.
+     *  `now` is this client's estimate of the server epoch; `hour` is what it is rendering;
+     *  `targetHour` is the authoritative全服 hour from the calibrated clock. */
+    worldClock:()=>{const snap=worldSnapshot()
+      return {now:worldNow(),source:clockSource(),failures:clockFailures(),local:!clock.world,linked:!!clock.linked,
+        anchored:!!clock.anchored,hour:clock.hour,weather:clock.weather,
+        targetHour:snap.hour,targetWeather:snap.weather,remainingMs:snap.remainingMs}},
+    /** IDOK-502: force a calibration now (used by scripts/verify-world-time.mjs). */
+    calibrateWorldClock:()=>calibrateWorldClock({force:true}),
+    get tour(){return tour},get walk(){return walker},...(params.has('verify')?{heli}:{}),
     flight: takeFlight,
     setPreset(name:string){if(getPlayMode()==='solo')return {ok:false,code:'FLIGHT_DISABLED_IN_SOLO'}
       setPreset(camera,name,manifest.bbox);camera.updateMatrixWorld();return stats.frame},

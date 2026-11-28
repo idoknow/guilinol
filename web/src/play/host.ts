@@ -18,7 +18,18 @@ export interface Walker {
   /** Water surface height at x/z, or null on dry land (IDOK-529). */
   waterAt?(x:number,z:number):number|null
 }
-export interface Clock {hour:number; weather:Weather; flowing:boolean; goal:number|null; set(hour:number,weather?:Weather):void}
+export interface Clock {
+  hour:number; weather:Weather; flowing:boolean; goal:number|null
+  /** IDOK-502: true while the hour follows the全服 clock; a local preview sets it false. */
+  world:boolean
+  /** ms time constant for easing into a new weather (manual picks use ~1.2 s, a world change ~12 s). */
+  blendMs:number
+  /** True while connected/connecting to the multiplayer server — the panel is read-only then. */
+  readonly linked?:boolean
+  /** True when a capture anchor (`?time=` / `?verify` / `?weather=`) owns the clock. */
+  readonly anchored?:boolean
+  set(hour:number,weather?:Weather):void
+}
 export interface Host {
   captureView():Promise<{view:import('../../../lib/feedback-contract').FeedbackView;shot:Blob}>
   setView(view:unknown):Promise<void>
