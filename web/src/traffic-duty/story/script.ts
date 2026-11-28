@@ -77,7 +77,7 @@ export const DUTY_STORY_BEATS: readonly DutyStoryBeat[] = Object.freeze([
         speakerLabel: '解放桥交警',
         expr: 'serious',
         shot: 'wide',
-        text: '这位市民来得正是时候！早高峰刚起来，桥上黑色非机动车道两轮车越来越密，有人不戴头盔还贴着逆行，我一个人守着西桥头顾不过来。',
+        text: '这位市民来得正是时候！早高峰刚起来，桥上非机动车道两轮车越来越密，有人不戴头盔、贴着逆行，还有人走人行道抄近路，我一个人守着西桥头顾不过来。',
       },
       {
         speaker: 'player',
@@ -110,7 +110,7 @@ export const DUTY_STORY_BEATS: readonly DutyStoryBeat[] = Object.freeze([
         speakerLabel: '解放桥交警',
         expr: 'remind',
         shot: 'bridge',
-        text: '记住范围就在解放桥三道连续护栏所在桥面上——走出桥头会显示「正在值班」并把你拉回。按 Q 吹哨警告周围违规车，按 E 挥旗点车靠边，长按 E 放行。',
+        text: '记住范围就在解放桥三道连续护栏所在桥面上——走出桥头会显示「正在值班」并把你拉回。按 Q 吹哨警告，按 E 挥旗点车靠边、长按放行；站车头正前方拦车，侧面后方容易跑路！',
       },
       {
         speaker: 'player',

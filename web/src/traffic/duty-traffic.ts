@@ -10,6 +10,29 @@ import {
   jiefangDeckWorldY,
   worldToJiefangBridgeLocal,
 } from '../traffic-duty/jiefang-railings'
+import {
+  ESCAPE_PASSIVE_RETRY_WINDOW_SEC,
+  JIEFANG_FRONT_WHISTLE_STOP_PROB,
+  acknowledgeJiefangStoryMode,
+  applyEscapeImpulse,
+  classifyInterceptAspect,
+  computeEscapeDodge,
+  escapeFleeProbability,
+  getEscapeClockSec,
+  getJiefangStoryModeVersion,
+  isActorStoppedOrTicketing,
+  isJiefangStoryModeActive,
+  isJiefangStoryModeRequested,
+  markEscapeCause,
+  peekEscapeMark,
+  subscribeDutyEscape,
+  tryEmitDutyEscape,
+  type DutyEscapeCause,
+  type DutyEscapeEvent,
+  type DutyEscapeListener,
+  type InterceptAspect,
+} from '../traffic-duty/jiefang-escape'
+import {computeFineYuanStack, resolveDutyFineTable, type DutyFineTable} from '../traffic-duty/types'
 import {touchUi} from '../ui/input-mode'
 import {masterVolume, rideSoundMuted} from '../walk/ride-sound-pref'
 import {staticSolids, useTrafficSolids, type Solid} from './contact'
@@ -31,8 +54,10 @@ import {
   actorHasAnyViolation,
   actorHasViolation,
   getActorViolations,
+  pickTwoWheelProfile,
   type ActiveTrafficViolation,
   type Actor,
+  type DutyHiddenLifecycleConfig,
   type ActorHandSide,
   type ActorLifecycleCallback,
   type ActorLifecycleEvent,
@@ -299,6 +324,216 @@ export const JIEFANG_DUTY_WEIGHTS: Readonly<DutyViolationWeights> = Object.freez
   sidewalk_riding: 0,
 })
 
+// ─── IDOK-541 解放桥剧情执勤预设（仅在 controller 请求剧情模式且本实例为桥面 deckOnly 车流时落地） ───
+
+/** 剧情模式次级违章相对权重（不含 no_helmet；闯红灯在桥面关闭）。 */
+export const JIEFANG_STORY_SECONDARY_WEIGHTS = Object.freeze({
+  ebike_overload: 10,
+  bike_double: 8,
+  // 次级单项期望 ≈ ¥63 → 每辆违规车 F̄ ≈ ¥107–112（数罪并罚累加，目标 104–125）
+  illegal_mod: 22,
+  wrong_way: 9,
+  sidewalk_riding: 12,
+  red_light_run: 0,
+})
+
+const JIEFANG_STORY_OVERRIDE_BASE: Readonly<DutyStoryOverrideConfig> = Object.freeze({
+  active: true,
+  nonmotorViolationRate: 0.88,
+  noHelmetGivenViolatorRate: 0.8,
+  multiViolationStackRate: 0.8,
+  allowSidewalkRiding: true,
+  sidewalkRidingWeight: 12,
+  allowWrongWay: true,
+  allowRedLightRun: false,
+  secondaryWeights: JIEFANG_STORY_SECONDARY_WEIGHTS,
+  maxViolatorRatio: 1.0,
+  violatorCooldownSec: 0,
+})
+
+/** 桌面：38 两轮 + 16 机动车 = 54 ≤ 56 actor 上限。 */
+export const JIEFANG_STORY_OVERRIDE_DESKTOP: Readonly<DutyStoryOverrideConfig> = Object.freeze({
+  ...JIEFANG_STORY_OVERRIDE_BASE,
+  desiredCars: 16,
+  desiredScooters: 38,
+  maxConcurrentViolators: 40,
+})
+
+/** 手机：30 两轮 + 10 机动车 = 40 ≤ 42 actor 上限。 */
+export const JIEFANG_STORY_OVERRIDE_MOBILE: Readonly<DutyStoryOverrideConfig> = Object.freeze({
+  ...JIEFANG_STORY_OVERRIDE_BASE,
+  desiredCars: 10,
+  desiredScooters: 30,
+  maxConcurrentViolators: 32,
+})
+
+/** 罚款池统计用默认罚款标准（与 controller / 罚款终端同源）。 */
+const DEFAULT_POOL_FINE_TABLE: Readonly<DutyFineTable> = Object.freeze(resolveDutyFineTable())
+
+/**
+ * 剧情模式同向两轮车隐藏入场最小车头间距（米）：
+ * 解放桥南北非机动车道/人行道横向间距约 28~35m；sim 以欧氏距离校验 headway，
+ * 若小于 28m 会导致南北成对扎堆发车、出现 200m+ 空档；保持 36m 可让 38 辆两轮车均匀铺满全桥零空档。
+ */
+export const JIEFANG_STORY_SCOOTER_HEADWAY_M = 36
+/** 罚款池流量模型：东西引桥 + 桥面全长（|lx| ≤ 285m）。 */
+export const JIEFANG_STORY_CORRIDOR_LENGTH_M = JIEFANG_APPROACH_OUTER_X * 2
+/** 罚款池流量模型：两轮车平均通过速度（米/秒）。 */
+export const JIEFANG_STORY_MEAN_SCOOTER_SPEED_MPS = 6
+
+export type JiefangFinePoolProfile = 'desktop' | 'mobile'
+
+export function resolveJiefangStoryOverride(profile: JiefangFinePoolProfile): Readonly<DutyStoryOverrideConfig> {
+  return profile === 'mobile' ? JIEFANG_STORY_OVERRIDE_MOBILE : JIEFANG_STORY_OVERRIDE_DESKTOP
+}
+
+function makeFinePoolRng(seed: number): () => number {
+  // mulberry32：确定性、可复现
+  let s = seed >>> 0 || 0x9e3779b9
+  return () => {
+    s = (s + 0x6d2b79f5) >>> 0
+    let t = s
+    t = Math.imul(t ^ (t >>> 15), t | 1)
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61)
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296
+  }
+}
+
+export interface JiefangViolatorFineSample {
+  /** 抽样两轮车数。 */
+  samples: number
+  /** 违规车占比（≈ nonmotorViolationRate）。 */
+  violatorShare: number
+  /** 每辆违规车平均罚款（元，数罪并罚累加）。 */
+  meanFinePerViolatorYuan: number
+  /** 每辆两轮车平均罚款（元，含守规车 0 元）。 */
+  meanFinePerScooterYuan: number
+  /** 违规车中 ≥2 项叠加的占比。 */
+  multiViolationShare: number
+}
+
+/**
+ * 以与 sim 完全一致的 `pickTwoWheelProfile` + 剧情覆盖做确定性蒙特卡洛，估计每辆违规车的平均罚款。
+ */
+export function sampleJiefangViolatorFines(opts?: {
+  profile?: JiefangFinePoolProfile
+  storyOverride?: DutyStoryOverrideConfig
+  fineTable?: Partial<DutyFineTable>
+  samples?: number
+  seed?: number
+}): JiefangViolatorFineSample {
+  const story = opts?.storyOverride ?? resolveJiefangStoryOverride(opts?.profile ?? 'desktop')
+  const table = resolveDutyFineTable(opts?.fineTable)
+  const samples = Math.max(100, Math.round(opts?.samples ?? 20000))
+  const rng = makeFinePoolRng(opts?.seed ?? 541)
+  const policy: TrafficViolationPolicy = {
+    nonmotorViolationRate: JIEFANG_NONMOTOR_VIOLATION_RATE,
+    noHelmetGivenViolatorRate: JIEFANG_NO_HELMET_CONDITIONAL_RATE,
+    allowSidewalkRiding: false,
+  }
+  let violators = 0
+  let multi = 0
+  let fineSum = 0
+  for (let i = 0; i < samples; i++) {
+    const p = pickTwoWheelProfile(rng, JIEFANG_DUTY_WEIGHTS, true, {
+      allowWrongWay: true,
+      policy,
+      storyOverride: {active: true, ...story},
+    })
+    if (p.violations.length === 0) continue
+    violators++
+    if (p.violations.length >= 2) multi++
+    fineSum += computeFineYuanStack(p.violations, table)
+  }
+  return {
+    samples,
+    violatorShare: violators / samples,
+    meanFinePerViolatorYuan: violators > 0 ? fineSum / violators : 0,
+    meanFinePerScooterYuan: fineSum / samples,
+    multiViolationShare: violators > 0 ? multi / violators : 0,
+  }
+}
+
+export interface JiefangFinePoolEstimate {
+  profile: JiefangFinePoolProfile
+  durationSec: number
+  /** 每个方向（北 / 南非机动车道）同时在场两轮车数。 */
+  scootersPerSide: number
+  /** 两轮车穿越 570m 走廊的平均时长（秒）。 */
+  traversalSec: number
+  /** 时长内每个方向经过的两轮车总数 n·(1 + t/T)。 */
+  scootersPerSideOverDuration: number
+  violatorShare: number
+  meanFinePerViolatorYuan: number
+  multiViolationShare: number
+  northYuan: number
+  southYuan: number
+  totalYuan: number
+}
+
+/**
+ * 纯函数：解放桥剧情模式理论罚款池（双向合计）。
+ *
+ * 流量模型：pool_side = n · r · F̄ · (1 + t / T)，
+ *  - n：单方向同时在场两轮车（desiredScooters / 2）；r：违规占比；F̄：每辆违规车平均罚款；
+ *  - T = 走廊长度 / 平均速度（默认 570m / 6m·s⁻¹ ≈ 95s）；初始在场车 + 时长内新入场车各计一次。
+ */
+export function estimateJiefangDutyFinePool(opts: {
+  durationSec: number
+  profile?: JiefangFinePoolProfile
+  fineTable?: Partial<DutyFineTable>
+  storyOverride?: DutyStoryOverrideConfig
+  samples?: number
+  seed?: number
+  corridorLengthM?: number
+  meanScooterSpeedMps?: number
+}): JiefangFinePoolEstimate {
+  const profile = opts.profile ?? 'desktop'
+  const story = opts.storyOverride ?? resolveJiefangStoryOverride(profile)
+  const durationSec = Math.max(0, Number.isFinite(opts.durationSec) ? opts.durationSec : 0)
+  const fines = sampleJiefangViolatorFines({
+    storyOverride: story,
+    fineTable: opts.fineTable,
+    samples: opts.samples,
+    seed: opts.seed,
+  })
+  const scootersPerSide = Math.max(0, (story.desiredScooters ?? 0) / 2)
+  const corridor = Math.max(1, opts.corridorLengthM ?? JIEFANG_STORY_CORRIDOR_LENGTH_M)
+  const speed = Math.max(0.5, opts.meanScooterSpeedMps ?? JIEFANG_STORY_MEAN_SCOOTER_SPEED_MPS)
+  const traversalSec = corridor / speed
+  const scootersPerSideOverDuration = scootersPerSide * (1 + durationSec / traversalSec)
+  const sideYuan = Math.round(scootersPerSideOverDuration * fines.violatorShare * fines.meanFinePerViolatorYuan)
+  return {
+    profile,
+    durationSec,
+    scootersPerSide,
+    traversalSec,
+    scootersPerSideOverDuration,
+    violatorShare: fines.violatorShare,
+    meanFinePerViolatorYuan: fines.meanFinePerViolatorYuan,
+    multiViolationShare: fines.multiViolationShare,
+    northYuan: sideYuan,
+    southYuan: sideYuan,
+    totalYuan: sideYuan * 2,
+  }
+}
+
+/** 运行时可观测的双向罚款池（`getStats().finePool`）。 */
+export interface DutyFinePoolStats {
+  /** 本次计数起（剧情落地或 start）累计入场违规两轮车理论罚款：北侧（lz<0）。 */
+  northYuan: number
+  /** 南侧（lz≥0）。 */
+  southYuan: number
+  totalYuan: number
+  /** 当前桥面在场、未开单违规车理论罚款。 */
+  liveNorthYuan: number
+  liveSouthYuan: number
+  liveTotalYuan: number
+  violatorsSeen: number
+  meanFinePerViolatorYuan: number
+  elapsedSec: number
+}
+
 export interface DutyTrafficOptions {
   scene?: THREE.Scene
   camera?: THREE.Camera
@@ -374,6 +609,10 @@ export interface DutyTrafficStats {
   fleeing: number
   halted: number
   braking: number
+  /** IDOK-541：本实例是否已落地解放桥剧情模式（正面拦车几何 + 逃逸气泡）。 */
+  jiefangStoryMode: boolean
+  /** IDOK-541：双向理论罚款池。 */
+  finePool: DutyFinePoolStats
 }
 
 export interface DutyTrafficHandle {
@@ -424,6 +663,8 @@ export interface DutyTrafficHandle {
   ): WhistleFlagHaltResult
   getStats(): DutyTrafficStats
   getLifecycleStats(): DutyLifecycleStats
+  /** IDOK-541：剧情模式下违规车跑路（侧后方拦车 / sim 被动发现带）事件；已过单车 6s + 全局 0.3s 节流。 */
+  onViolatorEscape(listener: DutyEscapeListener): () => void
 }
 
 let activeDutyRef:
@@ -1028,6 +1269,22 @@ export function createDutyTraffic(opts: DutyTrafficOptions = {}): DutyTrafficHan
   if (opts.onTicketReceived) ticketReceivedListeners.add(opts.onTicketReceived)
   if (opts.onActorSpawn) spawnListeners.add(opts.onActorSpawn)
   if (opts.onActorDespawn) despawnListeners.add(opts.onActorDespawn)
+  const escapeListeners = new Set<DutyEscapeListener>()
+
+  // IDOK-541 剧情模式握手 / 逃逸监听 / 罚款池
+  let storyDeckOnly = false
+  let storyMobile = false
+  let storyApplied = false
+  let storyVersionSeen = -1
+  let storyPrevOverride: DutyStoryOverrideConfig | null = null
+  let storyPrevScooterHeadwayM: number | undefined
+  let activeHiddenLifecycle: DutyHiddenLifecycleConfig | undefined
+  let escapeEpisodes = new WeakMap<Actor, {startedAt: number; done: boolean}>()
+  let finePoolSeen = new WeakSet<Actor>()
+  let finePoolNorthYuan = 0
+  let finePoolSouthYuan = 0
+  let finePoolViolators = 0
+  let finePoolStartSimTime = 0
 
   let active = false
   let startSeq = 0
@@ -1378,6 +1635,22 @@ export function createDutyTraffic(opts: DutyTrafficOptions = {}): DutyTrafficHan
         return false
       }
 
+      // 保留对象引用：剧情模式落地时原地调整同向两轮车隐藏入场车头间距（sim 浅拷贝 dutyConfig 时引用不变）。
+      const hiddenLifecycle: DutyHiddenLifecycleConfig | undefined = deckOnly
+        ? {
+            minBridgeEndDistM: JIEFANG_APPROACH_MIN_DIST_M,
+            minPlayerDistM: JIEFANG_HIDDEN_PLAYER_MIN_DIST_M,
+            frustumMinDistM: JIEFANG_HIDDEN_FRUSTUM_MAX_DIST_M,
+            bridgeEndDistance: jiefangBridgeEndDistanceM,
+            canSpawnOnTrack: canSpawnOnApproachTrack,
+            minCarHeadwayM: 34,
+            minScooterHeadwayM: 36,
+          }
+        : undefined
+      activeHiddenLifecycle = hiddenLifecycle
+      storyDeckOnly = deckOnly
+      storyMobile = mobile
+
       nextSim.setDutyConfig({
         active: true,
         dutyOnly: true,
@@ -1405,17 +1678,7 @@ export function createDutyTraffic(opts: DutyTrafficOptions = {}): DutyTrafficHan
         classifyOfficerZone: deckOnly ? classifyJiefangCrossSectionZone : undefined,
         constrainActorPosition: deckOnly ? constrainJiefangActorPosition : undefined,
         computePullOverTarget: deckOnly ? computeBridgePullOverTarget : undefined,
-        hiddenLifecycle: deckOnly
-          ? {
-              minBridgeEndDistM: JIEFANG_APPROACH_MIN_DIST_M,
-              minPlayerDistM: JIEFANG_HIDDEN_PLAYER_MIN_DIST_M,
-              frustumMinDistM: JIEFANG_HIDDEN_FRUSTUM_MAX_DIST_M,
-              bridgeEndDistance: jiefangBridgeEndDistanceM,
-              canSpawnOnTrack: canSpawnOnApproachTrack,
-              minCarHeadwayM: 34,
-              minScooterHeadwayM: 36,
-            }
-          : undefined,
+        hiddenLifecycle,
       })
 
       if (opts.scene && opts.camera) {
@@ -1442,6 +1705,10 @@ export function createDutyTraffic(opts: DutyTrafficOptions = {}): DutyTrafficHan
         getViolatorSnapshots: (qOpts?: {includeCited?: boolean}) => sim?.getViolatorSnapshots(qOpts) ?? [],
       }
       registerSolidsIfStandalone()
+      resetFinePool()
+      // IDOK-541：controller 已请求剧情模式时，在预热前落地剧情密度，开局即达到剧情车流。
+      storyVersionSeen = -1
+      syncJiefangStoryMode()
 
       // Pre-roll traffic smoothly from the far outer approaches (|lx| >= 262m, >= 121.5m from every bridge point)
       // with steady headway spacing so the entire 570m corridor reaches uniform bidirectional flow before gameplay.
@@ -1452,6 +1719,8 @@ export function createDutyTraffic(opts: DutyTrafficOptions = {}): DutyTrafficHan
         nextSim.step(preRollDt, warmPos)
       }
       minSpawnAbsX = JIEFANG_APPROACH_SPAWN_MIN_ABS_X
+      // 罚款池计时从预热结束算起；预热留在场上的车会在首帧计入（对应流量模型的初始 n）。
+      finePoolStartSimTime = nextSim.time
     })().catch(err => {
       if (token === startSeq) {
         stop()
@@ -1471,6 +1740,13 @@ export function createDutyTraffic(opts: DutyTrafficOptions = {}): DutyTrafficHan
     warningHorns = 0
     lastHitSpeedKmh = null
     lastHitSeverity = null
+    if (storyApplied) {
+      revertJiefangStoryMode()
+      acknowledgeJiefangStoryMode(false)
+    }
+    storyVersionSeen = -1
+    activeHiddenLifecycle = undefined
+    escapeEpisodes = new WeakMap()
     if (activeDutyRef && activeDutyRef.sim === sim) {
       activeDutyRef = undefined
     }
@@ -1592,11 +1868,43 @@ export function createDutyTraffic(opts: DutyTrafficOptions = {}): DutyTrafficHan
       visibleCheck = (actor: {x: number; y: number; z: number}) => frustum.containsPoint(probePoint.set(actor.x, actor.y + 0.7, actor.z))
     }
 
+    syncJiefangStoryMode()
     while (accumulator >= 0.05) {
+      // 记录本子步前逆行逃逸两轮车的 dodge，修正 sim.ts 在车头坐标系下反向朝执勤者横移的符号（平滑单步 0.11m，零瞬移锯齿）
+      let wrongWayFleeBefore: Map<Actor, number> | null = null
+      if (lastOfficerPos) {
+        for (const a of sim.actors) {
+          if (a.kind === 'scooter' && a.wrongWay && a.track && (a.dutyState === 'fleeing' || a.dutyState === 'evading')) {
+            if (!wrongWayFleeBefore) wrongWayFleeBefore = new Map()
+            wrongWayFleeBefore.set(a, a.dodge)
+          }
+        }
+      }
       sim.step(0.05, focus, stepOpts?.vehiclePos, visibleCheck)
+      if (wrongWayFleeBefore && lastOfficerPos) {
+        for (const [a, prev] of wrongWayFleeBefore) {
+          if (!a.wrongWay || !a.track || (a.dutyState !== 'fleeing' && a.dutyState !== 'evading')) continue
+          const delta = a.dodge - prev
+          if (Math.abs(delta) <= 1e-5) continue
+          const nx = -a.track.dz
+          const nz = a.track.dx
+          const officerSide = (lastOfficerPos.x - a.x) * nx + (lastOfficerPos.z - a.z) * nz
+          if (delta * officerSide > 0) {
+            const limit = a.track.gradeSeparated === 'jiefang' ? 0.6 : 0.85
+            const corrected = Math.max(-limit, Math.min(limit, prev - delta))
+            const shift = corrected - a.dodge
+            a.dodge = corrected
+            a.x += nx * shift
+            a.z += nz * shift
+            if (storyDeckOnly) constrainJiefangActorPosition(a)
+          }
+        }
+      }
       accumulator -= 0.05
     }
     pruneHandAnchors()
+    trackFinePool()
+    monitorEscapes()
     syncVisualFrame(safeDt, accumulator, true)
   }
 
@@ -1607,10 +1915,269 @@ export function createDutyTraffic(opts: DutyTrafficOptions = {}): DutyTrafficHan
     }
   }
 
+  // ─── IDOK-541 剧情模式握手 ───
+
+  function isStoryModeLiveHere(): boolean {
+    return storyApplied && isJiefangStoryModeActive()
+  }
+
+  function applyJiefangStoryMode(): void {
+    storyPrevOverride = storyOverride
+    setStoryOverrideInternal({...resolveJiefangStoryOverride(storyMobile ? 'mobile' : 'desktop')})
+    if (activeHiddenLifecycle) {
+      storyPrevScooterHeadwayM = activeHiddenLifecycle.minScooterHeadwayM
+      activeHiddenLifecycle.minScooterHeadwayM = JIEFANG_STORY_SCOOTER_HEADWAY_M
+    }
+    storyApplied = true
+    resetFinePool()
+  }
+
+  function revertJiefangStoryMode(): void {
+    if (!storyApplied) return
+    storyApplied = false
+    if (activeHiddenLifecycle) {
+      activeHiddenLifecycle.minScooterHeadwayM = storyPrevScooterHeadwayM ?? 36
+    }
+    storyPrevScooterHeadwayM = undefined
+    const prev = storyPrevOverride
+    storyPrevOverride = null
+    setStoryOverrideInternal(prev)
+  }
+
+  /** 轮询 controller 的剧情请求版本号；只撤销自己落地的覆盖，不干扰外部 `setStoryOverride()`。 */
+  function syncJiefangStoryMode(): void {
+    if (!sim) return
+    const version = getJiefangStoryModeVersion()
+    if (version === storyVersionSeen) return
+    storyVersionSeen = version
+    const want = isJiefangStoryModeRequested() && storyDeckOnly && activeDutyRef?.sim === sim
+    if (want) {
+      if (!storyApplied) applyJiefangStoryMode()
+      acknowledgeJiefangStoryMode(true)
+    } else if (storyApplied) {
+      revertJiefangStoryMode()
+      acknowledgeJiefangStoryMode(false)
+    }
+  }
+
+  // ─── IDOK-541 双向罚款池 ───
+
+  function resetFinePool(): void {
+    finePoolSeen = new WeakSet()
+    finePoolNorthYuan = 0
+    finePoolSouthYuan = 0
+    finePoolViolators = 0
+    finePoolStartSimTime = sim?.time ?? 0
+  }
+
+  function actorFineYuan(a: Actor): number {
+    return computeFineYuanStack(getActorViolations(a), DEFAULT_POOL_FINE_TABLE)
+  }
+
+  function trackFinePool(): void {
+    if (!sim) return
+    for (const a of sim.actors) {
+      if (a.kind !== 'scooter' || a.leaving || a.pendingRecycle || finePoolSeen.has(a)) continue
+      if (!actorHasAnyViolation(a)) continue
+      finePoolSeen.add(a)
+      const yuan = actorFineYuan(a)
+      if (yuan <= 0) continue
+      finePoolViolators++
+      const [, lz] = worldToJiefangBridgeLocal(a.x, a.z)
+      if (lz >= 0) finePoolSouthYuan += yuan
+      else finePoolNorthYuan += yuan
+    }
+  }
+
+  function buildFinePoolStats(actors: readonly Actor[]): DutyFinePoolStats {
+    let liveNorth = 0
+    let liveSouth = 0
+    for (const a of actors) {
+      if (a.kind !== 'scooter' || a.leaving || a.pendingRecycle || a.cited || a.ticketReceived) continue
+      if (!actorHasAnyViolation(a)) continue
+      const yuan = actorFineYuan(a)
+      if (yuan <= 0) continue
+      const [, lz] = worldToJiefangBridgeLocal(a.x, a.z)
+      if (lz >= 0) liveSouth += yuan
+      else liveNorth += yuan
+    }
+    const total = finePoolNorthYuan + finePoolSouthYuan
+    return {
+      northYuan: finePoolNorthYuan,
+      southYuan: finePoolSouthYuan,
+      totalYuan: total,
+      liveNorthYuan: liveNorth,
+      liveSouthYuan: liveSouth,
+      liveTotalYuan: liveNorth + liveSouth,
+      violatorsSeen: finePoolViolators,
+      meanFinePerViolatorYuan: finePoolViolators > 0 ? Number((total / finePoolViolators).toFixed(2)) : 0,
+      elapsedSec: sim ? Number(Math.max(0, sim.time - finePoolStartSimTime).toFixed(2)) : 0,
+    }
+  }
+
+  // ─── IDOK-541 逃逸事件 ───
+
+  function dispatchEscape(event: DutyEscapeEvent): void {
+    if (!sim || !sim.actors.includes(event.actor)) return
+    for (const listener of [...escapeListeners]) {
+      try {
+        listener(event)
+      } catch {
+        // 订阅方异常不影响车流
+      }
+    }
+  }
+
+  // 统一订阅全局逃逸总线：无论由 Q/E/F、commandHalt 还是被动发现触发，dutyTraffic.onViolatorEscape() 均可收到且不重复。
+  const unsubEscapeBus = subscribeDutyEscape(dispatchEscape)
+
+  function emitEscape(actor: Actor, cause: DutyEscapeCause, aspect: InterceptAspect): ReturnType<typeof tryEmitDutyEscape> {
+    return tryEmitDutyEscape({actor, cause, aspect})
+  }
+
+  function isEscapeCandidate(a: Actor): boolean {
+    return a.kind === 'scooter' && !a.leaving && !a.pendingRecycle && !a.cited && !a.ticketReceived && a.scale >= 0.5 && actorHasAnyViolation(a)
+  }
+
+  /**
+   * 监听 normal→fleeing/evading 迁移：
+   *  - 有 `markEscapeCause` 标记（侧后方 E/Q、吹哨失败等）：沿用标记的 cause / aspect，必发；
+   *  - 无标记（sim 4–15m 发现带被动跑路）：执勤者不在车头正前方扇区才发；
+   *  - 全局节流时在 1.5s 窗口内逐帧补发；单车冷却中则本段跑路不再补发。
+   */
+  function monitorEscapes(): void {
+    if (!sim) return
+    const live = isStoryModeLiveHere()
+    const now = getEscapeClockSec()
+    for (const a of sim.actors) {
+      if (a.kind !== 'scooter') continue
+      const state = a.dutyState
+      const escaping = state === 'fleeing' || state === 'evading'
+      if (!escaping) {
+        escapeEpisodes.delete(a)
+        continue
+      }
+      let episode = escapeEpisodes.get(a)
+      if (!episode) {
+        episode = {startedAt: now, done: !live}
+        escapeEpisodes.set(a, episode)
+      }
+      if (episode.done || !live) continue
+      if (!isEscapeCandidate(a)) {
+        episode.done = true
+        continue
+      }
+      if (now - episode.startedAt > ESCAPE_PASSIVE_RETRY_WINDOW_SEC) {
+        episode.done = true
+        continue
+      }
+      const mark = peekEscapeMark(a)
+      let cause: DutyEscapeCause
+      let aspect: InterceptAspect
+      if (mark) {
+        cause = mark.cause
+        aspect = mark.aspect
+      } else {
+        if (!lastOfficerPos) {
+          episode.done = true
+          continue
+        }
+        aspect = classifyInterceptAspect(a, lastOfficerPos)
+        if (aspect === 'front') {
+          episode.done = true
+          continue
+        }
+        cause = 'spotted'
+      }
+      const res = emitEscape(a, cause, aspect)
+      if (res.event || res.verdict === 'actor_cooldown') episode.done = true
+    }
+  }
+
+  /**
+   * 包装 `sim.commandHalt`：
+   *  1) 剧情模式下且未显式指定 `haltProbability` 时，按车头正前方扇区判定：
+   *     - 已停稳/靠边中违规车不惊跑；
+   *     - 侧面 0.80 / 车尾 0.85 概率（或已在逃逸中）直接加速逃逸 + 触发逃逸气泡；
+   *     - 正面拦车按 E 100% / Q 0.85 靠边停车（未停则减速）；
+   *  2) 修正逆行（wrongWay）跑路车横向避让符号：sim 在车头坐标系计算 side，逆行车会反向贴近执勤者；
+   *     这里以车道坐标系重算（仍限幅 ±0.6 / ±0.85，位置继续经 `constrainJiefangActorPosition` 夹紧）。
+   *  3) 剧情模式下为跑路车标记 cause / aspect 并发出逃逸事件。
+   */
+  function commandHaltWrapped(
+    origin: Position,
+    haltOpts?: Parameters<DutyTrafficHandle['commandHalt']>[1],
+  ): WhistleFlagHaltResult {
+    if (!sim) return {affected: 0, halted: [], fled: []}
+    const storyLive = isStoryModeLiveHere()
+    const cause: DutyEscapeCause = haltOpts?.kind === 'flag' ? 'flag' : 'whistle'
+    if (storyLive && haltOpts?.haltProbability === undefined) {
+      const rangeM = Math.max(4, haltOpts?.rangeM ?? (cause === 'flag' ? 10 : 12))
+      const stopDurationSec = Math.max(2, haltOpts?.stopDurationSec ?? (cause === 'flag' ? 45 : 14))
+      const rng = haltOpts?.random ?? random
+      const halted: Actor[] = []
+      const fled: Actor[] = []
+      for (const a of sim.actors) {
+        if (!isEscapeCandidate(a)) continue
+        if (Math.abs(a.y - origin.y) > 3) continue
+        if (Math.hypot(a.x - origin.x, a.z - origin.z) > rangeM) continue
+        if (isActorStoppedOrTicketing(a)) continue
+        const aspect = classifyInterceptAspect(a, origin)
+        const alreadyFleeing = a.dutyState === 'fleeing' || a.dutyState === 'evading'
+        if (aspect !== 'front' && (alreadyFleeing || rng() < escapeFleeProbability(aspect))) {
+          applyEscapeImpulse(a, {simTime: sim.time, officer: origin})
+          if (storyDeckOnly) constrainJiefangActorPosition(a)
+          markEscapeCause(a, cause, aspect)
+          emitEscape(a, cause, aspect)
+          fled.push(a)
+        } else if (cause === 'flag' || (aspect === 'front' && rng() < JIEFANG_FRONT_WHISTLE_STOP_PROB)) {
+          if (haltOpts?.pullOver === false) {
+            a.dutyState = 'halted'
+            a.haltedByDuty = true
+            a.fleeUntil = undefined
+            a.brakingForOfficer = false
+            a.lookAtOfficer = true
+            sim.stopActor(a, stopDurationSec)
+          } else {
+            if (a.dutyState === 'fleeing' || a.dutyState === 'evading') a.dutyState = 'normal'
+            a.fleeUntil = undefined
+            sim.pullOverViolator(a, stopDurationSec)
+          }
+          halted.push(a)
+        } else {
+          a.whistleSlowUntil = sim.time + 3.5
+          a.brakingForOfficer = true
+        }
+      }
+      return {affected: halted.length + fled.length, halted, fled}
+    }
+    const prevDodge = new Map<Actor, number>()
+    for (const a of sim.actors) {
+      if (a.kind === 'scooter' && a.wrongWay) prevDodge.set(a, a.dodge)
+    }
+    const res = sim.commandHalt(origin, haltOpts)
+    for (const a of res.fled) {
+      const before = prevDodge.get(a)
+      if (before === undefined || !a.wrongWay || !a.track || a.dodge === before) continue
+      const limit = a.track.gradeSeparated === 'jiefang' ? 0.6 : 0.85
+      a.dodge = computeEscapeDodge(a, origin, before, limit)
+      if (storyDeckOnly) constrainJiefangActorPosition(a)
+    }
+    if (storyLive && res.fled.length > 0) {
+      for (const a of res.fled) {
+        const aspect = classifyInterceptAspect(a, origin)
+        markEscapeCause(a, cause, aspect)
+        emitEscape(a, cause, aspect)
+      }
+    }
+    return res
+  }
+
   return {
     start,
     stop,
     dispose() {
+      unsubEscapeBus()
       stop()
       hitListeners.clear()
       hornListeners.clear()
@@ -1618,6 +2185,7 @@ export function createDutyTraffic(opts: DutyTrafficOptions = {}): DutyTrafficHan
       ticketReceivedListeners.clear()
       spawnListeners.clear()
       despawnListeners.clear()
+      escapeListeners.clear()
     },
     isActive: () => active,
     step,
@@ -1706,8 +2274,13 @@ export function createDutyTraffic(opts: DutyTrafficOptions = {}): DutyTrafficHan
       sim?.notifyViolatorCited(actor)
     },
     commandHalt(origin, haltOpts) {
-      if (!sim) return {affected: 0, halted: [], fled: []}
-      return sim.commandHalt(origin, haltOpts)
+      return commandHaltWrapped(origin, haltOpts)
+    },
+    onViolatorEscape(listener: DutyEscapeListener) {
+      escapeListeners.add(listener)
+      return () => {
+        escapeListeners.delete(listener)
+      }
     },
     getLifecycleStats(): DutyLifecycleStats {
       return {
@@ -1784,6 +2357,8 @@ export function createDutyTraffic(opts: DutyTrafficOptions = {}): DutyTrafficHan
         fleeing,
         halted,
         braking,
+        jiefangStoryMode: isStoryModeLiveHere(),
+        finePool: buildFinePoolStats(actors),
       }
     },
   }

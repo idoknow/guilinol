@@ -159,15 +159,25 @@ body:has(.knockdown-hud:not([hidden]), .td-story-dialog:not([hidden]), .td-fine-
   font-variant-numeric: tabular-nums;
 }
 
-.td-bar {
+.td-top-stack {
   position: fixed;
   left: 50%;
   top: calc(54px + env(safe-area-inset-top));
   transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  max-width: calc(100vw - 24px);
+  pointer-events: none;
+}
+
+.td-bar {
+  position: relative;
   display: inline-flex;
   align-items: center;
   gap: 10px;
-  max-width: calc(100vw - 24px);
+  max-width: 100%;
   padding: 4px 6px 4px 14px;
   border-radius: var(--td-r-pill);
   white-space: nowrap;
@@ -212,7 +222,7 @@ body:has(.knockdown-hud:not([hidden]), .td-story-dialog:not([hidden]), .td-fine-
 
 /* 任务条下面还有一到两行委托人台词（.st-sub，到 ~142px），交警牌挂在它下面（IDOK-468） */
 body:has(.gl-mission-hud:not([hidden])) .td-entry,
-body:has(.gl-mission-hud:not([hidden])) .td-bar {
+body:has(.gl-mission-hud:not([hidden])) .td-top-stack {
   top: calc(150px + env(safe-area-inset-top));
 }
 
@@ -234,14 +244,11 @@ body:has(.gl-mission-hud:not([hidden])) .td-bar {
   cursor: pointer;
 }
 
-/* ---------- 桥面执勤范围出界警告 ---------- */
+/* ---------- 桥面执勤范围出界警告（随 .td-top-stack 垂直排布，绝不与状态条/信号坞碰撞） ---------- */
 
 .td-bounds-banner {
-  position: fixed;
-  left: 50%;
-  top: calc(148px + env(safe-area-inset-top));
-  transform: translateX(-50%);
-  max-width: calc(100vw - 24px);
+  position: relative;
+  max-width: 100%;
   padding: 6px 14px;
   border-radius: var(--td-r-pill);
   box-shadow: inset 0 0 0 1.5px var(--td-accent);
@@ -252,26 +259,15 @@ body:has(.gl-mission-hud:not([hidden])) .td-bar {
   pointer-events: none;
 }
 
-body:has(.gl-mission-hud:not([hidden])) .td-bounds-banner {
-  top: calc(244px + env(safe-area-inset-top));
-}
-
-/* ---------- 执勤中哨子 / 指挥旗操作条（挂顶栏下方，零压底栏/倒地提示/罚款机） ---------- */
+/* ---------- 执勤中哨子 / 指挥旗操作条（随 .td-top-stack 紧跟状态条下方，多行折行零压盖） ---------- */
 
 .td-signal-dock {
-  position: fixed;
-  left: 50%;
-  top: calc(96px + env(safe-area-inset-top));
-  transform: translateX(-50%);
+  position: relative;
   display: inline-flex;
   align-items: center;
   gap: 8px;
   padding: 5px;
   border-radius: var(--td-r-pill);
-}
-
-body:has(.gl-mission-hud:not([hidden])) .td-signal-dock {
-  top: calc(192px + env(safe-area-inset-top));
 }
 
 .td-signal-dock .td-btn:disabled {
@@ -363,6 +359,112 @@ body:has(.gl-mission-hud:not([hidden])) .td-signal-dock {
   font-size: 13px;
   font-weight: 500;
   line-height: 1.3;
+}
+
+/* ---------- IDOK-541 逃逸气泡：墨玉实底 + 单发丝线 + 双层三角尾巴（与米纸开单气泡明确区分） ---------- */
+
+.td-bubble--escape {
+  --td-escape-tail: 9px;
+  --td-tail-x: 0px;
+  transform: translate(-50%, calc(-100% - var(--td-escape-tail)));
+  gap: 1px;
+  max-width: calc(100vw - 24px);
+  padding: 6px 12px 7px;
+  border-radius: var(--td-r-card);
+  background: var(--ui-surface);
+  color: var(--td-paper);
+  box-shadow: inset 0 0 0 1px var(--ui-line-strong);
+  opacity: 1;
+  transition: opacity 200ms var(--ui-ease);
+  animation: td-escape-in 240ms var(--ui-ease) backwards;
+}
+
+/* 尾巴外层：发丝线色 */
+.td-bubble--escape::before,
+.td-bubble--escape::after {
+  content: "";
+  position: absolute;
+  left: calc(50% + var(--td-tail-x));
+  width: 0;
+  height: 0;
+  border-style: solid;
+  border-color: transparent;
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+
+.td-bubble--escape::before {
+  top: 100%;
+  border-width: var(--td-escape-tail) 7px 0;
+  border-top-color: var(--ui-line-strong);
+}
+
+/* 尾巴内层：不透明墨玉实底，上移 1px 完整盖住接缝发丝线、零透色暗带 */
+.td-bubble--escape::after {
+  top: calc(100% - 1px);
+  border-width: calc(var(--td-escape-tail) - 1px) 6px 0;
+  border-top-color: var(--ui-surface);
+}
+
+.td-bubble--escape[data-td-tail="off"]::before,
+.td-bubble--escape[data-td-tail="off"]::after {
+  display: none;
+}
+
+.td-bubble--escape .td-bubble-shout {
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.35;
+  letter-spacing: 0.06em;
+  color: var(--ui-seal-light);
+  white-space: nowrap;
+  animation: td-escape-dash 240ms var(--ui-ease) 40ms backwards;
+}
+
+.td-bubble--escape .td-bubble-vow {
+  max-width: 100%;
+  overflow: hidden;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.3;
+  color: var(--td-paper);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.td-bubble--escape.td-bubble--leaving {
+  opacity: 0;
+}
+
+/* 一次性进场：上浮 8px（--ui-rise）+ 短喊横向轻冲 4px，营造“溜走”感；无循环 */
+@keyframes td-escape-in {
+  from {
+    opacity: 0;
+    translate: 0 var(--ui-rise, 8px);
+  }
+  to {
+    opacity: 1;
+    translate: 0 0;
+  }
+}
+
+@keyframes td-escape-dash {
+  from {
+    translate: -4px 0;
+  }
+  to {
+    translate: 0 0;
+  }
+}
+
+@media (max-width: 400px) {
+  .td-bubble--escape {
+    padding: 5px 10px 6px;
+  }
+
+  .td-bubble--escape .td-bubble-vow {
+    font-size: 12.5px;
+  }
 }
 
 /* ---------- 执勤 / 战报 / 排行榜面板（0 内滚） ---------- */
@@ -459,6 +561,11 @@ dialog.td-panel::backdrop {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 7px;
+}
+
+/* IDOK-541：7 项（含「走人行道」）固定 4 列两行，桌面与手机横屏 844×390 均不内滚 */
+.td-rules-grid--7 {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 
 .td-rule-item {
@@ -607,9 +714,11 @@ dialog.td-panel::after {
   border-radius: calc(var(--ui-r-lg) - var(--ui-frame));
 }
 .td-bar {
+  background: var(--ui-surface);
   padding-block: 5px;
 }
 .td-signal-dock {
+  background: var(--ui-surface);
   padding: 6px;
 }
 .td-entry:hover::after {
@@ -689,11 +798,16 @@ dialog.td-panel::after {
 
 @media (max-width: 560px) {
   .td-entry,
-  .td-bar {
+  .td-top-stack {
     left: calc(12px + env(safe-area-inset-left));
     top: calc(226px + env(safe-area-inset-top));
     transform: none;
     max-width: calc(100vw - 144px - env(safe-area-inset-left) - env(safe-area-inset-right));
+  }
+
+  .td-top-stack {
+    align-items: flex-start;
+    gap: 6px;
   }
 
   .td-entry {
@@ -724,36 +838,21 @@ dialog.td-panel::after {
   }
 
   .td-signal-dock {
-    left: calc(12px + env(safe-area-inset-left));
-    top: calc(266px + env(safe-area-inset-top));
-    bottom: auto;
-    transform: none;
     gap: 6px;
     padding: 4px;
   }
 
   .td-bounds-banner {
-    left: calc(12px + env(safe-area-inset-left));
-    top: calc(308px + env(safe-area-inset-top));
-    transform: none;
     font-size: 12px;
     padding: 5px 11px;
   }
 
-  body:has(.gl-mission-hud:not([hidden])) .td-bar {
+  body:has(.gl-mission-hud:not([hidden])) .td-top-stack {
     top: calc(292px + env(safe-area-inset-top));
   }
   /* 手机上任务条高度随步骤文字变（两到四行），交警指路牌挂在下面必压住计时 / 放弃：跑单时先收起，单子结束自动回来（IDOK-468） */
   body:has(.gl-mission-hud:not([hidden])) .td-entry {
     display: none;
-  }
-
-  body:has(.gl-mission-hud:not([hidden])) .td-signal-dock {
-    top: calc(332px + env(safe-area-inset-top));
-  }
-
-  body:has(.gl-mission-hud:not([hidden])) .td-bounds-banner {
-    top: calc(374px + env(safe-area-inset-top));
   }
 
   .td-signal-dock .td-btn {
@@ -765,43 +864,44 @@ dialog.td-panel::after {
   .td-whistle-btn {
     bottom: calc(278px + env(safe-area-inset-bottom));
   }
+
+  /* 窄屏手机（≤560px 竖屏）：7 项规则切 2 列，不挤字、不内滚 */
+  .td-rules-grid--7 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 /* ---------- 手机横屏（844x390 / 矮屏） ---------- */
 
 @media (pointer: coarse) and (not (any-pointer: fine)) and (max-height: 500px) {
   .td-entry,
-  .td-bar {
+  .td-top-stack {
     left: 50%;
-    top: calc(136px + env(safe-area-inset-top));
+    top: calc(122px + env(safe-area-inset-top));
     transform: translateX(-50%);
-    max-width: calc(100vw - 280px - env(safe-area-inset-left) - env(safe-area-inset-right));
+    max-width: calc(100vw - 260px - env(safe-area-inset-left) - env(safe-area-inset-right));
+  }
+
+  .td-top-stack {
+    align-items: center;
+    gap: 4px;
   }
 
   .td-signal-dock {
-    left: 50%;
-    top: calc(174px + env(safe-area-inset-top));
-    bottom: auto;
-    transform: translateX(-50%);
     gap: 6px;
     padding: 4px;
   }
 
   .td-bounds-banner {
-    top: calc(214px + env(safe-area-inset-top));
     font-size: 12px;
   }
 
-  body:has(.gl-mission-hud:not([hidden])) .td-bar {
+  body:has(.gl-mission-hud:not([hidden])) .td-top-stack {
     top: calc(174px + env(safe-area-inset-top));
   }
   /* 手机上任务条高度随步骤文字变（两到四行），交警指路牌挂在下面必压住计时 / 放弃：跑单时先收起，单子结束自动回来（IDOK-468） */
   body:has(.gl-mission-hud:not([hidden])) .td-entry {
     display: none;
-  }
-
-  body:has(.gl-mission-hud:not([hidden])) .td-signal-dock {
-    top: calc(212px + env(safe-area-inset-top));
   }
 
   /* 饮品店叫号面板占左侧（drinks/ui/order-panel.css：left 124、宽不超过 300）：交警入口挪到面板右边，不叠在叫号上（IDOK-468） */
@@ -811,13 +911,9 @@ dialog.td-panel::after {
     max-width: calc(100vw - 584px - env(safe-area-inset-left) - env(safe-area-inset-right));
   }
 
-  body:has(.gl-mission-hud:not([hidden])) .td-bounds-banner {
-    top: calc(250px + env(safe-area-inset-top));
-  }
-
   .td-signal-dock .td-btn {
-    min-height: 28px;
-    padding: 0 10px;
+    min-height: 26px;
+    padding: 0 9px;
     font-size: 11.5px;
   }
 
@@ -858,6 +954,11 @@ dialog.td-panel::after {
 @media (prefers-reduced-motion: reduce) {
   .td-hud-root * {
     transition: none !important;
+  }
+
+  .td-bubble--escape,
+  .td-bubble--escape .td-bubble-shout {
+    animation: none !important;
   }
 }
 

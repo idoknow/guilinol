@@ -58,6 +58,28 @@ export const DEFAULT_FINE_YUAN: Readonly<DutyFineTable> = Object.freeze({
   sidewalk_riding: 50,
 })
 
+function normalizeFineYuan(value: number | null | undefined, fallback: number): number {
+  return typeof value === 'number' && Number.isFinite(value) ? Math.max(1, Math.round(value)) : fallback
+}
+
+/**
+ * 罚款标准表单一真源（controller 与罚款终端共用）：
+ *  - 未覆写项回落 `DEFAULT_FINE_YUAN`，每项取整且 ≥1 元；
+ *  - `sidewalk_riding`（走人行道）未单独覆写时跟随解析后的 `wrong_way`（逆行同档处罚）。
+ */
+export function resolveDutyFineTable(custom?: Partial<DutyFineTable> | null): DutyFineTable {
+  const wrongWay = normalizeFineYuan(custom?.wrong_way, DEFAULT_FINE_YUAN.wrong_way)
+  return {
+    no_helmet: normalizeFineYuan(custom?.no_helmet, DEFAULT_FINE_YUAN.no_helmet),
+    bike_double: normalizeFineYuan(custom?.bike_double, DEFAULT_FINE_YUAN.bike_double),
+    ebike_overload: normalizeFineYuan(custom?.ebike_overload, DEFAULT_FINE_YUAN.ebike_overload),
+    illegal_mod: normalizeFineYuan(custom?.illegal_mod, DEFAULT_FINE_YUAN.illegal_mod),
+    wrong_way: wrongWay,
+    red_light_run: normalizeFineYuan(custom?.red_light_run, DEFAULT_FINE_YUAN.red_light_run),
+    sidewalk_riding: normalizeFineYuan(custom?.sidewalk_riding, wrongWay),
+  }
+}
+
 export const PLAYER_COMMISSION_RATE = 0.1
 
 export function computeCommissionYuan(totalFineYuan: number, rate = PLAYER_COMMISSION_RATE): number {
@@ -246,6 +268,9 @@ export interface ScreenMarkerSnapshot {
   visible: boolean
 }
 
+/** `citation`：开单后米纸气泡；`escape`：侧后方拦车失败时违规车“走咯！下次一定…”墨玉气泡。 */
+export type DutyBubbleKind = 'citation' | 'escape'
+
 export interface DutyBubbleSnapshot {
   id: string
   actor: Actor
@@ -259,6 +284,16 @@ export interface DutyBubbleSnapshot {
   screenX: number
   screenY: number
   visible: boolean
+  /** 气泡类型（旧调用方缺省视为 `citation`）。 */
+  kind: DutyBubbleKind
+  /** 气泡关联的违章列表（开单：已开具项；逃逸：车上未处理违章）。 */
+  violations?: ActiveViolation[]
+  /** 逃逸气泡第一行短喊（朱砂浅色），如 `走咯！`。 */
+  shout?: string
+  /** 逃逸气泡第二行承诺（纸色），如 `下次一定带头盔，也不走人行道！`。 */
+  vow?: string
+  /** 气泡总时长（秒），供 UI 计算淡出时机。 */
+  durationSec?: number
 }
 
 export interface ShiftSettlement {
@@ -379,6 +414,8 @@ export interface WhistleCiteResult {
     | 'already_cited'
     | 'not_violator'
     | 'out_of_range'
+    /** IDOK-541：剧情模式下从侧面 / 车尾拦车，违规车加速跑路。 */
+    | 'escaped'
   actor?: Actor
   violation?: ActiveViolation
   violations?: ActiveViolation[]
@@ -557,6 +594,13 @@ export interface TrafficDutyHost {
   signalRangeM?: number
   stopDurationSec?: number
   fineTable?: Partial<DutyFineTable>
+  /**
+   * 显式开启“车头正前方拦车”几何（E/F 正面 100% 靠边、Q 正面高概率停；侧面 0.80 / 车尾 0.85 跑路）。
+   * 缺省时仅在解放桥剧情执勤（剧情覆盖已在真实桥面车流落地）时自动开启；显式 `false` 强制关闭。
+   */
+  enforceFrontalIntercept?: boolean
+  /** 可选随机数生成器（默认 `Math.random`；单测可注入确定性序列）。 */
+  random?: () => number
   violationWeights?: DutyViolationWeights
   twoWheelShare?: number
   mountContainer?: HTMLElement

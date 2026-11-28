@@ -30,7 +30,18 @@ import {
   type CitationLedger,
   type HandoverWorkflowHandle,
 } from './handover/index.ts'
+import {
+  JIEFANG_FRONT_WHISTLE_STOP_PROB,
+  applyEscapeImpulse,
+  classifyInterceptAspect,
+  escapeFleeProbability,
+  markEscapeCause,
+  tryEmitDutyEscape,
+  type DutyEscapeCause,
+  type InterceptAspect,
+} from './jiefang-escape.ts'
 import {playBrakeScreechSound, playFlagWaveSound, playWhistleSound} from './whistle.ts'
+import {resolveActorViolations} from './types.ts'
 
 /** Q 吹哨半径：12m 内违规车减速、逃逸车有概率停下，正常车不受影响。 */
 export const DUTY_WHISTLE_RADIUS_M = 12
@@ -54,15 +65,19 @@ export interface WhistleKeyActionResult {
   readonly slowedActors: readonly Actor[]
   readonly haltedFleeingActors: readonly Actor[]
   readonly unaffectedNormalCount: number
+  /** IDOK-541（仅正面拦车几何开启时）：侧面 / 车尾吹哨后加速跑路的违规车。 */
+  readonly escapedActors?: readonly Actor[]
 }
 
 export interface FlagKeyActionResult {
   readonly ok: boolean
   readonly kind: 'flag_stop' | 'flag_release'
-  readonly reason?: 'inactive' | 'disabled_while_ticketing' | 'no_target_ahead' | 'nothing_to_release'
+  readonly reason?: 'inactive' | 'disabled_while_ticketing' | 'no_target_ahead' | 'nothing_to_release' | 'escaped'
   readonly message?: string
   readonly targetActor?: Actor
   readonly distanceM?: number
+  /** IDOK-541（仅正面拦车几何开启时）：执勤者相对目标车头的方位。 */
+  readonly aspect?: InterceptAspect
 }
 
 export interface TicketKeyActionResult {
@@ -114,6 +129,16 @@ export interface DutyKeysHost {
   readonly onToast?: (message: string) => void
   readonly onTicketStarted?: (workflow: HandoverWorkflowHandle, actor: Actor) => void
   readonly onTicketDelivered?: (actor: Actor) => void
+  /**
+   * IDOK-541：开启“车头正前方拦车”几何（缺省关闭 = 旧行为零回归）：
+   *  - E 正面：100% 平滑靠边（可打断 fleeing）；侧面 0.80 / 车尾 0.85 概率加速跑路；
+   *  - Q 正面：0.85 概率靠边，否则减速；侧面 / 车尾同概率跑路。
+   */
+  readonly enforceFrontalIntercept?: boolean | (() => boolean)
+  /** IDOK-541：sim 时钟（秒），用于跑路 `fleeUntil`。 */
+  readonly getSimTime?: () => number | undefined
+  /** IDOK-541：违规车被侧后方拦车惊跑后回调。 */
+  readonly onViolatorEscaped?: (actor: Actor, info: {cause: DutyEscapeCause; aspect: InterceptAspect}) => void
 }
 
 export interface DutyKeysController {
@@ -135,9 +160,7 @@ export interface DutyKeysController {
 
 function isViolatorActor(actor: Actor): boolean {
   if (actor.leaving || actor.scale < 0.5) return false
-  if (!actor.violation || actor.violation === 'none') return false
-  if (actor.violation === 'red_light_run' && actor.redLightActive === false) return false
-  return true
+  return resolveActorViolations(actor).length > 0
 }
 
 function isActorStopped(actor: Actor): boolean {
@@ -145,7 +168,8 @@ function isActorStopped(actor: Actor): boolean {
     actor.speed <= 0.35 ||
     Boolean(actor.haltedByDuty) ||
     actor.dutyState === 'halted' ||
-    actor.dutyState === 'pulled_over'
+    actor.dutyState === 'pulled_over' ||
+    actor.dutyState === 'pulling_over'
   )
 }
 
@@ -204,6 +228,47 @@ export function createDutyKeysController(host: DutyKeysHost): DutyKeysController
     }
     if (host.stopActor) host.stopActor(actor, durationSec)
     else stopSimActor(actor, durationSec)
+  }
+
+  function isFrontalInterceptEnforced(): boolean {
+    const flag = host.enforceFrontalIntercept
+    if (typeof flag === 'function') {
+      try {
+        return Boolean(flag())
+      } catch {
+        return false
+      }
+    }
+    return flag === true
+  }
+
+  /**
+   * IDOK-541 正面拦车：打断 fleeing / evading，交给宿主（sim.pullOverViolator → beginPullOver）平滑靠边；
+   * 宿主未能进入靠边状态时回退到原地拦停 `haltActor`。
+   */
+  function pullOverActor(actor: Actor, durationSec: number): void {
+    if (actor.dutyState === 'fleeing' || actor.dutyState === 'evading') actor.dutyState = 'normal'
+    actor.fleeUntil = undefined
+    actor.whistleSlowUntil = undefined
+    actor.brakingForOfficer = false
+    if (host.stopActor) {
+      host.stopActor(actor, durationSec)
+      if (actor.dutyState === 'pulling_over' || actor.dutyState === 'pulled_over') return
+    }
+    haltActor(actor, durationSec)
+  }
+
+  /** IDOK-541 侧后方拦车失败：违规车加速跑路 + 逃逸事件（气泡由 controller 订阅渲染）。 */
+  function escapeActor(actor: Actor, cause: DutyEscapeCause, aspect: InterceptAspect, officerPos: Position): void {
+    const simTime = host.getSimTime?.()
+    applyEscapeImpulse(actor, {
+      simTime: typeof simTime === 'number' && Number.isFinite(simTime) ? simTime : 0,
+      officer: officerPos,
+    })
+    markEscapeCause(actor, cause, aspect)
+    tryEmitDutyEscape({actor, cause, aspect})
+    if (lastHaltedActor === actor) lastHaltedActor = null
+    host.onViolatorEscaped?.(actor, {cause, aspect})
   }
 
   function isTicketingNow(): boolean {
@@ -338,10 +403,12 @@ export function createDutyKeysController(host: DutyKeysHost): DutyKeysController
     const pos = host.getPlayerPos()
     const slowedActors: Actor[] = []
     const haltedFleeingActors: Actor[] = []
+    const escapedActors: Actor[] = []
     let unaffectedNormalCount = 0
+    const enforce = isFrontalInterceptEnforced()
 
     if (pos) {
-      for (const actor of host.getActors()) {
+      for (const actor of [...host.getActors()]) {
         if (actor.leaving || actor.scale < 0.5) continue
         if (Math.abs(actor.y - pos.y) > MAX_VERTICAL_DIFF_M) continue
         const dist = Math.hypot(actor.x - pos.x, actor.z - pos.z)
@@ -356,6 +423,29 @@ export function createDutyKeysController(host: DutyKeysHost): DutyKeysController
         }
 
         const isFleeing = actor.dutyState === 'fleeing' || actor.dutyState === 'evading'
+        const alreadyStopped = isActorStopped(actor) || actor === workflowTargetActor
+        if (enforce) {
+          if (alreadyStopped) {
+            continue
+          }
+          const aspect = classifyInterceptAspect(actor, pos)
+          if (aspect === 'front') {
+            if (rng() < JIEFANG_FRONT_WHISTLE_STOP_PROB) {
+              pullOverActor(actor, 14)
+              lastHaltedActor = actor
+              haltedFleeingActors.push(actor)
+            } else if (actor.speed > 0.05) {
+              actor.speed = Math.max(0.6, actor.speed * DUTY_WHISTLE_SLOWDOWN_RATIO)
+              actor.brakingForOfficer = true
+              slowedActors.push(actor)
+            }
+            continue
+          } else if (isFleeing || rng() < escapeFleeProbability(aspect)) {
+            escapeActor(actor, 'whistle', aspect, pos)
+            escapedActors.push(actor)
+            continue
+          }
+        }
         if (isFleeing && rng() < fleeProb) {
           haltActor(actor, 14)
           lastHaltedActor = actor
@@ -377,6 +467,7 @@ export function createDutyKeysController(host: DutyKeysHost): DutyKeysController
       slowedActors,
       haltedFleeingActors,
       unaffectedNormalCount,
+      ...(enforce ? {escapedActors} : {}),
     }
   }
 
@@ -402,6 +493,36 @@ export function createDutyKeysController(host: DutyKeysHost): DutyKeysController
 
     if (!ahead) {
       return {ok: false, kind: 'flag_stop', reason: 'no_target_ahead'}
+    }
+
+    if (isFrontalInterceptEnforced()) {
+      const aspect = classifyInterceptAspect(ahead.actor, pos)
+      const alreadyStopped = isActorStopped(ahead.actor) || ahead.actor === workflowTargetActor
+      const alreadyFleeing = ahead.actor.dutyState === 'fleeing' || ahead.actor.dutyState === 'evading'
+      if (!alreadyStopped && aspect !== 'front' && (alreadyFleeing || rng() < escapeFleeProbability(aspect))) {
+        escapeActor(ahead.actor, 'flag', aspect, pos)
+        const msg = aspect === 'rear' ? '从车尾拦车，对方加速跑了——绕到车头正前方再挥旗' : '从侧面拦车，对方加速跑了——站到车头正前方再挥旗'
+        host.onToast?.(msg)
+        return {
+          ok: false,
+          kind: 'flag_stop',
+          reason: 'escaped',
+          message: msg,
+          targetActor: ahead.actor,
+          distanceM: ahead.dist,
+          aspect,
+        }
+      }
+      pullOverActor(ahead.actor, 16)
+      lastHaltedActor = ahead.actor
+      if (soundOn) playBrakeScreechSound()
+      return {
+        ok: true,
+        kind: 'flag_stop',
+        targetActor: ahead.actor,
+        distanceM: ahead.dist,
+        aspect,
+      }
     }
 
     haltActor(ahead.actor, 16)

@@ -62,6 +62,7 @@ export * from './traffic-signals-overlay.ts'
 export * from './story/index.ts'
 export * from './jiefang-railings.ts'
 export * from './duty-keys.ts'
+export * from './jiefang-escape.ts'
 export * from './handover/index.ts'
 export {
   clampFineYuan,
