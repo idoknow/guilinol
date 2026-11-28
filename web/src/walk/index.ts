@@ -2037,7 +2037,11 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
             crashSession=null;standUpSession=null;pickupSession=null;bikeObstacle='';knockdown.reset();syncKnockdownDomState(false);resetAirTracker(footY)
             resetPoseSpeed()
             checkDutyOutOfShift(x,footY,z)
-          },captureContext,currentMobility)
+          },captureContext,currentMobility,()=>{
+            if(document.body.dataset.drone==='rc')window.dispatchEvent(new Event('drone:rc'))
+            rides?.clearBoatPose(figure);rides?.dismount()
+            window.dispatchEvent(new CustomEvent('walk:toast',{detail:{text:'此处无法使用载具，已回到步行',ms:2400}}))
+          })
         net.emote(emote.id);net.tick(0)
     }
   }
