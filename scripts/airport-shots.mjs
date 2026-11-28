@@ -16,6 +16,14 @@ const views = [
   ['threshold-walk', [-26366,177,8248], [-26354,177,8170]],
 ]
 const table=JSON.parse(await readFile(process.env.AIRPORT_SHOT_PROPS??'dist/world/airport-props.json','utf8'))
+if(process.env.AIRPORT_FAR){
+  const entries=JSON.parse(await readFile('dist/world/manifest.json','utf8')).landmarks.filter(entry=>entry.farRadius===3000)
+  for(const entry of entries){
+    const [east,ground,south]=entry.position
+    for(const [direction,dx,dz] of [['east',1,0],['south',0,1],['west',-1,0],['north',0,-1]])
+      views.push([`${entry.id}-${direction}`,[east+2920*dx,ground+240,south+2920*dz],[east,ground+14,south]])
+  }
+}
 function detail(name,kind,distance,height,azimuth=0){
   const [east,ground,south,yaw]=table[kind][0],angle=yaw+azimuth
   views.push([name,[east+distance*Math.sin(angle),ground+height,south+distance*Math.cos(angle)],
@@ -39,6 +47,7 @@ try {
   await page.waitForFunction(() => window.viewer?.camera, null, {timeout:180000})
   const metrics = {}
   for (const [name, eye, target] of views) {
+    if(process.env.AIRPORT_FAR&&!name.startsWith('liangjiang_')&&name!=='overview')continue
     if(process.env.AIRPORT_VIEW && process.env.AIRPORT_VIEW!==name)continue
     await page.evaluate(([eye,target,name]) => {
       const { camera, manifest } = window.viewer
@@ -49,13 +58,13 @@ try {
       camera.updateMatrixWorld()
     }, [eye,target,name])
     await page.waitForTimeout(4000)
-    await page.waitForFunction(() => {
+    await page.waitForFunction(far => {
       const { stream, manifest, camera } = window.viewer
       const nearby = manifest.chunks.filter(tile => Math.hypot(tile.x + 128 - camera.position.x,
         tile.z + 128 - camera.position.z) <= stream.radius)
-      return (!manifest.airportProps||stream.scene.getObjectByName('Airport props')) && !stream.updateLandmarks?.pendingCount?.() && nearby.length && nearby.every(tile => stream.loaded.has(tile)) &&
+      return (far||!manifest.airportProps||stream.scene.getObjectByName('Airport props')) && !stream.updateLandmarks?.pendingCount?.() && (far||nearby.length) && nearby.every(tile => stream.loaded.has(tile)) &&
         !stream.pending.size && !stream.forest.pending.size
-    }, null, {timeout:120000})
+    }, Boolean(process.env.AIRPORT_FAR), {timeout:120000})
     metrics[name] = await page.evaluate(async () => {
       const samples = []
       const stream=window.viewer.stream, restore=[]
@@ -70,7 +79,7 @@ try {
         restore.push(()=>{node.onBeforeRender=previous})
       })
       for(const [entry,group] of stream.landmarks){
-        if(entry.id.startsWith('liangjiang_'))count(group,entry.id)
+        if(entry.id.startsWith('liangjiang_'))for(const lod of entry.lods)count(group.getObjectByName(lod),entry.id+':'+lod)
       }
       count(stream.scene.getObjectByName('Airport props'),'props')
       try{
