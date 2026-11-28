@@ -3,6 +3,7 @@ import * as T from 'three'
 import type {Stream} from '../stream'
 import type {Tile} from '../world'
 import {clearAvatarPose, getAvatarJoints} from './avatar-rig'
+import {headlightPolicyFor} from './vehicle-lights'
 import {
   applyKnockdownPose,
   createKnockdownState,
@@ -750,26 +751,52 @@ export function createBikeControl() {
     return setKickstand(!kickstandDown, silent)
   }
 
+  function notifyHeadlightPolicyRejected(msg: string) {
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('walk:headlight-policy', {
+        detail: {kind, vehicleType, rejected: true, reason: msg},
+      }))
+    }
+    if (!isVerifySilentMode()) emitToast(msg, 2000)
+  }
+
   function setHeadlight(mode: EbikeHeadlightMode, manual = true) {
+    const policy = headlightPolicyFor(kind, vehicleType)
+    if (manual && !policy.switchable) {
+      if (policy.rejectMessage) notifyHeadlightPolicyRejected(policy.rejectMessage)
+      return headlight
+    }
     if (kind === 'bike' && batteryPct <= 0 && mode !== 'off') {
       headlight = 'off'
       if (manual && !isVerifySilentMode()) emitToast('电量耗尽，无法开启头灯', 1800)
       return headlight
     }
-    headlight = mode
+    const clampedMode: EbikeHeadlightMode =
+      policy.maxMode === 'off' ? 'off' : policy.maxMode === 'low' && mode === 'high' ? 'low' : mode
+    headlight = clampedMode
     if (manual) headlightManual = true
     return headlight
   }
 
   function cycleHeadlight() {
+    const policy = headlightPolicyFor(kind, vehicleType)
+    if (!policy.switchable) {
+      if (policy.rejectMessage) notifyHeadlightPolicyRejected(policy.rejectMessage)
+      return headlight
+    }
     const order: readonly EbikeHeadlightMode[] = ['off', 'low', 'high']
     const next = order[(order.indexOf(headlight) + 1) % order.length]
     return setHeadlight(next, true)
   }
 
   function setEnvironmentHour(hour: number) {
-    if (headlightManual || batteryPct <= 0 || crashPhase !== 'none') return
-    const isNight = hour >= 18.5 || hour < 6.0
+    const policy = headlightPolicyFor(kind, vehicleType)
+    if (policy.maxMode === 'off') {
+      headlight = 'off'
+      return
+    }
+    if ((policy.switchable && headlightManual) || batteryPct <= 0 || crashPhase !== 'none') return
+    const isNight = hour >= 18.2 || hour < 6.2
     headlight = isNight ? 'low' : 'off'
   }
 
@@ -869,6 +896,8 @@ export function createBikeControl() {
     if (vehicleType === 'shared') {
       mods = null
       modelId = null
+      headlightManual = false
+      if (headlight === 'high') headlight = 'low'
     }
     profile = computeActiveProfile()
     gear = T.MathUtils.clamp(gear, 1, activeGears().length)

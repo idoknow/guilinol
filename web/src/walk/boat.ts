@@ -5,6 +5,7 @@ import type {Stream} from '../stream'
 import {walkConfig as cfg} from './config'
 import type {createPhysics} from './physics'
 import {vehicleModel} from './vehicle-model'
+import {createBoatLanternRig, type BoatLanternProbe, type BoatLanternRig} from './vehicle-lights'
 import {clearAvatarPose, getAvatarJoints} from './avatar-rig'
 
 type Physics = Awaited<ReturnType<typeof createPhysics>>
@@ -67,6 +68,7 @@ export interface MooringSlot {
   parkedHeading: number
   mesh: THREE.Mesh
   pier: THREE.Mesh
+  lantern: BoatLanternRig
 }
 
 interface BoatEnv {
@@ -213,6 +215,11 @@ export function createFreeBoats(env: BoatEnv) {
   const {group, docks, routes, sim, stream} = env
   const pierShape = new THREE.BoxGeometry(1, 1, 1)
   const pierMaterial = new THREE.MeshStandardMaterial({color: 0x7e6248})
+  // Sibling container outside slot.mesh so Box3.setFromObject(slot.mesh) bridge-clearance checks stay exact.
+  const lanternGroup = new THREE.Group()
+  lanternGroup.name = 'free-boat-lanterns'
+  group.add(lanternGroup)
+  let manualLightOn: boolean | null = null
 
   const slots: MooringSlot[] = Object.entries(docks).map(([name, dockPos]) => {
     const kind: FreeBoatKind = RIVER_DOCKS.has(name) ? 'freeRaft' : 'rowboat'
@@ -223,6 +230,8 @@ export function createFreeBoats(env: BoatEnv) {
     const pier = new THREE.Mesh(pierShape, pierMaterial)
     pier.visible = false
     group.add(pier)
+    const lantern = createBoatLanternRig(kind)
+    lanternGroup.add(lantern.group)
     const autoStarts: [number, number][] = routes
       .filter(r => r.start === name)
       .map(r => [r.path[0][0], r.path[0][2]])
@@ -243,6 +252,7 @@ export function createFreeBoats(env: BoatEnv) {
       parkedHeading: 0,
       mesh,
       pier,
+      lantern,
     }
   })
 
@@ -942,6 +952,48 @@ export function createFreeBoats(env: BoatEnv) {
     slot.mesh.rotation.set(pitch, heading, roll, 'YXZ')
   }
 
+  function syncLanterns(night: number, viewerX: number, viewerZ: number, maxShimmerBudget = 4) {
+    // Prioritize player's active boat first, then nearest visible moored boats within global shimmer budget.
+    let shimmerUsed = 0
+    const ordered = activeSlot
+      ? [activeSlot, ...slots.filter(s => s !== activeSlot)]
+      : slots
+    for (const s of ordered) {
+      if (!s.mesh.visible) {
+        s.lantern.update({night: 0, distance: 9999, manualOn: false, allowShimmer: false})
+        continue
+      }
+      s.lantern.group.position.copy(s.mesh.position)
+      s.lantern.group.quaternion.copy(s.mesh.quaternion)
+      const dist = Math.hypot(s.mesh.position.x - viewerX, s.mesh.position.z - viewerZ)
+      const isPlayerBoat = s === activeSlot
+      const allowShimmer = shimmerUsed < maxShimmerBudget && dist <= 260
+      s.lantern.update({
+        night,
+        distance: dist,
+        manualOn: isPlayerBoat ? manualLightOn : null,
+        allowShimmer,
+      })
+      if (s.lantern.probe().shimmerVisible) shimmerUsed++
+    }
+    return shimmerUsed
+  }
+
+  function toggleLight(night = 0): boolean {
+    const currentlyOn = activeSlot ? activeSlot.lantern.probe().lit : (manualLightOn ?? night > 0.12)
+    manualLightOn = !currentlyOn
+    return manualLightOn
+  }
+
+  function setLight(on: boolean | null): boolean | null {
+    manualLightOn = on
+    return manualLightOn
+  }
+
+  function lightProbe(): BoatLanternProbe | null {
+    return activeSlot ? activeSlot.lantern.probe() : null
+  }
+
   function pose(figure: THREE.Group, forward: number, right: number, dt: number) {
     const slot = activeSlot
     if (!slot) return
@@ -1157,6 +1209,11 @@ export function createFreeBoats(env: BoatEnv) {
     dismount,
     probe,
     relocate,
+    syncLanterns,
+    toggleLight,
+    setLight,
+    lightProbe,
+    get manualLightOn() { return manualLightOn },
     stop() { vx = vz = vLong = vLat = angVel = 0 },
     reset,
     moorings() {

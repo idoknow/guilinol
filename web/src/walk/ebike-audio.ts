@@ -27,6 +27,10 @@ export interface EbikeAudioCounts {
   crashImpact: number
   pickup: number
   shopBuy: number
+  tipOverImpact: number
+  carCrank: number
+  carShift: number
+  carRollawayBeep: number
 }
 
 export interface EbikeAudioSnapshot {
@@ -54,6 +58,13 @@ export interface EbikeAudioEngine {
   playLightSwitch: (mode: HeadlightSoundMode) => void
   playTurnRelay: (tickOn: boolean) => void
   playCrashImpact: (speedMs?: number) => void
+  playTipOverImpact: (strength?: number) => void
+  playCarCrank: () => void
+  playCarEngineStart: () => void
+  playCarEngineStop: () => void
+  playCarShift: (selector: 'P' | 'R' | 'N' | 'D') => void
+  playCarLockChirp: () => void
+  playCarRollawayBeep: () => void
   playPickupComplete: () => void
   playShopBuySuccess: () => void
   updateContinuous: (params: {
@@ -140,6 +151,10 @@ export function createEbikeAudioEngine(): EbikeAudioEngine {
     crashImpact: 0,
     pickup: 0,
     shopBuy: 0,
+    tipOverImpact: 0,
+    carCrank: 0,
+    carShift: 0,
+    carRollawayBeep: 0,
   }
 
   function ensureContext(resume=true): AudioContext | null {
@@ -484,6 +499,60 @@ export function createEbikeAudioEngine(): EbikeAudioEngine {
     noiseBurst(2100, 1.8, 0.18, 0.11 * strength, 0.04)
   }
 
+  function playTipOverImpact(strength = 0.75) {
+    counts.tipOverImpact++
+    const s = Math.min(1.2, Math.max(0.25, strength))
+    // Hollow plastic fairing thud + handlebar metallic clatter on asphalt
+    toneBurst(118, 46, 0.19, 0.14 * s, 'triangle', 0, 440)
+    noiseBurst(640, 1.4, 0.22, 0.15 * s, 0.004)
+    toneBurst(860, 520, 0.075, 0.08 * s, 'triangle', 0.015, 2200)
+    noiseBurst(2400, 2.4, 0.09, 0.085 * s, 0.025)
+  }
+
+  function playCarCrank() {
+    counts.carCrank++
+    // 4 rhythmic starter motor compression pulses (~180->240Hz)
+    for (let i = 0; i < 4; i++) {
+      const d = i * 0.175
+      toneBurst(175 + i * 16, 225 + i * 16, 0.12, 0.095, 'sawtooth', d, 760)
+      noiseBurst(520, 1.6, 0.075, 0.055, d + 0.01)
+    }
+  }
+
+  function playCarEngineStart() {
+    // Low ignition catch + warm idle settle
+    toneBurst(92, 145, 0.22, 0.13, 'sawtooth', 0, 460)
+    toneBurst(145, 78, 0.28, 0.09, 'triangle', 0.16, 380)
+    noiseBurst(420, 1.3, 0.18, 0.07, 0.02)
+  }
+
+  function playCarEngineStop() {
+    toneBurst(115, 42, 0.22, 0.08, 'triangle', 0, 320)
+    noiseBurst(700, 2.2, 0.05, 0.04, 0.02)
+  }
+
+  function playCarShift(selector: 'P' | 'R' | 'N' | 'D') {
+    counts.carShift++
+    noiseBurst(3200, 3.6, 0.014, 0.085, 0)
+    if (selector === 'P') {
+      toneBurst(142, 74, 0.085, 0.11, 'triangle', 0.012, 520)
+    } else if (selector === 'R') {
+      toneBurst(620, 620, 0.05, 0.065, 'sine', 0.015, 2200)
+    } else {
+      toneBurst(460, 340, 0.04, 0.055, 'triangle', 0.008, 1600)
+    }
+  }
+
+  function playCarLockChirp() {
+    toneBurst(1560, 1580, 0.045, 0.07, 'sine', 0)
+    toneBurst(1560, 1580, 0.045, 0.06, 'sine', 0.12)
+  }
+
+  function playCarRollawayBeep() {
+    counts.carRollawayBeep++
+    toneBurst(1180, 1180, 0.08, 0.09, 'sine', 0, 3000)
+  }
+
   function playPickupComplete() {
     counts.pickup++
     toneBurst(140, 210, 0.065, 0.10, 'triangle')
@@ -647,6 +716,13 @@ export function createEbikeAudioEngine(): EbikeAudioEngine {
     playLightSwitch,
     playTurnRelay,
     playCrashImpact,
+    playTipOverImpact,
+    playCarCrank,
+    playCarEngineStart,
+    playCarEngineStop,
+    playCarShift,
+    playCarLockChirp,
+    playCarRollawayBeep,
     playPickupComplete,
     playShopBuySuccess,
     updateContinuous,
