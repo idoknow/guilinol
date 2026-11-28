@@ -72,10 +72,14 @@ async function byRecord(rows, value) {
     }
   }
   const [rec] = await safeRows(
-    `select id, kind, value, uid::float8 as uid, fp, tier, reason, actor, policy_version,
-            created_ms::float8 as created_ms, until_ms::float8 as until_ms,
-            revoked_ms::float8 as revoked_ms, revoked_by, revoke_reason, health, meta
-     from mp_ban_records where id=$1 limit 1`,
+    `select record_id as id,
+            case when uid is not null then 'uid' else 'fp' end as kind,
+            coalesce(uid::text, fp, '') as value,
+            uid::float8 as uid, fp, tier, reason, actor, policy_version,
+            created_at::float8 as created_ms, until_ms::float8 as until_ms,
+            revoked_at::float8 as revoked_ms, revoked_by, revoked_reason as revoke_reason,
+            health_snapshot as health
+     from mp_ban_records where record_id=$1 limit 1`,
     [value],
   )
   if (!rec) return { record: null, account: null, events: [], captures: [], appeals: [], relatedAccounts: [] }

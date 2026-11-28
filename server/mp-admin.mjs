@@ -148,6 +148,29 @@ export function multiplayer(pool,env,{cache}={}){
           throw err
         }
       }
+      const normalizeRecord=(raw)=>{
+        if(!raw||typeof raw!=='object')return null
+        const uidVal=raw.uid!=null&&Number.isFinite(Number(raw.uid))?Number(raw.uid):null
+        const fpVal=raw.fp?String(raw.fp):null
+        const recId=String(raw.id??raw.recordId??raw.record_id??id)
+        return {
+          id:recId,
+          kind:raw.kind||(uidVal!=null?'uid':'fp'),
+          value:raw.value!=null?String(raw.value):(uidVal!=null?String(uidVal):fpVal||''),
+          uid:uidVal,
+          fp:fpVal,
+          tier:raw.tier??'ban',
+          reason:raw.reason??'',
+          actor:raw.actor??'',
+          policy_version:raw.policy_version??raw.policyVersion??null,
+          created_ms:raw.created_ms??raw.createdAt??raw.created_at??null,
+          until_ms:raw.until_ms??raw.until??null,
+          revoked_ms:raw.revoked_ms??raw.revokedAt??raw.revoked_at??null,
+          revoked_by:raw.revoked_by??raw.revokedBy??null,
+          revoke_reason:raw.revoke_reason??raw.revokedReason??raw.revoked_reason??null,
+          health:raw.health??raw.health_snapshot??null,
+        }
+      }
       let rtData=null
       if(env.RT_ADMIN_TOKEN){
         try{
@@ -158,13 +181,17 @@ export function multiplayer(pool,env,{cache}={}){
         }catch{}
       }
       const [pgRec]=await safeQuery(
-        `select id, kind, value, uid::float8 as uid, fp, tier, reason, actor, policy_version,
-                created_ms::float8 as created_ms, until_ms::float8 as until_ms,
-                revoked_ms::float8 as revoked_ms, revoked_by, revoke_reason, health, meta
-         from mp_ban_records where id=$1 limit 1`,
+        `select record_id as id,
+                case when uid is not null then 'uid' else 'fp' end as kind,
+                coalesce(uid::text, fp, '') as value,
+                uid::float8 as uid, fp, tier, reason, actor, policy_version,
+                created_at::float8 as created_ms, until_ms::float8 as until_ms,
+                revoked_at::float8 as revoked_ms, revoked_by, revoked_reason as revoke_reason,
+                health_snapshot as health
+         from mp_ban_records where record_id=$1 limit 1`,
         [id],
       )
-      const record=rtData?.record??pgRec??null
+      const record=normalizeRecord(rtData?.record??pgRec??null)
       if(!record)return json({record:null,account:null,events:[],captures:[],relatedAccounts:[]})
       const targetUid=record.uid!=null?String(record.uid):(record.kind==='uid'&&/^\d+$/.test(String(record.value))?String(record.value):null)
       const targetFp=record.fp||(record.kind==='fp'?String(record.value):'')
@@ -225,8 +252,8 @@ export function multiplayer(pool,env,{cache}={}){
       const fromMs=Number(body?.fromMs),toMs=Number(body?.toMs)
       const kind=typeof body?.kind==='string'?body.kind.trim().slice(0,40):''
       const reason=typeof body?.reason==='string'?body.reason.trim().slice(0,200):''
-      if(!Number.isFinite(fromMs)||!Number.isFinite(toMs)||toMs<=fromMs||toMs-fromMs>30*86400_000){
-        return json({error:'无效的时间窗（最多 30 天）'},400)
+      if(!Number.isFinite(fromMs)||!Number.isFinite(toMs)||toMs<=fromMs||toMs-fromMs>7*86400_000){
+        return json({error:'无效的时间窗（最多 7 天）'},400)
       }
       try{
         const response=await fetch(base+'/admin/unban-window',{
@@ -273,11 +300,10 @@ export function multiplayer(pool,env,{cache}={}){
         let targetFp=typeof body?.fp==='string'&&body.fp.trim()?body.fp.trim():undefined
         const recordId=(typeof body?.recordId==='string'&&body.recordId.trim())||fb.ban_record_id||undefined
         if(recordId&&(!targetUid||!targetFp)){
-          const {rows:[rec]}=await pool.query('select uid::float8 as uid, fp, kind, value from mp_ban_records where id=$1 limit 1',[recordId]).catch(()=>({rows:[]}))
+          const {rows:[rec]}=await pool.query('select uid::float8 as uid, fp from mp_ban_records where record_id=$1 limit 1',[recordId]).catch(()=>({rows:[]}))
           if(rec){
             if(!targetUid&&rec.uid!=null)targetUid=Number(rec.uid)
-            if(!targetUid&&rec.kind==='uid'&&/^\d+$/.test(String(rec.value)))targetUid=Number(rec.value)
-            if(!targetFp&&(rec.fp||rec.kind==='fp'))targetFp=rec.fp||String(rec.value)
+            if(!targetFp&&rec.fp)targetFp=String(rec.fp)
           }
         }
         if(!targetUid&&fb.account_uid!=null)targetUid=Number(fb.account_uid)

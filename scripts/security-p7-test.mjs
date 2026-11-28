@@ -23,7 +23,7 @@ test('securitySearch 按记录号查询并记录 security.search 审计', async 
       if (q.startsWith('begin') || q.startsWith('commit') || q.startsWith('rollback') || q.startsWith('select set_config')) {
         return { rows: [] }
       }
-      if (q.includes('from mp_ban_records where id=$1')) {
+      if (q.includes('from mp_ban_records where record_id=$1')) {
         return {
           rows: [{
             id: REC_UUID, kind: 'uid', value: '100088', uid: 100088, fp: 'b'.repeat(32),
@@ -79,15 +79,27 @@ test('admin/ban-record 在 RT 不可用时优雅回退 PG，admin/unban-window �
   const pool = {
     async query(sql, args) {
       queries.push({ sql, args })
-      if (sql.includes('from mp_ban_records where id=$1')) {
+      if (sql.includes('from mp_ban_records where record_id=$1')) {
         return { rows: [{ id: REC_UUID, kind: 'uid', value: '100088', uid: 100088, fp: '', created_ms: 1700000000000 }] }
       }
       return { rows: [], rowCount: 1 }
     },
   }
   let rtWindowPayload = null
+  let rtRecordMode = 'fail'
   t.mock.method(globalThis, 'fetch', async (url, init) => {
-    if (String(url).includes('/admin/ban-record')) throw new Error('ECONNREFUSED')
+    if (String(url).includes('/admin/ban-record')) {
+      if (rtRecordMode === 'fail') throw new Error('ECONNREFUSED')
+      return Response.json({
+        ok: true,
+        record: {
+          recordId: REC_UUID, uid: 100088, fp: 'b'.repeat(32), tier: 'cooldown',
+          reason: '测试', actor: 'auto', policyVersion: 'v2',
+          createdAt: 1700000000000, until: 1700000600000, revokedAt: 1700000100000, revokedBy: 'admin-1', revokedReason: '误判',
+        },
+        events: [],
+      })
+    }
     if (String(url).includes('/admin/unban-window')) {
       rtWindowPayload = JSON.parse(init.body)
       return Response.json({ ok: true, revoked: 3 })
@@ -101,9 +113,20 @@ test('admin/ban-record 在 RT 不可用时优雅回退 PG，admin/unban-window �
   const recData = await recRes.json()
   assert.equal(recData.record.id, REC_UUID)
 
-  // 非法时间窗（超过 30 天）拒绝
+  // RT 返回 camelCase 时正确归一化为前端 BanRecord 契约
+  rtRecordMode = 'ok'
+  const rtRecRes = await route('admin/ban-record', new Request(`http://localhost/api/admin/ban-record?id=${REC_UUID}`), 'admin-1')
+  assert.equal(rtRecRes.status, 200)
+  const rtRec = (await rtRecRes.json()).record
+  assert.equal(rtRec.id, REC_UUID)
+  assert.equal(rtRec.created_ms, 1700000000000)
+  assert.equal(rtRec.until_ms, 1700000600000)
+  assert.equal(rtRec.revoked_ms, 1700000100000)
+  assert.equal(rtRec.revoke_reason, '误判')
+
+  // 非法时间窗（超过 7 天）拒绝
   const badWin = await route('admin/unban-window', new Request('http://localhost/api/admin/unban-window', {
-    method: 'POST', body: JSON.stringify({ fromMs: 0, toMs: 40 * 86400_000 }),
+    method: 'POST', body: JSON.stringify({ fromMs: 0, toMs: 10 * 86400_000 }),
   }), 'admin-1')
   assert.equal(badWin.status, 400)
 
@@ -127,8 +150,8 @@ test('admin/appeal-resolve 一键解封并回复申诉；RT 失败时绝不假�
       if (sql.includes('from feedback f join users u')) {
         return { rows: [{ id: 'fb-appeal-1', user_id: 'u1', kind: '封禁申诉', status: fbStatus, ban_record_id: REC_UUID, account_uid: 100088 }] }
       }
-      if (sql.includes('from mp_ban_records where id=$1')) {
-        return { rows: [{ uid: 100088, fp: 'c'.repeat(32), kind: 'uid', value: '100088' }] }
+      if (sql.includes('from mp_ban_records where record_id=$1')) {
+        return { rows: [{ uid: 100088, fp: 'c'.repeat(32) }] }
       }
       if (sql.includes('update feedback set status=$1')) {
         fbStatus = args[0]

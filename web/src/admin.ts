@@ -2735,7 +2735,7 @@ const pages: Record<string, (view: View) => void> = {
       }) as EventListener },
       h('td', null,
         navLink(item.title, { view: 'feedback', id: item.id }, { class: 'adm-row-title' }),
-        triage?.suspected_misban ? h('span', { class: 'adm-pill adm-ban-auto' }, '疑似误封') : null,
+        (triage?.suspected_misban ?? triage?.suspectedMisban) ? h('span', { class: 'adm-pill adm-ban-auto' }, '疑似误封') : null,
         num(item.unread) ? h('em', { class: 'adm-unread' }, `${item.unread} 条新回复`) : null,
         h('small', { class: 'adm-row-sub' }, subParts.join(' · '))),
       h('td', null, pill(item.status)),
@@ -4148,20 +4148,32 @@ function feedbackDetail(id: string) {
     const triage = item.appeal_triage && typeof item.appeal_triage === 'object' ? item.appeal_triage : null
     const triageRecText: Record<string, string> = {
       recommend_unban: '建议优先核实解封',
+      suggest_unban: '建议优先核实解封',
+      review_evidence: '存在实锤或抓拍，请人工核查',
       manual_review: '需人工核查证据',
+      manual_check: '需人工核查证据',
+      already_revoked: '该记录已撤销',
       record_not_found: '未匹配到封禁记录',
     }
+    const triageSuspected = Boolean(triage?.suspected_misban ?? triage?.suspectedMisban)
+    const triageSummaryLines = triage
+      ? (Array.isArray(triage.summary)
+          ? triage.summary
+          : typeof triage.summary === 'string'
+            ? triage.summary.split(/\r?\n/).map((line: string) => line.trim()).filter(Boolean)
+            : [])
+      : []
     const triageCard = isAppeal && triage
       ? card('自动初审摘要', [
           h('div', { class: 'adm-state' },
-            triage.suspected_misban
+            triageSuspected
               ? h('span', { class: 'adm-pill adm-ban-auto' }, '疑似误封')
               : h('span', { class: 'adm-pill' }, triageRecText[String(triage.recommendation ?? '')] ?? '初审参考'),
-            triage.suspected_misban && triage.recommendation
+            triageSuspected && triage.recommendation
               ? h('span', { class: 'adm-sub' }, triageRecText[String(triage.recommendation)] ?? '')
               : null),
-          Array.isArray(triage.summary) && triage.summary.length
-            ? h('ul', { class: 'adm-triage-list' }, triage.summary.slice(0, 8).map((line: unknown) => h('li', null, String(line))))
+          triageSummaryLines.length
+            ? h('ul', { class: 'adm-triage-list' }, triageSummaryLines.slice(0, 8).map((line: unknown) => h('li', null, String(line))))
             : null,
         ])
       : null
