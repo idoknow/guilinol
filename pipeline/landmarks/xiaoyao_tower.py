@@ -349,9 +349,16 @@ def tower(model):
         model.mesh(shape.vertices+center,shape.faces,'granite')
     for z in (door-1.85,door+1.85):
         x = 17.75
-        model.box(x,0,z,.9,.55,.75,'granite')
+        grade = surface.ground(x,z)
+        plinth = trimesh.creation.box([.9,.55,.75])
+        vertices = plinth.vertices + [x,grade+.275,z]
+        for corner in vertices:
+            if corner[1] < grade+.275:
+                corner[1] = surface.ground(corner[0],corner[2])-.04
+        model.mesh(vertices,plinth.faces,'granite')
         if not model.detail:
             continue
+        model.pose = (0,grade,0,0)
         model.box(x-.12,.55,z,.55,.45,.6,'granite')                 # haunches
         model.beam([x+.05,.6,z],[x+.12,1.25,z],.2,'granite',8)      # chest
         orb([x+.12,1.35,z],.27,1)                                    # mane
@@ -360,6 +367,7 @@ def tower(model):
             model.beam([x+.25,.55,z+side],[x+.18,1.0,z+side],.06,'granite',5)
         if z < door:
             orb([x+.33,.67,z-.1],.12,0)                              # embroidered ball
+        model.pose = (0,0,0,0)
     # Sloping ashlar retaining wall along the outer side of the riverside stair,
     # hiding the tread ends, with a dark-grey coping. Treads keep the collision.
     low,high,face = 15.08,-5.08,20.44
