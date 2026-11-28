@@ -605,8 +605,34 @@ export interface TrafficDutyHost {
   twoWheelShare?: number
   mountContainer?: HTMLElement
   arbiterWired?: boolean
+  /** Opt-in beta shortcut pill (.td-entry) & quick-teleport toggle; disabled by default in production. */
+  enableEntryShortcut?: boolean
   alwaysShowEntry?: boolean
   enableDutyKeys?: boolean
+}
+
+export interface DutyEntryShortcutPolicyInput {
+  search?: string | null
+}
+
+/**
+ * Opt-in gate for the internal beta "解放桥交警" top HUD shortcut button & one-click teleport.
+ * Kept disabled by default in both production and local dev builds so players discover the officer
+ * naturally on Jiefang Bridge; enable explicitly with `?duty-entry` / `?duty-entry=1` (or `?duty-shortcut=1`).
+ */
+export function shouldEnableDutyEntryShortcut(input: DutyEntryShortcutPolicyInput = {}): boolean {
+  const rawSearch = input?.search ?? ''
+  const query = rawSearch.startsWith('?') ? rawSearch.slice(1) : rawSearch
+  const params = new URLSearchParams(query)
+  const flag =
+    params.get('duty-entry') ??
+    params.get('dutyEntry') ??
+    params.get('duty-shortcut') ??
+    params.get('dutyShortcut')
+  if (flag === null) return false
+  const norm = flag.trim().toLowerCase()
+  if (norm === '0' || norm === 'false' || norm === 'off' || norm === 'no') return false
+  return true
 }
 
 export interface TrafficDutyController {

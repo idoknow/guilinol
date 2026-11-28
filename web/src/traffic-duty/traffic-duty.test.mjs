@@ -83,6 +83,7 @@ await build({
         resolveDutyTeleportDeckY,
         resolveDutyZone,
         SHIZIJIE_DUTY_ZONE,
+        shouldEnableDutyEntryShortcut,
         TRAFFIC_DUTY_DURATION_SEC,
         VIOLATION_LABELS,
       } from './web/src/traffic-duty/types.ts'
@@ -189,6 +190,7 @@ const {
   resolveDutyTeleportDeckY,
   resolveDutyZone,
   SHIZIJIE_DUTY_ZONE,
+  shouldEnableDutyEntryShortcut,
   TRAFFIC_DUTY_DURATION_SEC,
   VIOLATION_LABELS,
   jiefangDeckWorldY,
@@ -2849,6 +2851,116 @@ test('k9: 模拟页面刷新后再开同金额班次仍正常到账（shiftNonce
     dutyLeft.dispose()
     setLeaderboardStorageForTest(null)
     setSaveStorageForTest(null)
+    globalThis.document = prevDoc
+  }
+})
+
+test('prod default omits beta .td-entry shortcut & go-bridge teleport while preserving natural bridge officer duty flow', async () => {
+  // 1) Opt-in URL gate: disabled by default in production and ordinary walk/verify links
+  assert.equal(shouldEnableDutyEntryShortcut(), false)
+  assert.equal(shouldEnableDutyEntryShortcut({search: ''}), false)
+  assert.equal(shouldEnableDutyEntryShortcut({search: '?mode=walk&solo=1'}), false)
+  assert.equal(shouldEnableDutyEntryShortcut({search: '?verify&play=tour'}), false)
+  assert.equal(shouldEnableDutyEntryShortcut({search: '?duty-entry=0'}), false)
+  assert.equal(shouldEnableDutyEntryShortcut({search: '?duty-entry=false'}), false)
+  assert.equal(shouldEnableDutyEntryShortcut({search: '?duty-entry=off'}), false)
+  assert.equal(shouldEnableDutyEntryShortcut({search: '?duty-entry=no'}), false)
+  assert.equal(shouldEnableDutyEntryShortcut({search: '?duty-entry'}), true)
+  assert.equal(shouldEnableDutyEntryShortcut({search: '?mode=walk&duty-entry=1'}), true)
+  assert.equal(shouldEnableDutyEntryShortcut({search: '?dutyEntry=true'}), true)
+  assert.equal(shouldEnableDutyEntryShortcut({search: '?duty-shortcut=1'}), true)
+
+  // 2) Production default mount: no .td-entry pill anywhere (far, Shizijie, or near Jiefang officer) and no go-bridge button
+  const {doc, body} = createMockBrowserDom()
+  const prevDoc = globalThis.document
+  globalThis.document = doc
+  let playerPos = {x: -844, y: 152, z: 208} // plazaSpawn (~606m away)
+  const toasts = []
+
+  const dutyProd = createTrafficDutyController(
+    {
+      getPlayerPos: () => playerPos,
+      isWalking: () => true,
+      projectToScreen: () => ({x: 640, y: 260, visible: true}),
+      mountContainer: body,
+      onToast: msg => toasts.push(msg),
+    },
+    {mountDom: true, mountUi: mountTrafficDutyUi},
+  )
+
+  try {
+    assert.equal(body.querySelector('.td-entry'), null, 'prod default must not mount .td-entry shortcut button')
+
+    // Move inside Jiefang Bridge duty zone (still far from talk range) -> still no .td-entry
+    playerPos = {x: -220, y: 151.85, z: 26.86}
+    dutyProd.step(0.016)
+    assert.equal(body.querySelector('.td-entry'), null, 'prod default must not mount .td-entry even inside Jiefang zone')
+
+    // Panels in idle, rank, and summary must NOT render go-bridge teleport CTA
+    dutyProd.openPanel('duty')
+    const panelBody = body.querySelector('.td-panel-body')
+    assert.ok(panelBody)
+    assert.equal(panelBody.innerHTML.includes('data-td-action="go-bridge"'), false, 'idle panel must not expose go-bridge')
+    dutyProd.openPanel('rank')
+    assert.equal(panelBody.innerHTML.includes('data-td-action="go-bridge"'), false, 'rank panel must not expose go-bridge')
+    dutyProd.closePanel()
+
+    // Clicking overhead marker without teleport callback does not teleport, shows natural walk hint
+    const marker = body.querySelector('[data-td-officer-marker="1"]')
+    assert.ok(marker && !marker.hidden, '3D overhead officer marker still guides players within 180m')
+    marker.onclick?.()
+    assert.equal(toasts.some(t => t.includes('请前往解放桥西桥头找交警对话')), true)
+
+    // Natural on-site flow: walk up to officer (<=5m) -> [F] candidate available -> start briefing -> active bar -> abandon -> summary (no go-bridge)
+    playerPos = {x: JIEFANG_DUTY_ZONE.spot.x - 1.5, y: JIEFANG_DUTY_ZONE.spot.y, z: JIEFANG_DUTY_ZONE.spot.z}
+    dutyProd.step(0.016)
+    const cand = dutyProd.getInteractCandidate()
+    assert.equal(cand?.action, 'talk_officer')
+    assert.equal(dutyProd.startOfficerBriefing('briefing_intro'), true)
+    assert.equal(dutyProd.skipStory(), true)
+    assert.equal(dutyProd.getSnapshot().phase, 'active')
+    const barEl = body.querySelector('[data-td-bar="1"]')
+    assert.ok(barEl && !barEl.hidden, 'active duty HUD bar remains visible during natural duty')
+
+    // Walk away from officer before abandoning -> summary panel must omit go-bridge button
+    playerPos = {x: -220, y: 151.85, z: 26.86}
+    dutyProd.abandonDuty()
+    assert.equal(dutyProd.getSnapshot().phase, 'summary')
+    assert.equal(panelBody.innerHTML.includes('data-td-action="go-bridge"'), false, 'summary panel must not expose go-bridge without teleport')
+  } finally {
+    dutyProd.dispose()
+  }
+
+  // 3) Opt-in shortcut mode (enableEntryShortcut: true, alwaysShowEntry: false): starts hidden when far (bug fix), visible in zone
+  let optPos = {x: -844, y: 152, z: 208}
+  let teleportCalls = 0
+  const dutyOpt = createTrafficDutyController(
+    {
+      getPlayerPos: () => optPos,
+      isWalking: () => true,
+      mountContainer: body,
+      enableEntryShortcut: true,
+      onTeleportToZone: () => {
+        teleportCalls += 1
+        return true
+      },
+    },
+    {mountDom: true, mountUi: mountTrafficDutyUi},
+  )
+
+  try {
+    const entryEl = body.querySelector('.td-entry')
+    assert.ok(entryEl, 'opt-in enableEntryShortcut mounts .td-entry')
+    assert.equal(entryEl.hidden, true, 'entry starts hidden when far and alwaysShowEntry is false')
+    optPos = {x: -220, y: 151.85, z: 26.86}
+    dutyOpt.step(0.016)
+    assert.equal(entryEl.hidden, false, 'opt-in entry becomes visible inside duty zone')
+    dutyOpt.openPanel('duty')
+    const panelBodyOpt = body.querySelector('.td-panel-body')
+    assert.equal(panelBodyOpt?.innerHTML.includes('data-td-action="go-bridge"'), true, 'opt-in panel keeps go-bridge shortcut')
+    assert.equal(teleportCalls, 0)
+  } finally {
+    dutyOpt.dispose()
     globalThis.document = prevDoc
   }
 })

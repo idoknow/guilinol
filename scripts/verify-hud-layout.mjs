@@ -332,7 +332,7 @@ try {
       )
 
       // `verify` publishes window.viewer; it also turns on the dev overlay, which we switch back off before measuring.
-      await page.goto(`${base}/?play&verify&mode=walk&flow=0${drinks ? '&drinks' : ''}`, {waitUntil: 'domcontentloaded', timeout: 120000})
+      await page.goto(`${base}/?play&verify&mode=walk&flow=0${drinks ? '&drinks' : ''}${duty ? '&duty-entry=1' : ''}`, {waitUntil: 'domcontentloaded', timeout: 120000})
       await page
         .waitForFunction(() => Boolean(window.viewer?.walk?.active), null, {timeout: 180000})
         .catch(async (err) => {

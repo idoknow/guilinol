@@ -1880,6 +1880,7 @@ export function createTrafficDutyController(
     ui = options.mountUi({
       container: host.mountContainer ?? (typeof document !== 'undefined' ? document.body : (undefined as unknown as HTMLElement)),
       arbiterWired: Boolean(host.arbiterWired),
+      showEntryShortcut: Boolean(host.enableEntryShortcut || host.alwaysShowEntry),
       alwaysShowEntry: Boolean(host.alwaysShowEntry),
       onTalkOfficer: () => {
         const dist = distanceToJiefangOfficer(host.getPlayerPos(), officerWorldPos())
