@@ -136,7 +136,7 @@ class Layout:
                 metadata['sphere'] = [*rounded, math.ceil((radius+math.dist(center,rounded))*1000)/1000]
                 self.entries.append((x,z,dict(id=entry['id'],name=entry['name'],file=entry['model'],
                     rotation=entry.get('rotation',0),collision=entry['collision'],bytes=model.stat().st_size,
-                    **metadata)))
+                    **({'farRadius': entry['farRadius']} if 'farRadius' in entry else {}), **metadata)))
         model_polys = []
         for x, z, entry in self.entries:
             if entry['id'] in ('fubo', 'diecai', 'duxiu'):

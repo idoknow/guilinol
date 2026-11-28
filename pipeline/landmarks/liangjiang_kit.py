@@ -7,7 +7,7 @@ import sys
 import numpy as np
 import trimesh
 from shapely.affinity import translate
-from shapely.geometry import box, LineString
+from shapely.geometry import box, LineString, Polygon
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from airport import airfield
@@ -104,44 +104,59 @@ def terminal_one(batch, footprint, solid):
     front_sign(batch,'桂林',east+.2,10.8,13,5.3)
 
 
-def terminal(batch, footprint, solid, t2):
-    sill = 11 if t2 else 8
+def roof_panel(batch, panel, arch, rise, cuts, sill):
+    if panel.is_empty or panel.area < .001:
+        return
+    west,north,east,south=panel.bounds
+    grid=np.linspace(west,east,max(2,1+int(np.ceil((east-west)/(12,21,36)[batch.level]))))
+    vertices,faces,indices=[],[],{}
+    for near,far in zip(cuts,cuts[1:]):
+        for left,right in zip(grid,grid[1:]):
+            for cell in polygons(panel.intersection(box(left,near,right,far))):
+                if cell.area<.001: continue
+                coords,triangles=trimesh.creation.triangulate_polygon(cell,engine='earcut')
+                lookup=[]
+                for east_coord,south_coord in coords:
+                    key=(round(east_coord,6),round(south_coord,6))
+                    if key not in indices:
+                        indices[key]=len(vertices)
+                        vertices.append((east_coord,arch(east_coord,south_coord)+rise+.65,south_coord))
+                    lookup.append(indices[key])
+                faces.extend(np.asarray(lookup)[triangles[:,::-1]])
+        for polygon in polygons(panel):
+            for ring in [polygon.exterior,*polygon.interiors]:
+                edge=ring.intersection(box(west-1,near,east+1,far))
+                for line in getattr(edge,'geoms',[edge]):
+                    if line.geom_type!='LineString': continue
+                    for first,last in zip(line.coords,list(line.coords)[1:]):
+                        heights=[arch(*point)+rise for point in (first,last)]
+                        for lower,upper,mat in [([sill,sill],heights,'airport_glass_lit'),(heights,np.add(heights,.65),'airport_roof_metal')]:
+                            batch.mesh([(point[0],y,point[1]) for point,y in zip([first,last,last,first],[lower[0],lower[1],upper[1],upper[0]])],[(0,1,2),(0,2,3)],mat)
+    if faces: batch.mesh(vertices,faces,'airport_roof_metal')
+
+
+def terminal_two(batch, footprint, solid):
+    sill = 11
     batch.slab(solid,-.3,7,'airport_concrete')
     batch.slab(footprint,7,sill,'airport_glass_lit')
     west,north,east,south = footprint.bounds
     span = south-north
-    bands = (0,.16,.35,.65,.84,1) if t2 else (0,1)
+    bands = (0,.16,.35,.65,.84,1)
     for idx,(start,end) in enumerate(zip(bands,bands[1:])):
         low,high = north+span*start,north+span*end
-        amplitude = [3,8,14,8,3][idx] if t2 else 7
+        amplitude = [3,8,14,8,3][idx]
         def arch(easting,southing):
-            if not t2:
-                phase = (easting-west)/(east-west)
-            else:
-                phase = (southing-low)/(high-low)
+            phase = (southing-low)/(high-low)
             return sill+2+amplitude*sin(pi*phase)
         pieces = (12,7,4)[batch.level]
-        for section in range(pieces):
-            if t2:
-                bounds = box(west,low+(high-low)*section/pieces,east,low+(high-low)*(section+1)/pieces)
-            else:
-                bounds = box(west+(east-west)*section/pieces,low,west+(east-west)*(section+1)/pieces,high)
-            clipped = footprint.intersection(bounds)
-            if t2:
-                for depth,(back,front,rise) in enumerate([(-1e3,32,0),(32,76,2),(76,1e3,4)]):
-                    shell = clipped.intersection(box(back,north,front,south))
-                    batch.slab(shell,sill,lambda x,z:arch(x,z)+rise,'airport_glass_lit')
-                    lip = clipped.intersection(box(back-(2 if depth else 0),north,front,south))
-                    batch.slab(lip,lambda x,z:arch(x,z)+rise,lambda x,z:arch(x,z)+rise+.65,'airport_roof_metal')
-            else:
-                batch.slab(clipped,sill,arch,'airport_glass_lit')
-                batch.slab(clipped,arch,lambda x,z:arch(x,z)+.65,'airport_roof_metal')
-                if batch.detail:
-                    rib = footprint.intersection(box(west+(east-west)*section/pieces,low,west+(east-west)*section/pieces+.32,high))
-                    batch.slab(rib,lambda x,z:arch(x,z)+.65,lambda x,z:arch(x,z)+.88,'airport_structure')
+        samples=np.linspace(low,high,129)
+        arc=np.r_[0,np.cumsum(np.hypot(np.diff(samples),np.diff([arch(0,z) for z in samples])))]
+        cuts=np.interp(np.linspace(0,arc[-1],pieces+1),arc,samples)
+        for back,front,rise in [(west,32,0),(32,76,2),(76,east,4)]:
+            roof_panel(batch,footprint.intersection(box(back,low,front,high)),arch,rise,cuts,sill)
     if batch.level < 2:
         rim = footprint.difference(footprint.buffer(-.45))
-        batch.slab(rim,sill-.6,sill,'airport_structure' if t2 else 'airport_red')
+        batch.slab(rim,sill-.6,sill,'airport_structure')
         front = footprint.intersection(box(east-14,north,east,south))
         batch.slab(front,7.05,7.55,'airport_concrete')
         batch.slab(front,sill-.15,sill+.25,'airport_roof_metal')
@@ -154,12 +169,6 @@ def terminal(batch, footprint, solid, t2):
                 batch.beam((point.x,7,point.y),(point.x,sill+1.9,point.y),.18,'airport_structure',4)
         def front_x(south_coord):
             return footprint.intersection(LineString([(west-1,south_coord),(east+1,south_coord)])).bounds[2]
-        if not t2:
-            for station in np.linspace(-6,6,7):
-                boundary=front_x(station)-.03
-                batch.beam((boundary,sill,station),(boundary,sill+5.45,station),.15,'airport_structure')
-            for low,high in zip(np.linspace(-6,6,7)[:-1],np.linspace(-6,6,7)[1:]):
-                batch.mesh([(front_x(z),y,z) for z,y in [(low,sill+2),(high,sill+2),(high,sill+5.45),(low,sill+5.45)]],[(0,1,2),(0,2,3)],'airport_structure')
         frontage=front_x(0)
         for lower,upper,depth,material in [(6.5,7,8,'airport_concrete'),(11,11.45,10,'airport_roof_metal')]:
             batch.slab(box(frontage-2,-24,frontage+depth,24),lower,upper,material)
@@ -191,36 +200,55 @@ def warehouse(batch, footprint, hangar):
     west,north,east,south = footprint.bounds
     height = 13 if hangar else 6
     batch.slab(footprint,-.3,height,'airport_concrete')
-    middle = (west+east)/2
-    def roof(easting,southing):
-        return height+.5+(3 if hangar else 1.4)*(1-abs(easting-middle)/((east-west)/2))
-    for low,high in [(west,middle),(middle,east)]:
+    middle=(west+east)/2
+    def roof(x,z):
+        return height+.35+(4 if hangar else 1.4)*(cos(pi*(x-middle)/(east-west)) if hangar else 1-abs(x-middle)/((east-west)/2))
+    cuts=np.linspace(west,east,(17,9,5)[batch.level] if hangar else 3)
+    for low,high in zip(cuts,cuts[1:]):
         batch.slab(footprint.intersection(box(low,north,high,south)),height,roof,'airport_roof_metal')
-    if batch.level < 2:
-        coords = list(footprint.exterior.coords)
-        _,first,last = max((np.linalg.norm(np.subtract(a,b)),a,b) for a,b in zip(coords,coords[1:]))
-        delta = np.subtract(last,first); length = np.linalg.norm(delta); tangent = delta/length
-        normal = np.array([-tangent[1],tangent[0]])
-        if np.dot(normal,(np.array(first)+last)/2) < 0: normal *= -1
-        count = 8 if hangar else max(1,int(length//9))
-        for idx in range(count):
-            start = first+delta*(.08+.84*idx/count)+normal*.012
-            end = first+delta*(.08+.84*(idx+1)/count)-tangent*(.2 if hangar else 2)+normal*.012
-            top = height-1 if hangar else 4.7
-            batch.mesh([(start[0],.8,start[1]),(end[0],.8,end[1]),(end[0],top,end[1]),(start[0],top,start[1])],
-                       [(0,1,2),(0,2,3)],'airport_door')
-            if not hangar:
-                for point in [start,end]:
-                    post=point+normal*2.35
-                    batch.beam((post[0],-.06,post[1]),(post[0],top+.2,post[1]),.13,'airport_structure')
-                for level,depth in [(1,2.5),(top+.2,3.5)]:
-                    outer = normal*depth
-                    batch.mesh([(point[0],level,point[1]) for point in (start,end,end+outer,start+outer)],
-                               [(0,1,2),(0,2,3)],'airport_structure')
-            elif batch.detail:
-                lower,upper=height-.9,height+.55
-                batch.beam((start[0],lower,start[1]),(end[0],upper,end[1]),.13,'airport_structure')
-                batch.beam((start[0],lower,start[1]),(end[0],lower,end[1]),.13,'airport_structure')
+    if batch.level==2: return
+    coords=np.asarray(footprint.exterior.coords)
+    # Present the doors to the apron-facing (western) side rather than a rear wall.
+    sides=[]
+    for first,last in zip(coords,coords[1:]):
+        delta=last-first; length=np.linalg.norm(delta)
+        if length<1: continue
+        tangent=delta/length; normal=np.array([-tangent[1],tangent[0]])
+        if np.dot(normal,(first+last)/2)<0: normal*=-1
+        sides.append((-normal[0]*length,length,first,tangent,normal))
+    _,length,origin,tangent,normal=max(sides,key=lambda side:side[0])
+    def block(along,end,inner,outer,base,top,material):
+        rect=Polygon([origin+tangent*u+normal*v for u,v in [(along,inner),(end,inner),(end,outer),(along,outer)]])
+        batch.slab(rect,base,top,material)
+    if hangar:
+        for height_mark in [.22,12.2]:
+            block(.04*length,.88*length,.05,.45,height_mark,height_mark+.22,'airport_structure')
+        block(.89*length,.99*length,-1,4.5,-.06,4.6,'airport_concrete')
+        block(.895*length,.985*length,4.49,4.53,1.7,3.2,'airport_glass_lit')
+        block(.885*length,.995*length,-1,4.8,4.6,4.9,'airport_roof_metal')
+    else:
+        block(.04*length,.96*length,0,3,-.06,1.2,'airport_concrete')
+        block(.03*length,.97*length,-.3,4.6,5.05,5.4,'airport_roof_metal')
+    count=8 if hangar else max(1,int(length//8))
+    for index in range(count):
+        step=length*(.84 if hangar else .92)/count
+        start=.04*length+index*step; end=start+step-(.18 if hangar else 1.3)
+        base,top=(.45,12.2) if hangar else (1.2,4.9)
+        block(start,end,.01,.10,base,top,'airport_door')
+        if hangar:
+            block(start+.15,end-.15,.10,.14,8.8,10,'airport_glass_lit')
+        elif batch.detail:
+            for slat in np.arange(1.55,4.9,.43):
+                block(start,end,.1,.14,slat,slat+.06,'airport_structure')
+        if not hangar and index%3==0 and index<9:
+            center=(start+end)/2
+            block(center-1.1,center+1.1,3.25,7.4,.72,3,'airport_roof_metal')
+            block(center-1.04,center+1.04,7.4,9,.62,2.45,'airport_door')
+            block(center-.93,center+.93,8.99,9.04,1.55,2.28,'airport_glass_lit')
+            for axle in (4.3,8.05):
+                wheel=origin+tangent*center+normal*axle
+                endpoints=[(p[0],.43,p[1]) for p in (wheel-1.13*tangent,wheel+1.13*tangent)]
+                batch.beam(*endpoints,.43,'airport_door',10)
 
 
 def generate(name, way):
@@ -232,7 +260,7 @@ def generate(name, way):
     for level in range(3):
         batch = Batch(level)
         if name=='t1': terminal_one(batch,foot,solid)
-        elif name=='t2': terminal(batch,foot,solid,True)
+        elif name=='t2': terminal_two(batch,foot,solid)
         elif name=='tower': tower(batch,foot)
         else: warehouse(batch,foot,name=='hangar')
         batch.finish(scene,f'lod{level}',grade)
@@ -240,4 +268,4 @@ def generate(name, way):
     collision.slab(solid,-.3,7 if name in ('t1','t2') else {'tower':23,'hangar':13,'cargo':6}[name], 'airport_concrete')
     if name in ('t1','t2'): collision.slab(foot,7,9,'airport_concrete')
     scene.add_geometry(grade.fit(trimesh.util.concatenate(collision.parts['airport_concrete'])),node_name='collision_surface')
-    scene.export(Path(sys.argv[1])/f'liangjiang_{name}.glb')
+    scene.export(Path(sys.argv[1])/f'liangjiang_{name}.glb',include_normals=True)

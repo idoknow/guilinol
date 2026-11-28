@@ -20,10 +20,10 @@ try{
     console.log(name,await page.evaluate(async()=>{
       const {Raycaster,Vector2}=await import('/qa/three.module.js'),{camera,stream}=window.viewer
       const meshes=[];stream.scene.traverseVisible(node=>{if(node.isMesh&&node.layers.test(camera.layers))meshes.push(node)})
-      return [[950,600],[1150,680],[850,650],[900,725],[1150,750],[640,460],[650,520]].map(([px,py])=>{
+      return [[510,625],[580,640],[660,630],[740,630],[820,635],[880,628],[970,645],[950,600],[1150,680],[850,650],[900,725],[1150,750],[640,460],[650,520]].map(([px,py])=>{
         const ray=new Raycaster();ray.layers.mask=camera.layers.mask;ray.setFromCamera(new Vector2(px/640-1,1-py/400),camera)
         const hits=ray.intersectObjects(meshes,false).filter(hit=>hit.distance<300)
-        return {pixel:[px,py],hits:hits.slice(0,3).map(({object,face,point})=>({mesh:object.name,material:object.material.name,normalY:face?.normal.y,height:point.y}))}
+        return {pixel:[px,py],hits:hits.slice(0,3).map(({object,face,point})=>({mesh:object.name,material:object.material.name,attributes:Object.keys(object.geometry.attributes),xyz:point.toArray(),normalY:face?.normal.y,height:point.y}))}
       })
     }).then(JSON.stringify))
   }

@@ -16,7 +16,7 @@ export {landmarkCulling}
 
 export interface Landmark {
   id:string; name?:string; file:string; position:[number,number,number]; rotation:number; collision:'mesh'|'box'|'none'; lods:string[]
-  sphere:[number,number,number,number]; bytes:number
+  sphere:[number,number,number,number]; bytes:number; farRadius?:number
   solid?:[number,number,[number,number][]][]
 }
 export type LoadedLandmarks = Map<Landmark,THREE.Group>
@@ -340,9 +340,10 @@ export function landmarkStream(
   }
 
   function entryCutoffs(entry:Landmark,metrics:RenderRangeMetrics,guardDist:number){
-    const load=Math.max(guardDist,metrics.landmarkLoadRadius)
-    const fadeCutoff=Math.max(guardDist,entry.lods.includes('lod2')?metrics.landmarkLoadRadius:metrics.landmarkLod1)
-    const unload=Math.max(guardDist+80,metrics.landmarkUnloadRadius)
+    const far=entry.farRadius??0
+    const load=Math.max(guardDist,metrics.landmarkLoadRadius,far)
+    const fadeCutoff=Math.max(guardDist,entry.lods.includes('lod2')?load:metrics.landmarkLod1)
+    const unload=Math.max(guardDist+80,metrics.landmarkUnloadRadius,far+80)
     return {load,fadeCutoff,unload}
   }
 
