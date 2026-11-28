@@ -78,6 +78,9 @@ try {
     assert.deepEqual(await api('walk/fog',{add:[5,7,5]}).then(r=>[r.count,r.added]),[2,2])
     assert.deepEqual(await api('walk/fog',{add:[7,9]}).then(r=>[r.count,r.added]),[3,1])
     assert.deepEqual((await api('walk/fog')).cells.sort((a,b)=>a-b),[5,7,9])
+    // IDOK-605：格子口径换成 8 m 后，旧口径（version=1）的记录按没开过图处理，再写入时换成新口径。
+    await sql(`UPDATE walk_fog SET version=1 WHERE user_id='${me.id}'`);assert.deepEqual((await api('walk/fog')).cells,[])
+    assert.deepEqual(await api('walk/fog',{add:[5]}).then(r=>[r.count,r.added]),[1,1]);assert.equal((await sql(`SELECT version FROM walk_fog WHERE user_id='${me.id}'`))[0].results[0].version,2)
     await api('walk/fog',{add:[-1]},400,'invalid_input');await api('walk/fog',{add:[1.5]},400,'invalid_input');await api('walk/fog',{add:Array.from({length:601},(_,i)=>i)},400,'invalid_input')
     await api('walk/fog',{add:[11]},403,'origin',{headers:{Origin:'https://example.test'}})
     console.log('Verification requires the latest registration password: missing and stale passwords rejected; current password accepted')
