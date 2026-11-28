@@ -66,7 +66,7 @@ export function photoMode(host: Host, place: () => string, onCapture?: () => voi
   }
 
   let active = false
-  let saved = {fov: 55, flowing: true}
+  let saved = {fov: 55, flowing: true, world: true}
   let recording: Recording | null = null
   let shotUrl = ''
 
@@ -336,9 +336,11 @@ export function photoMode(host: Host, place: () => string, onCapture?: () => voi
   function open() {
     if (active) return
     active = true
-    saved = {fov: host.camera.fov, flowing: host.clock.flowing}
+    saved = {fov: host.camera.fov, flowing: host.clock.flowing, world: host.clock.world}
     resetForBody(prefs().gear.equipped)
+    // IDOK-502: 拍照是本地预览——时辰可以在这一台设备上随便拨，关掉相机就交回全服时间。
     host.clock.flowing = false
+    host.clock.world = false
     host.walker()?.hold(true)
     setCameraShown(false, host.walker())
     document.body.dataset.photo = 'on'
@@ -354,6 +356,7 @@ export function photoMode(host: Host, place: () => string, onCapture?: () => voi
     bar.classList.remove('rec')
     active = false
     host.clock.flowing = saved.flowing
+    host.clock.world = saved.world
     host.walker()?.hold(false)
     host.walker()?.showFigure(true)
     host.camera.fov = saved.fov
