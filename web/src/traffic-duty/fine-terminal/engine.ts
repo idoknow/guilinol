@@ -22,6 +22,7 @@ import {
   computeFineYuanStack as computeUpstreamFineYuanStack,
   isActiveViolation,
   resolveActorViolations,
+  resolveDutyFineTable,
   type ActiveViolation,
   type DutyFineTable,
 } from '../types.ts'
@@ -66,16 +67,12 @@ export function normalizeViolationStack(
   return out
 }
 
+/**
+ * IDOK-541：单源委托 `../types.ts` 的 `resolveDutyFineTable`（与 controller 共用；
+ * 仅覆写 `wrong_way` 时 `sidewalk_riding` 同步跟随）。
+ */
 export function resolveFineTable(custom?: Partial<DutyFineTable>): DutyFineTable {
-  return {
-    no_helmet: Math.max(1, Math.round(custom?.no_helmet ?? R8_DEFAULT_FINE_YUAN.no_helmet)),
-    bike_double: Math.max(1, Math.round(custom?.bike_double ?? R8_DEFAULT_FINE_YUAN.bike_double)),
-    ebike_overload: Math.max(1, Math.round(custom?.ebike_overload ?? R8_DEFAULT_FINE_YUAN.ebike_overload)),
-    illegal_mod: Math.max(1, Math.round(custom?.illegal_mod ?? R8_DEFAULT_FINE_YUAN.illegal_mod)),
-    wrong_way: Math.max(1, Math.round(custom?.wrong_way ?? R8_DEFAULT_FINE_YUAN.wrong_way)),
-    red_light_run: Math.max(1, Math.round(custom?.red_light_run ?? R8_DEFAULT_FINE_YUAN.red_light_run)),
-    sidewalk_riding: Math.max(1, Math.round(custom?.sidewalk_riding ?? R8_DEFAULT_FINE_YUAN.sidewalk_riding)),
-  }
+  return resolveDutyFineTable(custom)
 }
 
 /**
