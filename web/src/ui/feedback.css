@@ -386,7 +386,7 @@ a.fb-photo{color:inherit}
 }
 .fb-pill.fb-status--submitted,.fb-pill.fb-status--queued{color:#d9cfa8}
 .fb-pill.fb-status--modelling,.fb-pill.fb-status--reviewing{color:var(--ui-jade-300)}
-.fb-pill.fb-status--live{color:var(--ui-ink);background:var(--ui-jade-300);border-color:var(--ui-jade-300)}
+.fb-pill.fb-status--live,.fb-pill.fb-status--resolved{color:var(--ui-ink);background:var(--ui-jade-300);border-color:var(--ui-jade-300)}
 .fb-pill.fb-status--need_info{color:var(--ui-error)}
 .fb-pill.fb-status--rejected,.fb-pill.fb-status--duplicate{color:var(--ui-text-3)}
 .fb-pill.fb-status--approved{color:var(--ui-ink);background:#d9cfa8;border-color:#d9cfa8}

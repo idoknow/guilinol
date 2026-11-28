@@ -532,7 +532,7 @@ function labelTables(root: ParentNode) {
   }
 }
 function pill(status: string) {
-  return h('span', { class: `adm-pill adm-status--${status === 'resolved' ? 'live' : status}` }, labels[status] ?? status)
+  return h('span', { class: `adm-pill adm-status--${status}` }, labels[status] ?? status)
 }
 function select(name: string, value: string, options: ([string, string] | { group: string; items: [string, string][] })[], onchange: (value: string) => void, aria?: string) {
   const node = h('select', { name, 'aria-label': aria ?? name, class: 'adm-select' })
