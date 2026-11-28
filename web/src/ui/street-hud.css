@@ -27,6 +27,19 @@ body[data-hud=street] .account-entry::before{background:var(--st-jade);color:var
 .st-cash{position:absolute;right:calc(22px + env(safe-area-inset-right));top:calc(14px + env(safe-area-inset-top));display:flex;flex-direction:column;align-items:flex-end;gap:6px}
 .st-money{font:700 36px/1 var(--st-num);font-variant-numeric:tabular-nums;letter-spacing:.01em;color:var(--st-gold);
   -webkit-text-stroke:1.5px rgba(10,10,10,.85);paint-order:stroke fill;text-shadow:var(--st-shadow)}
+/* IDOK-545 共享电车理赔到账：金额跳一下（680ms），左侧飘出金色 +¥ 浮标（900ms 轻抬淡出后自毁） */
+.st-cash.is-comp-bounce .st-money{transform-origin:100% 60%;animation:st-cash-bounce 680ms cubic-bezier(.2,.8,.2,1) both}
+.st-cash-delta{position:absolute;right:calc(100% + 10px);top:50%;translate:0 -50%;pointer-events:none;white-space:nowrap;
+  font:700 20px/1 var(--st-num);font-variant-numeric:tabular-nums;color:var(--st-gold);
+  -webkit-text-stroke:1px rgba(10,10,10,.85);paint-order:stroke fill;text-shadow:var(--st-shadow);
+  animation:st-cash-delta 900ms cubic-bezier(.2,.8,.2,1) both}
+@keyframes st-cash-bounce{0%,100%{transform:none}22%{transform:translateY(-4px) scale(1.1)}46%{transform:scale(.97)}68%{transform:translateY(-1.5px) scale(1.03)}}
+@keyframes st-cash-delta{0%{opacity:0;transform:translateY(6px) scale(.9)}18%{opacity:1;transform:none}68%{opacity:1;transform:translateY(-4px)}100%{opacity:0;transform:translateY(-10px)}}
+@keyframes st-cash-delta-fade{0%{opacity:0}18%,68%{opacity:1}100%{opacity:0}}
+@media (prefers-reduced-motion:reduce){
+  .st-cash.is-comp-bounce .st-money{animation:none!important}
+  .st-cash-delta{animation:st-cash-delta-fade 900ms ease-out both!important}
+}
 .st-phone-btn{position:absolute;right:calc(22px + env(safe-area-inset-right));top:calc(84px + env(safe-area-inset-top));display:flex;align-items:center;gap:7px;height:34px;padding:0 8px 0 10px;
   border-radius:10px;border:1px solid var(--st-line);background:var(--st-asphalt);color:var(--st-white);font-size:13px;font-weight:600;cursor:pointer}
 .st-phone-btn i{width:11px;height:17px;border:2px solid currentColor;border-radius:3px;box-sizing:border-box;position:relative}
@@ -100,6 +113,7 @@ body[data-hud=street] .btn-view{font-size:0}body[data-hud=street] .btn-view::aft
 @media (pointer:coarse) and (not (any-pointer:fine)),(max-width:560px){
   .st-cash{right:calc(12px + env(safe-area-inset-right));top:calc(12px + env(safe-area-inset-top));gap:5px}
   .st-money{font-size:28px}
+  .st-cash-delta{font-size:16px}
   .st-phone-btn{right:calc(12px + env(safe-area-inset-right));top:calc(66px + env(safe-area-inset-top));height:32px}
   .st-phone-btn kbd{display:none}
   body[data-hud=street] .minimap{left:calc(12px + env(safe-area-inset-left));top:calc(58px + env(safe-area-inset-top));bottom:auto;width:112px;height:112px;border-width:3px}

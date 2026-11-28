@@ -54,16 +54,17 @@ function unlockP(ctrl) {
 // ---------------------------------------------------------------------------
 // 1. Tuning nerf & personal isolation
 // ---------------------------------------------------------------------------
-check('EBIKE_SHARED_MAX_KMH nerfed to 18 km/h', EBIKE_SHARED_MAX_KMH === 18, `cap=${EBIKE_SHARED_MAX_KMH}`)
+check('EBIKE_SHARED_MAX_KMH locked at 25 km/h', EBIKE_SHARED_MAX_KMH === 25, `cap=${EBIKE_SHARED_MAX_KMH}`)
 
 const sharedProfile = resolveEbikeProfile('shared', {motorLevel: 3, batteryLevel: 3, controllerLevel: 3})
 check(
-  'shared profile ignores upgrades, disables wheelie, weakens accel & caps gears <= 18',
+  'shared profile ignores upgrades, disables wheelie, locks single gear & caps <= 25',
   !sharedProfile.allowUpgrades &&
     sharedProfile.allowWheelie === false &&
     sharedProfile.wheelieTorqueMul === 0 &&
     sharedProfile.accelMul < 1 &&
-    sharedProfile.gears.every(g => g.maxKmh <= 18 && g.wheelieGain === 0 && g.uphillMul >= 1.3),
+    sharedProfile.gears.length === 1 &&
+    sharedProfile.gears.every(g => g.maxKmh === 25 && g.wheelieGain === 0 && g.uphillMul >= 1.3),
   `gears=${sharedProfile.gears.map(g => g.maxKmh).join('/')} accelMul=${sharedProfile.accelMul}`,
 )
 
@@ -99,8 +100,8 @@ for (let i = 0; i < 200; i++) {
   sharedWheeliePeak = Math.max(sharedWheeliePeak, Math.abs(sharedCtrl.wheelie))
 }
 check(
-  'shared physics capped <= 18.2 km/h & wheelie remains strictly 0 under Space input',
-  sharedPeak >= 16 && sharedPeak <= 18.2 && sharedWheeliePeak === 0 && !sharedCtrl.telemetry().upgraded,
+  'shared physics capped <= 25.2 km/h & wheelie remains strictly 0 under Space input',
+  sharedPeak >= 22 && sharedPeak <= 25.2 && sharedWheeliePeak === 0 && !sharedCtrl.telemetry().upgraded,
   `peak=${sharedPeak.toFixed(1)} wheelie=${sharedWheeliePeak}`,
 )
 
@@ -161,8 +162,8 @@ for (let i = 0; i < 80; i++) {
   sharedDrainWheelie.steer(1, 0, 0.05, true, {wheelie: 1})
 }
 check(
-  'shared bike clamps downhill coasting <= 18.2 km/h & holding wheelie adds 0 battery drain',
-  sharedDownhillPeak <= 18.2 && Math.abs(sharedDrainBase.batteryPct - sharedDrainWheelie.batteryPct) < 1e-6,
+  'shared bike clamps downhill coasting <= 25.2 km/h & holding wheelie adds 0 battery drain',
+  sharedDownhillPeak <= 25.2 && Math.abs(sharedDrainBase.batteryPct - sharedDrainWheelie.batteryPct) < 1e-6,
   `downhillPeak=${sharedDownhillPeak.toFixed(2)} batBase=${sharedDrainBase.batteryPct.toFixed(3)} batWheelie=${sharedDrainWheelie.batteryPct.toFixed(3)}`,
 )
 

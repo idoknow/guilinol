@@ -24,7 +24,7 @@ export interface EbikeVehicleProfile {
 
 export const EBIKE_VEHICLE_PROFILES: Record<EbikeVehicleType, EbikeVehicleProfile> = {
   normal: {type: 'normal', label: '普通电动车', badge: '电摩', maxKmh: 50, gearCaps: [18, 25, 38, 50], drainBase: .24},
-  shared: {type: 'shared', label: '共享电动车', badge: '共享', maxKmh: 18, gearCaps: [12, 16, 18, 18], drainBase: .42},
+  shared: {type: 'shared', label: '共享电动车', badge: '共享', maxKmh: 25, gearCaps: [25, 25, 25, 25], drainBase: .42},
 }
 
 export interface EbikeGearSpec {
@@ -252,7 +252,7 @@ export function createEbikeFxController() {
   /** Resets to <=25 km/h compliant gear (D2) on every mount while keeping vehicle type and remaining battery. */
   function resetForMount(type: EbikeVehicleType = 'normal', initialBattery = 100) {
     vehicleType = type
-    gear = 2
+    gear = type === 'shared' ? 1 : 2
     battery = T.MathUtils.clamp(initialBattery, 0, 100)
     lowBatteryWarned = battery <= 20
     if (type === 'shared') {
@@ -265,6 +265,7 @@ export function createEbikeFxController() {
   function setVehicleType(type: EbikeVehicleType) {
     vehicleType = type
     if (type === 'shared') {
+      gear = 1
       modPreset = 'stock'
       customMods = null
     }
@@ -352,7 +353,9 @@ export function createEbikeFxController() {
 
     if (input.cycleMod) cycleModPreset()
 
-    if (external?.gear !== undefined) {
+    if (vehicleType === 'shared') {
+      gear = 1
+    } else if (external?.gear !== undefined) {
       if (external.gear >= 1) gear = T.MathUtils.clamp(Math.round(external.gear), 1, EBIKE_GEARS.length)
     } else {
       if (input.gearSelect !== null) gear = T.MathUtils.clamp(input.gearSelect, 1, EBIKE_GEARS.length)

@@ -58,7 +58,9 @@ import {touchUi} from '../ui/input-mode'
 import {look} from '../look/config'
 import {env} from '../look/time'
 import {createDriverPose} from './car'
-import {createRiderPose,notifyDismountBlocked} from './ride'
+import {createRiderPose,notifyDismountBlocked,type TwoWheelCrashCause} from './ride'
+import {isSharedHeadlightSwitchLocked,SHARED_EBIKE_COMPENSATION_YUAN} from './shared-ebike-logic'
+import {createDamagedBikeSignSprite,hideCompensationBanner,showCompensationBanner} from '../ui/compensation-banner'
 import {createEbikeAudioEngine} from './ebike-audio'
 import {RIDE_SOUND_EVENT} from './ride-sound-pref'
 import {clearAvatarPose, ensureAvatarRig, getAvatarJoint, getAvatarJoints} from './avatar-rig'
@@ -282,6 +284,9 @@ type DownedBikeEntry={
   hazardOverlay?:THREE.Group
   tip?:TipOverSim
   wallLean?:boolean
+  damaged?:boolean
+  damagedSign?:THREE.Sprite
+  spawnKey?:string
 }
 
 function setRiderJoints(joints:RiderJoints,targets:Partial<Record<RiderJointName,[number,number,number]>>,blend=1){
@@ -667,6 +672,8 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
     slideSpeed:number
     elapsed:number
     reason:Exclude<EbikeCrashReason,''>
+    damaged?:boolean
+    spawnKey?:string
   }
   type StandUpSession={elapsed:number;duration:number;side:-1|1;x:number;y:number;z:number;startYaw:number;targetYaw:number}
   type PickupSession={rec:DownedBikeEntry;elapsed:number;duration:number;startYaw:number}
@@ -1101,7 +1108,7 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
     const footY=rides?.boat?pos.y:pos.y-cfg.height/2
     const quietZone=getQuietZoneAt(pos.x,pos.z)
     const vSnap=rides?.getInteractSnapshot()??{
-      aboardKind:null,tourDisembarkQueued:false,nearDownedVehicle:null,nearVehicle:null,nearBoat:null,
+      aboardKind:null,tourDisembarkQueued:false,nearDownedVehicle:null,nearVehicle:null,nearDamagedVehicle:null,nearBoat:null,
     }
     const soloEnabled=getPlayMode()==='solo'
     const handoverReady=Boolean(trafficDutyRef?.isHandoverReady?.())
@@ -1137,6 +1144,7 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
       nearTrafficViolator,
       nearDutyOfficer,
       nearVehicle:vSnap.nearVehicle,
+      nearDamagedVehicle:vSnap.nearDamagedVehicle??null,
       nearBoat:vSnap.nearBoat,
     }
   }
@@ -1165,6 +1173,12 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
     },
     onVehicleOrBoatInteract(){
       rides?.interact()
+    },
+    onDamagedVehicleInteract(){
+      const now=performance.now()
+      if(now-lastDamagedHintAt<1800)return
+      lastDamagedHintAt=now
+      window.dispatchEvent(new CustomEvent('walk:toast',{detail:{text:'该共享电动车已摔坏报废，无法再次解锁或骑行',ms:2200}}))
     },
     onSoftHint(text){
       window.dispatchEvent(new CustomEvent('walk:toast',{detail:{text,ms:2200}}))
@@ -1270,6 +1284,7 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
     return true
   }
   let sharedWheelieHintAt=0
+  let lastDamagedHintAt=0
   window.addEventListener('walk:hail',()=>{if(!knockdown.isDown)hailSharedBike(getPlayMode()==='solo'?'点「解锁共享电动车（¥2）」出发':'点「骑电动车」出发')})
   window.addEventListener('keydown',event=>{
     if(active&&cigarette.active&&!event.repeat&&!isGlobalHotkeyBlocked(event.target)&&!isModalOrOverlayOpen()){
@@ -1311,6 +1326,8 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
   let bicyclePedalPhase=0, bicycleFootWeight=1
   let prevCarSpeed=0, prevCarObstacle='', lastCarBraking=false
   let actionButtonEl:HTMLButtonElement|null=null
+  const MAX_WORLD_DAMAGED_BIKES=3
+  const DAMAGED_BIKE_RECYCLE_DIST_M=60
   const downedHazardGeo=buildLampClusterGeometry([
     ...([-1,1] as const).map(side=>({
       channel:0 as const,
@@ -1331,12 +1348,32 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
       haloSize:.48,
     })),
   ])
+  const downedDamagedHazardGeo=buildLampClusterGeometry([
+    ...([-1,1] as const).map(side=>({
+      channel:0 as const,
+      pos:[side*.17,.72,-.54] as const,
+      size:[.08,.055,.065] as const,
+      dir:[side*.35,.25,-.90] as const,
+      color:0xe64b32,
+      offColor:0x521d16,
+      haloSize:.52,
+    })),
+    ...([-1,1] as const).map(side=>({
+      channel:0 as const,
+      pos:[side*.17,.64,.52] as const,
+      size:[.08,.055,.065] as const,
+      dir:[side*.35,.25,.90] as const,
+      color:0xe64b32,
+      offColor:0x521d16,
+      haloSize:.54,
+    })),
+  ])
   const downedHazardCluster=createLampClusterMaterial()
   downedHazardCluster.setChannel(0,1.45)
-  function attachDownedHazard(mesh:THREE.Mesh){
+  function attachDownedHazard(mesh:THREE.Mesh,damaged=false){
     const g=new THREE.Group()
     g.name='downed-hazard-flashers'
-    const lamps=new THREE.Mesh(downedHazardGeo,downedHazardCluster.materials)
+    const lamps=new THREE.Mesh(damaged?downedDamagedHazardGeo:downedHazardGeo,downedHazardCluster.materials)
     lamps.renderOrder=3
     g.add(lamps)
     mesh.add(g)
@@ -1344,6 +1381,12 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
   }
   function removeDownedHazard(rec:DownedBikeEntry){
     if(rec.hazardOverlay){rec.hazardOverlay.removeFromParent();rec.hazardOverlay=undefined}
+    if(rec.damagedSign){rec.damagedSign.removeFromParent();rec.damagedSign=undefined}
+  }
+  function recycleDownedDamagedEntry(rec:DownedBikeEntry){
+    removeDownedHazard(rec)
+    rides?.recycleDamagedBike(rec.mesh)
+    downedBikes.delete(rec)
   }
   function syncCarDomDataset(){
     if(rides?.car&&carGearbox.strict){
@@ -1402,17 +1445,23 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
   function findDownedNear(x:number,z:number,radius=.95):DownedBikeEntry|null{
     let best:DownedBikeEntry|null=null, bestD=radius
     for(const rec of downedBikes){
-      if(rec.tip)continue
+      if(rec.tip||rec.damaged)continue
       const d=Math.hypot(rec.x-x,rec.z-z)
       if(d<bestD){bestD=d;best=rec}
     }
     return best
   }
-  function syncAllDownedPoses(dt=0){
+  function syncAllDownedPoses(dt=0,playerX?:number,playerZ?:number){
     const flashOn=((performance.now()*.0018)%1)<.5
     const cdt=Math.min(.12,Math.max(0,dt))
     const pPos=sim.body.translation()
     for(const rec of downedBikes){
+      if(rec.damaged&&playerX!==undefined&&playerZ!==undefined){
+        if(Math.hypot(rec.x-playerX,rec.z-playerZ)>DAMAGED_BIKE_RECYCLE_DIST_M){
+          recycleDownedDamagedEntry(rec)
+          continue
+        }
+      }
       if(rec.tip&&cdt>0){
         const stepRes=stepTipOver(rec.tip,cdt)
         rec.roll=-rec.side*rec.tip.roll
@@ -1436,6 +1485,10 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
         }
       }
       if(rec.hazardOverlay)rec.hazardOverlay.visible=true
+      if(rec.damagedSign){
+        rec.damagedSign.visible=rec.mesh.visible
+        rec.damagedSign.position.set(rec.x,rec.y+1.1,rec.z)
+      }
       if(pickupSession?.rec===rec)continue
       rec.mesh.visible=true
       rec.mesh.position.set(rec.x,rec.y+rec.lift,rec.z)
@@ -1444,7 +1497,11 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
     downedHazardCluster.setChannel(0,flashOn?1.45:0)
   }
   function clearAllDowned(){
-    for(const rec of downedBikes){
+    for(const rec of [...downedBikes]){
+      if(rec.damaged){
+        recycleDownedDamagedEntry(rec)
+        continue
+      }
       removeDownedHazard(rec)
       rec.mesh.userData.downed=false
       rec.mesh.position.set(rec.x,rec.y,rec.z)
@@ -2068,7 +2125,7 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
     if(trafficDutyRef?.getSnapshot().phase==='active')trafficDutyRef.abandonDuty()
     resetWalk()
   }
-  function resetWalk(){settleCarRollaway('stop');combat.hide();cancelSmoke();knockdown.reset();syncKnockdownDomState(false);resetAirTracker();trafficTracker.reset();prevContactKnockdownAt=-9999;prevObstacleTripAt=-9999;dutyFlagHoldMode=null;dutyFlagHoldTimer=0;if(hotbarSlot()==='smoke')selectSlot('hand');ticketHandover.stop();ticketHandover.reset();emote.stop();emote.reset();smoking?.dispose();smoking=undefined;holdLayer.reset();camHoldBlend=0;wheel.close();cigarette.stop();if(shopOverlay?.isOpen())shopOverlay?.close('fly');outfitController.setRidingEbike(false);finishActiveTestRide('mode_switch');shopHintGroup.visible=false;ebikeShowroomGroup.visible=false;shopEbikeShowcaseRig.root.visible=false;for(const item of showroomBikes)item.snapped=false;destination=null;active=false;crashSession=null;standUpSession=null;pickupSession=null;twoWheelOp=createInitialTwoWheelOpState();carHeadlight='off';carHeadlightManual=false;delete document.body.dataset.carIgnition;delete document.body.dataset.carGear;clearAllDowned();releaseDynamicCar();releaseDynamicBike();input.syncRideHud(null,null);rides?.clearBoatPose(figure);rides?.show(false);actionButton.hidden=true;setPrompt(null);updateTravel('fly',null);if(wasCar||wasBike)applyFootController();wasBoat=wasBike=wasCar=false;bikeObstacle='';boatBoardElapsed=BOAT_BOARD_DUR;boatLandElapsed=BOAT_LAND_DUR;ridePose.reset();driverPose.reset(false);clearAvatarPose(figure);stopLocomotionActions();mixer.stopAllAction();resetMotion();figure.visible=false;input.show(false);external=null;lastTianyuanSyncKey='';sim.clear();camera.near=1;camera.updateProjectionMatrix()}
+  function resetWalk(){settleCarRollaway('stop');hideCompensationBanner();combat.hide();cancelSmoke();knockdown.reset();syncKnockdownDomState(false);resetAirTracker();trafficTracker.reset();prevContactKnockdownAt=-9999;prevObstacleTripAt=-9999;dutyFlagHoldMode=null;dutyFlagHoldTimer=0;if(hotbarSlot()==='smoke')selectSlot('hand');ticketHandover.stop();ticketHandover.reset();emote.stop();emote.reset();smoking?.dispose();smoking=undefined;holdLayer.reset();camHoldBlend=0;wheel.close();cigarette.stop();if(shopOverlay?.isOpen())shopOverlay?.close('fly');outfitController.setRidingEbike(false);finishActiveTestRide('mode_switch');shopHintGroup.visible=false;ebikeShowroomGroup.visible=false;shopEbikeShowcaseRig.root.visible=false;for(const item of showroomBikes)item.snapped=false;destination=null;active=false;crashSession=null;standUpSession=null;pickupSession=null;twoWheelOp=createInitialTwoWheelOpState();carHeadlight='off';carHeadlightManual=false;delete document.body.dataset.carIgnition;delete document.body.dataset.carGear;clearAllDowned();releaseDynamicCar();releaseDynamicBike();input.syncRideHud(null,null);rides?.clearBoatPose(figure);rides?.show(false);actionButton.hidden=true;setPrompt(null);updateTravel('fly',null);if(wasCar||wasBike)applyFootController();wasBoat=wasBike=wasCar=false;bikeObstacle='';boatBoardElapsed=BOAT_BOARD_DUR;boatLandElapsed=BOAT_LAND_DUR;ridePose.reset();driverPose.reset(false);clearAvatarPose(figure);stopLocomotionActions();mixer.stopAllAction();resetMotion();figure.visible=false;input.show(false);external=null;lastTianyuanSyncKey='';sim.clear();camera.near=1;camera.updateProjectionMatrix()}
   function canPlaceCrashOffset(x:number,z:number,refY:number,fromX?:number,fromZ?:number){
     if(!sim.withinBounds(x,z))return false
     if(sim.insideHouse(x,z,refY+.4))return false
@@ -2084,7 +2141,7 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
   function triggerTwoWheelCrash(
     reason:Exclude<EbikeCrashReason,''>,
     side:-1|1,
-    kdOpts?:{kind?:KnockdownKind;reason?:string;severity?:number;dir?:{x:number;z:number};speedMs?:number;suppressToast?:boolean},
+    kdOpts?:{kind?:KnockdownKind;reason?:string;severity?:number;dir?:{x:number;z:number};speedMs?:number;suppressToast?:boolean;crashCause?:TwoWheelCrashCause;bypassCompGate?:boolean},
   ){
     if(crashSession||!rides?.bike)return
     const kind=rides.rideKind==='bicycle'?'bicycle':'bike'
@@ -2092,6 +2149,8 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
     const sideX=Math.cos(rides.heading)*side, sideZ=-Math.sin(rides.heading)*side
     const paint=(rides.bike.userData.paint as number|undefined)??0
     const vehicleType:EbikeVehicleType=kind==='bike'?(rides.vehicleType??(rides.isShared||rides.bike.userData.shared?'shared':'normal')):'normal'
+    const isSharedTurnSlip=kind==='bike'&&vehicleType==='shared'&&kdOpts?.crashCause==='shared_turn_slip'
+    const spawnKey=isSharedTurnSlip?(rides.bikeSpawnKey??undefined):undefined
     const battery=kind==='bike'?(rides.ebikeBattery??ebikeFx.battery):100
     const modPreset=kind==='bike'?ebikeFx.modPreset:'stock'
     const fx=-Math.sin(rides.heading), fz=-Math.cos(rides.heading)
@@ -2118,12 +2177,33 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
       bikeOriginX:p.x,bikeOriginZ:p.z,
       bikeSlideX:0,bikeSlideZ:0,
       riderOffsetX:rx,riderOffsetZ:rz,
-      slideSpeed:THREE.MathUtils.clamp(Math.max(4.0,Math.abs(kdOpts?.speedMs??(prevTwoWheelSpeed||rides.speed))),4.0,12.5),
+      slideSpeed:THREE.MathUtils.clamp(Math.max(isSharedTurnSlip?3.6:4.0,Math.abs(kdOpts?.speedMs??(prevTwoWheelSpeed||rides.speed))),isSharedTurnSlip?3.6:4.0,12.5),
       elapsed:0,reason,
+      damaged:isSharedTurnSlip,
+      spawnKey,
     }
     rides.stop()
     const crashSeverity=THREE.MathUtils.clamp((crashSession.slideSpeed-3.5)/9,0.1,1)
     if(kind==='bike'){
+      if(isSharedTurnSlip){
+        rides.markCurrentBikeDamaged()
+        const solo=soloServices()
+        if(solo&&spawnKey){
+          const compRes=solo.commerce.creditSharedEbikeCompensation({
+            bikeKey:spawnKey,
+            amount:SHARED_EBIKE_COMPENSATION_YUAN,
+            bypassGate:Boolean(kdOpts?.bypassCompGate),
+          })
+          if(compRes.ok&&compRes.credited>0){
+            showCompensationBanner({
+              amount:compRes.credited,
+              balanceAfter:compRes.balanceAfter,
+            })
+          }else if(!verify||stuntMode){
+            window.dispatchEvent(new CustomEvent('walk:toast',{detail:{text:'共享电动车打滑摔坏无法继续骑行，本次暂未发放理赔',ms:2600}}))
+          }
+        }
+      }
       rides.applyPersonalCrashDamage(crashSeverity)
       emitGameEvent({type:'crash',severity:crashSeverity,vehicleId:rides.bikeInstanceId??undefined})
       rides.setEbikePark(false,true)
@@ -2152,8 +2232,8 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
     })
     syncKnockdownDomState(true)
     if(kind==='bike'&&ebikeFx.crashPhase==='none'){
-      ebikeFx.triggerCrash(reason,side,rides.heading,crashSession.slideSpeed,!!kdOpts?.suppressToast)
-    }else if(!kdOpts?.suppressToast&&(!verify||stuntMode)){
+      ebikeFx.triggerCrash(reason,side,rides.heading,crashSession.slideSpeed,Boolean(kdOpts?.suppressToast||isSharedTurnSlip))
+    }else if(!kdOpts?.suppressToast&&!isSharedTurnSlip&&(!verify||stuntMode)){
       window.dispatchEvent(new CustomEvent('walk:toast',{detail:{
         text:reason==='lowside'?'压弯过低打滑摔车！连按空格或点击起身 5 次先站起，再去扶车'
           :reason==='slip'?'急刹侧滑摔车！连按空格或点击起身 5 次先站起，再去扶车'
@@ -2218,6 +2298,12 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
       knockdown.forceRise(true)
       syncKnockdownDomState(false)
     }
+    const isDamaged=Boolean(c.damaged||c.mesh.userData.damaged)
+    const damagedSign=isDamaged?createDamagedBikeSignSprite():undefined
+    if(damagedSign){
+      damagedSign.position.set(bx,by+1.1,bz)
+      scene.add(damagedSign)
+    }
     const entry:DownedBikeEntry={
       mesh:c.mesh,
       kind:c.kind,
@@ -2230,12 +2316,22 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
       battery:c.battery,
       modPreset:c.modPreset,
       paint:c.paint,
-      hazardOverlay:c.kind==='bike'&&c.battery>0?attachDownedHazard(c.mesh):undefined,
+      hazardOverlay:c.kind==='bike'&&(isDamaged||c.battery>0)?attachDownedHazard(c.mesh,isDamaged):undefined,
+      damaged:isDamaged,
+      damagedSign,
+      spawnKey:c.spawnKey,
     }
     if(c.kind==='bike')rides.resetEbikeGearOnRecover()
-    rides.dismountDownedBike(bx,by,bz,entry.yaw,entry.roll,entry.lift)
+    rides.dismountDownedBike(bx,by,bz,entry.yaw,entry.roll,entry.lift,isDamaged)
     entry.mesh.userData.downedSide=c.side
     downedBikes.add(entry)
+    if(isDamaged){
+      const damagedList=[...downedBikes].filter(item=>item.damaged)
+      while(damagedList.length>MAX_WORLD_DAMAGED_BIKES){
+        const oldest=damagedList.shift()
+        if(oldest&&oldest!==entry)recycleDownedDamagedEntry(oldest)
+      }
+    }
     twoWheelOp=resolveTwoWheelTransition(twoWheelOp,{type:'standup',kind:c.kind}).state
     releaseDynamicBike()
     input.syncRideHud(null,null)
@@ -2258,7 +2354,9 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
     if(traveller)traveller.rotation.set(0,0,0)
     if(!verify||stuntMode){
       window.dispatchEvent(new CustomEvent('walk:toast',{detail:{
-        text:`已起身站稳，走近按 F 扶起${c.kind==='bicycle'?'单车':'电动车'}`,
+        text:isDamaged
+          ?'已起身站稳，该共享电动车已摔坏报废，无法再次骑行'
+          :`已起身站稳，走近按 F 扶起${c.kind==='bicycle'?'单车':'电动车'}`,
         ms:2200,
       }}))
     }
@@ -2295,7 +2393,7 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
   const blendFrom=new THREE.Vector3(),blendTurn=new THREE.Quaternion(),blendEye=new THREE.Quaternion()
   function follow(dt=0,snap=false){const pos=sim.body.translation(),footY=pos.y-cfg.height/2
     figure.position.set(pos.x,footY,pos.z)
-    if(downedBikes.size>0)syncAllDownedPoses(dt)
+    if(downedBikes.size>0)syncAllDownedPoses(dt,pos.x,pos.z)
     if(rides?.boat){
       const seatX=rides.boat.position.x, seatY=rides.boat.position.y+rides.boatSeatOffset, seatZ=rides.boat.position.z
       if(rides.freeBoat&&boatBoardElapsed<BOAT_BOARD_DUR){
@@ -2927,13 +3025,28 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
     wasBike=!!rides?.bike
     if(wasBike&&rides?.bike&&!crashSession){
       rides.setEbikeEnvironmentHour(env.hour)
+      const isSharedBikeNow=rides.rideKind==='bike'&&rides.isShared
+      const spawnKeyNow=rides.bikeSpawnKey??''
+      const soloSvc=soloServices()
+      const slipAllowed=
+        isSharedBikeNow
+        &&getPlayMode()==='solo'
+        &&grounded
+        &&!getQuietZoneAt(start.x,start.z)
+        &&trafficDutyRef?.getSnapshot().phase!=='active'
+        &&document.body.dataset.photo!=='on'
+        &&document.body.dataset.drone!=='rc'
+        &&Boolean(spawnKeyNow&&soloSvc?.commerce.canCreditSharedEbikeCompensation(spawnKeyNow).allowed)
+      rides.setSharedSlipEnabled(slipAllowed)
       // Consume one-shot pulse inputs ONCE per rendered frame (never inside multi-substep physics loop).
       if(rideCtrl.parkToggle)rides.toggleEbikePark()
       if(rideCtrl.kickstandToggle)rides.toggleEbikeKickstand()
       if(rideCtrl.headlightCycle){
         const beforeHl=rides.ebikeTelemetry?.headlight??'off'
+        const rKindNow=rides.rideKind==='bicycle'?'bicycle':'bike'
+        const vTypeNow=rides.vehicleType??'normal'
         const nextHl=rides.cycleEbikeHeadlight()
-        if(nextHl!==beforeHl&&(!verify||stuntMode)){
+        if(nextHl!==beforeHl&&!isSharedHeadlightSwitchLocked(rKindNow,vTypeNow)&&(!verify||stuntMode)){
           const hlText=nextHl==='high'?'远光灯已开启':nextHl==='low'?'近光灯已开启':'车灯已关闭'
           window.dispatchEvent(new CustomEvent('walk:toast',{detail:{text:hlText,ms:1600}}))
         }
@@ -3635,7 +3748,7 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
         }
         if(ebikeFx.vehicleType==='shared'&&rideCtrl.wheelie&&(rides.ebikeTelemetry?.speed??0)>=1.5&&performance.now()-sharedWheelieHintAt>3200){
           sharedWheelieHintAt=performance.now()
-          window.dispatchEvent(new CustomEvent('walk:toast',{detail:{text:'共享电动车限速 18 km/h 且禁止翘头，去十字街买个人电摩吧',ms:2200}}))
+          window.dispatchEvent(new CustomEvent('walk:toast',{detail:{text:'共享电动车限速 25 km/h 且禁止翘头，去十字街买个人电摩吧',ms:2200}}))
         }
         const rawTel=rides.ebikeTelemetry
         if(rawTel){
@@ -3708,7 +3821,11 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
         })
         if(mountedStaticBike)mountedStaticBike.userData.battery=ebikeState.battery
         if(rawTel&&rawTel.crashPhase!=='none'){
-          triggerTwoWheelCrash(rawTel.crashReason||'lowside',rawTel.crashSide??(rides.lean>=0?1:-1),{suppressToast:true})
+          triggerTwoWheelCrash(rawTel.crashReason||'lowside',rawTel.crashSide??(rides.lean>=0?1:-1),{
+            suppressToast:true,
+            crashCause:rawTel.crashCause,
+            reason:rawTel.crashCause==='shared_turn_slip'?'shared_turn_slip':undefined,
+          })
         }
         prevTwoWheelSpeed=Math.abs(rides.speed)
       }else{
@@ -3911,6 +4028,20 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
       get state(){return ebikeState},
       triggerCrash(reason:Exclude<EbikeCrashReason,''>='lowside',side:-1|1=1){if(rides?.bike)triggerTwoWheelCrash(reason,side)},
       triggerSlip:(opts?:BikeSlipKnockdownOptions)=>triggerBikeSlipKnockdownAction(opts),
+      setSharedSlipRng(rng:(()=>number)|null){rides?.setSharedSlipRng(rng)},
+      get sharedSlipStats(){return rides?.sharedSlipStats??null},
+      forceSharedTurnSlip(side:-1|1=1,opts?:{bypassCompGate?:boolean}){
+        if(!rides?.bike||rides.rideKind!=='bike'||!rides.isShared||crashSession)return false
+        rides.forceSharedTurnSlip(side)
+        triggerTwoWheelCrash('slip',side,{
+          kind:'ebike_slip',
+          reason:'shared_turn_slip',
+          crashCause:'shared_turn_slip',
+          suppressToast:true,
+          bypassCompGate:verify?Boolean(opts?.bypassCompGate):false,
+        })
+        return true
+      },
       recover(){return crashSession?beginStandUpFromCrash(true):false},
       pickupNearest(){
         if(rides?.bike||rides?.car||rides?.boat||standUpSession||pickupSession)return false

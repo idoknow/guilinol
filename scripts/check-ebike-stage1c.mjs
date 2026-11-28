@@ -127,7 +127,7 @@ try {
     ctrl.vehicleType === 'shared' &&
     ctrl.profile.allowUpgrades === false &&
     ctrl.profile.allowWheelie === false &&
-    ctrl.profile.tierMaxKmh <= 18
+    ctrl.profile.tierMaxKmh <= 25
 
   check(
     'P-gear unlock deterministic: Q stays P; E & brake clamp D3/S->D2 & preserve D1; Digit4->S; shared isolates model',

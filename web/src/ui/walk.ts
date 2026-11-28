@@ -473,7 +473,8 @@ const held=(action:Action)=>{let on=false;keys.forEach(code=>{if(!on&&hits(code,
       }
       const bikeGearLabels=['D1','D2','D3','S']
       const bicycleGearLabels=['1挡','2挡','3挡']
-      const gearLabels=rideKind==='bicycle'?bicycleGearLabels:bikeGearLabels
+      const sharedSingleGear=rideKind==='bike'&&state.vehicleType==='shared'
+      const gearLabels=rideKind==='bicycle'?bicycleGearLabels:sharedSingleGear?[]:bikeGearLabels
       if(rideKind==='bicycle'){
         typeEl.dataset.kind='bicycle';typeEl.textContent='单车'
         gearEl.textContent=state.gearLabel||'2挡'
@@ -481,20 +482,29 @@ const held=(action:Action)=>{let on=false;keys.forEach(code=>{if(!on&&hits(code,
         keysEl.textContent='1-3/Q·E · K撑 · H铃铛 · Shift压弯 · Space翘头'
         hornBtn.textContent='铃铛'
         hornBtn.classList.toggle('on',!!state.hornActive)
+        lightBtn.disabled=true
+        lightBtn.dataset.locked='1'
       }else{
         typeEl.dataset.kind=state.vehicleType;typeEl.textContent=state.vehicleBadge
         gearEl.textContent=state.parkLocked?'P':state.gearLabel
         gearEl.title=state.parkLocked
-          ?`${state.vehicleLabel} · P档驻车（按 0/P/K 或 E 解除）`
-          :`${state.vehicleLabel} · 本挡限速 ${Math.round(state.maxKmh)} km/h（1-4 / Q·E 换挡）${state.vehicleType==='shared'?' · 单次代步':''}`
-        const lightTag=state.headlight==='high'?'远光':state.headlight==='low'?'近光':'关灯'
-        keysEl.textContent=state.vehicleType==='shared'
-          ?'0/P驻车 · K撑 · L灯 · Z/X/B · H喇叭 · U定速 · 单次代步限18(禁翘头)'
+          ?`${state.vehicleLabel} · P档驻车（${sharedSingleGear?'轻捏刹车(S) / 按 P / 按 K 解锁':'按 0/P/K 或 E 解除'}）`
+          :sharedSingleGear
+            ?`${state.vehicleLabel} · 单档限速 ${Math.round(state.maxKmh)} km/h（不可调档）`
+            :`${state.vehicleLabel} · 本挡限速 ${Math.round(state.maxKmh)} km/h（1-4 / Q·E 换挡）`
+        const lightTag=sharedSingleGear
+          ?(state.headlight==='low'?'基础灯':'自动灯')
+          :(state.headlight==='high'?'远光':state.headlight==='low'?'近光':'关灯')
+        keysEl.textContent=sharedSingleGear
+          ?'0/P驻车 · K撑 · Z/X/B · H喇叭 · U定速 · 单档限25(禁调档/禁切远近光)'
           :'0/P驻车 · K撑 · L灯 · Z/X/B · H喇叭 · U定速 · G改 · Shift压弯'
         parkBtn.classList.toggle('on',!!state.parkLocked)
         parkBtn.setAttribute('aria-pressed',String(!!state.parkLocked))
         lightBtn.textContent=lightTag
         lightBtn.dataset.mode=state.headlight??'off'
+        lightBtn.dataset.locked=sharedSingleGear?'1':'0'
+        lightBtn.disabled=sharedSingleGear
+        lightBtn.title=sharedSingleGear?'共享电车锁定基础车灯（无法切换远近光）':'车灯切换 关/近/远 (L)'
         lightBtn.classList.toggle('on',state.headlight==='low'||state.headlight==='high')
         turnLeftBtn.classList.toggle('on',!!state.leftSignalLit)
         turnLeftBtn.classList.toggle('armed',state.turnSignal==='left')
@@ -571,7 +581,7 @@ const held=(action:Action)=>{let on=false;keys.forEach(code=>{if(!on&&hits(code,
           stateEl.textContent='低电预警'
         }else if(rideKind==='bike'&&state.vehicleType==='shared'){
           stateEl.hidden=false;stateEl.dataset.warn='0'
-          stateEl.textContent='单次代步 · 限18'
+          stateEl.textContent='单档 · 限25'
         }else{
           stateEl.hidden=true;stateEl.dataset.warn='0'
         }
@@ -590,6 +600,9 @@ const held=(action:Action)=>{let on=false;keys.forEach(code=>{if(!on&&hits(code,
       const hlLabel=headlight==='high'?'远光':headlight==='low'?'近光':'关灯'
       lightBtn.textContent=hlLabel
       lightBtn.dataset.mode=headlight
+      lightBtn.dataset.locked='0'
+      lightBtn.disabled=false
+      lightBtn.title='车灯切换 关/近/远 (L)'
       lightBtn.classList.toggle('on',headlight!=='off')
       gearEl.textContent=state.gearLabel
       gearEl.title=`自动挡 ${state.gearLabel} · ${state.modeLabel}模式上限 ${state.maxKmh} km/h（1-3 / Q·E 切模式）`

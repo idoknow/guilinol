@@ -11,6 +11,13 @@
  */
 
 import {
+  evaluateSharedEbikeCompEligibility,
+  localDayKey,
+  SHARED_EBIKE_COMPENSATION_REASON,
+  SHARED_EBIKE_COMPENSATION_YUAN,
+  type SharedEbikeCompEligibility,
+} from '../walk/shared-ebike-logic'
+import {
   EBIKE_SERVICE_CATALOG,
   EBIKE_UPGRADES_BY_ID,
   EBIKE_VISUALS_BY_ID,
@@ -916,6 +923,128 @@ export function unlockSharedEbike(req: {sessionKey: string; feeYuan?: number}): 
     }
   } finally {
     sharedUnlockInFlight.delete(key)
+  }
+}
+
+export interface SharedEbikeCompensationResult {
+  ok: boolean
+  code: 'OK' | 'ALREADY_CLAIMED' | 'COOLDOWN' | 'DAILY_CAP' | 'INVALID_KEY' | 'INVALID_AMOUNT' | 'IN_FLIGHT' | 'PERSIST_FAILED'
+  credited: number
+  balanceAfter: number
+  txId?: string
+  cooldownRemainingMs?: number
+}
+
+/**
+ * Checks whether a shared e-bike bay is currently eligible for slip compensation
+ * (permanent per-bay claim + 10 min real-time cooldown + 2/day cap).
+ */
+export function canCreditSharedEbikeCompensation(bikeKey: string, nowMs = Date.now()): SharedEbikeCompEligibility {
+  const base = getActiveSaveSnapshot()
+  return evaluateSharedEbikeCompEligibility(
+    base.economy.claimedSharedEbikeComp ?? [],
+    bikeKey,
+    base.economy.sharedEbikeCompState,
+    nowMs,
+  )
+}
+
+/**
+ * Atomically credits merchant slip compensation (+¥200) to the persisted wallet ledger
+ * without polluting `missionsDone`. Enforces per-bay permanent claim + global cooldown/daily cap.
+ */
+export function creditSharedEbikeCompensation(req: {
+  bikeKey: string
+  amount?: number
+  nowMs?: number
+  bypassGate?: boolean
+}): SharedEbikeCompensationResult {
+  const base = getActiveSaveSnapshot()
+  const nowMs = req.nowMs ?? Date.now()
+  const amount = req.amount ?? SHARED_EBIKE_COMPENSATION_YUAN
+  if (!req.bikeKey || typeof req.bikeKey !== 'string') {
+    return {ok: false, code: 'INVALID_KEY', credited: 0, balanceAfter: base.money}
+  }
+  if (!Number.isSafeInteger(amount) || amount <= 0) {
+    return {ok: false, code: 'INVALID_AMOUNT', credited: 0, balanceAfter: base.money}
+  }
+  const lockKey = `shared_ebike_comp:${req.bikeKey}`
+  if (inFlightLocks.has(lockKey)) {
+    return {ok: false, code: 'IN_FLIGHT', credited: 0, balanceAfter: base.money}
+  }
+
+  if (!req.bypassGate) {
+    const elig = evaluateSharedEbikeCompEligibility(
+      base.economy.claimedSharedEbikeComp ?? [],
+      req.bikeKey,
+      base.economy.sharedEbikeCompState,
+      nowMs,
+    )
+    if (!elig.allowed) {
+      const code =
+        elig.reason === 'already_claimed'
+          ? 'ALREADY_CLAIMED'
+          : elig.reason === 'cooldown'
+            ? 'COOLDOWN'
+            : elig.reason === 'daily_cap'
+              ? 'DAILY_CAP'
+              : 'INVALID_KEY'
+      return {
+        ok: false,
+        code,
+        credited: 0,
+        balanceAfter: base.money,
+        ...(elig.cooldownRemainingMs !== undefined ? {cooldownRemainingMs: elig.cooldownRemainingMs} : {}),
+      }
+    }
+  } else if ((base.economy.claimedSharedEbikeComp ?? []).includes(req.bikeKey)) {
+    return {ok: false, code: 'ALREADY_CLAIMED', credited: 0, balanceAfter: base.money}
+  }
+
+  inFlightLocks.add(lockKey)
+  try {
+    const next = cloneSave(base)
+    const balanceAfter = Math.min(MAX_SAFE_MONEY, base.money + amount)
+    const credited = balanceAfter - base.money
+    const txId = nextTxId(nowMs)
+    const today = localDayKey(nowMs)
+    const prevState = next.economy.sharedEbikeCompState ?? {lastAt: 0, dayKey: '', dayCount: 0}
+    const prevCount = prevState.dayKey === today ? prevState.dayCount : 0
+
+    next.money = balanceAfter
+    next.updatedAt = nowMs
+    if (!next.economy.claimedSharedEbikeComp.includes(req.bikeKey)) {
+      next.economy.claimedSharedEbikeComp.push(req.bikeKey)
+    }
+    next.economy.sharedEbikeCompState = {
+      lastAt: nowMs,
+      dayKey: today,
+      dayCount: prevCount + 1,
+    }
+    appendTx(next, {
+      txId,
+      idempotencyKey: `${SHARED_EBIKE_COMPENSATION_REASON}:${req.bikeKey}`,
+      kind: 'reward',
+      delta: credited,
+      balanceAfter,
+      refId: `${SHARED_EBIKE_COMPENSATION_REASON}:${req.bikeKey}`,
+      at: nowMs,
+    })
+
+    if (!persistSaveSync(next)) {
+      return {ok: false, code: 'PERSIST_FAILED', credited: 0, balanceAfter: base.money}
+    }
+    _commitPersistedSlice({money: balanceAfter, bumpWalletSeq: true})
+    emit({
+      type: 'money:change',
+      delta: credited,
+      balance: balanceAfter,
+      reason: SHARED_EBIKE_COMPENSATION_REASON,
+      txId,
+    })
+    return {ok: true, code: 'OK', credited, balanceAfter, txId}
+  } finally {
+    inFlightLocks.delete(lockKey)
   }
 }
 
