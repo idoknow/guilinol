@@ -35,6 +35,11 @@ test('bounded stream rejects oversized body before SQL',async()=>{
   const request=new Request('http://localhost/api/t',{method:'POST',body:'a'.repeat(4097)})
   assert.equal((await receive(request,null,'http://localhost')).status,413)
 })
+test('collision timeout accepts bounded landmark IDs, including tile-only waits',()=>{
+  const valid=value=>validate({...batch(),rows:[{kind:'collisionTimeout',ms:60005,missingLandmarks:value}]})
+  for(const ids of ['','jingjiang','jingjiang,wangcheng_teaching'])assert.equal(valid(ids),true)
+  for(const ids of [['jingjiang'],'https://example.org',Array(13).fill('a').join(',')])assert.equal(valid(ids),false)
+})
 test('receiver inserts one batch with trusted client_ip and node_ip outside event payload',async()=>{
   const message=batch(),calls=[]
   const db={async query(sql,args){calls.push({sql,args})}}

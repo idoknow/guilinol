@@ -237,6 +237,8 @@ export function landmarkStream(
   options?:LandmarkStreamOptions,
 ){
   const loaderReady=sharedKtx2Loader(renderer).then(basis=>new GLTFLoader().setKTX2Loader(createCachedKtx2Loader(basis)).setMeshoptDecoder(MeshoptDecoder))
+  const query=new URLSearchParams(location.search),profileId=query.has('verify')&&query.get('collisionProfile')
+  let requestedAt=0,fetchedAt=0,parsingAt=0
   const pending=new Set<Landmark>(), priorityPending=new Set<Landmark>(), retry=new Map<Landmark,number>()
   const states=new WeakMap<THREE.Group,LandmarkState>()
   const fetchedQueue:FetchedEntry[]=[]
@@ -295,10 +297,12 @@ export function landmarkStream(
     options?.onPendingChange?.()
     if(isPriority)priorityPending.add(entry)
     if(retry.has(entry))record('retry',{category:'landmark'})
+    if(entry.id===profileId)requestedAt=performance.now()
     fetch('./'+entry.file).then(response=>{
       if(!response.ok)throw Error(`HTTP ${response.status}`)
       return response.arrayBuffer()
     }).then(buffer=>{
+      if(entry.id===profileId)fetchedAt=performance.now()
       fetchedQueue.push({entry,buffer,isPriority})
       schedulePump()
     }).catch(error=>{
@@ -320,6 +324,7 @@ export function landmarkStream(
     }
     parsing=true
     void loaderReady.then(loader=>new Promise<THREE.Group>((resolve,reject)=>{
+      if(entry.id===profileId)parsingAt=performance.now()
       loader.parse(buffer,'./',gltf=>resolve(gltf.scene),reject)
     })).then(group=>{
       parsing=false
@@ -327,6 +332,7 @@ export function landmarkStream(
       if(entry.collision!=='none'){
         group.updateMatrixWorld(true)
         options?.collisionLandmarks?.set(entry,group)
+        if(entry.id===profileId){const readyAt=performance.now();console.info('collision:ready',JSON.stringify({id:entry.id,fetchMs:Math.round(fetchedAt-requestedAt),queueMs:Math.round(parsingAt-fetchedAt),decodeAndRegisterMs:Math.round(readyAt-parsingAt),totalMs:Math.round(readyAt-requestedAt)}))}
       }
       decodedQueue.push({entry,group,isPriority})
       schedulePump()
