@@ -654,6 +654,12 @@ export function droneMode(host:Host, deps:{
     input.enabled = true
     input.attach()
     input.onAction(act)
+    // IDOK-589: 上一趟下机时如果摇杆没回中（手指滑出垫子、pointercancel 丢了），
+    // 或者 W 还按着，这些残留会让新起的飞机「自己往某个方向飞」。进遥控一律先归零。
+    input.reset()
+    near.front = near.back = near.left = near.right = Infinity
+    obstacle = 0
+    wasBlocked = false
     // IDOK-527: 进场时挑最近的三处景点当导航目标，再算一次就够，飞起来目标不会乱跳。
     const spots = deps.spots?.() ?? []
     navSpots = [...spots]
@@ -967,10 +973,18 @@ export function droneMode(host:Host, deps:{
       return roll === sticks.roll ? sticks : {...sticks,roll}
     }
     obstacle = hit
-    // 2.5 m 内是「已经贴脸」：不许再往前推，反而轻轻后撤一点，飞机悬停等飞行员绕开。
-    if (hit <= 3) return {throttle:sticks.throttle,yaw:sticks.yaw * .5,pitch:Math.min(-.18,sticks.pitch),roll:roll * .2}
+    // IDOK-589: 避障只压制飞行员已经在推的那根杆，绝不自己给速度。
+    // 以前贴脸（≤3 m）时无条件 `pitch:-.18` + 偏航减半，飞机贴墙悬停时会自己倒着飞、自己慢慢转，
+    // 用户看到的就是「起飞后自己乱动」。现在前进推不动、后退完全不拦、偏航按原样。
+    if (hit <= 3) return {throttle:sticks.throttle,yaw:sticks.yaw,pitch:Math.min(0,sticks.pitch),roll}
     const damping = THREE.MathUtils.clamp(hit / 9,.12,.75)
-    return {throttle:sticks.throttle,yaw:sticks.yaw,pitch:sticks.pitch * damping,roll:roll * damping}
+    return {
+      throttle:sticks.throttle,
+      yaw:sticks.yaw,
+      pitch:sticks.pitch > 0 ? sticks.pitch * damping : sticks.pitch,
+      // 侧滑是绕开障碍的主要手段，只按 near 挡，不做额外衰减。
+      roll,
+    }
   }
 
   /**
