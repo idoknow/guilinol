@@ -65,6 +65,8 @@ export default defineConfig({
     writeFileSync(join(dist,'precache-manifest.json'), JSON.stringify({build:sha,files}))
     const source = readFileSync(join(root,'web/sw.js'),'utf8').replace('__BUILD__', sha)
     writeFileSync(join(dist,'sw.js'), source)
+    // 紧急回滚件：SW 出问题时把 dist/sw-kill.js 覆盖成 dist/sw.js 即可全量收回
+    writeFileSync(join(dist,'sw-kill.js'), readFileSync(join(root,'web/sw-kill.js'),'utf8'))
   }}, {name:'error-pages',generateBundle(){
     // IDOK-420: self-contained error pages, copied byte-for-byte (no Vite HTML transform) to dist/errors/.
     // Edit via scripts/build-error-pages.mjs; the CDN copy is pushed from the ops repo.
