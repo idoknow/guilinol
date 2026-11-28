@@ -23,7 +23,7 @@ let subCount=0
  *  计数放在模块级：地图可能比 socket 先打开，联网后要补发订阅。 */
 export function requestRoster(on:boolean){subCount=Math.max(0,subCount+(on?1:-1));rosterRequester?.()}
 
-export function attachNet(scene:Scene,clips:AnimationClip[],getPose:()=>Pose,getAvatar:()=>Avatar,camera:Camera,getActivity?:()=>ActivityReport,onCombat?:(p:CombatPacket,self:string)=>void,onSetback?:(x:number,y:number,z:number)=>void,getCaptureContext?:()=>CaptureClientContext,getMobility?:()=>MobilityState) {
+export function attachNet(scene:Scene,clips:AnimationClip[],getPose:()=>Pose,getAvatar:()=>Avatar,camera:Camera,getActivity?:()=>ActivityReport,onCombat?:(p:CombatPacket,self:string)=>void,onSetback?:(x:number,y:number,z:number)=>void,getCaptureContext?:()=>CaptureClientContext,getMobility?:()=>MobilityState,onMountRejected?:(reason:string)=>void) {
   const peers=players(scene,clips,camera)
   let travelReply:((reply:TravelReply)=>void)|undefined
   let landingPaused=false,rejoinTimer=0
@@ -49,6 +49,7 @@ export function attachNet(scene:Scene,clips:AnimationClip[],getPose:()=>Pose,get
   let socket:WebSocket|undefined,attempt=0,generation=0,timer=0,lastSent=-Infinity,lastRoster=-Infinity,lastActCheck=-Infinity,disposed=false
   let lastRosterV=0,rosterPaused=false,subTimer=0
   let lastActKey='',lastMobKey=''
+  let mobilitySeq=0
   let state:State='offline',online=0
   // AOI 之后 peers 只有身边 ~150m 的人；整座城的人来自服务端每 5s 一次的 roster（只有位置，没有朝向）
   let myId='',myUid=0,myName='',far=new Map<string,RosterPlayer>()
@@ -156,6 +157,13 @@ export function attachNet(scene:Scene,clips:AnimationClip[],getPose:()=>Pose,get
           case 'online':update('online',msg.online);break
           case 'roster':far=new Map();for(const [id,name,x,z,joinedAt] of msg.players as [string,string,number,number,number][])if(id!==myId)far.set(id,{id,name,x,z,yaw:0,v:0,bike:false,joinedAt,far:true});lastRoster=-Infinity;break
           // 服务端判定这次移动不合法（超速/飞天/非法瞬移）：把自己拉回服务端认可的位置
+          case 'vstate_ack':{
+            const local=getMobility?.()
+            if(msg.ok!==false || (msg.seq!=null && msg.seq!==mobilitySeq) || !local || `${local.mode}|${local.id??''}`!==lastMobKey)break
+            onMountRejected?.(msg.reason)
+            if([msg.x,msg.y,msg.z].every(Number.isFinite))onSetback?.(msg.x,msg.y,msg.z)
+            lastMobKey=msg.mode==='foot'?'foot|':''
+            break}
           case 'setback':{
             if(typeof msg.x==='number'&&typeof msg.z==='number')onSetback?.(msg.x,typeof msg.y==='number'?msg.y:0,msg.z)
             break}
@@ -218,7 +226,7 @@ export function attachNet(scene:Scene,clips:AnimationClip[],getPose:()=>Pose,get
     const key=`${next.mode}|${next.id??''}`
     if(key===lastMobKey)return
     lastMobKey=key
-    send({t:'vstate',mode:next.mode,...(next.id?{id:next.id}:{}),x:pose.x,y:pose.y,z:pose.z})
+    send({t:'vstate',seq:++mobilitySeq,mode:next.mode,...(next.id?{id:next.id}:{}),x:pose.x,y:pose.y,z:pose.z})
   }
   function tick(dt:number){if(state!=='online'||!welcomed)return
     flushEmote();const pose=getPose(),now=performance.now()
