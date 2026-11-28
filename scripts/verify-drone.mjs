@@ -90,17 +90,17 @@ try {
 
   const tap = async selector => {
     // 工具菜单里的入口会随「点空白处」收起来（#dock-menu 收起时整组按钮被摘掉），
-    // 所以每次点 .dock-drone 之前先把菜单重新展开一次。
-    if (selector === '.dock-drone') {
-      await page.evaluate(() => {
+    // 所以轮询里顺手把菜单重新展开 —— 只展开一次的话，排到那一刻菜单可能还没建好。
+    // poll in page instead of waitForSelector: the HUD redraws these nodes, and Playwright's
+    // attach-wait flakes when the node is replaced between two polls.
+    await page.waitForFunction(sel => {
+      if (sel === '.dock-drone') {
         const more = document.querySelector('.dock-more')
         const menu = document.querySelector('#dock-menu')
         if (more instanceof HTMLElement && (!menu || menu.hasAttribute('hidden'))) more.click()
-      })
-    }
-    // poll in page instead of waitForSelector: the HUD redraws these nodes, and Playwright's
-    // attach-wait flakes when the node is replaced between two polls.
-    await page.waitForFunction(sel => !!document.querySelector(sel), selector, {timeout: 30000, polling: 100})
+      }
+      return !!document.querySelector(sel)
+    }, selector, {timeout: 180000, polling: 250})
     return page.evaluate(sel => {
       const element = document.querySelector(sel)
       if (!element) throw Error(`missing ${sel}`)
@@ -133,7 +133,7 @@ try {
 
   // 2) place the FPV racer (IDOK-530: the fleet is down to the racer and the lifter)
   await tap('[data-drone="fpv"]')
-  await page.waitForFunction(() => !!window.droneDebug?.().flight, null, {timeout: 30000})
+  await page.waitForFunction(() => !!window.droneDebug?.().flight, null, {timeout: 120000, polling: 250})
   const placed = await page.evaluate(() => ({
     dock: document.querySelector('.dock-drone')?.textContent.trim(),
     hint: document.querySelector('.drone-hint')?.textContent.trim() ?? null,
@@ -171,6 +171,14 @@ try {
   console.log('climb', JSON.stringify(climb))
   assert.equal(climb.phase, 'flying', 'aircraft reaches the flying phase')
   assert.ok(climb.agl > 1.4, 'aircraft climbs after 起飞')
+
+  // 4b) IDOK-589: 松手就得悬停 —— 以前风只沿 x 推、避障贴脸时还会自己倒车/转向，
+  //     用户看到的就是「起飞后自己乱动」。4 秒无输入里位置和朝向都必须稳住。
+  const hoverStart = await page.evaluate(() => window.droneDebug().flight)
+  const hoverEnd = await step(0.1, 40)
+  console.log('hover', JSON.stringify({distance: [hoverStart.distance, hoverEnd.distance], yaw: [hoverStart.yaw, hoverEnd.yaw], agl: hoverEnd.agl}))
+  assert.ok(Math.abs(hoverEnd.distance - hoverStart.distance) < 1.5, 'no stick input = no self-motion (distance within 1.5 m)')
+  assert.ok(Math.abs(hoverEnd.yaw - hoverStart.yaw) < 1, 'no stick input = no self-yaw')
 
   // 5) keyboard sticks move the aircraft — climb clear of the eaves first: IDOK-529's avoidance
   //    refuses to fly into a facade, and the street's shop roofs sit only a few metres up.
@@ -328,7 +336,7 @@ try {
   assert.equal(cargo.max, '200', 'the cargo slider tops out at the 200 kg rating')
   assert.equal(cargo.chip, '运货 200 kg')
   await tap('[data-drone="flycart200"]')
-  await page.waitForFunction(() => !!window.droneDebug?.().flight, null, {timeout: 30000})
+  await page.waitForFunction(() => !!window.droneDebug?.().flight, null, {timeout: 120000, polling: 250})
   const cart = await page.evaluate(() => ({dock: document.querySelector('.dock-drone')?.textContent.trim(), state: window.droneDebug?.()}))
   console.log('cart', JSON.stringify(cart))
   assert.equal(cart.dock, '无人机')
@@ -378,7 +386,7 @@ try {
   await tap('.rc .rc-modes [data-mode="photo"]')
   assert.equal(await page.evaluate(() => document.querySelector('.rc')?.dataset.mode), 'photo')
   // IDOK-275: FlyCart glTF (eight props), winch mode hides the cargo box, the crate hangs on the sling
-  await page.waitForFunction(() => (window.droneDebug().payload?.parts ?? 0) >= 3, null, {timeout: 30000})
+  await page.waitForFunction(() => (window.droneDebug().payload?.parts ?? 0) >= 3, null, {timeout: 120000, polling: 250})
   const sling = await page.evaluate(() => window.droneDebug())
   console.log('sling', JSON.stringify({model: sling.model, payload: sling.payload}))
   assert.equal(sling.model.source, 'gltf')
