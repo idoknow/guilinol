@@ -76,7 +76,19 @@ async function enter(mode: PlayMode, remember = true, online=mode==='solo'&&mpEn
     title.close()
     if(started){if(creator)await main.spawnCreatedCharacter();main.setPaused(false)}
     else {hud(main);await main.boot(loader!,creator);started=true}
-    if(online&&remember&&(changed||initial))await waitForOnline(controller.signal)
+    if(!initial&&online&&remember&&changed){
+      try{await waitForOnline(controller.signal)}catch{
+        main.setTitleTransition(undefined)
+        main.leaveLocation(false)
+        setMpEnabled(wasOnline,previous==='solo'&&!wasOnline)
+        await setPlayMode(previous,false)
+        await main.waitForMode()
+        if(previous===mode)await main.enterLocation()
+        main.setPaused(false)
+        window.dispatchEvent(new CustomEvent('walk:toast',{detail:{text:'未能连接联机服务，已返回原模式',ms:3200}}))
+        return
+      }
+    }
     controller.signal.throwIfAborted()
     if(remember)await setPlayMode(mode,true)
   } catch(error) {

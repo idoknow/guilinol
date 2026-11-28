@@ -15,7 +15,8 @@ import {frameSample} from './mp-frame.mjs'
 
 const secret=randomBytes(32).toString('hex'),children=[],sockets=[]
 const smokeCapture=process.argv.includes('--smoke')
-const modeSwitch=process.argv.includes('--mode-switch')
+const connectivity=process.argv.includes('--connectivity')
+const modeSwitch=connectivity||process.argv.includes('--mode-switch')
 let failBrowser
 const browserError=new Promise((_,reject)=>{failBrowser=reject})
 const appearance={body:'f',v:1,createdAt:123,skin:2,face:1,brows:0,eyes:0,hair:'f_bun',hairColor:1,look:'sport'}
@@ -54,6 +55,7 @@ async function verify(){
   site=await preview({root:'web',configFile:'web/vite.config.ts',preview:{host:'127.0.0.1',port:number,strictPort:true,proxy:{'/api':'http://'+api,'/ws':{target:'ws://'+rt,ws:true}}}})
   assert.equal((await fetch(origin+'/api/rt/ticket',{method:'POST',headers:{origin}})).status,401)
   browser=await chromium.launch({executablePath:process.env.CHROMIUM,args:[...browserOptions().args,'--disable-background-timer-throttling','--disable-renderer-backgrounding','--disable-backgrounding-occluded-windows']})
+  if(connectivity)return (await import('./verify-mp-connectivity.mjs')).verifyConnectivity({origin,browser,database,appearance})
   const url=origin+'/?verify&mode=walk&flow=0'
   async function pageFor(name,mp){
     const page=await browser.newPage({viewport:name==='alice'?{width:240,height:135}:{width:480,height:270}});page.on('pageerror',failBrowser)

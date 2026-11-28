@@ -100,7 +100,7 @@ export function attachNet(scene:Scene,clips:AnimationClip[],getPose:()=>Pose,get
     try{
       const response=await fetch('/api/rt/ticket',{method:'POST',credentials:'same-origin'})
       if(version!==generation)return
-      if(response.status===401||response.status===403){update('offline');return}
+      if(response.status===403){update('offline');return}
       if(!response.ok)throw Error('ticket unavailable')
       const {ticket}=await response.json();if(version!==generation)return
       const endpoint=localStorage.getItem('guiling.ws')||`${location.protocol==='https:'?'wss':'ws'}://${location.host}/ws`
@@ -148,7 +148,7 @@ export function attachNet(scene:Scene,clips:AnimationClip[],getPose:()=>Pose,get
               let floor=y
               if(restoreHeight&&arrival==='restore'){
                 const valid=()=>version===generation&&ws===socket&&ws.readyState===WebSocket.OPEN
-                try{floor=await restoreHeight(x,y,z,valid)}catch{if(valid())ws.close(4000,'landing unavailable');return}
+                try{floor=await restoreHeight(x,y,z,valid)}catch{floor=y}
                 if(!valid())return
               }
               onSetback?.(x,floor,z);if(code)rejectTravel(code)}
