@@ -20,7 +20,7 @@ export const labels: Record<string, string> = {
   duplicate: '与已有反馈重复',
 }
 export const edges: Record<string, string[]> = {
-  submitted: ['approved','need_info','rejected','duplicate'],
+  submitted: ['approved','need_info','rejected','duplicate','resolved'],
   approved: ['queued'],
   queued: ['modelling', 'reviewing', 'live', 'need_info', 'rejected', 'duplicate', 'resolved'],
   modelling: ['reviewing', 'live', 'need_info', 'rejected', 'duplicate', 'resolved'],
