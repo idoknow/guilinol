@@ -25,7 +25,7 @@ try {
   await page.waitForFunction(() => window.viewer?.walk?.active, null, {timeout: 300000, polling: 500})
   await page.waitForFunction(() => typeof window.mapFog?.count === 'function', null, {timeout: 60000, polling: 250})
 
-  // 出生点周围应该已经点亮了几格（走路 tick 每 220 ms 记一次；IDOK-590 起每格 8 m、半径 10 m）。
+  // 出生点周围应该已经点亮了几格（走路 tick 每 220 ms 记一次；IDOK-605 起每格 8 m、半径 10 m）。
   const born = await page.evaluate(() => ({
     cells: window.mapFog.count(),
     stored: JSON.parse(localStorage.getItem('glol.fog.v2') ?? '[]').length,

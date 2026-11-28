@@ -27,7 +27,7 @@ const C = {paper:'#efe8d8', green:'#d3dcc0', water:'#a6c9c1', waterEdge:'#86ada5
   lmHub:'#2c4257', lmScenic:'#2f5d4b', lmCivic:'#8c5a2b', lmCampus:'#5c4569', lmFill:'rgba(244,239,226,.94)',
   shop:'#d9822b', shopText:'#9c4e0e', route:'#20d6c1', peer:'#2f7d70',
   halo:'rgba(239,232,216,.92)', roadHalo:'rgba(252,250,243,.95)',
-  // IDOK-590：未探索区域改成「雾」而不是墨块 —— 冷灰的水汽，压住细节但仍隐约看得出山形水势。
+  // IDOK-605：未探索区域改成「雾」而不是墨块 —— 冷灰的水汽，压住细节但仍隐约看得出山形水势。
   fog:'rgba(104,116,122,.93)', fogVeil:'rgba(84,98,105,.22)',
   // 小地图只有 150 px，浅雾会把整盘糊成一块灰：换更厚的一档，走过的街道才像被点亮。
   fogMini:'rgba(120,128,132,.9)'}
@@ -152,7 +152,7 @@ export function mapView(host:Host, atlas:Atlas, ui:{slot:HTMLElement; buttons:HT
   }
   const here = ()=>{const w = host.walker(); return w?.active?w.position:host.camera.position}
 
-  // --- 迷雾（IDOK-588 / IDOK-590）：只有走过的地方才是亮的，和 GTA 线下版的开图手感一致。
+  // --- 迷雾（IDOK-588 / IDOK-605）：只有走过的地方才是亮的，和 GTA 线下版的开图手感一致。
   // 先在离屏 canvas 上铺一层水汽（底色 + 世界锚定的云斑），再把「走过的格子」挖掉，整层贴上主画布。
   // 挖洞按行合并成长条：8 m 一格，逐格画圆在全图缩放下是几万次 arc，合并后只画几十上百条矩形。
   // 离屏画布比屏幕大一圈（FOG_PAD），这样高斯模糊的边缘落在屏幕外，不会在四边漏出透明缝。
@@ -491,7 +491,7 @@ export function mapView(host:Host, atlas:Atlas, ui:{slot:HTMLElement; buttons:HT
   ui.slot.append(mini,road)
   registerPageUI(mini); registerPageUI(road)
   // IDOK-256: the minimap disc is the only map entry (the old「地图」dock button opened the same atlas). M still works.
-  // IDOK-590：桌面端小地图走 GTA 那种「随朝向转的圆角方框」，触屏仍是上北下南的圆盘。
+  // IDOK-605：桌面端小地图走 GTA 那种「随朝向转的圆角方框」，触屏仍是上北下南的圆盘。
   const spin = document.createElement('canvas')
   const fine = ()=>matchMedia('(hover:hover) and (pointer:fine)').matches
   mini.classList.toggle('gta',fine())
@@ -548,7 +548,7 @@ export function mapView(host:Host, atlas:Atlas, ui:{slot:HTMLElement; buttons:HT
     if(canvas.width!==Math.round(w*dpr)||canvas.height!==Math.round(h*dpr)){canvas.width = Math.round(w*dpr); canvas.height = Math.round(h*dpr)}
     const g = canvas.getContext('2d')!; paint(g,w,h,dpr,view.x,view.z,view.scale,false)
     const explored = fogAreaKm2()
-    // IDOK-590：8 m 一格之后，走一段街才 0.01 km²，用公顷报出来更直观。
+    // IDOK-605：8 m 一格之后，走一段街才 0.01 km²，用公顷报出来更直观。
     fogText.textContent = `已探明 ${explored >= 1 ? `${explored.toFixed(1)} km²` : `${(explored * 100).toFixed(1)} 公顷`} `
     if(pin) {
       const x = w/2+(pin.x-view.x)*view.scale, y = h/2+(pin.z-view.z)*view.scale
