@@ -172,3 +172,135 @@ for (const body of ['figure', 'figure_m', 'figure_f'])
     for (const l of triangles.l)
       for (const r of triangles.r) assert(apart(l, r, 10), 'thumb surfaces within 3 mm')
   })
+
+test('full-body choreography, clean reset, and zero NaN across all 6 emotes', async () => {
+  const {readFile} = await import('node:fs/promises')
+  const {Quaternion, Vector3} = await import('three')
+  const {GLTFLoader} = await import('three/addons/loaders/GLTFLoader.js')
+  const {allEmotes} = await import('../web/src/emote/emotes.ts')
+  const {emotePlayback} = await import('../web/src/emote/playback.ts')
+
+  const bytes = await readFile('public/avatar/figure.glb')
+  const data = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength)
+  const {scene} = await new GLTFLoader().parseAsync(data, '')
+  const mesh = scene.getObjectByProperty('isSkinnedMesh', true)
+  const restQuats = new Map(mesh.skeleton.bones.map((b) => [b.name, b.quaternion.clone()]))
+  const restPos = new Map(mesh.skeleton.bones.map((b) => [b.name, b.position.clone()]))
+  const pose = emotePlayback(scene)
+
+  const wheelTracked = ['spine_01', 'spine_02', 'spine_03', 'neck_01', 'head', 'clavicle_l', 'clavicle_r', 'hand_l', 'hand_r']
+  for (const entry of allEmotes) {
+    pose.play(entry.id, 0)
+    const snapshots = new Map(wheelTracked.map((n) => [n, []]))
+    const steps = 16
+    const dt = entry.duration / steps
+    for (let s = 1; s <= steps; s++) {
+      pose.reset()
+      pose.tick(dt, false)
+      scene.updateMatrixWorld(true)
+      for (const b of mesh.skeleton.bones) {
+        const q = b.quaternion
+        assert(
+          Number.isFinite(q.x) && Number.isFinite(q.y) && Number.isFinite(q.z) && Number.isFinite(q.w),
+          `${entry.key} ${b.name} produced non-finite quaternion`,
+        )
+        assert(Math.abs(q.length() - 1) < 1e-3, `${entry.key} ${b.name} quaternion not unit length`)
+      }
+      if (entry.id <= 3) {
+        for (const n of wheelTracked) snapshots.get(n).push(scene.getObjectByName(n).quaternion.clone())
+      }
+    }
+    if (entry.id <= 3) {
+      for (const n of wheelTracked) {
+        const list = snapshots.get(n)
+        let maxAngle = 0
+        for (let i = 1; i < list.length; i++) maxAngle = Math.max(maxAngle, list[0].angleTo(list[i]))
+        assert(maxAngle > 0.015, `${entry.key}: ${n} should animate dynamically (maxAngle=${maxAngle.toFixed(4)})`)
+      }
+    }
+    pose.stop()
+    pose.reset()
+    for (const b of mesh.skeleton.bones) {
+      const q0 = restQuats.get(b.name)
+      const qDiff = Math.max(
+        Math.abs(b.quaternion.x - q0.x),
+        Math.abs(b.quaternion.y - q0.y),
+        Math.abs(b.quaternion.z - q0.z),
+        Math.abs(b.quaternion.w - q0.w),
+      )
+      assert(qDiff < 1e-5, `${entry.key}: ${b.name} quaternion did not reset (maxDiff=${qDiff})`)
+      assert(b.position.distanceTo(restPos.get(b.name)) < 1e-5, `${entry.key}: ${b.name} position did not reset`)
+    }
+  }
+})
+
+test('naiwa_laugh moving mode keeps legs untouched and splits torso yaw safely across spine_01..03', async () => {
+  const {readFile} = await import('node:fs/promises')
+  const {Matrix4, Quaternion, Vector3} = await import('three')
+  const {GLTFLoader} = await import('three/addons/loaders/GLTFLoader.js')
+  const {emotePlayback} = await import('../web/src/emote/playback.ts')
+
+  const bytes = await readFile('public/avatar/figure.glb')
+  const data = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength)
+  const {scene} = await new GLTFLoader().parseAsync(data, '')
+  const mesh = scene.getObjectByProperty('isSkinnedMesh', true)
+  const restLegs = ['pelvis', 'thigh_l', 'calf_l', 'foot_l', 'thigh_r', 'calf_r', 'foot_r'].map((n) => [
+    n,
+    scene.getObjectByName(n).quaternion.clone(),
+    scene.getObjectByName(n).position.clone(),
+  ])
+  const pose = emotePlayback(scene)
+  pose.play(3, 0)
+  for (let i = 0; i < 180; i++) {
+    pose.reset()
+    pose.tick(1 / 60, true)
+  }
+  scene.updateMatrixWorld(true)
+  for (const [n, q0, p0] of restLegs) {
+    const b = scene.getObjectByName(n)
+    const qDiff = Math.max(
+      Math.abs(b.quaternion.x - q0.x),
+      Math.abs(b.quaternion.y - q0.y),
+      Math.abs(b.quaternion.z - q0.z),
+      Math.abs(b.quaternion.w - q0.w),
+    )
+    assert(qDiff < 1e-5, `moving laugh must not touch ${n} quaternion`)
+    assert(b.position.distanceTo(p0) < 1e-5, `moving laugh must not touch ${n} position`)
+  }
+  const yawOf = (name) => {
+    const idx = mesh.skeleton.bones.findIndex((b) => b.name === name)
+    const restWorld = new Quaternion().setFromRotationMatrix(
+      new Matrix4().extractRotation(mesh.skeleton.boneInverses[idx].clone().invert()),
+    )
+    const fwd = new Vector3(0, 0, 1).applyQuaternion(
+      mesh.skeleton.bones[idx].getWorldQuaternion(new Quaternion()).multiply(restWorld.invert()),
+    )
+    return (Math.atan2(fwd.x, fwd.z) * 180) / Math.PI
+  }
+  const y0 = yawOf('pelvis'),
+    y1 = yawOf('spine_01'),
+    y2 = yawOf('spine_02'),
+    y3 = yawOf('spine_03')
+  assert(Math.abs(y3 - y0) > 20 && Math.abs(y3 - y0) <= 45, `moving laugh torso yaw should be moderate (${(y3 - y0).toFixed(1)}°)`)
+  assert(Math.abs(y1 - y0) <= 22, `spine_01 twist must be capped to prevent waist pinch (${(y1 - y0).toFixed(1)}°)`)
+  assert(Math.abs(y2 - y1) <= 22, `spine_02 twist must be capped (${(y2 - y1).toFixed(1)}°)`)
+  assert(Math.abs(y3 - y2) <= 22, `spine_03 twist must be capped (${(y3 - y2).toFixed(1)}°)`)
+})
+
+test('face cues cover anticipation, climax, and return to base for all 3 wheel emotes', async () => {
+  const {faceAt} = await import('../web/src/emote/face.ts')
+  const {thumbsUp} = await import('../web/src/emote/thumbs-up.ts')
+  const {seal} = await import('../web/src/emote/seal.ts')
+  const {laugh} = await import('../web/src/emote/laugh.ts')
+
+  assert.equal(faceAt(thumbsUp.face, 0.1), 'smile')
+  assert.equal(faceAt(thumbsUp.face, 1.5), 'thumbs_up')
+  assert.equal(faceAt(thumbsUp.face, 3.95), 'base')
+
+  assert.equal(faceAt(seal.face, 0.5), 'serious')
+  assert.equal(faceAt(seal.face, 2.9), 'base')
+
+  assert.equal(faceAt(laugh.face, 1.0), 'laugh')
+  assert.equal(faceAt(laugh.face, 2.8), 'serious')
+  assert.equal(faceAt(laugh.face, 4.1), 'base')
+})
