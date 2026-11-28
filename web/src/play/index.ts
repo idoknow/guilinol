@@ -69,12 +69,12 @@ export function play(host:Host) {
   // --- HUD dock (top right): minimap, then one 工具 menu for 景册 / 拍照 / 反馈 / 视角 / 设置 / 相机 / 无人机
   // (IDOK-468: eight always-on pills became one entry). The mode button (起飞, tour only) stays on the bar.
   const dock = document.createElement('nav'); dock.className = 'dock'; dock.setAttribute('aria-label','地图与工具')
-  const book = button('景册','打开景册（J）','dock-book'), shutter = button('拍照','拍照模式（P）','dock-photo')
+  const book = button('景册','打开景册（J）','dock-book','J'), shutter = button('拍照','拍照模式（P）','dock-photo','P')
   const count = document.createElement('small'); book.append(count)
   const slot = document.createElement('div'); slot.className = 'dock-mini'
   const bar = document.createElement('div'); bar.className = 'dock-bar'
   const more = document.createElement('button'); more.type = 'button'; more.className = 'dock-more'; more.textContent = '工具'
-  more.title = '工具：景册、拍照、相机、无人机、设置'
+  more.title = '工具'
   const buttons = document.createElement('div'); buttons.className = 'dock-buttons'; buttons.id = 'dock-menu'; buttons.hidden = true
   buttons.setAttribute('role','group'); buttons.setAttribute('aria-label','工具')
   more.setAttribute('aria-controls',buttons.id); more.setAttribute('aria-expanded','false')
@@ -91,9 +91,10 @@ export function play(host:Host) {
   bar.append(more,buttons); buttons.append(book,shutter); dock.append(slot,bar); document.body.append(dock)
   mountHotbar()
   const modeButton = document.querySelector<HTMLButtonElement>('.btn-mode')
-  if(modeButton) bar.prepend(modeButton)
-  function button(text:string,label:string,cls:string){const b = document.createElement('button'); b.className = cls; b.textContent = text
-    b.setAttribute('aria-label',label); b.title = label; return b}
+  // 起飞 / 落地是 main.ts 的 V 键；册页条目的键帽由 play.css ::after 读 aria-keyshortcuts 画（IDOK-542），不加子节点
+  if(modeButton){bar.prepend(modeButton); modeButton.setAttribute('aria-keyshortcuts','V')}
+  function button(text:string,label:string,cls:string,key?:string){const b = document.createElement('button'); b.className = cls; b.textContent = text
+    b.setAttribute('aria-label',label); b.title = label; if(key) b.setAttribute('aria-keyshortcuts',key); return b}
   const refreshCount = ()=>{count.textContent = `${stamps.size}/${spots.length}`}
   refreshCount()
 
@@ -250,7 +251,7 @@ export function play(host:Host) {
         return `<li class="${stamped?'done':''}"><div class="card-seal${stamped?' done':''}">${s.seal}</div>
         <div><h3>${s.name}</h3><p>${s.sub}${badge}</p></div>${claimBtn}${commerce?'':`<button data-id="${s.id}">前往</button>`}</li>`
       }).join('')}</ol>
-      <div class="book-docks" ${commerce?'hidden':''}><span>水边开船直达</span><div>${waterDocks.map(d=>`<button data-dock="${d.id}">${d.name} · ${d.badge}</button>`).join('')}</div></div>`
+      <div class="book-docks" role="group" aria-label="水边开船直达" ${commerce?'hidden':''}><div>${waterDocks.map(d=>`<button data-dock="${d.id}">${d.name} · ${d.badge}</button>`).join('')}</div></div>`
     sheet.hidden = false; requestAnimationFrame(()=>sheet.classList.add('show'))
     sheet.querySelector<HTMLButtonElement>('.card-close')!.onclick = closeBook
     for(const b of Array.from(sheet.querySelectorAll<HTMLButtonElement>('[data-claim]'))) b.onclick = ()=>{

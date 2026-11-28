@@ -14,16 +14,18 @@
   --mf-accent-hi: var(--ui-seal-hi, #bd5e48);
   --mf-accent-text: #f8b49c;
   --mf-radius: var(--ui-r-md, 12px);
-  --mf-h: 32px;
+  --mf-r-ctl: var(--ui-r-ctl, 4px);
+  --mf-h: var(--ui-h, 38px);
+  --mf-plaque: var(--ui-plaque, rgba(20, 32, 29, 0.86));
+  --mf-plaque-frame: var(--ui-plaque-frame, rgba(244, 239, 226, 0.3));
+  --mf-plaque-inset: var(--ui-plaque-inset, 3px);
+  --mf-plaque-r: var(--ui-plaque-r, 4px);
+  --mf-plaque-hover: var(--ui-surface-2, #1d2a27);
+  --mf-paper: var(--ui-paper, #f4efe2);
+  --mf-paper-ink: var(--ui-ink, #2a302c);
   --mf-blur: var(--ui-blur, none);
   --mf-ease: var(--ui-ease, cubic-bezier(0.2, 0.8, 0.2, 1));
   --mf-fast: var(--ui-fast, 0.15s);
-}
-
-@media (pointer: coarse) {
-  :root {
-    --mf-h: 40px;
-  }
 }
 
 /* ---------- 根与基础 ---------- */
@@ -60,8 +62,9 @@ body[data-mifen-drawer="1"] :is(.hint, .vehicle-action, .walk-ui, .cb-controls, 
   display: none !important;
 }
 
-/* 店内用不上的宿主入口（渲染范围、键位卡）让位给粉票栏，与十字街店内一致。 */
-body[data-mifen-indoor="1"] :is(.render-entry, .render-pop, .keys-card) {
+/* 店内用不上的宿主入口（渲染范围、键位卡、顶中接单与劝导入口）让位给经营条与粉票栏，与十字街店内一致。 */
+body[data-mifen-indoor="1"] :is(.render-entry, .render-pop, .keys-card, .gl-mission-entry, .gl-mission-hud, .td-entry),
+body:has(.mifen-bar:not([hidden])) :is(.gl-mission-entry, .gl-mission-hud, .td-entry) {
   display: none !important;
 }
 
@@ -118,7 +121,22 @@ body[data-mifen-indoor="1"] :is(.render-entry, .render-pop, .keys-card) {
   box-shadow: inset 0 0 0 1px var(--mf-line);
 }
 
-/* ---------- 按钮 ---------- */
+/* 常驻在画面上的三块（经营条、城市直达、近站牌）是匾：墨青纸面 + 内衬印框，那道框就是这一面唯一的线 */
+:is(.mifen-pill, .mifen-bar, .mifen-prompt) {
+  background: var(--mf-plaque);
+  box-shadow: none;
+}
+
+:is(.mifen-pill, .mifen-bar, .mifen-prompt)::after {
+  content: "";
+  position: absolute;
+  inset: var(--mf-plaque-inset);
+  border: 1px solid var(--mf-plaque-frame);
+  border-radius: var(--ui-r-xs, 2px);
+  pointer-events: none;
+}
+
+/* ---------- 按钮：方角版刻块；唯一主动作是残边朱印，展开着的是宣纸签 ---------- */
 
 .mifen-btn {
   display: inline-flex;
@@ -127,11 +145,13 @@ body[data-mifen-indoor="1"] :is(.render-entry, .render-pop, .keys-card) {
   gap: 6px;
   height: var(--mf-h);
   padding: 0 14px;
-  border-radius: 999px;
+  border-radius: var(--mf-r-ctl);
   background: var(--mf-fill);
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
-  transition: background-color var(--mf-fast);
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+  transition: background-color var(--mf-fast), color var(--mf-fast), transform var(--mf-fast);
 }
 
 .mifen-btn:hover {
@@ -139,7 +159,18 @@ body[data-mifen-indoor="1"] :is(.render-entry, .render-pop, .keys-card) {
 }
 
 .mifen-btn:active {
-  transform: scale(0.97);
+  transform: scale(var(--ui-press, 0.97));
+  transition-duration: var(--ui-press-t, 90ms);
+}
+
+.mifen-btn[aria-expanded="true"],
+.mifen-btn[aria-expanded="true"]:hover {
+  background: var(--mf-paper);
+  color: var(--mf-paper-ink);
+}
+
+.mifen-btn[aria-expanded="true"][data-ready]::after {
+  background: var(--mf-accent);
 }
 
 .mifen-btn:is(.mifen-btn--primary, .mifen-btn--gold) {
@@ -149,6 +180,25 @@ body[data-mifen-indoor="1"] :is(.render-entry, .render-pop, .keys-card) {
 
 .mifen-btn:is(.mifen-btn--primary, .mifen-btn--gold):hover {
   background: var(--mf-accent-hi);
+}
+
+.mifen-btn.mifen-btn--primary:not(:disabled) {
+  padding-inline: 18px;
+  border-radius: 0;
+  font-weight: 600;
+  letter-spacing: var(--ui-track, 0.1em);
+  -webkit-mask: var(--ui-mask-bar) center/100% 100% no-repeat;
+  mask: var(--ui-mask-bar) center/100% 100% no-repeat;
+}
+
+.mifen-btn.mifen-btn--primary:not(:disabled):active {
+  background: var(--mf-accent);
+  transform: scale(var(--ui-press-seal, 0.94));
+}
+
+.mifen-hud-root .mifen-btn.mifen-btn--primary:focus-visible {
+  outline: 1.5px solid var(--mf-text);
+  outline-offset: -5px;
 }
 
 .mifen-btn:disabled {
@@ -167,7 +217,7 @@ body[data-mifen-indoor="1"] :is(.render-entry, .render-pop, .keys-card) {
   background: var(--mf-accent-text);
 }
 
-/* ---------- 城市里的直达胶囊 ---------- */
+/* ---------- 城市里的直达匾：米粉碗小像 + 店名 ---------- */
 
 .mifen-pill {
   position: fixed;
@@ -175,18 +225,30 @@ body[data-mifen-indoor="1"] :is(.render-entry, .render-pop, .keys-card) {
   top: calc(58px + env(safe-area-inset-top));
   display: inline-flex;
   align-items: center;
-  gap: 10px;
-  height: 34px;
-  padding: 0 7px 0 14px;
-  border-radius: 999px;
+  gap: 8px;
+  height: var(--mf-h);
+  padding: 0 8px 0 10px;
+  border-radius: var(--mf-plaque-r);
   white-space: nowrap;
+  -webkit-tap-highlight-color: transparent;
+  transition: background-color var(--mf-fast);
+}
+
+.mifen-pill::before {
+  content: "";
+  flex: none;
+  width: var(--ui-ico, 18px);
+  height: var(--ui-ico, 18px);
+  background: currentColor;
+  -webkit-mask: url("../ui/ico-mifen.svg") center/contain no-repeat;
+  mask: url("../ui/ico-mifen.svg") center/contain no-repeat;
 }
 
 .mifen-pill:hover {
-  box-shadow: inset 0 0 0 1px var(--mf-text-3);
+  background: var(--mf-plaque-hover);
 }
 
-/* ---------- 经营条 ---------- */
+/* ---------- 经营条：墨青匾，只放数字和两字动词 ---------- */
 
 .mifen-bar {
   position: fixed;
@@ -199,8 +261,8 @@ body[data-mifen-indoor="1"] :is(.render-entry, .render-pop, .keys-card) {
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 5px 5px 5px 16px;
-  border-radius: 999px;
+  padding: 6px 6px 6px 16px;
+  border-radius: var(--mf-plaque-r);
 }
 
 .mifen-stat {
@@ -315,7 +377,7 @@ body[data-mifen-indoor="1"] :is(.render-entry, .render-pop, .keys-card) {
   color: var(--mf-text-2);
 }
 
-/* ---------- 近站按键 ---------- */
+/* ---------- 近站按键：墨青交互牌 + 宣纸键帽（屏上已有「做粉」一枚朱印，这里用匾） ---------- */
 
 .mifen-prompt {
   position: fixed;
@@ -327,9 +389,33 @@ body[data-mifen-indoor="1"] :is(.render-entry, .render-pop, .keys-card) {
   display: inline-flex;
   align-items: center;
   gap: 10px;
-  height: 36px;
-  padding: 0 16px 0 8px;
-  border-radius: 999px;
+  height: var(--mf-h);
+  padding: 0 16px 0 10px;
+  border-radius: var(--mf-plaque-r);
+  letter-spacing: var(--ui-track-body, 0.04em);
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+  transition: background-color var(--mf-fast), transform var(--mf-fast);
+}
+
+.mifen-prompt:hover {
+  background: var(--mf-plaque-hover);
+}
+
+.mifen-prompt:active {
+  transform: scale(var(--ui-press, 0.97));
+  transition-duration: var(--ui-press-t, 90ms);
+}
+
+.mifen-hud-root .mifen-prompt kbd {
+  min-width: var(--ui-key, 18px);
+  height: var(--ui-key, 18px);
+  padding: 0 4px;
+  border-radius: var(--ui-r-xs, 2px);
+  background: var(--mf-paper);
+  color: var(--mf-paper-ink);
+  box-shadow: inset 0 -1.5px 0 var(--ui-paper-line-strong, rgba(42, 48, 44, 0.3));
+  font: 600 var(--ui-fs-key, 10px)/1 var(--ui-num, var(--mf-font));
 }
 
 @media (hover: hover) and (pointer: fine) {
@@ -359,7 +445,7 @@ body[data-mifen-indoor="1"] :is(.render-entry, .render-pop, .keys-card) {
   gap: 12px;
   max-width: min(520px, calc(100vw - 32px));
   padding: 8px 16px;
-  border-radius: 999px;
+  border-radius: var(--mf-r-ctl);
   pointer-events: none;
   animation: mf-toast 2.6s var(--mf-ease) forwards;
 }
@@ -618,7 +704,7 @@ body[data-mifen-indoor="1"] :is(.render-entry, .render-pop, .keys-card) {
 .mifen-condiment-chip {
   height: var(--mf-h);
   padding: 0 14px;
-  border-radius: 999px;
+  border-radius: var(--mf-r-ctl);
   background: var(--mf-fill);
 }
 
@@ -706,9 +792,27 @@ body[data-mifen-indoor="1"] :is(.render-entry, .render-pop, .keys-card) {
   overflow-wrap: anywhere;
 }
 
+/* 抽屉里的推荐项 / 收尾键是宣纸签，不再盖第二枚朱印（经营条上已有「做粉」） */
 :is(.mifen-upgrade-drawer, .mifen-drawer) .mifen-btn:is(.mifen-btn--primary, .mifen-btn--gold) {
   background: var(--mf-text);
   color: var(--mf-ink);
+}
+
+:is(.mifen-upgrade-drawer, .mifen-drawer) .mifen-btn.mifen-btn--primary:not(:disabled) {
+  padding-inline: 14px;
+  border-radius: var(--mf-r-ctl);
+  -webkit-mask: none;
+  mask: none;
+}
+
+:is(.mifen-upgrade-drawer, .mifen-drawer) .mifen-btn.mifen-btn--primary:not(:disabled):active {
+  background: var(--mf-text);
+  transform: scale(var(--ui-press, 0.97));
+}
+
+.mifen-hud-root :is(.mifen-upgrade-drawer, .mifen-drawer) .mifen-btn.mifen-btn--primary:focus-visible {
+  outline: 2px solid var(--mf-text);
+  outline-offset: 2px;
 }
 
 .mifen-panel-head h3 small {
@@ -793,8 +897,8 @@ body[data-mifen-indoor="1"] :is(.render-entry, .render-pop, .keys-card) {
     width: min(max-content, calc(100vw - 20px));
     max-width: calc(100vw - 20px);
     gap: 3px;
-    padding: 4px 6px;
-    border-radius: var(--mf-radius);
+    padding: 6px;
+    border-radius: var(--mf-plaque-r);
   }
 
   .mifen-bar .mifen-stat {
@@ -804,10 +908,14 @@ body[data-mifen-indoor="1"] :is(.render-entry, .render-pop, .keys-card) {
 
   .mifen-bar .mifen-btn {
     flex: 0 0 auto;
-    min-height: 34px;
-    height: 34px;
+    min-height: var(--mf-h);
+    height: var(--mf-h);
     padding: 0 7px;
     font-size: 12px;
+  }
+
+  .mifen-bar .mifen-btn.mifen-btn--primary:not(:disabled) {
+    padding-inline: 12px;
   }
 
   .mifen-tickets {
@@ -868,12 +976,12 @@ body[data-mifen-indoor="1"] :is(.render-entry, .render-pop, .keys-card) {
     width: max-content;
     max-width: calc(100vw - 24px);
     gap: 3px;
-    padding: 3px 6px 3px 8px;
+    padding: 6px 6px 6px 10px;
   }
 
   .mifen-bar .mifen-btn {
     flex: 0 0 auto;
-    min-height: 28px;
+    min-height: var(--mf-h);
     padding: 0 7px;
     font-size: 12px;
   }
@@ -897,14 +1005,18 @@ body[data-mifen-indoor="1"] :is(.render-entry, .render-pop, .keys-card) {
 @media (max-height: 480px) {
   .mifen-bar {
     top: calc(6px + env(safe-area-inset-top));
-    padding: 3px 6px 3px 10px;
+    padding: 6px 6px 6px 12px;
     gap: 4px;
   }
 
   .mifen-bar .mifen-btn {
-    min-height: 30px;
+    min-height: var(--mf-h);
     padding: 0 9px;
     font-size: 13px;
+  }
+
+  .mifen-bar .mifen-btn.mifen-btn--primary:not(:disabled) {
+    padding-inline: 12px;
   }
 
   .mifen-bar .mifen-stat {

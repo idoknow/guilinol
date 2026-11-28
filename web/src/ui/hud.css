@@ -30,7 +30,7 @@ body:not([data-hud=street]) .hud-me>:is(.btn-menu,.account-entry,.btn-guide,.btn
   background:linear-gradient(var(--hud-wash),var(--hud-wash)) center/100% calc(100% - 8px) no-repeat}
 body:not([data-hud=street]) .hud-me>:is(.btn-menu,.account-entry,.btn-guide,.btn-unstuck):hover{--hud-wash:var(--ui-fill-2)}
 body:not([data-hud=street]) .hud-me>:is(.btn-menu,.account-entry,.btn-guide,.btn-unstuck):active{--hud-wash:color-mix(in srgb,var(--ui-seal) 72%,transparent);transform:scale(var(--ui-press))}
-body:not([data-hud=street]) .hud-me>:is(.btn-menu,.account-entry,.btn-guide,.btn-unstuck):focus-visible{outline:2px solid var(--ui-focus);outline-offset:-4px}
+body:not([data-hud=street]) .hud-me>:is(.btn-menu,.account-entry,.btn-guide,.btn-unstuck):focus-visible{outline:var(--ui-focus-w) solid var(--ui-focus);outline-offset:var(--ui-focus-in)}
 body:not([data-hud=street]) .btn-menu::before{width:18px;height:18px;background:currentColor;-webkit-mask:url("./hud-menu.svg") center/contain no-repeat;mask:url("./hud-menu.svg") center/contain no-repeat}
 /* 账号：游客是一枚斗笠翁小像；登录后头像字刻成一方残边朱文名章 */
 body:not([data-hud=street]) .account-entry::before{background:var(--ui-seal);box-shadow:none;border-radius:0;transform:rotate(-3deg);width:24px;height:24px;font-size:13px;
@@ -51,28 +51,44 @@ body:not([data-hud=street]) .hud-me>.btn-unstuck.armed{--hud-wash:var(--ui-seal)
 /* 右上 dock 里的模式切换 */
 .btn-mode{position:fixed;right:calc(14px + env(safe-area-inset-right));top:calc(12px + env(safe-area-inset-top));padding:8px 16px;border-radius:var(--ui-r-paper);font-size:14px;letter-spacing:var(--ui-track)}
 
-/* 时辰 / 天气 */
+/* 时辰 / 天气（IDOK-542）：一块墨青匾 + 内衬印框（同 .hud-me）。晨午昏夜 · 晴雾雨 · 流转 / 暂停都是刻线小像
+   （ico-sky-*.svg / ico-flow-*.svg，按 sky.ts 写的 data-sky 选），选中是宣纸签（纸底墨像），不再用朱砂；
+   分组竖线去掉，只留 1px 透明边，键和整块的盒子尺寸不变。字仍在键里（font-size:0）给读屏和脚本。
+   街头皮肤整块隐藏（street-hud.css），这里不另加 :not([data-hud=street])。 */
 .sky-ui[hidden]{display:none!important}
-.sky-ui{position:fixed;left:calc(12px + env(safe-area-inset-left));top:calc(60px + env(safe-area-inset-top));display:flex;align-items:center;gap:6px;padding:4px 6px 4px 12px;border-radius:var(--ui-r-paper);
-  background:var(--ui-glass);border:1px solid var(--ui-glass-line-soft);color:var(--ui-paper);font-size:13px;letter-spacing:.06em;user-select:none;-webkit-user-select:none}
-.sky-time{min-width:7.6em;opacity:.92}.sky-group{display:flex;gap:2px;padding-left:6px;border-left:1px solid var(--ui-glass-line-soft)}
-.sky-ui button{font-family:inherit;font-size:13px;color:var(--ui-paper);background:none;border:0;border-radius:3px;width:26px;height:24px;padding:0;cursor:pointer;opacity:.72;transition:background var(--ui-fast),opacity var(--ui-fast);-webkit-tap-highlight-color:transparent}
-.sky-ui button:hover{opacity:1}.sky-ui button.on{background:rgba(169,80,60,.75);opacity:1}.sky-ui .sky-flow{font-size:10px;width:24px;border-left:1px solid var(--ui-glass-line-soft);border-radius:0 3px 3px 0}
+.sky-ui{position:fixed;left:calc(12px + env(safe-area-inset-left));top:calc(60px + env(safe-area-inset-top));display:flex;align-items:center;gap:6px;padding:6px 8px 6px 12px;border-radius:var(--ui-plaque-r);
+  background:var(--ui-plaque);border:1px solid transparent;color:var(--ui-text);font-size:13px;letter-spacing:.06em;user-select:none;-webkit-user-select:none}
+.sky-ui::after{content:"";position:absolute;inset:calc(var(--ui-plaque-inset) - 1px);border:1px solid var(--ui-plaque-frame);border-radius:var(--ui-r-xs);pointer-events:none}
+.sky-time{min-width:7.6em;opacity:.92}.sky-group{display:flex;gap:2px;padding-left:6px;border-left:1px solid var(--ui-line)}
+.sky-ui button{position:relative;font-family:inherit;font-size:13px;color:var(--ui-text-2);background:none;border:0;border-radius:var(--ui-r-xs);width:26px;height:24px;padding:0;cursor:pointer;
+  transition:background var(--ui-fast),color var(--ui-fast),transform var(--ui-fast);-webkit-tap-highlight-color:transparent}
+.sky-ui button[data-sky]{font-size:0;letter-spacing:0}
+.sky-ui button[data-sky]::before{content:"";position:absolute;inset:0;margin:auto;width:var(--ui-ico-sm);height:var(--ui-ico-sm);background:currentColor;pointer-events:none;
+  -webkit-mask:var(--ico) center/contain no-repeat;mask:var(--ico) center/contain no-repeat}
+.sky-ui [data-sky=dawn]{--ico:url("./ico-sky-dawn.svg")}.sky-ui [data-sky=noon]{--ico:url("./ico-sky-noon.svg")}
+.sky-ui [data-sky=dusk]{--ico:url("./ico-sky-dusk.svg")}.sky-ui [data-sky=night]{--ico:url("./ico-sky-night.svg")}
+.sky-ui [data-sky=clear]{--ico:url("./ico-sky-clear.svg")}.sky-ui [data-sky=mist]{--ico:url("./ico-sky-mist.svg")}.sky-ui [data-sky=rain]{--ico:url("./ico-sky-rain.svg")}
+.sky-ui [data-sky=play]{--ico:url("./ico-flow-play.svg")}.sky-ui [data-sky=pause]{--ico:url("./ico-flow-pause.svg")}
+.sky-ui button:hover{color:var(--ui-text);background:var(--ui-wash-hover)}
+.sky-ui button:active{color:var(--ui-paper);background:var(--ui-wash-press);transform:scale(var(--ui-press));transition-duration:var(--ui-press-t);transition-timing-function:var(--ui-ease-press)}
+.sky-ui button:focus-visible{outline:var(--ui-focus-w) solid var(--ui-focus);outline-offset:-1px}
+.sky-ui button.on{color:var(--ui-ink);background:var(--ui-paper)}.sky-ui button.on:hover{background:var(--ui-paper-hi)}
+.sky-ui .sky-flow{width:24px;border-left:1px solid var(--ui-line);padding-left:2px}
 /* IDOK-158: fold the panel down to the clock, so a phone in landscape keeps the top edge clear.
    The control has to read as a control: a bare ‹ at 55% opacity looked like decoration and was
-   missed, so it carries its own glass chip and a drawn chevron instead of a text glyph. */
-.sky-ui .sky-fold{width:26px;margin-left:-2px;opacity:1;display:grid;place-items:center;background:rgba(244,239,226,.14);box-shadow:inset 0 0 0 1px rgba(244,239,226,.2)}
+   missed, so it carries its own opaque chip (walk-quick: chip not transparent, ≥24×24) and a drawn chevron (2px on touch). */
+.sky-ui .sky-fold{width:26px;margin-left:0;display:grid;place-items:center;color:var(--ui-text);background:var(--ui-surface-2);box-shadow:none}
 .sky-ui .sky-fold::before{content:"";width:6px;height:6px;border-right:1.8px solid currentColor;border-bottom:1.8px solid currentColor;transform:translate(-1px,0) rotate(135deg)}
-.sky-ui .sky-fold:hover{opacity:1;background:rgba(244,239,226,.26)}
-.sky-ui .sky-fold:active{background:rgba(244,239,226,.34)}
+.sky-ui .sky-fold:hover{background:var(--ui-jade-700)}
+.sky-ui .sky-fold:active{color:var(--ui-text);background:var(--ui-jade-700)}
 .sky-ui.folded .sky-fold::before{transform:translate(-1px,0) rotate(-45deg)}
-.sky-ui.folded{gap:0;padding:4px 4px 4px 12px}
+.sky-ui.folded{gap:0;padding:6px 6px 6px 12px}
 .sky-ui.folded .sky-group,.sky-ui.folded .sky-flow{display:none}
 .sky-ui.folded .sky-time{min-width:0;margin-right:6px}
 
-/* 底部提示、气泡、署名 */
-output,footer,.hint{position:fixed;left:10px;background:var(--ui-glass);color:var(--ui-paper);font:11px/1.4 var(--ui-serif);padding:3px 10px;border-radius:var(--ui-r-pill);pointer-events:none}
-output{top:auto;bottom:10px;font-family:ui-monospace,monospace;display:none}body[data-debug] output{display:block}
+/* 底部提示、气泡、署名（限定 body>output，防止误伤设置面板里的 <output>） */
+body>output,footer,.hint{position:fixed;left:10px;background:var(--ui-glass);color:var(--ui-paper);font:11px/1.4 var(--ui-serif);padding:3px 10px;border-radius:var(--ui-r-pill);pointer-events:none}
+body>output{top:auto;bottom:10px;font-family:ui-monospace,monospace;display:none}body[data-debug]>output{display:block}
 footer{left:auto;right:10px;bottom:10px;font-size:10px;opacity:.75}
 /* IDOK-239/374 测试画面声明 + 访问地址：接在右下署名之后（.beta-note 在 footer 内）。IDOK-468：只在 ?debug / ?verify 下出现 */
 body:not([data-debug]) .beta-note{display:none}
@@ -84,17 +100,24 @@ body:not([data-debug]) .beta-note{display:none}
    在主线程繁忙时，Chromium 的 opacity 过渡可能迟迟不开始，提示会在若干帧里保持完全透明。 */
 .toast.show{opacity:1;transform:translate(-50%,0);transition:transform .35s}
 
-/* 载具上下车 */
+/* 载具上下车 / [F] 交互 */
 .vehicle-action{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(78px + env(safe-area-inset-bottom));padding:10px 24px;border-radius:var(--ui-r-paper);z-index:2;font-size:15px;letter-spacing:.12em;
-  /* 唯一主动作：平面朱砂 + 内衬一道纸色细线（印框），不发光 */
+  /* 唯一主动作：平面朱砂 + 内衬一道纸色细线（印框），不发光（街头皮肤就停在这一版） */
   background:var(--ui-seal);border-color:var(--ui-seal);box-shadow:inset 0 0 0 3px var(--ui-seal),inset 0 0 0 4px rgba(244,239,226,.5)}
-.vehicle-action:active{transform:translateX(-50%) scale(.94)}
+.vehicle-action:active{transform:translateX(-50%) scale(var(--ui-press-seal))}
+/* IDOK-542：默认 HUD 下是一条残边朱印（--ui-mask-bar，同交通劝导主键），桌面左边配一枚宣纸键帽（walk.css ::before 读 aria-keyshortcuts）。
+   上车 / 上船 / 进店 / 共享电驴都是这一枚印，不再各配描边或霓虹底；遮罩只换外形，位置和盒子不动。焦点环收进印内。 */
+body:not([data-hud=street]) .vehicle-action{border-color:transparent;border-radius:0;box-shadow:none;
+  -webkit-mask:var(--ui-mask-bar) center/100% 100% no-repeat;mask:var(--ui-mask-bar) center/100% 100% no-repeat}
+body:not([data-hud=street]) .vehicle-action:hover{background:var(--ui-seal-hi)}
+body:not([data-hud=street]) .vehicle-action:active{background:var(--ui-seal);transition-duration:var(--ui-press-t);transition-timing-function:var(--ui-ease-press)}
+body:not([data-hud=street]) .vehicle-action:focus-visible{outline:1.5px solid var(--ui-paper);outline-offset:-5px}
 body[data-photo] .vehicle-action{display:none}
 body[data-aboard] .btn-jump{display:none}
 
 /* 手机：摇杆、跳、视距 */
 .joystick{position:fixed;left:calc(22px + env(safe-area-inset-left));bottom:calc(30px + env(safe-area-inset-bottom));width:124px;height:124px;border-radius:50%;display:grid;place-items:center;touch-action:none;
-  background:radial-gradient(circle,rgba(22,37,34,.26) 0 55%,rgba(22,37,34,.5) 56% 100%);border:1px solid var(--ui-glass-line)}
+  background:color-mix(in srgb,var(--ui-surface) 46%,transparent);border:1px solid var(--ui-glass-line)} /* 罗盘刻度见 walk.css（IDOK-542） */
 .joystick::after{content:"";position:absolute;inset:-7px;border-radius:50%;border:2px solid rgba(169,80,60,0);transition:border-color .2s}
 .joystick.running::after{border-color:rgba(208,105,76,.8)}
 .joystick-knob{width:50px;height:50px;border-radius:50%;background:rgba(244,239,226,.86);box-shadow:0 2px 10px rgba(20,30,28,.3);pointer-events:none;transition:transform .06s}
@@ -123,22 +146,22 @@ body[data-aboard] .btn-jump{display:none}
 .boot-bar{height:3px;background:rgba(42,61,60,.16);border-radius:2px;overflow:hidden}.boot-bar i{display:block;height:100%;width:8%;background:var(--ui-seal);border-radius:2px;transition:width .25s}
 
 @media (pointer:coarse) and (not (any-pointer:fine)){
-  output{left:calc(12px + env(safe-area-inset-left));top:calc(123px + env(safe-area-inset-top));bottom:auto;max-width:244px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-  .sky-ui{top:calc(58px + env(safe-area-inset-top));font-size:12px}.sky-ui button{width:30px;height:28px}
+  body>output{left:calc(12px + env(safe-area-inset-left));top:calc(123px + env(safe-area-inset-top));bottom:auto;max-width:244px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .sky-ui{top:calc(58px + env(safe-area-inset-top));font-size:12px}.sky-ui button{width:30px;height:26px}
   .sky-ui .sky-fold{width:30px}.sky-ui .sky-fold::before{width:7px;height:7px;border-width:2px}
   .hint{display:none}
   /* 手机底边是摇杆、快捷栏和拇指键：数据署名挂到顶边正中，做成一枚小题签；完整来源在「关于」 */
-  footer{left:50%;right:auto;top:0;bottom:auto;transform:translateX(-50%);max-width:max(200px,calc(100vw - 560px));min-width:0;overflow:hidden;text-overflow:ellipsis;
+  footer{left:50%;right:auto;top:0;bottom:auto;transform:translateX(-50%);max-width:max(240px,calc(100vw - 440px));min-width:0;overflow:hidden;text-overflow:ellipsis;
     font-size:8px;line-height:11px;padding:0 8px;border-radius:0 0 4px 4px;opacity:.6;white-space:nowrap;text-align:center}
   footer .beta-note{display:block}footer .beta-note::before{content:none}
   .btn-menu{padding:0 12px}.btn-menu span{display:none}
   .about-cols{grid-template-columns:1fr}}
 @media (pointer:coarse) and (not (any-pointer:fine)) and (max-height:500px){
-  output{top:calc(140px + env(safe-area-inset-top));max-width:126px;box-sizing:border-box}
+  body>output{top:calc(140px + env(safe-area-inset-top));max-width:126px;box-sizing:border-box}
   /* Landscape phones: the top band also holds the dock on the right (~423px in), so keep the sky panel
      clear of it even when it is unfolded (IDOK-158). */
-  .sky-ui{gap:4px;padding:3px 4px 3px 10px}.sky-ui button{width:26px;height:26px}.sky-ui .sky-fold{width:26px}
-  .sky-ui .sky-time{min-width:6.4em}.sky-ui.folded{padding:3px 3px 3px 10px}
+  .sky-ui{gap:4px;padding:5px 6px 5px 10px}.sky-ui button{width:26px;height:24px}.sky-ui .sky-fold{width:26px}
+  .sky-ui .sky-time{min-width:6.4em}.sky-ui.folded{padding:5px 5px 5px 10px}
 }
 @media (max-width:520px){.about-cols{grid-template-columns:1fr}.account-entry{max-width:7.5em}}
 /* Keyboard hint is meaningless on narrow screens and its nowrap line widened the mobile layout viewport (IDOK-109). */

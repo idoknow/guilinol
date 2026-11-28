@@ -4,8 +4,10 @@ import {getPlayMode, onPlayMode} from '../game/play-mode'
 // 时辰 / 天气 panel (top-left, under the stats line). Time flows by default (1 game hour per real
 // minute); ?time=6.6 pins the hour, ?weather=mist|rain picks weather, ?flow=0 pauses.
 // Solo (IDOK-154): no panel — time always flows and the weather rotates by itself, easing in slowly.
-const moods:[string,number][] = [['晨',6.6],['午',12.5],['昏',18.1],['夜',21.5]]
-const skies:[string,Weather][] = [['晴','clear'],['雾','mist'],['雨','rain']]
+// IDOK-542: each key shows a 刻线小像 picked by data-sky (hud.css → ico-sky-*.svg); the character stays
+// in the button (font-size:0) so screen readers and scripts still read 晨 / 午 / 晴 …
+const moods:[string,number,string][] = [['晨',6.6,'dawn'],['午',12.5,'noon'],['昏',18.1,'dusk'],['夜',21.5,'night']]
+const skies:[string,Weather,string][] = [['晴','clear','clear'],['雾','mist','mist'],['雨','rain','rain']]
 export function skyClock(params:URLSearchParams) {
   const pinned = params.get('time'), start = Number(pinned ?? 10)
   const clock = {hour:Number.isFinite(start)?start:10, weather:(['clear','mist','rain'].includes(params.get('weather')??'')?params.get('weather'):'clear') as Weather,
@@ -18,9 +20,9 @@ export function skyClock(params:URLSearchParams) {
   const time = document.createElement('span'); time.className = 'sky-time'
   const flow = document.createElement('button'); flow.className = 'sky-flow'
   const fold = document.createElement('button'); fold.className = 'sky-fold'
-  const row = (items:[string,unknown][], pick:(value:never)=>void, active:(value:never)=>boolean)=>{
+  const row = (items:[string,unknown,string][], pick:(value:never)=>void, active:(value:never)=>boolean)=>{
     const group = document.createElement('span'); group.className = 'sky-group'
-    const buttons = items.map(([text,value])=>{const b = document.createElement('button'); b.textContent = text
+    const buttons = items.map(([text,value,key])=>{const b = document.createElement('button'); b.textContent = text; b.dataset.sky = key; b.title = text
       b.onclick = ()=>{pick(value as never); refresh()}; group.append(b); return [b,value] as const})
     return {group,refresh(){for(const [b,value] of buttons) b.classList.toggle('on',active(value as never))}}
   }
@@ -28,8 +30,8 @@ export function skyClock(params:URLSearchParams) {
   const weathers = row(skies,(w:Weather)=>{clock.weather = w},(w:Weather)=>clock.weather===w)
   flow.onclick = ()=>{clock.flowing = !clock.flowing; refresh()}
   panel.append(time,hours.group,weathers.group,flow,fold); document.body.append(panel)
-  function refresh(){hours.refresh(); weathers.refresh(); flow.textContent = clock.flowing?'❚❚':'▶'
-    flow.setAttribute('aria-label',clock.flowing?'暂停时间':'时间流转'); time.textContent = label(clock.hour)}
+  function refresh(){hours.refresh(); weathers.refresh(); flow.textContent = clock.flowing?'❚❚':'▶'; flow.dataset.sky = clock.flowing?'pause':'play'
+    flow.setAttribute('aria-label',clock.flowing?'暂停时间':'时间流转'); flow.title = flow.getAttribute('aria-label')!; time.textContent = label(clock.hour)}
   refresh()
   // IDOK-158: on a phone the panel eats a third of the top edge, which matters most in landscape
   // where the view is the point. Fold it down to just the clock; remember the choice so rotating

@@ -2,7 +2,7 @@
 // 用现成的 .about-mask 弹层语言，好处是输入守卫会自动把移动/骑行热键挡住。
 import './settings.css'
 import {DEFAULT_PREFS, onPrefs, prefs, setPrefs, THUMB_SCALE_MAX, THUMB_SCALE_MIN, type StatsPrefs, type ThumbLayout} from './prefs'
-import {ACTIONS, bindingLabel, isCustom, keyLabel, reservedFor, resetBindings, setBinding, type Action} from '../input/keymap'
+import {ACTIONS, binding, bindingLabel, isCustom, keyLabel, reservedFor, resetBindings, setBinding, type Action} from '../input/keymap'
 import {setViewMode, viewModeLabel} from '../walk/view-mode'
 import {masterVolume,setMasterVolume,rideSoundMuted,setRideSoundMuted,RIDE_SOUND_EVENT} from '../walk/ride-sound-pref'
 
@@ -250,11 +250,26 @@ function button(text: string, label: string, className: string) {
   return element
 }
 
+/** 册页键帽（IDOK-542）：aria-keyshortcuts 跟着当前键位走（改键后也对），play.css 的 ::after 读它画宣纸键帽；
+ *  名称与提示里的「（N）」一起改。不加子节点、不动 textContent。 */
+function syncShortcut(entry: HTMLButtonElement, action: Action, name: string) {
+  const code = binding(action)[0]
+  const key = code ? keyLabel(code) : ''
+  if (key) entry.setAttribute('aria-keyshortcuts', key)
+  else entry.removeAttribute('aria-keyshortcuts')
+  const label = key ? `${name}（${key}）` : name
+  entry.setAttribute('aria-label', label)
+  entry.title = label
+}
+
 /** 右上角 dock 里的「设置」入口。 */
 export function mountSettingsEntry(host: HTMLElement) {
   if (host.querySelector('.dock-settings')) return
   const entry = button('设置', '设置（N）', 'dock-settings')
   entry.addEventListener('click', () => openSettings())
+  const keys = () => syncShortcut(entry, 'settings', '设置')
+  onPrefs(keys)
+  keys()
   host.append(entry)
 }
 
@@ -266,6 +281,7 @@ export function mountViewEntry(host: HTMLElement) {
   const sync = () => {
     entry.textContent = viewModeLabel()
     entry.dataset.view = prefs().view
+    syncShortcut(entry, 'view', '切换第一/第三人称')
   }
   entry.addEventListener('click', () => {
     setViewMode(prefs().view === 'first' ? 'third' : 'first')

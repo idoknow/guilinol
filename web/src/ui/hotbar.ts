@@ -47,16 +47,9 @@ export function showHotbar(on: boolean) {
   else delete document.body.dataset.hotbar
 }
 
-const HAND_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 12.5V6.2a1.3 1.3 0 0 1 2.6 0v5.3M10.6 11V4.8a1.3 1.3 0 0 1 2.6 0V11m0-.4V5.6a1.3 1.3 0 0 1 2.6 0v6.2m0-3.4a1.3 1.3 0 0 1 2.6 0v5.4c0 4-2.6 6.7-6.3 6.7-2.6 0-4-1.1-5.5-3.3l-2.3-3.4a1.4 1.4 0 0 1 2.2-1.7L8 14.3"/></svg>'
-const CAMERA_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8.2h3.2l1.6-2.2h6.4l1.6 2.2H20a1 1 0 0 1 1 1V18a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9.2a1 1 0 0 1 1-1z"/><circle cx="12" cy="13.4" r="3.4"/></svg>'
-
-// 香烟格：一包翻盖烟；香烟铺：小铺面（雨棚 + 柜台）。线条与空手 / 相机图标同粗细。
-const PACK_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="6.5" y="6" width="11" height="15" rx="1.2"/><path d="M6.5 10h11"/><path d="M9 6V3.6h1.6V6M11.6 6V3.2h1.6V6"/></svg>'
-// 鱼竿：斜挑的竿身 + 竿尖垂线和浮标，和其他格同一套 1.6 描边
-const ROD_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 20.5 19.5 4"/><path d="M19.5 4v10.2"/><path d="M18.3 14.2h2.4l-.5 3.3h-1.4z"/><circle cx="7.2" cy="16.8" r="1.6"/><path d="M3.5 20.5l2.3-2.3" stroke-width="3"/></svg>'
-const SHOP_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9.5 5.5 4h13L20 9.5"/><path d="M4 9.5c0 1.4 1.2 2.4 2.7 2.4s2.6-1 2.6-2.4c0 1.4 1.2 2.4 2.7 2.4s2.7-1 2.7-2.4c0 1.4 1.1 2.4 2.6 2.4S20 10.9 20 9.5"/><path d="M5.5 12v8h13v-8"/><path d="M10 20v-4.5h4V20"/></svg>'
-// IDOK-526: 无人机遥控器 —— 一块带两根摇杆的遥控面板，和空手 / 相机同一套 1.6 描边。
-const REMOTE_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="8.5" width="14" height="12" rx="2"/><circle cx="9.2" cy="14" r="2"/><circle cx="14.8" cy="14" r="2"/><path d="M8.5 8.5 6.5 3.5M15.5 8.5l2-5"/><path d="M10.4 18.2h3.2"/></svg>'
+// IDOK-542: every slot's picture is a 刻线小像 drawn in CSS (hotbar.css .hotbar-slot::before, ico-*.svg masks picked by
+// data-slot / data-shop / data-act): 空手 ico-hand、相机 ico-camera、香烟 ico-smoke、香烟铺 ico-shop、鱼竿 ico-rod、遥控器 ico-remote.
+// No inline SVG here; the <span> name stays for the selected slot and for 「丢弃」.
 export function mountHotbar() {
   if (bar) return
   bar = document.createElement('nav')
@@ -65,13 +58,13 @@ export function mountHotbar() {
   bar.setAttribute('aria-label', '物品栏')
   bar.innerHTML = `
     <button type="button" class="hotbar-slot" data-slot="hand" title="空手（1）" aria-label="空手（1）">
-      <kbd>1</kbd>${HAND_ICON}<span>空手</span>
+      <kbd>1</kbd><span>空手</span>
     </button>
     <button type="button" class="hotbar-slot" data-slot="camera" title="相机（2）" aria-label="相机（2）">
-      <kbd>2</kbd>${CAMERA_ICON}<span>相机</span>
+      <kbd>2</kbd><span>相机</span>
     </button>`
   if (smokeEnabled()) {
-    bar.insertAdjacentHTML('beforeend', `<button type="button" class="hotbar-slot" data-slot="smoke" title="香烟（3）" aria-label="香烟（3）"><kbd>3</kbd><b class="pack-count"></b>${PACK_ICON}<span>香烟</span></button><button type="button" class="hotbar-slot hotbar-shop" data-shop="smoke" title="香烟铺" aria-label="香烟铺">${SHOP_ICON}<span>香烟铺</span></button>`)
+    bar.insertAdjacentHTML('beforeend', `<button type="button" class="hotbar-slot" data-slot="smoke" title="香烟（3）" aria-label="香烟（3）"><kbd>3</kbd><b class="pack-count"></b><span>香烟</span></button><button type="button" class="hotbar-slot hotbar-shop" data-shop="smoke" title="香烟铺" aria-label="香烟铺"><span>香烟铺</span></button>`)
     const count = bar.querySelector('.pack-count')!
     const refresh = () => {
       const n = getActiveSaveSnapshot().packs.length
@@ -82,9 +75,9 @@ export function mountHotbar() {
     window.addEventListener('glol:save-written',refresh)
     bar.querySelector('[data-shop]')!.addEventListener('click',()=>window.dispatchEvent(new Event('smoke:shop')))
   }
-  bar.insertAdjacentHTML('beforeend',`<button hidden type="button" class="hotbar-slot hotbar-rod" data-slot="fishing" title="鱼竿（4）" aria-label="鱼竿（4）"><kbd>4</kbd>${ROD_ICON}<span>鱼竿</span></button>`)
+  bar.insertAdjacentHTML('beforeend',`<button hidden type="button" class="hotbar-slot hotbar-rod" data-slot="fishing" title="鱼竿（4）" aria-label="鱼竿（4）"><kbd>4</kbd><span>鱼竿</span></button>`)
   // IDOK-526: 无人机遥控器 —— 只有场上停着一台无人机时才出现，点它直接进遥控画面。
-  bar.insertAdjacentHTML('beforeend',`<button hidden type="button" class="hotbar-slot hotbar-drone" data-act="drone" title="无人机遥控器（5）" aria-label="无人机遥控器（5）"><kbd>5</kbd>${REMOTE_ICON}<span>遥控器</span></button>`)
+  bar.insertAdjacentHTML('beforeend',`<button hidden type="button" class="hotbar-slot hotbar-drone" data-act="drone" title="无人机遥控器（5）" aria-label="无人机遥控器（5）"><kbd>5</kbd><span>遥控器</span></button>`)
   const droneButton = bar.querySelector<HTMLButtonElement>('.hotbar-drone')!
   fishingButton=bar.querySelector('[data-slot=fishing]')
   for (const button of Array.from(bar.querySelectorAll<HTMLButtonElement>('.hotbar-slot'))) {
