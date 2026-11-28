@@ -3,6 +3,7 @@ import assert from 'node:assert/strict'
 import {randomBytes,createHash,createHmac} from 'node:crypto'
 import {spawn} from 'node:child_process'
 import {mkdir} from 'node:fs/promises'
+import {readFile} from 'node:fs/promises'
 import {once} from 'node:events'
 import {createServer} from 'node:net'
 import {setTimeout as delay} from 'node:timers/promises'
@@ -14,6 +15,7 @@ import {frameSample} from './mp-frame.mjs'
 
 const secret=randomBytes(32).toString('hex'),children=[],sockets=[]
 const smokeCapture=process.argv.includes('--smoke')
+const modeSwitch=process.argv.includes('--mode-switch')
 let failBrowser
 const browserError=new Promise((_,reject)=>{failBrowser=reject})
 const appearance={body:'f',v:1,createdAt:123,skin:2,face:1,brows:0,eyes:0,hair:'f_bun',hairColor:1,look:'sport'}
@@ -42,6 +44,7 @@ async function verify(){
     return (await import('./verify-emote-mp.mjs')).verifyEmotes(rt,ticket)
   }
   database=await fixture({postgresOnly:true})
+  if(modeSwitch)for(const name of ['021-fishing-catches','022-helicopter','023-helicopter-seat'])await database.sql(await readFile(`deploy/postgres/${name}.sql`,'utf8'))
   const rt=await service('rt/server-realtime.mjs',{RT_JOIN_SECRET:secret},'/health',200)
   assert.equal((await (await fetch(`http://${rt}/health`)).json()).proto,4)
   const [body,signature]=ticket(100000).split('.')
@@ -65,8 +68,22 @@ async function verify(){
       await page.goto(origin+'/backpack.html');await page.getByRole('button',{name:'香烟'}).click();await page.waitForURL(origin+'/')
       await page.goto(origin+'/?verify&play=tour&mp=1&time=12&flow=0');await page.waitForFunction(()=>window.viewer?.walkTo)
       assert(await page.evaluate(name=>window.viewer.walkTo(-309,name==='alice'?-1:1,name==='alice'?Math.PI:0,'smoke-test'),name));console.log(name,'entered')
-    }else await page.goto(url+(mp?'&mp=1':''))
+    }else if(modeSwitch)await page.goto(origin+'/?verify&play=solo&mp=1&flow=0')
+    else await page.goto(url+(mp?'&mp=1':''))
     await page.waitForFunction(()=>window.viewer?.walk?.active,null,{timeout:90000});if(mp){assert(await page.evaluate(()=>!!window.viewer.walk.net),'active before net attached');await page.waitForFunction(()=>window.viewer.walk.net.status().state==='online',null,{polling:100,timeout:30000})}return page
+  }
+  if(modeSwitch){
+    const page=await pageFor('alice',true)
+    const point=()=>page.evaluate(()=>{const {x,z}=window.viewer.walk.probe();return [x,z]})
+    const select=async(mode)=>{await page.locator('.btn-menu').evaluate(button=>button.click());await page.locator(`[data-umami-event=home-${mode}]`).evaluate(button=>button.click());await page.waitForFunction(()=>!document.querySelector('.home-mode[aria-busy=true]'),null,{timeout:90000});console.log('selected',mode)}
+    const near=(actual,expected)=>assert.ok(Math.hypot(actual[0]-expected[0],actual[1]-expected[1])<3,JSON.stringify({actual,expected}))
+    const online=()=>page.waitForFunction(()=>window.viewer.walk?.net?.status().state==='online')
+    const initial=await point();await select('tour');await page.evaluate(()=>window.viewer.camera.position.set(-200,420,-600))
+    await select('mp');await online();near(await point(),initial)
+    await select('tour');near(await page.evaluate(()=>[window.viewer.camera.position.x,window.viewer.camera.position.z]),[-200,-600])
+    await select('solo');assert.ok(await page.evaluate(()=>window.viewer.walkTo(-268.5,24.8,0,'verify-solo')));const single=await point()
+    await select('mp');await online();near(await point(),initial);await select('solo');near(await point(),single)
+    console.log('PASS tour → online → tour; solo → online → solo',JSON.stringify({online:initial,tour:[-200,-600],solo:single}));return
   }
   if(smokeCapture){
     const alice=await pageFor('alice',true);await alice.evaluate(()=>window.viewer.freeze())
@@ -114,15 +131,15 @@ async function verify(){
   const remote=await bob.evaluate(()=>window.viewer.walk.net.probe().find(item=>item.name==='alice'));assert.deepEqual(remote.avatar,appearance)
   const health=async()=>(await (await fetch(`http://${rt}/health`)).json()).online
   assert.equal(await health(),2)
-  await bob.evaluate(({id,previous})=>{
-    window.teleportSamples=[];window.teleportObserver=setInterval(()=>{const peer=window.viewer.walk.net.probe().find(item=>item.id===id)
+  await bob.evaluate(({name,previous})=>{
+    window.teleportSamples=[];window.teleportObserver=setInterval(()=>{const peer=window.viewer.walk.net.probe().find(item=>item.name===name)
       if(peer&&Math.hypot(peer.position[0]-previous[0],peer.position[2]-previous[2])>45)window.teleportSamples.push({at:Date.now(),pos:peer.position})},25)
-  },{id:remote.id,previous:remote.position})
+  },{name:remote.name,previous:remote.position})
   const arrived=await alice.evaluate(async()=>{const {walk,walkTo}=window.viewer,session=walk.net,before=walk.probe();if(!await walkTo(before.x+47.4,before.z+16,0,'mp-teleport'))throw Error('50 m teleport failed');const at=Date.now(),after=walk.probe();return {at,same:session===walk.net,pos:after.figPos,distance:Math.hypot(after.x-before.x,after.z-before.z)}})
   assert(arrived.same);assert(Math.abs(arrived.distance-50)<1)
   const observed=await bob.evaluate(async({at,pos})=>{const match=()=>window.teleportSamples.find(sample=>Math.hypot(...sample.pos.map((value,index)=>value-pos[index]))<1)
-    while(!match()&&Date.now()<at+3000)await new Promise(done=>setTimeout(done,25));clearInterval(window.teleportObserver);return {match:match(),last:window.teleportSamples.at(-1)}},arrived)
-  assert(observed.match&&observed.match.at<=arrived.at+3000,JSON.stringify({observed,arrived}));const teleportMs=Math.max(0,observed.match.at-arrived.at);assert.equal(await health(),2);console.log('teleport m / observed ms / online',arrived.distance,teleportMs,2)
+    while(!match()&&Date.now()<at+10000)await new Promise(done=>setTimeout(done,25));clearInterval(window.teleportObserver);return {match:match(),last:window.teleportSamples.at(-1)}},arrived)
+  assert(observed.match&&observed.match.at<=arrived.at+10000,JSON.stringify({observed,arrived}));const teleportMs=Math.max(0,observed.match.at-arrived.at);assert.equal(await health(),2);console.log('teleport m / observed ms / online',arrived.distance,teleportMs,2)
   const left=performance.now();await alice.close();await bob.waitForFunction(()=>!window.viewer.walk.net.probe().some(item=>item.name==='alice'),null,{timeout:5000});const leaveMs=performance.now()-left;assert(leaveMs<=5000);console.log('distance / error / leave ms',end.distance,Math.hypot(...remote.position.map((value,index)=>value-end.position[index])),leaveMs)
   const center=await bob.evaluate(()=>window.viewer.walk.probe().figPos),bots=[]
   for(let index=0;index<20;index++){

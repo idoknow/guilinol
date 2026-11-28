@@ -11,9 +11,9 @@ type Store = Pick<Storage, 'getItem' | 'setItem' | 'removeItem'>
 const finite = (value: unknown, limit = LIMIT): value is number =>
   typeof value === 'number' && Number.isFinite(value) && Math.abs(value) <= limit
 
-export function readMpSpot(store: Store = localStorage, now = Date.now()): MpSpot | null {
+export function readMpSpot(store: Store = localStorage, now = Date.now(), key=MP_SPOT_KEY): MpSpot | null {
   let raw: string | null = null
-  try { raw = store.getItem(MP_SPOT_KEY) } catch { return null }
+  try { raw = store.getItem(key) } catch { return null }
   if (!raw) return null
   try {
     const r = JSON.parse(raw) as {x?: unknown; z?: unknown; yaw?: unknown; t?: unknown} | null
@@ -24,9 +24,9 @@ export function readMpSpot(store: Store = localStorage, now = Date.now()): MpSpo
   } catch { return null }
 }
 
-export function saveMpSpot(spot: MpSpot, store: Store = localStorage, now = Date.now()): void {
+export function saveMpSpot(spot: MpSpot, store: Store = localStorage, now = Date.now(), key=MP_SPOT_KEY): void {
   if (!finite(spot.x) || !finite(spot.z) || !finite(spot.yaw, 1000)) return
-  try { store.setItem(MP_SPOT_KEY, JSON.stringify({x: Math.round(spot.x * 10) / 10, z: Math.round(spot.z * 10) / 10, yaw: Math.round(spot.yaw * 1000) / 1000, t: now})) } catch { /* private mode */ }
+  try { store.setItem(key, JSON.stringify({x: Math.round(spot.x * 10) / 10, z: Math.round(spot.z * 10) / 10, yaw: Math.round(spot.yaw * 1000) / 1000, t: now})) } catch { /* private mode */ }
 }
 
 export function clearMpSpot(store: Store = localStorage): void {
