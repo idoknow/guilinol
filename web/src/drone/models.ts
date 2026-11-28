@@ -189,49 +189,6 @@ function landingGear(style:'legs'|'skids'|'transform', spread:number, height:num
   return gear
 }
 
-function buildMavic4(spec:DroneSpec):DroneMesh {
-  const {root,body,props} = armature(spec,{bodyW:.20,bodyH:.075,bodyD:.30,reach:.42,motorR:.028,propR:.20})
-  const {gimbal,lens} = gimbalBlock(spec,{w:.075,h:.06,d:.07},3)
-  gimbal.position.set(0,-.05,-.14)
-  body.add(gimbal)
-  const gear = landingGear('legs',.22,.07,mat(spec.color.dark,.65,.3))
-  body.add(gear)
-  // forward binocular sensor bar + status LEDs
-  const sensor = box(.11,.014,.014,glow('#2f4a58'),0)
-  sensor.position.set(0,.02,-.2)
-  body.add(sensor)
-  const light = sphere(.008,glow('#e2452f'),8)
-  light.position.set(0,-.03,.16)
-  body.add(light)
-  return {root,props,gimbal,lens,lights:[light,sensor],gear}
-}
-
-function buildMini5(spec:DroneSpec):DroneMesh {
-  const {root,body,props} = armature(spec,{bodyW:.12,bodyH:.052,bodyD:.18,reach:.19,motorR:.018,propR:.095})
-  const {gimbal,lens} = gimbalBlock(spec,{w:.045,h:.04,d:.045},1)
-  gimbal.position.set(0,-.036,-.075)
-  body.add(gimbal)
-  const gear = landingGear('legs',.11,.045,mat(spec.color.dark,.65,.3))
-  body.add(gear)
-  const light = sphere(.005,glow('#35c26a'),8)
-  light.position.set(0,-.02,.1)
-  body.add(light)
-  return {root,props,gimbal,lens,lights:[light],gear}
-}
-
-function buildAir3S(spec:DroneSpec):DroneMesh {
-  const {root,body,props} = armature(spec,{bodyW:.16,bodyH:.066,bodyD:.24,reach:.33,motorR:.024,propR:.165})
-  const {gimbal,lens} = gimbalBlock(spec,{w:.062,h:.05,d:.06},2)
-  gimbal.position.set(0,-.044,-.115)
-  body.add(gimbal)
-  const gear = landingGear('legs',.18,.06,mat(spec.color.dark,.65,.3))
-  body.add(gear)
-  const light = sphere(.006,glow('#e2452f'),8)
-  light.position.set(0,-.026,.13)
-  body.add(light)
-  return {root,props,gimbal,lens,lights:[light],gear}
-}
-
 // IDOK-458: the FPV breakaway — four ducted props on a wide X frame, nose camera pod tilted up so the
 // pilot sees the props in frame at 140 km/h. The ducts are what make it read as a 穿越机 and not a Mini.
 function buildFpv(spec:DroneSpec):DroneMesh {
@@ -313,7 +270,7 @@ function buildFlyCart(spec:DroneSpec):DroneMesh {
 }
 
 const builders:Record<DroneId,(spec:DroneSpec)=>DroneMesh> = {
-  mavic4pro:buildMavic4, mini5pro:buildMini5, air3s:buildAir3S, fpv:buildFpv, flycart200:buildFlyCart,
+  fpv:buildFpv, flycart200:buildFlyCart,
 }
 
 export function buildDrone(id:DroneId):DroneMesh {

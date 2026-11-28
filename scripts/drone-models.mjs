@@ -22,11 +22,8 @@ const OUT = path.resolve(import.meta.dirname, '../public/models/drones')
 const { PI, sin, cos, abs, sign, hypot } = Math
 const KB = 1000
 
-// Landed root height = 0.8 × spec.height (web/src/drone/specs.ts) and per-model file budgets.
+// IDOK-530: only two airframes left — the FPV racer and the FlyCart lifter.
 const SPEC = {
-  mavic4pro: { height: 0.15, budget: 150 * KB },
-  mini5pro: { height: 0.09, budget: 150 * KB },
-  air3s: { height: 0.11, budget: 150 * KB },
   fpv: { height: 0.12, budget: 150 * KB },
   flycart200: { height: 1.05, budget: 300 * KB },
 }
@@ -398,91 +395,6 @@ function foldingQuad(id, o) {
   return m
 }
 
-function mavic4pro() {
-  const s = 1
-  const m = foldingQuad('mavic4pro', {
-    shell: '#4a4e54', dark: '#24272c', metal: '#8d949c', accent: '#c8b48a', scale: s,
-    length: 0.25, width: 0.1, height: 0.078,
-    frontHub: [0.168, 0.024, -0.118], rearHub: [0.172, 0.004, 0.128],
-    armW: 0.016, armH: 0.012, motorR: 0.016, motorH: 0.019, propR: 0.135, footY: -0.07,
-    gimbal(m, id) {
-      // Infinity gimbal: a round camera drum hung under the nose, three cameras behind one face.
-      m.group('gimbal', [0, -0.006, -0.11])
-      m.add('gimbal', 'dark', rbox(0.034, 0.012, 0.024, 0.004), [0, 0.004, 0])
-      m.add('gimbal', 'metal', cyl(0.01, 0.008, 12), [0, -0.004, 0])
-      m.add('gimbal', 'dark', beam([0.006, -0.006, 0], [0.04, -0.024, -0.014], 0.008, 0.01, 0.007, 0.009, 4, 10))
-      m.add('gimbal', 'metal', cyl(0.009, 0.006, 12, 'x'), [0.038, -0.026, -0.016])
-      m.add('gimbal', 'shell', loft([
-        { z: 0.004, w: 0.05, top: 0.025, bot: 0.025, n: 2 },
-        { z: -0.002, w: 0.066, top: 0.033, bot: 0.033, n: 2 },
-        { z: -0.032, w: 0.068, top: 0.034, bot: 0.034, n: 2 },
-        { z: -0.038, w: 0.062, top: 0.031, bot: 0.031, n: 2 },
-      ], 24), [0, -0.026, -0.012])
-      m.group('lens', [0, -0.026, -0.05], 'gimbal')
-      m.add('lens', 'dark', disc(0.03, 24, '-z'), [0, 0, 0.0005])
-      // main 4/3 Hasselblad: big barrel with the gold ring
-      m.add('lens', 'metal', lathe([[0.0135, 0], [0.0135, 0.004], [0.011, 0.005], [0.0095, 0.0045]], 18, '-z'), [-0.007, 0.004, 0])
-      m.add('lens', 'accent', lathe([[0.0145, -0.0005], [0.0145, 0.0015], [0.0135, 0.0015]], 18, '-z'), [-0.007, 0.004, 0])
-      m.add('lens', 'glass', lathe([[0.0095, 0.0045], [0.006, 0.006], [0, 0.0064]], 14, '-z'), [-0.007, 0.004, 0])
-      // 70 mm + 168 mm tele, stacked to the right
-      for (const [y, r] of [[0.011, 0.0058], [-0.006, 0.0072]]) {
-        m.add('lens', 'metal', cyl(r, 0.003, 14, '-z'), [0.015, y, -0.0015])
-        m.add('lens', 'glass', disc(r * 0.72, 14, '-z'), [0.015, y, -0.0031])
-      }
-    },
-  })
-  return { model: m, gearBottom: -0.07 }
-}
-
-function mini5pro() {
-  const m = foldingQuad('mini5pro', {
-    shell: '#6b7078', dark: '#2b2e33', metal: '#9aa2ab', accent: '#d8dde3', scale: 0.7,
-    length: 0.155, width: 0.066, height: 0.056,
-    frontHub: [0.118, 0.018, -0.086], rearHub: [0.106, 0.016, 0.096],
-    armW: 0.011, armH: 0.008, motorR: 0.0105, motorH: 0.013, propR: 0.078, footY: -0.04,
-    gimbal(m) {
-      // one big 1-inch camera in a rounded cube, carried by a yoke on both sides
-      m.group('gimbal', [0, 0.0, -0.072])
-      m.add('gimbal', 'dark', rbox(0.026, 0.008, 0.016, 0.003), [0, 0.002, 0])
-      for (const sx of [-1, 1]) {
-        m.add('gimbal', 'dark', beam([sx * 0.008, -0.002, 0], [sx * 0.022, -0.016, -0.01], 0.005, 0.006, 0.004, 0.006, 4, 8))
-        m.add('gimbal', 'metal', cyl(0.0055, 0.004, 12, sx > 0 ? 'x' : '-x'), [sx * 0.022, -0.02, -0.012])
-      }
-      m.add('gimbal', 'shell', rbox(0.036, 0.032, 0.03, 0.009, 3), [0, -0.02, -0.014])
-      m.group('lens', [0, -0.02, -0.029], 'gimbal')
-      m.add('lens', 'metal', lathe([[0.0115, 0], [0.0115, 0.003], [0.009, 0.004]], 18, '-z'))
-      m.add('lens', 'accent', lathe([[0.0122, -0.0004], [0.0122, 0.0012], [0.0115, 0.0012]], 18, '-z'))
-      m.add('lens', 'glass', lathe([[0.009, 0.004], [0.005, 0.0052], [0, 0.0056]], 14, '-z'))
-    },
-  })
-  return { model: m, gearBottom: -0.04 }
-}
-
-function air3s() {
-  const m = foldingQuad('air3s', {
-    shell: '#5a5e66', dark: '#26292e', metal: '#8f979f', accent: '#b9c0c8', scale: 0.88,
-    length: 0.215, width: 0.088, height: 0.068,
-    frontHub: [0.138, 0.02, -0.1], rearHub: [0.142, 0.004, 0.112],
-    armW: 0.014, armH: 0.01, motorR: 0.0135, motorH: 0.016, propR: 0.104, footY: -0.058,
-    gimbal(m) {
-      // Air's signature: two equal cameras side by side in a wide pill, plus the LiDAR window above
-      m.add('air3s', 'glass', rbox(0.03, 0.009, 0.004, 0.003), [0, -0.003, -0.107])
-      m.group('gimbal', [0, -0.004, -0.096])
-      m.add('gimbal', 'dark', rbox(0.03, 0.01, 0.02, 0.003), [0, 0.003, 0])
-      m.add('gimbal', 'dark', beam([0.006, -0.004, 0], [0.034, -0.022, -0.012], 0.007, 0.009, 0.006, 0.008, 4, 10))
-      m.add('gimbal', 'metal', cyl(0.008, 0.005, 12, 'x'), [0.034, -0.024, -0.014])
-      m.add('gimbal', 'shell', rbox(0.062, 0.034, 0.036, 0.011, 3), [0, -0.024, -0.016])
-      m.group('lens', [0, -0.024, -0.034], 'gimbal')
-      for (const x of [-0.014, 0.014]) {
-        m.add('lens', 'metal', lathe([[0.0105, 0], [0.0105, 0.003], [0.008, 0.0038]], 18, '-z'), [x, 0, 0])
-        m.add('lens', 'glass', lathe([[0.008, 0.0038], [0.0045, 0.005], [0, 0.0054]], 14, '-z'), [x, 0, 0])
-      }
-      m.add('lens', 'accent', rbox(0.006, 0.002, 0.0015, 0.0006), [0, -0.012, 0.0004])
-    },
-  })
-  return { model: m, gearBottom: -0.058 }
-}
-
 // ---------------------------------------------------------------- FPV 穿越机 (IDOK-458)
 //
 // Four ducted props on a wide X frame. The ducts — a torus ring plus an accent lip around each
@@ -674,8 +586,8 @@ const check = process.argv.includes('--check')
 const manifest = { version: 1, generator: 'scripts/drone-models.mjs', drones: {} }
 let failed = false
 if (!check) fs.mkdirSync(OUT, { recursive: true })
-const PROPS = { mavic4pro: 4, mini5pro: 4, air3s: 4, fpv: 4, flycart200: 8 }
-for (const make of [mavic4pro, mini5pro, air3s, fpv, flycart200]) {
+const PROPS = { fpv: 4, flycart200: 8 }
+for (const make of [fpv, flycart200]) {
   const { model, gearBottom } = make()
   const root = model.build()
   const s = stats(root)

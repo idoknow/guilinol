@@ -3,12 +3,12 @@ import type {Host} from '../play/host'
 import './drone.css'
 import {DRONE_IDS, drone, type DroneId} from './specs'
 import {buildDroneAsync, disposeDrone, spinProps, type DroneMesh} from './models'
-import {createFlight, landNow, lensPose, liftOff, requestHome, stepFlight, telemetry, type Flight, type Sticks} from './flight'
+import {createFlight, cancelReturn, landNow, lensPose, liftOff, requestHome, stepFlight, telemetry, type Flight, type Sticks} from './flight'
 import {PilotInput, type DroneAction} from './input'
 import {createRc, type RcView} from './rc-ui'
 import {createNav, type NavMark, type NavTarget, type NavView} from './radar'
 import {createRoute, type RouteView} from './route'
-import {batteryOf, chargeFleet, clearDamage, damageOf, healthSnapshot, raiseDamage, resetHealth, setBattery, stateOf, type DamageCause} from './health'
+import {addWear, batteryOf, chargeFleet, clearDamage, damageOf, DAMAGE_INTEGRITY, healthSnapshot, integrityOf, raiseDamage, resetHealth, setBattery, stateOf, type DamageCause} from './health'
 import {recordingProblem, startRecording, saveRecording, type Recording} from '../gear/video'
 
 // IDOK-215: 机库 → 放置 → 起飞 → 遥控画面。The dock entry opens the hangar; once a drone is out,
@@ -73,7 +73,16 @@ export function droneMode(host:Host, deps:{
   let avoidance = true
   let obstacle = 0
   let repairTimer = 0
-  let rainFor = 0
+  /** IDOK-530: 机内进水量（%）。下雨慢慢渗、贴水面猛灌，满了才算坏 —— 不是淋一下就报废。 */
+  let moisture = 0
+  /** 撞击连击冷却，避免同一堵墙每帧扣一次完整度。 */
+  let hitCooldown = 0
+  /** 四面障碍距离（米），避障红边用它画。 */
+  const near = {front:Infinity,back:Infinity,left:Infinity,right:Infinity}
+  /** IDOK-530: 云台不再跟着滑块瞬移，滑到目标值再慢慢追（灵敏度调低）。 */
+  let gimbalTarget = 0
+  /** IDOK-530: 地图上手动点的导航点。 */
+  let customTarget:NavTarget|null = null
   /** 上一帧机身是否已经在实体里 —— 只有「刚撞上」才算事故（IDOK-529）。 */
   let wasBlocked = false
   let route:RouteView|null = null
@@ -94,7 +103,7 @@ export function droneMode(host:Host, deps:{
   mask.innerHTML = `<div class="about-panel drone-panel" role="dialog" aria-label="无人机">
       <header><h2>无人机机库</h2><button class="about-close" aria-label="关闭">×</button></header>
       <div class="drone-grid"></div>
-      <p class="drone-foot">选一台放到身前；放好后点「飞无人机」进遥控画面。键盘：WASD 平移，↑↓ 升降，←→ 转向，R 返航，P 拍照，V 录像。</p>
+      <p class="drone-foot">选一台放到身前；放好后点物品栏的遥控器进遥控画面（键盘 5）。键盘：WASD 平移，↑↓ 升降，←→ 转向，R 返航，P 拍照，V 录像。</p>
     </div>`
   document.body.append(mask)
   const grid = mask.querySelector<HTMLElement>('.drone-grid')!
@@ -106,7 +115,7 @@ export function droneMode(host:Host, deps:{
   /** IDOK-529: what the hangar card shows — parked battery plus any damage the airframe took. */
   function stateFor(id:DroneId) {
     const state = stateOf(id)
-    return {battery:state.battery,charging:state.charging,damage:state.damage}
+    return {battery:state.battery,charging:state.charging,damage:state.damage,integrity:state.integrity}
   }
   function loadGrams():number {
     if (loadKind === 'none') return 0
@@ -136,14 +145,19 @@ export function droneMode(host:Host, deps:{
       const health = stateFor(id)
       const broken = health.damage
       const battery = Math.round(health.battery)
-      const state = broken
-        ? `<span class="drone-batt is-broken"><i style="width:0%"></i><b>${broken.cause}损坏</b></span>`
-        : `<span class="drone-batt${battery < 20 ? ' is-low' : ''}${health.charging && battery < 100 ? ' is-charging' : ''}"><i style="width:${battery}%"></i><b>${battery}%${health.charging && battery < 100 ? ' 充电中' : ''}</b></span>`
+      // IDOK-530: 损坏的机身也要看得到电量 —— 修好之后能飞多久是选它的关键。
+      const state = `<span class="drone-batt${battery < 20 ? ' is-low' : ''}${health.charging && battery < 100 ? ' is-charging' : ''}"><i style="width:${battery}%"></i><b>${battery}%${health.charging && battery < 100 ? ' 充电中' : ''}</b></span>`
+      // IDOK-530: 完整度没满时要看得见 —— 撞过但还没坏的机身会带着伤留在机库里。
+      const wear = !broken && health.integrity < 99.5
+        ? `<span class="drone-wear${health.integrity < 45 ? ' is-low' : ''}">完整度 ${Math.round(health.integrity)}%</span>`
+        : ''
       const cta = broken ? '寻找无人机' : isOut ? '召回' : '放到身前'
       return `<button class="drone-card${isOut ? ' out' : ''}${broken ? ' broken' : ''}" data-drone="${id}" type="button">
         <span class="drone-name">${spec.name}</span>
         <span class="drone-tag">${spec.tagline}</span>
         ${state}
+        ${broken ? `<span class="drone-damage">${broken.cause}损坏</span>` : ''}
+        ${wear}
         <dl>
           <div><dt>相机</dt><dd>${spec.camera.sensor}</dd></div>
           <div><dt>画质</dt><dd>${spec.video.res}${spec.video.fps} · ${spec.camera.mp}MP</dd></div>
@@ -386,14 +400,27 @@ export function droneMode(host:Host, deps:{
     const walker = host.walker()
     const from = walker?.active ? walker.position : host.camera.position
     const near = Math.hypot(wreck.pos.x - from.x,wreck.pos.z - from.z) < 7
+    // IDOK-530: 走开就立刻打断 —— 人跑了，手上那把螺丝刀也得停。
+    if (repairTimer > 0 && !near) {
+      repairTimer = 0
+      walker?.hold?.(false)
+      window.dispatchEvent(new CustomEvent('walk:toast',{detail:{text:'离得太远，维修中断了',ms:3200}}))
+    }
     if (!near && repairTimer <= 0) { repairButton?.remove(); repairButton = null; return }
     if (!repairButton) {
       repairButton = document.createElement('button')
       repairButton.className = 'drone-repair'
       repairButton.type = 'button'
       repairButton.onclick = () => {
-        if (repairTimer > 0) { repairTimer = 0; paintRepair(); return }
+        if (repairTimer > 0) {
+          repairTimer = 0
+          host.walker()?.hold?.(false)
+          paintRepair()
+          return
+        }
         repairTimer = 30
+        // 维修中不能走：按住 walker 的操控，进度条才站得住。
+        host.walker()?.hold?.(true)
         paintRepair()
       }
       document.body.append(repairButton)
@@ -406,9 +433,10 @@ export function droneMode(host:Host, deps:{
     const running = repairTimer > 0
     repairButton.classList.toggle('on',running)
     const left = Math.max(0,repairTimer)
+    const pct = Math.min(100,Math.max(0,(30 - left) / 30 * 100))
     repairButton.innerHTML = running
-      ? `<b>维修中 ${left.toFixed(0)}s</b><i style="width:${100 - left / 30 * 100}%"></i><span>点一下暂停</span>`
-      : `<b>维修 ${wreck.cause}损坏的${drone(wreck.id).short}</b><span>走近后点这里，需要 30 秒</span>`
+      ? `<b>维修中 ${left.toFixed(1)}s</b><i><u style="width:${pct.toFixed(1)}%"></u></i><span>走开就会中断 · 再点暂停</span>`
+      : `<b>维修 ${wreck.cause}损坏的${drone(wreck.id).short}</b><i><u style="width:0%"></u></i><span>站在机身旁边点这里，需要 30 秒</span>`
   }
 
   function stepRepair(dt:number) {
@@ -628,14 +656,21 @@ export function droneMode(host:Host, deps:{
       .slice(0,3)
     navIndex = 0
     navAuto = false
+    // IDOK-530: 云台目标角度从当前姿态起步，滑块只在后面慢慢追。
+    gimbalTarget = flight.gimbal
+    customTarget = null
+    moisture = 0
+    hitCooldown = 0
     rc = createRc(flight.spec,{
       takeoff:() => { if (!flight) return; if (flight.phase === 'landed') liftOff(flight); else landNow(flight) },
       land:() => { if (flight) landNow(flight) },
       rth:() => { if (flight) { requestHome(flight); rc?.toast('自动返航') } },
+      // IDOK-530: 取消返航 —— 返航途中想自己飞，按一下就把控制权收回来。
+      cancel:() => { if (flight && cancelReturn(flight)) rc?.toast('已取消返航 · 手动悬停') },
       photo:() => void snapshot(),
       record:() => void toggleRecord(),
       exit:() => exitRc(),
-      gimbal:deg => { if (flight) flight.gimbal = deg },
+      gimbal:deg => { gimbalTarget = deg },
       sticks:patch => input.setTouch(patch),
       hangar:() => { exitRc(); openHangar() },
       avoid:(on:boolean) => {
@@ -651,7 +686,7 @@ export function droneMode(host:Host, deps:{
     })
     document.body.append(rc.root)
     // IDOK-527: 导航盘挂在遥控器里，退出遥控时随 rc.root 一起摘掉。
-    nav = createNav(flight.spec,{cycle:() => cycleTarget(),auto:() => toggleAuto()})
+    nav = createNav(flight.spec,{cycle:() => cycleTarget(),auto:() => toggleAuto(),pick:(x,z) => pickSpot(x,z)})
     rc.root.append(nav.root)
     liftOff(flight)
     refreshDock()
@@ -669,6 +704,7 @@ export function droneMode(host:Host, deps:{
     nav = null
     navAuto = false
     navIndex = 0
+    customTarget = null
     delete document.body.dataset.drone
     if (ownsPhotoFlag) delete document.body.dataset.photo
     ownsPhotoFlag = false
@@ -792,15 +828,29 @@ export function droneMode(host:Host, deps:{
   }
 
   // --- 空中导航（IDOK-527）
-  /** 目标表：机库永远是第 0 个，然后是飞行员站位，最后是进场时最近的三处景点。 */
+  /** 目标表：地图上手动点的自选点排最前，然后机库、飞行员站位、进场时最近的三处景点。 */
   function navTargets():NavTarget[] {
     const list:NavTarget[] = []
     if (!flight) return list
+    if (customTarget) list.push(customTarget)
     list.push({label:'机库',x:flight.home.x,z:flight.home.z})
     const walker = host.walker()
     if (walker?.active) list.push({label:'我',x:walker.position.x,z:walker.position.z})
     list.push(...navSpots)
     return list
+  }
+
+  /** IDOK-530: 在地图上点一个点 → 直接变成导航目标（空中就顺手开始自动飞过去）。 */
+  function pickSpot(x:number, z:number) {
+    const walker = host.walker()
+    const from = walker?.active ? walker.position : host.camera.position
+    const dist = Math.hypot(x - from.x,z - from.z)
+    // 别把点选在城里太离谱的地方：离自己 2 km 以上就按 2 km 收一下，免得飞到世界外面。
+    const scale = dist > 2000 ? 2000 / dist : 1
+    customTarget = {label:'自选点',x:from.x + (x - from.x) * scale,z:from.z + (z - from.z) * scale,picked:true}
+    navIndex = 0
+    rc?.toast('导航目标 · 自选点')
+    if (flight && flight.phase !== 'landed') navAuto = true
   }
 
   function currentTarget():NavTarget|null {
@@ -891,6 +941,7 @@ export function droneMode(host:Host, deps:{
   /**
    * IDOK-529: 自动避障。探三条前方射线（2.5 / 5 / 9 m），撞上实体就把俯仰/横滚按距离收回来；
    * 上升时也看头顶，免得顶进牌楼或屋檐。返回收窄后的杆量，剩余交给飞行模型。
+   * IDOK-530: 2.2 m 内直接锁死前进（推到底也撞不上去），侧面贴太近时把横滚也归零。
    */
   function avoidSticks(sticks:Sticks):Sticks {
     if (!flight || !deps.blockedAt) return sticks
@@ -899,18 +950,46 @@ export function droneMode(host:Host, deps:{
     for (const step of [2.5,5,9]) {
       if (deps.blockedAt(flight.pos.x + fwd.x * step,flight.pos.y,flight.pos.z + fwd.z * step)) { hit = step; break }
     }
+    // 贴脸时把机身侧滑也压住：右边是墙就别再往右滚
+    let roll = sticks.roll
+    if (near.right < 1.6 && roll > 0) roll = 0
+    if (near.left < 1.6 && roll < 0) roll = 0
     if (!hit) {
       obstacle = 0
       if (sticks.throttle > .1 && deps.blockedAt(flight.pos.x,flight.pos.y + 3,flight.pos.z)) {
-        return {...sticks,throttle:Math.min(0,sticks.throttle)}
+        return {...sticks,roll,throttle:Math.min(0,sticks.throttle)}
       }
-      return sticks
+      return roll === sticks.roll ? sticks : {...sticks,roll}
     }
     obstacle = hit
     // 2.5 m 内是「已经贴脸」：不许再往前推，反而轻轻后撤一点，飞机悬停等飞行员绕开。
-    if (hit <= 3) return {throttle:sticks.throttle,yaw:sticks.yaw * .5,pitch:Math.min(-.18,sticks.pitch),roll:sticks.roll * .2}
+    if (hit <= 3) return {throttle:sticks.throttle,yaw:sticks.yaw * .5,pitch:Math.min(-.18,sticks.pitch),roll:roll * .2}
     const damping = THREE.MathUtils.clamp(hit / 9,.12,.75)
-    return {throttle:sticks.throttle,yaw:sticks.yaw,pitch:sticks.pitch * damping,roll:sticks.roll * damping}
+    return {throttle:sticks.throttle,yaw:sticks.yaw,pitch:sticks.pitch * damping,roll:roll * damping}
+  }
+
+  /**
+   * IDOK-530: 某一方向 1..8 m 内最近的实体距离（Infinity = 空）。
+   * 避障红边和「贴脸锁死」都靠它，所以顺路把四面距离缓存到 `near`。
+   */
+  function probe(x:number,z:number):number {
+    if (!flight || !deps.blockedAt) return Infinity
+    for (let step = 1; step <= 8; step += 1) {
+      if (deps.blockedAt(flight.pos.x + x * step,flight.pos.y,flight.pos.z + z * step)) return step
+    }
+    return Infinity
+  }
+
+  function scanNear() {
+    if (!flight) return
+    const fx = -Math.sin(flight.yaw)
+    const fz = -Math.cos(flight.yaw)
+    const rx = -fz
+    const rz = fx
+    near.front = probe(fx,fz)
+    near.back = probe(-fx,-fz)
+    near.left = probe(-rx,-rz)
+    near.right = probe(rx,rz)
   }
 
   // --- Frame
@@ -933,21 +1012,41 @@ export function droneMode(host:Host, deps:{
         rc?.toast(`已到达 ${target.label}`)
       } else sticks = autoSticks(target)
     }
+    scanNear()
     if (avoidance && flight.phase !== 'landed') sticks = avoidSticks(sticks)
     if (flight.phase !== 'landed') stepFlight(flight,Math.min(dt,.1),sticks,gnd)
     else stepFlight(flight,Math.min(dt,.1),{throttle:0,yaw:manual.yaw * .4,pitch:0,roll:0},gnd)
     // IDOK-529: 电量跟着飞行走，仓库卡片才看得见每台飞机还剩多少。
     setBattery(flight.spec.id,flight.battery,false)
-    // IDOK-529: 撞击 / 落水 / 淋雨 —— 三种都能把机身弄坏，坏机留在原地等维修。
-    // 撞墙只在「从通畅变成受阻」的那一帧才算：机身本来就在屋檐/牌楼的碰撞体里起飞时不该立刻炸。
+    // IDOK-530: 撞击按力度扣完整度，扣到阈值以下才报废；进水/淋雨走累计值。
+    // 撞墙只在「从通畅变成受阻」的那一帧记账：机身本来就在屋檐/牌楼的碰撞体里起飞时不该立刻炸。
+    hitCooldown = Math.max(0,hitCooldown - dt)
     const speed = Math.hypot(flight.vel.x,flight.vel.y,flight.vel.z)
     const blocked = deps.blockedAt?.(flight.pos.x,flight.pos.y,flight.pos.z) ?? false
-    if (blocked && !wasBlocked && speed > 3 && flight.phase !== 'takeoff' && flight.phase !== 'landing') { crash('撞击'); return }
+    if (blocked && !wasBlocked && speed > 3 && flight.phase !== 'takeoff' && flight.phase !== 'landing' && hitCooldown <= 0) {
+      const id = flight.spec.id
+      const dmg = THREE.MathUtils.clamp((speed - 2.5) * 6,5,70)
+      const left = addWear(id,dmg)
+      hitCooldown = .6
+      if (left <= DAMAGE_INTEGRITY) { crash('撞击'); return }
+      // 没到报废就先弹开：把机身推离墙面、速度清零，别继续往里钻。
+      const back = new THREE.Vector3(flight.vel.x,0,flight.vel.z)
+      if (back.lengthSq() > 1e-4) back.normalize()
+      flight.pos.addScaledVector(back,-.6)
+      flight.vel.set(0,0,0)
+      wasBlocked = false
+      rc?.toast(`撞击 · 完整度 ${left.toFixed(0)}%`)
+    }
     wasBlocked = blocked
     const water = deps.waterY?.(flight.pos.x,flight.pos.z) ?? null
-    if (water !== null && flight.pos.y - flight.spec.height * .5 <= water + .25) { crash('落水'); return }
-    rainFor = (deps.raining?.() ?? false) && flight.phase !== 'landed' ? rainFor + dt : 0
-    if (rainFor > 12) { crash('淋雨'); return }
+    const soaking = water !== null && flight.pos.y - flight.spec.height * .5 <= water + .25
+    const raining = (deps.raining?.() ?? false) && flight.phase !== 'landed'
+    if (soaking) moisture += 30 * dt
+    else if (raining) moisture += 3.5 * dt
+    else moisture = Math.max(0,moisture - 4 * dt)
+    if (moisture >= 100) { crash(soaking ? '落水' : '淋雨'); return }
+    // IDOK-530: 云台追着目标角度走，滑块和 Q/E 不再瞬间跳到位。
+    flight.gimbal += THREE.MathUtils.clamp(gimbalTarget - flight.gimbal,-18 * dt,18 * dt)
     mesh.root.position.copy(flight.pos)
     mesh.root.rotation.y = flight.yaw
     const throttle = flight.phase === 'landed' ? .06 : .5 + Math.min(.5,Math.hypot(flight.vel.x,flight.vel.y,flight.vel.z) / Math.max(1,flight.spec.speed))
@@ -957,9 +1056,10 @@ export function droneMode(host:Host, deps:{
     stepPayload()
 
     // IDOK-529: 返航路线 —— 绿色弧线 + 沿弧线流动的亮点，只在返航时出现。
+    // IDOK-530: 光柱要落到地面（起落点在地面上），所以把机库脚下的地面高度一起传进去。
     const returning = flight.phase === 'returning'
     route ??= createRoute(host.scene)
-    route.update(flight.pos,flight.home,returning,flight.elapsed)
+    route.update(flight.pos,flight.home,returning,flight.elapsed,deps.groundAt(flight.home.x,flight.home.z))
     if (obstacle > 0 && rcActive) rc?.toast('避障：前方有障碍')
 
     if (rcActive && rc) {
@@ -981,6 +1081,9 @@ export function droneMode(host:Host, deps:{
       // IDOK-529: 返航时中间出现绿色返航条 + 距离，同时机身下面那条绿色弧线一起走。
       rc.setReturning(returning ? Math.hypot(flight.pos.x - flight.home.x,flight.pos.z - flight.home.z) : null)
       rc.setAvoid(avoidance,obstacle > 0)
+      // IDOK-530: 靠近建筑的那一侧画面泛红；顶栏报完整度与进水量。
+      rc.setProximity(near.front,near.back,near.left,near.right)
+      rc.setHealth(integrityOf(flight.spec.id),moisture)
       chaseView()
     } else if (placed) {
       const d = host.walker()?.active
@@ -1009,10 +1112,16 @@ export function droneMode(host:Host, deps:{
     if (event.code === 'Escape' && !mask.hidden) { closeHangar(); event.stopPropagation() }
     if (!rcActive || !flight || event.ctrlKey || event.metaKey || event.altKey) return
     // IDOK-526: Q/E walk the gimbal up and down without taking the hands off WASD/arrows.
+    // IDOK-530: 按键只推目标角度，真正的云台在 advance() 里慢慢追上去。
     if (event.code === 'KeyQ' || event.code === 'KeyE') {
       const dir = event.code === 'KeyQ' ? -1 : 1
       const {tiltMin,tiltMax} = flight.spec.gimbal
-      flight.gimbal = Math.round(THREE.MathUtils.clamp(flight.gimbal + dir * 3,tiltMin,tiltMax))
+      gimbalTarget = THREE.MathUtils.clamp(gimbalTarget + dir * 1.5,tiltMin,tiltMax)
+      event.preventDefault()
+    }
+    // IDOK-530: X 取消返航，回到手动悬停。
+    if (event.code === 'KeyX') {
+      if (cancelReturn(flight)) rc?.toast('已取消返航 · 手动悬停')
       event.preventDefault()
     }
     // IDOK-526: G opens the hangar mid-session (same as the 机库 button).
@@ -1059,7 +1168,15 @@ export function droneMode(host:Host, deps:{
       avoid: {on:avoidance, obstacle},
       wreck: wreck ? {id:wreck.id,cause:wreck.cause,x:wreck.pos.x,y:wreck.pos.y,z:wreck.pos.z,repair:Math.max(0,repairTimer)} : null,
       repair: Math.max(0,repairTimer),
-      rain: rainFor,
+      // IDOK-530: 机身完整度、进水量、四面障碍距离、云台目标角度、地图自选点。
+      integrity: placed ? integrityOf(placed) : null,
+      moisture,
+      // Infinity 过不了 JSON，空方向报 99 m。
+      proximity: {front:capMeters(near.front),back:capMeters(near.back),left:capMeters(near.left),right:capMeters(near.right)},
+      gimbalTarget,
+      rained: deps.raining?.() ?? false,
+      picked: customTarget ? {x:customTarget.x,z:customTarget.z} : null,
+      rain: moisture,
       // IDOK-529: 返航航线是否画在场景里（绿色弧线 + 流动光点）。
       route: {active: !!route?.root.visible, points: route?.root.children.length ?? 0},
       health: healthSnapshot()}),
@@ -1074,8 +1191,15 @@ export function droneMode(host:Host, deps:{
     window.droneReset = api.debugReset
     window.droneCrash = api.debugCrash
     window.droneRepair = api.debugRepair
+    // IDOK-530: 截图脚本直接开库（加载遮罩会吞掉合成点击，只能走这个口子）。
+    window.droneOpen = () => openHangar()
   }
   return api
+}
+
+/** IDOK-530: 障碍距离过不了 JSON（Infinity），空方向的 99 m 只给调试/套件看。 */
+function capMeters(meters:number) {
+  return Number.isFinite(meters) ? Math.round(meters * 10) / 10 : 99
 }
 
 function stamp() {
@@ -1092,6 +1216,7 @@ declare global {
     droneReset?:() => void
     droneCrash?:(cause?:DamageCause) => boolean
     droneRepair?:(seconds:number) => number|null
+    droneOpen?:() => void
     droneChase?:(view:{distance:number; height:number; side:number}|null) => void
     lastDronePhoto?:{name:string;bytes:number;width:number;height:number;drone:string|null}
     lastDroneClip?:{name:string;container:string;mime:string;seconds:number;width:number;height:number;fps:number}

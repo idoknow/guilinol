@@ -1,6 +1,7 @@
-// IDOK-215: the fleet. Figures follow DJI's published spec sheets (S mode, sea level, no wind);
+// IDOK-215: the fleet. Figures follow the maker's published spec sheets (S mode, sea level, no wind);
 // where a number depends on battery or region we take the optimistic published one and say so in `notes`.
-export type DroneId = 'mavic4pro' | 'mini5pro' | 'air3s' | 'fpv' | 'flycart200'
+// IDOK-530: the fleet is down to two airframes — one FPV racer, one heavy lifter — and the brand is GLI.
+export type DroneId = 'fpv' | 'flycart200'
 export type RcUi = 'simple' | 'pro'
 
 export interface DroneSpec {
@@ -36,41 +37,8 @@ export interface DroneSpec {
 }
 
 export const DRONES:Record<DroneId,DroneSpec> = {
-  mavic4pro:{
-    id:'mavic4pro', name:'DJI Mavic 4 Pro', short:'Mavic 4 Pro', maker:'DJI',
-    tagline:'三摄旗舰，万物皆可入画', weightG:1063, flightMin:51, speed:25, ascent:10, descent:10,
-    ceiling:6000, wind:12, rangeKm:41, transmitKm:30,
-    gimbal:{tiltMin:-90, tiltMax:70},
-    camera:{sensor:'4/3 CMOS 哈苏', mp:100, lens:'24mm 等效', aperture:'f/2.8–f/11', zoom:'1–6× 混合（70mm/168mm 长焦）'},
-    video:{res:'6K', fps:60}, rc:'pro', span:1.13, height:.15, props:4,
-    color:{shell:'#3b3f45', accent:'#c8b48a', dark:'#23262b', metal:'#8d949c'},
-    battery:{label:'TB100', wh:95.2},
-    notes:'51 分钟续航、25 m/s、6000 m 升限、O4+ 30 km。',
-  },
-  mini5pro:{
-    id:'mini5pro', name:'DJI Mini 5 Pro', short:'Mini 5 Pro', maker:'DJI',
-    tagline:'249 克，一英寸，随手起飞', weightG:249, flightMin:52, speed:19, ascent:10, descent:8,
-    ceiling:6000, wind:10.7, rangeKm:32, transmitKm:20,
-    gimbal:{tiltMin:-90, tiltMax:55},
-    camera:{sensor:'1 英寸 CMOS', mp:50, lens:'24mm 等效', aperture:'f/1.8', zoom:'1–3× 数码'},
-    video:{res:'4K', fps:120}, rc:'simple', span:.38, height:.09, props:4,
-    color:{shell:'#54585f', accent:'#d8dde3', dark:'#2b2e33', metal:'#9aa2ab'},
-    battery:{label:'Mini 5 Pro 智能飞行电池 Plus', wh:38.4},
-    notes:'52 分钟（Plus 电池）、19 m/s、6000 m 升限、O4+ 20 km；遥控界面走傻瓜式。',
-  },
-  air3s:{
-    id:'air3s', name:'DJI Air 3S', short:'Air 3S', maker:'DJI',
-    tagline:'双摄旅行机，日夜都稳', weightG:724, flightMin:45, speed:21, ascent:10, descent:10,
-    ceiling:6000, wind:12, rangeKm:32, transmitKm:20,
-    gimbal:{tiltMin:-90, tiltMax:60},
-    camera:{sensor:'1 英寸 CMOS', mp:50, lens:'24mm 等效', aperture:'f/1.8', zoom:'1–3×（70mm 中长焦副摄）'},
-    video:{res:'4K', fps:60}, rc:'pro', span:.66, height:.11, props:4,
-    color:{shell:'#4a4e55', accent:'#b9c0c8', dark:'#26292e', metal:'#8f979f'},
-    battery:{label:'Air 3S 智能飞行电池', wh:77},
-    notes:'45 分钟、21 m/s、6000 m、O4 20 km。',
-  },
   fpv:{
-    id:'fpv', name:'DJI FPV 穿越机', short:'FPV', maker:'DJI',
+    id:'fpv', name:'GLI FPV 穿越机', short:'FPV', maker:'GLI',
     tagline:'140 km/h 穿越机，贴着树梢飞', weightG:795, flightMin:20, speed:39, ascent:12, descent:10,
     ceiling:6000, wind:13, rangeKm:32, transmitKm:20,
     gimbal:{tiltMin:-90, tiltMax:45},
@@ -81,7 +49,7 @@ export const DRONES:Record<DroneId,DroneSpec> = {
     notes:'手动模式 39 m/s（140 km/h）、20 分钟、O3 20 km；四片涵道桨，起飞后默认专业遥控。',
   },
   flycart200:{
-    id:'flycart200', name:'DJI FlyCart 200', short:'FlyCart 200', maker:'DJI',
+    id:'flycart200', name:'GLI FlyCart 200', short:'FlyCart 200', maker:'GLI',
     tagline:'重载运力机，200 公斤班组搬运', weightG:98800, payloadG:200000, flightMin:25, speed:25, ascent:5, descent:5,
     ceiling:6000, wind:12, rangeKm:36, transmitKm:40,
     gimbal:{tiltMin:-90, tiltMax:30},
@@ -93,9 +61,9 @@ export const DRONES:Record<DroneId,DroneSpec> = {
   },
 }
 
-export const DRONE_IDS:DroneId[] = ['mavic4pro','mini5pro','air3s','fpv','flycart200']
+export const DRONE_IDS:DroneId[] = ['fpv','flycart200']
 
-export function drone(id:DroneId):DroneSpec { return DRONES[id] ?? DRONES.mavic4pro }
+export function drone(id:DroneId):DroneSpec { return DRONES[id] ?? DRONES.fpv }
 
 /** Battery drain in percent per second at hover, scaled by takeoff mass (published minutes ÷ 100). */
 export function drainPerSecond(spec:DroneSpec, loadG = 0) {
